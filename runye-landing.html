@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>润野灌溉 | Runye Irrigation</title>
+<style>
+  :root{
+    --g-50:#f0fdf4;--g-100:#dcfce7;--g-200:#bbf7d0;--g-500:#22c55e;--g-600:#16a34a;--g-700:#15803d;--g-800:#166534;--g-900:#14532d;
+    --teal:#0d9488;--teal-700:#0f766e;
+    --s-50:#f8fafc;--s-100:#f1f5f9;--s-200:#e2e8f0;--s-300:#cbd5e1;--s-400:#94a3b8;--s-500:#64748b;--s-600:#475569;--s-700:#334155;--s-800:#1e293b;--s-900:#0f172a;
+    --red:#dc2626;--blue:#2563eb;--amber:#f59e0b;
+    --bg:#f7f5f0;--card:#ffffff;
+    --shadow:0 10px 30px rgba(15,23,42,.08);--shadow-sm:0 2px 8px rgba(15,23,42,.06);
+    --radius-xs:8px;--radius-sm:10px;--radius:14px;
+    --transition:all .2s ease;
+    --maxw:1280px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Microsoft YaHei","PingFang SC","Segoe UI",system-ui,-apple-system,sans-serif;color:var(--s-800);background:#fff;line-height:1.6;}
+  a{text-decoration:none;color:inherit;}
+  ul{list-style:none;}
+
+  /* ===== 顶部工具条 ===== */
+  .utility-bar{background:var(--s-800);color:var(--s-300);font-size:12px;}
+  .utility-inner{max-width:var(--maxw);margin:0 auto;padding:8px 24px;display:flex;justify-content:space-between;align-items:center;}
+  .utility-left{display:flex;gap:18px;align-items:center;}
+  .utility-left a,.utility-right a{color:var(--s-300);transition:var(--transition);}
+  .utility-left a:hover,.utility-right a:hover{color:#fff;}
+  .utility-right{display:flex;gap:18px;align-items:center;}
+  .utility-divider{width:1px;height:12px;background:var(--s-600);}
+
+  /* ===== 主导航 ===== */
+  .main-header{background:#fff;position:sticky;top:0;z-index:100;box-shadow:var(--shadow-sm);border-bottom:1px solid var(--s-100);}
+  .header-inner{max-width:var(--maxw);margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:72px;}
+  .brand{display:flex;align-items:center;gap:12px;}
+  .brand-logo{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,var(--g-700),var(--teal));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:18px;box-shadow:0 4px 12px rgba(22,163,74,.25);}
+  .brand-text{display:flex;flex-direction:column;line-height:1.2;}
+  .brand-name{font-size:18px;font-weight:800;color:var(--g-800);letter-spacing:.5px;}
+  .brand-sub{font-size:11px;color:var(--s-500);letter-spacing:1px;text-transform:uppercase;}
+
+  .main-nav{display:flex;align-items:center;gap:4px;}
+  .nav-item{position:relative;}
+  .nav-link{position:relative;display:flex;align-items:center;gap:4px;padding:8px 14px;font-size:14px;font-weight:600;color:var(--s-700);transition:var(--transition);white-space:nowrap;}
+  .nav-link::after{content:"";position:absolute;left:14px;right:14px;bottom:0;height:2px;background:var(--g-600);opacity:0;transform:scaleX(.4);transition:var(--transition);}
+  .nav-link:hover{color:var(--g-700);}
+  .nav-link:hover::after{opacity:1;transform:scaleX(1);}
+  .nav-link.active{color:var(--g-700);}
+  .nav-link.active::after{opacity:1;transform:scaleX(1);}
+  .nav-link .arrow{font-size:10px;opacity:.6;}
+
+  .header-actions{display:flex;align-items:center;gap:16px;}
+  .search-btn{width:36px;height:36px;border-radius:0;border:1px solid var(--s-200);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition);color:var(--s-600);}
+  .search-btn:hover{background:var(--g-700);border-color:var(--g-700);color:#fff;}
+  .mobile-menu-btn{display:none;flex-direction:column;gap:5px;padding:8px;cursor:pointer;}
+  .mobile-menu-btn span{display:block;width:22px;height:2px;background:var(--s-700);border-radius:0;}
+
+  /* ===== HERO ===== */
+  .hero{position:relative;height:calc(100vh - 110px);min-height:560px;max-height:760px;overflow:hidden;display:flex;align-items:center;}
+  .hero-bg{position:absolute;inset:0;background:
+    linear-gradient(90deg,rgba(15,23,42,.60) 0%,rgba(15,23,42,.30) 50%,rgba(15,23,42,.12) 100%),
+    url('hero-driptape.jpg') center/cover no-repeat;
+    background-color:#3a4a3a;
+  }
+  .hero-overlay{position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.45) 0%,rgba(0,0,0,.12) 55%,transparent 100%);}
+
+  .hero-content{position:relative;z-index:2;max-width:var(--maxw);width:100%;margin:0 auto;padding:0 24px;}
+  .hero-text-box{
+    position:relative;
+    max-width:560px;
+    padding:54px 48px 54px 56px;
+    color:#fff;
+    clip-path:polygon(0 0, 100% 0, 92% 100%, 0 100%);
+    background:rgba(255,255,255,.12);
+    backdrop-filter:blur(8px);
+    border-left:5px solid var(--g-500);
+  }
+  .hero-text-box::before{
+    content:"";position:absolute;inset:0;
+    background:rgba(255,255,255,.08);
+    clip-path:polygon(0 0, 100% 0, 92% 100%, 0 100%);
+    pointer-events:none;
+  }
+  .hero-tag{display:inline-block;font-size:12px;font-weight:700;color:var(--g-100);background:transparent;padding:0;border-radius:0;margin-bottom:14px;letter-spacing:1px;}
+  .hero-title{font-size:42px;font-weight:800;line-height:1.2;margin-bottom:16px;text-shadow:0 2px 10px rgba(0,0,0,.25);}
+  .hero-title small{display:block;font-size:20px;font-weight:500;margin-top:8px;opacity:.92;}
+  .hero-desc{font-size:15px;line-height:1.8;opacity:.92;max-width:420px;margin-bottom:28px;}
+  .hero-btns{display:flex;gap:14px;flex-wrap:wrap;}
+  .btn-primary{display:inline-flex;align-items:center;gap:8px;background:var(--g-700);color:#fff;font-size:15px;font-weight:700;letter-spacing:.5px;padding:14px 30px;border:0;border-radius:0;transition:var(--transition);}
+  .btn-primary:hover{background:var(--g-800);}
+  .btn-ghost{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);color:#fff;font-size:14px;font-weight:700;padding:14px 30px;border-radius:0;transition:var(--transition);border:1px solid rgba(255,255,255,.45);}
+  .btn-ghost:hover{background:rgba(255,255,255,.22);border-color:#fff;}
+
+  /* ===== 轮播控制 ===== */
+  .carousel-dots{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);display:flex;gap:10px;z-index:3;}
+  .dot{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,.35);cursor:pointer;transition:var(--transition);}
+  .dot.active{background:#fff;transform:scale(1.2);}
+  .carousel-arrows{position:absolute;bottom:24px;right:24px;display:flex;gap:10px;z-index:3;}
+  .arrow-btn{width:40px;height:40px;border-radius:0;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.35);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition);font-size:16px;}
+  .arrow-btn:hover{background:var(--g-700);border-color:var(--g-700);}
+
+  /* ===== 占位内容区 ===== */
+  .section{padding:80px 24px;max-width:var(--maxw);margin:0 auto;}
+  .section-title{font-size:28px;font-weight:800;color:var(--s-800);margin-bottom:12px;display:flex;align-items:center;gap:10px;}
+  .section-title::before{content:"";width:5px;height:24px;background:var(--teal);border-radius:3px;}
+  .section-sub{color:var(--s-500);font-size:14px;margin-bottom:40px;}
+  .placeholder-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px;}
+  .placeholder-card{background:var(--card);border:1px solid var(--s-100);border-radius:var(--radius);padding:28px;box-shadow:var(--shadow-sm);transition:var(--transition);}
+  .placeholder-card:hover{transform:translateY(-3px);box-shadow:var(--shadow);}
+  .ph-icon{width:48px;height:48px;border-radius:12px;background:var(--g-50);display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:16px;}
+  .ph-title{font-size:16px;font-weight:700;color:var(--s-800);margin-bottom:8px;}
+  .ph-text{font-size:13px;color:var(--s-500);line-height:1.7;}
+
+  /* ===== 页脚 ===== */
+  footer{background:var(--s-900);color:var(--s-300);font-size:13px;padding:40px 24px;}
+  .footer-inner{max-width:var(--maxw);margin:0 auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;}
+  .footer-links{display:flex;gap:20px;}
+  .footer-links a{color:var(--s-400);transition:var(--transition);}
+  .footer-links a:hover{color:#fff;}
+
+  /* ===== 移动端 ===== */
+  @media(max-width:920px){
+    .main-nav{display:none;position:absolute;top:72px;left:0;right:0;background:#fff;flex-direction:column;align-items:stretch;padding:12px 24px;box-shadow:var(--shadow);border-top:1px solid var(--s-100);gap:0;}
+    .main-nav.open{display:flex;}
+    .nav-link{padding:12px 0;border-radius:0;border-bottom:1px solid var(--s-50);}
+    .mobile-menu-btn{display:flex;}
+    .hero-title{font-size:32px;}
+    .hero-text-box{padding:36px 28px 36px 32px;clip-path:polygon(0 0,100% 0,96% 100%,0 100%);}
+    .utility-inner{justify-content:center;}
+    .utility-left{display:none;}
+  }
+  @media(max-width:560px){
+    .hero{height:auto;min-height:520px;padding:60px 0;}
+    .hero-title{font-size:26px;}
+    .hero-title small{font-size:16px;}
+    .hero-btns{flex-direction:column;}
+    .btn-primary,.btn-ghost{width:100%;justify-content:center;}
+    .carousel-arrows{display:none;}
+  }
+
+/* ===== FLAT-BTN-OVERRIDE: 按钮/交互控件取消圆角，整体扁平化 ===== */
+button,
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+.ghost-button,
+.live-pill-btn,
+.live-pill,
+.text-button,
+.btn-primary,
+.btn-ghost,
+.search-btn,
+.arrow-btn,
+.status,
+.step,
+.optimal-top b,
+.confidence,
+.at-btn,
+.at-btn-mode,
+.at-btn-action,
+.at-field input,
+.at-field select,
+.play-btn,
+.nav-link{
+  border-radius:0 !important;
+}
+/* ===== /FLAT-BTN-OVERRIDE ===== */
+
+/* 门户页「返回主页」按钮（门户页导航未包 .ry-nav，单独定义） */
+.nav-home-btn{margin-left:8px;display:inline-flex;align-items:center;gap:6px;padding:9px 16px;background:#15803d;color:#fff;font-size:14px;font-weight:700;text-decoration:none;border:0;border-radius:0;cursor:pointer;transition:all .2s ease;white-space:nowrap;letter-spacing:.5px;}
+.nav-home-btn:hover{background:#166534;}
+@media(max-width:920px){.nav-home-btn{margin:10px 24px 14px;justify-content:center;}}
+
+</style>
+</head>
+<body>
+
+<!-- 顶部工具条 -->
+<div class="utility-bar">
+  <div class="utility-inner">
+    <div class="utility-left">
+      <a href="#">联系我们</a>
+      <a href="#">常见问题</a>
+      <a href="#">下载中心</a>
+    </div>
+    <div class="utility-right">
+      <a href="#">语言</a>
+      <span class="utility-divider"></span>
+      <a href="#">中 / EN</a>
+    </div>
+  </div>
+</div>
+
+<!-- 主导航 -->
+<header class="main-header">
+  <div class="header-inner">
+    <a href="runye-landing.html" class="brand">
+      <div class="brand-logo">润</div>
+      <div class="brand-text">
+        <span class="brand-name">润野灌溉</span>
+        <span class="brand-sub">Runye Irrigation</span>
+      </div>
+    </a>
+
+    <nav class="main-nav" id="mainNav">
+      <div class="nav-item"><a href="index.html" class="nav-link active">精准灌溉</a></div>
+      <div class="nav-item"><a href="耐特菲姆滴灌带长度查询器.html" class="nav-link">滴灌带长度查询</a></div>
+      <div class="nav-item"><a href="index.html#three-level-view" class="nav-link">三级系统查询</a></div>
+      <div class="nav-item"><a href="#" class="nav-link">数字农业</a></div>
+      <div class="nav-item"><a href="#" class="nav-link">水肥课堂</a></div>
+      <div class="nav-item"><a href="#" class="nav-link">关于我们</a></div>
+    </nav>
+
+    <a href="runye-landing.html" class="nav-home-btn">⌂ 返回主页</a>
+    <div class="header-actions">
+      <button class="search-btn" title="搜索" aria-label="搜索">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
+      </button>
+      <div class="mobile-menu-btn" id="mobileMenuBtn" aria-label="菜单">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-overlay"></div>
+  <div class="hero-content">
+    <div class="hero-text-box">
+      <span class="hero-tag">润野灌溉设计工具</span>
+      <h1 class="hero-title">投入更少 <small>收获更多</small></h1>
+      <p class="hero-desc">基于耐特菲姆技术数据，集成三级管路选型、滴灌带长度查询与水力计算，为高效农业提供一体化灌溉设计支撑。</p>
+      <div class="hero-btns">
+        <a href="index.html" class="btn-primary">进入灌溉系统设计 →</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="carousel-dots">
+    <span class="dot active"></span>
+    <span class="dot"></span>
+    <span class="dot"></span>
+  </div>
+  <div class="carousel-arrows">
+    <button class="arrow-btn" aria-label="上一张">‹</button>
+    <button class="arrow-btn" aria-label="下一张">›</button>
+  </div>
+</section>
+
+<!-- 页脚 -->
+<footer>
+  <div class="footer-inner">
+    <div>© 2026 润野灌溉 Runye Irrigation. All rights reserved.</div>
+    <div class="footer-links">
+      <a href="#">隐私政策</a>
+      <a href="#">使用条款</a>
+      <a href="#">联系我们</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // 移动端菜单切换
+  document.getElementById('mobileMenuBtn').addEventListener('click', function(){
+    document.getElementById('mainNav').classList.toggle('open');
+  });
+
+  // 轮播 dot 交互（仅视觉）
+  var dots = document.querySelectorAll('.dot');
+  dots.forEach(function(d){
+    d.addEventListener('click', function(){
+      dots.forEach(function(x){ x.classList.remove('active'); });
+      d.classList.add('active');
+    });
+  });
+</script>
+
+</body>
+</html>

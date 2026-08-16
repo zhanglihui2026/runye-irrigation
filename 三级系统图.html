@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>润野灌溉 · 三级系统图（供水首部）</title>
+<style>
+  @media print {
+    body * { visibility: hidden; }
+    .print-area, .print-area * { visibility: visible; }
+    .print-area { position: absolute; left: 0; top: 0; margin: 0; border: none !important; box-shadow: none !important; }
+    body { margin: 0 !important; background: #fff !important; }
+    .no-print, aside { display: none !important; }
+    .layout { display: block !important; height: auto !important; }
+    main { display: block !important; overflow: visible !important; padding: 0 !important; }
+    /* 虚线外框与拖拽手柄仅在编辑时显示，打印/转 PDF 隐藏 */
+    .zb-frame, .zb-handle { display: none !important; }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; background: #eef1f5; color: #222; }
+  .no-print { background: #185FA5; color: #fff; display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; }
+  .no-print h1 { font-size: 16px; font-weight: 600; }
+  .no-print .btns button { margin-left: 8px; padding: 6px 14px; border: 1px solid rgba(255,255,255,.6); background: rgba(255,255,255,.12); color: #fff; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  .no-print .btns button:hover { background: rgba(255,255,255,.25); }
+  .no-print .btns button.primary { background: #fff; color: #185FA5; border-color: #fff; font-weight: 600; }
+
+  .layout { display: flex; height: calc(100vh - 44px); }
+  aside { width: 292px; min-width: 292px; background: #fff; border-right: 1px solid #d5dbe3; overflow-y: auto; padding: 12px; }
+  aside h2 { font-size: 13px; font-weight: 600; color: #185FA5; margin: 14px 0 8px; padding-bottom: 4px; border-bottom: 1px solid #e4e9f0; }
+  aside h2:first-child { margin-top: 0; }
+  .row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; font-size: 13px; }
+  .row label { color: #444; }
+  .row input[type=text], .row input[type=number], .row select { width: 138px; padding: 4px 6px; border: 1px solid #c3ccd8; border-radius: 5px; font-size: 13px; background: #fff; }
+  .row input[type=text]:focus, .row select:focus { outline: 1.5px solid #185FA5; border-color: #185FA5; }
+  .chk { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: #444; margin-bottom: 4px; }
+  .chk label { display: flex; align-items: center; gap: 4px; }
+  .fert-item { border: 1px solid #e0e6ee; border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; background: #f8fafc; }
+  .fert-item .ft { font-size: 12px; color: #185FA5; font-weight: 600; margin-bottom: 5px; }
+  .fert-item .row { margin-bottom: 4px; }
+  .fert-item select { width: 128px; }
+  .btn-line { display: flex; gap: 8px; margin-top: 10px; }
+  .btn-line button { flex: 1; padding: 7px 0; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  .btn-line .ok { background: #185FA5; color: #fff; border: 1px solid #185FA5; }
+  .btn-line .ok:hover { background: #0C447C; }
+  .btn-line .ghost { background: #fff; color: #185FA5; border: 1px solid #185FA5; }
+  .tip { font-size: 12px; color: #8892a0; margin-top: 10px; line-height: 1.7; }
+
+  main { flex: 1; overflow: auto; padding: 20px; display: flex; justify-content: center; align-items: flex-start; }
+  .sheet { background: #fff; box-shadow: 0 2px 14px rgba(20,40,70,.18); position: relative; }
+  .sheet-inner { position: absolute; left: 8mm; top: 8mm; right: 8mm; bottom: 8mm; border: 1.2mm solid #111; }
+  .sheet-inner2 { position: absolute; left: 11mm; top: 11mm; right: 11mm; bottom: 11mm; border: .35mm solid #111; }
+  .head { display: flex; align-items: center; justify-content: space-between; padding: 0 5mm; border-bottom: .35mm solid #111; position: absolute; left: 11mm; top: 11mm; right: 11mm; height: 14mm; }
+  .head .proj { font-size: 13pt; font-weight: 700; letter-spacing: 1.5px; color: #0C447C; }
+  .head .sub { font-size: 9.5pt; color: #444; }
+  .head .code { font-size: 9pt; border: .3mm solid #111; padding: .8mm 2.5mm; color: #333; }
+  .svg-zone { position: absolute; left: 13mm; right: 13mm; display: flex; align-items: center; justify-content: center; }
+  .svg-zone svg { width: auto; height: 100%; max-width: 100%; }
+  /* 设备表 / 设计说明 —— 图纸内可拖拽虚线外框区域 */
+  .zb-block { position: absolute; min-width: 80mm; min-height: 42mm; z-index: 5; }
+  .zb-frame { position: absolute; inset: 0; border: .45mm dashed #185FA5; pointer-events: none; }
+  .zb-title { position: absolute; left: 0; top: -6mm; font-size: 10pt; font-weight: 600; color: #0C447C; cursor: move; user-select: none; white-space: nowrap; background: #fff; padding: 0 1.5mm 0 0; z-index: 7; line-height: 1.1; }
+  .zb-body { position: absolute; left: 0; right: 0; top: 0; bottom: 0; width: auto; max-width: none; overflow: auto; }
+  .zb-body table { width: 100%; border-collapse: collapse; font-size: 7.5pt; }
+  .zb-body th, .zb-body td { border: .3mm solid #111; padding: 1mm .8mm; text-align: center; line-height: 1.25; }
+  .zb-body th { background: #E6F1FB; }
+  .zb-body .l { text-align: left; }
+  .zb-handle { position: absolute; right: 0; bottom: 0; width: 15px; height: 15px; cursor: nwse-resize; z-index: 6; user-select: none; touch-action: none; }
+  .zb-handle::after { content: ''; position: absolute; right: 3px; bottom: 3px; width: 7px; height: 7px; border-right: 2px solid #185FA5; border-bottom: 2px solid #185FA5; }
+  .notes li { font-size: 8.5pt; line-height: 2; margin-left: 0; }
+  .sheet.a4 .zb-body table { font-size: 6.6pt; }
+  .sheet.a4 .zb-body th, .sheet.a4 .zb-body td { padding: .75mm .5mm; }
+  .sheet.a4 .notes li { font-size: 7.5pt; line-height: 1.9; }
+  .sign { position: absolute; bottom: 10mm; right: 11mm; border-collapse: collapse; }
+  .sign td { border: .35mm solid #111; font-size: 8pt; text-align: center; padding: .6mm 2mm; }
+  .sign .name { font-size: 10.5pt; font-weight: 700; background: #E6F1FB; color: #0C447C; }
+  .sign .cap { background: #F1EFE8; font-size: 7.5pt; color: #555; }
+  .empty { position: absolute; inset: 11mm; display: flex; align-items: center; justify-content: center; font-size: 14px; color: #8892a0; }
+
+/* ===== FLAT-BTN-OVERRIDE: 按钮/交互控件取消圆角，整体扁平化 ===== */
+button,
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+.ghost-button,
+.live-pill-btn,
+.live-pill,
+.text-button,
+.btn-primary,
+.btn-ghost,
+.search-btn,
+.arrow-btn,
+.status,
+.step,
+.optimal-top b,
+.confidence,
+.at-btn,
+.at-btn-mode,
+.at-btn-action,
+.at-field input,
+.at-field select,
+.play-btn,
+.nav-link{
+  border-radius:0 !important;
+}
+/* ===== /FLAT-BTN-OVERRIDE ===== */
+
+
+/* ===== RY-NAV: 主页导航嵌入（与 runye-landing 一致） ===== */
+.ry-nav{
+  position:sticky;top:0;z-index:1500;
+  --g-50:#f0fdf4;--g-100:#dcfce7;--g-200:#bbf7d0;--g-300:#86efac;--g-400:#4ade80;--g-500:#22c55e;--g-600:#16a34a;--g-700:#15803d;--g-800:#166534;--g-900:#14532d;
+  --teal:#0d9488;--teal-700:#0f766e;
+  --s-50:#f8fafc;--s-100:#f1f5f9;--s-200:#e2e8f0;--s-300:#cbd5e1;--s-400:#94a3b8;--s-500:#64748b;--s-600:#475569;--s-700:#334155;--s-800:#1e293b;--s-900:#0f172a;
+  --shadow-sm:0 2px 8px rgba(15,23,42,.06);
+  --transition:all .2s ease;
+  --maxw:1280px;
+  font-family:"Microsoft YaHei","PingFang SC","Segoe UI",system-ui,-apple-system,sans-serif;
+}
+.ry-nav .utility-bar{background:var(--s-800);color:var(--s-300);font-size:12px;}
+.ry-nav .utility-inner{max-width:var(--maxw);margin:0 auto;padding:8px 24px;display:flex;justify-content:space-between;align-items:center;}
+.ry-nav .utility-left{display:flex;gap:18px;align-items:center;}
+.ry-nav .utility-left a,.ry-nav .utility-right a{color:var(--s-300);transition:var(--transition);text-decoration:none;}
+.ry-nav .utility-left a:hover,.ry-nav .utility-right a:hover{color:#fff;}
+.ry-nav .utility-right{display:flex;gap:18px;align-items:center;}
+.ry-nav .utility-divider{width:1px;height:12px;background:var(--s-600);}
+.ry-nav .main-header{background:#fff;box-shadow:var(--shadow-sm);border-bottom:1px solid var(--s-100);padding:0;margin:0;}
+.ry-nav .header-inner{max-width:var(--maxw);margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:72px;}
+.ry-nav .brand{display:flex;align-items:center;gap:12px;text-decoration:none;}
+.ry-nav .brand-logo{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,var(--g-700),var(--teal));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:18px;box-shadow:0 4px 12px rgba(22,163,74,.25);}
+.ry-nav .brand-text{display:flex;flex-direction:column;line-height:1.2;}
+.ry-nav .brand-name{font-size:18px;font-weight:800;color:var(--g-800);letter-spacing:.5px;}
+.ry-nav .brand-sub{font-size:11px;color:var(--s-500);letter-spacing:1px;text-transform:uppercase;}
+.ry-nav .main-nav{display:flex;align-items:center;gap:4px;}
+.ry-nav .nav-item{position:relative;}
+.ry-nav .nav-link{position:relative;display:flex;align-items:center;gap:4px;padding:8px 14px;font-size:14px;font-weight:600;color:var(--s-700);transition:var(--transition);white-space:nowrap;text-decoration:none;}
+.ry-nav .nav-link::after{content:"";position:absolute;left:14px;right:14px;bottom:0;height:2px;background:var(--g-600);opacity:0;transform:scaleX(.4);transition:var(--transition);}
+.ry-nav .nav-link:hover{color:var(--g-700);}
+.ry-nav .nav-link:hover::after{opacity:1;transform:scaleX(1);}
+.ry-nav .nav-link.active{color:var(--g-700);}
+.ry-nav .nav-link.active::after{opacity:1;transform:scaleX(1);}
+.ry-nav .header-actions{display:flex;align-items:center;gap:16px;}
+.ry-nav .search-btn{width:36px;height:36px;border:1px solid var(--s-200);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition);color:var(--s-600);}
+.ry-nav .search-btn:hover{background:var(--g-700);border-color:var(--g-700);color:#fff;}
+.ry-nav .mobile-menu-btn{display:none;flex-direction:column;gap:5px;padding:8px;cursor:pointer;}
+.ry-nav .mobile-menu-btn span{display:block;width:22px;height:2px;background:var(--s-700);border-radius:0;}
+@media(max-width:920px){
+  .ry-nav .main-nav{display:none;position:absolute;top:72px;left:0;right:0;background:#fff;flex-direction:column;align-items:stretch;padding:12px 24px;box-shadow:var(--shadow-sm);border-top:1px solid var(--s-100);gap:0;z-index:1500;}
+  .ry-nav .main-nav.open{display:flex;}
+  .ry-nav .nav-link{padding:12px 0;border-radius:0;border-bottom:1px solid var(--s-50);}
+  .ry-nav .mobile-menu-btn{display:flex;}
+}
+/* index.html 自带 sticky .topbar 需让位于导航栏 */
+.ry-nav ~ .topbar{top:72px !important;}
+.ry-nav .nav-home-btn{margin-left:8px;display:inline-flex;align-items:center;gap:6px;padding:9px 16px;background:var(--g-700);color:#fff;font-size:14px;font-weight:700;text-decoration:none;border:0;border-radius:0;cursor:pointer;transition:var(--transition);white-space:nowrap;letter-spacing:.5px;}
+.ry-nav .nav-home-btn:hover{background:var(--g-800);}
+@media(max-width:920px){
+  .ry-nav .nav-home-btn{margin:10px 24px 14px;justify-content:center;}
+}
+/* ===== /RY-NAV ===== */
+
+</style>
+</head>
+<body>
+
+<!-- ===== 主页导航（嵌入） ===== -->
+<div class="ry-nav">
+  <div class="utility-bar">
+    <div class="utility-inner">
+      <div class="utility-left">
+        <a href="runye-landing.html">联系我们</a>
+        <a href="runye-landing.html">常见问题</a>
+        <a href="runye-landing.html">下载中心</a>
+      </div>
+      <div class="utility-right">
+        <a href="runye-landing.html">语言</a>
+        <span class="utility-divider"></span>
+        <a href="runye-landing.html">中 / EN</a>
+      </div>
+    </div>
+  </div>
+  <header class="main-header">
+    <div class="header-inner">
+      <a href="runye-landing.html" class="brand">
+        <div class="brand-logo">润</div>
+        <div class="brand-text">
+          <span class="brand-name">润野灌溉</span>
+          <span class="brand-sub">Runye Irrigation</span>
+        </div>
+      </a>
+      <nav class="main-nav" id="mainNav">
+        <div class="nav-item"><a href="index.html" class="nav-link active">精准灌溉</a></div>
+        <div class="nav-item"><a href="耐特菲姆滴灌带长度查询器.html" class="nav-link">滴灌带长度查询</a></div>
+        <div class="nav-item"><a href="index.html#three-level-view" class="nav-link">三级系统查询</a></div>
+        <div class="nav-item"><a href="runye-landing.html" class="nav-link">数字农业</a></div>
+        <div class="nav-item"><a href="runye-landing.html" class="nav-link">水肥课堂</a></div>
+        <div class="nav-item"><a href="runye-landing.html" class="nav-link">关于我们</a></div>
+      </nav>
+      <a href="runye-landing.html" class="nav-home-btn">⌂ 返回主页</a>
+      <div class="header-actions">
+        <button class="search-btn" title="搜索" aria-label="搜索">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
+        </button>
+        <div class="mobile-menu-btn" id="mobileMenuBtn" aria-label="菜单">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+    </div>
+  </header>
+</div>
+
+
+<header class="no-print">
+  <h1>润野灌溉 · 三级系统图（供水首部系统）<span style="font-size:12px;font-weight:400;opacity:.85;margin-left:10px">独立页面 · 参数来自三级系统计算</span></h1>
+  <div class="btns">
+    <button onclick="exportSVG()">导出 SVG</button>
+    <button onclick="exportPNG()">导出 PNG</button>
+    <button class="primary" onclick="window.print()">打印 / PDF</button>
+  </div>
+</header>
+
+<div class="layout">
+  <aside>
+    <h2>图纸信息</h2>
+    <div class="row"><label>工程名称</label><input type="text" id="cfg_title" value="润野灌溉 — 供水首部系统图"></div>
+    <div class="row"><label>图号</label><input type="text" id="cfg_figNo" value="DG-01"></div>
+    <div class="row"><label>日期</label><input type="text" id="cfg_date" value="2026.08"></div>
+    <div class="row"><label>设计单位</label><input type="text" id="cfg_unit" value="（填写）"></div>
+
+    <h2>图纸规格与排版</h2>
+    <div class="row"><label>图纸规格</label>
+      <select id="cfg_paper">
+        <option value="a3">A3 横向</option>
+        <option value="a4">A4 横向</option>
+      </select>
+    </div>
+    <div class="row"><label>布局密度</label>
+      <select id="cfg_density">
+        <option value="0.8">紧凑</option>
+        <option value="1" selected>标准</option>
+        <option value="1.18">宽松</option>
+      </select>
+    </div>
+    <div class="chk" id="cfg_show">
+      <label><input type="checkbox" data-k="num" checked> 设备编号</label>
+      <label><input type="checkbox" data-k="dn" checked> 管径标注</label>
+      <label><input type="checkbox" data-k="legend" checked> 图例</label>
+      <label><input type="checkbox" data-k="table" checked> 设备表</label>
+      <label><input type="checkbox" data-k="notes" checked> 设计说明</label>
+      <label><input type="checkbox" data-k="sign" checked> 图签</label>
+    </div>
+
+    <h2>水源与设备</h2>
+    <div class="row"><label>水源类型</label>
+      <select id="cfg_source">
+        <option>蓄水池</option><option>水塘</option><option>水井</option><option>河道</option>
+      </select>
+    </div>
+    <div class="row"><label>水泵类型</label>
+      <select id="cfg_pump">
+        <option>自吸泵</option><option selected>离心/自吸泵</option><option>潜水泵</option>
+      </select>
+    </div>
+    <div class="row"><label>过滤器类型</label>
+      <select id="cfg_filter">
+        <option>叠片式</option><option>砂石式</option><option>网式</option><option>砂石+叠片二级</option>
+      </select>
+    </div>
+
+    <h2>管路管径</h2>
+    <div class="row"><label>吸水管 DN</label>
+      <input type="number" id="cfg_suctionDN" list="dn_list" min="25" max="300" step="1" title="可输入任意管径，或从下拉建议中选择">
+    </div>
+    <div class="row"><label>供水主管 DN</label>
+      <input type="number" id="cfg_mainDN" list="dn_list" min="25" max="300" step="1" title="可输入任意管径，或从下拉建议中选择">
+    </div>
+    <datalist id="dn_list"></datalist>
+    <div class="chk">
+      <label><input type="checkbox" id="cfg_checkValve" checked> 泵后止回阀</label>
+      <label><input type="checkbox" id="cfg_airValve" checked> 主管排气阀</label>
+    </div>
+
+    <h2>吸肥管设置</h2>
+    <div class="row"><label>吸肥管路数</label>
+      <select id="cfg_fertCount">
+        <option value="1" selected>1 路</option>
+        <option value="2">2 路</option>
+        <option value="3">3 路</option>
+        <option value="4">4 路</option>
+      </select>
+    </div>
+    <div id="fertList"></div>
+
+    <div class="btn-line">
+      <button class="ok" onclick="loadDefault()">恢复默认</button>
+      <button class="ghost" onclick="localStorage.removeItem('drip-cfg-tl');location.reload()">清空保存</button>
+    </div>
+    <p class="tip">所有参数实时生效，自动保存在本机浏览器。吸肥管路数可增删，管径可改，布局密度与图纸规格可调，图名/图号可编辑。</p>
+  </aside>
+
+  <main>
+    <div class="sheet print-area" id="sheet"></div>
+  </main>
+</div>
+
+<script>
+var DEFAULTS = {
+  title: '润野灌溉 — 供水首部系统图（三级）', figNo: 'DG-01', date: '2026.08', unit: '（填写）',
+  paper: 'a3', density: 1, source: '蓄水池', pump: '离心/自吸泵', filter: '叠片式',
+  suctionDN: 80, mainDN: 90, checkValve: true, airValve: true,
+  zoneCount: 2,
+  fertCount: 1, ferts: [{ type: '文丘里', dn: 25 }],
+  show: { num: true, dn: true, legend: true, table: true, notes: true, sign: true },
+  layoutVer: 2,
+  tableX: null, tableY: null, tableW: null, tableH: null,
+  notesX: null, notesY: null, notesW: null, notesH: null
+};
+var DN_OPT = [50, 63, 75, 80, 90, 100, 110, 125, 150];
+var FDN_OPT = [16, 20, 25, 32, 40];
+var cfg = null;
+var saved = null;
+var ZONE_GAP = 8;   // 设备表与设计说明区域横向间距（mm），恒定不变（移动/缩放联动保持）
+try { saved = JSON.parse(localStorage.getItem('drip-cfg-tl')); } catch (e) {}
+/* 布局 v2：区域对齐关系变更（设备表左缘=图例左缘、设计说明顶端=设备表顶端、间距缩小）。
+   旧版保存的位置/尺寸已不适用，自动丢弃 8 个位置字段，恢复新默认布局 */
+if (saved && saved.layoutVer !== 2) {
+  saved.tableX = null; saved.tableY = null; saved.tableW = null; saved.tableH = null;
+  saved.notesX = null; saved.notesY = null; saved.notesW = null; saved.notesH = null;
+}
+cfg = mergeDeep(clone(DEFAULTS), saved || {});
+if (!cfg.ferts || !cfg.ferts.length) cfg.ferts = [{ type: '文丘里', dn: 25 }];
+cfg.fertCount = Math.min(4, Math.max(1, cfg.fertCount || 1));
+
+function clone(o) { return JSON.parse(JSON.stringify(o)); }
+function mergeDeep(a, b) {
+  if (!b) return a;
+  for (var k in b) {
+    if (typeof b[k] === 'object' && b[k] && !Array.isArray(b[k]) && typeof a[k] === 'object' && a[k]) {
+      a[k] = mergeDeep(a[k], b[k]);
+    } else if (b[k] !== undefined && b[k] !== null) { a[k] = b[k]; }
+  }
+  return a;
+}
+function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function fillDNList(list, arr) {
+  list.innerHTML = '';
+  arr.forEach(function (d) {
+    var o = document.createElement('option');
+    o.value = String(d);
+    list.appendChild(o);
+  });
+}
+
+function bindUI() {
+  fillDNList(document.getElementById('dn_list'), DN_OPT);
+  document.getElementById('cfg_suctionDN').value = cfg.suctionDN;
+  document.getElementById('cfg_mainDN').value = cfg.mainDN;
+  document.getElementById('cfg_title').value = cfg.title;
+  document.getElementById('cfg_figNo').value = cfg.figNo;
+  document.getElementById('cfg_date').value = cfg.date;
+  document.getElementById('cfg_unit').value = cfg.unit;
+  document.getElementById('cfg_paper').value = cfg.paper;
+  document.getElementById('cfg_density').value = String(cfg.density);
+  document.getElementById('cfg_source').value = cfg.source;
+  document.getElementById('cfg_pump').value = cfg.pump;
+  document.getElementById('cfg_filter').value = cfg.filter;
+  document.getElementById('cfg_fertCount').value = String(cfg.fertCount);
+  document.getElementById('cfg_checkValve').checked = !!cfg.checkValve;
+  document.getElementById('cfg_airValve').checked = !!cfg.airValve;
+  var boxes = document.querySelectorAll('#cfg_show input');
+  boxes.forEach(function (b) { b.checked = !!cfg.show[b.getAttribute('data-k')]; });
+  renderFertList();
+}
+
+function renderFertList() {
+  var box = document.getElementById('fertList');
+  var n = cfg.fertCount;
+  while (cfg.ferts.length < n) cfg.ferts.push({ type: '文丘里', dn: 25 });
+  cfg.ferts = cfg.ferts.slice(0, n);
+  var html = '';
+  for (var i = 0; i < n; i++) {
+    html += '<div class="fert-item"><div class="ft">第 ' + (i + 1) + ' 路吸肥管（图面编号 4-' + (i + 1) + '）</div>' +
+      '<div class="row"><label>施肥方式</label><select data-i="' + i + '" data-f="type">' +
+      ['文丘里','压差式','注肥泵'].map(function (t) { return '<option' + (cfg.ferts[i].type === t ? ' selected' : '') + '>' + t + '</option>'; }).join('') +
+      '</select></div>' +
+      '<div class="row"><label>吸肥管 DN</label><select data-i="' + i + '" data-f="dn">' +
+      FDN_OPT.map(function (d) { return '<option value="' + d + '"' + (cfg.ferts[i].dn === d ? ' selected' : '') + '>' + d + '</option>'; }).join('') +
+      '</select></div></div>';
+  }
+  box.innerHTML = html;
+  box.querySelectorAll('select[data-f]').forEach(function (s) {
+    s.addEventListener('change', function () {
+      var i = +s.getAttribute('data-i'), f = s.getAttribute('data-f');
+      cfg.ferts[i][f] = (f === 'dn') ? +s.value : s.value;
+      persist(); render();
+    });
+  });
+}
+
+function collect() {
+  cfg.title = document.getElementById('cfg_title').value.trim() || DEFAULTS.title;
+  cfg.figNo = document.getElementById('cfg_figNo').value.trim() || 'DG-01';
+  cfg.date = document.getElementById('cfg_date').value.trim();
+  cfg.unit = document.getElementById('cfg_unit').value.trim() || '（填写）';
+  cfg.paper = document.getElementById('cfg_paper').value;
+  cfg.density = parseFloat(document.getElementById('cfg_density').value) || 1;
+  cfg.source = document.getElementById('cfg_source').value;
+  cfg.pump = document.getElementById('cfg_pump').value;
+  cfg.filter = document.getElementById('cfg_filter').value;
+  var _sdv = +document.getElementById('cfg_suctionDN').value;
+  var _mdv = +document.getElementById('cfg_mainDN').value;
+  if (isFinite(_sdv) && _sdv >= 25) cfg.suctionDN = Math.round(_sdv);
+  if (isFinite(_mdv) && _mdv >= 25) cfg.mainDN = Math.round(_mdv);
+  cfg.checkValve = document.getElementById('cfg_checkValve').checked;
+  cfg.airValve = document.getElementById('cfg_airValve').checked;
+  cfg.fertCount = +document.getElementById('cfg_fertCount').value;
+  document.querySelectorAll('#cfg_show input').forEach(function (b) { cfg.show[b.getAttribute('data-k')] = b.checked; });
+  while (cfg.ferts.length < cfg.fertCount) cfg.ferts.push({ type: '文丘里', dn: 25 });
+  cfg.ferts = cfg.ferts.slice(0, cfg.fertCount);
+}
+function persist() { try { localStorage.setItem('drip-cfg-tl', JSON.stringify(cfg)); } catch (e) {} }
+function loadDefault() { cfg = clone(DEFAULTS); bindUI(); persist(); render(); }
+
+document.addEventListener('change', function (e) {
+  if (e.target.closest('#fertList')) return;
+  if (e.target.id && e.target.id.indexOf('cfg_') === 0) { collect(); if (e.target.id === 'cfg_fertCount') renderFertList(); persist(); render(); }
+});
+document.addEventListener('input', function (e) {
+  if (e.target.id && e.target.id.indexOf('cfg_') === 0) { collect(); persist(); render(); }
+});
+
+/* 布局计算：全部横向段长与密度 k、图纸尺寸一致，供 drawSVG 与 render 共用 */
+function layout(cfg) {
+  var k = cfg.density;
+  var fW = 92 * k, fH = 58 * k;
+  var fGap = Math.min(fW + 18 * k, 96 + 24 * k);   // 吸肥管盒子间距 ≥ 盒宽，杜绝重叠
+  var x = 60 * k + (96 * k + 26 * k) + (26 * k + 26 * k + 20 * k);   // 水源 + 底阀吸水管
+  x += (cfg.fertCount - 1) * fGap + fW + 30 * k;  // 吸肥区
+  x += (34 + 20) * k;                              // 闸阀
+  x += (22 + 34 + 27 + 16) * k;                    // 水泵
+  x += 40 * k;                                     // 压力表
+  x += (10 + 30 + 14) * k;                         // 止回阀
+  x += (14 + 96 + 16) * k;                         // 过滤器
+  x += 40 * k;                                     // 压力表（过滤器后）
+  /* 纸面比例：提前计算 svgScale（仅依赖 cfg），供下方长度按纸面 mm 换算，与 render() 一致 */
+  var sh_ = cfg.show || {};
+  var ly_ = 255 + 52 * k + 40;
+  var lgRows_ = sh_.legend ? Math.ceil(9 / 4) : 0;
+  var H_ = Math.ceil(ly_ + (sh_.legend ? 38 + lgRows_ * 32 + 28 : 40));
+  var paperW_ = cfg.paper === 'a4' ? 297 : 420, paperH_ = cfg.paper === 'a4' ? 210 : 297;
+  var signH_ = sh_.sign ? 17 : 0;
+  var lowerH_ = (sh_.table || sh_.notes) ? (cfg.paper === 'a4' ? 78 : 82) : 0;
+  var svgScale_ = (paperH_ - 28 - (signH_ + 10 + lowerH_ + (lowerH_ > 0 ? 6 : 0) + 4)) / H_;
+  var zc = cfg.zoneCount || 2;                      // 联合灌溉分区数
+  var vGap = Math.max(22, Math.min(55, 180 / zc));  // 竖管上分区接管间距（自适应：2区≈55、4区≈45、8区≈22）
+  var mainExtendLen = 130 + 40 / svgScale_;         // 总管水平延伸至弯折点（弯折点右移纸面 40mm 试验值；分区管相应缩短，右缘仍对齐横线端头）
+  var branchPipeLen = 62;                            // 分区管水平长度（最小值，实际按纸面锚定伸展）
+  var branchLabelW = 55;                             // 分区标注宽度
+  var xNatural = x + mainExtendLen + branchPipeLen + branchLabelW + 30;  // 自然内容右界
+
+  /* 纸面锚定：图例标题下方横线右端（W-40）距内图框右边固定 20mm，
+     分区管与「轮灌区N」标注随之伸展、右缘对齐横线端头 */
+  var svgLeft_ = Math.max(13, 31 - 60 * k * svgScale_);            // 与 render() 水源锚定公式一致
+  var lineEndX = (paperW_ - 13 - 20 - svgLeft_) / svgScale_;       // 横线右端目标 x（SVG px）
+  lineEndX = Math.max(lineEndX, xNatural);                          // 内容超宽（如密度2）时保自然宽度
+  var bendX_ = x + mainExtendLen;
+  branchPipeLen = Math.max(40, lineEndX - 20 - 46 - bendX_);        // 管末端+箭头+间距 → 标注右缘对齐 lineEndX
+  var xEnd = lineEndX;                                              // svgSize 中 W = xEnd + 40 → 横线 x2 = W-40 = lineEndX
+  return { k: k, fW: fW, fH: fH, fGap: fGap, xEnd: xEnd, vGap: vGap, zc: zc, mainExtendLen: mainExtendLen, branchPipeLen: branchPipeLen, lineEndX: lineEndX, svgScale: svgScale_, svgLeft: svgLeft_ };
+}
+/* SVG 尺寸：W/H 与纸张绘图区宽高比匹配（A3 满布），render/exportSVG/exportPNG 三处共用，避免不一致 */
+function svgSize(cfg) {
+  var L = layout(cfg);
+  var W = Math.ceil(L.xEnd + 40);                 /* 横线右端 x2 = W-40 = L.lineEndX（距内图框右 20mm） */
+  var ly = 255 + 52 * L.k + 40;                   // 图例区起始 y
+  var lgRows = cfg.show.legend ? Math.ceil(9 / 4) : 0;   // 图例行数（9 项 ÷ 4 列）
+  var H = Math.ceil(ly + (cfg.show.legend ? 38 + lgRows * 32 + 28 : 40));   // 图例高 + 注记 + 底部留白
+  return { W: W, H: H, L: L, ly: ly };
+}
+function pw(dn) { return 2 + (dn / 25) * 0.8; }
+function drawSVG(cfg, W, H) {
+  var L = layout(cfg), k = L.k;
+  var yMain = 255;
+  var g = [];
+  g.push('<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" xmlns="http://www.w3.org/2000/svg">');
+  g.push('<defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="12" markerHeight="12" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>');
+  g.push('<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="#ffffff"/>');
+
+  var blue = '#185FA5', blueT = '#0C447C', blueF = '#378ADD', blueL = '#E6F1FB', green = '#0F6E56', greenL = '#E1F5EE';
+
+  function tag(x, y, n, opt) {
+    if (!cfg.show.num) return;
+    g.push('<circle cx="' + x + '" cy="' + y + '" r="' + (opt && opt.r || 11) + '" fill="#fff" stroke="' + blueT + '" stroke-width=".6"/>');
+    g.push('<text x="' + x + '" y="' + y + '" font-size="' + (opt && opt.fs || 12) + '" text-anchor="middle" dominant-baseline="central" fill="' + blueT + '">' + n + '</text>');
+  }
+  function pipe(x1, y1, x2, y2, w, col) {
+    g.push('<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="' + (col || blue) + '" stroke-width="' + w + '"/>');
+  }
+  function txt(x, y, s, fs, col, anchor) {
+    g.push('<text x="' + x + '" y="' + y + '" font-size="' + (fs || 12) + '" text-anchor="' + (anchor || 'middle') + '" fill="' + (col || '#222') + '">' + esc(s) + '</text>');
+  }
+
+  var x = 60 * k;
+
+  /* 1 水源 */
+  var sw = 96 * k, sh = 100 * k;
+  g.push('<text x="' + (x + 14) + '" y="' + (yMain - sh / 2 - 44) + '" font-size="13" fill="' + blueT + '">水源</text>');
+  tag(x + 14, yMain - sh / 2 - 22, '1');   // 圆下缘距水池矩形顶边 11px，不再重叠
+  g.push('<rect x="' + x + '" y="' + (yMain - sh / 2) + '" width="' + sw + '" height="' + sh + '" rx="6" fill="' + blueL + '" stroke="' + blue + '" stroke-width=".6"/>');
+  g.push('<path d="M' + x + ' ' + (yMain - sh / 2 + 18) + ' Q ' + (x + sw / 4) + ' ' + (yMain - sh / 2 + 10) + ' ' + (x + sw / 2) + ' ' + (yMain - sh / 2 + 18) + ' T ' + (x + sw) + ' ' + (yMain - sh / 2 + 18) + '" stroke="' + blue + '" stroke-width="1.1" fill="none"/>');
+  g.push('<path d="M' + x + ' ' + (yMain - sh / 2 + 18) + ' L' + (x + sw) + ' ' + (yMain - sh / 2 + 18) + ' L' + (x + sw) + ' ' + (yMain + sh / 2) + ' L' + x + ' ' + (yMain + sh / 2) + ' Z" fill="#B5D4F4" opacity=".5"/>');
+  txt(x + sw / 2, yMain + sh / 2 - 30, cfg.source, 13, blueT);
+  txt(x + sw / 2, yMain + sh / 2 - 12, '水源', 12, blue);
+  x += sw + 26 * k;
+
+  /* 2 底阀滤网 + 3 吸水管 */
+  pipe(x - 26 * k, yMain, x + 26 * k, yMain, pw(cfg.suctionDN));   // 水源出口(156k)→底阀圆心(208k)
+  x += 26 * k;                          // x = 底阀圆心（208k）
+  g.push('<circle cx="' + x + '" cy="' + yMain + '" r="13" fill="#fff" stroke="' + blue + '" stroke-width=".6"/>');
+  g.push('<line x1="' + x + '" y1="' + (yMain - 9) + '" x2="' + x + '" y2="' + (yMain + 9) + '" stroke="' + blue + '" stroke-width="1.2"/>');
+  g.push('<line x1="' + (x - 9) + '" y1="' + yMain + '" x2="' + (x + 9) + '" y2="' + yMain + '" stroke="' + blue + '" stroke-width=".6" stroke-dasharray="2.5 1.8"/>');
+  tag(x, yMain - 26, '2', { r: 10 });
+  txt(x, yMain + 34, '底阀+滤网', 12, blueT);
+  x += 26 * k;                          // x = 吸水管段起点（234k）
+  pipe(x - 26 * k, yMain, x + 20 * k, yMain, pw(cfg.suctionDN));   // 底阀圆心(208k)→吸水管段终点(254k)
+  if (cfg.show.dn) txt(x + 8, yMain + 26, '吸水管 DN' + cfg.suctionDN, 12.5, blueT, 'start');
+  tag(x + 8, yMain - 28, '3', { r: 10 });
+  x += 20 * k;
+
+  /* 4 吸肥区（4-1 ~ 4-n） */
+  var fc = cfg.fertCount, fW = L.fW, fH = L.fH, fGap = L.fGap;
+  var regionStart = x, regionW = (fc - 1) * fGap + fW;
+  for (var i = 0; i < fc; i++) {
+    var cx = regionStart + i * fGap + fW / 2;
+    var yTop = yMain - 96 * k - fH;
+    var numY = yTop - 20 * k;
+    pipe(cx, yMain, cx, numY, pw(cfg.ferts[i].dn || 25) + 1.5, green);
+    g.push('<rect x="' + (cx - fW / 2) + '" y="' + yTop + '" width="' + fW + '" height="' + fH + '" rx="6" fill="' + greenL + '" stroke="' + green + '" stroke-width=".6"/>');
+    txt(cx, yTop + 18, '施肥器 · ' + cfg.ferts[i].type, 12.5, '#04342C');
+    txt(cx, yTop + 38, '第 ' + (i + 1) + ' 路 · 吸肥 DN' + cfg.ferts[i].dn, 11.5, green);
+    var gy = yMain - 50 * k;
+    g.push('<rect x="' + (cx - 5) + '" y="' + (gy - 5) + '" width="10" height="10" fill="#fff" stroke="' + green + '" stroke-width=".6" transform="rotate(45 ' + cx + ' ' + gy + ')"/>');
+    if (cfg.show.num) {
+      g.push('<circle cx="' + cx + '" cy="' + numY + '" r="10" fill="#fff" stroke="' + green + '" stroke-width=".6"/>');
+      g.push('<text x="' + cx + '" y="' + numY + '" font-size="11.5" text-anchor="middle" dominant-baseline="central" fill="' + green + '">4-' + (i + 1) + '</text>');
+    }
+  }
+  pipe(regionStart, yMain, regionStart + regionW + 30 * k, yMain, pw(cfg.suctionDN));  // 吸肥区水平管延伸至闸阀段起点
+  x = regionStart + regionW + 30 * k;
+
+  /* 5 闸阀 */
+  pipe(x, yMain, x + 54 * k, yMain, pw(cfg.suctionDN));   // 贯穿闸阀段（54k）
+  var gx = x + 27 * k;
+  g.push('<rect x="' + (gx - 8) + '" y="' + (yMain - 8) + '" width="16" height="16" fill="#fff" stroke="' + blue + '" stroke-width=".6" transform="rotate(45 ' + gx + ' ' + yMain + ')"/>');
+  txt(gx, yMain + 28, '闸阀', 12, blueT);
+  tag(gx, yMain - 30, '5', { r: 10 });
+  x = gx + 27 * k;
+
+  /* 6 水泵 */
+  pipe(x, yMain, x + 99 * k, yMain, pw(cfg.suctionDN));   // 贯穿水泵段（22+34+27+16=99k），圆覆盖中部
+  var px = x + 22 * k + 34 * k;
+  g.push('<circle cx="' + px + '" cy="' + yMain + '" r="' + (27 * k) + '" fill="#fff" stroke="' + blue + '" stroke-width=".6"/>');
+  g.push('<path d="M' + px + ' ' + (yMain - 15 * k) + ' L' + (px + 12 * k) + ' ' + (yMain + 10 * k) + ' L' + (px - 12 * k) + ' ' + (yMain + 10 * k) + ' Z" fill="' + blueF + '"/>');
+  tag(px, yMain - 42 * k, '6');
+  txt(px, yMain - 60 * k, '水泵', 13, blueT);
+  txt(px, yMain + 27 * k + 18, cfg.pump, 12, blue);
+  x = px + 27 * k + 16 * k;
+
+  /* 7 压力表（泵后 / 过滤器前） */
+  pipe(x, yMain, x + 40 * k, yMain, pw(cfg.suctionDN));
+  var mgx = x + 20 * k;
+  g.push('<line x1="' + mgx + '" y1="' + yMain + '" x2="' + mgx + '" y2="' + (yMain - 22 * k) + '" stroke="' + blue + '" stroke-width="2"/>');
+  g.push('<circle cx="' + mgx + '" cy="' + (yMain - 34 * k) + '" r="11" fill="#fff" stroke="' + blue + '" stroke-width=".6"/>');
+  g.push('<line x1="' + mgx + '" y1="' + (yMain - 34 * k) + '" x2="' + (mgx + 6) + '" y2="' + (yMain - 40 * k) + '" stroke="' + blue + '" stroke-width="1.2"/>');
+  txt(mgx, yMain - 52 * k, '压力表', 12, blueT);
+  tag(mgx, yMain - 52 * k - 26, '7', { r: 9 });
+  x += 40 * k;
+
+  /* 8 止回阀 */
+  if (cfg.checkValve) {
+    var cvx = x + 10 * k;
+    g.push('<line x1="' + x + '" y1="' + yMain + '" x2="' + cvx + '" y2="' + yMain + '" stroke="' + blue + '" stroke-width="' + pw(cfg.suctionDN) + '"/>');
+    g.push('<line x1="' + cvx + '" y1="' + yMain + '" x2="' + (x + 54 * k) + '" y2="' + yMain + '" stroke="' + blue + '" stroke-width="' + pw(cfg.suctionDN) + '" marker-end="url(#arrow)"/>');
+    txt(cvx + 15 * k, yMain + 28, '止回阀', 12, blueT);
+    tag(cvx + 15 * k, yMain - 30, '8', { r: 10 });
+    x = cvx + 30 * k + 14 * k;
+  } else {
+    pipe(x, yMain, x + 54 * k, yMain, pw(cfg.suctionDN));   // 无止回阀时段宽仍画管道，保持连续
+    x += 54 * k;   // 无止回阀时也推进段宽，与 layout() 一致
+  }
+
+  /* 9 过滤器 */
+  var fw = 96 * k, fh = 62 * k;
+  pipe(x, yMain, x + 14 * k, yMain, pw(cfg.suctionDN));
+  var fx = x + 14 * k;
+  g.push('<rect x="' + fx + '" y="' + (yMain - fh / 2) + '" width="' + fw + '" height="' + fh + '" rx="4" fill="' + blueL + '" stroke="' + blue + '" stroke-width=".6"/>');
+  g.push('<path d="M' + (fx + 10) + ' ' + (yMain - 16 * k) + ' L' + (fx + fw / 2) + ' ' + yMain + ' L' + (fx + fw - 10) + ' ' + (yMain - 16 * k) + ' L' + (fx + fw - 10) + ' ' + (yMain + 16 * k) + ' L' + (fx + fw / 2) + ' ' + yMain + ' L' + (fx + 10) + ' ' + (yMain + 16 * k) + ' Z" fill="none" stroke="' + blueF + '" stroke-width="1.2"/>');
+  tag(fx + fw / 2, yMain - fh / 2 - 26, '9');
+  txt(fx + fw / 2, yMain - fh / 2 - 44, '过滤器', 13, blueT);
+  txt(fx + fw / 2, yMain + fh / 2 + 20, cfg.filter, 12, blue);
+  x = fx + fw + 16 * k;
+
+  /* 10 压力表（过滤器后，与泵后压力表配合监测过滤器压差） */
+  pipe(fx + fw, yMain, x + 40 * k, yMain, pw(cfg.mainDN) + 3);   // 从过滤器右缘直接接出，消除 16k 断口
+  var mgx2 = x + 20 * k;
+  g.push('<line x1="' + mgx2 + '" y1="' + yMain + '" x2="' + mgx2 + '" y2="' + (yMain - 22 * k) + '" stroke="' + blue + '" stroke-width="2"/>');
+  g.push('<circle cx="' + mgx2 + '" cy="' + (yMain - 34 * k) + '" r="11" fill="#fff" stroke="' + blue + '" stroke-width=".6"/>');
+  g.push('<line x1="' + mgx2 + '" y1="' + (yMain - 34 * k) + '" x2="' + (mgx2 + 6) + '" y2="' + (yMain - 40 * k) + '" stroke="' + blue + '" stroke-width="1.2"/>');
+  txt(mgx2, yMain - 52 * k, '压力表', 12, blueT);
+  tag(mgx2, yMain - 52 * k - 26, '10', { r: 9 });
+  x += 40 * k;
+
+  /* 11 供水主管 → 右端弯折向上 → 竖管接分区管 */
+  var mw = pw(cfg.mainDN) + 3;                 // 总管管宽
+  var mw2 = pw(cfg.mainDN) + 1;                // 分区管稍细
+  var zc = L.zc, vGap = L.vGap;
+  var bendX = x + L.mainExtendLen;             // 弯折点 x
+
+  /* DN 标注与编号（在主管起始处） */
+  if (cfg.show.dn) txt(x + 8, yMain + 28, '供水主管 DN' + cfg.mainDN, 12.5, blueT, 'start');
+  tag((x + bendX) / 2, yMain - 32, '11', { r: 10 });   // 编号11标在供水主管水平段中点上方，避开10号压力表与排气阀
+
+  /* 排气阀（主管水平段） */
+  var avX = x + 40;
+  if (cfg.airValve) {
+    g.push('<line x1="' + avX + '" y1="' + yMain + '" x2="' + avX + '" y2="' + (yMain - 18) + '" stroke="' + blue + '" stroke-width="2"/>');
+    g.push('<circle cx="' + avX + '" cy="' + (yMain - 24) + '" r="8" fill="#fff" stroke="' + blue + '" stroke-width=".6"/>');
+    txt(avX, yMain - 42, '排气阀', 11, blueT);
+    tag(avX + 34, yMain - 24, '12', { r: 9 });
+  }
+
+  /* 总管水平段 → 弯折点 */
+  pipe(x, yMain, bendX, yMain, mw);
+
+  /* 竖管向上（弯折后） */
+  var firstBranchY = yMain - 35;                 // 首个分区接管高度
+  var topY = firstBranchY - (zc - 1) * vGap - 25; // 竖管顶部
+  pipe(bendX, yMain, bendX, topY, mw);
+
+  /* 竖管顶端箭头（向上） */
+  g.push('<line x1="' + bendX + '" y1="' + topY + '" x2="' + bendX + '" y2="' + (topY - 10) + '" stroke="' + blue + '" stroke-width="' + mw + '" marker-end="url(#arrow)"/>');
+  txt(bendX + 20, topY - 4, '至各轮灌区', 12, blueT, 'start');
+
+  /* 各分区接管：从竖管向右接出 */
+  for (var zi = 0; zi < zc; zi++) {
+    var by = firstBranchY - zi * vGap;           // 分区接管高度
+    /* 闸阀（菱形）在竖管上 */
+    g.push('<rect x="' + (bendX - 7) + '" y="' + (by - 7) + '" width="14" height="14" fill="#fff" stroke="' + blue + '" stroke-width=".6" transform="rotate(45 ' + bendX + ' ' + by + ')"/>');
+    /* 分区管向右 */
+    pipe(bendX, by, bendX + L.branchPipeLen, by, mw2);
+    /* 末端箭头 */
+    g.push('<line x1="' + (bendX + L.branchPipeLen) + '" y1="' + by + '" x2="' + (bendX + L.branchPipeLen + 6) + '" y2="' + by + '" stroke="' + blue + '" stroke-width="' + mw2 + '" marker-end="url(#arrow)"/>');
+    /* 轮灌区标注 */
+    txt(bendX + L.branchPipeLen + 20, by + 4, '轮灌区' + (zi + 1), 11, blueT, 'start');
+  }
+
+  /* 图例（网格排版：每行 4 项，图标垂直居中，文字统一在图标右侧） */
+  if (cfg.show.legend) {
+    var ly = yMain + 52 * k + 40;
+    var lgW = W - 80;                       // 图例可用宽度
+    var lgCols = 4, lgRowGap = 32;          // 每行列数 / 行距（紧凑，压缩 SVG 高度）
+    var lgColW = lgW / lgCols;              // 列宽（等分）
+    var lgY = ly + 38;                      // 第一行图标中心 y
+
+    txt(40, ly, '图例', 14, blueT, 'start');
+    g.push('<line x1="40" y1="' + (ly + 11) + '" x2="' + (W - 40) + '" y2="' + (ly + 11) + '" stroke="' + blue + '" stroke-width=".5"/>');
+
+    var legendItems = [
+      {
+        name: '闸阀', draw: function (cx, cy) {
+          g.push('<rect x="' + (cx - 8) + '" y="' + (cy - 8) + '" width="16" height="16" fill="#fff" stroke="' + blue + '" stroke-width=".6" transform="rotate(45 ' + cx + ' ' + cy + ')"/>');
+        }
+      },
+      {
+        name: '止回阀', draw: function (cx, cy) {
+          g.push('<line x1="' + (cx - 16) + '" y1="' + cy + '" x2="' + (cx + 16) + '" y2="' + cy + '" stroke="' + blue + '" stroke-width="1.6" marker-end="url(#arrow)"/>');
+        }
+      },
+      {
+        name: '底阀+滤网', draw: function (cx, cy) {
+          g.push('<circle cx="' + cx + '" cy="' + cy + '" r="9" fill="#fff" stroke="' + blue + '" stroke-width=".6"/>');
+          g.push('<line x1="' + cx + '" y1="' + (cy - 7) + '" x2="' + cx + '" y2="' + (cy + 7) + '" stroke="' + blue + '" stroke-width="1.2"/>');
+          g.push('<line x1="' + (cx - 7) + '" y1="' + cy + '" x2="' + (cx + 7) + '" y2="' + cy + '" stroke="' + blue + '" stroke-width=".6" stroke-dasharray="2.5 1.8"/>');
+        }
+      },
+      {
+        name: '水泵', draw: function (cx, cy) {
+          g.push('<circle cx="' + cx + '" cy="' + cy + '" r="10" fill="#fff" stroke="' + blue + '" stroke-width=".6"/>');
+          g.push('<path d="M' + cx + ' ' + (cy - 8) + ' L' + (cx + 6) + ' ' + (cy + 4) + ' L' + (cx - 6) + ' ' + (cy + 4) + ' Z" fill="' + blueF + '"/>');
+        }
+      },
+      {
+        name: '过滤器', draw: function (cx, cy) {
+          g.push('<rect x="' + (cx - 13) + '" y="' + (cy - 10) + '" width="26" height="20" rx="3" fill="' + blueL + '" stroke="' + blue + '" stroke-width=".6"/>');
+          g.push('<path d="M' + (cx - 8) + ' ' + (cy - 3) + ' L' + (cx - 4) + ' ' + (cy + 2) + ' L' + cx + ' ' + (cy - 3) + ' L' + (cx + 4) + ' ' + (cy + 2) + ' L' + (cx + 8) + ' ' + (cy - 3) + '" fill="none" stroke="' + blueF + '" stroke-width=".9"/>');
+        }
+      },
+      {
+        name: '施肥器', draw: function (cx, cy) {
+          g.push('<circle cx="' + cx + '" cy="' + cy + '" r="11" fill="' + greenL + '" stroke="' + green + '" stroke-width=".6"/>');
+          g.push('<line x1="' + (cx - 7) + '" y1="' + (cy - 9) + '" x2="' + (cx + 7) + '" y2="' + (cy - 9) + '" stroke="' + green + '" stroke-width=".8"/>');
+          g.push('<line x1="' + cx + '" y1="' + (cy - 9) + '" x2="' + cx + '" y2="' + (cy - 12) + '" stroke="' + green + '" stroke-width=".8"/>');
+          g.push('<path d="M' + (cx - 6) + ' ' + (cy + 1) + ' L' + (cx - 3) + ' ' + (cy - 2) + ' L' + cx + ' ' + (cy + 1) + ' L' + (cx + 3) + ' ' + (cy - 2) + ' L' + (cx + 6) + ' ' + (cy + 1) + '" fill="none" stroke="' + green + '" stroke-width=".8"/>');
+          g.push('<circle cx="' + cx + '" cy="' + (cy + 6) + '" r="1.6" fill="' + green + '"/>');
+        }
+      },
+      {
+        name: '压力表', draw: function (cx, cy) {
+          g.push('<line x1="' + cx + '" y1="' + (cy - 13) + '" x2="' + cx + '" y2="' + (cy - 4) + '" stroke="' + blue + '" stroke-width="2"/>');
+          g.push('<circle cx="' + cx + '" cy="' + (cy - 17) + '" r="8" fill="#fff" stroke="' + blue + '" stroke-width=".6"/>');
+          g.push('<line x1="' + cx + '" y1="' + (cy - 17) + '" x2="' + (cx + 4) + '" y2="' + (cy - 21) + '" stroke="' + blue + '" stroke-width="1.2"/>');
+        }
+      },
+      {
+        name: '水流方向', draw: function (cx, cy) {
+          g.push('<line x1="' + (cx - 14) + '" y1="' + cy + '" x2="' + (cx + 14) + '" y2="' + cy + '" stroke="' + blue + '" stroke-width="1.6" marker-end="url(#arrow)"/>');
+        }
+      },
+      {
+        name: '分区管', draw: function (cx, cy) {
+          g.push('<rect x="' + (cx - 12) + '" y="' + (cy - 6) + '" width="12" height="12" fill="#fff" stroke="' + blue + '" stroke-width=".5" transform="rotate(45 ' + (cx - 6) + ' ' + cy + ')"/>');
+          g.push('<line x1="' + (cx - 6) + '" y1="' + cy + '" x2="' + (cx + 14) + '" y2="' + cy + '" stroke="' + blue + '" stroke-width="2.4" marker-end="url(#arrow)"/>');
+        }
+      }
+    ];
+
+    for (var li = 0; li < legendItems.length; li++) {
+      var lcol = li % lgCols, lrow = Math.floor(li / lgCols);
+      var lx = 40 + lcol * lgColW + 22;        // 图标中心 x（列起点 + 缩进）
+      var lyy = lgY + lrow * lgRowGap;         // 图标中心 y
+      legendItems[li].draw(lx, lyy);
+      txt(lx + 32, lyy + 4, legendItems[li].name, 12, '#333', 'start');
+    }
+
+    var noteY = lgY + Math.ceil(legendItems.length / lgCols) * lgRowGap + 12;
+    txt(40, noteY, '注：管径为参考值，最终以水力计算确定；吸肥管接于水泵进水侧（吸水管）。', 11.5, '#555', 'start');
+  }
+
+  g.push('</svg>');
+  return g.join('');
+}
+/* ===== 主渲染：组装整张图纸 ===== */
+function render() {
+  collect();
+  var S = svgSize(cfg), L = S.L, W = S.W, H = S.H;
+
+  var paperW, paperH;
+  if (cfg.paper === 'a4') { paperW = 297; paperH = 210; }
+  else { paperW = 420; paperH = 297; }
+
+  var sheet = document.getElementById('sheet');
+  sheet.className = 'sheet print-area ' + cfg.paper;
+  sheet.style.width = paperW + 'mm';
+  sheet.style.height = paperH + 'mm';
+
+  /* 同步 @page 打印尺寸，保证打印/转 PDF 时图纸满布整页（横向） */
+  var pageStyle = document.getElementById('print-page');
+  if (!pageStyle) {
+    pageStyle = document.createElement('style');
+    pageStyle.id = 'print-page';
+    document.head.appendChild(pageStyle);
+  }
+  pageStyle.textContent = '@page { size: ' + paperW + 'mm ' + paperH + 'mm; margin: 0; }';
+
+  /* 布局参数（mm） */
+  var headTop = 11, headH = 14;
+  var svgTop = headTop + headH + 3;          // 28mm
+  var signH = cfg.show.sign ? 17 : 0;
+  var signBottom = 10;
+  var lowerH = (cfg.show.table || cfg.show.notes) ? (cfg.paper === 'a4' ? 78 : 82) : 0;
+  var lowerGap = 6;
+  var svgBottom = signH + signBottom + lowerH + (lowerH > 0 ? lowerGap : 0) + 4;
+
+  /* 设备表与上方图例左侧对齐：按 .svg-zone 居中换算 SVG 内 x=40（图例标题）在纸面的位置 */
+  var svgZoneH = paperH - svgTop - svgBottom;
+  var svgScale = svgZoneH / H;
+  /* 水源矩形左边固定距内图框 20mm：纸面目标位置 = 内图框 11mm + 20mm = 31mm，
+     SVG 左缘 = 31 − 水源在 SVG 内左边距（60*k px → mm），并夹在绘图区内不越界 */
+  var srcLeftTarget = 11 + 20;
+  var svgLeft = srcLeftTarget - 60 * L.k * svgScale;
+  svgLeft = Math.max(13, Math.min(svgLeft, paperW - 13 - W * svgScale));   // .svg-zone left/right=13mm
+  var svgPadL = Math.max(0, svgLeft - 13);          // SVG 在 .svg-zone 内的左内边距（mm）
+  var legendLeft = svgLeft + 40 * svgScale;              // 图例标题"图例"左边缘
+  var tabPad = Math.max(legendLeft - 11, 2);             // 设备表默认左缘偏移（11 + tabPad = 图例标题"图例"左缘）
+
+  var html = '';
+  html += '<div class="sheet-inner"></div>';
+  html += '<div class="sheet-inner2"></div>';
+  html += '<div class="head"><span class="proj">' + esc(cfg.title) + '</span>';
+  html += '<span class="sub">' + esc(cfg.unit) + '</span>';
+  html += '<span class="code">' + esc(cfg.figNo) + '</span></div>';
+  html += '<div class="svg-zone" style="top:' + svgTop + 'mm;bottom:' + svgBottom + 'mm;justify-content:flex-start;padding-left:' + svgPadL + 'mm;">' + drawSVG(cfg, W, H) + '</div>';
+
+  if (lowerH > 0) {
+    var lowerW = paperW - 11 - 13;                                  // 底部可用宽（左 11mm / 右 13mm）
+    var zoneTop = paperH - (signH + signBottom + lowerGap) - lowerH; // 底部区域顶边（mm）
+    var defTableW = Math.max(90, lowerW * 0.60);
+    var defNotesW = Math.max(60, lowerW - defTableW - ZONE_GAP);
+    var defZoneH = lowerH - 6;
+    /* 设备表左缘与图例标题对齐；tX/tW 提前计算，供设计说明恒定间距引用 */
+    var tX = (cfg.tableX != null) ? cfg.tableX : 11 + tabPad;
+    var tW = (cfg.tableW != null) ? cfg.tableW : defTableW;
+    if (cfg.show.table) {
+      var tY = (cfg.tableY != null) ? cfg.tableY : zoneTop + 3;
+      var tH = (cfg.tableH != null) ? cfg.tableH : defZoneH;
+      html += zbBlock('设备表', 'table', buildTable(), tX, tY, tW, tH);
+    }
+    if (cfg.show.notes) {
+      /* 横向间距恒定：设计说明左缘 = 设备表右缘 + ZONE_GAP（忽略 cfg.notesX） */
+      var nX = tX + tW + ZONE_GAP;
+      var nY = (cfg.notesY != null) ? cfg.notesY : zoneTop + 3;
+      var nW = (cfg.notesW != null) ? cfg.notesW : defNotesW;
+      var nH = (cfg.notesH != null) ? cfg.notesH : defZoneH;
+      html += zbBlock('设计说明', 'notes', buildNotes(), nX, nY, nW, nH);
+    }
+  }
+
+  if (cfg.show.sign) {
+    html += buildSign();
+  }
+
+  sheet.innerHTML = html;
+  initZoneBlocks();
+}
+
+/* ===== 设备表 ===== */
+function buildTable() {
+  var rows = [];
+  rows.push(['1', '水源', cfg.source, '座', '1', '蓄水/取水设施']);
+  rows.push(['2', '底阀+滤网', 'DN' + cfg.suctionDN + ' 铸铁/不锈钢', '套', '1', '吸水口防杂物']);
+  rows.push(['3', '吸水管', 'DN' + cfg.suctionDN + ' PE/PVC', 'm', '\u2014', '流速 \u2264 1.5 m/s']);
+  for (var i = 0; i < cfg.fertCount; i++) {
+    var f = cfg.ferts[i];
+    rows.push(['4-' + (i + 1), '施肥器', f.type + ' DN' + f.dn, '套', '1', '含施肥罐']);
+  }
+  rows.push(['5', '闸阀', 'DN' + cfg.suctionDN, '个', '1', '泵前检修用']);
+  rows.push(['6', '水泵', cfg.pump + '（Q、H 按计算）', '台', '1', '配电机与控制柜']);
+  rows.push(['7', '压力表', '0~1.0 MPa', '块', '1', '过滤器前监测']);
+  if (cfg.checkValve) rows.push(['8', '止回阀', 'DN' + cfg.suctionDN, '个', '1', '防肥液/水回流']);
+  rows.push(['9', '过滤器', cfg.filter + ' DN' + cfg.suctionDN, '套', '1', '按水源水质选型']);
+  rows.push(['10', '压力表', '0~1.0 MPa', '块', '1', '过滤器后监测']);
+  var zc = cfg.zoneCount || 2;
+  rows.push(['11', '供水主管', 'DN' + cfg.mainDN + ' PE/PVC', 'm', '\u2014', '总管→弯折向上→各轮灌区']);
+  rows.push(['11a', '分区闸阀', 'DN' + cfg.mainDN, '个', String(zc), '每分区一个']);
+  rows.push(['11b', '分区管', 'DN' + cfg.mainDN + ' PE/PVC', 'm', '\u2014', '至各轮灌区' + zc + '路']);
+  if (cfg.airValve) rows.push(['12', '排气阀', 'DN25', '个', '1', '主管首端高点']);
+
+  var h = '<table><thead><tr>' +
+    '<th style="width:8%">编号</th>' +
+    '<th class="l" style="width:22%">名称</th>' +
+    '<th style="width:22%">规格/型号</th>' +
+    '<th style="width:8%">单位</th>' +
+    '<th style="width:8%">数量</th>' +
+    '<th class="l" style="width:32%">备注</th>' +
+    '</tr></thead><tbody>';
+  rows.forEach(function (r) {
+    h += '<tr><td>' + r[0] + '</td><td class="l">' + r[1] + '</td><td>' + r[2] +
+      '</td><td>' + r[3] + '</td><td>' + r[4] + '</td><td class="l">' + r[5] + '</td></tr>';
+  });
+  h += '</tbody></table>';
+  return h;
+}
+
+  /* 图纸内虚线外框区域：zbBlock 生成 + initZoneBlocks 拖拽（移动/缩放，文字字号不变；双击标题恢复默认）。
+     设备表与设计说明默认对齐：设备表左缘=图例左缘（11+tabPad），设计说明顶端=设备表顶端（同 top），水平间距 zoneGap=3mm */
+  function zbBlock(title, cls, body, x, y, w, h) {
+    return '<div class="zb-block zb-' + cls + '" style="left:' + x.toFixed(1) + 'mm;top:' + y.toFixed(1) + 'mm;width:' + w.toFixed(1) + 'mm;height:' + h.toFixed(1) + 'mm;">' +
+      '<i class="zb-frame"></i>' +
+      '<div class="zb-title" title="拖动移动位置，双击恢复默认">' + title + '</div>' +
+      '<div class="zb-body">' + body + '</div>' +
+      '<i class="zb-handle" title="拖动调整大小（文字不变）"></i>' +
+      '</div>';
+  }
+function initZoneBlocks() {
+  var sheet = document.getElementById('sheet');
+  var blocks = sheet.querySelectorAll('.zb-block');
+  var paperW = (cfg.paper === 'a4' ? 297 : 420);
+  var paperH = (cfg.paper === 'a4' ? 210 : 297);
+  function pxPerMm() {
+    var rect = sheet.getBoundingClientRect();
+    return rect.width > 0 ? rect.width / paperW : 3.78;
+  }
+  function readPos(blk) {
+    var rect = blk.getBoundingClientRect();
+    var srect = sheet.getBoundingClientRect();
+    var p = pxPerMm();
+    return {
+      x: rect.width > 0 ? (rect.left - srect.left) / p : (parseFloat(blk.style.left) || 0),
+      y: rect.height > 0 ? (rect.top - srect.top) / p : (parseFloat(blk.style.top) || 0),
+      w: rect.width > 0 ? rect.width / p : (parseFloat(blk.style.width) || 62 * paperW / 100),
+      h: rect.height > 0 ? rect.height / p : (parseFloat(blk.style.height) || 60)
+    };
+  }
+  /* 保存所有虚线框的位置与尺寸（移动/缩放任一框后整体落库） */
+  function saveAll() {
+    blocks.forEach(function (b) {
+      var k = b.className.indexOf('zb-table') >= 0 ? 'table' : 'notes';
+      var r = readPos(b);
+      cfg[k + 'X'] = Math.round(r.x * 10) / 10;
+      cfg[k + 'Y'] = Math.round(r.y * 10) / 10;
+      cfg[k + 'W'] = Math.round(r.w * 10) / 10;
+      cfg[k + 'H'] = Math.round(r.h * 10) / 10;
+    });
+    persist();
+  }
+  blocks.forEach(function (blk) {
+    var key = blk.className.indexOf('zb-table') >= 0 ? 'table' : 'notes';
+    var title = blk.querySelector('.zb-title');
+    var handle = blk.querySelector('.zb-handle');
+    title.addEventListener('mousedown', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      var p = pxPerMm();
+      var pos0 = [];
+      blocks.forEach(function (b) { pos0.push(readPos(b)); });
+      var idx = Array.prototype.indexOf.call(blocks, blk);
+      var s = pos0[idx];
+      var sx = e.clientX, sy = e.clientY;
+      var oldUS = document.body.style.userSelect;
+      document.body.style.userSelect = 'none';
+      function move(ev) {
+        /* 以被拖动框为基准做边界钳制，然后所有框整体同步平移（保持顶端对齐与间距） */
+        var nx = Math.max(11, Math.min(paperW - 11 - s.w, s.x + (ev.clientX - sx) / p));
+        var ny = Math.max(28, Math.min(paperH - 11 - s.h, s.y + (ev.clientY - sy) / p));
+        var odx = nx - s.x, ody = ny - s.y;
+        blocks.forEach(function (b, i) {
+          b.style.left = (pos0[i].x + odx).toFixed(1) + 'mm';
+          b.style.top = (pos0[i].y + ody).toFixed(1) + 'mm';
+        });
+      }
+      function up() {
+        document.removeEventListener('mousemove', move);
+        document.removeEventListener('mouseup', up);
+        document.body.style.userSelect = oldUS;
+        saveAll();
+      }
+      document.addEventListener('mousemove', move);
+      document.addEventListener('mouseup', up);
+    });
+    handle.addEventListener('mousedown', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      var p = pxPerMm();
+      var s = readPos(blk);
+      /* 找出另一框：缩放设备表时设计说明跟随（保持横向间距 ZONE_GAP 恒定） */
+      var otherBlk = null, other = null;
+      blocks.forEach(function (b) {
+        if (b !== blk) { otherBlk = b; other = readPos(b); }
+      });
+      var isLeft = otherBlk !== null && blk.className.indexOf('zb-table') >= 0;
+      var sx = e.clientX, sy = e.clientY;
+      var oldUS = document.body.style.userSelect;
+      document.body.style.userSelect = 'none';
+      function move(ev) {
+        var maxW = paperW - 13 - s.x;
+        if (isLeft && other) {
+          /* 设计说明右缘不得超过图纸右缘 → 设备表最大宽度受限 */
+          maxW = Math.min(maxW, paperW - 13 - s.x - ZONE_GAP - other.w);
+        }
+        var nw = Math.max(80, Math.min(maxW, s.w + (ev.clientX - sx) / p));
+        var nh = Math.max(42, Math.min(paperH - 10 - s.y, s.h + (ev.clientY - sy) / p));
+        blk.style.width = nw.toFixed(1) + 'mm';
+        blk.style.height = nh.toFixed(1) + 'mm';
+        if (isLeft && other) otherBlk.style.left = (s.x + nw + ZONE_GAP).toFixed(1) + 'mm';
+      }
+      function up() {
+        document.removeEventListener('mousemove', move);
+        document.removeEventListener('mouseup', up);
+        document.body.style.userSelect = oldUS;
+        saveAll();
+      }
+      document.addEventListener('mousemove', move);
+      document.addEventListener('mouseup', up);
+    });
+    title.addEventListener('dblclick', function () {
+      cfg.tableX = null; cfg.tableY = null;
+      cfg.tableW = null; cfg.tableH = null;
+      cfg.notesX = null; cfg.notesY = null;
+      cfg.notesW = null; cfg.notesH = null;
+      persist();
+      render();
+    });
+  });
+}
+
+/* ===== 设计说明（详细版） ===== */
+function buildNotes() {
+  var notes = [
+    '<b>系统组成与流程：</b>水源（蓄水池）→ 底阀+滤网 → 吸水管 →（吸肥管/施肥器接入）→ 水泵 → 过滤器 → 供水主管（总管）→ 末端向上弯折 → 分区闸阀 → 分区管 → 各轮灌区（滴灌带/滴头）。总管右端弯折向上，竖管按联合灌溉区数（' + (cfg.zoneCount || 2) + '区）向右引出对应数量分区管，每个分区设闸阀单独控制。',
+    '<b>流量与管径确定：</b>设计流量 Q = 灌溉面积 × 设计灌水率（或毛灌水定额 ÷ 轮灌周期 ÷ 日运行时间）。吸水管、主管流速取 1.0~1.5 m/s，管径 d = 1000×√(4Q/πv)。示例：Q≈20 m³/h 时吸水管 DN100、供水主管 DN90；Q 每增加一倍升一级管径。',
+    '<b>水泵选型：</b>流量按系统最大设计流量的 1.1 倍取；扬程 H = 净扬程 + 管路沿程/局部损失 + 过滤器损失（约 5~8 m）+ 灌水器工作压力（滴头 10~15 m）。自吸泵吸程一般 ≤ 5~6 m，水位落差超出时应改用离心泵配底阀灌水或潜水泵。',
+    '<b>过滤器选型：</b>水源为塘/河水（含泥沙、藻类、悬浮物）时，建议砂石过滤器 + 叠片过滤器二级过滤；井水、清水可用叠片式或网式。过滤精度 100~130 目，出口压损 ≤ 7 m；过滤器前后设压力表，压差 &gt; 0.05 MPa 时及时反冲洗。',
+    '<b>吸肥装置：</b>本图按吸肥管接于吸水管（泵前）布置，配置施肥罐与调节阀，利用泵前负压吸入肥液；亦可采用泵后旁路文丘里施肥器方案。施肥浓度控制 0.1%~0.3%，施肥完毕用清水冲洗管路 10~15 min，防止肥液结晶堵塞灌水器。',
+    '<b>附属设施：</b>泵前设闸阀与底阀保证灌水；泵后设止回阀防止回流污染水源；主管首端高点设排气阀，末端设冲洗阀；冬季或停用期排空管路存水防冻。'
+  ];
+  var h = '<ul class="notes" style="list-style:none;padding:0;margin:0;">';
+  notes.forEach(function (n, i) {
+    h += '<li>' + (i + 1) + '. ' + n + '</li>';
+  });
+  h += '</ul>';
+  return h;
+}
+
+/* ===== 图签 ===== */
+function buildSign() {
+  return '<table class="sign"><tr>' +
+    '<td class="cap">设计</td><td class="cap">校核</td><td class="cap">审核</td><td class="cap">日期</td></tr>' +
+    '<tr><td class="name">&nbsp;</td><td class="name">&nbsp;</td><td class="name">&nbsp;</td>' +
+    '<td class="name">' + esc(cfg.date) + '</td></tr></table>';
+}
+
+/* ===== 导出 SVG ===== */
+function exportSVG() {
+  collect();
+  var S = svgSize(cfg), W = S.W, H = S.H;
+  var svg = drawSVG(cfg, W, H);
+  var blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = cfg.figNo + '_滴灌供水设计图.svg';
+  a.click();
+  setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+}
+
+/* ===== 导出 PNG ===== */
+function exportPNG() {
+  collect();
+  var S = svgSize(cfg), W = S.W, H = S.H;
+  var svg = drawSVG(cfg, W, H);
+  var blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var img = new Image();
+  img.onload = function () {
+    var scale = 2;
+    var canvas = document.createElement('canvas');
+    canvas.width = W * scale;
+    canvas.height = H * scale;
+    var ctx = canvas.getContext('2d');
+    ctx.scale(scale, scale);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, W, H);
+    ctx.drawImage(img, 0, 0);
+    canvas.toBlob(function (b) {
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(b);
+      a.download = cfg.figNo + '_滴灌供水设计图.png';
+      a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+    }, 'image/png');
+    URL.revokeObjectURL(url);
+  };
+  img.onerror = function () {
+    URL.revokeObjectURL(url);
+    alert('PNG 导出失败，请尝试导出 SVG。');
+  };
+  img.src = url;
+}
+
+/* ===== URL 参数联动（三级系统计算结果：q=流量 h=扬程 p=功率 front=三级总管 main=三级主管）===== */
+(function () {
+  function qp(name) {
+    var m = location.search.match(new RegExp('[?&]' + name + '=([^&]*)'));
+    return m ? decodeURIComponent(m[1].replace(/\+/g, ' ')) : '';
+  }
+  function nearest(v, arr) {
+    var best = arr[0];
+    for (var i = 0; i < arr.length; i++) { if (Math.abs(arr[i] - v) < Math.abs(best - v)) best = arr[i]; }
+    return best;
+  }
+  var q = qp('q'), h = qp('h'), p = qp('p');
+  var front = qp('front'), main = qp('main');
+  if (q || h || p) {
+    var parts = ['润野灌溉 — 供水首部系统图'];
+    if (q) parts.push('Q ' + q);
+    if (h) parts.push('H ' + h);
+    if (p) parts.push('P ' + p);
+    cfg.title = parts.join(' · ');
+  }
+  var fd = parseInt(front, 10), md = parseInt(main, 10);
+  var zc = parseInt(qp('zc'), 10);
+  if (fd) cfg.mainDN = nearest(fd, DN_OPT);     // 三级「总管」→ 供水主管
+  if (md) cfg.suctionDN = nearest(md, DN_OPT);  // 三级「主管」→ 吸水管
+  if (zc >= 1 && zc <= 12) cfg.zoneCount = zc;  // 联合灌溉分区数 → 分区接管示意数量
+  if (fd || md || zc) persist();
+})();
+
+/* ===== 初始化 ===== */
+bindUI();
+render();
+
+</script>
+<script>
+/* ===== 前端防护：禁用右键菜单与源码查看快捷键 ===== */
+(function(){
+  document.addEventListener('contextmenu',function(e){e.preventDefault();return false;});
+  document.addEventListener('keydown',function(e){
+    var k=(e.key||'').toLowerCase();
+    if(e.key==='F12'||(e.ctrlKey&&e.shiftKey&&(k==='i'||k==='j'||k==='c'))||(e.ctrlKey&&k==='u')){
+      e.preventDefault();e.stopPropagation();return false;
+    }
+  });
+  document.addEventListener('selectstart',function(e){
+    var t=e.target&&e.target.tagName;
+    if(t==='INPUT'||t==='TEXTAREA')return;
+    e.preventDefault();
+  });
+})();
+</script>
+
+<!-- ===== 嵌入导航：移动端菜单 ===== -->
+<script>
+(function(){
+  var b=document.getElementById('mobileMenuBtn');
+  var n=document.getElementById('mainNav');
+  if(b&&n){b.addEventListener('click',function(){n.classList.toggle('open');});}
+})();
+</script>
+
+</body>
+</html>

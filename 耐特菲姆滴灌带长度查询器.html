@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>耐特菲姆滴灌带铺设长度查询器</title>
+<style>
+  :root{
+    /* 设计令牌 — 与润野主界面统一 */
+    --g-50:#f0fdf4; --g-100:#dcfce7; --g-200:#bbf7d0; --g-300:#86efac;
+    --g-400:#4ade80; --g-500:#22c55e; --g-600:#16a34a; --g-700:#15803d;
+    --g-800:#166534; --g-900:#14532d;
+    --s-50:#f8fafc; --s-100:#f1f5f9; --s-200:#e2e8f0; --s-300:#cbd5e1;
+    --s-400:#94a3b8; --s-500:#64748b; --s-600:#475569; --s-700:#334155;
+    --s-800:#1e293b; --s-900:#0f172a;
+    --blue:#3b82f6; --blue-50:#eff6ff; --blue-100:#dbeafe;
+    --amber:#f59e0b; --amber-50:#fffbeb; --amber-100:#fef3c7;
+    --red:#ef4444; --red-50:#fef2f2; --red-100:#fee2e2;
+    --teal:#0d9488; --teal-50:#f0fdfa; --teal-100:#ccfbf1;
+    --bg:#f7f5f0;
+    --radius:18px; --radius-sm:12px; --radius-xs:8px;
+    --shadow:0 2px 8px rgba(0,0,0,.04),0 0 0 1px rgba(0,0,0,.04);
+    --font:system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+    --mono:'SF Mono','Cascadia Code','Consolas',monospace;
+    --transition:all .22s cubic-bezier(.4,0,.2,1);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:var(--font);
+    background:var(--bg);
+    color:var(--s-800);
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  header{
+    background:linear-gradient(120deg,var(--g-800),var(--teal));
+    color:#fff;
+    padding:22px 20px 18px;
+    box-shadow:var(--shadow);
+  }
+  header h1{margin:0;font-size:22px;letter-spacing:.5px;}
+  header p{margin:6px 0 0;font-size:13px;opacity:.92;}
+  .wrap{max-width:1080px;margin:0 auto;padding:18px 16px 60px;}
+  .card{background:#fff;border:1px solid var(--s-100);border-radius:var(--radius-sm);box-shadow:var(--shadow);padding:18px;margin-bottom:18px;}
+  .card h2{margin:0 0 14px;font-size:16px;color:var(--s-800);display:flex;align-items:center;gap:8px;font-weight:700;}
+  .card h2::before{content:"";width:5px;height:18px;background:var(--teal);border-radius:3px;display:inline-block;}
+  .sub{font-size:12px;color:var(--s-500);margin:-8px 0 14px;}
+
+  /* product buttons */
+  .prod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;}
+  .prod{
+    border:2px solid var(--s-200);border-radius:var(--radius-xs);padding:11px 12px;cursor:pointer;
+    background:var(--g-50);transition:var(--transition);position:relative;
+  }
+  .prod:hover{border-color:var(--g-400);transform:translateY(-1px);}
+  .prod.active{border-color:var(--g-600);background:#fff;box-shadow:0 0 0 3px rgba(13,148,136,.15);}
+  .prod .pn{font-weight:700;font-size:14px;color:var(--s-800);padding-right:48px;line-height:1.35;}
+  .prod .pt{font-size:12px;color:var(--s-500);margin-top:2px;padding-right:48px;line-height:1.35;}
+  .prod .tag{position:absolute;top:8px;right:9px;font-size:10px;padding:1px 7px 2px;border-radius:20px;background:var(--g-100);color:var(--g-700);line-height:1.3;}
+
+  /* controls */
+  .controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;}
+  .field label{display:block;font-size:13px;color:var(--s-500);margin-bottom:5px;font-weight:600;}
+  .field select{
+    width:100%;padding:9px 10px;border:1.5px solid var(--s-200);border-radius:var(--radius-xs);font-size:14px;
+    background:#fff;color:var(--s-800);cursor:pointer;font-family:inherit;transition:var(--transition);
+  }
+  .field select:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-50);}
+
+  /* result */
+  .result{
+    display:flex;align-items:center;gap:20px;flex-wrap:wrap;
+    background:var(--g-50);border:1.5px solid var(--g-100);
+    border-radius:var(--radius-xs);padding:18px 20px;
+  }
+  .result .big{font-size:42px;font-weight:800;color:var(--g-700);line-height:1;}
+  .result .big small{font-size:16px;font-weight:600;color:var(--s-500);margin-left:4px;}
+  .result .meta{font-size:13px;color:var(--s-800);}
+  .result .meta b{color:var(--g-800);}
+  .result .flag{font-size:12px;padding:4px 10px;border-radius:20px;background:var(--amber-50);color:#8a6d00;border:1px solid var(--amber-100);}
+
+  /* heatmap */
+  .hm-scroll{overflow-x:auto;}
+  table.hm{border-collapse:separate;border-spacing:4px;margin:0 auto;}
+  table.hm th{
+    font-size:12px;color:var(--s-800);font-weight:700;padding:6px 10px;text-align:center;white-space:nowrap;
+  }
+  table.hm th.col-up{color:var(--red);}
+  table.hm th.col-down{color:var(--blue);}
+  table.hm td.rlbl{font-size:12px;color:var(--s-500);font-weight:600;text-align:right;padding-right:8px;white-space:nowrap;}
+  table.hm td.cell{
+    width:74px;height:50px;border-radius:var(--radius-xs);text-align:center;font-weight:700;font-size:15px;
+    cursor:pointer;color:var(--s-900);transition:var(--transition);border:2px solid transparent;position:relative;
+  }
+  table.hm td.cell:hover{transform:scale(1.06);z-index:2;}
+  table.hm td.cell.sel{border-color:var(--g-800);box-shadow:0 0 0 3px rgba(22,101,52,.25);}
+  table.hm td.cell.null{color:var(--s-300);background:#f1f5f9 !important;cursor:default;font-weight:400;}
+  .legend{display:flex;align-items:center;gap:10px;font-size:11px;color:var(--s-500);margin-top:10px;justify-content:center;flex-wrap:wrap;}
+  .legend .bar{height:10px;width:160px;border-radius:6px;background:linear-gradient(90deg,#fde68a,#86efac,#15803d);}
+  .legend .lab{font-size:11px;}
+
+  /* chart */
+  .chart-wrap{width:100%;overflow-x:auto;}
+  svg{display:block;max-width:100%;}
+  .chart-note{font-size:11px;color:var(--s-500);margin-top:6px;}
+
+  .note-box{font-size:12.5px;color:var(--s-600);line-height:1.8;}
+  .note-box b{color:var(--g-800);}
+  .src{font-size:11.5px;color:var(--s-400);border-top:1px dashed var(--s-200);padding-top:12px;margin-top:6px;line-height:1.7;}
+
+  @media(max-width:560px){
+    .result .big{font-size:34px;}
+    table.hm td.cell{width:60px;height:44px;font-size:13px;}
+  }
+
+/* ===== FLAT-BTN-OVERRIDE: 按钮/交互控件取消圆角，整体扁平化 ===== */
+button,
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+.ghost-button,
+.live-pill-btn,
+.live-pill,
+.text-button,
+.btn-primary,
+.btn-ghost,
+.search-btn,
+.arrow-btn,
+.status,
+.step,
+.optimal-top b,
+.confidence,
+.at-btn,
+.at-btn-mode,
+.at-btn-action,
+.at-field input,
+.at-field select,
+.play-btn,
+.nav-link{
+  border-radius:0 !important;
+}
+/* ===== /FLAT-BTN-OVERRIDE ===== */
+
+
+/* ===== RY-NAV: 主页导航嵌入（与 runye-landing 一致） ===== */
+.ry-nav{
+  position:sticky;top:0;z-index:1500;
+  --g-50:#f0fdf4;--g-100:#dcfce7;--g-200:#bbf7d0;--g-300:#86efac;--g-400:#4ade80;--g-500:#22c55e;--g-600:#16a34a;--g-700:#15803d;--g-800:#166534;--g-900:#14532d;
+  --teal:#0d9488;--teal-700:#0f766e;
+  --s-50:#f8fafc;--s-100:#f1f5f9;--s-200:#e2e8f0;--s-300:#cbd5e1;--s-400:#94a3b8;--s-500:#64748b;--s-600:#475569;--s-700:#334155;--s-800:#1e293b;--s-900:#0f172a;
+  --shadow-sm:0 2px 8px rgba(15,23,42,.06);
+  --transition:all .2s ease;
+  --maxw:1280px;
+  font-family:"Microsoft YaHei","PingFang SC","Segoe UI",system-ui,-apple-system,sans-serif;
+}
+.ry-nav .utility-bar{background:var(--s-800);color:var(--s-300);font-size:12px;}
+.ry-nav .utility-inner{max-width:var(--maxw);margin:0 auto;padding:8px 24px;display:flex;justify-content:space-between;align-items:center;}
+.ry-nav .utility-left{display:flex;gap:18px;align-items:center;}
+.ry-nav .utility-left a,.ry-nav .utility-right a{color:var(--s-300);transition:var(--transition);text-decoration:none;}
+.ry-nav .utility-left a:hover,.ry-nav .utility-right a:hover{color:#fff;}
+.ry-nav .utility-right{display:flex;gap:18px;align-items:center;}
+.ry-nav .utility-divider{width:1px;height:12px;background:var(--s-600);}
+.ry-nav .main-header{background:#fff;box-shadow:var(--shadow-sm);border-bottom:1px solid var(--s-100);padding:0;margin:0;}
+.ry-nav .header-inner{max-width:var(--maxw);margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:72px;}
+.ry-nav .brand{display:flex;align-items:center;gap:12px;text-decoration:none;}
+.ry-nav .brand-logo{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,var(--g-700),var(--teal));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:18px;box-shadow:0 4px 12px rgba(22,163,74,.25);}
+.ry-nav .brand-text{display:flex;flex-direction:column;line-height:1.2;}
+.ry-nav .brand-name{font-size:18px;font-weight:800;color:var(--g-800);letter-spacing:.5px;}
+.ry-nav .brand-sub{font-size:11px;color:var(--s-500);letter-spacing:1px;text-transform:uppercase;}
+.ry-nav .main-nav{display:flex;align-items:center;gap:4px;}
+.ry-nav .nav-item{position:relative;}
+.ry-nav .nav-link{position:relative;display:flex;align-items:center;gap:4px;padding:8px 14px;font-size:14px;font-weight:600;color:var(--s-700);transition:var(--transition);white-space:nowrap;text-decoration:none;}
+.ry-nav .nav-link::after{content:"";position:absolute;left:14px;right:14px;bottom:0;height:2px;background:var(--g-600);opacity:0;transform:scaleX(.4);transition:var(--transition);}
+.ry-nav .nav-link:hover{color:var(--g-700);}
+.ry-nav .nav-link:hover::after{opacity:1;transform:scaleX(1);}
+.ry-nav .nav-link.active{color:var(--g-700);}
+.ry-nav .nav-link.active::after{opacity:1;transform:scaleX(1);}
+.ry-nav .header-actions{display:flex;align-items:center;gap:16px;}
+.ry-nav .search-btn{width:36px;height:36px;border:1px solid var(--s-200);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition);color:var(--s-600);}
+.ry-nav .search-btn:hover{background:var(--g-700);border-color:var(--g-700);color:#fff;}
+.ry-nav .mobile-menu-btn{display:none;flex-direction:column;gap:5px;padding:8px;cursor:pointer;}
+.ry-nav .mobile-menu-btn span{display:block;width:22px;height:2px;background:var(--s-700);border-radius:0;}
+@media(max-width:920px){
+  .ry-nav .main-nav{display:none;position:absolute;top:72px;left:0;right:0;background:#fff;flex-direction:column;align-items:stretch;padding:12px 24px;box-shadow:var(--shadow-sm);border-top:1px solid var(--s-100);gap:0;z-index:1500;}
+  .ry-nav .main-nav.open{display:flex;}
+  .ry-nav .nav-link{padding:12px 0;border-radius:0;border-bottom:1px solid var(--s-50);}
+  .ry-nav .mobile-menu-btn{display:flex;}
+}
+/* index.html 自带 sticky .topbar 需让位于导航栏 */
+.ry-nav ~ .topbar{top:72px !important;}
+.ry-nav .nav-home-btn{margin-left:8px;display:inline-flex;align-items:center;gap:6px;padding:9px 16px;background:var(--g-700);color:#fff;font-size:14px;font-weight:700;text-decoration:none;border:0;border-radius:0;cursor:pointer;transition:var(--transition);white-space:nowrap;letter-spacing:.5px;}
+.ry-nav .nav-home-btn:hover{background:var(--g-800);}
+@media(max-width:920px){
+  .ry-nav .nav-home-btn{margin:10px 24px 14px;justify-content:center;}
+}
+/* ===== /RY-NAV ===== */
+
+</style>
+</head>
+<body>
+
+<!-- ===== 主页导航（嵌入） ===== -->
+<div class="ry-nav">
+  <div class="utility-bar">
+    <div class="utility-inner">
+      <div class="utility-left">
+        <a href="runye-landing.html">联系我们</a>
+        <a href="runye-landing.html">常见问题</a>
+        <a href="runye-landing.html">下载中心</a>
+      </div>
+      <div class="utility-right">
+        <a href="runye-landing.html">语言</a>
+        <span class="utility-divider"></span>
+        <a href="runye-landing.html">中 / EN</a>
+      </div>
+    </div>
+  </div>
+  <header class="main-header">
+    <div class="header-inner">
+      <a href="runye-landing.html" class="brand">
+        <div class="brand-logo">润</div>
+        <div class="brand-text">
+          <span class="brand-name">润野灌溉</span>
+          <span class="brand-sub">Runye Irrigation</span>
+        </div>
+      </a>
+      <nav class="main-nav" id="mainNav">
+        <div class="nav-item"><a href="index.html" class="nav-link">精准灌溉</a></div>
+        <div class="nav-item"><a href="耐特菲姆滴灌带长度查询器.html" class="nav-link active">滴灌带长度查询</a></div>
+        <div class="nav-item"><a href="index.html#three-level-view" class="nav-link">三级系统查询</a></div>
+        <div class="nav-item"><a href="runye-landing.html" class="nav-link">数字农业</a></div>
+        <div class="nav-item"><a href="runye-landing.html" class="nav-link">水肥课堂</a></div>
+        <div class="nav-item"><a href="runye-landing.html" class="nav-link">关于我们</a></div>
+      </nav>
+      <a href="runye-landing.html" class="nav-home-btn">⌂ 返回主页</a>
+      <div class="header-actions">
+        <button class="search-btn" title="搜索" aria-label="搜索">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
+        </button>
+        <div class="mobile-menu-btn" id="mobileMenuBtn" aria-label="菜单">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+    </div>
+  </header>
+</div>
+
+<header>
+  <h1>💧 耐特菲姆(Netafim) 滴灌带铺设长度查询器</h1>
+  <p>入口压力 × 坡度 × 滴头流量 × 滴头间距 综合查询 · 数据来自 Netafim 官方技术资料</p>
+</header>
+
+<div class="wrap">
+
+  <!-- 产品选择 -->
+  <div class="card">
+    <h2>① 选择产品</h2>
+    <div class="prod-grid" id="prodGrid"></div>
+  </div>
+
+  <!-- 参数 -->
+  <div class="card">
+    <h2>② 设定参数</h2>
+    <div class="sub">滴头间距与流量确定查表；入口压力、坡度决定结果——在下方矩阵中直接点击任意格也可查询。</div>
+    <div class="controls">
+      <div class="field">
+        <label>滴头间距</label>
+        <select id="fSpacing"></select>
+      </div>
+      <div class="field">
+        <label>滴头流量 (L/h)</label>
+        <select id="fFlow"></select>
+      </div>
+      <div class="field">
+        <label>入口压力 (bar)</label>
+        <select id="fPressure"></select>
+      </div>
+      <div class="field">
+        <label>坡度</label>
+        <select id="fSlope"></select>
+      </div>
+    </div>
+  </div>
+
+  <!-- 结果 -->
+  <div class="card">
+    <h2>③ 查询结果</h2>
+    <div class="result">
+      <div><span class="big" id="rLen">—</span><small>米（最大铺设长度）</small></div>
+      <div class="meta" id="rMeta"></div>
+      <div class="flag" id="rFlag" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- 热力矩阵 -->
+  <div class="card">
+    <h2>④ 压力 × 坡度 热力矩阵</h2>
+    <div class="sub">行=入口压力，列=坡度（左红=上坡逆坡，右蓝=下坡顺坡）。颜色越深表示可铺设越长。点击任意格即选中。</div>
+    <div class="hm-scroll">
+      <table class="hm" id="hm"></table>
+    </div>
+    <div class="legend">
+      <span class="lab">短</span><span class="bar"></span><span class="lab">长</span>
+      <span class="lab" style="color:var(--red);margin-left:14px;">■ 上坡(逆坡)</span>
+      <span class="lab" style="color:var(--blue);">■ 下坡(顺坡)</span>
+    </div>
+  </div>
+
+  <!-- 曲线 -->
+  <div class="card">
+    <h2>⑤ 趋势曲线</h2>
+    <div class="chart-wrap"><svg id="chart" viewBox="0 0 640 280"></svg></div>
+    <div class="chart-note" id="chartNote"></div>
+  </div>
+
+  <!-- 说明 -->
+  <div class="card">
+    <h2>使用说明与数据来源</h2>
+    <div class="note-box">
+      <b>· 最大铺设长度</b>：在保持滴灌带始末端滴头流量偏差 ≤10% 条件下，单条滴灌带/管可铺设的最大长度。<br>
+      <b>· 坡度含义</b>：正值(如上坡2%)为逆坡铺设（水往低处流、管往高处走），水力损失增大、长度缩短；负值(如下坡2%)为顺坡铺设，重力增益、长度增大。<br>
+      <b>· 规律</b>：入口压力越高、坡度越顺、滴头流量越小、间距越稀 → 可铺设越长。薄壁带(台风加强版)数据在 1.2bar 固定压力下测得；压力补偿管按不同压力分别列出。<br>
+      <b>· 压力补偿(PC)</b>：DripNet PC / UniWine 在补偿范围内流量恒定，铺设长度主要受入口压力与坡度影响。<br>
+      <b>· 限制</b>：Netafim 建议单条铺设不宜超过 <b>800 米</b>（保障冲洗效果）；顺坡低流量宽间距时计算值可能超限（表中以 — 表示）。<br>
+      <b>· 免责</b>：本表为理论计算参考值，实际工程应使用 IrriCAD 等专业灌溉设计软件精确计算。
+      <div class="src">
+        数据来源：Netafim 中国产品目录(2022/2023版)、Netafim Australia DripNet PC AS HWD 技术资料、Netafim New Zealand UniWine RC 技术资料、Netafim USA Subsurface Dripline Guide。
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ---------- 数据 ---------- */
+// 矩阵构建：将上坡/平地/下坡三个数组按压力索引合并为 matrix[pIdx][sIdx]
+function M(up, flat, down){
+  const m=[];
+  for(let i=0;i<up.length;i++){ m.push([up[i], flat[i], (down&&down[i]!==undefined)?down[i]:null]); }
+  return m;
+}
+const NB = null; // null 表示超限/无数据
+
+const PRODUCTS = {
+  typhoon:{
+    name:"Typhoon Plus 16100/16125", sub:"台风加强版 · 薄壁滴灌带", tag:"薄壁",
+    spec:"内径16.20mm｜壁厚0.25/0.31mm｜最大工作压力1.4/1.8bar",
+    note:"固定入口压力 1.2 bar 下测得",
+    pressures:[1.2], slopes:[2,1,0,-1,-2], spacingUnit:"cm",
+    spacings:[0.2,0.3,0.4], flows:[0.5,0.7,1.0,1.6,2.2],
+    data:{
+      "0.2":{ "0.5":[[117,146,180,209,241]], "0.7":[[103,123,145,163,184]], "1.0":[[88,101,115,126,139]], "1.6":[[70,77,85,91,98]], "2.2":[[59,64,69,73,78]] },
+      "0.3":{ "0.5":[[134,180,239,292,352]], "0.7":[[121,154,193,227,265]], "1.0":[[106,128,153,174,197]], "1.6":[[87,100,113,124,137]], "2.2":[[74,83,92,99,108]] },
+      "0.4":{ "0.5":[[144,205,291,372,464]], "0.7":[[133,178,235,286,345]], "1.0":[[119,150,186,218,254]], "1.6":[[99,118,138,155,174]], "2.2":[[86,99,113,124,136]] }
+    }
+  },
+  pc16010:{
+    name:"DripNet PC AS 16010", sub:"滴耐特防虹吸型 · 压力补偿管", tag:"PC",
+    spec:"内径14.20mm｜壁厚1.00mm｜外径16.20mm｜最大工作压力0.5~3.5bar",
+    note:"平地(坡度0%)条件下测得，末端最小工作压力0.4bar",
+    pressures:[1.0,1.6,2.2], slopes:[0], spacingUnit:"cm",
+    spacings:[0.2,0.3,0.4,0.5], flows:[1.6,2.0,3.0,3.8],
+    data:{
+      "0.2":{ "1.6":[[87],[110],[127]], "2.0":[[75],[95],[110]], "3.0":[[58],[73],[84]], "3.8":[[49],[63],[72]] },
+      "0.3":{ "1.6":[[121],[154],[177]], "2.0":[[104],[133],[153]], "3.0":[[80],[102],[118]], "3.8":[[69],[88],[101]] },
+      "0.4":{ "1.6":[[151],[193],[222]], "2.0":[[130],[166],[192]], "3.0":[[100],[128],[148]], "3.8":[[86],[110],[127]] },
+      "0.5":{ "1.6":[[179],[228],[263]], "2.0":[[155],[198],[228]], "3.0":[[119],[152],[175]], "3.8":[[103],[131],[151]] }
+    }
+  },
+  pc16250:{
+    name:"DripNet PC AS 16250", sub:"滴耐特防虹吸型 · 压力补偿管", tag:"PC",
+    spec:"内径15.50mm｜壁厚1.00mm｜外径16.76mm｜最大工作压力0.4~2.8bar",
+    note:"平地(坡度0%)条件下测得，末端最小工作压力0.4bar",
+    pressures:[1.0,1.6,2.2], slopes:[0], spacingUnit:"cm",
+    spacings:[0.2,0.3,0.4,0.5], flows:[0.6,1.0,1.6,2.0,3.0,3.8],
+    data:{
+      "0.2":{ "0.6":[[155],[197],[226]], "1.0":[[111],[141],[162]], "1.6":[[87],[110],[127]], "2.0":[[75],[95],[110]], "3.0":[[58],[73],[84]], "3.8":[[49],[63],[72]] },
+      "0.3":{ "0.6":[[217],[276],[318]], "1.0":[[155],[198],[227]], "1.6":[[121],[154],[177]], "2.0":[[104],[133],[153]], "3.0":[[80],[102],[118]], "3.8":[[69],[88],[101]] },
+      "0.4":{ "1.0":[[196],[249],[287]], "1.6":[[151],[193],[222]], "2.0":[[130],[166],[192]], "3.0":[[100],[128],[148]], "3.8":[[86],[110],[127]] },
+      "0.5":{ "1.6":[[179],[228],[263]], "2.0":[[155],[198],[228]], "3.0":[[119],[152],[175]], "3.8":[[103],[131],[151]] }
+    }
+  },
+  pc23009_2:{
+    name:"DripNet PC AS 23009", sub:"大口径压力补偿管 · 流量 2.0 L/h", tag:"PC·2.0",
+    spec:"内径20.80mm｜流量2.0 L/h｜最低考虑压力0.4bar",
+    note:"同时考虑入口压力(0.2~1.0bar)与坡度",
+    pressures:[0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0], slopes:[2,0,-2], spacingUnit:"m",
+    spacings:[1.0,1.5,2.0,2.5,3.0], flows:[2.0],
+    data:{
+      "1.0":{ "2.0":M([126,155,177,195,208,220,230,238,244],[153,202,244,284,320,354,386,417,446],[181,252,326,408,504,643,NB,NB,NB]) },
+      "1.5":{ "2.0":M([167,211,246,275,299,321,339,356,371],[190,251,304,353,398,440,480,518,555],[214,293,374,462,563,706,NB,NB,NB]) },
+      "2.0":{ "2.0":M([197,251,295,333,365,394,420,444,464],[217,287,348,404,455,504,550,593,635],[239,325,412,505,611,757,NB,NB,NB]) },
+      "2.5":{ "2.0":M([220,283,334,379,418,453,485,514,540],[240,317,384,446,502,556,606,654,701],[259,352,444,541,650,801,NB,NB,NB]) },
+      "3.0":{ "2.0":M([240,310,368,418,463,503,540,573,604],[259,342,414,481,542,600,655,707,757],[277,375,472,572,686,839,NB,NB,NB]) }
+    }
+  },
+  pc23009_3:{
+    name:"DripNet PC AS 23009", sub:"大口径压力补偿管 · 流量 3.0 L/h", tag:"PC·3.0",
+    spec:"内径20.80mm｜流量3.0 L/h｜最低考虑压力0.4bar",
+    note:"同时考虑入口压力(0.2~1.0bar)与坡度",
+    pressures:[0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0], slopes:[2,0,-2], spacingUnit:"m",
+    spacings:[1.0,1.5,2.0,2.5,3.0], flows:[3.0],
+    data:{
+      "1.0":{ "3.0":M([102,128,148,165,178,190,200,209,217],[118,156,189,219,247,273,298,321,344],[135,185,232,280,330,383,442,509,594]) },
+      "1.5":{ "3.0":M([133,170,200,225,247,267,285,301,315],[147,194,235,272,307,340,370,400,428],[161,218,271,324,379,436,498,569,656]) },
+      "2.0":{ "3.0":M([155,200,237,269,297,323,346,367,387],[168,221,268,312,352,389,424,458,490],[180,243,301,359,417,477,543,617,707]) },
+      "2.5":{ "3.0":M([172,223,265,302,334,364,391,416,440],[185,244,296,344,388,429,468,505,541],[196,265,326,388,449,512,581,657,749]) },
+      "3.0":{ "3.0":M([188,245,292,334,371,405,436,465,492],[199,263,320,371,419,463,506,545,585],[210,283,348,413,477,543,614,692,787]) }
+    }
+  },
+  uniwine:{
+    name:"UniWine RC 16010", sub:"葡萄园专用 · 压力补偿管", tag:"葡萄园",
+    spec:"内径14.20mm｜流量0.7 L/h｜最低考虑压力0.5bar",
+    note:"同时考虑入口压力(0.2~1.0bar)与坡度",
+    pressures:[0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0], slopes:[2,0,-2], spacingUnit:"m",
+    spacings:[1.0,1.5,2.0,2.5,3.0,3.5,4.0], flows:[0.7],
+    data:{
+      "1.0":{ "0.7":M([83,112,135,153,168,180,190,197,204],[96,137,176,213,247,279,310,340,369],[108,163,219,275,331,387,443,500,557]) },
+      "1.5":{ "0.7":M([111,154,190,221,248,271,291,310,326],[121,174,224,270,314,356,395,434,471],[131,195,258,321,382,444,505,565,626]) },
+      "2.0":{ "0.7":M([130,182,227,267,302,334,362,388,411],[139,200,257,311,361,410,456,500,543],[148,218,288,355,422,488,553,617,681]) },
+      "2.5":{ "0.7":M([145,204,256,303,345,383,418,449,478],[153,221,284,343,400,453,504,554,600],[161,238,312,384,455,524,593,661,727]) },
+      "3.0":{ "0.7":M([158,223,281,333,380,424,463,500,534],[165,239,306,371,431,489,545,598,649],[173,254,332,409,483,557,628,698,768]) },
+      "3.5":{ "0.7":M([169,239,302,359,412,459,503,545,583],[176,254,326,395,460,522,581,637,692],[183,269,351,431,509,585,659,733,805]) },
+      "4.0":{ "0.7":M([179,254,321,383,439,491,539,584,626],[185,268,344,417,485,550,613,673,731],[192,281,368,451,532,610,688,763,838]) }
+    }
+  }
+};
+
+const ORDER = ["typhoon","pc16010","pc16250","pc23009_2","pc23009_3","uniwine"];
+
+/* ---------- 状态 ---------- */
+let cur = { prod:"pc23009_2", spacing:1.0, flow:2.0, pIdx:4, sIdx:1 };
+
+/* ---------- 工具 ---------- */
+const slopeLabel = s => (s>0?("上坡 "+s+"%(逆坡)"):(s<0?("下坡 "+Math.abs(s)+"%(顺坡)"):"平地 0%"));
+const fmtKey = v => (v % 1 === 0 ? v.toFixed(1) : v.toString());
+
+function getProduct(){ return PRODUCTS[cur.prod]; }
+function curMatrix(){
+  const p = getProduct();
+  const sp = fmtKey(cur.spacing), fl = fmtKey(cur.flow);
+  const spData = p.data[sp];
+  if(!spData) return null;
+  const mat = spData[fl];
+  return mat || null;
+}
+function curVal(){
+  const m = curMatrix();
+  if(!m) return null;
+  const row = m[cur.pIdx];
+  if(!row) return null;
+  const v = row[cur.sIdx];
+  return v;
+}
+
+/* ---------- 渲染产品按钮 ---------- */
+function renderProducts(){
+  const g = document.getElementById("prodGrid");
+  g.innerHTML = "";
+  ORDER.forEach(k=>{
+    const p = PRODUCTS[k];
+    const d = document.createElement("div");
+    d.className = "prod" + (k===cur.prod?" active":"");
+    d.innerHTML = `<span class="tag">${p.tag}</span><div class="pn">${p.name}</div><div class="pt">${p.sub}</div>`;
+    d.onclick = ()=>{ selectProduct(k); };
+    g.appendChild(d);
+  });
+}
+
+function selectProduct(k){
+  cur.prod = k;
+  const p = PRODUCTS[k];
+  cur.spacing = p.spacings[0];
+  cur.flow = p.flows[0];
+  cur.pIdx = Math.floor(p.pressures.length/2);
+  cur.sIdx = Math.floor(p.slopes.length/2);
+  renderAll();
+}
+
+/* ---------- 渲染下拉 ---------- */
+function fillSelect(el, items, fmt){
+  el.innerHTML = "";
+  items.forEach((it,i)=>{
+    const o = document.createElement("option");
+    o.value = i; o.textContent = fmt(it, i);
+    el.appendChild(o);
+  });
+}
+function renderControls(){
+  const p = getProduct();
+  const spEl = document.getElementById("fSpacing");
+  const flEl = document.getElementById("fFlow");
+  const prEl = document.getElementById("fPressure");
+  const slEl = document.getElementById("fSlope");
+  fillSelect(spEl, p.spacings, v=>`${v} ${p.spacingUnit}`);
+  fillSelect(flEl, p.flows, v=>`${v} L/h`);
+  fillSelect(prEl, p.pressures, v=>`${v} bar`);
+  fillSelect(slEl, p.slopes, (v,i)=>slopeLabel(v));
+  spEl.value = p.spacings.indexOf(cur.spacing);
+  flEl.value = p.flows.indexOf(cur.flow);
+  prEl.value = cur.pIdx;
+  slEl.value = cur.sIdx;
+  spEl.onchange = ()=>{ cur.spacing = p.spacings[+spEl.value]; afterParam(); };
+  flEl.onchange = ()=>{ cur.flow = p.flows[+flEl.value]; afterParam(); };
+  prEl.onchange = ()=>{ cur.pIdx = +prEl.value; afterParam(); };
+  slEl.onchange = ()=>{ cur.sIdx = +slEl.value; afterParam(); };
+}
+function afterParam(){ renderResult(); renderHeatmap(); renderChart(); }
+
+/* ---------- 渲染结果 ---------- */
+function renderResult(){
+  const p = getProduct();
+  const v = curVal();
+  const lenEl = document.getElementById("rLen");
+  const metaEl = document.getElementById("rMeta");
+  const flagEl = document.getElementById("rFlag");
+  if(v===null||v===undefined){
+    lenEl.textContent = "—";
+    metaEl.innerHTML = `该产品在 <b>${p.pressures[cur.pIdx]} bar</b> / <b>${slopeLabel(p.slopes[cur.sIdx])}</b> 下计算长度超过 800m 上限，不推荐。`;
+    flagEl.style.display="none";
+    return;
+  }
+  lenEl.textContent = v;
+  metaEl.innerHTML = `产品：<b>${p.name}</b>（${p.sub}）<br>`
+    + `滴头间距 <b>${cur.spacing}${p.spacingUnit}</b>｜流量 <b>${cur.flow} L/h</b><br>`
+    + `入口压力 <b>${p.pressures[cur.pIdx]} bar</b>｜<b>${slopeLabel(p.slopes[cur.sIdx])}</b>`;
+  if(v>800){ flagEl.style.display="inline-block"; flagEl.textContent="⚠ 超过 800m 建议上限"; }
+  else { flagEl.style.display="none"; }
+}
+
+/* ---------- 渲染热力矩阵 ---------- */
+function heat(v, min, max){
+  if(v===null) return "#f0f0f0";
+  const r = max===min ? 1 : (v-min)/(max-min);
+  const hue = 40 + r*90;          // 40(琥珀) → 130(绿)
+  const light = 86 - r*30;        // 浅 → 深
+  return `hsl(${hue},62%,${light}%)`;
+}
+function renderHeatmap(){
+  const p = getProduct();
+  const m = curMatrix();
+  const tbl = document.getElementById("hm");
+  if(!m){
+    tbl.innerHTML = `<tr><td style="padding:18px;color:#94a3b8;">该「间距 × 流量」组合暂无数据，请换其他参数。</td></tr>`;
+    return;
+  }
+  // 收集有效值用于配色
+  let vals=[];
+  m.forEach(row=>row.forEach(c=>{ if(c!==null) vals.push(c); }));
+  const min = Math.min(...vals), max = Math.max(...vals);
+
+  tbl.innerHTML = "";
+  // 表头
+  const trHead = document.createElement("tr");
+  trHead.appendChild(document.createElement("th")); // 左上角空
+  p.slopes.forEach(s=>{
+    const th = document.createElement("th");
+    th.textContent = slopeLabel(s);
+    if(s>0) th.className="col-up"; else if(s<0) th.className="col-down";
+    trHead.appendChild(th);
+  });
+  tbl.appendChild(trHead);
+  // 行
+  p.pressures.forEach((pr,pi)=>{
+    const tr = document.createElement("tr");
+    const rl = document.createElement("td");
+    rl.className="rlbl"; rl.textContent = pr+" bar";
+    tr.appendChild(rl);
+    p.slopes.forEach((s,si)=>{
+      const td = document.createElement("td");
+      const v = m[pi][si];
+      if(v===null){ td.className="cell null"; td.textContent="—"; }
+      else{
+        td.className="cell" + (pi===cur.pIdx && si===cur.sIdx ? " sel":"");
+        td.style.background = heat(v,min,max);
+        td.textContent = v;
+        td.onclick = ()=>{ cur.pIdx=pi; cur.sIdx=si; renderControls(); renderResult(); renderHeatmap(); renderChart(); };
+      }
+      tr.appendChild(td);
+    });
+    tbl.appendChild(tr);
+  });
+}
+
+/* ---------- 渲染曲线 ---------- */
+function renderChart(){
+  const p = getProduct();
+  const m = curMatrix();
+  const svg = document.getElementById("chart");
+  if(!m){ svg.innerHTML=""; document.getElementById("chartNote").innerHTML="该组合暂无数据。"; return; }
+  const W=640,H=280, padL=46, padR=16, padT=18, padB=40;
+  svg.innerHTML = "";
+  const note = document.getElementById("chartNote");
+
+  if(p.pressures.length>1){
+    // 多条线：x=压力, y=长度, 每条线一个坡度
+    let allVals=[];
+    m.forEach(row=>row.forEach(c=>{ if(c!==null) allVals.push(c); }));
+    const ymax = Math.max(...allVals)*1.05;
+    const xmin=0, xmax=p.pressures.length-1;
+    const X = i => padL + (xmax===0?0:(i-xmin)/(xmax-xmin))*(W-padL-padR);
+    const Y = v => padT + (1 - v/ymax)*(H-padT-padB);
+    // 轴
+    drawLine(svg, padL, padT, padL, H-padB, "#e2e8f0");
+    drawLine(svg, padL, H-padB, W-padR, H-padB, "#e2e8f0");
+    // y 刻度
+    for(let t=0;t<=4;t++){
+      const v = ymax*t/4; const y=Y(v);
+      drawLine(svg, padL-4, y, padL, y, "#e2e8f0");
+      text(svg, padL-8, y+4, Math.round(v).toString(), "end", "#94a3b8");
+    }
+    // x 刻度
+    p.pressures.forEach((pr,i)=>{
+      const x=X(i);
+      text(svg, x, H-padB+16, pr+"", "middle", "#94a3b8");
+    });
+      text(svg, padL-30, padT-4, "米", "start", "#94a3b8");
+      text(svg, W-padR, H-padB+34, "入口压力 (bar)", "middle", "#94a3b8");
+    // 线
+    const colors = {"2":"#ef4444","0":"#16a34a","-2":"#3b82f6","1":"#f59e0b","-1":"#0ea5e9"};
+    p.slopes.forEach((s,si)=>{
+      let pts=[];
+      p.pressures.forEach((pr,pi)=>{ const v=m[pi][si]; if(v!==null) pts.push([X(pi),Y(v)]); });
+      if(pts.length>0){
+        const col = colors[s] || "#16a34a";
+        const poly = document.createElementNS("http://www.w3.org/2000/svg","polyline");
+        poly.setAttribute("points", pts.map(p=>p[0]+","+p[1]).join(" "));
+        poly.setAttribute("fill","none"); poly.setAttribute("stroke",col); poly.setAttribute("stroke-width","2.4");
+        poly.setAttribute("stroke-linejoin","round");
+        svg.appendChild(poly);
+        pts.forEach(pt=>{ const c=document.createElementNS("http://www.w3.org/2000/svg","circle"); c.setAttribute("cx",pt[0]); c.setAttribute("cy",pt[1]); c.setAttribute("r","3"); c.setAttribute("fill",col); svg.appendChild(c); });
+      }
+    });
+    note.innerHTML = "横轴=入口压力，每条曲线=一种坡度（<span style='color:#ef4444'>红=上坡</span> / <span style='color:#16a34a'>绿=平地</span> / <span style='color:#3b82f6'>蓝=下坡</span>）。可见顺坡铺设随压力升高长度增长最快。";
+  } else {
+    // 单压力：柱形图 across 坡度
+    const pr = p.pressures[0];
+    let vals = m[0].filter(c=>c!==null);
+    const ymax = Math.max(...vals)*1.1;
+    const X0=padL, X1=W-padR, Y0=H-padB, Y1=padT;
+    drawLine(svg, X0, Y0, X1, Y0, "#e2e8f0");
+    const n = p.slopes.length;
+    const bw = (X1-X0)/n*0.55;
+    const colors = {"2":"#ef4444","0":"#16a34a","-2":"#3b82f6","1":"#f59e0b","-1":"#0ea5e9"};
+    p.slopes.forEach((s,si)=>{
+      const v = m[0][si];
+      const cx = X0 + (si+0.5)*(X1-X0)/n;
+      if(v===null){
+        text(svg, cx, Y0-8, "—", "middle", "#cbd5e1");
+      } else {
+        const h = (v/ymax)*(Y0-Y1);
+        const rect = document.createElementNS("http://www.w3.org/2000/svg","rect");
+        rect.setAttribute("x", cx-bw/2); rect.setAttribute("y", Y0-h);
+        rect.setAttribute("width", bw); rect.setAttribute("height", h);
+        rect.setAttribute("fill", colors[s]||"#16a34a"); rect.setAttribute("rx","3");
+        rect.style.cursor="pointer";
+        rect.onclick=()=>{ cur.sIdx=si; renderControls(); renderResult(); renderHeatmap(); renderChart(); };
+        svg.appendChild(rect);
+        text(svg, cx, Y0-h-7, v.toString(), "middle", "#334155");
+      }
+      text(svg, cx, Y0+18, s>0?("上坡"+s+"%"):(s<0?("下坡"+Math.abs(s)+"%"):"平地"), "middle", colors[s]||"#334155");
+    });
+    text(svg, X0-30, Y1-4, "米", "start", "#94a3b8");
+    note.innerHTML = `该产品在固定入口压力 <b>${pr} bar</b> 下，不同坡度的铺设长度对比（点击柱条可切换坡度）。`;
+  }
+}
+function drawLine(svg,x1,y1,x2,y2,color){
+  const l=document.createElementNS("http://www.w3.org/2000/svg","line");
+  l.setAttribute("x1",x1);l.setAttribute("y1",y1);l.setAttribute("x2",x2);l.setAttribute("y2",y2);
+  l.setAttribute("stroke",color);l.setAttribute("stroke-width","1");
+  svg.appendChild(l);
+}
+function text(svg,x,y,str,anchor,color){
+  const t=document.createElementNS("http://www.w3.org/2000/svg","text");
+  t.setAttribute("x",x);t.setAttribute("y",y);t.setAttribute("text-anchor",anchor);
+  t.setAttribute("font-size","11");t.setAttribute("fill",color);t.setAttribute("font-family","Microsoft YaHei,sans-serif");
+  t.textContent=str; svg.appendChild(t);
+}
+
+/* ---------- 总渲染 ---------- */
+function renderAll(){
+  renderProducts();
+  renderControls();
+  renderResult();
+  renderHeatmap();
+  renderChart();
+}
+renderAll();
+</script>
+
+<!-- ===== 嵌入导航：移动端菜单 ===== -->
+<script>
+(function(){
+  var b=document.getElementById('mobileMenuBtn');
+  var n=document.getElementById('mainNav');
+  if(b&&n){b.addEventListener('click',function(){n.classList.toggle('open');});}
+})();
+</script>
+
+</body>
+</html>

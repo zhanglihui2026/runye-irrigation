@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>润野 · 地图面积测量（在线卫星图 · 免Key）</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<style>
+  :root{
+    --g-700:#15803d; --g-600:#16a34a; --g-500:#22c55e; --g-50:#f0fdf4;
+    --s-700:#334155; --s-500:#64748b; --s-300:#cbd5e1; --s-100:#f1f5f9;
+    --radius:0;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;font-family:-apple-system,"PingFang SC","Microsoft YaHei",Segoe UI,sans-serif;color:var(--s-700)}
+  #app{display:flex;flex-direction:column;height:100vh}
+  /* 顶部工具条 */
+  .topbar{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--g-700);color:#fff;flex-wrap:wrap}
+  .topbar .brand{font-weight:700;font-size:15px;margin-right:6px;letter-spacing:.5px}
+  .topbar .brand small{font-weight:400;opacity:.8;font-size:12px;margin-left:6px}
+  .topbar input[type=text]{height:34px;padding:0 10px;border:0;border-radius:var(--radius);min-width:180px;font-size:13px}
+  .topbar button{height:34px;padding:0 14px;border:0;border-radius:var(--radius);cursor:pointer;font-size:13px;font-weight:600}
+  .btn-light{background:#fff;color:var(--g-700)}
+  .btn-ghost{background:rgba(255,255,255,.15);color:#fff}
+  .btn-ghost:hover{background:rgba(255,255,255,.28)}
+  .btn-on{background:var(--g-500)!important;color:#fff!important}
+  .spacer{flex:1}
+  /* 主体 */
+  .main{flex:1;position:relative;display:flex}
+  #map{flex:1;height:100%;background:#dfe6e9}
+  /* 结果面板 */
+  .panel{position:absolute;right:14px;top:14px;width:240px;background:#fff;border:1px solid var(--s-300);
+    box-shadow:0 6px 20px rgba(0,0,0,.15);padding:14px;z-index:1000}
+  .panel h3{margin:0 0 10px;font-size:13px;color:var(--s-500);font-weight:700;letter-spacing:1px}
+  .panel .row{display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;border-bottom:1px dashed var(--s-100)}
+  .panel .row:last-child{border-bottom:0}
+  .panel .row .k{font-size:12px;color:var(--s-500)}
+  .panel .row .v{font-size:16px;font-weight:700;color:var(--g-700)}
+  .panel .row .v small{font-size:11px;color:var(--s-500);font-weight:400;margin-left:2px}
+  .panel .hint{font-size:11px;color:var(--s-500);margin-top:8px;line-height:1.5}
+  .panel .copy{margin-top:10px;width:100%;height:32px;border:0;border-radius:var(--radius);background:var(--g-600);color:#fff;font-weight:600;cursor:pointer;font-size:13px}
+  /* 操作提示条 */
+  .tip{position:absolute;left:14px;bottom:14px;background:rgba(15,23,42,.82);color:#fff;padding:8px 14px;font-size:12px;z-index:1000;border-radius:var(--radius);max-width:60%}
+  /* 加载失败提示 */
+  .warn{position:absolute;left:50%;top:14px;transform:translateX(-50%);background:#fef3c7;color:#92400e;
+    border:1px solid #f59e0b;padding:8px 14px;font-size:12px;z-index:1100;border-radius:var(--radius);display:none}
+  /* 绘制模式：高对比十字光标，替代地图拖动手型，避免点错位 */
+  .leaflet-container.drawing{ cursor:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2730%27%20height%3D%2730%27%3E%3Cg%20stroke%3D%27black%27%20stroke-width%3D%273%27%3E%3Cline%20x1%3D%2715%27%20y1%3D%273%27%20x2%3D%2715%27%20y2%3D%2712%27%2F%3E%3Cline%20x1%3D%2715%27%20y1%3D%2718%27%20x2%3D%2715%27%20y2%3D%2727%27%2F%3E%3Cline%20x1%3D%273%27%20y1%3D%2715%27%20x2%3D%2712%27%20y2%3D%2715%27%2F%3E%3Cline%20x1%3D%2718%27%20y1%3D%2715%27%20x2%3D%2727%27%20y2%3D%2715%27%2F%3E%3C%2Fg%3E%3Cg%20stroke%3D%27white%27%20stroke-width%3D%271.5%27%3E%3Cline%20x1%3D%2715%27%20y1%3D%273%27%20x2%3D%2715%27%20y2%3D%2712%27%2F%3E%3Cline%20x1%3D%2715%27%20y1%3D%2718%27%20x2%3D%2715%27%20y2%3D%2727%27%2F%3E%3Cline%20x1%3D%273%27%20y1%3D%2715%27%20x2%3D%2712%27%20y2%3D%2715%27%2F%3E%3Cline%20x1%3D%2718%27%20y1%3D%2715%27%20x2%3D%2727%27%20y2%3D%2715%27%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2715%27%20cy%3D%2715%27%20r%3D%272.5%27%20fill%3D%27white%27%20stroke%3D%27black%27%20stroke-width%3D%271%27%2F%3E%3C%2Fsvg%3E") 15 15, crosshair !important; }
+  .leaflet-container.drawing .leaflet-grab{ cursor:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2730%27%20height%3D%2730%27%3E%3Cg%20stroke%3D%27black%27%20stroke-width%3D%273%27%3E%3Cline%20x1%3D%2715%27%20y1%3D%273%27%20x2%3D%2715%27%20y2%3D%2712%27%2F%3E%3Cline%20x1%3D%2715%27%20y1%3D%2718%27%20x2%3D%2715%27%20y2%3D%2727%27%2F%3E%3Cline%20x1%3D%273%27%20y1%3D%2715%27%20x2%3D%2712%27%20y2%3D%2715%27%2F%3E%3Cline%20x1%3D%2718%27%20y1%3D%2715%27%20x2%3D%2727%27%20y2%3D%2715%27%2F%3E%3C%2Fg%3E%3Cg%20stroke%3D%27white%27%20stroke-width%3D%271.5%27%3E%3Cline%20x1%3D%2715%27%20y1%3D%273%27%20x2%3D%2715%27%20y2%3D%2712%27%2F%3E%3Cline%20x1%3D%2715%27%20y1%3D%2718%27%20x2%3D%2715%27%20y2%3D%2727%27%2F%3E%3Cline%20x1%3D%273%27%20y1%3D%2715%27%20x2%3D%2712%27%20y2%3D%2715%27%2F%3E%3Cline%20x1%3D%2718%27%20y1%3D%2715%27%20x2%3D%2727%27%20y2%3D%2715%27%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2715%27%20cy%3D%2715%27%20r%3D%272.5%27%20fill%3D%27white%27%20stroke%3D%27black%27%20stroke-width%3D%271%27%2F%3E%3C%2Fsvg%3E") 15 15, crosshair !important; }
+  @media(max-width:600px){ .panel{width:200px} .topbar input[type=text]{min-width:120px} }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <span class="brand">润野灌溉<small>地图面积测量 · 在线卫星图</small></span>
+    <input type="text" id="search" placeholder="搜索地点（如：三亚 崖州）" />
+    <button class="btn-light" id="btnSearch">搜索</button>
+    <button class="btn-ghost" id="btnLocate">定位三亚</button>
+    <button class="btn-ghost" id="btnBase">切换底图</button>
+    <span class="spacer"></span>
+    <button class="btn-ghost" id="btnDraw">✏️ 开始画框</button>
+    <button class="btn-ghost" id="btnFinish">✅ 完成</button>
+    <button class="btn-ghost" id="btnUndo">↩ 撤销</button>
+    <button class="btn-ghost" id="btnClear">🗑 清除</button>
+  </div>
+  <div class="main">
+    <div id="map"></div>
+    <div class="warn" id="warn">⚠️ 地图瓦片加载失败，请检查网络（本工具需要联网获取卫星影像）。</div>
+    <div class="panel">
+      <h3>测量结果</h3>
+      <div class="row"><span class="k">面积</span><span class="v"><span id="mu">0</span><small>亩</small></span></div>
+      <div class="row"><span class="k">折合</span><span class="v"><span id="ha">0</span><small>公顷</small></span></div>
+      <div class="row"><span class="k">平方</span><span class="v"><span id="sq">0</span><small>㎡</small></span></div>
+      <div class="row"><span class="k">周长</span><span class="v"><span id="peri">0</span><small>m</small></span></div>
+      <div class="row"><span class="k">顶点</span><span class="v"><span id="pts">0</span><small>个</small></span></div>
+      <div class="hint">点击地图添加顶点；拖动顶点可微调；「完成」自动闭合并计算。面积按真实球面经纬度计算。</div>
+      <button class="copy" id="btnCopy">↩ 回传设计工具（跳转）</button>
+    </div>
+    <div class="tip" id="tip">点击「✏️ 开始画框」后，在卫星图上依次点击地块边界顶点即可。</div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+(function(){
+  if(typeof L === 'undefined'){
+    document.getElementById('warn').style.display='block';
+    document.getElementById('warn').textContent='⚠️ Leaflet 库未能加载，请检查网络后刷新。';
+    return;
+  }
+
+  // ===== 地图初始化 =====
+  var map = L.map('map', { center:[18.2528, 109.5119], zoom:15, doubleClickZoom:false });
+  // 高德卫星瓦片（免Key直连，国内快）
+  var gaodeSat = L.tileLayer('https://webst0{s}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}',
+    { subdomains:'1234', maxZoom:19, attribution:'© 高德地图' });
+  // 高德路网标注（叠加，可选）
+  var gaodeLabel = L.tileLayer('https://wprd0{s}.is.autonavi.com/appmaptile?style=8&x={x}&y={y}&z={z}',
+    { subdomains:'1234', maxZoom:19, opacity:0.9 });
+  // OSM 街道图（备选）
+  var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { subdomains:'abc', maxZoom:19, attribution:'© OpenStreetMap' });
+
+  var baseLayers = { '高德卫星':gaodeSat, '高德卫星+路网':L.layerGroup([gaodeSat,gaodeLabel]), 'OSM街道':osm };
+  gaodeSat.addTo(map);
+
+  // 瓦片加载失败探测
+  map.on('tileerror', function(){ document.getElementById('warn').style.display='block'; });
+
+  // ===== 绘制逻辑 =====
+  var drawing = false;
+  var points = [];           // [{lat,lng}]
+  var markers = [];          // L.marker
+  var poly = null;           // L.polygon 实时
+  var rubber = null;         // 橡皮筋线
+  var latlngs = function(){ return points.map(function(p){return [p.lat,p.lng];}); };
+
+  function toRad(d){ return d*Math.PI/180; }
+  // 球面多边形面积（平方米）
+  function geodesicArea(pts){
+    if(pts.length<3) return 0;
+    var R=6378137, area=0;
+    for(var i=0;i<pts.length;i++){
+      var p1=pts[i], p2=pts[(i+1)%pts.length];
+      area += (toRad(p2.lng)-toRad(p1.lng))*(2+Math.sin(toRad(p1.lat))+Math.sin(toRad(p2.lat)));
+    }
+    return Math.abs(area*R*R/2);
+  }
+  // haversine 距离（米）
+  function hav(a,b){
+    var R=6378137, dLat=toRad(b.lat-a.lat), dLng=toRad(b.lng-a.lng);
+    var s=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLat/2)*Math.sin(dLat/2);
+    return 2*R*Math.asin(Math.sqrt(s));
+  }
+  function perimeter(pts){
+    if(pts.length<2) return 0;
+    var s=0; for(var i=0;i<pts.length-1;i++) s+=hav(pts[i],pts[i+1]);
+    if(pts.length>2) s+=hav(pts[pts.length-1],pts[0]); // 闭合
+    return s;
+  }
+
+  function refresh(){
+    // 更新多边形
+    if(poly){ map.removeLayer(poly); poly=null; }
+    if(points.length>=2){
+      poly = L.polygon(latlngs(), {color:'#16a34a', weight:2, fillColor:'#22c55e', fillOpacity:0.25}).addTo(map);
+    }
+    // 数值
+    var area = geodesicArea(points);
+    document.getElementById('mu').textContent = (area/666.67).toLocaleString('zh-CN',{maximumFractionDigits:2});
+    document.getElementById('ha').textContent = (area/10000).toLocaleString('zh-CN',{maximumFractionDigits:3});
+    document.getElementById('sq').textContent = area.toLocaleString('zh-CN',{maximumFractionDigits:0});
+    document.getElementById('peri').textContent = perimeter(points).toLocaleString('zh-CN',{maximumFractionDigits:0});
+    document.getElementById('pts').textContent = points.length;
+  }
+
+  function addPoint(lat,lng){
+    var p={lat:lat,lng:lng};
+    points.push(p);
+    var idx=points.length-1;
+    var m=L.marker([lat,lng],{draggable:true});
+    m.on('drag', function(e){
+      var ll=e.target.getLatLng();
+      points[idx]={lat:ll.lat,lng:ll.lng};
+      if(rubber) map.removeLayer(rubber);
+      refresh();
+    });
+    m.addTo(map);
+    markers.push(m);
+    refresh();
+  }
+
+  map.on('click', function(e){
+    if(!drawing) return;
+    addPoint(e.latlng.lat, e.latlng.lng);
+  });
+  map.on('mousemove', function(e){
+    if(!drawing || points.length===0) return;
+    if(rubber) map.removeLayer(rubber);
+    var last=points[points.length-1];
+    rubber=L.polyline([[last.lat,last.lng],[e.latlng.lat,e.latlng.lng]],{color:'#16a34a',weight:1,dashArray:'4,4',opacity:.7}).addTo(map);
+  });
+  map.on('mouseout', function(){ if(rubber){ map.removeLayer(rubber); rubber=null; } });
+
+  // ===== 按钮 =====
+  var btnDraw=document.getElementById('btnDraw');
+  function setDrawing(on){
+    drawing=on;
+    btnDraw.classList.toggle('btn-on',drawing);
+    map.getContainer().classList.toggle('drawing',drawing);
+    if(drawing) map.dragging.disable(); else map.dragging.enable();
+    btnDraw.textContent = drawing ? '✏️ 绘制中…' : '✏️ 开始画框';
+    document.getElementById('tip').textContent = drawing
+      ? '十字光标处即落点：依次点击地块边界顶点；拖动已有顶点可微调，点「完成」闭合。'
+      : '点击「✏️ 开始画框」后，在卫星图上依次点击地块边界顶点即可。';
+  }
+  btnDraw.onclick=function(){ setDrawing(!drawing); };
+  document.getElementById('btnFinish').onclick=function(){
+    if(rubber){map.removeLayer(rubber);rubber=null;}
+    refresh();
+    if(drawing) setDrawing(false); // 闭合后退出绘制，恢复地图拖拽与缩放查看
+  };
+  document.getElementById('btnUndo').onclick=function(){
+    if(points.length===0) return;
+    points.pop();
+    var m=markers.pop(); if(m) map.removeLayer(m);
+    refresh();
+  };
+  document.getElementById('btnClear').onclick=function(){
+    points=[]; markers.forEach(function(m){map.removeLayer(m);}); markers=[];
+    if(poly){map.removeLayer(poly);poly=null;} if(rubber){map.removeLayer(rubber);rubber=null;}
+    refresh();
+  };
+
+  // 底图切换
+  var baseArr=['高德卫星','高德卫星+路网','OSM街道']; var baseIdx=0;
+  document.getElementById('btnBase').onclick=function(){
+    baseIdx=(baseIdx+1)%baseArr.length;
+    map.removeLayer(baseLayers[baseArr[(baseIdx+2)%3]]);
+    baseLayers[baseArr[baseIdx]].addTo(map);
+    if(baseArr[baseIdx].indexOf('路网')>=0 && !map.hasLayer(gaodeLabel)){}
+    this.textContent='底图:'+baseArr[baseIdx].replace('高德','');
+  };
+
+  // 定位三亚
+  document.getElementById('btnLocate').onclick=function(){
+    map.setView([18.2528,109.5119],15);
+  };
+
+  // 搜索（Nominatim 免Key，国内较慢，best-effort）
+  function doSearch(){
+    var q=document.getElementById('search').value.trim();
+    if(!q) return;
+    document.getElementById('tip').textContent='搜索中…';
+    fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q))
+      .then(function(r){return r.json();})
+      .then(function(d){
+        if(d&&d.length){ map.setView([parseFloat(d[0].lat),parseFloat(d[0].lon)],15);
+          document.getElementById('tip').textContent='已定位：'+d[0].display_name; }
+        else document.getElementById('tip').textContent='未找到结果，可手动缩放/拖拽定位。';
+      })
+      .catch(function(){ document.getElementById('tip').textContent='搜索服务不可用（国内可能慢），请手动定位。'; });
+  }
+  document.getElementById('btnSearch').onclick=doSearch;
+  document.getElementById('search').addEventListener('keydown',function(e){ if(e.key==='Enter') doSearch(); });
+
+  // 回传设计工具：写入 localStorage，并跳转到 index.html 的面积测量工具（03 面积测量工具）
+  document.getElementById('btnCopy').onclick=function(){
+    var mu=parseFloat((geodesicArea(points)/666.67).toFixed(2));
+    if(!mu){ alert('请先画框测量出面积'); return; }
+    var sqm=Math.round(geodesicArea(points));
+    try{
+      localStorage.setItem('runyeMeasuredArea', JSON.stringify({mu:mu, sqm:sqm, poly:latlngs(), ts:Date.now(), source:'map'}));
+      var btn=document.getElementById('btnCopy');
+      btn.textContent='回传中…';
+      setTimeout(function(){ window.location.href='index.html#areaTool'; }, 350);
+    }catch(e){ alert('写入失败：'+e.message); }
+  };
+
+  refresh();
+})();
+</script>
+</body>
+</html>
