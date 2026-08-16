@@ -3252,6 +3252,13 @@ input[type="reset"],
       <input id="ppPlotAngle" type="number" value="0" min="-180" max="180" step="1">
       <span>°</span>
     </label>
+    <label class="pp-angle-control" title="以地块包围盒中心为轴镜像翻转整张图（含管线、水源、阀门），可任意切换不累积">
+      <span>地块镜像</span>
+      <button type="button" class="pp-btn-ghost pp-mirror-btn active" data-mirror="none">无</button>
+      <button type="button" class="pp-btn-ghost pp-mirror-btn" data-mirror="h">水平</button>
+      <button type="button" class="pp-btn-ghost pp-mirror-btn" data-mirror="v">垂直</button>
+      <button type="button" class="pp-btn-ghost pp-mirror-btn" data-mirror="hv">双向</button>
+    </label>
     <button class="pp-btn-ghost" id="ppRepartition" title="将当前旋转后的地块作为新基准重新切割分区">重新分区</button>
     <span class="pp-sep"></span>
     <button class="pp-btn-generate" id="ppGenerate">生成施工图</button>
@@ -6762,6 +6769,7 @@ function calcPlan(){
     nextPipeId:1,
     zoneRotated:false,
     plotRotationDeg:0,
+    plotMirror:'none',
     zoom:1, panX:0, panY:0, isPanning:false, panStartX:0, panStartY:0,
     cutOverrides:{x:{},y:{}},
     dragCut:null,
@@ -6918,6 +6926,8 @@ function calcPlan(){
       y:Object.assign({},snap.cutOverrides.y)
     };
     ppSyncPipeLevelUI();
+    ppState.plotMirror='none';
+    ppSyncMirrorUI();
   }
 
   function ppUndoStep(){
@@ -8039,6 +8049,61 @@ function calcPlan(){
       ppUpdateTransform();
       ppRender();
       ppRefreshDiagramOrReset();
+    });
+  }
+
+  // ===== 地块镜像：以地块包围盒中心为轴，翻转整张图（含管线/水源/阀门）=====
+  // mode: 'none' | 'h'(水平/左右) | 'v'(垂直/上下) | 'hv'(双向)
+  function ppSyncMirrorUI(){
+    var btns=document.querySelectorAll('.pp-mirror-btn');
+    btns.forEach(function(btn){ btn.classList.toggle('active', btn.getAttribute('data-mirror')===(ppState.plotMirror||'none')); });
+  }
+  function ppMirrorPoint(p,mode,cx,cy){
+    if(mode==='h')return{x:2*cx-p.x,y:p.y};
+    if(mode==='v')return{x:p.x,y:2*cy-p.y};
+    if(mode==='hv')return{x:2*cx-p.x,y:2*cy-p.y};
+    return{x:p.x,y:p.y};
+  }
+  function ppApplyMirror(mode){
+    if(!ppState.polyPts.length){alert('请先在面积测量工具中加载地块多边形');return;}
+    if(!ppState.plotMirror)ppState.plotMirror='none';
+    // 先撤销上一次镜像（镜像是对合运算，再镜像一次即回到基准），再应用新镜像
+    if(ppState.plotMirror!=='none'){
+      var b=ppGetBounds();var cx=b.minX+b.w/2,cy=b.minY+b.h/2;
+      var tf=function(pt){return ppMirrorPoint(pt,ppState.plotMirror,cx,cy);};
+      ppState.polyPts=ppState.polyPts.map(tf);
+      ppState.mainPipes=ppState.mainPipes.map(function(l){return l.map(tf);});
+      ppState.branchPipes=ppState.branchPipes.map(function(l){return l.map(tf);});
+      if(ppState.subBranchPipes)ppState.subBranchPipes=ppState.subBranchPipes.map(function(l){return l.map(tf);});
+      if(ppState.source)ppState.source=tf(ppState.source);
+      ppState.valves=ppState.valves.map(tf);
+    }
+    // 再应用新镜像（以当前几何中心为轴）
+    if(mode!=='none'){
+      var b2=ppGetBounds();var cx2=b2.minX+b2.w/2,cy2=b2.minY+b2.h/2;
+      var tf2=function(pt){return ppMirrorPoint(pt,mode,cx2,cy2);};
+      ppState.polyPts=ppState.polyPts.map(tf2);
+      ppState.mainPipes=ppState.mainPipes.map(function(l){return l.map(tf2);});
+      ppState.branchPipes=ppState.branchPipes.map(function(l){return l.map(tf2);});
+      if(ppState.subBranchPipes)ppState.subBranchPipes=ppState.subBranchPipes.map(function(l){return l.map(tf2);});
+      if(ppState.source)ppState.source=tf2(ppState.source);
+      ppState.valves=ppState.valves.map(tf2);
+    }
+    ppState.plotMirror=mode;
+    // 同步全局多边形（面积标签 / 三级传导保持一致）
+    window.measuredPolygon=ppState.polyPts.map(function(p){return{x:p.x,y:p.y};});
+    ppSyncMirrorUI();
+    ppUpdateTransform();ppRender();
+    if(typeof ppRefreshDiagramOrReset==='function')ppRefreshDiagramOrReset();
+  }
+  // 镜像按钮（事件委托到按钮组）
+  var ppMirrorWrap=document.querySelector('.pp-mirror-btn');
+  if(ppMirrorWrap){
+    ppMirrorWrap.parentNode.addEventListener('click',function(e){
+      var btn=e.target.closest?e.target.closest('.pp-mirror-btn'):null;
+      if(!btn||!btn.classList.contains('pp-mirror-btn'))return;
+      ppPushHistory();
+      ppApplyMirror(btn.getAttribute('data-mirror'));
     });
   }
 
