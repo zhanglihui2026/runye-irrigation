@@ -37,7 +37,7 @@ if errorlevel 1 (
 )
 
 echo [3/3] 推送到 GitHub（自动触发 Pages 重新部署）...
-git push origin main
+git push origin master
 
 if errorlevel 1 (
   echo.
