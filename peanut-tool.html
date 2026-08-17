@@ -91,6 +91,11 @@
   .manual-card.hidden{display:none}
   .manual-card .num-control{width:48%;display:inline-block;margin-right:3%}
 
+  .stage-guide-card .stage-current td{background:var(--g-50);font-weight:600;color:var(--g-700)}
+  .stage-guide-card .stage-current td:first-child{border-left:3px solid var(--g-700);padding-left:6px}
+  .stage-guide-card .stage-tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;background:var(--g-700);color:#fff;margin-left:6px;vertical-align:middle}
+  .stage-guide-card .stage-days{font-variant-numeric:tabular-nums;color:var(--ink)}
+
   @media (max-width:980px){
     .hero-grid{grid-template-columns:1fr}
     .kpi-grid{grid-template-columns:repeat(3,1fr)}
@@ -205,6 +210,28 @@
         </article>
       </div>
 
+      <div class="decision-table-card stage-guide-card">
+        <div class="section-head">
+          <p class="section-title">七彩花生生育期对照</p>
+          <span id="stageGuideHead">—</span>
+        </div>
+        <table>
+          <thead><tr><th>生育期</th><th>天数范围</th><th>水分策略</th><th>农事目标</th></tr></thead>
+          <tbody id="stageGuideBody"></tbody>
+        </table>
+      </div>
+
+      <div class="decision-table-card stage-guide-card">
+        <div class="section-head">
+          <p class="section-title">全生育期追肥计划</p>
+          <span>全期约 12 次追肥 · 合计约 30 kg/亩</span>
+        </div>
+        <table>
+          <thead><tr><th>生育期</th><th>追肥频率</th><th>每次用量</th><th>全期次数</th><th>全期总量</th><th>肥料配比</th><th>说明</th></tr></thead>
+          <tbody id="fertPlanBody"></tbody>
+        </table>
+      </div>
+
       <div class="decision-table-card">
         <div class="section-head">
           <p class="section-title">底肥氮磷钾折算</p>
@@ -265,11 +292,19 @@
     flowering:{low:1.0,high:1.8},pod:{low:1.2,high:2.2},harvest:{low:0,high:0.8}
   };
 
+  var stageFertPlan=[
+    {key:"seedling",   interval:"—",       perMu:0,   count:0, total:0,    ratio:"—",                   note:"根系嫩弱，靠底肥供给，施肥易烧苗"},
+    {key:"vegetative", interval:"8-10 天",  perMu:1.2, count:2, total:2.4,  ratio:"平衡型 20-20-20",       note:"促根瘤、稳苗架，控氮防徒长"},
+    {key:"flowering",  interval:"7 天",     perMu:2.2, count:3, total:6.6,  ratio:"高钾 15-10-30 + 硼钼",  note:"补硼钼促花针，稳墒减少落花"},
+    {key:"pod",        interval:"5-7 天",   perMu:3.0, count:7, total:21.0, ratio:"高钾 12-8-40 + 钙肥",   note:"需肥高峰，补钾钙保荚果，控病害"},
+    {key:"harvest",    interval:"—",       perMu:0,   count:0, total:0,    ratio:"—",                   note:"控水降湿，停止施肥，择晴采收"}
+  ];
+
   function yesterdayDate(){
     var d=new Date(); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10);
   }
   function defaultPlantingDate(){
-    var d=new Date(); d.setDate(d.getDate()-55); return d.toISOString().slice(0,10);
+    return new Date().getFullYear()+"-08-01";
   }
   function todayText(){
     return new Intl.DateTimeFormat("zh-CN",{timeZone:"Asia/Shanghai",month:"2-digit",day:"2-digit",weekday:"short"}).format(new Date());
@@ -373,7 +408,7 @@
 
   // ---- state ----
   var state={
-    locationName:locations[0].name,
+    locationName:(locations.find(function(l){return l.name==="海南东方";})||locations[0]).name,
     plantingDate:defaultPlantingDate(),
     areaMu:30,soilMoisture:66,irrigationEfficiency:86,lastFertDays:8,
     organicKgMu:120,compoundKgMu:35,calciumKgMu:18,boronGmu:400,
@@ -411,6 +446,9 @@
     $("heroFert").textContent=d.fertConclusion;
     $("riskScore").textContent=d.riskScore;
     $("scoreStage").textContent="播后 "+growthDays+" 天 · "+meta.label;
+    $("growthStage").textContent="当前生育期："+meta.label+"（"+meta.dayRange+"）";
+    $("growthDays").textContent="播后 "+growthDays+" 天";
+    $("growthTarget").textContent=meta.target;
 
     var kpis=[
       {l:"今日用水/亩",v:d.waterPerMu,u:"m³"},{l:"今日总用水",v:d.waterTotal,u:"m³"},
@@ -460,6 +498,31 @@
     }).join("");
 
     $("adviceList").innerHTML=d.operationAdvice.map(function(n){return "<li>"+n+"</li>";}).join("");
+
+    var stageOrder=["seedling","vegetative","flowering","pod","harvest"];
+    $("stageGuideHead").textContent="当前："+meta.label+" · 播后 "+growthDays+" 天";
+    $("stageGuideBody").innerHTML=stageOrder.map(function(k){
+      var s=stageMeta[k];
+      var cur=k===stage;
+      return '<tr class="'+(cur?"stage-current":"")+'">'+
+        '<td>'+s.label+(cur?'<span class="stage-tag">当前</span>':"")+'</td>'+
+        '<td class="stage-days">'+s.dayRange+'</td>'+
+        '<td>'+s.waterBand+'</td>'+
+        '<td>'+s.target+'</td></tr>';
+    }).join("");
+
+    $("fertPlanBody").innerHTML=stageFertPlan.map(function(p){
+      var s=stageMeta[p.key];
+      var cur=p.key===stage;
+      return '<tr class="'+(cur?"stage-current":"")+'">'+
+        '<td>'+s.label+(cur?'<span class="stage-tag">当前</span>':"")+'</td>'+
+        '<td>'+p.interval+'</td>'+
+        '<td>'+(p.perMu>0?p.perMu+' kg/亩':'—')+'</td>'+
+        '<td>'+(p.count>0?p.count+' 次':'—')+'</td>'+
+        '<td>'+(p.total>0?p.total+' kg/亩':'—')+'</td>'+
+        '<td>'+p.ratio+'</td>'+
+        '<td>'+p.note+'</td></tr>';
+    }).join("");
 
     $("manualCard").className="manual-card"+(state.weather.source==="manual"?"":" hidden");
   }
