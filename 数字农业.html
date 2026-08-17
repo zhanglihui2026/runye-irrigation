@@ -85,42 +85,40 @@
 
 <div class="info-bar">
   <span class="dot"></span>
-  <span>本页内嵌「润野 · 七彩花生水肥决策」工具。若下方长时间空白，请先在本机双击运行花生工具目录中的 <code>本地运行.bat</code> 启动服务（<code>http://localhost:3000</code>），然后刷新本页。</span>
+  <span>本页内嵌「润野 · 七彩花生水肥决策」工具：纯浏览器端实时抓取全岛昨日天气，自动识别生育期与底肥校正，<b>无需安装、无需本机服务，打开网页即用</b>。</span>
 </div>
 
 <div class="frame-wrap">
-  <iframe id="peanutFrame" src="http://localhost:3000" title="七彩花生水肥决策" loading="eager"></iframe>
+  <iframe id="peanutFrame" src="peanut-tool.html" title="七彩花生水肥决策" loading="eager"></iframe>
   <div class="fallback" id="fallback">
-    <h2>未检测到本地服务</h2>
-    <p>「七彩花生水肥决策」工具需要在你本机运行一个本地服务（<code>http://localhost:3000</code>）。</p>
+    <h2>工具内容未加载</h2>
+    <p>「七彩花生水肥决策」页面未能显示，通常是 <code>peanut-tool.html</code> 未一并上传所致。</p>
     <div class="step">
-      <b>第 1 步：</b>打开花生工具文件夹 <code>peanut-weather-advisor-local</code>。<br>
-      <b>第 2 步：</b>双击运行其中的 <code>本地运行.bat</code>，等待命令行出现本地访问地址（默认 3000 端口）。<br>
-      <b>第 3 步：</b>回到本页，点击下方按钮或刷新页面。
+      <b>解决：</b>确认 <code>peanut-tool.html</code> 已与 <code>数字农业.html</code> 放在同一目录；<br>
+      或点击下方按钮刷新本页。
     </div>
-    <p><button class="nav-home-btn" onclick="location.reload()">↻ 我已启动，刷新本页</button></p>
+    <p><button class="nav-home-btn" onclick="location.reload()">↻ 刷新本页</button></p>
   </div>
 </div>
 
 <script>
-  // 探测本地服务是否可达；不可达则显示兜底提示（不影响已运行的场景）
+  // 探测内嵌工具是否加载；加载失败（如文件缺失）则显示兜底提示
   (function () {
-    var shown = false;
+    var shown = false, loaded = false;
     function showFallback(){ if(!shown){ shown = true; document.getElementById('fallback').classList.add('show'); } }
     var frame = document.getElementById('peanutFrame');
-    // 连接被拒绝 / 资源加载失败时（多数浏览器会触发 iframe 的 error）
-    frame.addEventListener('error', showFallback, true);
-    // 主动探测：no-cors 即可，只判断“能否连上”
-    var probed = false;
-    function probe(){
-      if(probed) return; probed = true;
-      fetch('http://localhost:3000', { mode:'no-cors', cache:'no-store' })
-        .then(function(){ /* 可达，不显示兜底 */ })
-        .catch(function(){ /* 不可达：稍后显示兜底，给加载一点时间 */ setTimeout(showFallback, 4000); });
-    }
-    // file:// 或 http 页面下均可探测；https 页面 fetch 到 http 会被混合内容策略拦截并进入 catch，同样给出提示
-    if (document.readyState === 'complete') probe();
-    else window.addEventListener('load', probe);
+    frame.addEventListener('load', function(){ loaded = true; });
+    // 给页面一点加载时间，若 iframe 始终空白则提示
+    setTimeout(function(){
+      try {
+        var doc = frame.contentDocument || frame.contentWindow.document;
+        var has = doc && doc.body && doc.body.children.length > 0;
+        if (!loaded && !has) showFallback();
+      } catch (e) {
+        // 跨域或异常时不打扰，依赖 loaded 状态
+        if (!loaded) showFallback();
+      }
+    }, 5000);
   })();
 </script>
 

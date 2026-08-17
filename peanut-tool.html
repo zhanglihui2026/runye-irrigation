@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>润野 · 七彩花生水肥决策</title>
+<style>
+  :root{
+    --g-700:#1f8a4c; --g-600:#2fa463; --g-50:#eef7f0; --g-100:#dcefe2;
+    --ink:#1f2933; --ink-2:#51606b; --line:#e1e8e4; --bg:#f3f6f4;
+    --warn:#d9772b; --danger:#cf3a3a; --ok:#1f8a4c;
+    --shadow:0 6px 20px rgba(31,42,51,.08);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .ops-app{max-width:1240px;margin:0 auto;padding:18px 20px 48px}
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+  .topbar strong{display:block;font-size:18px;color:var(--g-700)}
+  .topbar span{font-size:12px;color:var(--ink-2)}
+  .sync-pill{font-size:12px;padding:6px 12px;border-radius:999px;background:var(--g-50);color:var(--g-700);border:1px solid var(--g-100)}
+  .sync-pill.loading{background:#fff5e8;color:var(--warn);border-color:#f3d8b3}
+  .sync-pill.error{background:#fdecec;color:var(--danger);border-color:#f3c2c2}
+  .sync-pill.ready{background:var(--g-50);color:var(--g-700);border-color:var(--g-100)}
+
+  .hero-grid{display:grid;grid-template-columns:1fr 220px;gap:16px;margin-bottom:16px}
+  .hero-copy{background:linear-gradient(135deg,var(--g-700),var(--g-600));color:#fff;border-radius:16px;padding:20px 22px;box-shadow:var(--shadow)}
+  .eyebrow{margin:0 0 6px;font-size:12px;opacity:.85;letter-spacing:.4px}
+  .hero-copy h1{margin:0 0 8px;font-size:26px;line-height:1.25}
+  .hero-sub{margin:0;font-size:15px;opacity:.92}
+  .score-card{background:#fff;border-radius:16px;padding:18px;box-shadow:var(--shadow);display:flex;flex-direction:column;justify-content:center;text-align:center;border:1px solid var(--line)}
+  .score-card span{font-size:13px;color:var(--ink-2)}
+  .score-card strong{font-size:44px;color:var(--g-700);line-height:1.1}
+  .score-card p{margin:6px 0 0;font-size:12px;color:var(--ink-2)}
+
+  .kpi-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:12px;margin-bottom:16px}
+  .kpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:var(--shadow);text-align:center}
+  .kpi span{display:block;font-size:12px;color:var(--ink-2);margin-bottom:6px}
+  .kpi strong{font-size:22px;color:var(--ink)}
+  .kpi em{font-size:12px;font-style:normal;color:var(--ink-2);margin-left:2px}
+
+  .main-grid{display:grid;grid-template-columns:320px 1fr;gap:16px;align-items:start}
+  .control-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:var(--shadow);position:sticky;top:14px}
+  .control-card h2{font-size:14px;margin:18px 0 10px;color:var(--g-700);border-left:3px solid var(--g-700);padding-left:8px}
+  .control-card h2:first-child{margin-top:0}
+  .control-card label{display:block;font-size:13px;color:var(--ink-2);margin-bottom:12px}
+  .control-card select,.control-card input.date-input{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:9px;font-size:14px;margin-top:5px;background:#fff;color:var(--ink)}
+  .growth-card{background:var(--g-50);border:1px solid var(--g-100);border-radius:12px;padding:12px;margin-bottom:12px}
+  .growth-card span{font-size:13px;color:var(--g-700);font-weight:600}
+  .growth-card strong{display:block;font-size:18px;margin:4px 0}
+  .growth-card p{margin:0;font-size:12px;color:var(--ink-2)}
+  .num-control{display:block;margin-bottom:12px}
+  .num-control>span{display:flex;justify-content:space-between;font-size:13px;color:var(--ink-2);margin-bottom:5px}
+  .num-control strong{color:var(--g-700);font-weight:600}
+  .number-row{display:flex;align-items:center;gap:6px}
+  .number-row input{flex:1;width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:9px;font-size:14px}
+  .number-row em{font-style:normal;color:var(--ink-2);font-size:12px;min-width:36px;text-align:right}
+
+  .board{display:flex;flex-direction:column;gap:16px}
+  .weather-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px 18px;box-shadow:var(--shadow);display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+  .weather-card strong{font-size:15px}
+  .section-title{margin:0 0 6px;font-size:13px;color:var(--ink-2)}
+  .weather-metrics{display:flex;gap:18px;flex-wrap:wrap}
+  .weather-metric span{display:block;font-size:12px;color:var(--ink-2)}
+  .weather-metric strong{font-size:18px}
+
+  .decision-table-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px 18px;box-shadow:var(--shadow)}
+  .section-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+  .section-head span{font-size:12px;color:var(--ink-2)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:12px;color:var(--ink-2);font-weight:600}
+  .focus-row{background:var(--g-50)}
+  .focus-row td{font-weight:600;color:var(--g-700)}
+
+  .insight-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .insight-grid article{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px 18px;box-shadow:var(--shadow)}
+  .bar-row{display:flex;align-items:center;gap:10px;margin:8px 0;font-size:13px}
+  .bar-row>span{width:64px;color:var(--ink-2);flex:none}
+  .bar-row i{height:10px;border-radius:6px;background:var(--g-600);display:block}
+  .bar-row.rain i{background:#3a8fd0}
+  .bar-row.water i{background:#2fa463}
+  .bar-row.basal i{background:#caa53a}
+  .bar-row strong{width:60px;text-align:right;flex:none}
+  .quiet-copy{font-size:12px;color:var(--ink-2);margin:8px 0 0}
+
+  .operation-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px 18px;box-shadow:var(--shadow)}
+  .operation-card ol{margin:8px 0 0;padding-left:20px;font-size:13px;color:var(--ink)}
+  .operation-card li{margin-bottom:7px}
+
+  .manual-card{background:#fff8ef;border:1px solid #f3d8b3;border-radius:16px;padding:16px 18px;box-shadow:var(--shadow)}
+  .manual-card.hidden{display:none}
+  .manual-card .num-control{width:48%;display:inline-block;margin-right:3%}
+
+  @media (max-width:980px){
+    .hero-grid{grid-template-columns:1fr}
+    .kpi-grid{grid-template-columns:repeat(3,1fr)}
+    .main-grid{grid-template-columns:1fr}
+    .control-card{position:static}
+    .insight-grid{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="ops-app">
+  <header class="topbar">
+    <div>
+      <strong>润野 · 七彩花生水肥决策</strong>
+      <span>全岛天气抓取 · 种植天数识别 · 底肥校正</span>
+    </div>
+    <div class="sync-pill" id="syncPill">等待抓取昨日天气</div>
+  </header>
+
+  <section class="hero-grid">
+    <div class="hero-copy">
+      <p class="eyebrow" id="eyebrow">今日/次日农事建议</p>
+      <h1 id="heroWater">—</h1>
+      <p class="hero-sub" id="heroFert">—</p>
+    </div>
+    <div class="score-card">
+      <span>作业适宜度</span>
+      <strong id="riskScore">—</strong>
+      <p id="scoreStage">—</p>
+    </div>
+  </section>
+
+  <section class="kpi-grid" id="kpiGrid"></section>
+
+  <section class="main-grid">
+    <aside class="control-card">
+      <h2>地块与生长参数</h2>
+      <label>种植区域
+        <select id="locationName"></select>
+      </label>
+      <label>种植日期
+        <input class="date-input" type="date" id="plantingDate" />
+      </label>
+      <div class="growth-card">
+        <span id="growthStage">—</span>
+        <strong id="growthDays">—</strong>
+        <p id="growthTarget">—</p>
+      </div>
+      <label class="num-control"><span>面积 <strong id="areaMuV"></strong></span>
+        <div class="number-row"><input type="number" id="areaMu" min="1" max="500" step="1"><em>亩</em></div></label>
+      <label class="num-control"><span>当前土壤墒情 <strong id="soilMoistureV"></strong></span>
+        <div class="number-row"><input type="number" id="soilMoisture" min="35" max="95" step="1"><em>%</em></div></label>
+      <label class="num-control"><span>灌溉效率 <strong id="irrigationEfficiencyV"></strong></span>
+        <div class="number-row"><input type="number" id="irrigationEfficiency" min="60" max="95" step="1"><em>%</em></div></label>
+      <label class="num-control"><span>距上次施肥 <strong id="lastFertDaysV"></strong></span>
+        <div class="number-row"><input type="number" id="lastFertDays" min="0" max="20" step="1"><em>天</em></div></label>
+
+      <h2>追肥 EC 参数</h2>
+      <label class="num-control"><span>原水 EC <strong id="sourceWaterEcV"></strong></span>
+        <div class="number-row"><input type="number" id="sourceWaterEc" min="0" max="2.5" step="0.05"><em>mS/cm</em></div></label>
+      <label class="num-control"><span>肥料 EC 系数 <strong id="fertEcCoeffV"></strong></span>
+        <div class="number-row"><input type="number" id="fertEcCoeff" min="0.5" max="2.2" step="0.05"><em>mS/g/L</em></div></label>
+
+      <h2>底肥配置</h2>
+      <label class="num-control"><span>有机肥 <strong id="organicKgMuV"></strong></span>
+        <div class="number-row"><input type="number" id="organicKgMu" min="0" max="300" step="5"><em>kg/亩</em></div></label>
+      <label class="num-control"><span>复合肥 <strong id="compoundKgMuV"></strong></span>
+        <div class="number-row"><input type="number" id="compoundKgMu" min="0" max="80" step="1"><em>kg/亩</em></div></label>
+      <label class="num-control"><span>复合肥 N <strong id="compoundNPctV"></strong></span>
+        <div class="number-row"><input type="number" id="compoundNPct" min="0" max="30" step="1"><em>%</em></div></label>
+      <label class="num-control"><span>复合肥 P2O5 <strong id="compoundPPctV"></strong></span>
+        <div class="number-row"><input type="number" id="compoundPPct" min="0" max="30" step="1"><em>%</em></div></label>
+      <label class="num-control"><span>复合肥 K2O <strong id="compoundKPctV"></strong></span>
+        <div class="number-row"><input type="number" id="compoundKPct" min="0" max="30" step="1"><em>%</em></div></label>
+      <label class="num-control"><span>钙镁磷/钙肥 <strong id="calciumKgMuV"></strong></span>
+        <div class="number-row"><input type="number" id="calciumKgMu" min="0" max="50" step="1"><em>kg/亩</em></div></label>
+      <label class="num-control"><span>硼肥 <strong id="boronGmuV"></strong></span>
+        <div class="number-row"><input type="number" id="boronGmu" min="0" max="1000" step="25"><em>g/亩</em></div></label>
+    </aside>
+
+    <section class="board">
+      <div class="weather-card">
+        <div>
+          <p class="section-title">昨日天气实况</p>
+          <strong id="weatherLoc">—</strong>
+        </div>
+        <div class="weather-metrics" id="weatherMetrics"></div>
+      </div>
+
+      <div class="decision-table-card">
+        <div class="section-head">
+          <p class="section-title">今日水肥执行表</p>
+          <span id="decisionHead">—</span>
+        </div>
+        <table>
+          <thead><tr><th>项目</th><th>每亩</th><th>全田</th><th>说明</th></tr></thead>
+          <tbody id="decisionBody"></tbody>
+        </table>
+      </div>
+
+      <div class="insight-grid">
+        <article>
+          <p class="section-title">水分平衡</p>
+          <div class="bar-row"><span>作物耗水</span><i id="barEtc"></i><strong id="valEtc">—</strong></div>
+          <div class="bar-row rain"><span>有效雨量</span><i id="barRain"></i><strong id="valRain">—</strong></div>
+          <div class="bar-row water"><span>补水深度</span><i id="barWater"></i><strong id="valWater">—</strong></div>
+        </article>
+        <article>
+          <p class="section-title">底肥与生育期判断</p>
+          <div class="bar-row basal"><span>底肥评分</span><i id="barBasal"></i><strong id="valBasal">—</strong></div>
+          <p class="quiet-copy" id="basalCopy">—</p>
+        </article>
+      </div>
+
+      <div class="decision-table-card">
+        <div class="section-head">
+          <p class="section-title">底肥氮磷钾折算</p>
+          <span>单位按 N、P2O5、K2O 统计</span>
+        </div>
+        <table>
+          <thead><tr><th>来源</th><th>N kg/亩</th><th>P2O5 kg/亩</th><th>K2O kg/亩</th><th>全田 N-P2O5-K2O</th><th>说明</th></tr></thead>
+          <tbody id="npkBody"></tbody>
+        </table>
+      </div>
+
+      <div class="operation-card">
+        <p class="section-title">详细农事操作建议</p>
+        <ol id="adviceList"></ol>
+      </div>
+
+      <div class="manual-card hidden" id="manualCard">
+        <p class="section-title">手动天气兜底</p>
+        <label class="num-control"><span>昨日降雨 <strong id="mRainV"></strong></span>
+          <div class="number-row"><input type="number" id="mRain" min="0" max="100" step="1"><em>mm</em></div></label>
+        <label class="num-control"><span>昨日最高温 <strong id="mTmaxV"></strong></span>
+          <div class="number-row"><input type="number" id="mTmax" min="20" max="42" step="1"><em>°C</em></div></label>
+        <label class="num-control"><span>昨日最低温 <strong id="mTminV"></strong></span>
+          <div class="number-row"><input type="number" id="mTmin" min="12" max="31" step="1"><em>°C</em></div></label>
+        <label class="num-control"><span>参考蒸散 <strong id="mEtoV"></strong></span>
+          <div class="number-row"><input type="number" id="mEto" min="1" max="9" step="0.1"><em>mm</em></div></label>
+      </div>
+    </section>
+  </section>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var locations = [
+    {name:"海南海口",lat:20.044,lon:110.199},{name:"海南三亚",lat:18.252,lon:109.512},
+    {name:"海南儋州",lat:19.517,lon:109.577},{name:"海南琼海",lat:19.246,lon:110.464},
+    {name:"海南文昌",lat:19.543,lon:110.797},{name:"海南万宁",lat:18.796,lon:110.389},
+    {name:"海南东方",lat:19.096,lon:108.654},{name:"海南五指山",lat:18.776,lon:109.516},
+    {name:"海南乐东",lat:18.747,lon:109.174},{name:"海南澄迈",lat:19.738,lon:110.006},
+    {name:"海南临高",lat:19.912,lon:109.69},{name:"海南定安",lat:19.681,lon:110.359},
+    {name:"海南屯昌",lat:19.363,lon:110.103},{name:"海南陵水",lat:18.506,lon:110.037},
+    {name:"海南昌江",lat:19.298,lon:109.055},{name:"海南保亭",lat:18.64,lon:109.702},
+    {name:"海南琼中",lat:19.033,lon:109.839},{name:"海南白沙",lat:19.225,lon:109.452}
+  ];
+
+  var stageMeta = {
+    seedling:{label:"播种出苗期",dayRange:"0-14 天",kc:0.42,baseFertKg:0.8,waterBand:"轻水保苗",target:"防烂种、促齐苗、少扰根"},
+    vegetative:{label:"营养生长期",dayRange:"15-29 天",kc:0.58,baseFertKg:1.4,waterBand:"控旺促根",target:"稳苗架、促根瘤、避免徒长"},
+    flowering:{label:"开花下针期",dayRange:"30-49 天",kc:0.78,baseFertKg:2.2,waterBand:"稳墒促下针",target:"稳水、补硼钼、减少落花"},
+    pod:{label:"结荚膨大期",dayRange:"50-89 天",kc:0.96,baseFertKg:3.0,waterBand:"水肥敏感",target:"补钾钙、保荚果、控病害"},
+    harvest:{label:"成熟收获期",dayRange:"90 天以上",kc:0.35,baseFertKg:0,waterBand:"控水降湿",target:"降湿防霉、择晴采收"}
+  };
+
+  var stageEcBand = {
+    seedling:{low:0.6,high:1.2},vegetative:{low:0.8,high:1.5},
+    flowering:{low:1.0,high:1.8},pod:{low:1.2,high:2.2},harvest:{low:0,high:0.8}
+  };
+
+  function yesterdayDate(){
+    var d=new Date(); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10);
+  }
+  function defaultPlantingDate(){
+    var d=new Date(); d.setDate(d.getDate()-55); return d.toISOString().slice(0,10);
+  }
+  function todayText(){
+    return new Intl.DateTimeFormat("zh-CN",{timeZone:"Asia/Shanghai",month:"2-digit",day:"2-digit",weekday:"short"}).format(new Date());
+  }
+  function round(v,d){ d=d||1; return Number((Math.round(v*Math.pow(10,d))/Math.pow(10,d)).toFixed(d)); }
+  function clamp(v,min,max){ return Math.min(Math.max(v,min),max); }
+  function daysSince(dateText){
+    var planted=new Date(dateText+"T00:00:00+08:00"); var now=new Date();
+    return Math.max(0,Math.floor((now.getTime()-planted.getTime())/86400000));
+  }
+  function stageFromDays(d){
+    if(d<15) return "seedling"; if(d<30) return "vegetative";
+    if(d<50) return "flowering"; if(d<90) return "pod"; return "harvest";
+  }
+  function buildOpenMeteoUrl(loc){
+    var p=new URLSearchParams({
+      latitude:String(loc.lat),longitude:String(loc.lon),
+      daily:"temperature_2m_max,temperature_2m_min,precipitation_sum,et0_fao_evapotranspiration,wind_speed_10m_max",
+      timezone:"Asia/Shanghai",past_days:"1",forecast_days:"1"
+    });
+    return "https://api.open-meteo.com/v1/forecast?"+p.toString();
+  }
+
+  function computeBasalScore(i){
+    var oS=clamp(i.organicKgMu/120,0,1), cS=clamp(i.compoundKgMu/35,0,1),
+        caS=clamp(i.calciumKgMu/18,0,1), bS=clamp(i.boronGmu/500,0,1);
+    var score=Math.round(oS*25+cS*35+caS*25+bS*15);
+    var status=score>=82?"充足":score>=60?"中等":"偏弱";
+    var factor=score>=82?0.72:score>=60?0.9:1.18;
+    return {score:score,status:status,factor:factor,calciumWeak:caS<0.65,boronWeak:bS<0.65};
+  }
+  function computeBasalNpk(i){
+    var organic={n:i.organicKgMu*0.015,p:i.organicKgMu*0.01,k:i.organicKgMu*0.012};
+    var compound={n:i.compoundKgMu*(i.compoundNPct/100),p:i.compoundKgMu*(i.compoundPPct/100),k:i.compoundKgMu*(i.compoundKPct/100)};
+    var calcium={n:0,p:i.calciumKgMu*0.12,k:0};
+    var total={n:organic.n+compound.n+calcium.n,p:organic.p+compound.p+calcium.p,k:organic.k+compound.k+calcium.k};
+    return {
+      organic:{n:round(organic.n,2),p:round(organic.p,2),k:round(organic.k,2)},
+      compound:{n:round(compound.n,2),p:round(compound.p,2),k:round(compound.k,2)},
+      calcium:{n:round(calcium.n,2),p:round(calcium.p,2),k:round(calcium.k,2)},
+      total:{n:round(total.n,2),p:round(total.p,2),k:round(total.k,2)}
+    };
+  }
+  function computeDecision(i){
+    var meta=stageMeta[i.stage];
+    var basal=computeBasalScore(i);
+    var basalNpk=computeBasalNpk(i);
+    var effectiveRain=i.weather.rainMm<=5?i.weather.rainMm*0.45:Math.min(i.weather.rainMm*0.72,30);
+    var heatFactor=i.weather.tempMax>=35?1.2:i.weather.tempMax>=33?1.08:i.weather.tempMin<=18?0.88:1;
+    var soilFactor=i.soilMoisture<55?1.25:i.soilMoisture>78?0.72:1;
+    var etcMm=Math.max(1.1,i.weather.etoMm*meta.kc*heatFactor);
+    var rawWaterMm=(etcMm-effectiveRain)*soilFactor;
+    var drainage=i.weather.rainMm>=30||i.soilMoisture>=84;
+    var wetSoil=i.weather.rainMm>=18||i.soilMoisture>=78;
+    var drought=i.weather.rainMm<4&&i.soilMoisture<58;
+    var irrigationCap=i.stage==="pod"?18:i.stage==="flowering"?15:12;
+    var irrigationMm=(drainage||i.stage==="harvest")?0:clamp(rawWaterMm,0,irrigationCap);
+    var waterPerMu=round((irrigationMm*0.667)/(i.irrigationEfficiency/100),1);
+    var waterTotal=round(waterPerMu*i.areaMu,1);
+    var weatherFertFactor=drainage||wetSoil?0:drought?1.12:1;
+    var fertIntervalFactor=i.lastFertDays<=4?0.45:i.lastFertDays<=7?0.75:1;
+    var stageAllowed=i.stage!=="harvest"&&i.stage!=="seedling";
+    var fertPerMu=stageAllowed?round(meta.baseFertKg*basal.factor*weatherFertFactor*fertIntervalFactor,2):0;
+    var fertTotal=round(fertPerMu*i.areaMu,1);
+    var fertConcentration=waterPerMu>0&&fertPerMu>0?round(fertPerMu/waterPerMu,2):0;
+    var fertigationEc=fertConcentration>0?round(i.sourceWaterEc+fertConcentration*i.fertEcCoeff,2):round(i.sourceWaterEc,2);
+    var ecBand=stageEcBand[i.stage];
+    var ecStatus=fertPerMu<=0?"今日不追肥":fertigationEc>ecBand.high?"偏高，建议加水稀释或分次施":fertigationEc<ecBand.low?"偏低，可按长势微调":"适宜";
+    var potassium=round(fertPerMu*(i.stage==="pod"?0.65:0.5),2);
+    var calcium=(i.stage==="pod"||basal.calciumWeak)?round(Math.max(fertPerMu*0.22,basal.calciumWeak&&fertPerMu>0?0.35:0),2):0;
+    var trace=(i.stage==="flowering"||i.stage==="pod"||basal.boronWeak)?round(Math.max(fertPerMu*0.015,fertPerMu>0?0.03:0),2):0;
+    var riskScore=clamp(100-Math.max(0,i.weather.rainMm-18)*1.7-Math.max(0,i.soilMoisture-75)*1.25-(i.weather.tempMax>=35?12:0)-(i.weather.windMax>=28?8:0)-(basal.score<60&&(i.stage==="flowering"||i.stage==="pod")?8:0),35,97);
+
+    var waterConclusion=drainage?"今日不灌水，先排涝降湿":waterPerMu<=0?"今日不补水，保墒巡田":("今日灌水 "+waterPerMu+" m³/亩");
+    var fertConclusion=fertPerMu<=0?(i.stage==="harvest"?"今日不追肥，准备控水收获":wetSoil||drainage?"今日暂停追肥，防根区缺氧":"今日不追肥，观察长势"):("今日随水施肥 "+fertPerMu+" kg/亩");
+
+    var operationAdvice=[
+      "播后 "+i.growthDays+" 天，系统判定为"+meta.label+"："+meta.target+"。",
+      drainage?"优先清理围沟、腰沟和厢沟，确认低洼点无积水后再考虑水肥。":
+        waterPerMu>0?("上午或傍晚完成滴灌/沟灌，单亩水量 "+waterPerMu+" m³，全田约 "+waterTotal+" m³。"):
+        "不安排灌溉，巡查垄面湿度、根区透气和叶片萎蔫情况。",
+      fertPerMu>0?("肥料随水后半程进入，全田水溶肥约 "+fertTotal+" kg；估算 EC "+fertigationEc+" mS/cm，结束前清水冲管 10-15 分钟。"):
+        "不做根区追肥，避免湿土施肥导致烧根、沤根或肥效流失。",
+      (fertPerMu>0&&fertigationEc>ecBand.high)?("当前生育期建议 EC 约 "+ecBand.low+"-"+ecBand.high+" mS/cm，本次估算偏高，优先增加灌水量、降低肥料浓度或拆成两次追肥。"):null,
+      basal.status==="偏弱"&&(i.stage==="flowering"||i.stage==="pod")?"底肥底盘偏弱，天气转稳后采用少量多次补肥，不一次性加大浓度。":("底肥状态"+basal.status+"，今日追肥按生育期和天气窗口校正。"),
+      (i.stage==="pod"&&basal.calciumWeak)?"钙肥底施不足，结荚期优先补钙，减少空荚、瘪荚风险。":null,
+      (i.stage==="flowering"&&basal.boronWeak)?"硼肥底施不足，开花下针期关注花针质量，可叶面或随水少量补硼钼。":null,
+      i.weather.tempMax>=34?"高温日避开 11:00-16:00 施肥、喷药和大水漫灌。":null,
+      i.weather.windMax>=28?"风力偏大，叶面肥和药剂建议顺延或改到低风时段。":null
+    ].filter(function(x){return x;});
+
+    return {
+      basal:basal,basalNpk:basalNpk,etcMm:round(etcMm,1),effectiveRain:round(effectiveRain,1),
+      irrigationMm:round(irrigationMm,1),waterPerMu:waterPerMu,waterTotal:waterTotal,
+      fertPerMu:fertPerMu,fertTotal:fertTotal,fertConcentration:fertConcentration,fertigationEc:fertigationEc,
+      ecStatus:ecStatus,ecBand:ecBand,potassium:potassium,calcium:calcium,trace:trace,
+      riskScore:Math.round(riskScore),waterConclusion:waterConclusion,fertConclusion:fertConclusion,
+      operationAdvice:operationAdvice
+    };
+  }
+
+  // ---- state ----
+  var state={
+    locationName:locations[0].name,
+    plantingDate:defaultPlantingDate(),
+    areaMu:30,soilMoisture:66,irrigationEfficiency:86,lastFertDays:8,
+    organicKgMu:120,compoundKgMu:35,calciumKgMu:18,boronGmu:400,
+    compoundNPct:15,compoundPPct:15,compoundKPct:15,
+    sourceWaterEc:0.35,fertEcCoeff:1.25,
+    weather:{date:yesterdayDate(),rainMm:12,tempMax:32,tempMin:25,etoMm:4.2,windMax:18,source:"manual"},
+    weatherStatus:"idle",weatherMessage:"等待抓取昨日天气"
+  };
+
+  function $(id){ return document.getElementById(id); }
+
+  function currentLoc(){ return locations.filter(function(l){return l.name===state.locationName;})[0]||locations[0]; }
+
+  function recompute(){
+    var loc=currentLoc();
+    var growthDays=daysSince(state.plantingDate);
+    var stage=stageFromDays(growthDays);
+    state._growthDays=growthDays; state._stage=stage;
+    state.decision=computeDecision({
+      weather:state.weather,stage:stage,growthDays:growthDays,
+      areaMu:state.areaMu,soilMoisture:state.soilMoisture,irrigationEfficiency:state.irrigationEfficiency,
+      lastFertDays:state.lastFertDays,organicKgMu:state.organicKgMu,compoundKgMu:state.compoundKgMu,
+      calciumKgMu:state.calciumKgMu,boronGmu:state.boronGmu,compoundNPct:state.compoundNPct,
+      compoundPPct:state.compoundPPct,compoundKPct:state.compoundKPct,
+      sourceWaterEc:state.sourceWaterEc,fertEcCoeff:state.fertEcCoeff
+    });
+  }
+
+  function render(){
+    var d=state.decision, loc=currentLoc(), stage=state._stage, growthDays=state._growthDays, meta=stageMeta[stage];
+    $("syncPill").textContent=state.weatherMessage;
+    $("syncPill").className="sync-pill "+state.weatherStatus;
+    $("eyebrow").textContent="今日/次日农事建议 · "+todayText();
+    $("heroWater").textContent=d.waterConclusion;
+    $("heroFert").textContent=d.fertConclusion;
+    $("riskScore").textContent=d.riskScore;
+    $("scoreStage").textContent="播后 "+growthDays+" 天 · "+meta.label;
+
+    var kpis=[
+      {l:"今日用水/亩",v:d.waterPerMu,u:"m³"},{l:"今日总用水",v:d.waterTotal,u:"m³"},
+      {l:"今日用肥/亩",v:d.fertPerMu,u:"kg"},{l:"今日总用肥",v:d.fertTotal,u:"kg"},
+      {l:"追肥EC估算",v:d.fertigationEc,u:"mS/cm"},{l:"底肥底盘评分",v:d.basal.score,u:"分"},
+      {l:"作物耗水估算",v:d.etcMm,u:"mm"}
+    ];
+    $("kpiGrid").innerHTML=kpis.map(function(k){
+      return '<div class="kpi"><span>'+k.l+'</span><strong>'+k.v+'<em>'+k.u+'</em></strong></div>';
+    }).join("");
+
+    $("weatherLoc").textContent=loc.name+" · "+state.weather.date;
+    $("weatherMetrics").innerHTML=
+      '<div class="weather-metric"><span>降雨</span><strong>'+state.weather.rainMm+' mm</strong></div>'+
+      '<div class="weather-metric"><span>温度</span><strong>'+state.weather.tempMin+'-'+state.weather.tempMax+' °C</strong></div>'+
+      '<div class="weather-metric"><span>参考蒸散</span><strong>'+state.weather.etoMm+' mm</strong></div>'+
+      '<div class="weather-metric"><span>最大风速</span><strong>'+state.weather.windMax+' km/h</strong></div>';
+
+    $("decisionHead").textContent="底肥状态："+d.basal.status+" · "+meta.waterBand;
+    var decisionRows=[
+      {item:"灌溉用水",perMu:d.waterPerMu+" m³/亩",total:d.waterTotal+" m³",note:d.waterConclusion},
+      {item:"水溶肥总量",perMu:d.fertPerMu+" kg/亩",total:d.fertTotal+" kg",note:d.fertConclusion},
+      {item:"追肥 EC 估算",perMu:d.fertigationEc+" mS/cm",total:d.fertConcentration+" g/L",note:d.ecStatus+"；建议 "+d.ecBand.low+"-"+d.ecBand.high+" mS/cm"},
+      {item:"其中高钾肥",perMu:d.potassium+" kg/亩",total:round(d.potassium*state.areaMu,1)+" kg",note:"根据底肥强弱和生育期折算"},
+      {item:"其中钙肥",perMu:d.calcium+" kg/亩",total:round(d.calcium*state.areaMu,1)+" kg",note:(stage==="pod"||d.basal.calciumWeak)?"钙供应不足或结荚期优先":"本阶段非重点"},
+      {item:"微量元素",perMu:d.trace+" kg/亩",total:round(d.trace*state.areaMu,1)+" kg",note:"硼、钼按产品浓度折算"}
+    ];
+    $("decisionBody").innerHTML=decisionRows.map(function(r,idx){
+      return '<tr class="'+(idx<2?"focus-row":"")+'"><td>'+r.item+'</td><td>'+r.perMu+'</td><td>'+r.total+'</td><td>'+r.note+'</td></tr>';
+    }).join("");
+
+    $("barEtc").style.width=clamp(d.etcMm*10,8,100)+"%"; $("valEtc").textContent=d.etcMm+"mm";
+    $("barRain").style.width=clamp(d.effectiveRain*4,8,100)+"%"; $("valRain").textContent=d.effectiveRain+"mm";
+    $("barWater").style.width=clamp(d.irrigationMm*7,6,100)+"%"; $("valWater").textContent=d.irrigationMm+"mm";
+    $("barBasal").style.width=clamp(d.basal.score,8,100)+"%"; $("valBasal").textContent=d.basal.score+"分";
+    $("basalCopy").textContent="当前为"+meta.label+"，底肥"+d.basal.status+"。系统会用底肥评分修正追肥量，避免底肥充足时重复施肥，也避免底肥不足时错过补钾、补钙、补硼窗口。";
+
+    var npkN=state.decision.basalNpk;
+    var npkRows=[
+      {item:"有机肥折算",n:npkN.organic.n,p:npkN.organic.p,k:npkN.organic.k,note:"估算 N1.5%、P2O5 1.0%、K2O 1.2%"},
+      {item:"复合肥折算",n:npkN.compound.n,p:npkN.compound.p,k:npkN.compound.k,note:"按 "+state.compoundNPct+"-"+state.compoundPPct+"-"+state.compoundKPct+" 折算"},
+      {item:"钙镁磷折算",n:npkN.calcium.n,p:npkN.calcium.p,k:npkN.calcium.k,note:"按 P2O5 12%估算"},
+      {item:"底肥合计",n:npkN.total.n,p:npkN.total.p,k:npkN.total.k,note:"每亩有效养分折算"}
+    ];
+    $("npkBody").innerHTML=npkRows.map(function(r,idx){
+      return '<tr class="'+(idx===npkRows.length-1?"focus-row":"")+'"><td>'+r.item+'</td><td>'+r.n+'</td><td>'+r.p+'</td><td>'+r.k+'</td><td>'+round(r.n*state.areaMu,1)+"-"+round(r.p*state.areaMu,1)+"-"+round(r.k*state.areaMu,1)+' kg</td><td>'+r.note+'</td></tr>';
+    }).join("");
+
+    $("adviceList").innerHTML=d.operationAdvice.map(function(n){return "<li>"+n+"</li>";}).join("");
+
+    $("manualCard").className="manual-card"+(state.weather.source==="manual"?"":" hidden");
+  }
+
+  function readInputs(){
+    state.areaMu=+$("areaMu").value||0;
+    state.soilMoisture=+$("soilMoisture").value||0;
+    state.irrigationEfficiency=+$("irrigationEfficiency").value||0;
+    state.lastFertDays=+$("lastFertDays").value||0;
+    state.sourceWaterEc=+$("sourceWaterEc").value||0;
+    state.fertEcCoeff=+$("fertEcCoeff").value||0;
+    state.organicKgMu=+$(  "organicKgMu").value||0;
+    state.compoundKgMu=+$( "compoundKgMu").value||0;
+    state.calciumKgMu=+$(  "calciumKgMu").value||0;
+    state.boronGmu=+$(     "boronGmu").value||0;
+    state.compoundNPct=+$( "compoundNPct").value||0;
+    state.compoundPPct=+$( "compoundPPct").value||0;
+    state.compoundKPct=+$( "compoundKPct").value||0;
+    // sync label strongs
+    ["areaMu","soilMoisture","irrigationEfficiency","lastFertDays","sourceWaterEc","fertEcCoeff",
+     "organicKgMu","compoundKgMu","calciumKgMu","boronGmu","compoundNPct","compoundPPct","compoundKPct"]
+     .forEach(function(id){ var el=$(id+"V"); if(el) el.textContent=$(id).value; });
+  }
+  function writeInputs(){
+    $("locationName").value=state.locationName;
+    $("plantingDate").value=state.plantingDate;
+    ["areaMu","soilMoisture","irrigationEfficiency","lastFertDays","sourceWaterEc","fertEcCoeff",
+     "organicKgMu","compoundKgMu","calciumKgMu","boronGmu","compoundNPct","compoundPPct","compoundKPct"]
+     .forEach(function(id){ $(id).value=state[id]; var el=$(id+"V"); if(el) el.textContent=state[id]; });
+    ["mRain","mTmax","mTmin","mEto"].forEach(function(id){ var map={mRain:"rainMm",mTmax:"tempMax",mTmin:"tempMin",mEto:"etoMm"};
+      $(id).value=state.weather[map[id]]; var el=$(id+"V"); if(el) el.textContent=state.weather[map[id]]; });
+  }
+
+  function bind(){
+    // populate location select
+    $("locationName").innerHTML=locations.map(function(l){return '<option value="'+l.name+'">'+l.name+'</option>';}).join("");
+    // param inputs
+    ["areaMu","soilMoisture","irrigationEfficiency","lastFertDays","sourceWaterEc","fertEcCoeff",
+     "organicKgMu","compoundKgMu","calciumKgMu","boronGmu","compoundNPct","compoundPPct","compoundKPct"]
+     .forEach(function(id){
+      $(id).addEventListener("input",function(){ readInputs(); recompute(); render(); });
+    });
+    $("locationName").addEventListener("change",function(){ state.locationName=this.value; writeInputs(); loadWeather(); });
+    $("plantingDate").addEventListener("input",function(){ state.plantingDate=this.value; recompute(); render(); });
+    // manual weather
+    ["mRain","mTmax","mTmin","mEto"].forEach(function(id){
+      var map={mRain:"rainMm",mTmax:"tempMax",mTmin:"tempMin",mEto:"etoMm"};
+      $(id).addEventListener("input",function(){
+        state.weather[map[id]]=+this.value||0; state.weather.source="manual";
+        state.weatherStatus="error"; state.weatherMessage="已使用手动兜底数据";
+        recompute(); render();
+      });
+    });
+  }
+
+  function loadWeather(){
+    var loc=currentLoc();
+    state.weatherStatus="loading"; state.weatherMessage="正在抓取昨日天气实况"; render();
+    fetch(buildOpenMeteoUrl(loc)).then(function(res){
+      if(!res.ok) throw new Error("bad");
+      return res.json();
+    }).then(function(data){
+      var daily=data.daily; var target=yesterdayDate();
+      var idx=Math.max(0,daily.time.indexOf(target));
+      state.weather={
+        date:daily.time[idx]||target,
+        rainMm:round(Number(daily.precipitation_sum[idx]||0),1),
+        tempMax:round(Number(daily.temperature_2m_max[idx]||31),1),
+        tempMin:round(Number(daily.temperature_2m_min[idx]||24),1),
+        etoMm:round(Number(daily.et0_fao_evapotranspiration[idx]||4),1),
+        windMax:round(Number(daily.wind_speed_10m_max[idx]||16),1),
+        source:"auto"
+      };
+      state.weatherStatus="ready"; state.weatherMessage="已抓取 "+state.weather.date+" 天气";
+      recompute(); render(); writeInputs();
+    }).catch(function(){
+      state.weatherStatus="error"; state.weatherMessage="天气抓取失败，当前使用手动兜底数据";
+      state.weather=Object.assign({},state.weather,{source:"manual"});
+      recompute(); render(); writeInputs();
+    });
+  }
+
+  // init
+  bind();
+  writeInputs();
+  recompute();
+  render();
+  loadWeather();
+})();
+</script>
+</body>
+</html>
