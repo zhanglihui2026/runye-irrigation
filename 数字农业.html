@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数字农业 · 七彩花生水肥决策｜润野灌溉</title>
+<style>
+  :root{
+    --g-50:#f0fdf4;--g-100:#dcfce7;--g-200:#bbf7d0;--g-500:#22c55e;--g-600:#16a34a;--g-700:#15803d;--g-800:#166534;--g-900:#14532d;
+    --teal:#0d9488;--teal-700:#0f766e;
+    --s-50:#f8fafc;--s-100:#f1f5f9;--s-200:#e2e8f0;--s-300:#cbd5e1;--s-400:#94a3b8;--s-500:#64748b;--s-600:#475569;--s-700:#334155;--s-800:#1e293b;--s-900:#0f172a;
+    --shadow-sm:0 2px 8px rgba(15,23,42,.06);
+    --radius:14px;--transition:all .2s ease;--maxw:1280px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Microsoft YaHei","PingFang SC","Segoe UI",system-ui,-apple-system,sans-serif;color:var(--s-800);background:#fff;line-height:1.6;}
+  a{text-decoration:none;color:inherit;}
+  ul{list-style:none;}
+
+  .main-header{background:#fff;position:sticky;top:0;z-index:100;box-shadow:var(--shadow-sm);border-bottom:1px solid var(--s-100);}
+  .header-inner{max-width:var(--maxw);margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:72px;}
+  .brand{display:flex;align-items:center;gap:12px;}
+  .brand-logo{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,var(--g-700),var(--teal));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:18px;box-shadow:0 4px 12px rgba(22,163,74,.25);}
+  .brand-text{display:flex;flex-direction:column;line-height:1.2;}
+  .brand-name{font-size:18px;font-weight:800;color:var(--g-800);letter-spacing:.5px;}
+  .brand-sub{font-size:11px;color:var(--s-500);letter-spacing:1px;text-transform:uppercase;}
+  .main-nav{display:flex;align-items:center;gap:4px;}
+  .nav-item{position:relative;}
+  .nav-link{position:relative;display:flex;align-items:center;gap:4px;padding:8px 14px;font-size:14px;font-weight:600;color:var(--s-700);transition:var(--transition);white-space:nowrap;}
+  .nav-link::after{content:"";position:absolute;left:14px;right:14px;bottom:0;height:2px;background:var(--g-600);opacity:0;transform:scaleX(.4);transition:var(--transition);}
+  .nav-link:hover{color:var(--g-700);}
+  .nav-link:hover::after{opacity:1;transform:scaleX(1);}
+  .nav-link.active{color:var(--g-700);}
+  .nav-link.active::after{opacity:1;transform:scaleX(1);}
+  .header-actions{display:flex;align-items:center;gap:16px;}
+  .nav-home-btn{margin-left:8px;display:inline-flex;align-items:center;gap:6px;padding:9px 16px;background:#15803d;color:#fff;font-size:14px;font-weight:700;text-decoration:none;border:0;border-radius:0;cursor:pointer;transition:all .2s ease;white-space:nowrap;letter-spacing:.5px;}
+  .nav-home-btn:hover{background:#166534;}
+
+  .info-bar{background:var(--g-50);border-bottom:1px solid var(--g-200);color:var(--s-700);font-size:13px;padding:10px 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .info-bar .dot{width:8px;height:8px;border-radius:50%;background:var(--g-500);flex:none;}
+  .info-bar code{background:#fff;border:1px solid var(--g-200);border-radius:6px;padding:1px 7px;font-size:12px;color:var(--g-800);}
+
+  .frame-wrap{position:relative;width:100%;height:calc(100vh - 72px - 44px);background:var(--s-50);}
+  .frame-wrap iframe{width:100%;height:100%;border:0;display:block;}
+
+  .fallback{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px;background:#fff;}
+  .fallback.show{display:flex;}
+  .fallback h2{color:var(--g-800);font-size:20px;margin-bottom:12px;}
+  .fallback p{color:var(--s-600);max-width:520px;margin-bottom:8px;font-size:15px;}
+  .fallback .step{background:var(--s-50);border:1px solid var(--s-200);border-radius:10px;padding:14px 18px;margin:10px 0;font-size:14px;color:var(--s-700);text-align:left;max-width:520px;}
+  .fallback .step b{color:var(--g-700);}
+
+  @media(max-width:920px){
+    .main-nav{display:none;position:absolute;top:72px;left:0;right:0;background:#fff;flex-direction:column;align-items:stretch;padding:12px 24px;box-shadow:var(--shadow-sm);border-top:1px solid var(--s-100);gap:0;}
+    .nav-link{padding:12px 0;border-radius:0;border-bottom:1px solid var(--s-50);}
+    .info-bar{font-size:12px;}
+    .frame-wrap{height:calc(100vh - 72px - 64px);}
+  }
+</style>
+</head>
+<body>
+
+<header class="main-header">
+  <div class="header-inner">
+    <a href="runye-landing.html" class="brand">
+      <div class="brand-logo">润</div>
+      <div class="brand-text">
+        <span class="brand-name">润野灌溉</span>
+        <span class="brand-sub">Runye Irrigation</span>
+      </div>
+    </a>
+    <nav class="main-nav" id="mainNav">
+      <div class="nav-item"><a href="index.html" class="nav-link">精准灌溉</a></div>
+      <div class="nav-item"><a href="耐特菲姆滴灌带长度查询器.html" class="nav-link">滴灌带长度查询</a></div>
+      <div class="nav-item"><a href="index.html#three-level-view" class="nav-link">三级系统查询</a></div>
+      <div class="nav-item"><a href="数字农业.html" class="nav-link active">数字农业</a></div>
+      <div class="nav-item"><a href="runye-landing.html" class="nav-link">水肥课堂</a></div>
+      <div class="nav-item"><a href="runye-landing.html" class="nav-link">关于我们</a></div>
+    </nav>
+    <div class="header-actions">
+      <a href="runye-landing.html" class="nav-home-btn">⌂ 返回主页</a>
+    </div>
+  </div>
+</header>
+
+<div class="info-bar">
+  <span class="dot"></span>
+  <span>本页内嵌「润野 · 七彩花生水肥决策」工具。若下方长时间空白，请先在本机双击运行花生工具目录中的 <code>本地运行.bat</code> 启动服务（<code>http://localhost:3000</code>），然后刷新本页。</span>
+</div>
+
+<div class="frame-wrap">
+  <iframe id="peanutFrame" src="http://localhost:3000" title="七彩花生水肥决策" loading="eager"></iframe>
+  <div class="fallback" id="fallback">
+    <h2>未检测到本地服务</h2>
+    <p>「七彩花生水肥决策」工具需要在你本机运行一个本地服务（<code>http://localhost:3000</code>）。</p>
+    <div class="step">
+      <b>第 1 步：</b>打开花生工具文件夹 <code>peanut-weather-advisor-local</code>。<br>
+      <b>第 2 步：</b>双击运行其中的 <code>本地运行.bat</code>，等待命令行出现本地访问地址（默认 3000 端口）。<br>
+      <b>第 3 步：</b>回到本页，点击下方按钮或刷新页面。
+    </div>
+    <p><button class="nav-home-btn" onclick="location.reload()">↻ 我已启动，刷新本页</button></p>
+  </div>
+</div>
+
+<script>
+  // 探测本地服务是否可达；不可达则显示兜底提示（不影响已运行的场景）
+  (function () {
+    var shown = false;
+    function showFallback(){ if(!shown){ shown = true; document.getElementById('fallback').classList.add('show'); } }
+    var frame = document.getElementById('peanutFrame');
+    // 连接被拒绝 / 资源加载失败时（多数浏览器会触发 iframe 的 error）
+    frame.addEventListener('error', showFallback, true);
+    // 主动探测：no-cors 即可，只判断“能否连上”
+    var probed = false;
+    function probe(){
+      if(probed) return; probed = true;
+      fetch('http://localhost:3000', { mode:'no-cors', cache:'no-store' })
+        .then(function(){ /* 可达，不显示兜底 */ })
+        .catch(function(){ /* 不可达：稍后显示兜底，给加载一点时间 */ setTimeout(showFallback, 4000); });
+    }
+    // file:// 或 http 页面下均可探测；https 页面 fetch 到 http 会被混合内容策略拦截并进入 catch，同样给出提示
+    if (document.readyState === 'complete') probe();
+    else window.addEventListener('load', probe);
+  })();
+</script>
+
+</body>
+</html>

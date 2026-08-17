@@ -234,18 +234,29 @@ fieldset:focus-within .field-hint{border-left-color:var(--g-400)}
 .branch-selector{margin-top:14px}
 .branch-selector>span{font-size:13px;color:var(--s-600);display:block;margin-bottom:8px;font-weight:600}
 .branch-selector>[role=group]{display:flex;gap:8px;flex-wrap:wrap}
-.branch-selector button{
+.branch-selector button,
+.branch-options button{
   font-size:13px;font-weight:600;padding:7px 14px;border:1.5px solid var(--s-200);
   border-radius:10px;background:#fff;color:var(--s-600);
   transition:var(--transition);position:relative;overflow:hidden
 }
-.branch-selector button:hover{border-color:var(--g-400);color:var(--g-600);background:var(--g-50);transform:translateY(-1px)}
-.branch-selector button:active{transform:translateY(0)}
-.branch-selector button.selected{
+.branch-selector button:hover,
+.branch-options button:hover{border-color:var(--g-400);color:var(--g-600);background:var(--g-50);transform:translateY(-1px)}
+.branch-selector button:active,
+.branch-options button:active{transform:translateY(0)}
+.branch-selector button.selected,
+.branch-options button.selected{
   background:var(--g-700);color:#fff;
   border-color:var(--g-700);box-shadow:0 4px 12px rgba(22,163,74,.25)
 }
 .branch-selector small{display:block;font-size:12px;color:var(--s-400);margin-top:8px}
+
+/* 01 区块：支管数与敷设方式合并为同一区块，按钮整行对齐 */
+.branch-block{margin-top:14px}
+.branch-label{font-size:13px;color:var(--s-600);font-weight:600;display:block;margin-bottom:8px}
+.branch-options{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.branch-options>[role=group]{display:flex;gap:8px;flex-wrap:wrap}
+.branch-block>small{display:block;font-size:12px;color:var(--s-400);margin-top:8px}
 
 /* ===== Pump Head Derivation ===== */
 .derivation-card{
@@ -385,6 +396,8 @@ fieldset:focus-within .field-hint{border-left-color:var(--g-400)}
 .result-list div{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:baseline;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05);min-width:0}
 .result-list dt{color:rgba(255,255,255,.45);font-size:11px;font-weight:500;white-space:nowrap}
 .result-list dd{color:#fff;font-weight:600;font-size:13px;text-align:right;white-space:nowrap}
+.result-list-compact{padding:12px 18px}
+.result-list-compact dd{font-size:14px}
 
 /* ===== Sections ===== */
 .pipe-selection-section,.network-section,.details,.method-note{padding:0 0 48px}
@@ -2950,7 +2963,7 @@ input[type="reset"],
         <div class="nav-item"><a href="index.html" class="nav-link active">精准灌溉</a></div>
         <div class="nav-item"><a href="耐特菲姆滴灌带长度查询器.html" class="nav-link">滴灌带长度查询</a></div>
         <div class="nav-item"><a href="index.html#three-level-view" class="nav-link">三级系统查询</a></div>
-        <div class="nav-item"><a href="runye-landing.html" class="nav-link">数字农业</a></div>
+        <div class="nav-item"><a href="数字农业.html" class="nav-link">数字农业</a></div>
         <div class="nav-item"><a href="runye-landing.html" class="nav-link">水肥课堂</a></div>
         <div class="nav-item"><a href="runye-landing.html" class="nav-link">关于我们</a></div>
       </nav>
@@ -3012,7 +3025,8 @@ input[type="reset"],
           <input id="fld_B" type="hidden" value="100">
           <input id="fld_N" type="hidden" value="1">
           <label class="field"><span>井/水池提升高度</span><span class="input-shell"><input id="fld_lift" type="number" min="0" step="1" value="5"><em>m</em></span></label>
-          <label class="field"><span>滴灌带入口工作压力</span><span class="input-shell"><input id="fld_tapePressure" type="number" min="0" step="0.1" value="1"><em>bar</em></span></label>
+          <label class="field"><span>滴灌带入口工作压力</span><span class="input-shell"><input id="fld_tapePressure" type="number" min="0" step="0.1" value="1.2"><em>bar</em></span></label>
+          <label class="field"><span>过滤与阀门损失</span><span class="input-shell"><input id="fld_filterLoss" type="number" min="0" step="0.5" value="5"><em>m</em></span></label>
         </div>
       </fieldset>
 
@@ -3034,27 +3048,24 @@ input[type="reset"],
         <div class="form-grid">
           <label class="field"><span>水源已有压力</span><span class="input-shell"><input id="fld_existPressure" type="number" min="0" step="0.1" value="0"><em>bar</em></span></label>
           <label class="field"><span>目标经济流速</span><span class="input-shell"><input id="fld_targetV" type="number" min="0" max="5" step="0.1" value="1.5"><em>m/s</em></span></label>
-          <label class="field"><span>过滤与阀门损失</span><span class="input-shell"><input id="fld_filterLoss" type="number" min="0" step="0.5" value="5"><em>m</em></span></label>
           <label class="field"><span>预计水泵效率 η</span><span class="input-shell"><input id="fld_efficiency" type="number" min="1" max="100" step="1" value="65"><em>%</em></span></label>
           <label class="field"><span>主管长度</span><span class="input-shell"><input id="fld_mainPipeLen" type="number" min="0" step="1" value="200"><em>m</em></span></label>
-          <label class="field"><span>滴灌带每卷长度</span><span class="input-shell"><input id="fld_tapeRollLen" type="number" min="0" step="100" value="2000"><em>m/卷</em></span></label>
+          <input id="fld_tapeRollLen" type="hidden" value="2000">
         </div>
-        <div class="branch-selector">
-          <span>分区阀门后并联支管</span>
-          <div role="group" id="branchGroup">
-            <button type="button" data-n="2" class="selected">2 根支管</button>
-            <button type="button" data-n="3">3 根支管</button>
-            <button type="button" data-n="4">4 根支管</button>
+        <div class="branch-block">
+          <span class="branch-label">分区阀门后并联支管</span>
+          <div class="branch-options">
+            <div role="group" id="branchGroup">
+              <button type="button" data-n="2" class="selected">2 根支管</button>
+              <button type="button" data-n="3">3 根支管</button>
+              <button type="button" data-n="4">4 根支管</button>
+            </div>
+            <div role="group" id="layoutGroup">
+              <button type="button" data-sides="1" class="selected">单边</button>
+              <button type="button" data-sides="2">双边</button>
+            </div>
           </div>
           <small>选择后按单根支管承担的流量、长度及出水口数量重新计算。</small>
-        </div>
-        <div class="branch-selector">
-          <span>滴灌带敷设方式</span>
-          <div role="group" id="layoutGroup">
-            <button type="button" data-sides="1" class="selected">单边敷设</button>
-            <button type="button" data-sides="2">双边敷设</button>
-          </div>
-          <small>单边：支管一侧接滴灌带；双边：支管两侧均接滴灌带，支管长度减半。</small>
         </div>
       </fieldset>
 
@@ -3257,7 +3268,6 @@ input[type="reset"],
       <button type="button" class="pp-btn-ghost pp-mirror-btn active" data-mirror="none">无</button>
       <button type="button" class="pp-btn-ghost pp-mirror-btn" data-mirror="h">水平</button>
       <button type="button" class="pp-btn-ghost pp-mirror-btn" data-mirror="v">垂直</button>
-      <button type="button" class="pp-btn-ghost pp-mirror-btn" data-mirror="hv">双向</button>
     </label>
     <button class="pp-btn-ghost" id="ppRepartition" title="将当前旋转后的地块作为新基准重新切割分区">重新分区</button>
     <span class="pp-sep"></span>
@@ -3765,7 +3775,7 @@ function doIrrImport(text){
           <div class="nav-item"><a href="index.html" class="nav-link">精准灌溉</a></div>
           <div class="nav-item"><a href="耐特菲姆滴灌带长度查询器.html" class="nav-link">滴灌带长度查询</a></div>
           <div class="nav-item"><a href="index.html#three-level-view" class="nav-link active">三级系统查询</a></div>
-          <div class="nav-item"><a href="runye-landing.html" class="nav-link">数字农业</a></div>
+          <div class="nav-item"><a href="数字农业.html" class="nav-link">数字农业</a></div>
           <div class="nav-item"><a href="runye-landing.html" class="nav-link">水肥课堂</a></div>
           <div class="nav-item"><a href="runye-landing.html" class="nav-link">关于我们</a></div>
         </nav>
@@ -4262,8 +4272,8 @@ function render() {
       </div>
     </div>
     <div class="area-strip">
-      <div><span>单个轮灌区</span><strong>${fmt(r.zoneMu,2)} 亩</strong><small>折算 ${fmt(r.zoneW,0)}×${fmt(r.zoneH,0)} m</small></div>
-      <div><span>单区滴灌带</span><strong>${fmt0(r.tapesPerZone)} 条</strong><small>单区流量 ${fmt(r.zoneFlow,1)} m³/h</small></div>
+      <div><span>单个轮灌区</span><strong>${fmt(r.zoneMu,2)} 亩</strong></div>
+      <div><span>单区滴灌带</span><strong>${fmt0(r.tapesPerZone)} 条</strong></div>
       <small>按单区面积试算；1 亩 = 666.67 m²，实际地块在下方绘图区落图。</small>
     </div>
     <div class="optimal-card">
@@ -4280,7 +4290,7 @@ function render() {
         <span>水泵工作点<b>${fmt(r.zoneFlow,1)} × ${fmt0(r.pumpHead)} m</b></span>
         <span>建议电机<b>${fmt0(r.motorKW_rounded)} kW</b></span>
       </div>
-      <p>主管按单区总流量选型；分区阀门后的支管按 2、3 或 4 根并联分流，选择最接近目标流速的标准 PE 外径。</p>
+      <p>主管按单区流量选型；阀门后的支管按 2、3 或 4 根并联分流，选最接近目标流速的标准 PE 外径。</p>
     </div>
     <div class="pump-card">
       <div class="pump-topline"><span>水泵建议工作点</span><span class="confidence">含 ${MARGIN_HEAD} m 富余及 ${SAFETY_FACTOR.toFixed(2)} 安全系数</span></div>
@@ -4323,20 +4333,11 @@ function render() {
       `).join('')}
       <p>每根支管最多连接 ceil(单区滴灌带数/支管根数) 条滴灌带；主管和水泵仍按单区总流量计算。</p>
     </div>
-    <dl class="result-list">
-      <div><dt>滴灌带布局</dt><dd>${fmt0(r.tapeRows)} 行 × ${r.segmentsPerRow} 段 = ${fmt0(r.totalTapes)} 条</dd></div>
-      <div><dt>单条滴灌带长度</dt><dd>${fmt(r.tapeLen,1)} m</dd></div>
-      <div><dt>滴灌带总长度</dt><dd>${fmt0(r.tapeTotalLen)} m · ${r.tapeRolls} 卷</dd></div>
-      <div><dt>单区滴灌带数</dt><dd>${fmt0(r.tapesPerZone)} 条</dd></div>
-      <div><dt>单条滴灌带流量</dt><dd>${fmt(r.tapeFlow,3)} m³/h</dd></div>
-      <div><dt>单区总流量</dt><dd>${fmt(r.zoneFlow,2)} m³/h</dd></div>
-      <div><dt>当前支管方案</dt><dd>${r.branchCount} 根/区 · 每根接 ${fmt0(r.tapsPerBranch)} 条</dd></div>
-      <div><dt>单根支管长度/流量</dt><dd>${fmt(r.branchLen,1)} m · ${fmt(r.branchFlow,2)} m³/h</dd></div>
+    <dl class="result-list result-list-compact">
+      <div><dt>每亩流量</dt><dd>${fmt(r.zoneFlow / r.zoneMu, 2)} m³/h·亩</dd></div>
+      <div><dt>每亩滴灌带长度</dt><dd>${fmt((r.tapesPerZone * r.tapeLen) / r.zoneMu, 1)} m/亩</dd></div>
       <div><dt>支管多孔折减系数 F</dt><dd>${fmt(r.branchF,4)}</dd></div>
       <div><dt>扬程安全系数前</dt><dd>${fmt(r.headBeforeSafety,2)} m</dd></div>
-      <div><dt>每亩地流量</dt><dd>${fmt(r.zoneFlow / r.zoneMu, 2)} m³/h·亩</dd></div>
-      <div><dt>每亩滴灌带长度</dt><dd>${fmt((r.tapesPerZone * r.tapeLen) / r.zoneMu, 1)} m/亩</dd></div>
-      <div><dt>单区滴灌带总长</dt><dd>${fmt0(r.tapesPerZone * r.tapeLen)} m</dd></div>
     </dl>
   `;
 
@@ -4566,7 +4567,7 @@ function selectLayout(sides) {
 }
 
 function resetDefaults() {
-  const defaults = {fld_zoneMu:30,fld_zoneFixedSide:200,fld_A:200,fld_B:100,fld_dh:5,fld_N:1,fld_tapeLen:100,fld_tapeSpacing:0.8,fld_tapeDh:1,fld_emitterSpacing:0.3,fld_emitterFlow:0.8,fld_tapeOD:16,fld_tapePressure:1,fld_lift:5,fld_existPressure:0,fld_targetV:1.5,fld_filterLoss:5,fld_efficiency:65,fld_mainPipeLen:200,fld_tapeRollLen:2000};
+  const defaults = {fld_zoneMu:30,fld_zoneFixedSide:200,fld_A:200,fld_B:100,fld_dh:5,fld_N:1,fld_tapeLen:100,fld_tapeSpacing:0.8,fld_tapeDh:1,fld_emitterSpacing:0.3,fld_emitterFlow:0.8,fld_tapeOD:16,fld_tapePressure:1.2,fld_lift:5,fld_existPressure:0,fld_targetV:1.5,fld_filterLoss:5,fld_efficiency:65,fld_mainPipeLen:200,fld_tapeRollLen:2000};
   Object.entries(defaults).forEach(([id, val]) => { document.getElementById(id).value = val; });
   document.querySelectorAll('#branchGroup button').forEach(b => b.classList.toggle('selected', +b.dataset.n === 2));
   document.querySelectorAll('#layoutGroup button').forEach(b => b.classList.toggle('selected', +b.dataset.sides === 1));
@@ -8053,7 +8054,7 @@ function calcPlan(){
   }
 
   // ===== 地块镜像：以地块包围盒中心为轴，翻转整张图（含管线/水源/阀门）=====
-  // mode: 'none' | 'h'(水平/左右) | 'v'(垂直/上下) | 'hv'(双向)
+  // mode: 'none' | 'h'(水平/左右) | 'v'(垂直/上下)
   function ppSyncMirrorUI(){
     var btns=document.querySelectorAll('.pp-mirror-btn');
     btns.forEach(function(btn){ btn.classList.toggle('active', btn.getAttribute('data-mirror')===(ppState.plotMirror||'none')); });
@@ -8061,7 +8062,6 @@ function calcPlan(){
   function ppMirrorPoint(p,mode,cx,cy){
     if(mode==='h')return{x:2*cx-p.x,y:p.y};
     if(mode==='v')return{x:p.x,y:2*cy-p.y};
-    if(mode==='hv')return{x:2*cx-p.x,y:2*cy-p.y};
     return{x:p.x,y:p.y};
   }
   function ppApplyMirror(mode){
