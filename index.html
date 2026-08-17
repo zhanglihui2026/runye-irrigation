@@ -21,7 +21,7 @@
   --s-400:#94a3b8; --s-500:#64748b; --s-600:#475569; --s-700:#334155;
   --s-800:#1e293b; --s-900:#0f172a;
   /* Accents */
-  --blue:#3b82f6; --blue-50:#eff6ff; --blue-100:#dbeafe;
+  --blue:#22c55e; --blue-50:#f0fdf4; --blue-100:#dcfce7;
   --amber:#f59e0b; --amber-50:#fffbeb; --amber-100:#fef3c7;
   --red:#ef4444; --red-50:#fef2f2; --red-100:#fee2e2;
   --teal:#0d9488; --teal-50:#f0fdfa; --teal-100:#ccfbf1;
@@ -193,7 +193,7 @@ a{color:inherit;text-decoration:none}
 }
 .live-pill-btn::before{content:'';width:6px;height:6px;background:rgba(255,255,255,.85);border-radius:50%;animation:pulse 2s infinite}
 .live-pill-btn:hover{transform:translateY(-1px);filter:brightness(1.08);box-shadow:0 5px 16px rgba(0,0,0,.25)}
-.live-pill-btn.blue{background:#2563eb}
+.live-pill-btn.blue{background:#16a34a}
 .live-pill-btn.red{background:#dc2626}
 .live-pill-btn.blue:hover{box-shadow:0 5px 16px rgba(37,99,235,.45)}
 .live-pill-btn.red:hover{box-shadow:0 5px 16px rgba(220,38,38,.45)}
@@ -982,7 +982,7 @@ body{
   content:'';
   position:absolute;
   left:0;right:0;top:0;height:4px;
-  background:linear-gradient(90deg,#16a34a,#0d9488,#3b82f6);
+  background:linear-gradient(90deg,#16a34a,#0d9488,#22c55e);
   border-radius:8px 8px 0 0;
 }
 .workspace{padding-bottom:54px}
@@ -1036,7 +1036,7 @@ legend{color:#53665b;letter-spacing:0}
 }
 .result-panel{
   background:
-    linear-gradient(135deg,rgba(59,130,246,.12),transparent 32%),
+    linear-gradient(135deg,rgba(22,163,74,.12),transparent 32%),
     linear-gradient(165deg,#173f2d 0%,#102c23 62%,#0b1f1a 100%);
   box-shadow:0 18px 44px rgba(12,42,31,.22),0 0 0 1px rgba(255,255,255,.07) inset;
 }
@@ -1108,7 +1108,7 @@ legend{color:#53665b;letter-spacing:0}
   box-shadow:0 8px 18px rgba(22,101,52,.1);
 }
 #areaTool .at-result-card{
-  background:linear-gradient(135deg,#ecfdf5 0%,#eff6ff 100%);
+  background:linear-gradient(135deg,#ecfdf5 0%,#f0fdf4 100%);
   border:1px solid rgba(13,148,136,.15);
 }
 #areaTool .at-canvas-wrap{
@@ -1120,7 +1120,7 @@ legend{color:#53665b;letter-spacing:0}
 }
 #pipePlanSection{
   background:
-    linear-gradient(135deg,rgba(59,130,246,.12),transparent 34%),
+    linear-gradient(135deg,rgba(22,163,74,.12),transparent 34%),
     linear-gradient(165deg,#173f2d 0%,#102c23 100%);
   box-shadow:0 20px 48px rgba(12,42,31,.2),0 0 0 1px rgba(255,255,255,.06) inset;
 }
@@ -1629,16 +1629,16 @@ main,footer{position:relative;z-index:1}
   position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;
   background:var(--bg);overflow-y:auto;display:none;
   /* Blue theme to distinguish from two-level green system */
-  --g-50:#eff6ff; --g-100:#dbeafe; --g-200:#bfdbfe; --g-300:#93c5fd;
-  --g-400:#60a5fa; --g-500:#3b82f6; --g-600:#2563eb; --g-700:#1d4ed8;
-  --g-800:#1e40af; --g-900:#172554;
-  --dg-700:#1e3a5f; --dg-800:#172a4a; --dg-900:#0f1f3a;
+  --g-50:#f0fdf4; --g-100:#dcfce7; --g-200:#bbf7d0; --g-300:#86efac;
+  --g-400:#86efac; --g-500:#22c55e; --g-600:#16a34a; --g-700:#15803d;
+  --g-800:#166534; --g-900:#14532d;
+  --dg-700:#14532d; --dg-800:#172a4a; --dg-900:#0f1f3a;
   --bg:#eef2f9;
 }
 .tl-overlay.active{display:block}
 .tl-header{
   position:sticky;top:0;z-index:10;
-  background:#fff;border-bottom:1px solid #c7d6ec;
+  background:#fff;border-bottom:1px solid #dcfce7;
   padding:14px 48px;display:flex;align-items:center;justify-content:space-between;
   box-shadow:0 1px 4px rgba(0,0,0,.04);
 }
@@ -1679,7 +1679,7 @@ main,footer{position:relative;z-index:1}
   border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);
 }
 .tl-trigger-btn{
-  font-size:12px;font-weight:700;color:#93c5fd;
+  font-size:12px;font-weight:700;color:#86efac;
   background:rgba(255,255,255,.1);border:1px solid rgba(147,197,253,.3);
   border-radius:20px;padding:5px 14px;transition:var(--transition);
   cursor:pointer;white-space:nowrap;
@@ -1687,11 +1687,11 @@ main,footer{position:relative;z-index:1}
 .tl-trigger-btn:hover{background:rgba(147,197,253,.2);border-color:rgba(147,197,253,.5)}
 .tl-trigger-btn-inline{
   font-size:13px;font-weight:700;color:#fff;
-  background:#2563eb;border:1px solid #1d4ed8;
+  background:#16a34a;border:1px solid #15803d;
   border-radius:8px;padding:7px 16px;transition:var(--transition);
   cursor:pointer;white-space:nowrap;
 }
-.tl-trigger-btn-inline:hover{background:#1d4ed8;border-color:#1e40af;transform:translateY(-1px);box-shadow:0 4px 12px rgba(37,99,235,.4)}
+.tl-trigger-btn-inline:hover{background:#15803d;border-color:#166534;transform:translateY(-1px);box-shadow:0 4px 12px rgba(37,99,235,.4)}
 #tlZoneCountGroup button{
   font-size:12px;font-weight:600;padding:3px 10px;border-radius:6px;
   border:1px solid var(--s-200);background:#fff;color:var(--s-600);cursor:pointer;transition:var(--transition);
@@ -1701,24 +1701,24 @@ main,footer{position:relative;z-index:1}
 
 /* ===== Three-level view: blue theme overrides for hardcoded green elements ===== */
 #threeLevelView .step{
-  background:linear-gradient(135deg,#2563eb,#0e7490);
+  background:linear-gradient(135deg,#16a34a,#0e7490);
   box-shadow:0 8px 16px rgba(30,58,95,.16);
 }
 #threeLevelView .panel-heading{
-  background:linear-gradient(180deg,#fff 0%,#f0f5fc 100%);
+  background:linear-gradient(180deg,#fff 0%,#f0fdf4 100%);
 }
 #threeLevelView .input-shell{
-  border-color:#c7d6ec;background:#fafcff;
+  border-color:#dcfce7;background:#fafcff;
 }
 #threeLevelView .input-shell:focus-within{
-  border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12);
+  border-color:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.12);
 }
 #threeLevelView .branch-selector button.selected{
-  background:linear-gradient(135deg,#1d4ed8,#0e7490);
+  background:linear-gradient(135deg,#15803d,#0e7490);
   border-color:#0e7490;
 }
 #threeLevelView .pump-card{
-  background:linear-gradient(135deg,#bfdbfe 0%,#a5f3fc 100%);
+  background:linear-gradient(135deg,#bbf7d0 0%,#a5f3fc 100%);
 }
 #threeLevelView .diameter-grid article:hover{
   border-color:rgba(96,165,250,.35);background:rgba(255,255,255,.1);
@@ -1726,39 +1726,39 @@ main,footer{position:relative;z-index:1}
 
 /* ===== Three-level view: pipeline section light-theme overrides ===== */
 #threeLevelView .pp-plan-bar{
-  background:#fafcff;border:1px solid #c7d6ec;color:#334155;
+  background:#fafcff;border:1px solid #dcfce7;color:#334155;
 }
 #threeLevelView .pp-plan-bar-result{
-  background:#f0f5fc;border-color:#c7d6ec;
+  background:#f0fdf4;border-color:#dcfce7;
 }
 #threeLevelView .pp-plan-item{color:#334155}
 #threeLevelView .pp-plan-label{color:#64748b}
-#threeLevelView .pp-plan-val{color:#1d4ed8}
+#threeLevelView .pp-plan-val{color:#15803d}
 #threeLevelView .pp-plan-item input,
 #threeLevelView .pp-plan-item select{
-  background:#fff;color:#1e293b;border:1px solid #bfdbfe;
+  background:#fff;color:#1e293b;border:1px solid #bbf7d0;
 }
 #threeLevelView .pp-plan-item input:focus,
 #threeLevelView .pp-plan-item select:focus{
-  border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12);
+  border-color:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.12);
 }
-#threeLevelView .pp-sep-vert{background:#c7d6ec}
+#threeLevelView .pp-sep-vert{background:#dcfce7}
 #threeLevelView .pp-hint{color:#94a3b8}
 #threeLevelView .pp-btn-ghost{
-  background:#fff;border-color:#bfdbfe;color:#1e3a5f;
+  background:#fff;border-color:#bbf7d0;color:#14532d;
 }
 #threeLevelView .pp-btn-ghost:hover{
-  background:#f0f5fc;border-color:#2563eb;color:#1d4ed8;
+  background:#f0fdf4;border-color:#16a34a;color:#15803d;
 }
 #threeLevelView .pp-btn-generate{
-  background:linear-gradient(135deg,#2563eb,#0e7490);
+  background:linear-gradient(135deg,#16a34a,#0e7490);
 }
 #threeLevelView .pp-btn-generate:hover{
-  background:linear-gradient(135deg,#1d4ed8,#0e7490);
+  background:linear-gradient(135deg,#15803d,#0e7490);
   box-shadow:0 4px 12px rgba(37,99,235,.4);
 }
 #threeLevelView .pp-diagram-wrap{
-  background:#fff;border:1px solid #c7d6ec;
+  background:#fff;border:1px solid #dcfce7;
 }
 #tlDiagramContent{position:relative;overflow:visible;padding-top:2px}
 #tlDiagramContent svg{display:block;user-select:none;max-width:100%;width:100%;height:auto}
@@ -1769,71 +1769,71 @@ main,footer{position:relative;z-index:1}
 .tl-drag-hint{position:absolute;top:4px;right:10px;font-size:11px;color:#94a3b8;pointer-events:none;z-index:10}
 
 /* ===== Three-level view: dark panel green→blue overrides ===== */
-#threeLevelView .result-heading .step.light{color:#bfdbfe}
-#threeLevelView .result-heading .live-pill{color:#bfdbfe}
-#threeLevelView .result-heading .live-pill::before{background:#93c5fd}
-#threeLevelView .optimal-top b{color:#172554;background:#93c5fd}
-#threeLevelView .optimal-specs b{color:#93c5fd}
+#threeLevelView .result-heading .step.light{color:#bbf7d0}
+#threeLevelView .result-heading .live-pill{color:#bbf7d0}
+#threeLevelView .result-heading .live-pill::before{background:#86efac}
+#threeLevelView .optimal-top b{color:#14532d;background:#86efac}
+#threeLevelView .optimal-specs b{color:#86efac}
 #threeLevelView .pump-card{
-  background:linear-gradient(135deg,#bfdbfe 0%,#a5f3fc 100%);
+  background:linear-gradient(135deg,#bbf7d0 0%,#a5f3fc 100%);
 }
-#threeLevelView .pump-topline>span{color:#172554}
-#threeLevelView .confidence{color:#1e3a5f;background:rgba(255,255,255,.5)}
-#threeLevelView .pump-metrics strong{color:#172554}
-#threeLevelView .pump-metrics span{color:#1e3a5f}
-#threeLevelView .pump-metrics b{color:#1e3a5f}
+#threeLevelView .pump-topline>span{color:#14532d}
+#threeLevelView .confidence{color:#14532d;background:rgba(255,255,255,.5)}
+#threeLevelView .pump-metrics strong{color:#14532d}
+#threeLevelView .pump-metrics span{color:#14532d}
+#threeLevelView .pump-metrics b{color:#14532d}
 #threeLevelView .motor-row{border-top-color:rgba(30,58,95,.12)}
 #threeLevelView .motor-row:first-of-type{border-top-color:rgba(30,58,95,.2)}
-#threeLevelView .motor-row span{color:#1e3a5f}
-#threeLevelView .motor-row strong{color:#172554}
+#threeLevelView .motor-row span{color:#14532d}
+#threeLevelView .motor-row strong{color:#14532d}
 #threeLevelView .branch-option:hover{border-color:rgba(147,197,253,.35);background:rgba(255,255,255,.08)}
-#threeLevelView .branch-option.selected{border-color:#93c5fd;background:rgba(147,197,253,.15);box-shadow:0 2px 8px rgba(37,99,235,.2)}
-#threeLevelView .branch-option b{color:#93c5fd}
+#threeLevelView .branch-option.selected{border-color:#86efac;background:rgba(147,197,253,.15);box-shadow:0 2px 8px rgba(37,99,235,.2)}
+#threeLevelView .branch-option b{color:#86efac}
 
 /* ===== Three-level view: pipe table green→blue overrides ===== */
-#threeLevelView .recommended-row{background:#1e3a5f!important}
+#threeLevelView .recommended-row{background:#14532d!important}
 #threeLevelView .recommended-row:hover{background:#172a4a!important}
-#threeLevelView .pipe-status.recommended{color:#1e3a5f}
+#threeLevelView .pipe-status.recommended{color:#14532d}
 
 /* ===== Three-level view: light-theme global green→blue overrides ===== */
-#threeLevelView .result-heading h2{color:#1e3a5f}
-#threeLevelView .result-heading .step.light{background:#1d4ed8;border-color:#1d4ed8}
-#threeLevelView .result-heading .live-pill{background:#eff6ff;border-color:#bfdbfe}
-#threeLevelView .rs-apply-btn{background:#1d4ed8}
-#threeLevelView .rs-apply-btn:hover{background:#1e40af}
+#threeLevelView .result-heading h2{color:#14532d}
+#threeLevelView .result-heading .step.light{background:#15803d;border-color:#15803d}
+#threeLevelView .result-heading .live-pill{background:#f0fdf4;border-color:#bbf7d0}
+#threeLevelView .rs-apply-btn{background:#15803d}
+#threeLevelView .rs-apply-btn:hover{background:#166534}
 
 /* ===== 滴灌供水首部系统图编辑器（#headModal 作用域，合并自 滴灌供水图编辑器.html） ===== */
 #headModal{position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;padding:18px;font-family:var(--font)}
 #headModal *{box-sizing:border-box;margin:0;padding:0}
 .hm-panel{width:min(1460px,98vw);height:min(920px,94vh);background:#eef1f5;border-radius:14px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 64px -16px rgba(0,0,0,.45)}
-.hm-topbar{background:#185FA5;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;flex-shrink:0}
+.hm-topbar{background:#16a34a;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;flex-shrink:0}
 .hm-title{font-size:15px;font-weight:700}
 .hm-actions{display:flex;gap:8px;flex-wrap:wrap}
 .hm-btn{padding:6px 14px;border:1px solid rgba(255,255,255,.55);background:rgba(255,255,255,.12);color:#fff;border-radius:6px;cursor:pointer;font-size:13px;font-family:inherit;transition:background .2s}
 .hm-btn:hover{background:rgba(255,255,255,.28)}
-.hm-btn.hm-primary{background:#fff;color:#185FA5;border-color:#fff;font-weight:600}
+.hm-btn.hm-primary{background:#fff;color:#16a34a;border-color:#fff;font-weight:600}
 .hm-btn.hm-close{background:rgba(220,38,38,.75);border-color:rgba(255,255,255,.3)}
 .hm-btn.hm-close:hover{background:#dc2626}
 .hm-body{flex:1;display:flex;min-height:0}
 .hm-aside{width:300px;min-width:300px;background:#fff;border-right:1px solid #d5dbe3;overflow-y:auto;padding:12px 14px;font-size:13px;color:#222}
-.hm-aside h2{font-size:13px;font-weight:700;color:#185FA5;margin:14px 0 8px;padding-bottom:4px;border-bottom:1px solid #e4e9f0}
+.hm-aside h2{font-size:13px;font-weight:700;color:#16a34a;margin:14px 0 8px;padding-bottom:4px;border-bottom:1px solid #e4e9f0}
 .hm-aside h2:first-child{margin-top:0}
 .hm-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;font-size:13px;gap:8px}
 .hm-row label{color:#444;white-space:nowrap}
 .hm-row input[type=text],.hm-row input[type=number],.hm-row select{width:150px;padding:4px 6px;border:1px solid #c3ccd8;border-radius:5px;font-size:13px;background:#fff;color:#222}
-.hm-row input:focus,.hm-row select:focus{outline:1.5px solid #185FA5;border-color:#185FA5}
+.hm-row input:focus,.hm-row select:focus{outline:1.5px solid #16a34a;border-color:#16a34a}
 .hm-chk{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:13px;color:#444;margin-bottom:4px}
 .hm-chk label{display:flex;align-items:center;gap:4px;cursor:pointer}
-.hm-chk input{accent-color:#185FA5;width:14px;height:14px}
+.hm-chk input{accent-color:#16a34a;width:14px;height:14px}
 .hm-fert-item{border:1px solid #e0e6ee;border-radius:6px;padding:6px 8px;margin-bottom:6px;background:#f8fafc}
-.hm-fert-item .ft{font-size:12px;color:#185FA5;font-weight:600;margin-bottom:5px}
+.hm-fert-item .ft{font-size:12px;color:#16a34a;font-weight:600;margin-bottom:5px}
 .hm-fert-item .hm-row{margin-bottom:4px}
 .hm-fert-item select{width:132px}
 .hm-btn-line{display:flex;gap:8px;margin-top:10px}
 .hm-btn-line button{flex:1;padding:7px 0;border-radius:6px;cursor:pointer;font-size:13px;font-family:inherit}
-.hm-btn-line .ok{background:#185FA5;color:#fff;border:1px solid #185FA5}
-.hm-btn-line .ok:hover{background:#0C447C}
-.hm-btn-line .ghost{background:#fff;color:#185FA5;border:1px solid #185FA5}
+.hm-btn-line .ok{background:#16a34a;color:#fff;border:1px solid #16a34a}
+.hm-btn-line .ok:hover{background:#15803d}
+.hm-btn-line .ghost{background:#fff;color:#16a34a;border:1px solid #16a34a}
 .hm-tip{font-size:12px;color:#8892a0;margin-top:10px;line-height:1.7}
 .hm-main{flex:1;overflow:auto;padding:18px;background:#eef1f5;display:flex;align-items:flex-start;justify-content:center}
 .hm-sheet-holder{transform-origin:top left}
@@ -1841,17 +1841,17 @@ main,footer{position:relative;z-index:1}
 #headModal .hm-sheet-inner{position:absolute;left:8mm;top:8mm;right:8mm;bottom:8mm;border:1.2mm solid #111}
 #headModal .hm-sheet-inner2{position:absolute;left:11mm;top:11mm;right:11mm;bottom:11mm;border:.35mm solid #111}
 #headModal .hm-head{display:flex;align-items:center;justify-content:space-between;padding:0 5mm;border-bottom:.35mm solid #111;position:absolute;left:11mm;top:11mm;right:11mm;height:14mm}
-#headModal .hm-head .proj{font-size:13pt;font-weight:700;letter-spacing:1.5px;color:#0C447C}
+#headModal .hm-head .proj{font-size:13pt;font-weight:700;letter-spacing:1.5px;color:#15803d}
 #headModal .hm-head .sub{font-size:9.5pt;color:#444}
 #headModal .hm-head .code{font-size:9pt;border:.3mm solid #111;padding:.8mm 2.5mm;color:#333}
 #headModal .hm-svg-zone{position:absolute;left:13mm;right:13mm;display:flex;align-items:center;justify-content:center}
 #headModal .hm-svg-zone svg{width:auto;height:100%;max-width:100%}
 #headModal .hm-lower{position:absolute;left:11mm;right:13mm;display:flex;gap:6mm}
 #headModal .hm-lower .hm-tab{flex:1;min-width:0}
-#headModal .hm-lower .hm-tab h3{font-size:10pt;font-weight:600;margin-bottom:1.6mm;color:#0C447C}
+#headModal .hm-lower .hm-tab h3{font-size:10pt;font-weight:600;margin-bottom:1.6mm;color:#15803d}
 #headModal .hm-lower table{width:90%;border-collapse:collapse;font-size:7.5pt}
 #headModal .hm-lower th,#headModal .hm-lower td{border:.3mm solid #111;padding:1mm .8mm;text-align:center;line-height:1.25;color:#111}
-#headModal .hm-lower th{background:#E6F1FB}
+#headModal .hm-lower th{background:#dcfce7}
 #headModal .hm-lower .l{text-align:left}
 #headModal .hm-notes li{font-size:7.3pt;line-height:1.7;margin-left:0;color:#111}
 #headModal .hm-sheet.a4 .hm-lower table{font-size:6.6pt}
@@ -1859,7 +1859,7 @@ main,footer{position:relative;z-index:1}
 #headModal .hm-sheet.a4 .hm-notes li{font-size:6.3pt;line-height:1.6}
 #headModal .hm-sign{position:absolute;bottom:10mm;right:11mm;border-collapse:collapse}
 #headModal .hm-sign td{border:.35mm solid #111;font-size:8pt;text-align:center;padding:.6mm 2mm;color:#111}
-#headModal .hm-sign .name{font-size:10.5pt;font-weight:700;background:#E6F1FB;color:#0C447C}
+#headModal .hm-sign .name{font-size:10.5pt;font-weight:700;background:#dcfce7;color:#15803d}
 #headModal .hm-sign .cap{background:#F1EFE8;font-size:7.5pt;color:#555}
 #headModal .hm-empty{position:absolute;inset:11mm;display:flex;align-items:center;justify-content:center;font-size:14px;color:#8892a0}
 
@@ -2187,7 +2187,7 @@ body{
   content:'';
   position:absolute;
   left:0;right:0;top:0;height:4px;
-  background:linear-gradient(90deg,#16a34a,#0d9488,#3b82f6);
+  background:linear-gradient(90deg,#16a34a,#0d9488,#22c55e);
   border-radius:8px 8px 0 0;
 }
 .workspace{padding-bottom:54px}
@@ -2241,7 +2241,7 @@ legend{color:#53665b;letter-spacing:0}
 }
 .result-panel{
   background:
-    linear-gradient(135deg,rgba(59,130,246,.12),transparent 32%),
+    linear-gradient(135deg,rgba(22,163,74,.12),transparent 32%),
     linear-gradient(165deg,#173f2d 0%,#102c23 62%,#0b1f1a 100%);
   box-shadow:0 18px 44px rgba(12,42,31,.22),0 0 0 1px rgba(255,255,255,.07) inset;
 }
@@ -2313,7 +2313,7 @@ legend{color:#53665b;letter-spacing:0}
   box-shadow:0 8px 18px rgba(22,101,52,.1);
 }
 #areaTool .at-result-card{
-  background:linear-gradient(135deg,#ecfdf5 0%,#eff6ff 100%);
+  background:linear-gradient(135deg,#ecfdf5 0%,#f0fdf4 100%);
   border:1px solid rgba(13,148,136,.15);
 }
 #areaTool .at-canvas-wrap{
@@ -2325,7 +2325,7 @@ legend{color:#53665b;letter-spacing:0}
 }
 #pipePlanSection{
   background:
-    linear-gradient(135deg,rgba(59,130,246,.12),transparent 34%),
+    linear-gradient(135deg,rgba(22,163,74,.12),transparent 34%),
     linear-gradient(165deg,#173f2d 0%,#102c23 100%);
   box-shadow:0 20px 48px rgba(12,42,31,.2),0 0 0 1px rgba(255,255,255,.06) inset;
 }
@@ -3289,7 +3289,7 @@ input[type="reset"],
     </div>
   </div>
   <div class="pp-legend" id="ppLegend" style="display:none">
-    <span class="pp-legend-item"><i style="background:#3b82f6"></i>主管</span>
+    <span class="pp-legend-item"><i style="background:#22c55e"></i>主管</span>
     <span class="pp-legend-item"><i style="background:#22c55e"></i>支管</span>
     <span class="pp-legend-item"><i style="background:#f59e0b;border-radius:50%;width:10px;height:10px"></i>水源</span>
     <span class="pp-legend-item"><i style="background:#ef4444;border-radius:50%;width:10px;height:10px"></i>阀门</span>
@@ -3343,7 +3343,7 @@ input[type="reset"],
   <div class="pp-hint" id="tlPpHint" style="display:none">📋 请先在面积测量工具中描绘并闭合边界</div>
   <div style="display:flex;gap:8px;margin:8px 0">
     <button class="pp-btn-generate" id="tlAutoPipe" onclick="tlAutoGenerate()">一键生成管线图</button>
-    <button class="pp-btn-generate" id="tlHeadGen" onclick="tlOpenSystemDiagram()" style="background:linear-gradient(135deg,#2563eb,#1d4ed8);box-shadow:0 2px 8px rgba(37,99,235,.35)">⚙️ 系统图生成</button>
+    <button class="pp-btn-generate" id="tlHeadGen" onclick="tlOpenSystemDiagram()" style="background:linear-gradient(135deg,#16a34a,#15803d);box-shadow:0 2px 8px rgba(37,99,235,.35)">⚙️ 系统图生成</button>
     <button class="pp-btn-ghost" id="tlDownload" style="display:none" onclick="tlDownloadSVG()">📥 下载</button>
     <button class="pp-btn-ghost" id="tlPrint" style="display:none" onclick="tlPrintDiagram()">🖨️ 打印图纸</button>
   </div>
@@ -5235,7 +5235,7 @@ function tlAutoGenerate() {
   var areaMu=(b.w*b.h/MU_TO_SQM).toFixed(1);
   var tlPlotNameVal=(document.getElementById('tlPlotName')&&document.getElementById('tlPlotName').value.trim())||'未命名地块';
   // Title & info —— 与图面拉开间距，不再压到地块
-  parts.push('<text x="'+svgW/2+'" y="40" text-anchor="middle" font-size="20" font-weight="700" fill="#1e3a5f">润野灌溉 · 三级管线施工简图</text>');
+  parts.push('<text x="'+svgW/2+'" y="40" text-anchor="middle" font-size="20" font-weight="700" fill="#14532d">润野灌溉 · 三级管线施工简图</text>');
   // 信息行：与标题分行；过长时按 " | " 边界自动换行
   var tlHeaderExtra=tlPartialCount>0?(' | 非标准 '+tlPartialCount+' 区'):'';
   var tlHeaderStr='地块名称 '+tlPlotNameVal+'  |  面积 '+areaMu+' 亩  |  地块 '+plotW.toFixed(0)+'×'+plotH.toFixed(0)+' m  |  '+totalZones+'分区  |  联合灌溉 '+zc+'区'+tlHeaderExtra;
@@ -5280,10 +5280,10 @@ function tlAutoGenerate() {
   parts.push('<g id="tlPlotGroup">');
   parts.push('<defs><clipPath id="tlPlotClip"><path d="'+d+'"/></clipPath></defs>');
   parts.push('<path d="'+d+'" fill="rgba(147,197,253,.12)" stroke="none"/>');
-  parts.push('<path d="'+d+'" fill="none" stroke="#1e3a5f" stroke-width="2"/>');
+  parts.push('<path d="'+d+'" fill="none" stroke="#14532d" stroke-width="2"/>');
 
   // Zone blocks
-  var zoneCols=['rgba(239,68,68,.12)','rgba(234,179,8,.12)','rgba(59,130,246,.12)','rgba(99,102,241,.12)','rgba(168,85,247,.12)','rgba(236,72,153,.12)','rgba(249,115,22,.12)','rgba(20,184,166,.12)'];
+  var zoneCols=['rgba(239,68,68,.12)','rgba(234,179,8,.12)','rgba(22,163,74,.12)','rgba(99,102,241,.12)','rgba(168,85,247,.12)','rgba(236,72,153,.12)','rgba(249,115,22,.12)','rgba(20,184,166,.12)'];
   var zoneStrokes=['rgba(239,68,68,.5)','rgba(234,179,8,.5)','rgba(59,130,246,.5)','rgba(99,102,241,.5)','rgba(168,85,247,.5)','rgba(236,72,153,.5)','rgba(249,115,22,.5)','rgba(20,184,166,.5)'];
   parts.push('<g clip-path="url(#tlPlotClip)">');
   for(var zr=0;zr<rows;zr++){
@@ -5509,7 +5509,7 @@ function tlAutoGenerate() {
   mainPipes.forEach(function(l){
     var md='';
     for(var i=0;i<l.length;i++){var p=ts(l[i].x,l[i].y);md+=(i===0?'M':'L')+p.x.toFixed(1)+' '+p.y.toFixed(1)+' ';}
-    parts.push('<path d="'+md+'" fill="none" stroke="#2563eb" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>');
+    parts.push('<path d="'+md+'" fill="none" stroke="#16a34a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>');
   });
 
   // Draw drip tape (示意，浅青细虚线) —— 画在支管之下，支管覆盖中段，视觉上从支管两侧伸出
@@ -5578,7 +5578,7 @@ function tlAutoGenerate() {
     var vp=ts(v.x,v.y);
     if(v.ax!==undefined && v.ay!==undefined){
       var ap=ts(v.ax, v.ay);
-      parts.push('<line x1="'+ap.x.toFixed(1)+'" y1="'+ap.y.toFixed(1)+'" x2="'+vp.x.toFixed(1)+'" y2="'+vp.y.toFixed(1)+'" stroke="#2563eb" stroke-width="3.5" stroke-linecap="round" opacity="0.92"/>');
+      parts.push('<line x1="'+ap.x.toFixed(1)+'" y1="'+ap.y.toFixed(1)+'" x2="'+vp.x.toFixed(1)+'" y2="'+vp.y.toFixed(1)+'" stroke="#16a34a" stroke-width="3.5" stroke-linecap="round" opacity="0.92"/>');
     }
     parts.push('<circle cx="'+vp.x.toFixed(1)+'" cy="'+vp.y.toFixed(1)+'" r="7" fill="#ef4444" stroke="#fff" stroke-width="2"/>');
     parts.push('<line x1="'+(vp.x-4).toFixed(1)+'" y1="'+(vp.y-4).toFixed(1)+'" x2="'+(vp.x+4).toFixed(1)+'" y2="'+(vp.y+4).toFixed(1)+'" stroke="#fff" stroke-width="1.5"/>');
@@ -5607,7 +5607,7 @@ function tlAutoGenerate() {
   var lx=svgW/2-150, ly=iy+17;
   parts.push('<g font-size="10" font-weight="600">');
   parts.push('<rect x="'+lx+'" y="'+ly+'" width="14" height="4" fill="#f97316" rx="2"/><text x="'+(lx+20)+'" y="'+(ly+5)+'" fill="#9a3412">总管</text>');
-  parts.push('<rect x="'+(lx+60)+'" y="'+ly+'" width="14" height="4" fill="#2563eb" rx="2"/><text x="'+(lx+80)+'" y="'+(ly+5)+'" fill="#1e40af">主管</text>');
+  parts.push('<rect x="'+(lx+60)+'" y="'+ly+'" width="14" height="4" fill="#16a34a" rx="2"/><text x="'+(lx+80)+'" y="'+(ly+5)+'" fill="#166534">主管</text>');
   parts.push('<rect x="'+(lx+130)+'" y="'+ly+'" width="14" height="3" fill="#0891b2" rx="2"/><text x="'+(lx+150)+'" y="'+(ly+5)+'" fill="#155e75">支管</text>');
   parts.push('<circle cx="'+(lx+200)+'" cy="'+(ly+2)+'" r="5" fill="#f59e0b"/><text x="'+(lx+210)+'" y="'+(ly+5)+'" fill="#92400e">水源</text>');
   parts.push('<circle cx="'+(lx+250)+'" cy="'+(ly+2)+'" r="5" fill="#ef4444"/><text x="'+(lx+260)+'" y="'+(ly+5)+'" fill="#991b1b">阀门</text>');
@@ -7342,7 +7342,7 @@ function calcPlan(){
       var isSel=ppState.lastSelectedCut&&ppState.lastSelectedCut.axis==='x'&&ppState.lastSelectedCut.index===xi;
       var midY=b.minY+b.h/2;
       var hp=ppToCanvas(cuts.xPos[xi],midY);
-      ppCtx.fillStyle=isDrag?'#f59e0b':isHover?'#3b82f6':isSel?'#22c55e':'rgba(59,130,246,.6)';
+      ppCtx.fillStyle=isDrag?'#f59e0b':isHover?'#22c55e':isSel?'#22c55e':'rgba(59,130,246,.6)';
       ppCtx.strokeStyle='#fff';ppCtx.lineWidth=2;
       ppCtx.beginPath();ppCtx.arc(hp.x,hp.y,(isHover||isDrag||isSel)?7:5,0,Math.PI*2);ppCtx.fill();ppCtx.stroke();
     }
@@ -7352,7 +7352,7 @@ function calcPlan(){
       var isSel2=ppState.lastSelectedCut&&ppState.lastSelectedCut.axis==='y'&&ppState.lastSelectedCut.index===yi;
       var midX=b.minX+b.w/2;
       var hp2=ppToCanvas(midX,cuts.yPos[yi]);
-      ppCtx.fillStyle=isDrag2?'#f59e0b':isHover2?'#3b82f6':isSel2?'#22c55e':'rgba(59,130,246,.6)';
+      ppCtx.fillStyle=isDrag2?'#f59e0b':isHover2?'#22c55e':isSel2?'#22c55e':'rgba(59,130,246,.6)';
       ppCtx.strokeStyle='#fff';ppCtx.lineWidth=2;
       ppCtx.beginPath();ppCtx.arc(hp2.x,hp2.y,(isHover2||isDrag2||isSel2)?7:5,0,Math.PI*2);ppCtx.fill();ppCtx.stroke();
     }
@@ -7537,7 +7537,7 @@ function calcPlan(){
 
     // Main pipes
     ppState.mainPipes.forEach(function(l,idx){
-      if(!ppIsPipeHidden('main',idx))ppDrawLine(l,'#3b82f6',4);
+      if(!ppIsPipeHidden('main',idx))ppDrawLine(l,'#22c55e',4);
     });
     // Branch pipes
     ppState.branchPipes.forEach(function(l,idx){
@@ -7569,14 +7569,14 @@ function calcPlan(){
       var pickedHidden=ppIsPipeHidden(pt,ppState.pickedPipe.index);
       var pickW=pt==='main'?7:pt==='subbranch'?5:5;
       var pickOW=pt==='main'?4:pt==='subbranch'?2:2.5;
-      var pickColor=pt==='main'?'#3b82f6':pt==='subbranch'?'#f97316':'#22c55e';
+      var pickColor=pt==='main'?'#22c55e':pt==='subbranch'?'#f97316':'#22c55e';
       ppDrawLine(ppState.pickedPipe.line,'#f59e0b',pickW);
       ppDrawLine(ppState.pickedPipe.line,pickedHidden?'rgba(100,116,139,.65)':pickColor,pickOW,pickedHidden?[7,5]:null);
     }
 
     // Current line being drawn
     if(ppState.currentLine.length>0){
-      var c=ppState.mode==='main'?'#3b82f6':ppState.mode==='branch'?'#22c55e':ppState.mode==='subbranch'?'#f97316':'rgba(0,0,0,.35)';
+      var c=ppState.mode==='main'?'#22c55e':ppState.mode==='branch'?'#22c55e':ppState.mode==='subbranch'?'#f97316':'rgba(0,0,0,.35)';
       var w=ppState.mode==='main'?4:ppState.mode==='branch'?2.5:ppState.mode==='subbranch'?2:1.5;
       ppDrawLine(ppState.currentLine,c,w);
       // Vertices
@@ -7638,7 +7638,7 @@ function calcPlan(){
       else{ppCtx.rect(tx,ty,tw,th);}
       ppCtx.fill();
       ppCtx.strokeStyle='rgba(255,255,255,.3)';ppCtx.lineWidth=1;ppCtx.stroke();
-      ppCtx.fillStyle='#93c5fd';ppCtx.textAlign='left';
+      ppCtx.fillStyle='#86efac';ppCtx.textAlign='left';
       ppCtx.fillText(txtSeg,tx+12,ty+18);
       ppCtx.fillStyle='#86efac';
       ppCtx.fillText(txtTotal,tx+12,ty+36);
@@ -7880,7 +7880,7 @@ function calcPlan(){
     if(!legend)return;
     var items=legend.querySelectorAll('.pp-legend-item');
     // Rebuild legend
-    legend.innerHTML='<span class="pp-legend-item"><i style="background:#3b82f6"></i>主管</span>'
+    legend.innerHTML='<span class="pp-legend-item"><i style="background:#22c55e"></i>主管</span>'
       +'<span class="pp-legend-item"><i style="background:#22c55e"></i>支管</span>'
       +(isThree?'<span class="pp-legend-item"><i style="background:#f97316"></i>一级管</span><span class="pp-legend-item"><i style="background:#a78bfa;height:2px;width:18px"></i>滴灌带</span>':'')
       +'<span class="pp-legend-item"><i style="background:#f59e0b;border-radius:50%;width:10px;height:10px"></i>水源</span>'
@@ -8274,7 +8274,7 @@ function calcPlan(){
     var zoneLayout=ppGetZoneLayout(b,planN);
     var zoneCuts=ppGetZoneCuts(b,zoneLayout);
     planN=zoneCuts.cols*zoneCuts.rows;
-    var zoneCols=['rgba(239,68,68,.12)','rgba(234,179,8,.12)','rgba(59,130,246,.12)','rgba(34,197,94,.12)','rgba(168,85,247,.12)','rgba(236,72,153,.12)','rgba(249,115,22,.12)','rgba(20,184,166,.12)'];
+    var zoneCols=['rgba(239,68,68,.12)','rgba(234,179,8,.12)','rgba(22,163,74,.12)','rgba(34,197,94,.12)','rgba(168,85,247,.12)','rgba(236,72,153,.12)','rgba(249,115,22,.12)','rgba(20,184,166,.12)'];
     var zoneStrokes=['rgba(239,68,68,.5)','rgba(234,179,8,.5)','rgba(59,130,246,.5)','rgba(34,197,94,.5)','rgba(168,85,247,.5)','rgba(236,72,153,.5)','rgba(249,115,22,.5)','rgba(20,184,166,.5)'];
     var labelParts=[];
     parts.push('<g clip-path="url(#ppPlotClip)">');
@@ -8410,13 +8410,13 @@ function calcPlan(){
       if(ppIsPipeHidden('main',idx))return;
       var md='';
       for(var i=0;i<l.length;i++){var p=ts(l[i].x,l[i].y);md+=(i===0?'M':'L')+p.x.toFixed(1)+' '+p.y.toFixed(1)+' ';}
-      parts.push('<path d="'+md+'" fill="none" stroke="#2563eb" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>');
+      parts.push('<path d="'+md+'" fill="none" stroke="#16a34a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>');
       // Calculate actual drawn length in meters
       var actualLen=ppLineLen(l);
       actualMainTotal+=actualLen;
       if(l.length>=2){
         var p1=ts(l[l.length-2].x,l[l.length-2].y),p2=ts(l[l.length-1].x,l[l.length-1].y);
-        parts.push(ppArrow(p1,p2,'#2563eb'));
+        parts.push(ppArrow(p1,p2,'#16a34a'));
       }
     });
 
@@ -8437,7 +8437,7 @@ function calcPlan(){
       var pipeNoteX=zoneDimX1+10;
       var pipeNoteY=Math.max(zoneDimY1+18,zoneDimY2-24);
       parts.push('<g text-anchor="start" font-size="9.5" font-weight="700">');
-      if(showPipeNoteMain)parts.push('<text x="'+pipeNoteX.toFixed(1)+'" y="'+pipeNoteY.toFixed(1)+'" fill="#1e40af">主管 '+mainPipeOD+'</text>');
+      if(showPipeNoteMain)parts.push('<text x="'+pipeNoteX.toFixed(1)+'" y="'+pipeNoteY.toFixed(1)+'" fill="#166534">主管 '+mainPipeOD+'</text>');
       if(showPipeNoteBranch)parts.push('<text x="'+pipeNoteX.toFixed(1)+'" y="'+(pipeNoteY+15).toFixed(1)+'" fill="#166534">支管 '+branchPipeOD+'</text>');
       parts.push('</g>');
     }
@@ -8490,7 +8490,7 @@ function calcPlan(){
           }
         });
         if(connSvg.length){
-          parts.push('<g clip-path="url(#ppPlotClip)" stroke="#2563eb" stroke-width="3.5" stroke-linecap="round" fill="none">');
+          parts.push('<g clip-path="url(#ppPlotClip)" stroke="#16a34a" stroke-width="3.5" stroke-linecap="round" fill="none">');
           parts.push(connSvg.join(''));
           parts.push('</g>');
         }
@@ -8573,7 +8573,8 @@ function calcPlan(){
     w.document.write('@page{size:A3 landscape;margin:5mm}');
     w.document.write('body{margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#fff}');
     w.document.write('svg{max-width:100%;max-height:100vh}');
-    w.document.write('@media print{body{margin:0}}</style></head><body>');
+    w.document.write('@media print{body{margin:0}}</style>  <link rel="stylesheet" href="runye-theme.css">
+</head><body>');
     w.document.write(ppState.lastSVG);
     w.document.write('</body></html>');
     w.document.close();
@@ -8931,7 +8932,7 @@ function drawSVG(cfg, W, H) {
   g.push('<defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>');
   g.push('<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="#ffffff"/>');
 
-  var blue = '#185FA5', blueT = '#0C447C', blueF = '#378ADD', blueL = '#E6F1FB', green = '#0F6E56', greenL = '#E1F5EE';
+  var blue = '#16a34a', blueT = '#15803d', blueF = '#0d9488', blueL = '#dcfce7', green = '#0F6E56', greenL = '#E1F5EE';
 
   function tag(x, y, n, opt) {
     if (!cfg.show.num) return;

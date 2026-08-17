@@ -23,7 +23,7 @@
   .sync-pill.ready{background:var(--g-50);color:var(--g-700);border-color:var(--g-100)}
 
   .hero-grid{display:grid;grid-template-columns:1fr 220px;gap:16px;margin-bottom:16px}
-  .hero-copy{background:linear-gradient(135deg,var(--g-700),var(--g-600));color:#fff;border-radius:16px;padding:20px 22px;box-shadow:var(--shadow)}
+  .hero-copy{background:linear-gradient(135deg,#166534,#0d9488);color:#fff;border-radius:16px;padding:20px 22px;box-shadow:var(--shadow)}
   .eyebrow{margin:0 0 6px;font-size:12px;opacity:.85;letter-spacing:.4px}
   .hero-copy h1{margin:0 0 8px;font-size:26px;line-height:1.25}
   .hero-sub{margin:0;font-size:15px;opacity:.92}
@@ -104,8 +104,37 @@
     .insight-grid{grid-template-columns:1fr}
   }
 </style>
+  <link rel="stylesheet" href="runye-theme.css">
 </head>
 <body>
+<header class="main-header">
+  <div class="header-inner">
+    <a href="runye-landing.html" class="brand">
+      <div class="brand-logo">润</div>
+      <div class="brand-text">
+        <span class="brand-name">润野灌溉</span>
+        <span class="brand-sub">Runye Irrigation</span>
+      </div>
+    </a>
+    <nav class="main-nav" id="mainNav">
+      <div class="nav-item"><a href="index.html" class="nav-link">精准灌溉</a></div>
+      <div class="nav-item"><a href="耐特菲姆滴灌带长度查询器.html" class="nav-link">滴灌带长度查询</a></div>
+      <div class="nav-item"><a href="index.html#three-level-view" class="nav-link">三级系统查询</a></div>
+      <div class="nav-item"><a href="数字农业.html" class="nav-link active">数字农业</a></div>
+      <div class="nav-item"><a href="runye-landing.html" class="nav-link">水肥课堂</a></div>
+      <div class="nav-item"><a href="runye-landing.html" class="nav-link">关于我们</a></div>
+    </nav>
+    <a href="runye-landing.html" class="nav-home-btn">⌂ 返回主页</a>
+    <div class="header-actions">
+      <button class="search-btn" title="搜索" aria-label="搜索">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
+      </button>
+      <div class="mobile-menu-btn" id="mobileMenuBtn" aria-label="菜单">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+  </div>
+</header>
 <div class="ops-app">
   <header class="topbar">
     <div>

@@ -1,0 +1,146 @@
+/* ============================================================
+   润野灌溉 · 统一设计语言 (runye-theme.css)
+   作用：集中定义品牌 token 与公共组件，供全站 9 个页面 <link> 引入。
+   说明：使用独立 --ry-* 命名空间，不与各页现有 --g-*/--s-*/--font 等变量冲突。
+   引入位置：放在各页 </head> 之前（即其内联 <style> 之后），确保本表对公共类生效。
+   ============================================================ */
+
+/* ===== 1. 设计 Token ===== */
+:root{
+  /* 品牌主色：绿（润野） */
+  --ry-green-50:#f0fdf4; --ry-green-100:#dcfce7; --ry-green-200:#bbf7d0;
+  --ry-green-500:#22c55e; --ry-green-600:#16a34a; --ry-green-700:#15803d;
+  --ry-green-800:#166534; --ry-green-900:#14532d;
+  /* 辅色：teal（灌溉/水） */
+  --ry-teal:#0d9488; --ry-teal-700:#0f766e;
+  /* 中性灰阶（文本） */
+  --ry-s-50:#f8fafc; --ry-s-100:#f1f5f9; --ry-s-200:#e2e8f0; --ry-s-300:#cbd5e1;
+  --ry-s-400:#94a3b8; --ry-s-500:#64748b; --ry-s-600:#475569; --ry-s-700:#334155;
+  --ry-s-800:#1e293b; --ry-s-900:#0f172a;
+  /* 排版 */
+  --ry-font:"Microsoft YaHei","PingFang SC","Segoe UI",system-ui,-apple-system,sans-serif;
+  --ry-maxw:1280px;
+  /* 形状 / 阴影 */
+  --ry-radius:14px; --ry-radius-sm:10px;
+  --ry-shadow:0 2px 8px rgba(15,23,42,.06);
+  --ry-shadow-md:0 6px 20px rgba(15,23,42,.10);
+  --ry-transition:all .2s ease;
+}
+
+/* ===== 2. 全局基础 ===== */
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:var(--ry-font);
+  color:var(--ry-s-800);
+  background:#fff;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+img{max-width:100%;}
+a{text-decoration:none;color:inherit;}
+
+/* ===== 3. 统一品牌顶栏（.main-header 家族，覆盖 7 个页面现有同名类） ===== */
+.main-header{
+  background:#fff;
+  position:sticky; top:0; z-index:100;
+  box-shadow:var(--ry-shadow);
+  border-bottom:1px solid var(--ry-s-100);
+}
+.header-inner{
+  max-width:var(--ry-maxw); margin:0 auto; padding:0 24px;
+  display:flex; align-items:center; justify-content:space-between; height:72px;
+}
+.brand{display:flex; align-items:center; gap:12px;}
+.brand-logo{
+  width:42px; height:42px; border-radius:50%;
+  background:linear-gradient(135deg,var(--ry-green-700),var(--ry-teal));
+  display:flex; align-items:center; justify-content:center;
+  color:#fff; font-weight:800; font-size:18px;
+  box-shadow:0 4px 12px rgba(22,163,74,.25);
+}
+.brand-text{display:flex; flex-direction:column; line-height:1.2;}
+.brand-name{font-size:18px; font-weight:800; color:var(--ry-green-800); letter-spacing:.5px;}
+.brand-sub{font-size:11px; color:var(--ry-s-500); letter-spacing:1px; text-transform:uppercase;}
+.main-nav{display:flex; align-items:center; gap:4px;}
+.nav-item{position:relative;}
+.nav-link{
+  position:relative; display:flex; align-items:center; gap:4px;
+  padding:8px 14px; font-size:14px; font-weight:600; color:var(--ry-s-700);
+  transition:var(--ry-transition); white-space:nowrap;
+}
+.nav-link::after{
+  content:""; position:absolute; left:14px; right:14px; bottom:0; height:2px;
+  background:var(--ry-green-600); opacity:0; transform:scaleX(.4); transition:var(--ry-transition);
+}
+.nav-link:hover{color:var(--ry-green-700);}
+.nav-link:hover::after,.nav-link.active::after{opacity:1; transform:scaleX(1);}
+.nav-link.active{color:var(--ry-green-700);}
+.header-actions{display:flex; align-items:center; gap:16px;}
+.nav-home-btn{
+  margin-left:8px; padding:8px 16px;
+  border:1px solid var(--ry-green-600); border-radius:999px;
+  color:var(--ry-green-700); font-size:14px; font-weight:600; background:#fff;
+  cursor:pointer; transition:var(--ry-transition);
+}
+.nav-home-btn:hover{background:var(--ry-green-50);}
+.search-btn{
+  width:38px; height:38px; border-radius:50%; border:none; background:transparent;
+  color:var(--ry-s-600); cursor:pointer; display:flex; align-items:center; justify-content:center;
+  transition:var(--ry-transition);
+}
+.search-btn:hover{background:var(--ry-s-50); color:var(--ry-green-700);}
+.mobile-menu-btn{
+  width:38px; height:38px; border-radius:10px; border:none; background:transparent;
+  cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px;
+}
+.mobile-menu-btn span{display:block; width:20px; height:2px; background:var(--ry-s-600); border-radius:2px; transition:var(--ry-transition);}
+.mobile-menu-btn:hover span{background:var(--ry-green-700);}
+
+/* ===== 4. 统一卡片 / 面板 ===== */
+.card,.panel{
+  background:#fff; border:1px solid var(--ry-s-100);
+  border-radius:var(--ry-radius); box-shadow:var(--ry-shadow); padding:20px;
+}
+.panel{padding:16px;}
+
+/* ===== 5. 统一分区标题 ===== */
+.section-title{
+  font-size:16px; font-weight:800; color:var(--ry-green-800);
+  margin:28px 0 14px; padding-left:12px;
+  border-left:4px solid var(--ry-green-600);
+}
+
+/* ===== 6. 统一按钮（基础 .btn 给中性默认底色，变体再覆盖） ===== */
+.btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  padding:10px 20px; border-radius:var(--ry-radius-sm);
+  font-size:14px; font-weight:700; cursor:pointer;
+  border:1px solid var(--ry-s-200); background:var(--ry-s-100); color:var(--ry-s-700);
+  transition:var(--ry-transition); font-family:inherit;
+}
+.btn-primary,button.primary{
+  background:var(--ry-green-600); color:#fff; border-color:var(--ry-green-600);
+  box-shadow:0 4px 12px rgba(22,163,74,.25);
+}
+.btn-primary:hover,button.primary:hover{background:var(--ry-green-700);}
+.btn-light{background:#fff; color:var(--ry-green-700); border-color:var(--ry-green-600);}
+.btn-light:hover{background:var(--ry-green-50);}
+.btn-ghost{background:transparent; color:var(--ry-s-600); border-color:var(--ry-s-200);}
+.btn-ghost:hover{background:var(--ry-s-50); color:var(--ry-s-700);}
+
+/* ===== 7. 统一表格（供后续页面采用 .ry-table；此处同时轻度规范通用 table） ===== */
+.ry-table{
+  width:100%; border-collapse:collapse; margin-top:12px; font-size:14px;
+  background:#fff; border-radius:var(--ry-radius); overflow:hidden; box-shadow:var(--ry-shadow);
+}
+.ry-table th{background:var(--ry-green-600); color:#fff; font-weight:700; padding:12px 14px; text-align:left;}
+.ry-table td{padding:11px 14px; border-bottom:1px solid var(--ry-s-100); color:var(--ry-s-700);}
+.ry-table tr:last-child td{border-bottom:none;}
+.ry-table tbody tr:nth-child(even){background:var(--ry-green-50);}
+.ry-table tbody tr:hover{background:var(--ry-green-100);}
+
+/* ===== 8. （预留）功能工具条 .topbar 保持各页原有样式，不在此覆盖，避免破坏地图页深绿底白字 ===== */
+
+/* ===== 9. index 内模块工具条（at/hm/tl）轻微对齐到品牌色，避免突兀 ===== */
+.at-topbar,.hm-topbar,.tl-header{border-left:4px solid var(--ry-green-600);}

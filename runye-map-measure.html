@@ -50,9 +50,38 @@
   .leaflet-container.drawing .leaflet-grab{ cursor:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2730%27%20height%3D%2730%27%3E%3Cg%20stroke%3D%27black%27%20stroke-width%3D%273%27%3E%3Cline%20x1%3D%2715%27%20y1%3D%273%27%20x2%3D%2715%27%20y2%3D%2712%27%2F%3E%3Cline%20x1%3D%2715%27%20y1%3D%2718%27%20x2%3D%2715%27%20y2%3D%2727%27%2F%3E%3Cline%20x1%3D%273%27%20y1%3D%2715%27%20x2%3D%2712%27%20y2%3D%2715%27%2F%3E%3Cline%20x1%3D%2718%27%20y1%3D%2715%27%20x2%3D%2727%27%20y2%3D%2715%27%2F%3E%3C%2Fg%3E%3Cg%20stroke%3D%27white%27%20stroke-width%3D%271.5%27%3E%3Cline%20x1%3D%2715%27%20y1%3D%273%27%20x2%3D%2715%27%20y2%3D%2712%27%2F%3E%3Cline%20x1%3D%2715%27%20y1%3D%2718%27%20x2%3D%2715%27%20y2%3D%2727%27%2F%3E%3Cline%20x1%3D%273%27%20y1%3D%2715%27%20x2%3D%2712%27%20y2%3D%2715%27%2F%3E%3Cline%20x1%3D%2718%27%20y1%3D%2715%27%20x2%3D%2727%27%20y2%3D%2715%27%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2715%27%20cy%3D%2715%27%20r%3D%272.5%27%20fill%3D%27white%27%20stroke%3D%27black%27%20stroke-width%3D%271%27%2F%3E%3C%2Fsvg%3E") 15 15, crosshair !important; }
   @media(max-width:600px){ .panel{width:200px} .topbar input[type=text]{min-width:120px} }
 </style>
+  <link rel="stylesheet" href="runye-theme.css">
 </head>
 <body>
 <div id="app">
+  <header class="main-header">
+    <div class="header-inner">
+      <a href="runye-landing.html" class="brand">
+        <div class="brand-logo">润</div>
+        <div class="brand-text">
+          <span class="brand-name">润野灌溉</span>
+          <span class="brand-sub">Runye Irrigation</span>
+        </div>
+      </a>
+      <nav class="main-nav" id="mainNav">
+        <div class="nav-item"><a href="index.html" class="nav-link">精准灌溉</a></div>
+        <div class="nav-item"><a href="耐特菲姆滴灌带长度查询器.html" class="nav-link">滴灌带长度查询</a></div>
+        <div class="nav-item"><a href="index.html#three-level-view" class="nav-link">三级系统查询</a></div>
+        <div class="nav-item"><a href="数字农业.html" class="nav-link">数字农业</a></div>
+        <div class="nav-item"><a href="runye-landing.html" class="nav-link">水肥课堂</a></div>
+        <div class="nav-item"><a href="runye-landing.html" class="nav-link">关于我们</a></div>
+      </nav>
+      <a href="runye-landing.html" class="nav-home-btn">⌂ 返回主页</a>
+      <div class="header-actions">
+        <button class="search-btn" title="搜索" aria-label="搜索">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
+        </button>
+        <div class="mobile-menu-btn" id="mobileMenuBtn" aria-label="菜单">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+    </div>
+  </header>
   <div class="topbar">
     <span class="brand">润野灌溉<small>地图面积测量 · 在线卫星图</small></span>
     <input type="text" id="search" placeholder="搜索地点（如：三亚 崖州）" />
