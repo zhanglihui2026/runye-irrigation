@@ -132,6 +132,24 @@
 
   /* 被数字农业.html iframe 嵌入时，隐藏自己的品牌顶栏，避免双导航 */
   .iframe-embed .main-header{display:none;}
+  .plot-board{background:var(--card,#fff);border:1px solid var(--line,#e5e7eb);border-radius:16px;padding:18px 18px 20px;margin:0 0 18px;box-shadow:0 1px 3px rgba(16,24,40,.04)}
+  .plot-board .board-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+  .plot-board .board-head h2{font-size:17px;margin:0;color:var(--ink,#111827)}
+  .plot-board .board-head .sub{font-size:12px;color:var(--ink-2,#6b7280)}
+  .plot-board-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+  .plot-card{position:relative;border:1px solid var(--line,#e5e7eb);border-radius:14px;padding:12px;background:#fff;cursor:pointer;transition:border-color .15s,box-shadow .15s,transform .15s}
+  .plot-card:hover{border-color:var(--g-600,#16a34a);box-shadow:0 4px 14px rgba(22,163,74,.12);transform:translateY(-2px)}
+  .plot-card.active{border-color:var(--g-700,#15803d);box-shadow:0 0 0 2px rgba(21,128,61,.18)}
+  .plot-card .pc-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+  .plot-card .pc-name{font-weight:700;font-size:14px;color:var(--ink,#111827);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .plot-card .pc-badge{font-size:11px;padding:2px 8px;border-radius:999px;background:var(--g-50,#dcfce7);color:var(--g-700,#15803d);white-space:nowrap}
+  .plot-card .pc-badge.muted{background:#f1f5f9;color:#64748b}
+  .plot-card .pc-svg-wrap{background:#f8fafc;border-radius:10px;padding:8px;display:flex;align-items:center;justify-content:center}
+  .plot-card svg.pc-svg{width:100%;height:auto;display:block}
+  .plot-card .pc-meta{margin-top:8px;font-size:12px;color:var(--ink-2,#6b7280);line-height:1.6}
+  .plot-card .pc-meta b{color:var(--ink,#111827);font-weight:600}
+  .plot-card .pc-foot{margin-top:6px;font-size:11px;color:#64748b}
+  .plot-board-empty{color:var(--ink-2,#6b7280);font-size:13px;padding:8px 2px;line-height:1.7}
 </style>
   <link rel="stylesheet" href="runye-theme.css">
 </head>
@@ -188,6 +206,14 @@
   </section>
 
   <section class="kpi-grid" id="kpiGrid"></section>
+
+  <section class="plot-board" id="plotBoard">
+    <div class="board-head">
+      <h2>地块图形看板</h2>
+      <span class="sub">引用自「精准灌溉」面积测量工具的地块图形 · 点击地块即在下方决策工具中选中并采集该地块天气</span>
+    </div>
+    <div class="plot-board-grid" id="plotBoardGrid"></div>
+  </section>
 
   <section class="main-grid">
     <aside class="control-card">
@@ -941,6 +967,79 @@
     return null;
   }
 
+  // ---- 地块图形看板 ----
+  // 将经纬度数组/对象归一化为“米坐标” {x:东向米, y:北向米}，与地块库存储格式一致；纯展示用，按包围盒等比缩放
+  function normPoly(poly){
+    if(!poly||!poly.length) return [];
+    var first=poly[0];
+    if(Array.isArray(first)){ return toMeters(poly.map(function(a){return {lat:a[0],lng:a[1]};})); }
+    if(first.x!=null && first.y!=null) return poly;
+    if(first.lat!=null && first.lng!=null) return toMeters(poly);
+    return [];
+  }
+  function toMeters(pts){
+    if(!pts||!pts.length) return [];
+    var clat=pts.reduce(function(s,p){return s+p.lat;},0)/pts.length, mlat=Math.PI/180*6378137, cosLat=Math.cos(clat*Math.PI/180), refLng=pts[0].lng, refLat=clat;
+    return pts.map(function(p){ return {x:Math.round((p.lng-refLng)*mlat*cosLat*100)/100, y:Math.round((p.lat-refLat)*mlat*100)/100}; });
+  }
+  // 把米坐标多边形渲染为等比缩放的 SVG 小地图（北向上）
+  function plotToSvg(poly){
+    var minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+    poly.forEach(function(p){ if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x; if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y; });
+    var w=maxX-minX, h=maxY-minY;
+    if(w<=0&&h<=0) return '';
+    var VB=120, PAD=14, IN=VB-2*PAD;
+    var scale=(w>0&&h>0)?Math.min(IN/w,IN/h):(w>0?IN/w:IN/h);
+    if(!isFinite(scale)||scale<=0) scale=1;
+    var sw=w*scale, sh=h*scale, ox=PAD+(IN-sw)/2, oy=PAD+(IN-sh)/2;
+    var pts=poly.map(function(p){ return (ox+(p.x-minX)*scale).toFixed(1)+','+(oy+(maxY-p.y)*scale).toFixed(1); }).join(' ');
+    var cx=(minX+maxX)/2, cy=(minY+maxY)/2;
+    var cnx=(ox+(cx-minX)*scale).toFixed(1), cny=(oy+(maxY-cy)*scale).toFixed(1);
+    return '<svg class="pc-svg" viewBox="0 0 '+VB+' '+VB+'" xmlns="http://www.w3.org/2000/svg">'
+      +'<polygon points="'+pts+'" fill="#dcfce7" stroke="#16a34a" stroke-width="2" stroke-linejoin="round"/>'
+      +'<circle cx="'+cnx+'" cy="'+cny+'" r="2.4" fill="#15803d"/></svg>';
+  }
+  // 选中某个地块（与下拉选择逻辑一致），并联动决策工具与天气采集
+  function selectPlotById(id){
+    state.selectedPlotId=id||'';
+    if(!id){
+      var p=applySharedPlot();
+      if(p && p.mu>0){ state.areaMu=p.mu; state._plotTs=p.ts; showPlotSyncNote('已从实际地块同步面积 '+p.mu+' 亩'+(p.plantingDate?' · 已记录播期 '+p.plantingDate:'')); if(p.plantingDate){ state.plantingDate=p.plantingDate; } }
+      else { showPlotSyncNote(''); }
+    } else {
+      var lp=loadLibrary().filter(function(x){return x.id===id;})[0];
+      if(lp && lp.mu>0){ state.areaMu=lp.mu; state._plotTs=lp.ts||0; showPlotSyncNote('已从地块库选择：'+lp.name+'（'+lp.mu+' 亩）'+(lp.plantingDate?' · 已记录播期 '+lp.plantingDate:'')); if(lp.plantingDate){ state.plantingDate=lp.plantingDate; } }
+    }
+    writeInputs(); recompute(); render(); persistState();
+    syncWeatherLog();
+  }
+  // 渲染地块图形看板
+  function renderPlotBoard(){
+    var grid=$("plotBoardGrid"); if(!grid) return;
+    var library=loadLibrary();
+    if(!library || !library.length){
+      grid.innerHTML='<div class="plot-board-empty">尚未保存任何地块。请先在「精准灌溉」的面积测量工具中描绘地块边界并保存，图形看板会自动引用到这里。</div>';
+      return;
+    }
+    var activeId=state.selectedPlotId||'';
+    grid.innerHTML=library.map(function(p){
+      var poly=normPoly(p.poly);
+      var svg=poly&&poly.length>=3?plotToSvg(poly):'';
+      var hasDate=!!p.plantingDate;
+      var sqm=p.sqm!=null?p.sqm:(p.mu!=null?Math.round(p.mu*666.67):null);
+      return '<div class="plot-card'+(p.id===activeId?' active':'')+'" data-id="'+escAttr(p.id)+'">'
+        +'<div class="pc-top"><span class="pc-name">'+escAttr(p.name||'未命名地块')+'</span>'
+        +'<span class="pc-badge'+(hasDate?'':' muted')+'">'+(hasDate?'已设播期':'待设播期')+'</span></div>'
+        +(svg?'<div class="pc-svg-wrap">'+svg+'</div>':'<div class="pc-svg-wrap"><div class="plot-board-empty">无图形数据</div></div>')
+        +'<div class="pc-meta"><b>'+(p.mu!=null?p.mu.toFixed(2):'0')+' 亩</b> · '+(sqm!=null?sqm.toLocaleString('zh-CN')+' ㎡':'')+'</div>'
+        +'<div class="pc-foot">'+(hasDate?'播期 '+p.plantingDate:'未设置播期（暂不能采集该地块天气）')+'</div>'
+        +'</div>';
+    }).join('');
+    Array.prototype.forEach.call(grid.querySelectorAll('.plot-card'), function(el){
+      el.addEventListener('click', function(){ selectPlotById(el.getAttribute('data-id')||''); renderPlotBoard(); });
+    });
+  }
+
   function bind(){
     // populate location select
     $("locationName").innerHTML=locations.map(function(l){return '<option value="'+l.name+'">'+l.name+'</option>';}).join("");
@@ -964,6 +1063,7 @@
       var lp=state.selectedPlotId?(loadLibrary().filter(function(x){return x.id===state.selectedPlotId;})[0]||{}):null;
       var pname=lp?lp.name:'同步的当前地块';
       showPlantingSaveHint('已保存播期 '+date+' 到「'+pname+'」，并按该播期采集了天气数据');
+      renderPlotBoard();
     }); }
     // manual weather
     ["mRain","mTmax","mTmin","mEto"].forEach(function(id){
@@ -979,22 +1079,7 @@
     var lrb=$("logRefreshBtn");
     if(lrb){ lrb.addEventListener('click',function(){ syncWeatherLog(); }); }
     var pls=$("plotLibrarySelect");
-    if(pls){ pls.addEventListener('change',function(){
-      var id=this.value; state.selectedPlotId=id;
-      if(!id){
-        var p=applySharedPlot();
-        if(p && p.mu>0){ state.areaMu=p.mu; state._plotTs=p.ts; showPlotSyncNote('已从实际地块同步面积 '+p.mu+' 亩'+(p.plantingDate?' · 已记录播期 '+p.plantingDate:''));
-          if(p.plantingDate){ state.plantingDate=p.plantingDate; } }
-        else { showPlotSyncNote(''); }
-      } else {
-        var lp=loadLibrary().filter(function(x){return x.id===id;})[0];
-        if(lp && lp.mu>0){ state.areaMu=lp.mu; state._plotTs=lp.ts||0; showPlotSyncNote('已从地块库选择：'+lp.name+'（'+lp.mu+' 亩）'+(lp.plantingDate?' · 已记录播期 '+lp.plantingDate:''));
-          if(lp.plantingDate){ state.plantingDate=lp.plantingDate; } }
-      }
-      writeInputs(); recompute(); render(); persistState();
-      // 切换地块后，按该地块的播期直接采集天气数据
-      syncWeatherLog();
-    }); }
+    if(pls){ pls.addEventListener('change',function(){ selectPlotById(this.value); renderPlotBoard(); }); }
   }
 
   function loadWeather(){
@@ -1034,6 +1119,9 @@
   }
   var library=loadLibrary();
   populatePlotLibrarySelect(library, state.selectedPlotId||'');
+  renderPlotBoard();
+  // 当地块库在其它页面（精准灌溉/面积测量）被修改时，自动刷新图形看板
+  try{ window.addEventListener('storage', function(e){ if(e && e.key==='runye_plot_library'){ populatePlotLibrarySelect(loadLibrary(), state.selectedPlotId||''); renderPlotBoard(); } }); }catch(e){}
   var activePlot = state.selectedPlotId ? library.filter(function(p){return p.id===state.selectedPlotId;})[0] : null;
   if(activePlot && activePlot.mu>0){
     state.areaMu=activePlot.mu; state._plotTs=activePlot.ts||0;
