@@ -68,7 +68,7 @@
         <div class="nav-item"><a href="耐特菲姆滴灌带长度查询器.html" class="nav-link">滴灌带长度查询</a></div>
         <div class="nav-item"><a href="index.html#three-level-view" class="nav-link">三级系统查询</a></div>
         <div class="nav-item"><a href="数字农业.html" class="nav-link">数字农业</a></div>
-        <div class="nav-item"><a href="runye-landing.html" class="nav-link">水肥课堂</a></div>
+        <div class="nav-item"><a href="runye-landing.html" class="nav-link">农事看板</a></div>
         <div class="nav-item"><a href="runye-landing.html" class="nav-link">关于我们</a></div>
       </nav>
       <a href="runye-landing.html" class="nav-home-btn">⌂ 返回主页</a>
@@ -106,6 +106,11 @@
       <div class="row"><span class="k">顶点</span><span class="v"><span id="pts">0</span><small>个</small></span></div>
       <div class="hint">点击地图添加顶点；拖动顶点可微调；「完成」自动闭合并计算。面积按真实球面经纬度计算。</div>
       <button class="copy" id="btnCopy">↩ 回传设计工具（跳转）</button>
+      <div style="margin-top:8px;display:flex;gap:6px;align-items:center;">
+        <input type="text" id="plotName" placeholder="地块名称（选填）" style="flex:1;min-width:0;padding:6px 8px;border:1px solid #c3ccd8;border-radius:5px;font-size:13px;">
+        <button class="copy" id="btnSavePlot" style="white-space:nowrap;">💾 保存地块</button>
+      </div>
+      <div class="hint" style="margin-top:6px;">保存后可累计多个地块；在「精准灌溉」页地块库「设为当前」，或在数字农业（水肥决策）页下拉选择。</div>
     </div>
     <div class="tip" id="tip">点击「✏️ 开始画框」后，在卫星图上依次点击地块边界顶点即可。</div>
   </div>
@@ -287,6 +292,31 @@
       btn.textContent='回传中…';
       setTimeout(function(){ window.location.href='index.html#areaTool'; }, 350);
     }catch(e){ alert('写入失败：'+e.message); }
+  };
+
+  // 保存到地块库（与精准灌溉页共用 localStorage['runye_plot_library']），可累计多个地块
+  document.getElementById('btnSavePlot').onclick=function(){
+    var mu=parseFloat((geodesicArea(points)/666.67).toFixed(2));
+    if(!mu){ alert('请先在地图上画框测量出面积再保存'); return; }
+    var sqm=Math.round(geodesicArea(points));
+    var name=(document.getElementById('plotName').value||'').trim();
+    var arr=[]; try{ arr=JSON.parse(localStorage.getItem('runye_plot_library')||'[]'); }catch(e){ arr=[]; }
+    if(!name) name='地块 '+(arr.length+1);
+    // 经纬度 → 本地米坐标（与精准灌溉页 applyMapMeasuredArea 一致），便于「设为当前」回填
+    var poly=latlngs(), xs=[], ys=[];
+    if(poly && poly.length>=3){
+      var lats=poly.map(function(p){return p[0];}), lngs=poly.map(function(p){return p[1];});
+      var clat=lats.reduce(function(a,b){return a+b;},0)/lats.length;
+      var R=6378137, mlat=R*Math.PI/180, cosLat=Math.cos(clat*Math.PI/180);
+      poly.forEach(function(p){ xs.push((p[1]-lngs[0])*mlat*cosLat); ys.push((p[0]-clat)*mlat); });
+    }
+    var plot={ id:'p'+Date.now()+Math.floor(Math.random()*1000), name:name, mu:mu, sqm:sqm,
+      poly:xs.map(function(x,i){return {x:Math.round(x*100)/100,y:Math.round(ys[i]*100)/100};}),
+      crop:'七彩花生', source:'map', ts:Date.now(), note:'' };
+    arr.push(plot);
+    try{ localStorage.setItem('runye_plot_library', JSON.stringify(arr)); }catch(e){ alert('保存失败：'+e.message); return; }
+    document.getElementById('plotName').value='';
+    alert('已保存到地块库：'+name+'（'+mu+' 亩）\n可在精准灌溉页「地块库」设为当前，或在数字农业页选择。');
   };
 
   refresh();

@@ -54,6 +54,12 @@
   .number-row{display:flex;align-items:center;gap:6px}
   .number-row input{flex:1;width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:9px;font-size:14px}
   .number-row em{font-style:normal;color:var(--ink-2);font-size:12px;min-width:36px;text-align:right}
+  .date-row{display:flex;align-items:center;gap:6px}
+  .date-row .date-input{flex:1;width:100%}
+  .save-planting-btn{flex:none;padding:8px 12px;border:0;border-radius:9px;background:var(--g-700);color:#fff;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+  .save-planting-btn:hover{background:var(--g-600)}
+  .planting-save-hint{display:block;margin-top:5px;font-size:12px;min-height:14px;color:var(--g-700)}
+  .planting-save-hint.warn{color:#b45309}
 
   .board{display:flex;flex-direction:column;gap:16px}
   .weather-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px 18px;box-shadow:var(--shadow);display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
@@ -103,10 +109,34 @@
     .control-card{position:static}
     .insight-grid{grid-template-columns:1fr}
   }
+
+  /* 种植期天气采集日志 */
+  .weather-log-card .log-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+  .log-toolbar .ghost-btn{background:var(--g-700);color:#fff;border:0;border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer}
+  .log-toolbar .ghost-btn:hover{background:var(--g-600)}
+  .log-toolbar .ghost-btn:disabled{opacity:.6;cursor:default}
+  .season-kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:12px}
+  .season-kpi{background:var(--g-50);border:1px solid var(--g-100);border-radius:12px;padding:10px 12px;text-align:center}
+  .season-kpi span{display:block;font-size:11px;color:var(--ink-2);margin-bottom:4px}
+  .season-kpi strong{font-size:18px;color:var(--g-700)}
+  .season-kpi em{font-size:11px;font-style:normal;color:var(--ink-2)}
+  .season-kpi strong.log-warn{color:var(--danger)}
+  .log-table-wrap{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:12px}
+  #weatherLogTable th{position:sticky;top:0;background:#fff;z-index:1}
+  #weatherLogTable td,#weatherLogTable th{font-size:12px;padding:7px 8px;white-space:nowrap}
+  .log-today td{background:#fff7e6;font-weight:600}
+  .log-warn{color:var(--danger)}
+  .history-advice-card ol{margin:8px 0 0;padding-left:20px;font-size:13px;color:var(--ink)}
+  .history-advice-card li{margin-bottom:7px}
+  .history-advice-card li.warn{color:var(--danger)}
+
+  /* 被数字农业.html iframe 嵌入时，隐藏自己的品牌顶栏，避免双导航 */
+  .iframe-embed .main-header{display:none;}
 </style>
   <link rel="stylesheet" href="runye-theme.css">
 </head>
 <body>
+<script>if(window.self!==window.top){document.body.classList.add('iframe-embed');}</script>
 <header class="main-header">
   <div class="header-inner">
     <a href="runye-landing.html" class="brand">
@@ -121,7 +151,7 @@
       <div class="nav-item"><a href="耐特菲姆滴灌带长度查询器.html" class="nav-link">滴灌带长度查询</a></div>
       <div class="nav-item"><a href="index.html#three-level-view" class="nav-link">三级系统查询</a></div>
       <div class="nav-item"><a href="数字农业.html" class="nav-link active">数字农业</a></div>
-      <div class="nav-item"><a href="runye-landing.html" class="nav-link">水肥课堂</a></div>
+      <div class="nav-item"><a href="runye-landing.html" class="nav-link">农事看板</a></div>
       <div class="nav-item"><a href="runye-landing.html" class="nav-link">关于我们</a></div>
     </nav>
     <a href="runye-landing.html" class="nav-home-btn">⌂ 返回主页</a>
@@ -162,17 +192,25 @@
   <section class="main-grid">
     <aside class="control-card">
       <h2>地块与生长参数</h2>
+      <p class="plot-sync-note" id="plotSyncNote" style="display:none"></p>
       <label>种植区域
         <select id="locationName"></select>
       </label>
       <label>种植日期
-        <input class="date-input" type="date" id="plantingDate" />
+        <div class="date-row">
+          <input class="date-input" type="date" id="plantingDate" />
+          <button type="button" id="savePlantingBtn" class="save-planting-btn">保存播期</button>
+        </div>
+        <span class="planting-save-hint" id="plantingSaveHint"></span>
       </label>
       <div class="growth-card">
         <span id="growthStage">—</span>
         <strong id="growthDays">—</strong>
         <p id="growthTarget">—</p>
       </div>
+      <label>从地块库选择
+        <select id="plotLibrarySelect"><option value="">（使用同步的当前地块）</option></select>
+      </label>
       <label class="num-control"><span>面积 <strong id="areaMuV"></strong></span>
         <div class="number-row"><input type="number" id="areaMu" min="1" max="500" step="1"><em>亩</em></div></label>
       <label class="num-control"><span>当前土壤墒情 <strong id="soilMoistureV"></strong></span>
@@ -203,6 +241,9 @@
         <div class="number-row"><input type="number" id="calciumKgMu" min="0" max="50" step="1"><em>kg/亩</em></div></label>
       <label class="num-control"><span>硼肥 <strong id="boronGmuV"></strong></span>
         <div class="number-row"><input type="number" id="boronGmu" min="0" max="1000" step="25"><em>g/亩</em></div></label>
+      <div class="reset-row">
+        <button type="button" class="ghost-btn" id="resetLocalBtn">清空本机保存并重置</button>
+      </div>
     </aside>
 
     <section class="board">
@@ -212,6 +253,32 @@
           <strong id="weatherLoc">—</strong>
         </div>
         <div class="weather-metrics" id="weatherMetrics"></div>
+      </div>
+
+      <div class="decision-table-card weather-log-card">
+        <div class="section-head">
+          <p class="section-title">种植期天气采集与分析（播种 → 今日）</p>
+          <span id="logSyncHead">—</span>
+        </div>
+        <div class="log-toolbar">
+          <button type="button" id="logRefreshBtn" class="ghost-btn">↻ 采集 / 刷新天气数据</button>
+          <span id="logRange" class="quiet-copy"></span>
+        </div>
+        <div class="season-kpi-grid" id="seasonKpiGrid"></div>
+        <div class="log-table-wrap">
+          <table id="weatherLogTable">
+            <thead><tr><th>日期</th><th>生育期</th><th>最高温</th><th>最低温</th><th>降雨</th><th>ET₀</th><th>风速</th><th>日积温</th><th>累计降雨</th><th>累计有效积温</th><th>季节水分盈亏</th><th>估算墒情</th></tr></thead>
+            <tbody id="weatherLogBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="decision-table-card history-advice-card">
+        <div class="section-head">
+          <p class="section-title">综合农事建议（结合播种以来历史数据）</p>
+          <span id="historyAdviceHead">—</span>
+        </div>
+        <ol id="historyAdviceList"></ol>
       </div>
 
       <div class="decision-table-card">
@@ -435,6 +502,221 @@
     };
   }
 
+  // ===== 种植期天气采集日志（播种 → 今日，本地累积） =====
+  var WEATHER_LOG_PREFIX='peanut-weather-log::';
+  var GDD_BASE=10;      // 花生有效积温基准温度 10°C
+  var SOIL_ANCHOR=70;   // 播种时假定墒情（仅作趋势参考）
+
+  function shanghaiToday(){
+    try{ return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai'}).format(new Date()); }
+    catch(e){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  }
+  function isoOf(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function addDaysISO(s,n){ var d=new Date(s+'T00:00:00+08:00'); d.setDate(d.getDate()+n); return isoOf(d); }
+  function diffDays(a,b){ var da=new Date(a+'T00:00:00+08:00'), db=new Date(b+'T00:00:00+08:00'); return Math.round((db.getTime()-da.getTime())/86400000); }
+
+  function buildArchiveUrl(loc,start,end){
+    var p=new URLSearchParams({
+      latitude:String(loc.lat),longitude:String(loc.lon),
+      start_date:start,end_date:end,
+      daily:'temperature_2m_max,temperature_2m_min,precipitation_sum,et0_fao_evapotranspiration,wind_speed_10m_max',
+      timezone:'Asia/Shanghai'
+    });
+    return 'https://archive-api.open-meteo.com/v1/archive?'+p.toString();
+  }
+  function chunkRange(start,end,maxDays){
+    var out=[], cur=new Date(start+'T00:00:00+08:00'), last=new Date(end+'T00:00:00+08:00');
+    if(cur>last) return out;
+    while(cur<=last){
+      var seg=new Date(cur); seg.setDate(seg.getDate()+maxDays-1);
+      if(seg>last) seg=last;
+      out.push([isoOf(cur),isoOf(seg)]);
+      cur=new Date(seg); cur.setDate(cur.getDate()+1);
+    }
+    return out;
+  }
+  function fetchRange(loc,start,end){
+    var chunks=chunkRange(start,end,365);
+    return Promise.all(chunks.map(function(c){
+      return fetch(buildArchiveUrl(loc,c[0],c[1]))
+        .then(function(r){ if(!r.ok) throw new Error('bad'); return r.json(); })
+        .then(function(data){
+          var d=data.daily; if(!d||!d.time) return [];
+          return d.time.map(function(t,i){
+            return {
+              date:t,
+              tmax:round(Number(d.temperature_2m_max[i]||0),1),
+              tmin:round(Number(d.temperature_2m_min[i]||0),1),
+              rainMm:round(Number(d.precipitation_sum[i]||0),1),
+              etoMm:round(Number(d.et0_fao_evapotranspiration[i]||0),1),
+              windMax:round(Number(d.wind_speed_10m_max[i]||0),1)
+            };
+          });
+        });
+    })).then(function(arrs){
+      var all=[].concat.apply([],arrs);
+      all.sort(function(a,b){ return a.date<b.date?-1:(a.date>b.date?1:0); });
+      return all;
+    });
+  }
+  function buildLog(records,plantingDate){
+    var cumRain=0,cumEffRain=0,cumCropET=0,gddTotal=0;
+    return records.map(function(r){
+      var ds=diffDays(plantingDate,r.date); if(ds<0) ds=0;
+      var stage=stageFromDays(ds);
+      var kc=stageMeta[stage].kc;
+      var gdd=Math.max(0,((r.tmax+r.tmin)/2)-GDD_BASE);
+      var effRain=r.rainMm<=5?r.rainMm*0.45:Math.min(r.rainMm*0.72,30);
+      var cropET=r.etoMm*kc;
+      cumRain+=r.rainMm; cumEffRain+=effRain; cumCropET+=cropET; gddTotal+=gdd;
+      var balance=cumEffRain-cumCropET;
+      var sm=clamp(SOIL_ANCHOR+balance,35,95);
+      return {
+        date:r.date,tmax:r.tmax,tmin:r.tmin,rainMm:r.rainMm,etoMm:r.etoMm,windMax:r.windMax,
+        daysSincePlant:ds,stage:stage,stageLabel:stageMeta[stage].label,
+        gdd:round(gdd,1),cumRain:round(cumRain,1),cumEffRain:round(cumEffRain,1),
+        cumCropET:round(cumCropET,1),gddTotal:round(gddTotal,1),seasonBalance:round(balance,1),sm:round(sm,0)
+      };
+    });
+  }
+  function computeSeasonAggregates(log,plantingDate,today){
+    if(!log||!log.length) return null;
+    var last=log[log.length-1];
+    var recent7=log.slice(-7);
+    var recent7Rain=recent7.reduce(function(a,r){return a+r.rainMm;},0);
+    var recent7TmaxAvg=recent7.reduce(function(a,r){return a+r.tmax;},0)/recent7.length;
+    var maxRun=0,run=0;
+    log.forEach(function(r){ if(r.rainMm>=1){ run++; if(run>maxRun) maxRun=run; } else { run=0; } });
+    var r7c=0,rr=0; recent7.forEach(function(r){ if(r.rainMm>=1){ rr++; if(rr>r7c) r7c=rr; } else { rr=0; } });
+    return {
+      count:log.length, plantToToday:diffDays(plantingDate,today),
+      totalRain:last.cumRain, totalEffRain:last.cumEffRain, totalCropET:last.cumCropET,
+      seasonBalance:last.seasonBalance, gddTotal:last.gddTotal,
+      recent7Rain:round(recent7Rain,1), recent7TmaxAvg:round(recent7TmaxAvg,1),
+      maxConsecRain:maxRun, recent7Consec:r7c,
+      currentStage:last.stage, currentStageLabel:last.stageLabel, currentSm:last.sm, latestDate:last.date
+    };
+  }
+  function computeHistoryAdvice(agg,state){
+    if(!agg) return ['尚未积累种植期天气数据：到播种后每日打开本页，系统会按所选种植区域自动抓取并累积天气，形成可分析序列。'];
+    var out=[];
+    var bal=agg.seasonBalance;
+    if(bal<-30){ out.push({t:'自播种以来累计有效降雨比作物蒸散少 '+Math.abs(round(bal,0))+' mm，季节偏旱。灌溉应常态化，重点保证开花下针与结荚期水分，避免荚果败育、空瘪。',w:false}); }
+    else if(bal>20){ out.push({t:'季节累计水分盈余 '+round(bal,0)+' mm，注意排涝降湿、适时控水；结荚期谨防烂果、烂针与根腐。',w:true}); }
+    else { out.push({t:'播种以来水分供需基本平衡（季节盈亏 '+round(bal,0)+' mm），维持常规水肥节奏即可。',w:false}); }
+
+    // 按历史水分盈亏微调今日灌水量（季节级综合，落到当日执行量）
+    var irriAdj = bal < -30 ? '今日灌水量可较常规上调约 15–25%，优先补足季节亏缺（'+round(bal,0)+' mm）'
+                : bal > 20  ? '今日暂缓或下调灌水、以排涝控湿为主，避免渍害烂果（盈余 '+round(bal,0)+' mm）'
+                : '今日维持常规灌水量即可（季节盈亏 '+round(bal,0)+' mm）';
+    out.push({t:'结合播种以来历史水分盈亏，今日灌水量建议：'+irriAdj+'。', w: bal>20});
+
+    if(agg.maxConsecRain>=3 || agg.recent7Rain>=55){ out.push({t:'近期出现连续降雨或高湿（最长连雨 '+agg.maxConsecRain+' 天，近7日降雨 '+agg.recent7Rain+' mm），叶斑病、白绢病、锈病风险升高：雨后及时清沟排水，暂停叶面肥与喷药，改用滴灌；发病田块雨前可预防性用药。',w:true}); }
+    if(agg.recent7TmaxAvg>=34 && (agg.currentStage==='flowering'||agg.currentStage==='pod')){ out.push({t:'近7日平均最高温 '+agg.recent7TmaxAvg+'°C，持续高温影响花粉活力与下针结荚；午后遮阴或微喷降温，避开 11:00–16:00 施肥喷药。',w:true}); }
+    if(agg.recent7Rain<5 && bal<-20){ out.push({t:'近期无有效降雨且季节亏缺，需及时滴灌补水，防止叶片萎蔫、落花落荚与籽仁充实不足。',w:false}); }
+    if(agg.currentSm<55){ out.push({t:'按历史水分平衡推算当前估算墒情 '+agg.currentSm+'%，偏低；今日补水优先级提高，可适度上调灌水量。',w:false}); }
+    else if(agg.currentSm>82){ out.push({t:'历史水分平衡显示当前估算偏湿（约 '+agg.currentSm+'%），今日以排涝控湿为主，谨慎补水。',w:true}); }
+    out.push({t:'播种以来有效积温累计 '+agg.gddTotal+'°C·d（'+agg.count+' 天），热量'+(agg.recent7TmaxAvg>=30?'充足，生育进程可能略快，留意成熟收获窗口提前；':'总体平稳，按常规生育期管理；')+'。',w:false});
+    return out;
+  }
+  function loadWeatherLogCache(locName){
+    try{ var raw=localStorage.getItem(WEATHER_LOG_PREFIX+locName); return raw?JSON.parse(raw):null; }catch(e){ return null; }
+  }
+  function saveWeatherLogCache(locName,obj){
+    try{ localStorage.setItem(WEATHER_LOG_PREFIX+locName, JSON.stringify(obj)); }catch(e){}
+  }
+  function renderLog(){
+    var log=state._log||[], agg=state._agg, today=shanghaiToday();
+    if($("logSyncHead")) $("logSyncHead").textContent = agg ? ('已采集 '+agg.count+' 天 · 更新于 '+agg.latestDate) : '尚未采集';
+    if($("logRange")) $("logRange").textContent = '采集范围：'+state.plantingDate+' → '+today+'（'+currentLoc().name+'）';
+    if($("seasonKpiGrid")){
+      if(agg){
+        var sk=[
+          {l:'累计降雨',v:agg.totalRain,u:'mm'},{l:'累计蒸散',v:agg.totalCropET,u:'mm'},
+          {l:'季节水分盈亏',v:agg.seasonBalance,u:'mm'},{l:'有效积温',v:agg.gddTotal,u:'°C·d'},
+          {l:'近7日降雨',v:agg.recent7Rain,u:'mm'},{l:'最长连雨',v:agg.maxConsecRain,u:'天'}
+        ];
+        $("seasonKpiGrid").innerHTML=sk.map(function(k){
+          var warn=k.l==='季节水分盈亏'&&(k.v<-30||k.v>20);
+          return '<div class="season-kpi"><span>'+k.l+'</span><strong class="'+(warn?'log-warn':'')+'">'+k.v+'<em>'+k.u+'</em></strong></div>';
+        }).join('');
+      } else {
+        $("seasonKpiGrid").innerHTML='<div class="quiet-copy">暂无数据</div>';
+      }
+    }
+    if($("weatherLogBody")){
+      if(log.length){
+        $("weatherLogBody").innerHTML=log.map(function(r){
+          var isToday=(r.date===today)||(r.date===addDaysISO(today,-1));
+          return '<tr class="'+(isToday?'log-today':'')+'">'+
+            '<td>'+r.date+'</td><td>'+r.stageLabel+'</td><td>'+r.tmax+'</td><td>'+r.tmin+'</td><td>'+r.rainMm+'</td><td>'+r.etoMm+'</td><td>'+r.windMax+'</td><td>'+r.gdd+'</td><td>'+r.cumRain+'</td><td>'+r.gddTotal+'</td><td>'+r.seasonBalance+'</td><td>'+r.sm+'%</td></tr>';
+        }).join('');
+      } else {
+        $("weatherLogBody").innerHTML='<tr><td colspan="12" style="text-align:center;color:var(--ink-2);padding:18px">尚未到播种日期或无历史数据；播种后每日打开本页将自动累积。</td></tr>';
+      }
+    }
+  }
+  function renderHistoryAdvice(){
+    var agg=state._agg;
+    if($("historyAdviceHead")) $("historyAdviceHead").textContent = agg ? (agg.currentStageLabel+' · 已结合 '+agg.count+' 天历史') : '—';
+    if($("historyAdviceList")){
+      var items=computeHistoryAdvice(agg,state);
+      $("historyAdviceList").innerHTML=items.map(function(it){
+        var t=typeof it==='string'?it:it.t, w=typeof it==='string'?false:it.w;
+        return '<li class="'+(w?'warn':'')+'">'+t+'</li>';
+      }).join('');
+    }
+  }
+  function syncWeatherLog(){
+    var loc=currentLoc(), planting=state.plantingDate, today=shanghaiToday();
+    // 历史库仅提供到“昨天”，今天数据尚未入库；end_date 用今天会越界报错导致整段失败
+    var fetchEnd=addDaysISO(today,-1);
+    state.weatherStatus="loading"; state.weatherMessage="正在采集播种以来天气数据";
+    if($("logRefreshBtn")) $("logRefreshBtn").disabled=true;
+    render();
+    if(diffDays(planting,fetchEnd)<0){
+      state._log=[]; state._agg=null;
+      state.weatherStatus="error"; state.weatherMessage="种植日期在今天或之后，暂无历史数据";
+      loadWeather();
+      if($("logRefreshBtn")) $("logRefreshBtn").disabled=false;
+      return;
+    }
+    fetchRange(loc,planting,fetchEnd).then(function(raw){
+      var log=buildLog(raw,planting);
+      state._log=log; state._agg=computeSeasonAggregates(log,planting,today);
+      saveWeatherLogCache(loc.name,{plantingDate:planting,updatedAt:today,records:raw});
+      var y=addDaysISO(today,-1);
+      var rec=log.filter(function(r){ return r.date===y||r.date===today; })[0] || (log.length?log[log.length-1]:null);
+      if(rec){
+        state.weather={date:rec.date,rainMm:rec.rainMm,tempMax:rec.tmax,tempMin:rec.tmin,etoMm:rec.etoMm,windMax:rec.windMax,source:"auto"};
+        state.weatherStatus="ready"; state.weatherMessage="已采集 "+log.length+" 天天气（"+planting+"→"+fetchEnd+"）";
+      } else {
+        state.weatherStatus="error"; state.weatherMessage="天气采集为空，使用手动兜底";
+        state.weather=Object.assign({},state.weather,{source:"manual"});
+      }
+      recompute(); render();
+      if($("logRefreshBtn")) $("logRefreshBtn").disabled=false;
+    }).catch(function(){
+      // 抓取失败时的本地缓存兜底：若此前同播期已采集过，直接复用，避免整表空白
+      var cached=loadWeatherLogCache(loc.name);
+      if(cached && cached.records && cached.records.length && cached.plantingDate===planting){
+        var log=buildLog(cached.records,planting);
+        state._log=log; state._agg=computeSeasonAggregates(log,planting,today);
+        var y=addDaysISO(today,-1);
+        var rec=log.filter(function(r){ return r.date===y||r.date===today; })[0] || (log.length?log[log.length-1]:null);
+        if(rec){ state.weather={date:rec.date,rainMm:rec.rainMm,tempMax:rec.tmax,tempMin:rec.tmin,etoMm:rec.etoMm,windMax:rec.windMax,source:"auto"}; }
+        else { state.weather=Object.assign({},state.weather,{source:"manual"}); }
+        state.weatherStatus="ready"; state.weatherMessage="天气接口暂不可用，已用本地缓存的 "+log.length+" 天数据";
+      } else {
+        state._log=[]; state._agg=null;
+        state.weatherStatus="error"; state.weatherMessage="历史天气抓取失败，使用手动/预报兜底";
+        state.weather=Object.assign({},state.weather,{source:"manual"});
+      }
+      recompute(); render();
+      if($("logRefreshBtn")) $("logRefreshBtn").disabled=false;
+    });
+  }
+
   // ---- state ----
   var state={
     locationName:(locations.find(function(l){return l.name==="海南东方";})||locations[0]).name,
@@ -442,7 +724,7 @@
     areaMu:30,soilMoisture:66,irrigationEfficiency:86,lastFertDays:8,
     organicKgMu:120,compoundKgMu:35,calciumKgMu:18,boronGmu:400,
     compoundNPct:15,compoundPPct:15,compoundKPct:15,
-    sourceWaterEc:0.35,fertEcCoeff:1.25,
+    sourceWaterEc:0.35,fertEcCoeff:1.25,selectedPlotId:'',
     weather:{date:yesterdayDate(),rainMm:12,tempMax:32,tempMin:25,etoMm:4.2,windMax:18,source:"manual"},
     weatherStatus:"idle",weatherMessage:"等待抓取昨日天气"
   };
@@ -554,6 +836,9 @@
     }).join("");
 
     $("manualCard").className="manual-card"+(state.weather.source==="manual"?"":" hidden");
+
+    renderLog();
+    renderHistoryAdvice();
   }
 
   function readInputs(){
@@ -585,6 +870,77 @@
       $(id).value=state.weather[map[id]]; var el=$(id+"V"); if(el) el.textContent=state.weather[map[id]]; });
   }
 
+  // ===== 本地持久化 + 跨页接收实际地块 =====
+  var PERSIST_KEY='peanut-state';
+  var PLOT_KEY='runyePlotData';
+  function persistState(){
+    try{
+      var s={
+        locationName:state.locationName, plantingDate:state.plantingDate,
+        areaMu:state.areaMu, soilMoisture:state.soilMoisture,
+        irrigationEfficiency:state.irrigationEfficiency, lastFertDays:state.lastFertDays,
+        sourceWaterEc:state.sourceWaterEc, fertEcCoeff:state.fertEcCoeff,
+        organicKgMu:state.organicKgMu, compoundKgMu:state.compoundKgMu,
+        compoundNPct:state.compoundNPct, compoundPPct:state.compoundPPct, compoundKPct:state.compoundKPct,
+        calciumKgMu:state.calciumKgMu, boronGmu:state.boronGmu,
+        plotTs:state._plotTs||0, selectedPlotId:state.selectedPlotId||''
+      };
+      localStorage.setItem(PERSIST_KEY, JSON.stringify(s));
+    }catch(e){}
+  }
+  function loadPersistedState(){
+    try{ var raw=localStorage.getItem(PERSIST_KEY); return raw?JSON.parse(raw):null; }catch(e){ return null; }
+  }
+  function applySharedPlot(){
+    try{ var raw=localStorage.getItem(PLOT_KEY); return raw?JSON.parse(raw):null; }catch(e){ return null; }
+  }
+  function loadLibrary(){
+    try{ var raw=localStorage.getItem('runye_plot_library'); return raw?JSON.parse(raw):[]; }catch(e){ return []; }
+  }
+  function escAttr(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function showPlotSyncNote(msg){
+    var pb=$("plotSyncNote");
+    if(!pb) return;
+    if(!msg){ pb.style.display='none'; return; }
+    pb.style.display='block'; pb.style.color='#15803d'; pb.style.fontSize='12px'; pb.style.margin='0 0 8px'; pb.textContent=msg;
+  }
+  function showPlantingSaveHint(msg, warn){
+    var el=$("plantingSaveHint"); if(!el) return;
+    el.textContent=msg||'';
+    el.className='planting-save-hint'+(warn?' warn':'');
+  }
+  function clearPlantingSaveHint(){ var el=$("plantingSaveHint"); if(el){ el.textContent=''; el.className='planting-save-hint'; } }
+  function populatePlotLibrarySelect(library, currentId){
+    var sel=$("plotLibrarySelect"); if(!sel) return;
+    var opts='<option value="">（使用同步的当前地块）</option>';
+    opts += library.map(function(p){
+      var extra=p.plantingDate?(' · 播期 '+p.plantingDate):'';
+      return '<option value="'+escAttr(p.id)+'"'+(p.id===currentId?' selected':'')+'>'+escAttr(p.name)+' · '+(p.mu!=null?p.mu.toFixed(2):'0')+' 亩'+extra+'</option>';
+    }).join('');
+    sel.innerHTML=opts;
+  }
+
+  // 将当前设置的播种日期写回“正在使用的地块”（地块库项 或 同步的当前地块），实现每个地块独立播种日期
+  function persistPlantingDateToPlot(date){
+    try{
+      if(state.selectedPlotId){
+        var arr=loadLibrary(); var p=arr.filter(function(x){return x.id===state.selectedPlotId;})[0];
+        if(p){ p.plantingDate=date; localStorage.setItem('runye_plot_library', JSON.stringify(arr)); }
+      } else {
+        var r=applySharedPlot();
+        if(r){ r.plantingDate=date; try{ localStorage.setItem(PLOT_KEY, JSON.stringify(r)); }catch(e){} }
+      }
+    }catch(e){}
+  }
+  // 取“正在使用的地块”绑定的播种日期（地块库项优先，其次按同步当前地块的 plotId 关联，再其次同步地块自带）
+  function activePlotPlantingDate(){
+    if(state.selectedPlotId){ var lp=loadLibrary().filter(function(x){return x.id===state.selectedPlotId;})[0]; if(lp) return lp.plantingDate||null; }
+    var p=applySharedPlot();
+    if(p && p.plotId){ var l2=loadLibrary().filter(function(x){return x.id===p.plotId;})[0]; if(l2) return l2.plantingDate||null; }
+    if(p) return p.plantingDate||null;
+    return null;
+  }
+
   function bind(){
     // populate location select
     $("locationName").innerHTML=locations.map(function(l){return '<option value="'+l.name+'">'+l.name+'</option>';}).join("");
@@ -592,10 +948,23 @@
     ["areaMu","soilMoisture","irrigationEfficiency","lastFertDays","sourceWaterEc","fertEcCoeff",
      "organicKgMu","compoundKgMu","calciumKgMu","boronGmu","compoundNPct","compoundPPct","compoundKPct"]
      .forEach(function(id){
-      $(id).addEventListener("input",function(){ readInputs(); recompute(); render(); });
+      $(id).addEventListener("input",function(){ readInputs(); recompute(); render(); persistState(); });
     });
-    $("locationName").addEventListener("change",function(){ state.locationName=this.value; writeInputs(); loadWeather(); });
-    $("plantingDate").addEventListener("input",function(){ state.plantingDate=this.value; recompute(); render(); });
+    $("locationName").addEventListener("change",function(){ state.locationName=this.value; writeInputs(); syncWeatherLog(); persistState(); });
+    $("plantingDate").addEventListener("input",function(){ state.plantingDate=this.value; clearPlantingSaveHint(); syncWeatherLog(); persistState(); });
+    // 显式“保存播期”按钮：把当前种植日期写回正在使用的地块，并刷新下拉标签与天气采集
+    var spb=$("savePlantingBtn");
+    if(spb){ spb.addEventListener('click',function(){
+      var date=$("plantingDate").value;
+      if(!date){ showPlantingSaveHint('请先选择种植日期后再保存',true); return; }
+      state.plantingDate=date;
+      persistPlantingDateToPlot(date);
+      populatePlotLibrarySelect(loadLibrary(), state.selectedPlotId||'');
+      syncWeatherLog(); persistState(); render();
+      var lp=state.selectedPlotId?(loadLibrary().filter(function(x){return x.id===state.selectedPlotId;})[0]||{}):null;
+      var pname=lp?lp.name:'同步的当前地块';
+      showPlantingSaveHint('已保存播期 '+date+' 到「'+pname+'」，并按该播期采集了天气数据');
+    }); }
     // manual weather
     ["mRain","mTmax","mTmin","mEto"].forEach(function(id){
       var map={mRain:"rainMm",mTmax:"tempMax",mTmin:"tempMin",mEto:"etoMm"};
@@ -605,6 +974,27 @@
         recompute(); render();
       });
     });
+    var rb=$("resetLocalBtn");
+    if(rb){ rb.addEventListener('click',function(){ if(confirm('确定清空本机保存的参数并恢复默认设置？此操作不可撤销（含已采集的天气日志）。')){ try{ localStorage.removeItem('peanut-state'); localStorage.removeItem('runyePlotData'); Object.keys(localStorage).forEach(function(k){ if(k.indexOf(WEATHER_LOG_PREFIX)===0) localStorage.removeItem(k); }); }catch(e){} location.reload(); } }); }
+    var lrb=$("logRefreshBtn");
+    if(lrb){ lrb.addEventListener('click',function(){ syncWeatherLog(); }); }
+    var pls=$("plotLibrarySelect");
+    if(pls){ pls.addEventListener('change',function(){
+      var id=this.value; state.selectedPlotId=id;
+      if(!id){
+        var p=applySharedPlot();
+        if(p && p.mu>0){ state.areaMu=p.mu; state._plotTs=p.ts; showPlotSyncNote('已从实际地块同步面积 '+p.mu+' 亩'+(p.plantingDate?' · 已记录播期 '+p.plantingDate:''));
+          if(p.plantingDate){ state.plantingDate=p.plantingDate; } }
+        else { showPlotSyncNote(''); }
+      } else {
+        var lp=loadLibrary().filter(function(x){return x.id===id;})[0];
+        if(lp && lp.mu>0){ state.areaMu=lp.mu; state._plotTs=lp.ts||0; showPlotSyncNote('已从地块库选择：'+lp.name+'（'+lp.mu+' 亩）'+(lp.plantingDate?' · 已记录播期 '+lp.plantingDate:''));
+          if(lp.plantingDate){ state.plantingDate=lp.plantingDate; } }
+      }
+      writeInputs(); recompute(); render(); persistState();
+      // 切换地块后，按该地块的播期直接采集天气数据
+      syncWeatherLog();
+    }); }
   }
 
   function loadWeather(){
@@ -636,10 +1026,31 @@
 
   // init
   bind();
+  var saved=loadPersistedState();
+  if(saved){
+    ['locationName','plantingDate','areaMu','soilMoisture','irrigationEfficiency','lastFertDays',
+     'sourceWaterEc','fertEcCoeff','organicKgMu','compoundKgMu','compoundNPct','compoundPPct',
+     'compoundKPct','calciumKgMu','boronGmu','selectedPlotId'].forEach(function(k){ if(saved[k]!=null) state[k]=saved[k]; });
+  }
+  var library=loadLibrary();
+  populatePlotLibrarySelect(library, state.selectedPlotId||'');
+  var activePlot = state.selectedPlotId ? library.filter(function(p){return p.id===state.selectedPlotId;})[0] : null;
+  if(activePlot && activePlot.mu>0){
+    state.areaMu=activePlot.mu; state._plotTs=activePlot.ts||0;
+    showPlotSyncNote('已从地块库选择：'+activePlot.name+'（'+activePlot.mu+' 亩）');
+  } else {
+    var plot=applySharedPlot();
+    if(plot && plot.ts && plot.ts>(saved?saved.plotTs||0:0) && plot.mu>0){
+      state.areaMu=plot.mu; state._plotTs=plot.ts;
+      showPlotSyncNote('已从实际地块同步面积 '+plot.mu+' 亩');
+    }
+  }
+  var pd=activePlotPlantingDate(); if(pd){ state.plantingDate=pd; }
   writeInputs();
+  persistState();
   recompute();
   render();
-  loadWeather();
+  syncWeatherLog();
 })();
 </script>
 </body>

@@ -194,7 +194,7 @@ input[type="reset"],
         <div class="nav-item"><a href="耐特菲姆滴灌带长度查询器.html" class="nav-link">滴灌带长度查询</a></div>
         <div class="nav-item"><a href="index.html#three-level-view" class="nav-link">三级系统查询</a></div>
         <div class="nav-item"><a href="数字农业.html" class="nav-link">数字农业</a></div>
-        <div class="nav-item"><a href="runye-landing.html" class="nav-link">水肥课堂</a></div>
+        <div class="nav-item"><a href="runye-landing.html" class="nav-link">农事看板</a></div>
         <div class="nav-item"><a href="runye-landing.html" class="nav-link">关于我们</a></div>
       </nav>
       <a href="runye-landing.html" class="nav-home-btn">⌂ 返回主页</a>
@@ -488,7 +488,7 @@ function drawSVG(cfg, W, H) {
   g.push('<defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="12" markerHeight="12" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>');
   g.push('<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="#ffffff"/>');
 
-  var blue = '#16a34a', blueT = '#15803d', blueF = '#0d9488', blueL = '#dcfce7', green = '#0F6E56', greenL = '#E1F5EE';
+  var blue = '#185FA5', blueT = '#0C447C', blueF = '#378ADD', blueL = '#E6F1FB', green = '#0F6E56', greenL = '#E1F5EE';
 
   function tag(x, y, n, opt) {
     if (!cfg.show.num) return;
@@ -647,11 +647,11 @@ function drawSVG(cfg, W, H) {
   for (var zi = 0; zi < zc; zi++) {
     var by = firstBranchY - zi * vGap;           // 分区接管高度
     /* 闸阀（菱形）在竖管上 */
-    g.push('<rect x="' + (bendX - 7) + '" y="' + (by - 7) + '" width="14" height="14" fill="#fff" stroke="' + blue + '" stroke-width=".6" transform="rotate(45 ' + bendX + ' ' + by + ')"/>');
+    g.push('<rect x="' + (bendX - 7) + '" y="' + (by - 7) + '" width="14" height="14" fill="#fff" stroke="#16a34a" stroke-width=".6" transform="rotate(45 ' + bendX + ' ' + by + ')"/>');
     /* 分区管向右 */
-    pipe(bendX, by, bendX + L.branchPipeLen, by, mw2);
+    pipe(bendX, by, bendX + L.branchPipeLen, by, mw2, '#16a34a');
     /* 末端箭头 */
-    g.push('<line x1="' + (bendX + L.branchPipeLen) + '" y1="' + by + '" x2="' + (bendX + L.branchPipeLen + 6) + '" y2="' + by + '" stroke="' + blue + '" stroke-width="' + mw2 + '" marker-end="url(#arrow)"/>');
+    g.push('<line x1="' + (bendX + L.branchPipeLen) + '" y1="' + by + '" x2="' + (bendX + L.branchPipeLen + 6) + '" y2="' + by + '" stroke="#16a34a" stroke-width="' + mw2 + '" marker-end="url(#arrow)"/>');
     /* 轮灌区标注 */
     txt(bendX + L.branchPipeLen + 20, by + 4, '轮灌区' + (zi + 1), 11, blueT, 'start');
   }
@@ -720,8 +720,8 @@ function drawSVG(cfg, W, H) {
       },
       {
         name: '分区管', draw: function (cx, cy) {
-          g.push('<rect x="' + (cx - 12) + '" y="' + (cy - 6) + '" width="12" height="12" fill="#fff" stroke="' + blue + '" stroke-width=".5" transform="rotate(45 ' + (cx - 6) + ' ' + cy + ')"/>');
-          g.push('<line x1="' + (cx - 6) + '" y1="' + cy + '" x2="' + (cx + 14) + '" y2="' + cy + '" stroke="' + blue + '" stroke-width="2.4" marker-end="url(#arrow)"/>');
+          g.push('<rect x="' + (cx - 12) + '" y="' + (cy - 6) + '" width="12" height="12" fill="#fff" stroke="#16a34a" stroke-width=".5" transform="rotate(45 ' + (cx - 6) + ' ' + cy + ')"/>');
+          g.push('<line x1="' + (cx - 6) + '" y1="' + cy + '" x2="' + (cx + 14) + '" y2="' + cy + '" stroke="#16a34a" stroke-width="2.4" marker-end="url(#arrow)"/>');
         }
       }
     ];
@@ -1080,8 +1080,10 @@ function exportPNG() {
   }
   var fd = parseInt(front, 10), md = parseInt(main, 10);
   var zc = parseInt(qp('zc'), 10);
-  if (fd) cfg.mainDN = nearest(fd, DN_OPT);     // 三级「总管」→ 供水主管
-  if (md) cfg.suctionDN = nearest(md, DN_OPT);  // 三级「主管」→ 吸水管
+  if (fd) {
+    cfg.mainDN = nearest(fd, DN_OPT);     // 供水主管：按系统总流量（三级总管）选型
+    cfg.suctionDN = nearest(fd, DN_OPT);  // 吸水管：同样按系统总流量选型（纠正此前误按分区流量导致偏小）
+  }
   if (zc >= 1 && zc <= 12) cfg.zoneCount = zc;  // 联合灌溉分区数 → 分区接管示意数量
   if (fd || md || zc) persist();
 })();

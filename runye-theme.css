@@ -144,3 +144,12 @@ a{text-decoration:none;color:inherit;}
 
 /* ===== 9. index 内模块工具条（at/hm/tl）轻微对齐到品牌色，避免突兀 ===== */
 .at-topbar,.hm-topbar,.tl-header{border-left:4px solid var(--ry-green-600);}
+
+/* ===== 10. 轻量幽灵按钮（清空本地保存等次级操作） ===== */
+.ghost-btn{
+  display:inline-block; margin:14px 0 4px; padding:8px 14px;
+  font-size:13px; font-weight:700; cursor:pointer; font-family:inherit;
+  background:transparent; color:var(--ry-s-500); border:1px solid var(--ry-s-200);
+  border-radius:var(--ry-radius-sm); transition:var(--ry-transition);
+}
+.ghost-btn:hover{background:var(--ry-s-50); color:var(--ry-s-700); border-color:var(--ry-s-300);}
