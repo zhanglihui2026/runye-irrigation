@@ -3110,7 +3110,7 @@ input[type="reset"],
 <!-- ===== 面积测量工具 + 实际地块规划 ===== -->
 <section id="areaTool">
   <div class="at-topbar">
-    <h1><span class="at-section-badge">03</span>面积测量工具 · 网格点计数法</h1>
+    <h1><span class="at-section-badge">03</span>面积测量工具 · 鞋带公式</h1>
     <div class="spacer"></div>
     <input type="file" id="atFileInput" accept="image/*" style="display:none">
     <button class="at-btn at-btn-light" onclick="document.getElementById('atFileInput').click()">📁 上传图片</button>
@@ -3155,9 +3155,9 @@ input[type="reset"],
       <div class="at-section">
         <h3><span class="num">3</span> 测量结果</h3>
         <div class="at-result-card">
-          <div class="at-result-row"><span class="label">网格点（内/总）</span><span class="value" id="atGridCount" style="font-size:12px;">— / —</span></div>
+          <div class="at-result-row"><span class="label">多边形顶点</span><span class="value" id="atGridCount" style="font-size:12px;">—</span></div>
           <div class="at-result-divider"></div>
-          <div class="at-result-row highlight"><span class="label">网格法面积</span><span class="value" id="atGridArea">— m²</span></div>
+          <div class="at-result-row highlight"><span class="label">鞋带公式面积</span><span class="value" id="atGridArea">— m²</span></div>
           <div class="at-result-hint" id="atResultHint">请先标定比例尺并描绘闭合边界</div>
         </div>
         <div class="at-field" style="margin-top:8px;">
@@ -3167,12 +3167,13 @@ input[type="reset"],
         <button class="at-btn-action" id="savePlotBtn" style="margin-top:6px;width:100%">💾 保存到地块库</button>
       </div>
       <div class="at-section">
-        <h3><span class="num">4</span> 网格点设置</h3>
+        <h3><span class="num">4</span> 网格辅助线（显示用）</h3>
         <div class="at-field">
           <label>网格间距（图像像素）</label>
           <div class="at-slider-container"><input type="range" id="atGridSpacing" min="2" max="50" value="10" step="1"><span class="value" id="atGridSpacingVal">10 px</span></div>
         </div>
         <label class="at-checkbox-row"><input type="checkbox" id="atShowGridLines"><span>显示网格线</span></label>
+        <div style="font-size:10px;color:#aaa;margin-top:4px;">网格仅用于视觉参考；面积统一采用鞋带公式（多边形顶点法）计算。</div>
       </div>
       <style id="plotLibStyle">
         .at-lib-count{display:inline-block;min-width:20px;height:20px;line-height:20px;text-align:center;background:#16a34a;color:#fff;border-radius:999px;font-size:11px;margin-left:6px;vertical-align:middle;}
@@ -6267,20 +6268,18 @@ function atCalculateArea(){
   if(!atState.metersPerPixel){gc.textContent='— / —';ga.textContent='— m²';ht.textContent='⚠️ 请先标定比例尺';return;}
   if(atState.polygon.length<3||!atState.polygonClosed){gc.textContent='— / —';ga.textContent='— m²';ht.textContent='⚠️ 请描绘并闭合边界';return;}
   const mpp=atState.metersPerPixel;
-  const cellArea=atState.gridSpacing*atState.gridSpacing*mpp*mpp;
-  const gridAreaVal=atState.gridResult.inside*cellArea;
   const pixelArea=atShoelaceArea(atState.polygon);
   const shoelaceVal=pixelArea*mpp*mpp;
-  gc.textContent=atState.gridResult.inside+' / '+atState.gridResult.total;
-  ga.textContent=atFormatArea(gridAreaVal,atState.realUnit);
+  gc.textContent=atState.polygon.length+' 个';
+  ga.textContent=atFormatArea(shoelaceVal,atState.realUnit);
   let hints=[];
-  hints.push('网格间距: '+atState.gridSpacing+'px ≈ '+(atState.gridSpacing*mpp).toFixed(3)+atState.realUnit);
+  hints.push('面积算法: 鞋带公式（多边形顶点法）');
   if(atState.realUnit==='m'){
-    hints.push('≈ '+(gridAreaVal/666.67).toFixed(2)+' 亩');
-    if(gridAreaVal>10000)hints.push('≈ '+(gridAreaVal/10000).toFixed(2)+' 公顷');
+    hints.push('≈ '+(shoelaceVal/666.67).toFixed(2)+' 亩');
+    if(shoelaceVal>10000)hints.push('≈ '+(shoelaceVal/10000).toFixed(2)+' 公顷');
   }
   ht.innerHTML=hints.join('<br>');
-  // expose measured area for plan section (use shoelace for accuracy)
+  // expose measured area for plan section (shoelace)
   window.measuredArea = (atState.realUnit==='m') ? shoelaceVal : 0;
   window.measuredPolygon = atState.polygon.map(function(p){return{x:p.x*mpp,y:p.y*mpp};});
   window.measuredPolygonSource='area';
