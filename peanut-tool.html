@@ -18,6 +18,10 @@
   .topbar strong{display:block;font-size:18px;color:var(--g-700)}
   .topbar span{font-size:12px;color:var(--ink-2)}
   .sync-pill{font-size:12px;padding:6px 12px;border-radius:999px;background:var(--g-50);color:var(--g-700);border:1px solid var(--g-100)}
+  .auth-bar{display:flex;align-items:center;gap:8px;margin-left:auto}
+  .auth-status{font-size:12px;color:var(--ink-2)}
+  .auth-btn{font-size:12px;padding:5px 12px;border-radius:999px;border:1px solid var(--g-600);background:#fff;color:var(--g-700);cursor:pointer;white-space:nowrap}
+  .auth-btn:hover{background:var(--g-50)}
   .sync-pill.loading{background:#fff5e8;color:var(--warn);border-color:#f3d8b3}
   .sync-pill.error{background:#fdecec;color:var(--danger);border-color:#f3c2c2}
   .sync-pill.ready{background:var(--g-50);color:var(--g-700);border-color:var(--g-100)}
@@ -64,15 +68,16 @@
   .basal-head-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:2px 0 4px}
   .basal-head-row .quiet-copy{font-size:12px;color:var(--ink-2)}
 
-  .board{display:flex;flex-direction:column;gap:16px}
-  .weather-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px 18px;box-shadow:var(--shadow);display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
-  .weather-card strong{font-size:15px}
-  .section-title{margin:0 0 6px;font-size:13px;color:var(--ink-2)}
+  .board{display:flex;flex-direction:column;gap:12px}
+  .weather-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:12px 18px;box-shadow:var(--shadow);display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+  .weather-left{display:flex;flex-direction:column}
+  .weather-title{margin:0;font-size:16px;font-weight:600;color:var(--ink);line-height:18px}
+  .weather-loc{margin:0;font-size:15px;color:var(--ink-2);line-height:27px}
   .weather-metrics{display:flex;gap:18px;flex-wrap:wrap}
-  .weather-metric span{display:block;font-size:12px;color:var(--ink-2)}
-  .weather-metric strong{font-size:18px}
+  .weather-metric span{display:block;font-size:12px;color:var(--ink-2);line-height:18px}
+  .weather-metric strong{font-size:18px;line-height:27px}
 
-  .decision-table-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px 18px;box-shadow:var(--shadow)}
+  .decision-table-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:12px 18px;box-shadow:var(--shadow)}
   .section-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap}
   .section-head span{font-size:12px;color:var(--ink-2)}
   table{width:100%;border-collapse:collapse;font-size:13px}
@@ -169,13 +174,14 @@
     </a>
     <nav class="main-nav" id="mainNav">
       <div class="nav-item"><a href="index.html" class="nav-link">精准灌溉</a></div>
-      <div class="nav-item"><a href="耐特菲姆滴灌带长度查询器.html" class="nav-link">滴灌带长度查询</a></div>
-      <div class="nav-item"><a href="index.html#three-level-view" class="nav-link">三级系统查询</a></div>
+      <div class="nav-item"><a href="耐特菲姆滴灌带长度查询器.html" class="nav-link">滴灌带查询</a></div>
+      <div class="nav-item"><a href="index.html#three-level-view" class="nav-link">三级系统</a></div>
       <div class="nav-item"><a href="数字农业.html" class="nav-link active">数字农业</a></div>
       <div class="nav-item"><a href="runye-landing.html" class="nav-link">农事看板</a></div>
       <div class="nav-item"><a href="runye-landing.html" class="nav-link">关于我们</a></div>
     </nav>
     <a href="runye-landing.html" class="nav-home-btn">⌂ 返回主页</a>
+    <div class="auth-bar"><span class="auth-status" id="authStatus">数据存本机浏览器</span><button class="auth-btn" id="authBtn" title="当前为静态版">本机存储</button></div>
     <div class="header-actions">
       <button class="search-btn" title="搜索" aria-label="搜索">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
@@ -286,9 +292,9 @@
 
     <section class="board">
       <div class="weather-card">
-        <div>
-          <p class="section-title">昨日天气实况</p>
-          <strong id="weatherLoc">—</strong>
+        <div class="weather-left">
+          <p class="weather-title">昨日天气实况</p>
+          <strong id="weatherLoc" class="weather-loc">—</strong>
         </div>
         <div class="weather-metrics" id="weatherMetrics"></div>
       </div>
@@ -347,12 +353,32 @@
       <div class="decision-table-card stage-guide-card">
         <div class="section-head">
           <p class="section-title">七彩花生生育期对照</p>
+          <p style="margin:0 0 10px;font-size:12px;line-height:1.5;color:#64748b;">以下水分策略与农事目标按海南热带／亚热带条件设定：常年无霜冻、高温高湿、砖红壤偏酸且易缺硼钼钙，管理重点在排涝降湿与叶斑病、白绢病、锈病防控。</p>
           <span id="stageGuideHead">—</span>
         </div>
         <table>
           <thead><tr><th>生育期</th><th>天数范围</th><th>水分策略</th><th>农事目标</th></tr></thead>
           <tbody id="stageGuideBody"></tbody>
         </table>
+      </div>
+
+      <div class="decision-table-card" style="border-left:4px solid var(--g-700);">
+        <div class="section-head">
+          <p class="section-title">关键补钙 · 减少空壳（海南重点）</p>
+          <span>七彩花生空壳率高？核心是果针区缺钙</span>
+        </div>
+        <p style="margin:0 0 8px;font-size:13px;line-height:1.65;color:var(--ink);">
+          <strong>原理：</strong>花生是喜钙作物，每产 100 kg 荚果需钙约 2.7 kg；但 <strong>90% 以上的钙由果针和幼果直接从浅层土壤吸收，根系吸收的钙几乎不向荚果转运</strong>。果针入土后约 20 天起进入需钙高峰、持续 6–8 周；缺钙 → 空壳、瘪果、单仁果、出仁率下降。
+        </p>
+        <p style="margin:0 0 8px;font-size:13px;line-height:1.65;color:var(--ink);">
+          <strong>关键期（决定饱果率的"剩余周期"）：</strong>初花—下针期（播种后约 30–45 天、果针入土前后）。<strong>施早易淋失、施晚（果针入土 100 天后）已无效</strong>，务必卡准窗口。
+        </p>
+        <p style="margin:0 0 8px;font-size:13px;line-height:1.65;color:var(--ink);">
+          <strong>怎么施：</strong>花期于垄间表土（≤5 cm）浅施 <strong>农用石膏粉 20–30 kg/亩</strong>（酸性砖红壤可增至 30–40 kg，沙土略减），结合中耕培土把钙留在果针区，施后跟一次轻水助溶解；以条施/沟施于果针入土处为佳。<strong>叶面喷钙只能辅助，不能替代浅层土施。</strong>用农用级石膏、禁用建筑石膏；不与铵态氮肥混用（间隔≥7 天）。
+        </p>
+        <p style="margin:0;font-size:13px;line-height:1.65;color:#166534;background:var(--g-50);padding:8px 10px;border-radius:8px;">
+          <strong>海南要点：</strong>砖红壤偏酸、活性钙本就低，叠加高温多雨钙淋失，是海南七彩花生 <strong>空壳率高、产量上不去的主因</strong>。除花期浅施石膏粉外：基肥配石灰/钙镁磷肥调酸补钙；同补硼钼（缺硼也致空壳、延迟开花）；钾肥深施到结果层以下防拮抗钙吸收；控旺防徒长（氮肥过多→地下营养不足→空壳）；保持果针区疏松湿润、防板结防积水。
+        </p>
       </div>
 
       <div class="decision-table-card stage-guide-card">
@@ -369,7 +395,7 @@
       <div class="decision-table-card">
         <div class="section-head">
           <p class="section-title">底肥氮磷钾折算</p>
-          <span>单位按 N、P2O5、K2O 统计</span>
+          <span>单位按 N、P2O5、K2O 统计 · 有机肥含量按常见估算，以实测报告为准</span>
         </div>
         <table>
           <thead><tr><th>来源</th><th>N kg/亩</th><th>P2O5 kg/亩</th><th>K2O kg/亩</th><th>全田 N-P2O5-K2O</th><th>说明</th></tr></thead>
@@ -416,9 +442,9 @@
   var stageMeta = {
     seedling:{label:"播种出苗期",dayRange:"0-14 天",kc:0.42,baseFertKg:0.8,waterBand:"轻水保苗",target:"防烂种、促齐苗、少扰根"},
     vegetative:{label:"营养生长期",dayRange:"15-29 天",kc:0.58,baseFertKg:1.4,waterBand:"控旺促根",target:"稳苗架、促根瘤、避免徒长"},
-    flowering:{label:"开花下针期",dayRange:"30-49 天",kc:0.78,baseFertKg:2.2,waterBand:"稳墒促下针",target:"稳水、补硼钼、减少落花"},
+    flowering:{label:"开花下针期",dayRange:"30-49 天",kc:0.78,baseFertKg:2.2,waterBand:"稳墒促下针",target:"稳水、补硼钼、下针前浅施石膏粉防空壳"},
     pod:{label:"结荚膨大期",dayRange:"50-89 天",kc:0.96,baseFertKg:3.0,waterBand:"水肥敏感",target:"补钾钙、保荚果、控病害"},
-    harvest:{label:"成熟收获期",dayRange:"90 天以上",kc:0.35,baseFertKg:0,waterBand:"控水降湿",target:"降湿防霉、择晴采收"}
+    harvest:{label:"成熟收获期",dayRange:"90 天以上",kc:0.35,baseFertKg:0,waterBand:"控水降湿",target:"降湿防霉、抢晴采收（海南无霜冻，重点控湿防回潮）"}
   };
 
   var stageEcBand = {
@@ -527,7 +553,10 @@
       (i.stage==="pod"&&basal.calciumWeak)?"钙肥底施不足，结荚期优先补钙，减少空荚、瘪荚风险。":null,
       (i.stage==="flowering"&&basal.boronWeak)?"硼肥底施不足，开花下针期关注花针质量，可叶面或随水少量补硼钼。":null,
       i.weather.tempMax>=34?"高温日避开 11:00-16:00 施肥、喷药和大水漫灌。":null,
-      i.weather.windMax>=28?"风力偏大，叶面肥和药剂建议顺延或改到低风时段。":null
+      i.weather.windMax>=28?"风力偏大，叶面肥和药剂建议顺延或改到低风时段。":null,
+      (i.stage==="flowering"||i.stage==="pod")?"关键补钙窗口（开花下针—结荚初期）：花生 90%+ 钙由果针/幼果直接从浅层土吸收，缺钙是海南空壳主因。果针入土前后于垄间表土（≤5cm）浅施农用石膏粉 20–30 kg/亩（酸性砖红壤 30–40 kg），结合中耕培土、施后跟轻水；"+(basal.calciumWeak?"底肥钙偏弱，更应重点补；":"")+"叶面喷钙仅作辅助。":null,
+      i.stage==="vegetative"?"距补钙关键期（初花—下针期，约播种后 30–45 天）已不远，提前备好农用石膏粉 20–30 kg/亩；到果针入土前后在垄间表土浅施，是压低海南空壳率的核心措施。":null,
+      i.stage==="harvest"?"本季补钙防空壳的关键窗口（初花—下针期）已过；下季务必在该窗口浅施石膏粉，这是海南七彩花生控空壳、提产量的核心动作。":null
     ].filter(function(x){return x;});
 
     return {
@@ -542,6 +571,159 @@
 
   // ===== 种植期天气采集日志（播种 → 今日，本地累积） =====
   var WEATHER_LOG_PREFIX='peanut-weather-log::';
+
+  // ===== 数据持久化抽象层（dataStore）=====
+  // 统一本地/云端为一个接口，业务调用点（get/set/remove/keysWithPrefix）保持不变。
+  // local 模式走 localStorage；cloud 模式：登录后把云端 KV 拉到本地缓存（读取走缓存、同步），
+  // 写入异步发往后端 API（按 userId 隔离）。
+  var dataStore = (function(){
+    var mode='local';                     // 'local' | 'cloud'
+    // 【接入点】CloudBase 环境 ID（控制台「环境 ID」）
+    var CLOUD_ENV_ID='runye-irrigation-d3e8xef4540bae5';
+    // 【接入点】后端云托管地址，例如 https://xxxx.ap-shanghai.app.tcloudbase.com
+    var BACKEND_URL='';
+    // 【接入点】与后端 API_KEY 保持一致（前端内置，仅用于防白嫖；真正隔离靠 userId）
+    var API_KEY='runye-shared-key-2026';
+    var cloudUid=null;
+    var cloudCache={};
+    var app=null;
+
+    // ---------- 本地实现 ----------
+    function localGet(key){ try{ var raw=localStorage.getItem(key); return raw?JSON.parse(raw):null; }catch(e){ return null; } }
+    function localSet(key,obj){ try{ localStorage.setItem(key, JSON.stringify(obj==null?null:obj)); }catch(e){} }
+    function localRemove(key){ try{ localStorage.removeItem(key); }catch(e){} }
+    function localKeys(prefix){ try{ var out=[]; for(var i=0;i<localStorage.length;i++){ var k=localStorage.key(i); if(k&&k.indexOf(prefix)===0) out.push(k);} return out; }catch(e){ return []; } }
+
+    // ---------- 云端实现 ----------
+    function ensureApp(){ if(!app && window.cloudbase){ try{ app=window.cloudbase.init({env:CLOUD_ENV_ID}); }catch(e){} } return app; }
+    function apiHeaders(){ return {'Content-Type':'application/json','X-Api-Key':API_KEY}; }
+    function cloudGet(key){ return cloudCache.hasOwnProperty(key)?cloudCache[key]:null; }
+    function cloudSet(key,obj){ cloudCache[key]=obj; pushCloud(key,obj); }
+    function cloudRemove(key){ delete cloudCache[key]; pushDeleteCloud(key); }
+    function cloudKeys(prefix){ var o=[]; for(var k in cloudCache){ if(cloudCache.hasOwnProperty(k)&&k.indexOf(prefix)===0) o.push(k); } return o; }
+    function pushCloud(key,obj){
+      if(!cloudUid) return;
+      fetch(BACKEND_URL+'/api/kv',{method:'POST',headers:apiHeaders(),body:JSON.stringify({uid:cloudUid,k:key,v:obj})}).catch(function(){});
+    }
+    function pushDeleteCloud(key){
+      if(!cloudUid) return;
+      fetch(BACKEND_URL+'/api/kv-delete',{method:'POST',headers:apiHeaders(),body:JSON.stringify({uid:cloudUid,k:key})}).catch(function(){});
+    }
+    async function refreshFromCloud(){
+      if(!cloudUid) return;
+      try{
+        var r=await fetch(BACKEND_URL+'/api/kv?uid='+encodeURIComponent(cloudUid)+'&prefix=',{headers:apiHeaders()});
+        var json=await r.json();
+        if(json&&json.kv){ cloudCache=json.kv||{}; }
+      }catch(e){}
+    }
+    async function uploadLocalToCloud(){
+      if(!cloudUid) return;
+      var keys=localKeys('');
+      for(var i=0;i<keys.length;i++){ try{ var v=localGet(keys[i]); if(v!==null) pushCloud(keys[i],v); }catch(e){} }
+    }
+
+    // ---------- 统一接口 ----------
+    function get(key){ return mode==='cloud'? cloudGet(key): localGet(key); }
+    function set(key,obj){ return mode==='cloud'? cloudSet(key,obj): localSet(key,obj); }
+    function remove(key){ return mode==='cloud'? cloudRemove(key): localRemove(key); }
+    function keysWithPrefix(prefix){ return mode==='cloud'? cloudKeys(prefix): localKeys(prefix); }
+
+    // ---------- 登录（CloudBase 登录认证 v2：短信验证码） ----------
+    // v2 流程：getVerification 拿 verificationInfo → signInWithSms 登录
+    // 控制台需开启「短信验证码登录」，且仅上海地域可用
+    var pendingVerification=null;
+    function normPhone(phone){ return (/^1\d{11}$/.test(phone))? ('+86 '+phone) : phone; }
+    async function sendCode(phone){
+      var a=ensureApp(); if(!a){ alert('CloudBase SDK 未加载，请检查网络'); return; }
+      var info=await a.auth().getVerification({ phone_number: normPhone(phone) });
+      pendingVerification=info;
+    }
+    async function loginPhone(phone, code){
+      var a=ensureApp(); if(!a){ alert('CloudBase SDK 未加载，请检查网络'); return; }
+      await a.auth().signInWithSms({ verificationInfo: pendingVerification, verificationCode: code, phoneNum:  normPhone(phone) });
+      var u=await a.auth().currentUser();
+      cloudUid=u.uid; mode='cloud';
+      await refreshFromCloud();
+      await uploadLocalToCloud();
+    }
+    function logout(){
+      if(app&&cloudUid){ try{ app.auth().signOut(); }catch(e){} }
+      cloudUid=null; mode='local'; cloudCache={};
+    }
+    async function restore(){
+      var a=ensureApp(); if(!a) return false;
+      try{
+        var u=await a.auth().currentUser();
+        if(u){ cloudUid=u.uid; mode='cloud'; await refreshFromCloud(); return true; }
+      }catch(e){}
+      return false;
+    }
+
+    return {
+      get:get, set:set, remove:remove, keysWithPrefix:keysWithPrefix,
+      getMode:function(){ return mode; },
+      setMode:function(m){ mode=m; },
+      markCloudReady:function(){},
+      getEnvId:function(){ return CLOUD_ENV_ID; },
+      isCloud:function(){ return mode==='cloud'&&!!cloudUid; },
+      getUid:function(){ return cloudUid; },
+      sendCode:sendCode, loginPhone:loginPhone, logout:logout, restore:restore
+    };
+  })();
+
+  // 登录/存储模式提示（GitHub Pages 静态版：数据存本机浏览器，不上云）
+  function initAuth(){
+    var btn=document.getElementById('authBtn'), st=document.getElementById('authStatus');
+    if(!btn) return;
+    function paint(){
+      st.textContent='数据存本机浏览器'; btn.textContent='本机存储';
+    }
+    btn.addEventListener('click', function(){
+      alert('当前为 GitHub Pages 静态版：\n\n• 所有数据（地块、参数、天气日志）保存在你本机浏览器（localStorage），不上传任何服务器。\n• 换设备、清缓存或使用隐私模式时数据不共享、可能丢失。\n• 需要跨设备云端同步时，后续将部署带后端的版本再启用。');
+    });
+    paint();
+  }
+
+  // 手机号登录弹窗
+  function showLoginDialog(paint){
+    var existing=document.getElementById('loginModal');
+    if(existing){ existing.style.display='flex'; return; }
+    var overlay=document.createElement('div');
+    overlay.id='loginModal';
+    overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:9999';
+    overlay.innerHTML='<div style="background:#fff;border-radius:14px;padding:22px;width:320px;box-shadow:0 10px 30px rgba(0,0,0,.2)">'+
+      '<p style="margin:0 0 12px;font-weight:bold;font-size:16px;color:#1f2933">登录账号（手机号）</p>'+
+      '<input id="lpPhone" placeholder="请输入手机号" style="width:100%;padding:10px;margin-bottom:10px;border:1px solid #d7d3c8;border-radius:8px;font-size:14px"/>'+
+      '<div style="display:flex;gap:8px">'+
+        '<input id="lpCode" placeholder="短信验证码" style="flex:1;padding:10px;border:1px solid #d7d3c8;border-radius:8px;font-size:14px"/>'+
+        '<button id="lpSend" style="padding:10px 12px;border:none;background:#1f8a4c;color:#fff;border-radius:8px;font-size:13px;white-space:nowrap">获取验证码</button>'+
+      '</div>'+
+      '<button id="lpOk" style="width:100%;margin-top:14px;padding:10px;border:none;background:#2fa463;color:#fff;border-radius:8px;font-size:15px">登录</button>'+
+      '<button id="lpClose" style="width:100%;margin-top:8px;padding:8px;border:1px solid #d7d3c8;background:#fff;border-radius:8px;font-size:13px">取消</button>'+
+      '<p style="margin:10px 0 0;font-size:12px;color:#8a9389">登录后数据保存到云端，换设备也能查看（账号与数据均存于腾讯云）。</p>'+
+    '</div>';
+    document.body.appendChild(overlay);
+    document.getElementById('lpClose').onclick=function(){ overlay.style.display='none'; };
+    document.getElementById('lpSend').onclick=async function(){
+      var phone=document.getElementById('lpPhone').value.trim();
+      if(!phone){ alert('请输入手机号'); return; }
+      try{ await dataStore.sendCode(phone); alert('验证码已发送，请查收短信'); }
+      catch(e){ alert('发送失败：'+(e&&e.message||e)); }
+    };
+    document.getElementById('lpOk').onclick=async function(){
+      var phone=document.getElementById('lpPhone').value.trim();
+      var code=document.getElementById('lpCode').value.trim();
+      if(!phone||!code){ alert('请输入手机号和验证码'); return; }
+      try{
+        await dataStore.loginPhone(phone, code);
+        overlay.style.display='none';
+        alert('登录成功，数据已同步到云端');
+        location.reload();
+      }catch(e){ alert('登录失败：'+(e&&e.message||e)); }
+    };
+  }
+  initAuth();
   var GDD_BASE=10;      // 花生有效积温基准温度 10°C
   var SOIL_ANCHOR=70;   // 播种时假定墒情（仅作趋势参考）
 
@@ -658,10 +840,10 @@
     return out;
   }
   function loadWeatherLogCache(locName){
-    try{ var raw=localStorage.getItem(WEATHER_LOG_PREFIX+locName); return raw?JSON.parse(raw):null; }catch(e){ return null; }
+    try{ return dataStore.get(WEATHER_LOG_PREFIX+locName); }catch(e){ return null; }
   }
   function saveWeatherLogCache(locName,obj){
-    try{ localStorage.setItem(WEATHER_LOG_PREFIX+locName, JSON.stringify(obj)); }catch(e){}
+    try{ dataStore.set(WEATHER_LOG_PREFIX+locName, obj); }catch(e){}
   }
   function renderLog(){
     var log=state._log||[], agg=state._agg, today=shanghaiToday();
@@ -840,7 +1022,7 @@
       {item:"有机肥折算",n:npkN.organic.n,p:npkN.organic.p,k:npkN.organic.k,note:"估算 N1.5%、P2O5 1.0%、K2O 1.2%"},
       {item:"复合肥折算",n:npkN.compound.n,p:npkN.compound.p,k:npkN.compound.k,note:"按 "+state.compoundNPct+"-"+state.compoundPPct+"-"+state.compoundKPct+" 折算"},
       {item:"钙镁磷折算",n:npkN.calcium.n,p:npkN.calcium.p,k:npkN.calcium.k,note:"按 P2O5 12%估算"},
-      {item:"底肥合计",n:npkN.total.n,p:npkN.total.p,k:npkN.total.k,note:"每亩有效养分折算"}
+      {item:"底肥投入养分合计",n:npkN.total.n,p:npkN.total.p,k:npkN.total.k,note:"按投入量折算，未计当季利用率"}
     ];
     $("npkBody").innerHTML=npkRows.map(function(r,idx){
       return '<tr class="'+(idx===npkRows.length-1?"focus-row":"")+'"><td>'+r.item+'</td><td>'+r.n+'</td><td>'+r.p+'</td><td>'+r.k+'</td><td>'+round(r.n*state.areaMu,1)+"-"+round(r.p*state.areaMu,1)+"-"+round(r.k*state.areaMu,1)+' kg</td><td>'+r.note+'</td></tr>';
@@ -923,17 +1105,17 @@
         calciumKgMu:state.calciumKgMu, boronGmu:state.boronGmu,
         plotTs:state._plotTs||0, selectedPlotId:state.selectedPlotId||''
       };
-      localStorage.setItem(PERSIST_KEY, JSON.stringify(s));
+      dataStore.set(PERSIST_KEY, s);
     }catch(e){}
   }
   function loadPersistedState(){
-    try{ var raw=localStorage.getItem(PERSIST_KEY); return raw?JSON.parse(raw):null; }catch(e){ return null; }
+    try{ return dataStore.get(PERSIST_KEY); }catch(e){ return null; }
   }
   function applySharedPlot(){
-    try{ var raw=localStorage.getItem(PLOT_KEY); return raw?JSON.parse(raw):null; }catch(e){ return null; }
+    try{ return dataStore.get(PLOT_KEY); }catch(e){ return null; }
   }
   function loadLibrary(){
-    try{ var raw=localStorage.getItem('runye_plot_library'); return raw?JSON.parse(raw):[]; }catch(e){ return []; }
+    try{ var v=dataStore.get('runye_plot_library'); return v? (Array.isArray(v)?v:[]) : []; }catch(e){ return []; }
   }
   function escAttr(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
   function showPlotSyncNote(msg){
@@ -968,10 +1150,10 @@
     try{
       if(state.selectedPlotId){
         var arr=loadLibrary(); var p=arr.filter(function(x){return x.id===state.selectedPlotId;})[0];
-        if(p){ p.plantingDate=date; localStorage.setItem('runye_plot_library', JSON.stringify(arr)); }
+        if(p){ p.plantingDate=date; dataStore.set('runye_plot_library', arr); }
       } else {
         var r=applySharedPlot();
-        if(r){ r.plantingDate=date; try{ localStorage.setItem(PLOT_KEY, JSON.stringify(r)); }catch(e){} }
+        if(r){ r.plantingDate=date; try{ dataStore.set(PLOT_KEY, r); }catch(e){} }
       }
     }catch(e){}
   }
@@ -993,10 +1175,10 @@
       BASAL_FIELDS.forEach(function(k){ basal[k]=state[k]; });
       if(state.selectedPlotId){
         var arr=loadLibrary(); var p=arr.filter(function(x){return x.id===state.selectedPlotId;})[0];
-        if(p){ p.basal=basal; localStorage.setItem('runye_plot_library', JSON.stringify(arr)); }
+        if(p){ p.basal=basal; dataStore.set('runye_plot_library', arr); }
       } else {
         var r=applySharedPlot();
-        if(r){ r.basal=basal; try{ localStorage.setItem(PLOT_KEY, JSON.stringify(r)); }catch(e){} }
+        if(r){ r.basal=basal; try{ dataStore.set(PLOT_KEY, r); }catch(e){} }
       }
     }catch(e){}
   }
@@ -1019,10 +1201,10 @@
     try{
       if(state.selectedPlotId){
         var arr=loadLibrary(); var p=arr.filter(function(x){return x.id===state.selectedPlotId;})[0];
-        if(p){ p.locationName=locName; localStorage.setItem('runye_plot_library', JSON.stringify(arr)); }
+        if(p){ p.locationName=locName; dataStore.set('runye_plot_library', arr); }
       } else {
         var r=applySharedPlot();
-        if(r){ r.locationName=locName; try{ localStorage.setItem(PLOT_KEY, JSON.stringify(r)); }catch(e){} }
+        if(r){ r.locationName=locName; try{ dataStore.set(PLOT_KEY, r); }catch(e){} }
       }
     }catch(e){}
   }
@@ -1173,7 +1355,7 @@
       });
     });
     var rb=$("resetLocalBtn");
-    if(rb){ rb.addEventListener('click',function(){ if(confirm('确定清空本机保存的参数并恢复默认设置？此操作不可撤销（含已采集的天气日志）。')){ try{ localStorage.removeItem('peanut-state'); localStorage.removeItem('runyePlotData'); Object.keys(localStorage).forEach(function(k){ if(k.indexOf(WEATHER_LOG_PREFIX)===0) localStorage.removeItem(k); }); }catch(e){} location.reload(); } }); }
+    if(rb){ rb.addEventListener('click',function(){ if(confirm('确定清空本机保存的参数并恢复默认设置？此操作不可撤销（含已采集的天气日志）。')){ try{ dataStore.remove('peanut-state'); dataStore.remove('runyePlotData'); dataStore.keysWithPrefix(WEATHER_LOG_PREFIX).forEach(function(k){ dataStore.remove(k); }); }catch(e){} location.reload(); } }); }
     var lrb=$("logRefreshBtn");
     if(lrb){ lrb.addEventListener('click',function(){ syncWeatherLog(); }); }
     var pls=$("plotLibrarySelect");
