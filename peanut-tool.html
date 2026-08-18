@@ -56,10 +56,13 @@
   .number-row em{font-style:normal;color:var(--ink-2);font-size:12px;min-width:36px;text-align:right}
   .date-row{display:flex;align-items:center;gap:6px}
   .date-row .date-input{flex:1;width:100%}
+  .date-row select{flex:1;width:100%}
   .save-planting-btn{flex:none;padding:8px 12px;border:0;border-radius:9px;background:var(--g-700);color:#fff;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
   .save-planting-btn:hover{background:var(--g-600)}
   .planting-save-hint{display:block;margin-top:5px;font-size:12px;min-height:14px;color:var(--g-700)}
   .planting-save-hint.warn{color:#b45309}
+  .basal-head-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:2px 0 4px}
+  .basal-head-row .quiet-copy{font-size:12px;color:var(--ink-2)}
 
   .board{display:flex;flex-direction:column;gap:16px}
   .weather-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px 18px;box-shadow:var(--shadow);display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
@@ -220,7 +223,11 @@
       <h2>地块与生长参数</h2>
       <p class="plot-sync-note" id="plotSyncNote" style="display:none"></p>
       <label>种植区域
-        <select id="locationName"></select>
+        <div class="date-row">
+          <select id="locationName"></select>
+          <button type="button" id="saveLocationBtn" class="save-planting-btn">保存区域</button>
+        </div>
+        <span class="planting-save-hint" id="locationSaveHint"></span>
       </label>
       <label>种植日期
         <div class="date-row">
@@ -253,6 +260,11 @@
         <div class="number-row"><input type="number" id="fertEcCoeff" min="0.5" max="2.2" step="0.05"><em>mS/g/L</em></div></label>
 
       <h2>底肥配置</h2>
+      <div class="basal-head-row">
+        <span class="quiet-copy">底肥配置按当前地块独立保存</span>
+        <button type="button" id="saveBasalBtn" class="save-planting-btn">保存底肥配置</button>
+      </div>
+      <span class="planting-save-hint" id="basalSaveHint"></span>
       <label class="num-control"><span>有机肥 <strong id="organicKgMuV"></strong></span>
         <div class="number-row"><input type="number" id="organicKgMu" min="0" max="300" step="5"><em>kg/亩</em></div></label>
       <label class="num-control"><span>复合肥 <strong id="compoundKgMuV"></strong></span>
@@ -936,11 +948,16 @@
     el.className='planting-save-hint'+(warn?' warn':'');
   }
   function clearPlantingSaveHint(){ var el=$("plantingSaveHint"); if(el){ el.textContent=''; el.className='planting-save-hint'; } }
+  function showLocationSaveHint(msg){ var el=$("locationSaveHint"); if(!el) return; el.textContent=msg||''; el.className='planting-save-hint'; }
+  function clearLocationSaveHint(){ var el=$("locationSaveHint"); if(el){ el.textContent=''; el.className='planting-save-hint'; } }
+  function showBasalSaveHint(msg){ var el=$("basalSaveHint"); if(!el) return; el.textContent=msg||''; el.className='planting-save-hint'; }
   function populatePlotLibrarySelect(library, currentId){
     var sel=$("plotLibrarySelect"); if(!sel) return;
     var opts='<option value="">（使用同步的当前地块）</option>';
     opts += library.map(function(p){
       var extra=p.plantingDate?(' · 播期 '+p.plantingDate):'';
+      if(p.locationName) extra+=' · 区域 '+p.locationName;
+      if(p.basal) extra+=' · 已配底肥';
       return '<option value="'+escAttr(p.id)+'"'+(p.id===currentId?' selected':'')+'>'+escAttr(p.name)+' · '+(p.mu!=null?p.mu.toFixed(2):'0')+' 亩'+extra+'</option>';
     }).join('');
     sel.innerHTML=opts;
@@ -965,6 +982,62 @@
     if(p && p.plotId){ var l2=loadLibrary().filter(function(x){return x.id===p.plotId;})[0]; if(l2) return l2.plantingDate||null; }
     if(p) return p.plantingDate||null;
     return null;
+  }
+
+  // 底肥配置字段（与 state / 输入控件一一对应），按地块独立保存
+  var BASAL_FIELDS=['organicKgMu','compoundKgMu','calciumKgMu','boronGmu','compoundNPct','compoundPPct','compoundKPct'];
+  // 将当前底肥配置写回“正在使用的地块”（地块库项 或 同步的当前地块），实现每个地块独立底肥配置
+  function persistBasalToPlot(){
+    try{
+      var basal={};
+      BASAL_FIELDS.forEach(function(k){ basal[k]=state[k]; });
+      if(state.selectedPlotId){
+        var arr=loadLibrary(); var p=arr.filter(function(x){return x.id===state.selectedPlotId;})[0];
+        if(p){ p.basal=basal; localStorage.setItem('runye_plot_library', JSON.stringify(arr)); }
+      } else {
+        var r=applySharedPlot();
+        if(r){ r.basal=basal; try{ localStorage.setItem(PLOT_KEY, JSON.stringify(r)); }catch(e){} }
+      }
+    }catch(e){}
+  }
+  // 取“正在使用的地块”绑定的底肥配置（地块库项优先，其次按同步当前地块的 plotId 关联，再其次同步地块自带）
+  function activePlotBasal(){
+    function fromPlot(p){ return (p&&p.basal)?p.basal:null; }
+    if(state.selectedPlotId){ return fromPlot(loadLibrary().filter(function(x){return x.id===state.selectedPlotId;})[0]); }
+    var p=applySharedPlot();
+    if(p && p.plotId){ var lp=loadLibrary().filter(function(x){return x.id===p.plotId;})[0]; if(lp && lp.basal) return lp.basal; }
+    return fromPlot(p);
+  }
+  // 将“正在使用的地块”的底肥配置应用到 state（地块未配置时保留当前/默认配置）
+  function applyPlotBasalToState(){
+    var b=activePlotBasal();
+    if(b){ BASAL_FIELDS.forEach(function(k){ if(b[k]!=null) state[k]=b[k]; }); }
+  }
+
+  // 将当前选择的种植区域（天气采集地点）写回“正在使用的地块”，实现每个地块独立天气区域
+  function persistLocationNameToPlot(locName){
+    try{
+      if(state.selectedPlotId){
+        var arr=loadLibrary(); var p=arr.filter(function(x){return x.id===state.selectedPlotId;})[0];
+        if(p){ p.locationName=locName; localStorage.setItem('runye_plot_library', JSON.stringify(arr)); }
+      } else {
+        var r=applySharedPlot();
+        if(r){ r.locationName=locName; try{ localStorage.setItem(PLOT_KEY, JSON.stringify(r)); }catch(e){} }
+      }
+    }catch(e){}
+  }
+  // 取“正在使用的地块”绑定的种植区域（天气地点），优先级同播期/底肥
+  function activePlotLocationName(){
+    if(state.selectedPlotId){ var lp=loadLibrary().filter(function(x){return x.id===state.selectedPlotId;})[0]; if(lp && lp.locationName) return lp.locationName; }
+    var p=applySharedPlot();
+    if(p && p.plotId){ var l2=loadLibrary().filter(function(x){return x.id===p.plotId;})[0]; if(l2 && l2.locationName) return l2.locationName; }
+    if(p && p.locationName) return p.locationName;
+    return null;
+  }
+  // 将“正在使用的地块”的种植区域应用到 state（地块未配置时保留当前/默认）
+  function applyPlotLocationToState(){
+    var loc=activePlotLocationName();
+    if(loc) state.locationName=loc;
   }
 
   // ---- 地块图形看板 ----
@@ -1010,6 +1083,8 @@
       var lp=loadLibrary().filter(function(x){return x.id===id;})[0];
       if(lp && lp.mu>0){ state.areaMu=lp.mu; state._plotTs=lp.ts||0; showPlotSyncNote('已从地块库选择：'+lp.name+'（'+lp.mu+' 亩）'+(lp.plantingDate?' · 已记录播期 '+lp.plantingDate:'')); if(lp.plantingDate){ state.plantingDate=lp.plantingDate; } }
     }
+    applyPlotLocationToState();
+    applyPlotBasalToState();
     writeInputs(); recompute(); render(); persistState();
     syncWeatherLog();
   }
@@ -1049,7 +1124,7 @@
      .forEach(function(id){
       $(id).addEventListener("input",function(){ readInputs(); recompute(); render(); persistState(); });
     });
-    $("locationName").addEventListener("change",function(){ state.locationName=this.value; writeInputs(); syncWeatherLog(); persistState(); });
+    $("locationName").addEventListener("change",function(){ state.locationName=this.value; clearLocationSaveHint(); writeInputs(); syncWeatherLog(); persistState(); });
     $("plantingDate").addEventListener("input",function(){ state.plantingDate=this.value; clearPlantingSaveHint(); syncWeatherLog(); persistState(); });
     // 显式“保存播期”按钮：把当前种植日期写回正在使用的地块，并刷新下拉标签与天气采集
     var spb=$("savePlantingBtn");
@@ -1063,6 +1138,29 @@
       var lp=state.selectedPlotId?(loadLibrary().filter(function(x){return x.id===state.selectedPlotId;})[0]||{}):null;
       var pname=lp?lp.name:'同步的当前地块';
       showPlantingSaveHint('已保存播期 '+date+' 到「'+pname+'」，并按该播期采集了天气数据');
+      renderPlotBoard();
+    }); }
+    // 显式“保存底肥配置”按钮：把当前底肥各项写回正在使用的地块，实现每个地块独立底肥配置
+    var sbb=$("saveBasalBtn");
+    if(sbb){ sbb.addEventListener('click',function(){
+      persistBasalToPlot();
+      populatePlotLibrarySelect(loadLibrary(), state.selectedPlotId||'');
+      recompute(); render();
+      var lp=state.selectedPlotId?(loadLibrary().filter(function(x){return x.id===state.selectedPlotId;})[0]||{}):null;
+      var pname=lp?lp.name:'同步的当前地块';
+      showBasalSaveHint('已保存底肥配置到「'+pname+'」，切换地块时按各地块调用');
+      renderPlotBoard();
+    }); }
+    // 显式“保存区域”按钮：把当前种植区域（天气地点）写回正在使用的地块，实现每个地块独立天气区域
+    var slb=$("saveLocationBtn");
+    if(slb){ slb.addEventListener('click',function(){
+      var locName=$("locationName").value;
+      state.locationName=locName;
+      persistLocationNameToPlot(locName);
+      populatePlotLibrarySelect(loadLibrary(), state.selectedPlotId||'');
+      var lp=state.selectedPlotId?(loadLibrary().filter(function(x){return x.id===state.selectedPlotId;})[0]||{}):null;
+      var pname=lp?lp.name:'同步的当前地块';
+      showLocationSaveHint('已保存种植区域「'+locName+'」到「'+pname+'」，切换地块时按各地块采集天气');
       renderPlotBoard();
     }); }
     // manual weather
@@ -1134,6 +1232,8 @@
     }
   }
   var pd=activePlotPlantingDate(); if(pd){ state.plantingDate=pd; }
+  applyPlotLocationToState();
+  applyPlotBasalToState();
   writeInputs();
   persistState();
   recompute();
