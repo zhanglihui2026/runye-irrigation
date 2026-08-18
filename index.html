@@ -3323,6 +3323,7 @@ input[type="reset"],
       <span style="flex:1"></span>
       <span style="font-size:12px;font-weight:500;color:#64748b;margin-right:4px">首部系统图</span>
       <button class="pp-btn-generate" id="ppHeadGen" style="padding:6px 16px;font-size:13px">⚙️ 生成</button>
+      <button class="pp-btn-ghost" id="ppSavePng" style="display:none" title="将施工简图保存为 PNG 图片">📥 保存图片</button>
       <button class="tl-trigger-btn-inline" onclick="openThreeLevelView(true)" title="三级管线：多分区联合灌溉总管选型 + 管路规划">三级管设计</button>
     </div>
     <div id="ppDiagramContent"><div class="pp-diagram-empty">完成面积测量并点击「生成施工图」后，这里显示最终施工图；点击右上「⚙️ 生成」生成供水首部系统图（水源—供水主管段）。</div></div>
@@ -3371,7 +3372,10 @@ input[type="reset"],
     <button class="pp-btn-ghost" id="tlPrint" style="display:none" onclick="tlPrintDiagram()">🖨️ 打印图纸</button>
   </div>
   <div class="pp-diagram-wrap" id="tlDiagramWrap">
-    <div class="pp-diagram-title">📋 三级管线施工简图</div>
+    <div class="pp-diagram-title">📋 三级管线施工简图
+      <span style="flex:1"></span>
+      <button class="pp-btn-ghost" id="tlSavePng" style="display:none" title="将施工简图保存为 PNG 图片">📥 保存图片</button>
+    </div>
     <div id="tlDiagramContent"><div class="pp-diagram-empty">完成面积测量并点击上方「一键生成管线图」后，这里显示三级管线施工简图；点击「⚙️ 系统图生成」可生成首部系统图。</div></div>
   </div>
 </section>
@@ -5646,6 +5650,7 @@ function tlAutoGenerate() {
   document.getElementById('tlDiagramWrap').style.display='block';
   document.getElementById('tlDownload').style.display='inline-block';
   document.getElementById('tlPrint').style.display='inline-block';
+  document.getElementById('tlSavePng').style.display='inline-block';
   document.getElementById('tlDiagramWrap').scrollIntoView({behavior:'smooth',block:'nearest'});
   console.log('[tlAutoGenerate] SVG generated successfully');
   } catch(err) {
@@ -5672,6 +5677,52 @@ function tlDownloadSVG() {
   var a=document.createElement('a');a.href=url;a.download='three-level-diagram.svg';a.click();
   URL.revokeObjectURL(url);
 }
+
+/* ===== 施工简图：SVG -> PNG 通用工具 ===== */
+function svgToPngBlob(svgStr, scale){
+  scale=scale||2;
+  return new Promise(function(resolve,reject){
+    var size={w:0,h:0};
+    var vb=svgStr.match(/viewBox\s*=\s*["']([^"']+)["']/);
+    if(vb){var p=vb[1].trim().split(/[\s,]+/);size.w=parseFloat(p[2]);size.h=parseFloat(p[3]);}
+    var svg=svgStr;
+    if(size.w&&size.h&&!/(\bwidth\s*=)/.test(svg)){
+      svg=svg.replace(/(<svg[^>]*?)>/, '$1 width="'+size.w+'" height="'+size.h+'">');
+    }
+    var blob=new Blob([svg],{type:'image/svg+xml;charset=utf-8'});
+    var url=URL.createObjectURL(blob);
+    var img=new Image();
+    img.onload=function(){
+      var c=document.createElement('canvas');
+      c.width=Math.max(1,Math.round(size.w*scale));
+      c.height=Math.max(1,Math.round(size.h*scale));
+      var ctx=c.getContext('2d');
+      ctx.fillStyle='#ffffff';ctx.fillRect(0,0,c.width,c.height);
+      ctx.drawImage(img,0,0,c.width,c.height);
+      URL.revokeObjectURL(url);
+      try{ c.toBlob(function(b){ if(b){resolve(b);}else{reject(new Error('PNG 生成失败'));} },'image/png'); }
+      catch(e){ reject(e); }
+    };
+    img.onerror=function(){ URL.revokeObjectURL(url); reject(new Error('SVG 图片加载失败')); };
+    img.src=url;
+  });
+}
+function downloadBlob(blob,filename){
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');a.href=url;a.download=filename;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); },1500);
+}
+function tlSaveDiagramPng(){
+  var ctn=document.getElementById('tlDiagramContent');
+  var svgEl=ctn?ctn.querySelector('svg'):null;
+  var svgStr=svgEl?new XMLSerializer().serializeToString(svgEl):tlDiagramSVG;
+  if(!svgStr||svgStr.indexOf('<svg')<0)svgStr=tlDiagramSVG;
+  if(!svgStr){alert('请先生成三级管线施工简图');return;}
+  svgToPngBlob(svgStr,2).then(function(b){ downloadBlob(b,'three-level-diagram.png'); })
+    .catch(function(e){ alert('PNG 保存失败：'+(e&&e.message||e)); });
+}
+document.getElementById('tlSavePng').addEventListener('click', tlSaveDiagramPng);
 
 function tlPrintDiagram() {
   if(!tlDiagramSVG)return;
@@ -8566,6 +8617,7 @@ function calcPlan(){
     document.getElementById('ppDiagramWrap').style.display='block';
     document.getElementById('ppDownload').style.display='inline-block';
     document.getElementById('ppPrint').style.display='inline-block';
+    document.getElementById('ppSavePng').style.display='inline-block';
     ppState.lastSVG=svgStr;
     if(doScroll) document.getElementById('ppDiagramWrap').scrollIntoView({behavior:'smooth',block:'nearest'});
   }
@@ -8590,6 +8642,13 @@ function calcPlan(){
     var url=URL.createObjectURL(blob);
     var a=document.createElement('a');a.href=url;a.download='irrigation-diagram.svg';a.click();
     URL.revokeObjectURL(url);
+  });
+
+  // Save as PNG
+  document.getElementById('ppSavePng').addEventListener('click',function(){
+    if(!ppState.lastSVG){alert('请先点击「生成施工图」生成施工简图');return;}
+    svgToPngBlob(ppState.lastSVG,2).then(function(b){ downloadBlob(b,'irrigation-diagram.png'); })
+      .catch(function(e){ alert('PNG 保存失败：'+(e&&e.message||e)); });
   });
 
   // Print A3
@@ -8691,6 +8750,7 @@ function calcPlan(){
       document.getElementById('ppDiagramWrap').style.display='block';
       document.getElementById('ppDownload').style.display='inline-flex';
       document.getElementById('ppPrint').style.display='inline-flex';
+      document.getElementById('ppSavePng').style.display='inline-flex';
     }else{
       document.getElementById('ppDiagramContent').innerHTML='<div class="pp-diagram-empty">完成面积测量并点击「生成施工图」后，这里显示最终施工图。</div>';
       document.getElementById('ppDiagramWrap').style.display='block';
