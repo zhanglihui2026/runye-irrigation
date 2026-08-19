@@ -63,6 +63,9 @@
   .ry-nav .main-nav .nav-item{flex:0 0 auto}
   .ry-nav .nav-link{padding:11px 15px;font-size:13px;border-bottom:none;border-right:1px solid var(--s-50);white-space:nowrap;}
   .ry-nav .nav-link::after{display:none}
+  /* 手机端：解除整页 100vh 锁定，允许页面滚动，让 info-bar 提示文字可随页滚走（不再常驻顶部） */
+  body{height:auto;min-height:100vh;overflow-y:auto;}
+  .frame-wrap{flex:1 1 auto;min-height:100vh;}
 }
 @media(max-width:480px){
   .ry-nav .header-inner{padding:0 12px}
