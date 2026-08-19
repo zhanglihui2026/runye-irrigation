@@ -12,7 +12,7 @@
     --shadow:0 6px 20px rgba(31,42,51,.08);
   }
   *{box-sizing:border-box}
-  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);line-height:1.5;-webkit-font-smoothing:antialiased}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg)!important;color:var(--ink)!important;line-height:1.5!important;-webkit-font-smoothing:antialiased}
   .ops-app{max-width:1240px;margin:0 auto;padding:18px 20px 48px}
   .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
   .topbar strong{display:block;font-size:18px;color:var(--g-700)}
@@ -46,8 +46,11 @@
   .control-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:var(--shadow);position:sticky;top:14px}
   .control-card h2{font-size:15px;margin:18px 0 10px;color:var(--g-700);border-left:3px solid var(--g-700);padding-left:8px}
   .control-card h2:first-child{margin-top:0}
-  /* 基础即手机样式：功能区块标题统一 15px（不依赖 iframe 内 @media —— 移动浏览器 iframe 忽略 viewport 致 max-width 失效） */
-  .section-title{font-size:15px;font-weight:700;color:var(--g-700);margin:14px 0 8px}
+  /* 基础即手机样式：功能区块标题统一 15px（不依赖 iframe 内 @media —— 移动浏览器 iframe 忽略 viewport 致 max-width 失效）
+     !important：runye-theme.css 在 <style> 之后加载，其 .section-title{font-size:16px;font-weight:800;border-left:4px;margin:28px 0 14px}
+     会以同优先级覆盖本规则，导致 11 个农事区域标题变 16px 且带绿色左边框、与其它标题不统一。
+     必须用 !important 压回（覆盖字号/字重/颜色/margin/边框），与加载顺序、嵌套层级无关。 */
+  .section-title{font-size:15px!important;font-weight:700!important;color:var(--g-700)!important;margin:14px 0 8px!important;border-left:none!important;padding-left:0!important}
   .control-card label{display:block;font-size:13px;color:var(--ink-2);margin-bottom:12px}
   .control-card select,.control-card input.date-input{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:9px;font-size:14px;margin-top:5px;background:#fff;color:var(--ink)}
   .growth-card{background:var(--g-50);border:1px solid var(--g-100);border-radius:12px;padding:12px;margin-bottom:12px}
