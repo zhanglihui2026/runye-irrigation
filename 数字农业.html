@@ -63,9 +63,11 @@
   .ry-nav .main-nav .nav-item{flex:0 0 auto}
   .ry-nav .nav-link{padding:11px 15px;font-size:13px;border-bottom:none;border-right:1px solid var(--s-50);white-space:nowrap;}
   .ry-nav .nav-link::after{display:none}
-  /* 手机端：解除整页 100vh 锁定，允许页面滚动；提示条可「收起」以免工具 iframe 吞滚动导致常驻 */
+  /* 手机端：解除整页 100vh 锁定。frame-wrap 不再占满视窗，iframe 高度由 JS 按工具内容高度设定，
+     整页变为一条自然滚动流——顶部 info-bar 随滚动滚走，工具内容也可整体滚动，不再「锁定」。 */
   body{height:auto;min-height:100vh;overflow-y:auto;}
-  .frame-wrap{flex:1 1 auto;height:100vh;min-height:auto;}
+  .frame-wrap{flex:none;height:auto;min-height:auto;}
+  .frame-wrap iframe{height:100vh;} /* 加载前占位，JS 加载后按内容高度覆盖 */
   .info-toggle{display:inline-flex;}
 }
 @media(max-width:480px){
@@ -181,6 +183,35 @@
       btn.setAttribute('aria-expanded', String(!collapsed));
       btn.textContent = collapsed ? '展开 ▼' : '收起 ▲';
     });
+  })();
+</script>
+<script>
+  // 手机端：让内嵌工具 iframe 高度 = 其文档内容高度，整页自然滚动，顶部提示条随滚动滚走（不再被 iframe 吞滚动而常驻）
+  (function(){
+    var frame = document.getElementById('peanutFrame');
+    if(!frame) return;
+    var mq = window.matchMedia('(max-width:768px)');
+    function fit(){
+      if(!mq.matches){ frame.style.height=''; return; } // 桌面端：交回 100% 内部滚动
+      try{
+        var doc = frame.contentDocument || (frame.contentWindow && frame.contentWindow.document);
+        if(!doc || !doc.body) { frame.style.height='100vh'; return; }
+        var h = Math.max(doc.documentElement.scrollHeight, doc.body.scrollHeight, 480);
+        frame.style.height = h + 'px';
+      }catch(e){ frame.style.height='100vh'; }
+    }
+    frame.addEventListener('load', function(){
+      fit();
+      // 工具内容动态变化（展开/收起分区、天气加载）时实时重算高度
+      try{
+        var doc = frame.contentDocument;
+        if(doc && doc.body && 'ResizeObserver' in window){
+          new ResizeObserver(fit).observe(doc.body);
+        }
+      }catch(e){}
+      setInterval(fit, 1000); // 兜底：兼容个别浏览器 ResizeObserver 不触发的情况
+    });
+    window.addEventListener('resize', fit);
   })();
 </script>
 
