@@ -119,6 +119,11 @@
     .main-grid{grid-template-columns:1fr}
     .control-card{position:static}
     .insight-grid{grid-template-columns:1fr}
+    .season-kpi-grid{grid-template-columns:repeat(3,1fr)}
+  }
+  @media (max-width:560px){
+    .season-kpi-grid{grid-template-columns:repeat(2,1fr)}
+    .kpi-grid{grid-template-columns:repeat(2,1fr)}
   }
 
   /* 种植期天气采集日志 */
@@ -164,11 +169,11 @@
   /* ===== 每日农事记事 ===== */
   .daily-log-card .daily-editor{margin:6px 0 14px;border:1px dashed #e3ddcf;border-radius:10px;padding:12px 14px;background:#fcfbf7}
   .daily-editor .daily-row{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;flex-wrap:wrap}
-  .daily-editor label{width:92px;flex:none;font-size:10.5px;color:#5b5446;padding-top:7px}
+  .daily-editor label{width:92px;flex:none;font-size:12px;color:#5b5446;padding-top:7px}
   .daily-editor input[type=date],.daily-editor textarea{flex:1;min-width:200px;padding:8px 10px;border:1px solid #e3ddcf;border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box}
-  .daily-advice{flex:1;min-width:200px;background:#fff;border:1px solid #e3ddcf;border-radius:8px;padding:8px 10px;font-size:10.5px;color:#5b5446;max-height:130px;overflow:auto;margin:0}
+  .daily-advice{flex:1;min-width:200px;background:#fff;border:1px solid #e3ddcf;border-radius:8px;padding:8px 10px;font-size:12px;color:#5b5446;max-height:130px;overflow:auto;margin:0}
   .daily-advice li{margin-bottom:4px;line-height:1.5}
-  #dailyLogHead{font-size:10.5px;color:var(--ink-2)}
+  #dailyLogHead{font-size:12px;color:var(--ink-2)}
   .daily-actions{display:flex;gap:10px;margin-top:4px;flex-wrap:wrap}
   .primary-btn{background:#2f7d5b;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer}
   .primary-btn:hover{opacity:.92}
@@ -181,10 +186,10 @@
   .section-title,
   .control-card h2,
   .weather-title,
-  .plot-board .board-head h2{font-size:11.25px;font-weight:700;color:var(--g-700);margin:14px 0 8px}
+  .plot-board .board-head h2{font-size:13px;font-weight:700;color:var(--g-700);margin:14px 0 8px}
   .control-card h2{margin:18px 0 10px}
   .weather-title{margin:0}
-  #growthStage{font-size:11.25px;font-weight:700;color:var(--g-700)}
+  #growthStage{font-size:13px;font-weight:700;color:var(--g-700)}
   .plot-board .board-head h2{margin:0}
 
   .ops-app{padding:14px 14px 36px}
@@ -220,12 +225,12 @@
   .daily-advice{font-size:12px}
 
   /* 综合农事建议：卡片宽度随屏幕自适应、内部文字流式缩放，解决手机端溢出/比例失调 */
-  .history-advice-card{width:100%;max-width:100%;box-sizing:border-box;padding:14px 14px;font-size:clamp(11px,calc(4px + 2.4vw),15px);line-height:1.6}
-  .history-advice-card ol{font-size:clamp(10px,calc(2px + 1.5vw),11px);line-height:1.6;padding-left:18px}
+  .history-advice-card{width:100%;max-width:100%;box-sizing:border-box;padding:14px 14px;font-size:12.5px;line-height:1.6}
+  .history-advice-card ol{font-size:12.5px;line-height:1.6;padding-left:18px}
   .history-advice-card li{margin-bottom:9px;overflow-wrap:break-word;word-break:break-word}
   /* 合并块内统一：标题(.section-title)、说明段落(p)、列表(ol) 字号与行距一致 */
-  .history-advice-card .section-title{font-size:11.25px;line-height:1.6;margin:18px 0 8px;font-weight:700;color:var(--g-700)}
-  .history-advice-card p{font-size:clamp(10px,calc(2px + 1.5vw),11px);line-height:1.6;margin:0 0 8px;color:var(--ink)}
+  .history-advice-card .section-title{font-size:13px;line-height:1.6;margin:18px 0 8px;font-weight:700;color:var(--g-700)}
+  .history-advice-card p{font-size:12.5px;line-height:1.6;margin:0 0 8px;color:var(--ink)}
   .history-advice-card .section-head .section-title{margin:0}
   .history-advice-card .calcium-note{color:#166534;background:var(--g-50);padding:8px 10px;border-radius:8px;margin-top:6px}
 
@@ -233,7 +238,7 @@
      被数字农业.html 以 iframe 嵌入时，iframe 布局视口为 980px，不进此块，自动沿用上方「基础=手机样式」。 */
   @media (min-width:1024px){
     body{font-size:15px}
-    .section-title,.control-card h2,.weather-title,.plot-board .board-head h2,#growthStage,.history-advice-card .section-title{font-size:13.5px}
+    .section-title,.control-card h2,.weather-title,.plot-board .board-head h2,#growthStage,.history-advice-card .section-title{font-size:15px}
     .ops-app{padding:18px 20px 48px}
     .hero-copy{padding:20px 22px}
     .hero-copy h1{font-size:26px;line-height:1.25}
@@ -248,12 +253,12 @@
     .season-kpi strong{font-size:18px}
     .weather-loc{font-size:15px;line-height:27px}
     .operation-card,.history-advice-card,.decision-table-card,.insight-grid article,.manual-card,.growth-card,.weather-card,.season-kpi,.daily-log-card,.plot-board{font-size:13px}
-    .operation-card ol,.history-advice-card ol{font-size:12px;line-height:1.6}
+    .operation-card ol,.history-advice-card ol{font-size:13px;line-height:1.6}
     .manual-card,.operation-card,.decision-table-card{padding:16px 18px}
-    .history-advice-card p{font-size:12px;line-height:1.6;font-weight:400}
-    .daily-editor label{font-size:12px}
-    .daily-advice{font-size:12px}
-    #dailyLogHead{font-size:12px}
+    .history-advice-card p{font-size:13px;line-height:1.6;font-weight:400}
+    .daily-editor label{font-size:13px}
+    .daily-advice{font-size:13px}
+    #dailyLogHead{font-size:13px}
   }
   </style>
 </head>
