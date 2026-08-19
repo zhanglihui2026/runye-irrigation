@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>七彩花生全程植保技术方案</title>
+<style>
+  :root{
+    --green:#2f7d32; --green-dark:#1b5e20; --green-light:#e8f5e9;
+    --earth:#8d6e3c; --water:#2b7bb0; --gold:#f4a318;
+    --bg:#fbfaf6; --card:#ffffff; --text:#2b2b27; --muted:#6b6b63;
+    --line:#e6e2d8; --shadow:0 6px 24px rgba(40,40,30,.08);
+    --radius:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",Segoe UI,Roboto,sans-serif;
+    background:var(--bg);color:var(--text);line-height:1.7;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+  .rainbow{background:linear-gradient(90deg,#e74c3c,#f39c12,#2ecc71,#2b7bb0,#8e44ad,#e84393);
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+
+  /* NAV */
+  nav{position:sticky;top:0;z-index:50;background:rgba(251,250,246,.92);
+    backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  .nav-inner{display:flex;align-items:center;justify-content:space-between;height:60px}
+  .brand{font-weight:800;font-size:19px;display:flex;align-items:center;gap:8px}
+  .brand .dot{width:14px;height:14px;border-radius:50%;
+    background:conic-gradient(#e74c3c,#f39c12,#2ecc71,#2b7bb0,#8e44ad,#e84393,#e74c3c)}
+  .nav-links{display:flex;gap:22px;font-size:14.5px;font-weight:600}
+  .nav-links a{color:var(--muted);transition:color .2s}
+  .nav-links a:hover,.nav-links a.active{color:var(--green)}
+  .nav-toggle{display:none;font-size:22px;background:none;border:none;cursor:pointer}
+
+  /* HERO */
+  .hero{position:relative;color:#fff;overflow:hidden;border-radius:0 0 28px 28px}
+  .hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .hero::after{content:"";position:absolute;inset:0;
+    background:linear-gradient(180deg,rgba(15,40,15,.35),rgba(15,40,15,.78))}
+  .hero-inner{position:relative;z-index:2;padding:84px 20px 70px;text-align:center}
+  .hero h1{font-size:clamp(28px,5vw,46px);font-weight:900;letter-spacing:1px;
+    text-shadow:0 3px 18px rgba(0,0,0,.4)}
+  .hero p.sub{margin-top:14px;font-size:clamp(15px,2.4vw,19px);opacity:.95}
+  .hero .chips{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:30px}
+  .chip{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.35);
+    padding:12px 20px;border-radius:12px;backdrop-filter:blur(4px);min-width:130px}
+  .chip b{display:block;font-size:24px;font-weight:800}
+  .chip span{font-size:13px;opacity:.9}
+
+  /* SECTIONS */
+  section{padding:60px 0}
+  .sec-head{text-align:center;margin-bottom:38px}
+  .sec-head .k{display:inline-block;font-size:13px;font-weight:700;letter-spacing:2px;
+    color:var(--green);background:var(--green-light);padding:4px 14px;border-radius:20px}
+  .sec-head h2{font-size:clamp(22px,3.6vw,32px);font-weight:900;margin-top:12px}
+  .sec-head p{color:var(--muted);max-width:720px;margin:12px auto 0;font-size:15px}
+
+  /* OVERVIEW CARDS */
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+  .card{background:var(--card);border-radius:var(--radius);padding:26px;box-shadow:var(--shadow);
+    border-top:5px solid var(--c);transition:transform .2s}
+  .card:hover{transform:translateY(-5px)}
+  .card .ico{font-size:30px;width:54px;height:54px;border-radius:12px;display:grid;place-items:center;
+    background:var(--c-soft)}
+  .card h3{margin:16px 0 6px;font-size:19px}
+  .card .cost{font-size:26px;font-weight:900;color:var(--c);margin-top:10px}
+  .card .cost small{font-size:13px;color:var(--muted);font-weight:600}
+  .card ul{margin-top:14px;padding-left:18px;font-size:14px;color:var(--muted)}
+  .card ul li{margin:6px 0}
+
+  /* SPLIT (variety) */
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:34px;align-items:center;
+    background:var(--card);border-radius:var(--radius);padding:30px;box-shadow:var(--shadow)}
+  .split img{width:100%;border-radius:12px;box-shadow:var(--shadow)}
+  .split h3{font-size:22px;margin-bottom:12px}
+  .split p{color:var(--muted);font-size:15px;margin-bottom:12px}
+  .tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  .tag{font-size:13px;padding:5px 12px;border-radius:20px;background:var(--green-light);color:var(--green-dark);font-weight:600}
+
+  /* COST */
+  .cost-grid{display:grid;grid-template-columns:300px 1fr;gap:40px;align-items:center;
+    background:var(--card);border-radius:var(--radius);padding:36px;box-shadow:var(--shadow)}
+  .donut{width:240px;height:240px;border-radius:50%;margin:0 auto;position:relative;
+    background:conic-gradient(var(--earth) 0 37.5%,var(--green) 37.5% 60%,var(--water) 60% 100%)}
+  .donut::after{content:"";position:absolute;inset:34px;background:var(--card);border-radius:50%;
+    box-shadow:inset 0 0 0 1px var(--line)}
+  .donut .center{position:absolute;inset:0;display:grid;place-content:center;text-align:center;z-index:2}
+  .donut .center b{font-size:30px;font-weight:900;color:var(--text)}
+  .donut .center span{font-size:13px;color:var(--muted)}
+  .legend{display:flex;flex-direction:column;gap:16px}
+  .lg{display:flex;align-items:center;gap:12px}
+  .lg .sw{width:16px;height:16px;border-radius:5px;flex:none}
+  .lg .nm{flex:1;font-weight:700}
+  .lg .vl{font-weight:800;color:var(--text)}
+  .lg .pc{color:var(--muted);font-size:13px;width:54px;text-align:right}
+  .bar{height:10px;border-radius:6px;background:var(--line);margin-top:6px;overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:6px}
+  .total-line{margin-top:20px;padding-top:18px;border-top:1px dashed var(--line);
+    display:flex;justify-content:space-between;align-items:baseline}
+  .total-line b{font-size:30px;color:var(--gold);font-weight:900}
+  .total-line span{color:var(--muted);font-size:14px}
+
+  /* TIMELINE */
+  .timeline{position:relative;margin-left:14px;padding-left:30px}
+  .timeline::before{content:"";position:absolute;left:7px;top:6px;bottom:6px;width:3px;
+    background:linear-gradient(180deg,var(--earth),var(--green),var(--water))}
+  .tl-item{position:relative;margin-bottom:26px}
+  .tl-item::before{content:"";position:absolute;left:-30px;top:5px;width:16px;height:16px;border-radius:50%;
+    background:var(--c);border:3px solid #fff;box-shadow:0 0 0 2px var(--c)}
+  .tl-time{font-weight:800;color:var(--c);font-size:15px}
+  .tl-box{background:var(--card);border-radius:12px;padding:14px 18px;margin-top:8px;
+    box-shadow:var(--shadow);border-left:4px solid var(--c)}
+  .tl-box .acts{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}
+  .pill{font-size:12.5px;padding:3px 10px;border-radius:16px;background:var(--c-soft);color:var(--c);font-weight:600}
+
+  /* TABLES */
+  .plan-block{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);
+    overflow:hidden;margin-bottom:34px;border-top:5px solid var(--c)}
+  .plan-head{background:var(--c-soft);padding:18px 24px;display:flex;align-items:center;gap:14px}
+  .plan-head .ph-ico{font-size:26px}
+  .plan-head h3{font-size:21px;color:var(--text)}
+  .plan-head .ph-cost{margin-left:auto;font-weight:800;color:var(--c);font-size:18px}
+  .tbl-scroll{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:680px}
+  thead th{background:var(--text);color:#fff;padding:12px 12px;text-align:left;font-weight:600;white-space:nowrap}
+  tbody td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  tbody tr:hover{background:#fcfbf6}
+  .stage-row td{background:var(--c-soft);font-weight:800;color:var(--c);padding:9px 14px;letter-spacing:.5px}
+  .prod{font-weight:700;color:var(--text)}
+  .target{color:var(--muted)}
+  .dose{white-space:nowrap;font-weight:600}
+  tfoot td{background:var(--green-light);font-weight:800;padding:12px;color:var(--green-dark)}
+  .muted-cell{color:var(--muted)}
+
+  /* NOTES */
+  .notes{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+  .note{background:var(--card);border-radius:12px;padding:20px 22px;box-shadow:var(--shadow);
+    border-left:4px solid var(--gold)}
+  .note b{display:block;margin-bottom:6px;color:var(--green-dark)}
+  .note p{font-size:14px;color:var(--muted)}
+
+  /* FARM IMAGE BANNER */
+  .farm{position:relative;border-radius:var(--radius);overflow:hidden;color:#fff;
+    box-shadow:var(--shadow);min-height:260px;display:flex;align-items:flex-end}
+  .farm img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .farm::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0),rgba(15,40,15,.8))}
+  .farm .ft{position:relative;z-index:2;padding:30px}
+  .farm h3{font-size:24px;margin-bottom:8px}
+  .farm p{max-width:560px;font-size:14.5px;opacity:.95}
+
+  footer{background:var(--green-dark);color:#e8f5e9;text-align:center;padding:40px 20px;margin-top:30px}
+  footer .big{font-size:30px;font-weight:900;color:#fff}
+  footer .big em{font-style:normal;color:var(--gold)}
+  footer p{opacity:.85;font-size:13.5px;margin-top:12px}
+
+  @media(max-width:860px){
+    .cards,.split,.cost-grid,.notes{grid-template-columns:1fr}
+    .cost-grid{gap:24px}
+    .nav-links{position:absolute;top:60px;right:0;left:0;flex-direction:column;gap:0;
+      background:var(--bg);border-bottom:1px solid var(--line);display:none}
+    .nav-links.open{display:flex}
+    .nav-links a{padding:14px 20px;border-bottom:1px solid var(--line)}
+    .nav-toggle{display:block}
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap nav-inner">
+    <div class="brand"><span class="dot"></span><span class="rainbow">七彩花生</span></div>
+    <button class="nav-toggle" aria-label="菜单">☰</button>
+    <div class="nav-links" id="navLinks">
+      <a href="#overview">方案总览</a>
+      <a href="#variety">品种介绍</a>
+      <a href="#cost">成本构成</a>
+      <a href="#timeline">生育期轴</a>
+      <a href="#plans">详细方案</a>
+      <a href="#notes">技术要点</a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<header class="hero">
+  <img src="assets/Aerial_landscape_view_of_a_vib_2026-08-19T12-55-31.png" alt="七彩花生种植基地航拍">
+  <div class="hero-inner">
+    <h1>七彩花生 · 全程植保技术方案</h1>
+    <p class="sub">科技植保 · 全生育期呵护 · 一亩一方案，从土壤到荚果的精准管理</p>
+    <div class="chips">
+      <div class="chip"><b>3</b><span>核心方案模块</span></div>
+      <div class="chip"><b>¥1600</b><span>亩建议零售价</span></div>
+      <div class="chip"><b>100天+</b><span>全生育期覆盖</span></div>
+      <div class="chip"><b>40+</b><span>农资产品组合</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- OVERVIEW -->
+<section id="overview">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="k">SCHEME OVERVIEW</span>
+      <h2>方案总览</h2>
+      <p>本方案由「底肥、叶面喷雾、灌根营养」三大模块构成，覆盖从播种前土壤处理到收获前的全生育期，形成立体化植保与营养管理网络。</p>
+    </div>
+    <div class="cards">
+      <div class="card" style="--c:var(--earth);--c-soft:#f3ead9">
+        <div class="ico">🌱</div>
+        <h3>底肥方案</h3>
+        <div class="cost">¥600<small> /亩</small></div>
+        <ul>
+          <li>播种前生石灰土壤消毒</li>
+          <li>有机肥 + 复合肥 + 杀菌剂三位一体</li>
+          <li>主攻：产量、黄曲霉毒素、生根</li>
+        </ul>
+      </div>
+      <div class="card" style="--c:var(--green);--c-soft:var(--green-light)">
+        <div class="ico">💧</div>
+        <h3>叶面喷雾植保方案</h3>
+        <div class="cost">¥360<small> /亩</small></div>
+        <ul>
+          <li>苗前封闭 + 苗后除草</li>
+          <li>控虫、杀菌、控旺、营养四位一体</li>
+          <li>7 个关键节点，贯穿全生育期</li>
+        </ul>
+      </div>
+      <div class="card" style="--c:var(--water);--c-soft:#dcecf6">
+        <div class="ico">🪴</div>
+        <h3>灌根植保营养方案</h3>
+        <div class="cost">¥640<small> /亩</small></div>
+        <ul>
+          <li>促根、防线虫、防地下害虫</li>
+          <li>根腐/白绢病专防 + 中微量元素</li>
+          <li>6 个节点，主攻荚果饱满度</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- VARIETY -->
+<section id="variety" style="background:#f3f1ea">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="k">VARIETY</span>
+      <h2>七彩花生 · 品种介绍</h2>
+    </div>
+    <div class="split">
+      <img src="assets/Close_up_studio_photo_of_fresh_2026-08-19T12-55-31.png" alt="七彩花生多彩荚果特写">
+      <div>
+        <h3>彩色种皮 · 营养与颜值兼修</h3>
+        <p>七彩花生（又称七彩野地花生）种皮天然呈现红、紫、黑、赭、米白等多种色泽，富含花青素、白藜芦醇与不饱和脂肪酸，是高端食用与礼品市场的特色品种。</p>
+        <p>因其种皮薄、风味足、商品价值高，对<strong>土壤健康、病害防控与荚果饱满度</strong>的要求更为严苛——这正是本全程方案设计的出发点。</p>
+        <div class="tags">
+          <span class="tag">高花青素</span>
+          <span class="tag">富白藜芦醇</span>
+          <span class="tag">特色礼品</span>
+          <span class="tag">需精细植保</span>
+          <span class="tag">忌连作</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COST -->
+<section id="cost">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="k">COST BREAKDOWN</span>
+      <h2>亩成本构成</h2>
+      <p>三大模块合计亩建议零售价 ¥1600。灌根营养占比最高，凸显七彩花生对根系健康与荚果品质的依赖；叶面与底肥协同保障植株健壮。</p>
+    </div>
+    <div class="cost-grid">
+      <div class="donut"><div class="center"><b>¥1600</b><span>亩建议零售价</span></div></div>
+      <div class="legend">
+        <div class="lg">
+          <span class="sw" style="background:var(--earth)"></span>
+          <span class="nm">底肥方案</span>
+          <span class="vl">¥600</span>
+          <span class="pc">37.5%</span>
+        </div>
+        <div class="bar"><i style="width:37.5%;background:var(--earth)"></i></div>
+        <div class="lg">
+          <span class="sw" style="background:var(--green)"></span>
+          <span class="nm">叶面喷雾植保</span>
+          <span class="vl">¥360</span>
+          <span class="pc">22.5%</span>
+        </div>
+        <div class="bar"><i style="width:22.5%;background:var(--green)"></i></div>
+        <div class="lg">
+          <span class="sw" style="background:var(--water)"></span>
+          <span class="nm">灌根植保营养</span>
+          <span class="vl">¥640</span>
+          <span class="pc">40.0%</span>
+        </div>
+        <div class="bar"><i style="width:40%;background:var(--water)"></i></div>
+        <div class="total-line">
+          <span>亩建议零售价（每亩）</span>
+          <b>¥1600</b>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TIMELINE -->
+<section id="timeline" style="background:#f3f1ea">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="k">GROWTH TIMELINE</span>
+      <h2>全生育期时间轴</h2>
+      <p>从播种前土壤处理到播后 100 天的收获前管理，三大模块按生育节点精准衔接。</p>
+    </div>
+    <div class="timeline">
+      <div class="tl-item" style="--c:var(--earth);--c-soft:#f3ead9">
+        <div class="tl-time">播种前</div>
+        <div class="tl-box"><strong>土壤处理（底肥模块）</strong>
+          <div class="acts"><span class="pill">生石灰 土壤消毒</span></div></div>
+      </div>
+      <div class="tl-item" style="--c:var(--earth);--c-soft:#f3ead9">
+        <div class="tl-time">整地期</div>
+        <div class="tl-box"><strong>底肥施用（底肥模块）</strong>
+          <div class="acts"><span class="pill">友擎有机肥</span><span class="pill">高富专 13-17-15</span><span class="pill">地腾 精甲·嘧菌酯</span></div></div>
+      </div>
+      <div class="tl-item" style="--c:var(--green);--c-soft:var(--green-light)">
+        <div class="tl-time">播后苗前</div>
+        <div class="tl-box"><strong>封闭除草（叶面模块）</strong>
+          <div class="acts"><span class="pill">精异丙甲草胺</span><span class="pill">双氯磺草胺</span></div></div>
+      </div>
+      <div class="tl-item" style="--c:var(--green);--c-soft:var(--green-light)">
+        <div class="tl-time">苗后</div>
+        <div class="tl-box"><strong>苗后除草（叶面模块）</strong>
+          <div class="acts"><span class="pill">烯草酮</span><span class="pill">双氯磺草胺</span></div></div>
+      </div>
+      <div class="tl-item" style="--c:var(--green);--c-soft:var(--green-light)">
+        <div class="tl-time">播后 15–20 天</div>
+        <div class="tl-box"><strong>杀虫杀菌控旺 + 促根防线虫</strong>
+          <div class="acts"><span class="pill" style="background:#dcecf6;color:var(--water)">灌根：根际香土</span><span class="pill" style="background:#dcecf6;color:var(--water)">灌根：削线</span><span class="pill">叶面：锐动/铜拳/腾丰</span><span class="pill">叶面：美得乐/硼钼/小胖子</span></div></div>
+      </div>
+      <div class="tl-item" style="--c:var(--green);--c-soft:var(--green-light)">
+        <div class="tl-time">播后 25–30 天（50% 开花）</div>
+        <div class="tl-box"><strong>开花期立体管理</strong>
+          <div class="acts"><span class="pill" style="background:#dcecf6;color:var(--water)">灌根：剿灭/苗乐乐/水溶肥</span><span class="pill">叶面：秀艳/适大进/磷酸二氢钾</span></div></div>
+      </div>
+      <div class="tl-item" style="--c:var(--water);--c-soft:#dcecf6">
+        <div class="tl-time">播后 30–40 天</div>
+        <div class="tl-box"><strong>下针与荚果膨大（灌根为主）</strong>
+          <div class="acts"><span class="pill">水溶肥 12-30-8</span><span class="pill">铠仆 海藻</span><span class="pill">泰稳丰 钙镁</span><span class="pill" style="background:var(--green-light);color:var(--green)">叶面：秀艳/美得乐</span></div></div>
+      </div>
+      <div class="tl-item" style="--c:var(--green);--c-soft:var(--green-light)">
+        <div class="tl-time">播后 55–80 天</div>
+        <div class="tl-box"><strong>荚果充实期（叶面为主）</strong>
+          <div class="acts"><span class="pill">叶面：秀艳/拜亩乐/金收</span><span class="pill">叶面：妥控/适大进 控旺</span><span class="pill">叶面：持续杀虫防病</span></div></div>
+      </div>
+      <div class="tl-item" style="--c:var(--water);--c-soft:#dcecf6">
+        <div class="tl-time">荚果期（80% 封垄）</div>
+        <div class="tl-box"><strong>荚果期营养与防病（灌根）</strong>
+          <div class="acts"><span class="pill">水溶肥 10-5-35</span><span class="pill">泰稳丰</span><span class="pill">苗乐乐 防白绢病</span><span class="pill">削线 防线虫</span></div></div>
+      </div>
+      <div class="tl-item" style="--c:var(--water);--c-soft:#dcecf6">
+        <div class="tl-time">间隔 7–10 天 ×2</div>
+        <div class="tl-box"><strong>追肥巩固（灌根）</strong>
+          <div class="acts"><span class="pill">水溶肥 10-5-35</span><span class="pill">根际香土</span><span class="pill">泰稳丰</span></div></div>
+      </div>
+      <div class="tl-item" style="--c:var(--green);--c-soft:var(--green-light)">
+        <div class="tl-time">播后 100 天</div>
+        <div class="tl-box"><strong>收获前保叶增产（叶面）</strong>
+          <div class="acts"><span class="pill">虫螨腈·虱螨脲</span><span class="pill">铜拳/锐动</span><span class="pill">金收/拜亩乐</span><span class="pill">美得乐/硼钼</span></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PLANS -->
+<section id="plans">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="k">DETAILED PLANS</span>
+      <h2>三大模块详细方案</h2>
+      <p>以下为各模块按生育期排列的农资组合、防治靶标与用量。各模块仅列汇总报价，不再展示逐条明细。</p>
+    </div>
+
+    <!-- 底肥方案 -->
+    <div class="plan-block" style="--c:var(--earth);--c-soft:#f3ead9">
+      <div class="plan-head"><span class="ph-ico">🌱</span><h3>一、底肥方案</h3><span class="ph-cost">亩汇总 ¥600</span></div>
+      <div class="tbl-scroll">
+        <table>
+          <thead><tr><th>作物生长期</th><th>农资产品</th><th>防治靶标</th><th>用量</th><th>使用方法</th><th>技术要领</th><th>注意事项</th></tr></thead>
+          <tbody>
+            <tr><td>播种前土壤处理</td><td class="prod">生石灰</td><td class="target">土壤消毒</td><td class="dose">50–80 kg/亩</td><td>撒施</td><td>均匀撒施</td><td>与底肥使用时间间隔最少 7 天</td></tr>
+            <tr><td>底肥方案</td><td class="prod">友擎有机肥</td><td class="target">产量</td><td class="dose">80 kg/亩</td><td>撒施</td><td>覆土、均匀分布 10–30 厘米</td><td>尽量不要裸露在土壤表面</td></tr>
+            <tr><td>底肥方案</td><td class="prod">高富专（13-17-15）</td><td class="target">产量、黄曲霉毒素</td><td class="dose">40 kg/亩</td><td>撒施</td><td>覆土、均匀分布 10–30 厘米</td><td>不能直接接触作物根系</td></tr>
+            <tr><td>底肥方案</td><td class="prod">地腾（0.8%精甲·嘧菌酯）</td><td class="target">茎基腐、生根</td><td class="dose">5 kg/亩</td><td>撒施</td><td>覆土、均匀分布 10–30 厘米</td><td>不能直接接触作物根系</td></tr>
+          </tbody>
+          <tfoot><tr><td colspan="6">底肥方案 亩汇总合计</td><td>¥600</td></tr></tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- 叶面喷雾 -->
+    <div class="plan-block" style="--c:var(--green);--c-soft:var(--green-light)">
+      <div class="plan-head"><span class="ph-ico">💧</span><h3>二、叶面喷雾植保方案</h3><span class="ph-cost">亩汇总 ¥360</span></div>
+      <div class="tbl-scroll">
+        <table>
+          <thead><tr><th>作物生长期</th><th>农资产品</th><th>防治靶标</th><th>用量</th><th>使用方法</th><th>技术要领</th><th>注意事项</th></tr></thead>
+          <tbody>
+            <tr class="stage-row"><td colspan="7">▶ 播后苗前</td></tr>
+            <tr><td>播后苗前</td><td class="prod">960克/升精异丙甲草胺</td><td class="target">尖叶草封闭</td><td class="dose">50–100 ml/亩</td><td>喷雾</td><td>播后 3 天内使用，墒情适中</td><td>均匀喷雾</td></tr>
+            <tr><td>播后苗前</td><td class="prod">84%双氯磺草胺</td><td class="target">阔叶草封闭</td><td class="dose">3–4 g/亩</td><td>喷雾</td><td>播后 3 天内使用，墒情适中</td><td>均匀喷雾</td></tr>
+            <tr class="stage-row"><td colspan="7">▶ 苗后除草</td></tr>
+            <tr><td>苗后除草</td><td class="prod">烯草酮</td><td class="target">尖叶草</td><td class="dose">50 ml/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>苗后除草</td><td class="prod">84%双氯磺草胺</td><td class="target">阔叶草封闭</td><td class="dose">2 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td>均匀喷雾</td></tr>
+            <tr class="stage-row"><td colspan="7">▶ 播后 15–20 天</td></tr>
+            <tr><td>播后15-20天</td><td class="prod">锐动（200g/L氯虫苯甲酰胺）</td><td class="target">控虫</td><td class="dose">30 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后15-20天</td><td class="prod">铜拳（16%甲维盐·茚虫威）</td><td class="target">杀虫</td><td class="dose">30 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后15-20天</td><td class="prod">24%虫螨腈·虱螨脲</td><td class="target">杀虫</td><td class="dose">30 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后15-20天</td><td class="prod">腾丰（28%环丙唑醇·嘧菌酯）</td><td class="target">控旺、防病、矮节</td><td class="dose">30 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后15-20天</td><td class="prod">美得乐（80%克菌丹）</td><td class="target">叶斑类病害、锈病</td><td class="dose">30 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后15-20天</td><td class="prod">微量元素聚合磷飞防助剂</td><td class="target">营养、抗絮凝</td><td class="dose">100 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后15-20天</td><td class="prod">硼钼</td><td class="target">营养</td><td class="dose">100 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后15-20天</td><td class="prod">小胖子（27.5%胺鲜酯·甲哌鎓）</td><td class="target">控旺</td><td class="dose">50 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr class="stage-row"><td colspan="7">▶ 播后 25–30 天（50% 开花）</td></tr>
+            <tr><td>播后25-30天</td><td class="prod">秀艳（32%苯甲·肟菌酯）</td><td class="target">矮节、叶片增厚</td><td class="dose">30 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后25-30天</td><td class="prod">24%虫螨腈·虱螨脲</td><td class="target">杀虫</td><td class="dose">50 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后25-30天</td><td class="prod">铜拳（16%甲维盐·茚虫威）</td><td class="target">杀虫</td><td class="dose">30 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后25-30天</td><td class="prod">锐动（200g/L氯虫苯甲酰胺）</td><td class="target">控虫</td><td class="dose">30 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后25-30天</td><td class="prod">适大进（15%调环酸钙）</td><td class="target">控旺</td><td class="dose">20 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后25-30天</td><td class="prod">磷酸二氢钾（洋丰）</td><td class="target">营养、控旺</td><td class="dose">100 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后25-30天</td><td class="prod">微量元素聚合磷飞防助剂</td><td class="target">营养、抗絮凝</td><td class="dose">100 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后25-30天</td><td class="prod">硼钼</td><td class="target">营养</td><td class="dose">100 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr class="stage-row"><td colspan="7">▶ 播后 35–40 天左右</td></tr>
+            <tr><td>播后35-40天</td><td class="prod">铜拳（16%甲维盐·茚虫威）</td><td class="target">杀虫</td><td class="dose">30 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后35-40天</td><td class="prod">锐动（200g/L氯虫苯甲酰胺）</td><td class="target">控虫</td><td class="dose">30 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后35-40天</td><td class="prod">美得乐（80%克菌丹）</td><td class="target">叶斑类病害、锈病</td><td class="dose">30 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后35-40天</td><td class="prod">秀艳（32%苯甲·肟菌酯）</td><td class="target">矮节、叶片增厚</td><td class="dose">30 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后35-40天</td><td class="prod">适大进（15%调环酸钙）</td><td class="target">控旺</td><td class="dose">30 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后35-40天</td><td class="prod">微量元素聚合磷飞防助剂</td><td class="target">营养、抗絮凝</td><td class="dose">100 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后35-40天</td><td class="prod">磷酸二氢钾（洋丰）</td><td class="target">营养、控旺</td><td class="dose">100 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后35-40天</td><td class="prod">硼钼</td><td class="target">营养</td><td class="dose">100 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr class="stage-row"><td colspan="7">▶ 播后 55–60 天左右</td></tr>
+            <tr><td>播后55-60天</td><td class="prod">秀艳（32%苯甲·肟菌酯）</td><td class="target">矮节、叶片增厚</td><td class="dose">30 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后55-60天</td><td class="prod">美得乐（80%克菌丹）</td><td class="target">叶斑类病害、锈病</td><td class="dose">30 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后55-60天</td><td class="prod">24%虫螨腈·虱螨脲</td><td class="target">杀虫</td><td class="dose">50 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后55-60天</td><td class="prod">铜拳（16%甲维盐·茚虫威）</td><td class="target">杀虫</td><td class="dose">30 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后55-60天</td><td class="prod">锐动（200g/L氯虫苯甲酰胺）</td><td class="target">控虫</td><td class="dose">30 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后55-60天</td><td class="prod">妥控（15%烯效唑·调环酸钙）</td><td class="target">控旺</td><td class="dose">30 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后55-60天</td><td class="prod">微量元素聚合磷飞防助剂</td><td class="target">营养、抗絮凝</td><td class="dose">100 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后55-60天</td><td class="prod">磷酸二氢钾（洋丰）</td><td class="target">营养、控旺</td><td class="dose">100 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后55-60天</td><td class="prod">硼钼</td><td class="target">营养</td><td class="dose">100 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后55-60天</td><td class="prod">金收（5%胺鲜酯）</td><td class="target">营养、增产</td><td class="dose">50 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后55-60天</td><td class="prod">拜亩乐（28%啶氧菌酯·环丙唑醇）</td><td class="target">增产、防病</td><td class="dose">30 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr class="stage-row"><td colspan="7">▶ 播后 75–80 天左右</td></tr>
+            <tr><td>播后75-80天</td><td class="prod">锐动（200g/L氯虫苯甲酰胺）</td><td class="target">控虫</td><td class="dose">30 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后75-80天</td><td class="prod">24%虫螨腈·虱螨脲</td><td class="target">杀虫</td><td class="dose">50 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后75-80天</td><td class="prod">铜拳（16%甲维盐·茚虫威）</td><td class="target">杀虫</td><td class="dose">30 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后75-80天</td><td class="prod">适大进（15%调环酸钙）</td><td class="target">控旺</td><td class="dose">30 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后75-80天</td><td class="prod">微量元素聚合磷飞防助剂</td><td class="target">营养、抗絮凝</td><td class="dose">100 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后75-80天</td><td class="prod">磷酸二氢钾（洋丰）</td><td class="target">营养、控旺</td><td class="dose">100 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后75-80天</td><td class="prod">金收（5%胺鲜酯）</td><td class="target">营养、增产</td><td class="dose">50 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后75-80天</td><td class="prod">美得乐（80%克菌丹）</td><td class="target">叶斑类病害、锈病</td><td class="dose">50 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后75-80天</td><td class="prod">硼钼</td><td class="target">营养</td><td class="dose">100 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后75-80天</td><td class="prod">拜亩乐（28%啶氧菌酯·环丙唑醇）</td><td class="target">增产、防病</td><td class="dose">30 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr class="stage-row"><td colspan="7">▶ 播后 100 天左右</td></tr>
+            <tr><td>播后100天</td><td class="prod">24%虫螨腈·虱螨脲</td><td class="target">杀虫</td><td class="dose">50 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后100天</td><td class="prod">铜拳（16%甲维盐·茚虫威）</td><td class="target">杀虫</td><td class="dose">30 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后100天</td><td class="prod">锐动（200g/L氯虫苯甲酰胺）</td><td class="target">控虫</td><td class="dose">30 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后100天</td><td class="prod">微量元素聚合磷飞防助剂</td><td class="target">营养、抗絮凝</td><td class="dose">100 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后100天</td><td class="prod">磷酸二氢钾（洋丰）</td><td class="target">营养、控旺</td><td class="dose">100 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后100天</td><td class="prod">硼钼</td><td class="target">营养</td><td class="dose">100 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后100天</td><td class="prod">美得乐（80%克菌丹）</td><td class="target">叶斑类病害、锈病</td><td class="dose">50 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后100天</td><td class="prod">金收（5%胺鲜酯）</td><td class="target">营养、增产</td><td class="dose">50 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后100天</td><td class="prod">拜亩乐（28%啶氧菌酯·环丙唑醇）</td><td class="target">增产、防病</td><td class="dose">30 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+          </tbody>
+          <tfoot><tr><td colspan="6">叶面喷雾植保方案 亩汇总合计</td><td>¥360</td></tr></tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- 灌根 -->
+    <div class="plan-block" style="--c:var(--water);--c-soft:#dcecf6">
+      <div class="plan-head"><span class="ph-ico">🪴</span><h3>三、灌根植保营养方案</h3><span class="ph-cost">亩汇总 ¥640</span></div>
+      <div class="tbl-scroll">
+        <table>
+          <thead><tr><th>作物生长期</th><th>农资产品</th><th>防治靶标</th><th>用量</th><th>使用方法</th><th>技术要领</th><th>注意事项</th></tr></thead>
+          <tbody>
+            <tr class="stage-row"><td colspan="7">▶ 播后 15–20 天</td></tr>
+            <tr><td>播后15-20天</td><td class="prod">根际香土（虾肽、寡糖、虾红素）</td><td class="target">氨基酸、促根、线虫</td><td class="dose">2 kg/亩</td><td>灌根</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后15-20天</td><td class="prod">削线</td><td class="target">线虫</td><td class="dose">1 kg/亩</td><td>灌根</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr class="stage-row"><td colspan="7">▶ 播后 25–30 天（50% 开花）</td></tr>
+            <tr><td>播后25-30天</td><td class="prod">根际香土（虾肽、寡糖、虾红素）</td><td class="target">氨基酸、促根、线虫</td><td class="dose">2 kg/亩</td><td>灌根</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后25-30天</td><td class="prod">剿灭（12%高氯氟·噻虫胺）</td><td class="target">地下害虫</td><td class="dose">500 ml/亩</td><td>灌根</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后25-30天</td><td class="prod">苗乐乐（11%噻呋酰胺·嘧菌酯·寡糖）</td><td class="target">根腐、白绢病</td><td class="dose">250 ml/亩</td><td>灌根</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后25-30天</td><td class="prod">大量元素水溶肥 12-30-8</td><td class="target">补充营养</td><td class="dose">2 kg/亩</td><td>灌根</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr class="stage-row"><td colspan="7">▶ 播后 30–35 天</td></tr>
+            <tr><td>播后30-35天</td><td class="prod">大量元素水溶肥 12-30-8</td><td class="target">补充营养</td><td class="dose">2 kg/亩</td><td>灌根</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后30-35天</td><td class="prod">铠仆（海藻）</td><td class="target">抗逆、加速下针</td><td class="dose">1 L/亩</td><td>灌根</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr class="stage-row"><td colspan="7">▶ 播后 35–40 天</td></tr>
+            <tr><td>播后35-40天</td><td class="prod">大量元素水溶肥 12-30-8</td><td class="target">补充营养</td><td class="dose">2 kg/亩</td><td>灌根</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>播后35-40天</td><td class="prod">泰稳丰（钙镁中微量）</td><td class="target">空心果</td><td class="dose">1 L/亩</td><td>灌根</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr class="stage-row"><td colspan="7">▶ 荚果期（80% 封垄、鸡头状）</td></tr>
+            <tr><td>荚果期</td><td class="prod">大量元素水溶肥 10-5-35</td><td class="target">补充营养</td><td class="dose">2 kg/亩</td><td>灌根</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>荚果期</td><td class="prod">泰稳丰（钙镁中微量）</td><td class="target">空心果</td><td class="dose">1 L/亩</td><td>灌根</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>荚果期</td><td class="prod">苗乐乐（11%噻呋酰胺·嘧菌酯·寡糖）</td><td class="target">根腐、白绢病</td><td class="dose">350 ml/亩</td><td>灌根</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>荚果期</td><td class="prod">削线</td><td class="target">线虫</td><td class="dose">1 kg/亩</td><td>灌根</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr class="stage-row"><td colspan="7">▶ 间隔 7–10 天</td></tr>
+            <tr><td>间隔7-10天</td><td class="prod">大量元素水溶肥 10-5-35</td><td class="target">补充营养</td><td class="dose">3 kg/亩</td><td>灌根</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>间隔7-10天</td><td class="prod">根际香土（虾肽、寡糖、虾红素）</td><td class="target">氨基酸、促根、线虫</td><td class="dose">2 kg/亩</td><td>灌根</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>间隔7-10天</td><td class="prod">泰稳丰（钙镁中微量）</td><td class="target">空心果</td><td class="dose">1 L/亩</td><td>灌根</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr class="stage-row"><td colspan="7">▶ 间隔 7–10 天（续）</td></tr>
+            <tr><td>间隔7-10天</td><td class="prod">大量元素水溶肥 10-5-35</td><td class="target">补充营养</td><td class="dose">3 kg/亩</td><td>灌根</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+            <tr><td>间隔7-10天</td><td class="prod">泰稳丰（钙镁中微量）</td><td class="target">空心果</td><td class="dose">1 L/亩</td><td>灌根</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
+          </tbody>
+          <tfoot><tr><td colspan="6">灌根植保营养方案 亩汇总合计</td><td>¥640</td></tr></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FARM BANNER -->
+<section id="operation" style="padding-top:0">
+  <div class="wrap">
+    <div class="farm">
+      <img src="assets/A_Chinese_farmer_in_straw_hat__2026-08-19T12-55-31.png" alt="农户田间植保作业">
+      <div class="ft">
+        <h3>科学植保 · 落地到每一亩</h3>
+        <p>方案中的叶面喷雾与灌根作业建议结合墒情、天气与飞防助剂统一实施，确保药剂均匀、吸收充分，最大限度发挥七彩花生的品质潜力。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- NOTES -->
+<section id="notes" style="background:#f3f1ea">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="k">KEY NOTES</span>
+      <h2>关键技术要点与注意事项</h2>
+    </div>
+    <div class="notes">
+      <div class="note"><b>⏱ 生石灰与底肥间隔</b><p>播种前土壤消毒用的生石灰，必须与底肥施用时间间隔至少 7 天，避免烧根与肥效损失。</p></div>
+      <div class="note"><b>🚫 化肥/杀菌剂勿触根</b><p>高富专、地腾等底肥成分严禁直接接触作物根系，须覆土并均匀分布于 10–30 厘米土层。</p></div>
+      <div class="note"><b>💧 苗前封闭看墒情</b><p>精异丙甲草胺、双氯磺草胺须在播后 3 天内、墒情适中时均匀喷雾，封闭除草效果最佳。</p></div>
+      <div class="note"><b>🌿 有机肥勿裸露</b><p>友擎有机肥撒施后尽量覆土，避免裸露于土壤表面造成养分挥发与流失。</p></div>
+      <div class="note"><b>🪴 灌根护根防病</b><p>根际香土、苗乐乐、削线等灌根产品主攻促根、防线虫与根腐/白绢病，是七彩花生荚果饱满的关键。</p></div>
+      <div class="note"><b>⚖️ 控旺贯穿全程</b><p>小胖子、适大进、妥控等控旺药剂在多个节点使用，防止旺长、促进矮节与荚果充实。</p></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="big">亩建议零售价 <em>¥1600</em> / 亩</div>
+  <p>底肥 ¥600 ＋ 叶面喷雾 ¥360 ＋ 灌根营养 ¥640 ＝ 亩建议零售价 ¥1600</p>
+  <p>数据来源：《七彩花生管理方案-最新.xlsx》· 全程植保技术方案 · 编制于 2026-08-19</p>
+</footer>
+
+<script>
+  // 移动端菜单
+  const toggle=document.querySelector('.nav-toggle');
+  const links=document.getElementById('navLinks');
+  toggle.addEventListener('click',()=>links.classList.toggle('open'));
+  links.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>links.classList.remove('open')));
+  // 滚动高亮
+  const secs=[...document.querySelectorAll('section[id]')];
+  const navA=[...document.querySelectorAll('.nav-links a')];
+  const obs=new IntersectionObserver(es=>{
+    es.forEach(e=>{
+      if(e.isIntersecting){
+        const id=e.target.id;
+        navA.forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#'+id));
+      }
+    });
+  },{rootMargin:'-45% 0px -50% 0px'});
+  secs.forEach(s=>obs.observe(s));
+</script>
+</body>
+</html>
