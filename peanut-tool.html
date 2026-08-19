@@ -18,6 +18,8 @@
   .topbar strong{display:block;font-size:18px;color:var(--g-700)}
   .topbar span{font-size:12px;color:var(--ink-2)}
   .sync-pill{font-size:12px;padding:6px 12px;border-radius:999px;background:var(--g-50);color:var(--g-700);border:1px solid var(--g-100)}
+  .nav-link-pill{font-size:12px;padding:6px 14px;border-radius:999px;background:var(--g-50);color:var(--g-700);border:1px solid var(--g-200);text-decoration:none;font-weight:600;white-space:nowrap;transition:background .15s}
+  .nav-link-pill:hover{background:var(--g-100);border-color:var(--g-400)}
   .auth-bar{display:flex;align-items:center;gap:8px;margin-left:auto}
   .auth-status{font-size:12px;color:var(--ink-2)}
   .auth-btn{font-size:12px;padding:5px 12px;border-radius:999px;border:1px solid var(--g-600);background:#fff;color:var(--g-700);cursor:pointer;white-space:nowrap}
@@ -275,7 +277,12 @@
       <strong>润野 · 七彩花生水肥决策</strong>
       <span>全岛天气抓取 · 种植天数识别 · 底肥校正</span>
     </div>
-    <div class="sync-pill" id="syncPill">等待抓取昨日天气</div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <a class="nav-link-pill" href="runye-landing.html">农事看板</a>
+      <a class="nav-link-pill" href="index.html">精准灌溉</a>
+      <a class="nav-link-pill" href="数字农业.html">数字农业</a>
+      <div class="sync-pill" id="syncPill">等待抓取昨日天气</div>
+    </div>
   </header>
 
   <section class="hero-grid">
