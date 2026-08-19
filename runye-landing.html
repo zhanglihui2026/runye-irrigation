@@ -30,30 +30,62 @@
   .utility-right{display:flex;gap:18px;align-items:center;}
   .utility-divider{width:1px;height:12px;background:var(--s-600);}
 
-  /* ===== 主导航 ===== */
-  .main-header{background:#fff;position:sticky;top:0;z-index:100;box-shadow:var(--shadow-sm);border-bottom:1px solid var(--s-100);}
-  .header-inner{max-width:var(--maxw);margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:72px;}
-  .brand{display:flex;align-items:center;gap:12px;}
-  .brand-logo{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,var(--g-700),var(--teal));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:18px;box-shadow:0 4px 12px rgba(22,163,74,.25);}
-  .brand-text{display:flex;flex-direction:column;line-height:1.2;}
-  .brand-name{font-size:18px;font-weight:800;color:var(--g-800);letter-spacing:.5px;}
-  .brand-sub{font-size:11px;color:var(--s-500);letter-spacing:1px;text-transform:uppercase;}
-
-  .main-nav{display:flex;align-items:center;gap:4px;}
-  .nav-item{position:relative;}
-  .nav-link{position:relative;display:flex;align-items:center;gap:4px;padding:8px 14px;font-size:14px;font-weight:600;color:var(--s-700);transition:var(--transition);white-space:nowrap;}
-  .nav-link::after{content:"";position:absolute;left:14px;right:14px;bottom:0;height:2px;background:var(--g-600);opacity:0;transform:scaleX(.4);transition:var(--transition);}
-  .nav-link:hover{color:var(--g-700);}
-  .nav-link:hover::after{opacity:1;transform:scaleX(1);}
-  .nav-link.active{color:var(--g-700);}
-  .nav-link.active::after{opacity:1;transform:scaleX(1);}
-  .nav-link .arrow{font-size:10px;opacity:.6;}
-
-  .header-actions{display:flex;align-items:center;gap:16px;}
-  .search-btn{width:36px;height:36px;border-radius:0;border:1px solid var(--s-200);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition);color:var(--s-600);}
-  .search-btn:hover{background:var(--g-700);border-color:var(--g-700);color:#fff;}
-  .mobile-menu-btn{display:none;flex-direction:column;gap:5px;padding:8px;cursor:pointer;}
-  .mobile-menu-btn span{display:block;width:22px;height:2px;background:var(--s-700);border-radius:0;}
+/* ===== RY-NAV: 主页导航嵌入（与精准灌溉页 index.html 完全一致） ===== */
+.ry-nav{
+  position:sticky;top:0;z-index:1500;
+  --g-50:#f0fdf4;--g-100:#dcfce7;--g-200:#bbf7d0;--g-300:#86efac;--g-400:#4ade80;--g-500:#22c55e;--g-600:#16a34a;--g-700:#15803d;--g-800:#166534;--g-900:#14532d;
+  --teal:#0d9488;--teal-700:#0f766e;
+  --s-50:#f8fafc;--s-100:#f1f5f9;--s-200:#e2e8f0;--s-300:#cbd5e1;--s-400:#94a3b8;--s-500:#64748b;--s-600:#475569;--s-700:#334155;--s-800:#1e293b;--s-900:#0f172a;
+  --shadow-sm:0 2px 8px rgba(15,23,42,.06);
+  --transition:all .2s ease;
+  --maxw:1280px;
+  font-family:"Microsoft YaHei","PingFang SC","Segoe UI",system-ui,-apple-system,sans-serif;
+}
+.ry-nav .utility-bar{background:var(--s-800);color:var(--s-300);font-size:12px;}
+.ry-nav .utility-inner{max-width:var(--maxw);margin:0 auto;padding:8px 24px;display:flex;justify-content:space-between;align-items:center;}
+.ry-nav .utility-left{display:flex;gap:18px;align-items:center;}
+.ry-nav .utility-left a,.ry-nav .utility-right a{color:var(--s-300);transition:var(--transition);text-decoration:none;}
+.ry-nav .utility-left a:hover,.ry-nav .utility-right a:hover{color:#fff;}
+.ry-nav .utility-right{display:flex;gap:18px;align-items:center;}
+.ry-nav .utility-divider{width:1px;height:12px;background:var(--s-600);}
+.ry-nav .main-header{background:#fff;box-shadow:var(--shadow-sm);border-bottom:1px solid var(--s-100);padding:0;margin:0;}
+.ry-nav .header-inner{max-width:var(--maxw);margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:72px;}
+.ry-nav .brand{display:flex;align-items:center;gap:12px;text-decoration:none;}
+.ry-nav .brand-logo{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,var(--g-700),var(--teal));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:18px;box-shadow:0 4px 12px rgba(22,163,74,.25);}
+.ry-nav .brand-text{display:flex;flex-direction:column;line-height:1.2;}
+.ry-nav .brand-name{font-size:18px;font-weight:800;color:var(--g-800);letter-spacing:.5px;}
+.ry-nav .brand-sub{font-size:11px;color:var(--s-500);letter-spacing:1px;text-transform:uppercase;}
+.ry-nav .main-nav{display:flex;align-items:center;gap:4px;}
+.ry-nav .nav-item{position:relative;}
+.ry-nav .nav-link{position:relative;display:flex;align-items:center;gap:4px;padding:8px 14px;font-size:14px;font-weight:600;color:var(--s-700);transition:var(--transition);white-space:nowrap;text-decoration:none;}
+.ry-nav .nav-link::after{content:"";position:absolute;left:14px;right:14px;bottom:0;height:2px;background:var(--g-600);opacity:0;transform:scaleX(.4);transition:var(--transition);}
+.ry-nav .nav-link:hover{color:var(--g-700);}
+.ry-nav .nav-link:hover::after{opacity:1;transform:scaleX(1);}
+.ry-nav .nav-link.active{color:var(--g-700);}
+.ry-nav .nav-link.active::after{opacity:1;transform:scaleX(1);}
+.ry-nav .header-actions{display:flex;align-items:center;gap:16px;}
+.ry-nav .search-btn{width:36px;height:36px;border:1px solid var(--s-200);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition);color:var(--s-600);}
+.ry-nav .search-btn:hover{background:var(--g-700);border-color:var(--g-700);color:#fff;}
+.ry-nav .mobile-menu-btn{display:none;flex-direction:column;gap:5px;padding:8px;cursor:pointer;}
+.ry-nav .mobile-menu-btn span{display:block;width:22px;height:2px;background:var(--s-700);border-radius:0;}
+.ry-nav .nav-home-btn{margin-left:8px;display:inline-flex;align-items:center;gap:6px;padding:9px 16px;background:var(--g-700);color:#fff;font-size:14px;font-weight:700;text-decoration:none;border:0;border-radius:0;cursor:pointer;transition:var(--transition);white-space:nowrap;letter-spacing:.5px;}
+.ry-nav .nav-home-btn:hover{background:var(--g-800);}
+/* 手机端导航：取消汉堡弹窗，顶部常驻一行横向滑动（与精准灌溉页 index.html 完全一致） */
+@media(max-width:768px){
+  .ry-nav .main-header{height:auto}
+  .ry-nav .header-inner{flex-wrap:wrap;height:auto;align-items:center;padding:8px 14px 0;gap:0;}
+  .ry-nav .brand{height:46px;flex:1 1 auto}
+  .ry-nav .header-actions{margin-left:auto;order:2}
+  .ry-nav .mobile-menu-btn{display:none !important}
+  .ry-nav .nav-home-btn{display:none !important}
+  .ry-nav .main-nav{display:flex !important;position:static;flex-direction:row;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;width:100%;order:3;gap:0;margin-top:6px;padding:0;background:#fff;box-shadow:none;border-top:1px solid var(--s-100);}
+  .ry-nav .main-nav::-webkit-scrollbar{display:none}
+  .ry-nav .main-nav .nav-item{flex:0 0 auto}
+  .ry-nav .nav-link{padding:11px 15px;font-size:13px;border-bottom:none;border-right:1px solid var(--s-50);white-space:nowrap;}
+  .ry-nav .nav-link::after{display:none}
+  .ry-nav .utility-bar{display:none}
+}
+/* ===== /RY-NAV ===== */
 
   /* ===== HERO ===== */
   .hero{position:relative;height:calc(100vh - 110px);min-height:560px;max-height:760px;overflow:hidden;display:flex;align-items:center;}
@@ -192,37 +224,51 @@ input[type="reset"],
   </div>
 </div>
 
-<!-- 主导航 -->
-<header class="main-header">
-  <div class="header-inner">
-    <a href="runye-landing.html" class="brand">
-      <div class="brand-logo">润</div>
-      <div class="brand-text">
-        <span class="brand-name">润野灌溉</span>
-        <span class="brand-sub">Runye Irrigation</span>
+<!-- 主页导航（嵌入，与精准灌溉页 index.html 完全一致） -->
+<div class="ry-nav">
+  <div class="utility-bar">
+    <div class="utility-inner">
+      <div class="utility-left">
+        <a href="runye-landing.html">联系我们</a>
+        <a href="runye-landing.html">常见问题</a>
+        <a href="runye-landing.html">下载中心</a>
       </div>
-    </a>
-
-    <nav class="main-nav" id="mainNav">
-      <div class="nav-item"><a href="index.html" class="nav-link active">精准灌溉</a></div>
-      <div class="nav-item"><a href="耐特菲姆滴灌带长度查询器.html" class="nav-link">滴灌带查询</a></div>
-      <div class="nav-item"><a href="index.html#three-level-view" class="nav-link">三级系统</a></div>
-      <div class="nav-item"><a href="数字农业.html" class="nav-link">数字农业</a></div>
-      <div class="nav-item"><a href="#" class="nav-link">农事看板</a></div>
-      <div class="nav-item"><a href="#" class="nav-link">关于我们</a></div>
-    </nav>
-
-    <a href="runye-landing.html" class="nav-home-btn">⌂ 返回主页</a>
-    <div class="header-actions">
-      <button class="search-btn" title="搜索" aria-label="搜索">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
-      </button>
-      <div class="mobile-menu-btn" id="mobileMenuBtn" aria-label="菜单">
-        <span></span><span></span><span></span>
+      <div class="utility-right">
+        <a href="runye-landing.html">语言</a>
+        <span class="utility-divider"></span>
+        <a href="runye-landing.html">中 / EN</a>
       </div>
     </div>
   </div>
-</header>
+  <header class="main-header">
+    <div class="header-inner">
+      <a href="runye-landing.html" class="brand">
+        <div class="brand-logo">润</div>
+        <div class="brand-text">
+          <span class="brand-name">润野灌溉</span>
+          <span class="brand-sub">Runye Irrigation</span>
+        </div>
+      </a>
+      <nav class="main-nav" id="mainNav">
+        <div class="nav-item"><a href="index.html" class="nav-link">精准灌溉</a></div>
+        <div class="nav-item"><a href="耐特菲姆滴灌带长度查询器.html" class="nav-link">滴灌带查询</a></div>
+        <div class="nav-item"><a href="index.html#three-level-view" class="nav-link">三级系统</a></div>
+        <div class="nav-item"><a href="数字农业.html" class="nav-link">数字农业</a></div>
+        <div class="nav-item"><a href="runye-landing.html" class="nav-link active">农事看板</a></div>
+        <div class="nav-item"><a href="runye-landing.html" class="nav-link">关于我们</a></div>
+      </nav>
+      <a href="runye-landing.html" class="nav-home-btn">⌂ 返回主页</a>
+      <div class="header-actions">
+        <button class="search-btn" title="搜索" aria-label="搜索">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
+        </button>
+        <div class="mobile-menu-btn" id="mobileMenuBtn" aria-label="菜单">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+    </div>
+  </header>
+</div>
 
 <!-- HERO -->
 <section class="hero">
