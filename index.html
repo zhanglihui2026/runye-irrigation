@@ -2909,6 +2909,71 @@ input[type="reset"],
 }
 /* ===== /RY-NAV ===== */
 
+/* ===== 移动端增强（手机浏览器适配） ===== */
+@media(max-width:768px){
+  html,body{overflow-x:hidden}
+  .container{padding:0 16px}
+
+  /* Hero 收紧 */
+  .hero{padding:20px 0 16px}
+  .hero h1{font-size:34px;line-height:1.14}
+  .hero-copy{font-size:16px;line-height:1.6;max-width:none}
+  .hero .container{gap:20px}
+  .hero-note{min-width:0;width:100%;padding:18px 0 18px 20px}
+  .hero-note .summary-main,.hero-note .summary-area{white-space:normal}
+  .hero-note .area-pair{gap:18px}
+
+  /* 触控放大：管线按钮 */
+  .pp-btn,.pp-btn-ghost,.pp-btn-generate{min-height:42px;padding-top:9px;padding-bottom:9px;font-size:14px}
+  #pipePlanSection .pp-toolbar,#pipePlanSection .pp-plan-bar{margin-left:16px;margin-right:16px}
+  #pipePlanSection .pp-sep{display:none}
+  .pp-plan-bar{gap:6px}
+  .pp-plan-item{font-size:13px}
+  .pp-plan-item input,.pp-select-sm,.pp-angle-control input{height:32px;font-size:14px}
+  .pp-plan-item input{width:54px}
+  .pp-angle-control{height:40px}
+  .pp-plan-bar .pp-plan-item{flex:none;margin:2px 0}
+
+  /* 面积测量工具 */
+  #areaTool .at-topbar{flex-wrap:wrap;gap:8px;padding:10px 16px}
+  #areaTool .at-topbar h1{font-size:13px;white-space:normal;flex:1 1 100%;line-height:1.3}
+  #areaTool .at-topbar .spacer{display:none}
+  #areaTool .at-btn{flex:1 1 auto;justify-content:center;min-height:40px;font-size:13px}
+  #areaTool .at-btn-mode,#areaTool .at-btn-action{min-height:42px;font-size:13px}
+
+  /* 分区阀门支管选择 */
+  .branch-options button,.branch-option{min-height:42px;font-size:14px;padding:9px 16px}
+
+  /* 字段输入触控友好 */
+  .field input,.input-shell input{min-height:42px;font-size:15px}
+
+  /* 导航手机收紧 */
+  .ry-nav .header-inner{padding:0 14px}
+  .ry-nav .main-header{height:60px}
+  .ry-nav .nav-home-btn{padding:9px 12px;font-size:13px}
+
+  /* 工作区单列间距 */
+  .workspace .container{gap:16px}
+
+  /* 表格允许横向滚动，避免挤压 */
+  .pipe-table-card,.network-card,.materials-card,.irr-compare-card,.check-card{overflow-x:auto}
+
+  /* 施工简图：手机端保持可读，允许横向滑动看大图（不缩成小字） */
+  .pp-diagram-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .pp-diagram-wrap svg{min-width:680px;max-width:none;height:auto}
+}
+
+@media(max-width:480px){
+  .container{padding:0 12px}
+  .hero h1{font-size:30px}
+  .hero-copy{font-size:15px}
+  .form-grid{grid-template-columns:1fr}
+  .pp-plan-bar .pp-plan-item{flex:1 1 calc(50% - 8px)}
+  .pp-plan-bar-result .pp-plan-item{flex:1 1 calc(50% - 8px)}
+  #pipePlanSection .pp-plan-bar,#pipePlanSection .pp-toolbar{margin-left:12px;margin-right:12px}
+  .ry-nav .header-inner{padding:0 12px}
+}
+
 </style>
 <script src="https://beacon.cdn.qq.com/sdk/4.5.9/beacon_web.min.js"></script>
 <script>
