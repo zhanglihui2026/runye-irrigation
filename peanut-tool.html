@@ -89,7 +89,7 @@
   th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top}
   th{font-size:12px;color:var(--ink-2);font-weight:600}
   .focus-row{background:var(--g-50)}
-  .focus-row td{font-weight:600;color:var(--g-700)}
+  .focus-row td{font-weight:500;color:var(--g-700)}
 
   .insight-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
   .insight-grid article{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px 18px;box-shadow:var(--shadow)}
@@ -225,6 +225,70 @@
   .primary-btn:hover{opacity:.92}
   .daily-empty{text-align:center;color:#8a8276;padding:16px}
   #dailyLogTable td,#dailyLogTable th{font-size:12px;padding:7px 8px;white-space:normal;vertical-align:top}
+
+  /* ===== 全场景字号层级统一兜底（重点：标题 15px，标题下正文统一 12px） =====
+     原因：工具页被数字农业.html 以 iframe 嵌入时，移动浏览器 iframe 内 layout viewport 约为 980px，
+     导致 @media(max-width:768px) 不触发；同时 runye-theme.css 在 <style> 之后加载会覆盖 .section-title。
+     因此把「标题 15px / 正文 12px」的层级直接写入基础样式，并用 !important 保证任何嵌套、
+     任何加载顺序、任何视口下都生效。 */
+  .section-title,
+  .control-card h2,
+  .weather-title,
+  .plot-board .board-head h2{font-size:15px!important}
+
+  /* 所有标题下方正文容器及子元素统一 12px，严格小于 15px 标题 */
+  .operation-card,
+  .history-advice-card,
+  .decision-table-card,
+  .insight-grid article,
+  .manual-card,
+  .growth-card,
+  .weather-card,
+  .season-kpi,
+  .daily-log-card,
+  .plot-board,
+  .operation-card *,
+  .history-advice-card *,
+  .decision-table-card *,
+  .insight-grid article *,
+  .manual-card *,
+  .growth-card *,
+  .weather-card *,
+  .season-kpi *,
+  .daily-log-card *,
+  .plot-board *{font-size:12px!important;line-height:1.55!important}
+
+  /* 恢复标题、表单元素的可读字号（它们被上面 * 通配符压成 12px 了，需要重新写回） */
+  .section-title,
+  .control-card h2,
+  .weather-title,
+  .plot-board .board-head h2{font-size:15px!important}
+  input,select,textarea,button{font-size:14px!important;line-height:1.4!important}
+
+  /* 标题下正文里的 <strong> 不再用默认 700 粗，统一 500，避免视觉上比标题还跳 */
+  .operation-card strong,
+  .history-advice-card strong,
+  .decision-table-card strong,
+  .insight-grid article strong,
+  .manual-card strong,
+  .growth-card strong,
+  .weather-card strong,
+  .season-kpi strong,
+  .daily-log-card strong,
+  .plot-board strong,
+  .bar-row strong,
+  .calcium-body strong{font-weight:500!important}
+
+  /* 标题下说明性灰色小字保持 12px（它们在 section-head 内，已被通配符覆盖，此处显式确认） */
+  .section-head span,
+  .section-head p:not(.section-title),
+  .quiet-copy,
+  .daily-advice,
+  .daily-advice li,
+  .plot-board .sub,
+  .plot-board-empty,
+  .plot-card .pc-meta,
+  .plot-card .pc-foot{font-size:12px!important;line-height:1.55!important}
 </style>
   <link rel="stylesheet" href="runye-theme.css">
 </head>
