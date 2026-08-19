@@ -99,16 +99,16 @@ a{color:inherit;text-decoration:none}
 
 /* ===== Hero ===== */
 .hero{
-  padding:40px 0 30px;position:relative;
+  padding:24px 0 20px;position:relative;
 }
 .hero::before{
-  content:'';position:absolute;top:-40px;right:-120px;
+  content:'';position:absolute;top:-24px;right:-120px;
   width:520px;height:520px;border-radius:50%;
   background:radial-gradient(circle at center,rgba(22,163,74,.08) 0%,transparent 70%);
   opacity:.8;z-index:-1;pointer-events:none;
 }
 @media(max-width:900px){
-  .hero::before{width:320px;height:320px;top:-40px;right:-40px}
+  .hero::before{width:320px;height:320px;top:-24px;right:-40px}
 }
 .hero .container{
   display:flex;align-items:flex-end;justify-content:space-between;gap:64px;
@@ -5107,7 +5107,9 @@ function tlUpdatePlanBar() {
   if(el=document.getElementById('tlPlanBranchPipe')) el.textContent='Ø '+branchPipe.od+' mm';
 }
 
-function tlAutoGenerate() {
+function tlAutoGenerate(options) {
+  options = options || {};
+  var doScroll = options.scroll !== false;
   try {
   // 局部辅助函数（三级页在 IIFE 之外，无法访问二级页内部的 pp* 函数，故此处自包含实现）
   function tlPolyArea(pts){ if(!pts||pts.length<3)return 0; var a=0; for(var i=0;i<pts.length;i++){var j=(i+1)%pts.length; a+=pts[i].x*pts[j].y-pts[j].x*pts[i].y;} return Math.abs(a)/2; }
@@ -5642,7 +5644,7 @@ function tlAutoGenerate() {
   document.getElementById('tlDownload').style.display='inline-block';
   document.getElementById('tlPrint').style.display='inline-block';
   document.getElementById('tlSavePng').style.display='inline-block';
-  document.getElementById('tlDiagramWrap').scrollIntoView({behavior:'smooth',block:'nearest'});
+  if(doScroll) document.getElementById('tlDiagramWrap').scrollIntoView({behavior:'smooth',block:'nearest'});
   console.log('[tlAutoGenerate] SVG generated successfully');
   } catch(err) {
     console.error('[tlAutoGenerate] Error:', err);
@@ -8622,6 +8624,12 @@ function calcPlan(){
 
   document.getElementById('ppGenerate').addEventListener('click',function(){
     ppGenerateDiagram({scroll:true});
+    // 同步生成三级管线施工简图：默认按当前选择的分区数（首次为2区一总管），调整4/6/8区后再次点击即按新选择重算
+    try{
+      if(window.measuredPolygon && window.measuredPolygon.length>=3 && typeof tlAutoGenerate==='function'){
+        tlAutoGenerate({scroll:false});
+      }
+    }catch(e){ console.warn('[ppGenerate] 三级管线图生成失败', e); }
   });
 
   // Download
