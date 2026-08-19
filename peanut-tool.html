@@ -109,8 +109,9 @@
 
   .stage-guide-card .stage-current td{background:var(--g-50);font-weight:600;color:var(--g-700)}
   .stage-guide-card .stage-current td:first-child{border-left:3px solid var(--g-700);padding-left:6px}
-  .stage-guide-card .stage-tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;background:var(--g-700);color:#fff;margin-left:6px;vertical-align:middle}
   .stage-guide-card .stage-days{font-variant-numeric:tabular-nums;color:var(--ink)}
+  .stage-guide-card .fert-plan-table{table-layout:fixed;width:100%}
+  .stage-guide-card .fert-plan-table th,.stage-guide-card .fert-plan-table td{padding:8px 6px;word-break:break-word;overflow-wrap:break-word}
 
   @media (max-width:980px){
     .hero-grid{grid-template-columns:1fr}
@@ -163,10 +164,11 @@
   /* ===== 每日农事记事 ===== */
   .daily-log-card .daily-editor{margin:6px 0 14px;border:1px dashed #e3ddcf;border-radius:10px;padding:12px 14px;background:#fcfbf7}
   .daily-editor .daily-row{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;flex-wrap:wrap}
-  .daily-editor label{width:92px;flex:none;font-size:13px;color:#5b5446;padding-top:7px}
+  .daily-editor label{width:92px;flex:none;font-size:10.5px;color:#5b5446;padding-top:7px}
   .daily-editor input[type=date],.daily-editor textarea{flex:1;min-width:200px;padding:8px 10px;border:1px solid #e3ddcf;border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box}
-  .daily-advice{flex:1;min-width:200px;background:#fff;border:1px solid #e3ddcf;border-radius:8px;padding:8px 10px;font-size:12px;color:#5b5446;max-height:130px;overflow:auto;margin:0}
+  .daily-advice{flex:1;min-width:200px;background:#fff;border:1px solid #e3ddcf;border-radius:8px;padding:8px 10px;font-size:10.5px;color:#5b5446;max-height:130px;overflow:auto;margin:0}
   .daily-advice li{margin-bottom:4px;line-height:1.5}
+  #dailyLogHead{font-size:10.5px;color:var(--ink-2)}
   .daily-actions{display:flex;gap:10px;margin-top:4px;flex-wrap:wrap}
   .primary-btn{background:#2f7d5b;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer}
   .primary-btn:hover{opacity:.92}
@@ -179,9 +181,10 @@
   .section-title,
   .control-card h2,
   .weather-title,
-  .plot-board .board-head h2{font-size:15px;font-weight:700;color:var(--g-700);margin:14px 0 8px}
+  .plot-board .board-head h2{font-size:11.25px;font-weight:700;color:var(--g-700);margin:14px 0 8px}
   .control-card h2{margin:18px 0 10px}
   .weather-title{margin:0}
+  #growthStage{font-size:11.25px;font-weight:700;color:var(--g-700)}
   .plot-board .board-head h2{margin:0}
 
   .ops-app{padding:14px 14px 36px}
@@ -205,7 +208,6 @@
   .plot-board{font-size:12px;line-height:1.55}
 
   .operation-card ol{font-size:12px;line-height:1.55}
-  .calcium-body{font-size:12px;line-height:1.55}
   .decision-table-card{font-size:12px}
   .weather-metric strong{font-size:13px;font-weight:500}
   .growth-card strong{font-size:13px;font-weight:500}
@@ -218,15 +220,20 @@
   .daily-advice{font-size:12px}
 
   /* 综合农事建议：卡片宽度随屏幕自适应、内部文字流式缩放，解决手机端溢出/比例失调 */
-  .history-advice-card{width:100%;max-width:100%;box-sizing:border-box;padding:14px 14px}
-  .history-advice-card ol{font-size:clamp(11px,calc(4px + 2.4vw),15px);line-height:1.65;padding-left:18px}
+  .history-advice-card{width:100%;max-width:100%;box-sizing:border-box;padding:14px 14px;font-size:clamp(11px,calc(4px + 2.4vw),15px);line-height:1.6}
+  .history-advice-card ol{font-size:clamp(10px,calc(2px + 1.5vw),11px);line-height:1.6;padding-left:18px}
   .history-advice-card li{margin-bottom:9px;overflow-wrap:break-word;word-break:break-word}
+  /* 合并块内统一：标题(.section-title)、说明段落(p)、列表(ol) 字号与行距一致 */
+  .history-advice-card .section-title{font-size:11.25px;line-height:1.6;margin:18px 0 8px;font-weight:700;color:var(--g-700)}
+  .history-advice-card p{font-size:clamp(10px,calc(2px + 1.5vw),11px);line-height:1.6;margin:0 0 8px;color:var(--ink)}
+  .history-advice-card .section-head .section-title{margin:0}
+  .history-advice-card .calcium-note{color:#166534;background:var(--g-50);padding:8px 10px;border-radius:8px;margin-top:6px}
 
   /* 桌面端（直接打开工具页，≥1024px）：在基础样式之后覆盖，恢复较大字号观感。
      被数字农业.html 以 iframe 嵌入时，iframe 布局视口为 980px，不进此块，自动沿用上方「基础=手机样式」。 */
   @media (min-width:1024px){
     body{font-size:15px}
-    .section-title,.control-card h2,.weather-title,.plot-board .board-head h2{font-size:18px}
+    .section-title,.control-card h2,.weather-title,.plot-board .board-head h2,#growthStage,.history-advice-card .section-title{font-size:13.5px}
     .ops-app{padding:18px 20px 48px}
     .hero-copy{padding:20px 22px}
     .hero-copy h1{font-size:26px;line-height:1.25}
@@ -234,16 +241,19 @@
     .score-card strong{font-size:44px}
     .kpi strong{font-size:22px}
     .kpi span{font-size:12px}
-    .control-card h2{font-size:14px}
-    .weather-title{font-size:16px;line-height:18px}
-    .plot-board .board-head h2{font-size:17px}
+    .weather-title{font-size:12px;line-height:18px}
+    .plot-board .board-head h2{font-size:12.75px}
     .growth-card strong{font-size:18px}
     .weather-metric strong{font-size:18px;line-height:27px}
     .season-kpi strong{font-size:18px}
     .weather-loc{font-size:15px;line-height:27px}
     .operation-card,.history-advice-card,.decision-table-card,.insight-grid article,.manual-card,.growth-card,.weather-card,.season-kpi,.daily-log-card,.plot-board{font-size:13px}
-    .operation-card ol,.history-advice-card ol{font-size:13px;line-height:1.6}
+    .operation-card ol,.history-advice-card ol{font-size:12px;line-height:1.6}
     .manual-card,.operation-card,.decision-table-card{padding:16px 18px}
+    .history-advice-card p{font-size:12px;line-height:1.6;font-weight:400}
+    .daily-editor label{font-size:12px}
+    .daily-advice{font-size:12px}
+    #dailyLogHead{font-size:12px}
   }
   </style>
 </head>
@@ -411,6 +421,20 @@
           <span id="historyAdviceHead">—</span>
         </div>
         <ol id="historyAdviceList"></ol>
+
+          <p class="section-title">关键补钙 · 减少空壳（海南重点）</p>
+          <p class="calcium-body">
+            <strong>原理：</strong>花生是喜钙作物，每产 100 kg 荚果需钙约 2.7 kg；但 <strong>90% 以上的钙由果针和幼果直接从浅层土壤吸收，根系吸收的钙几乎不向荚果转运</strong>。果针入土后约 20 天起进入需钙高峰、持续 6–8 周；缺钙 → 空壳、瘪果、单仁果、出仁率下降。
+          </p>
+          <p class="calcium-body">
+            <strong>关键期（决定饱果率的"剩余周期"）：</strong>初花—下针期（播种后约 30–45 天、果针入土前后）。<strong>施早易淋失、施晚（果针入土 100 天后）已无效</strong>，务必卡准窗口。
+          </p>
+          <p class="calcium-body">
+            <strong>怎么施：</strong>花期于垄间表土（≤5 cm）浅施 <strong>农用石膏粉 20–30 kg/亩</strong>（酸性砖红壤可增至 30–40 kg，沙土略减），结合中耕培土把钙留在果针区，施后跟一次轻水助溶解；以条施/沟施于果针入土处为佳。<strong>叶面喷钙只能辅助，不能替代浅层土施。</strong>用农用级石膏、禁用建筑石膏；不与铵态氮肥混用（间隔≥7 天）。
+          </p>
+          <p class="calcium-body calcium-note">
+            <strong>海南要点：</strong>砖红壤偏酸、活性钙本就低，叠加高温多雨钙淋失，是海南七彩花生 <strong>空壳率高、产量上不去的主因</strong>。除花期浅施石膏粉外：基肥配石灰/钙镁磷肥调酸补钙；同补硼钼（缺硼也致空壳、延迟开花）；钾肥深施到结果层以下防拮抗钙吸收；控旺防徒长（氮肥过多→地下营养不足→空壳）；保持果针区疏松湿润、防板结防积水。
+          </p>
       </div>
 
       <div class="decision-table-card">
@@ -424,20 +448,7 @@
         </table>
       </div>
 
-      <div class="insight-grid">
-        <article>
-          <p class="section-title">水分平衡</p>
-          <div class="bar-row"><span>作物耗水</span><i id="barEtc"></i><strong id="valEtc">—</strong></div>
-          <div class="bar-row rain"><span>有效雨量</span><i id="barRain"></i><strong id="valRain">—</strong></div>
-          <div class="bar-row water"><span>补水深度</span><i id="barWater"></i><strong id="valWater">—</strong></div>
-        </article>
-        <article>
-          <p class="section-title">底肥与生育期判断</p>
-          <div class="bar-row basal"><span>底肥评分</span><i id="barBasal"></i><strong id="valBasal">—</strong></div>
-          <p class="quiet-copy" id="basalCopy">—</p>
-        </article>
-      </div>
-
+      
       <div class="decision-table-card stage-guide-card">
         <div class="section-head">
           <p class="section-title">七彩花生生育期对照</p>
@@ -450,31 +461,15 @@
         </table>
       </div>
 
-      <div class="decision-table-card calcium-card" style="border-left:4px solid var(--g-700);">
-        <div class="section-head">
-          <p class="section-title">关键补钙 · 减少空壳（海南重点）</p>
-          <span>七彩花生空壳率高？核心是果针区缺钙</span>
-        </div>
-        <p class="calcium-body" style="margin:0 0 8px;line-height:1.65;color:var(--ink);">
-          <strong>原理：</strong>花生是喜钙作物，每产 100 kg 荚果需钙约 2.7 kg；但 <strong>90% 以上的钙由果针和幼果直接从浅层土壤吸收，根系吸收的钙几乎不向荚果转运</strong>。果针入土后约 20 天起进入需钙高峰、持续 6–8 周；缺钙 → 空壳、瘪果、单仁果、出仁率下降。
-        </p>
-        <p class="calcium-body" style="margin:0 0 8px;line-height:1.65;color:var(--ink);">
-          <strong>关键期（决定饱果率的"剩余周期"）：</strong>初花—下针期（播种后约 30–45 天、果针入土前后）。<strong>施早易淋失、施晚（果针入土 100 天后）已无效</strong>，务必卡准窗口。
-        </p>
-        <p class="calcium-body" style="margin:0 0 8px;line-height:1.65;color:var(--ink);">
-          <strong>怎么施：</strong>花期于垄间表土（≤5 cm）浅施 <strong>农用石膏粉 20–30 kg/亩</strong>（酸性砖红壤可增至 30–40 kg，沙土略减），结合中耕培土把钙留在果针区，施后跟一次轻水助溶解；以条施/沟施于果针入土处为佳。<strong>叶面喷钙只能辅助，不能替代浅层土施。</strong>用农用级石膏、禁用建筑石膏；不与铵态氮肥混用（间隔≥7 天）。
-        </p>
-        <p class="calcium-body" style="margin:0;line-height:1.65;color:#166534;background:var(--g-50);padding:8px 10px;border-radius:8px;">
-          <strong>海南要点：</strong>砖红壤偏酸、活性钙本就低，叠加高温多雨钙淋失，是海南七彩花生 <strong>空壳率高、产量上不去的主因</strong>。除花期浅施石膏粉外：基肥配石灰/钙镁磷肥调酸补钙；同补硼钼（缺硼也致空壳、延迟开花）；钾肥深施到结果层以下防拮抗钙吸收；控旺防徒长（氮肥过多→地下营养不足→空壳）；保持果针区疏松湿润、防板结防积水。
-        </p>
-      </div>
 
       <div class="decision-table-card stage-guide-card">
         <div class="section-head">
           <p class="section-title">全生育期追肥计划</p>
-          <span>全期约 12 次复合肥追肥 · 合计约 30 kg/亩 · 另滴灌随水增施钙肥（见下方「钙肥增施」行）</span>
         </div>
-        <table>
+        <table class="fert-plan-table">
+          <colgroup>
+            <col style="width:14%"><col style="width:13%"><col style="width:11%"><col style="width:8%"><col style="width:13%"><col style="width:16%"><col>
+          </colgroup>
           <thead><tr><th>生育期</th><th>追肥频率</th><th>每次用量</th><th>全期次数</th><th>全期总量</th><th>肥料配比</th><th>说明</th></tr></thead>
           <tbody id="fertPlanBody"></tbody>
         </table>
@@ -491,10 +486,6 @@
         </table>
       </div>
 
-      <div class="operation-card">
-        <p class="section-title">详细农事操作建议</p>
-        <ol id="adviceList"></ol>
-      </div>
 
       <div class="manual-card hidden" id="manualCard">
         <p class="section-title">手动天气兜底</p>
@@ -956,7 +947,9 @@
     if($("historyAdviceHead")) $("historyAdviceHead").textContent = agg ? (agg.currentStageLabel+' · 已结合 '+agg.count+' 天历史') : '—';
     if($("historyAdviceList")){
       var items=computeHistoryAdvice(agg,state);
-      $("historyAdviceList").innerHTML=items.map(function(it){
+      var opAdv=(state.decision && state.decision.operationAdvice) ? state.decision.operationAdvice : [];
+      var merged=items.concat(opAdv.map(function(n){ return {t:n, w:false}; }));
+      $("historyAdviceList").innerHTML=merged.map(function(it){
         var t=typeof it==='string'?it:it.t, w=typeof it==='string'?false:it.w;
         return '<li class="'+(w?'warn':'')+'">'+t+'</li>';
       }).join('');
@@ -1086,12 +1079,7 @@
       return '<tr class="'+(idx<2?"focus-row":"")+'"><td>'+r.item+'</td><td>'+r.perMu+'</td><td>'+r.total+'</td><td>'+r.note+'</td></tr>';
     }).join("");
 
-    $("barEtc").style.width=clamp(d.etcMm*10,8,100)+"%"; $("valEtc").textContent=d.etcMm+"mm";
-    $("barRain").style.width=clamp(d.effectiveRain*4,8,100)+"%"; $("valRain").textContent=d.effectiveRain+"mm";
-    $("barWater").style.width=clamp(d.irrigationMm*7,6,100)+"%"; $("valWater").textContent=d.irrigationMm+"mm";
-    $("barBasal").style.width=clamp(d.basal.score,8,100)+"%"; $("valBasal").textContent=d.basal.score+"分";
-    $("basalCopy").textContent="当前为"+meta.label+"，底肥"+d.basal.status+"。系统会用底肥评分修正追肥量，避免底肥充足时重复施肥，也避免底肥不足时错过补钾、补钙、补硼窗口。";
-
+        
     var npkN=state.decision.basalNpk;
     var npkRows=[
       {item:"有机肥折算",n:npkN.organic.n,p:npkN.organic.p,k:npkN.organic.k,note:"估算 N1.5%、P2O5 1.0%、K2O 1.2%"},
@@ -1103,7 +1091,6 @@
       return '<tr class="'+(idx===npkRows.length-1?"focus-row":"")+'"><td>'+r.item+'</td><td>'+r.n+'</td><td>'+r.p+'</td><td>'+r.k+'</td><td>'+round(r.n*state.areaMu,1)+"-"+round(r.p*state.areaMu,1)+"-"+round(r.k*state.areaMu,1)+' kg</td><td>'+r.note+'</td></tr>';
     }).join("");
 
-    $("adviceList").innerHTML=d.operationAdvice.map(function(n){return "<li>"+n+"</li>";}).join("");
 
     var stageOrder=["seedling","vegetative","flowering","pod","harvest"];
     $("stageGuideHead").textContent="当前："+meta.label+" · 播后 "+growthDays+" 天";
@@ -1111,7 +1098,7 @@
       var s=stageMeta[k];
       var cur=k===stage;
       return '<tr class="'+(cur?"stage-current":"")+'">'+
-        '<td>'+s.label+(cur?'<span class="stage-tag">当前</span>':"")+'</td>'+
+        '<td>'+s.label+'</td>'+
         '<td class="stage-days">'+s.dayRange+'</td>'+
         '<td>'+s.waterBand+'</td>'+
         '<td>'+s.target+'</td></tr>';
@@ -1126,7 +1113,7 @@
       var countCell = p.count===0 ? "—" : (isCustom ? p.count : p.count+" 次");
       var totalCell = p.total===0 ? "—" : (isCustom ? p.total : p.total+" kg/亩");
       return '<tr class="'+(cur?"stage-current":"")+(isCustom?" calcium-row":"")+'">'+
-        '<td>'+label+(cur?'<span class="stage-tag">当前</span>':"")+'</td>'+
+        '<td>'+label+'</td>'+
         '<td>'+p.interval+'</td>'+
         '<td>'+perCell+'</td>'+
         '<td>'+countCell+'</td>'+
