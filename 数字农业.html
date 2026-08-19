@@ -186,56 +186,12 @@
   })();
 </script>
 <script>
-  // 手机端：让内嵌工具 iframe 高度 = 其文档内容高度，整页自然滚动，顶部提示条随滚动滚走（不再被 iframe 吞滚动而常驻）
+  // 手机端：让内嵌工具 iframe 高度 = 其文档内容高度，整页自然滚动（不再被 iframe 吞滚动而常驻）。
+  // 注意：字号层级已在 peanut-tool.html 内自包含处理，父页不再注入任何样式。
   (function(){
     var frame = document.getElementById('peanutFrame');
     if(!frame) return;
     var mq = window.matchMedia('(max-width:768px)');
-
-    // —— 换思路：父页视口可靠，直接把移动端字号规则注入 iframe 文档，
-    //    不依赖 iframe 内部 @media 是否触发，确保「标题统一15px + 内容<标题」——
-    var MOBILE_CSS = ''
-      + '.ops-app{padding:14px 14px 36px !important}'
-      + '.hero-copy{padding:16px !important}'
-      + '.hero-copy h1{font-size:20px !important;line-height:1.3 !important}'
-      + '.hero-sub{font-size:14px !important}'
-      + '.score-card strong{font-size:34px !important}'
-      + '.kpi strong{font-size:18px !important}'
-      + '.kpi span{font-size:11px !important}'
-      + '.section-title{font-size:15px !important;font-weight:700 !important;color:var(--g-700) !important;margin:14px 0 8px !important}'
-      + '.control-card h2{font-size:15px !important;margin:18px 0 10px !important}'
-      + '.weather-title{font-size:15px !important}'
-      + '.plot-board .board-head h2{font-size:15px !important}'
-      + '.operation-card ol,.history-advice-card ol{font-size:12px !important;line-height:1.55 !important}'
-      + '.calcium-card p{font-size:12px !important;line-height:1.55 !important}'
-      + '.decision-table-card{font-size:13px !important}'
-      + '.weather-metric strong{font-size:13px !important}'
-      + '.growth-card strong{font-size:13px !important}'
-      + '.season-kpi strong{font-size:13px !important}'
-      + '.weather-loc{font-size:13px !important;line-height:1.5 !important}'
-      + '.manual-card,.operation-card,.decision-table-card{padding:14px !important}'
-      + 'table{font-size:12px !important}'
-      + 'th,td{padding:8px 6px !important}'
-      + '.daily-advice{font-size:12px !important}';
-
-    function applyMobileEmbed(){
-      try{
-        var doc = frame.contentDocument || (frame.contentWindow && frame.contentWindow.document);
-        if(!doc || !doc.head) return;
-        var style = doc.getElementById('mb-embed');
-        if(mq.matches){
-          if(!style){
-            style = doc.createElement('style');
-            style.id = 'mb-embed';
-            style.textContent = MOBILE_CSS;
-            doc.head.appendChild(style);
-          }
-        } else if(style){
-          style.parentNode.removeChild(style);
-        }
-      }catch(e){}
-    }
-
     function fit(){
       if(!mq.matches){ frame.style.height=''; return; } // 桌面端：交回 100% 内部滚动
       try{
@@ -246,7 +202,6 @@
       }catch(e){ frame.style.height='100vh'; }
     }
     frame.addEventListener('load', function(){
-      applyMobileEmbed();
       fit();
       // 工具内容动态变化（展开/收起分区、天气加载）时实时重算高度
       try{
@@ -257,7 +212,7 @@
       }catch(e){}
       setInterval(fit, 1000); // 兜底：兼容个别浏览器 ResizeObserver 不触发的情况
     });
-    window.addEventListener('resize', function(){ applyMobileEmbed(); fit(); });
+    window.addEventListener('resize', fit);
   })();
 </script>
 

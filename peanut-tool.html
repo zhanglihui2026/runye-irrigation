@@ -12,7 +12,7 @@
     --shadow:0 6px 20px rgba(31,42,51,.08);
   }
   *{box-sizing:border-box}
-  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg)!important;color:var(--ink)!important;font-size:13px!important;line-height:1.5!important;-webkit-font-smoothing:antialiased}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased}
   .ops-app{max-width:1240px;margin:0 auto;padding:18px 20px 48px}
   .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
   .topbar strong{display:block;font-size:18px;color:var(--g-700)}
@@ -46,11 +46,6 @@
   .control-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:var(--shadow);position:sticky;top:14px}
   .control-card h2{font-size:15px;margin:18px 0 10px;color:var(--g-700);border-left:3px solid var(--g-700);padding-left:8px}
   .control-card h2:first-child{margin-top:0}
-  /* 基础即手机样式：功能区块标题统一 15px（不依赖 iframe 内 @media —— 移动浏览器 iframe 忽略 viewport 致 max-width 失效）
-     !important：runye-theme.css 在 <style> 之后加载，其 .section-title{font-size:16px;font-weight:800;border-left:4px;margin:28px 0 14px}
-     会以同优先级覆盖本规则，导致 11 个农事区域标题变 16px 且带绿色左边框、与其它标题不统一。
-     必须用 !important 压回（覆盖字号/字重/颜色/margin/边框），与加载顺序、嵌套层级无关。 */
-  .section-title{font-size:15px!important;font-weight:700!important;color:var(--g-700)!important;margin:14px 0 8px!important;border-left:none!important;padding-left:0!important}
   .control-card label{display:block;font-size:13px;color:var(--ink-2);margin-bottom:12px}
   .control-card select,.control-card input.date-input{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:9px;font-size:14px;margin-top:5px;background:#fff;color:var(--ink)}
   .growth-card{background:var(--g-50);border:1px solid var(--g-100);border-radius:12px;padding:12px;margin-bottom:12px}
@@ -125,58 +120,10 @@
     .insight-grid{grid-template-columns:1fr}
   }
 
-  /* ===== 手机端字号统一缩放（数字农业 · 农事建议类板块） ===== */
-  @media (max-width:768px){
-    .ops-app{padding:14px 14px 36px}
-    .hero-copy{padding:16px}
-    .hero-copy h1{font-size:20px;line-height:1.3}
-    .hero-sub{font-size:14px}
-    .score-card strong{font-size:34px}
-    .kpi strong{font-size:18px}
-    .kpi span{font-size:11px}
-    /* 所有功能区标题统一为 15px（与 .section-title 一致）：含分析板块 / 参数区 h2 / 天气标题 / 地块看板标题 */
-    .section-title{font-size:15px;font-weight:700;color:var(--g-700);margin:14px 0 8px}
-    .control-card h2{font-size:15px;margin:18px 0 10px}
-    .weather-title{font-size:15px}
-    .plot-board .board-head h2{font-size:15px}
-    /* 三大农事建议区域：标题统一 15px，下方正文缩小至 12px（小于标题字号） */
-    .operation-card ol,.history-advice-card ol{font-size:12px;line-height:1.55}
-    .calcium-body{font-size:12px!important;line-height:1.55!important}
-    .decision-table-card{font-size:13px}
-    /* 标题下内容字号统一小于 15px 标题：KPI/天气/生长数值原为 15–16px，统一降至 13px */
-    .weather-metric strong{font-size:13px}
-    .growth-card strong{font-size:13px}
-    .season-kpi strong{font-size:13px}
-    .weather-loc{font-size:13px;line-height:1.5}
-    .manual-card,.operation-card,.decision-table-card{padding:14px}
-    table{font-size:12px}
-    th,td{padding:8px 6px}
-    .daily-advice{font-size:12px}
-  }
-  @media (max-width:480px){
-    .hero-copy h1{font-size:18px}
-    .score-card strong{font-size:30px}
-    .kpi strong{font-size:16px}
-  }
-
-  /* 桌面端（直接打开工具页，≥1024px）：恢复原有较大字号观感。
-     注意：被数字农业.html 以 iframe 嵌入时，iframe 布局视口为 980px，既不进 max-width 也不进此块，
-     自动沿用上面「基础=手机样式」的规则，从而彻底绕过 iframe 内 @media(max-width:768px) 失效的问题。 */
-  @media (min-width:1024px){
-    .hero-copy h1{font-size:26px;line-height:1.25}
-    .score-card strong{font-size:44px}
-    .kpi strong{font-size:22px}
-    .control-card h2{font-size:14px}
-    .weather-title{font-size:16px;line-height:18px}
-    .plot-board .board-head h2{font-size:17px}
-    .growth-card strong{font-size:18px}
-    .weather-metric strong{font-size:18px;line-height:27px}
-    .season-kpi strong{font-size:18px}
-    .weather-loc{font-size:15px;line-height:27px}
-  }
-
   /* 种植期天气采集日志 */
   .weather-log-card .log-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+  .ghost-btn{display:inline-block;background:transparent;color:var(--ink-2);border:1px solid var(--line);border-radius:9px;padding:8px 14px;font-size:13px;cursor:pointer}
+  .ghost-btn:hover{background:#f5f7f6}
   .log-toolbar .ghost-btn{background:var(--g-700);color:#fff;border:0;border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer}
   .log-toolbar .ghost-btn:hover{background:var(--g-600)}
   .log-toolbar .ghost-btn:disabled{opacity:.6;cursor:default}
@@ -195,8 +142,6 @@
   .history-advice-card li{margin-bottom:7px}
   .history-advice-card li.warn{color:var(--danger)}
 
-  /* 被数字农业.html iframe 嵌入时，隐藏自己的品牌顶栏，避免双导航 */
-  .iframe-embed .main-header{display:none;}
   .plot-board{background:var(--card,#fff);border:1px solid var(--line,#e5e7eb);border-radius:16px;padding:18px 18px 20px;margin:0 0 18px;box-shadow:0 1px 3px rgba(16,24,40,.04)}
   .plot-board .board-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
   .plot-board .board-head h2{font-size:15px;margin:0;color:var(--ink,#111827)}
@@ -228,17 +173,26 @@
   .daily-empty{text-align:center;color:#8a8276;padding:16px}
   #dailyLogTable td,#dailyLogTable th{font-size:12px;padding:7px 8px;white-space:normal;vertical-align:top}
 
-  /* ===== 全场景字号层级统一兜底（重点：标题 15px，标题下正文统一 12px） =====
-     原因：工具页被数字农业.html 以 iframe 嵌入时，移动浏览器 iframe 内 layout viewport 约为 980px，
-     导致 @media(max-width:768px) 不触发；同时 runye-theme.css 在 <style> 之后加载会覆盖 .section-title。
-     因此把「标题 15px / 正文 12px」的层级直接写入基础样式，并用 !important 保证任何嵌套、
-     任何加载顺序、任何视口下都生效。 */
+  /* ===== 字号层级（移动优先：基础=手机/默认；桌面由上方 min-width:1024 恢复）=====
+     单一来源、无 !important、无外部覆盖（已移除 runye-theme.css）。
+     标题统一 15px；标题下正文容器统一 12px（容器设字号，标题自带 15px 不受影响，杜绝误伤）。 */
   .section-title,
   .control-card h2,
   .weather-title,
-  .plot-board .board-head h2{font-size:15px!important}
+  .plot-board .board-head h2{font-size:15px;font-weight:700;color:var(--g-700);margin:14px 0 8px}
+  .control-card h2{margin:18px 0 10px}
+  .weather-title{margin:0}
+  .plot-board .board-head h2{margin:0}
 
-  /* 所有标题下方正文容器及子元素统一 12px，严格小于 15px 标题 */
+  .ops-app{padding:14px 14px 36px}
+  .hero-copy{padding:16px}
+  .hero-copy h1{font-size:18px;line-height:1.3}
+  .hero-sub{font-size:14px}
+  .score-card strong{font-size:30px}
+  .kpi strong{font-size:16px}
+  .kpi span{font-size:11px}
+
+  /* 标题下正文容器统一 12px（继承，标题不在此列故不受影响） */
   .operation-card,
   .history-advice-card,
   .decision-table-card,
@@ -248,83 +202,47 @@
   .weather-card,
   .season-kpi,
   .daily-log-card,
-  .plot-board,
-  .operation-card *,
-  .history-advice-card *,
-  .decision-table-card *,
-  .insight-grid article *,
-  .manual-card *,
-  .growth-card *,
-  .weather-card *,
-  .season-kpi *,
-  .daily-log-card *,
-  .plot-board *{font-size:12px!important;line-height:1.55!important}
+  .plot-board{font-size:12px;line-height:1.55}
 
-  /* 恢复标题、表单元素的可读字号（它们被上面 * 通配符压成 12px 了，需要重新写回） */
-  .section-title,
-  .control-card h2,
-  .weather-title,
-  .plot-board .board-head h2{font-size:15px!important}
-  input,select,textarea,button{font-size:14px!important;line-height:1.4!important}
+  .operation-card ol,.history-advice-card ol{font-size:12px;line-height:1.55}
+  .calcium-body{font-size:12px;line-height:1.55}
+  .decision-table-card{font-size:12px}
+  .weather-metric strong{font-size:13px;font-weight:500}
+  .growth-card strong{font-size:13px;font-weight:500}
+  .season-kpi strong{font-size:13px;font-weight:500}
+  .weather-loc{font-size:13px;line-height:1.5}
+  .section-head p:not(.section-title),.section-head span{font-size:12px;color:var(--ink-2)}
+  .manual-card,.operation-card,.decision-table-card{padding:14px}
+  table{font-size:12px}
+  th,td{padding:8px 6px}
+  .daily-advice{font-size:12px}
 
-  /* 标题下正文里的 <strong> 不再用默认 700 粗，统一 500，避免视觉上比标题还跳 */
-  .operation-card strong,
-  .history-advice-card strong,
-  .decision-table-card strong,
-  .insight-grid article strong,
-  .manual-card strong,
-  .growth-card strong,
-  .weather-card strong,
-  .season-kpi strong,
-  .daily-log-card strong,
-  .plot-board strong,
-  .bar-row strong,
-  .calcium-body strong{font-weight:500!important}
-
-  /* 标题下说明性灰色小字保持 12px（它们在 section-head 内，已被通配符覆盖，此处显式确认） */
-  .section-head span,
-  .section-head p:not(.section-title),
-  .quiet-copy,
-  .daily-advice,
-  .daily-advice li,
-  .plot-board .sub,
-  .plot-board-empty,
-  .plot-card .pc-meta,
-  .plot-card .pc-foot{font-size:12px!important;line-height:1.55!important}
-</style>
-  <link rel="stylesheet" href="runye-theme.css">
+  /* 桌面端（直接打开工具页，≥1024px）：在基础样式之后覆盖，恢复较大字号观感。
+     被数字农业.html 以 iframe 嵌入时，iframe 布局视口为 980px，不进此块，自动沿用上方「基础=手机样式」。 */
+  @media (min-width:1024px){
+    body{font-size:15px}
+    .section-title,.control-card h2,.weather-title,.plot-board .board-head h2{font-size:18px}
+    .ops-app{padding:18px 20px 48px}
+    .hero-copy{padding:20px 22px}
+    .hero-copy h1{font-size:26px;line-height:1.25}
+    .hero-sub{font-size:15px}
+    .score-card strong{font-size:44px}
+    .kpi strong{font-size:22px}
+    .kpi span{font-size:12px}
+    .control-card h2{font-size:14px}
+    .weather-title{font-size:16px;line-height:18px}
+    .plot-board .board-head h2{font-size:17px}
+    .growth-card strong{font-size:18px}
+    .weather-metric strong{font-size:18px;line-height:27px}
+    .season-kpi strong{font-size:18px}
+    .weather-loc{font-size:15px;line-height:27px}
+    .operation-card,.history-advice-card,.decision-table-card,.insight-grid article,.manual-card,.growth-card,.weather-card,.season-kpi,.daily-log-card,.plot-board{font-size:13px}
+    .operation-card ol,.history-advice-card ol{font-size:13px;line-height:1.6}
+    .manual-card,.operation-card,.decision-table-card{padding:16px 18px}
+  }
+  </style>
 </head>
 <body>
-<script>if(window.self!==window.top){document.body.classList.add('iframe-embed');}</script>
-<header class="main-header">
-  <div class="header-inner">
-    <a href="runye-landing.html" class="brand">
-      <div class="brand-logo">润</div>
-      <div class="brand-text">
-        <span class="brand-name">润野灌溉</span>
-        <span class="brand-sub">Runye Irrigation</span>
-      </div>
-    </a>
-    <nav class="main-nav" id="mainNav">
-      <div class="nav-item"><a href="index.html" class="nav-link">精准灌溉</a></div>
-      <div class="nav-item"><a href="耐特菲姆滴灌带长度查询器.html" class="nav-link">滴灌带查询</a></div>
-      <div class="nav-item"><a href="index.html#three-level-view" class="nav-link">三级系统</a></div>
-      <div class="nav-item"><a href="数字农业.html" class="nav-link active">数字农业</a></div>
-      <div class="nav-item"><a href="runye-landing.html" class="nav-link">农事看板</a></div>
-      <div class="nav-item"><a href="runye-landing.html" class="nav-link">关于我们</a></div>
-    </nav>
-    <a href="runye-landing.html" class="nav-home-btn">⌂ 返回主页</a>
-    <div class="auth-bar"><span class="auth-status" id="authStatus">数据存本机浏览器</span><button class="auth-btn" id="authBtn" title="当前为静态版">本机存储</button></div>
-    <div class="header-actions">
-      <button class="search-btn" title="搜索" aria-label="搜索">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
-      </button>
-      <div class="mobile-menu-btn" id="mobileMenuBtn" aria-label="菜单">
-        <span></span><span></span><span></span>
-      </div>
-    </div>
-  </div>
-</header>
 <div class="ops-app">
   <header class="topbar">
     <div>
@@ -532,16 +450,16 @@
           <p class="section-title">关键补钙 · 减少空壳（海南重点）</p>
           <span>七彩花生空壳率高？核心是果针区缺钙</span>
         </div>
-        <p class="calcium-body" style="margin:0 0 8px;font-size:13px;line-height:1.65;color:var(--ink);">
+        <p class="calcium-body" style="margin:0 0 8px;line-height:1.65;color:var(--ink);">
           <strong>原理：</strong>花生是喜钙作物，每产 100 kg 荚果需钙约 2.7 kg；但 <strong>90% 以上的钙由果针和幼果直接从浅层土壤吸收，根系吸收的钙几乎不向荚果转运</strong>。果针入土后约 20 天起进入需钙高峰、持续 6–8 周；缺钙 → 空壳、瘪果、单仁果、出仁率下降。
         </p>
-        <p class="calcium-body" style="margin:0 0 8px;font-size:13px;line-height:1.65;color:var(--ink);">
+        <p class="calcium-body" style="margin:0 0 8px;line-height:1.65;color:var(--ink);">
           <strong>关键期（决定饱果率的"剩余周期"）：</strong>初花—下针期（播种后约 30–45 天、果针入土前后）。<strong>施早易淋失、施晚（果针入土 100 天后）已无效</strong>，务必卡准窗口。
         </p>
-        <p class="calcium-body" style="margin:0 0 8px;font-size:13px;line-height:1.65;color:var(--ink);">
+        <p class="calcium-body" style="margin:0 0 8px;line-height:1.65;color:var(--ink);">
           <strong>怎么施：</strong>花期于垄间表土（≤5 cm）浅施 <strong>农用石膏粉 20–30 kg/亩</strong>（酸性砖红壤可增至 30–40 kg，沙土略减），结合中耕培土把钙留在果针区，施后跟一次轻水助溶解；以条施/沟施于果针入土处为佳。<strong>叶面喷钙只能辅助，不能替代浅层土施。</strong>用农用级石膏、禁用建筑石膏；不与铵态氮肥混用（间隔≥7 天）。
         </p>
-        <p class="calcium-body" style="margin:0;font-size:13px;line-height:1.65;color:#166534;background:var(--g-50);padding:8px 10px;border-radius:8px;">
+        <p class="calcium-body" style="margin:0;line-height:1.65;color:#166534;background:var(--g-50);padding:8px 10px;border-radius:8px;">
           <strong>海南要点：</strong>砖红壤偏酸、活性钙本就低，叠加高温多雨钙淋失，是海南七彩花生 <strong>空壳率高、产量上不去的主因</strong>。除花期浅施石膏粉外：基肥配石灰/钙镁磷肥调酸补钙；同补硼钼（缺硼也致空壳、延迟开花）；钾肥深施到结果层以下防拮抗钙吸收；控旺防徒长（氮肥过多→地下营养不足→空壳）；保持果针区疏松湿润、防板结防积水。
         </p>
       </div>
@@ -838,19 +756,6 @@
     };
   })();
 
-  // 登录/存储模式提示（GitHub Pages 静态版：数据存本机浏览器，不上云）
-  function initAuth(){
-    var btn=document.getElementById('authBtn'), st=document.getElementById('authStatus');
-    if(!btn) return;
-    function paint(){
-      st.textContent='数据存本机浏览器'; btn.textContent='本机存储';
-    }
-    btn.addEventListener('click', function(){
-      alert('当前为 GitHub Pages 静态版：\n\n• 所有数据（地块、参数、天气日志）保存在你本机浏览器（localStorage），不上传任何服务器。\n• 换设备、清缓存或使用隐私模式时数据不共享、可能丢失。\n• 需要跨设备云端同步时，后续将部署带后端的版本再启用。');
-    });
-    paint();
-  }
-
   // 手机号登录弹窗
   function showLoginDialog(paint){
     var existing=document.getElementById('loginModal');
@@ -889,7 +794,6 @@
       }catch(e){ alert('登录失败：'+(e&&e.message||e)); }
     };
   }
-  initAuth();
   var GDD_BASE=10;      // 花生有效积温基准温度 10°C
   var SOIL_ANCHOR=70;   // 播种时假定墒情（仅作趋势参考）
 
