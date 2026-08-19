@@ -127,26 +127,29 @@
     .score-card strong{font-size:34px}
     .kpi strong{font-size:18px}
     .kpi span{font-size:11px}
+    /* 所有功能区标题统一为 15px（与 .section-title 一致）：含分析板块 / 参数区 h2 / 天气标题 / 地块看板标题 */
     .section-title{font-size:15px;font-weight:700;color:var(--g-700);margin:14px 0 8px}
+    .control-card h2{font-size:15px;margin:18px 0 10px}
+    .weather-title{font-size:15px}
+    .plot-board .board-head h2{font-size:15px}
     /* 三大农事建议区域：标题统一 15px，下方正文缩小至 12px（小于标题字号） */
     .operation-card ol,.history-advice-card ol{font-size:12px;line-height:1.55}
     .calcium-card p{font-size:12px!important;line-height:1.55!important}
     .decision-table-card{font-size:13px}
-    .control-card h2{font-size:13px}
-    .weather-title{font-size:15px}
-    .weather-metric strong{font-size:16px}
-    .growth-card strong{font-size:16px}
+    /* 标题下内容字号统一小于 15px 标题：KPI/天气/生长数值原为 15–16px，统一降至 13px */
+    .weather-metric strong{font-size:13px}
+    .growth-card strong{font-size:13px}
+    .season-kpi strong{font-size:13px}
+    .weather-loc{font-size:13px;line-height:1.5}
     .manual-card,.operation-card,.decision-table-card{padding:14px}
     table{font-size:12px}
     th,td{padding:8px 6px}
-    .season-kpi strong{font-size:16px}
     .daily-advice{font-size:12px}
   }
   @media (max-width:480px){
     .hero-copy h1{font-size:18px}
     .score-card strong{font-size:30px}
     .kpi strong{font-size:16px}
-    .section-title{font-size:14px}
   }
 
   /* 种植期天气采集日志 */
