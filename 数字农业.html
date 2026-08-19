@@ -63,9 +63,10 @@
   .ry-nav .main-nav .nav-item{flex:0 0 auto}
   .ry-nav .nav-link{padding:11px 15px;font-size:13px;border-bottom:none;border-right:1px solid var(--s-50);white-space:nowrap;}
   .ry-nav .nav-link::after{display:none}
-  /* 手机端：解除整页 100vh 锁定，允许页面滚动，让 info-bar 提示文字可随页滚走（不再常驻顶部） */
+  /* 手机端：解除整页 100vh 锁定，允许页面滚动；提示条可「收起」以免工具 iframe 吞滚动导致常驻 */
   body{height:auto;min-height:100vh;overflow-y:auto;}
   .frame-wrap{flex:1 1 auto;min-height:100vh;}
+  .info-toggle{display:inline-flex;}
 }
 @media(max-width:480px){
   .ry-nav .header-inner{padding:0 12px}
@@ -74,8 +75,10 @@
 }
 
   .info-bar{background:var(--g-50);border-bottom:1px solid var(--g-200);color:var(--s-700);font-size:13px;}
-  .info-inner{max-width:1240px;margin:0 auto;padding:12px 20px;box-sizing:border-box;display:flex;flex-direction:column;align-items:flex-start;gap:10px;}
-  .info-bar .info-text{padding:0;line-height:1.6;}
+  .info-inner{max-width:1240px;margin:0 auto;padding:12px 20px;box-sizing:border-box;display:flex;flex-direction:row;align-items:flex-start;justify-content:space-between;gap:12px;}
+  .info-bar .info-text{padding:0;line-height:1.6;flex:1 1 auto;}
+  .info-toggle{display:none;flex:none;align-self:flex-start;margin-top:1px;background:var(--g-700);color:#fff;border:0;border-radius:999px;padding:4px 12px;font-size:12px;cursor:pointer;white-space:nowrap;}
+  .info-bar.collapsed{display:none;}
   .info-bar code{background:#fff;border:1px solid var(--g-200);border-radius:6px;padding:1px 7px;font-size:12px;color:var(--g-800);}
 
   .frame-wrap{position:relative;width:100%;flex:1 1 auto;min-height:0;background:var(--s-50);}
@@ -127,9 +130,10 @@
 </header>
 </div>
 
-<div class="info-bar">
+<div class="info-bar" id="infoBar">
   <div class="info-inner">
     <span class="info-text">本页内嵌「润野 · 七彩花生水肥决策」工具：浏览器端自<b>播种日起逐日采集、累积天气</b>，形成种植期数据表，并结合历史水分盈亏、积温与连雨情况<b>综合分析</b>给出每日农事建议，<b>打开网页即用</b>。</span>
+    <button type="button" class="info-toggle" id="infoToggle" aria-expanded="true">收起 ▲</button>
   </div>
 </div>
 
@@ -164,6 +168,19 @@
         if (!loaded) showFallback();
       }
     }, 5000);
+  })();
+</script>
+<script>
+  // 手机端：提示条「收起 / 展开」切换，避免工具 iframe 在手机上吞掉滚动导致提示常驻顶部
+  (function(){
+    var btn = document.getElementById('infoToggle');
+    var bar = document.getElementById('infoBar');
+    if(!btn || !bar) return;
+    btn.addEventListener('click', function(){
+      var collapsed = bar.classList.toggle('collapsed');
+      btn.setAttribute('aria-expanded', String(!collapsed));
+      btn.textContent = collapsed ? '展开 ▼' : '收起 ▲';
+    });
   })();
 </script>
 
