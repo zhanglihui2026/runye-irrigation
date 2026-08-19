@@ -2947,10 +2947,48 @@ input[type="reset"],
   /* 字段输入触控友好 */
   .field input,.input-shell input{min-height:42px;font-size:15px}
 
-  /* 导航手机收紧 */
-  .ry-nav .header-inner{padding:0 14px}
-  .ry-nav .main-header{height:60px}
-  .ry-nav .nav-home-btn{padding:9px 12px;font-size:13px}
+  /* 导航手机：常驻顶部，链接一行横向滑动（取消汉堡弹窗占用画面） */
+  .ry-nav .main-header{height:auto}
+  .ry-nav .header-inner{
+    flex-wrap:wrap;
+    height:auto;
+    align-items:center;
+    padding:8px 14px 0;
+    gap:0;
+  }
+  .ry-nav .brand{height:46px;flex:1 1 auto}
+  .ry-nav .header-actions{margin-left:auto;order:2}
+  .ry-nav .mobile-menu-btn{display:none !important}
+  .ry-nav .nav-home-btn{display:none !important}  /* 品牌logo即回主页入口 */
+  .ry-nav .main-nav{
+    display:flex !important;
+    position:static;
+    flex-direction:row;
+    flex-wrap:nowrap;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+    width:100%;
+    order:3;
+    gap:0;
+    margin-top:6px;
+    padding:0;
+    background:#fff;
+    box-shadow:none;
+    border-top:1px solid var(--s-100);
+  }
+  .ry-nav .main-nav::-webkit-scrollbar{display:none}
+  .ry-nav .main-nav .nav-item{flex:0 0 auto}
+  .ry-nav .nav-link{
+    padding:11px 15px;
+    font-size:13px;
+    border-bottom:none;
+    border-right:1px solid var(--s-50);
+    white-space:nowrap;
+  }
+  .ry-nav .nav-link::after{display:none}
+  /* 手机端隐藏顶部灰色小字条，减少画面占用 */
+  .ry-nav .utility-bar{display:none}
 
   /* 工作区单列间距 */
   .workspace .container{gap:16px}
@@ -2972,6 +3010,8 @@ input[type="reset"],
   .pp-plan-bar-result .pp-plan-item{flex:1 1 calc(50% - 8px)}
   #pipePlanSection .pp-plan-bar,#pipePlanSection .pp-toolbar{margin-left:12px;margin-right:12px}
   .ry-nav .header-inner{padding:0 12px}
+  .ry-nav .brand{height:42px}
+  .ry-nav .nav-link{padding:10px 12px;font-size:12px}
 }
 
 </style>
