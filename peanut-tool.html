@@ -90,6 +90,8 @@
   th{font-size:12px;color:var(--ink-2);font-weight:600}
   .focus-row{background:var(--g-50)}
   .focus-row td{font-weight:500;color:var(--g-700)}
+  .calcium-row td{background:var(--g-50);border-top:2px solid var(--g-200)}
+  .calcium-row td:first-child{font-weight:600;color:var(--g-700)}
 
   .insight-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
   .insight-grid article{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px 18px;box-shadow:var(--shadow)}
@@ -547,7 +549,7 @@
       <div class="decision-table-card stage-guide-card">
         <div class="section-head">
           <p class="section-title">全生育期追肥计划</p>
-          <span>全期约 12 次追肥 · 合计约 30 kg/亩</span>
+          <span>全期约 12 次复合肥追肥 · 合计约 30 kg/亩 · 另滴灌随水增施钙肥（见下方「钙肥增施」行）</span>
         </div>
         <table>
           <thead><tr><th>生育期</th><th>追肥频率</th><th>每次用量</th><th>全期次数</th><th>全期总量</th><th>肥料配比</th><th>说明</th></tr></thead>
@@ -618,8 +620,9 @@
   var stageFertPlan=[
     {key:"seedling",   interval:"—",       perMu:0,   count:0, total:0,    ratio:"—",                   note:"根系嫩弱，靠底肥供给，施肥易烧苗"},
     {key:"vegetative", interval:"8-10 天",  perMu:1.2, count:2, total:2.4,  ratio:"平衡型 20-20-20",       note:"促根瘤、稳苗架，控氮防徒长"},
-    {key:"flowering",  interval:"7 天",     perMu:2.2, count:3, total:6.6,  ratio:"高钾 15-10-30 + 硼钼",  note:"补硼钼促花针，稳墒减少落花"},
-    {key:"pod",        interval:"5-7 天",   perMu:3.0, count:7, total:21.0, ratio:"高钾 12-8-40 + 钙肥",   note:"需肥高峰，补钾钙保荚果，控病害"},
+    {key:"flowering",  interval:"7 天",     perMu:2.2, count:3, total:6.6,  ratio:"高钾 15-10-30 + 硼钼，初花起随水滴施硝酸钙", note:"补硼钼促花针；初花—下针是钙需求起点，随水追施硝酸钙（约 1.5–2 kg/亩·次）补充速效钙，与垄间浅施石膏形成双路补钙"},
+    {key:"pod",        interval:"5-7 天",   perMu:3.0, count:7, total:21.0, ratio:"高钾 12-8-40 + 硝酸钙（随水追施钙）", note:"需肥高峰，补钾钙保荚果；结荚期随水追施硝酸钙（约 2–3 kg/亩·次）强化速效钙，控病害、降空壳"},
+    {key:"calciumTop", label:"钙肥增施（滴灌随水）", interval:"初花—结荚（约 30–80 天）", perMu:"约 2 kg/亩·次", count:"8–10 次", total:"硝酸钙约 16–20 kg/亩", ratio:"硝酸钙 Ca(NO3)2 随水追施", note:"速效钙增施方案：不依赖石膏单一路。滴灌随水追施硝酸钙，在开花下针—结荚期高频补给速效钙，压低空壳率；石膏仍作浅层土施基础钙，二者互补不替代。缺钙/空壳风险高地块可提至 3 kg/亩·次"},
     {key:"harvest",    interval:"—",       perMu:0,   count:0, total:0,    ratio:"—",                   note:"控水降湿，停止施肥，择晴采收"}
   ];
 
@@ -1207,13 +1210,18 @@
 
     $("fertPlanBody").innerHTML=stageFertPlan.map(function(p){
       var s=stageMeta[p.key];
-      var cur=p.key===stage;
-      return '<tr class="'+(cur?"stage-current":"")+'">'+
-        '<td>'+s.label+(cur?'<span class="stage-tag">当前</span>':"")+'</td>'+
+      var label=p.label||(s&&s.label)||p.key;
+      var cur=s&&p.key===stage;
+      var isCustom=!s;
+      var perCell = p.perMu===0 ? "—" : (isCustom ? p.perMu : p.perMu+" kg/亩");
+      var countCell = p.count===0 ? "—" : (isCustom ? p.count : p.count+" 次");
+      var totalCell = p.total===0 ? "—" : (isCustom ? p.total : p.total+" kg/亩");
+      return '<tr class="'+(cur?"stage-current":"")+(isCustom?" calcium-row":"")+'">'+
+        '<td>'+label+(cur?'<span class="stage-tag">当前</span>':"")+'</td>'+
         '<td>'+p.interval+'</td>'+
-        '<td>'+(p.perMu>0?p.perMu+' kg/亩':'—')+'</td>'+
-        '<td>'+(p.count>0?p.count+' 次':'—')+'</td>'+
-        '<td>'+(p.total>0?p.total+' kg/亩':'—')+'</td>'+
+        '<td>'+perCell+'</td>'+
+        '<td>'+countCell+'</td>'+
+        '<td>'+totalCell+'</td>'+
         '<td>'+p.ratio+'</td>'+
         '<td>'+p.note+'</td></tr>';
     }).join("");
