@@ -173,18 +173,53 @@ input[type="reset"],
 .ry-nav .search-btn:hover{background:var(--g-700);border-color:var(--g-700);color:#fff;}
 .ry-nav .mobile-menu-btn{display:none;flex-direction:column;gap:5px;padding:8px;cursor:pointer;}
 .ry-nav .mobile-menu-btn span{display:block;width:22px;height:2px;background:var(--s-700);border-radius:0;}
-@media(max-width:920px){
-  .ry-nav .main-nav{display:none;position:absolute;top:72px;left:0;right:0;background:#fff;flex-direction:column;align-items:stretch;padding:12px 24px;box-shadow:var(--shadow-sm);border-top:1px solid var(--s-100);gap:0;z-index:1500;}
-  .ry-nav .main-nav.open{display:flex;}
-  .ry-nav .nav-link{padding:12px 0;border-radius:0;border-bottom:1px solid var(--s-50);}
-  .ry-nav .mobile-menu-btn{display:flex;}
-}
 /* index.html 自带 sticky .topbar 需让位于导航栏 */
 .ry-nav ~ .topbar{top:72px !important;}
 .ry-nav .nav-home-btn{margin-left:8px;display:inline-flex;align-items:center;gap:6px;padding:9px 16px;background:var(--g-700);color:#fff;font-size:14px;font-weight:700;text-decoration:none;border:0;border-radius:0;cursor:pointer;transition:var(--transition);white-space:nowrap;letter-spacing:.5px;}
 .ry-nav .nav-home-btn:hover{background:var(--g-800);}
-@media(max-width:920px){
-  .ry-nav .nav-home-btn{margin:10px 24px 14px;justify-content:center;}
+/* 手机端导航：常驻顶部，链接一行横向滑动（取消汉堡弹窗占用画面），与精准灌溉页(index.html)一致 */
+@media(max-width:768px){
+  .ry-nav .main-header{height:auto}
+  .ry-nav .header-inner{
+    flex-wrap:wrap;
+    height:auto;
+    align-items:center;
+    padding:8px 14px 0;
+    gap:0;
+  }
+  .ry-nav .brand{height:46px;flex:1 1 auto}
+  .ry-nav .header-actions{margin-left:auto;order:2}
+  .ry-nav .mobile-menu-btn{display:none !important}
+  .ry-nav .nav-home-btn{display:none !important}  /* 品牌logo即回主页入口 */
+  .ry-nav .main-nav{
+    display:flex !important;
+    position:static;
+    flex-direction:row;
+    flex-wrap:nowrap;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+    width:100%;
+    order:3;
+    gap:0;
+    margin-top:6px;
+    padding:0;
+    background:#fff;
+    box-shadow:none;
+    border-top:1px solid var(--s-100);
+  }
+  .ry-nav .main-nav::-webkit-scrollbar{display:none}
+  .ry-nav .main-nav .nav-item{flex:0 0 auto}
+  .ry-nav .nav-link{
+    padding:11px 15px;
+    font-size:13px;
+    border-bottom:none;
+    border-right:1px solid var(--s-50);
+    white-space:nowrap;
+  }
+  .ry-nav .nav-link::after{display:none}
+  /* 手机端隐藏顶部灰色小字条，减少画面占用 */
+  .ry-nav .utility-bar{display:none}
 }
 /* ===== /RY-NAV ===== */
 
