@@ -234,6 +234,11 @@
   .history-advice-card .section-head .section-title{margin:0}
   .history-advice-card .calcium-note{color:#166534;background:var(--g-50);padding:8px 10px;border-radius:8px;margin-top:6px}
 
+  /* 移动端直接打开工具页时（非 iframe 内）显示「返回」入口；桌面 iframe（980px 视口）下隐藏 */
+  .mobile-back{display:none;align-items:center;gap:6px;margin:0 0 12px;padding:8px 12px;width:max-content;background:var(--g-50);color:var(--g-700);border:1px solid var(--g-200);border-radius:8px;font-size:13px;font-weight:600;text-decoration:none}
+  .mobile-back:hover{background:var(--g-100)}
+  @media (max-width:768px){ .mobile-back{display:inline-flex} }
+
   /* 桌面端（直接打开工具页，≥1024px）：在基础样式之后覆盖，恢复较大字号观感。
      被数字农业.html 以 iframe 嵌入时，iframe 布局视口为 980px，不进此块，自动沿用上方「基础=手机样式」。 */
   @media (min-width:1024px){
@@ -264,6 +269,7 @@
 </head>
 <body>
 <div class="ops-app">
+  <a class="mobile-back" href="runye-landing.html">‹ 返回首页</a>
   <header class="topbar">
     <div>
       <strong>润野 · 七彩花生水肥决策</strong>

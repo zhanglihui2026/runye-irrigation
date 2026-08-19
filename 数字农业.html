@@ -216,5 +216,17 @@
   })();
 </script>
 
+<script>
+  // 根治手机端 iframe 显示问题：iOS Safari / 微信 WebView 中，iframe 内部页面被固定按 980px 视口渲染后
+  // 再等比缩放到手机宽度，导致整页被压成约 1/3、字号极小、横向显示不全。
+  // 解决方案：移动端不经 iframe，直接打开工具页（peanut-tool.html 自带 viewport=device-width，真机视口正确）。
+  // 桌面端仍用 iframe 嵌套，不受影响。
+  (function(){
+    if(/Mobi|Android|iPhone|iPad|iPod|Windows Phone|HarmonyOS/i.test(navigator.userAgent)){
+      window.location.replace('peanut-tool.html');
+    }
+  })();
+</script>
+
 </body>
 </html>
