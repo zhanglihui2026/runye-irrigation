@@ -4314,9 +4314,6 @@ function render() {
         <span>目标流速<b>${fmt(r.targetV,2)} m/s</b></span>
         <span>主管实际流速<b>${fmt(r.mainPipe.v,2)} m/s</b></span>
         <span>支管实际流速<b>${fmt(r.branchPipe.v,2)} m/s</b></span>
-        <span>单区流量<b>${fmt(r.zoneFlow,1)} m³/h</b></span>
-        <span>水泵工作点<b>${fmt(r.zoneFlow,1)} × ${fmt0(r.pumpHead)} m</b></span>
-        <span>建议电机<b>${fmt0(r.motorKW_rounded)} kW</b></span>
       </div>
       <p>主管按单区流量选型；阀门后的支管按 2、3 或 4 根并联分流，选最接近目标流速的标准 PE 外径。</p>
     </div>
