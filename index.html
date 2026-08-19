@@ -3016,6 +3016,14 @@ input[type="reset"],
   /* 施工简图：手机端保持可读，允许横向滑动看大图（不缩成小字） */
   .pp-diagram-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
   .pp-diagram-wrap svg{min-width:680px;max-width:none;height:auto}
+  /* 二级/三级施工简图区域统一：两个 SVG 同比例可读，标题栏文字与按钮排布一致 */
+  #ppDiagramContent svg,
+  #tlDiagramContent svg{min-width:680px !important;max-width:none !important}
+  .pp-diagram-title{font-size:15px;flex-wrap:wrap}
+  .pp-diagram-title .pp-btn-generate,
+  .pp-diagram-title .pp-btn-ghost,
+  .pp-diagram-title .tl-trigger-btn-inline{font-size:12px;padding:5px 10px}
+  .pp-diagram-title > span[style*="flex:1"]{flex:1 1 100% !important}
 }
 
 @media(max-width:480px){
