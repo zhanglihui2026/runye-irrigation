@@ -204,7 +204,7 @@
   .daily-log-card,
   .plot-board{font-size:12px;line-height:1.55}
 
-  .operation-card ol,.history-advice-card ol{font-size:12px;line-height:1.55}
+  .operation-card ol{font-size:12px;line-height:1.55}
   .calcium-body{font-size:12px;line-height:1.55}
   .decision-table-card{font-size:12px}
   .weather-metric strong{font-size:13px;font-weight:500}
@@ -216,6 +216,11 @@
   table{font-size:12px}
   th,td{padding:8px 6px}
   .daily-advice{font-size:12px}
+
+  /* 综合农事建议：卡片宽度随屏幕自适应、内部文字流式缩放，解决手机端溢出/比例失调 */
+  .history-advice-card{width:100%;max-width:100%;box-sizing:border-box;padding:14px 14px}
+  .history-advice-card ol{font-size:clamp(11px,calc(4px + 2.4vw),15px);line-height:1.65;padding-left:18px}
+  .history-advice-card li{margin-bottom:9px;overflow-wrap:break-word;word-break:break-word}
 
   /* 桌面端（直接打开工具页，≥1024px）：在基础样式之后覆盖，恢复较大字号观感。
      被数字农业.html 以 iframe 嵌入时，iframe 布局视口为 980px，不进此块，自动沿用上方「基础=手机样式」。 */
