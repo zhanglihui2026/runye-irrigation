@@ -118,6 +118,35 @@
     .insight-grid{grid-template-columns:1fr}
   }
 
+  /* ===== 手机端字号统一缩放（数字农业 · 农事建议类板块） ===== */
+  @media (max-width:768px){
+    .ops-app{padding:14px 14px 36px}
+    .hero-copy{padding:16px}
+    .hero-copy h1{font-size:20px;line-height:1.3}
+    .hero-sub{font-size:14px}
+    .score-card strong{font-size:34px}
+    .kpi strong{font-size:18px}
+    .kpi span{font-size:11px}
+    .section-title{font-size:15px;font-weight:700;color:var(--g-700);margin:14px 0 8px}
+    .operation-card ol,.history-advice-card ol{font-size:13px;line-height:1.6}
+    .decision-table-card{font-size:13px}
+    .control-card h2{font-size:13px}
+    .weather-title{font-size:15px}
+    .weather-metric strong{font-size:16px}
+    .growth-card strong{font-size:16px}
+    .manual-card,.operation-card,.decision-table-card{padding:14px}
+    table{font-size:12px}
+    th,td{padding:8px 6px}
+    .season-kpi strong{font-size:16px}
+    .daily-advice{font-size:12px}
+  }
+  @media (max-width:480px){
+    .hero-copy h1{font-size:18px}
+    .score-card strong{font-size:30px}
+    .kpi strong{font-size:16px}
+    .section-title{font-size:14px}
+  }
+
   /* 种植期天气采集日志 */
   .weather-log-card .log-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
   .log-toolbar .ghost-btn{background:var(--g-700);color:#fff;border:0;border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer}
