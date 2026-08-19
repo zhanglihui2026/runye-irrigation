@@ -196,6 +196,44 @@
   </div>
 </header>
 
+<!-- ===== 登录门（未登录遮挡全部内容） ===== -->
+<style>
+#gate{position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,.97);display:flex;align-items:center;justify-content:center;font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;}
+#gate .gb{background:#fff;padding:44px 38px;max-width:360px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.4);}
+#gate .gl{font-size:34px;margin-bottom:10px;}
+#gate .gt{font-size:19px;font-weight:800;color:#166534;margin-bottom:6px;}
+#gate .gs{font-size:13px;color:#64748b;margin-bottom:22px;}
+#gate input{width:100%;padding:12px 14px;font-size:15px;border:1px solid #cbd5e1;margin-bottom:16px;outline:none;box-sizing:border-box;}
+#gate input:focus{border-color:#16a34a;}
+#gate button{width:100%;padding:12px;background:#16a34a;color:#fff;font-size:15px;font-weight:700;border:0;cursor:pointer;transition:background .2s;}
+#gate button:hover{background:#15803d;}
+#gate .err{color:#dc2626;font-size:12px;margin-top:12px;display:none;}
+</style>
+<div id="gate">
+  <div class="gb">
+    <div class="gl">🌱</div>
+    <div class="gt">七彩花生 · 全程植保技术方案</div>
+    <div class="gs">授权查看 · 请输入访问密码</div>
+    <input id="gate-pwd" type="password" placeholder="访问密码" autocomplete="off">
+    <button id="gate-btn">进入查看</button>
+    <div id="gate-err" class="err">密码错误，请重试</div>
+  </div>
+</div>
+<script>
+(function(){
+  var PASS="qicai2026";
+  var gate=document.getElementById('gate');
+  function unlock(){ gate.style.display='none'; try{sessionStorage.setItem('qc_gate','1');}catch(e){} }
+  try{ if(sessionStorage.getItem('qc_gate')==='1'){ gate.style.display='none'; } }catch(e){}
+  var btn=document.getElementById('gate-btn');
+  var pwd=document.getElementById('gate-pwd');
+  var err=document.getElementById('gate-err');
+  btn.addEventListener('click',function(){ if(pwd.value===PASS){ unlock(); } else { err.style.display='block'; } });
+  pwd.addEventListener('keydown',function(e){ if(e.key==='Enter'){ btn.click(); } });
+})();
+</script>
+<!-- ===== /登录门 ===== -->
+
 <!-- OVERVIEW -->
 <section id="overview">
   <div class="wrap">
