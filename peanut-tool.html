@@ -267,6 +267,44 @@
     .daily-advice{font-size:13px}
     #dailyLogHead{font-size:13px}
   }
+  /* ===== 七彩花生植保方案 · 当前生育期决策 ===== */
+  .qicai-plan{background:#f3f1ea;padding:26px 0 30px;border-top:1px solid var(--s-100);}
+  .qicai-plan .wrap{max-width:1240px;margin:0 auto;padding:0;}
+  .qp-head{display:flex;gap:14px;align-items:flex-start;margin-bottom:16px;}
+  .qp-ico{font-size:26px;line-height:1;flex:0 0 auto;}
+  .qp-head h2{font-size:19px;color:var(--g-800);margin:0;}
+  .qp-head p{font-size:13px;color:var(--s-600);margin:4px 0 0;max-width:900px;line-height:1.55;}
+  .qp-body{display:flex;flex-direction:column;gap:14px;}
+  .qp-card{background:#fff;border:1px solid var(--s-200);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-sm);}
+  .qp-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
+  .qp-group{font-size:12px;color:var(--teal-700);font-weight:700;letter-spacing:.5px;}
+  .qp-card-head h3{font-size:17px;color:var(--g-800);margin:3px 0 0;}
+  .qp-meta{display:flex;gap:8px;flex-wrap:wrap;}
+  .qp-chip{font-size:12.5px;background:var(--g-50);color:var(--g-700);border:1px solid var(--g-200);border-radius:999px;padding:4px 12px;font-weight:600;white-space:nowrap;}
+  .qp-chip--count{background:#fff7ed;color:#c2410c;border-color:#fed7aa;}
+  .qp-section-title{font-size:13px;font-weight:700;color:var(--s-700);margin:6px 0 8px;padding-left:9px;border-left:3px solid var(--g-500);}
+  .qp-cat{display:flex;gap:10px;align-items:flex-start;padding:6px 0;border-bottom:1px dashed var(--s-100);}
+  .qp-cat:last-child{border-bottom:0;}
+  .qp-cat-label{flex:0 0 auto;font-size:12px;font-weight:700;color:#fff;border-radius:6px;padding:3px 9px;white-space:nowrap;}
+  .qp-cat-items{display:flex;flex-wrap:wrap;gap:6px;}
+  .qp-item{font-size:13px;background:var(--s-50);border:1px solid var(--s-200);border-radius:6px;padding:3px 9px;color:var(--s-800);}
+  .qp-tag--kill{background:#c0392b;}
+  .qp-tag--cure{background:#e67e22;}
+  .qp-tag--ctrl{background:#8e44ad;}
+  .qp-tag--nutri{background:#2b7bb0;}
+  .qp-tag--bio{background:#0d9488;}
+  .qp-tag--disinfect{background:#64748b;}
+  .qp-mix{margin-top:12px;font-size:13.5px;color:var(--s-700);background:#f8fafc;border:1px solid var(--s-200);border-radius:10px;padding:11px 13px;line-height:1.6;}
+  .qp-weather{background:#fff;border:1px solid var(--s-200);border-radius:var(--radius);padding:14px 18px;font-size:13.5px;color:var(--s-700);box-shadow:var(--shadow-sm);}
+  .qp-weather-recent{margin-top:6px;color:var(--s-600);}
+  .qp-muted{color:var(--s-400);}
+  .qp-caution{background:#fff;border:1px solid var(--s-200);border-radius:var(--radius);padding:14px 18px;box-shadow:var(--shadow-sm);}
+  .qp-caution ul{margin:0;padding-left:20px;}
+  .qp-caution li{font-size:13.5px;color:var(--s-700);margin:7px 0;line-height:1.6;}
+  .qp-next{font-size:13px;color:var(--teal-700);background:#ecfdf5;border:1px dashed var(--teal);border-radius:10px;padding:10px 14px;}
+  .qp-next--end{color:var(--s-600);background:#f8fafc;border-color:var(--s-200);}
+  @media(max-width:640px){ .qp-head{flex-direction:column;gap:8px;} }
+
   </style>
 </head>
 <body>
@@ -279,7 +317,7 @@
     </div>
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <a class="nav-link-pill" href="qicai-huasheng/index.html">植保方案</a>
-      <a class="nav-link-pill" href="runye-landing.html">农事看板</a>
+      <a class="nav-link-pill" href="qicai-huasheng/index.html">种植方案</a>
       <a class="nav-link-pill" href="index.html">精准灌溉</a>
       <a class="nav-link-pill" href="数字农业.html">数字农业</a>
       <div class="sync-pill" id="syncPill">等待抓取昨日天气</div>
@@ -307,6 +345,19 @@
       <span class="sub">引用自「精准灌溉」面积测量工具的地块图形 · 点击地块即在下方决策工具中选中并采集该地块天气</span>
     </div>
     <div class="plot-board-grid" id="plotBoardGrid"></div>
+  </section>
+
+  <section class="qicai-plan" id="qicaiPlanSection">
+    <div class="wrap">
+      <div class="qp-head">
+        <span class="qp-ico">🌱</span>
+        <div>
+          <h2>七彩花生植保方案 · 当前生育期决策</h2>
+          <p>移植自《七彩花生全程植保技术方案》：按「播种后天数」自动定位当前生育节点，结合近期天气给出「该用什么药 / 肥 / 菌、怎么混配、注意什么」。播期与天气随上方参数与采集数据实时联动。</p>
+        </div>
+      </div>
+      <div id="qicaiPlanBody" class="qp-body"></div>
+    </div>
   </section>
 
   <section class="main-grid">
@@ -558,6 +609,51 @@
     {key:"calciumTop", label:"钙肥增施（滴灌随水）", interval:"初花—结荚（约 30–80 天）", perMu:"约 2 kg/亩·次", count:"8–10 次", total:"硝酸钙约 16–20 kg/亩", ratio:"硝酸钙 Ca(NO3)2 随水追施", note:"速效钙增施方案：不依赖石膏单一路。滴灌随水追施硝酸钙，在开花下针—结荚期高频补给速效钙，压低空壳率；石膏仍作浅层土施基础钙，二者互补不替代。缺钙/空壳风险高地块可提至 3 kg/亩·次"},
     {key:"harvest",    interval:"—",       perMu:0,   count:0, total:0,    ratio:"—",                   note:"控水降湿，停止施肥，择晴采收"}
   ];
+
+  // ===== 七彩花生植保技术方案（移植自 qicai-huasheng「全生育期操作历」） =====
+  // dayMin/dayMax 为「播种后天数」窗口；flags：独立=须单独作业不与其它混配；偏多=药种多建议分2桶；三唑=含三唑类控旺叠加
+  var QICAI_PLAN=[
+    {group:"播种前 · 整地期",dayText:"播种前 · 土壤处理",dayMin:-60,dayMax:-8,op:"底肥 / 撒施",count:"1 种",
+     cats:{消毒:["生石灰 50–80 kg/亩"]},
+     mix:"必须独立：与后续底肥间隔 ≥7 天，单独撒施；碱性强，勿与铵态氮 / 菌剂同施。",flags:["独立"]},
+    {group:"播种前 · 整地期",dayText:"整地期（生石灰后 ≥7 天）",dayMin:-7,dayMax:-1,op:"底肥 / 撒施",count:"3 种",
+     cats:{肥菌:["友擎有机肥 80 kg","高富专 13-17-15 40 kg","地腾（精甲·嘧菌酯）5 kg"]},
+     mix:"三者混匀同施；覆土 10–30 cm，严禁触根。",flags:[]},
+    {group:"苗期 · 叶面除草",dayText:"播后苗前（≤3 天）",dayMin:0,dayMax:3,op:"叶面喷雾",count:"2 种",
+     cats:{除草:["精异丙甲草胺 50–100 ml","双氯磺草胺 3–4 g"]},
+     mix:"封闭除草组合同桶；（独立）不与杀虫 / 杀菌 / 营养混；墒情适中均匀喷。",flags:["独立"]},
+    {group:"苗期 · 叶面除草",dayText:"苗后",dayMin:4,dayMax:14,op:"叶面喷雾",count:"2 种",
+     cats:{除草:["烯草酮 50 ml","双氯磺草胺 2 g"]},
+     mix:"苗后除草同桶；（独立）避开高温；阔叶 + 尖叶兼顾。",flags:["独立"]},
+    {group:"播后 15–40 天 · 促根开花下针",dayText:"播后 15–20 天",dayMin:15,dayMax:20,op:"叶面 ＋ 灌根",count:"叶面 8 ＋ 灌根 2",
+     cats:{杀虫:["锐动","铜拳","虫螨腈·虱螨脲"],杀菌:["腾丰","美得乐"],控旺:["小胖子"],营养:["聚合磷助剂","硼钼"],灌根:["根际香土 2 kg","削线 1 kg"]},
+     mix:"叶面 8 种同桶一次喷；灌根 2 种同桶。叶面与灌根分两次施。现配现用、二次稀释。",flags:[]},
+    {group:"播后 15–40 天 · 促根开花下针",dayText:"播后 25–30 天（50% 开花）",dayMin:25,dayMax:30,op:"叶面 ＋ 灌根",count:"叶面 8 ＋ 灌根 4",
+     cats:{杀虫:["虫螨腈·虱螨脲","铜拳","锐动"],杀菌:["秀艳"],控旺:["适大进"],营养:["磷酸二氢钾","聚合磷助剂","硼钼"],灌根:["根际香土 2 kg","剿灭 500 ml","苗乐乐 250 ml","水溶肥 12-30-8 2 kg"]},
+     mix:"叶面 8 同桶；灌根 4 同桶（苗乐乐含杀菌 + 寡糖，与根际香土 / 水溶肥 / 剿灭兼容）。开花期避中午施。",flags:[]},
+    {group:"播后 15–40 天 · 促根开花下针",dayText:"播后 30–35 天",dayMin:31,dayMax:35,op:"灌根",count:"2 种",
+     cats:{营养:["水溶肥 12-30-8 2 kg","铠仆（海藻）1 L"]},
+     mix:"同桶；促下针、抗逆。",flags:[]},
+    {group:"播后 15–40 天 · 促根开花下针",dayText:"播后 35–40 天",dayMin:36,dayMax:40,op:"叶面 ＋ 灌根",count:"叶面 8 ＋ 灌根 2",
+     cats:{杀虫:["铜拳","锐动"],杀菌:["美得乐","秀艳"],控旺:["适大进"],营养:["磷酸二氢钾","聚合磷助剂","硼钼"],灌根:["水溶肥 12-30-8 2 kg","泰稳丰（钙镁）1 L"]},
+     mix:"叶面 8 同桶；灌根 2 同桶。",flags:[]},
+    {group:"荚果充实期 · 播后 55–80 天",dayText:"播后 55–60 天",dayMin:55,dayMax:60,op:"叶面",count:"11 种（偏多）",
+     cats:{杀虫:["虫螨腈·虱螨脲","铜拳","锐动"],杀菌:["秀艳","美得乐","拜亩乐"],控旺:["妥控"],营养:["磷酸二氢钾","聚合磷助剂","硼钼","金收"]},
+     mix:"偏多，建议分 2 桶：桶①杀虫3 + 营养（聚合磷 + 硼钼 + 金收）；桶②杀菌3（秀艳 + 美得乐 + 拜亩乐）+ 控旺（妥控）+ 磷酸二氢钾。注意秀艳 + 拜亩乐均含三唑，控旺叠加 → 保留 1 种或减量。",flags:["偏多","三唑"]},
+    {group:"荚果充实期 · 播后 55–80 天",dayText:"播后 75–80 天",dayMin:75,dayMax:80,op:"叶面",count:"10 种（偏多）",
+     cats:{杀虫:["锐动","虫螨腈·虱螨脲","铜拳"],杀菌:["美得乐","拜亩乐"],控旺:["适大进"],营养:["金收","磷酸二氢钾","聚合磷助剂","硼钼"]},
+     mix:"偏多，建议分 2 桶：桶①杀虫3 + 营养；桶②杀菌2（美得乐 + 拜亩乐）+ 控旺（适大进）+ 磷酸二氢钾。仅 1 个三唑（拜亩乐），控旺风险可控。",flags:["偏多"]},
+    {group:"荚果期 · 灌根为主",dayText:"荚果期（80% 封垄、鸡头状）",dayMin:81,dayMax:89,op:"灌根",count:"4 种",
+     cats:{肥菌:["水溶肥 10-5-35 2 kg","泰稳丰 1 L","苗乐乐 350 ml","削线 1 kg"]},
+     mix:"同桶；根果同护（营养 ＋ 防线虫 ＋ 防根腐 / 白绢）。",flags:[]},
+    {group:"荚果期 · 灌根为主",dayText:"间隔 7–10 天 ×2（巩固）",dayMin:90,dayMax:99,op:"灌根",count:"3 / 2 种",
+     cats:{肥菌:["轮① 水溶肥 10-5-35 3 kg + 根际香土 2 kg + 泰稳丰 1 L","轮② 水溶肥 10-5-35 3 kg + 泰稳丰 1 L"]},
+     mix:"同桶；巩固荚果饱满度。两轮间隔 7–10 天。",flags:[]},
+    {group:"收获前",dayText:"播后 100 天（收获前）",dayMin:100,dayMax:9999,op:"叶面",count:"9 种（偏多）",
+     cats:{杀虫:["虫螨腈·虱螨脲","铜拳","锐动"],杀菌:["美得乐","拜亩乐"],营养:["金收","磷酸二氢钾","聚合磷助剂","硼钼"]},
+     mix:"偏多，建议分 2 桶；收获前严格按各药标签安全间隔期停喷。美得乐 + 拜亩乐可同桶。",flags:["偏多"]}
+  ];
+  var QICAI_CAT_COLOR={杀虫:"kill",杀菌:"cure",控旺:"ctrl",营养:"nutri",肥菌:"bio",灌根:"bio",消毒:"disinfect",除草:"kill"};
 
   function yesterdayDate(){
     var d=new Date(); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10);
@@ -1055,6 +1151,92 @@
     });
   }
 
+  function renderQicaiPlan(){
+    var box=$("qicaiPlanBody"); if(!box) return;
+    var day=state._growthDays; if(day==null||day===undefined) day=daysSince(state.plantingDate);
+
+    // 定位当前/最近节点 + 下一节点
+    var cur=null,next=null;
+    for(var i=0;i<QICAI_PLAN.length;i++){ var e=QICAI_PLAN[i]; if(day>=e.dayMin&&day<=e.dayMax){ cur=e; } }
+    if(!cur){
+      var past=QICAI_PLAN.filter(function(e){return e.dayMax<day;});
+      cur=past.length?past[past.length-1]:QICAI_PLAN[0];
+    }
+    var up=QICAI_PLAN.filter(function(e){return e.dayMin>day;});
+    next=up.length?up[0]:null;
+
+    // 近期天气：当天 + 近 3 天历史
+    var w=state.weather||{};
+    var recent=[];
+    try{
+      var cache=loadWeatherLogCache(currentLoc().name);
+      if(cache&&cache.records){
+        var today=shanghaiToday();
+        recent=cache.records.slice().sort(function(a,b){return a.date<b.date?-1:1;}).filter(function(r){return r.date<today;}).slice(-3);
+      }
+    }catch(e){}
+    var sig={rain:false,hot:false,cold:false,wind:false};
+    var hasReal=(recent.length>0)||(w.source==="auto");
+    if(hasReal){
+      if((w.rainMm||0)>=5) sig.rain=true;
+      if((w.tempMax||0)>=34) sig.hot=true;
+      if((w.tempMin||99)<=18) sig.cold=true;
+      if((w.windMax||0)>=28) sig.wind=true;
+      recent.forEach(function(r){ if((r.rainMm||0)>=1) sig.rain=true; if((r.tmax||0)>=34) sig.hot=true; if((r.tmin||0)<=18) sig.cold=true; if((r.windMax||0)>=28) sig.wind=true; });
+    }
+    var drought=hasReal&&((w.rainMm||0)<4&&(state.soilMoisture||0)<58);
+
+    function catHtml(cats){
+      var order=["杀虫","杀菌","控旺","营养","肥菌","灌根","消毒","除草"];
+      var html="";
+      order.forEach(function(c){
+        if(cats[c]&&cats[c].length){
+          html+='<div class="qp-cat"><span class="qp-cat-label qp-tag--'+((QICAI_CAT_COLOR[c])||"nutri")+'">'+c+'</span><span class="qp-cat-items">'
+            +cats[c].map(function(x){return '<span class="qp-item">'+x+'</span>';}).join('')+'</span></div>';
+        }
+      });
+      return html;
+    }
+
+    var curHtml='<div class="qp-card">'
+      +'<div class="qp-card-head"><div><span class="qp-group">'+cur.group+'</span><h3>'+cur.dayText+'</h3></div>'
+      +'<div class="qp-meta"><span class="qp-chip">播后 '+day+' 天</span><span class="qp-chip">'+cur.op+'</span><span class="qp-chip qp-chip--count">用 '+cur.count+'</span></div></div>'
+      +'<div class="qp-section-title">该用什么 · 药 / 肥 / 菌搭配</div>'
+      +catHtml(cur.cats)
+      +'<div class="qp-mix"><b>混配方式 &amp; 关键提醒：</b>'+cur.mix+'</div>'
+      +'</div>';
+
+    var nextHtml = next
+      ? '<div class="qp-next"><span class="qp-next-label">下一节点预告</span> '+next.dayText+'（约播后 '+next.dayMin+' 天） · '+next.op+' · 用 '+next.count+'</div>'
+      : '<div class="qp-next qp-next--end">已到最后节点（收获前）：按各药标签安全间隔期停喷、择晴采收。</div>';
+
+    var wxHtml='<div class="qp-weather">'
+      +'<div class="qp-weather-today"><b>今日天气</b>：'+(w.date||'-')+' · 降雨 '+(w.rainMm||0)+' mm · '+(w.tempMin||'-')+'–'+(w.tempMax||'-')+'℃ · 风速 '+(w.windMax||0)+' km/h</div>';
+    if(recent.length){
+      wxHtml+='<div class="qp-weather-recent"><b>前几天</b>：'+recent.map(function(r){return r.date.slice(5)+' '+((r.rainMm||0)>=1?('雨'+(r.rainMm||0)+'mm'):'晴/多云')+' '+r.tmin+'–'+r.tmax+'℃';}).join('、')+'</div>';
+    } else {
+      wxHtml+='<div class="qp-weather-recent qp-muted">（暂无历史天气采集；点「采集 / 刷新天气数据」后将自动显示前几天天气）</div>';
+    }
+    wxHtml+='</div>';
+
+    var cau=[];
+    if(cur.flags.indexOf("独立")>=0) cau.push("本节点含<b>独立作业项</b>（除草剂 / 生石灰），严禁与杀虫·杀菌·营养同桶，单独喷施。");
+    if(cur.flags.indexOf("偏多")>=0) cau.push("本节点药种<b>偏多</b>（"+cur.count+"），建议<b>分 2 桶</b>：桶①杀虫 + 营养；桶②杀菌 + 控旺。现配现用、二次稀释。");
+    if(cur.flags.indexOf("三唑")>=0) cau.push("含<b>三唑类</b>（秀艳 / 拜亩乐）控旺叠加，保留 1 种或减量，避免抑制作物。");
+    if(sig.rain) cau.push("<b>近期有降雨</b>：叶面喷施避开雨前 / 雨后 6 小时，优先内吸性药剂；灌根不受影响可照常；低洼处及时排涝降湿。");
+    if(sig.hot) cau.push("<b>高温（≥34℃）</b>：避开 11:00–16:00 施药 / 施肥；加飞防助剂、防日灼；宜清晨或傍晚作业。");
+    if(sig.cold) cau.push("<b>低温（≤18℃）</b>：根系活性低，灌根 / 海藻 / 生物刺激素优先，叶面浓度宜低；控旺药酌情延后。");
+    if(sig.wind) cau.push("<b>风力偏大（≥28km/h）</b>：叶面肥 / 药剂顺延或改低风时段，不宜飞防。");
+    if(drought) cau.push("<b>干旱</b>：以灌根 / 淋施为主，叶面浓度宜低，结合灌溉补肥。");
+    if(!cau.length){
+      if(hasReal) cau.push("近期天气平稳，按本节点方案正常作业；大面积混配前先做小样杯混试验。");
+      else cau.push("尚未采集到实时天气：建议先点「采集 / 刷新天气数据」获取近期天气；当前按本节点方案正常作业，大面积混配前先做小样杯混试验。");
+    }
+    var cautionHtml='<div class="qp-caution"><div class="qp-section-title">结合天气的注意事项</div><ul>'+cau.map(function(t){return '<li>'+t+'</li>';}).join('')+'</ul></div>';
+
+    box.innerHTML=curHtml+wxHtml+cautionHtml+nextHtml;
+  }
+
   function render(){
     var d=state.decision, loc=currentLoc(), stage=state._stage, growthDays=state._growthDays, meta=stageMeta[stage];
     $("syncPill").textContent=state.weatherMessage;
@@ -1145,6 +1327,7 @@
 
     renderLog();
     renderHistoryAdvice();
+    renderQicaiPlan();
   }
 
   function readInputs(){

@@ -3085,7 +3085,7 @@ input[type="reset"],
         <div class="nav-item"><a href="index.html" class="nav-link active">精准灌溉</a></div>
         <div class="nav-item"><a href="耐特菲姆滴灌带长度查询器.html" class="nav-link">滴灌带查询</a></div>
         <div class="nav-item"><a href="index.html#three-level-view" class="nav-link">三级系统</a></div>
-        <div class="nav-item"><a href="runye-landing.html" class="nav-link">农事看板</a></div>
+        <div class="nav-item"><a href="qicai-huasheng/index.html" class="nav-link">种植方案</a></div>
         <div class="nav-item"><a href="runye-landing.html" class="nav-link">关于我们</a></div>
       </nav>
       <a href="runye-landing.html" class="nav-home-btn">⌂ 返回主页</a>
@@ -3143,7 +3143,7 @@ input[type="reset"],
           <label class="field"><span>分区固定边长</span><span class="input-shell"><input id="fld_zoneFixedSide" type="number" min="1" max="200" step="1" value="200"><em>m</em></span></label>
           <label class="field"><span>水源至最高点高差</span><span class="input-shell"><input id="fld_dh" type="number" min="0" step="1" value="5"><em>m</em></span></label>
           <label class="field"><span>井/水池提升高度</span><span class="input-shell"><input id="fld_lift" type="number" min="0" step="1" value="5"><em>m</em></span></label>
-          <label class="field"><span>滴灌带入口工作压力</span><span class="input-shell"><input id="fld_tapePressure" type="number" min="0" step="0.1" value="1.2"><em>bar</em></span></label>
+          <label class="field"><span>滴灌带入口工作压力</span><span class="input-shell"><input id="fld_tapePressure" type="number" min="0" step="0.1" value="1"><em>bar</em></span></label>
           <label class="field"><span>过滤与阀门损失</span><span class="input-shell"><input id="fld_filterLoss" type="number" min="0" step="0.5" value="5"><em>m</em></span></label>
           <label class="field"><span>水源已有压力</span><span class="input-shell"><input id="fld_existPressure" type="number" min="0" step="0.1" value="0"><em>bar</em></span></label>
           <label class="field"><span>目标经济流速</span><span class="input-shell"><input id="fld_targetV" type="number" min="0" max="5" step="0.1" value="1.5"><em>m/s</em></span></label>
@@ -3919,7 +3919,7 @@ function doIrrImport(text){
           <div class="nav-item"><a href="index.html" class="nav-link">精准灌溉</a></div>
           <div class="nav-item"><a href="耐特菲姆滴灌带长度查询器.html" class="nav-link">滴灌带查询</a></div>
           <div class="nav-item"><a href="index.html#three-level-view" class="nav-link active">三级系统</a></div>
-          <div class="nav-item"><a href="runye-landing.html" class="nav-link">农事看板</a></div>
+          <div class="nav-item"><a href="qicai-huasheng/index.html" class="nav-link">种植方案</a></div>
           <div class="nav-item"><a href="runye-landing.html" class="nav-link">关于我们</a></div>
         </nav>
         <a href="runye-landing.html" class="nav-home-btn">⌂ 返回主页</a>
@@ -4706,7 +4706,7 @@ function selectLayout(sides) {
 }
 
 function resetDefaults() {
-  const defaults = {fld_zoneMu:30,fld_zoneFixedSide:200,fld_A:200,fld_B:100,fld_dh:5,fld_N:1,fld_tapeLen:100,fld_tapeSpacing:0.8,fld_tapeDh:1,fld_emitterSpacing:0.3,fld_emitterFlow:0.8,fld_tapeOD:16,fld_tapePressure:1.2,fld_lift:5,fld_existPressure:0,fld_targetV:1.5,fld_filterLoss:5,fld_efficiency:65,fld_mainPipeLen:200,fld_tapeRollLen:2000};
+  const defaults = {fld_zoneMu:30,fld_zoneFixedSide:200,fld_A:200,fld_B:100,fld_dh:5,fld_N:1,fld_tapeLen:100,fld_tapeSpacing:0.8,fld_tapeDh:1,fld_emitterSpacing:0.3,fld_emitterFlow:0.8,fld_tapeOD:16,fld_tapePressure:1,fld_lift:5,fld_existPressure:0,fld_targetV:1.5,fld_filterLoss:5,fld_efficiency:65,fld_mainPipeLen:200,fld_tapeRollLen:2000};
   Object.entries(defaults).forEach(([id, val]) => { document.getElementById(id).value = val; });
   document.querySelectorAll('#branchGroup button').forEach(b => b.classList.toggle('selected', +b.dataset.n === 2));
   document.querySelectorAll('#layoutGroup button').forEach(b => b.classList.toggle('selected', +b.dataset.sides === 1));

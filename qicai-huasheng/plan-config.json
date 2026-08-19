@@ -1,0 +1,8 @@
+{
+  "recipient": "30667320@qq.com",
+  "base": "海南东方",
+  "lat": 19.096,
+  "lon": 108.654,
+  "plantingDate": "2026-08-01",
+  "_note": "plantingDate 须与 peanut-tool.html（数字农业）工具里设置的播期保持一致；用户在工具改播期时，请同步修改本文件的 plantingDate 字段，否则每日建议的『播种后第几天』会算错。"
+}
