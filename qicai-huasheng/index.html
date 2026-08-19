@@ -166,7 +166,14 @@
 </head>
 <body>
 
-<nav>
+<!-- 常驻顶栏：登录前后均可见，可随时返回其他工具 -->
+<div style="position:fixed;top:0;left:0;right:0;z-index:100000;display:flex;gap:6px;padding:5px 14px;background:rgba(15,23,42,.93);backdrop-filter:blur(8px);font-family:'Microsoft YaHei','PingFang SC',system-ui,sans-serif">
+  <a href="../runye-landing.html" style="color:#a7f3d0;font-size:12px;font-weight:600;text-decoration:none;padding:4px 12px;border-radius:6px;background:rgba(255,255,255,.08);white-space:nowrap">‹ 农事看板</a>
+  <a href="../peanut-tool.html" style="color:#a7f3d0;font-size:12px;font-weight:600;text-decoration:none;padding:4px 12px;border-radius:6px;background:rgba(255,255,255,.08);white-space:nowrap">水肥决策</a>
+  <a href="../index.html" style="color:#a7f3d0;font-size:12px;font-weight:600;text-decoration:none;padding:4px 12px;border-radius:6px;background:rgba(255,255,255,.08);white-space:nowrap">精准灌溉</a>
+</div>
+
+<nav style="margin-top:32px">
   <div class="wrap nav-inner">
     <div class="brand"><span class="dot"></span><span class="rainbow">七彩花生</span></div>
     <button class="nav-toggle" aria-label="菜单">☰</button>
