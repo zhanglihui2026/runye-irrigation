@@ -351,28 +351,6 @@
           <p>移植自《七彩花生全程植保技术方案》：按「播种后天数」自动定位当前生育节点，结合近期天气给出「该用什么药 / 肥 / 菌、怎么混配、注意什么」。播期与天气随上方参数与采集数据实时联动。</p>
         </div>
       </div>
-      <div class="plan-block" style="--c:var(--green);--c-soft:var(--green-light);display:none">
-      <div class="plan-head"><h3>参数设置（实时联动）</h3></div>
-      <div class="tbl-scroll" style="padding:22px 24px">
-        <div class="dec-params">
-          <label>播种日期<input type="date" id="dec-sow" value="2026-08-01"></label>
-          <label>当前日期<input type="date" id="dec-today" value="2026-08-20"></label>
-          <label>未来 3 天天气<select id="dec-weather">
-            <option value="sunny">晴朗</option>
-            <option value="cloudy">多云</option>
-            <option value="rain">小雨</option>
-            <option value="heavyrain">中到大雨</option>
-            <option value="typhoon">台风 / 强降雨预警</option>
-          </select></label>
-          <label>当前气温（℃）<input type="number" id="dec-temp" value="30" step="1"></label>
-          <label>田间墒情<select id="dec-soil">
-            <option value="dry">偏干</option>
-            <option value="ok" selected>适宜</option>
-            <option value="wet">偏湿</option>
-          </select></label>
-        </div>
-      </div>
-    </div>
 
     <div id="dec-result"></div>
     </div>
@@ -1105,6 +1083,8 @@
     weather:{date:yesterdayDate(),rainMm:12,tempMax:32,tempMin:25,etoMm:4.2,windMax:18,source:"manual"},
     weatherStatus:"idle",weatherMessage:"等待抓取昨日天气"
   };
+  // 暴露给「当前生育期决策」模块，实现播期/天气实时联动
+  window.__runyeState = state;
 
   function $(id){ return document.getElementById(id); }
 
@@ -1214,6 +1194,8 @@
 
     renderLog();
     renderHistoryAdvice();
+    // 通知「当前生育期决策」模块：播期/天气已刷新，需重新联动渲染
+    try{ window.dispatchEvent(new Event('runye-state-updated')); }catch(e){}
   }
 
   function readInputs(){
@@ -1763,7 +1745,36 @@
   var CAT_COLOR={虫害防治:"var(--g-700)",病害防治:"var(--warn)",生长调控:"#7c3aed",叶面营养:"#2563eb",底肥菌剂:"#2563eb",灌根调理:"#2563eb",土壤消毒:"#2563eb",杂草防除:"var(--g-700)"};
 
   function $(id){ return document.getElementById(id); }
-  function daysBetween(a,b){ return Math.round((b.getTime()-a.getTime())/86400000); }
+  // —— 联动辅助：从水肥工具实时状态(window.__runyeState)推导 ——
+  function todayISO(){ return new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Shanghai'}); }
+  function daysSincePlant(sowText){
+    if(!sowText) return null;
+    var planted=new Date(sowText+"T00:00:00+08:00"); var now=new Date();
+    if(isNaN(planted.getTime())) return null;
+    return Math.max(0, Math.floor((now.getTime()-planted.getTime())/86400000));
+  }
+  function mapWeather(w){
+    if(!w) return 'sunny';
+    var rain=(typeof w.rainMm==='number')?w.rainMm:0;
+    var wind=(typeof w.windMax==='number')?w.windMax:0;
+    if(rain>10 && wind>=20) return 'typhoon';   // 强降雨 + 大风 → 台风/强降雨预警
+    if(rain>10) return 'heavyrain';
+    if(rain>1) return 'rain';
+    if(rain>0.1) return 'cloudy';
+    return 'sunny';
+  }
+  function mapTemp(w){
+    if(!w) return 28;
+    var tmax=(typeof w.tempMax==='number')?w.tempMax:30;
+    var tmin=(typeof w.tempMin==='number')?w.tempMin:22;
+    return Math.round((tmax+tmin)/2);
+  }
+  function mapSoil(m){
+    if(typeof m!=='number') return 'ok';
+    if(m<50) return 'dry';
+    if(m>75) return 'wet';
+    return 'ok';
+  }
 
   function weatherAdvice(w,t,soil,node){
     var a=[];
@@ -1781,11 +1792,11 @@
   }
 
   function render(){
-    var sow=$('dec-sow').value, today=$('dec-today').value;
-    if(!sow||!today) return;
-    var dSow=new Date(sow), dToday=new Date(today);
-    if(isNaN(dSow)||isNaN(dToday)) return;
-    var days=daysBetween(dSow,dToday);
+    var st=window.__runyeState;
+    var today=todayISO();
+    var sow=st?st.plantingDate:null;
+    var days=daysSincePlant(sow);
+    if(days===null){ $('dec-result').innerHTML='<p style="color:#9a3412">未设置播期，无法定位生育节点。</p>'; return; }
     var active=NODES.filter(function(n){ return days>=n.dayMin && days<=n.dayMax; })[0];
     var gap=false, prevN=null, nextN=null;
     if(!active){
@@ -1798,7 +1809,7 @@
       nextN=NODES.filter(function(n){ return n.dayMin>days; })[0]||null;
     }
     if(!active){ $('dec-result').innerHTML='<p>暂无数据</p>'; return; }
-    var w=$('dec-weather').value, t=parseFloat($('dec-temp').value)||25, soil=$('dec-soil').value;
+    var w=mapWeather(st?st.weather:null), t=mapTemp(st?st.weather:null), soil=mapSoil(st?st.soilMoisture:null);
 
     var stat='<div class="dec-stat">'+
       '<div class="s"><b>播种后第 '+days+' 天</b><span>当前日期 <small>'+today+'</small></span></div>'+
@@ -1836,11 +1847,8 @@
   }
 
   function init(){
-    try{ var n=new Date(); var iso=n.getFullYear()+'-'+('0'+(n.getMonth()+1)).slice(-2)+'-'+('0'+n.getDate()).slice(-2); $('dec-today').value=iso; }catch(e){}
-    ['dec-sow','dec-today','dec-weather','dec-temp','dec-soil'].forEach(function(id){
-      var el=$(id); if(el){ el.addEventListener('change', render); el.addEventListener('input', render); }
-    });
-    render();
+    render();                                         // 首次渲染（读水肥工具实时状态）
+    window.addEventListener('runye-state-updated', render);  // 播期/天气变化时联动刷新
   }
   if(document.readyState!=='loading'){ init(); } else { document.addEventListener('DOMContentLoaded', init); }
 })();
