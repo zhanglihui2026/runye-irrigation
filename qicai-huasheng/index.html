@@ -177,7 +177,6 @@
     <div class="brand"><span class="dot"></span><span class="rainbow">七彩花生</span></div>
     <button class="nav-toggle" aria-label="菜单">☰</button>
       <a href="#overview">方案总览</a>
-      <a href="#cost">成本构成</a>
       <a href="#schedule">生育期操作历</a>
       <a href="#plans">详细方案</a>
       <a href="#usage">用量汇总</a>
@@ -194,50 +193,12 @@
     <p class="sub">科技植保 · 全生育期呵护 · 一亩一方案，从土壤到荚果的精准管理</p>
     <div class="chips">
       <div class="chip"><b>3</b><span>核心方案模块</span></div>
-      <div class="chip"><b>¥1600</b><span>亩建议零售价</span></div>
       <div class="chip"><b>100天+</b><span>全生育期覆盖</span></div>
       <div class="chip"><b>40+</b><span>农资产品组合</span></div>
     </div>
   </div>
 </header>
 
-<!-- ===== 登录门（未登录遮挡全部内容） ===== -->
-<style>
-#gate{position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,.97);display:flex;align-items:center;justify-content:center;font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;}
-#gate .gb{background:#fff;padding:44px 38px;max-width:360px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.4);}
-#gate .gl{font-size:34px;margin-bottom:10px;}
-#gate .gt{font-size:19px;font-weight:800;color:#166534;margin-bottom:6px;}
-#gate .gs{font-size:13px;color:#64748b;margin-bottom:22px;}
-#gate input{width:100%;padding:12px 14px;font-size:15px;border:1px solid #cbd5e1;margin-bottom:16px;outline:none;box-sizing:border-box;}
-#gate input:focus{border-color:#16a34a;}
-#gate button{width:100%;padding:12px;background:#16a34a;color:#fff;font-size:15px;font-weight:700;border:0;cursor:pointer;transition:background .2s;}
-#gate button:hover{background:#15803d;}
-#gate .err{color:#dc2626;font-size:12px;margin-top:12px;display:none;}
-</style>
-<div id="gate">
-  <div class="gb">
-    <div class="gl">🌱</div>
-    <div class="gt">七彩花生 · 全程植保技术方案</div>
-    <div class="gs">授权查看 · 请输入访问密码</div>
-    <input id="gate-pwd" type="password" placeholder="访问密码" autocomplete="off">
-    <button id="gate-btn">进入查看</button>
-    <div id="gate-err" class="err">密码错误，请重试</div>
-  </div>
-</div>
-<script>
-(function(){
-  var PASS="qicai2026";
-  var gate=document.getElementById('gate');
-  function unlock(){ gate.style.display='none'; try{sessionStorage.setItem('qc_gate','1');}catch(e){} }
-  try{ if(sessionStorage.getItem('qc_gate')==='1'){ gate.style.display='none'; } }catch(e){}
-  var btn=document.getElementById('gate-btn');
-  var pwd=document.getElementById('gate-pwd');
-  var err=document.getElementById('gate-err');
-  btn.addEventListener('click',function(){ if(pwd.value===PASS){ unlock(); } else { err.style.display='block'; } });
-  pwd.addEventListener('keydown',function(e){ if(e.key==='Enter'){ btn.click(); } });
-})();
-</script>
-<!-- ===== /登录门 ===== -->
 
 <!-- OVERVIEW -->
 <section id="overview">
@@ -250,8 +211,7 @@
     <div class="cards">
       <div class="card" style="--c:var(--earth);--c-soft:#f3ead9">
         <h3>底肥方案</h3>
-        <div class="cost">¥600<small> /亩</small></div>
-        <ul>
+                <ul>
           <li>播种前生石灰土壤消毒</li>
           <li>有机肥 + 复合肥 + 杀菌剂三位一体</li>
           <li>主攻：产量、黄曲霉毒素、生根</li>
@@ -259,8 +219,7 @@
       </div>
       <div class="card" style="--c:var(--green);--c-soft:var(--green-light)">
         <h3>叶面喷雾植保方案</h3>
-        <div class="cost">¥360<small> /亩</small></div>
-        <ul>
+                <ul>
           <li>苗前封闭 + 苗后除草</li>
           <li>控虫、杀菌、控旺、营养四位一体</li>
           <li>7 个关键节点，贯穿全生育期</li>
@@ -268,8 +227,7 @@
       </div>
       <div class="card" style="--c:var(--water);--c-soft:#dcecf6">
         <h3>灌根植保营养方案</h3>
-        <div class="cost">¥640<small> /亩</small></div>
-        <ul>
+                <ul>
           <li>促根、防线虫、防地下害虫</li>
           <li>根腐/白绢病专防 + 中微量元素</li>
           <li>6 个节点，主攻荚果饱满度</li>
@@ -281,7 +239,7 @@
 
 <!-- VARIETY -->
 <!-- COST -->
-<section id="cost">
+<section id="cost" style="display:none">
   <div class="wrap">
     <div class="sec-head">
       <span class="k">COST BREAKDOWN</span>
@@ -365,7 +323,7 @@
 
     <!-- 操作历 -->
     <div class="plan-block" style="--c:var(--water);--c-soft:#dcecf6">
-      <div class="plan-head"><h3>按天操作历（播种后天数）</h3><span class="ph-cost">叶面 ¥360 ＋ 灌根 ¥640</span></div>
+      <div class="plan-head"><h3>按天操作历（播种后天数）</h3></div>
       <div class="tbl-scroll">
         <table>
           <thead><tr><th class="nd">序</th><th>生育阶段 / 天数</th><th>约周次</th><th>作业</th><th>用几种</th><th>搭配清单（杀虫·杀菌·控旺·营养）</th><th>混配方式 &amp; 关键提醒</th></tr></thead>
@@ -459,7 +417,7 @@
 
     <!-- 底肥方案 -->
     <div class="plan-block" style="--c:var(--earth);--c-soft:#f3ead9">
-      <div class="plan-head"><h3>一、底肥方案</h3><span class="ph-cost">亩汇总 ¥600</span></div>
+      <div class="plan-head"><h3>一、底肥方案</h3></div>
       <div class="tbl-scroll">
         <table>
           <thead><tr><th>作物生长期</th><th>农资产品</th><th>防治靶标</th><th>用量</th><th>使用方法</th><th>技术要领</th><th>注意事项</th></tr></thead>
@@ -469,14 +427,13 @@
             <tr><td>底肥方案</td><td class="prod">高富专（13-17-15）</td><td class="target">产量、黄曲霉毒素</td><td class="dose">40 kg/亩</td><td>撒施</td><td>覆土、均匀分布 10–30 厘米</td><td>不能直接接触作物根系</td></tr>
             <tr><td>底肥方案</td><td class="prod">地腾（0.8%精甲·嘧菌酯）</td><td class="target">茎基腐、生根</td><td class="dose">5 kg/亩</td><td>撒施</td><td>覆土、均匀分布 10–30 厘米</td><td>不能直接接触作物根系</td></tr>
           </tbody>
-          <tfoot><tr><td colspan="6">底肥方案 亩汇总合计</td><td>¥600</td></tr></tfoot>
-        </table>
+                  </table>
       </div>
     </div>
 
     <!-- 叶面喷雾 -->
     <div class="plan-block" style="--c:var(--green);--c-soft:var(--green-light)">
-      <div class="plan-head"><h3>二、叶面喷雾植保方案</h3><span class="ph-cost">亩汇总 ¥360</span></div>
+      <div class="plan-head"><h3>二、叶面喷雾植保方案</h3></div>
       <div class="tbl-scroll">
         <table>
           <thead><tr><th>作物生长期</th><th>农资产品</th><th>防治靶标</th><th>用量</th><th>使用方法</th><th>技术要领</th><th>注意事项</th></tr></thead>
@@ -548,14 +505,13 @@
             <tr><td>播后100天</td><td class="prod">金收（5%胺鲜酯）</td><td class="target">营养、增产</td><td class="dose">50 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
             <tr><td>播后100天</td><td class="prod">拜亩乐（28%啶氧菌酯·环丙唑醇）</td><td class="target">增产、防病</td><td class="dose">30 g/亩</td><td>喷雾</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
           </tbody>
-          <tfoot><tr><td colspan="6">叶面喷雾植保方案 亩汇总合计</td><td>¥360</td></tr></tfoot>
-        </table>
+                  </table>
       </div>
     </div>
 
     <!-- 灌根 -->
     <div class="plan-block" style="--c:var(--water);--c-soft:#dcecf6">
-      <div class="plan-head"><h3>三、灌根植保营养方案</h3><span class="ph-cost">亩汇总 ¥640</span></div>
+      <div class="plan-head"><h3>三、灌根植保营养方案</h3></div>
       <div class="tbl-scroll">
         <table>
           <thead><tr><th>作物生长期</th><th>农资产品</th><th>防治靶标</th><th>用量</th><th>使用方法</th><th>技术要领</th><th>注意事项</th></tr></thead>
@@ -587,8 +543,7 @@
             <tr><td>间隔7-10天</td><td class="prod">大量元素水溶肥 10-5-35</td><td class="target">补充营养</td><td class="dose">3 kg/亩</td><td>灌根</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
             <tr><td>间隔7-10天</td><td class="prod">泰稳丰（钙镁中微量）</td><td class="target">空心果</td><td class="dose">1 L/亩</td><td>灌根</td><td class="muted-cell">—</td><td class="muted-cell">—</td></tr>
           </tbody>
-          <tfoot><tr><td colspan="6">灌根植保营养方案 亩汇总合计</td><td>¥640</td></tr></tfoot>
-        </table>
+                  </table>
       </div>
     </div>
   </div>
@@ -696,8 +651,6 @@
 </section>
 
 <footer>
-  <div class="big">亩建议零售价 <em>¥1600</em> / 亩</div>
-  <p>底肥 ¥600 ＋ 叶面喷雾 ¥360 ＋ 灌根营养 ¥640 ＝ 亩建议零售价 ¥1600</p>
   <p>数据来源：《七彩花生管理方案-最新.xlsx》· 全程植保技术方案 · 编制于 2026-08-19</p>
 </footer>
 
