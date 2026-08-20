@@ -4,3 +4,9 @@ Thumbs.db
 *.log
 *.bak
 *~
+
+# 自动化运行数据（不发布）
+.workbuddy/
+
+# 本地发布脚本（不发布）
+*.bat
