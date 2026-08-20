@@ -1816,8 +1816,8 @@
     });
 
     var mixHtml='<div class="dec-warn"><b>怎么混配</b>'+active.mix+'</div>';
-    var noteHtml='<div class="dec-note"><b>注意什么（结合近期天气）</b><ul>'+adv.map(function(x){ return '<li>'+x+'</li>'; }).join('')+'</ul></div>';
     var adv=weatherAdvice(w,t,soil,active);
+    var noteHtml='<div class="dec-note"><b>注意什么（结合近期天气）</b><ul>'+adv.map(function(x){ return '<li>'+x+'</li>'; }).join('')+'</ul></div>';
 
     var rh='<div class="rh">'+
       '<span class="badge">'+active.dayText+'</span>'+
