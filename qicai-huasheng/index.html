@@ -95,18 +95,22 @@
   .total-line b{font-size:26px;color:var(--gold);font-weight:900}
   .total-line span{color:var(--muted);font-size:13px}
 
-  /* TIMELINE — 横向步骤流 Stepper（超出自动换行） */
-  .stepper{display:flex;flex-wrap:wrap;gap:14px 14px;padding:12px 4px 8px}
-  .step{position:relative;flex:1 1 200px;min-width:186px;max-width:232px}
-  .step .dot{position:relative;z-index:1;width:30px;height:30px;border-radius:50%;margin:0 auto;
-    display:flex;align-items:center;justify-content:center;background:var(--c);color:#fff;
-    font-weight:800;font-size:13px;box-shadow:0 0 0 4px #fff,0 2px 6px rgba(0,0,0,.15)}
-  .step .card{position:relative;z-index:1;margin-top:12px;background:var(--card);border-radius:12px;
-    padding:10px 12px;box-shadow:var(--shadow);border-top:4px solid var(--c)}
-  .step .st-time{font-weight:800;color:var(--c);font-size:13px;line-height:1.35}
-  .step .st-title{font-size:12.5px;font-weight:700;color:#333;margin:7px 0 2px;line-height:1.4}
-  .step .acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
-  .pill{font-size:11.5px;padding:3px 8px;border-radius:14px;background:var(--c-soft);color:var(--c);font-weight:600}
+  /* TIMELINE — 环形生长轮 */
+  .wheel-legend{display:flex;flex-wrap:wrap;gap:16px;justify-content:center;margin-top:8px;
+    font-size:12.5px;color:var(--muted)}
+  .wheel-legend i{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+  .wheel-detail{display:grid;grid-template-columns:repeat(auto-fill,minmax(228px,1fr));gap:12px;margin-top:20px}
+  .wd-item{display:flex;gap:10px;background:var(--card);border-radius:10px;padding:11px 13px;
+    box-shadow:var(--shadow);border-left:4px solid var(--c)}
+  .wd-no{width:23px;height:23px;border-radius:50%;background:var(--c);color:#fff;font-size:12px;
+    font-weight:800;display:flex;align-items:center;justify-content:center;flex:none;margin-top:1px}
+  .wd-time{font-weight:800;color:var(--c);font-size:12.5px}
+  .wd-title{font-size:12.5px;font-weight:700;color:#333;margin:2px 0 6px;line-height:1.35}
+  .wd-acts{display:flex;flex-wrap:wrap;gap:5px}
+  .npill{font-size:11px;padding:2px 7px;border-radius:12px;font-weight:600}
+  .npill.g{background:var(--green-light);color:var(--green)}
+  .npill.w{background:#dcecf6;color:var(--water)}
+  .npill.e{background:#f3ead9;color:var(--earth)}
 
   /* TABLES */
   .plan-block{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);
@@ -333,64 +337,82 @@
     <div class="sec-head">
       <span class="k">GROWTH TIMELINE</span>
       <h2>全生育期时间轴</h2>
-      <p>从播种前土壤处理到播后 100 天的收获前管理，11 个关键节点横向串联（超出自动换行），按底肥 · 叶面 · 灌根三模块配色。</p>
+      <p>从播种前到播后 100 天，11 个关键节点沿<strong>环形生长轮</strong>排布（悬停节点查看用药），按底肥 · 叶面 · 灌根三模块配色；下方为节点明细。</p>
     </div>
-    <div class="stepper">
-      <div class="step" style="--c:var(--earth);--c-soft:#f3ead9">
-        <div class="dot">1</div>
-        <div class="card"><div class="st-time">播种前</div><div class="st-title">土壤处理（底肥模块）</div>
-          <div class="acts"><span class="pill">生石灰 土壤消毒</span></div></div>
-      </div>
-      <div class="step" style="--c:var(--earth);--c-soft:#f3ead9">
-        <div class="dot">2</div>
-        <div class="card"><div class="st-time">整地期</div><div class="st-title">底肥施用（底肥模块）</div>
-          <div class="acts"><span class="pill">友擎有机肥</span><span class="pill">高富专 13-17-15</span><span class="pill">地腾 精甲·嘧菌酯</span></div></div>
-      </div>
-      <div class="step" style="--c:var(--green);--c-soft:var(--green-light)">
-        <div class="dot">3</div>
-        <div class="card"><div class="st-time">播后苗前</div><div class="st-title">封闭除草（叶面模块）</div>
-          <div class="acts"><span class="pill">精异丙甲草胺</span><span class="pill">双氯磺草胺</span></div></div>
-      </div>
-      <div class="step" style="--c:var(--green);--c-soft:var(--green-light)">
-        <div class="dot">4</div>
-        <div class="card"><div class="st-time">苗后</div><div class="st-title">苗后除草（叶面模块）</div>
-          <div class="acts"><span class="pill">烯草酮</span><span class="pill">双氯磺草胺</span></div></div>
-      </div>
-      <div class="step" style="--c:var(--green);--c-soft:var(--green-light)">
-        <div class="dot">5</div>
-        <div class="card"><div class="st-time">播后 15–20 天</div><div class="st-title">杀虫杀菌控旺 + 促根防线虫</div>
-          <div class="acts"><span class="pill" style="background:#dcecf6;color:var(--water)">灌根：根际香土</span><span class="pill" style="background:#dcecf6;color:var(--water)">灌根：削线</span><span class="pill">叶面：锐动/铜拳/腾丰</span><span class="pill">叶面：美得乐/硼钼/小胖子</span></div></div>
-      </div>
-      <div class="step" style="--c:var(--green);--c-soft:var(--green-light)">
-        <div class="dot">6</div>
-        <div class="card"><div class="st-time">播后 25–30 天（50% 开花）</div><div class="st-title">开花期立体管理</div>
-          <div class="acts"><span class="pill" style="background:#dcecf6;color:var(--water)">灌根：剿灭/苗乐乐/水溶肥</span><span class="pill">叶面：秀艳/适大进/磷酸二氢钾</span></div></div>
-      </div>
-      <div class="step" style="--c:var(--water);--c-soft:#dcecf6">
-        <div class="dot">7</div>
-        <div class="card"><div class="st-time">播后 30–40 天</div><div class="st-title">下针与荚果膨大（灌根为主）</div>
-          <div class="acts"><span class="pill">水溶肥 12-30-8</span><span class="pill">铠仆 海藻</span><span class="pill">泰稳丰 钙镁</span><span class="pill" style="background:var(--green-light);color:var(--green)">叶面：秀艳/美得乐</span></div></div>
-      </div>
-      <div class="step" style="--c:var(--green);--c-soft:var(--green-light)">
-        <div class="dot">8</div>
-        <div class="card"><div class="st-time">播后 55–80 天</div><div class="st-title">荚果充实期（叶面为主）</div>
-          <div class="acts"><span class="pill">叶面：秀艳/拜亩乐/金收</span><span class="pill">叶面：妥控/适大进 控旺</span><span class="pill">叶面：持续杀虫防病</span></div></div>
-      </div>
-      <div class="step" style="--c:var(--water);--c-soft:#dcecf6">
-        <div class="dot">9</div>
-        <div class="card"><div class="st-time">荚果期（80% 封垄）</div><div class="st-title">荚果期营养与防病（灌根）</div>
-          <div class="acts"><span class="pill">水溶肥 10-5-35</span><span class="pill">泰稳丰</span><span class="pill">苗乐乐 防白绢病</span><span class="pill">削线 防线虫</span></div></div>
-      </div>
-      <div class="step" style="--c:var(--water);--c-soft:#dcecf6">
-        <div class="dot">10</div>
-        <div class="card"><div class="st-time">间隔 7–10 天 ×2</div><div class="st-title">追肥巩固（灌根）</div>
-          <div class="acts"><span class="pill">水溶肥 10-5-35</span><span class="pill">根际香土</span><span class="pill">泰稳丰</span></div></div>
-      </div>
-      <div class="step" style="--c:var(--green);--c-soft:var(--green-light)">
-        <div class="dot">11</div>
-        <div class="card"><div class="st-time">播后 100 天</div><div class="st-title">收获前保叶增产（叶面）</div>
-          <div class="acts"><span class="pill">虫螨腈·虱螨脲</span><span class="pill">铜拳/锐动</span><span class="pill">金收/拜亩乐</span><span class="pill">美得乐/硼钼</span></div></div>
-      </div>
+<svg viewBox="0 0 540 470" role="img" aria-label="全生育期环形生长轮" style="width:100%;max-width:520px;height:auto;display:block;margin:0 auto">
+    <circle cx="270" cy="230" r="92" fill="none" stroke="#e6e2d8" stroke-width="10"/>
+    <line x1="275.8" y1="138.2" x2="279.4" y2="80.3" stroke="#cfc9b8" stroke-width="1.5"/>
+    <circle cx="275.8" cy="138.2" r="15" fill="#8d6e3c" stroke="#fff" stroke-width="3"><title>土壤处理（底肥模块）
+生石灰 土壤消毒</title></circle>
+    <text x="275.8" y="138.2" text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="12" font-weight="800">1</text>
+    <text x="279.4" y="80.3" text-anchor="start" dominant-baseline="central" fill="#8d6e3c" font-size="12.5" font-weight="800">播种前</text>
+    <line x1="292.9" y1="140.9" x2="307.3" y2="84.7" stroke="#cfc9b8" stroke-width="1.5"/>
+    <circle cx="292.9" cy="140.9" r="15" fill="#8d6e3c" stroke="#fff" stroke-width="3"><title>底肥施用（底肥模块）
+友擎有机肥；高富专 13-17-15；地腾 精甲·嘧菌酯</title></circle>
+    <text x="292.9" y="140.9" text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="12" font-weight="800">2</text>
+    <text x="307.3" y="84.7" text-anchor="start" dominant-baseline="central" fill="#8d6e3c" font-size="12.5" font-weight="800">整地期</text>
+    <line x1="319.3" y1="152.3" x2="350.4" y2="103.4" stroke="#cfc9b8" stroke-width="1.5"/>
+    <circle cx="319.3" cy="152.3" r="15" fill="#2f7d32" stroke="#fff" stroke-width="3"><title>封闭除草（叶面模块）
+精异丙甲草胺；双氯磺草胺</title></circle>
+    <text x="319.3" y="152.3" text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="12" font-weight="800">3</text>
+    <text x="350.4" y="103.4" text-anchor="start" dominant-baseline="central" fill="#2f7d32" font-size="12.5" font-weight="800">苗前</text>
+    <line x1="340.9" y1="171.4" x2="385.6" y2="134.4" stroke="#cfc9b8" stroke-width="1.5"/>
+    <circle cx="340.9" cy="171.4" r="15" fill="#2f7d32" stroke="#fff" stroke-width="3"><title>苗后除草（叶面模块）
+烯草酮；双氯磺草胺</title></circle>
+    <text x="340.9" y="171.4" text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="12" font-weight="800">4</text>
+    <text x="385.6" y="134.4" text-anchor="start" dominant-baseline="central" fill="#2f7d32" font-size="12.5" font-weight="800">苗后</text>
+    <line x1="353.2" y1="190.8" x2="405.7" y2="166.1" stroke="#cfc9b8" stroke-width="1.5"/>
+    <circle cx="353.2" cy="190.8" r="15" fill="#2f7d32" stroke="#fff" stroke-width="3"><title>杀虫杀菌控旺 + 促根防线虫
+灌根：根际香土；灌根：削线；叶面：锐动/铜拳/腾丰；叶面：美得乐/硼钼/小胖子</title></circle>
+    <text x="353.2" y="190.8" text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="12" font-weight="800">5</text>
+    <text x="405.7" y="166.1" text-anchor="start" dominant-baseline="central" fill="#2f7d32" font-size="12.5" font-weight="800">15–20天</text>
+    <line x1="360.4" y1="247.2" x2="417.3" y2="258.1" stroke="#cfc9b8" stroke-width="1.5"/>
+    <circle cx="360.4" cy="247.2" r="15" fill="#2f7d32" stroke="#fff" stroke-width="3"><title>开花期立体管理
+灌根：剿灭/苗乐乐/水溶肥；叶面：秀艳/适大进/磷酸二氢钾</title></circle>
+    <text x="360.4" y="247.2" text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="12" font-weight="800">6</text>
+    <text x="417.3" y="258.1" text-anchor="start" dominant-baseline="central" fill="#2f7d32" font-size="12.5" font-weight="800">25–30天</text>
+    <line x1="344.4" y1="284.1" x2="391.4" y2="318.2" stroke="#cfc9b8" stroke-width="1.5"/>
+    <circle cx="344.4" cy="284.1" r="15" fill="#2b7bb0" stroke="#fff" stroke-width="3"><title>下针与荚果膨大（灌根为主）
+水溶肥 12-30-8；铠仆 海藻；泰稳丰 钙镁；叶面：秀艳/美得乐</title></circle>
+    <text x="344.4" y="284.1" text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="12" font-weight="800">7</text>
+    <text x="391.4" y="318.2" text-anchor="start" dominant-baseline="central" fill="#2b7bb0" font-size="12.5" font-weight="800">30–40天</text>
+    <line x1="186.8" y1="269.2" x2="134.3" y2="293.9" stroke="#cfc9b8" stroke-width="1.5"/>
+    <circle cx="186.8" cy="269.2" r="15" fill="#2f7d32" stroke="#fff" stroke-width="3"><title>荚果充实期（叶面为主）
+叶面：秀艳/拜亩乐/金收；叶面：妥控/适大进 控旺；叶面：持续杀虫防病</title></circle>
+    <text x="186.8" y="269.2" text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="12" font-weight="800">8</text>
+    <text x="134.3" y="293.9" text-anchor="end" dominant-baseline="central" fill="#2f7d32" font-size="12.5" font-weight="800">55–80天</text>
+    <line x1="195.6" y1="175.9" x2="148.6" y2="141.8" stroke="#cfc9b8" stroke-width="1.5"/>
+    <circle cx="195.6" cy="175.9" r="15" fill="#2b7bb0" stroke="#fff" stroke-width="3"><title>荚果期营养与防病（灌根）
+水溶肥 10-5-35；泰稳丰；苗乐乐 防白绢病；削线 防线虫</title></circle>
+    <text x="195.6" y="175.9" text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="12" font-weight="800">9</text>
+    <text x="148.6" y="141.8" text-anchor="end" dominant-baseline="central" fill="#2b7bb0" font-size="12.5" font-weight="800">封垄期</text>
+    <line x1="225.7" y1="149.4" x2="197.7" y2="98.6" stroke="#cfc9b8" stroke-width="1.5"/>
+    <circle cx="225.7" cy="149.4" r="15" fill="#2b7bb0" stroke="#fff" stroke-width="3"><title>追肥巩固（灌根）
+水溶肥 10-5-35；根际香土；泰稳丰</title></circle>
+    <text x="225.7" y="149.4" text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="12" font-weight="800">10</text>
+    <text x="197.7" y="98.6" text-anchor="end" dominant-baseline="central" fill="#2b7bb0" font-size="12.5" font-weight="800">巩固×2</text>
+    <line x1="264.2" y1="138.2" x2="260.6" y2="80.3" stroke="#cfc9b8" stroke-width="1.5"/>
+    <circle cx="264.2" cy="138.2" r="15" fill="#2f7d32" stroke="#fff" stroke-width="3"><title>收获前保叶增产（叶面）
+虫螨腈·虱螨脲；铜拳/锐动；金收/拜亩乐；美得乐/硼钼</title></circle>
+    <text x="264.2" y="138.2" text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="12" font-weight="800">11</text>
+    <text x="260.6" y="80.3" text-anchor="end" dominant-baseline="central" fill="#2f7d32" font-size="12.5" font-weight="800">100天</text>
+    <circle cx="270" cy="230" r="54" fill="#fff" stroke="#e6e2d8" stroke-width="2"/>
+    <text x="270" y="224" text-anchor="middle" font-size="14" font-weight="800" fill="#2b2b27">全生育期</text>
+    <text x="270" y="246" text-anchor="middle" font-size="13" fill="#6b6b63">约 100 天</text>
+    </svg>
+    <div class="wheel-legend"><span><i style="background:var(--earth)"></i>底肥</span><span><i style="background:var(--green)"></i>叶面</span><span><i style="background:var(--water)"></i>灌根</span><span style="color:#9a9486">· 悬停节点查看用药</span></div>
+    <div class="wheel-detail">
+    <div class="wd-item" style="--c:#8d6e3c"><span class="wd-no">1</span><div><div class="wd-time">播种前</div><div class="wd-title">土壤处理（底肥模块）</div><div class="wd-acts"><span class="npill e">生石灰 土壤消毒</span></div></div></div>
+    <div class="wd-item" style="--c:#8d6e3c"><span class="wd-no">2</span><div><div class="wd-time">整地期</div><div class="wd-title">底肥施用（底肥模块）</div><div class="wd-acts"><span class="npill e">友擎有机肥</span><span class="npill e">高富专 13-17-15</span><span class="npill e">地腾 精甲·嘧菌酯</span></div></div></div>
+    <div class="wd-item" style="--c:#2f7d32"><span class="wd-no">3</span><div><div class="wd-time">苗前</div><div class="wd-title">封闭除草（叶面模块）</div><div class="wd-acts"><span class="npill e">精异丙甲草胺</span><span class="npill e">双氯磺草胺</span></div></div></div>
+    <div class="wd-item" style="--c:#2f7d32"><span class="wd-no">4</span><div><div class="wd-time">苗后</div><div class="wd-title">苗后除草（叶面模块）</div><div class="wd-acts"><span class="npill e">烯草酮</span><span class="npill e">双氯磺草胺</span></div></div></div>
+    <div class="wd-item" style="--c:#2f7d32"><span class="wd-no">5</span><div><div class="wd-time">15–20天</div><div class="wd-title">杀虫杀菌控旺 + 促根防线虫</div><div class="wd-acts"><span class="npill w">灌根：根际香土</span><span class="npill w">灌根：削线</span><span class="npill g">叶面：锐动/铜拳/腾丰</span><span class="npill g">叶面：美得乐/硼钼/小胖子</span></div></div></div>
+    <div class="wd-item" style="--c:#2f7d32"><span class="wd-no">6</span><div><div class="wd-time">25–30天</div><div class="wd-title">开花期立体管理</div><div class="wd-acts"><span class="npill w">灌根：剿灭/苗乐乐/水溶肥</span><span class="npill g">叶面：秀艳/适大进/磷酸二氢钾</span></div></div></div>
+    <div class="wd-item" style="--c:#2b7bb0"><span class="wd-no">7</span><div><div class="wd-time">30–40天</div><div class="wd-title">下针与荚果膨大（灌根为主）</div><div class="wd-acts"><span class="npill e">水溶肥 12-30-8</span><span class="npill e">铠仆 海藻</span><span class="npill e">泰稳丰 钙镁</span><span class="npill g">叶面：秀艳/美得乐</span></div></div></div>
+    <div class="wd-item" style="--c:#2f7d32"><span class="wd-no">8</span><div><div class="wd-time">55–80天</div><div class="wd-title">荚果充实期（叶面为主）</div><div class="wd-acts"><span class="npill g">叶面：秀艳/拜亩乐/金收</span><span class="npill g">叶面：妥控/适大进 控旺</span><span class="npill g">叶面：持续杀虫防病</span></div></div></div>
+    <div class="wd-item" style="--c:#2b7bb0"><span class="wd-no">9</span><div><div class="wd-time">封垄期</div><div class="wd-title">荚果期营养与防病（灌根）</div><div class="wd-acts"><span class="npill e">水溶肥 10-5-35</span><span class="npill e">泰稳丰</span><span class="npill e">苗乐乐 防白绢病</span><span class="npill e">削线 防线虫</span></div></div></div>
+    <div class="wd-item" style="--c:#2b7bb0"><span class="wd-no">10</span><div><div class="wd-time">巩固×2</div><div class="wd-title">追肥巩固（灌根）</div><div class="wd-acts"><span class="npill e">水溶肥 10-5-35</span><span class="npill e">根际香土</span><span class="npill e">泰稳丰</span></div></div></div>
+    <div class="wd-item" style="--c:#2f7d32"><span class="wd-no">11</span><div><div class="wd-time">100天</div><div class="wd-title">收获前保叶增产（叶面）</div><div class="wd-acts"><span class="npill e">虫螨腈·虱螨脲</span><span class="npill e">铜拳/锐动</span><span class="npill e">金收/拜亩乐</span><span class="npill e">美得乐/硼钼</span></div></div></div>
     </div>
   </div>
 </section>
