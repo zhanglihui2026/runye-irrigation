@@ -190,6 +190,7 @@
       <a href="#timeline">生育期轴</a>
       <a href="#plans">详细方案</a>
       <a href="#schedule">操作历</a>
+      <a href="#usage">用量汇总</a>
       <a href="#notes">技术要点</a>
     </div>
   </div>
@@ -718,6 +719,77 @@
 
     <p style="text-align:center;color:var(--muted);font-size:13px;margin-top:18px">
       说明：本操作历依据《七彩花生管理方案》现有农资组合整理，混配建议为通用技术参照；实际请严格按各产品标签、当地植保站指导与天气墒情执行，混配前务必先做小样杯混试验。
+    </p>
+  </div>
+</section>
+
+<!-- USAGE SUMMARY -->
+<section id="usage">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="k">FERTILIZER SUMMARY</span>
+      <h2>全生育期追肥用量汇总</h2>
+      <p>按亩核算整个生育期追肥（肥料 / 菌剂）总用量，区分灌根与叶面两种施用方式；底肥为基施、单列对照。数据依据《全生育期操作历》已有农资组合整理。</p>
+    </div>
+
+    <!-- 合计卡片 -->
+    <div class="cards" style="margin-bottom:30px">
+      <div class="card" style="--c:var(--green);--c-soft:var(--green-light)">
+        <div class="ico">🪴</div>
+        <h3>追肥 · 灌根（固体）</h3>
+        <div class="cost">20.0<small> kg / 亩</small></div>
+        <ul>
+          <li>水溶肥 12-30-8 ＋ 10-5-35：14 kg</li>
+          <li>微生物菌剂 根际香土：6 kg</li>
+        </ul>
+      </div>
+      <div class="card" style="--c:var(--water);--c-soft:#dcecf6">
+        <div class="ico">💧</div>
+        <h3>追肥 · 灌根（液体）</h3>
+        <div class="cost">5.6<small> L / 亩</small></div>
+        <ul>
+          <li>铠仆海藻 1 L ＋ 泰稳丰钙镁 4 L</li>
+          <li>微生物 苗乐乐：0.6 L</li>
+        </ul>
+      </div>
+      <div class="card" style="--c:var(--earth);--c-soft:#f3ead9">
+        <div class="ico">🌱</div>
+        <h3>底肥 · 基施（对照）</h3>
+        <div class="cost">125<small> kg / 亩</small></div>
+        <ul>
+          <li>友擎有机肥 80 ＋ 复合肥 40 ＋ 地腾 5</li>
+          <li>另：生石灰土壤消毒 50–80 kg</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 明细表 -->
+    <div class="plan-block" style="--c:var(--green)">
+      <div class="plan-head"><span class="ph-ico">📊</span><h3>追肥明细（按物料 · 亩用量）</h3><span class="ph-cost">灌根 20 kg ＋ 5.6 L</span></div>
+      <div class="tbl-scroll">
+        <table>
+          <thead>
+            <tr><th>类别</th><th>施用方式</th><th>物料</th><th>亩用量</th><th>说明 / 分布</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><b>追肥</b></td><td>灌根（固体）</td><td class="prod">水溶肥 12-30-8 / 10-5-35</td><td class="dose">14 kg</td><td>分次随灌根施入（播后 25–35 天、荚果期）</td></tr>
+            <tr><td><b>追肥</b></td><td>灌根（固体）</td><td class="prod">微生物菌剂 根际香土</td><td class="dose">6 kg</td><td>促根、防线虫（播后 15–35 天、巩固期）</td></tr>
+            <tr><td><b>追肥</b></td><td>灌根（液体）</td><td class="prod">铠仆海藻 ＋ 泰稳丰钙镁</td><td class="dose">5.0 L</td><td>抗逆、中微量元素（泰稳丰共 4 L ＋ 铠仆 1 L）</td></tr>
+            <tr><td><b>追肥</b></td><td>灌根（液体）</td><td class="prod">微生物 苗乐乐</td><td class="dose">0.6 L</td><td>含杀菌 + 寡糖，与根际香土 / 水溶肥同桶</td></tr>
+            <tr><td><b>追肥</b></td><td>叶面（营养）</td><td class="prod">磷酸二氢钾 / 聚合磷助剂 / 硼钼 / 金收</td><td class="dose muted-cell">按标签</td><td>分 7 个节点喷施；本方案未列具体克重</td></tr>
+            <tr class="stage-row"><td colspan="5">底肥（基施 · 非追肥 · 单列对照）</td></tr>
+            <tr><td>底肥</td><td>基施</td><td class="prod">友擎有机肥 ＋ 高富专 ＋ 地腾</td><td class="dose">125 kg</td><td>有机肥 80 ＋ 复合肥 40 ＋ 地腾 5</td></tr>
+            <tr><td>底肥</td><td>基施</td><td class="prod">生石灰</td><td class="dose muted-cell">50–80 kg</td><td>土壤消毒（范围）</td></tr>
+          </tbody>
+          <tfoot>
+            <tr><td colspan="3">追肥合计（已量化：灌根固体 20 kg ＋ 灌根液体 5.6 L）</td><td class="dose">20.0 kg<br>＋ 5.6 L</td><td>叶面营养按产品标签，未计入量化合计</td></tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <p style="text-align:center;color:var(--muted);font-size:13px;margin-top:18px">
+      说明：以上用量依据《全生育期操作历》已有农资组合核算；叶面营养类（磷酸二氢钾 / 聚合磷助剂 / 硼钼 / 金收）按各产品标签推荐剂量喷施，方案中未逐一列明克重，故未计入量化合计。实际请结合田块与长势调整。
     </p>
   </div>
 </section>
