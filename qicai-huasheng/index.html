@@ -61,9 +61,7 @@
   .card{background:var(--card);border-radius:var(--radius);padding:22px;box-shadow:var(--shadow);
     border-top:5px solid var(--c);transition:transform .2s}
   .card:hover{transform:translateY(-5px)}
-  .card .ico{font-size:26px;width:48px;height:48px;border-radius:12px;display:grid;place-items:center;
-    background:var(--c-soft)}
-  .card h3{margin:12px 0 5px;font-size:17px}
+    .card h3{margin:12px 0 5px;font-size:17px}
   .card .cost{font-size:22px;font-weight:900;color:var(--c);margin-top:10px}
   .card .cost small{font-size:13px;color:var(--muted);font-weight:600}
   .card ul{margin-top:12px;padding-left:18px;font-size:13px;color:var(--muted)}
@@ -113,8 +111,7 @@
   .plan-block{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);
     overflow:hidden;margin-bottom:26px;border-top:5px solid var(--c)}
   .plan-head{background:var(--c-soft);padding:14px 20px;display:flex;align-items:center;gap:14px}
-  .plan-head .ph-ico{font-size:26px}
-  .plan-head h3{font-size:19px;color:var(--text)}
+    .plan-head h3{font-size:19px;color:var(--text)}
   .plan-head .ph-cost{margin-left:auto;font-weight:800;color:var(--c);font-size:16px}
   .tbl-scroll{overflow-x:auto}
   table{width:100%;border-collapse:collapse;font-size:13px;min-width:680px}
@@ -164,6 +161,28 @@
     .nav-links a{padding:14px 20px;border-bottom:1px solid var(--line)}
     .nav-toggle{display:block}
   }
+  /* DECISION 当前生育期决策 */
+  .dec-params{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:16px}
+  .dec-params label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:var(--muted)}
+  .dec-params input,.dec-params select{padding:9px 10px;border:1px solid var(--line);border-radius:9px;font-size:14px;font-family:inherit;color:var(--text);background:#fff;width:100%}
+  .dec-stat{display:flex;flex-wrap:wrap;gap:14px;margin:6px 0 18px}
+  .dec-stat .s{flex:1;min-width:160px;background:var(--card);border-radius:12px;padding:16px 18px;box-shadow:var(--shadow);border-left:4px solid var(--green)}
+  .dec-stat .s b{display:block;font-size:22px;font-weight:900;color:var(--text);line-height:1.3}
+  .dec-stat .s span{font-size:12.5px;color:var(--muted)}
+  .dec-rec{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:22px;border-top:5px solid var(--water)}
+  .dec-rec .rh{padding:14px 20px;background:#dcecf6;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .dec-rec .rh .badge{font-size:12px;font-weight:700;padding:4px 12px;border-radius:20px;background:#fff;color:var(--water);white-space:nowrap}
+  .dec-rec .rb{padding:22px 24px}
+  .dec-rec .rb h4{font-size:15px;color:var(--green-dark);margin:2px 0 10px}
+  .dec-cats{display:flex;flex-wrap:wrap;gap:10px;margin:4px 0 16px}
+  .dec-chip{font-size:13px;padding:8px 12px;border-radius:10px;background:#f7f6f1;border:1px solid var(--line);min-width:150px}
+  .dec-chip b{display:block;margin-bottom:3px}
+  .dec-chip ul{margin:4px 0 0 16px}
+  .dec-warn{background:#fff7ed;border-left:4px solid #e67e22;padding:12px 16px;border-radius:8px;margin:10px 0;font-size:13.5px;color:#9a3412}
+  .dec-warn b{display:block;margin-bottom:5px;color:#9a3412}
+  .dec-note{background:#e8f5e9;border-left:4px solid var(--green);padding:12px 16px;border-radius:8px;margin:10px 0;font-size:13.5px;color:var(--green-dark)}
+  .dec-note b{display:block;margin-bottom:5px;color:var(--green-dark)}
+  .dec-note ul,.dec-warn ul{margin:4px 0 0 18px}
 </style>
 </head>
 <body>
@@ -180,6 +199,7 @@
     <div class="brand"><span class="dot"></span><span class="rainbow">七彩花生</span></div>
     <button class="nav-toggle" aria-label="菜单">☰</button>
     <div class="nav-links" id="navLinks">
+      <a href="#decision">当前决策</a>
       <a href="#overview">方案总览</a>
       <a href="#cost">成本构成</a>
       <a href="#schedule">生育期操作历</a>
@@ -243,6 +263,42 @@
 </script>
 <!-- ===== /登录门 ===== -->
 
+<!-- DECISION 当前生育期决策 -->
+<section id="decision" style="background:#f3f1ea">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="k">LIVE DECISION</span>
+      <h2>当前生育期决策</h2>
+      <p>移植自《七彩花生全程植保技术方案》：按「播种后天数」自动定位当前生育节点，结合近期天气给出「该用什么药 / 肥 / 菌、怎么混配、注意什么」。播期与天气随上方参数实时联动（默认播期见参数，修改后请同步 plan-config.json 与 peanut-tool 播期）。</p>
+    </div>
+
+    <div class="plan-block" style="--c:var(--green);--c-soft:var(--green-light)">
+      <div class="plan-head"><h3>参数设置（实时联动）</h3></div>
+      <div class="tbl-scroll" style="padding:22px 24px">
+        <div class="dec-params">
+          <label>播种日期<input type="date" id="dec-sow" value="2026-08-01"></label>
+          <label>当前日期<input type="date" id="dec-today" value="2026-08-20"></label>
+          <label>未来 3 天天气<select id="dec-weather">
+            <option value="sunny">晴朗</option>
+            <option value="cloudy">多云</option>
+            <option value="rain">小雨</option>
+            <option value="heavyrain">中到大雨</option>
+            <option value="typhoon">台风 / 强降雨预警</option>
+          </select></label>
+          <label>当前气温（℃）<input type="number" id="dec-temp" value="30" step="1"></label>
+          <label>田间墒情<select id="dec-soil">
+            <option value="dry">偏干</option>
+            <option value="ok" selected>适宜</option>
+            <option value="wet">偏湿</option>
+          </select></label>
+        </div>
+      </div>
+    </div>
+
+    <div id="dec-result"></div>
+  </div>
+</section>
+
 <!-- OVERVIEW -->
 <section id="overview">
   <div class="wrap">
@@ -253,7 +309,6 @@
     </div>
     <div class="cards">
       <div class="card" style="--c:var(--earth);--c-soft:#f3ead9">
-        <div class="ico">🌱</div>
         <h3>底肥方案</h3>
         <div class="cost">¥600<small> /亩</small></div>
         <ul>
@@ -263,7 +318,6 @@
         </ul>
       </div>
       <div class="card" style="--c:var(--green);--c-soft:var(--green-light)">
-        <div class="ico">💧</div>
         <h3>叶面喷雾植保方案</h3>
         <div class="cost">¥360<small> /亩</small></div>
         <ul>
@@ -273,7 +327,6 @@
         </ul>
       </div>
       <div class="card" style="--c:var(--water);--c-soft:#dcecf6">
-        <div class="ico">🪴</div>
         <h3>灌根植保营养方案</h3>
         <div class="cost">¥640<small> /亩</small></div>
         <ul>
@@ -342,7 +395,7 @@
 
     <!-- 混配通则 -->
     <div class="plan-block" style="--c:var(--green);--c-soft:var(--green-light)">
-      <div class="plan-head"><span class="ph-ico">🔬</span><h3>混配通则：哪些能同桶，哪些必须分开</h3></div>
+      <div class="plan-head"><h3>混配通则：哪些能同桶，哪些必须分开</h3></div>
       <div class="tbl-scroll" style="padding:22px 24px">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:26px">
           <div>
@@ -372,7 +425,7 @@
 
     <!-- 操作历 -->
     <div class="plan-block" style="--c:var(--water);--c-soft:#dcecf6">
-      <div class="plan-head"><span class="ph-ico">📅</span><h3>按天操作历（播种后天数）</h3><span class="ph-cost">叶面 ¥360 ＋ 灌根 ¥640</span></div>
+      <div class="plan-head"><h3>按天操作历（播种后天数）</h3><span class="ph-cost">叶面 ¥360 ＋ 灌根 ¥640</span></div>
       <div class="tbl-scroll">
         <table>
           <thead><tr><th class="nd">序</th><th>生育阶段 / 天数</th><th>约周次</th><th>作业</th><th>用几种</th><th>搭配清单（杀虫·杀菌·控旺·营养）</th><th>混配方式 &amp; 关键提醒</th></tr></thead>
@@ -466,7 +519,7 @@
 
     <!-- 底肥方案 -->
     <div class="plan-block" style="--c:var(--earth);--c-soft:#f3ead9">
-      <div class="plan-head"><span class="ph-ico">🌱</span><h3>一、底肥方案</h3><span class="ph-cost">亩汇总 ¥600</span></div>
+      <div class="plan-head"><h3>一、底肥方案</h3><span class="ph-cost">亩汇总 ¥600</span></div>
       <div class="tbl-scroll">
         <table>
           <thead><tr><th>作物生长期</th><th>农资产品</th><th>防治靶标</th><th>用量</th><th>使用方法</th><th>技术要领</th><th>注意事项</th></tr></thead>
@@ -483,7 +536,7 @@
 
     <!-- 叶面喷雾 -->
     <div class="plan-block" style="--c:var(--green);--c-soft:var(--green-light)">
-      <div class="plan-head"><span class="ph-ico">💧</span><h3>二、叶面喷雾植保方案</h3><span class="ph-cost">亩汇总 ¥360</span></div>
+      <div class="plan-head"><h3>二、叶面喷雾植保方案</h3><span class="ph-cost">亩汇总 ¥360</span></div>
       <div class="tbl-scroll">
         <table>
           <thead><tr><th>作物生长期</th><th>农资产品</th><th>防治靶标</th><th>用量</th><th>使用方法</th><th>技术要领</th><th>注意事项</th></tr></thead>
@@ -562,7 +615,7 @@
 
     <!-- 灌根 -->
     <div class="plan-block" style="--c:var(--water);--c-soft:#dcecf6">
-      <div class="plan-head"><span class="ph-ico">🪴</span><h3>三、灌根植保营养方案</h3><span class="ph-cost">亩汇总 ¥640</span></div>
+      <div class="plan-head"><h3>三、灌根植保营养方案</h3><span class="ph-cost">亩汇总 ¥640</span></div>
       <div class="tbl-scroll">
         <table>
           <thead><tr><th>作物生长期</th><th>农资产品</th><th>防治靶标</th><th>用量</th><th>使用方法</th><th>技术要领</th><th>注意事项</th></tr></thead>
@@ -615,7 +668,6 @@
     <!-- 合计卡片 -->
     <div class="cards" style="margin-bottom:30px">
       <div class="card" style="--c:var(--green);--c-soft:var(--green-light)">
-        <div class="ico">🪴</div>
         <h3>追肥 · 灌根（固体）</h3>
         <div class="cost">20.0<small> kg / 亩</small></div>
         <ul>
@@ -624,7 +676,6 @@
         </ul>
       </div>
       <div class="card" style="--c:var(--water);--c-soft:#dcecf6">
-        <div class="ico">💧</div>
         <h3>追肥 · 灌根（液体）</h3>
         <div class="cost">5.6<small> L / 亩</small></div>
         <ul>
@@ -633,7 +684,6 @@
         </ul>
       </div>
       <div class="card" style="--c:var(--earth);--c-soft:#f3ead9">
-        <div class="ico">🌱</div>
         <h3>底肥 · 基施（对照）</h3>
         <div class="cost">125<small> kg / 亩</small></div>
         <ul>
@@ -645,7 +695,7 @@
 
     <!-- 明细表 -->
     <div class="plan-block" style="--c:var(--green)">
-      <div class="plan-head"><span class="ph-ico">📊</span><h3>追肥明细（按物料 · 亩用量）</h3><span class="ph-cost">灌根 20 kg ＋ 5.6 L</span></div>
+      <div class="plan-head"><h3>追肥明细（按物料 · 亩用量）</h3><span class="ph-cost">灌根 20 kg ＋ 5.6 L</span></div>
       <div class="tbl-scroll">
         <table>
           <thead>
@@ -729,6 +779,128 @@
     });
   },{rootMargin:'-45% 0px -50% 0px'});
   secs.forEach(s=>obs.observe(s));
+</script>
+<script>
+(function(){
+  var NODES=[
+    {group:"播种前·整地期", dayText:"播种前·土壤处理", dayMin:-60, dayMax:-8, op:"底肥/撒施", count:"1 种",
+     cats:{消毒:["生石灰 50–80 kg/亩"]}, mix:"必须独立：与后续底肥间隔 ≥7 天，单独撒施；碱性强，勿与铵态氮/菌剂同施。", flags:["独立"]},
+    {group:"播种前·整地期", dayText:"整地期（生石灰后 ≥7 天）", dayMin:-7, dayMax:-1, op:"底肥/撒施", count:"3 种",
+     cats:{肥菌:["友擎有机肥 80 kg","高富专 13-17-15 40 kg","地腾（精甲·嘧菌酯）5 kg"]}, mix:"三者混匀同施；覆土 10–30 cm，严禁触根。", flags:[]},
+    {group:"苗期·叶面除草", dayText:"播后苗前（≤3 天）", dayMin:0, dayMax:3, op:"叶面喷雾", count:"2 种",
+     cats:{除草:["精异丙甲草胺 50–100 ml","双氯磺草胺 3–4 g"]}, mix:"封闭除草组合同桶；（独立）不与杀虫/杀菌/营养混；墒情适中均匀喷。", flags:["独立"]},
+    {group:"苗期·叶面除草", dayText:"苗后", dayMin:4, dayMax:14, op:"叶面喷雾", count:"2 种",
+     cats:{除草:["烯草酮 50 ml","双氯磺草胺 2 g"]}, mix:"苗后除草同桶；（独立）避开高温；阔叶+尖叶兼顾。", flags:["独立"]},
+    {group:"播后15–40天·促根开花下针", dayText:"播后 15–20 天", dayMin:15, dayMax:20, op:"叶面＋灌根", count:"叶面 8＋灌根 2",
+     cats:{杀虫:["锐动","铜拳","虫螨腈·虱螨脲"],杀菌:["腾丰","美得乐"],控旺:["小胖子"],营养:["聚合磷助剂","硼钼"],灌根:["根际香土 2 kg","削线 1 kg"]},
+     mix:"叶面 8 种同桶一次喷；灌根 2 种同桶。叶面与灌根分两次施。现配现用、二次稀释。", flags:[]},
+    {group:"播后15–40天·促根开花下针", dayText:"播后 25–30 天（50% 开花）", dayMin:25, dayMax:30, op:"叶面＋灌根", count:"叶面 8＋灌根 4",
+     cats:{杀虫:["虫螨腈·虱螨脲","铜拳","锐动"],杀菌:["秀艳"],控旺:["适大进"],营养:["磷酸二氢钾","聚合磷助剂","硼钼"],灌根:["根际香土 2 kg","剿灭 500 ml","苗乐乐 250 ml","水溶肥 12-30-8 2 kg"]},
+     mix:"叶面 8 同桶；灌根 4 同桶（苗乐乐含杀菌+寡糖，与根际香土/水溶肥/剿灭兼容）。开花期避中午施。", flags:[]},
+    {group:"播后15–40天·促根开花下针", dayText:"播后 30–35 天", dayMin:31, dayMax:35, op:"灌根", count:"2 种",
+     cats:{营养:["水溶肥 12-30-8 2 kg","铠仆（海藻）1 L"]}, mix:"同桶；促下针、抗逆。", flags:[]},
+    {group:"播后15–40天·促根开花下针", dayText:"播后 35–40 天", dayMin:36, dayMax:40, op:"叶面＋灌根", count:"叶面 8＋灌根 2",
+     cats:{杀虫:["铜拳","锐动"],杀菌:["美得乐","秀艳"],控旺:["适大进"],营养:["磷酸二氢钾","聚合磷助剂","硼钼"],灌根:["水溶肥 12-30-8 2 kg","泰稳丰（钙镁）1 L"]},
+     mix:"叶面 8 同桶；灌根 2 同桶。", flags:[]},
+    {group:"荚果充实期·播后55–80天", dayText:"播后 55–60 天", dayMin:55, dayMax:60, op:"叶面", count:"11 种（偏多）",
+     cats:{杀虫:["虫螨腈·虱螨脲","铜拳","锐动"],杀菌:["秀艳","美得乐","拜亩乐"],控旺:["妥控"],营养:["磷酸二氢钾","聚合磷助剂","硼钼","金收"]},
+     mix:"偏多，建议分 2 桶：桶①杀虫3+营养（聚合磷+硼钼+金收）；桶②杀菌3（秀艳+美得乐+拜亩乐）+控旺（妥控）+磷酸二氢钾。注意秀艳+拜亩乐均含三唑，控旺叠加 → 保留 1 种或减量。", flags:["偏多","三唑"]},
+    {group:"荚果充实期·播后55–80天", dayText:"播后 75–80 天", dayMin:75, dayMax:80, op:"叶面", count:"10 种（偏多）",
+     cats:{杀虫:["锐动","虫螨腈·虱螨脲","铜拳"],杀菌:["美得乐","拜亩乐"],控旺:["适大进"],营养:["金收","磷酸二氢钾","聚合磷助剂","硼钼"]},
+     mix:"偏多，建议分 2 桶：桶①杀虫3+营养；桶②杀菌2（美得乐+拜亩乐）+控旺（适大进）+磷酸二氢钾。仅 1 个三唑（拜亩乐），控旺风险可控。", flags:["偏多"]},
+    {group:"荚果期·灌根为主", dayText:"荚果期（80% 封垄、鸡头状）", dayMin:81, dayMax:89, op:"灌根", count:"4 种",
+     cats:{肥菌:["水溶肥 10-5-35 2 kg","泰稳丰 1 L","苗乐乐 350 ml","削线 1 kg"]}, mix:"同桶；根果同护（营养＋防线虫＋防根腐/白绢）。", flags:[]},
+    {group:"荚果期·灌根为主", dayText:"间隔 7–10 天 ×2（巩固）", dayMin:90, dayMax:99, op:"灌根", count:"3/2 种",
+     cats:{肥菌:["轮① 水溶肥 10-5-35 3 kg+根际香土 2 kg+泰稳丰 1 L","轮② 水溶肥 10-5-35 3 kg+泰稳丰 1 L"]}, mix:"同桶；巩固荚果饱满度。两轮间隔 7–10 天。", flags:[]},
+    {group:"收获前", dayText:"播后 100 天（收获前）", dayMin:100, dayMax:9999, op:"叶面", count:"9 种（偏多）",
+     cats:{杀虫:["虫螨腈·虱螨脲","铜拳","锐动"],杀菌:["美得乐","拜亩乐"],营养:["金收","磷酸二氢钾","聚合磷助剂","硼钼"]},
+     mix:"偏多，建议分 2 桶；收获前严格按各药标签安全间隔期停喷。美得乐+拜亩乐可同桶。", flags:["偏多"]}
+  ];
+  var CAT_COLOR={杀虫:"#c0392b",杀菌:"#e67e22",控旺:"#8e44ad",营养:"#2b7bb0",肥菌:"#2b7bb0",灌根:"#2b7bb0",消毒:"#2b7bb0",除草:"#c0392b"};
+
+  function $(id){ return document.getElementById(id); }
+  function daysBetween(a,b){ return Math.round((b.getTime()-a.getTime())/86400000); }
+
+  function weatherAdvice(w,t,soil,node){
+    var a=[];
+    if(w==='rain'||w==='heavyrain'){ a.push('近期有降雨，建议在雨前 6 小时外或雨后 24 小时内完成作业；雨前 6 小时内勿喷，避免冲刷流失。'); }
+    if(w==='typhoon'){ a.push('台风 / 强降雨预警：暂停户外作业，抢在预警前完成叶面喷施；雨后及时排涝、防渍害。'); }
+    if(t>=33){ a.push('气温偏高（≥33℃），避开 11:00–15:00 施药，防药效下降与药害；选清晨或傍晚。'); }
+    if(t<=18){ a.push('气温偏低（≤18℃），药效发挥慢，宜选中午前后施药。'); }
+    if(soil==='dry'){ a.push('田间偏干：苗前封闭除草需墒情好，建议先灌水增墒再喷；灌根类可结合浇水施入。'); }
+    if(soil==='wet'){ a.push('田间偏湿：注意开沟排水防渍，避免烂根；叶面喷施待叶片干爽后进行。'); }
+    if(node.flags.indexOf('独立')>=0){ a.push('本节点含「独立作业」项，不可与杀虫 / 杀菌 / 营养混配，须单独实施。'); }
+    if(node.flags.indexOf('三唑')>=0){ a.push('本节点含多个三唑类药剂，控旺叠加风险高，保留 1 种或减量，防抑长过度。'); }
+    if(node.flags.indexOf('偏多')>=0){ a.push('本节点用药偏多，建议按提示分 2 桶喷施，现配现用、二次稀释。'); }
+    if(a.length===0){ a.push('天气与墒情条件常规，按节点方案正常实施即可。'); }
+    return a;
+  }
+
+  function render(){
+    var sow=$('dec-sow').value, today=$('dec-today').value;
+    if(!sow||!today) return;
+    var dSow=new Date(sow), dToday=new Date(today);
+    if(isNaN(dSow)||isNaN(dToday)) return;
+    var days=daysBetween(dSow,dToday);
+    var active=NODES.filter(function(n){ return days>=n.dayMin && days<=n.dayMax; })[0];
+    var gap=false, prevN=null, nextN=null;
+    if(!active){
+      gap=true;
+      var prevs=NODES.filter(function(n){ return n.dayMax<days; });
+      prevN=prevs.length?prevs[prevs.length-1]:null;
+      nextN=NODES.filter(function(n){ return n.dayMin>days; })[0]||null;
+      active=nextN||prevN;
+    } else {
+      nextN=NODES.filter(function(n){ return n.dayMin>days; })[0]||null;
+    }
+    if(!active){ $('dec-result').innerHTML='<p>暂无数据</p>'; return; }
+    var w=$('dec-weather').value, t=parseFloat($('dec-temp').value)||25, soil=$('dec-soil').value;
+
+    var stat='<div class="dec-stat">'+
+      '<div class="s"><b>播种后第 '+days+' 天</b><span>当前日期 '+today+'</span></div>'+
+      '<div class="s"><b style="font-size:18px">'+active.group+'</b><span>当前阶段</span></div>'+
+      '<div class="s"><b style="font-size:18px">'+(nextN?(nextN.dayMin-days)+' 天':'—')+'</b><span>'+(nextN?('下一节点：'+nextN.dayText):'全生育期已结束')+'</span></div>'+
+    '</div>';
+
+    var gapNote = gap ? '<p style="color:#9a3412;background:#fff7ed;border-left:4px solid #e67e22;padding:10px 14px;border-radius:8px;font-size:13.5px;margin:4px 0 16px">当前处于 <b>阶段过渡期（第 '+days+' 天，窗口间隙）</b>，暂无作业窗口；以下为 '+(nextN?('下一节点【'+nextN.dayText+'】的准备建议'):'最近节点的回顾')+'。</p>' : '';
+
+    var catsHtml='';
+    Object.keys(active.cats).forEach(function(k){
+      var color=CAT_COLOR[k]||'#888';
+      var items=active.cats[k].map(function(x){ return '<li>'+x+'</li>'; }).join('');
+      catsHtml+='<div class="dec-chip" style="border-left:4px solid '+color+'"><b style="color:'+color+'">'+k+'</b><ul>'+items+'</ul></div>';
+    });
+
+    var mixHtml='<div class="dec-warn"><b>怎么混配</b>'+active.mix+'</div>';
+    var adv=weatherAdvice(w,t,soil,active);
+    var advHtml='<div class="dec-note"><b>注意什么（结合近期天气）</b><ul>'+adv.map(function(x){ return '<li>'+x+'</li>'; }).join('')+'</ul></div>';
+
+    var rh='<div class="rh">'+
+      '<span class="badge">'+active.dayText+'</span>'+
+      '<span class="badge" style="color:var(--green);background:#e8f5e9">用 '+active.count+'</span>'+
+      '<span class="badge" style="color:#8e44ad;background:#f3e9f7">'+active.op+'</span>'+
+    '</div>';
+
+    var html = stat + gapNote +
+      '<div class="dec-rec"><div class="rh">'+rh+'</div><div class="rb">'+
+        '<h4>该用什么（药 / 肥 / 菌）</h4>'+
+        '<div class="dec-cats">'+catsHtml+'</div>'+
+        mixHtml + advHtml +
+      '</div></div>';
+
+    $('dec-result').innerHTML=html;
+  }
+
+  function init(){
+    try{ var n=new Date(); var iso=n.getFullYear()+'-'+('0'+(n.getMonth()+1)).slice(-2)+'-'+('0'+n.getDate()).slice(-2); $('dec-today').value=iso; }catch(e){}
+    ['dec-sow','dec-today','dec-weather','dec-temp','dec-soil'].forEach(function(id){
+      var el=$(id); if(el){ el.addEventListener('change', render); el.addEventListener('input', render); }
+    });
+    render();
+  }
+  if(document.readyState!=='loading'){ init(); } else { document.addEventListener('DOMContentLoaded', init); }
+})();
+
 </script>
 </body>
 </html>
