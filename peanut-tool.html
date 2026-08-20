@@ -332,9 +332,9 @@
   .op-nd-badge{font-size:12px;font-weight:800;color:#fff;background:var(--green);padding:5px 14px;border-radius:999px;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.12)}
   .op-stage-name{font-size:16px;font-weight:700;color:var(--g-700);line-height:1.4}
   .op-single-meta{display:flex;gap:12px;margin-bottom:14px}
-  .op-meta-cell{flex:1;background:#f1f7f3;border:1px solid #d7e7dc;border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:5px;min-width:0}
-  .op-meta-k{font-size:14px;color:var(--g-700);font-weight:800;letter-spacing:.3px}
-  .op-meta-v{font-size:12px;font-weight:700;color:var(--g-700);line-height:1.45}
+  .op-meta-cell{flex:1;background:#f1f7f3;border:1px solid #d7e7dc;border-radius:12px;padding:10px 12px;display:flex;flex-direction:row;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+  .op-meta-k{font-size:14px;color:var(--g-700);font-weight:800;letter-spacing:.3px;white-space:nowrap}
+  .op-meta-v{font-size:12px;font-weight:700;color:var(--g-700);line-height:1.45;white-space:nowrap}
   .op-single-block{margin-bottom:12px}
   .op-single-block:last-child{margin-bottom:0}
   .op-single-block b{display:block;font-size:12.5px;font-weight:700;color:var(--g-700);margin-bottom:7px;padding-left:9px;border-left:3px solid var(--green)}
@@ -1923,8 +1923,8 @@
         '<span class="op-stage-name">'+row.stage+'</span>'+
       '</div>'+
       '<div class="op-single-meta">'+
-        '<div class="op-meta-cell"><span class="op-meta-k">作业</span><span class="op-meta-v">'+row.op+'</span></div>'+
-        '<div class="op-meta-cell"><span class="op-meta-k">用几种</span><span class="op-meta-v">'+row.count+'</span></div>'+
+        '<div class="op-meta-cell"><span class="op-meta-k">作业：</span><span class="op-meta-v">'+row.op+'</span></div>'+
+        '<div class="op-meta-cell"><span class="op-meta-k">用几种：</span><span class="op-meta-v">'+row.count+'</span></div>'+
       '</div>'+
       '<div class="op-single-block"><b>搭配清单（杀虫 · 杀菌 · 控旺 · 营养）</b><span class="op-list-text">'+row.list+'</span></div>'+
       '<div class="op-single-block"><b>混配方式 &amp; 关键提醒</b><span class="op-mix-text">'+row.mix+'</span></div>'+
