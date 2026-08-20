@@ -1919,7 +1919,7 @@
     }
     var html='<div class="op-single">'+
       '<div class="op-single-head">'+
-        '<span class="op-nd-badge">序号 '+row.nd+'</span>'+
+        '<span class="op-nd-badge">第 '+row.nd+' 次管理</span>'+
         '<span class="op-stage-name">'+row.stage+'</span>'+
       '</div>'+
       '<div class="op-single-meta">'+
@@ -1930,7 +1930,7 @@
       '<div class="op-single-block"><b>混配方式 &amp; 关键提醒</b><span class="op-mix-text">'+row.mix+'</span></div>'+
     '</div>';
     box.innerHTML=html;
-    if(tag) tag.textContent='当前阶段：'+activeDayText;
+    if(tag) tag.textContent='当前阶段：第 '+row.nd+' 次管理';
   }
 
   function closeQpModal(){
