@@ -124,11 +124,12 @@
   .target{color:var(--muted)}
   .dose{white-space:nowrap;font-weight:600}
   tfoot td{background:var(--green-light);font-weight:800;padding:12px;color:var(--green-dark)}
-  /* 操作历：作业列适当加宽并固定为两行 */
-  #schedule table thead th:nth-child(2){width:116px;min-width:116px;white-space:normal;text-align:center}
-  #schedule table tbody td:nth-child(2){width:116px;min-width:116px;white-space:normal;text-align:center;vertical-align:middle;line-height:1.55;font-weight:600}
-  #schedule table thead th:nth-child(3){width:116px;min-width:116px;white-space:normal;text-align:center}
-  #schedule table tbody td:nth-child(3){width:116px;min-width:116px;white-space:normal;text-align:center;vertical-align:middle;line-height:1.55;font-weight:600}
+  /* 操作历：作业列(第4列)与用几种列(第5列)加宽并强制两行，避免三行（原规则误作用于第2/3列，已修正） */
+  #schedule table thead th:nth-child(2),#schedule table thead th:nth-child(3){width:116px;min-width:116px;white-space:normal;text-align:center}
+  #schedule table tbody td:nth-child(2),#schedule table tbody td:nth-child(3){width:116px;min-width:116px;white-space:normal;text-align:center;vertical-align:middle;line-height:1.55;font-weight:600}
+  #schedule table thead th:nth-child(4),#schedule table thead th:nth-child(5){white-space:normal;text-align:center}
+  #schedule table tbody td:nth-child(4){width:72px;min-width:72px;white-space:normal;text-align:center;vertical-align:middle;line-height:1.45;font-weight:600}
+  #schedule table tbody td:nth-child(5){width:104px;min-width:104px;white-space:normal;text-align:center;vertical-align:middle;line-height:1.45;font-weight:600}
   .muted-cell{color:var(--muted)}
 
   /* NOTES */
@@ -344,14 +345,14 @@
               <td><span style="color:#c0392b;font-weight:700">除草</span>：烯草酮 50ml ＋ 双氯磺草胺 2g</td>
               <td>苗后除草同桶；（独立）避开高温；阔叶+尖叶兼顾。</td>
             </tr><tr class="stage-row"><td colspan="7">▶ 播后 15–40 天（促根 · 开花下针）</td></tr><tr>
-              <td class="nd">5</td><td>播后 15–20 天</td><td>第 3 周</td><td>叶面<br>＋灌根</td><td>叶面 8 ＋ 灌根 2</td>
+              <td class="nd">5</td><td>播后 15–20 天</td><td>第 3 周</td><td>叶面<br>＋灌根</td><td>叶面 8<br>＋ 灌根 2</td>
               <td>
 【叶面 8】<span style="color:#c0392b;font-weight:700">杀虫</span>：锐动+铜拳+虫螨腈·虱螨脲 ｜ <span style="color:#e67e22;font-weight:700">杀菌</span>：腾丰+美得乐 ｜ <span style="color:#8e44ad;font-weight:700">控旺</span>：小胖子 ｜ <span style="color:#2b7bb0;font-weight:700">营养</span>：聚合磷助剂+硼钼<br>
 【灌根 2】根际香土 2kg ＋ 削线 1kg
               </td>
               <td>叶面 8 种同桶一次喷；灌根 2 种同桶。叶面与灌根分两次施。现配现用、二次稀释。</td>
             </tr><tr>
-              <td class="nd">6</td><td>播后 25–30 天（50% 开花）</td><td>第 4 周</td><td>叶面<br>＋灌根</td><td>叶面 8 ＋ 灌根 4</td>
+              <td class="nd">6</td><td>播后 25–30 天（50% 开花）</td><td>第 4 周</td><td>叶面<br>＋灌根</td><td>叶面 8<br>＋ 灌根 4</td>
               <td>
 【叶面 8】<span style="color:#c0392b;font-weight:700">杀虫</span>：虫螨腈·虱螨脲+铜拳+锐动 ｜ <span style="color:#e67e22;font-weight:700">杀菌</span>：秀艳 ｜ <span style="color:#8e44ad;font-weight:700">控旺</span>：适大进 ｜ <span style="color:#2b7bb0;font-weight:700">营养</span>：磷酸二氢钾+聚合磷助剂+硼钼<br>
 【灌根 4】根际香土 2kg ＋ 剿灭 500ml ＋ 苗乐乐 250ml ＋ 水溶肥12-30-8 2kg
@@ -362,20 +363,20 @@
               <td><span style="color:#2b7bb0;font-weight:700">肥/刺激素</span>：水溶肥12-30-8 2kg ＋ 铠仆（海藻）1L</td>
               <td>同桶；促下针、抗逆。</td>
             </tr><tr>
-              <td class="nd">8</td><td>播后 35–40 天</td><td>第 5 周</td><td>叶面<br>＋灌根</td><td>叶面 8 ＋ 灌根 2</td>
+              <td class="nd">8</td><td>播后 35–40 天</td><td>第 5 周</td><td>叶面<br>＋灌根</td><td>叶面 8<br>＋ 灌根 2</td>
               <td>
 【叶面 8】<span style="color:#c0392b;font-weight:700">杀虫</span>：铜拳+锐动 ｜ <span style="color:#e67e22;font-weight:700">杀菌</span>：美得乐+秀艳 ｜ <span style="color:#8e44ad;font-weight:700">控旺</span>：适大进 ｜ <span style="color:#2b7bb0;font-weight:700">营养</span>：磷酸二氢钾+聚合磷助剂+硼钼<br>
 【灌根 2】水溶肥12-30-8 2kg ＋ 泰稳丰（钙镁）1L
               </td>
               <td>叶面 8 同桶；灌根 2 同桶。</td>
             </tr><tr class="stage-row"><td colspan="7">▶ 荚果充实期（播后 55–80 天，叶面为主）</td></tr><tr>
-              <td class="nd">9</td><td>播后 55–60 天</td><td>第 8 周</td><td>叶面<br>喷施</td><td>11 种（偏多）</td>
+              <td class="nd">9</td><td>播后 55–60 天</td><td>第 8 周</td><td>叶面<br>喷施</td><td>11 种<br>（偏多）</td>
               <td>
 <span style="color:#c0392b;font-weight:700">杀虫</span>：虫螨腈·虱螨脲+铜拳+锐动 ｜ <span style="color:#e67e22;font-weight:700">杀菌</span>：秀艳+美得乐+拜亩乐 ｜ <span style="color:#8e44ad;font-weight:700">控旺</span>：妥控 ｜ <span style="color:#2b7bb0;font-weight:700">营养</span>：磷酸二氢钾+聚合磷助剂+硼钼+金收
               </td>
               <td>偏多，建议分 2 桶：桶①杀虫3+营养（聚合磷+硼钼+金收）；桶②杀菌3（秀艳+美得乐+拜亩乐）+控旺（妥控）+磷酸二氢钾。注意秀艳+拜亩乐均含三唑，控旺叠加 → 保留 1 种或减量。</td>
             </tr><tr>
-              <td class="nd">10</td><td>播后 75–80 天</td><td>第 11 周</td><td>叶面<br>喷施</td><td>10 种（偏多）</td>
+              <td class="nd">10</td><td>播后 75–80 天</td><td>第 11 周</td><td>叶面<br>喷施</td><td>10 种<br>（偏多）</td>
               <td>
 <span style="color:#c0392b;font-weight:700">杀虫</span>：锐动+虫螨腈·虱螨脲+铜拳 ｜ <span style="color:#e67e22;font-weight:700">杀菌</span>：美得乐+拜亩乐 ｜ <span style="color:#8e44ad;font-weight:700">控旺</span>：适大进 ｜ <span style="color:#2b7bb0;font-weight:700">营养</span>：金收+磷酸二氢钾+聚合磷助剂+硼钼
               </td>
@@ -385,14 +386,14 @@
               <td><span style="color:#2b7bb0;font-weight:700">肥/菌</span>：水溶肥10-5-35 2kg ＋ 泰稳丰 1L ＋ 苗乐乐 350ml ＋ 削线 1kg</td>
               <td>同桶；根果同护（营养 ＋ 防线虫 ＋ 防根腐/白绢）。</td>
             </tr><tr>
-              <td class="nd">12</td><td>间隔 7–10 天 ×2（巩固）</td><td>约第 13 周</td><td>灌根<br>根施</td><td>3 / 2 种</td>
+              <td class="nd">12</td><td>间隔 7–10 天 ×2（巩固）</td><td>约第 13 周</td><td>灌根<br>根施</td><td>3 / 2<br>种</td>
               <td>
 轮①：水溶肥10-5-35 3kg ＋ 根际香土 2kg ＋ 泰稳丰 1L（3 种）<br>
 轮②：水溶肥10-5-35 3kg ＋ 泰稳丰 1L（2 种）
               </td>
               <td>同桶；巩固荚果饱满度。两轮间隔 7–10 天。</td>
             </tr><tr class="stage-row"><td colspan="7">▶ 收获前</td></tr><tr>
-              <td class="nd">13</td><td>播后 100 天（收获前）</td><td>第 14 周</td><td>叶面<br>喷施</td><td>9 种（偏多）</td>
+              <td class="nd">13</td><td>播后 100 天（收获前）</td><td>第 14 周</td><td>叶面<br>喷施</td><td>9 种<br>（偏多）</td>
               <td>
 <span style="color:#c0392b;font-weight:700">杀虫</span>：虫螨腈·虱螨脲+铜拳+锐动 ｜ <span style="color:#e67e22;font-weight:700">杀菌</span>：美得乐+拜亩乐 ｜ <span style="color:#2b7bb0;font-weight:700">营养</span>：金收+磷酸二氢钾+聚合磷助剂+硼钼
               </td>
