@@ -14,7 +14,7 @@
   }
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",Segoe UI,Roboto,sans-serif;
-    background:var(--bg);color:var(--text);line-height:1.7;-webkit-font-smoothing:antialiased}
+    background:var(--bg);color:var(--text);line-height:1.62;-webkit-font-smoothing:antialiased}
   a{color:inherit;text-decoration:none}
   .wrap{max-width:1080px;margin:0 auto;padding:0 20px}
   .rainbow{background:linear-gradient(90deg,#e74c3c,#f39c12,#2ecc71,#2b7bb0,#8e44ad,#e84393);
@@ -24,11 +24,11 @@
   nav{position:sticky;top:36px;z-index:50;background:rgba(251,250,246,.92);
     backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
     box-shadow:0 3px 14px rgba(15,40,15,.08)}
-  .nav-inner{display:flex;align-items:center;justify-content:space-between;height:60px}
-  .brand{font-weight:800;font-size:19px;display:flex;align-items:center;gap:8px}
+  .nav-inner{display:flex;align-items:center;justify-content:space-between;height:54px}
+  .brand{font-weight:800;font-size:17px;display:flex;align-items:center;gap:8px}
   .brand .dot{width:14px;height:14px;border-radius:50%;
     background:conic-gradient(#e74c3c,#f39c12,#2ecc71,#2b7bb0,#8e44ad,#e84393,#e74c3c)}
-  .nav-links{display:flex;gap:22px;font-size:14.5px;font-weight:600}
+  .nav-links{display:flex;gap:18px;font-size:13.5px;font-weight:600}
   .nav-links a{color:var(--muted);transition:color .2s}
   .nav-links a:hover,.nav-links a.active{color:var(--green)}
   .nav-toggle{display:none;font-size:22px;background:none;border:none;cursor:pointer}
@@ -38,95 +38,95 @@
   .hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
   .hero::after{content:"";position:absolute;inset:0;
     background:linear-gradient(180deg,rgba(15,40,15,.35),rgba(15,40,15,.78))}
-  .hero-inner{position:relative;z-index:2;padding:84px 20px 70px;text-align:center}
-  .hero h1{font-size:clamp(28px,5vw,46px);font-weight:900;letter-spacing:1px;
+  .hero-inner{position:relative;z-index:2;padding:64px 20px 54px;text-align:center}
+  .hero h1{font-size:clamp(25px,4.3vw,40px);font-weight:900;letter-spacing:1px;
     text-shadow:0 3px 18px rgba(0,0,0,.4)}
-  .hero p.sub{margin-top:14px;font-size:clamp(15px,2.4vw,19px);opacity:.95}
-  .hero .chips{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:30px}
+  .hero p.sub{margin-top:12px;font-size:clamp(14px,2.2vw,17px);opacity:.95}
+  .hero .chips{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:24px}
   .chip{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.35);
-    padding:12px 20px;border-radius:12px;backdrop-filter:blur(4px);min-width:130px}
-  .chip b{display:block;font-size:24px;font-weight:800}
-  .chip span{font-size:13px;opacity:.9}
+    padding:10px 16px;border-radius:12px;backdrop-filter:blur(4px);min-width:120px}
+  .chip b{display:block;font-size:21px;font-weight:800}
+  .chip span{font-size:12px;opacity:.9}
 
   /* SECTIONS */
-  section{padding:60px 0}
-  .sec-head{text-align:center;margin-bottom:38px}
+  section{padding:46px 0}
+  .sec-head{text-align:center;margin-bottom:28px}
   .sec-head .k{display:inline-block;font-size:13px;font-weight:700;letter-spacing:2px;
     color:var(--green);background:var(--green-light);padding:4px 14px;border-radius:20px}
-  .sec-head h2{font-size:clamp(22px,3.6vw,32px);font-weight:900;margin-top:12px}
-  .sec-head p{color:var(--muted);max-width:720px;margin:12px auto 0;font-size:15px}
+  .sec-head h2{font-size:clamp(20px,3vw,27px);font-weight:900;margin-top:12px}
+  .sec-head p{color:var(--muted);max-width:720px;margin:12px auto 0;font-size:14px}
 
   /* OVERVIEW CARDS */
-  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
-  .card{background:var(--card);border-radius:var(--radius);padding:26px;box-shadow:var(--shadow);
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .card{background:var(--card);border-radius:var(--radius);padding:22px;box-shadow:var(--shadow);
     border-top:5px solid var(--c);transition:transform .2s}
   .card:hover{transform:translateY(-5px)}
-  .card .ico{font-size:30px;width:54px;height:54px;border-radius:12px;display:grid;place-items:center;
+  .card .ico{font-size:26px;width:48px;height:48px;border-radius:12px;display:grid;place-items:center;
     background:var(--c-soft)}
-  .card h3{margin:16px 0 6px;font-size:19px}
-  .card .cost{font-size:26px;font-weight:900;color:var(--c);margin-top:10px}
+  .card h3{margin:12px 0 5px;font-size:17px}
+  .card .cost{font-size:22px;font-weight:900;color:var(--c);margin-top:10px}
   .card .cost small{font-size:13px;color:var(--muted);font-weight:600}
-  .card ul{margin-top:14px;padding-left:18px;font-size:14px;color:var(--muted)}
-  .card ul li{margin:6px 0}
+  .card ul{margin-top:12px;padding-left:18px;font-size:13px;color:var(--muted)}
+  .card ul li{margin:5px 0}
 
   /* SPLIT (variety) */
-  .split{display:grid;grid-template-columns:1fr 1fr;gap:34px;align-items:center;
-    background:var(--card);border-radius:var(--radius);padding:30px;box-shadow:var(--shadow)}
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:26px;align-items:center;
+    background:var(--card);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow)}
   .split img{width:100%;border-radius:12px;box-shadow:var(--shadow)}
-  .split h3{font-size:22px;margin-bottom:12px}
-  .split p{color:var(--muted);font-size:15px;margin-bottom:12px}
+  .split h3{font-size:19px;margin-bottom:12px}
+  .split p{color:var(--muted);font-size:14px;margin-bottom:12px}
   .tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
-  .tag{font-size:13px;padding:5px 12px;border-radius:20px;background:var(--green-light);color:var(--green-dark);font-weight:600}
+  .tag{font-size:12.5px;padding:5px 12px;border-radius:20px;background:var(--green-light);color:var(--green-dark);font-weight:600}
 
   /* COST */
-  .cost-grid{display:grid;grid-template-columns:300px 1fr;gap:40px;align-items:center;
-    background:var(--card);border-radius:var(--radius);padding:36px;box-shadow:var(--shadow)}
-  .donut{width:240px;height:240px;border-radius:50%;margin:0 auto;position:relative;
+  .cost-grid{display:grid;grid-template-columns:300px 1fr;gap:30px;align-items:center;
+    background:var(--card);border-radius:var(--radius);padding:28px;box-shadow:var(--shadow)}
+  .donut{width:210px;height:210px;border-radius:50%;margin:0 auto;position:relative;
     background:conic-gradient(var(--earth) 0 37.5%,var(--green) 37.5% 60%,var(--water) 60% 100%)}
-  .donut::after{content:"";position:absolute;inset:34px;background:var(--card);border-radius:50%;
+  .donut::after{content:"";position:absolute;inset:30px;background:var(--card);border-radius:50%;
     box-shadow:inset 0 0 0 1px var(--line)}
   .donut .center{position:absolute;inset:0;display:grid;place-content:center;text-align:center;z-index:2}
-  .donut .center b{font-size:30px;font-weight:900;color:var(--text)}
+  .donut .center b{font-size:26px;font-weight:900;color:var(--text)}
   .donut .center span{font-size:13px;color:var(--muted)}
-  .legend{display:flex;flex-direction:column;gap:16px}
+  .legend{display:flex;flex-direction:column;gap:12px}
   .lg{display:flex;align-items:center;gap:12px}
   .lg .sw{width:16px;height:16px;border-radius:5px;flex:none}
   .lg .nm{flex:1;font-weight:700}
   .lg .vl{font-weight:800;color:var(--text)}
-  .lg .pc{color:var(--muted);font-size:13px;width:54px;text-align:right}
+  .lg .pc{color:var(--muted);font-size:12px;width:54px;text-align:right}
   .bar{height:10px;border-radius:6px;background:var(--line);margin-top:6px;overflow:hidden}
   .bar i{display:block;height:100%;border-radius:6px}
-  .total-line{margin-top:20px;padding-top:18px;border-top:1px dashed var(--line);
+  .total-line{margin-top:16px;padding-top:14px;border-top:1px dashed var(--line);
     display:flex;justify-content:space-between;align-items:baseline}
-  .total-line b{font-size:30px;color:var(--gold);font-weight:900}
-  .total-line span{color:var(--muted);font-size:14px}
+  .total-line b{font-size:26px;color:var(--gold);font-weight:900}
+  .total-line span{color:var(--muted);font-size:13px}
 
-  /* TIMELINE */
-  .timeline{position:relative;margin-left:14px;padding-left:30px}
-  .timeline::before{content:"";position:absolute;left:7px;top:6px;bottom:6px;width:3px;
-    background:linear-gradient(180deg,var(--earth),var(--green),var(--water))}
-  .tl-item{position:relative;margin-bottom:26px}
-  .tl-item::before{content:"";position:absolute;left:-30px;top:5px;width:16px;height:16px;border-radius:50%;
-    background:var(--c);border:3px solid #fff;box-shadow:0 0 0 2px var(--c)}
-  .tl-time{font-weight:800;color:var(--c);font-size:15px}
-  .tl-box{background:var(--card);border-radius:12px;padding:14px 18px;margin-top:8px;
-    box-shadow:var(--shadow);border-left:4px solid var(--c)}
-  .tl-box .acts{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}
-  .pill{font-size:12.5px;padding:3px 10px;border-radius:16px;background:var(--c-soft);color:var(--c);font-weight:600}
+  /* TIMELINE — 横向步骤流 Stepper（超出自动换行） */
+  .stepper{display:flex;flex-wrap:wrap;gap:14px 14px;padding:12px 4px 8px}
+  .step{position:relative;flex:1 1 200px;min-width:186px;max-width:232px}
+  .step .dot{position:relative;z-index:1;width:30px;height:30px;border-radius:50%;margin:0 auto;
+    display:flex;align-items:center;justify-content:center;background:var(--c);color:#fff;
+    font-weight:800;font-size:13px;box-shadow:0 0 0 4px #fff,0 2px 6px rgba(0,0,0,.15)}
+  .step .card{position:relative;z-index:1;margin-top:12px;background:var(--card);border-radius:12px;
+    padding:10px 12px;box-shadow:var(--shadow);border-top:4px solid var(--c)}
+  .step .st-time{font-weight:800;color:var(--c);font-size:13px;line-height:1.35}
+  .step .st-title{font-size:12.5px;font-weight:700;color:#333;margin:7px 0 2px;line-height:1.4}
+  .step .acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+  .pill{font-size:11.5px;padding:3px 8px;border-radius:14px;background:var(--c-soft);color:var(--c);font-weight:600}
 
   /* TABLES */
   .plan-block{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);
-    overflow:hidden;margin-bottom:34px;border-top:5px solid var(--c)}
-  .plan-head{background:var(--c-soft);padding:18px 24px;display:flex;align-items:center;gap:14px}
+    overflow:hidden;margin-bottom:26px;border-top:5px solid var(--c)}
+  .plan-head{background:var(--c-soft);padding:14px 20px;display:flex;align-items:center;gap:14px}
   .plan-head .ph-ico{font-size:26px}
-  .plan-head h3{font-size:21px;color:var(--text)}
-  .plan-head .ph-cost{margin-left:auto;font-weight:800;color:var(--c);font-size:18px}
+  .plan-head h3{font-size:19px;color:var(--text)}
+  .plan-head .ph-cost{margin-left:auto;font-weight:800;color:var(--c);font-size:16px}
   .tbl-scroll{overflow-x:auto}
-  table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:680px}
-  thead th{background:var(--text);color:#fff;padding:12px 12px;text-align:left;font-weight:600;white-space:nowrap}
-  tbody td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  table{width:100%;border-collapse:collapse;font-size:13px;min-width:680px}
+  thead th{background:var(--text);color:#fff;padding:10px 11px;text-align:left;font-weight:600;white-space:nowrap}
+  tbody td{padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top}
   tbody tr:hover{background:#fcfbf6}
-  .stage-row td{background:var(--c-soft);font-weight:800;color:var(--c);padding:9px 14px;letter-spacing:.5px}
+  .stage-row td{background:var(--c-soft);font-weight:800;color:var(--c);padding:8px 12px;letter-spacing:.5px}
   .prod{font-weight:700;color:var(--text)}
   .target{color:var(--muted)}
   .dose{white-space:nowrap;font-weight:600}
@@ -139,25 +139,25 @@
   .muted-cell{color:var(--muted)}
 
   /* NOTES */
-  .notes{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
-  .note{background:var(--card);border-radius:12px;padding:20px 22px;box-shadow:var(--shadow);
+  .notes{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+  .note{background:var(--card);border-radius:12px;padding:16px 18px;box-shadow:var(--shadow);
     border-left:4px solid var(--gold)}
   .note b{display:block;margin-bottom:6px;color:var(--green-dark)}
-  .note p{font-size:14px;color:var(--muted)}
+  .note p{font-size:13px;color:var(--muted)}
 
   /* FARM IMAGE BANNER */
   .farm{position:relative;border-radius:var(--radius);overflow:hidden;color:#fff;
-    box-shadow:var(--shadow);min-height:260px;display:flex;align-items:flex-end}
+    box-shadow:var(--shadow);min-height:230px;display:flex;align-items:flex-end}
   .farm img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
   .farm::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0),rgba(15,40,15,.8))}
-  .farm .ft{position:relative;z-index:2;padding:30px}
-  .farm h3{font-size:24px;margin-bottom:8px}
-  .farm p{max-width:560px;font-size:14.5px;opacity:.95}
+  .farm .ft{position:relative;z-index:2;padding:24px}
+  .farm h3{font-size:21px;margin-bottom:8px}
+  .farm p{max-width:560px;font-size:13.5px;opacity:.95}
 
-  footer{background:var(--green-dark);color:#e8f5e9;text-align:center;padding:40px 20px;margin-top:30px}
-  footer .big{font-size:30px;font-weight:900;color:#fff}
+  footer{background:var(--green-dark);color:#e8f5e9;text-align:center;padding:32px 20px;margin-top:24px}
+  footer .big{font-size:26px;font-weight:900;color:#fff}
   footer .big em{font-style:normal;color:var(--gold)}
-  footer p{opacity:.85;font-size:13.5px;margin-top:12px}
+  footer p{opacity:.85;font-size:13px;margin-top:10px}
 
   @media(max-width:860px){
     .cards,.split,.cost-grid,.notes{grid-template-columns:1fr}
@@ -364,62 +364,62 @@
     <div class="sec-head">
       <span class="k">GROWTH TIMELINE</span>
       <h2>全生育期时间轴</h2>
-      <p>从播种前土壤处理到播后 100 天的收获前管理，三大模块按生育节点精准衔接。</p>
+      <p>从播种前土壤处理到播后 100 天的收获前管理，11 个关键节点横向串联（超出自动换行），按底肥 · 叶面 · 灌根三模块配色。</p>
     </div>
-    <div class="timeline">
-      <div class="tl-item" style="--c:var(--earth);--c-soft:#f3ead9">
-        <div class="tl-time">播种前</div>
-        <div class="tl-box"><strong>土壤处理（底肥模块）</strong>
+    <div class="stepper">
+      <div class="step" style="--c:var(--earth);--c-soft:#f3ead9">
+        <div class="dot">1</div>
+        <div class="card"><div class="st-time">播种前</div><div class="st-title">土壤处理（底肥模块）</div>
           <div class="acts"><span class="pill">生石灰 土壤消毒</span></div></div>
       </div>
-      <div class="tl-item" style="--c:var(--earth);--c-soft:#f3ead9">
-        <div class="tl-time">整地期</div>
-        <div class="tl-box"><strong>底肥施用（底肥模块）</strong>
+      <div class="step" style="--c:var(--earth);--c-soft:#f3ead9">
+        <div class="dot">2</div>
+        <div class="card"><div class="st-time">整地期</div><div class="st-title">底肥施用（底肥模块）</div>
           <div class="acts"><span class="pill">友擎有机肥</span><span class="pill">高富专 13-17-15</span><span class="pill">地腾 精甲·嘧菌酯</span></div></div>
       </div>
-      <div class="tl-item" style="--c:var(--green);--c-soft:var(--green-light)">
-        <div class="tl-time">播后苗前</div>
-        <div class="tl-box"><strong>封闭除草（叶面模块）</strong>
+      <div class="step" style="--c:var(--green);--c-soft:var(--green-light)">
+        <div class="dot">3</div>
+        <div class="card"><div class="st-time">播后苗前</div><div class="st-title">封闭除草（叶面模块）</div>
           <div class="acts"><span class="pill">精异丙甲草胺</span><span class="pill">双氯磺草胺</span></div></div>
       </div>
-      <div class="tl-item" style="--c:var(--green);--c-soft:var(--green-light)">
-        <div class="tl-time">苗后</div>
-        <div class="tl-box"><strong>苗后除草（叶面模块）</strong>
+      <div class="step" style="--c:var(--green);--c-soft:var(--green-light)">
+        <div class="dot">4</div>
+        <div class="card"><div class="st-time">苗后</div><div class="st-title">苗后除草（叶面模块）</div>
           <div class="acts"><span class="pill">烯草酮</span><span class="pill">双氯磺草胺</span></div></div>
       </div>
-      <div class="tl-item" style="--c:var(--green);--c-soft:var(--green-light)">
-        <div class="tl-time">播后 15–20 天</div>
-        <div class="tl-box"><strong>杀虫杀菌控旺 + 促根防线虫</strong>
+      <div class="step" style="--c:var(--green);--c-soft:var(--green-light)">
+        <div class="dot">5</div>
+        <div class="card"><div class="st-time">播后 15–20 天</div><div class="st-title">杀虫杀菌控旺 + 促根防线虫</div>
           <div class="acts"><span class="pill" style="background:#dcecf6;color:var(--water)">灌根：根际香土</span><span class="pill" style="background:#dcecf6;color:var(--water)">灌根：削线</span><span class="pill">叶面：锐动/铜拳/腾丰</span><span class="pill">叶面：美得乐/硼钼/小胖子</span></div></div>
       </div>
-      <div class="tl-item" style="--c:var(--green);--c-soft:var(--green-light)">
-        <div class="tl-time">播后 25–30 天（50% 开花）</div>
-        <div class="tl-box"><strong>开花期立体管理</strong>
+      <div class="step" style="--c:var(--green);--c-soft:var(--green-light)">
+        <div class="dot">6</div>
+        <div class="card"><div class="st-time">播后 25–30 天（50% 开花）</div><div class="st-title">开花期立体管理</div>
           <div class="acts"><span class="pill" style="background:#dcecf6;color:var(--water)">灌根：剿灭/苗乐乐/水溶肥</span><span class="pill">叶面：秀艳/适大进/磷酸二氢钾</span></div></div>
       </div>
-      <div class="tl-item" style="--c:var(--water);--c-soft:#dcecf6">
-        <div class="tl-time">播后 30–40 天</div>
-        <div class="tl-box"><strong>下针与荚果膨大（灌根为主）</strong>
+      <div class="step" style="--c:var(--water);--c-soft:#dcecf6">
+        <div class="dot">7</div>
+        <div class="card"><div class="st-time">播后 30–40 天</div><div class="st-title">下针与荚果膨大（灌根为主）</div>
           <div class="acts"><span class="pill">水溶肥 12-30-8</span><span class="pill">铠仆 海藻</span><span class="pill">泰稳丰 钙镁</span><span class="pill" style="background:var(--green-light);color:var(--green)">叶面：秀艳/美得乐</span></div></div>
       </div>
-      <div class="tl-item" style="--c:var(--green);--c-soft:var(--green-light)">
-        <div class="tl-time">播后 55–80 天</div>
-        <div class="tl-box"><strong>荚果充实期（叶面为主）</strong>
+      <div class="step" style="--c:var(--green);--c-soft:var(--green-light)">
+        <div class="dot">8</div>
+        <div class="card"><div class="st-time">播后 55–80 天</div><div class="st-title">荚果充实期（叶面为主）</div>
           <div class="acts"><span class="pill">叶面：秀艳/拜亩乐/金收</span><span class="pill">叶面：妥控/适大进 控旺</span><span class="pill">叶面：持续杀虫防病</span></div></div>
       </div>
-      <div class="tl-item" style="--c:var(--water);--c-soft:#dcecf6">
-        <div class="tl-time">荚果期（80% 封垄）</div>
-        <div class="tl-box"><strong>荚果期营养与防病（灌根）</strong>
+      <div class="step" style="--c:var(--water);--c-soft:#dcecf6">
+        <div class="dot">9</div>
+        <div class="card"><div class="st-time">荚果期（80% 封垄）</div><div class="st-title">荚果期营养与防病（灌根）</div>
           <div class="acts"><span class="pill">水溶肥 10-5-35</span><span class="pill">泰稳丰</span><span class="pill">苗乐乐 防白绢病</span><span class="pill">削线 防线虫</span></div></div>
       </div>
-      <div class="tl-item" style="--c:var(--water);--c-soft:#dcecf6">
-        <div class="tl-time">间隔 7–10 天 ×2</div>
-        <div class="tl-box"><strong>追肥巩固（灌根）</strong>
+      <div class="step" style="--c:var(--water);--c-soft:#dcecf6">
+        <div class="dot">10</div>
+        <div class="card"><div class="st-time">间隔 7–10 天 ×2</div><div class="st-title">追肥巩固（灌根）</div>
           <div class="acts"><span class="pill">水溶肥 10-5-35</span><span class="pill">根际香土</span><span class="pill">泰稳丰</span></div></div>
       </div>
-      <div class="tl-item" style="--c:var(--green);--c-soft:var(--green-light)">
-        <div class="tl-time">播后 100 天</div>
-        <div class="tl-box"><strong>收获前保叶增产（叶面）</strong>
+      <div class="step" style="--c:var(--green);--c-soft:var(--green-light)">
+        <div class="dot">11</div>
+        <div class="card"><div class="st-time">播后 100 天</div><div class="st-title">收获前保叶增产（叶面）</div>
           <div class="acts"><span class="pill">虫螨腈·虱螨脲</span><span class="pill">铜拳/锐动</span><span class="pill">金收/拜亩乐</span><span class="pill">美得乐/硼钼</span></div></div>
       </div>
     </div>
