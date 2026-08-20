@@ -1167,7 +1167,7 @@
     $("riskScore").textContent=d.riskScore;
     $("scoreStage").textContent="播后 "+growthDays+" 天 · "+meta.label;
     $("growthStage").textContent="当前生育期："+meta.label+"（"+meta.dayRange+"）";
-    $("growthDays").textContent="播后 "+growthDays+" 天";
+    $("growthDays").textContent="播后 "+growthDays+" 天 · "+shanghaiToday();
     $("growthTarget").textContent=meta.target;
 
     var kpis=[
@@ -1864,8 +1864,12 @@
     if(!active){ $('dec-result').innerHTML='<p>暂无数据</p>'; return; }
     var w=mapWeather(st?st.weather:null), t=mapTemp(st?st.weather:null), soil=mapSoil(st?st.soilMoisture:null);
 
+    var stageDay=days-active.dayMin+1, stageTotal=active.dayMax-active.dayMin+1;
+    var progressCard=gap?
+      '<div class="s"><b>过渡期</b><span>当前处于阶段间隙</span></div>':
+      '<div class="s"><b>第 '+stageDay+' / '+stageTotal+' 天</b><span>本阶段进度 · '+active.group+'</span></div>';
     var stat='<div class="dec-stat">'+
-      '<div class="s"><b>播种后第 '+days+' 天</b><span>当前日期 <small>'+today+'</small></span></div>'+
+      progressCard+
       '<div class="s"><b>'+active.group+'</b><span>当前阶段</span></div>'+
       '<div class="s"><b>'+(nextN?(nextN.dayMin-days)+' 天':'—')+'</b><span>'+(nextN?('下一节点：'+nextN.dayText):'全生育期已结束')+'</span></div>'+
     '</div>';
