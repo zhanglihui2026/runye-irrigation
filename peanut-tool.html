@@ -50,7 +50,7 @@
   .control-card h2:first-child{margin-top:0}
   .control-card label{display:block;font-size:13px;color:var(--ink-2);margin-bottom:12px}
   .control-card select,.control-card input.date-input{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:9px;font-size:14px;margin-top:5px;background:#fff;color:var(--ink)}
-  .growth-card{background:var(--g-50);border:1px solid var(--g-100);border-radius:12px;padding:12px;margin-bottom:12px}
+  .growth-card{background:var(--g-50);border:1px solid var(--g-100);border-radius:12px;padding:12px;margin-bottom:12px;display:none}
   .growth-card span{font-size:13px;color:var(--g-700);font-weight:600}
   .growth-card strong{display:block;font-size:13px;margin:4px 0}
   .growth-card p{margin:0;font-size:12px;color:var(--ink-2)}
@@ -285,6 +285,11 @@
   .dec-stat .s b{display:block;font-size:20px;font-weight:800;color:var(--ink);line-height:1.25;margin-bottom:4px}
   .dec-stat .s span{font-size:12px;color:var(--ink-2)}
   .dec-stat .s span small{display:block;font-size:11px;color:var(--ink-2);opacity:.8;margin-top:2px}
+  .dec-current-stage{background:var(--g-50);border:1px solid var(--g-100);border-radius:16px;padding:14px 16px;margin:0 0 12px;box-shadow:var(--shadow)}
+  .dec-current-stage .dcs-label{display:block;font-size:13px;font-weight:700;color:var(--g-700);margin-bottom:5px}
+  .dec-current-stage .dcs-days{display:block;font-size:20px;font-weight:800;color:var(--ink);line-height:1.25;margin-bottom:5px}
+  .dec-current-stage .dcs-target{margin:0;font-size:12px;color:var(--ink-2);line-height:1.55}
+  .dec-stat-2{grid-template-columns:repeat(2,1fr)}
   .dec-rec{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px}
   .dec-rec .rh{padding:12px 16px;background:var(--g-50);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;flex-wrap:wrap;cursor:pointer;transition:background .15s}
   .dec-rec .rh:hover{background:#e7f3e8}
@@ -303,7 +308,7 @@
   .dec-note b{display:block;margin-bottom:4px;color:#166534;font-weight:700}
   .dec-note ul,.dec-warn ul{margin:4px 0 0 18px;padding:0}
   .dec-note li,.dec-warn li{margin:4px 0;line-height:1.55}
-  @media(max-width:980px){ .dec-stat{grid-template-columns:1fr} }
+  @media(max-width:980px){ .dec-stat{grid-template-columns:1fr} .dec-stat-2{grid-template-columns:1fr} }
 
   /* 当前生育期决策 — 阶段用药用肥详情弹窗 */
   .qp-modal{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.45);padding:16px}
@@ -641,6 +646,7 @@
     pod:{label:"结荚膨大期",dayRange:"50-89 天",kc:0.96,baseFertKg:3.0,waterBand:"水肥敏感",target:"补钾钙、保荚果、控病害"},
     harvest:{label:"成熟收获期",dayRange:"90 天以上",kc:0.35,baseFertKg:0,waterBand:"控水降湿",target:"降湿防霉、抢晴采收（海南无霜冻，重点控湿防回潮）"}
   };
+  window.stageMeta = stageMeta;
 
   var stageEcBand = {
     seedling:{low:0.6,high:1.2},vegetative:{low:0.8,high:1.5},
@@ -678,6 +684,7 @@
     if(d<15) return "seedling"; if(d<30) return "vegetative";
     if(d<50) return "flowering"; if(d<90) return "pod"; return "harvest";
   }
+  window.stageFromDays = stageFromDays;
   function buildOpenMeteoUrl(loc){
     var p=new URLSearchParams({
       latitude:String(loc.lat),longitude:String(loc.lon),
@@ -1864,12 +1871,14 @@
     if(!active){ $('dec-result').innerHTML='<p>暂无数据</p>'; return; }
     var w=mapWeather(st?st.weather:null), t=mapTemp(st?st.weather:null), soil=mapSoil(st?st.soilMoisture:null);
 
-    var stageDay=days-active.dayMin+1, stageTotal=active.dayMax-active.dayMin+1;
-    var progressCard=gap?
-      '<div class="s"><b>过渡期</b><span>当前处于阶段间隙</span></div>':
-      '<div class="s"><b>第 '+stageDay+' / '+stageTotal+' 天</b><span>本阶段进度 · '+active.group+'</span></div>';
-    var stat='<div class="dec-stat">'+
-      progressCard+
+    var stageKey=window.stageFromDays?window.stageFromDays(days):'';
+    var meta=(window.stageMeta&&window.stageMeta[stageKey])||{label:'',dayRange:'',target:''};
+    var currentStageHtml='<div class="dec-current-stage">'+
+      '<span class="dcs-label">当前生育期：'+escapeHtml(meta.label)+'（'+escapeHtml(meta.dayRange)+'）</span>'+
+      '<strong class="dcs-days">播后 '+days+' 天 · '+today+'</strong>'+
+      '<p class="dcs-target">'+escapeHtml(meta.target)+'</p>'+
+    '</div>';
+    var stat='<div class="dec-stat dec-stat-2">'+
       '<div class="s"><b>'+active.group+'</b><span>当前阶段</span></div>'+
       '<div class="s"><b>'+(nextN?(nextN.dayMin-days)+' 天':'—')+'</b><span>'+(nextN?('下一节点：'+nextN.dayText):'全生育期已结束')+'</span></div>'+
     '</div>';
@@ -1893,7 +1902,7 @@
       '<span class="badge" style="color:#7c3aed;background:#f3e8ff">'+active.op+'</span>'+
     '</div>';
 
-    var html = stat + gapNote +
+    var html = currentStageHtml + stat + gapNote +
       '<div class="dec-rec">'+rh+'<div class="rb">'+
         '<h4>该用什么（药 / 肥 / 菌）</h4>'+
         '<div class="dec-cats">'+catsHtml+'</div>'+
