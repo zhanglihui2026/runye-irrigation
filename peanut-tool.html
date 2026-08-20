@@ -268,65 +268,39 @@
     #dailyLogHead{font-size:13px}
   }
   /* ===== 七彩花生植保方案 · 当前生育期决策 ===== */
-  .qicai-plan{background:#f3f1ea;padding:26px 0 30px;border-top:1px solid var(--s-100);}
+  .qicai-plan{background:transparent;padding:18px 0 22px;}
   .qicai-plan .wrap{max-width:1240px;margin:0 auto;padding:0;}
-  .qp-head{margin-bottom:16px;}
-  .qp-head h2{font-size:19px;color:var(--g-800);margin:0;}
-  .qp-head p{font-size:13px;color:var(--s-600);margin:4px 0 0;max-width:900px;line-height:1.55;}
-  .qp-body{display:flex;flex-direction:column;gap:14px;}
-  .qp-card{background:#fff;border:1px solid var(--s-200);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-sm);}
-  .qp-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
-  .qp-group{font-size:12px;color:var(--teal-700);font-weight:700;letter-spacing:.5px;}
-  .qp-card-head h3{font-size:17px;color:var(--g-800);margin:3px 0 0;}
-  .qp-meta{display:flex;gap:8px;flex-wrap:wrap;}
-  .qp-chip{font-size:12.5px;background:var(--g-50);color:var(--g-700);border:1px solid var(--g-200);border-radius:999px;padding:4px 12px;font-weight:600;white-space:nowrap;}
-  .qp-chip--count{background:#fff7ed;color:#c2410c;border-color:#fed7aa;}
-  .qp-section-title{font-size:13px;font-weight:700;color:var(--s-700);margin:6px 0 8px;padding-left:9px;border-left:3px solid var(--g-500);}
-  .qp-cat{display:flex;gap:10px;align-items:flex-start;padding:6px 0;border-bottom:1px dashed var(--s-100);}
-  .qp-cat:last-child{border-bottom:0;}
-  .qp-cat-label{flex:0 0 auto;font-size:12px;font-weight:700;color:#fff;border-radius:6px;padding:3px 9px;white-space:nowrap;}
-  .qp-cat-items{display:flex;flex-wrap:wrap;gap:6px;}
-  .qp-item{font-size:13px;background:var(--s-50);border:1px solid var(--s-200);border-radius:6px;padding:3px 9px;color:var(--s-800);}
-  .qp-tag--kill{background:#c0392b;}
-  .qp-tag--cure{background:#e67e22;}
-  .qp-tag--ctrl{background:#8e44ad;}
-  .qp-tag--nutri{background:#2b7bb0;}
-  .qp-tag--bio{background:#0d9488;}
-  .qp-tag--disinfect{background:#64748b;}
-  .qp-mix{margin-top:12px;font-size:13.5px;color:var(--s-700);background:#f8fafc;border:1px solid var(--s-200);border-radius:10px;padding:11px 13px;line-height:1.6;}
-  .qp-weather{background:#fff;border:1px solid var(--s-200);border-radius:var(--radius);padding:14px 18px;font-size:13.5px;color:var(--s-700);box-shadow:var(--shadow-sm);}
-  .qp-weather-recent{margin-top:6px;color:var(--s-600);}
-  .qp-muted{color:var(--s-400);}
-  .qp-caution{background:#fff;border:1px solid var(--s-200);border-radius:var(--radius);padding:14px 18px;box-shadow:var(--shadow-sm);}
-  .qp-caution ul{margin:0;padding-left:20px;}
-  .qp-caution li{font-size:13.5px;color:var(--s-700);margin:7px 0;line-height:1.6;}
-  .qp-next{font-size:13px;color:var(--teal-700);background:#ecfdf5;border:1px dashed var(--teal);border-radius:10px;padding:10px 14px;}
-  .qp-next--end{color:var(--s-600);background:#f8fafc;border-color:var(--s-200);}
-  @media(max-width:640px){ .qp-head{flex-direction:column;gap:8px;} }
+  .qp-head{margin-bottom:14px;}
+  .qp-head h2{font-size:15px;font-weight:700;color:var(--g-700);margin:0 0 6px;border-left:3px solid var(--g-700);padding-left:9px;}
+  .qp-head p{font-size:12px;color:var(--ink-2);margin:0;max-width:900px;line-height:1.55;}
+  .qp-body{display:flex;flex-direction:column;gap:12px;}
 
-  
-/* DECISION 当前生育期决策 */
+  /* DECISION 当前生育期决策 */
   .dec-params{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:16px}
   .dec-params label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:var(--muted)}
   .dec-params input,.dec-params select{padding:9px 10px;border:1px solid var(--line);border-radius:9px;font-size:14px;font-family:inherit;color:var(--text);background:#fff;width:100%}
-  .dec-stat{display:flex;flex-wrap:wrap;gap:14px;margin:6px 0 18px}
-  .dec-stat .s{flex:1;min-width:160px;background:var(--card);border-radius:12px;padding:16px 18px;box-shadow:var(--shadow);border-left:4px solid var(--green)}
-  .dec-stat .s b{display:block;font-size:22px;font-weight:900;color:var(--text);line-height:1.3}
-  .dec-stat .s span{font-size:12.5px;color:var(--muted)}
-  .dec-rec{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:22px;border-top:5px solid var(--water)}
-  .dec-rec .rh{padding:14px 20px;background:#dcecf6;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .dec-rec .rh .badge{font-size:12px;font-weight:700;padding:4px 12px;border-radius:20px;background:#fff;color:var(--water);white-space:nowrap}
-  .dec-rec .rb{padding:22px 24px}
-  .dec-rec .rb h4{font-size:15px;color:var(--green-dark);margin:2px 0 10px}
-  .dec-cats{display:flex;flex-wrap:wrap;gap:10px;margin:4px 0 16px}
-  .dec-chip{font-size:13px;padding:8px 12px;border-radius:10px;background:#f7f6f1;border:1px solid var(--line);min-width:150px}
-  .dec-chip b{display:block;margin-bottom:3px}
-  .dec-chip ul{margin:4px 0 0 16px}
-  .dec-warn{background:#fff7ed;border-left:4px solid #e67e22;padding:12px 16px;border-radius:8px;margin:10px 0;font-size:13.5px;color:#9a3412}
-  .dec-warn b{display:block;margin-bottom:5px;color:#9a3412}
-  .dec-note{background:#e8f5e9;border-left:4px solid var(--green);padding:12px 16px;border-radius:8px;margin:10px 0;font-size:13.5px;color:var(--green-dark)}
-  .dec-note b{display:block;margin-bottom:5px;color:var(--green-dark)}
-  .dec-note ul,.dec-warn ul{margin:4px 0 0 18px}
+  .dec-stat{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:0 0 14px}
+  .dec-stat .s{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px 16px;box-shadow:var(--shadow);}
+  .dec-stat .s b{display:block;font-size:20px;font-weight:800;color:var(--ink);line-height:1.25;margin-bottom:4px}
+  .dec-stat .s span{font-size:12px;color:var(--ink-2)}
+  .dec-stat .s span small{display:block;font-size:11px;color:var(--ink-2);opacity:.8;margin-top:2px}
+  .dec-rec{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px}
+  .dec-rec .rh{padding:12px 16px;background:var(--g-50);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .dec-rec .rh .badge{font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;background:#fff;color:var(--g-700);border:1px solid var(--g-200);white-space:nowrap}
+  .dec-rec .rb{padding:16px 18px}
+  .dec-rec .rb h4{font-size:13px;font-weight:700;color:var(--g-700);margin:0 0 12px}
+  .dec-cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin:0 0 14px}
+  .dec-chip{font-size:12px;padding:10px 12px;border-radius:12px;background:#f8fafc;border:1px solid var(--line)}
+  .dec-chip b{display:block;font-size:12px;font-weight:700;margin-bottom:5px}
+  .dec-chip ul{margin:0 0 0 16px;padding:0;color:var(--ink-2)}
+  .dec-chip li{margin:3px 0;line-height:1.5}
+  .dec-warn{background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:12px 14px;margin:0 0 10px;font-size:12.5px;color:#9a3412}
+  .dec-warn b{display:block;margin-bottom:4px;color:#9a3412;font-weight:700}
+  .dec-note{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:12px 14px;margin:0;font-size:12.5px;color:#166534}
+  .dec-note b{display:block;margin-bottom:4px;color:#166534;font-weight:700}
+  .dec-note ul,.dec-warn ul{margin:4px 0 0 18px;padding:0}
+  .dec-note li,.dec-warn li{margin:4px 0;line-height:1.55}
+  @media(max-width:980px){ .dec-stat{grid-template-columns:1fr} }
 </style>
 </head>
 <body>
@@ -2250,7 +2224,7 @@
 <script>
 (function(){
   var NODES=[{"group":"播种前·整地期","dayText":"播种前·土壤处理","dayMin":-60,"dayMax":-8,"op":"底肥/撒施","count":"1 项","cats":{"土壤消毒":["生石灰 50–80 kg/亩，调节土壤酸碱度、杀灭土传病菌与虫卵"]},"mix":"必须独立：与后续底肥间隔 ≥7 天，单独撒施；碱性强，勿与铵态氮/菌剂同施。","flags":["独立"]},{"group":"播种前·整地期","dayText":"整地期（生石灰后 ≥7 天）","dayMin":-7,"dayMax":-1,"op":"底肥/撒施","count":"底肥 3 项","cats":{"底肥菌剂":["腐熟有机肥 + 平衡型复合肥 + 精甲·嘧菌酯类杀菌剂，培肥地力、预防土传病害"]},"mix":"三者混匀同施；覆土 10–30 cm，严禁触根。","flags":[]},{"group":"苗期·叶面除草","dayText":"播后苗前（≤3 天）","dayMin":0,"dayMax":3,"op":"叶面喷雾","count":"封闭 2 项","cats":{"杂草防除":["封闭除草组合：防除一年生禾本科与阔叶杂草"]},"mix":"封闭除草组合同桶；（独立）不与杀虫/杀菌/营养混；墒情适中均匀喷。","flags":["独立"]},{"group":"苗期·叶面除草","dayText":"苗后","dayMin":4,"dayMax":14,"op":"叶面喷雾","count":"苗后 2 项","cats":{"杂草防除":["苗后茎叶除草：防除尖叶与阔叶杂草"]},"mix":"苗后除草同桶；（独立）避开高温；阔叶+尖叶兼顾。","flags":["独立"]},{"group":"播后15–40天·促根开花下针","dayText":"播后 15–20 天","dayMin":15,"dayMax":20,"op":"叶面＋灌根","count":"叶面 + 灌根","cats":{"虫害防治":["防治蚜虫、蓟马、红蜘蛛及鳞翅目幼虫（夜蛾类）"],"病害防治":["预防叶斑病、锈病、白绢病早期发生"],"生长调控":["第1次控旺：抑制茎叶徒长，促根系下扎与花芽分化"],"叶面营养":["补充磷钾及硼钼微量元素，促开花下针"],"灌根调理":["根际微生物菌剂 + 防线虫/地下害虫处理，护根促根"]},"mix":"叶面虫害防治+病害防治+生长调控+叶面营养同桶一次喷；灌根调理单独一桶。叶面与灌根分两次施。现配现用、二次稀释。","flags":[]},{"group":"播后15–40天·促根开花下针","dayText":"播后 25–30 天（50% 开花）","dayMin":25,"dayMax":30,"op":"叶面＋灌根","count":"叶面 + 灌根","cats":{"虫害防治":["防治蓟马、蚜虫、甜菜夜蛾、斜纹夜蛾、棉铃虫等花果期害虫"],"病害防治":["预防锈病、叶斑病、白绢病"],"生长调控":["第2次控旺：控制株高、防倒伏、促开花整齐"],"叶面营养":["磷钾+硼钼，保花保果、提高授粉率"],"灌根调理":["高磷促根下针 + 防线虫 + 根腐/白绢病预防 + 微生物菌剂"]},"mix":"叶面组合同桶喷施；灌根组合同桶施用。开花期避开中午高温。","flags":[]},{"group":"播后15–40天·促根开花下针","dayText":"播后 30–35 天","dayMin":31,"dayMax":35,"op":"灌根","count":"灌根 2 项","cats":{"灌根调理":["高磷水溶肥促下针 + 海藻提取物抗逆"]},"mix":"同桶；促下针、抗逆。","flags":[]},{"group":"播后15–40天·促根开花下针","dayText":"播后 35–40 天","dayMin":36,"dayMax":40,"op":"叶面＋灌根","count":"叶面 + 灌根","cats":{"虫害防治":["继续防治蚜虫、蓟马、夜蛾类及螨类"],"病害防治":["预防叶斑病、锈病、白绢病"],"生长调控":["第3次控旺：巩固株型，防止中后期徒长"],"叶面营养":["磷钾+硼钼，维持光合、保果促针"],"灌根调理":["高磷水溶肥 + 钙镁中量元素，防脐腐、促荚果膨大"]},"mix":"叶面组合同桶喷施；灌根组合同桶施用。","flags":[]},{"group":"荚果充实期·播后55–80天","dayText":"播后 55–60 天","dayMin":55,"dayMax":60,"op":"叶面","count":"叶面组合（偏多）","cats":{"虫害防治":["防治后期蚜虫、夜蛾类、螨类及地下害虫上树"],"病害防治":["防治叶斑病、锈病、白绢病、炭疽病"],"生长调控":["第4次控旺：抑制营养生长，促光合产物向荚果转运"],"叶面营养":["磷钾+硼钼+氨基酸/微量元素，防早衰、促荚果充实"]},"mix":"本节点用药偏多，建议分 2 桶：桶①虫害防治+叶面营养；桶②病害防治+生长调控。注意多个三唑类药剂叠加控旺 → 保留 1 种或减量。","flags":["偏多","三唑"]},{"group":"荚果充实期·播后55–80天","dayText":"播后 75–80 天","dayMin":75,"dayMax":80,"op":"叶面","count":"叶面组合（偏多）","cats":{"虫害防治":["防治蚜虫、夜蛾类、螨类"],"病害防治":["防治叶斑病、锈病、白绢病"],"生长调控":["第5次控旺（轻控）：防后期徒长、促成熟"],"叶面营养":["磷钾+硼钼+氨基酸，防早衰、促饱果"]},"mix":"偏多，建议分 2 桶：桶①虫害防治+叶面营养；桶②病害防治+生长调控。三唑类仅保留 1 个，控旺风险可控。","flags":["偏多"]},{"group":"荚果期·灌根为主","dayText":"荚果期（80% 封垄、鸡头状）","dayMin":81,"dayMax":89,"op":"灌根","count":"灌根 4 项","cats":{"底肥菌剂":["高钾水溶肥 + 钙镁中微量元素 + 微生物菌剂 + 防线虫/根腐处理，根果同护"]},"mix":"同桶；根果同护（营养＋防线虫＋防根腐/白绢）。","flags":[]},{"group":"荚果期·灌根为主","dayText":"间隔 7–10 天 ×2（巩固）","dayMin":90,"dayMax":99,"op":"灌根","count":"两轮灌根","cats":{"底肥菌剂":["高钾水溶肥 + 钙镁 + 微生物菌剂，巩固荚果饱满度（两轮间隔 7–10 天）"]},"mix":"同桶；巩固荚果饱满度。两轮间隔 7–10 天。","flags":[]},{"group":"收获前","dayText":"播后 100 天（收获前）","dayMin":100,"dayMax":9999,"op":"叶面","count":"叶面组合（偏多）","cats":{"虫害防治":["末期虫害防治，压低虫口基数"],"病害防治":["末期病害防治，防落叶、保叶功能"],"叶面营养":["磷钾+微量元素，防早衰、促成熟"]},"mix":"偏多，建议分 2 桶；收获前严格按各药标签安全间隔期停喷。病害防治组合同桶。","flags":["偏多"]}];
-  var CAT_COLOR={虫害防治:"#c0392b",病害防治:"#e67e22",生长调控:"#8e44ad",叶面营养:"#2b7bb0",底肥菌剂:"#2b7bb0",灌根调理:"#2b7bb0",土壤消毒:"#2b7bb0",杂草防除:"#c0392b"};
+  var CAT_COLOR={虫害防治:"var(--g-700)",病害防治:"var(--warn)",生长调控:"#7c3aed",叶面营养:"#2563eb",底肥菌剂:"#2563eb",灌根调理:"#2563eb",土壤消毒:"#2563eb",杂草防除:"var(--g-700)"};
 
   function $(id){ return document.getElementById(id); }
   function daysBetween(a,b){ return Math.round((b.getTime()-a.getTime())/86400000); }
@@ -2291,12 +2265,12 @@
     var w=$('dec-weather').value, t=parseFloat($('dec-temp').value)||25, soil=$('dec-soil').value;
 
     var stat='<div class="dec-stat">'+
-      '<div class="s"><b>播种后第 '+days+' 天</b><span>当前日期 '+today+'</span></div>'+
-      '<div class="s"><b style="font-size:18px">'+active.group+'</b><span>当前阶段</span></div>'+
-      '<div class="s"><b style="font-size:18px">'+(nextN?(nextN.dayMin-days)+' 天':'—')+'</b><span>'+(nextN?('下一节点：'+nextN.dayText):'全生育期已结束')+'</span></div>'+
+      '<div class="s"><b>播种后第 '+days+' 天</b><span>当前日期 <small>'+today+'</small></span></div>'+
+      '<div class="s"><b>'+active.group+'</b><span>当前阶段</span></div>'+
+      '<div class="s"><b>'+(nextN?(nextN.dayMin-days)+' 天':'—')+'</b><span>'+(nextN?('下一节点：'+nextN.dayText):'全生育期已结束')+'</span></div>'+
     '</div>';
 
-    var gapNote = gap ? '<p style="color:#9a3412;background:#fff7ed;border-left:4px solid #e67e22;padding:10px 14px;border-radius:8px;font-size:13.5px;margin:4px 0 16px">当前处于 <b>阶段过渡期（第 '+days+' 天，窗口间隙）</b>，暂无作业窗口；以下为 '+(nextN?('下一节点【'+nextN.dayText+'】的准备建议'):'最近节点的回顾')+'。</p>' : '';
+    var gapNote = gap ? '<div class="dec-warn" style="margin-bottom:12px"><b>阶段过渡期提醒</b>当前处于第 '+days+' 天（窗口间隙），暂无作业窗口；以下为 '+(nextN?('下一节点【'+nextN.dayText+'】的准备建议'):'最近节点的回顾')+'。</div>' : '';
 
     var catsHtml='';
     Object.keys(active.cats).forEach(function(k){
@@ -2306,20 +2280,20 @@
     });
 
     var mixHtml='<div class="dec-warn"><b>怎么混配</b>'+active.mix+'</div>';
+    var noteHtml='<div class="dec-note"><b>注意什么（结合近期天气）</b><ul>'+adv.map(function(x){ return '<li>'+x+'</li>'; }).join('')+'</ul></div>';
     var adv=weatherAdvice(w,t,soil,active);
-    var advHtml='<div class="dec-note"><b>注意什么（结合近期天气）</b><ul>'+adv.map(function(x){ return '<li>'+x+'</li>'; }).join('')+'</ul></div>';
 
     var rh='<div class="rh">'+
       '<span class="badge">'+active.dayText+'</span>'+
       '<span class="badge" style="color:var(--green);background:#e8f5e9">用 '+active.count+'</span>'+
-      '<span class="badge" style="color:#8e44ad;background:#f3e9f7">'+active.op+'</span>'+
+      '<span class="badge" style="color:#7c3aed;background:#f3e8ff">'+active.op+'</span>'+
     '</div>';
 
     var html = stat + gapNote +
       '<div class="dec-rec"><div class="rh">'+rh+'</div><div class="rb">'+
         '<h4>该用什么（药 / 肥 / 菌）</h4>'+
         '<div class="dec-cats">'+catsHtml+'</div>'+
-        mixHtml + advHtml +
+        mixHtml + noteHtml +
       '</div></div>';
 
     $('dec-result').innerHTML=html;
