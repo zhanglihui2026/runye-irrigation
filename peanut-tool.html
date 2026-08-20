@@ -285,7 +285,9 @@
   .dec-stat .s span{font-size:12px;color:var(--ink-2)}
   .dec-stat .s span small{display:block;font-size:11px;color:var(--ink-2);opacity:.8;margin-top:2px}
   .dec-rec{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px}
-  .dec-rec .rh{padding:12px 16px;background:var(--g-50);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .dec-rec .rh{padding:12px 16px;background:var(--g-50);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;flex-wrap:wrap;cursor:pointer;transition:background .15s}
+  .dec-rec .rh:hover{background:#e7f3e8}
+  .dec-rec .rh::after{content:"查看详情";margin-left:auto;font-size:11px;color:var(--g-700);background:#fff;border:1px solid var(--g-200);padding:3px 8px;border-radius:999px;white-space:nowrap}
   .dec-rec .rh .badge{font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;background:#fff;color:var(--g-700);border:1px solid var(--g-200);white-space:nowrap}
   .dec-rec .rb{padding:16px 18px}
   .dec-rec .rb h4{font-size:13px;font-weight:700;color:var(--g-700);margin:0 0 12px}
@@ -301,7 +303,23 @@
   .dec-note ul,.dec-warn ul{margin:4px 0 0 18px;padding:0}
   .dec-note li,.dec-warn li{margin:4px 0;line-height:1.55}
   @media(max-width:980px){ .dec-stat{grid-template-columns:1fr} }
+
+  /* 当前生育期决策 — 阶段用药用肥详情弹窗 */
+  .qp-modal{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.45);padding:16px}
+  .qp-modal.show{display:flex}
+  .qp-modal-box{background:#fff;border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.22);width:100%;max-width:720px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden}
+  .qp-modal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;background:var(--g-50);border-bottom:1px solid var(--line)}
+  .qp-modal-head h3{margin:0;font-size:15px;font-weight:700;color:var(--g-700)}
+  .qp-modal-head .close{width:32px;height:32px;border:none;background:#fff;border:1px solid var(--line);border-radius:50%;font-size:18px;color:var(--muted);cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center}
+  .qp-modal-head .close:hover{background:#f8fafc;color:#333}
+  .qp-modal-body{padding:18px 20px;overflow-y:auto;font-size:13px;line-height:1.7;color:var(--text)}
+  .qp-modal-body .qp-section{margin-bottom:16px}
+  .qp-modal-body .qp-section:last-child{margin-bottom:0}
+  .qp-modal-body .qp-section b{display:block;font-size:13px;font-weight:700;color:var(--g-700);margin-bottom:6px}
+  .qp-modal-body .qp-section p{margin:0;background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  @media(max-width:640px){ .qp-modal-box{border-radius:14px;max-height:92vh} .qp-modal-body{font-size:12.5px} }
 </style>
+<script src="qicai-huasheng/schedule-details.js"></script>
 </head>
 <body>
 <div class="ops-app">
@@ -1745,6 +1763,7 @@
   var CAT_COLOR={虫害防治:"var(--g-700)",病害防治:"var(--warn)",生长调控:"#7c3aed",叶面营养:"#2563eb",底肥菌剂:"#2563eb",灌根调理:"#2563eb",土壤消毒:"#2563eb",杂草防除:"var(--g-700)"};
 
   function $(id){ return document.getElementById(id); }
+  function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
   // —— 联动辅助：从水肥工具实时状态(window.__runyeState)推导 ——
   function todayISO(){ return new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Shanghai'}); }
   function daysSincePlant(sowText){
@@ -1830,14 +1849,14 @@
     var adv=weatherAdvice(w,t,soil,active);
     var noteHtml='<div class="dec-note"><b>注意什么（结合近期天气）</b><ul>'+adv.map(function(x){ return '<li>'+x+'</li>'; }).join('')+'</ul></div>';
 
-    var rh='<div class="rh">'+
+    var rh='<div class="rh" data-day-text="'+escapeHtml(active.dayText)+'" title="点击查看阶段用药用肥详情">'+
       '<span class="badge">'+active.dayText+'</span>'+
       '<span class="badge" style="color:var(--green);background:#e8f5e9">用 '+active.count+'</span>'+
       '<span class="badge" style="color:#7c3aed;background:#f3e8ff">'+active.op+'</span>'+
     '</div>';
 
     var html = stat + gapNote +
-      '<div class="dec-rec"><div class="rh">'+rh+'</div><div class="rb">'+
+      '<div class="dec-rec">'+rh+'<div class="rb">'+
         '<h4>该用什么（药 / 肥 / 菌）</h4>'+
         '<div class="dec-cats">'+catsHtml+'</div>'+
         mixHtml + noteHtml +
@@ -1846,9 +1865,33 @@
     $('dec-result').innerHTML=html;
   }
 
+  function closeQpModal(){
+    var m=$('qpModal'); if(!m) return;
+    m.classList.remove('show'); m.setAttribute('aria-hidden','true');
+  }
+  function openQpModal(dayText){
+    var detail=(window.QICAI_SCHEDULE_DETAILS||{})[dayText];
+    if(!detail){ console.warn('QICAI_SCHEDULE_DETAILS 缺少 '+dayText); return; }
+    $('qpModalTitle').textContent=dayText+' · 用药用肥详情';
+    $('qpModalList').innerHTML=detail.listHtml;
+    $('qpModalMix').innerHTML=detail.mixHtml;
+    var m=$('qpModal'); m.classList.add('show'); m.setAttribute('aria-hidden','false');
+  }
+
   function init(){
     render();                                         // 首次渲染（读水肥工具实时状态）
     window.addEventListener('runye-state-updated', render);  // 播期/天气变化时联动刷新
+
+    // 点击「当前生育期决策」顶部阶段条，弹出对应阶段用药用肥详情（引用按天操作历数据）
+    document.addEventListener('click', function(e){
+      var rh=e.target.closest('.rh');
+      if(!rh) return;
+      var dayText=rh.getAttribute('data-day-text');
+      if(dayText) openQpModal(dayText);
+    });
+    $('qpModalClose').addEventListener('click', closeQpModal);
+    $('qpModal').addEventListener('click', function(e){ if(e.target===this) closeQpModal(); });
+    document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeQpModal(); });
   }
   if(document.readyState!=='loading'){ init(); } else { document.addEventListener('DOMContentLoaded', init); }
 })();
@@ -1861,5 +1904,19 @@
     document.querySelectorAll('.nav-link-pill').forEach(function(e){ e.style.display='none'; });
   }
 </script>
+
+<!-- 当前生育期决策：阶段用药用肥详情弹窗 -->
+<div class="qp-modal" id="qpModal" aria-hidden="true">
+  <div class="qp-modal-box" role="dialog" aria-modal="true" aria-labelledby="qpModalTitle">
+    <div class="qp-modal-head">
+      <h3 id="qpModalTitle">阶段用药用肥详情</h3>
+      <button class="close" id="qpModalClose" aria-label="关闭">&times;</button>
+    </div>
+    <div class="qp-modal-body" id="qpModalBody">
+      <div class="qp-section"><b>搭配清单</b><p id="qpModalList">—</p></div>
+      <div class="qp-section"><b>混配方式 &amp; 关键提醒</b><p id="qpModalMix">—</p></div>
+    </div>
+  </div>
+</div>
 </body>
 </html>
