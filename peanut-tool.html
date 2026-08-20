@@ -268,7 +268,7 @@
     #dailyLogHead{font-size:13px}
   }
   /* ===== 七彩花生植保方案 · 当前生育期决策 ===== */
-  .qicai-plan{background:transparent;padding:18px 0 22px;}
+  .qicai-plan{background:#f3f1ea;padding:24px 0 26px;border-top:1px solid var(--line);}
   .qicai-plan .wrap{max-width:1240px;margin:0 auto;padding:0;}
   .qp-head{margin-bottom:14px;}
   .qp-head h2{font-size:15px;font-weight:700;color:var(--g-700);margin:0 0 6px;border-left:3px solid var(--g-700);padding-left:9px;}
@@ -2309,6 +2309,13 @@
   if(document.readyState!=='loading'){ init(); } else { document.addEventListener('DOMContentLoaded', init); }
 })();
 
+</script>
+<script>
+  // 被「数字农业」页以 iframe 嵌入时，隐藏顶部冗余导航 pill：
+  // 外层已有主导航，且「数字农业」pill 指向自身会造成循环跳转。
+  if(window.self!==window.top){
+    document.querySelectorAll('.nav-link-pill').forEach(function(e){ e.style.display='none'; });
+  }
 </script>
 </body>
 </html>
