@@ -1470,6 +1470,14 @@
     syncWeatherLog();
   }
   // 渲染地块图形看板
+  function escapeHtml(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function todayISO(){ return new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Shanghai'}); }
+  function daysSincePlant(sowText){
+    if(!sowText) return null;
+    var planted=new Date(sowText+"T00:00:00+08:00"); var now=new Date();
+    if(isNaN(planted.getTime())) return null;
+    return Math.max(0, Math.floor((now.getTime()-planted.getTime())/86400000));
+  }
   function renderPlotBoard(){
     var grid=$("plotBoardGrid"); if(!grid) return;
     var library=loadLibrary();
@@ -1487,8 +1495,8 @@
       var stageBlock='';
       if(hasDate){
         var pDays=daysSincePlant(p.plantingDate);
-        var pStageKey=(pDays!=null && window.stageFromDays)?window.stageFromDays(pDays):'';
-        var pMeta=(pStageKey && window.stageMeta)?window.stageMeta[pStageKey]:{label:'',dayRange:'',target:''};
+        var pStageKey=(pDays!=null)?stageFromDays(pDays):'';
+        var pMeta=(pStageKey && stageMeta)?stageMeta[pStageKey]:{label:'',dayRange:'',target:''};
         stageBlock='<div class="pc-stage">'
           +'<div class="pcs-label">当前生育期：'+escapeHtml(pMeta.label)+'（'+escapeHtml(pMeta.dayRange)+'）</div>'
           +'<div class="pcs-days">播后 '+pDays+' 天 · '+today+'</div>'
