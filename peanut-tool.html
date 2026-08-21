@@ -342,11 +342,18 @@
   .op-meta-v{font-size:12px;font-weight:700;color:var(--g-700);line-height:1.45;white-space:nowrap}
   .op-single-block{margin-bottom:12px}
   .op-single-block:last-child{margin-bottom:0}
-  .op-mix-note{margin-top:14px}
-  .op-mix-note .dec-warn,.op-mix-note .dec-note{margin-bottom:10px}
-  .op-mix-note .dec-warn:last-child,.op-mix-note .dec-note:last-child{margin-bottom:0}
+  .op-single-layout{display:grid;grid-template-columns:1.3fr 1fr;gap:16px;align-items:start}
+  .op-single-main,.op-single-side{min-width:0}
+  .op-side-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px 16px;box-shadow:var(--shadow)}
+  .op-side-section{margin-bottom:12px}
+  .op-side-section:last-child{margin-bottom:0}
+  .op-side-section b{display:block;font-size:12.5px;font-weight:700;color:var(--g-700);margin-bottom:6px;padding-left:9px;border-left:3px solid var(--green)}
+  .op-side-section span,.op-side-section ul{display:block;font-size:12.5px;line-height:1.68;color:var(--text);margin:0}
+  .op-side-section ul{margin-left:18px;padding:0}
+  .op-side-section li{margin:4px 0;line-height:1.55}
   .op-single-block b{display:block;font-size:12.5px;font-weight:700;color:var(--g-700);margin-bottom:7px;padding-left:9px;border-left:3px solid var(--green)}
   .op-single-block .op-list-text,.op-single-block .op-mix-text{display:block;font-size:12.5px;line-height:1.68;color:var(--text)}
+  @media(max-width:980px){ .op-single-layout{grid-template-columns:1fr} }
   @media(max-width:640px){ .op-single-meta{flex-direction:row} }
 </style>
 <script src="qicai-huasheng/schedule-details.js"></script>
@@ -1908,9 +1915,11 @@
       catsHtml+='<div class="dec-chip" style="border-left:4px solid '+color+'"><b style="color:'+color+'">'+k+'</b><ul>'+items+'</ul></div>';
     });
 
-    var mixHtml='<div class="dec-warn"><b>怎么混配</b>'+active.mix+'</div>';
     var adv=weatherAdvice(w,t,soil,active);
-    var noteHtml='<div class="dec-note"><b>注意什么（结合近期天气）</b><ul>'+adv.map(function(x){ return '<li>'+x+'</li>'; }).join('')+'</ul></div>';
+    var sideHtml='<div class="op-side-card">'+
+      '<div class="op-side-section"><b>怎么混配</b><span>'+active.mix+'</span></div>'+
+      '<div class="op-side-section"><b>注意什么（结合近期天气）</b><ul>'+adv.map(function(x){ return '<li>'+x+'</li>'; }).join('')+'</ul></div>'+
+    '</div>';
 
     var rh='<div class="rh" data-day-text="'+escapeHtml(active.dayText)+'" title="点击查看阶段用药用肥详情">'+
       '<span class="badge">'+active.dayText+'</span>'+
@@ -1925,11 +1934,11 @@
       '</div></div>';
 
     $('dec-result').innerHTML=html;
-    renderScheduleViewport(active.dayText, nextLine, mixHtml, noteHtml);
+    renderScheduleViewport(active.dayText, nextLine, sideHtml);
   }
 
   // 渲染「操作历视窗」：只显示当前生育阶段对应的那一条操作内容（窗口不滚动，内容自适应展开）
-  function renderScheduleViewport(activeDayText, nextLineHtml, mixHtml, noteHtml){
+  function renderScheduleViewport(activeDayText, nextLineHtml, sideHtml){
     var data=window.QICAI_SCHEDULE;
     var box=$('opViewportScroll');
     if(!box||!data) return;
@@ -1947,14 +1956,18 @@
       return;
     }
     var html='<div class="op-single">'+
-      '<div class="op-single-head">'+
-        '<span class="op-nd-badge">第 '+row.nd+' 次管理</span>'+
+      '<div class="op-single-layout">'+
+        '<div class="op-single-main">'+
+          '<div class="op-single-head">'+
+            '<span class="op-nd-badge">第 '+row.nd+' 次管理</span>'+
+          '</div>'+
+          '<div class="op-single-meta">'+
+            '<div class="op-meta-cell"><span class="op-meta-k">作业：</span><span class="op-meta-v">'+row.count+'</span></div>'+
+          '</div>'+
+          '<div class="op-single-block"><b>搭配清单（杀虫 · 杀菌 · 控旺 · 营养）</b><span class="op-list-text">'+row.list+'</span></div>'+
+        '</div>'+
+        '<div class="op-single-side">'+(sideHtml||'')+'</div>'+
       '</div>'+
-      '<div class="op-single-meta">'+
-        '<div class="op-meta-cell"><span class="op-meta-k">作业：</span><span class="op-meta-v">'+row.count+'</span></div>'+
-      '</div>'+
-      '<div class="op-mix-note">'+(mixHtml||'')+(noteHtml||'')+'</div>'+
-      '<div class="op-single-block"><b>搭配清单（杀虫 · 杀菌 · 控旺 · 营养）</b><span class="op-list-text">'+row.list+'</span></div>'+
     '</div>';
     box.innerHTML=html;
     if(tag) tag.innerHTML='当前阶段：第 '+row.nd+' 次管理'+(nextLineHtml?'<span class="op-cur-next">'+nextLineHtml+'</span>':'');
