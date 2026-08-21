@@ -1883,7 +1883,7 @@
       '<p class="dcs-target">'+escapeHtml(meta.target)+'</p>'+
     '</div>';
     var stat='<div class="dec-stat dec-stat-2">'+
-      '<div class="s"><b>'+active.group+'</b><span>当前阶段</span></div>'+
+      '<div class="s"><b>'+active.group.replace(/^播后\d+[–-]\d+天·/,'').replace(/·播后\d+[–-]\d+天$/,'')+'</b><span>当前阶段</span></div>'+
       '<div class="s"><b>'+(nextN?(nextN.dayMin-days)+' 天':'—')+'</b><span>'+(nextN?('下一节点：'+nextN.dayText):'全生育期已结束')+'</span></div>'+
     '</div>';
 
