@@ -342,6 +342,9 @@
   .op-meta-v{font-size:12px;font-weight:700;color:var(--g-700);line-height:1.45;white-space:nowrap}
   .op-single-block{margin-bottom:12px}
   .op-single-block:last-child{margin-bottom:0}
+  .op-mix-note{margin-top:14px}
+  .op-mix-note .dec-warn,.op-mix-note .dec-note{margin-bottom:10px}
+  .op-mix-note .dec-warn:last-child,.op-mix-note .dec-note:last-child{margin-bottom:0}
   .op-single-block b{display:block;font-size:12.5px;font-weight:700;color:var(--g-700);margin-bottom:7px;padding-left:9px;border-left:3px solid var(--green)}
   .op-single-block .op-list-text,.op-single-block .op-mix-text{display:block;font-size:12.5px;line-height:1.68;color:var(--text)}
   @media(max-width:640px){ .op-single-meta{flex-direction:row} }
@@ -1919,15 +1922,14 @@
       '<div class="dec-rec">'+rh+'<div class="rb">'+
         '<h4>该用什么（药 / 肥 / 菌）</h4>'+
         '<div class="dec-cats">'+catsHtml+'</div>'+
-        mixHtml + noteHtml +
       '</div></div>';
 
     $('dec-result').innerHTML=html;
-    renderScheduleViewport(active.dayText, nextLine);
+    renderScheduleViewport(active.dayText, nextLine, mixHtml, noteHtml);
   }
 
   // 渲染「操作历视窗」：只显示当前生育阶段对应的那一条操作内容（窗口不滚动，内容自适应展开）
-  function renderScheduleViewport(activeDayText, nextLineHtml){
+  function renderScheduleViewport(activeDayText, nextLineHtml, mixHtml, noteHtml){
     var data=window.QICAI_SCHEDULE;
     var box=$('opViewportScroll');
     if(!box||!data) return;
@@ -1951,8 +1953,8 @@
       '<div class="op-single-meta">'+
         '<div class="op-meta-cell"><span class="op-meta-k">作业：</span><span class="op-meta-v">'+row.count+'</span></div>'+
       '</div>'+
+      '<div class="op-mix-note">'+(mixHtml||'')+(noteHtml||'')+'</div>'+
       '<div class="op-single-block"><b>搭配清单（杀虫 · 杀菌 · 控旺 · 营养）</b><span class="op-list-text">'+row.list+'</span></div>'+
-      '<div class="op-single-block"><b>混配方式 &amp; 关键提醒</b><span class="op-mix-text">'+row.mix+'</span></div>'+
     '</div>';
     box.innerHTML=html;
     if(tag) tag.innerHTML='当前阶段：第 '+row.nd+' 次管理'+(nextLineHtml?'<span class="op-cur-next">'+nextLineHtml+'</span>':'');
