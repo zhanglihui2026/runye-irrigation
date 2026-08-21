@@ -136,6 +136,14 @@
   .ctrl-table{min-width:760px}
   .ctrl-table td:nth-child(1){white-space:nowrap;font-weight:800;color:var(--green-dark);text-align:center;width:62px}
   .ctrl-table td:nth-child(2){white-space:nowrap;font-weight:700;color:var(--water);text-align:center;width:92px}
+  /* 四遍 vs 五遍 对比表：文字与标题左对齐 */
+  .ctrl-table.compare{min-width:480px}
+  .ctrl-table.compare thead th,
+  .ctrl-table.compare tbody td{text-align:left;padding-left:20px;padding-right:16px}
+  .ctrl-table.compare td:nth-child(1),
+  .ctrl-table.compare td:nth-child(2){width:auto;white-space:normal;text-align:left}
+  .ctrl-table.compare td:nth-child(1){font-weight:800;color:var(--green-dark)}
+  .ctrl-table.compare td:nth-child(2){font-weight:400;color:var(--text)}
   .ctrl-table td:nth-child(4){white-space:nowrap;text-align:center;width:96px}
 
   /* NOTES */
@@ -693,7 +701,7 @@
     <div class="plan-block" style="--c:var(--gold);--c-soft:#fbf0db">
       <div class="plan-head"><h3>四遍方案 与 五遍方案 的核心区别</h3></div>
       <div class="tbl-scroll">
-        <table class="ctrl-table">
+        <table class="ctrl-table compare">
           <thead><tr><th>对比项</th><th>四遍方案</th><th>五遍方案</th></tr></thead>
           <tbody>
             <tr><td>苗期（播种后 20–25 天）</td><td>不打药，靠水肥管理控苗</td><td>调环酸钙微控 1 次</td></tr>
