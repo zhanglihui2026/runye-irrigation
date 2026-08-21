@@ -43,6 +43,7 @@
   .kpi span{display:block;font-size:12px;color:var(--ink-2);margin-bottom:6px}
   .kpi strong{font-size:18px;color:var(--ink)}
   .kpi em{font-size:12px;font-style:normal;color:var(--ink-2);margin-left:2px}
+  .kpi small{display:block;font-size:11px;color:var(--ink-2);margin-top:4px}
 
   .main-grid{display:grid;grid-template-columns:320px 1fr;gap:16px;align-items:start}
   .control-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:var(--shadow);position:sticky;top:14px}
@@ -209,6 +210,7 @@
   .score-card strong{font-size:30px}
   .kpi strong{font-size:16px}
   .kpi span{font-size:11px}
+  .kpi small{font-size:10px}
 
   /* 标题下正文容器统一 12px（继承，标题不在此列故不受影响） */
   .operation-card,
@@ -1176,13 +1178,13 @@
     $("growthTarget").textContent=meta.target;
 
     var kpis=[
-      {l:"今日用水/亩",v:d.waterPerMu,u:"m³"},{l:"今日总用水",v:d.waterTotal,u:"m³"},
-      {l:"今日用肥/亩",v:d.fertPerMu,u:"kg"},{l:"今日总用肥",v:d.fertTotal,u:"kg"},
+      {l:"今日用水/亩",v:d.waterPerMu,u:"m³",note:"按天气"},{l:"今日总用水",v:d.waterTotal,u:"m³",note:"按天气"},
+      {l:"今日用肥/亩",v:d.fertPerMu,u:"kg",note:"按植保方案"},{l:"今日总用肥",v:d.fertTotal,u:"kg",note:"按植保方案"},
       {l:"追肥EC估算",v:d.fertigationEc,u:"mS/cm"},{l:"底肥底盘评分",v:d.basal.score,u:"分"},
       {l:"作物耗水估算",v:d.etcMm,u:"mm"}
     ];
     $("kpiGrid").innerHTML=kpis.map(function(k){
-      return '<div class="kpi"><span>'+k.l+'</span><strong>'+k.v+'<em>'+k.u+'</em></strong></div>';
+      return '<div class="kpi"><span>'+k.l+'</span><strong>'+k.v+'<em>'+k.u+'</em></strong>'+(k.note?'<small>'+k.note+'</small>':'')+'</div>';
     }).join("");
 
     $("weatherLoc").textContent=loc.name+" · "+state.weather.date;
