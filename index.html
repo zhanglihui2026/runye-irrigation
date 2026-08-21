@@ -332,6 +332,14 @@ fieldset:focus-within .field-hint{border-left-color:var(--g-400)}
 .optimal-specs b{display:block;color:#86efac;font-weight:700;margin-top:3px;font-size:13px}
 .optimal-card>p{font-size:12px;color:rgba(255,255,255,.45);line-height:1.6}
 
+/* ===== Diameter Section (merged pipe sizing) ===== */
+.diameter-section{padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.08)}
+.diameter-section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.diameter-section-header span{font-size:12px;color:rgba(255,255,255,.5);font-weight:500}
+.diameter-section-header b{font-size:11px;color:#14532d;background:#86efac;padding:4px 12px;border-radius:20px;font-weight:700}
+.diameter-section .diameter-grid{padding:0;border-bottom:none}
+.diameter-section-note{font-size:12px;color:rgba(255,255,255,.45);line-height:1.6;margin-top:10px}
+
 /* ===== Pump Card (light green accent) ===== */
 .pump-card{
   padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.08);
@@ -1040,7 +1048,7 @@ legend{color:#53665b;letter-spacing:0}
     linear-gradient(165deg,#173f2d 0%,#102c23 62%,#0b1f1a 100%);
   box-shadow:0 18px 44px rgba(12,42,31,.22),0 0 0 1px rgba(255,255,255,.07) inset;
 }
-.result-heading,.area-strip,.optimal-card,.diameter-grid,.branch-compare,.result-list{
+.result-heading,.area-strip,.optimal-card,.diameter-section,.diameter-grid,.branch-compare,.result-list{
   border-bottom-color:rgba(255,255,255,.1);
 }
 .pump-card{
@@ -1371,6 +1379,7 @@ main,footer{position:relative;z-index:1}
 .result-heading .live-pill::before{background:#16a34a}
 .area-strip span,
 .optimal-top span,
+.diameter-section-header span,
 .optimal-title small,
 .branch-compare-title small,
 .result-list dt,
@@ -1379,12 +1388,14 @@ main,footer{position:relative;z-index:1}
 }
 .area-strip small,
 .optimal-card>p,
+.diameter-section-note,
 .diameter-grid small,
 .branch-option span,
 .branch-compare>p{
   color:rgba(255,255,255,.68);
 }
-.optimal-top b{
+.optimal-top b,
+.diameter-section-header b{
   color:#14532d;
   background:#dcfce7;
 }
@@ -2245,7 +2256,7 @@ legend{color:#53665b;letter-spacing:0}
     linear-gradient(165deg,#173f2d 0%,#102c23 62%,#0b1f1a 100%);
   box-shadow:0 18px 44px rgba(12,42,31,.22),0 0 0 1px rgba(255,255,255,.07) inset;
 }
-.result-heading,.area-strip,.optimal-card,.diameter-grid,.branch-compare,.result-list{
+.result-heading,.area-strip,.optimal-card,.diameter-section,.diameter-grid,.branch-compare,.result-list{
   border-bottom-color:rgba(255,255,255,.1);
 }
 .pump-card{
@@ -2576,6 +2587,7 @@ main,footer{position:relative;z-index:1}
 .result-heading .live-pill::before{background:#16a34a}
 .area-strip span,
 .optimal-top span,
+.diameter-section-header span,
 .optimal-title small,
 .branch-compare-title small,
 .result-list dt,
@@ -2584,12 +2596,14 @@ main,footer{position:relative;z-index:1}
 }
 .area-strip small,
 .optimal-card>p,
+.diameter-section-note,
 .diameter-grid small,
 .branch-option span,
 .branch-compare>p{
   color:rgba(255,255,255,.68);
 }
-.optimal-top b{
+.optimal-top b,
+.diameter-section-header b{
   color:#14532d;
   background:#dcfce7;
 }
@@ -4422,17 +4436,29 @@ function render() {
       <div><span>单区滴灌带</span><strong>${fmt0(r.tapesPerZone)} 条</strong></div>
       <small>按单区面积试算；1 亩 = 666.67 m²，实际地块在下方绘图区落图。</small>
     </div>
-    <div class="optimal-card">
-      <div class="optimal-top"><span>单区流量选型结果 · 推荐管径</span><b>经济流速法</b></div>
-      <div class="optimal-title">
-        <strong>主管 Ø ${r.mainPipe.od} mm · 每区 ${r.branchCount} 根支管 Ø ${r.branchPipe.od} mm</strong>
+    <div class="diameter-section">
+      <div class="diameter-section-header">
+        <span>单区流量选型结果 · 推荐管径</span>
+        <b>经济流速法</b>
       </div>
-      <div class="optimal-specs">
-        <span>目标流速<b>${fmt(r.targetV,2)} m/s</b></span>
-        <span>主管实际流速<b>${fmt(r.mainPipe.v,2)} m/s</b></span>
-        <span>支管实际流速<b>${fmt(r.branchPipe.v,2)} m/s</b></span>
+      <div class="diameter-grid">
+        <article>
+          <span class="metric-label">主管推荐规格</span>
+          <strong>Ø ${r.mainPipe.od} mm</strong>
+          <small>理论内径 ${fmt(r.mainPipe.id,1)} mm · 主管长 ${fmt(r.mainPipeLen,1)} m · 主管实际流速 ${fmt(r.mainPipe.v,2)} m/s · 损失 ${fmt(r.mainLoss,2)} m</small>
+        </article>
+        <article>
+          <span class="metric-label">单根支管推荐规格</span>
+          <strong>Ø ${r.branchPipe.od} mm</strong>
+          <small>每区 ${r.branchCount} 根 · 单根 ${fmt(r.branchLen,1)} m · ${fmt(r.branchFlow,2)} m³/h · 支管实际流速 ${fmt(r.branchPipe.v,2)} m/s · 损失 ${fmt(r.branchLoss,2)} m</small>
+        </article>
+        <article>
+          <span class="metric-label">轮灌流量依据</span>
+          <strong>${fmt0(r.tapesPerZone)} 条/区</strong>
+          <small>单区折算 ${fmt(r.zoneW,0)}×${fmt(r.zoneH,0)} m · 单区流量 ${fmt(r.zoneFlow,1)} m³/h · 目标流速 ${fmt(r.targetV,2)} m/s</small>
+        </article>
       </div>
-      <p>主管按单区流量选型；阀门后的支管按 2、3 或 4 根并联分流，选最接近目标流速的标准 PE 外径。</p>
+      <p class="diameter-section-note">主管按单区流量选型；阀门后的支管按 2、3 或 4 根并联分流，选最接近目标流速的标准 PE 外径。</p>
     </div>
     <div class="pump-card">
       <div class="pump-topline"><span>水泵建议工作点</span><span class="confidence">含 ${MARGIN_HEAD} m 富余及 ${SAFETY_FACTOR.toFixed(2)} 安全系数</span></div>
@@ -4444,23 +4470,6 @@ function render() {
       <div class="motor-row"><span>轴功率计算 / 建议电机</span><strong>${fmt(r.pumpPower,1)} / ${fmt0(r.motorKW_rounded)} kW</strong></div>
       <div class="motor-row"><span>滴灌带入口压力</span><strong>${fmt(r.tapePressure,2)} bar · ${fmt(r.tapePressureM,1)} m</strong></div>
       <div class="motor-row"><span>主管＋支管沿程损失</span><strong>${fmt(r.mainLoss + r.branchLoss,2)} m</strong></div>
-    </div>
-    <div class="diameter-grid">
-      <article>
-        <span class="metric-label">主管推荐规格</span>
-        <strong>Ø ${r.mainPipe.od} mm</strong>
-        <small>理论内径 ${fmt(r.mainPipe.id,1)} mm · 主管长 ${fmt(r.mainPipeLen,1)} m · 损失 ${fmt(r.mainLoss,2)} m</small>
-      </article>
-      <article>
-        <span class="metric-label">单根支管推荐规格</span>
-        <strong>Ø ${r.branchPipe.od} mm</strong>
-        <small>每区 ${r.branchCount} 根 · 单根 ${fmt(r.branchLen,1)} m · ${fmt(r.branchFlow,2)} m³/h · 损失 ${fmt(r.branchLoss,2)} m</small>
-      </article>
-      <article>
-        <span class="metric-label">轮灌流量依据</span>
-        <strong>${fmt0(r.tapesPerZone)} 条/区</strong>
-        <small>单区折算 ${fmt(r.zoneW,0)}×${fmt(r.zoneH,0)} m · 单区流量 ${fmt(r.zoneFlow,1)} m³/h</small>
-      </article>
     </div>
     <div class="branch-compare">
       <div class="branch-compare-title"><span>分区阀门后支管方案对比</span><small>点击方案即可采用</small></div>
