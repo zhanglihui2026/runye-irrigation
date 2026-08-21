@@ -166,7 +166,6 @@
   .plot-card svg.pc-svg{width:100%;height:auto;display:block}
   .plot-card .pc-meta{margin-top:8px;font-size:12px;color:var(--ink-2,#6b7280);line-height:1.6}
   .plot-card .pc-meta b{color:var(--ink,#111827);font-weight:600}
-  .plot-card .pc-foot{margin-top:6px;font-size:11px;color:#64748b}
   .plot-card .pc-stage{margin-top:8px;color:#64748b;line-height:1.6}
   .plot-card .pc-stage .pcs-label,
   .plot-card .pc-stage .pcs-days,
@@ -1512,7 +1511,6 @@
         +'<span class="pc-badge'+(hasDate?'':' muted')+'">'+(hasDate?'已设播期':'待设播期')+'</span></div>'
         +(svg?'<div class="pc-svg-wrap">'+svg+'</div>':'<div class="pc-svg-wrap"><div class="plot-board-empty">无图形数据</div></div>')
         +'<div class="pc-meta"><b>'+(p.mu!=null?p.mu.toFixed(2):'0')+' 亩</b> · '+(sqm!=null?sqm.toLocaleString('zh-CN')+' ㎡':'')+'</div>'
-        +'<div class="pc-foot">'+(hasDate?'播期 '+p.plantingDate:'未设置播期（暂不能采集该地块天气）')+'</div>'
         +stageBlock
         +'</div>';
     }).join('');
