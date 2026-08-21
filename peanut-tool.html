@@ -334,8 +334,6 @@
   .op-viewport-scroll{max-height:none;overflow:visible;padding:14px 16px}
   /* 视窗内单条「当前阶段」详情卡：窗口不滚动，内容自适应展开 */
   .op-single-empty{padding:28px 10px;text-align:center;color:var(--muted);font-size:13px;line-height:1.6}
-  .op-single-head{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
-  .op-nd-badge{font-size:12px;font-weight:800;color:#fff;background:var(--green);padding:5px 14px;border-radius:999px;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.12)}
   .op-single-meta{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap}
   .op-meta-cell{flex:0 1 auto;background:#f1f7f3;border:1px solid #d7e7dc;border-radius:12px;padding:10px 12px;display:flex;flex-direction:row;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
   .op-meta-k{font-size:14px;color:var(--g-700);font-weight:800;letter-spacing:.3px;white-space:nowrap}
@@ -1958,9 +1956,6 @@
     var html='<div class="op-single">'+
       '<div class="op-single-layout">'+
         '<div class="op-single-main">'+
-          '<div class="op-single-head">'+
-            '<span class="op-nd-badge">第 '+row.nd+' 次管理</span>'+
-          '</div>'+
           '<div class="op-single-meta">'+
             '<div class="op-meta-cell"><span class="op-meta-k">作业：</span><span class="op-meta-v">'+row.count+'</span></div>'+
           '</div>'+
