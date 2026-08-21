@@ -132,6 +132,12 @@
   #schedule table tbody td:nth-child(4){width:104px;min-width:104px;white-space:normal;text-align:center;vertical-align:middle;line-height:1.45;font-weight:600}
   .muted-cell{color:var(--muted)}
 
+  /* 控旺专篇 */
+  .ctrl-table{min-width:760px}
+  .ctrl-table td:nth-child(1){white-space:nowrap;font-weight:800;color:var(--green-dark);text-align:center;width:62px}
+  .ctrl-table td:nth-child(2){white-space:nowrap;font-weight:700;color:var(--water);text-align:center;width:92px}
+  .ctrl-table td:nth-child(4){white-space:nowrap;text-align:center;width:96px}
+
   /* NOTES */
   .notes{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
   .note{background:var(--card);border-radius:12px;padding:16px 18px;box-shadow:var(--shadow);
@@ -177,10 +183,12 @@
   <div class="wrap nav-inner">
     <div class="brand"><span class="dot"></span><span class="rainbow">七彩花生</span></div>
     <button class="nav-toggle" aria-label="菜单">☰</button>
+    <div class="nav-links" id="navLinks">
       <a href="#overview">方案总览</a>
       <a href="#schedule">生育期操作历</a>
       <a href="#plans">详细方案</a>
       <a href="#usage">用量汇总</a>
+      <a href="#control">控旺专篇</a>
       <a href="#notes">技术要点</a>
     </div>
   </div>
@@ -630,6 +638,100 @@
         <p>方案中的叶面喷雾与灌根作业建议结合墒情、天气与飞防助剂统一实施，确保药剂均匀、吸收充分，最大限度发挥七彩花生的品质潜力。</p>
       </div>
     </div>
+  </div>
+</section>
+
+<!-- 控旺专篇 -->
+<section id="control" style="background:#f3f1ea">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="k">DWARFING PLAN</span>
+      <h2>控旺专篇 · 少量多次、轻控勤控</h2>
+      <p>海南 9–10 月均温 27℃ 左右、高温高湿，营养生长极旺，常规 1–2 次控旺压不住。本专篇采用「<b>少量多次、轻控勤控</b>」策略，把全程株高控制在 <b>45–50 cm</b> 以内、绝不超 60 cm。以下一律以 <b>播种后天数</b> 为统一标尺（比绝对日期更准），实际喷施以株高达标为准，<b>看苗控旺、不盯死日期</b>。</p>
+    </div>
+
+    <!-- 五遍方案 -->
+    <div class="plan-block" style="--c:var(--green);--c-soft:var(--green-light)">
+      <div class="plan-head"><h3>五遍控旺方案（苗期微控 + 全程轻控勤控）</h3><span class="ph-cost">共 5 遍</span></div>
+      <div class="tbl-scroll">
+        <table class="ctrl-table">
+          <thead><tr><th>遍次</th><th>播种后天数</th><th>生育阶段</th><th>株高参考</th><th>核心目的</th><th>推荐药剂</th><th>用量建议</th></tr></thead>
+          <tbody>
+            <tr><td>第 1 遍</td><td>20–25 天</td><td>苗期（4–6 叶）</td><td>15–20 cm</td><td>苗后微控，促根壮苗，促侧枝分生</td><td>调环酸钙</td><td>常规量 1/2</td></tr>
+            <tr><td>第 2 遍</td><td>33–37 天</td><td>初花—盛花初期</td><td>25–30 cm</td><td>提前轻控，防高温徒长，促低位下针</td><td>调环酸钙 / 烯效唑</td><td>常规量 1/2~2/3</td></tr>
+            <tr><td>第 3 遍</td><td>45–50 天</td><td>盛花末期（大量果针入土）</td><td>30–35 cm</td><td><b>核心控旺</b>，控上促下，最关键一遍</td><td>烯效唑（或多效唑仅此次）</td><td>常规量 2/3~全量</td></tr>
+            <tr><td>第 4 遍</td><td>57–61 天</td><td>结荚初期</td><td>35–40 cm</td><td>巩固控效，防反弹</td><td>烯效唑 / 调环酸钙（轮换）</td><td>常规量 1/2</td></tr>
+            <tr><td>第 5 遍</td><td>68–74 天</td><td>结荚盛期—饱果初期</td><td>40–45 cm</td><td>最终控高防倒伏，促荚果饱满</td><td>调环酸钙</td><td>常规量 1/3~1/2</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="padding:12px 20px;color:var(--muted);font-size:12.5px;line-height:1.7">
+        适用：基肥偏多、沙壤土保肥差、苗期明显徒长的地块。第 5 遍为<b>可选</b>——若第 4 遍后株高已稳定在 40 cm 左右、长势平稳，可省去，避免过度控旺致早衰。
+      </p>
+    </div>
+
+    <!-- 四遍方案 -->
+    <div class="plan-block" style="--c:var(--water);--c-soft:#dcecf6">
+      <div class="plan-head"><h3>四遍控旺方案（苗期不打药，集中在旺长主线）</h3><span class="ph-cost">共 4 遍</span></div>
+      <div class="tbl-scroll">
+        <table class="ctrl-table">
+          <thead><tr><th>遍次</th><th>播种后天数</th><th>生育阶段</th><th>株高参考</th><th>核心目的</th><th>推荐药剂</th><th>用量建议</th></tr></thead>
+          <tbody>
+            <tr><td>第 1 遍</td><td>33–37 天</td><td>初花—盛花初期</td><td>25–30 cm</td><td>提前轻控，压高温徒长，促低位下针（预警控，非必控）</td><td>调环酸钙</td><td>常规量 1/2~2/3</td></tr>
+            <tr><td>第 2 遍</td><td>45–50 天</td><td>盛花末期（大量果针入土）</td><td>30–35 cm</td><td><b>核心控旺</b>，控上促下，最关键、不能省不能早</td><td>烯效唑（或多效唑仅此次）</td><td>常规量 2/3~全量</td></tr>
+            <tr><td>第 3 遍</td><td>57–61 天</td><td>结荚初期</td><td>35–40 cm</td><td>巩固控效，防株高反弹（株高不到 38 cm 可跳过）</td><td>烯效唑 / 调环酸钙（轮换）</td><td>常规量 1/2</td></tr>
+            <tr><td>第 4 遍</td><td>68–74 天</td><td>结荚盛期—饱果初期</td><td>40–45 cm</td><td>最终控高防倒伏，促荚果饱满（收尾控，用量最轻）</td><td>调环酸钙</td><td>常规量 1/3~1/2</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="padding:12px 20px;color:var(--muted);font-size:12.5px;line-height:1.7">
+        适用：基肥适中、苗期长势平稳的地块。<b>苗期不打药</b>，靠水肥管理控苗；四遍集中在播种后 33–74 天的旺长主线上，每遍间隔约 10–12 天。兜底原则：任何一遍打完 7–10 天复查，株高增速没降下来就提前打下一遍；长势弱、受旱、叶色发黄的遍次直接跳过。
+      </p>
+    </div>
+
+    <!-- 四遍 vs 五遍 区别 -->
+    <div class="plan-block" style="--c:var(--gold);--c-soft:#fbf0db">
+      <div class="plan-head"><h3>四遍方案 与 五遍方案 的核心区别</h3></div>
+      <div class="tbl-scroll">
+        <table class="ctrl-table">
+          <thead><tr><th>对比项</th><th>四遍方案</th><th>五遍方案</th></tr></thead>
+          <tbody>
+            <tr><td>苗期（播种后 20–25 天）</td><td>不打药，靠水肥管理控苗</td><td>调环酸钙微控 1 次</td></tr>
+            <tr><td>第 1 遍时间</td><td>初花期（播种后 33–37 天）</td><td>苗期（播种后 20–25 天）</td></tr>
+            <tr><td>控旺遍数</td><td>4 遍（集中在 33–74 天）</td><td>5 遍（20–74 天）</td></tr>
+            <tr><td>核心控旺位置</td><td>第 2 遍（盛花末期）</td><td>第 3 遍（盛花末期）</td></tr>
+            <tr><td>适用地块</td><td>基肥适中、苗期长势平稳</td><td>基肥偏多、沙壤土保肥差、苗期明显徒长</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 关键技术要点 -->
+    <div class="sec-head" style="margin-top:30px">
+      <h2 style="font-size:clamp(18px,2.6vw,22px)">控旺关键技术要点</h2>
+    </div>
+    <div class="notes">
+      <div class="note"><b>💊 药剂选择（多次控旺核心）</b><p><b>调环酸钙</b>：安全性最高，只控秧不控果、不早衰，适合苗期和后期多次用；<b>烯效唑</b>：控旺稳定、残留低，适合中期核心控旺；<b>多效唑</b>：每季最多 1 次，只放核心遍次且用量要轻；建议两药轮换，避免单一累积。</p></div>
+      <div class="note"><b>🌱 看苗控旺，不盯死日期</b><p>株高没到对应高度 → 推迟或跳过；株高提前超标 → 提前喷施；长势瘦弱、受旱、黄苗地块 → 不控。实际喷施以株高达标为准。</p></div>
+      <div class="note"><b>🕓 喷施操作规范</b><p>时间：下午 4 点后（避开高温减药害）；部位：对准顶部生长点和中上部茎叶，不喷地表根部；用水量 30–40 公斤/亩，加有机硅助剂提高附着；喷后 6 小时内遇雨需补喷，补喷用量减半。</p></div>
+      <div class="note"><b>💧 控旺与水肥配合</b><p>控旺前后结合叶面喷磷酸二氢钾（50 g/亩），促下针、促膨果；核心遍次可搭配硼肥提高结实率；避免控旺后立即大量追施氮肥，否则抵消控旺效果。</p></div>
+    </div>
+
+    <!-- 风险提示 -->
+    <div class="plan-block" style="--c:#c0392b;--c-soft:#fdecea;margin-top:24px">
+      <div class="plan-head"><h3>风险提示</h3></div>
+      <div class="tbl-scroll" style="padding:18px 22px">
+        <ul style="padding-left:20px;font-size:13px;color:var(--muted);line-height:1.9">
+          <li><b style="color:var(--text)">第 5 遍为可选</b>：若第 4 遍后株高已稳定在 40 cm 左右、长势平稳，可省去第 5 遍，避免过度控旺导致早衰。</li>
+          <li><b style="color:var(--text)">11 月后气温下降</b>：花生自然生长放缓，后期控旺力度要逐遍减轻。</li>
+          <li><b style="color:var(--text)">株高目标</b>：七彩花生株高天然在 35–45 cm 区间，目标收获株高 45–50 cm，<b>绝不超过 60 cm</b>。</li>
+        </ul>
+      </div>
+    </div>
+
+    <p style="text-align:center;color:var(--muted);font-size:12.5px;margin-top:16px">
+      说明：本专篇以相对时间（播种后天数）表述，实际日期请按当地播种日推算；多效唑按农药登记要求每季最多使用 1 次；具体用量与混配请严格按各产品标签、当地植保站指导与天气墒情执行。
+    </p>
   </div>
 </section>
 
