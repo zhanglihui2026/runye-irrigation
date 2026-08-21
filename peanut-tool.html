@@ -287,10 +287,6 @@
   .dec-params{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:16px}
   .dec-params label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:var(--muted)}
   .dec-params input,.dec-params select{padding:9px 10px;border:1px solid var(--line);border-radius:9px;font-size:14px;font-family:inherit;color:var(--text);background:#fff;width:100%}
-  .dec-current-stage{background:var(--g-50);border:1px solid var(--g-100);border-radius:16px;padding:14px 16px;margin:0 0 12px;box-shadow:var(--shadow)}
-  .dec-current-stage .dcs-label{display:block;font-size:13px;font-weight:700;color:var(--g-700);margin-bottom:5px}
-  .dec-current-stage .dcs-days{display:block;font-size:20px;font-weight:800;color:var(--ink);line-height:1.25;margin-bottom:5px}
-  .dec-current-stage .dcs-target{margin:0;font-size:12px;color:var(--ink-2);line-height:1.55}
   .dec-rec{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px}
   .dec-rec .rh{padding:12px 16px;background:var(--g-50);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;flex-wrap:wrap;cursor:pointer;transition:background .15s}
   .dec-rec .rh:hover{background:#e7f3e8}
@@ -417,7 +413,6 @@
 
   <section class="main-grid">
     <aside class="control-card">
-      <div id="growthSummary"></div>
       <h2>地块与生长参数</h2>
       <p class="plot-sync-note" id="plotSyncNote" style="display:none"></p>
       <label>种植区域
@@ -1882,7 +1877,7 @@
     var today=todayISO();
     var sow=st?st.plantingDate:null;
     var days=daysSincePlant(sow);
-    if(days===null){ $('growthSummary').innerHTML=''; $('dec-result').innerHTML='<p style="color:#9a3412">未设置播期，无法定位生育节点。</p>'; renderScheduleViewport(null); return; }
+    if(days===null){ $('dec-result').innerHTML='<p style="color:#9a3412">未设置播期，无法定位生育节点。</p>'; renderScheduleViewport(null); return; }
     var active=NODES.filter(function(n){ return days>=n.dayMin && days<=n.dayMax; })[0];
     var gap=false, prevN=null, nextN=null;
     if(!active){
@@ -1894,16 +1889,9 @@
     } else {
       nextN=NODES.filter(function(n){ return n.dayMin>days; })[0]||null;
     }
-    if(!active){ $('growthSummary').innerHTML=''; $('dec-result').innerHTML='<p>暂无数据</p>'; return; }
+    if(!active){ $('dec-result').innerHTML='<p>暂无数据</p>'; return; }
     var w=mapWeather(st?st.weather:null), t=mapTemp(st?st.weather:null), soil=mapSoil(st?st.soilMoisture:null);
 
-    var stageKey=window.stageFromDays?window.stageFromDays(days):'';
-    var meta=(window.stageMeta&&window.stageMeta[stageKey])||{label:'',dayRange:'',target:''};
-    var currentStageHtml='<div class="dec-current-stage">'+
-      '<span class="dcs-label">当前生育期：'+escapeHtml(meta.label)+'（'+escapeHtml(meta.dayRange)+'）</span>'+
-      '<strong class="dcs-days">播后 '+days+' 天 · '+today+'</strong>'+
-      '<p class="dcs-target">'+escapeHtml(meta.target)+'</p>'+
-    '</div>';
     var nextLine = nextN
       ? ('距下一节点 <b>'+(nextN.dayMin-days)+' 天</b> · 下一节点：'+nextN.dayText)
       : '全生育期已结束';
@@ -1934,7 +1922,6 @@
         mixHtml + noteHtml +
       '</div></div>';
 
-    $('growthSummary').innerHTML=currentStageHtml;
     $('dec-result').innerHTML=html;
     renderScheduleViewport(active.dayText, nextLine);
   }
