@@ -291,9 +291,12 @@
   .dec-current-stage .dcs-days{display:block;font-size:20px;font-weight:800;color:var(--ink);line-height:1.25;margin-bottom:5px}
   .dec-current-stage .dcs-target{margin:0;font-size:12px;color:var(--ink-2);line-height:1.55}
   .dec-stat-2{grid-template-columns:repeat(2,1fr)}
-  .decision-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:0 0 14px;align-items:stretch}
+  .decision-summary{display:grid;grid-template-columns:1.1fr 2fr;gap:16px;margin:0 0 14px;align-items:stretch}
   .decision-summary .dec-current-stage{margin:0;display:flex;flex-direction:column;justify-content:center}
-  .decision-summary .dec-stat{margin:0}
+  .decision-summary .combined-card{margin:0;display:flex;flex-direction:column;justify-content:center}
+  .decision-summary .combined-card .cs-label{display:block;font-size:12px;color:var(--ink-2);font-weight:600;margin-bottom:2px}
+  .decision-summary .combined-card .next-node-line{display:block;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);font-size:12px;color:var(--ink-2);line-height:1.5}
+  .decision-summary .combined-card .next-node-line b{color:var(--g-700);font-weight:800}
   .dec-rec{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px}
   .dec-rec .rh{padding:12px 16px;background:var(--g-50);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;flex-wrap:wrap;cursor:pointer;transition:background .15s}
   .dec-rec .rh:hover{background:#e7f3e8}
@@ -1882,9 +1885,19 @@
       '<strong class="dcs-days">播后 '+days+' 天 · '+today+'</strong>'+
       '<p class="dcs-target">'+escapeHtml(meta.target)+'</p>'+
     '</div>';
-    var stat='<div class="dec-stat dec-stat-2">'+
-      '<div class="s"><b>'+active.group.replace(/^播后\d+[–-]\d+天·/,'').replace(/·播后\d+[–-]\d+天$/,'')+'</b><span>当前阶段</span></div>'+
-      '<div class="s"><b>'+(nextN?(nextN.dayMin-days)+' 天':'—')+'</b><span>'+(nextN?('下一节点：'+nextN.dayText):'全生育期已结束')+'</span></div>'+
+    var ndText='';
+    if(window.QICAI_SCHEDULE){
+      var _row=window.QICAI_SCHEDULE.filter(function(r){ return r.type==='row' && r.dayText===active.dayText; })[0];
+      if(_row && _row.nd) ndText='第 '+_row.nd+' 次管理';
+    }
+    var stageName=active.group.replace(/^播后\d+[–-]\d+天·/,'').replace(/·播后\d+[–-]\d+天$/,'');
+    var nextLine = nextN
+      ? ('距下一节点 <b>'+(nextN.dayMin-days)+' 天</b> · 下一节点：'+nextN.dayText)
+      : '全生育期已结束';
+    var stat='<div class="s combined-card">'+
+      '<span class="cs-label">当前阶段</span>'+
+      '<b>'+(ndText||stageName)+'</b>'+
+      '<span class="next-node-line">'+nextLine+'</span>'+
     '</div>';
 
     var gapNote = gap ? '<div class="dec-warn" style="margin-bottom:12px"><b>阶段过渡期提醒</b>当前处于第 '+days+' 天（窗口间隙），暂无作业窗口；以下为 '+(nextN?('下一节点【'+nextN.dayText+'】的准备建议'):'最近节点的回顾')+'。</div>' : '';
