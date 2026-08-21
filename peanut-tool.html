@@ -291,7 +291,7 @@
   .dec-current-stage .dcs-days{display:block;font-size:20px;font-weight:800;color:var(--ink);line-height:1.25;margin-bottom:5px}
   .dec-current-stage .dcs-target{margin:0;font-size:12px;color:var(--ink-2);line-height:1.55}
   .dec-stat-2{grid-template-columns:repeat(2,1fr)}
-  .decision-summary{display:grid;grid-template-columns:1.1fr 2fr;gap:16px;margin:0 0 14px;align-items:stretch}
+  .decision-summary{display:grid;grid-template-columns:1fr;gap:16px;margin:0 0 14px;align-items:stretch}
   .decision-summary .dec-current-stage{margin:0;display:flex;flex-direction:column;justify-content:center}
   .decision-summary .combined-card{margin:0;display:flex;flex-direction:column;justify-content:center}
   .decision-summary .combined-card .cs-label{display:block;font-size:12px;color:var(--ink-2);font-weight:600;margin-bottom:2px}
@@ -424,6 +424,7 @@
 
   <section class="main-grid">
     <aside class="control-card">
+      <div id="growthSummary"></div>
       <h2>地块与生长参数</h2>
       <p class="plot-sync-note" id="plotSyncNote" style="display:none"></p>
       <label>种植区域
@@ -1865,7 +1866,7 @@
     var today=todayISO();
     var sow=st?st.plantingDate:null;
     var days=daysSincePlant(sow);
-    if(days===null){ $('dec-result').innerHTML='<p style="color:#9a3412">未设置播期，无法定位生育节点。</p>'; renderScheduleViewport(null); return; }
+    if(days===null){ $('growthSummary').innerHTML=''; $('dec-result').innerHTML='<p style="color:#9a3412">未设置播期，无法定位生育节点。</p>'; renderScheduleViewport(null); return; }
     var active=NODES.filter(function(n){ return days>=n.dayMin && days<=n.dayMax; })[0];
     var gap=false, prevN=null, nextN=null;
     if(!active){
@@ -1877,7 +1878,7 @@
     } else {
       nextN=NODES.filter(function(n){ return n.dayMin>days; })[0]||null;
     }
-    if(!active){ $('dec-result').innerHTML='<p>暂无数据</p>'; return; }
+    if(!active){ $('growthSummary').innerHTML=''; $('dec-result').innerHTML='<p>暂无数据</p>'; return; }
     var w=mapWeather(st?st.weather:null), t=mapTemp(st?st.weather:null), soil=mapSoil(st?st.soilMoisture:null);
 
     var stageKey=window.stageFromDays?window.stageFromDays(days):'';
@@ -1919,7 +1920,7 @@
       '<span class="badge" style="color:#7c3aed;background:#f3e8ff">'+active.op+'</span>'+
     '</div>';
 
-    var summaryHtml='<div class="decision-summary">'+currentStageHtml+stat+'</div>';
+    var summaryHtml='<div class="decision-summary">'+stat+'</div>';
     var html = summaryHtml + gapNote +
       '<div class="dec-rec">'+rh+'<div class="rb">'+
         '<h4>该用什么（药 / 肥 / 菌）</h4>'+
@@ -1927,6 +1928,7 @@
         mixHtml + noteHtml +
       '</div></div>';
 
+    $('growthSummary').innerHTML=currentStageHtml;
     $('dec-result').innerHTML=html;
     renderScheduleViewport(active.dayText, nextLine);
   }
