@@ -167,6 +167,12 @@
   .plot-card .pc-meta{margin-top:8px;font-size:12px;color:var(--ink-2,#6b7280);line-height:1.6}
   .plot-card .pc-meta b{color:var(--ink,#111827);font-weight:600}
   .plot-card .pc-foot{margin-top:6px;font-size:11px;color:#64748b}
+  .plot-card .pc-stage{margin-top:10px;padding:10px 12px;background:var(--g-50,#f0fdf4);border:1px solid var(--g-100,#dcfce7);border-radius:12px}
+  .plot-card .pc-stage .pcs-label{font-size:12px;font-weight:700;color:var(--g-700,#15803d);margin-bottom:3px}
+  .plot-card .pc-stage .pcs-days{font-size:15px;font-weight:800;color:var(--ink,#111827);line-height:1.25;margin-bottom:3px}
+  .plot-card .pc-stage .pcs-target{font-size:11px;color:var(--ink-2,#6b7280);line-height:1.5;margin-bottom:6px}
+  .plot-card .pc-stage .pcs-foot{font-size:11px;color:#64748b;border-top:1px dashed var(--g-100,#dcfce7);padding-top:6px}
+  .plot-card .pc-stage-empty{color:#64748b;background:#f8fafc;border-color:var(--line,#e5e7eb);text-align:center;font-size:12px;padding:14px 10px}
   .plot-board-empty{color:var(--ink-2,#6b7280);font-size:13px;padding:8px 2px;line-height:1.7}
   /* ===== 每日农事记事 ===== */
   .daily-log-card .daily-editor{margin:6px 0 14px;border:1px dashed #e3ddcf;border-radius:10px;padding:12px 14px;background:#fcfbf7}
@@ -1472,17 +1478,33 @@
       return;
     }
     var activeId=state.selectedPlotId||'';
+    var today=todayISO();
     grid.innerHTML=library.map(function(p){
       var poly=normPoly(p.poly);
       var svg=poly&&poly.length>=3?plotToSvg(poly):'';
       var hasDate=!!p.plantingDate;
       var sqm=p.sqm!=null?p.sqm:(p.mu!=null?Math.round(p.mu*666.67):null);
+      var stageBlock='';
+      if(hasDate){
+        var pDays=daysSincePlant(p.plantingDate);
+        var pStageKey=(pDays!=null && window.stageFromDays)?window.stageFromDays(pDays):'';
+        var pMeta=(pStageKey && window.stageMeta)?window.stageMeta[pStageKey]:{label:'',dayRange:'',target:''};
+        stageBlock='<div class="pc-stage">'
+          +'<div class="pcs-label">当前生育期：'+escapeHtml(pMeta.label)+'（'+escapeHtml(pMeta.dayRange)+'）</div>'
+          +'<div class="pcs-days">播后 '+pDays+' 天 · '+today+'</div>'
+          +'<div class="pcs-target">'+escapeHtml(pMeta.target)+'</div>'
+          +'<div class="pcs-foot">'+(p.locationName?('位置：'+escapeHtml(p.locationName)+' · '):'位置：未设置 · ')+'播期 '+p.plantingDate+'</div>'
+          +'</div>';
+      } else {
+        stageBlock='<div class="pc-stage pc-stage-empty">未设置播期，无法显示该地块生育期信息</div>';
+      }
       return '<div class="plot-card'+(p.id===activeId?' active':'')+'" data-id="'+escAttr(p.id)+'">'
         +'<div class="pc-top"><span class="pc-name">'+escAttr(p.name||'未命名地块')+'</span>'
         +'<span class="pc-badge'+(hasDate?'':' muted')+'">'+(hasDate?'已设播期':'待设播期')+'</span></div>'
         +(svg?'<div class="pc-svg-wrap">'+svg+'</div>':'<div class="pc-svg-wrap"><div class="plot-board-empty">无图形数据</div></div>')
         +'<div class="pc-meta"><b>'+(p.mu!=null?p.mu.toFixed(2):'0')+' 亩</b> · '+(sqm!=null?sqm.toLocaleString('zh-CN')+' ㎡':'')+'</div>'
         +'<div class="pc-foot">'+(hasDate?'播期 '+p.plantingDate:'未设置播期（暂不能采集该地块天气）')+'</div>'
+        +stageBlock
         +'</div>';
     }).join('');
     Array.prototype.forEach.call(grid.querySelectorAll('.plot-card'), function(el){
