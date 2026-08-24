@@ -10,6 +10,3 @@ Thumbs.db
 
 # 本地发布脚本（不发布）
 *.bat
-
-# 七彩花生种植方案：含密码门，仅本地保留，不发布到 GitHub Pages
-qicai-huasheng/
