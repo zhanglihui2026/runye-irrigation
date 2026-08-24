@@ -656,6 +656,8 @@ function priceBlock(name, it){
   return h;
 }
 function renderDailyData(d){
+  var panel=document.getElementById('dailyPanel');
+  if(!panel) return;
   var upd=document.getElementById('dailyUpdated');
   if(upd && d.updated_at){ upd.textContent='· 更新于 '+String(d.updated_at).replace('T',' ').slice(0,16); }
   var w=d.weather||{}, p=d.prices||{}, n=(d.news||[]), a=d.advice||{};
