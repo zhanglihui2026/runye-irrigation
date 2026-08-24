@@ -608,11 +608,17 @@ function statCard(label,value,unit){
 function loadDailyData(){
   var panel=document.getElementById('dailyPanel');
   if(!panel) return;
-  // 优先 fetch JSON（GitHub Pages / 本地服务器环境，始终取最新）
+  // 静态引入的 data/daily-data.js 在解析阶段已注入 window.RUNYE_DAILY_DATA，
+  // file:// / 本地服务器 / GitHub Pages 三种环境均可用，优先用。
+  if(window.RUNYE_DAILY_DATA){ renderDailyData(window.RUNYE_DAILY_DATA); return; }
+  // 若静态脚本未注入（如 GitHub Pages CDN 偶发缓存），再尝试 fetch
   fetch('data/daily.json?t='+Date.now(), {cache:'no-store'})
     .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
     .then(function(d){ renderDailyData(d); })
-    .catch(function(){ loadDailyViaScript(panel); }); // file:// 无 CORS 时回退到 JS 全局
+    .catch(function(e){
+      var upd=document.getElementById('dailyUpdated'); if(upd) upd.textContent='';
+      panel.innerHTML='<div class="wb-muted">未能加载每日数据（'+esc(e.message)+'）。请确认 data/daily-data.js 已下载到本地，或在 workbench.html 同目录。</div>';
+    });
 }
 function loadDailyViaScript(panel){
   var s=document.createElement('script');
@@ -1284,5 +1290,7 @@ if(document.readyState!=='loading'){
   router();
 }
 </script>
+<!-- 静态注入每日行情数据镜像，file:// 协议下也能立即加载（解析阶段注入 window.RUNYE_DAILY_DATA） -->
+<script src="data/daily-data.js"></script>
 </body>
 </html>
