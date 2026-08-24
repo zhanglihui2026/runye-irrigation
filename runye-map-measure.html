@@ -140,7 +140,7 @@
           <div class="nav-item"><a href="耐特菲姆滴灌带长度查询器.html" class="nav-link">滴灌带查询</a></div>
           <div class="nav-item"><a href="index.html#three-level-view" class="nav-link">三级系统</a></div>
           <div class="nav-item"><a href="qicai-huasheng/index.html" class="nav-link">种植方案</a></div>
-          <div class="nav-item"><a href="runye-landing.html" class="nav-link">关于我们</a></div>
+          <div class="nav-item"><a href="文献/花生钙营养管理_整理翻译.html" class="nav-link">文献查询</a></div>
         </nav>
         <a href="runye-landing.html" class="nav-home-btn">⌂ 返回主页</a>
         <div class="header-actions">
@@ -238,7 +238,7 @@
   // haversine 距离（米）
   function hav(a,b){
     var R=6378137, dLat=toRad(b.lat-a.lat), dLng=toRad(b.lng-a.lng);
-    var s=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLat/2)*Math.sin(dLat/2);
+    var s=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLng/2)*Math.sin(dLng/2);
     return 2*R*Math.asin(Math.sqrt(s));
   }
   function perimeter(pts){
