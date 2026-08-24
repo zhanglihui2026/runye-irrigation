@@ -598,15 +598,26 @@ function statCard(label,value,unit){
 function loadDailyData(){
   var panel=document.getElementById('dailyPanel');
   if(!panel) return;
+  // 优先 fetch JSON（GitHub Pages / 本地服务器环境，始终取最新）
   fetch('data/daily.json?t='+Date.now(), {cache:'no-store'})
     .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
     .then(function(d){ renderDailyData(d); })
-    .catch(function(e){
-      var upd=document.getElementById('dailyUpdated'); if(upd) upd.textContent='';
-      panel.innerHTML='<div class="wb-muted">未能加载每日数据（'+esc(e.message)+'）。'+
-        '该面板在部署到 GitHub Pages 后自动显示每日抓取的价格 / 气象 / 新闻 / 种植建议；'+
-        '本地预览请通过本地服务器打开，或先推送 data/daily.json。</div>';
-    });
+    .catch(function(){ loadDailyViaScript(panel); }); // file:// 无 CORS 时回退到 JS 全局
+}
+function loadDailyViaScript(panel){
+  var s=document.createElement('script');
+  s.src='data/daily-data.js?t='+Date.now();
+  s.onload=function(){
+    var d=window.RUNYE_DAILY_DATA;
+    if(d){ renderDailyData(d); } else { showDailyFallback(panel); }
+  };
+  s.onerror=function(){ showDailyFallback(panel); };
+  document.head.appendChild(s);
+}
+function showDailyFallback(panel){
+  var upd=document.getElementById('dailyUpdated'); if(upd) upd.textContent='';
+  panel.innerHTML='<div class="wb-muted">未能加载每日数据。请确保 workbench.html 同级存在 <b>data/</b> 目录'+
+    '（含 daily.json 与 daily-data.js）。直接双击打开 workbench.html 或部署到 GitHub Pages 均可自动显示。</div>';
 }
 function trendClass(t){ return /涨|升|高|增|上/i.test(t||'')?'up':(/跌|降|减|下|回落/i.test(t||'')?'down':''); }
 function renderDailyData(d){

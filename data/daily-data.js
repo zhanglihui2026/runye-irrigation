@@ -1,4 +1,5 @@
-{
+// 自动生成：window.RUNYE_DAILY_DATA —— 勿手改，由 fetch_daily.py 同步
+window.RUNYE_DAILY_DATA = {
   "updated_at": "2026-08-24T20:17:09+08:00",
   "schema_version": 1,
   "source": "github-actions",
@@ -37,4 +38,4 @@
       "date": "2026-08-24"
     }
   ]
-}
+};

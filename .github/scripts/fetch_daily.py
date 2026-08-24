@@ -137,7 +137,14 @@ def main():
     os.makedirs(os.path.dirname(DATA), exist_ok=True)
     with open(DATA, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=2)
-    print("[ok] wrote", DATA, "| weather:", bool(w), "| news:", len(out["news"]))
+    # 同步生成 JS 全局镜像（供 workbench.html 在 file:// 直接打开时读取）
+    js_path = os.path.join(os.path.dirname(DATA), "daily-data.js")
+    with open(js_path, "w", encoding="utf-8") as f:
+        f.write("// 自动生成：window.RUNYE_DAILY_DATA —— 勿手改，由 fetch_daily.py 同步\n")
+        f.write("window.RUNYE_DAILY_DATA = ")
+        f.write(json.dumps(out, ensure_ascii=False, indent=2))
+        f.write(";\n")
+    print("[ok] wrote", DATA, "+ daily-data.js | weather:", bool(w), "| news:", len(out["news"]))
 
 
 if __name__ == "__main__":
