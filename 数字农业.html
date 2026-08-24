@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>数字农业 · 七彩花生水肥决策｜润野灌溉</title>
+<title>水肥植保决策工具｜润野灌溉</title>
 <style>
   :root{
     --g-50:#f0fdf4;--g-100:#dcfce7;--g-200:#bbf7d0;--g-500:#22c55e;--g-600:#16a34a;--g-700:#15803d;--g-800:#166534;--g-900:#14532d;
@@ -63,30 +63,12 @@
   .ry-nav .main-nav .nav-item{flex:0 0 auto}
   .ry-nav .nav-link{padding:11px 15px;font-size:13px;border-bottom:none;border-right:1px solid var(--s-50);white-space:nowrap;}
   .ry-nav .nav-link::after{display:none}
-  /* 手机端：解除整页 100vh 锁定。frame-wrap 不再占满视窗，iframe 高度由 JS 按工具内容高度设定，
-     整页变为一条自然滚动流——顶部 info-bar 随滚动滚走，工具内容也可整体滚动，不再「锁定」。 */
-  body{height:auto;min-height:100vh;overflow-y:auto;}
-  .frame-wrap{flex:none;height:auto;min-height:auto;}
-  .frame-wrap iframe{height:100vh;} /* 加载前占位，JS 加载后按内容高度覆盖 */
-  .info-toggle{display:inline-flex;}
 }
 @media(max-width:480px){
   .ry-nav .header-inner{padding:0 12px}
   .ry-nav .brand{height:42px}
   .ry-nav .nav-link{padding:10px 12px;font-size:12px}
 }
-
-  .info-bar{background:#fff;border-bottom:1px solid var(--g-100);color:var(--s-700);font-size:13px;box-shadow:0 1px 0 rgba(15,23,42,.03);}
-  .info-inner{max-width:1280px;margin:0 auto;padding:10px 24px;box-sizing:border-box;display:grid;grid-template-columns:minmax(220px,1fr) auto;align-items:center;gap:14px;}
-  .info-main{min-width:0;}
-  .info-kicker{display:block;font-size:11px;font-weight:800;letter-spacing:.08em;color:var(--g-700);line-height:1.2;margin-bottom:2px;}
-  .info-bar .info-text{display:block;padding:0;line-height:1.45;flex:1 1 auto;color:var(--s-700);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .info-tags{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;}
-  .info-tag{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:999px;background:var(--g-50);border:1px solid var(--g-100);font-size:12px;color:var(--g-800);white-space:nowrap;}
-  .info-toggle{display:none;flex:none;align-self:flex-start;margin-top:1px;background:var(--g-700);color:#fff;border:0;border-radius:999px;padding:4px 12px;font-size:12px;cursor:pointer;white-space:nowrap;}
-  .info-bar.collapsed .info-main,.info-bar.collapsed .info-tags{display:none;}
-  .info-bar.collapsed .info-inner{display:flex;justify-content:flex-end;}
-  .info-bar code{background:#fff;border:1px solid var(--g-200);border-radius:6px;padding:1px 7px;font-size:12px;color:var(--g-800);}
 
   .frame-wrap{position:relative;width:100%;flex:1 1 auto;min-height:0;background:var(--s-50);}
   .frame-wrap iframe{width:100%;height:100%;border:0;display:block;}
@@ -98,16 +80,18 @@
   .fallback .step{background:var(--s-50);border:1px solid var(--s-200);border-radius:10px;padding:14px 18px;margin:10px 0;font-size:14px;color:var(--s-700);text-align:left;max-width:520px;}
   .fallback .step b{color:var(--g-700);}
 
-  @media(max-width:920px){
-    .info-bar{font-size:12px;}
-    .info-inner{grid-template-columns:1fr;align-items:flex-start;padding:10px 14px;gap:8px;}
-    .info-bar .info-text{white-space:normal;}
-    .info-tags{justify-content:flex-start;}
-  }
 </style>
   <link rel="stylesheet" href="runye-theme.css">
 </head>
 <body>
+<script>
+  (function(){
+    var mobile = /Mobi|Android|iPhone|iPad|iPod|Windows Phone|HarmonyOS/i.test(navigator.userAgent);
+    if(mobile && location.search.indexOf('forceFrame=1') === -1){
+      window.location.replace('peanut-tool.html?from=digital');
+    }
+  })();
+</script>
 
 <div class="ry-nav">
 <header class="main-header">
@@ -124,8 +108,8 @@
       <div class="nav-item"><a href="index.html" class="nav-link">精准灌溉</a></div>
       <div class="nav-item"><a href="耐特菲姆滴灌带长度查询器.html" class="nav-link">滴灌带查询</a></div>
       <div class="nav-item"><a href="index.html#three-level-view" class="nav-link">三级系统</a></div>
-      <div class="nav-item"><a href="qicai-huasheng/index.html" class="nav-link">种植方案</a></div>
-      <div class="nav-item"><a href="runye-landing.html" class="nav-link">关于我们</a></div>
+      <div class="nav-item"><a href="qicai-huasheng/index.html" class="nav-link">植保方案</a></div>
+      <div class="nav-item"><a href="文献/花生钙营养管理_整理翻译.html" class="nav-link">文献查询</a></div>
     </nav>
     <div class="header-actions">
       <button class="search-btn" title="搜索" aria-label="搜索">
@@ -140,28 +124,13 @@
 </header>
 </div>
 
-<div class="info-bar" id="infoBar">
-  <div class="info-inner">
-    <div class="info-main">
-      <span class="info-kicker">数字农业工作台</span>
-      <span class="info-text">七彩花生水肥决策、地块同步、天气采集与每日农事记事集中到同一工作区。</span>
-    </div>
-    <div class="info-tags" aria-label="页面能力">
-      <span class="info-tag">播期识别</span>
-      <span class="info-tag">天气累计</span>
-      <span class="info-tag">农事建议</span>
-    </div>
-    <button type="button" class="info-toggle" id="infoToggle" aria-expanded="true">收起 ▲</button>
-  </div>
-</div>
-
 <div class="frame-wrap">
-  <iframe id="peanutFrame" src="peanut-tool.html" title="七彩花生水肥决策" loading="eager"></iframe>
+  <iframe id="peanutFrame" src="peanut-tool.html?from=digital" title="七彩花生水肥与植保决策" loading="eager"></iframe>
   <div class="fallback" id="fallback">
     <h2>工具内容未加载</h2>
-    <p>「七彩花生水肥决策」页面未能显示，通常是 <code>peanut-tool.html</code> 未一并上传所致。</p>
-    <div class="step">
-      <b>解决：</b>确认 <code>peanut-tool.html</code> 已与 <code>数字农业.html</code> 放在同一目录；<br>
+    <p id="fallbackText">「七彩花生水肥与植保决策」页面未能完成初始化。</p>
+    <div class="step" id="fallbackStep">
+      <b>排查：</b>确认 <code>peanut-tool.html</code> 与 <code>qicai-huasheng/schedule-core.js</code> 均已上传；<br>
       或点击下方按钮刷新本页。
     </div>
     <p><button class="nav-home-btn" onclick="location.reload()">↻ 刷新本页</button></p>
@@ -169,78 +138,60 @@
 </div>
 
 <script>
-  // 探测内嵌工具是否加载；加载失败（如文件缺失）则显示兜底提示
+  // 桌面端 iframe 健康检查：只做后台兜底，不渲染任何工具状态条。
   (function () {
-    var shown = false, loaded = false;
-    function showFallback(){ if(!shown){ shown = true; document.getElementById('fallback').classList.add('show'); } }
     var frame = document.getElementById('peanutFrame');
-    frame.addEventListener('load', function(){ loaded = true; });
-    // 给页面一点加载时间，若 iframe 始终空白则提示
+    var fallback = document.getElementById('fallback');
+    var fallbackText = document.getElementById('fallbackText');
+    var fallbackStep = document.getElementById('fallbackStep');
+    if(!frame) return;
+
+    var loaded = false;
+    var ready = false;
+
+    function showFallback(title, detail){
+      if(fallbackText && detail) fallbackText.textContent = detail;
+      if(fallbackStep && title) fallbackStep.innerHTML = '<b>排查：</b>' + title;
+      if(fallback) fallback.classList.add('show');
+    }
+    function hideFallback(){ if(fallback) fallback.classList.remove('show'); }
+    function requestPing(){
+      try{ frame.contentWindow.postMessage({source:'runye-digital', type:'ping'}, '*'); }catch(e){}
+    }
+
+    frame.addEventListener('load', function(){
+      loaded = true;
+      requestPing();
+      setTimeout(requestPing, 600);
+    });
+
+    window.addEventListener('message', function(event){
+      if(event.source !== frame.contentWindow) return;
+      var data = event.data || {};
+      if(data.source !== 'runye-peanut-tool') return;
+      if(data.type === 'ready'){
+        ready = true;
+        hideFallback();
+      }
+      if(data.type === 'error'){
+        showFallback('子页面脚本异常：' + (data.message || '未知错误'), '工具页已经打开，但内部脚本运行异常。');
+      }
+    });
+
     setTimeout(function(){
+      if(ready) return;
       try {
         var doc = frame.contentDocument || frame.contentWindow.document;
-        var has = doc && doc.body && doc.body.children.length > 0;
-        if (!loaded && !has) showFallback();
-      } catch (e) {
-        // 跨域或异常时不打扰，依赖 loaded 状态
-        if (!loaded) showFallback();
-      }
-    }, 5000);
-  })();
-</script>
-<script>
-  // 手机端：提示条「收起 / 展开」切换，避免工具 iframe 在手机上吞掉滚动导致提示常驻顶部
-  (function(){
-    var btn = document.getElementById('infoToggle');
-    var bar = document.getElementById('infoBar');
-    if(!btn || !bar) return;
-    btn.addEventListener('click', function(){
-      var collapsed = bar.classList.toggle('collapsed');
-      btn.setAttribute('aria-expanded', String(!collapsed));
-      btn.textContent = collapsed ? '展开 ▼' : '收起 ▲';
-    });
-  })();
-</script>
-<script>
-  // 手机端：让内嵌工具 iframe 高度 = 其文档内容高度，整页自然滚动（不再被 iframe 吞滚动而常驻）。
-  // 注意：字号层级已在 peanut-tool.html 内自包含处理，父页不再注入任何样式。
-  (function(){
-    var frame = document.getElementById('peanutFrame');
-    if(!frame) return;
-    var mq = window.matchMedia('(max-width:768px)');
-    function fit(){
-      if(!mq.matches){ frame.style.height=''; return; } // 桌面端：交回 100% 内部滚动
-      try{
-        var doc = frame.contentDocument || (frame.contentWindow && frame.contentWindow.document);
-        if(!doc || !doc.body) { frame.style.height='100vh'; return; }
-        var h = Math.max(doc.documentElement.scrollHeight, doc.body.scrollHeight, 480);
-        frame.style.height = h + 'px';
-      }catch(e){ frame.style.height='100vh'; }
-    }
-    frame.addEventListener('load', function(){
-      fit();
-      // 工具内容动态变化（展开/收起分区、天气加载）时实时重算高度
-      try{
-        var doc = frame.contentDocument;
-        if(doc && doc.body && 'ResizeObserver' in window){
-          new ResizeObserver(fit).observe(doc.body);
+        var hasBody = doc && doc.body && doc.body.children.length > 0;
+        if(!loaded && !hasBody){
+          showFallback('确认 peanut-tool.html 与数字农业.html 位于同一目录。', '「七彩花生水肥与植保决策」页面未能显示。');
         }
-      }catch(e){}
-      setInterval(fit, 1000); // 兜底：兼容个别浏览器 ResizeObserver 不触发的情况
-    });
-    window.addEventListener('resize', fit);
-  })();
-</script>
-
-<script>
-  // 根治手机端 iframe 显示问题：iOS Safari / 微信 WebView 中，iframe 内部页面被固定按 980px 视口渲染后
-  // 再等比缩放到手机宽度，导致整页被压成约 1/3、字号极小、横向显示不全。
-  // 解决方案：移动端不经 iframe，直接打开工具页（peanut-tool.html 自带 viewport=device-width，真机视口正确）。
-  // 桌面端仍用 iframe 嵌套，不受影响。
-  (function(){
-    if(/Mobi|Android|iPhone|iPad|iPod|Windows Phone|HarmonyOS/i.test(navigator.userAgent)){
-      window.location.replace('peanut-tool.html');
-    }
+      } catch (e) {
+        if(!loaded){
+          showFallback('浏览器阻止访问 iframe 内容，请直接打开工具页。', '「七彩花生水肥与植保决策」页面未能显示。');
+        }
+      }
+    }, 7000);
   })();
 </script>
 
