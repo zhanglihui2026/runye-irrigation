@@ -675,6 +675,8 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
   flex-direction:column;
   height:680px;
   border:1px solid var(--s-200);
+  /* 顶部 .ry-nav 为 sticky 吸顶（桌面高72px），跳转落点需下移避开，避免标题/上传按钮被遮挡 */
+  scroll-margin-top:88px;
 }
 #areaTool .at-topbar{
   background:linear-gradient(135deg,var(--g-800) 0%,var(--g-700) 100%);
@@ -1880,6 +1882,8 @@ main,footer{position:relative;z-index:1}
   flex-direction:column;
   height:680px;
   border:1px solid var(--s-200);
+  /* 顶部 .ry-nav 为 sticky 吸顶（桌面高72px），跳转落点需下移避开，避免标题/上传按钮被遮挡 */
+  scroll-margin-top:88px;
 }
 #areaTool .at-topbar{
   background:linear-gradient(135deg,var(--g-800) 0%,var(--g-700) 100%);
@@ -3087,7 +3091,7 @@ input[type="reset"],
         <div class="nav-item"><a href="耐特菲姆滴灌带长度查询器.html" class="nav-link">滴灌带查询</a></div>
         <div class="nav-item"><a href="index.html#three-level-view" class="nav-link">三级系统</a></div>
         <div class="nav-item"><a href="qicai-huasheng/index.html" class="nav-link">种植方案</a></div>
-        <div class="nav-item"><a href="runye-landing.html" class="nav-link">关于我们</a></div>
+        <div class="nav-item"><a href="文献/花生钙营养管理_整理翻译.html" class="nav-link">文献查询</a></div>
       </nav>
       <a href="runye-landing.html" class="nav-home-btn">⌂ 返回主页</a>
       <div class="header-actions">
@@ -3923,7 +3927,7 @@ function doIrrImport(text){
           <div class="nav-item"><a href="耐特菲姆滴灌带长度查询器.html" class="nav-link">滴灌带查询</a></div>
           <div class="nav-item"><a href="index.html#three-level-view" class="nav-link active">三级系统</a></div>
           <div class="nav-item"><a href="qicai-huasheng/index.html" class="nav-link">种植方案</a></div>
-          <div class="nav-item"><a href="runye-landing.html" class="nav-link">关于我们</a></div>
+          <div class="nav-item"><a href="文献/花生钙营养管理_整理翻译.html" class="nav-link">文献查询</a></div>
         </nav>
         <a href="runye-landing.html" class="nav-home-btn">⌂ 返回主页</a>
         <div class="header-actions">
@@ -4208,10 +4212,27 @@ function pipeStatusClass(v, isRecommended) {
   return 'outside';
 }
 
+function readNumber(id, fallback, options = {}) {
+  const el = document.getElementById(id);
+  const raw = el ? String(el.value).trim() : '';
+  let value = raw === '' ? fallback : Number(raw);
+  if (!Number.isFinite(value)) value = fallback;
+  if (options.integer) value = Math.round(value);
+  if (options.min != null && value < options.min) value = options.min;
+  if (options.max != null && value > options.max) value = options.max;
+  return value;
+}
+
+function readSelectedInt(selector, fallback) {
+  const el = document.querySelector(selector);
+  const value = parseInt(el && el.dataset ? el.dataset.n || el.dataset.sides : '', 10);
+  return Number.isFinite(value) ? value : fallback;
+}
+
 // ===== COMPUTE =====
 function compute() {
-  const zoneMuInput = +document.getElementById('fld_zoneMu').value || 30;
-  const fixedSideInput = +document.getElementById('fld_zoneFixedSide').value || MAX_ZONE_SIDE;
+  const zoneMuInput = readNumber('fld_zoneMu', 30, { min: 0.1 });
+  const fixedSideInput = readNumber('fld_zoneFixedSide', MAX_ZONE_SIDE, { min: 1 });
   const fixedSide = Math.min(MAX_ZONE_SIDE, Math.max(1, fixedSideInput));
   document.getElementById('fld_zoneFixedSide').value = fixedSide;
   const maxZoneAreaM2 = fixedSide * MAX_ZONE_SIDE;
@@ -4224,25 +4245,25 @@ function compute() {
   document.getElementById('fld_A').value = Math.round(A);
   document.getElementById('fld_B').value = Math.round(B);
   document.getElementById('fld_N').value = 1;
-  const dh = +document.getElementById('fld_dh').value || 8;
+  const dh = readNumber('fld_dh', 8);
   const zoneLayout = {cols:1,rows:1,N:1,zoneW:A,zoneH:B,zoneArea:zoneAreaM2,drawZoneW:A,drawZoneH:B};
   const N = 1;
-  const tapeLen = +document.getElementById('fld_tapeLen').value || 100;
-  const tapeSpacing = +document.getElementById('fld_tapeSpacing').value || 1.2;
-  const tapeDh = +document.getElementById('fld_tapeDh').value || 1;
-  const emitterSpacing = +document.getElementById('fld_emitterSpacing').value || 0.3;
-  const emitterFlow = +document.getElementById('fld_emitterFlow').value || 2;
-  const tapeOD = +document.getElementById('fld_tapeOD').value || 16;
-  const tapePressure = +document.getElementById('fld_tapePressure').value || 1;
-  const lift = +document.getElementById('fld_lift').value || 15;
-  const existPressure = +document.getElementById('fld_existPressure').value || 0;
-  const targetV = +document.getElementById('fld_targetV').value || 1.5;
-  const filterLoss = +document.getElementById('fld_filterLoss').value || 5;
-  const efficiency = (+document.getElementById('fld_efficiency').value || 65) / 100;
-  const branchCount = parseInt(document.querySelector('#branchGroup .selected')?.dataset?.n || 2);
-  const layoutSides = parseInt(document.querySelector('#layoutGroup .selected')?.dataset?.sides || 1);
-  const mainPipeLen = +document.getElementById('fld_mainPipeLen').value || A;
-  const tapeRollLen = +document.getElementById('fld_tapeRollLen').value || 2000;
+  const tapeLen = readNumber('fld_tapeLen', 100, { min: 0.01 });
+  const tapeSpacing = readNumber('fld_tapeSpacing', 1.2, { min: 0.01 });
+  const tapeDh = readNumber('fld_tapeDh', 1);
+  const emitterSpacing = readNumber('fld_emitterSpacing', 0.3, { min: 0.01 });
+  const emitterFlow = readNumber('fld_emitterFlow', 2, { min: 0 });
+  const tapeOD = readNumber('fld_tapeOD', 16, { min: 0.01 });
+  const tapePressure = readNumber('fld_tapePressure', 1, { min: 0 });
+  const lift = readNumber('fld_lift', 15);
+  const existPressure = readNumber('fld_existPressure', 0, { min: 0 });
+  const targetV = readNumber('fld_targetV', 1.5, { min: 0.01 });
+  const filterLoss = readNumber('fld_filterLoss', 5, { min: 0 });
+  const efficiency = readNumber('fld_efficiency', 65, { min: 1, max: 100 }) / 100;
+  const branchCount = readSelectedInt('#branchGroup .selected', 2);
+  const layoutSides = readSelectedInt('#layoutGroup .selected', 1);
+  const mainPipeLen = readNumber('fld_mainPipeLen', A, { min: 0 });
+  const tapeRollLen = readNumber('fld_tapeRollLen', 2000, { min: 0 });
 
   const totalArea = zoneAreaM2;
   const totalMu = zoneMu;
@@ -4284,7 +4305,7 @@ function compute() {
   const motorKW = Math.ceil(pumpPower / 0.5) * 0.5;
   const motorKW_rounded = Math.ceil(motorKW);
 
-  const intensity = zoneFlow / (zoneMu * MU_TO_SQM) * 1000;
+  const intensity = zoneMu > 0 ? zoneFlow / zoneMu : 0;
 
   const mainAll = evaluateAllPipes(zoneFlow, MAIN_PIPE_MIN_OD);
   const branchAll = evaluateAllPipes(branchFlow, 0, BRANCH_PIPE_MAX_OD);
@@ -4731,8 +4752,8 @@ document.querySelectorAll('#layoutGroup button').forEach(btn => {
 
 // ===== THREE-LEVEL PIPELINE VIEW =====
 function computeThreeLevel() {
-  const zoneMuInput = +document.getElementById('tl_zoneMu').value || 30;
-  const fixedSideInput = +document.getElementById('tl_zoneFixedSide').value || 300;
+  const zoneMuInput = readNumber('tl_zoneMu', 30, { min: 0.1 });
+  const fixedSideInput = readNumber('tl_zoneFixedSide', 300, { min: 1 });
   const fixedSide = Math.max(1, fixedSideInput);  // no MAX_ZONE_SIDE cap
   const zoneAreaM2 = Math.max(0.1, zoneMuInput) * MU_TO_SQM;
   const zoneMu = zoneAreaM2 / MU_TO_SQM;
@@ -4740,28 +4761,28 @@ function computeThreeLevel() {
   const A = fixedSide;
   const B = derivedSide;
   const N = 1;
-  const dh = +document.getElementById('tl_dh').value || 8;
+  const dh = readNumber('tl_dh', 8);
   const zoneLayout = {cols:1,rows:1,N:1,zoneW:A,zoneH:B,zoneArea:zoneAreaM2,drawZoneW:A,drawZoneH:B};
-  const tapeLen = +document.getElementById('tl_tapeLen').value || 100;
-  const tapeSpacing = +document.getElementById('tl_tapeSpacing').value || 1.2;
-  const tapeDh = +document.getElementById('tl_tapeDh').value || 1;
-  const emitterSpacing = +document.getElementById('tl_emitterSpacing').value || 0.3;
-  const emitterFlow = +document.getElementById('tl_emitterFlow').value || 2;
-  const tapeOD = +document.getElementById('tl_tapeOD').value || 16;
-  const tapePressure = +document.getElementById('tl_tapePressure').value || 1;
-  const lift = +document.getElementById('tl_lift').value || 15;
-  const existPressure = +document.getElementById('tl_existPressure').value || 0;
-  const targetV = +document.getElementById('tl_targetV').value || 1.5;
-  const filterLoss = +document.getElementById('tl_filterLoss').value || 5;
-  const efficiency = (+document.getElementById('tl_efficiency').value || 65) / 100;
-  const branchCount = parseInt(document.querySelector('#tl_branchGroup .selected')?.dataset?.n || 2);
-  const layoutSides = parseInt(document.querySelector('#tl_layoutGroup .selected')?.dataset?.sides || 1);
-  const mainPipeLen = +document.getElementById('tl_mainPipeLen').value || A;
-  const tapeRollLen = +document.getElementById('tl_tapeRollLen').value || 2000;
+  const tapeLen = readNumber('tl_tapeLen', 100, { min: 0.01 });
+  const tapeSpacing = readNumber('tl_tapeSpacing', 1.2, { min: 0.01 });
+  const tapeDh = readNumber('tl_tapeDh', 1);
+  const emitterSpacing = readNumber('tl_emitterSpacing', 0.3, { min: 0.01 });
+  const emitterFlow = readNumber('tl_emitterFlow', 2, { min: 0 });
+  const tapeOD = readNumber('tl_tapeOD', 16, { min: 0.01 });
+  const tapePressure = readNumber('tl_tapePressure', 1, { min: 0 });
+  const lift = readNumber('tl_lift', 15);
+  const existPressure = readNumber('tl_existPressure', 0, { min: 0 });
+  const targetV = readNumber('tl_targetV', 1.5, { min: 0.01 });
+  const filterLoss = readNumber('tl_filterLoss', 5, { min: 0 });
+  const efficiency = readNumber('tl_efficiency', 65, { min: 1, max: 100 }) / 100;
+  const branchCount = readSelectedInt('#tl_branchGroup .selected', 2);
+  const layoutSides = readSelectedInt('#tl_layoutGroup .selected', 1);
+  const mainPipeLen = readNumber('tl_mainPipeLen', A, { min: 0 });
+  const tapeRollLen = readNumber('tl_tapeRollLen', 2000, { min: 0 });
 
   // ===== Multi-zone combined irrigation =====
-  const zoneCount = Math.max(1, parseInt(document.getElementById('tl_zoneCount').value) || 1);
-  const frontPipeLen = Math.max(0, +document.getElementById('tl_frontPipeLen').value || 0);
+  const zoneCount = Math.max(1, readNumber('tl_zoneCount', 1, { integer: true }));
+  const frontPipeLen = readNumber('tl_frontPipeLen', 0, { min: 0 });
 
   const totalArea = zoneAreaM2;
   const totalMu = zoneMu;
@@ -4811,7 +4832,7 @@ function computeThreeLevel() {
   const motorKW = Math.ceil(pumpPower / 0.5) * 0.5;
   const motorKW_rounded = Math.ceil(motorKW);
 
-  const intensity = zoneFlow / (zoneMu * MU_TO_SQM) * 1000;
+  const intensity = zoneMu > 0 ? zoneFlow / zoneMu : 0;
 
   const mainAll = evaluateAllPipes(zoneFlow, MAIN_PIPE_MIN_OD);
   const branchAll = evaluateAllPipes(branchFlow, 0, BRANCH_PIPE_MAX_OD);
@@ -5151,84 +5172,42 @@ function tlUpdatePlanBar() {
   if(hintEl) hintEl.style.display = 'none';
   if(autoBtn) autoBtn.style.opacity = '1';
 
-  // Compute bounds
   var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
-  for (var i=0;i<poly.length;i++){var p=poly[i];if(p.x<minX)minX=p.x;if(p.x>maxX)maxX=p.x;if(p.y<minY)minY=p.y;if(p.y>maxY)maxY=p.y;}
+  for (var i=0;i<poly.length;i++){
+    var p=poly[i];
+    if(p.x<minX)minX=p.x;if(p.x>maxX)maxX=p.x;
+    if(p.y<minY)minY=p.y;if(p.y>maxY)maxY=p.y;
+  }
   var w=maxX-minX, h=maxY-minY;
   var planA=document.getElementById('tlPlanA');
   var planB=document.getElementById('tlPlanB');
   if(planA) planA.textContent=w.toFixed(0);
   if(planB) planB.textContent=h.toFixed(0);
 
-  // Use three-level compute for pump params
-  var r = computeThreeLevel();
   var zc = tlGetZoneCount();
+  var zoneCountInput = document.getElementById('tl_zoneCount');
+  if(zoneCountInput) zoneCountInput.value = zc;
+  var fpLen = readNumber('tlPlanFrontPipeLen', 200, { min: 0 });
+  var tv = readNumber('tlPlanTargetV', 1.5, { min: 0.01 });
+  var fpInput = document.getElementById('tl_frontPipeLen');
+  var tvInput = document.getElementById('tl_targetV');
+  if(fpInput) fpInput.value = fpLen;
+  if(tvInput) tvInput.value = tv;
 
-  // Override zoneCount in computation for the plan bar
-  var zoneMuVal = +document.getElementById('tl_zoneMu').value || 30;
-  var fixedSideVal = +document.getElementById('tl_zoneFixedSide').value || 300;
-  var zoneAreaM2 = Math.max(0.1, zoneMuVal) * MU_TO_SQM;
-  var derivedSide = Math.max(1, zoneAreaM2 / fixedSideVal);
-  var tapeLen = +document.getElementById('tl_tapeLen').value || 100;
-  var tapeSpacing = +document.getElementById('tl_tapeSpacing').value || 0.8;
-  var emitterSpacing = +document.getElementById('tl_emitterSpacing').value || 0.3;
-  var emitterFlow = +document.getElementById('tl_emitterFlow').value || 0.8;
-  var tapeRows = Math.floor(derivedSide / tapeSpacing);
-  var segmentsPerRow = Math.ceil(fixedSideVal / tapeLen);
-  var tapesPerZone = Math.ceil(tapeRows * segmentsPerRow);
-  var emittersPerTape = tapeLen / emitterSpacing;
-  var tapeFlow = emittersPerTape * emitterFlow / 1000;
-  var zoneFlow = tapesPerZone * tapeFlow;
-  var combinedFlow = zoneFlow * zc;
-
-  var targetV = +document.getElementById('tlPlanTargetV').value || 1.5;
-  var frontPipeLen = +document.getElementById('tlPlanFrontPipeLen').value || 200;
-
-  var frontPipe = selectPipe(combinedFlow, targetV, MAIN_PIPE_MIN_OD);
-  var mainPipe = selectPipe(zoneFlow, targetV, MAIN_PIPE_MIN_OD);
-  var branchCount = parseInt(document.querySelector('#tl_branchGroup .selected')?.dataset?.n || 2);
-  var branchFlow = zoneFlow / branchCount;
-  var branchPipe = selectPipe(branchFlow, targetV, 0, BRANCH_PIPE_MAX_OD);
-
-  // Pump: combined flow + front pipe loss + single zone main+branch loss
-  var dh = +document.getElementById('tl_dh').value || 5;
-  var lift = +document.getElementById('tl_lift').value || 5;
-  var tapePressure = +document.getElementById('tl_tapePressure').value || 1;
-  var existPressure = +document.getElementById('tl_existPressure').value || 0;
-  var filterLoss = +document.getElementById('tl_filterLoss').value || 5;
-  var efficiency = (+document.getElementById('tl_efficiency').value || 65) / 100;
-  var mainPipeLenInput = +document.getElementById('tl_mainPipeLen').value || fixedSideVal;
-  // Cap pipe lengths to actual plot dimensions — don't count portion beyond plot
-  var mainPipeLen = Math.min(mainPipeLenInput, Math.max(w, h));
-  var branchLenRaw = zoneAreaM2 / tapeLen / branchCount;
-  var branchLen = Math.min(branchLenRaw, Math.min(w, h));
-
-  var mainLoss = hazenWilliams(mainPipeLen, zoneFlow, mainPipe.id);
-  var tapsPerBranch = Math.ceil(tapesPerZone / branchCount);
-  var branchF = christiansenF(tapsPerBranch);
-  var branchLossRaw = hazenWilliams(branchLen, branchFlow, branchPipe.id);
-  var branchLoss = branchLossRaw * branchF;
-  var frontLoss = hazenWilliams(frontPipeLen, combinedFlow, frontPipe.id);
-  var tapePressureM = tapePressure * 10.2;
-
-  var headBeforeSafety = lift + dh + tapePressureM - existPressure * 10.2 + frontLoss + mainLoss + branchLoss + filterLoss + MARGIN_HEAD;
-  var pumpHead = headBeforeSafety * SAFETY_FACTOR;
-  var pumpPower = efficiency > 0 ? (2.725 * combinedFlow * pumpHead / efficiency / 1000) : 0;
-  var motorKW = Math.ceil(Math.ceil(pumpPower / 0.5) * 0.5);
-
+  var r = computeThreeLevel();
   function fmt(v,d){d=d==null?1:d;var f=Math.pow(10,d);return (Math.round(v*f)/f).toFixed(d);}
   function fmt0(v){return Math.round(v).toString();}
 
   var el;
-  if(el=document.getElementById('tlPlanZoneMu')) el.textContent=fmt(zoneMuVal,1);
-  if(el=document.getElementById('tlPlanCombinedFlow')) el.textContent=fmt(combinedFlow,1);
-  if(el=document.getElementById('tlPlanPumpFlow')) el.textContent=fmt(combinedFlow,1);
-  if(el=document.getElementById('tlPlanPumpHead')) el.textContent=fmt0(pumpHead);
-  if(el=document.getElementById('tlPlanPumpPower')) el.textContent=fmt0(motorKW);
-  if(el=document.getElementById('tlPlanFrontPipe')) el.textContent='Ø '+frontPipe.od+' mm';
-  if(el=document.getElementById('tlPlanFrontVelocity')) el.textContent=fmt(frontPipe.v,2);
-  if(el=document.getElementById('tlPlanMainPipe')) el.textContent='Ø '+mainPipe.od+' mm';
-  if(el=document.getElementById('tlPlanBranchPipe')) el.textContent='Ø '+branchPipe.od+' mm';
+  if(el=document.getElementById('tlPlanZoneMu')) el.textContent=fmt(r.zoneMu,1);
+  if(el=document.getElementById('tlPlanCombinedFlow')) el.textContent=fmt(r.combinedFlow,1);
+  if(el=document.getElementById('tlPlanPumpFlow')) el.textContent=fmt(r.combinedFlow,1);
+  if(el=document.getElementById('tlPlanPumpHead')) el.textContent=fmt0(r.pumpHead);
+  if(el=document.getElementById('tlPlanPumpPower')) el.textContent=fmt0(r.motorKW_rounded);
+  if(el=document.getElementById('tlPlanFrontPipe')) el.textContent='Ø '+r.frontPipe.od+' mm';
+  if(el=document.getElementById('tlPlanFrontVelocity')) el.textContent=fmt(r.frontPipe.v,2);
+  if(el=document.getElementById('tlPlanMainPipe')) el.textContent='Ø '+r.mainPipe.od+' mm';
+  if(el=document.getElementById('tlPlanBranchPipe')) el.textContent='Ø '+r.branchPipe.od+' mm';
 }
 
 function tlAutoGenerate(options) {
@@ -5317,8 +5296,8 @@ function tlAutoGenerate(options) {
     var tlShareDims=window.RunyeBridge.getPlanDims();
     if(tlShareDims && tlShareDims.w>0 && tlShareDims.h>0){ plotW=tlShareDims.w; plotH=tlShareDims.h; }
   } else {
-    var zoneMuVal = +document.getElementById('tl_zoneMu').value || 30;
-    var fixedSideVal = +document.getElementById('tl_zoneFixedSide').value || 300;
+    var zoneMuVal = readNumber('tl_zoneMu', 30);
+    var fixedSideVal = readNumber('tl_zoneFixedSide', 300);
     var zoneAreaM2 = Math.max(0.1, zoneMuVal) * MU_TO_SQM;
     var derivedSide = Math.max(1, zoneAreaM2 / fixedSideVal);
     var longIsX = plotW >= plotH;
@@ -6824,16 +6803,21 @@ function calcPlan(){
   const area = window.measuredArea || 0;
   if(area <= 0) return;
 
-  const tapeLen = parseFloat(document.getElementById('planTapeLen').value) || 100;
-  const tapeSpacing = parseFloat(document.getElementById('planTapeSpacing').value) || 0.8;
-  const emitterSpacing = parseFloat(document.getElementById('planEmitterSpacing').value) || 0.3;
-  const emitterFlow = parseFloat(document.getElementById('planEmitterFlow').value) || 0.8;
-  const tapeRollLen = parseFloat(document.getElementById('planTapeRoll').value) || 2000;
-  const targetV = parseFloat(document.getElementById('planTargetV')?.value) || 1.5;
-  const branchCount = parseInt(document.querySelector('#branchGroup .selected')?.dataset?.n || 2);
-  const layoutSides = parseInt(document.querySelector('#layoutGroup .selected')?.dataset?.sides || 1);
-  const lift = 5; // 默认提升高度 5m
-  const requestedN = parseInt(document.getElementById('planN').value) || 1;
+  const tapeLen = readNumber('planTapeLen', 100, { min: 0.01 });
+  const tapeSpacing = readNumber('planTapeSpacing', 0.8, { min: 0.01 });
+  const emitterSpacing = readNumber('planEmitterSpacing', 0.3, { min: 0.01 });
+  const emitterFlow = readNumber('planEmitterFlow', 0.8, { min: 0 });
+  const tapeRollLen = readNumber('planTapeRoll', 2000, { min: 0 });
+  const targetV = readNumber('planTargetV', 1.5, { min: 0.01 });
+  const branchCount = readSelectedInt('#branchGroup .selected', 2);
+  const layoutSides = readSelectedInt('#layoutGroup .selected', 1);
+  const lift = readNumber('fld_lift', 5);
+  const dh = readNumber('fld_dh', 5);
+  const tapePressure = readNumber('fld_tapePressure', 1, { min: 0 });
+  const existPressure = readNumber('fld_existPressure', 0, { min: 0 });
+  const filterLoss = readNumber('fld_filterLoss', 5, { min: 0 });
+  const efficiency = readNumber('fld_efficiency', 65, { min: 1, max: 100 }) / 100;
+  const requestedN = readNumber('planN', 1, { integer: true, min: 1 });
   const zoneModeEl = document.getElementById('planZoneMode');
   const manualZoneInput = document.getElementById('planZoneMuManual');
 
@@ -6888,15 +6872,20 @@ function calcPlan(){
   const zoneMu = zoneAreaM2 / MU_TO_SQM;
   const intensity = zoneMu > 0 ? zoneFlow / zoneMu : 0; // m³/h per mu
 
-  // Pump estimation (based on single zone flow)
+  // Pump estimation (same head model as the main calculator)
   const mainPipe = selectPipe(zoneFlow, targetV, MAIN_PIPE_MIN_OD);
-  const mainLoss = hazenWilliams(A, zoneFlow, mainPipe.id);
+  const mainLoss = hazenWilliams(mainPipeLen, zoneFlow, mainPipe.id);
   const branchFlow = zoneFlow / branchCount;
   const branchPipe = selectPipe(branchFlow, targetV, 0, BRANCH_PIPE_MAX_OD);
-  const tapePressureM = 10.2; // ~1 bar
-  const filterLoss = 5;
-  const pumpHead = (lift + tapePressureM + mainLoss + filterLoss + MARGIN_HEAD) * SAFETY_FACTOR;
-  const pumpPower = (2.725 * zoneFlow * pumpHead / 0.65 / 1000);
+  const branchSpan = zoneAreaM2 / tapeLen;
+  const branchLen = Math.min(branchSpan / (branchCount * layoutSides), B);
+  const tapsPerBranch = Math.ceil(tapesPerZone / branchCount);
+  const branchF = christiansenF(tapsPerBranch);
+  const branchLoss = hazenWilliams(branchLen, branchFlow, branchPipe.id) * branchF;
+  const tapePressureM = tapePressure * 10.2;
+  const headBeforeSafety = lift + dh + tapePressureM - existPressure * 10.2 + mainLoss + branchLoss + filterLoss + MARGIN_HEAD;
+  const pumpHead = headBeforeSafety * SAFETY_FACTOR;
+  const pumpPower = efficiency > 0 ? (2.725 * zoneFlow * pumpHead / efficiency / 1000) : 0;
   const motorKW = Math.ceil(pumpPower * 2) / 2; // round to nearest 0.5
 
   // Update display — Row 1 (input area)
@@ -6915,9 +6904,7 @@ function calcPlan(){
   document.getElementById('planBranchVelocity').textContent = branchPipe.v.toFixed(2);
   // 支管总长度 = (分区面积 m² ÷ 滴灌带长度 m) ÷ (支管根数 × 敷设边数)
   // 超出地块边界的部分不计算
-  const branchSpan = zoneAreaM2 / tapeLen;
-  var branchSingleLen = Math.round(branchSpan / (branchCount * layoutSides));
-  branchSingleLen = Math.min(branchSingleLen, B);
+  var branchSingleLen = Math.round(branchLen);
   document.getElementById('planBranchSingleLen').textContent = branchSingleLen;
 
   // Update area tag in title
@@ -6926,7 +6913,7 @@ function calcPlan(){
   if(tag) tag.innerHTML='实测 <b>'+area.toFixed(1)+' m²</b> · '+totalMu.toFixed(2)+' 亩 · '+(layoutSides===2?'双边':'单边')+' · '+zoneLayout.cols+'列×'+zoneLayout.rows+'行 · '+zoneModeLabel+'<b>'+Math.round(zoneLayout.zoneW)+'×'+Math.round(zoneLayout.zoneH)+'m</b>';
 
   // Store all data for apply
-  window.planData = { A, B, N, zoneCols: zoneLayout.cols, zoneRows: zoneLayout.rows, zoneW: zoneLayout.zoneW, zoneH: zoneLayout.zoneH, mainPipeLen, tapeLen, tapeSpacing, emitterSpacing, emitterFlow, tapeRollLen, lift, totalMu, zoneFlow, pumpHead, motorKW, intensity, manualZoneMu, targetV, mainPipeOD:'Ø '+mainPipe.od+' mm', branchPipeOD:'Ø '+branchPipe.od+' mm', mainPipeODValue:mainPipe.od, branchPipeODValue:branchPipe.od, mainVelocity:mainPipe.v, branchVelocity:branchPipe.v };
+  window.planData = { A, B, N, zoneCols: zoneLayout.cols, zoneRows: zoneLayout.rows, zoneW: zoneLayout.zoneW, zoneH: zoneLayout.zoneH, mainPipeLen, tapeLen, tapeSpacing, emitterSpacing, emitterFlow, tapeRollLen, lift, dh, totalMu, zoneFlow, pumpHead, pumpPower, motorKW, intensity, manualZoneMu, targetV, mainPipeOD:'Ø '+mainPipe.od+' mm', branchPipeOD:'Ø '+branchPipe.od+' mm', mainPipeODValue:mainPipe.od, branchPipeODValue:branchPipe.od, mainVelocity:mainPipe.v, branchVelocity:branchPipe.v };
   if(typeof render==='function') render();
   if(typeof window.ppRender==='function') window.ppRender();
   if(typeof window.ppRefreshDiagramIfVisible==='function') window.ppRefreshDiagramIfVisible();
@@ -9055,6 +9042,7 @@ function calcPlan(){
     arr.push(plot); saveLib(arr); window.currentPlotId=id;
     if(nameInput) nameInput.value='';
     renderLib(); toast('已保存到地块库：'+name);
+    if(window.runyeBridgeWriteBack) window.runyeBridgeWriteBack(id, plot);
   }
   function setCurrent(id){
     var arr=loadLib(); var p=arr.filter(function(x){return x.id===id;})[0];
@@ -9828,5 +9816,54 @@ render();
   else applyMapMeasuredArea();
 })();
 </script>
+
+<!-- ===== 工作台单向打通桥：来自 workbench.html 的「绘制边界」请求 ===== -->
+<script>
+(function(){
+  var PENDING_KEY='runye_pending_land';
+  function getPending(){ try{ return JSON.parse(localStorage.getItem(PENDING_KEY)||'null'); }catch(e){ return null; } }
+  function clearPending(){ try{ localStorage.removeItem(PENDING_KEY); }catch(e){} }
+
+  // 仅当 index 由工作台（?from=workbench）打开时才保留待回写标记；否则清除，避免误回写旧地块
+  var fromWB = /[?&]from=workbench\b/.test(location.search);
+  if(!fromWB) clearPending();
+
+  // 预填地块名，方便在精准灌溉内直接保存
+  document.addEventListener('DOMContentLoaded', function(){
+    var p=getPending();
+    if(p && p.name){
+      var ni=document.getElementById('plotNameInput');
+      if(ni && !ni.value) ni.value=p.name;
+    }
+    // 来自工作台「绘制边界」：直接定位到 03 面积测量工具区域（锚点兜底，防布局抖动未到位）
+    if(fromWB){
+      setTimeout(function(){
+        var sec=document.getElementById('areaTool');
+        if(sec) sec.scrollIntoView({behavior:'smooth', block:'start'});
+      }, 120);
+    }
+  });
+
+  // 保存地块后，把边界与实测面积回写工作台 runye_db_v1 的对应 land，并跳回工作台详情页
+  window.runyeBridgeWriteBack=function(plotId, plot){
+    var p=getPending();
+    if(!p || !p.land_id) return;
+    try{
+      var raw=localStorage.getItem('runye_db_v1'); if(!raw) return;
+      var db=JSON.parse(raw); if(!db || !db.lands) return;
+      var land=null;
+      db.lands.forEach(function(l){ if(l.land_id===p.land_id) land=l; });
+      if(!land) return;
+      land.geo_json={ source:'runye-irrigation', plotId:plotId, poly:plot.poly||[], sqm:plot.sqm||0, mu:plot.mu||0, saved_at:Date.now() };
+      if(plot.mu) land.area=plot.mu;
+      localStorage.setItem('runye_db_v1', JSON.stringify(db));
+      clearPending();
+      if(typeof atShowToast==='function') atShowToast('已回填工作台地块：'+(land.name||p.land_id)); else alert('已回填工作台地块');
+      setTimeout(function(){ window.location.href='workbench.html#/land/'+p.land_id; }, 900);
+    }catch(e){ console.error('bridge writeback failed', e); }
+  };
+})();
+</script>
+
 </body>
 </html>
