@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>润野 · 七彩花生水肥决策</title>
+<title>润野 · 七彩花生水肥与植保决策</title>
 <style>
   :root{
     --g-700:#1f8a4c; --g-600:#2fa463; --g-50:#eef7f0; --g-100:#dcefe2; --g-200:#b7dfc4; --g-400:#63bf81;
@@ -306,13 +306,6 @@
   .dec-params{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:16px}
   .dec-params label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:var(--muted)}
   .dec-params input,.dec-params select{padding:9px 10px;border:1px solid var(--line);border-radius:9px;font-size:14px;font-family:inherit;color:var(--text);background:#fff;width:100%}
-  .op-cats{margin:0 0 16px}
-  .op-cats-head{font-size:13px;font-weight:700;color:var(--g-700);margin:0 0 12px;padding-left:9px;border-left:3px solid var(--green)}
-  .dec-cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
-  .dec-chip{font-size:12px;padding:10px 12px;border-radius:12px;background:#f8fafc;border:1px solid var(--line)}
-  .dec-chip b{display:block;font-size:12px;font-weight:700;margin-bottom:5px}
-  .dec-chip ul{margin:0 0 0 16px;padding:0;color:var(--ink-2)}
-  .dec-chip li{margin:3px 0;line-height:1.5}
   .dec-warn{background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:12px 14px;margin:0 0 10px;font-size:12.5px;color:#9a3412}
   .dec-warn b{display:block;margin-bottom:4px;color:#9a3412;font-weight:700}
   .dec-note{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:12px 14px;margin:0;font-size:12.5px;color:#166534}
@@ -367,20 +360,51 @@
   @media(max-width:980px){ .op-single-layout{grid-template-columns:1fr} }
   @media(max-width:640px){ .op-single-meta{flex-direction:row} }
 </style>
-<script src="qicai-huasheng/schedule-details.js"></script>
-<script src="qicai-huasheng/schedule-data.js"></script>
+<script src="qicai-huasheng/schedule-core.js"></script>
+<script>
+  (function(){
+    function post(type, extra){
+      if(window.parent === window) return;
+      var payload = {source:'runye-peanut-tool', type:type, hasScheduleCore:!!window.QICAI_NODES};
+      if(extra){ for(var k in extra){ if(Object.prototype.hasOwnProperty.call(extra,k)) payload[k]=extra[k]; } }
+      try{ window.parent.postMessage(payload, '*'); }catch(e){}
+    }
+    function pageHeight(){
+      var d = document.documentElement, b = document.body;
+      return Math.max(d ? d.scrollHeight : 0, b ? b.scrollHeight : 0, 0);
+    }
+    function ready(){ post('ready', {height:pageHeight()}); }
+    window.RunyeDigitalBridge = { ready:ready, error:function(message){ post('error', {message:message || '未知错误'}); } };
+    window.addEventListener('message', function(event){
+      var data = event.data || {};
+      if(data.source === 'runye-digital' && data.type === 'ping') ready();
+    });
+    window.addEventListener('error', function(event){ post('error', {message:event.message || '脚本错误'}); });
+    window.addEventListener('unhandledrejection', function(event){
+      var reason = event.reason;
+      post('error', {message:(reason && (reason.message || reason.toString())) || '异步任务错误'});
+    });
+    if(document.readyState !== 'loading') setTimeout(ready, 0);
+    else document.addEventListener('DOMContentLoaded', function(){ setTimeout(ready, 0); });
+    window.addEventListener('load', function(){ setTimeout(ready, 0); });
+    if('ResizeObserver' in window){
+      window.addEventListener('load', function(){
+        try{ new ResizeObserver(function(){ post('ready', {height:pageHeight()}); }).observe(document.body); }catch(e){}
+      });
+    }
+  })();
+</script>
 </head>
 <body>
 <div class="ops-app">
-  <a class="mobile-back" href="runye-landing.html">‹ 返回首页</a>
+  <a class="mobile-back" href="数字农业.html">‹ 返回数字农业</a>
   <header class="topbar">
     <div>
-      <strong>润野 · 七彩花生水肥决策</strong>
+      <strong>润野 · 七彩花生水肥与植保决策</strong>
       <span>全岛天气抓取 · 种植天数识别 · 底肥校正</span>
     </div>
     <div class="topbar-actions">
       <a class="nav-link-pill" href="qicai-huasheng/index.html">植保方案</a>
-      <a class="nav-link-pill" href="qicai-huasheng/index.html">种植方案</a>
       <a class="nav-link-pill" href="index.html">精准灌溉</a>
       <a class="nav-link-pill" href="数字农业.html">数字农业</a>
       <div class="sync-pill" id="syncPill">等待抓取昨日天气</div>
@@ -1198,8 +1222,6 @@
 
     var kpis=[
       {l:"今日用水/亩",v:d.waterPerMu,u:"m³",note:"按天气"},{l:"今日总用水",v:d.waterTotal,u:"m³",note:"按天气"},
-      {l:"今日用肥/亩",v:d.fertPerMu,u:"kg",note:"按植保方案"},{l:"今日总用肥",v:d.fertTotal,u:"kg",note:"按植保方案"},
-      {l:"追肥EC估算",v:d.fertigationEc,u:"mS/cm"},{l:"底肥底盘评分",v:d.basal.score,u:"分"},
       {l:"作物耗水估算",v:d.etcMm,u:"mm"}
     ];
     $("kpiGrid").innerHTML=kpis.map(function(k){
@@ -1842,9 +1864,7 @@
 </script>
 <script>
 (function(){
-  var NODES=[{"group":"播种前·整地期","dayText":"播种前·土壤处理","dayMin":-60,"dayMax":-8,"op":"底肥/撒施","count":"1 项","cats":{"土壤消毒":["生石灰 50–80 kg/亩，调节土壤酸碱度、杀灭土传病菌与虫卵"]},"mix":"必须独立：与后续底肥间隔 ≥7 天，单独撒施；碱性强，勿与铵态氮/菌剂同施。","flags":["独立"]},{"group":"播种前·整地期","dayText":"整地期（生石灰后 ≥7 天）","dayMin":-7,"dayMax":-1,"op":"底肥/撒施","count":"底肥 3 项","cats":{"底肥菌剂":["腐熟有机肥 + 平衡型复合肥 + 精甲·嘧菌酯类杀菌剂，培肥地力、预防土传病害"]},"mix":"三者混匀同施；覆土 10–30 cm，严禁触根。","flags":[]},{"group":"苗期·叶面除草","dayText":"播后苗前（≤3 天）","dayMin":0,"dayMax":3,"op":"叶面喷雾","count":"封闭 2 项","cats":{"杂草防除":["封闭除草组合：防除一年生禾本科与阔叶杂草"]},"mix":"封闭除草组合同桶；（独立）不与杀虫/杀菌/营养混；墒情适中均匀喷。","flags":["独立"]},{"group":"苗期·叶面除草","dayText":"苗后","dayMin":4,"dayMax":14,"op":"叶面喷雾","count":"苗后 2 项","cats":{"杂草防除":["苗后茎叶除草：防除尖叶与阔叶杂草"]},"mix":"苗后除草同桶；（独立）避开高温；阔叶+尖叶兼顾。","flags":["独立"]},{"group":"播后15–40天·促根开花下针","dayText":"播后 15–20 天","dayMin":15,"dayMax":20,"op":"叶面＋灌根","count":"叶面 + 灌根","cats":{"虫害防治":["防治蚜虫、蓟马、红蜘蛛及鳞翅目幼虫（夜蛾类）"],"病害防治":["预防叶斑病、锈病、白绢病早期发生"],"生长调控":["第1次控旺：抑制茎叶徒长，促根系下扎与花芽分化"],"叶面营养":["补充磷钾及硼钼微量元素，促开花下针"],"灌根调理":["根际微生物菌剂 + 防线虫/地下害虫处理，护根促根"]},"mix":"叶面虫害防治+病害防治+生长调控+叶面营养同桶一次喷；灌根调理单独一桶。叶面与灌根分两次施。现配现用、二次稀释。","flags":[]},{"group":"播后15–40天·促根开花下针","dayText":"播后 25–30 天（50% 开花）","dayMin":25,"dayMax":30,"op":"叶面＋灌根","count":"叶面 + 灌根","cats":{"虫害防治":["防治蓟马、蚜虫、甜菜夜蛾、斜纹夜蛾、棉铃虫等花果期害虫"],"病害防治":["预防锈病、叶斑病、白绢病"],"生长调控":["第2次控旺：控制株高、防倒伏、促开花整齐"],"叶面营养":["磷钾+硼钼，保花保果、提高授粉率"],"灌根调理":["高磷促根下针 + 防线虫 + 根腐/白绢病预防 + 微生物菌剂"]},"mix":"叶面组合同桶喷施；灌根组合同桶施用。开花期避开中午高温。","flags":[]},{"group":"播后15–40天·促根开花下针","dayText":"播后 30–35 天","dayMin":31,"dayMax":35,"op":"灌根","count":"灌根 2 项","cats":{"灌根调理":["高磷水溶肥促下针 + 海藻提取物抗逆"]},"mix":"同桶；促下针、抗逆。","flags":[]},{"group":"播后15–40天·促根开花下针","dayText":"播后 35–40 天","dayMin":36,"dayMax":40,"op":"叶面＋灌根","count":"叶面 + 灌根","cats":{"虫害防治":["继续防治蚜虫、蓟马、夜蛾类及螨类"],"病害防治":["预防叶斑病、锈病、白绢病"],"生长调控":["第3次控旺：巩固株型，防止中后期徒长"],"叶面营养":["磷钾+硼钼，维持光合、保果促针"],"灌根调理":["高磷水溶肥 + 钙镁中量元素，防脐腐、促荚果膨大"]},"mix":"叶面组合同桶喷施；灌根组合同桶施用。","flags":[]},{"group":"荚果充实期·播后55–80天","dayText":"播后 55–60 天","dayMin":55,"dayMax":60,"op":"叶面","count":"叶面组合（偏多）","cats":{"虫害防治":["防治后期蚜虫、夜蛾类、螨类及地下害虫上树"],"病害防治":["防治叶斑病、锈病、白绢病、炭疽病"],"生长调控":["第4次控旺：抑制营养生长，促光合产物向荚果转运"],"叶面营养":["磷钾+硼钼+氨基酸/微量元素，防早衰、促荚果充实"]},"mix":"本节点用药偏多，建议分 2 桶：桶①虫害防治+叶面营养；桶②病害防治+生长调控。注意多个三唑类药剂叠加控旺 → 保留 1 种或减量。","flags":["偏多","三唑"]},{"group":"荚果充实期·播后55–80天","dayText":"播后 75–80 天","dayMin":75,"dayMax":80,"op":"叶面","count":"叶面组合（偏多）","cats":{"虫害防治":["防治蚜虫、夜蛾类、螨类"],"病害防治":["防治叶斑病、锈病、白绢病"],"生长调控":["第5次控旺（轻控）：防后期徒长、促成熟"],"叶面营养":["磷钾+硼钼+氨基酸，防早衰、促饱果"]},"mix":"偏多，建议分 2 桶：桶①虫害防治+叶面营养；桶②病害防治+生长调控。三唑类仅保留 1 个，控旺风险可控。","flags":["偏多"]},{"group":"荚果期·灌根为主","dayText":"荚果期（80% 封垄、鸡头状）","dayMin":81,"dayMax":89,"op":"灌根","count":"灌根 4 项","cats":{"底肥菌剂":["高钾水溶肥 + 钙镁中微量元素 + 微生物菌剂 + 防线虫/根腐处理，根果同护"]},"mix":"同桶；根果同护（营养＋防线虫＋防根腐/白绢）。","flags":[]},{"group":"荚果期·灌根为主","dayText":"间隔 7–10 天 ×2（巩固）","dayMin":90,"dayMax":99,"op":"灌根","count":"两轮灌根","cats":{"底肥菌剂":["高钾水溶肥 + 钙镁 + 微生物菌剂，巩固荚果饱满度（两轮间隔 7–10 天）"]},"mix":"同桶；巩固荚果饱满度。两轮间隔 7–10 天。","flags":[]},{"group":"收获前","dayText":"播后 100 天（收获前）","dayMin":100,"dayMax":9999,"op":"叶面","count":"叶面组合（偏多）","cats":{"虫害防治":["末期虫害防治，压低虫口基数"],"病害防治":["末期病害防治，防落叶、保叶功能"],"叶面营养":["磷钾+微量元素，防早衰、促成熟"]},"mix":"偏多，建议分 2 桶；收获前严格按各药标签安全间隔期停喷。病害防治组合同桶。","flags":["偏多"]}];
-  var CAT_COLOR={虫害防治:"var(--g-700)",病害防治:"var(--warn)",生长调控:"#7c3aed",叶面营养:"#2563eb",底肥菌剂:"#2563eb",灌根调理:"#2563eb",土壤消毒:"#2563eb",杂草防除:"var(--g-700)"};
-
+  var NODES = window.QICAI_NODES || [];
   function $(id){ return document.getElementById(id); }
   function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
   // —— 联动辅助：从水肥工具实时状态(window.__runyeState)推导 ——
@@ -1886,9 +1906,12 @@
     if(t<=18){ a.push('气温偏低（≤18℃），药效发挥慢，宜选中午前后施药。'); }
     if(soil==='dry'){ a.push('田间偏干：苗前封闭除草需墒情好，建议先灌水增墒再喷；灌根类可结合浇水施入。'); }
     if(soil==='wet'){ a.push('田间偏湿：注意开沟排水防渍，避免烂根；叶面喷施待叶片干爽后进行。'); }
-    if(node.flags.indexOf('独立')>=0){ a.push('本节点含「独立作业」项，不可与杀虫 / 杀菌 / 营养混配，须单独实施。'); }
-    if(node.flags.indexOf('三唑')>=0){ a.push('本节点含多个三唑类药剂，控旺叠加风险高，保留 1 种或减量，防抑长过度。'); }
-    if(node.flags.indexOf('偏多')>=0){ a.push('本节点用药偏多，建议按提示分 2 桶喷施，现配现用、二次稀释。'); }
+    var flags=node.flags||[];
+    if(flags.indexOf('独立')>=0){ a.push('本节点含「独立作业」项，不可与杀虫 / 杀菌 / 营养混配，须单独实施。'); }
+    if(flags.indexOf('三唑')>=0){ a.push('本节点含多个三唑类药剂，控旺叠加风险高，保留 1 种或减量，防抑长过度。'); }
+    if(flags.indexOf('偏多')>=0){ a.push('本节点用药偏多，建议按提示分 2 桶喷施，现配现用、二次稀释。'); }
+    if(flags.indexOf('控旺')>=0){ a.push('控旺节点以株高和长势为准：株高未达标、弱苗、受旱或叶色发黄时跳过或减量。'); }
+    if(flags.indexOf('可选')>=0){ a.push('本节点为可选调整窗口，应结合上一遍控旺效果和田间长势决定是否执行。'); }
     if(a.length===0){ a.push('天气与墒情条件常规，按节点方案正常实施即可。'); }
     return a;
   }
@@ -1919,13 +1942,6 @@
 
     var gapNote = gap ? '<div class="dec-warn" style="margin-bottom:12px"><b>阶段过渡期提醒</b>当前处于第 '+days+' 天（窗口间隙），暂无作业窗口；以下为 '+(nextN?('下一节点【'+nextN.dayText+'】的准备建议'):'最近节点的回顾')+'。</div>' : '';
 
-    var catsHtml='';
-    Object.keys(active.cats).forEach(function(k){
-      var color=CAT_COLOR[k]||'#888';
-      var items=active.cats[k].map(function(x){ return '<li>'+x+'</li>'; }).join('');
-      catsHtml+='<div class="dec-chip" style="border-left:4px solid '+color+'"><b style="color:'+color+'">'+k+'</b><ul>'+items+'</ul></div>';
-    });
-
     var adv=weatherAdvice(w,t,soil,active);
     var sideHtml='<div class="op-side-card">'+
       '<b>怎么混配 / 注意什么（结合近期天气）</b>'+
@@ -1933,18 +1949,12 @@
       '<ul>'+adv.map(function(x){ return '<li>'+x+'</li>'; }).join('')+'</ul>'+
     '</div>';
 
-    var rh='<div class="rh" data-day-text="'+escapeHtml(active.dayText)+'" title="点击查看阶段用药用肥详情">'+
-      '<span class="badge">'+active.dayText+'</span>'+
-      '<span class="badge" style="color:var(--green);background:#e8f5e9">用 '+active.count+'</span>'+
-      '<span class="badge" style="color:#7c3aed;background:#f3e8ff">'+active.op+'</span>'+
-    '</div>';
-
     $('dec-result').innerHTML=gapNote;
-    renderScheduleViewport(active.dayText, nextLine, catsHtml, sideHtml);
+    renderScheduleViewport(active.dayText, nextLine, sideHtml);
   }
 
   // 渲染「操作历视窗」：只显示当前生育阶段对应的那一条操作内容（窗口不滚动，内容自适应展开）
-  function renderScheduleViewport(activeDayText, nextLineHtml, catsHtml, sideHtml){
+  function renderScheduleViewport(activeDayText, nextLineHtml, sideHtml){
     var data=window.QICAI_SCHEDULE;
     var box=$('opViewportScroll');
     if(!box||!data) return;
@@ -1961,9 +1971,7 @@
       if(tag) tag.textContent='当前阶段：'+activeDayText;
       return;
     }
-    var catsBlock = catsHtml ? ('<div class="op-cats"><div class="op-cats-head">该用什么（药 / 肥 / 菌）</div><div class="dec-cats">'+catsHtml+'</div></div>') : '';
-    var html=catsBlock+
-      '<div class="op-single">'+
+    var html='<div class="op-single">'+
       '<div class="op-single-layout">'+
         '<div class="op-single-main">'+
           '<div class="op-single-meta">'+
@@ -2024,6 +2032,7 @@
   if(window.self!==window.top){
     document.querySelectorAll('.nav-link-pill').forEach(function(e){ e.style.display='none'; });
   }
+  if(window.RunyeDigitalBridge){ window.RunyeDigitalBridge.ready(); }
 </script>
 
 <!-- 当前生育期决策：阶段用药用肥详情弹窗 -->
