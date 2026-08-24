@@ -65,8 +65,11 @@
   .wb-quick{grid-template-columns:repeat(2,1fr);}
   .wb-quick .wb-stat{cursor:pointer;transition:all .2s;border-left:4px solid var(--teal);}
   .wb-quick .wb-stat:hover{box-shadow:var(--shadow-md);transform:translateY(-1px);}
-  .wb-quick .wb-stat .value{font-size:15px;color:var(--s-800);}
-  .wb-quick .wb-stat .sub{font-size:12px;color:var(--s-400);margin-top:4px;}
+  .wb-quick .wb-stat .value{font-size:14px;color:var(--s-800);font-weight:700;}
+  .wb-quick .wb-stat .sub{font-size:12px;color:var(--s-400);margin-top:3px;}
+  /* 总览「查看完整详情」4 卡（空间/农事/周期/设置） */
+  .wb-grid-actions .wb-stat .value{font-size:14px;color:var(--s-800);font-weight:700;}
+  .wb-grid-actions .wb-stat .sub{font-size:12px;color:var(--s-400);margin-top:3px;}
 
   /* 待办 / 最近地块 */
   .wb-two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
@@ -118,7 +121,7 @@
   .wb-decision{background:linear-gradient(135deg,#f0fdf4,#ecfeff);border:1px solid var(--g-200);border-radius:14px;padding:16px 18px;margin:14px 0;display:flex;flex-wrap:wrap;gap:20px;align-items:center;}
   .wb-decision .dc-block{min-width:120px;}
   .wb-decision .dc-label{font-size:12px;color:var(--s-500);margin-bottom:2px;}
-  .wb-decision .dc-phase{font-size:20px;font-weight:800;color:var(--g-700);}
+  .wb-decision .dc-phase{font-size:15px;font-weight:800;color:var(--g-700);}
   .wb-decision .dc-ops{font-size:13px;color:var(--s-700);max-width:520px;line-height:1.5;}
   .wb-decision .dc-warn{color:#c2410c;font-weight:700;font-size:14px;}
   .wb-decision .dc-hint{font-size:11px;color:var(--s-400);width:100%;margin-top:2px;}
@@ -224,13 +227,313 @@
   .wb-mkt-p{color:var(--g-700,#2e7d52);font-weight:600;white-space:nowrap;}
   .wb-mkt-d{color:var(--s-400,#8aa0a0);font-size:10.5px;white-space:nowrap;}
   .wb-ptrend.sm{font-size:10.5px;padding:0 4px;}
-  .wb-news{display:flex;flex-direction:column;max-height:210px;overflow:auto;padding:8px 12px;}
-  .wb-news-item{display:block;padding:8px 0;border-bottom:1px solid #f0f3f0;text-decoration:none;color:#333;}
+  .wb-news{display:flex;flex-direction:column;max-height:340px;overflow:auto;padding:4px 12px 8px;}
+  .wb-news-region{padding:6px 0 2px;border-bottom:1px dashed #eef1ee;}
+  .wb-news-region:last-child{border-bottom:none;}
+  .wb-news-rh{font-size:12px;font-weight:700;color:var(--g-700,#2e7d52);margin:2px 0 4px;letter-spacing:.5px;}
+  .wb-news-empty{font-size:11px;color:var(--s-400,#8aa0a0);padding:1px 0 6px;}
+  .wb-news-item{display:block;padding:7px 0;border-bottom:1px solid #f4f6f4;text-decoration:none;color:#333;}
+  .wb-news-item:last-child{border-bottom:none;}
   .wb-news-item:hover .wb-nt{color:var(--g-700,#2e7d52);}
   .wb-nt{display:block;font-size:13px;line-height:1.5;color:#222;}
   .wb-nm{display:block;font-size:11px;color:var(--s-400,#8aa0a0);margin-top:3px;}
   @media(max-width:1100px){.wb-daily-grid{grid-template-columns:repeat(2,1fr);}}
   @media(max-width:640px){.wb-daily-grid{grid-template-columns:1fr;}}
+
+  /* 控制台统一视觉层级 */
+  :root{
+    --radius:8px;
+    --radius-sm:6px;
+    --shadow:none;
+    --shadow-md:0 1px 3px rgba(15,23,42,.12);
+  }
+  body{
+    background:#f5f7f5;
+    font-size:14px;
+    line-height:1.5;
+  }
+  .wb-header{
+    box-shadow:0 1px 2px rgba(15,23,42,.06);
+    border-bottom:1px solid var(--line);
+  }
+  .wb-header-inner{
+    height:58px;
+    padding:0 22px;
+  }
+  .wb-logo{
+    width:34px;
+    height:34px;
+    font-size:15px;
+  }
+  .wb-brand{
+    gap:10px;
+  }
+  .wb-brand-name{
+    font-size:16px;
+    line-height:1.25;
+  }
+  .wb-brand-sub{
+    font-size:10px;
+    letter-spacing:.08em;
+    line-height:1.35;
+  }
+  .wb-header-links{
+    gap:8px;
+  }
+  .wb-header-links a{
+    min-height:30px;
+    padding:5px 12px;
+    border-radius:7px;
+    font-size:13px;
+  }
+  .wb-shell{
+    max-width:1480px;
+    grid-template-columns:220px minmax(0,1fr);
+    gap:18px;
+    padding:18px 22px;
+  }
+  .wb-sidebar{
+    top:76px;
+    min-height:calc(100vh - 94px);
+    border-radius:8px;
+    padding:12px;
+    box-shadow:none;
+  }
+  .wb-side-kicker{
+    font-size:12px;
+    letter-spacing:.04em;
+    margin:2px 2px 8px;
+  }
+  .wb-side-title{
+    font-size:14px;
+    margin:0 2px 12px;
+  }
+  .wb-nav{
+    gap:6px;
+  }
+  .wb-nav a{
+    min-height:46px;
+    padding:9px 10px;
+    gap:9px;
+    border-radius:8px;
+    font-size:13px;
+  }
+  .wb-nav a.active{
+    box-shadow:none;
+  }
+  .wb-nav a small{
+    font-size:11px;
+  }
+  .wb-nav-mark{
+    width:26px;
+    height:26px;
+    border-radius:6px;
+    font-size:12px;
+  }
+  .wb-side-actions{
+    gap:7px;
+    margin-top:14px;
+    padding-top:12px;
+  }
+  .wb-side-actions a,
+  .wb-side-actions button{
+    min-height:32px;
+    padding:6px 10px;
+    border-radius:7px;
+    font-size:13px;
+  }
+  .wb-section-title{
+    margin:18px 0 10px;
+    padding-left:10px;
+    border-left-width:3px;
+    font-size:15px;
+    line-height:1.35;
+  }
+  .wb-sub,
+  .wb-muted{
+    font-size:13px;
+  }
+  .wb-grid{
+    gap:12px;
+  }
+  .wb-stats{
+    gap:12px;
+  }
+  .wb-stat,
+  .wb-panel,
+  .wb-land-card,
+  .wb-rec,
+  .wb-irr,
+  .wb-cost,
+  .wb-dcard{
+    border-radius:8px;
+    box-shadow:none;
+  }
+  .wb-stat{
+    padding:14px 16px;
+  }
+  .wb-stat .label{
+    font-size:12px;
+    margin-bottom:5px;
+  }
+  .wb-stat .value{
+    font-size:22px;
+    line-height:1.2;
+  }
+  .wb-stat .unit{
+    font-size:12px;
+  }
+  .wb-quick .wb-stat,
+  .wb-grid-actions .wb-stat{
+    border-left-width:3px;
+  }
+  .wb-quick .wb-stat:hover,
+  .wb-land-card.link:hover{
+    transform:none;
+    box-shadow:var(--shadow-md);
+  }
+  .wb-quick .wb-stat .value,
+  .wb-grid-actions .wb-stat .value{
+    font-size:13px;
+    line-height:1.35;
+  }
+  .wb-quick .wb-stat .sub,
+  .wb-grid-actions .wb-stat .sub{
+    font-size:11px;
+  }
+  .wb-panel{
+    padding:14px;
+  }
+  .wb-panel h3,
+  .wb-list-head h3{
+    font-size:14px;
+    line-height:1.35;
+  }
+  .wb-toolbar{
+    gap:10px;
+    margin-bottom:12px;
+  }
+  .wb-toolbar input,
+  .wb-toolbar select,
+  .wb-field input,
+  .wb-field select,
+  .wb-field textarea{
+    border-radius:7px;
+    padding:8px 10px;
+    font-size:13px;
+  }
+  .wb-btn{
+    border-radius:7px;
+    padding:8px 13px;
+    font-size:13px;
+    min-height:34px;
+  }
+  .wb-land-grid{
+    gap:12px;
+  }
+  .wb-land-card{
+    padding:14px;
+  }
+  .wb-land-card .lc-name{
+    font-size:15px;
+  }
+  .wb-detail-tabs{
+    gap:4px;
+    margin-bottom:14px;
+  }
+  .wb-detail-tabs button{
+    padding:8px 13px;
+    font-size:13px;
+  }
+  .wb-back{
+    margin-bottom:12px;
+    font-size:13px;
+  }
+  .wb-decision{
+    background:#f7fff9;
+    border-color:#bbf7d0;
+    border-radius:8px;
+    padding:14px;
+    margin:12px 0;
+    gap:12px;
+  }
+  .wb-decision .dc-label{
+    font-size:12px;
+  }
+  .wb-decision .dc-phase{
+    font-size:16px;
+    line-height:1.35;
+  }
+  .wb-decision .dc-ops{
+    font-size:13px;
+    line-height:1.55;
+  }
+  .wb-decision .dc-warn{
+    font-size:13px;
+    line-height:1.45;
+  }
+  .wb-decision .dc-hint{
+    font-size:11px;
+  }
+  .wb-decision [style*="border-radius:10px"]{
+    border-radius:8px !important;
+    padding:10px 12px !important;
+  }
+  .wb-modal{
+    border-radius:8px;
+    padding:18px;
+  }
+  .wb-modal h3{
+    font-size:16px;
+    margin-bottom:14px;
+  }
+  .wb-todo,
+  .wb-rec,
+  .wb-irr,
+  .wb-cost,
+  .wb-table{
+    border-radius:8px;
+  }
+  .wb-table{
+    font-size:13px;
+  }
+  .wb-table th,
+  .wb-table td{
+    padding:9px 10px;
+  }
+  .wb-daily-grid{
+    gap:12px;
+  }
+  .wb-dcard{
+    overflow:hidden;
+  }
+  .wb-dcard-h{
+    font-size:13px;
+    padding:9px 12px;
+    background:#f8fafc;
+  }
+  .wb-dcard-b{
+    padding:12px;
+  }
+  .wb-dv{
+    font-size:20px;
+  }
+  .wb-pval{
+    font-size:14px;
+  }
+  .wb-nt{
+    font-size:13px;
+  }
+  @media(max-width:980px){
+    .wb-shell{
+      padding:14px;
+      gap:14px;
+    }
+    .wb-sidebar{
+      min-height:0;
+    }
+  }
+
 </style>
 <script src="qicai-huasheng/schedule-core.js"></script>
 </head>
@@ -254,13 +557,12 @@
 
 <div class="wb-shell">
   <aside class="wb-sidebar" aria-label="工作台功能切换">
-    <div class="wb-side-kicker">FUNCTIONS</div>
+    <div class="wb-side-kicker">功能</div>
     <div class="wb-side-title">功能切换</div>
     <nav class="wb-nav" id="wbNav">
       <a href="#/home" data-route="home"><span class="wb-nav-mark">总</span><span>工作台总览<small>待办、地块概览、快捷入口</small></span></a>
       <a href="#/lands" data-route="lands"><span class="wb-nav-mark">地</span><span>地块中心<small>地块档案、筛选、详情管理</small></span></a>
       <a href="#/reports" data-route="reports"><span class="wb-nav-mark">报</span><span>报表中心<small>记录汇总、投入统计、导出</small></span></a>
-      <a href="#/market" data-route="market"><span class="wb-nav-mark">行</span><span>每日行情<small>价格 · 气象 · 资讯 · 建议</small></span></a>
     </nav>
     <div class="wb-side-actions">
       <button type="button" onclick="openNewLandModal()">新建地块</button>
@@ -550,7 +852,6 @@ function router(){
   }
   if(hash==='lands'){ setActiveNav('lands'); renderLands(main); return; }
   if(hash==='reports'){ setActiveNav('reports'); renderReports(main); return; }
-  if(hash==='market'){ setActiveNav('market'); renderMarket(main); return; }
   setActiveNav('home'); renderHome(main);
 }
 
@@ -575,10 +876,6 @@ function renderHome(main){
       statCard('休耕地块', fallow, '块')+
       statCard('总面积', totalArea.toFixed(1), '亩')+
     '</div>'+
-    '<h2 class="wb-section-title">每日行情数据 <span id="dailyUpdated" class="wb-muted"></span> <a class="wb-more" href="#/market">查看完整 ›</a></h2>'+
-    '<div class="wb-panel" id="dailyPanel"><div class="wb-muted">正在加载每日外部数据（价格 · 气象 · 种植建议）…</div></div>'+
-    '<h2 class="wb-section-title">农业资讯 <span id="newsUpdated" class="wb-muted"></span> <a class="wb-more" href="#/market">查看每日行情完整 ›</a></h2>'+
-    '<div class="wb-panel" id="newsPanel"><div class="wb-muted">正在加载农业资讯…</div></div>'+
     '<h2 class="wb-section-title">快捷操作</h2>'+
     '<div class="wb-grid wb-quick">'+
       '<div class="wb-stat" onclick="openNewLandModal()"><div class="value">＋ 新建地块</div><div class="sub">录入名称、面积、作物与播期</div></div>'+
@@ -598,137 +895,9 @@ function renderHome(main){
     '</div>'+
   '</div>';
   main.innerHTML=html;
-  loadDailyData();
 }
 function statCard(label,value,unit){
   return '<div class="wb-stat"><div class="label">'+esc(label)+'</div><div class="value">'+esc(value)+'<span class="unit">'+esc(unit)+'</span></div></div>';
-}
-
-/* ============================================================
-   每日行情数据面板（读取 data/daily.json，由每日自动化写入）
-   ============================================================ */
-function loadDailyData(){
-  var panel=document.getElementById('dailyPanel');
-  if(!panel) return;
-  // 首页存在独立「农业资讯」板块（#newsPanel）时，每日行情卡片隐藏资讯卡避免重复；
-  // 每日行情独立页（#/market）无 #newsPanel，则四块完整展示。
-  var hasNewsPanel=!!document.getElementById('newsPanel');
-  function fill(d){
-    renderDailyData(d, !hasNewsPanel);
-    if(hasNewsPanel) renderNews(d);
-  }
-  // 静态引入的 data/daily-data.js 在解析阶段已注入 window.RUNYE_DAILY_DATA，
-  // file:// / 本地服务器 / GitHub Pages 三种环境均可用，优先用。
-  if(window.RUNYE_DAILY_DATA){ fill(window.RUNYE_DAILY_DATA); return; }
-  // 若静态脚本未注入（如 GitHub Pages CDN 偶发缓存），再尝试 fetch
-  fetch('data/daily.json?t='+Date.now(), {cache:'no-store'})
-    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
-    .then(fill)
-    .catch(function(e){
-      var upd=document.getElementById('dailyUpdated'); if(upd) upd.textContent='';
-      panel.innerHTML='<div class="wb-muted">未能加载每日数据（'+esc(e.message)+'）。请确认 data/daily-data.js 已下载到本地，或在 workbench.html 同目录。</div>';
-    });
-}
-function loadDailyViaScript(panel){
-  var s=document.createElement('script');
-  s.src='data/daily-data.js?t='+Date.now();
-  s.onload=function(){
-    var d=window.RUNYE_DAILY_DATA;
-    if(d){ renderDailyData(d); } else { showDailyFallback(panel); }
-  };
-  s.onerror=function(){ showDailyFallback(panel); };
-  document.head.appendChild(s);
-}
-function showDailyFallback(panel){
-  var upd=document.getElementById('dailyUpdated'); if(upd) upd.textContent='';
-  panel.innerHTML='<div class="wb-muted">未能加载每日数据。请确保 workbench.html 同级存在 <b>data/</b> 目录'+
-    '（含 daily.json 与 daily-data.js）。直接双击打开 workbench.html 或部署到 GitHub Pages 均可自动显示。</div>';
-}
-function trendClass(t){ return /涨|升|高|增|上/i.test(t||'')?'up':(/跌|降|减|下|回落/i.test(t||'')?'down':''); }
-function priceBlock(name, it){
-  if(!it) return '';
-  var h='<div class="wb-price"><span class="wb-pname">'+esc(name)+'</span>'+
-    '<span class="wb-pval">'+(it.price!=null?it.price:'—')+(it.unit?(' '+esc(it.unit)):'')+'</span>'+
-    (it.trend?'<span class="wb-ptrend '+trendClass(it.trend)+'">'+esc(it.trend)+'</span>':'')+
-    (it.market?'<span class="wb-pmeta">'+esc(it.market)+'</span>':'')+'</div>';
-  var ms=it.markets;
-  if(ms && ms.length){
-    h+='<div class="wb-mkt">';
-    ms.slice(0,8).forEach(function(m){
-      h+='<div class="wb-mkt-row"><span class="wb-mkt-m">'+esc(m.market||'')+'</span>'+
-        '<span class="wb-mkt-p">'+(m.price!=null?m.price:'—')+(m.unit?(' '+esc(m.unit)):'')+'</span>'+
-        (m.trend?'<span class="wb-ptrend sm '+trendClass(m.trend)+'">'+esc(m.trend)+'</span>':'')+
-        (m.date?'<span class="wb-mkt-d">'+esc(m.date)+'</span>':'')+'</div>';
-    });
-    h+='</div>';
-  }
-  return h;
-}
-function renderDailyData(d, showNews){
-  var panel=document.getElementById('dailyPanel');
-  if(!panel) return;
-  var upd=document.getElementById('dailyUpdated');
-  if(upd && d.updated_at){ upd.textContent='· 更新于 '+String(d.updated_at).replace('T',' ').slice(0,16); }
-  var w=d.weather||{}, p=d.prices||{}, n=(d.news||[]), a=d.advice||{};
-  var html='<div class="wb-daily-grid">';
-  /* 气象 */
-  html+='<div class="wb-dcard"><div class="wb-dcard-h">🌤 气象 · '+(esc(w.location)||'海南')+'</div><div class="wb-dcard-b">';
-  if(w.temp!=null) html+='<div class="wb-dv">'+w.temp+'°C<span>气温</span></div>';
-  if(w.rain_mm!=null) html+='<div class="wb-dv">'+w.rain_mm+'mm<span>降雨</span></div>';
-  if(w.humidity!=null) html+='<div class="wb-dv">'+w.humidity+'%<span>湿度</span></div>';
-  if(w.wind) html+='<div class="wb-dv" style="font-size:13px">'+esc(w.wind)+'<span>风力</span></div>';
-  html+='</div>'+(w.note?'<div class="wb-dnote">'+esc(w.note)+'</div>':'')+'</div>';
-  /* 价格 */
-  html+='<div class="wb-dcard"><div class="wb-dcard-h">💰 批发价格</div><div class="wb-dcard-b" style="display:block">';
-  html+=priceBlock('七彩花生', p.qicai_huasheng);
-  html+=priceBlock('辣椒', p.lajiao);
-  if(!p.qicai_huasheng && !p.lajiao) html+='<div class="wb-muted">暂无</div>';
-  html+='</div></div>';
-  /* 新闻（首页由独立「农业资讯」板块承担时，此处隐藏卡片以免重复） */
-  if(showNews!==false){
-    html+='<div class="wb-dcard"><div class="wb-dcard-h">📰 农业资讯</div><div class="wb-news">';
-    if(n.length){ n.slice(0,5).forEach(function(x){
-      html+='<a class="wb-news-item" href="'+(x.url||'#')+'" target="_blank" rel="noopener">'+
-        '<span class="wb-nt">'+esc(x.title||'')+'</span>'+
-        '<span class="wb-nm">'+(x.source||'')+(x.date?' · '+x.date:'')+'</span></a>';
-    }); } else { html+='<div class="wb-muted">暂无</div>'; }
-    html+='</div></div>';
-  }
-  /* 种植建议 */
-  html+='<div class="wb-dcard"><div class="wb-dcard-h">🌱 种植建议</div><div class="wb-dcard-b" style="display:block">';
-  if(a.planting_window) html+='<div class="wb-dnote"><b>播种窗口：</b>'+esc(a.planting_window)+'</div>';
-  if(a.climate_signal) html+='<div class="wb-dnote"><b>气候信号：</b>'+esc(a.climate_signal)+'</div>';
-  if(a.summary) html+='<div class="wb-dnote">'+esc(a.summary)+'</div>';
-  if(!a.planting_window && !a.climate_signal && !a.summary) html+='<div class="wb-muted">暂无</div>';
-  html+='</div></div>';
-  html+='</div>';
-  panel.innerHTML=html;
-}
-function renderNews(d){
-  var panel=document.getElementById('newsPanel');
-  if(!panel) return;
-  var n=(d.news||[]);
-  var u=document.getElementById('newsUpdated');
-  if(u && d.updated_at){ u.textContent='· 更新于 '+String(d.updated_at).replace('T',' ').slice(0,16); }
-  var html='<div class="wb-news">';
-  if(n.length){ n.forEach(function(x){
-    html+='<a class="wb-news-item" href="'+(x.url||'#')+'" target="_blank" rel="noopener">'+
-      '<span class="wb-nt">'+esc(x.title||'')+'</span>'+
-      '<span class="wb-nm">'+(x.source||'')+(x.date?' · '+x.date:'')+'</span></a>';
-  }); } else { html+='<div class="wb-muted">暂无</div>'; }
-  html+='</div>';
-  panel.innerHTML=html;
-}
-
-/* ============================================================
-   页面：每日行情（独立功能页，左侧导航入口）
-   ============================================================ */
-function renderMarket(main){
-  main.innerHTML=
-    '<h1 class="wb-section-title">每日行情数据 <span id="dailyUpdated" class="wb-muted"></span></h1>'+
-    '<div class="wb-muted" style="margin-bottom:14px">由每日 09:10 自动化（联网搜索）更新本地数据文件 —— 七彩花生 / 辣椒各市场批发价、三亚实时气象、农业资讯与种植建议。打开本页即读取最新结果。</div>'+
-    '<div class="wb-panel" id="dailyPanel" style="padding:18px"><div class="wb-muted">正在加载每日外部数据（价格 · 气象 · 新闻 · 种植建议）…</div></div>';
-  loadDailyData();
 }
 
 /* ============================================================
@@ -815,20 +984,20 @@ function renderLandDetail(main, id){
         '<div class="wb-rec-meta">'+(r.material_name?'物资：<b>'+esc(r.material_name)+'</b> ':'')+(r.dosage?'用量：<b>'+esc(r.dosage)+'</b>':'')+(r.method?' ｜ '+esc(r.method):'')+'</div></div>';
     }).join('')+'</div>' : '<div class="wb-empty">还没有农事记录，点击下方「查看完整详情 → 农事记录」录入</div>')+
     '<h2 class="wb-section-title">查看完整详情</h2>'+
-    '<div class="wb-grid wb-stats" style="grid-template-columns:repeat(2,1fr)">'+
-      '<div class="wb-stat" style="cursor:pointer" onclick="goTabFromOverview(\''+esc(id)+'\',\'space\')"><div class="value">🗺️ 空间信息</div><div class="sub">边界 / 地块档案 / 元数据</div></div>'+
-      '<div class="wb-stat" style="cursor:pointer" onclick="goTabFromOverview(\''+esc(id)+'\',\'records\')"><div class="value">📝 农事记录（'+recs.length+'）</div><div class="sub">全部录入 / 列表 / 待办</div></div>'+
-      '<div class="wb-stat" style="cursor:pointer" onclick="goTabFromOverview(\''+esc(id)+'\',\'cycle\')"><div class="value">📊 周期数据</div><div class="sub">时间轴 / 成本统计 / 导出</div></div>'+
-      '<div class="wb-stat" style="cursor:pointer" onclick="goTabFromOverview(\''+esc(id)+'\',\'settings\')"><div class="value">⚙️ 设置</div><div class="sub">编辑 / 归档 / 删除</div></div>'+
+    '<div class="wb-grid wb-stats wb-grid-actions" style="grid-template-columns:repeat(2,1fr)">'+
+      '<div class="wb-stat" style="cursor:pointer" onclick="goTabFromOverview(\''+esc(id)+'\',\'space\')"><div class="value">空间信息</div><div class="sub">边界 / 地块档案 / 元数据</div></div>'+
+      '<div class="wb-stat" style="cursor:pointer" onclick="goTabFromOverview(\''+esc(id)+'\',\'records\')"><div class="value">农事记录（'+recs.length+'）</div><div class="sub">全部录入 / 列表 / 待办</div></div>'+
+      '<div class="wb-stat" style="cursor:pointer" onclick="goTabFromOverview(\''+esc(id)+'\',\'cycle\')"><div class="value">周期数据</div><div class="sub">时间轴 / 成本统计 / 导出</div></div>'+
+      '<div class="wb-stat" style="cursor:pointer" onclick="goTabFromOverview(\''+esc(id)+'\',\'settings\')"><div class="value">设置</div><div class="sub">编辑 / 归档 / 删除</div></div>'+
     '</div>'+
     // 隐藏的完整详情容器（点上方卡片进入）
     '<div id="wbDetailFull" style="display:none;margin-top:18px">'+
       '<button class="wb-back" onclick="closeDetailFull()">‹ 收起，返回总览</button>'+
       '<div class="wb-detail-tabs" id="wbDetailTabs">'+
-        '<button data-tab="space" onclick="switchTab(this)">🗺️ 空间信息</button>'+
-        '<button data-tab="records" onclick="switchTab(this)">📝 农事记录</button>'+
-        '<button data-tab="cycle" onclick="switchTab(this)">📊 周期数据</button>'+
-        '<button data-tab="settings" onclick="switchTab(this)">⚙️ 设置</button>'+
+        '<button data-tab="space" onclick="switchTab(this)">空间信息</button>'+
+        '<button data-tab="records" onclick="switchTab(this)">农事记录</button>'+
+        '<button data-tab="cycle" onclick="switchTab(this)">周期数据</button>'+
+        '<button data-tab="settings" onclick="switchTab(this)">设置</button>'+
       '</div>'+
       '<div id="tab-space" class="wb-tab-panel">'+spacePanel(land)+'</div>'+
       '<div id="tab-records" class="wb-tab-panel">'+recordsPanel(land)+'</div>'+
@@ -846,8 +1015,8 @@ function overviewCard(land, s, recHint, recCount){
     statCard('农事记录', recCount, '条')+
   '</div>'+
   '<div class="wb-panel" style="padding:14px 16px">'+
-    '<div class="wb-muted" style="margin:0">📍 位置 / 农场：<b style="color:var(--s-800)">'+(esc(land.farm)||'—')+'</b> ｜ 土壤：'+(esc(land.soil_type)||'—')+' ｜ 播期：'+(esc(land.plant_date)||'—')+' ｜ 预计采收：'+(esc(land.harvest_date)||'—')+'</div>'+
-    '<div class="wb-muted" style="margin:6px 0 0">📋 '+esc(recHint)+'</div>'+
+    '<div class="wb-muted" style="margin:0">位置 / 农场：<b style="color:var(--s-800)">'+(esc(land.farm)||'—')+'</b> ｜ 土壤：'+(esc(land.soil_type)||'—')+' ｜ 播期：'+(esc(land.plant_date)||'—')+' ｜ 预计采收：'+(esc(land.harvest_date)||'—')+'</div>'+
+    '<div class="wb-muted" style="margin:6px 0 0">'+esc(recHint)+'</div>'+
   '</div>';
 }
 
@@ -926,7 +1095,7 @@ function boundarySection(land){
   }
   return '<div class="wb-panel" style="margin-top:16px;background:#fff7ed;border-color:#fed7aa">'+
     '<div class="wb-list-head"><h3 style="margin:0;font-size:14px;font-weight:700;color:#c2410c">尚未绘制边界</h3>'+
-      '<button class="wb-btn wb-btn-primary" onclick="openDrawBoundary(\''+esc(land.land_id)+'\')">🗺️ 绘制边界</button></div>'+
+      '<button class="wb-btn wb-btn-primary" onclick="openDrawBoundary(\''+esc(land.land_id)+'\')">绘制边界</button></div>'+
     '<div class="wb-rec-meta" style="color:#9a3412">在精准灌溉页面画图并保存后，边界与实测面积会回写此处，灌溉方案才能与地块关联。也可先不画，事后在此补绘。</div>'+
   '</div>';
 }
@@ -1089,8 +1258,8 @@ function openNewLandModal(){
     field('所属农场 / 位置','<input id="new_farm" placeholder="如：东方市感城镇">')+
     field('土壤类型','<input id="new_soil" placeholder="如：砂壤土">')+
     field('备注','<textarea id="new_remark" rows="2"></textarea>')+
-    '<div class="wb-form-note" style="margin-bottom:10px">提示：点「🗺️ 先画边界」会跳转精准灌溉页面画图，保存后边界与实测面积自动回写本地块；也可先建档、事后在详情「空间信息」补绘。</div>'+
-    '<div class="wb-modal-actions"><button class="wb-btn" onclick="closeModal()">取消</button><button class="wb-btn wb-btn-light" onclick="submitNewLandAndDraw()">🗺️ 先画边界</button><button class="wb-btn wb-btn-primary" onclick="submitNewLand()">保存地块</button></div>';
+    '<div class="wb-form-note" style="margin-bottom:10px">提示：点「先画边界」会跳转精准灌溉页面画图，保存后边界与实测面积自动回写本地块；也可先建档、事后在详情「空间信息」补绘。</div>'+
+    '<div class="wb-modal-actions"><button class="wb-btn" onclick="closeModal()">取消</button><button class="wb-btn wb-btn-light" onclick="submitNewLandAndDraw()">先画边界</button><button class="wb-btn wb-btn-primary" onclick="submitNewLand()">保存地块</button></div>';
   wbModal(html);
 }
 function collectLandForm(){
@@ -1318,7 +1487,5 @@ if(document.readyState!=='loading'){
   router();
 }
 </script>
-<!-- 静态注入每日行情数据镜像，file:// 协议下也能立即加载（解析阶段注入 window.RUNYE_DAILY_DATA） -->
-<script src="data/daily-data.js"></script>
 </body>
 </html>
