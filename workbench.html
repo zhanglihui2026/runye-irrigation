@@ -576,7 +576,9 @@ function renderHome(main){
       statCard('总面积', totalArea.toFixed(1), '亩')+
     '</div>'+
     '<h2 class="wb-section-title">每日行情数据 <span id="dailyUpdated" class="wb-muted"></span> <a class="wb-more" href="#/market">查看完整 ›</a></h2>'+
-    '<div class="wb-panel" id="dailyPanel"><div class="wb-muted">正在加载每日外部数据（价格 · 气象 · 新闻 · 种植建议）…</div></div>'+
+    '<div class="wb-panel" id="dailyPanel"><div class="wb-muted">正在加载每日外部数据（价格 · 气象 · 种植建议）…</div></div>'+
+    '<h2 class="wb-section-title">农业资讯 <span id="newsUpdated" class="wb-muted"></span> <a class="wb-more" href="#/market">查看每日行情完整 ›</a></h2>'+
+    '<div class="wb-panel" id="newsPanel"><div class="wb-muted">正在加载农业资讯…</div></div>'+
     '<h2 class="wb-section-title">快捷操作</h2>'+
     '<div class="wb-grid wb-quick">'+
       '<div class="wb-stat" onclick="openNewLandModal()"><div class="value">＋ 新建地块</div><div class="sub">录入名称、面积、作物与播期</div></div>'+
@@ -608,13 +610,20 @@ function statCard(label,value,unit){
 function loadDailyData(){
   var panel=document.getElementById('dailyPanel');
   if(!panel) return;
+  // 首页存在独立「农业资讯」板块（#newsPanel）时，每日行情卡片隐藏资讯卡避免重复；
+  // 每日行情独立页（#/market）无 #newsPanel，则四块完整展示。
+  var hasNewsPanel=!!document.getElementById('newsPanel');
+  function fill(d){
+    renderDailyData(d, !hasNewsPanel);
+    if(hasNewsPanel) renderNews(d);
+  }
   // 静态引入的 data/daily-data.js 在解析阶段已注入 window.RUNYE_DAILY_DATA，
   // file:// / 本地服务器 / GitHub Pages 三种环境均可用，优先用。
-  if(window.RUNYE_DAILY_DATA){ renderDailyData(window.RUNYE_DAILY_DATA); return; }
+  if(window.RUNYE_DAILY_DATA){ fill(window.RUNYE_DAILY_DATA); return; }
   // 若静态脚本未注入（如 GitHub Pages CDN 偶发缓存），再尝试 fetch
   fetch('data/daily.json?t='+Date.now(), {cache:'no-store'})
     .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
-    .then(function(d){ renderDailyData(d); })
+    .then(fill)
     .catch(function(e){
       var upd=document.getElementById('dailyUpdated'); if(upd) upd.textContent='';
       panel.innerHTML='<div class="wb-muted">未能加载每日数据（'+esc(e.message)+'）。请确认 data/daily-data.js 已下载到本地，或在 workbench.html 同目录。</div>';
@@ -655,7 +664,7 @@ function priceBlock(name, it){
   }
   return h;
 }
-function renderDailyData(d){
+function renderDailyData(d, showNews){
   var panel=document.getElementById('dailyPanel');
   if(!panel) return;
   var upd=document.getElementById('dailyUpdated');
@@ -675,14 +684,16 @@ function renderDailyData(d){
   html+=priceBlock('辣椒', p.lajiao);
   if(!p.qicai_huasheng && !p.lajiao) html+='<div class="wb-muted">暂无</div>';
   html+='</div></div>';
-  /* 新闻 */
-  html+='<div class="wb-dcard"><div class="wb-dcard-h">📰 农业资讯</div><div class="wb-news">';
-  if(n.length){ n.slice(0,5).forEach(function(x){
-    html+='<a class="wb-news-item" href="'+(x.url||'#')+'" target="_blank" rel="noopener">'+
-      '<span class="wb-nt">'+esc(x.title||'')+'</span>'+
-      '<span class="wb-nm">'+(x.source||'')+(x.date?' · '+x.date:'')+'</span></a>';
-  }); } else { html+='<div class="wb-muted">暂无</div>'; }
-  html+='</div></div>';
+  /* 新闻（首页由独立「农业资讯」板块承担时，此处隐藏卡片以免重复） */
+  if(showNews!==false){
+    html+='<div class="wb-dcard"><div class="wb-dcard-h">📰 农业资讯</div><div class="wb-news">';
+    if(n.length){ n.slice(0,5).forEach(function(x){
+      html+='<a class="wb-news-item" href="'+(x.url||'#')+'" target="_blank" rel="noopener">'+
+        '<span class="wb-nt">'+esc(x.title||'')+'</span>'+
+        '<span class="wb-nm">'+(x.source||'')+(x.date?' · '+x.date:'')+'</span></a>';
+    }); } else { html+='<div class="wb-muted">暂无</div>'; }
+    html+='</div></div>';
+  }
   /* 种植建议 */
   html+='<div class="wb-dcard"><div class="wb-dcard-h">🌱 种植建议</div><div class="wb-dcard-b" style="display:block">';
   if(a.planting_window) html+='<div class="wb-dnote"><b>播种窗口：</b>'+esc(a.planting_window)+'</div>';
@@ -690,6 +701,21 @@ function renderDailyData(d){
   if(a.summary) html+='<div class="wb-dnote">'+esc(a.summary)+'</div>';
   if(!a.planting_window && !a.climate_signal && !a.summary) html+='<div class="wb-muted">暂无</div>';
   html+='</div></div>';
+  html+='</div>';
+  panel.innerHTML=html;
+}
+function renderNews(d){
+  var panel=document.getElementById('newsPanel');
+  if(!panel) return;
+  var n=(d.news||[]);
+  var u=document.getElementById('newsUpdated');
+  if(u && d.updated_at){ u.textContent='· 更新于 '+String(d.updated_at).replace('T',' ').slice(0,16); }
+  var html='<div class="wb-news">';
+  if(n.length){ n.forEach(function(x){
+    html+='<a class="wb-news-item" href="'+(x.url||'#')+'" target="_blank" rel="noopener">'+
+      '<span class="wb-nt">'+esc(x.title||'')+'</span>'+
+      '<span class="wb-nm">'+(x.source||'')+(x.date?' · '+x.date:'')+'</span></a>';
+  }); } else { html+='<div class="wb-muted">暂无</div>'; }
   html+='</div>';
   panel.innerHTML=html;
 }
