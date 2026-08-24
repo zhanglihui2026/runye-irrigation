@@ -216,6 +216,12 @@
   .wb-ptrend.up{color:#c0392b;background:#fdecea;}
   .wb-ptrend.down{color:#1e8a4c;background:#e8f7ee;}
   .wb-pmeta{width:100%;font-size:11px;color:var(--s-400,#8aa0a0);}
+  .wb-mkt{margin:6px 0 2px;padding-top:6px;border-top:1px dashed #eef2ee;}
+  .wb-mkt-row{display:flex;align-items:baseline;gap:6px;padding:2px 0;font-size:12px;}
+  .wb-mkt-m{color:#334;flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .wb-mkt-p{color:var(--g-700,#2e7d52);font-weight:600;white-space:nowrap;}
+  .wb-mkt-d{color:var(--s-400,#8aa0a0);font-size:10.5px;white-space:nowrap;}
+  .wb-ptrend.sm{font-size:10.5px;padding:0 4px;}
   .wb-news{display:flex;flex-direction:column;max-height:210px;overflow:auto;padding:8px 12px;}
   .wb-news-item{display:block;padding:8px 0;border-bottom:1px solid #f0f3f0;text-decoration:none;color:#333;}
   .wb-news-item:hover .wb-nt{color:var(--g-700,#2e7d52);}
@@ -620,6 +626,25 @@ function showDailyFallback(panel){
     '（含 daily.json 与 daily-data.js）。直接双击打开 workbench.html 或部署到 GitHub Pages 均可自动显示。</div>';
 }
 function trendClass(t){ return /涨|升|高|增|上/i.test(t||'')?'up':(/跌|降|减|下|回落/i.test(t||'')?'down':''); }
+function priceBlock(name, it){
+  if(!it) return '';
+  var h='<div class="wb-price"><span class="wb-pname">'+esc(name)+'</span>'+
+    '<span class="wb-pval">'+(it.price!=null?it.price:'—')+(it.unit?(' '+esc(it.unit)):'')+'</span>'+
+    (it.trend?'<span class="wb-ptrend '+trendClass(it.trend)+'">'+esc(it.trend)+'</span>':'')+
+    (it.market?'<span class="wb-pmeta">'+esc(it.market)+'</span>':'')+'</div>';
+  var ms=it.markets;
+  if(ms && ms.length){
+    h+='<div class="wb-mkt">';
+    ms.slice(0,8).forEach(function(m){
+      h+='<div class="wb-mkt-row"><span class="wb-mkt-m">'+esc(m.market||'')+'</span>'+
+        '<span class="wb-mkt-p">'+(m.price!=null?m.price:'—')+(m.unit?(' '+esc(m.unit)):'')+'</span>'+
+        (m.trend?'<span class="wb-ptrend sm '+trendClass(m.trend)+'">'+esc(m.trend)+'</span>':'')+
+        (m.date?'<span class="wb-mkt-d">'+esc(m.date)+'</span>':'')+'</div>';
+    });
+    h+='</div>';
+  }
+  return h;
+}
 function renderDailyData(d){
   var upd=document.getElementById('dailyUpdated');
   if(upd && d.updated_at){ upd.textContent='· 更新于 '+String(d.updated_at).replace('T',' ').slice(0,16); }
@@ -633,14 +658,9 @@ function renderDailyData(d){
   if(w.wind) html+='<div class="wb-dv" style="font-size:13px">'+esc(w.wind)+'<span>风力</span></div>';
   html+='</div>'+(w.note?'<div class="wb-dnote">'+esc(w.note)+'</div>':'')+'</div>';
   /* 价格 */
-  html+='<div class="wb-dcard"><div class="wb-dcard-h">💰 批发价格</div><div class="wb-dcard-b">';
-  [['七彩花生',p.qicai_huasheng],['辣椒',p.lajiao]].forEach(function(kv){
-    var it=kv[1]; if(!it) return;
-    html+='<div class="wb-price"><span class="wb-pname">'+kv[0]+'</span>'+
-      '<span class="wb-pval">'+(it.price!=null?it.price:'—')+(it.unit?(' '+esc(it.unit)):'')+'</span>'+
-      (it.trend?'<span class="wb-ptrend '+trendClass(it.trend)+'">'+esc(it.trend)+'</span>':'')+
-      (it.market?'<div class="wb-pmeta">'+esc(it.market)+'</div>':'')+'</div>';
-  });
+  html+='<div class="wb-dcard"><div class="wb-dcard-h">💰 批发价格</div><div class="wb-dcard-b" style="display:block">';
+  html+=priceBlock('七彩花生', p.qicai_huasheng);
+  html+=priceBlock('辣椒', p.lajiao);
   if(!p.qicai_huasheng && !p.lajiao) html+='<div class="wb-muted">暂无</div>';
   html+='</div></div>';
   /* 新闻 */

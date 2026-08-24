@@ -3,15 +3,15 @@
 """
 每日行情数据抓取脚本（由 GitHub Actions 定时调用）。
 
-职责：
+职责（本脚本为「手动/备用」刷新，主力由 WorkBuddy 自动化经联网搜索写入）：
   1. 气象：调用 Open-Meteo 公开接口（无需 API Key）抓取海南·三亚实时气象。
   2. 新闻：尝试从 RSS 聚合抓取农业资讯（best-effort，失败则保留旧值）。
-  3. 价格 / 种植建议：保留 data/daily.json 中已有内容（由用户的 WorkBuddy
-     自动化或价格 API 维护），本脚本不覆盖。
+  3. 价格 / 种植建议：保留 data/daily.json 中已有内容（由用户的 WorkBuddy 自动化
+     经联网搜索获取七彩花生/辣椒各市场报价后写入），本脚本不覆盖。
 
-输出：写回仓库根目录 data/daily.json，供工作台（workbench.html）读取渲染。
+输出：写回仓库根目录 data/daily.json 与 data/daily-data.js，供工作台读取渲染。
 
-设计原则：任何单源失败都不影响整体 —— 工作流始终成功、JSON 始终有效。
+设计原则：任何单源失败都不影响整体 —— 脚本始终成功、JSON 始终有效。
 """
 import json
 import os
@@ -127,7 +127,7 @@ def main():
     w = fetch_weather()
     out["weather"] = w if w else existing.get("weather", {})
 
-    # 价格 / 种植建议：保留现有（由用户的 WorkBuddy 自动化或价格 API 维护）
+    # 价格 / 种植建议：保留现有（由用户的 WorkBuddy 自动化经联网搜索写入，本脚本不覆盖）
     out["prices"] = existing.get("prices", {})
     out["advice"] = existing.get("advice", {})
 
