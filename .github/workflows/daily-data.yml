@@ -1,0 +1,39 @@
+name: 每日行情数据抓取
+
+on:
+  schedule:
+    # 北京时间 09:00（UTC+8）= 世界时 01:00
+    - cron: '0 1 * * *'
+  workflow_dispatch:  # 允许在 Actions 页面手动触发
+
+permissions:
+  contents: write   # 允许 GITHUB_TOKEN 提交并推送
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 配置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 抓取并写入 data/daily.json
+        run: python .github/scripts/fetch_daily.py
+
+      - name: 提交并推送
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/daily.json
+          if git diff --cached --quiet; then
+            echo "数据无变化，跳过提交"
+          else
+            git commit -m "chore: 每日自动更新 data/daily.json"
+            git push
+          fi

@@ -199,6 +199,30 @@
     .wb-nav a{justify-content:flex-start;text-align:left;}
     .wb-field-row{flex-direction:column;gap:0;}
   }
+  /* 每日行情数据面板 */
+  .wb-daily-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:4px;}
+  .wb-dcard{background:#fff;border:1px solid var(--b-200,#e9efe9);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;}
+  .wb-dcard-h{font-size:14px;font-weight:600;color:var(--g-700,#2e7d52);padding:10px 14px;background:linear-gradient(180deg,#f2faf4,#fff);border-bottom:1px solid #eef2ee;}
+  .wb-dcard-b{display:grid;grid-template-columns:repeat(2,1fr);gap:10px 8px;padding:14px;}
+  .wb-dv{text-align:center;font-size:21px;font-weight:700;color:var(--g-800,#1f3d2b);line-height:1.1;}
+  .wb-dv span{display:block;font-size:11px;font-weight:500;color:var(--s-400,#8aa0a0);margin-top:4px;}
+  .wb-dnote{font-size:12.5px;color:#445;line-height:1.65;margin-top:8px;}
+  .wb-dnote b{color:var(--g-700,#2e7d52);}
+  .wb-price{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px;padding:6px 0;border-bottom:1px dashed #eef2ee;}
+  .wb-price:last-child{border-bottom:none;}
+  .wb-pname{font-size:13px;font-weight:600;color:#333;min-width:64px;}
+  .wb-pval{font-size:15px;font-weight:700;color:var(--g-700,#2e7d52);}
+  .wb-ptrend{font-size:12px;font-weight:600;padding:1px 6px;border-radius:6px;}
+  .wb-ptrend.up{color:#c0392b;background:#fdecea;}
+  .wb-ptrend.down{color:#1e8a4c;background:#e8f7ee;}
+  .wb-pmeta{width:100%;font-size:11px;color:var(--s-400,#8aa0a0);}
+  .wb-news{display:flex;flex-direction:column;max-height:210px;overflow:auto;padding:8px 12px;}
+  .wb-news-item{display:block;padding:8px 0;border-bottom:1px solid #f0f3f0;text-decoration:none;color:#333;}
+  .wb-news-item:hover .wb-nt{color:var(--g-700,#2e7d52);}
+  .wb-nt{display:block;font-size:13px;line-height:1.5;color:#222;}
+  .wb-nm{display:block;font-size:11px;color:var(--s-400,#8aa0a0);margin-top:3px;}
+  @media(max-width:1100px){.wb-daily-grid{grid-template-columns:repeat(2,1fr);}}
+  @media(max-width:640px){.wb-daily-grid{grid-template-columns:1fr;}}
 </style>
 <script src="qicai-huasheng/schedule-core.js"></script>
 </head>
@@ -557,12 +581,74 @@ function renderHome(main){
         (recent.length? recent.map(function(l){
           return '<div class="wb-todo"><span class="t-name">'+esc(l.name)+'</span><span class="t-meta">'+(STATUS_LABEL[l.status]||'')+' · '+(parseFloat(l.area)||0).toFixed(2)+' 亩</span><button class="t-btn" onclick="location.hash=\'#/land/'+esc(l.land_id)+'\'">进入</button></div>';
         }).join('') : '<div class="wb-empty">还没有地块，先去「新建地块」吧</div>')+
-      '</div>'+
-    '</div>';
+    '</div>'+
+  '</div>'+
+  '<h2 class="wb-section-title">每日行情数据 <span id="dailyUpdated" class="wb-muted"></span></h2>'+
+  '<div class="wb-panel" id="dailyPanel"><div class="wb-muted">正在加载每日外部数据（价格 · 气象 · 新闻 · 种植建议）…</div></div>';
   main.innerHTML=html;
+  loadDailyData();
 }
 function statCard(label,value,unit){
   return '<div class="wb-stat"><div class="label">'+esc(label)+'</div><div class="value">'+esc(value)+'<span class="unit">'+esc(unit)+'</span></div></div>';
+}
+
+/* ============================================================
+   每日行情数据面板（读取 data/daily.json，由每日自动化写入）
+   ============================================================ */
+function loadDailyData(){
+  var panel=document.getElementById('dailyPanel');
+  if(!panel) return;
+  fetch('data/daily.json?t='+Date.now(), {cache:'no-store'})
+    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(function(d){ renderDailyData(d); })
+    .catch(function(e){
+      var upd=document.getElementById('dailyUpdated'); if(upd) upd.textContent='';
+      panel.innerHTML='<div class="wb-muted">未能加载每日数据（'+esc(e.message)+'）。'+
+        '该面板在部署到 GitHub Pages 后自动显示每日抓取的价格 / 气象 / 新闻 / 种植建议；'+
+        '本地预览请通过本地服务器打开，或先推送 data/daily.json。</div>';
+    });
+}
+function trendClass(t){ return /涨|升|高|增|上/i.test(t||'')?'up':(/跌|降|减|下|回落/i.test(t||'')?'down':''); }
+function renderDailyData(d){
+  var upd=document.getElementById('dailyUpdated');
+  if(upd && d.updated_at){ upd.textContent='· 更新于 '+String(d.updated_at).replace('T',' ').slice(0,16); }
+  var w=d.weather||{}, p=d.prices||{}, n=(d.news||[]), a=d.advice||{};
+  var html='<div class="wb-daily-grid">';
+  /* 气象 */
+  html+='<div class="wb-dcard"><div class="wb-dcard-h">🌤 气象 · '+(esc(w.location)||'海南')+'</div><div class="wb-dcard-b">';
+  if(w.temp!=null) html+='<div class="wb-dv">'+w.temp+'°C<span>气温</span></div>';
+  if(w.rain_mm!=null) html+='<div class="wb-dv">'+w.rain_mm+'mm<span>降雨</span></div>';
+  if(w.humidity!=null) html+='<div class="wb-dv">'+w.humidity+'%<span>湿度</span></div>';
+  if(w.wind) html+='<div class="wb-dv" style="font-size:13px">'+esc(w.wind)+'<span>风力</span></div>';
+  html+='</div>'+(w.note?'<div class="wb-dnote">'+esc(w.note)+'</div>':'')+'</div>';
+  /* 价格 */
+  html+='<div class="wb-dcard"><div class="wb-dcard-h">💰 批发价格</div><div class="wb-dcard-b">';
+  [['七彩花生',p.qicai_huasheng],['辣椒',p.lajiao]].forEach(function(kv){
+    var it=kv[1]; if(!it) return;
+    html+='<div class="wb-price"><span class="wb-pname">'+kv[0]+'</span>'+
+      '<span class="wb-pval">'+(it.price!=null?it.price:'—')+(it.unit?(' '+esc(it.unit)):'')+'</span>'+
+      (it.trend?'<span class="wb-ptrend '+trendClass(it.trend)+'">'+esc(it.trend)+'</span>':'')+
+      (it.market?'<div class="wb-pmeta">'+esc(it.market)+'</div>':'')+'</div>';
+  });
+  if(!p.qicai_huasheng && !p.lajiao) html+='<div class="wb-muted">暂无</div>';
+  html+='</div></div>';
+  /* 新闻 */
+  html+='<div class="wb-dcard"><div class="wb-dcard-h">📰 农业资讯</div><div class="wb-news">';
+  if(n.length){ n.slice(0,5).forEach(function(x){
+    html+='<a class="wb-news-item" href="'+(x.url||'#')+'" target="_blank" rel="noopener">'+
+      '<span class="wb-nt">'+esc(x.title||'')+'</span>'+
+      '<span class="wb-nm">'+(x.source||'')+(x.date?' · '+x.date:'')+'</span></a>';
+  }); } else { html+='<div class="wb-muted">暂无</div>'; }
+  html+='</div></div>';
+  /* 种植建议 */
+  html+='<div class="wb-dcard"><div class="wb-dcard-h">🌱 种植建议</div><div class="wb-dcard-b" style="display:block">';
+  if(a.planting_window) html+='<div class="wb-dnote"><b>播种窗口：</b>'+esc(a.planting_window)+'</div>';
+  if(a.climate_signal) html+='<div class="wb-dnote"><b>气候信号：</b>'+esc(a.climate_signal)+'</div>';
+  if(a.summary) html+='<div class="wb-dnote">'+esc(a.summary)+'</div>';
+  if(!a.planting_window && !a.climate_signal && !a.summary) html+='<div class="wb-muted">暂无</div>';
+  html+='</div></div>';
+  html+='</div>';
+  panel.innerHTML=html;
 }
 
 /* ============================================================

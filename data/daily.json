@@ -1,0 +1,40 @@
+{
+  "updated_at": "2026-08-24T20:10:22+08:00",
+  "schema_version": 1,
+  "source": "github-actions",
+  "weather": {
+    "location": "海南·三亚",
+    "temp": 28.8,
+    "rain_mm": 0.1,
+    "humidity": 80,
+    "wind": "4.8 m/s",
+    "note": "Open-Meteo 实时气象（每日 09:00 北京时间自动更新）"
+  },
+  "prices": {
+    "qicai_huasheng": {
+      "price": "—",
+      "unit": "元/斤",
+      "trend": "待抓取",
+      "market": "全国批发市场均价"
+    },
+    "lajiao": {
+      "price": "—",
+      "unit": "元/斤",
+      "trend": "待抓取",
+      "market": "全国批发市场均价"
+    }
+  },
+  "advice": {
+    "planting_window": "样例：七彩花生（海南东方）建议 8/15 或 8/30 择机播种，以近 10 年降雨回溯为准。",
+    "climate_signal": "样例：关注 ENSO / 副高 / 季风槽 六大自然预判信号。",
+    "summary": "样例：本面板为每天自动化抓取结果，详见每日邮件推送与种植建议自动化。"
+  },
+  "news": [
+    {
+      "title": "样例：海南农业动态（部署后自动更新）",
+      "url": "https://www.moa.gov.cn/",
+      "source": "农业农村部",
+      "date": "2026-08-24"
+    }
+  ]
+}

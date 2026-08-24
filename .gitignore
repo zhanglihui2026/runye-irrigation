@@ -10,3 +10,5 @@ Thumbs.db
 
 # 本地发布脚本（不发布）
 *.bat
+__pycache__/
+*.pyc
