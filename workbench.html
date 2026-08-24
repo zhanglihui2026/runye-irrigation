@@ -571,6 +571,8 @@ function renderHome(main){
       statCard('休耕地块', fallow, '块')+
       statCard('总面积', totalArea.toFixed(1), '亩')+
     '</div>'+
+    '<h2 class="wb-section-title">每日行情数据 <span id="dailyUpdated" class="wb-muted"></span></h2>'+
+    '<div class="wb-panel" id="dailyPanel"><div class="wb-muted">正在加载每日外部数据（价格 · 气象 · 新闻 · 种植建议）…</div></div>'+
     '<h2 class="wb-section-title">快捷操作</h2>'+
     '<div class="wb-grid wb-quick">'+
       '<div class="wb-stat" onclick="openNewLandModal()"><div class="value">＋ 新建地块</div><div class="sub">录入名称、面积、作物与播期</div></div>'+
@@ -588,9 +590,7 @@ function renderHome(main){
           return '<div class="wb-todo"><span class="t-name">'+esc(l.name)+'</span><span class="t-meta">'+(STATUS_LABEL[l.status]||'')+' · '+(parseFloat(l.area)||0).toFixed(2)+' 亩</span><button class="t-btn" onclick="location.hash=\'#/land/'+esc(l.land_id)+'\'">进入</button></div>';
         }).join('') : '<div class="wb-empty">还没有地块，先去「新建地块」吧</div>')+
     '</div>'+
-  '</div>'+
-  '<h2 class="wb-section-title">每日行情数据 <span id="dailyUpdated" class="wb-muted"></span></h2>'+
-  '<div class="wb-panel" id="dailyPanel"><div class="wb-muted">正在加载每日外部数据（价格 · 气象 · 新闻 · 种植建议）…</div></div>';
+  '</div>';
   main.innerHTML=html;
   loadDailyData();
 }
