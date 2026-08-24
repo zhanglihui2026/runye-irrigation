@@ -218,6 +218,8 @@
   .wb-pmeta{width:100%;font-size:11px;color:var(--s-400,#8aa0a0);}
   .wb-mkt{margin:6px 0 2px;padding-top:6px;border-top:1px dashed #eef2ee;}
   .wb-mkt-row{display:flex;align-items:baseline;gap:6px;padding:2px 0;font-size:12px;}
+  .wb-more{font-size:12px;font-weight:600;color:var(--g-600,#16a34a);text-decoration:none;margin-left:8px;white-space:nowrap;}
+  .wb-more:hover{text-decoration:underline;}
   .wb-mkt-m{color:#334;flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .wb-mkt-p{color:var(--g-700,#2e7d52);font-weight:600;white-space:nowrap;}
   .wb-mkt-d{color:var(--s-400,#8aa0a0);font-size:10.5px;white-space:nowrap;}
@@ -258,6 +260,7 @@
       <a href="#/home" data-route="home"><span class="wb-nav-mark">总</span><span>工作台总览<small>待办、地块概览、快捷入口</small></span></a>
       <a href="#/lands" data-route="lands"><span class="wb-nav-mark">地</span><span>地块中心<small>地块档案、筛选、详情管理</small></span></a>
       <a href="#/reports" data-route="reports"><span class="wb-nav-mark">报</span><span>报表中心<small>记录汇总、投入统计、导出</small></span></a>
+      <a href="#/market" data-route="market"><span class="wb-nav-mark">行</span><span>每日行情<small>价格 · 气象 · 资讯 · 建议</small></span></a>
     </nav>
     <div class="wb-side-actions">
       <button type="button" onclick="openNewLandModal()">新建地块</button>
@@ -547,6 +550,7 @@ function router(){
   }
   if(hash==='lands'){ setActiveNav('lands'); renderLands(main); return; }
   if(hash==='reports'){ setActiveNav('reports'); renderReports(main); return; }
+  if(hash==='market'){ setActiveNav('market'); renderMarket(main); return; }
   setActiveNav('home'); renderHome(main);
 }
 
@@ -571,7 +575,7 @@ function renderHome(main){
       statCard('休耕地块', fallow, '块')+
       statCard('总面积', totalArea.toFixed(1), '亩')+
     '</div>'+
-    '<h2 class="wb-section-title">每日行情数据 <span id="dailyUpdated" class="wb-muted"></span></h2>'+
+    '<h2 class="wb-section-title">每日行情数据 <span id="dailyUpdated" class="wb-muted"></span> <a class="wb-more" href="#/market">查看完整 ›</a></h2>'+
     '<div class="wb-panel" id="dailyPanel"><div class="wb-muted">正在加载每日外部数据（价格 · 气象 · 新闻 · 种植建议）…</div></div>'+
     '<h2 class="wb-section-title">快捷操作</h2>'+
     '<div class="wb-grid wb-quick">'+
@@ -680,6 +684,17 @@ function renderDailyData(d){
   html+='</div></div>';
   html+='</div>';
   panel.innerHTML=html;
+}
+
+/* ============================================================
+   页面：每日行情（独立功能页，左侧导航入口）
+   ============================================================ */
+function renderMarket(main){
+  main.innerHTML=
+    '<h1 class="wb-section-title">每日行情数据 <span id="dailyUpdated" class="wb-muted"></span></h1>'+
+    '<div class="wb-muted" style="margin-bottom:14px">由每日 09:10 自动化（联网搜索）更新本地数据文件 —— 七彩花生 / 辣椒各市场批发价、三亚实时气象、农业资讯与种植建议。打开本页即读取最新结果。</div>'+
+    '<div class="wb-panel" id="dailyPanel" style="padding:18px"><div class="wb-muted">正在加载每日外部数据（价格 · 气象 · 新闻 · 种植建议）…</div></div>';
+  loadDailyData();
 }
 
 /* ============================================================
