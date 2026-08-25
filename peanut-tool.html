@@ -192,19 +192,6 @@
   .plot-card .pc-stage .pcs-foot{margin-top:4px;margin-bottom:0}
   .plot-card .pc-stage-empty{font-size:11px;color:#64748b;padding:2px 0;text-align:left;background:none;border:none}
   .plot-board-empty{color:var(--ink-2,#6b7280);font-size:13px;padding:8px 2px;line-height:1.7}
-  /* ===== 每日农事记事 ===== */
-  .daily-log-card .daily-editor{margin:6px 0 14px;border:1px dashed #e3ddcf;border-radius:10px;padding:12px 14px;background:#fcfbf7}
-  .daily-editor .daily-row{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;flex-wrap:wrap}
-  .daily-editor label{width:92px;flex:none;font-size:12px;color:#5b5446;padding-top:7px}
-  .daily-editor input[type=date],.daily-editor textarea{flex:1;min-width:200px;padding:8px 10px;border:1px solid #e3ddcf;border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box}
-  .daily-advice{flex:1;min-width:200px;background:#fff;border:1px solid #e3ddcf;border-radius:8px;padding:8px 10px;font-size:12px;color:#5b5446;max-height:130px;overflow:auto;margin:0}
-  .daily-advice li{margin-bottom:4px;line-height:1.5}
-  #dailyLogHead{font-size:12px;color:var(--ink-2)}
-  .daily-actions{display:flex;gap:10px;margin-top:4px;flex-wrap:wrap}
-  .primary-btn{background:#2f7d5b;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer}
-  .primary-btn:hover{opacity:.92}
-  .daily-empty{text-align:center;color:#8a8276;padding:16px}
-  #dailyLogTable td,#dailyLogTable th{font-size:12px;padding:7px 8px;white-space:normal;vertical-align:top}
 
   /* ===== 字号层级（移动优先：基础=手机/默认；桌面由上方 min-width:1024 恢复）=====
      单一来源、无 !important、无外部覆盖（已移除 runye-theme.css）。
@@ -238,7 +225,6 @@
   .growth-card,
   .weather-card,
   .season-kpi,
-  .daily-log-card,
   .plot-board{font-size:12px;line-height:1.55}
 
   .operation-card ol{font-size:12px;line-height:1.55}
@@ -251,7 +237,6 @@
   .manual-card,.operation-card,.decision-table-card{padding:14px}
   table{font-size:12px}
   th,td{padding:8px 6px}
-  .daily-advice{font-size:12px}
 
   /* 综合农事建议：卡片宽度随屏幕自适应、内部文字流式缩放，解决手机端溢出/比例失调 */
   .history-advice-card{width:100%;max-width:100%;box-sizing:border-box;padding:14px 14px;font-size:12.5px;line-height:1.6}
@@ -285,13 +270,9 @@
     .weather-metric strong{font-size:18px;line-height:27px}
     .season-kpi strong{font-size:18px}
     .weather-loc{font-size:15px;line-height:27px}
-    .operation-card,.history-advice-card,.decision-table-card,.insight-grid article,.manual-card,.growth-card,.weather-card,.season-kpi,.daily-log-card,.plot-board{font-size:13px}
     .operation-card ol,.history-advice-card ol{font-size:13px;line-height:1.6}
     .manual-card,.operation-card,.decision-table-card{padding:16px 18px}
     .history-advice-card p{font-size:13px;line-height:1.6;font-weight:400}
-    .daily-editor label{font-size:13px}
-    .daily-advice{font-size:13px}
-    #dailyLogHead{font-size:13px}
   }
   /* ===== 七彩花生植保方案 · 当前生育期决策 ===== */
   .qicai-plan{background:#fff;padding:16px;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);}
@@ -345,9 +326,10 @@
   .op-meta-v{font-size:12px;font-weight:700;color:var(--g-700);line-height:1.45;white-space:nowrap}
   .op-single-block{margin-bottom:12px}
   .op-single-block:last-child{margin-bottom:0}
-  .op-single-layout{display:grid;grid-template-columns:1.3fr 1fr;gap:16px;align-items:start}
-  .op-single-main,.op-single-side{min-width:0}
-  .op-side-card{background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .op-single-layout{display:grid;grid-template-columns:1.3fr 1fr;gap:16px;align-items:stretch}
+  .op-single-main,.op-single-side{min-width:0;display:flex;flex-direction:column}
+  .op-single-main > .op-single-meta,.op-single-main > .op-single-block{flex:0 0 auto}
+  .op-side-card{background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:18px 18px;flex:1 1 auto;display:flex;flex-direction:column}
   .op-side-card b{display:block;font-size:12.5px;font-weight:700;color:var(--g-700);margin-bottom:3px}
   .op-side-card b + b{margin-top:20px;margin-bottom:3px}
   .op-side-card span,.op-side-card ul{display:block;font-size:12.5px;line-height:1.68;color:var(--text);margin:0}
@@ -394,6 +376,7 @@
     }
   })();
 </script>
+  <link rel="stylesheet" href="runye-typography.css">
 </head>
 <body>
 <div class="ops-app">
@@ -545,38 +528,6 @@
           <table id="weatherLogTable">
             <thead><tr><th>日期</th><th>生育期</th><th>最高温</th><th>最低温</th><th>降雨</th><th>ET₀</th><th>风速</th><th>日积温</th><th>累计降雨</th><th>累计有效积温</th><th>季节水分盈亏</th><th>估算墒情</th></tr></thead>
             <tbody id="weatherLogBody"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- 每日农事记事：与建议对比、周期末复盘 -->
-      <div class="decision-table-card daily-log-card">
-        <div class="section-head">
-          <p class="section-title">每日农事记事 · 与建议对比 · 周期末复盘</p>
-          <span id="dailyLogHead" class="quiet-copy">—</span>
-        </div>
-        <div class="log-toolbar">
-          <button type="button" id="captureAdviceBtn" class="ghost-btn">＋ 抓取今日建议</button>
-          <button type="button" id="exportDailyBtn" class="ghost-btn">导出 JSON</button>
-          <button type="button" id="importDailyBtn" class="ghost-btn">导入 JSON</button>
-          <button type="button" id="reportDailyBtn" class="ghost-btn">生成复盘报告</button>
-          <input type="file" id="importDailyFile" accept="application/json" style="display:none">
-        </div>
-        <div class="daily-editor">
-          <div class="daily-row"><label>日期</label><input type="date" id="dlDate"><span class="quiet-copy" id="dlStage"></span></div>
-          <div class="daily-row"><label>今日建议快照</label><ul class="daily-advice" id="dlAdvicePreview"><li class="quiet-copy">点「抓取今日建议」自动带入当天的详细建议与综合建议</li></ul></div>
-          <div class="daily-row"><label>今日实际操作</label><textarea id="dlActions" rows="3" placeholder="记录今天实际做了哪些农事：灌溉、施肥、打药、中耕、除草、防灾、采收…"></textarea></div>
-          <div class="daily-row"><label>与建议偏差</label><textarea id="dlDeviation" rows="2" placeholder="哪些做了 / 没做 / 调整了，原因是什么"></textarea></div>
-          <div class="daily-row"><label>期末结果</label><textarea id="dlResult" rows="2" placeholder="收获后填写：亩产、空壳率、品质、成本等（可选，复盘报告用）"></textarea></div>
-          <div class="daily-actions">
-            <button type="button" id="saveDailyBtn" class="primary-btn">保存当日记录</button>
-            <button type="button" id="clearDailyBtn" class="ghost-btn">清空表单</button>
-          </div>
-        </div>
-        <div class="log-table-wrap">
-          <table id="dailyLogTable">
-            <thead><tr><th>日期</th><th>生育期</th><th>建议</th><th>实际操作摘要</th><th>偏差</th><th>操作</th></tr></thead>
-            <tbody id="dailyLogBody"></tbody>
           </table>
         </div>
       </div>
@@ -1604,7 +1555,6 @@
       var pname=lp?lp.name:'同步的当前地块';
       showLocationSaveHint('已保存种植区域「'+locName+'」到「'+pname+'」，切换地块时按各地块采集天气');
       renderPlotBoard();
-      renderDailyLog();
     }); }
     // manual weather
     ["mRain","mTmax","mTmin","mEto"].forEach(function(id){
@@ -1650,165 +1600,9 @@
     });
   }
 
-  // ============ 每日农事记事（与建议对比 / 周期末复盘） ============
-  var DAILY_LOG_PREFIX='peanut-daily-log::';
-  function dailyLogKey(){ return DAILY_LOG_PREFIX + (currentLoc().name||'默认'); }
-  function loadDailyLog(){ try{ var v=dataStore.get(dailyLogKey()); return Array.isArray(v)?v:[]; }catch(e){ return []; } }
-  function saveDailyLog(arr){ try{ dataStore.set(dailyLogKey(), arr); }catch(e){} }
-  function stageLabelOf(days){ var s=stageFromDays(days); return (stageMeta[s]&&stageMeta[s].label)||s; }
-
-  function renderDailyLog(){
-    var head=$("dailyLogHead"); if(head) head.textContent=currentLoc().name+' · 已记 '+loadDailyLog().length+' 天';
-    var body=$("dailyLogBody"); if(!body) return;
-    var arr=loadDailyLog().slice().sort(function(a,b){ return a.date<b.date?1:-1; });
-    if(!arr.length){ body.innerHTML='<tr><td colspan="6" class="daily-empty">暂无记事。每天打开本页，点「抓取今日建议」后填写实际操作并保存；收获后即可生成复盘报告。</td></tr>'; return; }
-    body.innerHTML=arr.map(function(r){
-      var act=(r.actions||'').replace(/</g,'&lt;'); if(act.length>40) act=act.slice(0,40)+'…';
-      var dev=(r.deviation||'').replace(/</g,'&lt;'); if(dev.length>20) dev=dev.slice(0,20)+'…';
-      return '<tr>'+
-        '<td>'+r.date+'</td>'+
-        '<td>'+(r.stageLabel||'')+'</td>'+
-        '<td>'+(r.advice? r.advice.length:0)+' 条</td>'+
-        '<td>'+act+'</td>'+
-        '<td>'+dev+'</td>'+
-        '<td><button type="button" class="ghost-btn" data-edit="'+r.date+'">编辑</button> <button type="button" class="ghost-btn" data-del="'+r.date+'">删除</button></td>'+
-      '</tr>';
-    }).join('');
-  }
-
-  function captureAdvice(){
-    recompute();
-    var date=$("dlDate").value || shanghaiToday();
-    $("dlDate").value=date;
-    var days=daysSince(state.plantingDate);
-    var stage=stageFromDays(days);
-    $("dlStage").textContent='播后 '+days+' 天 · '+(stageMeta[stage]&&stageMeta[stage].label||stage);
-    var adv=[];
-    if(state.decision && state.decision.operationAdvice) adv=adv.concat(state.decision.operationAdvice);
-    try{ var ha=computeHistoryAdvice(state._agg, state); if(ha&&ha.length) adv=adv.concat(ha.map(function(x){return typeof x==='string'?x:(x.t||'');})); }catch(e){}
-    var ul=$("dlAdvicePreview");
-    ul.innerHTML = adv.length? adv.map(function(t){return '<li>'+t.replace(/</g,'&lt;')+'</li>';}).join('') : '<li class="quiet-copy">暂无建议（请先采集天气并刷新）</li>';
-    ul._snapshot=adv;
-  }
-
-  function saveDaily(){
-    var date=$("dlDate").value || shanghaiToday();
-    var actions=($("dlActions").value||'').trim();
-    var deviation=($("dlDeviation").value||'').trim();
-    var result=($("dlResult").value||'').trim();
-    var days=daysSince(state.plantingDate);
-    var stage=stageFromDays(days);
-    var snap=($("dlAdvicePreview")._snapshot) || [];
-    var arr=loadDailyLog();
-    var rec={date:date, growthDays:days, stage:stage, stageLabel:(stageMeta[stage]&&stageMeta[stage].label||stage),
-             weather:{rainMm:state.weather.rainMm,tempMax:state.weather.tempMax,tempMin:state.weather.tempMin,etoMm:state.weather.etoMm,windMax:state.weather.windMax,source:state.weather.source},
-             advice:snap, actions:actions, deviation:deviation, result:result, updatedAt:shanghaiToday()};
-    var idx=-1; for(var i=0;i<arr.length;i++){ if(arr[i].date===date){ idx=i; break; } }
-    if(idx>=0) arr[idx]=rec; else arr.push(rec);
-    saveDailyLog(arr);
-    renderDailyLog();
-    alert('已保存 '+date+' 的农事记录');
-  }
-
-  function editDaily(date){
-    var arr=loadDailyLog(); var r=null;
-    for(var i=0;i<arr.length;i++){ if(arr[i].date===date){ r=arr[i]; break; } }
-    if(!r) return;
-    $("dlDate").value=r.date;
-    $("dlStage").textContent=(r.stageLabel||'');
-    var ul=$("dlAdvicePreview");
-    ul.innerHTML=(r.advice&&r.advice.length)? r.advice.map(function(t){return '<li>'+t.replace(/</g,'&lt;')+'</li>';}).join('') : '<li class="quiet-copy">（原建议快照）</li>';
-    ul._snapshot=r.advice||[];
-    $("dlActions").value=r.actions||'';
-    $("dlDeviation").value=r.deviation||'';
-    $("dlResult").value=r.result||'';
-    var card=document.querySelector('.daily-log-card'); if(card) window.scrollTo({top:card.offsetTop-20, behavior:'smooth'});
-  }
-
-  function deleteDaily(date){
-    if(!confirm('确定删除 '+date+' 的记录？')) return;
-    var arr=loadDailyLog().filter(function(r){return r.date!==date;});
-    saveDailyLog(arr); renderDailyLog();
-  }
-
-  function exportDaily(){
-    var keys=dataStore.keysWithPrefix(DAILY_LOG_PREFIX);
-    var out={}; keys.forEach(function(k){ out[k]=dataStore.get(k); });
-    var blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'});
-    var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-    a.download='runye-daily-log-'+shanghaiToday()+'.json'; a.click();
-    setTimeout(function(){ URL.revokeObjectURL(a.href); },1000);
-  }
-
-  function importDaily(file){
-    var reader=new FileReader();
-    reader.onload=function(){
-      try{
-        var data=JSON.parse(reader.result);
-        var cnt=0;
-        Object.keys(data).forEach(function(k){
-          if(k.indexOf(DAILY_LOG_PREFIX)===0){ dataStore.set(k, data[k]); cnt++; }
-        });
-        renderDailyLog();
-        alert('已导入 '+cnt+' 个地点的记事数据');
-      }catch(e){ alert('导入失败：文件格式不正确'); }
-    };
-    reader.readAsText(file);
-  }
-
-  function generateReport(){
-    var arr=loadDailyLog().slice().sort(function(a,b){ return a.date<b.date?-1:1; });
-    if(!arr.length){ alert('还没有任何每日记事，无法生成复盘报告'); return; }
-    var loc=currentLoc().name;
-    var rows=arr.map(function(r){
-      var adv=(r.advice||[]).map(function(t){return '<li>'+t.replace(/</g,'&lt;')+'</li>';}).join('');
-      var act=(r.actions||'—').replace(/</g,'&lt;').replace(/\n/g,'<br>');
-      var dev=(r.deviation||'—').replace(/</g,'&lt;').replace(/\n/g,'<br>');
-      return '<tr><td>'+r.date+'</td><td>'+(r.stageLabel||'')+'</td><td><ul class="rp-adv">'+adv+'</ul></td><td class="rp-act">'+act+'</td><td class="rp-dev">'+dev+'</td></tr>';
-    }).join('');
-    var withResult=arr.filter(function(r){return r.result && r.result.trim();});
-    var resultsHtml=withResult.length? withResult.map(function(r){return '<p><b>'+r.date+'：</b>'+(r.result||'').replace(/</g,'&lt;').replace(/\n/g,'<br>')+'</p>';}).join('') : '<p class="quiet-copy">尚未填写期末结果</p>';
-    var total=arr.length;
-    var devCount=arr.filter(function(r){return r.deviation && r.deviation.trim();}).length;
-    var html='<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>花生种植周期复盘报告 · '+loc+'</title>'+
-      '<style>body{font-family:"Microsoft YaHei",sans-serif;max-width:1000px;margin:24px auto;padding:0 16px;color:#1f2933}'+
-      'h1{font-size:22px;border-bottom:3px solid #2f7d5b;padding-bottom:8px}'+
-      '.meta{color:#5b5446;font-size:13px;margin:8px 0 18px}'+
-      'h2{font-size:17px;margin:24px 0 8px;color:#2f7d5b}'+
-      'table{border-collapse:collapse;width:100%;font-size:13px}td,th{border:1px solid #d7d3c8;padding:8px;vertical-align:top;text-align:left}'+
-      'th{background:#f3f1ea}.rp-adv{margin:0;padding-left:16px}.rp-act{background:#f7fbf9}.rp-dev{background:#fff8f0}'+
-      '.summary{background:#f3f1ea;border-radius:10px;padding:14px 16px;font-size:14px;line-height:1.7}'+
-      '.quiet-copy{color:#8a8276}</style></head><body>'+
-      '<h1>花生（七彩花生）种植周期复盘报告</h1>'+
-      '<p class="meta">地点：'+loc+' ｜ 记录天数：'+total+' 天 ｜ 含偏差备注：'+devCount+' 天 ｜ 生成日期：'+shanghaiToday()+'</p>'+
-      '<h2>一、每日「建议 vs 实际」对比</h2>'+
-      '<table><thead><tr><th>日期</th><th>生育期</th><th>当日系统建议</th><th>当日实际操作</th><th>偏差/备注</th></tr></thead><tbody>'+rows+'</tbody></table>'+
-      '<h2>二、期末结果汇总</h2>'+resultsHtml+
-      '<h2>三、经验与思考（结合每日偏差备注总结）</h2>'+
-      '<div class="summary">本周期共记录 '+total+' 天，其中 '+devCount+' 天对建议做了偏离或调整。请结合每日偏差备注，总结：'+
-      '① 哪些建议被验证有效；② 哪些偏离带来了正面 / 负面结果；③ 下个周期在播期、底肥、水分、补钙（空壳率）上的优化点。</div>'+
-      '</body></html>';
-    var blob=new Blob([html],{type:'text/html'});
-    var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-    a.download='花生复盘报告-'+loc+'-'+shanghaiToday()+'.html'; a.click();
-    setTimeout(function(){ URL.revokeObjectURL(a.href); },1000);
-  }
-
-  function bindDailyLog(){
-    var cap=$("captureAdviceBtn"); if(cap) cap.addEventListener('click', captureAdvice);
-    var sv=$("saveDailyBtn"); if(sv) sv.addEventListener('click', saveDaily);
-    var cl=$("clearDailyBtn"); if(cl) cl.addEventListener('click', function(){ $("dlActions").value=''; $("dlDeviation").value=''; $("dlResult").value=''; var ul=$("dlAdvicePreview"); ul.innerHTML='<li class="quiet-copy">点击「抓取今日建议」自动带入</li>'; ul._snapshot=[]; });
-    var ex=$("exportDailyBtn"); if(ex) ex.addEventListener('click', exportDaily);
-    var im=$("importDailyBtn"); var fi=$("importDailyFile");
-    if(im&&fi){ im.addEventListener('click', function(){ fi.click(); }); fi.addEventListener('change', function(){ if(fi.files&&fi.files[0]) importDaily(fi.files[0]); fi.value=''; }); }
-    var rp=$("reportDailyBtn"); if(rp) rp.addEventListener('click', generateReport);
-    var body=$("dailyLogBody");
-    if(body){ body.addEventListener('click', function(e){ var t=e.target; if(t&&t.getAttribute){ var ed=t.getAttribute('data-edit'), dl=t.getAttribute('data-del'); if(ed){ editDaily(ed); } if(dl){ deleteDaily(dl); } } }); }
-  }
 
   // init
   bind();
-  bindDailyLog();
   var saved=loadPersistedState();
   if(saved){
     ['locationName','plantingDate','areaMu','soilMoisture','irrigationEfficiency','lastFertDays',
@@ -1839,7 +1633,6 @@
   recompute();
   render();
   syncWeatherLog();
-  renderDailyLog();
 })();
 </script>
 

@@ -274,10 +274,10 @@ input[type="reset"],
 
     <h2>管路管径</h2>
     <div class="row"><label>吸水管 DN</label>
-      <input type="number" id="cfg_suctionDN" list="dn_list" min="25" max="300" step="1" title="可输入任意管径，或从下拉建议中选择">
+      <input type="number" id="cfg_suctionDN" list="dn_list" min="25" max="500" step="1" title="可输入任意管径，或从下拉建议中选择">
     </div>
     <div class="row"><label>供水主管 DN</label>
-      <input type="number" id="cfg_mainDN" list="dn_list" min="25" max="300" step="1" title="可输入任意管径，或从下拉建议中选择">
+      <input type="number" id="cfg_mainDN" list="dn_list" min="25" max="500" step="1" title="可输入任意管径，或从下拉建议中选择">
     </div>
     <datalist id="dn_list"></datalist>
     <div class="chk">
@@ -320,7 +320,7 @@ var DEFAULTS = {
   tableX: null, tableY: null, tableW: null, tableH: null,
   notesX: null, notesY: null, notesW: null, notesH: null
 };
-var DN_OPT = [50, 63, 75, 80, 90, 100, 110, 125, 150];
+var DN_OPT = [50, 63, 75, 80, 90, 100, 110, 125, 140, 150, 160, 180, 200, 225, 250, 280, 315, 355, 400, 450, 500];
 var FDN_OPT = [16, 20, 25, 32, 40];
 var cfg = null;
 var saved = null;

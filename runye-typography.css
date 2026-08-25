@@ -1,0 +1,296 @@
+/* ============================================================
+   润野灌溉 · 字号统一层
+   目标：工具页面控制在 6 个常用文字层级内；少量 Hero/结果数字保留放大。
+   说明：仅作用于屏幕显示，不覆盖工程图打印图框的 pt 字号。
+   ============================================================ */
+
+:root{
+  --ry-fs-hero:36px;
+  --ry-fs-display:30px;
+  --ry-fs-kpi:22px;
+  --ry-fs-title:16px;
+  --ry-fs-card:14px;
+  --ry-fs-body:13px;
+  --ry-fs-note:12px;
+  --ry-fs-tiny:11px;
+}
+
+@media screen{
+  body{
+    font-size:var(--ry-fs-body);
+    line-height:1.5;
+  }
+
+  /* 顶部品牌 / 导航 */
+  .brand-name,
+  .ry-nav .brand-name,
+  .wb-brand-name,
+  .topbar strong,
+  .brand{
+    font-size:var(--ry-fs-title) !important;
+    line-height:1.25;
+  }
+  .brand-logo,
+  .ry-nav .brand-logo,
+  .wb-logo{
+    font-size:15px !important;
+  }
+  .brand-sub,
+  .ry-nav .brand-sub,
+  .wb-brand-sub,
+  .topbar span{
+    font-size:var(--ry-fs-tiny) !important;
+    line-height:1.35;
+  }
+  .nav-link,
+  .ry-nav .nav-link,
+  .nav-home-btn,
+  .ry-nav .nav-home-btn,
+  .wb-header-links a,
+  .wb-nav a,
+  .wb-side-actions a,
+  .wb-side-actions button,
+  .nav-link-pill,
+  .sync-pill,
+  .auth-btn{
+    font-size:var(--ry-fs-body) !important;
+  }
+
+  /* 标题层级 */
+  .section-title,
+  .wb-section-title,
+  .panel-heading h2,
+  .detail-heading h2,
+  .pipe-table-title h3,
+  .control-card h2,
+  .weather-title,
+  .plot-board .board-head h2,
+  .qp-head h2,
+  .sec-head h2,
+  .plan-head h3,
+  .card h2,
+  .no-print h1,
+  aside h2,
+  .tl-header h2,
+  #areaTool .at-topbar h1,
+  #pipePlanSection .pp-title,
+  .pp-diagram-title{
+    font-size:var(--ry-fs-title) !important;
+    line-height:1.35;
+  }
+  .card h3,
+  .panel h3,
+  .wb-panel h3,
+  .wb-list-head h3,
+  .farm h3,
+  .gate-card h2,
+  .qp-modal-head h3,
+  .diagram h3,
+  .mock-title,
+  .field-plan-head strong,
+  .method-note>div>span{
+    font-size:var(--ry-fs-card) !important;
+    line-height:1.35;
+  }
+
+  /* 正文、表单、按钮、表格 */
+  p,
+  li,
+  table,
+  .ry-table,
+  .wb-table,
+  .selection-table,
+  .control-card label,
+  .field>span,
+  .field label,
+  .wb-field label,
+  .wb-field input,
+  .wb-field select,
+  .wb-field textarea,
+  input,
+  select,
+  textarea,
+  button,
+  .btn,
+  .btn-primary,
+  .btn-ghost,
+  .ghost-button,
+  .ghost-btn,
+  .text-button,
+  .primary-btn,
+  .at-btn,
+  .at-btn-action,
+  .wb-btn,
+  .wb-todo,
+  .wb-rec-meta,
+  .result-list,
+  .result-list dd,
+  .operation-card ol,
+  .history-advice-card ol,
+  .note p,
+  .farm p,
+  footer p{
+    font-size:var(--ry-fs-body) !important;
+  }
+  th,
+  td,
+  .ry-table th,
+  .ry-table td,
+  .wb-table th,
+  .wb-table td,
+  .selection-table th,
+  .selection-table td{
+    font-size:var(--ry-fs-body) !important;
+    line-height:1.5;
+  }
+
+  /* 辅助说明 */
+  small,
+  .sub,
+  .wb-sub,
+  .wb-muted,
+  .field-hint,
+  .tip,
+  .src,
+  .note-box,
+  .pipe-table-note,
+  .detail-heading p,
+  .result-list dt,
+  .wb-form-note,
+  .wb-rec-remark,
+  .wb-tl-date,
+  .ii-meta,
+  .pc-meta,
+  .weather-metric span,
+  .section-head span,
+  .quiet-copy,
+  .gate-card p,
+  .plot-board-empty,
+  .daily-advice,
+  .chart-note{
+    font-size:var(--ry-fs-note) !important;
+    line-height:1.55;
+  }
+
+  /* 标签 / 徽章 */
+  .tag,
+  .mod-tag,
+  .npill,
+  .pipe-status,
+  .live-pill,
+  .live-pill-btn,
+  .metric-label,
+  .wb-status,
+  .wb-nav a small,
+  .wb-side-kicker,
+  .wb-brand-sub,
+  .prod .tag,
+  .kpi small,
+  .season-kpi span,
+  .season-kpi em,
+  .plot-card .pc-badge,
+  .plot-card .pc-stage .pcs-label,
+  .plot-card .pc-stage .pcs-days,
+  .plot-card .pc-stage .pcs-target,
+  .plot-card .pc-stage .pcs-foot,
+  .plot-card .pc-stage-empty,
+  .op-viewport-bar .op-cur,
+  .op-view-detail,
+  .legend,
+  .legend .lab{
+    font-size:var(--ry-fs-tiny) !important;
+    line-height:1.45;
+  }
+
+  /* 数据/结果层级，保留必要强调但收窄跨度 */
+  .wb-stat .value,
+  .kpi strong,
+  .card .cost,
+  .total-line b,
+  .donut .center b,
+  .area-strip strong,
+  .optimal-title strong,
+  .diameter-grid strong,
+  .pump-node strong,
+  .network-summary strong,
+  .result .big small{
+    font-size:var(--ry-fs-kpi) !important;
+    line-height:1.2;
+  }
+  .score-card strong,
+  .result .big,
+  .pump-metrics strong{
+    font-size:var(--ry-fs-display) !important;
+    line-height:1.08;
+  }
+  .hero h1,
+  .hero-title,
+  h1{
+    font-size:var(--ry-fs-hero) !important;
+    line-height:1.16;
+  }
+  .hero-copy h1{
+    font-size:var(--ry-fs-kpi) !important;
+    line-height:1.25;
+  }
+  .hero-copy,
+  .hero-desc,
+  .hero-copy .hero-sub,
+  .hero-sub,
+  .lead{
+    font-size:15px !important;
+    line-height:1.65;
+  }
+  .hero-note strong,
+  .hero-note .summary-main strong,
+  .hero-note .summary-area b,
+  .chip b,
+  footer .big{
+    font-size:var(--ry-fs-display) !important;
+    line-height:1.08;
+  }
+  .chip span,
+  .hero p.sub,
+  .section-sub{
+    font-size:var(--ry-fs-card) !important;
+  }
+
+  /* 工具页特殊组件 */
+  .confidence{font-size:var(--ry-fs-tiny) !important;}
+  #areaTool .at-empty-state .big-icon,
+  .pp-empty .big-icon{
+    font-size:34px !important;
+  }
+  .history-advice-card,
+  .dec-warn,
+  .dec-note,
+  .op-side-card b,
+  .op-side-card span,
+  .op-side-card ul,
+  .op-single-block b,
+  .op-single-block .op-list-text,
+  .op-single-block .op-mix-text,
+  .qp-modal-body{
+    font-size:var(--ry-fs-body) !important;
+  }
+  #schedule table tbody td,
+  #dailyLogTable td,
+  #dailyLogTable th,
+  #weatherLogTable td,
+  #weatherLogTable th{
+    font-size:var(--ry-fs-note) !important;
+  }
+
+  @media(max-width:640px){
+    :root{
+      --ry-fs-hero:26px;
+      --ry-fs-display:26px;
+      --ry-fs-kpi:20px;
+      --ry-fs-title:15px;
+      --ry-fs-card:14px;
+      --ry-fs-body:13px;
+      --ry-fs-note:12px;
+      --ry-fs-tiny:11px;
+    }
+  }
+}

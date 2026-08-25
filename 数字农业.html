@@ -3,197 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>水肥植保决策工具｜润野灌溉</title>
+<title>数字农业工作台｜润野灌溉</title>
+<link rel="stylesheet" href="runye-theme.css">
+<meta http-equiv="refresh" content="0;url=workbench.html#/dashboard">
 <style>
-  :root{
-    --g-50:#f0fdf4;--g-100:#dcfce7;--g-200:#bbf7d0;--g-500:#22c55e;--g-600:#16a34a;--g-700:#15803d;--g-800:#166534;--g-900:#14532d;
-    --teal:#0d9488;--teal-700:#0f766e;
-    --s-50:#f8fafc;--s-100:#f1f5f9;--s-200:#e2e8f0;--s-300:#cbd5e1;--s-400:#94a3b8;--s-500:#64748b;--s-600:#475569;--s-700:#334155;--s-800:#1e293b;--s-900:#0f172a;
-    --shadow-sm:0 2px 8px rgba(15,23,42,.06);
-    --radius:14px;--transition:all .2s ease;--maxw:1280px;
-  }
-  *{box-sizing:border-box;margin:0;padding:0;}
-  body{font-family:"Microsoft YaHei","PingFang SC","Segoe UI",system-ui,-apple-system,sans-serif;color:var(--s-800);background:#eef4ef;line-height:1.6;display:flex;flex-direction:column;height:100vh;overflow:hidden;}
-  a{text-decoration:none;color:inherit;}
-  ul{list-style:none;}
-
-/* ===== 统一导航（与 index.html 精准灌溉页 .ry-nav 完全一致） ===== */
-.ry-nav{
-  position:sticky;top:0;z-index:1500;
-  --g-50:#f0fdf4;--g-100:#dcfce7;--g-200:#bbf7d0;--g-300:#86efac;--g-400:#4ade80;--g-500:#22c55e;--g-600:#16a34a;--g-700:#15803d;--g-800:#166534;--g-900:#14532d;
-  --teal:#0d9488;--teal-700:#0f766e;
-  --s-50:#f8fafc;--s-100:#f1f5f9;--s-200:#e2e8f0;--s-300:#cbd5e1;--s-400:#94a3b8;--s-500:#64748b;--s-600:#475569;--s-700:#334155;--s-800:#1e293b;--s-900:#0f172a;
-  --shadow-sm:0 2px 8px rgba(15,23,42,.06);
-  --transition:all .2s ease;
-  --maxw:1280px;
-  font-family:"Microsoft YaHei","PingFang SC","Segoe UI",system-ui,-apple-system,sans-serif;
-}
-.ry-nav .main-header{background:#fff;box-shadow:var(--shadow-sm);border-bottom:1px solid var(--s-100);padding:0;margin:0;}
-.ry-nav .header-inner{max-width:var(--maxw);margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:72px;}
-.ry-nav .brand{display:flex;align-items:center;gap:12px;text-decoration:none;}
-.ry-nav .brand-logo{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,var(--g-700),var(--teal));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:18px;box-shadow:0 4px 12px rgba(22,163,74,.25);}
-.ry-nav .brand-text{display:flex;flex-direction:column;line-height:1.2;}
-.ry-nav .brand-name{font-size:18px;font-weight:800;color:var(--g-800);letter-spacing:.5px;}
-.ry-nav .brand-sub{font-size:11px;color:var(--s-500);letter-spacing:1px;text-transform:uppercase;}
-.ry-nav .main-nav{display:flex;align-items:center;gap:4px;}
-.ry-nav .nav-item{position:relative;}
-.ry-nav .nav-link{position:relative;display:flex;align-items:center;gap:4px;padding:8px 14px;font-size:14px;font-weight:600;color:var(--s-700);transition:var(--transition);white-space:nowrap;text-decoration:none;}
-.ry-nav .nav-link::after{content:"";position:absolute;left:14px;right:14px;bottom:0;height:2px;background:var(--g-600);opacity:0;transform:scaleX(.4);transition:var(--transition);}
-.ry-nav .nav-link:hover{color:var(--g-700);}
-.ry-nav .nav-link:hover::after{opacity:1;transform:scaleX(1);}
-.ry-nav .nav-link.active{color:var(--g-700);}
-.ry-nav .nav-link.active::after{opacity:1;transform:scaleX(1);}
-.ry-nav .header-actions{display:flex;align-items:center;gap:16px;}
-.ry-nav .search-btn{width:36px;height:36px;border:1px solid var(--s-200);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition);color:var(--s-600);}
-.ry-nav .search-btn:hover{background:var(--g-700);border-color:var(--g-700);color:#fff;}
-.ry-nav .mobile-menu-btn{display:none;flex-direction:column;gap:5px;padding:8px;cursor:pointer;}
-.ry-nav .nav-home-btn{margin-left:8px;display:inline-flex;align-items:center;gap:6px;padding:9px 16px;background:var(--g-700);color:#fff;font-size:14px;font-weight:700;text-decoration:none;border:0;border-radius:0;cursor:pointer;transition:var(--transition);white-space:nowrap;letter-spacing:.5px;}
-.ry-nav .nav-home-btn:hover{background:var(--g-800);}
-
-/* 手机端：导航常驻顶部一行横向滑动（取消汉堡弹窗，与精准灌溉页完全一致） */
-@media(max-width:768px){
-  .ry-nav .main-header{height:auto}
-  .ry-nav .header-inner{flex-wrap:wrap;height:auto;align-items:center;padding:8px 14px 0;gap:0;}
-  .ry-nav .brand{height:46px;flex:1 1 auto}
-  .ry-nav .header-actions{margin-left:auto;order:2}
-  .ry-nav .mobile-menu-btn{display:none !important}
-  .ry-nav .nav-home-btn{display:none !important}
-  .ry-nav .main-nav{display:flex !important;position:static;flex-direction:row;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;width:100%;order:3;gap:0;margin-top:6px;padding:0;background:#fff;box-shadow:none;border-top:1px solid var(--s-100);}
-  .ry-nav .main-nav::-webkit-scrollbar{display:none}
-  .ry-nav .main-nav .nav-item{flex:0 0 auto}
-  .ry-nav .nav-link{padding:11px 15px;font-size:13px;border-bottom:none;border-right:1px solid var(--s-50);white-space:nowrap;}
-  .ry-nav .nav-link::after{display:none}
-}
-@media(max-width:480px){
-  .ry-nav .header-inner{padding:0 12px}
-  .ry-nav .brand{height:42px}
-  .ry-nav .nav-link{padding:10px 12px;font-size:12px}
-}
-
-  .frame-wrap{position:relative;width:100%;flex:1 1 auto;min-height:0;background:var(--s-50);}
-  .frame-wrap iframe{width:100%;height:100%;border:0;display:block;}
-
-  .fallback{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px;background:#fff;}
-  .fallback.show{display:flex;}
-  .fallback h2{color:var(--g-800);font-size:20px;margin-bottom:12px;}
-  .fallback p{color:var(--s-600);max-width:520px;margin-bottom:8px;font-size:15px;}
-  .fallback .step{background:var(--s-50);border:1px solid var(--s-200);border-radius:10px;padding:14px 18px;margin:10px 0;font-size:14px;color:var(--s-700);text-align:left;max-width:520px;}
-  .fallback .step b{color:var(--g-700);}
-
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f5f7f5;color:#1e293b;font-family:"Microsoft YaHei","PingFang SC","Segoe UI",system-ui,sans-serif}
+  .card{width:min(420px,calc(100vw - 32px));background:#fff;border:1px solid #dbe5dd;border-radius:8px;padding:24px;text-align:center}
+  h1{font-size:18px;color:#166534;margin:0 0 8px}
+  p{font-size:13px;color:#64748b;margin:0 0 16px}
+  a{display:inline-flex;min-height:34px;align-items:center;justify-content:center;padding:7px 14px;border-radius:7px;background:#15803d;color:#fff;text-decoration:none;font-size:13px;font-weight:700}
 </style>
-  <link rel="stylesheet" href="runye-theme.css">
+<script>
+  location.replace('workbench.html#/dashboard');
+</script>
 </head>
 <body>
-<script>
-  (function(){
-    var mobile = /Mobi|Android|iPhone|iPad|iPod|Windows Phone|HarmonyOS/i.test(navigator.userAgent);
-    if(mobile && location.search.indexOf('forceFrame=1') === -1){
-      window.location.replace('peanut-tool.html?from=digital');
-    }
-  })();
-</script>
-
-<div class="ry-nav">
-<header class="main-header">
-  <div class="header-inner">
-    <a href="runye-landing.html" class="brand">
-      <div class="brand-logo">润</div>
-      <div class="brand-text">
-        <span class="brand-name">润野灌溉</span>
-        <span class="brand-sub">Runye Irrigation</span>
-      </div>
-    </a>
-    <nav class="main-nav" id="mainNav">
-      <div class="nav-item"><a href="数字农业.html" class="nav-link active">数字农业</a></div>
-      <div class="nav-item"><a href="index.html" class="nav-link">精准灌溉</a></div>
-      <div class="nav-item"><a href="耐特菲姆滴灌带长度查询器.html" class="nav-link">滴灌带查询</a></div>
-      <div class="nav-item"><a href="index.html#three-level-view" class="nav-link">三级系统</a></div>
-      <div class="nav-item"><a href="qicai-huasheng/index.html" class="nav-link">植保方案</a></div>
-      <div class="nav-item"><a href="文献/花生钙营养管理_整理翻译.html" class="nav-link">文献查询</a></div>
-    </nav>
-    <div class="header-actions">
-      <button class="search-btn" title="搜索" aria-label="搜索">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
-      </button>
-      <div class="mobile-menu-btn" id="mobileMenuBtn" aria-label="菜单">
-        <span></span><span></span><span></span>
-      </div>
-      <a href="runye-landing.html" class="nav-home-btn">⌂ 返回主页</a>
-    </div>
+  <div class="card">
+    <h1>数字农业已合并到工作台</h1>
+    <p>正在跳转到数字农业工作台总控看板。</p>
+    <a href="workbench.html#/dashboard">立即打开</a>
   </div>
-</header>
-</div>
-
-<div class="frame-wrap">
-  <iframe id="peanutFrame" src="peanut-tool.html?from=digital" title="七彩花生水肥与植保决策" loading="eager"></iframe>
-  <div class="fallback" id="fallback">
-    <h2>工具内容未加载</h2>
-    <p id="fallbackText">「七彩花生水肥与植保决策」页面未能完成初始化。</p>
-    <div class="step" id="fallbackStep">
-      <b>排查：</b>确认 <code>peanut-tool.html</code> 与 <code>qicai-huasheng/schedule-core.js</code> 均已上传；<br>
-      或点击下方按钮刷新本页。
-    </div>
-    <p><button class="nav-home-btn" onclick="location.reload()">↻ 刷新本页</button></p>
-  </div>
-</div>
-
-<script>
-  // 桌面端 iframe 健康检查：只做后台兜底，不渲染任何工具状态条。
-  (function () {
-    var frame = document.getElementById('peanutFrame');
-    var fallback = document.getElementById('fallback');
-    var fallbackText = document.getElementById('fallbackText');
-    var fallbackStep = document.getElementById('fallbackStep');
-    if(!frame) return;
-
-    var loaded = false;
-    var ready = false;
-
-    function showFallback(title, detail){
-      if(fallbackText && detail) fallbackText.textContent = detail;
-      if(fallbackStep && title) fallbackStep.innerHTML = '<b>排查：</b>' + title;
-      if(fallback) fallback.classList.add('show');
-    }
-    function hideFallback(){ if(fallback) fallback.classList.remove('show'); }
-    function requestPing(){
-      try{ frame.contentWindow.postMessage({source:'runye-digital', type:'ping'}, '*'); }catch(e){}
-    }
-
-    frame.addEventListener('load', function(){
-      loaded = true;
-      requestPing();
-      setTimeout(requestPing, 600);
-    });
-
-    window.addEventListener('message', function(event){
-      if(event.source !== frame.contentWindow) return;
-      var data = event.data || {};
-      if(data.source !== 'runye-peanut-tool') return;
-      if(data.type === 'ready'){
-        ready = true;
-        hideFallback();
-      }
-      if(data.type === 'error'){
-        showFallback('子页面脚本异常：' + (data.message || '未知错误'), '工具页已经打开，但内部脚本运行异常。');
-      }
-    });
-
-    setTimeout(function(){
-      if(ready) return;
-      try {
-        var doc = frame.contentDocument || frame.contentWindow.document;
-        var hasBody = doc && doc.body && doc.body.children.length > 0;
-        if(!loaded && !hasBody){
-          showFallback('确认 peanut-tool.html 与数字农业.html 位于同一目录。', '「七彩花生水肥与植保决策」页面未能显示。');
-        }
-      } catch (e) {
-        if(!loaded){
-          showFallback('浏览器阻止访问 iframe 内容，请直接打开工具页。', '「七彩花生水肥与植保决策」页面未能显示。');
-        }
-      }
-    }, 7000);
-  })();
-</script>
-
 </body>
 </html>

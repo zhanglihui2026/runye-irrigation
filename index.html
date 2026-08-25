@@ -3057,7 +3057,8 @@ input[type="reset"],
     });
   }catch(e){}
 })();
-</script></head>
+</script>
+</head>
 <body>
 
 <!-- ===== 主页导航（嵌入） ===== -->
@@ -3444,8 +3445,7 @@ input[type="reset"],
     <div class="pp-diagram-title">
       📋 施工简图
       <span style="flex:1"></span>
-      <span style="font-size:12px;font-weight:500;color:#64748b;margin-right:4px">首部系统图</span>
-      <button class="pp-btn-generate" id="ppHeadGen" style="padding:6px 16px;font-size:13px">⚙️ 生成</button>
+      <button class="pp-btn-generate" id="ppHeadGen" style="padding:6px 16px;font-size:13px">⚙️ 生成系统图</button>
       <button class="pp-btn-ghost" id="ppSavePng" style="display:none" title="将施工简图保存为 PNG 图片">📥 保存图片</button>
       <button class="tl-trigger-btn-inline" onclick="openThreeLevelView(true)" title="三级管线：多分区联合灌溉总管选型 + 管路规划">三级管设计</button>
     </div>
@@ -4199,6 +4199,15 @@ function evaluateAllPipes(Q, minOd = 0, maxOd = Infinity) {
   });
 }
 
+function selectMotorPower(requiredKW) {
+  if (!Number.isFinite(requiredKW) || requiredKW <= 0) return 0;
+  const series = [0.37, 0.55, 0.75, 1.1, 1.5, 2.2, 3, 4, 5.5, 7.5, 11, 15, 18.5, 22, 30, 37, 45, 55, 75, 90, 110, 132, 160, 200, 250, 315];
+  for (const kw of series) {
+    if (kw >= requiredKW) return kw;
+  }
+  return Math.ceil(requiredKW / 5) * 5;
+}
+
 function pipeStatusLabel(v, isRecommended) {
   if (isRecommended) return '推荐';
   if (v >= ECON_VMIN && v <= ECON_VMAX) return '可选';
@@ -4267,23 +4276,24 @@ function compute() {
 
   const totalArea = zoneAreaM2;
   const totalMu = zoneMu;
-  const tapeRows = Math.floor(B / tapeSpacing);
-  const segmentsPerRow = Math.ceil(A / tapeLen);
+  const tapeRows = Math.max(1, Math.ceil(B / tapeSpacing));
+  const segmentsPerRow = Math.max(1, Math.ceil(A / tapeLen));
   const totalTapes = tapeRows * segmentsPerRow;
-  const tapeTotalLen = totalTapes * tapeLen;
+  const tapeTotalLen = totalArea / tapeSpacing;
   const tapeRolls = tapeRollLen > 0 ? Math.ceil(tapeTotalLen * 1.1 / tapeRollLen) : 0;
-  const tapesPerZone = Math.ceil(totalTapes / N);
+  const tapesPerZone = Math.max(1, Math.ceil(totalTapes / N));
 
+  const zoneTapeLen = zoneAreaM2 / tapeSpacing;
   const emittersPerTape = tapeLen / emitterSpacing;
   const tapeFlow = emittersPerTape * emitterFlow / 1000;
-  const zoneFlow = tapesPerZone * tapeFlow;
+  const zoneFlow = zoneTapeLen / emitterSpacing * emitterFlow / 1000;
 
   const mainPipe = selectPipe(zoneFlow, targetV, MAIN_PIPE_MIN_OD);
   const mainLoss = hazenWilliams(mainPipeLen, zoneFlow, mainPipe.id);
 
   const branchFlow = zoneFlow / branchCount;
-  // 支管总跨度 = 单区面积(m²) ÷ 滴灌带长度(m); 单根 = 跨度 ÷ (根数 × 敷设边数)
-  const branchSpan = zoneAreaM2 / tapeLen;
+  // 支管长度按垂直于滴灌带的分区跨度折算；滴灌带分段只影响接头数量，不应放大支管长度。
+  const branchSpan = B;
   const branchLen = branchSpan / (branchCount * layoutSides);
   const tapsPerBranch = Math.ceil(tapesPerZone / branchCount);
   const branchF = christiansenF(tapsPerBranch);
@@ -4298,12 +4308,13 @@ function compute() {
   const tapePressureM = tapePressure * 10.2;
   const tapeDeltaPct = tapePressureM > 0 ? (tapeLoss / tapePressureM) * 100 : 0;
 
-  const headBeforeSafety = lift + dh + tapePressureM - existPressure * 10.2 + mainLoss + branchLoss + filterLoss + MARGIN_HEAD;
+  const headBeforeSafetyRaw = lift + dh + tapePressureM - existPressure * 10.2 + mainLoss + branchLoss + filterLoss + MARGIN_HEAD;
+  const headBeforeSafety = Math.max(0, headBeforeSafetyRaw);
   const pumpHead = headBeforeSafety * SAFETY_FACTOR;
 
   const pumpPower = efficiency > 0 ? (2.725 * zoneFlow * pumpHead / efficiency / 1000) : 0;
-  const motorKW = Math.ceil(pumpPower / 0.5) * 0.5;
-  const motorKW_rounded = Math.ceil(motorKW);
+  const motorKW = selectMotorPower(pumpPower);
+  const motorKW_rounded = motorKW;
 
   const intensity = zoneMu > 0 ? zoneFlow / zoneMu : 0;
 
@@ -4326,12 +4337,12 @@ function compute() {
     tapeLen, tapeSpacing, tapeDh, emitterSpacing, emitterFlow, tapeOD, tapePressure,
     lift, existPressure, targetV, filterLoss, efficiency, branchCount, mainPipeLen,
     totalArea, totalMu, zoneMu,
-    tapeRows, segmentsPerRow, totalTapes, tapesPerZone, tapeRollLen, tapeTotalLen, tapeRolls,
+    tapeRows, segmentsPerRow, totalTapes, tapesPerZone, tapeRollLen, tapeTotalLen, tapeRolls, zoneTapeLen,
     emittersPerTape, tapeFlow, zoneFlow,
     mainPipe, mainLoss,
     branchPipe, branchLoss, branchFlow, branchLen, branchSpan, layoutSides, tapsPerBranch, branchF,
     tapeID, tapeLoss, tapePressureM, tapeDeltaPct,
-    headBeforeSafety, pumpHead, pumpPower, motorKW, motorKW_rounded,
+    headBeforeSafetyRaw, headBeforeSafety, pumpHead, pumpPower, motorKW, motorKW_rounded,
     intensity, mainAll, branchAll, branchAlternatives
   };
 }
@@ -4339,7 +4350,8 @@ function compute() {
 // ===== PUMP HEAD DERIVATION =====
 function renderDerivation(r) {
   const existPressureM = r.existPressure * 10.2;
-  const sum = r.lift + r.dh + r.tapePressureM - existPressureM + r.mainLoss + r.branchLoss + r.filterLoss + MARGIN_HEAD;
+  const rawSum = r.lift + r.dh + r.tapePressureM - existPressureM + r.mainLoss + r.branchLoss + r.filterLoss + MARGIN_HEAD;
+  const sum = Math.max(0, rawSum);
   document.getElementById('derivationCard').innerHTML = `
     <h3><svg class="svg-icon" style="width:14px;height:14px"><use href="#icon-pump"/></svg>水泵扬程构成</h3>
     <div class="derivation-row"><span>提升高度</span><b class="val">${fmt(r.lift,1)} m</b></div>
@@ -4352,7 +4364,7 @@ function renderDerivation(r) {
     <div class="derivation-sum">
       <div class="expr">
         ${fmt(r.lift,1)} + ${fmt(r.dh,1)} + ${fmt(r.tapePressureM,1)} ${existPressureM > 0 ? '- ' + fmt(existPressureM,1) : ''} + ${fmt(r.mainLoss + r.branchLoss,2)} + ${fmt(r.filterLoss,1)} + ${MARGIN_HEAD}
-        <br/>= <strong>${fmt(sum,2)} m</strong>（安全系数前）
+        <br/>= <strong>${fmt(sum,2)} m</strong>（安全系数前${rawSum < 0 ? '，已有压力已覆盖' : ''}）
       </div>
       <div class="result"><span>× ${SAFETY_FACTOR.toFixed(2)} 安全系数</span><strong>${fmt(r.pumpHead,2)} m</strong></div>
     </div>
@@ -4498,7 +4510,7 @@ function render() {
     </div>
     <dl class="result-list result-list-compact">
       <div><dt>每亩流量</dt><dd>${fmt(r.zoneFlow / r.zoneMu, 2)} m³/h·亩</dd></div>
-      <div><dt>每亩滴灌带长度</dt><dd>${fmt((r.tapesPerZone * r.tapeLen) / r.zoneMu, 1)} m/亩</dd></div>
+      <div><dt>每亩滴灌带长度</dt><dd>${fmt(r.zoneTapeLen / r.zoneMu, 1)} m/亩</dd></div>
       <div><dt>支管多孔折减系数 F</dt><dd>${fmt(r.branchF,4)}</dd></div>
       <div><dt>扬程安全系数前</dt><dd>${fmt(r.headBeforeSafety,2)} m</dd></div>
     </dl>
@@ -4786,16 +4798,17 @@ function computeThreeLevel() {
 
   const totalArea = zoneAreaM2;
   const totalMu = zoneMu;
-  const tapeRows = Math.floor(B / tapeSpacing);
-  const segmentsPerRow = Math.ceil(A / tapeLen);
+  const tapeRows = Math.max(1, Math.ceil(B / tapeSpacing));
+  const segmentsPerRow = Math.max(1, Math.ceil(A / tapeLen));
   const totalTapes = tapeRows * segmentsPerRow;
-  const tapeTotalLen = totalTapes * tapeLen;
+  const tapeTotalLen = totalArea / tapeSpacing;
   const tapeRolls = tapeRollLen > 0 ? Math.ceil(tapeTotalLen * 1.1 / tapeRollLen) : 0;
-  const tapesPerZone = Math.ceil(totalTapes / N);
+  const tapesPerZone = Math.max(1, Math.ceil(totalTapes / N));
 
+  const zoneTapeLen = zoneAreaM2 / tapeSpacing;
   const emittersPerTape = tapeLen / emitterSpacing;
   const tapeFlow = emittersPerTape * emitterFlow / 1000;
-  const zoneFlow = tapesPerZone * tapeFlow;
+  const zoneFlow = zoneTapeLen / emitterSpacing * emitterFlow / 1000;
 
   // Single-zone main pipe (per zone, after the zone valve)
   const mainPipe = selectPipe(zoneFlow, targetV, MAIN_PIPE_MIN_OD);
@@ -4807,7 +4820,7 @@ function computeThreeLevel() {
   const frontPipeLoss = hazenWilliams(frontPipeLen, combinedFlow, frontPipe.id);
 
   const branchFlow = zoneFlow / branchCount;
-  const branchSpan = zoneAreaM2 / tapeLen;
+  const branchSpan = B;
   const branchLen = branchSpan / (branchCount * layoutSides);
   const tapsPerBranch = Math.ceil(tapesPerZone / branchCount);
   const branchF = christiansenF(tapsPerBranch);
@@ -4824,13 +4837,14 @@ function computeThreeLevel() {
 
   // Pump head includes front pipe loss + per-zone main + branch
   const totalPipeLoss = frontPipeLoss + mainLoss + branchLoss;
-  const headBeforeSafety = lift + dh + tapePressureM - existPressure * 10.2 + totalPipeLoss + filterLoss + MARGIN_HEAD;
+  const headBeforeSafetyRaw = lift + dh + tapePressureM - existPressure * 10.2 + totalPipeLoss + filterLoss + MARGIN_HEAD;
+  const headBeforeSafety = Math.max(0, headBeforeSafetyRaw);
   const pumpHead = headBeforeSafety * SAFETY_FACTOR;
 
   // Pump flow = combined flow (all zones simultaneously)
   const pumpPower = efficiency > 0 ? (2.725 * combinedFlow * pumpHead / efficiency / 1000) : 0;
-  const motorKW = Math.ceil(pumpPower / 0.5) * 0.5;
-  const motorKW_rounded = Math.ceil(motorKW);
+  const motorKW = selectMotorPower(pumpPower);
+  const motorKW_rounded = motorKW;
 
   const intensity = zoneMu > 0 ? zoneFlow / zoneMu : 0;
 
@@ -4862,20 +4876,21 @@ function computeThreeLevel() {
     tapeLen, tapeSpacing, tapeDh, emitterSpacing, emitterFlow, tapeOD, tapePressure,
     lift, existPressure, targetV, filterLoss, efficiency, branchCount, mainPipeLen,
     totalArea, totalMu, zoneMu,
-    tapeRows, segmentsPerRow, totalTapes, tapesPerZone, tapeRollLen, tapeTotalLen, tapeRolls,
+    tapeRows, segmentsPerRow, totalTapes, tapesPerZone, tapeRollLen, tapeTotalLen, tapeRolls, zoneTapeLen,
     emittersPerTape, tapeFlow, zoneFlow,
     mainPipe, mainLoss,
     frontPipe, frontPipeLoss, frontPipeLen, zoneCount, combinedFlow, frontAll, frontAlternatives,
     branchPipe, branchLoss, branchFlow, branchLen, branchSpan, layoutSides, tapsPerBranch, branchF,
     tapeID, tapeLoss, tapePressureM, tapeDeltaPct,
-    totalPipeLoss, headBeforeSafety, pumpHead, pumpPower, motorKW, motorKW_rounded,
+    totalPipeLoss, headBeforeSafetyRaw, headBeforeSafety, pumpHead, pumpPower, motorKW, motorKW_rounded,
     intensity, mainAll, branchAll, branchAlternatives
   };
 }
 
 function renderTLDerivation(r) {
   const existPressureM = r.existPressure * 10.2;
-  const sum = r.lift + r.dh + r.tapePressureM - existPressureM + r.totalPipeLoss + r.filterLoss + MARGIN_HEAD;
+  const rawSum = r.lift + r.dh + r.tapePressureM - existPressureM + r.totalPipeLoss + r.filterLoss + MARGIN_HEAD;
+  const sum = Math.max(0, rawSum);
   document.getElementById('tl_derivationCard').innerHTML = `
     <h3><svg class="svg-icon" style="width:14px;height:14px"><use href="#icon-pump"/></svg>水泵扬程构成</h3>
     <div class="derivation-row"><span>提升高度</span><b class="val">${fmt(r.lift,1)} m</b></div>
@@ -4889,7 +4904,7 @@ function renderTLDerivation(r) {
     <div class="derivation-sum">
       <div class="expr">
         ${fmt(r.lift,1)} + ${fmt(r.dh,1)} + ${fmt(r.tapePressureM,1)} ${existPressureM > 0 ? '- ' + fmt(existPressureM,1) : ''} + ${fmt(r.totalPipeLoss,2)} + ${fmt(r.filterLoss,1)} + ${MARGIN_HEAD}
-        <br/>= <strong>${fmt(sum,2)} m</strong>（安全系数前）
+        <br/>= <strong>${fmt(sum,2)} m</strong>（安全系数前${rawSum < 0 ? '，已有压力已覆盖' : ''}）
       </div>
       <div class="result"><span>× ${SAFETY_FACTOR.toFixed(2)} 安全系数</span><strong>${fmt(r.pumpHead,2)} m</strong></div>
     </div>
@@ -6855,20 +6870,23 @@ function calcPlan(){
     planNEl.disabled = manualZoneMu > 0;
   }
 
-  // Drip tape computation (total)
+  // Drip tape computation: length drives flow and material quantity; segment count drives fittings/connectors.
   const mainPipeLen = A;
-  const tapeRows = Math.floor(B / tapeSpacing);
-  const segmentsPerRow = Math.ceil(A / tapeLen);
+  const tapeRows = Math.max(1, Math.ceil(B / tapeSpacing));
+  const segmentsPerRow = Math.max(1, Math.ceil(A / tapeLen));
   const totalTapes = tapeRows * segmentsPerRow;
-  const tapeTotalLen = totalTapes * tapeLen;
+  const tapeTotalLen = area / tapeSpacing;
   const tapeRolls = tapeRollLen > 0 ? Math.ceil(tapeTotalLen * 1.1 / tapeRollLen) : 0;
 
   // Per-zone flow (pump sized for single zone operation)
-  const emittersPerTape = tapeLen / emitterSpacing;
-  const tapeFlow = emittersPerTape * emitterFlow / 1000; // m³/h per tape
   const zoneAreaM2 = zoneLayout.zoneArea;
-  const tapesPerZone = Math.ceil(zoneAreaM2 / (tapeLen * tapeSpacing));
-  const zoneFlow = tapesPerZone * tapeFlow;  // single zone flow → pump sizing
+  const zoneTapeLen = zoneAreaM2 / tapeSpacing;
+  const zoneRows = Math.max(1, Math.ceil((zoneLayout.drawZoneH || zoneLayout.zoneH || B) / tapeSpacing));
+  const zoneSegmentsPerRow = Math.max(1, Math.ceil((zoneLayout.drawZoneW || zoneLayout.zoneW || A) / tapeLen));
+  const tapesPerZone = zoneRows * zoneSegmentsPerRow;
+  const emittersPerTape = tapeLen / emitterSpacing;
+  const tapeFlow = emittersPerTape * emitterFlow / 1000; // m³/h per full-length tape segment
+  const zoneFlow = zoneTapeLen / emitterSpacing * emitterFlow / 1000;  // single zone flow → pump sizing
   const zoneMu = zoneAreaM2 / MU_TO_SQM;
   const intensity = zoneMu > 0 ? zoneFlow / zoneMu : 0; // m³/h per mu
 
@@ -6877,16 +6895,17 @@ function calcPlan(){
   const mainLoss = hazenWilliams(mainPipeLen, zoneFlow, mainPipe.id);
   const branchFlow = zoneFlow / branchCount;
   const branchPipe = selectPipe(branchFlow, targetV, 0, BRANCH_PIPE_MAX_OD);
-  const branchSpan = zoneAreaM2 / tapeLen;
-  const branchLen = Math.min(branchSpan / (branchCount * layoutSides), B);
+  const branchSpan = Math.max(0, zoneLayout.drawZoneH || zoneLayout.zoneH || B);
+  const branchLen = branchSpan / (branchCount * layoutSides);
   const tapsPerBranch = Math.ceil(tapesPerZone / branchCount);
   const branchF = christiansenF(tapsPerBranch);
   const branchLoss = hazenWilliams(branchLen, branchFlow, branchPipe.id) * branchF;
   const tapePressureM = tapePressure * 10.2;
-  const headBeforeSafety = lift + dh + tapePressureM - existPressure * 10.2 + mainLoss + branchLoss + filterLoss + MARGIN_HEAD;
+  const headBeforeSafetyRaw = lift + dh + tapePressureM - existPressure * 10.2 + mainLoss + branchLoss + filterLoss + MARGIN_HEAD;
+  const headBeforeSafety = Math.max(0, headBeforeSafetyRaw);
   const pumpHead = headBeforeSafety * SAFETY_FACTOR;
   const pumpPower = efficiency > 0 ? (2.725 * zoneFlow * pumpHead / efficiency / 1000) : 0;
-  const motorKW = Math.ceil(pumpPower * 2) / 2; // round to nearest 0.5
+  const motorKW = selectMotorPower(pumpPower);
 
   // Update display — Row 1 (input area)
   document.getElementById('planA').textContent = A;
@@ -6902,8 +6921,7 @@ function calcPlan(){
   document.getElementById('planMainVelocity').textContent = mainPipe.v.toFixed(2);
   document.getElementById('planBranchPipe').textContent = 'Ø '+branchPipe.od+' mm';
   document.getElementById('planBranchVelocity').textContent = branchPipe.v.toFixed(2);
-  // 支管总长度 = (分区面积 m² ÷ 滴灌带长度 m) ÷ (支管根数 × 敷设边数)
-  // 超出地块边界的部分不计算
+  // 单根支管长度 = 分区垂直跨度 ÷ (支管根数 × 敷设边数)；超出地块边界的部分不计算。
   var branchSingleLen = Math.round(branchLen);
   document.getElementById('planBranchSingleLen').textContent = branchSingleLen;
 
@@ -6913,7 +6931,7 @@ function calcPlan(){
   if(tag) tag.innerHTML='实测 <b>'+area.toFixed(1)+' m²</b> · '+totalMu.toFixed(2)+' 亩 · '+(layoutSides===2?'双边':'单边')+' · '+zoneLayout.cols+'列×'+zoneLayout.rows+'行 · '+zoneModeLabel+'<b>'+Math.round(zoneLayout.zoneW)+'×'+Math.round(zoneLayout.zoneH)+'m</b>';
 
   // Store all data for apply
-  window.planData = { A, B, N, zoneCols: zoneLayout.cols, zoneRows: zoneLayout.rows, zoneW: zoneLayout.zoneW, zoneH: zoneLayout.zoneH, mainPipeLen, tapeLen, tapeSpacing, emitterSpacing, emitterFlow, tapeRollLen, lift, dh, totalMu, zoneFlow, pumpHead, pumpPower, motorKW, intensity, manualZoneMu, targetV, mainPipeOD:'Ø '+mainPipe.od+' mm', branchPipeOD:'Ø '+branchPipe.od+' mm', mainPipeODValue:mainPipe.od, branchPipeODValue:branchPipe.od, mainVelocity:mainPipe.v, branchVelocity:branchPipe.v };
+  window.planData = { A, B, N, zoneCols: zoneLayout.cols, zoneRows: zoneLayout.rows, zoneW: zoneLayout.zoneW, zoneH: zoneLayout.zoneH, mainPipeLen, tapeLen, tapeSpacing, emitterSpacing, emitterFlow, tapeRollLen, tapeTotalLen, totalTapes, tapesPerZone, zoneTapeLen, lift, dh, totalMu, zoneFlow, pumpHead, pumpPower, motorKW, intensity, manualZoneMu, targetV, mainPipeOD:'Ø '+mainPipe.od+' mm', branchPipeOD:'Ø '+branchPipe.od+' mm', mainPipeODValue:mainPipe.od, branchPipeODValue:branchPipe.od, mainVelocity:mainPipe.v, branchVelocity:branchPipe.v };
   if(typeof render==='function') render();
   if(typeof window.ppRender==='function') window.ppRender();
   if(typeof window.ppRefreshDiagramIfVisible==='function') window.ppRefreshDiagramIfVisible();
@@ -8741,6 +8759,10 @@ function calcPlan(){
         tlAutoGenerate({scroll:false});
       }
     }catch(e){ console.warn('[ppGenerate] 三级管线图生成失败', e); }
+    // 同步联动二级管线（水源—供水主管段）首部系统图：新标签页打开 二级系统图.html，带流量/扬程/功率/管径参数
+    try{
+      if(typeof openL2Head==='function') openL2Head();
+    }catch(e){ console.warn('[ppGenerate] 二级管线图打开失败', e); }
   });
 
   // Download
@@ -9084,7 +9106,7 @@ var DEFAULTS = {
   fertCount: 1, ferts: [{ type: '文丘里', dn: 25 }],
   show: { num: true, dn: true, legend: true, table: true, notes: true, sign: true }
 };
-var DN_OPT = [50, 63, 75, 80, 90, 100, 110, 125, 150];
+var DN_OPT = [50, 63, 75, 80, 90, 100, 110, 125, 140, 150, 160, 180, 200, 225, 250, 280, 315, 355, 400, 450, 500];
 var FDN_OPT = [16, 20, 25, 32, 40];
 var cfg = null;
 var saved = null;
@@ -9617,13 +9639,12 @@ function nearestDN(v, arr) {
   return best;
 }
 
-/* 从润野计算结果联动：水泵流量/扬程/功率、主管管径、支管管径 → 吸水管 */
+/* 从润野计算结果联动：水泵流量/扬程/功率、主管管径；吸水管按水泵总流量同主管联动 */
 function hmSyncFromRunye() {
   function txt(id) { var el = document.getElementById(id); return el ? el.textContent.trim() : ''; }
   var flow = txt('planPumpFlow'), head = txt('planPumpHead'), power = txt('planPumpPower');
-  var mainTxt = txt('planMainPipe'), branchTxt = txt('planBranchPipe');
+  var mainTxt = txt('planMainPipe');
   var mainDN = (mainTxt.match(/(\d+)/) || [])[1];
-  var branchDN = (branchTxt.match(/(\d+)/) || [])[1];
   var hasCalc = flow && flow !== '—' && flow !== '';
 
   // 工程名称联动计算结果
@@ -9636,10 +9657,10 @@ function hmSyncFromRunye() {
   cfg.title = parts.join(' · ');
 
   // 管径联动
-  if (mainDN) cfg.mainDN = nearestDN(parseInt(mainDN, 10), DN_OPT);
-  if (branchDN) {
-    var sv = parseInt(branchDN, 10);
-    cfg.suctionDN = nearestDN(Math.max(sv, Math.min(80, parseInt(mainDN, 10) || 80)), DN_OPT);
+  if (mainDN) {
+    var mv = parseInt(mainDN, 10);
+    cfg.mainDN = nearestDN(mv, DN_OPT);
+    cfg.suctionDN = nearestDN(mv, DN_OPT);
   }
   // 水泵备注：写入图签日期旁的说明已够用，这里不额外处理
   persist();
@@ -9647,7 +9668,7 @@ function hmSyncFromRunye() {
 
 /* 从三级系统计算结果联动（一键生成管线图的结果栏）：
    供水主管 ← 三级「总管」（承载联合流量，首部至各轮灌区，物理同根）
-   吸水管   ← 三级「主管」（水泵进口侧按分区主干就近匹配）
+   吸水管   ← 三级「总管」（泵前同样承载联合总流量，避免按单区主管导致偏小）
    Q/H/P    ← 三级「水泵流量/扬程/功率」 */
 function hmSyncFromThreeLevel() {
   function txt(id) { var el = document.getElementById(id); return el ? el.textContent.trim() : ''; }
@@ -9663,9 +9684,12 @@ function hmSyncFromThreeLevel() {
     if (power) parts.push('P ' + power);
     cfg.title = parts.join(' · ');
   }
-  // 管径联动：三级「总管」→ 供水主管；三级「主管」→ 吸水管
-  if (frontDN) cfg.mainDN = nearestDN(parseInt(frontDN, 10), DN_OPT);
-  if (mainDN) cfg.suctionDN = nearestDN(parseInt(mainDN, 10), DN_OPT);
+  // 管径联动：三级「总管」同时决定供水主管和泵前吸水管。
+  if (frontDN) {
+    var fv = parseInt(frontDN, 10);
+    cfg.mainDN = nearestDN(fv, DN_OPT);
+    cfg.suctionDN = nearestDN(fv, DN_OPT);
+  }
   persist();
   return hasCalc;
 }
@@ -9697,7 +9721,7 @@ function openL2Head() {
   function txt(id) { var el = document.getElementById(id); return el ? el.textContent.trim() : ''; }
   var q = txt('planPumpFlow'), h = txt('planPumpHead'), p = txt('planPumpPower');
   var main = (txt('planMainPipe').match(/(\d+)/) || [])[1] || '';
-  var suc = (txt('planBranchPipe').match(/(\d+)/) || [])[1] || '';
+  var suc = main;
   var base = encodeURI('二级系统图.html');
   var url = base + '?q=' + encodeURIComponent(q) +
             '&h=' + encodeURIComponent(h) +
