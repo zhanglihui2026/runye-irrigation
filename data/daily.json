@@ -1,13 +1,13 @@
 {
-  "updated_at": "2026-08-29T09:04:58+08:00",
+  "updated_at": "2026-08-30T09:03:53+08:00",
   "schema_version": 1,
   "source": "github-actions",
   "weather": {
     "location": "海南·三亚",
-    "temp": 27.8,
-    "rain_mm": 0.3,
-    "humidity": 89,
-    "wind": "7.4 m/s",
+    "temp": 26.7,
+    "rain_mm": 0.1,
+    "humidity": 93,
+    "wind": "6.4 m/s",
     "note": "Open-Meteo 实时气象（每日 09:00 北京时间自动更新）"
   },
   "prices": {},
