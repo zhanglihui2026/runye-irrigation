@@ -1641,6 +1641,8 @@ main,footer{position:relative;z-index:1}
   --bg:#eef2f9;
 }
 .tl-overlay.active{display:block}
+/* 三级系统查询浮层已隐藏（二级简图下方已内置三级系统出图），强制隐藏避免误触发 */
+#threeLevelView{display:none !important}
 .tl-header{
   position:sticky;top:0;z-index:10;
   background:#fff;border-bottom:1px solid #dcfce7;
@@ -3099,7 +3101,6 @@ input[type="reset"],
         <div class="nav-item"><a href="数字农业.html" class="nav-link">数字农业</a></div>
         <div class="nav-item"><a href="index.html" class="nav-link active">精准灌溉</a></div>
         <div class="nav-item"><a href="耐特菲姆滴灌带长度查询器.html" class="nav-link">滴灌带查询</a></div>
-        <div class="nav-item"><a href="index.html#three-level-view" class="nav-link">三级系统</a></div>
         <div class="nav-item"><a href="qicai-huasheng/index.html" class="nav-link">种植方案</a></div>
         <div class="nav-item"><a href="文献/花生钙营养管理_整理翻译.html" class="nav-link">文献查询</a></div>
       </nav>
@@ -3456,7 +3457,6 @@ input[type="reset"],
       <span style="flex:1"></span>
       <button class="pp-btn-generate" id="ppHeadGen" style="padding:6px 16px;font-size:13px">⚙️ 生成系统图</button>
       <button class="pp-btn-ghost" id="ppSavePng" style="display:none" title="将施工简图保存为 PNG 图片">📥 保存图片</button>
-      <button class="tl-trigger-btn-inline" onclick="openThreeLevelView(true)" title="三级管线：多分区联合灌溉总管选型 + 管路规划">三级管设计</button>
     </div>
     <div id="ppDiagramContent"><div class="pp-diagram-empty">完成面积测量并点击「生成施工图」后，这里显示最终施工图；点击右上「⚙️ 生成」生成供水首部系统图（水源—供水主管段）。</div></div>
   </div>
@@ -5201,20 +5201,20 @@ function closeThreeLevelView() {
   document.body.style.overflow = '';
 }
 
-// 门户页跳转直达三级系统视图：URL 带 #three-level-view 时自动打开浮层
-(function(){
-  function tryOpenThreeLevelFromHash(){
-    if(location.hash === '#three-level-view'){
-      try{ openThreeLevelView(); }catch(e){ console.warn('[hash] openThreeLevelView failed:', e); }
-    }
-  }
-  window.addEventListener('hashchange', tryOpenThreeLevelFromHash);
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', tryOpenThreeLevelFromHash);
-  } else {
-    tryOpenThreeLevelFromHash();
-  }
-})();
+// 三级系统查询浮层已隐藏（二级简图下方已内置三级系统出图），URL 锚点 #three-level-view 不再自动打开浮层
+// (function(){
+//   function tryOpenThreeLevelFromHash(){
+//     if(location.hash === '#three-level-view'){
+//       try{ openThreeLevelView(); }catch(e){ console.warn('[hash] openThreeLevelView failed:', e); }
+//     }
+//   }
+//   window.addEventListener('hashchange', tryOpenThreeLevelFromHash);
+//   if(document.readyState === 'loading'){
+//     document.addEventListener('DOMContentLoaded', tryOpenThreeLevelFromHash);
+//   } else {
+//     tryOpenThreeLevelFromHash();
+//   }
+// })();
 
 // Three-level view event listeners
 document.querySelectorAll('#threeLevelView input[type="number"]').forEach(inp => {
