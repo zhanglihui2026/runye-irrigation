@@ -107,6 +107,19 @@
   .wb-land-card .lc-row{font-size:13px;color:var(--s-600);margin:3px 0;display:flex;justify-content:space-between;}
   .wb-land-card .lc-row b{color:var(--s-800);font-weight:600;}
 
+  /* 地块图形看板卡片 */
+  .wb-land-card .lc-svg-wrap{background:#f8fafc;border:1px solid var(--line);border-radius:var(--radius);padding:8px;margin:10px 0;display:flex;align-items:center;justify-content:center;min-height:140px;}
+  .wb-land-card .lc-svg-wrap svg.lc-svg{width:100%;height:auto;display:block;}
+  .wb-land-card .lc-svg-empty{color:var(--s-400);font-size:12px;text-align:center;padding:18px 8px;}
+  .lc-svg-wrap{background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:8px;margin:10px 0;display:flex;align-items:center;justify-content:center;min-height:140px;}
+  .lc-svg-wrap svg{width:100%;height:auto;display:block;}
+  .lc-svg-empty{color:var(--s-400);font-size:12px;text-align:center;padding:18px 8px;}
+  .wb-land-card .lc-stage{margin-top:8px;font-size:12px;color:var(--s-600);line-height:1.55;}
+  .wb-land-card .lc-stage .lc-stage-line{margin:0 0 2px;}
+  .wb-land-card .lc-stage .lc-stage-target{color:var(--g-700);}
+  .wb-land-card .lc-area{font-size:13px;color:var(--s-600);margin-top:6px;}
+  .wb-land-card .lc-area b{color:var(--s-800);font-weight:700;}
+
   /* 详情骨架 */
   .wb-detail-tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);margin-bottom:18px;flex-wrap:wrap;}
   .wb-detail-tabs button{padding:10px 16px;border:none;background:transparent;font-size:14px;font-weight:600;color:var(--s-600);cursor:pointer;border-bottom:2px solid transparent;font-family:inherit;}
@@ -125,6 +138,75 @@
   .wb-decision .dc-ops{font-size:13px;color:var(--s-700);max-width:520px;line-height:1.5;}
   .wb-decision .dc-warn{color:#c2410c;font-weight:700;font-size:14px;}
   .wb-decision .dc-hint{font-size:11px;color:var(--s-400);width:100%;margin-top:2px;}
+
+  /* 种植历程 · 日历卡片 */
+  .tl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:10px;}
+  .tl-card{background:#fff;border:1px solid var(--g-200);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:6px;transition:box-shadow .15s,transform .15s;}
+  .tl-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.08);}
+  .tl-card.tl-passed{background:var(--g-50);border-color:var(--g-200);}
+  .tl-card.tl-active{border-color:#22c55e;background:#f0fdf4;box-shadow:0 0 0 1px #22c55e;}
+  .tl-card-head{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .tl-card-date{font-size:13px;font-weight:800;color:var(--g-800);}
+  .tl-card-win{font-size:11px;color:var(--s-500);background:var(--s-50);padding:2px 6px;border-radius:4px;white-space:nowrap;}
+  .tl-card-stage{font-size:13px;font-weight:700;color:var(--g-700);line-height:1.2;}
+  .tl-card-op{font-size:12px;color:var(--s-600);line-height:1.45;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+  .tl-card-badge{font-size:11px;color:var(--g-600);display:flex;align-items:center;gap:4px;margin-top:auto;}
+  .tl-card.tl-click{cursor:pointer;}
+  .tl-card.tl-click:hover{box-shadow:0 6px 18px rgba(0,0,0,.12);transform:translateY(-2px);}
+  .tl-card-hint{font-size:11px;color:var(--g-600);margin-top:auto;display:flex;align-items:center;gap:4px;}
+
+  /* 农业气象看板 */
+  .wx-panel{background:#fff;border:1px solid var(--g-200);border-radius:12px;padding:14px;margin:12px 0;}
+  .wx-title{font-size:15px;font-weight:700;color:var(--g-800);margin:0 0 10px;display:flex;align-items:center;justify-content:space-between;}
+  .wx-sub{font-size:12px;color:var(--s-500);font-weight:400;}
+  .wx-yesterday{display:flex;gap:12px;flex-wrap:wrap;align-items:center;background:linear-gradient(135deg,#f0fdf4,#ecfeff);border:1px solid var(--g-200);border-radius:12px;padding:14px;margin:12px 0;}
+  .wx-yesterday .wx-loc{min-width:180px;}
+  .wx-yesterday h3{margin:0 0 2px;font-size:15px;color:var(--g-800);}
+  .wx-yesterday .wx-date{font-size:12px;color:var(--s-500);}
+  .wx-yesterday .wx-items{display:flex;gap:24px;flex-wrap:wrap;flex:1;}
+  .wx-yesterday .wx-item{text-align:center;min-width:70px;}
+  .wx-yesterday .wx-item-label{font-size:11px;color:var(--s-500);margin-bottom:2px;}
+  .wx-yesterday .wx-item-val{font-size:18px;font-weight:800;color:var(--g-700);}
+  .wx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin:12px 0;}
+  .wx-card{background:#f8fafc;border:1px solid var(--g-200);border-radius:10px;padding:12px;text-align:center;}
+  .wx-card .wx-card-label{font-size:12px;color:var(--s-500);margin-bottom:4px;}
+  .wx-card .wx-card-val{font-size:17px;font-weight:800;color:var(--g-700);line-height:1.2;}
+  .wx-card .wx-card-unit{font-size:12px;color:var(--s-400);margin-left:2px;}
+  .wx-card.warn .wx-card-val{color:#dc2626;}
+  .wx-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px;}
+  .wx-table th,.wx-table td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:center;white-space:nowrap;}
+  .wx-table th{background:#f8fafc;color:var(--s-600);font-weight:600;position:sticky;top:0;}
+  .wx-table td{color:var(--s-800);}
+  .wx-table .wx-td-left{text-align:left;}
+  .wx-scroller{max-height:360px;overflow:auto;border:1px solid var(--line);border-radius:8px;}
+
+  /* 地块参数编辑面板（位置 / 播期 / 底肥） */
+  .wb-param-panel{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;margin:14px 0;box-shadow:var(--shadow);}
+  .wb-param-panel h2{font-size:15px;font-weight:700;color:var(--g-800);margin:0 0 12px;border-left:3px solid var(--g-600);padding-left:8px;}
+  .wb-param-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;}
+  .wb-param-field label{display:block;font-size:12px;color:var(--s-600);margin-bottom:4px;font-weight:600;}
+  .wb-param-field input,.wb-param-field select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:9px;font-size:14px;font-family:inherit;color:var(--s-800);background:#fff;}
+  .wb-param-field .unit{font-size:12px;color:var(--s-400);margin-left:4px;}
+  .wb-param-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:14px;}
+  .wb-param-actions-field{display:flex;flex-direction:column;justify-content:flex-end;gap:8px;min-width:240px;}
+  .wb-param-actions-field .wb-param-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:0;}
+  .wb-param-actions-field .wb-param-hint{font-size:12px;color:var(--s-500);margin:0;line-height:1.4;white-space:nowrap;}
+  .wb-param-hint.ok{color:var(--g-700);}
+
+  /* 地块详情头部（标题 + 昨日天气） */
+  .wb-detail-header{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin:14px 0;}
+  .wb-detail-title{flex:1;min-width:220px;}
+  .wb-detail-title .wb-section-title{margin:0 0 4px;padding-left:12px;border-left:4px solid var(--g-600);}
+  .wb-detail-title .wb-muted{margin:0;line-height:1.8;}
+  .wb-detail-title .wb-muted .wb-date-tag{background:var(--g-50);border:1px solid var(--g-200);padding:2px 8px;font-size:12px;font-weight:700;color:var(--g-700);display:inline-flex;align-items:center;vertical-align:middle;}
+  .wb-header-weather{background:linear-gradient(135deg,#f0fdf4,#ecfeff);border:1px solid var(--g-200);border-radius:12px;padding:10px 14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;min-width:280px;max-width:520px;}
+  .wb-header-weather .wh-loc{min-width:140px;}
+  .wb-header-weather .wh-loc h3{margin:0 0 2px;font-size:14px;color:var(--g-800);}
+  .wb-header-weather .wh-date{font-size:11px;color:var(--s-500);}
+  .wb-header-weather .wh-items{display:flex;gap:18px;flex-wrap:wrap;flex:1;}
+  .wb-header-weather .wh-item{text-align:center;min-width:54px;}
+  .wb-header-weather .wh-item-label{font-size:11px;color:var(--s-500);margin-bottom:1px;}
+  .wb-header-weather .wh-item-val{font-size:16px;font-weight:800;color:var(--g-700);}
 
   /* 表单 / 弹窗 */
   .wb-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:500;padding:16px;}
@@ -176,9 +258,14 @@
   .wb-ops-table col:nth-child(4){width:95px;}
   .wb-ops-table col:nth-child(6){width:112px;}
   .wb-ops-table td:first-child a{display:block;max-width:145px;line-height:1.45;}
-  .wb-ops-table td:nth-child(3),.wb-ops-table td:nth-child(5){line-height:1.6;}
+  .wb-ops-table td:nth-child(3),.wb-ops-table td:nth-child(4){line-height:1.5;}
+  .wb-ops-table td:nth-child(5){padding:0;vertical-align:top;min-width:240px;}
+.wb-ops-table td:nth-child(5) .wb-cell-clamp{font-size:13px;line-height:1.55;padding:10px 12px;box-sizing:content-box;word-break:break-all;white-space:normal;}
+.wb-dispatch-table td:nth-child(5){line-height:1.5;}
+.wb-dispatch-table td:nth-child(6){padding:0;vertical-align:top;min-width:240px;}
+.wb-dispatch-table td:nth-child(6) .wb-cell-clamp{font-size:13px;line-height:1.55;padding:10px 12px;box-sizing:content-box;word-break:break-all;white-space:normal;}
   .wb-table th,.wb-table td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;}
-  .wb-table th{background:var(--s-50);color:var(--s-700);font-weight:700;}
+  .wb-table th{background:var(--s-50);color:var(--s-700);font-weight:700;vertical-align:middle;line-height:1.3;}
   .wb-table tr:hover td{background:var(--g-50);}
 
   /* 灌溉方案列表 */
@@ -558,7 +645,6 @@
     </a>
     <div class="wb-header-links">
       <a href="#/dashboard">总控看板</a>
-      <a href="peanut-tool.html">水肥植保决策</a>
       <a href="index.html">精准灌溉</a>
     </div>
   </div>
@@ -569,15 +655,17 @@
     <div class="wb-side-kicker">功能</div>
     <div class="wb-side-title">功能切换</div>
     <nav class="wb-nav" id="wbNav">
-      <a href="#/dashboard" data-route="dashboard"><span class="wb-nav-mark">总</span><span>总控看板<small>今日作业、风险、库存、经营</small></span></a>
+      <a href="#/dashboard" data-route="dashboard"><span class="wb-nav-mark">总</span><span>总控看板<small>作业、风险、库存、经营</small></span></a>
       <a href="#/lands" data-route="lands"><span class="wb-nav-mark">地</span><span>地块中心<small>地块档案、筛选、详情管理</small></span></a>
       <a href="#/dispatch" data-route="dispatch"><span class="wb-nav-mark">调</span><span>统防调度<small>多地块作业窗口、派工单</small></span></a>
       <a href="#/purchase" data-route="purchase"><span class="wb-nav-mark">采</span><span>采购测算<small>农资需求、库存缺口、金额</small></span></a>
       <a href="#/reports" data-route="reports"><span class="wb-nav-mark">报</span><span>报表中心<small>记录汇总、投入统计、导出</small></span></a>
+      <a href="#/materials" data-route="materials"><span class="wb-nav-mark">库</span><span>物资库<small>植保方案物资、使用登记</small></span></a>
+      <a href="peanut-tool.html"><span class="wb-nav-mark">保</span><span>植保决策<small>用药用肥、节点预警</small></span></a>
     </nav>
     <div class="wb-side-actions">
       <button type="button" onclick="openNewLandModal()">新建地块</button>
-      <button type="button" onclick="openMaterialModal()">物资字典</button>
+      <button type="button" onclick="location.hash='#/materials'">物资库</button>
       <a href="qicai-huasheng/index.html">植保方案</a>
     </div>
   </aside>
@@ -612,6 +700,7 @@ function migrate(old){
   if(old && old.materials) fresh.materials=old.materials;
   if(old && old.tasks) fresh.tasks=old.tasks;
   if(old && old.crop_plans) fresh.crop_plans=old.crop_plans;
+  if(old && old.usageRecords) fresh.usageRecords=old.usageRecords;
   return fresh;
 }
 function dbInit(){
@@ -621,6 +710,7 @@ function dbInit(){
     records:[],        // 农事记录（施肥/用药/灌溉/耕作/采收/长势）
     irrigation_projects:[], // 历史兼容字段：工作台不再展示或打开灌溉设计工具
     materials:[],      // 物资字典
+    usageRecords:[],   // 物资使用明细（地块/日期/用量/操作人/备注/照片）
     tasks:[],          // 农事待办
     crop_plans:[]      // 后续可扩展的作物方案配置
   };
@@ -698,19 +788,50 @@ function addLand(data){
     create_time: data.create_time||new Date().toISOString(),
     remark: data.remark||''
   };
-  DB.lands.push(land); dbSave(DB);
+  DB.lands.push(land); dbSave(DB); syncLandsToPlotLibrary();
   return land;
 }
 function updateLand(id, patch){
   var l=getLand(id); if(!l) return null;
   for(var k in patch){ if(patch.hasOwnProperty(k)) l[k]=patch[k]; }
-  dbSave(DB); return l;
+  dbSave(DB); syncLandsToPlotLibrary(); return l;
 }
 function deleteLand(id){
   DB.lands=DB.lands.filter(function(l){return l.land_id!==id;});
   DB.records=DB.records.filter(function(r){return r.land_id!==id;});
   DB.irrigation_projects=DB.irrigation_projects.filter(function(p){return p.land_id!==id;});
-  dbSave(DB);
+  dbSave(DB); syncLandsToPlotLibrary();
+}
+/* ---------- 单向同步：以 DB.lands 为主，映射写回 runye_plot_library，使植保决策图形看板与地块中心一致 ---------- */
+function syncLandsToPlotLibrary(){
+  try{
+    var arr=[];
+    try{ var raw=localStorage.getItem('runye_plot_library'); if(raw) arr=JSON.parse(raw)||[]; }catch(e){ arr=[]; }
+    if(!Array.isArray(arr)) arr=[];
+    var pool=arr.slice();
+    var out=[];
+    getLands().forEach(function(l){
+      var ex=null, idx=-1, i, p, pa;
+      for(i=0;i<pool.length;i++){ p=pool[i]; if(p&&(p.id===l.land_id||p.plotId===l.land_id||(l.legacy_id&&p.id===l.legacy_id))){ ex=p; idx=i; break; } }
+      if(!ex){ for(i=0;i<pool.length;i++){ p=pool[i]; if(p&&samePlotName(p.name,l.name)){ ex=p; idx=i; break; } } }
+      if(!ex){ var la=landAreaMu(l); if(la>0){ for(i=0;i<pool.length;i++){ p=pool[i]; pa=parseFloat(p&&p.mu)||0; if(pa>0&&Math.abs(la-pa)<=Math.max(0.05,la*0.003)){ ex=p; idx=i; break; } } } }
+      if(idx>=0) pool.splice(idx,1);
+      var geo=landGeo(l);
+      var item=ex?JSON.parse(JSON.stringify(ex)):{};
+      item.id=l.land_id; item.plotId=l.land_id;
+      item.name=l.name||(ex&&ex.name)||'未命名地块';
+      var mu=(geo&&geo.mu>0?geo.mu:(ex&&ex.mu?ex.mu:landAreaMu(l))); item.mu=mu>0?mu:(ex&&ex.mu||0);
+      item.poly=(ex&&ex.poly&&ex.poly.length>=3)?ex.poly:(geo&&geo.poly&&geo.poly.length>=3?geo.poly:(ex&&ex.poly||[]));
+      item.plantingDate=(ex&&ex.plantingDate)||l.plant_date||null;
+      item.basal=(ex&&ex.basal!=null)?ex.basal:(l.base_fertilizer||null);
+      item.locationName=(ex&&ex.locationName)||l.planting_location||l.farm||null;
+      item.ts=(ex&&ex.ts)||Date.now();
+      if(l.legacy_id!==l.land_id){ l.legacy_id=l.land_id; }
+      out.push(item);
+    });
+    localStorage.setItem('runye_plot_library', JSON.stringify(out));
+    dbSave(DB);
+  }catch(e){ console.error('syncLandsToPlotLibrary failed', e); }
 }
 
 /* ---------- 兼容：把现有 runye_plot_library 地块导入为 land（一次性引导） ---------- */
@@ -789,12 +910,43 @@ function addMaterial(data){
     batch_no: data.batch_no||'',
     expiry_date: data.expiry_date||'',
     interval_days: data.interval_days||'',
-    recommend_dosage: data.recommend_dosage||''
+    recommend_dosage: data.recommend_dosage||'',
+    photo: data.photo||''
   };
   DB.materials.push(m); dbSave(DB); return m;
 }
 function deleteMaterial(id){
   DB.materials=DB.materials.filter(function(m){return m.material_id!==id;});
+  DB.usageRecords=(DB.usageRecords||[]).filter(function(u){return u.material_id!==id;});
+  dbSave(DB);
+}
+
+/* ---------- 物资使用明细 CRUD ---------- */
+function getUsageRecords(mid){
+  var all=DB.usageRecords||[];
+  return mid ? all.filter(function(u){return u.material_id===mid;}) : all;
+}
+function addUsageRecord(data){
+  var u={
+    usage_id: data.usage_id||uid('use'),
+    material_id: data.material_id||'',
+    land_id: data.land_id||'',
+    land_name: data.land_name||'',
+    operate_date: data.operate_date||todayISO(),
+    dosage: data.dosage||'',
+    operator: data.operator||'',
+    interval_days: data.interval_days||'',
+    remark: data.remark||'',
+    photo: data.photo||'',
+    create_time: data.create_time||new Date().toISOString()
+  };
+  DB.usageRecords=DB.usageRecords||[];
+  DB.usageRecords.push(u);
+  dbSave(DB);
+  return u;
+}
+function deleteUsageRecord(id){
+  DB.usageRecords=(DB.usageRecords||[]).filter(function(u){return u.usage_id!==id;});
   dbSave(DB);
 }
 
@@ -838,6 +990,171 @@ var STATUS_LABEL={wait:'待播种',planting:'种植中',fallow:'休耕'};
 var RECORD_TYPES=['施肥','用药','灌溉','耕作','采收','长势'];
 
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+
+/* ---------- 地块图形看板：坐标转换与 SVG 渲染 ---------- */
+var PLOT_STAGE_META={
+  seedling:{label:"播种出苗期",dayRange:"0-14 天",target:"防烂种、促齐苗、少扰根"},
+  vegetative:{label:"营养生长期",dayRange:"15-29 天",target:"稳苗架、促根瘤、避免徒长"},
+  flowering:{label:"开花下针期",dayRange:"30-49 天",target:"稳水、补硼钼、下针前浅施石膏粉防空壳"},
+  pod:{label:"结荚膨大期",dayRange:"50-89 天",target:"补钾钙、保荚果、控病害"},
+  harvest:{label:"成熟收获期",dayRange:"90 天以上",target:"降湿防霉、抢晴采收"}
+};
+function stageFromDays(d){
+  if(d<15) return "seedling"; if(d<30) return "vegetative";
+  if(d<50) return "flowering"; if(d<90) return "pod"; return "harvest";
+}
+function daysSincePlant(sowText){
+  if(!sowText) return null;
+  var planted=new Date(sowText+"T00:00:00+08:00"); var now=new Date();
+  if(isNaN(planted.getTime())) return null;
+  return Math.max(0, Math.floor((now.getTime()-planted.getTime())/86400000));
+}
+function normPoly(poly){
+  if(!poly||!poly.length) return [];
+  var first=poly[0];
+  if(Array.isArray(first)){ return toMeters(poly.map(function(a){return {lat:a[0],lng:a[1]};})); }
+  if(first.x!=null && first.y!=null) return poly;
+  if(first.lat!=null && first.lng!=null) return toMeters(poly);
+  return [];
+}
+function toMeters(pts){
+  if(!pts||!pts.length) return [];
+  var clat=pts.reduce(function(s,p){return s+p.lat;},0)/pts.length, mlat=Math.PI/180*6378137, cosLat=Math.cos(clat*Math.PI/180), refLng=pts[0].lng, refLat=clat;
+  return pts.map(function(p){ return {x:Math.round((p.lng-refLng)*mlat*cosLat*100)/100, y:Math.round((p.lat-refLat)*mlat*100)/100}; });
+}
+function plotToSvg(poly){
+  var minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+  poly.forEach(function(p){ if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x; if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y; });
+  var w=maxX-minX, h=maxY-minY;
+  if(w<=0&&h<=0) return '';
+  var VB=120, PAD=14, IN=VB-2*PAD;
+  var scale=(w>0&&h>0)?Math.min(IN/w,IN/h):(w>0?IN/w:IN/h);
+  if(!isFinite(scale)||scale<=0) scale=1;
+  var sw=w*scale, sh=h*scale, ox=PAD+(IN-sw)/2, oy=PAD+(IN-sh)/2;
+  var pts=poly.map(function(p){ return (ox+(p.x-minX)*scale).toFixed(1)+','+(oy+(maxY-p.y)*scale).toFixed(1); }).join(' ');
+  var cx=(minX+maxX)/2, cy=(minY+maxY)/2;
+  var cnx=(ox+(cx-minX)*scale).toFixed(1), cny=(oy+(maxY-cy)*scale).toFixed(1);
+  return '<svg class="lc-svg" viewBox="0 0 '+VB+' '+VB+'" xmlns="http://www.w3.org/2000/svg">'
+    +'<polygon points="'+pts+'" fill="#dcfce7" stroke="#16a34a" stroke-width="2" stroke-linejoin="round"/>'
+    +'<circle cx="'+cnx+'" cy="'+cny+'" r="2.4" fill="#15803d"/></svg>';
+}
+function landPlotSvgHtml(land){
+  var g=landGeo(land);
+  var poly=g && g.poly ? normPoly(g.poly) : [];
+  if(poly.length>=3) return '<div class="lc-svg-wrap">'+plotToSvg(poly)+'</div>';
+  return '<div class="lc-svg-wrap"><div class="lc-svg-empty">无图形数据</div></div>';
+}
+function landStageBlock(land){
+  var hasDate=!!land.plant_date;
+  if(!hasDate) return '<div class="lc-stage">未设置播期，无法显示该地块生育期信息</div>';
+  var days=daysSincePlant(land.plant_date);
+  var stageKey=(days!=null)?stageFromDays(days):'';
+  var meta=(stageKey && PLOT_STAGE_META[stageKey])||{label:'',dayRange:'',target:''};
+  var s=computeStage(land.plant_date, land.crop);
+  return '<div class="lc-stage">'
+    +'<div class="lc-stage-line">当前生育期：<b>'+esc(meta.label||s.stage||'—')+'</b>'+(meta.dayRange?'（'+esc(meta.dayRange)+'）':'')+'</div>'
+    +'<div class="lc-stage-line">播后 '+days+' 天 · '+todayISO()+'</div>'
+    +'<div class="lc-stage-line lc-stage-target">'+(meta.target||'')+'</div>'
+    +'<div class="lc-stage-line">位置：'+esc(land.planting_location||land.farm||'未设置')+' · 播期 '+esc(land.plant_date)+'</div>'
+    +'</div>';
+}
+
+/* ---------- 地块参数编辑：位置 / 播期 / 底肥（与 peanut-tool 互通） ---------- */
+var PLOT_LOCATIONS=[
+  {name:"海南海口",lat:20.044,lon:110.199},{name:"海南三亚",lat:18.252,lon:109.512},
+  {name:"海南儋州",lat:19.517,lon:109.577},{name:"海南琼海",lat:19.246,lon:110.464},
+  {name:"海南文昌",lat:19.543,lon:110.797},{name:"海南万宁",lat:18.796,lon:110.389},
+  {name:"海南东方",lat:19.096,lon:108.654},{name:"海南五指山",lat:18.776,lon:109.516},
+  {name:"海南乐东",lat:18.747,lon:109.174},{name:"海南澄迈",lat:19.738,lon:110.006},
+  {name:"海南临高",lat:19.912,lon:109.69},{name:"海南定安",lat:19.681,lon:110.359},
+  {name:"海南屯昌",lat:19.363,lon:110.103},{name:"海南陵水",lat:18.506,lon:110.037},
+  {name:"海南昌江",lat:19.298,lon:109.055},{name:"海南保亭",lat:18.64,lon:109.702},
+  {name:"海南琼中",lat:19.033,lon:109.839},{name:"海南白沙",lat:19.225,lon:109.452}
+];
+var BASAL_FIELDS=['organicKgMu','compoundKgMu','calciumKgMu','boronGmu','compoundNPct','compoundPPct','compoundKPct'];
+function locationOptionsHtml(selected){
+  return '<option value="">请选择区域</option>'+PLOT_LOCATIONS.map(function(loc){
+    return '<option value="'+esc(loc.name)+'"'+(loc.name===selected?' selected':'')+'>'+esc(loc.name)+'</option>';
+  }).join('');
+}
+function getBasal(land){
+  var b=land.base_fertilizer;
+  if(b && typeof b==='object') return b;
+  return {};
+}
+function basalVal(land, key){ var b=getBasal(land); return b[key]!=null?b[key]:''; }
+function landParamPanel(land){
+  var b=getBasal(land);
+  return '<div class="wb-param-panel">'+
+    '<h2>地块参数</h2>'+
+    '<div class="wb-param-grid">'+
+      '<div class="wb-param-field">'+
+        '<label>种植区域</label>'+
+        '<select id="lp_location" onchange="markParamDirty()">'+locationOptionsHtml(land.planting_location||land.farm||'')+'</select>'+
+      '</div>'+
+      '<div class="wb-param-field">'+
+        '<label>种植日期</label>'+
+        '<input type="date" id="lp_plant_date" value="'+esc(land.plant_date||'')+'" onchange="markParamDirty()">'+
+      '</div>'+
+      '<div class="wb-param-field">'+
+        '<label>有机肥 <span class="unit">kg/亩</span></label>'+
+        '<input type="number" id="lp_organicKgMu" min="0" max="300" step="5" value="'+esc(basalVal(land,'organicKgMu'))+'" oninput="markParamDirty()">'+
+      '</div>'+
+      '<div class="wb-param-field">'+
+        '<label>复合肥 <span class="unit">kg/亩</span></label>'+
+        '<input type="number" id="lp_compoundKgMu" min="0" max="80" step="1" value="'+esc(basalVal(land,'compoundKgMu'))+'" oninput="markParamDirty()">'+
+      '</div>'+
+      '<div class="wb-param-field">'+
+        '<label>复合肥 N <span class="unit">%</span></label>'+
+        '<input type="number" id="lp_compoundNPct" min="0" max="30" step="1" value="'+esc(basalVal(land,'compoundNPct'))+'" oninput="markParamDirty()">'+
+      '</div>'+
+      '<div class="wb-param-field">'+
+        '<label>复合肥 P₂O₅ <span class="unit">%</span></label>'+
+        '<input type="number" id="lp_compoundPPct" min="0" max="30" step="1" value="'+esc(basalVal(land,'compoundPPct'))+'" oninput="markParamDirty()">'+
+      '</div>'+
+      '<div class="wb-param-field">'+
+        '<label>复合肥 K₂O <span class="unit">%</span></label>'+
+        '<input type="number" id="lp_compoundKPct" min="0" max="30" step="1" value="'+esc(basalVal(land,'compoundKPct'))+'" oninput="markParamDirty()">'+
+      '</div>'+
+      '<div class="wb-param-field">'+
+        '<label>钙镁磷 / 钙肥 <span class="unit">kg/亩</span></label>'+
+        '<input type="number" id="lp_calciumKgMu" min="0" max="50" step="1" value="'+esc(basalVal(land,'calciumKgMu'))+'" oninput="markParamDirty()">'+
+      '</div>'+
+      '<div class="wb-param-field">'+
+        '<label>硼肥 <span class="unit">g/亩</span></label>'+
+        '<input type="number" id="lp_boronGmu" min="0" max="1000" step="25" value="'+esc(basalVal(land,'boronGmu'))+'" oninput="markParamDirty()">'+
+      '</div>'+
+      '<div class="wb-param-field wb-param-actions-field">'+
+        '<div class="wb-param-actions">'+
+          '<button class="wb-btn wb-btn-light" type="button" onclick="resetLandParams(\''+esc(land.land_id)+'\')">重置</button>'+
+          '<button class="wb-btn wb-btn-primary" type="button" onclick="saveLandParams(\''+esc(land.land_id)+'\')">保存地块参数</button>'+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+}
+function markParamDirty(){}
+function resetLandParams(id){
+  var l=getLand(id); if(!l) return;
+  document.getElementById('lp_location').value=l.planting_location||l.farm||'';
+  document.getElementById('lp_plant_date').value=l.plant_date||'';
+  BASAL_FIELDS.forEach(function(k){ var el=document.getElementById('lp_'+k); if(el) el.value=(l.base_fertilizer&&l.base_fertilizer[k]!=null)?l.base_fertilizer[k]:''; });
+}
+function saveLandParams(id){
+  var l=getLand(id); if(!l){ alert('地块不存在'); return; }
+  var location=document.getElementById('lp_location').value||'';
+  var plantDate=document.getElementById('lp_plant_date').value||'';
+  var basal={};
+  BASAL_FIELDS.forEach(function(k){
+    var el=document.getElementById('lp_'+k);
+    if(el){ var v=parseFloat(el.value); if(!isNaN(v)) basal[k]=v; }
+  });
+  var patch={planting_location:location, plant_date:plantDate, base_fertilizer:basal};
+  updateLand(id, patch);
+  // 播期/位置变化会影响决策卡和天气，局部刷新
+  renderLandDetail(document.getElementById('wbMain')||document.querySelector('main'), id);
+}
+
 function todayISO(){ return new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Shanghai'}); }
 function fmtNum(n){ var v=parseFloat(n); return isNaN(v)?'0':(v%1===0?v.toFixed(0):v.toFixed(2)); }
 function dosageParts(raw){
@@ -976,7 +1293,7 @@ function stagePlanForLand(land){
   var s=computeStage(land.plant_date, land.crop);
   if(s.warn || s.days==null || !s.stage) return null;
   var dueIn = s.gap ? (s.nextDays==null?999:Math.max(0,s.nextDays)) : 0;
-  return {land:land, stage:s.stage, nd:s.nd, op:s.op, list:s.list, mix:s.mix, dueIn:dueIn, dueDate:addDaysISO(todayISO(),dueIn), active:!s.gap, planName:s.planName, planKey:s.planKey};
+  return {land:land, stage:s.stage, nd:s.nd, op:s.op, list:s.list, mix:s.mix, days:s.days, dueIn:dueIn, dueDate:addDaysISO(todayISO(),dueIn), active:!s.gap, planName:s.planName, planKey:s.planKey};
 }
 function plannedTaskExists(landId, title, dueDate){
   return getTasks().some(function(t){ return !t.done && t.land_id===landId && t.title===title && t.due_date===dueDate; });
@@ -1063,6 +1380,7 @@ function router(){
   if(hash==='dispatch'){ setActiveNav('dispatch'); renderDispatch(main); return; }
   if(hash==='purchase'){ setActiveNav('purchase'); renderPurchase(main); return; }
   if(hash==='reports'){ setActiveNav('reports'); renderReports(main); return; }
+  if(hash==='materials'){ setActiveNav('materials'); renderMaterials(main); return; }
   setActiveNav('dashboard'); renderDashboard(main);
 }
 
@@ -1097,7 +1415,7 @@ function renderDashboard(main){
   var openTasks=tasks.filter(function(t){return !t.done;});
   var rows=actions.length?actions.map(function(p){
     var tag=p.active?'<span class="wb-status st-planting">今日窗口</span>':'<span class="wb-status st-wait">'+p.dueIn+'天后</span>';
-    return '<tr><td><a href="#/land/'+esc(p.land.land_id)+'" style="font-weight:800;color:var(--g-700)">'+esc(p.land.name)+'</a><br><small>'+esc(p.land.crop||'—')+' · 播后 '+esc(p.days||'')+' 天</small></td><td>'+landAreaMu(p.land).toFixed(2)+' 亩</td><td>'+esc(p.stage)+'</td><td>'+esc(p.op)+'</td><td>'+esc(p.list||p.mix||'按方案巡田执行').slice(0,150)+'</td><td>'+tag+'</td></tr>';
+    return '<tr><td><a href="#/land/'+esc(p.land.land_id)+'" style="font-weight:800;color:var(--g-700)">'+esc(p.land.name)+'</a><br><small>'+esc(p.land.crop||'—')+' · 播后 '+esc(p.days==null?'':p.days)+' 天</small></td><td>'+landAreaMu(p.land).toFixed(2)+' 亩</td><td>'+esc(p.stage)+'</td><td>'+esc(p.op)+'</td><td><div class="wb-cell-clamp">'+esc(p.list||p.mix||'按方案巡田执行')+'</div></td><td>'+tag+'</td></tr>';
   }).join(''):'<tr><td colspan="6" class="wb-empty">未来 3 天暂无集中作业窗口；请确认地块状态、作物和种植/播种日期。</td></tr>';
   var risks=dashboardRisks(lands,mats,tasks);
   var riskHtml=risks.length?risks.slice(0,10).map(function(r){return '<div class="wb-todo"><span class="t-name">'+esc(r.title)+'</span><span class="t-meta">'+esc(r.meta)+'</span><span class="wb-status '+(r.level==='danger'?'st-wait':'st-fallow')+'">'+(r.level==='danger'?'优先':'注意')+'</span></div>';}).join(''):'<div class="wb-empty">暂无明显风险项</div>';
@@ -1117,18 +1435,9 @@ function renderDashboard(main){
       statCard('3天内作业',actions.length,'项')+
       statCard('未完成待办',openTasks.length,'条')+
     '</div>'+
-    '<h2 class="wb-section-title">快捷入口</h2>'+
-    '<div class="wb-grid wb-quick">'+
-      '<div class="wb-stat" onclick="openNewLandModal()"><div class="value">＋ 新建地块</div><div class="sub">录入地点、播期、底肥方案</div></div>'+
-      '<div class="wb-stat" onclick="location.hash=\'#/dispatch\'"><div class="value">统防调度</div><div class="sub">合并派工、生成待办</div></div>'+
-      '<div class="wb-stat" onclick="location.hash=\'#/purchase\'"><div class="value">采购测算</div><div class="sub">需求、库存、采购缺口</div></div>'+
-      '<div class="wb-stat" onclick="location.hash=\'#/reports\'"><div class="value">经营报表</div><div class="sub">投入、收入、亩均成本</div></div>'+
-    '</div>'+
-    '<div class="wb-two-col" style="margin-top:18px">'+
-      '<div class="wb-panel"><div class="wb-list-head"><h3>今日 / 未来 3 天作业清单</h3><button class="wb-btn wb-btn-light" onclick="generateScaleTasks(3)">批量生成待办</button></div>'+
-        '<div style="overflow:auto"><table class="wb-table wb-ops-table"><colgroup><col><col><col><col><col><col></colgroup><thead><tr><th>地块</th><th>面积</th><th>节点</th><th>作业方式</th><th>建议内容</th><th>状态</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>'+
-      '<div class="wb-panel"><h3>风险队列</h3>'+riskHtml+'</div>'+
-    '</div>'+
+    '<div class="wb-panel" style="margin-top:18px"><div class="wb-list-head"><h3>今日 / 未来 3 天作业清单</h3><button class="wb-btn wb-btn-light" onclick="generateScaleTasks(3)">批量生成待办</button></div>'+
+      '<div style="overflow:auto"><table class="wb-table wb-ops-table"><colgroup><col><col><col><col><col><col></colgroup><thead><tr><th>地块</th><th>面积</th><th>节点</th><th>作业<br>方式</th><th>建议内容</th><th>状态</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>'+
+    '<div class="wb-panel" style="margin-top:18px"><div class="wb-list-head"><h3>风险队列</h3><span class="wb-muted">最近 10 项；右侧「注意/优先」标签可滚动查看</span></div>'+riskHtml+'</div>'+
     '<div class="wb-two-col" style="margin-top:18px">'+
       '<div class="wb-panel"><div class="wb-list-head"><h3>物资库存与采购预警</h3><button class="wb-btn wb-btn-light" onclick="location.hash=\'#/purchase\'">采购测算</button></div>'+
         '<div style="overflow:auto"><table class="wb-table"><thead><tr><th>物资</th><th>类别</th><th>库存</th><th>安全库存</th><th>单价</th><th>状态</th></tr></thead><tbody>'+matRows+'</tbody></table></div></div>'+
@@ -1188,15 +1497,14 @@ function filterLands(){
   if(!list.length){ grid.innerHTML='<div class="wb-empty" style="grid-column:1/-1">没有匹配的地块</div>'; return; }
   grid.innerHTML=list.map(function(l){
     var recCount=getRecords(l.land_id).length;
+    var g=landGeo(l);
+    var sqm=g && g.sqm ? g.sqm : (landAreaMu(l)*666.67);
     return '<div class="wb-land-card link" onclick="location.hash=\'#/land/'+esc(l.land_id)+'\'">'+
       '<div class="lc-top"><div><div class="lc-name">'+esc(l.name)+'</div><div class="lc-code">'+(l.code||'无编号')+'</div></div>'+
       '<span class="wb-status '+(l.status==='planting'?'st-planting':(l.status==='fallow'?'st-fallow':'st-wait'))+'">'+(STATUS_LABEL[l.status]||'待播种')+'</span></div>'+
-      '<div class="lc-row"><span>面积</span><b>'+landAreaMu(l).toFixed(2)+' 亩</b></div>'+
-      '<div class="lc-row"><span>作物</span><b>'+(l.crop||'—')+'</b></div>'+
-      '<div class="lc-row"><span>位置 / 农场</span><b>'+esc(l.planting_location||l.farm||'—')+'</b></div>'+
-      '<div class="lc-row"><span>播期</span><b>'+(l.plant_date||'—')+'</b></div>'+
-      '<div class="lc-row"><span>农事记录</span><b>'+recCount+' 条</b></div>'+
-      '<div class="lc-row"><span>边界</span><b>'+(hasLandGeo(l)?'已绘制':'未绘制')+'</b></div>'+
+      landPlotSvgHtml(l)+
+      '<div class="lc-area"><b>'+landAreaMu(l).toFixed(2)+' 亩</b> · '+(sqm?sqm.toLocaleString('zh-CN')+' ㎡':'')+'</div>'+
+      landStageBlock(l)+
     '</div>';
   }).join('');
 }
@@ -1211,17 +1519,27 @@ function renderLandDetail(main, id){
     return;
   }
   var s=computeStage(land.plant_date, land.crop);
+  var harvestDate=land.plant_date?addDaysISO(land.plant_date,120):null;
   var recs=getRecords(land.land_id).slice().sort(function(a,b){return (a.operate_date||'')<(b.operate_date||'')?1:-1;});
   var lastRec=recs[0];
   var recHint = lastRec? ('最近：'+esc(lastRec.operate_date)+' · '+esc(lastRec.record_type)+' · '+(esc(lastRec.material_name)||'—')) : '暂无农事记录';
+  var dateInline=land.plant_date?
+    ' ｜ 播种：<span class="wb-date-tag">'+esc(land.plant_date)+'</span> ｜ 预计采收：<span class="wb-date-tag">'+esc(harvestDate)+'</span>':
+    ' ｜ <span class="wb-date-tag">未设置种植日期</span>';
 
   // 进来即综合总览：基本信息 + 植保当前情况 + 农事简表；下方四标签为完整详情入口
   var html=''+
-    '<button class="wb-back" onclick="location.hash=\'#/lands\'">‹ 返回地块列表</button>'+
-    '<h1 class="wb-section-title">'+esc(land.name)+'</h1>'+
-    '<div class="wb-muted">编号：'+(land.code||'无')+' ｜ 实测面积：'+landAreaMu(land).toFixed(2)+' 亩 ｜ 作物：'+(land.crop||'—')+' ｜ 状态：'+(STATUS_LABEL[land.status]||'待播种')+'</div>'+
-    overviewCard(land, s, recHint, recs.length)+
-    decisionCard(land, s)+
+    '<div class="wb-detail-header">'+
+      '<div class="wb-detail-title">'+
+        '<h1 class="wb-section-title">'+esc(land.name)+'</h1>'+
+        '<div class="wb-muted">实测面积：'+landAreaMu(land).toFixed(2)+' 亩 ｜ 作物：'+(land.crop||'—')+' ｜ 状态：'+(STATUS_LABEL[land.status]||'待播种')+dateInline+'</div>'+
+      '</div>'+
+      '<div id="wbHeaderWeather" class="wb-header-weather"><div class="wb-muted">天气数据准备中…</div></div>'+
+    '</div>'+
+    landParamPanel(land)+
+    landTimeline(land, s)+
+    '<h2 class="wb-section-title">种后天气 · 农业气象看板</h2>'+
+    landWeatherDashboard(land)+
     '<h2 class="wb-section-title">农事简表（最近 5 条）</h2>'+
     (recs.length? '<div>'+recs.slice(0,5).map(function(r){
       return '<div class="wb-rec"><div class="wb-rec-top"><span class="wb-rec-type rt-'+esc(r.record_type)+'">'+esc(r.record_type)+'</span>'+
@@ -1250,19 +1568,8 @@ function renderLandDetail(main, id){
       '<div id="tab-settings" class="wb-tab-panel">'+settingsPanel(land)+'</div>'+
     '</div>';
   main.innerHTML=html;
-}
-
-function overviewCard(land, s, recHint, recCount){
-  return '<div class="wb-grid wb-stats" style="grid-template-columns:repeat(4,1fr);margin:14px 0">'+
-    statCard('实测面积', landAreaMu(land).toFixed(2), '亩')+
-    statCard('播种后', s.days!=null? (s.days+' 天') : '—', '')+
-    statCard('当前阶段', s.nd!=null? ('第'+s.nd+'次') : '—', '')+
-    statCard('农事记录', recCount, '条')+
-  '</div>'+
-  '<div class="wb-panel" style="padding:14px 16px">'+
-    '<div class="wb-muted" style="margin:0">种植地点：<b style="color:var(--s-800)">'+(esc(land.planting_location||land.farm)||'—')+'</b> ｜ 品种/茬口：'+(esc(land.variety)||'—')+' ｜ 土壤：'+(esc(land.soil_type)||'—')+' ｜ 种植/播种：'+(esc(land.plant_date)||'—')+' ｜ 预计采收：'+(esc(land.harvest_date)||'—')+'</div>'+
-    '<div class="wb-muted" style="margin:6px 0 0">'+esc(recHint)+'</div>'+
-  '</div>';
+  if(/[?&]space=1\b/.test(location.search||'')){ try{ goTabFromOverview(id,'space'); }catch(e){} }
+  loadLandWeather(land);
 }
 
 function goTabFromOverview(id, tab){
@@ -1276,28 +1583,212 @@ function closeDetailFull(){
   var full=document.getElementById('wbDetailFull'); if(full) full.style.display='none';
 }
 
-function decisionCard(land, s){
-  if(s.warn){
-    return '<div class="wb-decision" style="flex-direction:column;align-items:flex-start"><div class="dc-block"><div class="dc-label">当前植保情况</div><div class="dc-warn">'+esc(s.warn)+'</div></div>'+
-      '<div class="dc-hint">提示：补好种植/播种日期后，这里会自动显示「当前阶段 / 该用什么 / 怎么执行 / 距下一节点还有几天」。</div></div>';
+function landTimeline(land, s){
+  if(!land.plant_date) return '';
+  var plan=cropPlanFor(land.crop);
+  if(!plan || !plan.nodes || !plan.nodes.length) return '';
+  var days=s.days;
+  var cards=plan.nodes.map(function(n, idx){
+    var dMin=parseInt(n.dayMin,10), dMax=parseInt(n.dayMax,10);
+    var hasMin=!isNaN(dMin);
+    var dateMin=hasMin?addDaysISO(land.plant_date,dMin):'—';
+    var win=(hasMin&&!isNaN(dMax)&&dMax)?(dMin+'–'+dMax+' 天'):(hasMin?(dMin+' 天起'):'—');
+    var passed=(days!=null && hasMin && days>=dMin);
+    var active=false;
+    if(days!=null && hasMin){
+      if(!isNaN(dMax) && dMax>0){ active = days>=dMin && days<=dMax; }
+      else { active = days>=dMin && days<(dMin+5); }
+    }
+    var ops=(n.op?esc(n.op):'')+(n.op && n.list?' ｜ ':'')+(n.list?esc(n.list):'');
+    return '<div class="tl-card tl-click'+(passed?' tl-passed':'')+(active?' tl-active':'')+'" onclick="openTimelineNode(\''+esc(land.land_id)+'\','+idx+')">'+
+      '<div class="tl-card-head">'+
+        '<div class="tl-card-date">'+esc(dateMin)+'</div>'+
+        '<div class="tl-card-win">'+esc(win)+'</div>'+
+      '</div>'+
+      '<div class="tl-card-stage">'+esc(n.stage||'—')+'</div>'+
+      '<div class="tl-card-op">'+ops+'</div>'+
+      (passed?'<div class="tl-card-badge"><span>✓</span><span>已过窗口</span></div>':'<div class="tl-card-hint">点击查看完整植保方案 ›</div>')+
+    '</div>';
+  }).join('');
+  return '<h2 class="wb-section-title">种植历程 · 种后变化</h2>'+
+    '<div class="wb-panel" style="padding:12px 14px">'+
+      '<div class="wb-muted" style="margin-bottom:8px">播种日期：<b style="color:var(--s-800)">'+esc(land.plant_date)+'</b> ｜ 播后 <b>'+(days!=null?days:'—')+'</b> 天 ｜ 作物：'+(esc(land.crop)||'—')+' ｜ 方案：'+esc(plan.name||'作物方案')+'</div>'+
+      '<div class="tl-grid">'+cards+'</div>'+
+      '<div class="wb-form-note" style="margin-top:10px">说明：日历卡片按作物方案节点展开，每张卡片对应一个作业窗口。点击卡片可查看该窗口的完整植保详情（该用什么、怎么混配）。绿色边框为当前所处窗口，浅绿底为已过窗口，白色为待到达窗口。种后逐日气温 / 降雨见下方「水肥植保决策」内的「种后天气」区块。</div>'+
+    '</div>';
+}
+function openTimelineNode(landId, idx){
+  var land=getLand(landId); if(!land) return;
+  var plan=cropPlanFor(land.crop); if(!plan || !plan.nodes[idx]) return;
+  var n=plan.nodes[idx];
+  var dMin=parseInt(n.dayMin,10), dMax=parseInt(n.dayMax,10);
+  var dateMin=addDaysISO(land.plant_date, dMin);
+  var dateMax=(!isNaN(dMax) && dMax>0)?addDaysISO(land.plant_date, dMax):'—';
+  var nextInfo='';
+  if(idx+1<plan.nodes.length){
+    var next=plan.nodes[idx+1];
+    nextInfo='<div class="dc-hint" style="margin:10px 0 4px">下一节点：'+esc(next.stage)+'（播后 '+esc(next.dayMin)+' 天）</div>';
   }
-  return '<div class="wb-decision" style="flex-direction:column;align-items:stretch;gap:10px">'+
-    (s.gapNote?'<div class="dc-warn">'+esc(s.gapNote)+'</div>':'')+
-    '<div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center">'+
-      '<div class="dc-block"><div class="dc-label">当前阶段</div><div class="dc-phase">第 '+esc(s.nd)+' 次管理 · '+esc(s.stage)+'</div></div>'+
-      '<div class="dc-block"><div class="dc-label">作业方式</div><div class="dc-phase" style="font-size:16px">'+esc(s.op)+'</div></div>'+
-      '<div class="dc-block"><div class="dc-label">用几种</div><div class="dc-phase" style="font-size:16px">'+esc(s.count)+'</div></div>'+
-      '<div class="dc-block" style="margin-left:auto"><div class="dc-label">下一节点</div><div class="dc-ops" style="font-weight:700;color:var(--g-700)">'+esc(s.nextLine)+'</div></div>'+
+  var html=''+
+    '<h2 style="margin:0 0 6px;font-size:16px;color:var(--g-800)">'+esc(n.stage)+'</h2>'+
+    '<div style="font-size:12px;color:var(--s-500);margin-bottom:12px">第 '+esc(n.nd||'—')+' 次管理 · '+esc(land.crop)+' · 播后 '+esc(n.dayMin)+'–'+esc(n.dayMax)+' 天 · '+esc(dateMin)+' 至 '+esc(dateMax)+'</div>'+
+    '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px">'+
+      '<div class="dc-block"><div class="dc-label">作业方式</div><div class="dc-phase">'+esc(n.op||'—')+'</div></div>'+
+      '<div class="dc-block"><div class="dc-label">用几种</div><div class="dc-phase">'+esc(n.count||'—')+'</div></div>'+
     '</div>'+
-    '<div style="background:#fff;border:1px solid var(--g-200);border-radius:10px;padding:12px 14px">'+
+    '<div style="background:#fff;border:1px solid var(--g-200);border-radius:10px;padding:12px 14px;margin-bottom:10px">'+
       '<div class="dc-label" style="margin-bottom:4px">该用什么（药 · 肥 · 菌）</div>'+
-      '<div class="dc-ops" style="white-space:pre-wrap">'+esc(s.list)+'</div>'+
+      '<div class="dc-ops" style="white-space:pre-wrap">'+esc(n.list||'—')+'</div>'+
     '</div>'+
-    '<div style="background:#fff;border:1px solid var(--g-200);border-radius:10px;padding:12px 14px">'+
-      '<div class="dc-label" style="margin-bottom:4px">怎么混配</div>'+
-      '<div class="dc-ops" style="white-space:pre-wrap">'+esc(s.mix)+'</div>'+
+    '<div style="background:#fff;border:1px solid var(--g-200);border-radius:10px;padding:12px 14px;margin-bottom:10px">'+
+      '<div class="dc-label" style="margin-bottom:4px">怎么混配 / 注意什么</div>'+
+      '<div class="dc-ops" style="white-space:pre-wrap">'+esc(n.mix||'—')+'</div>'+
     '</div>'+
-    '<div class="dc-hint">当前方案：'+esc(s.planName||'作物方案')+'。仅供作业参考，具体用量以田间情况、当地农技意见与产品标签为准。</div>'+
+    nextInfo+
+    '<div class="dc-hint">当前方案：'+esc(plan.name||'作物方案')+'。仅供作业参考，具体用量以田间情况、当地农技意见与产品标签为准。</div>';
+  wbModal(html);
+}
+function loadLandWeather(land){
+  var box=document.getElementById('wbWeatherBox'); if(!box) return;
+  var headerBox=document.getElementById('wbHeaderWeather');
+  var cached=land.weather_cache;
+  if(cached && cached.fetchedDate===todayISO() && cached.days && cached.days.length){
+    var days=cached.days;
+    var stats=calcWeatherStats(days, land);
+    if(headerBox) renderHeaderWeather(headerBox, land, stats.yesterday);
+    renderWeatherBox(box, land, days); return;
+  }
+  var lat=parseFloat(land.lat||'')||18.2528, lon=parseFloat(land.lng||'')||109.5119;
+  var start=land.plant_date, end=addDaysISO(todayISO(),-1);
+  if(!start || start>end){ 
+    box.innerHTML='<div class="wb-muted">播种日期在未来或缺失，暂无可采集的种后天气数据。</div>'; 
+    if(headerBox) headerBox.innerHTML='<div class="wb-muted" style="font-size:12px">未设置播种日期</div>';
+    return; 
+  }
+  box.innerHTML='<div class="wb-muted">正在从气象接口采集 '+esc(start)+' 至今的逐日气温 / 降雨 / 蒸散 / 风速…</div>';
+  if(headerBox) headerBox.innerHTML='<div class="wb-muted" style="font-size:12px">正在采集天气数据…</div>';
+  var url='https://archive-api.open-meteo.com/v1/archive?latitude='+lat+'&longitude='+lon+'&start_date='+start+'&end_date='+end+'&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,et0_fao_evapotranspiration_sum,wind_speed_10m_max&timezone='+encodeURIComponent('Asia/Shanghai');
+  fetch(url).then(function(r){return r.json();}).then(function(d){
+    if(!d || !d.daily || !d.daily.time || !d.daily.time.length){ box.innerHTML='<div class="wb-muted">天气采集失败：接口未返回数据。</div>'; if(headerBox) headerBox.innerHTML='<div class="wb-muted" style="font-size:12px">天气采集失败</div>'; return; }
+    var days=d.daily.time.map(function(t,i){ return {date:t, tmax:d.daily.temperature_2m_max[i], tmin:d.daily.temperature_2m_min[i], rain:d.daily.precipitation_sum[i], et0:d.daily.et0_fao_evapotranspiration_sum[i], wind:d.daily.wind_speed_10m_max[i]}; });
+    try{ land.weather_cache={fetchedDate:todayISO(), days:days}; updateLand(land.land_id,{weather_cache:land.weather_cache}); }catch(e){}
+    var stats=calcWeatherStats(days, land);
+    if(headerBox) renderHeaderWeather(headerBox, land, stats.yesterday);
+    renderWeatherBox(box, land, days);
+  }).catch(function(e){ box.innerHTML='<div class="wb-muted">天气采集失败：'+(e&&e.message?esc(e.message):'网络错误')+'。请检查网络后点「重新采集」。</div>'; if(headerBox) headerBox.innerHTML='<div class="wb-muted" style="font-size:12px">天气采集失败</div>'; });
+}
+function todayWaterUsage(landId){
+  var recs=getRecords(landId).filter(function(r){
+    return r.record_type==='灌溉' && r.operate_date===todayISO();
+  });
+  if(!recs.length) return {value:null, unit:'暂无记录'};
+  var total=0, unit='m³';
+  recs.forEach(function(r){
+    var m=String(r.dosage||'').match(/([\d.]+)/);
+    if(m) total+=parseFloat(m[1]);
+    var u=(r.dosage||'').match(/(m³|方|吨|L|l|立方米|升)/);
+    if(u) unit=u[1];
+  });
+  return {value:total, unit:unit};
+}
+function renderHeaderWeather(box, land, yesterday){
+  var locName=esc(land.planting_location||land.farm||'海南万宁');
+  box.innerHTML='<div class="wh-loc"><h3>昨日天气实况</h3><div class="wh-date">'+esc(locName)+' · '+esc(yesterday.date)+'</div></div>'+
+    '<div class="wh-items">'+
+      '<div class="wh-item"><div class="wh-item-label">降雨</div><div class="wh-item-val">'+fmtT(yesterday.rain)+'<span style="font-size:10px;font-weight:500"> mm</span></div></div>'+
+      '<div class="wh-item"><div class="wh-item-label">温度</div><div class="wh-item-val">'+fmtT(yesterday.tmin)+'–'+fmtT(yesterday.tmax)+'<span style="font-size:10px;font-weight:500"> ℃</span></div></div>'+
+      '<div class="wh-item"><div class="wh-item-label">参考蒸散</div><div class="wh-item-val">'+fmtT(yesterday.et0)+'<span style="font-size:10px;font-weight:500"> mm</span></div></div>'+
+      '<div class="wh-item"><div class="wh-item-label">最大风速</div><div class="wh-item-val">'+fmtT(yesterday.wind)+'<span style="font-size:10px;font-weight:500"> km/h</span></div></div>'+
+    '</div>';
+}
+function renderWeatherBox(box, land, days){
+  if(!days || !days.length){ box.innerHTML='<div class="wb-muted">暂无种后天气数据。</div>'; return; }
+  var stats=calcWeatherStats(days, land);
+  var locName=esc(land.planting_location||land.farm||'海南万宁');
+  var water=todayWaterUsage(land.land_id);
+  var waterVal=(water.value!=null)?fmtT(water.value):'—';
+  var summaryHtml='<div class="wx-title">种植期天气采集与分析（播种 → 今日）<span class="wx-sub">已采集 '+days.length+' 天 · 更新于 '+esc(days[days.length-1].date)+'</span></div>'+
+    '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px">'+
+      '<button class="wb-btn wb-btn-primary" onclick="recollectWeather(\''+esc(land.land_id)+'\')">采集 / 刷新天气数据</button>'+
+      '<span class="wx-sub">采集范围：'+esc(land.plant_date)+' → '+esc(days[days.length-1].date)+'（'+esc(locName)+'）</span>'+
+    '</div>'+
+    '<div class="wx-grid">'+
+      '<div class="wx-card"><div class="wx-card-label">今日用水量</div><div class="wx-card-val">'+waterVal+'<span class="wx-card-unit">'+esc(water.unit)+'</span></div></div>'+
+      '<div class="wx-card"><div class="wx-card-label">累计降雨</div><div class="wx-card-val">'+fmtT(stats.totalRain)+'<span class="wx-card-unit">mm</span></div></div>'+
+      '<div class="wx-card"><div class="wx-card-label">累计蒸散</div><div class="wx-card-val">'+fmtT(stats.totalEt0)+'<span class="wx-card-unit">mm</span></div></div>'+
+      '<div class="wx-card'+(stats.waterBalance<0?' warn':'')+'"><div class="wx-card-label">季节水分盈亏</div><div class="wx-card-val">'+fmtT(stats.waterBalance)+'<span class="wx-card-unit">mm</span></div></div>'+
+      '<div class="wx-card"><div class="wx-card-label">有效积温</div><div class="wx-card-val">'+fmtT(stats.gdd)+'<span class="wx-card-unit">℃·d</span></div></div>'+
+      '<div class="wx-card"><div class="wx-card-label">今七日降雨</div><div class="wx-card-val">'+fmtT(stats.last7Rain)+'<span class="wx-card-unit">mm</span></div></div>'+
+      '<div class="wx-card"><div class="wx-card-label">最长连雨</div><div class="wx-card-val">'+stats.maxRainStreak+'<span class="wx-card-unit">天</span></div></div>'+
+    '</div>';
+  var head='<tr><th>日期</th><th>生育期</th><th>最高温</th><th>最低温</th><th>降雨</th><th>ET₀</th><th>风速</th><th>日积温</th><th>累计降雨</th><th>累计有效积温</th><th>季节水分盈亏</th><th>估算墒情</th></tr>';
+  var rows=stats.enriched.map(function(d){
+    return '<tr>'+
+      '<td>'+esc(d.date)+'</td>'+
+      '<td class="wx-td-left">'+esc(d.stage)+'</td>'+
+      '<td>'+fmtT(d.tmax)+'℃</td>'+
+      '<td>'+fmtT(d.tmin)+'℃</td>'+
+      '<td>'+fmtT(d.rain)+'</td>'+
+      '<td>'+fmtT(d.et0)+'</td>'+
+      '<td>'+fmtT(d.wind)+'</td>'+
+      '<td>'+fmtT(d.gdd)+'</td>'+
+      '<td>'+fmtT(d.cumRain)+'</td>'+
+      '<td>'+fmtT(d.cumGdd)+'</td>'+
+      '<td>'+fmtT(d.balance)+'</td>'+
+      '<td>'+fmtT(d.moisture)+'%</td>'+
+    '</tr>';
+  }).join('');
+  var tableHtml='<div class="wx-scroller"><table class="wx-table">'+head+rows+'</table></div>';
+  box.innerHTML=summaryHtml+tableHtml;
+}
+function calcWeatherStats(days, land){
+  var totalRain=0, totalEt0=0, gdd=0, maxRainStreak=0, curStreak=0, last7Rain=0;
+  var enriched=[];
+  for(var i=0;i<days.length;i++){
+    var d=days[i];
+    var tmax=parseFloat(d.tmax)||0, tmin=parseFloat(d.tmin)||0;
+    var rain=parseFloat(d.rain)||0, et0=parseFloat(d.et0)||0, wind=parseFloat(d.wind)||0;
+    var avgT=(tmax+tmin)/2;
+    var dailyGdd=Math.max(0, avgT-10);
+    totalRain+=rain; totalEt0+=et0; gdd+=dailyGdd;
+    if(rain>0){ curStreak++; maxRainStreak=Math.max(maxRainStreak,curStreak); }
+    else{ curStreak=0; }
+    var dsDay=daysFromDate(land.plant_date, d.date);
+    var stageKey=stageFromDays(dsDay);
+    var stageMeta=PLOT_STAGE_META[stageKey]||{};
+    enriched.push({
+      date:d.date, tmax:tmax, tmin:tmin, rain:rain, et0:et0, wind:wind, gdd:dailyGdd,
+      cumRain:totalRain, cumGdd:gdd, balance:totalRain-totalEt0,
+      moisture:(rain/(rain+et0+0.001)*100),
+      stage:stageMeta.label||'—'
+    });
+  }
+  if(days.length>=7){ for(var j=days.length-7;j<days.length;j++) last7Rain+=parseFloat(days[j].rain)||0; }
+  else{ for(var j=0;j<days.length;j++) last7Rain+=parseFloat(days[j].rain)||0; }
+  return {
+    yesterday:enriched[enriched.length-1],
+    totalRain:totalRain, totalEt0:totalEt0, waterBalance:totalRain-totalEt0,
+    gdd:gdd, maxRainStreak:maxRainStreak, last7Rain:last7Rain,
+    enriched:enriched
+  };
+}
+function daysFromDate(sow, iso){
+  if(!sow || !iso) return 0;
+  var d1=new Date(sow+'T00:00:00+08:00');
+  var d2=new Date(iso+'T00:00:00+08:00');
+  if(isNaN(d1.getTime()) || isNaN(d2.getTime())) return 0;
+  return Math.max(0, Math.floor((d2.getTime()-d1.getTime())/86400000));
+}
+function fmtT(v){ return (v==null||isNaN(v))?'-':(Math.round(v*10)/10); }
+function recollectWeather(id){ var l=getLand(id); if(!l) return; l.weather_cache=null; try{ updateLand(id,{weather_cache:null}); }catch(e){} loadLandWeather(l); }
+function landWeatherDashboard(land){
+  if(!land.plant_date){
+    return '<div class="wb-panel" style="padding:12px 14px">'+
+      '<div class="wb-muted">未设置播种日期，无法展示种后农业气象看板。请先在上方「地块参数」中设置种植日期。</div>'+
+    '</div>';
+  }
+  return '<div class="wb-panel" style="padding:12px 14px">'+
+    '<div id="wbWeatherBox"><div class="wb-muted">正在准备天气采集…</div></div>'+
   '</div>';
 }
 
@@ -1337,6 +1828,7 @@ function boundarySection(land){
     return '<div class="wb-panel" style="margin-top:16px">'+
       '<div class="wb-list-head"><h3 style="margin:0;font-size:14px;font-weight:700;color:var(--g-800)">空间边界</h3>'+
         '<button class="wb-btn wb-btn-light" onclick="openDrawBoundary(\''+esc(land.land_id)+'\')">重新绘制</button></div>'+
+      landPlotSvgHtml(land)+
       '<div class="wb-rec" style="border:none;background:var(--g-50)">'+
         '<div class="wb-rec-meta">✓ 已绘制边界 ｜ 来源：'+(esc(g.source)||'runye-irrigation')+' ｜ 实测：'+(parseFloat(g.sqm)||0).toFixed(0)+' m²（'+mu.toFixed(2)+' 亩）</div>'+
         '<div class="wb-rec-meta">顶点数：'+(g.poly?g.poly.length:0)+' ｜ 灌溉方案可在精准灌溉内基于该边界生成</div>'+
@@ -1470,7 +1962,7 @@ function renderDispatch(main){
   var rows=items.length?items.map(function(p){
     var mats=planMaterials(p).slice(0,5).map(function(m){return esc(m.name)+' '+esc(m.dosage)+'/亩';}).join('；') || '按方案巡田执行';
     var tag=p.active?'<span class="wb-status st-planting">今日窗口</span>':'<span class="wb-status st-wait">'+p.dueIn+'天后</span>';
-    return '<tr><td>'+tag+'<br><small>'+esc(p.dueDate)+'</small></td><td><a href="#/land/'+esc(p.land.land_id)+'" style="color:var(--g-700);font-weight:700">'+esc(p.land.name)+'</a><br><small>'+esc(p.land.crop||'—')+' ｜ '+landAreaMu(p.land).toFixed(2)+'亩</small></td><td>'+esc(p.planName||'')+'</td><td>'+esc(p.stage)+'</td><td>'+esc(p.op)+'</td><td>'+mats+'</td></tr>';
+    return '<tr><td>'+tag+'<br><small>'+esc(p.dueDate)+'</small></td><td><a href="#/land/'+esc(p.land.land_id)+'" style="color:var(--g-700);font-weight:700">'+esc(p.land.name)+'</a><br><small>'+esc(p.land.crop||'—')+' ｜ '+landAreaMu(p.land).toFixed(2)+'亩</small></td><td>'+esc(p.planName||'')+'</td><td>'+esc(p.stage)+'</td><td>'+esc(p.op)+'</td><td><div class="wb-cell-clamp">'+mats+'</div></td></tr>';
   }).join(''):'<tr><td colspan="6" class="wb-empty">未来 7 天暂无集中作业窗口；请确认地块状态、作物和种植/播种日期。</td></tr>';
   main.innerHTML=''+
     '<h1 class="wb-section-title">统防调度看板</h1>'+
@@ -1486,7 +1978,7 @@ function renderDispatch(main){
       '<button class="wb-btn wb-btn-light" onclick="generateScaleTasks(7)">生成未来7天待办</button>'+
       '<button class="wb-btn wb-btn-light" onclick="location.hash=\'#/purchase\'">查看采购测算</button>'+
     '</div>'+
-    '<div class="wb-panel" style="padding:0;overflow:auto"><table class="wb-table"><thead><tr><th>状态</th><th>地块</th><th>方案</th><th>节点</th><th>作业方式</th><th>建议内容</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+    '<div class="wb-panel" style="padding:0;overflow:auto"><table class="wb-table wb-dispatch-table"><thead><tr><th>状态</th><th>地块</th><th>方案</th><th>节点</th><th>作业<br>方式</th><th>建议内容</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
     '<div class="wb-form-note" style="margin-top:10px">说明：番茄、辣椒为规模化通用模板；七彩花生继续读取原全程植保方案。具体药肥用量需按产品标签和现场情况校准。</div>';
 }
 function renderPurchase(main){
@@ -1797,62 +2289,297 @@ function confirmDeleteTask(tid){ deleteTask(tid); router(); }
 function deleteTask(id){ DB.tasks=DB.tasks.filter(function(t){return t.task_id!==id;}); dbSave(DB); }
 
 /* 物资字典 */
-function openMaterialModal(){
+function openMaterialModal(editMid){
   var mats=getMaterials();
+  var editM=editMid ? mats.filter(function(m){return m.material_id===editMid;})[0]||null : null;
   var list = mats.length? mats.map(function(m){
     var stock=parseFloat(m.stock_qty)||0, safe=parseFloat(m.safe_stock)||0, low=safe>0&&stock<safe;
     var exp=m.expiry_date||'', expSoon=exp&&((new Date(exp+'T00:00:00+08:00')-new Date(todayISO()+'T00:00:00+08:00'))/86400000<=30);
+    var photo=m.photo ? '<div style="margin-top:6px"><img src="'+esc(m.photo)+'" style="max-height:60px;max-width:100%;border:1px solid var(--line)"></div>' : '';
     return '<div class="wb-rec"><div class="wb-rec-top"><span class="wb-rec-type rt-'+esc(m.category==='农药'?'用药':'施肥')+'">'+esc(m.category)+'</span>'+
-      '<button class="wb-rec-del" onclick="doDeleteMaterial(\''+esc(m.material_id)+'\')">删除</button></div>'+
+      '<div style="display:flex;gap:6px"><button class="wb-rec-del" onclick="openMaterialModal(\''+esc(m.material_id)+'\')">编辑</button><button class="wb-rec-del" onclick="doDeleteMaterial(\''+esc(m.material_id)+'\')">删除</button></div></div>'+
       '<div class="wb-rec-meta"><b>'+esc(m.name)+'</b>'+(m.spec?' ｜ 规格：'+esc(m.spec):'')+(m.unit?' ｜ 单位：'+esc(m.unit):'')+(m.unit_price?' ｜ 单价：¥'+esc(m.unit_price):'')+'</div>'+
-      '<div class="wb-rec-remark">库存：'+(m.stock_qty||'—')+' '+esc(m.unit||'')+' ｜ 安全库存：'+(m.safe_stock||'—')+' '+esc(m.unit||'')+(m.expiry_date?' ｜ 有效期：'+esc(m.expiry_date):'')+(low?' ｜ 库存偏低':'')+(expSoon?' ｜ 临期':'')+'</div></div>';
+      '<div class="wb-rec-remark">库存：'+(m.stock_qty||'—')+' '+esc(m.unit||'')+' ｜ 安全库存：'+(m.safe_stock||'—')+' '+esc(m.unit||'')+(m.expiry_date?' ｜ 有效期：'+esc(m.expiry_date):'')+(low?' ｜ 库存偏低':'')+(expSoon?' ｜ 临期':'')+'</div>'+photo+'</div>';
   }).join('') : '<div class="wb-empty">还没有物资字典，添加后可在录入农事时下拉选择</div>';
 
-  var html='<h3>物资字典（肥料 / 农药）</h3>'+
+  var title=editM?'<h3>编辑物资：'+esc(editM.name)+'</h3>':'<h3>物资字典（肥料 / 农药）</h3>';
+  var photoPreview=editM&&editM.photo ? '<div style="margin-bottom:8px"><img id="m_photoPreview" src="'+esc(editM.photo)+'" style="max-height:120px;max-width:100%;border:1px solid var(--line)"></div><input type="hidden" id="m_photo" value="'+esc(editM.photo)+'">' : '<input type="hidden" id="m_photo" value="">';
+  var html=title+
     '<div id="matList">'+list+'</div>'+
     '<hr style="border:none;border-top:1px solid var(--line);margin:14px 0">'+
-    field('名称','<input id="m_name" placeholder="如：吡虫啉">')+
+    (editM?'<input type="hidden" id="m_id" value="'+esc(editM.material_id)+'">':'<input type="hidden" id="m_id" value="">')+
+    field('名称','<input id="m_name" placeholder="如：吡虫啉" value="'+esc(editM?editM.name:'')+'">')+
     '<div class="wb-field-row">'+
-      field('类别','<select id="m_cat">'+optionList(['肥料','农药','其他'],'肥料')+'</select>')+
-      field('规格','<input id="m_spec" placeholder="如：10% 可湿粉">')+
+      field('类别','<select id="m_cat">'+optionList(['肥料','农药','其他'],editM?editM.category:'肥料')+'</select>')+
+      field('规格','<input id="m_spec" placeholder="如：10% 可湿粉" value="'+esc(editM?editM.spec:'')+'">')+
     '</div>'+
-    field('单位','<input id="m_unit" placeholder="如：袋 / 瓶 / kg / L">')+
+    field('单位','<input id="m_unit" placeholder="如：袋 / 瓶 / kg / L" value="'+esc(editM?editM.unit:'')+'">')+
     '<div class="wb-field-row">'+
-      field('当前库存','<input id="m_stock" type="number" step="0.01" placeholder="0">')+
-      field('安全库存','<input id="m_safe" type="number" step="0.01" placeholder="低于则预警">')+
-    '</div>'+
-    '<div class="wb-field-row">'+
-      field('单价（元/单位）','<input id="m_price" type="number" step="0.01" placeholder="用于估算成本">')+
-      field('安全间隔期(天)','<input id="m_interval" type="number" step="1" placeholder="农药必填更好">')+
+      field('当前库存','<input id="m_stock" type="number" step="0.01" placeholder="0" value="'+esc(editM?editM.stock_qty:'')+'">')+
+      field('安全库存','<input id="m_safe" type="number" step="0.01" placeholder="低于则预警" value="'+esc(editM?editM.safe_stock:'')+'">')+
     '</div>'+
     '<div class="wb-field-row">'+
-      field('供应商 / 批号','<input id="m_supplier" placeholder="供应商或批号">')+
-      field('有效期','<input id="m_expiry" type="date">')+
+      field('单价（元/单位）','<input id="m_price" type="number" step="0.01" placeholder="用于估算成本" value="'+esc(editM?editM.unit_price:'')+'">')+
+      field('安全间隔期(天)','<input id="m_interval" type="number" step="1" placeholder="农药必填更好" value="'+esc(editM?editM.interval_days:'')+'">')+
     '</div>'+
-    field('推荐亩用量','<input id="m_rec_dosage" placeholder="如：50 ml/亩">')+
-    '<div class="wb-modal-actions"><button class="wb-btn" onclick="closeModal()">关闭</button><button class="wb-btn wb-btn-primary" onclick="submitMaterial()">添加物资</button></div>';
+    '<div class="wb-field-row">'+
+      field('供应商 / 批号','<input id="m_supplier" placeholder="供应商或批号" value="'+esc(editM?editM.supplier:'')+'">')+
+      field('有效期','<input id="m_expiry" type="date" value="'+esc(editM?editM.expiry_date:'')+'">')+
+    '</div>'+
+    field('推荐亩用量','<input id="m_rec_dosage" placeholder="如：50 ml/亩" value="'+esc(editM?editM.recommend_dosage:'')+'">')+
+    photoPreview+
+    field('产品照片','<input type="file" id="m_photoInput" accept="image/*">')+
+    '<div class="wb-modal-actions"><button class="wb-btn" onclick="closeModal()">关闭</button><button class="wb-btn wb-btn-primary" onclick="submitMaterial()">'+(editM?'保存修改':'添加物资')+'</button></div>';
   wbModal(html);
 }
 function submitMaterial(){
   var name=document.getElementById('m_name').value.trim();
   if(!name){ alert('请填写物资名称'); return; }
-  addMaterial({
-    name:name,
-    category:document.getElementById('m_cat').value,
-    spec:document.getElementById('m_spec').value.trim(),
-    unit:document.getElementById('m_unit').value.trim(),
-    stock_qty:document.getElementById('m_stock').value.trim(),
-    safe_stock:document.getElementById('m_safe').value.trim(),
-    unit_price:document.getElementById('m_price').value.trim(),
-    supplier:document.getElementById('m_supplier').value.trim(),
-    batch_no:document.getElementById('m_supplier').value.trim(),
-    expiry_date:document.getElementById('m_expiry').value,
-    interval_days:document.getElementById('m_interval').value.trim(),
-    recommend_dosage:document.getElementById('m_rec_dosage').value.trim()
-  });
-  openMaterialModal(); // 刷新列表
+  var midEl=document.getElementById('m_id');
+  var photoEl=document.getElementById('m_photo');
+  var fileInput=document.getElementById('m_photoInput');
+  var file=fileInput && fileInput.files && fileInput.files[0];
+
+  function saveWithPhoto(photoData){
+    var data={
+      name:name,
+      category:document.getElementById('m_cat').value,
+      spec:document.getElementById('m_spec').value.trim(),
+      unit:document.getElementById('m_unit').value.trim(),
+      stock_qty:document.getElementById('m_stock').value.trim(),
+      safe_stock:document.getElementById('m_safe').value.trim(),
+      unit_price:document.getElementById('m_price').value.trim(),
+      supplier:document.getElementById('m_supplier').value.trim(),
+      batch_no:document.getElementById('m_supplier').value.trim(),
+      expiry_date:document.getElementById('m_expiry').value,
+      interval_days:document.getElementById('m_interval').value.trim(),
+      recommend_dosage:document.getElementById('m_rec_dosage').value.trim(),
+      photo:photoData||''
+    };
+    if(midEl && midEl.value){
+      var idx=DB.materials.findIndex(function(x){return x.material_id===midEl.value;});
+      if(idx>=0){
+        var old=DB.materials[idx];
+        DB.materials[idx]={
+          material_id: old.material_id,
+          name:data.name, category:data.category, spec:data.spec, unit:data.unit,
+          stock_qty:data.stock_qty, safe_stock:data.safe_stock, unit_price:data.unit_price,
+          supplier:data.supplier, batch_no:data.supplier, expiry_date:data.expiry_date,
+          interval_days:data.interval_days, recommend_dosage:data.recommend_dosage, photo:data.photo
+        };
+        dbSave(DB);
+      }
+    }else{
+      addMaterial(data);
+    }
+    closeModal();
+    alert('已保存');
+    router();
+  }
+
+  if(file){
+    if(file.size>8*1024*1024){ alert('照片太大，请选小于 8MB'); return; }
+    compressPhotoToDataURL(file, 480, saveWithPhoto);
+  }else{
+    saveWithPhoto(photoEl?photoEl.value:'');
+  }
 }
-function doDeleteMaterial(mid){ if(confirm('删除该物资？')){ deleteMaterial(mid); openMaterialModal(); } }
+function doDeleteMaterial(mid){ if(confirm('删除该物资？')){ deleteMaterial(mid); router(); } }
+
+/* ============================================================
+   页面：物资库（植保方案物资与使用登记）
+   ============================================================ */
+function __lcStripPlainItem(raw){
+  var s=raw.trim();
+  var doseMatch=s.match(/^(.*?)\s*([0-9.]+(?:\s*[-–]\s*[0-9.]+)?\s*(?:kg|g|ml|L|亩|袋|瓶|包|桶)\b.*)$/i);
+  if(doseMatch){ return {name:doseMatch[1].trim(), dose:doseMatch[2].trim(), spec:'', unit:''}; }
+  return {name:s, dose:'', spec:'', unit:''};
+}
+function importPlanMaterials(){
+  if(!confirm('从内置植保方案一键导入肥料/农药？\n会自动按作物、节点、用量去重，避免重复建立。')) return;
+  var plans=getPlanList();
+  var seen={};
+  var added=0;
+  plans.forEach(function(plan){
+    if(!plan || !Array.isArray(plan.nodes)) return;
+    (plan.nodes||[]).forEach(function(node){
+      var listStr=(node.list||'')+'; '+(node.mix||'');
+      var cats=[{raw:node.list,cat:'肥料',marker:/肥|有机肥|复合肥|水溶肥|钙镁|硼|钾|氮|尿素|磷酸二氢钾|硫酸钾|氯化钾|硝酸钾|海藻肥|微生物菌剂|生根/i},
+                  {raw:node.list,cat:'农药',marker:/药|虫|病|菌|草|蓟马|蚜虫|粉虱|青枯|根腐|炭疽|疫病|灰霉|叶斑|蛾|螺|鼠/i}];
+      var items=[];
+      cats.forEach(function(c){
+        var str=(c.raw||'').split(/；|;/);
+        str.forEach(function(seg){
+          seg=seg.trim();
+          if(!seg || !c.marker.test(seg)) return;
+          var p=__lcStripPlainItem(seg);
+          if(!p.name) return;
+          if(p.name.length>40) return;
+          items.push({name:p.name, dose:p.dose||'按方案', category:c.cat});
+        });
+      });
+      items.forEach(function(it){
+        var key=(it.name+'|'+it.category).toLowerCase();
+        if(seen[key]) return;
+        seen[key]=true;
+        if(DB.materials.some(function(m){return m.name===it.name && m.category===it.category;})) return;
+        addMaterial({ name:it.name, category:it.category, spec:'', unit:'', stock_qty:'', safe_stock:'', unit_price:'', recommend_dosage:it.dose });
+        added++;
+      });
+    });
+  });
+  alert('一键导入完成，共新增 '+added+' 种物资。');
+  router();
+}
+function compressPhotoToDataURL(file, maxWidth, cb){
+  maxWidth=maxWidth||480;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var img=new Image();
+    img.onload=function(){
+      var canvas=document.createElement('canvas');
+      var w=img.width, h=img.height;
+      if(w>maxWidth){ h=Math.round(h*maxWidth/w); w=maxWidth; }
+      canvas.width=w; canvas.height=h;
+      var ctx=canvas.getContext('2d');
+      ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h);
+      ctx.drawImage(img,0,0,w,h);
+      cb(canvas.toDataURL('image/jpeg',0.85));
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function uploadMaterialPhoto(mid){
+  var input=document.createElement('input');
+  input.type='file'; input.accept='image/*';
+  input.onchange=function(){
+    var file=input.files[0]; if(!file) return;
+    if(file.size>8*1024*1024){ alert('图片太大，请选小于 8MB 的照片'); return; }
+    compressPhotoToDataURL(file, 480, function(dataUrl){
+      var idx=DB.materials.findIndex(function(m){return m.material_id===mid;});
+      if(idx>=0){ DB.materials[idx].photo=dataUrl; dbSave(DB); alert('产品照片已保存'); router(); }
+    });
+  };
+  input.click();
+}
+function renderMaterials(main){
+  var mats=getMaterials();
+  var feis=mats.filter(function(m){return m.category==='肥料';});
+  var yaos=mats.filter(function(m){return m.category==='农药';});
+  var others=mats.filter(function(m){return m.category!=='肥料' && m.category!=='农药';});
+
+  function card(m){
+    var stock=parseFloat(m.stock_qty)||0, safe=parseFloat(m.safe_stock)||0;
+    var stockClass=stock<=0?'style="color:var(--r-600)"':(stock<safe?'style="color:var(--y-600)"':'');
+    var photo=m.photo ? '<div style="height:140px;display:flex;align-items:center;justify-content:center;background:#fff;border-bottom:1px solid var(--line);overflow:hidden"><img src="'+esc(m.photo)+'" style="max-width:100%;max-height:100%;object-fit:contain"></div>'
+      : '<div style="height:140px;display:flex;align-items:center;justify-content:center;background:var(--g-50);color:var(--g-400);border-bottom:1px solid var(--line)">暂无照片</div>';
+    return '<div class="wb-panel" style="padding:0;overflow:hidden;display:flex;flex-direction:column">'+
+      photo+
+      '<div style="padding:10px;display:flex;flex-direction:column;gap:4px;flex:1">'+
+        '<div style="display:flex;align-items:center;gap:6px">'+
+          '<span class="wb-tag" style="background:var(--g-50);color:var(--g-700);border:1px solid var(--g-200);font-size:11px;padding:2px 6px">'+esc(m.category||'—')+'</span>'+
+          '<strong style="font-size:13px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(m.name||'—')+'</strong>'+
+        '</div>'+
+        '<div style="font-size:12px;color:var(--g-600)">'+esc((m.spec||'')+(m.unit?' / '+m.unit:''))+'</div>'+
+        '<div style="font-size:12px">库存：<b '+stockClass+'>'+(m.stock_qty||'—')+'</b> '+(m.unit||'')+'</div>'+
+        '<div style="font-size:12px;color:var(--g-600)">推荐用量：'+(m.recommend_dosage||'—')+'</div>'+
+        '<div style="display:flex;gap:6px;margin-top:auto;padding-top:8px">'+
+          '<button class="wb-btn wb-btn-primary" style="flex:1;font-size:12px;padding:6px 8px" onclick="openUsageModal(\''+esc(m.material_id)+'\')">记一笔使用</button>'+
+          '<button class="wb-btn wb-btn-light" style="font-size:12px;padding:6px 10px" onclick="uploadMaterialPhoto(\''+esc(m.material_id)+'\')">传图</button>'+
+          '<button class="wb-btn wb-btn-light" style="font-size:12px;padding:6px 10px;color:var(--r-600)" onclick="doDeleteMaterial(\''+esc(m.material_id)+'\')">删除</button>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  }
+  function gridSection(title, items){
+    if(!items.length) return '';
+    return '<h2 class="wb-section-title" style="margin-top:18px;font-size:14px">'+esc(title)+'（'+items.length+' 项）</h2>'+
+      '<div class="wb-grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px">'+items.map(card).join('')+'</div>';
+  }
+
+  var allRecords=getUsageRecords();
+  var usageRows=allRecords.length ? allRecords.slice().reverse().map(function(u){
+    var m=getMaterials().filter(function(x){return x.material_id===u.material_id;})[0]||{};
+    var photo=u.photo ? '<img src="'+esc(u.photo)+'" style="width:40px;height:40px;object-fit:cover;border-radius:0">' : '';
+    return '<tr><td>'+esc(u.operate_date)+'</td><td>'+esc(u.land_name||'—')+'</td><td>'+esc(m.category||'—')+' '+esc(m.name||'—')+'</td><td>'+esc(u.dosage||'—')+'</td><td>'+esc(u.operator||'—')+'</td><td>'+photo+'</td><td>'+esc(u.remark||'')+'</td>'+
+      '<td><button class="wb-btn wb-btn-light" style="color:var(--r-600)" onclick="confirmDeleteUsageRecord(\''+esc(u.usage_id)+'\');router();">删除</button></td></tr>';
+  }).join('') : '<tr><td colspan="8" class="wb-empty">还没有使用记录，点击卡片上的「记一笔使用」开始登记。</td></tr>';
+
+  main.innerHTML=''+
+    '<h1 class="wb-section-title">物资库 · 植保方案物资与使用登记</h1>'+
+    '<div class="wb-sub">把植保方案里每个阶段的用药 / 用肥 / 用肥一次性入库；以后每次用哪个，点一下「记一笔使用」就进入实际使用统计清单，不用重复录入。</div>'+
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin:14px 0">'+
+      '<button class="wb-btn wb-btn-primary" onclick="importPlanMaterials()">从植保方案一键导入</button>'+
+      '<button class="wb-btn wb-btn-primary" style="background:#fff;color:var(--g-700);border:1px solid var(--g-300)" onclick="openMaterialModal()">新建 / 编辑物资</button>'+
+      '<button class="wb-btn wb-btn-light" onclick="exportUsageCSV()">导出使用统计（CSV）</button>'+
+    '</div>'+
+    gridSection('肥料', feis)+gridSection('农药', yaos)+gridSection('其他', others)+
+    (mats.length?'':'<div class="wb-empty" style="margin-top:20px">还没有物资字典。可点击「从植保方案一键导入」或「新建 / 编辑物资」添加。</div>')+
+    '<h2 class="wb-section-title" style="margin-top:24px">实际使用统计</h2>'+
+    '<div class="wb-panel" style="padding:0;overflow:auto"><table class="wb-table"><thead><tr><th>日期</th><th>地块</th><th>物资</th><th>用量</th><th>操作人</th><th>照片</th><th>备注</th><th>操作</th></tr></thead><tbody>'+usageRows+'</tbody></table></div>';
+}
+function openUsageModal(mid){
+  var m=getMaterials().filter(function(x){return x.material_id===mid;})[0];
+  if(!m){ alert('未找到物资'); return; }
+  var lands=getLands();
+  var landOpts=lands.length ? lands.map(function(l){return '<option value="'+esc(l.land_id)+'">'+esc(l.name)+' '+(l.crop||'')+'</option>';}).join('') : '<option value="">未建地块</option>';
+  var html='<h3>记一笔使用：'+esc(m.name)+'</h3>'+
+    '<div class="wb-field-row">'+
+      field('使用地块','<select id="u_land">'+landOpts+'</select>')+
+      field('使用日期','<input id="u_date" type="date" value="'+todayISO()+'">')+
+    '</div>'+
+    '<div class="wb-field-row">'+
+      field('实际用量','<input id="u_dosage" placeholder="如：50 kg/亩 × 10 亩 = 500 kg">')+
+      field('操作人','<input id="u_operator" placeholder="如：张三">')+
+    '</div>'+
+    '<div class="wb-field-row">'+
+      field('安全间隔期(天)','<input id="u_interval" type="number" step="1" placeholder="农药必填">')+
+      field('现场照片','<input type="file" id="u_photo" accept="image/*">')+
+    '</div>'+
+    field('备注','<textarea id="u_remark" rows="2" placeholder="如：叶面喷施、天气、效果"></textarea>')+
+    '<div class="wb-modal-actions"><button class="wb-btn" onclick="closeModal()">取消</button><button class="wb-btn wb-btn-primary" onclick="submitUsage(\''+esc(mid)+'\')">保存</button></div>';
+  wbModal(html);
+}
+function submitUsage(mid){
+  var landId=document.getElementById('u_land').value;
+  var land=getLand(landId)||{};
+  var data={
+    material_id:mid,
+    land_id:landId,
+    land_name:land.name||'',
+    operate_date:document.getElementById('u_date').value,
+    dosage:document.getElementById('u_dosage').value.trim(),
+    operator:document.getElementById('u_operator').value.trim(),
+    interval_days:document.getElementById('u_interval').value.trim(),
+    remark:document.getElementById('u_remark').value.trim(),
+    photo:''
+  };
+  var fileInput=document.getElementById('u_photo');
+  var file=fileInput && fileInput.files && fileInput.files[0];
+  function finish(){
+    addUsageRecord(data);
+    closeModal();
+    alert('已登记使用');
+    router();
+  }
+  if(file){
+    if(file.size>8*1024*1024){ alert('照片太大，请选小于 8MB'); return; }
+    compressPhotoToDataURL(file, 480, function(dataUrl){ data.photo=dataUrl; finish(); });
+  }else{
+    finish();
+  }
+}
+function confirmDeleteUsageRecord(uid){ if(confirm('删除这条使用记录？')){ deleteUsageRecord(uid); } }
+function exportUsageCSV(){
+  var rows=[['使用日期','地块','物资类别','物资名称','规格','单位','用量','操作人','安全间隔期(天)','备注']];
+  getUsageRecords().forEach(function(u){
+    var m=getMaterials().filter(function(x){return x.material_id===u.material_id;})[0]||{};
+    rows.push([u.operate_date,u.land_name||'',m.category||'',m.name||'',m.spec||'',m.unit||'',u.dosage||'',u.operator||'',u.interval_days||'',u.remark||'']);
+  });
+  var csv='\uFEFF'+rows.map(function(r){return r.map(function(c){return '"'+String(c==null?'':c).replace(/"/g,'""')+'"';}).join(',');}).join('\n');
+  downloadCSV('物资使用统计_'+todayISO()+'.csv', csv);
+}
 
 /* ============================================================
    导出 CSV
@@ -1978,15 +2705,30 @@ function goNewLand(){ openNewLandModal(); }
    初始化
    ============================================================ */
 window.addEventListener('hashchange', router);
+window.addEventListener('storage', function(e){
+  // 跨标签页实时同步：精准灌溉页绘制边界写回 runye_db_v1 后，本页若停留在地块详情/地块中心则立即刷新
+  if(e && e.key==='runye_db_v1'){
+    try{ DB=dbLoad()||DB; }catch(err){}
+    var h=location.hash.replace(/^#\/?/,'');
+    var main=document.getElementById('wbMain')||document.querySelector('main');
+    if(h.indexOf('land/')===0){
+      if(main) renderLandDetail(main, h.slice(5));
+    } else if(h==='lands'){
+      if(main && typeof filterLands==='function'){ try{ filterLands(); }catch(err){} }
+    }
+  }
+});
 window.addEventListener('DOMContentLoaded', function(){
   if(!getLands().length){ importLegacyPlots(); }
   syncLegacyPlotGeo();
+  syncLandsToPlotLibrary();
   if(!location.hash){ location.hash='#/dashboard'; }
   router();
 });
 if(document.readyState!=='loading'){
   if(!getLands().length){ importLegacyPlots(); }
   syncLegacyPlotGeo();
+  syncLandsToPlotLibrary();
   if(!location.hash){ location.hash='#/dashboard'; }
   router();
 }

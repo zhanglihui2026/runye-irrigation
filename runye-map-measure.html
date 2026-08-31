@@ -359,7 +359,9 @@
     if(!mu){ alert('请先画框测量出面积'); return; }
     var sqm=Math.round(geodesicArea(points));
     try{
-      localStorage.setItem('runyeMeasuredArea', JSON.stringify({mu:mu, sqm:sqm, poly:latlngs(), ts:Date.now(), source:'map'}));
+      var pid='pm'+Date.now();
+      var nm=(document.getElementById('plotName').value||'').trim();
+      localStorage.setItem('runyeMeasuredArea', JSON.stringify({plotId:pid, name:nm, mu:mu, sqm:sqm, poly:latlngs(), ts:Date.now(), source:'map'}));
       var btn=document.getElementById('btnCopy');
       btn.textContent='回传中…';
       setTimeout(function(){ window.location.href='index.html#areaTool'; }, 350);

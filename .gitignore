@@ -12,3 +12,12 @@ Thumbs.db
 *.bat
 __pycache__/
 *.pyc
+
+# 云端诊断/CloudBase 本地文件（不发布到 GitHub Pages）
+CLOUDBASE_SETUP.md
+cloud-diag.html
+cloud-sync.js
+cloudbaserc.json
+cloud-function/
+cloud-functions/
+functions/

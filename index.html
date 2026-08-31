@@ -883,6 +883,9 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
   display:flex;align-items:center;gap:8px;
 }
 #ppDiagramContent svg{max-width:100%;width:100%;height:auto;display:block}
+#ppDiagramContent svg #ppCalcBookGroup{cursor:move}
+#ppDiagramContent svg #ppCalcBookGroup:hover #ppCalcBookBg{fill:rgba(59,130,246,.04);stroke:rgba(59,130,246,.2);stroke-dasharray:3,3}
+#ppDiagramContent svg #ppCalcBookGroup:hover #ppCalcBookHandle{fill:rgba(99,102,241,.7)}
 .pp-diagram-empty{
   min-height:180px;
   display:flex;
@@ -1709,6 +1712,9 @@ main,footer{position:relative;z-index:1}
 #threeLevelView .panel-heading{
   background:linear-gradient(180deg,#fff 0%,#f0fdf4 100%);
 }
+#threeLevelView .tl-link-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+#threeLevelView .tl-link-chk{display:flex;align-items:center;gap:4px;font-size:12px;color:#475569;cursor:pointer;user-select:none}
+#threeLevelView .tl-link-chk input{width:14px;height:14px;accent-color:#16a34a;margin:0}
 #threeLevelView .input-shell{
   border-color:#dcfce7;background:#fafcff;
 }
@@ -2090,6 +2096,9 @@ main,footer{position:relative;z-index:1}
   display:flex;align-items:center;gap:8px;
 }
 #ppDiagramContent svg{max-width:100%;width:100%;height:auto;display:block}
+#ppDiagramContent svg #ppCalcBookGroup{cursor:move}
+#ppDiagramContent svg #ppCalcBookGroup:hover #ppCalcBookBg{fill:rgba(59,130,246,.04);stroke:rgba(59,130,246,.2);stroke-dasharray:3,3}
+#ppDiagramContent svg #ppCalcBookGroup:hover #ppCalcBookHandle{fill:rgba(99,102,241,.7)}
 .pp-diagram-empty{
   min-height:180px;
   display:flex;
@@ -3966,7 +3975,11 @@ function doIrrImport(text){
       <div class="input-panel">
         <div class="panel-heading">
           <div><span class="step">01</span><h2>输入设计参数</h2></div>
-          <button class="text-button" onclick="resetThreeLevelDefaults()">恢复示例</button>
+          <div class="tl-link-controls">
+            <label class="tl-link-chk" title="与二级系统联动：二级计算后自动带入单区参数"><input type="checkbox" id="tlLinkChk" checked onchange="window.__tlLinkEnabled=this.checked"> 与二级联动</label>
+            <button class="text-button" onclick="syncThreeLevelFromPlan();renderThreeLevel();tlUpdatePlanBar();" title="从二级系统重新读取单区参数">↻ 同步</button>
+            <button class="text-button" onclick="resetThreeLevelDefaults()">恢复示例</button>
+          </div>
         </div>
         <div class="tl-plotname-row">
           <label class="field"><span>地块名称</span><span class="input-shell"><input id="tlPlotName" type="text" placeholder="如：1号灌溉地块" value="七彩花生1号基地"></span></label>
@@ -4066,6 +4079,37 @@ const ECON_VMAX = 2.0;
 const MAX_ZONE_SIDE = 200;
 const MAIN_PIPE_MIN_OD = 90;
 const BRANCH_PIPE_MAX_OD = 160;
+
+// 多边形面积（鞋带公式）
+function polyAreaM2(poly){
+  if(!poly || poly.length < 3) return 0;
+  var s = 0;
+  for(var i=0;i<poly.length;i++){
+    var a = poly[i], b = poly[(i+1)%poly.length];
+    s += a.x*b.y - b.x*a.y;
+  }
+  return Math.abs(s)/2;
+}
+// 矩形裁剪多边形（Sutherland-Hodgman），用于求各轮灌区与地块的实际交集面积
+function clipPolyToRect(poly, x0, y0, x1, y1){
+  function half(pts, inside, inter){
+    var res = [];
+    for(var i=0;i<pts.length;i++){
+      var cur = pts[i], prev = pts[(i-1+pts.length)%pts.length];
+      var ci = inside(cur), pi = inside(prev);
+      if(ci){ if(!pi) res.push(inter(prev, cur)); res.push(cur); }
+      else if(pi){ res.push(inter(prev, cur)); }
+    }
+    return res;
+  }
+  if(!poly || poly.length < 3) return [];
+  var o = poly;
+  o = half(o, function(p){return p.x>=x0;}, function(a,b){var t=(x0-a.x)/(b.x-a.x);return {x:x0, y:a.y+t*(b.y-a.y)};});
+  o = half(o, function(p){return p.x<=x1;}, function(a,b){var t=(x1-a.x)/(b.x-a.x);return {x:x1, y:a.y+t*(b.y-a.y)};});
+  o = half(o, function(p){return p.y>=y0;}, function(a,b){var t=(y0-a.y)/(b.y-a.y);return {x:a.x+t*(b.x-a.x), y:y0};});
+  o = half(o, function(p){return p.y<=y1;}, function(a,b){var t=(y1-a.y)/(b.y-a.y);return {x:a.x+t*(b.x-a.x), y:y1};});
+  return o;
+}
 
 function calcZoneLayout(width, height, requestedN) {
   const safeW = Math.max(1, width || 1);
@@ -5086,6 +5130,37 @@ function resetThreeLevelDefaults() {
   renderThreeLevel();
 }
 
+function syncThreeLevelFromPlan() {
+  // 用二级系统"计算结果"(window.planData) 覆盖三级单区初始参数，确保与二级单区完全一致
+  var pd = window.planData;
+  if (!pd) return false;
+  function setv(id, v) {
+    if (v == null || !isFinite(v)) return;
+    var el = document.getElementById(id);
+    if (el) el.value = v;
+  }
+  // 单区面积：由二级"单区流量 / 灌溉强度"反算，精确等于二级单区面积（避免拿二级表单默认值 30 亩）
+  var singleMu = (pd.intensity && pd.intensity > 0) ? (pd.zoneFlow / pd.intensity) : (pd.totalMu / (pd.N || 1));
+  setv('tl_zoneMu', Math.round(singleMu * 10) / 10);
+  setv('tl_zoneFixedSide', Math.round(pd.zoneW || pd.A || 300));
+  setv('tl_tapeSpacing', pd.tapeSpacing);
+  setv('tl_emitterSpacing', pd.emitterSpacing);
+  setv('tl_emitterFlow', pd.emitterFlow);
+  setv('tl_tapeLen', pd.tapeLen);
+  var odEl = document.getElementById('fld_tapeOD');
+  if (odEl) setv('tl_tapeOD', odEl.value);
+  setv('tl_mainPipeLen', Math.round(pd.mainPipeLen));
+  setv('tl_lift', pd.lift);
+  setv('tl_dh', pd.dh);
+  setv('tl_tapePressure', pd.tapePressure);
+  setv('tl_existPressure', pd.existPressure);
+  setv('tl_targetV', pd.targetV);
+  setv('tl_filterLoss', pd.filterLoss);
+  setv('tl_efficiency', Math.round((pd.efficiency || 0.65) * 100));
+  setv('tl_tapeRollLen', pd.tapeRollLen);
+  return true;
+}
+
 function openThreeLevelView(scrollToPlan) {
   // Ensure measuredPolygon is available — fallback to ppState if missing
   if((!window.measuredPolygon || window.measuredPolygon.length < 3) && typeof window.ppGetPolyPts === 'function') {
@@ -5095,22 +5170,8 @@ function openThreeLevelView(scrollToPlan) {
       console.log('[openThreeLevelView] Restored measuredPolygon from ppState, points:', ppPts.length);
     }
   }
-  // Copy current main form values to three-level form
-  const copyMap = {
-    'fld_zoneMu':'tl_zoneMu','fld_dh':'tl_dh','fld_tapeLen':'tl_tapeLen','fld_tapeSpacing':'tl_tapeSpacing',
-    'fld_tapeDh':'tl_tapeDh','fld_emitterSpacing':'tl_emitterSpacing','fld_emitterFlow':'tl_emitterFlow',
-    'fld_tapeOD':'tl_tapeOD','fld_tapePressure':'tl_tapePressure','fld_lift':'tl_lift',
-    'fld_existPressure':'tl_existPressure','fld_targetV':'tl_targetV','fld_filterLoss':'tl_filterLoss',
-    'fld_efficiency':'tl_efficiency','fld_mainPipeLen':'tl_mainPipeLen','fld_tapeRollLen':'tl_tapeRollLen'
-  };
-  Object.entries(copyMap).forEach(([srcId, dstId]) => {
-    const src = document.getElementById(srcId);
-    const dst = document.getElementById(dstId);
-    if(src && dst) dst.value = src.value;
-  });
-  // Copy fixed side but remove the 200 cap
-  const fs = document.getElementById('fld_zoneFixedSide');
-  if(fs) document.getElementById('tl_zoneFixedSide').value = fs.value;
+  // 关联二级系统：用二级"计算结果"覆盖三级单区初始参数（而非二级表单默认值）
+  syncThreeLevelFromPlan();
   // Copy branch/layout selection
   const mainBranch = document.querySelector('#branchGroup .selected');
   if(mainBranch) document.querySelectorAll('#tl_branchGroup button').forEach(b => b.classList.toggle('selected', +b.dataset.n === +mainBranch.dataset.n));
@@ -5369,7 +5430,7 @@ function tlAutoGenerate(options) {
   parts.push('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+svgW+' '+svgH+'" style="background:#fff">');
   parts.push('<rect x="8" y="8" width="'+(svgW-16)+'" height="'+(svgH-16)+'" fill="none" stroke="#999" stroke-width="1.5" rx="2"/>');
 
-  var zc=totalZones;
+  var zc=tlGetZoneCount();
   var areaMu=(b.w*b.h/MU_TO_SQM).toFixed(1);
   var tlPlotNameVal=(document.getElementById('tlPlotName')&&document.getElementById('tlPlotName').value.trim())||'未命名地块';
   // Title & info —— 与图面拉开间距，不再压到地块
@@ -6837,7 +6898,7 @@ function calcPlan(){
   const manualZoneInput = document.getElementById('planZoneMuManual');
 
   // A/B from actual polygon bounding box (fallback to 1.5 ratio when no polygon)
-  var A, B;
+  var A, B, bbOX = 0, bbOY = 0;
   if (window.measuredPolygon && window.measuredPolygon.length >= 3) {
     var bbMinX=Infinity,bbMinY=Infinity,bbMaxX=-Infinity,bbMaxY=-Infinity;
     for (var bbI=0;bbI<window.measuredPolygon.length;bbI++){
@@ -6845,6 +6906,7 @@ function calcPlan(){
       if(bbP.x<bbMinX)bbMinX=bbP.x; if(bbP.x>bbMaxX)bbMaxX=bbP.x;
       if(bbP.y<bbMinY)bbMinY=bbP.y; if(bbP.y>bbMaxY)bbMaxY=bbP.y;
     }
+    bbOX = bbMinX; bbOY = bbMinY;
     A = Math.round(bbMaxX - bbMinX);
     B = Math.round(bbMaxY - bbMinY);
     if (A < 1 || B < 1) { A = Math.round(Math.sqrt(area * 1.5)); B = Math.round(area / A); }
@@ -6870,20 +6932,39 @@ function calcPlan(){
     planNEl.disabled = manualZoneMu > 0;
   }
 
+  // ===== 水泵选型原则（用户确认 2026-08-31）=====
+  // 水泵按【单个分区】选型，基准取「方正标准分区(外接矩形单格)」面积 = A×B / N：
+  //  · 标准分区用此泵可正常运行；
+  //  · 不规则(非标)分区的真实面积均 < 标准分区，用同一台(偏大)泵灌溉非标分区没问题；
+  //  · 将来配变频泵，偏大更无忧。
+  // 故单区面积取外接矩形单格 A×B/N（标准分区口径），不规则地块自然被“偏大覆盖”，不会欠灌。
+  // 注：滴灌带总长/用量、灌溉强度等【面积量】仍按真实实测面积 area 计（真值），仅【选型】用标准分区。
+  const drawZoneW = zoneLayout.drawZoneW || zoneLayout.zoneW || A;
+  const drawZoneH = zoneLayout.drawZoneH || zoneLayout.zoneH || B;
+  const gridArea = drawZoneW * drawZoneH;
+
+  // 单区面积（水泵选型依据）：手动指定优先；否则按方正标准分区（外接矩形单格）A×B/N
+  var zoneAreaForShape = manualZoneMu > 0 ? Math.min(manualZoneMu * MU_TO_SQM, area) : (A * B / N);
+  // 单区等效边长按 单区面积/格面积 缩放，保证 等效宽 × 等效高 === 单区面积（面积与几何自洽）
+  const shapeK = (gridArea > 0) ? Math.sqrt(zoneAreaForShape / gridArea) : 1;
+  const zoneWEff = drawZoneW * shapeK;
+  const zoneHEff = drawZoneH * shapeK;
+
   // Drip tape computation: length drives flow and material quantity; segment count drives fittings/connectors.
+  // 主管长度为几何量（须横跨地块最远端）；滴灌带用量按真实面积。
   const mainPipeLen = A;
   const tapeRows = Math.max(1, Math.ceil(B / tapeSpacing));
-  const segmentsPerRow = Math.max(1, Math.ceil(A / tapeLen));
-  const totalTapes = tapeRows * segmentsPerRow;
   const tapeTotalLen = area / tapeSpacing;
+  const segmentsPerRow = Math.max(1, Math.ceil(tapeTotalLen / tapeRows / tapeLen));
+  const totalTapes = Math.max(1, Math.ceil(tapeTotalLen / tapeLen));
   const tapeRolls = tapeRollLen > 0 ? Math.ceil(tapeTotalLen * 1.1 / tapeRollLen) : 0;
 
-  // Per-zone flow (pump sized for single zone operation)
-  const zoneAreaM2 = zoneLayout.zoneArea;
+  // Per-zone flow (pump sized for single zone operation) — 按最大分区实际面积选型
+  const zoneAreaM2 = zoneAreaForShape;
   const zoneTapeLen = zoneAreaM2 / tapeSpacing;
-  const zoneRows = Math.max(1, Math.ceil((zoneLayout.drawZoneH || zoneLayout.zoneH || B) / tapeSpacing));
-  const zoneSegmentsPerRow = Math.max(1, Math.ceil((zoneLayout.drawZoneW || zoneLayout.zoneW || A) / tapeLen));
-  const tapesPerZone = zoneRows * zoneSegmentsPerRow;
+  const zoneRows = Math.max(1, Math.ceil(zoneHEff / tapeSpacing));
+  const zoneSegmentsPerRow = Math.max(1, Math.ceil(zoneWEff / tapeLen));
+  const tapesPerZone = Math.max(1, Math.ceil(zoneTapeLen / tapeLen));
   const emittersPerTape = tapeLen / emitterSpacing;
   const tapeFlow = emittersPerTape * emitterFlow / 1000; // m³/h per full-length tape segment
   const zoneFlow = zoneTapeLen / emitterSpacing * emitterFlow / 1000;  // single zone flow → pump sizing
@@ -6895,7 +6976,7 @@ function calcPlan(){
   const mainLoss = hazenWilliams(mainPipeLen, zoneFlow, mainPipe.id);
   const branchFlow = zoneFlow / branchCount;
   const branchPipe = selectPipe(branchFlow, targetV, 0, BRANCH_PIPE_MAX_OD);
-  const branchSpan = Math.max(0, zoneLayout.drawZoneH || zoneLayout.zoneH || B);
+  const branchSpan = Math.max(0, zoneHEff);
   const branchLen = branchSpan / (branchCount * layoutSides);
   const tapsPerBranch = Math.ceil(tapesPerZone / branchCount);
   const branchF = christiansenF(tapsPerBranch);
@@ -6931,7 +7012,16 @@ function calcPlan(){
   if(tag) tag.innerHTML='实测 <b>'+area.toFixed(1)+' m²</b> · '+totalMu.toFixed(2)+' 亩 · '+(layoutSides===2?'双边':'单边')+' · '+zoneLayout.cols+'列×'+zoneLayout.rows+'行 · '+zoneModeLabel+'<b>'+Math.round(zoneLayout.zoneW)+'×'+Math.round(zoneLayout.zoneH)+'m</b>';
 
   // Store all data for apply
-  window.planData = { A, B, N, zoneCols: zoneLayout.cols, zoneRows: zoneLayout.rows, zoneW: zoneLayout.zoneW, zoneH: zoneLayout.zoneH, mainPipeLen, tapeLen, tapeSpacing, emitterSpacing, emitterFlow, tapeRollLen, tapeTotalLen, totalTapes, tapesPerZone, zoneTapeLen, lift, dh, totalMu, zoneFlow, pumpHead, pumpPower, motorKW, intensity, manualZoneMu, targetV, mainPipeOD:'Ø '+mainPipe.od+' mm', branchPipeOD:'Ø '+branchPipe.od+' mm', mainPipeODValue:mainPipe.od, branchPipeODValue:branchPipe.od, mainVelocity:mainPipe.v, branchVelocity:branchPipe.v };
+  window.planData = { A, B, N, zoneCols: zoneLayout.cols, zoneRows: zoneLayout.rows, zoneW: zoneLayout.zoneW, zoneH: zoneLayout.zoneH, mainPipeLen, tapeLen, tapeSpacing, emitterSpacing, emitterFlow, tapeRollLen, tapeTotalLen, totalTapes, tapesPerZone, zoneTapeLen, lift, dh, totalMu, zoneFlow, pumpHead, pumpPower, motorKW, intensity, manualZoneMu, targetV, mainPipeOD:'Ø '+mainPipe.od+' mm', branchPipeOD:'Ø '+branchPipe.od+' mm', mainPipeODValue:mainPipe.od, branchPipeODValue:branchPipe.od, mainVelocity:mainPipe.v, branchVelocity:branchPipe.v,
+    // 水泵扬程计算中间量，用于施工简图展示
+    tapePressure, tapePressureM, existPressure, mainLoss, branchLoss, filterLoss, headBeforeSafety, headBeforeSafetyRaw, safetyFactor: SAFETY_FACTOR, marginHead: MARGIN_HEAD, efficiency, branchCount, layoutSides
+  };
+  // 二级→三级 联动：二级计算完成后，自动把单区参数带入三级系统（若开启"与二级联动"）
+  if (window.__tlLinkEnabled !== false && typeof syncThreeLevelFromPlan === 'function') {
+    syncThreeLevelFromPlan();
+    if (typeof renderThreeLevel === 'function') renderThreeLevel();
+    if (typeof tlUpdatePlanBar === 'function') tlUpdatePlanBar();
+  }
   if(typeof render==='function') render();
   if(typeof window.ppRender==='function') window.ppRender();
   if(typeof window.ppRefreshDiagramIfVisible==='function') window.ppRefreshDiagramIfVisible();
@@ -8423,7 +8513,8 @@ function calcPlan(){
     var plotScaleY=b.h>0?plotH/b.h:1;
     var plotDisplayW=displayB.w*plotScaleX;
     var plotDisplayH=displayB.h*plotScaleY;
-    var svgW=1190,svgH=870,pad=80,bottomH=125;
+    // A3/A4 横向工程图纸比例：宽:高 ≈ 1.414:1（420×297 mm）
+    var svgW=1190,svgH=841,pad=60,bottomH=130;
     var drawW=svgW-2*pad,drawH=svgH-pad-bottomH;
     var drawX1=pad,drawX2=svgW-pad,drawY1=pad,drawY2=svgH-bottomH;
     var s=Math.min(drawW/plotDisplayW,drawH/plotDisplayH);
@@ -8702,34 +8793,77 @@ function calcPlan(){
       parts.push('<line x1="'+(vp.x+4).toFixed(1)+'" y1="'+(vp.y-4).toFixed(1)+'" x2="'+(vp.x-4).toFixed(1)+'" y2="'+(vp.y+4).toFixed(1)+'" stroke="#fff" stroke-width="1.5"/>');
     });
 
-    // Compact two-line data layout without outer frame.
-    var ix=20,iy=drawY2+54;
-    var boxW=svgW-40,boxH=48;
-    var layoutLabel=(layoutSides===2)?'双边':'单边';
-    var actualMainStr=actualMainTotal>0?actualMainTotal.toFixed(1)+'m':'未绘制';
-    var actualBranchStr=actualBranchTotal>0?actualBranchTotal.toFixed(1)+'m':'未绘制';
-    var paramLine1=layoutLabel+'敷设 | 滴灌带 '+planTapeLen+'m | 间距 '+planTapeSpacing+'m | 孔距 '+planEmitterSpacing+'m | 每亩流量 '+planIntensity+' m³/h/亩 | 水泵 '+planPumpFlow+' m³/h·'+planPumpHead+'m·'+planPumpPower+'kW';
-    var paramLine2='主管 '+mainPipeOD+' | 支管 '+branchPipeOD+' | 阀门 '+ppState.valves.filter(function(v){return ppPointInPlot(v);}).length+'个 | 实测主管 '+actualMainStr+' | 实测支管 '+actualBranchStr;
+    // Calculation book (draggable + resizable like three-level header, no fill, transparent background)
+    var cbX0=34, cbY0=drawY2+18;
+    var cbDefW=svgW-68;
+    var pdCalc=window.planData||{};
+    var cbLift=Number(pdCalc.lift)||0;
+    var cbDh=Number(pdCalc.dh)||0;
+    var cbTapePressureM=Number(pdCalc.tapePressureM)||((Number(pdCalc.tapePressure)||0)*10.2);
+    var cbExistPressureM=(Number(pdCalc.existPressure)||0)*10.2;
+    var cbMainLoss=Number(pdCalc.mainLoss)||0;
+    var cbBranchLoss=Number(pdCalc.branchLoss)||0;
+    var cbFilterLoss=Number(pdCalc.filterLoss)||0;
+    var cbPumpHead=Number(pdCalc.pumpHead)||0;
+    var cbZoneFlow=Number(pdCalc.zoneFlow)||0;
+    var cbPumpPower=Number(pdCalc.pumpPower)||0;
+    var cbMotorKW=Number(pdCalc.motorKW)||0;
+    var cbSafety=Number(pdCalc.safetyFactor)||1.10;
+    var cbMargin=Number(pdCalc.marginHead)||2;
+    var cbTapeLen=Number(pdCalc.tapeLen)||100;
+    var cbEmitterFlow=Number(pdCalc.emitterFlow)||0.8;
+    var cbTapeSpacing=Number(pdCalc.tapeSpacing)||0.8;
+    var cbEmitterSpacing=Number(pdCalc.emitterSpacing)||0.3;
+    var cbMainOD=pdCalc.mainPipeOD||'Ø — mm';
+    var cbBranchOD=pdCalc.branchPipeOD||'Ø — mm';
+    var cbActualMainStr=actualMainTotal>0?actualMainTotal.toFixed(1)+'m':'未绘制';
+    var cbActualBranchStr=actualBranchTotal>0?actualBranchTotal.toFixed(1)+'m':'未绘制';
+    var cbHasCalc=cbZoneFlow>0&&cbPumpHead>0;
 
-    // Scale bar – drawing-style tick ruler, aligned with the parameter block top.
+    var cbSegs=[];
+    cbSegs.push('滴灌带 '+cbTapeLen+'m | 滴孔流量 '+cbEmitterFlow+' L/h | 孔距 '+cbEmitterSpacing+'m | 带距 '+cbTapeSpacing+'m');
+    cbSegs.push('主管 '+cbMainOD+' | 支管 '+cbBranchOD+' | 实测主管 '+cbActualMainStr+' | 实测支管 '+cbActualBranchStr);
+    if(cbHasCalc){
+      cbSegs.push('扬程 H=(提升'+cbLift.toFixed(1)+' + 地形'+cbDh.toFixed(1)+' + 入口压力'+cbTapePressureM.toFixed(1)+' − 已有压力'+cbExistPressureM.toFixed(1)+' + 主管损失'+cbMainLoss.toFixed(2)+' + 支管损失'+cbBranchLoss.toFixed(2)+' + 过滤阀门'+cbFilterLoss.toFixed(1)+' + 富余'+cbMargin+') × '+cbSafety.toFixed(2)+' = '+cbPumpHead.toFixed(1)+' m');
+      cbSegs.push('水泵 Q='+cbZoneFlow.toFixed(1)+' m³/h  P=2.725×Q×H/η='+cbPumpPower.toFixed(1)+' kW  配套电机 '+cbMotorKW.toFixed(1)+' kW');
+    }else{
+      cbSegs.push('未获取到水泵计算中间量，请先在参数面板完成计算后再生成施工图。');
+    }
+
+    window._ppCalcBookSegs=cbSegs;
+    window._ppCalcBookX0=cbX0;
+    window._ppCalcBookY0=cbY0;
+    window._ppCalcBookDefW=cbDefW;
+
+    var cbLines=ppRewrapCalcBook(cbDefW);
+    var cbH=cbLines.length*18+12;
+    parts.push('<g id="ppCalcBookGroup">');
+    parts.push('<rect id="ppCalcBookBg" x="'+(cbX0-8)+'" y="'+(cbY0-14)+'" width="'+(cbDefW+16)+'" height="'+cbH+'" fill="rgba(255,255,255,0)" stroke="none" rx="2"/>');
+    for(var ci=0;ci<cbLines.length;ci++){
+      parts.push('<text x="'+cbX0+'" y="'+(cbY0+ci*18)+'" text-anchor="start" font-size="11" font-weight="600" fill="#334155" class="pp-cb-text">'+cbLines[ci]+'</text>');
+    }
+    var cbHandleX=cbX0-8+cbDefW+16-8;
+    var cbHandleY=cbY0-14+cbH-8;
+    parts.push('<rect id="ppCalcBookHandle" x="'+cbHandleX+'" y="'+cbHandleY+'" width="8" height="8" fill="rgba(99,102,241,.35)" rx="2" style="cursor:nwse-resize"/>');
+    parts.push('</g>');
+
+    // 比例尺（带刻度的视觉标尺，固定在底部右下角，不随计算书框拖动）
     var rawM=100/s;
     var niceM=ppNiceStep(rawM,1);
     niceM=Math.max(10,Math.round(niceM/10)*10);
     var barPx=niceM*s;
-    var barX1=svgW-34-barPx,barX2=svgW-34;
-    var barY=iy+24;
+    var barX2=svgW-34, barX1=barX2-barPx;
+    var barY=drawY2+bottomH-44;
+    parts.push('<text x="'+barX1.toFixed(1)+'" y="'+(barY-8).toFixed(1)+'" text-anchor="start" font-size="10" font-weight="700" fill="#1a4731">比例尺</text>');
     parts.push('<g stroke="#334155" fill="none" stroke-linecap="round">');
-    parts.push('<line x1="'+barX1.toFixed(1)+'" y1="'+barY+'" x2="'+barX2.toFixed(1)+'" y2="'+barY+'" stroke-width="1.4"/>');
-    for(var tk=0;tk<=4;tk++){var tx=barX1+barPx*tk/4;var th=(tk===0||tk===4)?12:(tk===2?9:6);parts.push('<line x1="'+tx.toFixed(1)+'" y1="'+barY+'" x2="'+tx.toFixed(1)+'" y2="'+(barY+th).toFixed(1)+'" stroke-width="'+(tk===0||tk===4?1.4:1)+'"/>');}
+    parts.push('<line x1="'+barX1.toFixed(1)+'" y1="'+barY+'" x2="'+barX2.toFixed(1)+'" y2="'+barY+'" stroke-width="1.6"/>');
+    for(var tk=0;tk<=4;tk++){var tx=barX1+barPx*tk/4;var th=(tk===0||tk===4)?12:(tk===2?9:6);parts.push('<line x1="'+tx.toFixed(1)+'" y1="'+barY+'" x2="'+tx.toFixed(1)+'" y2="'+(barY+th).toFixed(1)+'" stroke-width="'+(tk===0||tk===4?1.6:1)+'"/>');}
     parts.push('</g>');
     parts.push('<g font-size="9" font-weight="600" fill="#111827">');
-    parts.push('<text x="'+barX1.toFixed(1)+'" y="'+(barY+24).toFixed(1)+'" text-anchor="middle">0</text>');
-    parts.push('<text x="'+((barX1+barX2)/2).toFixed(1)+'" y="'+(barY+24).toFixed(1)+'" text-anchor="middle">'+Math.round(niceM/2)+'</text>');
-    parts.push('<text x="'+barX2.toFixed(1)+'" y="'+(barY+24).toFixed(1)+'" text-anchor="middle">'+niceM+' m</text>');
-    parts.push('<text x="'+(barX1-10).toFixed(1)+'" y="'+(barY+6).toFixed(1)+'" text-anchor="end" dominant-baseline="middle" font-size="10" font-weight="700">比例尺</text>');
+    parts.push('<text x="'+barX1.toFixed(1)+'" y="'+(barY+22).toFixed(1)+'" text-anchor="middle">0</text>');
+    parts.push('<text x="'+((barX1+barX2)/2).toFixed(1)+'" y="'+(barY+22).toFixed(1)+'" text-anchor="middle">'+Math.round(niceM/2)+'</text>');
+    parts.push('<text x="'+barX2.toFixed(1)+'" y="'+(barY+22).toFixed(1)+'" text-anchor="middle">'+niceM+' m</text>');
     parts.push('</g>');
-    parts.push('<text x="'+(ix+12)+'" y="'+(iy+27)+'" font-size="9.2" font-weight="600" fill="#334155">'+paramLine1+'</text>');
-    parts.push('<text x="'+(ix+12)+'" y="'+(iy+45)+'" font-size="9.2" font-weight="600" fill="#334155">'+paramLine2+'</text>');
 
     parts.push('</svg>');
     var svgStr=parts.join('');
@@ -8739,7 +8873,165 @@ function calcPlan(){
     document.getElementById('ppPrint').style.display='inline-block';
     document.getElementById('ppSavePng').style.display='inline-block';
     ppState.lastSVG=svgStr;
+    try{ ppInitCalcBookDrag(); }catch(e){ console.warn('[ppGenerateDiagram] calc book drag init failed', e); }
     if(doScroll) document.getElementById('ppDiagramWrap').scrollIntoView({behavior:'smooth',block:'nearest'});
+  }
+
+  function ppMeasureText(str){
+    var w=0;
+    for(var k=0;k<str.length;k++){
+      var ch=str[k];
+      w+=(ch.charCodeAt(0)>255?12:6.5);
+    }
+    return w;
+  }
+
+  function ppRewrapCalcBook(maxW){
+    var segs=window._ppCalcBookSegs;
+    if(!segs||!segs.length)return [];
+    var lines=[],cur='';
+    for(var i=0;i<segs.length;i++){
+      var trial=cur?cur+'  |  '+segs[i]:segs[i];
+      if(cur && ppMeasureText(trial)>maxW){
+        lines.push(cur);
+        cur=segs[i];
+      }else{
+        cur=trial;
+      }
+    }
+    if(cur)lines.push(cur);
+    if(lines.length>4){
+      var rest=lines.slice(1).join('  |  ');
+      lines=[lines[0],rest];
+    }
+    return lines;
+  }
+
+  /* 二级施工简图：底部计算书可拖动 + 右下角可调宽度（参考三级管线左上角信息框） */
+  function ppInitCalcBookDrag(){
+    var ctn=document.getElementById('ppDiagramContent');
+    if(!ctn)return;
+    var svgEl=ctn.querySelector('svg');
+    if(!svgEl)return;
+    var g=svgEl.querySelector('#ppCalcBookGroup');
+    if(!g)return;
+    var handle=svgEl.querySelector('#ppCalcBookHandle');
+    if(!handle)return;
+    if(window._ppCbMove)document.removeEventListener('mousemove',window._ppCbMove);
+    if(window._ppCbUp)document.removeEventListener('mouseup',window._ppCbUp);
+
+    var svgW=1190,svgH=841;
+    var frameX=8,frameY=8,frameW=svgW-16,frameH=svgH-16;
+    var pos={x:0,y:0};
+    var cbW=window._ppCalcBookDefW||(svgW-68);
+    try{
+      var saved=JSON.parse(localStorage.getItem('pp-calcbook-pos'));
+      if(saved&&typeof saved.x==='number')pos=saved;
+      var savedW=parseFloat(localStorage.getItem('pp-calcbook-w'));
+      if(savedW>0)cbW=savedW;
+    }catch(e){}
+
+    function applyPos(){
+      g.setAttribute('transform','translate('+pos.x.toFixed(1)+','+pos.y.toFixed(1)+')');
+    }
+
+    function getScale(){
+      var rect=svgEl.getBoundingClientRect();
+      return rect.width>0?svgW/rect.width:1;
+    }
+
+    function renderBookForWidth(w){
+      var lines=ppRewrapCalcBook(w);
+      var h=lines.length*18+12;
+      var x0=window._ppCalcBookX0||34;
+      var y0=window._ppCalcBookY0||0;
+      var bg=g.querySelector('#ppCalcBookBg');
+      if(bg){
+        bg.setAttribute('width',w+16);
+        bg.setAttribute('height',h);
+      }
+      var oldTexts=g.querySelectorAll('.pp-cb-text');
+      oldTexts.forEach(function(t){t.remove();});
+      for(var j=0;j<lines.length;j++){
+        var t=document.createElementNS('http://www.w3.org/2000/svg','text');
+        t.setAttribute('x',x0);
+        t.setAttribute('y',y0+j*18);
+        t.setAttribute('text-anchor','start');
+        t.setAttribute('font-size','11');
+        t.setAttribute('font-weight','600');
+        t.setAttribute('fill','#334155');
+        t.setAttribute('class','pp-cb-text');
+        t.textContent=lines[j];
+        g.insertBefore(t,handle);
+      }
+      var hnd=g.querySelector('#ppCalcBookHandle');
+      if(hnd){
+        hnd.setAttribute('x',x0-8+w+16-8);
+        hnd.setAttribute('y',y0-14+h-8);
+      }
+      return lines.length;
+    }
+
+    renderBookForWidth(cbW);
+    applyPos();
+
+    var dragStart=null;
+    g.addEventListener('mousedown',function(e){
+      if(e.button!==0)return;
+      if(e.target===handle||(e.target.closest&&e.target.closest('#ppCalcBookHandle')))return;
+      e.preventDefault();
+      var scale=getScale();
+      dragStart={x:e.clientX,y:e.clientY,ox:pos.x,oy:pos.y,scale:scale};
+      document.body.style.userSelect='none';
+    });
+
+    var resizeStart=null;
+    handle.addEventListener('mousedown',function(e){
+      if(e.button!==0)return;
+      e.preventDefault();
+      e.stopPropagation();
+      var scale=getScale();
+      resizeStart={x:e.clientX,y:e.clientY,ow:cbW,scale:scale};
+      document.body.style.userSelect='none';
+    });
+
+    window._ppCbMove=function(ev){
+      if(dragStart){
+        var s=dragStart.scale;
+        pos.x=dragStart.ox+(ev.clientX-dragStart.x)*s;
+        pos.y=dragStart.oy+(ev.clientY-dragStart.y)*s;
+        pos.x=Math.max(-20,Math.min(frameW-100,pos.x));
+        pos.y=Math.max(-50,Math.min(frameH-30,pos.y));
+        applyPos();
+      }
+      if(resizeStart){
+        var s2=resizeStart.scale;
+        var dx=(ev.clientX-resizeStart.x)*s2;
+        cbW=Math.max(200,Math.min(svgW-60,resizeStart.ow+dx));
+        renderBookForWidth(cbW);
+      }
+    };
+
+    window._ppCbUp=function(){
+      if(dragStart){dragStart=null;document.body.style.userSelect='';}
+      if(resizeStart){resizeStart=null;document.body.style.userSelect='';}
+      localStorage.setItem('pp-calcbook-pos',JSON.stringify(pos));
+      localStorage.setItem('pp-calcbook-w',cbW.toString());
+    };
+
+    document.addEventListener('mousemove',window._ppCbMove);
+    document.addEventListener('mouseup',window._ppCbUp);
+
+    g.addEventListener('dblclick',function(e){
+      e.stopPropagation();
+      e.preventDefault();
+      pos={x:0,y:0};
+      cbW=window._ppCalcBookDefW||svgW-68;
+      renderBookForWidth(cbW);
+      applyPos();
+      localStorage.setItem('pp-calcbook-pos',JSON.stringify(pos));
+      localStorage.setItem('pp-calcbook-w',cbW.toString());
+    });
   }
 
   function ppRefreshDiagramIfVisible(){
@@ -9052,6 +9344,32 @@ function calcPlan(){
       list.appendChild(item);
     });
   }
+  // 地图实测回传消费后调用：把当前 window.measuredPolygon 作为地块落库(runye_plot_library)，
+  // 并桥接到数字农业控制台·地块中心(runye_db_v1)，使「在线地图绘制」链能持久化、且地块中心可见。
+  // 与 saveCurrent 共用同一套落库/桥接逻辑，plotId 稳定以支持去重（重复回传同一地块只更新不新增）。
+  window.runyePersistMeasuredPlot=function(opts){
+    opts=opts||{};
+    var area=window.measuredArea||0;
+    if(area<=0) return null;
+    var arr=loadLib();
+    var id=opts.plotId || ('pm'+Date.now());
+    var exist=null; arr.forEach(function(x){ if(x.id===id) exist=x; });
+    var name=opts.name || (exist&&exist.name) || ('地块 '+(arr.length+1));
+    var plot={ id:id, name:name, mu:Math.round(area/666.67*100)/100, sqm:Math.round(area*100)/100,
+      poly:(window.measuredPolygon||[]).map(function(pt){return {x:Math.round((pt.x||0)*100)/100,y:Math.round((pt.y||0)*100)/100};}),
+      crop:'七彩花生', source:'map', ts:Date.now(), note:'' };
+    if(exist){ arr=arr.map(function(x){ return x.id===id?plot:x; }); }
+    else { arr.push(plot); }
+    saveLib(arr); window.currentPlotId=id; renderLib();
+    // 同步本页「管线绘图区」（管道规划）
+    try{ if(window.measuredPolygon && window.measuredPolygon.length>=3 && typeof window.ppLoadPolygon==='function') window.ppLoadPolygon(); }catch(e){}
+    try{ if(typeof window.ppGenerateDiagram==='function') window.ppGenerateDiagram({scroll:false}); }catch(e){}
+    // 同步数字农业控制台·地块中心(runye_db_v1)
+    try{ if(window.runyeSharePlotToDigital) window.runyeSharePlotToDigital(); }catch(e){}
+    if(window.runyeBridgeWriteBack) window.runyeBridgeWriteBack(id, plot);
+    return plot;
+  };
+
   function saveCurrent(){
     var area=window.measuredArea||0;
     if(area<=0){ toast('请先测量/生成地块再保存'); return; }
@@ -9064,6 +9382,11 @@ function calcPlan(){
     arr.push(plot); saveLib(arr); window.currentPlotId=id;
     if(nameInput) nameInput.value='';
     renderLib(); toast('已保存到地块库：'+name);
+    // 同步到本页「管线绘图区」（管道规划）：即时把刚画好的边界载入管线画布
+    try{ if(window.measuredPolygon && window.measuredPolygon.length>=3 && typeof window.ppLoadPolygon==='function') window.ppLoadPolygon(); }catch(e){}
+    try{ if(typeof window.ppGenerateDiagram==='function') window.ppGenerateDiagram({scroll:false}); }catch(e){}
+    // 同步到数字农业控制台·地块中心：写 runye_db_v1（runyeBridgeWriteBack 内部处理独立/来自工作台两种来源）
+    try{ if(window.runyeSharePlotToDigital) window.runyeSharePlotToDigital(); }catch(e){}
     if(window.runyeBridgeWriteBack) window.runyeBridgeWriteBack(id, plot);
   }
   function setCurrent(id){
@@ -9806,9 +10129,19 @@ render();
       }
 
       if(typeof updatePlan === 'function') updatePlan();
-      if(typeof window.ppLoadPolygon === 'function') window.ppLoadPolygon();
-      if(typeof window.ppGenerateDiagram === 'function') window.ppGenerateDiagram({scroll:false});
-      window.runyeSharePlotToDigital();
+      // 落库 + 桥接地块中心：地图实测回传的地块持久化到 runye_plot_library，并写回 runye_db_v1(地块中心)
+      // 管线绘图区由 runyePersistMeasuredPlot 一并刷新，避免回传后仅内存可见、刷新即丢
+      try{
+        if(typeof window.runyePersistMeasuredPlot==='function'){
+          window.runyePersistMeasuredPlot({ plotId:d.plotId||null, name:d.name||null });
+        } else if(window.runyeBridgeWriteBack){
+          var pid=d.plotId||('pm'+Date.now());
+          var fplot={ id:pid, name:d.name||'地图地块', mu:Math.round((d.sqm||0)/666.67*100)/100, sqm:d.sqm||0,
+            poly:(window.measuredPolygon||[]).map(function(pt){return {x:Math.round((pt.x||0)*100)/100,y:Math.round((pt.y||0)*100)/100};}),
+            crop:'七彩花生', source:'map', ts:Date.now(), note:'' };
+          window.runyeBridgeWriteBack(pid, fplot);
+        }
+      }catch(e){ console.error('map plot persist failed', e); }
       var sec = document.getElementById('areaTool');
       if(sec) sec.scrollIntoView({behavior:'smooth', block:'start'});
       showMapBanner(d);
@@ -9869,21 +10202,32 @@ render();
   });
 
   // 保存地块后，把边界与实测面积回写工作台 runye_db_v1 的对应 land，并跳回工作台详情页
+  // 兼容两类来源：
+  //  - 工作台「绘制边界」进来（?from=workbench，有 pending.land_id）：回填该 land 并跳回详情；
+  //  - 面积测量工具内独立绘制保存（无 pending）：按 plotId / 同名查找或新建 land，使工作台地块中心能看到。
   window.runyeBridgeWriteBack=function(plotId, plot){
     var p=getPending();
-    if(!p || !p.land_id) return;
     try{
       var raw=localStorage.getItem('runye_db_v1'); if(!raw) return;
       var db=JSON.parse(raw); if(!db || !db.lands) return;
       var land=null;
-      db.lands.forEach(function(l){ if(l.land_id===p.land_id) land=l; });
-      if(!land) return;
+      if(p && p.land_id){ db.lands.forEach(function(l){ if(l.land_id===p.land_id) land=l; }); }
+      if(!land){ db.lands.forEach(function(l){ if(l.land_id===plotId) land=l; }); }            // 复用同一 plotId 对应的 land
+      if(!land){ var nm=plot.name||''; if(nm){ db.lands.forEach(function(l){ if(String(l.name||'').trim()===nm.trim()) land=l; }); } } // 同名地块更新，避免重复建档
+      if(!land){
+        land={ land_id:plotId, name:plot.name||'未命名地块', code:'', area:plot.mu||0, geo_json:null,
+          crop:plot.crop||'七彩花生', variety:'', soil_type:'', planting_location:'', plant_date:'', harvest_date:'',
+          base_fertilizer:'', planting_method:'', status:'wait', farm:'', create_time:new Date().toISOString(), remark:'' };
+        db.lands.push(land);
+      }
       land.geo_json={ source:'runye-irrigation', plotId:plotId, poly:plot.poly||[], sqm:plot.sqm||0, mu:plot.mu||0, saved_at:Date.now() };
-      if(plot.mu) land.area=plot.mu;
+      if(plot.mu) land.area=Math.round(plot.mu*100)/100;
+      if(plot.name) land.name=plot.name;
+      if(!land.crop) land.crop=plot.crop||'七彩花生';
       localStorage.setItem('runye_db_v1', JSON.stringify(db));
-      clearPending();
-      if(typeof atShowToast==='function') atShowToast('已回填工作台地块：'+(land.name||p.land_id)); else alert('已回填工作台地块');
-      setTimeout(function(){ window.location.href='workbench.html#/land/'+p.land_id; }, 900);
+      if(p && p.land_id) clearPending();
+      if(typeof atShowToast==='function') atShowToast('已回填工作台地块：'+(land.name||plotId)); else alert('已回填工作台地块');
+      if(p && p.land_id){ setTimeout(function(){ window.location.href='workbench.html?space=1#/land/'+p.land_id; }, 900); }
     }catch(e){ console.error('bridge writeback failed', e); }
   };
 })();
