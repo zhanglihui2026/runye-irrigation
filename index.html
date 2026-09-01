@@ -153,6 +153,12 @@ a{color:inherit;text-decoration:none}
   display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);
   gap:20px;align-items:stretch;
 }
+@media(min-width:769px){
+  /* 桌面端把 .container 的 max-width 和 padding 都与 04 区统一：1120px 全宽 + 无外缩 */
+  .hero .container,
+  .workspace .container,
+  #pipeTablesSection .container{max-width:1120px;padding-left:0;padding-right:0}
+}
 @media(max-width:1024px){.workspace .container{grid-template-columns:1fr}}
 
 /* ===== Panels ===== */
@@ -883,6 +889,7 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
   display:flex;align-items:center;gap:8px;
 }
 #ppDiagramContent svg{max-width:100%;width:100%;height:auto;display:block}
+#ppDiagramContent svg #ppPlotGroup{cursor:move}
 #ppDiagramContent svg #ppCalcBookGroup{cursor:move}
 #ppDiagramContent svg #ppCalcBookGroup:hover #ppCalcBookBg{fill:rgba(59,130,246,.04);stroke:rgba(59,130,246,.2);stroke-dasharray:3,3}
 #ppDiagramContent svg #ppCalcBookGroup:hover #ppCalcBookHandle{fill:rgba(99,102,241,.7)}
@@ -952,14 +959,12 @@ body{
   box-shadow:0 5px 14px rgba(15,23,42,.04);
 }
 .hero{
-  padding:58px 0 42px;
+  padding:28px 0 20px;
   overflow:hidden;
 }
 .hero::before{display:none}
 .hero .container{
   align-items:center;
-  padding-top:10px;
-  padding-bottom:10px;
 }
 .eyebrow{
   border-radius:6px;
@@ -974,7 +979,7 @@ body{
   text-wrap:balance;
 }
 .hero h1 span{color:#166534}
-.hero-copy{color:#52645a;max-width:none;white-space:normal;overflow-wrap:anywhere}
+.hero-copy{color:#52645a;max-width:none;font-size:15px;white-space:nowrap;overflow-wrap:anywhere}
 .hero-note{
   border-radius:8px;
   border:1px solid rgba(15,23,42,.06);
@@ -1776,7 +1781,6 @@ main,footer{position:relative;z-index:1}
 #tlDiagramContent svg #tlHeaderGroup{cursor:move}
 #tlDiagramContent svg #tlHeaderGroup:hover #tlHeaderBg{fill:rgba(59,130,246,.04);stroke:rgba(59,130,246,.2);stroke-dasharray:3,3}
 #tlDiagramContent svg #tlHeaderGroup:hover #tlHeaderHandle{fill:rgba(99,102,241,.7)}
-.tl-drag-hint{position:absolute;top:4px;right:10px;font-size:11px;color:#94a3b8;pointer-events:none;z-index:10}
 
 /* ===== Three-level view: dark panel green→blue overrides ===== */
 #threeLevelView .result-heading .step.light{color:#bbf7d0}
@@ -2098,6 +2102,7 @@ main,footer{position:relative;z-index:1}
   display:flex;align-items:center;gap:8px;
 }
 #ppDiagramContent svg{max-width:100%;width:100%;height:auto;display:block}
+#ppDiagramContent svg #ppPlotGroup{cursor:move}
 #ppDiagramContent svg #ppCalcBookGroup{cursor:move}
 #ppDiagramContent svg #ppCalcBookGroup:hover #ppCalcBookBg{fill:rgba(59,130,246,.04);stroke:rgba(59,130,246,.2);stroke-dasharray:3,3}
 #ppDiagramContent svg #ppCalcBookGroup:hover #ppCalcBookHandle{fill:rgba(99,102,241,.7)}
@@ -2167,14 +2172,12 @@ body{
   box-shadow:0 5px 14px rgba(15,23,42,.04);
 }
 .hero{
-  padding:58px 0 42px;
+  padding:28px 0 20px;
   overflow:hidden;
 }
 .hero::before{display:none}
 .hero .container{
   align-items:center;
-  padding-top:10px;
-  padding-bottom:10px;
 }
 .eyebrow{
   border-radius:6px;
@@ -2189,7 +2192,7 @@ body{
   text-wrap:balance;
 }
 .hero h1 span{color:#166534}
-.hero-copy{color:#52645a;max-width:none;white-space:normal;overflow-wrap:anywhere}
+.hero-copy{color:#52645a;max-width:none;font-size:15px;white-space:nowrap;overflow-wrap:anywhere}
 .hero-note{
   border-radius:8px;
   border:1px solid rgba(15,23,42,.06);
@@ -2923,7 +2926,7 @@ input[type="reset"],
   /* Hero 收紧 */
   .hero{padding:20px 0 16px}
   .hero h1{font-size:34px;line-height:1.14;word-break:break-word;overflow-wrap:anywhere}
-  .hero-copy{font-size:16px;line-height:1.6;max-width:none}
+  .hero-copy{font-size:16px;line-height:1.6;max-width:none;white-space:normal}
   .hero .container{gap:20px}
   .hero-note{min-width:0;width:100%;padding:18px 0 18px 20px}
   .hero-note .summary-main,.hero-note .summary-area{white-space:normal}
@@ -3035,7 +3038,7 @@ input[type="reset"],
 @media(max-width:480px){
   .container{padding:0 12px}
   .hero h1{font-size:30px;word-break:break-word;overflow-wrap:anywhere}
-  .hero-copy{font-size:15px}
+  .hero-copy{font-size:15px;white-space:normal}
   .form-grid{grid-template-columns:1fr}
   .pp-plan-bar .pp-plan-item{flex:1 1 calc(50% - 8px)}
   .pp-plan-bar-result .pp-plan-item{flex:1 1 calc(50% - 8px)}
@@ -3044,6 +3047,23 @@ input[type="reset"],
   .ry-nav .brand{height:42px}
   .ry-nav .nav-link{padding:10px 12px;font-size:12px}
 }
+
+
+/* ===== 扬程计算式条（紧贴结果栏下方，仅扬程一行紧凑算式，常驻显示，不换行）===== */
+.pp-calc-formula{
+  margin:2px 14px 12px;padding:6px 14px;
+  background:rgba(15,23,42,.78);border:1px solid rgba(134,239,172,.18);border-radius:6px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:12px;line-height:1.5;color:rgba(255,255,255,.85);
+  white-space:nowrap;overflow-x:auto;
+}
+.pp-calc-formula .pp-cf-name{color:#86efac;font-weight:700;margin-right:4px}
+.pp-calc-formula .pp-cf-num{color:#fde68a;font-weight:600;padding:0 1px}
+.pp-calc-formula .pp-cf-op{color:rgba(255,255,255,.45);padding:0 2px}
+.pp-calc-formula .pp-cf-eq{color:rgba(255,255,255,.55);padding:0 2px;font-weight:600}
+.pp-calc-formula .pp-cf-final{color:#86efac;font-weight:700;background:rgba(134,239,172,.14);padding:1px 5px;border-radius:3px;margin-left:2px}
+.pp-calc-formula .pp-cf-line{display:inline;white-space:nowrap}
+.pp-calc-formula .pp-cf-line-h{display:block;white-space:nowrap;overflow:hidden;text-overflow:clip}
 
 
 </style>
@@ -3202,7 +3222,6 @@ input[type="reset"],
         <p class="field-hint">按单个分区试算：一边默认 200m，另一边由“分区面积 ÷ 固定边长”折算；滴灌带沿固定边方向铺设。</p>
       </fieldset>
 
-      <div class="derivation-card" id="derivationCard"></div>
     </div>
 
     <!-- RESULT PANEL -->
@@ -3234,11 +3253,6 @@ input[type="reset"],
     <p class="disclaimer">参考 GB/T 50485《微灌工程技术标准》。本工具用于方案比选和初步选型，不替代现场测绘、厂家水泵曲线及专业工程设计。</p>
   </div>
 </section>
-
-<footer>
-  <span>润野灌溉设计 · 优化版</span>
-  <span>让灌溉设计更清楚、更节水</span>
-</footer>
 
 <!-- ===== 面积测量工具 + 实际地块规划 ===== -->
 <section id="areaTool">
@@ -3393,6 +3407,8 @@ input[type="reset"],
     <span class="pp-plan-item"><span class="pp-plan-label">支管流速</span><span class="pp-plan-val" id="planBranchVelocity">—</span>m/s</span>
     <span class="pp-plan-item" style="display:none"><span class="pp-plan-label">支管总长度</span><span class="pp-plan-val" id="planBranchSingleLen">—</span>m</span>
   </div>
+  <!-- 扬程计算式（紧贴结果栏下方，仅扬程一行，实时跟随输入更新，不换行） -->
+  <div id="ppCalcDetail" class="pp-calc-formula pp-calc-h"></div>
   <input type="hidden" id="planTapeRoll" value="2000">
   <div class="pp-hint" id="ppHint">📋 请先在面积测量工具中描绘并闭合边界，完成后此处自动显示地块形状</div>
   <div class="pp-toolbar" id="ppToolbar">
@@ -3403,8 +3419,8 @@ input[type="reset"],
     <button class="pp-btn" data-mode="source">🟡 水源</button>
     <button class="pp-btn" data-mode="valve">🔴 阀门</button>
     <button class="pp-btn" data-mode="maskPipe">遮蔽管线</button>
-    <button class="pp-btn" data-mode="adjustCut">调网格</button>
-    <button class="pp-btn-ghost" id="ppResetCuts" title="恢复默认分区线位置">重置网格</button>
+    <button class="pp-btn" data-mode="adjustCut" title="拖动分区线调整分区；把一条线拖到相邻线上松手即可合并分区（分区数随之减少），误操作可用「回退」撤销">调网格</button>
+    <button class="pp-btn-ghost" id="ppResetCuts" title="恢复系统默认分区线位置（撤销所有拖动与合并）">重置网格</button>
     <span class="pp-cut-fine-group" id="ppCutFineGroup" style="display:none">
       <button class="pp-btn-ghost pp-fine-btn" id="ppFineUp" title="向上微调 0.3m">↑</button>
       <button class="pp-btn-ghost pp-fine-btn" id="ppFineDown" title="向下微调 0.3m">↓</button>
@@ -4391,36 +4407,12 @@ function compute() {
   };
 }
 
-// ===== PUMP HEAD DERIVATION =====
-function renderDerivation(r) {
-  const existPressureM = r.existPressure * 10.2;
-  const rawSum = r.lift + r.dh + r.tapePressureM - existPressureM + r.mainLoss + r.branchLoss + r.filterLoss + MARGIN_HEAD;
-  const sum = Math.max(0, rawSum);
-  document.getElementById('derivationCard').innerHTML = `
-    <h3><svg class="svg-icon" style="width:14px;height:14px"><use href="#icon-pump"/></svg>水泵扬程构成</h3>
-    <div class="derivation-row"><span>提升高度</span><b class="val">${fmt(r.lift,1)} m</b></div>
-    <div class="derivation-row"><span>＋ 地形高差</span><b class="val">${fmt(r.dh,1)} m</b></div>
-    <div class="derivation-row"><span>＋ 入口工作压力</span><b class="val">${fmt(r.tapePressure,2)} bar → ${fmt(r.tapePressureM,1)} m</b></div>
-    ${existPressureM > 0 ? `<div class="derivation-row"><span>－ 水源已有压力</span><b class="val">${fmt(r.existPressure,2)} bar → ${fmt(existPressureM,1)} m</b></div>` : ''}
-    <div class="derivation-row"><span>＋ 主管＋支管损失</span><b class="val">${fmt(r.mainLoss + r.branchLoss,2)} m</b></div>
-    <div class="derivation-row"><span>＋ 过滤与阀门损失</span><b class="val">${fmt(r.filterLoss,1)} m</b></div>
-    <div class="derivation-row"><span>＋ 富余水头</span><b class="val">${MARGIN_HEAD} m</b></div>
-    <div class="derivation-sum">
-      <div class="expr">
-        ${fmt(r.lift,1)} + ${fmt(r.dh,1)} + ${fmt(r.tapePressureM,1)} ${existPressureM > 0 ? '- ' + fmt(existPressureM,1) : ''} + ${fmt(r.mainLoss + r.branchLoss,2)} + ${fmt(r.filterLoss,1)} + ${MARGIN_HEAD}
-        <br/>= <strong>${fmt(sum,2)} m</strong>（安全系数前${rawSum < 0 ? '，已有压力已覆盖' : ''}）
-      </div>
-      <div class="result"><span>× ${SAFETY_FACTOR.toFixed(2)} 安全系数</span><strong>${fmt(r.pumpHead,2)} m</strong></div>
-    </div>
-  `;
-}
-
 // ===== RENDER =====
 function fmt(n, d=2) { return n.toFixed(d); }
 function fmt0(n) { return Math.round(n).toLocaleString(); }
 
 // material prices persist across re-renders
-const materialPrices = {};
+const materialPrices = {mainPipe:32, branchPipe:16, tape:0.075};
 const materialQtyOverrides = {};
 const customMaterials = {c1:{name:'',spec:'',qty:'',price:''},c2:{name:'',spec:'',qty:'',price:''},c3:{name:'',spec:'',qty:'',price:''}};
 
@@ -4476,7 +4468,6 @@ function updateMaterialTotals() {
 function render() {
   const r = compute();
   window._r = r;
-  renderDerivation(r);
 
   document.getElementById('heroSummary').innerHTML = `
     <span class="summary-label">单区试算</span>
@@ -5945,9 +5936,6 @@ function tlInitDrag(){
   /* 清理上一次生成的 document 级监听器（重新生成图纸时旧 SVG 已被替换） */
   if(window._tlDragMove)document.removeEventListener('mousemove',window._tlDragMove);
   if(window._tlDragUp)document.removeEventListener('mouseup',window._tlDragUp);
-  /* 提示文字 */
-  var hint=ctn.querySelector('.tl-drag-hint');
-  if(!hint){hint=document.createElement('div');hint.className='tl-drag-hint';hint.textContent='拖动地块或左上角文字可调整位置 · 左上角文字拖右下角可调宽度 · 双击恢复原位';ctn.appendChild(hint);}
   /* A3 图纸范围（SVG user units）*/
   var svgW=1190, svgH=900, frameX=8, frameY=8, frameW=svgW-16, frameH=svgH-16;
   /* 地块组原始包围盒 */
@@ -7006,6 +6994,16 @@ function calcPlan(){
   var branchSingleLen = Math.round(branchLen);
   document.getElementById('planBranchSingleLen').textContent = branchSingleLen;
 
+  // 实时更新「计算过程」面板：仅刷新内容，不控制折叠状态
+  ppRenderPlanCalcDetail({
+    zoneMu, intensity, zoneFlow, zoneTapeLen, emitterSpacing, emitterFlow, tapeLen,
+    tapePressure, tapePressureM, existPressure, lift, dh,
+    mainLoss, branchLoss, filterLoss, marginHead: MARGIN_HEAD,
+    headBeforeSafety, headBeforeSafetyRaw, safetyFactor: SAFETY_FACTOR,
+    pumpHead, efficiency, pumpPowerRaw: 2.725*zoneFlow*pumpHead/efficiency/1000, motorKW,
+    mainPipe, branchPipe, branchFlow, branchCount, branchSpan, branchLen, tapsPerBranch, branchF, mainPipeLen
+  });
+
   // Update area tag in title
   const tag=document.getElementById('planAreaTag');
   const zoneModeLabel = manualZoneMu > 0 ? '单区划定' : '单区折算';
@@ -7028,11 +7026,57 @@ function calcPlan(){
   if(typeof refreshRunyeCompare==='function') refreshRunyeCompare();
 }
 
+// 渲染「扬程计算式」条（紧贴结果栏下方，仅扬程一行紧凑算式，常驻显示；输入实时更新，不换行）
+function ppRenderPlanCalcDetail(p) {
+  try {
+  const el = document.getElementById('ppCalcDetail');
+  if (!el) return;
+  const N = '<span class="pp-cf-num">';   // 数值
+  const O = '<span class="pp-cf-op">';    // 运算符
+  const Q = '<span class="pp-cf-eq">';    // 等号
+  const R = '<span class="pp-cf-final">'; // 最终结果
+  const E = '</span>';
+
+  // 扬程 H = (提升 + 地形 + 入口×10.2 - 已有×10.2 + 主管损失 + 支管损失 + 过滤阀门 + 富余) × 1.10
+  const tapeM = p.tapePressure * 10.2;
+  const existM = (p.existPressure || 0) * 10.2;
+  const parts = [
+    { lbl: '提升',    v: p.lift },
+    { lbl: '地形',    v: p.dh },
+    { lbl: '入口压力', v: tapeM },
+    { lbl: '已有压力', v: -existM },
+    { lbl: '主管损失', v: p.mainLoss },
+    { lbl: '支管损失', v: p.branchLoss },
+    { lbl: '过滤阀门', v: p.filterLoss },
+    { lbl: '富余',     v: p.marginHead }
+  ];
+  const partsHtml = parts.map((it, i) => {
+    // 已有压力用「−」号，0 时显示为 0.0 保持格式一致
+    const sign = it.v < 0 ? '−' : (i === 0 ? '' : '+');
+    const abs = Math.abs(it.v);
+    return (i > 0 ? `${O}${sign}${E} ` : '') +
+           `${it.lbl} ${N}${abs.toFixed(2)}${E}`;
+  }).join(' ');
+  const lineH = `<span class="pp-cf-name">扬程 H</span>` +
+                `<span class="pp-cf-eq">= (</span>` +
+                partsHtml +
+                `<span class="pp-cf-eq">)</span> ` +
+                `<span class="pp-cf-op">×</span> ` +
+                `${N}${p.safetyFactor.toFixed(2)}${E} ` +
+                `<span class="pp-cf-eq">=</span>` +
+                `${R}${p.pumpHead.toFixed(2)} m${E}`;
+
+  el.innerHTML = `<span class="pp-cf-line pp-cf-line-h">${lineH}</span>`;
+  } catch(e) { console.error('[ppCalc] 渲染失败：', e); }
+}
+window.ppRenderPlanCalcDetail = ppRenderPlanCalcDetail;
+
 // Input listeners — all plan parameters
 ['planTapeLen','planTapeSpacing','planEmitterSpacing','planEmitterFlow','planN','planZoneMode','planZoneMuManual','planTargetV'].forEach(id=>{
   document.getElementById(id).addEventListener('input', calcPlan);
   document.getElementById(id).addEventListener('change', calcPlan);
 });
+// （ppToggleCalc 的 click 已在 ppToggleCalcDetail 定义处立即绑定，无需再注册 DOMContentLoaded）
 
 // ===== 07 管路规划与施工简图 =====
 (function(){
@@ -7060,6 +7104,9 @@ function calcPlan(){
     plotMirror:'none',
     zoom:1, panX:0, panY:0, isPanning:false, panStartX:0, panStartY:0,
     cutOverrides:{x:{},y:{}},
+    // 手动调整后的内部切割线位置快照（世界坐标，升序）；sig 用于识别基础划分是否变化
+    cutSnap:{sig:'',x:null,y:null},
+    mergePreview:null, // 拖动中待合并预览 {axis,index,target}
     dragCut:null,
     hoverCut:null,
     lastSelectedCut:null,
@@ -7110,6 +7157,7 @@ function calcPlan(){
     ppHintEl.style.display='none';ppToolbar.style.display='flex';
     ppEmpty.style.display='none';ppLegend.style.display='flex';
     ppState.polyPts=window.measuredPolygon.map(function(p){return{x:p.x,y:p.y};});
+    ppResetCutSnap('');
     ppUpdateTransform();ppRender();
   }
   window.ppLoadPolygon=ppLoadPolygon;
@@ -7188,6 +7236,11 @@ function calcPlan(){
       cutOverrides:{
         x:Object.assign({},ppState.cutOverrides.x),
         y:Object.assign({},ppState.cutOverrides.y)
+      },
+      cutSnap:{
+        sig:(ppState.cutSnap&&ppState.cutSnap.sig)||'',
+        x:(ppState.cutSnap&&ppState.cutSnap.x)?ppState.cutSnap.x.slice():null,
+        y:(ppState.cutSnap&&ppState.cutSnap.y)?ppState.cutSnap.y.slice():null
       }
     };
   }
@@ -7213,7 +7266,13 @@ function calcPlan(){
       x:Object.assign({},snap.cutOverrides.x),
       y:Object.assign({},snap.cutOverrides.y)
     };
-    ppSyncPipeLevelUI();
+    ppState.cutSnap={
+      sig:(snap.cutSnap&&snap.cutSnap.sig)||'',
+      x:(snap.cutSnap&&snap.cutSnap.x)?snap.cutSnap.x.slice():null,
+      y:(snap.cutSnap&&snap.cutSnap.y)?snap.cutSnap.y.slice():null
+    };
+    ppState.mergePreview=null;
+    if(typeof ppSyncPipeLevelUI==='function')ppSyncPipeLevelUI(); // 该函数未定义时跳过，避免回退中断
     ppState.plotMirror='none';
     ppSyncMirrorUI();
   }
@@ -7267,6 +7326,114 @@ function calcPlan(){
     return parts.length?parts:[total];
   }
 
+  // ===== 分区线快照（支持拖动合并减区）=====
+  // 基础划分签名：地块尺寸/分区行列数/设计分区尺寸任一变化，手动调整即失效并重置
+  function ppCutSig(dims,nx,ny,xDesign,yDesign){
+    return [Math.round((dims.w||0)*100),Math.round((dims.h||0)*100),nx,ny,Math.round((xDesign||0)*100),Math.round((yDesign||0)*100)].join('_');
+  }
+  // 1 画布像素对应的世界坐标长度（用于把"像素阈值"换算成世界距离）
+  function ppWorldPerPixel(axis){
+    var t=ppState.transform;
+    if(!t)return 1;
+    var ps=(axis==='x'?t.scaleX:t.scaleY)*(t.scale||1);
+    if(!ps||!isFinite(ps)||ps===0)return 1;
+    return 1/Math.abs(ps);
+  }
+  function ppResetCutSnap(sig){
+    ppState.cutSnap={sig:sig||'',x:null,y:null};
+    ppState.mergePreview=null;
+    return ppState.cutSnap;
+  }
+  // 用快照中的内部线位置重建 [起点, ...内部线, 终点]
+  function ppApplyCutSnap(pos,snapArr){
+    if(!snapArr||!snapArr.length)return pos;
+    var lo=pos[0],hi=pos[pos.length-1];
+    var mid=snapArr.filter(function(v){return isFinite(v)&&v>lo+0.5&&v<hi-0.5;}).sort(function(a,b){return a-b;});
+    var out=[],prev=lo;
+    for(var i=0;i<mid.length;i++){
+      if(mid[i]-prev>=0.5){out.push(mid[i]);prev=mid[i];}
+    }
+    return [lo].concat(out,[hi]);
+  }
+  // 取当前分区线数组（含手动调整与合并结果），index 为内部线索引（1..len-2）
+  function ppCurrentCuts(){
+    if(!ppState.polyPts||ppState.polyPts.length<3)return null;
+    var b=ppGetBounds();
+    var planN=parseInt(document.getElementById('planN')?.value)||parseInt(document.getElementById('fld_N')?.value)||4;
+    return ppGetZoneCuts(b,ppGetZoneLayout(b,planN));
+  }
+  // 设置第 index 条内部线的位置（写入快照）
+  function ppSetCutPos(axis,index,pos){
+    var cuts=ppCurrentCuts();
+    if(!cuts)return;
+    var arr=cuts[axis==='x'?'xPos':'yPos'];
+    if(index<=0||index>=arr.length-1)return;
+    var snap=ppState.cutSnap;
+    if(!snap||snap.sig!==cuts.sig)snap=ppResetCutSnap(cuts.sig);
+    var seed=snap[axis];
+    if(!seed||seed.length!==arr.length-2){
+      seed=[];
+      for(var i=1;i<arr.length-1;i++)seed.push(arr[i]);
+      snap[axis]=seed;
+    }
+    seed[index-1]=pos;
+  }
+  // 拖动某条内部线：靠近相邻内部线 OR 地块边界时吸附并标记待合并；否则夹在两邻线之间
+  // target 含义：
+  //   1..arr.length-2 → 合并到那条相邻内部线（保留目标线位置）
+  //   0               → 合并到地块上边界 / 左边界（整条线消失）
+  //   arr.length-1    → 合并到地块下边界 / 右边界（整条线消失）
+  function ppDragCutTo(axis,index,newPos){
+    var cuts=ppCurrentCuts();
+    if(!cuts)return null;
+    var arr=cuts[axis==='x'?'xPos':'yPos'];
+    if(index<=0||index>=arr.length-1)return null;
+    var lo=arr[index-1],hi=arr[index+1];
+    var thr=Math.max(2,10*ppWorldPerPixel(axis));   // 合并吸附阈值 ≈10 画布像素
+    var minGap=Math.max(2,4*ppWorldPerPixel(axis)); // 与相邻线的最小间距
+    var target=-1;
+    if(newPos>lo-minGap&&newPos<=lo+thr)target=0;                        // 拖到地块上/左边界附近
+    else if(newPos<hi+minGap&&newPos>=hi-thr)target=arr.length-1;            // 拖到地块下/右边界附近
+    else if(index-1>=1&&newPos>lo-minGap&&newPos<=lo+thr)target=index-1;     // 左侧是内部线
+    else if(index+1<=arr.length-2&&newPos<hi+minGap&&newPos>=hi-thr)target=index+1; // 右侧是内部线
+    if(target>=0){
+      // 几乎重合：保留极小偏移（>过滤阈值）让线在拖动中仍可见，松手时真正合并
+      var off=Math.max(0.6,0.75*ppWorldPerPixel(axis));
+      var tp;
+      if(target===0)tp=lo+off;
+      else if(target===arr.length-1)tp=hi-off;
+      else tp=(target<index)?(arr[target]+off):(arr[target]-off);
+      ppSetCutPos(axis,index,tp);
+      ppState.mergePreview={axis:axis,index:index,target:target};
+      return {merge:true,target:target,count:arr.length-1};
+    }
+    ppState.mergePreview=null;
+    var lo2=lo+minGap,hi2=hi-minGap;
+    if(lo2>hi2)lo2=hi2=(lo+hi)/2;
+    ppSetCutPos(axis,index,Math.max(lo2,Math.min(hi2,newPos)));
+    return {merge:false,count:arr.length-1};
+  }
+  // 松手时执行合并：删除被拖动的那条线。target=0/length-1 表示合并到边界（整条消失），其他表示合并到相邻内部线
+  function ppCommitMerge(){
+    var mp=ppState.mergePreview;
+    ppState.mergePreview=null;
+    if(!mp)return false;
+    var snap=ppState.cutSnap;
+    var arr=snap&&snap[mp.axis];
+    if(!arr||arr.length===0)return false;
+    var i=mp.index-1;
+    if(i<0||i>=arr.length)return false;
+    arr.splice(i,1);
+    // 选中线索引：合并到边界时已无线可选；合并到相邻内部线时指向目标
+    if(mp.target===0||mp.target===(arr.length+1))ppState.lastSelectedCut=null;
+    else{
+      var newIdx=(mp.target<mp.index)?mp.target:(mp.target-1);
+      if(newIdx>=1&&newIdx<=arr.length)ppState.lastSelectedCut={axis:mp.axis,index:newIdx};
+      else ppState.lastSelectedCut=null;
+    }
+    return true;
+  }
+
   function ppGetZoneCuts(b,layout){
     var dims=ppGetPlanDims(b);
     var longSide=Math.min(MAX_ZONE_SIDE,Math.max(layout.zoneW,layout.zoneH));
@@ -7282,39 +7449,25 @@ function calcPlan(){
     for(var yi=0;yi<yPlan.length;yi++){ySrc.push(yPlan[yi]*sy);yPos.push(yPos[yPos.length-1]+ySrc[yi]);}
     xPos[xPos.length-1]=b.minX+b.w;
     yPos[yPos.length-1]=b.minY+b.h;
-    // Apply user-dragged cut overrides (interior lines only)
-    if(ppState.cutOverrides){
-      var co=ppState.cutOverrides;
-      if(co.x){
-        for(var ci=1;ci<xPos.length-1;ci++){
-          if(co.x[ci]!=null&&isFinite(co.x[ci])){
-            var lo=xPos[ci-1]+2,hi=xPos[ci+1]-2;
-            xPos[ci]=Math.max(lo,Math.min(hi,co.x[ci]));
-          }
-        }
-        xSrc=[];xPlan=[];
-        for(var xi2=0;xi2<xPos.length-1;xi2++){
-          var wSrc=xPos[xi2+1]-xPos[xi2];
-          xSrc.push(wSrc);
-          xPlan.push(wSrc/sx);
-        }
-      }
-      if(co.y){
-        for(var cj=1;cj<yPos.length-1;cj++){
-          if(co.y[cj]!=null&&isFinite(co.y[cj])){
-            var lo2=yPos[cj-1]+2,hi2=yPos[cj+1]-2;
-            yPos[cj]=Math.max(lo2,Math.min(hi2,co.y[cj]));
-          }
-        }
-        ySrc=[];yPlan=[];
-        for(var yi2=0;yi2<yPos.length-1;yi2++){
-          var hSrc=yPos[yi2+1]-yPos[yi2];
-          ySrc.push(hSrc);
-          yPlan.push(hSrc/sy);
-        }
-      }
+    // 应用手动拖动/合并后的内部切割线快照（线数量可变 → 分区数随之变化）
+    var sig=ppCutSig(dims,xPlan.length,yPlan.length,xDesign,yDesign);
+    var snap=ppState.cutSnap;
+    if(!snap||snap.sig!==sig)snap=ppResetCutSnap(sig);
+    xPos=ppApplyCutSnap(xPos,snap.x);
+    yPos=ppApplyCutSnap(yPos,snap.y);
+    xSrc=[];xPlan=[];
+    for(var xa=0;xa<xPos.length-1;xa++){
+      var wSrc=xPos[xa+1]-xPos[xa];
+      xSrc.push(wSrc);
+      xPlan.push(sx>0?wSrc/sx:0);
     }
-    return {xPlan:xPlan,yPlan:yPlan,xSrc:xSrc,ySrc:ySrc,xPos:xPos,yPos:yPos,cols:xPlan.length,rows:yPlan.length,designW:xDesign,designH:yDesign};
+    ySrc=[];yPlan=[];
+    for(var ya=0;ya<yPos.length-1;ya++){
+      var hSrc=yPos[ya+1]-yPos[ya];
+      ySrc.push(hSrc);
+      yPlan.push(sy>0?hSrc/sy:0);
+    }
+    return {xPlan:xPlan,yPlan:yPlan,xSrc:xSrc,ySrc:ySrc,xPos:xPos,yPos:yPos,cols:xPlan.length,rows:yPlan.length,designW:xDesign,designH:yDesign,sig:sig,zoneCount:xPlan.length*yPlan.length};
   }
 
   // ===== 分区真实面积（裁剪到地块多边形）=====
@@ -7623,25 +7776,52 @@ function calcPlan(){
   function ppDrawCutHandles(b,cuts){
     if(ppState.mode!=='adjustCut')return;
     ppCtx.save();
+    var mp=ppState.mergePreview;
     for(var xi=1;xi<cuts.xPos.length-1;xi++){
       var isHover=ppState.hoverCut&&ppState.hoverCut.axis==='x'&&ppState.hoverCut.index===xi;
       var isDrag=ppState.dragCut&&ppState.dragCut.axis==='x'&&ppState.dragCut.index===xi;
       var isSel=ppState.lastSelectedCut&&ppState.lastSelectedCut.axis==='x'&&ppState.lastSelectedCut.index===xi;
+      var isMerge=!!(mp&&mp.axis==='x'&&(mp.index===xi||mp.target===xi));
       var midY=b.minY+b.h/2;
       var hp=ppToCanvas(cuts.xPos[xi],midY);
-      ppCtx.fillStyle=isDrag?'#f59e0b':isHover?'#22c55e':isSel?'#22c55e':'rgba(59,130,246,.6)';
-      ppCtx.strokeStyle='#fff';ppCtx.lineWidth=2;
-      ppCtx.beginPath();ppCtx.arc(hp.x,hp.y,(isHover||isDrag||isSel)?7:5,0,Math.PI*2);ppCtx.fill();ppCtx.stroke();
+      ppCtx.fillStyle=isMerge?'#f97316':isDrag?'#f59e0b':(isHover||isSel)?'#22c55e':'rgba(59,130,246,.6)';
+      ppCtx.strokeStyle='#fff';ppCtx.lineWidth=isMerge?3:2;
+      ppCtx.beginPath();ppCtx.arc(hp.x,hp.y,isMerge?9:((isHover||isDrag||isSel)?7:5),0,Math.PI*2);ppCtx.fill();ppCtx.stroke();
     }
     for(var yi=1;yi<cuts.yPos.length-1;yi++){
       var isHover2=ppState.hoverCut&&ppState.hoverCut.axis==='y'&&ppState.hoverCut.index===yi;
       var isDrag2=ppState.dragCut&&ppState.dragCut.axis==='y'&&ppState.dragCut.index===yi;
       var isSel2=ppState.lastSelectedCut&&ppState.lastSelectedCut.axis==='y'&&ppState.lastSelectedCut.index===yi;
+      var isMerge2=!!(mp&&mp.axis==='y'&&(mp.index===yi||mp.target===yi));
       var midX=b.minX+b.w/2;
       var hp2=ppToCanvas(midX,cuts.yPos[yi]);
-      ppCtx.fillStyle=isDrag2?'#f59e0b':isHover2?'#22c55e':isSel2?'#22c55e':'rgba(59,130,246,.6)';
-      ppCtx.strokeStyle='#fff';ppCtx.lineWidth=2;
-      ppCtx.beginPath();ppCtx.arc(hp2.x,hp2.y,(isHover2||isDrag2||isSel2)?7:5,0,Math.PI*2);ppCtx.fill();ppCtx.stroke();
+      ppCtx.fillStyle=isMerge2?'#f97316':isDrag2?'#f59e0b':(isHover2||isSel2)?'#22c55e':'rgba(59,130,246,.6)';
+      ppCtx.strokeStyle='#fff';ppCtx.lineWidth=isMerge2?3:2;
+      ppCtx.beginPath();ppCtx.arc(hp2.x,hp2.y,isMerge2?9:((isHover2||isDrag2||isSel2)?7:5),0,Math.PI*2);ppCtx.fill();ppCtx.stroke();
+    }
+    // 合并预览提示：拖动线吸附到相邻线/边界时提示松开后的分区数变化
+    if(mp){
+      var arr=cuts[mp.axis==='x'?'xPos':'yPos'];
+      var dirLabel=mp.axis==='x'?'竖向':'横向';
+      var perLine=mp.axis==='x'?cuts.rows:cuts.cols;
+      var n=Math.max(2,arr.length-1);
+      var totalNow=cuts.cols*cuts.rows;
+      var tip;
+      if(mp.target===0){
+        tip='松开鼠标：'+dirLabel+' 第 1 行/列将被移除（'+dirLabel+' '+n+' → '+(n-1)+'，共 '+totalNow+' → '+(totalNow-perLine)+' 区）';
+      }else if(mp.target===arr.length-1){
+        tip='松开鼠标：'+dirLabel+' 第 '+n+' 行/列将被移除（'+dirLabel+' '+n+' → '+(n-1)+'，共 '+totalNow+' → '+(totalNow-perLine)+' 区）';
+      }else{
+        tip='松开鼠标：'+dirLabel+' '+n+' 区合并为 '+(n-1)+' 区（共 '+(totalNow-perLine)+' 区）';
+      }
+      ppCtx.font='700 13px sans-serif';
+      ppCtx.textAlign='center';ppCtx.textBaseline='middle';
+      var tw=ppCtx.measureText(tip).width+28;
+      var tx=ppCanvas.width/2,ty=22;
+      ppCtx.fillStyle='rgba(249,115,22,.94)';
+      ppCtx.fillRect(tx-tw/2,ty-15,tw,30);
+      ppCtx.fillStyle='#fff';
+      ppCtx.fillText(tip,tx,ty);
     }
     ppCtx.restore();
   }
@@ -7999,6 +8179,7 @@ function calcPlan(){
           ppPushHistory();
           ppState.dragCut={axis:hit.axis,index:hit.index};
           ppState.lastSelectedCut={axis:hit.axis,index:hit.index};
+          ppState.mergePreview=null;
           ppCanvas.style.cursor=hit.axis==='x'?'ew-resize':'ns-resize';
           e.preventDefault();return;
         }
@@ -8013,11 +8194,10 @@ function calcPlan(){
       ppState.panX=pos.x-ppState.panStartX;ppState.panY=pos.y-ppState.panStartY;
       ppRender();return;
     }
-    // Dragging a cut line
+    // Dragging a cut line（靠近相邻线时吸附并标记合并）
     if(ppState.dragCut){
       var world2=ppToMeters(pos.x,pos.y);
-      if(!ppState.cutOverrides)ppState.cutOverrides={x:{},y:{}};
-      ppState.cutOverrides[ppState.dragCut.axis][ppState.dragCut.index]=world2[ppState.dragCut.axis==='x'?'x':'y'];
+      ppDragCutTo(ppState.dragCut.axis,ppState.dragCut.index,world2[ppState.dragCut.axis==='x'?'x':'y']);
       ppRender();
       if(typeof window.ppRefreshDiagramIfVisible==='function')window.ppRefreshDiagramIfVisible();
       return;
@@ -8047,12 +8227,16 @@ function calcPlan(){
 
   // Mouseup — stop pan or add point
   ppCanvas.addEventListener('mouseup',function(e){
-    // Finalize cut line drag
+    // Finalize cut line drag（存在合并预览时执行合并，分区数随之减少）
     if(ppState.dragCut){
+      var ppMerged=ppCommitMerge();
       ppState.dragCut=null;
+      ppState.hoverCut=null;
       ppCanvas.style.cursor=ppState.mode==='adjustCut'?'default':'crosshair';
       ppMouseDownPos=null;
       if(typeof window.ppRefreshDiagramIfVisible==='function')window.ppRefreshDiagramIfVisible();
+      if(ppMerged&&typeof ppRefreshMaterials==='function')ppRefreshMaterials();
+      ppRender();
       return;
     }
     if(ppState.isPanning){
@@ -8103,7 +8287,11 @@ function calcPlan(){
 
   ppCanvas.addEventListener('mouseleave',function(){
     ppState.hoverPt=null;ppState.mouseWorld=null;ppState.hoverCut=null;
-    if(ppState.dragCut){ppState.dragCut=null;}
+    if(ppState.dragCut){
+      var ppMergedLeave=ppCommitMerge(); // 移出画布时按当前预览结算合并
+      ppState.dragCut=null;
+      if(ppMergedLeave&&typeof ppRefreshMaterials==='function')ppRefreshMaterials();
+    }
     if(ppState.isPanning){ppState.isPanning=false;ppCanvas.style.cursor=ppState.mode==='adjustCut'?'default':'crosshair';}
     ppMouseDownPos=null;ppRender();
   });
@@ -8208,7 +8396,7 @@ function calcPlan(){
   function ppClearPipes(){
     ppPushHistory();
     ppState.mainPipes=[];ppState.branchPipes=[];ppState.subBranchPipes=[];
-    ppState.source=null;ppState.valves=[];ppState.currentLine=[];ppState.hiddenPipes={main:{},branch:{},subbranch:{}};ppState.pipeIds={main:[],branch:[],subbranch:[]};ppState.nextPipeId=1;ppState.cutOverrides={x:{},y:{}};ppUpdatePickResult(null);ppRender();
+    ppState.source=null;ppState.valves=[];ppState.currentLine=[];ppState.hiddenPipes={main:{},branch:{},subbranch:{}};ppState.pipeIds={main:[],branch:[],subbranch:[]};ppState.nextPipeId=1;ppState.cutOverrides={x:{},y:{}};ppResetCutSnap('');ppUpdatePickResult(null);ppRender();
     ppUpdateAutoPipeButton();
     if(typeof window.ppRefreshDiagramIfVisible==='function') window.ppRefreshDiagramIfVisible();
     ppRefreshMaterials();
@@ -8302,7 +8490,7 @@ function calcPlan(){
     ppState.hiddenPipes={main:{},branch:{},subbranch:{}};
     ppState.pipeIds={main:[],branch:[],subbranch:[]};
     ppState.nextPipeId=1;
-    ppState.cutOverrides={x:{},y:{}};
+    ppState.cutOverrides={x:{},y:{}};ppResetCutSnap('');
     ppState.dragCut=null;ppState.hoverCut=null;
     ppUpdatePickResult(null);
     // Recalculate plan dimensions from the rotated polygon
@@ -8377,6 +8565,8 @@ function calcPlan(){
       ppState.valves=ppState.valves.map(tf2);
     }
     ppState.plotMirror=mode;
+    // 镜像后世界坐标翻转，手动分区线位置失效，恢复默认划分（可用「回退」撤销）
+    ppResetCutSnap('');
     // 同步全局多边形（面积标签 / 三级传导保持一致）
     window.measuredPolygon=ppState.polyPts.map(function(p){return{x:p.x,y:p.y};});
     ppSyncMirrorUI();
@@ -8402,13 +8592,14 @@ function calcPlan(){
   var ppResetCutsBtn=document.getElementById('ppResetCuts');
   if(ppResetCutsBtn){
     ppResetCutsBtn.addEventListener('click',function(){
-      ppState.cutOverrides={x:{},y:{}};
+      ppState.cutOverrides={x:{},y:{}};ppResetCutSnap('');
       ppState.dragCut=null;ppState.hoverCut=null;ppState.lastSelectedCut=null;
       ppRender();
       if(typeof window.ppRefreshDiagramIfVisible==='function')window.ppRefreshDiagramIfVisible();
     });
   }
 
+  // ===== 网格线微调 =====
   // Fine-tune cut line position (0.3m per click)
   function ppFineStepWorld(axis){
     var t=ppState.transform;
@@ -8420,10 +8611,7 @@ function calcPlan(){
   function ppNudgeCut(dir){
     if(ppState.mode!=='adjustCut')return;
     var sel=ppState.lastSelectedCut;
-    if(!sel){
-      // fallback: use hoverCut
-      sel=ppState.hoverCut;
-    }
+    if(!sel){ sel=ppState.hoverCut; }
     if(!sel){return;}
     ppPushHistory();
     var b=ppGetBounds();
@@ -8432,11 +8620,12 @@ function calcPlan(){
     var layout=ppGetZoneLayout(b,planN);
     var cuts=ppGetZoneCuts(b,layout);
     if(!cuts)return;
-    if(!ppState.cutOverrides)ppState.cutOverrides={x:{},y:{}};
     var axis=sel.axis;
     var idx=sel.index;
-    // Get current position (with overrides applied)
-    var curPos=cuts[axis==='x'?'xPos':'yPos'][idx];
+    var arr=cuts[axis==='x'?'xPos':'yPos'];
+    if(idx<=0||idx>=arr.length-1)return; // 该线已被合并删除
+    // Get current position (with manual adjustments applied)
+    var curPos=arr[idx];
     var step=ppFineStepWorld(axis);
     var delta=0;
     if(axis==='x'){
@@ -8452,12 +8641,11 @@ function calcPlan(){
     }
     var newPos=curPos+delta;
     // Constrain between neighbors
-    var arr=cuts[axis==='x'?'xPos':'yPos'];
     var minBound=arr[idx-1]+2;
     var maxBound=arr[idx+1]-2;
     if(newPos<minBound)newPos=minBound;
     if(newPos>maxBound)newPos=maxBound;
-    ppState.cutOverrides[axis][idx]=newPos;
+    ppSetCutPos(axis,idx,newPos);
     ppState.lastSelectedCut={axis:axis,index:idx};
     ppRender();
     if(typeof window.ppRefreshDiagramIfVisible==='function')window.ppRefreshDiagramIfVisible();
@@ -8551,6 +8739,7 @@ function calcPlan(){
     parts.push('<text x="'+svgW/2+'" y="42" text-anchor="middle" font-size="20" font-weight="700" fill="#1a4731">润野灌溉 · 施工简图</text>');
     var headerExtra=partialCount>0?(' | 非标准 '+partialCount+' 区'):'';
     parts.push('<text x="34" y="42" text-anchor="start" font-size="12" font-weight="700" fill="#334155">面积 '+areaMu+' 亩 | 地块 '+planA+'×'+planB+' m | '+planN+'分区 | 标准区 '+zoneAreaMu+' 亩'+headerExtra+'</text>');
+    parts.push('<g id="ppPlotGroup">');
     parts.push('<defs><clipPath id="ppPlotClip"><path d="'+d+'"/></clipPath></defs>');
     parts.push('<path d="'+d+'" fill="rgba(134,239,172,.1)" stroke="none"/>');
 
@@ -8792,6 +8981,7 @@ function calcPlan(){
       parts.push('<line x1="'+(vp.x-4).toFixed(1)+'" y1="'+(vp.y-4).toFixed(1)+'" x2="'+(vp.x+4).toFixed(1)+'" y2="'+(vp.y+4).toFixed(1)+'" stroke="#fff" stroke-width="1.5"/>');
       parts.push('<line x1="'+(vp.x+4).toFixed(1)+'" y1="'+(vp.y-4).toFixed(1)+'" x2="'+(vp.x-4).toFixed(1)+'" y2="'+(vp.y+4).toFixed(1)+'" stroke="#fff" stroke-width="1.5"/>');
     });
+    parts.push('</g>');
 
     // Calculation book (draggable + resizable like three-level header, no fill, transparent background)
     var cbX0=34, cbY0=drawY2+18;
@@ -8823,10 +9013,7 @@ function calcPlan(){
     var cbSegs=[];
     cbSegs.push('滴灌带 '+cbTapeLen+'m | 滴孔流量 '+cbEmitterFlow+' L/h | 孔距 '+cbEmitterSpacing+'m | 带距 '+cbTapeSpacing+'m');
     cbSegs.push('主管 '+cbMainOD+' | 支管 '+cbBranchOD+' | 实测主管 '+cbActualMainStr+' | 实测支管 '+cbActualBranchStr);
-    if(cbHasCalc){
-      cbSegs.push('扬程 H=(提升'+cbLift.toFixed(1)+' + 地形'+cbDh.toFixed(1)+' + 入口压力'+cbTapePressureM.toFixed(1)+' − 已有压力'+cbExistPressureM.toFixed(1)+' + 主管损失'+cbMainLoss.toFixed(2)+' + 支管损失'+cbBranchLoss.toFixed(2)+' + 过滤阀门'+cbFilterLoss.toFixed(1)+' + 富余'+cbMargin+') × '+cbSafety.toFixed(2)+' = '+cbPumpHead.toFixed(1)+' m');
-      cbSegs.push('水泵 Q='+cbZoneFlow.toFixed(1)+' m³/h  P=2.725×Q×H/η='+cbPumpPower.toFixed(1)+' kW  配套电机 '+cbMotorKW.toFixed(1)+' kW');
-    }else{
+    if(!cbHasCalc){
       cbSegs.push('未获取到水泵计算中间量，请先在参数面板完成计算后再生成施工图。');
     }
 
@@ -8874,6 +9061,7 @@ function calcPlan(){
     document.getElementById('ppSavePng').style.display='inline-block';
     ppState.lastSVG=svgStr;
     try{ ppInitCalcBookDrag(); }catch(e){ console.warn('[ppGenerateDiagram] calc book drag init failed', e); }
+    try{ ppInitPlotDrag(); }catch(e){ console.warn('[ppGenerateDiagram] plot drag init failed', e); }
     if(doScroll) document.getElementById('ppDiagramWrap').scrollIntoView({behavior:'smooth',block:'nearest'});
   }
 
@@ -9031,6 +9219,93 @@ function calcPlan(){
       applyPos();
       localStorage.setItem('pp-calcbook-pos',JSON.stringify(pos));
       localStorage.setItem('pp-calcbook-w',cbW.toString());
+    });
+  }
+
+  /* 二级施工简图：图纸主体（地块/分区/管线/标注）可整体平移拖动，尺寸不变；参考三级管线 tlPlotGroup 拖动方式 */
+  function ppInitPlotDrag(){
+    var ctn=document.getElementById('ppDiagramContent');
+    if(!ctn)return;
+    var svgEl=ctn.querySelector('svg');
+    if(!svgEl)return;
+    var plotG=svgEl.querySelector('#ppPlotGroup');
+    if(!plotG)return;
+    if(window._ppPlotMove)document.removeEventListener('mousemove',window._ppPlotMove);
+    if(window._ppPlotUp)document.removeEventListener('mouseup',window._ppPlotUp);
+
+    var svgW=1190,svgH=841,frameX=8,frameY=8,frameW=svgW-16,frameH=svgH-16;
+    var pos={x:0,y:0};
+    try{
+      var saved=JSON.parse(localStorage.getItem('pp-plot-pos'));
+      if(saved&&typeof saved.x==='number')pos=saved;
+    }catch(e){}
+
+    var bbox=plotG.getBBox();
+    function clampPos(p){
+      var minX=frameX-bbox.x;
+      var maxX=frameX+frameW-(bbox.x+bbox.width);
+      var minY=frameY-bbox.y;
+      var maxY=frameY+frameH-(bbox.y+bbox.height);
+      if(minX>maxX){minX=maxX=(minX+maxX)/2;}
+      if(minY>maxY){minY=maxY=(minY+maxY)/2;}
+      p.x=Math.max(minX,Math.min(maxX,p.x));
+      p.y=Math.max(minY,Math.min(maxY,p.y));
+      return p;
+    }
+
+    function applyPos(){
+      plotG.setAttribute('transform','translate('+pos.x.toFixed(1)+','+pos.y.toFixed(1)+')');
+    }
+    if(pos.x||pos.y){clampPos(pos);applyPos();}
+
+    function getScale(){
+      var rect=svgEl.getBoundingClientRect();
+      return rect.width>0?svgW/rect.width:1;
+    }
+
+    var dragStart=null;
+    svgEl.addEventListener('mousedown',function(e){
+      if(e.button!==0)return;
+      var target=e.target;
+      if(!target||!target.closest)return;
+      // 点击计算书时交给计算书自己的拖动逻辑
+      if(target.closest('#ppCalcBookGroup'))return;
+      // 点击图纸组内部 或 SVG 背景空白处 均可拖动图纸
+      var hitPlot=target===svgEl||target.closest('#ppPlotGroup');
+      if(!hitPlot)return;
+      e.preventDefault();
+      var scale=getScale();
+      dragStart={x:e.clientX,y:e.clientY,ox:pos.x,oy:pos.y,scale:scale};
+      document.body.style.userSelect='none';
+      svgEl.style.cursor='grabbing';
+    });
+
+    window._ppPlotMove=function(ev){
+      if(!dragStart)return;
+      var s=dragStart.scale;
+      pos.x=dragStart.ox+(ev.clientX-dragStart.x)*s;
+      pos.y=dragStart.oy+(ev.clientY-dragStart.y)*s;
+      clampPos(pos);
+      applyPos();
+    };
+
+    window._ppPlotUp=function(){
+      if(!dragStart)return;
+      dragStart=null;
+      document.body.style.userSelect='';
+      svgEl.style.cursor='';
+      localStorage.setItem('pp-plot-pos',JSON.stringify(pos));
+    };
+
+    document.addEventListener('mousemove',window._ppPlotMove);
+    document.addEventListener('mouseup',window._ppPlotUp);
+
+    plotG.addEventListener('dblclick',function(e){
+      e.stopPropagation();
+      e.preventDefault();
+      pos={x:0,y:0};
+      applyPos();
+      localStorage.setItem('pp-plot-pos',JSON.stringify(pos));
     });
   }
 

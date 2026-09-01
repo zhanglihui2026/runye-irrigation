@@ -276,26 +276,54 @@
   .wb-list-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px;}
 
   @media(max-width:980px){
-    .wb-shell{grid-template-columns:1fr;padding:14px;gap:14px;}
-    .wb-sidebar{position:static;min-height:0;padding:12px;}
+    .wb-shell{grid-template-columns:1fr;padding:12px;gap:12px;}
+    /* 品牌栏：手机端保持单行紧凑，给顶部标签栏腾出空间 */
+    .wb-header-inner{height:52px;padding:0 12px;flex-direction:row;align-items:center;gap:8px;}
+    .wb-brand{gap:8px;}
+    .wb-logo{width:32px;height:32px;font-size:14px;}
+    .wb-brand-name{font-size:15px;}
+    .wb-brand-sub{display:none;}
+    .wb-header-links{gap:6px;flex-wrap:nowrap;}
+    .wb-header-links a{padding:6px 10px;font-size:12px;flex:0 0 auto;}
+    /* 功能切换：吸顶横向滚动标签栏，置于手机浏览器顶部 */
+    .wb-sidebar{
+      position:sticky;top:52px;z-index:150;
+      min-height:0;padding:8px 6px 6px;border-radius:12px;
+    }
     .wb-side-kicker,.wb-side-title{display:none;}
-    .wb-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}
-    .wb-nav a{justify-content:center;padding:10px 8px;text-align:center;}
+    .wb-nav{
+      display:flex;flex-direction:row;gap:8px;
+      overflow-x:auto;overflow-y:hidden;
+      -webkit-overflow-scrolling:touch;scrollbar-width:none;
+      padding-bottom:2px;
+    }
+    .wb-nav::-webkit-scrollbar{display:none;}
+    .wb-nav a{
+      flex:0 0 auto;justify-content:center;text-align:center;
+      padding:8px 14px;border-radius:999px;white-space:nowrap;
+    }
     .wb-nav a small{display:none;}
-    .wb-side-actions{display:flex;flex-wrap:wrap;margin-top:10px;padding-top:10px;}
-    .wb-side-actions a,.wb-side-actions button{width:auto;flex:1 1 120px;}
+    .wb-nav a > span:not(.wb-nav-mark){font-size:13px;line-height:1;}
+    .wb-nav-mark{width:24px;height:24px;border-radius:7px;font-size:12px;}
+    .wb-side-actions{
+      display:flex;flex-direction:row;flex-wrap:nowrap;gap:8px;
+      margin-top:8px;padding-top:8px;overflow-x:auto;scrollbar-width:none;
+    }
+    .wb-side-actions::-webkit-scrollbar{display:none;}
+    .wb-side-actions a,.wb-side-actions button{
+      width:auto;flex:0 0 auto;padding:6px 12px;font-size:12px;white-space:nowrap;
+    }
     .wb-stats{grid-template-columns:repeat(2,1fr);}
     .wb-quick{grid-template-columns:1fr;}
     .wb-two-col{grid-template-columns:1fr;}
+    .wb-field-row{flex-direction:column;gap:0;}
   }
   @media(max-width:640px){
     .wb-stats{grid-template-columns:1fr;}
-    .wb-header-inner{height:auto;min-height:62px;padding:10px 14px;align-items:flex-start;gap:10px;flex-direction:column;}
-    .wb-header-links{width:100%;}
-    .wb-header-links a{flex:1;}
-    .wb-nav{grid-template-columns:1fr;}
-    .wb-nav a{justify-content:flex-start;text-align:left;}
-    .wb-field-row{flex-direction:column;gap:0;}
+    .wb-nav a{padding:7px 12px;}
+    .wb-nav a > span:not(.wb-nav-mark){font-size:12.5px;}
+    .wb-nav-mark{width:22px;height:22px;font-size:11px;}
+    .wb-side-actions a,.wb-side-actions button{padding:6px 10px;font-size:12px;}
   }
   /* 每日行情数据面板 */
   .wb-daily-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:4px;}
@@ -620,10 +648,6 @@
     font-size:13px;
   }
   @media(max-width:980px){
-    .wb-shell{
-      padding:14px;
-      gap:14px;
-    }
     .wb-sidebar{
       min-height:0;
     }
@@ -657,7 +681,6 @@
     <nav class="wb-nav" id="wbNav">
       <a href="#/dashboard" data-route="dashboard"><span class="wb-nav-mark">总</span><span>总控看板<small>作业、风险、库存、经营</small></span></a>
       <a href="#/lands" data-route="lands"><span class="wb-nav-mark">地</span><span>地块中心<small>地块档案、筛选、详情管理</small></span></a>
-      <a href="#/dispatch" data-route="dispatch"><span class="wb-nav-mark">调</span><span>统防调度<small>多地块作业窗口、派工单</small></span></a>
       <a href="#/purchase" data-route="purchase"><span class="wb-nav-mark">采</span><span>采购测算<small>农资需求、库存缺口、金额</small></span></a>
       <a href="#/reports" data-route="reports"><span class="wb-nav-mark">报</span><span>报表中心<small>记录汇总、投入统计、导出</small></span></a>
       <a href="#/materials" data-route="materials"><span class="wb-nav-mark">库</span><span>物资库<small>植保方案物资、使用登记</small></span></a>
@@ -1364,7 +1387,15 @@ function optionList(arr, sel){ return arr.map(function(o){return '<option'+(o===
    ============================================================ */
 function setActiveNav(route){
   var links=document.querySelectorAll('#wbNav a');
-  links.forEach(function(a){ a.classList.toggle('active', a.getAttribute('data-route')===route); });
+  var isMobile=window.matchMedia('(max-width:980px)').matches;
+  links.forEach(function(a){
+    var on=a.getAttribute('data-route')===route;
+    a.classList.toggle('active', on);
+    /* 手机端：把当前激活标签滚动到横向标签栏可视中心，单手操作更顺手 */
+    if(on && isMobile){
+      try{ a.scrollIntoView({inline:'center',block:'nearest',behavior:'smooth'}); }catch(e){}
+    }
+  });
 }
 function router(){
   var hash=location.hash.replace(/^#\/?/,'');
@@ -1471,7 +1502,8 @@ function renderLands(main){
       '<select id="wbCropFilter" onchange="filterLands()"><option value="">全部作物</option>'+cropOptions()+'</select>'+
       '<button class="wb-btn wb-btn-primary" onclick="openNewLandModal()">＋ 新建地块</button>'+
     '</div>'+
-    '<div class="wb-land-grid" id="wbLandGrid"></div>';
+    '<div class="wb-land-grid" id="wbLandGrid"></div>'+
+    buildDispatchContent();
   main.innerHTML=html;
   filterLands();
 }
@@ -1952,7 +1984,7 @@ function switchTab(btn){
 /* ============================================================
    页面：统防调度 / 采购测算
    ============================================================ */
-function renderDispatch(main){
+function buildDispatchContent(){
   var items=scalePlanItems(7);
   var today=items.filter(function(p){return p.dueIn===0;});
   var three=items.filter(function(p){return p.dueIn<=3;});
@@ -1964,8 +1996,7 @@ function renderDispatch(main){
     var tag=p.active?'<span class="wb-status st-planting">今日窗口</span>':'<span class="wb-status st-wait">'+p.dueIn+'天后</span>';
     return '<tr><td>'+tag+'<br><small>'+esc(p.dueDate)+'</small></td><td><a href="#/land/'+esc(p.land.land_id)+'" style="color:var(--g-700);font-weight:700">'+esc(p.land.name)+'</a><br><small>'+esc(p.land.crop||'—')+' ｜ '+landAreaMu(p.land).toFixed(2)+'亩</small></td><td>'+esc(p.planName||'')+'</td><td>'+esc(p.stage)+'</td><td>'+esc(p.op)+'</td><td><div class="wb-cell-clamp">'+mats+'</div></td></tr>';
   }).join(''):'<tr><td colspan="6" class="wb-empty">未来 7 天暂无集中作业窗口；请确认地块状态、作物和种植/播种日期。</td></tr>';
-  main.innerHTML=''+
-    '<h1 class="wb-section-title">统防调度看板</h1>'+
+  return '<h1 class="wb-section-title">统防调度看板</h1>'+
     '<div class="wb-sub">把单地块决策合并成多地块作业窗口，方便统一派工、统一备药、统一复盘。</div>'+
     '<div class="wb-grid wb-stats" style="grid-template-columns:repeat(4,1fr);margin-top:18px">'+
       statCard('今日窗口',today.length,'块')+
@@ -1980,6 +2011,9 @@ function renderDispatch(main){
     '</div>'+
     '<div class="wb-panel" style="padding:0;overflow:auto"><table class="wb-table wb-dispatch-table"><thead><tr><th>状态</th><th>地块</th><th>方案</th><th>节点</th><th>作业<br>方式</th><th>建议内容</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
     '<div class="wb-form-note" style="margin-top:10px">说明：番茄、辣椒为规模化通用模板；七彩花生继续读取原全程植保方案。具体药肥用量需按产品标签和现场情况校准。</div>';
+}
+function renderDispatch(main){
+  main.innerHTML=buildDispatchContent();
 }
 function renderPurchase(main){
   var demand=aggregatePlanDemand(15);
