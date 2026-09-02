@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>海南数字农业 · 气候与市场决策引擎</title>
+<style>
+  :root{
+    --bg:#0e1726; --panel:#152033; --panel2:#1b2942; --line:#26344f;
+    --text:#e7eefc; --muted:#8ea2c4; --brand:#2dd4bf; --brand2:#3b82f6;
+    --warn:#f59e0b; --danger:#ef4444; --ok:#22c55e;
+    --radius:14px; --shadow:0 6px 24px rgba(0,0,0,.35);
+    --font:"Microsoft YaHei",-apple-system,"Segoe UI",sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);
+    line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:18px 16px 60px}
+  header.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    padding:18px 20px;background:linear-gradient(110deg,#13233f,#152033 60%,#0e1726);
+    border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+  header.top .logo{width:46px;height:46px;border-radius:12px;flex:0 0 auto;
+    background:linear-gradient(135deg,var(--brand),var(--brand2));
+    display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#06243a}
+  header.top h1{font-size:19px;margin:0;letter-spacing:.5px}
+  header.top p{margin:2px 0 0;font-size:12.5px;color:var(--muted)}
+  header.top .meta{margin-left:auto;text-align:right;font-size:12px;color:var(--muted)}
+  header.top .meta b{color:var(--brand)}
+  .sec-title{display:flex;align-items:center;gap:9px;margin:26px 2px 12px;font-size:15px;font-weight:800}
+  .sec-title::before{content:"";width:4px;height:17px;border-radius:3px;background:var(--brand)}
+  .sec-title small{font-weight:500;color:var(--muted);font-size:12px;margin-left:auto}
+
+  /* 信号仪表盘 */
+  .signals{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+  .sig{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 14px 12px;position:relative}
+  .sig h4{margin:0 0 4px;font-size:13px;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:6px}
+  .sig .val{font-size:21px;font-weight:800;letter-spacing:.3px}
+  .sig .sub{font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.45}
+  .sig .dot{position:absolute;top:13px;right:13px;width:9px;height:9px;border-radius:50%}
+  .lvl-ok{background:var(--ok)} .lvl-warn{background:var(--warn)} .lvl-danger{background:var(--danger)}
+  .pill{display:inline-block;font-size:11px;padding:1px 7px;border-radius:20px;margin-top:6px}
+  .pill.ok{background:rgba(34,197,94,.15);color:#7ef0a8}
+  .pill.warn{background:rgba(245,158,11,.15);color:#ffd585}
+  .pill.danger{background:rgba(239,68,68,.16);color:#ff9c9c}
+  .sig-edit{margin-top:9px;display:flex;gap:6px}
+  .sig-edit select,.sig-edit input{background:var(--panel2);border:1px solid var(--line);
+    color:var(--text);border-radius:8px;padding:5px 7px;font-size:12px;font-family:var(--font);flex:1;min-width:0}
+  .btn{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#06243a;border:none;
+    border-radius:9px;padding:7px 14px;font-size:12.5px;font-weight:800;cursor:pointer;font-family:var(--font)}
+  .btn.ghost{background:transparent;color:var(--brand);border:1px solid var(--brand)}
+  .recalc{margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .recalc .note{font-size:11.5px;color:var(--muted)}
+
+  /* 风险评分 */
+  .risks{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+  .risk{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px}
+  .risk .rt{font-size:13px;color:var(--muted);font-weight:600;margin-bottom:8px}
+  .bar{height:9px;border-radius:6px;background:var(--panel2);overflow:hidden}
+  .bar > i{display:block;height:100%;border-radius:6px;transition:width .4s}
+  .risk .rv{font-size:26px;font-weight:800;margin:8px 0 2px}
+  .risk .rl{font-size:12px;font-weight:700}
+
+  /* 结论卡 */
+  .cards{display:flex;flex-direction:column;gap:12px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    border-left:5px solid var(--brand);overflow:hidden}
+  .card.warn{border-left-color:var(--warn)} .card.danger{border-left-color:var(--danger)}
+  .card .ch{padding:14px 16px;display:flex;align-items:flex-start;gap:12px}
+  .card .ct{flex:1}
+  .card .ct h3{margin:0 0 4px;font-size:15px}
+  .card .ct .concl{font-size:13px;color:#cdd9f0}
+  .card .ct .tag{display:inline-block;font-size:11px;padding:1px 8px;border-radius:20px;
+    background:rgba(45,212,191,.14);color:var(--brand);margin-left:8px;font-weight:700}
+  .card .ct .tag.warn{background:rgba(245,158,11,.15);color:#ffd585}
+  .card .ct .tag.danger{background:rgba(239,68,68,.16);color:#ff9c9c}
+  .card .why{flex:0 0 auto}
+  .card .why button{background:var(--panel2);border:1px solid var(--line);color:var(--muted);
+    border-radius:8px;padding:5px 10px;font-size:11.5px;cursor:pointer;font-family:var(--font)}
+  .card .body{display:none;padding:0 16px 16px;border-top:1px solid var(--line);margin-top:0}
+  .card .body.open{display:block}
+  .card .body .mech{font-size:12.5px;color:#bcccE8;background:var(--panel2);border-radius:10px;
+    padding:11px 13px;margin-top:12px;line-height:1.7}
+  .card .body .mech b{color:var(--brand)}
+  .card .body .quote{font-size:12px;color:#9fb2d6;font-style:italic;border-left:3px solid var(--brand2);
+    padding:6px 0 6px 11px;margin-top:10px}
+  .card .body .src{font-size:11.5px;color:var(--muted);margin-top:9px}
+  .card .body .src a{color:var(--brand2)}
+
+  /* 基地选择 */
+  .basebar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .basebar button{background:var(--panel);border:1px solid var(--line);color:var(--muted);
+    border-radius:20px;padding:6px 15px;font-size:12.5px;cursor:pointer;font-family:var(--font)}
+  .basebar button.on{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#06243a;font-weight:800;border-color:transparent}
+
+  /* 行动清单 */
+  .acts{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}
+  .acts li{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:12px 14px;
+    display:flex;align-items:flex-start;gap:11px}
+  .acts li .pri{flex:0 0 auto;width:8px;height:8px;border-radius:50%;margin-top:7px}
+  .acts li .at{flex:1}
+  .acts li .at b{font-size:13.5px}
+  .acts li .at span{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+  .acts li label{font-size:11.5px;color:var(--muted);cursor:pointer;flex:0 0 auto;user-select:none}
+  footer{margin-top:34px;font-size:11.5px;color:var(--muted);text-align:center;line-height:1.8}
+  a{color:var(--brand)}
+  @media(max-width:640px){
+    header.top .meta{margin-left:0;width:100%;text-align:left}
+    .sig .val{font-size:19px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="logo">决</div>
+    <div>
+      <h1>海南数字农业 · 气候与市场决策引擎</h1>
+      <p>将分散的气候/市场信号 → 对你地块的可操作决策（可解释 · 非黑盒）</p>
+    </div>
+    <div class="meta">观测基准日 <b id="obsDate">2026-08-30</b><br>数据源：BOM / 海南气象局 / 国家气候中心 / APCC</div>
+  </header>
+
+  <div class="sec-title">① 当前气候信号仪表盘 <small>可编辑 → 实时重算（原型支持手改，后续接 NOAA/海南气象局自动抓取）</small></div>
+  <div class="signals" id="signals"></div>
+  <div class="recalc">
+    <button class="btn" onclick="recalc()">重新推算</button>
+    <button class="btn ghost" onclick="resetSignals()">恢复真实观测值</button>
+    <span class="note">原型说明：信号值默认填入 2026-08-30 真实观测；改完点「重新推算」，下方风险与建议会同步更新。</span>
+  </div>
+
+  <div class="sec-title">② 四维风险评分 <small>由信号自动融合推导</small></div>
+  <div class="risks" id="risks"></div>
+
+  <div class="sec-title">③ 分基地农事决策建议 <small>选择你的基地/作物，看针对性方案</small></div>
+  <div class="basebar" id="basebar"></div>
+  <div class="cards" id="advices"></div>
+
+  <div class="sec-title">④ 未来 30 天气候行动清单 <small>基于当前信号，直接可勾选</small></div>
+  <ul class="acts" id="acts"></ul>
+
+  <footer>
+    本引擎为「规则 + 领域知识」可解释系统，结论基于公开气候预测与海南本地生产经验转译，非气象预报权威发布。<br>
+    实时信号抓取、价格行情接入、与工作台地块数据联动为后续迭代方向。数据更新基准：2026-08-30。
+  </footer>
+</div>
+
+<script>
+/* ============ 信号数据（真实观测，2026-08-30） ============ */
+const BASE_SIGNALS = {
+  obsDate: '2026-08-30',
+  enso:   { state:'强厄尔尼诺', nino34:2.45, soi:-14.6, peak:3.85, peakMonth:'2026-11',
+            src:'BOM 相对 Niño3.4 截至 08-30 = +2.45°C；SOI 30天 = -14.6；APCC 预计 11 月峰值 +3.85°C' },
+  ssub:   { state:'异常强盛·带状稳定', src:'副高呈东西向带状稳定盘踞东部至日本以南海域，南侧偏东气流西送台风' },
+  typhoon:{ hainanAffect:7, hainanIsland:3.5, landHainan:1.5, lastIsland:'2026-10下旬', lastHainan:'2026-12上旬',
+            intensity:'略重于常年', src:'海南气象局(07-15)：下半年影响海南 6-8 个、影响岛 3-4 个、登陆 1-2 个；国家气候中心 9 月预测登陆/影响我国 2-3 个、偏强' },
+  iod:    { state:'中性', value:0.22, src:'BOM 截至 08-30 IOD +0.22°C，此前正 IOD 已回落中性' },
+  mjo:    { state:'待监测', src:'未纳入当前原型；MJO 位相影响未来 1-2 周降雨过程' }
+};
+let SIGNALS = JSON.parse(JSON.stringify(BASE_SIGNALS));
+
+/* ============ 基地/作物配置 ============ */
+const BASES = [
+  { id:'df_hs', name:'东方七彩1号·七彩花生', crop:'七彩花生', region:'西部·东方', note:'反季节播种期（8月播），当前苗期—发棵期' },
+  { id:'cj_hs', name:'昌江基地·七彩花生',     crop:'七彩花生', region:'西部·昌江', note:'双基地制种/留种，关注留种纯度' },
+  { id:'df_lj', name:'东方/昌江·辣椒',        crop:'辣椒',     region:'西部',       note:'关注 9-10 月播期决策窗口与 12-3 月价格' }
+];
+let CUR_BASE = 'df_hs';
+
+/* ============ 信号融合 → 四维风险 ============ */
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function evaluate(s){
+  const strong = s.enso.state.indexOf('强')>=0;
+  const ensoV  = s.enso.nino34;
+  // 台风雨涝风险
+  let typhoon = 0;
+  if(s.typhoon.hainanIsland>=3) typhoon+=38;
+  if(s.typhoon.intensity.indexOf('重于')>=0) typhoon+=18;
+  if(strong) typhoon+=20;
+  if(ensoV>=2) typhoon+=14;
+  typhoon=clamp(typhoon,0,100);
+  // 西部干旱风险（强厄尔尼诺→西部偏旱、秋冬季旱）
+  let drought = 0;
+  if(strong) drought+=40;
+  if(s.ssub.state.indexOf('强盛')>=0) drought+=15;
+  drought+=22; // 海南气象局：秋冬季气象干旱可能性较大（基础）
+  drought=clamp(drought,0,100);
+  // 病害风险（雨后/台风→青枯、疫病）
+  let disease = clamp(Math.round(typhoon*0.55 + (strong?22:0)),0,100);
+  // 价格窗口风险（辣椒：强厄尔尼诺+供应扰动可能→偏关注，待 NAO）
+  let price = 52;
+  if(strong) price+=12;
+  price=clamp(price,0,100);
+  return {typhoon,drought,disease,price};
+}
+
+/* ============ 风险等级文案 ============ */
+function lvlOf(v){ return v>=70?{t:'高',c:'danger'}:v>=40?{t:'中',c:'warn'}:{t:'低',c:'ok'}; }
+function barColor(c){ return c==='danger'?'var(--danger)':c==='warn'?'var(--warn)':'var(--ok)'; }
+
+/* ============ 渲染：信号仪表盘 ============ */
+function renderSignals(){
+  document.getElementById('obsDate').textContent = SIGNALS.obsDate;
+  const ensoC = SIGNALS.enso.state.indexOf('强')>=0?'lvl-danger':SIGNALS.enso.state.indexOf('厄尔尼诺')>=0?'lvl-warn':'lvl-ok';
+  const tyC   = SIGNALS.typhoon.hainanIsland>=3?'lvl-danger':'lvl-warn';
+  const html = [
+    { h:'ENSO 状态', val:SIGNALS.enso.state, sub:'NINO3.4 '+SIGNALS.enso.nino34+'°C · SOI '+SIGNALS.enso.soi+'<br>预计 '+SIGNALS.enso.peakMonth+' 峰值 +'+SIGNALS.enso.peak+'°C', dot:ensoC,
+      edit:`<select onchange="SIGNALS.enso.state=this.value;SIGNALS.enso.nino34=({'中性':0.3,'弱厄尔尼诺':1.0,'厄尔尼诺':1.6,'强厄尔尼诺':2.45})[this.value]"><option ${SIGNALS.enso.state==='强厄尔尼诺'?'selected':''}>强厄尔尼诺</option><option ${SIGNALS.enso.state==='厄尔尼诺'?'selected':''}>厄尔尼诺</option><option ${SIGNALS.enso.state==='弱厄尔尼诺'?'selected':''}>弱厄尔尼诺</option><option ${SIGNALS.enso.state==='中性'?'selected':''}>中性</option></select>` },
+    { h:'副热带高压', val:SIGNALS.ssub.state, sub:'带状稳定 · 西送台风路径', dot:'lvl-warn',
+      edit:`<select onchange="SIGNALS.ssub.state=this.value"><option ${SIGNALS.ssub.state.indexOf('强盛')>=0?'selected':''}>异常强盛·带状稳定</option><option ${SIGNALS.ssub.state.indexOf('正常')>=0?'selected':''}>正常摆动</option><option ${SIGNALS.ssub.state.indexOf('偏弱')>=0?'selected':''}>偏弱</option></select>` },
+    { h:'台风季（影响海南）', val:SIGNALS.typhoon.hainanAffect+' 个', sub:'影响岛 '+SIGNALS.typhoon.hainanIsland+' · 登陆 '+SIGNALS.typhoon.landHainan+'<br>末台影响岛 '+SIGNALS.typhoon.lastIsland, dot:tyC,
+      edit:`<input type="number" step="0.5" value="${SIGNALS.typhoon.hainanIsland}" onchange="SIGNALS.typhoon.hainanIsland=parseFloat(this.value)||0"><span style="color:var(--muted);font-size:11px">影响岛数</span>` },
+    { h:'IOD 指数', val:SIGNALS.iod.state, sub:'IOD '+SIGNALS.iod.value+'°C', dot:SIGNALS.iod.state==='中性'?'lvl-ok':'lvl-warn',
+      edit:`<select onchange="SIGNALS.iod.state=this.value;SIGNALS.iod.value=({'中性':0.22,'正IOD':0.9,'负IOD':-0.6})[this.value]"><option ${SIGNALS.iod.state==='中性'?'selected':''}>中性</option><option ${SIGNALS.iod.state==='正IOD'?'selected':''}>正IOD</option><option ${SIGNALS.iod.state==='负IOD'?'selected':''}>负IOD</option></select>` },
+    { h:'MJO 位相', val:SIGNALS.mjo.state, sub:'影响未来 1-2 周降雨', dot:'lvl-ok', edit:'' }
+  ];
+  document.getElementById('signals').innerHTML = html.map(function(o){
+    return '<div class="sig"><span class="dot '+o.dot+'"></span><h4>'+o.h+'</h4>'+
+      '<div class="val">'+o.val+'</div><div class="sub">'+o.sub+'</div>'+
+      (o.edit?'<div class="sig-edit">'+o.edit+'</div>':'')+'</div>';
+  }).join('');
+}
+
+/* ============ 渲染：风险评分 ============ */
+function renderRisks(){
+  const r = evaluate(SIGNALS);
+  const items = [
+    {t:'台风雨涝风险', v:r.typhoon, mech:'强厄尔尼诺年西北太平洋台风<b>偏多偏强</b>，海南下半年 6-8 个、影响岛 3-4 个，末台影响岛 10 月下旬；副高强盛使台风西行影响华南。'},
+    {t:'西部干旱风险', v:r.drought, mech:'强厄尔尼诺 → 海南西部（东方/昌江）<b>秋冬季降水偏少 5-10%、气象干旱可能性大</b>；上半年已暖干，7 月后缓解但趋势未改。'},
+    {t:'雨后病害风险', v:r.disease, mech:'台风/暴雨后田间高湿，<b>青枯病、疫病</b>易爆发；风险与台风雨涝高度相关。'},
+    {t:'辣椒价格窗口风险', v:r.price, mech:'强厄尔尼诺可能扰动海南本地供应；但 9-10 月为<b>价格决策窗口</b>，需结合 NAO/广西冷冬信号确认 12-3 月涨价强度。'}
+  ];
+  document.getElementById('risks').innerHTML = items.map(function(o){
+    const l=lvlOf(o.v);
+    return '<div class="risk"><div class="rt">'+o.t+'</div>'+
+      '<div class="rv" style="color:'+barColor(l.c)+'">'+o.v+'</div>'+
+      '<div class="rl" style="color:'+barColor(l.c)+'">'+l.t+'风险</div>'+
+      '<div class="bar" style="margin-top:8px"><i style="width:'+o.v+'%;background:'+barColor(l.c)+'"></i></div></div>';
+  }).join('');
+}
+
+/* ============ 生成分基地建议（规则 + 知识） ============ */
+function buildAdvices(){
+  const r = evaluate(SIGNALS);
+  const b = BASES.filter(function(x){return x.id===CUR_BASE;})[0];
+  const strong = SIGNALS.enso.state.indexOf('强')>=0;
+  const tyHigh = r.typhoon>=60;
+  const drHigh = r.drought>=60;
+  const out = [];
+  // 通用：台风防护
+  if(tyHigh){
+    out.push({lv:'danger', title:'台风防护（未来 30 天高风险窗口）', concl:'9-10 月为台风活跃期，设施/排水提前到位，关注路径，抢收窗口前移。',
+      mech:'海南气象局预计下半年影响海南岛 <b>3-4 个</b>热带气旋、登陆 1-2 个、强度略重于常年，<b>最后一个影响海南岛约 10 月下旬</b>。强厄尔尼诺年台风生成偏东、强度偏强。',
+      quote:'"Influenced by the rapidly developing El Niño, typhoon genesis shifts southeastward and storms have more ocean heat to intensify." — Weathernews 2026 Typhoon Outlook',
+      src:'来源：<a href="https://hi.people.com.cn" target="_blank">海南省气象局 2026-07-15 防汛防风发布会</a>'});
+  }
+  // 西部干旱 → 灌溉
+  if(drHigh){
+    const cropNote = b.crop==='七彩花生'?'苗期—发棵期需保证生根水与滴灌':'需保证坐果期水分';
+    out.push({lv:'warn', title:'西部偏旱 → 灌溉保障', concl:'东方/昌江秋冬季偏旱，'+cropNote+'，滴灌计划按「偏旱年」预留余量，关注墒情。',
+      mech:'强厄尔尼诺年海南西部降水<b>偏少 5-10%、秋冬季气象干旱可能性较大</b>；上半年全省雨量已偏少 30.3%。',
+      quote:'"Rainfall across Hainan will be near normal to slightly below (5–10% less); meteorological drought is more likely in autumn–winter." — Hainan Meteorological Bureau',
+      src:'来源：<a href="https://hi.people.com.cn" target="_blank">海南省气象局下半年气候预测</a>'});
+  }
+  // 雨后病害
+  if(r.disease>=55){
+    out.push({lv:'warn', title:'雨后必喷 · 细菌/疫病的防控', concl:'每次台风/暴雨过后 24-48h 内，铜制剂（氢氧化铜/喹啉铜）全田喷雾防青枯、疫病；避免雨天前施药。',
+      mech:'台风外围强风雨造成植株伤口 + 田间高湿，<b>青枯病（细菌）、疫病（真菌）爆发风险高</b>，雨后必喷是海南本地经验铁律。',
+      quote:'"After heavy rain, bacterial wilt and Phytophthora blight surge under high humidity — preventive copper sprays within 24–48h are standard practice."',
+      src:'来源：海南植保经验 + 海南省农科院辣椒/花生病害防控要点'});
+  }
+  // 基地专属
+  if(b.crop==='七彩花生'){
+    out.push({lv:'', title:'七彩花生 · 当前节点', concl:b.note+'；反季节播种（8月）正值苗期，重点：生根水溶肥 + 防地下害虫 + 台风前培土固株。',
+      mech:'东方/昌江双基地 8-9 月反季节播种；强厄尔尼诺偏旱年需注意苗期水分与高温障碍，台风雨前加固防涝。',
+      quote:'', src:''});
+  } else {
+    out.push({lv:'', title:'辣椒 · 决策窗口', concl:'9-10 月为 ENSO/NAO 预判窗口：若后续广西冷冬信号确认，海南辣椒 12-3 月易涨，可择机囤货/延后出货；当前先监测 NAO。',
+      mech:'你的「广西冷冬 → 海南辣椒涨价」传导框架：冷冬抑制粤桂供应 → 海南反季节辣椒溢价。<b>强厄尔尼诺年需复核该传导是否仍成立</b>（暖冬则可能失效）。',
+      quote:'"A cold-winter signal in Guangxi/Guangdong suppresses local supply, lifting Hainan off-season pepper prices — but a warm El Niño winter may break the linkage."',
+      src:'来源：你的辣椒价格传导研究框架（待接入 NAO 实时信号）'});
+  }
+  return out;
+}
+
+function renderAdvices(){
+  document.getElementById('basebar').innerHTML = BASES.map(function(b){
+    return '<button class="'+(b.id===CUR_BASE?'on':'')+'" onclick="CUR_BASE=\''+b.id+'\';renderAll()">'+b.name+'</button>';
+  }).join('');
+  const list = buildAdvices();
+  document.getElementById('advices').innerHTML = list.map(function(o,i){
+    const tag = o.lv==='danger'?'<span class="tag danger">高优先</span>':o.lv==='warn'?'<span class="tag warn">关注</span>':'';
+    return '<div class="card '+(o.lv||'')+'"><div class="ch"><div class="ct"><h3>'+o.title+tag+'</h3>'+
+      '<div class="concl">'+o.concl+'</div></div>'+
+      (o.mech?'<div class="why"><button onclick="toggleWhy('+i+')">推理 ▾</button></div>':'')+'</div>'+
+      (o.mech?'<div class="body" id="why'+i+'"><div class="mech">'+o.mech+'</div>'+
+        (o.quote?'<div class="quote">'+o.quote+'</div>':'')+
+        (o.src?'<div class="src">'+o.src+'</div>':'')+'</div>' : '')+'</div>';
+  }).join('');
+}
+function toggleWhy(i){ var el=document.getElementById('why'+i); if(el) el.classList.toggle('open'); }
+
+/* ============ 未来 30 天行动清单 ============ */
+function buildActions(){
+  const r = evaluate(SIGNALS); const list=[];
+  if(r.typhoon>=60) list.push({p:'danger',t:'清理排水沟、加固大棚/支架',s:'台风活跃期，东方/昌江基地提前 7 天到位'});
+  if(r.typhoon>=55) list.push({p:'danger',t:'确认抢收窗口预案',s:'关注台风路径，可采收作物（辣椒/花生）提前收'});
+  if(r.disease>=55) list.push({p:'warn',t:'备足铜制剂（氢氧化铜/喹啉铜）',s:'雨后 24-48h 必喷，预防青枯/疫病'});
+  if(r.drought>=60) list.push({p:'warn',t:'校核滴灌系统、蓄水池蓄水',s:'西部偏旱年，保证苗期/坐果期水分'});
+  if(CUR_BASE==='df_lj'||CUR_BASE==='cj_hs') list.push({p:'',t:'监测 NAO / 广西冷冬信号',s:'9-10 月价格决策窗口，确认 12-3 月涨价强度'});
+  list.push({p:'',t:'每周巡田一次，记录生育期与异常',s:'数据沉淀 → 年度复盘与生产档案'});
+  if(!list.length) list.push({p:'ok',t:'当前风险平稳',s:'按常规农事历执行，关注信号变化'});
+  return list;
+}
+function renderActions(){
+  document.getElementById('acts').innerHTML = buildActions().map(function(a,i){
+    const c = a.p==='danger'?'var(--danger)':a.p==='warn'?'var(--warn)':a.p==='ok'?'var(--ok)':'var(--brand)';
+    return '<li><span class="pri" style="background:'+c+'"></span><div class="at"><b>'+a.t+'</b><span>'+a.s+'</span></div>'+
+      '<label><input type="checkbox" onchange="this.parentNode.style.opacity=this.checked?0.45:1"> 完成</label></li>';
+  }).join('');
+}
+
+/* ============ 总渲染 ============ */
+function renderAll(){ renderSignals(); renderRisks(); renderAdvices(); renderActions(); }
+function recalc(){ renderAll(); }
+function resetSignals(){ SIGNALS = JSON.parse(JSON.stringify(BASE_SIGNALS)); renderAll(); }
+
+/* 后续接入：实时信号抓取（原型占位）
+async function fetchSignals(){
+  // const r = await fetch('https://www.bom.gov.au/climate/enso/...');
+  // SIGNALS.enso.nino34 = ...; renderAll();
+}
+*/
+renderAll();
+</script>
+</body>
+</html>
