@@ -345,6 +345,39 @@
     .wb-nav-mark{width:22px;height:22px;font-size:11px;}
     .wb-side-actions a,.wb-side-actions button{padding:6px 10px;font-size:12px;}
   }
+  /* ============================================================
+     页面：今日行动（手机端首屏着陆页）
+     ============================================================ */
+  .wb-today-hero{background:linear-gradient(135deg,var(--g-700),var(--teal));color:#fff;border-radius:var(--radius);padding:18px 18px;box-shadow:var(--shadow-md);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;}
+  .wb-today-hero .th-date .th-d{font-size:20px;font-weight:800;letter-spacing:.5px;line-height:1.1;}
+  .wb-today-hero .th-date .th-w{font-size:12px;opacity:.85;margin-top:3px;}
+  .wb-today-hero .th-stats{display:flex;gap:10px;flex-wrap:wrap;}
+  .wb-today-hero .th-stat{background:rgba(255,255,255,.16);border-radius:10px;padding:8px 12px;min-width:62px;text-align:center;}
+  .wb-today-hero .th-stat b{display:block;font-size:20px;font-weight:800;line-height:1.1;}
+  .wb-today-hero .th-stat span{font-size:11px;opacity:.9;}
+  .wb-today-section{margin-top:18px;}
+  .wb-today-action{background:#fff;border:1px solid var(--line);border-left:5px solid var(--g-600);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow);margin-bottom:12px;transition:all .2s;}
+  .wb-today-action.is-done{opacity:.58;border-left-color:var(--s-300);}
+  .wb-today-action .ta-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;}
+  .wb-today-action .ta-land{font-size:15.5px;font-weight:800;color:var(--s-800);}
+  .wb-today-action .ta-land a{color:var(--s-800);}
+  .wb-today-action .ta-land small{display:block;font-size:12px;color:var(--s-500);font-weight:500;margin-top:1px;}
+  .wb-today-action .ta-stage{font-size:12px;font-weight:800;color:#fff;background:var(--g-600);border-radius:999px;padding:4px 11px;white-space:nowrap;flex:none;}
+  .wb-today-action.is-done .ta-stage{background:var(--s-300);}
+  .wb-today-action .ta-meta{font-size:12.5px;color:var(--s-600);margin:8px 0 6px;}
+  .wb-today-action .ta-meta b{color:var(--g-700);}
+  .wb-today-action .ta-dose{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px;}
+  .wb-tag{display:inline-block;font-size:12px;font-weight:600;color:var(--g-800);background:var(--g-50);border:1px solid var(--g-200);border-radius:8px;padding:3px 8px;}
+  .wb-today-action .ta-mix{font-size:12px;color:var(--s-500);background:var(--s-50);border:1px solid var(--s-100);border-radius:8px;padding:7px 9px;margin-top:6px;line-height:1.55;}
+  .wb-today-action .ta-foot{display:flex;justify-content:space-between;align-items:center;margin-top:10px;}
+  .wb-today-action .ta-op{font-size:12px;font-weight:700;color:var(--teal-700);background:#ecfeff;border:1px solid #cffafe;border-radius:8px;padding:4px 10px;}
+  .ta-done-btn{font-family:inherit;font-size:13px;font-weight:700;color:#fff;background:var(--g-600);border:1px solid var(--g-600);border-radius:9px;padding:7px 14px;cursor:pointer;transition:all .2s;}
+  .ta-done-btn:hover{background:var(--g-700);}
+  .ta-done-flag{font-size:13px;font-weight:700;color:var(--s-500);background:var(--s-50);border:1px solid var(--s-100);border-radius:9px;padding:7px 14px;}
+  .wb-today-empty{background:#fff;border:1px dashed var(--g-200);border-radius:var(--radius);padding:22px;text-align:center;color:var(--s-500);font-size:13.5px;line-height:1.7;}
+  .wb-today-empty b{color:var(--g-700);}
+  .wb-soon .wb-todo .t-name{font-weight:600;color:var(--s-700);}
+  .wb-soon .wb-todo .t-name b{color:var(--g-700);}
   /* 每日行情数据面板 */
   .wb-daily-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:4px;}
   .wb-dcard{background:#fff;border:1px solid var(--b-200,#e9efe9);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;}
@@ -697,6 +730,7 @@
     <div class="wb-side-kicker">功能</div>
     <div class="wb-side-title">功能切换</div>
     <nav class="wb-nav" id="wbNav">
+      <a href="#/today" data-route="today"><span class="wb-nav-mark">今</span><span>今日<small>今天该干啥 · 作业 · 待办</small></span></a>
       <a href="#/dashboard" data-route="dashboard"><span class="wb-nav-mark">总</span><span>总控看板<small>作业、风险、库存、经营</small></span></a>
       <a href="#/lands" data-route="lands"><span class="wb-nav-mark">地</span><span>地块中心<small>地块档案、筛选、详情管理</small></span></a>
       <a href="#/purchase" data-route="purchase"><span class="wb-nav-mark">采</span><span>采购测算<small>农资需求、库存缺口、金额</small></span></a>
@@ -1419,12 +1453,17 @@ function setActiveNav(route){
 function router(){
   var hash=location.hash.replace(/^#\/?/,'');
   var main=document.getElementById('wbMain');
+  if(!hash){
+    if(window.matchMedia('(max-width:980px)').matches){ location.hash='#/today'; return; }
+    setActiveNav('dashboard'); renderDashboard(main); return;
+  }
   if(hash.indexOf('land/')===0){
     setActiveNav('lands');
     renderLandDetail(main, hash.slice(5));
     return;
   }
   if(hash==='home'){ location.hash='#/dashboard'; return; }
+  if(hash==='today'){ setActiveNav('today'); renderToday(main); return; }
   if(hash==='dashboard'){ setActiveNav('dashboard'); renderDashboard(main); return; }
   if(hash==='lands'){ setActiveNav('lands'); renderLands(main); return; }
   if(hash==='dispatch'){ setActiveNav('dispatch'); renderDispatch(main); return; }
@@ -1516,6 +1555,98 @@ function mobileTodoPanel(openTasks){
   return '<div class="wb-panel wb-mtodo" style="margin-top:18px">'+
     '<div class="wb-list-head"><h3>工作待办事项</h3>'+
     '<button class="wb-btn wb-btn-primary" type="button" onclick="openGlobalTaskModal()">＋ 新建待办</button></div>'+rows+'</div>';
+}
+/* ============================================================
+   页面：今日行动（手机端首屏着陆页）
+   ============================================================ */
+function todayRecordDone(p){
+  var td=todayISO();
+  return getRecords().some(function(r){
+    return r.land_id===p.land.land_id && r.operate_date===td && (String(r.remark||'').indexOf(p.stage)>=0);
+  });
+}
+function markTodayDone(landId, stage){
+  var p=scalePlanItems(0).filter(function(x){return x.land.land_id===landId && x.stage===stage;})[0]
+     || scalePlanItems(3).filter(function(x){return x.land.land_id===landId && x.stage===stage;})[0];
+  if(!p || todayRecordDone(p)){ router(); return; }
+  var op=p.op||'';
+  var mats=planMaterials(p);
+  var doseTxt=mats.map(function(m){return m.name;}).join(' ');
+  var type=/肥|水肥|滴灌/.test(op)||/肥|水溶|营养|生长/.test(doseTxt)?'施肥':(/叶面|喷|防|菌|杀/.test(op)?'用药':'其他');
+  var dosage=mats.length?mats.map(function(m){return m.name+' '+m.dosage+'/亩';}).join('；'):(p.list||'');
+  addRecord({
+    land_id:p.land.land_id,
+    record_type:type,
+    operate_date:todayISO(),
+    material_name:(p.planName||'')+' · '+p.stage,
+    dosage:dosage,
+    method:op,
+    remark:p.stage+' · '+op
+  });
+  router();
+}
+function renderToday(main){
+  var today=todayISO();
+  var lands=getLands();
+  var active=lands.filter(function(l){return l.status==='planting';});
+  var bases={}; active.forEach(function(l){ if(l.base) bases[l.base]=1; });
+  var todayItems=scalePlanItems(0);
+  var soonItems=scalePlanItems(3).filter(function(p){return p.dueIn>0;});
+  var openTasks=getTasks().filter(function(t){return !t.done;});
+
+  var hero='<div class="wb-today-hero">'+
+    '<div class="th-date"><div class="th-d">'+esc(today)+'</div><div class="th-w">今日行动 · 数字农业工作台</div></div>'+
+    '<div class="th-stats">'+
+      '<div class="th-stat"><b>'+todayItems.length+'</b><span>今日作业</span></div>'+
+      '<div class="th-stat"><b>'+active.length+'</b><span>种植地块</span></div>'+
+      '<div class="th-stat"><b>'+Object.keys(bases).length+'</b><span>基地</span></div>'+
+      '<div class="th-stat"><b>'+openTasks.length+'</b><span>待办</span></div>'+
+    '</div></div>';
+
+  var actionHtml;
+  if(todayItems.length){
+    actionHtml=todayItems.map(function(p){
+      var mats=planMaterials(p);
+      var doseHtml=mats.length?mats.map(function(m){return '<span class="wb-tag">'+esc(m.name)+' '+esc(m.dosage)+'/亩</span>';}).join(''):'<span class="wb-muted">按方案巡田执行</span>';
+      var done=todayRecordDone(p);
+      var btn=done
+        ? '<span class="ta-done-flag">✓ 今日已完成</span>'
+        : '<button class="ta-done-btn" type="button" onclick="markTodayDone(\''+esc(p.land.land_id)+'\',\''+esc(p.stage)+'\')">✓ 标记完成</button>';
+      var doseLine='<div class="ta-dose">'+doseHtml+'</div>';
+      var mixLine=p.mix?'<div class="ta-mix">'+esc(p.mix)+'</div>':'';
+      return '<div class="wb-today-action'+(done?' is-done':'')+'">'+
+        '<div class="ta-top"><div class="ta-land"><a href="#/land/'+esc(p.land.land_id)+'">'+esc(p.land.name)+'</a>'+
+          '<small>'+esc(p.land.crop||'—')+' ｜ '+landAreaMu(p.land).toFixed(2)+' 亩</small></div>'+
+          '<span class="ta-stage">'+esc(p.stage)+'</span></div>'+
+        mixLine+doseLine+
+        '<div class="ta-foot"><span class="ta-op">'+esc(p.op||'作业')+'</span>'+btn+'</div>'+
+      '</div>';
+    }).join('');
+  } else {
+    actionHtml='<div class="wb-today-empty">🎉 <b>今日暂无集中作业窗口</b><br>可安排巡田、学习方案，或处理下方待办。未来 3 天有 '+soonItems.length+' 项作业将陆续进入窗口。</div>';
+  }
+
+  var soonHtml=soonItems.length?soonItems.map(function(p){
+    return '<div class="wb-todo"><span class="t-name"><b>'+p.dueIn+'天后</b> · <a href="#/land/'+esc(p.land.land_id)+'" style="color:var(--g-700);font-weight:700">'+esc(p.land.name)+'</a> · '+esc(p.stage)+'</span>'+
+      (p.dueDate?'<span class="t-meta">'+esc(p.dueDate)+'</span>':'')+'</div>';
+  }).join(''):'<div class="wb-empty">未来 3 天暂无新作业窗口。</div>';
+
+  var todoHtml=openTasks.length?openTasks.map(function(t){
+    var land=t.land_id?(getLand(t.land_id)||{}):{};
+    var due=t.due_date?esc(t.due_date):'';
+    var over=(t.due_date&&t.due_date<todayISO())?' · 逾期':'';
+    var sub=(land.name?esc(land.name):'')+(due?(' · '+due+over):'');
+    return '<div class="wb-todo"><button class="t-check'+(t.done?' done':'')+'" type="button" onclick="toggleTask(\''+esc(t.task_id)+'\');router()">'+(t.done?'✓':'○')+'</button>'+
+      '<span class="t-name">'+esc(t.title)+'</span>'+
+      (sub?'<span class="t-meta">'+sub+'</span>':'')+'</div>';
+  }).join(''):'<div class="wb-empty">暂无工作待办，点「＋ 新建待办」添加</div>';
+
+  main.innerHTML=hero+
+    '<div class="wb-today-section"><div class="wb-panel"><div class="wb-list-head"><h3>今日行动</h3>'+
+      (todayItems.length?'<span class="wb-muted">'+todayItems.length+' 项 · 点「标记完成」写入农事记录</span>':'')+'</div>'+actionHtml+'</div></div>'+
+    '<div class="wb-today-section"><div class="wb-panel wb-soon"><div class="wb-list-head"><h3>未来 3 天</h3><span class="wb-muted">即将进入作业窗口</span></div>'+soonHtml+'</div></div>'+
+    '<div class="wb-today-section"><div class="wb-panel"><div class="wb-list-head"><h3>工作待办事项</h3>'+
+      '<button class="wb-btn wb-btn-primary" type="button" onclick="openGlobalTaskModal()">＋ 新建待办</button></div>'+todoHtml+'</div></div>';
 }
 function statCard(label,value,unit){
   return '<div class="wb-stat"><div class="label">'+esc(label)+'</div><div class="value">'+esc(value)+'<span class="unit">'+esc(unit)+'</span></div></div>';
