@@ -82,6 +82,13 @@
   .acts li.done span{text-decoration:line-through;color:var(--muted)}
   .acts .pri{font-size:10px;font-weight:700;padding:1px 7px;border-radius:5px;margin-right:4px}
   .pri.p1{background:#fde2de;color:var(--bad)} .pri.p2{background:#fdf0d9;color:#a9690a}
+  /* procurement panel (⑧) */
+  .proc-kpi{background:#fff5f3;border:1px solid #f3ddd8;border-radius:10px;padding:10px 12px;text-align:center}
+  .proc-kpi b{display:block;font-size:22px;color:var(--pepper-dark);line-height:1.1}
+  .proc-kpi span{font-size:11.5px;color:var(--muted)}
+  .proc-block{background:#fff;border:1px solid #f0e3df;border-radius:10px;padding:10px 14px;margin-top:10px}
+  .proc-h{font-weight:800;font-size:13.5px;color:var(--pepper-dark);margin-bottom:5px}
+  .proc-li{font-size:13px;color:#333;line-height:1.7}
   /* reasoning */
   .reasons{display:grid;gap:10px}
   details.reason{border:1px solid #f0e3df;border-radius:10px;padding:0;background:#fff;overflow:hidden}
@@ -160,6 +167,12 @@
   <div class="reasons" id="reasons"></div>
 </section>
 
+<section>
+  <div class="sec-head"><span class="bar"></span><h2>⑧ 冷冬收购策略（提前海南收购）</h2>
+    <span class="sub">广西冷冬信号 → 持续关注 → 提前海南锁量锁价</span></div>
+  <div class="panel" id="procPanel"></div>
+</section>
+
 <div class="note" style="margin-top:18px">
   <a class="back" href="index.html">← 返回通用气候与市场决策引擎</a>
 </div>
@@ -209,6 +222,7 @@ let SIG = {
   sh:'异常强盛',
   typhoon:7,                // 影响海南下半年台风个数
   guangxiCold:50,           // 广西冷冬概率% (厄尔尼诺年华南偏暖，阶段性寒潮)
+  nanling:'强',             // 南岭屏障强度：强/中/弱（决定冷空气能否南压至海南本地）
   hainanArea:48,            // 海南椒类面积 万亩（已调减）
   springFestival:'2026-02-17', qingming:'2026-04-05'
 };
@@ -254,11 +268,21 @@ function weatherRisk(plant, westDry){
   if(westDry && SIG.enso==='强厄尔尼诺') drought = clamp(drought+10,0,100); // 秋冬偏旱
   return Math.round(typhoon*0.40 + disease*0.35 + drought*0.25);
 }
+// 冷冬 + 南岭屏障：拆出两个传导结果
+//  trans        = 广西冷冬→海南涨价传导强度（驱动价格/供给适配）
+//  hainanFreeze = 海南本地受冻风险（南岭屏障弱时冷空气南压）
+function coldWinterModel(){
+  var gc = SIG.guangxiCold;                          // 0-100
+  var mult = SIG.nanling==='强'?1.12 : SIG.nanling==='弱'?0.95 : 1.0;
+  var trans = Math.round(clamp(gc*mult, 0, 100));    // 海南涨价传导
+  var hainanFreeze = SIG.nanling==='强'?gc*0.10 : SIG.nanling==='中'?gc*0.32 : gc*0.72;
+  return {trans:trans, hainanFreeze:Math.round(clamp(hainanFreeze,0,100))};
+}
 // 供给适配：海南面积偏紧(+) + 广西冷冬传导(+) ；全国设施扩种为常压
 function supplyFit(){
   var area = SIG.hainanArea;
   var areaScore = area<=50?82 : area<=60?62 : area<=70?40 : 18; // 48万亩→82
-  var cold = SIG.guangxiCold;                                    // 越高越利好传导
+  var cold = coldWinterModel().trans;                           // 用传导强度（含南岭屏障调制）
   // 全国设施面积扩大→结构性抑制（基准扣10）
   var fit = areaScore*0.55 + cold*0.45 - 8;
   return Math.round(clamp(fit,0,100));
@@ -296,6 +320,7 @@ function buildSigInputs(){
     {k:'sh',label:'副热带高压',type:'sel',opts:['异常强盛','偏强','正常','偏弱'],hint:'带状稳定→光照足利膨果'},
     {k:'typhoon',label:'影响海南台风数',type:'num',hint:'下半年 6–8 个，末台10月下旬'},
     {k:'guangxiCold',label:'广西冷冬概率 %',type:'num',hint:'高→海南反季溢价传导'},
+    {k:'nanling',label:'南岭屏障强度',type:'sel',opts:['强','中','弱'],hint:'强→冷空气被挡、海南稳利收购'},
     {k:'hainanArea',label:'海南椒类面积 万亩',type:'num',hint:'2025-26 调减至48（临界~70）'}
   ];
   var html=defs.map(function(d){
@@ -318,6 +343,7 @@ function readSig(){
   SIG.sh=document.getElementById('sig_sh').value;
   SIG.typhoon=+document.getElementById('sig_typhoon').value;
   SIG.guangxiCold=+document.getElementById('sig_guangxiCold').value;
+  SIG.nanling=document.getElementById('sig_nanling').value;
   SIG.hainanArea=+document.getElementById('sig_hainanArea').value;
 }
 
@@ -327,6 +353,7 @@ function renderHero(){
     '<span>观测日 <b>'+TODAY+'</b></span>'+
     '<span>ENSO <b>'+esc(SIG.enso)+'</b>（NINO3.4 +'+SIG.nino34+'℃）</span>'+
     '<span>海南椒类 <b>'+SIG.hainanArea+'万亩</b>（调减利好）</span>'+
+    '<span>冷冬传导 <b>'+coldWinterModel().trans+'/100</b>（南岭'+SIG.nanling+'）</span>'+
     '<span>供给适配 <b>'+sf+'/100</b></span>';
 }
 
@@ -391,10 +418,13 @@ function renderVariety(){
 
 function renderFactors(){
   var sf=supplyFit();
+  var cwm=coldWinterModel();
+  var nanLabel = SIG.nanling==='强'?'屏障强·广西冻海南稳':SIG.nanling==='弱'?'屏障弱·海南亦受冻':'屏障中';
   var factors=[
     {n:'季节/反季窗口（春节+清明峰）', v:88, c:'var(--ok)', t:'反季节核心溢价来源'},
     {n:'海南本地供给（面积偏紧）', v:sf, c:sf>=60?'var(--ok)':'var(--warn)', t:'48万亩已调减，偏紧利好'},
-    {n:'广西冷冬→海南涨价传导', v:SIG.guangxiCold, c:SIG.guangxiCold>=60?'var(--ok)':SIG.guangxiCold>=40?'var(--warn)':'var(--bad)', t:'暖冬则两广撞车利空'},
+    {n:'广西冷冬→海南涨价传导', v:cwm.trans, c:cwm.trans>=60?'var(--ok)':cwm.trans>=40?'var(--warn)':'var(--bad)', t:'南岭'+nanLabel+'：'+ (SIG.nanling==='强'?'纯价差套利空间最大':'屏障弱，海南亦受冻，紧迫性升高')},
+    {n:'海南本地受冻风险', v:cwm.hainanFreeze, c:cwm.hainanFreeze>=50?'var(--bad)':cwm.hainanFreeze>=25?'var(--warn)':'var(--neutral)', t:SIG.nanling==='强'?'南岭屏障强，冷空气难南压，海南基本不受冻':'南岭屏障弱，冷空气南压，海南作物亦需防护'},
     {n:'ENSO 西部偏旱（需水肥一体）', v:SIG.enso==='强厄尔尼诺'?72:40, c:'var(--warn)', t:'东方/昌江秋冬季偏旱'},
     {n:'台风/降雨（9月偏多）', v:clamp(SIG.typhoon*11,0,100), c:'var(--bad)', t:SIG.typhoon+'个影响海南，末台10月下旬'},
     {n:'全国设施辣椒扩种（常压）', v:55, c:'var(--warn)', t:'两广/云南/福建设施面积扩大'},
@@ -419,6 +449,9 @@ function renderConclusion(planRes, varRows){
     '<div class="line">• <b>何时种：</b>'+plantMsg+'。盛产期 '+bestPlan.first.slice(5)+' 起，精准覆盖春节('+SIG.springFestival.slice(5)+')与清明前('+SIG.qingming.slice(5)+')价格双峰；避开 9 月台风雨偏多风险窗口。</div>'+
     '<div class="line">• <b>种什么：</b>综合溢价/抗病/需求/基地适配，<b>'+esc(bestVar.v.name)+'</b> 居首（'+bestVar.s+'分）。东方优先朝天椒/红线椒，昌江优先特色紫黄线椒差异化溢价、避同质化滞销。</div>'+
     '<div class="line">• <b>价格怎么走：</b>海南椒类面积已由 71.6 万亩调减至 '+SIG.hainanArea+' 万亩（偏紧利好）；但需盯<strong>广西冷冬概率（'+SIG.guangxiCold+'%）</strong>——暖冬则两广提前上市"撞车"、反季优势失效，价格承压。</div>'+
+    (SIG.guangxiCold>=40
+      ? '<div class="line">• <b>提前海南收购：</b>冷冬信号已现（南岭屏障'+SIG.nanling+'）→ 一旦广西现阶段性寒潮即<strong>持续关注并启动收购</strong>，于 12–1 月在海南提前锁量锁价（建议覆盖预期销量 '+recommendPrebuy(coldWinterModel())+'%），吃反季价差。详见 ⑧ 冷冬收购策略。</div>'
+      : '')+
     '<div class="line">• <b>风险对冲：</b>强厄尔尼诺下西部秋冬季偏旱，必须配套水肥一体化滴灌；台风季前设施/排水提前到位，雨后必喷铜制剂防青枯/疫病。</div>'+
     '<span class="conf">决策置信度：'+conf+'（信号确定度 '+sf+'/100 供给适配）</span>';
   document.getElementById('concl').innerHTML=html;
@@ -434,10 +467,69 @@ function renderActions(planRes){
     {p:'p2', t:'建立出岛价格监测：盯三亚发改委/一亩田每日收购价，广西冷冬信号转强即上调预期'},
     {p:'p2', t:'雨后必喷铜制剂（氢氧化铜/枯草芽孢杆菌）防青枯病、疫病；现配现用二次稀释'}
   ];
+  // 冷冬信号出现 → 追加提前海南收购行动项
+  if(SIG.guangxiCold>=40){
+    var cwm=coldWinterModel();
+    var nanNote = SIG.nanling==='强'?'（南岭屏障强·海南稳·低买高卖价差）':'（南岭屏障弱·海南亦受冻·优先抢锁产地量）';
+    items.push({p:'p1', t:'【冷冬收购】持续关注广西/粤西最低气温与海南收购价（每周2次），出现阶段性寒潮/霜冻即启动海南收购'});
+    items.push({p:'p1', t:'【冷冬收购】于广西冻害兑现前（12 月–1 月）在海南提前锁定收购量与保底价，吃反季价差'+nanNote});
+    items.push({p:'p2', t:'【冷冬收购】对接东方/昌江产地代办与冷库，落实提前收购的仓储与资金预案（建议覆盖预期销量 '+recommendPrebuy(cwm)+'%）'});
+  }
   document.getElementById('acts').innerHTML=items.map(function(it,i){
     return '<li><input type="checkbox" id="act'+i+'" onchange="this.parentNode.classList.toggle(\'done\',this.checked)">'+
       '<span><span class="pri '+it.p+'">'+it.p.toUpperCase()+'</span>'+esc(it.t)+'</span></li>';
   }).join('');
+}
+
+// 建议提前收购覆盖比例（%）：屏障强→价差套利 50–75%；屏障弱→紧迫锁量 68–92%
+function recommendPrebuy(cwm){
+  if(SIG.nanling==='强') return Math.round(clamp(50 + cwm.trans*0.25, 50, 75));
+  if(SIG.nanling==='弱') return Math.round(clamp(68 + cwm.trans*0.20, 68, 92));
+  return Math.round(clamp(55 + cwm.trans*0.20, 55, 82));
+}
+
+// ⑧ 冷冬收购策略面板
+function renderProcurement(){
+  var cwm=coldWinterModel();
+  var active = SIG.guangxiCold>=40;
+  var monitor = SIG.guangxiCold>=60?'高（每周2次 + 寒潮预警即启动）'
+              : SIG.guangxiCold>=40?'中（每周2次监测）'
+              : SIG.guangxiCold>=25?'低（持续留意）':'待命（无冷冬信号）';
+  var ppPct = recommendPrebuy(cwm);
+  var nanInterpret = SIG.nanling==='强'
+    ? '南岭屏障<strong>强</strong>：冷空气被挡在 24°N 以北，广西/广东冻害、海南（18–20°N）基本不受冻 → 海南成为<strong>唯一反季节供给方</strong>，提前收购是"低买高(后期)卖"的价差套利。'
+    : SIG.nanling==='弱'
+    ? '南岭屏障<strong>弱</strong>：冷空气南压至海南，海南本地亦受冻、供给同步收缩 → 价格更暴涨但<strong>海南产量风险上升</strong>，提前收购要抢在海南冻害前锁量，紧迫性更高。'
+    : '南岭屏障<strong>中</strong>：冷空气部分南压，海南边缘地带有轻冻风险，介于上述两者之间。';
+  var badge = active
+    ? '<span class="pill h">冷冬信号出现 ✅</span>'
+    : '<span class="pill l">冷冬信号未出现</span>';
+  var html=
+    '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">'+badge+
+      '<span class="pill m">监控强度：'+monitor+'</span>'+
+      (active?'<span class="pill h">建议提前海南收购</span>':'')+'</div>'+
+    (active
+      ? '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px">'+
+        '<div class="proc-kpi"><b>'+cwm.trans+'</b><span>海南涨价传导</span></div>'+
+        '<div class="proc-kpi"><b>'+cwm.hainanFreeze+'</b><span>海南受冻风险</span></div>'+
+        '<div class="proc-kpi"><b>'+ppPct+'%</b><span>建议提前收购覆盖</span></div>'+
+        '<div class="proc-kpi"><b>12–1月</b><span>提前收购窗口</span></div>'+
+      '</div>'+
+      '<div class="proc-block"><div class="proc-h">一、持续关注机制（一旦出现冷冬信号即启动）</div>'+
+        '<div class="proc-li">• 监测对象：广西/粤西最低气温、霜冻预警，海南（东方/昌江）每日收购价。</div>'+
+        '<div class="proc-li">• 频率：广西出现阶段性寒潮即<strong>触发收购</strong>；常态每周 2 次滚动更新预期。</div>'+
+        '<div class="proc-li">• 判断标准：广西蔬菜产区现霜冻/持续低温 → 南菜北运缺口扩大 → 海南反季溢价启动，立即执行收购。</div>'+
+      '</div>'+
+      '<div class="proc-block"><div class="proc-h">二、提前在海南收购（锁量锁价）</div>'+
+        '<div class="proc-li">• 窗口：广西冻害兑现<strong>前</strong>（通常 12 月–1 月）于海南下单，吃反季价差，避免冻后价格已涨。</div>'+
+        '<div class="proc-li">• 比例：建议覆盖预期销量的 <strong>'+ppPct+'%</strong>'+(SIG.nanling==='弱'?'（屏障弱、紧迫，比例偏高）':'（屏障强、价差稳，可分步建仓）')+'。</div>'+
+        '<div class="proc-li">• 锁价：与产地代办/合作社签保底收购价，对接冷库仓储，落实资金预案，防冻后抢货推高成本。</div>'+
+      '</div>'+
+      '<div class="proc-block"><div class="proc-h">三、南岭屏障的影响</div>'+
+        '<div class="proc-li">'+nanInterpret+'</div>'+
+      '</div>'
+      : '<div class="note">当前广西冷冬概率（'+SIG.guangxiCold+'%）低于 40%，<strong>尚未触发冷冬收购策略</strong>。一旦该信号转强（阶段性寒潮/霜冻预报出现），本模块将自动激活"持续关注 + 提前海南收购"流程。平日仍建议保持海南收购价周度监测。</div>');
+  document.getElementById('procPanel').innerHTML=html;
 }
 
 function renderReasons(){
@@ -454,6 +546,10 @@ function renderReasons(){
      why:'广西/广东/云南降温→南方辣椒减产→"南菜北运"缺口→海南反季节溢价。暖冬则两广辣椒提前上市与海南"撞车"，海南失反季优势、价格暴跌（2025 春节后螺丝椒/泡椒跌至 0.2–0.3 元/斤）。故广西冷冬概率是本决策最关键外部变量。',
      en:'A cold winter in Guangxi/Yunnan reduces southern supply, raising Hainan off-season prices; a warm winter causes overlap with Guangxi harvests and collapses Hainan prices.',
      src:'央广网/中国新闻网 寒潮菜价报道；用户"广西冷冬→海南涨价传导"框架'},
+    {t:'南岭屏障如何左右"冷冬→海南涨价"的传导？',
+     why:'南岭（约 24°N）是华南气候分界线，阻挡冷空气南压。屏障强时，广西/广东冻害、海南（18–20°N）基本不受冻→海南成为唯一反季节供给方，价差套利空间最大；屏障弱时冷空气南压至海南，海南本地亦受冻、供给同步收缩，价格更暴涨但海南产量风险上升。两种情形下"提前在海南收购"都成立：强屏障是低买高卖价差，弱屏障是抢在海南冻害前锁量。引擎将"广西冷冬概率 × 南岭屏障"拆成「海南涨价传导」与「海南本地受冻风险」两个量分别驱动价格与风险。',
+     en:'The Nanling range (~24°N) blocks cold-air incursion. A strong barrier confines the Guangxi freeze while Hainan stays warm → Hainan is the sole off-season supplier (max spread); a weak barrier lets cold reach Hainan → Hainan supply also shrinks (price spikes but local crop risk rises). Pre-purchasing Hainan chili is warranted in both cases.',
+     src:'中央气象台寒潮路径分析；用户"广西冷冬→海南涨价传导"框架 + 南岭地理屏障研究'},
     {t:'强厄尔尼诺对东方/昌江的具体影响？',
      why:'2026 强厄尔尼诺（NINO3.4 +2.45℃，11 月峰值 +3.85℃）下，海南西部 9 月单月台风雨偏多、秋冬季偏旱趋势。早播（8–9 月）苗期遇高湿→疫病/青枯风险高；全期需水肥一体化应对偏旱；台风影响海南 6–8 个、末台 10 月下旬需防护。',
      en:'Under strong El Niño, Hainan\'s west sees more September typhoon rain but an autumn–winter drought trend; integrated drip irrigation and pre-typhoon protection are required.',
@@ -483,6 +579,7 @@ function recompute(){
   renderFactors();
   renderConclusion(planRes, varRows);
   renderActions(planRes);
+  renderProcurement();
   renderReasons();
 }
 
