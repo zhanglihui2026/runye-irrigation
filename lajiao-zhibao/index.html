@@ -62,8 +62,9 @@
     border-top:5px solid var(--c);transition:transform .2s;display:flex;flex-direction:column}
   .card:hover{transform:translateY(-5px)}
   .card h3{margin:4px 0 6px;font-size:15.5px;color:var(--text)}
-  .card .ico{font-size:22px}
   .card p.detail-desc{font-size:12.5px;color:var(--muted);line-height:1.6;margin-top:2px}
+  .dose-tip{font-size:11.5px;color:#9a4a00;background:#fff5e6;border:1px solid #ffd9a0;
+    border-radius:8px;padding:7px 9px;margin-top:auto;line-height:1.5}
   .dose{border-top:1px dashed var(--line);margin-top:12px;padding-top:10px}
   .dose-row{display:grid;grid-template-columns:1fr auto;gap:3px 10px;align-items:baseline;
     padding:5px 0;border-bottom:1px solid #f2efea}
@@ -72,8 +73,8 @@
   .dose-name small{font-weight:500;color:var(--muted);margin-left:4px;font-size:11px}
   .dose-amt{font-size:12.5px;font-weight:800;color:var(--text);white-space:nowrap;text-align:right}
   .dose-note{grid-column:1 / -1;font-size:11.5px;color:var(--muted);line-height:1.5;margin-top:1px}
-  .dose-tip{font-size:11.5px;color:#9a4a00;background:#fff5e6;border:1px solid #ffd9a0;
-    border-radius:8px;padding:7px 9px;margin-top:10px;line-height:1.5}
+
+  /* TABLES */
 
   /* TABLES */
   .plan-block{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);
@@ -81,7 +82,7 @@
   .plan-head{background:var(--pepper-soft);padding:13px 20px;display:flex;align-items:center;gap:14px}
   .plan-head h3{font-size:18px;color:var(--text)}
   .tbl-scroll{overflow-x:auto}
-  table{width:100%;border-collapse:collapse;font-size:13px;min-width:680px}
+  table{width:100%;border-collapse:collapse;font-size:13px;min-width:780px}
   thead th{background:var(--text);color:#fff;padding:10px 11px;text-align:left;font-weight:600;white-space:nowrap}
   tbody td{padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top}
   tbody tr:hover{background:#fcfbf6}
@@ -92,17 +93,19 @@
   .phi{color:var(--muted);white-space:nowrap}
   tfoot td{background:var(--pepper-light);font-weight:800;padding:11px;color:var(--pepper-dark)}
 
-  /* 操作历 */
-  .stage-row td{background:var(--pepper-soft);font-weight:800;color:var(--pepper-dark);
-    padding:8px 12px;letter-spacing:.5px}
-  #schedule table thead th:nth-child(1){width:150px;min-width:150px;white-space:normal}
-  #schedule table thead th:nth-child(2){width:120px;min-width:120px;white-space:normal;text-align:center}
-  #schedule table thead th:nth-child(3){width:78px;min-width:78px;white-space:normal;text-align:center}
-  #schedule table thead th:nth-child(4){width:84px;min-width:84px;white-space:normal;text-align:center}
+  /* 操作历 — 列宽按内容权重分配：时间 / 方式 / 种数 / 明细(最宽) / 混配 */
+  #schedule table thead th:nth-child(1){width:130px;min-width:130px;white-space:normal}
+  #schedule table thead th:nth-child(2){width:100px;min-width:100px;white-space:normal;text-align:center}
+  #schedule table thead th:nth-child(3){width:60px;min-width:60px;white-space:normal;text-align:center}
+  #schedule table thead th:nth-child(4){width:auto;min-width:280px;white-space:normal;text-align:left}
+  #schedule table thead th:nth-child(5){width:200px;min-width:160px;white-space:normal;text-align:left}
   #schedule table tbody td:nth-child(2){text-align:center;vertical-align:middle;font-weight:600}
   #schedule table tbody td:nth-child(3){text-align:center;vertical-align:middle;white-space:nowrap}
-  #schedule table tbody td:nth-child(4){text-align:center;vertical-align:middle;white-space:nowrap}
-  #schedule table tbody td{font-size:12px;padding:8px 10px}
+  #schedule table tbody td:nth-child(4){text-align:left;vertical-align:top}   /* 明细左靠齐 */
+  #schedule table tbody td:nth-child(5){text-align:left;vertical-align:top;font-size:11.5px}
+  #schedule table tbody td{font-size:12px;padding:7px 10px}
+  .stage-row td{background:var(--pepper-soft);font-weight:800;color:var(--pepper-dark);
+    padding:8px 12px;letter-spacing:.5px}
   #schedule table tbody tr.stage-row td{font-size:13px}
   .npill{font-size:11px;padding:2px 8px;border-radius:12px;font-weight:700;display:inline-block;margin:0 4px 4px 0}
   .npill.g{background:var(--leaf-light);color:var(--leaf-dark)}
@@ -407,9 +410,9 @@ const schedule = [
            '线虫':['10%噻唑磷颗粒剂 1.5–2 kg/亩 植前穴施','或 5%辛硫磷颗粒剂 3–4 kg/亩 深埋'] },
     mix:'生石灰与基肥间隔 ≥7 天；碱性强，勿与铵态氮/菌剂同施；地块 3 年内未种茄科作物。',
     flags:['独立'] },
-  { group:'整地消毒期', dayText:'定植前 7–1 天', dayMin:-7, dayMax:-1, op:'底肥·撒施', count:'2 项',
-    cats:{ '肥菌':['硫酸钾复合肥 30–50 kg/亩','优质有机肥 300–500 kg/亩'] },
-    mix:'撒施后旋耕；覆膜前施入；与生石灰处理错开。',
+  { group:'整地消毒期', dayText:'定植前 7–1 天', dayMin:-7, dayMax:-1, op:'底肥·撒施', count:'3 项',
+    cats:{ '肥菌':['硫酸钾复合肥(15-15-15) 30–50 kg/亩','优质腐熟有机肥 300–500 kg/亩','中微量元素(硼·锌·钙镁) 1–2 kg/亩'] },
+    mix:'三者混匀同施，撒施后旋耕入土、覆膜前施入；与生石灰消毒错开 ≥7 天；严禁种肥触根。',
     flags:[] },
   { group:'苗床送嫁期', dayText:'定植前 5–3 天', dayMin:-5, dayMax:-3, op:'叶面/灌根', count:'2 项',
     cats:{ '杀虫':['25%噻虫嗪 7–15 g/亩（或 3000 倍液）'],
@@ -425,6 +428,11 @@ const schedule = [
            '杀虫':['30%度锐(噻虫嗪·氯虫) 1500倍液'] },
     mix:'防褐斑、灰霉、蓟马、粉虱；现配现用，二次稀释。',
     flags:[] },
+  { group:'发棵期·水肥', dayText:'定植后 8–25 天', dayMin:8, dayMax:25, op:'滴灌追肥', count:'2 项',
+    cats:{ '肥菌':['平衡型水溶肥(N-P-K 20-20-20) 2 kg/亩'],
+           '营养':['糖醇钙镁 1 kg/亩'] },
+    mix:'分次滴灌，促茎叶与根系；弱苗地块适当增量，旺长地块控氮防徒长；随水施肥、少量多次。',
+    flags:[] },
   { group:'开花前预防', dayText:'定植后 15–25 天', dayMin:15, dayMax:25, op:'叶面', count:'3 项',
     cats:{ '杀菌':['80%代森锰锌 150–200 g/亩','32.5%苯甲·嘧菌酯(阿米妙收) 1000倍液'],
            '杀虫':['10%吡虫啉 1500–2000倍液'] },
@@ -438,12 +446,22 @@ const schedule = [
            '杀螨':['15%哒螨灵 2000倍液(茶黄螨/红蜘蛛)'] },
     mix:'建议分 2 桶：桶① 真菌+病毒+细菌(铜)；桶② 杀虫+杀螨。降雨后必喷铜制剂防细菌病；病毒病以防虫传毒为关键；钻心虫重点喷果柄。苯醚甲环唑含三唑，避免与其他三唑类叠加。',
     flags:['偏多','三唑','雨后必喷'] },
+  { group:'开花坐果·核心期', dayText:'定植后 26–45 天', dayMin:26, dayMax:45, op:'滴灌追肥', count:'2 项',
+    cats:{ '肥菌':['平衡型水溶肥 2 kg/亩'],
+           '营养':['糖醇钙镁 1 kg/亩'] },
+    mix:'花果同需肥高峰前补给；钙镁同施防脐腐；与叶面药错开施用，避免拮抗与烧叶。',
+    flags:[] },
   { group:'盛果期·轮换', dayText:'定植后 55–75 天', dayMin:55, dayMax:75, op:'叶面', count:'6 种',
     cats:{ '真菌':['25%吡唑醚菌酯 1500–2000倍液(炭疽/白粉)','50%咪鲜胺锰盐 1500–2000倍液'],
            '细菌':['20%噻菌铜 400–500倍液'],
            '杀虫':['1%甲维盐 10–20 mL/亩(钻心虫)','21%噻虫嗪 10–18 mL/亩(蓟马)'],
            '营养':['磷酸二氢钾 30–50 g/亩 + 糖醇钙 + 流体硼(防脐腐/促果)'] },
     mix:'轮换用药防抗性：烯酰吗啉↔吡唑醚菌酯、氯虫↔甲维盐交替；钙硼同喷防脐腐与烂果。',
+    flags:['轮换'] },
+  { group:'盛果期·轮换', dayText:'定植后 46–90 天', dayMin:46, dayMax:90, op:'滴灌追肥', count:'2 项',
+    cats:{ '肥菌':['高钾型水溶肥(N-P-K 12-8-40) 2 kg/亩'],
+           '营养':['糖醇钙镁 2 kg/亩'] },
+    mix:'高钾促膨果、增甜、防脐腐；采收期每 7–10 天一次随水施肥，少量多次；雨后加强疫病巡查。',
     flags:['轮换'] },
   { group:'采收前·安全停药', dayText:'采收前 7–15 天', dayMin:80, dayMax:9999, op:'生物/物理', count:'收尾',
     cats:{ '营养':['5%氨基寡糖素 40–50 mL/亩(抗逆)'],
@@ -487,7 +505,7 @@ function renderOverview(){
              '<span class="dose-amt">'+esc(d.d)+'</span></div>';
     }).join('');
     var tip = o.tip ? '<div class="dose-tip">'+esc(o.tip)+'</div>' : '';
-    return '<div class="card" style="--c:'+o.c+'"><div class="ico">'+o.ico+'</div>'+
+    return '<div class="card" style="--c:'+o.c+'">'+
       '<h3>'+esc(o.title)+'</h3><p class="detail-desc">'+esc(o.desc)+'</p>'+
       '<div class="dose">'+rows+'</div>'+tip+'</div>';
   }).join('');
