@@ -325,8 +325,9 @@
     #wbNav a[data-route="purchase"],
     #wbNav a[data-route="reports"],
     #wbNav a[href="peanut-tool.html"]{display:none;}
-    /* 侧栏动作中隐藏「植保方案」入口（对应植保决策） */
+    /* 侧栏动作中隐藏「植保方案」入口（对应植保决策）；辣椒植保同步隐藏，与七彩花生对称 */
     .wb-side-actions a[href="qicai-huasheng/index.html"]{display:none;}
+    .wb-side-actions a[href="lajiao-zhibao/index.html"]{display:none;}
     /* 侧栏动作中的「物资库」与切换栏重复，移动端仅保留最常用的「新建地块」 */
     .wb-side-actions button[onclick*="#/materials"]{display:none;}
     /* 移动端专属：显示工作待办事项块，收起偏重的经营/采购面板 */
@@ -706,7 +707,8 @@
     <div class="wb-side-actions">
       <button type="button" onclick="openNewLandModal()">新建地块</button>
       <button type="button" onclick="location.hash='#/materials'">物资库</button>
-      <a href="qicai-huasheng/index.html">植保方案</a>
+      <a href="qicai-huasheng/index.html">七彩花生植保</a>
+      <a href="lajiao-zhibao/index.html">辣椒植保方案</a>
     </div>
   </aside>
   <main class="wrap wb-main" id="wbMain"><!-- 路由内容注入 --></main>

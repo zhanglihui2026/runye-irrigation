@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>辣椒全程植保技术方案</title>
+<style>
+  :root{
+    --pepper:#c0392b; --pepper-dark:#7b241c; --pepper-light:#fdecea;
+    --pepper-soft:#fbeeec;
+    --leaf:#2e7d32; --leaf-dark:#1b5e20; --leaf-light:#e8f5e9;
+    --earth:#8d6e3c; --water:#2b7bb0; --gold:#f4a318;
+    --bg:#fbfaf6; --card:#ffffff; --text:#2b2b27; --muted:#6b6b63;
+    --line:#e6e2d8; --shadow:0 6px 24px rgba(120,20,15,.08);
+    --radius:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",Segoe UI,Roboto,sans-serif;
+    background:var(--bg);color:var(--text);line-height:1.62;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+
+  /* NAV */
+  nav{position:sticky;top:0;z-index:50;background:rgba(251,250,246,.94);
+    backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
+    box-shadow:0 3px 14px rgba(120,20,15,.08)}
+  .nav-inner{display:flex;align-items:center;justify-content:space-between;height:56px}
+  .brand{font-weight:800;font-size:17px;display:flex;align-items:center;gap:8px}
+  .brand .dot{width:14px;height:14px;border-radius:50%;
+    background:conic-gradient(#c0392b,#e67e22,#f1c40f,#2e7d32,#2b7bb0,#8e44ad,#c0392b)}
+  .nav-links{display:flex;gap:18px;font-size:13.5px;font-weight:600}
+  .nav-links a{color:var(--muted);transition:color .2s}
+  .nav-links a:hover,.nav-links a.active{color:var(--pepper)}
+  .nav-toggle{display:none;font-size:22px;background:none;border:none;cursor:pointer;color:var(--pepper)}
+
+  /* HERO */
+  .hero{position:relative;color:#fff;overflow:hidden;border-radius:0 0 28px 28px;
+    background:linear-gradient(135deg,#7b241c 0%,#c0392b 55%,#e67e22 100%)}
+  .hero::after{content:"";position:absolute;inset:0;
+    background:radial-gradient(circle at 80% 20%,rgba(255,255,255,.18),transparent 45%)}
+  .hero-inner{position:relative;z-index:2;padding:60px 20px 50px;text-align:center}
+  .hero h1{font-size:clamp(25px,4.3vw,40px);font-weight:900;letter-spacing:1px;
+    text-shadow:0 3px 18px rgba(0,0,0,.35)}
+  .hero p.sub{margin-top:12px;font-size:clamp(14px,2.2vw,17px);opacity:.96}
+  .hero .chips{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:26px}
+  .chip{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.32);
+    padding:13px 20px;border-radius:14px;backdrop-filter:blur(4px);min-width:140px}
+  .chip b{display:block;font-size:clamp(20px,3.4vw,28px);font-weight:800}
+  .chip span{font-size:clamp(12px,1.7vw,14px);opacity:.92}
+
+  /* SECTIONS */
+  section{padding:46px 0}
+  .sec-head{text-align:center;margin-bottom:28px}
+  .sec-head .k{display:inline-block;font-size:13px;font-weight:700;letter-spacing:2px;
+    color:var(--pepper);background:var(--pepper-light);padding:4px 14px;border-radius:20px}
+  .sec-head h2{font-size:clamp(20px,3vw,27px);font-weight:900;margin-top:12px}
+  .sec-head p{color:var(--muted);max-width:760px;margin:12px auto 0;font-size:14px}
+
+  /* OVERVIEW CARDS */
+  .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  .card{background:var(--card);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow);
+    border-top:5px solid var(--c);transition:transform .2s;display:flex;flex-direction:column}
+  .card:hover{transform:translateY(-5px)}
+  .card h3{margin:4px 0 6px;font-size:15.5px;color:var(--text)}
+  .card .ico{font-size:22px}
+  .card p.detail-desc{font-size:12.5px;color:var(--muted);line-height:1.6;margin-top:2px}
+  .dose{border-top:1px dashed var(--line);margin-top:12px;padding-top:10px}
+  .dose-row{display:grid;grid-template-columns:1fr auto;gap:3px 10px;align-items:baseline;
+    padding:5px 0;border-bottom:1px solid #f2efea}
+  .dose-row:last-child{border-bottom:0}
+  .dose-name{font-size:12.5px;font-weight:700;color:var(--c)}
+  .dose-name small{font-weight:500;color:var(--muted);margin-left:4px;font-size:11px}
+  .dose-amt{font-size:12.5px;font-weight:800;color:var(--text);white-space:nowrap;text-align:right}
+  .dose-note{grid-column:1 / -1;font-size:11.5px;color:var(--muted);line-height:1.5;margin-top:1px}
+  .dose-tip{font-size:11.5px;color:#9a4a00;background:#fff5e6;border:1px solid #ffd9a0;
+    border-radius:8px;padding:7px 9px;margin-top:10px;line-height:1.5}
+
+  /* TABLES */
+  .plan-block{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);
+    overflow:hidden;margin-bottom:26px;border-top:5px solid var(--pepper)}
+  .plan-head{background:var(--pepper-soft);padding:13px 20px;display:flex;align-items:center;gap:14px}
+  .plan-head h3{font-size:18px;color:var(--text)}
+  .tbl-scroll{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:13px;min-width:680px}
+  thead th{background:var(--text);color:#fff;padding:10px 11px;text-align:left;font-weight:600;white-space:nowrap}
+  tbody td{padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+  tbody tr:hover{background:#fcfbf6}
+  .pd{font-weight:700;color:var(--text)}
+  .pd small{font-weight:500;color:var(--muted);font-size:11.5px}
+  .target{color:var(--pepper-dark);font-weight:600}
+  .dose-cell{white-space:nowrap;font-weight:700;color:var(--water)}
+  .phi{color:var(--muted);white-space:nowrap}
+  tfoot td{background:var(--pepper-light);font-weight:800;padding:11px;color:var(--pepper-dark)}
+
+  /* 操作历 */
+  .stage-row td{background:var(--pepper-soft);font-weight:800;color:var(--pepper-dark);
+    padding:8px 12px;letter-spacing:.5px}
+  #schedule table thead th:nth-child(1){width:150px;min-width:150px;white-space:normal}
+  #schedule table thead th:nth-child(2){width:120px;min-width:120px;white-space:normal;text-align:center}
+  #schedule table thead th:nth-child(3){width:78px;min-width:78px;white-space:normal;text-align:center}
+  #schedule table thead th:nth-child(4){width:84px;min-width:84px;white-space:normal;text-align:center}
+  #schedule table tbody td:nth-child(2){text-align:center;vertical-align:middle;font-weight:600}
+  #schedule table tbody td:nth-child(3){text-align:center;vertical-align:middle;white-space:nowrap}
+  #schedule table tbody td:nth-child(4){text-align:center;vertical-align:middle;white-space:nowrap}
+  #schedule table tbody td{font-size:12px;padding:8px 10px}
+  #schedule table tbody tr.stage-row td{font-size:13px}
+  .npill{font-size:11px;padding:2px 8px;border-radius:12px;font-weight:700;display:inline-block;margin:0 4px 4px 0}
+  .npill.g{background:var(--leaf-light);color:var(--leaf-dark)}
+  .npill.w{background:#dcecf6;color:var(--water)}
+  .npill.e{background:#f3ead9;color:var(--earth)}
+  .npill.r{background:var(--pepper-light);color:var(--pepper-dark)}
+  .npill.k{background:#efe7f7;color:#6a3d9a}
+  .mix{font-size:12px;color:var(--muted);line-height:1.6;margin-top:6px}
+  .mix b{color:var(--text)}
+  .flag{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:12px;margin:0 4px 4px 0}
+  .flag.偏多{background:#fdecea;color:var(--pepper-dark);border:1px solid #f3bcb5}
+  .flag.三唑{background:#fff5e6;color:#9a6b00;border:1px solid #ffd9a0}
+  .flag.独立{background:#eef6ee;color:var(--leaf-dark);border:1px solid #cfe6cf}
+  .flag.雨后必喷{background:#e6f0f7;color:var(--water);border:1px solid #c2dcef}
+  .flag.轮换{background:#efe7f7;color:#6a3d9a;border:1px solid #ddcdf0}
+  .flag.控旺{background:#f3ead9;color:var(--earth);border:1px solid #e2d2b3}
+  .flag.可选{background:#eef0f2;color:#555;border:1px solid #d7dade}
+  .flag.安全停药{background:#e8f5e9;color:var(--leaf-dark);border:1px solid #bfe3c2}
+
+  /* COST */
+  .cost-grid{display:grid;grid-template-columns:300px 1fr;gap:30px;align-items:center;
+    background:var(--card);border-radius:var(--radius);padding:28px;box-shadow:var(--shadow)}
+  .donut{width:210px;height:210px;border-radius:50%;margin:0 auto;position:relative;
+    background:conic-gradient(var(--pepper) 0 32%,var(--water) 32% 58%,var(--earth) 58% 76%,
+      var(--gold) 76% 84%,#8e44ad 84% 90%,var(--leaf) 90% 100%)}
+  .donut::after{content:"";position:absolute;inset:30px;background:var(--card);border-radius:50%;
+    box-shadow:inset 0 0 0 1px var(--line)}
+  .donut .center{position:absolute;inset:0;display:grid;place-content:center;text-align:center;z-index:2}
+  .donut .center b{font-size:20px;font-weight:900;color:var(--text);line-height:1.2}
+  .donut .center span{font-size:12px;color:var(--muted)}
+  .legend{display:flex;flex-direction:column;gap:11px}
+  .lg{display:flex;align-items:center;gap:12px}
+  .lg .sw{width:16px;height:16px;border-radius:5px;flex:none}
+  .lg .nm{flex:1;font-weight:700}
+  .lg .vl{font-weight:800;color:var(--text)}
+  .lg .pc{color:var(--muted);font-size:12px;width:54px;text-align:right}
+  .cost-note{font-size:12px;color:var(--muted);margin-top:14px;line-height:1.7;
+    background:#f7f6f2;border:1px solid var(--line);border-left:4px solid var(--pepper);
+    border-radius:10px;padding:12px 14px}
+
+  /* NOTES */
+  .notes{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+  .note{background:var(--card);border-radius:12px;padding:16px 18px;box-shadow:var(--shadow);
+    border-left:4px solid var(--gold)}
+  .note b{display:block;margin-bottom:6px;color:var(--pepper-dark);font-size:14px}
+  .note p{font-size:13px;color:var(--muted);line-height:1.65}
+  .note ul{margin:6px 0 0 18px;font-size:12.5px;color:var(--muted)}
+  .note ul li{margin:4px 0}
+
+  footer{background:var(--pepper-dark);color:#fdecea;text-align:center;padding:30px 20px;margin-top:24px}
+  footer .big{font-size:22px;font-weight:900;color:#fff}
+  footer .big em{font-style:normal;color:var(--gold)}
+  footer p{opacity:.85;font-size:12.5px;margin-top:10px;line-height:1.7}
+  footer a{color:#ffd9a0;font-weight:700}
+
+  @media(max-width:980px){
+    .cards{grid-template-columns:repeat(2,1fr)}
+  }
+  @media(max-width:860px){
+    .cost-grid{grid-template-columns:1fr;gap:24px}
+    .nav-links{position:absolute;top:56px;right:0;left:0;flex-direction:column;gap:0;
+      background:var(--bg);border-bottom:1px solid var(--line);display:none}
+    .nav-links.open{display:flex}
+    .nav-links a{padding:14px 20px;border-bottom:1px solid var(--line)}
+    .nav-toggle{display:block}
+  }
+  @media(max-width:560px){
+    .cards,.notes{grid-template-columns:1fr}
+    .hero-inner{padding:44px 16px 38px}
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner wrap">
+    <div class="brand"><span class="dot"></span>辣椒植保方案</div>
+    <button class="nav-toggle" id="navToggle" aria-label="菜单">☰</button>
+    <div class="nav-links" id="navLinks">
+      <a href="#overview">防控概览</a>
+      <a href="#products">用药明细</a>
+      <a href="#schedule">操作历</a>
+      <a href="#cost">成本估算</a>
+      <a href="#notes">安全须知</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="hero-inner wrap">
+    <h1>辣椒全程植保技术方案</h1>
+    <p class="sub">以「定植」为时间锚点 · 病害 + 虫害 + 线虫 + 营养调控一体化 · 适配海南秋冬季反季节栽培</p>
+    <div class="chips">
+      <div class="chip"><b>8 类</b><span>主要病害防控</span></div>
+      <div class="chip"><b>6 类</b><span>主要虫害防控</span></div>
+      <div class="chip"><b>¥200–280</b><span>亩·季用药参考</span></div>
+      <div class="chip"><b>D0</b><span>定植为基准日</span></div>
+    </div>
+  </div>
+</header>
+
+<section id="overview">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="k">OVERVIEW</span>
+      <h2>防控概览 · 八道防线</h2>
+      <p>按「种子/苗床 → 土壤 → 真菌 → 细菌 → 病毒 → 虫害 → 害螨 → 营养调控」组织，每类列出核心药剂与每亩用量。所有用量以农药登记标签为准，本页依据海南省地方标准（DB46 绿色食品青黄皮尖椒）、海南省农科院及 2025 年防控要点整理。</p>
+    </div>
+    <div class="cards" id="ovCards"></div>
+  </div>
+</section>
+
+<section id="products" style="background:#f6f4ee">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="k">PRODUCTS</span>
+      <h2>用药用肥明细表</h2>
+      <p>具体产品 + 细粒度每亩用量。含通用名/含量、常见商品名、防治对象、施用方式与安全间隔期（SI）。挂果后优先选用生物农药或短安全间隔期药剂。</p>
+    </div>
+    <div class="plan-block">
+      <div class="plan-head"><h3>辣椒植保药剂清单（登记量 / 亩）</h3></div>
+      <div class="tbl-scroll">
+        <table>
+          <thead><tr><th>药剂（通用名·含量）</th><th>常见商品名</th><th>防治对象</th><th>每亩用量 / 兑水</th><th>施用方式</th><th>安全间隔期</th></tr></thead>
+          <tbody id="prodBody"></tbody>
+          <tfoot><tr><td colspan="6">说明：① 安全间隔期（SI）为距离采收的最小天数，采收前务必停用；②「农用链霉素」登记渐少，海南细菌性叶斑病可优先用春雷·王铜 / 噻菌铜；③ 具体浓度以产品标签为准。</td></tr></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="schedule">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="k">SCHEDULE</span>
+      <h2>全程操作历（以定植 D0 为锚点）</h2>
+      <p>负天数 = 定植前。每个节点列出作业方式、用药用肥明细与混配提示；标 <span class="flag 独立">独立</span> 表示需单独施药、不可混桶，<span class="flag 雨后必喷">雨后必喷</span> 表示细菌性病害在降雨后必须补喷。</p>
+    </div>
+    <div class="plan-block">
+      <div class="plan-head"><h3>生育期 × 防控节点对照</h3></div>
+      <div class="tbl-scroll">
+        <table id="schedule">
+          <thead><tr><th>时间</th><th>作业方式</th><th>用几种</th><th>用药用肥明细</th><th>混配与提示</th></tr></thead>
+          <tbody id="schedBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="cost" style="background:#f6f4ee">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="k">COST</span>
+      <h2>亩·季用药成本估算</h2>
+      <p>参考区间，含杀虫、杀菌、细菌病、病毒、害螨、营养调控六类；不含人工与器械。实际以当地零售价为准。</p>
+    </div>
+    <div class="cost-grid">
+      <div class="donut"><div class="center"><b>¥200–280</b><span>亩 / 季（参考）</span></div></div>
+      <div>
+        <div class="legend" id="costLegend"></div>
+        <div class="cost-note">成本结构随生育期前轻后重：苗期与定植期仅占约 <b>15%</b>，开花坐果—盛果期（D30–D80）占 <b>60%+</b>，是用药与成本高峰，也是疫病、炭疽、钻心虫、蓟马集中爆发期。建议此阶段轮换用药、分桶喷施，避免抗性上升与三唑类叠加抑长。</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="notes">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="k">NOTES</span>
+      <h2>安全用药与绿色防控须知</h2>
+      <p>植保的底线是「安全、合规、可追溯」。以下为采收前停药、轮换、抗逆与物理防控要点。</p>
+    </div>
+    <div class="notes" id="noteBox"></div>
+  </div>
+</section>
+
+<footer>
+  <div class="big">辣椒全程植保技术方案 · <em>海南 / 华南适配版</em></div>
+  <p>依据：海南省地方标准 DB46（绿色食品青黄皮尖椒）、海南省农业科学院冬季瓜菜防寒防病害技术、2025 年辣椒主要病虫害绿色防控要点等整理。<br>
+  具体用量、施药次数与安全间隔期以农药标签及 NY/T 393、GB/T 8321 为准。本页仅作生产参考，不构成登记承诺。</p>
+  <p style="margin-top:14px"><a href="../数字农业.html">← 返回数字农业</a> · <a href="../workbench.html">数字农业工作台</a> · <a href="../qicai-huasheng/index.html">七彩花生植保方案</a></p>
+</footer>
+
+<script>
+/* ---------- 数据 ---------- */
+const overview = [
+  { c:'var(--pepper)', ico:'🌱', title:'种子·苗期防护',
+    desc:'从源头压低苗病与传毒虫源',
+    dose:[
+      {n:'温汤浸种 / 10%磷酸三钠',a:'种子消毒',d:'55℃ 浸 30min'},
+      {n:'30%精甲·噁霉灵',a:'苗床喷淋',d:'1000–1500倍液'},
+      {n:'25%噻虫嗪（送嫁药）',a:'移栽前 3–5天',d:'7–15 g/亩'}
+    ],
+    tip:'带药移栽是防蚜/粉虱/苗病第一关。' },
+  { c:'var(--earth)', ico:'🟫', title:'土壤·基肥·线虫',
+    desc:'生石灰消毒、基肥与植前线虫处理',
+    dose:[
+      {n:'生石灰',a:'土壤消毒',d:'100–150 kg/亩'},
+      {n:'10%噻唑磷颗粒剂',a:'植前穴施',d:'1.5–2 kg/亩'},
+      {n:'硫酸钾复合肥',a:'底肥',d:'30–50 kg/亩'}
+    ],
+    tip:'生石灰与铵态氮/菌剂间隔≥7天，3年内未种茄科。' },
+  { c:'var(--leaf)', ico:'🍂', title:'真菌病害',
+    desc:'疫病、炭疽、灰霉、白粉、叶斑',
+    dose:[
+      {n:'50%烯酰吗啉',a:'疫病',d:'30–40 g/亩'},
+      {n:'10%苯醚甲环唑',a:'炭疽',d:'50–83 g/亩'},
+      {n:'250g/L嘧菌酯',a:'保护',d:'40–72 mL/亩'}
+    ],
+    tip:'疫病「雨后必喷」；苯醚甲环唑含三唑，勿叠加。' },
+  { c:'var(--water)', ico:'💧', title:'细菌病害',
+    desc:'疮痂、青枯、角斑、细菌性叶斑',
+    dose:[
+      {n:'47%春雷·王铜',a:'喷雾/灌根',d:'500–600倍液'},
+      {n:'20%噻菌铜',a:'喷雾',d:'400–500倍液'},
+      {n:'3%中生菌素',a:'喷雾',d:'800–1000倍液'}
+    ],
+    tip:'海南细菌性叶斑病重，降雨后必须补喷铜制剂。' },
+  { c:'#8e44ad', ico:'🧬', title:'病毒病',
+    desc:'CMV/TMV 等，以防虫传毒为核心',
+    dose:[
+      {n:'8%宁南霉素',a:'喷雾',d:'75–104 mL/亩'},
+      {n:'5%氨基寡糖素',a:'抗逆',d:'40–50 mL/亩'},
+      {n:'0.5%香菇多糖',a:'喷雾',d:'200–400 mL/亩'}
+    ],
+    tip:'治虫（蚜/蓟马）断毒源比喷药更关键。' },
+  { c:'var(--gold)', ico:'🐛', title:'虫害',
+    desc:'蚜虫、粉虱、蓟马、棉铃虫/烟青虫',
+    dose:[
+      {n:'10%溴氰虫酰胺',a:'蓟马',d:'40–60 mL/亩'},
+      {n:'5%氯虫苯甲酰胺',a:'钻心虫',d:'30–60 mL/亩'},
+      {n:'10%吡虫啉',a:'蚜/粉虱',d:'1500–2000倍液'}
+    ],
+    tip:'钻心虫重点喷果柄；轮换不同作用机理药剂。' },
+  { c:'#c0392b', ico:'🕷️', title:'害螨',
+    desc:'茶黄螨、红蜘蛛（叶背、嫩梢）',
+    dose:[
+      {n:'15%哒螨灵',a:'喷雾',d:'2000倍液'},
+      {n:'24%螺螨酯',a:'喷雾',d:'3000倍液'},
+      {n:'1.8%阿维菌素',a:'喷雾',d:'2000倍液'}
+    ],
+    tip:'发生初期喷透叶背与嫩梢，避开高温。' },
+  { c:'#2b7bb0', ico:'💊', title:'营养·调控·抗逆',
+    desc:'保花保果、防脐腐、抗寒抗逆',
+    dose:[
+      {n:'磷酸二氢钾',a:'叶面',d:'30–50 g/亩'},
+      {n:'糖醇钙 + 流体硼',a:'防脐腐',d:'按标签'},
+      {n:'芸苔素 / 氨基寡糖素',a:'抗逆',d:'按标签'}
+    ],
+    tip:'寒潮前喷海岛素/腐殖酸提升抗逆力。' }
+];
+
+const products = [
+  ['30%精甲·噁霉灵 水剂','—','猝倒/立枯/根腐','1000–1500倍液','苗床喷淋·灌根','7天'],
+  ['72.2%霜霉威盐酸盐','普力克','猝倒/疫病','500–600倍液','喷雾·灌根','7天'],
+  ['68%精甲·锰锌','—','茎基腐/疫病','600倍液','喷淋根部·喷雾','7天'],
+  ['50%烯酰吗啉 WP','—','疫病','30–40 g/亩','喷雾','7天'],
+  ['72%霜脲·锰锌 WP','克露','疫病','600–800倍液','喷雾','7天'],
+  ['68.75%氟吡菌胺·霜霉威 SC','银法利','疫病','800–1000倍液','喷雾','7天'],
+  ['250g/L嘧菌酯 SC','阿米西达','疫/炭/粉 保护','40–72 mL/亩','喷雾','5天'],
+  ['32.5%苯甲·嘧菌酯 SC','阿米妙收','炭疽/疫/叶斑','1000倍液','喷雾','5天'],
+  ['10%苯醚甲环唑 WG','—','炭疽/白粉','50–83 g/亩','喷雾','3–10天'],
+  ['25%咪鲜胺 EC','—','炭疽(中前期)','1500倍液','喷雾','7天'],
+  ['50%咪鲜胺锰盐 WP','—','炭疽/灰霉','1500–2000倍液','喷雾','10–12天'],
+  ['25%吡唑醚菌酯 EC','—','炭疽/白粉','1500–2000倍液','喷雾','10天'],
+  ['75%肟菌·戊唑醇 WG','—','炭疽','10–15 g/亩','喷雾','5天'],
+  ['50%腐霉利 WP','—','灰霉','1500倍液','喷雾','7天'],
+  ['20%嘧霉胺 SC','—','灰霉','800倍液','喷雾','7天'],
+  ['80%代森锰锌 WP','—','保护性(疫/炭)','150–200 g/亩','喷雾','14天'],
+  ['47%春雷·王铜 WP','—','细菌(疮痂/青枯/角斑)','500–600倍液','喷雾·灌根','7天'],
+  ['20%噻菌铜 SC','龙克菌','细菌(疮痂/角斑)','400–500倍液','喷雾','7天'],
+  ['77%氢氧化铜 WP','可杀得','细菌性叶斑','600倍液','喷雾','7天'],
+  ['3%中生菌素 WP','—','细菌(疮痂/叶斑)','800–1000倍液','喷雾','7天'],
+  ['72%农用硫酸链霉素 SP','—','细菌性叶斑','1500倍液','喷雾','3天(登记渐少)'],
+  ['8%宁南霉素 AS','—','病毒病','75–104 mL/亩','喷雾','7天'],
+  ['0.5%香菇多糖 AS','—','病毒病','200–400 mL/亩','喷雾','10天'],
+  ['5%氨基寡糖素 SL','海岛素','病毒/抗逆','40–50 mL/亩','喷雾','5天'],
+  ['2%壳寡糖 AS','—','病毒/抗逆','500–600倍液','喷雾','5天'],
+  ['10%吡虫啉 WP','—','蚜虫/粉虱','1500–2000倍液','喷雾','10–14天'],
+  ['25%噻虫嗪 WDG','—','蚜/粉虱/蓟马(送嫁)','7–15 g/亩','喷雾·灌根','3天'],
+  ['10%溴氰虫酰胺 SE','倍内威','蓟马/蚜/粉虱','40–60 mL/亩','喷雾','3天'],
+  ['双丙环虫酯 DC','英威','蚜/粉虱','10–65 mL/亩','喷雾','3天'],
+  ['5%氯虫苯甲酰胺 SC','康宽','棉铃虫/烟青虫/夜蛾','30–60 mL/亩','喷雾','5天'],
+  ['1%甲维盐 ME','—','钻心虫','10–20 mL/亩','喷雾','5天'],
+  ['15%哒螨灵 EC','—','茶黄螨/红蜘蛛','2000倍液','喷雾','7天'],
+  ['24%螺螨酯 SC','螨危','红蜘蛛','3000倍液','喷雾','7天'],
+  ['1.8%阿维菌素 EC','—','螨/青虫','2000倍液','喷雾','7天'],
+  ['10%噻唑磷 GR','—','根结线虫','1.5–2 kg/亩','植前穴施','90天'],
+  ['5%辛硫磷 GR','—','地下害虫','3–4 kg/亩','深埋','60天'],
+  ['生石灰','—','土壤消毒','100–150 kg/亩','撒施','—'],
+  ['磷酸二氢钾','—','营养(促果/抗逆)','30–50 g/亩','叶面','—'],
+  ['糖醇钙 + 流体硼','—','防脐腐/保花','按标签','叶面','—'],
+  ['芸苔素内酯 / 胺鲜酯','—','抗逆/保花','按标签','叶面','—']
+];
+
+const schedule = [
+  { group:'整地消毒期', dayText:'定植前 15–8 天', dayMin:-15, dayMax:-8, op:'土壤处理', count:'2 项',
+    cats:{ '消毒':['生石灰 100–150 kg/亩（翻耕前撒施，晒土 3–5 天）'],
+           '线虫':['10%噻唑磷颗粒剂 1.5–2 kg/亩 植前穴施','或 5%辛硫磷颗粒剂 3–4 kg/亩 深埋'] },
+    mix:'生石灰与基肥间隔 ≥7 天；碱性强，勿与铵态氮/菌剂同施；地块 3 年内未种茄科作物。',
+    flags:['独立'] },
+  { group:'整地消毒期', dayText:'定植前 7–1 天', dayMin:-7, dayMax:-1, op:'底肥·撒施', count:'2 项',
+    cats:{ '肥菌':['硫酸钾复合肥 30–50 kg/亩','优质有机肥 300–500 kg/亩'] },
+    mix:'撒施后旋耕；覆膜前施入；与生石灰处理错开。',
+    flags:[] },
+  { group:'苗床送嫁期', dayText:'定植前 5–3 天', dayMin:-5, dayMax:-3, op:'叶面/灌根', count:'2 项',
+    cats:{ '杀虫':['25%噻虫嗪 7–15 g/亩（或 3000 倍液）'],
+           '杀菌':['30%精甲·噁霉灵 1000–1500倍液（苗床喷淋）'] },
+    mix:'移栽前“送嫁药”，带药移栽防蚜/粉虱/苗病；现配现用。',
+    flags:['独立'] },
+  { group:'定植期', dayText:'定植当天 D0', dayMin:0, dayMax:0, op:'根部喷淋', count:'1 项',
+    cats:{ '杀菌':['68%精甲·锰锌 600倍液 喷淋根部（防茎基腐/立枯）'] },
+    mix:'定植浅栽、浇透定根水；精甲·锰锌淋根形成保护。',
+    flags:[] },
+  { group:'缓苗期', dayText:'定植后 7 天', dayMin:7, dayMax:7, op:'根施+喷雾', count:'2 项',
+    cats:{ '杀菌':['250g/L嘧菌酯(阿米西达) 1500倍液'],
+           '杀虫':['30%度锐(噻虫嗪·氯虫) 1500倍液'] },
+    mix:'防褐斑、灰霉、蓟马、粉虱；现配现用，二次稀释。',
+    flags:[] },
+  { group:'开花前预防', dayText:'定植后 15–25 天', dayMin:15, dayMax:25, op:'叶面', count:'3 项',
+    cats:{ '杀菌':['80%代森锰锌 150–200 g/亩','32.5%苯甲·嘧菌酯(阿米妙收) 1000倍液'],
+           '杀虫':['10%吡虫啉 1500–2000倍液'] },
+    mix:'以保护性杀菌为主；防蚜虫/粉虱；坐果前压低病虫基数。',
+    flags:[] },
+  { group:'开花坐果·核心期', dayText:'定植后 30–50 天', dayMin:30, dayMax:50, op:'叶面+雨后必喷', count:'10 种(偏多)',
+    cats:{ '真菌':['50%烯酰吗啉 30–40 g/亩(疫病)','10%苯醚甲环唑 50–83 g/亩(炭疽)'],
+           '细菌':['47%春雷·王铜 500–600倍液(疮痂/青枯/角斑)'],
+           '病毒':['8%宁南霉素 75–104 mL/亩'],
+           '杀虫':['10%溴氰虫酰胺 40–60 mL/亩(蓟马)','5%氯虫苯甲酰胺 30–60 mL/亩(钻心虫)','10%吡虫啉 1500–2000倍液(蚜/粉虱)'],
+           '杀螨':['15%哒螨灵 2000倍液(茶黄螨/红蜘蛛)'] },
+    mix:'建议分 2 桶：桶① 真菌+病毒+细菌(铜)；桶② 杀虫+杀螨。降雨后必喷铜制剂防细菌病；病毒病以防虫传毒为关键；钻心虫重点喷果柄。苯醚甲环唑含三唑，避免与其他三唑类叠加。',
+    flags:['偏多','三唑','雨后必喷'] },
+  { group:'盛果期·轮换', dayText:'定植后 55–75 天', dayMin:55, dayMax:75, op:'叶面', count:'6 种',
+    cats:{ '真菌':['25%吡唑醚菌酯 1500–2000倍液(炭疽/白粉)','50%咪鲜胺锰盐 1500–2000倍液'],
+           '细菌':['20%噻菌铜 400–500倍液'],
+           '杀虫':['1%甲维盐 10–20 mL/亩(钻心虫)','21%噻虫嗪 10–18 mL/亩(蓟马)'],
+           '营养':['磷酸二氢钾 30–50 g/亩 + 糖醇钙 + 流体硼(防脐腐/促果)'] },
+    mix:'轮换用药防抗性：烯酰吗啉↔吡唑醚菌酯、氯虫↔甲维盐交替；钙硼同喷防脐腐与烂果。',
+    flags:['轮换'] },
+  { group:'采收前·安全停药', dayText:'采收前 7–15 天', dayMin:80, dayMax:9999, op:'生物/物理', count:'收尾',
+    cats:{ '营养':['5%氨基寡糖素 40–50 mL/亩(抗逆)'],
+           '绿色':['停喷化学农药；黄板/防虫网/生物农药收尾'] },
+    mix:'采收前 7–15 天停用化学药剂，严守安全间隔期；以物理与生物防控收尾，降低农残。',
+    flags:['安全停药'] },
+  { group:'防寒抗逆专篇', dayText:'冬季寒潮前/后', dayMin:0, dayMax:0, op:'叶面', count:'2 项(可选)',
+    cats:{ '营养':['氨基寡糖素/海岛素/腐殖酸 叶面喷','芸苔素内酯 2000–3000倍液'] },
+    mix:'海南冬季寒潮前喷施提升抗逆；寒潮过后补喷百菌清/代森锰锌保护，防低温高湿病害。',
+    flags:['可选'] },
+  { group:'控旺专篇', dayText:'旺长地块·看苗', dayMin:0, dayMax:0, op:'叶面', count:'1 项(可选)',
+    cats:{ '调控':['调环酸钙 常规量 1/3–1/2（看苗轻控）','或 5%烯效唑 常规量 1/2–2/3'],
+           '营养':['磷酸二氢钾（弱苗不控）'] },
+    mix:'辣椒旺长（氮肥过量/密植）才控；以株高、节间长为触发；弱苗、受旱、开花盛期不控；三唑类每季 ≤1 次。',
+    flags:['控旺','可选'] }
+];
+
+const cost = [
+  { c:'var(--pepper)', nm:'真菌病害', vl:'¥70–95', pc:'32%' },
+  { c:'var(--water)', nm:'杀虫剂', vl:'¥55–75', pc:'26%' },
+  { c:'var(--earth)', nm:'细菌病害', vl:'¥30–45', pc:'18%' },
+  { c:'var(--gold)', nm:'营养调控', vl:'¥20–30', pc:'8%' },
+  { c:'#8e44ad', nm:'病毒病', vl:'¥12–18', pc:'6%' },
+  { c:'var(--leaf)', nm:'杀螨剂', vl:'¥12–18', pc:'6%' }
+];
+
+const notes = [
+  { b:'① 安全间隔期（SI）是底线', p:'采收前 7–15 天停用化学农药；吡虫啉(10–14天)、代森锰锌(14天)、甲维盐/氯虫(5天)等各有阈值，务必倒排停药日。挂果后优先选生物农药或短 SI 药剂。' },
+  { b:'② 轮换用药防抗性', p:'同作用机理药剂不连续使用：', ul:['疫病：烯酰吗啉 ↔ 氟吡菌胺·霜霉威 ↔ 霜脲·锰锌 轮换','钻心虫：氯虫苯甲酰胺 ↔ 甲维盐 ↔ 溴虫氟苯双酰胺 轮换','同一类药剂每季使用≤2–3 次'] },
+  { b:'③ 细菌病「雨后必喷」', p:'海南高温高湿、台风降雨频繁，疮痂/青枯/细菌性叶斑病易爆发。降雨后 24–48 小时内补喷春雷·王铜或噻菌铜，切断再侵染。铜制剂与叶面肥错开施用。' },
+  { b:'④ 病毒病重在防虫断毒', p:'蚜虫、蓟马是病毒传播媒介。防虫网(40目)+黄板+送嫁药+生长期虫控，比发病后喷药更有效。发现病株及时拔除带出田外。' },
+  { b:'⑤ 线虫与土传病前置', p:'根结线虫、青枯、枯萎以土壤处理为主：植前噻唑磷/辛硫磷穴施、生石灰消毒、与水稻/玉米轮作(≥2 年)是根本措施，发病后灌根效果有限。' },
+  { b:'⑥ 绿色防控优先', p:'防虫网、黄蓝板、杀虫灯、释放捕食螨/瓢虫、枯草芽孢杆菌/木霉菌等生物菌剂，减少化学用药；严禁高毒高残留及禁限用农药。' }
+];
+
+/* ---------- 渲染 ---------- */
+function renderOverview(){
+  document.getElementById('ovCards').innerHTML = overview.map(function(o){
+    var rows = o.dose.map(function(d){
+      return '<div class="dose-row"><span class="dose-name">'+esc(d.n)+'<small>'+esc(d.a)+'</small></span>'+
+             '<span class="dose-amt">'+esc(d.d)+'</span></div>';
+    }).join('');
+    var tip = o.tip ? '<div class="dose-tip">'+esc(o.tip)+'</div>' : '';
+    return '<div class="card" style="--c:'+o.c+'"><div class="ico">'+o.ico+'</div>'+
+      '<h3>'+esc(o.title)+'</h3><p class="detail-desc">'+esc(o.desc)+'</p>'+
+      '<div class="dose">'+rows+'</div>'+tip+'</div>';
+  }).join('');
+}
+
+function renderProducts(){
+  document.getElementById('prodBody').innerHTML = products.map(function(p){
+    return '<tr><td class="pd">'+esc(p[0])+'</td><td>'+esc(p[1])+'</td><td class="target">'+esc(p[2])+
+      '</td><td class="dose-cell">'+esc(p[3])+'</td><td>'+esc(p[4])+'</td><td class="phi">'+esc(p[5])+'</td></tr>';
+  }).join('');
+}
+
+function catPills(cats){
+  var cls = { '真菌':'g','细菌':'w','病毒':'k','杀虫':'r','杀螨':'r','营养':'e','肥菌':'e','消毒':'e','线虫':'e','调控':'e','绿色':'g' };
+  var html = '';
+  for(var key in cats){
+    html += '<div style="margin-bottom:6px"><b style="font-size:11.5px;color:var(--muted)">'+esc(key)+'</b> ';
+    cats[key].forEach(function(item){
+      var c = cls[key] || 'g';
+      html += '<span class="npill '+c+'">'+esc(item)+'</span>';
+    });
+    html += '</div>';
+  }
+  return html;
+}
+
+function renderSchedule(){
+  var lastGroup = null, html = '';
+  schedule.forEach(function(s){
+    if(s.group !== lastGroup){
+      html += '<tr class="stage-row"><td colspan="5">'+esc(s.group)+'</td></tr>';
+      lastGroup = s.group;
+    }
+    var flags = (s.flags||[]).map(function(f){ return '<span class="flag '+f+'">'+esc(f)+'</span>'; }).join('');
+    html += '<tr><td>'+esc(s.dayText)+'</td><td>'+esc(s.op)+'</td><td>'+esc(s.count)+'</td>'+
+      '<td>'+catPills(s.cats)+'</td>'+
+      '<td><div class="mix"><b>混配：</b>'+esc(s.mix)+'</div>'+flags+'</td></tr>';
+  });
+  document.getElementById('schedBody').innerHTML = html;
+}
+
+function renderCost(){
+  document.getElementById('costLegend').innerHTML = cost.map(function(c){
+    return '<div class="lg"><span class="sw" style="background:'+c.c+'"></span>'+
+      '<span class="nm">'+esc(c.nm)+'</span><span class="vl">'+esc(c.vl)+'</span>'+
+      '<span class="pc">'+esc(c.pc)+'</span></div>';
+  }).join('');
+}
+
+function renderNotes(){
+  document.getElementById('noteBox').innerHTML = notes.map(function(n){
+    var ul = n.ul ? '<ul>'+n.ul.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>' : '';
+    return '<div class="note"><b>'+esc(n.b)+'</b><p>'+esc(n.p)+'</p>'+ul+'</div>';
+  }).join('');
+}
+
+function esc(s){ return String(s).replace(/[&<>"]/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m];}); }
+
+/* ---------- 导航 ---------- */
+function initNav(){
+  var toggle = document.getElementById('navToggle');
+  var links = document.getElementById('navLinks');
+  toggle.addEventListener('click', function(){ links.classList.toggle('open'); });
+  links.addEventListener('click', function(e){ if(e.target.tagName==='A') links.classList.remove('open'); });
+  var anchors = Array.prototype.slice.call(links.querySelectorAll('a'));
+  var sections = anchors.map(function(a){ return document.querySelector(a.getAttribute('href')); });
+  function onScroll(){
+    var pos = window.scrollY + 80, idx = 0;
+    sections.forEach(function(sec,i){ if(sec && sec.offsetTop <= pos) idx = i; });
+    anchors.forEach(function(a,i){ a.classList.toggle('active', i===idx); });
+  }
+  window.addEventListener('scroll', onScroll); onScroll();
+}
+
+renderOverview(); renderProducts(); renderSchedule(); renderCost(); renderNotes(); initNav();
+</script>
+</body>
+</html>
