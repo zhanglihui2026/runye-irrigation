@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>海南数字农业 · 辣椒决策引擎</title>
+<style>
+  :root{
+    --pepper:#d8392b; --pepper-dark:#9e1f15; --pepper-soft:#fdecea; --pepper-2:#ff6a3d;
+    --g-700:#1f3d2b; --g-50:#eef6f0; --card:#fff; --text:#1a1a1a; --muted:#6b7280;
+    --radius:14px; --shadow:0 4px 18px rgba(0,0,0,.07); --bg:#faf7f5;
+    --ok:#1f9d55; --warn:#e0962b; --bad:#d8392b; --neutral:#5b67e0;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Microsoft YaHei",-apple-system,"PingFang SC",sans-serif;
+    background:var(--bg);color:var(--text);line-height:1.6;font-size:14px}
+  .wrap{max-width:1080px;margin:0 auto;padding:22px 18px 60px}
+  header.hero{background:linear-gradient(120deg,var(--pepper-dark),var(--pepper) 60%,var(--pepper-2));
+    color:#fff;border-radius:var(--radius);padding:22px 24px;box-shadow:var(--shadow)}
+  header.hero h1{margin:0 0 4px;font-size:22px;letter-spacing:.5px}
+  header.hero p{margin:0;opacity:.92;font-size:13px}
+  header.hero .meta{margin-top:10px;display:flex;gap:14px;flex-wrap:wrap;font-size:12px;opacity:.9}
+  header.hero .meta b{font-size:15px}
+  section{margin-top:22px}
+  .sec-head{display:flex;align-items:center;gap:8px;margin:0 0 12px}
+  .sec-head .bar{width:5px;height:20px;background:var(--pepper);border-radius:3px}
+  .sec-head h2{margin:0;font-size:17px}
+  .sec-head .sub{margin-left:auto;font-size:12px;color:var(--muted)}
+  .panel{background:var(--card);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);margin-bottom:16px}
+  /* signal dashboard */
+  .sig-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+  .sig{border:1px solid #f0e3df;border-radius:10px;padding:10px 12px;background:#fff}
+  .sig label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px}
+  .sig .val{font-weight:800;font-size:14px;color:var(--pepper-dark)}
+  .sig select,.sig input{width:100%;padding:6px 8px;border:1px solid #e2d6d0;border-radius:8px;font-size:13px;font-family:inherit}
+  .sig .hint{font-size:11px;color:var(--muted);margin-top:3px}
+  .btn{background:var(--pepper);color:#fff;border:none;border-radius:9px;padding:9px 18px;
+    font-size:14px;font-weight:700;cursor:pointer;margin-top:14px}
+  .btn:hover{filter:brightness(1.06)}
+  /* plan cards */
+  .plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+  .plan{border:2px solid #eee;border-radius:12px;padding:14px;background:#fff;position:relative}
+  .plan.best{border-color:var(--pepper);box-shadow:0 6px 20px rgba(216,57,43,.16)}
+  .plan .tag{position:absolute;top:-11px;left:14px;background:var(--pepper);color:#fff;
+    font-size:11px;font-weight:700;padding:2px 10px;border-radius:20px;display:none}
+  .plan.best .tag{display:inline-block}
+  .plan h3{margin:2px 0 8px;font-size:15px}
+  .plan .row{display:flex;justify-content:space-between;font-size:12.5px;padding:3px 0;border-bottom:1px dashed #f1e9e6}
+  .plan .row:last-child{border:none}
+  .plan .row b{color:var(--g-700)}
+  .score{font-size:30px;font-weight:800;text-align:center;margin:8px 0 2px;color:var(--pepper-dark)}
+  .score small{font-size:12px;color:var(--muted);font-weight:400}
+  .barwrap{height:8px;background:#f0e3df;border-radius:6px;overflow:hidden;margin:6px 0 2px}
+  .barwrap i{display:block;height:100%;background:linear-gradient(90deg,var(--pepper),var(--pepper-2))}
+  .pill{display:inline-block;font-size:11px;padding:1px 8px;border-radius:20px;margin:2px 2px 0 0}
+  .pill.h{background:#fde2de;color:var(--bad)} .pill.m{background:#fdf0d9;color:#a9690a}
+  .pill.l{background:#e3f3e9;color:var(--ok)}
+  /* tables */
+  table{width:100%;border-collapse:collapse;font-size:13px;min-width:560px}
+  .tbl-wrap{overflow:auto}
+  th,td{padding:9px 10px;text-align:left;border-bottom:1px solid #f1e9e6;vertical-align:top}
+  th{background:#fbf3f1;color:var(--pepper-dark);font-size:12.5px;position:sticky;top:0}
+  tbody tr:hover{background:#fff8f7}
+  .rk{font-weight:800;color:var(--pepper-dark)}
+  .rk.rec{color:var(--ok)}
+  /* factor bars */
+  .factor{display:grid;grid-template-columns:170px 1fr 70px;gap:10px;align-items:center;margin:8px 0;font-size:13px}
+  .factor .fname{color:var(--text)}
+  .factor .fbar{height:14px;background:#f0e3df;border-radius:8px;overflow:hidden}
+  .factor .fbar i{display:block;height:100%}
+  .factor .fval{text-align:right;font-weight:700;font-size:12.5px}
+  /* conclusion */
+  .concl{background:linear-gradient(120deg,#fff,#fff5f3);border:2px solid var(--pepper);border-radius:14px;padding:18px 20px}
+  .concl .big{font-size:19px;font-weight:800;color:var(--pepper-dark);margin:0 0 8px}
+  .concl .line{font-size:14px;margin:5px 0}
+  .concl .line b{color:var(--pepper-dark)}
+  .conf{display:inline-block;background:var(--g-50);color:var(--g-700);font-size:12px;font-weight:700;padding:3px 12px;border-radius:20px;margin-top:8px}
+  /* actions */
+  .acts{list-style:none;padding:0;margin:0}
+  .acts li{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px dashed #f1e9e6}
+  .acts li input{margin-top:4px;width:16px;height:16px;accent-color:var(--pepper)}
+  .acts li.done span{text-decoration:line-through;color:var(--muted)}
+  .acts .pri{font-size:10px;font-weight:700;padding:1px 7px;border-radius:5px;margin-right:4px}
+  .pri.p1{background:#fde2de;color:var(--bad)} .pri.p2{background:#fdf0d9;color:#a9690a}
+  /* reasoning */
+  .reasons{display:grid;gap:10px}
+  details.reason{border:1px solid #f0e3df;border-radius:10px;padding:0;background:#fff;overflow:hidden}
+  details.reason>summary{cursor:pointer;padding:11px 14px;font-weight:700;font-size:13.5px;list-style:none;display:flex;gap:8px;align-items:center}
+  details.reason>summary::-webkit-details-marker{display:none}
+  details.reason>summary .ar{color:var(--pepper);font-size:12px}
+  details.reason .body{padding:0 14px 12px;font-size:13px}
+  details.reason .body .why{background:#fbf3f1;border-left:3px solid var(--pepper);padding:8px 11px;border-radius:0 8px 8px 0;margin:6px 0}
+  details.reason .body .en{font-style:italic;color:#555;font-size:12px;background:#f6f6f6;padding:7px 10px;border-radius:8px;margin:6px 0}
+  details.reason .body .src{font-size:11.5px;color:var(--muted);margin-top:4px}
+  details.reason .body .src a{color:var(--neutral)}
+  .note{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5}
+  footer{margin-top:30px;font-size:11.5px;color:var(--muted);text-align:center;line-height:1.6}
+  a.back{color:var(--pepper-dark);font-size:12px;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="hero">
+  <h1>🌶️ 海南数字农业 · 辣椒决策引擎</h1>
+  <p>反季节机会研判 · 综合评估「何时种 · 种什么 · 价格怎么走」—— 专注辣椒（七彩花生体系已走通，本引擎不重复）</p>
+  <div class="meta" id="heroMeta"></div>
+</header>
+
+<section>
+  <div class="sec-head"><span class="bar"></span><h2>① 基础信号输入</h2>
+    <span class="sub">真实数据（2026-08 观测），可手改后点「重新推算」</span></div>
+  <div class="panel">
+    <div class="sig-grid" id="sigGrid"></div>
+    <div style="margin-top:12px">
+      <label style="font-size:12px;color:var(--muted)">种植基地</label>
+      <select id="baseSel" style="padding:7px 10px;border:1px solid #e2d6d0;border-radius:8px;font-size:13px;margin:4px 12px 0 0"></select>
+      <label style="font-size:12px;color:var(--muted)">主栽品种</label>
+      <select id="varSel" style="padding:7px 10px;border:1px solid #e2d6d0;border-radius:8px;font-size:13px;margin-top:4px"></select>
+    </div>
+    <button class="btn" onclick="recompute()">重新推算</button>
+    <div class="note">说明：本引擎为<strong>可解释规则引擎</strong>，结论均可下钻到「信号 → 机理 → 来源」。如需实时数据，留好 NOAA / 海南气象局 / 省发改委价格监测抓取接口。</div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="bar"></span><h2>② 播期方案对比</h2>
+    <span class="sub">晚播/中播/早播 三方案 · 综合分越高越优</span></div>
+  <div class="plans" id="planCards"></div>
+  <div class="note" id="planNote"></div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="bar"></span><h2>③ 品种决策评分</h2>
+    <span class="sub">溢价 · 抗病(疫病/青枯) · 市场需求 · 基地适配 四维加权</span></div>
+  <div class="panel tbl-wrap">
+    <table id="varTable"></table>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="bar"></span><h2>④ 价格驱动因子</h2>
+    <span class="sub">海南辣椒价格受什么影响 · 0–100 影响强度</span></div>
+  <div class="panel" id="factorBars"></div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="bar"></span><h2>⑤ 综合决策结论</h2></div>
+  <div class="concl" id="concl"></div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="bar"></span><h2>⑥ 未来 30–60 天行动清单</h2></div>
+  <div class="panel">
+    <ul class="acts" id="acts"></ul>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="bar"></span><h2>⑦ 推理链（可解释 · 附依据）</h2></div>
+  <div class="reasons" id="reasons"></div>
+</section>
+
+<div class="note" style="margin-top:18px">
+  <a class="back" href="index.html">← 返回通用气候与市场决策引擎</a>
+</div>
+<footer>
+  数据来源：海南省农业农村厅（2025-2026 冬春季瓜菜结构调整通报）、三亚市发改委价格监测日报（2026-02-09）、
+  海南省供销社冬季瓜菜出岛统计、中央气象台/海南气象局台风预测、BOM/APCC ENSO 通报、用户既有六大自然信号研究框架。<br>
+  本页为决策辅助，最终以实地农情与权威部门预报为准。
+</footer>
+</div>
+
+<script>
+/* ============ 基础数据（真实 2025–2026） ============ */
+const TODAY = '2026-09-02';
+
+// 反季节辣椒价格月度指数（相对，1.0=基线；春节/清明为峰，内地上市季崩）
+const PRICE_MONTH = {1:1.40,2:1.50,3:1.20,4:0.90,5:0.50,6:0.40,7:0.40,8:0.40,9:0.45,10:0.70,11:1.10,12:1.20};
+
+// 品种库（价格=2026-02 真实收购价 元/斤；disease=对疫病/青枯抗性0-1；demand=市场需求0-1）
+const VARIETIES = {
+  chaotian:{name:'朝天椒', price:6.74, disease:0.55, demand:0.95, dth:75,
+    baseFit:{dongfang:0.95, changjiang:0.78}, note:'东方朝天椒专业市场，均价最高、走餐饮刚需'},
+  hongxian:{name:'红线椒', price:5.29, disease:0.65, demand:0.85, dth:68,
+    baseFit:{dongfang:0.85, changjiang:0.80}, note:'彩椒线椒类，港澳/高端市场需求旺'},
+  xiaomila:{name:'小米辣', price:5.70, disease:0.50, demand:0.92, dth:72,
+    baseFit:{dongfang:0.80, changjiang:0.70}, note:'餐饮香辛型，价格波动大但溢价高（临高5.5-6.0）'},
+  xianjiao:{name:'红尖椒', price:4.10, disease:0.70, demand:0.82, dth:70,
+    baseFit:{dongfang:0.85, changjiang:0.85}, note:'主流大宗，红椒溢价高于青椒'},
+  xianjiao_q:{name:'青尖椒', price:2.78, disease:0.72, demand:0.80, dth:70,
+    baseFit:{dongfang:0.85, changjiang:0.85}, note:'量大价低，适合走量'},
+  luosi:{name:'螺丝椒', price:2.80, disease:0.66, demand:0.80, dth:68,
+    baseFit:{dongfang:0.82, changjiang:0.82}, note:'临高主栽，精品果价稳'},
+  paojiao:{name:'泡椒', price:2.55, disease:0.60, demand:0.60, dth:90,
+    baseFit:{dongfang:0.78, changjiang:0.75}, note:'传统大宗，近年同质化严重、易滞销'},
+  yuanjiao:{name:'圆椒', price:2.12, disease:0.58, demand:0.55, dth:88,
+    baseFit:{dongfang:0.75, changjiang:0.75}, note:'价格最低，谨慎'},
+  tese:{name:'特色线椒(紫/黄)', price:4.50, disease:0.75, demand:0.78, dth:70,
+    baseFit:{dongfang:0.78, changjiang:0.95}, note:'昌江特色品种，差异化溢价、避同质化'}
+};
+const BASES = {
+  dongfang:{name:'东方（西部）', market:'朝天椒专业市场·年均2亿斤', westDry:true},
+  changjiang:{name:'昌江（西部）', market:'特色线椒/紫黄线椒', westDry:true}
+};
+
+// 默认信号（强厄尔尼诺年实测）
+let SIG = {
+  enso:'强厄尔尼诺', nino34:2.45, ensoPeak:3.85,
+  sh:'异常强盛',
+  typhoon:7,                // 影响海南下半年台风个数
+  guangxiCold:50,           // 广西冷冬概率% (厄尔尼诺年华南偏暖，阶段性寒潮)
+  hainanArea:48,            // 海南椒类面积 万亩（已调减）
+  springFestival:'2026-02-17', qingming:'2026-04-05'
+};
+
+// 三个候选定植日（晚/中/早播）
+const PLAN_DATES = [
+  {key:'late', label:'晚播', plant:'2026-11-05', seedOffset:35},
+  {key:'mid',  label:'中播', plant:'2026-10-10', seedOffset:35},
+  {key:'early',label:'早播', plant:'2026-09-20', seedOffset:35}
+];
+
+/* ============ 工具 ============ */
+function addDays(d,n){var t=new Date(d+'T00:00:00');t.setDate(t.getDate()+n);return t;}
+function ymd(t){return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function esc(s){return String(s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
+
+/* ============ 核心引擎 ============ */
+// 价格窗口匹配：收获期（定植+dth ~ +dth+110天）按产量三角曲线加权，命中月度价格峰程度
+function priceWindowScore(plant, dth){
+  var start=addDays(plant,dth), end=addDays(plant,dth+110);
+  var span=(end-start)/86400000;          // 总天数
+  var sum=0,wsum=0,i=0;
+  for(var t=new Date(start); t<=end; t.setDate(t.getDate()+10), i++){
+    var m=t.getMonth()+1, mult=PRICE_MONTH[m]!=null?PRICE_MONTH[m]:0.40;
+    var frac=i*10/span;                    // 0~1 生育进度
+    var w=1-Math.abs(frac-0.5)*1.6;        // 三角权重，盛产期最高、两端低
+    if(w<0.15) w=0.15;
+    sum+=mult*w; wsum+=w;
+  }
+  var avg=sum/wsum;                        // 0.40 ~ 1.50
+  return Math.round(clamp((avg-0.40)/(1.50-0.40)*100,0,100));
+}
+// 天气风险：台风/降雨 + 疫病高湿 + 西部干旱，越晚播干旱升、台风降
+function weatherRisk(plant, westDry){
+  var m=new Date(plant+'T00:00:00').getMonth()+1; // 9~11
+  var typhoon = m<=8?92 : m===9?82 : m===10?48 : 22;
+  var disease = m<=8?86 : m===9?80 : m===10?52 : 32;
+  var drought = westDry ? (m<=8?28 : m===9?38 : m===10?58 : 72) : (m<=8?18:m===9?26:m===10?40:52);
+  // 信号调制
+  typhoon = clamp(typhoon * (1 + (SIG.typhoon-5)*0.045), 0, 100);
+  if(SIG.enso==='强厄尔尼诺') disease = clamp(disease+8,0,100); // 西部9月台风雨偏多→高湿
+  if(westDry && SIG.enso==='强厄尔尼诺') drought = clamp(drought+10,0,100); // 秋冬偏旱
+  return Math.round(typhoon*0.40 + disease*0.35 + drought*0.25);
+}
+// 供给适配：海南面积偏紧(+) + 广西冷冬传导(+) ；全国设施扩种为常压
+function supplyFit(){
+  var area = SIG.hainanArea;
+  var areaScore = area<=50?82 : area<=60?62 : area<=70?40 : 18; // 48万亩→82
+  var cold = SIG.guangxiCold;                                    // 越高越利好传导
+  // 全国设施面积扩大→结构性抑制（基准扣10）
+  var fit = areaScore*0.55 + cold*0.45 - 8;
+  return Math.round(clamp(fit,0,100));
+}
+// 信号适配：副高强(光照足利膨果+) 西部偏旱(需水肥一体,有备则+) 台风多(需防护-)
+function signalFit(){
+  var s=52;
+  if(SIG.sh==='异常强盛'||SIG.sh==='偏强') s+=14;
+  if(SIG.enso==='强厄尔尼诺') s+=8;   // 有准备则水肥一体化利好
+  if(SIG.typhoon>=7) s-=12;           // 台风多需防护投入
+  return Math.round(clamp(s,0,100));
+}
+// 单方案综合分
+function planScore(plant, dth, westDry){
+  var pw=priceWindowScore(plant,dth);
+  var wr=weatherRisk(plant,westDry);
+  var sf=supplyFit();
+  var sg=signalFit();
+  var total=Math.round(pw*0.45 + (100-wr)*0.30 + sf*0.15 + sg*0.10);
+  return {pw:pw, wr:wr, sf:sf, sg:sg, total:total};
+}
+// 品种评分
+function varietyScore(vk, base){
+  var v=VARIETIES[vk];
+  var priceN = clamp((v.price-2)/5*100,0,100);            // 2~7元/斤映射
+  var baseFit = (v.baseFit[base]||0.8)*100;
+  var s = priceN*0.40 + v.disease*100*0.25 + v.demand*100*0.20 + baseFit*0.15;
+  return Math.round(s);
+}
+
+/* ============ 渲染 ============ */
+function buildSigInputs(){
+  var defs=[
+    {k:'enso',label:'ENSO 状态',type:'sel',opts:['强厄尔尼诺','中性偏暖','拉尼娜'],hint:'BOM 2026-08 NINO3.4 +2.45℃'},
+    {k:'sh',label:'副热带高压',type:'sel',opts:['异常强盛','偏强','正常','偏弱'],hint:'带状稳定→光照足利膨果'},
+    {k:'typhoon',label:'影响海南台风数',type:'num',hint:'下半年 6–8 个，末台10月下旬'},
+    {k:'guangxiCold',label:'广西冷冬概率 %',type:'num',hint:'高→海南反季溢价传导'},
+    {k:'hainanArea',label:'海南椒类面积 万亩',type:'num',hint:'2025-26 调减至48（临界~70）'}
+  ];
+  var html=defs.map(function(d){
+    var ctrl;
+    if(d.type==='sel'){
+      ctrl='<select id="sig_'+d.k+'">'+d.opts.map(function(o){return '<option'+(SIG[d.k]===o?' selected':'')+'>'+o+'</option>';}).join('')+'</select>';
+    }else{
+      ctrl='<input id="sig_'+d.k+'" type="number" value="'+SIG[d.k]+'">';
+    }
+    return '<div class="sig"><label>'+d.label+'</label>'+ctrl+'<div class="hint">'+d.hint+'</div></div>';
+  }).join('');
+  document.getElementById('sigGrid').innerHTML=html;
+  // base & variety
+  document.getElementById('baseSel').innerHTML=Object.keys(BASES).map(function(b){return '<option value="'+b+'">'+BASES[b].name+'</option>';}).join('');
+  document.getElementById('varSel').innerHTML=Object.keys(VARIETIES).map(function(v){return '<option value="'+v+'">'+VARIETIES[v].name+'</option>';}).join('');
+}
+
+function readSig(){
+  SIG.enso=document.getElementById('sig_enso').value;
+  SIG.sh=document.getElementById('sig_sh').value;
+  SIG.typhoon=+document.getElementById('sig_typhoon').value;
+  SIG.guangxiCold=+document.getElementById('sig_guangxiCold').value;
+  SIG.hainanArea=+document.getElementById('sig_hainanArea').value;
+}
+
+function renderHero(){
+  var sf=supplyFit();
+  document.getElementById('heroMeta').innerHTML=
+    '<span>观测日 <b>'+TODAY+'</b></span>'+
+    '<span>ENSO <b>'+esc(SIG.enso)+'</b>（NINO3.4 +'+SIG.nino34+'℃）</span>'+
+    '<span>海南椒类 <b>'+SIG.hainanArea+'万亩</b>（调减利好）</span>'+
+    '<span>供给适配 <b>'+sf+'/100</b></span>';
+}
+
+function renderPlans(){
+  var base=document.getElementById('baseSel').value;
+  var vk=document.getElementById('varSel').value;
+  var v=VARIETIES[vk];
+  var westDry=BASES[base].westDry;
+  var results=PLAN_DATES.map(function(p){
+    var sc=planScore(p.plant, v.dth, westDry);
+    var seed=ymd(addDays(p.plant,-p.seedOffset));
+    var first=ymd(addDays(p.plant,v.dth));
+    var peak=ymd(addDays(p.plant,v.dth+55));
+    return {p:p, sc:sc, seed:seed, first:first, peak:peak};
+  });
+  var best=results.slice().sort(function(a,b){return b.sc.total-a.sc.total;})[0].p.key;
+  var html=results.map(function(r){
+    var riskPill = r.sc.wr>=70?'<span class="pill h">天气风险高</span>':r.sc.wr>=45?'<span class="pill m">天气风险中</span>':'<span class="pill l">天气风险低</span>';
+    var pwPill = r.sc.pw>=70?'<span class="pill l">价格窗口优</span>':r.sc.pw>=50?'<span class="pill m">价格窗口中</span>':'<span class="pill h">价格窗口弱</span>';
+    return '<div class="plan'+(r.p.key===best?' best':'')+'">'+
+      '<span class="tag">★ 推荐</span>'+
+      '<h3>'+r.p.label+'（定植 '+r.p.plant.slice(5)+'）</h3>'+
+      '<div class="score">'+r.sc.total+'<small> /100</small></div>'+
+      '<div class="barwrap"><i style="width:'+r.sc.total+'%"></i></div>'+
+      '<div class="row"><span>播种日</span><b>'+r.seed.slice(5)+'</b></div>'+
+      '<div class="row"><span>初采日</span><b>'+r.first.slice(5)+'</b></div>'+
+      '<div class="row"><span>盛产期</span><b>'+r.first.slice(5)+'–'+ymd(addDays(r.p.plant,v.dth+110)).slice(5)+'</b></div>'+
+      '<div class="row"><span>价格窗口分</span><b>'+r.sc.pw+'</b></div>'+
+      '<div class="row"><span>天气风险分</span><b>'+r.sc.wr+'</b></div>'+
+      '<div style="margin-top:6px">'+riskPill+pwPill+'</div>'+
+    '</div>';
+  }).join('');
+  document.getElementById('planCards').innerHTML=html;
+  var b=results.filter(function(r){return r.p.key===best;})[0];
+  document.getElementById('planNote').innerHTML='综合判定：<b>'+b.p.label+'（定植 '+b.p.plant.slice(5)+'）</b> 最优 —— 盛产期 '+b.first.slice(5)+' 起，覆盖春节('+SIG.springFestival.slice(5)+')与清明前高峰，天气风险可控。早播撞 9 月台风雨偏多、晚播收获后移偏避春节早期高价，请结合实播窗口取舍。';
+  return {best:best, results:results};
+}
+
+function renderVariety(){
+  var base=document.getElementById('baseSel').value;
+  var rows=Object.keys(VARIETIES).map(function(vk){
+    var v=VARIETIES[vk];
+    var s=varietyScore(vk,base);
+    return {vk:vk, v:v, s:s};
+  }).sort(function(a,b){return b.s-a.s;});
+  var html='<thead><tr><th>排名</th><th>品种</th><th>收购价<br>元/斤</th><th>溢价分</th><th>抗病<br>(疫病/青枯)</th><th>需求</th><th>基地适配</th><th>综合分</th><th>说明</th></tr></thead><tbody>'+
+    rows.map(function(r,i){
+      var priceN=clamp((r.v.price-2)/5*100,0,100);
+      return '<tr><td class="rk'+(i===0?' rec':'')+'">'+(i+1)+'</td>'+
+        '<td><b>'+esc(r.v.name)+'</b></td>'+
+        '<td>'+r.v.price.toFixed(2)+'</td>'+
+        '<td>'+Math.round(priceN)+'</td>'+
+        '<td>'+Math.round(r.v.disease*100)+'</td>'+
+        '<td>'+Math.round(r.v.demand*100)+'</td>'+
+        '<td>'+Math.round((r.v.baseFit[base]||0.8)*100)+'</td>'+
+        '<td class="rk'+(i===0?' rec':'')+'">'+r.s+'</td>'+
+        '<td style="color:var(--muted);font-size:12px">'+esc(r.v.note)+'</td></tr>';
+    }).join('')+'</tbody>';
+  document.getElementById('varTable').innerHTML=html;
+  return rows;
+}
+
+function renderFactors(){
+  var sf=supplyFit();
+  var factors=[
+    {n:'季节/反季窗口（春节+清明峰）', v:88, c:'var(--ok)', t:'反季节核心溢价来源'},
+    {n:'海南本地供给（面积偏紧）', v:sf, c:sf>=60?'var(--ok)':'var(--warn)', t:'48万亩已调减，偏紧利好'},
+    {n:'广西冷冬→海南涨价传导', v:SIG.guangxiCold, c:SIG.guangxiCold>=60?'var(--ok)':SIG.guangxiCold>=40?'var(--warn)':'var(--bad)', t:'暖冬则两广撞车利空'},
+    {n:'ENSO 西部偏旱（需水肥一体）', v:SIG.enso==='强厄尔尼诺'?72:40, c:'var(--warn)', t:'东方/昌江秋冬季偏旱'},
+    {n:'台风/降雨（9月偏多）', v:clamp(SIG.typhoon*11,0,100), c:'var(--bad)', t:SIG.typhoon+'个影响海南，末台10月下旬'},
+    {n:'全国设施辣椒扩种（常压）', v:55, c:'var(--warn)', t:'两广/云南/福建设施面积扩大'},
+    {n:'物流/出岛成本', v:50, c:'var(--neutral)', t:'过海费用削弱价格竞争力'}
+  ];
+  document.getElementById('factorBars').innerHTML=factors.map(function(f){
+    return '<div class="factor"><span class="fname">'+esc(f.n)+'</span>'+
+      '<span class="fbar"><i style="width:'+f.v+'%;background:'+f.c+'"></i></span>'+
+      '<span class="fval" style="color:'+f.c+'">'+f.v+'</span></div>'+
+      '<div style="grid-column:2/4;font-size:11px;color:var(--muted);margin:-4px 0 2px">'+esc(f.t)+'</div>';
+  }).join('');
+}
+
+function renderConclusion(planRes, varRows){
+  var bestPlan=planRes.results.filter(function(r){return r.p.key===planRes.best;})[0];
+  var bestVar=varRows[0];
+  var sf=supplyFit();
+  var conf = (SIG.guangxiCold>=40 && SIG.hainanArea<=55) ? '中高' : '中等';
+  var plantMsg = bestPlan.p.label+'（定植 '+bestPlan.p.plant.slice(5)+'，播种 '+bestPlan.seed.slice(5)+'）';
+  var html=
+    '<p class="big">✅ 建议：今年辣椒反季节<strong>值得做</strong>，优先「'+plantMsg+'」+ 主栽「'+esc(bestVar.v.name)+'」</p>'+
+    '<div class="line">• <b>何时种：</b>'+plantMsg+'。盛产期 '+bestPlan.first.slice(5)+' 起，精准覆盖春节('+SIG.springFestival.slice(5)+')与清明前('+SIG.qingming.slice(5)+')价格双峰；避开 9 月台风雨偏多风险窗口。</div>'+
+    '<div class="line">• <b>种什么：</b>综合溢价/抗病/需求/基地适配，<b>'+esc(bestVar.v.name)+'</b> 居首（'+bestVar.s+'分）。东方优先朝天椒/红线椒，昌江优先特色紫黄线椒差异化溢价、避同质化滞销。</div>'+
+    '<div class="line">• <b>价格怎么走：</b>海南椒类面积已由 71.6 万亩调减至 '+SIG.hainanArea+' 万亩（偏紧利好）；但需盯<strong>广西冷冬概率（'+SIG.guangxiCold+'%）</strong>——暖冬则两广提前上市"撞车"、反季优势失效，价格承压。</div>'+
+    '<div class="line">• <b>风险对冲：</b>强厄尔尼诺下西部秋冬季偏旱，必须配套水肥一体化滴灌；台风季前设施/排水提前到位，雨后必喷铜制剂防青枯/疫病。</div>'+
+    '<span class="conf">决策置信度：'+conf+'（信号确定度 '+sf+'/100 供给适配）</span>';
+  document.getElementById('concl').innerHTML=html;
+}
+
+function renderActions(planRes){
+  var bestPlan=planRes.results.filter(function(r){return r.p.key===planRes.best;})[0];
+  var items=[
+    {p:'p1', t:'确认「'+bestPlan.p.label+'」实播窗口，'+bestPlan.seed.slice(5)+' 前完成播种/育苗，错开 9 月台风雨偏多期'},
+    {p:'p1', t:'西部偏旱预警：部署滴灌水肥一体化，备好平衡型/高钾型水溶肥与糖醇钙镁'},
+    {p:'p2', t:'台风季（末台 10 月下旬）前：设施加固、田间排水沟清理、防虫网到位'},
+    {p:'p1', t:'选定主栽品种并锁种源：东方朝天椒/红线椒、昌江特色紫黄线椒，对接保底收购订单'},
+    {p:'p2', t:'建立出岛价格监测：盯三亚发改委/一亩田每日收购价，广西冷冬信号转强即上调预期'},
+    {p:'p2', t:'雨后必喷铜制剂（氢氧化铜/枯草芽孢杆菌）防青枯病、疫病；现配现用二次稀释'}
+  ];
+  document.getElementById('acts').innerHTML=items.map(function(it,i){
+    return '<li><input type="checkbox" id="act'+i+'" onchange="this.parentNode.classList.toggle(\'done\',this.checked)">'+
+      '<span><span class="pri '+it.p+'">'+it.p.toUpperCase()+'</span>'+esc(it.t)+'</span></li>';
+  }).join('');
+}
+
+function renderReasons(){
+  var reasons=[
+    {t:'为何反季节辣椒有制度性机会？',
+     why:'海南是全国冬春季"菜篮子"，11–4 月内地大田辣椒结束、南菜北运开启，海南反季节供应形成价格窗口。春节前后为全年价格峰值。',
+     en:'Hainan is a major off-season chili supplier for mainland China in winter/spring; prices peak around the Spring Festival when northern production ends.',
+     src:'海南省农业农村厅《冬季瓜菜种植结构调整》(2026-03)；一亩田市场分析'},
+    {t:'为何面积调减是利好信号？',
+     why:'海南椒类面积 2023–24 达 71.59 万亩（泡椒 20 余万亩）时严重过剩滞销；2025–26 主动"稳瓜减椒"调减至 48 万亩，供给收缩、价格传导更灵敏——印证你"临界面积失效"研究中的反向逻辑。',
+     en:'When Hainan pepper area exceeded ~70万亩, oversupply caused price collapse; the 2025–26 cut to 48万亩 tightens supply and revives the price-transmission mechanism.',
+     src:'海南省农业农村厅通报(2026-03)；南海网/南国都市报 2025 滞销报道'},
+    {t:'广西冷冬为何决定海南辣椒涨跌？',
+     why:'广西/广东/云南降温→南方辣椒减产→"南菜北运"缺口→海南反季节溢价。暖冬则两广辣椒提前上市与海南"撞车"，海南失反季优势、价格暴跌（2025 春节后螺丝椒/泡椒跌至 0.2–0.3 元/斤）。故广西冷冬概率是本决策最关键外部变量。',
+     en:'A cold winter in Guangxi/Yunnan reduces southern supply, raising Hainan off-season prices; a warm winter causes overlap with Guangxi harvests and collapses Hainan prices.',
+     src:'央广网/中国新闻网 寒潮菜价报道；用户"广西冷冬→海南涨价传导"框架'},
+    {t:'强厄尔尼诺对东方/昌江的具体影响？',
+     why:'2026 强厄尔尼诺（NINO3.4 +2.45℃，11 月峰值 +3.85℃）下，海南西部 9 月单月台风雨偏多、秋冬季偏旱趋势。早播（8–9 月）苗期遇高湿→疫病/青枯风险高；全期需水肥一体化应对偏旱；台风影响海南 6–8 个、末台 10 月下旬需防护。',
+     en:'Under strong El Niño, Hainan\'s west sees more September typhoon rain but an autumn–winter drought trend; integrated drip irrigation and pre-typhoon protection are required.',
+     src:'BOM/APCC ENSO 通报；海南气象局台风预测(2025-07-15 发布会)'},
+    {t:'品种价差为何巨大、如何选？',
+     why:'2026-02 三亚真实收购价：朝天椒 6.74、红线椒 5.29、红尖椒 4.10 元/斤，而泡椒 2.55、圆椒 2.12。朝天椒依托东方专业市场（年均 2 亿斤、交易额 10 亿）溢价最高；泡椒/圆椒同质化严重易滞销。昌江特色紫黄线椒走差异化避竞争。',
+     en:'Variety price spread is large (朝天椒 6.74 vs 圆椒 2.12 元/斤); choose high-premium, disease-resistant, differentiated varieties to avoid oversupply.',
+     src:'三亚市发改委价格监测日报(2026-02-09)；东方市农业农村局朝天椒市场数据；一亩田临高报价'},
+    {t:'播期如何与价格双峰对齐？',
+     why:'春节(2026-02-17)为价格主峰、清明前(4-5)为次峰。东方/昌江常规 10 月上旬定植→11 月下旬–12 月初初采→1–3 月盛产，正好覆盖双峰；过早(8–9 月定植)撞 9 月台风雨且盛产前移、错过春节早期高价，过晚(11 月后)收获后移偏避春节早期高价。本引擎综合分已量化此权衡。',
+     en:'Align planting so harvest peaks at Spring Festival (Feb 17) and pre-Qingming (Apr 5); conventional early-October transplanting in Dongfang/Changjiang covers both peaks.',
+     src:'一亩田《线椒海南上市时间表》；琼海辣椒高产栽培技术；用户播期研究(8/15 vs 8/30)'}
+  ];
+  document.getElementById('reasons').innerHTML=reasons.map(function(r){
+    return '<details class="reason"><summary><span class="ar">▾</span>'+esc(r.t)+'</summary>'+
+      '<div class="body"><div class="why"><b>机理：</b>'+esc(r.why)+'</div>'+
+      '<div class="en">'+esc(r.en)+'</div>'+
+      '<div class="src">来源：'+esc(r.src)+'</div></div></details>';
+  }).join('');
+}
+
+function recompute(){
+  readSig();
+  renderHero();
+  var planRes=renderPlans();
+  var varRows=renderVariety();
+  renderFactors();
+  renderConclusion(planRes, varRows);
+  renderActions(planRes);
+  renderReasons();
+}
+
+/* init */
+buildSigInputs();
+recompute();
+</script>
+</body>
+</html>
