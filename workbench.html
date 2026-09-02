@@ -376,6 +376,8 @@
   .ta-done-flag{font-size:13px;font-weight:700;color:var(--s-500);background:var(--s-50);border:1px solid var(--s-100);border-radius:9px;padding:7px 14px;}
   .wb-today-empty{background:#fff;border:1px dashed var(--g-200);border-radius:var(--radius);padding:22px;text-align:center;color:var(--s-500);font-size:13.5px;line-height:1.7;}
   .wb-today-empty b{color:var(--g-700);}
+  .ta-progress{height:8px;background:var(--s-100);border-radius:999px;overflow:hidden;margin-bottom:12px;}
+  .ta-progress-bar{height:100%;background:linear-gradient(90deg,var(--g-500),var(--g-700));border-radius:999px;transition:width .3s;}
   .wb-soon .wb-todo .t-name{font-weight:600;color:var(--s-700);}
   .wb-soon .wb-todo .t-name b{color:var(--g-700);}
   /* 每日行情数据面板 */
@@ -1559,6 +1561,27 @@ function mobileTodoPanel(openTasks){
 /* ============================================================
    页面：今日行动（手机端首屏着陆页）
    ============================================================ */
+function fmtDate8(d){ return d.toLocaleDateString('en-CA',{timeZone:'Asia/Shanghai'}); }
+/* 连续打卡天数：基于农事记录(records)的 operate_date；今天允许"进行中"（昨天有记录则不断），昨天起断则归零 */
+function checkinStreak(){
+  var dates={};
+  getRecords().forEach(function(r){ if(r.operate_date) dates[r.operate_date]=1; });
+  if(!Object.keys(dates).length) return 0;
+  var t=new Date(todayISO()+'T00:00:00+08:00');
+  var streak=0;
+  if(dates[todayISO()]){ streak=1; }
+  else {
+    var y=new Date(t.getTime()-86400000);
+    if(!dates[fmtDate8(y)]) return 0;
+    streak=1; t=y;
+  }
+  while(true){
+    t=new Date(t.getTime()-86400000);
+    var s=fmtDate8(t);
+    if(dates[s]){ streak++; } else break;
+  }
+  return streak;
+}
 function todayRecordDone(p){
   var td=todayISO();
   return getRecords().some(function(r){
@@ -1601,8 +1624,12 @@ function renderToday(main){
       '<div class="th-stat"><b>'+active.length+'</b><span>种植地块</span></div>'+
       '<div class="th-stat"><b>'+Object.keys(bases).length+'</b><span>基地</span></div>'+
       '<div class="th-stat"><b>'+openTasks.length+'</b><span>待办</span></div>'+
+      '<div class="th-stat"><b>'+checkinStreak()+'</b><span>连续打卡</span></div>'+
     '</div></div>';
 
+  var doneCount=todayItems.filter(todayRecordDone).length;
+  var totalCount=todayItems.length;
+  var progPct= totalCount? Math.round(doneCount/totalCount*100):0;
   var actionHtml;
   if(todayItems.length){
     actionHtml=todayItems.map(function(p){
@@ -1623,7 +1650,7 @@ function renderToday(main){
       '</div>';
     }).join('');
   } else {
-    actionHtml='<div class="wb-today-empty">🎉 <b>今日暂无集中作业窗口</b><br>可安排巡田、学习方案，或处理下方待办。未来 3 天有 '+soonItems.length+' 项作业将陆续进入窗口。</div>';
+    actionHtml='<div class="wb-today-empty">🎉 <b>今日暂无集中作业窗口</b><br>已连续打卡 '+checkinStreak()+' 天，保持节奏！可安排巡田、学习方案，或处理下方待办。未来 3 天有 '+soonItems.length+' 项作业将陆续进入窗口。</div>';
   }
 
   var soonHtml=soonItems.length?soonItems.map(function(p){
@@ -1643,7 +1670,9 @@ function renderToday(main){
 
   main.innerHTML=hero+
     '<div class="wb-today-section"><div class="wb-panel"><div class="wb-list-head"><h3>今日行动</h3>'+
-      (todayItems.length?'<span class="wb-muted">'+todayItems.length+' 项 · 点「标记完成」写入农事记录</span>':'')+'</div>'+actionHtml+'</div></div>'+
+      (totalCount?'<span class="wb-muted">已完成 '+doneCount+' / '+totalCount+'</span>':'')+'</div>'+
+      (totalCount?'<div class="ta-progress"><div class="ta-progress-bar" style="width:'+progPct+'%"></div></div>':'')+
+      actionHtml+'</div></div>'+
     '<div class="wb-today-section"><div class="wb-panel wb-soon"><div class="wb-list-head"><h3>未来 3 天</h3><span class="wb-muted">即将进入作业窗口</span></div>'+soonHtml+'</div></div>'+
     '<div class="wb-today-section"><div class="wb-panel"><div class="wb-list-head"><h3>工作待办事项</h3>'+
       '<button class="wb-btn wb-btn-primary" type="button" onclick="openGlobalTaskModal()">＋ 新建待办</button></div>'+todoHtml+'</div></div>';
