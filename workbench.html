@@ -80,6 +80,12 @@
   .wb-todo .t-meta{color:var(--s-500);font-size:12px;white-space:nowrap;}
   .wb-todo .t-btn{padding:4px 10px;font-size:12px;border:1px solid var(--g-600);color:var(--g-700);border-radius:8px;background:#fff;cursor:pointer;white-space:nowrap;}
   .wb-todo .t-btn:hover{background:var(--g-50);}
+  /* 移动端专属「工作待办事项」块：桌面默认隐藏，仅手机端显示 */
+  .wb-mtodo{display:none;}
+  .wb-hide-mobile{display:block;}
+  .wb-todo .t-check{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--g-600);background:#fff;color:var(--g-600);font-size:13px;font-weight:700;cursor:pointer;flex:none;display:inline-flex;align-items:center;justify-content:center;padding:0;line-height:1;}
+  .wb-todo .t-check.done{background:var(--g-600);color:#fff;border-color:var(--g-600);}
+  .wb-todo.is-done .t-name{text-decoration:line-through;color:var(--s-400);}
   .wb-empty{color:var(--s-400);font-size:13px;padding:14px 0;text-align:center;}
 
   /* 地块列表 */
@@ -313,6 +319,19 @@
     .wb-side-actions a,.wb-side-actions button{
       width:auto;flex:0 0 auto;padding:6px 12px;font-size:12px;white-space:nowrap;
     }
+    /* 品牌栏吸顶，配合下方功能切换栏一起固定在屏幕上方 */
+    .wb-header{position:sticky;top:0;z-index:200;}
+    /* 移动端简化：隐藏采购测算 / 报表中心 / 植保决策 三项切换 */
+    #wbNav a[data-route="purchase"],
+    #wbNav a[data-route="reports"],
+    #wbNav a[href="peanut-tool.html"]{display:none;}
+    /* 侧栏动作中隐藏「植保方案」入口（对应植保决策） */
+    .wb-side-actions a[href="qicai-huasheng/index.html"]{display:none;}
+    /* 侧栏动作中的「物资库」与切换栏重复，移动端仅保留最常用的「新建地块」 */
+    .wb-side-actions button[onclick*="#/materials"]{display:none;}
+    /* 移动端专属：显示工作待办事项块，收起偏重的经营/采购面板 */
+    .wb-mtodo{display:block;}
+    .wb-hide-mobile{display:none;}
     .wb-stats{grid-template-columns:repeat(2,1fr);}
     .wb-quick{grid-template-columns:1fr;}
     .wb-two-col{grid-template-columns:1fr;}
@@ -1443,8 +1462,9 @@ function renderDashboard(main){
   var actions=scalePlanItems(3);
   var openTasks=tasks.filter(function(t){return !t.done;});
   var rows=actions.length?actions.map(function(p){
+    var mats=planMaterials(p).slice(0,5).map(function(m){return esc(m.name)+' '+esc(m.dosage)+'/亩';}).join('；') || '按方案巡田执行';
     var tag=p.active?'<span class="wb-status st-planting">今日窗口</span>':'<span class="wb-status st-wait">'+p.dueIn+'天后</span>';
-    return '<tr><td><a href="#/land/'+esc(p.land.land_id)+'" style="font-weight:800;color:var(--g-700)">'+esc(p.land.name)+'</a><br><small>'+esc(p.land.crop||'—')+' · 播后 '+esc(p.days==null?'':p.days)+' 天</small></td><td>'+landAreaMu(p.land).toFixed(2)+' 亩</td><td>'+esc(p.stage)+'</td><td>'+esc(p.op)+'</td><td><div class="wb-cell-clamp">'+esc(p.list||p.mix||'按方案巡田执行')+'</div></td><td>'+tag+'</td></tr>';
+    return '<tr><td>'+tag+'<br><small>'+esc(p.dueDate)+'</small></td><td><a href="#/land/'+esc(p.land.land_id)+'" style="color:var(--g-700);font-weight:700">'+esc(p.land.name)+'</a><br><small>'+esc(p.land.crop||'—')+' ｜ '+landAreaMu(p.land).toFixed(2)+'亩</small></td><td>'+esc(p.planName||'')+'</td><td>'+esc(p.stage)+'</td><td>'+esc(p.op)+'</td><td><div class="wb-cell-clamp">'+mats+'</div></td></tr>';
   }).join(''):'<tr><td colspan="6" class="wb-empty">未来 3 天暂无集中作业窗口；请确认地块状态、作物和种植/播种日期。</td></tr>';
   var risks=dashboardRisks(lands,mats,tasks);
   var riskHtml=risks.length?risks.slice(0,10).map(function(r){return '<div class="wb-todo"><span class="t-name">'+esc(r.title)+'</span><span class="t-meta">'+esc(r.meta)+'</span><span class="wb-status '+(r.level==='danger'?'st-wait':'st-fallow')+'">'+(r.level==='danger'?'优先':'注意')+'</span></div>';}).join(''):'<div class="wb-empty">暂无明显风险项</div>';
@@ -1464,13 +1484,14 @@ function renderDashboard(main){
       statCard('3天内作业',actions.length,'项')+
       statCard('未完成待办',openTasks.length,'条')+
     '</div>'+
+    mobileTodoPanel(openTasks)+
     '<div class="wb-panel" style="margin-top:18px"><div class="wb-list-head"><h3>今日 / 未来 3 天作业清单</h3><button class="wb-btn wb-btn-light" onclick="generateScaleTasks(3)">批量生成待办</button></div>'+
-      '<div style="overflow:auto"><table class="wb-table wb-ops-table"><colgroup><col><col><col><col><col><col></colgroup><thead><tr><th>地块</th><th>面积</th><th>节点</th><th>作业<br>方式</th><th>建议内容</th><th>状态</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>'+
+      '<div style="padding:0;overflow:auto"><table class="wb-table wb-dispatch-table"><thead><tr><th>状态</th><th>地块</th><th>方案</th><th>节点</th><th>作业<br>方式</th><th>建议内容</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>'+
     '<div class="wb-panel" style="margin-top:18px"><div class="wb-list-head"><h3>风险队列</h3><span class="wb-muted">最近 10 项；右侧「注意/优先」标签可滚动查看</span></div>'+riskHtml+'</div>'+
     '<div class="wb-two-col" style="margin-top:18px">'+
-      '<div class="wb-panel"><div class="wb-list-head"><h3>物资库存与采购预警</h3><button class="wb-btn wb-btn-light" onclick="location.hash=\'#/purchase\'">采购测算</button></div>'+
+      '<div class="wb-panel wb-hide-mobile"><div class="wb-list-head"><h3>物资库存与采购预警</h3><button class="wb-btn wb-btn-light" onclick="location.hash=\'#/purchase\'">采购测算</button></div>'+
         '<div style="overflow:auto"><table class="wb-table"><thead><tr><th>物资</th><th>类别</th><th>库存</th><th>安全库存</th><th>单价</th><th>状态</th></tr></thead><tbody>'+matRows+'</tbody></table></div></div>'+
-      '<div class="wb-panel"><h3>经营指标</h3>'+
+      '<div class="wb-panel wb-hide-mobile"><h3>经营指标</h3>'+
         '<div class="wb-todo"><span class="t-name">农事记录总数</span><span class="t-meta">'+records.length+' 条，记录越完整，复盘越可靠</span></div>'+
         '<div class="wb-todo"><span class="t-name">估算投入</span><span class="t-meta">¥ '+Math.round(totalCost)+'，按实际金额优先、物资单价兜底</span></div>'+
         '<div class="wb-todo"><span class="t-name">采收收入</span><span class="t-meta">¥ '+Math.round(totalRevenue)+'，来自采收记录销售额</span></div>'+
@@ -1479,6 +1500,21 @@ function renderDashboard(main){
     '</div>';
 }
 function renderHome(main){ renderDashboard(main); }
+/* 移动端首屏专属：工作待办事项（仅手机端显示，桌面默认隐藏） */
+function mobileTodoPanel(openTasks){
+  var rows=openTasks.length?openTasks.map(function(t){
+    var land=t.land_id?(getLand(t.land_id)||{}):{};
+    var due=t.due_date?esc(t.due_date):'';
+    var over=(t.due_date&&t.due_date<todayISO())?' · 逾期':'';
+    var sub=(land.name?esc(land.name):'')+(due?(' · '+due+over):'');
+    return '<div class="wb-todo"><button class="t-check" type="button" onclick="toggleTask(\''+esc(t.task_id)+'\');router()">○</button>'+
+      '<span class="t-name">'+esc(t.title)+'</span>'+
+      (sub?'<span class="t-meta">'+sub+'</span>':'')+'</div>';
+  }).join(''):'<div class="wb-empty">暂无工作待办，点「＋ 新建待办」添加</div>';
+  return '<div class="wb-panel wb-mtodo" style="margin-top:18px">'+
+    '<div class="wb-list-head"><h3>工作待办事项</h3>'+
+    '<button class="wb-btn wb-btn-primary" type="button" onclick="openGlobalTaskModal()">＋ 新建待办</button></div>'+rows+'</div>';
+}
 function statCard(label,value,unit){
   return '<div class="wb-stat"><div class="label">'+esc(label)+'</div><div class="value">'+esc(value)+'<span class="unit">'+esc(unit)+'</span></div></div>';
 }
@@ -2309,6 +2345,21 @@ function submitTask(landId){
   var title=document.getElementById('t_title').value.trim();
   if(!title){ alert('请填写待办内容'); return; }
   addTask({land_id:landId, title:title, due_date:document.getElementById('t_due').value});
+  closeModal();
+  router();
+}
+/* 全局新建待办（不绑定地块），供移动端「工作待办事项」使用 */
+function openGlobalTaskModal(){
+  var html='<h3>新建工作待办</h3>'+
+    field('待办内容','<input id="t_title" placeholder="如：8月25日叶面肥">')+
+    field('到期日期','<input id="t_due" type="date" value="'+todayISO()+'">')+
+    '<div class="wb-modal-actions"><button class="wb-btn" type="button" onclick="closeModal()">取消</button><button class="wb-btn wb-btn-primary" type="button" onclick="submitGlobalTask()">保存待办</button></div>';
+  wbModal(html);
+}
+function submitGlobalTask(){
+  var title=document.getElementById('t_title').value.trim();
+  if(!title){ alert('请填写待办内容'); return; }
+  addTask({title:title, due_date:document.getElementById('t_due').value});
   closeModal();
   router();
 }
