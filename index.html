@@ -3066,6 +3066,13 @@ input[type="reset"],
 .pp-calc-formula .pp-cf-final{color:#86efac;font-weight:700;background:rgba(134,239,172,.14);padding:1px 5px;border-radius:3px;margin-left:2px}
 .pp-calc-formula .pp-cf-line{display:inline;white-space:nowrap}
 .pp-calc-formula .pp-cf-line-h{display:block;white-space:nowrap;overflow:hidden;text-overflow:clip}
+.pp-calc-formula .pp-cf-input{background:rgba(253,230,138,.10);color:#fde68a;font-weight:600;
+  border:0;border-bottom:1px dashed rgba(253,230,138,.5);padding:0 3px;margin:0 1px;
+  width:58px;height:18px;font-family:inherit;font-size:12px;text-align:center;border-radius:2px;
+  -moz-appearance:textfield;}
+.pp-calc-formula .pp-cf-input::-webkit-outer-spin-button,
+.pp-calc-formula .pp-cf-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+.pp-calc-formula .pp-cf-input:focus{outline:none;background:rgba(253,230,138,.22);border-bottom:1px solid #fde68a;}
 
 
 </style>
@@ -7018,12 +7025,17 @@ function ppRenderPlanCalcDetail(p) {
     { lbl: '过滤阀门', v: p.filterLoss },
     { lbl: '富余',     v: p.marginHead }
   ];
+  const EDITABLE_PARTS = { '提升': 'tl_lift', '地形': 'tl_dh' };
   const partsHtml = parts.map((it, i) => {
     // 已有压力用「−」号，0 时显示为 0.0 保持格式一致
     const sign = it.v < 0 ? '−' : (i === 0 ? '' : '+');
     const abs = Math.abs(it.v);
+    const target = EDITABLE_PARTS[it.lbl];
+    const valHtml = target
+      ? `<input type="number" step="any" min="0" class="pp-cf-num pp-cf-input" data-target="${target}" value="${abs.toFixed(2)}" title="可调节：写回原表单字段，触发重算">`
+      : `${N}${abs.toFixed(2)}${E}`;
     return (i > 0 ? `${O}${sign}${E} ` : '') +
-           `${it.lbl} ${N}${abs.toFixed(2)}${E}`;
+           `${it.lbl} ${valHtml}`;
   }).join(' ');
   const lineH = `<span class="pp-cf-name">扬程 H</span>` +
                 `<span class="pp-cf-eq">= (</span>` +
@@ -7035,6 +7047,20 @@ function ppRenderPlanCalcDetail(p) {
                 `${R}${p.pumpHead.toFixed(2)} m${E}`;
 
   el.innerHTML = `<span class="pp-cf-line pp-cf-line-h">${lineH}</span>`;
+  // 委托：提升/地形 inline input → 写回表单字段并触发重算
+  if (!el.dataset._editableBound) {
+    el.addEventListener('change', (ev) => {
+      const inp = ev.target.closest && ev.target.closest('input.pp-cf-input');
+      if (!inp) return;
+      const targetId = inp.dataset.target;
+      const v = parseFloat(inp.value);
+      if (Number.isFinite(v) && targetId) {
+        const tgt = document.getElementById(targetId);
+        if (tgt) { tgt.value = v; if (typeof calcPlan === 'function') calcPlan(); }
+      }
+    });
+    el.dataset._editableBound = '1';
+  }
   } catch(e) { console.error('[ppCalc] 渲染失败：', e); }
 }
 window.ppRenderPlanCalcDetail = ppRenderPlanCalcDetail;
