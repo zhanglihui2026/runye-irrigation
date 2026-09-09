@@ -2916,6 +2916,8 @@ input[type="reset"],
 .ry-nav .mobile-menu-btn span{display:block;width:22px;height:2px;background:var(--s-700);border-radius:0;}
 .ry-nav .nav-home-btn{margin-left:8px;display:none;/* 隐藏「返回主页」：将来恢复改为 inline-flex */align-items:center;gap:6px;padding:9px 16px;background:var(--g-700);color:#fff;font-size:14px;font-weight:700;text-decoration:none;border:0;border-radius:0;cursor:pointer;transition:var(--transition);white-space:nowrap;letter-spacing:.5px;}
 .ry-nav .nav-home-btn:hover{background:var(--g-800);}
+/* 隐藏 plan 栏「每区面积」项（两处共用一套隐藏规则）—— 将来恢复把下面一行删掉 */
+.pp-plan-item:has(#planZoneMu),.pp-plan-item:has(#tlPlanZoneMu){display:none;}
 /* ===== /RY-NAV ===== */
 
 /* ===== 移动端增强（手机浏览器适配） ===== */
