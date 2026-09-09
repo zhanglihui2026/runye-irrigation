@@ -3518,17 +3518,7 @@ input[type="reset"],
       <span style="flex:1"></span>
       <button class="pp-btn-ghost" id="tlSavePng" style="display:none" title="将施工简图保存为 PNG 图片">📥 保存图片</button>
     </div>
-    <div id="tlDiagramContent"><div class="pp-diagram-empty">完成面积测量并点击上方「一键生成管线图」后，这里显示三级管线施工简图；点击「⚙️ 系统图生成」可在下方直接生成首部系统图。</div></div>
-  </div>
-
-  <!-- 首部系统图：与三级管线施工简图同一板块、上下排列，点击「⚙️ 系统图生成」后用 iframe 直接内嵌渲染 -->
-  <div class="pp-diagram-wrap" id="tlSystemDiagramWrap" style="display:none;margin-top:14px">
-    <div class="pp-diagram-title">📋 首部系统图
-      <span style="flex:1"></span>
-      <a class="pp-btn-ghost" id="tlSystemOpenNew" target="_blank" rel="noopener" style="text-decoration:none">🔗 新窗口打开</a>
-      <button class="pp-btn-ghost" id="tlSystemClose" style="margin-left:6px">✕ 收起</button>
-    </div>
-    <iframe id="tlSystemIframe" title="首部系统图（iframe 内嵌）" style="width:100%;height:620px;border:1px solid rgba(134,239,172,.18);border-radius:6px;background:#fff"></iframe>
+    <div id="tlDiagramContent"><div class="pp-diagram-empty">完成面积测量并点击上方「一键生成管线图」后，这里显示三级管线施工简图；点击「⚙️ 系统图生成」将在新窗口打开首部系统图。</div></div>
   </div>
 </section>
 
@@ -6155,43 +6145,8 @@ function tlOpenSystemDiagram() {
             '&front=' + encodeURIComponent(front) +
             '&main=' + encodeURIComponent(main) +
             '&zc=' + encodeURIComponent(zc);
-
-  var wrap = document.getElementById('tlSystemDiagramWrap');
-  var iframe = document.getElementById('tlSystemIframe');
-  var openNew = document.getElementById('tlSystemOpenNew');
-  if (!wrap || !iframe) { window.open(url, '_blank'); return; } // 兜底：找不到面板时回退到原行为
-
-  // 已显示且 src 相同 → 不重复加载，仅滚动到可视区
-  if (wrap.style.display !== 'none' && iframe.src === url) {
-    wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    return;
-  }
-
-  iframe.src = url;
-  if (openNew) openNew.href = url;
-  wrap.style.display = '';
-  wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  window.open(url, '_blank');
 }
-
-/* 收起首部系统图面板（隐藏 + 清空 iframe src，释放 iframe 内页面内存） */
-function tlCloseSystemDiagram() {
-  var wrap = document.getElementById('tlSystemDiagramWrap');
-  var iframe = document.getElementById('tlSystemIframe');
-  if (iframe) {
-    // 用 about:blank 而非空 src，可彻底停止 iframe 内脚本与定时器
-    iframe.src = 'about:blank';
-  }
-  if (wrap) wrap.style.display = 'none';
-}
-
-/* 「✕ 收起」按钮事件绑定（DOM 中静态存在，绑定一次即可） */
-(function bindTlSystemClose(){
-  var btn = document.getElementById('tlSystemClose');
-  if (btn && !btn.dataset._bound) {
-    btn.addEventListener('click', tlCloseSystemDiagram);
-    btn.dataset._bound = '1';
-  }
-})();
 
 // Zone count selector
 document.querySelectorAll('#tlZoneCountGroup button').forEach(function(btn){
