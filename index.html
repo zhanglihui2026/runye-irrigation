@@ -7025,14 +7025,16 @@ function ppRenderPlanCalcDetail(p) {
     { lbl: '过滤阀门', v: p.filterLoss },
     { lbl: '富余',     v: p.marginHead }
   ];
-  const EDITABLE_PARTS = { '提升': 'tl_lift', '地形': 'tl_dh' };
+  // 提升/地形 在「精准灌溉」一级系统中对应的表单字段是 fld_lift / fld_dh
+  // （calcPlan 只读这两个字段），故 inline 修改必须写回它们，calcPlan 才会连带刷新扬程结果
+  const EDITABLE_PARTS = { '提升': 'fld_lift', '地形': 'fld_dh' };
   const partsHtml = parts.map((it, i) => {
     // 已有压力用「−」号，0 时显示为 0.0 保持格式一致
     const sign = it.v < 0 ? '−' : (i === 0 ? '' : '+');
     const abs = Math.abs(it.v);
     const target = EDITABLE_PARTS[it.lbl];
     const valHtml = target
-      ? `<input type="number" step="any" min="0" class="pp-cf-num pp-cf-input" data-target="${target}" value="${abs.toFixed(2)}" title="可调节：写回原表单字段，触发重算">`
+      ? `<input type="number" step="any" min="0" class="pp-cf-num pp-cf-input" data-target="${target}" value="${abs.toFixed(2)}" title="可调节：写回「井/水池提升高度 / 水源至最高点高差」并触发重算，扬程结果实时变化">`
       : `${N}${abs.toFixed(2)}${E}`;
     return (i > 0 ? `${O}${sign}${E} ` : '') +
            `${it.lbl} ${valHtml}`;
