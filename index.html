@@ -3073,6 +3073,8 @@ input[type="reset"],
 .pp-calc-formula .pp-cf-input::-webkit-outer-spin-button,
 .pp-calc-formula .pp-cf-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
 .pp-calc-formula .pp-cf-input:focus{outline:none;background:rgba(253,230,138,.22);border-bottom:1px solid #fde68a;}
+.pp-calc-formula .pp-cf-note{color:rgba(253,230,138,.50);font-size:11px;font-weight:500;
+  margin:0 2px 0 1px;letter-spacing:0;}
 
 
 </style>
@@ -7015,13 +7017,14 @@ function ppRenderPlanCalcDetail(p) {
   // 扬程 H = (提升 + 地形 + 入口×10.2 - 已有×10.2 + 主管损失 + 支管损失 + 过滤阀门 + 富余) × 1.10
   const tapeM = p.tapePressure * 10.2;
   const existM = (p.existPressure || 0) * 10.2;
+  // 「已有压力」默认 0，对扬程无贡献，从公式行隐藏（计算仍保留）
+  // 「主管损失/支管损失」后括弧注明对应管长，便于理解损失对应的几何尺度
   const parts = [
     { lbl: '提升',    v: p.lift },
     { lbl: '地形',    v: p.dh },
     { lbl: '入口压力', v: tapeM },
-    { lbl: '已有压力', v: -existM },
-    { lbl: '主管损失', v: p.mainLoss },
-    { lbl: '支管损失', v: p.branchLoss },
+    { lbl: '主管损失', v: p.mainLoss,  note: '主管 '+Math.round(p.mainPipeLen)+'m' },
+    { lbl: '支管损失', v: p.branchLoss, note: p.branchCount+'根×'+Math.round(p.branchLen)+'m/根' },
     { lbl: '过滤阀门', v: p.filterLoss },
     { lbl: '富余',     v: p.marginHead }
   ];
@@ -7036,8 +7039,9 @@ function ppRenderPlanCalcDetail(p) {
     const valHtml = target
       ? `<input type="number" step="any" min="0" class="pp-cf-num pp-cf-input" data-target="${target}" value="${abs.toFixed(2)}" title="可调节：写回「井/水池提升高度 / 水源至最高点高差」并触发重算，扬程结果实时变化">`
       : `${N}${abs.toFixed(2)}${E}`;
+    const noteHtml = it.note ? `<span class="pp-cf-note">（${it.note}）</span>` : '';
     return (i > 0 ? `${O}${sign}${E} ` : '') +
-           `${it.lbl} ${valHtml}`;
+           `${it.lbl} ${valHtml}${noteHtml}`;
   }).join(' ');
   const lineH = `<span class="pp-cf-name">扬程 H</span>` +
                 `<span class="pp-cf-eq">= (</span>` +
