@@ -146,6 +146,8 @@ input[type="reset"],
 .ry-nav .mobile-menu-btn span{display:block;width:22px;height:2px;background:var(--s-700);border-radius:0;}
 .ry-nav .nav-home-btn{margin-left:8px;display:inline-flex;align-items:center;gap:6px;padding:9px 16px;background:var(--g-700);color:#fff;font-size:14px;font-weight:700;text-decoration:none;border:0;border-radius:0;cursor:pointer;transition:var(--transition);white-space:nowrap;letter-spacing:.5px;}
 .ry-nav .nav-home-btn:hover{background:var(--g-800);}
+/* 隐藏「返回主页」：将来恢复改为 inline-flex —— 与精准灌溉 index.html 保持一致 */
+.ry-nav .nav-home-btn{display:none;}
 /* 手机端导航：取消汉堡弹窗，顶部常驻一行横向滑动（与精准灌溉页 index.html 完全一致） */
 @media(max-width:768px){
   .ry-nav .main-header{height:auto}
@@ -170,20 +172,6 @@ input[type="reset"],
 
 <!-- ===== 主页导航（嵌入） ===== -->
 <div class="ry-nav">
-  <div class="utility-bar">
-    <div class="utility-inner">
-      <div class="utility-left">
-        <a href="runye-landing.html">联系我们</a>
-        <a href="runye-landing.html">常见问题</a>
-        <a href="runye-landing.html">下载中心</a>
-      </div>
-      <div class="utility-right">
-        <a href="runye-landing.html">语言</a>
-        <span class="utility-divider"></span>
-        <a href="runye-landing.html">中 / EN</a>
-      </div>
-    </div>
-  </div>
   <header class="main-header">
     <div class="header-inner">
       <a href="runye-landing.html" class="brand">
@@ -194,11 +182,8 @@ input[type="reset"],
         </div>
       </a>
         <nav class="main-nav" id="mainNav">
-          <div class="nav-item"><a href="数字农业.html" class="nav-link">数字农业</a></div>
           <div class="nav-item"><a href="index.html" class="nav-link active">精准灌溉</a></div>
         <div class="nav-item"><a href="耐特菲姆滴灌带长度查询器.html" class="nav-link">滴灌带查询</a></div>
-        <div class="nav-item"><a href="qicai-huasheng/index.html" class="nav-link">种植方案</a></div>
-          <div class="nav-item"><a href="文献/花生钙营养管理_整理翻译.html" class="nav-link">文献查询</a></div>
         </nav>
       <a href="runye-landing.html" class="nav-home-btn">⌂ 返回主页</a>
       <div class="header-actions">
