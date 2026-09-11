@@ -22,13 +22,6 @@
   ul{list-style:none;}
 
   /* ===== 顶部工具条 ===== */
-  .utility-bar{background:var(--s-800);color:var(--s-300);font-size:12px;}
-  .utility-inner{max-width:var(--maxw);margin:0 auto;padding:8px 24px;display:flex;justify-content:space-between;align-items:center;}
-  .utility-left{display:flex;gap:18px;align-items:center;}
-  .utility-left a,.utility-right a{color:var(--s-300);transition:var(--transition);}
-  .utility-left a:hover,.utility-right a:hover{color:#fff;}
-  .utility-right{display:flex;gap:18px;align-items:center;}
-  .utility-divider{width:1px;height:12px;background:var(--s-600);}
 
 /* ===== RY-NAV: 主页导航嵌入（与精准灌溉页 index.html 完全一致） ===== */
 .ry-nav{
@@ -41,13 +34,7 @@
   --maxw:1280px;
   font-family:"Microsoft YaHei","PingFang SC","Segoe UI",system-ui,-apple-system,sans-serif;
 }
-.ry-nav .utility-bar{background:var(--s-800);color:var(--s-300);font-size:12px;}
-.ry-nav .utility-inner{max-width:var(--maxw);margin:0 auto;padding:8px 24px;display:flex;justify-content:space-between;align-items:center;}
-.ry-nav .utility-left{display:flex;gap:18px;align-items:center;}
-.ry-nav .utility-left a,.ry-nav .utility-right a{color:var(--s-300);transition:var(--transition);text-decoration:none;}
-.ry-nav .utility-left a:hover,.ry-nav .utility-right a:hover{color:#fff;}
-.ry-nav .utility-right{display:flex;gap:18px;align-items:center;}
-.ry-nav .utility-divider{width:1px;height:12px;background:var(--s-600);}
+
 .ry-nav .main-header{background:#fff;box-shadow:var(--shadow-sm);border-bottom:1px solid var(--s-100);padding:0;margin:0;}
 .ry-nav .header-inner{max-width:var(--maxw);margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:72px;}
 .ry-nav .brand{display:flex;align-items:center;gap:12px;text-decoration:none;}
@@ -83,7 +70,7 @@
   .ry-nav .main-nav .nav-item{flex:0 0 auto}
   .ry-nav .nav-link{padding:11px 15px;font-size:13px;border-bottom:none;border-right:1px solid var(--s-50);white-space:nowrap;}
   .ry-nav .nav-link::after{display:none}
-  .ry-nav .utility-bar{display:none}
+
 }
 /* ===== /RY-NAV ===== */
 
@@ -158,8 +145,7 @@
     .mobile-menu-btn{display:flex;}
     .hero-title{font-size:32px;}
     .hero-text-box{padding:36px 28px 36px 32px;clip-path:polygon(0 0,100% 0,96% 100%,0 100%);}
-    .utility-inner{justify-content:center;}
-    .utility-left{display:none;}
+
   }
   @media(max-width:560px){
     .hero{height:auto;min-height:520px;padding:60px 0;}
@@ -209,37 +195,9 @@ input[type="reset"],
 <body>
 
 <!-- 顶部工具条 -->
-<div class="utility-bar">
-  <div class="utility-inner">
-    <div class="utility-left">
-      <a href="#">联系我们</a>
-      <a href="#">常见问题</a>
-      <a href="#">下载中心</a>
-    </div>
-    <div class="utility-right">
-      <a href="#">语言</a>
-      <span class="utility-divider"></span>
-      <a href="#">中 / EN</a>
-    </div>
-  </div>
-</div>
 
 <!-- 主页导航（嵌入，与精准灌溉页 index.html 完全一致） -->
 <div class="ry-nav">
-  <div class="utility-bar">
-    <div class="utility-inner">
-      <div class="utility-left">
-        <a href="runye-landing.html">联系我们</a>
-        <a href="runye-landing.html">常见问题</a>
-        <a href="runye-landing.html">下载中心</a>
-      </div>
-      <div class="utility-right">
-        <a href="runye-landing.html">语言</a>
-        <span class="utility-divider"></span>
-        <a href="runye-landing.html">中 / EN</a>
-      </div>
-    </div>
-  </div>
   <header class="main-header">
     <div class="header-inner">
       <a href="runye-landing.html" class="brand">
@@ -250,11 +208,8 @@ input[type="reset"],
         </div>
       </a>
       <nav class="main-nav" id="mainNav">
-        <div class="nav-item"><a href="数字农业.html" class="nav-link">数字农业</a></div>
         <div class="nav-item"><a href="index.html" class="nav-link">精准灌溉</a></div>
         <div class="nav-item"><a href="耐特菲姆滴灌带长度查询器.html" class="nav-link">滴灌带查询</a></div>
-        <div class="nav-item"><a href="qicai-huasheng/index.html" class="nav-link active">种植方案</a></div>
-        <div class="nav-item"><a href="文献/花生钙营养管理_整理翻译.html" class="nav-link">文献查询</a></div>
       </nav>
       <a href="runye-landing.html" class="nav-home-btn">⌂ 返回主页</a>
       <div class="header-actions">
