@@ -213,6 +213,10 @@ input[type="reset"],
   .ry-nav .nav-link::after{display:none}
 
 }
+/* 顶部精简：整条品牌栏取消（润野灌溉 logo ＋ 精准灌溉/滴灌带查询 ＋ 返回主页 ＋ 搜索）
+   与 index.html（精准灌溉）处理保持一致，页面直接从内容开始
+   DOM 保留可恢复：删掉下面这一行即恢复 */
+body > .ry-nav{display:none!important}
 /* ===== /RY-NAV ===== */
 
 </style>

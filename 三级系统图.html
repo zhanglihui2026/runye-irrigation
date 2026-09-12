@@ -10,7 +10,7 @@
     .print-area, .print-area * { visibility: visible; }
     .print-area { position: absolute; left: 0; top: 0; margin: 0; border: none !important; box-shadow: none !important; }
     body { margin: 0 !important; background: #fff !important; }
-    .no-print, aside { display: none !important; }
+    .no-print, aside, .ry-aside-grip { display: none !important; }
     .layout { display: block !important; height: auto !important; }
     main { display: block !important; overflow: visible !important; padding: 0 !important; }
     /* 虚线外框与拖拽手柄仅在编辑时显示，打印/转 PDF 隐藏 */
@@ -26,25 +26,40 @@
   .no-print .btns button.primary { background: #fff; color: #16a34a; border-color: #fff; font-weight: 600; }
 
   .layout { display: flex; height: calc(100vh - 44px); }
-  aside { width: 292px; min-width: 292px; background: #fff; border-right: 1px solid #d5dbe3; overflow-y: auto; padding: 12px; }
-  aside h2 { font-size: 13px; font-weight: 600; color: #16a34a; margin: 14px 0 8px; padding-bottom: 4px; border-bottom: 1px solid #e4e9f0; }
-  aside h2:first-child { margin-top: 0; }
-  .row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; font-size: 13px; }
+  /* 左属性栏宽度可拖拽（2026-09-12 新增，与 04 二级管路的 .pp-grip 同一套做法）：
+     宽度由 --ry-aside-w 接管，拖拽条（.ry-aside-grip，紧跟本 aside 之后）实时改写；
+     未拖过时回落 292px —— 与改动前逐像素一致。控件宽度同理受 --ry-ctl-w /
+     --ry-fert-w 控制，未拖过时回落 138px / 128px。原来的 border-right 分隔线
+     改由拖拽条的 ::before 承担，避免两条竖线并排。 */
+  aside { width: var(--ry-aside-w, 292px); min-width: var(--ry-aside-w, 292px); background: #fff; overflow-y: auto; padding: 12px; scrollbar-width: none; -ms-overflow-style: none; }
+  /* 左栏纵向滚动条已按要求完全隐藏（2026-09-12）：滚轮 / 触控板仍可上下滚动，
+     只是不再显示滚动条（Chromium 走 scrollbar-width:none，WebKit 走 ::-webkit-scrollbar）。 */
+  aside::-webkit-scrollbar { width: 0; height: 0; display: none; }
+  /* 拖拽条：占 8px（整条都是热区），正中一条 2px 竖线＝原 aside 右边框的替代 */
+  .ry-aside-grip { flex: 0 0 8px; align-self: stretch; position: relative; cursor: col-resize; touch-action: none; -webkit-user-select: none; user-select: none; }
+  .ry-aside-grip::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; margin-left: -1px; background: #d5dbe3; }
+  .ry-aside-grip:hover::before, .ry-aside-grip.dragging::before { background: #94a3b8; width: 4px; margin-left: -2px; }
+  body.ry-aside-resizing { cursor: col-resize; }
+  body.ry-aside-resizing aside, body.ry-aside-resizing .ry-aside-grip { -webkit-user-select: none; user-select: none; }
+  /* 窄屏（拖拽条隐藏）恢复原来的分隔线，行为与改动前一致 */
+  @media (max-width: 768px) { .ry-aside-grip { display: none; } aside { border-right: 1px solid #d5dbe3; } }
+  /* 面板为纯字段列表（绿色分区标题已按要求移除）；字号/控件宽度/行距规格与二级系统图保持一致 */
+  .row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; font-size: 12px; }
   .row label { color: #444; }
-  .row input[type=text], .row input[type=number], .row select { width: 138px; padding: 4px 6px; border: 1px solid #c3ccd8; border-radius: 5px; font-size: 13px; background: #fff; }
-  .row input[type=text]:focus, .row select:focus { outline: 1.5px solid #16a34a; border-color: #16a34a; }
-  .chk { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: #444; margin-bottom: 4px; }
+  .row input[type=text], .row input[type=number], .row select { width: var(--ry-ctl-w, 138px); padding: 4px 6px; border: 1px solid #c3ccd8; border-radius: 5px; font-size: 12px; background: #fff; }
+  .row input[type=text]:focus, .row select:focus { outline: 1.5px solid #94a3b8; border-color: #94a3b8; }
+  .chk { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: #444; margin-bottom: 4px; }
   .chk label { display: flex; align-items: center; gap: 4px; }
   .fert-item { border: 1px solid #e0e6ee; border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; background: #f8fafc; }
-  .fert-item .ft { font-size: 12px; color: #16a34a; font-weight: 600; margin-bottom: 5px; }
+  .fert-item .ft { font-size: 11.5px; color: #1f2937; font-weight: 600; margin-bottom: 5px; }
   .fert-item .row { margin-bottom: 4px; }
-  .fert-item select { width: 128px; }
+  .fert-item select { width: var(--ry-fert-w, 128px); }
   .btn-line { display: flex; gap: 8px; margin-top: 10px; }
-  .btn-line button { flex: 1; padding: 7px 0; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  .btn-line button { flex: 1; padding: 7px 0; border-radius: 6px; cursor: pointer; font-size: 12px; }
   .btn-line .ok { background: #16a34a; color: #fff; border: 1px solid #16a34a; }
   .btn-line .ok:hover { background: #15803d; }
-  .btn-line .ghost { background: #fff; color: #16a34a; border: 1px solid #16a34a; }
-  .tip { font-size: 12px; color: #8892a0; margin-top: 10px; line-height: 1.7; }
+  .btn-line .ghost { background: #fff; color: #475569; border: 1px solid #c3ccd8; }
+  .tip { font-size: 11.5px; color: #5b6673; margin-top: 10px; line-height: 1.7; }
 
   main { flex: 1; overflow: auto; padding: 20px; display: flex; justify-content: center; align-items: flex-start; }
   .sheet { background: #fff; box-shadow: 0 2px 14px rgba(20,40,70,.18); position: relative; }
@@ -163,7 +178,50 @@ input[type="reset"],
   .ry-nav .nav-link::after{display:none}
   .ry-nav .utility-bar{display:none}
 }
+/* 顶部精简①：整条品牌栏取消（logo ｜ 精准灌溉 / 滴灌带查询 ｜ 搜索）—— 图纸页不需要站点导航。
+   DOM 保留可恢复：删掉本行即还原 */
+body > .ry-nav{display:none!important}
+/* 顶部精简②：绿色标题条取消（图纸名 + 独立页面说明 + 导出 SVG / 导出 PNG / 打印 PDF），
+   纵向空间全部让给图纸。注意：三个导出按钮随本条一并隐藏。
+   DOM 保留可恢复：删掉本行即还原 */
+body > header.no-print{display:none!important}
+/* 两条顶栏都取消后，正文高度由「一屏 − 绿色条 44px」改回整屏，避免底部留一条空带 */
+.layout{height:100vh}
 /* ===== /RY-NAV ===== */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   图纸等比适配：整幅 A3 一次看全（内嵌 iframe 与独立打开共用同一套逻辑）
+   ───────────────────────────────────────────────────────────────────────────
+   背景：A3 图幅实宽 420mm ≈ 1587px，而可视区通常只有 1100~1300px。若不处理：
+        ① 图幅在 flex 容器里被横向压扁（比例失真）；② 右侧被切在可视区外、
+        需横向滚动才能看全 —— 即用户反映的「右侧图纸显示不全」。
+   处理：① .sheet 取消 flex 收缩（flex:none），图幅保持 1587×1123 真实比例；
+        ② 图纸区改 overflow:hidden，滚动条不再出现；
+        ③ 由脚本按容器可用空间算出等比系数 k，对 .sheet 做 transform:scale
+           居中缩放（k 封顶 1，不放大），整幅 A3 一次看全。
+   触发：脚本恒执行 —— ?embed=1（index.html iframe 内嵌）挂 body.ry-embed；
+        独立打开（双击 html / 文件协议）挂 body.ry-fit-screen。两者共用下方规则。
+   隔离：打印 / 导出由 @media print 复位为真实 mm 图幅，不受屏幕缩放影响。
+        （原「🔗 新窗口」入口已按需求移除。）
+   ========================================================================= */
+body.ry-embed main, body.ry-fit-screen main{overflow:hidden;align-items:center;padding:12px}
+body.ry-embed .sheet, body.ry-fit-screen .sheet{
+  flex:none;transform-origin:center center;
+  /* 负外边距把「布局占位」收回到缩放后的实际尺寸：
+     transform:scale 只改视觉、不改布局，图幅在 flex 容器里仍按 1587×1123 占位，
+     居中时向两侧各溢出约 160px，父级的 scrollWidth 会虚报溢出（即便 overflow:
+     hidden 看不见滚动条，可滚动距离依然存在）。用等量负外边距把占位收回 sw·k，
+     居中对齐与视觉中心均不变，溢出归零。两个变量由 ryFitEmbedSheet 写入。
+     ry-embed（iframe 内嵌）与 ry-fit-screen（独立打开）共用本段。 */
+  margin-left:var(--ry-fit-nx,0px);margin-right:var(--ry-fit-nx,0px);
+  margin-top:var(--ry-fit-ny,0px);margin-bottom:var(--ry-fit-ny,0px);
+}
+/* 打印 / 导出：内嵌与独立打开一律复位为真实 mm 图幅，不受屏幕等比缩放影响。
+   transform/margin 由脚本写成行内样式（无 !important），故此处用 !important 覆盖。 */
+@media print{
+  body.ry-embed main, body.ry-fit-screen main{overflow:visible!important;align-items:flex-start!important;padding:0!important}
+  body.ry-embed .sheet, body.ry-fit-screen .sheet{transform:none!important;margin:0!important}
+}
 
 </style>
   <link rel="stylesheet" href="runye-theme.css">
@@ -210,13 +268,12 @@ input[type="reset"],
 
 <div class="layout">
   <aside>
-    <h2>图纸信息</h2>
+    <!-- 左侧分区标题（图纸信息 / 图纸规格与排版 / 水源与设备 / 管路管径 / 吸肥管设置）已按要求整条移除以去除绿色文字，面板改为纯字段列表 -->
     <div class="row"><label>工程名称</label><input type="text" id="cfg_title" value="润野灌溉 — 供水首部系统图"></div>
     <div class="row"><label>图号</label><input type="text" id="cfg_figNo" value="DG-01"></div>
     <div class="row"><label>日期</label><input type="text" id="cfg_date" value="2026.08"></div>
     <div class="row"><label>设计单位</label><input type="text" id="cfg_unit" value="（填写）"></div>
 
-    <h2>图纸规格与排版</h2>
     <div class="row"><label>图纸规格</label>
       <select id="cfg_paper">
         <option value="a3">A3 横向</option>
@@ -239,7 +296,6 @@ input[type="reset"],
       <label><input type="checkbox" data-k="sign" checked> 图签</label>
     </div>
 
-    <h2>水源与设备</h2>
     <div class="row"><label>水源类型</label>
       <select id="cfg_source">
         <option>蓄水池</option><option>水塘</option><option>水井</option><option>河道</option>
@@ -256,7 +312,6 @@ input[type="reset"],
       </select>
     </div>
 
-    <h2>管路管径</h2>
     <div class="row"><label>吸水管 DN</label>
       <input type="number" id="cfg_suctionDN" list="dn_list" min="25" max="500" step="1" title="可输入任意管径，或从下拉建议中选择">
     </div>
@@ -269,7 +324,6 @@ input[type="reset"],
       <label><input type="checkbox" id="cfg_airValve" checked> 主管排气阀</label>
     </div>
 
-    <h2>吸肥管设置</h2>
     <div class="row"><label>吸肥管路数</label>
       <select id="cfg_fertCount">
         <option value="1" selected>1 路</option>
@@ -286,6 +340,8 @@ input[type="reset"],
     </div>
     <p class="tip">所有参数实时生效，自动保存在本机浏览器。吸肥管路数可增删，管径可改，布局密度与图纸规格可调，图名/图号可编辑。</p>
   </aside>
+  <!-- 左属性栏宽度拖拽条：拖动改写 --ry-aside-w（宽/窄都跟手），双击恢复默认宽度 -->
+  <div class="ry-aside-grip" id="ryAsideGrip" role="separator" aria-orientation="vertical" title="拖动调整左侧工具栏宽度 · 双击恢复默认"></div>
 
   <main>
     <div class="sheet print-area" id="sheet"></div>
@@ -811,6 +867,8 @@ function render() {
 
   sheet.innerHTML = html;
   initZoneBlocks();
+  /* 嵌入模式：图幅（A3/A4 切换）或设备表/设计说明显隐改变后，重算缩放系数 */
+  if (window.ryFitEmbedSheet) window.ryFitEmbedSheet();
 }
 
 /* ===== 设备表 ===== */
@@ -1076,6 +1134,59 @@ function exportPNG() {
   if (fd || md || zc) persist();
 })();
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   图纸等比缩放：按容器适配，整幅一次看全（配合上方 body.ry-embed / ry-fit-screen 的 CSS）
+   ───────────────────────────────────────────────────────────────────────────
+   触发：本段恒执行（嵌入与独立打开共用）——
+        · ?embed=1（index.html 的 tlBuildSysUrl(1) 传入）→ 挂 body.ry-embed；
+        · 独立打开（双击 html / 文件协议）→ 挂 body.ry-fit-screen。
+   算法：k = min(可用宽 / 图幅宽, 可用高 / 图幅高, 1)
+        —— 取宽高两个方向的较小值，保证整幅不裁切；封顶 1 不放大，避免小图被
+           拉糊。k 施加在 .sheet 上，transform-origin 为元素中心，父级
+           main 是 flex 居中 + overflow:hidden，因此缩放后的图心与容器中心
+           重合，四周留白均匀。
+   重算时机：render() 之后（纸张切换 A3/A4 会改图幅）、窗口 resize、
+            main 尺寸变化（ResizeObserver，覆盖 index.html 切 Tab / 拖拽
+            属性栏等令 iframe 尺寸变化的情形）。
+   打印/导出：屏幕缩放是行内 transform，@media print 用 !important 复位，
+            仍输出真实 mm 图幅（见 CSS 注释）。
+   ========================================================================= */
+(function () {
+  var isEmbed = /[?&]embed=1/.test(location.search);
+  /* 嵌入(iframe) 与 独立打开(屏幕) 都做等比适配，整幅一次看全。
+     区别仅类名：embed → ry-embed（index.html 内嵌）；独立打开 → ry-fit-screen
+     （双击 html / 文件协议直接开）。打印/导出仍走真实 mm 尺寸，见下方 @media print 复位。 */
+  document.body.classList.add(isEmbed ? 'ry-embed' : 'ry-fit-screen');
+  var main = document.querySelector('main');
+  var sheet = document.getElementById('sheet');
+  if (!main || !sheet) return;
+
+  function fit() {
+    sheet.style.transform = 'none';                 // 先复位，才能量到图幅真实尺寸
+    var cs = getComputedStyle(main);
+    var availW = main.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    var availH = main.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    var sw = sheet.offsetWidth, sh = sheet.offsetHeight;
+    if (!sw || !sh || availW <= 0 || availH <= 0) return;   // 尚未渲染，等下一次
+    var k = Math.min(availW / sw, availH / sh, 1);
+    sheet.style.transform = 'scale(' + k + ')';
+    /* 负外边距收回布局占位（原理见 body.ry-embed .sheet 上方注释） */
+    sheet.style.setProperty('--ry-fit-nx', (-sw * (1 - k) / 2) + 'px');
+    sheet.style.setProperty('--ry-fit-ny', (-sh * (1 - k) / 2) + 'px');
+  }
+
+  window.ryFitEmbedSheet = fit;
+  window.addEventListener('resize', fit);
+  if (window.ResizeObserver) { new ResizeObserver(fit).observe(main); }
+  /* 外层 index.html 的主动通知：iframe 内文档的 resize / ResizeObserver 在
+     「切 Tab、拖拽属性栏、缩放浏览器窗口」等场景下并不保证触发（实测会不触发，
+     图幅停留在旧比例而溢出可视区），故由外层监听 iframe 尺寸后 postMessage 驱动。 */
+  window.addEventListener('message', function (e) {
+    if (e && e.data && e.data.type === 'ry-fit-sys') fit();
+  });
+  fit();
+})();
+
 /* ===== 初始化 ===== */
 bindUI();
 render();
@@ -1108,5 +1219,109 @@ render();
 })();
 </script>
 
+<!-- ===== 左侧工具栏宽度可拖拽（.ry-aside-grip） =====
+     与 index.html「04 二级管路 / 03 地块绘制」同一套做法（纯附加，不改任何既有 id、
+     事件绑定与渲染逻辑）：
+     1. 拖动改写 .layout 上的 CSS 变量 --ry-aside-w，左栏宽度即时变化；
+        并同步写 --ry-ctl-w / --ry-fert-w，让字段控件随栏宽一起变宽/变窄
+        （栏变宽 → 长文本看得全；栏变窄 → 把宽度让给图纸）。
+     2. 用 rAF 节流调用 window.ryFitEmbedSheet() + 派发 resize，复用页面现成的
+        图纸等比适配，图纸随主区变化即时重算，始终整幅可见、不裁切。
+     3. 松手写入 localStorage(runye_tl_sys_aside_w)，下次自动恢复；
+        双击拖拽条清除变量 → 回到默认（292px）。
+     4. 从未拖过时不写任何变量 → CSS 回落原值，视觉与改动前逐像素一致。
+     5. 窄屏（≤768px）CSS 已隐藏拖拽条，本段不动任何宽度，零影响；打印媒体下 likewise。 -->
+<script>
+(function(){
+  var layout=document.querySelector('.layout');
+  if(!layout) return;
+  var aside=layout.querySelector('aside');
+  var main=layout.querySelector('main');
+  var grip=document.getElementById('ryAsideGrip');
+  if(!aside||!main||!grip) return;
+
+  var KEY='runye_tl_sys_aside_w';
+  var GRIP_W=8;
+  var MIN_W=220;      /* 再窄，「供水主管 DN」等长标签 + 输入框会被压瘪 */
+  var MAIN_MIN=360;   /* 保证图纸区不被挤没 */
+  var MAX_W=560;
+  var CTL_OFF=154;    /* 默认栏宽 292 − 138（当前控件宽）= 154，故从 292 拖起时控件宽度不跳变 */
+  var CTL_MIN=96, CTL_MAX=340;
+
+  function clamp(v,lo,hi){ v=parseFloat(v); if(isNaN(v)) return null; return Math.max(lo,Math.min(hi,v)); }
+  function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{}; }catch(e){ return {}; } }
+  function save(o){ try{ localStorage.setItem(KEY,JSON.stringify(o)); }catch(e){} }
+  function maxW(){ return Math.max(MIN_W,Math.min(MAX_W,layout.clientWidth-GRIP_W-MAIN_MIN)); }
+
+  function apply(px){
+    if(px==null){
+      layout.style.removeProperty('--ry-aside-w');
+      layout.style.removeProperty('--ry-ctl-w');
+      layout.style.removeProperty('--ry-fert-w');
+      return;
+    }
+    var ctl=Math.round(clamp(px-CTL_OFF,CTL_MIN,CTL_MAX));
+    layout.style.setProperty('--ry-aside-w',px+'px');
+    layout.style.setProperty('--ry-ctl-w',ctl+'px');
+    layout.style.setProperty('--ry-fert-w',Math.max(88,ctl-10)+'px');
+  }
+
+  /* 启动即恢复上次拖出的宽度（越界自动夹回合法区间） */
+  var saved=clamp(load().w,MIN_W,MAX_W);
+  if(saved) apply(Math.min(saved,maxW()));
+
+  var pend=false;
+  function refit(){
+    if(pend) return; pend=true;
+    var run=function(){
+      pend=false;
+      try{ if(typeof window.ryFitEmbedSheet==='function') window.ryFitEmbedSheet(); }catch(e){}
+      try{ window.dispatchEvent(new Event('resize')); }catch(e){}
+    };
+    if(window.requestAnimationFrame) window.requestAnimationFrame(run); else setTimeout(run,16);
+  }
+
+  var EV=window.PointerEvent
+    ? {down:'pointerdown',move:'pointermove',up:'pointerup',cancel:'pointercancel'}
+    : {down:'mousedown',move:'mousemove',up:'mouseup',cancel:'blur'};
+  var drag=null;
+
+  grip.addEventListener(EV.down,function(e){
+    if(e.button!=null&&e.button!==0) return;              /* 只响应左键 */
+    drag={x:e.clientX,w:aside.getBoundingClientRect().width};
+    grip.classList.add('dragging');
+    document.body.classList.add('ry-aside-resizing');
+    if(e.preventDefault) e.preventDefault();              /* 阻止拖拽时选中文字 */
+  });
+  function onMove(e){
+    if(!drag) return;
+    var w=clamp(drag.w+(e.clientX-drag.x),MIN_W,maxW());
+    if(w!=null) apply(w);
+    refit();
+  }
+  function endDrag(){
+    if(!drag) return;
+    drag=null;
+    grip.classList.remove('dragging');
+    document.body.classList.remove('ry-aside-resizing');
+    var o=load(); o.w=Math.round(aside.getBoundingClientRect().width); save(o);
+    refit();
+  }
+  grip.addEventListener('dblclick',function(){
+    var o=load(); delete o.w; save(o); apply(null); refit();
+  });
+  document.addEventListener(EV.move,onMove);
+  document.addEventListener(EV.up,endDrag);
+  document.addEventListener(EV.cancel,endDrag);
+  window.addEventListener('blur',endDrag);                /* 指针移出窗口收不到 up 时兜底 */
+
+  /* 视口变化后把已拖出的宽度重新夹回合法区间（拖拽进行中不干预，否则跟手打架） */
+  window.addEventListener('resize',function(){
+    if(drag) return;
+    var s=clamp(load().w,MIN_W,MAX_W);
+    if(s) apply(Math.min(s,maxW()));
+  });
+})();
+</script>
 </body>
 </html>
