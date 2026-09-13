@@ -1,0 +1,52 @@
+/* ============================================================
+   runye-nav.css — 顶部功能区导航「皮肤」唯一出处（2026-09-13 去重）
+   index.html 与 runye-map-measure.html 共用本文件；
+   导航按钮清单在 runye-nav.js（同为唯一出处）。
+   各页只保留自己的布局差异：
+     · index.html：.fn-inner 1120px 居中对齐内容容器（非工具模式）/
+       工具模式 max-width:none + padding:0 12px（见 index 内 body.ry-tool 段）
+     · runye-map-measure.html：.fn-inner 整幅排布 padding:0 12px
+   改导航外观（颜色/字体/高度/选中态）只改本文件，所有页面同步生效。
+   ============================================================ */
+html{--fn-nav-h:36px}
+:root{--u-nav:#173e32;--u-nav-hover:#244e40;--u-nav-active:#2d604b;--u-nav-ink:#d9e9df}
+.fn-nav{
+  background:var(--u-nav);
+  border-bottom:1px solid var(--u-nav);
+}
+.fn-nav .fn-inner{
+  display:flex;align-items:center;gap:0;
+  height:var(--fn-nav-h);
+  overflow-x:auto;overflow-y:hidden;
+  scrollbar-width:none;-ms-overflow-style:none;
+}
+.fn-nav .fn-inner::-webkit-scrollbar{display:none}
+/* 导航项：深绿底同款（与主页最终生效样式一致）
+   12.5px/字重500/内距14px、亮字 #d9e9df；
+   选中 = 深绿底 #2d604b + 白字 + 2px 浅绿下划条 #76d2a4 */
+.fn-nav .fn-link{
+  flex:none;display:inline-flex;align-items:center;
+  height:var(--fn-nav-h);padding:0 14px;
+  font-size:12.5px;font-weight:500;color:var(--u-nav-ink);
+  text-decoration:none;background:none;border:0;
+  border-bottom:2px solid transparent;border-radius:0;
+  transition:color .16s ease,background-color .16s ease,border-color .16s ease;
+  white-space:nowrap;
+}
+/* 导航项若是 button（要执行页面自有逻辑，不是定位锚点），去掉 UA 默认样式后与 a.fn-link 完全一致 */
+.fn-nav button.fn-link{
+  font-family:inherit;background:none;
+  cursor:pointer;appearance:none;-webkit-appearance:none;
+}
+.fn-nav .fn-link:hover{background:var(--u-nav-hover);color:#fff}
+.fn-nav .fn-link.active{
+  background:var(--u-nav-active);color:#fff;
+  border-bottom-color:#76d2a4;box-shadow:none;
+}
+.fn-nav .fn-link.active:hover{background:var(--u-nav-hover);color:#fff;border-bottom-color:#76d2a4}
+/* 窄屏同步收紧：36 → 34（与主页历史约定一致） */
+@media(max-width:768px){
+  html{--fn-nav-h:34px}
+  .fn-nav .fn-link{padding:0 10px;font-size:12px}
+}
+@media print{.fn-nav{display:none!important}}

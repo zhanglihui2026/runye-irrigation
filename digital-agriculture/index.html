@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数字农业 · 统一入口｜润野</title>
+<link rel="stylesheet" href="digital-agriculture.css">
+<link rel="stylesheet" href="../runye-typography.css">
+</head>
+<body class="da-page">
+  <div class="da-shell">
+    <header class="da-header">
+      <h1>数字农业</h1>
+      <span class="da-ver" id="daVer"></span>
+    </header>
+    <p class="da-sub">七彩花生水肥与植保决策、地块全周期管理。可从精准灌溉工具带入当前地块，也可独立使用。</p>
+
+    <section class="da-plot" id="daPlot" hidden>
+      <h2 id="daPlotTitle">来自精准灌溉的地块</h2>
+      <dl id="daPlotDl"></dl>
+      <p class="da-src" id="daPlotSrc"></p>
+    </section>
+
+    <section class="da-cards">
+      <a class="da-card" href="workbench.html">
+        <h3>数字农业工作台</h3>
+        <p>地块全周期管理：地块档案、农事记录、植保方案与报表（runye_db_v1 数据中心）。</p>
+      </a>
+      <a class="da-card" href="peanut-tool.html">
+        <h3>七彩花生水肥与植保决策</h3>
+        <p>生长参数、追肥 EC、底肥配置、天气联动、生育期对照与全期追肥计划。</p>
+      </a>
+      <a class="da-card" href="../qicai-huasheng/index.html">
+        <h3>七彩花生植保方案</h3>
+        <p>分生育期植保方案与每日对照（独立工具页）。</p>
+      </a>
+      <a class="da-card" href="../index.html">
+        <h3>返回精准灌溉</h3>
+        <p>灌溉设计参数、面积测量、二级/三级管路与材料清单。</p>
+      </a>
+    </section>
+
+    <p class="da-foot">
+      数据接口：runye_digital_bridge_v1（v1，只读） ·
+      开发规则见 <a href="AGENTS.md">AGENTS.md</a> ·
+      模块说明见 <a href="README.md">README.md</a>
+    </p>
+  </div>
+
+  <script src="digital-agriculture.js"></script>
+  <script>
+  (function () {
+    var B = window.RunyeDigitalBridge;
+    var ver = document.getElementById('daVer');
+    if (ver) ver.textContent = '桥接协议 v' + B.VERSION;
+    var sec = document.getElementById('daPlot');
+    var dl = document.getElementById('daPlotDl');
+    var src = document.getElementById('daPlotSrc');
+    var title = document.getElementById('daPlotTitle');
+    if (!B || !sec || !dl || !src) return;
+
+    var res = B.readPayload();
+    var urlId = B.plotIdFromUrl();
+
+    function showPlot(d) {
+      var p = d.plot;
+      sec.hidden = false;
+      if (title) title.textContent = '来自精准灌溉的地块';
+      var rows = [
+        ['地块名称', p.name],
+        ['面积', p.areaMu.toFixed(2) + ' 亩' + (p.areaSqm ? '（' + Math.round(p.areaSqm).toLocaleString() + ' m²）' : '')],
+        ['作物', p.crop || '—'],
+        ['播种日期', p.plantingDate || '—'],
+        ['地块 ID', p.id]
+      ];
+      dl.innerHTML = rows.map(function (r) {
+        return '<dt>' + r[0] + '</dt><dd>' + String(r[1]).replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</dd>';
+      }).join('');
+      if (src) src.textContent = '数据来源：runye-irrigation（桥接协议 v' + d.version + '，生成于 ' + new Date(d.generatedAt).toLocaleString() + '）';
+    }
+    function showWarn(msg) {
+      sec.hidden = false;
+      sec.classList.add('da-warn');
+      if (title) title.textContent = '未找到地块数据';
+      dl.innerHTML = '';
+      src.innerHTML = '<span class="da-warn-text">' + msg + '</span>';
+    }
+
+    if (res.ok) {
+      if (!urlId || urlId === res.data.plot.id) showPlot(res.data);
+      else showWarn('链接中的地块 ID（' + urlId + '）与最近一次桥接数据不一致。请回到精准灌溉工具重新进入，或直接使用下方工具。');
+    } else if (urlId) {
+      showWarn('链接带了地块 ID，但本机没有对应的桥接数据（' + res.reason + '）。请从精准灌溉工具重新进入；以下工具仍可独立使用。');
+    }
+    // 无 URL 参数也无桥接数据：保持隐藏，入口页作为纯导航使用，不报错。
+  })();
+  </script>
+</body>
+</html>

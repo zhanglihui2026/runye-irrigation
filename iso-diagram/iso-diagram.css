@@ -1,0 +1,19 @@
+/* iso-diagram.css — 轴测图视图样式（作用域前缀 tlIso，不污染平面图/系统图） */
+#tlIsoDiagramWrap{background:#fff}
+/* 视口容器：overflow 裁剪 + 禁原生触摸滚动，平移/缩放由模块统一接管（对齐二级制图区体验） */
+#tlIsoDiagramContent{position:relative;overflow:hidden;padding:4px;background:#fff}
+#tlIsoDiagramContent svg{display:block;user-select:none;margin:0;transform-origin:0 0;cursor:grab}
+#tlIsoDiagramContent svg.iso-dragging{cursor:grabbing}
+/* 手工配件层（2026-09-13）：构件可点击；放置模式十字丝 */
+#tlIsoDiagramContent svg g.iso-fit{cursor:pointer}
+#tlIsoDiagramContent.iso-placing,#tlIsoDiagramContent.iso-placing svg{cursor:crosshair}
+#tlIsoDiagramContent svg text{pointer-events:none}
+#tlIsoToolbar{align-items:center;flex-wrap:wrap}
+#tlIsoToolbar .pp-btn-ghost{white-space:nowrap}
+#tlIsoZoomPct{font-size:12px;color:#64748b;padding:0 6px;align-self:center;min-width:42px;text-align:center}
+/* 打印：仅轴测图内容 */
+@media print{
+  body>*{display:none !important}
+  #tlIsoDiagramWrap{display:block !important;position:static}
+  #tlIsoToolbar{display:none !important}
+}

@@ -43,23 +43,23 @@
   body.ry-aside-resizing aside, body.ry-aside-resizing .ry-aside-grip { -webkit-user-select: none; user-select: none; }
   /* 窄屏（拖拽条隐藏）恢复原来的分隔线，行为与改动前一致 */
   @media (max-width: 768px) { .ry-aside-grip { display: none; } aside { border-right: 1px solid #d5dbe3; } }
-  /* 面板为纯字段列表（绿色分区标题已按要求移除）；字号/控件宽度/行距规格与二级系统图保持一致 */
-  .row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; font-size: 12px; }
+  /* 面板为纯字段列表（绿色分区标题已按要求移除）；控件宽度/行距与二级系统图一致；字号 2026-09-13 起比二级小一档（用户要求文字更小） */
+  .row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; font-size: 11px; }
   .row label { color: #444; }
-  .row input[type=text], .row input[type=number], .row select { width: var(--ry-ctl-w, 138px); padding: 4px 6px; border: 1px solid #c3ccd8; border-radius: 5px; font-size: 12px; background: #fff; }
+  .row input[type=text], .row input[type=number], .row select { width: var(--ry-ctl-w, 138px); padding: 4px 6px; border: 1px solid #c3ccd8; border-radius: 5px; font-size: 11px; background: #fff; }
   .row input[type=text]:focus, .row select:focus { outline: 1.5px solid #94a3b8; border-color: #94a3b8; }
-  .chk { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: #444; margin-bottom: 4px; }
+  .chk { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11px; color: #444; margin-bottom: 4px; }
   .chk label { display: flex; align-items: center; gap: 4px; }
   .fert-item { border: 1px solid #e0e6ee; border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; background: #f8fafc; }
-  .fert-item .ft { font-size: 11.5px; color: #1f2937; font-weight: 600; margin-bottom: 5px; }
+  .fert-item .ft { font-size: 10.5px; color: #1f2937; font-weight: 600; margin-bottom: 5px; }
   .fert-item .row { margin-bottom: 4px; }
   .fert-item select { width: var(--ry-fert-w, 128px); }
   .btn-line { display: flex; gap: 8px; margin-top: 10px; }
-  .btn-line button { flex: 1; padding: 7px 0; border-radius: 6px; cursor: pointer; font-size: 12px; }
+  .btn-line button { flex: 1; padding: 7px 0; border-radius: 6px; cursor: pointer; font-size: 11px; }
   .btn-line .ok { background: #16a34a; color: #fff; border: 1px solid #16a34a; }
   .btn-line .ok:hover { background: #15803d; }
   .btn-line .ghost { background: #fff; color: #475569; border: 1px solid #c3ccd8; }
-  .tip { font-size: 11.5px; color: #5b6673; margin-top: 10px; line-height: 1.7; }
+  .tip { font-size: 10.5px; color: #5b6673; margin-top: 10px; line-height: 1.7; }
 
   main { flex: 1; overflow: auto; padding: 20px; display: flex; justify-content: center; align-items: flex-start; }
   .sheet { background: #fff; box-shadow: 0 2px 14px rgba(20,40,70,.18); position: relative; }
@@ -287,14 +287,7 @@ body.ry-embed .sheet, body.ry-fit-screen .sheet{
         <option value="1.18">宽松</option>
       </select>
     </div>
-    <div class="chk" id="cfg_show">
-      <label><input type="checkbox" data-k="num" checked> 设备编号</label>
-      <label><input type="checkbox" data-k="dn" checked> 管径标注</label>
-      <label><input type="checkbox" data-k="legend" checked> 图例</label>
-      <label><input type="checkbox" data-k="table" checked> 设备表</label>
-      <label><input type="checkbox" data-k="notes" checked> 设计说明</label>
-      <label><input type="checkbox" data-k="sign" checked> 图签</label>
-    </div>
+    <!-- 「显示内容」复选框组（设备编号/管径标注/图例/设备表/设计说明/图签）已按用户要求移除（2026-09-13）：出图恒为全显示 -->
 
     <div class="row"><label>水源类型</label>
       <select id="cfg_source">
@@ -413,8 +406,7 @@ function bindUI() {
   document.getElementById('cfg_fertCount').value = String(cfg.fertCount);
   document.getElementById('cfg_checkValve').checked = !!cfg.checkValve;
   document.getElementById('cfg_airValve').checked = !!cfg.airValve;
-  var boxes = document.querySelectorAll('#cfg_show input');
-  boxes.forEach(function (b) { b.checked = !!cfg.show[b.getAttribute('data-k')]; });
+  // 「显示内容」复选框组已按用户要求移除（2026-09-13）：出图恒为六项全显示（cfg.show 用默认值）
   renderFertList();
 }
 
@@ -460,7 +452,7 @@ function collect() {
   cfg.checkValve = document.getElementById('cfg_checkValve').checked;
   cfg.airValve = document.getElementById('cfg_airValve').checked;
   cfg.fertCount = +document.getElementById('cfg_fertCount').value;
-  document.querySelectorAll('#cfg_show input').forEach(function (b) { cfg.show[b.getAttribute('data-k')] = b.checked; });
+  // 「显示内容」复选框组已按用户要求移除（2026-09-13）：出图恒为六项全显示（cfg.show 用默认值）
   while (cfg.ferts.length < cfg.fertCount) cfg.ferts.push({ type: '文丘里', dn: 25 });
   cfg.ferts = cfg.ferts.slice(0, cfg.fertCount);
 }

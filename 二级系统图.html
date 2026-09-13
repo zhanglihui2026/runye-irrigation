@@ -230,14 +230,7 @@ input[type="reset"],
         <option value="1.18">宽松</option>
       </select>
     </div>
-    <div class="chk" id="cfg_show">
-      <label><input type="checkbox" data-k="num" checked> 设备编号</label>
-      <label><input type="checkbox" data-k="dn" checked> 管径标注</label>
-      <label><input type="checkbox" data-k="legend" checked> 图例</label>
-      <label><input type="checkbox" data-k="table" checked> 设备表</label>
-      <label><input type="checkbox" data-k="notes" checked> 设计说明</label>
-      <label><input type="checkbox" data-k="sign" checked> 图签</label>
-    </div>
+    <!-- 「显示内容」复选框组（设备编号/管径标注/图例/设备表/设计说明/图签）已按用户要求移除（2026-09-13）：出图恒为全显示 -->
 
     <h2>水源与设备</h2>
     <div class="row"><label>水源类型</label>
@@ -356,8 +349,7 @@ function bindUI() {
   document.getElementById('cfg_fertCount').value = String(cfg.fertCount);
   document.getElementById('cfg_checkValve').checked = !!cfg.checkValve;
   document.getElementById('cfg_airValve').checked = !!cfg.airValve;
-  var boxes = document.querySelectorAll('#cfg_show input');
-  boxes.forEach(function (b) { b.checked = !!cfg.show[b.getAttribute('data-k')]; });
+  // 「显示内容」复选框组已按用户要求移除（2026-09-13）：出图恒为六项全显示（cfg.show 用默认值）
   renderFertList();
 }
 
@@ -403,7 +395,7 @@ function collect() {
   cfg.checkValve = document.getElementById('cfg_checkValve').checked;
   cfg.airValve = document.getElementById('cfg_airValve').checked;
   cfg.fertCount = +document.getElementById('cfg_fertCount').value;
-  document.querySelectorAll('#cfg_show input').forEach(function (b) { cfg.show[b.getAttribute('data-k')] = b.checked; });
+  // 「显示内容」复选框组已按用户要求移除（2026-09-13）：出图恒为六项全显示（cfg.show 用默认值）
   while (cfg.ferts.length < cfg.fertCount) cfg.ferts.push({ type: '文丘里', dn: 25 });
   cfg.ferts = cfg.ferts.slice(0, cfg.fertCount);
 }

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>润野 · 数字化建模（参数化建模试验区）</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- 顶部栏 -->
+    <header id="topbar">
+      <div class="brand">
+        <span class="logo">⬡</span>
+        <span class="title">数字化建模 <span class="modeling-subtitle">/ 参数化建模</span></span>
+        <span class="modeling-badge">试验版</span>
+      </div>
+      <div class="top-actions">
+        <button id="btnHelp" class="btn ghost">使用说明</button>
+        <button id="btnResetView" class="btn ghost">重置视图</button>
+      </div>
+    </header>
+
+    <div class="modeling-scope"><span>图形 → 拾取节点 → 参数放样 → 三维预览</span><span>模型单位未标定 · 当前会话使用，刷新清空</span></div>
+    <!-- 主体：左拾取视图 / 右电池节点 -->
+    <div id="main">
+      <!-- 4 绘图工具栏：页面最左侧，竖向排列（页面级侧栏，不参与三大区拖动） -->
+      <aside id="drawRail" class="rail rail-left" aria-label="绘图工具栏">
+        <div id="leftToolbar" class="toolbar rail-toolbar">
+          <span class="rail-title">绘制</span>
+          <button class="tool" data-mode="line">直线</button>
+          <button class="tool" data-mode="rect">方形</button>
+          <button class="tool" data-mode="circle">圆形</button>
+          <span class="sep"></span>
+          <span class="rail-title">视图</span>
+          <button class="tool" data-mode="select" title="选择/拾取图形">选择</button>
+          <button class="tool" data-mode="pan" title="拖拽平移视图">平移</button>
+          <button id="btnZoomIn" class="tool" title="放大">＋</button>
+          <button id="btnZoomOut" class="tool" title="缩小">－</button>
+          <button id="btnClearShapes" class="tool danger" title="清空全部图形">清空图形</button>
+        </div>
+      </aside>
+      <!-- 左侧：图形拾取视图区 -->
+      <section id="left">
+        <div id="vp2dWrap" class="canvas-wrap">
+          <canvas id="vp2d"></canvas>
+          <div id="vp2dHint" class="canvas-hint">提示：选择「直线/方形/圆形」后在视图中拖拽绘制；用「选择」点击图形即可拾取。</div>
+        </div>
+
+        <div id="splitH" class="splitter split-h" role="separator" aria-orientation="horizontal" aria-label="调整绘图区与参数三维区的高度" title="拖动调整「绘图区」与「参数+三维」的高度，双击复位"></div>
+        <div id="bottomRow" class="bottom-row">
+          <div id="previewWrap" class="canvas-wrap preview">
+            <div class="panel-title">三维预览（放样成果）</div>
+            <canvas id="vp3d"></canvas>
+            <div id="vp3dMsg" class="preview-msg">尚未生成模型</div>
+          </div>
+
+          <div id="props" class="props">
+            <div class="panel-title">参数调节（选中图形后在此编辑）</div>
+            <div id="propsBody" class="props-body">
+              <div class="empty-tip">未选中任何图形。在左侧视图绘制并点击拾取一个图形，即可在此调节参数。</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div id="splitV" class="splitter split-v" role="separator" aria-orientation="vertical" aria-label="调整左侧两区与电池区的宽度" title="拖动调整左侧两区与「电池区」的宽度，双击复位"></div>
+      <!-- 右侧：电池节点编辑区 -->
+      <section id="right">
+        <div id="nodeEditor" class="node-editor">
+          <svg id="wires"></svg>
+          <!-- 节点由 JS 动态生成到 #nodeCanvas 内；该层承载缩放与平移，SVG 连线层保持不缩放 -->
+          <div id="nodeCanvas" class="node-canvas"></div>
+          <div id="nodeEmptyHint" class="node-empty-hint">点击「＋ 拾取电池」或「＋ 放样电池」开始建模。</div>
+        </div>
+        <div id="nodeHint" class="node-hint">
+          数据流向：左侧「拾取图形」电池先拾取一个图形 → 把它的输出端（绿）连到「放样圆管」的输入端（蓝）。鼠标悬停电池标题可看功能说明，标题「▾」可折叠。画布：滚轮缩放、空白处拖动平移。
+        </div>
+      </section>
+      <!-- 9 电池工具栏：页面最右侧，竖向排列（页面级侧栏，不参与三大区拖动） -->
+      <aside id="battRail" class="rail rail-right" aria-label="电池工具栏">
+        <div id="nodeToolbar" class="toolbar rail-toolbar">
+          <span class="rail-title">电池</span>
+          <button id="btnAddPick" class="tool">＋ 拾取电池</button>
+          <button id="btnAddLoft" class="tool">＋ 放样电池</button>
+          <button id="btnExample" class="tool">快速示例</button>
+          <button id="btnClearWires" class="tool">清空连线</button>
+          <button id="btnResetCalc" class="tool">重置运算</button>
+          <button id="btnClearNodes" class="tool danger">清空节点</button>
+          <span class="sep"></span>
+          <span class="rail-title">画布</span>
+          <button id="btnNodeZoomOut" class="tool" title="缩小电池画布">－</button>
+          <button id="btnNodeFit" class="tool" title="缩放至全部电池可见">适应</button>
+          <button id="btnNodeZoomIn" class="tool" title="放大电池画布">＋</button>
+          <button id="btnNodeReset" class="tool" title="恢复原始倍率与位置">重置</button>
+          <span id="nodeZoomLabel" class="zoom-label">100%</span>
+        </div>
+      </aside>
+    </div>
+
+    <!-- 使用说明浮层 -->
+    <div id="helpOverlay" class="overlay" hidden>
+      <div class="help-card">
+        <div class="help-head">
+          <h2>使用说明</h2>
+          <button id="btnCloseHelp" class="btn ghost">关闭</button>
+        </div>
+        <div class="help-body">
+          <h3>本期功能范围</h3>
+          <p>这里的数字化建模指参数化节点建模：支持直线、圆形和方形，拾取与连线，以及直线路径的圆形／矩形截面放样。预览为封闭实体网格，不含管壁厚度、水力校核或工程量计算。</p>
+          <p>模型使用未标定的局部单位，不自动对应米或毫米。模型只保留在当前页面内，切换顶部导航不会清空，刷新或关闭页面会清空。本试验区不读写灌溉设计、地块库及材料清单；顶部“三维建模”是另一个待规划入口。</p>
+          <h3>一、图形拾取（左侧视图）</h3>
+          <ol>
+            <li>点击工具栏「直线 / 方形 / 圆形」，在视图中按下并拖拽即可绘制对应图形。</li>
+            <li>点击「选择」工具，再点击视图内任意图形即可<b>拾取</b>该图形（高亮显示）。</li>
+            <li>用「平移」工具或视图区右键拖拽可平移；滚轮缩放；「重置视图」恢复默认。</li>
+          </ol>
+          <h3>二、参数调节</h3>
+          <ol>
+            <li>选中图形后，左下「参数调节」面板出现对应参数。</li>
+            <li>尺寸参数（半径 / 宽高 / 长度）支持<b>数值输入 + 滑块</b>两种方式，修改即时生效。</li>
+            <li>参数自动容错：半径、长度、宽高不允许为负数，越界自动修正。</li>
+          </ol>
+          <h3>三、电池节点连线（右侧）</h3>
+          <ol>
+            <li>点击「＋ 拾取电池」创建<b>拾取图形</b>节点，点击「＋ 放样电池」创建<b>放样圆管</b>节点。</li>
+            <li>在「拾取图形」电池上点「<b>拾取图形</b>」按钮，再回到左侧视图点选一个图形，即把该图形存入此电池。</li>
+            <li>用鼠标从「拾取图形」电池的输出端（绿）按住，拖到「放样圆管」的输入端（蓝）建立连线：直线 → 放样路径；圆形/方形 → 放样截面。</li>
+            <li>同一输入端只保留一条连线；点击连线本身可删除该连线。</li>
+            <li>节点标题栏「×」可删除节点；工具栏「清空节点 / 清空连线 / 重置运算」分别对应相应操作。</li>
+          </ol>
+          <h3>四、成果预览</h3>
+          <ol>
+            <li>路径与截面都绑定后，左侧「三维预览」实时显示放样圆管 / 方管实体。</li>
+            <li>在三维预览区拖拽可旋转视角，滚轮缩放。</li>
+            <li>缺失任一输入时，节点与预览区提示「缺失输入数据」，不会报错或崩溃。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 依赖按顺序加载（经典脚本，可直接双击 index.html 运行） -->
+  <script src="js/vec3.js"></script>
+  <script src="js/geometry.js"></script>
+  <script src="js/renderer3d.js"></script>
+  <script src="js/viewport2d.js"></script>
+  <script src="js/splitters.js"></script>
+  <script src="js/nodeeditor.js"></script>
+  <script src="js/app.js"></script>
+  <script src="embed.js"></script>
+</body>
+</html>

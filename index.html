@@ -2313,45 +2313,15 @@ input[type="reset"],
   margin:0 1px;letter-spacing:0;}
 
 
-/* ===== FN-NAV: 顶部功能区导航（原品牌栏已隐藏，本栏为页面唯一吸顶栏） ===== */
-/* 2026-09-12 用户要求「上下高度变小一点」：吸顶高 42 → 36（含 1px 底边线共 43 → 37）。
+/* ===== FN-NAV: 顶部功能区导航（原品牌栏已隐藏，本栏为页面唯一吸顶栏） =====
+   2026-09-13 去重：导航「皮肤」（底色/文字/高度/悬停/选中态）统一在 runye-nav.css，
+   「按钮清单」统一在 runye-nav.js —— 本文件不再各自维护，改导航只改那两个文件。
+   吸顶高 var(--fn-nav-h)=36px（窄屏 34）也由 runye-nav.css 定义；
    全站各处（区块满屏高、跳转落点 scroll-margin-top、JS stickyOffset）均按
-   var(--fn-nav-h) 相对计算，改这一行即全局跟随，无需逐处同步。 */
-html{--fn-nav-h:36px}
-.fn-nav{
-  background:#fff;
-  border-bottom:1px solid var(--s-200);   /* 扁平化：取消投影，只用一条实线分隔 */
-}
-.fn-nav .fn-inner{
-  /* 与页面内容容器（.container：1120px 居中）对齐，使首个导航项左边缘 = 各功能板块左边缘 */
-  max-width:1120px;margin:0 auto;padding:0;
-  height:var(--fn-nav-h);
-  display:flex;align-items:center;gap:0;
-  overflow-x:auto;overflow-y:hidden;
-  scrollbar-width:none;-ms-overflow-style:none;
-}
-.fn-nav .fn-inner::-webkit-scrollbar{display:none}
-/* 导航项：扁平直角（取消胶囊圆角 / 实心绿块 / 投影）
-   选中态 = 极浅绿底 + 绿色文字 + 2px 绿色下划条（下划条压在导航底线上，读作"当前页"） */
-.fn-nav .fn-link{
-  flex:none;display:inline-flex;align-items:center;
-  height:var(--fn-nav-h);padding:0 12px;
-  font-size:13px;font-weight:600;color:var(--s-600);text-decoration:none;
-  background:none;border:0;border-bottom:2px solid transparent;border-radius:0;
-  transition:color .16s ease,background-color .16s ease,border-color .16s ease;
-  white-space:nowrap;
-}
-/* 导航项「系统图」是 button（要执行打开逻辑，不是定位锚点），去掉 UA 默认样式后与 a.fn-link 完全一致 */
-.fn-nav button.fn-link{
-  font-family:inherit;background:none;
-  cursor:pointer;appearance:none;-webkit-appearance:none;
-}
-.fn-nav .fn-link:hover{background:var(--g-50);color:var(--g-700)}
-.fn-nav .fn-link.active{
-  background:var(--g-50);color:var(--g-700);
-  border-bottom-color:var(--g-600);box-shadow:none;
-}
-.fn-nav .fn-link.active:hover{background:var(--g-100);color:var(--g-700);border-bottom-color:var(--g-600)}
+   var(--fn-nav-h) 相对计算。 */
+/* 布局差异（仅本页保留）：非工具模式下 .fn-inner 与内容容器（.container：1120px 居中）
+   对齐，使首个导航项左边缘 = 各功能板块左边缘；工具模式由 body.ry-tool 段覆盖为整幅 */
+.fn-nav .fn-inner{max-width:1120px;margin:0 auto;padding:0}
 /* 导航精简：隐藏主导航（精准灌溉 / 滴灌带查询）—— 内容已并入下方功能区导航，避免两行导航重复
    仅作用于页面主导航（body 直接子级），不影响三级视图遮罩内的同名导航；DOM 保留，删掉本行即恢复 */
 body > .ry-nav .main-nav,body > .ry-nav .main-nav.open{display:none!important}
@@ -2366,11 +2336,10 @@ body > .ry-nav .main-header{display:none!important}
 #designInput,#pipeTablesSection,#networkSection,#areaTool,#pipePlanSection,#tlPipePlanSection,#detailsSection,#irrCompareSection{
   scroll-margin-top:calc(var(--fn-nav-h) + 1px);
 }
-/* 手机端（≤768）：保持自然宽度 + 横向滑动，与内容容器同一内距 */
+/* 手机端（≤768）：保持自然宽度 + 横向滑动，与内容容器同一内距
+   （高度 34 / 项内距 10px / 字号 12px 在 runye-nav.css 的同名媒体查询里） */
 @media(max-width:768px){
-  html{--fn-nav-h:34px}   /* 窄屏同步收紧：38 → 34 */
-  .fn-nav .fn-inner{padding:0 16px;gap:0}
-  .fn-nav .fn-link{height:var(--fn-nav-h);padding:0 10px;font-size:12px}
+  .fn-nav .fn-inner{padding:0 16px}
 }
 @media(max-width:480px){
   .fn-nav .fn-inner{padding:0 12px}
@@ -2385,7 +2354,6 @@ body > .ry-nav .main-header{display:none!important}
 @media(max-width:480px){
   .details .container{padding-left:12px;padding-right:12px}
 }
-@media print{.fn-nav{display:none!important}}
 
 /* ===== 整屏版面：每个功能区各占满一屏（一个版面 = 一个功能区，内容在一屏内完整显示） =====
    注：设计参数与管径选型对比已合并为同一版面，规则见下方「合并版面」段，不在此列 */
@@ -2754,7 +2722,7 @@ body > .ry-nav .main-header{display:none!important}
         · 左 .pp-side  = 参数 + 计算结果 + 扬程算式（竖排表单）
         · 右 .pp-stage = 两列网格：左列「拾取结果 + 画布(flex:1) + 图例」，
                          右列「.pp-toolbar 竖排面板（grid-row:1/-1 跨满三行）」
-        下方「施工简图」仍为通栏，位置不变。
+        下方「二级简图」仍为通栏，位置不变。
    后续：.pp-title 标题条已取消，section 现在直接以 .pp-body 开始，
         版心高度改为「一屏 − 吸顶导航」（原为再扣 38px 标题条）。
    约束：仅版式与间距，所有字段 ID、计算逻辑、事件绑定一律不动
@@ -2954,7 +2922,7 @@ body > .ry-nav .main-header{display:none!important}
 /* ===== 05 三级管路：复用二级 .pp-body 两栏版式（左参数栏 ＋ 右图纸区） =====
    与二级保持同源：深色 section 外壳（#tlPipePlanSection 已有）+ 内部浅色卡片。
    约束：仅版式与间距，所有字段 id、计算逻辑、事件绑定一律不动。
-   差异：三级无手绘画布 / 竖排工具轨，故 .pp-stage 用单栏放「施工简图」，
+   差异：三级无手绘画布 / 竖排工具轨，故 .pp-stage 用单栏放「二级简图」，
         系统图另置于 section 底部内嵌区域（#tlSysDiagramWrap，iframe 渲染三级系统图.html）。 */
 #tlPipePlanSection > .pp-body{
   flex:0 0 auto;
@@ -2968,6 +2936,23 @@ body > .ry-nav .main-header{display:none!important}
 }
 #tlPipePlanSection > .pp-body>.pp-side{grid-column:1}
 #tlPipePlanSection > .pp-body>.pp-stage{grid-column:3}
+/* —— 05a 三级参数栏拖拽条：与 04 二级 .pp-grip 同一套（JS 运行时注入，
+   默认隐藏，宽屏三段版面显形；输出模式 clean="1" 由 12.2 段既有规则隐藏）—— */
+#tlPipePlanSection .pp-grip{display:none}
+@media(min-width:1101px){
+  #tlPipePlanSection > .pp-body>.pp-grip-side{grid-column:2;grid-row:1}
+  #tlPipePlanSection .pp-grip{
+    display:block;position:relative;align-self:stretch;min-width:0;
+    cursor:col-resize;touch-action:none;
+    -webkit-user-select:none;user-select:none;
+  }
+  #tlPipePlanSection .pp-grip::before{
+    content:"";position:absolute;top:0;bottom:0;left:50%;
+    width:2px;margin-left:-1px;background:#dde8e1;
+  }
+  #tlPipePlanSection .pp-grip:hover::before,
+  #tlPipePlanSection .pp-grip.dragging::before{background:var(--g-600);width:4px;margin-left:-2px}
+}
 #tlPipePlanSection .pp-side,
 #tlPipePlanSection .pp-stage{min-width:0;min-height:0}
 #tlPipePlanSection .pp-side{
@@ -3132,18 +3117,9 @@ body.ry-tool{
 
 /* ── 2. 顶部导航 → 深色工程工具条 ───────────────────────────────────────── */
 body.ry-tool > .ry-nav{position:relative;z-index:60}
-body.ry-tool .fn-nav{background:var(--ry-bar);border-bottom:1px solid #1b1b19}
+/* 2026-09-13 去重：工具模式导航的底色/文字/选中态皮肤统一在 runye-nav.css（两模式同款）；
+   本页只保留工具模式的布局差异（.fn-inner 整幅排布） */
 body.ry-tool .fn-nav .fn-inner{max-width:none;margin:0;padding:0 12px}
-body.ry-tool .fn-nav .fn-link{
-  height:var(--fn-nav-h);padding:0 14px;
-  font-size:12.5px;font-weight:500;
-  color:var(--ry-bar-ink2);
-  border-bottom:2px solid transparent;background:none;
-}
-body.ry-tool .fn-nav .fn-link:hover{background:var(--ry-bar-hi);color:var(--ry-bar-ink)}
-body.ry-tool .fn-nav .fn-link.active{
-  background:var(--ry-bar-hi);color:#fff;border-bottom-color:var(--ry-acc);
-}
 
 /* ── 3. 视口高度 / 底部状态栏 ───────────────────────────────────────────── */
 body.ry-tool > main{
@@ -3291,8 +3267,24 @@ body.ry-tool #tlPipePlanSection .pp-toolbar{
 /* Tab ↔ 面板显隐（data-ry-view 由 JS 写在 section 上，默认 edit / pipe） */
 #pipePlanSection[data-ry-view="edit"] .ry-pane-draw{display:none}
 #pipePlanSection[data-ry-view="draw"] .ry-pane-edit{display:none}
-#tlPipePlanSection[data-ry-view="pipe"] .ry-pane-sys{display:none}
-#tlPipePlanSection[data-ry-view="sys"] .ry-pane-pipe{display:none}
+#tlPipePlanSection[data-ry-view="pipe"] .ry-pane-sys,#tlPipePlanSection[data-ry-view="pipe"] .ry-pane-iso{display:none}
+#tlPipePlanSection[data-ry-view="sys"] .ry-pane-pipe,#tlPipePlanSection[data-ry-view="sys"] .ry-pane-iso{display:none}
+#tlPipePlanSection[data-ry-view="iso"] .ry-pane-pipe,#tlPipePlanSection[data-ry-view="iso"] .ry-pane-sys{display:none}
+/* —— 12.7a 三级设计工作区（ws）视图：与 pipe/sys/iso 互斥（2026-09-13）—— */
+#tlPipePlanSection[data-ry-view="ws"] .ry-pane-pipe,
+#tlPipePlanSection[data-ry-view="ws"] .ry-pane-sys,
+#tlPipePlanSection[data-ry-view="ws"] .ry-pane-iso{display:none}
+#tlPipePlanSection[data-ry-view="pipe"] .ry-pane-ws,
+#tlPipePlanSection[data-ry-view="sys"] .ry-pane-ws,
+#tlPipePlanSection[data-ry-view="iso"] .ry-pane-ws{display:none}
+#tlPipePlanSection .ry-pane-ws{
+  /* 2026-09-13 晚：工具条改右侧竖向工具轨（参考二级管线 .pp-stage 三列做法），
+     两列：画布 ｜ 工具轨（宽度对齐二级 --pp-tool-w 的默认档） */
+  display:grid;grid-template-columns:minmax(0,1fr) clamp(118px,9vw,138px);
+  grid-template-rows:minmax(0,1fr);column-gap:8px;
+  min-height:460px;margin:0;min-width:0;
+}
+#tlPipePlanSection[data-ry-view="ws"] .ry-pane-ws{flex:1 1 auto}
 
 /* 图纸卡片：去掉白底留白与内边距，直接占满主区
    ★ 同上：上方有 #pipePlanSection .pp-diagram-wrap{margin:20px;border:1px solid #d9e4dd}
@@ -3320,7 +3312,7 @@ body.ry-tool .pp-diagram-wrap > #ppDiagramContent{
 body.ry-tool .pp-diagram-wrap > #ppDiagramContent > svg{
   width:100%;height:auto;max-height:100%;
 }
-/* 三级「施工管线图」同款满布（2026-09-12）：根因同上——
+/* 三级「三级简图」同款满布（2026-09-12）：根因同上——
    #tlDiagramWrap 被 JS 内联 display:block 压掉 flex，容器高度随内容撑开、
    底部被 wrap 的 overflow:hidden 裁掉。给容器加 height:100%（上方 A 处），
    再让 SVG 在可用空间内等比铺满（宽撑满、高受钳时整体等比缩小居中）。 */
@@ -3478,12 +3470,6 @@ body{
 
 
 
-/* 功能区吸顶导航：浅色模式（窄屏 / 非工具模式）降饱和；
-   工具模式的「深色工程工具条」保持不变，只靠上面 --ry-acc 降饱和。 */
-body:not(.ry-tool) #fnNav.fn-nav{background:#fff;border-bottom:1px solid var(--u-line)}
-body:not(.ry-tool) #fnNav .fn-link{color:var(--u-ink-2)}
-body:not(.ry-tool) #fnNav .fn-link:hover{background:var(--u-bg-2);color:var(--u-accent)}
-body:not(.ry-tool) #fnNav .fn-link.active{color:var(--u-accent);border-bottom-color:var(--u-accent)}
 
 /* ═══ 4. 01 输入设计参数 → 工程属性面板 ══════════════════════════════════ */
 /* 4.1 工作区底：撤掉径向绿光晕 + 绿白渐变（工具模式同样） */
@@ -3710,7 +3696,7 @@ body:not(.ry-tool) .pp-btn-generate:hover{transform:none;box-shadow:0 0 0 1px va
         并用 ID 选择器（#ppToolbar / #ppCanvasWrap / #ppPickResult / #ppLegend）
         落到具体网格单元格 —— 优先级足够高，**不需要 !important**，
         因此下面这些规则只在工具模式（body.ry-tool）生效，窄屏滚动版式不受影响。
-   注：整段额外用 data-ry-view="edit" 限定，避免与「施工简图」Tab 的
+   注：整段额外用 data-ry-view="edit" 限定，避免与「二级简图」Tab 的
       `#pipePlanSection[data-ry-view="draw"] .ry-pane-edit{display:none}` 打架。
    约束：工具条仍是同一个 DOM 节点，所有 id、事件绑定、计算逻辑一律不动；
         列宽沿用 JS 早已在写的 --pp-tool-w（右键拖拽调宽能力保持可用）。
@@ -3804,24 +3790,24 @@ body.ry-tool #pipePlanSection .ry-pane-edit>.pp-grip-tool.dragging::before{
   background:var(--ry-acc);width:4px;margin-left:-2px;
 }
 
-/* ═══ 12. 三级管路：切「供水首部系统图」后，左属性栏让位、系统图满布 ══════
+/* ═══ 12. 三级管路：切「三级系统图」后，左属性栏让位、系统图满布 ══════
    ---------------------------------------------------------------------------
    现象：点「生成系统图」后，iframe 只拿到「主区」那点宽度 —— 左属性栏仍占
         272px + 10px 拖拽列，系统图被迫压窄，图面细节被挤到看不清。
    需求：系统图视图下左属性栏（地块与灌溉参数 / 水力计算结果 / 三个按钮）
         不再显示，整幅宽度让给系统图。
    为何只改 CSS 就够：入口 —— 左栏 #tlSysBtn、顶部导航「⚙️ 生成系统图」、
-        以及底部状态栏「供水首部系统图」Tab（面板内 #tlSysGen 已按要求移除）——
+        以及底部状态栏「三级系统图」Tab（面板内 #tlSysGen 已按要求移除）——
         全部走 rySetTab(sectionId,'sys')，
         该函数必定把 data-ry-view="sys" 写到 section 上（并同步刷新 Tab 高亮）；
-        切回「施工管线图」Tab 时属性值又变回 pipe，无需任何 JS 分支。
+        切回「三级简图」Tab 时属性值又变回 pipe，无需任何 JS 分支。
    修法：网格仍保持三列结构（避免 .pp-stage 的 grid-column:3 落到隐式列上），
         只把前两列宽度压成 0、并隐藏左栏与拖拽条，主工作区自然铺满整版。
         ★ 列定义那条必须带 body.ry-tool 前缀：工具模式下同属性由 RY-TOOL 段
           第 6 节的 `body.ry-tool #tlPipePlanSection > .pp-body`（1,2,1）声明，
           不带前缀的 (1,1,0) 会被它按特异性压掉。全程零 !important。
    约束：只动版式。字段 id / 单位 / 按钮 / 事件绑定 / 计算逻辑一律不碰；
-        左栏 DOM 一个字都没删 —— 切回「施工管线图」立即原样恢复。
+        左栏 DOM 一个字都没删 —— 切回「三级简图」立即原样恢复。
    ======================================================================== */
 #tlPipePlanSection[data-ry-view="sys"] > .pp-body{
   /* 属性栏 ｜ 拖拽条 ｜ 主工作区 —— 前两列收为 0，主区独占 */
@@ -3855,9 +3841,71 @@ body.ry-tool #tlPipePlanSection[data-ry-view="sys"] #tlSysDiagramContent{padding
   display:block;width:100%;height:100%;min-height:0;border:0;background:#fff;
 }
 
+/* ═══ 12.2 输出模式（data-ry-clean="1"）：底部「简图」按钮＝只看图纸 ══════
+   ---------------------------------------------------------------------------
+   需求（2026-09-13）：底部状态栏切到「二级简图 / 三级简图 / 系统简图 / 轴测简图」时
+        只显示图纸区内容，左侧属性栏不显示；
+        点顶部导航（二级管路 / 三级管路）一律回到绘图工作区（左栏恢复）。
+   实现：rySetTab 负责写 data-ry-clean（简图类视图 → "1"，二级 edit → "0"；
+        三级所有视图都经 rySetTab 进入，一律 "1"）；
+        顶部导航点击处理器复位视图后写 "0"（见文件尾部导航脚本）。
+        值用 "1"/"0" 而非增删属性：verify_pp_tabs / verify_nav_switch 的最小
+        DOM 桩只有 setAttribute（无 removeAttribute），保证闸门桩可直接真跑。
+   手法：同 12 段 —— 网格保持三列结构（避免 .pp-stage 的 grid-column:3
+        落到隐式列上），前两列收 0 + 隐藏左栏与拖拽条；带 body.ry-tool 前缀的
+        同属性列定义压住 RY-TOOL 段第 6 节的 (var,10px,1fr)。全程零 !important。
+   ======================================================================== */
+#pipePlanSection[data-ry-clean="1"] > .pp-body,
+#tlPipePlanSection[data-ry-clean="1"] > .pp-body{
+  /* 属性栏 ｜ 拖拽条 ｜ 主工作区 —— 前两列收为 0，图纸独占 */
+  grid-template-columns:0 0 minmax(0,1fr);
+}
+#pipePlanSection[data-ry-clean="1"] > .pp-body>.pp-side,
+#pipePlanSection[data-ry-clean="1"] > .pp-body>.pp-grip-side,
+#tlPipePlanSection[data-ry-clean="1"] > .pp-body>.pp-side,
+#tlPipePlanSection[data-ry-clean="1"] > .pp-body>.pp-grip-side{display:none}
+/* 工具模式：把 RY-TOOL 段第 6 节那条同属性、同特异性的列定义按住 */
+body.ry-tool #pipePlanSection[data-ry-clean="1"] > .pp-body,
+body.ry-tool #tlPipePlanSection[data-ry-clean="1"] > .pp-body{
+  grid-template-columns:0 0 minmax(0,1fr);
+}
+
+/* ═══ 12.3 轴测简图左侧工具栏（2026-09-13）：输出态常驻左栏，内容占位 ══════
+   需求：三级切到「轴测简图」时左侧保留一个工具栏（类似二级参数卡样式），
+        内容待定先占位；二级及其余简图视图仍按 12.2 全隐藏不变。
+   实现：新元素 .tl-iso-side（同时带 .pp-side 骨架类，继承卡片样式），
+        仅 data-ry-view="iso" 时显示；clean="1" 的列收 0 规则对 iso 视图
+        改写为「左栏 ｜ 拖拽条宽 ｜ 图纸」，特异性更高的同属性列定义压住 12.2。
+        拖拽条 .pp-grip-side 在 iso 下仍隐藏（列宽 10px 仅作间距，不做拖拽）。
+   ======================================================================== */
+#tlPipePlanSection > .pp-body>.tl-iso-side{display:none}
+#tlPipePlanSection[data-ry-view="iso"] > .pp-body>.tl-iso-side{display:flex}
+/* 带 body.ry-tool 前缀的同属性规则：压住 RY-TOOL 段「body.ry-tool #tl… .pp-side{display:flex}」
+   （该条特异性 (1,2,1) 高于上面两条的 (1,2,0)/(1,3,1) 中的默认隐藏 (1,2,0)） */
+body.ry-tool #tlPipePlanSection > .pp-body>.tl-iso-side{display:none}
+body.ry-tool #tlPipePlanSection[data-ry-view="iso"] > .pp-body>.tl-iso-side{display:flex}
+#tlPipePlanSection[data-ry-view="iso"][data-ry-clean="1"] > .pp-body,
+body.ry-tool #tlPipePlanSection[data-ry-view="iso"][data-ry-clean="1"] > .pp-body{
+  grid-template-columns:var(--pp-side-w,clamp(272px,20vw,318px)) 10px minmax(0,1fr);
+}
+/* 占位卡片（对齐二级参数卡观感：白卡 + 绿标题 + 灰虚线空态） */
+.tl-iso-card{background:#fff;border:1px solid #dbe7e0;border-radius:8px;padding:10px 12px;margin:0 0 8px}
+.tl-iso-card-title{color:#2d604b;font-weight:600;font-size:13px;margin-bottom:8px}
+.tl-iso-card-empty{border:1px dashed #c5d6cc;border-radius:6px;padding:14px 10px;font-size:11.5px;color:#7d8f86;line-height:1.7;text-align:center}
+/* 配件布置控件（2026-09-13 下午） */
+.tl-iso-kinds{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.tl-iso-kinds button{padding:6px 0;font-size:12px;border:1px solid #c5d6cc;background:#f8fbf9;border-radius:6px;cursor:pointer;color:#2c4a3d}
+.tl-iso-kinds button.active{background:#2d604b;border-color:#2d604b;color:#fff;font-weight:600}
+.tl-iso-row{display:flex;align-items:center;justify-content:space-between;margin-top:8px;font-size:12px;color:#33463d}
+.tl-iso-row select{flex:0 0 130px;padding:4px 6px;font-size:12px;border:1px solid #c5d6cc;border-radius:6px;background:#fff}
+.tl-iso-hint{margin-top:8px;font-size:11px;line-height:1.6;color:#7d8f86}
+.tl-iso-info{display:flex;flex-direction:column;gap:4px}
+.tl-iso-kv{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;color:#4b5b53}
+.tl-iso-kv b{font-weight:600;color:#243c35;text-align:right;word-break:break-all}
+
 /* ═══ 13. 主区 Tab 条下移到页面左下角状态栏（2026-09-12 再调整） ══════════
    ---------------------------------------------------------------------------
-   需求：二级「管线编辑 / 施工简图」、三级「施工管线图 / 供水首部系统图」两组
+   需求：二级「管线编辑 / 二级简图」、三级「三级简图 / 三级系统图」两组
         切换条，按需求统一下移到页面底部状态栏 #ryStatusBar 内、位于「制图」
         标签之前 —— 画布与左属性栏都拿回被占掉的那一行高度，切换入口收在左下角。
    实现：HTML 里两组 .ry-tabs 移入 #ryStatusBar（同一批节点、同一批 id；
@@ -3880,7 +3928,7 @@ body.ry-tool #tlPipePlanSection[data-ry-view="sys"] #tlSysDiagramContent{padding
 /* 13.1a 主用：body[data-ry-sec]（由 ryShowSection 写入）
    2026-09-12 再调整：不再「只显示当前功能区那一组」，改为**二级 / 三级两组同时显示**
    —— 只要当前功能区是二级或三级中的任意一个，底部就把 4 个按钮
-   （管线编辑 / 施工简图 / 施工管线图 / 供水首部系统图）一次性摆出来，
+   （管线编辑 / 二级简图 / 三级简图 / 三级系统图）一次性摆出来，
    在哪个页面都能直接点另外那一组的按钮跳过去；跨功能区切换由 rySetTab 里
    本就有的「目标功能区未激活则先切过去」分支负责，无需新增代码。 */
 body[data-ry-sec="pipePlanSection"] .ry-statusbar .ry-tabs,
@@ -3904,6 +3952,8 @@ body:has(#tlPipePlanSection.ry-active) .ry-statusbar .ry-tabs{
   border:1px solid var(--u-line,#d7dddf);border-radius:0;
 }
 .ry-statusbar .ry-tabs-st button+button{border-left:0}
+/* 2026-09-13：两组 Tab（二级/三级）同时可见时贴合为一排（抵消状态栏 12px gap） */
+.ry-statusbar .ry-tabs + .ry-tabs{margin-left:-12px}
 .ry-statusbar .ry-tabs-st button:hover{background:var(--u-bg-2,#f3f5f5);color:var(--u-ink,#263238)}
 /* 13.3 选中态：浅底 + 灰绿字（--u-accent-2 在 --u-accent-bg 上约 4.6:1，过 AA）
         沿用原「底部 2px 标识线」的写法，不做满块鲜绿填充。 */
@@ -3912,7 +3962,7 @@ body:has(#tlPipePlanSection.ry-active) .ry-statusbar .ry-tabs{
   font-weight:600;box-shadow:inset 0 -2px 0 var(--u-accent,#3f6f60);
 }
 /* 13.3b 只亮「当前功能区」那一组：两组现在同时显示，非当前那一组的 .active
-        必须视觉熄灭 —— 否则会同时亮两个按钮（管线编辑 + 施工管线图），
+        必须视觉熄灭 —— 否则会同时亮两个按钮（管线编辑 + 三级简图），
         让人看不出此刻在哪一页。特异性 (1,3,2) 高于 13.3 的 (0,3,1)，零 !important。 */
 body[data-ry-sec="pipePlanSection"] .ry-statusbar #tlTabs button.active,
 body[data-ry-sec="tlPipePlanSection"] .ry-statusbar #ppTabs button.active{
@@ -4027,16 +4077,6 @@ body{background:var(--u-bg)!important;color:var(--u-ink)!important}
 .ry-nav .search-btn{border-color:var(--u-line)!important;color:var(--u-ink-2)!important}
 .ry-nav .search-btn:hover{background:var(--u-bg-2)!important;border-color:var(--u-line)!important;color:var(--u-accent)!important}
 
-/* 功能区工具栏（工具模式）：浅灰底、窄高度、选中项浅蓝灰底 + 蓝灰底边标识 */
-body.ry-tool .fn-nav{background:var(--u-nav)!important;border-bottom:1px solid var(--u-nav)!important}
-body.ry-tool .fn-nav .fn-link{color:var(--u-nav-ink)!important;background:none!important;border-bottom:2px solid transparent!important}
-body.ry-tool .fn-nav .fn-link:hover{background:var(--u-nav-hover)!important;color:#fff!important}
-body.ry-tool .fn-nav .fn-link.active{background:var(--u-nav-active)!important;color:#fff!important;border-bottom-color:#76d2a4!important}
-/* 功能区工具栏（窄屏 / 非工具模式）：同一套灰阶 */
-body:not(.ry-tool) #fnNav.fn-nav{background:var(--u-nav);border-bottom:1px solid var(--u-nav)}
-body:not(.ry-tool) #fnNav .fn-link{color:var(--u-nav-ink);background:none;border-bottom:2px solid transparent}
-body:not(.ry-tool) #fnNav .fn-link:hover{background:var(--u-nav-hover);color:#fff}
-body:not(.ry-tool) #fnNav .fn-link.active{background:var(--u-nav-active);color:#fff;border-bottom-color:#76d2a4}
 
 /* 导航栏「⚙️ 生成系统图」入口已按要求取消（用户 2026-09-12）。
    仅隐藏导航入口：openTlSystemDiagramFromNav() 与 DOM 节点均保留，随时可恢复。
@@ -4437,6 +4477,10 @@ body.ry-tool #tlPipePlanSection .pp-side .pp-plan-item,
   }catch(e){}
 })();
 </script>
+<link rel="stylesheet" href="modeling/workspace.css">
+<link rel="stylesheet" href="iso-diagram/iso-diagram.css">
+<link rel="stylesheet" href="tl-workspace/tl-workspace.css">
+<link rel="stylesheet" href="runye-nav.css">
 </head>
 <body>
 
@@ -4467,6 +4511,7 @@ body.ry-tool #tlPipePlanSection .pp-side .pp-plan-item,
       </a>
       <nav class="main-nav" id="mainNav">
         <div class="nav-item"><a href="index.html" class="nav-link active">精准灌溉</a></div>
+<div class="nav-item"><a href="digital-agriculture/index.html" class="nav-link">数字农业</a></div>
         <div class="nav-item"><a href="耐特菲姆滴灌带长度查询器.html" class="nav-link">滴灌带查询</a></div>
       </nav>
       <a href="runye-landing.html" class="nav-home-btn">⌂ 返回主页</a>
@@ -4481,25 +4526,24 @@ body.ry-tool #tlPipePlanSection .pp-side .pp-plan-item,
     </div>
   </header>
 
-  <!-- ===== 顶部功能区导航（唯一吸顶栏） ===== -->
+  <!-- ===== 顶部功能区导航（唯一吸顶栏） =====
+       2026-09-13 去重：按钮清单统一在 runye-nav.js（唯一出处），本页只保留特有静态项
+       （⚙️生成系统图，2026-09-12 起入口隐藏但 DOM 保留，随时可恢复）。
+       「管网布置/数据对比」两区块仍 display:none，恢复上线时在 runye-nav.js 的 ITEMS 加回。 -->
   <nav class="fn-nav" id="fnNav" aria-label="功能区导航">
-    <div class="fn-inner">
-      <a class="fn-link" href="#designInput" data-target="designInput">标准分区预设</a>
-      <a class="fn-link" href="#networkSection" data-target="networkSection">管网布置</a>
-      <a class="fn-link" href="#areaTool" data-target="areaTool">地块绘制</a>
-      <a class="fn-link" href="#pipePlanSection" data-target="pipePlanSection">二级管路</a>
-      <a class="fn-link" href="#tlPipePlanSection" data-target="tlPipePlanSection">三级管路</a>
-      <a class="fn-link" href="#detailsSection" data-target="detailsSection">材料清单</a>
-      <a class="fn-link" href="#irrCompareSection" data-target="irrCompareSection">数据对比</a>
+    <div class="fn-inner" data-ry-fnnav>
       <!-- 系统图入口：button 而非锚点（要执行打开逻辑），无 data-target 故不参与滚动高亮 -->
       <button class="fn-link" type="button" id="fnSystemDiagram" onclick="openTlSystemDiagramFromNav()" title="生成供水首部系统图（三级系统图）· 已生成三级计算结果时自动内嵌渲染">⚙️ 生成系统图</button>
-      <a class="fn-link" href="耐特菲姆滴灌带长度查询器.html">滴灌带查询</a>
-      <!-- 在线地图入口：独立页面（runye-map-measure.html，高德卫星影像 · 免Key），
-           无 data-target 故与「滴灌带查询」同等待遇 —— 原样保留为普通站内链接，不参与滚动高亮；
-           2026-09-12 按用户要求移到导航最后 -->
-      <a class="fn-link" href="runye-map-measure.html" title="打开在线卫星图面积测量（高德影像 · 免Key），量完可回传面积">在线地图</a>
     </div>
   </nav>
+  <!-- 顶部导航动作按钮（系统图/轴测图，runye-nav.js act 项）：动作映射须先于 runye-nav.js 注册 -->
+  <script>
+    window.RyFnNavActions = {
+      sys: function () { if (typeof tlShowSysDiagram === 'function') tlShowSysDiagram(); },
+      iso: function () { if (typeof tlShowIsoDiagram === 'function') tlShowIsoDiagram(); }
+    };
+  </script>
+  <script src="runye-nav.js"></script>
 </div>
 
 
@@ -4522,10 +4566,9 @@ body.ry-tool #tlPipePlanSection .pp-side .pp-plan-item,
      面积条（.area-strip）里完整保留，信息没有丢失。
      （如需恢复：从 git 历史取回原 <section class="hero"> 与 render() 里的 heroSummary 赋值即可。） -->
 
-<!-- ===== DECISION 当前生育期决策 ===== -->
 
 <!-- ===== WORKSPACE：设计参数 + 管径选型对比（合并为同一个整屏版面） ===== -->
-<section class="workspace ry-sec ry-active" id="designInput">
+<section class="workspace ry-sec" id="designInput">
   <div class="mw-shell">
    <!-- ① 输入设计参数 -->
    <div class="mw-col mw-col-input">
@@ -4633,7 +4676,7 @@ body.ry-tool #tlPipePlanSection .pp-side .pp-plan-item,
 </section>
 
 <!-- ===== 面积测量工具 + 实际地块规划 ===== -->
-<section id="areaTool" class="ry-sec">
+<section id="areaTool" class="ry-sec ry-active">
   <!-- 03 顶部绿条已取消：标题「03 面积测量工具 · 鞋带公式」与「💾 导出截图」按钮一并移除，
        「📁 上传图片」「🗺️ 地图在线测量」两个入口已移入左侧栏顶部（.at-entry-section）。
        导出截图的 JS 逻辑仍在（atBtnDownload 已加空值守卫）—— 将来需要恢复，
@@ -4801,7 +4844,7 @@ body.ry-tool #tlPipePlanSection .pp-side .pp-plan-item,
   </div>
   <!-- 扬程计算式（紧贴结果栏下方，仅扬程一行，实时跟随输入更新，不换行） -->
   <div id="ppCalcDetail" class="pp-calc-formula pp-calc-h"></div>
-  <!-- 视图切换（管线编辑 / 施工简图）：2026-09-12 再下移 —— 已搬出左栏，
+  <!-- 视图切换（管线编辑 / 二级简图）：2026-09-12 再下移 —— 已搬出左栏，
        落到页面底部状态栏 #ryStatusBar 内、位于「制图」标签之前（见该文件尾部注释）。
        仍是同一个节点、同一个 id —— JS 用 getElementById('ppTabs') 绑定事件，与父节点无关。 -->
   </aside>
@@ -4881,13 +4924,13 @@ body.ry-tool #tlPipePlanSection .pp-side .pp-plan-item,
 </section>
 
 <!-- ===== 04 三级管路规划与施工简图（移至主页面，位于二级简图下方） ===== -->
-<section id="tlPipePlanSection" class="ry-sec" data-ry-view="pipe">
+<section id="tlPipePlanSection" class="ry-sec" data-ry-view="ws">
   <!-- 标题栏（05 徽章 +「三级管路规划与施工简图」+ 副标题「多分区联合灌溉 · 一键生成管线图」）
        已按要求取消，section 直接从参数条开始。
        恢复：把下面这段放回本 section 首行即可，配套 CSS 原值见样式区注释。
        <div class="tl-section-title">
          <span class="step">05</span>
-         <div><h3>三级管路规划与施工简图</h3><p>多分区联合灌溉 · 一键生成管线图</p></div>
+         <div><h3>三级管路规划与施工简图</h3><p>多分区联合灌溉 · 生成管线图</p></div>
        </div> -->
   <!-- 版式：复用二级管路「左参数栏 ＋ 右图纸区」的 .pp-body 两栏布局 -->
   <div class="pp-body">
@@ -4921,20 +4964,53 @@ body.ry-tool #tlPipePlanSection .pp-side .pp-plan-item,
     <span class="pp-plan-item"><span class="pp-plan-label">支管</span><span class="pp-plan-val" id="tlPlanBranchPipe">—</span></span>
   </div>
   <div class="pp-hint" id="tlPpHint" style="display:none">📋 请先在面积测量工具中描绘并闭合边界</div>
-  <button class="pp-btn-generate" id="tlAutoPipe" onclick="tlAutoGenerate()" style="width:100%;margin-top:10px">一键生成管线图</button>
-  <button class="pp-btn-generate" id="tlSysBtn" type="button" onclick="tlShowSysDiagram()" style="width:100%;margin-top:8px">生成系统图</button>
+  <!-- 三个主操作按钮横向一排（2026-09-13）：生成管线图 / 生成系统图 / 生成轴测图 -->
+  <div style="display:flex;gap:6px;margin-top:10px">
+    <button class="pp-btn-generate" id="tlAutoPipe" onclick="tlAutoGenerate()" style="flex:1;min-width:0;padding-left:4px;padding-right:4px;font-size:12px;white-space:nowrap">生成管线图</button>
+    <button class="pp-btn-generate" id="tlSysBtn" type="button" onclick="tlShowSysDiagram()" style="flex:1;min-width:0;padding-left:4px;padding-right:4px;font-size:12px;white-space:nowrap">生成系统图</button>
+    <button class="pp-btn-generate" id="tlIsoBtn" type="button" onclick="tlShowIsoDiagram()" style="flex:1;min-width:0;padding-left:4px;padding-right:4px;font-size:12px;white-space:nowrap">生成轴测图</button>
+  </div>
   <button class="pp-btn-ghost" id="tlDownload" style="display:none;width:100%;margin-top:8px" onclick="tlDownloadSVG()">📥 下载</button>
   <button class="pp-btn-ghost" id="tlPrint" style="display:none;width:100%;margin-top:6px" onclick="tlPrintDiagram()">🖨️ 打印图纸</button>
   </aside>
+  <!-- 轴测简图左侧工具栏（2026-09-13）：仅 data-ry-view="iso" 显示；配件布置 + 构件参数 -->
+  <aside class="pp-side tl-iso-side" id="tlIsoSide">
+    <div class="tl-iso-card">
+      <div class="tl-iso-card-title">配件布置</div>
+      <div class="tl-iso-kinds" id="tlIsoKinds">
+        <button type="button" data-kind="tee" class="active">三通</button>
+        <button type="button" data-kind="elbow">弯头</button>
+        <button type="button" data-kind="valve">阀门</button>
+      </div>
+      <label class="tl-iso-row"><span>规格</span>
+        <select id="tlIsoSpec">
+          <option value="">与管道同径</option>
+          <option>dn160</option>
+          <option>dn140</option>
+          <option>dn110</option>
+          <option>dn90</option>
+          <option>dn75</option>
+          <option>dn63</option>
+        </select>
+      </label>
+      <button class="pp-btn-generate" id="tlIsoPlaceBtn" type="button" style="width:100%;margin-top:8px">确定 · 放置</button>
+      <div class="tl-iso-hint" id="tlIsoPlaceHint">选好配件与规格，点「确定」后到右侧图上沿管线点击放置</div>
+    </div>
+    <div class="tl-iso-card" id="tlIsoInfoCard" style="display:none">
+      <div class="tl-iso-card-title">构件参数</div>
+      <div id="tlIsoInfoBody" class="tl-iso-info"></div>
+      <button class="pp-btn-ghost" id="tlIsoDelBtn" type="button" style="display:none;width:100%;margin-top:8px">🗑 删除该配件</button>
+    </div>
+  </aside>
   <!-- 图纸区：工具条（生成 / 下载 / 打印）＋ 施工简图 -->
   <div class="pp-stage">
-  <!-- 视图切换（施工管线图 / 供水首部系统图）：2026-09-12 下移到底部状态栏 #ryStatusBar，
+  <!-- 视图切换（三级简图 / 三级系统图）：2026-09-12 下移到底部状态栏 #ryStatusBar，
        位于「制图」标签之前。同一个节点、同一个 id，JS 用 getElementById('tlTabs') 绑定事件。 -->
   <div class="pp-toolbar" id="tlToolbar" style="display:none">
   </div>
   <div class="ry-pane ry-pane-pipe">
   <div class="pp-diagram-wrap" id="tlDiagramWrap">
-    <div id="tlDiagramContent"><div class="pp-diagram-empty">完成面积测量并点击上方「一键生成管线图」后，这里显示三级管线施工简图；切到「供水首部系统图」标签可查看首部系统图。</div></div>
+    <div id="tlDiagramContent"><div class="pp-diagram-empty">完成面积测量并点击上方「生成管线图」后，这里显示三级管线施工简图；切到「系统简图」标签可查看首部系统图。</div></div>
   </div><!-- /.pp-diagram-wrap -->
   </div><!-- /.ry-pane-pipe -->
   <!-- 系统图：与管线图同处右主区，由主区顶部 Tab 切换（替代原「整屏替换」） -->
@@ -4950,11 +5026,44 @@ body.ry-tool #tlPipePlanSection .pp-side .pp-plan-item,
            <button class="pp-btn-generate" id="tlSysGen" type="button" style="padding:5px 14px;font-size:12px">⚙️ 生成 / 重绘系统图</button>
          </div> -->
     <div id="tlSysDiagramContent">
-      <div class="pp-diagram-empty">完成面积测量并点击「一键生成管线图」后，切到「供水首部系统图」视图会自动在此内嵌渲染首部系统图。</div>
+      <div class="pp-diagram-empty">完成面积测量并点击「生成管线图」后，切到「系统简图」视图会自动在此内嵌渲染首部系统图。</div>
       <iframe id="tlSysFrame" style="display:none;width:100%;border:0;background:#fff" title="三级系统图"></iframe>
     </div>
   </div><!-- /.pp-diagram-wrap -->
   </div><!-- /.ry-pane-sys -->
+  <!-- 轴测图：与管线图/系统图同处右主区，由主区顶部 Tab 切换（iso-diagram 模块，只读平面图几何） -->
+  <div class="ry-pane ry-pane-iso">
+  <div class="pp-diagram-wrap" id="tlIsoDiagramWrap">
+    <div id="tlIsoToolbar" style="display:none">
+      <button class="pp-btn-ghost" id="tlIsoZoomIn" type="button" style="padding:5px 12px;font-size:12px" onclick="RyIsoDiagram.zoomIn()" title="放大（也可用鼠标滚轮）">🔍＋ 放大</button>
+      <button class="pp-btn-ghost" id="tlIsoZoomOut" type="button" style="padding:5px 12px;font-size:12px" onclick="RyIsoDiagram.zoomOut()" title="缩小（也可用鼠标滚轮）">🔍－ 缩小</button>
+      <button class="pp-btn-ghost" id="tlIsoZoomFit" type="button" style="padding:5px 12px;font-size:12px" onclick="RyIsoDiagram.zoomFit()" title="复位到适应窗口（也可双击图纸区）">⛶ 适应窗口</button>
+      <span id="tlIsoZoomPct">100%</span>
+      <button class="pp-btn-ghost" id="tlIsoDownload" type="button" style="padding:5px 14px;font-size:12px;margin-left:auto" onclick="RyIsoDiagram.downloadSVG()">📥 下载轴测图 SVG</button>
+      <button class="pp-btn-ghost" id="tlIsoPrint" type="button" style="padding:5px 14px;font-size:12px" onclick="RyIsoDiagram.printSVG()">🖨️ 打印轴测图</button>
+    </div>
+    <div id="tlIsoDiagramContent"><div class="pp-diagram-empty">完成面积测量并点击「生成管线图」后，切到「轴测简图」视图会根据平面图几何自动生成轴测示意图（含三通与阀门）。</div></div>
+  </div><!-- /.pp-diagram-wrap -->
+  </div><!-- /.ry-pane-iso -->
+  <!-- 三级设计工作区（2026-09-13）：可缩放/平移 + 手工插入管线层
+       （tl-workspace 模块，只读 window.tlDiagramData；手工层不写回平面数据） -->
+  <div class="ry-pane ry-pane-ws">
+  <div class="tl-ws-toolbar" id="tlWsToolbar" style="display:none">
+    <button class="tl-ws-btn" id="tlWsMain" type="button" data-ws-mode="main">插入主管</button>
+    <button class="tl-ws-btn" id="tlWsBranch" type="button" data-ws-mode="branch">插入支管</button>
+    <span class="tl-ws-sep"></span>
+    <button class="tl-ws-btn" id="tlWsUndo" type="button" title="撤销最后一条手工管线">↩ 回退</button>
+    <button class="tl-ws-btn" id="tlWsClear" type="button" title="清空全部手工管线">🗑 清空手工</button>
+    <span class="tl-ws-count" id="tlWsManCount">手工 0 条</span>
+    <span class="tl-ws-sep"></span>
+    <button class="tl-ws-btn" id="tlWsZoomIn" type="button" onclick="RyTlWs.zoomIn()" title="放大（也可用鼠标滚轮）">🔍＋ 放大</button>
+    <button class="tl-ws-btn" id="tlWsZoomOut" type="button" onclick="RyTlWs.zoomOut()" title="缩小（也可用鼠标滚轮）">🔍－ 缩小</button>
+    <button class="tl-ws-btn" id="tlWsZoomFit" type="button" onclick="RyTlWs.zoomFit()" title="适应窗口（也可双击图纸区）">⛶ 适应窗口</button>
+    <span class="tl-ws-pct" id="tlWsZoomPct">100%</span>
+    <span class="tl-ws-hint" id="tlWsHint">点「插入主管/支管」后在图上点击逐点画线，双击结束</span>
+  </div>
+  <div id="tlWsContent"><div class="tl-ws-empty">请先生成三级管线平面图（点左侧「生成管线图」）</div></div>
+  </div><!-- /.ry-pane-ws -->
   </div><!-- /.pp-stage -->
   </div><!-- /.pp-body -->
 </section>
@@ -5250,22 +5359,40 @@ function doIrrImport(text){
 })();
 </script>
 
+<section id="threeDModelingSection" class="ry-sec ry-modeling-section" aria-label="三维建模">
+  <div class="ry-modeling-reserved">
+    <svg class="ry-modeling-cube" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 10 86 30 86 70 50 90 14 70 14 30Z M14 30 50 50 86 30 M50 50V90" fill="none" stroke="currentColor" stroke-width="2"/><path d="M50 10V50" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 4"/></svg>
+    <span class="ry-modeling-badge">功能规划中</span>
+    <h2>三维建模</h2>
+    <p>入口已预留，建模方式与功能范围将在后续确认。</p>
+    <button type="button" class="ry-modeling-open" data-open-parametric>先体验参数化建模 →</button>
+  </div>
+</section>
+<section id="parametricModelingSection" class="ry-sec ry-modeling-section" aria-label="数字化建模 · 参数化建模" data-modeling-state="idle">
+  <div class="ry-modeling-load" role="status">
+    <strong id="parametricLoadText">正在打开参数化建模工具…</strong>
+    <a href="modeling/parametric/index.html" target="_blank" rel="noopener">在独立窗口打开</a>
+  </div>
+  <iframe id="parametricModelerFrame" title="数字化建模：图形绘制、参数调节与节点放样" data-src="modeling/parametric/embedded.html" sandbox="allow-scripts"></iframe>
+</section>
 </main>
 
 <!-- ===== 底部状态栏（工具模式）：当前功能区 + 关键结果，常驻视口底部 ===== -->
 <div class="ry-statusbar" id="ryStatusBar">
-  <!-- 主区 Tab 条（下移到此）：二级「管线编辑 / 施工简图」、三级「施工管线图 / 供水首部系统图」
+  <!-- 主区 Tab 条（下移到此）：二级「管线编辑 / 二级简图」、三级「三级简图 / 三级系统图」
        2026-09-12 按需求从各功能区内部下移到页面左下角，位于「制图」标签之前。
        仍是同一批节点、同一批 id —— JS 用 getElementById('ppTabs'/'tlTabs') 绑定事件；
        两组默认都收起，只显示「当前功能区」对应的那一组（见样式区 13 段）。
        回退方法：把这两段 div 分别放回 aside.pp-side 末尾 与 #tlPipePlanSection .pp-stage 开头即可。 -->
   <div class="ry-tabs ry-tabs-st" id="ppTabs" data-ry-sec="pipePlanSection">
-    <button type="button" data-ry-view="edit" class="active">管线编辑</button>
-    <button type="button" data-ry-view="draw">施工简图</button>
+    <button type="button" data-ry-view="edit" class="active">二级设计</button>
+    <button type="button" data-ry-view="draw">二级简图</button>
   </div>
   <div class="ry-tabs ry-tabs-st" id="tlTabs" data-ry-sec="tlPipePlanSection">
-    <button type="button" data-ry-view="pipe" class="active">施工管线图</button>
-    <button type="button" data-ry-view="sys">供水首部系统图</button>
+    <button type="button" data-ry-view="ws" class="active">三级设计</button>
+    <button type="button" data-ry-view="pipe">三级简图</button>
+    <button type="button" data-ry-view="sys">系统简图</button>
+    <button type="button" data-ry-view="iso">轴测简图</button>
   </div>
   <span class="ry-st-tag" id="ryStTag">就绪</span>
   <b id="ryStSection">标准分区预设</b>
@@ -5309,14 +5436,7 @@ function doIrrImport(text){
             <option value="1.18">宽松</option>
           </select>
         </div>
-        <div class="hm-chk" id="cfg_show">
-          <label><input type="checkbox" data-k="num" checked> 设备编号</label>
-          <label><input type="checkbox" data-k="dn" checked> 管径标注</label>
-          <label><input type="checkbox" data-k="legend" checked> 图例</label>
-          <label><input type="checkbox" data-k="table" checked> 设备表</label>
-          <label><input type="checkbox" data-k="notes" checked> 设计说明</label>
-          <label><input type="checkbox" data-k="sign" checked> 图签</label>
-        </div>
+        <!-- 「显示内容」复选框组（设备编号/管径标注/图例/设备表/设计说明/图签）已按用户要求移除（2026-09-13）：出图恒为全显示 -->
 
         <h2>水源与设备</h2>
         <div class="hm-row"><label>水源类型</label>
@@ -5388,6 +5508,7 @@ function doIrrImport(text){
         </a>
         <nav class="main-nav" id="tl-mainNav">
           <div class="nav-item"><a href="index.html" class="nav-link">精准灌溉</a></div>
+<div class="nav-item"><a href="digital-agriculture/index.html" class="nav-link">数字农业</a></div>
           <div class="nav-item"><a href="耐特菲姆滴灌带长度查询器.html" class="nav-link">滴灌带查询</a></div>
         </nav>
         <a href="runye-landing.html" class="nav-home-btn">⌂ 返回主页</a>
@@ -5562,6 +5683,8 @@ function clipPolyToRect(poly, x0, y0, x1, y1){
   o = half(o, function(p){return p.y<=y1;}, function(a,b){var t=(y1-a.y)/(b.y-a.y);return {x:a.x+t*(b.x-a.x), y:y1};});
   return o;
 }
+
+function tlMeasureText(str){var w=0;for(var k=0;k<str.length;k++){var ch=str[k];w+=(ch.charCodeAt(0)>255?12:6.5);}return w;}
 
 function calcZoneLayout(width, height, requestedN) {
   const safeW = Math.max(1, width || 1);
@@ -5925,11 +6048,10 @@ function render() {
         <strong>主管 Ø ${r.mainPipe.od} mm · 每区 ${r.branchCount} 根支管 Ø ${r.branchPipe.od} mm</strong>
       </div>
       <div class="optimal-specs">
-        <span>目标流速<b>${fmt(r.targetV,2)} m/s</b></span>
+        <span>目标流速<b>${fmt(r.targetV,2)} m/s</b><small class="spec-note">主管按单区流量选型；阀门后的支管按 2、3 或 4 根并联分流，选最接近目标流速的标准 PE 外径。</small></span>
         <span>主管实际流速<b>${fmt(r.mainPipe.v,2)} m/s</b><small class="spec-note">理论内径 ${fmt(r.mainPipe.id,1)} mm · 主管长 ${fmt(r.mainPipeLen,1)} m · 损失 ${fmt(r.mainLoss,2)} m</small></span>
         <span>支管实际流速<b>${fmt(r.branchPipe.v,2)} m/s</b><small class="spec-note">每区 ${r.branchCount} 根 · 单根 ${fmt(r.branchLen,1)} m · ${fmt(r.branchFlow,2)} m³/h · 损失 ${fmt(r.branchLoss,2)} m</small></span>
       </div>
-      <p>主管按单区流量选型；阀门后的支管按 2、3 或 4 根并联分流，选最接近目标流速的标准 PE 外径。</p>
     </div>
     <div class="pump-card">
       <div class="pump-topline"><span>水泵建议工作点</span><span class="confidence">含 ${MARGIN_HEAD} m 富余及 ${SAFETY_FACTOR.toFixed(2)} 安全系数</span></div>
@@ -6719,28 +6841,12 @@ function tlAutoGenerate(options) {
   var doScroll = options.scroll !== false;
   try {
   // 局部辅助函数（三级页在 IIFE 之外，无法访问二级页内部的 pp* 函数，故此处自包含实现）
-  function tlPolyArea(pts){ if(!pts||pts.length<3)return 0; var a=0; for(var i=0;i<pts.length;i++){var j=(i+1)%pts.length; a+=pts[i].x*pts[j].y-pts[j].x*pts[i].y;} return Math.abs(a)/2; }
-  function tlClipPolyToRect(poly,x0,y0,x1,y1){
-    if(!poly||poly.length===0)return [];
-    var out=poly.map(function(p){return{x:p.x,y:p.y};});
-    var planes=[
-      {inside:function(p){return p.x>=x0;},inter:function(a,b){var t=(x0-a.x)/(b.x-a.x);return{x:x0,y:a.y+t*(b.y-a.y)};}},
-      {inside:function(p){return p.y>=y0;},inter:function(a,b){var t=(y0-a.y)/(b.y-a.y);return{x:a.x+t*(b.x-a.x),y:y0};}},
-      {inside:function(p){return p.x<=x1;},inter:function(a,b){var t=(x1-a.x)/(b.x-a.x);return{x:x1,y:a.y+t*(b.y-a.y)};}},
-      {inside:function(p){return p.y<=y1;},inter:function(a,b){var t=(y1-a.y)/(b.y-a.y);return{x:a.x+t*(b.x-a.x),y:y1};}}
-    ];
-    for(var e=0;e<planes.length;e++){ var inp=out; out=[]; if(inp.length===0)break; var prev=inp[inp.length-1];
-      for(var i=0;i<inp.length;i++){ var cur=inp[i];
-        if(planes[e].inside(cur)){ if(!planes[e].inside(prev))out.push(planes[e].inter(prev,cur)); out.push(cur); }
-        else if(planes[e].inside(prev)){ out.push(planes[e].inter(prev,cur)); } prev=cur; } }
-    return out;
-  }
   function tlZoneActualAreaM2(zc,zr,zoneCuts,plotPoly){
     if(!plotPoly||plotPoly.length<3)return zoneCuts.xPlan[zc]*zoneCuts.yPlan[zr];
     var x0=zoneCuts.xPos[zc], y0=zoneCuts.yPos[zr];
     var x1=zoneCuts.xPos[zc+1], y1=zoneCuts.yPos[zr+1];
-    var clipped=tlClipPolyToRect(plotPoly,x0,y0,x1,y1);
-    return tlPolyArea(clipped);
+    var clipped=clipPolyToRect(plotPoly,x0,y0,x1,y1);
+    return polyAreaM2(clipped);
   }
   function tlZoneSizeLabel(w,h){
     function f(v){ if(!isFinite(v))return '—'; var rounded=Math.round(v); return Math.abs(v-rounded)<0.05?String(rounded):v.toFixed(1); }
@@ -6809,14 +6915,8 @@ function tlAutoGenerate(options) {
     var yDesign = longIsX ? fixedSideVal : derivedSide;
 
     // Split into zones
-    function splitLen(total, step) {
-      var parts=[], used=0; step=Math.max(1,step||1);
-      while(total-used>step+0.05){parts.push(step);used+=step;}
-      var rest=total-used; if(rest>0.05)parts.push(rest);
-      return parts.length?parts:[total];
-    }
-    xPlan=splitLen(plotW, xDesign);
-    yPlan=splitLen(plotH, yDesign);
+    xPlan=splitZoneLength(plotW, xDesign);
+    yPlan=splitZoneLength(plotH, yDesign);
     var sx=b.w/plotW, sy=b.h/plotH;
     xSrc=[],ySrc=[],xPos=[b.minX],yPos=[b.minY];
     for(var xi=0;xi<xPlan.length;xi++){xSrc.push(xPlan[xi]*sx);xPos.push(xPos[xPos.length-1]+xSrc[xi]);}
@@ -6866,7 +6966,6 @@ function tlAutoGenerate(options) {
   // 信息行：与标题分行；过长时按 " | " 边界自动换行
   var tlHeaderExtra=tlPartialCount>0?(' | 非标准 '+tlPartialCount+' 区'):'';
   var tlHeaderStr='地块名称 '+tlPlotNameVal+'  |  面积 '+areaMu+' 亩  |  地块 '+plotW.toFixed(0)+'×'+plotH.toFixed(0)+' m  |  '+totalZones+'分区  |  联合灌溉 '+zc+'区'+tlHeaderExtra;
-  function tlMeasureText(str){var w=0;for(var k=0;k<str.length;k++){var ch=str[k];w+=(ch.charCodeAt(0)>255?12:6.5);}return w;}
   var tlHeaderSegs=tlHeaderStr.split('  |  ');
   var tlHeaderLines=[], tlCur='';
   for(var hi=0;hi<tlHeaderSegs.length;hi++){
@@ -7245,14 +7344,25 @@ function tlAutoGenerate(options) {
   var svgStr=parts.join('');
   tlDiagramSVG=svgStr;
   document.getElementById('tlDiagramContent').innerHTML=svgStr;
+  // ===== 轴测图数据导出（iso-diagram 模块只读）：平面图最终几何快照，不回写、不参与计算 =====
+  window.tlDiagramData = { version: 1, world: 'meter', generatedAt: new Date().toISOString(), plot: { w: plotW, h: plotH },
+    poly: JSON.parse(JSON.stringify(poly)),
+    zones: { cols: cols, rows: rows, xPos: xPos.slice(), yPos: yPos.slice(), xPlan: xPlan.slice(), yPlan: yPlan.slice(), xSrc: xSrc.slice(), ySrc: ySrc.slice() },
+    mainPipes: JSON.parse(JSON.stringify(mainPipes)), branchPipes: JSON.parse(JSON.stringify(branchPipes)),
+    valves: JSON.parse(JSON.stringify(valves)), dripTapes: JSON.parse(JSON.stringify(dripTapes)),
+    frontPipe: frontPipe ? JSON.parse(JSON.stringify(frontPipe)) : null,
+    sourcePos: sourcePos ? { x: sourcePos.x, y: sourcePos.y } : null,
+    meta: { zoneCount: totalZones,
+      pump: { flow: (pumpFlowEl ? pumpFlowEl.textContent : ''), head: (pumpHeadEl ? pumpHeadEl.textContent : ''), power: (pumpPowerEl ? pumpPowerEl.textContent : '') },
+      pipes: { front: (frontPipeEl ? frontPipeEl.textContent : ''), main: (mainPipeEl ? mainPipeEl.textContent : ''), branch: (branchPipeEl ? branchPipeEl.textContent : '') } } };
   tlInitDrag();
   tlInitHeaderDrag();
   document.getElementById('tlDiagramWrap').style.display='block';
   document.getElementById('tlDownload').style.display='block';
   document.getElementById('tlPrint').style.display='block';
   // tlSavePng 已移除，不再显示
-  // 进入管线图满屏视图
-  try{ tlShowPipelineDiagram(); }catch(e){}
+  // 生成完直接落在「三级设计」工作区（可缩放/可插管）
+  try{ tlShowWorkspace(); }catch(e){}
   console.log('[tlAutoGenerate] SVG generated successfully');
   } catch(err) {
     console.error('[tlAutoGenerate] Error:', err);
@@ -7451,11 +7561,10 @@ function tlRewrapHeader(maxW){
   var ctn=document.getElementById('tlDiagramContent');
   var g=ctn?ctn.querySelector('#tlHeaderGroup'):null;
   if(!g)return 0;
-  function measure(str){var w=0;for(var k=0;k<str.length;k++){var ch=str[k];w+=(ch.charCodeAt(0)>255?12:6.5);}return w;}
   var lines=[],cur='';
   for(var i=0;i<segs.length;i++){
     var trial=cur?cur+'  |  '+segs[i]:segs[i];
-    if(cur&&measure(trial)>maxW){lines.push(cur);cur=segs[i];}
+    if(cur&&tlMeasureText(trial)>maxW){lines.push(cur);cur=segs[i];}
     else{cur=trial;}
   }
   if(cur)lines.push(cur);
@@ -7589,7 +7698,7 @@ function tlInitHeaderDrag(){
 /* 三级系统图：在三级管路 section 底部的 #tlSysDiagramWrap 内嵌区域用 iframe 渲染「三级系统图.html」
    —— 替代原先 window.open 弹新页面；🔗 新窗口 按钮（#tlSysOpen）已按要求移除，统一走内嵌 iframe。
    - 计算结果通过 URL 参数传入独立页面，复用其完整渲染逻辑（SVG 生成、参数编辑、PNG 导出等）
-   - 渲染触发：切到「供水首部系统图」视图时自动内嵌渲染（原「⚙️ 生成 / 重绘系统图」
+   - 渲染触发：切到「三级系统图」视图时自动内嵌渲染（原「⚙️ 生成 / 重绘系统图」
      按钮已按要求取消）；左栏 #tlSysBtn 与导航 #fnSystemDiagram 仍可手动触发。 */
 /* embed=1 → 供 iframe 内嵌用（图纸按容器等比缩放、整幅可见）；不传 → 独立页面原样 */
 function tlBuildSysUrl(embed) {
@@ -7639,13 +7748,23 @@ function tlOpenSystemDiagram() {
 })();
 
 /* ===== 主区 Tab 切换（替代原「整屏替换」）====================================
-   二级：#ppTabs → edit（管线编辑）/ draw（施工简图）
-   三级：#tlTabs → pipe（施工管线图）/ sys（供水首部系统图）
+   二级：#ppTabs → edit（管线编辑）/ draw（二级简图）
+   三级：#tlTabs → pipe（三级简图）/ sys（三级系统图）
    左属性栏始终保留，只有右主区换面板；不再整屏替换，切换时不跳版。 */
 function rySetTab(sectionId, view) {
   var sec = document.getElementById(sectionId);
   if (!sec) return;
   sec.setAttribute('data-ry-view', view);
+  /* 输出模式标记（2026-09-13，见样式 12.2 段）：底部「简图」按钮 → 图纸独占、
+     左属性栏让位；二级「管线编辑」回到工作区。值用 "1"/"0"（增删属性会破坏
+     verify_pp_tabs / verify_nav_switch 的最小 DOM 桩 —— 桩没有 removeAttribute）。
+     三级的 pipe/sys/iso 全部是图纸输出（工作区=顶部导航入口，由导航处理器写 "0"）。 */
+  if(sectionId==='pipePlanSection'){
+    sec.setAttribute('data-ry-clean', view==='draw' ? '1' : '0');
+  }else if(sectionId==='tlPipePlanSection'){
+    /* 2026-09-13：ws=「三级设计」工作区（左栏保留）；pipe/sys/iso 仍是图纸输出 */
+    sec.setAttribute('data-ry-clean', view==='ws' ? '0' : '1');
+  }
   var bar = sec.querySelector('.ry-tabs');
   /* 2026-09-12：两组切换条已下移到页面底部状态栏 #ryStatusBar（不再在 section 内），
      此时 sec.querySelector('.ry-tabs') 为 null —— 退回按 data-ry-sec 全局查找，
@@ -7662,23 +7781,54 @@ function rySetTab(sectionId, view) {
     window.ryShowSection(sec, null);
   }
   if (typeof window.ryStatusUpdate === 'function') window.ryStatusUpdate(sec);
-  /* 三级管路切到「供水首部系统图」时自动内嵌渲染一次
+  /* 三级管路切到「三级系统图」时自动内嵌渲染一次
      （原「⚙️ 生成 / 重绘系统图」按钮已按要求取消，改由切视图触发）；
      已有 src 则不再重复加载，避免每次切 Tab 都刷新 iframe。 */
   if (sectionId === 'tlPipePlanSection' && view === 'sys' && typeof tlOpenSystemDiagram === 'function') {
     var sysFrameAuto = document.getElementById('tlSysFrame');
     if (sysFrameAuto && !sysFrameAuto.getAttribute('src')) tlOpenSystemDiagram();
   }
+  /* 三级管路切到「轴测图」时根据平面图几何自动渲染（iso-diagram 模块，只读 window.tlDiagramData）；
+     无平面图数据时显示提示不崩溃；重复切换 innerHTML 整体替换，不叠加 SVG。 */
+  if (sectionId === 'tlPipePlanSection' && view === 'iso') {
+    var isoCtn = document.getElementById('tlIsoDiagramContent');
+    var isoBar = document.getElementById('tlIsoToolbar');
+    if (isoCtn && window.RyIsoDiagram) {
+      if (window.tlDiagramData) {
+        window.RyIsoDiagram.render(isoCtn, window.tlDiagramData);
+        if (isoBar) isoBar.style.display = 'flex';
+      } else {
+        isoCtn.innerHTML = '<div class="pp-diagram-empty">请先生成三级管线平面图（点「生成管线图」）</div>';
+        if (isoBar) isoBar.style.display = 'none';
+      }
+    }
+  }
+  /* 三级管路切到「三级设计」工作区：tl-workspace 模块按平面图几何渲染
+     （只读 window.tlDiagramData，与轴测图同一红线）；无数据时显示提示。
+     重复切换整幅重渲染（视口复位），手工管线层随数据引用保留。 */
+  if (sectionId === 'tlPipePlanSection' && view === 'ws') {
+    var wsCtn = document.getElementById('tlWsContent');
+    var wsBar = document.getElementById('tlWsToolbar');
+    if (wsCtn && window.RyTlWs) {
+      if (window.tlDiagramData) {
+        window.RyTlWs.render(wsCtn, window.tlDiagramData);
+        if (wsBar) wsBar.style.display = 'flex';
+      } else {
+        wsCtn.innerHTML = '<div class="tl-ws-empty">请先生成三级管线平面图（点左侧「生成管线图」）</div>';
+        if (wsBar) wsBar.style.display = 'none';
+      }
+    }
+  }
   /* 面板由隐藏变可见后，画布 / 图纸需按新容器尺寸重绘 */
   try { window.dispatchEvent(new Event('resize')); } catch (e) { }
 }
 
-/* 三级系统图：切到「供水首部系统图」Tab 并在 iframe 内渲染 */
+/* 三级系统图：切到「三级系统图」Tab 并在 iframe 内渲染 */
 function tlShowSysDiagram() {
   tlOpenSystemDiagram();
   rySetTab('tlPipePlanSection', 'sys');
 }
-/* 退回「施工管线图」Tab */
+/* 退回「三级简图」Tab */
 function tlBackToPipeline() {
   rySetTab('tlPipePlanSection', 'pipe');
 }
@@ -7691,10 +7841,10 @@ function openTlSystemDiagramFromNav() {
 /* 系统图区域按钮（⚙️ 生成 / 重绘系统图 #tlSysGen）已按要求取消（2026-09-12）
    —— 按钮本体与其点击绑定一并移除：只删按钮的话 getElementById 会拿到 null 抛
    TypeError，整段脚本静默中断（页面看着没坏、下方功能全废）。
-   替代入口：切到「供水首部系统图」视图时由 rySetTab 自动内嵌渲染（仅首次，
+   替代入口：切到「三级系统图」视图时由 rySetTab 自动内嵌渲染（仅首次，
    已有 src 不重复加载）；左栏 #tlSysBtn 与导航 #fnSystemDiagram 仍可手动触发。 */
 
-/* ===== 二级施工简图：切到「施工简图」Tab ===== */
+/* ===== 二级施工简图：切到「二级简图」Tab ===== */
 function ppShowConstructDiagram() {
   rySetTab('pipePlanSection', 'draw');
 }
@@ -7703,13 +7853,23 @@ function ppBackToEditor() {
   rySetTab('pipePlanSection', 'edit');
 }
 
-/* ===== 三级管线图：切到「施工管线图」Tab ===== */
+/* ===== 三级管线图：切到「三级简图」Tab ===== */
 function tlShowPipelineDiagram() {
   rySetTab('tlPipePlanSection', 'pipe');
+}
+/* 三级设计工作区：切到 ws 视图（tl-workspace 模块渲染，2026-09-13） */
+function tlShowWorkspace() {
+  rySetTab('tlPipePlanSection', 'ws');
 }
 /* 兼容旧名（原整屏视图的返回入口） */
 function tlBackFromPipeline() {
   rySetTab('tlPipePlanSection', 'pipe');
+}
+
+/* ===== 三级轴测图：切到「轴测图」Tab（iso-diagram 模块渲染，只读平面图几何 window.tlDiagramData） ===== */
+function tlShowIsoDiagram() {
+  if (!window.tlDiagramData) { alert('请先生成三级管线平面图'); return; }
+  rySetTab('tlPipePlanSection', 'iso');
 }
 
 // Zone count selector
@@ -7954,24 +8114,13 @@ function atPointInPolygon(point,polygon){
   return inside;
 }
 
-function atShoelaceArea(polygon){
-  if(polygon.length<3)return 0;
-  let area=0;
-  for(let i=0;i<polygon.length;i++){
-    const j=(i+1)%polygon.length;
-    area+=polygon[i].x*polygon[j].y;
-    area-=polygon[j].x*polygon[i].y;
-  }
-  return Math.abs(area)/2;
-}
-
 function atCalculateArea(){
   const gc=document.getElementById('atGridCount'),ga=document.getElementById('atGridArea'),
         ht=document.getElementById('atResultHint');
   if(!atState.metersPerPixel){gc.textContent='— / —';ga.textContent='— m²';ht.textContent='⚠️ 请先标定比例尺';return;}
   if(atState.polygon.length<3||!atState.polygonClosed){gc.textContent='— / —';ga.textContent='— m²';ht.textContent='⚠️ 请描绘并闭合边界';return;}
   const mpp=atState.metersPerPixel;
-  const pixelArea=atShoelaceArea(atState.polygon);
+  const pixelArea=polyAreaM2(atState.polygon);
   const shoelaceVal=pixelArea*mpp*mpp;
   gc.textContent=atState.polygon.length+' 个';
   ga.textContent=atFormatArea(shoelaceVal,atState.realUnit);
@@ -8373,7 +8522,7 @@ atSetMode('none');
 
 // Export utilities for use outside this IIFE
 window.atPointInPolygon = atPointInPolygon;
-window.atShoelaceArea = atShoelaceArea;
+window.atShoelaceArea = polyAreaM2;
 
 })();
 </script>
@@ -11073,27 +11222,7 @@ window.ppRenderPlanCalcDetail = ppRenderPlanCalcDetail;
     return parseInt(document.querySelector('#layoutGroup .selected')?.dataset?.sides||'1',10);
   }
 
-  // 实际地块 → 数字农业页面：写入共享 key（同源 localStorage，peanut-tool 启动即读）
-  window.runyeSharePlotToDigital=function(){
-    try{
-      var sqm=window.measuredArea||0;
-      if(sqm<=0) return;
-      var mu=sqm/666.67;
-      var poly=(window.measuredPolygon||[]).map(function(p){return [Math.round((p.x||0)*100)/100, Math.round((p.y||0)*100)/100];});
-      var pid=window.currentPlotId||null, pdt=null;
-      if(pid){ try{ var lib=JSON.parse(localStorage.getItem('runye_plot_library')||'[]'); var lp=lib.filter(function(x){return x.id===pid;})[0]; if(lp) pdt=lp.plantingDate||null; }catch(e){} }
-      localStorage.setItem('runyePlotData', JSON.stringify({
-        mu:Math.round(mu*100)/100,
-        sqm:Math.round(sqm*100)/100,
-        poly:poly,
-        crop:'七彩花生',
-        ts:Date.now(),
-        source:'runye-irrigation',
-        plotId:pid,
-        plantingDate:pdt
-      }));
-    }catch(e){}
-  };
+  // 地块数据同步到数字农业已外移至 irrigation-bridge.js（window.runyeSharePlotToDigital / runyeOpenDigitalAgriculture）。
 
   window.runyeSaveProject=function(){
     if(typeof updateMaterialTotals==='function') updateMaterialTotals();
@@ -11245,10 +11374,9 @@ window.ppRenderPlanCalcDetail = ppRenderPlanCalcDetail;
     try{ if(typeof window.ppLoadPolygon==='function') window.ppLoadPolygon(); }catch(e){}
     try{ if(typeof window.ppGenerateDiagram==='function') window.ppGenerateDiagram({scroll:false}); }catch(e){}
     try{ if(typeof window.runyeSharePlotToDigital==='function') window.runyeSharePlotToDigital(); }catch(e){}
-    renderLib(); toast('已设为当前地块：'+p.name);
-    // 提示确认后直接跳转到「二级管路制图区」查看生成的施工简图。
-    // 说明：若 toast 落到原生 alert 分支（页面没有 toast 容器时的兜底），alert 是阻塞式的，
-    // 这一行会在用户点「确定」之后才执行 —— 正好符合「点确定即跳转」的预期。
+    renderLib();
+    // 2026-09-13：按用户要求去掉「已设为当前地块」提示（该提示在页面无 toast 容器时兜底为
+    // 阻塞式原生 alert，需多点一次「确定」）——点击「设为当前」后直接跳转「二级管路制图区」。
     // 落点几何复用导航的 ryJumpToSection（stickyOffset() 已含吸顶栏真实高度 43px）。
     try{ if(typeof window.ryJumpToSection==='function') window.ryJumpToSection('pipePlanSection'); }catch(e){}
   }
@@ -11326,8 +11454,7 @@ function bindUI() {
   document.getElementById('cfg_fertCount').value = String(cfg.fertCount);
   document.getElementById('cfg_checkValve').checked = !!cfg.checkValve;
   document.getElementById('cfg_airValve').checked = !!cfg.airValve;
-  var boxes = document.querySelectorAll('#cfg_show input');
-  boxes.forEach(function (b) { b.checked = !!cfg.show[b.getAttribute('data-k')]; });
+  // 「显示内容」复选框组已按用户要求移除（2026-09-13）：出图恒为六项全显示（cfg.show 用默认值）
   renderFertList();
 }
 
@@ -11371,7 +11498,7 @@ function collect() {
   cfg.checkValve = document.getElementById('cfg_checkValve').checked;
   cfg.airValve = document.getElementById('cfg_airValve').checked;
   cfg.fertCount = +document.getElementById('cfg_fertCount').value;
-  document.querySelectorAll('#cfg_show input').forEach(function (b) { cfg.show[b.getAttribute('data-k')] = b.checked; });
+  // 「显示内容」复选框组已按用户要求移除（2026-09-13）：出图恒为六项全显示（cfg.show 用默认值）
   while (cfg.ferts.length < cfg.fertCount) cfg.ferts.push({ type: '文丘里', dn: 25 });
   cfg.ferts = cfg.ferts.slice(0, cfg.fertCount);
 }
@@ -11923,23 +12050,6 @@ bindUI();
 render();
 })();
 </script>
-<script>
-/* ===== 前端防护：禁用右键菜单与源码查看快捷键 ===== */
-(function(){
-  document.addEventListener('contextmenu',function(e){e.preventDefault();return false;});
-  document.addEventListener('keydown',function(e){
-    var k=(e.key||'').toLowerCase();
-    if(e.key==='F12'||(e.ctrlKey&&e.shiftKey&&(k==='i'||k==='j'||k==='c'))||(e.ctrlKey&&k==='u')){
-      e.preventDefault();e.stopPropagation();return false;
-    }
-  });
-  document.addEventListener('selectstart',function(e){
-    var t=e.target&&e.target.tagName;
-    if(t==='INPUT'||t==='TEXTAREA')return;
-    e.preventDefault();
-  });
-})();
-</script>
 
 <!-- ===== 嵌入导航：移动端菜单 ===== -->
 <script>
@@ -12027,64 +12137,8 @@ render();
 })();
 </script>
 
-<!-- ===== 工作台单向打通桥：来自 workbench.html 的「绘制边界」请求 ===== -->
-<script>
-(function(){
-  var PENDING_KEY='runye_pending_land';
-  function getPending(){ try{ return JSON.parse(localStorage.getItem(PENDING_KEY)||'null'); }catch(e){ return null; } }
-  function clearPending(){ try{ localStorage.removeItem(PENDING_KEY); }catch(e){} }
-
-  // 仅当 index 由工作台（?from=workbench）打开时才保留待回写标记；否则清除，避免误回写旧地块
-  var fromWB = /[?&]from=workbench\b/.test(location.search);
-  if(!fromWB) clearPending();
-
-  // 预填地块名，方便在精准灌溉内直接保存
-  document.addEventListener('DOMContentLoaded', function(){
-    var p=getPending();
-    if(p && p.name){
-      var ni=document.getElementById('plotNameInput');
-      if(ni && !ni.value) ni.value=p.name;
-    }
-    // 来自工作台「绘制边界」：直接定位到 03 面积测量工具区域（锚点兜底，防布局抖动未到位）
-    if(fromWB){
-      setTimeout(function(){
-        var sec=document.getElementById('areaTool');
-        if(sec) sec.scrollIntoView({behavior:'smooth', block:'start'});
-      }, 120);
-    }
-  });
-
-  // 保存地块后，把边界与实测面积回写工作台 runye_db_v1 的对应 land，并跳回工作台详情页
-  // 兼容两类来源：
-  //  - 工作台「绘制边界」进来（?from=workbench，有 pending.land_id）：回填该 land 并跳回详情；
-  //  - 面积测量工具内独立绘制保存（无 pending）：按 plotId / 同名查找或新建 land，使工作台地块中心能看到。
-  window.runyeBridgeWriteBack=function(plotId, plot){
-    var p=getPending();
-    try{
-      var raw=localStorage.getItem('runye_db_v1'); if(!raw) return;
-      var db=JSON.parse(raw); if(!db || !db.lands) return;
-      var land=null;
-      if(p && p.land_id){ db.lands.forEach(function(l){ if(l.land_id===p.land_id) land=l; }); }
-      if(!land){ db.lands.forEach(function(l){ if(l.land_id===plotId) land=l; }); }            // 复用同一 plotId 对应的 land
-      if(!land){ var nm=plot.name||''; if(nm){ db.lands.forEach(function(l){ if(String(l.name||'').trim()===nm.trim()) land=l; }); } } // 同名地块更新，避免重复建档
-      if(!land){
-        land={ land_id:plotId, name:plot.name||'未命名地块', code:'', area:plot.mu||0, geo_json:null,
-          crop:plot.crop||'七彩花生', variety:'', soil_type:'', planting_location:'', plant_date:'', harvest_date:'',
-          base_fertilizer:'', planting_method:'', status:'wait', farm:'', create_time:new Date().toISOString(), remark:'' };
-        db.lands.push(land);
-      }
-      land.geo_json={ source:'runye-irrigation', plotId:plotId, poly:plot.poly||[], sqm:plot.sqm||0, mu:plot.mu||0, saved_at:Date.now() };
-      if(plot.mu) land.area=Math.round(plot.mu*100)/100;
-      if(plot.name) land.name=plot.name;
-      if(!land.crop) land.crop=plot.crop||'七彩花生';
-      localStorage.setItem('runye_db_v1', JSON.stringify(db));
-      if(p && p.land_id) clearPending();
-      if(typeof atShowToast==='function') atShowToast('已回填工作台地块：'+(land.name||plotId)); else alert('已回填工作台地块');
-      if(p && p.land_id){ setTimeout(function(){ window.location.href='workbench.html?space=1#/land/'+p.land_id; }, 900); }
-    }catch(e){ console.error('bridge writeback failed', e); }
-  };
-})();
-</script>
+<!-- ===== 灌溉 ↔ 数字农业 最小桥接（runyeOpenDigitalAgriculture / runyeSharePlotToDigital / runyeBridgeWriteBack）：实现外置于 irrigation-bridge.js ===== -->
+<script src="irrigation-bridge.js"></script>
 
 <!-- ===== 主区 Tab 绑定 + 底部状态栏 + 视口自适应 ===== -->
 <script>
@@ -12107,13 +12161,16 @@ render();
 
   /* ---------- 2. 底部状态栏 ---------- */
   var NAMES={designInput:'标准分区预设',areaTool:'地块绘制',
-             pipePlanSection:'二级管路',tlPipePlanSection:'三级管路',detailsSection:'材料清单'};
+             pipePlanSection:'二级管路',tlPipePlanSection:'三级管路',detailsSection:'材料清单',
+             threeDModelingSection:'三维建模',parametricModelingSection:'数字化建模'};
   var HINTS={
     designInput:'调整左侧参数，方案与管径选型结果实时更新',
     areaTool:'上传图片或在线地图描绘地块边界，闭合后自动回填面积',
-    pipePlanSection:'绘制主管 / 支管 → 生成施工图 → 切「施工简图」查看',
-    tlPipePlanSection:'设定联合灌溉分区 → 一键生成管线图 → 切「供水首部系统图」',
-    detailsSection:'材料清单与工程量汇总'
+    pipePlanSection:'绘制主管 / 支管 → 生成施工图 → 切「二级简图」查看',
+    tlPipePlanSection:'设定联合灌溉分区 → 生成管线图 → 「三级设计」可缩放/插入管线',
+    detailsSection:'材料清单与工程量汇总',
+    threeDModelingSection:'入口已预留 · 功能规划中',
+    parametricModelingSection:'参数化建模 · 独立试验区 · 当前会话保留，刷新清空'
   };
   window.ryStatusUpdate=function(sec){
     if(!sec) return;
@@ -12254,6 +12311,21 @@ render();
          点导航应回到绘图编辑区，而非停留在简图区 —— 先退出满屏态。 */
       if(it.sec.classList.contains('sys-view')) it.sec.classList.remove('sys-view');
       if(it.sec.classList.contains('pipe-view')) it.sec.classList.remove('pipe-view');
+      /* ★ 顶部导航＝绘图工作区（2026-09-13）：不管底部状态栏切到哪个简图，
+         点顶部一律回到该功能区的绘图工作区 —— 二级复位到「管线编辑」、
+         三级复位到「三级设计工作区」，并清除输出模式标记（左属性栏恢复）。
+         rySetTab 会把三级的标记写成 "1"，所以复位后必须再写 "0"（顺序不可倒）。
+         try/catch：此处任何异常都会中断整个 forEach，后续导航项将全部失绑。 */
+      try{
+        if(typeof rySetTab==='function'){
+          if(it.sec.id==='pipePlanSection' && it.sec.getAttribute('data-ry-view')!=='edit'){
+            rySetTab(it.sec.id,'edit');
+          }else if(it.sec.id==='tlPipePlanSection' && it.sec.getAttribute('data-ry-view')!=='ws'){
+            rySetTab(it.sec.id,'ws');
+          }
+        }
+        it.sec.setAttribute('data-ry-clean','0');
+      }catch(err){}
       /* ★ 工具模式＝单视口切换：点导航直接换功能区，不做滚动定位。
          这里以前缺这条分支 —— 工具模式下其它功能区都是 display:none，
          锚点无处可跳，点击因此"完全没反应"。 */
@@ -12463,6 +12535,92 @@ render();
 
 <script>
 /* ============================================================================
+   05 三级管路 —— 左参数栏宽度可拖拽（与 04 二级 .pp-grip-side 同一套做法）
+   ----------------------------------------------------------------------------
+   1. 运行时在 #tlPipePlanSection .pp-body 的「参数栏」与「图纸区」之间注入
+      .pp-grip-side（占既有网格第 2 列 10px，不额外占宽）；
+   2. 拖动改写 #tlPipePlanSection 上的 --pp-side-w（三级网格本就消费该变量），
+      rAF 节流派发 window resize 让图纸/工作区自适应；
+   3. 松手写 localStorage(runye_tl_panel_w)，双击恢复默认响应式宽度；
+   4. 窄屏（≤1100px）CSS 隐藏拖拽条；输出模式（clean="1"）由 12.2 段隐藏并收 0。
+   ============================================================================ */
+(function(){
+  var sec=document.getElementById('tlPipePlanSection');
+  if(!sec) return;
+  var body=sec.querySelector('.pp-body');
+  if(!body) return;
+  var side=document.getElementById('tlSide');
+  var stage=body.querySelector('.pp-stage');
+  if(!side||!stage) return;
+  if(body.querySelector('.pp-grip-side')) return;   /* 防重复注入 */
+
+  var KEY='runye_tl_panel_w';
+  var MIN_SIDE=200,MAX_SIDE=560,CANVAS_MIN=320;
+  function clampNum(v,lo,hi){ v=parseFloat(v); if(isNaN(v)) return null; return Math.max(lo,Math.min(hi,v)); }
+  function loadWs(){ try{ return JSON.parse(localStorage.getItem(KEY))||{}; }catch(e){ return {}; } }
+  function saveWs(o){ try{ localStorage.setItem(KEY,JSON.stringify(o)); }catch(e){} }
+  function maxSide(){
+    var inner=body.clientWidth-28;                  /* 减 .pp-body 左右 padding(14×2) */
+    return Math.max(MIN_SIDE,Math.min(MAX_SIDE,inner-10-CANVAS_MIN));
+  }
+  function applySide(px){ if(px==null) sec.style.removeProperty('--pp-side-w'); else sec.style.setProperty('--pp-side-w',px+'px'); }
+
+  var saved=clampNum(loadWs().side,MIN_SIDE,MAX_SIDE);
+  if(saved) applySide(Math.min(saved,maxSide()));
+
+  var pend=false;
+  function refit(){
+    if(pend) return; pend=true;
+    var run=function(){ pend=false; try{ window.dispatchEvent(new Event('resize')); }catch(e){} };
+    if(window.requestAnimationFrame) window.requestAnimationFrame(run); else setTimeout(run,16);
+  }
+
+  var g=document.createElement('div');
+  g.className='pp-grip pp-grip-side';
+  g.title='拖动调整参数栏宽度 · 双击恢复默认';
+  g.setAttribute('role','separator');
+  g.setAttribute('aria-orientation','vertical');
+  body.insertBefore(g,stage);
+
+  var EV=window.PointerEvent?{down:'pointerdown',move:'pointermove',up:'pointerup',cancel:'pointercancel'}:{down:'mousedown',move:'mousemove',up:'mouseup',cancel:'blur'};
+  var drag=null;
+  g.addEventListener(EV.down,function(e){
+    if(e.button!=null&&e.button!==0) return;        /* 只响应左键 */
+    drag={x:e.clientX,sideW:side.getBoundingClientRect().width};
+    g.classList.add('dragging');
+    document.body.classList.add('pp-col-resizing');
+    if(e.preventDefault) e.preventDefault();
+  });
+  document.addEventListener(EV.move,function(e){
+    if(!drag) return;
+    var w=clampNum(drag.sideW+(e.clientX-drag.x),MIN_SIDE,maxSide());
+    if(w!=null) applySide(w);
+    refit();
+  });
+  function endDrag(){
+    if(!drag) return;
+    drag=null;
+    g.classList.remove('dragging');
+    document.body.classList.remove('pp-col-resizing');
+    var o=loadWs();
+    o.side=Math.round(side.getBoundingClientRect().width);
+    saveWs(o);
+    refit();
+  }
+  document.addEventListener(EV.up,endDrag);
+  document.addEventListener(EV.cancel,endDrag);
+  window.addEventListener('blur',endDrag);
+  g.addEventListener('dblclick',function(){ var o=loadWs(); delete o.side; saveWs(o); applySide(null); refit(); });
+  window.addEventListener('resize',function(){
+    if(drag) return;
+    var s=clampNum(loadWs().side,MIN_SIDE,MAX_SIDE);
+    if(s) applySide(Math.min(s,maxSide()));
+  });
+})();
+</script>
+
+<script>
+/* ============================================================================
    03 地块绘制 —— 左属性栏宽度可拖拽（.at-grip）
    ----------------------------------------------------------------------------
    与 04 二级管路的 .pp-grip 同一套做法（纯附加，不改任何既有 id、事件绑定与计算逻辑）：
@@ -12551,6 +12709,124 @@ render();
     if(drag) return;
     var s=clampNum(loadW().side,MIN_SIDE,MAX_SIDE);
     if(s) applySide(Math.min(s,maxSide()));
+  });
+})();
+</script>
+<script src="modeling/integration.js"></script>
+<script src="iso-diagram/iso-diagram.js"></script>
+
+<!-- ===== 三级设计工作区模块 + 页面接线（2026-09-13） ===== -->
+<script src="tl-workspace/tl-workspace.js"></script>
+<script>
+(function(){
+  function el(id){ return document.getElementById(id); }
+  var mainBtn=el('tlWsMain'), branchBtn=el('tlWsBranch'),
+      count=el('tlWsManCount'), hint=el('tlWsHint');
+  var HINT_IDLE='点「插入主管/支管」后在图上点击逐点画线，双击结束，Esc 取消';
+  function refresh(m){
+    if(mainBtn) mainBtn.classList.toggle('active', m==='main');
+    if(branchBtn) branchBtn.classList.toggle('active', m==='branch');
+    var cvn=document.querySelector('#tlWsContent .tl-ws-canvas');
+    if(cvn) cvn.classList.toggle('tl-ws-inserting', !!m);
+    if(hint) hint.textContent = m ? ('正在插入'+(m==='main'?'主管':'支管')+'：点击加点，双击/Enter 结束，Esc 取消') : HINT_IDLE;
+  }
+  if(window.RyTlWs){
+    RyTlWs.onManualChange=function(n){ if(count) count.textContent='手工 '+n+' 条'; };
+    RyTlWs.onModeChange=refresh;   /* Esc 退出插入模式时同步按钮高亮 */
+  }
+  function bindMode(btn){
+    if(!btn) return;
+    btn.addEventListener('click', function(){
+      if(!window.RyTlWs) return;
+      refresh(RyTlWs.setMode(btn.getAttribute('data-ws-mode')));
+    });
+  }
+  bindMode(mainBtn); bindMode(branchBtn);
+  var u=el('tlWsUndo'); if(u) u.addEventListener('click', function(){ if(window.RyTlWs) RyTlWs.undo(); });
+  var c=el('tlWsClear'); if(c) c.addEventListener('click', function(){ if(window.RyTlWs) RyTlWs.clearManual(); });
+})();
+</script>
+<script>
+/* 轴测图工具栏（#tlIsoSide）接线：配件布置 + 构件参数（2026-09-13）。
+   模块保持纯几何/无 DOM 依赖（Node 可测），页面侧 UI 逻辑集中在此。 */
+(function () {
+  var ISO = window.RyIsoDiagram;
+  var KINDS = { tee: '三通', elbow: '弯头', valve: '阀门' };
+  var kindsEl = document.getElementById('tlIsoKinds');
+  var specEl = document.getElementById('tlIsoSpec');
+  var btn = document.getElementById('tlIsoPlaceBtn');
+  var hint = document.getElementById('tlIsoPlaceHint');
+  var infoCard = document.getElementById('tlIsoInfoCard');
+  var infoBody = document.getElementById('tlIsoInfoBody');
+  var delBtn = document.getElementById('tlIsoDelBtn');
+  if (!ISO || !kindsEl || !btn || !hint || !infoCard || !infoBody || !delBtn) return;
+  var curKind = 'tee', curId = null;
+
+  function setHint(t) { hint.textContent = t; }
+
+  /* 配件类型三选一 */
+  kindsEl.addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-kind]');
+    if (!b) return;
+    curKind = b.getAttribute('data-kind');
+    Array.prototype.forEach.call(kindsEl.querySelectorAll('button[data-kind]'), function (x) {
+      x.classList.toggle('active', x === b);
+    });
+  });
+
+  /* 确定 · 放置 / 取消放置 */
+  btn.addEventListener('click', function () {
+    if (ISO.placingKind()) {
+      ISO.cancelPlace();
+      return;
+    }
+    if (!document.querySelector('#tlIsoDiagramContent svg')) {
+      setHint('请先生成轴测图（需已生成三级管线平面图）');
+      return;
+    }
+    var spec = specEl ? specEl.value : '';
+    ISO.startPlace(curKind, spec);
+    btn.textContent = '取消放置';
+    setHint('放置模式：在右侧图上沿管线点击放置「' + KINDS[curKind] + (spec ? ' · ' + spec : '') + '」；再点本按钮可取消');
+  });
+
+  /* 放置结果反馈 */
+  ISO.onPlaceResult = function (res) {
+    if (res && res.ok) {
+      btn.textContent = '确定 · 放置';
+      setHint('已放置 ' + res.id + '（' + KINDS[res.kind] + (res.spec ? ' · ' + res.spec : '') + '）。点击图中构件可查看参数');
+    } else if (ISO.placingKind()) {
+      setHint((res && res.reason) || '请沿管线点击');
+    } else {
+      btn.textContent = '确定 · 放置';
+      setHint((res && res.reason) || '已取消放置');
+    }
+  };
+
+  /* 构件参数显示（自动三通/阀门 + 手工配件） */
+  function row(k, v) { return '<div class="tl-iso-kv"><span>' + k + '</span><b>' + v + '</b></div>'; }
+  ISO.onFittingClick = function (info) {
+    if (!info) return;
+    curId = info.id;
+    var h = row('类型', info.typeName || info.kindLabel)
+      + row('编号', info.id)
+      + row('规格', info.spec || '—');
+    if (info.segName) h += row('所在管段', info.segName);
+    if (info.upstream) h += row('上游', info.upstream);
+    if (info.downstream) h += row('下游', info.downstream);
+    if (info.zone) h += row('分区', info.zone);
+    if (info.point) h += row('坐标', 'x=' + info.point.x.toFixed(1) + ', y=' + info.point.y.toFixed(1) + ' m');
+    infoBody.innerHTML = h;
+    infoCard.style.display = '';
+    delBtn.style.display = info.manual ? '' : 'none';
+  };
+  delBtn.addEventListener('click', function () {
+    if (!curId) return;
+    if (ISO.removeManual(curId)) {
+      infoCard.style.display = 'none';
+      curId = null;
+      setHint('配件已删除');
+    }
   });
 })();
 </script>

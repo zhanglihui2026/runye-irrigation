@@ -1,0 +1,55 @@
+/* digital-agriculture.css — 数字农业模块入口页样式
+   延续宿主主题：深绿主色、浅色面板、克制圆角。仅供 digital-agriculture/index.html 使用。 */
+
+:root {
+  --da-green: #15803d;
+  --da-green-deep: #166534;
+  --da-line: #dbe5dd;
+  --da-bg: #f5f7f5;
+  --da-text: #1e293b;
+  --da-muted: #64748b;
+}
+
+.da-page {
+  min-height: 100vh;
+  margin: 0;
+  background: var(--da-bg);
+  color: var(--da-text);
+  font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", system-ui, sans-serif;
+}
+
+.da-shell { max-width: 880px; margin: 0 auto; padding: 32px 20px 48px; }
+
+.da-header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+.da-header h1 { font-size: 22px; color: var(--da-green-deep); margin: 0; }
+.da-header .da-ver { font-size: 12px; color: var(--da-muted); }
+
+.da-sub { font-size: 13px; color: var(--da-muted); margin: 0 0 20px; }
+
+.da-plot {
+  background: #fff; border: 1px solid var(--da-line); border-radius: 8px;
+  padding: 16px 18px; margin-bottom: 22px;
+}
+.da-plot h2 { font-size: 15px; margin: 0 0 10px; color: var(--da-green-deep); }
+.da-plot dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0; font-size: 13px; }
+.da-plot dt { color: var(--da-muted); }
+.da-plot dd { margin: 0; font-weight: 600; }
+.da-plot .da-src { margin-top: 10px; font-size: 12px; color: var(--da-muted); }
+.da-plot.da-warn { border-color: #f59e0b; }
+.da-plot .da-warn-text { font-size: 13px; color: #b45309; margin: 0; }
+
+.da-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.da-card {
+  display: block; background: #fff; border: 1px solid var(--da-line); border-radius: 8px;
+  padding: 16px 18px; text-decoration: none; color: inherit;
+}
+.da-card:hover { border-color: var(--da-green); }
+.da-card h3 { font-size: 15px; color: var(--da-green-deep); margin: 0 0 6px; }
+.da-card p { font-size: 12.5px; color: var(--da-muted); margin: 0; line-height: 1.6; }
+
+.da-foot { margin-top: 26px; font-size: 12px; color: var(--da-muted); }
+.da-foot a { color: var(--da-green); }
+
+@media (max-width: 560px) {
+  .da-plot dl { grid-template-columns: 1fr; }
+}

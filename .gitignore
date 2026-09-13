@@ -27,5 +27,6 @@ functions/
 
 # 本地验收脚本与勘察报告（不发布到 GitHub Pages）
 verify_*.js
+verify_*.cjs
 audit_*.js
 docs/

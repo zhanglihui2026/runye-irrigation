@@ -1,0 +1,21 @@
+/* 宿主只管理入口、容器和预留页；模型器内部样式在 parametric/css/。 */
+.ry-modeling-section{
+  position:relative; min-width:0; overflow:hidden;
+  height:calc(100vh - var(--fn-nav-h,36px) - 1px);
+  background:var(--u-panel,#f7faf9); color:var(--u-ink,#243c35);
+  scroll-margin-top:calc(var(--fn-nav-h,36px) + 1px);
+}
+#parametricModelerFrame{display:block;width:100%;height:100%;border:0;visibility:hidden;background:var(--u-panel,#f7faf9)}
+#parametricModelingSection[data-modeling-state="ready"] #parametricModelerFrame{visibility:visible}
+#parametricModelingSection[data-modeling-state="ready"] .ry-modeling-load{display:none}
+.ry-modeling-load{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;font-size:14px}
+.ry-modeling-load a{color:var(--u-accent-2,#116447);text-underline-offset:3px}
+.ry-modeling-reserved{height:100%;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px 20px}
+.ry-modeling-cube{width:90px;height:90px;color:var(--u-accent,#18835e);margin-bottom:24px}
+.ry-modeling-badge{font-size:12px;padding:3px 9px;border:1px solid var(--u-accent-line,#9bcbb4);background:var(--u-accent-bg,#e0f2e9);color:var(--u-accent-2,#116447)}
+.ry-modeling-reserved h2{font-size:23px;color:var(--u-ink,#243c35);margin:16px 0 8px}
+.ry-modeling-reserved p{font-size:14px;line-height:1.8;color:var(--u-ink-2,#4a6259);margin:0 0 24px}
+.ry-modeling-open{font:inherit;font-size:13px;border:1px solid var(--u-accent-2,#116447);padding:9px 16px;background:var(--u-accent-2,#116447);color:#fff;cursor:pointer;border-radius:3px}
+.ry-modeling-open:hover{background:var(--u-accent,#18835e)}
+.ry-modeling-open:focus-visible{outline:2px solid var(--u-water,#245f87);outline-offset:3px}
+@media print{#threeDModelingSection,#parametricModelingSection{display:none!important}}

@@ -1,0 +1,77 @@
+/* =====================================================================
+ * tl-workspace.css — 三级管线设计工作区（tl-workspace.js 配套样式）
+ * 自包含：全部带 .tl-ws 前缀，不与既有 .pp-* 类发生级联纠缠。
+ * ===================================================================== */
+
+/* 画布容器：占满 pane 左列，白底圆角（对齐图纸区观感）
+   2026-09-13 晚：父容器 .ry-pane-ws 改两列网格（画布 ｜ 右侧竖向工具轨），
+   本元素定位到左列（原 flex:1 1 auto 在 grid 下不再参与尺寸分配）。 */
+#tlWsContent{
+  grid-column:1;grid-row:1;min-width:0;
+  position:relative;min-height:280px;
+  overflow:hidden;border-radius:10px;
+  background:#fff;border:1px solid #dbe7e0;
+  outline:none;
+}
+.tl-ws-canvas{position:absolute;inset:0;overflow:hidden;cursor:default}
+.tl-ws-canvas svg.tl-ws-svg{display:block;user-select:none;-webkit-user-select:none}
+.tl-ws-canvas.tl-ws-dragging{cursor:grabbing}
+.tl-ws-canvas.tl-ws-inserting{cursor:crosshair}
+.tl-ws-empty{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  color:#7d8f86;font-size:13px;text-align:center;padding:0 20px;line-height:1.8;
+}
+
+/* 工具条 → 右侧竖向工具轨（参考二级管线 .pp-toolbar 的竖排做法）：
+   每键独占一行、铺满轨宽；背景渐变/边框对齐二级工具轨。
+   JS 显示时写 inline display:flex（不影响 column 方向）；无数据时 inline display:none。
+   ⚠ 显隐由 JS 内联样式接管，这里不写 display，避免被内联覆盖产生歧义。 */
+.tl-ws-toolbar{
+  grid-column:2;grid-row:1;
+  display:flex;flex-direction:column;flex-wrap:nowrap;align-items:stretch;
+  gap:4px;flex:0 0 auto;
+  padding:7px 7px;margin:0;
+  background:linear-gradient(180deg,#f8fbf9 0%,#f2f7f4 100%);
+  border:1px solid #dde8e1;border-radius:8px;
+  font-size:12px;
+  overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
+}
+/* 分隔符：竖排下竖线改横线 */
+.tl-ws-toolbar .tl-ws-sep{width:100%;height:1px;align-self:auto;margin:3px 0;flex:0 0 auto;background:#e4ece7}
+.tl-ws-btn{
+  width:100%;box-sizing:border-box;flex:0 0 auto;
+  height:28px;min-height:0;padding:0 6px;
+  display:flex;align-items:center;justify-content:center;text-align:center;
+  font-size:12px;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  border:1px solid #c5d6cc;background:#f8fbf9;
+  border-radius:6px;cursor:pointer;color:#2c4a3d;
+}
+.tl-ws-btn:hover{border-color:#2d604b}
+.tl-ws-btn.active{background:#2d604b;border-color:#2d604b;color:#fff;font-weight:600}
+.tl-ws-pct{width:100%;min-width:0;text-align:center;color:#4b5b53;font-weight:600}
+.tl-ws-count{width:100%;text-align:center;color:#7d8f86;font-size:11px;flex:0 0 auto}
+.tl-ws-count b{color:#2d604b}
+/* 操作提示：沉到轨底，允许折行（竖排下原 margin-left:auto 失效） */
+.tl-ws-hint{
+  width:100%;margin:auto 0 0;padding-top:4px;
+  color:#8a9a90;font-size:11px;line-height:1.5;text-align:left;
+  border-top:1px solid #e4ece7;flex:0 0 auto;
+}
+
+/* 窄屏（≤760px）回退：工具轨退回顶部横排（与旧版一致）
+   ⚠ 选择器带 body 前缀压过 index.html 内联样式里同特异性的 grid 定义 */
+@media (max-width:760px){
+  body #tlPipePlanSection .ry-pane-ws{
+    display:flex;flex-direction:column;
+  }
+  .tl-ws-toolbar{
+    flex-direction:row;flex-wrap:wrap;align-items:center;
+    padding:6px 8px;margin:0 0 8px;
+    background:#fff;overflow:visible;
+  }
+  .tl-ws-toolbar .tl-ws-sep{width:1px;align-self:stretch;margin:0 3px}
+  .tl-ws-btn{width:auto;height:auto;padding:5px 12px;line-height:1.3;display:inline-block}
+  .tl-ws-pct,.tl-ws-count{width:auto;text-align:left}
+  .tl-ws-hint{width:auto;margin:0 0 0 auto;padding-top:0;border-top:0}
+  #tlWsContent{grid-column:auto;grid-row:auto;flex:1 1 auto}
+}
