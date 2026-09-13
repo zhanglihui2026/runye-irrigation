@@ -6,11 +6,20 @@
 #tlIsoDiagramContent svg.iso-dragging{cursor:grabbing}
 /* 手工配件层（2026-09-13）：构件可点击；放置模式十字丝 */
 #tlIsoDiagramContent svg g.iso-fit{cursor:pointer}
+#tlIsoDiagramContent [data-selected="true"]{filter:drop-shadow(0 0 2px #17a078)}
 #tlIsoDiagramContent.iso-placing,#tlIsoDiagramContent.iso-placing svg{cursor:crosshair}
 #tlIsoDiagramContent svg text{pointer-events:none}
 #tlIsoToolbar{align-items:center;flex-wrap:wrap}
 #tlIsoToolbar .pp-btn-ghost{white-space:nowrap}
 #tlIsoZoomPct{font-size:12px;color:#64748b;padding:0 6px;align-self:center;min-width:42px;text-align:center}
+.iso-editor[hidden]{display:none!important}
+.iso-editor label{display:grid;grid-template-columns:1fr;gap:4px;margin:10px 0;font-size:12px;color:#354e45}
+.iso-editor input:not([type=checkbox]),.iso-editor select{box-sizing:border-box;width:100%;min-width:0;padding:6px;border:1px solid #bdd1c8;background:white;color:#243c35}
+.iso-editor .iso-check{display:flex;align-items:center}
+.iso-editor .iso-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.iso-editor button{padding:7px 10px;background:#f3f8f5;border:1px solid #bdd1c8;color:#244e40;cursor:pointer}
+.iso-editor [data-action=apply]{background:#176448;color:white}
+.iso-editor p{font-size:12px;overflow-wrap:anywhere}
 /* 打印：仅轴测图内容 */
 @media print{
   body>*{display:none !important}

@@ -1647,6 +1647,14 @@ legend{color:#53665b;letter-spacing:0}
 #areaTool .at-canvas-wrap{
   background:#202723;
 }
+#areaTool .at-canvas-hint{
+  position:absolute;left:50%;bottom:14px;transform:translateX(-50%);
+  max-width:86%;padding:6px 14px;border-radius:16px;
+  background:rgba(15,28,22,.72);color:#cfe6d8;font-size:11.5px;line-height:1.6;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;
+  backdrop-filter:blur(2px);
+}
+@media(max-width:760px){#areaTool .at-canvas-hint{white-space:normal;text-align:center;border-radius:12px}}
 
 #pipePlanSection{
   background:
@@ -3900,6 +3908,24 @@ body.ry-tool #tlPipePlanSection[data-ry-view="iso"][data-ry-clean="1"] > .pp-bod
 .tl-iso-row select{flex:0 0 130px;padding:4px 6px;font-size:12px;border:1px solid #c5d6cc;border-radius:6px;background:#fff}
 .tl-iso-hint{margin-top:8px;font-size:11px;line-height:1.6;color:#7d8f86}
 .tl-iso-info{display:flex;flex-direction:column;gap:4px}
+/* —— 轴测图右侧分区统计栏（2026-09-13）：画布｜统计 两列（参考 .ry-pane-ws 做法） —— */
+#tlPipePlanSection .ry-pane-iso{
+  display:grid;grid-template-columns:minmax(0,1fr) clamp(200px,17vw,256px);
+  grid-template-rows:minmax(0,1fr);column-gap:8px;
+  min-height:460px;margin:0;min-width:0;
+}
+#tlPipePlanSection .ry-pane-iso>#tlIsoDiagramWrap{margin:0;min-height:0;min-width:0}
+.tl-iso-stats{min-height:0;overflow:auto}
+.tl-iso-stats table{width:100%;border-collapse:collapse;font-size:10.5px;color:#33463e}
+.tl-iso-stats th,.tl-iso-stats td{padding:3px 4px;text-align:right;border-bottom:1px solid #e3ece6;white-space:nowrap}
+.tl-iso-stats th:first-child,.tl-iso-stats td:first-child{text-align:left}
+.tl-iso-stats thead th{font-weight:600;color:#243c35;border-bottom:1.5px solid #c6d8cc}
+.tl-iso-stats tr.sum td{font-weight:700;border-top:2px solid #8fae9b;background:#f4f9f5}
+.tl-iso-stats .tl-iso-note{font-size:10.5px;color:#5b6b66;line-height:1.6;margin-top:6px}
+@media(max-width:900px){
+  #tlPipePlanSection .ry-pane-iso{grid-template-columns:minmax(0,1fr)}
+  #tlPipePlanSection .ry-pane-iso>.tl-iso-stats{grid-column:1/-1;max-height:260px}
+}
 .tl-iso-kv{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;color:#4b5b53}
 .tl-iso-kv b{font-weight:600;color:#243c35;text-align:right;word-break:break-all}
 
@@ -4725,7 +4751,6 @@ body.ry-tool #tlPipePlanSection .pp-side .pp-plan-item,
           <button class="at-btn-action" id="atBtnUndo">↩ 回退</button>
           <button class="at-btn-action" id="atBtnClose">⭕ 闭合</button>
         </div>
-        <div style="font-size:10px;color:#aaa;margin-top:3px;">提示：拾取框线后可拖动节点微调；手绘时双击闭合 · 右键回退最后一点</div>
       </div>
       <div class="at-section">
         <h3><span class="num">3</span> 测量结果</h3>
@@ -4736,7 +4761,6 @@ body.ry-tool #tlPipePlanSection .pp-side .pp-plan-item,
           <div class="at-result-hint" id="atResultHint">请先标定比例尺并描绘闭合边界</div>
         </div>
         <div class="at-field" style="margin-top:5px;">
-          <label>地块名称（保存到地块库）</label>
           <input type="text" id="plotNameInput" placeholder="如 1号田 / 东坡地块" maxlength="20">
         </div>
         <button class="at-btn-action" id="savePlotBtn" style="margin-top:4px;width:100%">💾 保存到地块库</button>
@@ -4786,6 +4810,7 @@ body.ry-tool #tlPipePlanSection .pp-side .pp-plan-item,
         <p>拖拽图片到此处，或点击「上传图片」</p>
         <p class="sub">支持 JPG / PNG / BMP 等常见格式</p>
       </div>
+      <div class="at-canvas-hint" id="atCanvasHint">提示：拾取框线后可拖动节点微调；手绘时双击闭合 · 右键回退最后一点</div>
     </div>
   </div>
   <!-- 03 底部状态栏已按要求取消（原 .at-statusbar：浏览模式/比例尺模式/描绘模式徽章 + 操作提示 + 光标坐标 + 缩放百分比）。
@@ -5044,6 +5069,11 @@ body.ry-tool #tlPipePlanSection .pp-side .pp-plan-item,
     </div>
     <div id="tlIsoDiagramContent"><div class="pp-diagram-empty">完成面积测量并点击「生成管线图」后，切到「轴测简图」视图会根据平面图几何自动生成轴测示意图（含三通与阀门）。</div></div>
   </div><!-- /.pp-diagram-wrap -->
+  <!-- 分区材料统计栏（2026-09-13）：随轴测图渲染自动汇总（computeStats 只读），右侧竖排 -->
+  <aside class="tl-iso-stats tl-iso-card" id="tlIsoStats">
+    <div class="tl-iso-card-title">分区材料统计</div>
+    <div id="tlIsoStatsBody"><div class="tl-iso-note">生成轴测图后自动统计各分区面积、阀门 / 三通 / 弯头数量与管道长度，并汇总合计。</div></div>
+  </aside>
   </div><!-- /.ry-pane-iso -->
   <!-- 三级设计工作区（2026-09-13）：可缩放/平移 + 手工插入管线层
        （tl-workspace 模块，只读 window.tlDiagramData；手工层不写回平面数据） -->
@@ -5385,11 +5415,11 @@ function doIrrImport(text){
        两组默认都收起，只显示「当前功能区」对应的那一组（见样式区 13 段）。
        回退方法：把这两段 div 分别放回 aside.pp-side 末尾 与 #tlPipePlanSection .pp-stage 开头即可。 -->
   <div class="ry-tabs ry-tabs-st" id="ppTabs" data-ry-sec="pipePlanSection">
-    <button type="button" data-ry-view="edit" class="active">二级设计</button>
+    <button type="button" data-ry-view="edit" class="active">二级制图</button>
     <button type="button" data-ry-view="draw">二级简图</button>
   </div>
   <div class="ry-tabs ry-tabs-st" id="tlTabs" data-ry-sec="tlPipePlanSection">
-    <button type="button" data-ry-view="ws" class="active">三级设计</button>
+    <button type="button" data-ry-view="ws" class="active">三级制图</button>
     <button type="button" data-ry-view="pipe">三级简图</button>
     <button type="button" data-ry-view="sys">系统简图</button>
     <button type="button" data-ry-view="iso">轴测简图</button>
@@ -7797,9 +7827,11 @@ function rySetTab(sectionId, view) {
       if (window.tlDiagramData) {
         window.RyIsoDiagram.render(isoCtn, window.tlDiagramData);
         if (isoBar) isoBar.style.display = 'flex';
+        if (typeof tlIsoStatsRender === 'function') tlIsoStatsRender();
       } else {
         isoCtn.innerHTML = '<div class="pp-diagram-empty">请先生成三级管线平面图（点「生成管线图」）</div>';
         if (isoBar) isoBar.style.display = 'none';
+        if (typeof tlIsoStatsReset === 'function') tlIsoStatsReset();
       }
     }
   }
@@ -11236,7 +11268,8 @@ window.ppRenderPlanCalcDetail = ppRenderPlanCalcDetail;
       materialPrices:JSON.parse(JSON.stringify(window.materialPrices||materialPrices||{})),
       materialQtyOverrides:JSON.parse(JSON.stringify(window.materialQtyOverrides||materialQtyOverrides||{})),
       customMaterials:JSON.parse(JSON.stringify(window.customMaterials||customMaterials||{})),
-      pipePlan:typeof window.ppGetState==='function'?window.ppGetState():null
+      pipePlan:typeof window.ppGetState==='function'?window.ppGetState():null,
+      isoDiagram:window.RyIsoDiagram && window.tlDiagramData ? {data:window.tlDiagramData, editor:window.RyIsoDiagram.exportState()} : null
     };
     localStorage.setItem(SAVE_KEY,JSON.stringify(data));
     window.runyeSharePlotToDigital();
@@ -11273,6 +11306,17 @@ window.ppRenderPlanCalcDetail = ppRenderPlanCalcDetail;
     // 施工简图管线恢复后重渲染，材料清单随之采用施工简图实际长度
     if(typeof render==='function') render();
     if(typeof updateMaterialTotals==='function') updateMaterialTotals();
+    if(window.RyIsoDiagram){
+      var isoSaved=data.isoDiagram;
+      window.RyIsoDiagram.cancelEdit();
+      if(isoSaved && window.RyIsoDiagram.importState(isoSaved.editor,isoSaved.data)){
+        window.tlDiagramData=isoSaved.data;
+        window.RyIsoDiagram.render(document.getElementById('tlIsoDiagramContent'),isoSaved.data);
+      }else{
+        window.tlDiagramData=null;
+        window.RyIsoDiagram.render(document.getElementById('tlIsoDiagramContent'),null);
+      }
+    }
     projectToast('方案已打开');
   };
 
@@ -12167,7 +12211,7 @@ render();
     designInput:'调整左侧参数，方案与管径选型结果实时更新',
     areaTool:'上传图片或在线地图描绘地块边界，闭合后自动回填面积',
     pipePlanSection:'绘制主管 / 支管 → 生成施工图 → 切「二级简图」查看',
-    tlPipePlanSection:'设定联合灌溉分区 → 生成管线图 → 「三级设计」可缩放/插入管线',
+    tlPipePlanSection:'设定联合灌溉分区 → 生成管线图 → 「三级制图」可缩放/插入管线',
     detailsSection:'材料清单与工程量汇总',
     threeDModelingSection:'入口已预留 · 功能规划中',
     parametricModelingSection:'参数化建模 · 独立试验区 · 当前会话保留，刷新清空'
@@ -12747,6 +12791,34 @@ render();
 })();
 </script>
 <script>
+/* —— 分区材料统计栏渲染（2026-09-13）：读 RyIsoDiagram.computeStats 只读汇总，填 #tlIsoStatsBody —— */
+function tlIsoStatsRender() {
+  var body = document.getElementById('tlIsoStatsBody');
+  if (!body || !window.RyIsoDiagram || typeof window.RyIsoDiagram.computeStats !== 'function' || !window.tlDiagramData) return;
+  var st = window.RyIsoDiagram.computeStats(window.tlDiagramData);
+  if (!st) { body.innerHTML = '<div class="tl-iso-note">暂无可统计的数据</div>'; return; }
+  function f1(v) { return (Math.round(v * 10) / 10).toFixed(1); }
+  function f2(v) { return (Math.round(v * 100) / 100).toFixed(2); }
+  var h = '<table><thead><tr><th>分区</th><th>面积(亩)</th><th>阀门</th><th>三通</th><th>弯头</th><th>管道(m)</th></tr></thead><tbody>';
+  st.zones.forEach(function (z) {
+    h += '<tr><td>' + z.id + '</td><td>' + f2(z.areaMu) + '</td><td>' + z.valves + '</td><td>' + z.tees + '</td><td>' + z.elbows + '</td><td>' + f1(z.pipeLen) + '</td></tr>';
+  });
+  var t = st.totals;
+  h += '<tr class="sum"><td>合计</td><td>' + f2(t.areaMu) + '</td><td>' + t.valves + '</td><td>' + t.tees + '</td><td>' + t.elbows + '</td><td>' + f1(t.pipeLen) + '</td></tr>';
+  h += '</tbody></table>';
+  h += '<div class="tl-iso-note">共 ' + t.zones + ' 区 · 面积 ' + f1(t.area) + ' ㎡（' + f2(t.areaMu) + ' 亩）<br>'
+    + '总管 ' + f1(t.frontLen) + ' m · 主管 ' + f1(t.mainLen) + ' m · 支管 ' + f1(t.branchLen) + ' m<br>'
+    + '含主管接入阀 ' + t.inletValves + ' 个，已计入阀门合计；弯头 / 手工三通按「配件布置」统计';
+  if (t.manual.tee || t.manual.elbow || t.manual.valve) h += '<br>手工配件：三通 ' + t.manual.tee + ' · 弯头 ' + t.manual.elbow + ' · 阀门 ' + t.manual.valve;
+  if (t.unmappedPipe > 0.05) h += '<br>未归入分区的管段 ' + f1(t.unmappedPipe) + ' m（已计入合计）';
+  h += '</div>';
+  body.innerHTML = h;
+}
+function tlIsoStatsReset() {
+  var body = document.getElementById('tlIsoStatsBody');
+  if (body) body.innerHTML = '<div class="tl-iso-note">生成轴测图后自动统计各分区面积、阀门 / 三通 / 弯头数量与管道长度，并汇总合计。</div>';
+}
+
 /* 轴测图工具栏（#tlIsoSide）接线：配件布置 + 构件参数（2026-09-13）。
    模块保持纯几何/无 DOM 依赖（Node 可测），页面侧 UI 逻辑集中在此。 */
 (function () {
@@ -12792,6 +12864,7 @@ render();
 
   /* 放置结果反馈 */
   ISO.onPlaceResult = function (res) {
+    if (typeof tlIsoStatsRender === 'function') tlIsoStatsRender(); /* 放置/取消后统计同步（2026-09-13） */
     if (res && res.ok) {
       btn.textContent = '确定 · 放置';
       setHint('已放置 ' + res.id + '（' + KINDS[res.kind] + (res.spec ? ' · ' + res.spec : '') + '）。点击图中构件可查看参数');
@@ -12823,6 +12896,7 @@ render();
   delBtn.addEventListener('click', function () {
     if (!curId) return;
     if (ISO.removeManual(curId)) {
+      if (typeof tlIsoStatsRender === 'function') tlIsoStatsRender(); /* 删除后统计同步（2026-09-13） */
       infoCard.style.display = 'none';
       curId = null;
       setHint('配件已删除');
@@ -12830,5 +12904,6 @@ render();
   });
 })();
 </script>
+<script src="iso-diagram/editor.js"></script>
 </body>
 </html>

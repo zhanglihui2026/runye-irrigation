@@ -16,6 +16,7 @@
   var ITEMS = [
     { label: '标准分区预设', hash: 'designInput',              pre: 1 },
     { label: '地块绘制',     hash: 'areaTool',                 pre: 1 },
+    { label: '在线地图',     href: 'runye-map-measure.html',   pre: 1 },
     { label: '二级管路',     hash: 'pipePlanSection',          pre: 1 },
     { label: '三级管路',     hash: 'tlPipePlanSection',        pre: 1 },
     { label: '系统图',       act: 'sys', page: 'index.html',   pre: 1, title: '三级系统图（供水首部系统图）' },
@@ -23,8 +24,7 @@
     { label: '三维建模',     hash: 'threeDModelingSection',    pre: 1 },
     { label: '数字化建模',   hash: 'parametricModelingSection',pre: 1, title: '数字化建模 · 参数化节点建模' },
     { label: '材料清单',     hash: 'detailsSection',           pre: 1 },
-    { label: '滴灌带查询',   href: '耐特菲姆滴灌带长度查询器.html' },
-    { label: '在线地图',     href: 'runye-map-measure.html' }
+    { label: '滴灌带查询',   href: '耐特菲姆滴灌带长度查询器.html' }
     /* pre:1 = 注入到本页静态特有项（如 ⚙️生成系统图）之前；其余追加在末尾。
        act 项 = 本页动作按钮（渲染为 button，点击调 window.RyFnNavActions[act]）；
        page 项 = 动作所属页面（其他页面渲染为跨页链接）。 */

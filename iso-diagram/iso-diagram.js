@@ -44,6 +44,87 @@
   var SEG_Z = { front: HEIGHTS.front, main: HEIGHTS.main, branch: HEIGHTS.branch };
   var SEG_NAME = { front: '总管', main: '主管', branch: '支管' };
   var manual = [];
+  var edits = {}, history = [], draft = null, dataKey = '';
+  function copy(value) { return JSON.parse(JSON.stringify(value)); }
+  function geometryKey(data) {
+    if (!data) return '';
+    return JSON.stringify([data.frontPipe, data.mainPipes, data.branchPipes, data.valves, data.poly]);
+  }
+  function snapshot() { return copy({ edits: edits, manual: manual, seq: manualSeq }); }
+  function restore(s) { edits = copy(s.edits || {}); manual = copy(s.manual || []); manualSeq = copy(s.seq || {tee:0,elbow:0,valve:0}); }
+  function checkpoint() { history.push(snapshot()); if (history.length > 40) history.shift(); }
+  function params(id) {
+    var item=manual.filter(function(m){return m.id===id;})[0];
+    return Object.assign({ spec:item ? item.spec : '', branchSpec:'', valveType:'通用阀门', connection:'未指定', angle:90,
+      size:1, label:true, labelX:9, labelY:3, rise:28, position:0.57, height:null }, edits[id] || {});
+  }
+  function manualPosition(id, value) {
+    var m=manual.filter(function(m){return m.id===id;})[0];
+    if(!m || !lastDataRef)return null;
+    var line=m.segType==='front'?lastDataRef.frontPipe:(m.segType==='main'?lastDataRef.mainPipes:lastDataRef.branchPipes)[m.segIndex];
+    if(!line || line.length<2)return null;
+    var total=0,best=Infinity,along=0;
+    for(var i=0;i+1<line.length;i++){
+      var len=dist(line[i],line[i+1]), point=closestOnSeg(m.point,line[i],line[i+1]), d=dist(point,m.point);
+      if(d<best){best=d;along=total+dist(line[i],point);} total+=len;
+    }
+    if(value===undefined)return {distance:along,length:total};
+    if(!Number.isFinite(value)||value<0.5||value>total-0.5)return false;
+    var left=value;
+    for(var j=0;j+1<line.length;j++){
+      var length=dist(line[j],line[j+1]);
+      if(left<=length && length>0){m.point={x:line[j].x+(line[j+1].x-line[j].x)*left/length,y:line[j].y+(line[j+1].y-line[j].y)*left/length};return true;}
+      left-=length;
+    }
+    return false;
+  }
+  function validParams(p) {
+    return typeof p.spec === 'string' && p.spec.length <= 40 && typeof p.branchSpec === 'string' && p.branchSpec.length <= 40 &&
+      ['通用阀门','闸阀','球阀','蝶阀','止回阀'].indexOf(p.valveType) >= 0 &&
+      ['未指定','法兰','螺纹','热熔','承插'].indexOf(p.connection) >= 0 &&
+      [45,90].indexOf(p.angle) >= 0 && typeof p.label === 'boolean' &&
+      Number.isFinite(p.size) && p.size >= 0.5 && p.size <= 2 &&
+      Number.isFinite(p.labelX) && Math.abs(p.labelX) <= 100 && Number.isFinite(p.labelY) && Math.abs(p.labelY) <= 100 &&
+      Number.isFinite(p.rise) && p.rise >= 24 && p.rise <= 120 &&
+      Number.isFinite(p.position) && p.position >= 0.15 && p.position <= 0.85 &&
+      (p.height === null || (Number.isFinite(p.height) && p.height > 0 && p.height <= 100));
+  }
+  function notifyEdit() { if (api.onEditChange) api.onEditChange(); }
+  function beginEdit(id) {
+    cancelEdit();
+    if (!fittingInfo(id)) return false;
+    draft = {id:id, before:snapshot()}; rerenderKeepView(); return params(id);
+  }
+  function previewEdit(values) {
+    if (!draft) return false;
+    var p = Object.assign({}, params(draft.id), values);
+    if (!validParams(p)) return false;
+    if(values.distance!==undefined && !manualPosition(draft.id,values.distance))return false;
+    delete p.distance;
+    edits[draft.id] = p; rerenderKeepView(); return true;
+  }
+  function applyEdit() {
+    if (!draft) return false;
+    history.push(draft.before); if(history.length > 40) history.shift();
+    draft = null; notifyEdit(); return true;
+  }
+  function cancelEdit() {
+    if (!draft) return;
+    restore(draft.before); draft = null; rerenderKeepView();
+  }
+  function resetEdit(id) { cancelEdit(); checkpoint(); delete edits[id]; rerenderKeepView(); notifyEdit(); }
+  function undoEdit() { cancelEdit(); if (!history.length) return false; restore(history.pop()); rerenderKeepView(); notifyEdit(); return true; }
+  function exportState() { return {version:1, geometry:dataKey, state:draft ? copy(draft.before) : snapshot()}; }
+  function importState(saved, data) {
+    if (!saved || saved.version !== 1 || saved.geometry !== geometryKey(data) || !saved.state) return false;
+    var s = saved.state;
+    if (!s.edits || !Array.isArray(s.manual) || s.manual.length > 2000 || !s.seq) return false;
+    if (!Object.keys(s.edits).every(function(id){return /^(TEE-[FB]|V-[FB]|R-V-B|M-[TEV])\d+$/.test(id) && validParams(Object.assign({}, params(''),s.edits[id]));})) return false;
+    if (!s.manual.every(function(m){return /^M-[TEV]\d+$/.test(m.id) && KIND_LABEL[m.kind] && SEG_NAME[m.segType] && Number.isInteger(m.segIndex) && m.segIndex >= 0 && m.point && Number.isFinite(m.point.x) && Number.isFinite(m.point.y) && typeof m.spec === 'string';})) return false;
+    if(!['tee','elbow','valve'].every(function(k){return Number.isInteger(s.seq[k])&&s.seq[k]>=0&&s.seq[k]<=1000000;}))return false;
+    if(new Set(s.manual.map(function(m){return m.id;})).size!==s.manual.length)return false;
+    attachData(data); restore(s); manual.forEach(function(m){m.z=SEG_Z[m.segType];manualSeq[m.kind]=Math.max(manualSeq[m.kind],Number(m.id.slice(3)));}); history=[]; draft=null; rerenderKeepView(); return true;
+  }
   var manualSeq = { tee: 0, elbow: 0, valve: 0 };
   var lastDataRef = null;
   var placing = null;        /* {kind, spec} | null —— 放置模式 */
@@ -194,6 +275,7 @@
   // 阀门通用符号：两三角尖端相对，沿安装管段方向旋转；不推定具体阀型。
   function valveSymbol(q, angle) {
     return '<g data-symbol="valve" transform="translate(' + fmt(q.x) + ' ' + fmt(q.y) + ') rotate(' + fmt(angle) + ')">'
+      + '<rect x="-8" y="-6" width="16" height="12" fill="transparent"/>'
       + '<path d="M-7 -4 L7 4 L7 -4 L-7 4 Z" fill="white" stroke="#202020" stroke-width="1.2"/></g>';
   }
 
@@ -235,11 +317,25 @@
       if (!v.conn || v.downstream === '?') return;
       var i = Number(v.downstream.slice(7));
       var a = P(v.conn.x, v.conn.y, HEIGHTS.main), b = P(v.point.x, v.point.y, v.z);
-      branchOffsets[i] = { x: a.x - b.x, y: a.y - 28 - b.y };
+      branchOffsets[i] = { x: a.x - b.x, y: a.y - params('R-' + v.id).rise - b.y };
     });
     viewState.branchOffsets = branchOffsets;
     function shifted(q, offset) { return {x:q.x + (offset ? offset.x : 0), y:q.y + (offset ? offset.y : 0)}; }
     function valvePoint(v) { return shifted(P(v.point.x, v.point.y, v.z), v.conn ? branchOffsets[Number(v.downstream.slice(7))] : null); }
+    function fitLabel(id, q, fallback) {
+      var p = params(id), custom = edits[id];
+      if (!p.label || (!custom && !fallback)) return '';
+      var text = id + (p.spec ? ' ' + p.spec : '') + (p.branchSpec ? ' × ' + p.branchSpec : '');
+      if (custom && id.indexOf('V') >= 0) text += ' ' + p.valveType;
+      if (custom && p.connection !== '未指定') text += ' ' + p.connection;
+      if (custom && id.indexOf('M-E') === 0) text += ' ' + p.angle + '°';
+      if (id.indexOf('R-') === 0) text += p.height === null ? ' 高度待定' : ' H=' + p.height + 'm';
+      return '<text x="' + fmt(q.x+p.labelX) + '" y="' + fmt(q.y+p.labelY) + '" font-size="9" fill="#333" paint-order="stroke" stroke="white" stroke-width="2" font-family="system-ui">' + esc(text) + '</text>';
+    }
+    function scaledSymbol(symbol, q, id) {
+      var size=params(id).size;
+      return '<g transform="translate('+fmt(q.x)+' '+fmt(q.y)+') scale('+size+') translate('+fmt(-q.x)+' '+fmt(-q.y)+')">'+symbol+'</g>';
+    }
     function path3(list, zOf, offset) {
       var d = '';
       for (var i = 0; i < list.length; i++) {
@@ -266,6 +362,26 @@
       + ' · 生成 ' + esc(String(now)) + '</text>');
     s.push('</g>');
 
+    /* 3a) 地块轮廓线（z=0，2026-09-13 用户要求显示；分区分割线保留） */
+    if (model.poly && model.poly.length >= 3) {
+      s.push('<polygon data-plot-outline="1" points="' + model.poly.map(function (p) {
+        var q = P(p.x, p.y, 0);
+        return fmt(q.x) + ',' + fmt(q.y);
+      }).join(' ') + '" fill="none" stroke="#55655e" stroke-width="1.8" stroke-linejoin="round"/>');
+    }
+
+    /* 3b) 地块裁剪（2026-09-13 用户要求：管线超出地块的部分不显示）。
+       以地块轮廓 polygon 作 clipPath；无有效轮廓（<3 点）时不裁剪。
+       仅显示层裁剪：包围盒取景仍按原始几何计算，取景/缩放不受影响。 */
+    var clipAttr = '';
+    if (model.poly && model.poly.length >= 3) {
+      clipAttr = ' clip-path="url(#isoPlotClip)"';
+      s.push('<defs><clipPath id="isoPlotClip"><polygon points="' + model.poly.map(function (p) {
+        var q = P(p.x, p.y, 0);
+        return fmt(q.x) + ',' + fmt(q.y);
+      }).join(' ') + '"/></clipPath></defs>');
+    }
+
     /* 3) 分区地面辅助线（z=0 平行四边形） */
     if (model.zones && model.zones.xPos && model.zones.yPos) {
       s.push('<g fill="none" stroke="' + COLORS.zone + '" stroke-width="0.8" opacity="0.5">');
@@ -281,7 +397,7 @@
 
     /* 4) 埋地管网（z<0，画在地面之下 → 先绘制，被地表图元覆盖）
        4a) 总管↔主管接入段（表达段：三通→阀门→主管上游端，均位于地下） */
-    s.push('<g fill="none" stroke="' + COLORS.front + '" stroke-width="1.5">');
+    s.push('<g fill="none" stroke="' + COLORS.front + '" stroke-width="1.5"' + clipAttr + '>');
     model.tees.filter(function (t) { return t.type === 'front-main'; }).forEach(function (t) {
       var vl = model.valves.filter(function (v) { return v.tee === t.id; })[0];
       var mi = parseInt(String(t.downstream).slice(5), 10);
@@ -294,7 +410,7 @@
     s.push('</g>');
 
     /* 4b) 主管（埋地） */
-    s.push('<g fill="none" stroke="' + COLORS.main + '" stroke-width="1.8" stroke-linejoin="round">');
+    s.push('<g fill="none" stroke="' + COLORS.main + '" stroke-width="1.8" stroke-linejoin="round"' + clipAttr + '>');
     model.mains.forEach(function (l) { s.push('<path d="' + path3(l, function () { return HEIGHTS.main; }) + '"/>'); });
     s.push('</g>');
 
@@ -302,6 +418,7 @@
     s.push('<defs><marker id="isoArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">'
       + '<path d="M0 0 L10 5 L0 10 z" fill="' + COLORS.front + '"/></marker></defs>');
     if (model.front && model.front.length >= 2) {
+      s.push('<g' + clipAttr + '>');
       s.push('<path d="' + path3(model.front, function () { return HEIGHTS.front; })
         + '" fill="none" stroke="' + COLORS.front + '" stroke-width="2.2" marker-mid="url(#isoArrow)" marker-end="url(#isoArrow)"/>');
       /* 中点补一个箭头（两点线段无 mid） */
@@ -312,55 +429,57 @@
           + fmt(Math.atan2(P(model.front[1].x, model.front[1].y, HEIGHTS.front).y - P(model.front[0].x, model.front[0].y, HEIGHTS.front).y,
             P(model.front[1].x, model.front[1].y, HEIGHTS.front).x - P(model.front[0].x, model.front[0].y, HEIGHTS.front).x) * 180 / Math.PI) + ')"/>');
       }
+      s.push('</g>');
     }
 
     /* 5) 滴灌带 —— 2026-09-13 按用户要求轴测图不再绘制（图例同步移除）。
        model.tapes 仍参与边界计算（保持取景/缩放不变），仅跳过绘制。 */
 
     /* 6) 支管（地表 z=0.3，覆盖埋地管网之上） */
-    s.push('<g fill="none" stroke="' + COLORS.branch + '" stroke-width="1.2" stroke-linejoin="round">');
+    s.push('<g fill="none" stroke="' + COLORS.branch + '" stroke-width="1.2" stroke-linejoin="round"' + clipAttr + '>');
     model.branches.forEach(function (l,i) { s.push('<path data-branch="' + i + '" d="' + path3(l, function () { return HEIGHTS.branch; }, branchOffsets[i]) + '"/>'); });
     s.push('</g>');
 
     /* 9) 连接平面路径保持不变；三通处用真正竖直立管表达层差。 */
-    s.push('<g>');
+    s.push('<g' + clipAttr + '>');
     model.valves.forEach(function (v) {
       var q = valvePoint(v);
       if (v.conn) {
         var t0 = P(v.conn.x, v.conn.y, HEIGHTS.main);
-        s.push('<path data-connector="main-branch" d="M' + fmt(t0.x) + ' ' + fmt(t0.y) + ' L' + fmt(q.x) + ' ' + fmt(q.y) + '" fill="none" stroke="' + COLORS.main + '" stroke-width="1.5"/>');
+        s.push('<g class="iso-fit" data-fit="R-' + esc(v.id) + '"><title>连接立管（展开示意）</title><path d="M'+fmt(t0.x)+' '+fmt(t0.y)+' L'+fmt(q.x)+' '+fmt(q.y)+'" stroke="transparent" stroke-width="10"/>');
+        s.push('<path data-connector="main-branch" d="M' + fmt(t0.x) + ' ' + fmt(t0.y) + ' L' + fmt(q.x) + ' ' + fmt(q.y) + '" fill="none" stroke="' + COLORS.main + '" stroke-width="1.5"/>' + fitLabel('R-'+v.id,q,false) + '</g>');
       }
     });
     s.push('</g>');
-    s.push('<g>');
+    s.push('<g' + clipAttr + '>');
     model.valves.forEach(function (v) {
       var q = valvePoint(v);
       var tee = model.tees.filter(function(t) { return t.id === v.tee; })[0];
       var before = P(tee.point.x, tee.point.y, v.z);
       var angle = Math.atan2(q.y - before.y, q.x - before.x) * 180 / Math.PI;
       // 支管阀画在立管中部，三通—阀门—支管依次连接。
-      if (v.conn) { q.y += 12; angle = -90; }
+      if (v.conn) { q.y += params('R-'+v.id).rise * (1-params('R-'+v.id).position); angle = -90; }
       s.push('<g class="iso-fit" data-fit="' + esc(v.id) + '" style="cursor:pointer"><title>' + esc(v.id + (v.zone ? ' · ' + v.zone : '') + ' · 上游 ' + v.upstream + ' · 下游 ' + v.downstream) + '</title>'
-        + valveSymbol(q, angle)
-        + (model.valves.length <= MAX_VALVE_LABELS ? '<text x="' + fmt(q.x + 9) + '" y="' + fmt(q.y + 3) + '" font-size="7" fill="#7f1d1d" font-family="system-ui">' + esc(v.id) + '</text>' : '')
+        + scaledSymbol(valveSymbol(q, angle),q,v.id)
+        + fitLabel(v.id,q,model.valves.length <= MAX_VALVE_LABELS)
         + '</g>');
     });
     s.push('</g>');
 
     /* 10) 三通符号（T 形短杆 + 圆点） */
-    s.push('<g>');
+    s.push('<g' + clipAttr + '>');
     model.tees.forEach(function (t) {
       var z = t.type === 'front-main' ? HEIGHTS.front : HEIGHTS.main;
       var q = P(t.point.x, t.point.y, z);
       s.push('<g class="iso-fit" data-fit="' + esc(t.id) + '" style="cursor:pointer"><title>' + esc(t.id + ' · ' + t.upstream + ' → ' + t.downstream) + '</title>'
         + '<circle cx="' + fmt(q.x) + '" cy="' + fmt(q.y) + '" r="7" fill="transparent"/>'
-        + '<circle cx="' + fmt(q.x) + '" cy="' + fmt(q.y) + '" r="2" fill="' + COLORS.tee + '"/></g>');
+        + '<circle cx="' + fmt(q.x) + '" cy="' + fmt(q.y) + '" r="' + (2*params(t.id).size) + '" fill="' + COLORS.tee + '"/>' + fitLabel(t.id,q,false) + '</g>');
     });
     s.push('</g>');
 
     /* 10b) 手工配件层（编辑层：三通/弯头/阀门，非水力计算对象；点击可查参数） */
     if (manual.length) {
-      s.push('<g>');
+      s.push('<g' + clipAttr + '>');
       manual.forEach(function (m) {
         var q = shifted(P(m.point.x, m.point.y, m.z), m.segType === 'branch' ? branchOffsets[m.segIndex] : null);
         var sym = '';
@@ -383,7 +502,7 @@
             + '<path d="M' + fmt(q.x - 6.5) + ' ' + fmt(q.y) + ' H' + fmt(q.x + 6.5) + ' M' + fmt(q.x) + ' ' + fmt(q.y) + ' V' + fmt(q.y + 6.5) + '" stroke="#fff" stroke-width="1.4" fill="none"/>';
         }
         s.push('<g class="iso-fit" data-fit="' + esc(m.id) + '" style="cursor:pointer"><title>'
-          + esc(m.id + ' · ' + KIND_LABEL[m.kind] + ' · ' + (m.spec || '与管道同径')) + '</title>' + sym + '</g>');
+          + esc(m.id + ' · ' + KIND_LABEL[m.kind] + ' · ' + (m.spec || '与管道同径')) + '</title>' + scaledSymbol(sym,q,m.id) + fitLabel(m.id,q,!!edits[m.id]) + '</g>');
       });
       s.push('</g>');
     }
@@ -428,7 +547,9 @@
     s.push('<text x="' + lx + '" y="' + (ly + 44) + '" font-size="10" font-weight="400" fill="#444">45°正面斜轴测 · 不按比例 · 支管按Z向立管展开；标高/埋深待设计确认，非施工放样依据。G=主管，Z=支管。</text>');
     s.push('</g>');
     s.push('</svg>');
-    return s.join('');
+    var output=s.join('');
+    if(draft)output=output.replace('data-fit="'+draft.id+'"','data-selected="true" data-fit="'+draft.id+'"');
+    return output;
   }
 
   function esc(t) {
@@ -598,6 +719,7 @@
   function placingKind() { return placing ? placing.kind : null; }
   function addManual(kind, spec, segType, segIndex, point) {
     if (!MANUAL_PREFIX[kind] || !point || !SEG_Z[segType]) return null;
+    cancelEdit(); checkpoint();
     manualSeq[kind]++;
     var m = {
       id: MANUAL_PREFIX[kind] + pad2(manualSeq[kind]), kind: kind, spec: spec || '',
@@ -605,11 +727,12 @@
       point: { x: point.x, y: point.y }, z: SEG_Z[segType]
     };
     manual.push(m);
+    notifyEdit();
     return m;
   }
   function removeManual(id) {
     for (var i = 0; i < manual.length; i++) {
-      if (manual[i].id === id) { manual.splice(i, 1); rerenderKeepView(); return true; }
+      if (manual[i].id === id) { cancelEdit(); checkpoint(); manual.splice(i, 1); delete edits[id]; rerenderKeepView(); notifyEdit(); return true; }
     }
     return false;
   }
@@ -617,13 +740,19 @@
   function manualCount() { return manual.length; }
   /* 数据引用变更（重新生成平面图）→ 清空手工层；同引用重渲染 → 保留 */
   function attachData(data) {
-    if (data !== lastDataRef) clearManual();
+    var nextKey=geometryKey(data);
+    if (nextKey !== dataKey) { clearManual(); edits={}; history=[]; draft=null; dataKey=nextKey; }
     lastDataRef = data || null;
   }
   /* 构件参数查询（自动三通/阀门 + 手工配件统一入口），找不到返回 null */
   function fittingInfo(id) {
     if (!viewState || !viewState.model) return null;
     var model = viewState.model, i, t, v, m;
+    if (id.indexOf('R-') === 0) {
+      v=model.valves.filter(function(v){return 'R-'+v.id===id && v.conn;})[0];
+      if(v) return {id:id, manual:false, kind:'riser', kindLabel:'连接立管', typeName:'主管—支管连接立管', upstream:v.upstream, downstream:v.downstream, point:v.conn};
+      return null;
+    }
     for (i = 0; i < model.tees.length; i++) if (model.tees[i].id === id) {
       t = model.tees[i];
       return {
@@ -651,6 +780,108 @@
       };
     }
     return null;
+  }
+
+  /* ---------- 分区材料统计（2026-09-13，只读汇总） ----------
+   * 口径：
+   * · 分区面积 = 网格单元宽×高（米²，1 亩 = 666.67 米²）
+   * · 阀门 = 平面图出水阀（v.zone 归区）+ 主管接入阀（仅合计）+ 手工阀门
+   * · 三通 = 主管×支管自动三通（随阀归区）+ 手工三通；总管×主管三通仅计入合计
+   * · 弯头 = 手工弯头（自动几何无弯头，按「配件布置」统计）
+   * · 管道长度 = 折线段长求和（米）；分区内 = 主管+支管，总管仅计入合计
+   * 手工配件按 segType/segIndex 经「主/支管 ↔ 分区」映射归区
+   * （映射依据：阀 v.zone ↔ v.upstream=main-i / v.downstream=branch-i）；
+   * 总管上的手工配件与未映射管段仅计入合计（unmappedPipe 单列）。 */
+  var MU_M2 = 2000 / 3; /* 1 亩 = 666.67 米² */
+  function polyLen(line) {
+    var L = 0;
+    for (var i = 0; i + 1 < line.length; i++) L += Math.hypot(line[i + 1].x - line[i].x, line[i + 1].y - line[i].y);
+    return L;
+  }
+  function computeStats(data) {
+    var model = buildModel(data);
+    if (!model) return null;
+    var zs = model.zones, cells = [];
+    if (zs && zs.xPos && zs.yPos) {
+      for (var r = 0; r + 1 < zs.yPos.length; r++) {
+        for (var c = 0; c + 1 < zs.xPos.length; c++) {
+          cells.push({
+            id: 'R' + (r + 1) + 'C' + (c + 1),
+            w: zs.xPos[c + 1] - zs.xPos[c], h: zs.yPos[r + 1] - zs.yPos[r],
+            area: (zs.xPos[c + 1] - zs.xPos[c]) * (zs.yPos[r + 1] - zs.yPos[r]),
+            valves: 0, tees: 0, elbows: 0, mainLen: 0, branchLen: 0, pipeLen: 0, areaMu: 0
+          });
+        }
+      }
+    }
+    function cell(id) { for (var i = 0; i < cells.length; i++) if (cells[i].id === id) return cells[i]; return null; }
+    function zoneOfMain(mi) {
+      for (var i = 0; i < model.valves.length; i++) {
+        var v = model.valves[i];
+        if (v.zone && String(v.upstream) === 'main-' + mi) return v.zone;
+      }
+      return null;
+    }
+    function zoneOfBranch(bi) {
+      for (var i = 0; i < model.valves.length; i++) {
+        var v = model.valves[i];
+        if (v.zone && String(v.downstream) === 'branch-' + bi) return v.zone;
+      }
+      return null;
+    }
+    /* 管长归区（主/支管未归区分开计） */
+    var unmappedMain = 0, unmappedBranch = 0;
+    model.mains.forEach(function (m, mi) {
+      var cl = cell(zoneOfMain(mi)), L = polyLen(m);
+      if (cl) cl.mainLen += L; else unmappedMain += L;
+    });
+    model.branches.forEach(function (b, bi) {
+      var cl = cell(zoneOfBranch(bi)), L = polyLen(b);
+      if (cl) cl.branchLen += L; else unmappedBranch += L;
+    });
+    /* 自动三通/阀门归区（无分区者计入合计：zonelessTee / zonelessValve） */
+    var frontTeeCount = 0, zonelessTee = 0, zonelessValve = 0;
+    model.tees.forEach(function (t) {
+      if (t.type === 'front-main') { frontTeeCount++; return; }
+      var v = null;
+      for (var i = 0; i < model.valves.length; i++) if (model.valves[i].tee === t.id) { v = model.valves[i]; break; }
+      var cl = v && v.zone ? cell(v.zone) : null;
+      if (cl) cl.tees++; else zonelessTee++;
+    });
+    model.valves.forEach(function (v) {
+      var cl = v.zone ? cell(v.zone) : null;
+      if (cl) cl.valves++; else if (!v.auto) zonelessValve++;
+    });
+    /* 手工配件归区 */
+    var man = { tee: 0, elbow: 0, valve: 0 }, manInZone = { tee: 0, elbow: 0, valve: 0 };
+    manual.forEach(function (m) {
+      var cl = null;
+      if (m.segType === 'main') cl = cell(zoneOfMain(m.segIndex));
+      else if (m.segType === 'branch') cl = cell(zoneOfBranch(m.segIndex));
+      man[m.kind]++;
+      if (cl) { manInZone[m.kind]++; if (m.kind === 'tee') cl.tees++; else if (m.kind === 'elbow') cl.elbows++; else cl.valves++; }
+    });
+    cells.forEach(function (cl) { cl.areaMu = cl.area / MU_M2; cl.pipeLen = cl.mainLen + cl.branchLen; });
+    var tot = {
+      zones: cells.length, area: 0, areaMu: 0,
+      valves: 0, tees: frontTeeCount, elbows: 0,
+      frontLen: (model.front && model.front.length >= 2) ? polyLen(model.front) : 0,
+      mainLen: 0, branchLen: 0, pipeLen: 0,
+      inletValves: model.valves.filter(function (v) { return v.auto; }).length,
+      unmappedPipe: unmappedMain + unmappedBranch, manual: man
+    };
+    cells.forEach(function (cl) {
+      tot.area += cl.area; tot.valves += cl.valves; tot.tees += cl.tees; tot.elbows += cl.elbows;
+      tot.mainLen += cl.mainLen; tot.branchLen += cl.branchLen;
+    });
+    tot.areaMu = tot.area / MU_M2;
+    tot.valves += tot.inletValves + zonelessValve + (man.valve - manInZone.valve); /* 接入阀 + 无分区出水阀 + 未归区手工阀 */
+    tot.tees += zonelessTee + (man.tee - manInZone.tee);                           /* 无分区分支三通 + 未归区手工三通 */
+    tot.elbows += (man.elbow - manInZone.elbow);                                   /* 未归区手工弯头 */
+    tot.mainLen += unmappedMain;   /* 未归区主管计入合计 */
+    tot.branchLen += unmappedBranch; /* 未归区支管计入合计 */
+    tot.pipeLen = tot.frontLen + tot.mainLen + tot.branchLen;
+    return { zones: cells, totals: tot };
   }
 
   /* ---------- 容器渲染（幂等：innerHTML 替换，不叠加；重渲染后视口复位） ---------- */
@@ -719,13 +950,17 @@
     EPS: EPS, VALVE_OFFSET: VALVE_OFFSET, HEIGHTS: HEIGHTS, RISE45: RISE45, COLORS: COLORS,
     projectIso: projectIso, unprojectIso: unprojectIso,
     snapPoint: snapPoint, closestOnSeg: closestOnSeg, segDist: segDist,
-    buildModel: buildModel, renderSVG: renderSVG, render: render,
+    buildModel: buildModel, computeStats: computeStats, renderSVG: renderSVG, render: render,
     zoomIn: zoomIn, zoomOut: zoomOut, zoomFit: zoomFit,
     downloadSVG: downloadSVG, printSVG: printSVG,
     /* 手工配件层（编辑表达层） */
     startPlace: startPlace, cancelPlace: cancelPlace, placingKind: placingKind,
     addManual: addManual, removeManual: removeManual, clearManual: clearManual,
     manualCount: manualCount, fittingInfo: fittingInfo, attachData: attachData,
+    getParams:params, beginEdit:beginEdit, previewEdit:previewEdit, applyEdit:applyEdit, cancelEdit:cancelEdit,
+    manualPosition:manualPosition,
+    resetEdit:resetEdit, undoEdit:undoEdit, exportState:exportState, importState:importState,
+    redraw:rerenderKeepView, onEditChange:null,
     getViewState: function () { return viewState; }, /* 只读钩子：E2E 坐标换算 */
     PLACE_TOL: PLACE_TOL, onFittingClick: null, onPlaceResult: null
   };

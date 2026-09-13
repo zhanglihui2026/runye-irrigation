@@ -66,7 +66,7 @@
   .sheet-inner { position: absolute; left: 8mm; top: 8mm; right: 8mm; bottom: 8mm; border: 1.2mm solid #111; }
   .sheet-inner2 { position: absolute; left: 11mm; top: 11mm; right: 11mm; bottom: 11mm; border: .35mm solid #111; }
   .head { display: flex; align-items: center; justify-content: space-between; padding: 0 5mm; border-bottom: .35mm solid #111; position: absolute; left: 11mm; top: 11mm; right: 11mm; height: 14mm; }
-  .head .proj { font-size: 13pt; font-weight: 700; letter-spacing: 1.5px; color: #15803d; }
+  .head .proj { font-size: 13pt; font-weight: 700; letter-spacing: 1.5px; color: #111; }
   .head .sub { font-size: 9.5pt; color: #444; }
   .head .code { font-size: 9pt; border: .3mm solid #111; padding: .8mm 2.5mm; color: #333; }
   .svg-zone { position: absolute; left: 13mm; right: 13mm; display: flex; align-items: center; justify-content: center; }
@@ -74,7 +74,7 @@
   /* 设备表 / 设计说明 —— 图纸内可拖拽虚线外框区域 */
   .zb-block { position: absolute; min-width: 80mm; min-height: 42mm; z-index: 5; }
   .zb-frame { position: absolute; inset: 0; border: .45mm dashed #16a34a; pointer-events: none; }
-  .zb-title { position: absolute; left: 0; top: -6mm; font-size: 10pt; font-weight: 600; color: #15803d; cursor: move; user-select: none; white-space: nowrap; background: #fff; padding: 0 1.5mm 0 0; z-index: 7; line-height: 1.1; }
+  .zb-title { position: absolute; left: 0; top: -6mm; font-size: 10pt; font-weight: 600; color: #111; cursor: move; user-select: none; white-space: nowrap; background: #fff; padding: 0 1.5mm 0 0; z-index: 7; line-height: 1.1; }
   .zb-body { position: absolute; left: 0; right: 0; top: 0; bottom: 0; width: auto; max-width: none; overflow: auto; }
   .zb-body table { width: 100%; border-collapse: collapse; font-size: 7.5pt; }
   .zb-body th, .zb-body td { border: .3mm solid #111; padding: 1mm .8mm; text-align: center; line-height: 1.25; }
@@ -88,7 +88,7 @@
   .sheet.a4 .notes li { font-size: 7.5pt; line-height: 1.9; }
   .sign { position: absolute; bottom: 10mm; right: 11mm; border-collapse: collapse; }
   .sign td { border: .35mm solid #111; font-size: 8pt; text-align: center; padding: .6mm 2mm; }
-  .sign .name { font-size: 10.5pt; font-weight: 700; background: #dcfce7; color: #15803d; }
+  .sign .name { font-size: 10.5pt; font-weight: 700; background: #dcfce7; color: #111; }
   .sign .cap { background: #F1EFE8; font-size: 7.5pt; color: #555; }
   .empty { position: absolute; inset: 11mm; display: flex; align-items: center; justify-content: center; font-size: 14px; color: #8892a0; }
 
@@ -574,13 +574,13 @@ function drawSVG(cfg, W, H) {
     var numY = yTop - 20 * k;
     pipe(cx, yMain, cx, numY, pw(cfg.ferts[i].dn || 25) + 1.5, green);
     g.push('<rect x="' + (cx - fW / 2) + '" y="' + yTop + '" width="' + fW + '" height="' + fH + '" rx="6" fill="' + greenL + '" stroke="' + green + '" stroke-width=".6"/>');
-    txt(cx, yTop + 18, '施肥器 · ' + cfg.ferts[i].type, 12.5, '#04342C');
-    txt(cx, yTop + 38, '第 ' + (i + 1) + ' 路 · 吸肥 DN' + cfg.ferts[i].dn, 11.5, green);
+    txt(cx, yTop + 18, '施肥器 · ' + cfg.ferts[i].type, 12.5, '#111');
+    txt(cx, yTop + 38, '第 ' + (i + 1) + ' 路 · 吸肥 DN' + cfg.ferts[i].dn, 11.5, '#111');
     var gy = yMain - 50 * k;
     g.push('<rect x="' + (cx - 5) + '" y="' + (gy - 5) + '" width="10" height="10" fill="#fff" stroke="' + green + '" stroke-width=".6" transform="rotate(45 ' + cx + ' ' + gy + ')"/>');
     if (cfg.show.num) {
       g.push('<circle cx="' + cx + '" cy="' + numY + '" r="10" fill="#fff" stroke="' + green + '" stroke-width=".6"/>');
-      g.push('<text x="' + cx + '" y="' + numY + '" font-size="11.5" text-anchor="middle" dominant-baseline="central" fill="' + green + '">4-' + (i + 1) + '</text>');
+      g.push('<text x="' + cx + '" y="' + numY + '" font-size="11.5" text-anchor="middle" dominant-baseline="central" fill="' + '#111' + '">4-' + (i + 1) + '</text>');
     }
   }
   pipe(regionStart, yMain, regionStart + regionW + 30 * k, yMain, pw(cfg.suctionDN));  // 吸肥区水平管延伸至闸阀段起点

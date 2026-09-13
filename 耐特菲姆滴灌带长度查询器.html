@@ -33,7 +33,8 @@
     line-height:1.6;
     -webkit-font-smoothing:antialiased;
   }
-  .wrap{max-width:1080px;margin:0 auto;padding:18px 16px 60px;}
+  /* 2026-09-13 内容满布：取消 1080px 限宽，改为全宽 + 两侧留白（超宽屏限 1760px 居中） */
+  .wrap{max-width:1760px;margin:0 auto;padding:18px 22px 60px;}
   .card{background:#fff;border:1px solid var(--s-100);border-radius:var(--radius-sm);box-shadow:var(--shadow);padding:18px;margin-bottom:18px;}
   .card h2{margin:0 0 14px;font-size:16px;color:var(--s-800);display:flex;align-items:center;gap:8px;font-weight:700;}
   .card h2::before{content:"";width:5px;height:18px;background:var(--teal);border-radius:3px;display:inline-block;}
@@ -219,10 +220,23 @@ input[type="reset"],
 body > .ry-nav{display:none!important}
 /* ===== /RY-NAV ===== */
 
+/* ===== FN-NAV 本页布局差异（与在线地图页一致）：导航条吸顶 + .fn-inner 整幅排布 ===== */
+.fn-nav{position:sticky;top:0;z-index:1500;}
+.fn-nav .fn-inner{max-width:none;padding:0 12px;}
+
 </style>
   <link rel="stylesheet" href="runye-theme.css">
+  <link rel="stylesheet" href="runye-nav.css">
 </head>
 <body>
+
+<!-- ===== 顶部功能区导航（2026-09-13）：皮肤 = runye-nav.css、按钮清单 = runye-nav.js
+     （与主页/在线地图页同一份 ITEMS，当前页「滴灌带查询」自动高亮；
+     data-base 使站内锚点项跨页跳回 index.html 对应功能区） ===== -->
+<nav class="fn-nav" aria-label="功能区导航">
+  <div class="fn-inner" data-ry-fnnav data-base="index.html#"></div>
+</nav>
+<script src="runye-nav.js"></script>
 
 <!-- ===== 主页导航（嵌入） ===== -->
 <div class="ry-nav">
