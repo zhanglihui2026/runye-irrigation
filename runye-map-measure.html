@@ -56,9 +56,9 @@
   .results .row .v small{font-size:10px;color:var(--s-500);font-weight:400;margin-left:2px}
   .hint{font-size:10px;color:var(--s-500);margin-top:5px;line-height:1.4}
   .results .mbtn-primary{margin-top:6px;width:100%}
-  .save-row{margin-top:5px;display:flex;gap:6px;align-items:center}
-  .save-row input{flex:1;min-width:0;padding:0 8px}
-  .save-row .mbtn{flex:none;white-space:nowrap}
+.save-row{margin-top:5px;display:flex;gap:6px;align-items:center;justify-content:stretch}
+.save-row .mbtn{flex:1 1 0;min-width:0;white-space:nowrap;padding-left:4px;padding-right:4px}
+  .ry-pin{background:transparent;border:none}
   /* 地图 */
   .map-wrap{flex:1;position:relative;min-width:0}
   #map{position:absolute;top:0;left:0;right:0;bottom:0;background:#dfe6e9}
@@ -126,9 +126,8 @@
         <div class="row"><span class="k">周长</span><span class="v"><span id="peri">0</span><small>m</small></span></div>
         <div class="row"><span class="k">顶点</span><span class="v"><span id="pts">0</span><small>个</small></span></div>
         <div class="hint">点击地图添加顶点；拖动顶点可微调；「完成」自动闭合并计算。面积按真实球面经纬度计算。</div>
-        <button class="mbtn mbtn-primary" id="btnCopy">↩ 回传设计工具（跳转）</button>
         <div class="save-row">
-          <input type="text" id="plotName" placeholder="地块名称（选填）" />
+          <button class="mbtn mbtn-primary" id="btnCopy">↩ 回传设计工具</button>
           <button class="mbtn mbtn-primary" id="btnSavePlot">💾 保存地块</button>
         </div>
         <div class="hint">保存后可累计多个地块；在「精准灌溉」页地块库「设为当前」，或在数字农业（水肥决策）页下拉选择。</div>
@@ -217,11 +216,20 @@
     document.getElementById('pts').textContent = points.length;
   }
 
+  /* 顶点标识（2026-09-15 用户要求）：默认大头针太大，缩小到 60%（15×25），样式同默认蓝针 */
+  function pinIcon(){
+    return L.divIcon({
+      className:'ry-pin',
+      html:'<svg width="15" height="25" viewBox="0 0 25 41"><path d="M12.5 0C5.6 0 0 5.6 0 12.5 0 21.9 12.5 41 12.5 41S25 21.9 25 12.5C25 5.6 19.4 0 12.5 0z" fill="#2a81cb" stroke="#fff" stroke-width="1.5"/><circle cx="12.5" cy="12.5" r="4" fill="#fff"/></svg>',
+      iconSize:[15,25],iconAnchor:[7,24]
+    });
+  }
+
   function addPoint(lat,lng){
     var p={lat:lat,lng:lng};
     points.push(p);
     var idx=points.length-1;
-    var m=L.marker([lat,lng],{draggable:true});
+    var m=L.marker([lat,lng],{draggable:true,icon:pinIcon(),keyboard:false});
     m.on('drag', function(e){
       var ll=e.target.getLatLng();
       points[idx]={lat:ll.lat,lng:ll.lng};
@@ -314,7 +322,7 @@
     var sqm=Math.round(geodesicArea(points));
     try{
       var pid='pm'+Date.now();
-      var nm=(document.getElementById('plotName').value||'').trim();
+      var nm='';
       localStorage.setItem('runyeMeasuredArea', JSON.stringify({plotId:pid, name:nm, mu:mu, sqm:sqm, poly:latlngs(), ts:Date.now(), source:'map'}));
       var btn=document.getElementById('btnCopy');
       btn.textContent='回传中…';
@@ -327,7 +335,7 @@
     var mu=parseFloat((geodesicArea(points)/666.67).toFixed(2));
     if(!mu){ alert('请先在地图上画框测量出面积再保存'); return; }
     var sqm=Math.round(geodesicArea(points));
-    var name=(document.getElementById('plotName').value||'').trim();
+    var name='';
     var arr=[]; try{ arr=JSON.parse(localStorage.getItem('runye_plot_library')||'[]'); }catch(e){ arr=[]; }
     if(!name) name='地块 '+(arr.length+1);
     // 经纬度 → 本地米坐标（与精准灌溉页 applyMapMeasuredArea 一致），便于「设为当前」回填
@@ -343,7 +351,6 @@
       crop:'七彩花生', source:'map', ts:Date.now(), note:'' };
     arr.push(plot);
     try{ localStorage.setItem('runye_plot_library', JSON.stringify(arr)); }catch(e){ alert('保存失败：'+e.message); return; }
-    document.getElementById('plotName').value='';
     alert('已保存到地块库：'+name+'（'+mu+' 亩）\n可在精准灌溉页「地块库」设为当前，或在数字农业页选择。');
   };
 

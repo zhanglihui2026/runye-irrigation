@@ -3,6 +3,12 @@
   'use strict';
   var iso=window.RyIsoDiagram, side=document.getElementById('tlIsoSide');
   if(!iso || !side) return;
+  /* 2026-09-15 用户下线（ISO_PARAM_EDITOR_OFF）：轴测左栏编辑类功能整体取消，
+     本「构件参数编辑面板 + 撤销/保存工具条」一并收起（整栏空置），待用户重定方案；
+     恢复时改回 false 即可。末尾「恢复本地草稿」分支随之停用（编辑已不可用，
+     旧草稿数据仍保留在 localStorage 不删除）。 */
+  var ISO_PARAM_EDITOR_OFF = true;
+  if (ISO_PARAM_EDITOR_OFF) return;
   var selected=null;
   var panel=document.createElement('div'); panel.className='tl-iso-card iso-editor'; panel.hidden=true;
   side.appendChild(panel);
@@ -37,6 +43,7 @@
     }else{
       h+=field(info.kind==='tee'?'直通两端口径（空白=随管）':'口径（空白=随管）','spec',p.spec);
       if(info.kind==='tee')h+=field('分支口径（空白=随管）','branchSpec',p.branchSpec);
+      if(info.kind==='tee' && info.teeType && info.branchSpec)h+=field('接管长度 m','branchLen',info.branchLen,'number',0.5,10,0.1);
       if(info.kind==='valve')h+=select('阀门类型（通用图例，类型另注）','valveType',['通用阀门','闸阀','球阀','蝶阀','止回阀'],p.valveType);
       if(info.kind==='elbow')h+=select('弯头角度（标注，不改变管路）','angle',[45,90],p.angle);
       h+=select('连接方式','connection',['未指定','法兰','螺纹','热熔','承插'],p.connection);

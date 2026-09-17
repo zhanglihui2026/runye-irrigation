@@ -4,7 +4,15 @@
  * 职责：读取三级平面图最终几何数据（window.tlDiagramData，由 tlAutoGenerate
  *       末尾导出），做表达转换：等轴测投影 + 连接识别（三通）+ 阀门 + SVG。
  * 红线：只读不写。不参与任何水力计算，不修改流量/管径/扬程/分区/材料清单，
- *       不回调灌溉计算，不写 localStorage，不改变平面图几何数据。
+ *       不回调灌溉计算，不改变平面图几何数据。
+ * 2026-09-15 阶段1（用户批准）：接入共享图面数据层 RyTlEditPipes
+ *       （tl-edit-pipes.js）—— 显示三级工作区手工管线（等轴测层，含长度标注），
+ *       新增「插入主管/插入支管」画线模式；两视图双向同步：任一处增删，
+ *       另一视图立即重渲染。手工管线仍只存共享层自有状态，不写回 tlDiagramData。
+ * 2026-09-15 阶段2（用户批准）：接入自动管线图面编辑层 RyTlAutoEdits
+ *       （tl-auto-edits.js）—— 二级传递的自动管线（front/main/branch）可点选
+ *       （高亮+信息）、就地改长（末段沿原方向拉伸）、插三通/阀门（沿管弧长定位）。
+ *       渲染/统计用 applyTo 有效几何副本，tlDiagramData 仍只读不写。
  * 数据契约见 iso-diagram/README.md；版本 version:1，单位米。
  * ===================================================================== */
 (function () {
@@ -12,18 +20,19 @@
 
   /* ---------- 常量（绘图表达参数，不参与水力计算） ---------- */
   var EPS = 0.01;                 // 连接点吸附容差（米）
+  var TEE_LINK_TOL = 0.06;        // 三通「连接管」判定容差（米）：端点落在三通点 ±6cm 内即视为接管跟随旋转
   var VALVE_OFFSET = 1.5;         // 阀门与三通沿下游管线的间距（米）
   var TEE_SNAP = 0.5;             // 阀门斜拉点视为落在主管上的容差（与平面图一致）
-  var MAX_VALVE_LABELS = 24;      // 阀门数 ≤ 此值时在图上标注编号（避免拥挤）
+  /* 2026-09-15 用户要求：同类型管道/阀门不逐个标注 —— 阀门仅在编辑过参数后显示编号 */
   /* 层级表达（z 仅用于轴测图上下关系，不代表真实埋深，不参与水力计算）：
    * 总管/主管为埋地管 → 位于地面之下（z<0，画在支管下方）；
    * 支管/滴灌带为地表管（z≥0）。 */
   var HEIGHTS = { front: -1.5, main: -1.0, branch: 0.3, tape: 0.0, source: 0.9, inletValveZ: -1.5 };
   var RISE45 = 14;                // 三通 45° 斜拉段固定长度（viewBox 单位，2026-09-13 用户指定：不管阀位远近、方向统一）
   var COLORS = {
-    front: '#202020',   // 单线工程表达，线宽区分管线层级
-    main: '#202020',
-    branch: '#202020',
+    front: '#f97316',   // 2026-09-16 用户要求：轴测图管线颜色同三级简图（总管橙/主管蓝/支管绿）
+    main: '#185FA5',
+    branch: '#16a34a',
     tape: '#888888',
     tee: '#202020',
     valve: '#202020',
@@ -39,23 +48,50 @@
    * 平面数据对象引用变更（重新生成平面图）→ 自动清空。
    * 条目：{id, kind:'tee'|'elbow'|'valve', spec, segType:'front'|'main'|'branch',
    *        segIndex, point:{x,y}（数据坐标，米）, z（随管段层高）} */
-  var KIND_LABEL = { tee: '三通', elbow: '弯头', valve: '阀门' };
-  var MANUAL_PREFIX = { tee: 'M-T', elbow: 'M-E', valve: 'M-V' };
+  var KIND_LABEL = { tee: '三通', elbow: '弯头', valve: '阀门', pipe: '接管' };
+  var MANUAL_PREFIX = { tee: 'M-T', elbow: 'M-E', valve: 'M-V', pipe: 'M-G' };
   var SEG_Z = { front: HEIGHTS.front, main: HEIGHTS.main, branch: HEIGHTS.branch };
   var SEG_NAME = { front: '总管', main: '主管', branch: '支管' };
   var manual = [];
+  /* ---------- 自动三通「第三口旋转」覆盖层（2026-09-16 用户口径）----------
+   * 用户口径：图上右键的三通多半是**自动三通**（TEE-F01 在总管上 / TEE-B01 在主管上），
+   * 它们由模型派生、不能改模型（维持只读红线），故第三口旋转只记在本表达层覆盖里：
+   *   id（TEE-F01/TEE-B01）→ {branchDir:{x,y,z} 单位向量, branchSpin:累计角(度)}
+   * 渲染时若有覆盖则画成 T 形（贯通杆 = 宿管中心轴、第三口 = branchDir）。
+   * ★ 无覆盖时渲染输出逐字节不变 → 等价性基线零差异。 */
+  var autoSpin = {};
+  /* 所在管段类的管径数字串（如 '110'），解析自 meta.pipes（'Ø 110 mm'/'O110' 等），无则 '' */
+  function hostDia(segType) {
+    var meta = lastDataRef && lastDataRef.meta, v = meta && meta.pipes && meta.pipes[segType];
+    var mm = v ? String(v).match(/\d+(?:\.\d+)?/) : null;
+    return mm ? mm[0] : '';
+  }
   var edits = {}, history = [], draft = null, dataKey = '';
   function copy(value) { return JSON.parse(JSON.stringify(value)); }
   function geometryKey(data) {
     if (!data) return '';
     return JSON.stringify([data.frontPipe, data.mainPipes, data.branchPipes, data.valves, data.poly]);
   }
-  function snapshot() { return copy({ edits: edits, manual: manual, seq: manualSeq }); }
-  function restore(s) { edits = copy(s.edits || {}); manual = copy(s.manual || []); manualSeq = copy(s.seq || {tee:0,elbow:0,valve:0}); }
+  function snapshot() {
+    /* epPipes：三通旋转会刚体修改共享层 EP 管 pts，撤销须一并还原，否则撤销后管子不归位。 */
+    var ep = (typeof EP !== 'undefined' && EP.list) ? EP.list() : [];
+    var epPipes = ep.map(function (p) { return { id: p.id, pts: copy(p.pts) }; });
+    return copy({ edits: edits, manual: manual, seq: manualSeq, autoSpin: autoSpin, epPipes: epPipes });
+  }
+  function restore(s) {
+    edits = copy(s.edits || {});
+    manual = copy(s.manual || []);
+    manualSeq = copy(s.seq || {tee:0,elbow:0,valve:0,pipe:0});
+    autoSpin = copy(s.autoSpin || {});
+    if (Array.isArray(s.epPipes) && typeof EP !== 'undefined' && EP.list) {
+      var byId = {}; EP.list().forEach(function (p) { byId[p.id] = p; });
+      s.epPipes.forEach(function (e) { var p = byId[e.id]; if (p && Array.isArray(e.pts)) p.pts = copy(e.pts); });
+    }
+  }
   function checkpoint() { history.push(snapshot()); if (history.length > 40) history.shift(); }
   function params(id) {
     var item=manual.filter(function(m){return m.id===id;})[0];
-    return Object.assign({ spec:item ? item.spec : '', branchSpec:'', valveType:'通用阀门', connection:'未指定', angle:90,
+    return Object.assign({ spec:item ? item.spec : '', branchSpec:'', teeType:null, branchLen:1, valveType:'通用阀门', connection:'未指定', angle:90,
       size:1, label:true, labelX:9, labelY:3, rise:28, position:0.57, height:null }, edits[id] || {});
   }
   function manualPosition(id, value) {
@@ -80,6 +116,8 @@
   }
   function validParams(p) {
     return typeof p.spec === 'string' && p.spec.length <= 40 && typeof p.branchSpec === 'string' && p.branchSpec.length <= 40 &&
+      (p.teeType === null || p.teeType === 'equal' || p.teeType === 'reducing') &&
+      Number.isFinite(p.branchLen) && p.branchLen >= 0.5 && p.branchLen <= 10 &&
       ['通用阀门','闸阀','球阀','蝶阀','止回阀'].indexOf(p.valveType) >= 0 &&
       ['未指定','法兰','螺纹','热熔','承插'].indexOf(p.connection) >= 0 &&
       [45,90].indexOf(p.angle) >= 0 && typeof p.label === 'boolean' &&
@@ -119,16 +157,56 @@
     if (!saved || saved.version !== 1 || saved.geometry !== geometryKey(data) || !saved.state) return false;
     var s = saved.state;
     if (!s.edits || !Array.isArray(s.manual) || s.manual.length > 2000 || !s.seq) return false;
+    /* 自动三通第三口旋转覆盖（可选字段：旧存档无此键 → 视为空覆盖，向后兼容） */
+    if (s.autoSpin !== undefined) {
+      if (!s.autoSpin || typeof s.autoSpin !== 'object' || Array.isArray(s.autoSpin)) return false;
+      if (!Object.keys(s.autoSpin).every(function (id) {
+        var v = s.autoSpin[id];
+        return /^TEE-[FB]\d+$/.test(id) && v && v.branchDir
+          && isFinite(v.branchDir.x) && isFinite(v.branchDir.y) && isFinite(v.branchDir.z) && isFinite(v.branchSpin);
+      })) return false;
+    }
     if (!Object.keys(s.edits).every(function(id){return /^(TEE-[FB]|V-[FB]|R-V-B|M-[TEV])\d+$/.test(id) && validParams(Object.assign({}, params(''),s.edits[id]));})) return false;
-    if (!s.manual.every(function(m){return /^M-[TEV]\d+$/.test(m.id) && KIND_LABEL[m.kind] && SEG_NAME[m.segType] && Number.isInteger(m.segIndex) && m.segIndex >= 0 && m.point && Number.isFinite(m.point.x) && Number.isFinite(m.point.y) && typeof m.spec === 'string';})) return false;
+    if (!s.manual.every(function(m){
+      if (m.kind === 'pipe') return /^M-G\d+$/.test(m.id) && Array.isArray(m.pts) && m.pts.length >= 2 && m.pts.every(function(p){return p && isFinite(p.x) && isFinite(p.y) && isFinite(p.z);}) && typeof m.spec === 'string' && (m.teeId === undefined || typeof m.teeId === 'string');
+      return /^M-[TEV]\d+$/.test(m.id) && KIND_LABEL[m.kind] && SEG_NAME[m.segType] && Number.isInteger(m.segIndex) && m.segIndex >= 0 && m.point && isFinite(m.point.x) && isFinite(m.point.y) && typeof m.spec === 'string' && (m.hostPipe === undefined || (typeof m.hostPipe === 'string' && /^M-G\d+$/.test(m.hostPipe)));
+    })) return false;
     if(!['tee','elbow','valve'].every(function(k){return Number.isInteger(s.seq[k])&&s.seq[k]>=0&&s.seq[k]<=1000000;}))return false;
     if(new Set(s.manual.map(function(m){return m.id;})).size!==s.manual.length)return false;
-    attachData(data); restore(s); manual.forEach(function(m){m.z=SEG_Z[m.segType];manualSeq[m.kind]=Math.max(manualSeq[m.kind],Number(m.id.slice(3)));}); history=[]; draft=null; rerenderKeepView(); return true;
+    attachData(data); restore(s); manual.forEach(function(m){m.z = (m.hostPipe && isFinite(m.z)) ? m.z : SEG_Z[m.segType];manualSeq[m.kind]=Math.max(manualSeq[m.kind],Number(m.id.slice(3)));}); history=[]; draft=null; rerenderKeepView(); return true;
   }
-  var manualSeq = { tee: 0, elbow: 0, valve: 0 };
+  var manualSeq = { tee: 0, elbow: 0, valve: 0, pipe: 0 };
   var lastDataRef = null;
   var placing = null;        /* {kind, spec} | null —— 放置模式 */
   var viewState = null;      /* {k, ox, oy, model} —— renderSVG 记录，供命中测试 */
+  /* ---------- 共享图面数据层（2026-09-15 阶段1）----------
+   * 手工管线（主管/支管折线）单一数据源：三级工作区 ⇄ 轴测图双向同步。
+   * 缺失（加载顺序异常/Node 旧测试）时退化为空层，本模块仍可独立运行。 */
+  var EP = (typeof window !== 'undefined' && window.RyTlEditPipes) ? window.RyTlEditPipes : {
+    list: function () { return []; }, add: function () { return null; },
+    syncGeometry: function () { return 'kept'; }, onChange: function () { return function () {}; }
+  };
+  /* 自动管线图面编辑层（2026-09-15 阶段2）：缺失（Node 旧测试/加载顺序异常）时退化为空层 */
+  var AE = (typeof window !== 'undefined' && window.RyTlAutoEdits) ? window.RyTlAutoEdits : {
+    applyTo: function (d) { return d; }, syncGeometry: function () { return 'kept'; },
+    lensMap: function () { return {}; }, fitsList: function () { return []; },
+    pipePts: function () { return null; }, pipeName: function (p) { return p; },
+    allPids: function () { return []; }, effPts: function () { return null; },
+    pointAt: function () { return null; }, locate: function () { return null; },
+    setLen: function () { return false; }, addFitting: function () { return null; },
+    removeFitting: function () { return false; }, moveFitting: function () { return false; },
+    calibersMap: function () { return {}; }, caliberOf: function () { return null; },
+    setCaliber: function () { return false; }, clearCaliber: function () { return false; },
+    onChange: function () { return function () {}; }
+  };
+  var pipeMode = null;       /* 'main' | 'branch' | null —— 插入管线模式 */
+  var pipeDraft = null;      /* {kind, pts:[{x,y}(米)]} —— 进行中的手工管线折线 */
+  var selPipeId = null;      /* 选中的手工管线 id（点击拾取，虚线加粗高亮） */
+  var selAutoId = null;      /* 选中的自动管线 pid：'front'|'main-i'|'branch-i'（阶段2） */
+  var selAutoAt = 0;         /* 选中自动管线时的点击位置（沿管弧长，米）——插配件用 */
+  var selFitId = null;       /* 选中的图面配件 id（A-F##，阶段2） */
+  var fitDrag = null;        /* 配件沿管拖动态 {id, pointerId, atM}（阶段2b） */
+  var fitDragRaf = 0;        /* 拖动提交 rAF 节流句柄 */
   var PLACE_TOL = 16;        /* 放置吸附容差（SVG viewBox 单位 px）
    * 回调 onFittingClick / onPlaceResult 挂在导出对象 api 上（页面注入） */
 
@@ -249,12 +327,15 @@
     });
 
     function pad(n) { return (n < 10 ? '0' : '') + n; }
+    /* 阀门所在分区：**区号与地块分区标注同口径**（行主序 zi+1 →「37区」），
+       与 index.html 三级工作区统计表的 wsRectZone 保持同一公式（2026-09-17 第四十三轮）。 */
     function zoneOf(v, zs) {
       if (!zs || !zs.xPos || !zs.yPos) return null;
+      var znC = zs.cols || (zs.xPos.length - 1);   /* 列数：区号 = r * cols + c + 1 */
       for (var c = 0; c + 1 < zs.xPos.length; c++) {
         if (v.x >= zs.xPos[c] - EPS && v.x <= zs.xPos[c + 1] + EPS) {
           for (var r = 0; r + 1 < zs.yPos.length; r++) {
-            if (v.y >= zs.yPos[r] - EPS && v.y <= zs.yPos[r + 1] + EPS) return 'R' + (r + 1) + 'C' + (c + 1);
+            if (v.y >= zs.yPos[r] - EPS && v.y <= zs.yPos[r + 1] + EPS) return (r * znC + c + 1) + '区';
           }
         }
       }
@@ -273,14 +354,17 @@
   function fmt(v) { return (Math.round(v * 10) / 10).toString(); }
 
   // 阀门通用符号：两三角尖端相对，沿安装管段方向旋转；不推定具体阀型。
+  // 2026-09-16 用户要求：可见蝶形缩小（0.7×：14×8 → 9.8×5.6）；
+  // 透明命中区 rect 保持 16×12 不缩（不可见，保证点击目标稳定，否则 bbox 中心会被标签拉偏）。
   function valveSymbol(q, angle) {
     return '<g data-symbol="valve" transform="translate(' + fmt(q.x) + ' ' + fmt(q.y) + ') rotate(' + fmt(angle) + ')">'
       + '<rect x="-8" y="-6" width="16" height="12" fill="transparent"/>'
-      + '<path d="M-7 -4 L7 4 L7 -4 L-7 4 Z" fill="white" stroke="#202020" stroke-width="1.2"/></g>';
+      + '<path d="M-4.9 -2.8 L4.9 2.8 L4.9 -2.8 L-4.9 2.8 Z" fill="white" stroke="#202020" stroke-width="1.2"/></g>';
   }
 
   function renderSVG(data) {
-    var model = buildModel(data);
+    /* 阶段2：渲染用有效几何（改长后的副本）；data 本身只读不写 */
+    var model = buildModel(AE.applyTo(data));
     if (!model) return null;
 
     /* 1) 收集全部 3D 点 → 等轴测投影 →包围盒 → 自适应缩放 */
@@ -294,6 +378,11 @@
     if (model.source) pushPt(model.source.x, model.source.y, HEIGHTS.source);
     model.tees.forEach(function (t) { pushPt(t.point.x, t.point.y, t.type === 'front-main' ? HEIGHTS.front : HEIGHTS.main); });
     model.valves.forEach(function (v) { pushPt(v.point.x, v.point.y, v.z); });
+    /* 共享层手工管线也参与取景（2026-09-15 阶段1） */
+    (EP.list() || []).forEach(function (m) {
+      var z = m.kind === 'main' ? HEIGHTS.main : HEIGHTS.branch;
+      (m.pts || []).forEach(function (p) { pushPt(p.x, p.y, z); });
+    });
     if (!pts.length) return null;
 
     var i, p, pr = pts.map(function (p) { return projectIso(p.x, p.y, p.z, 1); });
@@ -362,24 +451,14 @@
       + ' · 生成 ' + esc(String(now)) + '</text>');
     s.push('</g>');
 
-    /* 3a) 地块轮廓线（z=0，2026-09-13 用户要求显示；分区分割线保留） */
+    /* 3b) 地块轮廓：仅作可见参考线，不再裁剪管线（2026-09-16 用户要求：轴测图管线
+       不被地块剪切，完整显示；管线长度统计仍以地块内有效几何为准，与三级简图/
+       材料清单一致）。主管/支管/三通/阀件/配件均不被裁剪；总管与手工管线本就
+       允许在地块外敷设。 */
+    var clipAttr = '';   /* 占位：下方管线组仍引用 clipAttr，置空即不裁剪 */
     if (model.poly && model.poly.length >= 3) {
-      s.push('<polygon data-plot-outline="1" points="' + model.poly.map(function (p) {
-        var q = P(p.x, p.y, 0);
-        return fmt(q.x) + ',' + fmt(q.y);
-      }).join(' ') + '" fill="none" stroke="#55655e" stroke-width="1.8" stroke-linejoin="round"/>');
-    }
-
-    /* 3b) 地块裁剪（2026-09-13 用户要求：管线超出地块的部分不显示）。
-       以地块轮廓 polygon 作 clipPath；无有效轮廓（<3 点）时不裁剪。
-       仅显示层裁剪：包围盒取景仍按原始几何计算，取景/缩放不受影响。 */
-    var clipAttr = '';
-    if (model.poly && model.poly.length >= 3) {
-      clipAttr = ' clip-path="url(#isoPlotClip)"';
-      s.push('<defs><clipPath id="isoPlotClip"><polygon points="' + model.poly.map(function (p) {
-        var q = P(p.x, p.y, 0);
-        return fmt(q.x) + ',' + fmt(q.y);
-      }).join(' ') + '"/></clipPath></defs>');
+      var isoPlotPts = model.poly.map(function (p) { var q = P(p.x, p.y, 0); return fmt(q.x) + ',' + fmt(q.y); }).join(' ');
+      s.push('<polygon points="' + isoPlotPts + '" fill="none" stroke="#94a3b8" stroke-width="1" stroke-dasharray="6,4" opacity="0.7"/>');
     }
 
     /* 3) 分区地面辅助线（z=0 平行四边形） */
@@ -397,7 +476,7 @@
 
     /* 4) 埋地管网（z<0，画在地面之下 → 先绘制，被地表图元覆盖）
        4a) 总管↔主管接入段（表达段：三通→阀门→主管上游端，均位于地下） */
-    s.push('<g fill="none" stroke="' + COLORS.front + '" stroke-width="1.5"' + clipAttr + '>');
+    s.push('<g fill="none" stroke="' + COLORS.front + '" stroke-width="1.5">');
     model.tees.filter(function (t) { return t.type === 'front-main'; }).forEach(function (t) {
       var vl = model.valves.filter(function (v) { return v.tee === t.id; })[0];
       var mi = parseInt(String(t.downstream).slice(5), 10);
@@ -411,15 +490,16 @@
 
     /* 4b) 主管（埋地） */
     s.push('<g fill="none" stroke="' + COLORS.main + '" stroke-width="1.8" stroke-linejoin="round"' + clipAttr + '>');
-    model.mains.forEach(function (l) { s.push('<path d="' + path3(l, function () { return HEIGHTS.main; }) + '"/>'); });
+    model.mains.forEach(function (l, mi) { s.push('<path data-tlpipe="main-' + mi + '" style="cursor:pointer" d="' + path3(l, function () { return HEIGHTS.main; }) + '"/>'); });
     s.push('</g>');
 
     /* 4c) 总管（埋地，带流向箭头） */
     s.push('<defs><marker id="isoArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">'
       + '<path d="M0 0 L10 5 L0 10 z" fill="' + COLORS.front + '"/></marker></defs>');
     if (model.front && model.front.length >= 2) {
-      s.push('<g' + clipAttr + '>');
-      s.push('<path d="' + path3(model.front, function () { return HEIGHTS.front; })
+      /* 总管豁免地块裁剪（2026-09-14）：管线在地块外，裁剪会把整条总管裁没 */
+      s.push('<g>');
+      s.push('<path data-tlpipe="front" style="cursor:pointer" d="' + path3(model.front, function () { return HEIGHTS.front; })
         + '" fill="none" stroke="' + COLORS.front + '" stroke-width="2.2" marker-mid="url(#isoArrow)" marker-end="url(#isoArrow)"/>');
       /* 中点补一个箭头（两点线段无 mid） */
       if (model.front.length === 2) {
@@ -437,8 +517,128 @@
 
     /* 6) 支管（地表 z=0.3，覆盖埋地管网之上） */
     s.push('<g fill="none" stroke="' + COLORS.branch + '" stroke-width="1.2" stroke-linejoin="round"' + clipAttr + '>');
-    model.branches.forEach(function (l,i) { s.push('<path data-branch="' + i + '" d="' + path3(l, function () { return HEIGHTS.branch; }, branchOffsets[i]) + '"/>'); });
+    model.branches.forEach(function (l,i) { s.push('<path data-branch="' + i + '" data-tlpipe="branch-' + i + '" style="cursor:pointer" d="' + path3(l, function () { return HEIGHTS.branch; }, branchOffsets[i]) + '"/>'); });
     s.push('</g>');
+
+    /* 6b) 手工管线层（共享图面数据层 RyTlEditPipes，2026-09-15 阶段1 双向同步）
+       颜色与三级设计工作区一致（主管蓝/支管绿）；点击可选中（data-manpipe，
+       虚线加粗高亮）。不做地块裁剪：手工管线允许画在地块外（与工作区口径一致）。 */
+    var manPipes = EP.list() || [];
+    if (manPipes.length) {
+      s.push('<g fill="none" stroke-linecap="round" stroke-linejoin="round">');
+      manPipes.forEach(function (m) {
+        if (!m.pts || m.pts.length < 2) return;
+        var z = m.kind === 'main' ? HEIGHTS.main : HEIGHTS.branch;
+        var col = m.kind === 'main' ? '#185FA5' : '#16a34a';
+        var isSel = m.id === selPipeId;
+        var d = '';
+        m.pts.forEach(function (p, i) { var q = P(p.x, p.y, z); d += (i ? 'L' : 'M') + fmt(q.x) + ' ' + fmt(q.y); });
+        var mid = m.pts[Math.floor(m.pts.length / 2)], mq = P(mid.x, mid.y, z);
+        s.push('<g class="iso-manpipe" data-manpipe="' + esc(m.id) + '" style="cursor:pointer"><title>'
+          + esc(m.id + ' · ' + (m.kind === 'main' ? '主管' : '支管') + ' · ' + m.len.toFixed(1) + 'm') + '</title>'
+          + '<path d="' + d + '" stroke="' + col + '" stroke-width="' + (isSel ? 3.4 : (m.kind === 'main' ? 2.4 : 1.6)) + '"' + (isSel ? ' stroke-dasharray="8,4"' : '') + '/>'
+          + m.pts.map(function (p) { var q = P(p.x, p.y, z); return '<rect x="' + fmt(q.x - 2) + '" y="' + fmt(q.y - 2) + '" width="4" height="4" fill="#fff" stroke="' + col + '" stroke-width="1"/>'; }).join('')
+          + '<text x="' + fmt(mq.x + 6) + '" y="' + fmt(mq.y - 4) + '" font-size="9" font-family="system-ui" fill="' + (isSel ? '#7c3aed' : '#47555e') + '"' + (isSel ? ' font-weight="700"' : '') + ' paint-order="stroke" stroke="white" stroke-width="2">' + esc(m.id + ' ' + m.len.toFixed(1) + 'm' + (isSel ? ' · 已选' : '')) + '</text>'
+          + '</g>');
+      });
+      s.push('</g>');
+    }
+
+    /* 6b-2) 改长管线长度标注（阶段2）：琥珀色显示有效长度（对齐工作区口径） */
+    var elens = AE.lensMap();
+    Object.keys(elens).forEach(function (epid) {
+      var eepts = AE.effPts(epid, data);
+      if (!eepts) return;
+      var ez2 = epid === 'front' ? HEIGHTS.front : (epid.indexOf('main-') === 0 ? HEIGHTS.main : HEIGHTS.branch);
+      var emid = eepts[Math.floor(eepts.length / 2)];
+      var emq = P(emid.x, emid.y, ez2);
+      s.push('<text data-tlens="1" x="' + fmt(emq.x + 6) + '" y="' + fmt(emq.y - 4) + '" font-size="9" font-family="system-ui" fill="#b45309" paint-order="stroke" stroke="white" stroke-width="2">' + esc(AE.polylineLen(eepts).toFixed(1) + 'm') + '</text>');
+    });
+    /* 6b-3) 改径标注（2026-09-16 阶段2e）：琥珀 Ø 数值（对齐工作区/施工编辑器口径） */
+    var ecals = AE.calibersMap ? AE.calibersMap() : {};
+    Object.keys(ecals).forEach(function (cpid) {
+      var cepts = AE.effPts(cpid, data);
+      if (!cepts) return;
+      var cz2 = cpid === 'front' ? HEIGHTS.front : (cpid.indexOf('main-') === 0 ? HEIGHTS.main : HEIGHTS.branch);
+      var cmid = cepts[Math.floor(cepts.length / 2)];
+      var cmq = P(cmid.x, cmid.y, cz2);
+      s.push('<text data-tlcal="' + esc(cpid) + '" x="' + fmt(cmq.x + 6) + '" y="' + fmt(cmq.y + 12) + '" font-size="9.5" font-family="system-ui" font-weight="700" fill="#b45309" paint-order="stroke" stroke="white" stroke-width="2" pointer-events="none">' + esc('Ø' + ecals[cpid]) + '</text>');
+      if (typeof window !== 'undefined' && window.tlPipeHfMark) {
+        var chm = window.tlPipeHfMark(cpid);
+        if (chm) s.push('<text data-tlhf="' + esc(cpid) + '" x="' + fmt(cmq.x + 6) + '" y="' + fmt(cmq.y + 24) + '" font-size="9" font-family="system-ui" font-weight="600" fill="' + chm.color + '" paint-order="stroke" stroke="white" stroke-width="2.5" pointer-events="none">' + esc(chm.text) + '</text>');
+      }
+    });
+
+    /* 6c) 自动管线选中高亮（阶段2）：有效几何虚线加粗覆盖 */
+    if (selAutoId) {
+      var septs = AE.effPts(selAutoId, data);
+      if (septs) {
+        var sz = selAutoId === 'front' ? HEIGHTS.front : (selAutoId.indexOf('main-') === 0 ? HEIGHTS.main : HEIGHTS.branch);
+        var sw = selAutoId === 'front' ? 3.4 : (selAutoId.indexOf('main-') === 0 ? 2.9 : 2.4);
+        s.push('<path data-tlsel="1" d="' + path3(septs, function () { return sz; }) + '" fill="none" stroke="#f59e0b" stroke-width="' + fmt(sw) + '" stroke-dasharray="8,4" stroke-linecap="round" stroke-linejoin="round" pointer-events="none"/>');
+      }
+    }
+
+    /* 6d) 自动管线图面配件层（共享编辑层 RyTlAutoEdits，阶段2）：
+       三通/阀门按沿管弧长定位在有效几何上（改长后随动/clamp）；点击可选中。 */
+    var autoFits = AE.fitsList() || [];
+    if (autoFits.length) {
+      s.push('<g' + clipAttr + '>');
+      autoFits.forEach(function (f) {
+        var pos = AE.pointAt(f.pid, data, f.atM);
+        if (!pos) return;
+        var fz = f.pid === 'front' ? HEIGHTS.front : (f.pid.indexOf('main-') === 0 ? HEIGHTS.main : HEIGHTS.branch);
+        var fq = P(pos.x, pos.y, fz);
+        var fSel = f.id === selFitId;
+        var fCol = '#b45309';
+        var fsym;
+        if (f.kind === 'valve') {
+          fsym = '<path d="M' + fmt(fq.x - 4.5) + ' ' + fmt(fq.y - 3.6) + ' L' + fmt(fq.x + 4.5) + ' ' + fmt(fq.y + 3.6)
+            + ' L' + fmt(fq.x + 4.5) + ' ' + fmt(fq.y - 3.6) + ' L' + fmt(fq.x - 4.5) + ' ' + fmt(fq.y + 3.6)
+            + ' Z" fill="' + fCol + '" stroke="#fff" stroke-width="1.3"/>';
+        } else {
+          fsym = '<circle cx="' + fmt(fq.x) + '" cy="' + fmt(fq.y) + '" r="4.6" fill="' + fCol + '" stroke="#fff" stroke-width="1.3"/>'
+            + '<path d="M' + fmt(fq.x - 6) + ' ' + fmt(fq.y) + ' H' + fmt(fq.x + 6) + ' M' + fmt(fq.x) + ' ' + fmt(fq.y) + ' V' + fmt(fq.y + 6) + '" stroke="#fff" stroke-width="1.2" fill="none"/>';
+        }
+        /* 图面三通第三口旋转（2026-09-16）：spin≠0 时补画 T 形（贯通杆=宿管中心轴、
+           第三口=绕宿管轴旋转后的方向，与模型三通 autoSpin 同款画法）。
+           ★ spin 缺省（0/未转）时 spinSym 为空串 —— 未旋转图面输出与旧版逐字节一致。 */
+        var spinSym = '';
+        if (f.kind === 'tee' && f.spin && typeof AE.tangentAt === 'function') {
+          var fdir = AE.tangentAt(f.pid, data, f.atM);
+          if (fdir) {
+            var fqa = P(pos.x - fdir.x, pos.y - fdir.y, fz), fqb = P(pos.x + fdir.x, pos.y + fdir.y, fz);
+            var ftAng = Math.atan2(fqb.y - fqa.y, fqb.x - fqa.x) * 180 / Math.PI;
+            var fper = { x: -fdir.y, y: fdir.x };
+            var fb3 = rotateAboutAxis({ x: fper.x, y: fper.y, z: 0 }, { x: fdir.x, y: fdir.y, z: 0 }, f.spin * Math.PI / 180);
+            var fqb2 = P(pos.x + fb3.x, pos.y + fb3.y, fz + fb3.z);
+            var fbAng = Math.atan2(fqb2.y - fq.y, fqb2.x - fq.x) * 180 / Math.PI;
+            spinSym = '<path d="M' + fmt(fq.x - 8) + ' ' + fmt(fq.y) + ' H' + fmt(fq.x + 8) + '" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" transform="rotate(' + fmt(ftAng) + ' ' + fmt(fq.x) + ' ' + fmt(fq.y) + ')"/>'
+              + '<path d="M' + fmt(fq.x) + ' ' + fmt(fq.y) + ' L' + fmt(fq.x + 9.4) + ' ' + fmt(fq.y) + '" stroke="' + COLORS.branch + '" stroke-width="2.4" fill="none" stroke-linecap="round" transform="rotate(' + fmt(fbAng) + ' ' + fmt(fq.x) + ' ' + fmt(fq.y) + ')"/>';
+          }
+        }
+        var fLabels = '';
+        if (fSel) {   /* 选中/拖动：距起点·距终点两段距离（和=当前有效管长，阶段2b） */
+          var fepts = AE.effPts(f.pid, data);
+          if (fepts) {
+            var fLen = AE.polylineLen(fepts);
+            var fD1 = Math.max(0, Math.min(f.atM, fLen)), fD2 = fLen - fD1;
+            var fLab = function (at, tag) {
+              var p2 = AE.pointAt(f.pid, data, at);
+              if (!p2) return '';
+              var q2 = P(p2.x, p2.y, fz);
+              return '<text data-tlfitdist="' + tag + '" x="' + fmt(q2.x + 5) + '" y="' + fmt(q2.y - 5) + '" font-size="9.5" font-family="system-ui" font-weight="700" fill="#b45309" paint-order="stroke" stroke="white" stroke-width="2.5" pointer-events="none">' + esc(at.toFixed(1) + 'm') + '</text>';
+            };
+            fLabels = fLab(fD1 / 2, 'start') + fLab(fD1 + fD2 / 2, 'end');
+          }
+        }
+        s.push('<g class="iso-tlfit" data-tlfit="' + esc(f.id) + '" style="cursor:pointer"><title>'
+          + esc(f.id + ' · ' + (f.kind === 'tee' ? '三通' : '阀门') + ' · ' + AE.pipeName(f.pid) + ' ' + pos.along.toFixed(1) + 'm') + '</title>'
+          + (fSel ? '<circle cx="' + fmt(fq.x) + '" cy="' + fmt(fq.y) + '" r="9" fill="none" stroke="#7c3aed" stroke-width="1.6" stroke-dasharray="4,3"/>' : '')
+          + fsym + spinSym + fLabels + '</g>');
+      });
+      s.push('</g>');
+    }
 
     /* 9) 连接平面路径保持不变；三通处用真正竖直立管表达层差。 */
     s.push('<g' + clipAttr + '>');
@@ -461,7 +661,7 @@
       if (v.conn) { q.y += params('R-'+v.id).rise * (1-params('R-'+v.id).position); angle = -90; }
       s.push('<g class="iso-fit" data-fit="' + esc(v.id) + '" style="cursor:pointer"><title>' + esc(v.id + (v.zone ? ' · ' + v.zone : '') + ' · 上游 ' + v.upstream + ' · 下游 ' + v.downstream) + '</title>'
         + scaledSymbol(valveSymbol(q, angle),q,v.id)
-        + fitLabel(v.id,q,model.valves.length <= MAX_VALVE_LABELS)
+        + fitLabel(v.id,q,false)
         + '</g>');
     });
     s.push('</g>');
@@ -471,8 +671,23 @@
     model.tees.forEach(function (t) {
       var z = t.type === 'front-main' ? HEIGHTS.front : HEIGHTS.main;
       var q = P(t.point.x, t.point.y, z);
+      /* 第三口旋转覆盖（2026-09-16）：该自动三通被右键旋转过 → 补画 T 形
+         （贯通杆 = 宿管中心轴、第三口 = branchDir，各自投影后旋转）。
+         ★ 无覆盖时 spinSym 为空串 → 本段输出与改动前逐字节一致（等价性零差异）。 */
+      var spinSym = '';
+      if (autoSpin[t.id]) {
+        var sTdir = teeThroughDir(t);
+        var sqt = P(t.point.x + sTdir.x, t.point.y + sTdir.y, z);
+        var sTAng = Math.atan2(sqt.y - q.y, sqt.x - q.x) * 180 / Math.PI;
+        var sBdir = teeBranchDir(t);
+        var sqb = P(t.point.x + sBdir.x, t.point.y + sBdir.y, z);
+        var sBAng = Math.atan2(sqb.y - q.y, sqb.x - q.x) * 180 / Math.PI;
+        spinSym = '<path d="M' + fmt(q.x - 8) + ' ' + fmt(q.y) + ' H' + fmt(q.x + 8) + '" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" transform="rotate(' + fmt(sTAng) + ' ' + fmt(q.x) + ' ' + fmt(q.y) + ')"/>'
+          + '<path d="M' + fmt(q.x) + ' ' + fmt(q.y) + ' L' + fmt(q.x + 9.4) + ' ' + fmt(q.y) + '" stroke="' + COLORS.branch + '" stroke-width="2.4" fill="none" stroke-linecap="round" transform="rotate(' + fmt(sBAng) + ' ' + fmt(q.x) + ' ' + fmt(q.y) + ')"/>';
+      }
       s.push('<g class="iso-fit" data-fit="' + esc(t.id) + '" style="cursor:pointer"><title>' + esc(t.id + ' · ' + t.upstream + ' → ' + t.downstream) + '</title>'
         + '<circle cx="' + fmt(q.x) + '" cy="' + fmt(q.y) + '" r="7" fill="transparent"/>'
+        + spinSym
         + '<circle cx="' + fmt(q.x) + '" cy="' + fmt(q.y) + '" r="' + (2*params(t.id).size) + '" fill="' + COLORS.tee + '"/>' + fitLabel(t.id,q,false) + '</g>');
     });
     s.push('</g>');
@@ -481,7 +696,12 @@
     if (manual.length) {
       s.push('<g' + clipAttr + '>');
       manual.forEach(function (m) {
-        var q = shifted(P(m.point.x, m.point.y, m.z), m.segType === 'branch' ? branchOffsets[m.segIndex] : null);
+        /* 接管（kind='pipe'）没有 point，只有 pts 折线：取中点作标签/缩放锚点，
+           否则下方 scaledSymbol/fitLabel 会解引用 undefined.x（2026-09-16 修复）。 */
+        var isPipe = m.kind === 'pipe';
+        if (isPipe && (!m.pts || m.pts.length < 2)) return;
+        var anchor = isPipe ? m.pts[Math.floor((m.pts.length - 1) / 2)] : m.point;
+        var q = shifted(P(anchor.x, anchor.y, isPipe ? anchor.z : m.z), m.segType === 'branch' ? branchOffsets[m.segIndex] : null);
         var sym = '';
         if (m.kind === 'valve') {
           var line = m.segType === 'front' ? model.front : (m.segType === 'main' ? model.mains : model.branches)[m.segIndex];
@@ -497,12 +717,62 @@
           sym = valveSymbol(q, angle);
         } else if (m.kind === 'elbow') {
           sym = '<rect x="' + fmt(q.x - 5) + '" y="' + fmt(q.y - 5) + '" width="10" height="10" fill="' + COLORS.elbow + '" stroke="#fff" stroke-width="1.6" transform="rotate(45 ' + fmt(q.x) + ' ' + fmt(q.y) + ')"/>';
+        } else if (m.kind === 'pipe') {
+          sym = '';   /* 接管：无符号，仅画管段（下方 att） */
         } else {
+          /* 三通符号（2026-09-16 用户口径）：**贯通杆 = 宿管中心轴方向**（两端接管道），
+             **第三口短杆 = branchDir**。两者分别投影后各自旋转，屏幕上仍是「T 形」，
+             且第三口绕管轴旋转时贯通杆始终贴合管道、不会被拧歪。 */
+          var tdir = teeThroughDir(m);
+          var qt = P(m.point.x + tdir.x, m.point.y + tdir.y, m.z + tdir.z);
+          var tAng = Math.atan2(qt.y - q.y, qt.x - q.x) * 180 / Math.PI;
+          var bdir = teeBranchDir(m);
+          var qb = P(m.point.x + bdir.x, m.point.y + bdir.y, m.z + bdir.z);
+          var bAng = Math.atan2(qb.y - q.y, qb.x - q.x) * 180 / Math.PI;
           sym = '<circle cx="' + fmt(q.x) + '" cy="' + fmt(q.y) + '" r="5.2" fill="' + COLORS.tee + '" stroke="#fff" stroke-width="1.6"/>'
-            + '<path d="M' + fmt(q.x - 6.5) + ' ' + fmt(q.y) + ' H' + fmt(q.x + 6.5) + ' M' + fmt(q.x) + ' ' + fmt(q.y) + ' V' + fmt(q.y + 6.5) + '" stroke="#fff" stroke-width="1.4" fill="none"/>';
+            + '<path d="M' + fmt(q.x - 7) + ' ' + fmt(q.y) + ' H' + fmt(q.x + 7) + '" stroke="#fff" stroke-width="1.5" fill="none" transform="rotate(' + fmt(tAng) + ' ' + fmt(q.x) + ' ' + fmt(q.y) + ')"/>'
+            + '<path d="M' + fmt(q.x) + ' ' + fmt(q.y) + ' L' + fmt(q.x + 7.4) + ' ' + fmt(q.y) + '" stroke="#fff" stroke-width="1.5" fill="none" transform="rotate(' + fmt(bAng) + ' ' + fmt(q.x) + ' ' + fmt(q.y) + ')"/>';
+        }
+        /* 分支口 / 接管绘制（2026-09-16）：接管画整段折线；三通按是否旋转画 3D 分支或保留原水平分支 */
+        var att = '';
+        var mp = params(m.id);
+        if (m.kind === 'pipe' && m.pts && m.pts.length >= 2) {
+          var pp = m.pts.map(function (pt) { return shifted(P(pt.x, pt.y, pt.z), m.segType === 'branch' ? branchOffsets[m.segIndex] : null); });
+          var pd = pp.map(function (p) { return fmt(p.x) + ' ' + fmt(p.y); }).join(' L');
+          att = '<path d="M' + pd + '" fill="none" stroke="' + COLORS.branch + '" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>';
+        } else if (m.kind === 'tee') {
+          if (m.branchDir && isFinite(m.branchDir.x)) {
+            /* 已绕 X/Y/Z 旋转：沿 3D 方向画分支口（未转换时画短虚线指示方向） */
+            var bd = teeBranchDir(m);
+            var blen = (mp.teeType && Number.isFinite(mp.branchLen) && mp.branchLen > 0) ? mp.branchLen : 0.6;
+            var boff = m.segType === 'branch' ? branchOffsets[m.segIndex] : null;
+            var e3 = shifted(P(m.point.x + bd.x * blen, m.point.y + bd.y * blen, m.z + bd.z * blen), boff);
+            att = '<path d="M' + fmt(q.x) + ' ' + fmt(q.y) + ' L' + fmt(e3.x) + ' ' + fmt(e3.y) + '" fill="none" stroke="' + (mp.teeType ? COLORS.branch : '#94a3b8') + '" stroke-width="' + (mp.teeType ? 2.4 : 1.6) + '" stroke-linecap="round"' + (mp.teeType ? '' : ' stroke-dasharray="3 3"') + '/>';
+            if (mp.teeType && mp.branchSpec) att += '<text x="' + fmt(e3.x + 4) + '" y="' + fmt(e3.y - 4) + '" font-size="9" font-family="system-ui" fill="#166534" paint-order="stroke" stroke="white" stroke-width="2.5">' + esc(mp.branchSpec + '×' + mp.branchLen + 'm') + '</text>';
+          } else if (mp.teeType && mp.branchSpec && Number.isFinite(mp.branchLen) && mp.branchLen > 0) {
+            /* 未旋转：保留原水平分支画法（屏幕朝上侧，2026-09-14） */
+            var attLine = m.segType === 'front' ? model.front : (m.segType === 'main' ? model.mains : model.branches)[m.segIndex];
+            var attDir = null, attBest = Infinity;
+            for (var aj = 0; attLine && aj + 1 < attLine.length; aj++) {
+              var attD = segDist(m.point, attLine[aj], attLine[aj + 1]);
+              if (attD < attBest) {
+                attBest = attD;
+                var adx = attLine[aj + 1].x - attLine[aj].x, ady = attLine[aj + 1].y - attLine[aj].y, adl = Math.hypot(adx, ady) || 1;
+                attDir = { x: adx / adl, y: ady / adl };
+              }
+            }
+            if (attDir) {
+              var attOff = m.segType === 'branch' ? branchOffsets[m.segIndex] : null;
+              var attE1 = shifted(P(m.point.x - attDir.y * mp.branchLen, m.point.y + attDir.x * mp.branchLen, m.z), attOff);
+              var attE2 = shifted(P(m.point.x + attDir.y * mp.branchLen, m.point.y - attDir.x * mp.branchLen, m.z), attOff);
+              var attE = attE1.y <= attE2.y ? attE1 : attE2; /* 屏幕朝上的一侧 */
+              att = '<path d="M' + fmt(q.x) + ' ' + fmt(q.y) + ' L' + fmt(attE.x) + ' ' + fmt(attE.y) + '" fill="none" stroke="' + COLORS.branch + '" stroke-width="2.4" stroke-linecap="round"/>'
+                + '<text x="' + fmt(attE.x + 4) + '" y="' + fmt(attE.y - 4) + '" font-size="9" font-family="system-ui" fill="#166534" paint-order="stroke" stroke="white" stroke-width="2.5">' + esc(mp.branchSpec + '×' + mp.branchLen + 'm') + '</text>';
+            }
+          }
         }
         s.push('<g class="iso-fit" data-fit="' + esc(m.id) + '" style="cursor:pointer"><title>'
-          + esc(m.id + ' · ' + KIND_LABEL[m.kind] + ' · ' + (m.spec || '与管道同径')) + '</title>' + scaledSymbol(sym,q,m.id) + fitLabel(m.id,q,!!edits[m.id]) + '</g>');
+          + esc(m.id + ' · ' + KIND_LABEL[m.kind] + ' · ' + (m.spec || '与管道同径')) + '</title>' + att + scaledSymbol(sym,q,m.id) + fitLabel(m.id,q,!!edits[m.id]) + '</g>');
       });
       s.push('</g>');
     }
@@ -519,25 +789,27 @@
       if (!line || line.length < 2) return;
       var a = line[0], b = line[line.length - 1];
       var q = shifted(P((a.x + b.x) / 2, (a.y + b.y) / 2, z), shift);
-      s.push('<g data-pipe-note="1" font-size="10" font-family="system-ui" fill="#202020"><path d="M' + fmt(q.x) + ' ' + fmt(q.y) + ' l12 ' + offset + ' h70" fill="none" stroke="#555" stroke-width="0.6"/><text x="' + fmt(q.x + 14) + '" y="' + fmt(q.y + offset - 3) + '" paint-order="stroke" stroke="white" stroke-width="3">' + esc(text) + '</text></g>');
+      s.push('<g data-pipe-note="1" pointer-events="none" font-size="10" font-family="system-ui" fill="#202020"><path d="M' + fmt(q.x) + ' ' + fmt(q.y) + ' l12 ' + offset + ' h70" fill="none" stroke="#555" stroke-width="0.6"/><text x="' + fmt(q.x + 14) + '" y="' + fmt(q.y + offset - 3) + '" paint-order="stroke" stroke="white" stroke-width="3">' + esc(text) + '</text></g>');
     }
+    /* 2026-09-15 用户要求：标注简化 —— 同类型管道不逐根引出标注（图里只剩总管一条），
+       主管/支管规格改由图例文字给出，用颜色区分类型；点击管件仍可查看参数。 */
     pipeNote(model.front, HEIGHTS.front, '总管 ' + (meta.pipes && meta.pipes.front || '管径待定'), 20);
-    model.mains.forEach(function(line, i) { pipeNote(line, HEIGHTS.main, 'G' + (i + 1) + ' ' + (meta.pipes && meta.pipes.main || '待定'), -16); });
-    model.branches.forEach(function(line, i) { pipeNote(line, HEIGHTS.branch, 'Z' + (i + 1) + ' ' + (meta.pipes && meta.pipes.branch || '待定'), 18, branchOffsets[i]); });
-    s.push('<g transform="translate(65 655)" fill="none" stroke="#555" stroke-width="0.8"><path d="M0 -32 V0 H38 M0 0 L27 -27"/><g stroke="none" fill="#333" font-family="system-ui" font-size="10"><text x="40" y="4">X</text><text x="28" y="-29">Y</text><text x="-4" y="-37">Z</text></g></g>');
+    s.push('<g transform="translate(65 655)" pointer-events="none" fill="none" stroke="#555" stroke-width="0.8"><path d="M0 -32 V0 H38 M0 0 L27 -27"/><g stroke="none" fill="#333" font-family="system-ui" font-size="10"><text x="40" y="4">X</text><text x="28" y="-29">Y</text><text x="-4" y="-37">Z</text></g></g>');
 
-    /* 12) 图例 + 底部参数 */
+    /* 12) 图例 + 底部参数 —— 图例含管径规格（2026-09-15：管道逐根标注已取消，规格看这里） */
     var ly = svgH - footerH + 30, lx = 60;
     s.push('<g font-family="system-ui,sans-serif" font-size="10.5" font-weight="600">');
     function legItem(x, draw, label, color) {
       s.push(draw(x, ly));
       s.push('<text x="' + (x + 20) + '" y="' + (ly + 4) + '" fill="' + (color || '#334155') + '">' + esc(label) + '</text>');
-      return x + 92;
+      var w = 24;
+      for (var li = 0; li < label.length; li++) w += label.charCodeAt(li) > 255 ? 10.5 : 6; /* 中文≈10.5px，数字/字母≈6px */
+      return x + w + 14;
     }
     var x0 = lx;
-    x0 = legItem(x0, function (x, y) { return '<rect x="' + x + '" y="' + (y - 4) + '" width="14" height="4" rx="2" fill="' + COLORS.front + '"/>'; }, '总管');
-    x0 = legItem(x0, function (x, y) { return '<rect x="' + x + '" y="' + (y - 4) + '" width="14" height="4" rx="2" fill="' + COLORS.main + '"/>'; }, '主管');
-    x0 = legItem(x0, function (x, y) { return '<rect x="' + x + '" y="' + (y - 3) + '" width="14" height="3" rx="1.5" fill="' + COLORS.branch + '"/>'; }, '支管');
+    x0 = legItem(x0, function (x, y) { return '<rect x="' + x + '" y="' + (y - 4) + '" width="14" height="4" rx="2" fill="' + COLORS.front + '"/>'; }, '总管 ' + (meta.pipes && meta.pipes.front || '管径待定'));
+    x0 = legItem(x0, function (x, y) { return '<rect x="' + x + '" y="' + (y - 4) + '" width="14" height="4" rx="2" fill="' + COLORS.main + '"/>'; }, '主管 ' + (meta.pipes && meta.pipes.main || '管径待定'));
+    x0 = legItem(x0, function (x, y) { return '<rect x="' + x + '" y="' + (y - 3) + '" width="14" height="3" rx="1.5" fill="' + COLORS.branch + '"/>'; }, '支管 ' + (meta.pipes && meta.pipes.branch || '管径待定'));
     /* 滴灌带图例已随绘制一并移除（2026-09-13） */
     x0 = legItem(x0, function (x, y) { return '<path d="M' + x + ' ' + y + ' h14 m-7 0 v-9" fill="none" stroke="#202020" stroke-width="1.5"/>'; }, '三通连接');
     x0 = legItem(x0, function (x, y) { return valveSymbol({x:x + 7,y:y}, 0); }, '阀门(通用)');
@@ -546,6 +818,18 @@
     s.push('<text x="' + lx + '" y="' + (ly + 26) + '" fill="#334155">' + esc('联合灌溉 ' + zoneCount + ' 区 · ' + pumpTxt) + '</text>');
     s.push('<text x="' + lx + '" y="' + (ly + 44) + '" font-size="10" font-weight="400" fill="#444">45°正面斜轴测 · 不按比例 · 支管按Z向立管展开；标高/埋深待设计确认，非施工放样依据。G=主管，Z=支管。</text>');
     s.push('</g>');
+    /* 进行中手工管线折线预览（插入模式，2026-09-15 阶段1） */
+    if (pipeDraft && pipeDraft.pts.length && viewState) {
+      (function () {
+        function PD(x, y, z) { var q = projectIso(x, y, z, viewState.k); return { x: viewState.ox + q.x, y: viewState.oy + q.y }; }
+        var z = pipeDraft.kind === 'main' ? HEIGHTS.main : HEIGHTS.branch;
+        var d = '';
+        pipeDraft.pts.forEach(function (p, i) { var q = PD(p.x, p.y, z); d += (i ? 'L' : 'M') + fmt(q.x) + ' ' + fmt(q.y); });
+        var g = '<g id="isoPipeDraft" pointer-events="none"><path d="' + d + '" fill="none" stroke="#7c3aed" stroke-width="2" stroke-dasharray="6,4" opacity="0.9"/>';
+        pipeDraft.pts.forEach(function (p) { var q = PD(p.x, p.y, z); g += '<circle cx="' + fmt(q.x) + '" cy="' + fmt(q.y) + '" r="2.6" fill="#7c3aed"/>'; });
+        s.push(g + '</g>');
+      })();
+    }
     s.push('</svg>');
     var output=s.join('');
     if(draft)output=output.replace('data-fit="'+draft.id+'"','data-selected="true" data-fit="'+draft.id+'"');
@@ -605,6 +889,7 @@
     if (ctn._isoWired) return; /* 容器只挂一次监听，重渲染不叠加 */
     ctn._isoWired = true;
     ctn.style.touchAction = 'none';
+    ctn.tabIndex = -1;   /* 可聚焦：插入管线模式下 Enter/Esc 键盘接线（2026-09-15 阶段1） */
     ctn.addEventListener('wheel', function (e) {
       var el = currentEL(ctn); if (!el) return;
       e.preventDefault();
@@ -614,25 +899,101 @@
     var drag = null;
     ctn.addEventListener('pointerdown', function (e) {
       var el = currentEL(ctn); if (!el) return;
-      drag = { x: e.clientX - view.x, y: e.clientY - view.y, id: e.pointerId };
-      el.classList.add('iso-dragging');
-      if (el.setPointerCapture) { try { el.setPointerCapture(e.pointerId); } catch (err) { } }
-      e.preventDefault();
+      try { ctn.focus({ preventScroll: true }); } catch (err) { try { ctn.focus(); } catch (e2) {} }
+      /* 配件沿管拖动（阶段2b）：左键按在图面配件上 → 进入拖动（平移让位）；capture 挂容器（重渲染不丢） */
+      if (e.button === 0 && !pipeMode && viewState && lastDataRef) {
+        var tD = document.elementFromPoint(e.clientX, e.clientY);
+        var fgD = tD && tD.closest ? tD.closest('[data-tlfit]') : null;
+        if (fgD) {
+          var fidD = fgD.getAttribute('data-tlfit');
+          var gfD = (AE.fitsList() || []).filter(function (x) { return x.id === fidD; })[0];
+          if (gfD) {
+            fitDrag = { id: gfD.id, pointerId: e.pointerId, atM: gfD.atM };
+            selFitId = gfD.id; selAutoId = null; selPipeId = null;
+            rerenderKeepView();
+            if (typeof api.onAutoSel === 'function') api.onAutoSel(autoSelInfo());
+            if (ctn.setPointerCapture) { try { ctn.setPointerCapture(e.pointerId); } catch (e3) {} }
+            e.preventDefault();
+            return;
+          }
+        }
+      }
+      /* 插入管线模式下左键用于逐点画线，平移让位（与三级工作区口径一致） */
+      if (e.button === 1 || (e.button === 0 && !pipeMode)) {
+        drag = { x: e.clientX - view.x, y: e.clientY - view.y, id: e.pointerId };
+        el.classList.add('iso-dragging');
+        if (el.setPointerCapture) { try { el.setPointerCapture(e.pointerId); } catch (err) { } }
+        e.preventDefault();
+      }
     });
     ctn.addEventListener('pointermove', function (e) {
-      if (!drag || e.pointerId !== drag.id) return;
+      if (fitDrag && e.pointerId === fitDrag.pointerId) {   /* 配件沿管拖动：逆投影→沿管弧长（rAF 节流提交，阶段2b） */
+        var elF = currentEL(ctn);
+        var fF = (AE.fitsList() || []).filter(function (x) { return x.id === fitDrag.id; })[0];
+        if (elF && fF && lastDataRef && viewState) {
+          var uF = svgUserPoint(elF, e.clientX, e.clientY);
+          if (uF) {
+            var zF = fF.pid === 'front' ? HEIGHTS.front : (fF.pid.indexOf('main-') === 0 ? HEIGHTS.main : HEIGHTS.branch);
+            var dF = unprojectIso(uF.x - viewState.ox, uF.y - viewState.oy, zF, viewState.k);
+            var locF = AE.locate(fF.pid, lastDataRef, dF);
+            if (locF) {
+              fitDrag.atM = locF.along;
+              if (!fitDragRaf) fitDragRaf = requestAnimationFrame(function () {
+                fitDragRaf = 0;
+                if (fitDrag) AE.moveFitting(fitDrag.id, fitDrag.atM, lastDataRef, 'iso');
+              });
+            }
+          }
+        }
+        return;
+      }
+      if (!drag || e.pointerId !== drag.id) {
+        /* 插入管线模式：悬停跟随预览（只更新 isoPipeDraft 组，不重建整图） */
+        if (pipeMode && pipeDraft && pipeDraft.pts.length && viewState) {
+          var elp = currentEL(ctn);
+          var u = elp && svgUserPoint(elp, e.clientX, e.clientY);
+          var dg = elp && ctn.querySelector('#isoPipeDraft');
+          if (u && dg) {
+            var z = pipeMode === 'main' ? HEIGHTS.main : HEIGHTS.branch;
+            function PD(x, y) { var q = projectIso(x, y, z, viewState.k); return { x: viewState.ox + q.x, y: viewState.oy + q.y }; }
+            var pd = unprojectIso(u.x - viewState.ox, u.y - viewState.oy, z, viewState.k);
+            var d = '';
+            pipeDraft.pts.forEach(function (p, i) { var q = PD(p.x, p.y); d += (i ? 'L' : 'M') + fmt(q.x) + ' ' + fmt(q.y); });
+            var qe = PD(pd.x, pd.y);
+            d += 'L' + fmt(qe.x) + ' ' + fmt(qe.y);
+            var h = '<path d="' + d + '" fill="none" stroke="#7c3aed" stroke-width="2" stroke-dasharray="6,4" opacity="0.9"/>';
+            pipeDraft.pts.forEach(function (p) { var q = PD(p.x, p.y); h += '<circle cx="' + fmt(q.x) + '" cy="' + fmt(q.y) + '" r="2.6" fill="#7c3aed"/>'; });
+            dg.innerHTML = h;
+          }
+        }
+        return;
+      }
       var el = currentEL(ctn); if (!el) return;
       view.x = e.clientX - drag.x; view.y = e.clientY - drag.y;
       applyView(ctn, el);
     });
     function up(e) {
+      if (fitDrag && (e.pointerId === undefined || e.pointerId === fitDrag.pointerId)) fitDrag = null;
       if (!drag || (e.pointerId !== undefined && e.pointerId !== drag.id)) return;
       drag = null;
       var el = currentEL(ctn); if (el) el.classList.remove('iso-dragging');
     }
     ctn.addEventListener('pointerup', up);
     ctn.addEventListener('pointercancel', up);
-    ctn.addEventListener('dblclick', function () { zoomFit(); });
+    ctn.addEventListener('dblclick', function () {
+      /* 插入管线模式：双击结束画线（对齐三级工作区交互）；否则适应窗口 */
+      if (pipeMode && pipeDraft && pipeDraft.pts.length >= 2) { commitPipeDraft(); return; }
+      zoomFit();
+    });
+    /* 键盘：Enter 结束 / Esc 取消草稿（无草稿时退出插入模式）。容器 tabIndex=-1 可聚焦 */
+    ctn.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && pipeDraft) { commitPipeDraft(); e.preventDefault(); }
+      else if (e.key === 'Escape') {
+        if (pipeDraft) { pipeDraft = null; rerenderKeepView(); }
+        else if (pipeMode) endPipeMode();
+        e.preventDefault();
+      }
+    });
     /* 点击（与拖拽平移区分：按下到抬起位移 ≤5px 才算点击）：
        放置模式 → 沿管线放置配件；否则 → 命中构件显示参数 */
     var downPos = null;
@@ -641,8 +1002,87 @@
       if (!downPos || Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y) > 5) return;
       handleClick(ctn, e);
     });
+    /* 右键构件（2026-09-14）：命中 g[data-fit] 时拦截默认菜单，交页面弹出
+       转换菜单（手工三通 同径/异径）；未命中构件不拦截。 */
+    ctn.addEventListener('contextmenu', function (e) {
+      /* 2026-09-16：先精确命中；未中则在 FIT_HIT_PAD 内找最近构件（见 nearestFitEl 注释），
+         避免「右键三通没反应／误弹改径菜单」导致旋转入口不可发现。 */
+      var t = document.elementFromPoint(e.clientX, e.clientY);
+      var g = t && t.closest ? t.closest('g[data-fit]') : null;
+      var tf = t && t.closest ? t.closest('g[data-tlfit]') : null;
+      if (!g && !tf) {
+        /* 都未精确命中：FIT_HIT_PAD 内找最近的（模型构件 / 图面配件分开扫，取更近者；
+           等距取模型构件 —— 其绘制在上层，与 elementFromPoint 的精确命中优先级一致） */
+        g = nearestFitEl(currentEL(ctn), e.clientX, e.clientY, FIT_HIT_PAD);
+        tf = nearestTlFitEl(currentEL(ctn), e.clientX, e.clientY, FIT_HIT_PAD);
+        if (g && tf) {
+          var dgf = rectDist(g, e.clientX, e.clientY), dtf = rectDist(tf, e.clientX, e.clientY);
+          if (dtf < dgf) g = null; else tf = null;
+        }
+      }
+      if (g) {
+        e.preventDefault();
+        if (typeof api.onFittingContextMenu === 'function') api.onFittingContextMenu(fittingInfo(g.getAttribute('data-fit')), e.clientX, e.clientY);
+        return;
+      }
+      if (tf) {
+        /* 图面配件（A-F## 共享编辑层）右键（2026-09-16）：选中并交页面弹旋转菜单 ——
+           旧链路只认 g[data-fit] 与 [data-tlpipe]，A-F## 右键毫无反应（用户实测）。 */
+        e.preventDefault();
+        selFitId = tf.getAttribute('data-tlfit');
+        selAutoId = null; selPipeId = null;
+        rerenderKeepView();
+        if (typeof api.onAutoSel === 'function') api.onAutoSel(autoSelInfo());
+        if (typeof api.onTlFitContextMenu === 'function') api.onTlFitContextMenu(selFitId, e.clientX, e.clientY);
+        return;
+      }
+      /* 右键自动管线（2026-09-16 阶段2e）：选中该管并交页面弹管径菜单；未命中不拦截 */
+      var ap = t && t.closest ? t.closest('[data-tlpipe]') : null;
+      if (!ap) return;
+      e.preventDefault();
+      var pid = ap.getAttribute('data-tlpipe');
+      var u3 = svgUserPoint(currentEL(ctn), e.clientX, e.clientY);
+      var loc3 = null;
+      if (u3 && viewState && lastDataRef) {
+        var z3 = pid === 'front' ? HEIGHTS.front : (pid.indexOf('main-') === 0 ? HEIGHTS.main : HEIGHTS.branch);
+        var d3 = unprojectIso(u3.x - viewState.ox, u3.y - viewState.oy, z3, viewState.k);
+        loc3 = AE.locate(pid, lastDataRef, d3);
+      }
+      selAutoId = pid; selAutoAt = loc3 ? loc3.along : 0;
+      selFitId = null; selPipeId = null;
+      rerenderKeepView();
+      if (typeof api.onAutoSel === 'function') api.onAutoSel(autoSelInfo());
+      if (typeof api.onAutoPipeContextMenu === 'function') api.onAutoPipeContextMenu(pid, e.clientX, e.clientY);
+    });
   }
 
+  /* ---------- 命中容差：邻近构件（2026-09-16） ----------
+     三通/阀门/立管符号在图面上多为细描边（bbox 中心是空的），用户「点在配件上」
+     往往落在符号边缘或紧邻的空白处 → elementFromPoint 精确命中失败。旧行为下：
+     右键毫无反应，或右偏一点落到自动管线分支弹出改径菜单，用户即「找不到旋转入口」
+     （2026-09-16 实测：某个三通中心 ±12px 的 81 个采样点里只有 6 个能弹出旋转菜单）。
+     故精确命中失败时，在 pad（屏幕像素）内找最近的 g[data-fit]，仍按命中该构件处理。 */
+  var FIT_HIT_PAD = 12;
+  function rectDist(el, clientX, clientY) {
+    var r = el.getBoundingClientRect();
+    if (!r || (r.width === 0 && r.height === 0)) return Infinity;   /* 不可见/零尺寸构件：跳过 */
+    var dx = clientX < r.left ? r.left - clientX : (clientX > r.right ? clientX - r.right : 0);
+    var dy = clientY < r.top ? r.top - clientY : (clientY > r.bottom ? clientY - r.bottom : 0);
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+  function nearestElBy(svg, sel, clientX, clientY, pad) {
+    if (!svg || !svg.querySelectorAll) return null;
+    var list = svg.querySelectorAll(sel);
+    var best = null, bestD = pad;
+    for (var i = 0; i < list.length; i++) {
+      var d = rectDist(list[i], clientX, clientY);
+      /* <=：等距时取遍历靠后者＝DOM 靠后者＝绘制在上层者（重叠三通优先命中最上层） */
+      if (d <= bestD) { bestD = d; best = list[i]; }
+    }
+    return best;
+  }
+  function nearestFitEl(svg, clientX, clientY, pad) { return nearestElBy(svg, 'g[data-fit]', clientX, clientY, pad); }
+  function nearestTlFitEl(svg, clientX, clientY, pad) { return nearestElBy(svg, 'g[data-tlfit]', clientX, clientY, pad); }
   /* ---------- 点击处理：放置 / 构件参数 ---------- */
   function svgUserPoint(el, clientX, clientY) {
     try {
@@ -654,43 +1094,169 @@
   }
   function handleClick(ctn, e) {
     var el = currentEL(ctn); if (!el) return;
+    if (pipeMode) { handlePipeClick(ctn, el, e); return; }
     if (placing) { placeFromEvent(ctn, el, e); return; }
     /* 注意：平移拖拽用 setPointerCapture 捕获到 svg，click 事件的 target 会被重定向
        到 svg 根——必须用 elementFromPoint 取指针位置下的真实元素再找构件分组。 */
     var t = document.elementFromPoint(e.clientX, e.clientY);
+    /* 手工管线拾取（共享图面数据层，2026-09-15 阶段1）：点击选中/取消并通知页面 */
+    var mg = t && t.closest ? t.closest('g[data-manpipe]') : null;
+    if (mg) {
+      var id = mg.getAttribute('data-manpipe');
+      selPipeId = (selPipeId === id) ? null : id;
+      rerenderKeepView();
+      if (typeof api.onPipeClick === 'function') api.onPipeClick(selPipeId, selPipeInfo());
+      return;
+    }
+    /* 自动管线图面配件拾取（阶段2）：点击选中/取消 */
+    var fg = t && t.closest ? t.closest('[data-tlfit]') : null;
+    if (fg) {
+      var fid = fg.getAttribute('data-tlfit');
+      selFitId = (selFitId === fid) ? null : fid;
+      selAutoId = null; selPipeId = null;
+      rerenderKeepView();
+      if (typeof api.onAutoSel === 'function') api.onAutoSel(autoSelInfo());
+      return;
+    }
+    /* 自动管线拾取（阶段2）：命中 path → 逆投影到所在层高平面 → 沿管弧长 */
+    var ag = t && t.closest ? t.closest('[data-tlpipe]') : null;
+    if (ag) {
+      var pid = ag.getAttribute('data-tlpipe');
+      var u2 = svgUserPoint(el, e.clientX, e.clientY);
+      var loc = null;
+      if (u2 && viewState && lastDataRef) {
+        var z2 = pid === 'front' ? HEIGHTS.front : (pid.indexOf('main-') === 0 ? HEIGHTS.main : HEIGHTS.branch);
+        var d2 = unprojectIso(u2.x - viewState.ox, u2.y - viewState.oy, z2, viewState.k);
+        loc = AE.locate(pid, lastDataRef, d2);
+      }
+      if (loc) {
+        selAutoId = (selAutoId === pid) ? null : pid;   // 再点同管 = 取消选中
+        selAutoAt = loc.along;
+        selFitId = null; selPipeId = null;
+        rerenderKeepView();
+        if (typeof api.onAutoSel === 'function') api.onAutoSel(autoSelInfo());
+        return;
+      }
+    }
     var g = t && t.closest ? t.closest('g[data-fit]') : null;
+    /* 2026-09-16：左键同样给容差，否则点在三通符号的镂空中心/边缘会毫无反馈 */
+    if (!g) g = nearestFitEl(el, e.clientX, e.clientY, FIT_HIT_PAD);
     if (g && typeof api.onFittingClick === 'function') api.onFittingClick(fittingInfo(g.getAttribute('data-fit')));
   }
-  function placeFromEvent(ctn, el, e) {
-    var kind = placing.kind, spec = placing.spec || '';
-    if (!viewState || !lastDataRef) { endPlace(); notifyPlace({ ok: false, reason: '尚未生成轴测图' }); return; }
+  /* 选中手工管线信息（页面/测试用），未选中返回 null */
+  function selPipeInfo() {
+    if (!selPipeId) return null;
+    var list = EP.list() || [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].id === selPipeId) {
+        var m = list[i];
+        return { id: m.id, kind: m.kind, kindLabel: m.kind === 'main' ? '主管' : '支管', len: m.len, pts: m.pts.length };
+      }
+    }
+    return null;
+  }
+
+  /* ---------- 插入主管/支管画线模式（共享图面数据层，2026-09-15 阶段1）---------- */
+  function startPipeMode(kind) {
+    if (kind !== 'main' && kind !== 'branch') return null;
+    if (pipeMode === kind) { endPipeMode(); return null; }   // 再点同款 = 退出
+    pipeMode = kind; pipeDraft = null; selPipeId = null; selAutoId = null; selFitId = null;
+    var ctn = currentCTN();
+    if (ctn) { ctn.classList.add('iso-pipe-drafting'); try { ctn.focus({ preventScroll: true }); } catch (e) { try { ctn.focus(); } catch (e2) {} } }
+    if (typeof api.onPipeModeChange === 'function') api.onPipeModeChange(kind, null);
+    return kind;
+  }
+  function endPipeMode(silent) {
+    pipeMode = null; pipeDraft = null;
+    var ctn = currentCTN();
+    if (ctn) ctn.classList.remove('iso-pipe-drafting');
+    if (!silent && typeof api.onPipeModeChange === 'function') api.onPipeModeChange(null, null);
+  }
+  function pipeModeKind() { return pipeMode; }
+  /* 图面三通的锚点（数据坐标，米）：自动三通（TEE-F/B，模型派生）+ 手工三通（M-T##）。
+     两视图画线时都吸附到这些点 —— 用户手绘管端点能精确落在三通上，
+     三通旋转时该管才会被 teeSubtree 的 nearPt 认作「连接管」跟随旋转
+     （2026-09-17 指令 C：三通转动后连接管随之转动）。 */
+  function teeSnapPts() {
+    var out = [];
+    var model = viewState && viewState.model;
+    if (model && model.tees) {
+      model.tees.forEach(function (t) { if (t && t.point && isFinite(t.point.x)) out.push({ x: t.point.x, y: t.point.y, z: isFinite(t.z) ? t.z : 0 }); });
+    }
+    manual.forEach(function (m) { if (m.kind === 'tee' && m.point) out.push({ x: m.point.x, y: m.point.y, z: isFinite(m.z) ? m.z : 0 }); });
+    return out;
+  }
+  /* 吸附点收集（数据坐标，米）：平面几何端点 + 阀门/水源 + 地块顶点 + 手工管线端点 + 三通锚点 */
+  function pipeSnapPts() {
+    var data = lastDataRef, pts = [];
+    if (!data) return pts;
+    function add(p) { if (p && isFinite(p.x) && isFinite(p.y)) pts.push({ x: p.x, y: p.y }); }
+    function ends(line) { if (line && line.length >= 2) { add(line[0]); add(line[line.length - 1]); } }
+    ends(data.frontPipe);
+    (data.mainPipes || []).forEach(ends);
+    (data.branchPipes || []).forEach(ends);
+    (data.valves || []).forEach(function (v) { add(v); });
+    add(data.sourcePos);
+    (data.poly || []).forEach(add);
+    (EP.list() || []).forEach(function (m) { ends(m.pts); });
+    /* 自动管线改长后的有效端点 + 图面配件（三通/阀门 A-F##）也吸附（阶段2c，与工作区口径一致） */
+    Object.keys(AE.lensMap() || {}).forEach(function (pid) { var e = AE.effPts(pid, data); if (e) ends(e); });
+    (AE.fitsList() || []).forEach(function (f) { var p = AE.pointAt(f.pid, data, f.atM); if (p) add(p); });
+    /* 三通锚点（2026-09-17）：画线可吸附到自动/手工三通，使连接管跟随旋转成立 */
+    teeSnapPts().forEach(add);
+    var out = [];
+    pts.forEach(function (p) {
+      var dup = out.some(function (q) { return Math.hypot(q.x - p.x, q.y - p.y) < 0.05; });
+      if (!dup) out.push(p);
+    });
+    return out;
+  }
+  /* 屏幕点击 → 数据坐标（kind 对应层高平面上的逆投影）+ 端点吸附 */
+  function pipeDataPoint(el, e, kind) {
     var u = svgUserPoint(el, e.clientX, e.clientY);
-    if (!u) { notifyPlace({ ok: false, reason: '坐标解析失败，请重试' }); return; }
-    var model = viewState.model, best = { d: PLACE_TOL };
-    function scan(list, segType) {
-      (list || []).forEach(function (line, li) {
-        for (var i = 0; i + 1 < line.length; i++) {
-          var z = SEG_Z[segType];
-          var pa = projectIso(line[i].x, line[i].y, z, viewState.k), pb = projectIso(line[i + 1].x, line[i + 1].y, z, viewState.k);
-          var offset = segType === 'branch' && viewState.branchOffsets[li];
-          if (offset) { pa.x += offset.x; pa.y += offset.y; pb.x += offset.x; pb.y += offset.y; }
-          var d = segDist(u, { x: viewState.ox + pa.x, y: viewState.oy + pa.y }, { x: viewState.ox + pb.x, y: viewState.oy + pb.y });
-          if (d < best.d) best = { d: d, segType: segType, segIndex: segType === 'front' ? 0 : li, line: line, i: i, z: z };
-        }
-      });
-    }
-    scan(model.front ? [model.front] : [], 'front'); scan(model.mains, 'main'); scan(model.branches, 'branch');
-    if (!best.segType) { notifyPlace({ ok: false, reason: '未命中管线：请沿总管/主管/支管的管段点击' }); return; }
-    var line = best.line, i = best.i, z = best.z;
-    var shift = best.segType === 'branch' && viewState.branchOffsets[best.segIndex] || {x:0,y:0};
-    var c = closestOnSeg(unprojectIso(u.x - viewState.ox - shift.x, u.y - viewState.oy - shift.y, z, viewState.k), line[i], line[i + 1]);
-    if (dist(c, line[i]) < 0.5 || dist(c, line[i + 1]) < 0.5) {
-      notifyPlace({ ok: false, reason: '位置太靠近管段端点（避免与自动三通重叠），请点在管段中部' }); return;
-    }
-    var m = addManual(kind, spec, best.segType, best.segIndex, c);
-    endPlace();
+    if (!u || !viewState) return null;
+    var z = kind === 'main' ? HEIGHTS.main : HEIGHTS.branch;
+    var d = unprojectIso(u.x - viewState.ox, u.y - viewState.oy, z, viewState.k);
+    var tolU = 12;   // 12 屏幕像素 → SVG 用户单位（getScreenCTM.a = 每用户单位屏幕像素）
+    try { var m = el.getScreenCTM(); if (m && m.a) tolU = 12 / m.a; } catch (err) {}
+    var best = null, bd = tolU;
+    pipeSnapPts().forEach(function (sp) {
+      var q = projectIso(sp.x, sp.y, z, viewState.k);
+      q = { x: viewState.ox + q.x, y: viewState.oy + q.y };
+      var dd = Math.hypot(q.x - u.x, q.y - u.y);
+      if (dd < bd) { bd = dd; best = sp; }
+    });
+    return best || { x: d.x, y: d.y };
+  }
+  function handlePipeClick(ctn, el, e) {
+    if (!viewState || !lastDataRef) return;
+    var p = pipeDataPoint(el, e, pipeMode);
+    if (!p) return;
+    if (!pipeDraft) pipeDraft = { kind: pipeMode, pts: [] };
+    /* 连续点击同一点（双击的第二击）不重复入列 */
+    var last = pipeDraft.pts[pipeDraft.pts.length - 1];
+    if (last && Math.hypot(last.x - p.x, last.y - p.y) < 0.05) return;
+    pipeDraft.pts.push(p);
     rerenderKeepView();
-    notifyPlace({ ok: true, id: m.id, kind: kind, spec: spec });
+  }
+  function commitPipeDraft() {
+    if (!pipeDraft) return false;
+    if (pipeDraft.pts.length < 2) { pipeDraft = null; rerenderKeepView(); return false; }
+    var n = pipeDraft.pts.length;
+    /* 双击的第二次 click 已入列一个重复点，剔除后再提交 */
+    if (n >= 2 && Math.hypot(pipeDraft.pts[n - 1].x - pipeDraft.pts[n - 2].x, pipeDraft.pts[n - 1].y - pipeDraft.pts[n - 2].y) < 0.05) pipeDraft.pts.pop();
+    var m = EP.add(pipeDraft.kind, pipeDraft.pts, 'iso');   // 共享层广播 → 两视图订阅重渲染
+    pipeDraft = null;
+    rerenderKeepView();
+    return !!m;
+  }
+  function placeFromEvent(ctn, el, e) {
+    if (!placing) return;
+    /* 复用 scanAndAdd（与右键管道直接加同一套命中/端点校验，2026-09-16） */
+    var m = scanAndAdd(placing.kind, e.clientX, e.clientY);
+    if (!m) { notifyPlace({ ok: false, reason: '未命中管线：请沿总管/主管/支管的管段点击' }); return; }
+    endPlace();
+    notifyPlace({ ok: true, id: m.id, kind: placing.kind, spec: m.spec });
   }
   function endPlace() {
     placing = null;
@@ -717,17 +1283,381 @@
   }
   function cancelPlace() { endPlace(); notifyPlace({ ok: false, reason: '已取消放置' }); }
   function placingKind() { return placing ? placing.kind : null; }
-  function addManual(kind, spec, segType, segIndex, point) {
+  function addManual(kind, spec, segType, segIndex, point, opts) {
     if (!MANUAL_PREFIX[kind] || !point || !SEG_Z[segType]) return null;
     cancelEdit(); checkpoint();
     manualSeq[kind]++;
+    var o = opts || {};
     var m = {
       id: MANUAL_PREFIX[kind] + pad2(manualSeq[kind]), kind: kind, spec: spec || '',
       segType: segType, segIndex: segIndex || 0,
       point: { x: point.x, y: point.y }, z: SEG_Z[segType]
     };
+    /* 挂在接管（M-G##）上的配件（2026-09-17 链式跟随）：hostPipe 记宿管 id；
+       z 取命中点插值高程 —— 接管可绕管轴转到任意高度，不能再套用 SEG_Z 固定层高。 */
+    if (o.hostPipe) m.hostPipe = o.hostPipe;
+    if (isFinite(o.z)) m.z = o.z;
     manual.push(m);
     notifyEdit();
+    return m;
+  }
+  /* 按 id 取手工层条目（三通/接管共用；避免各处重复 manual.filter） */
+  function manualById(id) {
+    for (var i = 0; i < manual.length; i++) if (manual[i].id === id) return manual[i];
+    return null;
+  }
+  /* 接管（M-G##）上某点的 **3D** 切线：接管可绕宿管轴转到任意高度 → 切线必须带 z，
+     否则挂在接管上的三通仍按「水平面内垂直」求第三口，转到竖直时会算错。 */
+  function hostPipeTangent(m) {
+    var p = manualById(m.hostPipe);
+    if (!p || !p.pts || p.pts.length < 2) return null;
+    var cz = isFinite(m.z) ? m.z : 0, best = null, bd = Infinity;
+    for (var i = 0; i + 1 < p.pts.length; i++) {
+      var a = p.pts[i], b = p.pts[i + 1];
+      var dx = b.x - a.x, dy = b.y - a.y, dz = (b.z || 0) - (a.z || 0), L = Math.hypot(dx, dy, dz);
+      if (!(L > 0)) continue;
+      var t = ((m.point.x - a.x) * dx + (m.point.y - a.y) * dy + (cz - (a.z || 0)) * dz) / (L * L);
+      if (t < 0) t = 0; else if (t > 1) t = 1;
+      var d = Math.hypot(a.x + dx * t - m.point.x, a.y + dy * t - m.point.y, (a.z || 0) + dz * t - cz);
+      if (d < bd) { bd = d; best = { x: dx / L, y: dy / L, z: dz / L }; }
+    }
+    return best;
+  }
+  /* ───────── 三通第三口 绕「宿管中心轴」旋转（2026-09-16 用户口径修正）─────────
+   * 用户口径：**旋转轴 = 该三通所在管道的中心轴**，不是世界 X/Y/Z ——
+   *   管道沿 Y 轴走向 → 旋转轴就是 Y 轴；沿 X 轴走向 → 旋转轴就是 X 轴；斜向同理。
+   * 三通的**两端接管道**（贯通方向 = 管轴 teeThroughDir），**第三个口** branchDir
+   * 绕管轴扫出 → 可指向侧面 / 正上方 / 正下方（立管）。
+   * 用 Rodrigues 公式绕管轴旋转的好处：天然保持「第三口 ⊥ 管轴」，管口不会被拧歪；
+   * 未旋转时缺省 = 水平面内垂直宿管（与 2026-09-14 原画法一致）。
+   * 红线：仅编辑表达层，不写回 tlDiagramData、不参与水力计算/材料清单。 */
+  function hostTangentAt(m) {
+    if (m.hostPipe) { var hp = hostPipeTangent(m); if (hp) return hp; }
+    var line = m.segType === 'front' ? lastDataRef.frontPipe : (m.segType === 'main' ? lastDataRef.mainPipes : lastDataRef.branchPipes)[m.segIndex];
+    if (!line || line.length < 2) return { x: 1, y: 0 };
+    for (var i = 0; i + 1 < line.length; i++) {
+      var a = line[i], b = line[i + 1], len = Math.hypot(b.x - a.x, b.y - a.y);
+      if (len <= 0) continue;
+      var t = ((m.point.x - a.x) * (b.x - a.x) + (m.point.y - a.y) * (b.y - a.y)) / (len * len);
+      if (t >= -0.05 && t <= 1.05) return { x: (b.x - a.x) / len, y: (b.y - a.y) / len };
+    }
+    return { x: 1, y: 0 };
+  }
+  /* 归一化「三通」记录：手工三通（M-T01，自带 segType/segIndex）与**自动三通**
+     （TEE-F01 在总管上 / TEE-B01 在 main-N 主管上，自带 type/upstream）统一成
+     {segType,segIndex,point} —— 使宿管中心轴 / 缺省第三口方向对两者复用同一套几何。 */
+  function asTeeRec(x) {
+    if (!x) return null;
+    if (x.segType && x.point) return x;
+    if (x.type === 'front-main') return { segType: 'front', segIndex: 0, point: x.point };
+    if (x.type === 'main-branch') {
+      var mm = /^main-(\d+)$/.exec(String(x.upstream || ''));
+      return { segType: 'main', segIndex: mm ? parseInt(mm[1], 10) : 0, point: x.point };
+    }
+    return null;
+  }
+  function autoTeeById(id) {
+    if (!viewState || !viewState.model) return null;
+    var list = viewState.model.tees || [];
+    for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i];
+    return null;
+  }
+  /* 宿管中心轴（3D 单位向量；本项目管道均为水平敷设 → z 分量 0） */
+  function teeThroughDir(m) {
+    var rec = asTeeRec(m) || m;
+    var t = hostTangentAt(rec), tz = isFinite(t.z) ? t.z : 0;
+    var L = Math.hypot(t.x, t.y, tz) || 1;
+    return { x: t.x / L, y: t.y / L, z: tz / L };
+  }
+  /* 宿管走向文字（供菜单说明「旋转轴是哪个轴」） */
+  function teeAxisLabel(m) {
+    var t = teeThroughDir(m), ax = Math.abs(t.x), ay = Math.abs(t.y);
+    if (ax >= 0.94) return '沿 X 轴走向';
+    if (ay >= 0.94) return '沿 Y 轴走向';
+    return '斜向 ' + (Math.atan2(t.y, t.x) * 180 / Math.PI).toFixed(0) + '°';
+  }
+  function defaultBranchDir(m) {
+    var rec = asTeeRec(m) || m;
+    var k = teeThroughDir(rec), d = { x: -k.y, y: k.x, z: 0 }, L = Math.hypot(d.x, d.y) || 1;
+    /* 缺省第三口 = 竖直轴 ẑ × 管轴 k（天然 ⊥ 管轴）；管轴水平（k.z=0）时退化为旧的
+       (-ty, tx, 0)，与 2026-09-14 原画法逐字节一致。管轴竖直时叉积为零 → 兜底 X 向。 */
+    if (!(L > 1e-9)) return { x: 1, y: 0, z: 0 };
+    return { x: d.x / L, y: d.y / L, z: 0 };
+  }
+  /* 第三口当前方向：手工三通读自身 branchDir，自动三通读覆盖表 autoSpin[id]，
+     两者皆无 = 缺省（水平面内垂直宿管） */
+  function teeBranchDir(m) {
+    var b = m.branchDir || (m.id && autoSpin[m.id] ? autoSpin[m.id].branchDir : null);
+    if (b && isFinite(b.x) && isFinite(b.y) && isFinite(b.z)) {
+      var L = Math.hypot(b.x, b.y, b.z) || 1;
+      return { x: b.x / L, y: b.y / L, z: b.z / L };
+    }
+    return defaultBranchDir(m);
+  }
+  /* Rodrigues 旋转：向量 v 绕单位轴 k 旋转 rad（右手定则），返回单位向量 */
+  function rotateAboutAxis(v, k, rad) {
+    var c = Math.cos(rad), s = Math.sin(rad);
+    var dot = v.x * k.x + v.y * k.y + v.z * k.z;
+    var cx = k.y * v.z - k.z * v.y, cy = k.z * v.x - k.x * v.z, cz = k.x * v.y - k.y * v.x;
+    var x = v.x * c + cx * s + k.x * dot * (1 - c);
+    var y = v.y * c + cy * s + k.y * dot * (1 - c);
+    var z = v.z * c + cz * s + k.z * dot * (1 - c);
+    var L = Math.hypot(x, y, z) || 1;
+    return { x: x / L, y: y / L, z: z / L };
+  }
+  /* 从三通分支口接出的生长管（pipe.teeId 指回该三通）跟随旋转（2026-09-16 用户需求：
+     「三通接一段主管，方向不对，想转动这根主管」）—— 整根折线绕三通点 C、绕宿管中心轴 k
+     刚体旋转（管长/管形不变），起点严格回贴三通点，保证管子始终从第三口长出来。
+     ★ 这里必须用**不归一化**的 Rodrigues（rotateAboutAxis 会把向量归一化成单位长，
+     位移向量会被压成 1m —— e2e 实测 len 2.000→1.000 抓到）。 */
+  function rotateVecAbout(v, k, rad) {
+    var c = Math.cos(rad), s = Math.sin(rad);
+    var dot = v.x * k.x + v.y * k.y + v.z * k.z;
+    var cx = k.y * v.z - k.z * v.y, cy = k.z * v.x - k.x * v.z, cz = k.x * v.y - k.y * v.x;
+    return {
+      x: v.x * c + cx * s + k.x * dot * (1 - c),
+      y: v.y * c + cy * s + k.y * dot * (1 - c),
+      z: v.z * c + cz * s + k.z * dot * (1 - c)
+    };
+  }
+  /* 链式下游整串（2026-09-17 第三十八轮）：根三通 → 接出的接管 → 接管上的子三通
+     → 子三通再接出的管 … 递归收集整棵子树，统一绕 (根三通点 C, 根管轴 k) 做 3D 刚体旋转；
+     管点用不归一化的 rotateVecAbout（管长/管形不变），三通第三口方向用 rotateAboutAxis。
+     ★ 种子扩展（2026-09-17 完善细节）：除显式 teeId 链外，凡端点恰好落在三通点 C 上的手工管
+     （如自动三通 TEE-F/B 用左栏「插入管线」手绘接出的管，没有 teeId）也算接管，一并跟随旋转。 */
+  /* 全部候选「接管」：① 内部手工层 manual 中的 kind='pipe'（M-G##，菜单从分支口接出）；
+     ② 共享图面数据层 EP.list() 中的手工管线（M-P##，三级工作区/轴测图左栏手绘接出）。
+     两者都要参与三通旋转跟随 —— 旧逻辑只扫 manual，漏掉用户在三级工作区手绘、
+     端点落在三通上的 M-P## 管，导致「三通转了、管子没转」（2026-09-17 指令 C 缺口）。 */
+  function allPipes() {
+    var list = [];
+    manual.forEach(function (p) { if (p.kind === 'pipe' && p.pts && p.pts.length >= 2) list.push(p); });
+    var ep = (typeof EP !== 'undefined' && EP.list) ? EP.list() : [];
+    ep.forEach(function (p) { if (p && p.pts && p.pts.length >= 2) list.push(p); });
+    return list;
+  }
+  function teeSubtree(id, anchorPt) {
+    var pipes = [], tees = [], guard = 0;
+    function nearPt(q) {
+      if (!anchorPt || !q) return false;
+      return Math.abs(q.x - anchorPt.x) < TEE_LINK_TOL && Math.abs(q.y - anchorPt.y) < TEE_LINK_TOL
+        && Math.abs((q.z || 0) - (anchorPt.z || 0)) < TEE_LINK_TOL;
+    }
+    function seedPipes() {
+      return allPipes().filter(function (p) {
+        var linked = (p.teeId === id) || nearPt(p.pts[0]) || nearPt(p.pts[p.pts.length - 1]);
+        return linked;
+      });
+    }
+    (function walk(list) {
+      if ((guard += 1) > 4000) return;
+      list.forEach(function (p) {
+        if (pipes.indexOf(p) >= 0) return;
+        pipes.push(p);
+        manual.forEach(function (t) {
+          if (t.kind !== 'tee' || t.hostPipe !== p.id) return;
+          if (tees.indexOf(t) < 0) tees.push(t);
+          var child = allPipes().filter(function (cp) { return cp.teeId === t.id && cp.pts && cp.pts.length >= 2; });
+          walk(child);
+        });
+      });
+    })(seedPipes());
+    return { pipes: pipes, tees: tees };
+  }
+  function teeCenter3(t) { return { x: t.point.x, y: t.point.y, z: isFinite(t.z) ? t.z : 0 }; }
+  function rotateTeePipes(id, C, k, rad, anchorPt) {
+    var sub = teeSubtree(id, anchorPt);
+    if (!sub.pipes.length && !sub.tees.length) return 0;
+    sub.tees.forEach(function (t) {
+      var r = rotateVecAbout({ x: t.point.x - C.x, y: t.point.y - C.y, z: (isFinite(t.z) ? t.z : 0) - C.z }, k, rad);
+      t.point = { x: C.x + r.x, y: C.y + r.y };
+      t.z = C.z + r.z;
+      if (t.branchDir && isFinite(t.branchDir.x) && isFinite(t.branchDir.y) && isFinite(t.branchDir.z)) {
+        t.branchDir = rotateAboutAxis(t.branchDir, k, rad);
+      }
+    });
+    sub.pipes.forEach(function (p) {
+      var rpts = p.pts.map(function (pt) {
+        var r = rotateVecAbout({ x: pt.x - C.x, y: pt.y - C.y, z: (pt.z || 0) - C.z }, k, rad);
+        return { x: C.x + r.x, y: C.y + r.y, z: C.z + r.z };
+      });
+      /* 内部 manual 管直接改 pts；共享层 EP 管（M-P##）走 EP.update 写回并通知
+         另一视图（三级工作区）实时重渲染，保持双向同步（2026-09-17 指令 C）。 */
+      if (manual.indexOf(p) < 0) {
+        if (typeof EP !== 'undefined' && EP.update) EP.update(p.id, function (q) { q.pts = rpts; }, 'iso');
+        else p.pts = rpts;
+      } else {
+        p.pts = rpts;
+      }
+    });
+    /* 起点回贴宿主三通旋转后的中心：执行两轮（子三通先落位 → 其下游管再贴一次），
+       消除逐级累积的浮点漂移，保证管子接口始终咬合。仅对带 teeId 的内部接管生效
+       （共享层 M-P## 手绘管无 teeId，不强制回贴，避免误移动非链式管）。 */
+    function snapAll() {
+      sub.pipes.forEach(function (p) {
+        if (manual.indexOf(p) < 0) return;
+        var h = manualById(p.teeId);
+        if (h) p.pts[0] = teeCenter3(h);
+      });
+    }
+    snapAll(); snapAll();
+    return sub.pipes.length + sub.tees.length;
+  }
+  /* 第三口绕**宿管中心轴**旋转 deg 度（正号 = 右手定则绕轴正向）。累加记录 branchSpin。
+     手工三通写自身；**自动三通**写覆盖表 autoSpin（不改模型，维持只读红线）。
+     其接出的生长管（teeId 链）同步刚体旋转。checkpoint 必须在改动**前**（undo 语义）。 */
+  function rotateTee(id, deg) {
+    var d = Number(deg);
+    if (!isFinite(d) || d === 0) return false;
+    var m = manual.filter(function (x) { return x.id === id; })[0];
+    if (m && m.kind === 'tee') {
+      var k = teeThroughDir(m), rad = d * Math.PI / 180;
+      var C3 = { x: m.point.x, y: m.point.y, z: m.z };
+      checkpoint();
+      m.branchDir = rotateAboutAxis(teeBranchDir(m), k, rad);
+      m.branchSpin = Math.round(((Number(m.branchSpin) || 0) + d) * 1000) / 1000;
+      rotateTeePipes(id, C3, k, rad, C3);
+      rerenderKeepView(); notifyEdit();
+      return true;
+    }
+    var t = autoTeeById(id), rec = asTeeRec(t);
+    if (!rec) return false;
+    var k2 = teeThroughDir(rec);
+    var C2 = { x: t.point.x, y: t.point.y, z: (isFinite(t.z) ? t.z : 0) };
+    var cur = (autoSpin[id] && autoSpin[id].branchDir) || defaultBranchDir(rec);
+    var spin = ((autoSpin[id] && Number(autoSpin[id].branchSpin)) || 0) + d;
+    checkpoint();
+    autoSpin[id] = {
+      branchDir: rotateAboutAxis(cur, k2, d * Math.PI / 180),
+      branchSpin: Math.round(spin * 1000) / 1000
+    };
+    /* 同步刚体旋转其连接的手绘管（M-P## 共享层 / 端点贴三通的内部管），
+       与手工三通同一套语义：绕三通点 C2、绕宿管中心轴 k2。 */
+    rotateTeePipes(id, C2, k2, d * Math.PI / 180, C2);
+    rerenderKeepView(); notifyEdit();
+    return true;
+  }
+  /* 第三口复位：回到水平面内垂直宿管（branchSpin 归零）；生长管按累计角反转回原位 */
+  function resetTeeBranch(id) {
+    var m = manual.filter(function (x) { return x.id === id; })[0];
+    if (m && m.kind === 'tee') {
+      var spin = Number(m.branchSpin) || 0;
+      checkpoint();
+      if (spin) rotateTeePipes(id, { x: m.point.x, y: m.point.y, z: m.z }, teeThroughDir(m), -spin * Math.PI / 180, { x: m.point.x, y: m.point.y, z: m.z });
+      delete m.branchDir;
+      m.branchSpin = 0;
+      rerenderKeepView(); notifyEdit();
+      return true;
+    }
+    if (autoSpin[id]) {
+      var ta = autoTeeById(id), reca = ta ? asTeeRec(ta) : null;
+      var spinA = (autoSpin[id] && Number(autoSpin[id].branchSpin)) || 0;
+      checkpoint();
+      if (reca && spinA) {
+        var C2r = { x: ta.point.x, y: ta.point.y, z: (isFinite(ta.z) ? ta.z : 0) };
+        rotateTeePipes(id, C2r, teeThroughDir(reca), -spinA * Math.PI / 180, C2r);
+      }
+      delete autoSpin[id];
+      rerenderKeepView(); notifyEdit(); return true;
+    }
+    return !!autoTeeById(id);
+  }
+  /* 第三口相对缺省方向的累计转角（度；未旋转 = 0） */
+  function teeBranchSpin(id) {
+    var m = manual.filter(function (x) { return x.id === id; })[0];
+    if (m) return Number(m.branchSpin) || 0;
+    return (autoSpin[id] && Number(autoSpin[id].branchSpin)) || 0;
+  }
+  function spawnPipeFromTee(id) {
+    var m = manual.filter(function (x) { return x.id === id; })[0];
+    if (!m || m.kind !== 'tee') return false;
+    var bd = teeBranchDir(m), mp = params(id);
+    var len = (mp.teeType && Number.isFinite(mp.branchLen) && mp.branchLen > 0) ? mp.branchLen : 1;
+    var tip = { x: m.point.x + bd.x * len, y: m.point.y + bd.y * len, z: m.z + bd.z * len };
+    var n = 0;
+    manual.forEach(function (x) { if (x.kind === 'pipe') { var mm = /^M-G(\d+)$/.exec(x.id); if (mm) n = Math.max(n, parseInt(mm[1], 10)); } });
+    var pid = 'M-G' + pad2(n + 1);
+    checkpoint();
+    manual.push({ id: pid, kind: 'pipe', spec: mp.teeType ? (mp.branchSpec || '') : (m.spec || ''), segType: m.segType, segIndex: m.segIndex,
+      teeId: id,   /* 指回宿三通：第三口旋转/复位时本管跟随刚体旋转（rotateTeePipes） */
+      pts: [{ x: m.point.x, y: m.point.y, z: m.z }, tip] });
+    rerenderKeepView(); notifyEdit();
+    return pid;
+  }
+  function extendManualPipe(id, len) {
+    var m = manual.filter(function (x) { return x.id === id; })[0];
+    if (!m || m.kind !== 'pipe' || !m.pts || m.pts.length < 2) return false;
+    len = Number.isFinite(len) && len > 0 ? len : 1;
+    var a = m.pts[m.pts.length - 2], b = m.pts[m.pts.length - 1];
+    var dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z, L = Math.hypot(dx, dy, dz) || 1;
+    m.pts.push({ x: b.x + dx / L * len, y: b.y + dy / L * len, z: b.z + dz / L * len });
+    checkpoint(); rerenderKeepView(); notifyEdit();
+    return true;
+  }
+  /* 扫描命中管线并在命中点放置配件（放置模式 / 右键管道直接加 共用）。返回 manual 条目或 null。 */
+  function scanAndAdd(kind, clientX, clientY) {
+    if (!viewState || !lastDataRef) return null;
+    var ctn = currentCTN(); if (!ctn) return null;
+    var el = currentEL(ctn); if (!el) return null;
+    var u = svgUserPoint(el, clientX, clientY); if (!u) return null;
+    var model = viewState.model, best = { d: PLACE_TOL };
+    function scan(list, segType) {
+      (list || []).forEach(function (line, li) {
+        for (var i = 0; i + 1 < line.length; i++) {
+          var z = SEG_Z[segType];
+          var pa = projectIso(line[i].x, line[i].y, z, viewState.k), pb = projectIso(line[i + 1].x, line[i + 1].y, z, viewState.k);
+          var offset = segType === 'branch' && viewState.branchOffsets[li];
+          if (offset) { pa.x += offset.x; pa.y += offset.y; pb.x += offset.x; pb.y += offset.y; }
+          var d = segDist(u, { x: viewState.ox + pa.x, y: viewState.oy + pa.y }, { x: viewState.ox + pb.x, y: viewState.oy + pb.y });
+          if (d < best.d) best = { d: d, segType: segType, segIndex: segType === 'front' ? 0 : li, line: line, i: i, z: z };
+        }
+      });
+    }
+    scan(model.front ? [model.front] : [], 'front'); scan(model.mains, 'main'); scan(model.branches, 'branch');
+    /* 接管（M-G##）同样可挂载配件（2026-09-17 链式跟随的前提）：投影后取最近段，
+       命中点按同一参数 t 在 3D 折线上插值（仿射投影 → 参数不变）。 */
+    var bestPipe = null;
+    manual.forEach(function (p) {
+      if (p.kind !== 'pipe' || !p.pts || p.pts.length < 2) return;
+      var poff = (p.segType === 'branch' && viewState.branchOffsets[p.segIndex]) || { x: 0, y: 0 };
+      for (var i = 0; i + 1 < p.pts.length; i++) {
+        var a = p.pts[i], b = p.pts[i + 1];
+        var pa = projectIso(a.x, a.y, a.z || 0, viewState.k), pb = projectIso(b.x, b.y, b.z || 0, viewState.k);
+        var A = { x: viewState.ox + pa.x + poff.x, y: viewState.oy + pa.y + poff.y };
+        var B = { x: viewState.ox + pb.x + poff.x, y: viewState.oy + pb.y + poff.y };
+        var cp = closestOnSeg(u, A, B);
+        var abx = B.x - A.x, aby = B.y - A.y, ab2 = abx * abx + aby * aby;
+        var t = ab2 > 0 ? ((cp.x - A.x) * abx + (cp.y - A.y) * aby) / ab2 : 0;
+        if (t < 0) t = 0; else if (t > 1) t = 1;
+        var L3 = Math.hypot(b.x - a.x, b.y - a.y, (b.z || 0) - (a.z || 0));
+        var guard = Math.min(0.2, L3 * 0.25);
+        if (t * L3 < guard || (1 - t) * L3 < guard) continue;   /* 贴端点不放：不压住已有三通/管口 */
+        var d = dist(u, cp);
+        if (d < best.d && (!bestPipe || d < bestPipe.d)) bestPipe = { d: d, p: p, i: i, t: t };
+      }
+    });
+    if (bestPipe && (!best.segType || bestPipe.d < best.d)) {
+      var qa = bestPipe.p.pts[bestPipe.i], qb = bestPipe.p.pts[bestPipe.i + 1], qt = bestPipe.t;
+      var c3 = { x: qa.x + (qb.x - qa.x) * qt, y: qa.y + (qb.y - qa.y) * qt };
+      var z3 = (qa.z || 0) + ((qb.z || 0) - (qa.z || 0)) * qt;
+      var useSpec3 = (kind === 'tee' || kind === 'valve') ? (bestPipe.p.spec || hostDia(bestPipe.p.segType)) : '';
+      return addManual(kind, useSpec3, bestPipe.p.segType, bestPipe.p.segIndex || 0, c3,
+        { hostPipe: bestPipe.p.id, z: z3 });
+    }
+    if (!best.segType) return null;
+    var line = best.line, i = best.i, z = best.z;
+    var shift = best.segType === 'branch' && viewState.branchOffsets[best.segIndex] || { x: 0, y: 0 };
+    var c = closestOnSeg(unprojectIso(u.x - viewState.ox - shift.x, u.y - viewState.oy - shift.y, z, viewState.k), line[i], line[i + 1]);
+    if (dist(c, line[i]) < 0.5 || dist(c, line[i + 1]) < 0.5) return null;
+    var useSpec = (kind === 'tee' || kind === 'valve') ? hostDia(best.segType) : '';
+    return addManual(kind, useSpec, best.segType, best.segIndex, c);
+  }
+  function addManualAtScreen(kind, clientX, clientY) {
+    if (!KIND_LABEL[kind]) return null;
+    var m = scanAndAdd(kind, clientX, clientY);
+    if (!m) return null;
+    rerenderKeepView();
+    notifyPlace({ ok: true, id: m.id, kind: kind, spec: m.spec });
     return m;
   }
   function removeManual(id) {
@@ -736,12 +1666,44 @@
     }
     return false;
   }
-  function clearManual() { manual = []; manualSeq = { tee: 0, elbow: 0, valve: 0 }; }
+  function clearManual() { manual = []; manualSeq = { tee: 0, elbow: 0, valve: 0, pipe: 0 }; }
   function manualCount() { return manual.length; }
+  /* ---------- 手工三通转换（2026-09-14 用户要求）----------
+   * 右键手工三通选「同径 / 异径」后，分支口自动接一段管道（默认 1 m，可改长）。
+   * 状态存于编辑参数：teeType('equal'|'reducing')/branchSpec/branchLen(0.5~10 m)，
+   * 走 beginEdit→previewEdit→applyEdit 事务 —— 撤销/存档/编辑面板预览天然打通，
+   * 且不能持有 manual 条目引用跨 cancelEdit（restore 会整组换数组，旧引用变孤儿）。 */
+  function convertTee(id, type) {
+    var info = fittingInfo(id);
+    if (!info || !info.manual || info.kind !== 'tee') return false;
+    if (['equal', 'reducing'].indexOf(type) < 0) return false;
+    var other = hostDia(info.segType === 'branch' ? 'main' : 'branch');
+    if (type === 'reducing' && !other) return false;
+    var cur = params(id);
+    if (!beginEdit(id)) return false;
+    var values = {
+      teeType: type,
+      branchSpec: type === 'equal' ? (cur.spec || '') : other,
+      branchLen: (cur.teeType && Number.isFinite(cur.branchLen)) ? cur.branchLen : 1
+    };
+    if (!previewEdit(values)) { cancelEdit(); return false; }
+    applyEdit();
+    return true;
+  }
+  function setBranchLen(id, len) {
+    var info = fittingInfo(id);
+    if (!info || !info.manual || info.kind !== 'tee' || !info.teeType) return false;
+    var v = Number(len);
+    if (!Number.isFinite(v) || v < 0.5 || v > 10) return false;
+    if (!beginEdit(id)) return false;
+    if (!previewEdit({ branchLen: Math.round(v * 100) / 100 })) { cancelEdit(); return false; }
+    applyEdit();
+    return true;
+  }
   /* 数据引用变更（重新生成平面图）→ 清空手工层；同引用重渲染 → 保留 */
   function attachData(data) {
     var nextKey=geometryKey(data);
-    if (nextKey !== dataKey) { clearManual(); edits={}; history=[]; draft=null; dataKey=nextKey; }
+    if (nextKey !== dataKey) { clearManual(); autoSpin={}; edits={}; history=[]; draft=null; dataKey=nextKey; }
     lastDataRef = data || null;
   }
   /* 构件参数查询（自动三通/阀门 + 手工配件统一入口），找不到返回 null */
@@ -758,7 +1720,11 @@
       return {
         id: t.id, manual: false, kind: 'tee', kindLabel: '三通',
         typeName: t.type === 'front-main' ? '三通（总管×主管，自动）' : '三通（主管×支管，自动）',
-        upstream: t.upstream, downstream: t.downstream, point: t.point, spec: '随所在管段管径'
+        upstream: t.upstream, downstream: t.downstream, point: t.point, spec: '随所在管段管径',
+        type: t.type,                    /* 供 teeThroughDir/teeAxisLabel 直接吃 info（宿管判定） */
+        /* 第三口绕宿管中心轴旋转（2026-09-16）：自动三通同样可旋转（记在表达层覆盖表） */
+        axisLabel: teeAxisLabel(t),
+        branchSpin: teeBranchSpin(t.id)
       };
     }
     for (i = 0; i < model.valves.length; i++) if (model.valves[i].id === id) {
@@ -772,11 +1738,21 @@
     }
     for (i = 0; i < manual.length; i++) if (manual[i].id === id) {
       m = manual[i];
+      var mp = params(m.id);
       return {
         id: m.id, manual: true, kind: m.kind, kindLabel: KIND_LABEL[m.kind],
-        typeName: KIND_LABEL[m.kind] + '（手工布置）',
+        typeName: (m.kind === 'tee' && mp.teeType)
+          ? '三通（手工布置·' + (m.spec || '?') + '转' + (mp.branchSpec || '?') + '）'
+          : KIND_LABEL[m.kind] + '（手工布置）',
         segName: SEG_NAME[m.segType] + (m.segType === 'front' ? '' : (m.segIndex + 1)),
-        point: m.point, spec: m.spec || '与管道同径'
+        segType: m.segType, segIndex: m.segIndex,
+        point: m.kind === 'pipe' ? ((m.pts && m.pts[0]) || null) : m.point, spec: m.spec || '与管道同径',
+        teeType: mp.teeType || null, branchSpec: mp.teeType ? (mp.branchSpec || null) : null,
+        branchLen: mp.teeType ? mp.branchLen : null,
+        /* 绕宿管中心轴的旋转口径（2026-09-16）：轴 = 该三通所在管道的中心轴 */
+        axisLabel: m.kind === 'tee' ? teeAxisLabel(m) : null,
+        branchSpin: m.kind === 'tee' ? teeBranchSpin(m.id) : null,
+        branchDir: m.kind === 'tee' ? teeBranchDir(m) : null
       };
     }
     return null;
@@ -799,14 +1775,16 @@
     return L;
   }
   function computeStats(data) {
-    var model = buildModel(data);
+    /* 阶段2：统计按有效几何（改长后）口径显示；data 只读不写 */
+    var model = buildModel(AE.applyTo(data));
     if (!model) return null;
     var zs = model.zones, cells = [];
     if (zs && zs.xPos && zs.yPos) {
+      var znC = zs.cols || (zs.xPos.length - 1);   /* 区号与地块分区标注同口径（行主序 zi+1） */
       for (var r = 0; r + 1 < zs.yPos.length; r++) {
         for (var c = 0; c + 1 < zs.xPos.length; c++) {
           cells.push({
-            id: 'R' + (r + 1) + 'C' + (c + 1),
+            id: (r * znC + c + 1) + '区',
             w: zs.xPos[c + 1] - zs.xPos[c], h: zs.yPos[r + 1] - zs.yPos[r],
             area: (zs.xPos[c + 1] - zs.xPos[c]) * (zs.yPos[r + 1] - zs.yPos[r]),
             valves: 0, tees: 0, elbows: 0, mainLen: 0, branchLen: 0, pipeLen: 0, areaMu: 0
@@ -861,6 +1839,16 @@
       man[m.kind]++;
       if (cl) { manInZone[m.kind]++; if (m.kind === 'tee') cl.tees++; else if (m.kind === 'elbow') cl.elbows++; else cl.valves++; }
     });
+    /* 手工三通接管长度（2026-09-14）：计入支管长度，随三通归区；总管上未归区进合计 */
+    manual.forEach(function (m) {
+      if (m.kind === 'tee') {
+        var mp = params(m.id);
+        if (mp.teeType && mp.branchSpec && Number.isFinite(mp.branchLen) && mp.branchLen > 0) {
+          var cl2 = m.segType === 'main' ? cell(zoneOfMain(m.segIndex)) : (m.segType === 'branch' ? cell(zoneOfBranch(m.segIndex)) : null);
+          if (cl2) cl2.branchLen += mp.branchLen; else unmappedBranch += mp.branchLen;
+        }
+      }
+    });
     cells.forEach(function (cl) { cl.areaMu = cl.area / MU_M2; cl.pipeLen = cl.mainLen + cl.branchLen; });
     var tot = {
       zones: cells.length, area: 0, areaMu: 0,
@@ -884,10 +1872,71 @@
     return { zones: cells, totals: tot };
   }
 
+  /* ---------- 自动管线图面编辑 API（共享编辑层，2026-09-15 阶段2）---------- */
+  function autoSelInfo() {
+    if (selFitId) {
+      var f = (AE.fitsList() || []).filter(function (x) { return x.id === selFitId; })[0];
+      if (!f) return null;
+      var fpos = AE.pointAt(f.pid, lastDataRef, f.atM);
+      return { fit: true, id: f.id, kind: f.kind, kindLabel: f.kind === 'tee' ? '三通' : '阀门', pid: f.pid, pipeName: AE.pipeName(f.pid), atM: f.atM, pipeLen: fpos ? fpos.len : null, spin: (f.kind === 'tee' && isFinite(f.spin)) ? f.spin : 0 };
+    }
+    if (!selAutoId || !lastDataRef) return null;
+    var epts = AE.effPts(selAutoId, lastDataRef), bpts = AE.pipePts(selAutoId, lastDataRef);
+    if (!epts) return null;
+    return { auto: true, id: selAutoId, kindLabel: AE.pipeName(selAutoId), len: AE.polylineLen(epts), baseLen: bpts ? AE.polylineLen(bpts) : 0, pickAt: selAutoAt, od: AE.caliberOf ? AE.caliberOf(selAutoId) : null };
+  }
+  /* 选中自动管线就地改长（米）；成功后 AE 广播 → 两视图重渲染 */
+  function setAutoLen(v) {
+    if (!selAutoId || !lastDataRef) return false;
+    return AE.setLen(selAutoId, Number(v), lastDataRef, 'iso');
+  }
+  /* 在选中自动管线的点击位置插入三通/阀门 */
+  function insertAutoFit(kind) {
+    if (!selAutoId || !lastDataRef) return null;
+    return AE.addFitting(kind, selAutoId, selAutoAt, lastDataRef, 'iso');
+  }
+  function deleteSelFit() {
+    if (!selFitId) return false;
+    var ok = AE.removeFitting(selFitId, 'iso');
+    if (ok) { selFitId = null; rerenderKeepView(); if (typeof api.onAutoSel === 'function') api.onAutoSel(null); }
+    return ok;
+  }
+  /* 选中配件精确定位（输入框，阶段2b）：atM = 距起点弧长（米）；距终点输入由页面换算 pipeLen−v */
+  function moveSelFit(atM) {
+    if (!selFitId || !lastDataRef) return false;
+    var ok = AE.moveFitting(selFitId, Number(atM), lastDataRef, 'iso');
+    if (ok && typeof api.onAutoSel === 'function') api.onAutoSel(autoSelInfo());
+    return ok;
+  }
+  /* 图面改径（2026-09-16 阶段2e）：右键菜单选 pid 一步设置/恢复；AE 广播 → 两视图重渲染 */
+  function setAutoCaliber(pid, od) {
+    if (!lastDataRef) return false;
+    var ok = AE.setCaliber(pid, Number(od), lastDataRef, 'iso');
+    if (ok) {
+      selPipeId = null; selFitId = null; selAutoId = pid; selAutoAt = 0;
+      rerenderKeepView();
+      if (typeof api.onAutoSel === 'function') api.onAutoSel(autoSelInfo());
+    }
+    return ok;
+  }
+  function clearAutoCaliber(pid) {
+    if (!lastDataRef) return false;
+    var ok = AE.clearCaliber(pid, 'iso');
+    if (ok) {
+      rerenderKeepView();
+      if (selAutoId === pid && typeof api.onAutoSel === 'function') api.onAutoSel(autoSelInfo());
+    }
+    return ok;
+  }
+
   /* ---------- 容器渲染（幂等：innerHTML 替换，不叠加；重渲染后视口复位） ---------- */
   function render(container, data) {
     if (!container) return null;
     attachData(data);
+    /* 共享图面数据层几何绑定（2026-09-15 阶段1）：几何变化 → 手工管线自动清空 */
+    if (data && EP.syncGeometry) EP.syncGeometry(data);
+    /* 自动管线图面编辑层几何绑定（阶段2）：几何变化 → 改长/配件自动清空 */
+    if (data && AE.syncGeometry) AE.syncGeometry(data);
     if (!data) {
       container.innerHTML = '<div class="pp-diagram-empty">请先生成三级管线平面图</div>';
       return null;
@@ -897,6 +1946,8 @@
       container.innerHTML = '<div class="pp-diagram-empty">轴测图生成失败：几何数据不完整（version 需为 1）</div>';
       return null;
     }
+    /* 2026-09-17 第六十三轮：轴测图「改径汇总条」（原 #tlIsoCalChip）已按用户要求取消，
+       画布右上角不再叠加任何卡片；三级工作区那份 #tlWsCalChip 保留不动。 */
     container.innerHTML = svg;
     var el = container.querySelector('svg');
     view.z = 1; view.x = 0; view.y = 0;
@@ -916,6 +1967,10 @@
     var el = currentSVG();
     if (!el) { alert('请先生成轴测图'); return null; }
     var clone = el.cloneNode(true);
+    /* 剔除施工管网编辑器的叠加层（含悬停高亮）：导出图纸只保留图纸本身（2026-09-15） */
+    Array.prototype.forEach.call(clone.querySelectorAll('[data-ry-export-skip]'), function (n) {
+      if (n.parentNode) n.parentNode.removeChild(n);
+    });
     clone.style.transform = '';
     clone.style.width = '';
     clone.style.height = '';
@@ -960,10 +2015,40 @@
     getParams:params, beginEdit:beginEdit, previewEdit:previewEdit, applyEdit:applyEdit, cancelEdit:cancelEdit,
     manualPosition:manualPosition,
     resetEdit:resetEdit, undoEdit:undoEdit, exportState:exportState, importState:importState,
+    convertTee:convertTee, setBranchLen:setBranchLen,
+    rotateTee:rotateTee, resetTeeBranch:resetTeeBranch, teeBranchSpin:teeBranchSpin,
+    teeThroughDir:teeThroughDir, teeAxisLabel:teeAxisLabel, teeBranchDir:teeBranchDir, asTeeRec:asTeeRec,
+    addManualAtScreen:addManualAtScreen, spawnPipeFromTee:spawnPipeFromTee, extendManualPipe:extendManualPipe,
+    teeSubtree:teeSubtree, hostTangentAt:hostTangentAt, teeSnapPts:teeSnapPts,
+    /* 手工管线画线模式 + 拾取（共享图面数据层，2026-09-15 阶段1） */
+    startPipeMode: startPipeMode, endPipeMode: endPipeMode, pipeModeKind: pipeModeKind,
+    selPipeInfo: selPipeInfo, pipeDataPoint: pipeDataPoint,
+    onPipeClick: null, onPipeModeChange: null,
+    /* 自动管线图面编辑（阶段2） */
+    setAutoLen: setAutoLen, insertAutoFit: insertAutoFit, deleteSelFit: deleteSelFit, moveSelFit: moveSelFit,
+    setAutoCaliber: setAutoCaliber, clearAutoCaliber: clearAutoCaliber, onAutoPipeContextMenu: null,
+    autoSelInfo: autoSelInfo, onAutoSel: null,
     redraw:rerenderKeepView, onEditChange:null,
     getViewState: function () { return viewState; }, /* 只读钩子：E2E 坐标换算 */
-    PLACE_TOL: PLACE_TOL, onFittingClick: null, onPlaceResult: null
+    PLACE_TOL: PLACE_TOL, onFittingClick: null, onPlaceResult: null, onFittingContextMenu: null
   };
   if (typeof window !== 'undefined') window.RyIsoDiagram = api;
+  /* 共享层订阅（双向同步核心，2026-09-15 阶段1）：三级工作区/主方案存档发起的
+     手工管线变更 → 本视图保持视口重渲染（Node 环境无 DOM 自动跳过）。 */
+  EP.onChange(function () {
+    if (typeof document === 'undefined' || !lastDataRef) return;
+    if (selPipeId && !selPipeInfo()) { selPipeId = null; if (typeof api.onPipeClick === 'function') api.onPipeClick(null, null); }
+    rerenderKeepView();
+  });
+  /* 自动管线编辑层订阅（阶段2）：工作区/存档发起的改长/配件变更 → 本视图保持视口重渲染 */
+  AE.onChange(function () {
+    if (typeof document === 'undefined' || !lastDataRef) return;
+    if ((selAutoId || selFitId) && !autoSelInfo()) {
+      selAutoId = null; selFitId = null;
+      if (typeof api.onAutoSel === 'function') api.onAutoSel(null);
+    }
+    rerenderKeepView();
+    if (selFitId && autoSelInfo() && typeof api.onAutoSel === 'function') api.onAutoSel(autoSelInfo());
+  });
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })();

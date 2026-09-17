@@ -12,6 +12,12 @@
 
 验证：`node --test tests/iso_editor.test.cjs tests/iso_diagram.test.cjs`；`node tests/iso_editor.smoke.cjs`在独立Edge上下文验证点击、应用/取消、立管、撤销、刷新及主方案保存恢复，不访问用户浏览器存储。`ISO_SCREENSHOT`可指定截图路径。现有分区统计保留手工配件数量统计，参数覆写不改变其计数；工程参数尚未接入材料选型。
 
+## 施工管网编辑（尺寸驱动，2026-09-14）
+
+在参数编辑之上的拓扑级编辑：从三级管线数据建**独立施工模型**（配件/接口/管段/约束，稳定ID，单位米），点管段或配件显真实尺寸、直管插阀/三通自动拆段、空接口接管（水平/竖直/直角）、改末端长度上游固定下游整体移、移三通分支随动；两端固定/闭环等冲突拦截不静默拉断。一次编辑=一事务撤销，存 `runye_net_v1:<plotId>`，不回写 `tlDiagramData`。详见 `NETWORK_EDITOR.md`。
+
+验证：`node --test tests/network_model.test.cjs`（72项）；`NODE_PATH=<workspace>/node_modules node tests/network_editor.smoke.cjs`（浏览器冒烟22项）。
+
 ## 当前画法（2026-09-13 最新用户修正）
 
 采用45°正面斜轴测，X水平、Y向右上45°、Z竖直。主管至支管的连接整段平行Z轴；三通在下、阀门在立管中部、支管在上。为满足此展开示意，支管及所属滴灌带整体作显示平移，偏移保存在 viewState.branchOffsets；配件拾取须扣除该偏移。原平面坐标与水力计算不变，展开图不用于平面放样。

@@ -1,0 +1,162 @@
+/* 水力计算器（2026-09-17 第六十二轮）
+ * 宿主：index.html 的 #threeDModelingSection（.ry-modeling-section，height:100vh-nav，overflow:hidden）。
+ * 变量约定与 modeling/workspace.css、iso-diagram.css 一致：一律 var(--u-x, 字面值) ——
+ * 本项目从不定义 --u-*，全靠兜底字面值，颜色与宿主现有面板保持一致（绿系 + 石板灰）。
+ *
+ * @media print 隐藏：与 workspace.css 的 #threeDModelingSection{display:none} 一致（见文件末）。
+ */
+.hc-wrap{
+  height:100%;min-width:0;display:flex;overflow:hidden;
+  font:13px/1.6 "Microsoft YaHei","PingFang SC","Segoe UI",system-ui,sans-serif;
+  color:var(--u-ink,#243c35);background:var(--u-panel,#f7faf9);
+}
+.hc-side{
+  flex:0 0 356px;width:356px;min-width:0;overflow:auto;padding:12px 12px 48px;
+  background:#fff;border-right:1px solid var(--u-accent-line,#cfe3da);
+}
+.hc-main{flex:1;min-width:0;overflow:auto;padding:12px 16px 48px}
+
+/* ---------- 滚动条：与工程既有细条一致（2026-09-17 第六十五轮） ----------
+   ★ 只写 ::-webkit-scrollbar，**刻意不写** scrollbar-width / scrollbar-color：
+     Chromium 121+ 起，标准滚动条属性会让 webkit 伪元素失效 —— 实测（Edge 143）
+     「两者都写」得到 11px 的 thin 条，「只写 webkit」才是 4px（见 _p1/_scrollbar_exp.cjs）。
+   ★ 4px 是本工程最窄的既有值（#ryCadSide 的 .ry-cad-grps / .tl-iso-stats 的意图值）。 */
+.hc-side::-webkit-scrollbar,.hc-main::-webkit-scrollbar{width:4px;height:4px}
+.hc-side::-webkit-scrollbar-track,.hc-main::-webkit-scrollbar-track,
+.hc-side::-webkit-scrollbar-corner,.hc-main::-webkit-scrollbar-corner{background:transparent}
+.hc-side::-webkit-scrollbar-thumb,.hc-main::-webkit-scrollbar-thumb{background:#bfd3c6;border-radius:2px}
+.hc-side::-webkit-scrollbar-thumb:hover,.hc-main::-webkit-scrollbar-thumb:hover{background:#9db8a7}
+
+/* ---------- 参数区 ---------- */
+.hc-h{font-size:13px;font-weight:700;color:var(--u-accent-2,#116447);margin:0 0 8px;letter-spacing:.3px}
+.hc-group{margin:0 0 14px;padding:10px 10px 8px;border:1px solid var(--u-accent-line,#cfe3da);border-radius:6px;background:var(--u-accent-bg,#f4fbf7)}
+.hc-group>.hc-h{margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.hc-row{display:flex;align-items:center;gap:8px;margin:0 0 7px;min-width:0}
+.hc-row>label{flex:0 0 96px;color:var(--u-ink-2,#4a6259);font-size:12.5px}
+.hc-row input[type=number],.hc-row input[type=text],.hc-row select{
+  flex:1;min-width:0;font:inherit;font-size:12.5px;padding:4px 6px;border:1px solid var(--u-accent-line,#cfe3da);
+  border-radius:4px;background:#fff;color:inherit;
+}
+.hc-row input[type=number]{text-align:right}
+.hc-row input:focus-visible,.hc-row select:focus-visible{outline:2px solid var(--u-water,#245f87);outline-offset:1px}
+.hc-unit{flex:0 0 auto;color:var(--u-ink-2,#7b9188);font-size:11.5px;width:22px}
+.hc-row-chk>label{flex:1;display:flex;align-items:center;gap:6px;color:var(--u-ink-2,#4a6259)}
+.hc-row-ro>label{flex:0 0 96px}
+.hc-row-ro>b{font-weight:700;color:var(--u-accent-2,#116447)}
+.hc-btn{
+  font:inherit;font-size:12.5px;padding:5px 10px;border:1px solid var(--u-accent-2,#116447);border-radius:4px;
+  background:#fff;color:var(--u-accent-2,#116447);cursor:pointer;white-space:nowrap;
+}
+.hc-btn:hover{background:var(--u-accent-bg,#e0f2e9)}
+.hc-btn:focus-visible{outline:2px solid var(--u-water,#245f87);outline-offset:2px}
+.hc-btn-primary{background:var(--u-accent-2,#116447);color:#fff}
+.hc-btn-primary:hover{background:var(--u-accent,#18835e)}
+.hc-btn-sm{padding:2px 7px;font-size:11.5px;line-height:1.5}
+.hc-btn-danger{border-color:#c2410c;color:#c2410c}
+.hc-btn-danger:hover{background:#fff2ec}
+.hc-foot{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+
+/* ---------- 主管卡 ---------- */
+.hc-main-card{margin:0 0 12px;padding:9px 10px 6px;border:1px solid var(--u-accent-line,#cfe3da);border-radius:6px;background:#fff}
+.hc-main-card-h{display:flex;align-items:center;gap:6px;margin:0 0 7px}
+.hc-main-card-h>strong{font-size:13px;color:var(--u-accent-2,#116447)}
+.hc-main-card-h>.hc-sp{flex:1}
+.hc-tap-row{display:grid;grid-template-columns:38px 1fr 1fr 1fr 1fr 26px;gap:5px;align-items:center;margin:0 0 5px}
+.hc-tap-head{font-size:11.5px;color:var(--u-ink-2,#7b9188);text-align:center}
+.hc-tap-row input{
+  width:100%;min-width:0;font:inherit;font-size:12px;padding:3px 4px;text-align:right;
+  border:1px solid var(--u-accent-line,#cfe3da);border-radius:4px;background:#fff;color:inherit;
+}
+.hc-tap-row input:focus-visible{outline:2px solid var(--u-water,#245f87);outline-offset:1px}
+.hc-tap-no{font-size:12px;color:var(--u-ink-2,#4a6259);text-align:center}
+
+/* ---------- 结果区 ---------- */
+.hc-pick{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 12px}
+.hc-pick>span{color:var(--u-ink-2,#4a6259);font-size:12.5px}
+.hc-pick select{font:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--u-accent-line,#cfe3da);border-radius:4px;background:#fff;color:inherit}
+.hc-hero{
+  display:flex;align-items:center;gap:20px;flex-wrap:wrap;
+  padding:14px 18px;margin:0 0 14px;border:1px solid var(--u-accent-line,#9bcbb4);border-radius:8px;
+  background:linear-gradient(180deg,var(--u-accent-bg,#eef8f3),#fff);
+}
+.hc-hero-num{display:flex;align-items:baseline;gap:4px}
+.hc-hero-num>b{font-size:38px;line-height:1;font-weight:800;color:var(--u-accent-2,#116447);font-variant-numeric:tabular-nums}
+.hc-hero-num>i{font-style:normal;font-size:15px;color:var(--u-ink-2,#4a6259)}
+.hc-hero-sub{display:flex;flex-direction:column;gap:2px;font-size:12.5px;color:var(--u-ink-2,#4a6259)}
+.hc-hero-sub b{color:var(--u-ink,#243c35);font-variant-numeric:tabular-nums}
+.hc-hero-path{margin-left:auto;text-align:right;font-size:12.5px;color:var(--u-ink-2,#4a6259);max-width:52%}
+.hc-hero-path b{color:var(--u-accent-2,#116447)}
+.hc-block{margin:0 0 16px}
+.hc-block-h{font-size:13px;font-weight:700;color:var(--u-accent-2,#116447);margin:0 0 6px;display:flex;align-items:center;gap:8px}
+.hc-block-h>.hc-block-note{font-weight:400;font-size:11.5px;color:var(--u-ink-2,#7b9188)}
+.hc-table-wrap{overflow:auto;border:1px solid var(--u-accent-line,#cfe3da);border-radius:6px;background:#fff}
+.hc-table{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
+.hc-table th,.hc-table td{padding:5px 9px;border-bottom:1px solid #e8f0ec;text-align:right;white-space:nowrap}
+.hc-table th{background:var(--u-accent-bg,#f1f9f5);color:var(--u-accent-2,#116447);font-weight:600;text-align:right;position:sticky;top:0}
+.hc-table th:first-child,.hc-table td:first-child{text-align:left}
+.hc-table tbody tr:last-child td{border-bottom:0}
+.hc-table td.hc-td-name{text-align:left;color:var(--u-ink,#243c35)}
+.hc-table tr.hc-row-sum td{background:#fbfdfc;font-weight:700}
+.hc-table tr.hc-row-worst td{background:#fff7ed}
+.hc-chip{display:inline-block;margin-left:5px;padding:0 5px;border-radius:3px;font-size:10.5px;line-height:16px;vertical-align:1px}
+.hc-chip-warn{background:#ffedd5;color:#c2410c;border:1px solid #fdba74}
+.hc-chip-low{background:#eef2f6;color:#64748b;border:1px solid #d8e1ea}
+.hc-chip-worst{background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5}
+.hc-note{margin:10px 0 0;padding:8px 10px;border-left:3px solid var(--u-accent-line,#9bcbb4);background:#fbfdfc;color:var(--u-ink-2,#4a6259);font-size:11.5px;line-height:1.75}
+.hc-note code{font-family:ui-monospace,Consolas,monospace;font-size:11.5px;background:#eef6f1;padding:0 3px;border-radius:3px}
+.hc-empty{padding:18px;color:var(--u-ink-2,#7b9188);font-size:12.5px}
+
+/* ---------- 管网示意图（图上网选路径，2026-09-17 第六十三轮） ----------
+   文字统一加白描边（paint-order:stroke）→ 压在管线上仍能看清；文字不吃指针事件，
+   点击一律落到所属路径的 .hc-nhit 热区，保证「点哪儿就是哪条路径」。
+   颜色沿用本站绿系：普通管 #a9c6ba，当前路径 #18835e，最不利 #b91c1c，最有利 #15803d。 */
+.hc-net{overflow:auto;border:1px solid var(--u-accent-line,#cfe3da);border-radius:6px;background:#fff;padding:2px 4px}
+.hc-net-svg{display:block}
+.hc-net-svg text{font:11px/1.35 "Microsoft YaHei","PingFang SC","Segoe UI",system-ui,sans-serif;
+  fill:#7b9188;paint-order:stroke;stroke:#fff;stroke-width:2.6px;stroke-linejoin:round;pointer-events:none}
+/* ★ 下面几条文字配色**必须**带 `.hc-net-svg` 前缀即 (0,2,0)：
+   基础规则 `.hc-net-svg text` 是 (0,1,1)，而单类选择器只有 (0,1,0) —— 会被它压过去。
+   症状极具迷惑性：`fill` 悄悄落回 #7b9188（颜色只是"淡了点"），而 `font-weight` 不在基础规则里
+   所以**仍然生效** → 看着像没坏，实际颜色全错。这是靠 getComputedStyle 量测才揪出来的，
+   截图肉眼分辨不了（见 _p1/_hcnet_measure.cjs）。
+   顺序也有意为之：`.hc-nt-b` 排在 `.hc-nt-lab` 之后 → 同一元素同时带两类时取绿。 */
+.hc-net-svg .hc-nt-lab{fill:#4a6259}
+.hc-net-svg .hc-nt-lab.hc-non-t{fill:#116447}
+.hc-net-svg .hc-nt-b{fill:#116447;font-weight:700}
+.hc-net-svg .hc-nt-dim{fill:#9aa8a2;font-size:10px}
+.hc-net-svg .hc-nt-sum{fill:#334b43;font-weight:700;font-variant-numeric:tabular-nums}
+.hc-net-svg .hc-nt-sum.hc-nworst{fill:#b91c1c}
+.hc-net-svg .hc-nt-sum.hc-nbest{fill:#15803d}
+.hc-net-svg .hc-nt-sum.is-on{fill:#0b4f37;font-size:12.5px}
+.hc-npipe{stroke:#a9c6ba;fill:none;stroke-linecap:round}
+.hc-npipe.hc-non{stroke:#18835e}
+.hc-narw{fill:#a9c6ba}
+.hc-narw.hc-non{fill:#18835e}
+.hc-nsrc{fill:#fff;stroke:#18835e;stroke-width:2.5}
+.hc-nnode{fill:#fff;stroke:#a9c6ba;stroke-width:2}
+.hc-nnode.hc-non{stroke:#18835e;stroke-width:2.5}
+.hc-nnode-off{fill:#dfe9e4;stroke:#c3d6cd;stroke-width:1.5}
+.hc-nend{fill:#c3d6cd}
+.hc-nend.hc-non{fill:#18835e}
+.hc-ntail{stroke:#cfdcd6;stroke-width:2;stroke-dasharray:4 4}
+.hc-nhit{fill:transparent}
+.hc-nhot{cursor:pointer}
+.hc-nhot:hover .hc-npipe{stroke:#0f9c6d}
+.hc-nhot:hover .hc-narw{fill:#0f9c6d}
+.hc-nhot:hover .hc-nend{fill:#0f9c6d}
+.hc-nhot:hover .hc-nnode{stroke:#0f9c6d}
+.hc-nhot:focus-visible{outline:none}
+.hc-nhot:focus-visible .hc-nhit{fill:rgba(24,131,94,.10);stroke:#18835e;stroke-width:1.5}
+.hc-net-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:7px 0 0;font-size:12px;color:var(--u-ink-2,#4a6259)}
+.hc-net-cur b{color:var(--u-accent-2,#116447)}
+.hc-net-legend{display:flex;align-items:center;gap:12px;margin-left:auto;font-size:11.5px;color:var(--u-ink-2,#7b9188)}
+.hc-lg{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:4px;background:#a9c6ba}
+.hc-lg-on{background:#18835e}
+.hc-lg-worst{background:#b91c1c}
+.hc-lg-best{background:#15803d}
+
+@media (max-width:980px){
+  .hc-wrap{flex-direction:column}
+  .hc-side{flex:0 0 auto;width:auto;border-right:0;border-bottom:1px solid var(--u-accent-line,#cfe3da);max-height:46vh}
+}
+@media print{#threeDModelingSection{display:none!important}}

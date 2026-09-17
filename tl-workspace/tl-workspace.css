@@ -11,6 +11,10 @@
   position:relative;min-height:280px;
   overflow:hidden;border-radius:10px;
   background:#fff;border:1px solid #dbe7e0;
+  /* 第五十一轮（用户要求）：「红色箭头指向的线取消」= 画布右缘与工具轨之间那条竖分隔线。
+     用 border-right-color:transparent 而**不是** border-right:0 —— 保住这 1px 占位，
+     画布内容宽度 / 网格列宽逐像素不变（不触发图纸 baseFit 重排），另三边边框与圆角保持原样。 */
+  border-right-color:transparent;
   outline:none;
 }
 .tl-ws-canvas{position:absolute;inset:0;overflow:hidden;cursor:default}
@@ -27,17 +31,33 @@
    JS 显示时写 inline display:flex（不影响 column 方向）；无数据时 inline display:none。
    ⚠ 显隐由 JS 内联样式接管，这里不写 display，避免被内联覆盖产生歧义。 */
 .tl-ws-toolbar{
-  grid-column:2;grid-row:1;
+  grid-column:3;grid-row:1;
   display:flex;flex-direction:column;flex-wrap:nowrap;align-items:stretch;
   gap:4px;flex:0 0 auto;
   padding:7px 7px;margin:0;
   background:linear-gradient(180deg,#f8fbf9 0%,#f2f7f4 100%);
   border:1px solid #dde8e1;border-radius:8px;
+  /* 第五十一轮：同一处分隔带上的另一条线（工具轨左缘）一并取消 ——
+     只去画布那条会剩这条，用户仍会看到"线还在"。 */
+  border-left-color:transparent;
   font-size:12px;
   overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
 }
+/* 工具轨滚动条改细条（第四十八轮）：面板改成「完全展开」后工具轨必然竖向滚动，
+   默认 15px 宽的滚动条会吃掉轨内可用宽度（实测 236 → 221px），把统计表 6 列挤到放不下。
+   与 .tl-ws-stats 自身的细滚动条同款样式（保持一致）。 */
+.tl-ws-toolbar::-webkit-scrollbar{width:5px;height:5px}
+.tl-ws-toolbar::-webkit-scrollbar-thumb{background:#bfd3c6;border-radius:2px}
+.tl-ws-toolbar::-webkit-scrollbar-thumb:hover{background:#9db8a7}
+.tl-ws-toolbar::-webkit-scrollbar-track,.tl-ws-toolbar::-webkit-scrollbar-corner{background:transparent}
+
 /* 分隔符：竖排下竖线改横线 */
 .tl-ws-toolbar .tl-ws-sep{width:100%;height:1px;align-self:auto;margin:3px 0;flex:0 0 auto;background:#e4ece7}
+
+/* 无图时工具栏只露「生成管线图」（第四十三轮）：面板在 ws 视图已就绪但还没有图纸时，
+   工具栏不再整体隐藏 —— 生成按钮必须一直可点（它是唯一入口）。 */
+.tl-ws-toolbar.tl-ws-toolbar-bare>*:not(#tlAutoPipe){display:none}
+.tl-ws-toolbar.tl-ws-toolbar-bare #tlAutoPipe{white-space:normal;line-height:1.4;font-weight:700}
 .tl-ws-btn{
   width:100%;box-sizing:border-box;flex:0 0 auto;
   height:28px;min-height:0;padding:0 6px;
@@ -48,7 +68,7 @@
 }
 .tl-ws-btn:hover{border-color:#2d604b}
 .tl-ws-btn.active{background:#2d604b;border-color:#2d604b;color:#fff;font-weight:600}
-.tl-ws-pct{width:100%;min-width:0;text-align:center;color:#4b5b53;font-weight:600}
+/* 2026-09-17（第五十三轮）：.tl-ws-pct 规则随缩放按钮组一并取消（已无元素使用该 class）。 */
 .tl-ws-count{width:100%;text-align:center;color:#7d8f86;font-size:11px;flex:0 0 auto}
 .tl-ws-count b{color:#2d604b}
 /* 操作提示：沉到轨底，允许折行（竖排下原 margin-left:auto 失效） */
@@ -69,9 +89,67 @@
     padding:6px 8px;margin:0 0 8px;
     background:#fff;overflow:visible;
   }
+  /* 横向工具轨下，轨内统计表独占一整行（否则会被排到按钮旁边挤成细条） */
+  .tl-ws-toolbar>.tl-ws-stats{flex:1 1 100%;min-height:0;max-height:220px;overflow:auto;margin:0 0 6px}
   .tl-ws-toolbar .tl-ws-sep{width:1px;align-self:stretch;margin:0 3px}
   .tl-ws-btn{width:auto;height:auto;padding:5px 12px;line-height:1.3;display:inline-block}
-  .tl-ws-pct,.tl-ws-count{width:auto;text-align:left}
+  .tl-ws-count{width:auto;text-align:left}
   .tl-ws-hint{width:auto;margin:0 0 0 auto;padding-top:0;border-top:0}
   #tlWsContent{grid-column:auto;grid-row:auto;flex:1 1 auto}
+}
+
+/* ═══ 管段管径与损失统计表（2026-09-17 第四十二轮，用户要求）═══════════════
+   位置：三级设计工作区**工具轨内部顶端**（第四十四轮按用户要求移入），其下为各工具按钮；
+   工作区列序 画布 ｜ 拖拽条 ｜ 工具轨（工具轨宽度由 #tlWsSegStatsGrip 拖拽调节）。
+   性质与轴测图「分区材料统计」不同：那张表统计**数量**；本表按分区逐**段**列管长，
+   管径可就地改（同源 AE.cals，与右键改径等效），并列出按计算管径 / 当前管径的
+   水头损失「改前 → 改后」对比。窄屏（≤900px）工具轨收窄，统计表在轨内自行滚动。 */
+/* 工具轨宽度拖拽条（第四十四轮）：网格第 2 列（画布与工具轨之间），拖动改工具轨宽度 */
+#tlWsSegStatsGrip{grid-column:2;grid-row:1;min-height:0;cursor:col-resize;border-radius:3px;background:transparent;transition:background .15s}
+#tlWsSegStatsGrip:hover,#tlWsSegStatsGrip.on{background:rgba(45,96,75,.30)}
+/* 统计表（第四十四轮起移入 .tl-ws-toolbar **内部顶端**）：
+   第四十六轮起按内容**完全展开**（不内滚、不限高），下方工具按钮被整体下推、可推出屏幕；
+   ★ 不再定位到网格列，也不再控制画布列宽（轨道宽度由 #tlWsSegStatsGrip 独立调节）。 */
+.tl-ws-stats{
+  /* 第四十六轮（用户澄清：「上面这部分完全展开，展开后把下面那些内容直接往下推，可以超过屏幕」）：
+     面板**按内容完全展开**（无内滚、无 max-height），下方按钮被一路往下推；超出屏幕由工具轨滚动。
+     —— 第四十五轮的「弹性填充 + 内滚 + 64vh 封顶」作废（那会把长表压在框内滚动、按钮并未真下推）。 */
+  flex:0 0 auto;min-height:0;min-width:0;margin:0;
+  overflow:visible;
+  padding:8px 9px;border:1px solid #dbe7e0;border-radius:8px;background:#fff;
+  font-size:11.5px;color:#243c35;
+  scrollbar-width:thin;scrollbar-color:#bfd3c6 transparent;
+}
+.tl-ws-stats::-webkit-scrollbar{width:4px;height:4px}
+.tl-ws-stats::-webkit-scrollbar-thumb{background:#bfd3c6;border-radius:2px}
+.tl-ws-stats::-webkit-scrollbar-thumb:hover{background:#9db8a7}
+.tl-ws-stats::-webkit-scrollbar-track,.tl-ws-stats::-webkit-scrollbar-corner{background:transparent}
+.tl-ws-stats-title{
+  font-weight:700;font-size:12px;color:#243c35;margin:0 0 6px;
+  cursor:pointer;user-select:none;position:sticky;top:-8px;background:#fff;padding:2px 0;z-index:2}
+.tl-ws-stats-title:hover{color:#15803d}
+.tl-ws-stats table{width:100%;border-collapse:collapse;font-size:10.5px;color:#33463e}
+/* 第四十八轮：表头与同列内容统一居中（原「前两列左对齐、其余右对齐」）；padding 4→2px 收窄列宽 ——
+   实测（_p1/_statsfit_probe.cjs）padding 3px 时表 min-content 230px 仍 > 可用 221px，右侧「改后 / Δ」被裁；
+   收到 2px 后 min-content 218px，可完整落在默认工具轨宽度内。 */
+.tl-ws-stats th,.tl-ws-stats td{padding:3px 2px;text-align:center;border-bottom:1px solid #e3ece6;white-space:nowrap}
+/* 第四十八轮：原「管段 / 长(m) 两列左对齐」的特例取消 —— 全表统一居中，表头与内容同轴 */
+.tl-ws-stats thead th{font-weight:600;color:#243c35;border-bottom:1.5px solid #c6d8cc}
+.tl-ws-stats tr.zonehead td{text-align:left;font-weight:700;background:#f4f9f5;color:#2d604b;border-top:1px solid #d9e8df}
+.tl-ws-stats tr.sum td{font-weight:700;border-top:1.5px solid #8fae9b;background:#f8fbf9}
+.tl-ws-stats tr.grand td{font-weight:700;border-top:2px solid #6f9281;background:#f4f9f5}
+/* 第四十八轮：框宽改为「按选项文字自动」（width:auto）—— 只要容下 Ø160 / Ø500 即可，不再按固定 76px。 */
+.tl-ws-stats select{font-size:10.5px;padding:1px 2px;border:1px solid #cbd5e1;border-radius:3px;background:#fff;width:auto;max-width:none;color:inherit}
+.tl-ws-stats select.changed{border-color:#f59e0b;background:#fffbeb;color:#92400e;font-weight:600}
+.tl-ws-stats .tl-ws-stats-note{font-size:10px;color:#7d8f86;line-height:1.6;margin-top:6px}
+.tl-ws-stats .tl-ws-stats-empty{font-size:11.5px;color:#7d8f86;line-height:1.8}
+/* 折叠（第四十四轮：统计表在工具轨内部 → 只收成一行紧凑表头，不再竖排成窄条） */
+.tl-ws-stats.stats-collapsed{
+  flex:0 0 auto;min-height:0;max-height:none;overflow:hidden;padding:6px 9px}
+.tl-ws-stats.stats-collapsed .tl-ws-stats-title{
+  margin:0;writing-mode:horizontal-tb;letter-spacing:0;position:static;background:none}
+.tl-ws-stats.stats-collapsed #tlWsStatsBody{display:none}
+@media(max-width:900px){
+  /* 窄屏：工具轨收窄（见 index.html 同断点）；统计表同样按内容完全展开，超出由工具轨滚动 */
+  .tl-ws-stats{min-height:0}
 }

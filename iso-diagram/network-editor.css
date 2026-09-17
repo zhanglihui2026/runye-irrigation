@@ -1,0 +1,218 @@
+/* =====================================================================
+ * network-editor.css — 施工管网装配编辑器样式（面板 + SVG 叠加层 + 就地菜单）
+ * 2026-09-15 起为双视图：面板按当前视图挂 #tlSide（平面）或 #tlIsoSide（轴测），
+ * 叠加层同步注入 #tlDiagramContent svg / #tlIsoDiagramContent svg。
+ * 配色沿用工程工具风格。
+ * ===================================================================== */
+
+/* ---------- SVG 叠加层 ---------- */
+/* 注意：index.html 有 #tlIsoDiagramContent svg text{pointer-events:none}（保护底图），
+ * 此处必须用同等及以上特异性夺回文本命中。 */
+/* 2026-09-15：叠加层同时用于平面图（#tlDiagramContent）与轴测图（#tlIsoDiagramContent），
+ * 两个宿主的文本命中/样式规则必须成对给出（平面图没有 `svg text{pointer-events:none}`，
+ * 但保持同等特异性更稳妥）。 */
+#tlIsoDiagramContent svg .cn-layer text.cn-dim,
+#tlDiagramContent svg .cn-layer text.cn-dim {
+  font-size: 11px;
+  font-weight: 600;
+  fill: #111827;
+  paint-order: stroke;
+  stroke: #fff;
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  pointer-events: all;
+  cursor: pointer;
+}
+#tlIsoDiagramContent svg .cn-layer text.cn-dim:hover,
+#tlDiagramContent svg .cn-layer text.cn-dim:hover { fill: #b45309; }
+svg .cn-layer [data-cn-fit]:hover,
+svg .cn-layer [data-cn-port]:hover { filter: brightness(1.15); }
+
+/* ---------- 左栏面板卡片 ---------- */
+.cn-card { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.cn-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cn-title { font-size: 12.5px; font-weight: 700; color: #243c35; letter-spacing: 0.5px; }
+
+.cn-btn {
+  border: 1px solid #c6d8cc;
+  background: #fff;
+  color: #33463e;
+  font-size: 11.5px;
+  padding: 4px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.cn-btn:hover { background: #f2f7f3; border-color: #8fae9b; }
+.cn-btn.cn-primary { background: #15803d; border-color: #15803d; color: #fff; font-weight: 600; }
+.cn-btn.cn-primary:hover { background: #116632; }
+.cn-btn.cn-danger { color: #b91c1c; border-color: #ecc7c7; }
+.cn-btn.cn-danger:hover { background: #fdf2f2; border-color: #d99; }
+.cn-btn.cn-ghost { background: transparent; }
+.cn-btn.cn-active { background: #fef3c7; border-color: #d97706; color: #92400e; font-weight: 600; }
+
+.cn-note { font-size: 10.5px; color: #5b6b66; line-height: 1.6; }
+.cn-summary { font-size: 11px; color: #33463e; line-height: 1.7; background: #f4f9f5; border: 1px solid #e3ece6; border-radius: 5px; padding: 5px 8px; }
+.cn-summary b { color: #243c35; }
+.cn-warn-txt { color: #b45309; font-weight: 600; }
+
+.cn-msg { font-size: 10.5px; line-height: 1.55; border-radius: 5px; padding: 5px 8px; border: 1px solid; word-break: break-all; }
+.cn-msg-info { background: #f8fafc; border-color: #e2e8f0; color: #475569; }
+.cn-msg-ok { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
+.cn-msg-warn { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+
+.cn-row { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.cn-radio { font-size: 11.5px; color: #33463e; display: inline-flex; align-items: center; gap: 3px; cursor: pointer; }
+
+/* 基准端（改尺寸时不动的一端）/ 沿管轴移动接头 */
+.cn-anchor { background: #f7faf8; border: 1px solid #e3ece6; border-radius: 5px; padding: 4px 6px; }
+.cn-anchor .cn-radio { font-size: 11px; }
+.cn-axmove { background: #f7faf8; border: 1px solid #e3ece6; border-radius: 5px; padding: 4px 6px; }
+
+.cn-input {
+  width: 74px;
+  border: 1px solid #c6d8cc;
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 11.5px;
+  color: #243c35;
+}
+.cn-input-sm { width: 52px; }
+.cn-input:focus { outline: none; border-color: #8fae9b; box-shadow: 0 0 0 2px rgba(143, 174, 155, 0.25); }
+
+.cn-form { font-size: 11px; color: #33463e; line-height: 2; }
+
+.cn-sel { border-top: 1px dashed #dbe7de; padding-top: 7px; display: flex; flex-direction: column; gap: 5px; }
+.cn-sel-title { font-size: 11.5px; font-weight: 700; color: #243c35; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.cn-badge { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 8px; background: #e6f2ea; color: #15803d; }
+.cn-segref {
+  text-align: left;
+  border: 1px solid #e3ece6;
+  background: #fbfdfb;
+  color: #33463e;
+  font-size: 10.5px;
+  padding: 3px 7px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.cn-segref:hover { border-color: #8fae9b; background: #f2f7f3; }
+
+.cn-details { font-size: 10.5px; color: #5b6b66; }
+.cn-details summary { cursor: pointer; color: #b45309; font-weight: 600; }
+.cn-detail-item { padding: 2px 0 0 4px; line-height: 1.5; }
+
+/* ---------- 编辑事务条（预览中：确认 / 取消） ---------- */
+.cn-txbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #f59e0b;
+  background: #fffbeb;
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+.cn-tx-label { font-size: 11px; font-weight: 700; color: #92400e; flex: 1; }
+.cn-txbar .cn-btn.cn-primary { background: #16a34a; border-color: #16a34a; }
+.cn-txbar .cn-btn.cn-primary:hover { background: #12813c; }
+
+/* ---------- 延伸 / 修剪流程提示 ---------- */
+.cn-flow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  padding: 5px 8px;
+}
+.cn-flow .cn-btn { margin-left: auto; }
+
+/* ---------- 旧存档选择 ---------- */
+.cn-legacy { border: 1px dashed #d97706; background: #fffdf5; border-radius: 6px; padding: 6px 8px; display: flex; flex-direction: column; gap: 5px; }
+.cn-legacy-title { color: #92400e; font-weight: 600; }
+
+/* ---- 逐件接管：继续连接选项行 / 型号下拉 ---- */
+.cn-conn { flex-wrap: wrap; gap: 4px; }
+.cn-conn .cn-btn { padding: 2px 8px; font-size: 12px; }
+.cn-form select.cn-input { max-width: 230px; }
+
+/* ---------- 清单式接管（施工顺序清单） ---------- */
+.cn-assy { border: 1px solid #dbe7de; background: #fbfdfb; border-radius: 6px; padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; }
+.cn-assy-title { font-size: 11.5px; font-weight: 700; color: #243c35; display: flex; align-items: center; gap: 6px; }
+.cn-assy-list { margin: 0; padding-left: 20px; font-size: 10.5px; color: #33463e; line-height: 1.75; max-height: 150px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #c9d6ce transparent; }
+.cn-assy-list::-webkit-scrollbar { width: 4px; }
+.cn-assy-list::-webkit-scrollbar-track { background: transparent; }
+.cn-assy-list::-webkit-scrollbar-thumb { background: #c9d6ce; border-radius: 2px; }
+.cn-assy-empty { font-size: 10.5px; color: #5b6b66; line-height: 1.6; }
+.cn-assy-step { font-size: 10.5px; color: #5b6b66; margin-top: 2px; }
+.cn-assy select.cn-input { max-width: 100%; }
+.cn-assy-err { font-size: 10.5px; color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca; border-radius: 5px; padding: 4px 6px; line-height: 1.5; word-break: break-all; }
+
+/* ---------- 就地小菜单 #cnPop（2026-09-15）：点白圈空口 / 点管段中部就地弹出 ---------- */
+/* 挂在 document.body 下（fixed 定位），不进入 SVG，避免与底图点击/pointer-capture 互相干扰。 */
+#cnPop.cn-pop {
+  position: fixed;
+  z-index: 60;
+  min-width: 158px;
+  max-width: 250px;
+  background: #fff;
+  border: 1px solid #c6d8cc;
+  border-radius: 8px;
+  padding: 7px;
+  box-shadow: 0 6px 20px rgba(16, 40, 30, 0.2);
+  font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+}
+.cn-pop-head {
+  font-size: 11px;
+  font-weight: 700;
+  color: #2d604b;
+  margin-bottom: 5px;
+  word-break: break-all;
+}
+.cn-pop .cn-btn { display: block; width: 100%; text-align: left; margin: 3px 0; padding: 5px 9px; font-size: 11.5px; }
+.cn-pop input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #c6d8cc;
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 12px;
+  color: #243c35;
+  margin: 2px 0 4px;
+}
+.cn-pop input:focus { outline: none; border-color: #8fae9b; box-shadow: 0 0 0 2px rgba(143, 174, 155, 0.25); }
+/* 就地改长菜单的基准端下拉（2026-09-15） */
+.cn-pop select.cn-selbox {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #c6d8cc;
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 11.5px;
+  color: #243c35;
+  background: #fff;
+  margin: 2px 0 4px;
+}
+.cn-pop select.cn-selbox:focus { outline: none; border-color: #8fae9b; }
+/* 改管径菜单的外径按钮网格（2026-09-15） */
+.cn-cal-grid { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 6px; }
+.cn-cal-grid .cn-btn.cn-cal-btn { display: block; width: auto; min-width: 44px; text-align: center; margin: 0; padding: 4px 6px; font-size: 11px; }
+/* 沿线统计卡（2026-09-15）：面板内按管径分组合计 + 沿程损失 */
+.cn-pathstats { border: 1px solid #c6d8cc; border-radius: 7px; padding: 6px 8px; margin: 7px 0; background: #f4faf6; }
+.cn-pathstats .cn-path-row { font-size: 11px; color: #243c35; line-height: 1.6; }
+.cn-pathstats .cn-path-row.cn-warn-txt { color: #b45309; }
+.cn-pathstats .cn-path-sum { font-size: 10.5px; color: #5b6b66; line-height: 1.55; margin-top: 3px; }
+.cn-pathstats .cn-row { margin-top: 4px; }
+/* 改径段 Ø 标注（叠加层内，随 data-ry-export-skip 一并剔除） */
+g.cn-layer text.cn-cal {
+  font-size: 10px;
+  font-weight: 700;
+  fill: #b45309;
+  paint-order: stroke;
+  stroke: #fff;
+  stroke-width: 3px;
+  font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+}
