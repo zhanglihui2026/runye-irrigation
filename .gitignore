@@ -30,3 +30,12 @@ verify_*.js
 verify_*.cjs
 audit_*.js
 docs/
+
+# 一次性调试残留（下划线开头的文件；目录由上面的 _*/ 覆盖）
+# 注意：不能用 `_*` 通配——仓库里已有被跟踪的 _delcards.py
+_out_*
+_patch_*
+_r_*
+*.pre-*
+*.post-*
+*.rv_bak
