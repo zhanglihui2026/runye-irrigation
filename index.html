@@ -4605,6 +4605,7 @@ body.ry-tool #tlPipePlanSection .pp-side .pp-plan-item,
 <link rel="stylesheet" href="tl-workspace/tl-workspace.css">
 <link rel="stylesheet" href="runye-nav.css">
 <link rel="stylesheet" href="hydraulic-calc/hydraulic-calc.css">
+<link rel="stylesheet" href="filter-system/filter-system.css">
 <style id="ryCadTwinCss">
 /* --- 14c. CAD 全局工具栏 · 选择器孪生（2026-09-14 脚本生成，勿手改） ---
    原「#pipePlanSection …」「#tlPipePlanSection …」规则，在 .pp-side 被 ryCadJs
@@ -6451,8 +6452,9 @@ function doIrrImport(text){
 </section>
 <section id="filterSystemSection" class="ry-sec" aria-label="过滤系统">
   <!-- 2026-09-18 第七十一轮（用户要求）：顶部导航新增「过滤系统」→ 点击进入本页。
-       页面具体做法用户下一步再给，本轮只搭**空壳**：标题 + 占位说明，
-       不引脚本、不改 tlDiagramData、不进任何计算，避免占位元素污染全站快照。 -->
+       用户下一步给了做法：本页由 filter-system/filter-system.js **懒挂载**
+       （首次可见时才建 DOM、替换下面的 .fs-empty 占位），故此处静态保持为空壳。
+       该模块只读本页参数、不写 tlDiagramData，避免占位元素污染全站快照。 -->
   <div class="fs-empty" id="filterSystemEmpty">
     <div class="fs-empty-inner">
       <div class="fs-empty-title">过滤系统</div>
@@ -13791,7 +13793,7 @@ render();
     detailsSection:'材料清单与工程量汇总',
 threeDModelingSection:'树状管网水头损失：任选路径独立成算，管径/长度实时联动',
     parametricModelingSection:'参数化建模 · 独立试验区 · 当前会话保留，刷新清空',
-    filterSystemSection:'过滤系统生成页面（具体内容待补充）'
+    filterSystemSection:'GREEN 型单体并联机组 · 四视图与选型计算 · 可回写过滤损失'
   };
   window.ryStatusUpdate=function(sec){
     if(!sec) return;
@@ -14344,6 +14346,9 @@ threeDModelingSection:'树状管网水头损失：任选路径独立成算，管
 <script src="tl-workspace/tl-workspace.js"></script>
 <script src="hydraulic-calc/hc-core.js"></script>
 <script src="hydraulic-calc/hydraulic-calc.js"></script>
+<!-- 过滤系统页（2026-09-18 第七十二轮）：GREEN 单体版管路模型 + 选型计算，
+     懒挂载（首次可见时建 DOM），与二级/三级计算双向融合。 -->
+<script src="filter-system/filter-system.js"></script>
 <script>
 (function(){
   function el(id){ return document.getElementById(id); }

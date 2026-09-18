@@ -1,0 +1,104 @@
+/* 过滤系统 · 叠片过滤器并联机组选型工作台（2026-09-18）
+ * 宿主：index.html 的 #filterSystemSection（第七十一轮预留的空壳页）。
+ * 变量约定与 modeling/workspace.css、hydraulic-calc.css 一致：一律 var(--u-x, 字面值) ——
+ * 本项目从不定义 --u-*，全靠兜底字面值，颜色与宿主现有面板保持一致（绿系 + 石板灰）。
+ *
+ * @media print 隐藏：与 workspace.css / hydraulic-calc.css 同款（见文件末）。
+ */
+.fs-wrap{
+  flex:1 1 auto;min-height:0;min-width:0;display:flex;flex-direction:column;overflow:hidden;
+  font:13px/1.6 "Microsoft YaHei","PingFang SC","Segoe UI",system-ui,sans-serif;
+  color:var(--u-ink,#243c35);background:var(--u-panel,#f7faf9);
+}
+.fs-wrap-body{flex:1 1 auto;min-height:0;min-width:0;display:flex;overflow:hidden}
+.fs-main{flex:1;min-width:0;overflow:auto;padding:14px 16px 44px}
+
+/* ---------- 滚动条：只写 ::-webkit-scrollbar（第六十五轮实测口径，见 hydraulic-calc.css） ---------- */
+.fs-side::-webkit-scrollbar,.fs-main::-webkit-scrollbar{width:4px;height:4px}
+.fs-side::-webkit-scrollbar-track,.fs-main::-webkit-scrollbar-track,
+.fs-side::-webkit-scrollbar-corner,.fs-main::-webkit-scrollbar-corner{background:transparent}
+.fs-side::-webkit-scrollbar-thumb,.fs-main::-webkit-scrollbar-thumb{background:#bfd3c6;border-radius:2px}
+.fs-side::-webkit-scrollbar-thumb:hover,.fs-main::-webkit-scrollbar-thumb:hover{background:#9db8a7}
+
+/* ---------- 顶部条 ---------- */
+.fs-bar{
+  flex:0 0 auto;display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  padding:9px 16px;border-bottom:1px solid var(--u-accent-line,#cfe3da);background:#fff;
+}
+.fs-bar-title{font-size:14px;font-weight:700;color:var(--u-accent-2,#116447)}
+.fs-bar-sub{font-size:12px;color:var(--u-ink-2,#7b9188)}
+.fs-bar-sp{flex:1}
+.fs-bar-btn{
+  font:inherit;font-size:12.5px;padding:4px 10px;border:1px solid var(--u-accent-line,#cfe3da);
+  border-radius:4px;background:#fff;color:var(--u-accent-2,#116447);cursor:pointer;white-space:nowrap;
+}
+.fs-bar-btn:hover{background:var(--u-accent-bg,#e0f2e9)}
+.fs-bar-btn.solid{background:var(--u-accent-2,#116447);color:#fff;border-color:var(--u-accent-2,#116447)}
+.fs-bar-btn.solid:hover{background:var(--u-accent,#18835e)}
+.fs-bar-btn.on{background:var(--u-accent,#18835e);color:#fff;border-color:var(--u-accent,#18835e)}
+
+/* ---------- 左栏 ---------- */
+.fs-side{
+  flex:0 0 348px;width:348px;min-height:0;overflow:auto;padding:12px 12px 48px;
+  background:#fff;border-right:1px solid var(--u-accent-line,#cfe3da);
+  display:flex;flex-direction:column;
+}
+.fs-group{margin:0 0 12px;padding:10px 10px 8px;border:1px solid var(--u-accent-line,#cfe3da);border-radius:6px;background:var(--u-accent-bg,#f4fbf7)}
+.fs-gh{font-size:13px;font-weight:700;color:var(--u-accent-2,#116447);margin:0 0 8px;display:flex;align-items:center;gap:6px;letter-spacing:.3px}
+.fs-gh>em{font-style:normal;font-weight:400;font-size:11.5px;color:var(--u-ink-2,#7b9188);margin-left:auto}
+.fs-row{display:flex;align-items:center;gap:7px;margin:0 0 7px;min-width:0}
+.fs-row>label{flex:0 0 88px;color:var(--u-ink-2,#4a6259);font-size:12.5px}
+.fs-row input[type=number],.fs-row select{
+  font:inherit;font-size:12.5px;padding:4px 6px;border:1px solid var(--u-accent-line,#cfe3da);
+  border-radius:4px;background:#fff;color:inherit;min-width:0;
+}
+.fs-row input[type=number]{flex:0 0 60px;width:60px;text-align:right}
+.fs-row select{flex:1}
+.fs-row input[type=range]{flex:1;min-width:0;accent-color:var(--u-accent,#18835e);height:18px;margin:0}
+.fs-row input:focus-visible,.fs-row select:focus-visible{outline:2px solid var(--u-water,#245f87);outline-offset:1px}
+.fs-unit{flex:0 0 auto;font-size:11.5px;color:var(--u-ink-2,#7b9188);min-width:26px}
+.fs-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
+.fs-chip{
+  font:inherit;font-size:12px;padding:3px 9px;border:1px solid var(--u-accent-line,#cfe3da);
+  border-radius:999px;background:#fff;color:var(--u-ink-2,#4a6259);cursor:pointer;white-space:nowrap;
+}
+.fs-chip:hover{border-color:var(--u-accent,#18835e);color:var(--u-accent-2,#116447)}
+.fs-chip.on{background:#fde9e9;border-color:#b91c1c;color:#b91c1c;font-weight:700}
+.fs-note{margin:2px 0 0;padding:7px 9px;border-left:3px solid var(--u-accent-line,#9bcbb4);background:#fbfdfc;color:var(--u-ink-2,#4a6259);font-size:11.5px;line-height:1.7}
+.fs-note b{color:var(--u-ink,#243c35)}
+
+/* ---------- 四视图 ---------- */
+.fs-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0 0 14px}
+.fs-vcard{border:1px solid var(--u-accent-line,#cfe3da);border-radius:6px;background:#fff;padding:7px 9px 3px;min-width:0}
+.fs-vcard-h{display:flex;align-items:baseline;gap:8px;margin:0 0 3px}
+.fs-vcard-h>b{font-size:12.5px;font-weight:700;color:var(--u-accent-2,#116447)}
+.fs-vcard-h>em{font-style:normal;font-size:11px;color:var(--u-ink-2,#7b9188);margin-left:auto}
+.fs-vcard svg{width:100%;height:auto;display:block}
+
+/* ---------- 结果区 ---------- */
+.fs-block{margin:0 0 14px;border:1px solid var(--u-accent-line,#cfe3da);border-radius:6px;background:#fff;padding:10px 12px 8px}
+.fs-block-h{font-size:13px;font-weight:700;color:var(--u-accent-2,#116447);margin:0 0 8px;display:flex;align-items:center;gap:8px}
+.fs-block-h>em{font-style:normal;font-weight:400;font-size:11.5px;color:var(--u-ink-2,#7b9188)}
+.fs-kv{display:flex;align-items:baseline;gap:8px;padding:4px 0;border-bottom:1px dashed #eef4f1;font-size:12.5px}
+.fs-kv:last-child{border-bottom:0}
+.fs-kv>span:first-child{flex:0 0 210px;color:var(--u-ink-2,#4a6259)}
+.fs-kv>span:last-child{font-variant-numeric:tabular-nums;color:var(--u-ink,#243c35)}
+.fs-kv>span:last-child b{color:var(--u-accent-2,#116447)}
+.fs-ok{color:#15803d;font-weight:700}
+.fs-bad{color:#b91c1c;font-weight:700}
+.fs-warn{color:#c2410c;font-weight:700}
+.fs-kv-note{flex:0 0 210px;color:var(--u-ink-2,#4a6259)}
+.fs-leg{display:flex;flex-wrap:wrap;gap:14px;margin:8px 0 0;font-size:11.5px;color:var(--u-ink-2,#4a6259)}
+.fs-leg>span{display:inline-flex;align-items:center;gap:5px}
+.fs-lg{width:16px;height:3px;border-radius:2px;display:inline-block}
+.fs-lg-square{width:11px;height:11px;border-radius:2px;display:inline-block}
+
+/* ---------- 响应式 ---------- */
+@media (max-width:1180px){
+  .fs-wrap-body{flex-direction:column}
+  .fs-side{flex:0 0 auto;width:auto;max-height:46vh;border-right:0;border-bottom:1px solid var(--u-accent-line,#cfe3da)}
+  .fs-grid{grid-template-columns:1fr}
+}
+@media print{
+  #filterSystemSection{display:none!important}
+}
