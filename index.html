@@ -1451,6 +1451,16 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
   text-align:center;
   padding:24px;
 }
+/* 第七十一轮：过滤系统页空壳（内容待用户确认）。
+   工具模式下 .ry-active 是 flex 列，内层用 flex:1 撑满可用高度（与其余功能区一致）。 */
+#filterSystemSection .fs-empty{
+  flex:1;min-height:180px;margin:16px;
+  display:flex;align-items:center;justify-content:center;
+  border:1px dashed #cbd5e1;border-radius:10px;background:#f8fafc;padding:24px;
+}
+#filterSystemSection .fs-empty-inner{text-align:center}
+#filterSystemSection .fs-empty-title{font-size:17px;font-weight:700;color:#1f2937;margin-bottom:6px}
+#filterSystemSection .fs-empty-note{font-size:12.5px;color:#64748b}
 
 /* Hidden by request: remove network demo and calculation basis blocks from the UI. */
 #networkSection,
@@ -6438,6 +6448,17 @@ function doIrrImport(text){
     <a href="modeling/parametric/index.html" target="_blank" rel="noopener">在独立窗口打开</a>
   </div>
   <iframe id="parametricModelerFrame" title="数字化建模：图形绘制、参数调节与节点放样" data-src="modeling/parametric/embedded.html" sandbox="allow-scripts"></iframe>
+</section>
+<section id="filterSystemSection" class="ry-sec" aria-label="过滤系统">
+  <!-- 2026-09-18 第七十一轮（用户要求）：顶部导航新增「过滤系统」→ 点击进入本页。
+       页面具体做法用户下一步再给，本轮只搭**空壳**：标题 + 占位说明，
+       不引脚本、不改 tlDiagramData、不进任何计算，避免占位元素污染全站快照。 -->
+  <div class="fs-empty" id="filterSystemEmpty">
+    <div class="fs-empty-inner">
+      <div class="fs-empty-title">过滤系统</div>
+      <div class="fs-empty-note">过滤系统生成页面 · 内容与交互待确认后补充</div>
+    </div>
+  </div>
 </section>
 </main>
 
@@ -13760,7 +13781,8 @@ render();
   /* ---------- 2. 底部状态栏 ---------- */
   var NAMES={designInput:'标准分区预设',areaTool:'地块绘制',
              pipePlanSection:'二级管路',tlPipePlanSection:'三级管路编辑',detailsSection:'材料清单',
-             threeDModelingSection:'水力计算器',parametricModelingSection:'数字化建模'};
+             threeDModelingSection:'水力计算器',parametricModelingSection:'数字化建模',
+             filterSystemSection:'过滤系统'};
   var HINTS={
     designInput:'调整左侧参数，方案与管径选型结果实时更新',
     areaTool:'上传图片或在线地图描绘地块边界，闭合后自动回填面积',
@@ -13768,7 +13790,8 @@ render();
     tlPipePlanSection:'设定联合灌溉分区 → 生成管线图 → 「三级制图」可缩放/插入管线',
     detailsSection:'材料清单与工程量汇总',
 threeDModelingSection:'树状管网水头损失：任选路径独立成算，管径/长度实时联动',
-    parametricModelingSection:'参数化建模 · 独立试验区 · 当前会话保留，刷新清空'
+    parametricModelingSection:'参数化建模 · 独立试验区 · 当前会话保留，刷新清空',
+    filterSystemSection:'过滤系统生成页面（具体内容待补充）'
   };
   window.ryStatusUpdate=function(sec){
     if(!sec) return;
