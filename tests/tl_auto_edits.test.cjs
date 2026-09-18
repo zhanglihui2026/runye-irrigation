@@ -100,7 +100,10 @@ const AE = require('../tl-workspace/tl-auto-edits.js');
   ok(AE.fitsList().length === 1 && AE.fitsList()[0] === f1, 'fitsList 即时可见');
   const f2 = AE.addFitting('valve', 'front', 999, d, 'test');
   ok(f2.atM === 299.99, 'atM 超出管长 → clamp 到管长内（299.99）');
-  ok(AE.addFitting('elbow', 'main-0', 10, d) === null, '不支持的配件类型 → null（弯头不在图面层）');
+  /* 2026-09-18 第七十轮：工具轨新增「弯头」按钮后，图面层正式支持弯头 —— 上面那条
+     「弯头不在图面层」的断言已过期，改写成下面 4b 的正向契约；此处保留**真正的**负向：
+     一个确实不在 KINDS 里的 kind 必须仍被拒绝（否则 addFitting 的入口形同虚设）。 */
+  ok(AE.addFitting('reducer', 'main-0', 10, d) === null, '不支持的配件类型（reducer）→ null');
   ok(AE.addFitting('tee', 'main-99', 10, d) === null, '管线不存在 → null');
   AE.addFitting('valve', 'main-1', 10, d, 'test');
   ok(AE.fitCount() === 3, 'fitCount = 3');
@@ -355,6 +358,23 @@ const AE = require('../tl-workspace/tl-auto-edits.js');
   const d2 = mkData(); d2.mainPipes[0][1].y = 120;
   AE.syncGeometry(d2);
   ok(AE.fitCount() === 0 && AE.fitSpinOf('A-F01') === 0, '几何变化 → spin 随配件整层清空');
+  AE.reset(); AE.discardSaved();
+}
+
+/* ---------- 4b. 图面弯头（2026-09-18 第七十轮：工具轨「阀门/三通/弯头」）---------- */
+{
+  AE.reset(); AE.discardSaved();
+  const d = mkData({ multiSegMain: true });          /* 3 点折线：可表达「内部拐点」 */
+  AE.syncGeometry(d);
+  const fe = AE.addFitting('elbow', 'main-0', 70, d, 'test');
+  ok(fe && fe.id === 'A-F01' && fe.kind === 'elbow' && fe.atM === 70, '图面层现在支持弯头（按弧长定位）');
+  const pe = AE.pointAt('main-0', d, fe.atM);
+  ok(pe && Math.abs(pe.x - 32) < 1e-9 && Math.abs(pe.y - 70) < 1e-9, '弯头取点与三通同源（沿管 70m → (32,70)）');
+  ok(AE.moveFitting(fe.id, 80, d, 'test') && AE.fitsList()[0].atM === 80, '弯头可沿管拖动 / 输入改弧长');
+  ok(AE.setFitSpin(fe.id, 15, 'test') === false, '弯头无第三口 → 旋转拒绝（与阀门口径一致）');
+  const snapE = AE.serialize();
+  AE.reset(); AE.discardSaved();
+  ok(AE.restore(snapE) === true && AE.fitsList()[0] && AE.fitsList()[0].kind === 'elbow', 'serialize/restore 保留弯头');
   AE.reset(); AE.discardSaved();
 }
 

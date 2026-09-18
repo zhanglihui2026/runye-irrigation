@@ -21,7 +21,7 @@
   var LS_KEY = 'runye_tlEditPipes_v1';
   var KINDS = { main: '主管', branch: '支管' };
   var ID_RE = /^M-P\d+$/;
-  var FIT_KINDS = { tee: '三通', elbow: '弯头' };   // 手工配件（2026-09-16）
+  var FIT_KINDS = { tee: '三通', elbow: '弯头', valve: '阀门' };   // 手工配件（2026-09-16；阀门 2026-09-18 第十八轮新增）
   var FIT_ID_RE = /^MP-F\d+$/;
 
   /* ---------- 状态 ---------- */
@@ -31,7 +31,7 @@
   var subs = [];                        // 订阅者 fn(detail)
   var emitting = false;
   var savedLS = null;                   // localStorage 兜底存档（init 时读一次）
-  var fits = [];                        // 手工配件 [{id, kind:'tee'|'elbow', pid, atM(tee)|end(elbow), side(tee ±1)}]（2026-09-16）
+  var fits = [];                        // 手工配件 [{id, kind:'tee'|'elbow'|'valve', pid, atM(tee/valve)|end(elbow), side(tee ±1)}]（2026-09-16）
   var fseq = { n: 0 };                  // 配件计数器（MP-F 前缀）
 
   /* ---------- 基础 ---------- */
@@ -101,7 +101,8 @@
   }
 
   /* ---------- 手工配件（2026-09-16）：三通/弯头 ----------
-   * 三通挂管身（atM 沿管弧长，side 决定分支朝向哪一侧）；弯头挂端头（end 0=起点 1=终点）。
+   * 三通挂管身（atM 沿管弧长，side 决定分支朝向哪一侧）；弯头挂端头（end 0=起点 1=终点）；
+   * 阀门挂管身（atM 沿管弧长，无分支侧向 —— 2026-09-18 第十八轮新增）。
    * 「接管道」由工作区读 fitPos 锚点后调 add() 引出新管段（默认 1m，选中即改长）——链式生长。
    * 红线不变：配件只增本模块自有状态，不参与水力计算、不进材料清单。 */
   function fitById(id) {
@@ -121,7 +122,12 @@
     if (!m || !m.pts || m.pts.length < 2) return null;
     var pts = m.pts, a = null, d = null;
     if (f.kind === 'elbow') {
-      if (f.end === 0) {
+      if (Number.isInteger(f.vi) && f.vi >= 0 && f.vi < pts.length) {
+        /* 内部拐点：锚点 = 该顶点；方向取顶点之后一段（保证非零），末点则退回前一段 */
+        a = pts[f.vi];
+        if (f.vi + 1 < pts.length) d = { x: pts[f.vi + 1].x - pts[f.vi].x, y: pts[f.vi + 1].y - pts[f.vi].y };
+        else d = { x: pts[f.vi].x - pts[f.vi - 1].x, y: pts[f.vi].y - pts[f.vi - 1].y };
+      } else if (f.end === 0) {
         a = pts[0];
         d = { x: pts[0].x - pts[1].x, y: pts[0].y - pts[1].y };
       } else {
@@ -141,7 +147,8 @@
         left -= seg;
       }
       if (!a) { a = { x: pts[pts.length - 1].x, y: pts[pts.length - 1].y }; d = { x: 1, y: 0 }; }
-      d = { x: -d.y * (f.side || 1), y: d.x * (f.side || 1) };   // 分支方向 = 垂直宿管
+      /* 三通：分支方向 = 垂直宿管（side 选侧）；阀门无分支口，dir 保持管轴切线（仅占位，2026-09-18） */
+      if (f.kind === 'tee') d = { x: -d.y * (f.side || 1), y: d.x * (f.side || 1) };
     }
     var dl = Math.hypot(d.x, d.y) || 1;
     return { x: a.x, y: a.y, dir: { x: d.x / dl, y: d.y / dl }, kind: m.kind, hostLen: Math.round(polylineLen(pts) * 100) / 100 };
@@ -153,10 +160,14 @@
     var o = opts || {}, f;
     if (kind === 'elbow') {
       f = { id: 'MP-F' + pad2(++fseq.n), kind: kind, pid: pid, end: (o.end === 0 ? 0 : 1) };
+      /* 挂内部拐点（2026-09-18 第七十轮「弯头吸附到管线拐角/端头」）：vi = 折线顶点下标，
+         出现时覆盖 end；端点仍走 end(0/1) 语义，旧存档与旧调用点不受影响。 */
+      if (Number.isInteger(o.vi) && o.vi >= 0 && o.vi < m.pts.length) { f.vi = o.vi; delete f.end; }
     } else {
       var L = polylineLen(m.pts);
       var at = Math.max(0.01, Math.min(Number(o.atM) || 0, L - 0.01));
-      f = { id: 'MP-F' + pad2(++fseq.n), kind: kind, pid: pid, atM: Math.round(at * 100) / 100, side: (o.side === -1 ? -1 : 1) };
+      f = { id: 'MP-F' + pad2(++fseq.n), kind: kind, pid: pid, atM: Math.round(at * 100) / 100 };
+      if (kind === 'tee') f.side = (o.side === -1 ? -1 : 1);   // 阀门无分支侧（2026-09-18）
     }
     fits.push(f);
     notify('addFit', source);
@@ -170,7 +181,7 @@
   }
   function moveFit(id, atM, source) {
     var f = fitById(id);
-    if (!f || f.kind !== 'tee' || !isFinite(atM)) return false;
+    if (!f || f.kind === 'elbow' || !isFinite(atM)) return false;   // 三通/阀门按弧长定位；弯头挂端头不参与
     var m = pipeById(f.pid);
     if (!m) return false;
     var L = polylineLen(m.pts);
@@ -281,8 +292,15 @@
       for (var k = 0; k < state.fits.length; k++) {
         var ft = state.fits[k];
         if (!FIT_ID_RE.test(ft.id) || !FIT_KINDS[ft.kind] || !pipeById(ft.pid)) return false;
-        if (ft.kind === 'elbow') { if (ft.end !== 0 && ft.end !== 1) return false; }
-        else { if (!isFinite(ft.atM) || ft.atM < 0 || (ft.side !== -1 && ft.side !== 1)) return false; }
+        if (ft.kind === 'elbow') {
+          if (Number.isInteger(ft.vi) && ft.vi >= 0) { /* 内部拐点弯头（2026-09-18）*/ }
+          else if (ft.end !== 0 && ft.end !== 1) return false;
+        }
+        else {
+          if (!isFinite(ft.atM) || ft.atM < 0) return false;
+          if (ft.kind === 'tee' && ft.side !== -1 && ft.side !== 1) return false;   /* 阀门无 side（2026-09-18） */
+          if (ft.kind === 'valve' && ft.side != null) return false;                 /* 阀门无第三口：写了 side 即脏数据 */
+        }
         if (seenF[ft.id]) return false;
         seenF[ft.id] = 1;
         fmax = Math.max(fmax, parseInt(ft.id.slice(4), 10) || 0);

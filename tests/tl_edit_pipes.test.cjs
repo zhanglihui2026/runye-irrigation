@@ -216,7 +216,9 @@ console.log('== E. 手工配件（三通/弯头） ==');
   ok(!EP.moveFit(e1.id, 5, 'test'), '弯头无 atM → moveFit 拒绝');
 
   /* 非法：未知 kind / 宿主不存在 */
-  eq(EP.addFit('valve', m.id, { atM: 1 }, 'test'), null, 'valve 非手工配件 → 拒绝');
+  /* 2026-09-18 第七十轮：工具轨三按钮后，阀门也走手工层 —— 上面那条「valve 非手工配件」
+     的断言已过期，改写成下面独立块的正向契约；此处保留真正的负向（不存在的 kind）。 */
+  eq(EP.addFit('reducer', m.id, { atM: 1 }, 'test'), null, '未知配件类型（reducer）→ 拒绝');
   eq(EP.addFit('tee', 'M-P99', { atM: 1 }, 'test'), null, '宿主不存在 → 拒绝');
 
   /* 通知/订阅链不抛错（notify 带 fits 计数） */
@@ -239,11 +241,18 @@ console.log('== E. 手工配件（三通/弯头） ==');
   ok(EP.restore(old1, true), '旧存档（无 fits）恢复成功');
   eq(EP.fitsList().length, 0, '旧存档配件为空');
 
-  /* 非法数据拒绝：坏 kind / 宿主缺失 / 重复 id */
+  /* 非法数据拒绝：坏 kind / 宿主缺失 / 重复 id
+     2026-09-18 第七十轮：valve 已是手工层合法成员（工具轨三按钮），不能再拿它充当「坏 kind」
+     —— 换成确实不在 FIT_KINDS 里的 reducer；阀门本身的边界改由下方「带 side → 拒绝」把关，
+     那条更能代表真实脏数据（旧码 kier 给阀门顺手写了个 side）。 */
   EP.reset();
   const mm = EP.add('branch', [{ x: 0, y: 0 }, { x: 4, y: 0 }], 'test');
-  const bad1 = JSON.parse(JSON.stringify(old1)); bad1.pipes = [JSON.parse(JSON.stringify(mm))]; bad1.seq = { n: 1 }; bad1.fits = [{ id: 'MP-F01', kind: 'valve', pid: mm.id, atM: 1, side: 1 }];
-  eq(EP.restore(bad1, true), false, '坏 kind 拒绝');
+  const bad1 = JSON.parse(JSON.stringify(old1)); bad1.pipes = [JSON.parse(JSON.stringify(mm))]; bad1.seq = { n: 1 }; bad1.fits = [{ id: 'MP-F01', kind: 'reducer', pid: mm.id, atM: 1, side: 1 }];
+  eq(EP.restore(bad1, true), false, '坏 kind（reducer）拒绝');
+  const bad1v = JSON.parse(JSON.stringify(bad1)); bad1v.fits = [{ id: 'MP-F01', kind: 'valve', pid: mm.id, atM: 1, side: 1 }];
+  eq(EP.restore(bad1v, true), false, '阀门带 side（无第三口却写了分支侧）→ 拒绝');
+  const bad1v2 = JSON.parse(JSON.stringify(bad1)); bad1v2.fits = [{ id: 'MP-F01', kind: 'valve', pid: mm.id, atM: 1 }];
+  eq(EP.restore(bad1v2, true), true, '纯阀门（无 side）→ 接受（第七十轮新成员）');
   const bad2 = JSON.parse(JSON.stringify(old1)); bad2.pipes = [JSON.parse(JSON.stringify(mm))]; bad2.seq = { n: 1 }; bad2.fits = [{ id: 'MP-F01', kind: 'tee', pid: 'M-P99', atM: 1, side: 1 }];
   eq(EP.restore(bad2, true), false, '宿主缺失拒绝');
   const bad3 = JSON.parse(JSON.stringify(old1)); bad3.pipes = [JSON.parse(JSON.stringify(mm))]; bad3.seq = { n: 1 }; bad3.fits = [{ id: 'MP-F01', kind: 'elbow', pid: mm.id, end: 2 }];
@@ -267,6 +276,40 @@ console.log('== E. 手工配件（三通/弯头） ==');
   /* ws 侧：渲染含手工配件 + pickManFit 经由 api._geo 不可测（无 DOM）——几何已单测覆盖 */
   EP.reset();
   eq(EP.count(), 0, '清场');
+}());
+
+/* ---------- 手工层补齐：阀门 + 内部拐点弯头（2026-09-18 第七十轮）---------- */
+(function () {
+  EP.reset();
+  const m = EP.add('main', [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }], 'test');
+
+  /* ① 阀门：按弧长定位、无第三口（不写 side）、dir 退化为沿管切线 */
+  const v = EP.addFit('valve', m.id, { atM: 5 }, 'test');
+  ok(v && v.kind === 'valve' && v.atM === 5 && v.side === undefined, '手工阀门：按弧长定位且不写 side（无第三口）');
+  const av = EP.fitPos(v.id);
+  ok(av && Math.abs(av.x - 5) < 1e-9 && Math.abs(av.dir.x - 1) < 1e-9, '阀门锚点 = 管上该点，dir = 沿管切线（占位）', av && JSON.stringify(av));
+  ok(!EP.flipFit(v.id, 'test'), '阀门不可换向（flipFit 只认三通）');
+  ok(EP.moveFit(v.id, 8, 'test'), '阀门可按弧长改位置');
+
+  /* ② 弯头挂内部拐点 vi：不止两端，中间拐角也能吸附 */
+  const e = EP.addFit('elbow', m.id, { vi: 1 }, 'test');
+  ok(e && e.kind === 'elbow' && e.vi === 1 && e.end === undefined, '弯头挂内部拐点：写 vi、不写 end');
+  const ae = EP.fitPos(e.id);
+  ok(ae && Math.abs(ae.x - 10) < 1e-9 && Math.abs(ae.y) < 1e-9, '内部拐点锚点 = 该顶点 (10,0)', ae && (ae.x + ',' + ae.y));
+  ok(ae && ae.dir.y > 0.99, '内部拐点方向取顶点之后一段（保证非零）', ae && JSON.stringify(ae.dir));
+  ok(!EP.moveFit(e.id, 5, 'test'), '内部拐点弯头无 atM → moveFit 拒绝（与端头弯头同口径）');
+
+  /* ③ 序列化往返：valve 与 vi 都要活得下来 */
+  const sv = EP.serialize();
+  EP.reset();
+  ok(EP.restore(sv) === true, 'restore 接受 valve + vi 弯头');
+  const list = EP.fitsList();
+  ok(list.length === 2 && list.filter(function (f) { return f.kind === 'valve'; }).length === 1
+     && list.filter(function (f) { return f.vi === 1; }).length === 1, 'restore 后两件套在位', JSON.stringify(list));
+  const badV = JSON.parse(JSON.stringify(sv));
+  badV.fits = [{ id: 'MP-F01', kind: 'elbow', pid: 'M-P01', vi: -3 }];
+  ok(EP.restore(badV, true) === false, 'vi 为负 → restore 拒绝');
+  EP.reset();
 }());
 
 console.log('== 结论：PASS=' + pass + ' FAIL=' + fail + ' ==');

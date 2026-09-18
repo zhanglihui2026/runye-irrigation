@@ -596,6 +596,9 @@
           fsym = '<path d="M' + fmt(fq.x - 4.5) + ' ' + fmt(fq.y - 3.6) + ' L' + fmt(fq.x + 4.5) + ' ' + fmt(fq.y + 3.6)
             + ' L' + fmt(fq.x + 4.5) + ' ' + fmt(fq.y - 3.6) + ' L' + fmt(fq.x - 4.5) + ' ' + fmt(fq.y + 3.6)
             + ' Z" fill="' + fCol + '" stroke="#fff" stroke-width="1.3"/>';
+        } else if (f.kind === 'elbow') {
+          /* 图面弯头（2026-09-18 第七十轮）：旋转方块，与三级工作区 AE 层同款 */
+          fsym = '<rect x="' + fmt(fq.x - 4.6) + '" y="' + fmt(fq.y - 4.6) + '" width="9.2" height="9.2" fill="' + fCol + '" stroke="#fff" stroke-width="1.3" transform="rotate(45 ' + fmt(fq.x) + ' ' + fmt(fq.y) + ')"/>';
         } else {
           fsym = '<circle cx="' + fmt(fq.x) + '" cy="' + fmt(fq.y) + '" r="4.6" fill="' + fCol + '" stroke="#fff" stroke-width="1.3"/>'
             + '<path d="M' + fmt(fq.x - 6) + ' ' + fmt(fq.y) + ' H' + fmt(fq.x + 6) + ' M' + fmt(fq.x) + ' ' + fmt(fq.y) + ' V' + fmt(fq.y + 6) + '" stroke="#fff" stroke-width="1.2" fill="none"/>';
@@ -633,7 +636,7 @@
           }
         }
         s.push('<g class="iso-tlfit" data-tlfit="' + esc(f.id) + '" style="cursor:pointer"><title>'
-          + esc(f.id + ' · ' + (f.kind === 'tee' ? '三通' : '阀门') + ' · ' + AE.pipeName(f.pid) + ' ' + pos.along.toFixed(1) + 'm') + '</title>'
+          + esc(f.id + ' · ' + (KIND_LABEL[f.kind] || '配件') + ' · ' + AE.pipeName(f.pid) + ' ' + pos.along.toFixed(1) + 'm') + '</title>'
           + (fSel ? '<circle cx="' + fmt(fq.x) + '" cy="' + fmt(fq.y) + '" r="9" fill="none" stroke="#7c3aed" stroke-width="1.6" stroke-dasharray="4,3"/>' : '')
           + fsym + spinSym + fLabels + '</g>');
       });
@@ -1878,7 +1881,7 @@
       var f = (AE.fitsList() || []).filter(function (x) { return x.id === selFitId; })[0];
       if (!f) return null;
       var fpos = AE.pointAt(f.pid, lastDataRef, f.atM);
-      return { fit: true, id: f.id, kind: f.kind, kindLabel: f.kind === 'tee' ? '三通' : '阀门', pid: f.pid, pipeName: AE.pipeName(f.pid), atM: f.atM, pipeLen: fpos ? fpos.len : null, spin: (f.kind === 'tee' && isFinite(f.spin)) ? f.spin : 0 };
+      return { fit: true, id: f.id, kind: f.kind, kindLabel: KIND_LABEL[f.kind] || '配件', pid: f.pid, pipeName: AE.pipeName(f.pid), atM: f.atM, pipeLen: fpos ? fpos.len : null, spin: (f.kind === 'tee' && isFinite(f.spin)) ? f.spin : 0 };
     }
     if (!selAutoId || !lastDataRef) return null;
     var epts = AE.effPts(selAutoId, lastDataRef), bpts = AE.pipePts(selAutoId, lastDataRef);

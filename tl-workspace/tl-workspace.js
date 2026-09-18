@@ -66,7 +66,8 @@
     manualMain: '#185FA5', manualBranch: '#16a34a',
     draft: '#7c3aed', snap: '#7c3aed',
     label: '#47555e',
-    manTee: '#e11d48', manElbow: '#7c3aed'    /* 手工配件（2026-09-16）：三通玫红 / 弯头紫（玫红区别于蓝主管，易辨认） */
+    manTee: '#e11d48', manElbow: '#7c3aed',   /* 手工配件（2026-09-16）：三通玫红 / 弯头紫（玫红区别于蓝主管，易辨认） */
+    manValve: '#0891b2'                       /* 手工阀门（2026-09-18 第七十轮）：靛青，与玫红三通、紫弯头三色区分 */
   };
   /* 联合灌溉分组底色（2026-09-16）：仅工作区按 N=combinedN 顺序分组（分组轮流 + 余数单独成组）。
      每组一个独立浅色；同组同色、组间一眼区分；超出调色板循环并降透明度避免与首轮混淆。
@@ -136,6 +137,9 @@
     return '<div id="tlWsGroupInfo" style="display:block;position:absolute;bottom:10px;left:10px;max-width:42%;background:rgba(255,255,255,.96);border:1px solid #1f2937;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.12);padding:6px 11px;font:11.5px/1.55 system-ui,sans-serif;color:#1f2937;pointer-events:none;text-align:left;z-index:6"></div>';
   }
   var KIND_LABEL = { main: '主管', branch: '支管' };
+  /* 图面/手工配件类型 → 中文名（2026-09-18 第七十轮）：阀门进入手工层后，原「非三通即弯头」的
+     三元表达式会张冠李戴，统一走这张表。 */
+  var MAN_FIT_LABEL = { tee: '三通', valve: '阀门', elbow: '弯头' };
 
   /* ---------- 模块状态 ---------- */
   /* 手工管线在共享数据层 EP（2026-09-15 阶段1）；本模块只保留视图态 */
@@ -155,6 +159,7 @@
   var autoDragRaf = 0;        // 拖动提交 rAF 节流句柄
   var lastDataRef = null;
   var mode = null;            // null | 'main' | 'branch' —— 插入模式
+  var fitMode = null;         // null | 'valve' | 'tee' | 'elbow' —— 配件插入模式（2026-09-18 第七十轮）
   var orthoLock = false;      // 横竖锁定（2026-09-16）：画线新点约束与上一点水平/垂直
   var draft = null;           // {kind, pts:[{x,y}(米)]} —— 进行中的折线
   var view = { z: 1, x: 0, y: 0 };
@@ -549,6 +554,9 @@
       var sym;
       if (f.kind === 'valve') {
         sym = '<path d="M' + fmt(q.x - 4.5) + ' ' + fmt(q.y - 3.6) + ' L' + fmt(q.x + 4.5) + ' ' + fmt(q.y + 3.6) + ' L' + fmt(q.x + 4.5) + ' ' + fmt(q.y - 3.6) + ' L' + fmt(q.x - 4.5) + ' ' + fmt(q.y + 3.6) + ' Z" fill="' + col + '" stroke="#fff" stroke-width="1.3"/>';
+      } else if (f.kind === 'elbow') {
+        /* 图面弯头（第七十轮）：旋转方块——与手工层弯头同款符号，吸附在管线折点/端头 */
+        sym = '<rect x="' + fmt(q.x - 4.6) + '" y="' + fmt(q.y - 4.6) + '" width="9.2" height="9.2" fill="' + col + '" stroke="#fff" stroke-width="1.3" transform="rotate(45 ' + fmt(q.x) + ' ' + fmt(q.y) + ')"/>';
       } else {
         sym = '<circle cx="' + fmt(q.x) + '" cy="' + fmt(q.y) + '" r="4.6" fill="' + col + '" stroke="#fff" stroke-width="1.3"/>'
           + '<path d="M' + fmt(q.x - 6) + ' ' + fmt(q.y) + ' H' + fmt(q.x + 6) + ' M' + fmt(q.x) + ' ' + fmt(q.y) + ' V' + fmt(q.y + 6) + '" stroke="#fff" stroke-width="1.2" fill="none"/>';
@@ -609,9 +617,12 @@
       var a = EP.fitPos(f.id);
       if (!a) return;
       var q = T(a), fSel = f.id === selManFitId;
-      var col = f.kind === 'tee' ? COLORS.manTee : COLORS.manElbow;
+      var col = f.kind === 'tee' ? COLORS.manTee : (f.kind === 'valve' ? COLORS.manValve : COLORS.manElbow);
       var sym;
-      if (f.kind === 'tee') {
+      if (f.kind === 'valve') {
+        /* 手工阀门（第七十轮）：与图面层同款蝶形符号，靛青配色 */
+        sym = '<path d="M' + fmt(q.x - 4.5) + ' ' + fmt(q.y - 3.6) + ' L' + fmt(q.x + 4.5) + ' ' + fmt(q.y + 3.6) + ' L' + fmt(q.x + 4.5) + ' ' + fmt(q.y - 3.6) + ' L' + fmt(q.x - 4.5) + ' ' + fmt(q.y + 3.6) + ' Z" fill="' + col + '" stroke="#fff" stroke-width="1.3"/>';
+      } else if (f.kind === 'tee') {
         sym = '<circle cx="' + fmt(q.x) + '" cy="' + fmt(q.y) + '" r="4.6" fill="' + col + '" stroke="#fff" stroke-width="1.3"/>'
             + '<path d="M' + fmt(q.x - 6) + ' ' + fmt(q.y) + ' H' + fmt(q.x + 6) + ' M' + fmt(q.x) + ' ' + fmt(q.y) + ' V' + fmt(q.y + 6) + '" stroke="#fff" stroke-width="1.2" fill="none"/>';
       } else {
@@ -718,10 +729,32 @@
     if (m !== 'main' && m !== 'branch') m = null;
     if (mode === m) m = null;                    // 再点同款 = 退出插入模式
     mode = m;
+    if (mode) clearFitMode();                    // 与配件插入模式互斥（第七十轮）
     if (!mode) cancelDraft();
     if (mode && multiMode) setMultiMode(false);   // 进插入模式自动退出多选（第五十八轮），否则点管身没反应
     updatePreview();
     return mode;
+  }
+  /* 配件插入模式（2026-09-18 第七十轮，用户要求「右侧工具栏增加阀门/三通/弯头插入按钮」）：
+     工具轨点按钮进入 → 点管线即在点击处插入 → 弯头吸附到该管线最近的折点/端头 → 再点同按钮或 Esc 退出。
+     与画线模式 mode 互斥（点管线不会被拖管/加选抢走）；插入后保持模式，可连续布点。
+     ★ 所有写入都落在共享 AE/EP 层（不走 tlDiagramData），不进水力计算与材料清单（红线不变）。 */
+  function clearFitMode() {
+    if (!fitMode) return fitMode;
+    fitMode = null;
+    if (typeof api.onFitModeChange === 'function') api.onFitModeChange(null);
+    return fitMode;
+  }
+  function setFitMode(m) {
+    if (m !== 'valve' && m !== 'tee' && m !== 'elbow') m = null;
+    if (fitMode === m) m = null;                 // 再点同款 = 退出配件插入模式
+    fitMode = m;
+    if (fitMode) {
+      if (mode) { mode = null; cancelDraft(); updatePreview(); if (typeof api.onModeChange === 'function') api.onModeChange(null); }
+      if (multiMode) setMultiMode(false);        // 多选开关会把「点管身」吃掉
+    }
+    if (typeof api.onFitModeChange === 'function') api.onFitModeChange(fitMode);
+    return fitMode;
   }
   function notifyChange() {
     if (typeof api.onManualChange === 'function') api.onManualChange(EP.count());
@@ -741,7 +774,7 @@
       var mf = EP.fitById ? EP.fitById(selManFitId) : null;
       if (mf) {
         var fp = EP.fitPos(mf.id);
-        return { manFit: true, id: mf.id, kind: mf.kind, kindLabel: mf.kind === 'tee' ? '三通' : '弯头', pid: mf.pid, pipeName: mf.pid, atM: (mf.atM != null ? mf.atM : null), pipeLen: fp ? fp.hostLen : null };
+        return { manFit: true, id: mf.id, kind: mf.kind, kindLabel: MAN_FIT_LABEL[mf.kind] || '配件', pid: mf.pid, pipeName: mf.pid, atM: (mf.atM != null ? mf.atM : null), pipeLen: fp ? fp.hostLen : null };
       }
       return null;
     }
@@ -751,7 +784,7 @@
       (AE.fitsList() || []).forEach(function (x) { if (x.id === selFitId) f = x; });
       if (f) {
         var fpos = AE.pointAt(f.pid, lastDataRef, f.atM);
-        return { fit: true, id: f.id, kind: f.kind, kindLabel: f.kind === 'tee' ? '三通' : '阀门', pid: f.pid, pipeName: AE.pipeName(f.pid), atM: f.atM, pipeLen: fpos ? fpos.len : null };
+        return { fit: true, id: f.id, kind: f.kind, kindLabel: MAN_FIT_LABEL[f.kind] || '配件', pid: f.pid, pipeName: AE.pipeName(f.pid), atM: f.atM, pipeLen: fpos ? fpos.len : null };
       }
       return null;
     }
@@ -874,9 +907,11 @@
   function openManFitMenu(fitId, x, y) {
     var f = EP.fitById(fitId);
     if (!f) return;
-    var items = [{ label: ('🔗 接管道（默认 ' + BRANCH_SPAWN_LEN + 'm）'), fn: function () { attachBranchPipe(fitId); } }];
+    var items = [];
+    /* 内部拐点弯头（f.vi）没有「延伸出去的端头」，接管道会画在自身管身上 → 不给这一项（第七十轮） */
+    if (f.kind === 'tee' || (f.kind === 'elbow' && !Number.isInteger(f.vi))) items.push({ label: ('🔗 接管道（默认 ' + BRANCH_SPAWN_LEN + 'm）'), fn: function () { attachBranchPipe(fitId); } });
     if (f.kind === 'tee') items.push({ label: '⇄ 分支换向', fn: function () { EP.flipFit(fitId, 'ws'); } });
-    items.push({ label: '🗑 删除' + (f.kind === 'tee' ? '三通' : '弯头'), fn: function () {
+    items.push({ label: '🗑 删除' + (MAN_FIT_LABEL[f.kind] || '配件'), fn: function () {
       if (f.branchId) EP.remove(f.branchId, 'ws');   // 删三通连带删接出的支管
       EP.removeFit(fitId, 'ws');
       if (selManFitId === fitId) { selManFitId = null; if (typeof api.onPipeSelect === 'function') api.onPipeSelect(null); }
@@ -895,7 +930,7 @@
       items.push({ label: '⌂ 复位第三口（垂直管道）', fn: function () { AE.setFitSpin(fitId, 0, 'ws-menu'); } });
     }
     items.push({ label: ('🔗 接管道（默认 ' + BRANCH_SPAWN_LEN + 'm）'), fn: function () { attachAutoBranchPipe(fitId); } });
-    items.push({ label: '🗑 删除' + (f.kind === 'valve' ? '阀门' : '三通'), fn: function () {
+    items.push({ label: '🗑 删除' + (MAN_FIT_LABEL[f.kind] || '配件'), fn: function () {
       if (f.branchId) EP.remove(f.branchId, 'ws');   // 删三通/阀门连带删接出的支管
       var ok = AE.removeFitting(fitId, 'ws');
       if (ok) { if (selFitId === fitId) selFitId = null; rerenderKeepView(); if (typeof api.onPipeSelect === 'function') api.onPipeSelect(null); }
@@ -1049,6 +1084,76 @@
     return best;
   }
 
+  /* ---------- 配件插入模式的命中小工具（2026-09-18 第七十轮）---------- */
+  /* 点 → 最近管线（自动层 AE + 手工层 EP 一起比，取真正最近的）：
+     {layer:'auto', pid, along} | {layer:'manual', id, atM, pts}；未命中返回 null。 */
+  function pickAnyPipe(p, tolM) {
+    var best = null, bd = tolM;
+    function consider(d, rec) { if (d < bd) { bd = d; best = rec; } }
+    EP.list().forEach(function (m) {
+      if (!m.pts || m.pts.length < 2) return;
+      var pre = 0;
+      for (var i = 0; i + 1 < m.pts.length; i++) {
+        var c = closestOnSeg(p, m.pts[i], m.pts[i + 1]);
+        consider(Math.hypot(c.x - p.x, c.y - p.y), { layer: 'manual', id: m.id, pts: m.pts,
+          atM: pre + Math.hypot(c.x - m.pts[i].x, c.y - m.pts[i].y) });
+        pre += Math.hypot(m.pts[i + 1].x - m.pts[i].x, m.pts[i + 1].y - m.pts[i].y);
+      }
+    });
+    if (lastDataRef && viewState && viewState.base) {
+      AE.allPids(lastDataRef).forEach(function (pid) {
+        var epts = AE.effPts(pid, lastDataRef);
+        if (!epts) return;
+        for (var i = 0; i + 1 < epts.length; i++) {
+          var c = closestOnSeg(p, epts[i], epts[i + 1]);
+          var loc = AE.locate(pid, lastDataRef, c);
+          consider(Math.hypot(c.x - p.x, c.y - p.y), { layer: 'auto', pid: pid, pts: epts, along: loc ? loc.along : 0 });
+        }
+      });
+    }
+    return best;
+  }
+  /* 折线上距 p 最近的顶点（端头或内部拐点）→ {vi, atM, end}：弯头落点吸附用 */
+  function nearestVertex(pts, p) {
+    if (!pts || !pts.length) return null;
+    var best = -1, bd = Infinity;
+    for (var i = 0; i < pts.length; i++) {
+      var d = Math.hypot(pts[i].x - p.x, pts[i].y - p.y);
+      if (d < bd) { bd = d; best = i; }
+    }
+    if (best < 0) return null;
+    var pre = 0;
+    for (var j = 0; j < best; j++) pre += Math.hypot(pts[j + 1].x - pts[j].x, pts[j + 1].y - pts[j].y);
+    return { vi: best, atM: pre, end: (best === 0 ? 0 : (best === pts.length - 1 ? 1 : null)) };
+  }
+  /* 插入配件：命中记录 → 新配件 id（写共享层并广播，两视图自动重渲染），失败返回 null。
+     自动管线写 AE（tee/valve/elbow 全支持）；手工管线写 EP（弯头用 end/vi，其余用弧长 atM）。 */
+  function insertFitAt(hit, p) {
+    if (!hit || !fitMode) return null;
+    var kind = fitMode, id = null;
+    if (hit.layer === 'auto' && lastDataRef) {
+      var at = hit.along;
+      if (kind === 'elbow') {                    // 弯头：吸附到该管线最近的折点/端头
+        var nv = nearestVertex(AE.effPts(hit.pid, lastDataRef) || [], p || { x: 0, y: 0 });
+        if (nv) at = nv.atM;
+      }
+      var nf = AE.addFitting(kind, hit.pid, at, lastDataRef, 'ws');
+      if (nf) { selManFitId = null; id = nf.id; selectFit(id); }
+    } else if (hit.layer === 'manual') {
+      var mf = null;
+      if (kind === 'elbow') {
+        var m = EP.pipeById ? EP.pipeById(hit.id) : null;
+        var nv2 = nearestVertex((m && m.pts) || [], p || { x: 0, y: 0 });
+        if (nv2 && nv2.end !== null) mf = EP.addFit('elbow', hit.id, { end: nv2.end }, 'ws');
+        else if (nv2) mf = EP.addFit('elbow', hit.id, { vi: nv2.vi }, 'ws');   // 内部拐点
+      } else {
+        mf = EP.addFit(kind, hit.id, { atM: hit.atM }, 'ws');
+      }
+      if (mf) { id = mf.id; selectManFit(id); }
+    }
+    return id;
+  }
+
   /* ---------- 指针坐标 → 数据坐标（米） ---------- */
   function svgUserPoint(el, clientX, clientY) {
     try {
@@ -1133,6 +1238,18 @@
       try { ctn.focus({ preventScroll: true }); } catch (err) { ctn.focus(); }
       downPos = { x: e.clientX, y: e.clientY };
       suppressAutoPick = false;                  // 每次按下重新开始（第五十八轮）
+      /* 配件插入模式（2026-09-18 第七十轮）：工具轨已选好类型 → 点管线即在点击处插入。
+         必须排在配件拖动/管身拖动/平移之前，否则点管身会被它们截走；
+         点空白不退出模式（便于连续布点），退出靠再点按钮或 Esc。 */
+      if (e.button === 0 && fitMode && !mode && viewState && viewState.base && lastDataRef) {
+        var rawFitPt = rawDataPoint(el, e);
+        if (rawFitPt) {
+          var hitFit = pickAnyPipe(rawFitPt, snapTolUnits(el) / viewState.k * 1.5);
+          if (hitFit) insertFitAt(hitFit, rawFitPt);
+        }
+        e.preventDefault();
+        return;
+      }
       /* 配件沿管拖动（阶段2b）：左键按在图面配件上 → 进入拖动（平移让位）；capture 挂容器（重渲染不丢） */
       if (e.button === 0 && !mode && viewState && viewState.base && lastDataRef) {
         var rawD = rawDataPoint(el, e);
@@ -1337,6 +1454,7 @@
       else if (e.key === 'Escape') {
         if (draft) cancelDraft();
         else if (mode) { mode = null; updatePreview(); if (typeof api.onModeChange === 'function') api.onModeChange(null); }
+        else if (fitMode) setFitMode(null);      // Esc 退出配件插入模式（第七十轮）
         e.preventDefault();
       }
     });
@@ -1591,6 +1709,10 @@
   api.zoomIn = zoomIn; api.zoomOut = zoomOut; api.zoomFit = zoomFit;
   api.setMode = setMode;
   api.mode = function () { return mode; };
+  api.setFitMode = setFitMode;                            // 配件插入模式（第七十轮）：'valve'|'tee'|'elbow'|null
+  api.fitMode = function () { return fitMode; };
+  api.onFitModeChange = null;                             // 模式变化 → 页面重画工具轨按钮高亮（页面注入）
+  api.onFitChange = null;                                 // 插入成功 → 页面提示（页面注入，可选）
   api.setOrtho = function (v) { orthoLock = !!v; return orthoLock; };   // 横竖锁定开关（2026-09-16）
   api.ortho = function () { return orthoLock; };
   api.undo = undo;

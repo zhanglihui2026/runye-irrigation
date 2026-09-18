@@ -6,7 +6,8 @@
  *       共用的「图面编辑」单一数据源：
  *       ① 长度覆盖 lens —— pid → 新总长度（米）。改长策略与手工管线一致：
  *          前段保持不动，末段沿原方向拉伸/收缩到目标总长。
- *       ② 配件 fits —— 三通/阀门，按沿管弧长 atM（米，基于设计原始几何）
+ *       ② 配件 fits —— 三通/阀门/弯头，按沿管弧长 atM（米，基于设计原始几何；
+ *          弯头由工作区点击时吸附到管线折点后写入，见 tl-workspace.js 插入模式）
  *          定位；改长后位置随有效几何平移/截断（clamp）。
  *       ③ 管径覆盖 cals —— pid → 外径 od（mm，2026-09-16 阶段2e 图面改径）：
  *          只作显示标注（琥珀 Ø），不改几何、不参与水力计算、不进材料清单。
@@ -23,13 +24,13 @@
 
   var VERSION = 1;
   var LS_KEY = 'runye_tlAutoEdits_v1';
-  var KINDS = { tee: '三通', valve: '阀门' };
+  var KINDS = { tee: '三通', valve: '阀门', elbow: '弯头' };   // elbow：2026-09-18 第十八轮新增（工具轨三按钮）
   var PID_RE = /^(front|main-\d+|branch-\d+)$/;
   var FIT_ID_RE = /^A-F\d+$/;
 
   /* ---------- 状态 ---------- */
   var lens = {};                        // { pid: 新总长度(米) }
-  var fits = [];                        // [{id, kind:'tee'|'valve', pid, atM}]
+  var fits = [];                        // [{id, kind:'tee'|'valve'|'elbow', pid, atM}]
   var cals = {};                        // { pid: 外径 od(mm) }（阶段2e 改径，显示标注）
   var moves = {};                       // { pid: {dx,dy} } 图面平移覆盖（米，2026-09-16；不改管长，红线安全）
   var seq = { n: 0 };                   // 配件全局单计数器（A-F 前缀，禁分计数防撞号）

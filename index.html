@@ -6061,13 +6061,19 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     <button class="tl-ws-btn" id="tlWsBranch" type="button" data-ws-mode="branch">插入支管</button>
     <button class="tl-ws-btn" id="tlWsOrtho" type="button" title="横竖锁定：画线时新点只能与上一点水平/垂直对齐；按住 Shift 临时反向">⊥ 横竖锁定</button>
     <span class="tl-ws-sep"></span>
+    <!-- 配件插入按钮（2026-09-18 第七十轮，用户要求「右侧工具栏增加阀门/三通/弯头插入按钮」）：
+         常驻可见，不必先选中管线 —— 点按钮高亮进入插入模式 → 点管线即在点击处插入 → 再点本按钮或 Esc 退出；
+         自动管线与手工管线都支持；弯头会自动吸附到该管线最近的拐角/端头。
+         旧版「⊞ 三通 / 🔩 阀门」需先选中自动管线才出现（且不支持手工管线），此处已取消。 -->
+    <button class="tl-ws-btn" id="tlWsFitValve" type="button" aria-pressed="false" title="插入阀门：点本按钮后，再点管线上的位置即插入（自动/手工管线都支持）">🔩 阀门</button>
+    <button class="tl-ws-btn" id="tlWsFitTee" type="button" aria-pressed="false" title="插入三通：点本按钮后，再点管线上的位置即插入（自动/手工管线都支持）">⊞ 三通</button>
+    <button class="tl-ws-btn" id="tlWsFitElbow" type="button" aria-pressed="false" title="插入弯头：点本按钮后点击管线，自动吸附到最近的拐角/端头">⌐ 弯头</button>
+    <span class="tl-ws-sep"></span>
     <button class="tl-ws-btn" id="tlWsUndo" type="button" title="撤销最后一条手工管线">↩ 回退</button>
     <button class="tl-ws-btn" id="tlWsClear" type="button" title="清空全部手工管线">🗑 清空手工</button>
     <button class="tl-ws-btn" id="tlWsLenBtn" type="button" style="display:none" title="就地改长：前段保持不动，末段沿原方向拉伸/收缩">📏 改长</button>
     <button class="tl-ws-btn" id="tlWsDelBtn" type="button" style="display:none" title="删除选中的手工管线">🗑 删除选中</button>
-    <button class="tl-ws-btn" id="tlWsTeeBtn" type="button" style="display:none" title="在选中自动管线的点击位置插入三通">⊞ 三通</button>
     <button class="tl-ws-btn" id="tlWsMoveResetBtn" type="button" style="display:none" title="恢复选中自动管线的原始位置（清除图面平移）">⌖ 恢复位置</button>
-    <button class="tl-ws-btn" id="tlWsValveBtn" type="button" style="display:none" title="在选中自动管线的点击位置插入阀门">🔩 阀门</button>
     <button class="tl-ws-btn" id="tlWsCalBtn" type="button" style="display:none" title="改选中管线的管径（与右键改管径等效）">🔧 改直径</button>
     <span class="tl-ws-sep" id="tlWsMultiSep" style="display:none"></span>
     <span class="tl-ws-multi" id="tlWsMultiInfo" style="display:none"></span>
@@ -14321,12 +14327,14 @@ threeDModelingSection:'树状管网水头损失：任选路径独立成算，管
   var mainBtn=el('tlWsMain'), branchBtn=el('tlWsBranch'),
       count=el('tlWsManCount'), hint=el('tlWsHint'),
       selInfo=el('tlWsSelInfo'), lenBtn=el('tlWsLenBtn'), delBtn=el('tlWsDelBtn'),
-      teeBtn=el('tlWsTeeBtn'), valveBtn=el('tlWsValveBtn'), moveResetBtn=el('tlWsMoveResetBtn'),
+      /* 2026-09-18 第七十轮：⊞三通 / 🔩阀门（选中自动管线才临时出现）已取消，改为下面三个常驻按钮。 */
+      fitValveBtn=el('tlWsFitValve'), fitTeeBtn=el('tlWsFitTee'), fitElbowBtn=el('tlWsFitElbow'),
+      moveResetBtn=el('tlWsMoveResetBtn'),
       fitDist=el('tlWsFitDist'), fitA=el('tlWsFitA'), fitB=el('tlWsFitB'),
       calBtn=el('tlWsCalBtn'), multiSep=el('tlWsMultiSep'), multiInfo=el('tlWsMultiInfo'),
       multiCalBtn=el('tlWsMultiCalBtn'), multiClearBtn=el('tlWsMultiClearBtn'), multiBtn=el('tlWsMultiBtn');
   var curAutoPid=null;
-  var HINT_IDLE='点「插入主管/支管」后在图上点击逐点画线，双击结束，Esc 取消；点击已画管线可选中改长/删除，按住管线拖动可整条平移';
+  var HINT_IDLE='点「插入主管/支管」后在图上点击逐点画线，双击结束，Esc 取消；点「阀门/三通/弯头」后再点管线即插入配件（弯头自动吸附到最近拐角/端头）；点击已画管线可选中改长/删除，按住管线拖动可整条平移';
   function f1(v){ return (Math.round(v*10)/10).toFixed(1); }
   function refresh(m){
     if(mainBtn) mainBtn.classList.toggle('active', m==='main');
@@ -14335,6 +14343,29 @@ threeDModelingSection:'树状管网水头损失：任选路径独立成算，管
     if(cvn) cvn.classList.toggle('tl-ws-inserting', !!m);
     if(hint) hint.textContent = m ? ('正在插入'+(m==='main'?'主管':'支管')+'：点击加点，双击/Enter 结束，Esc 取消') : HINT_IDLE;
   }
+  /* 配件插入按钮态（2026-09-18 第七十轮）：与 drawMultiBtn 同理 —— 按钮态不由页面这
+     一次点击决定，而由 RyTlWs.onFitModeChange 回推（进入画线/多选时会被模块内部自动踢出）。 */
+  var FIT_BTNS={ valve:null, tee:null, elbow:null };
+  var FIT_CN={ valve:'阀门', tee:'三通', elbow:'弯头' };
+  function drawFitBtns(fm){
+    Object.keys(FIT_BTNS).forEach(function(k){
+      var b=FIT_BTNS[k]; if(!b) return;
+      b.classList.toggle('active', fm===k);
+      b.setAttribute('aria-pressed', fm===k?'true':'false');
+    });
+    var fcn=document.querySelector('#tlWsContent .tl-ws-canvas');
+    if(fcn) fcn.classList.toggle('tl-ws-inserting', !!fm);
+    if(hint && !(window.RyTlWs && RyTlWs.mode && RyTlWs.mode())) {
+      hint.textContent = fm
+        ? ('正在插入'+FIT_CN[fm]+'：点击管线即在该处插入'+(fm==='elbow'?'（自动吸附到最近的拐角/端头）':'')+'，再点本按钮或 Esc 退出')
+        : HINT_IDLE;
+    }
+  }
+  FIT_BTNS.valve=fitValveBtn; FIT_BTNS.tee=fitTeeBtn; FIT_BTNS.elbow=fitElbowBtn;
+  Object.keys(FIT_BTNS).forEach(function(k){
+    var b=FIT_BTNS[k]; if(!b) return;
+    b.addEventListener('click', function(){ if(window.RyTlWs && RyTlWs.setFitMode) RyTlWs.setFitMode(k); });
+  });
   if(window.RyTlWs){
     /* 汇总（2026-09-15 阶段1）：条数 + 按类型长度自动加减 */
     RyTlWs.onManualChange=function(n){
@@ -14342,6 +14373,7 @@ threeDModelingSection:'树状管网水头损失：任选路径独立成算，管
       if(count) count.textContent='手工 '+n+' 条 · 主管 '+f1(t.main.len)+'m · 支管 '+f1(t.branch.len)+'m';
     };
     RyTlWs.onModeChange=refresh;   /* Esc 退出插入模式时同步按钮高亮 */
+    RyTlWs.onFitModeChange=drawFitBtns;   /* 第七十轮：配件插入模式的进入/退出回推按钮高亮与提示 */
     /* 选中信息 → 工具栏按钮（2026-09-15 阶段1 手工；阶段2 扩展自动管线/配件） */
     RyTlWs.onPipeSelect=function(info){
       var isAuto = info && info.auto, isFit = info && info.fit, isManFit = info && info.manFit;
@@ -14355,9 +14387,7 @@ threeDModelingSection:'树状管网水头损失：任选路径独立成算，管
       if(lenBtn) lenBtn.style.display = (info && !isFit && !isManFit) ? '' : 'none';   /* 配件无可改长度 */
       if(delBtn){ delBtn.style.display = (info && !isAuto) ? '' : 'none';   /* 自动管线不可删除 */
         delBtn.textContent = (isFit || isManFit) ? '🗑 删除配件' : '🗑 删除选中'; }
-      if(teeBtn) teeBtn.style.display = isAuto ? '' : 'none';
       if(moveResetBtn) moveResetBtn.style.display = (isAuto && window.RyTlAutoEdits && window.RyTlAutoEdits.moveOf(info.id)) ? '' : 'none';
-      if(valveBtn) valveBtn.style.display = isAuto ? '' : 'none';
       if(fitDist) fitDist.style.display = isFit ? '' : 'none';   /* 选中配件：两侧距离输入框（阶段2b） */
       if(isFit && fitA && fitB){
         var tot=(info.pipeLen!=null)?info.pipeLen:(info.atM||0), at=info.atM||0;
@@ -14369,7 +14399,7 @@ threeDModelingSection:'树状管网水头损失：任选路径独立成算，管
       if(hint && !RyTlWs.mode()) hint.textContent = info
         ? (isManFit ? ('已选配件 '+info.id+'（'+info.kindLabel+'，挂在 '+(info.pid||'')+' 上）：右键配件可接管道（默认 1m）/换向/删除；点空白处取消')
           : (isFit ? ('已选配件 '+info.id+'（'+info.kindLabel+' · '+(info.pipeName||info.pid)+'）：可在管上拖动，或用「距起点/距终点」精确定位，可删除；点空白处取消')
-            : (isAuto ? ('已选 '+info.kindLabel+'（'+info.id+' '+info.len.toFixed(1)+'m'+(window.tlPipeCalText&&window.tlPipeCalText(info.id)?'，'+window.tlPipeCalText(info.id):'')+(window.tlPipeHfText&&window.tlPipeHfText(info.id)?'，'+window.tlPipeHfText(info.id):'')+'）：可改长/右键改管径，或在点击位置插三通/阀门；点空白处取消')
+            : (isAuto ? ('已选 '+info.kindLabel+'（'+info.id+' '+info.len.toFixed(1)+'m'+(window.tlPipeCalText&&window.tlPipeCalText(info.id)?'，'+window.tlPipeCalText(info.id):'')+(window.tlPipeHfText&&window.tlPipeHfText(info.id)?'，'+window.tlPipeHfText(info.id):'')+'）：可改长/右键改管径，或用工具轨的「阀门/三通/弯头」按钮在管线任意位置插入配件；点空白处取消')
               : ('已选中 '+info.id+'（'+info.kindLabel+' '+info.len.toFixed(1)+'m）：按住可整条拖动，或改长/删除；点空白处取消'))))
         : HINT_IDLE;
       /* 第五十二轮（2026-09-17，用户要求）：选中自动管线 → 右侧统计表自动滚到它所在的分区。
@@ -14418,8 +14448,6 @@ threeDModelingSection:'树状管网水头损失：任选路径独立成算，管
     var info=RyTlWs.getSelected();
     if(info && info.fit) RyTlWs.deleteSelFit(); else RyTlWs.deleteSelected();
   });
-  if(teeBtn) teeBtn.addEventListener('click', function(){ if(window.RyTlWs) RyTlWs.insertAutoFit('tee'); });
-  if(valveBtn) valveBtn.addEventListener('click', function(){ if(window.RyTlWs) RyTlWs.insertAutoFit('valve'); });
   /* 两侧距离输入（阶段2b）：改任一侧，另一侧自动补齐（和=当前有效管长） */
   function wsFitInput(which){
     if(!window.RyTlWs) return;
@@ -14456,8 +14484,6 @@ threeDModelingSection:'树状管网水头损失：任选路径独立成算，管
     if(show){   /* 多选态：隐藏单选中才用的按钮，避免歧义 */
       if(lenBtn) lenBtn.style.display='none';
       if(delBtn) delBtn.style.display='none';
-      if(teeBtn) teeBtn.style.display='none';
-      if(valveBtn) valveBtn.style.display='none';
       if(moveResetBtn) moveResetBtn.style.display='none';
       if(fitDist) fitDist.style.display='none';
       if(calBtn) calBtn.style.display='none';
@@ -14483,6 +14509,7 @@ threeDModelingSection:'树状管网水头损失：任选路径独立成算，管
   if(window.RyTlWs){
     RyTlWs.onMultiMode=drawMultiBtn;
     drawMultiBtn(RyTlWs.isMultiMode ? RyTlWs.isMultiMode() : false);
+    drawFitBtns(RyTlWs.fitMode ? RyTlWs.fitMode() : null);
   }
 })();
 </script>
