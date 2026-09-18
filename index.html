@@ -5421,6 +5421,11 @@ body.ry-cad-iso #ryCadGrpIso{display:block}
    既不依赖重渲染，也不受「隐藏期间发生重渲染」影响；简图与三级工作区两份标注同属一个开关。
    注：下载 / 打印走独立快照，不受此开关影响（要跟随一起隐藏就说一声）。 */
 body.ry-worst-off [data-tlworst]{display:none}
+/* 最远水路水流动画（2026-09-19 用户要求：静态颜色虚线 → 流动虚线，观感同过滤器反冲水流 fs-flow）：
+   dasharray 6 7、0.9s 循环、dashoffset → -26（每周期两个 dash 步长），流向 = 路径绘制方向（水源 → 最远区末端）。
+   仍受上面 ry-worst-off 开关门控（整组 display:none，动画类不参与显隐）。 */
+.tl-worst-flow{stroke-dasharray:6 7;animation:tlWorstFlow .9s linear infinite;pointer-events:none}
+@keyframes tlWorstFlow{to{stroke-dashoffset:-26}}
 
 /* 接管：搬进工具栏的 .pp-side 去掉「独立栏」外观，宽度撑满分组。
    特异性与孪生规则齐平（1,3,1）+ 本段在孪生段之后 → 后来居上，零 !important 之争。 */
@@ -6444,11 +6449,22 @@ function doIrrImport(text){
   -->
 </section>
 <section id="parametricModelingSection" class="ry-sec ry-modeling-section" aria-label="数字化建模 · 参数化建模" data-modeling-state="idle">
-  <div class="ry-modeling-load" role="status">
-    <strong id="parametricLoadText">正在打开参数化建模工具…</strong>
-    <a href="modeling/parametric/index.html" target="_blank" rel="noopener">在独立窗口打开</a>
+  <!-- 2026-09-19（用户指令）：数字化建模只预留导航入口，具体内容暂不展示——
+       原 iframe（modeling/parametric/embedded.html，由 modeling/integration.js 懒加载适配）暂停接入；
+       integration.js 顶部 if(!section||!frame) 判空自动空转，无残留报错。
+       将来方案定了，把下面注释里的原文放回本节即可恢复：
+       <div class="ry-modeling-load" role="status">
+         <strong id="parametricLoadText">正在打开参数化建模工具…</strong>
+         <a href="modeling/parametric/index.html" target="_blank" rel="noopener">在独立窗口打开</a>
+       </div>
+       <iframe id="parametricModelerFrame" title="数字化建模：图形绘制、参数调节与节点放样" data-src="modeling/parametric/embedded.html" sandbox="allow-scripts"></iframe>
+  -->
+  <div style="min-height:420px;display:flex;align-items:center;justify-content:center">
+    <div style="text-align:center">
+      <div style="font-size:15px;font-weight:700;color:#334155">数字化建模 · 入口预留</div>
+      <div style="font-size:12.5px;margin-top:8px;color:#64748b">具体建模内容规划中——方案确定后在此上线。</div>
+    </div>
   </div>
-  <iframe id="parametricModelerFrame" title="数字化建模：图形绘制、参数调节与节点放样" data-src="modeling/parametric/embedded.html" sandbox="allow-scripts"></iframe>
 </section>
 <section id="filterSystemSection" class="ry-sec" aria-label="过滤系统">
   <!-- 2026-09-18 第七十一轮（用户要求）：顶部导航新增「过滤系统」→ 点击进入本页。
@@ -7586,9 +7602,11 @@ function tlWorstPathMarkSVG(ts) {
   out.push('<path d="' + dF + '" stroke="#a855f7" stroke-opacity="0.40" stroke-width="13"/>');
   if (dL) out.push('<path d="' + dL + '" stroke="#a855f7" stroke-opacity="0.40" stroke-width="13"/>');
   out.push('<path d="' + dM + '" stroke="#a855f7" stroke-opacity="0.40" stroke-width="12"/>');
-  out.push('<path d="' + dF + '" stroke="#7e22ce" stroke-width="1.8" stroke-dasharray="7,4"/>');
-  if (dL) out.push('<path d="' + dL + '" stroke="#7e22ce" stroke-width="1.8" stroke-dasharray="7,4"/>');
-  out.push('<path d="' + dM + '" stroke="#7e22ce" stroke-width="1.8" stroke-dasharray="7,4"/>');
+  /* v26：虚线改水流动画（用户要求，观感同过滤器反冲水流 fs-flow）——dasharray/动画由 .tl-worst-flow 类提供，
+     保留紫色系与光晕底衬（紫色仍是「最远水路」的识别色，动画只让水「流」起来） */
+  out.push('<path d="' + dF + '" class="tl-worst-flow" stroke="#7e22ce" stroke-width="1.8"/>');
+  if (dL) out.push('<path d="' + dL + '" class="tl-worst-flow" stroke="#7e22ce" stroke-width="1.8"/>');
+  out.push('<path d="' + dM + '" class="tl-worst-flow" stroke="#7e22ce" stroke-width="1.8"/>');
   var e = ts(g.endPt.x, g.endPt.y);
   out.push('<circle cx="' + e.x.toFixed(1) + '" cy="' + e.y.toFixed(1) + '" r="6" fill="#fff" stroke="#7e22ce" stroke-width="2.5"/>');
   out.push('<text x="' + (e.x + 11).toFixed(1) + '" y="' + (e.y - 9).toFixed(1) + '" font-size="11" font-weight="700" '
@@ -13792,7 +13810,7 @@ render();
     tlPipePlanSection:'设定联合灌溉分区 → 生成管线图 → 「三级制图」可缩放/插入管线',
     detailsSection:'材料清单与工程量汇总',
 threeDModelingSection:'树状管网水头损失：任选路径独立成算，管径/长度实时联动',
-    parametricModelingSection:'参数化建模 · 独立试验区 · 当前会话保留，刷新清空',
+    parametricModelingSection:'数字化建模 · 入口预留（方案确定后上线）',
     filterSystemSection:'GREEN 型单体并联机组 · 四视图与选型计算 · 可回写过滤损失'
   };
   window.ryStatusUpdate=function(sec){
