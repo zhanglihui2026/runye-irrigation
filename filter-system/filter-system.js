@@ -251,14 +251,25 @@
     if (!open) s += line(x + 1.2, y + h - 1.5, x + w - 1.2, y + 1.5, C.fitS, 1.3);
     return s;
   }
-  function dimH(x1, x2, y, label) {
-    return line(x1, y - 3, x1, y + 3, C.dim, 0.7) + line(x2, y - 3, x2, y + 3, C.dim, 0.7) +
+  /* v57：尺寸「端线」（尺寸界线）朝图形一侧适当延长——更美观且指向被测对象。
+     DIM_EXT：朝图形侧多出的长度；背图形侧仍为 3（既有观感不变）。
+     dir >0：图形在正方向侧（dimH 下 / dimV 右）；dir <0：负方向侧（上 / 左）；0 或缺省：对称 ±3。 */
+  var DIM_EXT = 8;
+  function dimH(x1, x2, y, label, dir) {
+    var up = 3, dn = 3;                        /* 尺寸线上半长 / 下半长（屏幕 y 向下为正） */
+    if (dir > 0) dn += DIM_EXT;                /* 图形在下方 → 端线向下（朝图形）延长 */
+    else if (dir < 0) up += DIM_EXT;           /* 图形在上方 → 端线向上（朝图形）延长 */
+    return line(x1, y - up, x1, y + dn, C.dim, 0.7) + line(x2, y - up, x2, y + dn, C.dim, 0.7) +
       '<line x1="' + r2(x1) + '" y1="' + r2(y) + '" x2="' + r2(x2) + '" y2="' + r2(y) +
       '" stroke="' + C.dim + '" stroke-width="0.9" marker-start="url(#fsAr)" marker-end="url(#fsAr)"/>' +
       txt((x1 + x2) / 2, y - 5, label, 11, C.txt2, 'middle');
   }
-  function dimV(x, y1, y2, label) {
-    return line(x, y1 - 3, x, y1 + 3, C.dim, 0.7) + line(x, y2 - 3, x, y2 + 3, C.dim, 0.7) +
+  /* v57：dimV 端线改为「垂直于尺寸线的小横线」（原为沿尺寸线延长 3px、共线看不出），并朝图形一侧延长 */
+  function dimV(x, y1, y2, label, dir) {
+    var lf = 3, rt = 3;                        /* 尺寸线左侧长 / 右侧长 */
+    if (dir > 0) rt += DIM_EXT;                /* 图形在右侧 → 端线向右（朝图形）延长 */
+    else if (dir < 0) lf += DIM_EXT;           /* 图形在左侧 → 端线向左（朝图形）延长 */
+    return line(x - lf, y1, x + rt, y1, C.dim, 0.7) + line(x - lf, y2, x + rt, y2, C.dim, 0.7) +
       '<line x1="' + r2(x) + '" y1="' + r2(y1) + '" x2="' + r2(x) + '" y2="' + r2(y2) +
       '" stroke="' + C.dim + '" stroke-width="0.9" marker-start="url(#fsAr)" marker-end="url(#fsAr)"/>' +
       txt(x + 5, (y1 + y2) / 2 + 4, label, 11, C.txt2, 'start');
@@ -428,11 +439,11 @@
 
     /* 尺寸与注记 */
     /* 罐径 OD 标注已按用户要求取消（v27）：「过滤器 OD200 这种文字不标注」——几何参数不再上图，S=400 保留 */
-    o += dimH(X(0), X(c.s), Y(d.yIn) - Math.max(30, c.od * sc * 0.72), 'S=' + c.s);
+    o += dimH(X(0), X(c.s), Y(d.yIn) - Math.max(30, c.od * sc * 0.72), 'S=' + c.s, 1);   /* v57：图形在下 */
     /* v51：W 标注固定屏幕 y=352（v47 的 372 上移 20px，与图形拉近）——两行总管文字仍在其下方 */
     o += dimH(X(-c.od / 2), X((c.n - 1) * c.s + c.od / 2), 352,
-      '总宽 W = ' + (c.n - 1) + 'S + OD = ' + d.W + ' mm');
-    o += dimV(X(x0) - 64, Y(d.yIn), Y(d.yOut), '2Δ=' + (2 * c.delta));   /* v22：左移让位进水箭头 */
+      '总宽 W = ' + (c.n - 1) + 'S + OD = ' + d.W + ' mm', -1);   /* v57：图形在上 */
+    o += dimV(X(x0) - 64, Y(d.yIn), Y(d.yOut), '2Δ=' + (2 * c.delta), 1);   /* v57：图形在右 */   /* v22：左移让位进水箭头 */
     o += txt(X(x0), 388, '② 排污总管（贴地 +' + mm(d.zWs) + ' · 与 ① 同一竖直平面，俯视虚线重合）· DN' + c.dnWs + ' · 各组排污立管接入', 11, C.ws, 'start');   /* v47：移到 W 标注下方；v51 上移 20px */
     o += txt(X(x0), 372, '③ 出水总管（前 · +' + mm(d.zPort) + '）  ·  DN' + c.dnOut, 11, C.out, 'start');   /* v47：移到 W 标注下方；v51 上移 20px */
     /* ① 标注（v21）：移到右端管上方避开左端 S/OD 尺寸文字；排污立管说明并入 ② 行 */
@@ -526,8 +537,8 @@
     }
 
     /* 尺寸与标高 */
-    o += dimH(X(0), X(c.s), Y(d.zTop) - 34, 'S=' + c.s);
-    o += dimV(X(hmax) - 26   /* v44：右移 8px 与 V0 阀脱开 */, Y(0), Y(d.zTop), 'H总=' + (c.hm + c.h));
+    o += dimH(X(0), X(c.s), Y(d.zTop) - 34, 'S=' + c.s, 1);   /* v57：图形在下 */
+    o += dimV(X(hmax) - 26   /* v44：右移 8px 与 V0 阀脱开 */, Y(0), Y(d.zTop), 'H总=' + (c.hm + c.h), -1);   /* v57：图形在左 */
     o += elevMark(X(hmin) + 36   /* v46：再左移 20px 对齐侧视 v40 脱开幅度 */, Y(d.zTop), '+' + mm(d.zTop));
     o += elevMark(X(hmin) + 36   /* v46：再左移 20px 对齐侧视 v40 脱开幅度 */, Y(d.zInTop), '+' + mm(d.zInTop));
     o += elevMark(X(hmin) + 36   /* v46：再左移 20px 对齐侧视 v40 脱开幅度 */, Y(d.zPort), '+' + mm(d.zPort));
