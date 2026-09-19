@@ -6036,6 +6036,13 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     <div id="tlSysDiagramContent">
       <div class="pp-diagram-empty">完成面积测量并点击「生成管线图」后，切到「系统简图」视图会自动在此内嵌渲染首部系统图。</div>
       <iframe id="tlSysFrame" style="display:none;width:100%;border:0;background:#fff" title="三级系统图"></iframe>
+      <!-- 三级管线施工简图·图框（2026-09-19，用户要求「这部分内容加个图框在系统简图中显示出来」）：
+           tlAutoGenerate 生成管线图后把同一 SVG 克隆进此图框（id 加 sc_ 前缀防 DOM id 重复），
+           切到「系统简图」时与首部系统图同屏显示 -->
+      <div id="tlSysPipeBox" style="display:none;margin:12px 14px 14px;border:2px solid #475569;background:#fff">
+        <div style="padding:6px 10px;border-bottom:1px solid #cbd5e1;font-size:12.5px;font-weight:600;color:#334155;background:#f1f5f9">三级管线施工简图</div>
+        <div id="tlSysPipeBoxBody" style="padding:10px;overflow-x:auto"></div>
+      </div>
     </div>
   </div><!-- /.pp-diagram-wrap -->
   </div><!-- /.ry-pane-sys -->
@@ -7528,7 +7535,7 @@ function tlWorstPathLen(needGeom) {
     }
     var mainPipes = d.mainPipes || [], branchPipes = d.branchPipes || [];
     var branchLens = branchPipes.map(function (bp, bi) { return polyLen(eff('branch-' + bi, bp)); });
-    var taps = [], worst = null;
+    var taps = [], zones = [], worst = null;
     for (var zi = 0; zi < mainPipes.length; zi++) {
       var mp = eff('main-' + zi, mainPipes[zi]);
       if (!mp || mp.length < 2) continue;
@@ -7543,12 +7550,13 @@ function tlWorstPathLen(needGeom) {
       var bl = (zi < branchLens.length) ? branchLens[zi] : 0;        /* 简图按分区顺序 1:1 生成；无对应则回退计算式 */
       taps.push({ zi: zi, run: r.run });
       var mainTot = ml + link;
+      zones.push({ zi: zi, main: mainTot, run: r.run });
       var totPath = r.run + mainTot + bl;
       if (!worst || totPath > worst.totPath) worst = { totPath: totPath, run: r.run, main: mainTot, branch: bl, link: link, zi: zi, q: r.q, mp: mp, useStart: useStart, fromTail: fromTail, f: f };
     }
     if (!worst) return EMPTY;
     taps.sort(function (a, b) { return a.run - b.run; });
-    var out = { fromFigure: true, zoneIndex: worst.zi, front: worst.run, main: worst.main, branch: worst.branch, link: worst.link, taps: taps };
+    var out = { fromFigure: true, zoneIndex: worst.zi, front: worst.run, main: worst.main, branch: worst.branch, link: worst.link, taps: taps, zones: zones };
     if (needGeom) {
       /* 标注几何（第四十七轮）：水源端 → 接点 的**总管局部折线**（只走参与本路径的那一段，不是整根总管），
          再经连接段接到该区主管。支管不标（用户明确要求）。
@@ -7574,6 +7582,49 @@ function tlWorstPathLen(needGeom) {
   } catch (e) {
     return EMPTY;
   }
+}
+
+/* 三级方案数据 → 水力计算器 自动推送（2026-09-19，用户要求）：
+   地块绘制划分分区、生成三级管线图后，把管线计算相关数值（推荐管径、图面实长、
+   每根支管设计流量）直接导入水力计算器，用户零输入。
+   口径 v2（2026-09-19 用户核对流量后确认）：全分区联合 —— trunk=总管段(水源→最远区接点)、
+   mains=每个分区一根主管（各区图面实长）+ 各 branchCount 根支管；
+   计算器总管流量=联合流量（N 区 × zoneFlow），最不利路径由计算器自动标出。 */
+function tlPushToHydraulicCalc() {
+  try {
+    var HC = window.RyHydraulicCalc;
+    if (!HC || typeof HC.importThreeLevel !== 'function') return false;
+    var d = window.tlDiagramData;
+    if (!d || !d.frontPipe) return false;
+    var wp = tlWorstPathLen();
+    if (!wp || !wp.fromFigure) return false;
+    var r = computeThreeLevel();
+    var bc = Math.max(1, r.branchCount | 0);
+    /* v2.1（2026-09-19 用户核对流量）：联合灌溉 = 全图轮灌中同时只开 tl_zoneCount 区（面板「联合灌溉分区数」），
+       总管流量 = 同时开区数 × 单区流量 = combinedFlow（2 区×80=160）。故计算器只导入 zoneCount 根主管：
+       按距水源弧长取最远的 zoneCount 区（最不利组合，与图面最不利路径标注同源），每根挂 branchCount 根支管。 */
+    var allZones = wp.zones || [];
+    if (!allZones.length) return false;
+    var nImp = Math.max(1, Math.min(r.zoneCount | 0 || 1, allZones.length));
+    var zones = allZones.slice().sort(function (a, b) { return b.run - a.run; }).slice(0, nImp);
+    zones.sort(function (a, b) { return a.run - b.run; });   /* 显示顺序仍按沿总管由近到远 */
+    var mains = [];
+    for (var zi = 0; zi < zones.length; zi++) {
+      var z = zones[zi], ts = [];
+      for (var k = 0; k < bc; k++) ts.push({ at: Math.round(z.main * (k + 1) / bc * 100) / 100, od: r.branchPipe.od, len: r.branchLenUsed, flow: r.branchFlow });
+      mains.push({ od: r.mainPipe.od, len: z.main, taps: ts });
+    }
+    /* 来源行列表式（2026-09-19 用户批注「用列表表示更美观」） */
+    var srcTitle = '已导入三级方案 · ' + zones.length + ' 区联合灌溉 · 最远 ' + (wp.zoneIndex + 1) + ' 区';
+    var srcRows = [
+      '总管：OD ' + r.frontPipe.od + ' · ' + fmt(r.frontLenUsed, 1) + ' m',
+      '主管：OD ' + r.mainPipe.od + ' × ' + zones.length + ' 区' + (allZones.length > zones.length ? '（全图 ' + allZones.length + ' 区轮灌，按最不利组合取最远 ' + zones.length + ' 区）' : '（各区图面实长）') + ',',
+      '支管：OD ' + r.branchPipe.od + ' · ' + fmt(r.branchLenUsed, 1) + ' m × 每区 ' + bc + ' 根（每根 ' + fmt(r.branchFlow, 1) + ' m³/h）',
+      '联合流量：' + fmt(r.combinedFlow, 1) + ' m³/h（' + (r.zoneCount | 0 || 1) + ' 区 × ' + fmt(r.zoneFlow, 1) + '）——计算器总管流量同此值'
+    ];
+    HC.importThreeLevel({ trunk: { od: r.frontPipe.od, len: r.frontLenUsed }, mains: mains, srcTitle: srcTitle, srcRows: srcRows });
+    return true;
+  } catch (e) { return false; }
 }
 
 /* ---- 最不利路径图面标注（2026-09-17 第四十七轮，用户要求）----
@@ -8851,6 +8902,15 @@ function tlAutoGenerate(options) {
   var svgStr=parts.join('');
   tlDiagramSVG=svgStr;
   document.getElementById('tlDiagramContent').innerHTML=svgStr;
+  /* 系统简图图框同步（2026-09-19）：克隆同一 SVG，id 加 sc_ 前缀（url(# / href="# 引用同步替换），防 DOM id 重复 */
+  try {
+    var sysPipeBox = document.getElementById('tlSysPipeBox');
+    if (sysPipeBox) {
+      document.getElementById('tlSysPipeBoxBody').innerHTML =
+        svgStr.replace(/id="/g, 'id="sc_').replace(/url\(#/g, 'url(#sc_').replace(/href="#/g, 'href="#sc_');
+      sysPipeBox.style.display = 'block';
+    }
+  } catch (ePipeBox) { }
   /* 固定文字层填充（2026-09-16）：与 SVG 内三组同源数据；工作区缩放/平移不影响 */
   (function(){
     var ov=document.getElementById('tlWsOverlays');
@@ -8875,6 +8935,7 @@ function tlAutoGenerate(options) {
   try { tlRefreshLossCard(); } catch (e) { }   /* 左下角「管段长度与水头损失」按本次图面几何刷新 */
   /* 右侧「管段管径与损失」统计表（第四十二轮）：按新图面几何重算每段管径与损失 */
   try { if (typeof window.tlWsStatsRender === 'function') window.tlWsStatsRender(); } catch (e) { }
+  try { tlPushToHydraulicCalc(); } catch (e) { }   /* 三级方案数据 → 水力计算器 自动推送（2026-09-19） */
   try { tlWsBarSync(); } catch (e) { }
   // tlSavePng 已移除，不再显示
   // 生成完直接落在「三级设计」工作区（可缩放/可插管）
@@ -15755,7 +15816,7 @@ function tlIsoStatsReset() {
   /* 图面改长 / 改径 / 整条平移（AE 编辑层）→ 左下角「管段长度与水头损失」同步刷新：
      最远分区路径长度走 AE.effPts（图面有效几何），几何一变数值就得跟着变；
      第四十二轮起同步刷新右侧「管段管径与损失」统计表（长度与损失都随之变）。 */
-  if (AE && AE.onChange) AE.onChange(function () { try { tlRefreshLossCard(); } catch (e) { } try { pumpUpdateNote(); } catch (e) { } try { window.tlWsStatsRender(); } catch (e) { } });
+  if (AE && AE.onChange) AE.onChange(function () { try { tlRefreshLossCard(); } catch (e) { } try { pumpUpdateNote(); } catch (e) { } try { window.tlWsStatsRender(); } catch (e) { } try { tlPushToHydraulicCalc(); } catch (e) { } });   /* 末位：图面几何一变即重推水力计算器（2026-09-19） */
   try { pumpUpdateNote(); } catch (e) { }
 /* ═══ 管段信息卡（2026-09-17 第五十七轮，用户要求）═══════════════════════════════
    需求：「点击一下管道 应该在鼠标旁边就显示这个管道的基本信息，直径多少 多少米

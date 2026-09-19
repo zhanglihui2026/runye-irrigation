@@ -44,7 +44,7 @@
   var IN_TOP_RISE = 800; // ①上 进水总管比罐口抬高（mm，2026-09-18 定稿 800 → ①上 +1.520、进水阀（立管中段）+1.120）
 
   var DEFAULTS = {
-    n: 4, od: 200, h: 750, hm: 600, s: 400, delta: 260, clear: 150,
+    n: 4, od: 200, h: 600, hm: 600, s: 360, delta: 600, clear: 150,   /* v38：默认值改按用户指定组（H600/S360/Δ600） */
     dnIn: 110, dnOut: 110, dnWs: 110, dnBr: 90,
     q: 60, loss: 5, bw: -1
   };
@@ -72,6 +72,7 @@
     in: '#185FA5', inL: '#B5D4F4', inF: '#E6F1FB',
     out: '#0F6E56', outL: '#9FE1CB', outF: '#E1F5EE',
     ws: '#A32D2D', wsL: '#F09595', wsF: '#FCEBEB',
+    bw: '#7048E8', bwL: '#B3A3F2', bwF: '#EFEBFC',   /* v35：反冲/直排组状态高亮（亮紫，醒目且不与①蓝/③青/②红/阀橙撞色） */
     tank: '#F1EFE8', tankS: '#5F5E5A',
     valve: '#FAEEDA', valveS: '#BA7517',
     fit: 'url(#fsFitG)', fitS: '#6E6E80',   /* 管件：白→灰渐变本体 + 深灰描边 */
@@ -112,7 +113,8 @@
   }
   function pipe(x1, y1, x2, y2, col, light, wmm, sc, dash) {
     var w = Math.max(3, wmm * sc);
-    return line(x1, y1, x2, y2, col, w, dash) + line(x1, y1, x2, y2, light, Math.max(1, w * 0.55), dash);
+    /* v30：亮线占比 0.55→0.775——两侧深色轮廓边减半（如顶视 DN110 管带 35.6px 的轮廓边 8→4px），管带总宽与管径语义不变；pipe 仅用于 ①②③ 总管 */
+    return line(x1, y1, x2, y2, col, w, dash) + line(x1, y1, x2, y2, light, Math.max(1, w * 0.775), dash);
   }
   function arrow(x1, y1, x2, y2, st, w) {
     return '<line x1="' + r2(x1) + '" y1="' + r2(y1) + '" x2="' + r2(x2) + '" y2="' + r2(y2) +
@@ -298,7 +300,8 @@
   /* 顶视图：世界 x 向右、y 向后（屏幕向上） */
   function mapTop(c, d, mg) {
     var xmin = -c.od / 2 - mg, xmax = (c.n - 1) * c.s + c.od / 2 + mg;
-    var ymin = d.yOut - c.od / 2 - mg, ymax = d.yIn + c.od / 2 + mg;
+    /* v47：底部加 160mm 富余——图形略缩，给固定屏幕坐标的 W 标注 + ③/② 两行总管文字腾位 */
+    var ymin = d.yOut - c.od / 2 - mg - 160, ymax = d.yIn + c.od / 2 + mg;
     var m = fit(xmax - xmin, ymax - ymin, 16);
     return {
       sc: m.sc,
@@ -307,12 +310,12 @@
     };
   }
   /* 立面类视图：水平为 h（可翻转）、垂直为标高 z */
-  function mapElev(hmin, hmax, zmin, zmax, pad, hFlip) {
+  function mapElev(hmin, hmax, zmin, zmax, pad, hFlip, dy) {
     var m = fit(hmax - hmin, zmax - zmin, pad);
     return {
       sc: m.sc,
       X: function (h) { return m.ox + (hFlip ? (hmax - h) : (h - hmin)) * m.sc; },
-      Y: function (z) { return m.oy + (zmax - z) * m.sc; }
+      Y: function (z) { return m.oy + (dy || 0) + (zmax - z) * m.sc; }   /* dy: 图形整体下移（v28 侧视 +22 上下均衡） */
     };
   }
 
@@ -320,7 +323,7 @@
   function renderTop(c) {
     var d = der(c), mg = Math.max(220, c.od * 1.2);
     var M = mapTop(c, d, mg), X = M.X, Y = M.Y, sc = M.sc;
-    var x0 = -200, x1 = (c.n - 1) * c.s + 200;
+    var x0 = -200, x1 = (c.n - 1) * c.s + 120;   /* v29：右端延伸 200→120——为出水箭头/文字再右移腾出视界空间（整组右端元素随 x1 左移，V0/堵头相对关系不变） */
     var o = DEFS;
 
     /* ② 排污总管（与 ① 同一竖直平面 → 俯视重合，红虚线垫底） */
@@ -340,21 +343,21 @@
       o += '<circle cx="' + r2(X(gx)) + '" cy="' + r2(Y(d.yIn)) + '" r="2.5" fill="' + C.in + '"/>';
       /* 前支管：罐前缘 → ③ */
       o += line(X(gx), Y(-c.od / 2), X(gx), Y(d.yOut), C.outL, Math.max(2, c.dnBr * sc));
-      /* 罐（俯视为圆） */
+      /* 管件表达：罐前/后口接头 + ③ 三通口箍（v33：改画在罐圆之前——罐圆完整可见，接头仅外侧探出圆缘；③ 三通口在管上不受影响） */
+      var pbw = Math.max(2, c.dnBr * sc), pow = Math.max(3, c.dnOut * sc);
+      o += fitRect(X(gx) - pbw * 0.65, Y(c.od / 2) - pbw * 0.65, pbw * 1.3, pbw * 1.3, 2);   /* 罐后口接头 */
+      o += fitRect(X(gx) - pbw * 0.65, Y(-c.od / 2) - pbw * 0.65, pbw * 1.3, pbw * 1.3, 2);  /* 罐前口接头 */
+      o += fitRect(X(gx) - pow * 0.65, Y(d.yOut) - pbw * 0.65, pow * 1.3, pbw * 1.3, 2);     /* ③ 三通口 */
+      /* 罐（俯视为圆）——v33：后画，盖住接头内侧半段，圆形显示完整更美观 */
       o += '<circle cx="' + r2(X(gx)) + '" cy="' + r2(Y(0)) + '" r="' + r2(c.od / 2 * sc) +
-        '" fill="' + (bw ? C.wsF : C.tank) + '" stroke="' + (bw ? C.ws : C.tankS) + '" stroke-width="1.1"/>';
+        '" fill="' + (bw ? C.bwF : C.tank) + '" stroke="' + (bw ? C.bw : C.tankS) + '" stroke-width="1.1"/>';
       o += '<circle cx="' + r2(X(gx)) + '" cy="' + r2(Y(0)) + '" r="' + r2(Math.max(3, (c.od / 2 - 45) * sc)) +
-        '" fill="none" stroke="' + (bw ? C.wsL : C.ghost) + '" stroke-width="0.8" stroke-dasharray="3 3"/>';
+        '" fill="none" stroke="' + (bw ? C.bwL : C.ghost) + '" stroke-width="0.8" stroke-dasharray="3 3"/>';
       /* 阀位：进水阀 V + 排污阀 P 同在节点竖管上，俯视投影重合 → 画一块（先垫管件箍座，阀块坐于其上） */
       var rw = Math.max(3, c.dnIn * sc) * 1.3;
       o += '<rect x="' + r2(X(gx) - rw / 2) + '" y="' + r2(Y(d.yIn) - rw / 2) + '" width="' + r2(rw) + '" height="' + r2(rw) +
         '" rx="3" fill="' + C.fit + '" stroke="' + C.fitS + '" stroke-width="1"/>';
       o += fitShine(X(gx) - rw / 2 + 2.5, Y(d.yIn) - rw / 2 + 3, X(gx) + rw / 2 - 2.5, Y(d.yIn) - rw / 2 + 3);
-      /* 管件表达：罐前/后口接头 + ③ 三通口箍（画在罐圆之后以露出） */
-      var pbw = Math.max(2, c.dnBr * sc), pow = Math.max(3, c.dnOut * sc);
-      o += fitRect(X(gx) - pbw * 0.65, Y(c.od / 2) - pbw * 0.65, pbw * 1.3, pbw * 1.3, 2);   /* 罐后口接头 */
-      o += fitRect(X(gx) - pbw * 0.65, Y(-c.od / 2) - pbw * 0.65, pbw * 1.3, pbw * 1.3, 2);  /* 罐前口接头 */
-      o += fitRect(X(gx) - pow * 0.65, Y(d.yOut) - pbw * 0.65, pow * 1.3, pbw * 1.3, 2);     /* ③ 三通口 */
       /* 支管快捷接头（v25 沟槽卡箍式）：前后两根支管 37.5% 处各一只——对卡两半壳+唇边+中缝+螺栓，
          拆开快接即可整体抽出罐体检修；37.5%（原 40%）+ 块高 14 是为避开 V 阀座上缘 189.8mm（块带 136.4~183.6mm，净空 6.2mm） */
       var qcW = Math.max(12, pbw + 14), qcH = 14;
@@ -365,8 +368,8 @@
       if (j === 0) o += txt(X(gx) + qcW / 2 + 9, yQb + 3, '沟槽快接', 9, C.fitS, 'start');
       var vw = Math.max(7, VALVE_W * sc), vh = Math.max(6, VALVE_W * sc * 0.7);
       var modeTxt = { filter: '过滤', backwash: '反冲洗', dump: '直排短路', off: '隔离' }[mT];
-      var vFill = (mT === 'filter') ? C.valve : (bw ? C.ws : '#FFFFFF');
-      var vStrk = (mT === 'off') ? C.fitS : (bw ? C.ws : C.valveS);
+      var vFill = (mT === 'filter') ? C.valve : (bw ? C.bw : '#FFFFFF');
+      var vStrk = (mT === 'off') ? C.fitS : (bw ? C.bw : C.valveS);
       o += '<rect x="' + r2(X(gx) - vw / 2) + '" y="' + r2(Y(d.yIn) - vh / 2) + '" width="' + r2(vw) + '" height="' + r2(vh) +
         '" rx="2" class="fs-valve" data-fs-valve="' + j + ':cycle" cursor="pointer" fill="' + vFill + '" stroke="' + vStrk +
         '" stroke-width="1"><title>G' + (j + 1) + ' 阀组 · ' + modeTxt + '（点击切换：过滤→反冲→隔离→直排）</title></rect>';
@@ -376,7 +379,7 @@
         o += txt(X(gx) - rw / 2 - 4, Y(d.yIn) - 2, 'V1', 10, C.valveS, 'end');
         o += txt(X(gx) - rw / 2 - 4, Y(d.yIn) + 10, 'P1', 10, C.valveS, 'end');
       }
-      o += txt(X(gx), Y(0) + 4, 'G' + (j + 1), 11, bw ? C.ws : C.txt3, 'middle', bw ? 700 : 400);
+      o += txt(X(gx), Y(0) + 4, 'G' + (j + 1), 11, bw ? C.bw : C.txt3, 'middle', bw ? 700 : 400);
     }
 
     /* 水流方向层（动画虚线）：按各组阀态推导 ①③② 与每组支管有否流动及方向 */
@@ -410,8 +413,8 @@
     o += line(X(x1), Y(d.yOut), X(x1 + 80), Y(d.yOut), C.out, Math.max(3, c.dnOut * sc));
     o += v0Valve(X(x1 + 12), Y(d.yOut) - vh0 / 2, vw0, vh0, v0o);
     o += txt(X(x1 + 12) + vw0 / 2, Y(d.yOut) + vh0 / 2 + 11, 'V0', 10, C.valveS, 'middle');
-    o += arrow(X(x1 + 150), Y(d.yOut), X(x1 + 182), Y(d.yOut), C.out, 1.6);   /* v24：再外移脱离图形群（n=6 时箭头头距 viewBox 右缘 ≥4px） */
-    o += txt(X(x1 + 178), Y(d.yOut) - 12, '出水', 12, C.out, 'end');   /* end 锚压箭头上方：n=6 字形右缘 673 距右缘 680 净空 7px */
+    o += arrow(X(x1 + 190), Y(d.yOut), X(x1 + 222), Y(d.yOut), C.out, 1.6);   /* v29：随 ext 缩短再右移（空隙 150→190mm；n=6 箭头头距右缘 15px） */
+    o += txt(X(x1 + 218), Y(d.yOut) - 12, '出水', 12, C.out, 'end');   /* end 锚压箭头上方：n=6 字形右缘 663.5 距右缘 680 净空 16px */
 
     /* 管端堵头（v17）：① 末端（末组之后死头）与 ③ 上游端（首组之前死头）为盲板端盖；
      * ① 左端=进水来向、③ 右端=V0 出水去向、② 左端=排污排向，均接走不设堵头 */
@@ -426,11 +429,12 @@
     /* 尺寸与注记 */
     /* 罐径 OD 标注已按用户要求取消（v27）：「过滤器 OD200 这种文字不标注」——几何参数不再上图，S=400 保留 */
     o += dimH(X(0), X(c.s), Y(d.yIn) - Math.max(30, c.od * sc * 0.72), 'S=' + c.s);
-    o += dimH(X(-c.od / 2), X((c.n - 1) * c.s + c.od / 2), Y(d.yOut) + 80,
+    /* v51：W 标注固定屏幕 y=352（v47 的 372 上移 20px，与图形拉近）——两行总管文字仍在其下方 */
+    o += dimH(X(-c.od / 2), X((c.n - 1) * c.s + c.od / 2), 352,
       '总宽 W = ' + (c.n - 1) + 'S + OD = ' + d.W + ' mm');
     o += dimV(X(x0) - 64, Y(d.yIn), Y(d.yOut), '2Δ=' + (2 * c.delta));   /* v22：左移让位进水箭头 */
-    o += txt(X(x0), Y(d.yOut) + 50, '② 排污总管（贴地 +' + mm(d.zWs) + ' · 与 ① 同一竖直平面，俯视虚线重合）· DN' + c.dnWs + ' · 各组排污立管接入', 11, C.ws, 'start');
-    o += txt(X(x0), Y(d.yOut) + 32, '③ 出水总管（前 · +' + mm(d.zPort) + '）  ·  DN' + c.dnOut, 11, C.out, 'start');
+    o += txt(X(x0), 388, '② 排污总管（贴地 +' + mm(d.zWs) + ' · 与 ① 同一竖直平面，俯视虚线重合）· DN' + c.dnWs + ' · 各组排污立管接入', 11, C.ws, 'start');   /* v47：移到 W 标注下方；v51 上移 20px */
+    o += txt(X(x0), 372, '③ 出水总管（前 · +' + mm(d.zPort) + '）  ·  DN' + c.dnOut, 11, C.out, 'start');   /* v47：移到 W 标注下方；v51 上移 20px */
     /* ① 标注（v21）：移到右端管上方避开左端 S/OD 尺寸文字；排污立管说明并入 ② 行 */
     o += txt(X(x1) - 4, Y(d.yIn) - 42, '① 进水总管（+' + mm(d.zInTop) + '）· DN' + c.dnIn, 11, C.in, 'end');
     o += txt(VW - 14, 18, '俯视 · 上=后 / 下=前', 11, C.txt3, 'end');
@@ -441,7 +445,7 @@
   function renderFront(c) {
     var d = der(c), mg = Math.max(260, c.od * 1.3);
     var hmin = -c.od / 2 - mg, hmax = (c.n - 1) * c.s + c.od / 2 + mg;
-    var M = mapElev(hmin, hmax, -120, d.zTop + 220, 16, false);
+    var M = mapElev(hmin, hmax, -120, Math.max(d.zTop + 320, d.zInTop + 100), 16, false);   /* v38：上界按 zInTop 兜底（H=600 时顶部说明贴 ① 管带） */   /* v32：zmax 220→320——虚拟顶加高使图形整体下移，顶部说明(y=18)与 ① 管线/标高脱开（原几乎叠着） */
     var X = M.X, Y = M.Y, sc = M.sc;
     var h0 = -120, h1 = (c.n - 1) * c.s + 120;
     var o = DEFS;
@@ -460,16 +464,16 @@
       var cx = i * c.s, mF = msF[i], bw = (mF === 'backwash' || mF === 'dump');
       /* 罐体 */
       o += '<rect x="' + r2(X(cx - c.od / 2)) + '" y="' + r2(Y(d.zTop)) + '" width="' + r2(c.od * sc) +
-        '" height="' + r2(c.h * sc) + '" fill="' + (bw ? C.wsF : C.tank) +
-        '" stroke="' + (bw ? C.ws : C.tankS) + '" stroke-width="1.1"/>';
+        '" height="' + r2(c.h * sc) + '" fill="' + (bw ? C.bwF : C.tank) +
+        '" stroke="' + (bw ? C.bw : C.tankS) + '" stroke-width="1.1"/>';
       /* 卡箍（罐底金属箍） */
       o += '<rect x="' + r2(X(cx - c.od / 2)) + '" y="' + r2(Y(d.zBot + 46)) + '" width="' + r2(c.od * sc) +
         '" height="' + r2(46 * sc) + '" fill="none" stroke="' + C.ghost + '" stroke-width="1"/>';
       /* 罐顶排气阀 ⑥ */
       var vx = c.od * 0.16;
       o += '<rect x="' + r2(X(cx) - vx * sc) + '" y="' + r2(Y(d.zTop) - 60 * sc) + '" width="' + r2(2 * vx * sc) +
-        '" height="' + r2(60 * sc) + '" fill="' + (bw ? C.wsF : C.tank) +
-        '" stroke="' + (bw ? C.ws : C.tankS) + '" stroke-width="0.8"/>';
+        '" height="' + r2(60 * sc) + '" fill="' + (bw ? C.bwF : C.tank) +
+        '" stroke="' + (bw ? C.bw : C.tankS) + '" stroke-width="0.8"/>';
       if (i === 0) o += txt(X(cx) + vx * sc + 5, Y(d.zTop) - 60 * sc + 11, '⑥ 排气', 10, C.txt3, 'start');
       /* 排污立管（汇流节点 +zPort → ②，位于罐体之后画虚线；反冲/直排组亮为实线）+ 排污阀 P */
       o += line(X(cx), Y(d.zPort), X(cx), Y(d.zWs), bw ? C.ws : C.wsL, Math.max(2.4, c.dnWs * sc * 0.75),
@@ -479,7 +483,7 @@
       o += valveRect(X(cx) - vw / 2, Y(vy) - vh / 2, vw, vh, (mF === 'backwash' || mF === 'dump'),
         i + ':p', 'P' + (i + 1) + ' 排污阀（节点下立管中段）');
       /* 组号 */
-      o += txt(X(cx), Y(d.zTop) + 16, 'G' + (i + 1), 11, bw ? C.ws : C.txt3, 'middle', bw ? 700 : 400);
+      o += txt(X(cx), Y(d.zTop) + 16, 'G' + (i + 1), 11, bw ? C.bw : C.txt3, 'middle', bw ? 700 : 400);
     }
 
     /* ①上 → 汇流节点 立管（虚线：位于罐体之后）+ 进水阀 V */
@@ -523,15 +527,15 @@
 
     /* 尺寸与标高 */
     o += dimH(X(0), X(c.s), Y(d.zTop) - 34, 'S=' + c.s);
-    o += dimV(X(hmax) - 34, Y(0), Y(d.zTop), 'H总=' + (c.hm + c.h));
-    o += elevMark(X(hmin) + 74, Y(d.zTop), '+' + mm(d.zTop));
-    o += elevMark(X(hmin) + 74, Y(d.zInTop), '+' + mm(d.zInTop));
-    o += elevMark(X(hmin) + 74, Y(d.zPort), '+' + mm(d.zPort));
-    o += elevMark(X(hmin) + 74, Y(d.zBot), '+' + mm(d.zBot));
-    o += elevMark(X(hmin) + 74, Y(d.zWs), '+' + mm(d.zWs));
-    o += elevMark(X(hmin) + 74, Y(0), '±0.000');
+    o += dimV(X(hmax) - 26   /* v44：右移 8px 与 V0 阀脱开 */, Y(0), Y(d.zTop), 'H总=' + (c.hm + c.h));
+    o += elevMark(X(hmin) + 36   /* v46：再左移 20px 对齐侧视 v40 脱开幅度 */, Y(d.zTop), '+' + mm(d.zTop));
+    o += elevMark(X(hmin) + 36   /* v46：再左移 20px 对齐侧视 v40 脱开幅度 */, Y(d.zInTop), '+' + mm(d.zInTop));
+    o += elevMark(X(hmin) + 36   /* v46：再左移 20px 对齐侧视 v40 脱开幅度 */, Y(d.zPort), '+' + mm(d.zPort));
+    o += elevMark(X(hmin) + 36   /* v46：再左移 20px 对齐侧视 v40 脱开幅度 */, Y(d.zBot), '+' + mm(d.zBot));
+    o += elevMark(X(hmin) + 36   /* v46：再左移 20px 对齐侧视 v40 脱开幅度 */, Y(d.zWs), '+' + mm(d.zWs));
+    o += elevMark(X(hmin) + 36   /* v46：再左移 20px 对齐侧视 v40 脱开幅度 */, Y(0), '±0.000');
     /* 注释（v21）：移到地面线下方作脚注，不再横穿四只罐体 */
-    o += txt(X(hmin) + 60, Y(d.zWs) + 28, '支管/罐口与 ③ 同层 +' + mm(d.zPort) + '（平接）；①上 +' + mm(d.zInTop) + ' 供应，节点下排污立管（P 常闭）落 ②', 11, C.txt2, 'start');
+    o += txt(X(hmin) + 60, Y(d.zWs) + 44, '支管/罐口与 ③ 同层 +' + mm(d.zPort) + '（平接）；①上 +' + mm(d.zInTop) + ' 供应，节点下排污立管（P 常闭）落 ②', 11, C.txt2, 'start');   /* v32：脚注 28→44——与 +0.060/+0.000 刻度拉开 */
     o += txt(VW - 14, 18, '前视 · 从前往后看（①路与排污立管均在罐后，虚线）', 11, C.txt3, 'end');
     return o;
   }
@@ -540,7 +544,7 @@
   function renderSide(c) {
     var d = der(c), mg = Math.max(300, c.od * 1.4);
     var hmin = d.yOut - mg, hmax = d.yIn + mg;
-    var M = mapElev(hmin, hmax, -120, d.zTop + 220, 16, true);
+    var M = mapElev(hmin, hmax, -120, Math.max(d.zTop + 220, d.zInTop + 50), 16, true, 22);   /* v38：上界按 zInTop 兜底（H=600 时 zTop+220 不够） */   /* v28：图形下移 22px——原上空 -4.4px（顶部被裁）/下空 40.5px，均衡后 17.6/18.5 */
     var X = M.X, Y = M.Y, sc = M.sc;
     var m0 = modes(c)[0], bw = (m0 === 'backwash' || m0 === 'dump');
     var o = DEFS;
@@ -588,15 +592,16 @@
 
     /* 罐体（矩形 = 圆柱正投影） */
     o += '<rect x="' + r2(X(c.od / 2)) + '" y="' + r2(Y(d.zTop)) + '" width="' + r2(c.od * sc) +
-      '" height="' + r2(c.h * sc) + '" fill="' + (bw ? C.wsF : C.tank) +
-      '" stroke="' + (bw ? C.ws : C.tankS) + '" stroke-width="1.1"/>';
+      '" height="' + r2(c.h * sc) + '" fill="' + (bw ? C.bwF : C.tank) +
+      '" stroke="' + (bw ? C.bw : C.tankS) + '" stroke-width="1.1"/>';
     o += line(X(c.od / 2), Y(d.zBot + 46), X(-c.od / 2), Y(d.zBot + 46), C.ghost, 1);
 
     /* 管件表达：汇流节点三通（圆角 T + 三端法兰）+ 罐口承口套环 + 三处总管接口套环 */
     var nbw = Math.max(2.4, c.dnBr * sc);            /* 支管/立管带宽 */
     var nx = X(d.yIn), ny = Y(d.zPort);
-    var tw = nbw * 1.5, ex = nbw * 0.8, AL = nbw * 0.8, rT = Math.min(4, nbw * 0.24);   /* v20：臂长 1.05→0.8，给后支管快接腾位 */
-    o += '<path d="' + roundedTee(nx, ny, tw, ex, ex, AL, nbw * 1.5, rT) +
+    /* v54：三通比例重塑成 T 形；v56：整体微缩、水平支臂改短（AL 1.6→1.1，用户批注「左侧接支管的接头长了」） */
+    var tw = nbw * 1.15, ex = nbw * 0.95, AL = nbw * 1.1, rT = Math.min(4, nbw * 0.24);
+    o += '<path d="' + roundedTee(nx, ny, tw, ex, ex, AL, nbw * 1.15, rT) +
       '" fill="' + C.fit + '" stroke="' + C.fitS + '" stroke-width="1.4" stroke-linejoin="round"/>';
     o += fitFlange(nx - tw / 2 - 1.8, ny - ex, nx + tw / 2 + 1.8, ny - ex);   /* 上端法兰（①侧） */
     o += fitFlange(nx - tw / 2 - 1.8, ny + ex, nx + tw / 2 + 1.8, ny + ex);   /* 下端法兰（②侧） */
@@ -632,14 +637,14 @@
     o += line(cxc, Y(d.zTop), cxc, Y(d.zTop + 70), C.tankS, 2.4);
     o += txt(cxc + 6, Y(d.zTop + 70) + 4, '⑥ 排气', 10, C.txt3, 'start');
 
-    o += elevMark(X(hmax) - 92, Y(d.zTop), '+' + mm(d.zTop));
-    o += elevMark(X(hmax) - 92, Y(d.zInTop), '+' + mm(d.zInTop));
-    o += elevMark(X(hmax) - 92, Y(d.zPort), '+' + mm(d.zPort));
-    o += elevMark(X(hmax) - 92, Y(d.zBot), '+' + mm(d.zBot));
-    o += elevMark(X(hmax) - 92, Y(d.zWs), '+' + mm(d.zWs));
-    o += elevMark(X(hmax) - 92, Y(0), '±0.000');
+    o += elevMark(X(d.yIn) - 44   /* v37：标高列贴立管左侧跟随图形；v40：间距 24→44 与图形脱开（用户批注太近） */, Y(d.zTop), '+' + mm(d.zTop));
+    o += elevMark(X(d.yIn) - 44   /* v37：标高列贴立管左侧跟随图形；v40：间距 24→44 与图形脱开（用户批注太近） */, Y(d.zInTop), '+' + mm(d.zInTop));
+    o += elevMark(X(d.yIn) - 44   /* v37：标高列贴立管左侧跟随图形；v40：间距 24→44 与图形脱开（用户批注太近） */, Y(d.zPort), '+' + mm(d.zPort));
+    o += elevMark(X(d.yIn) - 44   /* v37：标高列贴立管左侧跟随图形；v40：间距 24→44 与图形脱开（用户批注太近） */, Y(d.zBot), '+' + mm(d.zBot));
+    o += elevMark(X(d.yIn) - 44   /* v37：标高列贴立管左侧跟随图形；v40：间距 24→44 与图形脱开（用户批注太近） */, Y(d.zWs), '+' + mm(d.zWs));
+    o += elevMark(X(d.yIn) - 44   /* v37：标高列贴立管左侧跟随图形；v40：间距 24→44 与图形脱开（用户批注太近） */, Y(0), '±0.000');
     o += txt(X(d.yIn) + 10, Y(d.zInTop) - 20, '①上 进水 +' + mm(d.zInTop), 11, C.in, 'start');
-    o += txt(X(d.yIn) - 16, Y(d.zPort) + 12, '汇流节点 +' + mm(d.zPort) + '（支管与③同高）', 11, C.in, 'end');   /* v21：改节点左下，右伸会压罐体 */
+    /* v34：删「汇流节点 +0.720（支管与③同高）」文字标注（用户批注取消） */
     o += txt(X(d.yOut) - 10, Y(d.zPort) + 20, '③ 出水 +' + mm(d.zPort), 11, C.out, 'end');
     o += txt(X(d.yIn) + 16, Y(d.zWs) + 4, '② 排污 +' + mm(d.zWs), 11, C.ws, 'start');
     o += txt(VW - 14, 18, '侧视 · 左=后 / 右=前', 11, C.txt3, 'end');
@@ -666,7 +671,7 @@
     var pad = 18, padTop = 34;   // padTop: 顶部说明文字区让位（v21 图形整体下移）
     var sc = Math.min((VW - 2 * pad) / (umax - umin), (VH - padTop - pad) / (vmax - vmin));
     var ox = pad - umin * sc + (VW - 2 * pad - (umax - umin) * sc) / 2;
-    var oy = padTop - vmin * sc + ((VH - padTop - pad) - (vmax - vmin) * sc) / 2;
+    var oy = padTop - vmin * sc + ((VH - padTop - pad) - (vmax - vmin) * sc) / 2 + 28;   /* v28：图形整体下移 28px——probe 包围盒底部虚扩致居中偏上（原上空 6.1/下空 63.3），均衡后 34/35 */
     var X = function (x, y) { return ox + u(x, y) * sc; };
     var Y = function (x, y, z) { return oy + v(x, y, z) * sc; };
     var rx = 1.2247 * sc, ry = 0.7071 * sc;                 // 单位半径的水平圆投影
@@ -698,23 +703,30 @@
         '" stroke="' + C.fitS + '" stroke-width="1" stroke-linejoin="round"/>';
       o += '<circle cx="' + r2(apx) + '" cy="' + r2(apy) + '" r="1.8" fill="' + C.fitS + '"/>';
       o += line(X(cx, -R), Y(cx, -R, d.zPort), X(cx, d.yOut), Y(cx, d.yOut, d.zPort), C.outL, Math.max(2, c.dnBr * sc));
+      /* 罐后口卡箍（v52：进水侧——画在罐体之前，罐体侧影遮住菱形内侧一半，只露出朝后探出的部分；
+         用户批注「进水管的菱形应该是被罐体遮挡了一部分的」）。hw 定义在此（axoF 沿用）。 */
+      var hw = Math.max(3.5, c.dnBr * sc * 0.55);
+      var hpx = X(cx, R), hpy = Y(cx, R, d.zPort);
+      o += '<path data-fs-coup="axoB' + i + '" d="M' + r2(hpx) + ' ' + r2(hpy - hw) + ' L' + r2(hpx + hw * 1.15) + ' ' + r2(hpy) +
+        ' L' + r2(hpx) + ' ' + r2(hpy + hw) + ' L' + r2(hpx - hw * 1.15) + ' ' + r2(hpy) + ' Z" fill="' + C.fit +
+        '" stroke="' + C.fitS + '" stroke-width="1" stroke-linejoin="round"/>';
       /* 罐体：底椭圆 + 侧影 + 顶椭圆（水平圆 → 固定比例椭圆） */
       var erx = rx * R, ery = Math.max(3, ry * R);
       o += '<ellipse cx="' + r2(X(cx, 0)) + '" cy="' + r2(Y(cx, 0, d.zBot)) + '" rx="' + r2(erx) + '" ry="' + r2(ery) +
-        '" fill="' + (bw ? C.wsF : C.tank) + '" stroke="' + (bw ? C.ws : C.tankS) + '" stroke-width="1"/>';
+        '" fill="' + (bw ? C.bwF : C.tank) + '" stroke="' + (bw ? C.bw : C.tankS) + '" stroke-width="1"/>';
       var blu = X(cx, R), blv = Y(cx, R, d.zBot), tlu = X(cx, R), tlv = Y(cx, R, d.zTop);
       var bru = X(cx, -R), brv = Y(cx, -R, d.zBot), tru = X(cx, -R), trv = Y(cx, -R, d.zTop);
       o += '<path d="M' + r2(blu) + ' ' + r2(blv) + ' L' + r2(tlu) + ' ' + r2(tlv) + ' L' + r2(tru) + ' ' + r2(trv) +
-        ' L' + r2(bru) + ' ' + r2(brv) + ' Z" fill="' + (bw ? C.wsF : C.tank) + '" stroke="none"/>';
-      o += line(tlu, tlv, blu, blv, bw ? C.ws : C.tankS, 1);
-      o += line(tru, trv, bru, brv, bw ? C.ws : C.tankS, 1);
+        ' L' + r2(bru) + ' ' + r2(brv) + ' Z" fill="' + (bw ? C.bwF : C.tank) + '" stroke="none"/>';
+      o += line(tlu, tlv, blu, blv, bw ? C.bw : C.tankS, 1);
+      o += line(tru, trv, bru, brv, bw ? C.bw : C.tankS, 1);
       o += '<ellipse cx="' + r2(X(cx, 0)) + '" cy="' + r2(Y(cx, 0, d.zTop)) + '" rx="' + r2(erx) + '" ry="' + r2(ery) +
-        '" fill="' + (bw ? C.wsF : C.tank) + '" stroke="' + (bw ? C.ws : C.tankS) + '" stroke-width="1.2"/>';
-      /* 管件表达：罐后口卡箍（支管与罐体连接处，画在罐体之上以露出） */
-      var hw = Math.max(3.5, c.dnBr * sc * 0.55);
-      var hpx = X(cx, R), hpy = Y(cx, R, d.zPort);
-      o += '<path d="M' + r2(hpx) + ' ' + r2(hpy - hw) + ' L' + r2(hpx + hw * 1.15) + ' ' + r2(hpy) +
-        ' L' + r2(hpx) + ' ' + r2(hpy + hw) + ' L' + r2(hpx - hw * 1.15) + ' ' + r2(hpy) + ' Z" fill="' + C.fit +
+        '" fill="' + (bw ? C.bwF : C.tank) + '" stroke="' + (bw ? C.bw : C.tankS) + '" stroke-width="1.2"/>';
+      /* 罐前口卡箍（v43 图示；v52：排水/出水侧——画在罐体之上，图层最上层完整显示，
+         用户批注「排水管的菱形位于图层最上层显示出来」） */
+      var fpx = X(cx, -R), fpy = Y(cx, -R, d.zPort);
+      o += '<path data-fs-coup="axoF' + i + '" d="M' + r2(fpx) + ' ' + r2(fpy - hw) + ' L' + r2(fpx + hw * 1.15) + ' ' + r2(fpy) +
+        ' L' + r2(fpx) + ' ' + r2(fpy + hw) + ' L' + r2(fpx - hw * 1.15) + ' ' + r2(fpy) + ' Z" fill="' + C.fit +
         '" stroke="' + C.fitS + '" stroke-width="1" stroke-linejoin="round"/>';
       /* 排气阀 ⑥ */
       o += line(X(cx, 0), Y(cx, 0, d.zTop), X(cx, 0), Y(cx, 0, d.zTop + 70), C.tankS, 2.4);
@@ -736,7 +748,7 @@
         o += flow(X(cx, d.yOut), Y(cx, d.yOut, d.zPort), X(cx, -R), Y(cx, -R, d.zPort), C.out);       /* ③ → 罐前口（倒行） */
         o += flow(X(cx, R), Y(cx, R, d.zPort), X(cx, d.yIn), Y(cx, d.yIn, d.zPort), C.ws);            /* 罐后口 → 节点 → 排污 */
       }
-      o += txt(X(cx, 0), Y(cx, 0, d.zTop + 70) - 8, 'G' + (i + 1), 10, bw ? C.ws : C.txt3, 'middle', bw ? 700 : 400);
+      o += txt(X(cx, 0), Y(cx, 0, d.zTop + 70) - 8, 'G' + (i + 1), 10, bw ? C.bw : C.txt3, 'middle', bw ? 700 : 400);
       /* 轴测图：只给第 1 组引注阀位与排气口（其余组构造相同：G2=V2/P2、G3=V3/P3、G4=V4/P4） */
       if (i === 0) {
         o += txt(ox + m1 * sc + vwA / 2 + 4, oy + m1v * sc + 3, 'V1', 9, C.valveS, 'start');
@@ -761,7 +773,7 @@
 
     o += txt(X(x0, d.yIn) - 6, Y(x0, d.yIn, d.zInTop), '① 进水总管（+' + mm(d.zInTop) + '）· DN' + c.dnIn, 11, C.in, 'end');
     o += txt(X(x1, d.yOut) + 6, Y(x1, d.yOut, d.zPort) + 12, '③ 出水总管', 11, C.out, 'start');
-    o += txt(X(x1, d.yIn) + 6, Y(x1, d.yIn, d.zWs) - 6, '② 排污总管（贴地·与①同平面）', 11, C.ws, 'start');
+    o += txt(X(x1, d.yIn) + 6, Y(x1, d.yIn, d.zWs) - 6, '② 排污总管', 11, C.ws, 'start');   /* v48：括号说明删除（用户批注） */
     o += txt(14, 18, '轴测 · 进水阀 V（立管）+ 排污阀 P（节点下·常闭·直落 ②）· G1=V1/P1…G4=V4/P4 · 支管平接罐后口（与③同高）', 11, C.txt3, 'start');
     return o;
   }
@@ -826,9 +838,9 @@
 
   /* ================= DOM ================= */
   function rangeRow(spec) {
+    /* v36：滑块已取消（用户批注）——数字框直接输入，事件仍走 rootEl 委托 */
     return '<div class="fs-row">' +
       '<label>' + esc(spec.label) + '</label>' +
-      '<input type="range" data-fs-range="' + spec.k + '" min="' + spec.min + '" max="' + spec.max + '" step="' + spec.step + '">' +
       '<input type="number" data-fs-num="' + spec.k + '" min="' + spec.min + '" max="' + spec.max + '" step="' + spec.step + '">' +
       '<span class="fs-unit">' + esc(spec.unit) + '</span></div>';
   }
@@ -840,25 +852,33 @@
     h += '<div class="fs-wrap-body" style="display:flex;flex:1 1 auto;min-height:0">';
     /* ---- 左栏 ---- */
     h += '<aside class="fs-side">';
-    /* ---- 操作按钮组（v13：从顶部条移到左栏顶部）---- */
+    /* ---- 操作按钮组（v13 从顶部条移到左栏顶部；v41「恢复默认参数」移到右列过滤损失卡下）---- */
     h += '<div class="fs-group fs-actions">' +
       '<button type="button" class="fs-bar-btn" data-fs-act="syncFlow" title="从当前设计方案读联合流量作为本页设计流量 Q">⟵ 取当前方案流量</button>' +
       '<button type="button" class="fs-bar-btn solid" data-fs-act="writeLoss" title="把本页过滤损失写入三级/二级计算的「过滤与阀门损失」">写入过滤损失 →</button>' +
-      '<button type="button" class="fs-bar-btn" data-fs-act="reset">恢复默认参数</button>' +
       '</div>';
-    h += '<div class="fs-group"><div class="fs-gh">机组参数<em>改即联动四视图</em></div>' +
-      RANGES.map(rangeRow).join('') + '</div>';
-    h += '<div class="fs-group"><div class="fs-gh">管路管径</div>' +
+    /* v36：机组参数 + 管路管径 并排；v39：过滤损失卡片移入右列（管路管径下方），说明文字留 duo 后全宽 */
+    h += '<div class="fs-duo">' +
+      '<div class="fs-duo-col">' +
+      '<div class="fs-group"><div class="fs-gh">机组参数</div>' +
+      RANGES.map(rangeRow).join('') + '</div>' +
+      '</div>' +
+      '<div class="fs-duo-col">' +
+      '<div class="fs-group"><div class="fs-gh">管路管径</div>' +
       DNS.map(function (x) {
         return '<div class="fs-row"><label>' + esc(x.label) + '</label>' +
           '<select data-fs-sel="' + x.k + '">' + opt + '</select><span class="fs-unit">DN</span></div>';
-      }).join('') + '</div>';
-    h += '<div class="fs-group"><div class="fs-gh">过滤损失<em>可回写扬程计算</em></div>' +
+      }).join('') + '</div>' +
+      '<div class="fs-group"><div class="fs-gh">过滤损失<em>可回写扬程计算</em></div>' +
       '<div class="fs-row"><label>损失取值</label>' +
       '<input type="number" data-fs-num="loss" min="0" max="30" step="0.5"><span class="fs-unit">m</span></div>' +
-      '<div class="fs-note">清洁状态约 2~3 m，压差报警前约 5~7 m。<b>点上方「写入过滤损失」</b>即可把该值送进三级 / 二级计算的扬程算式。</div>' +
+      '</div>' +
+      /* v41：「恢复默认参数」按钮移到过滤损失卡下方（用户批注），脱离顶部按钮组；data-fs-act 委托不变 */
+      '<button type="button" class="fs-bar-btn" data-fs-act="reset">恢复默认参数</button>' +
+      '</div>' +
       '</div>';
-    h += '<div class="fs-group"><div class="fs-gh">阀门操作模拟<em>点图上阀块或下方胶囊</em></div>' +
+    h += '<div class="fs-note">清洁状态约 2~3 m，压差报警前约 5~7 m。<b>点上方「写入过滤损失」</b>即可把该值送进三级 / 二级计算的扬程算式。</div>';
+    h += '<div class="fs-group"><div class="fs-gh">阀门操作模拟<em>点图上阀块或下方表格行</em></div>' +
       '<div class="fs-chips" id="fsChips"></div>' +
       '<div class="fs-valves" id="fsValves"></div>' +
       '<div class="fs-note"><b>V0 出水总阀</b>（③ 下游端）：正常开启产水；<b>任一组反冲时自动关闭</b>——③ 内净水不外送，全部倒行用于反冲（停水反冲式）。<br>' +
@@ -932,27 +952,30 @@
       h += '<button type="button" class="fs-chip' + (on ? ' on' : '') + '" data-fs-bw="' + i + '">' +
         'G' + (i + 1) + ' ' + map[ms[i]] + '</button>';
     }
-    h += '<button type="button" class="fs-chip" data-fs-bw="-1">全部恢复过滤</button>';
+    h += '<button type="button" class="fs-chip" data-fs-bw="-1">全过滤</button>';
     box.innerHTML = h;
   }
   /* 面板阀门一览：每组一枚胶囊（V/P 开关态 + 组态名），点击与图上阀块同为 cycle 切换 */
+  /* v49：改表格排版（用户批注「做个表格显示」）——每行一组：机组/进水阀/排污阀/组态，V0 总阀首行（自动联动不可点）。
+     契约属性原样保留在行上：.fs-vchip（e2e 计数 n+1）、data-fs-valve="i:cycle"（点击委托 closest）、data-v0、data-mode（状态配色）。 */
   function renderValves() {
     var box = rootEl && rootEl.querySelector('#fsValves');
     if (!box) return;
     var arr = valveArr(cfg), ms = modes(cfg);
     var map = { filter: '过滤', backwash: '反冲洗', dump: '直排短路', off: '隔离' };
-    var h = '';
     /* V0 出水总阀（v12）：非点击自动联动——有组反冲时自动关闭（停水反冲） */
     var v0o = v0Open(cfg);
-    h += '<span class="fs-vchip" data-v0="' + (v0o ? 'open' : 'closed') + '"' +
+    var h = '<table class="fs-vtable"><thead><tr><th>机组</th><th>进水阀</th><th>排污阀</th><th>组态</th></tr></thead><tbody>';
+    h += '<tr class="fs-vchip" data-v0="' + (v0o ? 'open' : 'closed') + '"' +
       ' title="V0 出水总阀（机组 ③ 下游端，自动联动不可点击）：任一组反冲时自动关闭——③ 内净水全部倒行用于反冲（停水反冲式）">' +
-      '<b>V0 总阀</b><em>' + (v0o ? '开 · 产水' : '关 · 反冲中') + '</em></span>';
+      '<td>V0 总阀</td><td colspan="2">' + (v0o ? '开 · 产水' : '关 · 反冲中') + '</td><td>自动联动</td></tr>';
     for (var i = 0; i < cfg.n; i++) {
-      h += '<span class="fs-vchip" data-mode="' + ms[i] + '" data-fs-valve="' + i + ':cycle"' +
-        ' title="G' + (i + 1) + ' 阀组（点击切换：过滤→反冲→隔离→直排）">' +
-        '<b>V' + (i + 1) + (arr[i].v ? '开' : '关') + '</b><b>P' + (i + 1) + (arr[i].p ? '开' : '关') + '</b>' +
-        '<em>' + map[ms[i]] + '</em></span>';
+      h += '<tr class="fs-vchip" data-mode="' + ms[i] + '" data-fs-valve="' + i + ':cycle"' +
+        ' title="G' + (i + 1) + ' 阀组（点击行切换：过滤→反冲→隔离→直排）">' +
+        '<td>G' + (i + 1) + '</td><td>V' + (i + 1) + (arr[i].v ? '开' : '关') + '</td>' +
+        '<td>P' + (i + 1) + (arr[i].p ? '开' : '关') + '</td><td>' + map[ms[i]] + '</td></tr>';
     }
+    h += '</tbody></table>';
     box.innerHTML = h;
   }
 

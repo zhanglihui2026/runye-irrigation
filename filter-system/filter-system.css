@@ -22,9 +22,9 @@
 
 /* ---------- 回执消息条已取消（v19：整条删除）----------
  * 操作回执改写到页面底部状态栏 #ryStHint（见 filter-system.js planNote），本文件不再有回执条样式。 */
-/* 按钮样式现用于左栏顶部操作按钮组（.fs-actions，v13 起顶部条不再放按钮） */
+/* 按钮样式用于左栏顶部操作按钮组（.fs-actions）+ 右列「恢复默认参数」（.fs-duo-col 内，v41，flex stretch 自动全宽） */
 .fs-bar-btn{
-  font:inherit;font-size:12.5px;padding:4px 10px;border:1px solid var(--u-accent-line,#cfe3da);
+  font:inherit;font-size:11.5px;padding:4px 10px;border:1px solid var(--u-accent-line,#cfe3da);
   border-radius:4px;background:#fff;color:var(--u-accent-2,#116447);cursor:pointer;white-space:nowrap;
 }
 .fs-bar-btn:hover{background:var(--u-accent-bg,#e0f2e9)}
@@ -54,27 +54,38 @@
 .fs-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
 .fs-actions .fs-bar-btn{flex:1 1 auto;text-align:center;white-space:nowrap}
 .fs-group{margin:0 0 8px;padding:8px 9px 6px;border:1px solid var(--u-accent-line,#cfe3da);border-radius:6px;background:var(--u-accent-bg,#f4fbf7)}
-.fs-gh{font-size:13px;font-weight:700;color:var(--u-accent-2,#116447);margin:0 0 6px;display:flex;align-items:center;gap:6px;letter-spacing:.3px}
-.fs-gh>em{font-style:normal;font-weight:400;font-size:11.5px;color:var(--u-ink-2,#7b9188);margin-left:auto}
+.fs-gh{font-size:12px;font-weight:700;color:var(--u-accent-2,#116447);margin:0 0 6px;display:flex;align-items:center;gap:6px;letter-spacing:.3px}
+.fs-gh>em{font-style:normal;font-weight:400;font-size:10.5px;color:var(--u-ink-2,#7b9188);margin-left:auto}
 .fs-row{display:flex;align-items:center;gap:7px;margin:0 0 7px;min-width:0}
-.fs-row>label{flex:0 0 88px;color:var(--u-ink-2,#4a6259);font-size:12.5px}
+.fs-row>label{flex:0 0 88px;color:var(--u-ink-2,#4a6259);font-size:11.5px}
 .fs-row input[type=number],.fs-row select{
-  font:inherit;font-size:12.5px;padding:4px 6px;border:1px solid var(--u-accent-line,#cfe3da);
+  font:inherit;font-size:11.5px;padding:4px 6px;border:1px solid var(--u-accent-line,#cfe3da);
   border-radius:4px;background:#fff;color:inherit;min-width:0;
 }
 .fs-row input[type=number]{flex:0 0 60px;width:60px;text-align:right}
 .fs-row select{flex:1}
-.fs-row input[type=range]{flex:1;min-width:0;accent-color:var(--u-accent,#18835e);height:18px;margin:0}
 .fs-row input:focus-visible,.fs-row select:focus-visible{outline:2px solid var(--u-water,#245f87);outline-offset:1px}
-.fs-unit{flex:0 0 auto;font-size:11.5px;color:var(--u-ink-2,#7b9188);min-width:26px}
-.fs-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
+.fs-unit{flex:0 0 auto;font-size:10.5px;color:var(--u-ink-2,#7b9188);min-width:26px}
+/* ---------- v36：机组参数 + 管路管径 并排（.fs-duo）；滑块已取消，数字框直接输入 ---------- */
+.fs-duo{display:flex;gap:6px;align-items:flex-start;margin:0 0 8px}
+.fs-duo-col{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:8px}
+.fs-duo + .fs-note{margin:0 0 8px}   /* v39：duo 后的过滤损失说明为独立全宽块 */
+.fs-duo .fs-group{min-width:0;margin:0;padding:8px 7px 4px}
+.fs-duo .fs-row{gap:4px;margin:0 0 6px}
+.fs-duo .fs-row>label{flex:0 0 auto;white-space:nowrap}
+.fs-duo input[type=number]{flex:1 1 44px;min-width:44px;width:auto;padding:4px 3px}
+.fs-duo select{flex:1 1 36px;min-width:36px;padding:4px 2px}
+.fs-duo .fs-unit{min-width:0}
+/* v49：组态胶囊改等宽网格，行列对齐；v53：minmax 104→64——左栏默认 280px 排 3 列，拖宽后自动 4 列 */
+.fs-chips{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px;margin:0 0 8px}
+.fs-chips .fs-chip{text-align:center;justify-self:stretch}
 .fs-chip{
-  font:inherit;font-size:12px;padding:3px 9px;border:1px solid var(--u-accent-line,#cfe3da);
+  font:inherit;font-size:11px;padding:3px 6px;   /* v53：收窄内边距，4 列时按钮内容不溢出 */border:1px solid var(--u-accent-line,#cfe3da);
   border-radius:999px;background:#fff;color:var(--u-ink-2,#4a6259);cursor:pointer;white-space:nowrap;
 }
 .fs-chip:hover{border-color:var(--u-accent,#18835e);color:var(--u-accent-2,#116447)}
-.fs-chip.on{background:#fde9e9;border-color:#b91c1c;color:#b91c1c;font-weight:700}
-.fs-note{margin:2px 0 0;padding:7px 9px;border-left:3px solid var(--u-accent-line,#9bcbb4);background:#fbfdfc;color:var(--u-ink-2,#4a6259);font-size:11.5px;line-height:1.7}
+.fs-chip.on{background:#ede9fc;border-color:#7048e8;color:#5f3dc4;font-weight:700}   /* v35：反冲激活胶囊随图上高亮改紫 */
+.fs-note{margin:2px 0 0;padding:7px 9px;border-left:3px solid var(--u-accent-line,#9bcbb4);background:#fbfdfc;color:var(--u-ink-2,#4a6259);font-size:10.5px;line-height:1.7}
 .fs-note b{color:var(--u-ink,#243c35)}
 
 /* ---------- 四视图 ---------- */
@@ -108,19 +119,29 @@
 .fs-valve:hover{stroke-width:1.8}
 .fs-flow{stroke-dasharray:6 7;animation:fsFlow .9s linear infinite;pointer-events:none}
 @keyframes fsFlow{to{stroke-dashoffset:-26}}
-.fs-valves{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
-.fs-vchip{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border:1px solid var(--u-accent-line,#cfe3da);border-radius:6px;background:#fff;font-size:11.5px;line-height:1.5;cursor:pointer;user-select:none}
-.fs-vchip b{font-weight:700;color:var(--u-ink,#243c35)}
-.fs-vchip em{font-style:normal;font-weight:700;color:var(--u-ink-2,#4a6259)}
-.fs-vchip:hover{border-color:var(--u-accent,#18835e)}
-.fs-vchip[data-mode="backwash"]{background:#fde9e9;border-color:#b91c1c}
-.fs-vchip[data-mode="backwash"] em{color:#b91c1c}
-.fs-vchip[data-mode="dump"]{background:#ffe3e3;border-color:#e03131}
-.fs-vchip[data-mode="dump"] em{color:#e03131}
-.fs-vchip[data-mode="off"]{opacity:.72}
+/* v49：阀门一览改表格（.fs-vtable）；契约类 .fs-vchip 保留在 tr 上 */
+.fs-valves{margin:0 0 8px}
+.fs-vtable{width:100%;border-collapse:collapse;font-size:10.5px;line-height:1.5}
+.fs-vtable th{font-weight:700;color:var(--u-ink-2,#4a6259);text-align:left;padding:3px 8px;border-bottom:1.5px solid var(--u-accent-line,#cfe3da);white-space:nowrap}
+.fs-vtable td{padding:4px 8px;border-bottom:1px solid var(--u-accent-line,#cfe3da);color:var(--u-ink,#243c35);white-space:nowrap}
+tr.fs-vchip{cursor:pointer;user-select:none}
+tr.fs-vchip:hover td{background:#f0f7f4}
+tr.fs-vchip[data-mode="backwash"] td{background:#ede9fc}
+tr.fs-vchip[data-mode="backwash"] td:last-child{color:#5f3dc4;font-weight:700}
+tr.fs-vchip[data-mode="dump"] td{background:#ffe3e3}
+tr.fs-vchip[data-mode="dump"] td:last-child{color:#e03131;font-weight:700}
+tr.fs-vchip[data-mode="off"] td{opacity:.72}
+tr.fs-vchip[data-v0="closed"] td{background:#f1f3f5;color:#495057}
+/* v49：旧 span 胶囊样式已删——display:inline-flex 会破坏 tr.fs-vchip 表格行布局 */
+
+/* v49：以下三条旧胶囊配色由上方 tr.fs-vchip[data-mode]/[data-v0] 接管 */   /* v35：反冲态随图上高亮改紫 */
+
+
+
+
 /* V0 出水总阀胶囊（v12）：关闭态灰底 */
-.fs-vchip[data-v0="closed"]{background:#f1f3f5;border-color:#adb5bd}
-.fs-vchip[data-v0="closed"] em{color:#495057}
+
+
 .fs-lg-dash{background:repeating-linear-gradient(90deg,#37475f 0 4px,transparent 4px 7px)}
 
 /* ---------- 响应式 ---------- */

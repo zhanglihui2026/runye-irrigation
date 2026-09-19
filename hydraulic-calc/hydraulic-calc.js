@@ -36,6 +36,12 @@
   }
   var rootEl = null;
   var cfg = null;
+  var lastSrc = null;   /* 三级方案来源说明（importThreeLevel 写入，展示在左栏顶部 .hc-src）；{title, rows[]} */
+  function srcNoteHtml() {
+    if (!lastSrc) return '';
+    return '<b>' + esc(lastSrc.title || '') + '</b>' +
+      (lastSrc.rows && lastSrc.rows.length ? '<ul>' + lastSrc.rows.map(function (r) { return '<li>' + esc(r) + '</li>'; }).join('') + '</ul>' : '');
+  }
 
   /* ---------------- 数值/文本工具 ---------------- */
   function f(v, n) {
@@ -71,6 +77,7 @@
     return '' +
       '<div class="hc-wrap">' +
       '  <aside class="hc-side">' +
+      '    <div class="hc-src" data-hc="srcNote" style="display:none"></div>' +
       '    <div class="hc-h">参数 · 改任意一项，右侧结果立即更新</div>' +
       '    <div class="hc-group">' +
       '      <div class="hc-h">全局</div>' +
@@ -292,6 +299,9 @@
     var swT = swOf(c.trunk.od);
     o.push('<line class="hc-npipe hc-non" x1="' + (NET.X_SRC + 8) + '" y1="' + yMid + '" x2="' + xSplit +
       '" y2="' + yMid + '" stroke-width="' + swT + '"/>');
+    /* v57：选中路径水流动画——白色流动虚线叠加在管道上（绘制方向=水流方向） */
+    o.push('<line class="hc-nflow" x1="' + (NET.X_SRC + 8) + '" y1="' + yMid + '" x2="' + xSplit +
+      '" y2="' + yMid + '" stroke-width="' + Math.min(2.2, swT * 0.5) + '"/>');
     o.push('<path class="hc-narw hc-non" d="' + netArrow(xSplit, yMid, 'r') + '"/>');
     var xT = (NET.X_SRC + 8 + xSplit) / 2;
     o.push(T(xT, yMid - 25, '总管 Ø' + Core.fmt(c.trunk.od), 'hc-nt-lab hc-nt-b', 'middle'));
@@ -301,6 +311,9 @@
     if (n > 1) {
       o.push('<line class="hc-npipe hc-non" x1="' + xSplit + '" y1="' + laneY(0) + '" x2="' + xSplit +
         '" y2="' + laneY(n - 1) + '" stroke-width="' + swT + '"/>');
+      /* v57：立管上只画水源 → 所选主管那段（车道方向） */
+      o.push('<line class="hc-nflow" x1="' + xSplit + '" y1="' + yMid + '" x2="' + xSplit +
+        '" y2="' + laneY(sel.mi) + '" stroke-width="' + Math.min(2.2, swT * 0.5) + '"/>');
     }
     o.push('<circle class="hc-nnode hc-non" cx="' + xSplit + '" cy="' + yMid + '" r="4.5"/>');
     if (n > 1) o.push(T(xSplit, yMid + 22, '分水三通', 'hc-nt-lab hc-nt-dim', 'middle'));
@@ -332,6 +345,8 @@
         if (x - prev > 0.5) {
           o.push('<line class="hc-npipe' + (isSeg ? ' hc-non' : '') + '" x1="' + Math.round(prev) + '" y1="' + y +
             '" x2="' + Math.round(x) + '" y2="' + y + '" stroke-width="' + swOf(m.od) + '"/>');
+          if (isSeg) o.push('<line class="hc-nflow" x1="' + Math.round(prev) + '" y1="' + y +
+            '" x2="' + Math.round(x) + '" y2="' + y + '" stroke-width="' + Math.min(2, swOf(m.od) * 0.45) + '"/>');
         }
         /* 分水口 */
         o.push('<circle class="' + (isSeg ? 'hc-nnode hc-non' : 'hc-nnode-off') + '" cx="' + Math.round(x) +
@@ -339,6 +354,8 @@
         /* 支管竖直段 + 流向箭头 + 末端节点 */
         o.push('<line class="hc-npipe' + (isSeg ? ' hc-non' : '') + '" x1="' + Math.round(x) + '" y1="' + y +
           '" x2="' + Math.round(x) + '" y2="' + yb + '" stroke-width="' + swOf(t.od) + '"/>');
+        if (isTap) o.push('<line class="hc-nflow" x1="' + Math.round(x) + '" y1="' + y +
+          '" x2="' + Math.round(x) + '" y2="' + yb + '" stroke-width="' + Math.min(2, swOf(t.od) * 0.45) + '"/>');
         o.push('<path class="hc-narw' + (isSeg ? ' hc-non' : '') + '" d="' + netArrow(x, yb - 2, 'd') + '"/>');
         o.push('<circle class="' + (isTap ? 'hc-nend hc-non' : 'hc-nend') + '" cx="' + Math.round(x) +
           '" cy="' + (yb + 4) + '" r="3.5"/>');
@@ -644,6 +661,10 @@
     if (!cfg) cfg = loadCfg() || Core.defaultConfig();
     renderMains();
     renderResults();
+    if (lastSrc) {
+      var srcEl = rootEl.querySelector('[data-hc="srcNote"]');
+      if (srcEl) { srcEl.innerHTML = srcNoteHtml(); srcEl.style.display = ''; }
+    }
     return rootEl;
   }
 
@@ -696,6 +717,35 @@
       cfg = Core.normalize(c);
       if (!isMountedNow()) mount();
       renderMains(); renderResults(); saveCfg();
+      return cfg;
+    },
+    /* 三级方案数据导入（2026-09-19）：地块划分→三级管线图生成后自动推送全分区数据。
+       data = { trunk:{od,len}, mains:[{od,len,taps:[{at,od,len,flow}]}], srcTitle, srcRows }；
+       trunkFlow=Σ主管流量=combinedFlow（mains 为三级侧组装的最远 zoneCount 根主管）；normalize 负责数值清洗（at clamp/排序）；
+       导入后自动跳到最不利路径，左栏顶部显示来源行。注意：会覆盖当前 cfg（自动推送口径，用户已确认）。 */
+    importThreeLevel: function (data) {
+      /* v2.1（2026-09-19 用户核对流量）：联合灌溉口径 —— data.mains 为三级侧按「最远 zoneCount 区」组装的主管组
+         （全图轮灌、同时只开 zoneCount 区），trunkFlow=Σ主管流量=combinedFlow。 */
+      var mains = (data && data.mains || []).filter(function (m) {
+        if (!m || !(m.od > 0) || !m.taps || !m.taps.length) return false;
+        for (var ti = 0; ti < m.taps.length; ti++) if (!m.taps[ti] || !(m.taps[ti].od > 0)) return false;
+        return true;
+      });
+      if (!data || !data.trunk || !mains.length) return null;
+      var c = Core.defaultConfig();
+      c.trunk = { od: data.trunk.od, len: data.trunk.len };
+      c.mains = mains;
+      cfg = Core.normalize(c);
+      lastSrc = { title: data.srcTitle || data.src || '', rows: data.srcRows || [] };
+      if (!isMountedNow()) mount();
+      renderMains(); renderResults();
+      try {
+        var w = Core.worstPath(cfg);
+        if (w) selectPath(w.mi, w.ti);
+      } catch (e) { }
+      var srcEl = rootEl && rootEl.querySelector('[data-hc="srcNote"]');
+      if (srcEl) { srcEl.innerHTML = srcNoteHtml(); srcEl.style.display = lastSrc ? '' : 'none'; }
+      saveCfg();
       return cfg;
     },
     reset: resetCfg,
