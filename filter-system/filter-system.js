@@ -376,7 +376,7 @@
       var yQf = Y(-c.od / 2) + (Y(d.yOut) - Y(-c.od / 2)) * 0.375;
       o += grooveCoupling(X(gx), yQb, qcH, qcW, 'v', 'br' + j, 'G' + (j + 1) + ' 后支管沟槽卡箍快接 · 对卡两半壳+螺栓紧固 · 拆开可整体抽出罐体检修');
       o += grooveCoupling(X(gx), yQf, qcH, qcW, 'v', 'bf' + j, 'G' + (j + 1) + ' 前支管沟槽卡箍快接 · 拆开可整体抽出罐体检修');
-      if (j === 0) o += txt(X(gx) + qcW / 2 + 9, yQb + 3, '沟槽快接', 9, C.fitS, 'start');
+      if (j === c.n - 1) o += txt(X(gx) + qcW / 2 + 9, yQb + 3, '沟槽快接', 9, C.fitS, 'start');   /* v58：右移到末组（G6）卡箍右侧行尾空白——原 j===0 处文字压在 G2 卡箍上（用户 2026-09-19 指令） */
       var vw = Math.max(7, VALVE_W * sc), vh = Math.max(6, VALVE_W * sc * 0.7);
       var modeTxt = { filter: '过滤', backwash: '反冲洗', dump: '直排短路', off: '隔离' }[mT];
       var vFill = (mT === 'filter') ? C.valve : (bw ? C.bw : '#FFFFFF');
@@ -925,7 +925,11 @@
     return h;
   }
   function vcard(id, title, note) {
-    return '<div class="fs-vcard"><div class="fs-vcard-h"><b>' + esc(title) + '</b><em>' + esc(note) + '</em></div>' +
+    /* v59：仅轴测图卡带「放大」按钮（放大后占四窗之和的范围）；其余三张不带按钮，默认视觉逐像素不变 */
+    var zbtn = (id === 'axo')
+      ? '<button type="button" class="fs-zbtn" data-fs-act="axoZoom" data-fs-zoomed="0" title="放大到四窗之和的范围（再点还原）">放大</button>'
+      : '';
+    return '<div class="fs-vcard' + (id === 'axo' ? ' fs-vcard--axo' : '') + '"><div class="fs-vcard-h"><b>' + esc(title) + '</b>' + zbtn + '<em>' + esc(note) + '</em></div>' +
       '<svg id="' + SVG_IDS[id] + '" viewBox="0 0 ' + VW + ' ' + VH + '" preserveAspectRatio="xMidYMid meet"></svg></div>';
   }
 
@@ -1133,6 +1137,20 @@
     return (isFinite(v) && v > 0) ? v : 0;
   }
   function doAct(name, btn) {
+    /* v59：轴测图放大/还原——放大时该卡横跨两列（= 四窗之和的范围），其余三张收起 */
+    if (name === 'axoZoom') {
+      var grid = rootEl ? rootEl.querySelector('.fs-grid') : null;
+      var card = rootEl ? rootEl.querySelector('.fs-vcard--axo') : null;
+      if (!grid || !card) return;
+      var on = !grid.classList.contains('is-axo-zoom');
+      if (on) { grid.classList.add('is-axo-zoom'); card.classList.add('is-axo-zoom'); }
+      else { grid.classList.remove('is-axo-zoom'); card.classList.remove('is-axo-zoom'); }
+      if (btn) {
+        btn.setAttribute('data-fs-zoomed', on ? '1' : '0');
+        btn.textContent = on ? '还原' : '放大';
+      }
+      return;
+    }
     if (name === 'reset') {
       cfg = clone(DEFAULTS);
       saveCfg(); syncInputs(); render();

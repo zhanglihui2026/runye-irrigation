@@ -154,3 +154,9 @@ tr.fs-vchip[data-v0="closed"] td{background:#f1f3f5;color:#495057}
 @media print{
   #filterSystemSection{display:none!important}
 }
+
+/* v59：轴测图「放大」按钮 + 放大态（放大后该卡横跨两列 = 四窗之和的范围；默认不放大，视觉不变） */
+.fs-zbtn{font:inherit;font-size:11px;line-height:1;padding:2px 8px;border:1px solid var(--u-accent-line,#cfe3da);border-radius:4px;background:#fff;color:var(--u-accent-2,#116447);cursor:pointer}
+.fs-zbtn:hover{background:#f3f9f6;border-color:var(--u-accent-2,#116447)}
+.fs-grid.is-axo-zoom .fs-vcard{display:none}
+.fs-grid.is-axo-zoom .fs-vcard.is-axo-zoom{display:block;grid-column:1 / -1}
