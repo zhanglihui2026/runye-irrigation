@@ -49,6 +49,26 @@
   .search-row{display:flex;gap:6px}
   .search-row input{flex:1;min-width:0}
   .search-row .mbtn{flex:none;text-align:center}
+  /* 搜索结果候选 + 已保存地点（2026-09-19 v60：地点搜索 / 保存地点 / 位置记忆） */
+  .sr-list{margin-top:5px;border:1px solid var(--s-300);background:#fff;max-height:158px;overflow-y:auto}
+  .sr-list[hidden]{display:none}
+  .sr-item{display:block;width:100%;border:0;border-bottom:1px solid var(--s-100);background:#fff;
+    text-align:left;padding:5px 7px;font:inherit;font-size:11px;line-height:1.35;color:var(--s-700);cursor:pointer}
+  .sr-item:last-child{border-bottom:0}
+  .sr-item:hover{background:var(--g-50);color:var(--g-700)}
+  .sr-item b{display:block;font-weight:600;color:inherit}
+  .sr-item i{font-style:normal;display:block;font-size:10px;color:var(--s-500);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pill-list{margin-top:5px;display:flex;flex-direction:column;gap:4px}
+  .pill-list[hidden]{display:none}
+  .place-item{display:flex;gap:4px;align-items:center}
+  .place-go{flex:1 1 auto;min-width:0;height:26px;padding:0 6px;border:1px solid var(--s-300);background:#fff;
+    color:var(--s-700);font:inherit;font-size:11px;text-align:left;cursor:pointer;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .place-go:hover{border-color:var(--g-600);color:var(--g-700);background:var(--g-50)}
+  .place-del{flex:none;width:26px;height:26px;border:1px solid var(--s-300);background:#fff;color:var(--s-500);
+    font:inherit;font-size:13px;line-height:1;cursor:pointer}
+  .place-del:hover{border-color:#dc2626;color:#dc2626;background:#fef2f2}
   /* 测量结果 */
   .results .row{display:flex;justify-content:space-between;align-items:baseline;padding:2px 0;border-bottom:1px dashed var(--s-100)}
   .results .row .k{font-size:11px;color:var(--s-500)}
@@ -105,8 +125,12 @@
             <input type="text" id="search" placeholder="搜索地点（如：三亚 崖州）" />
             <button class="mbtn" id="btnSearch">搜索</button>
           </div>
+          <div class="sr-list" id="searchRes" hidden></div>
+          <button class="mbtn" id="btnSavePlace">💾 保存地点</button>
+          <div class="pill-list" id="placeList" hidden></div>
           <button class="mbtn" id="btnLocate">📍 定位三亚</button>
           <button class="mbtn" id="btnBase">🗺️ 切换底图</button>
+          <div class="hint" id="placeHint">搜索定位后可「保存地点」；地图位置自动记住，下次打开回到上次位置。也可直接输入坐标（如 18.2528,109.5119）定位。</div>
         </div>
       </section>
       <section>
@@ -165,6 +189,29 @@
 
   var baseLayers = { '高德卫星':gaodeSat, '高德卫星+路网':L.layerGroup([gaodeSat,gaodeLabel]), 'OSM街道':osm };
   gaodeSat.addTo(map);
+
+  // ===== 位置持久化（2026-09-19 v60）=====
+  // K_VIEW   上次视图（自动记忆）——保证「下次打开回到上次位置」
+  // K_PLACES 用户显式「保存地点」的书签列表（可点击回跳、可删除）
+  var K_VIEW='runye_map_view', K_PLACES='runye_map_places', K_Q='runye_map_lastq';
+  function lsGet(k,d){ try{ var s=localStorage.getItem(k); return s?JSON.parse(s):d; }catch(e){ return d; } }
+  function lsSet(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); return true; }catch(e){ return false; } }
+  function tip(s){ document.getElementById('tip').textContent=s; }
+  function curView(){ var c=map.getCenter(); return {lat:+c.lat.toFixed(6),lng:+c.lng.toFixed(6),zoom:map.getZoom()}; }
+  function saveView(){ var v=curView(); v.ts=Date.now(); lsSet(K_VIEW,v); }
+
+  // 打开时恢复上次位置（数据缺失/损坏则保持默认中心，不影响首次使用）
+  (function(){
+    var v=lsGet(K_VIEW,null);
+    if(v && isFinite(v.lat) && isFinite(v.lng) && isFinite(v.zoom)){
+      map.setView([v.lat,v.lng], Math.max(3,Math.min(19,v.zoom)));
+      tip('已回到上次位置（'+v.lat.toFixed(4)+', '+v.lng.toFixed(4)+'）。');
+    }
+    var q=lsGet(K_Q,'');
+    if(q) document.getElementById('search').value=q;
+  })();
+  // 视图变化即记忆（拖拽/缩放/定位都会触发 moveend）——下次打开据此恢复
+  map.on('moveend', saveView);
 
   // 瓦片加载失败探测
   map.on('tileerror', function(){ document.getElementById('warn').style.display='block'; });
@@ -298,22 +345,189 @@
     map.setView([18.2528,109.5119],15);
   };
 
-  // 搜索（Nominatim 免Key，国内较慢，best-effort）
+  // ===== 地点搜索（2026-09-19 v60：多源兜底 + 候选点选）=====
+  // 旧版只打 Nominatim 且无超时，国内常长时间无响应（表现为一直「搜索中…」）。
+  // 现改为：主源 Photon（komoot，免 Key、国内可达、返回中文地名与 extent 包围盒），
+  // 备源 Nominatim；单源 12s 超时逐个降级；全部失败时提示手动定位（手动定位同样可「保存地点」）。
+  var searchSeq=0, lastPick=null;
+  function fetchJson(url, ms){
+    var ctl=(typeof AbortController!=='undefined')?new AbortController():null;
+    var t=setTimeout(function(){ if(ctl) ctl.abort(); }, ms||12000);
+    var opt=ctl?{signal:ctl.signal}:{};
+    return fetch(url,opt).then(function(r){
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      return r.json();
+    }).then(function(j){ clearTimeout(t); return j; }, function(e){ clearTimeout(t); throw e; });
+  }
+  // extent 统一为 Leaflet bounds 形式 [[minLat,minLng],[maxLat,maxLng]]
+  function normPhoton(j){
+    var out=[];
+    ((j&&j.features)||[]).forEach(function(f){
+      var p=f.properties||{}, c=f.geometry&&f.geometry.coordinates;
+      if(!p.name || !c || c.length<2) return;
+      var det=[];
+      [p.district,p.city,p.state,p.country].forEach(function(s){
+        if(s && s!==p.name && det.indexOf(s)<0) det.push(s);
+      });
+      var e=p.extent, bnd=null;
+      if(e && e.length===4) bnd=[[e[3],e[0]],[e[1],e[2]]];
+      out.push({name:String(p.name), detail:det.join(' · '), lat:+c[1], lng:+c[0], extent:bnd});
+    });
+    return out.filter(function(r){ return isFinite(r.lat)&&isFinite(r.lng); });
+  }
+  function normNominatim(j){
+    var out=[];
+    (j||[]).forEach(function(r){
+      var la=parseFloat(r.lat), lo=parseFloat(r.lon);
+      if(!isFinite(la)||!isFinite(lo)) return;
+      var nm=r.name||String(r.display_name||'').split(',')[0];
+      var bb=r.boundingbox, bnd=null;
+      if(bb && bb.length===4) bnd=[[+bb[0],+bb[2]],[+bb[1],+bb[3]]];
+      out.push({name:nm, detail:String(r.display_name||''), lat:la, lng:lo, extent:bnd});
+    });
+    return out;
+  }
+  var resCache=[];
+  function renderRes(list){
+    resCache=list;
+    var box=document.getElementById('searchRes');
+    box.innerHTML='';
+    if(!list.length){ box.hidden=true; return; }
+    list.forEach(function(r,i){
+      var b=document.createElement("button");
+      b.type='button'; b.className='sr-item';
+      b.setAttribute('data-sr-idx', String(i));
+      var t=document.createElement("b"); t.textContent=r.name; b.appendChild(t);
+      if(r.detail){ var d=document.createElement("i"); d.textContent=r.detail; b.appendChild(d); }
+      b.title=r.name+(r.detail?' — '+r.detail:'');
+      b.onclick=function(){ pick(r); };
+      box.appendChild(b);
+    });
+    box.hidden=false;
+  }
+  var searchMark=null;
+  function markSearch(r){
+    if(searchMark){ map.removeLayer(searchMark); searchMark=null; }
+    searchMark=L.marker([r.lat,r.lng],{icon:L.divIcon({
+      className:'ry-pin', iconSize:[18,30], iconAnchor:[9,29],
+      html:'<svg width="18" height="30" viewBox="0 0 25 41"><path d="M12.5 0C5.6 0 0 5.6 0 12.5 0 21.9 12.5 41 12.5 41S25 21.9 25 12.5C25 5.6 19.4 0 12.5 0z" fill="#dc2626" stroke="#fff" stroke-width="1.5"/><circle cx="12.5" cy="12.5" r="4" fill="#fff"/></svg>'
+    })}).addTo(map);
+    searchMark.bindTooltip(r.name,{direction:'top'});
+  }
+  function goTo(r){
+    if(r.extent){ map.fitBounds(r.extent,{padding:[20,20],maxZoom:16}); }
+    else if(isFinite(r.zoom)){ map.setView([r.lat,r.lng], r.zoom); }
+    else { map.setView([r.lat,r.lng], 16); }
+    markSearch(r);
+  }
+  function pick(r){
+    lastPick=r;
+    goTo(r);
+    document.getElementById('search').value=r.name;
+    lsSet(K_Q,r.name);
+    renderRes([]);
+    tip('已定位：'+r.name+(r.detail?'（'+r.detail+'）':'')+'。点「💾 保存地点」可记住此处。');
+  }
+  // 坐标直入（免网络兜底）：支持「18.2528,109.5119」；首值 >90 时按「经度,纬度」理解
+  function parseLatLng(q){
+    var m=/^\s*(-?\d+(?:\.\d+)?)\s*[,，\s]\s*(-?\d+(?:\.\d+)?)\s*$/.exec(q);
+    if(!m) return null;
+    var a=parseFloat(m[1]), b=parseFloat(m[2]), lat, lng;
+    if(Math.abs(a)>90 && Math.abs(b)<=90){ lng=a; lat=b; } else { lat=a; lng=b; }
+    if(Math.abs(lat)>90 || Math.abs(lng)>180) return null;
+    return {lat:lat, lng:lng};
+  }
   function doSearch(){
     var q=document.getElementById('search').value.trim();
-    if(!q) return;
-    document.getElementById('tip').textContent='搜索中…';
-    fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q))
-      .then(function(r){return r.json();})
-      .then(function(d){
-        if(d&&d.length){ map.setView([parseFloat(d[0].lat),parseFloat(d[0].lon)],15);
-          document.getElementById('tip').textContent='已定位：'+d[0].display_name; }
-        else document.getElementById('tip').textContent='未找到结果，可手动缩放/拖拽定位。';
-      })
-      .catch(function(){ document.getElementById('tip').textContent='搜索服务不可用（国内可能慢），请手动定位。'; });
+    if(!q){ tip('请输入要搜索的地点名称，例如「三亚 崖州」。'); return; }
+    lsSet(K_Q,q);
+    // 坐标直入优先：不触网即可定位
+    var ll=parseLatLng(q);
+    if(ll){
+      lastPick={name:q, detail:'坐标定位', lat:ll.lat, lng:ll.lng, zoom:16};
+      goTo(lastPick);
+      renderRes([]);
+      tip('已按坐标定位：'+ll.lat+', '+ll.lng+'。点「💾 保存地点」可记住此处。');
+      return;
+    }
+    lastPick=null;
+    var seq=++searchSeq;
+    renderRes([]);
+    tip('搜索中…');
+    /* 本地偏置：以当前地图中心为参照，重名地名优先命中本地（实测「东方市」→ 19.0979,108.6482 海南） */
+    var cc=map.getCenter();
+    var bias='&lat='+(+cc.lat.toFixed(5))+'&lon='+(+cc.lng.toFixed(5))+'&zoom=8';
+    var srcs=[
+      {url:'https://photon.komoot.io/api/?limit=6'+bias+'&q='+encodeURIComponent(q), norm:normPhoton},
+      /* 备源必须限中国：实测不限国家时「东方市」首条命中巴拉圭同名地（-25.5,-54.6） */
+      {url:'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&countrycodes=cn&accept-language=zh&q='+encodeURIComponent(q), norm:normNominatim}
+    ];
+    (function next(i){
+      if(seq!==searchSeq) return;
+      if(i>=srcs.length){ tip('搜索服务暂不可用或未找到结果；可手动拖拽/缩放定位后点「💾 保存地点」。'); return; }
+      fetchJson(srcs[i].url, 12000).then(function(j){
+        if(seq!==searchSeq) return;
+        var rs=srcs[i].norm(j);
+        if(!rs.length) return next(i+1);
+        renderRes(rs);
+        tip('找到 '+rs.length+' 个候选地点，点选即定位。');
+      }).catch(function(){ if(seq===searchSeq) next(i+1); });
+    })(0);
   }
   document.getElementById('btnSearch').onclick=doSearch;
   document.getElementById('search').addEventListener('keydown',function(e){ if(e.key==='Enter') doSearch(); });
+
+  // ===== 保存地点（书签）=====
+  function renderPlaces(){
+    var arr=lsGet(K_PLACES,[])||[];
+    var box=document.getElementById('placeList');
+    box.innerHTML='';
+    arr.forEach(function(p){
+      var row=document.createElement("div"); row.className="place-item";
+      row.setAttribute('data-place-id', p.id);
+      var go=document.createElement("button");
+      go.type='button'; go.className='place-go'; go.setAttribute('data-place-go','1');
+      go.textContent='📍 '+p.name; go.title=p.name;
+      go.onclick=function(){
+        lastPick={name:p.name,detail:'',lat:p.lat,lng:p.lng,zoom:p.zoom};
+        goTo(lastPick);
+        document.getElementById('search').value=p.name;
+        lsSet(K_Q,p.name);
+        tip('已回到保存的地点：'+p.name+'。');
+      };
+      var del=document.createElement("button");
+      del.type='button'; del.className='place-del'; del.setAttribute('data-place-del','1');
+      del.textContent='×'; del.title='删除该地点';
+      del.setAttribute('aria-label','删除地点 '+p.name);
+      del.onclick=function(){
+        var now=(lsGet(K_PLACES,[])||[]).filter(function(x){ return x.id!==p.id; });
+        lsSet(K_PLACES, now);
+        renderPlaces();
+        tip('已删除地点：'+p.name+'。');
+      };
+      row.appendChild(go); row.appendChild(del); box.appendChild(row);
+    });
+    box.hidden = arr.length===0;
+  }
+  document.getElementById('btnSavePlace').onclick=function(){
+    var v=curView();
+    var nm=(lastPick && lastPick.name) || document.getElementById('search').value.trim() || '';
+    var arr=lsGet(K_PLACES,[])||[];
+    if(!nm) nm='地点 '+(arr.length+1);
+    var hit=null;
+    for(var i=0;i<arr.length;i++){ if(arr[i].name===nm){ hit=arr[i]; break; } }
+    if(hit){ hit.lat=v.lat; hit.lng=v.lng; hit.zoom=v.zoom; hit.ts=Date.now(); }
+    else{
+      arr.push({id:'mp'+Date.now().toString(36)+'-'+Math.floor(Math.random()*1e4).toString(36),
+        name:nm, lat:v.lat, lng:v.lng, zoom:v.zoom, ts:Date.now()});
+      if(arr.length>20) arr=arr.slice(arr.length-20);
+    }
+    lsSet(K_PLACES,arr);
+    saveView();
+    renderPlaces();
+    tip('已保存地点：'+nm+'（'+v.lat.toFixed(4)+', '+v.lng.toFixed(4)+'）——下次打开会回到这里。');
+  };
+  renderPlaces();
 
   // 回传设计工具：写入 localStorage，并跳转到 index.html 的面积测量工具（03 面积测量工具）
   document.getElementById('btnCopy').onclick=function(){

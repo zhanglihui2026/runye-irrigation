@@ -15293,11 +15293,10 @@ function tlIsoStatsReset() {
     var dlt = h1s - h0s;
     var cut = Math.abs(dlt) < 0.005;
     var ph = pumpHeadNow();
-    var l2tail = '图面估算（Hazen-Williams），不改选型计算';
     var l2;
-    if (cut) l2 = '按图面估算损失基本不变 · ' + l2tail;
-    else if (ph) l2 = '按水泵扬程 ' + ph + ' m 估算：可由 ' + ph + ' m 调整为 ' + Math.max(0, ph + dlt).toFixed(1) + ' m · ' + l2tail;
-    else l2 = '水泵扬程可相应' + (dlt <= 0 ? '降低' : '增加') + ' ' + Math.abs(dlt).toFixed(1) + ' m · ' + l2tail;
+    if (cut) l2 = '按图面估算损失基本不变';
+    else if (ph) l2 = '按水泵扬程 ' + ph + ' m 估算：可由 ' + ph + ' m 调整为 ' + Math.max(0, ph + dlt).toFixed(1) + ' m';
+    else l2 = '水泵扬程可相应' + (dlt <= 0 ? '降低' : '增加') + ' ' + Math.abs(dlt).toFixed(1) + ' m';
     var parts = [];
     if (dDown < -0.005) parts.push('<b style="color:#15803d">减少 ' + Math.abs(dDown).toFixed(2) + ' m</b>');
     if (dUp > 0.005) parts.push('<b style="color:#b91c1c">增加 ' + dUp.toFixed(2) + ' m</b>');

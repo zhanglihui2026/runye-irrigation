@@ -562,13 +562,7 @@
     var cxc = X(0);
 
     o += line(X(hmin), Y(0), X(hmax), Y(0), C.dim, 1.2);
-    /* 三根总管断面圆（唯一能同时看清前后错位与标高链的视图） */
-    o += '<circle cx="' + r2(X(d.yIn)) + '" cy="' + r2(Y(d.zWs)) + '" r="' + r2(Math.max(4, c.dnWs / 2 * sc)) +
-      '" fill="' + C.wsF + '" stroke="' + C.ws + '" stroke-width="1.4"/>';
-    o += '<circle cx="' + r2(X(d.yOut)) + '" cy="' + r2(Y(d.zPort)) + '" r="' + r2(Math.max(4, c.dnOut / 2 * sc)) +
-      '" fill="' + C.outF + '" stroke="' + C.out + '" stroke-width="1.4"/>';
-    o += '<circle cx="' + r2(X(d.yIn)) + '" cy="' + r2(Y(d.zInTop)) + '" r="' + r2(Math.max(4, c.dnIn / 2 * sc)) +
-      '" fill="' + C.inF + '" stroke="' + C.in + '" stroke-width="1.4"/>';
+    /* v61：三根总管断面圆已移到「水流方向层」之后绘制（原在此处会被随后画的管带盖住） */
     /* ① 断面（v18：翻边外圈已取消——横向总管上不放活接图示） */
     /* ①上 → 汇流节点 立管（进水阀 V1 装立管中段） */
     o += line(X(d.yIn), Y(d.zInTop), X(d.yIn), Y(d.zPort), C.inL, Math.max(2.4, c.dnBr * sc));
@@ -643,6 +637,17 @@
       o += flow(X(d.yOut), Y(d.zPort), X(-c.od / 2), Y(d.zPort), C.out);   /* ③ → 罐前口（净水倒行入罐） */
       o += flow(X(c.od / 2), Y(d.zPort), X(d.yIn), Y(d.zPort), C.ws);      /* 罐后口 → 节点 → 排污 */
     }
+
+    /* v61 图层顺序（用户批注：色块压在圆上不好看，圆应遮挡管道）：
+       三根总管断面圆在此绘制 —— 位于 管带(①②③) + 管件 + 水流虚线 之上，圆面遮住管端；
+       又位于 标高/文字 之下，圆内注释与刻度仍清晰。
+       （唯一能同时看清前后错位与标高链的视图，故保留此三圆） */
+    o += '<circle cx="' + r2(X(d.yIn)) + '" cy="' + r2(Y(d.zWs)) + '" r="' + r2(Math.max(4, c.dnWs / 2 * sc)) +
+      '" fill="' + C.wsF + '" stroke="' + C.ws + '" stroke-width="1.4"/>';
+    o += '<circle cx="' + r2(X(d.yOut)) + '" cy="' + r2(Y(d.zPort)) + '" r="' + r2(Math.max(4, c.dnOut / 2 * sc)) +
+      '" fill="' + C.outF + '" stroke="' + C.out + '" stroke-width="1.4"/>';
+    o += '<circle cx="' + r2(X(d.yIn)) + '" cy="' + r2(Y(d.zInTop)) + '" r="' + r2(Math.max(4, c.dnIn / 2 * sc)) +
+      '" fill="' + C.inF + '" stroke="' + C.in + '" stroke-width="1.4"/>';
 
     /* 罐顶排气口 ⑥（侧视/左视为竖管，标出标高链顶端） */
     o += line(cxc, Y(d.zTop), cxc, Y(d.zTop + 70), C.tankS, 2.4);
