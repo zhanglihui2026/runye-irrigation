@@ -31,8 +31,19 @@
   /* 主体：左侧工具栏 + 地图（2026-09-13 改版：原绿色顶部操作条与右侧浮动测量面板
      的全部内容集中到左侧工具栏，地图占满其余空间） */
   .main{flex:1;position:relative;display:flex;min-height:0}
-  .side{flex:none;width:250px;background:#fff;border-right:1px solid var(--s-300);
+  .side{flex:none;width:var(--mapSideW,250px);background:#fff;border-right:1px solid var(--s-300);
     overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:10px}
+  /* 细滚动条（2026-09-20）：只写 ::-webkit-scrollbar，不写 scrollbar-width/color
+     标准属性——两者并存会让 webkit 伪元素整条失效，实测回退 11px 标准条（第六十五轮） */
+  .side::-webkit-scrollbar,.sr-list::-webkit-scrollbar{width:4px;height:4px}
+  .side::-webkit-scrollbar-track,.sr-list::-webkit-scrollbar-track{background:transparent}
+  .side::-webkit-scrollbar-thumb,.sr-list::-webkit-scrollbar-thumb{background:#bfd3c6;border-radius:2px}
+  .side::-webkit-scrollbar-thumb:hover,.sr-list::-webkit-scrollbar-thumb:hover{background:#9db8a7}
+  /* 左侧工具栏宽度拖拽条（2026-09-20）：拖动写 --mapSideW + localStorage 记忆，双击恢复默认；
+     没拖过不写任何变量，默认宽度 250px 逐像素不变 */
+  .side-grip{flex:none;width:6px;cursor:col-resize;background:transparent;touch-action:none;position:relative;z-index:5}
+  .side-grip:hover,.side-grip:active{background:var(--g-100)}
+  body.side-resizing{cursor:col-resize!important;user-select:none!important}
   .side section{flex:none}
   .sec-t{margin:0 0 5px;font-size:11px;color:var(--s-500);font-weight:700;letter-spacing:1px;
     border-left:3px solid var(--g-600);padding-left:8px;line-height:1.4}
@@ -94,6 +105,7 @@
   @media(max-width:700px){
     .main{flex-direction:column}
     .side{width:100%;max-height:46vh;border-right:0;border-bottom:1px solid var(--s-300)}
+    .side-grip{display:none}
   }
 /* ===== RY-NAV 区块已整体取消（2026-09-12）：原 .ry-nav 品牌导航栏的 50 行样式
    （.main-header/.header-inner/.brand/.main-nav/.nav-link/.nav-home-btn/.search-btn/
@@ -157,6 +169,8 @@
         <div class="hint">保存后可累计多个地块；在「精准灌溉」页地块库「设为当前」，或在数字农业（水肥决策）页下拉选择。</div>
       </section>
     </aside>
+    <!-- 左侧工具栏宽度拖拽条（2026-09-20）：拖动调宽、双击恢复默认 -->
+    <div class="side-grip" id="mapSideGrip" title="拖动调节工具栏宽度；双击恢复默认"></div>
     <div class="map-wrap">
       <div id="map"></div>
       <div class="warn" id="warn">⚠️ 地图瓦片加载失败，请检查网络（本工具需要联网获取卫星影像）。</div>
@@ -215,6 +229,52 @@
 
   // 瓦片加载失败探测
   map.on('tileerror', function(){ document.getElementById('warn').style.display='block'; });
+
+  // ===== 左侧工具栏宽度拖拽（2026-09-20）=====
+  // 项目约定：没拖过不写任何变量——.side 宽度走 var(--mapSideW,250px) 回退，默认视觉逐像素不变；
+  // 拖过才写内联变量 + localStorage 记忆；双击拖拽条恢复默认。拖动时 rAF 节流调 map.invalidateSize()。
+  (function(){
+    var side=document.querySelector('.side'), grip=document.getElementById('mapSideGrip');
+    if(!side||!grip) return;
+    var K_W='runye_map_side_w', MIN=180, MAX=520;
+    function apply(w){
+      side.style.setProperty('--mapSideW', w+'px');
+      if(typeof map!=='undefined' && map && map.invalidateSize) map.invalidateSize();
+    }
+    var drag=null, raf=0, pendW=0;
+    function frame(){ raf=0; if(drag) apply(pendW); }
+    grip.addEventListener('pointerdown', function(e){
+      e.preventDefault();
+      drag={x:e.clientX, w:side.getBoundingClientRect().width};
+      pendW=Math.round(drag.w);
+      try{ grip.setPointerCapture(e.pointerId); }catch(err){}
+      document.body.classList.add('side-resizing');
+    });
+    grip.addEventListener('pointermove', function(e){
+      if(!drag) return;
+      pendW=Math.max(MIN, Math.min(MAX, Math.round(drag.w + (e.clientX-drag.x))));
+      if(!raf) raf=requestAnimationFrame(frame);
+    });
+    function endDrag(){
+      if(!drag) return;
+      drag=null;
+      if(raf){ cancelAnimationFrame(raf); raf=0; }
+      document.body.classList.remove('side-resizing');
+      try{ localStorage.setItem(K_W, String(pendW)); }catch(err){}
+    }
+    grip.addEventListener('pointerup', endDrag);
+    grip.addEventListener('pointercancel', endDrag);
+    grip.addEventListener('dblclick', function(){
+      side.style.removeProperty('--mapSideW');
+      try{ localStorage.removeItem(K_W); }catch(err){}
+      if(typeof map!=='undefined' && map && map.invalidateSize) map.invalidateSize();
+    });
+    // 恢复记忆宽度（有存档才写变量）
+    try{
+      var s=localStorage.getItem(K_W);
+      if(s){ var w=parseInt(s,10); if(isFinite(w) && w>=MIN && w<=MAX) apply(w); }
+    }catch(err){}
+  })();
 
   // ===== 绘制逻辑 =====
   var drawing = false;

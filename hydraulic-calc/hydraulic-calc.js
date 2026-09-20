@@ -54,6 +54,23 @@
   }
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
 
+  /* 长度 / 流量一律规整到两位小数（2026-09-19 用户要求：精确到小数点后两位）。
+     ★ 统一在 normalize 之后落一次 —— cfg 内部值与输入框显示值因此同源，否则
+       domOutOfSync()（字符串比对）会永久判「不同步」→ 每次渲染重建卡片 → 输入焦点丢失。 */
+  function tidy2(c) {
+    if (!c) return c;
+    if (c.trunk) c.trunk.len = Core.r2(Number(c.trunk.len) || 0);
+    (c.mains || []).forEach(function (m) {
+      m.len = Core.r2(Number(m.len) || 0);
+      (m.taps || []).forEach(function (t) {
+        t.len = Core.r2(Number(t.len) || 0);
+        t.flow = Core.r2(Number(t.flow) || 0);
+      });
+    });
+    return c;
+  }
+  function nm(c) { return tidy2(Core.normalize(c)); }   /* normalize 后统一规整（所有入口汇聚于此） */
+
   /* ---------------- 存档 ---------------- */
   function loadCfg() {
     try {
@@ -61,7 +78,7 @@
       if (!raw) return null;
       var o = JSON.parse(raw);
       if (!o || !o.mains || !o.mains.length || !o.trunk) return null;
-      return Core.normalize(o);
+      return nm(o);
     } catch (e) { return null; }
   }
   function saveCfg() {
@@ -166,8 +183,8 @@
           '  <span class="hc-tap-no">' + (ti + 1) + '</span>' +
           '  <input type="number" data-hc="tapAt" data-mi="' + mi + '" data-ti="' + ti + '" min="0" step="10" value="' + t.at + '" title="该三通距本主管起点的距离（m）">' +
           '  <input type="number" list="' + OD_DATALIST_ID + '" data-hc="tapOd" data-mi="' + mi + '" data-ti="' + ti + '" min="1" step="5" value="' + t.od + '" title="支管管径 OD（mm）">' +
-          '  <input type="number" data-hc="tapLen" data-mi="' + mi + '" data-ti="' + ti + '" min="0" step="5" value="' + t.len + '" title="支管长度（m）">' +
-          '  <input type="number" data-hc="tapFlow" data-mi="' + mi + '" data-ti="' + ti + '" min="0" step="0.5" value="' + t.flow + '" title="该支管末端设计流量（m³/h）">' +
+          '  <input type="number" data-hc="tapLen" data-mi="' + mi + '" data-ti="' + ti + '" min="0" step="5" value="' + f(t.len, 2) + '" title="支管长度（m）">' +
+          '  <input type="number" data-hc="tapFlow" data-mi="' + mi + '" data-ti="' + ti + '" min="0" step="0.5" value="' + f(t.flow, 2) + '" title="该支管末端设计流量（m³/h）">' +
           '  <button type="button" class="hc-btn hc-btn-sm hc-btn-danger" data-hc-act="delTap" data-mi="' + mi + '" data-ti="' + ti + '" title="删除该三通 / 支管"' + (m.taps.length <= 1 ? ' disabled' : '') + '>×</button>' +
           '</div>';
       }).join('');
@@ -180,7 +197,7 @@
         '    <button type="button" class="hc-btn hc-btn-sm hc-btn-danger" data-hc-act="delMain" data-mi="' + mi + '"' + (only1 ? ' disabled' : '') + '>删除主管</button>' +
         '  </div>' +
         '  <div class="hc-row"><label>管径 OD</label><input type="number" list="' + OD_DATALIST_ID + '" data-hc="mainOd" data-mi="' + mi + '" min="1" step="5" value="' + m.od + '"><span class="hc-unit">mm</span></div>' +
-        '  <div class="hc-row"><label>长度</label><input type="number" data-hc="mainLen" data-mi="' + mi + '" min="0" step="5" value="' + m.len + '"><span class="hc-unit">m</span></div>' +
+        '  <div class="hc-row"><label>长度</label><input type="number" data-hc="mainLen" data-mi="' + mi + '" min="0" step="5" value="' + f(m.len, 2) + '"><span class="hc-unit">m</span></div>' +
         '  <div class="hc-row hc-row-ro"><label>流量（累加）</label><b data-hc-out="mainFlow" data-mi="' + mi + '">—</b></div>' +
         '  <div class="hc-tap-row hc-tap-head"><span>支管</span><span>距起点 m</span><span>管径 OD</span><span>长 m</span><span>流量 m³/h</span><span></span></div>' +
         taps +
@@ -192,13 +209,13 @@
     var box = rootEl.querySelector('#' + MAINS_ID);
     if (box) box.innerHTML = mainsHtml();
     rootEl.querySelector('[data-hc="trunkOd"]').value = cfg.trunk.od;
-    rootEl.querySelector('[data-hc="trunkLen"]').value = cfg.trunk.len;
+    rootEl.querySelector('[data-hc="trunkLen"]').value = f(cfg.trunk.len, 2);
     rootEl.querySelector('[data-hc="C"]').value = cfg.C;
     rootEl.querySelector('[data-hc="juncZeta"]').value = cfg.juncZeta;
     rootEl.querySelector('[data-hc="caliber"]').value = cfg.caliber;
     rootEl.querySelector('[data-hc="includeLocal"]').checked = !!cfg.includeLocal;
     if (!rootEl.querySelector('[data-hc="bulkFlow"]').value) {
-      rootEl.querySelector('[data-hc="bulkFlow"]').value = (cfg.mains[0] && cfg.mains[0].taps[0]) ? cfg.mains[0].taps[0].flow : 6;
+      rootEl.querySelector('[data-hc="bulkFlow"]').value = (cfg.mains[0] && cfg.mains[0].taps[0]) ? f(cfg.mains[0].taps[0].flow, 2) : f(6, 2);
     }
     renderPathPickers();
   }
@@ -214,7 +231,7 @@
     var taps = cfg.mains[mi].taps;
     var ti = Math.max(0, Math.min(taps.length - 1, parseInt(st.value, 10) || 0));
     st.innerHTML = taps.map(function (t, j) {
-      return '<option value="' + j + '">支管 ' + (j + 1) + '（' + t.len + ' m / ' + t.flow + ' m³/h）</option>';
+      return '<option value="' + j + '">支管 ' + (j + 1) + '（' + f(t.len, 2) + ' m / ' + f(t.flow, 2) + ' m³/h）</option>';
     }).join('');
     st.value = String(ti);
   }
@@ -305,7 +322,7 @@
     o.push('<path class="hc-narw hc-non" d="' + netArrow(xSplit, yMid, 'r') + '"/>');
     var xT = (NET.X_SRC + 8 + xSplit) / 2;
     o.push(T(xT, yMid - 25, '总管 Ø' + Core.fmt(c.trunk.od), 'hc-nt-lab hc-nt-b', 'middle'));
-    o.push(T(xT, yMid - 12, Core.fmt(c.trunk.len) + ' m · Q ' + f(all.trunkFlow, 1), 'hc-nt-lab', 'middle'));
+    o.push(T(xT, yMid - 12, f(c.trunk.len, 2) + ' m · Q ' + f(all.trunkFlow, 2), 'hc-nt-lab', 'middle'));
 
     /* ── 分水立管（多主管时才有实线段）+ 分水节点 ── */
     if (n > 1) {
@@ -325,8 +342,8 @@
         return m.len > 0 ? xMain0 + NET.MAIN_LEN * Math.max(0, Math.min(1, t.at / m.len)) : xMain0;
       };
       var slot = NET.MAIN_LEN / Math.max(1, M);
-      o.push(T(xMain0, y - 14, '主管' + (i + 1) + ' Ø' + Core.fmt(m.od) + ' · ' + Core.fmt(m.len) + ' m · Q ' +
-        f(Core.mainFlow(c, i), 1) + ' m³/h', 'hc-nt-lab hc-nt-b' + (i === sel.mi ? ' hc-non-t' : '')));
+      o.push(T(xMain0, y - 14, '主管' + (i + 1) + ' Ø' + Core.fmt(m.od) + ' · ' + f(m.len, 2) + ' m · Q ' +
+        f(Core.mainFlow(c, i), 2) + ' m³/h', 'hc-nt-lab hc-nt-b' + (i === sel.mi ? ' hc-non-t' : '')));
       var prev = xMain0;
       m.taps.forEach(function (t, j) {
         var x = Math.max(prev, xAt(t));      /* 位置重合/逆序时退化成一个点，保证段长非负 */
@@ -424,16 +441,16 @@
     set('total', f(res.total, 3));
     set('hf', f(res.hf, 3));
     set('hlocal', f(res.hlocal, 3));
-    set('trunkFlow', f(res.trunkFlow, 1) + ' m³/h（' + sums.taps + ' 根支管之和）');
-    cfg.mains.forEach(function (m, i) { set('mainFlow', f(Core.mainFlow(cfg, i), 1) + ' m³/h', i); });
+    set('trunkFlow', f(res.trunkFlow, 2) + ' m³/h（' + sums.taps + ' 根支管之和）');
+    cfg.mains.forEach(function (m, i) { set('mainFlow', f(Core.mainFlow(cfg, i), 2) + ' m³/h', i); });
 
     var legLen = res.legs.reduce(function (s, l) { return s + l.L; }, 0);
-    set('pathText', '<b>' + esc(res.label) + '</b><br>总管 ' + cfg.trunk.len + ' m + 主管' + (p.mi + 1) + ' ' +
-      f(res.legs.reduce(function (s, l) { return s + (l.kind === 'main' ? l.L : 0); }, 0), 0) + ' m + 支管' + (p.ti + 1) + ' ' +
-      cfg.mains[p.mi].taps[p.ti].len + ' m = <b>' + f(legLen, 0) + ' m</b>；本路流量由支管末端反推（'
-      + f(res.tapFlowIn, 1) + ' m³/h → 主管 ' + f(res.mainFlow, 1) + ' m³/h → 总管 ' + f(res.trunkFlow, 1) + ' m³/h）');
+    set('pathText', '<b>' + esc(res.label) + '</b><br>总管 ' + f(cfg.trunk.len, 2) + ' m + 主管' + (p.mi + 1) + ' ' +
+      f(res.legs.reduce(function (s, l) { return s + (l.kind === 'main' ? l.L : 0); }, 0), 2) + ' m + 支管' + (p.ti + 1) + ' ' +
+      f(cfg.mains[p.mi].taps[p.ti].len, 2) + ' m = <b>' + f(legLen, 2) + ' m</b>；本路流量由支管末端反推（'
+      + f(res.tapFlowIn, 2) + ' m³/h → 主管 ' + f(res.mainFlow, 2) + ' m³/h → 总管 ' + f(res.trunkFlow, 2) + ' m³/h）');
     set('pickNote', '共 ' + sums.mains + ' 根主管 × ' + cfg.mains[p.mi].taps.length + ' 根支管');
-    set('combNote', sums.taps + ' 条组合路径 · 全部管道总长 ' + f(sums.totalLen, 0) + ' m');
+    set('combNote', sums.taps + ' 条组合路径 · 全部管道总长 ' + f(sums.totalLen, 2) + ' m');
 
     var all = Core.allPaths(cfg);
     renderNet(res, all);
@@ -452,8 +469,8 @@
       else if (l.status === '流速偏低') chip = '<span class="hc-chip hc-chip-low">偏低</span>';
       h += '<tr>' +
         '<td class="hc-td-name">' + esc(l.name) + '</td>' +
-        '<td>' + f(l.od, 0) + '</td><td>' + f(l.id, 1) + '</td><td>' + f(l.L, 0) + '</td>' +
-        '<td>' + f(l.Q, 1) + '</td><td>' + f(l.v, 3) + chip + '</td>' +
+        '<td>' + f(l.od, 0) + '</td><td>' + f(l.id, 1) + '</td><td>' + f(l.L, 2) + '</td>' +
+        '<td>' + f(l.Q, 2) + '</td><td>' + f(l.v, 3) + chip + '</td>' +
         '<td>' + f(l.hf, 3) + '</td><td>—</td><td>' + f(l.hf, 3) + '</td></tr>';
     });
     res.localLegs.forEach(function (l) {
@@ -464,7 +481,7 @@
     });
     var legLen = res.legs.reduce(function (s, l) { return s + l.L; }, 0);
     h += '<tr class="hc-row-sum"><td class="hc-td-name">合计（' + esc(res.label) + '）</td>' +
-      '<td>—</td><td>—</td><td>' + f(legLen, 0) + '</td><td>' + f(res.trunkFlow, 1) + '</td><td>—</td>' +
+      '<td>—</td><td>—</td><td>' + f(legLen, 2) + '</td><td>' + f(res.trunkFlow, 2) + '</td><td>—</td>' +
       '<td>' + f(res.hf, 3) + '</td><td>' + f(res.hlocal, 3) + '</td><td>' + f(res.total, 3) + '</td></tr>';
     h += '</tbody>';
     t.innerHTML = h;
@@ -486,7 +503,7 @@
       h += '<tr class="' + (r.isWorst ? 'hc-row-worst' : '') + '">' +
         '<td>' + (r.mi + 1) + '-' + (r.ti + 1) + '</td>' +
         '<td class="hc-td-name">总管 → 主管' + (r.mi + 1) + ' → 支管' + (r.ti + 1) + '</td>' +
-        '<td>' + f(r.Qmain, 1) + '</td><td>' + f(r.Qtap, 1) + '</td>' +
+        '<td>' + f(r.Qmain, 2) + '</td><td>' + f(r.Qtap, 2) + '</td>' +
         '<td>' + f(r.hf, 3) + '</td><td>' + f(r.hlocal, 3) + '</td>' +
         '<td><b>' + f(r.total, 3) + '</b></td>' +
         '<td>' + mark.join('') + '</td></tr>';
@@ -527,12 +544,15 @@
      才重建主管卡 —— 避免每次输入都重建 DOM 导致焦点丢失。 */
   function domOutOfSync() {
     var q = function (sel) { return rootEl.querySelector(sel); };
+    /* 长度类输入框显示的是两位补零串（'40.00'），内部是 40 —— 必须按数值 + 两位取整比，
+       否则每次渲染都判「不同步」而重建卡片。管径 / 距起点仍按原字符串比对（未做补零）。 */
+    var sameNum = function (el, val) { return !!el && Core.r2(Number(el.value) || 0) === Core.r2(Number(val) || 0); };
     if (String(q('[data-hc="trunkOd"]').value) !== String(cfg.trunk.od)) return true;
-    if (String(q('[data-hc="trunkLen"]').value) !== String(cfg.trunk.len)) return true;
+    if (!sameNum(q('[data-hc="trunkLen"]'), cfg.trunk.len)) return true;
     for (var mi = 0; mi < cfg.mains.length; mi++) {
       if (!q('[data-hc="mainOd"][data-mi="' + mi + '"]')) return true;
       if (String(q('[data-hc="mainOd"][data-mi="' + mi + '"]').value) !== String(cfg.mains[mi].od)) return true;
-      if (String(q('[data-hc="mainLen"][data-mi="' + mi + '"]').value) !== String(cfg.mains[mi].len)) return true;
+      if (!sameNum(q('[data-hc="mainLen"][data-mi="' + mi + '"]'), cfg.mains[mi].len)) return true;
       for (var ti = 0; ti < cfg.mains[mi].taps.length; ti++) {
         var s = '[data-mi="' + mi + '"][data-ti="' + ti + '"]';
         var a = q('[data-hc="tapAt"]' + s);
@@ -584,7 +604,7 @@
       return;
     } else if (name === 'jumpWorst') {
       syncFromDom();
-      cfg = Core.normalize(cfg);
+      cfg = nm(cfg);
       var w = Core.worstPath(cfg);
       if (w) {
         rootEl.querySelector('[data-hc="pathMain"]').value = String(w.mi);
@@ -597,7 +617,7 @@
       return;
     } else return;
 
-    cfg = Core.normalize(cfg);
+    cfg = nm(cfg);
     renderMains();
     renderResults();
     saveCfg();
@@ -623,7 +643,7 @@
       if (k === 'pathMain') { renderPathPickers(); renderResults(); return; }
       if (k === 'pathTap') { renderResults(); return; }
       syncFromDom();
-      cfg = Core.normalize(cfg);                 /* 失焦时做归一化（clamp / 排序） */
+      cfg = nm(cfg);                 /* 失焦时做归一化（clamp / 排序） */
       if (domOutOfSync()) renderMains();         /* 只在显示值真的被纠正时才重建 */
       renderResults();
       saveCfg();
@@ -714,7 +734,7 @@
     root: function () { return rootEl; },
     getConfig: function () { return cfg ? clone(cfg) : null; },
     setConfig: function (c) {
-      cfg = Core.normalize(c);
+      cfg = nm(c);
       if (!isMountedNow()) mount();
       renderMains(); renderResults(); saveCfg();
       return cfg;
@@ -735,7 +755,7 @@
       var c = Core.defaultConfig();
       c.trunk = { od: data.trunk.od, len: data.trunk.len };
       c.mains = mains;
-      cfg = Core.normalize(c);
+      cfg = nm(c);
       lastSrc = { title: data.srcTitle || data.src || '', rows: data.srcRows || [] };
       if (!isMountedNow()) mount();
       renderMains(); renderResults();

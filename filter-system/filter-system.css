@@ -22,7 +22,8 @@
 
 /* ---------- 回执消息条已取消（v19：整条删除）----------
  * 操作回执改写到页面底部状态栏 #ryStHint（见 filter-system.js planNote），本文件不再有回执条样式。 */
-/* 按钮样式用于左栏顶部操作按钮组（.fs-actions）+ 右列「恢复默认参数」（.fs-duo-col 内，v41，flex stretch 自动全宽） */
+/* 按钮样式用于左栏顶部操作按钮组（.fs-actions，v88 起三个按钮同排）
+   + 右列「切换接法」按钮（.fs-duo-col 内，靠 flex stretch 自动全宽） */
 .fs-bar-btn{
   font:inherit;font-size:11.5px;padding:4px 10px;border:1px solid var(--u-accent-line,#cfe3da);
   border-radius:4px;background:#fff;color:var(--u-accent-2,#116447);cursor:pointer;white-space:nowrap;
@@ -50,9 +51,15 @@
 }
 .fs-resizer:hover::before,.fs-resizer.on::before{background:var(--u-accent,#18835e)}
 
-/* ---------- 操作按钮组（v13：从顶部条移到左栏顶部，复用 fs-group 卡片外观） ---------- */
+/* ---------- 操作按钮组（v13：从顶部条移到左栏顶部，复用 fs-group 卡片外观） ----------
+   v88：三个按钮同排一行（取当前方案流量 / 写入过滤损失 / 恢复默认参数）。
+   宽度账（实测，_p1/_v88_probe.cjs）：默认栏宽 348 ⇒ 组内可用 303px；
+     保留箭头：119+106+91+2×8 = 332 > 303 ⇒ 必换行；
+     去箭头后：103+91+91+16 = 301 ≤ 303 ⇒ 排得下；
+   再给按钮左右内边距 10 → 7px（仅本作用域，右列「切换接法」不受影响）多腾 18px ⇒ 余量 20px。
+   窄栏（< 340px）仍由 flex-wrap 优雅换行，不会横向溢出、不会裁字。 ---------- */
 .fs-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
-.fs-actions .fs-bar-btn{flex:1 1 auto;text-align:center;white-space:nowrap}
+.fs-actions .fs-bar-btn{flex:1 1 auto;text-align:center;white-space:nowrap;padding-left:7px;padding-right:7px}
 .fs-group{margin:0 0 8px;padding:8px 9px 6px;border:1px solid var(--u-accent-line,#cfe3da);border-radius:6px;background:var(--u-accent-bg,#f4fbf7)}
 .fs-gh{font-size:12px;font-weight:700;color:var(--u-accent-2,#116447);margin:0 0 6px;display:flex;align-items:center;gap:6px;letter-spacing:.3px}
 .fs-gh>em{font-style:normal;font-weight:400;font-size:10.5px;color:var(--u-ink-2,#7b9188);margin-left:auto}
@@ -160,3 +167,14 @@ tr.fs-vchip[data-v0="closed"] td{background:#f1f3f5;color:#495057}
 .fs-zbtn:hover{background:#f3f9f6;border-color:var(--u-accent-2,#116447)}
 .fs-grid.is-axo-zoom .fs-vcard{display:none}
 .fs-grid.is-axo-zoom .fs-vcard.is-axo-zoom{display:block;grid-column:1 / -1}
+
+/* ---------- v85：轴测图「放大」后的标注文字缩放 ----------
+ * 「放大」= 该卡横跨两列，SVG 宽度 ≈ 2.04×（实测 1600 视口 scale 0.868 → 1.772），
+ * 字号随等比放大：11 用户单位 → 屏幕 26px，长引注（尤其顶部那行方式说明，宽近整个卡宽）
+ * 会喧宾夺主。这里把「长引注」压到 9.5 用户单位（屏幕 ≈ 16.8px：比未放大时的 13px 略大、
+ * 比原来的 26px 明显收敛，即「稍微缩小」）。
+ * 管件引注码（G1…Gn / V1 / ⑥ / P1 常闭）带 class="fs-tcode"，被 :not() 排除，保持原尺寸 ——
+ * 它们是读图索引，短、且需要四组之间大小一致。
+ * ★ 要再小 / 再大，只改下面这一个 9.5（数值单位 = SVG 用户单位，脚本 _p1/_v85_measure.cjs 可实测）。
+ * 只在放大态生效 ⇒ 未放大（默认）视觉逐像素不变。 */
+.fs-grid.is-axo-zoom .fs-vcard.is-axo-zoom svg text:not(.fs-tcode){font-size:9.5px}

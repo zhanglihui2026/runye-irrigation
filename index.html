@@ -5789,6 +5789,11 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
   <aside class="pp-side" id="ppSide">
   <!-- 地块规划参数 — 第1行：输入参数 -->
   <div class="pp-plan-bar" id="ppPlanBar" style="margin-bottom:8px">
+    <!-- 2026-09-20 v91 用户要求：把「水泵提升高度 / 地形高差」做成可设定值，放进本面板、排在「滴灌带间距」之前。
+         与 01 一级表单同源：planLift ⇄ fld_lift、planDh ⇄ fld_dh（双向镜像，见下方 JS 块），默认值仍为 5 / 5。
+         需要撤掉：删掉本注释与下面两行 item 即可，另删本文件底部 ppPullLiftDh / ppLiftDhCapture 那一整块（含两个 document 监听）与 resetDefaults 里的回填调用。 -->
+    <span class="pp-plan-item"><span class="pp-plan-label">水泵提升高度</span><input type="number" id="planLift" value="5" min="0" step="1">m</span>
+    <span class="pp-plan-item"><span class="pp-plan-label">地形高差</span><input type="number" id="planDh" value="5" min="0" step="1">m</span>
     <span class="pp-plan-item"><span class="pp-plan-label">滴灌带间距</span><input type="number" id="planTapeSpacing" value="0.4" min="0.1" step="0.1">m</span>
     <span class="pp-plan-item"><span class="pp-plan-label">滴孔间距</span><input type="number" id="planEmitterSpacing" value="0.3" min="0.05" step="0.05">m</span>
     <span class="pp-plan-item"><span class="pp-plan-label">滴头流量</span><input type="number" id="planEmitterFlow" value="0.8" min="0.1" step="0.1">L/h</span>
@@ -7471,6 +7476,8 @@ function setLayoutSides(sides) {
 function resetDefaults() {
   const defaults = {fld_zoneMu:30,fld_zoneFixedSide:200,fld_A:200,fld_B:100,fld_dh:5,fld_N:1,fld_tapeLen:100,fld_tapeSpacing:0.8,fld_tapeDh:1,fld_emitterSpacing:0.3,fld_emitterFlow:0.8,fld_tapeOD:16,fld_tapePressure:1,fld_lift:5,fld_existPressure:0,fld_targetV:1.5,fld_filterLoss:5,fld_efficiency:65,fld_mainPipeLen:200,fld_tapeRollLen:2000};
   Object.entries(defaults).forEach(([id, val]) => { document.getElementById(id).value = val; });
+  // v91：fld_lift / fld_dh 被复位后，二级面板的同名镜像框要一起跟上
+  if (typeof ppPullLiftDh === 'function') ppPullLiftDh();
   document.querySelectorAll('#branchGroup button').forEach(b => b.classList.toggle('selected', +b.dataset.n === 2));
   document.querySelectorAll('#layoutGroup button').forEach(b => b.classList.toggle('selected', +b.dataset.sides === 1));
   render();
@@ -8441,7 +8448,7 @@ function tlAutoGenerate(options) {
   parts.push('<g id="tlFrameGroup"><rect x="8" y="8" width="'+(svgW-16)+'" height="'+(svgH-16)+'" fill="none" stroke="#999" stroke-width="1.5" rx="2"/></g>');
 
   var zc=tlGetZoneCount();
-  var areaMu=(b.w*b.h/MU_TO_SQM).toFixed(1);
+  var areaMu=window.measuredArea?(window.measuredArea/MU_TO_SQM).toFixed(2):(b.w*b.h/MU_TO_SQM).toFixed(1);
   var tlPlotNameVal=(document.getElementById('tlPlotName')&&document.getElementById('tlPlotName').value.trim())||'未命名地块';
   // 标题（2026-09-16 恢复）：简图/下载/打印显示；工作区克隆剥离 tlTitleGroup
   parts.push('<g id="tlTitleGroup"><text x="'+svgW/2+'" y="40" text-anchor="middle" font-size="20" font-weight="700" fill="#14532d">润野灌溉 · 三级管线施工简图</text></g>');
@@ -9429,9 +9436,6 @@ function tlShowSysDiagram() {
   rySetTab('tlPipePlanSection', 'sys');
 }
 /* 退回「三级简图」Tab */
-function tlBackToPipeline() {
-  rySetTab('tlPipePlanSection', 'pipe');
-}
 
 /* 导航栏「⚙️ 生成系统图」入口：切到三级系统图 Tab（已生成三级结果时自动内嵌渲染） */
 function openTlSystemDiagramFromNav() {
@@ -9449,22 +9453,13 @@ function ppShowConstructDiagram() {
   rySetTab('pipePlanSection', 'draw');
 }
 /* 退回「管线编辑」Tab */
-function ppBackToEditor() {
-  rySetTab('pipePlanSection', 'edit');
-}
 
 /* ===== 三级管线图：切到「三级简图」Tab ===== */
-function tlShowPipelineDiagram() {
-  rySetTab('tlPipePlanSection', 'pipe');
-}
 /* 三级设计工作区：切到 ws 视图（tl-workspace 模块渲染，2026-09-13） */
 function tlShowWorkspace() {
   rySetTab('tlPipePlanSection', 'ws');
 }
 /* 兼容旧名（原整屏视图的返回入口） */
-function tlBackFromPipeline() {
-  rySetTab('tlPipePlanSection', 'pipe');
-}
 
 /* ===== 三级轴测图：切到「轴测图」Tab（iso-diagram 模块渲染，只读平面图几何 window.tlDiagramData） ===== */
 function tlShowIsoDiagram() {
@@ -10182,6 +10177,11 @@ function clearPlanResults(){
 }
 
 function calcPlan(){
+  // v91：面板「水泵提升高度 / 地形高差」镜像框在这里回填。
+  //   calcPlan 是所有「改了 fld_lift / fld_dh 想看到结果」路径的汇聚点（面板框 / 扬程计算式条
+  //   内联编辑 / 联动同步都会走它），而内联编辑是**程序化赋值**、不冒事件，
+  //   光靠 document 上的 input/change 捕获监听补不到 ⇒ 放在这里做不变量式回填（相等时无操作）。
+  if (typeof ppPullLiftDh === 'function') ppPullLiftDh();
   const area = window.measuredArea || 0;
   if(area <= 0) return;
 
@@ -10461,6 +10461,41 @@ window.ppRenderHeadBreakdown = ppRenderHeadBreakdown;
   document.getElementById(id).addEventListener('input', calcPlan);
   document.getElementById(id).addEventListener('change', calcPlan);
 });
+
+/* ===== 面板「水泵提升高度 / 地形高差」⇄ 一级表单 fld_lift / fld_dh 双向镜像（2026-09-20 v91）=====
+   这两个量是**同一个物理量**：01 一级表单的「井/水池提升高度 fld_lift」「水源至最高点高差 fld_dh」；
+   calcPlan（二级扬程）、ppRenderHeadBreakdown（05 扬程分解）、ppRenderPlanCalcDetail（扬程计算式条，
+   其内联编辑框 data-target 就是 fld_lift/fld_dh）全都只认 fld_* ⇒ 沿用 fld_* 作唯一数据源，
+   面板这两个框只做镜像。不变量：**两处 value 始终逐字相同**。
+     · 面板框改值 → 写回 fld_*（document 捕获阶段，先于任何 input 监听落地，
+       使既有 render() 也读到新值）→ calcPlan()
+     · fld_* 变值（扬程计算式条内联编辑 / 恢复默认参数）→ 回填面板框
+   注：赋值 .value 不触发事件，故不会形成回环。 */
+var PP_LIFTDH_PAIRS = [['planLift', 'fld_lift'], ['planDh', 'fld_dh']];
+function ppPullLiftDh() {                                   // fld_* → 面板
+  PP_LIFTDH_PAIRS.forEach(function (pr) {
+    var src = document.getElementById(pr[1]), dst = document.getElementById(pr[0]);
+    if (src && dst && dst.value !== src.value) dst.value = src.value;
+  });
+}
+function ppLiftDhCapture(ev) {                              // 捕获阶段：面板 → fld_*
+  var t = ev.target;
+  if (!t || !t.id) return;
+  for (var i = 0; i < PP_LIFTDH_PAIRS.length; i++) {
+    var pr = PP_LIFTDH_PAIRS[i];
+    if (t.id === pr[0]) { var m = document.getElementById(pr[1]); if (m) m.value = t.value; return; }
+    if (t.id === pr[1]) { ppPullLiftDh(); return; }
+  }
+}
+document.addEventListener('input', ppLiftDhCapture, true);
+document.addEventListener('change', ppLiftDhCapture, true);
+['planLift', 'planDh'].forEach(function (id) {              // 面板框改值后重算二级
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('input', calcPlan);
+  el.addEventListener('change', calcPlan);
+});
+ppPullLiftDh();                                              // 首屏对齐一次
 // （ppToggleCalc 的 click 已在 ppToggleCalcDetail 定义处立即绑定，无需再注册 DOMContentLoaded）
 
 // ===== 07 管路规划与施工简图 =====
@@ -11049,22 +11084,6 @@ window.ppRenderHeadBreakdown = ppRenderHeadBreakdown;
     ppEnsurePipeIds(group);
   }
 
-  function ppRemoveLastPipe(type){
-    var group=type==='main'?'main':type==='subbranch'?'subbranch':'branch';
-    ppEnsurePipeIds(group);
-    var removedId=null;
-    if(group==='main'&&ppState.mainPipes.length>0){
-      ppState.mainPipes.pop();
-      removedId=ppState.pipeIds.main.pop();
-    }else if(group==='subbranch'&&ppState.subBranchPipes&&ppState.subBranchPipes.length>0){
-      ppState.subBranchPipes.pop();
-      removedId=ppState.pipeIds.subbranch.pop();
-    }else if(group==='branch'&&ppState.branchPipes.length>0){
-      ppState.branchPipes.pop();
-      removedId=ppState.pipeIds.branch.pop();
-    }
-    if(removedId&&ppState.hiddenPipes&&ppState.hiddenPipes[group])delete ppState.hiddenPipes[group][removedId];
-  }
 
   function ppIsPipeHidden(type,index){
     var group=type==='main'?'main':type==='subbranch'?'subbranch':'branch';
@@ -13203,7 +13222,6 @@ function collect() {
   cfg.ferts = cfg.ferts.slice(0, cfg.fertCount);
 }
 function persist() { try { localStorage.setItem('drip-cfg', JSON.stringify(cfg)); } catch (e) {} }
-function loadDefault() { cfg = clone(DEFAULTS); bindUI(); persist(); render(); hmFit(); }
 
 document.addEventListener('change', function (e) {
   if (!document.getElementById('headModal') || document.getElementById('headModal').style.display === 'none') return;
@@ -13696,22 +13714,7 @@ function hmSyncFromThreeLevel() {
 }
 
 /* 三级系统入口：有三级计算结果则用三级数据，无则回退润野方案区联动 */
-function hmOpenFromThreeLevel() {
-  var has = hmSyncFromThreeLevel();
-  if (!has) hmSyncFromRunye();
-  bindUI();
-  render();
-  document.getElementById('headModal').style.display = 'flex';
-  setTimeout(hmFit, 30);
-}
 
-function hmOpen() {
-  hmSyncFromRunye();
-  bindUI();
-  render();
-  document.getElementById('headModal').style.display = 'flex';
-  setTimeout(hmFit, 30);
-}
 
 function hmCloseFn() {
   document.getElementById('headModal').style.display = 'none';
