@@ -11251,7 +11251,7 @@ ppPullLiftDh();                                              // 首屏对齐一�
         var x=p1.x,y=p1.y,w=p2.x-p1.x,h=p2.y-p1.y;
         var _m2=ppZoneActualAreaM2(zc,zr,cuts,ppState.polyPts);
         var _mu=_m2/666.67;
-        var _std=parseFloat((Math.min(MAX_ZONE_SIDE,Math.max(cuts.designW,cuts.designH))*Math.min(MAX_ZONE_SIDE,Math.min(cuts.designW,cuts.designH))/666.67).toFixed(2));
+        var _std=cuts.xPlan[zc]*cuts.yPlan[zr]/666.67;
         var _partial=_std>0 && _mu<_std*0.97 && _mu>0.05;
         ppCtx.fillStyle=_partial?'rgba(245,158,11,.18)':fills[zi%fills.length];
         ppCtx.strokeStyle=_partial?'rgba(217,119,6,.9)':strokes[zi%strokes.length];
@@ -11272,7 +11272,7 @@ ppPullLiftDh();                                              // 首屏对齐一�
         var aw=Math.abs(w),ah=Math.abs(h);
         var _m2=ppZoneActualAreaM2(zc,zr,cuts,ppState.polyPts);
         var _mu=_m2/666.67;
-        var _std=parseFloat((Math.min(MAX_ZONE_SIDE,Math.max(cuts.designW,cuts.designH))*Math.min(MAX_ZONE_SIDE,Math.min(cuts.designW,cuts.designH))/666.67).toFixed(2));
+        var _std=cuts.xPlan[zc]*cuts.yPlan[zr]/666.67;
         var _partial=_std>0 && _mu<_std*0.97 && _mu>0.05;
         if(aw>34&&ah>26 && _mu>0.05){
           if(_partial){
@@ -12128,15 +12128,21 @@ ppPullLiftDh();                                              // 首屏对齐一�
     var zoneLayout=ppGetZoneLayout(b,planN);
     var zoneCuts=ppGetZoneCuts(b,zoneLayout);
     planN=zoneCuts.cols*zoneCuts.rows;
-    var zoneAreaMu=(Math.min(MAX_ZONE_SIDE,Math.max(zoneCuts.designW,zoneCuts.designH))*Math.min(MAX_ZONE_SIDE,Math.min(zoneCuts.designW,zoneCuts.designH))/666.67).toFixed(2);
+    var _nomMuMin=Infinity,_nomMuMax=0;
+    for(var _zr0=0;_zr0<zoneCuts.rows;_zr0++){for(var _zc0=0;_zc0<zoneCuts.cols;_zc0++){
+      var _nomMu=zoneCuts.xPlan[_zc0]*zoneCuts.yPlan[_zr0]/666.67;
+      if(_nomMu<_nomMuMin)_nomMuMin=_nomMu;
+      if(_nomMu>_nomMuMax)_nomMuMax=_nomMu;
+    }}
+    var zoneAreaMu=(!isFinite(_nomMuMin)||_nomMuMax<=0)?'0.00':((Math.round(_nomMuMin*100)!==Math.round(_nomMuMax*100))?(_nomMuMin.toFixed(2)+'~'+_nomMuMax.toFixed(2)):_nomMuMax.toFixed(2));
     // 预统计：实际面积小于标准分区的"非标准分区"数量
     var plotPoly=ppState.polyPts&&ppState.polyPts.length>=3?ppState.polyPts.map(function(p){return{x:p.x,y:p.y};}):null;
-    var standardMu=parseFloat(zoneAreaMu)||0;
     var partialCount=0;
     for(var _zr=0;_zr<zoneCuts.rows;_zr++){for(var _zc=0;_zc<zoneCuts.cols;_zc++){
       var _m2=ppZoneActualAreaM2(_zc,_zr,zoneCuts,plotPoly);
       var _mu=_m2/666.67;
-      if(standardMu>0&&_mu<standardMu*0.97&&_mu>0.05)partialCount++;
+      var _stdMu=zoneCuts.xPlan[_zc]*zoneCuts.yPlan[_zr]/666.67;
+      if(_stdMu>0&&_mu<_stdMu*0.97&&_mu>0.05)partialCount++;
     }}
 
     var parts=[];
@@ -12172,7 +12178,8 @@ ppPullLiftDh();                                              // 首屏对齐一�
         // 实际落在线段多边形内的面积（m²）与标准区比较，判定是否"非完整分区"
         var actualM2=ppZoneActualAreaM2(zc,zr,zoneCuts,plotPoly);
         var actualMu=actualM2/666.67;
-        var isPartial=standardMu>0 && actualMu<standardMu*0.97;
+        var _stdMu=zoneCuts.xPlan[zc]*zoneCuts.yPlan[zr]/666.67;
+        var isPartial=_stdMu>0 && actualMu<_stdMu*0.97;
         var cellFill=isPartial?'rgba(245,158,11,.16)':zoneCols[ci];
         var cellStroke=isPartial?'rgba(217,119,6,.85)':zoneStrokes[ci];
         parts.push('<rect x="'+rx.toFixed(1)+'" y="'+ry.toFixed(1)+'" width="'+rw.toFixed(1)+'" height="'+rh.toFixed(1)+'" fill="'+cellFill+'" stroke="'+cellStroke+'" stroke-width="1" stroke-dasharray="6,3"/>');
@@ -12190,7 +12197,8 @@ ppPullLiftDh();                                              // 首屏对齐一�
         var aw=Math.abs(rw),ah=Math.abs(rh);
         var actualM2=ppZoneActualAreaM2(zc,zr,zoneCuts,plotPoly);
         var actualMu=actualM2/666.67;
-        var isPartial=standardMu>0 && actualMu<standardMu*0.97;
+        var _stdMu=zoneCuts.xPlan[zc]*zoneCuts.yPlan[zr]/666.67;
+        var isPartial=_stdMu>0 && actualMu<_stdMu*0.97;
         if(aw>36&&ah>26 && actualMu>0.05){
           if(isPartial){
             // 非标准分区：与标准分区一致，文字置于分区右上角（已在裁剪层之外绘制，可超出地块显示）
