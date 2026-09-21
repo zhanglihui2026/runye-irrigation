@@ -5830,13 +5830,25 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
   <div class="ry-pane ry-pane-edit">
   <input type="hidden" id="planTapeRoll" value="2000">
   <div class="pp-toolbar" id="ppToolbar">
-    <button class="pp-btn active" data-mode="main">主管</button>
-    <button class="pp-btn" data-mode="branch">支管</button>
-    <button class="pp-btn-ghost" id="ppLineOrtho" type="button">横竖锁定</button>
-    <span class="pp-sep"></span>
-    <button class="pp-btn" data-mode="source">水源</button>
-    <button class="pp-btn" data-mode="valve">阀门</button>
-    <button class="pp-btn" data-mode="maskPipe">遮蔽管线</button>
+    <!-- 2026-09-21 v96 用户要求（截图里 6 支红箭头指向本组）：「主管 / 支管 / 横竖锁定 / 水源 / 阀门 /
+         遮蔽管线」六个按钮全部**隐藏**（用户原话：这些按钮都隐藏起来，没什么用）。
+         理由：手工绘制管路的入口已在「三级设计工作区」工具轨（#tlWsToolbar 的 插入主管 / 插入支管 /
+         ⊥横竖锁定 / 🔩阀门 / ⊞三通 / ⌐弯头），本组属重复入口。
+         做法：**只加行内 display:none，不删 DOM、更不删 JS 引用** —— 两个原因：
+           · #ppToolbar .pp-btn[data-mode] 的点击绑定与 #ppLineOrtho 的点击绑定都要留着；
+             后者那行（原 L11864）没有空值守卫，删元素会抛 TypeError 直接把整段脚本打断。
+           · verify_sketchup.js 会**计数** #ppToolbar .pp-btn / .pp-btn-ghost，删元素会改变契约值。
+         display:none 的元素不参与 flex 布局、不留空档，轨道顶部仍从「调网格」开始。
+         紧随本组之后的分隔线一并隐藏，避免轨道顶部出现一条孤立横线。
+         要恢复：删掉下面 6 个按钮与该分隔线上的 style="display:none" 即可（其余代码一律未动）。
+         静态契约：verify_ry_tool.js 的 must 表里锁了这 6 条 display:none 字面，被改回可见即报红。 -->
+    <button class="pp-btn active" data-mode="main" style="display:none">主管</button>
+    <button class="pp-btn" data-mode="branch" style="display:none">支管</button>
+    <button class="pp-btn-ghost" id="ppLineOrtho" type="button" style="display:none">横竖锁定</button>
+    <span class="pp-sep" style="display:none"></span>
+    <button class="pp-btn" data-mode="source" style="display:none">水源</button>
+    <button class="pp-btn" data-mode="valve" style="display:none">阀门</button>
+    <button class="pp-btn" data-mode="maskPipe" style="display:none">遮蔽管线</button>
     <button class="pp-btn" data-mode="adjustCut" title="拖动分区线调整分区；把一条线拖到相邻线上松手即可合并分区（分区数随之减少），误操作可用「回退」撤销">调网格</button>
     <button class="pp-btn-ghost" id="ppResetCuts" title="恢复系统默认分区线位置（撤销所有拖动与合并）">重置网格</button>
     <span class="pp-cut-fine-group" id="ppCutFineGroup" style="display:none">
