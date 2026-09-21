@@ -6801,6 +6801,43 @@ function clipPolyToRect(poly, x0, y0, x1, y1){
   return o;
 }
 
+/* ===== 分区实际面积与联合分组统计（2026-09-21 v95，L2/L3 共用同一口径）=====
+   cuts = {xPos,yPos,xPlan,yPlan,cols,rows}（米制网格，含手动拖拽割缝）；
+   poly = 实测地块多边形点（与 cuts 同坐标系，通常 window.measuredPolygon）；n = 联合分区数。
+   分区序号 zi = zr*cols + zc（行主序，与图面 data-zi / 区号 (zi+1) 一致）；
+   组号 g = floor(zi / n)（与图面联合灌溉色带同规则），尾组不足 n 个区按实际参与比较。
+   返回 { ok, cells[m²], maxCell, maxCellIndex, groups[{g,sum,zones[]}], maxGroup, maxGroupIndex, groupCount } */
+function ryZoneAreaGroups(cuts, poly, n){
+  var out={ok:false, cells:[], maxCell:0, maxCellIndex:-1, groups:[], maxGroup:0, maxGroupIndex:-1, groupCount:0};
+  try{
+    if(!cuts||!cuts.cols||!cuts.rows||!cuts.xPos||!cuts.yPos) return out;
+    var total=cuts.cols*cuts.rows;
+    if(!(total>0)) return out;
+    var N=Math.max(1, Math.round(n||1));
+    var usePoly=!!(poly&&poly.length>=3);
+    for(var zi=0; zi<total; zi++){
+      var zc=zi%cuts.cols, zr=Math.floor(zi/cuts.cols);
+      var x0=cuts.xPos[zc], y0=cuts.yPos[zr], x1=cuts.xPos[zc+1], y1=cuts.yPos[zr+1];
+      var a=0;
+      if(usePoly&&x1>x0&&y1>y0) a=polyAreaM2(clipPolyToRect(poly, x0, y0, x1, y1));
+      else if(cuts.xPlan&&cuts.yPlan) a=cuts.xPlan[zc]*cuts.yPlan[zr];
+      if(!(a>0)) a=0;
+      out.cells.push(a);
+      if(a>out.maxCell){ out.maxCell=a; out.maxCellIndex=zi; }
+    }
+    var gc=Math.max(1, Math.ceil(total/N));
+    for(var g=0; g<gc; g++){
+      var sum=0, zs=[];
+      for(var zz=g*N; zz<Math.min((g+1)*N,total); zz++){ sum+=out.cells[zz]; zs.push(zz); }
+      out.groups.push({g:g, sum:sum, zones:zs});
+      if(sum>out.maxGroup){ out.maxGroup=sum; out.maxGroupIndex=g; }
+    }
+    out.groupCount=out.groups.length;
+    out.ok=true;
+  }catch(e){ out.ok=false; }
+  return out;
+}
+
 function tlMeasureText(str){var w=0;for(var k=0;k<str.length;k++){var ch=str[k];w+=(ch.charCodeAt(0)>255?12:6.5);}return w;}
 
 function calcZoneLayout(width, height, requestedN) {
@@ -7607,8 +7644,10 @@ function tlPushToHydraulicCalc() {
     if (!wp || !wp.fromFigure) return false;
     var r = computeThreeLevel();
     var bc = Math.max(1, r.branchCount | 0);
-    /* v2.1（2026-09-19 用户核对流量）：联合灌溉 = 全图轮灌中同时只开 tl_zoneCount 区（面板「联合灌溉分区数」），
-       总管流量 = 同时开区数 × 单区流量 = combinedFlow（2 区×80=160）。故计算器只导入 zoneCount 根主管：
+    /* v2.1（2026-09-19 用户核对流量）+ v95（2026-09-21 用户口径）：联合灌溉 = 全图轮灌中同时只开 tl_zoneCount 区
+       （面板「联合灌溉分区数」）；总管流量 = 该 N 下「最大联合组的实际面积和」换算的 combinedFlow
+       （v95 起不再按「单区流量 × N」估算；组号 = floor(分区序号 / N)，尾组按实际区数参与比较）。
+       故计算器只导入 zoneCount 根主管：
        按距水源弧长取最远的 zoneCount 区（最不利组合，与图面最不利路径标注同源），每根挂 branchCount 根支管。 */
     var allZones = wp.zones || [];
     if (!allZones.length) return false;
@@ -7627,7 +7666,9 @@ function tlPushToHydraulicCalc() {
       '总管：OD ' + r.frontPipe.od + ' · ' + fmt(r.frontLenUsed, 1) + ' m',
       '主管：OD ' + r.mainPipe.od + ' × ' + zones.length + ' 区' + (allZones.length > zones.length ? '（全图 ' + allZones.length + ' 区轮灌，按最不利组合取最远 ' + zones.length + ' 区）' : '（各区图面实长）') + ',',
       '支管：OD ' + r.branchPipe.od + ' · ' + fmt(r.branchLenUsed, 1) + ' m × 每区 ' + bc + ' 根（每根 ' + fmt(r.branchFlow, 1) + ' m³/h）',
-      '联合流量：' + fmt(r.combinedFlow, 1) + ' m³/h（' + (r.zoneCount | 0 || 1) + ' 区 × ' + fmt(r.zoneFlow, 1) + '）——计算器总管流量同此值'
+      '联合流量：' + fmt(r.combinedFlow, 1) + ' m³/h（' + (r.zoneCount | 0 || 1) + ' 区联合' + (r.worstGroup
+        ? ' · 最大联合组 第 ' + (r.worstGroup.g + 1) + ' 组 ' + r.worstGroup.zones.map(function (z) { return (z + 1) + '区'; }).join('、') + ' 的面积和'
+        : ' · 估算 ' + fmt(r.zoneFlow, 1) + ' × ' + (r.zoneCount | 0 || 1)) + '）——计算器总管流量同此值'
     ];
     HC.importThreeLevel({ trunk: { od: r.frontPipe.od, len: r.frontLenUsed }, mains: mains, srcTitle: srcTitle, srcRows: srcRows });
     return true;
@@ -7745,27 +7786,24 @@ function computeThreeLevel() {
      多边形的面积；取全部分区的最大者作为单区流量基准，联合流量=最大分区流量×联合分区数（最不利）。
      二级共享网格（RunyeBridge.getZoneCuts，含拖拽割缝）+实测多边形存在时生效；
      无网格/多边形或取数异常时退回「单个分区面积」输入值（flowAreaSrc='input'）。 */
-  var flowAreaM2 = zoneAreaM2;
-  var flowAreaSrc = 'input';
-  (function () {
+  /* v95：一次算全图分区实际面积 + 按联合分区数自动分组（组号 = floor(分区序号 / N)），
+     单区侧取 maxCell（最大分区实际面积），联合侧取 maxGroup（最大组的面积和）。 */
+  var tlGrid = (function () {
     try {
       var share = window.RunyeBridge ? window.RunyeBridge.getZoneCuts() : null;
       var poly = window.measuredPolygon;
-      if (!share || !share.cols || !share.rows || !share.xPos || !share.yPos) return;
-      if (!poly || poly.length < 3) return;
-      var maxM2 = 0;
-      for (var fzr = 0; fzr < share.rows; fzr++) {
-        for (var fzc = 0; fzc < share.cols; fzc++) {
-          var fx0 = share.xPos[fzc], fy0 = share.yPos[fzr];
-          var fx1 = share.xPos[fzc + 1], fy1 = share.yPos[fzr + 1];
-          if (!(fx1 > fx0) || !(fy1 > fy0)) continue;
-          var fa = polyAreaM2(clipPolyToRect(poly, fx0, fy0, fx1, fy1));
-          if (fa > maxM2) maxM2 = fa;
-        }
-      }
-      if (maxM2 > 0) { flowAreaM2 = maxM2; flowAreaSrc = 'figureMaxZone'; }
-    } catch (e) { /* 退回输入值口径 */ }
+      if (!share || !share.cols || !share.rows || !share.xPos || !share.yPos) return null;
+      if (!poly || poly.length < 3) return null;
+      return { share: share, poly: poly };
+    } catch (e) { return null; }
   })();
+  var zoneStat = null;
+  if (tlGrid) {
+    var gs = ryZoneAreaGroups(tlGrid.share, tlGrid.poly, zoneCount);
+    if (gs && gs.ok && gs.maxCell > 0) zoneStat = gs;
+  }
+  var flowAreaM2 = zoneStat ? zoneStat.maxCell : zoneAreaM2;
+  var flowAreaSrc = zoneStat ? 'figureMaxZone' : 'input';
   const flowZoneMu = flowAreaM2 / MU_TO_SQM;
 
   const totalArea = zoneAreaM2;
@@ -7787,7 +7825,26 @@ function computeThreeLevel() {
   const mainLoss = hazenWilliams(mainLenUsed, zoneFlow, (pipeOdOverride('main') || mainPipe.id));
 
   // Front main pipe (总管) — carries combined flow for all simultaneous zones；长度取水源→最远分区接点
-  const combinedFlow = zoneFlow * zoneCount;
+  /* v95（2026-09-21，用户口径）：联合流量按「自动组合后最大一组的实际面积和」换算
+     （组号 = floor(分区序号 / 联合分区数)，尾组不足 N 区按实际面积和参与比较，取最大组）；
+     无图面网格/多边形时退回「最大分区流量 × 联合分区数」的初步估算。 */
+  const combinedAreaM2 = (zoneStat && zoneStat.maxGroup > 0) ? zoneStat.maxGroup : (flowAreaM2 * zoneCount);
+  const combinedFlow = combinedAreaM2 / tapeSpacing / emitterSpacing * emitterFlow / 1000;
+
+  /* v95：对比表「不同联合分区数」逐档口径 —— 每一档 N 都按「该 N 下最大组的实际面积和」算流量
+     （与 combinedFlow 同一 ryZoneAreaGroups 口径，故 groupAreaByN[zoneCount].flow === combinedFlow）；
+     无图面网格/多边形时逐档退回「单区流量 × N」的初步估算。 */
+  var groupAreaByN = {};
+  (function () {
+    var ns = [1, 2, 3, 4, 6, 8, zoneCount];
+    for (var ni = 0; ni < ns.length; ni++) {
+      var key = Math.max(1, Math.round(ns[ni]));
+      if (groupAreaByN[key]) continue;
+      var g = tlGrid ? ryZoneAreaGroups(tlGrid.share, tlGrid.poly, key) : null;
+      var areaN = (g && g.ok && g.maxGroup > 0) ? g.maxGroup : (flowAreaM2 * key);
+      groupAreaByN[key] = { areaM2: areaN, flow: areaN / tapeSpacing / emitterSpacing * emitterFlow / 1000 };
+    }
+  })();
   const frontPipe = selectPipe(combinedFlow, targetV, MAIN_PIPE_MIN_OD);
   const frontPipeLoss = hazenWilliams(frontLenUsed, combinedFlow, (pipeOdOverride('front') || frontPipe.id));
 
@@ -7826,8 +7883,9 @@ function computeThreeLevel() {
   const frontAll = evaluateAllPipes(combinedFlow, MAIN_PIPE_MIN_OD);
 
   // Alternatives for different zone counts (1, 2, 3, 4, 6, 8)
+  // v95：逐档 N 与主口径同源 —— 取该 N 下「最大联合组的实际面积和」，不再用 单区流量×N 的初步估算
   const frontAlternatives = [1, 2, 3, 4, 6, 8].filter(n => n !== zoneCount).map(n => {
-    const cf = zoneFlow * n;
+    const cf = (groupAreaByN[n] ? groupAreaByN[n].flow : (zoneFlow * n));
     const fp = selectPipe(cf, targetV, MAIN_PIPE_MIN_OD);
     const fl = hazenWilliams(frontLenUsed, cf, fp.id);
     return { n, flow: cf, pipe: fp, loss: fl, len: frontLenUsed };
@@ -7858,6 +7916,14 @@ function computeThreeLevel() {
     wp, frontLenUsed, mainLenUsed, branchLenUsed,
     /* 流量口径（2026-09-21）：flowAreaM2=最大分区实际面积(m²)，flowAreaSrc='figureMaxZone'|'input' */
     flowAreaM2, flowZoneMu, flowAreaSrc,
+    /* v95 联合分区：combinedAreaM2=最大一组实际面积和(m²)；worstGroup={g:组号(0基),zones:分区序号(0基),sum:m²}；
+       无图面数据时 worstGroup=null、combinedAreaM2=flowAreaM2×zoneCount（初步估算） */
+    combinedAreaM2, groupCount: (zoneStat ? zoneStat.groupCount : 0),
+    worstGroup: (zoneStat && zoneStat.maxGroup > 0)
+      ? { g: zoneStat.maxGroupIndex, zones: zoneStat.groups[zoneStat.maxGroupIndex].zones.slice(), sum: zoneStat.maxGroup, count: zoneStat.groups[zoneStat.maxGroupIndex].zones.length }
+      : null,
+    /* v95：对比表逐档口径 —— key=N，value={areaM2:该 N 下最大组实际面积和(m²), flow:对应联合流量(m³/h)} */
+    groupAreaByN,
     tapeID, tapeLoss, tapePressureM, tapeDeltaPct,
     totalPipeLoss, headBeforeSafetyRaw, headBeforeSafety, pumpHead, pumpPower, motorKW, motorKW_rounded,
     intensity, mainAll, branchAll, branchAlternatives
@@ -7905,7 +7971,7 @@ function renderThreeLevel() {
     <div class="area-strip">
       <div><span>单个分区</span><strong>${fmt(r.zoneMu,2)} 亩</strong><small>折算 ${fmt(r.zoneW,0)}×${fmt(r.zoneH,0)} m</small></div>
       <div><span>联合灌溉</span><strong>${fmt0(r.zoneCount)} 个分区</strong><small>联合流量 ${fmt(r.combinedFlow,1)} m³/h</small></div>
-      <small>单区流量 ${fmt(r.zoneFlow,1)} m³/h × ${fmt0(r.zoneCount)} 区 = ${fmt(r.combinedFlow,1)} m³/h</small>
+      <small>单区流量 ${fmt(r.zoneFlow,1)} m³/h（最大分区 ${fmt(r.flowAreaM2 / MU_TO_SQM, 2)} 亩）${r.worstGroup ? ' · 最大联合组 第 ' + (r.worstGroup.g + 1) + ' 组（' + r.worstGroup.zones.map(function (z) { return (z + 1) + '区'; }).join('、') + '）' + fmt(r.worstGroup.sum / MU_TO_SQM, 2) + ' 亩' : ' × ' + fmt0(r.zoneCount) + ' 区（估算）'} → 联合流量 ${fmt(r.combinedFlow,1)} m³/h</small>
     </div>
 
     <!-- ===== 总管选型（核心结果） ===== -->
@@ -7931,7 +7997,7 @@ function renderThreeLevel() {
       <div class="branch-compare-title"><span>不同联合分区数总管对比</span><small>查看不同分区数对应的总管管径</small></div>
       <div class="branch-compare-head"><span>分区数</span><span>联合流量</span><span>总管流速</span><span>推荐总管</span></div>
       ${[1, 2, 3, 4, 6, 8].map(n => {
-        const cf = r.zoneFlow * n;
+        const cf = (r.groupAreaByN && r.groupAreaByN[n]) ? r.groupAreaByN[n].flow : (r.zoneFlow * n);
         const fp = selectPipe(cf, r.targetV, MAIN_PIPE_MIN_OD);
         const isCurrent = n === r.zoneCount;
         return `<button type="button" class="branch-option ${isCurrent ? 'selected' : ''}" onclick="document.getElementById('tl_zoneCount').value=${n};renderThreeLevel()">
@@ -7941,7 +8007,7 @@ function renderThreeLevel() {
           <b>Ø ${fp.od} mm</b>
         </button>`;
       }).join('')}
-      <p>点击方案切换联合分区数。分区越多，总管流量越大，所需管径越粗。</p>
+      <p>点击方案切换联合分区数。每档按该分区数下「最大联合组的实际面积和」计流量（组号 = 分区序号 ÷ N 向下取整，尾组按实际区数）。分区越多，总管流量越大，所需管径越粗。</p>
     </div>
 
     <!-- ===== 单区主管 + 支管 ===== -->
@@ -10296,7 +10362,23 @@ function calcPlan(){
 
   // Per-zone flow (pump sized for single zone operation) — 按最大分区实际面积选型
   const zoneAreaM2 = zoneAreaForShape;
-  const zoneTapeLen = zoneAreaM2 / tapeSpacing;
+  /* v95（2026-09-21，用户口径）：二级「水泵流量」的初步估算改为按图面最大分区的实际面积
+     （裁剪到实测地块）计；无图面网格/多边形时退回「单区面积」设计值（手动亩/区 或 外接矩形单格）。
+     ※ 二级是单区轮灌口径（一次灌一区）；"×联合分区数"的联合分区流量只在三级页面体现。 */
+  var flowAreaM2 = zoneAreaM2;
+  var flowAreaSrc = 'input';
+  (function () {
+    try {
+      var share = window.RunyeBridge ? window.RunyeBridge.getZoneCuts() : null;
+      var poly = window.measuredPolygon;
+      if (!share || !share.cols || !share.rows || !share.xPos || !share.yPos) return;
+      if (!poly || poly.length < 3) return;
+      var gs = ryZoneAreaGroups(share, poly, 1);
+      if (gs && gs.ok && gs.maxCell > 0) { flowAreaM2 = gs.maxCell; flowAreaSrc = 'figureMaxZone'; }
+    } catch (e) { }
+  })();
+  const flowZoneMu = flowAreaM2 / MU_TO_SQM;
+  const zoneTapeLen = flowAreaM2 / tapeSpacing;
   const zoneRows = Math.max(1, Math.ceil(zoneHEff / tapeSpacing));
   const zoneSegmentsPerRow = Math.max(1, Math.ceil(zoneWEff / tapeLen));
   const tapesPerZone = Math.max(1, Math.ceil(zoneTapeLen / tapeLen));
@@ -10304,7 +10386,7 @@ function calcPlan(){
   const tapeFlow = emittersPerTape * emitterFlow / 1000; // m³/h per full-length tape segment
   const zoneFlow = zoneTapeLen / emitterSpacing * emitterFlow / 1000;  // single zone flow → pump sizing
   const zoneMu = zoneAreaM2 / MU_TO_SQM;
-  const intensity = zoneMu > 0 ? zoneFlow / zoneMu : 0; // m³/h per mu
+  const intensity = flowZoneMu > 0 ? zoneFlow / flowZoneMu : 0; // m³/h per mu（v95 起与流量同口径：最大分区实际面积）
 
   // Pump estimation (same head model as the main calculator)
   const mainPipe = selectPipe(zoneFlow, targetV, MAIN_PIPE_MIN_OD);
@@ -10357,10 +10439,10 @@ function calcPlan(){
   // Update area tag in title
   const tag=document.getElementById('planAreaTag');
   const zoneModeLabel = manualZoneMu > 0 ? '单区划定' : '单区折算';
-  if(tag) tag.innerHTML='实测 <b>'+area.toFixed(1)+' m²</b> · '+totalMu.toFixed(2)+' 亩 · '+(layoutSides===2?'双边':'单边')+' · '+zoneLayout.cols+'列×'+zoneLayout.rows+'行 · '+zoneModeLabel+'<b>'+Math.round(zoneLayout.zoneW)+'×'+Math.round(zoneLayout.zoneH)+'m</b>';
+  if(tag) tag.innerHTML='实测 <b>'+area.toFixed(1)+' m²</b> · '+totalMu.toFixed(2)+' 亩 · '+(layoutSides===2?'双边':'单边')+' · '+zoneLayout.cols+'列×'+zoneLayout.rows+'行 · '+zoneModeLabel+'<b>'+Math.round(zoneLayout.zoneW)+'×'+Math.round(zoneLayout.zoneH)+'m</b>'+(flowAreaSrc==='figureMaxZone'?(' · 流量按图面最大分区 <b>'+(flowAreaM2/MU_TO_SQM).toFixed(2)+' 亩</b>'):'');
 
   // Store all data for apply
-  window.planData = { A, B, N, zoneCols: zoneLayout.cols, zoneRows: zoneLayout.rows, zoneW: zoneLayout.zoneW, zoneH: zoneLayout.zoneH, mainPipeLen, tapeLen, tapeSpacing, emitterSpacing, emitterFlow, tapeRollLen, tapeTotalLen, totalTapes, tapesPerZone, zoneTapeLen, lift, dh, totalMu, zoneFlow, pumpHead, pumpPower, motorKW, intensity, manualZoneMu, targetV, mainPipeOD:'Ø '+mainPipe.od+' mm', branchPipeOD:'Ø '+branchPipe.od+' mm', mainPipeODValue:mainPipe.od, branchPipeODValue:branchPipe.od, mainVelocity:mainPipe.v, branchVelocity:branchPipe.v,
+  window.planData = { A, B, N, zoneCols: zoneLayout.cols, zoneRows: zoneLayout.rows, zoneW: zoneLayout.zoneW, zoneH: zoneLayout.zoneH, mainPipeLen, tapeLen, tapeSpacing, emitterSpacing, emitterFlow, tapeRollLen, tapeTotalLen, totalTapes, tapesPerZone, zoneTapeLen, lift, dh, totalMu, zoneFlow, pumpHead, pumpPower, motorKW, intensity, manualZoneMu, targetV, flowAreaM2, flowAreaSrc, mainPipeOD:'Ø '+mainPipe.od+' mm', branchPipeOD:'Ø '+branchPipe.od+' mm', mainPipeODValue:mainPipe.od, branchPipeODValue:branchPipe.od, mainVelocity:mainPipe.v, branchVelocity:branchPipe.v,
     // 水泵扬程计算中间量，用于施工简图展示
     tapePressure, tapePressureM, existPressure, mainLoss, branchLoss, filterLoss, headBeforeSafety, headBeforeSafetyRaw, safetyFactor: SAFETY_FACTOR, marginHead: MARGIN_HEAD, efficiency, branchCount, layoutSides
   };
