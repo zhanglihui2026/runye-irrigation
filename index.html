@@ -7741,6 +7741,33 @@ function computeThreeLevel() {
   const frontLenUsed = (wp.fromFigure && wp.front > 0) ? wp.front : frontPipeLen;
   const mainLenUsed = (wp.fromFigure && wp.main > 0) ? wp.main : mainPipeLen;
 
+  /* 水泵流量按「最大分区的实际面积」计（2026-09-21，用户口径）：分区实际面积=裁剪到实测地块
+     多边形的面积；取全部分区的最大者作为单区流量基准，联合流量=最大分区流量×联合分区数（最不利）。
+     二级共享网格（RunyeBridge.getZoneCuts，含拖拽割缝）+实测多边形存在时生效；
+     无网格/多边形或取数异常时退回「单个分区面积」输入值（flowAreaSrc='input'）。 */
+  var flowAreaM2 = zoneAreaM2;
+  var flowAreaSrc = 'input';
+  (function () {
+    try {
+      var share = window.RunyeBridge ? window.RunyeBridge.getZoneCuts() : null;
+      var poly = window.measuredPolygon;
+      if (!share || !share.cols || !share.rows || !share.xPos || !share.yPos) return;
+      if (!poly || poly.length < 3) return;
+      var maxM2 = 0;
+      for (var fzr = 0; fzr < share.rows; fzr++) {
+        for (var fzc = 0; fzc < share.cols; fzc++) {
+          var fx0 = share.xPos[fzc], fy0 = share.yPos[fzr];
+          var fx1 = share.xPos[fzc + 1], fy1 = share.yPos[fzr + 1];
+          if (!(fx1 > fx0) || !(fy1 > fy0)) continue;
+          var fa = polyAreaM2(clipPolyToRect(poly, fx0, fy0, fx1, fy1));
+          if (fa > maxM2) maxM2 = fa;
+        }
+      }
+      if (maxM2 > 0) { flowAreaM2 = maxM2; flowAreaSrc = 'figureMaxZone'; }
+    } catch (e) { /* 退回输入值口径 */ }
+  })();
+  const flowZoneMu = flowAreaM2 / MU_TO_SQM;
+
   const totalArea = zoneAreaM2;
   const totalMu = zoneMu;
   const tapeRows = Math.max(1, Math.ceil(B / tapeSpacing));
@@ -7750,7 +7777,7 @@ function computeThreeLevel() {
   const tapeRolls = tapeRollLen > 0 ? Math.ceil(tapeTotalLen * 1.1 / tapeRollLen) : 0;
   const tapesPerZone = Math.max(1, Math.ceil(totalTapes / N));
 
-  const zoneTapeLen = zoneAreaM2 / tapeSpacing;
+  const zoneTapeLen = flowAreaM2 / tapeSpacing;
   const emittersPerTape = tapeLen / emitterSpacing;
   const tapeFlow = emittersPerTape * emitterFlow / 1000;
   const zoneFlow = zoneTapeLen / emitterSpacing * emitterFlow / 1000;
@@ -7792,7 +7819,7 @@ function computeThreeLevel() {
   const motorKW = selectMotorPower(pumpPower);
   const motorKW_rounded = motorKW;
 
-  const intensity = zoneMu > 0 ? zoneFlow / zoneMu : 0;
+  const intensity = flowZoneMu > 0 ? zoneFlow / flowZoneMu : 0;
 
   const mainAll = evaluateAllPipes(zoneFlow, MAIN_PIPE_MIN_OD);
   const branchAll = evaluateAllPipes(branchFlow, 0, BRANCH_PIPE_MAX_OD);
@@ -7829,6 +7856,8 @@ function computeThreeLevel() {
     branchPipe, branchLoss, branchFlow, branchLen: branchLenUsed, branchSpan, layoutSides, tapsPerBranch, branchF,
     /* 最远分区最不利路径（2026-09-16）：wp=来源与分区号，*LenUsed=各段实际采用长度（米） */
     wp, frontLenUsed, mainLenUsed, branchLenUsed,
+    /* 流量口径（2026-09-21）：flowAreaM2=最大分区实际面积(m²)，flowAreaSrc='figureMaxZone'|'input' */
+    flowAreaM2, flowZoneMu, flowAreaSrc,
     tapeID, tapeLoss, tapePressureM, tapeDeltaPct,
     totalPipeLoss, headBeforeSafetyRaw, headBeforeSafety, pumpHead, pumpPower, motorKW, motorKW_rounded,
     intensity, mainAll, branchAll, branchAlternatives
