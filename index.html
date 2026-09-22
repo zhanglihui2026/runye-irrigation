@@ -9163,6 +9163,65 @@ function tlAutoGenerate(options) {
     tlTextBox(dimLeftX-15,(plotTop+plotBottom)/2,tlDimLabel(plotH),'middle',true);
   })();
 
+  // v111b（2026-09-22 用户确认示意图后定稿）：联合分区横竖尺寸标注 —— 只标两类位置：
+  //   横向 = 「上方还有联合分区」的组（minR>0，顶边即两联合分区分界线，画在分界线上方）；
+  //          顶行组（顶边=地块上边界）不画 —— 用户 2026-09-22 圈❌明确取消。
+  //   竖向 = 「右缘贴地块右边界」的组（maxC===cols-1，画在地块右缘外侧）；
+  //          组与组相邻处的内部右缘不画（避免标进邻区内部）—— 用户圈❌明确取消。
+  //   尺寸值 = 设计网格包络 ΣxPlan / ΣyPlan（与分区标签「设计尺寸」同口径）。
+  //   整层 pointer-events="none"：不挡组边界线（data-mgb）拖动命中，也不挡画布平移。
+  (function(){
+    function gdVal(v){ if(!isFinite(v))return '— m'; var r0=Math.round(v); return Math.abs(v-r0)<0.05?r0+' m':v.toFixed(1)+' m'; }
+    function gdGrpOf(zi){ return tlManualActive ? ((typeof window!=='undefined'&&window.tlZoneManualGroupOf)?window.tlZoneManualGroupOf(zi):-1) : Math.floor(zi/tlGN); }
+    var gdBox={};
+    for(var gdr=0;gdr<rows;gdr++){
+      for(var gdc=0;gdc<cols;gdc++){
+        var gdG=gdGrpOf(gdr*cols+gdc);
+        if(gdG<0)continue;   /* 手动模式未分组的区不是联合分区，不标 */
+        var gdB=gdBox[gdG];
+        if(!gdB)gdB=gdBox[gdG]={minC:gdc,maxC:gdc,minR:gdr,maxR:gdr};
+        if(gdc<gdB.minC)gdB.minC=gdc; if(gdc>gdB.maxC)gdB.maxC=gdc;
+        if(gdr<gdB.minR)gdB.minR=gdr; if(gdr>gdB.maxR)gdB.maxR=gdr;
+      }
+    }
+    var gdLines=[], gdTexts=[];
+    function gdTickH(x,y){ var k=5.5; gdLines.push('<line x1="'+(x-k).toFixed(1)+'" y1="'+(y+k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y-k).toFixed(1)+'" stroke-width="1.8"/>'); }
+    function gdTickV(x,y){ var k=5.5; gdLines.push('<line x1="'+(x-k).toFixed(1)+'" y1="'+(y-k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y+k).toFixed(1)+'" stroke-width="1.8"/>'); }
+    Object.keys(gdBox).forEach(function(gdK){
+      var gdB=gdBox[gdK];
+      var gdW=0,gdH=0;
+      for(var gci=gdB.minC;gci<=gdB.maxC;gci++)gdW+=xPlan[gci];
+      for(var gri=gdB.minR;gri<=gdB.maxR;gri++)gdH+=yPlan[gri];
+      var gdX0=zX(gdB.minR,gdB.minC), gdX1=zX(gdB.minR,gdB.maxC+1);
+      var gdY0=zY(gdB.minC,gdB.minR), gdY1=zY(gdB.maxC,gdB.maxR+1);
+      var gdTL=ts(gdX0,gdY0), gdTR=ts(gdX1,gdY0), gdBR=ts(gdX1,gdY1);
+      /* 横向尺寸线：仅「上方还有联合分区」的组（minR>0，顶边=分界线），画在分界线上方 */
+      if(gdB.minR>0 && gdTR.x-gdTL.x>26){
+        var gdHy=Math.max(gdTL.y-14, headerBottom+16);
+        gdLines.push('<line x1="'+gdTL.x.toFixed(1)+'" y1="'+Math.min(gdTL.y-4,gdHy-6).toFixed(1)+'" x2="'+gdTL.x.toFixed(1)+'" y2="'+Math.max(gdTL.y-4,gdHy-6).toFixed(1)+'"/>');
+        gdLines.push('<line x1="'+gdTR.x.toFixed(1)+'" y1="'+Math.min(gdTR.y-4,gdHy-6).toFixed(1)+'" x2="'+gdTR.x.toFixed(1)+'" y2="'+Math.max(gdTR.y-4,gdHy-6).toFixed(1)+'"/>');
+        gdLines.push('<line x1="'+gdTL.x.toFixed(1)+'" y1="'+gdHy.toFixed(1)+'" x2="'+gdTR.x.toFixed(1)+'" y2="'+gdHy.toFixed(1)+'"/>');
+        gdTickH(gdTL.x,gdHy); gdTickH(gdTR.x,gdHy);
+        gdTexts.push('<text x="'+((gdTL.x+gdTR.x)/2).toFixed(1)+'" y="'+(gdHy-4).toFixed(1)+'" text-anchor="middle" font-size="12" font-weight="700" fill="#111111">'+gdVal(gdW)+'</text>');
+      }
+      /* 竖向尺寸线：仅「右缘贴地块右边界」的组（maxC=最后一列），画在地块右缘外侧 */
+      if(gdB.maxC===cols-1 && gdBR.y-gdTR.y>26){
+        var gdVx=gdBR.x+14;
+        gdLines.push('<line x1="'+Math.min(gdTR.x+4,gdVx-6).toFixed(1)+'" y1="'+gdTR.y.toFixed(1)+'" x2="'+Math.max(gdTR.x+4,gdVx-6).toFixed(1)+'" y2="'+gdTR.y.toFixed(1)+'"/>');
+        gdLines.push('<line x1="'+Math.min(gdBR.x+4,gdVx-6).toFixed(1)+'" y1="'+gdBR.y.toFixed(1)+'" x2="'+Math.max(gdBR.x+4,gdVx-6).toFixed(1)+'" y2="'+gdBR.y.toFixed(1)+'"/>');
+        gdLines.push('<line x1="'+gdVx.toFixed(1)+'" y1="'+gdTR.y.toFixed(1)+'" x2="'+gdVx.toFixed(1)+'" y2="'+gdBR.y.toFixed(1)+'"/>');
+        gdTickV(gdVx,gdTR.y); gdTickV(gdVx,gdBR.y);
+        gdTexts.push('<g transform="translate('+(gdVx+13).toFixed(1)+' '+((gdTR.y+gdBR.y)/2).toFixed(1)+') rotate(-90)"><text x="0" y="4" text-anchor="middle" font-size="12" font-weight="700" fill="#111111">'+gdVal(gdH)+'</text></g>');
+      }
+    });
+    if(gdLines.length){
+      parts.push('<g pointer-events="none" stroke="#111111" stroke-width="0.95" fill="none" opacity="0.95" stroke-linecap="square">');
+      parts.push(gdLines.join(''));
+      parts.push('</g>');
+      parts.push('<g pointer-events="none">'+gdTexts.join('')+'</g>');
+    }
+  })();
+
   // ===== 管线：优先采用二级页已生成几何（数据传导），否则三级页自动布管 =====
   var mainPipes=[], branchPipes=[], valves=[];
   var ppShare=window.RunyeBridge?window.RunyeBridge.state:null;
@@ -9185,22 +9244,28 @@ function tlAutoGenerate(options) {
         var gapV=Math.min(Math.max(zoneH2*0.06,4),14,zoneH2*0.22);
         var gapH=Math.min(Math.max(zoneW2*0.06,4),14,zoneW2*0.22);
         if(fixedSideIsHorizontal){
-          var mainX=zx2+zoneW2*0.32;
+          /* v110（2026-09-22 用户要求）：主管改到分区横向中间；支管在主管旁平移一小段
+             （原主管 32% 偏置、支管落中 → 主支相距 18% 边长，用户反馈偏移过大，缩到 9%） */
+          var mainX=zx2+zoneW2*0.5;
+          var brOffX=Math.min(Math.max(zoneW2*0.09,2),zoneW2*0.22);
+          var brX=mainX+brOffX;
           mainPipes.push([{x:mainX,y:zy2},{x:mainX,y:zy2+zoneH2}]);
-          branchPipes.push([{x:centerX,y:zy2+gapV},{x:centerX,y:zy2+zoneH2-gapV}]);
-          if(window.atPointInPolygon&&window.atPointInPolygon({x:centerX,y:centerY},poly)){
-            var tlDx=centerX-mainX, tlAy=centerY-tlDx;
+          branchPipes.push([{x:brX,y:zy2+gapV},{x:brX,y:zy2+zoneH2-gapV}]);
+          if(window.atPointInPolygon&&window.atPointInPolygon({x:brX,y:centerY},poly)){
+            var tlDx=brX-mainX, tlAy=centerY-tlDx;
             if(tlAy<zy2)tlAy=zy2; if(tlAy>zy2+zoneH2)tlAy=zy2+zoneH2;
-            valves.push({x:centerX,y:centerY,ax:mainX,ay:tlAy});
+            valves.push({x:brX,y:centerY,ax:mainX,ay:tlAy});
           }
         }else{
-          var mainY=zy2+zoneH2*0.32;
+          var mainY=zy2+zoneH2*0.5;
+          var brOffY=Math.min(Math.max(zoneH2*0.09,2),zoneH2*0.22);
+          var brY=mainY+brOffY;
           mainPipes.push([{x:zx2,y:mainY},{x:zx2+zoneW2,y:mainY}]);
-          branchPipes.push([{x:zx2+gapH,y:centerY},{x:zx2+zoneW2-gapH,y:centerY}]);
-          if(window.atPointInPolygon&&window.atPointInPolygon({x:centerX,y:centerY},poly)){
-            var tlDy=centerY-mainY, tlAx=centerX+tlDy;
+          branchPipes.push([{x:zx2+gapH,y:brY},{x:zx2+zoneW2-gapH,y:brY}]);
+          if(window.atPointInPolygon&&window.atPointInPolygon({x:centerX,y:brY},poly)){
+            var tlDy=brY-mainY, tlAx=centerX+tlDy;
             if(tlAx<zx2)tlAx=zx2; if(tlAx>zx2+zoneW2)tlAx=zx2+zoneW2;
-            valves.push({x:centerX,y:centerY,ax:tlAx,ay:mainY});
+            valves.push({x:centerX,y:brY,ax:tlAx,ay:mainY});
           }
         }
       }
