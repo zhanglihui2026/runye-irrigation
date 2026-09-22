@@ -5959,10 +5959,19 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     <span class="pp-plan-item"><span class="pp-plan-label">联合灌溉</span>
       <div role="group" id="tlZoneCountGroup" style="display:inline-flex;gap:4px">
         <button type="button" data-n="2" class="selected">2区</button>
+        <button type="button" data-n="3">3区</button>
         <button type="button" data-n="4">4区</button>
-        <button type="button" data-n="6">6区</button>
-        <button type="button" data-n="8">8区</button>
+        <button type="button" data-n="5">5区</button>
       </div>
+    </span>
+    <!-- v112（2026-09-22 用户要求）：手动分组「保存 / 调出」——点上方自动 N 区按钮会清空手动分组（既有行为），
+         保存=当前手动分组深拷贝快照（内存 + localStorage 按地块名分槽持久，刷新页面也在）；
+         调出=恢复快照并走 tlApplyGroups 重生成图面。 -->
+    <span class="pp-plan-item" style="gap:6px;min-height:22px">
+      <span class="pp-plan-label" style="color:#64748b">手动分组</span>
+      <button type="button" id="tlGroupSaveBtn" title="保存当前手动分组；点上方自动按钮清空后可重新调出" style="font-size:10px;padding:2px 8px;border:1px solid #cbd5e1;background:#fff;border-radius:4px;cursor:pointer;color:#334155">保存分组</button>
+      <button type="button" id="tlGroupRestoreBtn" title="调出已保存的手动分组" style="font-size:10px;padding:2px 8px;border:1px solid #cbd5e1;background:#fff;border-radius:4px;cursor:pointer;color:#334155">调出分组</button>
+      <span id="tlGroupSnapHint" style="font-size:10px;color:#94a3b8"></span>
     </span>
     <div id="tlGroupStatus" style="margin-top:6px;font-size:11px;line-height:1.5;color:#64748b">分组：自动（按 N=2 均分）</div>
     <!-- 2026-09-16 用户要求：左栏面板「总管长度」输入取消（总管长度仍可在下方水力参数卡
@@ -7058,14 +7067,22 @@ function calcPlanZoneLayout(width, height, requestedN, manualMu) {
 function peInnerDiam(od) { return od * (1 - 2 / SDR); }
 
 /* 图面管径覆盖（2026-09-17 第四十一轮）：三级图面上用右键/工具轨改过管径后，
-   用户点左栏「⇧ 更新水泵扬程」确认，才把图面管径折算成 front/main/branch 三档覆盖值，
-   参与 computeThreeLevel 的沿程损失计算（否则仍按 selectPipe 理论选管）。
-   空对象 = 未确认，计算完全等同旧版（不写任何键 → 与历史行为逐字节一致）。 */
-var tlPipeOdOverride = { front: 0, main: 0, branch: 0 };
-/* 取覆盖管径（mm）；未确认或无值返回 0（调用侧用 || 回退到 selectPipe 结果） */
-function pipeOdOverride(kind) {
-  var v = tlPipeOdOverride && tlPipeOdOverride[kind];
-  return (isFinite(v) && v > 0) ? v : 0;
+   用户点左栏「⇧ 更新水泵扬程」确认后，保存各管道的外径，按轮灌组逐路径校核。
+   null = 未确认，仍按 selectPipe 理论选管；计算管径统一由外径折算内径。 */
+var tlPipeOdOverride = null;
+/* 已确认管径按管道编号保存，绑定图面几何；旧的分类平均值不再参与计算。 */
+function tlNormalizePipeOverride(value) {
+  if (!value || value.version !== 1 || typeof value.geoKey !== 'string' || !value.geoKey || !value.calibers) return null;
+  var cals = {};
+  Object.keys(value.calibers).forEach(function (pid) {
+    var od = value.calibers[pid];
+    if (/^(front|main-\d+|branch-\d+)$/.test(pid) && Number.isFinite(od) && od >= 16 && od <= 1200) cals[pid] = od;
+  });
+  return Object.keys(cals).length ? { version: 1, geoKey: value.geoKey, calibers: cals } : null;
+}
+function tlAppliedPipeOverride() {
+  var value = tlNormalizePipeOverride(tlPipeOdOverride), ae = window.RyTlAutoEdits;
+  return value && ae && window.tlDiagramData && value.geoKey === ae.geometryKey(window.tlDiagramData) ? value : null;
 }
 
 function hazenWilliams(L, Q, d) {
@@ -7712,7 +7729,7 @@ function tlWorstPathLen(needGeom) {
       var bl = (zi < branchLens.length) ? branchLens[zi] : 0;        /* 简图按分区顺序 1:1 生成；无对应则回退计算式 */
       taps.push({ zi: zi, run: r.run });
       var mainTot = ml + link;
-      zones.push({ zi: zi, main: mainTot, run: r.run });
+      zones.push({ zi: zi, main: mainTot, branch: bl, run: r.run });
       var totPath = r.run + mainTot + bl;
       if (!worst || totPath > worst.totPath) worst = { totPath: totPath, run: r.run, main: mainTot, branch: bl, link: link, zi: zi, q: r.q, mp: mp, useStart: useStart, fromTail: fromTail, f: f };
     }
@@ -7897,8 +7914,8 @@ function computeThreeLevel() {
   /* 最远分区最不利路径（2026-09-16）：图面已生成时，总管/主管/支管长度改用图面到「最远分区」的
      实际折线长，损失只算这一条路径（不再按各地块累加）。无图面时退回试算输入值。 */
   const wp = (typeof tlWorstPathLen === 'function') ? tlWorstPathLen() : { fromFigure: false, zoneIndex: -1, front: 0, main: 0, branch: 0, taps: [] };
-  const frontLenUsed = (wp.fromFigure && wp.front > 0) ? wp.front : frontPipeLen;
-  const mainLenUsed = (wp.fromFigure && wp.main > 0) ? wp.main : mainPipeLen;
+  let frontLenUsed = (wp.fromFigure && wp.front > 0) ? wp.front : frontPipeLen;
+  let mainLenUsed = (wp.fromFigure && wp.main > 0) ? wp.main : mainPipeLen;
 
   /* 水泵流量按「最大分区的实际面积」计（2026-09-21，用户口径）：分区实际面积=裁剪到实测地块
      多边形的面积；取全部分区的最大者作为单区流量基准，联合流量=最大分区流量×联合分区数（最不利）。
@@ -7943,7 +7960,7 @@ function computeThreeLevel() {
 
   // Single-zone main pipe (per zone, after the zone valve) —— 长度取「最远分区」主管
   const mainPipe = selectPipe(zoneFlow, targetV, MAIN_PIPE_MIN_OD);
-  const mainLoss = hazenWilliams(mainLenUsed, zoneFlow, (pipeOdOverride('main') || mainPipe.id));
+  let mainLoss = hazenWilliams(mainLenUsed, zoneFlow, mainPipe.id);
 
   // Front main pipe (总管) — carries combined flow for all simultaneous zones；长度取水源→最远分区接点
   /* v95（2026-09-21，用户口径）：联合流量按「自动组合后最大一组的实际面积和」换算
@@ -7993,17 +8010,55 @@ function computeThreeLevel() {
     }
   })();
   const frontPipe = selectPipe(combinedFlow, targetV, MAIN_PIPE_MIN_OD);
-  const frontPipeLoss = hazenWilliams(frontLenUsed, combinedFlow, (pipeOdOverride('front') || frontPipe.id));
+  let frontPipeLoss = hazenWilliams(frontLenUsed, combinedFlow, frontPipe.id);
 
   const branchFlow = zoneFlow / branchCount;
   const branchSpan = B;
   const branchLen = branchSpan / (branchCount * layoutSides);
-  const branchLenUsed = (wp.fromFigure && wp.branch > 0) ? wp.branch : branchLen;
+  let branchLenUsed = (wp.fromFigure && wp.branch > 0) ? wp.branch : branchLen;
   const tapsPerBranch = Math.ceil(tapesPerZone / branchCount);
   const branchF = christiansenF(tapsPerBranch);
   const branchPipe = selectPipe(branchFlow, targetV, 0, BRANCH_PIPE_MAX_OD);
-  const branchLossRaw = hazenWilliams(branchLenUsed, branchFlow, (pipeOdOverride('branch') || branchPipe.id));
-  const branchLoss = branchLossRaw * branchF;
+  const branchLossRaw = hazenWilliams(branchLenUsed, branchFlow, branchPipe.id);
+  let branchLoss = branchLossRaw * branchF;
+
+  // 显式应用图面管径后：分别校核每个轮灌组，总管按取水点分段累加。
+  // 支管沿用现有均分流量及 Christiansen 折减规则。
+  var hydraulicPath = null;
+  var appliedPipes = tlAppliedPipeOverride();
+  if (appliedPipes && wp.fromFigure && wp.zones && window.RyPipePathLoss) {
+    var pathZones = wp.zones.map(function (z) {
+      var area = zoneStat ? (zoneStat.cells[z.zi] || 0) : flowAreaM2;
+      return { zi: z.zi, run: z.run, main: z.main, branch: z.branch > 0 ? z.branch : branchLen,
+        flow: area / tapeSpacing / emitterSpacing * emitterFlow / 1000 };
+    });
+    var pathGroups = [], assigned = {};
+    if (tlManualGroupsRef) {
+      tlManualGroupsRef.forEach(function (group) {
+        var ids = group.filter(function (id) {
+          if (assigned[id] || !pathZones.some(function (z) { return z.zi === id; })) return false;
+          assigned[id] = true; return true;
+        });
+        if (ids.length) pathGroups.push(ids);
+      });
+      pathZones.forEach(function (z) { if (!assigned[z.zi]) pathGroups.push([z.zi]); });
+    } else {
+      pathZones.forEach(function (z) {
+        var gi = Math.floor(z.zi / zoneCount);
+        if (!pathGroups[gi]) pathGroups[gi] = [];
+        pathGroups[gi].push(z.zi);
+      });
+      pathGroups = pathGroups.filter(Boolean);
+    }
+    var pathCheck = window.RyPipePathLoss.calculate({ zones: pathZones, groups: pathGroups,
+      calibers: appliedPipes.calibers, frontOd: frontPipe.od, mainOd: mainPipe.od, branchOd: branchPipe.od,
+      branchCount: branchCount, branchF: branchF, innerDiam: peInnerDiam, hazen: hazenWilliams });
+    hydraulicPath = pathCheck.worst;
+    if (hydraulicPath) {
+      frontPipeLoss = hydraulicPath.frontPipeLoss; mainLoss = hydraulicPath.mainLoss; branchLoss = hydraulicPath.branchLoss;
+      frontLenUsed = hydraulicPath.front; mainLenUsed = hydraulicPath.main; branchLenUsed = hydraulicPath.branch;
+    }
+  }
 
   const tapeID = tapeOD * 0.8;
   const tapeLossRaw = hazenWilliams(tapeLen, tapeFlow, tapeID);
@@ -8060,7 +8115,7 @@ function computeThreeLevel() {
     frontPipe, frontPipeLoss, frontPipeLen: frontLenUsed, zoneCount, combinedFlow, frontAll, frontAlternatives,
     branchPipe, branchLoss, branchFlow, branchLen: branchLenUsed, branchSpan, layoutSides, tapsPerBranch, branchF,
     /* 最远分区最不利路径（2026-09-16）：wp=来源与分区号，*LenUsed=各段实际采用长度（米） */
-    wp, frontLenUsed, mainLenUsed, branchLenUsed,
+    wp, hydraulicPath, frontLenUsed, mainLenUsed, branchLenUsed,
     /* 流量口径（2026-09-21）：flowAreaM2=最大分区实际面积(m²)，flowAreaSrc='figureMaxZone'|'input' */
     flowAreaM2, flowZoneMu, flowAreaSrc,
     /* v95 联合分区：combinedAreaM2=最大一组实际面积和(m²)；worstGroup={g:组号(0基),zones:分区序号(0基),sum:m²}；
@@ -8523,6 +8578,53 @@ function tlDeleteGroup(g) {
   tlApplyGroups();
 }
 function tlResetAllGroups() { window.tlManualGroups = []; tlApplyGroups(); }
+/* v112（2026-09-22 用户要求）：手动分组「保存 / 调出」快照 ——
+   点上方 2/3/4/5 区自动按钮会清空 window.tlManualGroups（既有行为）；
+   保存 = 深拷贝快照存 window._tlManualGroupsSnapshot + localStorage（按地块名分槽，刷新页面也在）；
+   调出 = 恢复快照并走 tlApplyGroups 重生成（组色带 / 联合流量 / 左栏状态表即时回填）。
+   校验：恢复前过滤非分区序号，分区总数以当前 tlDiagramData 为准，越界成员剔除，防止旧快照套在新网格上。 */
+function tlManualGroupsSnapshotKey() {
+  var nameEl = document.getElementById('tlPlotName');
+  var name = (nameEl && nameEl.value.trim()) || 'default';
+  return 'ry_tl_manual_groups_snapshot::' + name;
+}
+function tlSnapHint(msg) {
+  var h = document.getElementById('tlGroupSnapHint'); if (h) h.textContent = msg || '';
+}
+window.tlSaveManualGroups = function () {
+  var mg = (typeof window !== 'undefined' && window.tlManualGroups && window.tlManualGroups.length) ? window.tlManualGroups : null;
+  if (!mg) { tlSnapHint('当前没有手动分组可保存'); return false; }
+  var snap = mg.map(function (g) { return (g || []).slice(); }).filter(function (g) { return g.length > 0; });
+  if (!snap.length) { tlSnapHint('当前没有手动分组可保存'); return false; }
+  window._tlManualGroupsSnapshot = snap;
+  try { localStorage.setItem(tlManualGroupsSnapshotKey(), JSON.stringify(snap)); } catch (e) { }
+  tlSnapHint('已保存 ' + snap.length + ' 组（点「调出分组」可恢复）');
+  return true;
+};
+window.tlRestoreManualGroups = function () {
+  var snap = window._tlManualGroupsSnapshot;
+  if (!snap || !snap.length) {
+    try { var raw = localStorage.getItem(tlManualGroupsSnapshotKey()); if (raw) snap = JSON.parse(raw); } catch (e) { snap = null; }
+  }
+  if (!snap || !snap.length) { tlSnapHint('没有已保存的手动分组'); return false; }
+  var d = (typeof window !== 'undefined') ? window.tlDiagramData : null;
+  var z = d && d.zones;
+  var maxZi = z ? ((z.cols || (z.xPos ? z.xPos.length - 1 : 0)) * (z.rows || (z.yPos ? z.yPos.length - 1 : 0))) : Infinity;
+  var cleaned = [];
+  for (var gi = 0; gi < snap.length; gi++) {
+    var g2 = [];
+    for (var ki = 0; ki < snap[gi].length; ki++) {
+      var zi2 = parseInt(snap[gi][ki], 10);
+      if (isFinite(zi2) && zi2 >= 0 && zi2 < maxZi && g2.indexOf(zi2) < 0) g2.push(zi2);
+    }
+    if (g2.length) cleaned.push(g2);
+  }
+  if (!cleaned.length) { tlSnapHint('快照与当前分区网格不匹配，未恢复'); return false; }
+  window.tlManualGroups = cleaned;
+  tlApplyGroups();
+  tlSnapHint('已调出 ' + cleaned.length + ' 组');
+  return true;
+};
 /* v98b：把「应用分组 / 合并给定分区」暴露到 window，供图纸右键菜单调用（与面板共用同一状态） */
 window.tlApplyGroups = tlApplyGroups;
 window.tlMergeIndices = function (sel) {
@@ -8539,6 +8641,11 @@ window.tlMergeIndices = function (sel) {
   if (cs) cs.addEventListener('click', function () { var l = document.getElementById('tlGroupZoneList'); if (l) { var cbs = l.querySelectorAll('input[type=checkbox]'); for (var i = 0; i < cbs.length; i++) cbs[i].checked = false; if (mb) mb.disabled = true; } });
   var ra = document.getElementById('tlGroupResetAll');
   if (ra) ra.addEventListener('click', tlResetAllGroups);
+  /* v112：手动分组「保存 / 调出」按钮接线 */
+  var gsb = document.getElementById('tlGroupSaveBtn');
+  if (gsb) gsb.addEventListener('click', window.tlSaveManualGroups);
+  var grb = document.getElementById('tlGroupRestoreBtn');
+  if (grb) grb.addEventListener('click', window.tlRestoreManualGroups);
   var gl = document.getElementById('tlGroupList');
   if (gl) gl.addEventListener('click', function (e) { var t = e.target; if (t && t.getAttribute && t.getAttribute('data-g') != null) { tlDeleteGroup(parseInt(t.getAttribute('data-g'), 10)); } });
   var listEl = document.getElementById('tlGroupZoneList');
@@ -8707,9 +8814,9 @@ function tlUpdatePlanBar() {
   var rDes = r, ovApplied = false;
   try {
     var ovTmp = (typeof tlPipeOdOverride !== 'undefined') ? tlPipeOdOverride : null;
-    if (ovTmp && (ovTmp.front || ovTmp.main || ovTmp.branch)) {
+    if (tlAppliedPipeOverride()) {
       ovApplied = true;
-      tlPipeOdOverride = { front: 0, main: 0, branch: 0 };
+      tlPipeOdOverride = null;
       rDes = computeThreeLevel();
       tlPipeOdOverride = ovTmp;
     }
@@ -8753,9 +8860,6 @@ function tlUpdatePlanBar() {
   }
   tlRealSet('tlPlanPumpHeadReal', ovApplied ? r.pumpHead : NaN, 'm', 1);
   tlRealSet('tlPlanPumpPowerReal', ovApplied ? r.motorKW_rounded : NaN, 'kW', 1);
-  tlRealSet('tlPlanFrontVelocityReal', ovApplied ? r.frontPipe.v : NaN, 'm/s', 2);
-  tlRealSet('tlPlanMainVelocityReal', ovApplied ? r.mainPipe.v : NaN, 'm/s', 2);
-  tlRealSet('tlPlanBranchVelocityReal', ovApplied ? r.branchPipe.v : NaN, 'm/s', 2);
   /* v109（2026-09-22 用户要求）：管径前后对比 —— 改径重算后实际参与计算的管径
      （computeThreeLevel 按覆盖管径算出的 r.*Pipe.od），与设计管径不同时显示「315 → 280 mm」，
      未改径或改径后没变显示 —（浅灰）。 */
@@ -8765,9 +8869,18 @@ function tlUpdatePlanBar() {
         Math.round(odReal) === Math.round(odDes)) { e2.textContent = '—'; e2.style.color = '#cbd5e1'; return; }
     e2.textContent = fmt0(odDes) + ' → ' + fmt0(odReal) + ' mm'; e2.style.color = '';
   }
-  tlRealPipe('tlPlanFrontPipeReal', r.frontPipe.od, rDes.frontPipe.od);
-  tlRealPipe('tlPlanMainPipeReal', r.mainPipe.od, rDes.mainPipe.od);
-  tlRealPipe('tlPlanBranchPipeReal', r.branchPipe.od, rDes.branchPipe.od);
+  var usedCals = tlAppliedPipeOverride(), worstZi = r.hydraulicPath && r.hydraulicPath.zoneIndex;
+  usedCals = usedCals ? usedCals.calibers : {};
+  tlRealPipe('tlPlanFrontPipeReal', usedCals.front || r.frontPipe.od, rDes.frontPipe.od);
+  tlRealPipe('tlPlanMainPipeReal', usedCals['main-' + worstZi] || r.mainPipe.od, rDes.mainPipe.od);
+  tlRealPipe('tlPlanBranchPipeReal', usedCals['branch-' + worstZi] || r.branchPipe.od, rDes.branchPipe.od);
+  function actualVelocity(flow, od) {
+    return ovApplied ? flow / 3600 / (Math.PI * Math.pow(peInnerDiam(od) / 1000, 2) / 4) : NaN;
+  }
+  var hp = r.hydraulicPath;
+  tlRealSet('tlPlanFrontVelocityReal', actualVelocity(hp ? hp.frontFlow : r.combinedFlow, usedCals.front || r.frontPipe.od), 'm/s', 2);
+  tlRealSet('tlPlanMainVelocityReal', actualVelocity(hp ? hp.mainFlow : r.zoneFlow, usedCals['main-' + worstZi] || r.mainPipe.od), 'm/s', 2);
+  tlRealSet('tlPlanBranchVelocityReal', actualVelocity(hp ? hp.branchFlow : r.branchFlow, usedCals['branch-' + worstZi] || r.branchPipe.od), 'm/s', 2);
   /* 扬程计算过程（三级左栏）：与结果栏同源（computeThreeLevel），生成/切页/改参均经此处刷新 */
   if (typeof ppRenderHeadBreakdown === 'function') ppRenderHeadBreakdown(r);
   /* 管径调整·扬程确认卡（第四十一轮）：随结果栏刷新，无图/无改径时自行隐藏或禁用 */
@@ -8892,7 +9005,15 @@ function tlAutoGenerate(options) {
 
   // SVG setup —— 工整三段式布局：顶部标题+信息行、中部图面、底部参数+图例；各段留白均匀
   var svgW=1190, svgH=900, padX=80, headerBottom=110, footerTop=790;
-  var drawTop=headerBottom, drawBottom=footerTop;
+  /* v111c（2026-09-22 用户要求）：绘图区下缘预留 68px 给「地块总尺寸线」——
+     原先 drawBottom=footerTop，偏高地块 plotBottom=790 贴住 footer，
+     总尺寸线被 min(footerTop-30,·) 钳位到 760、跳进地块底部 30px 内，
+     与拖到下方的联合分区分界线小尺寸线（分界线-14px）直接相撞（用户截图：120 m 排压 576 m）。
+     收到 footerTop-68 后 plotBottom ≤ 722 ⇒ dimBottomY=plotBottom+38 永不被钳位，
+     总尺寸线恒在地块底缘下方 38px、文字 ≤772 仍在 footer(790) 之上；
+     小尺寸线 ≤ 地块底缘-14px ⇒ 两者间距恒 ≥52px，结构上不可能再相遇。
+     宽扁地块（宽度受限）不受影响；仅偏高地块整体约缩小 9%。 */
+  var drawTop=headerBottom, drawBottom=footerTop-68;
   var drawW=svgW-2*padX, drawH=drawBottom-drawTop;
   var s=Math.min(drawW/b.w, drawH/b.h); s=Math.min(s,2);
   var ox=padX+(drawW-b.w*s)/2, oy=drawTop+(drawH-b.h*s)/2;
@@ -9143,9 +9264,10 @@ function tlAutoGenerate(options) {
       parts.push('<text x="'+x.toFixed(1)+'" y="'+(y+2).toFixed(1)+'" text-anchor="'+anchor+'" font-size="12" font-weight="700" fill="#111111">'+text+'</text>');
     }
     function tlArchTick(x,y,dir){
-      var k=5.5;
-      if(dir==='h')parts.push('<line x1="'+(x-k).toFixed(1)+'" y1="'+(y+k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y-k).toFixed(1)+'" stroke-width="1.8"/>');
-      else parts.push('<line x1="'+(x-k).toFixed(1)+'" y1="'+(y-k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y+k).toFixed(1)+'" stroke-width="1.8"/>');
+      /* v113（2026-09-22 用户要求）：建筑斜短线加粗、缩短 —— k 5.5→4（长 11px→8px）、线宽 1.8→2.8 */
+      var k=4;
+      if(dir==='h')parts.push('<line x1="'+(x-k).toFixed(1)+'" y1="'+(y+k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y-k).toFixed(1)+'" stroke-width="2.8"/>');
+      else parts.push('<line x1="'+(x-k).toFixed(1)+'" y1="'+(y-k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y+k).toFixed(1)+'" stroke-width="2.8"/>');
     }
     parts.push('<g stroke="#111111" stroke-width="0.95" fill="none" opacity="0.98" stroke-linecap="square">');
     parts.push('<line x1="'+plotLeft.toFixed(1)+'" y1="'+(plotBottom+7).toFixed(1)+'" x2="'+plotLeft.toFixed(1)+'" y2="'+(dimBottomY+12).toFixed(1)+'"/>');
@@ -9164,8 +9286,9 @@ function tlAutoGenerate(options) {
   })();
 
   // v111b（2026-09-22 用户确认示意图后定稿）：联合分区横竖尺寸标注 —— 只标两类位置：
-  //   横向 = 「上方还有联合分区」的组（minR>0，顶边即两联合分区分界线，画在分界线上方）；
-  //          顶行组（顶边=地块上边界）不画 —— 用户 2026-09-22 圈❌明确取消。
+  //   横向 = 组底边上方（v111d 改锚：单行组=地块底缘上方；多行时上行组=分界线上方；
+  //          v111b 原按 minR>0 只标上行组，导致单行布局一个横标都不出 —— 用户 18:45 报「改没了」要求恢复）；
+  //          顶行组的地块上边界上方仍不画（用户圈❌取消的位置不变）。
   //   竖向 = 「右缘贴地块右边界」的组（maxC===cols-1，画在地块右缘外侧）；
   //          组与组相邻处的内部右缘不画（避免标进邻区内部）—— 用户圈❌明确取消。
   //   尺寸值 = 设计网格包络 ΣxPlan / ΣyPlan（与分区标签「设计尺寸」同口径）。
@@ -9185,8 +9308,9 @@ function tlAutoGenerate(options) {
       }
     }
     var gdLines=[], gdTexts=[];
-    function gdTickH(x,y){ var k=5.5; gdLines.push('<line x1="'+(x-k).toFixed(1)+'" y1="'+(y+k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y-k).toFixed(1)+'" stroke-width="1.8"/>'); }
-    function gdTickV(x,y){ var k=5.5; gdLines.push('<line x1="'+(x-k).toFixed(1)+'" y1="'+(y-k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y+k).toFixed(1)+'" stroke-width="1.8"/>'); }
+    /* v113（2026-09-22 用户要求）：联合分区小尺寸斜短线同步加粗缩短 —— k 5.5→4、线宽 1.8→2.8（与 tlArchTick/ppArchTick 一致） */
+    function gdTickH(x,y){ var k=4; gdLines.push('<line x1="'+(x-k).toFixed(1)+'" y1="'+(y+k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y-k).toFixed(1)+'" stroke-width="2.8"/>'); }
+    function gdTickV(x,y){ var k=4; gdLines.push('<line x1="'+(x-k).toFixed(1)+'" y1="'+(y-k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y+k).toFixed(1)+'" stroke-width="2.8"/>'); }
     Object.keys(gdBox).forEach(function(gdK){
       var gdB=gdBox[gdK];
       var gdW=0,gdH=0;
@@ -9195,11 +9319,15 @@ function tlAutoGenerate(options) {
       var gdX0=zX(gdB.minR,gdB.minC), gdX1=zX(gdB.minR,gdB.maxC+1);
       var gdY0=zY(gdB.minC,gdB.minR), gdY1=zY(gdB.maxC,gdB.maxR+1);
       var gdTL=ts(gdX0,gdY0), gdTR=ts(gdX1,gdY0), gdBR=ts(gdX1,gdY1);
-      /* 横向尺寸线：仅「上方还有联合分区」的组（minR>0，顶边=分界线），画在分界线上方 */
-      if(gdB.minR>0 && gdTR.x-gdTL.x>26){
-        var gdHy=Math.max(gdTL.y-14, headerBottom+16);
-        gdLines.push('<line x1="'+gdTL.x.toFixed(1)+'" y1="'+Math.min(gdTL.y-4,gdHy-6).toFixed(1)+'" x2="'+gdTL.x.toFixed(1)+'" y2="'+Math.max(gdTL.y-4,gdHy-6).toFixed(1)+'"/>');
-        gdLines.push('<line x1="'+gdTR.x.toFixed(1)+'" y1="'+Math.min(gdTR.y-4,gdHy-6).toFixed(1)+'" x2="'+gdTR.x.toFixed(1)+'" y2="'+Math.max(gdTR.y-4,gdHy-6).toFixed(1)+'"/>');
+      /* 横向尺寸线（v111d，2026-09-22 用户：小尺寸被 v111b 的 minR>0 条件改没了，要求恢复）：
+         改锚到「组底边」上方 14px，对所有联合分区生效——
+         单行组底边=地块底缘 ⇒ 画在地块底缘上方（用户 18:45 截图圈定要回的位置）；
+         多行时上行组底边=与下行的分界线 ⇒ 画在分界线上方（17:41 确认示意图同款位置）。
+         与总尺寸线（地块底缘+38）间距恒 ≥52px（v111c 预留），不再干扰。 */
+      if(gdTR.x-gdTL.x>26){
+        var gdHy=gdBR.y-14;
+        gdLines.push('<line x1="'+gdTL.x.toFixed(1)+'" y1="'+Math.min(gdBR.y-4,gdHy-6).toFixed(1)+'" x2="'+gdTL.x.toFixed(1)+'" y2="'+Math.max(gdBR.y-4,gdHy-6).toFixed(1)+'"/>');
+        gdLines.push('<line x1="'+gdTR.x.toFixed(1)+'" y1="'+Math.min(gdBR.y-4,gdHy-6).toFixed(1)+'" x2="'+gdTR.x.toFixed(1)+'" y2="'+Math.max(gdBR.y-4,gdHy-6).toFixed(1)+'"/>');
         gdLines.push('<line x1="'+gdTL.x.toFixed(1)+'" y1="'+gdHy.toFixed(1)+'" x2="'+gdTR.x.toFixed(1)+'" y2="'+gdHy.toFixed(1)+'"/>');
         gdTickH(gdTL.x,gdHy); gdTickH(gdTR.x,gdHy);
         gdTexts.push('<text x="'+((gdTL.x+gdTR.x)/2).toFixed(1)+'" y="'+(gdHy-4).toFixed(1)+'" text-anchor="middle" font-size="12" font-weight="700" fill="#111111">'+gdVal(gdW)+'</text>');
@@ -9477,7 +9605,36 @@ function tlAutoGenerate(options) {
 
   var iy=footerTop+52; // 底部参数块起始 y（整体下移，与图例对齐）
   parts.push('<g id="tlParamsGroup" font-size="10.5" font-weight="600" fill="#334155">');
-  parts.push('<text x="40" y="'+iy+'">总管 '+ (frontPipeEl?frontPipeEl.textContent:'—') +' · 主管 '+ (mainPipeEl?mainPipeEl.textContent:'—') +' · 支管 '+ (branchPipeEl?branchPipeEl.textContent:'—') +'</text>');
+  /* v116（2026-09-22 用户要求）：参数行显示管道「实际直径 + 实际长度」——
+     直径 = 图面改径（RyTlAutoEdits.cals）按管长加权的该类代表径，无改径退回水力计算值；
+     长度 = computeThreeLevel 实际采用长度（最不利路径图面几何，含图面改长/平移），与损失/扬程同源。
+     旧版只显示水力计算径且无长度，图面改径后点「生成管线图」数字不动（用户实测）。
+     meta.pipes 保持设计径文本不动（iso/network-model 消费，多道 e2e 只读红线）。 */
+  function tlFigOdOf(kind, designOd) {
+    try {
+      var AE2 = window.RyTlAutoEdits, d2 = window.tlDiagramData;
+      if (!AE2 || !AE2.calibersMap || !d2) return designOd;
+      var cals2 = AE2.calibersMap() || {};
+      var pids2 = [];
+      if (kind === 'front') { pids2.push('front'); }
+      else {
+        var arr2 = (kind === 'main') ? d2.mainPipes : d2.branchPipes;
+        if (arr2) for (var pi2 = 0; pi2 < arr2.length; pi2++) pids2.push(kind + '-' + pi2);
+      }
+      var sw2 = 0, sl2 = 0;
+      for (var qi2 = 0; qi2 < pids2.length; qi2++) {
+        var od2 = cals2[pids2[qi2]]; if (!od2) continue;
+        var pts2 = AE2.effPts(pids2[qi2], d2); if (!pts2) continue;
+        var L2 = AE2.polylineLen(pts2);
+        sw2 += od2 * L2; sl2 += L2;
+      }
+      if (!(sl2 > 0)) return designOd;
+      return Math.round(sw2 / sl2 * 10) / 10;
+    } catch (eOd) { return designOd; }
+  }
+  function tlFmtLen(v) { if (!isFinite(v)) return '—'; var f = Math.pow(10, 1); return (Math.round(v * f) / f).toFixed(1); }
+  var tlOdF = tlFigOdOf('front', r.frontPipe.od), tlOdM = tlFigOdOf('main', r.mainPipe.od), tlOdB = tlFigOdOf('branch', r.branchPipe.od);
+  parts.push('<text x="40" y="'+iy+'">总管 Ø '+tlOdF+' mm · '+tlFmtLen(r.frontLenUsed)+' m · 主管 Ø '+tlOdM+' mm · '+tlFmtLen(r.mainLenUsed)+' m · 支管 Ø '+tlOdB+' mm · '+tlFmtLen(r.branchLenUsed)+' m</text>');
   /* v109b：结果条文本已自带单位（如「185.1 m³/h」），此处不再重复拼单位 */
   parts.push('<text x="40" y="'+(iy+22)+'">联合灌溉 '+zc+'区 · 水泵 '+ (pumpFlowEl?pumpFlowEl.textContent:'—') +' · '+ (pumpHeadEl?pumpHeadEl.textContent:'—') +' · '+ (pumpPowerEl?pumpPowerEl.textContent:'—') +'</text>');
   parts.push('</g>');
@@ -10068,7 +10225,16 @@ document.querySelectorAll('#tlZoneCountGroup button').forEach(function(btn){
   btn.addEventListener('click',function(){
     document.querySelectorAll('#tlZoneCountGroup button').forEach(function(b){b.classList.remove('selected');});
     btn.classList.add('selected');
-    if (typeof window !== 'undefined') { window.tlManualGroups = []; try { if (window.tlPersistManualGroups) window.tlPersistManualGroups(); } catch(e){} }
+    /* v115（2026-09-22 用户要求）：点 2/3/4/5 区自动按钮 = 完全回到自动 ——
+       手动分组**和**手动拖过的分界线（阶梯覆盖表 tlZoneStep）都要清空；
+       只清分组不清阶梯时，拖过的分界线会一直保持调节状态（用户实测：16 区 242.9/60m 不回位）。
+       清空后走下方 tlAutoGenerate 重生成 ⇒ 分界线回到二级共享网格标准位置，静默保存同步落盘 zoneStep:null。 */
+    if (typeof window !== 'undefined') {
+      window.tlManualGroups = [];
+      try { if (typeof tlZoneStepClear === 'function') tlZoneStepClear(); } catch(e){}
+      try { if (window.tlDiagramData && window.tlDiagramData.zones) { window.tlDiagramData.zones.cutOffX = null; window.tlDiagramData.zones.cutOffY = null; } } catch(e){}
+      try { if (window.tlPersistManualGroups) window.tlPersistManualGroups(); } catch(e){}
+    }
     tlUpdatePlanBar();
     try { if (typeof window.tlRefreshGroupPanel === 'function') window.tlRefreshGroupPanel(); } catch (e) { }
     /* 2026-09-16：联合灌溉区数 N 改变 → 联合灌溉分组色带同步。
@@ -12962,9 +13128,10 @@ ppPullLiftDh();                                              // 首屏对齐一�
       parts.push('<text x="'+x.toFixed(1)+'" y="'+(y+2).toFixed(1)+'" text-anchor="'+anchor+'">'+text+'</text>');
     }
     function ppArchTick(x,y,dir){
-      var k=5.5;
-      if(dir==='h')parts.push('<line x1="'+(x-k).toFixed(1)+'" y1="'+(y+k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y-k).toFixed(1)+'" stroke-width="1.8"/>');
-      else parts.push('<line x1="'+(x-k).toFixed(1)+'" y1="'+(y-k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y+k).toFixed(1)+'" stroke-width="1.8"/>');
+      /* v113（2026-09-22 用户要求）：建筑斜短线加粗、缩短 —— k 5.5→4（长 11px→8px）、线宽 1.8→2.8（与三级 tlArchTick 同步） */
+      var k=4;
+      if(dir==='h')parts.push('<line x1="'+(x-k).toFixed(1)+'" y1="'+(y+k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y-k).toFixed(1)+'" stroke-width="2.8"/>');
+      else parts.push('<line x1="'+(x-k).toFixed(1)+'" y1="'+(y-k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y+k).toFixed(1)+'" stroke-width="2.8"/>');
     }
     parts.push('<g stroke="#111111" stroke-width="0.95" fill="none" opacity="0.98" stroke-linecap="square">');
     parts.push('<line x1="'+plotLeft.toFixed(1)+'" y1="'+(plotBottom+7).toFixed(1)+'" x2="'+plotLeft.toFixed(1)+'" y2="'+(dimBottomY+12).toFixed(1)+'"/>');
@@ -13651,6 +13818,9 @@ ppPullLiftDh();                                              // 首屏对齐一�
       inputValues:collectInputValues(),
       branchCount:getSelectedBranchCount(),
       layoutSides:getSelectedLayoutSides(),
+      tlBranchCount:readSelectedInt('#tl_branchGroup .selected', 2),
+      tlLayoutSides:readSelectedInt('#tl_layoutGroup .selected', 1),
+      pipeOdOverride:tlAppliedPipeOverride(),
       measuredArea:window.measuredArea||0,
       measuredPolygon:window.measuredPolygon||[],
       materialPrices:JSON.parse(JSON.stringify(window.materialPrices||materialPrices||{})),
@@ -13674,7 +13844,13 @@ ppPullLiftDh();                                              // 首屏对齐一�
     if(!raw){projectToast('还没有保存过方案');return;}
     var data;
     try{data=JSON.parse(raw);}catch(e){projectToast('保存数据读取失败');return;}
+    // 先清除上一方案的计算覆盖；旧存档缺字段时使用明确默认值。
+    tlPipeOdOverride = null;
     restoreInputValues(data.inputValues);
+    var tlBc = [2,3,4].includes(Number(data.tlBranchCount)) ? Number(data.tlBranchCount) : 2;
+    var tlLs = [1,2].includes(Number(data.tlLayoutSides)) ? Number(data.tlLayoutSides) : 1;
+    document.querySelectorAll('#tl_branchGroup button').forEach(function (b) { b.classList.toggle('selected', +b.dataset.n === tlBc); });
+    document.querySelectorAll('#tl_layoutGroup button').forEach(function (b) { b.classList.toggle('selected', +b.dataset.sides === tlLs); });
     if(typeof selectBranch==='function') selectBranch(parseInt(data.branchCount||2,10));
     if(typeof selectLayout==='function') selectLayout(parseInt(data.layoutSides||1,10));
     if(typeof materialPrices!=='undefined'){
@@ -13702,6 +13878,11 @@ ppPullLiftDh();                                              // 首屏对齐一�
     if(window.RyIsoDiagram){
       var isoSaved=data.isoDiagram;
       window.RyIsoDiagram.cancelEdit();
+      // 先绑定目标方案几何，避免用上一方案的签名拒绝本方案改长、改径存档。
+      if (isoSaved && isoSaved.data) {
+        if (window.RyTlEditPipes) window.RyTlEditPipes.syncGeometry(isoSaved.data);
+        if (window.RyTlAutoEdits) window.RyTlAutoEdits.syncGeometry(isoSaved.data);
+      }
       /* 共享图面数据层先恢复（2026-09-15 阶段1）：几何签名随存档校验，不符拒绝 */
       if(window.RyTlEditPipes){
         if(data.tlEditPipes && window.RyTlEditPipes.restore(data.tlEditPipes)){
@@ -13720,7 +13901,9 @@ ppPullLiftDh();                                              // 首屏对齐一�
           if(window.RyTlAutoEdits.discardSaved) window.RyTlAutoEdits.discardSaved();
         }
       }
-      if(isoSaved && window.RyIsoDiagram.importState(isoSaved.editor,isoSaved.data)){
+      if(isoSaved && isoSaved.data && isoSaved.data.version === 1){
+        // 尚未打开轴测页时 editor.geometry 可能为空；仍须恢复有效的原始图面。
+        window.RyIsoDiagram.importState(isoSaved.editor,isoSaved.data);
         window.tlDiagramData=isoSaved.data;
         window.RyIsoDiagram.render(document.getElementById('tlIsoDiagramContent'),isoSaved.data);
       }else{
@@ -13745,6 +13928,15 @@ ppPullLiftDh();                                              // 首屏对齐一�
       try { if (typeof window.tlRefreshGroupPanel === 'function') window.tlRefreshGroupPanel(); } catch (e) { }
       try { if (window.tlPersistManualGroups) window.tlPersistManualGroups(); } catch(e){}
     }
+    // 二级重算会同步三级输入；以存档中的三级参数为准恢复最终计算条件。
+    restoreInputValues(data.inputValues);
+    document.querySelectorAll('#tl_branchGroup button').forEach(function (b) { b.classList.toggle('selected', +b.dataset.n === tlBc); });
+    document.querySelectorAll('#tl_layoutGroup button').forEach(function (b) { b.classList.toggle('selected', +b.dataset.sides === tlLs); });
+    tlPipeOdOverride = tlNormalizePipeOverride(data.pipeOdOverride);
+    if (!tlAppliedPipeOverride()) tlPipeOdOverride = null;
+    renderThreeLevel();
+    if (typeof tlUpdatePlanBar === 'function') tlUpdatePlanBar();
+    if (window.tlPumpUpdateNote) window.tlPumpUpdateNote();
     projectToast('方案已打开');
   };
 
@@ -15181,6 +15373,7 @@ threeDModelingSection:'树状管网水头损失：任选路径独立成算，管
 <!-- ===== 三级设计工作区模块 + 页面接线（2026-09-13） ===== -->
 <script src="tl-workspace/tl-workspace.js"></script>
 <script src="hydraulic-calc/hc-core.js"></script>
+<script src="hydraulic-calc/pipe-path-loss.js"></script>
 <script src="hydraulic-calc/hydraulic-calc.js"></script>
 <!-- 过滤系统页（2026-09-18 第七十二轮）：GREEN 单体版管路模型 + 选型计算，
      懒挂载（首次可见时建 DOM），与二级/三级计算双向融合。 -->
@@ -16032,34 +16225,18 @@ function tlIsoStatsReset() {
     var dlt = h1 - h0;
     return { text: 'hf ' + h0.toFixed(2) + '\u2192' + h1.toFixed(2) + (dlt <= 0 ? ' \u2193' : ' \u2191') + Math.abs(dlt).toFixed(2), color: dlt <= 0 ? '#15803d' : '#b91c1c' };
   };
-  /* 汇总条（ws/iso 画布内，每次重渲染刷新）：改 N 段合计损失变化 + 水泵扬程可调参考 */
+  /* 汇总条与右栏共用正式扬程计算；不得累加不同路径的损失作为水泵扬程。 */
   window.tlCalSummaryText = function () {
     if (!AE || !AE.calibersMap) return '';
     var cals = AE.calibersMap(), pids = Object.keys(cals);
     if (!pids.length) return '';
-    var h0s = 0, h1s = 0, n = 0, dDown = 0, dUp = 0;
-    pids.forEach(function (pid) {
-      var base = baseCal(pid);
-      if (!base) return;
-      var h0 = hfFor(pid, base), h1 = hfFor(pid, cals[pid]);
-      if (h0 == null || h1 == null) return;
-      h0s += h0; h1s += h1; n++;
-      if (h1 < h0) dDown += h1 - h0; else if (h1 > h0) dUp += h1 - h0;
-    });
-    if (!n) return '';
-    var dlt = h1s - h0s;
-    var cut = Math.abs(dlt) < 0.005;
-    var ph = pumpHeadNow();
-    var l2;
-    if (cut) l2 = '按图面估算损失基本不变';
-    else if (ph) l2 = '按水泵扬程 ' + ph + ' m 估算：可由 ' + ph + ' m 调整为 ' + Math.max(0, ph + dlt).toFixed(1) + ' m';
-    else l2 = '水泵扬程可相应' + (dlt <= 0 ? '降低' : '增加') + ' ' + Math.abs(dlt).toFixed(1) + ' m';
-    var parts = [];
-    if (dDown < -0.005) parts.push('<b style="color:#15803d">减少 ' + Math.abs(dDown).toFixed(2) + ' m</b>');
-    if (dUp > 0.005) parts.push('<b style="color:#b91c1c">增加 ' + dUp.toFixed(2) + ' m</b>');
-    var l1 = '改径 <b>' + n + '</b> 段 · \u03a3水头损失 ' + h0s.toFixed(2) + '\u2192' + h1s.toFixed(2) + ' m'
-      + (cut ? '（基本不变）' : '（' + parts.join('，') + '，净' + (dlt <= 0 ? '减 ' : '增 ') + Math.abs(dlt).toFixed(2) + ' m）');
-    return l1 + '<br>' + l2;
+    var pair = pumpComparison(), r = pair.current;
+    if (!r.hydraulicPath) return '图面路径未就绪，暂无法校核水泵扬程';
+    return '改径 <b>' + pids.length + '</b> 段 · 最大损失路径：第 ' + (r.hydraulicPath.zoneIndex + 1) + ' 区'
+      + ' · 路径损失 ' + r.totalPipeLoss.toFixed(2) + ' m（总管 ' + r.frontPipeLoss.toFixed(2)
+      + ' + 主管 ' + r.mainLoss.toFixed(2) + ' + 支管 ' + r.branchLoss.toFixed(2) + '）'
+      + '<br>水泵扬程：设计 ' + pair.design.pumpHead.toFixed(1) + ' → 改径重算 <b>' + r.pumpHead.toFixed(1)
+      + ' m</b>（已含安全系数，与右栏一致）';
   };
   function apply(view, pid, od) {
     var mod = view === 'ws' ? window.RyTlWs : window.RyIsoDiagram;
@@ -16131,32 +16308,32 @@ function tlIsoStatsReset() {
   if (window.RyIsoDiagram) window.RyIsoDiagram.onAutoPipeContextMenu = function (pid, x, y) { openMenu('iso', pid, x, y); };
   /* ===== 更新水泵扬程（2026-09-17 第四十一轮，用户要求）=====
      背景：图面改径只作标注（红线），不进选型计算。但用户要"改不同管径 → 评估最经济的
-     管径与水泵"，所以给一个显式确认动作：把图面已改的管径按长度加权折算成
-     front/main/branch 三档代表外径，写入 tlPipeOdOverride 参与 computeThreeLevel 重算。
+     管径与水泵"，所以给一个显式确认动作：按管道编号保存已改外径，
+     写入 tlPipeOdOverride 参与 computeThreeLevel 的轮灌组逐路径校核。
      要点：
-       · 未点按钮 → 覆盖表全 0 → 计算完全等同旧版（不写任何键，eq 基线不受影响）；
+       · 未点按钮 → 覆盖为空 → 计算等同旧版；
        · 只在"图面确实改过径"的管段上生效（其余仍按 selectPipe 理论选管）；
        · 按下后按钮转「已按图面管径更新」态，并列出扬程/功率的前后差，便于比选。 */
   function odGroupOf(pid) {
     if (pid === 'front') return 'front';
     return pid.indexOf('main-') === 0 ? 'main' : 'branch';
   }
-  /* 按长度加权求该类管线在图面上的代表外径（mm）；没改过径的管段按计算值计入 */
-  function weightedOd(kind) {
-    var cals = AE && AE.calibersMap ? AE.calibersMap() : {};
-    var pids = AE && AE.allPids ? AE.allPids(window.tlDiagramData) : Object.keys(cals);
-    var wsum = 0, osum = 0, touched = 0;
-    pids.forEach(function (pid) {
-      if (odGroupOf(pid) !== kind) return;
-      var od = cals[pid];
-      if (!od) return;
-      var L = 0;
-      try { L = pipeLenM(pid); } catch (e) { L = 0; }
-      if (!(L > 0)) return;
-      wsum += L; osum += od * L; touched++;
+  function pipeCaliberSnapshot() {
+    if (!AE || !window.tlDiagramData) return null;
+    var cals = AE.calibersMap(), live = {};
+    AE.allPids(window.tlDiagramData).forEach(function (pid) {
+      if (cals[pid]) live[pid] = cals[pid];
     });
-    if (!touched || !(wsum > 0)) return null;
-    return { od: osum / wsum, n: touched, len: wsum };
+    return tlNormalizePipeOverride({ version: 1, geoKey: AE.geometryKey(window.tlDiagramData), calibers: live });
+  }
+  function pumpComparison() {
+    var saved = tlPipeOdOverride;
+    try {
+      tlPipeOdOverride = null;
+      var design = computeThreeLevel();
+      tlPipeOdOverride = pipeCaliberSnapshot();
+      return { design: design, current: computeThreeLevel() };
+    } finally { tlPipeOdOverride = saved; }
   }
   /* 统计图面改径情况（供按钮状态与提示行） */
   window.tlPumpOverrideStat = function () {
@@ -16164,7 +16341,7 @@ function tlIsoStatsReset() {
     var ids = Object.keys(cals);
     var n = 0, byKind = { front: 0, main: 0, branch: 0 };
     ids.forEach(function (pid) { if (AE.caliberOf && AE.caliberOf(pid)) { n++; byKind[odGroupOf(pid)]++; } });
-    var applied = !!(tlPipeOdOverride && (tlPipeOdOverride.front || tlPipeOdOverride.main || tlPipeOdOverride.branch));
+    var applied = !!tlAppliedPipeOverride();
     return { n: n, byKind: byKind, applied: applied };
   };
   function pumpUpdateNote() {
@@ -16177,15 +16354,14 @@ function tlIsoStatsReset() {
     box.style.display = hasFig ? '' : 'none';
     if (!hasFig) return;
     if (st.n <= 0) {
-      if (note) note.innerHTML = '图面尚未改过管径；直接在图上右键管线改径后，点下面按钮重算扬程';
-      if (btn) { btn.textContent = '⇧ 更新水泵扬程'; btn.disabled = true; btn.style.opacity = '0.5'; }
+      if (note) note.textContent = '当前使用设计管径；调整图面管径后自动重算扬程。';
+      if (btn) { btn.textContent = st.applied ? '⇧ 恢复设计水泵扬程' : '⇧ 更新水泵扬程'; btn.disabled = !st.applied; btn.style.opacity = st.applied ? '1' : '0.5'; }
     } else if (st.applied) {
-      var p = [];
-      if (tlPipeOdOverride.front) p.push('总管 Ø' + tlPipeOdOverride.front.toFixed(0));
-      if (tlPipeOdOverride.main) p.push('主管 Ø' + tlPipeOdOverride.main.toFixed(0));
-      if (tlPipeOdOverride.branch) p.push('支管 Ø' + tlPipeOdOverride.branch.toFixed(0));
-      if (note) note.innerHTML = '✅ 已按图面管径更新：' + (p.join(' · ') || '—') + '<br><span style="color:#94a3b8">再改管径后需重新点按钮</span>';
-      if (btn) { btn.textContent = '⇧ 重新更新水泵扬程'; btn.disabled = false; btn.style.opacity = '1'; }
+      var count = Object.keys(tlAppliedPipeOverride().calibers).length;
+      var result = computeThreeLevel();
+      if (note) note.textContent = '已应用 ' + count + ' 根管道的管径，按轮灌组逐段校核。' +
+        (result.hydraulicPath ? '最大损失路径：第 ' + (result.hydraulicPath.zoneIndex + 1) + ' 区。' : '') + '调整管径后自动更新。';
+      if (btn) { btn.textContent = '↻ 重新校核水泵扬程'; btn.disabled = false; btn.style.opacity = '1'; }
     } else {
       if (note) note.innerHTML = '图面已改径 <b>' + st.n + '</b> 段，点下方按钮按这些管径重算扬程';
       if (btn) { btn.textContent = '⇧ 更新水泵扬程'; btn.disabled = false; btn.style.opacity = '1'; }
@@ -16193,17 +16369,13 @@ function tlIsoStatsReset() {
   }
   window.tlPumpUpdateRun = function () {
     var st = window.tlPumpOverrideStat();
-    if (st.n <= 0) { pumpUpdateNote(); return false; }
+    if (st.n > 0 && (!window.RyPipePathLoss || !tlWorstPathLen().fromFigure)) return false;
     var before = null;
     try {
-      var r0 = computeThreeLevel();
+      var r0 = pumpComparison().design;
       before = { head: r0.pumpHead, kw: r0.motorKW_rounded, loss: r0.totalPipeLoss };
     } catch (e) { }
-    tlPipeOdOverride = { front: 0, main: 0, branch: 0 };
-    ['front', 'main', 'branch'].forEach(function (k) {
-      var w = weightedOd(k);
-      if (w) tlPipeOdOverride[k] = Math.round(w.od * 10) / 10;
-    });
+    tlPipeOdOverride = pipeCaliberSnapshot();
     try { tlUpdatePlanBar(); } catch (e) { console.error('[tlPumpUpdate] 重算失败：', e); }
     try { tlRefreshLossCard(); } catch (e) { }
     try {
@@ -16215,11 +16387,11 @@ function tlIsoStatsReset() {
         function col(v) { return v < -0.005 ? '#15803d' : (v > 0.005 ? '#b91c1c' : '#64748b'); }
         d.style.display = '';
         d.innerHTML = '<div style="border-top:1px dashed #cbd5e1;padding-top:5px">'
-          + '<div>水泵扬程 <b>' + before.head.toFixed(1) + ' → ' + r1.pumpHead.toFixed(1) + ' m</b>'
+          + '<div>设计 → 改径重算 · 水泵扬程 <b>' + before.head.toFixed(1) + ' → ' + r1.pumpHead.toFixed(1) + ' m</b>'
           + ' <b style="color:' + col(dh) + '">(' + sgn(dh, ' m', 1) + ')</b></div>'
           + '<div>水泵功率 <b>' + before.kw + ' → ' + r1.motorKW_rounded + ' kW</b>'
           + ' <b style="color:' + col(dk) + '">(' + sgn(dk, ' kW', 2) + ')</b></div>'
-          + '<div>管道总损失 ' + before.loss.toFixed(2) + ' → ' + r1.totalPipeLoss.toFixed(2) + ' m'
+          + '<div>设计估算 → 最大路径损失 ' + before.loss.toFixed(2) + ' → ' + r1.totalPipeLoss.toFixed(2) + ' m'
           + ' <b style="color:' + col(dl) + '">(' + sgn(dl, ' m', 2) + ')</b></div></div>';
       }
     } catch (e) { }
@@ -16602,7 +16774,11 @@ function tlIsoStatsReset() {
   /* 图面改长 / 改径 / 整条平移（AE 编辑层）→ 左下角「管段长度与水头损失」同步刷新：
      最远分区路径长度走 AE.effPts（图面有效几何），几何一变数值就得跟着变；
      第四十二轮起同步刷新右侧「管段管径与损失」统计表（长度与损失都随之变）。 */
-  if (AE && AE.onChange) AE.onChange(function () { try { tlRefreshLossCard(); } catch (e) { } try { pumpUpdateNote(); } catch (e) { } try { window.tlWsStatsRender(); } catch (e) { } try { tlPushToHydraulicCalc(); } catch (e) { } });   /* 末位：图面几何一变即重推水力计算器（2026-09-19） */
+  if (AE && AE.onChange) AE.onChange(function () {
+    window.tlPumpUpdateRun();
+    try { window.tlWsStatsRender(); } catch (e) { }
+    try { tlPushToHydraulicCalc(); } catch (e) { }
+  });
   try { pumpUpdateNote(); } catch (e) { }
 /* ═══ 管段信息卡（2026-09-17 第五十七轮，用户要求）═══════════════════════════════
    需求：「点击一下管道 应该在鼠标旁边就显示这个管道的基本信息，直径多少 多少米

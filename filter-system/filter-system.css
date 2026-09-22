@@ -120,6 +120,11 @@
 .fs-leg>span{display:inline-flex;align-items:center;gap:5px}
 .fs-lg{width:16px;height:3px;border-radius:2px;display:inline-block}
 .fs-lg-square{width:11px;height:11px;border-radius:2px;display:inline-block}
+/* ★ v99：压力表图例样本 —— 白底深灰圈 + 橙红指针（与图上 gauge() 同观感） */
+.fs-lg-gauge{width:13px;height:13px;border-radius:50%;display:inline-block;background:#fff;
+  border:1.5px solid #6E6E80;position:relative;flex:0 0 auto}
+.fs-lg-gauge::after{content:'';position:absolute;left:50%;top:50%;width:5px;height:1.6px;
+  background:#E8590C;transform-origin:0 50%;transform:rotate(-58deg) translateX(0.6px)}
 
 /* ---------- 阀门交互 + 水流动画（v11） ---------- */
 .fs-valve{cursor:pointer}
