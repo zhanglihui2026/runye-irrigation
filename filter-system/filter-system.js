@@ -66,7 +66,11 @@
     wRun: 540, wRunAuto: true,
     /* ★ v85：① 立管高度（① 进水总管相对罐口的抬高，mm）。默认 = 原常量 IN_TOP_RISE 800。
        四视图的 ① 总管标高与进水立管长度全部由它决定（der().zInTop）。 */
-    inRise: IN_TOP_RISE
+    inRise: IN_TOP_RISE,
+    /* ★ v102（2026-09-22 用户定稿）：①③ 总管自由端加长 mainExt（mm）——
+       ① 进水端向左加长、③ 出水端向右加长；③ 左端与 ② 排污总管原位不动。
+       四视图同步生效（侧视为断面圆，几何上不体现）；0 = 不加长（回到 v101 视觉）。 */
+    mainExt: 200
   };
 
   var RANGES = [
@@ -80,6 +84,8 @@
     /* ★ v85：① 立管高度（① 进水总管抬高）——图上几条竖向进水立管的高度，四视图同步生效。
        上下限按「① 总管仍明显高于罐顶」取：200 时略低于罐顶（可见 ① 沉到罐体一侧），1600 时很高。 */
     { k: 'inRise', label: '① 立管高度', min: 200, max: 1600, step: 50, unit: 'mm' },
+    /* ★ v102：总管加长——① 进水端 / ③ 出水端各加长的长度（③ 左端、② 不动） */
+    { k: 'mainExt', label: '总管加长', min: 0, max: 1000, step: 50, unit: 'mm' },
     { k: 'q', label: '设计流量 Q', min: 5, max: 400, step: 5, unit: 'm³/h' },
     /* v82：方式二专用；★ v92（用户批注「只能驱动方式二，不能驱动方式一」）：两种接法都驱动 ——
        方式一驱动「节点 → 贴地 ②」的竖直排污立管长，方式二驱动「朝后水平支管」长。自动跟随见 DEFAULTS 注释。 */
@@ -104,7 +110,8 @@
     tank: '#F1EFE8', tankS: '#5F5E5A',
     valve: '#FAEEDA', valveS: '#BA7517',
     fit: 'url(#fsFitG)', fitS: '#6E6E80',   /* 管件：白→灰渐变本体 + 深灰描边 */
-    dim: '#98A2B3', txt: '#243c35', txt2: '#4a6259', txt3: '#7b9188', ghost: '#D9DCE3'
+    dim: '#98A2B3', txt: '#243c35', txt2: '#4a6259', txt3: '#7b9188', ghost: '#D9DCE3',
+    gN: '#E8590C'   /* ★ v99：压力表指针（橙红，与阀橙同族但不撞） */
   };
 
   var rootEl = null;
@@ -185,6 +192,208 @@
   function arrow(x1, y1, x2, y2, st, w) {
     return '<line x1="' + r2(x1) + '" y1="' + r2(y1) + '" x2="' + r2(x2) + '" y2="' + r2(y2) +
       '" stroke="' + st + '" stroke-width="' + r2(w || 1.4) + '" marker-end="url(#fsAr)"/>';
+  }
+
+  /* ★ v99 压力表（2026-09-21 用户批注「进水管跟出水管都安装上压力表，改下」）
+     ──────────────────────────────────────────────────────────────────────
+     为什么要装：叠片过滤器是在线运行的，堵塞程度只能靠**进出口压差**读出来
+     （ΔP = 过滤损失，正是本页写回二/三级扬程计算的那一项）。纸上没有两只压力表，
+     这个损失就只是算出来的数，运行人员没法现场核对。
+     装哪里：PG1 挂 ① 进水总管**上游端**（水来的那一头）；PG2 挂 ③ 出水总管**下游侧**。
+             ★ 标号用 PG1/PG2，**不**用 P1/P2 —— 图上 P1~P4 已经是「排污阀」的编号
+             （见本文件头「阀编号：V1~V4 = 进水阀，P1~P4 = 排污阀」），同名会让读图/施工搞混。
+     怎么画：引出短管（自管带外缘起）+ 表盘（白底深灰圈）+ 指针（橙红）+ 轴心，
+             图上只写 PG1/PG2 标号，含义进右下角图例 —— 四视图/两接法完全同一套画法。
+     挂点口径：一律让到**管带外缘**（bandHalf），短管不压管子本体。
+     尺寸口径：表盘半径/短管长取**固定像素**（与 dimH 端线 3px、标注字号同口径）——
+             视图随参数缩放时表盘不再跟着缩小，缩到面板宽度后仍看得清。
+     ★ 位置口径（v99 的关键）：**没有**任何一组静态坐标能同时满足「6 组参数 × 2 接法」
+       —— 空档随 n/S/Δ/OD/DN 漂移（俯视最明显：左端那座 V1 阀座、右端「① 进水总管」文字、
+       粗管时的排污阀块会轮番压上来）。所以每个视图给**一串候选**（按观感优先级排），
+       渲染进 DOM 后由 pickGauges() 量**真实 bbox** 取第一个「不压东西 + 不出视口」的，
+       其余整组删掉 —— DOM 里恒只剩 2 只表（data-fs-gauge），闸门按视图计数不受影响。 */
+  var G_R = 10, G_STEM = 8, G_OFF = G_R + G_STEM;   /* 表心相对挂点的屏幕距离（含短管，px） */
+  /* 单只表的**候选**：<g data-fs-gcand="视图:in|out" data-i="序号">（择优后转 data-fs-gauge）。
+     ax/ay = 挂点（管带外缘）；dx/dy = 挂点 → 表心 的屏幕偏移；lab 图上标号；
+     col 标号颜色（随所挂总管）；labPos 标号落位 'r'/'l'/'u'/'d'。 */
+  function gaugeAt(tag, i, ax, ay, dx, dy, lab, col, labPos) {
+    var L = Math.sqrt(dx * dx + dy * dy) || 1;
+    var ux = dx / L, uy = dy / L;
+    var cx = ax + dx, cy = ay + dy;
+    var s = '<g data-fs-gcand="' + tag + '" data-i="' + i + '">';
+    s += '<title>' + (lab === 'PG1'
+      ? 'PG1 ① 进水压力表（读进水压力；与 PG2 之差 = 过滤损失 ΔP）'
+      : 'PG2 ③ 出水压力表（读出水压力；与 PG1 之差 = 过滤损失 ΔP）') + '</title>';
+    s += line(ax, ay, cx - ux * G_R, cy - uy * G_R, C.fitS, 1.6);          /* 引出短管 */
+    s += '<circle cx="' + r2(cx) + '" cy="' + r2(cy) + '" r="' + G_R +
+      '" fill="#FFFFFF" stroke="' + C.fitS + '" stroke-width="1.5"/>';      /* 表盘 */
+    var na = -Math.PI * 0.32;                                              /* 指针：指向右上 ~ -58° */
+    s += line(cx, cy, cx + Math.cos(na) * G_R * 0.62, cy + Math.sin(na) * G_R * 0.62, C.gN, 1.6);
+    s += '<circle cx="' + r2(cx) + '" cy="' + r2(cy) + '" r="1.5" fill="' + C.fitS + '"/>';
+    if (lab) {
+      var lx = cx, ly = cy + 3.5, an = 'middle';
+      if (labPos === 'r') { lx = cx + G_R + 3; an = 'start'; }
+      else if (labPos === 'l') { lx = cx - G_R - 3; an = 'end'; }
+      else if (labPos === 'u') { lx = cx; ly = cy - G_R - 4; }
+      else if (labPos === 'd') { lx = cx; ly = cy + G_R + 11; }
+      s += txt(lx, ly, lab, 9, col, an, 700);
+    }
+    s += '</g>';
+    return s;
+  }
+  /* 候选集 = 挂点序列 × 方向序列 × 标号落位序列。三层都按观感优先级排 —— 序号 0 = 首选，
+     pickGauges 同分取序号小者，所以"择优"永远先落在最好看的位置上。 */
+  function gaugeCands(pts, dirs, labs) {
+    var out = [];
+    pts.forEach(function (p) {
+      dirs.forEach(function (dv) {
+        labs.forEach(function (lp) { out.push([p[0], p[1], dv[0], dv[1], lp]); });
+      });
+    });
+    return out;
+  }
+  /* 水平管视图（俯视/前视）用：**臂 × 屏幕步距铺点**。
+     arm = [挂点相对轴线的 y 偏移, 短管 dx, 短管 dy, 标号落位]；yAxis = 轴线屏幕 y。
+     ★ 为什么臂要那么多：方式二俯视里 ① 的**整条后方**压着一排"排污阀方块"（DN315 时每块 57.6px
+       见方、块间只剩 5px），"挂在后缘、表朝后"这条路整条管长都走不通 —— 必须留"挂前缘、表朝前"
+       和"从管带里往外伸"这两种退路。哪种退路能用，随 n/S/Δ/OD/DN 变，故一律做成候选交给 pickGauges。
+     ★ 为什么按屏幕步距而不是世界定比：投影缩放 sc 随参数变化很厉害（方式二俯视实测只有方式一的
+       一半上下），世界定比会把整串候选挤进十几像素、一起落进同一个阀块的投影里（实测 5 个定比
+       候选无一可用）；屏幕步距则永远把候选铺满整条管长。
+     候选总数软上限 90/臂数 个点，臂 6~8 ⇒ 每标号 ≤ 96 个候选（自己给自己设的口径）。 */
+  function segCands(sxa, sxb, step, yAxis, arms) {
+    var maxPts = Math.max(2, Math.floor(90 / Math.max(1, arms.length)));
+    var n = Math.max(2, Math.min(maxPts, Math.round(Math.abs(sxb - sxa) / step)));
+    var out = [];
+    for (var a = 0; a < arms.length; a++) {
+      var arm = arms[a];
+      for (var i = 0; i <= n; i++) {
+        out.push([sxa + (sxb - sxa) * i / n, yAxis + arm[0], arm[1], arm[2], arm[3]]);
+      }
+    }
+    return out;
+  }
+  /* 侧视专用：挂点被断面圆钉死（只能挂圆的正上 / 正下一点 —— 那一点才是"表接在管子哪一点"），
+     唯一自由度是**短管朝哪伸 + 标号落哪边**。故把「外半圈 5 个方向 × 4 个标号落位」全铺出来。 */
+  var G_S2 = Math.SQRT1_2;
+  var SIDE_DIRS_IN = [[0, -G_OFF], [-G_OFF * G_S2, -G_OFF * G_S2], [G_OFF * G_S2, -G_OFF * G_S2],
+    [-G_OFF, 0], [G_OFF, 0]];
+  /* ★ v103（2026-09-22 用户批注）：方向与 PG1 一致 —— PG2 也挂断面圆**正上**（退路：斜上/左右） */
+  var SIDE_DIRS_OUT = [[0, -G_OFF], [-G_OFF * G_S2, -G_OFF * G_S2], [G_OFF * G_S2, -G_OFF * G_S2],
+    [-G_OFF, 0], [G_OFF, 0]];
+  var SIDE_LABS = ['l', 'r', 'u', 'd'];
+  /* ★ 候选**不写进视图字符串**：gaugeP 只把候选收进 G_PEND，由 stageGauges 分批注入 DOM。
+     为什么（实测）：getBBox 本身极便宜（干净 SVG 上 0.001ms/次，34 个元素 0.1ms）；
+     真正的开销是**写入之后再量触发的全文档重排** —— 每多一个候选分组约 +0.047ms，
+     752 个候选 ≈ +34ms（实测一次 render 里那"唯一一次 39ms"就是它）。
+     而"往单个视图追加 6 个候选再重排"只要 0.46ms ⇒ 把候选从 ~750 降到 ~64（每标号只注入到
+     命中为止，通常第 1 批就命中）就能把这次重排从 39ms 压到 ~3ms。 */
+  var G_PEND = [];   /* 本次 render 收集到的候选：[{ tag, lab, col, items: [候选 SVG 串…] }]，按调用顺序 */
+  var G_CHUNK = 8;   /* 每个标号每批注入的候选个数（实测 8 个 ≈ 0.5ms 一次重排） */
+  function gaugeP(tag, cands, lab, col) {
+    var items = [];
+    for (var i = 0; i < cands.length; i++) {
+      var k = cands[i];
+      items.push(gaugeAt(tag, i, k[0], k[1], k[2], k[3], lab, col, k[4]));
+    }
+    G_PEND.push({ tag: tag, lab: lab, col: col, items: items });
+    return '';   /* 候选不进视图字符串 —— 交给 stageGauges 分批注入（见上） */
+  }
+  /* ★ 候选择优 = 「分批注入 → 量 → 命中即停」。分三个小函数：
+     gaugeObstacles(svgEl) —— 收集并量出本视图的**障碍**（文字/管件）bbox。每视图只量一次。
+     gaugeScore(g, ob)     —— 单个候选打分 = 出视口(+1000) + 与障碍交叠数
+                              （两方向都 ≥1px 才算交叠，与主闸门同一口径）。
+     gaugePickTag(...)     —— 按序号分批把候选注入 DOM，逐批打分，命中（0 分）即停。
+     打分口径与旧实现逐字相同：有 0 分候选 ⇒ 取**序号最小**者（旧实现遇到第一个 0 分就 break，
+     等价）；全无 0 分 ⇒ 取分最低者（同分取序号小者）。故结果与原实现严格等价。
+     退化保护：所在分区 display:none 时 getBBox 全 0 ⇒ 全为 0 分 ⇒ 自动落到序号 0 的首选候选，
+     行为确定（不会因为面板不可见而挑到一个随机位置）。 */
+  var G_VBW = 680, G_VBH = 420;   /* = VW / VH，择优时判「出视口」用 */
+  function gaugeObstacles(svgEl) {
+    var inCand = function (e) {
+      for (var n = e; n && n.getAttribute; n = n.parentNode) {
+        if (n.getAttribute('data-fs-gcand')) return true;
+      }
+      return false;
+    };
+    var obs = Array.prototype.slice.call(svgEl.querySelectorAll(
+      'text,[data-fs-valve],[data-fs-v0],[data-fs-cap],[data-fs-coup],[data-fs-out]'))
+      .filter(function (e) { return !inCand(e); });
+    var ob = [];
+    obs.forEach(function (e) {
+      var b; try { b = e.getBBox(); } catch (err) { return; }
+      ob.push({ x: b.x, y: b.y, w: b.width, h: b.height });
+    });
+    return ob;
+  }
+  function gaugeScore(g, ob) {
+    var score = 0, b;
+    try { b = g.getBBox(); } catch (err) { b = { x: 0, y: 0, width: 0, height: 0 }; }
+    if (!(b.x >= 0 && b.y >= 0 && b.x + b.width <= G_VBW && b.y + b.height <= G_VBH)) score += 1000;
+    for (var j = 0; j < ob.length; j++) {
+      var o = ob[j];
+      if (Math.min(b.x + b.width, o.x + o.w) - Math.max(b.x, o.x) >= 1 &&
+        Math.min(b.y + b.height, o.y + o.h) - Math.max(b.y, o.y) >= 1) score += 1;
+    }
+    return score;
+  }
+  function gaugePickTag(svgEl, ent, ob) {
+    var n = ent.items.length, best = null, bestScore = 1e9;
+    for (var from = 0; from < n; from += G_CHUNK) {
+      var to = Math.min(n, from + G_CHUNK);
+      svgEl.insertAdjacentHTML('beforeend', ent.items.slice(from, to).join(''));
+      var found = svgEl.querySelectorAll('[data-fs-gcand="' + ent.tag + '"]'), fresh = [];
+      for (var q = 0; q < found.length; q++) {          /* 只认这一批刚注入的 */
+        var ii = +found[q].getAttribute('data-i');
+        if (ii >= from && ii < to) fresh.push(found[q]);
+      }
+      fresh.sort(function (a, b) {
+        return (+a.getAttribute('data-i')) - (+b.getAttribute('data-i'));
+      });
+      for (var i = 0; i < fresh.length; i++) {
+        var sc = gaugeScore(fresh[i], ob);
+        if (sc < bestScore) { bestScore = sc; best = fresh[i]; }
+        if (bestScore === 0) break;
+      }
+      if (bestScore === 0) break;   /* 命中：序号最小且不压东西 ⇒ 立刻收工，不再注入后续批次 */
+    }
+    return best;
+  }
+  /* 落定：中选者转 data-fs-gauge，本视图其余候选整组删除 —— DOM 里只留中选那一只。 */
+  function gaugeFinish(svgEl, winners) {
+    var all = Array.prototype.slice.call(svgEl.querySelectorAll('[data-fs-gcand]'));
+    all.forEach(function (g) {
+      if (winners.indexOf(g) >= 0) {
+        var tag = g.getAttribute('data-fs-gcand');
+        g.removeAttribute('data-fs-gcand');
+        g.removeAttribute('data-i');
+        g.setAttribute('data-fs-gauge', tag);
+      } else { g.parentNode.removeChild(g); }
+    });
+  }
+  /* ★ 舞台总控：按 G_PEND 顺序（俯视 in→out、前视 in→out、侧视、轴测）逐标号择优。
+     障碍"每视图只量一次"；已定下来的那只表**按顺序**并入该视图的障碍（in 先于 out）——
+     与旧实现完全一致（旧实现也是 in 处理完把中选 bbox push 进 ob，再处理 out）。 */
+  function stageGauges(gEls, entries) {
+    var byId = {}, obById = {}, winById = {};
+    gEls.forEach(function (el) { byId[el.id] = el; });
+    entries.forEach(function (ent) {
+      var id = SVG_IDS[ent.tag.split(':')[0]], el = byId[id];
+      if (!el) return;
+      if (!obById[id]) obById[id] = gaugeObstacles(el);   /* 本视图首次用到 ⇒ 量障碍（只一次） */
+      var ob = obById[id];
+      var best = gaugePickTag(el, ent, ob);
+      (winById[id] = winById[id] || []).push(best);
+      if (best) {                                          /* 中选者并入障碍，供本视图后一个标号避让 */
+        try {
+          var b = best.getBBox();
+          ob.push({ x: b.x, y: b.y, w: b.width, h: b.height });
+        } catch (e) {}
+      }
+    });
+    Object.keys(winById).forEach(function (id) {
+      gaugeFinish(byId[id], winById[id].filter(Boolean));
+    });
   }
   /* 管件（三通本体/卡箍）矩形块：渐变本体 + 深灰描边 */
   function fitRect(x, y, w, h, rx) {
@@ -424,7 +633,8 @@
   }
   /* 顶视图：世界 x 向右、y 向后（屏幕向上） */
   function mapTop(c, d, mg) {
-    var xmin = -c.od / 2 - mg, xmax = (c.n - 1) * c.s + c.od / 2 + mg;
+    var ext = Math.max(0, c.mainExt || 0);   /* ★ v102：①左/③右 各加长 ext ⇒ 视口同步外扩防裁切 */
+    var xmin = -c.od / 2 - mg - ext, xmax = (c.n - 1) * c.s + c.od / 2 + mg + ext;
     /* v47：底部加 160mm 富余——图形略缩，给固定屏幕坐标的 W 标注 + ③/② 两行总管文字腾位 */
     var ymin = d.yOut - c.od / 2 - mg - 160, ymax = d.yIn + c.od / 2 + mg;
     var m = fit(xmax - xmin, ymax - ymin, 16);
@@ -447,7 +657,8 @@
   /* ★ v82：方式二顶视专用映射 —— 只把「后侧」（屏幕上方）留出 LWB 的余量，
      前侧不动。若直接给 mapTop 加大 mg，前后一起撑开会把整图压得很小。 */
   function mapTopB(c, d, mg, LWB) {
-    var xmin = -c.od / 2 - mg, xmax = (c.n - 1) * c.s + c.od / 2 + mg;
+    var ext = Math.max(0, c.mainExt || 0);   /* ★ v102：①左/③右 各加长 ext ⇒ 视口同步外扩防裁切 */
+    var xmin = -c.od / 2 - mg - ext, xmax = (c.n - 1) * c.s + c.od / 2 + mg + ext;
     var ymin = d.yOut - c.od / 2 - mg - 160;
     var ymax = d.yIn + Math.max(c.od / 2 + mg, LWB + 200);   /* v82b：尾侧留 70 时管端几乎贴顶，放不下 S 尺寸线；v84：S 线又上移到 −26，150 只够 ≈40px（实测文字顶部溢出 viewBox）⇒ 提到 200 */
     var m = fit(xmax - xmin, ymax - ymin, 16);
@@ -462,16 +673,17 @@
   function renderTop(c) {
     var d = der(c), mg = Math.max(220, c.od * 1.2);
     var M = mapTop(c, d, mg), X = M.X, Y = M.Y, sc = M.sc;
-    var x0 = -200, x1 = (c.n - 1) * c.s + 120;   /* v29：右端延伸 200→120——为出水箭头/文字再右移腾出视界空间（整组右端元素随 x1 左移，V0/堵头相对关系不变） */
+    var x0 = -200, x1 = (c.n - 1) * c.s + 120;
+    var xE = Math.max(0, c.mainExt || 0), x0i = x0 - xE, x1o = x1 + xE;   /* ★ v102：① 进水端=x0i（向左）、③ 出水端=x1o（向右）；③ 左端与 ② 不动 */   /* v29：右端延伸 200→120——为出水箭头/文字再右移腾出视界空间（整组右端元素随 x1 左移，V0/堵头相对关系不变） */
     var o = DEFS;
 
     /* ② 排污总管（与 ① 同一竖直平面 → 俯视重合，红虚线垫底） */
     o += line(X(x0), Y(d.yIn), X(x1), Y(d.yIn), C.ws, Math.max(1.6, c.dnWs * sc * 0.5), '7 5');
     /* 每组排污立管：俯视与接驳支管投影重合（组心线上），不另画 */
     /* ③ 出水总管（前） */
-    o += pipe(X(x0), Y(d.yOut), X(x1), Y(d.yOut), C.out, C.outL, c.dnOut, sc);
+    o += pipe(X(x0), Y(d.yOut), X(x1o), Y(d.yOut), C.out, C.outL, c.dnOut, sc);
     /* ① 进水总管（后，唯一进水总管）——横向总管上不放活接图示（v18 用户定：快接只在支管上） */
-    o += pipe(X(x0), Y(d.yIn), X(x1), Y(d.yIn), C.in, C.inL, c.dnIn, sc);
+    o += pipe(X(x0i), Y(d.yIn), X(x1), Y(d.yIn), C.in, C.inL, c.dnIn, sc);
 
     var msT = modes(c);
     for (var j = 0; j < c.n; j++) {
@@ -528,10 +740,10 @@
       else if (m === 'backwash') { hasW = true; }
       else if (m === 'dump') { hasV = true; hasW = true; }
     });
-    if (hasV) o += flow(X(x0), Y(d.yIn), X(x1), Y(d.yIn), C.in);
+    if (hasV) o += flow(X(x0i), Y(d.yIn), X(x1), Y(d.yIn), C.in);
     var v0o = v0Open(c);
-    if (hasF) o += flow(X(x0), Y(d.yOut), X(x1), Y(d.yOut), C.out);            /* ③ 管内通长流（V0 在管端外延伸段，不占管内） */
-    if (hasF && v0o) o += '<line x1="' + r2(X(x1)) + '" y1="' + r2(Y(d.yOut)) + '" x2="' + r2(X(x1 + 80)) +
+    if (hasF) o += flow(X(x0), Y(d.yOut), X(x1o), Y(d.yOut), C.out);            /* ③ 管内通长流（V0 在管端外延伸段，不占管内） */
+    if (hasF && v0o) o += '<line x1="' + r2(X(x1o)) + '" y1="' + r2(Y(d.yOut)) + '" x2="' + r2(X(x1o + 80)) +
       '" y2="' + r2(Y(d.yOut)) + '" class="fs-flow" data-fs-ext="1" stroke="' + C.out +
       '" stroke-width="2.2" stroke-linecap="round"/>';                          /* V0 开：延伸段有水流出（data-fs-ext 供闸门断言） */
     if (hasW) o += flow(X(x1), Y(d.yIn) + 4, X(x0), Y(d.yIn) + 4, C.ws); /* ② 与 ① 同一竖直平面：+4px 错开、反向排出 */
@@ -549,11 +761,11 @@
     /* 出水总阀 V0（v16：移到 ③ 管端**外侧**延伸短管上，不再与 G 末组三通口重叠）
      * 右端一律用世界坐标偏移（随缩放自适应，n=6 最紧时也不出界）；出水箭头指向外（v16 修正反向）。 */
     var vw0 = Math.max(7, VALVE_W * sc), vh0 = Math.max(6, VALVE_W * sc * 0.7);
-    o += line(X(x1), Y(d.yOut), X(x1 + 80), Y(d.yOut), C.out, Math.max(3, c.dnOut * sc));
-    o += v0Valve(X(x1 + 12), Y(d.yOut) - vh0 / 2, vw0, vh0, v0o);
-    o += txt(X(x1 + 12) + vw0 / 2, Y(d.yOut) + vh0 / 2 + 11, 'V0', 10, C.valveS, 'middle');
-    o += arrow(X(x1 + 190), Y(d.yOut), X(x1 + 222), Y(d.yOut), C.out, 1.6);   /* v29：随 ext 缩短再右移（空隙 150→190mm；n=6 箭头头距右缘 15px） */
-    o += txt(X(x1 + 218), Y(d.yOut) - 12, '出水', 12, C.out, 'end');   /* end 锚压箭头上方：n=6 字形右缘 663.5 距右缘 680 净空 16px */
+    o += line(X(x1o), Y(d.yOut), X(x1o + 80), Y(d.yOut), C.out, Math.max(3, c.dnOut * sc));
+    o += v0Valve(X(x1o + 12), Y(d.yOut) - vh0 / 2, vw0, vh0, v0o);
+    o += txt(X(x1o + 12) + vw0 / 2, Y(d.yOut) + vh0 / 2 + 11, 'V0', 10, C.valveS, 'middle');
+    o += arrow(X(x1o + 190), Y(d.yOut), X(x1o + 222), Y(d.yOut), C.out, 1.6);   /* v29：随 ext 缩短再右移（空隙 150→190mm；n=6 箭头头距右缘 15px） */
+    o += txt(X(x1o + 218), Y(d.yOut) - 12, '出水', 12, C.out, 'end');   /* end 锚压箭头上方：n=6 字形右缘 663.5 距右缘 680 净空 16px */
 
     /* 管端堵头（v17）：① 末端（末组之后死头）与 ③ 上游端（首组之前死头）为盲板端盖；
      * ① 左端=进水来向、③ 右端=V0 出水去向、② 左端=排污排向，均接走不设堵头 */
@@ -561,8 +773,8 @@
     o += endCapV(X(x0) - 1, Y(d.yOut), Math.max(3, c.dnOut * sc) + 5, C.out, 'topOut');
 
     /* 流向箭头（v22：整体移到管端外侧、与管道脱开——进水箭头指向管但不压管） */
-    o += arrow(X(x0) - 42, Y(d.yIn), X(x0) - 16, Y(d.yIn), C.in, 1.6);
-    o += txt(X(x0) - 29, Y(d.yIn) - 10, '进水', 12, C.in, 'middle');
+    o += arrow(X(x0i) - 42, Y(d.yIn), X(x0i) - 16, Y(d.yIn), C.in, 1.6);
+    o += txt(X(x0i) - 29, Y(d.yIn) - 10, '进水', 12, C.in, 'middle');
     /* 「出水」箭头已在上方随 V0 画（指向外）；排污不另设右端引注：② 与 ① 俯视重合 */
 
     /* 尺寸与注记 */
@@ -571,11 +783,38 @@
     /* v51：W 标注固定屏幕 y=352（v47 的 372 上移 20px，与图形拉近）——两行总管文字仍在其下方 */
     o += dimH(X(-c.od / 2), X((c.n - 1) * c.s + c.od / 2), 352,
       '总宽 W = ' + (c.n - 1) + 'S + OD = ' + d.W + ' mm', -1);   /* v57：图形在上 */
-    o += dimV(X(x0) - 64, Y(d.yIn), Y(d.yOut), '2Δ=' + (2 * c.delta), 1);   /* v57：图形在右 */   /* v22：左移让位进水箭头 */
+    o += dimV(X(x0i) - 64, Y(d.yIn), Y(d.yOut), '2Δ=' + (2 * c.delta), 1);   /* v57：图形在右 */   /* v22：左移让位进水箭头 */
     o += txt(X(x0), 388, '② 排污总管（' + wsPosWord(d.zWs) + ' ' + sg(d.zWs) + ' · 与 ① 同一竖直平面，俯视虚线重合）· DN' + c.dnWs + ' · 各组排污立管接入', 11, C.ws, 'start');   /* v47：移到 W 标注下方；v51 上移 20px */
     o += txt(X(x0), 372, '③ 出水总管（前 · +' + mm(d.zPort) + '）  ·  DN' + c.dnOut, 11, C.out, 'start');   /* v47：移到 W 标注下方；v51 上移 20px */
     /* ① 标注（v21）：移到右端管上方避开左端 S/OD 尺寸文字；排污立管说明并入 ② 行 */
     o += txt(X(x1) - 4, Y(d.yIn) - 42, '① 进水总管（+' + mm(d.zInTop) + '）· DN' + c.dnIn, 11, C.in, 'end');
+
+    /* ★ v99 压力表 → ★ v103（2026-09-22 用户批注）：**首选** = 方向朝上（同 PG1）+ 挂**加长段**——
+       PG1 首选 ① 进水端加长段 [x0i, x0]、PG2 首选 ③ 出水端加长段 [x1, x1o]；
+       段内按屏幕步距铺候选（mainExt=0 时三点重合于管端，行为确定）。
+       ★ v103b 兜底 = v99 原全管长 × 多方向候选（A_TIN/A_TOUT）：极端参数（n2 紧 Δ150 / n6 S250 /
+       dn315）下加长段上方没有干净空档时，择优自动落回原位 —— 宁可方向不一致也不压字/压管件。
+       恒有 PG1.x < PG2.x（主闸门「进水表在上游侧」断言）在任何 n/S/Δ 下都成立。 */
+    var hwInT = Math.max(3, c.dnIn * sc) / 2, hwOutT = Math.max(3, c.dnOut * sc) / 2;
+    var xP2T = (c.n - 2) * c.s + c.s / 2;
+    var p2UpT = (c.delta - c.od / 2) * sc >= 58;
+    var UP_IN_T = [[-hwInT, 0, -G_OFF, 'u']];
+    var UP_OUT_T = [[-hwOutT, 0, -G_OFF, 'u']];
+    /* PG1 兜底臂：① 后缘朝后 → 朝左（上游）→ 前缘朝前 / 带内朝左（v99 原顺序）。PG2 兜底：按 v90 分档。 */
+    var A_TIN = [
+      [-hwInT, 0, -G_OFF, 'u'], [-hwInT, 0, -G_OFF, 'r'], [-hwInT, -G_OFF, 0, 'l'],
+      [hwInT, 0, G_OFF, 'd'], [hwInT, 0, G_OFF, 'r'], [hwInT, -G_OFF, 0, 'l'],
+      [6, 0, G_OFF, 'd'], [0, 0, -G_OFF, 'r']
+    ];
+    var A_TOUT = p2UpT ? [
+      [-hwOutT, 0, -G_OFF, 'r'], [-hwOutT, 0, -G_OFF, 'd'], [-hwOutT, -G_OFF, 0, 'l'],
+      [hwOutT, 0, G_OFF, 'r'], [hwOutT, -G_OFF, 0, 'l'], [hwOutT, 0, G_OFF, 'd']
+    ] : [
+      [hwOutT, 0, G_OFF, 'r'], [hwOutT, 0, G_OFF, 'd'], [hwOutT, -G_OFF, 0, 'l'],
+      [-hwOutT, 0, -G_OFF, 'r'], [-hwOutT, -G_OFF, 0, 'l'], [-hwOutT, 0, -G_OFF, 'd']
+    ];
+    o += gaugeP('top:in', segCands(X(x0i), X(x0), 30, Y(d.yIn), UP_IN_T).concat(segCands(X(x0) + 10, X(xP2T) - 40, 30, Y(d.yIn), A_TIN)), 'PG1', C.in);
+    o += gaugeP('top:out', segCands(X(x1), X(x1o), 30, Y(d.yOut), UP_OUT_T).concat(segCands(X(xP2T) + 14, X(x1) - 10, 30, Y(d.yOut), A_TOUT)), 'PG2', C.out);
     o += txt(VW - 14, 18, '俯视 · 上=后 / 下=前', 11, C.txt3, 'end');
     return o;
   }
@@ -583,10 +822,12 @@
   /* ================= 前视图 ================= */
   function renderFront(c) {
     var d = der(c), mg = Math.max(260, c.od * 1.3);
-    var hmin = -c.od / 2 - mg, hmax = (c.n - 1) * c.s + c.od / 2 + mg;
-    var M = mapElev(hmin, hmax, Math.min(-120, d.zWs - 160)   /* ★ v92：zmin 让位给可能下移的 ②（160mm < 180mm ⇒ 默认仍 -120、逐像素不变；极端参数下约 17px 余量够放 ② 圆与标注） */, Math.max(d.zTop + 320, d.zInTop + 100), 16, false);   /* v38：上界按 zInTop 兜底（H=600 时顶部说明贴 ① 管带） */   /* v32：zmax 220→320——虚拟顶加高使图形整体下移，顶部说明(y=18)与 ① 管线/标高脱开（原几乎叠着） */
+    var extF = Math.max(0, c.mainExt || 0);   /* ★ v102：①左/③右 各加长 extF ⇒ 视口同步外扩 */
+    var hmin = -c.od / 2 - mg - extF, hmax = (c.n - 1) * c.s + c.od / 2 + mg + extF;
+    var M = mapElev(hmin, hmax, Math.min(-120, d.zWs - 160)   /* ★ v92：zmin 让位给可能下移的 ②（160mm < 180mm ⇒ 默认仍 -120、逐像素不变；极端参数下约 17px 余量够放 ② 圆与标注） */, Math.max(d.zTop + 320, d.zInTop + 300), 16, false);   /* v38：上界按 zInTop 兜底（H=600 时顶部说明贴 ① 管带） */   /* v32：zmax 220→320——虚拟顶加高使图形整体下移，顶部说明(y=18)与 ① 管线/标高脱开（原几乎叠着） */
     var X = M.X, Y = M.Y, sc = M.sc;
     var h0 = -120, h1 = (c.n - 1) * c.s + 120;
+    var hE = Math.max(0, c.mainExt || 0), h0i = h0 - hE, h1o = h1 + hE;   /* ★ v102：① 左端=h0i、③ 右端=h1o（③ 左端、② 不动） */
     var o = DEFS;
 
     /* 地面线 */
@@ -594,9 +835,9 @@
     /* ② 排污总管 */
     o += pipe(X(h0), Y(d.zWs), X(h1), Y(d.zWs), C.ws, C.wsL, c.dnWs, sc);
     /* ③ 出水总管 +0.720（接驳支管与罐口同高，位于罐后不另画通长线） */
-    o += pipe(X(h0), Y(d.zPort), X(h1), Y(d.zPort), C.out, C.outL, c.dnOut, sc);
+    o += pipe(X(h0), Y(d.zPort), X(h1o), Y(d.zPort), C.out, C.outL, c.dnOut, sc);
     /* ①上 进水总管（虚线，位于罐体之后）——横向总管上不放活接图示（v18） */
-    o += line(X(h0), Y(d.zInTop), X(h1), Y(d.zInTop), C.in, Math.max(1.6, c.dnIn * sc * 0.5), '7 5');
+    o += line(X(h0i), Y(d.zInTop), X(h1), Y(d.zInTop), C.in, Math.max(1.6, c.dnIn * sc * 0.5), '7 5');
 
     var msF = modes(c);
     for (var i = 0; i < c.n; i++) {
@@ -645,13 +886,13 @@
       else if (m === 'backwash') { hasWF = true; }
       else if (m === 'dump') { hasVF = true; hasWF = true; }
     });
-    if (hasVF) o += flow(X(h0), Y(d.zInTop), X(h1), Y(d.zInTop), C.in);
+    if (hasVF) o += flow(X(h0i), Y(d.zInTop), X(h1), Y(d.zInTop), C.in);
     var v0oF = v0Open(c);
-    if (hasFF) o += flow(X(h0), Y(d.zPort), v0oF ? X(h1) : X(h1) + 14, Y(d.zPort), C.out); /* V0 关：③ 流停在阀前 */
+    if (hasFF) o += flow(X(h0), Y(d.zPort), v0oF ? X(h1o) : X(h1o) + 14, Y(d.zPort), C.out); /* V0 关：③ 流停在阀前 */
     /* 出水总阀 V0（v12：③ 右端外延短管上）：有组反冲时自动关闭（停水反冲） */
     var vw0F = Math.max(7, VALVE_W * sc), vh0F = Math.max(6, VALVE_W * sc * 0.62);
-    var v0xF = X(h1) + 14;
-    o += line(X(h1), Y(d.zPort), v0xF + vw0F, Y(d.zPort), C.outL, Math.max(2.4, c.dnOut * sc));
+    var v0xF = X(h1o) + 14;
+    o += line(X(h1o), Y(d.zPort), v0xF + vw0F, Y(d.zPort), C.outL, Math.max(2.4, c.dnOut * sc));
     o += v0Valve(v0xF, Y(d.zPort) - vh0F / 2, vw0F, vh0F, v0oF);
     o += txt(v0xF + vw0F / 2, Y(d.zPort) - vh0F / 2 - 4, 'V0', 10, C.valveS, 'middle');
     /* 管端堵头（v17）：① 末端与 ③ 上游端（与顶视/轴测同口径；① 前视为罐后虚线，堵头按虚线宽度收窄） */
@@ -673,6 +914,31 @@
     o += elevMark(X(hmin) + 36   /* v46：再左移 20px 对齐侧视 v40 脱开幅度 */, Y(d.zBot), '+' + mm(d.zBot));
     o += elevMark(X(hmin) + 36   /* v46：再左移 20px 对齐侧视 v40 脱开幅度 */, Y(d.zWs), sg(d.zWs));
     o += elevMark(X(hmin) + 36   /* v46：再左移 20px 对齐侧视 v40 脱开幅度 */, Y(0), '±0.000');
+
+    /* ★ v99 压力表 → ★ v103（2026-09-22 用户批注）：**首选** = 朝上 + 挂**加长段**——
+       PG1 首选 ① 进水端加长段 [h0i, h0]（仍要求 ① 高出罐顶 120mm 才装，理由同前）；
+       PG2 首选 ③ 出水端加长段 [h1, h1o]。
+       ★ v103b 兜底 = v99 原全管长 × 多方向候选（A_FIN/A_FOUT），极端参数自动落回。 */
+    var hwInF = Math.max(1.6, c.dnIn * sc * 0.5) / 2, hwOutF = Math.max(3, c.dnOut * sc) / 2;
+    var UP_IN_F = [[-hwInF, 0, -G_OFF, 'u']];
+    var UP_OUT_F = [[-hwOutF, 0, -G_OFF, 'u']];
+    var A_FIN = [
+      [-hwInF, 0, -G_OFF, 'r'], [-hwInF, 0, -G_OFF, 'u'], [-hwInF, -G_OFF, 0, 'l'],
+      [-hwInF, G_OFF, 0, 'r'], [hwInF, 0, G_OFF, 'r'], [hwInF, 0, G_OFF, 'd'],
+      [-hwInF, 0, -G_OFF, 'l'], [hwInF, -G_OFF, 0, 'l']
+    ];
+    var A_FOUT = [
+      [hwOutF, 0, G_OFF, 'r'], [hwOutF, 0, G_OFF, 'd'], [hwOutF, -G_OFF, 0, 'l'],
+      [-hwOutF, 0, -G_OFF, 'r'], [-hwOutF, -G_OFF, 0, 'l'], [hwOutF, G_OFF, 0, 'r']
+    ];
+    if (d.zInTop >= d.zTop + 120)
+      o += gaugeP('front:in', segCands(X(h0i), X(h0), 34, Y(d.zInTop), UP_IN_F).concat(segCands(X(h0) + 10, X(h1) - 10, 34, Y(d.zInTop), A_FIN)), 'PG1', C.in);
+    /* ★ v111（2026-09-22 用户批注「PG2 应往右移到总管加长段内」）：h1=(n-1)s+120 可能落在
+       罐右缘 (n-1)s+od/2 之内（od=200 时 h1 比罐缘仅靠外 20mm），表盘视觉上压罐右肩。
+       首选改挂**罐缘之后**的净加长段，且从净段**中点**起铺（不再从段左缘起铺），段尾 h1o 兜底；
+       兜底 A_FOUT 不变。h1v=min(max(h1,罐缘),h1o)：ext 极小时段宽趋 0，与旧候选同点等价。 */
+    var h1v = Math.min(Math.max(h1, (c.n - 1) * c.s + c.od / 2), h1o);
+    o += gaugeP('front:out', segCands((X(h1v) + X(h1o)) / 2, X(h1o), 34, Y(d.zPort), UP_OUT_F).concat(segCands(X(h0) + 10, X(h1) - 10, 34, Y(d.zPort), A_FOUT)), 'PG2', C.out);
     /* 注释（v21）：移到地面线下方作脚注，不再横穿四只罐体 */
     /* ★ v92：这条 ② 脚注改钉在**地面线**上（Y(0) − 60×sc ≡ 原 Y(d.zWs)+… 在 zWs=60 下逐位相等，
        因 mapElev 的 Y 对 z 是斜率 −sc 的线性函数）⇒ 默认输出不变；方式一里参数把 ② 顶高/压低时
@@ -686,7 +952,7 @@
   function renderSide(c) {
     var d = der(c), mg = Math.max(300, c.od * 1.4);
     var hmin = d.yOut - mg, hmax = d.yIn + mg;
-    var M = mapElev(hmin, hmax, Math.min(-120, d.zWs - 160)   /* ★ v92：同前视（默认仍是 -120） */, Math.max(d.zTop + 220, d.zInTop + 50), 16, true, 22);   /* v38：上界按 zInTop 兜底（H=600 时 zTop+220 不够） */   /* v28：图形下移 22px——原上空 -4.4px（顶部被裁）/下空 40.5px，均衡后 17.6/18.5 */
+    var M = mapElev(hmin, hmax, Math.min(-120, d.zWs - 160)   /* ★ v92：同前视（默认仍是 -120） */, Math.max(d.zTop + 220, d.zInTop + 260), 16, true, 22);   /* v38：上界按 zInTop 兜底（H=600 时 zTop+220 不够） */   /* v28：图形下移 22px——原上空 -4.4px（顶部被裁）/下空 40.5px，均衡后 17.6/18.5 */
     var X = M.X, Y = M.Y, sc = M.sc;
     var m0 = modes(c)[0], bw = (m0 === 'backwash' || m0 === 'dump');
     var o = DEFS;
@@ -780,9 +1046,17 @@
     o += '<circle cx="' + r2(X(d.yIn)) + '" cy="' + r2(Y(d.zInTop)) + '" r="' + r2(Math.max(4, c.dnIn / 2 * sc)) +
       '" fill="' + C.inF + '" stroke="' + C.in + '" stroke-width="1.4"/>';
 
-    /* 罐顶排气口 ⑥（侧视/左视为竖管，标出标高链顶端） */
+    /* 罐顶排气口 ⑥（侧视/左视为竖管，标出标高链顶端）
+       ★ v108：③ 出水标签在净宽不足时升到 PG2 走廊顶之上（见下方 v90/v108 注释），可能与本标注
+       同带（高压侧实测压 12.9×12.5）—— 相交则本标注上移 16px 让开（③ 布局参数须提前算）。 */
+    var rOut3 = Math.max(4, c.dnOut / 2 * sc), lxL3 = X(-c.od / 2) + 6, lxR3 = X(d.yOut) - rOut3 - 6;
+    var cx3 = Math.max(X(d.yOut), X(-c.od / 2) + 46), ty3 = Y(d.zPort) - rOut3 - 48;
+    var y6 = Y(d.zTop + 70) + 4;
+    if (lxR3 - lxL3 < 82 &&
+        cx3 + 40 > cxc + 6 && cx3 - 40 < cxc + 46 &&
+        ty3 + 3 > y6 - 8 && ty3 - 12 < y6 + 4) y6 -= 16;
     o += line(cxc, Y(d.zTop), cxc, Y(d.zTop + 70), C.tankS, 2.4);
-    o += txt(cxc + 6, Y(d.zTop + 70) + 4, '⑥ 排气', 10, C.txt3, 'start');
+    o += txt(cxc + 6, y6, '⑥ 排气', 10, C.txt3, 'start');
 
     o += elevMark(X(d.yIn) - 44   /* v37：标高列贴立管左侧跟随图形；v40：间距 24→44 与图形脱开（用户批注太近） */, Y(d.zTop), '+' + mm(d.zTop));
     o += elevMark(X(d.yIn) - 44   /* v37：标高列贴立管左侧跟随图形；v40：间距 24→44 与图形脱开（用户批注太近） */, Y(d.zInTop), '+' + mm(d.zInTop));
@@ -800,16 +1074,38 @@
          · ③ 断面圆左缘 = X(yOut) − dnOut/2·sc   —— dnOut 越大越往左伸（od400+dnOut315 净宽仅 56px < 标签 76.1px）。
        故分两档（确定性，无测量歧义）：
          档 1 常规：居中于「罐前口 +6 ~ ③ 断面圆左缘 −6」之间、管轴上方 24px（默认净宽 118.8px ≫ 82px）；
-         档 2 空间不足（净宽 < 82px）：悬于 ③ 断面圆正上方；高度取 max(圆半径 + 10, 24) ——
-               小口径时半径被 max(4,·) 钳到 4px，只用 r+10 会贴到管带（od150/dnOut32 只剩 0.5px 净空）；
+         档 2 空间不足（净宽 < 82px）：x 仍居中于原位（max(X(yOut), X(-od/2)+46) —— 罐体/管带/
+               P1 文字均不压，v90 契约全绿原证），**y 升到 PG2 正上候选走廊顶之上**：
+               走廊顶 = Y−rOut3−41（挂点→短管 18→标号顶 23），基线取 Y−rOut3−48 留 4px ——
+               ★ v108：原 y=Y−max(rOut3+10,24) 时文字带正横穿走廊（ov 28×13.7），会把侧视 PG2
+               择优整条逼到朝左（2026-09-22 用户批注「压力表方向应朝上」）；走廊是垂直通道，
+               文字悬于其顶不算挡。右对齐方案（end 钉 X(yOut)−20）已试并否决 —— od400 系组
+               罐体投影右缘伸到圆心左 ~60px，左移文字压罐体/进水管带（v90 契约 17 项红）。
                Math.max 同时兜住「Δ < od/2」时罐体右缘比 ③ 断面圆更靠右的退化几何。
        契约：_p1/_verify_fs_outlet_label_v90.cjs（9 组参数 × 2 接法：净空 ≥2px、零交叠、零溢出）。 */
-    var rOut3 = Math.max(4, c.dnOut / 2 * sc), lxL3 = X(-c.od / 2) + 6, lxR3 = X(d.yOut) - rOut3 - 6;
+    /* ★ v108（2026-09-22 用户批注「压力表安装方向应朝上」）：③ 文字右缘必须让开 PG2 的**正上候选走廊**
+       （表盘 r10 + 标号「PG2」半宽 ~11 ⇒ 走廊半宽 13，取圆心左 15px 为界），否则侧视 PG2 择优被
+       这行字挡住、整条退路落到朝左（实测默认参数交叠 28×15.1 全横穿走廊，见 _p1/_v108_side_probe.cjs）。
+       主分支：中心 cap 到圆心左 56（=15+文字半宽 40+1，实测半宽 38.0；文字仍在 [lxL3,lxR3] 带内只左移）；
+       左移后与全图零交叠已由探针预检（movedHits=[]）。 */
     o += (lxR3 - lxL3 >= 82)
-      ? txt((lxL3 + lxR3) / 2, Y(d.zPort) - 24, '③ 出水 +' + mm(d.zPort), 11, C.out, 'middle')
-      : txt(Math.max(X(d.yOut), X(-c.od / 2) + 46), Y(d.zPort) - Math.max(rOut3 + 10, 24),
+      ? txt(Math.min((lxL3 + lxR3) / 2, X(d.yOut) - 56), Y(d.zPort) - 24, '③ 出水 +' + mm(d.zPort), 11, C.out, 'middle')
+      : txt(cx3, ty3,
         '③ 出水 +' + mm(d.zPort), 11, C.out, 'middle');
     o += txt(X(d.yIn) + 16, Y(d.zWs) + 4, '② 排污 ' + sg(d.zWs), 11, C.ws, 'start');
+
+    /* ★ v99 压力表：侧视（沿机组轴线看）里 ①③ 是**断面圆**，表就挂在圆的外缘上 ——
+       ★ v103：PG1/PG2 一律朝上（方向一致），不挤进罐体/汇流节点那一堆管件里。
+       挂点必须是断面圆的**正上 / 正下**一点（挂点即"表接在管子哪一点"），故候选只变
+       短管方向与标号落位、挂点不动 —— 主闸门对侧视正好也只量这一点（20 个候选见 SIDE_*）。 */
+    var rrInS = Math.max(4, c.dnIn / 2 * sc), rrOutS = Math.max(4, c.dnOut / 2 * sc);
+    o += gaugeP('side:in', gaugeCands([[X(d.yIn), Y(d.zInTop) - rrInS]], SIDE_DIRS_IN, SIDE_LABS),
+      'PG1', C.in);
+    /* ★ v103b：首选正上（同 PG1，标号朝上）；斜上/左右为退路；全撞时退回断面圆正下（v99 原位） */
+    o += gaugeP('side:out', gaugeCands([[X(d.yOut), Y(d.zPort) - rrOutS]],
+      [[0, -G_OFF]], ['u'])
+      .concat(gaugeCands([[X(d.yOut), Y(d.zPort) - rrOutS]], SIDE_DIRS_OUT.slice(1), SIDE_LABS))
+      .concat([[X(d.yOut), Y(d.zPort) + rrOutS, 0, G_OFF, 'd']]), 'PG2', C.out);
     o += txt(VW - 14, 18, '侧视 · 左=后 / 右=前', 11, C.txt3, 'end');
     return o;
   }
@@ -820,10 +1116,11 @@
     var u = function (x, y) { return 0.866 * (x + y); };
     var v = function (x, y, z) { return 0.5 * (x - y) - z; };
     var x0 = -220, x1 = (c.n - 1) * c.s + 220;
+    var xE = Math.max(0, c.mainExt || 0), x0i = x0 - xE, x1o = x1 + xE;   /* ★ v102：① 左端=x0i、③ 右端=x1o（③ 左端、② 不动）；标注锚点按 v89 契约不动 */
 
     var probe = [
-      [x0, d.yIn, d.zTop], [x1, d.yIn, d.zTop], [x0, d.yOut, 0], [x1, d.yOut, 0],
-      [x0, d.yIn, d.zTop + 90], [x1, 0, 0], [x0, d.yIn, d.zInTop],
+      [x0, d.yIn, d.zTop], [x1, d.yIn, d.zTop], [x0, d.yOut, 0], [x1o, d.yOut, 0],
+      [x0, d.yIn, d.zTop + 90], [x1, 0, 0], [x0i, d.yIn, d.zInTop],
       /* ★ v92：② 排污总管的两端 —— 方式一里它的标高由「排污支管长」决定，参数调到极端
          （② 落到地面以下）时不纳入包围盒就会被裁掉（同 v82 给方式二加末端点的做法）。 */
       [x0, d.yIn, d.zWs - 400], [x1, d.yIn, d.zWs - 400]   /* 再让 400mm：② 的引注文字在其下方，只贴到管端仍会被裁 */
@@ -846,7 +1143,7 @@
     var p1TagX = 0, p1TagY = 0;   /* G1「P1 常闭」引注坐标（③ rail 之后补画，避免被管带盖住） */
     /* ② 排污总管（最前 → 最后画）；先画 ① 与罐体，再 ③，最后 ② */
     /* ①上 进水总管（唯一进水总管，罐后高位） */
-    o += pipe(X(x0, d.yIn), Y(x0, d.yIn, d.zInTop), X(x1, d.yIn), Y(x1, d.yIn, d.zInTop), C.in, C.inL, c.dnIn, sc);
+    o += pipe(X(x0i, d.yIn), Y(x0i, d.yIn, d.zInTop), X(x1, d.yIn), Y(x1, d.yIn, d.zInTop), C.in, C.inL, c.dnIn, sc);
     /* ② 排污总管（贴地，与 ① 同一竖直平面 → 先画，中段被罐体遮住） */
     o += pipe(X(x0, d.yIn), Y(x0, d.yIn, d.zWs), X(x1, d.yIn), Y(x1, d.yIn, d.zWs), C.ws, C.wsL, c.dnWs, sc);
 
@@ -923,10 +1220,10 @@
       }
     }
 
-    o += pipe(X(x0, d.yOut), Y(x0, d.yOut, d.zPort), X(x1, d.yOut), Y(x1, d.yOut, d.zPort), C.out, C.outL, c.dnOut, sc);
+    o += pipe(X(x0, d.yOut), Y(x0, d.yOut, d.zPort), X(x1o, d.yOut), Y(x1o, d.yOut, d.zPort), C.out, C.outL, c.dnOut, sc);
     /* 出水总阀 V0（v12：③ 末端管内）：有组反冲时自动关闭（停水反冲） */
     var vw0A = Math.max(7, VALVE_W * sc), vh0A = Math.max(7, VALVE_W * sc * 0.8);
-    var v0u = ox + u(x1 - 40, d.yOut) * sc, v0v = oy + v(x1 - 40, d.yOut, d.zPort) * sc;
+    var v0u = ox + u(x1o - 40, d.yOut) * sc, v0v = oy + v(x1o - 40, d.yOut, d.zPort) * sc;
     o += v0Valve(v0u - vw0A / 2, v0v - vh0A / 2, vw0A, vh0A, v0Open(c));
     o += txt(p1TagX, p1TagY, 'P1 常闭', 9, C.valveS, 'start', 0, 'fs-tcode');   /* 后画于阀块右侧罐身留白处：不与罐描边线交叠 */
     /* 管端堵头（v17）：① 末端（右端死头）与 ③ 上游端（左端死头）——等轴测斜向短板，垂直于管轴；
@@ -941,6 +1238,40 @@
     o += txt(X(x1, d.yOut) + 6, Y(x1, d.yOut, d.zPort) + 12, '③ 出水总管', 11, C.out, 'start');
     o += txt(X(x1, d.yIn) + 6, Y(x1, d.yIn, d.zWs) - 6, '② 排污总管', 11, C.ws, 'start');   /* v48：括号说明删除（用户批注） */
     o += txt(14, 18, '轴测 · 进水阀 V（立管）+ 排污阀 P（节点下·常闭·直落 ②）· G1=V1/P1…G4=V4/P4 · 支管平接罐后口（与③同高）', 11, C.txt3, 'start');
+
+    /* ★ v99 压力表：轴测里挂点只取**远离罐体的空角** —— PG1 靠 ① 左端（上游）、
+       PG2 落在 ③ 那一带的空档；短管一律朝屏幕正上/正下，与其余三视图同观感。
+       最后画 ⇒ 永远压在管带/罐体之上，不会被遮。
+       挂点沿 ①③ 管轴按定比铺候选（轴测里沿轴走 = 屏幕朝 (0.866, 0.5) 走，
+       离轴距离恒定 ⇒ 择优选位不会把表带离管子）；具体落在哪由 pickGauges() 现选。 */
+    var hwInA = Math.max(3, c.dnIn * sc) / 2, hwOutA = Math.max(3, c.dnOut * sc) / 2;
+    /* ★ v103：**首选**挂**加长段**（PG1 [x0i, x0]、PG2 [x1, x1o]）方向朝上（PG2 原为正下）；
+       ★ v103b 兜底 = v99 原全管长候选（fb1A/fb2A；v105b 由 g1F/g2F 改名，避免与旧静态挂点 mustNot 契约撞名），极端参数下加长段没干净空档时自动落回。 */
+    var g1A = [0.30, 0.50, 0.70].map(function (f) { return x0i + (x0 - x0i) * f; });
+    var g2A = [0.30, 0.50, 0.70].map(function (f) { return x1 + (x1o - x1) * f; });
+    var fb1A = [0.02, 0.14, 0.28, 0.44, 0.62].map(function (f) { return x0 + (x1 - x0) * f; });
+    var fb2A = [0.50, 0.34, 0.66, 0.20, 0.80].map(function (f) { return x0 + (x1 - x0) * f; });
+    /* ★ v108：首选候选扩容 —— 3 挂点 × 标号(u/r/l) = 9 个正上候选 + 加长段斜上 6 个（标号 r/l），
+       高位罐/粗管等参数下加长段正上被罐体斜投影/文字擦碰时有变体可绕，尽量避免落到朝下兜底
+       （2026-09-22 用户批注「压力表方向应朝上」；契约 _p1/_verify_fs_gauge_dir_v108.cjs）。 */
+    o += gaugeP('axo:in', gaugeCands(
+      g1A.map(function (t) { return [X(t, d.yIn), Y(t, d.yIn, d.zInTop) - hwInA]; }),
+      [[0, -G_OFF]], ['u', 'r', 'l'])
+      .concat(gaugeCands(
+      g1A.map(function (t) { return [X(t, d.yIn), Y(t, d.yIn, d.zInTop) - hwInA]; }),
+      [[-G_OFF * 0.71, -G_OFF * 0.71]], ['r', 'l']))
+      .concat(gaugeCands(
+      fb1A.map(function (t) { return [X(t, d.yIn), Y(t, d.yIn, d.zInTop) - hwInA]; }),
+      [[0, -G_OFF], [-G_OFF, 0], [G_OFF, 0]], ['r', 'u', 'l'])), 'PG1', C.in);
+    o += gaugeP('axo:out', gaugeCands(
+      g2A.map(function (t) { return [X(t, d.yOut), Y(t, d.yOut, d.zPort) - hwOutA]; }),
+      [[0, -G_OFF]], ['u', 'r', 'l'])
+      .concat(gaugeCands(
+      g2A.map(function (t) { return [X(t, d.yOut), Y(t, d.yOut, d.zPort) - hwOutA]; }),
+      [[-G_OFF * 0.71, -G_OFF * 0.71]], ['r', 'l']))
+      .concat(gaugeCands(
+      fb2A.map(function (t) { return [X(t, d.yOut), Y(t, d.yOut, d.zPort) + hwOutA]; }),
+      [[0, G_OFF], [-G_OFF * 0.71, G_OFF * 0.71], [G_OFF, 0]], ['r', 'd', 'l'])), 'PG2', C.out);
     return o;
   }
 
@@ -1029,7 +1360,8 @@
        LWB=540 的管段会被裁掉。改用只在后侧留余量的 mapTopB。 */
     var LWB = lwRunB(c);
     var M = mapTopB(c, d, mg, LWB), X = M.X, Y = M.Y, sc = M.sc;
-    var x0 = -200, x1 = (c.n - 1) * c.s + 120;   /* v29：右端延伸 200→120——为出水箭头/文字再右移腾出视界空间（整组右端元素随 x1 左移，V0/堵头相对关系不变） */
+    var x0 = -200, x1 = (c.n - 1) * c.s + 120;
+    var xE = Math.max(0, c.mainExt || 0), x0i = x0 - xE, x1o = x1 + xE;   /* ★ v102：① 进水端=x0i（向左）、③ 出水端=x1o（向右）；③ 左端与 ② 不动 */   /* v29：右端延伸 200→120——为出水箭头/文字再右移腾出视界空间（整组右端元素随 x1 左移，V0/堵头相对关系不变） */
     var o = DEFS;
 
     /* ★ v84（方式二）：② 排污主管 —— 把各组「朝后水平排污支管」的末端横向串成**一根总管**
@@ -1038,9 +1370,9 @@
        先画主管，组循环里的支管与接口件再压上去。（方式一仍用贴地 ② 总管，不动。） */
     o += pipeTag(pipe(X(x0), Y(d.yIn + LWB), X(x1), Y(d.yIn + LWB), C.ws, C.wsL, c.dnWs, sc), 'topWsMainB');
     /* ③ 出水总管（前） */
-    o += pipe(X(x0), Y(d.yOut), X(x1), Y(d.yOut), C.out, C.outL, c.dnOut, sc);
+    o += pipe(X(x0), Y(d.yOut), X(x1o), Y(d.yOut), C.out, C.outL, c.dnOut, sc);
     /* ① 进水总管（后，唯一进水总管）——横向总管上不放活接图示（v18 用户定：快接只在支管上） */
-    o += pipe(X(x0), Y(d.yIn), X(x1), Y(d.yIn), C.in, C.inL, c.dnIn, sc);
+    o += pipe(X(x0i), Y(d.yIn), X(x1), Y(d.yIn), C.in, C.inL, c.dnIn, sc);
 
     var msT = modes(c);
     for (var j = 0; j < c.n; j++) {
@@ -1115,11 +1447,11 @@
       else if (m === 'backwash') { hasW = true; }
       else if (m === 'dump') { hasV = true; hasW = true; }
     });
-    if (hasV) o += flow(X(x0), Y(d.yIn), X(x1), Y(d.yIn), C.in);
+    if (hasV) o += flow(X(x0i), Y(d.yIn), X(x1), Y(d.yIn), C.in);
     var v0o = v0Open(c);
-    if (hasF) o += flow(X(x0), Y(d.yOut), X(x1), Y(d.yOut), C.out);            /* ③ 管内通长流（V0 在管端外延伸段，不占管内） */
+    if (hasF) o += flow(X(x0), Y(d.yOut), X(x1o), Y(d.yOut), C.out);            /* ③ 管内通长流（V0 在管端外延伸段，不占管内） */
     if (hasW) o += flow(X(x0), Y(d.yIn + LWB), X(x1), Y(d.yIn + LWB), C.ws);   /* v84：② 排污主管内通长流（各组支管汇入后向右送走） */
-    if (hasF && v0o) o += '<line x1="' + r2(X(x1)) + '" y1="' + r2(Y(d.yOut)) + '" x2="' + r2(X(x1 + 80)) +
+    if (hasF && v0o) o += '<line x1="' + r2(X(x1o)) + '" y1="' + r2(Y(d.yOut)) + '" x2="' + r2(X(x1o + 80)) +
       '" y2="' + r2(Y(d.yOut)) + '" class="fs-flow" data-fs-ext="1" stroke="' + C.out +
       '" stroke-width="2.2" stroke-linecap="round"/>';                          /* V0 开：延伸段有水流出（data-fs-ext 供闸门断言） */
     /* v82：贴地 ② 总管已取消 ⇒ 不再有「沿 ② 反向排出」的整条流线；
@@ -1142,11 +1474,11 @@
     /* 出水总阀 V0（v16：移到 ③ 管端**外侧**延伸短管上，不再与 G 末组三通口重叠）
      * 右端一律用世界坐标偏移（随缩放自适应，n=6 最紧时也不出界）；出水箭头指向外（v16 修正反向）。 */
     var vw0 = Math.max(7, VALVE_W * sc), vh0 = Math.max(6, VALVE_W * sc * 0.7);
-    o += line(X(x1), Y(d.yOut), X(x1 + 80), Y(d.yOut), C.out, Math.max(3, c.dnOut * sc));
-    o += v0Valve(X(x1 + 12), Y(d.yOut) - vh0 / 2, vw0, vh0, v0o);
-    o += txt(X(x1 + 12) + vw0 / 2, Y(d.yOut) + vh0 / 2 + 11, 'V0', 10, C.valveS, 'middle');
-    o += arrow(X(x1 + 190), Y(d.yOut), X(x1 + 222), Y(d.yOut), C.out, 1.6);   /* v29：随 ext 缩短再右移（空隙 150→190mm；n=6 箭头头距右缘 15px） */
-    o += txt(X(x1 + 218), Y(d.yOut) - 12, '出水', 12, C.out, 'end');   /* end 锚压箭头上方：n=6 字形右缘 663.5 距右缘 680 净空 16px */
+    o += line(X(x1o), Y(d.yOut), X(x1o + 80), Y(d.yOut), C.out, Math.max(3, c.dnOut * sc));
+    o += v0Valve(X(x1o + 12), Y(d.yOut) - vh0 / 2, vw0, vh0, v0o);
+    o += txt(X(x1o + 12) + vw0 / 2, Y(d.yOut) + vh0 / 2 + 11, 'V0', 10, C.valveS, 'middle');
+    o += arrow(X(x1o + 190), Y(d.yOut), X(x1o + 222), Y(d.yOut), C.out, 1.6);   /* v29：随 ext 缩短再右移（空隙 150→190mm；n=6 箭头头距右缘 15px） */
+    o += txt(X(x1o + 218), Y(d.yOut) - 12, '出水', 12, C.out, 'end');   /* end 锚压箭头上方：n=6 字形右缘 663.5 距右缘 680 净空 16px */
 
     /* 管端堵头（v17）：① 末端（末组之后死头）与 ③ 上游端（首组之前死头）为盲板端盖；
      * ① 左端=进水来向、③ 右端=V0 出水去向、② 左端=排污排向，均接走不设堵头 */
@@ -1154,8 +1486,8 @@
     o += endCapV(X(x0) - 1, Y(d.yOut), Math.max(3, c.dnOut * sc) + 5, C.out, 'topOut');
 
     /* 流向箭头（v22：整体移到管端外侧、与管道脱开——进水箭头指向管但不压管） */
-    o += arrow(X(x0) - 42, Y(d.yIn), X(x0) - 16, Y(d.yIn), C.in, 1.6);
-    o += txt(X(x0) - 29, Y(d.yIn) - 10, '进水', 12, C.in, 'middle');
+    o += arrow(X(x0i) - 42, Y(d.yIn), X(x0i) - 16, Y(d.yIn), C.in, 1.6);
+    o += txt(X(x0i) - 29, Y(d.yIn) - 10, '进水', 12, C.in, 'middle');
     /* 「出水」箭头已在上方随 V0 画（指向外）；排污不另设右端引注：② 与 ① 俯视重合 */
 
     /* 尺寸与注记 */
@@ -1166,13 +1498,40 @@
     /* v51：W 标注固定屏幕 y=352（v47 的 372 上移 20px，与图形拉近）——两行总管文字仍在其下方 */
     o += dimH(X(-c.od / 2), X((c.n - 1) * c.s + c.od / 2), 352,
       '总宽 W = ' + (c.n - 1) + 'S + OD = ' + d.W + ' mm', -1);   /* v57：图形在上 */
-    o += dimV(X(x0) - 64, Y(d.yIn), Y(d.yOut), '2Δ=' + (2 * c.delta), 1);   /* v57：图形在右 */   /* v22：左移让位进水箭头 */
+    o += dimV(X(x0i) - 64, Y(d.yIn), Y(d.yOut), '2Δ=' + (2 * c.delta), 1);   /* v57：图形在右 */   /* v22：左移让位进水箭头 */
     o += txt(X(x0), 388, '② 排污主管（方式二）：各组支管朝后水平 ' + LWB + ' mm 汇入 · 管中 +' + mm(d.zPort) +
       ' · DN' + c.dnWs, 11, C.ws, 'start');   /* v83：标高随支管层；本行已贴近画布宽，别再往里加字（实测加 7 字即溢出 680） */   /* v47：移到 W 标注下方；v51 上移 20px */
     o += txt(X(x0), 372, '③ 出水总管（前 · +' + mm(d.zPort) + '）  ·  DN' + c.dnOut, 11, C.out, 'start');   /* v47：移到 W 标注下方；v51 上移 20px */
     /* ① 标注（v21）：移到右端管上方避开左端 S/OD 尺寸文字；排污立管说明并入 ② 行 */
     /* v82b：① 标注原在 ① 线之上（方式二被新管段压住）⇒ 移到末组右侧的空角（管段够不到那里） */
     o += txt(X(x1) + 8, Y(d.yIn) - 12, '① 进水总管（+' + mm(d.zInTop) + '）· DN' + c.dnIn, 11, C.in, 'start');
+
+    /* ★ v99 压力表 → ★ v103（2026-09-22 用户批注）：**首选** = 方向朝上（同 PG1）+ 挂**加长段**——
+       PG1 首选 ① 进水端加长段 [x0i, x0]、PG2 首选 ③ 出水端加长段 [x1, x1o]；
+       段内按屏幕步距铺候选（mainExt=0 时三点重合于管端，行为确定）。
+       ★ v103b 兜底 = v99 原全管长 × 多方向候选（A_TIN/A_TOUT）：极端参数（n2 紧 Δ150 / n6 S250 /
+       dn315）下加长段上方没有干净空档时，择优自动落回原位 —— 宁可方向不一致也不压字/压管件。
+       恒有 PG1.x < PG2.x（主闸门「进水表在上游侧」断言）在任何 n/S/Δ 下都成立。 */
+    var hwInT = Math.max(3, c.dnIn * sc) / 2, hwOutT = Math.max(3, c.dnOut * sc) / 2;
+    var xP2T = (c.n - 2) * c.s + c.s / 2;
+    var p2UpT = (c.delta - c.od / 2) * sc >= 58;
+    var UP_IN_T = [[-hwInT, 0, -G_OFF, 'u']];
+    var UP_OUT_T = [[-hwOutT, 0, -G_OFF, 'u']];
+    /* PG1 兜底臂：① 后缘朝后 → 朝左（上游）→ 前缘朝前 / 带内朝左（v99 原顺序）。PG2 兜底：按 v90 分档。 */
+    var A_TIN = [
+      [-hwInT, 0, -G_OFF, 'u'], [-hwInT, 0, -G_OFF, 'r'], [-hwInT, -G_OFF, 0, 'l'],
+      [hwInT, 0, G_OFF, 'd'], [hwInT, 0, G_OFF, 'r'], [hwInT, -G_OFF, 0, 'l'],
+      [6, 0, G_OFF, 'd'], [0, 0, -G_OFF, 'r']
+    ];
+    var A_TOUT = p2UpT ? [
+      [-hwOutT, 0, -G_OFF, 'r'], [-hwOutT, 0, -G_OFF, 'd'], [-hwOutT, -G_OFF, 0, 'l'],
+      [hwOutT, 0, G_OFF, 'r'], [hwOutT, -G_OFF, 0, 'l'], [hwOutT, 0, G_OFF, 'd']
+    ] : [
+      [hwOutT, 0, G_OFF, 'r'], [hwOutT, 0, G_OFF, 'd'], [hwOutT, -G_OFF, 0, 'l'],
+      [-hwOutT, 0, -G_OFF, 'r'], [-hwOutT, -G_OFF, 0, 'l'], [-hwOutT, 0, -G_OFF, 'd']
+    ];
+    o += gaugeP('top:in', segCands(X(x0i), X(x0), 30, Y(d.yIn), UP_IN_T).concat(segCands(X(x0) + 10, X(xP2T) - 40, 30, Y(d.yIn), A_TIN)), 'PG1', C.in);
+    o += gaugeP('top:out', segCands(X(x1), X(x1o), 30, Y(d.yOut), UP_OUT_T).concat(segCands(X(xP2T) + 14, X(x1) - 10, 30, Y(d.yOut), A_TOUT)), 'PG2', C.out);
     o += txt(VW - 14, 18, '俯视 · 上=后 / 下=前', 11, C.txt3, 'end');
     return o;
   }
@@ -1181,19 +1540,21 @@
   function renderFrontB(c) {
     var d = der(c), mg = Math.max(260, c.od * 1.3);
     var LWB = lwRunB(c);   /* v82：朝后伸出长度（自动/手动由 lwRunB 决定） */
-    var hmin = -c.od / 2 - mg, hmax = (c.n - 1) * c.s + c.od / 2 + mg;
-    var M = mapElev(hmin, hmax, Math.min(-120, d.zWs - 160)   /* ★ v92：zmin 让位给可能下移的 ②（160mm < 180mm ⇒ 默认仍 -120、逐像素不变；极端参数下约 17px 余量够放 ② 圆与标注） */, Math.max(d.zTop + 320, d.zInTop + 100), 16, false);   /* v38：上界按 zInTop 兜底（H=600 时顶部说明贴 ① 管带） */   /* v32：zmax 220→320——虚拟顶加高使图形整体下移，顶部说明(y=18)与 ① 管线/标高脱开（原几乎叠着） */
+    var extF = Math.max(0, c.mainExt || 0);   /* ★ v102：①左/③右 各加长 extF ⇒ 视口同步外扩 */
+    var hmin = -c.od / 2 - mg - extF, hmax = (c.n - 1) * c.s + c.od / 2 + mg + extF;
+    var M = mapElev(hmin, hmax, Math.min(-120, d.zWs - 160)   /* ★ v92：zmin 让位给可能下移的 ②（160mm < 180mm ⇒ 默认仍 -120、逐像素不变；极端参数下约 17px 余量够放 ② 圆与标注） */, Math.max(d.zTop + 320, d.zInTop + 300), 16, false);   /* v38：上界按 zInTop 兜底（H=600 时顶部说明贴 ① 管带） */   /* v32：zmax 220→320——虚拟顶加高使图形整体下移，顶部说明(y=18)与 ① 管线/标高脱开（原几乎叠着） */
     var X = M.X, Y = M.Y, sc = M.sc;
     var h0 = -120, h1 = (c.n - 1) * c.s + 120;
+    var hE = Math.max(0, c.mainExt || 0), h0i = h0 - hE, h1o = h1 + hE;   /* ★ v102：① 左端=h0i、③ 右端=h1o（③ 左端、② 不动） */
     var o = DEFS;
 
     /* 地面线 */
     o += line(X(hmin), Y(0), X(hmax), Y(0), C.dim, 1.2);
     /* ★ v82（方式二）：贴地 ② 排污总管不再画（各机组朝后直排）。 */
     /* ③ 出水总管 +0.720（接驳支管与罐口同高，位于罐后不另画通长线） */
-    o += pipe(X(h0), Y(d.zPort), X(h1), Y(d.zPort), C.out, C.outL, c.dnOut, sc);
+    o += pipe(X(h0), Y(d.zPort), X(h1o), Y(d.zPort), C.out, C.outL, c.dnOut, sc);
     /* ①上 进水总管（虚线，位于罐体之后）——横向总管上不放活接图示（v18） */
-    o += line(X(h0), Y(d.zInTop), X(h1), Y(d.zInTop), C.in, Math.max(1.6, c.dnIn * sc * 0.5), '7 5');
+    o += line(X(h0i), Y(d.zInTop), X(h1), Y(d.zInTop), C.in, Math.max(1.6, c.dnIn * sc * 0.5), '7 5');
     /* ★ v84（方式二）：② 排污主管 —— 本视向（沿 y 看）它与 ③ 出水总管**同标高(zPort)、同 x 跨度**
        ⇒ 真实投影完全重合。按本项目「位于罐后的管画虚线」的既有约定（① 亦然），② 画红虚线压在
        ③ 之上；两条线重合正说明「②③ 同层」，不是画错。 */
@@ -1250,13 +1611,13 @@
       else if (m === 'backwash') { hasWF = true; }
       else if (m === 'dump') { hasVF = true; hasWF = true; }
     });
-    if (hasVF) o += flow(X(h0), Y(d.zInTop), X(h1), Y(d.zInTop), C.in);
+    if (hasVF) o += flow(X(h0i), Y(d.zInTop), X(h1), Y(d.zInTop), C.in);
     var v0oF = v0Open(c);
-    if (hasFF) o += flow(X(h0), Y(d.zPort), v0oF ? X(h1) : X(h1) + 14, Y(d.zPort), C.out); /* V0 关：③ 流停在阀前 */
+    if (hasFF) o += flow(X(h0), Y(d.zPort), v0oF ? X(h1o) : X(h1o) + 14, Y(d.zPort), C.out); /* V0 关：③ 流停在阀前 */
     /* 出水总阀 V0（v12：③ 右端外延短管上）：有组反冲时自动关闭（停水反冲） */
     var vw0F = Math.max(7, VALVE_W * sc), vh0F = Math.max(6, VALVE_W * sc * 0.62);
-    var v0xF = X(h1) + 14;
-    o += line(X(h1), Y(d.zPort), v0xF + vw0F, Y(d.zPort), C.outL, Math.max(2.4, c.dnOut * sc));
+    var v0xF = X(h1o) + 14;
+    o += line(X(h1o), Y(d.zPort), v0xF + vw0F, Y(d.zPort), C.outL, Math.max(2.4, c.dnOut * sc));
     o += v0Valve(v0xF, Y(d.zPort) - vh0F / 2, vw0F, vh0F, v0oF);
     o += txt(v0xF + vw0F / 2, Y(d.zPort) - vh0F / 2 - 4, 'V0', 10, C.valveS, 'middle');
     /* 管端堵头（v17）：① 末端与 ③ 上游端（与顶视/轴测同口径；① 前视为罐后虚线，堵头按虚线宽度收窄） */
@@ -1278,6 +1639,31 @@
     o += elevMark(X(hmin) + 36   /* v46：再左移 20px 对齐侧视 v40 脱开幅度 */, Y(d.zBot), '+' + mm(d.zBot));
     /* v82：贴地 ② 总管已取消 ⇒ 不再保留 +' + mm(d.zWs) + ' 这一层刻度 */
     o += elevMark(X(hmin) + 36   /* v46：再左移 20px 对齐侧视 v40 脱开幅度 */, Y(0), '±0.000');
+
+    /* ★ v99 压力表 → ★ v103（2026-09-22 用户批注）：**首选** = 朝上 + 挂**加长段**——
+       PG1 首选 ① 进水端加长段 [h0i, h0]（仍要求 ① 高出罐顶 120mm 才装，理由同前）；
+       PG2 首选 ③ 出水端加长段 [h1, h1o]。
+       ★ v103b 兜底 = v99 原全管长 × 多方向候选（A_FIN/A_FOUT），极端参数自动落回。 */
+    var hwInF = Math.max(1.6, c.dnIn * sc * 0.5) / 2, hwOutF = Math.max(3, c.dnOut * sc) / 2;
+    var UP_IN_F = [[-hwInF, 0, -G_OFF, 'u']];
+    var UP_OUT_F = [[-hwOutF, 0, -G_OFF, 'u']];
+    var A_FIN = [
+      [-hwInF, 0, -G_OFF, 'r'], [-hwInF, 0, -G_OFF, 'u'], [-hwInF, -G_OFF, 0, 'l'],
+      [-hwInF, G_OFF, 0, 'r'], [hwInF, 0, G_OFF, 'r'], [hwInF, 0, G_OFF, 'd'],
+      [-hwInF, 0, -G_OFF, 'l'], [hwInF, -G_OFF, 0, 'l']
+    ];
+    var A_FOUT = [
+      [hwOutF, 0, G_OFF, 'r'], [hwOutF, 0, G_OFF, 'd'], [hwOutF, -G_OFF, 0, 'l'],
+      [-hwOutF, 0, -G_OFF, 'r'], [-hwOutF, -G_OFF, 0, 'l'], [hwOutF, G_OFF, 0, 'r']
+    ];
+    if (d.zInTop >= d.zTop + 120)
+      o += gaugeP('front:in', segCands(X(h0i), X(h0), 34, Y(d.zInTop), UP_IN_F).concat(segCands(X(h0) + 10, X(h1) - 10, 34, Y(d.zInTop), A_FIN)), 'PG1', C.in);
+    /* ★ v111（2026-09-22 用户批注「PG2 应往右移到总管加长段内」）：h1=(n-1)s+120 可能落在
+       罐右缘 (n-1)s+od/2 之内（od=200 时 h1 比罐缘仅靠外 20mm），表盘视觉上压罐右肩。
+       首选改挂**罐缘之后**的净加长段，且从净段**中点**起铺（不再从段左缘起铺），段尾 h1o 兜底；
+       兜底 A_FOUT 不变。h1v=min(max(h1,罐缘),h1o)：ext 极小时段宽趋 0，与旧候选同点等价。 */
+    var h1v = Math.min(Math.max(h1, (c.n - 1) * c.s + c.od / 2), h1o);
+    o += gaugeP('front:out', segCands((X(h1v) + X(h1o)) / 2, X(h1o), 34, Y(d.zPort), UP_OUT_F).concat(segCands(X(h0) + 10, X(h1) - 10, 34, Y(d.zPort), A_FOUT)), 'PG2', C.out);
     /* 注释（v21）：移到地面线下方作脚注，不再横穿四只罐体 */
     /* ★ v92：这条 ② 脚注改钉在**地面线**上（Y(0) − 60×sc ≡ 原 Y(d.zWs)+… 在 zWs=60 下逐位相等，
        因 mapElev 的 Y 对 z 是斜率 −sc 的线性函数）⇒ 默认输出不变；方式一里参数把 ② 顶高/压低时
@@ -1294,7 +1680,7 @@
        否则这段管子画到 680×420 视口之外被裁掉（原 hmax = yIn + mg 只到 yIn+300）。 */
     var LWB = lwRunB(c);                            /* v82：水平段长 = 原立管段长（≈0.44 m），可在左栏调 */
     var hmin = d.yOut - mg, hmax = Math.max(d.yIn + mg, d.yIn + LWB + 120);
-    var M = mapElev(hmin, hmax, Math.min(-120, d.zWs - 160)   /* ★ v92：同前视（默认仍是 -120） */, Math.max(d.zTop + 220, d.zInTop + 50), 16, true, 22);   /* v38：上界按 zInTop 兜底（H=600 时 zTop+220 不够） */   /* v28：图形下移 22px——原上空 -4.4px（顶部被裁）/下空 40.5px，均衡后 17.6/18.5 */
+    var M = mapElev(hmin, hmax, Math.min(-120, d.zWs - 160)   /* ★ v92：同前视（默认仍是 -120） */, Math.max(d.zTop + 220, d.zInTop + 260), 16, true, 22);   /* v38：上界按 zInTop 兜底（H=600 时 zTop+220 不够） */   /* v28：图形下移 22px——原上空 -4.4px（顶部被裁）/下空 40.5px，均衡后 17.6/18.5 */
     var X = M.X, Y = M.Y, sc = M.sc;
     var m0 = modes(c)[0], bw = (m0 === 'backwash' || m0 === 'dump');
     var o = DEFS;
@@ -1423,9 +1809,17 @@
     o += '<circle cx="' + r2(X(d.yIn)) + '" cy="' + r2(Y(d.zInTop)) + '" r="' + r2(Math.max(4, c.dnIn / 2 * sc)) +
       '" fill="' + C.inF + '" stroke="' + C.in + '" stroke-width="1.4"/>';
 
-    /* 罐顶排气口 ⑥（侧视/左视为竖管，标出标高链顶端） */
+    /* 罐顶排气口 ⑥（侧视/左视为竖管，标出标高链顶端）
+       ★ v108：③ 出水标签在净宽不足时升到 PG2 走廊顶之上（见下方 v90/v108 注释），可能与本标注
+       同带（高压侧实测压 12.9×12.5）—— 相交则本标注上移 16px 让开（③ 布局参数须提前算）。 */
+    var rOut3 = Math.max(4, c.dnOut / 2 * sc), lxL3 = X(-c.od / 2) + 6, lxR3 = X(d.yOut) - rOut3 - 6;
+    var cx3 = Math.max(X(d.yOut), X(-c.od / 2) + 46), ty3 = Y(d.zPort) - rOut3 - 48;
+    var y6 = Y(d.zTop + 70) + 4;
+    if (lxR3 - lxL3 < 82 &&
+        cx3 + 40 > cxc + 6 && cx3 - 40 < cxc + 46 &&
+        ty3 + 3 > y6 - 8 && ty3 - 12 < y6 + 4) y6 -= 16;
     o += line(cxc, Y(d.zTop), cxc, Y(d.zTop + 70), C.tankS, 2.4);
-    o += txt(cxc + 6, Y(d.zTop + 70) + 4, '⑥ 排气', 10, C.txt3, 'start');
+    o += txt(cxc + 6, y6, '⑥ 排气', 10, C.txt3, 'start');
 
     o += elevMark(X(d.yIn) - 44   /* v37：标高列贴立管左侧跟随图形；v40：间距 24→44 与图形脱开（用户批注太近） */, Y(d.zTop), '+' + mm(d.zTop));
     o += elevMark(X(d.yIn) - 44   /* v37：标高列贴立管左侧跟随图形；v40：间距 24→44 与图形脱开（用户批注太近） */, Y(d.zInTop), '+' + mm(d.zInTop));
@@ -1446,14 +1840,23 @@
          · ③ 断面圆左缘 = X(yOut) − dnOut/2·sc   —— dnOut 越大越往左伸（od400+dnOut315 净宽仅 56px < 标签 76.1px）。
        故分两档（确定性，无测量歧义）：
          档 1 常规：居中于「罐前口 +6 ~ ③ 断面圆左缘 −6」之间、管轴上方 24px（默认净宽 118.8px ≫ 82px）；
-         档 2 空间不足（净宽 < 82px）：悬于 ③ 断面圆正上方；高度取 max(圆半径 + 10, 24) ——
-               小口径时半径被 max(4,·) 钳到 4px，只用 r+10 会贴到管带（od150/dnOut32 只剩 0.5px 净空）；
+         档 2 空间不足（净宽 < 82px）：x 仍居中于原位（max(X(yOut), X(-od/2)+46) —— 罐体/管带/
+               P1 文字均不压，v90 契约全绿原证），**y 升到 PG2 正上候选走廊顶之上**：
+               走廊顶 = Y−rOut3−41（挂点→短管 18→标号顶 23），基线取 Y−rOut3−48 留 4px ——
+               ★ v108：原 y=Y−max(rOut3+10,24) 时文字带正横穿走廊（ov 28×13.7），会把侧视 PG2
+               择优整条逼到朝左（2026-09-22 用户批注「压力表方向应朝上」）；走廊是垂直通道，
+               文字悬于其顶不算挡。右对齐方案（end 钉 X(yOut)−20）已试并否决 —— od400 系组
+               罐体投影右缘伸到圆心左 ~60px，左移文字压罐体/进水管带（v90 契约 17 项红）。
                Math.max 同时兜住「Δ < od/2」时罐体右缘比 ③ 断面圆更靠右的退化几何。
        契约：_p1/_verify_fs_outlet_label_v90.cjs（9 组参数 × 2 接法：净空 ≥2px、零交叠、零溢出）。 */
-    var rOut3 = Math.max(4, c.dnOut / 2 * sc), lxL3 = X(-c.od / 2) + 6, lxR3 = X(d.yOut) - rOut3 - 6;
+    /* ★ v108（2026-09-22 用户批注「压力表安装方向应朝上」）：③ 文字右缘必须让开 PG2 的**正上候选走廊**
+       （表盘 r10 + 标号「PG2」半宽 ~11 ⇒ 走廊半宽 13，取圆心左 15px 为界），否则侧视 PG2 择优被
+       这行字挡住、整条退路落到朝左（实测默认参数交叠 28×15.1 全横穿走廊，见 _p1/_v108_side_probe.cjs）。
+       主分支：中心 cap 到圆心左 56（=15+文字半宽 40+1，实测半宽 38.0；文字仍在 [lxL3,lxR3] 带内只左移）；
+       左移后与全图零交叠已由探针预检（movedHits=[]）。 */
     o += (lxR3 - lxL3 >= 82)
-      ? txt((lxL3 + lxR3) / 2, Y(d.zPort) - 24, '③ 出水 +' + mm(d.zPort), 11, C.out, 'middle')
-      : txt(Math.max(X(d.yOut), X(-c.od / 2) + 46), Y(d.zPort) - Math.max(rOut3 + 10, 24),
+      ? txt(Math.min((lxL3 + lxR3) / 2, X(d.yOut) - 56), Y(d.zPort) - 24, '③ 出水 +' + mm(d.zPort), 11, C.out, 'middle')
+      : txt(cx3, ty3,
         '③ 出水 +' + mm(d.zPort), 11, C.out, 'middle');
     /* v82：'② 排污总管' 文字随贴地总管一并取消 */
     /* v81：新增——旋转后排污口落在 +0.500（= 罐底标高），标注避开 P1 阀体。
@@ -1472,6 +1875,19 @@
        —— 回到 v82 的短文案；「与支管同层」在图上已由左右共线自明，并写在计算表/俯视行注里。 */
     o += txt(VW - 14, 46, '方式二 · 各组支管朝后（左）水平 ' + LWB + ' mm，汇入 ② 排污主管 +' + mm(zWB), 11, C.txt3, 'end');
     /* v82b：原放 y=32 会与「①上 进水 +1.520」重叠（实测 88×12px）—— 下移一行 */
+
+    /* ★ v99 压力表：侧视（沿机组轴线看）里 ①③ 是**断面圆**，表就挂在圆的外缘上 ——
+       ★ v103：PG1/PG2 一律朝上（方向一致），不挤进罐体/汇流节点那一堆管件里。
+       挂点必须是断面圆的**正上 / 正下**一点（挂点即"表接在管子哪一点"），故候选只变
+       短管方向与标号落位、挂点不动 —— 主闸门对侧视正好也只量这一点（20 个候选见 SIDE_*）。 */
+    var rrInS = Math.max(4, c.dnIn / 2 * sc), rrOutS = Math.max(4, c.dnOut / 2 * sc);
+    o += gaugeP('side:in', gaugeCands([[X(d.yIn), Y(d.zInTop) - rrInS]], SIDE_DIRS_IN, SIDE_LABS),
+      'PG1', C.in);
+    /* ★ v103b：首选正上（同 PG1，标号朝上）；斜上/左右为退路；全撞时退回断面圆正下（v99 原位） */
+    o += gaugeP('side:out', gaugeCands([[X(d.yOut), Y(d.zPort) - rrOutS]],
+      [[0, -G_OFF]], ['u'])
+      .concat(gaugeCands([[X(d.yOut), Y(d.zPort) - rrOutS]], SIDE_DIRS_OUT.slice(1), SIDE_LABS))
+      .concat([[X(d.yOut), Y(d.zPort) + rrOutS, 0, G_OFF, 'd']]), 'PG2', C.out);
     o += txt(VW - 14, 18, '侧视 · 左=后 / 右=前', 11, C.txt3, 'end');
     return o;
   }
@@ -1483,10 +1899,11 @@
     var u = function (x, y) { return 0.866 * (x + y); };
     var v = function (x, y, z) { return 0.5 * (x - y) - z; };
     var x0 = -220, x1 = (c.n - 1) * c.s + 220;
+    var xE = Math.max(0, c.mainExt || 0), x0i = x0 - xE, x1o = x1 + xE;   /* ★ v102：① 左端=x0i、③ 右端=x1o（③ 左端、② 不动）；标注锚点按 v89 契约不动 */
 
     var probe = [
-      [x0, d.yIn, d.zTop], [x1, d.yIn, d.zTop], [x0, d.yOut, 0], [x1, d.yOut, 0],
-      [x0, d.yIn, d.zTop + 90], [x1, 0, 0], [x0, d.yIn, d.zInTop],
+      [x0, d.yIn, d.zTop], [x1, d.yIn, d.zTop], [x0, d.yOut, 0], [x1o, d.yOut, 0],
+      [x0, d.yIn, d.zTop + 90], [x1, 0, 0], [x0i, d.yIn, d.zInTop],
       [x1, d.yIn + LWB, d.zPort],  /* v82/v83：朝后伸出的排污管末端（zPort 层）—— 不纳入包围盒就会被裁掉 */
       [x0, d.yIn + LWB, d.zPort]   /* v84：② 排污主管的左端（同一末端平面上的另一端） */
     ];
@@ -1508,7 +1925,7 @@
     var p1TagX = 0, p1TagY = 0;   /* G1「P1 常闭」引注坐标（③ rail 之后补画，避免被管带盖住） */
     /* ② 排污总管（最前 → 最后画）；先画 ① 与罐体，再 ③，最后 ② */
     /* ①上 进水总管（唯一进水总管，罐后高位） */
-    o += pipe(X(x0, d.yIn), Y(x0, d.yIn, d.zInTop), X(x1, d.yIn), Y(x1, d.yIn, d.zInTop), C.in, C.inL, c.dnIn, sc);
+    o += pipe(X(x0i, d.yIn), Y(x0i, d.yIn, d.zInTop), X(x1, d.yIn), Y(x1, d.yIn, d.zInTop), C.in, C.inL, c.dnIn, sc);
     /* ★ v84（方式二）：② 排污主管 —— 各组排污支管末端的横向总管（同 ③ 的汇流逻辑）。
        先画（处于底层），组循环里的支管与接口件再压上去。（方式一仍用贴地 ② 总管，不动。） */
     o += pipeTag(pipe(X(x0, d.yIn + LWB), Y(x0, d.yIn + LWB, d.zPort), X(x1, d.yIn + LWB), Y(x1, d.yIn + LWB, d.zPort),
@@ -1600,10 +2017,10 @@
       }
     }
 
-    o += pipe(X(x0, d.yOut), Y(x0, d.yOut, d.zPort), X(x1, d.yOut), Y(x1, d.yOut, d.zPort), C.out, C.outL, c.dnOut, sc);
+    o += pipe(X(x0, d.yOut), Y(x0, d.yOut, d.zPort), X(x1o, d.yOut), Y(x1o, d.yOut, d.zPort), C.out, C.outL, c.dnOut, sc);
     /* 出水总阀 V0（v12：③ 末端管内）：有组反冲时自动关闭（停水反冲） */
     var vw0A = Math.max(7, VALVE_W * sc), vh0A = Math.max(7, VALVE_W * sc * 0.8);
-    var v0u = ox + u(x1 - 40, d.yOut) * sc, v0v = oy + v(x1 - 40, d.yOut, d.zPort) * sc;
+    var v0u = ox + u(x1o - 40, d.yOut) * sc, v0v = oy + v(x1o - 40, d.yOut, d.zPort) * sc;
     o += v0Valve(v0u - vw0A / 2, v0v - vh0A / 2, vw0A, vh0A, v0Open(c));
     o += txt(p1TagX, p1TagY, 'P1 常闭', 9, C.valveS, 'start', 0, 'fs-tcode');   /* 后画于阀块右侧罐身留白处：不与罐描边线交叠 */
     /* 管端堵头（v17）：① 末端（右端死头）与 ③ 上游端（左端死头）——等轴测斜向短板，垂直于管轴；
@@ -1622,6 +2039,40 @@
         与方式一轴测的 '② 排污总管' 同风格（v48 用户批注：括号说明删除）；
         口径/标高已在俯视行注与计算表里，此处再堆括号会把标号拉长去压邻近支管。 */
     o += txt(14, 18, '轴测 · 方式二：各组排污支管朝后水平 ' + LWB + ' mm 汇入 ② 排污主管 · G1=V1/P1…G4=V4/P4 · 支管平接罐后口（与③同高）', 11, C.txt3, 'start');
+
+    /* ★ v99 压力表：轴测里挂点只取**远离罐体的空角** —— PG1 靠 ① 左端（上游）、
+       PG2 落在 ③ 那一带的空档；短管一律朝屏幕正上/正下，与其余三视图同观感。
+       最后画 ⇒ 永远压在管带/罐体之上，不会被遮。
+       挂点沿 ①③ 管轴按定比铺候选（轴测里沿轴走 = 屏幕朝 (0.866, 0.5) 走，
+       离轴距离恒定 ⇒ 择优选位不会把表带离管子）；具体落在哪由 pickGauges() 现选。 */
+    var hwInA = Math.max(3, c.dnIn * sc) / 2, hwOutA = Math.max(3, c.dnOut * sc) / 2;
+    /* ★ v103：**首选**挂**加长段**（PG1 [x0i, x0]、PG2 [x1, x1o]）方向朝上（PG2 原为正下）；
+       ★ v103b 兜底 = v99 原全管长候选（fb1A/fb2A；v105b 由 g1F/g2F 改名，避免与旧静态挂点 mustNot 契约撞名），极端参数下加长段没干净空档时自动落回。 */
+    var g1A = [0.30, 0.50, 0.70].map(function (f) { return x0i + (x0 - x0i) * f; });
+    var g2A = [0.30, 0.50, 0.70].map(function (f) { return x1 + (x1o - x1) * f; });
+    var fb1A = [0.02, 0.14, 0.28, 0.44, 0.62].map(function (f) { return x0 + (x1 - x0) * f; });
+    var fb2A = [0.50, 0.34, 0.66, 0.20, 0.80].map(function (f) { return x0 + (x1 - x0) * f; });
+    /* ★ v108：首选候选扩容 —— 3 挂点 × 标号(u/r/l) = 9 个正上候选 + 加长段斜上 6 个（标号 r/l），
+       高位罐/粗管等参数下加长段正上被罐体斜投影/文字擦碰时有变体可绕，尽量避免落到朝下兜底
+       （2026-09-22 用户批注「压力表方向应朝上」；契约 _p1/_verify_fs_gauge_dir_v108.cjs）。 */
+    o += gaugeP('axo:in', gaugeCands(
+      g1A.map(function (t) { return [X(t, d.yIn), Y(t, d.yIn, d.zInTop) - hwInA]; }),
+      [[0, -G_OFF]], ['u', 'r', 'l'])
+      .concat(gaugeCands(
+      g1A.map(function (t) { return [X(t, d.yIn), Y(t, d.yIn, d.zInTop) - hwInA]; }),
+      [[-G_OFF * 0.71, -G_OFF * 0.71]], ['r', 'l']))
+      .concat(gaugeCands(
+      fb1A.map(function (t) { return [X(t, d.yIn), Y(t, d.yIn, d.zInTop) - hwInA]; }),
+      [[0, -G_OFF], [-G_OFF, 0], [G_OFF, 0]], ['r', 'u', 'l'])), 'PG1', C.in);
+    o += gaugeP('axo:out', gaugeCands(
+      g2A.map(function (t) { return [X(t, d.yOut), Y(t, d.yOut, d.zPort) - hwOutA]; }),
+      [[0, -G_OFF]], ['u', 'r', 'l'])
+      .concat(gaugeCands(
+      g2A.map(function (t) { return [X(t, d.yOut), Y(t, d.yOut, d.zPort) - hwOutA]; }),
+      [[-G_OFF * 0.71, -G_OFF * 0.71]], ['r', 'l']))
+      .concat(gaugeCands(
+      fb2A.map(function (t) { return [X(t, d.yOut), Y(t, d.yOut, d.zPort) + hwOutA]; }),
+      [[0, G_OFF], [-G_OFF * 0.71, G_OFF * 0.71], [G_OFF, 0]], ['r', 'd', 'l'])), 'PG2', C.out);
     return o;
   }
 
@@ -1745,6 +2196,8 @@
       '<span><i class="fs-lg-square" style="background:' + C.valve + ';border:1px solid ' + C.valveS + '"></i>阀开（V 进水 · P 排污，图上可点击）</span>' +
       '<span><i class="fs-lg-square" style="background:#fff;border:1px solid ' + C.fitS + '"></i>阀关</span>' +
       '<span><i class="fs-lg fs-lg-dash"></i>水流方向（动画虚线）</span>' +
+      /* ★ v99：压力表图例（四视图统一：PG1 挂 ① 进水、PG2 挂 ③ 出水） */
+      '<span><i class="fs-lg fs-lg-gauge"></i>压力表（PG1 ① 进水 / PG2 ③ 出水，两表之差 = 过滤损失 ΔP）</span>' +
       '<span><i class="fs-lg-square" style="background:' + C.wsF + ';border:1px solid ' + C.ws + '"></i>反冲 / 直排中的组</span>' +
       '</div></div>';
     h += '</section>';
@@ -1764,15 +2217,20 @@
   function render() {
     if (!rootEl || !cfg) return;
     if (cfg.bw >= cfg.n) cfg.bw = -1;
+    /* ★ v99 压力表：候选由 gaugeP 收集进 G_PEND（不写进视图字符串），写完视图内容后
+       由 stageGauges 分批注入并当场择优 —— 见 gaugeP / stageGauges 上的实测说明。 */
+    G_PEND = [];
     var R = (mode === 'b') ? RENDER_B : RENDER_A;
     var v = {
       top: R.top(cfg), front: R.front(cfg),
       side: R.side(cfg), axo: R.axo(cfg)
     };
+    var gEls = [];
     Object.keys(SVG_IDS).forEach(function (k) {
       var el = rootEl.querySelector('#' + SVG_IDS[k]);
-      if (el) el.innerHTML = v[k];
+      if (el) { el.innerHTML = v[k]; gEls.push(el); }
     });
+    try { stageGauges(gEls, G_PEND); } catch (e) {}
     var box = rootEl.querySelector('#fsCalc');
     if (box) {
       box.innerHTML = ((mode === 'b') ? calcRowsB(cfg) : calcRows(cfg)).map(function (r) {
