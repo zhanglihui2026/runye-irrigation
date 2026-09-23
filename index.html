@@ -8941,11 +8941,12 @@ function tlUpdatePlanBar() {
   }
   if(el=document.getElementById('tlPlanPumpFlow')) el.textContent=fmt(r.combinedFlow,1)+' m³/h';
   /* v107：设计列 = 理论选管（无覆盖）计算；未改径时 rDes===r，显示与旧版一致 */
-  /* v119（2026-09-23 用户反馈「水泵扬程还是不能更新」）：改径重算后主数字必须跟着变 ——
-     主数字 = 当前实际（图面管径重算）值；设计值挪到右侧小字并加「设计」前缀
-     （v107 的「主=设计 / 小字=实际」拆分主次颠倒，主数字永远不变 = 用户读作扬程不更新）。 */
-  if(el=document.getElementById('tlPlanPumpHead')){ el.textContent=fmt0(ovApplied?r.pumpHead:rDes.pumpHead)+' m'; el.title=ovApplied?'按图面改径重算的值；右侧小字为设计管径下的值':''; }
-  if(el=document.getElementById('tlPlanPumpPower')){ el.textContent=fmt0(ovApplied?r.motorKW_rounded:rDes.motorKW_rounded)+' kW'; el.title=ovApplied?'按图面改径重算的值；右侧小字为设计管径下的值':''; }
+  /* v139（2026-09-23 用户反馈「应用到图面后改径重算列没更新」）：水泵两行回到与管径行同款列语义——
+     主列（设计值）= 理论选管计算值；橙列（改径重算）= 应用管径重算值（见下方 tlRealSet 调用）。
+     v119 的「主=实际 / 橙=设计」与列头错位，用户读作「改径重算列没更新」；改径后的值
+     在橙列与下方黑条（水泵扬程 36.5 m）直接可见。 */
+  if(el=document.getElementById('tlPlanPumpHead')) el.textContent=fmt(rDes.pumpHead,1)+' m';
+  if(el=document.getElementById('tlPlanPumpPower')) el.textContent=fmt(rDes.motorKW_rounded,1)+' kW';
   if(el=document.getElementById('tlPlanFrontPipe')) el.textContent='Ø '+rDes.frontPipe.od+' mm';
   if(el=document.getElementById('tlPlanFrontVelocity')) el.textContent=fmt(rDes.frontPipe.v,2)+' m/s';
   if(el=document.getElementById('tlPlanMainPipe')) el.textContent='Ø '+rDes.mainPipe.od+' mm';
@@ -8959,14 +8960,9 @@ function tlUpdatePlanBar() {
     if (!ovApplied || typeof v !== 'number' || !isFinite(v)) { e2.textContent = '—'; e2.style.color = '#cbd5e1'; return; }
     e2.textContent = fmt(v, dec) + ' ' + unit; e2.style.color = '';
   }
-  /* v119：扬程/功率的小字槽位改放「设计值」（主数字已是实际值） */
-  function tlDesignSet(id, v, unit, dec) {
-    var e2 = document.getElementById(id); if (!e2) return;
-    if (!ovApplied || typeof v !== 'number' || !isFinite(v)) { e2.textContent = '—'; e2.style.color = '#cbd5e1'; return; }
-    e2.textContent = '设计 ' + fmt(v, dec) + ' ' + unit; e2.style.color = '#94a3b8';
-  }
-  tlDesignSet('tlPlanPumpHeadReal', rDes.pumpHead, 'm', 1);
-  tlDesignSet('tlPlanPumpPowerReal', rDes.motorKW_rounded, 'kW', 1);
+  /* v139：扬程/功率橙列（改径重算）= 应用管径重算后的值（与流速行同款 tlRealSet；未应用显示 —） */
+  tlRealSet('tlPlanPumpHeadReal', r.pumpHead, 'm', 1);
+  tlRealSet('tlPlanPumpPowerReal', r.motorKW_rounded, 'kW', 1);
   /* v109（2026-09-22 用户要求）：管径前后对比 —— 改径重算后实际参与计算的管径
      （computeThreeLevel 按覆盖管径算出的 r.*Pipe.od），与设计管径不同时显示「315 → 280 mm」，
      未改径或改径后没变显示 —（浅灰）。 */
@@ -10365,9 +10361,12 @@ function tlInitHeaderDrag(){
 /* embed=1 → 供 iframe 内嵌用（图纸按容器等比缩放、整幅可见）；不传 → 独立页面原样 */
 function tlBuildSysUrl(embed) {
   function txt(id) { var el = document.getElementById(id); return el ? el.textContent.trim() : ''; }
-  var q = txt('tlPlanPumpFlow'), h = txt('tlPlanPumpHead'), p = txt('tlPlanPumpPower');
-  var front = (txt('tlPlanFrontPipe').match(/(\d+)/) || [])[1] || '';
-  var main = (txt('tlPlanMainPipe').match(/(\d+)/) || [])[1] || '';
+  /* v139：系统图取「应用到图面」后的当前值（tlFigParamLines 同源：水泵参数 1 位小数 +
+     图面实际管径），不再读结果栏主数字文本（v139 起主列=设计值口径） */
+  var fpSys = window.tlFigParamLines ? window.tlFigParamLines(computeThreeLevel()) : null;
+  var q = fpSys ? fpSys.pump.flow : txt('tlPlanPumpFlow'), h = fpSys ? fpSys.pump.head : txt('tlPlanPumpHead'), p = fpSys ? fpSys.pump.power : txt('tlPlanPumpPower');
+  var front = fpSys ? String(fpSys.ods.front) : ((txt('tlPlanFrontPipe').match(/(\d+)/) || [])[1] || '');
+  var main = fpSys ? String(fpSys.ods.main) : ((txt('tlPlanMainPipe').match(/(\d+)/) || [])[1] || '');
   var zc = tlGetZoneCount();
   var base = encodeURI('三级系统图.html');
   return base + '?q=' + encodeURIComponent(q) +
@@ -14958,8 +14957,10 @@ function hmSyncFromRunye() {
 function hmSyncFromThreeLevel() {
   function txt(id) { var el = document.getElementById(id); return el ? el.textContent.trim() : ''; }
   function dnOf(v) { return (v.match(/(\d+)/) || [])[1]; }
-  var flow = txt('tlPlanPumpFlow'), head = txt('tlPlanPumpHead'), power = txt('tlPlanPumpPower');
-  var frontDN = dnOf(txt('tlPlanFrontPipe')), mainDN = dnOf(txt('tlPlanMainPipe'));
+  /* v139：与系统图同款——取「应用到图面」后的当前值（tlFigParamLines 同源），不读结果栏主数字文本 */
+  var fpHm = window.tlFigParamLines ? window.tlFigParamLines(computeThreeLevel()) : null;
+  var flow = fpHm ? fpHm.pump.flow : txt('tlPlanPumpFlow'), head = fpHm ? fpHm.pump.head : txt('tlPlanPumpHead'), power = fpHm ? fpHm.pump.power : txt('tlPlanPumpPower');
+  var frontDN = fpHm ? String(fpHm.ods.front) : dnOf(txt('tlPlanFrontPipe')), mainDN = fpHm ? String(fpHm.ods.main) : dnOf(txt('tlPlanMainPipe'));
   /* v109b：文本自带单位（未计算时为「— m³/h」），有值判定改为不含占位符「—」 */
   var hasCalc = flow && flow.indexOf('—') < 0;
 
