@@ -4008,7 +4008,7 @@ body.ry-tool #tlPipePlanSection[data-ry-view="iso"][data-ry-clean="1"] > .pp-bod
 .tl-iso-info{display:flex;flex-direction:column;gap:4px}
 /* —— 轴测图右侧分区统计栏（2026-09-13）：画布｜拖拽条｜统计 三列 —— */
 #tlPipePlanSection .ry-pane-iso{
-  display:grid;grid-template-columns:minmax(0,1fr) 6px var(--tlStatsW,clamp(200px,17vw,256px));
+  display:grid;grid-template-columns:minmax(0,1fr);
   grid-template-rows:minmax(0,1fr);column-gap:8px;
   min-height:460px;margin:0;min-width:0;
 }
@@ -5300,7 +5300,7 @@ body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="iso"][data-r
   grid-template-columns:var(--pp-side-w,clamp(272px,20vw,318px)) 10px minmax(0,1fr);
 }
 #ryCadSide [data-pp="tlPipePlanSection"] .ry-pane-iso{
-  display:grid;grid-template-columns:minmax(0,1fr) clamp(200px,17vw,256px);
+  display:grid;grid-template-columns:minmax(0,1fr);
   grid-template-rows:minmax(0,1fr);column-gap:8px;
   min-height:460px;margin:0;min-width:0;
 }
@@ -6170,13 +6170,8 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
       <div class="te-foot"><div class="te-sum" id="teSum">—</div><button class="te-apply" id="tlEconApply" title="把选中组合应用到整个地块（同类管道统一改径），水泵扬程/功率随之重算">✓ 应用到图面</button></div>
     </div>
   </div><!-- /.pp-diagram-wrap -->
-  <!-- 统计栏宽度拖拽条（2026-09-15 用户要求）：拖动调节右列宽度；没拖过不写任何变量 -->
-  <div id="tlWsStatsGrip" title="拖动调节统计栏宽度（双击恢复默认）"></div>
-  <!-- 分区材料统计栏（2026-09-13）：随轴测图渲染自动汇总（computeStats 只读），右侧竖排 -->
-  <aside class="tl-iso-stats tl-iso-card" id="tlIsoStats">
-    <div class="tl-iso-card-title" id="tlIsoStatsToggle" title="点击折叠 / 展开分区材料统计"><span id="tlIsoStatsArrow">▸</span> 分区材料统计</div>
-    <div id="tlIsoStatsBody"><div class="tl-iso-note">生成轴测图后自动统计各分区面积、阀门 / 三通 / 弯头数量与管道长度，并汇总合计。</div></div>
-  </aside>
+  <!-- v122（2026-09-23 用户要求）：轴测图右侧「分区材料统计」栏整体取消（拖拽条一并删除）。
+       渲染/折叠/拖宽函数保留但全部空值守卫（getElementById 落空即 return），历史探针作废。 -->
   </div><!-- /.ry-pane-iso -->
   <!-- 三级设计工作区（2026-09-13）：可缩放/平移 + 手工插入管线层
        （tl-workspace 模块，只读 window.tlDiagramData；手工层不写回平面数据） -->
@@ -17772,7 +17767,16 @@ function tlIsoStatsReset() {
     try{
       if(!inVp()) return;
       var side=$('ryCadSide');
-      if(side&&side.getAttribute('data-ry-open')==='0'){
+      var sIso=(spec||'')==='tlPipePlanSection:iso';
+      /* v122（2026-09-23 用户要求）：点轴测图 → 左侧工具栏自动折叠（图面与经济对比面板需要宽度）。
+         与原「自动展开」同一口径：仅在切到轴测那一次触发，用户随后手动展开/收起不被反复顶动
+         （再切视口才按新目标重新联动）。 */
+      if(side&&sIso&&side.getAttribute('data-ry-open')!=='0'){
+        side.setAttribute('data-ry-open','0');
+        try{ localStorage.setItem('ryCadOpen','0'); }catch(err){}
+        applyWidth(); refit();
+      }
+      if(side&&!sIso&&side.getAttribute('data-ry-open')==='0'){
         side.setAttribute('data-ry-open','1');
         try{ localStorage.setItem('ryCadOpen','1'); }catch(err){}
         applyWidth(); refit();
