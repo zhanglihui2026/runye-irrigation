@@ -5910,16 +5910,17 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
          元素 id 与 JS 引用（ppRotateZones/ppPlotAngle/ppRepartition/mirror）一律不动。 -->
     <span class="pp-sep"></span>
     <button class="pp-btn-ghost" id="ppRotateZones">↻ 分区旋转90°</button>
-    <label class="pp-angle-control" title="仅旋转地块外轮廓，分区切割保持不旋转">
-      <span>地块角度</span>
-      <input id="ppPlotAngle" type="number" value="0" min="-180" max="180" step="1">
-      <span>°</span>
-    </label>
+    <!-- v130（2026-09-23 用户要求）：地块镜像移到地块角度上方（两块整体对调，控件与逻辑不动） -->
     <label class="pp-angle-control" title="以地块包围盒中心为轴镜像翻转整张图（含管线、水源、阀门），可任意切换不累积">
       <span>地块镜像</span>
       <button type="button" class="pp-btn-ghost pp-mirror-btn active" data-mirror="none">无</button>
       <button type="button" class="pp-btn-ghost pp-mirror-btn" data-mirror="h">水平</button>
       <button type="button" class="pp-btn-ghost pp-mirror-btn" data-mirror="v">垂直</button>
+    </label>
+    <label class="pp-angle-control" title="仅旋转地块外轮廓，分区切割保持不旋转">
+      <span>地块角度</span>
+      <input id="ppPlotAngle" type="number" value="0" min="-180" max="180" step="1">
+      <span>°</span>
     </label>
     <button class="pp-btn-ghost" id="ppRepartition" title="将当前旋转后的地块作为新基准重新切割分区">重新分区</button>
   </div>
