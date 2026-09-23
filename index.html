@@ -6145,7 +6145,10 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     <div id="tlEconPanel" style="display:none">
       <style>
         #tlIsoDiagramWrap{position:relative}
-        #tlEconPanel{position:absolute;top:46px;right:0;bottom:0;width:clamp(400px,36vw,560px);overflow:hidden;display:flex;flex-direction:column;background:#fff;border:1px solid #c5d6cc;border-right:0;border-radius:0;box-shadow:none;z-index:40;font-size:12px;color:#1f2937;padding:10px 12px}
+        /* v126：宽度可拖 —— var(--tlEconW) 挂在 #tlIsoDiagramWrap 上，没拖过走 clamp 回退值；拖拽条 #tlEconGrip 同读该变量贴在面板左缘 */
+        #tlEconPanel{position:absolute;top:46px;right:0;bottom:0;width:var(--tlEconW,clamp(400px,36vw,560px));overflow:hidden;display:flex;flex-direction:column;background:#fff;border:1px solid #c5d6cc;border-right:0;border-radius:0;box-shadow:none;z-index:40;font-size:12px;color:#1f2937;padding:10px 12px}
+        #tlEconGrip{position:absolute;top:46px;bottom:0;right:calc(var(--tlEconW,clamp(400px,36vw,560px)) - 3px);width:7px;cursor:col-resize;z-index:41;display:none;background:transparent;border-radius:3px}
+        #tlEconGrip:hover,#tlEconGrip.on{background:rgba(45,96,75,.28)}
         /* v124：头部（标题/管长/下拉/假设）锁定不动，只有中部表格区滚动；取消悬浮卡片，贴合右缘 */
         #tlEconPanel .te-mid{flex:1 1 auto;min-height:0;overflow:auto;scrollbar-width:thin;scrollbar-color:#bfd3c6 transparent;padding-right:2px}
         #tlEconPanel .te-mid::-webkit-scrollbar{width:4px;height:4px}
@@ -6188,6 +6191,9 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
       </div>
       <div class="te-foot"><div class="te-sum" id="teSum">—</div><button class="te-apply" id="tlEconApply" title="把选中组合应用到整个地块（同类管道统一改径），水泵扬程/功率随之重算">✓ 应用到图面</button></div>
     </div>
+    <!-- v126（2026-09-23 用户要求）：面板宽度拖拽条（贴面板左缘，随面板显隐；约定同工具轨拖拽条：
+         没拖过不写任何变量走 CSS 回退宽，拖过即持久化 localStorage，双击恢复默认） -->
+    <div id="tlEconGrip" title="拖拽调整面板宽度（双击恢复默认）"></div>
   </div><!-- /.pp-diagram-wrap -->
   <!-- v122（2026-09-23 用户要求）：轴测图右侧「分区材料统计」栏整体取消（拖拽条一并删除）。
        渲染/折叠/拖宽函数保留但全部空值守卫（getElementById 落空即 return），历史探针作废。 -->
@@ -16970,8 +16976,8 @@ function tlIsoStatsReset() {
       try { if (window.tlPumpUpdateRun) window.tlPumpUpdateRun(); } catch (e) { }
       return n > 0;
     }
-    function openP() { st.open = true; var p = document.getElementById('tlEconPanel'); if (p) p.style.display = ''; render(); }
-    function closeP() { st.open = false; var p = document.getElementById('tlEconPanel'); if (p) p.style.display = 'none'; }
+    function openP() { st.open = true; var p = document.getElementById('tlEconPanel'); if (p) p.style.display = ''; var g = document.getElementById('tlEconGrip'); if (g) g.style.display = 'block'; render(); }
+    function closeP() { st.open = false; var p = document.getElementById('tlEconPanel'); if (p) p.style.display = 'none'; var g = document.getElementById('tlEconGrip'); if (g) g.style.display = 'none'; }
     function toggleP() { st.open ? closeP() : openP(); }
     (function bind() {
       var btn = document.getElementById('tlEconBtn');
@@ -17013,6 +17019,43 @@ function tlIsoStatsReset() {
       });
     })();
     return { open: openP, close: closeP, toggle: toggleP, render: render, build: build, applySel: applySel };
+  })();
+  /* v126（2026-09-23 用户要求）：经济对比面板宽度可拖 —— 镜像 #tlWsSegStatsGrip（第四十四轮）的约定：
+     没拖过不写任何变量（走 CSS 回退宽 clamp(400px,36vw,560px)），拖过即持久化 localStorage
+     'runye_tlEconPanel_w'，双击恢复默认。宽度范围 [360, min(820, 画布宽-280)] —— 至少给轴测图留 280px。 */
+  (function bindEconGrip(){
+    var grip=document.getElementById('tlEconGrip'),wrap=document.getElementById('tlIsoDiagramWrap');
+    if(!grip||!wrap)return;
+    var KEY='runye_tlEconPanel_w';
+    try{var w0=parseInt(localStorage.getItem(KEY),10)||0;if(w0>0)wrap.style.setProperty('--tlEconW',w0+'px');}catch(e){}
+    var drag=null;
+    grip.addEventListener('pointerdown',function(e){
+      var pr=wrap.getBoundingClientRect();
+      var maxW=Math.min(820,pr.width-280);
+      if(maxW<360)return;
+      drag={pr:pr,maxW:maxW};
+      grip.classList.add('on');
+      document.body.style.userSelect='none';
+      if(grip.setPointerCapture){try{grip.setPointerCapture(e.pointerId);}catch(err){}}
+      e.preventDefault();
+    });
+    grip.addEventListener('pointermove',function(e){
+      if(!drag)return;
+      var w=Math.round(Math.max(360,Math.min(drag.maxW,drag.pr.right-e.clientX)));
+      wrap.style.setProperty('--tlEconW',w+'px');
+      drag.w=w;
+    });
+    function endDrag(){drag=null;grip.classList.remove('on');document.body.style.userSelect='';}
+    grip.addEventListener('pointerup',function(){
+      var w=null;if(drag)w=drag.w;
+      endDrag();
+      if(w){try{localStorage.setItem(KEY,String(w));}catch(e){}}
+    });
+    grip.addEventListener('pointercancel',endDrag);
+    grip.addEventListener('dblclick',function(){
+      wrap.style.removeProperty('--tlEconW');
+      try{localStorage.removeItem(KEY);}catch(e){}
+    });
   })();
   /* v105（2026-09-22 用户要求）：「管段管径与损失」统计表目前没啥用 → 总开关隐藏。
      后续要调回这张表时：把 TL_WS_STATS_HIDDEN 改回 false 即可，其余逻辑一律不动。 */
