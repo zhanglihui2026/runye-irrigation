@@ -6149,6 +6149,11 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
         #tlEconPanel{position:absolute;top:46px;right:0;bottom:0;width:var(--tlEconW,clamp(400px,36vw,560px));overflow:hidden;display:flex;flex-direction:column;background:#fff;border:1px solid #c5d6cc;border-right:0;border-radius:0;box-shadow:none;z-index:40;font-size:12px;color:#1f2937;padding:10px 12px}
         #tlEconGrip{position:absolute;top:46px;bottom:0;right:calc(var(--tlEconW,clamp(400px,36vw,560px)) - 3px);width:7px;cursor:col-resize;z-index:41;display:none;background:transparent;border-radius:3px}
         #tlEconGrip:hover,#tlEconGrip.on{background:rgba(45,96,75,.28)}
+        /* v127：面板收起后的右侧折叠细条（与左侧「⚙ 工具栏」收起条同一交互语言：点条展开） */
+        #tlEconRail{position:absolute;top:46px;bottom:0;right:0;width:30px;display:none;align-items:center;justify-content:flex-start;padding-top:14px;background:#f4f9f5;border:1px solid #c5d6cc;border-right:0;border-radius:0;cursor:pointer;z-index:39;font-size:12.5px;font-weight:700;color:#2d604b;writing-mode:vertical-rl;letter-spacing:4px;user-select:none}
+        #tlEconRail:hover{background:#e6f2ea}
+        /* v127：面板展开时顶部工具栏让位（按钮组左移到面板左缘以内；--tlEconW 实时跟随拖宽） */
+        #tlIsoToolbar.te-padded{padding-right:var(--tlEconW,clamp(400px,36vw,560px))}
         /* v124：头部（标题/管长/下拉/假设）锁定不动，只有中部表格区滚动；取消悬浮卡片，贴合右缘 */
         #tlEconPanel .te-mid{flex:1 1 auto;min-height:0;overflow:auto;scrollbar-width:thin;scrollbar-color:#bfd3c6 transparent;padding-right:2px}
         #tlEconPanel .te-mid::-webkit-scrollbar{width:4px;height:4px}
@@ -6194,6 +6199,8 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     <!-- v126（2026-09-23 用户要求）：面板宽度拖拽条（贴面板左缘，随面板显隐；约定同工具轨拖拽条：
          没拖过不写任何变量走 CSS 回退宽，拖过即持久化 localStorage，双击恢复默认） -->
     <div id="tlEconGrip" title="拖拽调整面板宽度（双击恢复默认）"></div>
+    <!-- v127：面板收起后的右侧折叠细条 —— 点它重新展开面板（与左侧工具栏收起条同款交互） -->
+    <div id="tlEconRail" title="点开管径经济对比">💰 经济对比</div>
   </div><!-- /.pp-diagram-wrap -->
   <!-- v122（2026-09-23 用户要求）：轴测图右侧「分区材料统计」栏整体取消（拖拽条一并删除）。
        渲染/折叠/拖宽函数保留但全部空值守卫（getElementById 落空即 return），历史探针作废。 -->
@@ -10454,6 +10461,9 @@ function rySetTab(sectionId, view) {
         if (isoBar) isoBar.style.display = 'none';
         if (typeof tlIsoStatsReset === 'function') tlIsoStatsReset();
       }
+      /* v127（2026-09-23 用户要求）：切入轴测图 → 管径经济对比面板默认展开（无图也展开，显示占位说明）；
+         收起走右侧折叠细条，按钮组让位见 openP/closeP 的 te-padded。 */
+      if (window.tlEconPanel && typeof window.tlEconPanel.open === 'function') window.tlEconPanel.open();
     }
   }
   /* 三级管路切到「三级设计」工作区：tl-workspace 模块按平面图几何渲染
@@ -16976,8 +16986,23 @@ function tlIsoStatsReset() {
       try { if (window.tlPumpUpdateRun) window.tlPumpUpdateRun(); } catch (e) { }
       return n > 0;
     }
-    function openP() { st.open = true; var p = document.getElementById('tlEconPanel'); if (p) p.style.display = ''; var g = document.getElementById('tlEconGrip'); if (g) g.style.display = 'block'; render(); }
-    function closeP() { st.open = false; var p = document.getElementById('tlEconPanel'); if (p) p.style.display = 'none'; var g = document.getElementById('tlEconGrip'); if (g) g.style.display = 'none'; }
+    /* v127：展开 = 面板 + 宽度拖拽条显示、右侧折叠细条隐藏、顶部工具栏按钮组左移（padding-right=面板宽）；
+       收起 = 面板与拖拽条隐藏、右侧折叠细条出现（同左侧工具栏的收起条）、工具栏让位取消。 */
+    function openP() {
+      st.open = true;
+      var p = document.getElementById('tlEconPanel'); if (p) p.style.display = '';
+      var g = document.getElementById('tlEconGrip'); if (g) g.style.display = 'block';
+      var r = document.getElementById('tlEconRail'); if (r) r.style.display = 'none';
+      var tb = document.getElementById('tlIsoToolbar'); if (tb) tb.classList.add('te-padded');
+      render();
+    }
+    function closeP() {
+      st.open = false;
+      var p = document.getElementById('tlEconPanel'); if (p) p.style.display = 'none';
+      var g = document.getElementById('tlEconGrip'); if (g) g.style.display = 'none';
+      var r = document.getElementById('tlEconRail'); if (r) r.style.display = 'flex';
+      var tb = document.getElementById('tlIsoToolbar'); if (tb) tb.classList.remove('te-padded');
+    }
     function toggleP() { st.open ? closeP() : openP(); }
     (function bind() {
       var btn = document.getElementById('tlEconBtn');
@@ -17056,6 +17081,9 @@ function tlIsoStatsReset() {
       wrap.style.removeProperty('--tlEconW');
       try{localStorage.removeItem(KEY);}catch(e){}
     });
+    /* v127：右侧折叠细条点击 → 重新展开面板 */
+    var rail=document.getElementById('tlEconRail');
+    if(rail)rail.addEventListener('click',function(){ if(window.tlEconPanel&&window.tlEconPanel.open)window.tlEconPanel.open(); });
   })();
   /* v105（2026-09-22 用户要求）：「管段管径与损失」统计表目前没啥用 → 总开关隐藏。
      后续要调回这张表时：把 TL_WS_STATS_HIDDEN 改回 false 即可，其余逻辑一律不动。 */
