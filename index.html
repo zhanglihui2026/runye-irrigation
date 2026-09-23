@@ -7656,7 +7656,10 @@ function render() {
   const zoneValveN = tlMains > 0 ? tlMains : r.N;
   const zoneValveSpec = useTl ? ('\u00d8 ' + specMainOd + ' \u00d7 \u00d8 ' + specBranchOd + ' mm') : ('\u00d8 ' + materialPipeSpecs.mainPipeOD + ' mm');
   const teeSpec = useTl ? ('\u00d8 ' + specFrontOd + ' \u00d7 \u00d8 ' + specMainOd + ' mm') : '\u2014';
-  const teeN = tlMains > 0 ? tlMains : 0;
+  /* v143（用户纠偏）：三通=总管×主管、每根物理主管 1 个（图上 2 根主管=2 套，不是 20）；
+     总管接入阀同行同数量（阀门接在主管上）。分区阀仍按分区数（tlMains）不变。 */
+  const mainLineN = (useTl && typeof window.tlMainLineCount === 'function') ? window.tlMainLineCount(window.tlDiagramData.mainPipes) : 0;
+  const teeN = mainLineN;
   const matTotalMu = window.measuredArea ? window.measuredArea / 666.67 : (r.totalMu || (r.zoneMu * r.N) || 0);
   // 滴灌带：总面积(m²) ÷ 滴灌带间距(m)；面积优先施工简图实测面积、回退设计面积；间距优先施工简图输入、回退设计参数
   const ppTapeSpEl = document.getElementById('planTapeSpacing');
@@ -9667,21 +9670,52 @@ function tlAutoGenerate(options) {
     var frontHoriz=Math.abs(frontPipe[0].y-fEnd.y)<1e-6;   // 总管水平？
     var fxMin=Math.min(frontPipe[0].x,fEnd.x), fxMax=Math.max(frontPipe[0].x,fEnd.x);
     var fyMin=Math.min(frontPipe[0].y,fEnd.y), fyMax=Math.max(frontPipe[0].y,fEnd.y);
-    var tlStubs=[];
+    /* v143：主管先按物理线归并（同排共线多段=一根），连接段/三通/阀门按物理线各画一次
+       （旧版按分段画：20 段共线主管画 20 条重叠 stub、无交接符号）。 */
+    var tlMainLines={};
     mainPipes.forEach(function(l){
+      var pa=l[0], pb=l[l.length-1];
+      var ddx=Math.abs(pa.x-pb.x), ddy=Math.abs(pa.y-pb.y), mk;
+      if(ddy<=ddx*0.25) mk='H'+(Math.round((pa.y+pb.y)*2)/2);
+      else if(ddx<=ddy*0.25) mk='V'+(Math.round((pa.x+pb.x)*2)/2);
+      else mk='S'+pa.x.toFixed(1)+','+pa.y.toFixed(1);
+      if(!tlMainLines[mk])tlMainLines[mk]=l;
+    });
+    var tlStubs=[], tlJunctions=[];
+    Object.keys(tlMainLines).forEach(function(mk){
+      var l=tlMainLines[mk];
       var pa=l[0], pb=l[l.length-1];
       if(frontHoriz && pa.x===pb.x){          // 垂直主管 → 朝上的一端接水平总管
         var pt=pa.y<=pb.y?pa:pb;
-        if(pt.x>=fxMin-0.5 && pt.x<=fxMax+0.5) tlStubs.push([{x:pt.x,y:frontPipe[0].y},{x:pt.x,y:pt.y}]);
+        if(pt.x>=fxMin-0.5 && pt.x<=fxMax+0.5){
+          tlStubs.push([{x:pt.x,y:frontPipe[0].y},{x:pt.x,y:pt.y}]);
+          tlJunctions.push({x:pt.x,y:frontPipe[0].y,dx:0,dy:(pt.y>=frontPipe[0].y?1:-1),stubM:Math.abs(pt.y-frontPipe[0].y)});
+        }
       } else if(!frontHoriz && pa.y===pb.y){  // 水平主管 → 朝左的一端接垂直总管
         var pt2=pa.x<=pb.x?pa:pb;
-        if(pt2.y>=fyMin-0.5 && pt2.y<=fyMax+0.5) tlStubs.push([{x:frontPipe[0].x,y:pt2.y},{x:pt2.x,y:pt2.y}]);
+        if(pt2.y>=fyMin-0.5 && pt2.y<=fyMax+0.5){
+          tlStubs.push([{x:frontPipe[0].x,y:pt2.y},{x:pt2.x,y:pt2.y}]);
+          tlJunctions.push({x:frontPipe[0].x,y:pt2.y,dx:(pt2.x>=frontPipe[0].x?1:-1),dy:0,stubM:Math.abs(pt2.x-frontPipe[0].x)});
+        }
       }
     });
     tlStubs.forEach(function(sl){
       var sd='';
       for(var si=0;si<sl.length;si++){var sp2=ts(sl[si].x,sl[si].y);sd+=(si===0?'M':'L')+sp2.x.toFixed(1)+' '+sp2.y.toFixed(1)+' ';}
       parts.push('<path d="'+sd+'" fill="none" stroke="#185FA5" stroke-width="5" stroke-linecap="round"/>');
+    });
+    /* v143（用户要求）：总管×主管交接处画「三通 + 阀门」——三通方块在总管口，
+       阀门（红⊗，与分区阀同款式）接在主管接入段上（连接段中点，向主管侧偏）。
+       数量=物理主管根数，与材料清单三通/总管接入阀行同源。 */
+    tlJunctions.forEach(function(jc){
+      var jp=ts(jc.x,jc.y);
+      parts.push('<rect data-junction-tee x="'+(jp.x-4.5).toFixed(1)+'" y="'+(jp.y-4.5).toFixed(1)+'" width="9" height="9" fill="#0C447C" stroke="#ffffff" stroke-width="1.5"/>');
+      if(jc.stubM>1){
+        var jv=ts(jc.x+jc.dx*jc.stubM*0.5, jc.y+jc.dy*jc.stubM*0.5);
+        parts.push('<g data-junction-valve><circle cx="'+jv.x.toFixed(1)+'" cy="'+jv.y.toFixed(1)+'" r="6.5" fill="#ef4444" stroke="#ffffff" stroke-width="2"/>'
+          +'<line x1="'+(jv.x-3.6).toFixed(1)+'" y1="'+(jv.y-3.6).toFixed(1)+'" x2="'+(jv.x+3.6).toFixed(1)+'" y2="'+(jv.y+3.6).toFixed(1)+'" stroke="#ffffff" stroke-width="1.4"/>'
+          +'<line x1="'+(jv.x+3.6).toFixed(1)+'" y1="'+(jv.y-3.6).toFixed(1)+'" x2="'+(jv.x-3.6).toFixed(1)+'" y2="'+(jv.y+3.6).toFixed(1)+'" stroke="#ffffff" stroke-width="1.4"/></g>');
+      }
     });
   }
 
@@ -16803,6 +16837,22 @@ function tlIsoStatsReset() {
      v140（用户澄清）：管长统计 = 全地块实际用量——AE.allPids→effPts（有效几何，含手工
      改长/平移）逐段累加，与经济面板「全地块管长」同口径；不用最不利路径长度
      （r.*LenUsed 只是扬程计算用的最远分区路径）；无图面数据时退回 r.*LenUsed。 */
+  /* v143（用户纠偏）：物理主管归并计数——图面 mainPipes 每分区一段，同排共线的多段
+     实为同一根主管（如 20 分区两排布置 = 2 根横向主管）。按「方向+共线坐标(0.5m 容差)」
+     归并后计数，供材料清单三通/总管接入阀数量与简图交接符号共用同一口径。 */
+  window.tlMainLineCount = function (pipes) {
+    if (!pipes || !pipes.length) return 0;
+    var seen = {}, n = 0;
+    pipes.forEach(function (l) {
+      var pa = l[0], pb = l[l.length - 1];
+      var ddx = Math.abs(pa.x - pb.x), ddy = Math.abs(pa.y - pb.y), mk;
+      if (ddy <= ddx * 0.25) mk = 'H' + (Math.round((pa.y + pb.y) * 2) / 2);      /* 水平：按 y 归并 */
+      else if (ddx <= ddy * 0.25) mk = 'V' + (Math.round((pa.x + pb.x) * 2) / 2); /* 垂直：按 x 归并 */
+      else mk = 'S' + pa.x.toFixed(1) + ',' + pa.y.toFixed(1);                    /* 斜线：逐段各算 */
+      if (!seen[mk]) { seen[mk] = 1; n++; }
+    });
+    return n;
+  };
   window.tlFigParamLines = function (r) {
     var d = window.tlDiagramData;
     function figOd(kind, designOd) {
