@@ -6193,6 +6193,8 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
         #tlEconPanel .te-prices{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:4px}
         #tlEconPanel .te-prices label{font-size:10px;color:#64748b;display:grid;grid-template-columns:auto 1fr;align-items:center;gap:2px}
         #tlEconPanel .te-prices input{width:100%;padding:2px 3px;font-size:10.5px;border:1px solid #cbd5e1;border-radius:4px}
+        /* v134：下拉切换→表格跳转时选中行闪黄一次，视觉反馈明确 */
+        @keyframes teflash{0%{background-color:#fcd34d}100%{background-color:transparent}}
       </style>
       <div class="te-head"><b>💰 管径经济性对比</b><button class="te-close" id="tlEconClose" title="关闭面板">×</button></div>
       <div class="te-sub" id="teLens">生成管线图后，这里按<b>全地块</b>总/主/支管总长对比不同管径组合的水泵扬程、功率与费用。</div>
@@ -16953,7 +16955,8 @@ function tlIsoStatsReset() {
       if (st.selF < st.selM) st.selF = st.selM;
       document.getElementById('tePicks').innerHTML =
         '总管 <select id="teSelF">' + opts(D.oF, st.selF) + '</select> 主管 <select id="teSelM">' + opts(D.oM, st.selM) + '</select> 支管 <select id="teSelB">' + opts(D.oB, st.selB) + '</select>'
-        + '<span style="color:#94a3b8">（最多六档：设计值下 3 档 / 上 2 档，不足六档时按 总≥主≥支 约束截断）</span>';
+        + '<span style="color:#94a3b8">（最多六档：设计值下 3 档 / 上 2 档，不足六档时按 总≥主≥支 约束截断）</span>'
+        + (st.notice ? '<span id="teNotice" style="color:#b45309;font-weight:600">⚠ ' + st.notice + '</span>' : '');
       document.getElementById('teAssum').innerHTML =
         '电价 <input id="teAssumPrice" type="number" min="0.01" step="0.05" value="' + a.price + '"> 元/度 · 年运行 <input id="teAssumHours" type="number" min="1" step="100" value="' + a.hours + '"> h · 折旧 <input id="teAssumYears" type="number" min="1" step="1" value="' + a.years + '"> 年';
       var rows = D.combos.map(function (c) { var e = c.kw * a.hours * a.price; return { c: c, elec: e, annual: c.mat / a.years + e }; });
@@ -16979,7 +16982,9 @@ function tlIsoStatsReset() {
       document.getElementById('tePrices').innerHTML = CAL_SERIES.map(function (od) {
         return '<label>Ø' + od + '<input type="number" min="0" step="1" data-teprice="' + od + '" value="' + (pr[od] != null ? pr[od] : '') + '"></label>';
       }).join('');
-      if (selIdx >= 0) { var tr = document.querySelector('#teTbl tr.sel'); if (tr && tr.scrollIntoView) try { tr.scrollIntoView({ block: 'nearest' }); } catch (e) { } }
+      /* v134：下拉驱动的跳转滚动到可视区中央 + 闪黄一次；其他渲染（改价/点行等）维持 nearest 不抢滚动 */
+      if (selIdx >= 0) { var tr = document.querySelector('#teTbl tr.sel'); if (tr && tr.scrollIntoView) try { tr.scrollIntoView({ block: st.flashSel ? 'center' : 'nearest' }); if (st.flashSel) { tr.style.animation = 'none'; void tr.offsetHeight; tr.style.animation = 'teflash 1s ease-out 1'; } } catch (e) { } }
+      st.flashSel = false;
     }
     function applySel() {
       var D = st.cache; if (!D) return false;
@@ -17028,14 +17033,15 @@ function tlIsoStatsReset() {
           var a = assum();
           var rows2 = st.cache.combos.map(function (c) { return { c: c, annual: annualOf(c, a) }; });
           rows2.sort(function (x, y) { return x.annual - y.annual; });
-          if (rows2[i]) { st.selF = rows2[i].c.f; st.selM = rows2[i].c.m; st.selB = rows2[i].c.b; st.sel = i; render(); }
+          if (rows2[i]) { st.selF = rows2[i].c.f; st.selM = rows2[i].c.m; st.selB = rows2[i].c.b; st.sel = i; st.notice = ''; render(); }
         }
       });
       panelEl.addEventListener('change', function (e) {
         var t = e.target;
-        if (t.id === 'teSelF') { st.selF = parseInt(t.value, 10); if (st.selM > st.selF) st.selM = st.selF; if (st.selB > st.selM) st.selB = st.selM; render(); return; }
-        if (t.id === 'teSelM') { st.selM = parseInt(t.value, 10); if (st.selM > st.selF) st.selF = st.selM; if (st.selB > st.selM) st.selB = st.selM; render(); return; }
-        if (t.id === 'teSelB') { st.selB = parseInt(t.value, 10); if (st.selB > st.selM) st.selM = st.selB; if (st.selM > st.selF) st.selF = st.selM; render(); return; }
+        /* v134：跳转反馈 —— 改写被 总≥主≥支 约束截断的值时显式提示（否则用户以为没跳）；flashSel 驱动居中滚动+闪黄 */
+        if (t.id === 'teSelF') { var m0 = st.selM, b0 = st.selB; st.selF = parseInt(t.value, 10); if (st.selM > st.selF) st.selM = st.selF; if (st.selB > st.selM) st.selB = st.selM; st.notice = (m0 !== st.selM || b0 !== st.selB) ? '已按 总≥主≥支 约束调整：主管 Ø' + st.selM + (b0 !== st.selB ? '、支管 Ø' + st.selB : '') : ''; st.flashSel = true; render(); return; }
+        if (t.id === 'teSelM') { var f0 = st.selF, b0 = st.selB; st.selM = parseInt(t.value, 10); if (st.selM > st.selF) st.selF = st.selM; if (st.selB > st.selM) st.selB = st.selM; st.notice = (f0 !== st.selF || b0 !== st.selB) ? '已按 总≥主≥支 约束调整：总管 Ø' + st.selF + (b0 !== st.selB ? '、支管 Ø' + st.selB : '') : ''; st.flashSel = true; render(); return; }
+        if (t.id === 'teSelB') { var m0 = st.selM, f0 = st.selF; st.selB = parseInt(t.value, 10); if (st.selB > st.selM) st.selM = st.selB; if (st.selM > st.selF) st.selF = st.selM; st.notice = (m0 !== st.selM || f0 !== st.selF) ? '已按 总≥主≥支 约束调整：主管 Ø' + st.selM + (f0 !== st.selF ? '、总管 Ø' + st.selF : '') : ''; st.flashSel = true; render(); return; }
         if (t.id === 'teAssumPrice' || t.id === 'teAssumHours' || t.id === 'teAssumYears') {
           var a = assum();
           if (t.id === 'teAssumPrice') a.price = parseFloat(t.value) || a.price;
