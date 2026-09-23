@@ -9305,6 +9305,8 @@ function tlAutoGenerate(options) {
     parts.push('</g>');
   })();
 
+  // v115（2026-09-23 用户截图修正）：横向尺寸改为「按块逐段」——地块横向被主管分成几块，
+  //   横向标注就分几段（每段=一条设计网格列宽，不再按组包络把相邻两块并成一段）。
   // v111b（2026-09-22 用户确认示意图后定稿）：联合分区横竖尺寸标注 —— 只标两类位置：
   //   横向 = 组底边上方（v111d 改锚：单行组=地块底缘上方；多行时上行组=分界线上方；
   //          v111b 原按 minR>0 只标上行组，导致单行布局一个横标都不出 —— 用户 18:45 报「改没了」要求恢复）；
@@ -9328,36 +9330,38 @@ function tlAutoGenerate(options) {
       }
     }
     var gdParts=[], gdExt=[], gdTexts=[];
+    var gdBands={};   /* v115：横向「按块逐段」标注 —— 同一条带线（包络底行+1）的组先归并，见下方绘制循环 */
     /* v113（2026-09-22 用户要求）：联合分区小尺寸斜短线同步加粗缩短 —— k 5.5→4、线宽 1.8→2.8（与 tlArchTick/ppArchTick 一致） */
     function gdTickH(x,y){ var k=4; return '<line x1="'+(x-k).toFixed(1)+'" y1="'+(y+k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y-k).toFixed(1)+'" stroke-width="2.8"/>'; }
     function gdTickV(x,y){ var k=4; return '<line x1="'+(x-k).toFixed(1)+'" y1="'+(y-k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y+k).toFixed(1)+'" stroke-width="2.8"/>'; }
     Object.keys(gdBox).forEach(function(gdK){
       var gdB=gdBox[gdK];
+      /* v115fix：gdG 此前在 forEach 里未定义（泄漏自上一循环=最后一个单元格的组号），
+         导致所有联合分区标注共用同一个 id（v111 起就错；v114 下还会一拖全动）。
+         forEach 的键 gdK 本身就是组号，直接取用。 */
+      var gdGN=parseInt(gdK,10);
       var gdW=0,gdH=0;
       for(var gci=gdB.minC;gci<=gdB.maxC;gci++)gdW+=xPlan[gci];
       for(var gri=gdB.minR;gri<=gdB.maxR;gri++)gdH+=yPlan[gri];
       var gdX0=zX(gdB.minR,gdB.minC), gdX1=zX(gdB.minR,gdB.maxC+1);
       var gdY0=zY(gdB.minC,gdB.minR), gdY1=zY(gdB.maxC,gdB.maxR+1);
       var gdTL=ts(gdX0,gdY0), gdTR=ts(gdX1,gdY0), gdBR=ts(gdX1,gdY1);
-      /* 横向尺寸线（v111d，2026-09-22 用户：小尺寸被 v111b 的 minR>0 条件改没了，要求恢复）：
-         改锚到「组底边」上方 14px，对所有联合分区生效——
-         单行组底边=地块底缘 ⇒ 画在地块底缘上方（用户 18:45 截图圈定要回的位置）；
-         多行时上行组底边=与下行的分界线 ⇒ 画在分界线上方（17:41 确认示意图同款位置）。
-         与总尺寸线（地块底缘+38）间距恒 ≥52px（v111c 预留），不再干扰。 */
+      /* 横向尺寸线（v111d 锚点沿用：组底边上方 14px——单行组=地块底缘上方，多行=分界线上方；
+         与总尺寸线间距恒 ≥52px（v111c 预留）。
+         v115（2026-09-23 用户截图：横向实际被主管分成三块，旧「组包络」一段标注把其中两块并到一起——不对）：
+         这里只把同一条带线的组归并进 gdBands（键=包络底行+1），实际绘制在 forEach 之后
+         按「每块（每条设计网格列）一段」画 —— 段不再跨主管，值=该列设计宽 xPlan[c]。 */
       if(gdTR.x-gdTL.x>26){
-        var gdIdH='gd'+gdG+'-h';
-        var gdHy=gdBR.y-14+tlDimOffOf(gdIdH);   /* v114: off 正=向下 */
-        gdExt.push('<line data-dimext="'+gdIdH+'" x1="'+gdTL.x.toFixed(1)+'" y1="'+Math.min(gdBR.y-4,gdHy-6).toFixed(1)+'" x2="'+gdTL.x.toFixed(1)+'" y2="'+Math.max(gdBR.y-4,gdHy-6).toFixed(1)+'"/>');
-        gdExt.push('<line data-dimext="'+gdIdH+'" x1="'+gdTR.x.toFixed(1)+'" y1="'+Math.min(gdBR.y-4,gdHy-6).toFixed(1)+'" x2="'+gdTR.x.toFixed(1)+'" y2="'+Math.max(gdBR.y-4,gdHy-6).toFixed(1)+'"/>');
-        gdParts.push('<g data-dim="'+gdIdH+'">'
-          +'<line x1="'+gdTL.x.toFixed(1)+'" y1="'+gdHy.toFixed(1)+'" x2="'+gdTR.x.toFixed(1)+'" y2="'+gdHy.toFixed(1)+'"/>'
-          +gdTickH(gdTL.x,gdHy)+gdTickH(gdTR.x,gdHy)
-          +'<text x="'+((gdTL.x+gdTR.x)/2).toFixed(1)+'" y="'+(gdHy-4).toFixed(1)+'" text-anchor="middle" font-size="12" font-weight="700" fill="#111111" stroke="none">'+gdVal(gdW)+'</text></g>');
-        window._tlDimHits.push({id:gdIdH,axis:'y',x1:gdTL.x,y1:gdHy,x2:gdTR.x,y2:gdHy,minOff:-8});
+        var gdRc=gdBands[gdB.maxR+1];
+        if(!gdRc){gdRc=gdBands[gdB.maxR+1]={minR:gdB.minR,maxR:gdB.maxR,minC:gdB.minC,maxC:gdB.maxC,firstG:gdGN};}
+        else{
+          if(gdB.minC<gdRc.minC)gdRc.minC=gdB.minC;
+          if(gdB.maxC>gdRc.maxC)gdRc.maxC=gdB.maxC;
+        }
       }
       /* 竖向尺寸线：仅「右缘贴地块右边界」的组（maxC=最后一列），画在地块右缘外侧 */
       if(gdB.maxC===cols-1 && gdBR.y-gdTR.y>26){
-        var gdIdV='gd'+gdG+'-v';
+        var gdIdV='gd'+gdGN+'-v';
         var gdVx=gdBR.x+14+tlDimOffOf(gdIdV);   /* v114: off 正=向右 */
         gdExt.push('<line data-dimext="'+gdIdV+'" x1="'+Math.min(gdTR.x+4,gdVx-6).toFixed(1)+'" y1="'+gdTR.y.toFixed(1)+'" x2="'+Math.max(gdTR.x+4,gdVx-6).toFixed(1)+'" y2="'+gdTR.y.toFixed(1)+'"/>');
         gdExt.push('<line data-dimext="'+gdIdV+'" x1="'+Math.min(gdBR.x+4,gdVx-6).toFixed(1)+'" y1="'+gdBR.y.toFixed(1)+'" x2="'+Math.max(gdBR.x+4,gdVx-6).toFixed(1)+'" y2="'+gdBR.y.toFixed(1)+'"/>');
@@ -9366,6 +9370,27 @@ function tlAutoGenerate(options) {
           +gdTickV(gdVx,gdTR.y)+gdTickV(gdVx,gdBR.y)
           +'<g transform="translate('+(gdVx+13).toFixed(1)+' '+((gdTR.y+gdBR.y)/2).toFixed(1)+') rotate(-90)"><text x="0" y="4" text-anchor="middle" font-size="12" font-weight="700" fill="#111111" stroke="none">'+gdVal(gdH)+'</text></g></g>');
         window._tlDimHits.push({id:gdIdV,axis:'x',x1:gdVx,y1:gdTR.y,x2:gdVx,y2:gdBR.y,minOff:-8});
+      }
+    });
+    /* v115 横向「按块逐段」绘制：每条带线一条链，链内每段只跨一个块（主管分块边界），
+       值=该列设计宽 xPlan[c]（与分区标签「设计尺寸」同口径）；段过窄（≤26px）跳过。
+       v114 拖动照常可用 —— 每段独立 id（gdG-hc列号），锚点固定、端线加长、偏移记忆。 */
+    Object.keys(gdBands).forEach(function(gdBK){
+      var gdRc=gdBands[gdBK];
+      var gdY1b=zY(gdRc.maxC,gdRc.maxR+1);
+      var gdBRb=ts(zX(gdRc.minR,gdRc.maxC+1),gdY1b);
+      for(var gdc2=gdRc.minC;gdc2<=gdRc.maxC;gdc2++){
+        var gdPA=ts(zX(gdRc.maxR,gdc2),gdY1b), gdPB=ts(zX(gdRc.maxR,gdc2+1),gdY1b);
+        if(gdPB.x-gdPA.x<=26)continue;
+        var gdIdH='gd'+gdRc.firstG+'-hc'+gdc2;
+        var gdHy=gdBRb.y-14+tlDimOffOf(gdIdH);   /* v114: off 正=向下 */
+        gdExt.push('<line data-dimext="'+gdIdH+'" x1="'+gdPA.x.toFixed(1)+'" y1="'+Math.min(gdBRb.y-4,gdHy-6).toFixed(1)+'" x2="'+gdPA.x.toFixed(1)+'" y2="'+Math.max(gdBRb.y-4,gdHy-6).toFixed(1)+'"/>');
+        gdExt.push('<line data-dimext="'+gdIdH+'" x1="'+gdPB.x.toFixed(1)+'" y1="'+Math.min(gdBRb.y-4,gdHy-6).toFixed(1)+'" x2="'+gdPB.x.toFixed(1)+'" y2="'+Math.max(gdBRb.y-4,gdHy-6).toFixed(1)+'"/>');
+        gdParts.push('<g data-dim="'+gdIdH+'">'
+          +'<line x1="'+gdPA.x.toFixed(1)+'" y1="'+gdHy.toFixed(1)+'" x2="'+gdPB.x.toFixed(1)+'" y2="'+gdHy.toFixed(1)+'"/>'
+          +gdTickH(gdPA.x,gdHy)+gdTickH(gdPB.x,gdHy)
+          +'<text x="'+((gdPA.x+gdPB.x)/2).toFixed(1)+'" y="'+(gdHy-4).toFixed(1)+'" text-anchor="middle" font-size="12" font-weight="700" fill="#111111" stroke="none">'+gdVal(xPlan[gdc2])+'</text></g>');
+        window._tlDimHits.push({id:gdIdH,axis:'y',x1:gdPA.x,y1:gdHy,x2:gdPB.x,y2:gdHy,minOff:-8});
       }
     });
     if(gdExt.length){
