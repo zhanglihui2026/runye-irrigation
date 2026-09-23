@@ -7633,8 +7633,30 @@ function render() {
   // 施工简图数据传导：主管/支管长度优先取施工简图实际绘制（未遮蔽）管线长度；滴灌带不在施工简图布置，按总面积÷滴灌带间距直接传导；无数据时回退理论计算值
   const ppStats = (typeof window.ppGetMaterialStats === 'function') ? window.ppGetMaterialStats() : {mainLen:0,branchLen:0,hasPipes:false};
   const usePP = !!(ppStats && ppStats.hasPipes);
-  const matMainLen = usePP ? ppStats.mainLen : r.mainPipeLen;
-  const matBranchLen = usePP ? ppStats.branchLen : r.branchLen * r.branchCount * r.N;
+  /* v142（2026-09-23 用户要求）：材料清单数据从三级简图获取——
+     总/主/支管长度 = tlFigParamLines().lens（全地块实际用量：AE 有效几何逐段累加，含图面改长/改径/平移；
+     无图面时内部退回 r.*LenUsed 试算值）；管径 = ods（图面改径按管长加权的实际代表径，无改径退回设计值）；
+     主管根数 = 图上分区数（mainPipes.length，每区一根主管）。主管/支管在无三级图面时维持原口径
+     （二级施工简图统计 -> 理论值），已有行为不变；总管行无二级来源，始终取三级口径。 */
+  var tlMat = null, tlMains = 0;
+  try {
+    if (typeof computeThreeLevel === 'function' && window.tlFigParamLines) {
+      var rr3 = computeThreeLevel();
+      if (rr3 && rr3.frontPipe) tlMat = window.tlFigParamLines(rr3);
+    }
+  } catch (eTlMat) { tlMat = null; }
+  try { if (window.tlDiagramData && window.tlDiagramData.mainPipes) tlMains = window.tlDiagramData.mainPipes.length; } catch (eTlN) { tlMains = 0; }
+  const useTl = !!(tlMat && tlMat.lens && window.tlDiagramData);
+  const matFrontLen = (tlMat && tlMat.lens && isFinite(tlMat.lens.front)) ? tlMat.lens.front : (r.mainPipeLen || 0);
+  const matMainLen = useTl ? tlMat.lens.main : (usePP ? ppStats.mainLen : r.mainPipeLen);
+  const matBranchLen = useTl ? tlMat.lens.branch : (usePP ? ppStats.branchLen : r.branchLen * r.branchCount * r.N);
+  const specFrontOd = tlMat ? tlMat.ods.front : materialPipeSpecs.mainPipeOD;
+  const specMainOd = useTl ? tlMat.ods.main : materialPipeSpecs.mainPipeOD;
+  const specBranchOd = useTl ? tlMat.ods.branch : materialPipeSpecs.branchPipeOD;
+  const zoneValveN = tlMains > 0 ? tlMains : r.N;
+  const zoneValveSpec = useTl ? ('\u00d8 ' + specMainOd + ' \u00d7 \u00d8 ' + specBranchOd + ' mm') : ('\u00d8 ' + materialPipeSpecs.mainPipeOD + ' mm');
+  const teeSpec = useTl ? ('\u00d8 ' + specFrontOd + ' \u00d7 \u00d8 ' + specMainOd + ' mm') : '\u2014';
+  const teeN = tlMains > 0 ? tlMains : 0;
   const matTotalMu = window.measuredArea ? window.measuredArea / 666.67 : (r.totalMu || (r.zoneMu * r.N) || 0);
   // 滴灌带：总面积(m²) ÷ 滴灌带间距(m)；面积优先施工简图实测面积、回退设计面积；间距优先施工简图输入、回退设计参数
   const ppTapeSpEl = document.getElementById('planTapeSpacing');
@@ -7660,14 +7682,20 @@ function render() {
           <table>
             <thead><tr><th>材料</th><th>规格</th><th>估算数量</th><th>单价(元)</th><th>合计(元)</th><th>亩均(m/亩)·折合(元/亩)</th></tr></thead>
             <tbody>
+              <tr data-key="frontPipe" data-qty="${(matFrontLen * 1.1).toFixed(1)}" data-permu="${permuOf(matFrontLen)}">
+                <td>总管</td><td>Ø ${specFrontOd} mm</td><td><span class="qty-text">${(matFrontLen * 1.1).toFixed(1)}</span><span class="unit-tag">m</span></td>
+                <td><input class="price-input" type="number" min="0" step="0.1" placeholder="0" value="${materialPrices.frontPipe || ''}"><span class="unit-tag">元/m</span></td>
+                <td class="total-cell">—</td>
+                <td class="permu-cell">${permuOf(matFrontLen)} m/亩 · —</td>
+              </tr>
               <tr data-key="mainPipe" data-qty="${(matMainLen * 1.1).toFixed(1)}" data-permu="${permuOf(matMainLen)}">
-                <td>主管</td><td>Ø ${materialPipeSpecs.mainPipeOD} mm</td><td><span class="qty-text">${(matMainLen * 1.1).toFixed(1)}</span><span class="unit-tag">m</span></td>
+                <td>主管</td><td>Ø ${specMainOd} mm</td><td><span class="qty-text">${(matMainLen * 1.1).toFixed(1)}</span><span class="unit-tag">m</span></td>
                 <td><input class="price-input" type="number" min="0" step="0.1" placeholder="0" value="${materialPrices.mainPipe || ''}"><span class="unit-tag">元/m</span></td>
                 <td class="total-cell">—</td>
                 <td class="permu-cell">${permuOf(matMainLen)} m/亩 · —</td>
               </tr>
               <tr data-key="branchPipe" data-qty="${(matBranchLen * 1.1).toFixed(1)}" data-permu="${permuOf(matBranchLen)}">
-                <td>支管</td><td>Ø ${materialPipeSpecs.branchPipeOD} mm</td><td><span class="qty-text">${(matBranchLen * 1.1).toFixed(1)}</span><span class="unit-tag">m</span></td>
+                <td>支管</td><td>Ø ${specBranchOd} mm</td><td><span class="qty-text">${(matBranchLen * 1.1).toFixed(1)}</span><span class="unit-tag">m</span></td>
                 <td><input class="price-input" type="number" min="0" step="0.1" placeholder="0" value="${materialPrices.branchPipe || ''}"><span class="unit-tag">元/m</span></td>
                 <td class="total-cell">—</td>
                 <td class="permu-cell">${permuOf(matBranchLen)} m/亩 · —</td>
@@ -7684,9 +7712,21 @@ function render() {
                 <td class="total-cell">—</td>
                 <td class="permu-cell">—</td>
               </tr>
-              <tr data-key="zoneValve" data-qty="${r.N}">
-                <td>分区总阀</td><td>Ø ${materialPipeSpecs.mainPipeOD} mm</td><td>${r.N} 套</td>
+              <tr data-key="zoneValve" data-qty="${zoneValveN}">
+                <td>分区总阀</td><td>${zoneValveSpec}</td><td>${zoneValveN} 套</td>
                 <td><input class="price-input" type="number" min="0" step="1" placeholder="0" value="${materialPrices.zoneValve || ''}"><span class="unit-tag">元/套</span></td>
+                <td class="total-cell">—</td>
+                <td class="permu-cell">—</td>
+              </tr>
+              <tr data-key="teeJoint" data-qty="${teeN}">
+                <td>三通</td><td>${teeSpec}</td><td>${teeN > 0 ? teeN + ' 套' : '—'}</td>
+                <td><input class="price-input" type="number" min="0" step="1" placeholder="0" value="${materialPrices.teeJoint || ''}"><span class="unit-tag">元/套</span></td>
+                <td class="total-cell">—</td>
+                <td class="permu-cell">—</td>
+              </tr>
+              <tr data-key="frontValve" data-qty="${teeN}">
+                <td>总管接入阀</td><td>Ø ${specMainOd} mm</td><td>${teeN > 0 ? teeN + ' 套' : '—'}</td>
+                <td><input class="price-input" type="number" min="0" step="1" placeholder="0" value="${materialPrices.frontValve || ''}"><span class="unit-tag">元/套</span></td>
                 <td class="total-cell">—</td>
                 <td class="permu-cell">—</td>
               </tr>
@@ -15252,6 +15292,9 @@ threeDModelingSection:'水力计算器 · 入口预留（方案确定后上线�
     if(window.requestAnimationFrame) window.requestAnimationFrame(refit); else setTimeout(refit, 16);
     if(!link){ for(var j=0;j<items.length;j++){ if(items[j].sec===sec){ link=items[j].link; break; } } }
     activate(link||null);
+    /* v142：材料清单页数据取三级简图口径（管长/实际管径/分区阀与三通数量），
+       图面改动后切入本页时重渲染一次，保证统计与三级简图同源最新。 */
+    try{ if(sec && sec.id==='detailsSection' && typeof window.render==='function') window.render(); }catch(err){}
     if(typeof window.ryStatusUpdate==='function') window.ryStatusUpdate(sec);
   }
   window.ryShowSection=ryShowSection;
@@ -16813,7 +16856,9 @@ function tlIsoStatsReset() {
     if (lB === null) lB = r.branchLenUsed;
     var l1 = '总管 Ø ' + ods.front + ' mm · ' + fmtLen(lF) + ' m · 主管 Ø ' + ods.main + ' mm · ' + fmtLen(lM) + ' m · 支管 Ø ' + ods.branch + ' mm · ' + fmtLen(lB) + ' m';
     var l2 = '联合灌溉 ' + (typeof tlGetZoneCount === 'function' ? tlGetZoneCount() : (r.zoneCount || 1)) + '区 · 水泵 ' + pump.flow + ' · ' + pump.head + ' · ' + pump.power;
-    return { lines: [l1, l2], ods: ods, pump: pump };
+    /* v142：lens = 总/主/支管全地块实际长度（plotLen 统计，无图面退回 r.*LenUsed）——
+       材料清单页从三级简图口径取数用；加法扩展，既有消费方（lines/ods/pump）零感知。 */
+    return { lines: [l1, l2], ods: ods, pump: pump, lens: { front: lF, main: lM, branch: lB } };
   };
   /* ===== v136（2026-09-23 用户反馈）：轴测图图例/信息行实时更新 =====
      「应用到图面」后管线与左栏结果都变了，但图例读的 tlDiagramData.meta.pipes/pump 是
