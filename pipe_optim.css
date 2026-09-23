@@ -1,0 +1,95 @@
+/* ============================================================================
+ * [NEW MODULE: pipe_optim]  pipe_optim.css  ——  管网优化分析弹窗（隔离样式）
+ * ----------------------------------------------------------------------------
+ * 全部类名以 po- 前缀，独立于润野灌溉原站样式，绝不覆盖原站任何规则。
+ * 本文件由 pipe_optim_ui.js 在运行时注入 <link>，不改动原 index.html 的 <head>。
+ * ========================================================================== */
+
+.po-overlay {
+  position: fixed; inset: 0; z-index: 99990;
+  background: rgba(13, 32, 26, 0.55);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 28px 16px; overflow-y: auto;
+  font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+.po-dialog {
+  width: 100%; max-width: 980px; background: #fff; color: #1f2937;
+  border-radius: 12px; box-shadow: 0 18px 60px rgba(0,0,0,.35);
+  display: flex; flex-direction: column; max-height: 92vh; overflow: hidden;
+}
+.po-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px; background: #173e32; color: #d9e9df;
+  border-bottom: 1px solid #0f2a22;
+}
+.po-header h2 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: .3px; }
+.po-header .po-close {
+  border: 0; background: transparent; color: #d9e9df; font-size: 22px;
+  line-height: 1; cursor: pointer; padding: 2px 8px; border-radius: 6px;
+}
+.po-header .po-close:hover { background: #244e40; }
+.po-body { padding: 18px 20px; overflow-y: auto; }
+
+.po-hint {
+  font-size: 12.5px; color: #6b7280; line-height: 1.6; margin: 0 0 14px;
+  background: #f3f6f4; border: 1px solid #e2e8e4; border-radius: 8px; padding: 10px 12px;
+}
+.po-hint b { color: #173e32; }
+
+.po-config {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px 16px; margin: 0 0 16px; padding: 14px; background: #f8faf9;
+  border: 1px solid #e7ede9; border-radius: 8px;
+}
+.po-field { display: flex; flex-direction: column; gap: 4px; }
+.po-field label { font-size: 12px; color: #4b5563; font-weight: 500; }
+.po-field input {
+  height: 30px; padding: 0 8px; border: 1px solid #cfd8d3; border-radius: 6px;
+  font-size: 13px; color: #1f2937; background: #fff;
+}
+.po-field input:focus { outline: 2px solid #76d2a4; border-color: #2d604b; }
+
+.po-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 18px; }
+.po-btn {
+  height: 34px; padding: 0 16px; border-radius: 7px; border: 1px solid transparent;
+  font-size: 13px; font-weight: 600; cursor: pointer; transition: .15s;
+}
+.po-btn-primary { background: #2d604b; color: #fff; }
+.po-btn-primary:hover { background: #244e40; }
+.po-btn-ghost { background: #fff; color: #2d604b; border-color: #b7c9bf; }
+.po-btn-ghost:hover { background: #eef4f0; }
+.po-btn:disabled { opacity: .55; cursor: not-allowed; }
+
+.po-status { font-size: 12.5px; color: #6b7280; margin: 0 0 14px; min-height: 18px; }
+.po-status.po-err { color: #b91c1c; }
+
+.po-section-title {
+  font-size: 13.5px; font-weight: 600; color: #173e32; margin: 18px 0 8px;
+  padding-left: 9px; border-left: 3px solid #2d604b;
+}
+
+.po-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-bottom: 6px; }
+.po-table th, .po-table td {
+  border: 1px solid #e2e8e4; padding: 7px 9px; text-align: center; white-space: nowrap;
+}
+.po-table th { background: #173e32; color: #d9e9df; font-weight: 600; }
+.po-table td { color: #374151; }
+.po-table tr:nth-child(even) td { background: #f7faf8; }
+.po-table .po-best { background: #e8f6ee !important; font-weight: 600; color: #166534; }
+.po-table .po-bad { color: #b91c1c; font-weight: 600; }
+
+.po-scheme-scroll { overflow-x: auto; margin-bottom: 6px; }
+.po-scheme-table td.po-tier-main { color: #185FA5; }
+.po-scheme-table td.po-tier-branch { color: #166534; }
+.po-scheme-table td.po-tier-front { color: #b45309; }
+
+.po-bars { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.po-bar-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.po-bar-row .po-bar-label { width: 84px; color: #4b5563; flex: none; text-align: right; }
+.po-bar-track { flex: 1; height: 16px; background: #eef2f0; border-radius: 4px; overflow: hidden; }
+.po-bar-fill { height: 100%; background: linear-gradient(90deg,#2d604b,#76d2a4); }
+.po-bar-row .po-bar-val { width: 64px; flex: none; color: #374151; }
+.po-bar-row.po-below .po-bar-fill { background: linear-gradient(90deg,#b91c1c,#f87171); }
+
+.po-empty { text-align: center; color: #9ca3af; font-size: 13px; padding: 30px 0; }
+.po-foot-note { font-size: 11.5px; color: #9ca3af; margin-top: 16px; line-height: 1.6; }
