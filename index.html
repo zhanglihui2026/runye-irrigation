@@ -7348,7 +7348,7 @@ function render() {
         <strong>主管 Ø ${r.mainPipe.od} mm · 每区 ${r.branchCount} 根支管 Ø ${r.branchPipe.od} mm</strong>
       </div>
       <div class="optimal-specs">
-        <span>目标流速<b>${fmt(r.targetV,2)} m/s</b><small class="spec-note">主管按单区流量选型；阀门后的支管按 2、3 或 4 根并联分流，选最接近目标流速的标准 PE 外径。</small></span>
+        <span>目标流速<b>${fmt(r.targetV,2)} m/s</b><small class="spec-note">主管按单区流量选型；阀门后的支管按 2、3 或 4 根并联分流。</small></span>
         <span>主管实际流速<b>${fmt(r.mainPipe.v,2)} m/s</b><small class="spec-note">理论内径 ${fmt(r.mainPipe.id,1)} mm · 主管长 ${fmt(r.mainPipeLen,1)} m · 损失 ${fmt(r.mainLoss,2)} m</small></span>
         <span>支管实际流速<b>${fmt(r.branchPipe.v,2)} m/s</b><small class="spec-note">每区 ${r.branchCount} 根 · 单根 ${fmt(r.branchLen,1)} m · ${fmt(r.branchFlow,2)} m³/h · 损失 ${fmt(r.branchLoss,2)} m</small></span>
       </div>
