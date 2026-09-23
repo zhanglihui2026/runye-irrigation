@@ -6145,7 +6145,14 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     <div id="tlEconPanel" style="display:none">
       <style>
         #tlIsoDiagramWrap{position:relative}
-        #tlEconPanel{position:absolute;top:46px;right:10px;width:452px;max-height:calc(100% - 58px);overflow:auto;background:#fff;border:1px solid #c5d6cc;border-radius:10px;box-shadow:0 10px 30px rgba(15,23,42,.20);z-index:40;font-size:12px;color:#1f2937;padding:10px 12px}
+        #tlEconPanel{position:absolute;top:46px;right:0;bottom:0;width:clamp(400px,36vw,560px);overflow:hidden;display:flex;flex-direction:column;background:#fff;border:1px solid #c5d6cc;border-right:0;border-radius:0;box-shadow:none;z-index:40;font-size:12px;color:#1f2937;padding:10px 12px}
+        /* v124：头部（标题/管长/下拉/假设）锁定不动，只有中部表格区滚动；取消悬浮卡片，贴合右缘 */
+        #tlEconPanel .te-mid{flex:1 1 auto;min-height:0;overflow:auto;scrollbar-width:thin;scrollbar-color:#bfd3c6 transparent;padding-right:2px}
+        #tlEconPanel .te-mid::-webkit-scrollbar{width:4px;height:4px}
+        #tlEconPanel .te-mid::-webkit-scrollbar-thumb{background:#bfd3c6;border-radius:2px}
+        #tlEconPanel .te-mid::-webkit-scrollbar-thumb:hover{background:#9db8a7}
+        #tlEconPanel .te-mid::-webkit-scrollbar-track,#tlEconPanel .te-mid::-webkit-scrollbar-corner{background:transparent}
+        #tlEconPanel .te-foot{flex:0 0 auto}
         #tlEconPanel .te-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
         #tlEconPanel .te-head b{font-size:13px;color:#14532d}
         #tlEconPanel .te-close{margin-left:auto;border:0;background:transparent;font-size:16px;cursor:pointer;color:#64748b;line-height:1}
@@ -6174,9 +6181,11 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
       <div class="te-sub" id="teLens">生成管线图后，这里按<b>全地块</b>总/主/支管总长对比不同管径组合的水泵扬程、功率与费用。</div>
       <div class="te-row" id="tePicks"></div>
       <div class="te-row" id="teAssum"></div>
+      <div class="te-mid" id="teMid">
       <div id="teTbl"></div>
       <div class="te-note" id="teNote"></div>
       <details id="tePriceDetails"><summary>管材单价表（元/m，占位价可改，自动记忆）</summary><div class="te-prices" id="tePrices"></div></details>
+      </div>
       <div class="te-foot"><div class="te-sum" id="teSum">—</div><button class="te-apply" id="tlEconApply" title="把选中组合应用到整个地块（同类管道统一改径），水泵扬程/功率随之重算">✓ 应用到图面</button></div>
     </div>
   </div><!-- /.pp-diagram-wrap -->
