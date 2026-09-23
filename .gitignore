@@ -52,3 +52,11 @@ runye_v100_merge.cjs
 
 # 下划线开头的排查/校验文本快照（纯调试产物；.py 不在此列，_delcards.py 已被跟踪不受影响）
 _*.txt
+
+# v98~v105 时代历史调试探针/本地闸门器/单测（28 个，22:3x 用户桌面端 Changes 清单清净到 0；均无页面运行时依赖）
+runye_v98*
+runye_v101*
+runye_v104*
+runye_v105*
+runye_gates.cjs
+tests/
