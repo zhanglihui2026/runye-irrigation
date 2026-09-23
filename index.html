@@ -7715,8 +7715,14 @@ function render() {
                 <td class="total-cell">—</td>
                 <td class="permu-cell">—</td>
               </tr>
+              <tr data-key="zoneTee" data-qty="${zoneValveN}">
+                <td>分区三通</td><td>${zoneValveSpec}</td><td>${zoneValveN} 套</td>
+                <td><input class="price-input" type="number" min="0" step="1" placeholder="0" value="${materialPrices.zoneTee || ''}"><span class="unit-tag">元/套</span></td>
+                <td class="total-cell">—</td>
+                <td class="permu-cell">—</td>
+              </tr>
               <tr data-key="zoneValve" data-qty="${zoneValveN}">
-                <td>分区总阀</td><td>${zoneValveSpec}</td><td>${zoneValveN} 套</td>
+                <td>分区电动阀</td><td>Ø ${specBranchOd} mm · 电动</td><td>${zoneValveN} 套</td>
                 <td><input class="price-input" type="number" min="0" step="1" placeholder="0" value="${materialPrices.zoneValve || ''}"><span class="unit-tag">元/套</span></td>
                 <td class="total-cell">—</td>
                 <td class="permu-cell">—</td>
@@ -7730,12 +7736,6 @@ function render() {
               <tr data-key="frontValve" data-qty="${teeN}">
                 <td>总管接入阀</td><td>Ø ${specMainOd} mm</td><td>${teeN > 0 ? teeN + ' 套' : '—'}</td>
                 <td><input class="price-input" type="number" min="0" step="1" placeholder="0" value="${materialPrices.frontValve || ''}"><span class="unit-tag">元/套</span></td>
-                <td class="total-cell">—</td>
-                <td class="permu-cell">—</td>
-              </tr>
-              <tr data-key="branchValve" data-qty="${r.branchCount * r.N}">
-                <td>支管阀/接头</td><td>Ø ${materialPipeSpecs.branchPipeOD} mm</td><td>${r.branchCount * r.N} 套</td>
-                <td><input class="price-input" type="number" min="0" step="1" placeholder="0" value="${materialPrices.branchValve || ''}"><span class="unit-tag">元/套</span></td>
                 <td class="total-cell">—</td>
                 <td class="permu-cell">—</td>
               </tr>
