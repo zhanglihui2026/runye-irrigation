@@ -9242,14 +9242,26 @@ function tlAutoGenerate(options) {
   }
   parts.push('</g>');
 
+  // ===== v114（2026-09-23 用户示意确认）：尺寸标注线可拖 —— 抓住尺寸线沿法向平移，
+  //   两端界线锚点固定、自动加长；偏移记忆 localStorage('tl-dim-offs')（带布局签名，布局变化自动重置）。
+  var tlDimSig=[cols,rows,tlGN,tlManualActive?JSON.stringify(window.tlManualGroups||[]):'-',Math.round(b.w),Math.round(b.h)].join('|');
+  if(!window._tlDimState||window._tlDimState.sig!==tlDimSig){
+    var _dimSaved=null;try{_dimSaved=JSON.parse(localStorage.getItem('tl-dim-offs')||'null');}catch(e){}
+    window._tlDimState=(_dimSaved&&_dimSaved.sig===tlDimSig&&_dimSaved.offs)?{sig:tlDimSig,offs:_dimSaved.offs}:{sig:tlDimSig,offs:{}};
+  }
+  window._tlDimHits=[];
+  function tlDimOffOf(id){return window._tlDimState.offs[id]||0;}
+
   // 地块尺寸标注（建筑制图风格）：图下水平尺寸线 + 图左垂直尺寸线；尺寸值取二级页传导(有桥)或实测，与二级页施工简图一致
   (function(){
     var plotLeft=ts(b.minX,b.minY).x;
     var plotRight=ts(b.minX+b.w,b.minY).x;
     var plotTop=ts(b.minX,b.minY).y;
     var plotBottom=ts(b.minX,b.minY+b.h).y;
-    var dimBottomY=Math.min(footerTop-30, plotBottom+38);
-    var dimLeftX=Math.max(58, plotLeft-48);
+    var dimBottomBase=Math.min(footerTop-30, plotBottom+38);
+    var dimLeftBase=Math.max(58, plotLeft-48);
+    var dimBottomY=dimBottomBase+tlDimOffOf('gplot-h');      /* v114: off 正=向下（远离地块） */
+    var dimLeftX=dimLeftBase-tlDimOffOf('gplot-v');          /* v114: off 正=向左（远离地块） */
     function tlDimLabel(value){
       if(!isFinite(value))return '— m';
       var rounded=Math.round(value);
@@ -9258,10 +9270,10 @@ function tlAutoGenerate(options) {
     function tlTextBox(x,y,text,anchor,rotate){
       if(rotate){
         parts.push('<g transform="translate('+x.toFixed(1)+' '+y.toFixed(1)+') rotate(-90)">');
-        parts.push('<text x="0" y="4" text-anchor="middle" font-size="12" font-weight="700" fill="#111111">'+text+'</text></g>');
+        parts.push('<text x="0" y="4" text-anchor="middle" font-size="12" font-weight="700" fill="#111111" stroke="none">'+text+'</text></g>');
         return;
       }
-      parts.push('<text x="'+x.toFixed(1)+'" y="'+(y+2).toFixed(1)+'" text-anchor="'+anchor+'" font-size="12" font-weight="700" fill="#111111">'+text+'</text>');
+      parts.push('<text x="'+x.toFixed(1)+'" y="'+(y+2).toFixed(1)+'" text-anchor="'+anchor+'" font-size="12" font-weight="700" fill="#111111" stroke="none">'+text+'</text>');
     }
     function tlArchTick(x,y,dir){
       /* v113（2026-09-22 用户要求）：建筑斜短线加粗、缩短 —— k 5.5→4（长 11px→8px）、线宽 1.8→2.8 */
@@ -9269,20 +9281,28 @@ function tlAutoGenerate(options) {
       if(dir==='h')parts.push('<line x1="'+(x-k).toFixed(1)+'" y1="'+(y+k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y-k).toFixed(1)+'" stroke-width="2.8"/>');
       else parts.push('<line x1="'+(x-k).toFixed(1)+'" y1="'+(y-k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y+k).toFixed(1)+'" stroke-width="2.8"/>');
     }
-    parts.push('<g stroke="#111111" stroke-width="0.95" fill="none" opacity="0.98" stroke-linecap="square">');
-    parts.push('<line x1="'+plotLeft.toFixed(1)+'" y1="'+(plotBottom+7).toFixed(1)+'" x2="'+plotLeft.toFixed(1)+'" y2="'+(dimBottomY+12).toFixed(1)+'"/>');
-    parts.push('<line x1="'+plotRight.toFixed(1)+'" y1="'+(plotBottom+7).toFixed(1)+'" x2="'+plotRight.toFixed(1)+'" y2="'+(dimBottomY+12).toFixed(1)+'"/>');
+    /* 底部水平尺寸线（gplot-h）：界线锚 = 地块左下/右下角（固定），界线活动端随 off 伸长 */
+    window._tlDimHits.push({id:'gplot-h',axis:'y',x1:plotLeft,y1:dimBottomY,x2:plotRight,y2:dimBottomY,
+      minOff:-(dimBottomBase-plotBottom-6)});
+    parts.push('<g data-dim="gplot-h" stroke="#111111" stroke-width="0.95" fill="none" opacity="0.98" stroke-linecap="square">');
+    parts.push('<line data-dimext="gplot-h" x1="'+plotLeft.toFixed(1)+'" y1="'+(plotBottom+7).toFixed(1)+'" x2="'+plotLeft.toFixed(1)+'" y2="'+(dimBottomY+12).toFixed(1)+'"/>');
+    parts.push('<line data-dimext="gplot-h" x1="'+plotRight.toFixed(1)+'" y1="'+(plotBottom+7).toFixed(1)+'" x2="'+plotRight.toFixed(1)+'" y2="'+(dimBottomY+12).toFixed(1)+'"/>');
     parts.push('<line x1="'+plotLeft.toFixed(1)+'" y1="'+dimBottomY.toFixed(1)+'" x2="'+plotRight.toFixed(1)+'" y2="'+dimBottomY.toFixed(1)+'"/>');
     tlArchTick(plotLeft,dimBottomY,'h');
     tlArchTick(plotRight,dimBottomY,'h');
-    parts.push('<line x1="'+(plotLeft-7).toFixed(1)+'" y1="'+plotTop.toFixed(1)+'" x2="'+(dimLeftX-12).toFixed(1)+'" y2="'+plotTop.toFixed(1)+'"/>');
-    parts.push('<line x1="'+(plotLeft-7).toFixed(1)+'" y1="'+plotBottom.toFixed(1)+'" x2="'+(dimLeftX-12).toFixed(1)+'" y2="'+plotBottom.toFixed(1)+'"/>');
+    tlTextBox((plotLeft+plotRight)/2,dimBottomY+12,tlDimLabel(plotW),'middle',false);
+    parts.push('</g>');
+    /* 左侧垂直尺寸线（gplot-v）：界线锚 = 地块左上/左下角（固定），off 正=向左远离 */
+    window._tlDimHits.push({id:'gplot-v',axis:'x',x1:dimLeftX,y1:plotTop,x2:dimLeftX,y2:plotBottom,
+      minOff:-(plotLeft-dimLeftBase-6)});
+    parts.push('<g data-dim="gplot-v" stroke="#111111" stroke-width="0.95" fill="none" opacity="0.98" stroke-linecap="square">');
+    parts.push('<line data-dimext="gplot-v" x1="'+(plotLeft-7).toFixed(1)+'" y1="'+plotTop.toFixed(1)+'" x2="'+(dimLeftX-12).toFixed(1)+'" y2="'+plotTop.toFixed(1)+'"/>');
+    parts.push('<line data-dimext="gplot-v" x1="'+(plotLeft-7).toFixed(1)+'" y1="'+plotBottom.toFixed(1)+'" x2="'+(dimLeftX-12).toFixed(1)+'" y2="'+plotBottom.toFixed(1)+'"/>');
     parts.push('<line x1="'+dimLeftX.toFixed(1)+'" y1="'+plotTop.toFixed(1)+'" x2="'+dimLeftX.toFixed(1)+'" y2="'+plotBottom.toFixed(1)+'"/>');
     tlArchTick(dimLeftX,plotTop,'v');
     tlArchTick(dimLeftX,plotBottom,'v');
-    parts.push('</g>');
-    tlTextBox((plotLeft+plotRight)/2,dimBottomY+12,tlDimLabel(plotW),'middle',false);
     tlTextBox(dimLeftX-15,(plotTop+plotBottom)/2,tlDimLabel(plotH),'middle',true);
+    parts.push('</g>');
   })();
 
   // v111b（2026-09-22 用户确认示意图后定稿）：联合分区横竖尺寸标注 —— 只标两类位置：
@@ -9307,10 +9327,10 @@ function tlAutoGenerate(options) {
         if(gdr<gdB.minR)gdB.minR=gdr; if(gdr>gdB.maxR)gdB.maxR=gdr;
       }
     }
-    var gdLines=[], gdTexts=[];
+    var gdParts=[], gdExt=[], gdTexts=[];
     /* v113（2026-09-22 用户要求）：联合分区小尺寸斜短线同步加粗缩短 —— k 5.5→4、线宽 1.8→2.8（与 tlArchTick/ppArchTick 一致） */
-    function gdTickH(x,y){ var k=4; gdLines.push('<line x1="'+(x-k).toFixed(1)+'" y1="'+(y+k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y-k).toFixed(1)+'" stroke-width="2.8"/>'); }
-    function gdTickV(x,y){ var k=4; gdLines.push('<line x1="'+(x-k).toFixed(1)+'" y1="'+(y-k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y+k).toFixed(1)+'" stroke-width="2.8"/>'); }
+    function gdTickH(x,y){ var k=4; return '<line x1="'+(x-k).toFixed(1)+'" y1="'+(y+k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y-k).toFixed(1)+'" stroke-width="2.8"/>'; }
+    function gdTickV(x,y){ var k=4; return '<line x1="'+(x-k).toFixed(1)+'" y1="'+(y-k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y+k).toFixed(1)+'" stroke-width="2.8"/>'; }
     Object.keys(gdBox).forEach(function(gdK){
       var gdB=gdBox[gdK];
       var gdW=0,gdH=0;
@@ -9325,28 +9345,34 @@ function tlAutoGenerate(options) {
          多行时上行组底边=与下行的分界线 ⇒ 画在分界线上方（17:41 确认示意图同款位置）。
          与总尺寸线（地块底缘+38）间距恒 ≥52px（v111c 预留），不再干扰。 */
       if(gdTR.x-gdTL.x>26){
-        var gdHy=gdBR.y-14;
-        gdLines.push('<line x1="'+gdTL.x.toFixed(1)+'" y1="'+Math.min(gdBR.y-4,gdHy-6).toFixed(1)+'" x2="'+gdTL.x.toFixed(1)+'" y2="'+Math.max(gdBR.y-4,gdHy-6).toFixed(1)+'"/>');
-        gdLines.push('<line x1="'+gdTR.x.toFixed(1)+'" y1="'+Math.min(gdBR.y-4,gdHy-6).toFixed(1)+'" x2="'+gdTR.x.toFixed(1)+'" y2="'+Math.max(gdBR.y-4,gdHy-6).toFixed(1)+'"/>');
-        gdLines.push('<line x1="'+gdTL.x.toFixed(1)+'" y1="'+gdHy.toFixed(1)+'" x2="'+gdTR.x.toFixed(1)+'" y2="'+gdHy.toFixed(1)+'"/>');
-        gdTickH(gdTL.x,gdHy); gdTickH(gdTR.x,gdHy);
-        gdTexts.push('<text x="'+((gdTL.x+gdTR.x)/2).toFixed(1)+'" y="'+(gdHy-4).toFixed(1)+'" text-anchor="middle" font-size="12" font-weight="700" fill="#111111">'+gdVal(gdW)+'</text>');
+        var gdIdH='gd'+gdG+'-h';
+        var gdHy=gdBR.y-14+tlDimOffOf(gdIdH);   /* v114: off 正=向下 */
+        gdExt.push('<line data-dimext="'+gdIdH+'" x1="'+gdTL.x.toFixed(1)+'" y1="'+Math.min(gdBR.y-4,gdHy-6).toFixed(1)+'" x2="'+gdTL.x.toFixed(1)+'" y2="'+Math.max(gdBR.y-4,gdHy-6).toFixed(1)+'"/>');
+        gdExt.push('<line data-dimext="'+gdIdH+'" x1="'+gdTR.x.toFixed(1)+'" y1="'+Math.min(gdBR.y-4,gdHy-6).toFixed(1)+'" x2="'+gdTR.x.toFixed(1)+'" y2="'+Math.max(gdBR.y-4,gdHy-6).toFixed(1)+'"/>');
+        gdParts.push('<g data-dim="'+gdIdH+'">'
+          +'<line x1="'+gdTL.x.toFixed(1)+'" y1="'+gdHy.toFixed(1)+'" x2="'+gdTR.x.toFixed(1)+'" y2="'+gdHy.toFixed(1)+'"/>'
+          +gdTickH(gdTL.x,gdHy)+gdTickH(gdTR.x,gdHy)
+          +'<text x="'+((gdTL.x+gdTR.x)/2).toFixed(1)+'" y="'+(gdHy-4).toFixed(1)+'" text-anchor="middle" font-size="12" font-weight="700" fill="#111111" stroke="none">'+gdVal(gdW)+'</text></g>');
+        window._tlDimHits.push({id:gdIdH,axis:'y',x1:gdTL.x,y1:gdHy,x2:gdTR.x,y2:gdHy,minOff:-8});
       }
       /* 竖向尺寸线：仅「右缘贴地块右边界」的组（maxC=最后一列），画在地块右缘外侧 */
       if(gdB.maxC===cols-1 && gdBR.y-gdTR.y>26){
-        var gdVx=gdBR.x+14;
-        gdLines.push('<line x1="'+Math.min(gdTR.x+4,gdVx-6).toFixed(1)+'" y1="'+gdTR.y.toFixed(1)+'" x2="'+Math.max(gdTR.x+4,gdVx-6).toFixed(1)+'" y2="'+gdTR.y.toFixed(1)+'"/>');
-        gdLines.push('<line x1="'+Math.min(gdBR.x+4,gdVx-6).toFixed(1)+'" y1="'+gdBR.y.toFixed(1)+'" x2="'+Math.max(gdBR.x+4,gdVx-6).toFixed(1)+'" y2="'+gdBR.y.toFixed(1)+'"/>');
-        gdLines.push('<line x1="'+gdVx.toFixed(1)+'" y1="'+gdTR.y.toFixed(1)+'" x2="'+gdVx.toFixed(1)+'" y2="'+gdBR.y.toFixed(1)+'"/>');
-        gdTickV(gdVx,gdTR.y); gdTickV(gdVx,gdBR.y);
-        gdTexts.push('<g transform="translate('+(gdVx+13).toFixed(1)+' '+((gdTR.y+gdBR.y)/2).toFixed(1)+') rotate(-90)"><text x="0" y="4" text-anchor="middle" font-size="12" font-weight="700" fill="#111111">'+gdVal(gdH)+'</text></g>');
+        var gdIdV='gd'+gdG+'-v';
+        var gdVx=gdBR.x+14+tlDimOffOf(gdIdV);   /* v114: off 正=向右 */
+        gdExt.push('<line data-dimext="'+gdIdV+'" x1="'+Math.min(gdTR.x+4,gdVx-6).toFixed(1)+'" y1="'+gdTR.y.toFixed(1)+'" x2="'+Math.max(gdTR.x+4,gdVx-6).toFixed(1)+'" y2="'+gdTR.y.toFixed(1)+'"/>');
+        gdExt.push('<line data-dimext="'+gdIdV+'" x1="'+Math.min(gdBR.x+4,gdVx-6).toFixed(1)+'" y1="'+gdBR.y.toFixed(1)+'" x2="'+Math.max(gdBR.x+4,gdVx-6).toFixed(1)+'" y2="'+gdBR.y.toFixed(1)+'"/>');
+        gdParts.push('<g data-dim="'+gdIdV+'">'
+          +'<line x1="'+gdVx.toFixed(1)+'" y1="'+gdTR.y.toFixed(1)+'" x2="'+gdVx.toFixed(1)+'" y2="'+gdBR.y.toFixed(1)+'"/>'
+          +gdTickV(gdVx,gdTR.y)+gdTickV(gdVx,gdBR.y)
+          +'<g transform="translate('+(gdVx+13).toFixed(1)+' '+((gdTR.y+gdBR.y)/2).toFixed(1)+') rotate(-90)"><text x="0" y="4" text-anchor="middle" font-size="12" font-weight="700" fill="#111111" stroke="none">'+gdVal(gdH)+'</text></g></g>');
+        window._tlDimHits.push({id:gdIdV,axis:'x',x1:gdVx,y1:gdTR.y,x2:gdVx,y2:gdBR.y,minOff:-8});
       }
     });
-    if(gdLines.length){
+    if(gdExt.length){
       parts.push('<g pointer-events="none" stroke="#111111" stroke-width="0.95" fill="none" opacity="0.95" stroke-linecap="square">');
-      parts.push(gdLines.join(''));
+      parts.push(gdExt.join(''));
+      parts.push(gdParts.join(''));
       parts.push('</g>');
-      parts.push('<g pointer-events="none">'+gdTexts.join('')+'</g>');
     }
   })();
 
@@ -9829,6 +9855,8 @@ function tlInitDrag(){
   /* 清理上一次生成的 document 级监听器（重新生成图纸时旧 SVG 已被替换） */
   if(window._tlDragMove)document.removeEventListener('mousemove',window._tlDragMove);
   if(window._tlDragUp)document.removeEventListener('mouseup',window._tlDragUp);
+  if(window._tlDimMove)document.removeEventListener('mousemove',window._tlDimMove);
+  if(window._tlDimUp)document.removeEventListener('mouseup',window._tlDimUp);
   /* A3 图纸范围（SVG user units）*/
   var svgW=1190, svgH=900, frameX=8, frameY=8, frameW=svgW-16, frameH=svgH-16;
   /* 地块组原始包围盒 */
@@ -9863,6 +9891,16 @@ function tlInitDrag(){
     if(e.button!==0)return;
     var target=e.target;
     if(!target||!target.closest||!target.closest('#tlPlotGroup'))return;
+    /* v114：尺寸标注线命中优先于整组平移（命中按坐标算，不依赖 pointer-events） */
+    var _dimP=tlDimSvgPoint(svgEl,e);
+    var _dimHit=_dimP?tlDimHitTest(_dimP):null;
+    if(_dimHit){
+      e.preventDefault();
+      dimDrag={hit:_dimHit,x0:e.clientX,y0:e.clientY,off0:window._tlDimState.offs[_dimHit.id]||0,lastOff:window._tlDimState.offs[_dimHit.id]||0,k:getScale()};
+      document.body.style.userSelect='none';
+      svgEl.style.cursor=_dimHit.axis==='y'?'ns-resize':'ew-resize';
+      return;
+    }
     e.preventDefault();
     var scale=getScale();
     dragStart={x:e.clientX,y:e.clientY,ox:pos.x,oy:pos.y,scale:scale};
@@ -9886,6 +9924,59 @@ function tlInitDrag(){
   };
   document.addEventListener('mousemove',window._tlDragMove);
   document.addEventListener('mouseup',window._tlDragUp);
+  /* ===== v114：尺寸标注线拖动 —— 命中按 _tlDimHits 坐标，更新走 data-dim/data-dimext 增量 ===== */
+  var dimDrag=null;
+  function tlDimSvgPoint(svg,e){
+    var m=svg.getScreenCTM(); if(!m)return null;
+    var pt=svg.createSVGPoint(); pt.x=e.clientX; pt.y=e.clientY;
+    try{return pt.matrixTransform(m.inverse());}catch(err){return null;}
+  }
+  function tlDimHitTest(p){
+    var hits=window._tlDimHits||[]; var best=null,bd=9;
+    for(var i=0;i<hits.length;i++){
+      var h=hits[i];
+      if(h.axis==='y'){
+        if(p.x<Math.min(h.x1,h.x2)-9||p.x>Math.max(h.x1,h.x2)+9)continue;
+        var d=Math.abs(p.y-h.y1); if(d<bd){bd=d;best=h;}
+      }else{
+        if(p.y<Math.min(h.y1,h.y2)-9||p.y>Math.max(h.y1,h.y2)+9)continue;
+        var d2=Math.abs(p.x-h.x1); if(d2<bd){bd=d2;best=h;}
+      }
+    }
+    return best;
+  }
+  function tlDimApplyDD(id,axis,dd,tot){
+    var g=svgEl.querySelector('[data-dim="'+id+'"]');
+    if(g)g.setAttribute('transform','translate('+(axis==='x'?(tot||0):0).toFixed(1)+','+(axis==='y'?(tot||0):0).toFixed(1)+')');
+    var exts=svgEl.querySelectorAll('[data-dimext="'+id+'"]');
+    for(var i=0;i<exts.length;i++){
+      var ln=exts[i], a=axis==='x'?'x2':'y2';
+      ln.setAttribute(a,(parseFloat(ln.getAttribute(a))+dd).toFixed(1));
+    }
+  }
+  window._tlDimMove=function(ev){
+    if(!dimDrag)return;
+    var h=dimDrag.hit;
+    /* v114fix：d = 按下时偏移 + 总位移×k（此前误用 lastOff+总位移 → 每次 move 累计多加，e2e 实测 65.6≠43.7） */
+    var d=dimDrag.off0+((h.axis==='y')?(ev.clientY-dimDrag.y0):(ev.clientX-dimDrag.x0))*dimDrag.k;
+    d=Math.max(h.minOff,Math.min(320,d));
+    var dd=d-dimDrag.lastOff;
+    if(!dd)return;
+    window._tlDimState.offs[h.id]=d;
+    tlDimApplyDD(h.id,h.axis,dd,d);
+    dimDrag.lastOff=d;
+  };
+  window._tlDimUp=function(){
+    if(!dimDrag)return;
+    dimDrag=null;
+    document.body.style.userSelect='';
+    svgEl.style.cursor='';
+    try{localStorage.setItem('tl-dim-offs',JSON.stringify({sig:window._tlDimState.sig,offs:window._tlDimState.offs}));}catch(e){}
+  };
+  document.addEventListener('mousemove',window._tlDimMove);
+  document.addEventListener('mouseup',window._tlDimUp);
+  /* v114：hover 光标用 SVG 原生 cursor 属性（渲染时随尺寸线输出）—— 不挂 JS mousemove，
+     headless 下「cursor 赋值↔合成 mousemove」会互相触发形成事件风暴（实测死循环），禁走此路。 */
   /* 双击地块组重置位置 */
   plotG.addEventListener('dblclick',function(e){
     e.stopPropagation();
