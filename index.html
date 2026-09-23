@@ -6141,7 +6141,10 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
       <span id="tlIsoZoomPct">100%</span>
       <button class="pp-btn-ghost" id="tlIsoDownload" type="button" style="padding:5px 14px;font-size:12px;margin-left:auto" onclick="RyIsoDiagram.downloadSVG()">📥 下载轴测图 SVG</button>
       <button class="pp-btn-ghost" id="tlIsoPrint" type="button" style="padding:5px 14px;font-size:12px" onclick="RyIsoDiagram.printSVG()">🖨️ 打印轴测图</button>
-      <button class="pp-btn-ghost" id="tlEconBtn" type="button" style="padding:5px 14px;font-size:12px" title="按全地块总/主/支管总长，对比不同管径组合的水泵扬程、功率与管材投入，找经济平衡点">💰 管径经济对比</button>
+      <!-- v133（2026-09-23 用户要求）：工具栏上的「管径经济对比」入口取消——面板已有右侧折叠细条
+           （#tlEconRail）作为唯一开启入口且切入轴测图自动展开，此处重复。按 v96 纪律 DOM 与
+           click 监听保留，仅 display:none。要恢复：删掉 style="display:none" 即可。 -->
+      <button class="pp-btn-ghost" id="tlEconBtn" type="button" style="padding:5px 14px;font-size:12px;display:none" title="按全地块总/主/支管总长，对比不同管径组合的水泵扬程、功率与管材投入，找经济平衡点">💰 管径经济对比</button>
     </div>
     <div id="tlIsoDiagramContent"><div class="pp-diagram-empty">完成面积测量并点击「生成管线图」后，切到「轴测简图」视图会根据平面图几何自动生成轴测示意图（含三通与阀门）。</div></div>
 
