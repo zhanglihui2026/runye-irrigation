@@ -5901,6 +5901,14 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     <span class="pp-sep"></span>
     <button class="pp-btn-ghost" id="ppUndo">↩ 回退</button>
     <button class="pp-btn-ghost" id="ppAutoPipe">自动管路</button>
+    <span class="pp-sep"></span>
+    <button class="pp-btn-generate" id="ppGenerate">生成施工图</button>
+    <button class="pp-btn-ghost" id="ppDownload" style="display:none">📥 下载</button>
+    <button class="pp-btn-ghost" id="ppPrint" style="display:none">🖨️ 打印A3</button>
+    <!-- v128（2026-09-23 用户要求）：「地块交底调整」组（分区旋转90°/地块角度/地块镜像/重新分区）
+         从中部整体移到工具栏底部（分区旋转随之移动）——纯 DOM 顺序调整，
+         元素 id 与 JS 引用（ppRotateZones/ppPlotAngle/ppRepartition/mirror）一律不动。 -->
+    <span class="pp-sep"></span>
     <button class="pp-btn-ghost" id="ppRotateZones">↻ 分区旋转90°</button>
     <label class="pp-angle-control" title="仅旋转地块外轮廓，分区切割保持不旋转">
       <span>地块角度</span>
@@ -5914,10 +5922,6 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
       <button type="button" class="pp-btn-ghost pp-mirror-btn" data-mirror="v">垂直</button>
     </label>
     <button class="pp-btn-ghost" id="ppRepartition" title="将当前旋转后的地块作为新基准重新切割分区">重新分区</button>
-    <span class="pp-sep"></span>
-    <button class="pp-btn-generate" id="ppGenerate">生成施工图</button>
-    <button class="pp-btn-ghost" id="ppDownload" style="display:none">📥 下载</button>
-    <button class="pp-btn-ghost" id="ppPrint" style="display:none">🖨️ 打印A3</button>
   </div>
   <div class="pp-pick-result" id="ppPickResult" style="display:none">
     <span class="muted">拾取结果</span>
