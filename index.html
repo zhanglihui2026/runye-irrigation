@@ -16756,7 +16756,10 @@ function tlIsoStatsReset() {
      ods = 图面实际代表径（图面改径按管长加权，无改径退回水力计算值，v116 口径）。
      v138（用户要求）：水泵参数=当前重算 r 的流量/扬程/功率，1 位小数——与经济面板
      「当前选择」同源同精度（原取结果条文本被 fmt0 取整，39 m ≠ 面板 38.9 m）；
-     r 值异常时退回结果条文本兜底。管长统计维持原逻辑（computeThreeLevel 实际采用长度）。 */
+     r 值异常时退回结果条文本兜底。
+     v140（用户澄清）：管长统计 = 全地块实际用量——AE.allPids→effPts（有效几何，含手工
+     改长/平移）逐段累加，与经济面板「全地块管长」同口径；不用最不利路径长度
+     （r.*LenUsed 只是扬程计算用的最远分区路径）；无图面数据时退回 r.*LenUsed。 */
   window.tlFigParamLines = function (r) {
     var d = window.tlDiagramData;
     function figOd(kind, designOd) {
@@ -16789,7 +16792,26 @@ function tlIsoStatsReset() {
       head: f1(r.pumpHead) !== null ? f1(r.pumpHead) + ' m' : barTxt('tlPlanPumpHead'),
       power: f1(r.motorKW_rounded) !== null ? f1(r.motorKW_rounded) + ' kW' : barTxt('tlPlanPumpPower')
     };
-    var l1 = '总管 Ø ' + ods.front + ' mm · ' + fmtLen(r.frontLenUsed) + ' m · 主管 Ø ' + ods.main + ' mm · ' + fmtLen(r.mainLenUsed) + ' m · 支管 Ø ' + ods.branch + ' mm · ' + fmtLen(r.branchLenUsed) + ' m';
+    /* v140：全地块管长统计（与经济面板「全地块管长」同口径：有效几何逐段累加，含手工改动） */
+    function plotLen(kind) {
+      try {
+        var AE = window.RyTlAutoEdits;
+        if (!AE || !AE.allPids || !d) return null;
+        var pids = AE.allPids(d), total = 0, i;
+        for (i = 0; i < pids.length; i++) {
+          var k = pids[i] === 'front' ? 'front' : (pids[i].indexOf('main-') === 0 ? 'main' : 'branch');
+          if (k !== kind) continue;
+          var pts = AE.effPts(pids[i], d); if (!pts || pts.length < 2) continue;
+          total += AE.polylineLen(pts);
+        }
+        return total > 0 ? total : null;
+      } catch (eL) { return null; }
+    }
+    var lF = plotLen('front'), lM = plotLen('main'), lB = plotLen('branch');
+    if (lF === null) lF = r.frontLenUsed;
+    if (lM === null) lM = r.mainLenUsed;
+    if (lB === null) lB = r.branchLenUsed;
+    var l1 = '总管 Ø ' + ods.front + ' mm · ' + fmtLen(lF) + ' m · 主管 Ø ' + ods.main + ' mm · ' + fmtLen(lM) + ' m · 支管 Ø ' + ods.branch + ' mm · ' + fmtLen(lB) + ' m';
     var l2 = '联合灌溉 ' + (typeof tlGetZoneCount === 'function' ? tlGetZoneCount() : (r.zoneCount || 1)) + '区 · 水泵 ' + pump.flow + ' · ' + pump.head + ' · ' + pump.power;
     return { lines: [l1, l2], ods: ods, pump: pump };
   };
