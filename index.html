@@ -13658,8 +13658,8 @@ ppPullLiftDh();                                              // 首屏对齐一�
     var svgStr=parts.join('');
     document.getElementById('ppDiagramContent').innerHTML=svgStr;
     document.getElementById('ppDiagramWrap').style.display='block';
-    document.getElementById('ppDownload').style.display='inline-block';
-    document.getElementById('ppPrint').style.display='inline-block';
+    /* v129b（2026-09-23 用户要求）：「下载/打印A3」按钮取消 —— 不再重新显示（DOM 与 click 监听保留，按钮恒 display:none）。
+       原两行：ppDownload/ppPrint.style.display='inline-block' */
     ppState.lastSVG=svgStr;
     try{ ppInitCalcBookDrag(); }catch(e){ console.warn('[ppGenerateDiagram] calc book drag init failed', e); }
     try{ ppInitPlotDrag(); }catch(e){ console.warn('[ppGenerateDiagram] plot drag init failed', e); }
@@ -14072,8 +14072,8 @@ ppPullLiftDh();                                              // 首屏对齐一�
     if(ppState.lastSVG){
       document.getElementById('ppDiagramContent').innerHTML=ppState.lastSVG;
       document.getElementById('ppDiagramWrap').style.display='block';
-      document.getElementById('ppDownload').style.display='inline-flex';
-      document.getElementById('ppPrint').style.display='inline-flex';
+      /* v129b（同上）：状态恢复路径也不重新显示下载/打印A3。
+         原两行：ppDownload/ppPrint.style.display='inline-flex' */
     }else{
       document.getElementById('ppDiagramContent').innerHTML='<div class="pp-diagram-empty">完成面积测量并点击「生成施工图」后，这里显示最终施工图。</div>';
       document.getElementById('ppDiagramWrap').style.display='block';
