@@ -672,6 +672,10 @@
    *   所以另加「显式展示钩子」（ryShowSection / ryJumpToSection 命中本区块就挂载）双保险。
    */
   function mount() {
+    /* v135（2026-09-23 用户指令）入口预留总闸：置 true 时界面不挂载（同「数字化建模」的处理方式），
+       模块/API/存档全保留；IntersectionObserver、ryShowSection/ryJumpToSection 钩子照常在，
+       只是命中后空转。恢复：window.RY_HC_RESERVED=false 或删除本行。 */
+    if (window.RY_HC_RESERVED) return null;
     var sec = document.getElementById(SEC_ID);
     if (!sec || !Core) return null;
     var wrap = sec.querySelector('.hc-wrap');
@@ -734,6 +738,7 @@
     root: function () { return rootEl; },
     getConfig: function () { return cfg ? clone(cfg) : null; },
     setConfig: function (c) {
+      if (window.RY_HC_RESERVED) return null;   /* v135 入口预留总闸（见 mount 内注释） */
       cfg = nm(c);
       if (!isMountedNow()) mount();
       renderMains(); renderResults(); saveCfg();
@@ -744,6 +749,7 @@
        trunkFlow=Σ主管流量=combinedFlow（mains 为三级侧组装的最远 zoneCount 根主管）；normalize 负责数值清洗（at clamp/排序）；
        导入后自动跳到最不利路径，左栏顶部显示来源行。注意：会覆盖当前 cfg（自动推送口径，用户已确认）。 */
     importThreeLevel: function (data) {
+      if (window.RY_HC_RESERVED) return null;   /* v135 入口预留总闸：三级方案自动推送空转（tlPushToHydraulicCalc 自带 try/catch，无感） */
       /* v2.1（2026-09-19 用户核对流量）：联合灌溉口径 —— data.mains 为三级侧按「最远 zoneCount 区」组装的主管组
          （全图轮灌、同时只开 zoneCount 区），trunkFlow=Σ主管流量=combinedFlow。 */
       var mains = (data && data.mains || []).filter(function (m) {

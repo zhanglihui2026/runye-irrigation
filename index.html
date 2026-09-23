@@ -6628,6 +6628,19 @@ function doIrrImport(text){
       <button type="button" class="ry-modeling-open" data-open-parametric>先体验参数化建模 →</button>
     </div>
   -->
+
+  <!-- 2026-09-23（用户指令）v135：「水力计算器」内容暂不展示，只保留导航入口——处理方式与
+       「数字化建模」（parametricModelingSection）一致。界面懒挂载由 window.RY_HC_RESERVED 总闸门控
+       （脚本定义见下方 hydraulic-calc 脚本标签前的注释；mount/setConfig/importThreeLevel 三入口守卫），
+       计算核心 hc-core.js / pipe-path-loss.js 照常加载（后者是三级扬程校核依赖，不可停），
+       RyHydraulicCalc API、localStorage 存档 runye_hydraulic_calc_cfg_v1 全保留。
+       将来想好了怎么做，把 window.RY_HC_RESERVED 改为 false（或删掉下面占位 div）即可原样恢复。 -->
+  <div style="min-height:420px;display:flex;align-items:center;justify-content:center">
+    <div style="text-align:center">
+      <div style="font-size:15px;font-weight:700;color:#334155">水力计算器 · 入口预留</div>
+      <div style="font-size:12.5px;margin-top:8px;color:#64748b">具体内容规划中——方案确定后在此上线。</div>
+    </div>
+  </div>
 </section>
 <section id="parametricModelingSection" class="ry-sec ry-modeling-section" aria-label="数字化建模 · 参数化建模" data-modeling-state="idle">
   <!-- 2026-09-19（用户指令）：数字化建模只预留导航入口，具体内容暂不展示——
@@ -15145,7 +15158,7 @@ render();
     pipePlanSection:'绘制主管 / 支管 → 生成施工图 → 切「二级简图」查看',
     tlPipePlanSection:'设定联合灌溉分区 → 生成管线图 → 「三级制图」可缩放/插入管线',
     detailsSection:'材料清单与工程量汇总',
-threeDModelingSection:'树状管网水头损失：任选路径独立成算，管径/长度实时联动',
+threeDModelingSection:'水力计算器 · 入口预留（方案确定后上线）',
     parametricModelingSection:'数字化建模 · 入口预留（方案确定后上线）',
     filterSystemSection:'GREEN 型单体并联机组 · 四视图与选型计算 · 可回写过滤损失'
   };
@@ -15698,6 +15711,11 @@ threeDModelingSection:'树状管网水头损失：任选路径独立成算，管
 
 <!-- ===== 三级设计工作区模块 + 页面接线（2026-09-13） ===== -->
 <script src="tl-workspace/tl-workspace.js"></script>
+<!-- 2026-09-23（用户指令）v135：水力计算器「入口预留」总闸——置 true 时界面不挂载
+     （hydraulic-calc.js 的 mount/setConfig/importThreeLevel 直接空转），导航入口与占位文案保留，
+     计算核心与 API 照常加载。将来恢复：改 false 或删除本行。
+     注意 pipe-path-loss.js 是三级扬程校核（RyPipePathLoss.calculate）依赖，必须照常加载。 -->
+<script>window.RY_HC_RESERVED=true;</script>
 <script src="hydraulic-calc/hc-core.js"></script>
 <script src="hydraulic-calc/pipe-path-loss.js"></script>
 <script src="hydraulic-calc/hydraulic-calc.js"></script>
