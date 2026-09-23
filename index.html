@@ -9333,7 +9333,7 @@ function tlAutoGenerate(options) {
     /* 底部水平尺寸线（gplot-h）：界线锚 = 地块左下/右下角（固定），界线活动端随 off 伸长 */
     window._tlDimHits.push({id:'gplot-h',axis:'y',x1:plotLeft,y1:dimBottomY,x2:plotRight,y2:dimBottomY,
       minOff:-(dimBottomBase-plotBottom-6)});
-    parts.push('<g data-dim="gplot-h" stroke="#111111" stroke-width="0.95" fill="none" opacity="0.98" stroke-linecap="square">');
+    parts.push('<g data-dim="gplot-h" data-axis="y" stroke="#111111" stroke-width="0.95" fill="none" opacity="0.98" stroke-linecap="square">');
     parts.push('<line data-dimext="gplot-h" x1="'+plotLeft.toFixed(1)+'" y1="'+(plotBottom+7).toFixed(1)+'" x2="'+plotLeft.toFixed(1)+'" y2="'+(dimBottomY+12).toFixed(1)+'"/>');
     parts.push('<line data-dimext="gplot-h" x1="'+plotRight.toFixed(1)+'" y1="'+(plotBottom+7).toFixed(1)+'" x2="'+plotRight.toFixed(1)+'" y2="'+(dimBottomY+12).toFixed(1)+'"/>');
     parts.push('<line x1="'+plotLeft.toFixed(1)+'" y1="'+dimBottomY.toFixed(1)+'" x2="'+plotRight.toFixed(1)+'" y2="'+dimBottomY.toFixed(1)+'"/>');
@@ -9344,7 +9344,7 @@ function tlAutoGenerate(options) {
     /* 左侧垂直尺寸线（gplot-v）：界线锚 = 地块左上/左下角（固定），off 正=向左远离 */
     window._tlDimHits.push({id:'gplot-v',axis:'x',x1:dimLeftX,y1:plotTop,x2:dimLeftX,y2:plotBottom,
       minOff:-(plotLeft-dimLeftBase-6)});
-    parts.push('<g data-dim="gplot-v" stroke="#111111" stroke-width="0.95" fill="none" opacity="0.98" stroke-linecap="square">');
+    parts.push('<g data-dim="gplot-v" data-axis="x" stroke="#111111" stroke-width="0.95" fill="none" opacity="0.98" stroke-linecap="square">');
     parts.push('<line data-dimext="gplot-v" x1="'+(plotLeft-7).toFixed(1)+'" y1="'+plotTop.toFixed(1)+'" x2="'+(dimLeftX-12).toFixed(1)+'" y2="'+plotTop.toFixed(1)+'"/>');
     parts.push('<line data-dimext="gplot-v" x1="'+(plotLeft-7).toFixed(1)+'" y1="'+plotBottom.toFixed(1)+'" x2="'+(dimLeftX-12).toFixed(1)+'" y2="'+plotBottom.toFixed(1)+'"/>');
     parts.push('<line x1="'+dimLeftX.toFixed(1)+'" y1="'+plotTop.toFixed(1)+'" x2="'+dimLeftX.toFixed(1)+'" y2="'+plotBottom.toFixed(1)+'"/>');
@@ -9414,7 +9414,7 @@ function tlAutoGenerate(options) {
         var gdVx=gdBR.x+14+tlDimOffOf(gdIdV);   /* v114: off 正=向右 */
         gdExt.push('<line data-dimext="'+gdIdV+'" x1="'+Math.min(gdTR.x+4,gdVx-6).toFixed(1)+'" y1="'+gdTR.y.toFixed(1)+'" x2="'+Math.max(gdTR.x+4,gdVx-6).toFixed(1)+'" y2="'+gdTR.y.toFixed(1)+'"/>');
         gdExt.push('<line data-dimext="'+gdIdV+'" x1="'+Math.min(gdBR.x+4,gdVx-6).toFixed(1)+'" y1="'+gdBR.y.toFixed(1)+'" x2="'+Math.max(gdBR.x+4,gdVx-6).toFixed(1)+'" y2="'+gdBR.y.toFixed(1)+'"/>');
-        gdParts.push('<g data-dim="'+gdIdV+'">'
+        gdParts.push('<g data-dim="'+gdIdV+'" data-axis="x">'
           +'<line x1="'+gdVx.toFixed(1)+'" y1="'+gdTR.y.toFixed(1)+'" x2="'+gdVx.toFixed(1)+'" y2="'+gdBR.y.toFixed(1)+'"/>'
           +gdTickV(gdVx,gdTR.y)+gdTickV(gdVx,gdBR.y)
           +'<g transform="translate('+(gdVx+13).toFixed(1)+' '+((gdTR.y+gdBR.y)/2).toFixed(1)+') rotate(-90)"><text x="0" y="4" text-anchor="middle" font-size="12" font-weight="700" fill="#111111" stroke="none">'+gdVal(gdH)+'</text></g></g>');
@@ -9435,7 +9435,7 @@ function tlAutoGenerate(options) {
         var gdHy=gdBRb.y-14+tlDimOffOf(gdIdH);   /* v114: off 正=向下 */
         gdExt.push('<line data-dimext="'+gdIdH+'" x1="'+gdPA.x.toFixed(1)+'" y1="'+Math.min(gdBRb.y-4,gdHy-6).toFixed(1)+'" x2="'+gdPA.x.toFixed(1)+'" y2="'+Math.max(gdBRb.y-4,gdHy-6).toFixed(1)+'"/>');
         gdExt.push('<line data-dimext="'+gdIdH+'" x1="'+gdPB.x.toFixed(1)+'" y1="'+Math.min(gdBRb.y-4,gdHy-6).toFixed(1)+'" x2="'+gdPB.x.toFixed(1)+'" y2="'+Math.max(gdBRb.y-4,gdHy-6).toFixed(1)+'"/>');
-        gdParts.push('<g data-dim="'+gdIdH+'">'
+        gdParts.push('<g data-dim="'+gdIdH+'" data-axis="y">'
           +'<line x1="'+gdPA.x.toFixed(1)+'" y1="'+gdHy.toFixed(1)+'" x2="'+gdPB.x.toFixed(1)+'" y2="'+gdHy.toFixed(1)+'"/>'
           +gdTickH(gdPA.x,gdHy)+gdTickH(gdPB.x,gdHy)
           +'<text x="'+((gdPA.x+gdPB.x)/2).toFixed(1)+'" y="'+(gdHy-4).toFixed(1)+'" text-anchor="middle" font-size="12" font-weight="700" fill="#111111" stroke="none">'+gdVal(xPlan[gdc2])+'</text></g>');
@@ -9931,6 +9931,8 @@ function tlInitDrag(){
   if(window._tlDragUp)document.removeEventListener('mouseup',window._tlDragUp);
   if(window._tlDimMove)document.removeEventListener('mousemove',window._tlDimMove);
   if(window._tlDimUp)document.removeEventListener('mouseup',window._tlDimUp);
+  if(window._tlDimTouchMove)document.removeEventListener('touchmove',window._tlDimTouchMove);
+  if(window._tlDimTouchUp)document.removeEventListener('touchend',window._tlDimTouchUp);
   /* A3 图纸范围（SVG user units）*/
   var svgW=1190, svgH=900, frameX=8, frameY=8, frameW=svgW-16, frameH=svgH-16;
   /* 地块组原始包围盒 */
@@ -9958,6 +9960,17 @@ function tlInitDrag(){
   function getScale(){
     var rect=svgEl.getBoundingClientRect();
     return rect.width>0?svgW/rect.width:1;
+  }
+  /* v121（2026-09-23 用户反馈「拖动没实现」）：可用性加固 —— ① 光标：悬停尺寸线变双向箭头
+     （v114 注释声称「渲染时输出 cursor」实际没做，用户悬停无任何反馈以为功能不存在）；
+     ② hover 高亮：尺寸线悬停变绿加粗，明确「抓到了」；③ 顺带把命中窗口放宽到 18px。 */
+  if(!svgEl.querySelector('style.tlDimUx')){
+    var _st=document.createElementNS('http://www.w3.org/2000/svg','style');
+    _st.setAttribute('class','tlDimUx');
+    _st.textContent='[data-dim][data-axis="x"]{cursor:ew-resize}'
+      +'[data-dim][data-axis="y"]{cursor:ns-resize}'
+      +'[data-dim]:hover line{stroke:#15803d;stroke-width:2.2}';
+    svgEl.insertBefore(_st,svgEl.firstChild);
   }
   /* 拖拽逻辑：仅点击地块组内部时触发 */
   var dragStart=null;
@@ -10006,14 +10019,14 @@ function tlInitDrag(){
     try{return pt.matrixTransform(m.inverse());}catch(err){return null;}
   }
   function tlDimHitTest(p){
-    var hits=window._tlDimHits||[]; var best=null,bd=9;
+    var hits=window._tlDimHits||[]; var best=null,bd=18;
     for(var i=0;i<hits.length;i++){
       var h=hits[i];
       if(h.axis==='y'){
-        if(p.x<Math.min(h.x1,h.x2)-9||p.x>Math.max(h.x1,h.x2)+9)continue;
+        if(p.x<Math.min(h.x1,h.x2)-18||p.x>Math.max(h.x1,h.x2)+18)continue;
         var d=Math.abs(p.y-h.y1); if(d<bd){bd=d;best=h;}
       }else{
-        if(p.y<Math.min(h.y1,h.y2)-9||p.y>Math.max(h.y1,h.y2)+9)continue;
+        if(p.y<Math.min(h.y1,h.y2)-18||p.y>Math.max(h.y1,h.y2)+18)continue;
         var d2=Math.abs(p.x-h.x1); if(d2<bd){bd=d2;best=h;}
       }
     }
@@ -10049,6 +10062,28 @@ function tlInitDrag(){
   };
   document.addEventListener('mousemove',window._tlDimMove);
   document.addEventListener('mouseup',window._tlDimUp);
+  /* v121：触摸/触屏 —— mouse 系列在触屏上不触发（此前尺寸线拖动在手机/平板完全无效）。
+     touchstart 命中后复用同一 dimDrag；touchmove 把 touches[0] 伪装成 mouse 事件转调 _tlDimMove。 */
+  svgEl.addEventListener('touchstart',function(e){
+    if(e.touches.length!==1)return;
+    var t=e.touches[0];
+    var _dimP=tlDimSvgPoint(svgEl,t);
+    var _dimHit=_dimP?tlDimHitTest(_dimP):null;
+    if(!_dimHit)return;
+    e.preventDefault();
+    dimDrag={hit:_dimHit,x0:t.clientX,y0:t.clientY,off0:window._tlDimState.offs[_dimHit.id]||0,lastOff:window._tlDimState.offs[_dimHit.id]||0,k:getScale()};
+  },{passive:false});
+  window._tlDimTouchMove=function(ev){
+    if(!dimDrag)return;
+    if(ev.touches&&ev.touches.length===1){
+      var t=ev.touches[0];
+      ev.preventDefault();
+      window._tlDimMove({clientX:t.clientX,clientY:t.clientY});
+    }
+  };
+  window._tlDimTouchUp=function(){if(window._tlDimUp)window._tlDimUp();};
+  document.addEventListener('touchmove',window._tlDimTouchMove,{passive:false});
+  document.addEventListener('touchend',window._tlDimTouchUp);
   /* v114：hover 光标用 SVG 原生 cursor 属性（渲染时随尺寸线输出）—— 不挂 JS mousemove，
      headless 下「cursor 赋值↔合成 mousemove」会互相触发形成事件风暴（实测死循环），禁走此路。 */
   /* 双击地块组重置位置 */
