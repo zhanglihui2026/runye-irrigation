@@ -6267,6 +6267,13 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     <button class="tl-ws-btn" id="tlWsMultiBtn" type="button" aria-pressed="false" onclick="tlWsMultiToggle()" title="多选管道：开启后点管身逐段加选（同类型），再点已选段取消该段；点空白清空全部；Ctrl/⌘ + 点管身可直接加选（无需开启）">▣ 多选管道</button>
     <!-- 最远水路显示开关（第五十四轮）：必须在 #tlAutoPipe **之前** —— A6 契约要求生成按钮贴底 -->
     <button class="tl-ws-btn active" id="tlWorstPathToggle" type="button" aria-pressed="true" onclick="tlWorstPathToggle()" title="关闭「最远水路」路径标注（水源 → 最远分区，与水泵扬程同源）">👁 关闭最远水路</button>
+    <!-- v125（2026-09-23 用户要求「标注线增加一个多选按钮，跟水管多选逻辑一样」）：
+         点一下进入多选 —— 之后无位移地点尺寸线即逐条加选/取消；拖动任一已选尺寸线时全部已选一起平移；
+         再点本按钮退出并清空选择。选择集与拖动全走 document 级（v123b 同口径），简图/ws 两份渲染同步。 -->
+    <button class="tl-ws-btn" id="tlDimMultiBtn" type="button" aria-pressed="false" onclick="tlDimMultiToggle()" title="多选标注：开启后点尺寸线逐条加选（无位移点击），再点已选线取消；拖动任一已选尺寸线时全部已选一起平移">▣ 多选标注</button>
+    <!-- v125（同轮用户要求）：尺寸调整保存开关 —— 默认关 = 拖动仅本次有效，刷新页面即恢复初始位置；
+         开 = 当前调整写入本地（localStorage），刷新后保留。关掉时自动清除已保存数据。 -->
+    <button class="tl-ws-btn" id="tlDimSaveBtn" type="button" aria-pressed="false" onclick="tlDimSaveToggle()" title="尺寸调整保存开关：关=拖动仅本次有效，刷新即恢复初始位置；开=当前调整写入本地，刷新后保留">💾 尺寸调整：不保存</button>
 
     <button class="tl-ws-btn" id="tlAutoPipe" type="button" onclick="tlAutoGenerate()" title="按当前参数生成 / 重新生成三级管线平面图（生成后右侧「管段管径与损失」表逐段列出管长与管径）">🔄 生成管线图</button>
     <span class="tl-ws-hint" id="tlWsHint">点「插入主管/支管」后在图上点击逐点画线，双击结束</span>
@@ -9309,7 +9316,12 @@ function tlAutoGenerate(options) {
   //   两端界线锚点固定、自动加长；偏移记忆 localStorage('tl-dim-offs')（带布局签名，布局变化自动重置）。
   var tlDimSig=[cols,rows,tlGN,tlManualActive?JSON.stringify(window.tlManualGroups||[]):'-',Math.round(b.w),Math.round(b.h)].join('|');
   if(!window._tlDimState||window._tlDimState.sig!==tlDimSig){
-    var _dimSaved=null;try{_dimSaved=JSON.parse(localStorage.getItem('tl-dim-offs')||'null');}catch(e){}
+    /* v125：保存开关（localStorage 'tl-dim-save'）—— 关(默认)=不读存档并清掉旧档（刷新即恢复初始位置）；
+       开=照旧读档（用户点过「保存」后刷新数据保留）。 */
+    var _dimSaveOn=false;try{_dimSaveOn=localStorage.getItem('tl-dim-save')==='1';}catch(e){}
+    var _dimSaved=null;
+    if(_dimSaveOn){try{_dimSaved=JSON.parse(localStorage.getItem('tl-dim-offs')||'null');}catch(e){}}
+    else{try{localStorage.removeItem('tl-dim-offs');}catch(e){}}
     window._tlDimState=(_dimSaved&&_dimSaved.sig===tlDimSig&&_dimSaved.offs)?{sig:tlDimSig,offs:_dimSaved.offs}:{sig:tlDimSig,offs:{}};
   }
   window._tlDimHits=[];
@@ -9983,7 +9995,10 @@ function tlInitDrag(){
     _st.id='tlDimUxStyle';
     _st.textContent='[data-dim][data-axis="x"]{cursor:ew-resize}'
       +'[data-dim][data-axis="y"]{cursor:ns-resize}'
-      +'[data-dim]:hover line{stroke:#15803d;stroke-width:2.2}';
+      +'[data-dim]:hover line{stroke:#15803d;stroke-width:2.2}'
+      /* v125：多选高亮（棕橙），简图与 ws 克隆的 [data-dim] 组都会带上 class */
+      +'[data-dim].tl-dimsel line{stroke:#b45309;stroke-width:2.4}'
+      +'[data-dim].tl-dimsel text{fill:#b45309}';
     document.head.appendChild(_st);
   }
   /* 拖拽逻辑：仅点击地块组内部时触发 */
@@ -9997,7 +10012,7 @@ function tlInitDrag(){
     var _dimHit=_dimP?tlDimHitTest(_dimP):null;
     if(_dimHit){
       e.preventDefault();
-      dimDrag={hit:_dimHit,x0:e.clientX,y0:e.clientY,off0:window._tlDimState.offs[_dimHit.id]||0,lastOff:window._tlDimState.offs[_dimHit.id]||0,k:getScale(),src:'sys'};
+      dimDrag=tlDimDragObj(_dimHit,tlDimGroupFor(_dimHit),e.clientX,e.clientY,getScale(),'sys');
       document.body.style.userSelect='none';
       svgEl.style.cursor=_dimHit.axis==='y'?'ns-resize':'ew-resize';
       return;
@@ -10059,24 +10074,53 @@ function tlInitDrag(){
       ln.setAttribute(a,(parseFloat(ln.getAttribute(a))+dd).toFixed(1));
     }
   }
+  /* v125：多选拖动 —— 按住「已选」尺寸线拖动 = 全部已选一起平移。
+     每条线沿自己的法向取位移分量（y 轴线取 dy、x 轴线取 dx），minOff 约束逐条生效。 */
+  function tlDimGroupFor(hit){
+    if(!(window._tlDimMulti&&window._tlDimSel&&window._tlDimSel.length&&window._tlDimSel.indexOf(hit.id)>=0))return null;
+    var grp=[],hits=window._tlDimHits||[];
+    for(var i=0;i<hits.length;i++){
+      var h=hits[i];
+      if(window._tlDimSel.indexOf(h.id)>=0)grp.push({id:h.id,axis:h.axis,minOff:h.minOff,off0:window._tlDimState.offs[h.id]||0});
+    }
+    return grp.length?grp:null;
+  }
+  function tlDimDragObj(hit,g,x0,y0,k,src){
+    var grp=g||[{id:hit.id,axis:hit.axis,minOff:hit.minOff,off0:window._tlDimState.offs[hit.id]||0}];
+    var lo={};for(var i=0;i<grp.length;i++)lo[grp[i].id]=grp[i].off0;
+    return {hit:hit,grp:grp,lastOffs:lo,x0:x0,y0:y0,k:k,src:src||''};
+  }
   window._tlDimMove=function(ev){
     if(!dimDrag)return;
-    var h=dimDrag.hit;
-    /* v114fix：d = 按下时偏移 + 总位移×k（此前误用 lastOff+总位移 → 每次 move 累计多加，e2e 实测 65.6≠43.7） */
-    var d=dimDrag.off0+((h.axis==='y')?(ev.clientY-dimDrag.y0):(ev.clientX-dimDrag.x0))*dimDrag.k;
-    d=Math.max(h.minOff,Math.min(320,d));
-    var dd=d-dimDrag.lastOff;
-    if(!dd)return;
-    window._tlDimState.offs[h.id]=d;
-    tlDimApplyDD(h.id,h.axis,dd,d);
-    dimDrag.lastOff=d;
+    dimDrag.dx=(ev.clientX||0)-dimDrag.x0; dimDrag.dy=(ev.clientY||0)-dimDrag.y0;
+    for(var i=0;i<dimDrag.grp.length;i++){
+      var h=dimDrag.grp[i];
+      /* v114fix：d = 按下时偏移 + 总位移×k（此前误用 lastOff+总位移 → 每次 move 累计多加，e2e 实测 65.6≠43.7） */
+      var d=h.off0+((h.axis==='y')?dimDrag.dy:dimDrag.dx)*dimDrag.k;
+      d=Math.max(h.minOff,Math.min(320,d));
+      var dd=d-(dimDrag.lastOffs[h.id]||0);
+      if(!dd)continue;
+      window._tlDimState.offs[h.id]=d;
+      tlDimApplyDD(h.id,h.axis,dd,d);
+      dimDrag.lastOffs[h.id]=d;
+    }
   };
   window._tlDimUp=function(){
     if(!dimDrag)return;
+    /* v125：多选模式下「无位移的点击」= 加选/取消该尺寸线（与水管多选同口径，<4px 视为点击） */
+    if(window._tlDimMulti&&dimDrag.hit&&Math.abs(dimDrag.dx||0)<4&&Math.abs(dimDrag.dy||0)<4){
+      var _id=dimDrag.hit.id,_ix=window._tlDimSel.indexOf(_id);
+      if(_ix>=0)window._tlDimSel.splice(_ix,1);else window._tlDimSel.push(_id);
+      if(window.tlDimSelSync)window.tlDimSelSync();
+    }
     dimDrag=null;
     document.body.style.userSelect='';
     svgEl.style.cursor='';
-    try{localStorage.setItem('tl-dim-offs',JSON.stringify({sig:window._tlDimState.sig,offs:window._tlDimState.offs}));}catch(e){}
+    /* v125：保存开关 —— 开=写入本地；关(默认)=不保存并清掉旧档（刷新即恢复初始位置） */
+    try{
+      if(window._tlDimSaveOn)localStorage.setItem('tl-dim-offs',JSON.stringify({sig:window._tlDimState.sig,offs:window._tlDimState.offs}));
+      else localStorage.removeItem('tl-dim-offs');
+    }catch(e){}
   };
   document.addEventListener('mousemove',window._tlDimMove);
   document.addEventListener('mouseup',window._tlDimUp);
@@ -10089,7 +10133,7 @@ function tlInitDrag(){
     var _dimHit=_dimP?tlDimHitTest(_dimP):null;
     if(!_dimHit)return;
     e.preventDefault();
-    dimDrag={hit:_dimHit,x0:t.clientX,y0:t.clientY,off0:window._tlDimState.offs[_dimHit.id]||0,lastOff:window._tlDimState.offs[_dimHit.id]||0,k:getScale()};
+    dimDrag=tlDimDragObj(_dimHit,tlDimGroupFor(_dimHit),t.clientX,t.clientY,getScale());
   },{passive:false});
   window._tlDimTouchMove=function(ev){
     if(!dimDrag)return;
@@ -10121,7 +10165,7 @@ function tlInitDrag(){
     var _r=wsSvg.getBoundingClientRect();
     var _vb=(wsSvg.viewBox&&wsSvg.viewBox.baseVal)?wsSvg.viewBox.baseVal.width:svgW;
     var _k=_r.width>0?_vb/_r.width:1;
-    dimDrag={hit:_dimHit,x0:e.clientX,y0:e.clientY,off0:window._tlDimState.offs[_dimHit.id]||0,lastOff:window._tlDimState.offs[_dimHit.id]||0,k:_k,src:'ws'};
+    dimDrag=tlDimDragObj(_dimHit,tlDimGroupFor(_dimHit),e.clientX,e.clientY,_k,'ws');
     document.body.style.userSelect='none';
     wsSvg.style.cursor=_dimHit.axis==='y'?'ns-resize':'ew-resize';
   }
@@ -15823,6 +15867,62 @@ threeDModelingSection:'树状管网水头损失：任选路径独立成算，管
     drawMultiBtn(RyTlWs.isMultiMode ? RyTlWs.isMultiMode() : false);
     drawFitBtns(RyTlWs.fitMode ? RyTlWs.fitMode() : null);
   }
+})();
+</script>
+<script>
+/* —— v125（2026-09-23 用户要求）：标注线多选 + 尺寸调整保存开关 ——
+   多选镜像水管多选交互（▣ 按钮 aria-pressed、无位移点击加选/取消、退出清空）；
+   选择集/保存标志都是 window 级，尺寸拖动的按下点（简图 mousedown / ws 捕获 pointerdown / touch）
+   在 tlInitDrag 内按 tlDimGroupFor 取组。保存开关持久化在 localStorage 'tl-dim-save'：
+   开=点按钮即把当前 offs 写档（此后每次拖动结束也写）；关=清档（刷新即恢复初始位置）。 */
+(function(){
+  var mBtn=document.getElementById('tlDimMultiBtn'),sBtn=document.getElementById('tlDimSaveBtn');
+  window._tlDimMulti=false;
+  window._tlDimSel=[];
+  try{window._tlDimSaveOn=localStorage.getItem('tl-dim-save')==='1';}catch(e){window._tlDimSaveOn=false;}
+  function drawM(){
+    if(!mBtn)return;
+    var on=!!window._tlDimMulti;
+    mBtn.classList.toggle('active',on);
+    mBtn.setAttribute('aria-pressed',on?'true':'false');
+    mBtn.textContent=on?'▣ 多选标注中 · 点此退出':'▣ 多选标注';
+    mBtn.title=on
+      ?'多选标注已开启：无位移地点尺寸线逐条加选/取消；拖动任一已选尺寸线时全部已选一起平移；点本按钮退出并清空选择'
+      :'多选标注：开启后点尺寸线逐条加选（无位移点击），再点已选线取消；拖动任一已选尺寸线时全部已选一起平移';
+  }
+  function drawS(){
+    if(!sBtn)return;
+    var on=!!window._tlDimSaveOn;
+    sBtn.classList.toggle('active',on);
+    sBtn.setAttribute('aria-pressed',on?'true':'false');
+    sBtn.textContent=on?'💾 尺寸调整：已保存':'💾 尺寸调整：不保存';
+    sBtn.title=on
+      ?'尺寸拖动结果已写入本地，刷新页面后仍保留。点本按钮关闭并清除已保存数据（刷新即恢复初始位置）'
+      :'尺寸拖动仅本次有效，刷新页面即恢复初始位置。点本按钮保存当前调整（刷新后保留）';
+  }
+  /* 选择集同步到两份渲染：class 挂在 [data-dim] 组上，ws 克隆自简图时会一并带上 */
+  window.tlDimSelSync=function(){
+    var all=document.querySelectorAll('[data-dim]');
+    for(var i=0;i<all.length;i++){
+      var g=all[i],on=window._tlDimSel.indexOf(g.getAttribute('data-dim'))>=0;
+      if(on)g.classList.add('tl-dimsel');else g.classList.remove('tl-dimsel');
+    }
+  };
+  window.tlDimMultiToggle=function(){
+    window._tlDimMulti=!window._tlDimMulti;
+    if(!window._tlDimMulti){window._tlDimSel=[];window.tlDimSelSync();}
+    drawM();
+  };
+  window.tlDimSaveToggle=function(){
+    window._tlDimSaveOn=!window._tlDimSaveOn;
+    try{
+      localStorage.setItem('tl-dim-save',window._tlDimSaveOn?'1':'0');
+      if(window._tlDimSaveOn&&window._tlDimState)localStorage.setItem('tl-dim-offs',JSON.stringify({sig:window._tlDimState.sig,offs:window._tlDimState.offs}));
+      else localStorage.removeItem('tl-dim-offs');
+    }catch(e){}
+    drawS();
+  };
+  drawM();drawS();
 })();
 </script>
 <script>
