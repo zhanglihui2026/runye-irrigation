@@ -6127,8 +6127,48 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
       <span id="tlIsoZoomPct">100%</span>
       <button class="pp-btn-ghost" id="tlIsoDownload" type="button" style="padding:5px 14px;font-size:12px;margin-left:auto" onclick="RyIsoDiagram.downloadSVG()">📥 下载轴测图 SVG</button>
       <button class="pp-btn-ghost" id="tlIsoPrint" type="button" style="padding:5px 14px;font-size:12px" onclick="RyIsoDiagram.printSVG()">🖨️ 打印轴测图</button>
+      <button class="pp-btn-ghost" id="tlEconBtn" type="button" style="padding:5px 14px;font-size:12px" title="按全地块总/主/支管总长，对比不同管径组合的水泵扬程、功率与管材投入，找经济平衡点">💰 管径经济对比</button>
     </div>
     <div id="tlIsoDiagramContent"><div class="pp-diagram-empty">完成面积测量并点击「生成管线图」后，切到「轴测简图」视图会根据平面图几何自动生成轴测示意图（含三通与阀门）。</div></div>
+
+    <!-- v120（2026-09-23 用户要求）：管径经济性对比面板 —— 选 总/主/支 管径组合看扬程/功率/管材投入/年电费/年均总成本 -->
+    <div id="tlEconPanel" style="display:none">
+      <style>
+        #tlIsoDiagramWrap{position:relative}
+        #tlEconPanel{position:absolute;top:46px;right:10px;width:452px;max-height:calc(100% - 58px);overflow:auto;background:#fff;border:1px solid #c5d6cc;border-radius:10px;box-shadow:0 10px 30px rgba(15,23,42,.20);z-index:40;font-size:12px;color:#1f2937;padding:10px 12px}
+        #tlEconPanel .te-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+        #tlEconPanel .te-head b{font-size:13px;color:#14532d}
+        #tlEconPanel .te-close{margin-left:auto;border:0;background:transparent;font-size:16px;cursor:pointer;color:#64748b;line-height:1}
+        #tlEconPanel .te-sub{font-size:11px;color:#475569;margin-bottom:6px;line-height:1.5}
+        #tlEconPanel .te-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;font-size:11.5px}
+        #tlEconPanel .te-row select{padding:3px 4px;font-size:12px;border:1px solid #c5d6cc;border-radius:6px;background:#fff}
+        #tlEconPanel .te-row input{width:58px;padding:3px 4px;font-size:11.5px;border:1px solid #c5d6cc;border-radius:6px}
+        #tlEconPanel table{width:100%;border-collapse:collapse;font-size:10.5px;color:#334155}
+        #tlEconPanel th,#tlEconPanel td{padding:3px 4px;text-align:right;border-bottom:1px solid #e3ece6;white-space:nowrap;cursor:pointer}
+        #tlEconPanel th{position:sticky;top:0;background:#f4f9f5;color:#243c35;font-weight:600;border-bottom:1.5px solid #c6d8cc;z-index:1}
+        #tlEconPanel td:first-child,#tlEconPanel th:first-child{text-align:left}
+        #tlEconPanel tr.sel td{background:#dcfce7}
+        #tlEconPanel tr.des td:first-child::after{content:"（设计）";color:#94a3b8;font-size:9.5px}
+        #tlEconPanel tr.min td.te-annual{color:#15803d;font-weight:700}
+        #tlEconPanel .te-note{font-size:10.5px;color:#5b6b66;line-height:1.6;margin-top:6px}
+        #tlEconPanel .te-foot{display:flex;align-items:center;gap:8px;margin-top:8px}
+        #tlEconPanel .te-sum{flex:1;font-size:11px;color:#334155;line-height:1.5}
+        #tlEconPanel .te-apply{border:0;background:#2d604b;color:#fff;border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer;white-space:nowrap}
+        #tlEconPanel .te-apply:hover{background:#24503e}
+        #tlEconPanel details{margin-top:6px;font-size:11px;color:#475569}
+        #tlEconPanel .te-prices{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:4px}
+        #tlEconPanel .te-prices label{font-size:10px;color:#64748b;display:grid;grid-template-columns:auto 1fr;align-items:center;gap:2px}
+        #tlEconPanel .te-prices input{width:100%;padding:2px 3px;font-size:10.5px;border:1px solid #cbd5e1;border-radius:4px}
+      </style>
+      <div class="te-head"><b>💰 管径经济性对比</b><button class="te-close" id="tlEconClose" title="关闭面板">×</button></div>
+      <div class="te-sub" id="teLens">生成管线图后，这里按<b>全地块</b>总/主/支管总长对比不同管径组合的水泵扬程、功率与费用。</div>
+      <div class="te-row" id="tePicks"></div>
+      <div class="te-row" id="teAssum"></div>
+      <div id="teTbl"></div>
+      <div class="te-note" id="teNote"></div>
+      <details id="tePriceDetails"><summary>管材单价表（元/m，占位价可改，自动记忆）</summary><div class="te-prices" id="tePrices"></div></details>
+      <div class="te-foot"><div class="te-sum" id="teSum">—</div><button class="te-apply" id="tlEconApply" title="把选中组合应用到整个地块（同类管道统一改径），水泵扬程/功率随之重算">✓ 应用到图面</button></div>
+    </div>
   </div><!-- /.pp-diagram-wrap -->
   <!-- 统计栏宽度拖拽条（2026-09-15 用户要求）：拖动调节右列宽度；没拖过不写任何变量 -->
   <div id="tlWsStatsGrip" title="拖动调节统计栏宽度（双击恢复默认）"></div>
@@ -16608,6 +16648,182 @@ function tlIsoStatsReset() {
     });
     return rows.length ? rows : null;
   }
+  /* ===== 管径经济性对比面板（v120，2026-09-23 用户要求）=====
+     轴测图右侧列表：选不同 总管/主管/支管 管径组合 → 水泵扬程/功率/管材投入/年电费/年均总成本
+     一表对比（按年均总成本升序，最低行=平衡点参考），可一键应用到图面。口径约定（用户明确）：
+     · 总/主/支管长度 = 三级管线编辑的【全地块】图面有效长度（wsSegRows 汇总，含手工改动），
+       不是最远点路径 —— 改径是整个地块一起改，评估的是整体费用；
+     · 每组组合 = 整地块同类管道统一改径后 computeThreeLevel 重算（临时覆盖 tlPipeOdOverride，算完恢复）；
+     · 六档：以水力计算设计管径为锚，向下 3 档 + 向上 2 档（不足则顺延），并强制 总≥主≥支
+       （主管下限=支管设计管径、总管下限=主管设计管径、支管上限=主管设计管径 —— 「不可能比支管还小」）；
+     · 管材单价为占位价（面板内可改，localStorage 记忆）；电价/年运行小时/折旧年限可改；
+     · 年均总成本 = 管材投入 ÷ 折旧年限 + 功率 × 年运行小时 × 电价，升序排列即经济性排序。 */
+  window.tlEconPanel = (function () {
+    var PRICES_DEFAULT = { 50: 6, 63: 9, 75: 12, 90: 17, 110: 24, 125: 30, 140: 37, 160: 47, 180: 60, 200: 73, 220: 88, 225: 92, 250: 113, 280: 141, 315: 178, 355: 225, 400: 286, 450: 362, 500: 447 };
+    var ASSUM_KEY = 'runye_tlEconAssum', PRICE_KEY = 'runye_tlEconPrices';
+    var st = { open: false, sel: -1, selF: null, selM: null, selB: null, cache: null, cacheKey: '' };
+    function assum() {
+      var v = { price: 0.65, hours: 2000, years: 15 };
+      try { var s = JSON.parse(localStorage.getItem(ASSUM_KEY) || '{}'); for (var k in v) { if (typeof s[k] === 'number' && isFinite(s[k]) && s[k] > 0) v[k] = s[k]; } } catch (e) { }
+      return v;
+    }
+    function prices() {
+      var p = {}, k;
+      for (k in PRICES_DEFAULT) p[k] = PRICES_DEFAULT[k];
+      try { var s = JSON.parse(localStorage.getItem(PRICE_KEY) || '{}'); for (k in s) { if (typeof s[k] === 'number' && isFinite(s[k]) && s[k] > 0) p[k] = s[k]; } } catch (e) { }
+      return p;
+    }
+    function kindOf(pid) { return pid === 'front' ? 'front' : (pid.indexOf('main-') === 0 ? 'main' : 'branch'); }
+    function odOpts(design, minOd, maxOd) {
+      var i = CAL_SERIES.indexOf(design);
+      if (i < 0) { i = 0; for (var j = 0; j < CAL_SERIES.length; j++) { if (CAL_SERIES[j] <= design) i = j; } }
+      var below = [], above = [], j2;
+      for (j2 = i - 1; j2 >= 0 && below.length < 3; j2--) { var v = CAL_SERIES[j2]; if (minOd != null && v < minOd) break; below.unshift(v); }
+      for (j2 = i + 1; j2 < CAL_SERIES.length && above.length < 2; j2++) { var v2 = CAL_SERIES[j2]; if (maxOd != null && v2 > maxOd) break; above.push(v2); }
+      return below.concat([CAL_SERIES[i]]).concat(above);
+    }
+    function cacheKey() {
+      var AE = window.RyTlAutoEdits, d = window.tlDiagramData;
+      if (!AE || !d) return '';
+      try { return AE.geometryKey(d) + '|' + AE.allPids(d).length; } catch (e) { return ''; }
+    }
+    function build() {
+      var AE = window.RyTlAutoEdits, d = window.tlDiagramData;
+      if (!AE || !d || !AE.allPids) return null;
+      var rows = wsSegRows(); if (!rows) return null;
+      var len = { front: 0, main: 0, branch: 0 };
+      rows.forEach(function (r) { len[r.kind] += r.len; });
+      var savedOv = tlPipeOdOverride, rDes;
+      try { tlPipeOdOverride = null; rDes = computeThreeLevel(); } finally { tlPipeOdOverride = savedOv; }
+      var dF = Math.round(rDes.frontPipe.od), dM = Math.round(rDes.mainPipe.od), dB = Math.round(rDes.branchPipe.od);
+      var oF = odOpts(dF, dM, null), oM = odOpts(dM, dB, null), oB = odOpts(dB, null, dM);
+      var pids = AE.allPids(d), kinds = pids.map(function (pid) { return kindOf(pid); });
+      var geoKey = AE.geometryKey(d);
+      var combos = [];
+      oF.forEach(function (f) { oM.forEach(function (m) { if (m > f) return; oB.forEach(function (b2) { if (b2 > m) return; combos.push({ f: f, m: m, b: b2 }); }); }); });
+      combos.forEach(function (c) {
+        var cal = {};
+        pids.forEach(function (pid, idx) { cal[pid] = kinds[idx] === 'front' ? c.f : (kinds[idx] === 'main' ? c.m : c.b); });
+        var ov = tlNormalizePipeOverride({ version: 1, geoKey: geoKey, calibers: cal });
+        var saved = tlPipeOdOverride, r;
+        try { tlPipeOdOverride = ov; r = computeThreeLevel(); } finally { tlPipeOdOverride = saved; }
+        c.head = r.pumpHead; c.kw = r.motorKW_rounded;
+        var pr = prices();
+        c.mat = len.front * (pr[c.f] || 0) + len.main * (pr[c.m] || 0) + len.branch * (pr[c.b] || 0);
+      });
+      return { len: len, dF: dF, dM: dM, dB: dB, oF: oF, oM: oM, oB: oB, combos: combos, nPids: pids.length };
+    }
+    function fmtN(v, dec) { return (isFinite(v) ? v : 0).toFixed(dec == null ? 0 : dec); }
+    function annualOf(c, a) { return c.mat / a.years + c.kw * a.hours * a.price; }
+    function render() {
+      var panelEl = document.getElementById('tlEconPanel'); if (!panelEl) return;
+      var key = cacheKey();
+      if (st.cacheKey !== key) { st.cache = build(); st.cacheKey = key; st.sel = -1; st.selF = null; st.selM = null; st.selB = null; }
+      var D = st.cache;
+      var lensEl = document.getElementById('teLens');
+      if (!D) {
+        if (lensEl) lensEl.innerHTML = '请先在三级管路编辑<b>生成管线图</b>（当前无图面数据），本面板按全地块管长做经济性对比。';
+        document.getElementById('tePicks').innerHTML = ''; document.getElementById('teTbl').innerHTML = '';
+        document.getElementById('teSum').textContent = '—'; return;
+      }
+      if (lensEl) lensEl.innerHTML = '全地块管长（取自三级管线编辑，含手工改动）：总管 <b>' + fmtN(D.len.front) + '</b> m · 主管 <b>' + fmtN(D.len.main) + '</b> m · 支管 <b>' + fmtN(D.len.branch) + '</b> m（共 ' + D.nPids + ' 段）。改径按整地块同类管道统一生效。';
+      var a = assum();
+      /* 单价可在面板内改：材料投入必须在渲染时按当前单价重算（不能烤在 build 缓存里，否则改价无效） */
+      var prNow = prices();
+      D.combos.forEach(function (c) { c.mat = D.len.front * (prNow[c.f] || 0) + D.len.main * (prNow[c.m] || 0) + D.len.branch * (prNow[c.b] || 0); });
+      if (st.selF == null) { st.selF = D.dF; st.selM = D.dM; st.selB = D.dB; }
+      function opts(list, v) { return list.map(function (o) { return '<option value="' + o + '"' + (o === v ? ' selected' : '') + '>Ø' + o + '</option>'; }).join(''); }
+      if (st.selM != null && st.selF < st.selM) st.selF = st.selM;
+      if (st.selB != null && st.selM < st.selB) st.selM = st.selB;
+      if (st.selF < st.selM) st.selF = st.selM;
+      document.getElementById('tePicks').innerHTML =
+        '总管 <select id="teSelF">' + opts(D.oF, st.selF) + '</select> 主管 <select id="teSelM">' + opts(D.oM, st.selM) + '</select> 支管 <select id="teSelB">' + opts(D.oB, st.selB) + '</select>'
+        + '<span style="color:#94a3b8">（最多六档：设计值下 3 档 / 上 2 档，不足六档时按 总≥主≥支 约束截断）</span>';
+      document.getElementById('teAssum').innerHTML =
+        '电价 <input id="teAssumPrice" type="number" min="0.01" step="0.05" value="' + a.price + '"> 元/度 · 年运行 <input id="teAssumHours" type="number" min="1" step="100" value="' + a.hours + '"> h · 折旧 <input id="teAssumYears" type="number" min="1" step="1" value="' + a.years + '"> 年';
+      var rows = D.combos.map(function (c) { var e = c.kw * a.hours * a.price; return { c: c, elec: e, annual: c.mat / a.years + e }; });
+      rows.sort(function (x, y) { return x.annual - y.annual; });
+      var selIdx = -1, minIdx = 0;
+      rows.forEach(function (r, i) { if (r.c.f === st.selF && r.c.m === st.selM && r.c.b === st.selB) selIdx = i; });
+      var html = '<table><thead><tr><th>组合 总/主/支</th><th>管材投入(元)</th><th>扬程(m)</th><th>功率(kW)</th><th>年电费(元)</th><th>年均总(元/年)</th></tr></thead><tbody>';
+      rows.forEach(function (r, i) {
+        var cls = (i === selIdx ? 'sel ' : '') + (i === minIdx ? 'min ' : '') + (r.c.f === D.dF && r.c.m === D.dM && r.c.b === D.dB ? 'des' : '');
+        html += '<tr data-i="' + i + '" class="' + cls.trim() + '">'
+          + '<td>Ø' + r.c.f + ' / Ø' + r.c.m + ' / Ø' + r.c.b + '</td>'
+          + '<td>' + fmtN(r.c.mat) + '</td><td>' + fmtN(r.c.head, 1) + '</td><td>' + fmtN(r.c.kw, 1) + '</td>'
+          + '<td>' + fmtN(r.elec) + '</td><td class="te-annual">' + fmtN(r.annual) + '</td></tr>';
+      });
+      html += '</tbody></table>';
+      document.getElementById('teTbl').innerHTML = html;
+      document.getElementById('teNote').innerHTML = '扬程/功率 = 整地块统一改径后重算（最不利路径口径，与结果栏同源）；管材投入 = 各类总长 × 单价。绿字年均总 = 最低（平衡点参考）；「（设计）」= 水力计算选管组合。';
+      var selRow = selIdx >= 0 ? rows[selIdx] : null;
+      document.getElementById('teSum').innerHTML = selRow
+        ? '当前选择：总 Ø' + selRow.c.f + ' · 主 Ø' + selRow.c.m + ' · 支 Ø' + selRow.c.b + ' → 扬程 <b>' + fmtN(selRow.c.head, 1) + ' m</b> · 功率 <b>' + fmtN(selRow.c.kw, 1) + ' kW</b> · 管材 <b>' + fmtN(selRow.c.mat) + ' 元</b> · 年均总 <b>' + fmtN(selRow.annual) + ' 元/年</b>'
+        : '点击表中任一行选择组合。';
+      var pr = prices();
+      document.getElementById('tePrices').innerHTML = CAL_SERIES.map(function (od) {
+        return '<label>Ø' + od + '<input type="number" min="0" step="1" data-teprice="' + od + '" value="' + (pr[od] != null ? pr[od] : '') + '"></label>';
+      }).join('');
+      if (selIdx >= 0) { var tr = document.querySelector('#teTbl tr.sel'); if (tr && tr.scrollIntoView) try { tr.scrollIntoView({ block: 'nearest' }); } catch (e) { } }
+    }
+    function applySel() {
+      var D = st.cache; if (!D) return false;
+      var rows = D.combos.filter(function (c) { return c.f === st.selF && c.m === st.selM && c.b === st.selB; });
+      if (!rows.length) return false;
+      var c = rows[0];
+      var AE = window.RyTlAutoEdits, d = window.tlDiagramData; if (!AE || !d) return false;
+      var pids = AE.allPids(d), n = 0;
+      pids.forEach(function (pid) {
+        var k = kindOf(pid), od = k === 'front' ? c.f : (k === 'main' ? c.m : c.b);
+        try { if (AE.setCaliber(pid, od, d, 'econ')) n++; } catch (e) { }
+      });
+      try { if (window.tlPumpUpdateRun) window.tlPumpUpdateRun(); } catch (e) { }
+      return n > 0;
+    }
+    function openP() { st.open = true; var p = document.getElementById('tlEconPanel'); if (p) p.style.display = ''; render(); }
+    function closeP() { st.open = false; var p = document.getElementById('tlEconPanel'); if (p) p.style.display = 'none'; }
+    function toggleP() { st.open ? closeP() : openP(); }
+    (function bind() {
+      var btn = document.getElementById('tlEconBtn');
+      if (btn) btn.addEventListener('click', toggleP);
+      var panelEl = document.getElementById('tlEconPanel');
+      if (!panelEl) return;
+      panelEl.addEventListener('click', function (e) {
+        var t = e.target;
+        if (t.id === 'tlEconClose') { closeP(); return; }
+        if (t.id === 'tlEconApply') { applySel(); return; }
+        var tr = t.closest ? t.closest('tr[data-i]') : null;
+        if (tr && st.cache) {
+          var i = parseInt(tr.getAttribute('data-i'), 10);
+          var a = assum();
+          var rows2 = st.cache.combos.map(function (c) { return { c: c, annual: annualOf(c, a) }; });
+          rows2.sort(function (x, y) { return x.annual - y.annual; });
+          if (rows2[i]) { st.selF = rows2[i].c.f; st.selM = rows2[i].c.m; st.selB = rows2[i].c.b; st.sel = i; render(); }
+        }
+      });
+      panelEl.addEventListener('change', function (e) {
+        var t = e.target;
+        if (t.id === 'teSelF') { st.selF = parseInt(t.value, 10); if (st.selM > st.selF) st.selM = st.selF; if (st.selB > st.selM) st.selB = st.selM; render(); return; }
+        if (t.id === 'teSelM') { st.selM = parseInt(t.value, 10); if (st.selM > st.selF) st.selF = st.selM; if (st.selB > st.selM) st.selB = st.selM; render(); return; }
+        if (t.id === 'teSelB') { st.selB = parseInt(t.value, 10); if (st.selB > st.selM) st.selM = st.selB; if (st.selM > st.selF) st.selF = st.selM; render(); return; }
+        if (t.id === 'teAssumPrice' || t.id === 'teAssumHours' || t.id === 'teAssumYears') {
+          var a = assum();
+          if (t.id === 'teAssumPrice') a.price = parseFloat(t.value) || a.price;
+          if (t.id === 'teAssumHours') a.hours = parseFloat(t.value) || a.hours;
+          if (t.id === 'teAssumYears') a.years = parseFloat(t.value) || a.years;
+          try { localStorage.setItem(ASSUM_KEY, JSON.stringify(a)); } catch (e2) { }
+          render(); return;
+        }
+        if (t.getAttribute && t.getAttribute('data-teprice')) {
+          var od = t.getAttribute('data-teprice'), pr = prices(), v = parseFloat(t.value);
+          if (isFinite(v) && v > 0) pr[od] = v; else delete pr[od];
+          try { localStorage.setItem(PRICE_KEY, JSON.stringify(pr)); } catch (e3) { }
+          render(); return;
+        }
+      });
+    })();
+    return { open: openP, close: closeP, toggle: toggleP, render: render, build: build, applySel: applySel };
+  })();
   /* v105（2026-09-22 用户要求）：「管段管径与损失」统计表目前没啥用 → 总开关隐藏。
      后续要调回这张表时：把 TL_WS_STATS_HIDDEN 改回 false 即可，其余逻辑一律不动。 */
   window.TL_WS_STATS_HIDDEN = true;
