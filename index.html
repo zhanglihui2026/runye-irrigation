@@ -9765,6 +9765,9 @@ function tlAutoGenerate(options) {
     flowModel: { zoneFlow: r.zoneFlow, branchFlow: r.branchFlow, combinedFlow: r.combinedFlow, zoneCount: r.zoneCount, branchCount: r.branchCount },
     pump: { flow: (pumpFlowEl ? pumpFlowEl.textContent : ''), head: (pumpHeadEl ? pumpHeadEl.textContent : ''), power: (pumpPowerEl ? pumpPowerEl.textContent : '') },
     pipes: { front: (frontPipeEl ? frontPipeEl.textContent : ''), main: (mainPipeEl ? mainPipeEl.textContent : ''), branch: (branchPipeEl ? branchPipeEl.textContent : '') } };
+  /* v136：meta.live（图面实际值快照）随生成初始化——此刻实际==设计；此后每次改径重算
+     由 tlPumpUpdateRun 收口刷新（见 tlSyncIsoMeta）。meta.pipes 设计口径不动（消费红线）。 */
+  try { window.tlSyncIsoMeta && window.tlSyncIsoMeta(); } catch (eIsoMeta) { }
 
   var iy=footerTop+52; // 底部参数块起始 y（整体下移，与图例对齐）
   parts.push('<g id="tlParamsGroup" font-size="10.5" font-weight="600" fill="#334155">');
@@ -16767,6 +16770,48 @@ function tlIsoStatsReset() {
       if (btn) { btn.textContent = '⇧ 更新水泵扬程'; btn.disabled = false; btn.style.opacity = '1'; }
     }
   }
+  /* ===== v136（2026-09-23 用户反馈）：轴测图图例/信息行实时更新 =====
+     「应用到图面」后管线与左栏结果都变了，但图例读的 tlDiagramData.meta.pipes/pump 是
+     生成管线图时刻的设计口径快照（网络模型/三通菜单/损失估算/e2e 消费红线，不能改写）。
+     故新增 meta.live 实时快照：pipes=按管长加权的图面实际管径（AE.calibersMap，无改径退回
+     水力计算值），pump=左栏结果条当前主数字文本。只写 live，设计口径原样保留。 */
+  window.tlSyncIsoMeta = function () {
+    var d = window.tlDiagramData;
+    if (!d || d.version !== 1) return false;
+    var r = null;
+    try { r = computeThreeLevel(); } catch (e) { return false; }
+    if (!r || !r.frontPipe) return false;
+    var AE = window.RyTlAutoEdits;
+    function figOd(kind, designOd) {
+      try {
+        if (!AE || !AE.calibersMap) return designOd;
+        var cals = AE.calibersMap() || {}, pids = [], i;
+        if (kind === 'front') { pids.push('front'); }
+        else {
+          var arr = (kind === 'main') ? d.mainPipes : d.branchPipes;
+          if (arr) for (i = 0; i < arr.length; i++) pids.push(kind + '-' + i);
+        }
+        var sw = 0, sl = 0;
+        for (i = 0; i < pids.length; i++) {
+          var od = cals[pids[i]]; if (!od) continue;
+          var pts = AE.effPts(pids[i], d); if (!pts) continue;
+          var L = AE.polylineLen(pts);
+          sw += od * L; sl += L;
+        }
+        if (!(sl > 0)) return designOd;
+        return Math.round(sw / sl * 10) / 10;
+      } catch (eOd) { return designOd; }
+    }
+    function barTxt(id) { var el = document.getElementById(id); return el ? el.textContent : ''; }
+    var m = d.meta || (d.meta = {});
+    m.live = {
+      pipes: { front: 'Ø ' + figOd('front', r.frontPipe.od) + ' mm',
+               main: 'Ø ' + figOd('main', r.mainPipe.od) + ' mm',
+               branch: 'Ø ' + figOd('branch', r.branchPipe.od) + ' mm' },
+      pump: { flow: barTxt('tlPlanPumpFlow'), head: barTxt('tlPlanPumpHead'), power: barTxt('tlPlanPumpPower') }
+    };
+    return true;
+  };
   window.tlPumpUpdateRun = function () {
     var st = window.tlPumpOverrideStat();
     if (st.n > 0 && (!window.RyPipePathLoss || !tlWorstPathLen().fromFigure)) return false;
@@ -16778,6 +16823,10 @@ function tlIsoStatsReset() {
     tlPipeOdOverride = pipeCaliberSnapshot();
     try { tlUpdatePlanBar(); } catch (e) { console.error('[tlPumpUpdate] 重算失败：', e); }
     try { tlRefreshLossCard(); } catch (e) { }
+    /* v136：meta.live 实时快照 + 轴测图重渲染（若已挂载）——图例/信息行跟着实际值走。
+       redraw 内部无图面时自动空转；此收口覆盖 经济面板应用/图面改径/更新水泵扬程 三条路。 */
+    try { window.tlSyncIsoMeta && window.tlSyncIsoMeta(); } catch (e) { }
+    try { if (window.RyIsoDiagram && window.RyIsoDiagram.redraw) window.RyIsoDiagram.redraw(); } catch (e) { }
     try {
       var r1 = computeThreeLevel();
       var d = document.getElementById('tlPumpUpdateDelta');

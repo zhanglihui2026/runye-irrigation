@@ -440,14 +440,21 @@
 
     /* 2) 标题/信息行 */
     var meta = model.meta || {};
+    /* v136（2026-09-23 用户反馈「应用到图面后左下角图例不更新」）：信息行/引线标注/图例/水泵行
+       优先读 meta.live（图面实际管径与水泵值，tlPumpUpdateRun 收口实时刷新）；
+       无 live（旧存档/未初始化）退回设计口径 meta.pipes/meta.pump，行为与旧版一致。
+       hostDia(65) 与 network-model 的设计口径消费方一律不动。 */
+    var LV = meta.live || null;
+    function pipeTxt(k, dflt) { return (LV && LV.pipes && LV.pipes[k]) || (meta.pipes && meta.pipes[k]) || dflt; }
+    function pumpTxtOf(k) { return (LV && LV.pump && LV.pump[k]) || (meta.pump && meta.pump[k]) || '—'; }
     var zoneCount = (meta.zoneCount !== undefined) ? meta.zoneCount : ((model.zones && model.zones.cols) ? model.zones.cols * model.zones.rows : '—');
     var now = data.generatedAt ? String(data.generatedAt).replace('T', ' ').slice(0, 16) : new Date().toISOString().slice(0, 16).replace('T', ' ');
     s.push('<g font-family="system-ui,sans-serif">');
     s.push('<text x="' + (svgW / 2) + '" y="34" text-anchor="middle" font-size="19" font-weight="700" fill="' + COLORS.label + '">三级管线轴测示意图</text>');
     s.push('<text x="' + (svgW / 2) + '" y="54" text-anchor="middle" font-size="11" fill="#5b6b66">'
-      + '分区 ' + zoneCount + ' 区 · 总管 ' + esc(meta.pipes && meta.pipes.front || '—')
-      + ' · 主管 ' + esc(meta.pipes && meta.pipes.main || '—')
-      + ' · 支管 ' + esc(meta.pipes && meta.pipes.branch || '—')
+      + '分区 ' + zoneCount + ' 区 · 总管 ' + esc(pipeTxt('front', '—'))
+      + ' · 主管 ' + esc(pipeTxt('main', '—'))
+      + ' · 支管 ' + esc(pipeTxt('branch', '—'))
       + ' · 生成 ' + esc(String(now)) + '</text>');
     s.push('</g>');
 
@@ -796,7 +803,7 @@
     }
     /* 2026-09-15 用户要求：标注简化 —— 同类型管道不逐根引出标注（图里只剩总管一条），
        主管/支管规格改由图例文字给出，用颜色区分类型；点击管件仍可查看参数。 */
-    pipeNote(model.front, HEIGHTS.front, '总管 ' + (meta.pipes && meta.pipes.front || '管径待定'), 20);
+    pipeNote(model.front, HEIGHTS.front, '总管 ' + pipeTxt('front', '管径待定'), 20);
     s.push('<g transform="translate(65 655)" pointer-events="none" fill="none" stroke="#555" stroke-width="0.8"><path d="M0 -32 V0 H38 M0 0 L27 -27"/><g stroke="none" fill="#333" font-family="system-ui" font-size="10"><text x="40" y="4">X</text><text x="28" y="-29">Y</text><text x="-4" y="-37">Z</text></g></g>');
 
     /* 12) 图例 + 底部参数 —— 图例含管径规格（2026-09-15：管道逐根标注已取消，规格看这里） */
@@ -810,14 +817,17 @@
       return x + w + 14;
     }
     var x0 = lx;
-    x0 = legItem(x0, function (x, y) { return '<rect x="' + x + '" y="' + (y - 4) + '" width="14" height="4" rx="2" fill="' + COLORS.front + '"/>'; }, '总管 ' + (meta.pipes && meta.pipes.front || '管径待定'));
-    x0 = legItem(x0, function (x, y) { return '<rect x="' + x + '" y="' + (y - 4) + '" width="14" height="4" rx="2" fill="' + COLORS.main + '"/>'; }, '主管 ' + (meta.pipes && meta.pipes.main || '管径待定'));
-    x0 = legItem(x0, function (x, y) { return '<rect x="' + x + '" y="' + (y - 3) + '" width="14" height="3" rx="1.5" fill="' + COLORS.branch + '"/>'; }, '支管 ' + (meta.pipes && meta.pipes.branch || '管径待定'));
+    x0 = legItem(x0, function (x, y) { return '<rect x="' + x + '" y="' + (y - 4) + '" width="14" height="4" rx="2" fill="' + COLORS.front + '"/>'; }, '总管 ' + pipeTxt('front', '管径待定'));
+    x0 = legItem(x0, function (x, y) { return '<rect x="' + x + '" y="' + (y - 4) + '" width="14" height="4" rx="2" fill="' + COLORS.main + '"/>'; }, '主管 ' + pipeTxt('main', '管径待定'));
+    x0 = legItem(x0, function (x, y) { return '<rect x="' + x + '" y="' + (y - 3) + '" width="14" height="3" rx="1.5" fill="' + COLORS.branch + '"/>'; }, '支管 ' + pipeTxt('branch', '管径待定'));
     /* 滴灌带图例已随绘制一并移除（2026-09-13） */
     x0 = legItem(x0, function (x, y) { return '<path d="M' + x + ' ' + y + ' h14 m-7 0 v-9" fill="none" stroke="#202020" stroke-width="1.5"/>'; }, '三通连接');
     x0 = legItem(x0, function (x, y) { return valveSymbol({x:x + 7,y:y}, 0); }, '阀门(通用)');
     x0 = legItem(x0, function (x, y) { return '<circle cx="' + (x + 7) + '" cy="' + (y - 2) + '" r="6" fill="' + COLORS.source + '"/>'; }, '水源/泵');
-    var pumpTxt = '水泵 ' + ((meta.pump && meta.pump.flow) || '—') + ' m³/h · ' + ((meta.pump && meta.pump.head) || '—') + ' m · ' + ((meta.pump && meta.pump.power) || '—') + ' kW';
+    /* v136 发现的既有小 bug 顺手修：meta.pump/live.pump 存的是结果条文本（自带单位），
+       旧模板再拼一次单位 → 「40.0 m³/h m³/h」。此处只取数字，单位由本模板统一拼。 */
+    function isoNum(v) { var m2 = String(v == null ? '' : v).match(/\d+(?:\.\d+)?/); return m2 ? m2[0] : '—'; }
+    var pumpTxt = '水泵 ' + isoNum(pumpTxtOf('flow')) + ' m³/h · ' + isoNum(pumpTxtOf('head')) + ' m · ' + isoNum(pumpTxtOf('power')) + ' kW';
     s.push('<text x="' + lx + '" y="' + (ly + 26) + '" fill="#334155">' + esc('联合灌溉 ' + zoneCount + ' 区 · ' + pumpTxt) + '</text>');
     s.push('<text x="' + lx + '" y="' + (ly + 44) + '" font-size="10" font-weight="400" fill="#444">45°正面斜轴测 · 不按比例 · 支管按Z向立管展开；标高/埋深待设计确认，非施工放样依据。G=主管，Z=支管。</text>');
     s.push('</g>');
