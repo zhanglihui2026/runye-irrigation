@@ -17099,10 +17099,15 @@ function tlIsoStatsReset() {
       var c = rows[0];
       var AE = window.RyTlAutoEdits, d = window.tlDiagramData; if (!AE || !d) return false;
       var pids = AE.allPids(d), n = 0;
-      pids.forEach(function (pid) {
-        var k = kindOf(pid), od = k === 'front' ? c.f : (k === 'main' ? c.m : c.b);
-        try { if (AE.setCaliber(pid, od, d, 'econ')) n++; } catch (e) { }
-      });
+      /* v141 批处理：整次应用合并为一次通知——原先每段 setCaliber 都跑一遍完整
+         重算+重渲染链（N 段 = N×13 遍计算 + N×3 次整幅 SVG 重建），现在只跑一遍 */
+      AE.beginBatch();
+      try {
+        pids.forEach(function (pid) {
+          var k = kindOf(pid), od = k === 'front' ? c.f : (k === 'main' ? c.m : c.b);
+          try { if (AE.setCaliber(pid, od, d, 'econ')) n++; } catch (e) { }
+        });
+      } finally { AE.endBatch(); }
       try { if (window.tlPumpUpdateRun) window.tlPumpUpdateRun(); } catch (e) { }
       return n > 0;
     }
