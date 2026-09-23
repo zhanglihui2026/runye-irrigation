@@ -16752,8 +16752,10 @@ function tlIsoStatsReset() {
   /* ===== v137（2026-09-23 用户要求）：三级简图参数两行单一来源 =====
      「应用到图面」等改径重算后，简图/系统简图 SVG 里烤死的参数行也要跟着变——
      生成（tlAutoGenerate）与实时重写（tlSyncIsoMeta）共用本构造，保证逐字同源。
-     ods = 图面实际代表径（图面改径按管长加权，无改径退回水力计算值，v116 口径）；
-     第二行的水泵流量/扬程/功率取左栏结果条当前主数字文本（v109b：自带单位，不重拼）。 */
+     ods = 图面实际代表径（图面改径按管长加权，无改径退回水力计算值，v116 口径）。
+     v138（用户要求）：水泵参数=当前重算 r 的流量/扬程/功率，1 位小数——与经济面板
+     「当前选择」同源同精度（原取结果条文本被 fmt0 取整，39 m ≠ 面板 38.9 m）；
+     r 值异常时退回结果条文本兜底。管长统计维持原逻辑（computeThreeLevel 实际采用长度）。 */
   window.tlFigParamLines = function (r) {
     var d = window.tlDiagramData;
     function figOd(kind, designOd) {
@@ -16778,17 +16780,24 @@ function tlIsoStatsReset() {
       } catch (eOd) { return designOd; }
     }
     function fmtLen(v) { if (!isFinite(v)) return '—'; var f = Math.pow(10, 1); return (Math.round(v * f) / f).toFixed(1); }
+    function f1(v) { return isFinite(v) ? (Math.round(v * 10) / 10).toFixed(1) : null; }
     function barTxt(id) { var el = document.getElementById(id); return el ? el.textContent : ''; }
     var ods = { front: figOd('front', r.frontPipe.od), main: figOd('main', r.mainPipe.od), branch: figOd('branch', r.branchPipe.od) };
+    var pump = {
+      flow: f1(r.combinedFlow) !== null ? f1(r.combinedFlow) + ' m³/h' : barTxt('tlPlanPumpFlow'),
+      head: f1(r.pumpHead) !== null ? f1(r.pumpHead) + ' m' : barTxt('tlPlanPumpHead'),
+      power: f1(r.motorKW_rounded) !== null ? f1(r.motorKW_rounded) + ' kW' : barTxt('tlPlanPumpPower')
+    };
     var l1 = '总管 Ø ' + ods.front + ' mm · ' + fmtLen(r.frontLenUsed) + ' m · 主管 Ø ' + ods.main + ' mm · ' + fmtLen(r.mainLenUsed) + ' m · 支管 Ø ' + ods.branch + ' mm · ' + fmtLen(r.branchLenUsed) + ' m';
-    var l2 = '联合灌溉 ' + (typeof tlGetZoneCount === 'function' ? tlGetZoneCount() : (r.zoneCount || 1)) + '区 · 水泵 ' + barTxt('tlPlanPumpFlow') + ' · ' + barTxt('tlPlanPumpHead') + ' · ' + barTxt('tlPlanPumpPower');
-    return { lines: [l1, l2], ods: ods };
+    var l2 = '联合灌溉 ' + (typeof tlGetZoneCount === 'function' ? tlGetZoneCount() : (r.zoneCount || 1)) + '区 · 水泵 ' + pump.flow + ' · ' + pump.head + ' · ' + pump.power;
+    return { lines: [l1, l2], ods: ods, pump: pump };
   };
   /* ===== v136（2026-09-23 用户反馈）：轴测图图例/信息行实时更新 =====
      「应用到图面」后管线与左栏结果都变了，但图例读的 tlDiagramData.meta.pipes/pump 是
      生成管线图时刻的设计口径快照（网络模型/三通菜单/损失估算/e2e 消费红线，不能改写）。
      故新增 meta.live 实时快照：pipes=按管长加权的图面实际管径（AE.calibersMap，无改径退回
-     水力计算值），pump=左栏结果条当前主数字文本。只写 live，设计口径原样保留。 */
+     水力计算值），pump=当前重算值（v138 起与面板「当前选择」同源同精度，不再取结果条取整文本）。
+     只写 live，设计口径原样保留。 */
   window.tlSyncIsoMeta = function () {
     var d = window.tlDiagramData;
     if (!d || d.version !== 1) return false;
@@ -16797,13 +16806,12 @@ function tlIsoStatsReset() {
     if (!r || !r.frontPipe) return false;
     var fp = window.tlFigParamLines ? window.tlFigParamLines(r) : null;
     if (!fp) return false;
-    function barTxt(id) { var el = document.getElementById(id); return el ? el.textContent : ''; }
     var m = d.meta || (d.meta = {});
     m.live = {
       pipes: { front: 'Ø ' + fp.ods.front + ' mm',
                main: 'Ø ' + fp.ods.main + ' mm',
                branch: 'Ø ' + fp.ods.branch + ' mm' },
-      pump: { flow: barTxt('tlPlanPumpFlow'), head: barTxt('tlPlanPumpHead'), power: barTxt('tlPlanPumpPower') }
+      pump: fp.pump   /* v138：与面板「当前选择」同源同精度（1 位小数） */
     };
     /* v137：简图/系统简图内烤死的参数两行用同一构造实时重写
        （#tlDiagramContent 原生 + #tlSysPipeBoxBody 克隆 sc_ 前缀，后缀匹配一并命中；
