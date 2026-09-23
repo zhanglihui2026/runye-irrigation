@@ -39,3 +39,16 @@ _r_*
 *.pre-*
 *.post-*
 *.rv_bak
+
+# CDP 探针 DOM 快照目录与历史探针脚本（纯调试产物，不发布）
+shots_*/
+_bk*
+_chk_*
+_gchk*
+_imgchk*
+_gates_*
+runye_v9*.cjs
+runye_v100_merge.cjs
+
+# 下划线开头的排查/校验文本快照（纯调试产物；.py 不在此列，_delcards.py 已被跟踪不受影响）
+_*.txt
