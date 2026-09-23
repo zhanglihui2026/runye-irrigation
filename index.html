@@ -8843,8 +8843,11 @@ function tlUpdatePlanBar() {
   }
   if(el=document.getElementById('tlPlanPumpFlow')) el.textContent=fmt(r.combinedFlow,1)+' m³/h';
   /* v107：设计列 = 理论选管（无覆盖）计算；未改径时 rDes===r，显示与旧版一致 */
-  if(el=document.getElementById('tlPlanPumpHead')) el.textContent=fmt0(rDes.pumpHead)+' m';
-  if(el=document.getElementById('tlPlanPumpPower')) el.textContent=fmt0(rDes.motorKW_rounded)+' kW';
+  /* v119（2026-09-23 用户反馈「水泵扬程还是不能更新」）：改径重算后主数字必须跟着变 ——
+     主数字 = 当前实际（图面管径重算）值；设计值挪到右侧小字并加「设计」前缀
+     （v107 的「主=设计 / 小字=实际」拆分主次颠倒，主数字永远不变 = 用户读作扬程不更新）。 */
+  if(el=document.getElementById('tlPlanPumpHead')){ el.textContent=fmt0(ovApplied?r.pumpHead:rDes.pumpHead)+' m'; el.title=ovApplied?'按图面改径重算的值；右侧小字为设计管径下的值':''; }
+  if(el=document.getElementById('tlPlanPumpPower')){ el.textContent=fmt0(ovApplied?r.motorKW_rounded:rDes.motorKW_rounded)+' kW'; el.title=ovApplied?'按图面改径重算的值；右侧小字为设计管径下的值':''; }
   if(el=document.getElementById('tlPlanFrontPipe')) el.textContent='Ø '+rDes.frontPipe.od+' mm';
   if(el=document.getElementById('tlPlanFrontVelocity')) el.textContent=fmt(rDes.frontPipe.v,2)+' m/s';
   if(el=document.getElementById('tlPlanMainPipe')) el.textContent='Ø '+rDes.mainPipe.od+' mm';
@@ -8858,8 +8861,14 @@ function tlUpdatePlanBar() {
     if (!ovApplied || typeof v !== 'number' || !isFinite(v)) { e2.textContent = '—'; e2.style.color = '#cbd5e1'; return; }
     e2.textContent = fmt(v, dec) + ' ' + unit; e2.style.color = '';
   }
-  tlRealSet('tlPlanPumpHeadReal', ovApplied ? r.pumpHead : NaN, 'm', 1);
-  tlRealSet('tlPlanPumpPowerReal', ovApplied ? r.motorKW_rounded : NaN, 'kW', 1);
+  /* v119：扬程/功率的小字槽位改放「设计值」（主数字已是实际值） */
+  function tlDesignSet(id, v, unit, dec) {
+    var e2 = document.getElementById(id); if (!e2) return;
+    if (!ovApplied || typeof v !== 'number' || !isFinite(v)) { e2.textContent = '—'; e2.style.color = '#cbd5e1'; return; }
+    e2.textContent = '设计 ' + fmt(v, dec) + ' ' + unit; e2.style.color = '#94a3b8';
+  }
+  tlDesignSet('tlPlanPumpHeadReal', rDes.pumpHead, 'm', 1);
+  tlDesignSet('tlPlanPumpPowerReal', rDes.motorKW_rounded, 'kW', 1);
   /* v109（2026-09-22 用户要求）：管径前后对比 —— 改径重算后实际参与计算的管径
      （computeThreeLevel 按覆盖管径算出的 r.*Pipe.od），与设计管径不同时显示「315 → 280 mm」，
      未改径或改径后没变显示 —（浅灰）。 */
