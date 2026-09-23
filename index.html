@@ -3344,6 +3344,13 @@ body.ry-tool #tlPipePlanSection .pp-toolbar{
 #tlPipePlanSection[data-ry-view="ws"] .ry-pane-pipe,
 #tlPipePlanSection[data-ry-view="ws"] .ry-pane-sys,
 #tlPipePlanSection[data-ry-view="ws"] .ry-pane-iso{display:none}
+/* v123（2026-09-23 用户反馈「标注线还是拖不动」真因）：data-ry-view 缺失（生成管线图后
+   未点过任何 Tab 的初始态）时以下隐藏规则全部不匹配 → 四个 pane 叠放，ws 工作区透明
+   画布（svg.tl-ws-svg）在最上层拦截简图全部真实鼠标点击 —— 尺寸线/整图拖动/右键全失效。
+   改为「默认隐藏、按 view 显示」：attr 缺失 = 只显示三级简图(.ry-pane-sys)。 */
+#tlPipePlanSection:not([data-ry-view="pipe"]) .ry-pane-pipe{display:none}
+#tlPipePlanSection:not([data-ry-view="iso"]) .ry-pane-iso{display:none}
+#tlPipePlanSection:not([data-ry-view="ws"]) .ry-pane-ws{display:none}
 #tlPipePlanSection[data-ry-view="pipe"] .ry-pane-ws,
 #tlPipePlanSection[data-ry-view="sys"] .ry-pane-ws,
 #tlPipePlanSection[data-ry-view="iso"] .ry-pane-ws{display:none}
@@ -5172,6 +5179,9 @@ body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-toolbar{
 #ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="ws"] .ry-pane-pipe,
 #ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="ws"] .ry-pane-sys,
 #ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="ws"] .ry-pane-iso{display:none}
+#ryCadSide [data-pp="tlPipePlanSection"]:not([data-ry-view="pipe"]) .ry-pane-pipe{display:none}
+#ryCadSide [data-pp="tlPipePlanSection"]:not([data-ry-view="iso"]) .ry-pane-iso{display:none}
+#ryCadSide [data-pp="tlPipePlanSection"]:not([data-ry-view="ws"]) .ry-pane-ws{display:none}
 #ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="pipe"] .ry-pane-ws,
 #ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="sys"] .ry-pane-ws,
 #ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="iso"] .ry-pane-ws{display:none}
@@ -7867,7 +7877,7 @@ function tlWorstPathMarkSVG(ts) {
   var dL = (g.linkPts && g.linkPts.length > 1) ? d(g.linkPts) : '';
   var dM = d(g.mainPts);
   var out = [];
-  out.push('<g data-tlworst="1" fill="none" stroke-linecap="round" stroke-linejoin="round">');
+  out.push('<g data-tlworst="1" fill="none" stroke-linecap="round" stroke-linejoin="round" pointer-events="none">');
   out.push('<path d="' + dF + '" stroke="#a855f7" stroke-opacity="0.40" stroke-width="13"/>');
   if (dL) out.push('<path d="' + dL + '" stroke="#a855f7" stroke-opacity="0.40" stroke-width="13"/>');
   out.push('<path d="' + dM + '" stroke="#a855f7" stroke-opacity="0.40" stroke-width="12"/>');
@@ -9959,13 +9969,13 @@ function tlInitDrag(){
   /* v121（2026-09-23 用户反馈「拖动没实现」）：可用性加固 —— ① 光标：悬停尺寸线变双向箭头
      （v114 注释声称「渲染时输出 cursor」实际没做，用户悬停无任何反馈以为功能不存在）；
      ② hover 高亮：尺寸线悬停变绿加粗，明确「抓到了」；③ 顺带把命中窗口放宽到 18px。 */
-  if(!svgEl.querySelector('style.tlDimUx')){
-    var _st=document.createElementNS('http://www.w3.org/2000/svg','style');
-    _st.setAttribute('class','tlDimUx');
+  if(!document.getElementById('tlDimUxStyle')){
+    var _st=document.createElement('style');
+    _st.id='tlDimUxStyle';
     _st.textContent='[data-dim][data-axis="x"]{cursor:ew-resize}'
       +'[data-dim][data-axis="y"]{cursor:ns-resize}'
       +'[data-dim]:hover line{stroke:#15803d;stroke-width:2.2}';
-    svgEl.insertBefore(_st,svgEl.firstChild);
+    document.head.appendChild(_st);
   }
   /* 拖拽逻辑：仅点击地块组内部时触发 */
   var dragStart=null;
@@ -9978,7 +9988,7 @@ function tlInitDrag(){
     var _dimHit=_dimP?tlDimHitTest(_dimP):null;
     if(_dimHit){
       e.preventDefault();
-      dimDrag={hit:_dimHit,x0:e.clientX,y0:e.clientY,off0:window._tlDimState.offs[_dimHit.id]||0,lastOff:window._tlDimState.offs[_dimHit.id]||0,k:getScale()};
+      dimDrag={hit:_dimHit,x0:e.clientX,y0:e.clientY,off0:window._tlDimState.offs[_dimHit.id]||0,lastOff:window._tlDimState.offs[_dimHit.id]||0,k:getScale(),src:'sys'};
       document.body.style.userSelect='none';
       svgEl.style.cursor=_dimHit.axis==='y'?'ns-resize':'ew-resize';
       return;
@@ -10028,9 +10038,13 @@ function tlInitDrag(){
     return best;
   }
   function tlDimApplyDD(id,axis,dd,tot){
-    var g=svgEl.querySelector('[data-dim="'+id+'"]');
-    if(g)g.setAttribute('transform','translate('+(axis==='x'?(tot||0):0).toFixed(1)+','+(axis==='y'?(tot||0):0).toFixed(1)+')');
-    var exts=svgEl.querySelectorAll('[data-dimext="'+id+'"]');
+    /* v123b：ws 工作区（三级管线编辑视图）克隆渲染了同一份图纸（同样带 [data-dim]/[data-dimext]），
+       文档级应用让简图与 ws 两份渲染同步平移（此前只动简图那份，ws 视图里尺寸线纹丝不动）。 */
+    var gs=document.querySelectorAll('[data-dim="'+id+'"]');
+    for(var gi=0;gi<gs.length;gi++){
+      gs[gi].setAttribute('transform','translate('+(axis==='x'?(tot||0):0).toFixed(1)+','+(axis==='y'?(tot||0):0).toFixed(1)+')');
+    }
+    var exts=document.querySelectorAll('[data-dimext="'+id+'"]');
     for(var i=0;i<exts.length;i++){
       var ln=exts[i], a=axis==='x'?'x2':'y2';
       ln.setAttribute(a,(parseFloat(ln.getAttribute(a))+dd).toFixed(1));
@@ -10079,6 +10093,43 @@ function tlInitDrag(){
   window._tlDimTouchUp=function(){if(window._tlDimUp)window._tlDimUp();};
   document.addEventListener('touchmove',window._tlDimTouchMove,{passive:false});
   document.addEventListener('touchend',window._tlDimTouchUp);
+  /* ===== v123b（2026-09-23 用户反馈「标注线还是拖不动」真正根因）=====
+     生成管线图后应用自动落在「三级管线编辑」(data-ry-view="ws") 视图，用户看到的图纸是
+     ws 工作区克隆渲染的（tl-workspace renderPipeBaseSVG 把简图 base.inner 原样嵌入，坐标
+     系相同、同样带 [data-dim]）—— 但 v114 拖动只挂在简图 svg 上，ws 视图里尺寸线是纯装饰。
+     这里把同一套命中/拖动委托到 #tlWsCanvas（canvas 稳定存在；svg 每次渲染重建不能直挂）。 */
+  /* 注意：#tlWsCanvas 每次渲染都会被 innerHTML 整体重建（tl-workspace.js renderSVG），
+     不能直挂 —— 委托到 document（稳定），每次 tlInitDrag 先摘旧再挂新。 */
+  function wsDimPress(e){
+    var wsSvg=e.target&&e.target.closest?e.target.closest('#tlWsCanvas svg.tl-ws-svg'):null;
+    if(!wsSvg)return;
+    var _dimP=tlDimSvgPoint(wsSvg,e);
+    var _dimHit=_dimP?tlDimHitTest(_dimP):null;
+    if(!_dimHit)return;
+    /* 命中尺寸线 → 捕获阶段拦截：ws 编辑器（ctn 上的 pointerdown 平移/选管）让位，与简图「尺寸线优先」同口径 */
+    if(e.preventDefault)e.preventDefault();
+    if(e.stopPropagation)e.stopPropagation();
+    var _r=wsSvg.getBoundingClientRect();
+    var _vb=(wsSvg.viewBox&&wsSvg.viewBox.baseVal)?wsSvg.viewBox.baseVal.width:svgW;
+    var _k=_r.width>0?_vb/_r.width:1;
+    dimDrag={hit:_dimHit,x0:e.clientX,y0:e.clientY,off0:window._tlDimState.offs[_dimHit.id]||0,lastOff:window._tlDimState.offs[_dimHit.id]||0,k:_k,src:'ws'};
+    document.body.style.userSelect='none';
+    wsSvg.style.cursor=_dimHit.axis==='y'?'ns-resize':'ew-resize';
+  }
+  /* 必须用 pointerdown（捕获阶段）：ws 编辑器在 ctn 上挂 pointerdown 且 preventDefault ——
+     一旦被取消，随后的兼容 mousedown 根本不会派发，mousedown 委托永远收不到。
+     pointerdown 同时覆盖鼠标/触摸/笔，无需再挂 touchstart。 */
+  if(window._tlDimWsDown)document.removeEventListener('pointerdown',window._tlDimWsDown,true);
+  window._tlDimWsDown=function(e){ if(e.button!==0)return; wsDimPress(e); };
+  document.addEventListener('pointerdown',window._tlDimWsDown,true);
+  /* ws 按下时 preventDefault 已取消兼容 mouse 事件 → 拖动必须由 pointermove/pointerup 驱动
+     （src 区分两条链路，避免双重处理）。 */
+  if(window._tlDimWsMove)document.removeEventListener('pointermove',window._tlDimWsMove);
+  if(window._tlDimWsUp)document.removeEventListener('pointerup',window._tlDimWsUp);
+  window._tlDimWsMove=function(ev){ if(dimDrag&&dimDrag.src==='ws')window._tlDimMove(ev); };
+  window._tlDimWsUp=function(){ if(dimDrag&&dimDrag.src==='ws')window._tlDimUp(); };
+  document.addEventListener('pointermove',window._tlDimWsMove);
+  document.addEventListener('pointerup',window._tlDimWsUp);
   /* v114：hover 光标用 SVG 原生 cursor 属性（渲染时随尺寸线输出）—— 不挂 JS mousemove，
      headless 下「cursor 赋值↔合成 mousemove」会互相触发形成事件风暴（实测死循环），禁走此路。 */
   /* 双击地块组重置位置 */
