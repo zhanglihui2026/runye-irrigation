@@ -5904,7 +5904,6 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     <!-- v131（2026-09-23 用户要求）：交底调整组上移紧挨「自动管路」，「生成施工图」放到组下面
          （v128 曾把组放最底、v130 调组内镜像/角度顺序——本次仅再调块序，控件与逻辑不动） -->
     <span class="pp-sep"></span>
-    <button class="pp-btn-ghost" id="ppRotateZones">↻ 分区旋转90°</button>
     <label class="pp-angle-control" title="以地块包围盒中心为轴镜像翻转整张图（含管线、水源、阀门），可任意切换不累积">
       <span>地块镜像</span>
       <button type="button" class="pp-btn-ghost pp-mirror-btn active" data-mirror="none">无</button>
@@ -5917,6 +5916,8 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
       <span>°</span>
     </label>
     <button class="pp-btn-ghost" id="ppRepartition" title="将当前旋转后的地块作为新基准重新切割分区">重新分区</button>
+    <!-- v132（2026-09-23 用户要求）：分区旋转90° 移到「重新分区」下面（组内收尾） -->
+    <button class="pp-btn-ghost" id="ppRotateZones">↻ 分区旋转90°</button>
     <span class="pp-sep"></span>
     <button class="pp-btn-generate" id="ppGenerate">生成施工图</button>
     <button class="pp-btn-ghost" id="ppDownload" style="display:none">📥 下载</button>
