@@ -9776,33 +9776,12 @@ function tlAutoGenerate(options) {
      长度 = computeThreeLevel 实际采用长度（最不利路径图面几何，含图面改长/平移），与损失/扬程同源。
      旧版只显示水力计算径且无长度，图面改径后点「生成管线图」数字不动（用户实测）。
      meta.pipes 保持设计径文本不动（iso/network-model 消费，多道 e2e 只读红线）。 */
-  function tlFigOdOf(kind, designOd) {
-    try {
-      var AE2 = window.RyTlAutoEdits, d2 = window.tlDiagramData;
-      if (!AE2 || !AE2.calibersMap || !d2) return designOd;
-      var cals2 = AE2.calibersMap() || {};
-      var pids2 = [];
-      if (kind === 'front') { pids2.push('front'); }
-      else {
-        var arr2 = (kind === 'main') ? d2.mainPipes : d2.branchPipes;
-        if (arr2) for (var pi2 = 0; pi2 < arr2.length; pi2++) pids2.push(kind + '-' + pi2);
-      }
-      var sw2 = 0, sl2 = 0;
-      for (var qi2 = 0; qi2 < pids2.length; qi2++) {
-        var od2 = cals2[pids2[qi2]]; if (!od2) continue;
-        var pts2 = AE2.effPts(pids2[qi2], d2); if (!pts2) continue;
-        var L2 = AE2.polylineLen(pts2);
-        sw2 += od2 * L2; sl2 += L2;
-      }
-      if (!(sl2 > 0)) return designOd;
-      return Math.round(sw2 / sl2 * 10) / 10;
-    } catch (eOd) { return designOd; }
-  }
-  function tlFmtLen(v) { if (!isFinite(v)) return '—'; var f = Math.pow(10, 1); return (Math.round(v * f) / f).toFixed(1); }
-  var tlOdF = tlFigOdOf('front', r.frontPipe.od), tlOdM = tlFigOdOf('main', r.mainPipe.od), tlOdB = tlFigOdOf('branch', r.branchPipe.od);
-  parts.push('<text x="40" y="'+iy+'">总管 Ø '+tlOdF+' mm · '+tlFmtLen(r.frontLenUsed)+' m · 主管 Ø '+tlOdM+' mm · '+tlFmtLen(r.mainLenUsed)+' m · 支管 Ø '+tlOdB+' mm · '+tlFmtLen(r.branchLenUsed)+' m</text>');
+  /* v137：两行文案抽到全局 tlFigParamLines 单一来源（逐字同格式）——
+     「应用到图面」改径重算后 tlSyncIsoMeta 用同一构造实时重写简图/系统简图内这两行。 */
+  var tlPl = window.tlFigParamLines(r);
+  parts.push('<text x="40" y="'+iy+'">'+tlPl.lines[0]+'</text>');
   /* v109b：结果条文本已自带单位（如「185.1 m³/h」），此处不再重复拼单位 */
-  parts.push('<text x="40" y="'+(iy+22)+'">联合灌溉 '+zc+'区 · 水泵 '+ (pumpFlowEl?pumpFlowEl.textContent:'—') +' · '+ (pumpHeadEl?pumpHeadEl.textContent:'—') +' · '+ (pumpPowerEl?pumpPowerEl.textContent:'—') +'</text>');
+  parts.push('<text x="40" y="'+(iy+22)+'">'+tlPl.lines[1]+'</text>');
   parts.push('</g>');
 
   // 图例：与参数块第二行（联合灌溉/水泵）同一基线对齐
@@ -16770,21 +16749,17 @@ function tlIsoStatsReset() {
       if (btn) { btn.textContent = '⇧ 更新水泵扬程'; btn.disabled = false; btn.style.opacity = '1'; }
     }
   }
-  /* ===== v136（2026-09-23 用户反馈）：轴测图图例/信息行实时更新 =====
-     「应用到图面」后管线与左栏结果都变了，但图例读的 tlDiagramData.meta.pipes/pump 是
-     生成管线图时刻的设计口径快照（网络模型/三通菜单/损失估算/e2e 消费红线，不能改写）。
-     故新增 meta.live 实时快照：pipes=按管长加权的图面实际管径（AE.calibersMap，无改径退回
-     水力计算值），pump=左栏结果条当前主数字文本。只写 live，设计口径原样保留。 */
-  window.tlSyncIsoMeta = function () {
+  /* ===== v137（2026-09-23 用户要求）：三级简图参数两行单一来源 =====
+     「应用到图面」等改径重算后，简图/系统简图 SVG 里烤死的参数行也要跟着变——
+     生成（tlAutoGenerate）与实时重写（tlSyncIsoMeta）共用本构造，保证逐字同源。
+     ods = 图面实际代表径（图面改径按管长加权，无改径退回水力计算值，v116 口径）；
+     第二行的水泵流量/扬程/功率取左栏结果条当前主数字文本（v109b：自带单位，不重拼）。 */
+  window.tlFigParamLines = function (r) {
     var d = window.tlDiagramData;
-    if (!d || d.version !== 1) return false;
-    var r = null;
-    try { r = computeThreeLevel(); } catch (e) { return false; }
-    if (!r || !r.frontPipe) return false;
-    var AE = window.RyTlAutoEdits;
     function figOd(kind, designOd) {
       try {
-        if (!AE || !AE.calibersMap) return designOd;
+        var AE = window.RyTlAutoEdits;
+        if (!AE || !AE.calibersMap || !d) return designOd;
         var cals = AE.calibersMap() || {}, pids = [], i;
         if (kind === 'front') { pids.push('front'); }
         else {
@@ -16802,14 +16777,47 @@ function tlIsoStatsReset() {
         return Math.round(sw / sl * 10) / 10;
       } catch (eOd) { return designOd; }
     }
+    function fmtLen(v) { if (!isFinite(v)) return '—'; var f = Math.pow(10, 1); return (Math.round(v * f) / f).toFixed(1); }
+    function barTxt(id) { var el = document.getElementById(id); return el ? el.textContent : ''; }
+    var ods = { front: figOd('front', r.frontPipe.od), main: figOd('main', r.mainPipe.od), branch: figOd('branch', r.branchPipe.od) };
+    var l1 = '总管 Ø ' + ods.front + ' mm · ' + fmtLen(r.frontLenUsed) + ' m · 主管 Ø ' + ods.main + ' mm · ' + fmtLen(r.mainLenUsed) + ' m · 支管 Ø ' + ods.branch + ' mm · ' + fmtLen(r.branchLenUsed) + ' m';
+    var l2 = '联合灌溉 ' + (typeof tlGetZoneCount === 'function' ? tlGetZoneCount() : (r.zoneCount || 1)) + '区 · 水泵 ' + barTxt('tlPlanPumpFlow') + ' · ' + barTxt('tlPlanPumpHead') + ' · ' + barTxt('tlPlanPumpPower');
+    return { lines: [l1, l2], ods: ods };
+  };
+  /* ===== v136（2026-09-23 用户反馈）：轴测图图例/信息行实时更新 =====
+     「应用到图面」后管线与左栏结果都变了，但图例读的 tlDiagramData.meta.pipes/pump 是
+     生成管线图时刻的设计口径快照（网络模型/三通菜单/损失估算/e2e 消费红线，不能改写）。
+     故新增 meta.live 实时快照：pipes=按管长加权的图面实际管径（AE.calibersMap，无改径退回
+     水力计算值），pump=左栏结果条当前主数字文本。只写 live，设计口径原样保留。 */
+  window.tlSyncIsoMeta = function () {
+    var d = window.tlDiagramData;
+    if (!d || d.version !== 1) return false;
+    var r = null;
+    try { r = computeThreeLevel(); } catch (e) { return false; }
+    if (!r || !r.frontPipe) return false;
+    var fp = window.tlFigParamLines ? window.tlFigParamLines(r) : null;
+    if (!fp) return false;
     function barTxt(id) { var el = document.getElementById(id); return el ? el.textContent : ''; }
     var m = d.meta || (d.meta = {});
     m.live = {
-      pipes: { front: 'Ø ' + figOd('front', r.frontPipe.od) + ' mm',
-               main: 'Ø ' + figOd('main', r.mainPipe.od) + ' mm',
-               branch: 'Ø ' + figOd('branch', r.branchPipe.od) + ' mm' },
+      pipes: { front: 'Ø ' + fp.ods.front + ' mm',
+               main: 'Ø ' + fp.ods.main + ' mm',
+               branch: 'Ø ' + fp.ods.branch + ' mm' },
       pump: { flow: barTxt('tlPlanPumpFlow'), head: barTxt('tlPlanPumpHead'), power: barTxt('tlPlanPumpPower') }
     };
+    /* v137：简图/系统简图内烤死的参数两行用同一构造实时重写
+       （#tlDiagramContent 原生 + #tlSysPipeBoxBody 克隆 sc_ 前缀，后缀匹配一并命中；
+         生成路径调用本函数时 SVG 尚未注入，查不到节点自然空转）。 */
+    var hosts = ['tlDiagramContent', 'tlSysPipeBoxBody'];
+    for (var hi = 0; hi < hosts.length; hi++) {
+      var host = document.getElementById(hosts[hi]);
+      if (!host || !host.querySelectorAll) continue;
+      var gs = host.querySelectorAll('[id$="tlParamsGroup"]');
+      for (var gi = 0; gi < gs.length; gi++) {
+        var ts = gs[gi].querySelectorAll('text');
+        if (ts.length >= 2) { ts[0].textContent = fp.lines[0]; ts[1].textContent = fp.lines[1]; }
+      }
+    }
     return true;
   };
   window.tlPumpUpdateRun = function () {
