@@ -10843,7 +10843,14 @@ document.addEventListener('input', function(e) {
   }
 });
 
-render();
+// 首笔计算等待 native 桥接就绪：确保浏览器端真正走 C++（inner/hazen/velocity/local/christiansen），
+// 而不在一加载就 JS 回退。ready 必然 resolve（成功=cpp-wasm，失败=JS 回退），不会卡白屏；
+// 若桥接脚本未加载，window.RyHydraulicNative 为空，则立即渲染（等价原行为）。
+(function(){
+  var ry = (typeof window !== 'undefined' && window.RyHydraulicNative) || null;
+  var ready = (ry && ry.ready) ? ry.ready : Promise.resolve();
+  Promise.resolve(ready).then(function(){ if (typeof render === 'function') render(); });
+})();
 </script>
 
 <!-- ===== 面积测量工具 JS ===== -->
@@ -15230,7 +15237,12 @@ window.addEventListener('resize', function () { if (document.getElementById('hea
 
 /* 初始化（模态框隐藏状态下渲染，打开时即时可用） */
 bindUI();
-render();
+// 首笔渲染同样等待 native 就绪，避免隐藏预渲染走 JS 回退（数值一致，仅一致性考虑）
+(function(){
+  var ry = (typeof window !== 'undefined' && window.RyHydraulicNative) || null;
+  var ready = (ry && ry.ready) ? ry.ready : Promise.resolve();
+  Promise.resolve(ready).then(function(){ if (typeof render === 'function') render(); });
+})();
 })();
 </script>
 

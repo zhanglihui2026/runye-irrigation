@@ -41,4 +41,6 @@ node hydraulic-calc/native/browser-smoke.cjs
 
 **不混用实现**：任一水力原语只在 `RyHydraulicNative.<fn>` 被挂载后（即原子地、在一次 resolve 中）才改用 C++，因此同一次 `computeThreeLevel()` 计算内不会 JS/C++ 混算；首屏自动运行若早于 wasm 就绪，则整次用 JS，后续用 C++，结果等价。`RyHydraulicNative.ready` 是一个 Promise，宿主可在首次计算前 `await` 它以确保已切到 C++。
 
+**宿主已实现**：`index.html` 的首笔 `render()`（主工具）与三级系统图模态的初始化 `render()` 均已改为等待 `RyHydraulicNative.ready` 后再执行首笔计算——`ready` 成功则首笔即走 C++，失败（或 `RyHydraulicNative` 整体缺失）则立即回退 JS，不会卡白屏。即浏览器端默认首笔就走 `cpp-wasm`，而非一加载先 JS 回退。
+
 `head`（扬程）与 `power`（功率）两个函数已加入 `hydraulics.cpp` 与 `hc-core.js`，但**当前随仓库提供的 `hydraulics-wasm.js` 不含这两个导出**。要启用 C++ 版扬程/功率，需按下方「重新编译」重建 wasm；重建前 `RyHydraulicNative.head/power` 保持未定义，hc-core 自动回退到 JS 实现。`verify.cjs` 在 wasm 未导出时打印 `SKIP`，导出后自动交叉校验。
