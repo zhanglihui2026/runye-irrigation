@@ -6310,8 +6310,10 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
          再点本按钮退出并清空选择。选择集与拖动全走 document 级（v123b 同口径），简图/ws 两份渲染同步。 -->
     <button class="tl-ws-btn" id="tlDimMultiBtn" type="button" aria-pressed="false" onclick="tlDimMultiToggle()" title="多选标注：开启后点尺寸线逐条加选（无位移点击），再点已选线取消；拖动任一已选尺寸线时全部已选一起平移">▣ 多选标注</button>
     <!-- v125（同轮用户要求）：尺寸调整保存开关 —— 默认关 = 拖动仅本次有效，刷新页面即恢复初始位置；
-         开 = 当前调整写入本地（localStorage），刷新后保留。关掉时自动清除已保存数据。 -->
-    <button class="tl-ws-btn" id="tlDimSaveBtn" type="button" aria-pressed="false" onclick="tlDimSaveToggle()" title="尺寸调整保存开关：关=拖动仅本次有效，刷新即恢复初始位置；开=当前调整写入本地，刷新后保留">💾 尺寸调整：不保存</button>
+         开 = 当前调整写入本地（localStorage），刷新后保留。关掉时自动清除已保存数据。
+         2026-09-24（用户要求）：去掉💾图标；文字恒为「保存」，不再切换「已保存/不保存」（切换文字有歧义）；
+         状态只靠颜色表达 —— 浅色=未保存，深绿(.active)=已保存；再点一次取消并清档。 -->
+    <button class="tl-ws-btn" id="tlDimSaveBtn" type="button" aria-pressed="false" onclick="tlDimSaveToggle()" title="尺寸调整保存：浅色=未保存（拖动仅本次有效，刷新即恢复初始位置），点「保存」写入本地（按钮变深色，刷新后保留）；再点一次取消并清除">保存</button>
 
     <button class="tl-ws-btn" id="tlAutoPipe" type="button" onclick="tlAutoGenerate()" title="按当前参数生成 / 重新生成三级管线平面图（生成后右侧「管段管径与损失」表逐段列出管长与管径）">🔄 生成管线图</button>
     <span class="tl-ws-hint" id="tlWsHint">点「插入主管/支管」后在图上点击逐点画线，双击结束</span>
@@ -16118,10 +16120,10 @@ threeDModelingSection:'水力计算器 · 入口预留（方案确定后上线�
     var on=!!window._tlDimSaveOn;
     sBtn.classList.toggle('active',on);
     sBtn.setAttribute('aria-pressed',on?'true':'false');
-    sBtn.textContent=on?'💾 尺寸调整：已保存':'💾 尺寸调整：不保存';
+    sBtn.textContent='保存';   /* 2026-09-24 用户要求：文字恒为「保存」，状态只由颜色(.active)表达 */
     sBtn.title=on
-      ?'尺寸拖动结果已写入本地，刷新页面后仍保留。点本按钮关闭并清除已保存数据（刷新即恢复初始位置）'
-      :'尺寸拖动仅本次有效，刷新页面即恢复初始位置。点本按钮保存当前调整（刷新后保留）';
+      ?'已保存：尺寸拖动结果写入本地，刷新页面后仍保留（按钮深色）。再点一次取消并清除已保存数据（刷新即恢复初始位置）'
+      :'未保存：尺寸拖动仅本次有效，刷新页面即恢复初始位置（按钮浅色）。点「保存」把当前调整写入本地（刷新后保留）';
   }
   /* 选择集同步到两份渲染：class 挂在 [data-dim] 组上，ws 克隆自简图时会一并带上 */
   window.tlDimSelSync=function(){
