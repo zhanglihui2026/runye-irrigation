@@ -806,6 +806,65 @@
     pipeNote(model.front, HEIGHTS.front, '总管 ' + pipeTxt('front', '管径待定'), 20);
     s.push('<g transform="translate(65 655)" pointer-events="none" fill="none" stroke="#555" stroke-width="0.8"><path d="M0 -32 V0 H38 M0 0 L27 -27"/><g stroke="none" fill="#333" font-family="system-ui" font-size="10"><text x="40" y="4">X</text><text x="28" y="-29">Y</text><text x="-4" y="-37">Z</text></g></g>');
 
+    /* 11b) 最远水路（轴测图，2026-09-24 用户要求）—— 与平面图 tlWorstPathMarkSVG 同款紫色标注：
+       总管段(z=front 高程) + 接入立管(front→main) + 主管段(z=main 高程) + 末端圆点 + 标签。
+       复用 [data-tlworst] / .tl-worst-flow 通用 CSS：「显示最不利路径」开关与流动动画自动继承。
+       数据源 tlWorstPathLen(true).geom 与平面图同源；仅当渲染数据=当前图面数据时绘制（防快照错配）。 */
+    (function () {
+      var wpG = null, wpZi = -1, wpLen = 0;
+      try {
+        if (window.tlWorstPathLen && window.tlDiagramData && data === window.tlDiagramData) {
+          var wp = window.tlWorstPathLen(true);
+          if (wp && wp.fromFigure && wp.geom && wp.geom.frontPts && wp.geom.frontPts.length >= 2
+              && wp.geom.mainPts && wp.geom.mainPts.length >= 2) {
+            wpG = wp.geom; wpZi = wp.zoneIndex | 0; wpLen = Number(wp.geom.len);
+          }
+        }
+      } catch (e) { wpG = null; }
+      if (!wpG) return;
+      function projLine(pts, z) {
+        var d = '';
+        for (var i = 0; i < pts.length; i++) {
+          var q = P(pts[i].x, pts[i].y, z);
+          if (!Number.isFinite(q.x) || !Number.isFinite(q.y)) return null;
+          d += (i ? 'L' : 'M') + fmt(q.x) + ' ' + fmt(q.y);
+        }
+        return d;
+      }
+      var dF = projLine(wpG.frontPts, HEIGHTS.front);
+      var dM = projLine(wpG.mainPts, HEIGHTS.main);
+      if (!dF || !dM) return;
+      /* 接入立管：接点处 front 高程水平段 → 升到 main 高程（与 §4a 总管↔主管接入段同构） */
+      var dL = null;
+      if (wpG.linkPts && wpG.linkPts.length === 2) {
+        var qa = P(wpG.linkPts[0].x, wpG.linkPts[0].y, HEIGHTS.front);
+        var qb0 = P(wpG.linkPts[1].x, wpG.linkPts[1].y, HEIGHTS.front);
+        var qb1 = P(wpG.linkPts[1].x, wpG.linkPts[1].y, HEIGHTS.main);
+        if (Number.isFinite(qa.x) && Number.isFinite(qa.y) && Number.isFinite(qb1.x) && Number.isFinite(qb1.y))
+          dL = 'M' + fmt(qa.x) + ' ' + fmt(qa.y) + 'L' + fmt(qb0.x) + ' ' + fmt(qb0.y) + 'L' + fmt(qb1.x) + ' ' + fmt(qb1.y);
+      }
+      var glow = 'fill="none" stroke="#a855f7" stroke-opacity="0.40" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"';
+      var flow = 'fill="none" stroke="#7e22ce" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"';
+      var segs = '<path d="' + dF + '"/><path d="' + dM + '"/>' + (dL ? '<path d="' + dL + '"/>' : '');
+      var g = '<g data-tlworst="1" pointer-events="none">';
+      g += '<g ' + glow + '>' + segs + '</g>';
+      g += '<g ' + flow + ' class="tl-worst-flow">' + segs + '</g>';
+      if (wpG.endPt && Number.isFinite(wpLen)) {
+        var qe = P(wpG.endPt.x, wpG.endPt.y, HEIGHTS.main);
+        if (Number.isFinite(qe.x) && Number.isFinite(qe.y)) {
+          g += '<circle cx="' + fmt(qe.x) + '" cy="' + fmt(qe.y) + '" r="3.5" fill="#fff" stroke="#7e22ce" stroke-width="1.8"/>';
+          /* 标签分档：末端点在图纸右半区时改向左侧延伸（text-anchor:end）——
+             右侧浮动面板（经济性对比等）会盖住 SVG 右缘，右半区一律朝左写最稳妥 */
+          var wpLabelRight = qe.x > svgW / 2;
+          g += '<text x="' + fmt(qe.x + (wpLabelRight ? -7 : 7)) + '" y="' + fmt(qe.y - 6) + '"'
+            + (wpLabelRight ? ' text-anchor="end"' : '')
+            + ' font-size="10" font-weight="700" font-family="system-ui" fill="#7e22ce" paint-order="stroke" stroke="white" stroke-width="2.5">最远 ' + (wpZi + 1) + ' 区 · ' + fmt(wpLen) + ' m</text>';
+        }
+      }
+      g += '</g>';
+      s.push(g);
+    })();
+
     /* 12) 图例 + 底部参数 —— 图例含管径规格（2026-09-15：管道逐根标注已取消，规格看这里） */
     var ly = svgH - footerH + 30, lx = 60;
     s.push('<g font-family="system-ui,sans-serif" font-size="10.5" font-weight="600">');

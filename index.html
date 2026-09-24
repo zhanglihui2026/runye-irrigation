@@ -3045,9 +3045,12 @@ body > .ry-nav .main-header{display:none!important}
 #ryCadSide #tlPlanBar2.pp-plan-bar-result .pp-plan-item>.pp-plan-label:first-child{margin-right:0;flex:0 0 64px}
 .tl-plan-result .pp-plan-item>.pp-plan-val{flex:0 0 88px;text-align:center;white-space:nowrap}
 .tl-plan-result .pp-plan-val-real{flex:1 1 auto;text-align:center;font-weight:700;color:#b45309;font-variant-numeric:tabular-nums;white-space:nowrap}
-.tl-plan-result .pp-plan-cols-head{border-bottom:1px solid #e4ece7;min-height:18px;color:#94a3b8;font-size:10px}
+.tl-plan-result .pp-plan-cols-head{border-bottom:1px solid #e4ece7;min-height:18px;color:#94a3b8;font-size:11px;font-weight:600} /* 2026-09-24 用户要求：表头不小于正文(11px)并适当加粗(600) */
 .tl-plan-result .pp-cols-h1{flex:0 0 88px;text-align:center}
 .tl-plan-result .pp-cols-h2{flex:1 1 auto;text-align:center;color:#b45309}
+.tl-plan-result .pp-cal-sel{width:100%;max-width:100%;box-sizing:border-box;font:inherit;font-size:11px;font-weight:700;color:#b45309;text-align:center;text-align-last:center;background:#fff7ed;border:1px solid #fed7aa;border-radius:5px;padding:1px 2px;cursor:pointer}
+.tl-plan-result .pp-cal-sel:focus{outline:none;border-color:#f59e0b}
+.tl-plan-result .pp-cal-sel option{color:#1f2937;font-weight:400}
 #tlPipePlanSection .pp-side .pp-btn-ghost{color:#333;border-color:#ccc;background:#f8f9fa}
 /* v98e：左栏「手动分组」状态块改表格显示（组 / 分区 / 面积 + 合计） */
 .tl-grp-cap{font-size:11px;font-weight:700;color:#2f6d43;margin:0 0 4px}
@@ -5835,6 +5838,12 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
          需要撤掉：删掉本注释与下面两行 item 即可，另删本文件底部 ppPullLiftDh / ppLiftDhCapture 那一整块（含两个 document 监听）与 resetDefaults 里的回填调用。 -->
     <span class="pp-plan-item"><span class="pp-plan-label">水泵提升高度</span><input type="number" id="planLift" value="5" min="0" step="1">m</span>
     <span class="pp-plan-item"><span class="pp-plan-label">地形高差</span><input type="number" id="planDh" value="5" min="0" step="1">m</span>
+    <!-- 2026-09-24 用户要求：新增「单边铺设长度」（默认100m，可调80/120等）。
+         分区划分固定边 = 滴灌带双边铺设长度 = 2×此值（默认 2×100=200m，即原 MAX_ZONE_SIDE 硬编码）；
+         另一边 = 单区面积 ÷ 固定边，调节后分区宽度自动跟随。
+         消费点：planZoneFixedSide() → calcZoneLayout / calcManualZoneLayout / ppGetZoneCuts。
+         需要撤掉：删本 item，并把 planZoneFixedSide 三处消费点还原为 MAX_ZONE_SIDE。 -->
+    <span class="pp-plan-item"><span class="pp-plan-label">单边铺设长度</span><input type="number" id="planTapeLaySide" value="100" min="10" step="10" title="滴灌带在分区内单边铺设长度；分区固定边 = 2×此值（双边），调节后分区划分自动跟随">m</span>
     <span class="pp-plan-item"><span class="pp-plan-label">滴灌带间距</span><input type="number" id="planTapeSpacing" value="0.4" min="0.1" step="0.1">m</span>
     <span class="pp-plan-item"><span class="pp-plan-label">滴孔间距</span><input type="number" id="planEmitterSpacing" value="0.3" min="0.05" step="0.05">m</span>
     <span class="pp-plan-item"><span class="pp-plan-label">滴头流量</span><input type="number" id="planEmitterFlow" value="0.8" min="0.1" step="0.1">L/h</span>
@@ -6012,11 +6021,11 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     <span class="pp-plan-item"><span class="pp-plan-label">水泵功率</span><span class="pp-plan-val" id="tlPlanPumpPower">— kW</span><span class="pp-plan-val-real" id="tlPlanPumpPowerReal">—</span></span>
     <span class="pp-sep-vert"></span>
     <!-- v109：管径行补「改径重算」列 —— 管径前后对比（设计 Ø → 改径 Ø，未改径显示 —） -->
-    <span class="pp-plan-item"><span class="pp-plan-label">总管</span><span class="pp-plan-val" id="tlPlanFrontPipe">—</span><span class="pp-plan-val-real" id="tlPlanFrontPipeReal">—</span></span>
+    <span class="pp-plan-item"><span class="pp-plan-label">总管</span><span class="pp-plan-val" id="tlPlanFrontPipe">—</span><span class="pp-plan-val-real"><select id="tlCalSelFront" class="pp-cal-sel" title="选择总管管径（设计值±3档），扬程/流速随之实时重算"></select></span></span>
     <span class="pp-plan-item"><span class="pp-plan-label">总管流速</span><span class="pp-plan-val" id="tlPlanFrontVelocity">— m/s</span><span class="pp-plan-val-real" id="tlPlanFrontVelocityReal">—</span></span>
-    <span class="pp-plan-item"><span class="pp-plan-label">主管</span><span class="pp-plan-val" id="tlPlanMainPipe">—</span><span class="pp-plan-val-real" id="tlPlanMainPipeReal">—</span></span>
+    <span class="pp-plan-item"><span class="pp-plan-label">主管</span><span class="pp-plan-val" id="tlPlanMainPipe">—</span><span class="pp-plan-val-real"><select id="tlCalSelMain" class="pp-cal-sel" title="选择主管管径（设计值±3档），扬程/流速随之实时重算"></select></span></span>
     <span class="pp-plan-item"><span class="pp-plan-label">主管流速</span><span class="pp-plan-val" id="tlPlanMainVelocity">— m/s</span><span class="pp-plan-val-real" id="tlPlanMainVelocityReal">—</span></span>
-    <span class="pp-plan-item"><span class="pp-plan-label">支管</span><span class="pp-plan-val" id="tlPlanBranchPipe">—</span><span class="pp-plan-val-real" id="tlPlanBranchPipeReal">—</span></span>
+    <span class="pp-plan-item"><span class="pp-plan-label">支管</span><span class="pp-plan-val" id="tlPlanBranchPipe">—</span><span class="pp-plan-val-real"><select id="tlCalSelBranch" class="pp-cal-sel" title="选择支管管径（设计值±3档），扬程/流速随之实时重算"></select></span></span>
     <span class="pp-plan-item"><span class="pp-plan-label">支管流速</span><span class="pp-plan-val" id="tlPlanBranchVelocity">— m/s</span><span class="pp-plan-val-real" id="tlPlanBranchVelocityReal">—</span></span>
   </div>
   <!-- 扬程计算过程（2026-09-16 第三十五轮建，第三十六轮按要求移入三级左栏并简化，
@@ -7065,14 +7074,26 @@ function ryZoneAreaGroups(cuts, poly, n){
 
 function tlMeasureText(str){var w=0;for(var k=0;k<str.length;k++){var ch=str[k];w+=(ch.charCodeAt(0)>255?12:6.5);}return w;}
 
+/* 2026-09-24 用户要求：分区固定边可调 —— 面板「单边铺设长度」×2（双边铺设长度），
+   默认 100×2=200（即原 MAX_ZONE_SIDE 硬编码）。只作用于二级分区划分
+   （calcZoneLayout / calcManualZoneLayout / ppGetZoneCuts 钳制）；
+   一级 fld_zoneFixedSide、三级 tl_zoneFixedSide 各有自己的输入，不受影响。 */
+function planZoneFixedSide() {
+  var el = document.getElementById('planTapeLaySide');
+  var v = parseFloat(el ? el.value : '');
+  if (!isFinite(v) || v <= 0) v = 100;
+  return Math.max(1, 2 * v);
+}
+
 function calcZoneLayout(width, height, requestedN) {
+  const S = planZoneFixedSide();
   const safeW = Math.max(1, width || 1);
   const safeH = Math.max(1, height || 1);
   const totalArea = safeW * safeH;
-  const minCols = Math.max(1, Math.ceil(safeW / MAX_ZONE_SIDE));
-  const minRows = Math.max(1, Math.ceil(safeH / MAX_ZONE_SIDE));
+  const minCols = Math.max(1, Math.ceil(safeW / S));
+  const minRows = Math.max(1, Math.ceil(safeH / S));
   const minNBySide = minCols * minRows;
-  const minNByArea = Math.max(1, Math.ceil(totalArea / (MAX_ZONE_SIDE * MAX_ZONE_SIDE)));
+  const minNByArea = Math.max(1, Math.ceil(totalArea / (S * S)));
   const minN = Math.max(minNBySide, minNByArea);
   const targetN = Math.max(parseInt(requestedN, 10) || minN, minN);
   let best = null;
@@ -7083,12 +7104,12 @@ function calcZoneLayout(width, height, requestedN) {
     const drawZoneW = safeW / cols;
     const drawZoneH = safeH / rows;
     const zoneArea = totalArea / n;
-    const derivedSide = Math.min(MAX_ZONE_SIDE, zoneArea / MAX_ZONE_SIDE);
+    const derivedSide = Math.min(S, zoneArea / S);
     const score = n * 100000 + Math.abs(drawZoneW - drawZoneH);
     if (!best || score < best.score) {
       best = {
         cols, rows, N: n,
-        zoneW: MAX_ZONE_SIDE,
+        zoneW: S,
         zoneH: derivedSide,
         zoneArea,
         drawZoneW,
@@ -7102,8 +7123,8 @@ function calcZoneLayout(width, height, requestedN) {
     cols: minCols,
     rows: minRows,
     N: minN,
-    zoneW: MAX_ZONE_SIDE,
-    zoneH: Math.min(MAX_ZONE_SIDE, totalArea / minN / MAX_ZONE_SIDE),
+    zoneW: S,
+    zoneH: Math.min(S, totalArea / minN / S),
     zoneArea: totalArea / minN,
     drawZoneW: safeW / minCols,
     drawZoneH: safeH / minRows
@@ -7127,8 +7148,8 @@ function calcManualZoneLayout(width, height, manualMu) {
   const safeW = Math.max(1, width || 1);
   const safeH = Math.max(1, height || 1);
   const targetArea = Math.max(0.1, manualMu || 0.1) * MU_TO_SQM;
-  const fixedSide = MAX_ZONE_SIDE;
-  const derivedSide = Math.min(MAX_ZONE_SIDE, Math.max(1, targetArea / fixedSide));
+  const fixedSide = planZoneFixedSide();  /* 2026-09-24：固定边 = 双边铺设长度（可调），原 MAX_ZONE_SIDE */
+  const derivedSide = Math.min(fixedSide, Math.max(1, targetArea / fixedSide));
   const longIsX = safeW >= safeH;
   const xDesign = longIsX ? derivedSide : fixedSide;
   const yDesign = longIsX ? fixedSide : derivedSide;
@@ -7181,6 +7202,77 @@ function tlNormalizePipeOverride(value) {
 function tlAppliedPipeOverride() {
   var value = tlNormalizePipeOverride(tlPipeOdOverride), ae = window.RyTlAutoEdits;
   return value && ae && window.tlDiagramData && value.geoKey === ae.geometryKey(window.tlDiagramData) ? value : null;
+}
+
+/* ===== 2026-09-24 用户要求：「水力计算结果」面板 总管/主管/支管 的「改径重算」列
+   改为管径选择按钮（设计值±3档）。选中后经 computeThreeLevel 实时重算扬程/流速/功率。 ===== */
+/* 手动选管状态：null = 用设计管径（不覆盖）；数字 = 覆盖该档管径 OD。 */
+window.tlManualCals = window.tlManualCals || { front: null, main: null, branch: null };
+/* 把手动选管并入 tlPipeOdOverride（与既有「图面改径 / 应用到图面」同源机制）：
+   ① 保证 tlAppliedPipeOverride() 生效 → ovApplied=true，改径重算列正常显示；
+   ② 图面分支沿程损失按新管径重算。键名同时覆盖 AE.allPids 段键与 wp.zones 的 zone 键（双命名空间）。 */
+function tlBuildPipeOverride() {
+  if (!window.tlManualCals) window.tlManualCals = { front: null, main: null, branch: null };
+  var mc = window.tlManualCals;
+  var anyManual = (mc.front != null || mc.main != null || mc.branch != null);
+  var AE = window.RyTlAutoEdits;
+  var base = (typeof pipeCaliberSnapshot === 'function') ? pipeCaliberSnapshot() : null;
+  var cals = (base && base.calibers) ? Object.assign({}, base.calibers) : {};
+  var geoKey = (base && base.geoKey) ? base.geoKey : (AE && window.tlDiagramData ? AE.geometryKey(window.tlDiagramData) : null);
+  if (AE && window.tlDiagramData && anyManual) {
+    AE.allPids(window.tlDiagramData).forEach(function (pid) {
+      if (/^main-\d+$/.test(pid) && mc.main != null) cals[pid] = mc.main;
+      else if (/^branch-\d+$/.test(pid) && mc.branch != null) cals[pid] = mc.branch;
+    });
+  }
+  var wp2 = (typeof tlWorstPathLen === 'function') ? tlWorstPathLen() : null;
+  if (wp2 && wp2.zones && anyManual) {
+    wp2.zones.forEach(function (z) {
+      if (mc.main != null) cals['main-' + z.zi] = mc.main;
+      if (mc.branch != null) cals['branch-' + z.zi] = mc.branch;
+    });
+  }
+  if (mc.front != null) cals.front = mc.front;
+  tlPipeOdOverride = (geoKey && Object.keys(cals).length)
+    ? tlNormalizePipeOverride({ version: 1, geoKey: geoKey, calibers: cals })
+    : null;
+}
+/* 面板三个直径选择 <select> 的填充：以设计值(±3档)为选项，当前有效值为选中态。 */
+function tlRefreshCalSels(r, rDes) {
+  if (!r || !r.frontPipe || !rDes || !rDes.frontPipe) return;
+  var sels = [
+    { sel: 'tlCalSelFront', des: rDes.frontPipe.od, cur: r.frontPipe.od },
+    { sel: 'tlCalSelMain', des: rDes.mainPipe.od, cur: r.mainPipe.od },
+    { sel: 'tlCalSelBranch', des: rDes.branchPipe.od, cur: r.branchPipe.od }
+  ];
+  tlBindCalSels();
+  sels.forEach(function (s) {
+    var el = document.getElementById(s.sel); if (!el) return;
+    var centerIdx = PE_OD_SERIES.indexOf(s.des);
+    if (centerIdx < 0) { var best = 0, bd = Infinity; for (var i = 0; i < PE_OD_SERIES.length; i++) { var d = Math.abs(PE_OD_SERIES[i] - s.des); if (d < bd) { bd = d; best = i; } } centerIdx = best; }
+    var lo = Math.max(0, centerIdx - 3), hi = Math.min(PE_OD_SERIES.length - 1, centerIdx + 3);
+    var opts = PE_OD_SERIES.slice(lo, hi + 1);
+    if (isFinite(s.cur) && opts.indexOf(s.cur) < 0 && PE_OD_SERIES.indexOf(s.cur) >= 0) { opts = opts.concat([s.cur]); opts.sort(function (a, b) { return a - b; }); }
+    el.innerHTML = opts.map(function (od) { return '<option value="' + od + '">Ø ' + od + '</option>'; }).join('');
+    el.setAttribute('data-design', s.des);
+    var chosen = isFinite(s.cur) ? s.cur : s.des;
+    el.value = (opts.indexOf(chosen) >= 0) ? chosen : s.des;
+  });
+}
+/* 选择按钮 change 事件绑定（仅绑定一次）。选回设计值即清除该档覆盖。 */
+function tlBindCalSels() {
+  if (window._tlCalSelBound) return; window._tlCalSelBound = true;
+  [['front', 'tlCalSelFront'], ['main', 'tlCalSelMain'], ['branch', 'tlCalSelBranch']].forEach(function (p) {
+    var el = document.getElementById(p[1]); if (!el) return;
+    el.addEventListener('change', function () {
+      var design = Number(el.getAttribute('data-design'));
+      var val = Number(el.value);
+      if (!window.tlManualCals) window.tlManualCals = { front: null, main: null, branch: null };
+      window.tlManualCals[p[0]] = (val === design) ? null : val;
+      tlBuildPipeOverride();
+      if (typeof tlUpdatePlanBar === 'function') tlUpdatePlanBar();
+    });
+  });
 }
 
 function hazenWilliams(L, Q, d) {
@@ -7584,7 +7676,7 @@ function render() {
           <span class="step">04</span>
           <div>
             <h2>管网布置示意图</h2>
-      <p>主管沿 A 方向；轮灌区按一边固定 ${MAX_ZONE_SIDE}m、另一边由单区面积除以 ${MAX_ZONE_SIDE}m 折算，且不得超过 ${MAX_ZONE_SIDE}m。</p>
+      <p>主管沿 A 方向；轮灌区一边固定为「滴灌带双边铺设长度」＝面板「单边铺设长度」×2（默认 100×2＝200m，可调），另一边由单区面积除以该值折算。</p>
           </div>
         </div>
         <div class="network-legend">
@@ -8198,6 +8290,15 @@ function computeThreeLevel() {
     if (hydraulicPath) {
       frontPipeLoss = hydraulicPath.frontPipeLoss; mainLoss = hydraulicPath.mainLoss; branchLoss = hydraulicPath.branchLoss;
       frontLenUsed = hydraulicPath.front; mainLenUsed = hydraulicPath.main; branchLenUsed = hydraulicPath.branch;
+    }
+    /* 2026-09-24（用户要求）：面板管径选择按钮 —— 手动选管已并入 tlPipeOdOverride.calibers
+       （tlBuildPipeOverride），沿程损失在上方 hydraulicPath 校核中已按新管径计算；此处把
+       r.*Pipe.od 同步为手动选管值并据相同长度重算各段损失，供面板流速/返回对象/图例同源使用。 */
+    if (window.tlManualCals) {
+      var _mc = window.tlManualCals;
+      if (_mc.front != null) { frontPipe.od = _mc.front; frontPipe.id = peInnerDiam(_mc.front); frontPipeLoss = hazenWilliams(frontLenUsed, combinedFlow, frontPipe.id); }
+      if (_mc.main != null) { mainPipe.od = _mc.main; mainPipe.id = peInnerDiam(_mc.main); mainLoss = hazenWilliams(mainLenUsed, zoneFlow, mainPipe.id); }
+      if (_mc.branch != null) { branchPipe.od = _mc.branch; branchPipe.id = peInnerDiam(_mc.branch); branchLoss = hazenWilliams(branchLenUsed, branchFlow, branchPipe.id) * branchF; }
     }
   }
 
@@ -9017,9 +9118,8 @@ function tlUpdatePlanBar() {
   }
   var usedCals = tlAppliedPipeOverride(), worstZi = r.hydraulicPath && r.hydraulicPath.zoneIndex;
   usedCals = usedCals ? usedCals.calibers : {};
-  tlRealPipe('tlPlanFrontPipeReal', usedCals.front || r.frontPipe.od, rDes.frontPipe.od);
-  tlRealPipe('tlPlanMainPipeReal', usedCals['main-' + worstZi] || r.mainPipe.od, rDes.mainPipe.od);
-  tlRealPipe('tlPlanBranchPipeReal', usedCals['branch-' + worstZi] || r.branchPipe.od, rDes.branchPipe.od);
+  /* 2026-09-24（用户要求）：总管/主管/支管「改径重算」列改为管径选择按钮 —— 填充并同步选中态 */
+  tlRefreshCalSels(r, rDes);
   function actualVelocity(flow, od) {
     return ovApplied ? flow / 3600 / (Math.PI * Math.pow(peInnerDiam(od) / 1000, 2) / 4) : NaN;
   }
@@ -9464,7 +9564,9 @@ function tlAutoGenerate(options) {
   //          顶行组的地块上边界上方仍不画（用户圈❌取消的位置不变）。
   //   竖向 = 「右缘贴地块右边界」的组（maxC===cols-1，画在地块右缘外侧）；
   //          组与组相邻处的内部右缘不画（避免标进邻区内部）—— 用户圈❌明确取消。
-  //   尺寸值 = 设计网格包络 ΣxPlan / ΣyPlan（与分区标签「设计尺寸」同口径）。
+  //   尺寸值 = 【端点实际跨距】（2026-09-24 用户报告手动调节后拾取边界点不对：
+//          原按设计网格 ΣxPlan/ΣyPlan 取值，阶梯拖动/合并后与画线端点失配；
+//          无手动调节时 zX/zY 退化为 xPos/yPos ⇒ 与设计值逐位一致）。
   //   整层 pointer-events="none"：不挡组边界线（data-mgb）拖动命中，也不挡画布平移。
   (function(){
     function gdVal(v){ if(!isFinite(v))return '— m'; var r0=Math.round(v); return Math.abs(v-r0)<0.05?r0+' m':v.toFixed(1)+' m'; }
@@ -9496,7 +9598,12 @@ function tlAutoGenerate(options) {
       for(var gri=gdB.minR;gri<=gdB.maxR;gri++)gdH+=yPlan[gri];
       var gdX0=zX(gdB.minR,gdB.minC), gdX1=zX(gdB.minR,gdB.maxC+1);
       var gdY0=zY(gdB.minC,gdB.minR), gdY1=zY(gdB.maxC,gdB.maxR+1);
-      var gdTL=ts(gdX0,gdY0), gdTR=ts(gdX1,gdY0), gdBR=ts(gdX1,gdY1);
+      /* 2026-09-24 用户报告：手动调节（阶梯拖割缝/拖分界线/手动分组）后分地块标注拾取的边界点不对。
+         竖向标注画在组右缘（列 maxC 外侧）⇒ 上下端必须取【列 maxC】上的实际边界
+         （原上端取 minC 列：阶梯/合并后两列边界不同 ⇒ 端点越界进邻带，用户截图右缘 255 线跨过紫色分界线）。
+         gdTR/gdBR 只服务于右缘竖向标注与其加选命中 ⇒ 直接改用右缘列端点。 */
+      var gdY0v=zY(gdB.maxC,gdB.minR), gdY1v=zY(gdB.maxC,gdB.maxR+1);
+      var gdTL=ts(gdX0,gdY0), gdTR=ts(gdX1,gdY0v), gdBR=ts(gdX1,gdY1v);
       /* 横向尺寸线（v111d 锚点沿用：组底边上方 14px——单行组=地块底缘上方，多行=分界线上方；
          与总尺寸线间距恒 ≥52px（v111c 预留）。
          v115（2026-09-23 用户截图：横向实际被主管分成三块，旧「组包络」一段标注把其中两块并到一起——不对）：
@@ -9519,7 +9626,8 @@ function tlAutoGenerate(options) {
         gdParts.push('<g data-dim="'+gdIdV+'" data-axis="x">'
           +'<line x1="'+gdVx.toFixed(1)+'" y1="'+gdTR.y.toFixed(1)+'" x2="'+gdVx.toFixed(1)+'" y2="'+gdBR.y.toFixed(1)+'"/>'
           +gdTickV(gdVx,gdTR.y)+gdTickV(gdVx,gdBR.y)
-          +'<g transform="translate('+(gdVx+13).toFixed(1)+' '+((gdTR.y+gdBR.y)/2).toFixed(1)+') rotate(-90)"><text x="0" y="4" text-anchor="middle" font-size="12" font-weight="700" fill="#111111" stroke="none">'+gdVal(gdH)+'</text></g></g>');
+          /* 值 = 端点实际跨距（2026-09-24：原 ΣyPlan 设计值在手动调节后失真；无调节时两者逐位一致） */
+          +'<g transform="translate('+(gdVx+13).toFixed(1)+' '+((gdTR.y+gdBR.y)/2).toFixed(1)+') rotate(-90)"><text x="0" y="4" text-anchor="middle" font-size="12" font-weight="700" fill="#111111" stroke="none">'+gdVal(gdY1v-gdY0v)+'</text></g></g>');
         window._tlDimHits.push({id:gdIdV,axis:'x',x1:gdVx,y1:gdTR.y,x2:gdVx,y2:gdBR.y,minOff:-8});
       }
     });
@@ -9540,7 +9648,8 @@ function tlAutoGenerate(options) {
         gdParts.push('<g data-dim="'+gdIdH+'" data-axis="y">'
           +'<line x1="'+gdPA.x.toFixed(1)+'" y1="'+gdHy.toFixed(1)+'" x2="'+gdPB.x.toFixed(1)+'" y2="'+gdHy.toFixed(1)+'"/>'
           +gdTickH(gdPA.x,gdHy)+gdTickH(gdPB.x,gdHy)
-          +'<text x="'+((gdPA.x+gdPB.x)/2).toFixed(1)+'" y="'+(gdHy-4).toFixed(1)+'" text-anchor="middle" font-size="12" font-weight="700" fill="#111111" stroke="none">'+gdVal(xPlan[gdc2])+'</text></g>');
+          +'<text x="'+((gdPA.x+gdPB.x)/2).toFixed(1)+'" y="'+(gdHy-4).toFixed(1)+'" text-anchor="middle" font-size="12" font-weight="700" fill="#111111" stroke="none">'
+          +gdVal(zX(gdRc.maxR,gdc2+1)-zX(gdRc.maxR,gdc2))+'</text></g>');  /* 2026-09-24：值=该段端点实际跨距（原 xPlan[c] 设计宽，阶梯拖动后失真） */
         window._tlDimHits.push({id:gdIdH,axis:'y',x1:gdPA.x,y1:gdHy,x2:gdPB.x,y2:gdHy,minOff:-8});
       }
     });
@@ -11624,7 +11733,7 @@ function ppRenderHeadBreakdown(r) {
 window.ppRenderHeadBreakdown = ppRenderHeadBreakdown;
 
 // Input listeners — all plan parameters
-['planTapeLen','planTapeSpacing','planEmitterSpacing','planEmitterFlow','planN','planZoneMode','planZoneMuManual','planTargetV'].forEach(id=>{
+['planTapeLaySide','planTapeLen','planTapeSpacing','planEmitterSpacing','planEmitterFlow','planN','planZoneMode','planZoneMuManual','planTargetV'].forEach(id=>{
   document.getElementById(id).addEventListener('input', calcPlan);
   document.getElementById(id).addEventListener('change', calcPlan);
 });
@@ -12107,8 +12216,9 @@ ppPullLiftDh();                                              // 首屏对齐一�
 
   function ppGetZoneCuts(b,layout){
     var dims=ppGetPlanDims(b);
-    var longSide=Math.min(MAX_ZONE_SIDE,Math.max(layout.zoneW,layout.zoneH));
-    var shortSide=Math.min(MAX_ZONE_SIDE,Math.min(layout.zoneW,layout.zoneH));
+    /* 2026-09-24：上限跟随面板「单边铺设长度」×2（原固定 MAX_ZONE_SIDE=200，单边120→双边240 不得被钳回200） */
+    var longSide=Math.min(planZoneFixedSide(),Math.max(layout.zoneW,layout.zoneH));
+    var shortSide=Math.min(planZoneFixedSide(),Math.min(layout.zoneW,layout.zoneH));
     var longIsX=dims.w>=dims.h;
     var xDesign=(longIsX!==layout.rotated)?shortSide:longSide;
     var yDesign=(longIsX!==layout.rotated)?longSide:shortSide;
