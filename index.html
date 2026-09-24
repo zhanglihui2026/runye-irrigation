@@ -6062,7 +6062,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
          （画线走「三级设计」工作区，双向同步保留）；卡片仅保留 #tlIsoPipeHint 反馈行
          （右键旋转/阀门/接管等图面操作提示都写这里） -->
     <div class="tl-iso-card tl-iso-pipe-card">
-      <div class="tl-iso-hint" id="tlIsoPipeHint">右键图上的三通即可旋转第三口（绕管道中心轴，每点 ±15°），右键接管可延长/删除；插入管线请到「三级设计」工作区，两页数据互通</div>
+      <div class="tl-iso-hint" id="tlIsoPipeHint">右键管线可加三通/弯头/阀门（节点）；右键三通可选分支口型号、快速转向（0/90/180/270°、±15° 微调）并「从分支口接管道」；接管端点与图上白圈节点自动吸附；插入管线请到「三级设计」工作区，两页数据互通</div>
     </div>
     <!-- 自动管线选中卡（2026-09-15 阶段2）：点选二级传递的自动管线后显示；ISO_FITTING_UI_OFF 下豁免隐藏 -->
     <div class="tl-iso-card tl-iso-autocard" id="tlIsoAutoCard" style="display:none">
@@ -16478,6 +16478,8 @@ function tlIsoStatsReset() {
   var ctx = null;   /* 懒创建 */
   var ctxBtnCss = 'display:block;width:100%;text-align:left;border:0;background:none;padding:6px 10px;'
     + 'cursor:pointer;border-radius:4px;font:inherit;color:inherit';
+  /* 分支口异径型号档（2026-09-24 任务⑥）：右键三通「分支口型号」可选项 = 小于宿管径的 PE 外径 */
+  var TEE_OD_SERIES = [63, 75, 90, 110, 140, 160, 200, 250, 315, 355, 400];
   function hideCtx() { if (ctx) ctx.style.display = 'none'; }
   /* 左键点构件的兜底提示（2026-09-16）：参数面板已下线（editor.js ISO_PARAM_EDITOR_OFF），
      ISO.onFittingClick 保持 null → 左键点三通/接管毫无反馈，用户会以为该处不可交互
@@ -16550,6 +16552,34 @@ function tlIsoStatsReset() {
       }
       hideCtx(); return;
     }
+    /* 快速转向（2026-09-24 任务⑥）：目标角 − 当前累计角 = 旋转增量，走既有 rotateTee 链
+       （手工/自动三通都支持；接管/子树刚体跟随）。0° 与复位同义，增量 0 时静默。 */
+    if (b.getAttribute('data-rotq') !== null) {
+      var tq = parseInt(b.getAttribute('data-rotq'), 10);
+      var curq = (ISO.teeBranchSpin ? ISO.teeBranchSpin(id) : 0) || 0;
+      var dq = tq - curq;
+      if (dq && ISO.rotateTee(id, dq)) {
+        if (typeof tlIsoStatsRender === 'function') tlIsoStatsRender();
+        if (typeof ISO.onFittingClick === 'function') ISO.onFittingClick(ISO.fittingInfo(id));
+        setHint('第三口已快速转向 ' + tq + '°（可 ±15° 微调或从分支口接管道）');
+      }
+      hideCtx(); return;
+    }
+    /* 分支口型号（2026-09-24 任务⑥）：手工三通直接转异径并指定分支口规格。
+       走 beginEdit→previewEdit→applyEdit 事务（与 convertTee 同链路，撤销/存档天然打通）。 */
+    if (b.getAttribute('data-tspec')) {
+      var odv = b.getAttribute('data-tspec');
+      var inf = ISO.fittingInfo ? ISO.fittingInfo(id) : null;
+      if (inf && inf.manual && ISO.beginEdit && ISO.beginEdit(id)) {
+        var curp = ISO.getParams ? ISO.getParams(id) : {};
+        var vals = { teeType: 'reducing', branchSpec: odv, branchLen: (curp.teeType && Number.isFinite(curp.branchLen)) ? curp.branchLen : 1 };
+        if (ISO.previewEdit(vals)) ISO.applyEdit(); else ISO.cancelEdit();
+        if (typeof tlIsoStatsRender === 'function') tlIsoStatsRender();
+        if (typeof ISO.onFittingClick === 'function') ISO.onFittingClick(ISO.fittingInfo(id));
+        setHint('三通已转异径（分支口 ' + odv + '），右键三通可「从分支口接管道」');
+      } else setHint('分支口型号调整仅对手工三通可用');
+      hideCtx(); return;
+    }
     if (b.getAttribute('data-t')) {
       if (ISO.convertTee(id, b.getAttribute('data-t'))) {
         if (typeof tlIsoStatsRender === 'function') tlIsoStatsRender();
@@ -16561,7 +16591,7 @@ function tlIsoStatsReset() {
     hideCtx();
   }
   function onCtxHover(e) {
-    var sel = 'button[data-t],button[data-rot],button[data-reset],button[data-spawn],button[data-ext],button[data-del]';
+    var sel = 'button[data-t],button[data-rot],button[data-reset],button[data-spawn],button[data-ext],button[data-del],button[data-rotq],button[data-tspec]';
     var b = e.target.closest ? e.target.closest(sel) : null;
     Array.prototype.forEach.call(ctx.querySelectorAll(sel), function (x) { x.style.background = x === b ? '#f0fdf4' : ''; });
   }
@@ -16629,11 +16659,30 @@ function tlIsoStatsReset() {
          渲染成灰色说明，避免出现点了没反应的死按钮。 */
       + (info.manual
         ? '<button type="button" data-spawn="1" style="' + ctxBtnCss + ';color:#15803d">从分支口接管道</button>'
-        : '<div style="padding:4px 10px;color:#94a3b8">自动三通：第三口可旋转；接管道用左侧工具栏画线</div>');
+        : '<div style="padding:4px 10px;color:#94a3b8">自动三通：第三口可旋转；接管道用左侧工具栏画线</div>')
+      /* 快速转向（2026-09-24 任务⑥）：常用角度一步到位，免连点 ±15° */
+      + '<div style="padding:3px 10px 1px;font-weight:700;color:#0369a1">快速转向</div>'
+      + '<div style="display:flex;gap:2px;padding:0 4px">'
+      + '<button type="button" data-rotq="0" style="' + ctxBtnCss + ';width:auto;flex:1;text-align:center">0°</button>'
+      + '<button type="button" data-rotq="90" style="' + ctxBtnCss + ';width:auto;flex:1;text-align:center">90°</button>'
+      + '<button type="button" data-rotq="180" style="' + ctxBtnCss + ';width:auto;flex:1;text-align:center">180°</button>'
+      + '<button type="button" data-rotq="270" style="' + ctxBtnCss + ';width:auto;flex:1;text-align:center">270°</button>'
+      + '</div>';
     if (host) {
       h += '<div style="border-bottom:1px solid #e5e7eb;margin:2px 0"></div>'
         + '<button type="button" data-t="equal" style="' + ctxBtnCss + '">' + host + '转' + host + '（同径三通）</button>'
         + (other && other !== host ? '<button type="button" data-t="reducing" style="' + ctxBtnCss + '">' + host + '转' + other + '（异径三通）</button>' : '');
+    }
+    /* 分支口型号（2026-09-24 任务⑥）：手工三通可任选小于宿管径的异径档 */
+    if (info.manual && host) {
+      var hostNum = parseFloat(host);
+      var smaller = TEE_OD_SERIES.filter(function (v) { return hostNum && v < hostNum; });
+      if (smaller.length) {
+        h += '<div style="padding:3px 10px 1px;font-weight:700;color:#0369a1">分支口型号（异径）</div>'
+          + '<div style="display:flex;flex-wrap:wrap;gap:2px;padding:0 4px">'
+          + smaller.map(function (v) { return '<button type="button" data-tspec="' + v + '" style="' + ctxBtnCss + ';width:auto;flex:1 0 28%;text-align:center">' + v + '</button>'; }).join('')
+          + '</div>';
+      }
     }
     ctx.innerHTML = h;
     ctx.style.display = 'block';

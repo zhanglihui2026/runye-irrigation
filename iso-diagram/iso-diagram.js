@@ -702,6 +702,11 @@
     });
     s.push('</g>');
 
+    /* 节点圆（2026-09-24 任务⑥）：可捕捉的空口画白心圆（三通空分支口 / 接管自由端），
+       与 nearNode 吸附点一一对应 —— 图上看得见的「节点」，供右键接管/画线捕捉。 */
+    function nodeDot(q) {
+      return '<circle class="iso-node" cx="' + fmt(q.x) + '" cy="' + fmt(q.y) + '" r="3.1" fill="#fff" stroke="' + COLORS.tee + '" stroke-width="1.5" pointer-events="none"/>';
+    }
     /* 10b) 手工配件层（编辑层：三通/弯头/阀门，非水力计算对象；点击可查参数） */
     if (manual.length) {
       s.push('<g' + clipAttr + '>');
@@ -781,6 +786,26 @@
             }
           }
         }
+        /* 节点圆（2026-09-24 任务⑥）：三通尚无分支接管 → 分支口画节点圆；
+           接管两端中未贴在其它节点上的自由端画节点圆（贴了 = 口已占用）。 */
+        var nodeDots = '';
+        if (m.kind === 'tee') {
+          var hasBP = manual.some(function (x) { return x.kind === 'pipe' && x.teeId === m.id; });
+          if (!hasBP) {
+            var bdN = teeBranchDir(m);
+            var blN = (mp.teeType && Number.isFinite(mp.branchLen) && mp.branchLen > 0) ? mp.branchLen : 0.6;
+            var boN = m.segType === 'branch' ? branchOffsets[m.segIndex] : null;
+            nodeDots = nodeDot(shifted(P(m.point.x + bdN.x * blN, m.point.y + bdN.y * blN, m.z + bdN.z * blN), boN));
+          }
+        } else if (m.kind === 'pipe' && m.pts && m.pts.length >= 2) {
+          for (var ei = 0; ei < 2; ei++) {
+            var epN = ei === 0 ? m.pts[0] : m.pts[m.pts.length - 1];
+            if (nearNode(epN, m.id)) continue;   /* 端点已贴在其它节点（宿三通/对端）上：口已占用 */
+            var eoN = m.segType === 'branch' ? branchOffsets[m.segIndex] : null;
+            nodeDots += nodeDot(shifted(P(epN.x, epN.y, epN.z || 0), eoN));
+          }
+        }
+        att += nodeDots;
         s.push('<g class="iso-fit" data-fit="' + esc(m.id) + '" style="cursor:pointer"><title>'
           + esc(m.id + ' · ' + KIND_LABEL[m.kind] + ' · ' + (m.spec || '与管道同径')) + '</title>' + att + scaledSymbol(sym,q,m.id) + fitLabel(m.id,q,!!edits[m.id]) + '</g>');
       });
@@ -1339,9 +1364,18 @@
   function rerenderKeepView() {
     var ctn = currentCTN(); if (!ctn || !lastDataRef) return;
     var keep = { z: view.z, x: view.x, y: view.y };
+    /* 保留显示宽度（2026-09-24 任务⑥）：render→baseFit 会按「当前」容器宽重设 svg，
+       若初始 render 时容器布局未稳（宽度过时），放置/加管一触发 rerender 图面就跳变
+       （实测 1273→1551px，同屏点映射漂移 1.218 倍）。恢复旧宽 → 所见即所得不跳变，
+       rerender 前后同一屏幕点指向同一模型位置（节点复用/连续放置的前提）。 */
+    var el0 = currentEL(ctn), w0 = el0 ? el0.style.width : '';
     render(ctn, lastDataRef);
     view = keep;
-    var el = currentEL(ctn); if (el) applyView(ctn, el);
+    var el = currentEL(ctn);
+    if (el) {
+      if (w0 && el.style.width !== w0) el.style.width = w0;
+      applyView(ctn, el);
+    }
   }
 
   /* ---------- 手工配件管理 API（页面工具栏 / 测试使用） ---------- */
@@ -1640,12 +1674,43 @@
     if (m) return Number(m.branchSpin) || 0;
     return (autoSpin[id] && Number(autoSpin[id].branchSpin)) || 0;
   }
+  /* ---------- 节点吸附（2026-09-24 任务⑥）----------
+     「节点」= 手工层已存在的可捕捉点：三通/弯头/阀门中心 + 接管（M-G##）两端。
+     右键三通「从分支口接管道」的末端、接管「延长」的续端都会自动吸附到最近节点
+     （容差 NODE_SNAP_TOL 米），从节点上再画管/接管时端点天然精确对齐。 */
+  var NODE_SNAP_TOL = 0.6;   /* 米 */
+  function nearNode(p, excludeId) {
+    if (!p || !isFinite(p.x) || !isFinite(p.y)) return null;
+    var best = null;
+    manual.forEach(function (m) {
+      if (m.id === excludeId) return;
+      var pts = [];
+      /* z 修正（2026-09-24 任务⑥）：m.point 无 z（存于 m.z），补齐后接管端（z=SEG_Z）
+         才能与配件节点正确比对，否则虚高 1.0m 误判不占用 */
+      if (m.kind === 'tee' || m.kind === 'elbow' || m.kind === 'valve') pts.push({ x: m.point.x, y: m.point.y, z: m.z });
+      else if (m.kind === 'pipe' && m.pts && m.pts.length >= 2) pts = [m.pts[0], m.pts[m.pts.length - 1]];
+      for (var i = 0; i < pts.length; i++) {
+        var q = pts[i]; if (!q) continue;
+        var d = Math.hypot(q.x - p.x, q.y - p.y, (q.z || 0) - (p.z || 0));
+        if (d <= NODE_SNAP_TOL && (!best || d < best.d)) {
+          best = { d: d, id: m.id, kind: m.kind, point: q, end: m.kind === 'pipe' ? (i === 0 ? 0 : m.pts.length - 1) : -1 };
+        }
+      }
+    });
+    return best;
+  }
   function spawnPipeFromTee(id) {
     var m = manual.filter(function (x) { return x.id === id; })[0];
     if (!m || m.kind !== 'tee') return false;
     var bd = teeBranchDir(m), mp = params(id);
     var len = (mp.teeType && Number.isFinite(mp.branchLen) && mp.branchLen > 0) ? mp.branchLen : 1;
     var tip = { x: m.point.x + bd.x * len, y: m.point.y + bd.y * len, z: m.z + bd.z * len };
+    /* 末端节点吸附（2026-09-24 任务⑥）：生长管末端落在已有节点（其它三通/阀门/接管端）容差内
+       → 精确接到该节点上，而不是差几厘米悬空。排除宿三通自身；吸附点与宿点重合则不吸。 */
+    var nnT = nearNode(tip, id);
+    if (nnT && Math.hypot(nnT.point.x - m.point.x, nnT.point.y - m.point.y, (nnT.point.z || 0) - m.z) > 0.15) {
+      tip = { x: nnT.point.x, y: nnT.point.y, z: isFinite(nnT.point.z) ? nnT.point.z : m.z };
+    }
     var n = 0;
     manual.forEach(function (x) { if (x.kind === 'pipe') { var mm = /^M-G(\d+)$/.exec(x.id); if (mm) n = Math.max(n, parseInt(mm[1], 10)); } });
     var pid = 'M-G' + pad2(n + 1);
@@ -1662,7 +1727,13 @@
     len = Number.isFinite(len) && len > 0 ? len : 1;
     var a = m.pts[m.pts.length - 2], b = m.pts[m.pts.length - 1];
     var dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z, L = Math.hypot(dx, dy, dz) || 1;
-    m.pts.push({ x: b.x + dx / L * len, y: b.y + dy / L * len, z: b.z + dz / L * len });
+    var np = { x: b.x + dx / L * len, y: b.y + dy / L * len, z: b.z + dz / L * len };
+    /* 续接端节点吸附（2026-09-24 任务⑥）：延长后的新端点落在已有节点容差内 → 精确接上 */
+    var nnE = nearNode(np, id);
+    if (nnE && Math.hypot(nnE.point.x - b.x, nnE.point.y - b.y, (nnE.point.z || 0) - b.z) > 0.15) {
+      np = { x: nnE.point.x, y: nnE.point.y, z: isFinite(nnE.point.z) ? nnE.point.z : np.z };
+    }
+    m.pts.push(np);
     checkpoint(); rerenderKeepView(); notifyEdit();
     return true;
   }
@@ -1713,6 +1784,8 @@
       var c3 = { x: qa.x + (qb.x - qa.x) * qt, y: qa.y + (qb.y - qa.y) * qt };
       var z3 = (qa.z || 0) + ((qb.z || 0) - (qa.z || 0)) * qt;
       var useSpec3 = (kind === 'tee' || kind === 'valve') ? (bestPipe.p.spec || hostDia(bestPipe.p.segType)) : '';
+      /* 节点复用（2026-09-24 任务⑥）：放三通的位置已在某节点容差内 → 返回既有三通，不重复叠放 */
+      if (kind === 'tee') { var nnP = nearNode({ x: c3.x, y: c3.y, z: z3 }); if (nnP && nnP.kind === 'tee') return nnP; }
       return addManual(kind, useSpec3, bestPipe.p.segType, bestPipe.p.segIndex || 0, c3,
         { hostPipe: bestPipe.p.id, z: z3 });
     }
@@ -1722,6 +1795,8 @@
     var c = closestOnSeg(unprojectIso(u.x - viewState.ox - shift.x, u.y - viewState.oy - shift.y, z, viewState.k), line[i], line[i + 1]);
     if (dist(c, line[i]) < 0.5 || dist(c, line[i + 1]) < 0.5) return null;
     var useSpec = (kind === 'tee' || kind === 'valve') ? hostDia(best.segType) : '';
+    /* 节点复用（2026-09-24 任务⑥）：同 A4a —— 节点附近放三通不再产生重叠副本 */
+    if (kind === 'tee') { var nnA = nearNode({ x: c.x, y: c.y, z: z }); if (nnA && nnA.kind === 'tee') return nnA; }
     return addManual(kind, useSpec, best.segType, best.segIndex, c);
   }
   function addManualAtScreen(kind, clientX, clientY) {
@@ -2091,6 +2166,7 @@
     rotateTee:rotateTee, resetTeeBranch:resetTeeBranch, teeBranchSpin:teeBranchSpin,
     teeThroughDir:teeThroughDir, teeAxisLabel:teeAxisLabel, teeBranchDir:teeBranchDir, asTeeRec:asTeeRec,
     addManualAtScreen:addManualAtScreen, spawnPipeFromTee:spawnPipeFromTee, extendManualPipe:extendManualPipe,
+    nearNode:nearNode, manualEntries:function(){ return manual; }, NODE_SNAP_TOL:NODE_SNAP_TOL,   /* 节点吸附（2026-09-24 任务⑥，E2E 只读） */
     teeSubtree:teeSubtree, hostTangentAt:hostTangentAt, teeSnapPts:teeSnapPts,
     /* 手工管线画线模式 + 拾取（共享图面数据层，2026-09-15 阶段1） */
     startPipeMode: startPipeMode, endPipeMode: endPipeMode, pipeModeKind: pipeModeKind,
