@@ -2,10 +2,10 @@
 #tlIsoDiagramWrap{background:#fff}
 /* 视口容器：overflow 裁剪 + 禁原生触摸滚动，平移/缩放由模块统一接管（对齐二级制图区体验） */
 #tlIsoDiagramContent{position:relative;overflow:hidden;padding:4px;background:#fff}
-#tlIsoDiagramContent svg{display:block;user-select:none;margin:0;transform-origin:0 0;cursor:grab}
+#tlIsoDiagramContent svg{display:block;user-select:none;margin:0;transform-origin:0 0;cursor:default} /* 2026-09-24 用户要求：grab(小手)改箭头，选择管线不受干扰；拖动中仍是 grabbing */
 #tlIsoDiagramContent svg.iso-dragging{cursor:grabbing}
 /* 手工配件层（2026-09-13）：构件可点击；放置模式十字丝 */
-#tlIsoDiagramContent svg g.iso-fit{cursor:pointer}
+#tlIsoDiagramContent svg g.iso-fit{cursor:default} /* 2026-09-24 用户要求：pointer 改 default（箭头），与全图统一 */
 #tlIsoDiagramContent [data-selected="true"]{filter:drop-shadow(0 0 2px #17a078)}
 #tlIsoDiagramContent.iso-placing,#tlIsoDiagramContent.iso-placing svg{cursor:crosshair}
 #tlIsoDiagramContent svg text{pointer-events:none}

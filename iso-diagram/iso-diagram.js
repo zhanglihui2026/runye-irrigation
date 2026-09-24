@@ -491,7 +491,10 @@
       var d0 = segDist(m[0], model.front[0], model.front[model.front.length - 1]);
       var upEnd = d0 <= segDist(m[m.length - 1], model.front[0], model.front[model.front.length - 1]) ? m[0] : m[m.length - 1];
       var points = [P(t.point.x, t.point.y, HEIGHTS.front), P(upEnd.x, upEnd.y, HEIGHTS.front), P(upEnd.x, upEnd.y, HEIGHTS.main)];
-      s.push('<path data-connector="front-main" d="' + points.map(function(q, i) { return (i ? 'L' : 'M') + fmt(q.x) + ' ' + fmt(q.y); }).join(' ') + '"/>');
+      /* 2026-09-24 用户要求：所有管线/配件都可选 —— 引入立管此前是裸 path（1.5px 细线，
+       * bbox 中心不在线上，elementFromPoint 点不中）。仿 R- 立管先例：包 g[data-connpipe] +
+       * 透明宽命中路径；点击 = 选中其所属主管（见 handleClick 的 data-connpipe 分支）。 */
+      s.push('<g data-connpipe="main-' + mi + '" style="cursor:default"><path d="' + points.map(function(q, i) { return (i ? 'L' : 'M') + fmt(q.x) + ' ' + fmt(q.y); }).join(' ') + '" fill="none" stroke="transparent" stroke-width="10"/><path data-connector="front-main" d="' + points.map(function(q, i) { return (i ? 'L' : 'M') + fmt(q.x) + ' ' + fmt(q.y); }).join(' ') + '"/></g>');
     });
     s.push('</g>');
 
@@ -1274,6 +1277,18 @@
         if (typeof api.onAutoSel === 'function') api.onAutoSel(autoSelInfo());
         return;
       }
+    }
+    /* 2026-09-24 用户要求：所有管线/配件都可选 —— 主管↔总管的引入立管（front-main connector）
+       此前是裸 path 无选中处理；点击 = 选中其所属主管（高亮该主管并打开信息），再点取消 */
+    var cg = t && t.closest ? t.closest('[data-connpipe]') : null;
+    if (cg) {
+      var cpid2 = cg.getAttribute('data-connpipe');
+      selAutoId = (selAutoId === cpid2) ? null : cpid2;
+      selAutoAt = 0;
+      selFitId = null; selPipeId = null;
+      rerenderKeepView();
+      if (typeof api.onAutoSel === 'function') api.onAutoSel(autoSelInfo());
+      return;
     }
     var g = t && t.closest ? t.closest('g[data-fit]') : null;
     /* 2026-09-16：左键同样给容差，否则点在三通符号的镂空中心/边缘会毫无反馈 */
