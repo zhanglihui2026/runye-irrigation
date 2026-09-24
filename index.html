@@ -5838,6 +5838,10 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
          需要撤掉：删掉本注释与下面两行 item 即可，另删本文件底部 ppPullLiftDh / ppLiftDhCapture 那一整块（含两个 document 监听）与 resetDefaults 里的回填调用。 -->
     <span class="pp-plan-item"><span class="pp-plan-label">水泵提升高度</span><input type="number" id="planLift" value="5" min="0" step="1">m</span>
     <span class="pp-plan-item"><span class="pp-plan-label">地形高差</span><input type="number" id="planDh" value="5" min="0" step="1">m</span>
+    <!-- 2026-09-24 任务⑮（用户要求）：新增「水源距离」——自动生成时水源贴着地块，实际水源可能在
+         地块外一段距离。该距离计入三级总管长度（frontLenUsed）→ 总管沿程损失 → 水泵扬程，
+         并计入总管长度统计（结果栏/损失卡/对比表）与材料清单。 -->
+    <span class="pp-plan-item"><span class="pp-plan-label">水源距离</span><input type="number" id="planSrcDist" value="0" min="0" step="1" title="水源到地块边界的距离（m）：计入总管长度 → 总管沿程损失 → 水泵扬程；同时计入总管长度统计与材料清单">m</span>
     <!-- 2026-09-24 用户要求：新增「单边铺设长度」（默认100m，可调80/120等）。
          分区划分固定边 = 滴灌带双边铺设长度 = 2×此值（默认 2×100=200m，即原 MAX_ZONE_SIDE 硬编码）；
          另一边 = 单区面积 ÷ 固定边，调节后分区宽度自动跟随。
@@ -7746,7 +7750,7 @@ function render() {
   } catch (eTlMat) { tlMat = null; }
   try { if (window.tlDiagramData && window.tlDiagramData.mainPipes) tlMains = window.tlDiagramData.mainPipes.length; } catch (eTlN) { tlMains = 0; }
   const useTl = !!(tlMat && tlMat.lens && window.tlDiagramData);
-  const matFrontLen = (tlMat && tlMat.lens && isFinite(tlMat.lens.front)) ? tlMat.lens.front : (r.mainPipeLen || 0);
+  const matFrontLen = ((tlMat && tlMat.lens && isFinite(tlMat.lens.front)) ? tlMat.lens.front : (r.mainPipeLen || 0)) + readNumber('planSrcDist', 0, { min: 0 });   /* 任务⑮：计入水源距离 */
   const matMainLen = useTl ? tlMat.lens.main : (usePP ? ppStats.mainLen : r.mainPipeLen);
   const matBranchLen = useTl ? tlMat.lens.branch : (usePP ? ppStats.branchLen : r.branchLen * r.branchCount * r.N);
   const specFrontOd = tlMat ? tlMat.ods.front : materialPipeSpecs.mainPipeOD;
@@ -7886,7 +7890,7 @@ function setLayoutSides(sides) {
 }
 
 function resetDefaults() {
-  const defaults = {fld_zoneMu:30,fld_zoneFixedSide:200,fld_A:200,fld_B:100,fld_dh:5,fld_N:1,fld_tapeLen:100,fld_tapeSpacing:0.8,fld_tapeDh:1,fld_emitterSpacing:0.3,fld_emitterFlow:0.8,fld_tapeOD:16,fld_tapePressure:1,fld_lift:5,fld_existPressure:0,fld_targetV:1.5,fld_filterLoss:5,fld_efficiency:65,fld_mainPipeLen:200,fld_tapeRollLen:2000};
+  const defaults = {fld_zoneMu:30,fld_zoneFixedSide:200,fld_A:200,fld_B:100,fld_dh:5,fld_N:1,fld_tapeLen:100,fld_tapeSpacing:0.8,fld_tapeDh:1,fld_emitterSpacing:0.3,fld_emitterFlow:0.8,fld_tapeOD:16,fld_tapePressure:1,fld_lift:5,fld_existPressure:0,fld_targetV:1.5,fld_filterLoss:5,fld_efficiency:65,fld_mainPipeLen:200,fld_tapeRollLen:2000,planSrcDist:0};
   Object.entries(defaults).forEach(([id, val]) => { document.getElementById(id).value = val; });
   // v91：fld_lift / fld_dh 被复位后，二级面板的同名镜像框要一起跟上
   if (typeof ppPullLiftDh === 'function') ppPullLiftDh();
@@ -8154,7 +8158,7 @@ function computeThreeLevel() {
   /* 最远分区最不利路径（2026-09-16）：图面已生成时，总管/主管/支管长度改用图面到「最远分区」的
      实际折线长，损失只算这一条路径（不再按各地块累加）。无图面时退回试算输入值。 */
   const wp = (typeof tlWorstPathLen === 'function') ? tlWorstPathLen() : { fromFigure: false, zoneIndex: -1, front: 0, main: 0, branch: 0, taps: [] };
-  let frontLenUsed = (wp.fromFigure && wp.front > 0) ? wp.front : frontPipeLen;
+  let frontLenUsed = ((wp.fromFigure && wp.front > 0) ? wp.front : frontPipeLen) + readNumber('planSrcDist', 0, { min: 0 });   /* 任务⑮：计入水源距离 */
   let mainLenUsed = (wp.fromFigure && wp.main > 0) ? wp.main : mainPipeLen;
 
   /* 水泵流量按「最大分区的实际面积」计（2026-09-21，用户口径）：分区实际面积=裁剪到实测地块
@@ -8296,7 +8300,7 @@ function computeThreeLevel() {
     hydraulicPath = pathCheck.worst;
     if (hydraulicPath) {
       frontPipeLoss = hydraulicPath.frontPipeLoss; mainLoss = hydraulicPath.mainLoss; branchLoss = hydraulicPath.branchLoss;
-      frontLenUsed = hydraulicPath.front; mainLenUsed = hydraulicPath.main; branchLenUsed = hydraulicPath.branch;
+      frontLenUsed = hydraulicPath.front + readNumber('planSrcDist', 0, { min: 0 }); mainLenUsed = hydraulicPath.main; branchLenUsed = hydraulicPath.branch;   /* 任务⑮：计入水源距离 */
     }
     /* 2026-09-24（用户要求）：面板管径选择按钮 —— 手动选管已并入 tlPipeOdOverride.calibers
        （tlBuildPipeOverride），沿程损失在上方 hydraulicPath 校核中已按新管径计算；此处把
@@ -11746,6 +11750,16 @@ window.ppRenderHeadBreakdown = ppRenderHeadBreakdown;
 ['planTapeLaySide','planTapeLen','planTapeSpacing','planEmitterSpacing','planEmitterFlow','planN','planZoneMode','planZoneMuManual','planTargetV'].forEach(id=>{
   document.getElementById(id).addEventListener('input', calcPlan);
   document.getElementById(id).addEventListener('change', calcPlan);
+});
+
+/* ===== 任务⑮（2026-09-24 用户要求）：「水源距离」→ 三级总管长度/总管损失/水泵扬程 + 总管长度统计 =====
+   输入即重算三级（renderThreeLevel + tlUpdatePlanBar→损失卡），与二级面板参数联动。 */
+['planSrcDist'].forEach(id=>{
+  var elx=document.getElementById(id);
+  if(!elx) return;
+  var refx=function(){ if(typeof renderThreeLevel==='function') renderThreeLevel(); if(typeof tlUpdatePlanBar==='function') tlUpdatePlanBar(); };
+  elx.addEventListener('input', refx);
+  elx.addEventListener('change', refx);
 });
 
 /* ===== 面板「水泵提升高度 / 地形高差」⇄ 一级表单 fld_lift / fld_dh 双向镜像（2026-09-20 v91）=====
