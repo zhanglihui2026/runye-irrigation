@@ -9907,6 +9907,9 @@ function tlAutoGenerate(options) {
     if(v.ax!==undefined && v.ay!==undefined){
       var ap=ts(v.ax, v.ay);
       parts.push('<line x1="'+ap.x.toFixed(1)+'" y1="'+ap.y.toFixed(1)+'" x2="'+vp.x.toFixed(1)+'" y2="'+vp.y.toFixed(1)+'" stroke="#185FA5" stroke-width="3.5" stroke-linecap="round" opacity="0.92"/>');
+      /* 任务⑧（2026-09-24 用户要求）：主管×支管交接处补三通方块 —— 与总管×主管交接
+         （data-junction-tee，深蓝白边 9×9）同款式，交接符号全覆盖。 */
+      parts.push('<rect data-junction-tee x="'+(ap.x-4.5).toFixed(1)+'" y="'+(ap.y-4.5).toFixed(1)+'" width="9" height="9" fill="#0C447C" stroke="#ffffff" stroke-width="1.5"/>');
     }
     parts.push('<circle cx="'+vp.x.toFixed(1)+'" cy="'+vp.y.toFixed(1)+'" r="7" fill="#ef4444" stroke="#fff" stroke-width="2"/>');
     parts.push('<line x1="'+(vp.x-4).toFixed(1)+'" y1="'+(vp.y-4).toFixed(1)+'" x2="'+(vp.x+4).toFixed(1)+'" y2="'+(vp.y+4).toFixed(1)+'" stroke="#fff" stroke-width="1.5"/>');
