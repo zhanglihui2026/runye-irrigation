@@ -305,6 +305,25 @@
     }
     return 0;
   }
+  /* 图面三通第三口口径（2026-09-24 任务⑨）：branchSpec 仅标注第三口外径（mm，字符串），
+   * 空串=随管（删键，序列化与未设置一致）；不进水力计算/材料清单（同 spin 口径）。 */
+  function fitBranchSpecOf(id) {
+    for (var i = 0; i < fits.length; i++) {
+      if (fits[i].id === id) return (fits[i].kind === 'tee' && fits[i].branchSpec) ? String(fits[i].branchSpec) : '';
+    }
+    return '';
+  }
+  function setFitBranchSpec(id, spec, source) {
+    for (var i = 0; i < fits.length; i++) {
+      if (fits[i].id !== id) continue;
+      if (fits[i].kind !== 'tee') return false;
+      var v = String(spec == null ? '' : spec).trim();
+      if (v === '') delete fits[i].branchSpec; else fits[i].branchSpec = v.slice(0, 40);
+      notify('fitSpec', source);
+      return true;
+    }
+    return false;
+  }
   function setFitSpin(id, ang, source) {
     for (var i = 0; i < fits.length; i++) {
       if (fits[i].id !== id) continue;
@@ -420,7 +439,7 @@
     calibersMap: calibersMap, caliberOf: caliberOf, setCaliber: setCaliber, clearCaliber: clearCaliber,
     movesMap: movesMap, moveOf: moveOf, movePipe: movePipe, clearMove: clearMove,
     fitsList: fitsList, addFitting: addFitting, removeFitting: removeFitting, moveFitting: moveFitting, fitCount: fitCount,
-    fitSpinOf: fitSpinOf, setFitSpin: setFitSpin, tangentAt: tangentAt,
+    fitSpinOf: fitSpinOf, setFitSpin: setFitSpin, fitBranchSpecOf: fitBranchSpecOf, setFitBranchSpec: setFitBranchSpec, tangentAt: tangentAt,
     reset: reset, discardSaved: discardSaved, syncGeometry: syncGeometry,
     serialize: serialize, restore: restore, onChange: onChange,
     beginBatch: beginBatch, endBatch: endBatch,   /* v141 批处理（见 applySel / 性能探针 _perf_e2e.cjs） */

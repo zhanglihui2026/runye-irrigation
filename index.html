@@ -16288,13 +16288,41 @@ function tlIsoStatsReset() {
       + '<button class="pp-btn-ghost" id="tlIsoFitSpinM" type="button" style="flex:1;font-size:11px;padding:2px 0">第三口 -15°</button>'
       + '<button class="pp-btn-ghost" id="tlIsoFitSpinP" type="button" style="flex:1;font-size:11px;padding:2px 0">第三口 +15°</button>'
       + '<button class="pp-btn-ghost" id="tlIsoFitSpinR" type="button" style="flex:1;font-size:11px;padding:2px 0">复位</button>'
-      + '</div>';
+      + '</div>'
+      + '<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#47555e;margin-top:6px">第三口口径'
+      + '<select id="tlIsoFitSpecSel" style="flex:1;padding:2px 4px;font-size:11px;border:1px solid #cbd5e1;border-radius:4px"></select></label>'
+      + '<button class="pp-btn-ghost" id="tlIsoFitConnBtn" type="button" style="width:100%;margin-top:6px">🔗 管道接入（默认 30 m）</button>'
+      + '<div id="tlIsoFitConnHint" style="font-size:11px;color:#47555e;margin-top:3px">选口径后点「管道接入」，鼠标到图上第三口附近自动吸附，点击即生成 30 m 接管。</div>';
     card.appendChild(spinRow);
+    /* 第三口口径下拉（任务⑨）：随管 / 常用外径档；仅标注，不进水力计算 */
+    var specSel = document.getElementById('tlIsoFitSpecSel');
+    var SPEC_OPTS = ['随管', 63, 75, 90, 110, 140, 160, 180, 200, 225, 250, 315, 355, 400];
+    specSel.innerHTML = SPEC_OPTS.map(function (o) { return '<option value="' + o + '">' + o + '</option>'; }).join('');
+    specSel.addEventListener('change', function () {
+      var AE2 = window.RyTlAutoEdits;
+      var a2 = ISO.autoSelInfo && ISO.autoSelInfo();
+      if (!AE2 || !AE2.setFitBranchSpec || !a2 || !a2.fit || a2.kind !== 'tee') return;
+      AE2.setFitBranchSpec(a2.id, specSel.value === '随管' ? '' : specSel.value, 'iso-panel');
+    });
+    document.getElementById('tlIsoFitConnBtn').addEventListener('click', function () {
+      ISO.setConnectMode(!ISO.connectMode());
+    });
+    ISO.onConnectModeChange = function (on) {
+      var b = document.getElementById('tlIsoFitConnBtn');
+      var h = document.getElementById('tlIsoFitConnHint');
+      if (b) b.textContent = on ? '✕ 退出管道接入' : '🔗 管道接入（默认 30 m）';
+      if (h) h.textContent = on ? '移动鼠标到第三口附近吸附（紫色虚线圈），点击生成 30 m 接管；点空白处退出。'
+        : '选口径后点「管道接入」，鼠标到图上第三口附近自动吸附，点击即生成 30 m 接管。';
+    };
     function spinBy(d) {
       var AE = window.RyTlAutoEdits;
       var a2 = ISO.autoSelInfo && ISO.autoSelInfo();
       if (!AE || !AE.setFitSpin || !a2 || !a2.fit || a2.kind !== 'tee') return;
-      AE.setFitSpin(a2.id, (d === null) ? 0 : ((AE.fitSpinOf ? AE.fitSpinOf(a2.id) : 0) + d), 'iso-panel');
+      var oldS = AE.fitSpinOf ? AE.fitSpinOf(a2.id) : 0;
+      var newS = (d === null) ? 0 : (oldS + d);
+      AE.setFitSpin(a2.id, newS, 'iso-panel');
+      /* 任务⑨：第三口旋转后，已接出的管道（teeId 回链）刚体跟随 */
+      if (ISO.syncAutoFitSpin) ISO.syncAutoFitSpin(a2.id, newS, oldS);
     }
     document.getElementById('tlIsoFitSpinM').addEventListener('click', function () { spinBy(-15); });
     document.getElementById('tlIsoFitSpinP').addEventListener('click', function () { spinBy(15); });
@@ -16310,6 +16338,8 @@ function tlIsoStatsReset() {
     var sp = AE.fitSpinOf ? AE.fitSpinOf(a.id) : 0;
     var t2 = document.getElementById('tlIsoFitSpinTxt');
     if (t2) t2.textContent = sp ? ('第三口方向：已绕管道轴转 ' + sp + '°') : '第三口方向：垂直管道（0°）';
+    var sel2 = document.getElementById('tlIsoFitSpecSel');
+    if (sel2) sel2.value = (AE.fitBranchSpecOf ? AE.fitBranchSpecOf(a.id) : '') || '随管';
   }
   ISO.onAutoSel = function (a) {
     if (!card) return;
