@@ -497,7 +497,7 @@
 
     /* 4b) 主管（埋地） */
     s.push('<g fill="none" stroke="' + COLORS.main + '" stroke-width="1.8" stroke-linejoin="round"' + clipAttr + '>');
-    model.mains.forEach(function (l, mi) { s.push('<path data-tlpipe="main-' + mi + '" style="cursor:pointer" d="' + path3(l, function () { return HEIGHTS.main; }) + '"/>'); });
+    model.mains.forEach(function (l, mi) { s.push('<path data-tlpipe="main-' + mi + '" style="cursor:default" d="' + path3(l, function () { return HEIGHTS.main; }) + '"/>'); });
     s.push('</g>');
 
     /* 4c) 总管（埋地，带流向箭头） */
@@ -506,7 +506,7 @@
     if (model.front && model.front.length >= 2) {
       /* 总管豁免地块裁剪（2026-09-14）：管线在地块外，裁剪会把整条总管裁没 */
       s.push('<g>');
-      s.push('<path data-tlpipe="front" style="cursor:pointer" d="' + path3(model.front, function () { return HEIGHTS.front; })
+      s.push('<path data-tlpipe="front" style="cursor:default" d="' + path3(model.front, function () { return HEIGHTS.front; })
         + '" fill="none" stroke="' + COLORS.front + '" stroke-width="2.2" marker-mid="url(#isoArrow)" marker-end="url(#isoArrow)"/>');
       /* 中点补一个箭头（两点线段无 mid） */
       if (model.front.length === 2) {
@@ -524,7 +524,7 @@
 
     /* 6) 支管（地表 z=0.3，覆盖埋地管网之上） */
     s.push('<g fill="none" stroke="' + COLORS.branch + '" stroke-width="1.2" stroke-linejoin="round"' + clipAttr + '>');
-    model.branches.forEach(function (l,i) { s.push('<path data-branch="' + i + '" data-tlpipe="branch-' + i + '" style="cursor:pointer" d="' + path3(l, function () { return HEIGHTS.branch; }, branchOffsets[i]) + '"/>'); });
+    model.branches.forEach(function (l,i) { s.push('<path data-branch="' + i + '" data-tlpipe="branch-' + i + '" style="cursor:default" d="' + path3(l, function () { return HEIGHTS.branch; }, branchOffsets[i]) + '"/>'); });
     s.push('</g>');
 
     /* 6b) 手工管线层（共享图面数据层 RyTlEditPipes，2026-09-15 阶段1 双向同步）
@@ -541,7 +541,7 @@
         var d = '';
         m.pts.forEach(function (p, i) { var q = P(p.x, p.y, z); d += (i ? 'L' : 'M') + fmt(q.x) + ' ' + fmt(q.y); });
         var mid = m.pts[Math.floor(m.pts.length / 2)], mq = P(mid.x, mid.y, z);
-        s.push('<g class="iso-manpipe" data-manpipe="' + esc(m.id) + '" style="cursor:pointer"><title>'
+        s.push('<g class="iso-manpipe" data-manpipe="' + esc(m.id) + '" style="cursor:default"><title>'
           + esc(m.id + ' · ' + (m.kind === 'main' ? '主管' : '支管') + ' · ' + m.len.toFixed(1) + 'm') + '</title>'
           + '<path d="' + d + '" stroke="' + col + '" stroke-width="' + (isSel ? 3.4 : (m.kind === 'main' ? 2.4 : 1.6)) + '"' + (isSel ? ' stroke-dasharray="8,4"' : '') + '/>'
           + m.pts.map(function (p) { var q = P(p.x, p.y, z); return '<rect x="' + fmt(q.x - 2) + '" y="' + fmt(q.y - 2) + '" width="4" height="4" fill="#fff" stroke="' + col + '" stroke-width="1"/>'; }).join('')
@@ -646,7 +646,7 @@
             fLabels += fLab(fD1 / 2, 'start') + fLab(fD1 + fD2 / 2, 'end');   /* +=（任务⑨）：保留前置的第三口口径标注，勿覆盖 */
           }
         }
-        s.push('<g class="iso-tlfit" data-tlfit="' + esc(f.id) + '" style="cursor:pointer"><title>'
+        s.push('<g class="iso-tlfit" data-tlfit="' + esc(f.id) + '" style="cursor:default"><title>'
           + esc(f.id + ' · ' + (KIND_LABEL[f.kind] || '配件') + ' · ' + AE.pipeName(f.pid) + ' ' + pos.along.toFixed(1) + 'm') + '</title>'
           + (fSel ? '<circle cx="' + fmt(fq.x) + '" cy="' + fmt(fq.y) + '" r="9" fill="none" stroke="#7c3aed" stroke-width="1.6" stroke-dasharray="4,3"/>' : '')
           + fsym + spinSym + fLabels + '</g>');
@@ -673,7 +673,7 @@
       var angle = Math.atan2(q.y - before.y, q.x - before.x) * 180 / Math.PI;
       // 支管阀画在立管中部，三通—阀门—支管依次连接。
       if (v.conn) { q.y += params('R-'+v.id).rise * (1-params('R-'+v.id).position); angle = -90; }
-      s.push('<g class="iso-fit" data-fit="' + esc(v.id) + '" style="cursor:pointer"><title>' + esc(v.id + (v.zone ? ' · ' + v.zone : '') + ' · 上游 ' + v.upstream + ' · 下游 ' + v.downstream) + '</title>'
+      s.push('<g class="iso-fit" data-fit="' + esc(v.id) + '" style="cursor:default"><title>' + esc(v.id + (v.zone ? ' · ' + v.zone : '') + ' · 上游 ' + v.upstream + ' · 下游 ' + v.downstream) + '</title>'
         + scaledSymbol(valveSymbol(q, angle),q,v.id)
         + fitLabel(v.id,q,false)
         + '</g>');
@@ -699,7 +699,7 @@
         spinSym = '<path d="M' + fmt(q.x - 8) + ' ' + fmt(q.y) + ' H' + fmt(q.x + 8) + '" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" transform="rotate(' + fmt(sTAng) + ' ' + fmt(q.x) + ' ' + fmt(q.y) + ')"/>'
           + '<path d="M' + fmt(q.x) + ' ' + fmt(q.y) + ' L' + fmt(q.x + 9.4) + ' ' + fmt(q.y) + '" stroke="' + COLORS.branch + '" stroke-width="2.4" fill="none" stroke-linecap="round" transform="rotate(' + fmt(sBAng) + ' ' + fmt(q.x) + ' ' + fmt(q.y) + ')"/>';
       }
-      s.push('<g class="iso-fit" data-fit="' + esc(t.id) + '" style="cursor:pointer"><title>' + esc(t.id + ' · ' + t.upstream + ' → ' + t.downstream) + '</title>'
+      s.push('<g class="iso-fit" data-fit="' + esc(t.id) + '" style="cursor:default"><title>' + esc(t.id + ' · ' + t.upstream + ' → ' + t.downstream) + '</title>'
         + '<circle cx="' + fmt(q.x) + '" cy="' + fmt(q.y) + '" r="7" fill="transparent"/>'
         + spinSym
         + '<circle cx="' + fmt(q.x) + '" cy="' + fmt(q.y) + '" r="' + (2*params(t.id).size) + '" fill="' + COLORS.tee + '"/>' + fitLabel(t.id,q,false) + '</g>');
@@ -810,7 +810,7 @@
           }
         }
         att += nodeDots;
-        s.push('<g class="iso-fit" data-fit="' + esc(m.id) + '" style="cursor:pointer"><title>'
+        s.push('<g class="iso-fit" data-fit="' + esc(m.id) + '" style="cursor:default"><title>'
           + esc(m.id + ' · ' + KIND_LABEL[m.kind] + ' · ' + (m.spec || '与管道同径')) + '</title>' + att + scaledSymbol(sym,q,m.id) + fitLabel(m.id,q,!!edits[m.id]) + '</g>');
       });
       s.push('</g>');

@@ -4013,7 +4013,7 @@ body.ry-tool #tlPipePlanSection[data-ry-view="iso"][data-ry-clean="1"] > .pp-bod
 /* 插入管线卡（2026-09-15 阶段1：轴测图 ⇄ 三级设计工作区 双向同步，共享图面数据层） */
 #tlIsoSide .tl-iso-pipe-card button.active{background:#185FA5 !important;border-color:#185FA5 !important;color:#fff !important}
 #tlIsoDiagramContent.iso-pipe-drafting{cursor:crosshair}
-#tlIsoDiagramContent .iso-manpipe{cursor:pointer}
+#tlIsoDiagramContent .iso-manpipe{cursor:default}
 .tl-ws-sel{display:none;font-size:12px;color:#7c3aed;font-weight:600}
 .tl-iso-info{display:flex;flex-direction:column;gap:4px}
 /* —— 轴测图右侧分区统计栏（2026-09-13）：画布｜拖拽条｜统计 三列 —— */
@@ -6151,7 +6151,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
       <button class="pp-btn-ghost" id="tlIsoDownload" type="button" style="padding:5px 14px;font-size:12px;margin-left:auto" onclick="RyIsoDiagram.downloadSVG()">📥 下载轴测图 SVG</button>
       <button class="pp-btn-ghost" id="tlIsoPrint" type="button" style="padding:5px 14px;font-size:12px" onclick="RyIsoDiagram.printSVG()">🖨️ 打印轴测图</button>
       <!-- v133（2026-09-23 用户要求）：工具栏上的「管径经济对比」入口取消——面板已有右侧折叠细条
-           （#tlEconRail）作为唯一开启入口且切入轴测图自动展开，此处重复。按 v96 纪律 DOM 与
+           （#tlEconRail）作为唯一开启入口（切入轴测图默认折叠，手动点细条展开），此处重复。按 v96 纪律 DOM 与
            click 监听保留，仅 display:none。要恢复：删掉 style="display:none" 即可。 -->
       <button class="pp-btn-ghost" id="tlEconBtn" type="button" style="padding:5px 14px;font-size:12px;display:none" title="按全地块总/主/支管总长，对比不同管径组合的水泵扬程、功率与管材投入，找经济平衡点">💰 管径经济对比</button>
     </div>
@@ -10656,9 +10656,9 @@ function rySetTab(sectionId, view) {
         if (isoBar) isoBar.style.display = 'none';
         if (typeof tlIsoStatsReset === 'function') tlIsoStatsReset();
       }
-      /* v127（2026-09-23 用户要求）：切入轴测图 → 管径经济对比面板默认展开（无图也展开，显示占位说明）；
-         收起走右侧折叠细条，按钮组让位见 openP/closeP 的 te-padded。 */
-      if (window.tlEconPanel && typeof window.tlEconPanel.open === 'function') window.tlEconPanel.open();
+      /* 2026-09-24 用户要求：切入轴测图 → 管径经济对比面板默认折叠（反转 v127 的自动展开；
+         左侧工具栏同时自动展开，见 ensureFor）。重新展开走右侧折叠细条 #tlEconRail。 */
+      if (window.tlEconPanel && typeof window.tlEconPanel.close === 'function') window.tlEconPanel.close();
     }
   }
   /* 三级管路切到「三级设计」工作区：tl-workspace 模块按平面图几何渲染
@@ -18417,12 +18417,13 @@ function tlIsoStatsReset() {
       if(!inVp()) return;
       var side=$('ryCadSide');
       var sIso=(spec||'')==='tlPipePlanSection:iso';
-      /* v122（2026-09-23 用户要求）：点轴测图 → 左侧工具栏自动折叠（图面与经济对比面板需要宽度）。
-         与原「自动展开」同一口径：仅在切到轴测那一次触发，用户随后手动展开/收起不被反复顶动
+      /* 2026-09-24 用户要求：点轴测图 → 左侧工具栏自动展开（反转 v122 的自动折叠；
+         配套：经济对比面板改为自动折叠让位，见 rySetTab 轴测分支的 tlEconPanel.close()）。
+         同一口径：仅在切到轴测那一次触发，用户随后手动展开/收起不被反复顶动
          （再切视口才按新目标重新联动）。 */
-      if(side&&sIso&&side.getAttribute('data-ry-open')!=='0'){
-        side.setAttribute('data-ry-open','0');
-        try{ localStorage.setItem('ryCadOpen','0'); }catch(err){}
+      if(side&&sIso&&side.getAttribute('data-ry-open')!=='1'){
+        side.setAttribute('data-ry-open','1');
+        try{ localStorage.setItem('ryCadOpen','1'); }catch(err){}
         applyWidth(); refit();
       }
       if(side&&!sIso&&side.getAttribute('data-ry-open')==='0'){
