@@ -1407,8 +1407,10 @@
     /* 复用 scanAndAdd（与右键管道直接加同一套命中/端点校验，2026-09-16） */
     var m = scanAndAdd(placing.kind, e.clientX, e.clientY);
     if (!m) { notifyPlace({ ok: false, reason: '未命中管线：请沿总管/主管/支管的管段点击' }); return; }
+    var placedKind = placing.kind;   /* 任务⑯修复（既有缺陷）：endPlace() 置 null 后再读 placing.kind 必抛 TypeError */
     endPlace();
-    notifyPlace({ ok: true, id: m.id, kind: placing.kind, spec: m.spec });
+    rerenderKeepView();              /* 任务⑯：放置成功立即重绘，配件当场可见 */
+    notifyPlace({ ok: true, id: m.id, kind: placedKind, spec: m.spec });
   }
   function endPlace() {
     placing = null;
@@ -1889,8 +1891,14 @@
     return moved;
   }
 
-  /* —— 管道接入捕捉模式：mousemove 吸附最近自动三通第三口（≤PLACE_TOL），click 生成 30m 接管 —— */
+  /* —— 管道接入捕捉模式：mousemove 吸附最近自动三通第三口（≤PLACE_TOL），click 生成接管 —— */
   var connectMode = false, connectHover = null, connectWire = null;
+  /* 任务⑯（2026-09-24 用户要求）：接管长度可调 —— 读面板输入框（缺省 30 m，1~2000 容错） */
+  function connectLen() {
+    var inp = (typeof document !== 'undefined') ? document.getElementById('tlIsoConnLen') : null;
+    var v = inp ? parseFloat(inp.value) : NaN;
+    return (Number.isFinite(v) && v > 0) ? Math.min(v, 2000) : 30;
+  }
   function connectTargets() {
     var out = [];
     if (!lastDataRef || !viewState) return out;
@@ -1898,8 +1906,14 @@
       if (f.kind !== 'tee') return;
       var pos = AE.pointAt(f.pid, lastDataRef, f.atM);
       if (!pos) return;
-      var pr = projectIso(pos.x, pos.y, SEG_Z[pidSegType(f.pid)], viewState.k);
-      out.push({ id: f.id, sx: viewState.ox + pr.x, sy: viewState.oy + pr.y, spec: AE.fitBranchSpecOf ? AE.fitBranchSpecOf(f.id) : '' });
+      var zP = SEG_Z[pidSegType(f.pid)];
+      var pr = projectIso(pos.x, pos.y, zP, viewState.k);
+      /* 任务⑯：按比例预览 —— 第三口方向 × 接管长度 → 末端 3D 点 → 屏幕投影 */
+      var bdP = autoFitBranchDir(f), lenP = connectLen();
+      var tipP = { x: pos.x + bdP.x * lenP, y: pos.y + bdP.y * lenP, z: zP + bdP.z * lenP };
+      var tp = projectIso(tipP.x, tipP.y, tipP.z, viewState.k);
+      out.push({ id: f.id, sx: viewState.ox + pr.x, sy: viewState.oy + pr.y, spec: AE.fitBranchSpecOf ? AE.fitBranchSpecOf(f.id) : '',
+        tx: viewState.ox + tp.x, ty: viewState.oy + tp.y, len: lenP });
     });
     return out;
   }
@@ -1917,8 +1931,10 @@
     g.setAttribute('id', 'isoConnectHint');
     g.setAttribute('pointer-events', 'none');
     g.innerHTML = '<circle cx="' + t.sx.toFixed(1) + '" cy="' + t.sy.toFixed(1) + '" r="9" fill="none" stroke="#7c3aed" stroke-width="2" stroke-dasharray="4,3"/>'
+      + (isFinite(t.tx) && isFinite(t.ty) ? '<line x1="' + t.sx.toFixed(1) + '" y1="' + t.sy.toFixed(1) + '" x2="' + t.tx.toFixed(1) + '" y2="' + t.ty.toFixed(1) + '" stroke="#7c3aed" stroke-width="2.5" stroke-dasharray="6,4" opacity="0.8"/>'
+        + '<circle cx="' + t.tx.toFixed(1) + '" cy="' + t.ty.toFixed(1) + '" r="3.5" fill="#7c3aed"/>' : '')
       + '<text x="' + (t.sx + 12).toFixed(1) + '" y="' + (t.sy - 8).toFixed(1) + '" font-size="10.5" font-weight="700" font-family="system-ui" fill="#6d28d9" paint-order="stroke" stroke="white" stroke-width="2.5">'
-      + '接入 ' + t.id + (t.spec ? ' · 第三口 Ø' + t.spec : '') + '</text>';
+      + '接入 ' + t.id + ' · ' + (isFinite(t.len) ? t.len : 30) + ' m' + (t.spec ? ' · 第三口 Ø' + t.spec : '') + '</text>';
     svg.appendChild(g);
   }
   function setConnectMode(on) {
@@ -1952,14 +1968,15 @@
         var t = nearest(e);
         setConnectMode(false);
         if (!t) { setHintMsg('管道接入已取消'); return; }
-        var pid = spawnPipeFromAutoTee(t.id, 30);
-        setHintMsg(pid ? ('已从 ' + t.id + ' 第三口接入管道 ' + pid + '（30 m' + (t.spec ? ' · Ø' + t.spec : '') + '）；再次点「管道接入」可继续') : '接入失败');
+        var lenC = connectLen();
+        var pid = spawnPipeFromAutoTee(t.id, lenC);
+        setHintMsg(pid ? ('已从 ' + t.id + ' 第三口接入管道 ' + pid + '（' + lenC + ' m' + (t.spec ? ' · Ø' + t.spec : '') + '）；接管端头可直接插三通/弯头，再次点「管道接入」可继续') : '接入失败');
       }
     };
     ctn.addEventListener('mousemove', connectWire.move, true);
     ctn.addEventListener('click', connectWire.click, true);
     if (typeof api.onConnectModeChange === 'function') api.onConnectModeChange(true);
-    setHintMsg('管道接入：移动鼠标到三通第三口附近（紫色虚线圈吸附），点击生成 30 m 接管');
+    setHintMsg('管道接入：移动鼠标到三通第三口附近（紫色虚线圈吸附，虚线=按比例的接管预览），点击生成接管（长度=面板「接管长度」）');
     return true;
   }
   function setHintMsg(s) { var h = document.getElementById('tlIsoPipeHint'); if (h) h.textContent = s; }
@@ -2001,7 +2018,27 @@
         if (t < 0) t = 0; else if (t > 1) t = 1;
         var L3 = Math.hypot(b.x - a.x, b.y - a.y, (b.z || 0) - (a.z || 0));
         var guard = Math.min(0.2, L3 * 0.25);
-        if (t * L3 < guard || (1 - t) * L3 < guard) continue;   /* 贴端点不放：不压住已有三通/管口 */
+        if (t * L3 < guard || (1 - t) * L3 < guard) {
+          /* 任务⑯（2026-09-24 用户要求）：接管端头可直接连接三通/弯头 —— 自由端吸附到端点放置；
+             被占用端点仍拒绝防叠。占用检查除手工层节点（nearNode）外还要查 AE 配件：
+             接管起点=宿三通 A-F##（AE 层），nearNode 看不到它，不查会在宿三通上叠放新三通。 */
+          var epT2 = (t * L3 <= (1 - t) * L3) ? 0 : 1;
+          var epP2 = epT2 === 0 ? a : b;
+          var epOcc2 = false;
+          (AE.fitsList() || []).forEach(function (ff) {
+            if (epOcc2 || !(AE.pointAt && lastDataRef)) return;
+            var fp = AE.pointAt(ff.pid, lastDataRef, ff.atM);
+            /* z 口径：AE.pointAt 不带 SEG_Z 层高（返回 2D/0），按配件宿管 segType 取层高再比，
+               否则 dz=1.0m > NODE_SNAP_TOL 误判「未占用」，会在宿三通上叠放新三通 */
+            var fpz = SEG_Z[pidSegType(ff.pid)];
+            if (fp && Math.hypot(fp.x - epP2.x, fp.y - epP2.y, fpz - (epP2.z || 0)) <= NODE_SNAP_TOL) epOcc2 = true;
+          });
+          if (epOcc2) continue;
+          /* 排除被扫描管自身（J8）：接管两端本身是节点（nearNode 对 kind='pipe' 取 pts 首尾），
+             不排除则「在自己端点放三通」永远被自己拦住（I4 实测 u 距端点 0.53px 仍 bp=null）。 */
+          if (nearNode({ x: epP2.x, y: epP2.y, z: epP2.z || 0 }, p.id)) continue;   /* 其它节点占用 → 拒绝；三通复用由后面 c3 的 nearNode 统一处理 */
+          t = epT2;   /* 自由端 → 吸附到端点，允许直接放三通/弯头 */
+        }
         var d = dist(u, cp);
         if (d < best.d && (!bestPipe || d < bestPipe.d)) bestPipe = { d: d, p: p, i: i, t: t };
       }
@@ -2021,6 +2058,16 @@
     var shift = best.segType === 'branch' && viewState.branchOffsets[best.segIndex] || { x: 0, y: 0 };
     var c = closestOnSeg(unprojectIso(u.x - viewState.ox - shift.x, u.y - viewState.oy - shift.y, z, viewState.k), line[i], line[i + 1]);
     if (dist(c, line[i]) < 0.5 || dist(c, line[i + 1]) < 0.5) return null;
+    /* 任务⑯（I5 防叠，J9）：自动管线分支的放置点若已在 AE 图面配件（如宿三通 A-F##）上 → 拒绝。
+       nnA 只查 manual 层节点，AE 层配件它看不到；点击宿三通位置时 main-0 以 d≈0.01px 胜出接管
+       （J6 检查在接管分支，走不到），不查会在宿三通正上方叠放新三通。 */
+    var aeOcc3 = false;
+    (AE.fitsList() || []).forEach(function (ff) {
+      if (aeOcc3 || !(AE.pointAt && lastDataRef)) return;
+      var fp3 = AE.pointAt(ff.pid, lastDataRef, ff.atM);
+      if (fp3 && Math.hypot(fp3.x - c.x, fp3.y - c.y, SEG_Z[pidSegType(ff.pid)] - z) <= NODE_SNAP_TOL) aeOcc3 = true;
+    });
+    if (aeOcc3) return null;
     var useSpec = (kind === 'tee' || kind === 'valve') ? hostDia(best.segType) : '';
     /* 节点复用（2026-09-24 任务⑥）：同 A4a —— 节点附近放三通不再产生重叠副本 */
     if (kind === 'tee') { var nnA = nearNode({ x: c.x, y: c.y, z: z }); if (nnA && nnA.kind === 'tee') return nnA; }
