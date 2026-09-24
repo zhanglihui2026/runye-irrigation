@@ -6281,7 +6281,8 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
       <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:#47555e">距起点 <input id="tlWsFitA" type="number" step="0.1" min="0" style="width:58px;padding:1px 3px;font-size:11px;border:1px solid #cbd5e1;border-radius:4px"> m</label>
       <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:#47555e">距终点 <input id="tlWsFitB" type="number" step="0.1" min="0" style="width:58px;padding:1px 3px;font-size:11px;border:1px solid #cbd5e1;border-radius:4px"> m</label>
     </span>
-    <span class="tl-ws-count" id="tlWsManCount">手工 0 条</span>
+    <!-- 2026-09-24（用户截图标注「没啥用，取消」）：原「手工 N 条 · 主管 … · 支管 …」汇总文字已取消；
+         需要恢复时：① 把 span#tlWsManCount 插回本行；② tlWs 模块 onManualChange 钩子里恢复渲染。 -->
     <span class="tl-ws-sel" id="tlWsSelInfo"></span>
     <span class="tl-ws-sep"></span>
     <!-- 2026-09-17（第五十三轮，用户截图标注「取消」）：此处原为缩放按钮组 + 百分比显示，
@@ -15904,7 +15905,7 @@ threeDModelingSection:'水力计算器 · 入口预留（方案确定后上线�
 (function(){
   function el(id){ return document.getElementById(id); }
   var mainBtn=el('tlWsMain'), branchBtn=el('tlWsBranch'),
-      count=el('tlWsManCount'), hint=el('tlWsHint'),
+      hint=el('tlWsHint'),
       selInfo=el('tlWsSelInfo'), lenBtn=el('tlWsLenBtn'), delBtn=el('tlWsDelBtn'),
       /* 2026-09-18 第七十轮：⊞三通 / 🔩阀门（选中自动管线才临时出现）已取消，改为下面三个常驻按钮。 */
       fitValveBtn=el('tlWsFitValve'), fitTeeBtn=el('tlWsFitTee'), fitElbowBtn=el('tlWsFitElbow'),
@@ -15947,10 +15948,9 @@ threeDModelingSection:'水力计算器 · 入口预留（方案确定后上线�
   });
   if(window.RyTlWs){
     /* 汇总（2026-09-15 阶段1）：条数 + 按类型长度自动加减 */
-    RyTlWs.onManualChange=function(n){
-      var t=RyTlWs.totals();
-      if(count) count.textContent='手工 '+n+' 条 · 主管 '+f1(t.main.len)+'m · 支管 '+f1(t.branch.len)+'m';
-    };
+    /* 2026-09-24（用户取消「手工 N 条」汇总文字）：钩子保留为空，维持模块回调契约
+       （核心层在手工管线增删时仍会调用）；汇总口径见 RyTlWs.totals()，水力计算不受影响。 */
+    RyTlWs.onManualChange=function(n){};
     RyTlWs.onModeChange=refresh;   /* Esc 退出插入模式时同步按钮高亮 */
     RyTlWs.onFitModeChange=drawFitBtns;   /* 第七十轮：配件插入模式的进入/退出回推按钮高亮与提示 */
     /* 选中信息 → 工具栏按钮（2026-09-15 阶段1 手工；阶段2 扩展自动管线/配件） */
