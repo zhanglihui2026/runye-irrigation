@@ -1019,6 +1019,34 @@
           }
         }
       }
+        /* 任务⑩命中兜底：接出管（M-G##，teeId 回链）绘制在三通符号之上，按在符号中心会被
+           接管 path 挡住 → fitDrag 建立失败、拖不动。此处把「按在接管上、且点击点距其
+           宿三通符号 <12 viewBox 单位」解释为按三通本身（与 connect 模式同投影口径）。 */
+        var fgM = tD && tD.closest ? tD.closest('g[data-fit^="M-G"]') : null;
+        if (fgM) {
+          var gidM = fgM.getAttribute('data-fit');
+          var mpM = null;
+          for (var mi = 0; mi < manual.length; mi++) if (manual[mi].id === gidM) { mpM = manual[mi]; break; }
+          var tidM = mpM && mpM.teeId;
+          var gfM = tidM ? (AE.fitsList() || []).filter(function (x) { return x.id === tidM; })[0] : null;
+          /* 位置取自 AE fit 本身（接管条目无 point 字段，只有 pts —— 用 mpM.point 会恒 false） */
+          var posM = gfM ? AE.pointAt(gfM.pid, lastDataRef, gfM.atM) : null;
+          var zM = gfM ? (gfM.pid === 'front' ? HEIGHTS.front : (gfM.pid.indexOf('main-') === 0 ? HEIGHTS.main : HEIGHTS.branch)) : 0;
+          var pM = posM ? projectIso(posM.x, posM.y, zM, viewState.k) : null;
+          if (gfM && pM && viewState) {
+            var elM = currentEL(ctn);
+            var uM = elM && svgUserPoint(elM, e.clientX, e.clientY);
+            if (uM && Math.hypot(uM.x - (pM.x + viewState.ox), uM.y - (pM.y + viewState.oy)) < 12) {
+              fitDrag = { id: gfM.id, pointerId: e.pointerId, atM: gfM.atM };
+              selFitId = gfM.id; selAutoId = null; selPipeId = null;
+              rerenderKeepView();
+              if (typeof api.onAutoSel === 'function') api.onAutoSel(autoSelInfo());
+              if (ctn.setPointerCapture) { try { ctn.setPointerCapture(e.pointerId); } catch (e4) {} }
+              e.preventDefault();
+              return;
+            }
+          }
+        }
       /* 插入管线模式下左键用于逐点画线，平移让位（与三级工作区口径一致） */
       if (e.button === 1 || (e.button === 0 && !pipeMode)) {
         drag = { x: e.clientX - view.x, y: e.clientY - view.y, id: e.pointerId };
@@ -1041,7 +1069,11 @@
               fitDrag.atM = locF.along;
               if (!fitDragRaf) fitDragRaf = requestAnimationFrame(function () {
                 fitDragRaf = 0;
-                if (fitDrag) AE.moveFitting(fitDrag.id, fitDrag.atM, lastDataRef, 'iso');
+                if (fitDrag) {
+                  AE.moveFitting(fitDrag.id, fitDrag.atM, lastDataRef, 'iso');
+                  /* 任务⑩：teeId 回链的接出管道随三通拖动平移（起点回贴第三口） */
+                  syncAutoFitMove(fitDrag.id);
+                }
               });
             }
           }
@@ -1074,7 +1106,11 @@
       applyView(ctn, el);
     });
     function up(e) {
-      if (fitDrag && (e.pointerId === undefined || e.pointerId === fitDrag.pointerId)) fitDrag = null;
+      if (fitDrag && (e.pointerId === undefined || e.pointerId === fitDrag.pointerId)) {
+        /* 任务⑩：收尾补交最后一次 atM 并同步接管跟随（rAF 可能被 up 抢先清句柄丢尾帧） */
+        try { if (fitDrag.atM != null) { AE.moveFitting(fitDrag.id, fitDrag.atM, lastDataRef, 'iso-up'); } } catch (eUp) { }
+        fitDrag = null;
+      }
       if (!drag || (e.pointerId !== undefined && e.pointerId !== drag.id)) return;
       drag = null;
       var el = currentEL(ctn); if (el) el.classList.remove('iso-dragging');
@@ -1808,6 +1844,36 @@
     rerenderKeepView(); notifyEdit();
     return true;
   }
+  /* 拖动三通 → 接出管道随动（2026-09-24 任务⑩，用户要求）：teeId 回链的接管（以及端点
+     落在第三口 ±TEE_LINK_TOL 内的手工管）整体平移，使连接端贴回第三口新位置。
+     Δ 按连接端现算 = 自愈式：此前脱开的管道在下一次拖动中自动接回。 */
+  function syncAutoFitMove(id) {
+    var f = aeFitById(id, 'tee');
+    if (!f || !lastDataRef) return false;
+    var pos = AE.pointAt(f.pid, lastDataRef, f.atM);
+    if (!pos) return false;
+    var z = SEG_Z[pidSegType(f.pid)];
+    var moved = false;
+    manual.forEach(function (p) {
+      if (p.kind !== 'pipe' || !p.pts || p.pts.length < 2) return;
+      var end = -1;
+      if (p.teeId === id) end = 0;
+      else {
+        var dS = Math.hypot(p.pts[0].x - pos.x, p.pts[0].y - pos.y, (p.pts[0].z || 0) - z);
+        var dE = Math.hypot(p.pts[p.pts.length - 1].x - pos.x, p.pts[p.pts.length - 1].y - pos.y, (p.pts[p.pts.length - 1].z || 0) - z);
+        if (dS < TEE_LINK_TOL && dS <= dE) end = 0;
+        else if (dE < TEE_LINK_TOL) end = p.pts.length - 1;
+      }
+      if (end < 0) return;
+      var dx = pos.x - p.pts[end].x, dy = pos.y - p.pts[end].y;
+      if (Math.abs(dx) < 1e-9 && Math.abs(dy) < 1e-9) return;
+      p.pts = p.pts.map(function (q) { return { x: q.x + dx, y: q.y + dy, z: q.z }; });
+      moved = true;
+    });
+    if (moved) { rerenderKeepView(); notifyEdit(); }
+    return moved;
+  }
+
   /* —— 管道接入捕捉模式：mousemove 吸附最近自动三通第三口（≤PLACE_TOL），click 生成 30m 接管 —— */
   var connectMode = false, connectHover = null, connectWire = null;
   function connectTargets() {
@@ -2312,7 +2378,7 @@
     rotateTee:rotateTee, resetTeeBranch:resetTeeBranch, teeBranchSpin:teeBranchSpin,
     teeThroughDir:teeThroughDir, teeAxisLabel:teeAxisLabel, teeBranchDir:teeBranchDir, asTeeRec:asTeeRec,
     addManualAtScreen:addManualAtScreen, spawnPipeFromTee:spawnPipeFromTee, extendManualPipe:extendManualPipe,
-    spawnPipeFromAutoTee:spawnPipeFromAutoTee, syncAutoFitSpin:syncAutoFitSpin, setConnectMode:setConnectMode,
+    spawnPipeFromAutoTee:spawnPipeFromAutoTee, syncAutoFitSpin:syncAutoFitSpin, syncAutoFitMove:syncAutoFitMove, setConnectMode:setConnectMode,
     connectMode:function(){ return connectMode; }, autoFitBranchDir:autoFitBranchDir,
     nearNode:nearNode, manualEntries:function(){ return manual; }, NODE_SNAP_TOL:NODE_SNAP_TOL,   /* 节点吸附（2026-09-24 任务⑥，E2E 只读） */
     teeSubtree:teeSubtree, hostTangentAt:hostTangentAt, teeSnapPts:teeSnapPts,
