@@ -4616,6 +4616,8 @@ body.ry-tool #tlPipePlanSection .pp-side .pp-plan-item,
   #fnNav .fn-link:focus-visible,#areaTool button:focus-visible,#pipePlanSection button:focus-visible,#tlPipePlanSection button:focus-visible{outline:2px solid var(--u-water);outline-offset:-3px}
 }
 </style>
+<script src="hydraulic-calc/hydraulics-wasm.js"></script>
+<script src="hydraulic-calc/native-bridge.js"></script>
 <script src="https://beacon.cdn.qq.com/sdk/4.5.9/beacon_web.min.js"></script>
 <script>
 (function(){
@@ -7194,7 +7196,7 @@ function calcPlanZoneLayout(width, height, requestedN, manualMu) {
   return manualMu > 0 ? calcManualZoneLayout(width, height, manualMu) : calcZoneLayout(width, height, requestedN);
 }
 
-function peInnerDiam(od) { return od * (1 - 2 / SDR); }
+function peInnerDiam(od) { return typeof window !== 'undefined' && window.RyHydraulicNative && window.RyHydraulicNative.inner ? window.RyHydraulicNative.inner(od, SDR) : od * (1 - 2 / SDR); }
 
 /* 图面管径覆盖（2026-09-17 第四十一轮）：三级图面上用右键/工具轨改过管径后，
    用户点左栏「⇧ 更新水泵扬程」确认后，保存各管道的外径，按轮灌组逐路径校核。
@@ -7287,11 +7289,13 @@ function tlBindCalSels() {
 }
 
 function hazenWilliams(L, Q, d) {
+  if (typeof window !== 'undefined' && window.RyHydraulicNative && window.RyHydraulicNative.hazen) return window.RyHydraulicNative.hazen(L, Q, d, C_HAZEN);
   if (d <= 0 || Q <= 0) return 0;
   return 1.113e9 * L * Math.pow(Q, 1.852) / (Math.pow(C_HAZEN, 1.852) * Math.pow(d, 4.87));
 }
 
 function christiansenF(N) {
+  if (typeof window !== 'undefined' && window.RyHydraulicNative && window.RyHydraulicNative.christiansen) return window.RyHydraulicNative.christiansen(N);
   if (N <= 1) return 1;
   const m = 1.852;
   return 1 / (m + 1) + 1 / (2 * N) + Math.sqrt(m - 1) / (6 * N * N);

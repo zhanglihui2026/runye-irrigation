@@ -37,6 +37,9 @@
   'use strict';
 
   var C_DEFAULT = 150;
+  function nativeCore() {
+    return typeof window !== 'undefined' ? window.RyHydraulicNative : null;
+  }
   var G2 = 19.62;                 /* 2g，m/s²×2 */
   var SDR_DEFAULT = 13.6;
   var PE_OD_SERIES = [50, 63, 75, 90, 110, 125, 140, 160, 180, 200, 225, 250, 280, 315, 355, 400, 450, 500];
@@ -102,6 +105,8 @@
   function innerDiam(od, mode) {
     var d = pos(od, 0);
     var sdr = sdrOf(mode);
+    var native = nativeCore();
+    if (native && native.inner) return native.inner(d, sdr);
     if (!sdr) return d;
     return d * (1 - 2 / sdr);
   }
@@ -110,6 +115,8 @@
   function hazen(L, Q, d, C) {
     var Li = pos(L, 0), Qi = nonNeg(Q), Di = pos(d, 0), Ci = pos(C, C_DEFAULT);
     if (Li <= 0 || Qi <= 0 || Di <= 0 || Ci <= 0) return 0;
+    var native = nativeCore();
+    if (native && native.hazen) return native.hazen(Li, Qi, Di, Ci);
     return 1.113e9 * Li * Math.pow(Qi, 1.852) / (Math.pow(Ci, 1.852) * Math.pow(Di, 4.87));
   }
 
@@ -117,6 +124,8 @@
   function velocity(Q, d) {
     var Qi = nonNeg(Q), Di = pos(d, 0);
     if (Qi <= 0 || Di <= 0) return 0;
+    var native = nativeCore();
+    if (native && native.velocity) return native.velocity(Qi, Di);
     var area = Math.PI * Math.pow(Di / 1000, 2) / 4;
     return Qi / 3600 / area;
   }
@@ -132,7 +141,33 @@
   function localLoss(v, zeta) {
     var vi = nonNeg(v), z = nonNeg(zeta);
     if (vi <= 0 || z <= 0) return 0;
+    var native = nativeCore();
+    if (native && native.localLoss) return native.localLoss(vi, z);
     return z * vi * vi / G2;
+  }
+
+  /* 水泵扬程（m）：静扬程 + 沿程/局部损失合计 + 富余水头，乘安全系数。
+   * 与 index.html computeThreeLevel 同式：H = (提升+地形+入口压力折米−已有压力折米
+   *   + 主管损失+支管损失+过滤阀门损失 + 富余) × 安全系数(默认 1.10)。
+   * staticM = 提升+地形+入口压力折米−已有压力折米；lossM = 主管+支管+过滤阀门损失合计。
+   * 与 index.html peInnerDiam/hazenWilliams 一致：输入清洗仍由本模块/宿主负责，C++ 不擅自替换。 */
+  function head(staticM, lossM, marginM, safety) {
+    var s = num(staticM, 0), l = num(lossM, 0), m = num(marginM, 0), f = num(safety, 1);
+    if (f <= 0) return 0;
+    var native = nativeCore();
+    if (native && native.head) return native.head(s, l, m, f);
+    return (s + l + m) * f;
+  }
+
+  /* 水泵轴功率（kW）：P = ρ·g·Q·H/η，Q m³/h，常数 2.725 = 1000·9.81/3600
+   * （ρ=1000, g=9.81, 小时→秒, W→kW），η 为小数效率。零流量/零扬程/零效率→0。
+   * 与 index.html computeThreeLevel 的 2.725×Q×H/η/1000 同式。 */
+  function power(flow, hd, eta) {
+    var Qi = nonNeg(flow), Hi = num(hd, 0), ei = num(eta, 0);
+    if (Qi <= 0 || Hi <= 0 || ei <= 0) return 0;
+    var native = nativeCore();
+    if (native && native.power) return native.power(Qi, Hi, ei);
+    return 2.725 * Qi * Hi / ei / 1000;
   }
 
   /* 口径模式校白名单：非法/缺失一律回落 SDR13.6（与宿主默认一致） */
@@ -321,6 +356,7 @@
     num: num, nonNeg: nonNeg, pos: pos, r2: r2, fmt: fmt,
     sdrOf: sdrOf, caliberLabel: caliberLabel, validCaliber: validCaliber, innerDiam: innerDiam,
     hazen: hazen, velocity: velocity, statusOf: statusOf, localLoss: localLoss,
+    head: head, power: power,
     defaultConfig: defaultConfig, normalize: normalize,
     tapFlow: tapFlow, mainFlow: mainFlow, trunkFlow: trunkFlow,
     pathLoss: pathLoss, allPaths: allPaths, worstPath: worstPath, summary: summary
