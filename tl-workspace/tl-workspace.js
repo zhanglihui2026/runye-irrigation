@@ -1055,13 +1055,13 @@
         if (fepts) {
           var fLen = AE.polylineLen(fepts);
           var fD1 = Math.max(0, Math.min(f.atM, fLen)), fD2 = fLen - fD1;
-          var fLab = function (at, tag) {
+          var fLab = function (at, tag, val) {
             var p2 = AE.pointAt(f.pid, data, at);
             if (!p2) return '';
             var q2 = T(p2);
-            return '<text data-tlfitdist="' + tag + '" x="' + fmt(q2.x + 5) + '" y="' + fmt(q2.y - 5) + '" font-size="9.5" font-family="system-ui" font-weight="700" fill="#b45309" paint-order="stroke" stroke="#fff" stroke-width="2.5" pointer-events="none">' + esc(at.toFixed(1) + 'm') + '</text>';
+            return '<text data-tlfitdist="' + tag + '" x="' + fmt(q2.x + 5) + '" y="' + fmt(q2.y - 5) + '" font-size="9.5" font-family="system-ui" font-weight="700" fill="#b45309" paint-order="stroke" stroke="#fff" stroke-width="2.5" pointer-events="none">' + esc(val.toFixed(1) + 'm') + '</text>';
           };
-          distLabels = fLab(fD1 / 2, 'start') + fLab(fD1 + fD2 / 2, 'end');
+          distLabels = fLab(fD1 / 2, 'start', fD1) + fLab(fD1 + fD2 / 2, 'end', fD2);   /* 2026-09-24 修复：标注文字=该段距离 fD1/fD2（与面板距起点/距终点同值），at 仅决定标注位置 */
         }
       }
       s.push('<g class="tl-ws-tlfit" data-tlfit="' + esc(f.id) + '">'
@@ -1198,6 +1198,8 @@
     wireInteractions(ctn);
     updateCalChip('tlWsCalChip');
     if (selGroup !== null) applyGroupHighlight();     // 分组高亮在局部重渲染后保持
+    /* v146：同 render() —— rerenderKeepView 用 replaceChild 换 svg，也把命中线层抹了，按需补挂 */
+    try { if (global.RyTlPathMeasure && global.RyTlPathMeasure.syncLayer) global.RyTlPathMeasure.syncLayer(); } catch (e) { }
   }
   function commitDraft() {
     if (!draft || draft.pts.length < 2) { draft = null; updatePreview(); return false; }
@@ -2268,6 +2270,9 @@
       if (el) { baseFit(c2, el); applyView(c2, el); }
       wireInteractions(c2);
     }
+    /* v146（2026-09-25 用户反馈「总管还是没有分段」）：路径测算命中线层（#tlPathLayer）
+       挂在本函数整棵重建的 svg 上 → 重建后按需补挂（模式未开时 syncLayer 直接返回）。 */
+    try { if (global.RyTlPathMeasure && global.RyTlPathMeasure.syncLayer) global.RyTlPathMeasure.syncLayer(); } catch (e) { }
     return true;
   }
 

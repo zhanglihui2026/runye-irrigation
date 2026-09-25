@@ -10,7 +10,8 @@
  *          弯头由工作区点击时吸附到管线折点后写入，见 tl-workspace.js 插入模式）
  *          定位；改长后位置随有效几何平移/截断（clamp）。
  *       ③ 管径覆盖 cals —— pid → 外径 od（mm，2026-09-16 阶段2e 图面改径）：
- *          只作显示标注（琥珀 Ø），不改几何、不参与水力计算、不进材料清单。
+ *          只作显示标注（琥珀 Ø），不改几何、不参与水力计算、不进材料清单；
+ *          v145（2026-09-25）起不持久化：不进存档、不从存档恢复，每次打开网页清空。
  * 管线标识 pid：'front' | 'main-<i>' | 'branch-<i>'（下标 = tlDiagramData
  *       数组下标；平面图重生成后下标可能重排 → 几何签名不符时整层清空）。
  * 红线：只增本模块自有状态，不写回 tlDiagramData、不参与水力计算、
@@ -368,8 +369,11 @@
     return 'changed';
   }
 
+  /* v145（2026-09-25 用户约定）：改径（cals）不进任何存档 —— 「调整管径之后才跳出，
+     每次打开网页都应清空」。持久化快照只含几何类编辑（改长/配件/平移）；改径仅会话内有效，
+     恢复端一律置空（见 restore）。 */
   function serialize() {
-    return { version: VERSION, geoKey: geoKey, lens: copy(lens), fits: copy(fits), cals: copy(cals), moves: copy(moves), seq: copy(seq) };
+    return { version: VERSION, geoKey: geoKey, lens: copy(lens), fits: copy(fits), cals: {}, moves: copy(moves), seq: copy(seq) };
   }
   /* 恢复（主方案存档 / localStorage）。几何签名不符 → 拒绝（返回 false）。
    * silent=true 供 syncGeometry 内部恢复用（不广播）。 */
@@ -405,7 +409,8 @@
     }
     lens = copy(state.lens);
     fits = copy(state.fits);
-    cals = state.cals ? copy(state.cals) : {};
+    /* v145：改径不从存档恢复（旧档可能带 cals，忽略之）——仅会话内由 setCaliber 产生 */
+    cals = {};
     moves = state.moves ? copy(state.moves) : {};
     seq = { n: Math.max(state.seq.n, maxN) };
     if (state.geoKey) geoKey = state.geoKey;
@@ -450,6 +455,7 @@
   /* 浏览器端：读 localStorage 兜底存档（syncGeometry 同几何签名时恢复） */
   if (typeof localStorage !== 'undefined') {
     try { savedLS = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); } catch (e) { savedLS = null; }
+    if (savedLS) { delete savedLS.cals; }   /* v145：旧兜底档剥改径（防同几何签名幽灵恢复） */
   }
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

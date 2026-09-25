@@ -4028,8 +4028,8 @@ body.ry-tool #tlPipePlanSection[data-ry-view="iso"][data-ry-clean="1"] > .pp-bod
 #tlWsStatsGrip{min-height:0;cursor:col-resize;border-radius:3px;background:transparent;transition:background .15s}
 #tlWsStatsGrip:hover,#tlWsStatsGrip.on{background:rgba(45,96,75,.30)}
 /* 滚动条最窄（2026-09-15 用户要求）：统计栏内 4px 细条 */
-.tl-iso-stats{scrollbar-width:thin;scrollbar-color:#bfd3c6 transparent}
-.tl-iso-stats::-webkit-scrollbar{width:4px;height:4px}
+/* v144：.tl-iso-stats 滚动条由全局 *::-webkit-scrollbar 统一（标准属性会让 webkit 伪元素失效） */
+.tl-iso-stats::-webkit-scrollbar{width:5px;height:5px}
 .tl-iso-stats::-webkit-scrollbar-thumb{background:#bfd3c6;border-radius:2px}
 .tl-iso-stats::-webkit-scrollbar-thumb:hover{background:#9db8a7}
 .tl-iso-stats::-webkit-scrollbar-track,.tl-iso-stats::-webkit-scrollbar-corner{background:transparent}
@@ -4618,6 +4618,8 @@ body.ry-tool #tlPipePlanSection .pp-side .pp-plan-item,
 </style>
 <script src="hydraulic-calc/hydraulics-wasm.js"></script>
 <script src="hydraulic-calc/native-bridge.js"></script>
+<script src="hydraulic-calc/hc-core.js"></script>
+<script src="hydraulic-calc/design-core.js"></script>
 <script src="https://beacon.cdn.qq.com/sdk/4.5.9/beacon_web.min.js"></script>
 <script>
 (function(){
@@ -5438,8 +5440,17 @@ body.ry-tool.ry-cad-vp #ryCadSide[data-ry-open="0"]{width:40px}
 #ryCadSide .ry-cad-grps{flex:1 1 auto;overflow-y:auto;overflow-x:hidden}
 /* 滚动条最细化（2026-09-14 用户要求）：工具栏分组区 + 各属性栏 .pp-side
    （区块内两态与搬入工具栏后的孪生态都是同一条规则族）。 */
-#ryCadSide .ry-cad-grps, .pp-side{scrollbar-width:thin;scrollbar-color:#c9d6ce transparent}
-#ryCadSide .ry-cad-grps::-webkit-scrollbar, .pp-side::-webkit-scrollbar{width:4px;height:4px}
+/* v144（2026-09-24 全站滚动条统一）：竖向/横向滚动条全站统一 5px。
+   ★ 刻意不写 scrollbar-width / scrollbar-color 标准属性（原 .pp-side 写过 thin）——
+   Chromium 121+ 下标准属性会让 ::-webkit-scrollbar 失效，落成约 11px 的 thin 条
+   （第六十五轮实测口径，同 hydraulic-calc.css 头注）；下面是全局兜底规则，
+   各容器自己的 webkit 细条规则（选择器更具体）不受影响。 */
+*::-webkit-scrollbar{width:5px;height:5px}
+*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-corner{background:transparent}
+*::-webkit-scrollbar-thumb{background:#c9d6ce;border-radius:3px}
+*::-webkit-scrollbar-thumb:hover{background:#9db4a8}
+#ryCadSide .ry-cad-grps::-webkit-scrollbar, .pp-side::-webkit-scrollbar{width:5px;height:5px}
 #ryCadSide .ry-cad-grps::-webkit-scrollbar-track, .pp-side::-webkit-scrollbar-track{background:transparent}
 #ryCadSide .ry-cad-grps::-webkit-scrollbar-thumb, .pp-side::-webkit-scrollbar-thumb{background:#c9d6ce;border-radius:2px}
 #ryCadSide .ry-cad-grps::-webkit-scrollbar-thumb:hover, .pp-side::-webkit-scrollbar-thumb:hover{background:#9db4a8}
@@ -5907,6 +5918,8 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     <button class="pp-btn" data-mode="maskPipe" style="display:none">遮蔽管线</button>
     <button class="pp-btn" data-mode="adjustCut" title="拖动分区线调整分区；把一条线拖到相邻线上松手即可合并分区（分区数随之减少），误操作可用「回退」撤销">调网格</button>
     <button class="pp-btn-ghost" id="ppResetCuts" title="恢复系统默认分区线位置（撤销所有拖动与合并）">重置网格</button>
+    <!-- 任务K（2026-09-26）：分区面积锁定按钮。开启后拖动/微调网格线只整体平移分区，各区面积不变；合并/重置/重新分区/旋转会先自动解锁 -->
+    <button class="pp-btn-ghost" id="ppLockArea" title="锁定分区面积：开启后拖动网格线只整体平移分区，不改变各区面积（如 18 亩保持 18 亩）；合并/重置/重新分区/旋转等操作会先自动解锁">🔓 锁定面积</button>
     <span class="pp-cut-fine-group" id="ppCutFineGroup" style="display:none">
       <button class="pp-btn-ghost pp-fine-btn" id="ppFineUp" title="向上微调 0.3m">↑</button>
       <button class="pp-btn-ghost pp-fine-btn" id="ppFineDown" title="向下微调 0.3m">↓</button>
@@ -6068,7 +6081,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
          （画线走「三级设计」工作区，双向同步保留）；卡片仅保留 #tlIsoPipeHint 反馈行
          （右键旋转/阀门/接管等图面操作提示都写这里） -->
     <div class="tl-iso-card tl-iso-pipe-card">
-      <div class="tl-iso-hint" id="tlIsoPipeHint">右键管线可加三通/弯头/阀门（节点）；右键三通可选分支口型号、快速转向（0/90/180/270°、±15° 微调）并「从分支口接管道」；接管端点与图上白圈节点自动吸附；插入管线请到「三级设计」工作区，两页数据互通</div>
+      <div class="tl-iso-hint" id="tlIsoPipeHint">右键管线可加三通/弯头/阀门（节点）；右键三通可选分支口型号、快速转向（0/90/180/270°、±15° 微调）并「从分支口接管道」；接管端点与图上白圈节点自动吸附；画线可用左栏「➕ 管道插入」（端点自动吸附节点/三通），与「三级设计」工作区数据互通</div>
     </div>
     <!-- 自动管线选中卡（2026-09-15 阶段2）：点选二级传递的自动管线后显示；ISO_FITTING_UI_OFF 下豁免隐藏 -->
     <div class="tl-iso-card tl-iso-autocard" id="tlIsoAutoCard" style="display:none">
@@ -6085,6 +6098,15 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     </div>
     <div class="tl-iso-card">
       <div class="tl-iso-card-title">配件布置</div>
+      <!-- 任务J（2026-09-25 用户要求）：管道插入入口复活。旧按钮 id tlIsoPipeMain/tlIsoPipeBranch
+           已删且被 verify_ry_tool.js mustNot 锁定禁用 —— 故用新 id tlIsoPipeKindSel/tlIsoPipeInsBtn。 -->
+      <label class="tl-iso-row" id="tlIsoPipeInsRow"><span>管线类型</span>
+        <select id="tlIsoPipeKindSel">
+          <option value="main">主管</option>
+          <option value="branch">支管</option>
+        </select>
+      </label>
+      <button class="pp-btn-generate" id="tlIsoPipeInsBtn" type="button" style="width:100%;margin-top:6px">➕ 管道插入</button>
       <div class="tl-iso-kinds" id="tlIsoKinds">
         <button type="button" data-kind="tee" class="active">三通</button>
         <button type="button" data-kind="elbow">弯头</button>
@@ -6178,8 +6200,8 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
         /* v127：面板展开时顶部工具栏让位（按钮组左移到面板左缘以内；--tlEconW 实时跟随拖宽） */
         #tlIsoToolbar.te-padded{padding-right:var(--tlEconW,clamp(400px,36vw,560px))}
         /* v124：头部（标题/管长/下拉/假设）锁定不动，只有中部表格区滚动；取消悬浮卡片，贴合右缘 */
-        #tlEconPanel .te-mid{flex:1 1 auto;min-height:0;overflow:auto;scrollbar-width:thin;scrollbar-color:#bfd3c6 transparent;padding-right:2px}
-        #tlEconPanel .te-mid::-webkit-scrollbar{width:4px;height:4px}
+        #tlEconPanel .te-mid{flex:1 1 auto;min-height:0;overflow:auto;padding-right:2px}
+        #tlEconPanel .te-mid::-webkit-scrollbar{width:5px;height:5px}
         #tlEconPanel .te-mid::-webkit-scrollbar-thumb{background:#bfd3c6;border-radius:2px}
         #tlEconPanel .te-mid::-webkit-scrollbar-thumb:hover{background:#9db8a7}
         #tlEconPanel .te-mid::-webkit-scrollbar-track,#tlEconPanel .te-mid::-webkit-scrollbar-corner{background:transparent}
@@ -6317,9 +6339,10 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     <button class="tl-ws-btn" id="tlDimMultiBtn" type="button" aria-pressed="false" onclick="tlDimMultiToggle()" title="多选标注：开启后点尺寸线逐条加选（无位移点击），再点已选线取消；拖动任一已选尺寸线时全部已选一起平移">▣ 多选标注</button>
     <!-- v125（同轮用户要求）：尺寸调整保存开关 —— 默认关 = 拖动仅本次有效，刷新页面即恢复初始位置；
          开 = 当前调整写入本地（localStorage），刷新后保留。关掉时自动清除已保存数据。
-         2026-09-24（用户要求）：去掉💾图标；文字恒为「保存」，不再切换「已保存/不保存」（切换文字有歧义）；
+         2026-09-24（用户要求）：去掉💾图标；文字恒定，不再切换「已保存/不保存」（切换文字有歧义）；
+         2026-09-25（用户要求）：文字改为「标注保存」。
          状态只靠颜色表达 —— 浅色=未保存，深绿(.active)=已保存；再点一次取消并清档。 -->
-    <button class="tl-ws-btn" id="tlDimSaveBtn" type="button" aria-pressed="false" onclick="tlDimSaveToggle()" title="尺寸调整保存：浅色=未保存（拖动仅本次有效，刷新即恢复初始位置），点「保存」写入本地（按钮变深色，刷新后保留）；再点一次取消并清除">保存</button>
+    <button class="tl-ws-btn" id="tlDimSaveBtn" type="button" aria-pressed="false" onclick="tlDimSaveToggle()" title="尺寸调整保存：浅色=未保存（拖动仅本次有效，刷新即恢复初始位置），点「标注保存」写入本地（按钮变深色，刷新后保留）；再点一次取消并清除">标注保存</button>
 
     <button class="tl-ws-btn" id="tlAutoPipe" type="button" onclick="tlAutoGenerate()" title="按当前参数生成 / 重新生成三级管线平面图（生成后右侧「管段管径与损失」表逐段列出管长与管径）">🔄 生成管线图</button>
     <span class="tl-ws-hint" id="tlWsHint">点「插入主管/支管」后在图上点击逐点画线，双击结束</span>
@@ -7196,7 +7219,7 @@ function calcPlanZoneLayout(width, height, requestedN, manualMu) {
   return manualMu > 0 ? calcManualZoneLayout(width, height, manualMu) : calcZoneLayout(width, height, requestedN);
 }
 
-function peInnerDiam(od) { return typeof window !== 'undefined' && window.RyHydraulicNative && window.RyHydraulicNative.inner ? window.RyHydraulicNative.inner(od, SDR) : od * (1 - 2 / SDR); }
+function peInnerDiam(od) { return RyDesignCore.inner(od, SDR); }
 
 /* 图面管径覆盖（2026-09-17 第四十一轮）：三级图面上用右键/工具轨改过管径后，
    用户点左栏「⇧ 更新水泵扬程」确认后，保存各管道的外径，按轮灌组逐路径校核。
@@ -7284,52 +7307,29 @@ function tlBindCalSels() {
       window.tlManualCals[p[0]] = (val === design) ? null : val;
       tlBuildPipeOverride();
       if (typeof tlUpdatePlanBar === 'function') tlUpdatePlanBar();
+      if (typeof window.tlSyncIsoMeta === 'function') window.tlSyncIsoMeta();
     });
   });
 }
 
 function hazenWilliams(L, Q, d) {
-  if (typeof window !== 'undefined' && window.RyHydraulicNative && window.RyHydraulicNative.hazen) return window.RyHydraulicNative.hazen(L, Q, d, C_HAZEN);
-  if (d <= 0 || Q <= 0) return 0;
-  return 1.113e9 * L * Math.pow(Q, 1.852) / (Math.pow(C_HAZEN, 1.852) * Math.pow(d, 4.87));
+  return RyDesignCore.hazen(L, Q, d, C_HAZEN);
 }
 
 function christiansenF(N) {
-  if (typeof window !== 'undefined' && window.RyHydraulicNative && window.RyHydraulicNative.christiansen) return window.RyHydraulicNative.christiansen(N);
-  if (N <= 1) return 1;
-  const m = 1.852;
-  return 1 / (m + 1) + 1 / (2 * N) + Math.sqrt(m - 1) / (6 * N * N);
+  return RyDesignCore.christiansen(N);
 }
 
 function selectPipe(Q, targetV, minOd = 0, maxOd = Infinity) {
-  let best = null;
-  for (const od of PE_OD_SERIES.filter(od => od >= minOd && od <= maxOd)) {
-    const id = peInnerDiam(od);
-    const area = Math.PI * Math.pow(id / 1000, 2) / 4;
-    const v = Q / 3600 / area;
-    if (!best || Math.abs(v - targetV) < Math.abs(best.v - targetV)) {
-      best = { od, id, v, area };
-    }
-  }
-  return best;
+  return RyDesignCore.selectPipe(Q, targetV, PE_OD_SERIES, SDR, minOd, maxOd);
 }
 
 function evaluateAllPipes(Q, minOd = 0, maxOd = Infinity) {
-  return PE_OD_SERIES.filter(od => od >= minOd && od <= maxOd).map(od => {
-    const id = peInnerDiam(od);
-    const area = Math.PI * Math.pow(id / 1000, 2) / 4;
-    const v = Q / 3600 / area;
-    return { od, id, v };
-  });
+  return RyDesignCore.pipes(Q, PE_OD_SERIES, SDR, minOd, maxOd).map(function (p) { return { od: p.od, id: p.id, v: p.v }; });
 }
 
 function selectMotorPower(requiredKW) {
-  if (!Number.isFinite(requiredKW) || requiredKW <= 0) return 0;
-  const series = [0.37, 0.55, 0.75, 1.1, 1.5, 2.2, 3, 4, 5.5, 7.5, 11, 15, 18.5, 22, 30, 37, 45, 55, 75, 90, 110, 132, 160, 200, 250, 315];
-  for (const kw of series) {
-    if (kw >= requiredKW) return kw;
-  }
-  return Math.ceil(requiredKW / 5) * 5;
+  return RyDesignCore.motor(requiredKW);
 }
 
 function pipeStatusLabel(v, isRecommended) {
@@ -7434,9 +7434,9 @@ function compute() {
 
   const headBeforeSafetyRaw = lift + dh + tapePressureM - existPressure * 10.2 + mainLoss + branchLoss + filterLoss + MARGIN_HEAD;
   const headBeforeSafety = Math.max(0, headBeforeSafetyRaw);
-  const pumpHead = headBeforeSafety * SAFETY_FACTOR;
+  const pumpHead = RyDesignCore.head(headBeforeSafety, 0, 0, SAFETY_FACTOR);
 
-  const pumpPower = efficiency > 0 ? (2.725 * zoneFlow * pumpHead / efficiency / 1000) : 0;
+  const pumpPower = RyDesignCore.power(zoneFlow, pumpHead, efficiency);
   const motorKW = selectMotorPower(pumpPower);
   const motorKW_rounded = motorKW;
 
@@ -8328,10 +8328,10 @@ function computeThreeLevel() {
   const totalPipeLoss = frontPipeLoss + mainLoss + branchLoss;
   const headBeforeSafetyRaw = lift + dh + tapePressureM - existPressure * 10.2 + totalPipeLoss + filterLoss + MARGIN_HEAD;
   const headBeforeSafety = Math.max(0, headBeforeSafetyRaw);
-  const pumpHead = headBeforeSafety * SAFETY_FACTOR;
+  const pumpHead = RyDesignCore.head(headBeforeSafety, 0, 0, SAFETY_FACTOR);
 
   // Pump flow = combined flow (all zones simultaneously)
-  const pumpPower = efficiency > 0 ? (2.725 * combinedFlow * pumpHead / efficiency / 1000) : 0;
+  const pumpPower = RyDesignCore.power(combinedFlow, pumpHead, efficiency);
   const motorKW = selectMotorPower(pumpPower);
   const motorKW_rounded = motorKW;
 
@@ -11591,8 +11591,8 @@ function calcPlan(){
   const tapePressureM = tapePressure * 10.2;
   const headBeforeSafetyRaw = lift + dh + tapePressureM - existPressure * 10.2 + mainLoss + branchLoss + filterLoss + MARGIN_HEAD;
   const headBeforeSafety = Math.max(0, headBeforeSafetyRaw);
-  const pumpHead = headBeforeSafety * SAFETY_FACTOR;
-  const pumpPower = efficiency > 0 ? (2.725 * zoneFlow * pumpHead / efficiency / 1000) : 0;
+  const pumpHead = RyDesignCore.head(headBeforeSafety, 0, 0, SAFETY_FACTOR);
+  const pumpPower = RyDesignCore.power(zoneFlow, pumpHead, efficiency);
   const motorKW = selectMotorPower(pumpPower);
 
   // Update display — Row 1 (input area)
@@ -11622,7 +11622,7 @@ function calcPlan(){
     tapePressure, tapePressureM, existPressure, lift, dh,
     mainLoss, branchLoss, filterLoss, marginHead: MARGIN_HEAD,
     headBeforeSafety, headBeforeSafetyRaw, safetyFactor: SAFETY_FACTOR,
-    pumpHead, efficiency, pumpPowerRaw: 2.725*zoneFlow*pumpHead/efficiency/1000, motorKW,
+    pumpHead, efficiency, pumpPowerRaw: pumpPower, motorKW,
     mainPipe, branchPipe, branchFlow, branchCount, branchSpan, branchLen, tapsPerBranch, branchF, mainPipeLen
   });
 
@@ -11841,6 +11841,7 @@ ppPullLiftDh();                                              // 首屏对齐一�
     dragCut:null,
     hoverCut:null,
     lastSelectedCut:null,
+    areaLocked:false, // 分区面积锁定：开启后拖动/微调网格线只整体平移、各区面积不变（任务K 2026-09-26）
     history:[]
   };
 
@@ -12247,6 +12248,28 @@ ppPullLiftDh();                                              // 首屏对齐一�
     ppState.mergePreview=null;
     ppSetCutPos(axis,index,Math.max(lo2,Math.min(hi2,newPos)));
     return {merge:false,count:arr.length-1};
+  }
+
+  /* 任务K（2026-09-26）：面积锁定状态下的整轴刚性平移。
+     拖动任一条内部线时，整条轴（所有内部线）按相同 delta 平移，格宽不变 → 各区面积不变。
+     不做合并、不夹在邻线之间，仅在地块边界内做整体平移约束。 */
+  function ppDragCutAxis(axis,anchorIndex,newPos){
+    var cuts=ppCurrentCuts();
+    if(!cuts)return null;
+    var key=axis==='x'?'xPos':'yPos';
+    var arr=cuts[key];
+    if(anchorIndex<=0||anchorIndex>=arr.length-1)return null;
+    var minGap=Math.max(2,4*ppWorldPerPixel(axis));
+    var delta=newPos-arr[anchorIndex];
+    // 约束整体平移，使最外侧两条内部线仍落在地块边界内（保持格序）
+    var dMin=arr[0]+minGap-arr[1];
+    var dMax=arr[arr.length-1]-minGap-arr[arr.length-2];
+    if(dMin>dMax){ delta=0; }
+    else { if(delta<dMin)delta=dMin; if(delta>dMax)delta=dMax; }
+    var orig=arr.slice();
+    for(var i=1;i<arr.length-1;i++){ ppSetCutPos(axis,i,orig[i]+delta); }
+    ppState.mergePreview=null;
+    return {merge:false,count:arr.length-1,axis:axis,delta:delta};
   }
 
   function ppGetZoneCuts(b,layout){
@@ -13005,7 +13028,11 @@ ppPullLiftDh();                                              // 首屏对齐一�
     // Dragging a cut line（靠近相邻线时吸附并标记合并）
     if(ppState.dragCut){
       var world2=ppToMeters(pos.x,pos.y);
-      ppDragCutTo(ppState.dragCut.axis,ppState.dragCut.index,world2[ppState.dragCut.axis==='x'?'x':'y']);
+      var dcK=ppState.dragCut;
+      var dcCoord=world2[dcK.axis==='x'?'x':'y'];
+      // 面积锁定：整轴刚性平移（面积不变）；否则单线拖动（可合并）
+      if(ppState.areaLocked)ppDragCutAxis(dcK.axis,dcK.index,dcCoord);
+      else ppDragCutTo(dcK.axis,dcK.index,dcCoord);
       ppRender();
       if(typeof window.ppRefreshDiagramIfVisible==='function')window.ppRefreshDiagramIfVisible();
       return;
@@ -13039,7 +13066,8 @@ ppPullLiftDh();                                              // 首屏对齐一�
   ppCanvas.addEventListener('mouseup',function(e){
     // Finalize cut line drag（存在合并预览时执行合并，分区数随之减少）
     if(ppState.dragCut){
-      var ppMerged=ppCommitMerge();
+      // 面积锁定：只平移、不合并（合并会改变区数与面积）
+      var ppMerged=ppState.areaLocked?false:ppCommitMerge();
       ppState.dragCut=null;
       ppState.hoverCut=null;
       ppCanvas.style.cursor=ppState.mode==='adjustCut'?'default':'crosshair';
@@ -13280,6 +13308,7 @@ ppPullLiftDh();                                              // 首屏对齐一�
   }
 
   function ppRepartitionFromRotatedPlot(){
+    ppUnlockArea(); // 重新分区会改变各区面积，锁定态自动解除（任务K 2026-09-26）
     if(!ppState.polyPts.length){alert('请先在面积测量工具中描绘边界');return;}
     var deg=parseFloat(ppState.plotRotationDeg)||0;
     if(!deg){alert('请先输入地块旋转角度，再点击重新分区');return;}
@@ -13317,6 +13346,7 @@ ppPullLiftDh();                                              // 首屏对齐一�
   });
 
   document.getElementById('ppRotateZones').addEventListener('click',function(){
+    ppUnlockArea(); // 分区旋转会改变各区面积，锁定态自动解除（任务K 2026-09-26）
     ppPushHistory();
     ppState.zoneRotated=!ppState.zoneRotated;
     this.classList.toggle('active',ppState.zoneRotated);
@@ -13399,14 +13429,33 @@ ppPullLiftDh();                                              // 首屏对齐一�
     ppRepartitionBtn.addEventListener('click',ppRepartitionFromRotatedPlot);
   }
 
+  // 任务K（2026-09-26）：分区面积锁定按钮的 UI 同步与自动解锁
+  function ppUpdateLockAreaBtn(){
+    var btn=document.getElementById('ppLockArea');
+    if(!btn)return;
+    if(ppState.areaLocked){ btn.textContent='🔒 已锁定面积'; btn.classList.add('active'); }
+    else { btn.textContent='🔓 锁定面积'; btn.classList.remove('active'); }
+  }
+  function ppUnlockArea(){
+    if(ppState.areaLocked){ ppState.areaLocked=false; ppUpdateLockAreaBtn(); }
+  }
   var ppResetCutsBtn=document.getElementById('ppResetCuts');
   if(ppResetCutsBtn){
     ppResetCutsBtn.addEventListener('click',function(){
+      ppUnlockArea(); // 重置网格会改变各区面积，锁定态自动解除（任务K 2026-09-26）
       ppState.cutOverrides={x:{},y:{}};ppResetCutSnap('');
       ppState.dragCut=null;ppState.hoverCut=null;ppState.lastSelectedCut=null;
       ppRender();
       if(typeof window.ppRefreshDiagramIfVisible==='function')window.ppRefreshDiagramIfVisible();
     });
+  }
+  var ppLockAreaBtn=document.getElementById('ppLockArea');
+  if(ppLockAreaBtn){
+    ppLockAreaBtn.addEventListener('click',function(){
+      ppState.areaLocked=!ppState.areaLocked;
+      ppUpdateLockAreaBtn();
+    });
+    ppUpdateLockAreaBtn(); // 同步初始文案（默认未锁定）
   }
 
   // ===== 网格线微调 =====
@@ -13423,6 +13472,31 @@ ppPullLiftDh();                                              // 首屏对齐一�
     var sel=ppState.lastSelectedCut;
     if(!sel){ sel=ppState.hoverCut; }
     if(!sel){return;}
+    // 面积锁定：微调改为整轴刚性平移，各区面积不变（任务K 2026-09-26）
+    if(ppState.areaLocked){
+      ppPushHistory();
+      var b2=ppGetBounds(); if(!b2)return;
+      var planN2=parseInt(document.getElementById('planN')?.value)||parseInt(document.getElementById('fld_N')?.value)||4;
+      var layout2=ppGetZoneLayout(b2,planN2);
+      var cuts2=ppGetZoneCuts(b2,layout2); if(!cuts2)return;
+      var ax=sel.axis;
+      var s=ppFineStepWorld(ax);
+      var d=0;
+      if(ax==='x'){ if(dir==='left')d=-s; else if(dir==='right')d=s; else return; }
+      else { if(dir==='up')d=-s; else if(dir==='down')d=s; else return; }
+      if(d===0)return;
+      var arr2=cuts2[ax==='x'?'xPos':'yPos'];
+      var mg=Math.max(2,4*ppWorldPerPixel(ax));
+      var dMin=arr2[0]+mg-arr2[1], dMax=arr2[arr2.length-1]-mg-arr2[arr2.length-2];
+      var delta=d;
+      if(dMin>dMax)delta=0; else { if(delta<dMin)delta=dMin; if(delta>dMax)delta=dMax; }
+      var o2=arr2.slice();
+      for(var i2=1;i2<arr2.length-1;i2++){ ppSetCutPos(ax,i2,o2[i2]+delta); }
+      ppState.mergePreview=null;
+      ppRender();
+      if(typeof window.ppRefreshDiagramIfVisible==='function')window.ppRefreshDiagramIfVisible();
+      return;
+    }
     ppPushHistory();
     var b=ppGetBounds();
     if(!b)return;
@@ -15927,7 +16001,6 @@ threeDModelingSection:'水力计算器 · 入口预留（方案确定后上线�
      计算核心与 API 照常加载。将来恢复：改 false 或删除本行。
      注意 pipe-path-loss.js 是三级扬程校核（RyPipePathLoss.calculate）依赖，必须照常加载。 -->
 <script>window.RY_HC_RESERVED=true;</script>
-<script src="hydraulic-calc/hc-core.js"></script>
 <script src="hydraulic-calc/pipe-path-loss.js"></script>
 <script src="hydraulic-calc/hydraulic-calc.js"></script>
 <!-- 过滤系统页（2026-09-18 第七十二轮）：GREEN 单体版管路模型 + 选型计算，
@@ -16140,7 +16213,7 @@ threeDModelingSection:'水力计算器 · 入口预留（方案确定后上线�
     var on=!!window._tlDimMulti;
     mBtn.classList.toggle('active',on);
     mBtn.setAttribute('aria-pressed',on?'true':'false');
-    mBtn.textContent=on?'▣ 多选标注中 · 点此退出':'▣ 多选标注';
+    mBtn.textContent=on?'▣ 标注多选':'▣ 多选标注';   /* 2026-09-25 用户要求：激活态由「多选标注中 · 点此退出」缩短为「标注多选」，状态仍由 .active 深色表达 */
     mBtn.title=on
       ?'多选标注已开启：无位移地点尺寸线逐条加选/取消；拖动任一已选尺寸线时全部已选一起平移；点本按钮退出并清空选择'
       :'多选标注：开启后点尺寸线逐条加选（无位移点击），再点已选线取消；拖动任一已选尺寸线时全部已选一起平移';
@@ -16150,10 +16223,10 @@ threeDModelingSection:'水力计算器 · 入口预留（方案确定后上线�
     var on=!!window._tlDimSaveOn;
     sBtn.classList.toggle('active',on);
     sBtn.setAttribute('aria-pressed',on?'true':'false');
-    sBtn.textContent='保存';   /* 2026-09-24 用户要求：文字恒为「保存」，状态只由颜色(.active)表达 */
+    sBtn.textContent='标注保存';   /* 2026-09-24 用户要求：文字恒定，状态只由颜色(.active)表达；2026-09-25 用户要求改「标注保存」 */
     sBtn.title=on
       ?'已保存：尺寸拖动结果写入本地，刷新页面后仍保留（按钮深色）。再点一次取消并清除已保存数据（刷新即恢复初始位置）'
-      :'未保存：尺寸拖动仅本次有效，刷新页面即恢复初始位置（按钮浅色）。点「保存」把当前调整写入本地（刷新后保留）';
+      :'未保存：尺寸拖动仅本次有效，刷新页面即恢复初始位置（按钮浅色）。点「标注保存」把当前调整写入本地（刷新后保留）';
   }
   /* 选择集同步到两份渲染：class 挂在 [data-dim] 组上，ws 克隆自简图时会一并带上 */
   window.tlDimSelSync=function(){
@@ -16436,7 +16509,7 @@ function tlIsoStatsReset() {
      恢复时改回 false 即可。静态 HTML 保留（verify_pp_tabs 骨架契约仍在），
      仅运行时隐藏并跳过全部接线；iso-diagram.js 的 onFittingClick/onPlaceResult
      调用点自带 typeof 守卫，跳过接线不会报错。 */
-  var ISO_FITTING_UI_OFF = true;
+  var ISO_FITTING_UI_OFF = false;   /* 任务J（2026-09-25 用户要求）：恢复左栏插入入口（管道/阀门/弯头/三通），改回 true 可再次整体下线 */
   if (ISO_FITTING_UI_OFF) {
     /* 配件布置/构件参数两卡仍隐藏（2026-09-15 下线维持）；插入管线卡（.tl-iso-pipe-card，
        阶段1 双向同步）单独保留显示。 */
@@ -16460,6 +16533,32 @@ function tlIsoStatsReset() {
   /* 三通/阀门规格自动随所在管道管径（2026-09-14），仅弯头保留规格下拉 */
   function syncSpecRow() { if (specRow) specRow.style.display = curKind === 'elbow' ? '' : 'none'; }
   syncSpecRow();
+
+  /* 管道插入（任务J 2026-09-25 用户要求）：进入/退出画线模式；图面点击依次取点
+     （pipeDataPoint 内建吸附：管线节点/三通/阀门），双击或 Enter 成管，Esc 撤销当前折线。
+     画线与配件放置互斥：进入画线前先取消未完成的放置。 */
+  var pipeInsBtn = document.getElementById('tlIsoPipeInsBtn');
+  var pipeKindSel = document.getElementById('tlIsoPipeKindSel');
+  var syncPipeBtn = function () {
+    if (!pipeInsBtn) return;
+    var on = ISO.pipeModeKind();
+    pipeInsBtn.textContent = on ? '✕ 退出画线' : '➕ 管道插入';
+    pipeInsBtn.classList.toggle('active', !!on);
+  };
+  if (pipeInsBtn && pipeKindSel) {
+    pipeInsBtn.addEventListener('click', function () {
+      if (!document.querySelector('#tlIsoDiagramContent svg')) {
+        setHint('请先生成轴测图（需已生成三级管线平面图）'); return;
+      }
+      if (ISO.pipeModeKind()) { ISO.endPipeMode(); syncPipeBtn(); setHint('已退出画线模式'); return; }
+      if (ISO.placingKind()) { ISO.cancelPlace(); btn.textContent = '确定 · 放置'; }
+      var k = ISO.startPipeMode(pipeKindSel.value);
+      if (!k) { setHint('画线模式启动失败：管线类型无效'); return; }
+      syncPipeBtn();
+      setHint('画线模式（' + (k === 'main' ? '主管' : '支管') + '）：在图上依次点击 起点→转折点→终点，双击或 Enter 成管，Esc 撤销折线；端点自动吸附节点/三通');
+    });
+    ISO.onPipeModeChange = function () { syncPipeBtn(); };
+  }
 
   /* 配件类型三选一 */
   kindsEl.addEventListener('click', function (e) {
@@ -16564,7 +16663,7 @@ function tlIsoStatsReset() {
       if (typeof prev === 'function') { prev(info); return; }
       if (!info) return;
       var tip = info.kind === 'pipe'
-        ? '接管 ' + (info.id || '') + '：右键可「延长 1 m / 删除」'
+        ? '接管 ' + (info.id || '') + '：右键可「延长 / 删除 / 插入三通·阀门·弯头」'
         : '配件 ' + (info.id || '') + '：右键可旋转第三口（每点 ±15°，绕管道中心轴）／转换同径·异径';
       setHint(tip);
     };
@@ -16613,6 +16712,23 @@ function tlIsoStatsReset() {
       else setHint('接管道失败');
       hideCtx(); return;
     }
+    /* 就地插入配件（2026-09-24 任务⑰）：以右键点为放置点插入 三通（型号可选）/阀门/弯头 */
+    if (b.getAttribute('data-itfits')) {
+      var itfKind = b.getAttribute('data-itfits');
+      var itfSpec = b.getAttribute('data-ispec');
+      var itfX = parseFloat(ctx.getAttribute('data-x')), itfY = parseFloat(ctx.getAttribute('data-y'));
+      var itfRes = (ISO.insertFittingAt && isFinite(itfX) && isFinite(itfY))
+        ? ISO.insertFittingAt(itfKind, itfSpec == null ? '' : itfSpec, itfX, itfY) : null;
+      if (itfRes) {
+        if (typeof tlIsoStatsRender === 'function') tlIsoStatsRender();
+        setHint(itfKind === 'tee'
+          ? ('已在接管上插入三通 ' + itfRes.id + (itfSpec ? '（分支口 ' + itfSpec + '）' : '（同径）') + ' —— 右键三通可旋转第三口 / 从分支口接管道')
+          : (itfKind === 'valve'
+            ? ('已插入阀门 ' + itfRes.id)
+            : ('已插入弯头 ' + itfRes.id + '，接管已分段 —— 右键弯头可调整角度（水平面内）')));
+      } else setHint('插入失败：请右键更靠近接管管身的位置再试');
+      hideCtx(); return;
+    }
     if (b.getAttribute('data-ext')) {
       if (ISO.extendManualPipe && ISO.extendManualPipe(id, 1)) { if (typeof tlIsoStatsRender === 'function') tlIsoStatsRender(); setHint('接管已延长 1 m'); }
       hideCtx(); return;
@@ -16653,6 +16769,32 @@ function tlIsoStatsReset() {
       } else setHint('分支口型号调整仅对手工三通可用');
       hideCtx(); return;
     }
+    /* 弯头调角（2026-09-24 任务⑰）：data-erot = 目标累计角（绝对值），增量 = 目标 − 当前 */
+    if (b.getAttribute('data-erot') !== null) {
+      var etq = parseFloat(b.getAttribute('data-erot'));
+      var ecq = (ISO.elbowSpin ? ISO.elbowSpin(id) : 0) || 0;
+      var edq = etq - ecq;
+      if (edq && ISO.rotateElbow && ISO.rotateElbow(id, edq)) {
+        if (typeof tlIsoStatsRender === 'function') tlIsoStatsRender();
+        setHint('弯头已转至 ' + (((ISO.elbowSpin ? ISO.elbowSpin(id) : 0) % 360 + 360) % 360) + '°（下游管道刚体跟随；可 ±15° 微调或复位）');
+      }
+      hideCtx(); return;
+    }
+    if (b.getAttribute('data-ereset')) {
+      if (ISO.resetElbow && ISO.resetElbow(id)) {
+        if (typeof tlIsoStatsRender === 'function') tlIsoStatsRender();
+        setHint('弯头已复位（下游管道回到插入时方向）');
+      }
+      hideCtx(); return;
+    }
+    if (b.getAttribute('data-edel')) {
+      if (ISO.removeElbow && ISO.removeElbow(id)) {
+        if (typeof tlIsoStatsRender === 'function') tlIsoStatsRender();
+        var icE = document.getElementById('tlIsoInfoCard'); if (icE) icE.style.display = 'none';
+        setHint('弯头已删除，下游管道并回上游接管');
+      }
+      hideCtx(); return;
+    }
     if (b.getAttribute('data-t')) {
       if (ISO.convertTee(id, b.getAttribute('data-t'))) {
         if (typeof tlIsoStatsRender === 'function') tlIsoStatsRender();
@@ -16664,7 +16806,7 @@ function tlIsoStatsReset() {
     hideCtx();
   }
   function onCtxHover(e) {
-    var sel = 'button[data-t],button[data-rot],button[data-reset],button[data-spawn],button[data-ext],button[data-del],button[data-rotq],button[data-tspec]';
+    var sel = 'button[data-t],button[data-rot],button[data-reset],button[data-spawn],button[data-ext],button[data-del],button[data-rotq],button[data-tspec],button[data-itfits],button[data-erot],button[data-ereset],button[data-edel]';
     var b = e.target.closest ? e.target.closest(sel) : null;
     Array.prototype.forEach.call(ctx.querySelectorAll(sel), function (x) { x.style.background = x === b ? '#f0fdf4' : ''; });
   }
@@ -16687,7 +16829,7 @@ function tlIsoStatsReset() {
        图上绝大多数三通是自动生成的，若只认手工层（旧逻辑 !info.manual 直接返回），
        用户在图上右键三通将毫无反应 = 「功能没有实现」。自动三通第三口旋转记在
        表达层覆盖表（不动模型），菜单其余项（同径/异径转换）仍只对手工三通出现。 */
-    if (!info || (info.kind !== 'tee' && info.kind !== 'pipe')) {
+    if (!info || (info.kind !== 'tee' && info.kind !== 'pipe' && info.kind !== 'elbow')) {   /* elbow：弯头调角菜单（2026-09-24 任务⑰） */
       /* 立管/阀门等「无分支可旋转」的构件：旧行为是静默 return → 用户右键毫无反应，
          与「旋转入口找不到」同源。2026-09-16 改为在提示行说明，让入口边界可见。 */
       hideCtx();
@@ -16698,11 +16840,49 @@ function tlIsoStatsReset() {
       ensureCtx();
       ctx.removeAttribute('data-tlfit');   /* 属性成对清理：防上一次 A-F## 菜单的路由残留（2026-09-16） */
       ctx.setAttribute('data-fit', info.id);
+      /* 记录右键点屏幕坐标：插入三通/阀门/弯头以该点为放置点（2026-09-24 任务⑰） */
+      ctx.setAttribute('data-x', String(Math.round(x)));
+      ctx.setAttribute('data-y', String(Math.round(y)));
       ctx.innerHTML = '<button type="button" data-ext="1" style="' + ctxBtnCss + '">延长 1 m（沿当前方向）</button>'
-        + '<button type="button" data-del="1" style="' + ctxBtnCss + ';color:#b91c1c">删除接管</button>';
+        + '<button type="button" data-del="1" style="' + ctxBtnCss + ';color:#b91c1c">删除接管</button>'
+        /* 就地插入配件（2026-09-24 任务⑰）：三通型号可选；阀门/弯头自动生成 */
+        + '<div style="border-top:1px solid #e5e7eb;margin:2px 0"></div>'
+        + '<button type="button" data-itfits="valve" style="' + ctxBtnCss + '">插入阀门（自动）</button>'
+        + '<button type="button" data-itfits="elbow" style="' + ctxBtnCss + ';color:#15803d">插入弯头（自动 · 可调角度）</button>'
+        + '<div style="padding:3px 10px 1px;font-weight:700;color:#0369a1">插入三通 · 分支口型号</div>'
+        + '<div style="display:flex;flex-wrap:wrap;gap:2px;padding:0 4px">'
+        + '<button type="button" data-itfits="tee" data-ispec="" style="' + ctxBtnCss + ';width:auto;flex:1 0 28%;text-align:center">同径</button>'
+        + TEE_OD_SERIES.map(function (v) { return '<button type="button" data-itfits="tee" data-ispec="' + v + '" style="' + ctxBtnCss + ';width:auto;flex:1 0 28%;text-align:center">' + v + '</button>'; }).join('')
+        + '</div>';
       ctx.style.display = 'block';
-      ctx.style.left = Math.max(4, Math.min(x, window.innerWidth - 180)) + 'px';
-      ctx.style.top = Math.max(4, Math.min(y, window.innerHeight - 92)) + 'px';
+      ctx.style.left = Math.max(4, Math.min(x, window.innerWidth - 200)) + 'px';
+      ctx.style.top = Math.max(4, y) + 'px';
+      var rcP = ctx.getBoundingClientRect();
+      if (rcP.bottom > window.innerHeight - 8) ctx.style.top = Math.max(4, window.innerHeight - rcP.height - 12) + 'px';
+      return;
+    }
+    /* 弯头右键菜单（2026-09-24 任务⑰）：±15° 微调（按钮携带「当前角 ±15」的绝对目标）、
+       快速转向 0/90/180/270、复位、删除（并回上游管）。data-erot 一律为绝对目标角。 */
+    if (info.kind === 'elbow') {
+      ensureCtx();
+      ctx.removeAttribute('data-tlfit');
+      ctx.setAttribute('data-fit', info.id);
+      var eCur = (ISO.elbowSpin ? ISO.elbowSpin(info.id) : 0) || 0;
+      var eNow = ((eCur % 360) + 360) % 360;
+      ctx.innerHTML = '<div style="padding:4px 10px;font-weight:700;color:#0369a1">弯头 · 调整角度<br><span style="font-weight:400;color:#475569">下游管道绕弯点在水平面内转向（当前 ' + eNow + '°）</span></div>'
+        + '<button type="button" data-erot="' + (eCur - 15) + '" style="' + ctxBtnCss + '">转 -15°</button>'
+        + '<button type="button" data-erot="' + (eCur + 15) + '" style="' + ctxBtnCss + '">转 +15°</button>'
+        + '<button type="button" data-ereset="1" style="' + ctxBtnCss + '">复位（回到插入时方向）</button>'
+        + '<div style="padding:3px 10px 1px;font-weight:700;color:#0369a1">快速转向</div>'
+        + '<div style="display:flex;gap:2px;padding:0 4px">'
+        + [0, 90, 180, 270].map(function (a) { return '<button type="button" data-erot="' + a + '" style="' + ctxBtnCss + ';width:auto;flex:1;text-align:center">' + a + '°</button>'; }).join('')
+        + '</div>'
+        + '<button type="button" data-edel="1" style="' + ctxBtnCss + ';color:#b91c1c">删除弯头（并回上游管）</button>';
+      ctx.style.display = 'block';
+      ctx.style.left = Math.max(4, Math.min(x, window.innerWidth - 200)) + 'px';
+      ctx.style.top = Math.max(4, y) + 'px';
+      var rcE2 = ctx.getBoundingClientRect();
+      if (rcE2.bottom > window.innerHeight - 8) ctx.style.top = Math.max(4, window.innerHeight - rcE2.height - 12) + 'px';
       return;
     }
     if (info.kind !== 'tee') { hideCtx(); return; }

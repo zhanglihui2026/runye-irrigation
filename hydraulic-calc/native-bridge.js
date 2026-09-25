@@ -22,16 +22,16 @@
     if (!mod || typeof mod._ry_abi_version !== 'function' || mod._ry_abi_version() !== 1) {
       throw new Error('Unsupported hydraulic ABI');
     }
+    ['inner', 'hazen', 'velocity', 'local', 'christiansen', 'head', 'power'].forEach(function (name) {
+      if (typeof mod['_ry_' + name] !== 'function') throw new Error('Incomplete hydraulic build: ' + name);
+    });
     api.inner = mod._ry_inner;
     api.hazen = mod._ry_hazen;
     api.velocity = mod._ry_velocity;
     api.localLoss = mod._ry_local;
     api.christiansen = mod._ry_christiansen;
-    /* head / power are optional: only present after a rebuild that includes
-     * ry_head / ry_power in the C++ source. Until then these stay undefined and
-     * hc-core falls back to its JS implementation. */
-    if (typeof mod._ry_head === 'function') api.head = mod._ry_head;
-    if (typeof mod._ry_power === 'function') api.power = mod._ry_power;
+    api.head = mod._ry_head;
+    api.power = mod._ry_power;
     api.backend = 'cpp-wasm';
   }
 

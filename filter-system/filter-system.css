@@ -14,7 +14,7 @@
 .fs-main{flex:1;min-width:0;overflow:auto;padding:8px 10px 22px}
 
 /* ---------- 滚动条：只写 ::-webkit-scrollbar（第六十五轮实测口径，见 hydraulic-calc.css） ---------- */
-.fs-side::-webkit-scrollbar,.fs-main::-webkit-scrollbar{width:4px;height:4px}
+.fs-side::-webkit-scrollbar,.fs-main::-webkit-scrollbar{width:5px;height:5px}
 .fs-side::-webkit-scrollbar-track,.fs-main::-webkit-scrollbar-track,
 .fs-side::-webkit-scrollbar-corner,.fs-main::-webkit-scrollbar-corner{background:transparent}
 .fs-side::-webkit-scrollbar-thumb,.fs-main::-webkit-scrollbar-thumb{background:#bfd3c6;border-radius:2px}

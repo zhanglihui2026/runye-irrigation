@@ -38,16 +38,19 @@ const server = http.createServer((req, res) => {
       const result = await page.evaluate(async () => {
         // wasm 初始化是异步的：等 ready 后再断言 backend，避免首屏尚未切换。
         await (window.RyHydraulicNative && window.RyHydraulicNative.ready || Promise.resolve());
-        let calls = 0;
-        if (RyHydraulicNative.hazen) {
-          const f = RyHydraulicNative.hazen;
-          RyHydraulicNative.hazen = (...args) => { calls++; return f(...args); };
+        const calls = { hazen: 0, head: 0, power: 0 };
+        for (const name of Object.keys(calls)) {
+          if (!RyHydraulicNative[name]) continue;
+          const f = RyHydraulicNative[name];
+          RyHydraulicNative[name] = (...args) => { calls[name]++; return f(...args); };
         }
         const r = computeThreeLevel();
         return { backend: RyHydraulicNative.backend, head: r.pumpHead, loss: r.totalPipeLoss, calls };
       });
       assert.equal(result.backend, mode === 'fallback' ? 'javascript' : 'cpp-wasm');
-      if (mode !== 'fallback') assert.ok(result.calls > 0, 'Host must really execute C++');
+      if (mode !== 'fallback') for (const name of Object.keys(result.calls)) {
+        assert.ok(result.calls[name] > 0, 'Host must really execute C++ ' + name);
+      }
       assert.deepEqual(errors, []);
       results.push(result);
       await context.close();

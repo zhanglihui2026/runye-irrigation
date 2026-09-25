@@ -118,9 +118,9 @@
   overflow:visible;
   padding:8px 9px;border:1px solid #dbe7e0;border-radius:8px;background:#fff;
   font-size:11.5px;color:#243c35;
-  scrollbar-width:thin;scrollbar-color:#bfd3c6 transparent;
+  /* v144：滚动条统一 5px（标准属性会让 webkit 伪元素失效，见 index.html 全局规则） */
 }
-.tl-ws-stats::-webkit-scrollbar{width:4px;height:4px}
+.tl-ws-stats::-webkit-scrollbar{width:5px;height:5px}
 .tl-ws-stats::-webkit-scrollbar-thumb{background:#bfd3c6;border-radius:2px}
 .tl-ws-stats::-webkit-scrollbar-thumb:hover{background:#9db8a7}
 .tl-ws-stats::-webkit-scrollbar-track,.tl-ws-stats::-webkit-scrollbar-corner{background:transparent}

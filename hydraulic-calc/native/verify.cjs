@@ -16,7 +16,13 @@ const near = (a, b, tol) => {
  * regardless of whether the factory is sync or async. */
 (async () => {
   const mod = await Promise.resolve(create());
+  const verifyPaths = require('./path-fixtures.cjs');
+  verifyPaths(ref.hazen);
+  verifyPaths((...args) => mod._ry_hazen(...args));
   assert.equal(mod._ry_abi_version(), 1);
+  for (const name of ['inner', 'hazen', 'velocity', 'local', 'christiansen', 'head', 'power']) {
+    assert.equal(typeof mod['_ry_' + name], 'function', 'Missing required export: ' + name);
+  }
 
   // --- (a) equivalence vs the JS reference (regression guard) ---
   let count = 0;
@@ -31,7 +37,7 @@ const near = (a, b, tol) => {
   }
 
   // --- (b) independent anchors (NOT derived from the JS reference) ---
-  // Known value recomputed by hand: HF(200 m, 60 m³/h, Ø160 SDR13.6 inner, C=150).
+  // Fixed regression snapshot (not an independent engineering reference).
   near(mod._ry_hazen(200, 60, mod._ry_inner(160, 13.6), 150), 1.6326760596746448);
   // Zero-flow / zero-diameter / zero-sdr properties must hold regardless of old code.
   assert.equal(mod._ry_hazen(100, 0, 110, 150), 0);
@@ -50,22 +56,39 @@ const near = (a, b, tol) => {
   // bridge may attach asynchronously → wait for ready before asserting backend.
   await ctx.RyHydraulicNative.ready;
   assert.equal(ctx.RyHydraulicNative.backend, 'cpp-wasm');
+  // Incomplete/failed builds must not partially activate the native API.
+  for (const factory of [() => ({ _ry_abi_version: () => 1 }),
+    () => Promise.reject(new Error('test load failure'))]) {
+    const fallback = { console: { warn() {} }, createRunyeHydraulics: factory };
+    fallback.window = fallback;
+    vm.createContext(fallback);
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '../native-bridge.js'), 'utf8'), fallback);
+    await fallback.RyHydraulicNative.ready;
+    assert.equal(fallback.RyHydraulicNative.backend, 'javascript');
+    assert.equal(fallback.RyHydraulicNative.hazen, undefined);
+    assert.ok(fallback.RyHydraulicNative.error);
+  }
   const cfg = ref.defaultConfig();
   near(ctx.RyHcCore.summary(cfg).maxTotal, ref.summary(cfg).maxTotal);
   for (const mode of ['id', 'sdr17', 'sdr21']) {
     near(ctx.RyHcCore.innerDiam(225, mode), ref.innerDiam(225, mode));
   }
 
-  // --- (d) head / power (only if this wasm build exports them) ---
-  let headPowerNote = 'SKIP (rebuild wasm with ry_head/ry_power to activate)';
-  if (typeof mod._ry_power === 'function' && typeof mod._ry_head === 'function') {
+  // --- (d) mandatory head / power ---
     near(mod._ry_power(48, 30, 0.75), 2.725 * 48 * 30 / 0.75 / 1000);
     near(mod._ry_head(10, 5, 2, 1.10), (10 + 5 + 2) * 1.10);
     near(ctx.RyHcCore.power(48, 30, 0.75), ref.power(48, 30, 0.75));
     near(ctx.RyHcCore.head(10, 5, 2, 1.10), ref.head(10, 5, 2, 1.10));
     assert.equal(mod._ry_power(0, 30, 0.75), 0, 'zero flow → zero power');
     assert.equal(mod._ry_head(10, 5, 2, 0), 0, 'zero safety → zero head');
-    headPowerNote = 'OK (wasm exports ry_head/ry_power)';
-  }
-  console.log(`PASS: ${count} numeric comparisons + independent anchors + full-path integration. head/power: ${headPowerNote}`);
+    near(mod._ry_inner(160, 16), 140);
+    near(mod._ry_velocity(9 * Math.PI, 100), 1);
+    near(mod._ry_hazen(2, 150, 1, 150), 2.226e9);
+    near(mod._ry_head(10, 5, 2, 1.1), 18.7);
+    near(mod._ry_power(360, 10, 0.5), 19.62);
+    assert.equal(mod._ry_head(-50, 5, 2, 1.1), 0);
+    assert.equal(ctx.RyHcCore.head(-50, 5, 2, 1.1), 0);
+    assert.equal(ref.head(-50, 5, 2, 1.1), 0);
+    assert.equal(mod._ry_power(360, 10, 0), 0);
+  console.log(`PASS: ${count} numeric comparisons + algebraic anchors + full-path integration; head/power required`);
 })().catch((e) => { console.error('FAIL:', e && e.message ? e.message : e); process.exitCode = 1; });

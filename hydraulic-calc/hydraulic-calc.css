@@ -30,7 +30,7 @@
      Chromium 121+ 起，标准滚动条属性会让 webkit 伪元素失效 —— 实测（Edge 143）
      「两者都写」得到 11px 的 thin 条，「只写 webkit」才是 4px（见 _p1/_scrollbar_exp.cjs）。
    ★ 4px 是本工程最窄的既有值（#ryCadSide 的 .ry-cad-grps / .tl-iso-stats 的意图值）。 */
-.hc-side::-webkit-scrollbar,.hc-main::-webkit-scrollbar{width:4px;height:4px}
+.hc-side::-webkit-scrollbar,.hc-main::-webkit-scrollbar{width:5px;height:5px}
 .hc-side::-webkit-scrollbar-track,.hc-main::-webkit-scrollbar-track,
 .hc-side::-webkit-scrollbar-corner,.hc-main::-webkit-scrollbar-corner{background:transparent}
 .hc-side::-webkit-scrollbar-thumb,.hc-main::-webkit-scrollbar-thumb{background:#bfd3c6;border-radius:2px}

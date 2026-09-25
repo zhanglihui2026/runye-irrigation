@@ -12,6 +12,7 @@
 
 - `index.html`
 - `hydraulic-calc/hc-core.js`
+- `hydraulic-calc/design-core.js`（页面使用的纯选管与电机选型接口）
 - `hydraulic-calc/native-bridge.js`
 - `hydraulic-calc/hydraulics-wasm.js`（编译产物，内嵌真正的 WASM）
 - 本目录中的 C++ 源码和构建说明，供后续维护。
@@ -43,4 +44,8 @@ node hydraulic-calc/native/browser-smoke.cjs
 
 **宿主已实现**：`index.html` 的首笔 `render()`（主工具）与三级系统图模态的初始化 `render()` 均已改为等待 `RyHydraulicNative.ready` 后再执行首笔计算——`ready` 成功则首笔即走 C++，失败（或 `RyHydraulicNative` 整体缺失）则立即回退 JS，不会卡白屏。即浏览器端默认首笔就走 `cpp-wasm`，而非一加载先 JS 回退。
 
-`head`（扬程）与 `power`（功率）两个函数已加入 `hydraulics.cpp` 与 `hc-core.js`，但**当前随仓库提供的 `hydraulics-wasm.js` 不含这两个导出**。要启用 C++ 版扬程/功率，需按下方「重新编译」重建 wasm；重建前 `RyHydraulicNative.head/power` 保持未定义，hc-core 自动回退到 JS 实现。`verify.cjs` 在 wasm 未导出时打印 `SKIP`，导出后自动交叉校验。
+`head`（扬程）与 `power`（功率）已编译进随项目提供的 WASM。主页面三处扬程/功率计算均通过 `RyDesignCore` 调用。所有七项原语必须完整导出才能启用 C++，缺少任何一项会整组回退；测试不再跳过缺失导出。扬程安全系数前的净水头限制为非负，效率按小数输入，功率输出 kW。
+
+边界：`design-core.js` 承担最近目标流速选管及电机档位选择，`pipe-path-loss.js` 承担轮灌组逐路径计算，两者仍为 JavaScript；C++ 承担数值原语。页面保留输入读取、方案组合、绘图和存档，不表示整个后端已迁移为 C++。
+
+`verify.cjs` 包含 2500 项 JS/C++ 对比、代数消元算例、扬程/功率边界、桥接失败回退，以及 `path-fixtures.cjs` 的独立路径算例（顺序轮灌与同时灌溉、异径、最不利路径、零流量）。消元算例采用非工程尺寸，仅验证公式和连接关系，不能替代实际工程设计校核。浏览器测试检查沿程损失、扬程和功率确实调用 C++，并验证静态站点子路径、本地文件及 JS 回退结果一致。

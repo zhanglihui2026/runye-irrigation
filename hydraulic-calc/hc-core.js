@@ -156,7 +156,7 @@
     if (f <= 0) return 0;
     var native = nativeCore();
     if (native && native.head) return native.head(s, l, m, f);
-    return (s + l + m) * f;
+    return Math.max(0, s + l + m) * f;
   }
 
   /* 水泵轴功率（kW）：P = ρ·g·Q·H/η，Q m³/h，常数 2.725 = 1000·9.81/3600

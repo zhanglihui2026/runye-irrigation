@@ -168,7 +168,7 @@
     }
     if (!Object.keys(s.edits).every(function(id){return /^(TEE-[FB]|V-[FB]|R-V-B|M-[TEV])\d+$/.test(id) && validParams(Object.assign({}, params(''),s.edits[id]));})) return false;
     if (!s.manual.every(function(m){
-      if (m.kind === 'pipe') return /^M-G\d+$/.test(m.id) && Array.isArray(m.pts) && m.pts.length >= 2 && m.pts.every(function(p){return p && isFinite(p.x) && isFinite(p.y) && isFinite(p.z);}) && typeof m.spec === 'string' && (m.teeId === undefined || typeof m.teeId === 'string');
+      if (m.kind === 'pipe') return /^M-G\d+$/.test(m.id) && Array.isArray(m.pts) && m.pts.length >= 2 && m.pts.every(function(p){return p && isFinite(p.x) && isFinite(p.y) && isFinite(p.z);}) && typeof m.spec === 'string' && (m.teeId === undefined || typeof m.teeId === 'string') && (m.elbowId === undefined || (typeof m.elbowId === 'string' && /^M-E\d+$/.test(m.elbowId)));   /* elbowId：弯头拆管的下游段（2026-09-24 任务⑰） */
       return /^M-[TEV]\d+$/.test(m.id) && KIND_LABEL[m.kind] && SEG_NAME[m.segType] && Number.isInteger(m.segIndex) && m.segIndex >= 0 && m.point && isFinite(m.point.x) && isFinite(m.point.y) && typeof m.spec === 'string' && (m.hostPipe === undefined || (typeof m.hostPipe === 'string' && /^M-G\d+$/.test(m.hostPipe)));
     })) return false;
     if(!['tee','elbow','valve'].every(function(k){return Number.isInteger(s.seq[k])&&s.seq[k]>=0&&s.seq[k]<=1000000;}))return false;
@@ -640,13 +640,13 @@
           if (fepts) {
             var fLen = AE.polylineLen(fepts);
             var fD1 = Math.max(0, Math.min(f.atM, fLen)), fD2 = fLen - fD1;
-            var fLab = function (at, tag) {
+            var fLab = function (at, tag, val) {
               var p2 = AE.pointAt(f.pid, data, at);
               if (!p2) return '';
               var q2 = P(p2.x, p2.y, fz);
-              return '<text data-tlfitdist="' + tag + '" x="' + fmt(q2.x + 5) + '" y="' + fmt(q2.y - 5) + '" font-size="9.5" font-family="system-ui" font-weight="700" fill="#b45309" paint-order="stroke" stroke="white" stroke-width="2.5" pointer-events="none">' + esc(at.toFixed(1) + 'm') + '</text>';
+              return '<text data-tlfitdist="' + tag + '" x="' + fmt(q2.x + 5) + '" y="' + fmt(q2.y - 5) + '" font-size="9.5" font-family="system-ui" font-weight="700" fill="#b45309" paint-order="stroke" stroke="white" stroke-width="2.5" pointer-events="none">' + esc(val.toFixed(1) + 'm') + '</text>';
             };
-            fLabels += fLab(fD1 / 2, 'start') + fLab(fD1 + fD2 / 2, 'end');   /* +=（任务⑨）：保留前置的第三口口径标注，勿覆盖 */
+            fLabels += fLab(fD1 / 2, 'start', fD1) + fLab(fD1 + fD2 / 2, 'end', fD2);   /* +=（任务⑨）保留前置第三口口径标注；2026-09-24 修复：标注文字=该段距离 fD1/fD2（与面板距起点/距终点同值），at 仅决定标注位置 */
           }
         }
         s.push('<g class="iso-tlfit" data-tlfit="' + esc(f.id) + '" style="cursor:default"><title>'
@@ -814,7 +814,7 @@
         }
         att += nodeDots;
         s.push('<g class="iso-fit" data-fit="' + esc(m.id) + '" style="cursor:default"><title>'
-          + esc(m.id + ' · ' + KIND_LABEL[m.kind] + ' · ' + (m.spec || '与管道同径')) + '</title>' + att + scaledSymbol(sym,q,m.id) + fitLabel(m.id,q,!!edits[m.id]) + '</g>');
+          + esc(m.id + ' · ' + KIND_LABEL[m.kind] + ' · ' + (m.spec || '与管道同径') + (m.kind === 'elbow' && Number(m.angle) ? ' · 已转 ' + Number(m.angle) + '°' : '')) + '</title>'   /* 弯头显示累计转角（2026-09-24 任务⑰） */ + att + scaledSymbol(sym,q,m.id) + fitLabel(m.id,q,!!edits[m.id]) + '</g>');
       });
       s.push('</g>');
     }
@@ -1161,6 +1161,27 @@
         }
       }
       if (g) {
+        /* 任务⑰让位：按/右键在接管上、且点击点距其关联弯头符号 <12 viewBox 单位 →
+           让位给弯头（下游段经 elbowId 回指；上游段正查 hostPipe）。否则 10px 弯头方块
+           被后绘制的接管 path 盖住，弯头调角菜单永远弹不出（S3b 实证）。 */
+        var mE = manualById(g.getAttribute('data-fit'));
+        if (mE && mE.kind === 'pipe' && viewState && lastDataRef) {
+          var candsE = [];
+          if (mE.elbowId) { var e1E = manualById(mE.elbowId); if (e1E && e1E.kind === 'elbow') candsE.push(e1E); }
+          manual.forEach(function (x) { if (x.kind === 'elbow' && x.hostPipe === mE.id && candsE.indexOf(x) < 0) candsE.push(x); });
+          if (candsE.length) {
+            var uE = svgUserPoint(currentEL(ctn), e.clientX, e.clientY);
+            if (uE) {
+              var bestE = null, bestD = 12;
+              candsE.forEach(function (eb) {
+                var pE = projectIso(eb.point.x, eb.point.y, isFinite(eb.z) ? eb.z : 0, viewState.k);
+                var dE = Math.hypot((viewState.ox + pE.x) - uE.x, (viewState.oy + pE.y) - uE.y);
+                if (dE < bestD) { bestD = dE; bestE = eb; }
+              });
+              if (bestE) g = currentEL(ctn).querySelector('g[data-fit="' + bestE.id + '"]') || g;
+            }
+          }
+        }
         e.preventDefault();
         if (typeof api.onFittingContextMenu === 'function') api.onFittingContextMenu(fittingInfo(g.getAttribute('data-fit')), e.clientX, e.clientY);
         return;
@@ -1982,7 +2003,7 @@
   function setHintMsg(s) { var h = document.getElementById('tlIsoPipeHint'); if (h) h.textContent = s; }
 
   /* 扫描命中管线并在命中点放置配件（放置模式 / 右键管道直接加 共用）。返回 manual 条目或 null。 */
-  function scanAndAdd(kind, clientX, clientY) {
+  function scanAndAdd(kind, clientX, clientY, specOv) {
     if (!viewState || !lastDataRef) return null;
     var ctn = currentCTN(); if (!ctn) return null;
     var el = currentEL(ctn); if (!el) return null;
@@ -2047,7 +2068,7 @@
       var qa = bestPipe.p.pts[bestPipe.i], qb = bestPipe.p.pts[bestPipe.i + 1], qt = bestPipe.t;
       var c3 = { x: qa.x + (qb.x - qa.x) * qt, y: qa.y + (qb.y - qa.y) * qt };
       var z3 = (qa.z || 0) + ((qb.z || 0) - (qa.z || 0)) * qt;
-      var useSpec3 = (kind === 'tee' || kind === 'valve') ? (bestPipe.p.spec || hostDia(bestPipe.p.segType)) : '';
+      var useSpec3 = (kind === 'tee' || kind === 'valve') ? ((specOv != null && specOv !== '') ? String(specOv) : (bestPipe.p.spec || hostDia(bestPipe.p.segType))) : '';   /* specOv：右键接管菜单指定三通分支口型号（2026-09-24 任务⑰） */
       /* 节点复用（2026-09-24 任务⑥）：放三通的位置已在某节点容差内 → 返回既有三通，不重复叠放 */
       if (kind === 'tee') { var nnP = nearNode({ x: c3.x, y: c3.y, z: z3 }); if (nnP && nnP.kind === 'tee') return nnP; }
       return addManual(kind, useSpec3, bestPipe.p.segType, bestPipe.p.segIndex || 0, c3,
@@ -2068,7 +2089,7 @@
       if (fp3 && Math.hypot(fp3.x - c.x, fp3.y - c.y, SEG_Z[pidSegType(ff.pid)] - z) <= NODE_SNAP_TOL) aeOcc3 = true;
     });
     if (aeOcc3) return null;
-    var useSpec = (kind === 'tee' || kind === 'valve') ? hostDia(best.segType) : '';
+    var useSpec = (kind === 'tee' || kind === 'valve') ? ((specOv != null && specOv !== '') ? String(specOv) : hostDia(best.segType)) : '';   /* specOv：同上（2026-09-24 任务⑰） */
     /* 节点复用（2026-09-24 任务⑥）：同 A4a —— 节点附近放三通不再产生重叠副本 */
     if (kind === 'tee') { var nnA = nearNode({ x: c.x, y: c.y, z: z }); if (nnA && nnA.kind === 'tee') return nnA; }
     return addManual(kind, useSpec, best.segType, best.segIndex, c);
@@ -2086,6 +2107,212 @@
       if (manual[i].id === id) { cancelEdit(); checkpoint(); manual.splice(i, 1); delete edits[id]; rerenderKeepView(); notifyEdit(); return true; }
     }
     return false;
+  }
+
+  /* ---------- 接管右键就地插入配件（2026-09-24 任务⑰）----------
+   * 右键接管（M-G##）菜单可插入 三通（分支口型号可选）/ 阀门 / 弯头：
+   * · 三通/阀门：复用 scanAndAdd（节点复用 + 防叠），型号经 specOv 覆盖；
+   *   选了型号的三通再走 beginEdit→previewEdit→applyEdit 写 teeType/branchSpec
+   *   （与三通菜单「分支口型号」同一事务链路，撤销/存档天然打通）。
+   * · 弯头：在命中点把接管拆成两段 —— 上游段保留原 id，下游段新 M-G##
+   *   （elbowId 指回弯头），弯头记累计转角 angle（度）。调整角度 = 下游段及其
+   *   子树（宿三通 + teeId 链）绕弯点**竖直轴**在水平面内刚体旋转
+   *   （rotateVecAbout 不归一化 —— 管长/管形不变，同 rotateTeePipes 教训）。
+   * 删除弯头 = 下游段并回上游段（已转角度保留为折线形状），宿三通改挂上游段。 */
+  function insertElbowAt(clientX, clientY) {
+    if (!viewState || !lastDataRef) return null;
+    var ctn = currentCTN(); if (!ctn) return null;
+    var el = currentEL(ctn); if (!el) return null;
+    var u = svgUserPoint(el, clientX, clientY); if (!u) return null;
+    var bestPipe = null;
+    manual.forEach(function (p) {
+      if (p.kind !== 'pipe' || !p.pts || p.pts.length < 2) return;
+      var poff = (p.segType === 'branch' && viewState.branchOffsets[p.segIndex]) || { x: 0, y: 0 };
+      for (var i = 0; i + 1 < p.pts.length; i++) {
+        var a = p.pts[i], b = p.pts[i + 1];
+        var pa = projectIso(a.x, a.y, a.z || 0, viewState.k), pb = projectIso(b.x, b.y, b.z || 0, viewState.k);
+        var A = { x: viewState.ox + pa.x + poff.x, y: viewState.oy + pa.y + poff.y };
+        var B = { x: viewState.ox + pb.x + poff.x, y: viewState.oy + pb.y + poff.y };
+        var cp = closestOnSeg(u, A, B);
+        var abx = B.x - A.x, aby = B.y - A.y, ab2 = abx * abx + aby * aby;
+        var t = ab2 > 0 ? ((cp.x - A.x) * abx + (cp.y - A.y) * aby) / ab2 : 0;
+        if (t < 0) t = 0; else if (t > 1) t = 1;
+        var L3 = Math.hypot(b.x - a.x, b.y - a.y, (b.z || 0) - (a.z || 0));
+        var d = dist(u, cp);
+        if (d < PLACE_TOL && (!bestPipe || d < bestPipe.d)) bestPipe = { d: d, p: p, i: i, t: t, L3: L3 };
+      }
+    });
+    if (!bestPipe) return null;
+    var p = bestPipe.p, i = bestPipe.i, t = bestPipe.t, L3 = bestPipe.L3;
+    var guard = Math.min(0.2, L3 * 0.25);
+    var mid = t * L3 >= guard && (1 - t) * L3 >= guard;   /* 中段：拆管；端部：仅放符号（任务⑯ 端头语义） */
+    var qa = p.pts[i], qb = p.pts[i + 1];
+    var c = mid
+      ? { x: qa.x + (qb.x - qa.x) * t, y: qa.y + (qb.y - qa.y) * t, z: (qa.z || 0) + ((qb.z || 0) - (qa.z || 0)) * t }
+      : (t * L3 <= (1 - t) * L3 ? { x: qa.x, y: qa.y, z: qa.z || 0 } : { x: qb.x, y: qb.y, z: qb.z || 0 });
+    if (!mid) {
+      /* 端部占用检查（防叠，同 scanAndAdd 端部语义）：手工节点 / AE 图面配件 */
+      var occ = !!nearNode(c, p.id);
+      if (!occ) (AE.fitsList() || []).forEach(function (ff) {
+        if (occ || !(AE.pointAt && lastDataRef)) return;
+        var fp = AE.pointAt(ff.pid, lastDataRef, ff.atM);
+        if (fp && Math.hypot(fp.x - c.x, fp.y - c.y, SEG_Z[pidSegType(ff.pid)] - (c.z || 0)) <= NODE_SNAP_TOL) occ = true;
+      });
+      if (occ) return null;
+      return addManual('elbow', p.spec || '', p.segType, p.segIndex || 0, c, { hostPipe: p.id, z: c.z });
+    }
+    /* 中段：checkpoint 一次 → 拆管 → 推入弯头 + 下游段（不再各自 checkpoint，undo 一步回退） */
+    checkpoint();
+    var upPts = [], k1;
+    for (k1 = 0; k1 <= i; k1++) upPts.push({ x: p.pts[k1].x, y: p.pts[k1].y, z: p.pts[k1].z || 0 });
+    upPts.push({ x: c.x, y: c.y, z: c.z });
+    var downPts = [{ x: c.x, y: c.y, z: c.z }], k2;
+    for (k2 = i + 1; k2 < p.pts.length; k2++) downPts.push({ x: p.pts[k2].x, y: p.pts[k2].y, z: p.pts[k2].z || 0 });
+    var nE = 0, mm;
+    manual.forEach(function (x) { if (x.kind === 'elbow') { mm = /^M-E(\d+)$/.exec(x.id); if (mm) nE = Math.max(nE, parseInt(mm[1], 10)); } });
+    manualSeq.elbow = Math.max(manualSeq.elbow, nE) + 1;
+    var eid = 'M-E' + pad2(manualSeq.elbow);
+    var nP = 0;
+    manual.forEach(function (x) { if (x.kind === 'pipe') { mm = /^M-G(\d+)$/.exec(x.id); if (mm) nP = Math.max(nP, parseInt(mm[1], 10)); } });
+    manualSeq.pipe = Math.max(manualSeq.pipe, nP) + 1;
+    var did = 'M-G' + pad2(manualSeq.pipe);
+    p.pts = upPts;
+    manual.push({ id: eid, kind: 'elbow', spec: p.spec || '', segType: p.segType, segIndex: p.segIndex || 0,
+      point: { x: c.x, y: c.y }, z: c.z, hostPipe: p.id, downId: did, angle: 0 });
+    manual.push({ id: did, kind: 'pipe', spec: p.spec || '', segType: p.segType, segIndex: p.segIndex || 0,
+      elbowId: eid, pts: downPts });
+    notifyEdit();
+    return manualById(eid);
+  }
+  /* 弯头子树：下游段（elbowId 链 / 端点贴弯点的手绘管）+ 其宿三通 + teeId 链。
+     上游段（hostPipe）明确排除 —— 转的是「弯头之后」的管，上游不动。 */
+  function elbowSubtree(id) {
+    var m = manualById(id);
+    var out = { pipes: [], tees: [] };
+    if (!m) return out;
+    var C = { x: m.point.x, y: m.point.y, z: isFinite(m.z) ? m.z : 0 };
+    function nearPt(q) {
+      return q && Math.abs(q.x - C.x) < TEE_LINK_TOL && Math.abs(q.y - C.y) < TEE_LINK_TOL
+        && Math.abs((q.z || 0) - (C.z || 0)) < TEE_LINK_TOL;
+    }
+    var guard = 0;
+    (function walk(list) {
+      if ((guard += 1) > 4000) return;
+      list.forEach(function (p) {
+        if (out.pipes.indexOf(p) >= 0 || p.id === m.hostPipe) return;
+        out.pipes.push(p);
+        manual.forEach(function (t) {
+          if (t.kind !== 'tee' || t.hostPipe !== p.id) return;
+          if (out.tees.indexOf(t) < 0) out.tees.push(t);
+          walk(allPipes().filter(function (cp) { return cp.teeId === t.id && cp.pts && cp.pts.length >= 2; }));
+        });
+      });
+    })(allPipes().filter(function (p) {
+      return p.id !== m.hostPipe && (p.elbowId === id || nearPt(p.pts && p.pts[0]) || nearPt(p.pts && p.pts[p.pts.length - 1]));
+    }));
+    return out;
+  }
+  /* 弯头调角核心（不 checkpoint）：下游子树绕弯点、绕竖直轴刚体旋转 */
+  function rotateElbowCore(id, deg) {
+    var m = manualById(id);
+    if (!m || m.kind !== 'elbow') return false;
+    var d = Number(deg);
+    if (!isFinite(d) || d === 0) return false;
+    var C = { x: m.point.x, y: m.point.y, z: isFinite(m.z) ? m.z : 0 };
+    var k = { x: 0, y: 0, z: 1 };   /* 竖直轴：水平面内转向 */
+    var rad = d * Math.PI / 180;
+    var sub = elbowSubtree(id);
+    sub.tees.forEach(function (t) {
+      var r = rotateVecAbout({ x: t.point.x - C.x, y: t.point.y - C.y, z: (isFinite(t.z) ? t.z : 0) - C.z }, k, rad);
+      t.point = { x: C.x + r.x, y: C.y + r.y };
+      t.z = C.z + r.z;
+      if (t.branchDir && isFinite(t.branchDir.x) && isFinite(t.branchDir.y) && isFinite(t.branchDir.z)) {
+        t.branchDir = rotateAboutAxis(t.branchDir, k, rad);
+      }
+    });
+    sub.pipes.forEach(function (p) {
+      var rpts = p.pts.map(function (pt) {
+        var r = rotateVecAbout({ x: pt.x - C.x, y: pt.y - C.y, z: (pt.z || 0) - C.z }, k, rad);
+        return { x: C.x + r.x, y: C.y + r.y, z: C.z + r.z };
+      });
+      if (manual.indexOf(p) < 0) {
+        if (typeof EP !== 'undefined' && EP.update) EP.update(p.id, function (q) { q.pts = rpts; }, 'iso');
+        else p.pts = rpts;
+      } else p.pts = rpts;
+    });
+    /* 起点回贴弯点（两轮消浮点漂移，仿 rotateTeePipes.snapAll） */
+    function snap() {
+      sub.pipes.forEach(function (p) {
+        if (manual.indexOf(p) < 0 || p.elbowId !== id) return;
+        p.pts[0] = { x: C.x, y: C.y, z: C.z };
+      });
+    }
+    snap(); snap();
+    return true;
+  }
+  function rotateElbow(id, deg) {
+    var m = manualById(id);
+    if (!m || m.kind !== 'elbow') return false;
+    var d = Number(deg);
+    if (!isFinite(d) || d === 0) return false;
+    checkpoint();
+    if (!rotateElbowCore(id, d)) return false;
+    m.angle = Math.round(((Number(m.angle) || 0) + d) * 1000) / 1000;
+    rerenderKeepView(); notifyEdit();
+    return true;
+  }
+  function elbowSpin(id) {
+    var m = manualById(id);
+    return (m && m.kind === 'elbow') ? (Number(m.angle) || 0) : 0;
+  }
+  function resetElbow(id) {
+    var m = manualById(id);
+    if (!m || m.kind !== 'elbow') return false;
+    var spin = Number(m.angle) || 0;
+    checkpoint();
+    if (spin) rotateElbowCore(id, -spin);
+    delete m.angle;
+    rerenderKeepView(); notifyEdit();
+    return true;
+  }
+  /* 删除弯头：下游段并回上游段（转过的角度保留为折线形状）；上游段已删则仅摘符号 */
+  function removeElbow(id) {
+    var m = manualById(id);
+    if (!m || m.kind !== 'elbow') return false;
+    var up = manualById(m.hostPipe), down = manualById(m.downId);
+    checkpoint();
+    if (up && down && up.kind === 'pipe' && down.kind === 'pipe' && up.pts && down.pts && up.pts.length >= 2 && down.pts.length >= 2) {
+      up.pts = up.pts.concat(down.pts.slice(1).map(function (pt) { return { x: pt.x, y: pt.y, z: pt.z || 0 }; }));
+      manual.forEach(function (t) { if (t.hostPipe === down.id) t.hostPipe = up.id; });
+      var di = manual.indexOf(down);
+      if (di >= 0) manual.splice(di, 1);
+    }
+    var ei = manual.indexOf(m);
+    if (ei >= 0) manual.splice(ei, 1);
+    rerenderKeepView(); notifyEdit();
+    return true;
+  }
+  /* 右键接管就地插入三通/阀门/弯头（页面菜单入口，2026-09-24 任务⑰） */
+  function insertFittingAt(kind, spec, clientX, clientY) {
+    if (!KIND_LABEL[kind] || kind === 'pipe') return null;
+    var m;
+    if (kind === 'elbow') {
+      m = insertElbowAt(clientX, clientY);
+    } else {
+      m = scanAndAdd(kind, clientX, clientY, spec);
+      if (m && kind === 'tee' && spec) {
+        /* 型号三通：写 teeType/branchSpec（与三通菜单 data-tspec 同一事务链路） */
+        if (beginEdit(m.id)) {
+          var cur = params(m.id);
+          var vals = { teeType: 'reducing', branchSpec: String(spec), branchLen: (cur.teeType && Number.isFinite(cur.branchLen)) ? cur.branchLen : 1 };
+          if (previewEdit(vals)) applyEdit(); else cancelEdit();
+        }
+      }
+    }
+    if (!m) return null;
+    rerenderKeepView();
+    notifyPlace({ ok: true, id: m.id, kind: kind, spec: m.spec || '' });
+    return m;
   }
   function clearManual() { manual = []; manualSeq = { tee: 0, elbow: 0, valve: 0, pipe: 0 }; }
   function manualCount() { return manual.length; }
@@ -2440,6 +2667,7 @@
     rotateTee:rotateTee, resetTeeBranch:resetTeeBranch, teeBranchSpin:teeBranchSpin,
     teeThroughDir:teeThroughDir, teeAxisLabel:teeAxisLabel, teeBranchDir:teeBranchDir, asTeeRec:asTeeRec,
     addManualAtScreen:addManualAtScreen, spawnPipeFromTee:spawnPipeFromTee, extendManualPipe:extendManualPipe,
+    insertFittingAt:insertFittingAt, rotateElbow:rotateElbow, resetElbow:resetElbow, elbowSpin:elbowSpin, removeElbow:removeElbow,   /* 接管右键插入配件 + 弯头调角（2026-09-24 任务⑰） */
     spawnPipeFromAutoTee:spawnPipeFromAutoTee, syncAutoFitSpin:syncAutoFitSpin, syncAutoFitMove:syncAutoFitMove, setConnectMode:setConnectMode,
     connectMode:function(){ return connectMode; }, autoFitBranchDir:autoFitBranchDir,
     nearNode:nearNode, manualEntries:function(){ return manual; }, NODE_SNAP_TOL:NODE_SNAP_TOL,   /* 节点吸附（2026-09-24 任务⑥，E2E 只读） */

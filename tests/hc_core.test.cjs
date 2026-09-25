@@ -161,8 +161,9 @@ const srcSdr = grab(/const SDR = [\d.]+;/, 'SDR 常量');
 const srcEconMin = grab(/const ECON_VMIN = [\d.]+;/, 'ECON_VMIN 常量');
 const srcEconMax = grab(/const ECON_VMAX = [\d.]+;/, 'ECON_VMAX 常量');
 
-const hostHw = new Function('C_HAZEN', srcHw + '\nreturn hazenWilliams;')(parseInt(srcC.match(/\d+/)[0], 10));
-const hostId = new Function('SDR', srcId + '\nreturn peInnerDiam;')(parseFloat(srcSdr.match(/[\d.]+/)[0]));
+const design = require('../hydraulic-calc/design-core.js');
+const hostHw = new Function('C_HAZEN', 'RyDesignCore', srcHw + '\nreturn hazenWilliams;')(parseInt(srcC.match(/\d+/)[0], 10), design);
+const hostId = new Function('SDR', 'RyDesignCore', srcId + '\nreturn peInnerDiam;')(parseFloat(srcSdr.match(/[\d.]+/)[0]), design);
 
 [[200, 48, 191.9], [125, 24, 136.5], [80, 6, 93.8], [333, 7.25, 61.3]].forEach(function (c) {
   near(H.hazen(c[0], c[1], c[2], H.C_DEFAULT), hostHw(c[0], c[1], c[2]), 1e-12,

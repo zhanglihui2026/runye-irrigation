@@ -35,7 +35,7 @@ EMSCRIPTEN_KEEPALIVE double ry_christiansen(double outlets) {
 // staticM = 提升+地形+入口压力折米−已有压力折米 ; lossM = 主管+支管+过滤阀门损失合计.
 EMSCRIPTEN_KEEPALIVE double ry_head(double staticM, double lossM, double marginM, double safety) {
   if (safety <= 0) return 0;
-  return (staticM + lossM + marginM) * safety;
+  return std::fmax(0.0, staticM + lossM + marginM) * safety;
 }
 // Pump shaft power (kW): P = ρ·g·Q·H / η, with Q in m³/h and the constant
 // 2.725 = 1000·9.81/3600 (ρ=1000, g=9.81, hour→second, W→kW). η is efficiency
