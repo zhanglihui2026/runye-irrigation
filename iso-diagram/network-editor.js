@@ -215,12 +215,12 @@
       if (calChanged) {
         g.appendChild(mk('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, stroke: '#d97706', 'stroke-width': 4, 'stroke-linecap': 'round', opacity: 0.88, 'data-cn-seg': s.id }));
       }
-      /* 所有管段都标管径（2026-09-26）：改径段琥珀底+白字，普通段灰字小字 */
-      if (s.caliber != null) {
+      /* 只标改过管径的段（2026-09-26 用户要求简化：普通段不逐根标，看图例即可） */
+      if (calChanged && s.caliber != null) {
         var mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
         var ddx = b.x - a.x, ddy = b.y - a.y, LL = Math.hypot(ddx, ddy) || 1;
         var cal = mk('text', { x: mx - ddy / LL * 22, y: my + ddx / LL * 22, 'class': 'cn-cal', 'text-anchor': 'middle', 'pointer-events': 'none', 'data-cn-seg': s.id,
-          fill: calChanged ? '#b45309' : '#64748b', 'font-size': calChanged ? 12 : 10, 'font-weight': calChanged ? 700 : 400 });
+          fill: '#b45309', 'font-size': 12, 'font-weight': 700 });
         cal.textContent = 'Ø' + s.caliber;
         g.appendChild(cal);
       }
@@ -303,6 +303,7 @@
 
     svg.appendChild(g);
     st.layer = g;
+    autoReport();
   }
   /* ---------- 悬停提示（2026-09-15）----------
    * 底图自带的管段/配件不再常驻描边，靠这里给一个「可点」的即时反馈：

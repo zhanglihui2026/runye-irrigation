@@ -6249,7 +6249,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
          没拖过不写任何变量走 CSS 回退宽，拖过即持久化 localStorage，双击恢复默认） -->
     <div id="tlEconGrip" title="拖拽调整面板宽度（双击恢复默认）"></div>
     <!-- v127：面板收起后的右侧折叠细条 —— 点它重新展开面板（与左侧工具栏收起条同款交互） -->
-    <div id="tlEconRail" title="点开管径经济对比">💰 经济对比</div>
+    <div id="tlEconRail" title="点开管径经济对比" style="display:none">💰 经济对比</div>
   </div><!-- /.pp-diagram-wrap -->
   <!-- v122（2026-09-23 用户要求）：轴测图右侧「分区材料统计」栏整体取消（拖拽条一并删除）。
        渲染/折叠/拖宽函数保留但全部空值守卫（getElementById 落空即 return），历史探针作废。 -->
@@ -6690,10 +6690,10 @@ function doIrrImport(text){
        计算核心 hc-core.js / pipe-path-loss.js 照常加载（后者是三级扬程校核依赖，不可停），
        RyHydraulicCalc API、localStorage 存档 runye_hydraulic_calc_cfg_v1 全保留。
        将来想好了怎么做，把 window.RY_HC_RESERVED 改为 false（或删掉下面占位 div）即可原样恢复。 -->
-  <div style="display:flex;gap:16px;min-height:calc(100vh - 43px);padding:0 0 0 0">
+  <div id="optMainFlex" style="display:flex;gap:0;min-height:calc(100vh - 43px);padding:16px 16px 0 0">
     <!-- 左侧工具栏 -->
-    <div style="width:200px;flex-shrink:0;background:#fff;border:1px solid #e2e8f0;border-radius:0;padding:14px;box-shadow:none;align-self:stretch;border-top:0;border-bottom:0">
-      <div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:10px">管径综合优化</div>
+    <div id="optSidebar" style="width:170px;flex-shrink:0;background:#fff;border:1px solid #e2e8f0;border-radius:0;padding:12px;box-shadow:none;align-self:stretch;border-top:0;border-bottom:0">
+      <div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:10px">经济指标分析</div>
       <div style="font-size:11.5px;color:#64748b;line-height:1.5;margin-bottom:12px">前期管材投入 vs 后期电费，找年均总成本最低的平衡点。</div>
       <div style="font-size:12px;font-weight:600;color:#334155;margin-bottom:6px">计算假设</div>
       <label style="display:block;font-size:11.5px;color:#475569;margin-bottom:8px">电价<br><input id="optPrice" type="number" step="0.05" style="width:90px;margin-top:3px"> 元/度</label>
@@ -6702,21 +6702,26 @@ function doIrrImport(text){
       <button id="btnPipeOpt" type="button" class="pp-btn-generate" style="width:100%;padding:8px;font-size:12px">🔄 综合分析</button>
       <div id="optSvgInfo" style="font-size:11px;color:#475569;margin-top:14px;line-height:1.6"></div>
     </div>
+    <div id="optSideDrag" style="width:5px;cursor:col-resize;background:#e2e8f0;flex-shrink:0;align-self:stretch"></div>
     <!-- 右侧内容 -->
-    <div style="flex:1;min-width:0">
+    <div style="flex:1;min-width:0;padding-left:12px">
       <div id="pipeOptResult"><div style="color:#94a3b8;font-size:12.5px">点左侧「🔄 综合分析」按钮开始。前提：已生成三级管线图。</div></div>
     </div>
   </div>
 </section>
 <script>
 (function(){
-  var price=0.65, hours=2000, years=15, curRows=null;
+  var price=0.65, hours=1200, years=8, curRows=null;
   function fmtWan(v){ return (v/10000).toFixed(1)+'万'; }
   function fmtK(v){ return (v/1000).toFixed(0)+'k'; }
   try{ var s=JSON.parse(localStorage.getItem('runye_tlEconAssum')||'{}'); if(s.price)price=s.price; if(s.hours)hours=s.hours; if(s.years)years=s.years; }catch(e){}
   document.getElementById('optPrice').value=price;
   document.getElementById('optHours').value=hours;
   document.getElementById('optYears').value=years;
+  /* 参数变化自动重算 */
+  ['optPrice','optHours','optYears'].forEach(function(id){
+    document.getElementById(id).addEventListener('change', function(){ try{ document.getElementById('btnPipeOpt').click(); }catch(e){} });
+  });
 
   function drawSvg(c){
     var d=window.tlDiagramData; if(!d) return '<div style="color:#dc2626">无图面数据</div>';
@@ -6734,8 +6739,8 @@ function doIrrImport(text){
     function ty(y){return oy+(y-minY)*sc;}
     function ptsToStr(seg){ return seg.map(function(p){return tx(p.x).toFixed(1)+','+ty(p.y).toFixed(1);}).join(' '); }
     var s='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px">';
-    if(d.poly&&d.poly.length>=3){ s+='<polygon points="'+ptsToStr(d.poly)+'" fill="#ecfccb" fill-opacity="0.5" stroke="#84cc16" stroke-width="1.2"/>'; }
-    (d.dripTapes||[]).forEach(function(seg){ s+='<polyline points="'+ptsToStr(seg)+'" stroke="#67e8f9" stroke-width="0.8" fill="none" opacity="0.7"/>'; });
+    if(d.poly&&d.poly.length>=3){ s+='<polygon points="'+ptsToStr(d.poly)+'" fill="#f8fafc" fill-opacity="0.6" stroke="#000" stroke-width="1" stroke-dasharray="5,3"/>'; }
+    (d.dripTapes||[]).forEach(function(seg){ s+='<polyline points="'+ptsToStr(seg)+'" stroke="#e2e8f0" stroke-width="0.8" fill="none"/>'; });
     (d.branchPipes||[]).forEach(function(seg){ s+='<polyline points="'+ptsToStr(seg)+'" stroke="#16a34a" stroke-width="1.6" fill="none"/>'; });
     (d.mainPipes||[]).forEach(function(seg){ s+='<polyline points="'+ptsToStr(seg)+'" stroke="#185FA5" stroke-width="3" fill="none"/>'; });
     if(d.frontPipe){
@@ -6757,6 +6762,28 @@ function doIrrImport(text){
     document.getElementById('optSvgInfo').innerHTML='<b>当前选中</b><br>总管 Ø'+r.c.f+' · 主管 Ø'+r.c.m+' · 支管 Ø'+r.c.b+'<br>扬程 '+r.c.head.toFixed(1)+' m · 功率 '+r.c.kw.toFixed(1)+' kW<br>管材 '+Math.round(r.c.mat)+' 元 · 年电费 '+Math.round(r.elec)+' 元<br>年均 <b>'+Math.round(r.annual)+' 元/年</b>';
   }
 
+  /* 拖拽调左侧工具栏宽度 */
+  (function(){
+    var drag=document.getElementById('optSideDrag'), side=document.getElementById('optSidebar');
+    if(!drag||!side) return;
+    drag.addEventListener('mousedown', function(e){
+      e.preventDefault();
+      var sx=e.clientX, sw=side.offsetWidth;
+      function mv(ev){
+        var dw=ev.clientX-sx;
+        side.style.flex='none';
+        side.style.width=Math.max(120, Math.min(320, sw+dw))+'px';
+      }
+      function up(){
+        document.removeEventListener('mousemove', mv);
+        document.removeEventListener('mouseup', up);
+      }
+      document.addEventListener('mousemove', mv);
+      document.addEventListener('mouseup', up);
+    });
+  })();
+  /* 进入页面自动分析(如果已有图面数据) */
+  setTimeout(function(){ try{ if(window.tlDiagramData && window.tlEconPanel) document.getElementById('btnPipeOpt').click(); }catch(e){} }, 500);
   document.getElementById('btnPipeOpt').addEventListener('click', function(){
     var box=document.getElementById('pipeOptResult');
     try{
@@ -6776,31 +6803,62 @@ function doIrrImport(text){
       html+='<div style="margin-top:4px">总管 Ø'+minRow.c.f+' · 主管 Ø'+minRow.c.m+' · 支管 Ø'+minRow.c.b+'</div>';
       html+='<div style="font-size:11.5px;color:#475569;margin-top:2px">扬程 '+minRow.c.head.toFixed(1)+' m · 功率 '+minRow.c.kw.toFixed(1)+' kW · 管材 '+Math.round(minRow.c.mat)+' 元 · 年电费 '+Math.round(minRow.elec)+' 元 · <b>年均总 '+Math.round(minRow.annual)+' 元/年</b></div>';
       if(desRow){ var save=desRow.annual-minRow.annual; html+='<div style="font-size:11.5px;color:#475569;margin-top:2px">对比当前设计(Ø'+D.dF+'/'+D.dM+'/'+D.dB+')：年均省 '+Math.round(save)+' 元/年('+(save/desRow.annual*100).toFixed(1)+'%)</div>'; }
+      html+='<button id="btnApplyCombo" type="button" style="margin-top:8px;padding:6px 16px;background:#15803d;color:#fff;border:0;border-radius:5px;font-size:12px;cursor:pointer">✅ 应用此组合（全图管径切换并重算）</button>';
       html+='</div>';
       html+='<div style="display:flex;gap:16px;align-items:flex-start">';
-      html+='<div style="flex:1;min-width:0;max-height:72vh;overflow-y:auto">';
+      html+='<div id="optTableWrap" style="flex:1.3;min-width:340px;max-height:72vh;overflow-y:auto">';
       html+='<table style="width:100%;border-collapse:collapse;font-size:12px">';
-      html+='<thead><tr style="background:#f1f5f9;position:sticky;top:0"><th style="padding:5px 6px;text-align:left">组合 总/主/支</th><th>管材</th><th>扬程 m</th><th>功率 kW</th><th>年电费</th><th>年均/年</th></tr></thead><tbody>';
+      html+='<thead><tr style="background:#f1f5f9;position:sticky;top:0"><th style="padding:5px 16px 5px 4px;text-align:left">组合 总/主/支</th><th style="padding-left:20px">管材</th><th>扬程 m</th><th>功率 kW</th><th>总管流速</th><th>年电费</th><th>年均/年</th></tr></thead><tbody>';
       rows.forEach(function(r,i){
         var isMin=i===0, isDes=desRow&&r.c.f===D.dF&&r.c.m===D.dM&&r.c.b===D.dB;
         var bg=isMin?'background:#dcfce7':(isDes?'background:#fef3c7':'');
         html+='<tr data-row="'+i+'" style="border-bottom:1px solid #e2e8f0;'+bg+';cursor:pointer">';
-        html+='<td style="padding:4px 6px">'+(isMin?'★ ':'')+'Ø'+r.c.f+'/Ø'+r.c.m+'/Ø'+r.c.b+(isDes?' <span style="color:#92400e">(当前)':'')+'</td>';
-        html+='<td style="text-align:center">'+fmtWan(r.c.mat)+'</td>';
+        html+='<td style="padding:4px 6px 4px 4px;white-space:nowrap">'+(isMin?'★ ':'')+'Ø'+r.c.f+'/Ø'+r.c.m+'/Ø'+r.c.b+(isDes?' <span style="color:#92400e">(当前)':'')+'</td>';
+        html+='<td style="text-align:center;padding-left:4px">'+fmtWan(r.c.mat)+'</td>';
         html+='<td style="text-align:center">'+r.c.head.toFixed(1)+'</td>';
         html+='<td style="text-align:center">'+r.c.kw.toFixed(1)+'</td>';
+        var vF=r.c.vF, vColor=vF>2.0?'#dc2626':(vF>1.6?'#d97706':'#166534');
+        html+='<td style="text-align:center;color:'+vColor+';font-weight:'+(vF>2.0?'700':'400')+'">'+vF.toFixed(2)+'</td>';
         html+='<td style="text-align:center">'+fmtK(r.elec)+'</td>';
         html+='<td style="text-align:center;font-weight:700">'+fmtK(r.annual)+'</td>';
         html+='</tr>';
       });
       html+='</tbody></table>';
       html+='</div>';
-      html+='<div style="flex:1.1;min-width:380px;position:sticky;top:0">';
+      html+='<div id="optDrag" style="width:1px;cursor:col-resize;background:#94a3b8;flex-shrink:0;margin:0 4px;align-self:stretch" title="拖拽调表格宽度"></div>';
+      html+='<div id="optSvgWrap" style="flex:1.7;min-width:380px;position:sticky;top:0">';
       html+='<div style="font-size:12px;font-weight:600;color:#334155;margin-bottom:6px">管平面布置（点左侧表格行切换管径）</div>';
       html+='<div id="optSvgBox" style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">'+drawSvg(minRow.c)+'</div>';
       html+='</div>';
       html+='</div>';
       box.innerHTML=html;
+      /* 拖拽调表格宽度 */
+      var drag=document.getElementById('optDrag'), tw=document.getElementById('optTableWrap');
+      if(drag&&tw){
+        drag.addEventListener('mousedown', function(e){
+          e.preventDefault();
+          var startX=e.clientX, startW=tw.offsetWidth;
+          function onMove(ev){
+            var dw=ev.clientX-startX;
+            tw.style.flex='none';
+            tw.style.width=Math.max(280, Math.min(600, startW+dw))+'px';
+          }
+          function onUp(){
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+          }
+          document.addEventListener('mousemove', onMove);
+          document.addEventListener('mouseup', onUp);
+        });
+      }
+      document.getElementById('btnApplyCombo').addEventListener('click', function(){
+        var r=rows[0];
+        window.tlManualCals={front:r.c.f, main:r.c.m, branch:r.c.b};
+        if(typeof tlBuildPipeOverride==='function') tlBuildPipeOverride();
+        if(typeof tlUpdatePlanBar==='function') tlUpdatePlanBar();
+        if(typeof window.tlSyncIsoMeta==='function') window.tlSyncIsoMeta();
+        alert('已应用 总管Ø'+r.c.f+' · 主管Ø'+r.c.m+' · 支管Ø'+r.c.b+'\n扬程/功率/材料清单已按此管径重算。');
+      });
       box.querySelectorAll('tr[data-row]').forEach(function(tr){
         tr.addEventListener('click', function(){
           box.querySelectorAll('tr').forEach(function(t){t.style.outline='';});
@@ -17736,7 +17794,7 @@ function tlIsoStatsReset() {
     var ASSUM_KEY = 'runye_tlEconAssum', PRICE_KEY = 'runye_tlEconPrices';
     var st = { open: false, sel: -1, selF: null, selM: null, selB: null, cache: null, cacheKey: '' };
     function assum() {
-      var v = { price: 0.65, hours: 2000, years: 15 };
+      var v = { price: 0.65, hours: 1200, years: 8 };
       try { var s = JSON.parse(localStorage.getItem(ASSUM_KEY) || '{}'); for (var k in v) { if (typeof s[k] === 'number' && isFinite(s[k]) && s[k] > 0) v[k] = s[k]; } } catch (e) { }
       return v;
     }
@@ -17781,6 +17839,11 @@ function tlIsoStatsReset() {
         var saved = tlPipeOdOverride, r;
         try { tlPipeOdOverride = ov; r = computeThreeLevel(); } finally { tlPipeOdOverride = saved; }
         c.head = r.pumpHead; c.kw = r.motorKW_rounded;
+        /* 流速 m/s: Q(m3/h)/3600 / 截面积(m2) */
+        function vOf(Q, odMm) { var d = odMm/1000*0.94; return (Q/3600)/(Math.PI*d*d/4); }
+        c.vF = r.combinedFlow ? vOf(r.combinedFlow, c.f) : (r.zoneFlow ? vOf(r.zoneFlow, c.f) : 0);
+        c.vM = r.zoneFlow ? vOf(r.zoneFlow, c.m) : 0;
+        c.vB = r.branchFlow ? vOf(r.branchFlow, c.b) : 0;
         var pr = prices();
         c.mat = len.front * (pr[c.f] || 0) + len.main * (pr[c.m] || 0) + len.branch * (pr[c.b] || 0);
       });

@@ -20,10 +20,10 @@
     { label: '二级管路',     hash: 'pipePlanSection',          pre: 1 },
     { label: '三级管路编辑', hash: 'tlPipePlanSection',   pre: 1 },
     { label: '轴测图',       act: 'iso', page: 'index.html',   pre: 1, title: '三级管线轴测图（先「生成管线图」再点）' },
+    { label: '经济指标分析', hash: 'threeDModelingSection', pre: 1, title: '管径经济指标分析：前期管材投入 vs 后期电费，找年均总成本最低的平衡点' },
     { label: '过滤系统',     hash: 'filterSystemSection', pre: 1, title: '过滤系统 · GREEN 型单体并联机组（初稿）' },
     { label: '系统图',       act: 'sys', page: 'index.html',   pre: 1, title: '三级系统图（供水首部系统图）' },
     { label: '材料清单',     hash: 'detailsSection',           pre: 1 },
-    { label: '管径优化',     hash: 'threeDModelingSection', pre: 1, title: '管径综合优化：前期管材投入 vs 后期电费，找年均总成本最低的平衡点' },
     { label: '数字化建模',   hash: 'parametricModelingSection',pre: 1, title: '数字化建模 · 参数化节点建模' },
     { label: '滴灌带查询',   href: '耐特菲姆滴灌带长度查询器.html' }
     /* pre:1 = 注入到本页静态特有项（如 ⚙️生成系统图）之前；其余追加在末尾。
