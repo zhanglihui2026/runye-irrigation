@@ -1428,7 +1428,7 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
 .pp-legend{display:flex;gap:20px;padding:12px 4px 0;flex-wrap:wrap}
 .pp-legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:rgba(0,0,0,.5)}
 .pp-legend-item i{display:inline-block;width:20px;height:3px;border-radius:2px}
-.pp-diagram-wrap{margin-top:20px;background:#fff;border-radius:12px;padding:20px}
+.pp-diagram-wrap{margin-top:20px;background:#fff;border-radius:12px;padding:20px;position:relative}
 .pp-diagram-title{
   font-size:16px;font-weight:700;color:#1a4731;margin-bottom:12px;
   display:flex;align-items:center;gap:8px;
@@ -6181,7 +6181,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
       <!-- v133（2026-09-23 用户要求）：工具栏上的「管径经济对比」入口取消——面板已有右侧折叠细条
            （#tlEconRail）作为唯一开启入口（切入轴测图默认折叠，手动点细条展开），此处重复。按 v96 纪律 DOM 与
            click 监听保留，仅 display:none。要恢复：删掉 style="display:none" 即可。 -->
-      <button class="pp-btn-ghost" id="tlEconBtn" type="button" style="padding:5px 14px;font-size:12px;display:none" title="按全地块总/主/支管总长，对比不同管径组合的水泵扬程、功率与管材投入，找经济平衡点">💰 管径经济对比</button>
+      <!-- 管径经济对比入口已移除（导航栏已有） -->
       <button class="pp-btn-ghost" id="btnOptLaunch" type="button" style="padding:5px 14px;font-size:12px" title="管径综合优化：前期管材投入 vs 后期电费，找年均总成本最低的平衡点">📊 管径综合优化</button>
     </div>
     <div id="tlIsoDiagramContent"><div class="pp-diagram-empty">完成面积测量并点击「生成管线图」后，切到「轴测简图」视图会根据平面图几何自动生成轴测示意图（含三通与阀门）。</div></div>
@@ -6249,7 +6249,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
          没拖过不写任何变量走 CSS 回退宽，拖过即持久化 localStorage，双击恢复默认） -->
     <div id="tlEconGrip" title="拖拽调整面板宽度（双击恢复默认）"></div>
     <!-- v127：面板收起后的右侧折叠细条 —— 点它重新展开面板（与左侧工具栏收起条同款交互） -->
-    <div id="tlEconRail" title="点开管径经济对比" style="display:none">💰 经济对比</div>
+    <!-- 经济对比侧条已移除 -->
   </div><!-- /.pp-diagram-wrap -->
   <!-- v122（2026-09-23 用户要求）：轴测图右侧「分区材料统计」栏整体取消（拖拽条一并删除）。
        渲染/折叠/拖宽函数保留但全部空值守卫（getElementById 落空即 return），历史探针作废。 -->
@@ -6759,7 +6759,18 @@ function doIrrImport(text){
     if(!curRows) return;
     var r=curRows[i];
     document.getElementById('optSvgBox').innerHTML=drawSvg(r.c);
-    document.getElementById('optSvgInfo').innerHTML='<b>当前选中</b><br>总管 Ø'+r.c.f+' · 主管 Ø'+r.c.m+' · 支管 Ø'+r.c.b+'<br>扬程 '+r.c.head.toFixed(1)+' m · 功率 '+r.c.kw.toFixed(1)+' kW<br>管材 '+Math.round(r.c.mat)+' 元 · 年电费 '+Math.round(r.elec)+' 元<br>年均 <b>'+Math.round(r.annual)+' 元/年</b>';
+    var vc=function(v){return v>2.0?'#dc2626':(v>1.6?'#d97706':'#166534')};
+    document.getElementById('optSvgInfo').innerHTML='<div style="font-size:11px;font-weight:700;color:#334155;margin-bottom:4px">当前选中</div>' +
+      '<table style="width:100%;font-size:11px;border-collapse:collapse">' +
+      '<tr style="border-bottom:1px solid #e2e8f0"><td style="padding:2px 0;color:#64748b">总管</td><td>Ø'+r.c.f+' <span style="color:'+vc(r.c.vF)+';font-weight:600">('+r.c.vF.toFixed(2)+' m/s)</span></td></tr>' +
+      '<tr style="border-bottom:1px solid #e2e8f0"><td style="padding:2px 0;color:#64748b">主管</td><td>Ø'+r.c.m+' <span style="color:'+vc(r.c.vM)+';font-weight:600">('+r.c.vM.toFixed(2)+' m/s)</span></td></tr>' +
+      '<tr style="border-bottom:1px solid #e2e8f0"><td style="padding:2px 0;color:#64748b">支管</td><td>Ø'+r.c.b+' <span style="color:'+vc(r.c.vB)+';font-weight:600">('+r.c.vB.toFixed(2)+' m/s)</span></td></tr>' +
+      '</table>' +
+      '<div style="font-size:11px;line-height:1.9;color:#475569;margin-top:4px">' +
+      '<div>扬程: '+r.c.head.toFixed(1)+' m · 功率: '+r.c.kw.toFixed(1)+' kW</div>' +
+      '<div>水泵流量: '+r.combinedFlow.toFixed(1)+' m³/h</div>' +
+      '<div>管材: '+Math.round(r.c.mat).toLocaleString()+' 元 · 年电费: '+Math.round(r.elec).toLocaleString()+' 元</div>' +
+      '<div>年均: <b style="color:#15803d">'+Math.round(r.annual).toLocaleString()+' 元/年</b></div></div>';
   }
 
   /* 拖拽调左侧工具栏宽度 */
@@ -6792,7 +6803,7 @@ function doIrrImport(text){
       years=parseFloat(document.getElementById('optYears').value)||15;
       var D=window.tlEconPanel.build();
       if(!D){ box.innerHTML='<div style="color:#dc2626">未找到图面数据。请先在三级管路编辑页「生成管线图」。</div>'; return; }
-      var rows=D.combos.map(function(c){ var elec=c.kw*hours*price; return {c:c, elec:elec, annual:c.mat/years+elec}; });
+      var rows=D.combos.map(function(c){ var elec=c.kw*hours*price; return {c:c, elec:elec, annual:c.mat/years+elec, combinedFlow:D.combinedFlow}; });
       rows.sort(function(a,b){return a.annual-b.annual;});
       curRows=rows;
       var minRow=rows[0];
@@ -9758,8 +9769,8 @@ function tlAutoGenerate(options) {
     window._tlDimHits.push({id:'gplot-h',axis:'y',x1:plotLeft,y1:dimBottomY,x2:plotRight,y2:dimBottomY,
       minOff:-(dimBottomBase-plotBottom-6)});
     parts.push('<g data-dim="gplot-h" data-axis="y" stroke="#111111" stroke-width="0.95" fill="none" opacity="0.98" stroke-linecap="square">');
-    parts.push('<line data-dimext="gplot-h" x1="'+plotLeft.toFixed(1)+'" y1="'+(plotBottom+7).toFixed(1)+'" x2="'+plotLeft.toFixed(1)+'" y2="'+(dimBottomY+12).toFixed(1)+'"/>');
-    parts.push('<line data-dimext="gplot-h" x1="'+plotRight.toFixed(1)+'" y1="'+(plotBottom+7).toFixed(1)+'" x2="'+plotRight.toFixed(1)+'" y2="'+(dimBottomY+12).toFixed(1)+'"/>');
+    parts.push('<line data-dimext="gplot-h" x1="'+plotLeft.toFixed(1)+'" y1="'+(plotBottom+4).toFixed(1)+'" x2="'+plotLeft.toFixed(1)+'" y2="'+(dimBottomY+6).toFixed(1)+'"/>');
+    parts.push('<line data-dimext="gplot-h" x1="'+plotRight.toFixed(1)+'" y1="'+(plotBottom+4).toFixed(1)+'" x2="'+plotRight.toFixed(1)+'" y2="'+(dimBottomY+6).toFixed(1)+'"/>');
     parts.push('<line x1="'+plotLeft.toFixed(1)+'" y1="'+dimBottomY.toFixed(1)+'" x2="'+plotRight.toFixed(1)+'" y2="'+dimBottomY.toFixed(1)+'"/>');
     tlArchTick(plotLeft,dimBottomY,'h');
     tlArchTick(plotRight,dimBottomY,'h');
@@ -9769,8 +9780,8 @@ function tlAutoGenerate(options) {
     window._tlDimHits.push({id:'gplot-v',axis:'x',x1:dimLeftX,y1:plotTop,x2:dimLeftX,y2:plotBottom,
       minOff:-(plotLeft-dimLeftBase-6)});
     parts.push('<g data-dim="gplot-v" data-axis="x" stroke="#111111" stroke-width="0.95" fill="none" opacity="0.98" stroke-linecap="square">');
-    parts.push('<line data-dimext="gplot-v" x1="'+(plotLeft-7).toFixed(1)+'" y1="'+plotTop.toFixed(1)+'" x2="'+(dimLeftX-12).toFixed(1)+'" y2="'+plotTop.toFixed(1)+'"/>');
-    parts.push('<line data-dimext="gplot-v" x1="'+(plotLeft-7).toFixed(1)+'" y1="'+plotBottom.toFixed(1)+'" x2="'+(dimLeftX-12).toFixed(1)+'" y2="'+plotBottom.toFixed(1)+'"/>');
+    parts.push('<line data-dimext="gplot-v" x1="'+(plotLeft-4).toFixed(1)+'" y1="'+plotTop.toFixed(1)+'" x2="'+(dimLeftX-6).toFixed(1)+'" y2="'+plotTop.toFixed(1)+'"/>');
+    parts.push('<line data-dimext="gplot-v" x1="'+(plotLeft-4).toFixed(1)+'" y1="'+plotBottom.toFixed(1)+'" x2="'+(dimLeftX-6).toFixed(1)+'" y2="'+plotBottom.toFixed(1)+'"/>');
     parts.push('<line x1="'+dimLeftX.toFixed(1)+'" y1="'+plotTop.toFixed(1)+'" x2="'+dimLeftX.toFixed(1)+'" y2="'+plotBottom.toFixed(1)+'"/>');
     tlArchTick(dimLeftX,plotTop,'v');
     tlArchTick(dimLeftX,plotBottom,'v');
@@ -12922,13 +12933,13 @@ ppPullLiftDh();                                              // 首屏对齐一�
       }else{
         tip='松开鼠标：'+dirLabel+' '+n+' 区合并为 '+(n-1)+' 区（共 '+(totalNow-perLine)+' 区）';
       }
-      ppCtx.font='700 13px sans-serif';
+      ppCtx.font='13px sans-serif';
       ppCtx.textAlign='center';ppCtx.textBaseline='middle';
       var tw=ppCtx.measureText(tip).width+28;
       var tx=ppCanvas.width/2,ty=22;
       ppCtx.fillStyle='rgba(249,115,22,.94)';
       ppCtx.fillRect(tx-tw/2,ty-15,tw,30);
-      ppCtx.fillStyle='#fff';
+      ppCtx.fillStyle='#000';
       ppCtx.fillText(tip,tx,ty);
     }
     ppCtx.restore();
@@ -12938,8 +12949,8 @@ ppPullLiftDh();                                              // 首屏对齐一�
     var planN=parseInt(document.getElementById('planN')?.value)||parseInt(document.getElementById('fld_N')?.value)||4;
     var layout=ppGetZoneLayout(b,planN);
     var cuts=ppGetZoneCuts(b,layout);
-    var fills=['rgba(239,68,68,.10)','rgba(234,179,8,.12)','rgba(59,130,246,.10)','rgba(34,197,94,.10)','rgba(168,85,247,.10)','rgba(236,72,153,.10)','rgba(249,115,22,.10)','rgba(20,184,166,.10)'];
-    var strokes=['rgba(239,68,68,.45)','rgba(202,138,4,.45)','rgba(37,99,235,.45)','rgba(22,163,74,.45)','rgba(126,34,206,.45)','rgba(190,24,93,.45)','rgba(194,65,12,.45)','rgba(13,148,136,.45)'];
+    var fills=['rgba(239,68,68,.12)','rgba(234,179,8,.12)','rgba(22,163,74,.12)','rgba(99,102,241,.12)','rgba(168,85,247,.12)','rgba(236,72,153,.12)','rgba(249,115,22,.12)','rgba(20,184,166,.12)'];
+    var strokes=['rgba(51,65,85,.28)','rgba(51,65,85,.28)','rgba(51,65,85,.28)','rgba(51,65,85,.28)','rgba(51,65,85,.28)','rgba(51,65,85,.28)','rgba(51,65,85,.28)','rgba(51,65,85,.28)'];
     ppCtx.save();
     ppTracePlotPath();
     ppCtx.clip();
@@ -12980,41 +12991,42 @@ ppPullLiftDh();                                              // 首屏对齐一�
         if(aw>34&&ah>26 && _mu>0.05){
           if(_partial){
             // 非标准分区：与标准分区一致，文字置于分区右上角（已在裁剪层之外绘制，可超出地块显示）
-            ppCtx.fillStyle='#b45309';
+            ppCtx.fillStyle='#000';
             var pLabelX=x+w-8, pLabelY=y+8;
             ppCtx.textAlign='right';
             if(aw>78&&ah>44){
-              ppCtx.font='700 13px sans-serif';
+              ppCtx.font='13px sans-serif';
               ppCtx.fillText((zi+1)+'区',pLabelX,pLabelY);
-              ppCtx.font='700 11px sans-serif';
+              ppCtx.font='11px sans-serif';
               ppCtx.fillText('实际 '+_mu.toFixed(1)+' 亩',pLabelX,pLabelY+16);
             }else{
-              ppCtx.font='700 8px sans-serif';
+              ppCtx.font='8px sans-serif';
               ppCtx.fillText((zi+1)+'区 实际'+_mu.toFixed(1)+'亩',pLabelX,pLabelY);
             }
           }else{
             var zoneSizeText=ppZoneSizeLabel(Math.max(cuts.xPlan[zc],cuts.yPlan[zr]),Math.min(cuts.xPlan[zc],cuts.yPlan[zr]));
             var zoneAreaText=(cuts.xPlan[zc]*cuts.yPlan[zr]/666.67).toFixed(1)+'亩';
             var labelX=x+w-8, labelY=y+8;
-            ppCtx.fillStyle=strokes[zi%strokes.length].replace('.45','.95');
+            ppCtx.fillStyle='#000';
             if(aw>88&&ah>48){
               ppCtx.textAlign='right';
-              ppCtx.font='700 13px sans-serif';
+              ppCtx.font='13px sans-serif';
               ppCtx.fillText((zi+1)+'区',labelX,labelY);
-              ppCtx.font='600 10px sans-serif';
+              ppCtx.font='10px sans-serif';
               ppCtx.fillText(zoneSizeText,labelX,labelY+16);
+              ppCtx.font='10px sans-serif';
               ppCtx.fillText(zoneAreaText,labelX,labelY+31);
             }else if(ah>70){
               ppCtx.save();
               ppCtx.translate(x+w/2,y+h/2);
               ppCtx.rotate(-Math.PI/2);
               ppCtx.textAlign='center';
-              ppCtx.font='700 10px sans-serif';
+              ppCtx.font='10px sans-serif';
               ppCtx.fillText((zi+1)+'区 '+zoneSizeText+' '+zoneAreaText,0,-4);
               ppCtx.restore();
             }else{
               ppCtx.textAlign='center';
-              ppCtx.font='700 8px sans-serif';
+              ppCtx.font='8px sans-serif';
               ppCtx.fillText((zi+1)+'区 '+zoneSizeText+' '+zoneAreaText,x+w/2,y+h/2-5);
             }
           }
@@ -13168,7 +13180,7 @@ ppPullLiftDh();                                              // 首屏对齐一�
       ppCtx.fillStyle='#f59e0b';ppCtx.beginPath();
       ppCtx.arc(sp.x,sp.y,8,0,Math.PI*2);ppCtx.fill();
       ppCtx.strokeStyle='#fff';ppCtx.lineWidth=2;ppCtx.stroke();
-      ppCtx.fillStyle='#fff';ppCtx.font='10px sans-serif';ppCtx.textAlign='center';
+      ppCtx.fillStyle='#000';ppCtx.font='10px sans-serif';ppCtx.textAlign='center';
       ppCtx.fillText('水源',sp.x,sp.y-13);
     }
 
@@ -14024,13 +14036,13 @@ ppPullLiftDh();                                              // 首屏对齐一�
       else parts.push('<line x1="'+(x-k).toFixed(1)+'" y1="'+(y-k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y+k).toFixed(1)+'" stroke-width="2.8"/>');
     }
     parts.push('<g stroke="#111111" stroke-width="0.95" fill="none" opacity="0.98" stroke-linecap="square">');
-    parts.push('<line x1="'+plotLeft.toFixed(1)+'" y1="'+(plotBottom+7).toFixed(1)+'" x2="'+plotLeft.toFixed(1)+'" y2="'+(dimBottomY+12).toFixed(1)+'"/>');
-    parts.push('<line x1="'+plotRight.toFixed(1)+'" y1="'+(plotBottom+7).toFixed(1)+'" x2="'+plotRight.toFixed(1)+'" y2="'+(dimBottomY+12).toFixed(1)+'"/>');
+    parts.push('<line x1="'+plotLeft.toFixed(1)+'" y1="'+(plotBottom+4).toFixed(1)+'" x2="'+plotLeft.toFixed(1)+'" y2="'+(dimBottomY+6).toFixed(1)+'"/>');
+    parts.push('<line x1="'+plotRight.toFixed(1)+'" y1="'+(plotBottom+4).toFixed(1)+'" x2="'+plotRight.toFixed(1)+'" y2="'+(dimBottomY+6).toFixed(1)+'"/>');
     parts.push('<line x1="'+plotLeft.toFixed(1)+'" y1="'+dimBottomY.toFixed(1)+'" x2="'+plotRight.toFixed(1)+'" y2="'+dimBottomY.toFixed(1)+'"/>');
     ppArchTick(plotLeft,dimBottomY,'h');
     ppArchTick(plotRight,dimBottomY,'h');
-    parts.push('<line x1="'+(plotLeft-7).toFixed(1)+'" y1="'+plotTop.toFixed(1)+'" x2="'+(dimLeftX-12).toFixed(1)+'" y2="'+plotTop.toFixed(1)+'"/>');
-    parts.push('<line x1="'+(plotLeft-7).toFixed(1)+'" y1="'+plotBottom.toFixed(1)+'" x2="'+(dimLeftX-12).toFixed(1)+'" y2="'+plotBottom.toFixed(1)+'"/>');
+    parts.push('<line x1="'+(plotLeft-4).toFixed(1)+'" y1="'+plotTop.toFixed(1)+'" x2="'+(dimLeftX-6).toFixed(1)+'" y2="'+plotTop.toFixed(1)+'"/>');
+    parts.push('<line x1="'+(plotLeft-4).toFixed(1)+'" y1="'+plotBottom.toFixed(1)+'" x2="'+(dimLeftX-6).toFixed(1)+'" y2="'+plotBottom.toFixed(1)+'"/>');
     parts.push('<line x1="'+dimLeftX.toFixed(1)+'" y1="'+plotTop.toFixed(1)+'" x2="'+dimLeftX.toFixed(1)+'" y2="'+plotBottom.toFixed(1)+'"/>');
     ppArchTick(dimLeftX,plotTop,'v');
     ppArchTick(dimLeftX,plotBottom,'v');
@@ -17847,7 +17859,7 @@ function tlIsoStatsReset() {
         var pr = prices();
         c.mat = len.front * (pr[c.f] || 0) + len.main * (pr[c.m] || 0) + len.branch * (pr[c.b] || 0);
       });
-      return { len: len, dF: dF, dM: dM, dB: dB, oF: oF, oM: oM, oB: oB, combos: combos, nPids: pids.length };
+      return { len: len, dF: dF, dM: dM, dB: dB, oF: oF, oM: oM, oB: oB, combos: combos, nPids: pids.length, combinedFlow: rDes.combinedFlow || 0, zoneFlow: rDes.zoneFlow || 0, branchFlow: rDes.branchFlow || 0 };
     }
     function fmtN(v, dec) { return (isFinite(v) ? v : 0).toFixed(dec == null ? 0 : dec); }
     function annualOf(c, a) { return c.mat / a.years + c.kw * a.hours * a.price; }
