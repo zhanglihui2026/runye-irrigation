@@ -125,6 +125,9 @@
     <div class="fn-inner" data-ry-fnnav data-base="index.html#"></div>
   </nav>
   <script src="runye-nav.js"></script>
+  <!-- [NEW MODULE: map-enhance] 实景叠加图层（2026-09-26）：删除下两行即卸载，不影响其他逻辑 -->
+  <script src="runye-geo.js"></script>
+  <script src="runye-map-enhance.js"></script>
   <!-- [NEW MODULE: pipe_optim] 导航按钮与主页同源（2026-09-23 用户要求：三页导航一致） -->
   <script src="pipe_optim_ui.js"></script>
   <div class="main">
@@ -153,6 +156,7 @@
           <button class="mbtn" id="btnDraw">✏️ 开始画框</button>
           <button class="mbtn" id="btnFinish">✅ 完成</button>
           <button class="mbtn" id="btnUndo">↩ 撤销</button>
+          <button class="mbtn" id="btnMeasure">📏 测距</button>
           <button class="mbtn" id="btnClear">🗑 清除</button>
         </div>
       </section>
@@ -168,7 +172,25 @@
           <button class="mbtn mbtn-primary" id="btnCopy">↩ 回传设计工具</button>
           <button class="mbtn mbtn-primary" id="btnSavePlot">💾 保存地块</button>
         </div>
+        <div class="save-row">
+          <button class="mbtn" id="btnGeoJSON">⬇ GeoJSON</button>
+          <button class="mbtn" id="btnKML">⬇ KML</button>
+        </div>
+        <div class="save-row">
+          <button class="mbtn" id="btnImport">⬆ 导入地块(GeoJSON/KML)</button>
+        </div>
+        <input type="file" id="fileImport" accept=".geojson,.json,.kml,.kmz" style="display:none" />
         <div class="hint">保存后可累计多个地块；在「精准灌溉」页地块库「设为当前」，或在数字农业（水肥决策）页下拉选择。</div>
+      </section>
+      <section>
+        <h4 class="sec-t">我的地块</h4>
+        <div class="pill-list" id="myPlotList" hidden></div>
+        <div class="hint" id="myPlotHint">保存/导入后的地块列在这里；点击飞到该地块，×删除。</div>
+        <div class="save-row">
+          <button class="mbtn" id="btnExportProj">💾 导出工程</button>
+          <button class="mbtn" id="btnImportProj">📂 导入工程</button>
+        </div>
+        <input type="file" id="fileProj" accept=".json,.runye.json" style="display:none" />
       </section>
     </aside>
     <!-- 左侧工具栏宽度拖拽条（2026-09-20）：拖动调宽、双击恢复默认 -->
@@ -625,10 +647,197 @@
     var plot={ id:'p'+Date.now()+Math.floor(Math.random()*1000), name:name, mu:mu, sqm:sqm,
       poly:xs.map(function(x,i){return {x:Math.round(x*100)/100,y:Math.round(ys[i]*100)/100};}),
       crop:'七彩花生', source:'map', ts:Date.now(), note:'' };
+    // [map-enhance] 写入权威经纬度坐标，供卫星图实景叠加（旧字段 poly 保留不动，主程序画布照常消费）
+    var rawLL=latlngs();
+    if(rawLL && rawLL.length>=1){
+      var sl=rawLL.reduce(function(a,p){return a+p[0];},0)/rawLL.length;
+      var sn=rawLL.reduce(function(a,p){return a+p[1];},0)/rawLL.length;
+      plot.polyLatLng=rawLL;
+      plot.center={lat:+sl.toFixed(6), lng:+sn.toFixed(6)};
+      // geo 基准必须与 plot.poly 的米坐标原点一致：x 原点=首点经度，y 原点=平均纬度
+      // （否则管网/地块用 m2ll 反投回卫星图会整体平移）
+      plot.geo={refLat:+sl.toFixed(6), refLng:+rawLL[0][1].toFixed(6), proj:'mercatorLocal', ts:Date.now()};
+    }
     arr.push(plot);
     try{ localStorage.setItem('runye_plot_library', JSON.stringify(arr)); }catch(e){ alert('保存失败：'+e.message); return; }
+    if(rymHandle && rymHandle.refresh){ try{ rymHandle.refresh(); }catch(e){} }
     alert('已保存到地块库：'+name+'（'+mu+' 亩）\n可在精准灌溉页「地块库」设为当前，或在数字农业页选择。');
   };
+
+  // [map-enhance] 把地块库叠加到卫星图（隔离模块，失败不影响测量主流程）
+  var rymHandle=null;
+  try{ if(window.RunyeMapEnhance) rymHandle=window.RunyeMapEnhance.attach(map); }catch(e){}
+
+  // [map-enhance] 导出：把当前画框 + 地块库全部带坐标地块打包成 GeoJSON / KML
+  function collectPlotsForExport(){
+    var arr=[];
+    if(points && points.length>=3){
+      var ll=latlngs();
+      arr.push({name:'当前画框', mu:parseFloat((geodesicArea(ll)/666.67).toFixed(2)), crop:'', polyLatLng:ll});
+    }
+    try{
+      (JSON.parse(localStorage.getItem('runye_plot_library')||'[]')).forEach(function(p){
+        if(p && p.polyLatLng && p.polyLatLng.length>=3) arr.push(p);
+      });
+    }catch(e){}
+    return arr;
+  }
+  function doExport(fmt){
+    var arr=collectPlotsForExport();
+    if(!arr.length){ alert('没有可导出的地块：先在地图上画框，或先「保存地块」。'); return; }
+    try{
+      if(fmt==='geojson') RunyeMapEnhance.export.download('runye-plots.geojson', RunyeMapEnhance.export.geoJSON(arr), 'application/geo+json;charset=utf-8');
+      else RunyeMapEnhance.export.download('runye-plots.kml', RunyeMapEnhance.export.kml(arr), 'application/vnd.google-earth.kml+xml;charset=utf-8');
+    }catch(e){ alert('导出失败：'+e.message); }
+  }
+  document.getElementById('btnGeoJSON').onclick=function(){ doExport('geojson'); };
+  document.getElementById('btnKML').onclick=function(){ doExport('kml'); };
+
+  // [map-enhance] 导入：读取 GeoJSON/KML 文件，解析成地块存入地块库并叠加到地图
+  document.getElementById('btnImport').onclick=function(){ document.getElementById('fileImport').click(); };
+  document.getElementById('fileImport').onchange=function(e){
+    var f=e.target.files && e.target.files[0];
+    if(!f) return;
+    var reader=new FileReader();
+    reader.onload=function(){
+      try{
+        var text=String(reader.result||'');
+        var arr=null;
+        // 按扩展名或文件头判断 KML（兼容 .kml/.kmz 文本与奥维导出）
+        if(/\.kml$/i.test(f.name) || /<kml[\s>]/i.test(text.slice(0,800))) arr=RunyeMapEnhance.parse.kml(text);
+        else arr=RunyeMapEnhance.parse.geoJSON(text);
+        if(!arr || !arr.length){ alert('未能从文件中解析出地块多边形（需要至少一个闭合多边形）。'); return; }
+        var lib=[]; try{ lib=JSON.parse(localStorage.getItem('runye_plot_library')||'[]'); }catch(err){ lib=[]; }
+        var allLL=[];
+        arr.forEach(function(p){
+          var ll=p.polyLatLng; if(!ll || ll.length<3) return;
+          var mu=(p.mu && p.mu>0)?p.mu:parseFloat((geodesicArea(ll)/666.67).toFixed(2));
+          var sqm=Math.round(geodesicArea(ll));
+          // 转本地米坐标（与「保存地块」同一原点：首点经度 x、平均纬度 y）
+          var xs=[],ys=[];
+          var lats=ll.map(function(q){return q[0];}), lngs=ll.map(function(q){return q[1];});
+          var clat=lats.reduce(function(a,b){return a+b;},0)/lats.length;
+          var R=6378137, mlat=R*Math.PI/180, cosLat=Math.cos(clat*Math.PI/180);
+          ll.forEach(function(q){ xs.push((q[1]-lngs[0])*mlat*cosLat); ys.push((q[0]-clat)*mlat); });
+          var sn=lngs.reduce(function(a,b){return a+b;},0)/lngs.length;
+          lib.push({ id:'imp'+Date.now()+Math.floor(Math.random()*1000),
+            name:p.name||('导入地'+(lib.length+1)), mu:mu, sqm:sqm,
+            poly:xs.map(function(x,i){return {x:Math.round(x*100)/100,y:Math.round(ys[i]*100)/100};}),
+            polyLatLng:ll, center:{lat:+clat.toFixed(6),lng:+sn.toFixed(6)},
+            geo:{refLat:+clat.toFixed(6), refLng:+ll[0][1].toFixed(6), proj:'mercatorLocal'},
+            crop:'', source:'import', ts:Date.now(), note:'' });
+          allLL=allLL.concat(ll);
+        });
+        localStorage.setItem('runye_plot_library', JSON.stringify(lib));
+        if(rymHandle && rymHandle.refresh){ try{ rymHandle.refresh(); }catch(err){} }
+        if(allLL.length){ try{ map.fitBounds(L.latLngBounds(allLL),{padding:[30,30],maxZoom:17}); }catch(err){} }
+        alert('已导入 '+arr.length+' 个地块到地块库，并定位到导入范围。');
+      }catch(err){ alert('导入失败：'+err.message); }
+      e.target.value='';
+    };
+    reader.readAsText(f,'utf-8');
+  };
+
+  // [map-enhance] 我的地块列表：读 runye_plot_library，点击飞到该地块，×删除（删后同步刷新卫星叠加）
+  function renderMyPlots(){
+    var box=document.getElementById('myPlotList');
+    if(!box) return;
+    var arr=[]; try{ arr=JSON.parse(localStorage.getItem('runye_plot_library')||'[]'); }catch(e){ arr=[]; }
+    box.innerHTML='';
+    arr.forEach(function(p){
+      if(!p || !p.id) return;
+      var row=document.createElement('div'); row.className='place-item';
+      var go=document.createElement('button');
+      go.type='button'; go.className='place-go';
+      go.textContent='📍 '+(p.name||'地块')+'（'+(p.mu!=null?p.mu:'?')+'亩）';
+      go.title=p.name||'';
+      go.onclick=function(){
+        var ll=p.polyLatLng;
+        if(ll && ll.length>=3){ try{ map.fitBounds(L.latLngBounds(ll),{padding:[40,40],maxZoom:17}); }catch(e){} }
+        else if(p.center){ try{ map.setView([p.center.lat,p.center.lng],16); }catch(e){} }
+      };
+      var del=document.createElement('button');
+      del.type='button'; del.className='place-del'; del.textContent='×'; del.title='删除该地块';
+      del.onclick=function(){
+        var now=(JSON.parse(localStorage.getItem('runye_plot_library')||'[]')).filter(function(x){return x.id!==p.id;});
+        localStorage.setItem('runye_plot_library', JSON.stringify(now));
+        renderMyPlots();
+        if(typeof rymHandle!=='undefined' && rymHandle && rymHandle.refresh){ try{ rymHandle.refresh(); }catch(e){} }
+      };
+      row.appendChild(go); row.appendChild(del); box.appendChild(row);
+    });
+    box.hidden = arr.length===0;
+  }
+  // [map-enhance] 测距工具：逐点量距离，不入库，与地块绘制互斥；双击结束
+  var measuring=false, measurePts=[], measureLayer=L.layerGroup().addTo(map);
+  document.getElementById('btnMeasure').onclick=function(){
+    measuring=!measuring;
+    this.classList.toggle('btn-on',measuring);
+    if(measuring){
+      if(drawing) setDrawing(false);
+      map.dragging.disable();
+      tip('测距模式：点击地图逐点打点，紫色虚线显示累计距离，双击结束。');
+    } else finishMeasure();
+  };
+  function finishMeasure(){
+    measuring=false;
+    var bm=document.getElementById('btnMeasure'); if(bm) bm.classList.remove('btn-on');
+    map.dragging.enable();
+    measureLayer.clearLayers(); measurePts=[];
+    tip('测距结束。');
+  }
+  map.on('click', function(e){
+    if(!measuring) return;
+    measurePts.push({lat:e.latlng.lat,lng:e.latlng.lng});
+    renderMeasure();
+  });
+  map.on('dblclick', function(){ if(measuring) finishMeasure(); });
+  function renderMeasure(){
+    measureLayer.clearLayers();
+    if(!measurePts.length) return;
+    measurePts.forEach(function(p){
+      L.circleMarker([p.lat,p.lng],{radius:4,color:'#7c3aed',fillColor:'#7c3aed',fillOpacity:1}).addTo(measureLayer);
+    });
+    if(measurePts.length>=2){
+      L.polyline(measurePts.map(function(p){return [p.lat,p.lng];}),{color:'#7c3aed',weight:2,dashArray:'6,4'}).addTo(measureLayer);
+      var total=0; for(var i=1;i<measurePts.length;i++) total+=hav(measurePts[i-1],measurePts[i]);
+      tip('累计测距：'+total.toFixed(1)+' 米（'+measurePts.length+' 点，双击结束）');
+    }
+  }
+
+  // [map-enhance] 工程文件导出/导入：打包地块库+管网+视图为单文件，换设备不丢数据
+  document.getElementById('btnExportProj').onclick=function(){
+    try{
+      var data={ app:'runye-irrigation', version:1, ts:Date.now(),
+        plots: JSON.parse(localStorage.getItem('runye_plot_library')||'[]'),
+        network: JSON.parse(localStorage.getItem('runye_network_layout')||'null'),
+        view: JSON.parse(localStorage.getItem('runye_map_view')||'null') };
+      var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+      var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+      a.download='runye-project-'+new Date().toISOString().slice(0,10)+'.runye.json';
+      document.body.appendChild(a); a.click(); setTimeout(function(){a.remove();URL.revokeObjectURL(a.href);},100);
+    }catch(e){ alert('导出失败：'+e.message); }
+  };
+  document.getElementById('btnImportProj').onclick=function(){ document.getElementById('fileProj').click(); };
+  document.getElementById('fileProj').onchange=function(e){
+    var f=e.target.files&&e.target.files[0]; if(!f) return;
+    var reader=new FileReader();
+    reader.onload=function(){
+      try{
+        var d=JSON.parse(String(reader.result||''));
+        if(d.plots) localStorage.setItem('runye_plot_library', JSON.stringify(d.plots));
+        if(d.network) localStorage.setItem('runye_network_layout', JSON.stringify(d.network));
+        if(d.view) localStorage.setItem('runye_map_view', JSON.stringify(d.view));
+        if(typeof rymHandle!=='undefined'&&rymHandle&&rymHandle.refresh) rymHandle.refresh();
+        renderMyPlots();
+        alert('工程已导入：'+(d.plots||[]).length+' 个地块'+(d.network?'、管网已恢复':''));
+      }catch(err){ alert('导入失败：'+err.message); }
+      e.target.value='';
+    };
+    reader.readAsText(f,'utf-8');
+  };
+
+  renderMyPlots();
 
   refresh();
 })();

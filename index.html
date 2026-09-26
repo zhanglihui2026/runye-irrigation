@@ -6182,6 +6182,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
            （#tlEconRail）作为唯一开启入口（切入轴测图默认折叠，手动点细条展开），此处重复。按 v96 纪律 DOM 与
            click 监听保留，仅 display:none。要恢复：删掉 style="display:none" 即可。 -->
       <button class="pp-btn-ghost" id="tlEconBtn" type="button" style="padding:5px 14px;font-size:12px;display:none" title="按全地块总/主/支管总长，对比不同管径组合的水泵扬程、功率与管材投入，找经济平衡点">💰 管径经济对比</button>
+      <button class="pp-btn-ghost" id="btnOptLaunch" type="button" style="padding:5px 14px;font-size:12px" title="管径综合优化：前期管材投入 vs 后期电费，找年均总成本最低的平衡点">📊 管径综合优化</button>
     </div>
     <div id="tlIsoDiagramContent"><div class="pp-diagram-empty">完成面积测量并点击「生成管线图」后，切到「轴测简图」视图会根据平面图几何自动生成轴测示意图（含三通与阀门）。</div></div>
 
@@ -6343,6 +6344,15 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
          2026-09-25（用户要求）：文字改为「标注保存」。
          状态只靠颜色表达 —— 浅色=未保存，深绿(.active)=已保存；再点一次取消并清档。 -->
     <button class="tl-ws-btn" id="tlDimSaveBtn" type="button" aria-pressed="false" onclick="tlDimSaveToggle()" title="尺寸调整保存：浅色=未保存（拖动仅本次有效，刷新即恢复初始位置），点「标注保存」写入本地（按钮变深色，刷新后保留）；再点一次取消并清除">标注保存</button>
+    <!-- 任务M（2026-09-26 用户：「标注线的文字跟箭头尺寸有点大，做一个控制按钮，可以适当的调整他们比例」）：
+         标注比例四键组 —— Aa−/Aa±10%（60%~180%）、⟲复位100%；写 localStorage('tl-dim-scale')，
+         简图/系统简图克隆/下载/打印同源渲染自然生效。必须在 #tlAutoPipe 之前 —— A6 契约要求生成按钮贴底。 -->
+    <div id="tlDimScaleRow" style="display:flex;align-items:center;gap:4px;margin:4px 0 2px">
+      <button class="tl-ws-btn" id="tlDimScaleMinus" type="button" style="flex:0 0 auto;width:auto;padding:4px 7px" onclick="tlDimScaleStep(-1)" title="标注文字/箭头缩小 10%（下限 60%）">Aa－</button>
+      <span id="tlDimScaleVal" style="font-size:11px;font-weight:700;color:#47555e;min-width:36px;text-align:center">100%</span>
+      <button class="tl-ws-btn" id="tlDimScalePlus" type="button" style="flex:0 0 auto;width:auto;padding:4px 7px" onclick="tlDimScaleStep(1)" title="标注文字/箭头放大 10%（上限 180%）">Aa＋</button>
+      <button class="tl-ws-btn" id="tlDimScaleReset" type="button" style="flex:0 0 auto;width:auto;padding:4px 7px" onclick="tlDimScaleReset()" title="恢复默认 100%">⟲</button>
+    </div>
 
     <button class="tl-ws-btn" id="tlAutoPipe" type="button" onclick="tlAutoGenerate()" title="按当前参数生成 / 重新生成三级管线平面图（生成后右侧「管段管径与损失」表逐段列出管长与管径）">🔄 生成管线图</button>
     <span class="tl-ws-hint" id="tlWsHint">点「插入主管/支管」后在图上点击逐点画线，双击结束</span>
@@ -6654,7 +6664,7 @@ function doIrrImport(text){
 })();
 </script>
 
-<section id="threeDModelingSection" class="ry-sec ry-modeling-section" aria-label="水力计算器">
+<section id="threeDModelingSection" class="ry-sec ry-modeling-section" aria-label="管径优化" style="max-width:none!important;padding-left:20px;padding-right:20px">
   <!-- 2026-09-17 第六十二轮（用户指令）：「水力计算器」接入真实功能，原「三维建模」占位页取消 ——
        本区块改为**树状管网水头损失计算器**：总管（水源 → 分水三通）→ 若干路主管（每根主管沿线若干三通）
        → 每个三通接一根支管；任选「主管 i × 该主管第 j 根支管」的路径独立成算，
@@ -6680,13 +6690,129 @@ function doIrrImport(text){
        计算核心 hc-core.js / pipe-path-loss.js 照常加载（后者是三级扬程校核依赖，不可停），
        RyHydraulicCalc API、localStorage 存档 runye_hydraulic_calc_cfg_v1 全保留。
        将来想好了怎么做，把 window.RY_HC_RESERVED 改为 false（或删掉下面占位 div）即可原样恢复。 -->
-  <div style="min-height:420px;display:flex;align-items:center;justify-content:center">
-    <div style="text-align:center">
-      <div style="font-size:15px;font-weight:700;color:#334155">水力计算器 · 入口预留</div>
-      <div style="font-size:12.5px;margin-top:8px;color:#64748b">具体内容规划中——方案确定后在此上线。</div>
+  <div style="display:flex;gap:16px;min-height:calc(100vh - 43px);padding:0 0 0 0">
+    <!-- 左侧工具栏 -->
+    <div style="width:200px;flex-shrink:0;background:#fff;border:1px solid #e2e8f0;border-radius:0;padding:14px;box-shadow:none;align-self:stretch;border-top:0;border-bottom:0">
+      <div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:10px">管径综合优化</div>
+      <div style="font-size:11.5px;color:#64748b;line-height:1.5;margin-bottom:12px">前期管材投入 vs 后期电费，找年均总成本最低的平衡点。</div>
+      <div style="font-size:12px;font-weight:600;color:#334155;margin-bottom:6px">计算假设</div>
+      <label style="display:block;font-size:11.5px;color:#475569;margin-bottom:8px">电价<br><input id="optPrice" type="number" step="0.05" style="width:90px;margin-top:3px"> 元/度</label>
+      <label style="display:block;font-size:11.5px;color:#475569;margin-bottom:8px">年运行小时<br><input id="optHours" type="number" step="100" style="width:90px;margin-top:3px"> h</label>
+      <label style="display:block;font-size:11.5px;color:#475569;margin-bottom:12px">折旧年限<br><input id="optYears" type="number" step="1" style="width:90px;margin-top:3px"> 年</label>
+      <button id="btnPipeOpt" type="button" class="pp-btn-generate" style="width:100%;padding:8px;font-size:12px">🔄 综合分析</button>
+      <div id="optSvgInfo" style="font-size:11px;color:#475569;margin-top:14px;line-height:1.6"></div>
+    </div>
+    <!-- 右侧内容 -->
+    <div style="flex:1;min-width:0">
+      <div id="pipeOptResult"><div style="color:#94a3b8;font-size:12.5px">点左侧「🔄 综合分析」按钮开始。前提：已生成三级管线图。</div></div>
     </div>
   </div>
 </section>
+<script>
+(function(){
+  var price=0.65, hours=2000, years=15, curRows=null;
+  function fmtWan(v){ return (v/10000).toFixed(1)+'万'; }
+  function fmtK(v){ return (v/1000).toFixed(0)+'k'; }
+  try{ var s=JSON.parse(localStorage.getItem('runye_tlEconAssum')||'{}'); if(s.price)price=s.price; if(s.hours)hours=s.hours; if(s.years)years=s.years; }catch(e){}
+  document.getElementById('optPrice').value=price;
+  document.getElementById('optHours').value=hours;
+  document.getElementById('optYears').value=years;
+
+  function drawSvg(c){
+    var d=window.tlDiagramData; if(!d) return '<div style="color:#dc2626">无图面数据</div>';
+    var xs=[], ys=[];
+    function pushPts(arr){ (arr||[]).forEach(function(seg){ if(Array.isArray(seg)) seg.forEach(function(p){ if(p&&p.x!=null){xs.push(p.x);ys.push(p.y);} }); else if(seg&&seg.x!=null){xs.push(seg.x);ys.push(seg.y);} }); }
+    pushPts(d.mainPipes); pushPts(d.branchPipes); pushPts(d.dripTapes); pushPts([d.frontPipe]); pushPts(d.poly);
+    if(d.sourcePos){xs.push(d.sourcePos.x);ys.push(d.sourcePos.y);}
+    if(!xs.length) return '<div style="color:#dc2626">图面无坐标</div>';
+    var minX=Math.min.apply(null,xs), maxX=Math.max.apply(null,xs);
+    var minY=Math.min.apply(null,ys), maxY=Math.max.apply(null,ys);
+    var pad=20, W=520, H=400;
+    var sc=Math.min((W-pad*2)/(maxX-minX||1),(H-pad*2)/(maxY-minY||1));
+    var ox=pad+(W-pad*2-(maxX-minX)*sc)/2, oy=pad+(H-pad*2-(maxY-minY)*sc)/2;
+    function tx(x){return ox+(x-minX)*sc;}
+    function ty(y){return oy+(y-minY)*sc;}
+    function ptsToStr(seg){ return seg.map(function(p){return tx(p.x).toFixed(1)+','+ty(p.y).toFixed(1);}).join(' '); }
+    var s='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px">';
+    if(d.poly&&d.poly.length>=3){ s+='<polygon points="'+ptsToStr(d.poly)+'" fill="#ecfccb" fill-opacity="0.5" stroke="#84cc16" stroke-width="1.2"/>'; }
+    (d.dripTapes||[]).forEach(function(seg){ s+='<polyline points="'+ptsToStr(seg)+'" stroke="#67e8f9" stroke-width="0.8" fill="none" opacity="0.7"/>'; });
+    (d.branchPipes||[]).forEach(function(seg){ s+='<polyline points="'+ptsToStr(seg)+'" stroke="#16a34a" stroke-width="1.6" fill="none"/>'; });
+    (d.mainPipes||[]).forEach(function(seg){ s+='<polyline points="'+ptsToStr(seg)+'" stroke="#185FA5" stroke-width="3" fill="none"/>'; });
+    if(d.frontPipe){
+      s+='<polyline points="'+ptsToStr(d.frontPipe)+'" stroke="#f97316" stroke-width="4.5" fill="none"/>';
+      var fp=d.frontPipe, fmx=tx((fp[0].x+fp[1].x)/2), fmy=ty((fp[0].y+fp[1].y)/2);
+      s+='<text x="'+fmx+'" y="'+(fmy-8)+'" text-anchor="middle" font-size="11" font-weight="700" fill="#c2410c">总管 Ø'+c.f+'</text>';
+    }
+    if(d.sourcePos){ s+='<circle cx="'+tx(d.sourcePos.x)+'" cy="'+ty(d.sourcePos.y)+'" r="6" fill="#ef4444"/>'; s+='<text x="'+tx(d.sourcePos.x)+'" y="'+(ty(d.sourcePos.y)-10)+'" text-anchor="middle" font-size="10" fill="#991b1b">水源</text>'; }
+    if(d.mainPipes&&d.mainPipes.length){ var m=d.mainPipes[0]; s+='<text x="'+tx((m[0].x+m[1].x)/2)+'" y="'+(ty((m[0].y+m[1].y)/2)-10)+'" text-anchor="middle" font-size="11" font-weight="700" fill="#0C447C" stroke="#fff" stroke-width="3" paint-order="stroke">主管 Ø'+c.m+'</text>'; }
+    if(d.branchPipes&&d.branchPipes.length){ var b=d.branchPipes[0]; s+='<text x="'+tx((b[0].x+b[1].x)/2)+'" y="'+(ty((b[0].y+b[1].y)/2)+14)+'" text-anchor="middle" font-size="9" fill="#166534" stroke="#fff" stroke-width="3" paint-order="stroke">支管 Ø'+c.b+'</text>'; }
+    s+='</svg>';
+    return s;
+  }
+
+  function renderRow(i){
+    if(!curRows) return;
+    var r=curRows[i];
+    document.getElementById('optSvgBox').innerHTML=drawSvg(r.c);
+    document.getElementById('optSvgInfo').innerHTML='<b>当前选中</b><br>总管 Ø'+r.c.f+' · 主管 Ø'+r.c.m+' · 支管 Ø'+r.c.b+'<br>扬程 '+r.c.head.toFixed(1)+' m · 功率 '+r.c.kw.toFixed(1)+' kW<br>管材 '+Math.round(r.c.mat)+' 元 · 年电费 '+Math.round(r.elec)+' 元<br>年均 <b>'+Math.round(r.annual)+' 元/年</b>';
+  }
+
+  document.getElementById('btnPipeOpt').addEventListener('click', function(){
+    var box=document.getElementById('pipeOptResult');
+    try{
+      price=parseFloat(document.getElementById('optPrice').value)||0.65;
+      hours=parseFloat(document.getElementById('optHours').value)||2000;
+      years=parseFloat(document.getElementById('optYears').value)||15;
+      var D=window.tlEconPanel.build();
+      if(!D){ box.innerHTML='<div style="color:#dc2626">未找到图面数据。请先在三级管路编辑页「生成管线图」。</div>'; return; }
+      var rows=D.combos.map(function(c){ var elec=c.kw*hours*price; return {c:c, elec:elec, annual:c.mat/years+elec}; });
+      rows.sort(function(a,b){return a.annual-b.annual;});
+      curRows=rows;
+      var minRow=rows[0];
+      var desRow=rows.filter(function(r){return r.c.f===D.dF&&r.c.m===D.dM&&r.c.b===D.dB;})[0];
+      var html='';
+      html+='<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:10px;margin-bottom:12px">';
+      html+='<div style="font-weight:700;color:#15803d;font-size:13px">★ 推荐最优组合</div>';
+      html+='<div style="margin-top:4px">总管 Ø'+minRow.c.f+' · 主管 Ø'+minRow.c.m+' · 支管 Ø'+minRow.c.b+'</div>';
+      html+='<div style="font-size:11.5px;color:#475569;margin-top:2px">扬程 '+minRow.c.head.toFixed(1)+' m · 功率 '+minRow.c.kw.toFixed(1)+' kW · 管材 '+Math.round(minRow.c.mat)+' 元 · 年电费 '+Math.round(minRow.elec)+' 元 · <b>年均总 '+Math.round(minRow.annual)+' 元/年</b></div>';
+      if(desRow){ var save=desRow.annual-minRow.annual; html+='<div style="font-size:11.5px;color:#475569;margin-top:2px">对比当前设计(Ø'+D.dF+'/'+D.dM+'/'+D.dB+')：年均省 '+Math.round(save)+' 元/年('+(save/desRow.annual*100).toFixed(1)+'%)</div>'; }
+      html+='</div>';
+      html+='<div style="display:flex;gap:16px;align-items:flex-start">';
+      html+='<div style="flex:1;min-width:0;max-height:72vh;overflow-y:auto">';
+      html+='<table style="width:100%;border-collapse:collapse;font-size:12px">';
+      html+='<thead><tr style="background:#f1f5f9;position:sticky;top:0"><th style="padding:5px 6px;text-align:left">组合 总/主/支</th><th>管材</th><th>扬程 m</th><th>功率 kW</th><th>年电费</th><th>年均/年</th></tr></thead><tbody>';
+      rows.forEach(function(r,i){
+        var isMin=i===0, isDes=desRow&&r.c.f===D.dF&&r.c.m===D.dM&&r.c.b===D.dB;
+        var bg=isMin?'background:#dcfce7':(isDes?'background:#fef3c7':'');
+        html+='<tr data-row="'+i+'" style="border-bottom:1px solid #e2e8f0;'+bg+';cursor:pointer">';
+        html+='<td style="padding:4px 6px">'+(isMin?'★ ':'')+'Ø'+r.c.f+'/Ø'+r.c.m+'/Ø'+r.c.b+(isDes?' <span style="color:#92400e">(当前)':'')+'</td>';
+        html+='<td style="text-align:center">'+fmtWan(r.c.mat)+'</td>';
+        html+='<td style="text-align:center">'+r.c.head.toFixed(1)+'</td>';
+        html+='<td style="text-align:center">'+r.c.kw.toFixed(1)+'</td>';
+        html+='<td style="text-align:center">'+fmtK(r.elec)+'</td>';
+        html+='<td style="text-align:center;font-weight:700">'+fmtK(r.annual)+'</td>';
+        html+='</tr>';
+      });
+      html+='</tbody></table>';
+      html+='</div>';
+      html+='<div style="flex:1.1;min-width:380px;position:sticky;top:0">';
+      html+='<div style="font-size:12px;font-weight:600;color:#334155;margin-bottom:6px">管平面布置（点左侧表格行切换管径）</div>';
+      html+='<div id="optSvgBox" style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">'+drawSvg(minRow.c)+'</div>';
+      html+='</div>';
+      html+='</div>';
+      box.innerHTML=html;
+      box.querySelectorAll('tr[data-row]').forEach(function(tr){
+        tr.addEventListener('click', function(){
+          box.querySelectorAll('tr').forEach(function(t){t.style.outline='';});
+          tr.style.outline='2px solid #2563eb';
+          renderRow(parseInt(tr.getAttribute('data-row')));
+        });
+      });
+      renderRow(0);
+    }catch(e){ box.innerHTML='<div style="color:#dc2626">分析失败:'+e.message+'</div>'; }
+  });
+})();
+</script>
 <section id="parametricModelingSection" class="ry-sec ry-modeling-section" aria-label="数字化建模 · 参数化建模" data-modeling-state="idle">
   <!-- 2026-09-19（用户指令）：数字化建模只预留导航入口，具体内容暂不展示——
        原 iframe（modeling/parametric/embedded.html，由 modeling/integration.js 懒加载适配）暂停接入；
@@ -9105,6 +9231,7 @@ function tlUpdatePlanBar() {
      v119 的「主=实际 / 橙=设计」与列头错位，用户读作「改径重算列没更新」；改径后的值
      在橙列与下方黑条（水泵扬程 36.5 m）直接可见。 */
   if(el=document.getElementById('tlPlanPumpHead')) el.textContent=fmt(rDes.pumpHead,1)+' m';
+
   if(el=document.getElementById('tlPlanPumpPower')) el.textContent=fmt(rDes.motorKW_rounded,1)+' kW';
   if(el=document.getElementById('tlPlanFrontPipe')) el.textContent='Ø '+rDes.frontPipe.od+' mm';
   if(el=document.getElementById('tlPlanFrontVelocity')) el.textContent=fmt(rDes.frontPipe.v,2)+' m/s';
@@ -9518,6 +9645,27 @@ function tlAutoGenerate(options) {
   window._tlDimHits=[];
   function tlDimOffOf(id){return window._tlDimState.offs[id]||0;}
 
+  /* 任务M（2026-09-26 用户：「标注线的文字跟箭头尺寸有点大…做一个控制按钮，可以适当的调整他们比例」）：
+     标注比例系数（0.6~1.8，步进 0.1，localStorage 'tl-dim-scale' 持久）——
+     作用点：尺寸线文字字号 + 建筑斜短线(tick)半长/线宽；下载/打印/系统简图克隆同源渲染自然生效。 */
+  function tlDimScaleOf(){
+    try{ var v=parseFloat(localStorage.getItem('tl-dim-scale')); return (v>=0.6&&v<=1.8)?v:1; }catch(e){ return 1; }
+  }
+  var tlDS=tlDimScaleOf();
+  (function(){ var dsv=document.getElementById('tlDimScaleVal'); if(dsv)dsv.textContent=Math.round(tlDS*100)+'%'; })();
+  window.tlDimScaleStep=function(dir){
+    var n=Math.round((tlDimScaleOf()+dir*0.1)*10)/10;
+    n=Math.max(0.6,Math.min(1.8,n));
+    try{localStorage.setItem('tl-dim-scale',String(n));}catch(e){}
+    var el=document.getElementById('tlDimScaleVal'); if(el)el.textContent=Math.round(n*100)+'%';
+    try{tlAutoGenerate({scroll:false});}catch(e){}   /* 任务M：重渲染宿主是 tlAutoGenerate（整段简图 SVG 渲染在其函数体内），tlUpdatePlanBar 只是状态栏小函数 */
+  };
+  window.tlDimScaleReset=function(){
+    try{localStorage.removeItem('tl-dim-scale');}catch(e){}
+    var el=document.getElementById('tlDimScaleVal'); if(el)el.textContent='100%';
+    try{tlAutoGenerate({scroll:false});}catch(e){}
+  };
+
   // 地块尺寸标注（建筑制图风格）：图下水平尺寸线 + 图左垂直尺寸线；尺寸值取二级页传导(有桥)或实测，与二级页施工简图一致
   (function(){
     var plotLeft=ts(b.minX,b.minY).x;
@@ -9536,16 +9684,17 @@ function tlAutoGenerate(options) {
     function tlTextBox(x,y,text,anchor,rotate){
       if(rotate){
         parts.push('<g transform="translate('+x.toFixed(1)+' '+y.toFixed(1)+') rotate(-90)">');
-        parts.push('<text x="0" y="4" text-anchor="middle" font-size="12" font-weight="700" fill="#111111" stroke="none">'+text+'</text></g>');
+        parts.push('<text x="0" y="'+(4*tlDS).toFixed(2)+'" text-anchor="middle" font-size="'+(12*tlDS).toFixed(2)+'" font-weight="700" fill="#111111" stroke="none">'+text+'</text></g>');
         return;
       }
-      parts.push('<text x="'+x.toFixed(1)+'" y="'+(y+2).toFixed(1)+'" text-anchor="'+anchor+'" font-size="12" font-weight="700" fill="#111111" stroke="none">'+text+'</text>');
+      parts.push('<text x="'+x.toFixed(1)+'" y="'+(y+2*tlDS).toFixed(1)+'" text-anchor="'+anchor+'" font-size="'+(12*tlDS).toFixed(2)+'" font-weight="700" fill="#111111" stroke="none">'+text+'</text>');
     }
     function tlArchTick(x,y,dir){
-      /* v113（2026-09-22 用户要求）：建筑斜短线加粗、缩短 —— k 5.5→4（长 11px→8px）、线宽 1.8→2.8 */
-      var k=4;
-      if(dir==='h')parts.push('<line x1="'+(x-k).toFixed(1)+'" y1="'+(y+k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y-k).toFixed(1)+'" stroke-width="2.8"/>');
-      else parts.push('<line x1="'+(x-k).toFixed(1)+'" y1="'+(y-k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y+k).toFixed(1)+'" stroke-width="2.8"/>');
+      /* v113（2026-09-22 用户要求）：建筑斜短线加粗、缩短 —— k 5.5→4（长 11px→8px）、线宽 1.8→2.8；
+         任务M：k 与线宽再乘标注比例 tlDS（比例控件可调） */
+      var k=4*tlDS;
+      if(dir==='h')parts.push('<line x1="'+(x-k).toFixed(1)+'" y1="'+(y+k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y-k).toFixed(1)+'" stroke-width="'+(2.8*tlDS).toFixed(2)+'"/>');
+      else parts.push('<line x1="'+(x-k).toFixed(1)+'" y1="'+(y-k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y+k).toFixed(1)+'" stroke-width="'+(2.8*tlDS).toFixed(2)+'"/>');
     }
     /* 底部水平尺寸线（gplot-h）：界线锚 = 地块左下/右下角（固定），界线活动端随 off 伸长 */
     window._tlDimHits.push({id:'gplot-h',axis:'y',x1:plotLeft,y1:dimBottomY,x2:plotRight,y2:dimBottomY,
@@ -9599,9 +9748,10 @@ function tlAutoGenerate(options) {
     }
     var gdParts=[], gdExt=[], gdTexts=[];
     var gdBands={};   /* v115：横向「按块逐段」标注 —— 同一条带线（包络底行+1）的组先归并，见下方绘制循环 */
-    /* v113（2026-09-22 用户要求）：联合分区小尺寸斜短线同步加粗缩短 —— k 5.5→4、线宽 1.8→2.8（与 tlArchTick/ppArchTick 一致） */
-    function gdTickH(x,y){ var k=4; return '<line x1="'+(x-k).toFixed(1)+'" y1="'+(y+k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y-k).toFixed(1)+'" stroke-width="2.8"/>'; }
-    function gdTickV(x,y){ var k=4; return '<line x1="'+(x-k).toFixed(1)+'" y1="'+(y-k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y+k).toFixed(1)+'" stroke-width="2.8"/>'; }
+    /* v113（2026-09-22 用户要求）：联合分区小尺寸斜短线同步加粗缩短 —— k 5.5→4、线宽 1.8→2.8（与 tlArchTick/ppArchTick 一致）；
+       任务M：k 与线宽再乘标注比例 tlDS */
+    function gdTickH(x,y){ var k=4*tlDS; return '<line x1="'+(x-k).toFixed(1)+'" y1="'+(y+k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y-k).toFixed(1)+'" stroke-width="'+(2.8*tlDS).toFixed(2)+'"/>'; }
+    function gdTickV(x,y){ var k=4*tlDS; return '<line x1="'+(x-k).toFixed(1)+'" y1="'+(y-k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y+k).toFixed(1)+'" stroke-width="'+(2.8*tlDS).toFixed(2)+'"/>'; }
     Object.keys(gdBox).forEach(function(gdK){
       var gdB=gdBox[gdK];
       /* v115fix：gdG 此前在 forEach 里未定义（泄漏自上一循环=最后一个单元格的组号），
@@ -9642,7 +9792,7 @@ function tlAutoGenerate(options) {
           +'<line x1="'+gdVx.toFixed(1)+'" y1="'+gdTR.y.toFixed(1)+'" x2="'+gdVx.toFixed(1)+'" y2="'+gdBR.y.toFixed(1)+'"/>'
           +gdTickV(gdVx,gdTR.y)+gdTickV(gdVx,gdBR.y)
           /* 值 = 端点实际跨距（2026-09-24：原 ΣyPlan 设计值在手动调节后失真；无调节时两者逐位一致） */
-          +'<g transform="translate('+(gdVx+13).toFixed(1)+' '+((gdTR.y+gdBR.y)/2).toFixed(1)+') rotate(-90)"><text x="0" y="4" text-anchor="middle" font-size="12" font-weight="700" fill="#111111" stroke="none">'+gdVal(gdY1v-gdY0v)+'</text></g></g>');
+          +'<g transform="translate('+(gdVx+13).toFixed(1)+' '+((gdTR.y+gdBR.y)/2).toFixed(1)+') rotate(-90)"><text x="0" y="'+(4*tlDS).toFixed(2)+'" text-anchor="middle" font-size="'+(12*tlDS).toFixed(2)+'" font-weight="700" fill="#111111" stroke="none">'+gdVal(gdY1v-gdY0v)+'</text></g></g>');
         window._tlDimHits.push({id:gdIdV,axis:'x',x1:gdVx,y1:gdTR.y,x2:gdVx,y2:gdBR.y,minOff:-8});
       }
     });
@@ -9663,7 +9813,7 @@ function tlAutoGenerate(options) {
         gdParts.push('<g data-dim="'+gdIdH+'" data-axis="y">'
           +'<line x1="'+gdPA.x.toFixed(1)+'" y1="'+gdHy.toFixed(1)+'" x2="'+gdPB.x.toFixed(1)+'" y2="'+gdHy.toFixed(1)+'"/>'
           +gdTickH(gdPA.x,gdHy)+gdTickH(gdPB.x,gdHy)
-          +'<text x="'+((gdPA.x+gdPB.x)/2).toFixed(1)+'" y="'+(gdHy-4).toFixed(1)+'" text-anchor="middle" font-size="12" font-weight="700" fill="#111111" stroke="none">'
+          +'<text x="'+((gdPA.x+gdPB.x)/2).toFixed(1)+'" y="'+(gdHy-4*tlDS).toFixed(1)+'" text-anchor="middle" font-size="'+(12*tlDS).toFixed(2)+'" font-weight="700" fill="#111111" stroke="none">'
           +gdVal(zX(gdRc.maxR,gdc2+1)-zX(gdRc.maxR,gdc2))+'</text></g>');  /* 2026-09-24：值=该段端点实际跨距（原 xPlan[c] 设计宽，阶梯拖动后失真） */
         window._tlDimHits.push({id:gdIdH,axis:'y',x1:gdPA.x,y1:gdHy,x2:gdPB.x,y2:gdHy,minOff:-8});
       }
@@ -10003,6 +10153,75 @@ function tlAutoGenerate(options) {
   var svgStr=parts.join('');
   tlDiagramSVG=svgStr;
   document.getElementById('tlDiagramContent').innerHTML=svgStr;
+  /* [map-enhance] 管网反投卫星图（2026-09-26）：把 tlDiagramData 米坐标管线按当前 geo 基准
+     反投成经纬度，写入 localStorage['runye_network_layout']，地图页 runye-map-enhance.js 读取后
+     在卫星图叠加真实主管/支管/水源点。无 geo 基准（手动画矩形、未经地图回传）时静默跳过。
+     整段删除即卸载，不影响主流程。 */
+  try { (function(){
+    var dd = window.tlDiagramData; if(!dd || dd.world!=='meter') return;
+    var base = window.__runyeGeoBase || null;
+    if(!base || !isFinite(base.refLat) || !isFinite(base.refLng)){
+      try{ var lib=JSON.parse(localStorage.getItem('runye_plot_library')||'[]');
+        for(var i=lib.length-1;i>=0;i--){ if(lib[i].geo && isFinite(lib[i].geo.refLat)){ base=lib[i].geo; break; } } }catch(e){}
+    }
+    if(!base || !isFinite(base.refLat)) return;
+    var R=6378137, mlat=R*Math.PI/180, cosLat=Math.cos(base.refLat*Math.PI/180);
+    function p2ll(pt){ if(!pt||!isFinite(pt.x)) return null; return [ +(base.refLat+pt.y/mlat).toFixed(6), +(base.refLng+pt.x/(mlat*cosLat)).toFixed(6) ]; }
+    function ln2ll(line){ if(!line||line.length<2) return null; var out=[]; for(var k=0;k<line.length;k++){ var ll=p2ll(line[k]); if(ll) out.push(ll); } return out.length>=2?out:null; }
+    function dnOf(txt){ var m=/(\d+)/.exec(String(txt||'')); return m?+m[1]:0; }
+    var meta=dd.meta||{}, mpipes=(meta.pipes)||{};
+    var segDn={ front:dnOf(mpipes.front), main:dnOf(mpipes.main)||90, branch:dnOf(mpipes.branch)||63 };
+    var segments=[];
+    function pushSegs(arr,dn,prefix){ if(!arr) return; for(var i=0;i<arr.length;i++){ var ll=ln2ll(arr[i]); if(ll) segments.push({id:prefix+i, name:prefix+(i+1), dn:dn, latLng:ll}); } }
+    if(dd.frontPipe) pushSegs([dd.frontPipe], segDn.front||segDn.main, 'front');
+    pushSegs(dd.mainPipes, segDn.main, 'main');
+    pushSegs(dd.branchPipes, segDn.branch, 'branch');
+    var src = dd.sourcePos ? p2ll(dd.sourcePos) : null;
+    if(!segments.length && !src) return;
+    localStorage.setItem('runye_network_layout', JSON.stringify({ sourcePos: src?{lat:src[0],lng:src[1]}:null, segments: segments, ts: Date.now() }));
+    /* [map-enhance] 阀门 + 滴灌带反投（2026-09-26 任务1，用户契约）：地图侧 enhancement 按
+       runye_network_layout.valves（红圈）/ .dripTapes（青色虚线）渲染 —— 读出来补字段再写回，
+       不重写整个 key（地图侧可能同帧写过其他字段）。 */
+    try{
+      var valvesLL=[];
+      if(dd.valves && dd.valves.length){
+        dd.valves.forEach(function(v){ var ll=p2ll(v); if(ll) valvesLL.push({lat:ll[0], lng:ll[1]}); });
+      }
+      var dripLL=[];
+      if(dd.dripTapes && dd.dripTapes.length){
+        dd.dripTapes.forEach(function(line){
+          if(!line||line.length<2) return;
+          var pts=[];
+          line.forEach(function(pt){ var ll=p2ll(pt); if(ll) pts.push(ll); });
+          if(pts.length>=2) dripLL.push(pts);
+        });
+      }
+      var net = JSON.parse(localStorage.getItem('runye_network_layout')||'{}');
+      net.valves = valvesLL;
+      net.dripTapes = dripLL;
+      localStorage.setItem('runye_network_layout', JSON.stringify(net));
+    }catch(eVT){}
+    /* [map-enhance] 同步地块多边形到地块库（带 polyLatLng）：切到在线地图页自动叠加地块轮廓，
+       与管网一起显示。固定 id=auto-current 幂等更新，不污染用户手动保存的其他地块。 */
+    try{
+      if(dd.poly && dd.poly.length>=3){
+        var pll = []; for(var pi=0; pi<dd.poly.length; pi++){ var llpt=p2ll(dd.poly[pi]); if(llpt) pll.push(llpt); }
+        if(pll.length>=3){
+          var area=0; for(var ai=0; ai<pll.length; ai++){ var a=pll[ai], b=pll[(ai+1)%pll.length];
+            area += ((a[1]-b[1])*Math.PI/180)*(2 + Math.sin(a[0]*Math.PI/180)+Math.sin(b[0]*Math.PI/180)); }
+          area = Math.abs(area*6378137*6378137/2);
+          var sl=0, sn=0; pll.forEach(function(q){ sl+=q[0]; sn+=q[1]; });
+          var entry={ id:'auto-current', name:'当前设计地块', mu:Math.round(area/666.67*100)/100, sqm:Math.round(area),
+            polyLatLng:pll, center:{lat:+(sl/pll.length).toFixed(6), lng:+(sn/pll.length).toFixed(6)},
+            geo:{refLat:base.refLat, refLng:base.refLng, proj:'mercatorLocal'}, source:'auto', ts:Date.now() };
+          var lib2=[]; try{ lib2=JSON.parse(localStorage.getItem('runye_plot_library')||'[]'); }catch(eL){ lib2=[]; }
+          var hit=false; for(var bi=0; bi<lib2.length; bi++){ if(lib2[bi].id==='auto-current'){ lib2[bi]=entry; hit=true; break; } }
+          if(!hit) lib2.push(entry);
+          localStorage.setItem('runye_plot_library', JSON.stringify(lib2));
+        }
+      }
+    }catch(ePlot){}
+  })(); } catch(eNet){ try{ console.warn('[map-enhance] network projection skipped:', eNet && eNet.message); }catch(_){} }
   /* 系统简图图框同步（2026-09-19）：克隆同一 SVG，id 加 sc_ 前缀（url(# / href="# 引用同步替换），防 DOM id 重复 */
   try {
     var sysPipeBox = document.getElementById('tlSysPipeBox');
@@ -14646,6 +14865,10 @@ ppPullLiftDh();                                              // 首屏对齐一�
     if(!p) return;
     window.measuredArea=p.sqm||0;
     window.measuredPolygon=Array.isArray(p.poly)?p.poly:[];
+    /* [map-enhance] 任务2（2026-09-26）：「设为当前」同步 geo 反投基准 —— 地图页存的地块带
+       geo（refLat/refLng），带基准的地块在主程序生成管网后也能反投卫星图；手画地块无 geo →
+       置 null，反投按既有逻辑静默跳过。 */
+    window.__runyeGeoBase = (p.geo && isFinite(p.geo.refLat)) ? p.geo : null;
     window.currentPlotId=id;
     try{ if(typeof updatePlan==='function') updatePlan(); }catch(e){}
     try{ if(typeof window.ppLoadPolygon==='function') window.ppLoadPolygon(); }catch(e){}
@@ -15356,6 +15579,7 @@ bindUI();
           ys.push((p[0] - clat) * mlat);
         });
         window.measuredPolygon = xs.map(function(x,i){return {x:x, y:ys[i]};});
+        window.__runyeGeoBase = { refLat: clat, refLng: lngs[0] };  // [map-enhance] network projection datum (x=first lng, y=mean lat, matches runye-geo m2ll)
       } else {
         window.measuredPolygon = [];
       }
@@ -16468,10 +16692,13 @@ function tlIsoStatsReset() {
     } else {
       syncSpinRow(null);
       var edited = a.baseLen && Math.abs(a.baseLen - a.len) > 0.05;
+      var calTxt = (window.tlPipeCalText && window.tlPipeCalText(a.id)) || '';
       if (info) info.innerHTML = '已选 <b>' + a.kindLabel + '</b>（' + a.id + '）<br>长度 ' + f1(a.len) + 'm'
         + (edited ? '（设计值 ' + f1(a.baseLen) + 'm）' : '')
         + '<br>点击位置：距起点 ' + f1(a.pickAt || 0) + 'm'
-        + (window.tlPipeCalText && window.tlPipeCalText(a.id) ? '<br>' + window.tlPipeCalText(a.id) + ' · 右键管身可改管径' : '<br>右键管身可改管径' + (window.tlPipeHfText && window.tlPipeHfText(a.id) ? '<br>' + window.tlPipeHfText(a.id) : ''));
+        + (calTxt ? '<br><b style="color:#15803d;font-size:13px">' + calTxt + '</b>' : '<br>右键管身可改管径')
+        + (window.tlPipeHfText && window.tlPipeHfText(a.id) ? '<br>' + window.tlPipeHfText(a.id) : '')
+        + '<br><span style="color:#b45309;font-size:11px">⊞ 插三通 / 🔩 插阀门将自动继承本管管径，接管口径默认"随管"</span>';
       if (lenBtn) lenBtn.style.display = '';
       if (teeBtn) teeBtn.style.display = '';
       if (valveBtn) valveBtn.style.display = '';
@@ -16795,6 +17022,17 @@ function tlIsoStatsReset() {
       }
       hideCtx(); return;
     }
+    /* 接管随转（2026-09-26 任务L）：data-ehrot = 相对转角（±15°），绕接管固定端整链刚体旋转 */
+    if (b.getAttribute('data-ehrot') !== null) {
+      var ehq = parseFloat(b.getAttribute('data-ehrot'));
+      if (ISO.rotateElbowWithHost && ISO.rotateElbowWithHost(id, ehq)) {
+        if (typeof tlIsoStatsRender === 'function') tlIsoStatsRender();
+        setHint('接管已随弯头同转 ' + ehq + '°（绕接管固定端整链刚体旋转，Ctrl+Z 可撤销）');
+      } else {
+        setHint('接管随转失败：未找到可旋转的接管');
+      }
+      hideCtx(); return;
+    }
     if (b.getAttribute('data-t')) {
       if (ISO.convertTee(id, b.getAttribute('data-t'))) {
         if (typeof tlIsoStatsRender === 'function') tlIsoStatsRender();
@@ -16806,7 +17044,7 @@ function tlIsoStatsReset() {
     hideCtx();
   }
   function onCtxHover(e) {
-    var sel = 'button[data-t],button[data-rot],button[data-reset],button[data-spawn],button[data-ext],button[data-del],button[data-rotq],button[data-tspec],button[data-itfits],button[data-erot],button[data-ereset],button[data-edel]';
+    var sel = 'button[data-t],button[data-rot],button[data-reset],button[data-spawn],button[data-ext],button[data-del],button[data-rotq],button[data-tspec],button[data-itfits],button[data-erot],button[data-ereset],button[data-edel],button[data-ehrot]';
     var b = e.target.closest ? e.target.closest(sel) : null;
     Array.prototype.forEach.call(ctx.querySelectorAll(sel), function (x) { x.style.background = x === b ? '#f0fdf4' : ''; });
   }
@@ -16877,6 +17115,11 @@ function tlIsoStatsReset() {
         + '<div style="display:flex;gap:2px;padding:0 4px">'
         + [0, 90, 180, 270].map(function (a) { return '<button type="button" data-erot="' + a + '" style="' + ctxBtnCss + ';width:auto;flex:1;text-align:center">' + a + '°</button>'; }).join('')
         + '</div>'
+        /* 接管随转（2026-09-26 任务L）：端部插弯头调角只转符号、接管不动；想带接管一起转用这两键（绕接管固定端整链刚体旋转） */
+        + '<div style="padding:3px 10px 1px;font-weight:700;color:#0369a1">带动接管同转</div>'
+        + '<div style="padding:0 10px 2px;color:#64748b">接管没跟着转时用这两键：绕接管固定端整链刚体旋转</div>'
+        + '<button type="button" data-ehrot="-15" style="' + ctxBtnCss + '">接管随转 -15°</button>'
+        + '<button type="button" data-ehrot="15" style="' + ctxBtnCss + '">接管随转 +15°</button>'
         + '<button type="button" data-edel="1" style="' + ctxBtnCss + ';color:#b91c1c">删除弯头（并回上游管）</button>';
       ctx.style.display = 'block';
       ctx.style.left = Math.max(4, Math.min(x, window.innerWidth - 200)) + 'px';
@@ -18743,5 +18986,7 @@ function tlIsoStatsReset() {
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bind); else bind();
 })();
 </script>
+
+
 </body>
 </html>

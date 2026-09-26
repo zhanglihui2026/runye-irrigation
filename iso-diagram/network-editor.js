@@ -34,7 +34,7 @@
      待用户重定方案后再恢复 —— 恢复时把 EDITOR_OFF 改回 false 即可。
      模型引擎（network-model.js）与全部单测不受影响；
      exportClean 无层可摘 → 直通；exportForProject 恒 null（主方案保存不受影响）。 */
-  var EDITOR_OFF = true;
+  var EDITOR_OFF = false;
 
   var KEY_PREFIX = 'runye_construction_net_v1';
   function storeKey() { return KEY_PREFIX + ':' + (window.currentPlotId || 'current'); }
@@ -214,9 +214,13 @@
       var inPath = !!(st.path && st.path.map[s.id]);
       if (calChanged) {
         g.appendChild(mk('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, stroke: '#d97706', 'stroke-width': 4, 'stroke-linecap': 'round', opacity: 0.88, 'data-cn-seg': s.id }));
+      }
+      /* 所有管段都标管径（2026-09-26）：改径段琥珀底+白字，普通段灰字小字 */
+      if (s.caliber != null) {
         var mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
         var ddx = b.x - a.x, ddy = b.y - a.y, LL = Math.hypot(ddx, ddy) || 1;
-        var cal = mk('text', { x: mx - ddy / LL * 24, y: my + ddx / LL * 24, 'class': 'cn-cal', 'text-anchor': 'middle', 'pointer-events': 'none', 'data-cn-seg': s.id });
+        var cal = mk('text', { x: mx - ddy / LL * 22, y: my + ddx / LL * 22, 'class': 'cn-cal', 'text-anchor': 'middle', 'pointer-events': 'none', 'data-cn-seg': s.id,
+          fill: calChanged ? '#b45309' : '#64748b', 'font-size': calChanged ? 12 : 10, 'font-weight': calChanged ? 700 : 400 });
         cal.textContent = 'Ø' + s.caliber;
         g.appendChild(cal);
       }
@@ -264,6 +268,10 @@
         var q = { x: p.x + dir.x * 9, y: p.y + dir.y * 9 };
         g.appendChild(mk('circle', { cx: q.x, cy: q.y, r: 7, fill: 'rgba(0,0,0,0)', 'pointer-events': 'all', 'data-cn-port': f.id + '|' + fp.port, cursor: 'pointer' }));
         g.appendChild(mk('circle', { cx: q.x, cy: q.y, r: 3.4, fill: '#fff', stroke: '#d97706', 'stroke-width': 2, 'pointer-events': 'none' }));
+        if (st.flashId === f.id) {
+          g.appendChild(mk('circle', { cx: q.x, cy: q.y, r: 11, fill: 'none', stroke: '#d97706', 'stroke-width': 2, opacity: 0.6, 'pointer-events': 'none' }));
+          g.appendChild(mk('circle', { cx: q.x, cy: q.y, r: 16, fill: 'none', stroke: '#d97706', 'stroke-width': 1.2, opacity: 0.25, 'pointer-events': 'none' }));
+        }
       });
       /* 自由管端（口被自身管段占用）：非延伸/修剪/插入模式下画续接口白圈 */
       if ((!st.mode || st.mode === 'start') && f.type === 'endpoint' && !st.net.fixed[f.id] &&
@@ -472,6 +480,35 @@
    *       提交走引擎 planConnect + applyConnect（两段式，事务内 = 一步撤销）。 */
   var CAT_ID = { pipe: 'GEN-PIPE-110', tee: 'GEN-TEE-110-110-110', elbow: 'GEN-ELBOW-110-90', valve: 'GEN-VALVE-110' };
   var CAT_NAME = { pipe: '管道', tee: '三通', elbow: '弯头', valve: '阀门' };
+  /* [enrich] 接管时自动随上游管径：查上游 caliber + 按 caliber 选产品型号（2026-09-26） */
+  function upstreamCaliber(fid, pid) {
+    if (!st.net || !st.net.segments) return null;
+    var found = null;
+    Object.keys(st.net.segments).forEach(function (sid) {
+      var s = st.net.segments[sid];
+      if (!s || s.caliber == null) return;
+      var str = JSON.stringify(s);
+      if (str.indexOf(fid) >= 0) { if (found == null) found = s.caliber; }
+    });
+    return found;
+  }
+  function pickCatalogId(type, caliber) {
+    var d = caliber || 110;
+    var map = {
+      pipe: 'GEN-PIPE-' + d,
+      tee: 'GEN-TEE-' + d + '-' + d + '-' + d,
+      elbow: 'GEN-ELBOW-' + d + '-90',
+      valve: 'GEN-VALVE-' + d
+    };
+    try { if (window.RyCatalog && window.RyCatalog.get(map[type])) return map[type]; } catch (e) {}
+    return CAT_ID[type];
+  }
+  /* 接三通分支口默认小一级：225→160→110→90（灌溉常用主管变支管） */
+  function downCaliber(d) {
+    var SEQ = [90, 110, 140, 160, 200, 225];
+    for (var i = SEQ.length - 1; i > 0; i--) { if (SEQ[i] <= d) return SEQ[i - 1]; }
+    return 90;
+  }
   /* 与 index.html 主计算保持一致的水力常数与 PE 外径序列（C_HAZEN=150 / SDR=13.6 / PE_OD_SERIES）；
      220 为用户点名的非标规格，一并放进菜单（setCaliber 接受任意合理值） */
   var CAL_C = 150, CAL_SDR = 13.6;
@@ -524,12 +561,14 @@
     if (!st.net || st.viewOnly) return;
     var fid = hit.fitting, pid = hit.port;
     var edir = portEdir(fid, pid);
+    var uc = upstreamCaliber(fid, pid) || 110;
+    var pc = { pipe: pickCatalogId('pipe', uc), tee: pickCatalogId('tee', uc), elbow: pickCatalogId('elbow', uc), valve: pickCatalogId('valve', uc) };
     popupShow(e.clientX, e.clientY, function (el) {
-      popHead(el, '空口 ' + fid + '.' + pid + ' · 接什么');
-      popBtn(el, '接管道（继续铺管）', function () { stepPipe(fid, pid, e); });
-      popBtn(el, '接三通', function () { stepPerp('tee', fid, pid, edir, e); });
-      popBtn(el, '接弯头 90°', function () { stepPerp('elbow', fid, pid, edir, e); });
-      popBtn(el, '接阀门', function () { doConnect(fid, pid, 'valve', { modelId: CAT_ID.valve }); });
+      popHead(el, '空口 ' + fid + '.' + pid + ' · 接什么（随管 Ø' + uc + '）');
+      popBtn(el, '接管道（继续铺管 Ø' + uc + '）', function () { stepPipe(fid, pid, e, pc); });
+      popBtn(el, '接三通（主管Ø' + uc + ' × 分支Ø' + downCaliber(uc) + '）', function () { stepPerp('tee', fid, pid, edir, e, pc, uc); });
+      popBtn(el, '接弯头 90°（Ø' + uc + '）', function () { stepPerp('elbow', fid, pid, edir, e, pc); });
+      popBtn(el, '接阀门（Ø' + uc + '）', function () { doConnect(fid, pid, 'valve', { modelId: pc.valve }); });
       popBtn(el, '取消', popupHide, 'cn-ghost');
     });
   }
@@ -722,32 +761,46 @@
       try { inp.focus(); inp.select(); } catch (err) {}
     });
   }
-  function stepPipe(fid, pid, e) {
+  function stepPipe(fid, pid, e, pc) {
+    pc = pc || {};
     popupShow(e.clientX, e.clientY, function (el) {
-      popHead(el, '接管道 · ' + CAT_ID.pipe + ' · 填长度');
+      popHead(el, '接管道 · ' + (pc.pipe || CAT_ID.pipe) + ' · 填长度');
       var inp = document.createElement('input');
-      inp.type = 'number'; inp.step = '0.1'; inp.min = '0.05'; inp.value = '1';
+      inp.type = 'number'; inp.step = '0.1'; inp.min = '0.05';
+      var lastLen = '1';
+      try { lastLen = localStorage.getItem('runye_last_pipe_len') || '1'; } catch (e) {}
+      inp.value = lastLen;
       el.appendChild(inp);
       popBtn(el, '确定', function () {
         var v = parseFloat(inp.value);
         if (!isFinite(v) || v <= 0) { msg('长度必须是正数', 'warn'); return; }
-        doConnect(fid, pid, 'pipe', { modelId: CAT_ID.pipe, length: v });
+        try { localStorage.setItem('runye_last_pipe_len', String(v)); } catch (e) {}
+        doConnect(fid, pid, 'pipe', { modelId: pc.pipe || CAT_ID.pipe, length: v });
       }, 'cn-primary');
       popBtn(el, '取消', popupHide, 'cn-ghost');
       try { inp.focus(); inp.select(); } catch (err) {}
     });
   }
   /* 三通分支 / 弯头出口：垂直于来流轴（产品固定 90°），左右两侧可选 */
-  function stepPerp(choice, fid, pid, edir, e) {
+  function stepPerp(choice, fid, pid, edir, e, pc, uc) {
     if (!edir) return;
+    pc = pc || {};
+    var modelId;
+    if (choice === 'tee') {
+      var big = uc || 110, small = downCaliber(big);
+      var rid = 'GEN-TEE-' + big + '-' + big + '-' + small;
+      modelId = (window.RyCatalog && window.RyCatalog.get(rid)) ? rid : (pc.tee || CAT_ID.tee);
+    } else {
+      modelId = pc[choice] || CAT_ID[choice];
+    }
     var opts = [
       { label: (choice === 'tee' ? '分支' : '出口') + '向右侧', dir: { x: round2(-edir.y), y: round2(edir.x) } },
       { label: (choice === 'tee' ? '分支' : '出口') + '向左侧', dir: { x: round2(edir.y), y: round2(-edir.x) } }
     ];
     popupShow(e.clientX, e.clientY, function (el) {
-      popHead(el, (choice === 'tee' ? '接三通 · ' + CAT_ID.tee : '接弯头 · ' + CAT_ID.elbow) + ' · 朝哪边');
+      popHead(el, (choice === 'tee' ? '接三通 · ' : '接弯头 · ') + modelId + ' · 朝哪边');
       opts.forEach(function (o) {
-        popBtn(el, o.label, function () { doConnect(fid, pid, choice, { modelId: CAT_ID[choice], dir: o.dir }); });
+        popBtn(el, o.label, function () { doConnect(fid, pid, choice, { modelId: modelId, dir: o.dir }); });
       });
       popBtn(el, '取消', popupHide, 'cn-ghost');
     });
@@ -766,6 +819,8 @@
       drawLayer(); renderPanel(); return;
     }
     st.sel = { type: 'fitting', id: r.fittingId };
+    st.flashId = r.fittingId;
+    setTimeout(function () { st.flashId = null; drawLayer(); }, 2200);
     var tail = (choice === 'pipe') ? '，新管另一端的白圈可继续点着往下接' : '';
     msg('已接' + CAT_NAME[choice] + ' ' + r.fittingId + tail, 'ok');
     drawLayer(); renderPanel();
@@ -930,6 +985,38 @@
     if (st.net.undo()) { msg('已撤销一步', 'ok'); } else { msg('没有可撤销的操作', 'info'); }
     drawLayer(); renderPanel();
   }
+  /* [enrich] Ctrl+Z 撤销快捷键（2026-09-26） */
+  if (typeof document !== 'undefined') {
+    document.addEventListener('keydown', function (e) {
+      if (!st.active || busy()) return;
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z') && !e.shiftKey) {
+        var tag = (document.activeElement && document.activeElement.tagName) || '';
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+        e.preventDefault(); doUndo();
+      }
+    });
+  }
+  /* [enrich] 把施工管网主管长上报回主程序水力计算（2026-09-26，打破只读红线） */
+  function doReportToMain() {
+    if (!st.net) return;
+    var groups = {};
+    Object.keys(st.net.segments).forEach(function (sid) {
+      var s = st.net.segments[sid];
+      if (!s || s.caliber == null) return;
+      if (!groups[s.caliber]) groups[s.caliber] = 0;
+      groups[s.caliber] += s.length || 0;
+    });
+    var keys = Object.keys(groups).map(Number).sort(function (a, b) { return b - a; });
+    if (!keys.length) { msg('施工管网还没有带管径的管段，先接管或改径', 'warn'); return; }
+    var mainCal = keys[0], mainLen = groups[mainCal];
+    var summary = keys.map(function (k) { return 'Ø' + k + ' ' + groups[k].toFixed(1) + 'm'; }).join(' · ');
+    if (!confirm('施工管网按管径统计：\n' + summary + '\n\n把主管（Ø' + mainCal + '）总长 ' + mainLen.toFixed(1) + ' m\n填回主程序「主管长度」并触发重算？\n（会覆盖当前主程序里填的值）')) return;
+    var el = document.getElementById('fld_mainPipeLen') || document.getElementById('tl_mainPipeLen');
+    if (!el) { msg('找不到主程序主管长度输入框', 'warn'); return; }
+    el.value = Math.round(mainLen);
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    msg('已上报 Ø' + mainCal + ' 主管 ' + mainLen.toFixed(1) + ' m 到主程序，已触发重算', 'ok');
+  }
   function doSave() {
     if (!st.net) return;
     if (busy()) { msg('有未确认的预览：请先【确认】提交或【取消】，保存不含未确认的预览', 'warn'); return; }
@@ -1048,6 +1135,12 @@
         msg('已从平面图建立施工管网副本' + (u ? '（' + u + ' 处连接待确认，见明细）' : ''), u ? 'warn' : 'ok');
       }
     }
+    /* [cleanup] 隐藏与施工编辑器重复的旧左栏卡片（2026-09-26 用户要求只留施工接管一套） */
+    try {
+      ['tlIsoAutoCard','tlIsoInfoCard'].forEach(function(id){ var el=document.getElementById(id); if(el) el.style.display='none'; });
+      var kinds=document.getElementById('tlIsoKinds'); if(kinds){ var card=kinds.closest('.tl-iso-card'); if(card) card.style.display='none'; }
+      var hint=document.getElementById('tlIsoPipeHint'); if(hint){ var hc=hint.closest('.tl-iso-card'); if(hc) hc.style.display='none'; }
+    } catch(e) {}
     st.active = true;
     wireHost();
     watchHosts();
@@ -1194,6 +1287,29 @@
       (sum.uncertain ? ' · <span class="cn-warn-txt">待确认 ' + sum.uncertain + '</span>' : '') +
       (st.viewOnly ? ' · <span class="cn-warn-txt">只读查看</span>' : '');
     card.appendChild(info);
+    /* [enrich] 配件分类明细 + 按管径管长汇总（2026-09-26） */
+    (function () {
+      var KN = { valve: '阀门', tee: '三通', elbow: '弯头', reducer: '异径接头', cap: '封堵', source: '水源', endpoint: '端点' };
+      var byKind = sum.fittingsByType || {};
+      var parts = [];
+      Object.keys(byKind).forEach(function (k) { if (KN[k]) parts.push(KN[k] + ' ' + byKind[k]); });
+      if (parts.length) {
+        var d1 = document.createElement('div'); d1.className = 'cn-note';
+        d1.textContent = '配件明细：' + parts.join(' · ');
+        card.appendChild(d1);
+      }
+      var byCal = {};
+      Object.keys(st.net.segments).forEach(function (id) {
+        var s = st.net.segments[id]; var c = s.caliber || '?';
+        byCal[c] = (byCal[c] || 0) + s.length;
+      });
+      var cp = Object.keys(byCal).sort(function (a, b) { return (+b) - (+a); }).map(function (c) { return 'Ø' + c + ' ' + byCal[c].toFixed(1) + 'm'; });
+      if (cp.length) {
+        var d2 = document.createElement('div'); d2.className = 'cn-note';
+        d2.textContent = '按管径：' + cp.join(' · ');
+        card.appendChild(d2);
+      }
+    })();
     if (catLvl === 'generic') {
       var prec = document.createElement('div');
       prec.className = 'cn-note';
@@ -1249,6 +1365,7 @@
     var undoBtn = btn('↩ 撤销', doUndo);
     if (busy()) undoBtn.disabled = true;
     row.appendChild(undoBtn);
+    row.appendChild(btn('📤 上报主管长', doReportToMain, 'cn-ghost'));
     var saveBtn = btn('💾 保存', doSave);
     if (busy()) saveBtn.disabled = true;
     row.appendChild(saveBtn);

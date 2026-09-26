@@ -2275,6 +2275,72 @@
     rerenderKeepView(); notifyEdit();
     return true;
   }
+  /* 接管随转（2026-09-26 任务L，用户：「弯头安装在连接管上之后，连接管随着弯头转动它也应该跟着一起转动」）：
+     端部插弯头（只放符号、hostPipe=整根接管）调角时子树为空 → 接管不动。
+     本函数手动触发：以接管远离弯头的固定端为旋转心，宿主管整条 + 其上配件（含 teeId 链递归）
+     + 弯头 + 下游子树整链绕竖直轴刚体旋转 —— 三通口连接不撕开；不改 m.angle（弯头相对接管朝向不变）。 */
+  function elbowHostChain(id) {
+    var m = manualById(id);
+    if (!m || m.kind !== 'elbow') return null;
+    var host = manualById(m.hostPipe);
+    if (!host || host.kind !== 'pipe' || !host.pts || host.pts.length < 2) return null;
+    var C = { x: m.point.x, y: m.point.y, z: isFinite(m.z) ? m.z : 0 };
+    function d3(q) { return Math.hypot(q.x - C.x, q.y - C.y, (q.z || 0) - C.z); }
+    var a0 = host.pts[0], a1 = host.pts[host.pts.length - 1];
+    var anchor = d3(a0) >= d3(a1) ? a0 : a1;   /* 离弯头最远端 = 固定旋转心 */
+    var out = { anchor: anchor, pipes: [host], tees: [] };
+    var guard = 0;
+    (function walk(list) {
+      if ((guard += 1) > 4000) return;
+      list.forEach(function (p) {
+        if (out.pipes.indexOf(p) < 0) out.pipes.push(p);   /* teeId 链接管本身也要转（漏 push → 三通转了接管脱接） */
+        manual.forEach(function (t) {
+          if (t.kind === 'pipe' || t === m || t.hostPipe !== p.id) return;   /* t===m：弯头自身单独转，收进集合会双重旋转 */
+          if (out.tees.indexOf(t) >= 0) return;
+          out.tees.push(t);
+          if (t.kind === 'tee') walk(allPipes().filter(function (cp) { return cp.teeId === t.id && cp.pts && cp.pts.length >= 2; }));
+        });
+      });
+    })([host]);
+    return out;
+  }
+  function rotateElbowWithHost(id, deg) {
+    var m = manualById(id);
+    if (!m || m.kind !== 'elbow') return false;
+    var chain = elbowHostChain(id);
+    if (!chain) return false;
+    var d = Number(deg);
+    if (!isFinite(d) || d === 0) return false;
+    checkpoint();
+    var rad = d * Math.PI / 180;
+    var A = { x: chain.anchor.x, y: chain.anchor.y, z: chain.anchor.z || 0 };
+    var k = { x: 0, y: 0, z: 1 };   /* 竖直轴：水平面内转向（同 rotateElbowCore） */
+    function rotPt(q) {
+      var r = rotateVecAbout({ x: q.x - A.x, y: q.y - A.y, z: (q.z || 0) - A.z }, k, rad);
+      return { x: A.x + r.x, y: A.y + r.y, z: A.z + r.z };
+    }
+    function rotFit(t) {
+      var q = rotPt({ x: t.point.x, y: t.point.y, z: isFinite(t.z) ? t.z : 0 });
+      t.point = { x: q.x, y: q.y };
+      t.z = q.z;
+      if (t.branchDir && isFinite(t.branchDir.x) && isFinite(t.branchDir.y) && isFinite(t.branchDir.z)) {
+        t.branchDir = rotateAboutAxis(t.branchDir, k, rad);
+      }
+    }
+    /* 1) 宿主管整条 + teeId 链接管；2) 链上配件；3) 弯头符号点（m.angle 不动） */
+    chain.pipes.forEach(function (p) { p.pts = p.pts.map(rotPt); });
+    chain.tees.forEach(rotFit);
+    var me = rotPt({ x: m.point.x, y: m.point.y, z: isFinite(m.z) ? m.z : 0 });
+    m.point = { x: me.x, y: me.y };
+    m.z = me.z;
+    /* 4) 下游子树绕同一锚点（复用 elbowSubtree 收集；与链重叠的管/配件只转一次 ——
+          端点贴弯点的 teeId 链管会同时命中两个集合，漏判重 = 转双倍角） */
+    var sub = elbowSubtree(id);
+    sub.pipes.forEach(function (p) { if (chain.pipes.indexOf(p) < 0) p.pts = p.pts.map(rotPt); });
+    sub.tees.forEach(function (t) { if (chain.tees.indexOf(t) < 0) rotFit(t); });
+    rerenderKeepView(); notifyEdit();
+    return true;
+  }
   /* 删除弯头：下游段并回上游段（转过的角度保留为折线形状）；上游段已删则仅摘符号 */
   function removeElbow(id) {
     var m = manualById(id);
@@ -2667,7 +2733,7 @@
     rotateTee:rotateTee, resetTeeBranch:resetTeeBranch, teeBranchSpin:teeBranchSpin,
     teeThroughDir:teeThroughDir, teeAxisLabel:teeAxisLabel, teeBranchDir:teeBranchDir, asTeeRec:asTeeRec,
     addManualAtScreen:addManualAtScreen, spawnPipeFromTee:spawnPipeFromTee, extendManualPipe:extendManualPipe,
-    insertFittingAt:insertFittingAt, rotateElbow:rotateElbow, resetElbow:resetElbow, elbowSpin:elbowSpin, removeElbow:removeElbow,   /* 接管右键插入配件 + 弯头调角（2026-09-24 任务⑰） */
+    insertFittingAt:insertFittingAt, rotateElbow:rotateElbow, resetElbow:resetElbow, elbowSpin:elbowSpin, removeElbow:removeElbow, rotateElbowWithHost:rotateElbowWithHost,   /* 接管右键插入配件 + 弯头调角（2026-09-24 任务⑰）+ 接管随转（2026-09-26 任务L） */
     spawnPipeFromAutoTee:spawnPipeFromAutoTee, syncAutoFitSpin:syncAutoFitSpin, syncAutoFitMove:syncAutoFitMove, setConnectMode:setConnectMode,
     connectMode:function(){ return connectMode; }, autoFitBranchDir:autoFitBranchDir,
     nearNode:nearNode, manualEntries:function(){ return manual; }, NODE_SNAP_TOL:NODE_SNAP_TOL,   /* 节点吸附（2026-09-24 任务⑥，E2E 只读） */

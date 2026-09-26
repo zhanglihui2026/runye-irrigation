@@ -29,7 +29,7 @@
   'use strict';
 
   var CATALOG = {
-    version: '2026.09.15-1',
+    version: '2026.09.26-2',
     /* Ø110 等径最小闭环（PE 外径制，灌溉常用 0.4MPa 级）。
      * placeholder = 配件本体占位长度（米，中心线口径）：对接时两端各占一半，
      * 用于把「中心线长度」换算成「下料参考长度」。pipe 类本体占位为 0。 */
@@ -69,6 +69,52 @@
         source: '通用施工示意（无厂家依据，待核实）' }
     ]
   };
+
+  /* 批量补录常用 PE 外径系列（2026-09-26）：90/110/140/160/200/225 管材+等径三通+90°弯头+球阀 */
+  (function () {
+    var D = [90, 110, 140, 160, 200, 225];
+    D.forEach(function (d) {
+      CATALOG.items.push({ id: 'GEN-PIPE-' + d, type: 'pipe', brand: '通用示意', model: 'PE直管 Ø' + d,
+        material: 'PE100', pressure: '0.4MPa', placeholder: 0,
+        calibers: [{ label: '两端', caliber: d, system: 'PE-外径', conn: '热熔对接' }],
+        source: '通用施工示意（无厂家依据，待核实）' });
+      CATALOG.items.push({ id: 'GEN-TEE-' + d + '-' + d + '-' + d, type: 'tee', brand: '通用示意', model: 'PE三通 ' + d + '×' + d + '×' + d,
+        material: 'PE100', pressure: '0.4MPa', placeholder: 0.20,
+        ports: [{ key: 's1', label: '直通口A', caliber: d, system: 'PE-外径', conn: '热熔对接', kind: 'straight' },
+               { key: 's2', label: '直通口B', caliber: d, system: 'PE-外径', conn: '热熔对接', kind: 'straight' },
+               { key: 'br', label: '分支口', caliber: d, system: 'PE-外径', conn: '热熔对接', kind: 'branch' }],
+        source: '通用施工示意（无厂家依据，待核实）' });
+      CATALOG.items.push({ id: 'GEN-ELBOW-' + d + '-90', type: 'elbow', brand: '通用示意', model: 'PE弯头 ' + d + '×' + d + ' 90°',
+        material: 'PE100', pressure: '0.4MPa', placeholder: 0.12, angle: 90,
+        ports: [{ key: 'in', label: '进口', caliber: d, system: 'PE-外径', conn: '热熔对接', kind: 'straight' },
+               { key: 'out', label: '出口', caliber: d, system: 'PE-外径', conn: '热熔对接', kind: 'straight' }],
+        source: '通用施工示意（无厂家依据，待核实）' });
+      CATALOG.items.push({ id: 'GEN-VALVE-' + d, type: 'valve', brand: '通用示意', model: 'PE球阀 ' + d,
+        material: 'PE100', pressure: '0.4MPa', placeholder: 0.16,
+        ports: [{ key: 'in', label: '进口', caliber: d, system: 'PE-外径', conn: '热熔对接', kind: 'straight' },
+               { key: 'out', label: '出口', caliber: d, system: 'PE-外径', conn: '热熔对接', kind: 'straight' }],
+        source: '通用施工示意（无厂家依据，待核实）' });
+    });
+    /* 异径接头（大小头）：常用变径 */
+    [[225, 160], [200, 160], [160, 110], [140, 110], [110, 90]].forEach(function (pair) {
+      var big = pair[0], small = pair[1];
+      CATALOG.items.push({ id: 'GEN-RED-' + big + '-' + small, type: 'reducer', brand: '通用示意', model: 'PE异径接头 ' + big + '×' + small,
+        material: 'PE100', pressure: '0.4MPa', placeholder: 0.15,
+        ports: [{ key: 'in', label: '大口', caliber: big, system: 'PE-外径', conn: '热熔对接', kind: 'straight' },
+               { key: 'out', label: '小口', caliber: small, system: 'PE-外径', conn: '热熔对接', kind: 'straight' }],
+        source: '通用施工示意（无厂家依据，待核实）' });
+    });
+    /* 异径三通：直通大径，分支口小径（主管225接支管160这种） */
+    [[225, 160], [200, 160], [160, 110], [140, 110]].forEach(function (pair) {
+      var big = pair[0], small = pair[1];
+      CATALOG.items.push({ id: 'GEN-TEE-' + big + '-' + big + '-' + small, type: 'tee', brand: '通用示意', model: 'PE异径三通 ' + big + '×' + big + '×' + small,
+        material: 'PE100', pressure: '0.4MPa', placeholder: 0.22,
+        ports: [{ key: 's1', label: '直通口A', caliber: big, system: 'PE-外径', conn: '热熔对接', kind: 'straight' },
+               { key: 's2', label: '直通口B', caliber: big, system: 'PE-外径', conn: '热熔对接', kind: 'straight' },
+               { key: 'br', label: '分支口', caliber: small, system: 'PE-外径', conn: '热熔对接', kind: 'branch' }],
+        source: '通用施工示意（无厂家依据，待核实）' });
+    });
+  })();
 
   /* 每类配件的固定接口数契约（多一口/少一口都是模型违约）。
    * 未收录类型的契约先保留 —— 补录型号时直接可用。 */
