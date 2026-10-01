@@ -10397,6 +10397,19 @@ function tlAutoGenerate(options) {
   }
   // 若二级页已放置水源点，优先采用二级页的水源几何
   if(ppShare && ppShare.source){ sourcePos={x:ppShare.source.x,y:ppShare.source.y}; }
+  /* v170（2026-10-01 用户要求「总管移动之后，水源跟阀门自动跟着移动，地块外的主管就不用显示了」，
+     同日更正「不对，是主管」——地块外裁的是主管接入段，不是总管）：
+     总管图面平移（AE.moves['front']）在简图渲染层整体跟随 —— 水源点、总管→主管连接段、
+     交接三通/阀门全部随总管刚性平移（只动显示层；下方 tlDiagramData 快照仍落设计几何，
+     水力/材料/几何签名不变 —— moves 的红线原样保持）。
+     tlFrontDesign/tlSrcDesign 预存设计值供快照使用（否则 effPts 会再叠一次 moves）。 */
+  var tlFrontMv=(window.RyTlAutoEdits&&typeof window.RyTlAutoEdits.moveOf==='function')?window.RyTlAutoEdits.moveOf('front'):null;
+  var tlFrontDesign=frontPipe?JSON.parse(JSON.stringify(frontPipe)):null;
+  var tlSrcDesign=sourcePos?{x:sourcePos.x,y:sourcePos.y}:null;
+  if(tlFrontMv&&frontPipe){
+    frontPipe=frontPipe.map(function(fp){return{x:fp.x+tlFrontMv.dx,y:fp.y+tlFrontMv.dy};});
+    if(sourcePos)sourcePos={x:sourcePos.x+tlFrontMv.dx,y:sourcePos.y+tlFrontMv.dy};
+  }
 
   // Draw front main pipe (总管) — orange, thick
   if(frontPipe){
@@ -10468,11 +10481,17 @@ function tlAutoGenerate(options) {
         }
       }
     });
+    /* v170b（2026-10-01 用户更正「不对，是主管」）：总管被拖动过后，主管→总管接入段
+       （主管色粗线，用户口中的「地块外的主管」）并入地块裁剪组 —— 总管尚在地块外/半进时，
+       伸出地块的那段接入线不再显示；未拖动时保持原样（接入段画在裁剪组之外是老场景：
+       总管在地块外沿，接入线必须可见）。data-tlstub 供工作区克隆/闸门选择器使用。 */
+    if(tlFrontMv)parts.push('<g clip-path="url(#tlPlotClip)" data-tlstubg="1">');
     tlStubs.forEach(function(sl){
       var sd='';
       for(var si=0;si<sl.length;si++){var sp2=ts(sl[si].x,sl[si].y);sd+=(si===0?'M':'L')+sp2.x.toFixed(1)+' '+sp2.y.toFixed(1)+' ';}
-      parts.push('<path d="'+sd+'" fill="none" stroke="#185FA5" stroke-width="5" stroke-linecap="round"/>');
+      parts.push('<path data-tlstub="1" d="'+sd+'" fill="none" stroke="#185FA5" stroke-width="5" stroke-linecap="round"/>');
     });
+    if(tlFrontMv)parts.push('</g>');
     /* v143（用户要求）：总管×主管交接处画「三通 + 阀门」——三通方块在总管口，
        阀门（红⊗，与分区阀同款式）接在主管接入段上（连接段中点，向主管侧偏）。
        数量=物理主管根数，与材料清单三通/总管接入阀行同源。 */
@@ -10602,8 +10621,10 @@ function tlAutoGenerate(options) {
     mainPipes: JSON.parse(JSON.stringify(mainPipes)), branchPipes: JSON.parse(JSON.stringify(branchPipes)),
     valves: JSON.parse(JSON.stringify(valves)), dripTapes: JSON.parse(JSON.stringify(dripTapes)),
     partialFlags: tlPartialFlags.slice(), zoneActMu: tlZoneActMu.slice(),
-    frontPipe: frontPipe ? JSON.parse(JSON.stringify(frontPipe)) : null,
-    sourcePos: sourcePos ? { x: sourcePos.x, y: sourcePos.y } : null };
+    /* v170：快照落「设计几何」—— 总管平移只动显示层（上面 frontPipe/sourcePos
+       已是平移后的绘制副本）；AE.effPts 还会再叠一次 moves，写移动值会双重平移。 */
+    frontPipe: tlFrontDesign,
+    sourcePos: tlSrcDesign };
   r = computeThreeLevel();
   try { tlUpdatePlanBar(); } catch (e) { }
   var pumpFlowEl=document.getElementById('tlPlanPumpFlow');
@@ -10795,7 +10816,9 @@ function tlAutoGenerate(options) {
   try { tlWsBarSync(); } catch (e) { }
   // tlSavePng 已移除，不再显示
   // 生成完直接落在「三级设计」工作区（可缩放/可插管）
-  try{ tlShowWorkspace(); }catch(e){}
+  /* v170c：options.stay 为真时不跳视图 —— AE 订阅（front 平移→重建简图）每帧触发本函数，
+     若每次都 tlShowWorkspace 会把用户从简图视图强行切走（且拖动中每帤 rySetTab）。其余调用方不传 stay，行为不变。 */
+  if(!options.stay){ try{ tlShowWorkspace(); }catch(e){} }
   console.log('[tlAutoGenerate] SVG generated successfully');
   } catch(err) {
     console.error('[tlAutoGenerate] Error:', err);
@@ -19327,10 +19350,26 @@ function tlIsoStatsReset() {
   /* 图面改长 / 改径 / 整条平移（AE 编辑层）→ 左下角「管段长度与水头损失」同步刷新：
      最远分区路径长度走 AE.effPts（图面有效几何），几何一变数值就得跟着变；
      第四十二轮起同步刷新右侧「管段管径与损失」统计表（长度与损失都随之变）。 */
-  if (AE && AE.onChange) AE.onChange(function () {
+  /* v170：总管平移签名（front 的 dx,dy）—— 只在它变化时重建三级简图（水源/接入阀/连接段
+     随总管跟随，见 tlAutoGenerate 内 tlFrontMv）。主管/支管的 move 不触碰简图（简图本就不显示它们的
+     平移），避免每帧无谓整图重建。 */
+  var tlFrontMvSig = '';
+  if (AE && AE.onChange) AE.onChange(function (d) {
     window.tlPumpUpdateRun();
     try { window.tlWsStatsRender(); } catch (e) { }
     try { tlPushToHydraulicCalc(); } catch (e) { }
+    if (d && d.action === 'move') {
+      var _fm = (AE.moveOf ? AE.moveOf('front') : null) || null;
+      var _sig = _fm ? (_fm.dx.toFixed(3) + ',' + _fm.dy.toFixed(3)) : '';
+      if (_sig !== tlFrontMvSig) {
+        tlFrontMvSig = _sig;
+        /* 订阅顺序：工作区订阅先执行、其底图克隆的是重建前的旧简图 —— 简图重建后再补一次
+           rerenderKeepView，让克隆底图与覆盖层（有效几何）同帧对齐，否则水源/接入阀停在
+           上一帧位置（拖动结束后就永久差一帧）。 */
+        try { if (typeof window.tlAutoGenerate === 'function') window.tlAutoGenerate({ stay: true }); } catch (eGen) { }
+        try { if (window.RyTlWs && window.RyTlWs.rerenderKeepView) window.RyTlWs.rerenderKeepView(); } catch (eWs) { }
+      }
+    }
   });
   try { pumpUpdateNote(); } catch (e) { }
 /* ═══ 管段信息卡（2026-09-17 第五十七轮，用户要求）═══════════════════════════════
