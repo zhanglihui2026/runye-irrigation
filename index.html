@@ -8304,9 +8304,6 @@ function render() {
   `;
 
   // Details
-  const tapeDeltaStatus = r.tapeDeltaPct > 60 ? '需要优化' : r.tapeDeltaPct > 30 ? '可接受' : '良好';
-  const gaugePct = Math.min(r.tapeDeltaPct, 100);
-  const gaugeColor = r.tapeDeltaPct > 60 ? 'var(--red)' : r.tapeDeltaPct > 30 ? 'var(--amber)' : 'var(--g-500)';
 
   const suggestions = [];
   if (r.tapeDeltaPct > 50) suggestions.push(`滴灌带沿线估算压差约 ${fmt0(r.tapeDeltaPct)}%；仅用于均匀性校核，不计入水泵扬程。建议缩短滴灌带长度、增大内径或采用压力补偿滴头。`);
@@ -10146,7 +10143,6 @@ function tlAutoGenerate(options) {
       var r1=ts(zx,zy), r2=ts(zx+zoneW,zy+zoneH);
       var rx=r1.x, ry=r1.y, rw=r2.x-r1.x, rh=r2.y-r1.y;
       var aw=Math.abs(rw), ah=Math.abs(rh);
-      var stdMu=xPlan[zc2]*yPlan[zr]/MU_TO_SQM;
       var actM2=tlZoneActualAreaM2(zc2,zr,tlZoneCuts,tlPlotPolyForZone);
       var actMu=actM2/MU_TO_SQM;
       var isPartial=tlPartialFlags[zi];
@@ -10387,7 +10383,7 @@ function tlAutoGenerate(options) {
         if(gdr<gdB.minR)gdB.minR=gdr; if(gdr>gdB.maxR)gdB.maxR=gdr;
       }
     }
-    var gdParts=[], gdTexts=[];   /* v176b：分区端线独立数组取消 —— 改【组内】（见下） */
+    var gdParts=[];   /* v176b：分区端线独立数组取消 —— 改【组内】（见下） */
     var gdBands={};   /* v115：横向「按块逐段」标注 —— 同一条带线（包络底行+1）的组先归并，见下方绘制循环 */
     var gdBandsV={};   /* v175：竖向「按行逐段」标注 —— 右缘竖线（列=cols）的组先归并，见下方绘制循环 */
     /* v113（2026-09-22 用户要求）：联合分区小尺寸斜短线同步加粗缩短 —— k 5.5→4、线宽 1.8→2.8（与 tlArchTick/ppArchTick 一致）；
@@ -10404,7 +10400,7 @@ function tlAutoGenerate(options) {
       for(var gci=gdB.minC;gci<=gdB.maxC;gci++)gdW+=xPlan[gci];
       for(var gri=gdB.minR;gri<=gdB.maxR;gri++)gdH+=yPlan[gri];
       var gdX0=zX(gdB.minR,gdB.minC), gdX1=zX(gdB.minR,gdB.maxC+1);
-      var gdY0=zY(gdB.minC,gdB.minR), gdY1=zY(gdB.maxC,gdB.maxR+1);
+      var gdY0=zY(gdB.minC,gdB.minR);
       /* 2026-09-24 用户报告：手动调节（阶梯拖割缝/拖分界线/手动分组）后分地块标注拾取的边界点不对。
          竖向标注画在组右缘（列 maxC 外侧）⇒ 上下端必须取【列 maxC】上的实际边界
          （原上端取 minC 列：阶梯/合并后两列边界不同 ⇒ 端点越界进邻带，用户截图右缘 255 线跨过紫色分界线）。
@@ -12584,7 +12580,9 @@ function calcPlan(){
   var zoneAreaForShape = manualZoneMu > 0 ? Math.min(manualZoneMu * MU_TO_SQM, area) : (A * B / N);
   // 单区等效边长按 单区面积/格面积 缩放，保证 等效宽 × 等效高 === 单区面积（面积与几何自洽）
   const shapeK = (gridArea > 0) ? Math.sqrt(zoneAreaForShape / gridArea) : 1;
-  const zoneWEff = drawZoneW * shapeK;
+  /* v178：原此处还有 zoneWEff = drawZoneW*shapeK —— 它与上方的 zoneSegmentsPerRow 成对
+     （有效宽 / 横向分段数），自重构后双双无引用，一并删除（纯运算，无副作用）。
+     纵向的 zoneHEff 仍在用（zoneRows / branchSpan），保留。 */
   const zoneHEff = drawZoneH * shapeK;
 
   // Drip tape computation: length drives flow and material quantity; segment count drives fittings/connectors.
@@ -12607,7 +12605,6 @@ function calcPlan(){
   const flowZoneMu = flowAreaM2 / MU_TO_SQM;
   const zoneTapeLen = flowAreaM2 / tapeSpacing;
   const zoneRows = Math.max(1, Math.ceil(zoneHEff / tapeSpacing));
-  const zoneSegmentsPerRow = Math.max(1, Math.ceil(zoneWEff / tapeLen));
   const tapesPerZone = Math.max(1, Math.ceil(zoneTapeLen / tapeLen));
   const emittersPerTape = tapeLen / emitterSpacing;
   const tapeFlow = emittersPerTape * emitterFlow / 1000; // m³/h per full-length tape segment
@@ -14618,11 +14615,9 @@ ppPullLiftDh();                                              // 首屏对齐一�
     // 直接引用计算器结果
     var mainPipeOD=pd.mainPipeOD||(r.mainPipe?('Ø '+r.mainPipe.od+' mm'):'—');
     var mainPipeLen=r.mainPipeLen?r.mainPipeLen.toFixed(1)+' m':'—';
-    var mainPipeID=r.mainPipe?r.mainPipe.id.toFixed(1)+' mm':'—';
     var branchPipeOD=pd.branchPipeOD||(r.branchPipe?('Ø '+r.branchPipe.od+' mm'):'—');
     var pFlow=r.zoneFlow?r.zoneFlow.toFixed(1)+' m³/h':'—';
     var pHead=r.pumpHead?r.pumpHead.toFixed(1)+' m':'—';
-    var pPower=r.pumpPower?r.pumpPower.toFixed(1)+' kW':'—';
     var motorKW=r.motorKW_rounded?r.motorKW_rounded+' kW':'—';
     var areaMu=window.measuredArea?(window.measuredArea/666.67).toFixed(2):(r.totalMu?r.totalMu.toFixed(2):'—');
     var stDims=window.runyePlanDims||{};
@@ -14635,7 +14630,6 @@ ppPullLiftDh();                                              // 首屏对齐一�
     var planTapeSpacing=document.getElementById('planTapeSpacing')?document.getElementById('planTapeSpacing').value:'—';
     var planEmitterSpacing=document.getElementById('planEmitterSpacing')?document.getElementById('planEmitterSpacing').value:'—';
     var layoutSides=parseInt(document.querySelector('#layoutGroup .selected')?.dataset?.sides||1);
-    var planTapeLen=parseFloat(document.getElementById('planTapeLaySide')?.value)||100;   /* 2026-09-28：单带长度取消，改读单边铺设长度 */
 
     var b=ppGetBounds();
     var displayB=ppGetDisplayBounds();
@@ -14648,7 +14642,7 @@ ppPullLiftDh();                                              // 首屏对齐一�
     // A3/A4 横向工程图纸比例：宽:高 ≈ 1.414:1（420×297 mm）
     var svgW=1190,svgH=841,pad=60,bottomH=130;
     var drawW=svgW-2*pad,drawH=svgH-pad-bottomH;
-    var drawX1=pad,drawX2=svgW-pad,drawY1=pad,drawY2=svgH-bottomH;
+    var drawY2=svgH-bottomH;
     var s=Math.min(drawW/plotDisplayW,drawH/plotDisplayH);
     s=Math.min(s,2);
     var ox=pad+(drawW-plotDisplayW*s)/2,oy=pad+(drawH-plotDisplayH*s)/2;
@@ -14951,19 +14945,10 @@ ppPullLiftDh();                                              // 首屏对齐一�
     var cbX0=34, cbY0=drawY2+18;
     var cbDefW=svgW-68;
     var pdCalc=window.planData||{};
-    var cbLift=Number(pdCalc.lift)||0;
-    var cbDh=Number(pdCalc.dh)||0;
-    var cbTapePressureM=Number(pdCalc.tapePressureM)||((Number(pdCalc.tapePressure)||0)*10.2);
-    var cbExistPressureM=(Number(pdCalc.existPressure)||0)*10.2;
-    var cbMainLoss=Number(pdCalc.mainLoss)||0;
-    var cbBranchLoss=Number(pdCalc.branchLoss)||0;
-    var cbFilterLoss=Number(pdCalc.filterLoss)||0;
+    /* v178：此处原有 11 个 cbXxx 取值（lift/dh/tapePressureM/existPressureM/mainLoss/branchLoss/filterLoss/pumpPower/motorKW/safetyFactor/marginHead），
+       cbSegs 精简后即零引用 —— 已删（取值本身无副作用，删后输出逐字节不变）。 */
     var cbPumpHead=Number(pdCalc.pumpHead)||0;
     var cbZoneFlow=Number(pdCalc.zoneFlow)||0;
-    var cbPumpPower=Number(pdCalc.pumpPower)||0;
-    var cbMotorKW=Number(pdCalc.motorKW)||0;
-    var cbSafety=Number(pdCalc.safetyFactor)||1.10;
-    var cbMargin=Number(pdCalc.marginHead)||2;
     var cbTapeLen=Number(pdCalc.tapeLen)||100;
     var cbEmitterFlow=Number(pdCalc.emitterFlow)||0.8;
     var cbTapeSpacing=Number(pdCalc.tapeSpacing)||0.8;
