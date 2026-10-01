@@ -10359,6 +10359,7 @@ function tlAutoGenerate(options) {
     }
     var gdParts=[], gdExt=[], gdTexts=[];
     var gdBands={};   /* v115：横向「按块逐段」标注 —— 同一条带线（包络底行+1）的组先归并，见下方绘制循环 */
+    var gdBandsV={};   /* v175：竖向「按行逐段」标注 —— 右缘竖线（列=cols）的组先归并，见下方绘制循环 */
     /* v113（2026-09-22 用户要求）：联合分区小尺寸斜短线同步加粗缩短 —— k 5.5→4、线宽 1.8→2.8（与 tlArchTick/ppArchTick 一致）；
        任务M：k 与线宽再乘标注比例 tlDS */
     function gdTickH(x,y){ var k=DG.tick*tlDS; return '<line x1="'+(x-k).toFixed(1)+'" y1="'+(y+k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y-k).toFixed(1)+'" stroke-width="'+(DG.tickW*tlDS).toFixed(2)+'"/>'; }
@@ -10393,20 +10394,18 @@ function tlAutoGenerate(options) {
           if(gdB.maxC>gdRc.maxC)gdRc.maxC=gdB.maxC;
         }
       }
-      /* 竖向尺寸线：仅「右缘贴地块右边界」的组（maxC=最后一列），画在地块右缘外侧 */
+      /* 竖向尺寸线：仅「右缘贴地块右边界」的组（maxC=最后一列）。
+         v175（2026-10-01 用户拍板：「竖向按行逐段平铺，不要重叠」）：改为「按行逐段」——
+         与 v115 横向「按块逐段」对称：同一条右缘竖线（列=cols）的组先归并进 gdBandsV，
+         实际绘制在 forEach 之后按「每行一段」画。段不再整组包络 ⇒ 相邻组在行上不再重叠，
+         逐段拼接恒等于地块总高。值 = 该行端点实际跨距 ÷ gdSy（换算回 plan 米）。 */
       if(gdB.maxC===cols-1 && gdBR.y-gdTR.y>26){
-        var gdIdV='gd'+gdGN+'-v';
-        var gdVx=gdBR.x+14+tlDimOffOf(gdIdV);   /* v114: off 正=向右 */
-        gdExt.push('<line data-dimext="'+gdIdV+'" x1="'+Math.min(gdTR.x+4,gdVx+4).toFixed(1)+'" y1="'+gdTR.y.toFixed(1)+'" x2="'+Math.max(gdTR.x+4,gdVx+4).toFixed(1)+'" y2="'+gdTR.y.toFixed(1)+'"/>');
-        gdExt.push('<line data-dimext="'+gdIdV+'" x1="'+Math.min(gdBR.x+4,gdVx+4).toFixed(1)+'" y1="'+gdBR.y.toFixed(1)+'" x2="'+Math.max(gdBR.x+4,gdVx+4).toFixed(1)+'" y2="'+gdBR.y.toFixed(1)+'"/>');
-        gdParts.push('<g data-dim="'+gdIdV+'" data-axis="x">'
-          +'<line x1="'+gdVx.toFixed(1)+'" y1="'+gdTR.y.toFixed(1)+'" x2="'+gdVx.toFixed(1)+'" y2="'+gdBR.y.toFixed(1)+'"/>'
-          +gdTickV(gdVx,gdTR.y)+gdTickV(gdVx,gdBR.y)
-          /* v174：值 = 端点实际跨距 ÷ gdSy（换算回 plan 米）。2026-09-24 换用时漏了这层换算，
-             导致 Σ分区 比总尺寸大 (b.h-plotH)（右侧 414.5 m vs 左侧 414 m）。 */
-          /* v148：锚点落在尺寸线上，off = GAP+ASC（数字在线的【右侧】，朝线的一侧是墨迹左缘 = 基线−ASC） */
-          +'<g transform="translate('+gdVx.toFixed(1)+' '+((gdTR.y+gdBR.y)/2).toFixed(1)+') rotate(-90)"><text x="0" y="'+(GAP+ASC).toFixed(2)+'" text-anchor="middle" font-size="'+(DG.font*tlDS).toFixed(2)+'" font-weight="700" fill="#111111" stroke="none">'+gdVal((gdY1v-gdY0v)/gdSy)+'</text></g></g>');
-        window._tlDimHits.push({id:gdIdV,axis:'x',x1:gdVx,y1:gdTR.y,x2:gdVx,y2:gdBR.y,minOff:-8});
+        var gdRcV=gdBandsV[gdB.maxC+1];
+        if(!gdRcV){gdRcV=gdBandsV[gdB.maxC+1]={minR:gdB.minR,maxR:gdB.maxR,maxC:gdB.maxC,firstG:gdGN};}
+        else{
+          if(gdB.minR<gdRcV.minR)gdRcV.minR=gdB.minR;
+          if(gdB.maxR>gdRcV.maxR)gdRcV.maxR=gdB.maxR;
+        }
       }
     });
     /* v115 横向「按块逐段」绘制：每条带线一条链，链内每段只跨一个块（主管分块边界），
@@ -10429,6 +10428,29 @@ function tlAutoGenerate(options) {
           +'<text x="'+((gdPA.x+gdPB.x)/2).toFixed(1)+'" y="'+(gdHy-GAP-DESC).toFixed(1)+'" text-anchor="middle" font-size="'+(DG.font*tlDS).toFixed(2)+'" font-weight="700" fill="#111111" stroke="none">'
           +gdVal((zX(gdRc.maxR,gdc2+1)-zX(gdRc.maxR,gdc2))/gdSx)+'</text></g>');  /* v174：值=该段端点实际跨距 ÷ gdSx（换算回 plan 米；2026-09-24 起用实际跨距，v174 补上单位换算） */
         window._tlDimHits.push({id:gdIdH,axis:'y',x1:gdPA.x,y1:gdHy,x2:gdPB.x,y2:gdHy,minOff:-8});
+      }
+    });
+    /* v175 竖向「按行逐段」绘制：右缘一条链，链内每段只跨一行，值 = 该行端点实际跨距 ÷ gdSy
+       （= 设计行高 yPlan[r]）。端点取【行界在右缘列上的实际位置】⇒ 阶梯拖动后仍跟随实画；
+       与 v115 横向对称 —— 相邻组在行上不再重叠，逐段拼接 = 地块总高（与总尺寸同口径）。
+       v114 拖动照常可用 —— 每段独立 id（gdG-vr行号），锚点固定、端线加长、偏移记忆。 */
+    Object.keys(gdBandsV).forEach(function(gdVK){
+      var gdRcV=gdBandsV[gdVK];
+      var gdCxV=gdRcV.maxC;                         /* = cols-1（右缘列） */
+      for(var gdr2=gdRcV.minR;gdr2<=gdRcV.maxR;gdr2++){
+        var gdPAv=ts(zX(gdr2,cols),zY(gdCxV,gdr2)), gdPBv=ts(zX(gdr2,cols),zY(gdCxV,gdr2+1));
+        if(gdPBv.y-gdPAv.y<=26)continue;
+        var gdIdV='gd'+gdRcV.firstG+'-vr'+gdr2;
+        var gdVx=gdPAv.x+14+tlDimOffOf(gdIdV);      /* v114: off 正=向右 */
+        gdExt.push('<line data-dimext="'+gdIdV+'" x1="'+Math.min(gdPAv.x+4,gdVx+4).toFixed(1)+'" y1="'+gdPAv.y.toFixed(1)+'" x2="'+Math.max(gdPAv.x+4,gdVx+4).toFixed(1)+'" y2="'+gdPAv.y.toFixed(1)+'"/>');
+        gdExt.push('<line data-dimext="'+gdIdV+'" x1="'+Math.min(gdPBv.x+4,gdVx+4).toFixed(1)+'" y1="'+gdPBv.y.toFixed(1)+'" x2="'+Math.max(gdPBv.x+4,gdVx+4).toFixed(1)+'" y2="'+gdPBv.y.toFixed(1)+'"/>');
+        gdParts.push('<g data-dim="'+gdIdV+'" data-axis="x">'
+          +'<line x1="'+gdVx.toFixed(1)+'" y1="'+gdPAv.y.toFixed(1)+'" x2="'+gdVx.toFixed(1)+'" y2="'+gdPBv.y.toFixed(1)+'"/>'
+          +gdTickV(gdVx,gdPAv.y)+gdTickV(gdVx,gdPBv.y)
+          /* v174：值 ÷ gdSy 换算回 plan 米（防分区链与总尺寸不同口径）；v175：改为逐行取值 */
+          /* v148：锚点落在尺寸线上，off = GAP+ASC（数字在线的【右侧】，朝线的一侧是墨迹左缘 = 基线−ASC） */
+          +'<g transform="translate('+gdVx.toFixed(1)+' '+((gdPAv.y+gdPBv.y)/2).toFixed(1)+') rotate(-90)"><text x="0" y="'+(GAP+ASC).toFixed(2)+'" text-anchor="middle" font-size="'+(DG.font*tlDS).toFixed(2)+'" font-weight="700" fill="#111111" stroke="none">'+gdVal((zY(gdCxV,gdr2+1)-zY(gdCxV,gdr2))/gdSy)+'</text></g></g>');
+        window._tlDimHits.push({id:gdIdV,axis:'x',x1:gdVx,y1:gdPAv.y,x2:gdVx,y2:gdPBv.y,minOff:-8});
       }
     });
     if(gdExt.length){
