@@ -6033,7 +6033,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
   <aside class="pp-side" id="tlSide">
   <div class="pp-plan-bar" id="tlPlanBar" style="margin-bottom:8px">
     <span class="pp-plan-item"><span class="pp-plan-label">联合灌溉</span>
-      <div role="group" id="tlZoneCountGroup" style="display:inline-flex;gap:4px">
+      <div role="group" id="tlZoneCountGroup" data-init-n="2" style="display:inline-flex;gap:4px">
         <button type="button" data-n="1">1区</button>
         <button type="button" data-n="2" class="selected">2区</button>
         <button type="button" data-n="3">3区</button>
@@ -6048,6 +6048,13 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
       <button type="button" id="tlGroupSaveBtn" title="保存当前手动分组；点上方自动按钮清空后可重新调出" style="font-size:10px;padding:2px 8px;border:1px solid #cbd5e1;background:#fff;border-radius:4px;cursor:pointer;color:#334155">保存分组</button>
       <button type="button" id="tlGroupRestoreBtn" title="调出已保存的手动分组" style="font-size:10px;padding:2px 8px;border:1px solid #cbd5e1;background:#fff;border-radius:4px;cursor:pointer;color:#334155">调出分组</button>
       <span id="tlGroupSnapHint" style="font-size:10px;color:#94a3b8"></span>
+    </span>
+    <!-- v177（2026-10-01 用户请求⑲）：一键回到初始化设计。
+         刻意复用「点 N 区按钮」那条既有、已验证的完整复位路径（见下方接线），
+         使状态清理只有一份实现；初始分区数取自 #tlZoneCountGroup 的 data-init-n（单一事实来源）。 -->
+    <span class="pp-plan-item" style="gap:6px;min-height:22px">
+      <span class="pp-plan-label" style="color:#64748b">联合分区</span>
+      <button type="button" id="tlGroupInitBtn" title="一键回到初始化设计：分区数回初始、清空手动分组与已建联合组、清掉手动拖过的分界线，并按初始设计重新生成图面。不影响「保存分组」已存的档 —— 误点后可点「调出分组」找回。" style="font-size:10px;padding:2px 8px;border:1px solid #cbd5e1;background:#fff;border-radius:4px;cursor:pointer;color:#334155">↺ 恢复初始化</button>
     </span>
     <div id="tlGroupStatus" style="margin-top:6px;font-size:11px;line-height:1.5;color:#64748b">分组：自动（按 N=2 均分）</div>
     <!-- 2026-09-16 用户要求：左栏面板「总管长度」输入取消（总管长度仍可在下方水力参数卡
@@ -9583,6 +9590,29 @@ window.tlMergeIndices = function (sel) {
   if (gsb) gsb.addEventListener('click', window.tlSaveManualGroups);
   var grb = document.getElementById('tlGroupRestoreBtn');
   if (grb) grb.addEventListener('click', window.tlRestoreManualGroups);
+  /* v177（2026-10-01 用户请求⑲）：「↺ 恢复初始化」= 回到初始化设计。
+     刻意【不重写一套复位逻辑】，而是程序化点击「2 区」按钮 —— 那条路径（上方 #tlZoneCountGroup
+     的 click 处理器）已经在做全套：清 tlManualGroups、tlZoneStepClear()、清 cutOffX/Y、
+     tlPersistManualGroups() 落盘、tlUpdatePlanBar + tlRefreshGroupPanel、重生成图面。
+     两套实现必然慢慢漂移，故只保留一条。
+     初始分区数取 #tlZoneCountGroup 的 data-init-n（HTML 单一事实来源，避免这里再硬编码一个 2）。
+     刻意【不动「保存分组」存档】：误点后仍可点「调出分组」找回（用户确认：不加二次确认）。 */
+  var gib = document.getElementById('tlGroupInitBtn');
+  if (gib) gib.addEventListener('click', function () {
+    var grp = document.getElementById('tlZoneCountGroup');
+    var initN = grp ? parseInt(grp.getAttribute('data-init-n'), 10) : NaN;
+    if (!isFinite(initN)) initN = 2;
+    var b = grp ? grp.querySelector('button[data-n="' + initN + '"]') : null;
+    if (!b) { tlSnapHint('初始化失败：未找到「' + initN + ' 区」按钮'); return; }
+    b.click();
+    /* v177b：提示基于【复位后的实际状态】校验，不无条件报成功 ——
+       否则一旦复位路径失效（注入体检实测：把 click 掏空），会谎报「已恢复初始化」。 */
+    var okN = (typeof tlGetZoneCount === 'function') && (tlGetZoneCount() === initN);
+    var okG = !(window.tlManualGroups && window.tlManualGroups.length);
+    tlSnapHint((okN && okG)
+      ? ('已恢复初始化：' + initN + ' 区联合灌溉 · 手动分组与分界线已清空')
+      : '初始化未完全生效，请再点一次或刷新页面');
+  });
   var gl = document.getElementById('tlGroupList');
   if (gl) gl.addEventListener('click', function (e) { var t = e.target; if (t && t.getAttribute && t.getAttribute('data-g') != null) { tlDeleteGroup(parseInt(t.getAttribute('data-g'), 10)); } });
   var listEl = document.getElementById('tlGroupZoneList');
