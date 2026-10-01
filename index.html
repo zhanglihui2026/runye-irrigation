@@ -10644,19 +10644,25 @@ function tlAutoGenerate(options) {
     parts.push('<path data-tlpipe="main-'+mi+'" d="'+md+'" fill="none" stroke="'+(tlHidM?'#64748b':'#185FA5')+'" stroke-width="5"'+(tlHidM?' stroke-dasharray="8,5" opacity="0.55"':'')+' stroke-linecap="round" stroke-linejoin="round"/>');
   });
 
-  // Draw drip tape (示意，浅青细虚线) —— 画在支管之下，支管覆盖中段，视觉上从支管两侧伸出
-  dripTapes.forEach(function(l){
-    var td='';
-    for(var i=0;i<l.length;i++){var p=ts(l[i].x,l[i].y);td+=(i===0?'M':'L')+p.x.toFixed(1)+' '+p.y.toFixed(1)+' ';}
-    parts.push('<path d="'+td+'" fill="none" stroke="#67e8f9" stroke-width="1.4" stroke-dasharray="3,3" stroke-linecap="round"/>');
-  });
-
   // Draw branch pipes (green) — clipped to plot boundary
   branchPipes.forEach(function(l,bi){
     var bd='';
     for(var i=0;i<l.length;i++){var p=ts(l[i].x,l[i].y);bd+=(i===0?'M':'L')+p.x.toFixed(1)+' '+p.y.toFixed(1)+' ';}
     var tlHidB=window.tlIsPipeHidden('branch-'+bi);
     parts.push('<path data-tlpipe="branch-'+bi+'" d="'+bd+'" fill="none" stroke="'+(tlHidB?'#64748b':'#16a34a')+'" stroke-width="3"'+(tlHidB?' stroke-dasharray="8,5" opacity="0.55"':'')+' stroke-linecap="round" stroke-linejoin="round"/>');
+  });
+
+  /* v172（2026-10-01 用户要求「修改一下管道显示的图层逻辑，总管道位于最底层，主管位于总管上层，
+     支管位于总管的上层，滴灌带与支管在一层」，并经选项确认）——
+     管道叠放顺序（自下而上）：总管 → 主管 → 支管 → 滴灌带。
+     滴灌带与支管同层，同层内滴灌带压在支管之上 ⇒ 滴灌带**后**于支管绘制（本次由「支管之前」调到「支管之后」）。
+     旧口径「画在支管之下、支管覆盖中段，视觉上从支管两侧伸出」已废止。
+     滴灌带仍在同一地块裁剪组内（与支管同组），出界部分与支管一并裁剪，行为不变。
+     data-tltape：稳定标识，供图层契约闸门按「文档顺序」断言叠放层级（勿删）。 */
+  dripTapes.forEach(function(l){
+    var td='';
+    for(var i=0;i<l.length;i++){var p=ts(l[i].x,l[i].y);td+=(i===0?'M':'L')+p.x.toFixed(1)+' '+p.y.toFixed(1)+' ';}
+    parts.push('<path data-tltape="1" d="'+td+'" fill="none" stroke="#67e8f9" stroke-width="1.4" stroke-dasharray="3,3" stroke-linecap="round"/>');
   });
   parts.push('</g>');
 
