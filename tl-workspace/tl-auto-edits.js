@@ -14,8 +14,21 @@
  *          v145（2026-09-25）起不持久化：不进存档、不从存档恢复，每次打开网页清空。
  * 管线标识 pid：'front' | 'main-<i>' | 'branch-<i>'（下标 = tlDiagramData
  *       数组下标；平面图重生成后下标可能重排 → 几何签名不符时整层清空）。
- * 红线：只增本模块自有状态，不写回 tlDiagramData、不参与水力计算、
- *       不进材料清单；applyTo 仅返回显示用有效几何副本（无编辑时原引用返回）。
+ * 红线：只增本模块自有状态，不写回 tlDiagramData、不参与水力计算；
+ *       applyTo 仅返回显示用有效几何副本（无编辑时原引用返回）。
+ * v162（2026-09-29 用户要求「三级管线页面增加管道遮蔽/隐藏功能，被遮蔽的管道
+ *       不计入材料清单」）：新增 hidden —— pid → true「管道遮蔽」。语义 =
+ *       ① 图面（三级简图 / 三级工作区 / 轴测图）改「灰色虚线」显示；
+ *       ② 该管**不计入材料清单**（管长 / 管径加权 / 主管根数派生的三通与阀门件数
+ *          / 挂在该管上的节点配件），即「遮蔽 = 该管及其配件不参与材料统计」。
+ *       ⇒ 本模块此前的「不进材料清单」红线自此**只对增量状态成立**：cals（改径）
+ *         仍不进材料清单，hidden（遮蔽）进；两者都照旧不写回 tlDiagramData、
+ *         不参与水力计算（遮蔽只动材料统计与显示，水力结果一字不变）。
+ * v165（2026-09-30「遮蔽遇到总管要能分段遮蔽」）：hidden 的键放宽到 'front-N'
+ *       （总管按主管接入点的分段）。语义 = ① 该段图面灰虚线；② 该段长度不计入材料清单
+ *       （其余段照常计）。「整管遮蔽」'front' 与「逐段遮蔽」'front-N' 可并存：
+ *       读口一侧合并（段遮蔽 = hidden['front-N'] || hidden['front']，见宿主 tlIsPipeSegHidden）。
+ *       写入不提供自动展开 —— 展开/收拢由宿主收口 tlPipeHiddenChanged 负责（它才知道段数）。
  * 绑定：geometryKey 与 tl-edit-pipes 同口径（front/main/branch/valves/poly），
  *       几何变化 → 自动清空；同几何 → 保留（localStorage 同签名才恢复）。
  * 通知：notify 带 {action, source, lens, fits}；emitting 防重入。
@@ -27,6 +40,15 @@
   var LS_KEY = 'runye_tlAutoEdits_v1';
   var KINDS = { tee: '三通', valve: '阀门', elbow: '弯头' };   // elbow：2026-09-18 第十八轮新增（工具轨三按钮）
   var PID_RE = /^(front|main-\d+|branch-\d+)$/;
+  /* v165（2026-09-30 用户要求「这个遮蔽功能遇到总管，不能分段遮蔽，要改下，可以分段遮蔽」）：
+     遮蔽状态额外允许「总管分段 pid」'front-N'（段号 = 总管按主管接入点切出的第 N 段）。
+     ★ 只放宽遮蔽这一路。几何类接口（effPts / applyTo / locate / pointAt / setLen / setCaliber /
+       movePipe / allPids / pipePts 的存在性判据）**继续用严格 PID_RE**，让 'front-N' 在那里一律
+       落空 —— 否则「拿整管几何冒充段几何」会把段长 / 段径 / 加权口径全部算错
+       （v163 踩过同款：多选 totalLen 曾把每一段按整管长度累加）。 */
+  var HID_PID_RE = /^(front|front-\d+|main-\d+|branch-\d+)$/;
+  /* 段 pid → 整管 pid（仅 'front-N' 有归并；其余原样返回） */
+  function basePid(pid) { return /^front-\d+$/.test(String(pid)) ? 'front' : pid; }
   var FIT_ID_RE = /^A-F\d+$/;
 
   /* ---------- 状态 ---------- */
@@ -34,6 +56,7 @@
   var fits = [];                        // [{id, kind:'tee'|'valve'|'elbow', pid, atM}]
   var cals = {};                        // { pid: 外径 od(mm) }（阶段2e 改径，显示标注）
   var moves = {};                       // { pid: {dx,dy} } 图面平移覆盖（米，2026-09-16；不改管长，红线安全）
+  var hidden = {};                      // v162：{ pid: true } 管道遮蔽 —— 图面灰虚线 + 不计入材料清单
   var seq = { n: 0 };                   // 配件全局单计数器（A-F 前缀，禁分计数防撞号）
   var geoKey = '';                      // 当前绑定的平面几何签名
   var subs = [];
@@ -66,7 +89,7 @@
     if (batchDepth > 0) { batchDirty = true; return; }   /* v141：批处理期间只记脏标记 */
     emitting = true;
     try {
-      var detail = { action: action, source: source || '', lens: Object.keys(lens).length, fits: fits.length, cals: Object.keys(cals).length, moves: Object.keys(moves).length };
+      var detail = { action: action, source: source || '', lens: Object.keys(lens).length, fits: fits.length, cals: Object.keys(cals).length, moves: Object.keys(moves).length, hidden: Object.keys(hidden).length };
       for (var i = 0; i < subs.length; i++) { try { subs[i](detail); } catch (e) {} }
     } finally { emitting = false; }
     persist();
@@ -264,6 +287,38 @@
     return true;
   }
 
+  /* ---------- 管道遮蔽（v162，2026-09-29 用户要求）----------
+   * 状态：hidden[pid]=true。与 lens/moves 同为「图面状态」，随几何签名变化清空、
+   * 随存档（主方案 tlAutoEdits 字段 / localStorage 兜底）持久化。
+   * 消费方：三级简图与轴测图绘制处（灰虚线）、三级工作区绘制处（灰虚线）、
+   *        材料清单口径（tlFigParamLines 的 plotLen/figOd + 主管根数派生件数）。
+   * 红线：不改几何（effPts/applyTo 不看 hidden）、不改水力、不写回 tlDiagramData。 */
+  function hiddenMap() { return hidden; }
+  function isHidden(pid) { return !!(pid && hidden[pid]); }
+  /* 显式设置：pid 须为现有管线（或现有总管的分段 'front-N'）；on 为真值 → 置遮蔽，否则清除
+     （无变化不广播）。v165：段 pid 的存在性按整管判（'front-N' → 'front'）。 */
+  function setHidden(pid, on, data, source) {
+    if (!(typeof pid === 'string' && HID_PID_RE.test(pid))) return false;
+    if (data && !pipePts(basePid(pid), data)) return false;
+    var want = !!on;
+    if (want === !!hidden[pid]) return true;      /* 幂等：状态未变 → 不广播（防冗余重渲染） */
+    if (want) hidden[pid] = true; else delete hidden[pid];
+    notify('hidden', source);
+    return true;
+  }
+  function toggleHidden(pid, data, source) {
+    return setHidden(pid, !hidden[pid], data, source);
+  }
+  /* 全部恢复显示（不删管线、不动其它编辑层状态） */
+  function clearHidden(source) {
+    if (!Object.keys(hidden).length) return false;
+    hidden = {};
+    notify('hidden', source);
+    return true;
+  }
+  /* 遮蔽条数（宿主材料清单/hint 用；不广播、只读） */
+  function hiddenCount() { return Object.keys(hidden).length; }
+
   /* 插入配件：atM 为沿设计原始几何的弧长（米，越界 clamp 到管长内 0.01m） */
   function addFitting(kind, pid, atM, data, source) {
     if (!KINDS[kind] || !validPid(pid) || !isFinite(atM)) return null;
@@ -340,8 +395,8 @@
 
   /* 静默清空（不广播；换方案/几何失配由渲染方整体重绘），仍持久化 */
   function reset() {
-    if (!Object.keys(lens).length && !fits.length && !Object.keys(cals).length && !Object.keys(moves).length && !seq.n) return false;
-    lens = {}; fits = []; cals = {}; moves = {}; seq = { n: 0 };
+    if (!Object.keys(lens).length && !fits.length && !Object.keys(cals).length && !Object.keys(moves).length && !Object.keys(hidden).length && !seq.n) return false;
+    lens = {}; fits = []; cals = {}; moves = {}; hidden = {}; seq = { n: 0 };
     persist();
     return true;
   }
@@ -359,7 +414,13 @@
     var k = geometryKey(data);
     if (!k) return 'kept';
     if (k === geoKey) return 'kept';
-    lens = {}; fits = []; cals = {}; moves = {}; seq = { n: 0 };
+    /* v167（2026-09-30 用户要求「总管的位置要移动到地块范围以内」→ 选「拖进去后不弹回」）：
+       几何签名变化时保留总管的整体平移 moves['front'] —— 它是用户显式拖动的图面位置，
+       与割缝/分区几何无关（此前任何引起 mainPipes 变化的操作都会把它清掉，总管弹回外侧）。
+       其余编辑（改长/配件/改径/遮蔽/其他管平移）照旧清空；reset()（换方案）语义不变。 */
+    var keepFrontMove = moves['front'] || null;
+    lens = {}; fits = []; cals = {}; moves = {}; hidden = {}; seq = { n: 0 };
+    if (keepFrontMove) moves['front'] = keepFrontMove;
     geoKey = k;
     if (savedLS && savedLS.geoKey === k) {
       restore(savedLS, true);
@@ -373,7 +434,7 @@
      每次打开网页都应清空」。持久化快照只含几何类编辑（改长/配件/平移）；改径仅会话内有效，
      恢复端一律置空（见 restore）。 */
   function serialize() {
-    return { version: VERSION, geoKey: geoKey, lens: copy(lens), fits: copy(fits), cals: {}, moves: copy(moves), seq: copy(seq) };
+    return { version: VERSION, geoKey: geoKey, lens: copy(lens), fits: copy(fits), cals: {}, moves: copy(moves), hidden: copy(hidden), seq: copy(seq) };
   }
   /* 恢复（主方案存档 / localStorage）。几何签名不符 → 拒绝（返回 false）。
    * silent=true 供 syncGeometry 内部恢复用（不广播）。 */
@@ -398,6 +459,13 @@
       var mv = state.moves[mids[mi]];
       if (!validPid(mids[mi]) || !mv || !isFinite(mv.dx) || !isFinite(mv.dy)) return false;
     }
+    /* v162：hidden 为可选新增字段 —— 旧档（无此键）一律视为「无遮蔽」，不得因此拒收。
+       给了就必须是合法 pid → 真值 的对象；任何非法项直接拒收整档（与 lens 同严）。 */
+    var hids = (state.hidden && typeof state.hidden === 'object' && !Array.isArray(state.hidden)) ? Object.keys(state.hidden) : [];
+    for (var hidx = 0; hidx < hids.length; hidx++) {
+      if (!(typeof hids[hidx] === 'string' && HID_PID_RE.test(hids[hidx]))) return false;   /* v165：允许 front-N */
+    }
+    if (state.hidden != null && (typeof state.hidden !== 'object' || Array.isArray(state.hidden))) return false;
     var seen = {}, maxN = 0;
     for (i = 0; i < state.fits.length; i++) {
       var f = state.fits[i];
@@ -412,6 +480,8 @@
     /* v145：改径不从存档恢复（旧档可能带 cals，忽略之）——仅会话内由 setCaliber 产生 */
     cals = {};
     moves = state.moves ? copy(state.moves) : {};
+    hidden = {};
+    if (state.hidden) hids.forEach(function (hp) { if (state.hidden[hp]) hidden[hp] = true; });   /* v162 */
     seq = { n: Math.max(state.seq.n, maxN) };
     if (state.geoKey) geoKey = state.geoKey;
     if (!silent) notify('restore', 'project');
@@ -443,12 +513,13 @@
     lensMap: lensMap, setLen: setLen, clearLen: clearLen,
     calibersMap: calibersMap, caliberOf: caliberOf, setCaliber: setCaliber, clearCaliber: clearCaliber,
     movesMap: movesMap, moveOf: moveOf, movePipe: movePipe, clearMove: clearMove,
+    hiddenMap: hiddenMap, isHidden: isHidden, setHidden: setHidden, toggleHidden: toggleHidden, clearHidden: clearHidden, hiddenCount: hiddenCount,
     fitsList: fitsList, addFitting: addFitting, removeFitting: removeFitting, moveFitting: moveFitting, fitCount: fitCount,
     fitSpinOf: fitSpinOf, setFitSpin: setFitSpin, fitBranchSpecOf: fitBranchSpecOf, setFitBranchSpec: setFitBranchSpec, tangentAt: tangentAt,
     reset: reset, discardSaved: discardSaved, syncGeometry: syncGeometry,
     serialize: serialize, restore: restore, onChange: onChange,
     beginBatch: beginBatch, endBatch: endBatch,   /* v141 批处理（见 applySel / 性能探针 _perf_e2e.cjs） */
-    _state: function () { return { lens: lens, fits: fits, cals: cals, moves: moves, seq: seq, geoKey: geoKey, subs: subs.length }; }
+    _state: function () { return { lens: lens, fits: fits, cals: cals, moves: moves, hidden: hidden, seq: seq, geoKey: geoKey, subs: subs.length }; }
   };
   global.RyTlAutoEdits = api;
 

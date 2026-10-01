@@ -138,6 +138,72 @@
     return (feature && feature.poly) ? feature.poly : [];
   }
 
+  /* =====================================================================
+   * GCJ-02（高德/国测局火星坐标）转换 —— 2026-09-28 修复地图叠加偏移
+   * 背景：高德卫星瓦片本身是 GCJ-02，而 Leaflet 按 WGS-84 网格摆放；
+   *       因此"人工在高德影像上点击/读出的坐标"天然是 GCJ-02（贴合影像），
+   *       而外部数据（搜索定位、导入 KML/GeoJSON 等）是真实 WGS-84，
+   *       直接叠加就整体偏移。统一约定：本地存储与显示都用 GCJ-02，
+   *       仅在 WGS-84 外部入口做 wgs2gcj 转换、导出时做 gcj2wgs 还原。
+   * ===================================================================== */
+  var GCJ_A = 6378245.0;                       // GCJ-02 参考椭球长半轴
+  var GCJ_EE = 0.00669342162296594323;         // 偏心率平方
+  function _outOfChina(lat, lng) {
+    return lng < 72.004 || lng > 137.8347 || lat < 0.8293 || lat > 55.8271;
+  }
+  function _transfLat(x, y) {
+    var ret = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x));
+    ret += (20.0 * Math.sin(6.0 * x * Math.PI) + 20.0 * Math.sin(2.0 * x * Math.PI)) * 2.0 / 3.0;
+    ret += (20.0 * Math.sin(y * Math.PI) + 40.0 * Math.sin(y / 3.0 * Math.PI)) * 2.0 / 3.0;
+    ret += (160.0 * Math.sin(y / 12.0 * Math.PI) + 320 * Math.sin(y * Math.PI / 30.0)) * 2.0 / 3.0;
+    return ret;
+  }
+  function _transfLng(x, y) {
+    var ret = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x));
+    ret += (20.0 * Math.sin(6.0 * x * Math.PI) + 20.0 * Math.sin(2.0 * x * Math.PI)) * 2.0 / 3.0;
+    ret += (20.0 * Math.sin(x * Math.PI) + 40.0 * Math.sin(x / 3.0 * Math.PI)) * 2.0 / 3.0;
+    ret += (150.0 * Math.sin(x / 12.0 * Math.PI) + 300.0 * Math.sin(x / 30.0 * Math.PI)) * 2.0 / 3.0;
+    return ret;
+  }
+  /** WGS-84 → GCJ-02（火星坐标）；境外点不转换原样返回 */
+  function wgs2gcj(lat, lng) {
+    if (_outOfChina(lat, lng)) return { lat: lat, lng: lng };
+    var dLat = _transfLat(lng - 105.0, lat - 35.0);
+    var dLng = _transfLng(lng - 105.0, lat - 35.0);
+    var radLat = lat / 180.0 * Math.PI;
+    var magic = Math.sin(radLat); magic = 1 - GCJ_EE * magic * magic;
+    var sqrtMagic = Math.sqrt(magic);
+    dLat = (dLat * 180.0) / ((GCJ_A * (1 - GCJ_EE)) / (magic * sqrtMagic) * Math.PI);
+    dLng = (dLng * 180.0) / (GCJ_A / sqrtMagic * Math.cos(radLat) * Math.PI);
+    return { lat: lat + dLat, lng: lng + dLng };
+  }
+  /** GCJ-02 → WGS-84（迭代求逆，精度亚米级）；境外点不转换 */
+  function gcj2wgs(lat, lng) {
+    if (_outOfChina(lat, lng)) return { lat: lat, lng: lng };
+    var wLat = lat, wLng = lng;
+    for (var i = 0; i < 30; i++) {
+      var g = wgs2gcj(wLat, wLng);
+      var dLat = g.lat - lat, dLng = g.lng - lng;
+      wLat -= dLat; wLng -= dLng;
+      if (Math.abs(dLat) < 1e-9 && Math.abs(dLng) < 1e-9) break;
+    }
+    return { lat: wLat, lng: wLng };
+  }
+  /** 多边形 WGS-84 [[lat,lng],...] → GCJ-02 */
+  function polyWgs2Gcj(pts) {
+    return (pts || []).map(function (p) {
+      var g = wgs2gcj(p[0], p[1]);
+      return [+g.lat.toFixed(7), +g.lng.toFixed(7)];
+    });
+  }
+  /** 多边形 GCJ-02 → WGS-84 */
+  function polyGcj2Wgs(pts) {
+    return (pts || []).map(function (p) {
+      var g = gcj2wgs(p[0], p[1]);
+      return [+g.lat.toFixed(7), +g.lng.toFixed(7)];
+    });
+  }
+
   /** haversine 两点距离（米），与地图页一致 */
   function hav(a, b) {
     var dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng);
@@ -152,13 +218,31 @@
     if (pts.length < 3) return 0;
     var area = 0;
     for (var i = 0; i < pts.length; i++) {
-      var p1 = pts[i], p2 = pts[(i + 1) % pts.length];
+      var p1 = coordPair(pts[i]), p2 = coordPair(pts[(i + 1) % pts.length]);
       area += (toRad(p2[1]) - toRad(p1[1])) * (2 + Math.sin(toRad(p1[0])) + Math.sin(toRad(p2[0])));
     }
     return Math.abs(area * R * R / 2);
   }
 
+  // 坐标边界统一支持历史数组和对象；拒绝 null、非有限数及越界值。
+  function coordPair(p) {
+    var lat = Array.isArray(p) ? p[0] : p && p.lat;
+    var lng = Array.isArray(p) ? p[1] : p && p.lng;
+    if (typeof lat !== 'number' || typeof lng !== 'number' || !isFinite(lat) || !isFinite(lng) || Math.abs(lat)>90 || Math.abs(lng)>180) throw new Error('无效的经纬度坐标');
+    return [lat, lng];
+  }
+  function normalizeRing(points) {
+    if (!Array.isArray(points)) throw new Error('地块缺少多边形坐标');
+    var pts = points.map(coordPair);
+    if (pts.length>1 && pts[0][0]===pts[pts.length-1][0] && pts[0][1]===pts[pts.length-1][1]) pts.pop();
+    var seen = {};
+    pts.forEach(function(p){ seen[p.join(',')] = true; });
+    if (Object.keys(seen).length<3 || !(geodesicArea(pts)>0)) throw new Error('地块至少需要三个不同顶点及有效面积');
+    return pts;
+  }
+
   return {
+    coordPair: coordPair, normalizeRing: normalizeRing,
     R: R, MLAT: MLAT, GEO_KEY: GEO_KEY,
     getBase: getBase,
     ensureGeo: ensureGeo,
@@ -168,6 +252,10 @@
     polyM2ll: polyM2ll,
     baseOfFeature: baseOfFeature,
     toCanvasPoly: toCanvasPoly,
+    wgs2gcj: wgs2gcj,
+    gcj2wgs: gcj2wgs,
+    polyWgs2Gcj: polyWgs2Gcj,
+    polyGcj2Wgs: polyGcj2Wgs,
     hav: hav,
     geodesicArea: geodesicArea
   };

@@ -41,6 +41,16 @@
     label: '#243c35',
     elbow: '#7c3aed'    // 手工弯头（紫，仅轴测编辑层）
   };
+  /* ---------- v162：管道遮蔽外观 ----------
+   * 被遮蔽的管在轴测图同样改「灰色虚线」（与三级简图/工作区/二级页同色 slate-500 @55%）；
+   * **管宽与几何都不动**（只加 path 自身的 stroke 覆盖 / 追加虚线属性），取景与命中不受影响。
+   * 注：主/支管两条 path 自身没写 stroke（继承父 <g> 的描边）—— path 自身的呈现属性优先于
+   * 继承值，故只给 path 追加 stroke 即可覆盖；总管那条自身带 stroke，改的是它自己的值。 */
+  var HID_STROKE = '#64748b';
+  function isHid(pid) { return !!(AE.isHidden && AE.isHidden(pid)); }
+  function hidAtr(pid) {
+    return isHid(pid) ? ' stroke="' + HID_STROKE + '" stroke-dasharray="8,5" opacity="0.55"' : '';
+  }
 
   /* ---------- 手工配件层（编辑表达层，2026-09-13）----------
    * 性质：轴测图上的编辑标注（三通/弯头/阀门），不写回平面数据、不参与水力计算
@@ -449,7 +459,7 @@
     function pumpTxtOf(k) { return (LV && LV.pump && LV.pump[k]) || (meta.pump && meta.pump[k]) || '—'; }
     var zoneCount = (meta.zoneCount !== undefined) ? meta.zoneCount : ((model.zones && model.zones.cols) ? model.zones.cols * model.zones.rows : '—');
     var now = data.generatedAt ? String(data.generatedAt).replace('T', ' ').slice(0, 16) : new Date().toISOString().slice(0, 16).replace('T', ' ');
-    s.push('<g font-family="system-ui,sans-serif">');
+    s.push('<g data-ryfix="1" font-family="system-ui,sans-serif">');
     s.push('<text x="' + (svgW / 2) + '" y="34" text-anchor="middle" font-size="19" font-weight="700" fill="' + COLORS.label + '">三级管线轴测示意图</text>');
     s.push('<text x="' + (svgW / 2) + '" y="54" text-anchor="middle" font-size="11" fill="#5b6b66">'
       + '分区 ' + zoneCount + ' 区 · 总管 ' + esc(pipeTxt('front', '—'))
@@ -488,6 +498,7 @@
       var vl = model.valves.filter(function (v) { return v.tee === t.id; })[0];
       var mi = parseInt(String(t.downstream).slice(5), 10);
       var m = model.mains[mi]; if (!m || !vl) return;
+      if (isHid('main-' + mi)) return;   /* v162：遮蔽主管的接入段一并省略（该管不计入材料清单） */
       var d0 = segDist(m[0], model.front[0], model.front[model.front.length - 1]);
       var upEnd = d0 <= segDist(m[m.length - 1], model.front[0], model.front[model.front.length - 1]) ? m[0] : m[m.length - 1];
       var points = [P(t.point.x, t.point.y, HEIGHTS.front), P(upEnd.x, upEnd.y, HEIGHTS.front), P(upEnd.x, upEnd.y, HEIGHTS.main)];
@@ -500,7 +511,7 @@
 
     /* 4b) 主管（埋地） */
     s.push('<g fill="none" stroke="' + COLORS.main + '" stroke-width="1.8" stroke-linejoin="round"' + clipAttr + '>');
-    model.mains.forEach(function (l, mi) { s.push('<path data-tlpipe="main-' + mi + '" style="cursor:default" d="' + path3(l, function () { return HEIGHTS.main; }) + '"/>'); });
+    model.mains.forEach(function (l, mi) { s.push('<path data-tlpipe="main-' + mi + '"' + hidAtr('main-' + mi) + ' style="cursor:default" d="' + path3(l, function () { return HEIGHTS.main; }) + '"/>'); });
     s.push('</g>');
 
     /* 4c) 总管（埋地，带流向箭头） */
@@ -509,10 +520,13 @@
     if (model.front && model.front.length >= 2) {
       /* 总管豁免地块裁剪（2026-09-14）：管线在地块外，裁剪会把整条总管裁没 */
       s.push('<g>');
+      /* v162：遮蔽的总管 → 灰虚线、不带流向箭头（箭头 marker 是深色实心，压在灰虚线上很脏） */
+      var fHid = isHid('front');
       s.push('<path data-tlpipe="front" style="cursor:default" d="' + path3(model.front, function () { return HEIGHTS.front; })
-        + '" fill="none" stroke="' + COLORS.front + '" stroke-width="2.2" marker-mid="url(#isoArrow)" marker-end="url(#isoArrow)"/>');
-      /* 中点补一个箭头（两点线段无 mid） */
-      if (model.front.length === 2) {
+        + '" fill="none" stroke="' + (fHid ? HID_STROKE : COLORS.front) + '" stroke-width="2.2"'
+        + (fHid ? ' stroke-dasharray="8,5" opacity="0.55"' : ' marker-mid="url(#isoArrow)" marker-end="url(#isoArrow)"') + '/>');
+      /* 中点补一个箭头（两点线段无 mid；遮蔽时不画） */
+      if (model.front.length === 2 && !fHid) {
         var mp = { x: (model.front[0].x + model.front[1].x) / 2, y: (model.front[0].y + model.front[1].y) / 2 };
         var mq = P(mp.x, mp.y, HEIGHTS.front);
         s.push('<polygon points="0,-4 8,0 0,4" fill="' + COLORS.front + '" transform="translate(' + fmt(mq.x) + ',' + fmt(mq.y) + ') rotate('
@@ -527,7 +541,7 @@
 
     /* 6) 支管（地表 z=0.3，覆盖埋地管网之上） */
     s.push('<g fill="none" stroke="' + COLORS.branch + '" stroke-width="1.2" stroke-linejoin="round"' + clipAttr + '>');
-    model.branches.forEach(function (l,i) { s.push('<path data-branch="' + i + '" data-tlpipe="branch-' + i + '" style="cursor:default" d="' + path3(l, function () { return HEIGHTS.branch; }, branchOffsets[i]) + '"/>'); });
+    model.branches.forEach(function (l,i) { s.push('<path data-branch="' + i + '" data-tlpipe="branch-' + i + '"' + hidAtr('branch-' + i) + ' style="cursor:default" d="' + path3(l, function () { return HEIGHTS.branch; }, branchOffsets[i]) + '"/>'); });
     s.push('</g>');
 
     /* 6b) 手工管线层（共享图面数据层 RyTlEditPipes，2026-09-15 阶段1 双向同步）
@@ -655,6 +669,101 @@
           + fsym + spinSym + fLabels + '</g>');
       });
       s.push('</g>');
+    }
+
+    /* 6e) 节点与节点连线层（v157，2026-09-29 用户需求：三级工作区里「手动增加的节点 /
+       管道连线」原先在轴测图看不到，本层把它一并画出来）。
+       · 数据源 RyTlNodes（tl-nodes.js，localStorage runye_tlNodes_v1 独立键）——
+         与 AE / EP 同属「表达层」：只读展示，不写回 tlDiagramData、不进水力计算。
+       · 位置口径必须与三级工作区逐点一致，否则两图对不上：
+         ① 基准几何用 AE.pointAt(pid, data, atM)，data 传**原始** tlDiagramData
+            （与工作区 lastDataRef 同源）。本模块 model 用的是 AE.applyTo(data) 副本，
+            但 effPts 内部按同一 lens/moves 变换、两者恒等；这里若改传 applyTo 副本
+            会被二次变换（改长过的管上节点会漂）。
+         ② 支管的「立管展开」整体平移 branchOffsets[i] 必须一并施加，否则支管节点脱管。
+         ③ 跨管连线（lk.pid == null）两节点各按所属管标高投影后直连（3D 直线投影仍是直线）。
+       · 只读：整层 pointer-events="none" —— 不参与选中 / 放置 / 画线命中
+         （与工作区「节点连线不遮挡点管」同口径）。
+       · 等价性：无节点时本段不输出任何字符 ⇒ 轴测图旧图面逐字节不变。 */
+    if (typeof window !== 'undefined' && window.RyTlNodes
+        && typeof window.RyTlNodes.list === 'function' && typeof window.RyTlNodes.links === 'function'
+        && typeof AE.pointAt === 'function' && typeof AE.polylineLen === 'function') {
+      var ndList = window.RyTlNodes.list() || [];
+      if (ndList.length) {
+        var ndLks = window.RyTlNodes.links() || [];
+        var ndZOf = function (pid) { return pid === 'front' ? HEIGHTS.front : (String(pid).indexOf('main-') === 0 ? HEIGHTS.main : HEIGHTS.branch); };
+        var ndOffOf = function (pid) { return String(pid).indexOf('branch-') === 0 ? branchOffsets[Number(String(pid).slice(7))] : null; };
+        var ndById = {};
+        ndList.forEach(function (nd) { if (nd && nd.id != null) ndById[nd.id] = nd; });
+        /* 节点 → 数据坐标（有效几何 + 支管展开平移；不可用 null） */
+        var ndPlan = function (nd) { return (nd && nd.pid !== undefined) ? AE.pointAt(nd.pid, data, nd.atM) : null; };
+        /* 数据坐标 → SVG 屏幕点（施加支管立管展开平移） */
+        var ndScreen = function (nd, pos) {
+          pos = pos || ndPlan(nd);
+          return pos ? shifted(P(pos.x, pos.y, ndZOf(nd.pid)), ndOffOf(nd.pid)) : null;
+        };
+        /* 沿折线取弧长 [a,b]（米）子折线 —— 与工作区 ndSlice 同口径（折管上连线仍贴合管线） */
+        var ndSlice = function (pts, a, b) {
+          if (!pts || pts.length < 2 || !(b - a > 1e-9)) return null;
+          var out = [], tot = 0, i;
+          for (i = 0; i + 1 < pts.length && tot < b; i++) {
+            var ax = pts[i].x, ay = pts[i].y, bx = pts[i + 1].x, by = pts[i + 1].y;
+            var sg = Math.hypot(bx - ax, by - ay);
+            if (tot + sg <= a) { tot += sg; continue; }
+            var t0 = Math.max(0, sg > 0 ? (a - tot) / sg : 0), t1 = Math.min(1, sg > 0 ? (b - tot) / sg : 1);
+            if (!out.length) out.push({ x: ax + (bx - ax) * t0, y: ay + (by - ay) * t0 });
+            if (t1 >= 1) out.push({ x: bx, y: by }); else out.push({ x: ax + (bx - ax) * t1, y: ay + (by - ay) * t1 });
+            tot += sg;
+            if (t1 < 1) break;
+          }
+          return out.length >= 2 ? out : null;
+        };
+        var ndCol = '#7c3aed';   /* 与工作区节点 / 连线同色（紫） */
+        s.push('<g class="iso-tlnodes" pointer-events="none">');
+        /* 1) 连线（先画，节点圆点压在其上）：同管 = 沿管折线段；跨管 = 两节点平面直连 */
+        ndLks.forEach(function (lk) {
+          if (!lk) return;
+          var na = ndById[lk.a], nb = ndById[lk.b];
+          if (!na || !nb) return;
+          var d = '', mq = null;
+          if (na.pid !== nb.pid) {
+            var pa = ndPlan(na), pb = ndPlan(nb);
+            var qa = ndScreen(na, pa), qb = ndScreen(nb, pb);
+            if (!qa || !qb || !pa || !pb) return;
+            d = 'M' + fmt(qa.x) + ' ' + fmt(qa.y) + 'L' + fmt(qb.x) + ' ' + fmt(qb.y);
+            mq = { x: (qa.x + qb.x) / 2, y: (qa.y + qb.y) / 2 };
+          } else {
+            var nepts = AE.effPts(na.pid, data); if (!nepts) return;
+            var npLen = AE.polylineLen(nepts);
+            var na1 = Math.max(0, Math.min(na.atM, npLen)), nb1 = Math.max(0, Math.min(nb.atM, npLen));
+            if (!(Math.abs(nb1 - na1) > 1e-6)) return;   /* 两节点重合 → 不画零长段（与工作区同） */
+            var nsub = ndSlice(nepts, Math.min(na1, nb1), Math.max(na1, nb1)); if (!nsub) return;
+            var nz = ndZOf(na.pid), nof = ndOffOf(na.pid);
+            nsub.forEach(function (p, i) { var q = shifted(P(p.x, p.y, nz), nof); d += (i ? 'L' : 'M') + fmt(q.x) + ' ' + fmt(q.y); });
+            var nmp = nsub[Math.floor(nsub.length / 2)];
+            mq = shifted(P(nmp.x, nmp.y, nz), nof);
+          }
+          s.push('<path class="iso-tlnodelink" data-isonodelink="' + esc(lk.id) + '" d="' + d + '" fill="none" stroke="' + ndCol
+            + '" stroke-width="2.6" stroke-dasharray="5,3" stroke-linecap="round" opacity="0.95"/>');
+          s.push('<text data-isonodelinklabel="' + esc(lk.id) + '" x="' + fmt(mq.x + 7) + '" y="' + fmt(mq.y - 12)
+            + '" font-size="9" font-family="system-ui" font-weight="700" fill="#5b21b6" paint-order="stroke" stroke="#fff" stroke-width="2.5" pointer-events="none">'
+            + esc(lk.id + (lk.od != null ? ' Ø' + lk.od : '')) + '</text>');
+        });
+        /* 2) 节点圆点（含配件数角标；与工作区同口径：节点 = 配件组合容器，图面只画圆点） */
+        ndList.forEach(function (nd) {
+          var npos = ndPlan(nd);
+          if (!npos) return;   /* 管不在（几何签名不符等）→ 跳过，不抛 */
+          var nq = ndScreen(nd, npos);
+          if (!nq) return;
+          var ncnt = (typeof window.RyTlNodes.fitTotal === 'function') ? window.RyTlNodes.fitTotal(nd) : 0;
+          s.push('<g class="iso-tlnode" data-isonode="' + esc(nd.id) + '">'
+            + '<circle cx="' + fmt(nq.x) + '" cy="' + fmt(nq.y) + '" r="4.5" fill="' + ndCol + '" stroke="#fff" stroke-width="1.4"/>'
+            + (ncnt > 0 ? '<circle cx="' + fmt(nq.x + 6) + '" cy="' + fmt(nq.y - 6) + '" r="4.2" fill="#fff" stroke="' + ndCol + '" stroke-width="1.1"/>'
+              + '<text x="' + fmt(nq.x + 6) + '" y="' + fmt(nq.y - 3.8) + '" font-size="6.2" font-family="system-ui" font-weight="700" fill="#6d28d9" text-anchor="middle" pointer-events="none">' + ncnt + '</text>' : '')
+            + '</g>');
+        });
+        s.push('</g>');
+      }
     }
 
     /* 9) 连接平面路径保持不变；三通处用真正竖直立管表达层差。 */
@@ -822,7 +931,7 @@
     /* 11) 水源/泵符号 */
     if (model.source) {
       var q0 = P(model.source.x, model.source.y, HEIGHTS.source);
-      s.push('<g><circle cx="' + fmt(q0.x) + '" cy="' + fmt(q0.y) + '" r="9" fill="' + COLORS.source + '" stroke="#fff" stroke-width="2"/>'
+      s.push('<g data-ryfix="1"><circle cx="' + fmt(q0.x) + '" cy="' + fmt(q0.y) + '" r="9" fill="' + COLORS.source + '" stroke="#fff" stroke-width="2"/>'
         + '<text x="' + fmt(q0.x) + '" y="' + fmt(q0.y + 3.5) + '" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">P</text></g>');
     }
 
@@ -831,12 +940,12 @@
       if (!line || line.length < 2) return;
       var a = line[0], b = line[line.length - 1];
       var q = shifted(P((a.x + b.x) / 2, (a.y + b.y) / 2, z), shift);
-      s.push('<g data-pipe-note="1" pointer-events="none" font-size="10" font-family="system-ui" fill="#202020"><path d="M' + fmt(q.x) + ' ' + fmt(q.y) + ' l12 ' + offset + ' h70" fill="none" stroke="#555" stroke-width="0.6"/><text x="' + fmt(q.x + 14) + '" y="' + fmt(q.y + offset - 3) + '" paint-order="stroke" stroke="white" stroke-width="3">' + esc(text) + '</text></g>');
+      s.push('<g data-ryfix="1" data-pipe-note="1" pointer-events="none" font-size="10" font-family="system-ui" fill="#202020"><path d="M' + fmt(q.x) + ' ' + fmt(q.y) + ' l12 ' + offset + ' h70" fill="none" stroke="#555" stroke-width="0.6"/><text x="' + fmt(q.x + 14) + '" y="' + fmt(q.y + offset - 3) + '" paint-order="stroke" stroke="white" stroke-width="3">' + esc(text) + '</text></g>');
     }
     /* 2026-09-15 用户要求：标注简化 —— 同类型管道不逐根引出标注（图里只剩总管一条），
        主管/支管规格改由图例文字给出，用颜色区分类型；点击管件仍可查看参数。 */
     pipeNote(model.front, HEIGHTS.front, '总管 ' + pipeTxt('front', '管径待定'), 20);
-    s.push('<g transform="translate(65 655)" pointer-events="none" fill="none" stroke="#555" stroke-width="0.8"><path d="M0 -32 V0 H38 M0 0 L27 -27"/><g stroke="none" fill="#333" font-family="system-ui" font-size="10"><text x="40" y="4">X</text><text x="28" y="-29">Y</text><text x="-4" y="-37">Z</text></g></g>');
+    s.push('<g data-ryfix="1" transform="translate(65 655)" pointer-events="none" fill="none" stroke="#555" stroke-width="0.8"><path d="M0 -32 V0 H38 M0 0 L27 -27"/><g stroke="none" fill="#333" font-family="system-ui" font-size="10"><text x="40" y="4">X</text><text x="28" y="-29">Y</text><text x="-4" y="-37">Z</text></g></g>');
 
     /* 11b) 最远水路（轴测图，2026-09-24 用户要求）—— 与平面图 tlWorstPathMarkSVG 同款紫色标注：
        总管段(z=front 高程) + 接入立管(front→main) + 主管段(z=main 高程) + 末端圆点 + 标签。
@@ -899,7 +1008,7 @@
 
     /* 12) 图例 + 底部参数 —— 图例含管径规格（2026-09-15：管道逐根标注已取消，规格看这里） */
     var ly = svgH - footerH + 30, lx = 60;
-    s.push('<g font-family="system-ui,sans-serif" font-size="10.5" font-weight="600">');
+    s.push('<g data-ryfix="1" font-family="system-ui,sans-serif" font-size="10.5" font-weight="600">');
     function legItem(x, draw, label, color) {
       s.push(draw(x, ly));
       s.push('<text x="' + (x + 20) + '" y="' + (ly + 4) + '" fill="' + (color || '#334155') + '">' + esc(label) + '</text>');
@@ -915,6 +1024,14 @@
     x0 = legItem(x0, function (x, y) { return '<path d="M' + x + ' ' + y + ' h14 m-7 0 v-9" fill="none" stroke="#202020" stroke-width="1.5"/>'; }, '三通连接');
     x0 = legItem(x0, function (x, y) { return valveSymbol({x:x + 7,y:y}, 0); }, '阀门(通用)');
     x0 = legItem(x0, function (x, y) { return '<circle cx="' + (x + 7) + '" cy="' + (y - 2) + '" r="6" fill="' + COLORS.source + '"/>'; }, '水源/泵');
+    /* 节点 / 连线图例（v157）：仅当图面上确有节点时才追加 —— 无节点时图面逐字节不变 */
+    if (typeof window !== 'undefined' && window.RyTlNodes && typeof window.RyTlNodes.list === 'function'
+        && (window.RyTlNodes.list() || []).length) {
+      x0 = legItem(x0, function (x, y) {
+        return '<circle cx="' + (x + 4) + '" cy="' + (y - 2) + '" r="4" fill="#7c3aed" stroke="#fff" stroke-width="1.2"/>'
+          + '<path d="M' + (x + 9) + ' ' + (y - 2) + ' h8" fill="none" stroke="#7c3aed" stroke-width="2.4" stroke-dasharray="3,2"/>';
+      }, '节点/连线');
+    }
     /* v136 发现的既有小 bug 顺手修：meta.pump/live.pump 存的是结果条文本（自带单位），
        旧模板再拼一次单位 → 「40.0 m³/h m³/h」。此处只取数字，单位由本模板统一拼。 */
     function isoNum(v) { var m2 = String(v == null ? '' : v).match(/\d+(?:\.\d+)?/); return m2 ? m2[0] : '—'; }
@@ -2643,6 +2760,98 @@
     return ok;
   }
 
+  /* ---------- 文字避让（v158，2026-09-29 用户：「遇到文字重叠的时候 要自动避开」） ----------
+   * 为什么在「落地后」做，而不是拼字符串时顺手挪：
+   *   判定必须用浏览器真实字形度量（getBBox 取墨迹盒 + getScreenCTM 换算到屏幕）。
+   *   靠估宽（中文 10.5px / 数字 6px）会把「该避的没避、不该动的乱动」变成常态。
+   * 规则：
+   *   · 障碍层（只做障碍、自己不动）= 带 data-ryfix="1" 的祖先下的文字：
+   *     标题/副标题、图例与页脚、坐标轴、水源 P 字、管径引线标注
+   *     （用户截图里被紫色连线标签压住的就是最后这个）。
+   *   · 可动层 = 其余全部「贴几何的注释标签」：
+   *     连线标签 / 配件标签 / 校准 Ø / 改长 m / 最不利 / 第三口 / 配件距离 / 最远水路 / 节点徽标。
+   *   · 判定口径 = 屏幕矩形 + 2px 呼吸间隙（标签有白色描边 halo，贴合也算视觉重叠）。
+   *   · 候选阶梯确定性顺序，先「零重叠」者胜；全都不零重叠时取重叠面积最小者，
+   *     且必须严格小于原位重叠才动 —— 挪了没更好就宁可不挪（避免瞎动）。
+   *   · 全图无重叠 ⇒ 一次属性都不写：既有图面逐属性不变（等价性零差异）。
+   * 返回：本次实际移动的标签数（诊断用；闸门改为直接比对 DOM 与字符串的 x/y，不依赖本值）。 */
+  var TEXT_LADDER = [[0, 0], [0, -13], [0, 13], [14, 0], [-14, 0],
+                     [14, -13], [-14, -13], [14, 13], [-14, 13],
+                     [0, -26], [0, 26], [28, 0], [-28, 0],
+                     [28, -26], [-28, -26], [28, 26], [-28, 26],
+                     [0, -40], [0, 40]];
+  var TEXT_PAD = 2;                 /* 屏幕 px：白色描边的呼吸间隙 */
+  function avoidTextOverlap(svg) {
+    if (!svg || !svg.querySelectorAll || !svg.createSVGPoint || !svg.getBoundingClientRect) return 0;
+    var vb = svg.getBoundingClientRect();
+    /* 容器未布局 / 被隐藏时量不到真实字形 —— 此时**不判定**，不把「量不到」当成「不重叠」 */
+    if (!(vb.width > 2 && vb.height > 2)) return 0;
+    var pt = svg.createSVGPoint();
+    function rectOf(e) {
+      var b; try { b = e.getBBox(); } catch (err) { return null; }
+      if (!b || !(b.width > 0) || !(b.height > 0)) return null;
+      var m = e.getScreenCTM(); if (!m) return null;
+      var xs = [], ys = [],
+          cxs = [b.x, b.x + b.width, b.x, b.x + b.width],
+          cys = [b.y, b.y, b.y + b.height, b.y + b.height];
+      for (var i = 0; i < 4; i++) { pt.x = cxs[i]; pt.y = cys[i]; var q = pt.matrixTransform(m); xs.push(q.x); ys.push(q.y); }
+      return { l: Math.min.apply(null, xs) - TEXT_PAD, t: Math.min.apply(null, ys) - TEXT_PAD,
+               r: Math.max.apply(null, xs) + TEXT_PAD, b: Math.max.apply(null, ys) + TEXT_PAD };
+    }
+    function ovSum(r, list) {
+      var sum = 0;
+      for (var i = 0; i < list.length; i++) {
+        var ox = Math.min(r.r, list[i].r) - Math.max(r.l, list[i].l);
+        var oy = Math.min(r.b, list[i].b) - Math.max(r.t, list[i].t);
+        if (ox > 0 && oy > 0) sum += ox * oy;
+      }
+      return sum;
+    }
+    var all = svg.querySelectorAll('text'), items = [], i, e, r, fx, p;
+    for (i = 0; i < all.length; i++) {
+      e = all[i];
+      if (e.getAttribute('data-rymv') === '0') continue;      /* 显式豁免 */
+      r = rectOf(e); if (!r) continue;
+      fx = false; p = e;
+      while (p && p !== svg) {
+        if (p.getAttribute && p.getAttribute('data-ryfix') === '1') { fx = true; break; }
+        p = p.parentNode;
+      }
+      items.push({ el: e, r0: r, fixed: fx });
+    }
+    if (items.length < 2) return 0;
+    var placed = [], moved = 0;
+    /* 先把障碍层全部登记：可动标签无论文档顺序，都必须躲开它们 */
+    for (i = 0; i < items.length; i++) if (items[i].fixed) placed.push(items[i].r0);
+    for (i = 0; i < items.length; i++) {
+      var it = items[i]; if (it.fixed) continue;
+      var ov0 = ovSum(it.r0, placed);
+      if (ov0 <= 0) { placed.push(it.r0); continue; }          /* 本来就不撞 ⇒ 一个属性都不写 */
+      var pick = null, pickOv = Infinity, pickZero = false, sIdx, dx, dy, cand, ov;
+      for (sIdx = 1; sIdx < TEXT_LADDER.length; sIdx++) {
+        dx = TEXT_LADDER[sIdx][0]; dy = TEXT_LADDER[sIdx][1];
+        cand = { l: it.r0.l + dx, t: it.r0.t + dy, r: it.r0.r + dx, b: it.r0.b + dy };
+        ov = ovSum(cand, placed);
+        if (ov <= 0) { pick = { c: cand, d: [dx, dy] }; pickZero = true; break; }
+        if (ov < pickOv) { pickOv = ov; pick = { c: cand, d: [dx, dy] }; }
+      }
+      if (!pick) { placed.push(it.r0); continue; }
+      if (!pickZero && pickOv >= ov0) { placed.push(it.r0); continue; }   /* 挪了没更好 ⇒ 不动 */
+      /* 屏幕位移 → 自身坐标位移（getScreenCTM 的逆；对含缩放的线性变换都成立） */
+      var m2 = it.el.getScreenCTM();
+      if (!m2 || typeof m2.inverse !== 'function') { placed.push(it.r0); continue; }
+      var iv = m2.inverse();
+      var lx = iv.a * pick.d[0] + iv.c * pick.d[1], ly = iv.b * pick.d[0] + iv.d * pick.d[1];
+      var ax = parseFloat(it.el.getAttribute('x')), ay = parseFloat(it.el.getAttribute('y'));
+      if (!isFinite(ax) || !isFinite(ay)) { placed.push(it.r0); continue; }
+      it.el.setAttribute('x', fmt(ax + lx));
+      it.el.setAttribute('y', fmt(ay + ly));
+      placed.push(pick.c);
+      moved++;
+    }
+    return moved;
+  }
+
   /* ---------- 容器渲染（幂等：innerHTML 替换，不叠加；重渲染后视口复位） ---------- */
   function render(container, data) {
     if (!container) return null;
@@ -2667,6 +2876,7 @@
     view.z = 1; view.x = 0; view.y = 0;
     baseFit(container, el);
     applyView(container, el);
+    avoidTextOverlap(el);          /* v158：文字重叠自动避让；无重叠时一次属性都不写 */
     wireInteractions(container);
     return svg;
   }

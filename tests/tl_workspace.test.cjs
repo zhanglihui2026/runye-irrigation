@@ -202,7 +202,7 @@ console.log('== tl-workspace 纯逻辑回归 ==');
   ok(svg.indexOf('tlWsPlotClip') > 0, '含地块轮廓 clipPath（分区填充裁剪到轮廓内）');
   ok((svg.match(/<rect /g) || []).length >= 2, '分区底色 ≥2 格');
   ok(svg.indexOf('stroke-width="2" stroke-dasharray="5,5"') > 0, '分区线已加粗（width=2）');
-  ok(svg.indexOf('stroke="#f97316"') > 0, '总管（橙色）路径在位');
+  ok(svg.indexOf('stroke="#111827"') > 0, '总管路径在位（v162 总管改深灰 #111827，原橙色 #f97316）');
   /* 2026-09-16 契约更新：分区底色由「标准浅绿/非标琥珀」改为「联合灌溉分组色带」
      （组号 g=floor(zi/N)，同组同色 .30 透明度）+ 组边界深线；非标改为琥珀描边 overlay。
      反向断言：#e6f2ea / rgba(245,158,11,.18) 不得再作为分区底色出现。 */

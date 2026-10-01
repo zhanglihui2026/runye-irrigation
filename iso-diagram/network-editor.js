@@ -303,7 +303,7 @@
 
     svg.appendChild(g);
     st.layer = g;
-    autoReport();
+    if (typeof autoReport === 'function') autoReport();   /* bf86f81 落了调用没落定义：守卫防空抛（2026-09-28） */
   }
   /* ---------- 悬停提示（2026-09-15）----------
    * 底图自带的管段/配件不再常驻描边，靠这里给一个「可点」的即时反馈：
@@ -437,6 +437,13 @@
   }
   function onClick(e) {
     if (!st.active || !st.net || st.viewOnly) return;
+    /* 放置/画线模式让行（2026-09-28 Request Q）：施工副本镜像了所有平面管，图面任意管点击
+       都会命中 segment 并 stopPropagation，点击冒泡不到 ctn → iso 的放置/画线分支永远收不到
+       → 轴测图配件布置「点不上」。iso 正在放置配件或画线时直接放行（不抢断、不选中）。 */
+    try {
+      var ISO2 = window.RyIsoDiagram;
+      if (ISO2 && ((ISO2.placingKind && ISO2.placingKind()) || (ISO2.pipeModeKind && ISO2.pipeModeKind()))) return;
+    } catch (e2) { /* 守卫失败按原逻辑走 */ }
     /* 与拖拽平移区分：按下到抬起位移 >5px 视为拖拽，不选中 */
     if (st.down && Math.hypot(e.clientX - st.down.x, e.clientY - st.down.y) > 5) return;
     var pt = svgPoint(e);
@@ -1136,11 +1143,12 @@
         msg('已从平面图建立施工管网副本' + (u ? '（' + u + ' 处连接待确认，见明细）' : ''), u ? 'warn' : 'ok');
       }
     }
-    /* [cleanup] 隐藏与施工编辑器重复的旧左栏卡片（2026-09-26 用户要求只留施工接管一套） */
+    /* [cleanup] 隐藏与施工编辑器重复的动态卡片（2026-09-26 用户要求只留施工接管一套）。
+       2026-09-28 Request Q 修正：此前把静态卡「配件布置」「提示行」也一并强藏，
+       而静态卡没有任何重新显示的路径 → 轴测图配件布置永远点不开。
+       两张动态卡（自动管线选中/构件参数）选中时会自行 style.display=''，强藏无碍，故保留。 */
     try {
       ['tlIsoAutoCard','tlIsoInfoCard'].forEach(function(id){ var el=document.getElementById(id); if(el) el.style.display='none'; });
-      var kinds=document.getElementById('tlIsoKinds'); if(kinds){ var card=kinds.closest('.tl-iso-card'); if(card) card.style.display='none'; }
-      var hint=document.getElementById('tlIsoPipeHint'); if(hint){ var hc=hint.closest('.tl-iso-card'); if(hc) hc.style.display='none'; }
     } catch(e) {}
     st.active = true;
     wireHost();

@@ -153,3 +153,12 @@
   /* 窄屏：工具轨收窄（见 index.html 同断点）；统计表同样按内容完全展开，超出由工具轨滚动 */
   .tl-ws-stats{min-height:0}
 }
+
+/* 2026-09-28 用户反馈：标注文字挡点击 —— 标注 <text> 永久不拦截鼠标（显隐开关只管可见性） */
+.tl-ws-svg text { pointer-events: none; }
+
+/* v155（2026-09-29）：节点可沿管拖动 —— 补光标反馈。
+   此前 .tl-ws-node 没有任何样式，节点拖得动但看不出能拖（用户两次报「不能拖动」，
+   截图里鼠标都是箭头）；给可拖的节点圆点上 grab 光标，按下时 grabbing。 */
+.tl-ws-node{cursor:grab}
+.tl-ws-node:active{cursor:grabbing}

@@ -136,6 +136,52 @@
     return { zoneFlow: zoneFlow, combinedFlow: zoneFlow * zoneCount, zoneCount: zoneCount };
   }
 
+  /* ---------- 总管分段比例（v165：数据驱动，不依赖 DOM）----------
+   * 用户要求（2026-09-30）：「这个遮蔽功能遇到总管，不能分段遮蔽，要改一下，可以分段遮蔽。」
+   * 分段 = 按「每根主管靠总管一端的接入点」把总管切成 N+1 段。本函数只认数据
+   * （tlDiagramData + AE 设计几何），不看 SVG ⇒ 三级简图 / 三级工作区 / 轴测图可共用同一套分段，
+   * 段号绝不会两处错位（v165 之前只有工作区 DOM 那一路能算，简图无从知道段边界）。
+   * 返回 { juncs:[{mi,t}], cuts:[0,...,1], Lm }；总管非直线 / 数据缺失 → null。
+   * cuts = 归一化位置（0..1，沿总管起点→终点）；同点接入（< FRONT_CUT_MIN_M 米）合并为一段。
+   * dIn（可选）：数据对象。★ 三级简图渲染发生在 window.tlDiagramData 赋值**之前**
+   *   （简图先拼 parts、末尾才落快照），那时无参调用会读到上一幅图的旧几何 ⇒ 必须能显式传入。
+   * 几何取「设计几何」(pipePts) 而非有效几何：简图用设计几何、工作区可用有效几何，
+   *   若各按自己那套算 t，改长后两边段边界就会错位；统一用设计几何 ⇒ 只有比例缩放，段号一致。 */
+  var FRONT_CUT_MIN_M = 1.0;
+  function ratioCuts(dIn) {
+    var d = dIn || data(), A = AE();
+    if (!d || !A) return null;
+    var PTS = (typeof A.pipePts === 'function') ? A.pipePts : A.effPts;
+    var fp = PTS('front', d);
+    if (!fp || fp.length !== 2) return null;                /* 仅支持直线总管（现状几何） */
+    var a = fp[0], b = fp[1];
+    var Lm = Math.hypot(b.x - a.x, b.y - a.y);
+    if (!(Lm > 0)) return null;
+    var juncs = [];
+    (d.mainPipes || []).forEach(function (line, mi) {
+      var epts = PTS('main-' + mi, d);
+      if (!epts || epts.length < 2) return;
+      var pa = epts[0], pb = epts[epts.length - 1];
+      var na = pointToSeg(pa, a, b), nb = pointToSeg(pb, a, b);
+      var near = na.dist <= nb.dist ? na : nb;              /* 离总管更近的那一端 = 接入端 */
+      if (near.dist > FRONT_JUNC_TOL) return;               /* 该主管不接总管（跳过） */
+      if (near.t < -0.002 || near.t > 1.002) return;        /* 投影越出总管端点，非真实接入 */
+      juncs.push({ mi: mi, t: near.t });
+    });
+    juncs.sort(function (x, y) { return x.t - y.t; });
+    var minGap = FRONT_CUT_MIN_M / Lm;
+    var cuts = [0];
+    juncs.forEach(function (j) {
+      var t = Math.max(0, Math.min(1, j.t));
+      if (t <= cuts[cuts.length - 1] + minGap) return;      /* 同点/过近接入 → 合并（同排共线多段主管） */
+      cuts.push(t);
+    });
+    if (cuts[cuts.length - 1] < 1 - minGap) cuts.push(1);
+    else cuts[cuts.length - 1] = 1;
+    if (cuts.length < 2) cuts = [0, 1];
+    return { juncs: juncs, cuts: cuts, Lm: Lm };
+  }
+
   /* ---------- 总管分段 ---------- */
   function wsSvg() {
     var ctn = el('tlWsContent');
@@ -143,7 +189,8 @@
   }
   function frontPathEl() { var s = wsSvg(); return s ? s.querySelector('[data-tlpipe="front"]') : null; }
 
-  /* 每根主管靠总管一端的接入点（模型坐标，口径同渲染层连接段）+ 沿 front 的 px 弧长位置 */
+  /* 总管分段（px 弧长口径，供工作区定位/选中）：分段比例一律取自 ratioCuts()（唯一来源），
+     再按本图 path 的 px 弧长换算 ⇒「简图显示的分段」与「工作区点选的分段」逐段一致。 */
   function computeSegs() {
     var d = data(), A = AE();
     var fpEl = frontPathEl();
@@ -153,38 +200,21 @@
     var Lpx = fpEl.getTotalLength();
     var Lm = polyLenM(fp);
     if (!(Lpx > 0) || !(Lm > 0)) return null;
+    var RC = ratioCuts();
+    if (!RC) return null;
+    var cuts = RC.cuts.map(function (r) { return r * Lpx; });
+    var juncs = RC.juncs.map(function (j) { return { mi: j.mi, s: j.t * Lpx, t: j.t }; });
     var horiz = Math.abs(fp[0].y - fp[1].y) < 1e-6;        /* 总管水平？仅用于签名/调试 */
-    /* 总管分段点 = 每根主管「朝总管一端」的接入点（与渲染层连接段/三通同源）：
-       取主管两端点中离总管直线最近者，投影到总管上；垂直距离 ≤ FRONT_JUNC_TOL 即视为接在总管上，
-       其沿线弧长位置 s 即分段点。不再写死「总管水平↔主管垂直 / 总管垂直↔主管水平」的镜像分支——
-       旧版两分支方向写反（总管水平、主管垂直时一律切不出分段 → 整管不可选，见任务 G 附1）。 */
-    var juncs = [];
-    (d.mainPipes || []).forEach(function (line, mi) {
-      var epts = A.effPts('main-' + mi, d);
-      if (!epts || epts.length < 2) return;
-      var pa = epts[0], pb = epts[epts.length - 1];
-      var na = pointToSeg(pa, fp[0], fp[1]), nb = pointToSeg(pb, fp[0], fp[1]);
-      var near = na.dist <= nb.dist ? na : nb;              /* 离总管更近的那一端 */
-      if (near.dist > FRONT_JUNC_TOL) return;               /* 该主管不接总管（跳过） */
-      if (near.t < -0.002 || near.t > 1.002) return;        /* 投影越出总管端点，非真实接入 */
-      var s = near.t * Lpx;                                 /* 直线总管：弧长比例 = 参数 t */
-      juncs.push({ mi: mi, s: s });
-    });
-    juncs.sort(function (a, b) { return a.s - b.s; });
-    var cuts = [0];
-    juncs.forEach(function (j) {                             /* 同点接入去重（同排共线多段主管） */
-      if (j.s - cuts[cuts.length - 1] > 1.5) cuts.push(j.s);
-    });
-    if (cuts[cuts.length - 1] < Lpx - 1.5) cuts.push(Lpx);
-    else cuts[cuts.length - 1] = Lpx;
     /* 主管分段：按管上三通/阀门切分（mainCuts），随缓存一起签名失效 */
     var mains = [];
     (d.mainPipes || []).forEach(function (line, mi) { mains.push(mainCuts(mi, d, A)); });
-    var sig = fpEl.getAttribute('d') + '|' + (d.mainPipes || []).length
+    /* v165：签名加入 Lpx/Lm/分段比例 —— 改长/平移会改有效几何，必须让缓存失效。
+       （旧签名只取底图 path 的 d，而底图 path 是设计几何、改长后一字不变 ⇒ 缓存会一直吃旧分段。） */
+    var sig = Lpx.toFixed(2) + '|' + Lm.toFixed(3) + '|' + RC.cuts.map(function (r) { return r.toFixed(5); }).join(',')
       + '|' + mains.map(function (M) {
         return M ? (M.Lm.toFixed(2) + ':' + M.cuts.map(function (c) { return c.toFixed(2); }).join(',')) : '-';
       }).join(';');
-    return { cuts: cuts, Lpx: Lpx, Lm: Lm, juncs: juncs, horiz: horiz, fp: fp, mains: mains, sig: sig };
+    return { cuts: cuts, Lpx: Lpx, Lm: Lm, juncs: juncs, horiz: horiz, fp: fp, mains: mains, sig: sig, ratios: RC.cuts.slice() };
   }
 
   function segs() {
@@ -260,6 +290,7 @@
     var A = AE(), d = data();
     var mBase = /^(main-\d+)(?:-\d+)?$/.exec(pid);
     var basePid = mBase ? mBase[1] : pid;
+    if (/^front-\d+$/.test(pid)) basePid = 'front';   /* 总管段沿用整管 front 的图面改径 */
     var od = (A && A.caliberOf) ? A.caliberOf(basePid) : null;
     if (od) return od;
     var key = /^front-/.test(pid) ? 'front' : (/^main-/.test(pid) ? 'main' : null);
@@ -275,6 +306,20 @@
   }
   function segHf(pid) {
     var L = segLen(pid), Q = segFlow(pid), od = segOd(pid);
+    if (L == null || Q == null || od == null) return null;
+    return hf(L, Q, od);
+  }
+  /* 段计算值外径（不受图面改径影响，= meta.pipes 对应键；front-N → front，main-i-j → main） */
+  function segBaseOd(pid) {
+    var d = data();
+    if (!d || !d.meta || !d.meta.pipes) return null;
+    var key = /^front-/.test(pid) ? 'front' : (/^main-/.test(pid) ? 'main' : 'branch');
+    var mm = String(d.meta.pipes[key] || '').match(/\d+(?:\.\d+)?/);
+    return mm ? parseFloat(mm[0]) : null;
+  }
+  /* 段水头损失（用计算值外径，便于对比改径前后的 delta） */
+  function segBaseHf(pid) {
+    var L = segLen(pid), Q = segFlow(pid), od = segBaseOd(pid);
     if (L == null || Q == null || od == null) return null;
     return hf(L, Q, od);
   }
@@ -519,8 +564,33 @@
     clear: function () { pathSegs = []; drawHi(); renderPanel(); },
     segs: function () { return pathSegs.slice(); },
     segInfo: function (pid) {
-      return { name: segName(pid), len: segLen(pid), flow: segFlow(pid), od: segOd(pid), hf: segHf(pid) };
+      return { name: segName(pid), len: segLen(pid), flow: segFlow(pid), od: segOd(pid), baseOd: segBaseOd(pid), hf: segHf(pid), baseHf: segBaseHf(pid) };
     },
+    /* v150（2026-09-28 用户要求「总管被主管打断后应可独立选择」）：普通模式分段选择支撑，
+       供 tl-workspace 选中信息/高亮复用。segIndexAt：沿管弧长（米）→ 所在总管段号；
+       frontSegPts：段号 → 该段子折线（数据米坐标，改长/平移后仍正确）；segsData：分段缓存快照（诊断用） */
+    segIndexAt: function (alongM) {
+      var S = segs(); if (!S || !isFinite(alongM) || !(S.Lm > 0) || !(S.Lpx > 0)) return null;
+      var sPx = alongM * S.Lpx / S.Lm;
+      for (var i = 0; i + 1 < S.cuts.length; i++) {
+        if (sPx >= S.cuts[i] - 1e-6 && sPx <= S.cuts[i + 1] + 1e-6) return i;
+      }
+      return null;
+    },
+    frontSegPts: function (i) {
+      var S = segs(); if (!S || !isFinite(i) || i < 0 || i + 1 >= S.cuts.length) return null;
+      var aM = S.cuts[i] / S.Lpx * S.Lm, bM = S.cuts[i + 1] / S.Lpx * S.Lm;
+      return slicePoly(S.fp, aM, bM);
+    },
+    segsData: function () {
+      var S = segs(); if (!S) return null;
+      return { cuts: S.cuts.slice(), Lpx: S.Lpx, Lm: S.Lm, juncCount: S.juncs.length };
+    },
+    /* v165（总管分段遮蔽）：总管分段比例（0..1 数组，长度 = 段数 + 1）—— 数据驱动、不依赖 DOM，
+       三级简图 / 三级工作区 / 轴测图共用同一套段边界。取不到分段（无总管 / 非直线 / 数据未就绪）→ null。
+       ★ 为什么需要它：总管在简图里要按段渲染（半遮蔽 = 一段灰虚线、其余实线），而简图渲染
+         发生在工作区 svg 之前 —— 不能依赖 frontPathEl()。 */
+    frontRatios: function (dIn) { var RC = ratioCuts(dIn); return RC ? RC.cuts.slice() : null },
     syncLayer: syncLayer,
     /* 纯逻辑内部函数（单测/体检用，2026-09-24 主管分段）：不参与页面交互 */
     _internals: { slicePoly: slicePoly, polyD: polyD, wsT: wsT, mainCuts: mainCuts, mainSegBounds: mainSegBounds },

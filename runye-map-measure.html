@@ -98,9 +98,20 @@
   /* 加载失败提示 */
   .warn{position:absolute;left:50%;top:14px;transform:translateX(-50%);background:#fef3c7;color:#92400e;
     border:1px solid #f59e0b;padding:8px 14px;font-size:12px;z-index:1100;border-radius:var(--radius);display:none}
+  /* 实时面积框（2026-09-28）：白底橙边常驻标签；pointer-events:none 不挡绘制点击 */
+  .ry-area-tip{background:rgba(255,255,255,.96);border:1.5px solid #ff6b00;border-radius:8px;
+    box-shadow:0 3px 10px rgba(0,0,0,.25);padding:5px 10px;pointer-events:none}
+  .ry-area-tip .ab-t{font-size:14px;font-weight:800;color:#ea580c;white-space:nowrap}
+  .ry-area-tip .ab-s{font-size:11px;font-weight:600;color:#64748b;margin-top:1px;white-space:nowrap}
   /* 绘制模式：高对比十字光标，替代地图拖动手型，避免点错位 */
   .leaflet-container.drawing{ cursor:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2730%27%20height%3D%2730%27%3E%3Cg%20stroke%3D%27black%27%20stroke-width%3D%273%27%3E%3Cline%20x1%3D%2715%27%20y1%3D%273%27%20x2%3D%2715%27%20y2%3D%2712%27%2F%3E%3Cline%20x1%3D%2715%27%20y1%3D%2718%27%20x2%3D%2715%27%20y2%3D%2727%27%2F%3E%3Cline%20x1%3D%273%27%20y1%3D%2715%27%20x2%3D%2712%27%20y2%3D%2715%27%2F%3E%3Cline%20x1%3D%2718%27%20y1%3D%2715%27%20x2%3D%2727%27%20y2%3D%2715%27%2F%3E%3C%2Fg%3E%3Cg%20stroke%3D%27white%27%20stroke-width%3D%271.5%27%3E%3Cline%20x1%3D%2715%27%20y1%3D%273%27%20x2%3D%2715%27%20y2%3D%2712%27%2F%3E%3Cline%20x1%3D%2715%27%20y1%3D%2718%27%20x2%3D%2715%27%20y2%3D%2727%27%2F%3E%3Cline%20x1%3D%273%27%20y1%3D%2715%27%20x2%3D%2712%27%20y2%3D%2715%27%2F%3E%3Cline%20x1%3D%2718%27%20y1%3D%2715%27%20x2%3D%2727%27%20y2%3D%2715%27%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2715%27%20cy%3D%2715%27%20r%3D%272.5%27%20fill%3D%27white%27%20stroke%3D%27black%27%20stroke-width%3D%271%27%2F%3E%3C%2Fsvg%3E") 15 15, crosshair !important; }
   .leaflet-container.drawing .leaflet-grab{ cursor:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2730%27%20height%3D%2730%27%3E%3Cg%20stroke%3D%27black%27%20stroke-width%3D%273%27%3E%3Cline%20x1%3D%2715%27%20y1%3D%273%27%20x2%3D%2715%27%20y2%3D%2712%27%2F%3E%3Cline%20x1%3D%2715%27%20y1%3D%2718%27%20x2%3D%2715%27%20y2%3D%2727%27%2F%3E%3Cline%20x1%3D%273%27%20y1%3D%2715%27%20x2%3D%2712%27%20y2%3D%2715%27%2F%3E%3Cline%20x1%3D%2718%27%20y1%3D%2715%27%20x2%3D%2727%27%20y2%3D%2715%27%2F%3E%3C%2Fg%3E%3Cg%20stroke%3D%27white%27%20stroke-width%3D%271.5%27%3E%3Cline%20x1%3D%2715%27%20y1%3D%273%27%20x2%3D%2715%27%20y2%3D%2712%27%2F%3E%3Cline%20x1%3D%2715%27%20y1%3D%2718%27%20x2%3D%2715%27%20y2%3D%2727%27%2F%3E%3Cline%20x1%3D%273%27%20y1%3D%2715%27%20x2%3D%2712%27%20y2%3D%2715%27%2F%3E%3Cline%20x1%3D%2718%27%20y1%3D%2715%27%20x2%3D%2727%27%20y2%3D%2715%27%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2715%27%20cy%3D%2715%27%20r%3D%272.5%27%20fill%3D%27white%27%20stroke%3D%27black%27%20stroke-width%3D%271%27%2F%3E%3C%2Fsvg%3E") 15 15, crosshair !important; }
+  /* [v150 2026-09-29] 绘制期间叠加层不抢点击。
+   * 地块/管网叠加层是 interactive path（带 popup），它们会把 Map 的 click 拦在自己身上
+   * （Leaflet 1.9.4 _findEventTargets 命中图层后不再补上 map），于是「在地块范围内点顶点没反应」。
+   * 实测不隔离时 4 次点击只登记 3 个顶点 —— 用户点出来的框自然与他以为点的位置不一致。
+   * 标点在 marker-pane，不受本规则影响 ⇒ 绘制中仍可拖动已有顶点微调。 */
+  .leaflet-container.drawing .leaflet-overlay-pane path{ pointer-events:none !important; }
   /* 窄屏：左侧工具栏转为顶部横条（纵向滚动），地图仍占满剩余空间 */
   @media(max-width:700px){
     .main{flex-direction:column}
@@ -155,6 +166,7 @@
         <div class="tools">
           <button class="mbtn" id="btnDraw">✏️ 开始画框</button>
           <button class="mbtn" id="btnFinish">✅ 完成</button>
+          <button class="mbtn" id="btnAddPt">➕ 加点</button>
           <button class="mbtn" id="btnUndo">↩ 撤销</button>
           <button class="mbtn" id="btnMeasure">📏 测距</button>
           <button class="mbtn" id="btnClear">🗑 清除</button>
@@ -167,7 +179,7 @@
         <div class="row"><span class="k">平方</span><span class="v"><span id="sq">0</span><small>㎡</small></span></div>
         <div class="row"><span class="k">周长</span><span class="v"><span id="peri">0</span><small>m</small></span></div>
         <div class="row"><span class="k">顶点</span><span class="v"><span id="pts">0</span><small>个</small></span></div>
-        <div class="hint">点击地图添加顶点；拖动顶点可微调；「完成」自动闭合并计算。面积按真实球面经纬度计算。</div>
+        <div class="hint">点击地图添加顶点；拖动顶点可微调；「完成」自动闭合并计算。画完点「➕ 加点」，拖动框线上的 ⊕ 手柄（或贴着框线单击）即可继续增加标点，把地块贴得更准。面积按真实球面经纬度计算。</div>
         <div class="save-row">
           <button class="mbtn mbtn-primary" id="btnCopy">↩ 回传设计工具</button>
           <button class="mbtn mbtn-primary" id="btnSavePlot">💾 保存地块</button>
@@ -179,7 +191,7 @@
         <div class="save-row">
           <button class="mbtn" id="btnImport">⬆ 导入地块(GeoJSON/KML)</button>
         </div>
-        <input type="file" id="fileImport" accept=".geojson,.json,.kml,.kmz" style="display:none" />
+        <input type="file" id="fileImport" accept=".geojson,.json,.kml" style="display:none" />
         <div class="hint">保存后可累计多个地块；在「精准灌溉」页地块库「设为当前」，或在数字农业（水肥决策）页下拉选择。</div>
       </section>
       <section>
@@ -213,8 +225,65 @@
     return;
   }
 
+  /* ===== [v150 2026-09-29] 矢量渲染器防呆：切断「一个坏图层拖垮全部矢量层」=====
+   * 根因（用户反复反馈「面积框与标点不吻合，一放大缩小面积框就变」）——
+   *   Leaflet 1.9.4 的 Renderer 里三个循环
+   *     _onZoomEnd()  : for (var id in this._layers) { this._layers[id]._project(); }
+   *     _updatePaths(): for (var id in this._layers) { this._layers[id]._update();  }
+   *     _reset()      : for (var id in this._layers) { this._layers[id]._reset();   }
+   *   全都**没有 try/catch**。地图上所有矢量图层共享同一个 Renderer，所以：
+   *   任一图层（如地块库里含 null 顶点的坏地块）抛错 ⇒ 循环中断 ⇒ 排在其后的
+   *   图层不再重投影。测量框每次 refresh() 都先 removeLayer 再 addTo，永远排在
+   *   _layers 末尾 ⇒ 必然是最容易被牺牲的那一个 ⇒ 只有它停在上一级缩放，
+   *   缩放级差 2^k 倍：标点（marker pane，独立链路）走了，框没走。
+   * 对策：把三个循环替换为「逐层独立 try/catch」，坏图层只牺牲自己并打日志。
+   *   对正常数据完全等价（同一循环、同一顺序、同一调用），只多一层隔离。 */
+  var ryRendPatched = false;
+  function rySafeLoop(rend, method, tag) {
+    var bad = 0, id, lay;
+    for (id in rend._layers) {
+      lay = rend._layers[id];
+      try { lay[method](); }
+      catch (e) {
+        bad++;
+        try { if (lay && lay._parts !== undefined) lay._parts = []; } catch (e2) {}   // 坏图层自己消失，不再参与绘制
+      }
+    }
+    if (bad && window.console && console.warn) {
+      console.warn('[map-measure] 矢量层 ' + tag + ' 有 ' + bad + ' 个图层异常（已逐层隔离，其它图层/测量框不受影响）。');
+    }
+  }
+  function hardenRendererLoop() {
+    if (ryRendPatched) return true;
+    var proto = null;
+    try { if (typeof L !== 'undefined' && L.Renderer && L.Renderer.prototype) proto = L.Renderer.prototype; } catch (e) {}
+    if (!proto) {   // 兜底：直接从实例取原型，不依赖 L.Renderer 是否导出
+      try { map.eachLayer(function (l) { if (!proto && l instanceof L.Path && l._renderer) proto = Object.getPrototypeOf(l._renderer); }); } catch (e) {}
+    }
+    if (!proto || proto.__rySafeLoop) return false;
+    proto.__rySafeLoop = true;
+    proto._onZoomEnd   = function () { rySafeLoop(this, '_project', 'zoomend/_project'); };
+    proto._updatePaths = function () { rySafeLoop(this, '_update', 'update/_update'); };
+    proto._reset       = function () {
+      try { this._update(); } catch (e) {}
+      try { this._updateTransform(this._center, this._zoom); } catch (e) {}
+      rySafeLoop(this, '_reset', 'viewreset/_reset');
+    };
+    ryRendPatched = true;
+    return true;
+  }
+  hardenRendererLoop();
+
   // ===== 地图初始化 =====
-  var map = L.map('map', { center:[18.2528, 109.5119], zoom:15, doubleClickZoom:false });
+  // [GCJ-02 修复 2026-09-28] 高德瓦片是 GCJ-02；默认中心/定位三亚的
+  // 18.2528,109.5119 是真实 WGS-84，须先转 GCJ-02 才能贴合高德影像。
+  var defCenter = RunyeGeo ? RunyeGeo.wgs2gcj(18.2528, 109.5119) : { lat: 18.2528, lng: 109.5119 };
+  // 数据始终存 GCJ-02；仅在 OSM 显示边界转为 WGS-84。
+  var baseIdx=0, switchingBase=false;
+  function toDisplay(p){var q=RunyeGeo.coordPair(p);if(baseIdx===2){var w=RunyeGeo.gcj2wgs(q[0],q[1]);return [w.lat,w.lng];}return q;}
+  function fromDisplay(p){var q=RunyeGeo.coordPair(p);return baseIdx===2?RunyeGeo.wgs2gcj(q[0],q[1]):{lat:q[0],lng:q[1]};}
+  function displayRing(ll){return ll.map(toDisplay);}
+  var map = L.map('map', { center:[defCenter.lat, defCenter.lng], zoom:15, doubleClickZoom:false });
   // 高德卫星瓦片（免Key直连，国内快）
   var gaodeSat = L.tileLayer('https://webst0{s}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}',
     { subdomains:'1234', maxZoom:19, attribution:'© 高德地图' });
@@ -235,8 +304,8 @@
   function lsGet(k,d){ try{ var s=localStorage.getItem(k); return s?JSON.parse(s):d; }catch(e){ return d; } }
   function lsSet(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); return true; }catch(e){ return false; } }
   function tip(s){ document.getElementById('tip').textContent=s; }
-  function curView(){ var c=map.getCenter(); return {lat:+c.lat.toFixed(6),lng:+c.lng.toFixed(6),zoom:map.getZoom()}; }
-  function saveView(){ var v=curView(); v.ts=Date.now(); lsSet(K_VIEW,v); }
+  function curView(){ var c=fromDisplay(map.getCenter()); return {lat:+c.lat.toFixed(6),lng:+c.lng.toFixed(6),zoom:map.getZoom()}; }
+  function saveView(){ if(switchingBase) return; var v=curView(); v.ts=Date.now(); lsSet(K_VIEW,v); }
 
   // 打开时恢复上次位置（数据缺失/损坏则保持默认中心，不影响首次使用）
   (function(){
@@ -252,7 +321,7 @@
   map.on('moveend', saveView);
 
   // 瓦片加载失败探测
-  map.on('tileerror', function(){ document.getElementById('warn').style.display='block'; });
+  [gaodeSat,gaodeLabel,osm].forEach(function(layer){ layer.on('tileerror', function(){ document.getElementById('warn').style.display='block'; }); layer.on('tileload', function(){ document.getElementById('warn').style.display='none'; }); });
 
   // ===== 左侧工具栏宽度拖拽（2026-09-20）=====
   // 项目约定：没拖过不写任何变量——.side 宽度走 var(--mapSideW,250px) 回退，默认视觉逐像素不变；
@@ -302,23 +371,47 @@
 
   // ===== 绘制逻辑 =====
   var drawing = false;
+  var currentMapPlotId=null;
   var points = [];           // [{lat,lng}]
-  var markers = [];          // L.marker
+  var markers = [];          // L.marker —— 与 points 必须始终同长同序（下标即点序）
   var poly = null;           // L.polygon 实时
   var rubber = null;         // 橡皮筋线
+  var lastAdded = null;      // [v153] 最近新增的顶点 marker；「撤销」优先撤它（无记录时等同弹队尾）
   var latlngs = function(){ return points.map(function(p){return [p.lat,p.lng];}); };
+
+  /* ===== [v152 2026-09-29] 测量框接入「图层」面板 ===== 
+   * 用户诉求：地图上自己画的测量框/顶点标点/面积文字，也要能一键隐藏显示
+   *   （看地块叠加层、管网走向时不想被自己画的框挡）。
+   * 做法：把 poly / markers / rubber 全部收进同一个 LayerGroup —— 勾选框一关 = 整组
+   *   摘离地图（框、顶点、橡皮筋、面积文字一起消失），一开 = 整组放回，原样复原。
+   *   数据（points）与数值一律不动，也不重建对象，所以「开关」永远是免费的。
+   * 三个必须配套处理的点（漏一个就会「藏了还留在屏幕上」）：
+   *   ① 面积文字是 permanent tooltip，它挂在 marker 上但属于独立的层 —— 摘组前显式
+   *      unbind、放回时由 updateAreaBox() 重绑，否则文字会残留或被清一半。
+   *   ② 测量标点原本与「搜索定位红标」共用 .ry-pin 类名 ⇒ 测量标点另加 ry-mpin，
+   *      保证搜索结果的红标不跟着被关掉，闸门也能按 .ry-mpin 精确计数。
+   *   ③ 关着的时候又开始画框会看不见落点 ⇒ addPoint 里自动把开关打开。
+   * 状态随既有 runye_map_layers 一起持久化（刷新后保持）。
+   * 注意：本条只管「面积测量」；紫色测距线是另一套（measureLayer），不受本开关影响。 */
+  var measureGroup = L.layerGroup().addTo(map);
+  var measureOn = true;
+  function setMeasureOn(on){
+    on = !!on;
+    if (on === measureOn) return;          // 幂等：状态没变就返回（同时切断「同步面板→回调→再同步」的递归）
+    measureOn = on;
+    if (measureOn){
+      if (!map.hasLayer(measureGroup)) measureGroup.addTo(map);
+      updateAreaBox(geodesicArea(points));  // 面积文字随组摘除被清掉，放回时必须重绑
+    } else {
+      if (areaAnchor){ try{ areaAnchor.unbindTooltip(); }catch(e){} areaAnchor = null; }
+      if (map.hasLayer(measureGroup)) measureGroup.remove();
+    }
+    if (rymHandle && rymHandle.setLayer){ try{ rymHandle.setLayer('measure', measureOn); }catch(e){} }
+  }
 
   function toRad(d){ return d*Math.PI/180; }
   // 球面多边形面积（平方米）
-  function geodesicArea(pts){
-    if(pts.length<3) return 0;
-    var R=6378137, area=0;
-    for(var i=0;i<pts.length;i++){
-      var p1=pts[i], p2=pts[(i+1)%pts.length];
-      area += (toRad(p2.lng)-toRad(p1.lng))*(2+Math.sin(toRad(p1.lat))+Math.sin(toRad(p2.lat)));
-    }
-    return Math.abs(area*R*R/2);
-  }
+  function geodesicArea(pts){ return RunyeGeo.geodesicArea(pts); }
   // haversine 距离（米）
   function hav(a,b){
     var R=6378137, dLat=toRad(b.lat-a.lat), dLng=toRad(b.lng-a.lng);
@@ -332,12 +425,45 @@
     return s;
   }
 
+  // ===== 实时面积框（2026-09-28 用户要求）：点击测量点后，地图上实时显示面积/周长 =====
+  // 2026-09-28 二次修改：吸附到最后一个顶点标点（marker tooltip 与标记严格同步，
+  // 缩放/平移/拖顶点都不漂移）。旧版独立 tooltip 挂均值中心经纬度，缩放动画中会漂移。
+  // 少于 2 点不显示；markers 与 points 平行维护（撤销/清除同步 pop），重绑安全。
+  var areaAnchor=null;   // 当前吸附面积框的顶点 marker
+  function updateAreaBox(area){
+    // 锚点未变时只更新文字、绝不 unbind/rebind：否则 permanent tooltip 每次 refresh
+    // （尤其 zoomend→syncView→refresh）都会销毁重建 DOM，重触发淡入动画，缩放时面积框「闪烁/变化」。
+    // 实证（_zoom_drift_test）：位置本就恒定吸附标点（dxr 摆幅≈0），问题只在重建闪烁，故改为原地更新内容。
+    if(!measureOn || points.length<2 || markers.length!==points.length){
+      if(areaAnchor){ areaAnchor.unbindTooltip(); areaAnchor=null; }
+      return;
+    }
+    var muTxt = points.length>=3 ? (area/666.67).toLocaleString('zh-CN',{maximumFractionDigits:2})+' 亩' : '—';
+    var html='<div class="ab-t">📐 '+muTxt+'</div>'
+      +'<div class="ab-s">周长 '+perimeter(points).toLocaleString('zh-CN',{maximumFractionDigits:0})+' m · '+points.length+' 顶点</div>';
+    var newAnchor=markers[markers.length-1];
+    if(areaAnchor===newAnchor && areaAnchor.getTooltip()){
+      areaAnchor.setTooltipContent(html);          // 标点未变：仅改文字，零闪烁
+    }else{
+      if(areaAnchor){ areaAnchor.unbindTooltip(); }
+      areaAnchor=newAnchor;
+      areaAnchor.bindTooltip(html,{permanent:true,direction:'right',offset:[10,0],className:'ry-area-tip',interactive:false,zoomAnimation:true});
+    }
+  }
+
+  /* [v153 2026-09-29] 多边形绘制独立成 drawPoly(ring)：refresh() 传当前点表；
+   * 加点模式下拖 ⊕ 手柄时传「临时把待插入点算进去」的 ring，做实时预览（数据不动）。
+   * 加点模式下额外挂 click：贴着框线单击也能插点（见 onPolyClick）。 */
+  function drawPoly(ring){
+    if(poly){ measureGroup.removeLayer(poly); poly=null; }
+    if(ring && ring.length>=2){
+      poly = L.polygon(displayRing(ring), {color:'#ff6b00', weight:3, fillColor:'#ff8c1a', fillOpacity:0.22, className:'ry-mpoly'}).addTo(measureGroup);
+      if(addMode) poly.on('click', onPolyClick);
+    }
+  }
   function refresh(){
     // 更新多边形
-    if(poly){ map.removeLayer(poly); poly=null; }
-    if(points.length>=2){
-      poly = L.polygon(latlngs(), {color:'#16a34a', weight:2, fillColor:'#22c55e', fillOpacity:0.25}).addTo(map);
-    }
+    drawPoly(points.length>=2 ? latlngs() : null);
     // 数值
     var area = geodesicArea(points);
     document.getElementById('mu').textContent = (area/666.67).toLocaleString('zh-CN',{maximumFractionDigits:2});
@@ -345,48 +471,266 @@
     document.getElementById('sq').textContent = area.toLocaleString('zh-CN',{maximumFractionDigits:0});
     document.getElementById('peri').textContent = perimeter(points).toLocaleString('zh-CN',{maximumFractionDigits:0});
     document.getElementById('pts').textContent = points.length;
+    updateAreaBox(area);
   }
+
+  /* ===== 视图同步保险（2026-09-28 修：用户报「面积框线不吸附标点，在标点外面一大圈」）=====
+   * 症状（对用户截图做像素取证）：框线 8 个顶点 = 8 个标点绕缩放锚点整体放大 2.008 倍
+   *   （纯缩放、无旋转、残差 ≤4.6px），而描边宽度仍是 3px（未被 CSS 缩放）
+   *   ⇒ 不是样式问题，是「矢量路径坐标停在高一级缩放」：框线错、标点/面积提示框/底图都对。
+   * 成因（Leaflet 1.9.4 的事件分工）：标点在 zoom/viewreset 就重定位，而矢量层要等
+   *   zoomend/viewreset 才重新投影路径（Renderer._onZoomEnd → Path._project）。
+   *   出现「缩放级已切换但矢量层没收到重投影」的时序，就会稳定复现这个症状。
+   * 对策：视图安定后强制 ①矢量层整体重投影 + 容器 transform 归位 ②标点按当前缩放重定位
+   *   ③重建多边形并重绑面积框。全程走 Leaflet 自己走的同一条路（renderer._reset），
+   *   不引入新依赖、不改数据、不改数值。 */
+  var viewSyncing=false, syncRetry=0;
+  function syncView(){
+    /* [v150 2026-09-29 重写] 旧版三处缺陷，逐一改对：
+     *  ① `|| map._animatingZoom` 是「静默放弃」：恰在动画中触发就直接 return 且
+     *     永不重试，等于这次同步被丢掉 ⇒ 改为「不打断动画，但补一次」（限次防死循环）。
+     *  ② 用 rend._reset() 一把梭：它内部同样是「无 try/catch 的整轮循环」，
+     *     任一坏图层抛错就整段跳过，而外层 catch(e){} 把异常静默吞掉 ——
+     *     于是连后面的 refresh() 都没跑（这正是 2026-09-28 那次「修了没用」的原因）。
+     *     ⇒ 改为**逐图层独立 try/catch** 重投影，坏图层只牺牲自己。
+     *  ③ 异常不再静默：全部记进数组并 console.warn，杜绝「改了跟没改一样」。
+     *  ④ 不再每次 zoomend 都 refresh() 重建测量框（那会让它永远排在 renderer
+     *     _layers 末尾，成为最容易被牺牲的图层）；只在它真的坏了才重建。 */
+    if(viewSyncing || switchingBase) return;
+    if(map._animatingZoom){                                     // 缩放动画未结束：等它结束再补（最多 20 次≈1.6s）
+      if(syncRetry++ < 20) setTimeout(syncView, 80);
+      return;
+    }
+    syncRetry=0;
+    viewSyncing=true;
+    hardenRendererLoop();                                       // 兜底：实例存在后确保原型已加固
+    var errs=[];
+    try{
+      // ① renderer 容器：尺寸/viewBox/transform 归位（先做，后面的 _update/_project 依赖 _bounds）
+      var rends=[], seen=[];
+      map.eachLayer(function(l){
+        try{
+          if(l instanceof L.Path && l._renderer && seen.indexOf(l._renderer)<0){ seen.push(l._renderer); rends.push(l._renderer); }
+        }catch(e){}
+      });
+      for(var r=0;r<rends.length;r++){
+        try{ rends[r]._update(); }catch(e){ errs.push('renderer._update: '+((e&&e.message)||e)); }
+        try{ rends[r]._updateTransform(rends[r]._center, rends[r]._zoom); }catch(e){ errs.push('renderer._updateTransform: '+((e&&e.message)||e)); }
+      }
+      // ② 每个矢量层各自重投影（含地块叠加层）；坏图层只跳过自己，绝不连累测量框
+      var polyBad=false;
+      map.eachLayer(function(l){
+        if(!(l instanceof L.Path)) return;
+        try{ l._project(); }
+        catch(e){ errs.push('path._project: '+((e&&e.message)||e)); if(l===poly) polyBad=true; return; }
+        try{ l._update(); }
+        catch(e){ errs.push('path._update: '+((e&&e.message)||e)); if(l===poly) polyBad=true; }
+      });
+      // ③ 标点按当前缩放重定位（marker pane 独立链路，正常本就正确，这里只兜底）
+      for(var i=0;i<markers.length;i++){
+        if(points[i]){ try{ markers[i].setLatLng(toDisplay(points[i])); }catch(e){ errs.push('marker.setLatLng: '+((e&&e.message)||e)); } }
+      }
+      // ④ 测量框自检：只有它缺失/没投影出来/本轮投影失败，才重建
+      if(points.length>=2 && (polyBad || !poly || !poly._parts)) refresh();
+    }catch(e){ errs.push('syncView: '+((e&&e.message)||e)); }
+    viewSyncing=false;
+    if(errs.length && window.console && console.warn){
+      console.warn('[map-measure] syncView 捕获 '+errs.length+' 项异常（已逐层隔离，测量框不受影响）：', errs);
+    }
+  }
+  map.on('zoomend viewreset resize', syncView);
 
   /* 顶点标识（2026-09-15 用户要求）：默认大头针太大，缩小到 60%（15×25），样式同默认蓝针 */
   function pinIcon(){
     return L.divIcon({
-      className:'ry-pin',
+      className:'ry-pin ry-mpin',
       html:'<svg width="15" height="25" viewBox="0 0 25 41"><path d="M12.5 0C5.6 0 0 5.6 0 12.5 0 21.9 12.5 41 12.5 41S25 21.9 25 12.5C25 5.6 19.4 0 12.5 0z" fill="#2a81cb" stroke="#fff" stroke-width="1.5"/><circle cx="12.5" cy="12.5" r="4" fill="#fff"/></svg>',
       iconSize:[15,25],iconAnchor:[7,24]
     });
   }
 
-  function addPoint(lat,lng){
-    var p={lat:lat,lng:lng};
-    points.push(p);
-    var idx=points.length-1;
-    var m=L.marker([lat,lng],{draggable:true,icon:pinIcon(),keyboard:false});
+  /* ===== [v153 2026-09-29] 「➕ 加点」：画完之后仍能在框线上增加标点，把地块贴得更准 =====
+   * 用户诉求（截图：画好的橙色框 + 「189.49 亩 · 17 顶点」）：
+   *   「地图绘制的框线 要可以增加标点，这样我可以更精准的得到地块。」
+   * 现状：画完再点「开始画框」，新点只能**接在队尾** ⇒ 框线立刻拐出一个尖角，
+   *   对「把某条边贴准田埂」毫无帮助。
+   * 做法（两条入口，都只动点表、不动别的）：
+   *   ① 每条边中点挂一个橙色 ⊕ 手柄。它是 marker（marker-pane），因此**天然不会**被
+   *      地块/管网那些 interactive path 抢走点击 —— v150 实测 overlay path 命中后不再把
+   *      click 补给 map，拿 path 当手柄会时灵时不灵。把 ⊕ 拖到真实边界松手 ⇒ 就在这条边上
+   *      插进一个顶点，并直接成为可继续拖动的普通标点。
+   *   ② 贴着框线（≤ EDGE_TOL px）单击 ⇒ 先吸附到最近边上的垂足再插点，框线不会被点歪。
+   * 配套必修：原 addPoint 的 drag 处理器把下标 idx **闭包写死**，一旦在中间插点，
+   *   其后所有标点的下标全部错位 —— 拖动就会改到别的点、把框线搅乱。
+   *   这里改成运行时用 markers.indexOf(m) 现取，插入/撤销都不再错位。
+   * 类名约定：顶点标点 = .ry-mpin（既有闸门按它计数）；中点手柄 = .ry-mid（互不污染）。 */
+  var addMode=false;          // 「加点」模式开关
+  var midHandles=[];          // 每边中点的 ⊕ 手柄 marker（只在 addMode 下存在）
+  var EDGE_TOL=14;            // 判定「贴着框线单击」的像素容差
+
+  /* 中点手柄图标：白底橙圈 ⊕；锚点居中（不像顶点针那样靠下尖端） */
+  function midIcon(){
+    return L.divIcon({
+      className:'ry-pin ry-mid',
+      html:'<svg width="18" height="18" viewBox="0 0 18 18">'
+         + '<circle cx="9" cy="9" r="6.5" fill="#ffffff" fill-opacity="0.92" stroke="#ff6b00" stroke-width="2"/>'
+         + '<path d="M9 5.6V12.4M5.6 9H12.4" stroke="#ff6b00" stroke-width="1.8" stroke-linecap="round"/>'
+         + '</svg>',
+      iconSize:[18,18], iconAnchor:[9,9]
+    });
+  }
+
+  /* 顶点 marker 的拖动绑定：下标**运行时现取**（插点/撤销之后仍指向正确的点） */
+  function bindVertexDrag(m){
+    m.on('dragstart', function(){ clearMidHandles(); });   // 拖顶点期间手柄位置必然过期，先撤掉
     m.on('drag', function(e){
-      var ll=e.target.getLatLng();
-      points[idx]={lat:ll.lat,lng:ll.lng};
-      if(rubber) map.removeLayer(rubber);
+      var i=markers.indexOf(m);
+      if(i<0) return;
+      var ll=fromDisplay(e.target.getLatLng());
+      points[i]={lat:ll.lat,lng:ll.lng};
+      if(rubber) measureGroup.removeLayer(rubber);
       refresh();
     });
-    m.addTo(map);
-    markers.push(m);
+    m.on('dragend', function(){ buildMidHandles(); });     // 松手后按新形位重建手柄
+    return m;
+  }
+
+  /* 在 points / markers 的 idx 位置**同步**插入一个顶点（idx 越界则追加到队尾）。
+   * 两个数组必须始终同长同序 —— updateAreaBox 里就有 markers.length!==points.length 的守卫。 */
+  function addPointAt(idx,lat,lng){
+    if(!measureOn) setMeasureOn(true);   // 框关着还画就看不见落点：绘制即自动显示
+    var n=points.length;
+    if(!(idx>=0) || idx>n) idx=n;
+    points.splice(idx,0,{lat:lat,lng:lng});
+    var m=bindVertexDrag(L.marker(toDisplay([lat,lng]),{draggable:true,icon:pinIcon(),keyboard:false}));
+    m.addTo(measureGroup);
+    markers.splice(idx,0,m);
+    lastAdded=m;
     refresh();
+    return idx;
+  }
+  function addPoint(lat,lng){ return addPointAt(points.length, lat, lng); }   // 旧行为：追加到队尾
+
+  /* ---- 中点 ⊕ 手柄 ---- */
+  function clearMidHandles(keep){
+    var remain=[];
+    for(var i=0;i<midHandles.length;i++){
+      var h=midHandles[i];
+      if(h===keep){ remain.push(h); continue; }   // 正在拖的那个绝不能从地图上摘掉（会打断 Leaflet 拖拽）
+      try{ if(map.hasLayer(h)) measureGroup.removeLayer(h); }catch(e){}
+    }
+    midHandles=remain;
+  }
+  function buildMidHandles(){
+    clearMidHandles();
+    if(!addMode || points.length<2) return;       // 不足 2 点没有「边」，无从插点
+    for(var i=0;i<points.length;i++){
+      if(points.length===2 && i===1) break;       // 两点时首尾是同一段，只给一个手柄
+      midHandles.push(makeMidHandle(i));
+    }
+  }
+  function makeMidHandle(edgeIdx){
+    var a=points[edgeIdx], b=points[(edgeIdx+1)%points.length];
+    var h=L.marker(toDisplay([(a.lat+b.lat)/2,(a.lng+b.lng)/2]),
+      {draggable:true, icon:midIcon(), keyboard:false, zIndexOffset:800});
+    h._ryEdge=edgeIdx;
+    h.bindTooltip('拖动我 → 在此边增加标点',{direction:'top',offset:[0,-14]});
+    // 拖动中实时预览：把该边按「已在此处插了一点」重绘框线（points 不动，纯预览）
+    h.on('drag', function(e){
+      var p=fromDisplay(e.target.getLatLng());
+      if(points.length>=2){
+        var ring=points.slice();
+        ring.splice(Math.min(h._ryEdge+1, ring.length), 0, {lat:p.lat,lng:p.lng});
+        drawPoly(ring.map(function(q){ return [q.lat,q.lng]; }));
+      }
+    });
+    h.on('dragend', function(e){ commitMidHandle(h, e.target.getLatLng()); });
+    h.on('click', function(e){ commitMidHandle(h, e.target.getLatLng()); });   // 不拖、点一下也插点
+    h.addTo(measureGroup);
+    return h;
+  }
+  /* 把中点手柄「转正」为正式顶点：插点 + 换标准顶点针 + 重建手柄。
+   * 注意**不要复用这个 marker**：Leaflet 的 MarkerDrag 把拖动监听绑在创建时的 icon 元素上，
+   * setIcon() 会换掉该元素 ⇒ 复用会让新顶点再也拖不动。这里直接新建一个标准顶点 marker。 */
+  function commitMidHandle(h, latlng){
+    if(!latlng || !isFinite(latlng.lat) || !isFinite(latlng.lng)) return;
+    if(!(h._ryEdge>=0)) return;                   // 已提交过（dragend 与 click 可能连着触发）⇒ 防重复插点
+    var e=h._ryEdge, n=points.length;
+    if(n<2) return;
+    var at=Math.min(e+1, n);                      // 首尾那条边（e=n-1）插到队尾，环序不变
+    var canonical=fromDisplay(latlng);
+    var lat=canonical.lat, lng=canonical.lng;
+    h._ryEdge=null;
+    midHandles=midHandles.filter(function(x){ return x!==h; });   // 先把自己从手柄集合摘掉
+    clearMidHandles();                                            // 其余手柄的边号已失效，全部撤掉
+    try{ if(map.hasLayer(h)) measureGroup.removeLayer(h); }catch(err){}
+    addPointAt(at, lat, lng);
+    buildMidHandles();                                            // 新裂成的两条边重新给出手柄
+    tip('已在框线上增加标点（共 '+points.length+' 个顶点）；继续拖动它微调，或再拖别的 ⊕。');
+  }
+  /* 找离点击处最近的边，返回该边上的垂足（吸附用，避免把框线点歪） */
+  function nearestEdgeSnap(latlng){
+    var n=points.length; if(n<2) return null;
+    var p=map.latLngToContainerPoint(latlng), best=null;
+    for(var i=0;i<n;i++){
+      var a=map.latLngToContainerPoint(toDisplay(points[i]));
+      var b=map.latLngToContainerPoint(toDisplay(points[(i+1)%n]));
+      var vx=b.x-a.x, vy=b.y-a.y, l2=vx*vx+vy*vy;
+      var t=l2>0 ? ((p.x-a.x)*vx+(p.y-a.y)*vy)/l2 : 0;
+      if(t<0) t=0; else if(t>1) t=1;
+      var qx=a.x+vx*t, qy=a.y+vy*t;
+      var d=Math.sqrt((p.x-qx)*(p.x-qx)+(p.y-qy)*(p.y-qy));
+      if(!best || d<best.d) best={d:d, edge:i, x:qx, y:qy};
+    }
+    if(!best || best.d>EDGE_TOL) return null;      // 离框线太远不算，避免误加点
+    var ll=fromDisplay(map.containerPointToLatLng([best.x,best.y]));
+    return { edge:best.edge, lat:ll.lat, lng:ll.lng };
+  }
+  /* 加点模式下「贴着框线单击」⇒ 吸附垂足后插点 */
+  function onPolyClick(e){
+    if(!addMode) return;
+    var sn=nearestEdgeSnap(e.latlng);
+    if(!sn){ tip('请贴着框线单击（或拖动线上的 ⊕ 手柄）来增加标点。'); return; }
+    addPointAt(sn.edge+1, sn.lat, sn.lng);
+    buildMidHandles();
+    tip('已在框线上增加标点（共 '+points.length+' 个顶点）；可拖动它微调。');
+  }
+  function setAddMode(on){
+    on = !!on && points.length>=2;                 // 少于 2 点没有边，加点无从谈起
+    if(on===addMode){ if(on) buildMidHandles(); return; }   // 幂等
+    addMode=on;
+    var b=document.getElementById('btnAddPt');
+    if(b){ b.classList.toggle('btn-on',addMode); b.textContent = addMode ? '➕ 加点中…' : '➕ 加点'; }
+    if(addMode){
+      if(drawing) setDrawing(false);               // 与「画框」互斥
+      if(measuring) finishMeasure();               // 与「测距」互斥
+      buildMidHandles();
+      tip('加点模式：把框线上的 ⊕ 手柄拖到地块真实边界处松手即增加标点；也可贴着框线单击。再点「➕ 加点」退出。');
+    }else{
+      clearMidHandles();
+      tip('已退出加点模式。');
+    }
   }
 
   map.on('click', function(e){
     if(!drawing) return;
-    addPoint(e.latlng.lat, e.latlng.lng);
+    var p=fromDisplay(e.latlng);
+    addPoint(p.lat, p.lng);
   });
   map.on('mousemove', function(e){
     if(!drawing || points.length===0) return;
-    if(rubber) map.removeLayer(rubber);
+    if(rubber) measureGroup.removeLayer(rubber);
     var last=points[points.length-1];
-    rubber=L.polyline([[last.lat,last.lng],[e.latlng.lat,e.latlng.lng]],{color:'#16a34a',weight:1,dashArray:'4,4',opacity:.7}).addTo(map);
+    rubber=L.polyline([toDisplay(last),[e.latlng.lat,e.latlng.lng]],{color:'#ff6b00',weight:2,dashArray:'6,4',opacity:.9}).addTo(measureGroup);
   });
-  map.on('mouseout', function(){ if(rubber){ map.removeLayer(rubber); rubber=null; } });
+  map.on('mouseout', function(){ if(rubber){ measureGroup.removeLayer(rubber); rubber=null; } });
 
   // ===== 按钮 =====
   var btnDraw=document.getElementById('btnDraw');
   function setDrawing(on){
+    if(on && measuring) finishMeasure();
+    if(!on && rubber){measureGroup.removeLayer(rubber);rubber=null;}
+    if(on) setAddMode(false);            // [v153] 与「加点」互斥：一开始画框就退出加点模式
     drawing=on;
     btnDraw.classList.toggle('btn-on',drawing);
     map.getContainer().classList.toggle('drawing',drawing);
@@ -397,36 +741,62 @@
       : '点击「✏️ 开始画框」后，在卫星图上依次点击地块边界顶点即可。';
   }
   btnDraw.onclick=function(){ setDrawing(!drawing); };
+  // [v153] 加点模式开关：需先有框（≥2 点）才有「边」可插点
+  document.getElementById('btnAddPt').onclick=function(){
+    if(!addMode && points.length<2){ tip('先点「✏️ 开始画框」画出一个框（至少 2 个顶点），再用「➕ 加点」在框线上插点。'); return; }
+    setAddMode(!addMode);
+  };
   document.getElementById('btnFinish').onclick=function(){
-    if(rubber){map.removeLayer(rubber);rubber=null;}
+    if(rubber){measureGroup.removeLayer(rubber);rubber=null;}
     refresh();
+    if(addMode) setAddMode(false);  // [v153] 完成后顺手退出加点模式
     if(drawing) setDrawing(false); // 闭合后退出绘制，恢复地图拖拽与缩放查看
   };
   document.getElementById('btnUndo').onclick=function(){
     if(points.length===0) return;
-    points.pop();
-    var m=markers.pop(); if(m) map.removeLayer(m);
+    // [v153] 「撤销」优先撤掉**最近新增**的那个顶点（加点流程下才有意义）；
+    //   没有插入记录时 i=markers.length-1，与旧行为（弹队尾）逐字等价。
+    var i = lastAdded ? markers.indexOf(lastAdded) : -1;
+    if(i<0) i = markers.length-1;
+    points.splice(i,1);
+    var m=markers.splice(i,1)[0];
+    if(m){ measureGroup.removeLayer(m); if(m===lastAdded) lastAdded=null; }
     refresh();
+    if(addMode) buildMidHandles();
   };
   document.getElementById('btnClear').onclick=function(){
-    points=[]; markers.forEach(function(m){map.removeLayer(m);}); markers=[];
-    if(poly){map.removeLayer(poly);poly=null;} if(rubber){map.removeLayer(rubber);rubber=null;}
+    setAddMode(false);                 // [v153] 点全没了，加点模式一并退出（⊕ 手柄随模式清除）
+    currentMapPlotId=null;
+    if(measuring) finishMeasure();
+    points=[]; markers.forEach(function(m){measureGroup.removeLayer(m);}); markers=[];
+    lastAdded=null;
+    if(poly){measureGroup.removeLayer(poly);poly=null;} if(rubber){measureGroup.removeLayer(rubber);rubber=null;}
     refresh();
   };
 
   // 底图切换
-  var baseArr=['高德卫星','高德卫星+路网','OSM街道']; var baseIdx=0;
+  var baseArr=['高德卫星','高德卫星+路网','OSM街道'];
   document.getElementById('btnBase').onclick=function(){
-    baseIdx=(baseIdx+1)%baseArr.length;
-    map.removeLayer(baseLayers[baseArr[(baseIdx+2)%3]]);
-    baseLayers[baseArr[baseIdx]].addTo(map);
-    if(baseArr[baseIdx].indexOf('路网')>=0 && !map.hasLayer(gaodeLabel)){}
-    this.textContent='底图:'+baseArr[baseIdx].replace('高德','');
+    var center=fromDisplay(map.getCenter()), zoom=map.getZoom();
+    switchingBase=true;
+    try{
+      map.removeLayer(baseLayers[baseArr[baseIdx]]);
+      baseIdx=(baseIdx+1)%baseArr.length;
+      baseLayers[baseArr[baseIdx]].addTo(map);
+      map.setView(toDisplay(center),zoom,{animate:false});
+      markers.forEach(function(m,i){m.setLatLng(toDisplay(points[i]));});
+      if(rubber){measureGroup.removeLayer(rubber);rubber=null;}
+      refresh(); renderMeasure(); if(addMode) buildMidHandles();
+      if(searchMark && lastPick) markSearch(lastPick);
+      if(rymHandle && rymHandle.refresh) rymHandle.refresh();
+      this.textContent='底图:'+baseArr[baseIdx].replace('高德','');
+    }finally{switchingBase=false;saveView();}
   };
 
   // 定位三亚
   document.getElementById('btnLocate').onclick=function(){
-    map.setView([18.2528,109.5119],15);
+    var c = RunyeGeo ? RunyeGeo.wgs2gcj(18.2528, 109.5119) : { lat:18.2528, lng:109.5119 };
+    map.setView(toDisplay(c),15);
   };
 
   // ===== 地点搜索（2026-09-19 v60：多源兜底 + 候选点选）=====
@@ -444,6 +814,9 @@
     }).then(function(j){ clearTimeout(t); return j; }, function(e){ clearTimeout(t); throw e; });
   }
   // extent 统一为 Leaflet bounds 形式 [[minLat,minLng],[maxLat,maxLng]]
+  // [GCJ-02 修复 2026-09-28] Photon/Nominatim 返回真实 WGS-84；转成 GCJ-02 网格值再定位，
+  //   否则搜索定位到的地方与高德影像整体偏移。extent 包围盒同样转。
+  function toGcjLL(lat,lng){ if(RunyeGeo&&isFinite(lat)&&isFinite(lng)){ var g=RunyeGeo.wgs2gcj(lat,lng); return {lat:g.lat,lng:g.lng}; } return {lat:lat,lng:lng}; }
   function normPhoton(j){
     var out=[];
     ((j&&j.features)||[]).forEach(function(f){
@@ -455,7 +828,10 @@
       });
       var e=p.extent, bnd=null;
       if(e && e.length===4) bnd=[[e[3],e[0]],[e[1],e[2]]];
-      out.push({name:String(p.name), detail:det.join(' · '), lat:+c[1], lng:+c[0], extent:bnd});
+      var g=toGcjLL(+c[1], +c[0]);
+      if(bnd){ bnd=[[ toGcjLL(bnd[0][0],bnd[0][1]).lat, toGcjLL(bnd[0][0],bnd[0][1]).lng ],
+                   [ toGcjLL(bnd[1][0],bnd[1][1]).lat, toGcjLL(bnd[1][0],bnd[1][1]).lng ]]; }
+      out.push({name:String(p.name), detail:det.join(' · '), lat:g.lat, lng:g.lng, extent:bnd});
     });
     return out.filter(function(r){ return isFinite(r.lat)&&isFinite(r.lng); });
   }
@@ -467,7 +843,10 @@
       var nm=r.name||String(r.display_name||'').split(',')[0];
       var bb=r.boundingbox, bnd=null;
       if(bb && bb.length===4) bnd=[[+bb[0],+bb[2]],[+bb[1],+bb[3]]];
-      out.push({name:nm, detail:String(r.display_name||''), lat:la, lng:lo, extent:bnd});
+      var g=toGcjLL(la, lo);
+      if(bnd){ bnd=[[ toGcjLL(+bb[0],+bb[2]).lat, toGcjLL(+bb[0],+bb[2]).lng ],
+                   [ toGcjLL(+bb[1],+bb[3]).lat, toGcjLL(+bb[1],+bb[3]).lng ]]; }
+      out.push({name:nm, detail:String(r.display_name||''), lat:g.lat, lng:g.lng, extent:bnd});
     });
     return out;
   }
@@ -490,18 +869,21 @@
     box.hidden=false;
   }
   var searchMark=null;
+  // [GCJ-02 修复 2026-09-28] 所有进入地图显示的坐标统一为高德网格值(GCJ-02)：
+  //   搜索候选/坐标直入是真实 WGS-84，在 norm/parse 入口处已转成 GCJ-02；
+  //   保存地点存的是 map.getCenter()(已是网格值)，恢复时直接用、不再转换。
   function markSearch(r){
     if(searchMark){ map.removeLayer(searchMark); searchMark=null; }
-    searchMark=L.marker([r.lat,r.lng],{icon:L.divIcon({
+    searchMark=L.marker(toDisplay(r),{icon:L.divIcon({
       className:'ry-pin', iconSize:[18,30], iconAnchor:[9,29],
       html:'<svg width="18" height="30" viewBox="0 0 25 41"><path d="M12.5 0C5.6 0 0 5.6 0 12.5 0 21.9 12.5 41 12.5 41S25 21.9 25 12.5C25 5.6 19.4 0 12.5 0z" fill="#dc2626" stroke="#fff" stroke-width="1.5"/><circle cx="12.5" cy="12.5" r="4" fill="#fff"/></svg>'
     })}).addTo(map);
     searchMark.bindTooltip(r.name,{direction:'top'});
   }
   function goTo(r){
-    if(r.extent){ map.fitBounds(r.extent,{padding:[20,20],maxZoom:16}); }
-    else if(isFinite(r.zoom)){ map.setView([r.lat,r.lng], r.zoom); }
-    else { map.setView([r.lat,r.lng], 16); }
+    if(r.extent){ map.fitBounds(displayRing(r.extent),{padding:[20,20],maxZoom:16}); }
+    else if(isFinite(r.zoom)){ map.setView(toDisplay(r), r.zoom); }
+    else { map.setView(toDisplay(r), 16); }
     markSearch(r);
   }
   function pick(r){
@@ -525,21 +907,23 @@
     var q=document.getElementById('search').value.trim();
     if(!q){ tip('请输入要搜索的地点名称，例如「三亚 崖州」。'); return; }
     lsSet(K_Q,q);
+    var seq=++searchSeq;
     // 坐标直入优先：不触网即可定位
     var ll=parseLatLng(q);
     if(ll){
-      lastPick={name:q, detail:'坐标定位', lat:ll.lat, lng:ll.lng, zoom:16};
+      // [GCJ-02 修复 2026-09-28] 用户输入的坐标是真实 WGS-84，转成 GCJ-02 网格值再定位
+      var gl=toGcjLL(ll.lat, ll.lng);
+      lastPick={name:q, detail:'坐标定位', lat:gl.lat, lng:gl.lng, zoom:16};
       goTo(lastPick);
       renderRes([]);
-      tip('已按坐标定位：'+ll.lat+', '+ll.lng+'。点「💾 保存地点」可记住此处。');
+      tip('已按坐标定位：'+gl.lat.toFixed(6)+', '+gl.lng.toFixed(6)+'。点「💾 保存地点」可记住此处。');
       return;
     }
     lastPick=null;
-    var seq=++searchSeq;
     renderRes([]);
     tip('搜索中…');
     /* 本地偏置：以当前地图中心为参照，重名地名优先命中本地（实测「东方市」→ 19.0979,108.6482 海南） */
-    var cc=map.getCenter();
+    var cc=RunyeGeo.gcj2wgs(curView().lat,curView().lng);
     var bias='&lat='+(+cc.lat.toFixed(5))+'&lon='+(+cc.lng.toFixed(5))+'&zoom=8';
     var srcs=[
       {url:'https://photon.komoot.io/api/?limit=6'+bias+'&q='+encodeURIComponent(q), norm:normPhoton},
@@ -616,11 +1000,13 @@
   // 回传设计工具：写入 localStorage，并跳转到 index.html 的面积测量工具（03 面积测量工具）
   document.getElementById('btnCopy').onclick=function(){
     var mu=parseFloat((geodesicArea(points)/666.67).toFixed(2));
-    if(!mu){ alert('请先画框测量出面积'); return; }
+    if(!isFinite(mu) || mu<=0){ alert('请先画框测量出有效面积'); return; }
     var sqm=Math.round(geodesicArea(points));
     try{
-      var pid='pm'+Date.now();
-      var nm='';
+      var pid=currentMapPlotId || ('pm'+Date.now());
+      var lib=lsGet('runye_plot_library',[]);
+      var saved=lib.filter(function(p){return p.id===pid;})[0];
+      var nm=saved?saved.name:'';
       localStorage.setItem('runyeMeasuredArea', JSON.stringify({plotId:pid, name:nm, mu:mu, sqm:sqm, poly:latlngs(), ts:Date.now(), source:'map'}));
       var btn=document.getElementById('btnCopy');
       btn.textContent='回传中…';
@@ -631,7 +1017,7 @@
   // 保存到地块库（与精准灌溉页共用 localStorage['runye_plot_library']），可累计多个地块
   document.getElementById('btnSavePlot').onclick=function(){
     var mu=parseFloat((geodesicArea(points)/666.67).toFixed(2));
-    if(!mu){ alert('请先在地图上画框测量出面积再保存'); return; }
+    if(!isFinite(mu) || mu<=0){ alert('请先在地图上画框测量出有效面积再保存'); return; }
     var sqm=Math.round(geodesicArea(points));
     var name='';
     var arr=[]; try{ arr=JSON.parse(localStorage.getItem('runye_plot_library')||'[]'); }catch(e){ arr=[]; }
@@ -644,7 +1030,9 @@
       var R=6378137, mlat=R*Math.PI/180, cosLat=Math.cos(clat*Math.PI/180);
       poly.forEach(function(p){ xs.push((p[1]-lngs[0])*mlat*cosLat); ys.push((p[0]-clat)*mlat); });
     }
-    var plot={ id:'p'+Date.now()+Math.floor(Math.random()*1000), name:name, mu:mu, sqm:sqm,
+    var previous=arr.filter(function(p){return p.id===currentMapPlotId;})[0];
+    if(previous) name=previous.name;
+    var plot={ id:currentMapPlotId || ('p'+Date.now()+Math.floor(Math.random()*1000)), name:name, mu:mu, sqm:sqm,
       poly:xs.map(function(x,i){return {x:Math.round(x*100)/100,y:Math.round(ys[i]*100)/100};}),
       crop:'七彩花生', source:'map', ts:Date.now(), note:'' };
     // [map-enhance] 写入权威经纬度坐标，供卫星图实景叠加（旧字段 poly 保留不动，主程序画布照常消费）
@@ -658,15 +1046,23 @@
       // （否则管网/地块用 m2ll 反投回卫星图会整体平移）
       plot.geo={refLat:+sl.toFixed(6), refLng:+rawLL[0][1].toFixed(6), proj:'mercatorLocal', ts:Date.now()};
     }
-    arr.push(plot);
+    plot.crs='GCJ-02';
+    if(previous){plot.crop=previous.crop;plot.note=previous.note;arr=arr.map(function(p){return p.id===plot.id?plot:p;});}
+    else arr.push(plot);
     try{ localStorage.setItem('runye_plot_library', JSON.stringify(arr)); }catch(e){ alert('保存失败：'+e.message); return; }
-    if(rymHandle && rymHandle.refresh){ try{ rymHandle.refresh(); }catch(e){} }
+    currentMapPlotId=plot.id;
+    refreshPlotLibrary();
     alert('已保存到地块库：'+name+'（'+mu+' 亩）\n可在精准灌溉页「地块库」设为当前，或在数字农业页选择。');
   };
 
   // [map-enhance] 把地块库叠加到卫星图（隔离模块，失败不影响测量主流程）
   var rymHandle=null;
-  try{ if(window.RunyeMapEnhance) rymHandle=window.RunyeMapEnhance.attach(map); }catch(e){}
+  try{ if(window.RunyeMapEnhance) rymHandle=window.RunyeMapEnhance.attach(map, {onMeasure:setMeasureOn, toDisplay:toDisplay, autoFit:!lsGet(K_VIEW,null)}); }catch(e){}
+
+  function refreshPlotLibrary(){
+    if(rymHandle && rymHandle.refresh) rymHandle.refresh();
+    renderMyPlots();
+  }
 
   // [map-enhance] 导出：把当前画框 + 地块库全部带坐标地块打包成 GeoJSON / KML
   function collectPlotsForExport(){
@@ -677,7 +1073,7 @@
     }
     try{
       (JSON.parse(localStorage.getItem('runye_plot_library')||'[]')).forEach(function(p){
-        if(p && p.polyLatLng && p.polyLatLng.length>=3) arr.push(p);
+        if(p && p.polyLatLng && p.polyLatLng.length>=3 && !(points.length>=3 && p.id===currentMapPlotId)) arr.push(p);
       });
     }catch(e){}
     return arr;
@@ -698,6 +1094,7 @@
   document.getElementById('fileImport').onchange=function(e){
     var f=e.target.files && e.target.files[0];
     if(!f) return;
+    if(/\.kmz$/i.test(f.name)){alert('请先解压 KMZ，再选择其中的 KML 文件。');e.target.value='';return;}
     var reader=new FileReader();
     reader.onload=function(){
       try{
@@ -711,30 +1108,33 @@
         var allLL=[];
         arr.forEach(function(p){
           var ll=p.polyLatLng; if(!ll || ll.length<3) return;
-          var mu=(p.mu && p.mu>0)?p.mu:parseFloat((geodesicArea(ll)/666.67).toFixed(2));
-          var sqm=Math.round(geodesicArea(ll));
+          // [GCJ-02 修复 2026-09-28] 导入文件的坐标是标准 WGS-84，转成 GCJ-02 才能贴合高德影像
+          var llGcj = RunyeGeo ? RunyeGeo.polyWgs2Gcj(ll) : ll;
+          var mu=parseFloat((geodesicArea(llGcj)/666.67).toFixed(2));
+          var sqm=Math.round(geodesicArea(llGcj));
           // 转本地米坐标（与「保存地块」同一原点：首点经度 x、平均纬度 y）
           var xs=[],ys=[];
-          var lats=ll.map(function(q){return q[0];}), lngs=ll.map(function(q){return q[1];});
+          var lats=llGcj.map(function(q){return q[0];}), lngs=llGcj.map(function(q){return q[1];});
           var clat=lats.reduce(function(a,b){return a+b;},0)/lats.length;
           var R=6378137, mlat=R*Math.PI/180, cosLat=Math.cos(clat*Math.PI/180);
-          ll.forEach(function(q){ xs.push((q[1]-lngs[0])*mlat*cosLat); ys.push((q[0]-clat)*mlat); });
+          llGcj.forEach(function(q){ xs.push((q[1]-lngs[0])*mlat*cosLat); ys.push((q[0]-clat)*mlat); });
           var sn=lngs.reduce(function(a,b){return a+b;},0)/lngs.length;
           lib.push({ id:'imp'+Date.now()+Math.floor(Math.random()*1000),
             name:p.name||('导入地'+(lib.length+1)), mu:mu, sqm:sqm,
             poly:xs.map(function(x,i){return {x:Math.round(x*100)/100,y:Math.round(ys[i]*100)/100};}),
-            polyLatLng:ll, center:{lat:+clat.toFixed(6),lng:+sn.toFixed(6)},
-            geo:{refLat:+clat.toFixed(6), refLng:+ll[0][1].toFixed(6), proj:'mercatorLocal'},
-            crop:'', source:'import', ts:Date.now(), note:'' });
-          allLL=allLL.concat(ll);
+            polyLatLng:llGcj, center:{lat:+clat.toFixed(6),lng:+sn.toFixed(6)},
+            geo:{refLat:+clat.toFixed(6), refLng:+llGcj[0][1].toFixed(6), proj:'mercatorLocal'},
+            crop:p.crop || '', source:'import', crs:'GCJ-02', ts:Date.now(), note:'' });
+          allLL=allLL.concat(llGcj);
         });
         localStorage.setItem('runye_plot_library', JSON.stringify(lib));
-        if(rymHandle && rymHandle.refresh){ try{ rymHandle.refresh(); }catch(err){} }
-        if(allLL.length){ try{ map.fitBounds(L.latLngBounds(allLL),{padding:[30,30],maxZoom:17}); }catch(err){} }
+        refreshPlotLibrary();
+        if(allLL.length){ try{ map.fitBounds(L.latLngBounds(displayRing(allLL)),{padding:[30,30],maxZoom:17}); }catch(err){} }
         alert('已导入 '+arr.length+' 个地块到地块库，并定位到导入范围。');
       }catch(err){ alert('导入失败：'+err.message); }
       e.target.value='';
     };
+    reader.onerror=function(){alert('文件读取失败，请重新选择文件。');e.target.value='';};
     reader.readAsText(f,'utf-8');
   };
 
@@ -753,8 +1153,8 @@
       go.title=p.name||'';
       go.onclick=function(){
         var ll=p.polyLatLng;
-        if(ll && ll.length>=3){ try{ map.fitBounds(L.latLngBounds(ll),{padding:[40,40],maxZoom:17}); }catch(e){} }
-        else if(p.center){ try{ map.setView([p.center.lat,p.center.lng],16); }catch(e){} }
+        if(ll && ll.length>=3){ try{ map.fitBounds(L.latLngBounds(displayRing(ll)),{padding:[40,40],maxZoom:17}); }catch(e){} }
+        else if(p.center){ try{ map.setView(toDisplay(p.center),16); }catch(e){} }
       };
       var del=document.createElement('button');
       del.type='button'; del.className='place-del'; del.textContent='×'; del.title='删除该地块';
@@ -774,6 +1174,7 @@
     measuring=!measuring;
     this.classList.toggle('btn-on',measuring);
     if(measuring){
+      setAddMode(false);
       if(drawing) setDrawing(false);
       map.dragging.disable();
       tip('测距模式：点击地图逐点打点，紫色虚线显示累计距离，双击结束。');
@@ -782,13 +1183,13 @@
   function finishMeasure(){
     measuring=false;
     var bm=document.getElementById('btnMeasure'); if(bm) bm.classList.remove('btn-on');
-    map.dragging.enable();
+    if(!drawing) map.dragging.enable();
     measureLayer.clearLayers(); measurePts=[];
     tip('测距结束。');
   }
   map.on('click', function(e){
     if(!measuring) return;
-    measurePts.push({lat:e.latlng.lat,lng:e.latlng.lng});
+    measurePts.push(fromDisplay(e.latlng));
     renderMeasure();
   });
   map.on('dblclick', function(){ if(measuring) finishMeasure(); });
@@ -796,10 +1197,10 @@
     measureLayer.clearLayers();
     if(!measurePts.length) return;
     measurePts.forEach(function(p){
-      L.circleMarker([p.lat,p.lng],{radius:4,color:'#7c3aed',fillColor:'#7c3aed',fillOpacity:1}).addTo(measureLayer);
+      L.circleMarker(toDisplay(p),{radius:4,color:'#7c3aed',fillColor:'#7c3aed',fillOpacity:1}).addTo(measureLayer);
     });
     if(measurePts.length>=2){
-      L.polyline(measurePts.map(function(p){return [p.lat,p.lng];}),{color:'#7c3aed',weight:2,dashArray:'6,4'}).addTo(measureLayer);
+      L.polyline(measurePts.map(toDisplay),{color:'#7c3aed',weight:2,dashArray:'6,4'}).addTo(measureLayer);
       var total=0; for(var i=1;i<measurePts.length;i++) total+=hav(measurePts[i-1],measurePts[i]);
       tip('累计测距：'+total.toFixed(1)+' 米（'+measurePts.length+' 点，双击结束）');
     }
@@ -825,12 +1226,41 @@
     reader.onload=function(){
       try{
         var d=JSON.parse(String(reader.result||''));
-        if(d.plots) localStorage.setItem('runye_plot_library', JSON.stringify(d.plots));
-        if(d.network) localStorage.setItem('runye_network_layout', JSON.stringify(d.network));
-        if(d.view) localStorage.setItem('runye_map_view', JSON.stringify(d.view));
-        if(typeof rymHandle!=='undefined'&&rymHandle&&rymHandle.refresh) rymHandle.refresh();
-        renderMyPlots();
-        alert('工程已导入：'+(d.plots||[]).length+' 个地块'+(d.network?'、管网已恢复':''));
+        if(!d || d.app!=='runye-irrigation' || d.version!==1 || !Array.isArray(d.plots)) throw new Error('不是支持的润野工程文件');
+        var ids=Object.create(null);
+        d.plots.forEach(function(p){
+          if(!p || typeof p.id!=='string' || !p.id || ids[p.id]) throw new Error('地块 ID 缺失或重复');
+          ids[p.id]=true;
+          if(p.crs && p.crs!=='GCJ-02') throw new Error('工程坐标系不受支持');
+          if(p.polyLatLng){
+            p.polyLatLng=RunyeGeo.normalizeRing(p.polyLatLng);
+            p.sqm=Math.round(geodesicArea(p.polyLatLng));p.mu=+(p.sqm/666.67).toFixed(2);
+            if(p.geo){RunyeGeo.coordPair([p.geo.refLat,p.geo.refLng]);}else p.geo=RunyeGeo.baseOfFeature(p);
+            p.poly=RunyeGeo.polyLL2m(p.polyLatLng,p.geo);
+          }else if(!Array.isArray(p.poly) || p.poly.length<3 || !p.poly.every(function(q){return q && typeof q.x==='number' && isFinite(q.x) && typeof q.y==='number' && isFinite(q.y);}) || !(p.sqm>0)) throw new Error('地块缺少有效边界或面积');
+        });
+        if(d.network!=null){
+          if(!Array.isArray(d.network.segments)) throw new Error('工程管网格式错误');
+          d.network.segments.forEach(function(s){if(!s || !Array.isArray(s.latLng) || s.latLng.length<2) throw new Error('管段坐标不足');s.latLng.forEach(RunyeGeo.coordPair);});
+          if(d.network.sourcePos) RunyeGeo.coordPair(d.network.sourcePos);
+          ['valves','dripTapes'].forEach(function(key){if(d.network[key]!=null && !Array.isArray(d.network[key])) throw new Error('设备或滴灌带格式错误');});
+          (d.network.valves||[]).forEach(RunyeGeo.coordPair);
+          (d.network.dripTapes||[]).forEach(function(line){if(!Array.isArray(line) || line.length<2) throw new Error('滴灌带坐标不足');line.forEach(RunyeGeo.coordPair);});
+        }
+        if(d.view!=null){RunyeGeo.coordPair(d.view);if(typeof d.view.zoom!=='number' || !isFinite(d.view.zoom) || d.view.zoom<3 || d.view.zoom>19) throw new Error('地图缩放级别无效');}
+        var keys=['runye_plot_library','runye_network_layout','runye_map_view'], old=keys.map(function(k){return localStorage.getItem(k);});
+        try{
+          localStorage.setItem(keys[0],JSON.stringify(d.plots));
+          if(d.network==null) localStorage.removeItem(keys[1]);else localStorage.setItem(keys[1],JSON.stringify(d.network));
+          if(d.view==null) localStorage.removeItem(keys[2]);else localStorage.setItem(keys[2],JSON.stringify(d.view));
+        }catch(writeError){
+          keys.forEach(function(k,i){try{if(old[i]==null)localStorage.removeItem(k);else localStorage.setItem(k,old[i]);}catch(restoreError){console.error('工程导入回滚失败',k,restoreError);}});
+          throw writeError;
+        }
+        document.getElementById('btnClear').click();setDrawing(false);
+        refreshPlotLibrary();
+        if(d.view) map.setView(toDisplay(d.view),d.view.zoom,{animate:false});
+        alert('工程已导入：'+d.plots.length+' 个地块'+(d.network?'、管网已恢复':'、无管网'));
       }catch(err){ alert('导入失败：'+err.message); }
       e.target.value='';
     };

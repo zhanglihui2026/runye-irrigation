@@ -61,7 +61,7 @@
     plotFill: '#f6faf7', plotLine: '#3f7a55',
     zone: '#8fae9b', zoneDash: '5,5',
     zoneFill: '#e6f2ea', zoneFillPartial: 'rgba(245,158,11,.18)',   /* 分区底色：标准=浅绿、非标=琥珀（2026-09-15 用户要求二色区分） */
-    branch: '#16a34a', main: '#185FA5', front: '#f97316',
+    branch: '#16a34a', main: '#185FA5', front: '#111827',
     valve: '#ef4444', source: '#f59e0b',
     manualMain: '#185FA5', manualBranch: '#16a34a',
     draft: '#7c3aed', snap: '#7c3aed',
@@ -69,6 +69,23 @@
     manTee: '#e11d48', manElbow: '#7c3aed',   /* 手工配件（2026-09-16）：三通玫红 / 弯头紫（玫红区别于蓝主管，易辨认） */
     manValve: '#0891b2'                       /* 手工阀门（2026-09-18 第七十轮）：靛青，与玫红三通、紫弯头三色区分 */
   };
+  /* ---------- v162：管道遮蔽的统一外观 ----------
+   * 遮蔽 = 该管在三级简图/工作区/轴测图改「灰色虚线」（与二级页「遮蔽管线」同色
+   * slate-500 @55%），且不计入材料清单。**管宽保持不变**：命中容差、几何、水力都不动，
+   * 只换颜色与线型 —— 避免「遮一下就点不中/量不准」的连锁问题。 */
+  var HID_STROKE = '#64748b';
+  /* v165（总管分段遮蔽）：渲染侧统一走宿主读口 —— 'front-N' 会合并「整管遮蔽」语义
+     （段遮蔽 = hidden['front-N'] || hidden['front']）。宿主未注入（Node 单测）→ 回退 AE 直读。 */
+  function isPidHidden(pid) {
+    if (typeof window !== 'undefined' && typeof window.tlIsPipeSegHidden === 'function') {
+      try { return !!window.tlIsPipeSegHidden(pid); } catch (e) { }
+    }
+    return !!(AE.isHidden && AE.isHidden(pid));
+  }
+  function hidAttr(pid, col, w) {
+    if (!isPidHidden(pid)) return ' stroke="' + col + '" stroke-width="' + w + '"';
+    return ' stroke="' + HID_STROKE + '" stroke-width="' + w + '" stroke-dasharray="8,5" opacity="0.55"';
+  }
   /* 联合灌溉分组底色（2026-09-16）：仅工作区按 N=combinedN 顺序分组（分组轮流 + 余数单独成组）。
      4 色循环调色板（2026-09-20）：每组一色、同组同色、组间一眼区分；超出 4 色循环并降透明度区分第 2 轮。
      非标区在主 render 中保留琥珀描边（仍归入其序号所在组）。 */
@@ -167,11 +184,31 @@
   var selId = null;           // 选中手工管线 id（非插入模式点击拾取）
   var selAutoId = null;       // 选中自动管线 pid：'front'|'main-i'|'branch-i'（阶段2）
   var selAutoAt = 0;          // 选中自动管线时的点击位置（沿管弧长，米）——插配件用
+  var selAutoSeg = null;      // v150：选中总管时的分段号（front-i 的 i；null=整管/不可分段/非总管）
+  var selNodeId = null;       // v150：选中节点 id（RyTlNodes 节点=配件组合容器，只画圆点）
   var selFitId = null;        // 选中图面配件 id（A-F##，阶段2）
   var selManFitId = null;     // 选中手工配件 id（MP-F## 三通/弯头，2026-09-16）
   var selSet = [];            // 同类型多选：自动管线 pid 数组（第三十九轮）
   var multiMode = false;      // 多选开关（第五十八轮）：开启后普通点管身 = 逐段加选（不必按 Ctrl）
+  var maskMode = false;       // v162 遮蔽模式：开启后点管身 = 切换该管「遮蔽/取消遮蔽」
   var suppressAutoPick = false;  // pointerdown 已处理过本次「点管身」（多选）→ 抑制随后的合成 click 重复处理
+  /* v151（2026-09-28 用户要求）：节点沿管自由拖动 + 桩号实时显示（拖动可精确定位） */
+  var nodeDrag = null;        // 节点沿管拖动态 {id, pid, pointerId, sx, sy, moved, atM}
+  var nodeDragRaf = 0;        // 拖动提交 rAF 节流句柄
+  var nodeDragTip = null;     // 桩号距离跟随标签
+  function nodeDragTipShow(cx, cy, id, atM) {
+    if (!nodeDragTip) {
+      nodeDragTip = document.createElement('div');
+      nodeDragTip.id = 'tlNodeDragTip';
+      nodeDragTip.style.cssText = 'display:none;position:fixed;z-index:9991;background:#5b21b6;color:#fff;font:11px/1.6 system-ui,sans-serif;padding:2px 8px;border-radius:4px;pointer-events:none;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.25)';
+      document.body.appendChild(nodeDragTip);
+    }
+    nodeDragTip.textContent = id + ' · 桩号 ' + Math.max(0, atM).toFixed(1) + ' m';
+    nodeDragTip.style.left = (cx + 14) + 'px';
+    nodeDragTip.style.top = (cy - 10) + 'px';
+    nodeDragTip.style.display = 'block';
+  }
+  function nodeDragTipHide() { if (nodeDragTip) nodeDragTip.style.display = 'none'; }
   var fitDrag = null;         // 配件沿管拖动态 {id, pointerId, atM}（阶段2b）
   var fitDragRaf = 0;         // 拖动提交 rAF 节流句柄
   var pipeDrag = null;        // 整条拖动手工管线（2026-09-16）{id, pointerId, last, acc, moved}
@@ -310,6 +347,20 @@
         var p = clone.querySelector('[data-tlpipe="' + pid + '"]');
         if (p) p.setAttribute('visibility', 'hidden');
       });
+      /* v164：被遮蔽的管线在克隆底图同样隐藏原 path，灰虚线由 tlWsAuto 覆盖层按有效几何重画 ——
+         否则宿主简图样式未及时对齐时（如重新生成简图后），工作区会把被遮蔽管照原色实线画出 */
+      var hidMapC = AE.hiddenMap ? AE.hiddenMap() : {};
+      Object.keys(hidMapC).forEach(function (pid) {
+        if (!hidMapC[pid]) return;
+        var p2 = clone.querySelector('[data-tlpipe="' + pid + '"]');
+        if (p2) p2.setAttribute('visibility', 'hidden');
+      });
+      /* v165：总管（分段 path 与整管引用 path）一律隐藏，改由覆盖层 tlWsAuto 按「主管接入点分段」
+         重画 —— 否则半遮蔽时底图那条整管实线会透过灰虚线显示、看起来「没遮住」。
+         ⚠ 只设 visibility，整管引用 path 仍留在 DOM：RyTlPathMeasure.frontPathEl() 与
+         getTotalLength() 依赖它换算分段弧长，删掉会让总管分段选择整条失效。 */
+      var fNodes = clone.querySelectorAll('[data-tlpipe="front"],[data-tlpipe-seg]');
+      for (var fk = 0; fk < fNodes.length; fk++) fNodes[fk].setAttribute('visibility', 'hidden');
       var ids = clone.querySelectorAll('[id]');
       for (var j = 0; j < ids.length; j++) ids[j].setAttribute('id', 'tlWsPipe_' + ids[j].getAttribute('id'));
       var html = clone.innerHTML
@@ -917,10 +968,10 @@
           if (flags[zi2]) {
             /* 非标准分区：琥珀色，编号 + 实际亩数 */
             if (aw > 78 && ah > 44) {
-              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly) + '" text-anchor="end" font-size="12" font-weight="700" fill="#b45309"' + FF + '>' + tlZoneGrpTag(zi2, tlN) + '区</text>');
-              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly + 13) + '" text-anchor="end" font-size="9" font-weight="700" fill="#b45309"' + FF + '>实际 ' + muTxt(actMu2) + ' 亩</text>');
+              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly) + '" text-anchor="end" font-size="12" font-weight="700" fill="#b45309" data-tlzone="1" ' + FF + '>' + tlZoneGrpTag(zi2, tlN) + '区</text>');
+              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly + 13) + '" text-anchor="end" font-size="9" font-weight="700" fill="#b45309" data-tlzone="1" ' + FF + '>实际 ' + muTxt(actMu2) + ' 亩</text>');
             } else if (aw > 34 && ah > 22) {
-              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly) + '" text-anchor="end" font-size="8" font-weight="700" fill="#b45309"' + FF + '>' + tlZoneGrpTag(zi2, tlN) + '区 实际' + muTxt(actMu2) + '亩</text>');
+              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly) + '" text-anchor="end" font-size="8" font-weight="700" fill="#b45309" data-tlzone="1" ' + FF + '>' + tlZoneGrpTag(zi2, tlN) + '区 实际' + muTxt(actMu2) + '亩</text>');
             }
           } else {
             /* 标准分区：深灰，编号 + 设计尺寸 + 亩数 */
@@ -929,17 +980,17 @@
             var sizeTxt = muTxt(dw) + '×' + muTxt(dh2) + 'm';
             var areaTxt = muTxt(stdMu2) + '亩';
             if (aw > 120 && ah > 68) {
-              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly) + '" text-anchor="end" font-size="13" font-weight="700" fill="#111827"' + FF + '>' + tlZoneGrpTag(zi2, tlN) + '区</text>');
-              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly + 14) + '" text-anchor="end" font-size="9.5" font-weight="600" fill="#111827"' + FF + '>' + sizeTxt + '</text>');
-              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly + 26) + '" text-anchor="end" font-size="9" fill="#111827"' + FF + '>' + areaTxt + '</text>');
+              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly) + '" text-anchor="end" font-size="13" font-weight="700" fill="#111827" data-tlzone="1" ' + FF + '>' + tlZoneGrpTag(zi2, tlN) + '区</text>');
+              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly + 14) + '" text-anchor="end" font-size="9.5" font-weight="600" fill="#111827" data-tlzone="1" ' + FF + '>' + sizeTxt + '</text>');
+              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly + 26) + '" text-anchor="end" font-size="9" fill="#111827" data-tlzone="1" ' + FF + '>' + areaTxt + '</text>');
             } else if (ah > 90) {
               lp.push('<g transform="translate(' + fmt(rx + rw / 2) + ' ' + fmt(ry + rh / 2) + ') rotate(-90)">');
-              lp.push('<text x="0" y="3" text-anchor="middle" font-size="9" font-weight="700" fill="#111827"' + FF + '>' + tlZoneGrpTag(zi2, tlN) + '区 ' + sizeTxt + ' ' + areaTxt + '</text></g>');
+              lp.push('<text x="0" y="3" text-anchor="middle" font-size="9" font-weight="700" fill="#111827" data-tlzone="1" ' + FF + '>' + tlZoneGrpTag(zi2, tlN) + '区 ' + sizeTxt + ' ' + areaTxt + '</text></g>');
             } else if (aw > 46 && ah > 34) {
-              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly) + '" text-anchor="end" font-size="11" font-weight="700" fill="#111827"' + FF + '>' + tlZoneGrpTag(zi2, tlN) + '区</text>');
-              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly + 12) + '" text-anchor="end" font-size="8.5" fill="#111827"' + FF + '>' + sizeTxt + ' ' + areaTxt + '</text>');
+              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly) + '" text-anchor="end" font-size="11" font-weight="700" fill="#111827" data-tlzone="1" ' + FF + '>' + tlZoneGrpTag(zi2, tlN) + '区</text>');
+              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly + 12) + '" text-anchor="end" font-size="8.5" fill="#111827" data-tlzone="1" ' + FF + '>' + sizeTxt + ' ' + areaTxt + '</text>');
             } else if (aw > 30 && ah > 22) {
-              lp.push('<text x="' + fmt(rx + rw / 2) + '" y="' + fmt(ry + rh / 2 + 3) + '" text-anchor="middle" font-size="7.5" font-weight="700" fill="#111827"' + FF + '>' + tlZoneGrpTag(zi2, tlN) + '区 ' + areaTxt + '</text>');
+              lp.push('<text x="' + fmt(rx + rw / 2) + '" y="' + fmt(ry + rh / 2 + 3) + '" text-anchor="middle" font-size="7.5" font-weight="700" fill="#111827" data-tlzone="1" ' + FF + '>' + tlZoneGrpTag(zi2, tlN) + '区 ' + areaTxt + '</text>');
             }
           }
         }
@@ -951,17 +1002,18 @@
           var lpPt = tlUnionLabelWorld(tlMgL[lg], z, zcN, zrN, lpCells);
           if (!lpPt) continue;
           var lpQ = T(lpPt), lpLines = tlUnionLabelLines(tlMgL, lg, lpCells);
-          lp.push('<text x="' + fmt(lpQ.x) + '" y="' + fmt(lpQ.y + 4) + '" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a" font-family="system-ui" data-tlunion="' + lg + '">' + lpLines.name + '</text>');
-          lp.push('<text x="' + fmt(lpQ.x) + '" y="' + fmt(lpQ.y + 19) + '" text-anchor="middle" font-size="11" font-weight="700" fill="#0f172a" font-family="system-ui" data-tlunion="' + lg + '">' + (lpLines.mu === '' ? '面积待算' : lpLines.mu + ' 亩') + '</text>');
+          lp.push('<text x="' + fmt(lpQ.x) + '" y="' + fmt(lpQ.y + 4) + '" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a" font-family="system-ui" data-tlzone="1" data-tlunion="' + lg + '">' + lpLines.name + '</text>');
+          lp.push('<text x="' + fmt(lpQ.x) + '" y="' + fmt(lpQ.y + 19) + '" text-anchor="middle" font-size="11" font-weight="700" fill="#0f172a" font-family="system-ui" data-tlzone="1" data-tlunion="' + lg + '">' + (lpLines.mu === '' ? '面积待算' : lpLines.mu + ' 亩') + '</text>');
         }
       }
       if (lp.length) s.push('<g>' + lp.join('') + '</g>');
     }
     /* 2) 滴灌带 —— 2026-09-15 按用户要求工作区不再绘制（数据仍由 tlDiagramData 导出，不影响轴测图） */
     /* 3) 支管 → 主管 → 总管（下位先画） */
-    (data.branchPipes || []).forEach(function (l) { if (l && l.length >= 2) s.push('<path d="' + pl(l) + '" fill="none" stroke="' + COLORS.branch + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'); });
-    (data.mainPipes || []).forEach(function (l) { if (l && l.length >= 2) s.push('<path d="' + pl(l) + '" fill="none" stroke="' + COLORS.main + '" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>'); });
-    if (data.frontPipe && data.frontPipe.length >= 2) s.push('<path d="' + pl(data.frontPipe) + '" fill="none" stroke="' + COLORS.front + '" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>');
+    /* v162：底图兜底路径（克隆不到简图时自绘）—— 遮蔽管按同一口径画灰虚线 */
+    (data.branchPipes || []).forEach(function (l, bi) { if (l && l.length >= 2) s.push('<path d="' + pl(l) + '" fill="none"' + hidAttr('branch-' + bi, COLORS.branch, 1.6) + ' stroke-linecap="round" stroke-linejoin="round"/>'); });
+    (data.mainPipes || []).forEach(function (l, mi) { if (l && l.length >= 2) s.push('<path d="' + pl(l) + '" fill="none"' + hidAttr('main-' + mi, COLORS.main, 2.6) + ' stroke-linecap="round" stroke-linejoin="round"/>'); });
+    if (data.frontPipe && data.frontPipe.length >= 2) s.push('<path d="' + pl(data.frontPipe) + '" fill="none"' + hidAttr('front', COLORS.front, 4) + ' stroke-linecap="round" stroke-linejoin="round"/>');
     /* 4) 水源 + 阀门 */
     if (data.sourcePos) {
       var sp = T(data.sourcePos);
@@ -998,27 +1050,91 @@
    * ① 改长管线按简图原色重画有效几何 + 琥珀长度标注；
    * ② 配件标记（三通/阀门，按沿管弧长定位在有效几何上，改长随动/clamp）；
    * ③ 选中高亮（琥珀虚线加粗）。 */
-  var AUTO_STYLE = { front: { c: '#f97316', w: 6 }, main: { c: '#185FA5', w: 5 }, branch: { c: '#16a34a', w: 3 } };
-  function autoStyle(pid) { return AUTO_STYLE[pid === 'front' ? 'front' : (pid.indexOf('main-') === 0 ? 'main' : 'branch')]; }
+  var AUTO_STYLE = { front: { c: '#111827', w: 6 }, main: { c: '#185FA5', w: 5 }, branch: { c: '#16a34a', w: 3 } };
+  /* v163：front-N 段沿用整管 front 样式 */
+  function autoStyle(pid) { return AUTO_STYLE[(pid === 'front' || /^front-\d+$/.test(String(pid))) ? 'front' : (pid.indexOf('main-') === 0 ? 'main' : 'branch')]; }
+  /* 沿折线取弧长 [a,b]（米）的子折线（v165：总管分段绘制用；单段/越界都安全） */
+  function sliceAlong(pts, a, b) {
+    if (!pts || pts.length < 2 || !isFinite(a) || !isFinite(b) || !(b - a > 1e-9)) return null;
+    var out = [], total = 0;
+    for (var i = 0; i + 1 < pts.length && total < b; i++) {
+      var ax = pts[i].x, ay = pts[i].y, bx = pts[i + 1].x, by = pts[i + 1].y;
+      var sg = Math.hypot(bx - ax, by - ay);
+      if (total + sg <= a) { total += sg; continue; }
+      var t0 = Math.max(0, sg > 0 ? (a - total) / sg : 0);
+      var t1 = Math.min(1, sg > 0 ? (b - total) / sg : 1);
+      if (!out.length) out.push({ x: ax + (bx - ax) * t0, y: ay + (by - ay) * t0 });
+      if (t1 >= 1) out.push({ x: bx, y: by });
+      else out.push({ x: ax + (bx - ax) * t1, y: ay + (by - ay) * t1 });
+      total += sg;
+      if (t1 < 1) break;
+    }
+    return out.length >= 2 ? out : null;
+  }
+  /* 总管分段绘制（v165，2026-09-30 用户要求「遮蔽遇到总管要能分段遮蔽」）：
+     按「主管接入点」把总管有效几何切成 N 段，每段独立上色（遮蔽 = 灰虚线、其余 = 原色实线）。
+     段边界取自宿主 RyTlPathMeasure.frontRatios()（与简图/分段选择同源，段号绝不两处错位）；
+     取不到 → cuts=[0,1]，单段 = 整管（等价旧行为）。
+     为什么总管总在本层画：底图克隆里总管已被隐藏（见 pipeBaseSVG），本层是它唯一渲染源。 */
+  function drawFrontSegs(T, data, lm) {
+    var epts = AE.effPts('front', data);
+    if (!epts) return '';
+    var RM = (typeof window !== 'undefined') ? window.RyTlPathMeasure : null;
+    var cuts = (RM && typeof RM.frontRatios === 'function') ? RM.frontRatios() : null;
+    if (!cuts || cuts.length < 2) cuts = [0, 1];
+    var Lm = AE.polylineLen(epts), st = autoStyle('front');
+    var hidP = [], visP = [], anyVis = false, i;
+    for (i = 0; i + 1 < cuts.length; i++) {
+      var sub = sliceAlong(epts, cuts[i] * Lm, cuts[i + 1] * Lm);
+      if (!sub) continue;
+      var d = '';
+      sub.forEach(function (q, qi) { var w = T(q); d += (qi ? 'L' : 'M') + fmt(w.x) + ' ' + fmt(w.y); });
+      var hid = isPidHidden('front-' + i);
+      var el = '<path data-tlfrontseg="' + i + '" d="' + d + '" fill="none"'
+        + (hid ? hidAttr('front-' + i, st.c, st.w) : ' stroke="' + st.c + '" stroke-width="' + st.w + '"')
+        + ' stroke-linecap="round" stroke-linejoin="round"/>';
+      if (hid) hidP.push(el); else { visP.push(el); anyVis = true; }
+    }
+    var out = hidP.concat(visP);   /* 遮蔽段先画：灰色圆头不压在实线端点上 */
+    /* 长度标注：与原口径一致 —— 只在「总管确实改过长」且仍有未遮蔽段时标（整管中点） */
+    if (anyVis && lm && lm['front']) {
+      var mid = epts[Math.floor(epts.length / 2)], mq = T(mid);
+      out.push('<text x="' + fmt(mq.x + 6) + '" y="' + fmt(mq.y - 4) + '" font-size="9" font-family="system-ui" fill="#b45309">' + esc(Lm.toFixed(1) + 'm') + '</text>');
+    }
+    return out.join('');
+  }
   function autoSVG(T) {
     var data = lastDataRef;
     if (!data) return '';
     var s = [];
     /* 1) 改长后的管线（有效几何） */
     var lm = AE.lensMap();
-    Object.keys(lm).forEach(function (pid) {
+    /* v164：被遮蔽管（含未改长的）也由覆盖层按有效几何重画灰虚线 —— 底图克隆里该 path 已
+       visibility:hidden，这里补画才能呈现「灰色虚线」的遮蔽态（原来只重画改长管） */
+    var hmDraw = AE.hiddenMap ? AE.hiddenMap() : {};
+    var drawPids = {};
+    /* v165：总管改由 drawFrontSegs() 按分段重画（可只遮其中一段），这里排除它 ——
+       否则整管会再画一遍压在分段之上，「半遮蔽」就看不出来了。 */
+    Object.keys(lm).forEach(function (k) { if (k !== 'front') drawPids[k] = 1; });
+    Object.keys(hmDraw).forEach(function (k) { if (hmDraw[k] && k !== 'front' && !/^front-\d+$/.test(k)) drawPids[k] = 1; });
+    Object.keys(drawPids).forEach(function (pid) {
       var epts = AE.effPts(pid, data);
       if (!epts) return;
       var st = autoStyle(pid);
       var d = '';
       epts.forEach(function (p, i) { var q = T(p); d += (i ? 'L' : 'M') + fmt(q.x) + ' ' + fmt(q.y); });
-      s.push('<path d="' + d + '" fill="none" stroke="' + st.c + '" stroke-width="' + st.w + '" stroke-linecap="round" stroke-linejoin="round"/>');
+      var hid = isPidHidden(pid);   /* v162：遮蔽管→灰虚线；长度标注一并省掉（遮蔽即不在图上参与表达） */
+      s.push('<path d="' + d + '" fill="none"' + (hid ? hidAttr(pid, st.c, st.w) : ' stroke="' + st.c + '" stroke-width="' + st.w + '"') + ' stroke-linecap="round" stroke-linejoin="round"/>');
+      if (hid) return;
       var mid = epts[Math.floor(epts.length / 2)], mq = T(mid);
       s.push('<text x="' + fmt(mq.x + 6) + '" y="' + fmt(mq.y - 4) + '" font-size="9" font-family="system-ui" fill="#b45309">' + esc(AE.polylineLen(epts).toFixed(1) + 'm') + '</text>');
     });
+    /* 1a) 总管（v165）：按主管接入点分段重画 —— 每段独立遮蔽态 */
+    s.push(drawFrontSegs(T, data, lm));
     /* 1b) 改径标注（2026-09-16 阶段2e）：琥珀虚线套壳 + Ø 数值（对齐施工编辑器口径） */
     var cm = AE.calibersMap ? AE.calibersMap() : {};
     Object.keys(cm).forEach(function (pid) {
+      if (isPidHidden(pid)) return;   /* v162：遮蔽管不画改径套壳/Ø/hf 标注 */
       var epts = AE.effPts(pid, data);
       if (!epts) return;
       var st = autoStyle(pid);
@@ -1068,13 +1184,90 @@
         + (fSel ? '<circle cx="' + fmt(q.x) + '" cy="' + fmt(q.y) + '" r="9" fill="none" stroke="#7c3aed" stroke-width="1.6" stroke-dasharray="4,3"/>' : '')
         + sym + distLabels + '</g>');
     });
+    /* 2b) 节点与节点连线（v150：节点=配件组合容器只画圆点，含配件数角标；
+           连线=同管两节点间沿管子折线（改长/平移后仍贴合），紫虚线+段长标注） */
+    if (window.RyTlNodes && typeof window.RyTlNodes.list === 'function') {
+      var ndSlice = function (pts, a, b) {   /* 沿折线取弧长 [a,b]（米）子折线 */
+        if (!pts || pts.length < 2 || !(b - a > 1e-9)) return null;
+        var out = [], tot = 0;
+        for (var i = 0; i + 1 < pts.length && tot < b; i++) {
+          var ax = pts[i].x, ay = pts[i].y, bx = pts[i + 1].x, by = pts[i + 1].y;
+          var sg = Math.hypot(bx - ax, by - ay);
+          if (tot + sg <= a) { tot += sg; continue; }
+          var t0 = Math.max(0, sg > 0 ? (a - tot) / sg : 0), t1 = Math.min(1, sg > 0 ? (b - tot) / sg : 1);
+          if (!out.length) out.push({ x: ax + (bx - ax) * t0, y: ay + (by - ay) * t0 });
+          if (t1 >= 1) out.push({ x: bx, y: by }); else out.push({ x: ax + (bx - ax) * t1, y: ay + (by - ay) * t1 });
+          tot += sg;
+          if (t1 < 1) break;
+        }
+        return out.length >= 2 ? out : null;
+      };
+      var ndL = AE.polylineLen;
+      window.RyTlNodes.links().forEach(function (lk) {
+        var na = window.RyTlNodes.nodeById(lk.a), nb = window.RyTlNodes.nodeById(lk.b);
+        if (!na || !nb) return;
+        if (na.pid === nb.pid) {
+        var ep2 = AE.effPts(na.pid, data); if (!ep2) return;
+        var L2 = ndL(ep2);
+        var a1 = Math.max(0, Math.min(na.atM, L2)), b1 = Math.max(0, Math.min(nb.atM, L2));
+        if (!(Math.abs(b1 - a1) > 1e-6)) return;
+        var sub = ndSlice(ep2, Math.min(a1, b1), Math.max(a1, b1)); if (!sub) return;
+        var d3 = '';
+        sub.forEach(function (p, i) { var q3 = T(p); d3 += (i ? 'L' : 'M') + fmt(q3.x) + ' ' + fmt(q3.y); });
+        var mp = sub[Math.floor(sub.length / 2)], mq3 = T(mp);
+        s.push('<path data-tlnodelink="' + esc(lk.id) + '" d="' + d3 + '" fill="none" stroke="#7c3aed" stroke-width="4" stroke-dasharray="2,4" stroke-linecap="round" opacity="0.9" pointer-events="none"/>');
+        s.push('<text x="' + fmt(mq3.x + 6) + '" y="' + fmt(mq3.y - 6) + '" font-size="9.5" font-family="system-ui" font-weight="700" fill="#6d28d9" paint-order="stroke" stroke="#fff" stroke-width="2.5" pointer-events="none">' + esc(lk.id + ' ' + Math.abs(b1 - a1).toFixed(1) + 'm' + (lk.od != null ? ' Ø' + lk.od : '')) + '</text>');
+        /* v156：命中带改成与可见虚线同形状的 <path d="d3"> —— 原先是 sub[0]→sub[last] 的**直弦 <line>**，
+           折管上会与可见虚线分离 ⇒ 看着点在连线上、其实没命中（同一类「点不到」缺陷）。d3 就是可见虚线的 d。 */
+        s.push('<path data-tllinkhit="' + esc(lk.id) + '" d="' + d3 + '" fill="none" stroke="rgba(0,0,0,0)" stroke-width="12" pointer-events="stroke" cursor="pointer"/>');
+        } else {
+        /* 2026-09-28 用户要求：跨管连线=两节点平面直连（总管/主管同埋深、同标高，水平连接即可） */
+        var paC = nodePos(na), pbC = nodePos(nb); if (!paC || !pbC) return;
+        var qaC = T(paC), qbC = T(pbC);
+        var dC = Math.hypot(pbC.x - paC.x, pbC.y - paC.y); if (!(dC > 1e-6)) return;
+        s.push('<path data-tlnodelink="' + esc(lk.id) + '" d="M' + fmt(qaC.x) + ' ' + fmt(qaC.y) + 'L' + fmt(qbC.x) + ' ' + fmt(qbC.y) + '" fill="none" stroke="#7c3aed" stroke-width="4" stroke-dasharray="2,4" stroke-linecap="round" opacity="0.9" pointer-events="none"/>');
+        s.push('<text x="' + fmt((qaC.x + qbC.x) / 2 + 6) + '" y="' + fmt((qaC.y + qbC.y) / 2 - 6) + '" font-size="9.5" font-family="system-ui" font-weight="700" fill="#6d28d9" paint-order="stroke" stroke="#fff" stroke-width="2.5" pointer-events="none">' + esc(lk.id + ' ' + dC.toFixed(1) + 'm 跨接' + (lk.od != null ? ' Ø' + lk.od : '')) + '</text>');
+        s.push('<line data-tllinkhit="' + esc(lk.id) + '" x1="' + fmt(qaC.x) + '" y1="' + fmt(qaC.y) + '" x2="' + fmt(qbC.x) + '" y2="' + fmt(qbC.y) + '" stroke="rgba(0,0,0,0)" stroke-width="12" pointer-events="stroke" cursor="pointer"/>');
+        }
+      });
+      window.RyTlNodes.list().forEach(function (nd) {
+        var pos = nodePos(nd); if (!pos) return;
+        var q4 = T(pos);
+        var nSel = nd.id === selNodeId;
+        var cnt = window.RyTlNodes.fitTotal ? window.RyTlNodes.fitTotal(nd) : 0;
+        /* 2026-09-30 节点角标升级（请求④）：连接度角标 + 中间节点语义
+           deg = 该节点连线数；deg>=2 = 中间节点（琥珀环 #f59e0b 高亮）；deg===1 = 端点；deg===0 = 未连接 */
+        var deg = (window.RyTlNodes.degreeOf ? window.RyTlNodes.degreeOf(nd.id) : 0);
+        var isMid = deg >= 2;
+        s.push('<g class="tl-ws-node" data-tlnode="' + esc(nd.id) + '">'
+          + (nSel ? '<circle cx="' + fmt(q4.x) + '" cy="' + fmt(q4.y) + '" r="10" fill="none" stroke="#7c3aed" stroke-width="1.6" stroke-dasharray="4,3"/>' : '')
+          + (isMid ? '<circle cx="' + fmt(q4.x) + '" cy="' + fmt(q4.y) + '" r="8.5" fill="none" stroke="#f59e0b" stroke-width="1.8"/>' : '')
+          + '<circle cx="' + fmt(q4.x) + '" cy="' + fmt(q4.y) + '" r="5.5" fill="#7c3aed" stroke="#fff" stroke-width="1.4"/>'
+          + (cnt > 0 ? '<circle cx="' + fmt(q4.x + 6.5) + '" cy="' + fmt(q4.y - 6.5) + '" r="4.5" fill="#fff" stroke="#7c3aed" stroke-width="1.1"/>'
+            + '<text x="' + fmt(q4.x + 6.5) + '" y="' + fmt(q4.y - 4.2) + '" font-size="6.5" font-family="system-ui" font-weight="700" fill="#6d28d9" text-anchor="middle" pointer-events="none">' + cnt + '</text>' : '')
+          + (deg > 0 ? '<circle cx="' + fmt(q4.x + 6.5) + '" cy="' + fmt(q4.y + 6.5) + '" r="4.5" fill="#fff" stroke="#f59e0b" stroke-width="1.1"/>'
+            + '<text x="' + fmt(q4.x + 6.5) + '" y="' + fmt(q4.y + 8.8) + '" font-size="6.5" font-family="system-ui" font-weight="700" fill="#b45309" text-anchor="middle" pointer-events="none">↔' + deg + '</text>' : '')
+          + '</g>');
+      });
+    }
     /* 3) 选中自动管线 / 同类型多选集合 高亮（第三十九轮扩展 selSet） */
     var hlSet = {};
     if (selAutoId) hlSet[selAutoId] = 1;
     selSet.forEach(function (p) { hlSet[p] = 1; });
     Object.keys(hlSet).forEach(function (pid) {
       var epts2 = AE.effPts(pid, data);
+      /* v163：多选里的总管段 'front-N' → 该段子折线（与单选 selAutoSeg 同源） */
+      var mSegPid = /^front-(\d+)$/.exec(pid);
+      if (mSegPid && window.RyTlPathMeasure && typeof window.RyTlPathMeasure.frontSegPts === 'function') {
+        var sptsN = window.RyTlPathMeasure.frontSegPts(Number(mSegPid[1]));
+        if (sptsN && sptsN.length >= 2) epts2 = sptsN;
+      }
       if (!epts2) return;
+      /* v150：总管分段选中 → 只高亮所在段（子折线，米坐标），非整根 */
+      if (pid === 'front' && selAutoSeg != null && window.RyTlPathMeasure && typeof window.RyTlPathMeasure.frontSegPts === 'function') {
+        var spts = window.RyTlPathMeasure.frontSegPts(selAutoSeg);
+        if (spts && spts.length >= 2) epts2 = spts;
+      }
       var st2 = autoStyle(pid);
       var d2 = '';
       epts2.forEach(function (p, i) { var q2 = T(p); d2 += (i ? 'L' : 'M') + fmt(q2.x) + ' ' + fmt(q2.y); });
@@ -1178,7 +1371,7 @@
     if (!ctn || !el || !lastDataRef) return;
     /* 只重建图形内容，保持视口变换不变 */
     var tmp = document.createElement('div');
-    tmp.innerHTML = renderSVG(lastDataRef);
+    tmp.innerHTML = wsStripLabels(renderSVG(lastDataRef));
     var fresh = tmp.querySelector('svg');
     if (!fresh) return;
     /* ★ 2026-09-17（第四十二轮修正）：新 svg 必须继承旧 svg 的「铺满容器」尺寸。
@@ -1222,6 +1415,7 @@
     if (mode) clearFitMode();                    // 与配件插入模式互斥（第七十轮）
     if (!mode) cancelDraft();
     if (mode && multiMode) setMultiMode(false);   // 进插入模式自动退出多选（第五十八轮），否则点管身没反应
+    if (mode && maskMode) setMaskMode(false);     // v162：同理退出遮蔽模式（否则点管身会被遮蔽吃掉）
     updatePreview();
     return mode;
   }
@@ -1236,12 +1430,13 @@
     return fitMode;
   }
   function setFitMode(m) {
-    if (m !== 'valve' && m !== 'tee' && m !== 'elbow') m = null;
+    if (m !== 'valve' && m !== 'tee' && m !== 'elbow' && m !== 'node') m = null;   /* v150：+node（节点=配件组合容器） */
     if (fitMode === m) m = null;                 // 再点同款 = 退出配件插入模式
     fitMode = m;
     if (fitMode) {
       if (mode) { mode = null; cancelDraft(); updatePreview(); if (typeof api.onModeChange === 'function') api.onModeChange(null); }
       if (multiMode) setMultiMode(false);        // 多选开关会把「点管身」吃掉
+      if (maskMode) setMaskMode(false);          // v162：遮蔽模式同样会把「点管身」吃掉
     }
     if (typeof api.onFitModeChange === 'function') api.onFitModeChange(fitMode);
     return fitMode;
@@ -1280,7 +1475,22 @@
     }
     if (selAutoId && lastDataRef) {
       var epts = AE.effPts(selAutoId, lastDataRef), bpts = AE.pipePts(selAutoId, lastDataRef);
-      if (epts) return { auto: true, id: selAutoId, kindLabel: AE.pipeName(selAutoId), len: AE.polylineLen(epts), baseLen: bpts ? AE.polylineLen(bpts) : 0, pickAt: selAutoAt, od: AE.caliberOf ? AE.caliberOf(selAutoId) : null };
+      if (epts) {
+        var info = { auto: true, pid: selAutoId, id: selAutoId, kindLabel: AE.pipeName(selAutoId), len: AE.polylineLen(epts), baseLen: bpts ? AE.polylineLen(bpts) : 0, pickAt: selAutoAt, od: AE.caliberOf ? AE.caliberOf(selAutoId) : null };
+        /* v150：总管按主管接入点分段后，普通模式选中 = 所在段（信息卡显示「总管·第N段 + 段长」）。
+           分段模型不可用（总管非直线/几何未就绪）→ 回退整管口径，行为与旧版一致。 */
+        if (selAutoId === 'front' && selAutoSeg != null && window.RyTlPathMeasure && typeof window.RyTlPathMeasure.segInfo === 'function') {
+          var sg = window.RyTlPathMeasure.segInfo('front-' + selAutoSeg);
+          if (sg && sg.len != null) {
+            info.kindLabel = '总管·第' + (selAutoSeg + 1) + '段';
+            info.len = sg.len;
+            info.segIndex = selAutoSeg;
+            info.pid = 'front-' + selAutoSeg;   /* v165：段 pid —— 宿主面板/右键/遮蔽写入都用它 */
+            if (sg.od != null) info.od = sg.od;
+          }
+        }
+        return info;
+      }
     }
     return null;
   }
@@ -1482,10 +1692,15 @@
     if (typeof api.onPipeSelect === 'function') api.onPipeSelect(selInfo());
     return selId;
   }
-  /* 选中自动管线（pid + 点击位置沿管弧长）（阶段2） */
+  /* 选中自动管线（pid + 点击位置沿管弧长）（阶段2）；v150：front → 按分段模型定位所在段 */
   function selectAuto(pid, along) {
     selId = null; selFitId = null;
     selAutoId = pid || null; selAutoAt = along || 0;
+    selAutoSeg = null;
+    if (selAutoId === 'front' && window.RyTlPathMeasure && typeof window.RyTlPathMeasure.segIndexAt === 'function') {
+      var si = window.RyTlPathMeasure.segIndexAt(selAutoAt);
+      if (si != null) selAutoSeg = si;
+    }
     rerenderKeepView();
     if (typeof api.onPipeSelect === 'function') api.onPipeSelect(selInfo());
     return selAutoId;
@@ -1500,18 +1715,35 @@
   }
   /* 清空全部选中（点空处；保持旧「点击即重渲染+通知」口径） */
   function clearSel() {
-    selId = null; selAutoId = null; selFitId = null; selManFitId = null;
+    selId = null; selAutoId = null; selFitId = null; selManFitId = null; selNodeId = null; selAutoSeg = null;
     rerenderKeepView();
     if (typeof api.onPipeSelect === 'function') api.onPipeSelect(selInfo());
     exitMulti();   // 清空选中同时退出多选（第三十九轮）
   }
   /* 同类型管道多选（2026-09-17 第三十九轮）：selSet 存自动管线 pid；整体改径 + 长度求和 */
-  function pipeType(pid) { return pid === 'front' ? 'front' : (String(pid).indexOf('main-') === 0 ? 'main' : 'branch'); }
+  /* v163：总管段 pid 'front-N'（多选分段选择）归入 front 类型 */
+  function pipeType(pid) { return (pid === 'front' || /^front-\d+$/.test(String(pid))) ? 'front' : (String(pid).indexOf('main-') === 0 ? 'main' : 'branch'); }
+  /* v163：总管段 pid 归一化 —— AE 只认整管 'front'，段 pid 的改径/清改径统一落到整管（去重） */
+  function normSegPids(pids) {
+    var out = [], seen = {};
+    (pids || []).forEach(function (pid) {
+      var p = /^front-\d+$/.test(String(pid)) ? 'front' : pid;
+      if (!seen[p]) { seen[p] = 1; out.push(p); }
+    });
+    return out;
+  }
   function exitMulti() {
     if (selSet.length) {
       selSet = [];
       if (typeof api.onMultiSelect === 'function') api.onMultiSelect(null);
     }
+  }
+  /* v163：总管段 'front-N' 长度 = 分段模型段长（AE.effPts 不认段 pid，整管口径会算错） */
+  function segLenOf(pid) {
+    var m = /^front-(\d+)$/.exec(String(pid));
+    if (!m || !window.RyTlPathMeasure || typeof window.RyTlPathMeasure.segInfo !== 'function') return null;
+    var sg = window.RyTlPathMeasure.segInfo(pid);
+    return (sg && sg.len != null) ? sg.len : null;
   }
   function selSetInfo() {
     if (!selSet.length || !lastDataRef) return null;
@@ -1519,6 +1751,7 @@
     selSet.forEach(function (pid) {
       var epts = AE.effPts(pid, lastDataRef);
       if (epts) total += AE.polylineLen(epts);
+      else { var sl = segLenOf(pid); if (sl != null) total += sl; }
     });
     return { count: selSet.length, type: pipeType(selSet[0]), totalLen: total, pids: selSet.slice() };
   }
@@ -1605,6 +1838,39 @@
     return best;
   }
 
+  /* ---------- 节点（v150，RyTlNodes：节点=配件组合容器，图面只画圆点）---------- */
+  /* 节点图面位置：pid + atM（改长后超出管长 → 贴末端显示），数据米坐标；不可用返回 null */
+  function nodePos(nd) {
+    if (!nd || !lastDataRef) return null;
+    var ep = AE.effPts(nd.pid, lastDataRef);
+    if (!ep) return null;
+    var L = AE.polylineLen(ep);
+    return AE.pointAt(nd.pid, lastDataRef, Math.max(0, Math.min(nd.atM, L)));
+  }
+  /* 点 → 最近节点（tolM 米容差）：{id, node, pos}；未命中 null */
+  function pickNode(p, tolM) {
+    if (!window.RyTlNodes || !lastDataRef || typeof window.RyTlNodes.list !== 'function') return null;
+    var best = null, bd = Math.max(tolM, 0.8);
+    window.RyTlNodes.list().forEach(function (nd) {
+      var pos = nodePos(nd);
+      if (!pos) return;
+      var d = Math.hypot(pos.x - p.x, pos.y - p.y);
+      if (d < bd) { bd = d; best = { id: nd.id, node: nd, pos: pos }; }
+    });
+    return best;
+  }
+  /* 选中节点：清其它选中态 → 重渲染（节点高亮环）→ 通知页面清信息卡 → 弹节点配件面板 */
+  function selectNode(id, cx, cy) {
+    selId = null; selAutoId = null; selFitId = null; selManFitId = null; selAutoSeg = null;
+    selNodeId = id || null;
+    rerenderKeepView();
+    if (typeof api.onPipeSelect === 'function') api.onPipeSelect(null);
+    if (selNodeId && window.RyTlNodes && typeof window.RyTlNodes.openPanel === 'function') {
+      window.RyTlNodes.openPanel(selNodeId, cx, cy);
+    }
+    return selNodeId;
+  }
+
   /* ---------- 配件插入模式的命中小工具（2026-09-18 第七十轮）---------- */
   /* 点 → 最近管线（自动层 AE + 手工层 EP 一起比，取真正最近的）：
      {layer:'auto', pid, along} | {layer:'manual', id, atM, pts}；未命中返回 null。 */
@@ -1652,6 +1918,12 @@
   function insertFitAt(hit, p) {
     if (!hit || !fitMode) return null;
     var kind = fitMode, id = null;
+    if (kind === 'node') {                       /* v150：节点=配件组合容器，只画圆点；仅自动管线支持 */
+      if (hit.layer !== 'auto' || !window.RyTlNodes || typeof window.RyTlNodes.addAt !== 'function') return null;
+      var nn = window.RyTlNodes.addAt(hit.pid, hit.along);
+      if (nn) selectNode(nn.id);                 // 建完即选中并弹配件面板
+      return nn ? nn.id : null;
+    }
     if (hit.layer === 'auto' && lastDataRef) {
       var at = hit.along;
       if (kind === 'elbow') {                    // 弯头：吸附到该管线最近的折点/端头
@@ -1763,13 +2035,72 @@
          必须排在配件拖动/管身拖动/平移之前，否则点管身会被它们截走；
          点空白不退出模式（便于连续布点），退出靠再点按钮或 Esc。 */
       if (e.button === 0 && fitMode && !mode && viewState && viewState.base && lastDataRef) {
+        /* v156（2026-09-29 用户报「之前连接线可以选择管径的，怎么没有了」）：
+           点连线命中带 → 弹连线面板（选管径），必须排在配件插入之前。
+           原来这个判断只写在**普通模式分支**里，于是在 ◉ 节点 / 阀门 / 三通 / 弯头 模式下
+           点连线会被 pickAnyPipe → insertFitAt 截走：实测点连线中段不但没弹面板，
+           还**多插了一个节点**（节点数 2→3）。
+           用 e.target.closest 精确判定：命中带是 12px 透明功能层且在最上层，只有鼠标真的
+           落在它上面才生效 ⇒ 对「点管子插配件」零影响。
+           （技能 §2.143：任何「更具体的目标」都必须排在「更宽泛的目标」之前。） */
+        var tLkFit = e.target && e.target.closest ? e.target.closest('[data-tllinkhit]') : null;
+        if (tLkFit && window.RyTlNodes && typeof window.RyTlNodes.openLinkPanel === 'function') {
+          suppressAutoPick = true;
+          window.RyTlNodes.openLinkPanel(tLkFit.getAttribute('data-tllinkhit'), e.clientX, e.clientY);
+          e.preventDefault();
+          return;
+        }
         var rawFitPt = rawDataPoint(el, e);
         if (rawFitPt) {
+          /* v150：节点模式下点已有节点 → 不重复插入。
+             v155（2026-09-29 用户第二次报「节点在管道上还是不能拖动」）：
+             原来这一行是 selectNode(nh.id, …) + return，把「节点模式下的拖动」整个截走 ——
+             CDP 真实鼠标事件实测：pointerdown 命中节点即弹面板并 return，pointermove 全部落到
+             管线上，moveNode 调用 0 次、桩号 43.5 纹丝不动；同一个节点切到普通模式拖得动（8 次）。
+             改为与普通模式（v151）同款「起拖」：拖动 → 沿管实时移动改桩号；不拖直接抬起 →
+             由既有 pointerup 的 !wasMovedNd → selectNode 兜住，点击弹面板行为零变化；
+             点空管仍走 pickAnyPipe → insertFitAt，连续布点也零变化。
+             （技能 §2.143：改动拖动分支必须逐条核对——本分支命中节点后立即 return，
+              后面的配件拖动 / 手工配件 / 管身拖动 / 画布平移全部不参与，不会二次截走。） */
+          if (fitMode === 'node') {
+            var nh = pickNode(rawFitPt, snapTolUnits(el) / viewState.k);
+            if (nh) {
+              nodeDrag = { id: nh.id, pid: nh.node ? nh.node.pid : null, pointerId: e.pointerId, sx: e.clientX, sy: e.clientY, moved: false, atM: null };
+              suppressAutoPick = true;
+              if (ctn.setPointerCapture) { try { ctn.setPointerCapture(e.pointerId); } catch (errNdF) {} }
+              e.preventDefault();
+              return;
+            }
+          }
           var hitFit = pickAnyPipe(rawFitPt, snapTolUnits(el) / viewState.k * 1.5);
           if (hitFit) insertFitAt(hitFit, rawFitPt);
         }
         e.preventDefault();
         return;
+      }
+      /* v150→v151（2026-09-28 用户要求）：按在节点上 → 进入沿管拖动（自由移动 + 桩号实时显示）；
+         未移动抬起 = 点击 → 弹节点面板。suppressAutoPick 抑制合成 click 走管线拾取。 */
+      if (e.button === 0 && !mode && !fitMode && viewState && viewState.base && lastDataRef) {
+        var rawNd = rawDataPoint(el, e);
+        var ndh2 = rawNd ? pickNode(rawNd, snapTolUnits(el) / viewState.k) : null;
+        if (ndh2) {
+          nodeDrag = { id: ndh2.id, pid: ndh2.node ? ndh2.node.pid : null, pointerId: e.pointerId, sx: e.clientX, sy: e.clientY, moved: false, atM: null };
+          suppressAutoPick = true;
+          /* 2026-09-28 补 capture（与其他拖动分支同款）：拖动中指针滑出画布/被节点面板等浮层遮挡时，
+             pointerup 仍会送达 ctn —— 否则 nodeDrag 残留、tooltip 不隐藏（探针 D2 tipHidden:false 抓出） */
+          if (ctn.setPointerCapture) { try { ctn.setPointerCapture(e.pointerId); } catch (errNd) {} }
+          e.preventDefault();
+          return;
+        }
+        /* v151（2026-09-28 用户要求）：按在节点连线上 → 弹连线面板（选管径/删除）；
+           suppressAutoPick 抑制随后的合成 click 走管线拾取（否则点连线会选中底下管线） */
+        var tLk = e.target && e.target.closest ? e.target.closest('[data-tllinkhit]') : null;
+        if (tLk && window.RyTlNodes && typeof window.RyTlNodes.openLinkPanel === 'function') {
+          suppressAutoPick = true;
+          window.RyTlNodes.openLinkPanel(tLk.getAttribute('data-tllinkhit'), e.clientX, e.clientY);
+          e.preventDefault();
+          return;
+        }
       }
       /* 配件沿管拖动（阶段2b）：左键按在图面配件上 → 进入拖动（平移让位）；capture 挂容器（重渲染不丢） */
       if (e.button === 0 && !mode && viewState && viewState.base && lastDataRef) {
@@ -1803,6 +2134,37 @@
           return;
         }
       }
+      /* v162：遮蔽模式 —— 左键点管身 = 切换该管「遮蔽/取消遮蔽」（不进入拖动、不改选中）。
+         必须排在「整条拖动自动管线」之前，否则点管身会被拖动分支截走。
+         suppressAutoPick 抑制随后的合成 click 走管线拾取（否则会把刚遮蔽的管选中/清空上下文）。 */
+      if (e.button === 0 && !mode && !fitMode && viewState && viewState.base && lastDataRef && maskMode) {
+        var rawMk = rawDataPoint(el, e);
+        var mkHit = rawMk ? pickAutoPipe(rawMk, snapTolUnits(el) / viewState.k * 1.2) : null;
+        if (mkHit) {
+          suppressAutoPick = true;
+          /* v164（2026-09-30 用户报「总管点击隐藏管道，图中没有隐藏」）：
+             原来直调 AE.toggleHidden 只写共享层状态 —— 简图样式不刷、工作区底图（简图克隆）
+             不重克隆、材料清单不重算 ⇒ 状态已写入但图面完全看不到遮蔽（右键菜单路径走
+             tlPipeHiddenChanged 所以一直是好的，唯独这条点击路径漏接）。
+             改走宿主统一收口 tlPipeHiddenChanged（先刷简图样式 → 写状态广播 → 全量对齐 →
+             工作区重克隆 → 材料重算 → 轴测重绘）；宿主未注入（Node 单测）回退 AE.toggleHidden。 */
+          /* v165（2026-09-30 用户要求「遮蔽功能遇到总管，不能分段遮蔽，要改下，可以分段遮蔽」）：
+             总管按「主管接入点」分段 —— 点哪一段就只遮蔽那一段（旧行为是整条总管一起遮）。
+             段号取自与「分段选择」同一套模型（segIndexAt），故点选位置 = 显示段号，不会错位。 */
+          var mkPid = mkHit.pid;
+          if (mkPid === 'front' && typeof window !== 'undefined' && window.RyTlPathMeasure && typeof window.RyTlPathMeasure.segIndexAt === 'function') {
+            var mkSeg = window.RyTlPathMeasure.segIndexAt(mkHit.along);
+            if (mkSeg != null) mkPid = 'front-' + mkSeg;
+          }
+          if (typeof window !== 'undefined' && window.tlPipeHiddenChanged) {
+            window.tlPipeHiddenChanged({ pid: mkPid, toggleEach: true });
+          } else {
+            AE.toggleHidden(mkPid, lastDataRef, 'ws');
+          }
+          e.preventDefault();
+          return;
+        }
+      }
       /* 整条拖动自动管线（2026-09-16）：图面平移覆盖（AE.moves，不改 tlDiagramData/管长，红线安全） */
       if (e.button === 0 && !mode && viewState && viewState.base && lastDataRef) {
         var rawAuto = rawDataPoint(el, e);
@@ -1813,7 +2175,14 @@
              click 事件到不了容器（实测 3 次 pointerdown / 0 次 click）—— 判定写在 click 里
              等于「按钮点了没反应」，第三十九轮的 Ctrl+点 同因失效（只对测试的手工派发生效）。 */
           if (multiMode || e.ctrlKey || e.metaKey) {
-            toggleSelSet(apd.pid);             // 同类型加选 / 再点取消该段
+            /* v163：总管在多选模式同样按主管接入点分段（v150 只接了普通模式，多选漏接
+               —— 2026-09-30 用户报「总管又不能分段选择」，复现 selSet=['front'] 整管）。 */
+            var mPid = apd.pid;
+            if (mPid === 'front' && window.RyTlPathMeasure && typeof window.RyTlPathMeasure.segIndexAt === 'function') {
+              var mSeg = window.RyTlPathMeasure.segIndexAt(apd.along);
+              if (mSeg != null) mPid = 'front-' + mSeg;
+            }
+            toggleSelSet(mPid);                // 同类型加选 / 再点取消该段
             suppressAutoPick = true;           // 三段派发（测试路径）时 click 也会到，避免二次切换
             e.preventDefault();
             return;
@@ -1875,6 +2244,30 @@
                   lastDataRef.zones.xPos = nc.xPos.slice(); lastDataRef.zones.yPos = nc.yPos.slice();
                   rerenderKeepView();
                 }
+              }
+            });
+          }
+        }
+        return;
+      }
+      if (nodeDrag && e.pointerId === nodeDrag.pointerId) {       // v151 节点沿管拖动：沿管弧长实时跟随（rAF 节流）+ 桩号提示
+        var elNd = currentEL(ctn);
+        if (!nodeDrag.moved && Math.hypot(e.clientX - nodeDrag.sx, e.clientY - nodeDrag.sy) < 3) return;  // 3px 启动阈值（与 autoDrag/pipeDrag 同款）
+        nodeDrag.moved = true;
+        if (elNd && lastDataRef && nodeDrag.pid) {
+          var rawNdM = rawDataPoint(elNd, e);
+          var locNd = rawNdM ? AE.locate(nodeDrag.pid, lastDataRef, rawNdM) : null;
+          if (locNd) {
+            nodeDrag.atM = locNd.along;
+            nodeDragTipShow(e.clientX, e.clientY, nodeDrag.id, locNd.along);
+            /* 2026-09-28 面板桩号实时同步：拖动中 tooltip 与已打开节点面板的桩号框保持一致（用户报两数分叉） */
+            if (window.RyTlNodes && typeof window.RyTlNodes.syncStake === 'function') {
+              window.RyTlNodes.syncStake(nodeDrag.id, locNd.along);
+            }
+            if (!nodeDragRaf) nodeDragRaf = requestAnimationFrame(function () {
+              nodeDragRaf = 0;
+              if (nodeDrag && window.RyTlNodes && typeof window.RyTlNodes.moveNode === 'function') {
+                window.RyTlNodes.moveNode(nodeDrag.id, nodeDrag.atM);
               }
             });
           }
@@ -1984,6 +2377,13 @@
         autoDrag = null;
       }
       if (fitDrag && (e.pointerId === undefined || e.pointerId === fitDrag.pointerId)) fitDrag = null;
+      if (nodeDrag && (e.pointerId === undefined || e.pointerId === nodeDrag.pointerId)) {
+        var wasMovedNd = nodeDrag.moved, dragNdId = nodeDrag.id, upX = e.clientX, upY = e.clientY;
+        if (nodeDragRaf) { cancelAnimationFrame(nodeDragRaf); nodeDragRaf = 0; }
+        nodeDrag = null;
+        nodeDragTipHide();
+        if (!wasMovedNd) selectNode(dragNdId, upX, upY);   /* 未移动抬起 = 点击 → 弹节点面板（v150 行为保持） */
+      }
       if (drag && (e.pointerId === undefined || e.pointerId === drag.id)) {
         drag = null;
         var el = currentEL(ctn); if (el) el.classList.remove('tl-ws-dragging');
@@ -2007,6 +2407,9 @@
           var raw = rawDataPoint(el, e);
           var tolM2 = snapTolUnits(el) / viewState.k;
           if (raw) {
+            /* v150：节点标记画在覆盖层最上 → 命中优先于图面配件/管线；点节点弹配件面板 */
+            var ndh = pickNode(raw, tolM2);
+            if (ndh) { exitMulti(); selectNode(ndh.id, e.clientX, e.clientY); return; }
             var ff = pickAutoFit(raw, tolM2);
             if (ff) { exitMulti(); selectFit(ff.id); return; }     // 配件标记优先于所在管线
             var ap = pickAutoPipe(raw, tolM2 * 1.2);
@@ -2061,6 +2464,7 @@
         if (draft) cancelDraft();
         else if (mode) { mode = null; updatePreview(); if (typeof api.onModeChange === 'function') api.onModeChange(null); }
         else if (fitMode) setFitMode(null);      // Esc 退出配件插入模式（第七十轮）
+        else if (maskMode) setMaskMode(false);   // Esc 退出遮蔽模式（v162）
         e.preventDefault();
       }
     });
@@ -2245,6 +2649,41 @@
     wireCalChipDrag(chip);
   }
   /* ---------- 渲染入口 ---------- */
+  /* 2026-09-28 标注显隐开关状态（true=隐藏图面标注：文字+标注线；api.setLabelsOff/toggleLabels 切换） */
+  var labelsOff = false;
+  var zoneLabelsOff = false;
+  /* 唯一剥离出口：render() 与 rerenderKeepView() 两条渲染路径都必须经过它
+   * （rerenderKeepView 直接 renderSVG+replaceChild 不走 render() —— 漏挂 = 开关后残留，实测踩过）。
+   * 2026-09-28 晚（用户要求「标注线也要可隐藏/显示」）：标注线一并剥离 ——
+   *   ① data-tlcal 改径套壳线（琥珀虚线，Ø 文字的配线）
+   *   ② data-tlnodelink 节点连线（紫虚线）——不剥离！属功能层，随管线常显，隐藏态依然可选中变换管径（2026-09-28 晚用户明确）
+   *   ③ data-tllinkhit 连线命中带（12px 透明功能层；不剥离！隐藏态保留才能点击连线弹面板，2026-09-28 晚修正：曾误剥致隐藏态连线点不了）
+   *   ④ data-tlworst 最不利路径标注整组（与其独立开关叠加：任一关=隐藏）
+   * 隐藏=纯管网（管线+节点+配件+底图）；data-tlworst 组内无嵌套 <g> → 非贪婪到首个 </g> 即整组剥净。 */
+  function wsStripLabels(svg) {
+    if ((!labelsOff && !zoneLabelsOff) || svg == null) return svg;
+    var s = String(svg);
+    if (labelsOff) {
+      s = s
+      .replace(/<g\b[^>]*\bdata-tlworst\b[^>]*>[\s\S]*?<\/g>/g, '')
+      .replace(/<(?:path|line)\b[^>]*\bdata-tlcal\b[^>]*>/g, '')
+      .replace(/<text\b(?![^>]*\bdata-tlzone\b)[\s\S]*?<\/text>/g, '')
+      /* 2026-09-28 晚（用户：尺寸标注线干扰选管，要求一并隐藏）：地块尺寸线（建筑制图风格，宿主图克隆底图带入）
+         —— ① 先剥 text：data-dim 组内 rotate 数字包装随之变空组；
+         ② 剥空组：data-dim 组内不再有嵌套 g；
+         ③ data-dim 整组非贪婪剥（尺寸横线/竖线+tick 斜短线+组内 dimext 界线全走）；
+         ④ 孤立 data-dimext 界线（gdExt 外层组）单独剥；
+         ⑤ 再清一次空组壳（gdExt 外层 pointer-events=none 组变空后移除）。 */
+      .replace(/<g\b[^>]*><\/g>/g, '')
+      .replace(/<g\b[^>]*\bdata-dim=\"[^\"]*\"[^>]*>[\s\S]*?<\/g>/g, '')
+      .replace(/<line\b[^>]*\bdata-dimext\b[^>]*>/g, '')
+      .replace(/<g\b[^>]*><\/g>/g, '');
+    }
+    if (zoneLabelsOff) {
+      s = s.replace(/<text\b[^>]*\bdata-tlzone\b[^>]*>[\s\S]*?<\/text>/g, '');
+    }
+    return s;
+  }
   function render(ctn, data) {
     selGroup = null;                                  // 切换/重渲染 → 清空分组高亮
     if (!ctn) return false;
@@ -2259,7 +2698,11 @@
     AE.syncGeometry(data);
     lastDataRef = data;
     closeCtxMenu();
-    ctn.innerHTML = '<div class="tl-ws-canvas" id="tlWsCanvas">' + renderSVG(data) + calChipHtml('tlWsCalChip') + groupInfoHtml() + '</div>';
+    /* 2026-09-28 标注显隐：render() 是本工作区 SVG 的唯一出口 —— 开关打开时剥掉全部标注
+       （文字 + 标注线：改径套壳/节点连线/命中带/最不利路径；底图克隆与自绘两条路径一次性覆盖），
+       图面只剩管线/节点/配件/底图，点周边图形更顺手。 */
+    var __wsSvgAll = wsStripLabels(renderSVG(data));
+    ctn.innerHTML = '<div class="tl-ws-canvas" id="tlWsCanvas">' + __wsSvgAll + calChipHtml('tlWsCalChip') + groupInfoHtml() + '</div>';
     /* 第四十九轮：汇总条重建后重挂拖拽。
        ⚠ 必须守卫 querySelector：纯逻辑单测（tests/tl_workspace.test.cjs）传的是最小桩容器
        `{ innerHTML: '' }`，直接调用会 TypeError（2026-09-17 实测踩到，单测 20/22 报红）。 */
@@ -2305,6 +2748,10 @@
 
   /* ---------- 导出 ---------- */
   api.render = render;
+  /* v162：遮蔽换样式后需要「就地重渲染」把工作区底图（克隆自简图）刷成新样式。
+     工作区底图不是自绘而是 cloneNode(#tlDiagramContent svg)，所以简图换完样式必须再走一次
+     rerenderKeepView 才能同步 —— 只 render 会重建整幅图、丢掉视口与选中态。 */
+  api.rerenderKeepView = rerenderKeepView;
   api.groupFillCss = function (g) { return groupFill(g); };   /* 供三级简图分区上色带（单一调色板） */
   /* 三级简图「联合灌溉分组」图例（2026-09-16 补全）：纯 HTML 覆盖层，不进简图 SVG（不破坏下载/打印成图）。
      仅展示色带+每组含哪些区+本轮合灌流量；不重涂简图分区（保持简图既有配色）。 */
@@ -2369,7 +2816,7 @@
     if (!lastDataRef) return false;
     var ok = AE.setCaliber(pid, Number(od), lastDataRef, 'ws');
     if (ok) {
-      selId = null; selFitId = null; selAutoId = pid; selAutoAt = 0;
+      selId = null; selFitId = null; selAutoId = pid; selAutoAt = 0; selAutoSeg = null;   /* v150：改径=整管口径，回退整管显示 */
       rerenderKeepView();
       if (typeof api.onPipeSelect === 'function') api.onPipeSelect(selInfo());
     }
@@ -2396,7 +2843,8 @@
     multiMode = on;
     if (on) {
       if (mode) { mode = null; cancelDraft(); updatePreview(); if (typeof api.onModeChange === 'function') api.onModeChange(null); }
-      selId = null; selAutoId = null; selFitId = null; selManFitId = null;
+      if (maskMode) setMaskMode(false);   // v162：遮蔽模式会把「点管身」吃掉
+      selId = null; selAutoId = null; selFitId = null; selManFitId = null; selNodeId = null; selAutoSeg = null;
       selSet = [];
       rerenderKeepView();
       if (typeof api.onPipeSelect === 'function') api.onPipeSelect(null);
@@ -2415,9 +2863,40 @@
     if (typeof api.onPipeSelect === 'function') api.onPipeSelect(null);
     if (typeof api.onMultiSelect === 'function') api.onMultiSelect(null);
   };
+  /* ---------- v162：管道遮蔽模式（2026-09-29 用户要求）----------
+   * 开启后点管身 = 切换该管「遮蔽/取消遮蔽」（不进入拖动、不改选中）。
+   * 状态本体在共享编辑层 AE.hidden（pid → true）：本模块只提供「点击 → 切换」这一入口，
+   * 显示（灰虚线）与材料清单跳过由各消费方读 AE.isHidden 自行处理。
+   * 与画线 / 配件插入 / 多选三个模式互斥（都要抢「点管身」这一下）。 */
+  function setMaskMode(on) {
+    on = !!on;
+    if (maskMode === on) return maskMode;
+    maskMode = on;
+    if (on) {
+      if (mode) { mode = null; cancelDraft(); updatePreview(); if (typeof api.onModeChange === 'function') api.onModeChange(null); }
+      if (fitMode) clearFitMode();
+      if (multiMode) setMultiMode(false);
+    }
+    if (typeof api.onMaskMode === 'function') api.onMaskMode(maskMode);
+    return maskMode;
+  }
+  api.setMaskMode = setMaskMode;
+  api.isMaskMode = function () { return maskMode; };
+  api.onMaskMode = null;   /* 遮蔽模式变化 → 页面重画工具轨按钮（页面注入） */
+  /* 宿主（工具轨/右键菜单）直接切换某条管的遮蔽；AE 广播 → 工作区与轴测图一起重渲染 */
+  api.setAutoHidden = function (pid, on) {
+    if (!lastDataRef || !pid) return false;
+    return AE.setHidden(pid, on, lastDataRef, 'ws');
+  };
+  api.toggleAutoHidden = function (pid) {
+    if (!lastDataRef || !pid) return false;
+    return AE.toggleHidden(pid, lastDataRef, 'ws');
+  };
+  api.isAutoHidden = function (pid) { return isPidHidden(pid); };   /* v165：段 pid 也走统一读口 */
   api.setAutoCaliberMulti = function (pids, od) {
     if (!lastDataRef || !pids || !pids.length) return false;
     var ok = true;
+    pids = normSegPids(pids);   /* v163：总管段 pid → 整管 'front'（AE 只认整管） */
     pids.forEach(function (pid) {
       var r = AE.setCaliber(pid, Number(od), lastDataRef, 'ws');
       if (!r) ok = false;
@@ -2428,6 +2907,7 @@
   };
   api.clearAutoCaliberMulti = function (pids) {
     if (!lastDataRef || !pids || !pids.length) return false;
+    pids = normSegPids(pids);   /* v163：总管段 pid → 整管 'front' */
     pids.forEach(function (pid) { if (AE.clearCaliber) AE.clearCaliber(pid, 'ws'); });
     rerenderKeepView();
     if (typeof api.onMultiSelect === 'function') api.onMultiSelect(selSetInfo());
@@ -2547,6 +3027,34 @@
     window.tlPersistManualGroups = tlPersistManualGroups;
     window.tlManualBtnSync = tlManualBtnSync;
   }
+
+  /* ===== v150 节点层联动：节点增删/改配件 → 重渲染（角标/连线随数据更新）；删除的是选中节点 → 清选中态 ===== */
+  if (typeof window !== 'undefined' && window.RyTlNodes && typeof window.RyTlNodes.subscribe === 'function') {
+    window.RyTlNodes.subscribe(function (det) {
+      if (det && det.action === 'removeNode' && selNodeId === det.id) selNodeId = null;
+      rerenderKeepView();
+    });
+  }
+  api._v150 = { selNodeId: function () { return selNodeId; }, selAutoSeg: function () { return selAutoSeg; } };   // 诊断/E2E 钩子
+  /* ---------- 标注显隐开关 API（2026-09-28 用户要求）----------
+   * setLabelsOff(v)/toggleLabels()：切换后 rerenderKeepView() 保持视口重渲染；labelsOff() 供按钮回读。
+   * 剥离（文字+标注线）在 render() 出口统一做（见渲染入口处注释）；text 层 pointer-events 由 CSS 常驻禁用。 */
+  api.labelsOff = function () { return labelsOff; };
+  api.setLabelsOff = function (v) {
+    labelsOff = !!v;
+    if (typeof rerenderKeepView === 'function') { try { rerenderKeepView(); } catch (e) { } }
+    return labelsOff;
+  };
+  api.toggleLabels = function () { return api.setLabelsOff(!labelsOff); };
+  /* 地块文字独立开关：只控区号/尺寸/亩数 text，与标识标注线互不影响 */
+  api.zoneLabelsOff = function () { return zoneLabelsOff; };
+  api.setZoneLabelsOff = function (v) {
+    zoneLabelsOff = !!v;
+    if (typeof rerenderKeepView === 'function') { try { rerenderKeepView(); } catch (e) { } }
+    return zoneLabelsOff;
+  };
+  api.toggleZoneLabels = function () { return api.setZoneLabelsOff(!zoneLabelsOff); };
+  api._stripLabels = wsStripLabels;   /* 诊断/E2E 钩子：探针直测剥离函数（合成 SVG 含四类标注线） */
 
   global.RyTlWs = api;
 })(typeof window !== 'undefined' ? window : globalThis);
