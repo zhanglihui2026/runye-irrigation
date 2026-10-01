@@ -10295,8 +10295,8 @@ function tlAutoGenerate(options) {
     window._tlDimHits.push({id:'gplot-h',axis:'y',x1:plotLeft,y1:dimBottomY,x2:plotRight,y2:dimBottomY,
       minOff:-(dimBottomBase-plotBottom-6)});
     parts.push('<g data-dim="gplot-h" data-axis="y" stroke="#111111" stroke-width="0.95" fill="none" opacity="0.98" stroke-linecap="square">');
-    parts.push('<line data-dimext="gplot-h" x1="'+plotLeft.toFixed(1)+'" y1="'+(plotBottom+4).toFixed(1)+'" x2="'+plotLeft.toFixed(1)+'" y2="'+(dimBottomY+DG.ext).toFixed(1)+'"/>');
-    parts.push('<line data-dimext="gplot-h" x1="'+plotRight.toFixed(1)+'" y1="'+(plotBottom+4).toFixed(1)+'" x2="'+plotRight.toFixed(1)+'" y2="'+(dimBottomY+DG.ext).toFixed(1)+'"/>');
+    parts.push('<line data-dimext="gplot-h" data-dimextfix="y1" x1="'+plotLeft.toFixed(1)+'" y1="'+(plotBottom+4).toFixed(1)+'" x2="'+plotLeft.toFixed(1)+'" y2="'+(dimBottomY+DG.ext).toFixed(1)+'"/>');
+    parts.push('<line data-dimext="gplot-h" data-dimextfix="y1" x1="'+plotRight.toFixed(1)+'" y1="'+(plotBottom+4).toFixed(1)+'" x2="'+plotRight.toFixed(1)+'" y2="'+(dimBottomY+DG.ext).toFixed(1)+'"/>');
     parts.push('<line x1="'+plotLeft.toFixed(1)+'" y1="'+dimBottomY.toFixed(1)+'" x2="'+plotRight.toFixed(1)+'" y2="'+dimBottomY.toFixed(1)+'"/>');
     tlArchTick(plotLeft,dimBottomY,'h');
     tlArchTick(plotRight,dimBottomY,'h');
@@ -10310,8 +10310,8 @@ function tlAutoGenerate(options) {
     window._tlDimHits.push({id:'gplot-v',axis:'x',x1:dimLeftX,y1:plotTop,x2:dimLeftX,y2:plotBottom,
       minOff:-(plotLeft-dimLeftBase-6)});
     parts.push('<g data-dim="gplot-v" data-axis="x" stroke="#111111" stroke-width="0.95" fill="none" opacity="0.98" stroke-linecap="square">');
-    parts.push('<line data-dimext="gplot-v" x1="'+(plotLeft-4).toFixed(1)+'" y1="'+plotTop.toFixed(1)+'" x2="'+(dimLeftX-4).toFixed(1)+'" y2="'+plotTop.toFixed(1)+'"/>');
-    parts.push('<line data-dimext="gplot-v" x1="'+(plotLeft-4).toFixed(1)+'" y1="'+plotBottom.toFixed(1)+'" x2="'+(dimLeftX-4).toFixed(1)+'" y2="'+plotBottom.toFixed(1)+'"/>');
+    parts.push('<line data-dimext="gplot-v" data-dimextfix="x1" x1="'+(plotLeft-4).toFixed(1)+'" y1="'+plotTop.toFixed(1)+'" x2="'+(dimLeftX-4).toFixed(1)+'" y2="'+plotTop.toFixed(1)+'"/>');
+    parts.push('<line data-dimext="gplot-v" data-dimextfix="x1" x1="'+(plotLeft-4).toFixed(1)+'" y1="'+plotBottom.toFixed(1)+'" x2="'+(dimLeftX-4).toFixed(1)+'" y2="'+plotBottom.toFixed(1)+'"/>');
     parts.push('<line x1="'+dimLeftX.toFixed(1)+'" y1="'+plotTop.toFixed(1)+'" x2="'+dimLeftX.toFixed(1)+'" y2="'+plotBottom.toFixed(1)+'"/>');
     tlArchTick(dimLeftX,plotTop,'v');
     tlArchTick(dimLeftX,plotBottom,'v');
@@ -10357,7 +10357,7 @@ function tlAutoGenerate(options) {
         if(gdr<gdB.minR)gdB.minR=gdr; if(gdr>gdB.maxR)gdB.maxR=gdr;
       }
     }
-    var gdParts=[], gdExt=[], gdTexts=[];
+    var gdParts=[], gdTexts=[];   /* v176b：分区端线独立数组取消 —— 改【组内】（见下） */
     var gdBands={};   /* v115：横向「按块逐段」标注 —— 同一条带线（包络底行+1）的组先归并，见下方绘制循环 */
     var gdBandsV={};   /* v175：竖向「按行逐段」标注 —— 右缘竖线（列=cols）的组先归并，见下方绘制循环 */
     /* v113（2026-09-22 用户要求）：联合分区小尺寸斜短线同步加粗缩短 —— k 5.5→4、线宽 1.8→2.8（与 tlArchTick/ppArchTick 一致）；
@@ -10420,9 +10420,12 @@ function tlAutoGenerate(options) {
         if(gdPB.x-gdPA.x<=26)continue;
         var gdIdH='gd'+gdRc.firstG+'-hc'+gdc2;
         var gdHy=gdBRb.y-14+tlDimOffOf(gdIdH);   /* v114: off 正=向下 */
-        gdExt.push('<line data-dimext="'+gdIdH+'" x1="'+gdPA.x.toFixed(1)+'" y1="'+Math.min(gdBRb.y-4,gdHy-DG.ext).toFixed(1)+'" x2="'+gdPA.x.toFixed(1)+'" y2="'+Math.max(gdBRb.y-4,gdHy-DG.ext).toFixed(1)+'"/>');
-        gdExt.push('<line data-dimext="'+gdIdH+'" x1="'+gdPB.x.toFixed(1)+'" y1="'+Math.min(gdBRb.y-4,gdHy-DG.ext).toFixed(1)+'" x2="'+gdPB.x.toFixed(1)+'" y2="'+Math.max(gdBRb.y-4,gdHy-DG.ext).toFixed(1)+'"/>');
-        gdParts.push('<g data-dim="'+gdIdH+'" data-axis="y">'
+        /* v176b：端线必须是【该尺寸线组的子节点】（与 gplot-h 同构）。
+           原实现把端线放进与组【并列】的独立数组 ⇒ 它在 [data-dim] 组外，
+           组 transform 平移带不动它 ⇒ 拖尺寸线时端线不跟随、超出量乱跳。 */
+        var gdEvH=('<line data-dimext="'+gdIdH+'" data-dimextfix="y1" x1="'+gdPA.x.toFixed(1)+'" y1="'+(gdBRb.y-4).toFixed(1)+'" x2="'+gdPA.x.toFixed(1)+'" y2="'+(gdHy-DG.ext).toFixed(1)+'"/>')
+          +('<line data-dimext="'+gdIdH+'" data-dimextfix="y1" x1="'+gdPB.x.toFixed(1)+'" y1="'+(gdBRb.y-4).toFixed(1)+'" x2="'+gdPB.x.toFixed(1)+'" y2="'+(gdHy-DG.ext).toFixed(1)+'"/>');
+        gdParts.push('<g data-dim="'+gdIdH+'" data-axis="y">'+gdEvH
           +'<line x1="'+gdPA.x.toFixed(1)+'" y1="'+gdHy.toFixed(1)+'" x2="'+gdPB.x.toFixed(1)+'" y2="'+gdHy.toFixed(1)+'"/>'
           +gdTickH(gdPA.x,gdHy)+gdTickH(gdPB.x,gdHy)
           +'<text x="'+((gdPA.x+gdPB.x)/2).toFixed(1)+'" y="'+(gdHy-GAP-DESC).toFixed(1)+'" text-anchor="middle" font-size="'+(DG.font*tlDS).toFixed(2)+'" font-weight="700" fill="#111111" stroke="none">'
@@ -10442,9 +10445,10 @@ function tlAutoGenerate(options) {
         if(gdPBv.y-gdPAv.y<=26)continue;
         var gdIdV='gd'+gdRcV.firstG+'-vr'+gdr2;
         var gdVx=gdPAv.x+14+tlDimOffOf(gdIdV);      /* v114: off 正=向右 */
-        gdExt.push('<line data-dimext="'+gdIdV+'" x1="'+Math.min(gdPAv.x+4,gdVx+4).toFixed(1)+'" y1="'+gdPAv.y.toFixed(1)+'" x2="'+Math.max(gdPAv.x+4,gdVx+4).toFixed(1)+'" y2="'+gdPAv.y.toFixed(1)+'"/>');
-        gdExt.push('<line data-dimext="'+gdIdV+'" x1="'+Math.min(gdPBv.x+4,gdVx+4).toFixed(1)+'" y1="'+gdPBv.y.toFixed(1)+'" x2="'+Math.max(gdPBv.x+4,gdVx+4).toFixed(1)+'" y2="'+gdPBv.y.toFixed(1)+'"/>');
-        gdParts.push('<g data-dim="'+gdIdV+'" data-axis="x">'
+        /* v176b：同横向 —— 端线并入该尺寸线组内 */
+        var gdEvV=('<line data-dimext="'+gdIdV+'" data-dimextfix="x1" x1="'+(gdPAv.x+4).toFixed(1)+'" y1="'+gdPAv.y.toFixed(1)+'" x2="'+(gdVx+4).toFixed(1)+'" y2="'+gdPAv.y.toFixed(1)+'"/>')
+          +('<line data-dimext="'+gdIdV+'" data-dimextfix="x1" x1="'+(gdPBv.x+4).toFixed(1)+'" y1="'+gdPBv.y.toFixed(1)+'" x2="'+(gdVx+4).toFixed(1)+'" y2="'+gdPBv.y.toFixed(1)+'"/>');
+        gdParts.push('<g data-dim="'+gdIdV+'" data-axis="x">'+gdEvV
           +'<line x1="'+gdVx.toFixed(1)+'" y1="'+gdPAv.y.toFixed(1)+'" x2="'+gdVx.toFixed(1)+'" y2="'+gdPBv.y.toFixed(1)+'"/>'
           +gdTickV(gdVx,gdPAv.y)+gdTickV(gdVx,gdPBv.y)
           /* v174：值 ÷ gdSy 换算回 plan 米（防分区链与总尺寸不同口径）；v175：改为逐行取值 */
@@ -10453,9 +10457,8 @@ function tlAutoGenerate(options) {
         window._tlDimHits.push({id:gdIdV,axis:'x',x1:gdVx,y1:gdPAv.y,x2:gdVx,y2:gdPBv.y,minOff:-8});
       }
     });
-    if(gdExt.length){
+    if(gdParts.length){
       parts.push('<g pointer-events="none" stroke="#111111" stroke-width="0.95" fill="none" opacity="0.95" stroke-linecap="square">');
-      parts.push(gdExt.join(''));
       parts.push(gdParts.join(''));
       parts.push('</g>');
     }
@@ -11251,17 +11254,30 @@ function tlInitDrag(){
     }
     return best;
   }
-  function tlDimApplyDD(id,axis,dd,tot){
+  function tlDimApplyDD(id,axis,dd){
     /* v123b：ws 工作区（三级管线编辑视图）克隆渲染了同一份图纸（同样带 [data-dim]/[data-dimext]），
-       文档级应用让简图与 ws 两份渲染同步平移（此前只动简图那份，ws 视图里尺寸线纹丝不动）。 */
+       文档级应用让简图与 ws 两份渲染同步平移（此前只动简图那份，ws 视图里尺寸线纹丝不动）。
+       v176（2026-10-01 用户：「拖尺寸线时端线超出量在变、端线都不超出箭头了」）：
+        原来组用【绝对偏移 tot】、端线活动端又 +=dd ⇒ 端线被计入两次位移，
+        端线超出量 = DG.ext + off（拖到上限时整条端线跑到尺寸线上方）。
+        现改为：① 组位移按 dd【累加】（_tlDimState.dtot，两份渲染共用）——
+                累加和恒等于「相对渲染基线的位移」，与是否存在已保存偏移无关；
+              ② 端线【锚端】（data-dimextfix 指定的坐标）反补 -dd ⇒ 渲染后锚端恒定不动；
+              ③ 端线另一头（活动端）不再改 ⇒ 随组平移，恰好保持「超出 DG.ext」。
+       v176b：删掉已死的第 4 参 tot（全仓库唯一调用点；保留死参数=「闸门看得见但没用」的隐患）。 */
     var gs=document.querySelectorAll('[data-dim="'+id+'"]');
+    if(window._tlDimState&&!window._tlDimState.dtot)window._tlDimState.dtot={};
+    var _dt=window._tlDimState?window._tlDimState.dtot:null;
+    var _t=((_dt&&_dt[id])||0)+dd;
+    if(_dt)_dt[id]=_t;
     for(var gi=0;gi<gs.length;gi++){
-      gs[gi].setAttribute('transform','translate('+(axis==='x'?(tot||0):0).toFixed(1)+','+(axis==='y'?(tot||0):0).toFixed(1)+')');
+      gs[gi].setAttribute('transform','translate('+(axis==='x'?_t.toFixed(1):'0')+','+(axis==='y'?_t.toFixed(1):'0')+')');
     }
     var exts=document.querySelectorAll('[data-dimext="'+id+'"]');
     for(var i=0;i<exts.length;i++){
-      var ln=exts[i], a=axis==='x'?'x2':'y2';
-      ln.setAttribute(a,(parseFloat(ln.getAttribute(a))+dd).toFixed(1));
+      var ln=exts[i], fix=ln.getAttribute('data-dimextfix');
+      if(!fix)continue;
+      ln.setAttribute(fix,(parseFloat(ln.getAttribute(fix))-dd).toFixed(1));
     }
   }
   /* v125：多选拖动 —— 按住「已选」尺寸线拖动 = 全部已选一起平移。
@@ -11291,7 +11307,7 @@ function tlInitDrag(){
       var dd=d-(dimDrag.lastOffs[h.id]||0);
       if(!dd)continue;
       window._tlDimState.offs[h.id]=d;
-      tlDimApplyDD(h.id,h.axis,dd,d);
+      tlDimApplyDD(h.id,h.axis,dd);
       dimDrag.lastOffs[h.id]=d;
     }
   };
