@@ -10746,7 +10746,7 @@ function tlAutoGenerate(options) {
            总管横向(jc.dy≠0) → 阀恒在总管下侧(+y)；总管竖向(jc.dx≠0) → 阀恒在总管右侧(+x)。
            基准点取「总管×主管交点」jm（落在总管上），阀距总管固定垂直距离 JC_VALVE_OFF（米）。*/
         var jm=ts(jc.x,jc.y);
-        var JC_VALVE_OFF=6.0; // 固定距离（米）：阀距总管（交点）的垂直距离
+        var JC_VALVE_OFF=10.0; // 固定距离（米）：阀距总管（交点）的垂直距离（2026-10-01 用户要求「适当放大一点」：6.0→10.0）
         var jox=(jc.dx===0)?0:JC_VALVE_OFF; // 总管竖向 → 右侧(+x)
         var joy=(jc.dy===0)?0:JC_VALVE_OFF; // 总管横向 → 下侧(+y)
         var jv=ts(jc.x+jox, jc.y+joy);
