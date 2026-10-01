@@ -10334,6 +10334,17 @@ function tlAutoGenerate(options) {
   //   整层 pointer-events="none"：不挡组边界线（data-mgb）拖动命中，也不挡画布平移。
   (function(){
     function gdVal(v){ if(!isFinite(v))return '— m'; var r0=Math.round(v); return Math.abs(v-r0)<0.05?r0+' m':v.toFixed(1)+' m'; }
+    /* v174（2026-10-01 用户：手动调节分区后右侧竖尺寸 414.5/214.2 与总尺寸 414 不一致）：
+       zX/zY 返回的是【按实测外接框 b 缩放后的 map 米】（Σ = b.w / b.h），而总尺寸 gplot-h/v 用的是
+       设计 plan 尺寸 plotW/plotH = round(b.w)/round(b.h)。2026-09-24 把分区值由 ΣxPlan/ΣyPlan 改成
+       「端点实际跨距」时漏了这层单位换算 ⇒ 分区链 Σ 恒比总尺寸大 (b.h-plotH)（实测 414.45 vs 414，
+       右侧 414.5 m 与左侧总尺寸 414 m 画在同一条跨度上）。
+       这里把实测跨距 ÷ sx ÷ sy 换回 plan 米：既保住「用手册后的端点实际跨距」这一修复，
+       又让分区链与总尺寸同口径、逐段相加恒等于总尺寸。 */
+    var gdSx=(isFinite(plotW)&&plotW>0)?(b.w/plotW):1;
+    var gdSy=(isFinite(plotH)&&plotH>0)?(b.h/plotH):1;
+    if(!isFinite(gdSx)||gdSx<=0)gdSx=1;
+    if(!isFinite(gdSy)||gdSy<=0)gdSy=1;
     function gdGrpOf(zi){ return tlManualActive ? ((typeof window!=='undefined'&&window.tlZoneManualGroupOf)?window.tlZoneManualGroupOf(zi):-1) : Math.floor(zi/tlGN); }
     var gdBox={};
     for(var gdr=0;gdr<rows;gdr++){
@@ -10391,9 +10402,10 @@ function tlAutoGenerate(options) {
         gdParts.push('<g data-dim="'+gdIdV+'" data-axis="x">'
           +'<line x1="'+gdVx.toFixed(1)+'" y1="'+gdTR.y.toFixed(1)+'" x2="'+gdVx.toFixed(1)+'" y2="'+gdBR.y.toFixed(1)+'"/>'
           +gdTickV(gdVx,gdTR.y)+gdTickV(gdVx,gdBR.y)
-          /* 值 = 端点实际跨距（2026-09-24：原 ΣyPlan 设计值在手动调节后失真；无调节时两者逐位一致） */
+          /* v174：值 = 端点实际跨距 ÷ gdSy（换算回 plan 米）。2026-09-24 换用时漏了这层换算，
+             导致 Σ分区 比总尺寸大 (b.h-plotH)（右侧 414.5 m vs 左侧 414 m）。 */
           /* v148：锚点落在尺寸线上，off = GAP+ASC（数字在线的【右侧】，朝线的一侧是墨迹左缘 = 基线−ASC） */
-          +'<g transform="translate('+gdVx.toFixed(1)+' '+((gdTR.y+gdBR.y)/2).toFixed(1)+') rotate(-90)"><text x="0" y="'+(GAP+ASC).toFixed(2)+'" text-anchor="middle" font-size="'+(DG.font*tlDS).toFixed(2)+'" font-weight="700" fill="#111111" stroke="none">'+gdVal(gdY1v-gdY0v)+'</text></g></g>');
+          +'<g transform="translate('+gdVx.toFixed(1)+' '+((gdTR.y+gdBR.y)/2).toFixed(1)+') rotate(-90)"><text x="0" y="'+(GAP+ASC).toFixed(2)+'" text-anchor="middle" font-size="'+(DG.font*tlDS).toFixed(2)+'" font-weight="700" fill="#111111" stroke="none">'+gdVal((gdY1v-gdY0v)/gdSy)+'</text></g></g>');
         window._tlDimHits.push({id:gdIdV,axis:'x',x1:gdVx,y1:gdTR.y,x2:gdVx,y2:gdBR.y,minOff:-8});
       }
     });
@@ -10415,7 +10427,7 @@ function tlAutoGenerate(options) {
           +'<line x1="'+gdPA.x.toFixed(1)+'" y1="'+gdHy.toFixed(1)+'" x2="'+gdPB.x.toFixed(1)+'" y2="'+gdHy.toFixed(1)+'"/>'
           +gdTickH(gdPA.x,gdHy)+gdTickH(gdPB.x,gdHy)
           +'<text x="'+((gdPA.x+gdPB.x)/2).toFixed(1)+'" y="'+(gdHy-GAP-DESC).toFixed(1)+'" text-anchor="middle" font-size="'+(DG.font*tlDS).toFixed(2)+'" font-weight="700" fill="#111111" stroke="none">'
-          +gdVal(zX(gdRc.maxR,gdc2+1)-zX(gdRc.maxR,gdc2))+'</text></g>');  /* 2026-09-24：值=该段端点实际跨距（原 xPlan[c] 设计宽，阶梯拖动后失真） */
+          +gdVal((zX(gdRc.maxR,gdc2+1)-zX(gdRc.maxR,gdc2))/gdSx)+'</text></g>');  /* v174：值=该段端点实际跨距 ÷ gdSx（换算回 plan 米；2026-09-24 起用实际跨距，v174 补上单位换算） */
         window._tlDimHits.push({id:gdIdH,axis:'y',x1:gdPA.x,y1:gdHy,x2:gdPB.x,y2:gdHy,minOff:-8});
       }
     });
