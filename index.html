@@ -576,7 +576,13 @@ fieldset:focus-within .field-hint{border-left-color:var(--g-400)}
 }
 .pipe-deriv-result span{font-size:11px;color:var(--s-500)}
 .pipe-deriv-result strong{font-size:16px;color:var(--g-700)}
-.materials-card table{width:100%;font-size:13px;border-collapse:collapse;table-layout:fixed}
+.materials-card table{width:auto;font-size:13px;border-collapse:collapse;table-layout:fixed}
+.materials-card .mat-tablescroll{overflow-x:auto}
+body.mat-resizing,body.mat-resizing *{user-select:none}
+body.mat-resizing *{cursor:col-resize!important}
+.materials-card input.mat-formula{color:var(--g-700)}
+.materials-card input.mat-formula-err{color:#dc2626;font-weight:700}
+
 .materials-card th{text-align:left;padding:8px 6px;font-size:11px;color:var(--s-400);border-bottom:2px solid var(--s-100);font-weight:600;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}
 .materials-card td{padding:7px 6px;border-bottom:1px solid var(--s-50);font-weight:500;color:var(--s-700);white-space:nowrap}
 .materials-card td:nth-child(3),.materials-card td:nth-child(4),.materials-card td:nth-child(5),.materials-card td:nth-child(6){text-align:left}
@@ -7834,7 +7840,7 @@ function updateMaterialTotals() {
       const specInput = tr.querySelector('.custom-spec');
       /* v169：自定义行改动态存储（matTbl.custom），原 c1~c3 固定行退役 */
       const mrow = (matTbl.custom || []).find(rw => rw.id === key);
-      if (mrow) { mrow.name = nameInput.value; mrow.spec = specInput.value; mrow.qty = qtyInput.value; mrow.price = priceInput.value; matTblSave(); }
+      if (mrow) { mrow.name = nameInput.dataset.formula || nameInput.value; mrow.spec = specInput.dataset.formula || specInput.value; mrow.qty = qtyInput.dataset.formula || qtyInput.value; mrow.price = priceInput.dataset.formula || priceInput.value; matTblSave(); }
       qty = parseFloat(qtyInput.value) || 0;
       price = parseFloat(priceInput.value) || 0;
     } else {
@@ -7842,6 +7848,8 @@ function updateMaterialTotals() {
       const input = tr.querySelector('.price-input');
       price = parseFloat(input.value) || 0;
       materialPrices[tr.dataset.key] = price;
+      if (input.dataset.formula) { matTbl.priceF = matTbl.priceF || {}; matTbl.priceF[tr.dataset.key] = input.dataset.formula; matTblSave(); }
+      else if (matTbl.priceF && matTbl.priceF[tr.dataset.key]) { delete matTbl.priceF[tr.dataset.key]; matTblSave(); }
     }
     const subtotal = qty * price;
     const cell = tr.querySelector('.total-cell');
@@ -7868,9 +7876,11 @@ function updateMaterialTotals() {
 const MAT_TBL_KEY = 'runyeMatTable_v1';
 let matTbl = (function () {
   try { const s = JSON.parse(localStorage.getItem(MAT_TBL_KEY) || 'null'); if (s && s.ver === 1) return s; } catch (e) {}
-  return { ver: 1, notes: {}, extraCols: [], extraCells: {}, colW: {}, custom: [], migrated: false };
+  return { ver: 1, notes: {}, extraCols: [], extraCells: {}, colW: {}, custom: [], priceF: {}, migrated: false };
 })();
 function matTblSave() { try { localStorage.setItem(MAT_TBL_KEY, JSON.stringify(matTbl)); } catch (e) {} }
+/* v171：自动行单价优先取持久化公式(matTbl.priceF)，否则取内存 materialPrices */
+function matPriceVal(key) { return (matTbl.priceF && matTbl.priceF[key]) ? matTbl.priceF[key] : (materialPrices[key] || ''); }
 function matEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 const MAT_BASE_COLS = [
   ['mat', 190, '材料'], ['spec', 215, '规格'], ['qty', 150, '估算数量'],
@@ -7882,6 +7892,18 @@ function matColgroup() {
   MAT_BASE_COLS.forEach(c => { h += '<col data-mcol="' + c[0] + '" style="width:' + (matTbl.colW[c[0]] || c[1]) + 'px">'; });
   (matTbl.extraCols || []).forEach(c => { h += '<col data-mcol="' + c.id + '" style="width:' + (c.w || 130) + 'px">'; });
   return h + '</colgroup>';
+}
+/* v171：把表格显式宽度设为各列宽度之和。
+   关键：table-layout:fixed 下，只有表格显式宽度 == 列宽之和时，各列才会严格按 colgroup 宽度渲染；
+   若表格宽度由 CSS 自动决定（width:auto / max-content），列会被内容宽度重排、相互挤占，
+   拖拽列宽时其它列跟着缩放、被拖列只微动——这正是用户说的「拖动跳动」。
+   设成显式列宽和后，拖哪列哪列按 1:1 变化，超宽部分由 .mat-tablescroll 横向滚动。 */
+function matSyncTableWidth() {
+  var t = document.querySelector('.materials-card table');
+  if (!t) return;
+  var sum = 0, cols = t.querySelectorAll('colgroup col'), w;
+  for (var i = 0; i < cols.length; i++) { w = parseFloat(cols[i].style.width); if (!isNaN(w)) sum += w; }
+  if (sum > 0) t.style.width = sum + 'px';
 }
 function matGrip(id) { return '<span class="mat-colgrip" data-mcol="' + id + '" title="拖动调列宽"></span>'; }
 function matBaseHeads() {
@@ -7905,8 +7927,8 @@ function matCustomRowsHtml() {
     '<tr class="custom-row" data-key="' + rw.id + '">'
     + '<td><span class="mat-row-del" data-mrowdel="' + rw.id + '" title="删除此行">×</span><input class="custom-input custom-name" type="text" placeholder="材料名称" value="' + matEsc(rw.name) + '"></td>'
     + '<td><input class="custom-input custom-spec" type="text" placeholder="规格" value="' + matEsc(rw.spec) + '"></td>'
-    + '<td><input class="custom-input custom-qty" type="number" min="0" step="0.1" placeholder="0" value="' + matEsc(rw.qty) + '"></td>'
-    + '<td><input class="price-input" type="number" min="0" step="0.1" placeholder="0" value="' + matEsc(rw.price) + '"><span class="unit-tag">元/m</span></td>'
+    + '<td><input class="custom-input custom-qty" type="text" inputmode="decimal" min="0" step="0.1" placeholder="0" value="' + matEsc(rw.qty) + '"></td>'
+    + '<td><input class="price-input" type="text" inputmode="decimal" min="0" step="0.1" placeholder="0" value="' + matEsc(rw.price) + '"><span class="unit-tag">元/m</span></td>'
     + '<td class="total-cell">—</td>'
     + '<td class="permu-cell">—</td>'
     + matRowTail(rw.id) + '</tr>').join('');
@@ -7928,6 +7950,18 @@ if (!window._matTblDelegated) {
     if (t.classList && t.classList.contains('mat-note')) { const k = t.dataset.mrow; if (k) { matTbl.notes[k] = t.value; matTblSave(); } }
     else if (t.classList && t.classList.contains('mat-extra')) { const k = t.dataset.mrow, cid = t.dataset.mcol; if (k && cid) { (matTbl.extraCells[cid] = matTbl.extraCells[cid] || {})[k] = t.value; matTblSave(); } }
   });
+  /* v171：公式格聚焦还原原始公式、失焦重算并持久化 */
+  document.addEventListener('focusin', function (e) {
+    const t = e.target;
+    if (t && t.classList && t.classList.contains('mat-formula') && t.dataset.formula) { t.value = t.dataset.formula; }
+  });
+  document.addEventListener('focusout', function (e) {
+    const t = e.target;
+    if (t && t.classList && (t.classList.contains('mat-formula') || (t.dataset && t.dataset.formula))) {
+      try { matApplyFormulas(); } catch (e2) {}
+      try { updateMaterialTotals(); } catch (e2) {}
+    }
+  });
   document.addEventListener('click', function (e) {
     const rd = e.target.closest ? e.target.closest('.mat-row-del') : null;
     if (rd) { const id = rd.dataset.mrowdel; matTbl.custom = (matTbl.custom || []).filter(r => r.id !== id); matTblSave(); render(); return; }
@@ -7944,22 +7978,123 @@ if (!window._matTblDelegated) {
   document.addEventListener('mousedown', function (e) {
     const grip = e.target.closest ? e.target.closest('.mat-colgrip') : null;
     if (!grip) return;
+    document.body.classList.add('mat-resizing');
     const cid = grip.dataset.mcol;
     const col = document.querySelector('.materials-card colgroup col[data-mcol="' + cid + '"]');
     if (!col) return;
-    const startX = e.clientX, startW = col.getBoundingClientRect().width;
+    /* v171 修正：<col> 元素无渲染盒子，getBoundingClientRect().width 恒为 0；
+       必须以列实际宽度（内联 style.width，退化取同列 <th> 宽度）为基准，否则每次拖拽都从 0 算起被 clamp 到最小值，列宽永远跳变。 */
+    const thEl = document.querySelector('.materials-card th[data-mcol="' + cid + '"]');
+    const startX = e.clientX, startW = parseFloat(col.style.width) || (thEl ? thEl.getBoundingClientRect().width : 0);
     e.preventDefault();
-    const move = ev => { const w = Math.max(56, Math.round(startW + ev.clientX - startX)); col.style.width = w + 'px'; };
+    const move = ev => { const w = Math.max(56, Math.round(startW + ev.clientX - startX)); col.style.width = w + 'px'; matSyncTableWidth(); };
     const up = ev => {
       document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up);
+      document.body.classList.remove('mat-resizing');
       const w = Math.max(56, Math.round(startW + ev.clientX - startX));
       const xc = (matTbl.extraCols || []).find(c => c.id === cid);
       if (xc) { xc.w = w; } else { matTbl.colW[cid] = w; }
+      matSyncTableWidth();
       matTblSave();
     };
     document.addEventListener('mousemove', move);
     document.addEventListener('mouseup', up);
   });
+}
+
+
+/* ===== v171（2026-10-01 用户要求）：材料表支持 =公式（加减乘除 + 单元格引用 + 区域求和）=====
+   作用范围：所有带存储绑定的可编辑格（单价 / 自定义行数量·单价·名称·规格 / 备注 / 自定义列）。
+   坐标系：列按渲染顺序 A..（基础7列 mat/spec/qty/price/total/permu/note + 自定义列）；
+           行按 tbody 数据行 1..（自动行 + 节点配件/连线行 + 自定义行）。
+   语法：以 = 开头；支持 + - * / ( )、数字、单元格引用（如 C2）、区域求和 SUM(C2:C9)。
+   求值：先填字面量值，再迭代解析公式（最多 行数+列数 轮）以解开单元格间依赖；自引用标 #REF!。
+   显示：公式格平时显示计算结果（原始公式存于 dataset.formula 与存储）；聚焦时还原公式可编辑；失焦重算。
+   整段删除即卸载本功能。 */
+function matParseNum(ss) {
+  if (ss == null) return NaN;
+  var t = String(ss).replace(/[¥\s,]/g, '').replace(/元|套|m\/亩|m/g, '').trim();
+  var m = t.match(/-?\d+(?:\.\d+)?/);
+  return m ? parseFloat(m[0]) : NaN;
+}
+function matColLetter(i) { var s = ''; i = i + 1; while (i > 0) { var mm = (i - 1) % 26; s = String.fromCharCode(65 + mm) + s; i = Math.floor((i - 1) / 26); } return s; }
+function matColLetterIndex(letter) { var n = 0; for (var i = 0; i < letter.length; i++) n = n * 26 + (letter.charCodeAt(i) - 64); return n - 1; }
+function matCellRefs(expr) { var refs = [], re = /([A-Z]+\d+)/g, m; while ((m = re.exec(expr))) refs.push(m[1]); return refs; }
+function matEvalExpr(expr, vals) {
+  expr = expr.replace(/SUM\(\s*([A-Z]+\d+)\s*:\s*([A-Z]+\d+)\s*\)/gi, function (mm, a, b) {
+    var ac = a.match(/^([A-Z]+)(\d+)$/), bc = b.match(/^([A-Z]+)(\d+)$/);
+    if (!ac || !bc) return '0';
+    var c1 = matColLetterIndex(ac[1]), c2 = matColLetterIndex(bc[1]), r1 = +ac[2], r2 = +bc[2], sum = 0;
+    for (var c = Math.min(c1, c2); c <= Math.max(c1, c2); c++)
+      for (var r = Math.min(r1, r2); r <= Math.max(r1, r2); r++) { var v = vals[matColLetter(c) + r]; if (typeof v === 'number' && !isNaN(v)) sum += v; }
+    return '(' + sum + ')';
+  });
+  expr = expr.replace(/([A-Z]+\d+)/g, function (mm, ref) { var v = vals[ref]; return (typeof v === 'number' && !isNaN(v)) ? String(v) : '0'; });
+  if (!/^[-+*/().\s\d]+$/.test(expr)) return { err: 'syntax' };
+  try { var rr = Function('"use strict";return (' + expr + ');')(); return { val: rr }; } catch (e) { return { err: e.message }; }
+}
+function matFmtNum(n) {
+  if (!isFinite(n)) return '#ERR!';
+  if (Math.abs(n - Math.round(n)) < 1e-9) return String(Math.round(n));
+  var st = n.toFixed(3);
+  while (st.indexOf('.') >= 0 && st.charAt(st.length - 1) === '0') st = st.slice(0, -1);
+  if (st.charAt(st.length - 1) === '.') st = st.slice(0, -1);
+  return st;
+}
+function matBuildCellMap() {
+  var tbl = document.querySelector('.materials-card table');
+  if (!tbl) return null;
+  var cols = Array.prototype.slice.call(tbl.querySelectorAll('colgroup col'));
+  var colIds = cols.map(function (c) { return c.getAttribute('data-mcol'); });
+  var rows = Array.prototype.slice.call(tbl.querySelectorAll('tbody tr'));
+  var map = { cells: {}, colIds: colIds, rowCount: rows.length };
+  rows.forEach(function (tr, ri) {
+    var r = ri + 1;
+    Array.prototype.slice.call(tr.children).forEach(function (td, ci) {
+      var cid = colIds[ci]; if (!cid) return;
+      var key = matColLetter(ci) + r;
+      var inp = td.querySelector('input');
+      var raw;
+      if (inp) { raw = (inp.dataset.formula && inp.value.charAt(0) !== '=') ? inp.dataset.formula : inp.value; }
+      else { raw = td.textContent || ''; }
+      map.cells[key] = { raw: raw, el: inp || td, colId: cid, row: r, col: ci, letter: matColLetter(ci) };
+    });
+  });
+  return map;
+}
+function matSetFormulaCell(c, display, isErr) {
+  if (!c.el || c.el.tagName !== 'INPUT') return;
+  c.el.dataset.formula = c.raw;
+  if (document.activeElement !== c.el) c.el.value = display;
+  c.el.classList.toggle('mat-formula', !isErr);
+  c.el.classList.toggle('mat-formula-err', !!isErr);
+}
+function matApplyFormulas() {
+  var map = matBuildCellMap(); if (!map) return;
+  var vals = {};
+  Object.keys(map.cells).forEach(function (k) { var c = map.cells[k]; vals[k] = matParseNum(c.raw); });
+  var formulaKeys = Object.keys(map.cells).filter(function (k) { var c = map.cells[k]; return typeof c.raw === 'string' && c.raw.charAt(0) === '='; });
+  formulaKeys.forEach(function (k) { var c = map.cells[k]; if (matCellRefs(c.raw.slice(1)).indexOf(k) >= 0) c._selfRef = true; });
+  /* 非公式格清掉历史公式标记 */
+  Object.keys(map.cells).forEach(function (k) {
+    var c = map.cells[k];
+    if (!c.el || c.el.tagName !== 'INPUT') return;
+    if (typeof c.raw !== 'string' || c.raw.charAt(0) !== '=') {
+      if (document.activeElement !== c.el) { c.el.classList.remove('mat-formula', 'mat-formula-err'); if (c.el.dataset.formula) delete c.el.dataset.formula; }
+    }
+  });
+  var passes = 0, changed = true;
+  while (changed && passes < formulaKeys.length + 3) {
+    changed = false; passes++;
+    formulaKeys.forEach(function (k) {
+      var c = map.cells[k];
+      if (c._selfRef) { matSetFormulaCell(c, '#REF!', true); vals[k] = NaN; return; }
+      var res = matEvalExpr(c.raw.slice(1), vals);
+      if (res.err) { matSetFormulaCell(c, '#ERR!', true); vals[k] = NaN; return; }
+      var num = Number(res.val);
+      if (!isNaN(num)) { if (vals[k] !== num) { vals[k] = num; changed = true; } matSetFormulaCell(c, matFmtNum(num), false); }
+    });
+  }
 }
 
 function render() {
@@ -8269,7 +8404,7 @@ function render() {
             var dk = 'nodeFit-' + k;
             ndRows.push('<tr data-key="' + dk + '" data-qty="' + b.qty + '">'
               + '<td>' + b.name + '</td><td>' + b.spec + '</td><td><span class="qty-text">' + b.qty + '</span><span class="unit-tag">套</span></td>'
-              + '<td><input class="price-input" type="number" min="0" step="1" placeholder="0" value="' + (materialPrices[dk] || '') + '"><span class="unit-tag">元/套</span></td>'
+              + '<td><input class="price-input" type="text" inputmode="decimal" min="0" step="1" placeholder="0" value="' + (materialPrices[dk] || '') + '"><span class="unit-tag">元/套</span></td>'
               + '<td class="total-cell">—</td>'
               + '<td class="permu-cell">—</td>'
               + matRowTail(dk) + '</tr>');
@@ -8310,7 +8445,7 @@ function render() {
         lkRows.push('<tr data-key="' + dk + '" data-qty="' + q.toFixed(1) + '">'
           + '<td>连接管（节点连线）</td><td>' + spec + '</td>'
           + '<td><span class="qty-text">' + q.toFixed(1) + '</span><span class="unit-tag">m</span></td>'
-          + '<td><input class="price-input" type="number" min="0" step="0.1" placeholder="0" value="' + (materialPrices[dk] || '') + '"><span class="unit-tag">元/m</span></td>'
+          + '<td><input class="price-input" type="text" inputmode="decimal" min="0" step="0.1" placeholder="0" value="' + (materialPrices[dk] || '') + '"><span class="unit-tag">元/m</span></td>'
           + '<td class="total-cell">—</td>'
           + '<td class="permu-cell">—</td>'
           + matRowTail(dk) + '</tr>');
@@ -8338,71 +8473,72 @@ function render() {
           <div class="mat-toolbar">
             <button type="button" id="matAddRow">＋ 添加行</button>
             <button type="button" id="matAddCol">＋ 添加列</button>
-            <span class="mat-tip">拖列头右缘调列宽 · 自定义列头悬停「×」删列 · 自定义行首「×」删行 · 备注直接输入</span>
+            <span class="mat-tip">拖列头右缘调列宽（已修跳动）· 自定义列/行支持 =公式（如 =C2*D2、=SUM(C2:C9)）· 灰色自动行由工具生成、改参数即更新 · 备注/自定义列直接输入</span>
           </div>
+          <div class="mat-tablescroll">
           <table>
             ${matColgroup()}
             <thead><tr>${matBaseHeads()}${matExtraHeads()}</tr></thead>
             <tbody>
               <tr data-key="frontPipe" data-qty="${(matFrontLen * 1.1).toFixed(1)}" data-permu="${permuOf(matFrontLen)}">
                 <td>总管</td><td>Ø ${specFrontOd} mm</td><td><span class="qty-text">${(matFrontLen * 1.1).toFixed(1)}</span><span class="unit-tag">m</span></td>
-                <td><input class="price-input" type="number" min="0" step="0.1" placeholder="0" value="${materialPrices.frontPipe || ''}"><span class="unit-tag">元/m</span></td>
+                <td><input class="price-input" type="text" inputmode="decimal" min="0" step="0.1" placeholder="0" value="${matPriceVal('frontPipe')}""><span class="unit-tag">元/m</span></td>
                 <td class="total-cell">—</td>
                 <td class="permu-cell">${permuOf(matFrontLen)} m/亩 · —</td>
                 ${matRowTail("frontPipe")}
               </tr>
               <tr data-key="mainPipe" data-qty="${(matMainLen * 1.1).toFixed(1)}" data-permu="${permuOf(matMainLen)}">
                 <td>主管</td><td>Ø ${specMainOd} mm</td><td><span class="qty-text">${(matMainLen * 1.1).toFixed(1)}</span><span class="unit-tag">m</span></td>
-                <td><input class="price-input" type="number" min="0" step="0.1" placeholder="0" value="${materialPrices.mainPipe || ''}"><span class="unit-tag">元/m</span></td>
+                <td><input class="price-input" type="text" inputmode="decimal" min="0" step="0.1" placeholder="0" value="${matPriceVal('mainPipe')}""><span class="unit-tag">元/m</span></td>
                 <td class="total-cell">—</td>
                 <td class="permu-cell">${permuOf(matMainLen)} m/亩 · —</td>
                 ${matRowTail("mainPipe")}
               </tr>
               <tr data-key="branchPipe" data-qty="${(matBranchLen * 1.1).toFixed(1)}" data-permu="${permuOf(matBranchLen)}">
                 <td>支管</td><td>Ø ${specBranchOd} mm</td><td><span class="qty-text">${(matBranchLen * 1.1).toFixed(1)}</span><span class="unit-tag">m</span></td>
-                <td><input class="price-input" type="number" min="0" step="0.1" placeholder="0" value="${materialPrices.branchPipe || ''}"><span class="unit-tag">元/m</span></td>
+                <td><input class="price-input" type="text" inputmode="decimal" min="0" step="0.1" placeholder="0" value="${matPriceVal('branchPipe')}""><span class="unit-tag">元/m</span></td>
                 <td class="total-cell">—</td>
                 <td class="permu-cell">${permuOf(matBranchLen)} m/亩 · —</td>
                 ${matRowTail("branchPipe")}
               </tr>
               <tr data-key="tape" data-qty="${(matTapeLen * 1.1).toFixed(1)}" data-permu="${permuOf(matTapeLen)}">
                 <td>滴灌带</td><td>Ø ${r.tapeOD} mm</td><td><span class="qty-text">${(matTapeLen * 1.1).toFixed(1)}</span><span class="unit-tag">m</span></td>
-                <td><input class="price-input" type="number" min="0" step="0.1" placeholder="0" value="${materialPrices.tape || ''}"><span class="unit-tag">元/m</span></td>
+                <td><input class="price-input" type="text" inputmode="decimal" min="0" step="0.1" placeholder="0" value="${matPriceVal('tape')}""><span class="unit-tag">元/m</span></td>
                 <td class="total-cell">—</td>
                 <td class="permu-cell">${permuOf(matTapeLen)} m/亩 · —</td>
                 ${matRowTail("tape")}
               </tr>
               <tr data-key="tapeJoint" data-qty="${(r.totalTapes * 1.05).toFixed(1)}">
                 <td>滴灌带接头</td><td>同滴灌带</td><td>${fmt0(r.totalTapes * 1.05)} 套</td>
-                <td><input class="price-input" type="number" min="0" step="0.5" placeholder="0" value="${materialPrices.tapeJoint || ''}"><span class="unit-tag">元/套</span></td>
+                <td><input class="price-input" type="text" inputmode="decimal" min="0" step="0.5" placeholder="0" value="${matPriceVal('tapeJoint')}""><span class="unit-tag">元/套</span></td>
                 <td class="total-cell">—</td>
                 <td class="permu-cell">—</td>
                 ${matRowTail("tapeJoint")}
               </tr>
               <tr data-key="zoneTee" data-qty="${zoneValveN}">
                 <td>分区三通</td><td>${zoneValveSpec}</td><td>${zoneValveN} 套</td>
-                <td><input class="price-input" type="number" min="0" step="1" placeholder="0" value="${materialPrices.zoneTee || ''}"><span class="unit-tag">元/套</span></td>
+                <td><input class="price-input" type="text" inputmode="decimal" min="0" step="1" placeholder="0" value="${matPriceVal('zoneTee')}""><span class="unit-tag">元/套</span></td>
                 <td class="total-cell">—</td>
                 <td class="permu-cell">—</td>
                 ${matRowTail("zoneTee")}
               </tr>
               <tr data-key="zoneValve" data-qty="${zoneValveN}">
                 <td>分区电动阀</td><td>Ø ${specBranchOd} mm · 电动</td><td>${zoneValveN} 套</td>
-                <td><input class="price-input" type="number" min="0" step="1" placeholder="0" value="${materialPrices.zoneValve || ''}"><span class="unit-tag">元/套</span></td>
+                <td><input class="price-input" type="text" inputmode="decimal" min="0" step="1" placeholder="0" value="${matPriceVal('zoneValve')}""><span class="unit-tag">元/套</span></td>
                 <td class="total-cell">—</td>
                 <td class="permu-cell">—</td>
                 ${matRowTail("zoneValve")}
               </tr>
               <tr data-key="teeJoint" data-qty="${teeN}">
                 <td>主管接入三通</td><td>${teeSpec}</td><td>${teeN > 0 ? teeN + ' 套' : '—'}</td>
-                <td><input class="price-input" type="number" min="0" step="1" placeholder="0" value="${materialPrices.teeJoint || ''}"><span class="unit-tag">元/套</span></td>
+                <td><input class="price-input" type="text" inputmode="decimal" min="0" step="1" placeholder="0" value="${matPriceVal('teeJoint')}""><span class="unit-tag">元/套</span></td>
                 <td class="total-cell">—</td>
                 <td class="permu-cell">—</td>
                 ${matRowTail("teeJoint")}
               </tr>
               <tr data-key="frontValve" data-qty="${teeN}">
                 <td>主管接入阀</td><td>Ø ${specMainOd} mm</td><td>${teeN > 0 ? teeN + ' 套' : '—'}</td>
-                <td><input class="price-input" type="number" min="0" step="1" placeholder="0" value="${materialPrices.frontValve || ''}"><span class="unit-tag">元/套</span></td>
+                <td><input class="price-input" type="text" inputmode="decimal" min="0" step="1" placeholder="0" value="${matPriceVal('frontValve')}""><span class="unit-tag">元/套</span></td>
                 <td class="total-cell">—</td>
                 <td class="permu-cell">—</td>
                 ${matRowTail("frontValve")}
@@ -8412,11 +8548,16 @@ function render() {
               ${matCustomRowsHtml()}
             </tbody>
             <tfoot><tr><td colspan="4">材料总计</td><td class="grand-total-val">¥ 0</td><td colspan="${2 + (matTbl.extraCols || []).length}"></td></tr></tfoot>
-          </table>
+          </table></div>
         </article>
       </div>
     </div>
   `;
+  /* v171：渲染后先跑公式(把单价公式算成数值)→重算合计(填 E 列)→再跑公式(让公式可引用 E) */
+  try { matApplyFormulas(); } catch (e) { }
+  try { updateMaterialTotals(); } catch (e) { }
+  try { matApplyFormulas(); } catch (e) { }
+  matSyncTableWidth();
 }
 
 function selectBranch(n) {
