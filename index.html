@@ -6122,7 +6122,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
          （画线走「三级设计」工作区，双向同步保留）；卡片仅保留 #tlIsoPipeHint 反馈行
          （右键旋转/阀门/接管等图面操作提示都写这里） -->
     <div class="tl-iso-card tl-iso-pipe-card">
-      <div class="tl-iso-hint" id="tlIsoPipeHint">右键管线可加三通/弯头/阀门（节点）；右键三通可选分支口型号、快速转向（0/90/180/270°、±15° 微调）并「从分支口接管道」；接管端点与图上白圈节点自动吸附；画线可用左栏「➕ 管道插入」（端点自动吸附节点/三通），与「三级设计」工作区数据互通</div>
+      <div class="tl-iso-hint" id="tlIsoPipeHint">插入三通 / 弯头 / 阀门请在「三级管路编辑」的节点中完成；本图右键只作查看与已有配件调整 —— 右键三通可选分支口型号、快速转向（0/90/180/270°、±15° 微调）并「从分支口接管道」；右键弯头可调角 / 接管随转 / 删除；右键接管可「延长 1 m / 删除」；接管端点与图上白圈节点自动吸附；画线可用左栏「➕ 管道插入」（端点自动吸附节点/三通），与「三级设计」工作区数据互通</div>
     </div>
     <!-- 自动管线选中卡（2026-09-15 阶段2）：点选二级传递的自动管线后显示；ISO_FITTING_UI_OFF 下豁免隐藏 -->
     <div class="tl-iso-card tl-iso-autocard" id="tlIsoAutoCard" style="display:none">
@@ -17658,6 +17658,20 @@ function tlIsoStatsReset() {
    双向同步保留；画线模式仍可编程触发（startPipeMode，模块自带 iso-pipe-drafting 光标态与
    onPipeModeChange 守卫），页面侧按钮接线整体移除。#tlIsoPipeHint 保留为图面操作反馈行。 */
 
+/* 轴测图「插入配件」总开关（2026-10-01 v179 用户要求：「三级管路编辑中的节点能解决大部分问题，
+   因此轴测图中关于插入配件的功能都取消」）。true = 全入口下线：
+     · 左栏「配件布置」卡的配件放置三件套（三通/弯头/阀门 + 弯头规格 + 确定·放置 + 放置提示）
+     · 左栏「自动管线」卡的「⊞ 在点击位置插三通 / 🔩 在点击位置插阀门」
+     · 图面接管右键菜单的「插入阀门 / 插入弯头 / 插入三通·分支口型号」整段
+     · 图面自动管线右键菜单的「＋ 加三通 / 加弯头 / 加阀门」段
+   改回 false 即可全量恢复（HTML 与处理逻辑一行未删，只做运行时收起与接线跳过）。
+   保留项：➕ 管道插入（画线）、已有配件的图上显示与材料统计、右键对已有配件的
+   旋转 / 快速转向 / 改长 / 删除 / 从分支口接管道；「管网装配」卡的收起见
+   iso-diagram/network-editor.js 的 ISO_OFF。
+   注：本变量是**页面级顶层 var**（非 IIFE 内局部），块内各独立 IIFE 直接取用，
+   跨 <script> 的工作区右键菜单（openMenu）经 window.ISO_FITTING_UI_OFF 取用。 */
+var ISO_FITTING_UI_OFF = true;
+
 /* 轴测图「自动管线选中」卡接线（2026-09-15 阶段2）：点选二级传递的自动管线
    → 信息 + 改长 + 在点击位置插三通/阀门；点图面配件标记（A-F##）可删除。 */
 (function () {
@@ -17672,6 +17686,11 @@ function tlIsoStatsReset() {
   var distBox = document.getElementById('tlIsoAutoDist');
   var fitA = document.getElementById('tlIsoFitA');
   var fitB = document.getElementById('tlIsoFitB');
+  /* v179（2026-10-01）：插入配件下线 → 两个插入按钮收起（📏 改长保留） */
+  if (ISO_FITTING_UI_OFF) {
+    if (teeBtn) teeBtn.style.display = 'none';
+    if (valveBtn) valveBtn.style.display = 'none';
+  }
   function f1(v) { return (Math.round(v * 10) / 10).toFixed(1); }
   /* 图面三通第三口旋转按钮行（2026-09-16 用户要求面板兜底入口）：
      懒创建（首次选中三通才 appendChild）→ 未选中时 DOM 零增量（eq 基线不受影响）。 */
@@ -17767,10 +17786,10 @@ function tlIsoStatsReset() {
         + '<br>点击位置：距起点 ' + f1(a.pickAt || 0) + 'm'
         + (calTxt ? '<br><b style="color:#15803d;font-size:13px">' + calTxt + '</b>' : '<br>右键管身可改管径')
         + (window.tlPipeHfText && window.tlPipeHfText(a.id) ? '<br>' + window.tlPipeHfText(a.id) : '')
-        + '<br><span style="color:#b45309;font-size:11px">⊞ 插三通 / 🔩 插阀门将自动继承本管管径，接管口径默认"随管"</span>';
+        + (ISO_FITTING_UI_OFF ? '' : '<br><span style="color:#b45309;font-size:11px">⊞ 插三通 / 🔩 插阀门将自动继承本管管径，接管口径默认"随管"</span>');
       if (lenBtn) lenBtn.style.display = '';
-      if (teeBtn) teeBtn.style.display = '';
-      if (valveBtn) valveBtn.style.display = '';
+      if (teeBtn && !ISO_FITTING_UI_OFF) teeBtn.style.display = '';
+      if (valveBtn && !ISO_FITTING_UI_OFF) valveBtn.style.display = '';
       if (fitDelBtn) fitDelBtn.style.display = 'none';
       if (distBox) distBox.style.display = 'none';
     }
@@ -17782,8 +17801,8 @@ function tlIsoStatsReset() {
     if (v === null) return;
     if (!ISO.setAutoLen(parseFloat(v))) alert('改长失败：请输入大于前段总长的正数');
   });
-  if (teeBtn) teeBtn.addEventListener('click', function () { ISO.insertAutoFit('tee'); });
-  if (valveBtn) valveBtn.addEventListener('click', function () { ISO.insertAutoFit('valve'); });
+  if (teeBtn && !ISO_FITTING_UI_OFF) teeBtn.addEventListener('click', function () { ISO.insertAutoFit('tee'); });
+  if (valveBtn && !ISO_FITTING_UI_OFF) valveBtn.addEventListener('click', function () { ISO.insertAutoFit('valve'); });
   if (fitDelBtn) fitDelBtn.addEventListener('click', function () { ISO.deleteSelFit(); });
   /* 两侧距离输入（阶段2b）：改任一侧，另一侧自动补齐（和=当前有效管长） */
   function isoFitInput(which) {
@@ -17800,17 +17819,17 @@ function tlIsoStatsReset() {
 /* 轴测图工具栏（#tlIsoSide）接线：配件布置 + 构件参数（2026-09-13）。
    模块保持纯几何/无 DOM 依赖（Node 可测），页面侧 UI 逻辑集中在此。 */
 (function () {
-  /* 2026-09-15 用户下线（ISO_FITTING_UI_OFF 开关）：轴测左栏编辑类功能整体取消，
-     「配件布置 / 构件参数」两卡一并收起，左栏位置保留空置，待用户重定方案；
-     恢复时改回 false 即可。静态 HTML 保留（verify_pp_tabs 骨架契约仍在），
-     仅运行时隐藏并跳过全部接线；iso-diagram.js 的 onFittingClick/onPlaceResult
-     调用点自带 typeof 守卫，跳过接线不会报错。 */
-  var ISO_FITTING_UI_OFF = false;   /* 任务J（2026-09-25 用户要求）：恢复左栏插入入口（管道/阀门/弯头/三通），改回 true 可再次整体下线 */
+  /* 插入配件下线（2026-10-01 v179，开关见上方页面级 ISO_FITTING_UI_OFF）：
+     只收起「配件放置」四件套（类型三选一 / 弯头规格 / 确定·放置 / 放置提示），
+     **不整卡隐藏** —— 同一张卡里还挂着「管线类型 + ➕ 管道插入」画线入口
+     （2026-09-25 任务J 用户要回、2026-10-01 再次确认保留）。
+     静态 HTML 全量保留（verify_pp_tabs 骨架契约仍在），仅运行时收起；
+     下方「构件参数」卡与删除接线一并保留（已有配件仍可查看/删除）。 */
   if (ISO_FITTING_UI_OFF) {
-    /* 配件布置/构件参数两卡仍隐藏（2026-09-15 下线维持）；插入管线卡（.tl-iso-pipe-card，
-       阶段1 双向同步）单独保留显示。 */
-    Array.prototype.forEach.call(document.querySelectorAll('#tlIsoSide .tl-iso-card:not(.tl-iso-pipe-card):not(.tl-iso-autocard)'), function (c) { c.style.display = 'none'; });
-    return;
+    ['tlIsoKinds', 'tlIsoSpecRow', 'tlIsoPlaceBtn', 'tlIsoPlaceHint'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
   }
   var ISO = window.RyIsoDiagram;
   var KINDS = { tee: '三通', elbow: '弯头', valve: '阀门' };
@@ -17858,6 +17877,7 @@ function tlIsoStatsReset() {
 
   /* 配件类型三选一 */
   kindsEl.addEventListener('click', function (e) {
+    if (ISO_FITTING_UI_OFF) return;   /* v179：插入配件下线（元素已收起，此处为双保险） */
     var b = e.target.closest('button[data-kind]');
     if (!b) return;
     curKind = b.getAttribute('data-kind');
@@ -17867,8 +17887,9 @@ function tlIsoStatsReset() {
     syncSpecRow();
   });
 
-  /* 确定 · 放置 / 取消放置 */
+  /* 确定 · 放置 / 取消放置（v179：插入配件下线时本按钮已收起，handler 短路为双保险） */
   btn.addEventListener('click', function () {
+    if (ISO_FITTING_UI_OFF) return;
     if (ISO.placingKind()) {
       ISO.cancelPlace();
       return;
@@ -18150,17 +18171,22 @@ function tlIsoStatsReset() {
       /* 记录右键点屏幕坐标：插入三通/阀门/弯头以该点为放置点（2026-09-24 任务⑰） */
       ctx.setAttribute('data-x', String(Math.round(x)));
       ctx.setAttribute('data-y', String(Math.round(y)));
-      ctx.innerHTML = '<button type="button" data-ext="1" style="' + ctxBtnCss + '">延长 1 m（沿当前方向）</button>'
-        + '<button type="button" data-del="1" style="' + ctxBtnCss + ';color:#b91c1c">删除接管</button>'
-        /* 就地插入配件（2026-09-24 任务⑰）：三通型号可选；阀门/弯头自动生成 */
-        + '<div style="border-top:1px solid #e5e7eb;margin:2px 0"></div>'
-        + '<button type="button" data-itfits="valve" style="' + ctxBtnCss + '">插入阀门（自动）</button>'
-        + '<button type="button" data-itfits="elbow" style="' + ctxBtnCss + ';color:#15803d">插入弯头（自动 · 可调角度）</button>'
-        + '<div style="padding:3px 10px 1px;font-weight:700;color:#0369a1">插入三通 · 分支口型号</div>'
-        + '<div style="display:flex;flex-wrap:wrap;gap:2px;padding:0 4px">'
-        + '<button type="button" data-itfits="tee" data-ispec="" style="' + ctxBtnCss + ';width:auto;flex:1 0 28%;text-align:center">同径</button>'
-        + TEE_OD_SERIES.map(function (v) { return '<button type="button" data-itfits="tee" data-ispec="' + v + '" style="' + ctxBtnCss + ';width:auto;flex:1 0 28%;text-align:center">' + v + '</button>'; }).join('')
-        + '</div>';
+      /* 就地插入配件（2026-09-24 任务⑰）：三通型号可选；阀门/弯头自动生成。
+         2026-10-01（v179 用户要求）起整段下线 —— 插入配件改走三级管路编辑的节点；
+         恢复方式：把页面级 ISO_FITTING_UI_OFF 改回 false。延长 / 删除两项始终保留。 */
+      var hPipeMenu = '<button type="button" data-ext="1" style="' + ctxBtnCss + '">延长 1 m（沿当前方向）</button>'
+        + '<button type="button" data-del="1" style="' + ctxBtnCss + ';color:#b91c1c">删除接管</button>';
+      if (!ISO_FITTING_UI_OFF) {
+        hPipeMenu += '<div style="border-top:1px solid #e5e7eb;margin:2px 0"></div>'
+          + '<button type="button" data-itfits="valve" style="' + ctxBtnCss + '">插入阀门（自动）</button>'
+          + '<button type="button" data-itfits="elbow" style="' + ctxBtnCss + ';color:#15803d">插入弯头（自动 · 可调角度）</button>'
+          + '<div style="padding:3px 10px 1px;font-weight:700;color:#0369a1">插入三通 · 分支口型号</div>'
+          + '<div style="display:flex;flex-wrap:wrap;gap:2px;padding:0 4px">'
+          + '<button type="button" data-itfits="tee" data-ispec="" style="' + ctxBtnCss + ';width:auto;flex:1 0 28%;text-align:center">同径</button>'
+          + TEE_OD_SERIES.map(function (v) { return '<button type="button" data-itfits="tee" data-ispec="' + v + '" style="' + ctxBtnCss + ';width:auto;flex:1 0 28%;text-align:center">' + v + '</button>'; }).join('')
+          + '</div>';
+      }
+      ctx.innerHTML = hPipeMenu;
       ctx.style.display = 'block';
       ctx.style.left = Math.max(4, Math.min(x, window.innerWidth - 200)) + 'px';
       ctx.style.top = Math.max(4, y) + 'px';
@@ -18493,7 +18519,9 @@ function tlIsoStatsReset() {
     else { base = baseCal(pid); od = AE && AE.caliberOf ? AE.caliberOf(pid) : null; name = AE && AE.pipeName ? AE.pipeName(pid) : pid; }
     var btnCss = 'display:block;width:100%;text-align:left;border:0;background:none;padding:4px 10px;cursor:pointer;border-radius:4px;font:inherit;color:inherit';
     var h = '';
-    if (view === 'iso') {
+    /* 轴测图「加配件」段（2026-10-01 v179 用户要求下线）：不再渲染；平面视图本无此段。
+       恢复方式：把页面级 ISO_FITTING_UI_OFF 改回 false。改径 / 遮蔽等原有项不受影响。 */
+    if (view === 'iso' && !window.ISO_FITTING_UI_OFF) {
       h += '<div style="padding:4px 10px;font-weight:700;color:#0369a1">轴测图 · 加配件</div>'
         + '<button type="button" data-add="tee" style="' + btnCss + '">＋ 加三通</button>'
         + '<button type="button" data-add="elbow" style="' + btnCss + '">＋ 加弯头</button>'

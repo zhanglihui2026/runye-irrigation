@@ -77,6 +77,13 @@
     var v = sec && sec.getAttribute('data-ry-view');
     return v === 'iso' ? 'iso' : 'plan';
   }
+  /* 2026-10-01（v179 用户要求）：「插入配件」改走三级管路编辑的节点，故**轴测视图下
+     本施工编辑卡整体收起**（含 插入配件 / 延伸管道 / 修剪管道），且该视图不绑点击/悬停 ——
+     轴测图上不再存在任何就地插入配件的入口；平面视图的功能与行为完全不变。
+     恢复方式：把 ISO_OFF 改回 false（或删掉本开关与下面三处 isoOff() 门控）。
+     说明：只关「入口」不关「显示」—— 叠加层仍照常绘制，已建施工管网照旧可见。 */
+  var ISO_OFF = true;
+  function isoOff() { return ISO_OFF && activeView() === 'iso'; }
   function hostSvg() {
     var id = activeView() === 'iso' ? 'tlIsoDiagramContent' : 'tlDiagramContent';
     var ctn = document.getElementById(id);
@@ -436,7 +443,7 @@
     return best;
   }
   function onClick(e) {
-    if (!st.active || !st.net || st.viewOnly) return;
+    if (!st.active || !st.net || st.viewOnly || isoOff()) return;   /* v179：轴测视图下线（双保险） */
     /* 放置/画线模式让行（2026-09-28 Request Q）：施工副本镜像了所有平面管，图面任意管点击
        都会命中 segment 并 stopPropagation，点击冒泡不到 ctn → iso 的放置/画线分支永远收不到
        → 轴测图配件布置「点不上」。iso 正在放置配件或画线时直接放行（不抢断、不选中）。 */
@@ -1159,6 +1166,7 @@
      外加 data-ry-view 切换（平面 ↔ 轴测）都要重新挂接并重画叠加层 */
   function wireHost() {
     watchPlotGroup();     /* 平面图地块组被拖动时叠加层要跟着走 */
+    if (isoOff()) { detachHost(); return; }   /* v179：轴测视图下线 —— 不绑 click/pointermove/pointerleave，杜绝就地插入入口 */
     var svg = hostSvg();
     if (!svg || st.hostSvg === svg) return;
     detachHost();
@@ -1269,6 +1277,8 @@
   function renderPanel() {
     ensureCard();
     var card = panelCard(); if (!card) return;
+    /* v179：轴测视图下整卡收起（平面视图照旧） */
+    card.style.display = isoOff() ? 'none' : '';
     card.innerHTML = '';
     var h = document.createElement('div');
     h.className = 'cn-head';
