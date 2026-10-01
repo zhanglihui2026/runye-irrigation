@@ -360,6 +360,15 @@
          ⚠ 只设 visibility，整管引用 path 仍留在 DOM：RyTlPathMeasure.frontPathEl() 与
          getTotalLength() 依赖它换算分段弧长，删掉会让总管分段选择整条失效。 */
       var fNodes = clone.querySelectorAll('[data-tlpipe="front"],[data-tlpipe-seg]');
+      /* v173（2026-10-01 用户要求「箭头指向的蓝色方块外面的白框还有蓝色的支管，都应该在
+         黑色的总管上面，现在图层的顺序不对」）：在**第一个总管节点之前**插一个注释标记
+         <!--tlFrontSlot-->。简图里总管画在主管/支管之前（tlAutoGenerate 顺序：总管 →
+         接入段 → 主管 → 支管 → 滴灌带），所以这个标记就是总管的**原 z 位置**；
+         renderPipeBaseSVG 把重画的分段插回标记处，工作区叠序与简图逐层一致。
+         ⚠ 注释必须保留（innerHTML 序列化保留注释）—— 改注释即丢图层契约。 */
+      if (fNodes.length && fNodes[0].parentNode) {
+        fNodes[0].parentNode.insertBefore(document.createComment('tlFrontSlot'), fNodes[0]);
+      }
       for (var fk = 0; fk < fNodes.length; fk++) fNodes[fk].setAttribute('visibility', 'hidden');
       var ids = clone.querySelectorAll('[id]');
       for (var j = 0; j < ids.length; j++) ids[j].setAttribute('id', 'tlWsPipe_' + ids[j].getAttribute('id'));
@@ -798,14 +807,30 @@
     var s = [];
     s.push('<svg viewBox="0 0 ' + fmt(base.w) + ' ' + fmt(base.h) + '" preserveAspectRatio="xMidYMid meet" class="tl-ws-svg" xmlns="http://www.w3.org/2000/svg">');
     s.push('<rect x="0" y="0" width="' + fmt(base.w) + '" height="' + fmt(base.h) + '" fill="#fff"/>');
-    s.push(base.inner);
+    /* v173（2026-10-01）：总管几何**插回它在简图里的原 z 位置**（base.inner 里
+       <!--tlFrontSlot--> 标记处，见 pipeBaseSVG）—— 即落在主管 / 支管 / 交接三通白框
+       **之下**。此前总管由覆盖层 #tlWsAuto 重画，而该整层压在克隆底图之上 ⇒
+       黑总管把蓝主管、绿支管、三通白框全盖住了（用户截图即此）。
+       坐标安全：标记落在 #tlPlotGroup 内，而 pipeBaseSVG 已 removeAttribute('transform')，
+       其坐标系 = 根 viewBox，与原先 #tlWsAuto 完全一致。
+       兜底：标记缺失或分段几何取不到 → 退回旧行为（画在 #tlWsAuto），总管不丢。 */
+    var FRONT_SLOT = '<!--tlFrontSlot-->';
+    var _fSlot = base.inner.indexOf(FRONT_SLOT);
+    var _fInner = (_fSlot >= 0) ? drawFrontSegsEx(T, data, AE.lensMap(), 'geom') : '';
+    var _fSank = (_fSlot >= 0 && _fInner !== '');
+    if (_fSank) {
+      s.push(base.inner.slice(0, _fSlot) + '<g id="tlWsFrontBase">' + _fInner + '</g>'
+        + base.inner.slice(_fSlot + FRONT_SLOT.length));
+    } else {
+      s.push(base.inner);
+    }
     /* v98d：手动分组「组边界线」覆盖层（与简图同款外观；拖动中被拖那条高亮为蓝色） */
     /* v101：覆盖层裁剪到地块多边形（与简图同源的点序）；poly 无效时不裁剪、不放 defs。 */
     var _clipD = tlPlotPathD(data, T);
     if (_clipD) s.push('<defs><clipPath id="tlWsClipPlot"><path d="' + _clipD + '"/></clipPath></defs>');
     s.push('<g id="tlWsZoneCuts"' + (_clipD ? tlPlotClipAttr(data) : '') + '>' + ungroupedGbLines(T, data) + manualGbLines(T, data) + '</g>');
     /* 自动管线图面编辑覆盖层（阶段2）：改长有效几何 + 配件标记 + 选中高亮 */
-    s.push('<g id="tlWsAuto">' + autoSVG(T) + '</g>');
+    s.push('<g id="tlWsAuto">' + autoSVG(T, _fSank) + '</g>');
     /* 手工管线层 + 预览层：T 与简图 ts 同一坐标系（偏移合并进 viewState） */
     s.push('<g id="tlWsManual">' + manualSVG(T) + '</g>');
     s.push('<g id="tlWsPreview"></g>');
@@ -1076,7 +1101,14 @@
      段边界取自宿主 RyTlPathMeasure.frontRatios()（与简图/分段选择同源，段号绝不两处错位）；
      取不到 → cuts=[0,1]，单段 = 整管（等价旧行为）。
      为什么总管总在本层画：底图克隆里总管已被隐藏（见 pipeBaseSVG），本层是它唯一渲染源。 */
-  function drawFrontSegs(T, data, lm) {
+  /* 签名冻结（verify_v165_frontseghide.cjs 的 S10 钉住这个字面串）：对外入口保持三参形式，
+     模式走 drawFrontSegsEx —— 别把 mode 加到这里，闸门会立刻假红。 */
+  function drawFrontSegs(T, data, lm) { return drawFrontSegsEx(T, data, lm, ''); }
+  /* mode：'' = 几何 + 长度标注（旧行为）；'geom' = 只出几何；'label' = 只出长度标注。
+     v173：几何下沉到克隆底图（#tlWsFrontBase，主管/支管之下），而**标注留在覆盖层** ——
+     标注是「读」不是「图」，跟着下沉会被 5px 主管压住（它原先一直在最上层）。 */
+  function drawFrontSegsEx(T, data, lm, mode) {
+    var wantGeom = (mode !== 'label'), wantLabel = (mode !== 'geom');
     var epts = AE.effPts('front', data);
     if (!epts) return '';
     var RM = (typeof window !== 'undefined') ? window.RyTlPathMeasure : null;
@@ -1095,15 +1127,17 @@
         + ' stroke-linecap="round" stroke-linejoin="round"/>';
       if (hid) hidP.push(el); else { visP.push(el); anyVis = true; }
     }
-    var out = hidP.concat(visP);   /* 遮蔽段先画：灰色圆头不压在实线端点上 */
+    var out = wantGeom ? hidP.concat(visP) : [];   /* 遮蔽段先画：灰色圆头不压在实线端点上 */
     /* 长度标注：与原口径一致 —— 只在「总管确实改过长」且仍有未遮蔽段时标（整管中点） */
-    if (anyVis && lm && lm['front']) {
+    if (wantLabel && anyVis && lm && lm['front']) {
       var mid = epts[Math.floor(epts.length / 2)], mq = T(mid);
       out.push('<text x="' + fmt(mq.x + 6) + '" y="' + fmt(mq.y - 4) + '" font-size="9" font-family="system-ui" fill="#b45309">' + esc(Lm.toFixed(1) + 'm') + '</text>');
     }
     return out.join('');
   }
-  function autoSVG(T) {
+  /* v173：skipFront=true 时本层不画总管 —— 总管已下沉到克隆底图的 #tlWsFrontBase（原 z 位置）。
+     该参数只在「标记缺失 / 分段几何落空」时才为 false，用于退回旧行为、避免总管整条消失。 */
+  function autoSVG(T, skipFront) {
     var data = lastDataRef;
     if (!data) return '';
     var s = [];
@@ -1130,7 +1164,9 @@
       s.push('<text x="' + fmt(mq.x + 6) + '" y="' + fmt(mq.y - 4) + '" font-size="9" font-family="system-ui" fill="#b45309">' + esc(AE.polylineLen(epts).toFixed(1) + 'm') + '</text>');
     });
     /* 1a) 总管（v165）：按主管接入点分段重画 —— 每段独立遮蔽态 */
-    s.push(drawFrontSegs(T, data, lm));
+    /* v173：几何已下沉到克隆底图 ⇒ 本层只补长度标注（位置与 v173 之前逐位一致）；
+       兜底路径（skipFront=false）仍走老三参入口，几何+标注一起出。 */
+    s.push(skipFront ? drawFrontSegsEx(T, data, lm, 'label') : drawFrontSegs(T, data, lm));
     /* 1b) 改径标注（2026-09-16 阶段2e）：琥珀虚线套壳 + Ø 数值（对齐施工编辑器口径） */
     var cm = AE.calibersMap ? AE.calibersMap() : {};
     Object.keys(cm).forEach(function (pid) {
