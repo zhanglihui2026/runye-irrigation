@@ -10742,11 +10742,14 @@ function tlAutoGenerate(options) {
       var jp=ts(jc.x,jc.y);
       parts.push('<rect data-junction-tee data-junction-front="1" x="'+(jp.x-4.5).toFixed(1)+'" y="'+(jp.y-4.5).toFixed(1)+'" width="9" height="9" fill="#0C447C" stroke="#ffffff" stroke-width="1.5"/>');
       if(jc.stubM>1){
-        var jmx=jc.x+jc.dx*jc.stubM*0.5, jmy=jc.y+jc.dy*jc.stubM*0.5; // 接入段中点（在主管轴线上）
-        var jm=ts(jmx,jmy);
-        var JC_VALVE_OFF=6.0; // 固定距离（米）：阀门距主管轴线的垂直偏移（> 管半宽2.5+阀半径6.5=4.5m 视图单位，确保阀清晰位于管侧），不随接入段长短变化
-        var jox=jc.dx!==0?0:JC_VALVE_OFF, joy=jc.dy!==0?0:JC_VALVE_OFF; // 竖管→右(+x) / 横管→下(+y)
-        var jv=ts(jmx+jox, jmy+joy);
+        /* v171d（用户 2026-10-01 更正：以「总管」为基准，不是主管/接入段）——
+           总管横向(jc.dy≠0) → 阀恒在总管下侧(+y)；总管竖向(jc.dx≠0) → 阀恒在总管右侧(+x)。
+           基准点取「总管×主管交点」jm（落在总管上），阀距总管固定垂直距离 JC_VALVE_OFF（米）。*/
+        var jm=ts(jc.x,jc.y);
+        var JC_VALVE_OFF=6.0; // 固定距离（米）：阀距总管（交点）的垂直距离
+        var jox=(jc.dx===0)?0:JC_VALVE_OFF; // 总管竖向 → 右侧(+x)
+        var joy=(jc.dy===0)?0:JC_VALVE_OFF; // 总管横向 → 下侧(+y)
+        var jv=ts(jc.x+jox, jc.y+joy);
         parts.push('<line x1="'+jm.x.toFixed(1)+'" y1="'+jm.y.toFixed(1)+'" x2="'+jv.x.toFixed(1)+'" y2="'+jv.y.toFixed(1)+'" stroke="#185FA5" stroke-width="3.5" stroke-linecap="round" opacity="0.92"/>');
         parts.push('<g data-junction-valve><circle cx="'+jv.x.toFixed(1)+'" cy="'+jv.y.toFixed(1)+'" r="6.5" fill="#ef4444" stroke="#ffffff" stroke-width="2"/>'
           +'<line x1="'+(jv.x-3.6).toFixed(1)+'" y1="'+(jv.y-3.6).toFixed(1)+'" x2="'+(jv.x+3.6).toFixed(1)+'" y2="'+(jv.y+3.6).toFixed(1)+'" stroke="#ffffff" stroke-width="1.4"/>'
@@ -15195,7 +15198,7 @@ ppPullLiftDh();                                              // 首屏对齐一�
     try{ if(typeof ppRefreshDiagramIfVisible==='function') ppRefreshDiagramIfVisible(); }catch(e){}
     try{
       var poly=(typeof window!=='undefined')?window.measuredPolygon:null;
-      if(poly&&poly.length>=3&&typeof tlAutoGenerate==='function') tlAutoGenerate({scroll:false});
+      if(poly&&poly.length>=3&&typeof tlAutoGenerate==='function') tlAutoGenerate({scroll:false,stay:true});
       else if(typeof renderThreeLevel==='function') renderThreeLevel();
     }catch(e){}
     /* 2026-09-22 修复：绿色「水力计算结果」栏必须从实时分区网格独立重算，不能依赖 tlAutoGenerate 成功。
@@ -15619,7 +15622,7 @@ ppPullLiftDh();                                              // 首屏对齐一�
         window.alert=function(){};
         var _ryPoly=(typeof window.ppGetPolyPts==='function')?window.ppGetPolyPts():(window.measuredPolygon||[]);
         if(_ryPoly && _ryPoly.length>=3 && typeof window.ppGenerateDiagram==='function') window.ppGenerateDiagram({scroll:false});
-        if((window.measuredPolygon||[]).length>=3 && typeof tlAutoGenerate==='function') tlAutoGenerate({scroll:false});
+        if((window.measuredPolygon||[]).length>=3 && typeof tlAutoGenerate==='function') tlAutoGenerate({scroll:false,stay:true});
       }catch(e){}finally{ window.alert=_ryAlert0; }
       try{ if(typeof renderThreeLevel==='function') renderThreeLevel(); }catch(e){}
       try{ if(typeof tlUpdatePlanBar==='function') tlUpdatePlanBar(); }catch(e){}
@@ -20656,7 +20659,7 @@ function tlIsoStatsReset() {
       try { if (window.tlEconPanel && window.tlEconPanel.render) window.tlEconPanel.render(); } catch (e) { }
       var poly = window.measuredPolygon;
       var hasPoly = (poly && poly.length >= 3);
-      try { if (hasPoly && typeof tlAutoGenerate === 'function') tlAutoGenerate({ scroll: false }); } catch (e) { }
+      try { if (hasPoly && typeof tlAutoGenerate === 'function') tlAutoGenerate({ scroll: false, stay: true }); } catch (e) { }
       try { if (hasPoly && typeof ppGenerateDiagram === 'function') ppGenerateDiagram({ scroll: false }); } catch (e) { }
       try { var v = document.getElementById('tlDimScaleVal'); if (v) v.textContent = Math.round(loadScale() * 100) + '%'; } catch (e) { }
     }, 360);
