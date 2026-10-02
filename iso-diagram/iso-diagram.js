@@ -943,8 +943,26 @@
       s.push('<g data-ryfix="1" data-pipe-note="1" pointer-events="none" font-size="10" font-family="system-ui" fill="#202020"><path d="M' + fmt(q.x) + ' ' + fmt(q.y) + ' l12 ' + offset + ' h70" fill="none" stroke="#555" stroke-width="0.6"/><text x="' + fmt(q.x + 14) + '" y="' + fmt(q.y + offset - 3) + '" paint-order="stroke" stroke="white" stroke-width="3">' + esc(text) + '</text></g>');
     }
     /* 2026-09-15 用户要求：标注简化 —— 同类型管道不逐根引出标注（图里只剩总管一条），
-       主管/支管规格改由图例文字给出，用颜色区分类型；点击管件仍可查看参数。 */
-    pipeNote(model.front, HEIGHTS.front, '总管 ' + pipeTxt('front', '管径待定'), 20);
+       主管/支管规格改由图例文字给出，用颜色区分类型；点击管件仍可查看参数。
+       2026-10-02 用户要求：总管/主管/支管各标一处「管径 + 标高」，不逐条标注（太乱）。
+       标高推算：总管/主管按「管道埋深」参数（window.RyBuryDepth，设置页可调，默认 600mm）
+       取管中标高（两者同标高水平连接）；支管为地表管 ±0.000。 */
+    function buryElevTxt() {
+      var mm = 0;
+      try { if (typeof window !== 'undefined' && window.RyBuryDepth && typeof window.RyBuryDepth.get === 'function') mm = window.RyBuryDepth.get() || 0; } catch (e) { mm = 0; }
+      if (!isFinite(mm) || mm <= 0) mm = 600;
+      return '-' + (Math.round(mm) / 1000).toFixed(3);
+    }
+    pipeNote(model.front, HEIGHTS.front, '总管 ' + pipeTxt('front', '管径待定') + ' · 标高 ' + buryElevTxt(), 46);   /* offset 46：总管 z 最低，引出向下远离主管/支管标注行（2026-10-02 实测 20 会与主管文字叠字） */
+    /* 主管/支管各取第一条未被遮蔽的标注（不逐条标注）；该类管全被遮蔽或不存则不标 */
+    function firstVis(list, pidOf) {
+      for (var i = 0; i < list.length; i++) { if (!isHid(pidOf(i))) return list[i]; }
+      return null;
+    }
+    var mainNote0 = firstVis(model.mains || [], function (i) { return 'main-' + i; });
+    if (mainNote0) pipeNote(mainNote0, HEIGHTS.main, '主管 ' + pipeTxt('main', '管径待定') + ' · 标高 ' + buryElevTxt(), 20);
+    var branchNote0 = firstVis(model.branches || [], function (i) { return 'branch-' + i; });
+    if (branchNote0) pipeNote(branchNote0, HEIGHTS.branch, '支管 ' + pipeTxt('branch', '管径待定') + ' · 标高 ±0.000', -24);   /* offset -24：支管 z 最高，向上引出 —— 多分区密集图 z 层像素差变小，向下引出会叠上主管标注（2026-10-02 48 区实测） */
     s.push('<g data-ryfix="1" transform="translate(65 655)" pointer-events="none" fill="none" stroke="#555" stroke-width="0.8"><path d="M0 -32 V0 H38 M0 0 L27 -27"/><g stroke="none" fill="#333" font-family="system-ui" font-size="10"><text x="40" y="4">X</text><text x="28" y="-29">Y</text><text x="-4" y="-37">Z</text></g></g>');
 
     /* 11b) 最远水路（轴测图，2026-09-24 用户要求）—— 与平面图 tlWorstPathMarkSVG 同款紫色标注：
@@ -1037,7 +1055,7 @@
     function isoNum(v) { var m2 = String(v == null ? '' : v).match(/\d+(?:\.\d+)?/); return m2 ? m2[0] : '—'; }
     var pumpTxt = '水泵 ' + isoNum(pumpTxtOf('flow')) + ' m³/h · ' + isoNum(pumpTxtOf('head')) + ' m · ' + isoNum(pumpTxtOf('power')) + ' kW';
     s.push('<text x="' + lx + '" y="' + (ly + 26) + '" fill="#334155">' + esc('联合灌溉 ' + zoneCount + ' 区 · ' + pumpTxt) + '</text>');
-    s.push('<text x="' + lx + '" y="' + (ly + 44) + '" font-size="10" font-weight="400" fill="#444">45°正面斜轴测 · 不按比例 · 支管按Z向立管展开；标高/埋深待设计确认，非施工放样依据。G=主管，Z=支管。</text>');
+    s.push('<text x="' + lx + '" y="' + (ly + 44) + '" font-size="10" font-weight="400" fill="#444">45°正面斜轴测 · 不按比例 · 支管按Z向立管展开；总管/主管标高按管道埋深参数推算（设置页可调），支管位于地表 ±0.000；非施工放样依据。G=主管，Z=支管。</text>');
     s.push('</g>');
     /* 进行中手工管线折线预览（插入模式，2026-09-15 阶段1） */
     if (pipeDraft && pipeDraft.pts.length && viewState) {
