@@ -585,14 +585,17 @@ body.mat-resizing *{cursor:col-resize!important}
 
 .materials-card th{text-align:left;padding:8px 6px;font-size:11px;color:var(--s-400);border-bottom:2px solid var(--s-100);font-weight:600;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}
 .materials-card td{padding:7px 6px;border-bottom:1px solid var(--s-50);font-weight:500;color:var(--s-700);white-space:nowrap}
-.materials-card td:nth-child(3),.materials-card td:nth-child(4),.materials-card td:nth-child(5),.materials-card td:nth-child(6){text-align:left}
-.materials-card td:nth-child(3) .qty-text,.materials-card td:nth-child(4) .price-input,.materials-card td:nth-child(5) .total-cell,.materials-card td:nth-child(6) .permu-cell{text-align:left}
-.materials-card th:nth-child(1),.materials-card td:nth-child(1){width:13%}
-.materials-card th:nth-child(2),.materials-card td:nth-child(2){width:14%}
-.materials-card th:nth-child(3),.materials-card td:nth-child(3){width:20%}
-.materials-card th:nth-child(4),.materials-card td:nth-child(4){width:19%}
-.materials-card th:nth-child(5),.materials-card td:nth-child(5){width:13%}
-.materials-card th:nth-child(6),.materials-card td:nth-child(6){width:21%}
+/* v180：列宽/对齐改用 data-mcol 定位。原先用 nth-child，插入「行号」槽列后全部错位一格，
+   且 :nth-child() 的特异度高于 .mat-rownum，会把行号槽撑成材料列的 13% 宽。
+   data-mcol 由 matDecorate 统一打标，后续再加列也不会再错位。 */
+.materials-card th[data-mcol=mat],.materials-card td[data-mcol=mat]{width:13%}
+.materials-card th[data-mcol=spec],.materials-card td[data-mcol=spec]{width:14%}
+.materials-card th[data-mcol=qty],.materials-card td[data-mcol=qty]{width:20%}
+.materials-card th[data-mcol=price],.materials-card td[data-mcol=price]{width:19%}
+.materials-card th[data-mcol=total],.materials-card td[data-mcol=total]{width:13%}
+.materials-card th[data-mcol=permu],.materials-card td[data-mcol=permu]{width:21%}
+.materials-card td[data-mcol=qty] .qty-text,.materials-card td[data-mcol=price] .price-input,
+.materials-card td[data-mcol=total] .total-cell,.materials-card td[data-mcol=permu] .permu-cell{text-align:left}
 .materials-card tbody tr:hover{background:var(--s-50)}
 /* v169：可编辑材料表（备注列 / 列宽拖拽 / 加行加列）—— 置于 nth-child 宽度规则之后以覆盖之 */
 .materials-card th{position:relative}
@@ -646,6 +649,27 @@ body.mat-resizing *{cursor:col-resize!important}
 .materials-card .custom-input:focus{border-color:var(--g-500);box-shadow:0 0 0 3px var(--g-100)}
 .materials-card .custom-qty{width:70px;text-align:right;-moz-appearance:textfield}
 .materials-card .custom-qty::-webkit-inner-spin-button{opacity:.4;height:20px}
+/* ===== v180 材料表电子表化（2026-10-02）===== */
+.materials-card .mat-namebox{display:inline-flex;align-items:center;justify-content:center;min-width:46px;height:24px;padding:0 7px;border:1.5px solid var(--s-200);border-radius:6px;background:#fff;font-size:12px;font-weight:700;color:var(--g-700);font-family:ui-monospace,Menlo,Consolas,monospace}
+.materials-card .mat-rownum{width:46px;min-width:46px;padding:6px 4px!important;text-align:center!important;font-size:11px!important;font-weight:600;color:var(--s-400);background:var(--s-50);border-right:1px solid var(--s-100);user-select:none;white-space:nowrap}
+.materials-card th.mat-rownum{background:var(--s-50);color:var(--s-400);font-size:11px;text-align:center;letter-spacing:0}
+.materials-card .mat-col-letter{display:inline-block;min-width:15px;margin-right:5px;padding:1px 4px;border-radius:4px;background:var(--g-100);color:var(--g-700);font-size:10px;font-weight:700;font-family:ui-monospace,Menlo,Consolas,monospace;vertical-align:middle;letter-spacing:0}
+.materials-card tbody td{position:relative;cursor:cell}
+.materials-card tbody td.mat-inrange{background:#eef4ff}
+.materials-card tbody td.mat-sel{outline:2px solid var(--g-500);outline-offset:-2px;background:#e8f1ff;z-index:1}
+.materials-card tbody tr:hover td.mat-sel{background:#dfeaff}
+.materials-card td.mat-ref{background:#fff4d6!important;box-shadow:inset 0 0 0 1px #f6c344}
+.materials-card .mat-cell-editor{width:100%;height:100%;min-width:60px;border:0;padding:0 4px;margin:0;font:inherit;font-size:12.5px;color:var(--s-800);background:#fff;outline:none;box-shadow:inset 0 0 0 2px var(--g-500);border-radius:2px}
+.materials-card .mat-cell-editor.mat-editing{position:absolute;inset:0;z-index:30}
+.mat-fill-handle{position:absolute;display:none;width:9px;height:9px;background:var(--g-500);border:2px solid #fff;border-radius:2px;cursor:crosshair;z-index:60;box-shadow:0 1px 3px rgba(0,0,0,.28)}
+.mat-menu{position:fixed;z-index:9998;min-width:152px;padding:5px;background:#fff;border:1px solid var(--s-200);border-radius:9px;box-shadow:0 8px 26px rgba(15,23,42,.18);font-size:12.5px}
+.mat-menu-item{padding:6px 11px;border-radius:6px;color:var(--s-700);font-weight:600;cursor:pointer;white-space:nowrap}
+.mat-menu-item:hover{background:var(--g-50);color:var(--g-700)}
+.mat-menu-item.disabled{color:var(--s-300);cursor:not-allowed;font-weight:500}
+.mat-menu-item.disabled:hover{background:transparent;color:var(--s-300)}
+.mat-menu-sep{height:1px;margin:4px 6px;background:var(--s-100)}
+.mat-flash{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);padding:7px 16px;border-radius:8px;background:rgba(15,23,42,.9);color:#fff;font-size:12.5px;font-weight:600;z-index:9999;opacity:0;transition:opacity .22s;pointer-events:none}
+
 .materials-card tr.custom-row td{background:var(--g-50)}
 .materials-card tfoot tr{border-top:2px solid var(--s-200)}
 .materials-card tfoot td{padding:12px 6px;font-weight:700;font-size:15px;color:var(--s-900)}
@@ -6340,6 +6364,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     <button class="tl-ws-btn" id="tlWsFitTee" type="button" aria-pressed="false" title="插入三通：点本按钮后，再点管线上的位置即插入（自动/手工管线都支持）">⊞ 三通</button>
     <button class="tl-ws-btn" id="tlWsFitElbow" type="button" aria-pressed="false" title="插入弯头：点本按钮后点击管线，自动吸附到最近的拐角/端头">⌐ 弯头</button>
     <button class="tl-ws-btn" id="tlWsFitNode" type="button" aria-pressed="false" title="插入节点（v150）：点本按钮后，再点管线即在点击处插入节点圆点；点节点弹面板勾选配件组合（三通/阀门/45°弯头/90°弯头），两节点可连线，配件按数量计入工程量汇总">◉ 节点</button>
+    <button class="tl-ws-btn" id="tlLineBtn" type="button" aria-pressed="false" onclick="RyTlWs.toggleLineMode()" title="划线（新增）：进入后在节点圆点(N-##)上按住，拖到另一节点松手即生成连接线（自动吸附节点，不区分主管/支管/总管）；松手后弹出管径面板选直径；再点本按钮或 Esc 退出">✏ 划线</button>
     <span class="tl-ws-sep"></span>
     <!-- ↩回退 / 🗑清空手工（2026-09-28 用户指令取消）：只作用于手工管线，画线入口移除后成孤儿按钮；
          手工管线无本地持久化（仅会话内有效），无遗留清理问题。RyTlWs.undo/clearManual 核心能力保留。 -->
@@ -7858,11 +7883,14 @@ function updateMaterialTotals() {
       if (input.dataset.formula) { matTbl.priceF = matTbl.priceF || {}; matTbl.priceF[tr.dataset.key] = input.dataset.formula; matTblSave(); }
       else if (matTbl.priceF && matTbl.priceF[tr.dataset.key]) { delete matTbl.priceF[tr.dataset.key]; matTblSave(); }
     }
+    /* v180：若该格被用户手工改过（matTbl.edits），合计/亩均不覆盖，保留用户值 */
+    const ovTotal = matEditFor(tr.dataset.key, 'total');
+    const ovPermu = matEditFor(tr.dataset.key, 'permu');
     const subtotal = qty * price;
     const cell = tr.querySelector('.total-cell');
-    if (cell) cell.textContent = price > 0 && qty > 0 ? '¥' + fmt0(subtotal) : '—';
+    if (cell && ovTotal == null) cell.textContent = price > 0 && qty > 0 ? '¥' + fmt0(subtotal) : '—';
     const permuCell = tr.querySelector('.permu-cell');
-    if (permuCell) {
+    if (permuCell && ovPermu == null) {
       const permu = parseFloat(tr.dataset.permu) || 0;
       permuCell.textContent = permu > 0
         ? permu.toFixed(1) + ' m/亩 · ' + (price > 0 ? '¥' + (permu * price).toFixed(1) : '—')
@@ -7971,15 +7999,23 @@ if (!window._matTblDelegated) {
   });
   document.addEventListener('click', function (e) {
     const rd = e.target.closest ? e.target.closest('.mat-row-del') : null;
-    if (rd) { const id = rd.dataset.mrowdel; matTbl.custom = (matTbl.custom || []).filter(r => r.id !== id); matTblSave(); render(); return; }
+    if (rd) { matDeleteRow(rd.dataset.mrowdel); return; }
     const cd = e.target.closest ? e.target.closest('.mat-col-del') : null;
-    if (cd) { const cid = cd.dataset.mcoldel; matTbl.extraCols = (matTbl.extraCols || []).filter(c => c.id !== cid); delete matTbl.extraCells[cid]; matTblSave(); render(); return; }
-    if (e.target.closest && e.target.closest('#matAddRow')) { matTbl.custom = (matTbl.custom || []).concat([{ id: 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: '', spec: '', qty: '', price: '' }]); matTblSave(); render(); return; }
+    if (cd) { matDeleteCol(cd.dataset.mcoldel); return; }
+    /* v180c：＋添加行/＋添加列 改为「在选中位置下方/右侧插入」（对齐全表自由编辑的在线表格手感）；
+       未选中任何格时退化为追加到末尾。中间插入的完整控制见行号/列头右键菜单。 */
+    if (e.target.closest && e.target.closest('#matAddRow')) {
+      var rows2 = matRows();
+      var selRow = rows2[Math.max(0, Math.min(matSel.r, rows2.length) - 1)];
+      if (selRow && selRow.dataset.key) matInsertRow(selRow.dataset.key, true);
+      else { matTbl.custom = (matTbl.custom || []).concat([{ id: 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: '', spec: '', qty: '', price: '' }]); matTblSave(); render(); }
+      return;
+    }
     if (e.target.closest && e.target.closest('#matAddCol')) {
-      const t = (window.prompt('新列名称：', '说明 ' + ((matTbl.extraCols || []).length + 1)) || '').trim();
-      if (!t) return;
-      matTbl.extraCols = (matTbl.extraCols || []).concat([{ id: 'x' + Date.now().toString(36), title: t, w: 130 }]);
-      matTblSave(); render(); return;
+      var ids3 = matColIds().filter(function (x) { return x !== MAT_RN; });
+      var selCol = ids3[Math.max(0, Math.min(matSel.c, ids3.length - 1))];
+      if (selCol) matInsertCol(selCol, true); else matInsertCol('note', true);
+      return;
     }
   });
   document.addEventListener('mousedown', function (e) {
@@ -8048,6 +8084,621 @@ function matFmtNum(n) {
   if (st.charAt(st.length - 1) === '.') st = st.slice(0, -1);
   return st;
 }
+/* ===== v180（2026-10-02 用户要求「材料表还是要改为跟腾讯文档/飞书类似的在线表格」）=====
+   目标：把「一堆散落 <input> 的表」升级为真正的电子表 —— 单元格选中态、行列坐标、纯键盘操作、
+   复制粘贴/剪切、拖拽填充柄、公式引用高亮，且**全表自由编辑**。
+   关键约束：tbody 由 render() 每次重建 ⇒ 手改值必须存 matTbl.edits（按 行key|列id，非按 A1 地址，
+   这样增删行不会错位）并在 matDecorate() 里回填，否则改参数即丢。
+   原生 input 格（单价/备注/自定义列/自定义行）继续走各自既有持久化，不进 edits，避免双写冲突。 */
+var MAT_RN = '__rn';        /* 行号槽列的 data-mcol，占 children[0]，不参与 A1 地址 */
+var MAT_ADDR_OFF = 1;      /* 数据列 dcol = children 索引 - 1 */
+var matSel = { r: 1, c: 1, ar: 1, ac: 1, editing: false };
+var matClip = null;        /* {rows:[[txt,...]], cut:bool} */
+var matFill = null;        /* 填充柄拖拽态 */
+var matEditsReady = false;
+
+function matTblEl() { return document.querySelector('.materials-card table'); }
+function matRows() { var t = matTblEl(); return t ? Array.prototype.slice.call(t.querySelectorAll('tbody tr')) : []; }
+function matColIds() {
+  var t = matTblEl(); if (!t) return [];
+  return Array.prototype.slice.call(t.querySelectorAll('colgroup col')).map(function (c) { return c.getAttribute('data-mcol'); });
+}
+function matKey(tr, i) { return (tr && tr.dataset.key) || ('r' + ((i || 0) + 1)); }
+/* 取 (数据列, 行) 对应的 td；dcol 从 0 起，自动跳过行号槽 */
+function matCell(dcol, row) {
+  var rows = matRows(); if (row < 1 || row > rows.length) return null;
+  var td = rows[row - 1].children[dcol + MAT_ADDR_OFF];
+  return (td && td.tagName === 'TD') ? td : null;
+}
+function matAddr(dcol, row) { return matColLetter(dcol) + row; }
+function matEditFor(rowKey, colId) {
+  if (!rowKey || !colId) return null;
+  var e = matTbl.edits; if (!e) return null;
+  var v = e[rowKey + '|' + colId];
+  return (v == null) ? null : v;
+}
+
+/* ---------- 1. 铺设：行号槽 + 列标 + 回填用户改写 ---------- */
+function matDecorate() {
+  var t = matTblEl(); if (!t) return;
+  /* v180c：顺序很关键 —— 先补行号槽/打标，再按模型重排行与列，最后补列标与表脚。
+     render() 每次按「基础列 + 自定义列(数组序)」重建，本函数负责把它摆成用户要的顺序。 */
+  matEnsureRowNumCol(t);
+  matStampColIds(t);
+  var order = matOrderedColIds();
+  var full = [MAT_RN].concat(order);
+  matReorderCols(t, full);
+  matReorderRows(t);
+  matSetColLetters(t);
+  matRenumberRows(t);
+  matRebuildFoot(t, full);
+  matApplyEdits();
+  try { matApplyFormulas(); } catch (e) {}
+  try { updateMaterialTotals(); } catch (e) {}
+  try { matApplyFormulas(); } catch (e) {}
+  matSyncTableWidth();
+  if (!matEditsReady) { matEditsReady = true; matBindGrid(); }
+  matSelect(matSel.r, matSel.c, false, true);
+}
+
+/* ---- v180c 列顺序模型：自定义列用 after 锚定在某一列之后（'__top__' = 最前）；无 after = 末尾（向后兼容） ---- */
+function matOrderedColIds() {
+  var out = ['mat', 'spec', 'qty', 'price', 'total', 'permu', 'note'];
+  (matTbl.extraCols || []).forEach(function (c) {
+    var at = c.after;
+    if (!at) { out.push(c.id); return; }
+    if (at === '__top__') { out.splice(0, 0, c.id); return; }
+    var i = out.indexOf(at);
+    if (i < 0) out.push(c.id); else out.splice(i + 1, 0, c.id);
+  });
+  return out;
+}
+function matEnsureRowNumCol(t) {
+  var cols = t.querySelector('colgroup');
+  if (cols && matColIds()[0] !== MAT_RN) {
+    var rnCol = document.createElement('col');
+    rnCol.setAttribute('data-mcol', MAT_RN); rnCol.style.width = '46px';
+    cols.insertBefore(rnCol, cols.firstChild);
+  }
+  var hr = t.querySelector('thead tr');
+  if (hr && !hr.querySelector('.mat-rownum')) {
+    var rnTh = document.createElement('th');
+    rnTh.className = 'mat-rownum'; rnTh.setAttribute('data-mcol', MAT_RN); rnTh.textContent = '#';
+    hr.insertBefore(rnTh, hr.firstChild);
+  }
+  matRows().forEach(function (tr) {
+    if (!tr.querySelector(':scope > .mat-rownum')) {
+      var td = document.createElement('td');
+      td.className = 'mat-rownum'; td.setAttribute('data-mcol', MAT_RN);
+      tr.insertBefore(td, tr.firstChild);
+    }
+  });
+}
+function matStampColIds(t) {
+  var ids = matColIds();
+  matRows().forEach(function (tr) {
+    Array.prototype.slice.call(tr.children).forEach(function (td, ci) {
+      var cid = ids[ci]; if (!cid) return;
+      td.setAttribute('data-mcol', cid);
+      if (cid !== MAT_RN) td.setAttribute('tabindex', '-1');
+    });
+  });
+}
+function matReorderChildren(box, order) {
+  var map = {};
+  Array.prototype.slice.call(box.children).forEach(function (ch) { var id = ch.getAttribute('data-mcol'); if (id) map[id] = ch; });
+  for (var i = 0; i < order.length; i++) { if (map[order[i]]) box.appendChild(map[order[i]]); }
+}
+function matReorderCols(t, full) {
+  var cg = t.querySelector('colgroup'); if (cg) matReorderChildren(cg, full);
+  var hr = t.querySelector('thead tr'); if (hr) matReorderChildren(hr, full);
+  matRows().forEach(function (tr) { matReorderChildren(tr, full); });
+}
+/* ---- v180c 行顺序模型：自定义行用 after 锚定在某一行的 data-key 之后（'__top__' = 最前） ---- */
+function matReorderRows(t) {
+  var tb = t.querySelector('tbody'); if (!tb) return;
+  var customs = (matTbl.custom || []);
+  if (!customs.length) return;
+  var byKey = {};
+  Array.prototype.slice.call(tb.children).forEach(function (tr) { if (tr.dataset.key) byKey[tr.dataset.key] = tr; });
+  var lastOn = {};
+  customs.forEach(function (rw) {
+    var tr = byKey[rw.id]; if (!tr) return;
+    var at = rw.after;
+    if (!at) { tb.appendChild(tr); return; }
+    if (at === '__top__') {
+      var pv = lastOn['__top__'];
+      tb.insertBefore(tr, pv ? pv.nextSibling : tb.firstChild);
+      lastOn['__top__'] = tr; return;
+    }
+    var a = byKey[at];
+    if (!a) { tb.appendChild(tr); return; }
+    var prev = lastOn[at];
+    if (prev && prev.parentNode === tb) tb.insertBefore(tr, prev.nextSibling);
+    else tb.insertBefore(tr, a.nextSibling);
+    lastOn[at] = tr;
+  });
+}
+function matSetColLetters(t) {
+  var hr = t.querySelector('thead tr'); if (!hr) return;
+  var ids = matColIds().filter(function (x) { return x !== MAT_RN; });
+  Array.prototype.slice.call(hr.querySelectorAll('th[data-mcol]')).forEach(function (th) {
+    var cid = th.getAttribute('data-mcol'); if (cid === MAT_RN) return;
+    var dcol = ids.indexOf(cid); if (dcol < 0) return;
+    var old = th.querySelector('.mat-col-letter'); if (old) old.parentNode.removeChild(old);
+    var lb = document.createElement('span');
+    lb.className = 'mat-col-letter'; lb.textContent = matColLetter(dcol);
+    th.insertBefore(lb, th.firstChild);
+  });
+}
+function matRenumberRows(t) {
+  matRows().forEach(function (tr, i) {
+    var td = tr.querySelector(':scope > .mat-rownum');
+    if (td) td.textContent = String(i + 1);
+  });
+}
+/* 表脚按最终列序重建：标签格跨到「合计」列，其后补空格（不再依赖 nth-child/累加 colspan） */
+function matRebuildFoot(t, full) {
+  var fr = t.querySelector('tfoot tr'); if (!fr) return;
+  var ti = full.indexOf('total'); if (ti < 1) ti = 1;
+  var before = ti, after = Math.max(0, full.length - ti - 1);
+  var gtv = '\u00a5 0';
+  var oldGt = fr.querySelector('.grand-total-val'); if (oldGt && oldGt.textContent) gtv = oldGt.textContent;
+  fr.innerHTML = '<td colspan="' + before + '">\u6750\u6599\u603b\u8ba1</td>'
+    + '<td class="grand-total-val" data-mcol="total">' + gtv + '</td>'
+    + (after > 0 ? '<td colspan="' + after + '"></td>' : '');
+}
+
+/* ---- v180c 插入/删除（中间插入的核心） ---- */
+function matNewId(p) { return p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+function matInsertRow(anchorKey, below) {
+  var rows = matRows(), idx = -1;
+  rows.forEach(function (tr, i) { if (tr.dataset.key === anchorKey) idx = i; });
+  var after;
+  if (below) after = anchorKey;
+  else after = (idx <= 0) ? '__top__' : (rows[idx - 1].dataset.key || '__top__');
+  matTbl.custom = (matTbl.custom || []).concat([{ id: matNewId('u'), name: '', spec: '', qty: '', price: '', after: after }]);
+  matTblSave(); render();
+}
+function matInsertCol(anchorColId, right, presetTitle) {
+  var title = presetTitle;
+  if (title == null) title = (window.prompt('\u65b0\u5217\u540d\u79f0\uff1a', '\u8bf4\u660e ' + ((matTbl.extraCols || []).length + 1)) || '').trim();
+  if (!title) return;
+  var order = matOrderedColIds(), i = order.indexOf(anchorColId), after;
+  if (right) after = anchorColId;
+  else after = (i <= 0) ? '__top__' : order[i - 1];
+  matTbl.extraCols = (matTbl.extraCols || []).concat([{ id: matNewId('x'), title: title, w: 130, after: after }]);
+  matTblSave(); render();
+}
+function matDeleteCol(cid) {
+  matTbl.extraCols = (matTbl.extraCols || []).filter(function (c) { return c.id !== cid; });
+  delete matTbl.extraCells[cid];
+  if (matTbl.edits) Object.keys(matTbl.edits).forEach(function (k) { if (k.split('|')[1] === cid) delete matTbl.edits[k]; });
+  matTblSave(); render();
+}
+function matDeleteRow(key) {
+  matTbl.custom = (matTbl.custom || []).filter(function (c) { return c.id !== key; });
+  if (matTbl.edits) Object.keys(matTbl.edits).forEach(function (k) { if (k.split('|')[0] === key) delete matTbl.edits[k]; });
+  matTblSave(); render();
+}
+
+/* ---- v180c 右键菜单（飞书/腾讯文档式：在行号上右键＝行操作，在列头上右键＝列操作） ---- */
+function matMenuClose() { var d = document.getElementById('matMenu'); if (d && d.parentNode) d.parentNode.removeChild(d); }
+function matMenu(items, x, y) {
+  matMenuClose();
+  var d = document.createElement('div');
+  d.className = 'mat-menu'; d.id = 'matMenu';
+  items.forEach(function (it) {
+    if (it.sep) { var s = document.createElement('div'); s.className = 'mat-menu-sep'; d.appendChild(s); return; }
+    var a = document.createElement('div');
+    a.className = 'mat-menu-item' + (it.disabled ? ' disabled' : '');
+    a.textContent = it.label;
+    if (!it.disabled) a.addEventListener('mousedown', function (ev) { ev.preventDefault(); ev.stopPropagation(); matMenuClose(); it.run(); });
+    d.appendChild(a);
+  });
+  document.body.appendChild(d);
+  var w = d.offsetWidth, h = d.offsetHeight;
+  d.style.left = Math.max(4, Math.min(x, window.innerWidth - w - 8)) + 'px';
+  d.style.top = Math.max(4, Math.min(y, window.innerHeight - h - 8)) + 'px';
+}
+
+/* 把 matTbl.edits 的手改值回填到「无原生 input」的格（qty 同步 dataset.qty 供合计计算） */
+function matApplyEdits() {
+  var edits = matTbl.edits; if (!edits) return;
+  var t = matTblEl(); if (!t) return;
+  var cids = matColIds();
+  matRows().forEach(function (tr) {
+    var rk = tr.dataset.key; if (!rk) return;
+    Array.prototype.slice.call(tr.children).forEach(function (td, ci) {
+      var cid = cids[ci]; if (!cid || cid === MAT_RN) return;
+      if (td.querySelector('input')) return;          /* 原生 input 格自行持久化 */
+      var key = rk + '|' + cid;
+      if (!Object.prototype.hasOwnProperty.call(edits, key)) return;
+      var v = edits[key];
+      if (cid === 'qty') tr.dataset.qty = v;
+      matPaintCell(td, v);
+    });
+  });
+}
+/* 画值到无 input 的格：保留单位角标（qty-text + unit-tag 结构） */
+function matPaintCell(td, v) {
+  var qs = td.querySelector('.qty-text');
+  if (qs) { qs.textContent = v; td.dataset.raw = v; }
+  else { td.textContent = v; td.dataset.raw = v; }
+}
+
+/* ---------- 2. 选中态 ---------- */
+function matSelRect() {
+  return {
+    r1: Math.min(matSel.r, matSel.ar), r2: Math.max(matSel.r, matSel.ar),
+    c1: Math.min(matSel.c, matSel.ac), c2: Math.max(matSel.c, matSel.ac)
+  };
+}
+function matClearSelClass() {
+  document.querySelectorAll('.materials-card td.mat-sel, .materials-card td.mat-inrange').forEach(function (td) {
+    td.classList.remove('mat-sel', 'mat-inrange');
+  });
+}
+function matSelect(r, c, extend, quiet) {
+  var cids = matColIds().filter(function (x) { return x !== MAT_RN; });
+  if (cids.length < 1) return;
+  r = Math.max(1, Math.min(r, matRows().length));
+  c = Math.max(0, Math.min(c, cids.length - 1));
+  if (!extend) { matSel.ar = r; matSel.ac = c; }
+  matSel.r = r; matSel.c = c;
+  matClearSelClass();
+  var q = matSelRect();
+  for (var rr = q.r1; rr <= q.r2; rr++) {
+    for (var cc = q.c1; cc <= q.c2; cc++) {
+      var td = matCell(cc, rr); if (!td) continue;
+      td.classList.add(rr === r && cc === c ? 'mat-sel' : 'mat-inrange');
+    }
+  }
+  var box = document.querySelector('.mat-namebox');
+  if (box) box.textContent = matAddr(c, r);
+  /* v180：焦点必须落进网格，matGridKey 的 card.contains(activeElement) 守卫才成立。
+     否则 activeElement 停在 body → 方向键/Tab/Ctrl+C 等全部被守卫挡掉（v180 首版即此 bug）。
+     quiet=true（render 后恢复选区）时不抢焦点，避免打断用户正在做的事。 */
+  if (!quiet) {
+    var act = matCell(c, r);
+    if (act) {
+      var inner = act.querySelector('input');
+      try { (inner || act).focus({ preventScroll: true }); } catch (eF) { try { (inner || act).focus(); } catch (eF2) {} }
+    }
+  }
+  matPlaceHandle();
+}
+/* ---------- 3. 填充柄 ---------- */
+function matEnsureHandle() {
+  var h = document.getElementById('matFillHandle');
+  if (h) return h;
+  h = document.createElement('div');
+  h.id = 'matFillHandle'; h.className = 'mat-fill-handle'; h.title = '拖动填充';
+  document.body.appendChild(h);
+  return h;
+}
+function matPlaceHandle() {
+  var h = document.getElementById('matFillHandle');
+  if (!h) return;
+  var q = matSelRect();
+  var td = matCell(q.c2, q.r2);
+  var t = matTblEl();
+  if (!td || !t || (q.r1 === q.r2 && q.c1 === q.c2)) { h.style.display = 'none'; return; }
+  var a = td.getBoundingClientRect(), b = t.getBoundingClientRect();
+  h.style.display = 'block';
+  h.style.left = (a.right - 4 + window.scrollX) + 'px';
+  h.style.top = (a.bottom - 4 + window.scrollY) + 'px';
+}
+
+/* ---------- 4. 编辑 ---------- */
+function matCommitCell(td, text) {
+  var tr = td.parentNode;
+  var cids = matColIds();
+  var ci = Array.prototype.indexOf.call(tr.children, td);
+  var cid = cids[ci];
+  var rk = matKey(tr, matRows().indexOf(tr));
+  var inp = td.querySelector('input');
+  if (inp) {
+    inp.value = text;
+    if (text.charAt(0) === '=') inp.dataset.formula = text; else delete inp.dataset.formula;
+    matTblSave();
+  } else {
+    if (cid === 'qty') tr.dataset.qty = text;
+    matPaintCell(td, text);
+    matTbl.edits = matTbl.edits || {};
+    var k = rk + '|' + cid;
+    if (text === '') delete matTbl.edits[k]; else matTbl.edits[k] = text;
+    matTblSave();
+  }
+  /* v180 修正：必须「先回填 edits、再求值」。反序时 matApplyEdits 会把公式原文盖在计算结果上，格内显示 =SUM(..) 而非数字。 */
+  matApplyEdits();
+  try { matApplyFormulas(); } catch (e) {}
+  try { updateMaterialTotals(); } catch (e) {}
+  try { matApplyFormulas(); } catch (e) {}
+}
+function matBeginEdit(td, initial) {
+  if (!td || matSel.editing) return;
+  var inp = td.querySelector('input');
+  if (!inp) {
+    inp = document.createElement('input');
+    inp.type = 'text'; inp.className = 'mat-cell-editor'; inp._matCreated = true;
+    var raw = (td.dataset.raw != null) ? td.dataset.raw : (td.querySelector('.qty-text') ? td.querySelector('.qty-text').textContent : td.textContent);
+    inp.value = initial != null ? initial : raw;
+    td.textContent = '';
+    td.appendChild(inp);
+    if (td.querySelector('.unit-tag')) { /* 单位已随 textContent 清掉，编辑态不显示 */ }
+  }
+  matSel.editing = true;
+  inp.classList.add('mat-editing');
+  inp.focus();
+  if (initial != null) { inp.value = initial; }
+  else inp.select();
+  matHighlightRefs(inp.value);
+  inp.addEventListener('keydown', matEditKey);
+  inp.addEventListener('input', function () { matHighlightRefs(inp.value); });
+  inp._matBlur = function () { matEndEdit(inp, true); };
+  inp.addEventListener('blur', inp._matBlur);
+}
+function matEndEdit(inp, commit) {
+  if (!inp) { matSel.editing = false; return; }
+  var td = inp.closest('td');
+  var val = inp.value;
+  /* 先摘掉自建编辑器再提交：否则 matPaintCell 写 textContent 时，输入框仍挂在 td 里，文本会被顶掉 */
+  if (inp._matCreated) {
+    inp.removeEventListener('blur', inp._matBlur);
+    if (inp.parentNode) inp.parentNode.removeChild(inp);
+  } else {
+    inp.classList.remove('mat-editing');
+  }
+  /* _matDone 只用于去重（Enter 之后的 blur 不再重复提交），不参与是否提交的判断 */
+  if (commit && !inp._matDone && td) matCommitCell(td, val);
+  inp._matDone = true;
+  matHighlightRefs(null);
+  matSel.editing = false;
+}
+function matCancelEdit() {
+  var inp = document.querySelector('.mat-cell-editor');
+  if (!inp) { matSel.editing = false; return; }
+  var td = inp.closest('td');
+  inp._matDone = true;
+  inp.removeEventListener('blur', inp._matBlur);
+  if (td && !td.querySelector('input:not(.mat-cell-editor)')) matApplyEdits();
+  if (inp.parentNode) inp.parentNode.removeChild(inp);
+  if (td) matApplyEdits();
+  matSel.editing = false;
+  matHighlightRefs(null);
+}
+
+/* ---------- 5. 公式引用高亮 ---------- */
+function matHighlightRefs(expr) {
+  document.querySelectorAll('.materials-card td.mat-ref, .materials-card td.mat-refsrc').forEach(function (td) {
+    td.classList.remove('mat-ref', 'mat-refsrc');
+  });
+  if (!expr || expr.charAt(0) !== '=') return;
+  var tds = Array.prototype.slice.call(document.querySelectorAll('.materials-card tbody td'));
+  var self = null;
+  expr.replace(/([A-Z]+)(\d+):([A-Z]+)(\d+)/g, function (m, c1, r1, c2, r2) {
+    var a = matColLetterIndex(c1), b = matColLetterIndex(c2);
+    for (var cc = Math.min(a, b); cc <= Math.max(a, b); cc++)
+      for (var rr = Math.min(+r1, +r2); rr <= Math.max(+r1, +r2); rr++) { var x = matCell(cc, rr); if (x) x.classList.add('mat-ref'); }
+    return m;
+  });
+  expr.replace(/([A-Z]+\d+)/g, function (m) {
+    if (m.indexOf(':') >= 0) return m;
+    var mm = m.match(/^([A-Z]+)(\d+)$/); if (!mm) return m;
+    var x = matCell(matColLetterIndex(mm[1]), +mm[2]);
+    if (x) { x.classList.add('mat-ref'); self = x; }
+    return m;
+  });
+}
+
+/* ---------- 6. 写值（粘贴/填充/键入共用） ---------- */
+function matWriteAt(dcol, row, text) {
+  var td = matCell(dcol, row); if (!td) return;
+  matCommitCell(td, text);
+  matPaintCell(td, text);
+}
+
+/* ---------- 7. 复制 / 剪切 / 粘贴 ---------- */
+function matBuildClip() {
+  var q = matSelRect(), rows = [];
+  for (var r = q.r1; r <= q.r2; r++) {
+    var line = [];
+    for (var c = q.c1; c <= q.c2; c++) {
+      var td = matCell(c, r);
+      var v = '';
+      if (td) { var i2 = td.querySelector('input'); v = i2 ? i2.value : ((td.dataset.raw != null) ? td.dataset.raw : td.textContent); }
+      line.push(v);
+    }
+    rows.push(line);
+  }
+  return rows;
+}
+function matClipText(rows) {
+  return rows.map(function (l) { return l.join('\t'); }).join('\n');
+}
+function matCopy(cut) {
+  var rows = matBuildClip();
+  matClip = { rows: rows, cut: !!cut };
+  var txt = matClipText(rows);
+  try { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt); } catch (e) {}
+  var ta = document.createElement('textarea');
+  ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); } catch (e) {}
+  document.body.removeChild(ta);
+  if (cut) { for (var r = matSelRect().r1; r <= matSelRect().r2; r++) for (var c = matSelRect().c1; c <= matSelRect().c2; c++) matWriteAt(c, r, ''); }
+  matFlash('已' + (cut ? '剪切' : '复制') + ' ' + rows.length + '×' + rows[0].length);
+}
+function matPaste(text) {
+  if (text == null) text = (matClip ? matClipText(matClip.rows) : '');
+  if (!text) return;
+  var rows = String(text).replace(/\r/g, '').replace(/\n$/, '').split('\n').map(function (l) { return l.split('\t'); });
+  var q = matSelRect();
+  for (var i = 0; i < rows.length; i++)
+    for (var j = 0; j < rows[i].length; j++) matWriteAt(q.c1 + j, q.r1 + i, rows[i][j]);
+  if (matClip && matClip.cut) matClip = null;
+  matFlash('已粘贴 ' + rows.length + ' 行');
+}
+/* ---------- 8. 填充柄拖拽 ---------- */
+function matFillApply(srcR1, srcC1, srcR2, srcC2, dstR2, dstC2) {
+  var srcH = srcR2 - srcR1 + 1, srcW = srcC2 - srcC1 + 1;
+  for (var r = srcR1; r <= dstR2; r++)
+    for (var c = srcC1; c <= dstC2; c++) {
+      if (r >= srcR1 && r <= srcR2 && c >= srcC1 && c <= srcC2) continue;
+      var sr = srcR1 + ((r - srcR1) % srcH), sc = srcC1 + ((c - srcC1) % srcW);
+      var td = matCell(sc, sr); if (!td) continue;
+      var i2 = td.querySelector('input');
+      matWriteAt(c, r, i2 ? i2.value : ((td.dataset.raw != null) ? td.dataset.raw : td.textContent));
+    }
+}
+function matCellFromPoint(x, y) {
+  var el = document.elementFromPoint(x, y);
+  var td = el ? el.closest('.materials-card tbody td') : null;
+  if (!td) return null;
+  var tr = td.parentNode, cids = matColIds();
+  var ci = Array.prototype.indexOf.call(tr.children, td);
+  var cid = cids[ci]; if (!cid || cid === MAT_RN) return null;
+  return { c: ci - MAT_ADDR_OFF, r: matRows().indexOf(tr) + 1 };
+}
+
+/* ---------- 9. 事件绑定（一次） ---------- */
+function matBindGrid() {
+  /* v180c 修正：监听器绝不能挂 .materials-card 本体 —— render() 会把 detailsSection.innerHTML
+     整体重写，该元素被重建，旧引用沦为游离节点：此后点单元格选不中、右键菜单打不开、双击不进编辑
+     （全部静默失效、无报错）。统一挂 document + closest('.materials-card') 守卫。 */
+  function matInCard(e) { return !!(e.target && e.target.closest && e.target.closest('.materials-card')); }
+  document.addEventListener('mousedown', function (e) {
+    if (e.target.id === 'matFillHandle') {
+      var q0 = matSelRect();
+      matFill = { r1: q0.r1, c1: q0.c1, r2: q0.r2, c2: q0.c2 };
+      e.preventDefault();
+      return;
+    }
+    if (!matInCard(e)) return;
+    var td = e.target.closest ? e.target.closest('tbody td') : null;
+    if (!td) return;
+    if (td.classList.contains('mat-rownum')) { var q = matSelRect(); matSelect(q.r1, q.c1, false); return; }
+    var ci = Array.prototype.indexOf.call(td.parentNode.children, td);
+    var dcol = ci - MAT_ADDR_OFF; if (dcol < 0) return;
+    var r = matRows().indexOf(td.parentNode) + 1;
+    var ext = e.shiftKey;
+    matSelect(r, dcol, ext);
+  });
+  document.addEventListener('dblclick', function (e) {
+    if (!matInCard(e)) return;
+    var td = e.target.closest ? e.target.closest('tbody td') : null;
+    if (!td || td.classList.contains('mat-rownum')) return;
+    var ci = Array.prototype.indexOf.call(td.parentNode.children, td);
+    matBeginEdit(td, null);
+  });
+  document.addEventListener('mousemove', function (e) {
+    if (!matFill) return;
+    var p = matCellFromPoint(e.clientX, e.clientY); if (!p) return;
+    if (p.r !== matSel.r || p.c !== matSel.c) { matSel.r = p.r; matSel.c = p.c; matSelect(p.r, p.c, true); }
+  });
+  document.addEventListener('mouseup', function () {
+    if (!matFill) return;
+    var f = matFill; matFill = null;
+    var q = matSelRect();
+    if (q.r2 > f.r2 || q.c2 > f.c2) matFillApply(f.r1, f.c1, f.r2, f.c2, q.r2, q.c2);
+  });
+  document.addEventListener('keydown', matGridKey, true);
+  window.addEventListener('resize', matPlaceHandle);
+  window.addEventListener('scroll', matPlaceHandle, true);
+  /* v180c：右键菜单 —— 行号右键＝行操作；列头右键＝列操作（对应在线表格的中间插入） */
+  document.addEventListener('contextmenu', function (e) {
+    if (!matInCard(e)) return;
+    var th = e.target.closest ? e.target.closest('thead th') : null;
+    if (th) {
+      var cid = th.getAttribute('data-mcol');
+      if (cid === MAT_RN) { e.preventDefault(); return; }
+      e.preventDefault();
+      var isExtra = (matTbl.extraCols || []).some(function (c) { return c.id === cid; });
+      matMenu([
+        { label: '\u5728\u5de6\u4fa7\u63d2\u5165\u5217', run: function () { matInsertCol(cid, false); } },
+        { label: '\u5728\u53f3\u4fa7\u63d2\u5165\u5217', run: function () { matInsertCol(cid, true); } },
+        { sep: true },
+        { label: '\u5220\u9664\u672c\u5217', disabled: !isExtra, run: function () { matDeleteCol(cid); } }
+      ], e.clientX, e.clientY);
+      return;
+    }
+    var rn = e.target.closest ? e.target.closest('tbody td.mat-rownum') : null;
+    if (rn) {
+      e.preventDefault();
+      var key = rn.parentNode.dataset.key;
+      var isCustom = (matTbl.custom || []).some(function (c) { return c.id === key; });
+      matMenu([
+        { label: '\u5728\u4e0a\u65b9\u63d2\u5165\u884c', run: function () { matInsertRow(key, false); } },
+        { label: '\u5728\u4e0b\u65b9\u63d2\u5165\u884c', run: function () { matInsertRow(key, true); } },
+        { sep: true },
+        { label: '\u5220\u9664\u672c\u884c', disabled: !isCustom, run: function () { matDeleteRow(key); } }
+      ], e.clientX, e.clientY);
+    }
+  });
+  document.addEventListener('mousedown', function (e) {
+    if (!e.target.closest || !e.target.closest('#matMenu')) matMenuClose();
+  });
+}
+function matEditKey(e) {
+  /* ⚠ 不要再在此提前置 _matDone：那会让 matEndEdit 内部的去重判断跳过提交（v180 首版即此 bug，Enter 提交静默失效） */
+  if (e.key === 'Enter') { e.preventDefault(); matEndEdit(e.target, true); matMove(0, e.shiftKey ? -1 : 1); }
+  else if (e.key === 'Tab') { e.preventDefault(); matEndEdit(e.target, true); matMove(0, e.shiftKey ? -1 : 1); }
+  else if (e.key === 'Escape') { e.preventDefault(); matCancelEdit(); }
+  e.stopPropagation();
+}
+function matMove(dr, dc) {
+  matSelect(matSel.r + dr, matSel.c + dc, false);
+}
+function matGridKey(e) {
+  var card = document.querySelector('.materials-card');
+  var ae = document.activeElement;
+  if (card && !card.contains(ae)) return;
+  if (ae && ae.classList && ae.classList.contains('mat-cell-editor')) return;   /* 编辑中交给 matEditKey */
+  var nav = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+  if (nav[e.key]) { e.preventDefault(); matMove(nav[e.key][0], nav[e.key][1]); return; }
+  if (e.key === 'Tab') { e.preventDefault(); matMove(0, e.shiftKey ? -1 : 1); return; }
+  if (e.key === 'Enter' || e.key === 'F2') {
+    e.preventDefault();
+    var td = matCell(matSel.c, matSel.r); if (td) matBeginEdit(td, null);
+    return;
+  }
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    e.preventDefault();
+    var q = matSelRect();
+    for (var r = q.r1; r <= q.r2; r++) for (var c = q.c1; c <= q.c2; c++) matWriteAt(c, r, '');
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C')) { e.preventDefault(); matCopy(false); return; }
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'x' || e.key === 'X')) { e.preventDefault(); matCopy(true); return; }
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')) {
+    e.preventDefault();
+    if (navigator.clipboard && navigator.clipboard.readText) {
+      navigator.clipboard.readText().then(function (t) { matPaste(t); }).catch(function () { matPaste(null); });
+    } else matPaste(null);
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D')) {
+    e.preventDefault();
+    var q2 = matSelRect();
+    var snap = [];
+    for (var rr = q2.r1; rr <= q2.r2; rr++) { var line = []; for (var cc = q2.c1; cc <= q2.c2; cc++) { var x = matCell(cc, rr); var iv = x && x.querySelector('input'); line.push(iv ? iv.value : (x ? ((x.dataset.raw != null) ? x.dataset.raw : x.textContent) : '')); } snap.push(line); }
+    for (var i = 0; i < snap.length; i++) for (var j = 0; j < snap[i].length; j++) matWriteAt(q2.c1 + j, q2.r2 + 1 + i, snap[i][j]);
+    return;
+  }
+  /* 直接键入即进入编辑（覆盖原值）—— 电子表核心手感 */
+  if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key.length === 1) {
+    var td2 = matCell(matSel.c, matSel.r);
+    if (td2) { e.preventDefault(); matBeginEdit(td2, e.key); }
+  }
+}
+function matFlash(msg) {
+  var el = document.getElementById('matFlash'); if (!el) return;
+  el.textContent = msg; el.style.opacity = '1';
+  clearTimeout(el._t);
+  el._t = setTimeout(function () { el.style.opacity = '0'; }, 1400);
+}
+
 function matBuildCellMap() {
   var tbl = document.querySelector('.materials-card table');
   if (!tbl) return null;
@@ -8058,21 +8709,30 @@ function matBuildCellMap() {
   rows.forEach(function (tr, ri) {
     var r = ri + 1;
     Array.prototype.slice.call(tr.children).forEach(function (td, ci) {
-      var cid = colIds[ci]; if (!cid) return;
-      var key = matColLetter(ci) + r;
+      var cid = colIds[ci]; if (!cid || cid === MAT_RN) return;
+      /* v180：行号槽列（MAT_RN）是纯 UI，不参与 A1 地址空间；数据列 dcol 从 0 起 */
+      var dcol = ci - MAT_ADDR_OFF; if (dcol < 0) return;
+      var key = matColLetter(dcol) + r;
       var inp = td.querySelector('input');
       var raw;
       if (inp) { raw = (inp.dataset.formula && inp.value.charAt(0) !== '=') ? inp.dataset.formula : inp.value; }
-      else { raw = td.textContent || ''; }
-      map.cells[key] = { raw: raw, el: inp || td, colId: cid, row: r, col: ci, letter: matColLetter(ci) };
+      else { raw = (td.dataset.raw != null) ? td.dataset.raw : (td.textContent || ''); }
+      map.cells[key] = { raw: raw, el: inp || td, colId: cid, row: r, col: dcol, letter: matColLetter(dcol) };
     });
   });
   return map;
 }
 function matSetFormulaCell(c, display, isErr) {
-  if (!c.el || c.el.tagName !== 'INPUT') return;
-  c.el.dataset.formula = c.raw;
-  if (document.activeElement !== c.el) c.el.value = display;
+  if (!c.el) return;
+  if (c.el.tagName === 'INPUT') {
+    c.el.dataset.formula = c.raw;
+    if (document.activeElement !== c.el) c.el.value = display;
+  } else {
+    /* v180 修正：纯文本 td 也要显示求值结果（原先只处理 INPUT 直接 return，=SUM 在全表自由编辑下永不生效）。
+       注意只改可见文本、绝不回写 dataset.raw —— 那里要保留公式原文供下次 matBuildCellMap 重新求值。 */
+    var qs = c.el.querySelector('.qty-text');
+    if (qs) qs.textContent = display; else c.el.textContent = display;
+  }
   c.el.classList.toggle('mat-formula', !isErr);
   c.el.classList.toggle('mat-formula-err', !!isErr);
 }
@@ -8477,7 +9137,8 @@ function render() {
           <div class="mat-toolbar">
             <button type="button" id="matAddRow">＋ 添加行</button>
             <button type="button" id="matAddCol">＋ 添加列</button>
-            <span class="mat-tip">拖列头右缘调列宽（已修跳动）· 自定义列/行支持 =公式（如 =C2*D2、=SUM(C2:C9)）· 灰色自动行由工具生成、改参数即更新 · 备注/自定义列直接输入</span>
+            <span class="mat-namebox" id="matNameBox" title="当前单元格坐标">A1</span>
+            <span class="mat-tip">点单元格选中 · 方向键移动 · 直接键入即编辑 · Enter/Tab 提交、Esc 取消 · Delete 清空 · Ctrl+C/X/V 复制剪贴 · 拖右下角宝蓝点填充 · 在行号上右键=上/下插入行，在列头右键=左/右插入列 · 全表可编辑（手改数值会脱离水力自动算量）· =SUM(C2:C9) 公式可用</span>
           </div>
           <div class="mat-tablescroll">
           <table>
@@ -8562,6 +9223,8 @@ function render() {
   try { updateMaterialTotals(); } catch (e) { }
   try { matApplyFormulas(); } catch (e) { }
   matSyncTableWidth();
+  /* v180：铺行号槽/列标、套用用户改写、恢复选区与填充柄（tbody 刚被重建，必须最后跑） */
+  try { matDecorate(); } catch (eMatDec) { }
 }
 
 function selectBranch(n) {
@@ -9857,6 +10520,94 @@ function tlUpdatePlanBar() {
   try { if (typeof window.tlRefreshGroupStatus === 'function') window.tlRefreshGroupStatus(r); } catch (e) { }
 }
 
+function tlBuildTlNodesLayer(geo) {
+  /* v180（2026-10-02）：三级简图补画工作区插入的节点连线 + 节点圆点。
+     几何取 geo.frontPipe/mainPipes/branchPipes（与简图已落管线同源）+ 坐标变换 geo.ts；不用 AE.effPts（会叠 lens/moves 错位）。
+     返回图层 <g> 字符串；无节点/连线返回 ''。节点与连线各自独立渲染（仅加节点、无连线也显示）。 */
+  try {
+    if (!geo || !window.RyTlNodes) return '';
+    var frontPipe = geo.frontPipe, mainPipes = geo.mainPipes, branchPipes = geo.branchPipes, ts = geo.ts;
+    if (!frontPipe && !(mainPipes && mainPipes.length) && !(branchPipes && branchPipes.length)) return '';
+    if (typeof window.RyTlNodes.links !== 'function' || typeof window.RyTlNodes.nodeById !== 'function') return '';
+    var tlNL = window.RyTlNodes.links() || [];
+    function tlPipePtsOf(pid) {
+      if (pid === 'front') return frontPipe;
+      if (pid && pid.indexOf('main-') === 0) { var miN = parseInt(pid.slice(5), 10); return (miN >= 0 && miN < mainPipes.length) ? mainPipes[miN] : null; }
+      if (pid && pid.indexOf('branch-') === 0) { var biN = parseInt(pid.slice(7), 10); return (biN >= 0 && biN < branchPipes.length) ? branchPipes[biN] : null; }
+      return null;
+    }
+    function tlPolyLen(pts) { var L = 0; for (var i = 0; i + 1 < pts.length; i++) L += Math.hypot(pts[i+1].x - pts[i].x, pts[i+1].y - pts[i].y); return L; }
+    function tlPointAtM(pts, atM) { var len = tlPolyLen(pts), left = Math.max(0, Math.min(atM, len)); for (var i = 0; i + 1 < pts.length; i++) { var seg = Math.hypot(pts[i+1].x - pts[i].x, pts[i+1].y - pts[i].y); if (seg > 0 && left <= seg) { var t = left / seg; return { x: pts[i].x + (pts[i+1].x - pts[i].x) * t, y: pts[i].y + (pts[i+1].y - pts[i].y) * t }; } left -= seg; } var e = pts[pts.length-1]; return { x: e.x, y: e.y }; }
+    function tlSliceArc(pts, a, b) { if (!pts || pts.length < 2 || !(b - a > 1e-6)) return null; var out = [], tot = 0; for (var i = 0; i + 1 < pts.length && tot < b; i++) { var ax = pts[i].x, ay = pts[i].y, bx = pts[i+1].x, by = pts[i+1].y, sg = Math.hypot(bx - ax, by - ay); if (tot + sg <= a) { tot += sg; continue; } var t0 = Math.max(0, sg > 0 ? (a - tot) / sg : 0), t1 = Math.min(1, sg > 0 ? (b - tot) / sg : 1); if (!out.length) out.push({ x: ax + (bx - ax) * t0, y: ay + (by - ay) * t0 }); if (t1 >= 1) out.push({ x: bx, y: by }); else out.push({ x: ax + (bx - ax) * t1, y: ay + (by - ay) * t1 }); tot += sg; if (t1 < 1) break; } return out.length >= 2 ? out : null; }
+    function tlPosOfNode(nd) { var ep = tlPipePtsOf(nd.pid); if (!ep) return null; return tlPointAtM(ep, Math.max(0, Math.min(nd.atM, tlPolyLen(ep)))); }
+    var tlNLSvg = [];
+    tlNL.forEach(function (lk) {
+      var na = window.RyTlNodes.nodeById(lk.a), nb = window.RyTlNodes.nodeById(lk.b);
+      if (!na || !nb) return;
+      var odTxt = (lk.od != null) ? (' \u00d8' + lk.od) : '';
+      if (na.pid === nb.pid) {
+        var ep = tlPipePtsOf(na.pid); if (!ep) return;
+        var L = tlPolyLen(ep);
+        var a1 = Math.max(0, Math.min(na.atM, L)), b1 = Math.max(0, Math.min(nb.atM, L));
+        if (!(Math.abs(b1 - a1) > 1e-6)) return;
+        var sub = tlSliceArc(ep, Math.min(a1, b1), Math.max(a1, b1)); if (!sub) return;
+        var d = ''; sub.forEach(function (p, i) { var q = ts(p.x, p.y); d += (i ? 'L' : 'M') + q.x.toFixed(1) + ' ' + q.y.toFixed(1); });
+        var mp = sub[Math.floor(sub.length / 2)], mq = ts(mp.x, mp.y);
+        tlNLSvg.push('<path data-tlnodelink="' + lk.id + '" d="' + d + '" fill="none" stroke="#7c3aed" stroke-width="4" stroke-dasharray="2,4" stroke-linecap="round" opacity="0.92"/>');
+        tlNLSvg.push('<text x="' + (mq.x + 6).toFixed(1) + '" y="' + (mq.y - 6).toFixed(1) + '" font-size="9.5" font-weight="700" fill="#6d28d9" paint-order="stroke" stroke="#fff" stroke-width="2.5">' + lk.id + ' ' + Math.abs(b1 - a1).toFixed(1) + 'm' + odTxt + '</text>');
+      } else {
+        var pa = tlPosOfNode(na), pb = tlPosOfNode(nb); if (!pa || !pb) return;
+        var qa = ts(pa.x, pa.y), qb = ts(pb.x, pb.y);
+        var dc = Math.hypot(pb.x - pa.x, pb.y - pa.y); if (!(dc > 1e-6)) return;
+        tlNLSvg.push('<path data-tlnodelink="' + lk.id + '" d="M' + qa.x.toFixed(1) + ' ' + qa.y.toFixed(1) + 'L' + qb.x.toFixed(1) + ' ' + qb.y.toFixed(1) + '" fill="none" stroke="#7c3aed" stroke-width="4" stroke-dasharray="2,4" stroke-linecap="round" opacity="0.92"/>');
+        tlNLSvg.push('<text x="' + ((qa.x + qb.x) / 2 + 6).toFixed(1) + '" y="' + ((qa.y + qb.y) / 2 - 6).toFixed(1) + '" font-size="9.5" font-weight="700" fill="#6d28d9" paint-order="stroke" stroke="#fff" stroke-width="2.5">' + lk.id + ' ' + dc.toFixed(1) + 'm \u8de4\u63a5' + odTxt + '</text>');
+      }
+    });
+    var ndListAll = (window.RyTlNodes.list && window.RyTlNodes.list()) || [];
+    var tlNdSvg = [];
+    ndListAll.forEach(function (nd) {
+      var pos = tlPosOfNode(nd); if (!pos) return;
+      var q = ts(pos.x, pos.y);
+      var deg = (window.RyTlNodes.degreeOf ? window.RyTlNodes.degreeOf(nd.id) : 0);
+      var cnt = (window.RyTlNodes.fitTotal ? window.RyTlNodes.fitTotal(nd) : 0);
+      tlNdSvg.push('<circle data-tlnode="' + nd.id + '" cx="' + q.x.toFixed(1) + '" cy="' + q.y.toFixed(1) + '" r="5.5" fill="#7c3aed" stroke="#fff" stroke-width="1.4"/>');
+      if (deg > 0) tlNdSvg.push('<circle cx="' + (q.x + 6.5).toFixed(1) + '" cy="' + (q.y + 6.5).toFixed(1) + '" r="4.5" fill="#fff" stroke="#f59e0b" stroke-width="1.1"/>' + '<text x="' + (q.x + 6.5).toFixed(1) + '" y="' + (q.y + 8.8).toFixed(1) + '" font-size="6.5" font-weight="700" fill="#b45309" text-anchor="middle">' + deg + '</text>');
+      if (cnt > 0) tlNdSvg.push('<circle cx="' + (q.x + 6.5).toFixed(1) + '" cy="' + (q.y - 6.5).toFixed(1) + '" r="4.5" fill="#fff" stroke="#7c3aed" stroke-width="1.1"/>' + '<text x="' + (q.x + 6.5).toFixed(1) + '" y="' + (q.y - 4.2).toFixed(1) + '" font-size="6.5" font-weight="700" fill="#6d28d9" text-anchor="middle">' + cnt + '</text>');
+    });
+    var out = '';
+    if (tlNLSvg.length) out += '<g data-tlnodelink-layer="1">' + tlNLSvg.join('') + '</g>';
+    if (tlNdSvg.length) out += '<g data-tlnode-layer="1">' + tlNdSvg.join('') + '</g>';
+    return out;
+  } catch (e) { return ''; }
+}
+function tlRefreshTlNodesLayer() {
+  /* 订阅 RyTlNodes 变更：实时刷新三级简图（#tlDiagramContent）的节点/连线图层，无需重新「生成管线图」。 */
+  var geo = window.__tlPlanGeo; var host = document.getElementById('tlDiagramContent');
+  if (!geo || !host) return;
+  var svg = host.querySelector('svg'); if (!svg) return;
+  var old = svg.querySelectorAll('[data-tlnodelink-layer],[data-tlnode-layer]');
+  for (var i = 0; i < old.length; i++) { if (old[i].parentNode) old[i].parentNode.removeChild(old[i]); }
+  var frag = tlBuildTlNodesLayer(geo); if (!frag) return;
+  /* DOMParser 解析为 SVG 命名空间，再 importNode 进主 svg（避免 innerHTML 在 SVG 元素上的命名空间陷阱） */
+  var parsed = new DOMParser().parseFromString('<svg xmlns="http://www.w3.org/2000/svg">' + frag + '</svg>', 'image/svg+xml');
+  var psvg = parsed.documentElement;
+  /* 必须先快照再importNode：importNode 是「复制」不摘除源节点，若写成 while(psvg.firstChild) + importNode
+     则 firstChild 永不推进 → 死循环卡死页面（appendChild 是「移动」才可边遍历边摘）。 */
+  var kids = Array.prototype.slice.call(psvg ? psvg.childNodes : []);
+  for (var ki = 0; ki < kids.length; ki++) svg.appendChild(document.importNode(kids[ki], true));
+}
+/* v180b：挂「工作区改动 → 简图实时刷新」的订阅。
+   ⚠ 必须在 tl-nodes.js 加载【之后】调用：本函数定义在主脚本内，而 tl-nodes.js 在文件末尾才加载，
+   若就地 subscribe，此处 window.RyTlNodes 仍是 undefined → 静默跳过、实时刷新永远不生效
+   （v180b 首版就踩了这个坑：节点连线改半天，简图纹丝不动）。故改为具名钩子，由页面在脚本就绪后调用。 */
+function tlHookTlNodesLiveSync() {
+  if (window.__tlNodesLiveSyncHooked) return true;
+  if (!window.RyTlNodes || typeof window.RyTlNodes.subscribe !== 'function') return false;
+  window.__tlNodesLiveSyncHooked = true;
+  window.RyTlNodes.subscribe(function () { try { tlRefreshTlNodesLayer(); } catch (e) {} });
+  return true;
+}
+
 function tlAutoGenerate(options) {
   options = options || {};
   var doScroll = options.scroll !== false;
@@ -10739,58 +11490,10 @@ function tlAutoGenerate(options) {
      （与下方已落 SVG 的管线逐点同源），不用 AE.effPts（会再叠 lens/moves，导致错位）。
      只补显示层，不进 tlDiagramData / 水力 / 材料（材料已由 v168 单独统计）。整段删除即卸载。 */
   try {
-    if (window.RyTlNodes && typeof window.RyTlNodes.links === 'function' && typeof window.RyTlNodes.nodeById === 'function') {
-      var tlNL = window.RyTlNodes.links() || [];
-      if (tlNL.length) {
-        function tlPipePtsOf(pid) {
-          if (pid === 'front') return frontPipe;
-          if (pid && pid.indexOf('main-') === 0) { var miN = parseInt(pid.slice(5), 10); return (miN >= 0 && miN < mainPipes.length) ? mainPipes[miN] : null; }
-          if (pid && pid.indexOf('branch-') === 0) { var biN = parseInt(pid.slice(7), 10); return (biN >= 0 && biN < branchPipes.length) ? branchPipes[biN] : null; }
-          return null;
-        }
-        function tlPolyLen(pts) { var L = 0; for (var i = 0; i + 1 < pts.length; i++) L += Math.hypot(pts[i+1].x - pts[i].x, pts[i+1].y - pts[i].y); return L; }
-        function tlPointAtM(pts, atM) { var len = tlPolyLen(pts), left = Math.max(0, Math.min(atM, len)); for (var i = 0; i + 1 < pts.length; i++) { var seg = Math.hypot(pts[i+1].x - pts[i].x, pts[i+1].y - pts[i].y); if (seg > 0 && left <= seg) { var t = left / seg; return { x: pts[i].x + (pts[i+1].x - pts[i].x) * t, y: pts[i].y + (pts[i+1].y - pts[i].y) * t }; } left -= seg; } var e = pts[pts.length-1]; return { x: e.x, y: e.y }; }
-        function tlSliceArc(pts, a, b) { if (!pts || pts.length < 2 || !(b - a > 1e-6)) return null; var out = [], tot = 0; for (var i = 0; i + 1 < pts.length && tot < b; i++) { var ax = pts[i].x, ay = pts[i].y, bx = pts[i+1].x, by = pts[i+1].y, sg = Math.hypot(bx - ax, by - ay); if (tot + sg <= a) { tot += sg; continue; } var t0 = Math.max(0, sg > 0 ? (a - tot) / sg : 0), t1 = Math.min(1, sg > 0 ? (b - tot) / sg : 1); if (!out.length) out.push({ x: ax + (bx - ax) * t0, y: ay + (by - ay) * t0 }); if (t1 >= 1) out.push({ x: bx, y: by }); else out.push({ x: ax + (bx - ax) * t1, y: ay + (by - ay) * t1 }); tot += sg; if (t1 < 1) break; } return out.length >= 2 ? out : null; }
-        function tlPosOfNode(nd) { var ep = tlPipePtsOf(nd.pid); if (!ep) return null; return tlPointAtM(ep, Math.max(0, Math.min(nd.atM, tlPolyLen(ep)))); }
-        var tlNLSvg = [];
-        tlNL.forEach(function (lk) {
-          var na = window.RyTlNodes.nodeById(lk.a), nb = window.RyTlNodes.nodeById(lk.b);
-          if (!na || !nb) return;
-          var odTxt = (lk.od != null) ? (' \u00d8' + lk.od) : '';
-          if (na.pid === nb.pid) {
-            var ep = tlPipePtsOf(na.pid); if (!ep) return;
-            var L = tlPolyLen(ep);
-            var a1 = Math.max(0, Math.min(na.atM, L)), b1 = Math.max(0, Math.min(nb.atM, L));
-            if (!(Math.abs(b1 - a1) > 1e-6)) return;
-            var sub = tlSliceArc(ep, Math.min(a1, b1), Math.max(a1, b1)); if (!sub) return;
-            var d = ''; sub.forEach(function (p, i) { var q = ts(p.x, p.y); d += (i ? 'L' : 'M') + q.x.toFixed(1) + ' ' + q.y.toFixed(1); });
-            var mp = sub[Math.floor(sub.length / 2)], mq = ts(mp.x, mp.y);
-            tlNLSvg.push('<path data-tlnodelink="' + lk.id + '" d="' + d + '" fill="none" stroke="#7c3aed" stroke-width="4" stroke-dasharray="2,4" stroke-linecap="round" opacity="0.92"/>');
-            tlNLSvg.push('<text x="' + (mq.x + 6).toFixed(1) + '" y="' + (mq.y - 6).toFixed(1) + '" font-size="9.5" font-weight="700" fill="#6d28d9" paint-order="stroke" stroke="#fff" stroke-width="2.5">' + lk.id + ' ' + Math.abs(b1 - a1).toFixed(1) + 'm' + odTxt + '</text>');
-          } else {
-            var pa = tlPosOfNode(na), pb = tlPosOfNode(nb); if (!pa || !pb) return;
-            var qa = ts(pa.x, pa.y), qb = ts(pb.x, pb.y);
-            var dc = Math.hypot(pb.x - pa.x, pb.y - pa.y); if (!(dc > 1e-6)) return;
-            tlNLSvg.push('<path data-tlnodelink="' + lk.id + '" d="M' + qa.x.toFixed(1) + ' ' + qa.y.toFixed(1) + 'L' + qb.x.toFixed(1) + ' ' + qb.y.toFixed(1) + '" fill="none" stroke="#7c3aed" stroke-width="4" stroke-dasharray="2,4" stroke-linecap="round" opacity="0.92"/>');
-            tlNLSvg.push('<text x="' + ((qa.x + qb.x) / 2 + 6).toFixed(1) + '" y="' + ((qa.y + qb.y) / 2 - 6).toFixed(1) + '" font-size="9.5" font-weight="700" fill="#6d28d9" paint-order="stroke" stroke="#fff" stroke-width="2.5">' + lk.id + ' ' + dc.toFixed(1) + 'm \u8de4\u63a5' + odTxt + '</text>');
-          }
-        });
-        if (tlNLSvg.length) parts.push('<g data-tlnodelink-layer="1">' + tlNLSvg.join('') + '</g>');
-        /* 节点圆点（与连线同层，置于连线之上；工作区紫色圆点 + 连接度角标） */
-        var ndListAll = (window.RyTlNodes.list && window.RyTlNodes.list()) || [];
-        var tlNdSvg = [];
-        ndListAll.forEach(function (nd) {
-          var pos = tlPosOfNode(nd); if (!pos) return;
-          var q = ts(pos.x, pos.y);
-          var deg = (window.RyTlNodes.degreeOf ? window.RyTlNodes.degreeOf(nd.id) : 0);
-          var cnt = (window.RyTlNodes.fitTotal ? window.RyTlNodes.fitTotal(nd) : 0);
-          tlNdSvg.push('<circle data-tlnode="' + nd.id + '" cx="' + q.x.toFixed(1) + '" cy="' + q.y.toFixed(1) + '" r="5.5" fill="#7c3aed" stroke="#fff" stroke-width="1.4"/>');
-          if (deg > 0) tlNdSvg.push('<circle cx="' + (q.x + 6.5).toFixed(1) + '" cy="' + (q.y + 6.5).toFixed(1) + '" r="4.5" fill="#fff" stroke="#f59e0b" stroke-width="1.1"/>' + '<text x="' + (q.x + 6.5).toFixed(1) + '" y="' + (q.y + 8.8).toFixed(1) + '" font-size="6.5" font-weight="700" fill="#b45309" text-anchor="middle">' + deg + '</text>');
-          if (cnt > 0) tlNdSvg.push('<circle cx="' + (q.x + 6.5).toFixed(1) + '" cy="' + (q.y - 6.5).toFixed(1) + '" r="4.5" fill="#fff" stroke="#7c3aed" stroke-width="1.1"/>' + '<text x="' + (q.x + 6.5).toFixed(1) + '" y="' + (q.y - 4.2).toFixed(1) + '" font-size="6.5" font-weight="700" fill="#6d28d9" text-anchor="middle">' + cnt + '</text>');
-        });
-        if (tlNdSvg.length) parts.push('<g data-tlnode-layer="1">' + tlNdSvg.join('') + '</g>');
-      }
-    }
+    /* v180b（2026-10-02）：节点/连线图层抽成 tlBuildTlNodesLayer()（节点与连线各自独立渲染，
+       仅加节点、无连线也显示）。实时刷新由 tlRefreshTlNodesLayer 订阅 RyTlNodes 完成。 */
+    var tlNodeLayerSvg = tlBuildTlNodesLayer({ frontPipe: frontPipe, mainPipes: mainPipes, branchPipes: branchPipes, ts: ts });
+    if (tlNodeLayerSvg) parts.push(tlNodeLayerSvg);
   } catch (eNdLink) { }
 
   if(sourcePos){
@@ -10964,6 +11667,9 @@ function tlAutoGenerate(options) {
   try { parts.push(tlWorstPathMarkSVG(ts)); } catch (e) { }
 
   parts.push('</svg>');
+  /* v180b（2026-10-02）：缓存本次几何映射，供 tlRefreshTlNodesLayer 在 RyTlNodes 变更时
+     实时刷新三级简图的节点/连线图层（无需重新「生成管线图」）。 */
+  window.__tlPlanGeo = { frontPipe: frontPipe, mainPipes: mainPipes, branchPipes: branchPipes, ts: ts };
   var svgStr=parts.join('');
   tlDiagramSVG=svgStr;
   document.getElementById('tlDiagramContent').innerHTML=svgStr;
@@ -17264,6 +17970,8 @@ threeDModelingSection:'经济指标分析 · 入口预留（方案确定后上�
 
 <!-- ===== 三级设计工作区模块 + 页面接线（2026-09-13） ===== -->
 <script src="tl-workspace/tl-nodes.js"></script>
+<!-- v180b（2026-10-02）：tl-nodes.js 就绪后再挂简图实时刷新订阅（见 tlHookTlNodesLiveSync 注释） -->
+<script>try{if(typeof tlHookTlNodesLiveSync==="function"){tlHookTlNodesLiveSync();}}catch(e){}</script>
 <script src="tl-workspace/tl-workspace.js"></script>
 <script src="tl-workspace/tl-path-measure.js"></script>
 <!-- 2026-09-23（用户指令）v135：水力计算器「入口预留」总闸——置 true 时界面不挂载
@@ -21074,5 +21782,6 @@ var ISO_FITTING_UI_OFF = true;
 })();
 </script>
 
+<div class="mat-flash" id="matFlash"></div>
 </body>
 </html>

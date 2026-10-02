@@ -221,6 +221,13 @@
   var cutDragRaf = 0;         // 拖动提交 rAF 节流句柄
   var mode = null;            // null | 'main' | 'branch' —— 插入模式
   var fitMode = null;         // null | 'valve' | 'tee' | 'elbow' —— 配件插入模式（2026-09-18 第七十轮）
+  /* 划线模式（新增）：进入后在工作区节点圆点(N-##)上按下→拖到另一节点松手→生成连接线（自动吸附节点）；
+     不区分主管/支管/总管（连线 pid:null 平面直连 或 同管沿管）；松手后自动弹管径面板选 Ø；
+     复用 RyTlNodes.setLinkStart/completeLink/openLinkPanel，数据/渲染/工程量全复用，不进水力。 */
+  var lineMode = false;
+  var lineDrag = null;        // { fromId, pointerId, moved, sx, sy, fromScreen:{x,y} }
+  var lineRubber = null;      // 拖动中的橡皮筋线段（屏幕坐标 SVG <line>）
+  var lineRubberSvg = null;
   var orthoLock = false;      // 横竖锁定（2026-09-16）：画线新点约束与上一点水平/垂直
   var draft = null;           // {kind, pts:[{x,y}(米)]} —— 进行中的折线
   var view = { z: 1, x: 0, y: 0 };
@@ -1447,6 +1454,7 @@
   function setMode(m) {
     if (m !== 'main' && m !== 'branch') m = null;
     if (mode === m) m = null;                    // 再点同款 = 退出插入模式
+    if (lineMode && m) setLineMode(null);        // 划线模式与管插入模式互斥（抢占「点管身」）
     mode = m;
     if (mode) clearFitMode();                    // 与配件插入模式互斥（第七十轮）
     if (!mode) cancelDraft();
@@ -1468,6 +1476,7 @@
   function setFitMode(m) {
     if (m !== 'valve' && m !== 'tee' && m !== 'elbow' && m !== 'node') m = null;   /* v150：+node（节点=配件组合容器） */
     if (fitMode === m) m = null;                 // 再点同款 = 退出配件插入模式
+    if (lineMode && m) setLineMode(null);        // 划线模式与配件插入模式互斥
     fitMode = m;
     if (fitMode) {
       if (mode) { mode = null; cancelDraft(); updatePreview(); if (typeof api.onModeChange === 'function') api.onModeChange(null); }
@@ -1477,6 +1486,64 @@
     if (typeof api.onFitModeChange === 'function') api.onFitModeChange(fitMode);
     return fitMode;
   }
+  /* 划线模式（新增）：与配件插入/管插入/多选/遮蔽互斥；进入后节点吸附拖动画线。
+     吸附只用节点圆点 N-##（不吸管道）；端点必须落在已有节点（空白处不画线）；线型=两点平面直线。 */
+  function nodeScreenCenterOf(id) {
+    var c = currentCTN();
+    if (!c) return null;
+    var all = c.querySelectorAll('[data-tlnode]');
+    for (var i = 0; i < all.length; i++) {
+      if (all[i].getAttribute('data-tlnode') === id) {
+        var r = all[i].getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      }
+    }
+    return null;
+  }
+  function ensureLineRubber() {
+    if (lineRubber) return lineRubber;
+    if (typeof document === 'undefined') return null;
+    var ns = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('style', 'position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:9980;overflow:visible');
+    var ln = document.createElementNS(ns, 'line');
+    ln.setAttribute('stroke', '#7c3aed');
+    ln.setAttribute('stroke-width', '2.5');
+    ln.setAttribute('stroke-dasharray', '6 4');
+    ln.setAttribute('stroke-linecap', 'round');
+    svg.appendChild(ln);
+    document.body.appendChild(svg);
+    lineRubber = ln; lineRubberSvg = svg;
+    return ln;
+  }
+  function hideLineRubber() { if (lineRubberSvg) lineRubberSvg.style.display = 'none'; }
+  function setLineMode(v) {
+    v = !!v;
+    if (v) {
+      /* 进入前退出其它会抢「点管身」的模式（它们内部不再回头清 lineMode：lineMode 在最后才置 true，避免递归） */
+      if (mode) { mode = null; cancelDraft(); updatePreview(); if (typeof api.onModeChange === 'function') api.onModeChange(null); }
+      if (fitMode) setFitMode(null);
+      if (multiMode) setMultiMode(false);
+      if (maskMode) setMaskMode(false);
+      if (window.RyTlPathMeasure && typeof window.RyTlPathMeasure.toggle === 'function') {
+        var pbtn = (typeof document !== 'undefined') ? document.getElementById('tlPathBtn') : null;
+        if (pbtn && pbtn.getAttribute('aria-pressed') === 'true') window.RyTlPathMeasure.toggle();
+      }
+      lineMode = true;
+    } else {
+      lineMode = false;
+      hideLineRubber();
+    }
+    var btn = (typeof document !== 'undefined') ? document.getElementById('tlLineBtn') : null;
+    if (btn) { btn.setAttribute('aria-pressed', lineMode ? 'true' : 'false'); btn.classList.toggle('active', lineMode); }
+    var hint = (typeof document !== 'undefined') ? document.getElementById('tlWsHint') : null;
+    if (hint) hint.textContent = lineMode
+      ? '划线：在节点圆点(N-##)上按住，拖到另一节点松手（自动吸附）；松手后选管径'
+      : '点「阀门/三通/弯头/节点」后再点管线即插入配件';
+    if (typeof api.onLineModeChange === 'function') api.onLineModeChange(lineMode);
+    return lineMode;
+  }
+  function toggleLineMode() { return setLineMode(!lineMode); }
   function notifyChange() {
     if (typeof api.onManualChange === 'function') api.onManualChange(EP.count());
   }
@@ -2070,6 +2137,26 @@
       /* 配件插入模式（2026-09-18 第七十轮）：工具轨已选好类型 → 点管线即在点击处插入。
          必须排在配件拖动/管身拖动/平移之前，否则点管身会被它们截走；
          点空白不退出模式（便于连续布点），退出靠再点按钮或 Esc。 */
+      /* 划线模式（新增）：在节点圆点上按下→进入画线拖动（吸附起点）；未按在节点上则放行（可平移/点连线） */
+      if (e.button === 0 && lineMode && viewState && viewState.base && lastDataRef) {
+        var rawLL = rawDataPoint(el, e);
+        var nhLL = rawLL ? pickNode(rawLL, snapTolUnits(el) / viewState.k) : null;
+        if (nhLL) {
+          var scLL = nodeScreenCenterOf(nhLL.id) || { x: e.clientX, y: e.clientY };
+          lineDrag = { fromId: nhLL.id, pointerId: e.pointerId, moved: false, sx: e.clientX, sy: e.clientY, fromScreen: scLL };
+          suppressAutoPick = true;
+          var rbLL = ensureLineRubber();
+          if (rbLL) {
+            lineRubberSvg.style.display = 'block';
+            rbLL.setAttribute('x1', scLL.x); rbLL.setAttribute('y1', scLL.y);
+            rbLL.setAttribute('x2', scLL.x); rbLL.setAttribute('y2', scLL.y);
+          }
+          if (ctn.setPointerCapture) { try { ctn.setPointerCapture(e.pointerId); } catch (errLL) {} }
+          e.preventDefault();
+          return;
+        }
+        /* 未按在节点上：不拦截（允许平移 / 点连线弹面板） */
+      }
       if (e.button === 0 && fitMode && !mode && viewState && viewState.base && lastDataRef) {
         /* v156（2026-09-29 用户报「之前连接线可以选择管径的，怎么没有了」）：
            点连线命中带 → 弹连线面板（选管径），必须排在配件插入之前。
@@ -2259,6 +2346,21 @@
       }
     });
     ctn.addEventListener('pointermove', function (e) {
+      if (lineDrag && e.pointerId === lineDrag.pointerId) {       // 划线拖动：橡皮筋跟随，终点吸附到最近节点
+        lineDrag.moved = true;
+        lineDrag.sx = e.clientX; lineDrag.sy = e.clientY;
+        var elLM = currentEL(ctn);
+        var rawLM = elLM ? rawDataPoint(elLM, e) : null;
+        var tLM = rawLM ? pickNode(rawLM, snapTolUnits(elLM) / viewState.k) : null;
+        var rbLM = ensureLineRubber();
+        if (rbLM) {
+          var fromC = lineDrag.fromScreen || { x: e.clientX, y: e.clientY };
+          var toC = tLM ? (nodeScreenCenterOf(tLM.id) || { x: e.clientX, y: e.clientY }) : { x: e.clientX, y: e.clientY };
+          rbLM.setAttribute('x1', fromC.x); rbLM.setAttribute('y1', fromC.y);
+          rbLM.setAttribute('x2', toC.x); rbLM.setAttribute('y2', toC.y);
+        }
+        return;
+      }
       if (cutDrag && e.pointerId === cutDrag.pointerId) {         // v98d：拖组边界线 → 写回共享分区线 + 三级实时重绘
         var elCd = currentEL(ctn);
         if (elCd && typeof window !== 'undefined' && window.RunyeBridge && typeof window.RunyeBridge.cutDragTo === 'function') {
@@ -2392,6 +2494,24 @@
       }
     });
     function up(e) {
+      if (lineDrag && (e.pointerId === undefined || e.pointerId === lineDrag.pointerId)) {  // 划线：松手=终点吸附→建连→弹管径面板
+        var ld = lineDrag; lineDrag = null;
+        hideLineRubber();
+        var elLU = currentEL(ctn);
+        var rawLU = elLU ? rawDataPoint(elLU, e) : null;
+        var tLU = rawLU ? pickNode(rawLU, snapTolUnits(elLU) / viewState.k) : null;
+        if (tLU && tLU.id !== ld.fromId && window.RyTlNodes && typeof window.RyTlNodes.completeLink === 'function') {
+          window.RyTlNodes.setLinkStart(ld.fromId);
+          var lk = window.RyTlNodes.completeLink(tLU.id);
+          if (lk && typeof window.RyTlNodes.openLinkPanel === 'function') {
+            window.RyTlNodes.openLinkPanel(lk.id, e.clientX, e.clientY);   // 画完选直径
+          } else if (typeof window.RyTlNodes.setLinkStart === 'function') {
+            window.RyTlNodes.setLinkStart(null);                          // 重复连线等：清起点
+          }
+        }
+        e.preventDefault();
+        return;
+      }
       if (cutDrag && (e.pointerId === undefined || e.pointerId === cutDrag.pointerId)) {   // v98d：组边界线拖动结算
         if (cutDragRaf) { cancelAnimationFrame(cutDragRaf); cutDragRaf = 0; }
         var wasStep = !!cutDrag.step;
@@ -2517,6 +2637,7 @@
         if (draft) cancelDraft();
         else if (mode) { mode = null; updatePreview(); if (typeof api.onModeChange === 'function') api.onModeChange(null); }
         else if (fitMode) setFitMode(null);      // Esc 退出配件插入模式（第七十轮）
+        else if (lineMode) setLineMode(null);    // Esc 退出划线模式（新增）
         else if (maskMode) setMaskMode(false);   // Esc 退出遮蔽模式（v162）
         e.preventDefault();
       }
@@ -2831,6 +2952,9 @@
   };
   api.zoomIn = zoomIn; api.zoomOut = zoomOut; api.zoomFit = zoomFit;
   api.setMode = setMode;
+  api.setLineMode = setLineMode;
+  api.toggleLineMode = toggleLineMode;
+  api.isLineMode = function () { return lineMode; };
   api.mode = function () { return mode; };
   api.setFitMode = setFitMode;                            // 配件插入模式（第七十轮）：'valve'|'tee'|'elbow'|null
   api.fitMode = function () { return fitMode; };
@@ -2892,6 +3016,7 @@
      关闭 = 清空多选集合并回到单选。第三十九轮的「Ctrl/⌘ + 点」捷径同时修好（现在真实鼠标也走通）。 */
   function setMultiMode(on) {
     on = !!on;
+    if (lineMode && on) setLineMode(null);       // 划线模式与多选互斥
     if (multiMode === on) return multiMode;
     multiMode = on;
     if (on) {
@@ -2923,6 +3048,7 @@
    * 与画线 / 配件插入 / 多选三个模式互斥（都要抢「点管身」这一下）。 */
   function setMaskMode(on) {
     on = !!on;
+    if (lineMode && on) setLineMode(null);       // 划线模式与遮蔽互斥
     if (maskMode === on) return maskMode;
     maskMode = on;
     if (on) {
