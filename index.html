@@ -1468,6 +1468,11 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
 .pp-btn-generate:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(22,163,74,.4)}
 .pp-check-label{display:flex;align-items:center;gap:4px;font-size:12px;color:rgba(255,255,255,.75);cursor:pointer;white-space:nowrap}
 .pp-check-label input{accent-color:#16a34a;margin:0;width:14px;height:14px}
+/* [v185 2026-10-03] 地块划分开关：关闭（body.ry-zoneauto-off）时隐藏施工简图里的分区层。
+   与三级 ry-worst-off 同一范式 —— 分区照常计算与渲染，只由 CSS 门控显隐，
+   这样「关开关」永远不会改变面积/水力/材料任何计算结果。 */
+body.ry-zoneauto-off #ppDiagramContent .pp-zone-layer{display:none}
+body.ry-zoneauto-off #ppDiagramContent .pp-zone-label{display:none}
 .pp-select-sm{padding:5px 8px;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:rgba(0,0,0,.25);color:rgba(255,255,255,.8);font-size:12px;font-family:inherit;cursor:pointer;outline:none}
 .pp-select-sm:focus{border-color:#16a34a}
 .pp-canvas-wrap{
@@ -5985,6 +5990,18 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     <button class="pp-btn" data-mode="valve" style="display:none">阀门</button>
     <button class="pp-btn" data-mode="maskPipe" style="display:none">遮蔽管线</button>
     <button class="pp-btn" data-mode="adjustCut" title="拖动分区线调整分区；把一条线拖到相邻线上松手即可合并分区（分区数随之减少），误操作可用「回退」撤销">调网格</button>
+    <!-- [v185 2026-10-03] 地块划分开关（用户要求）：
+         平时（大地块）传过来后自动划分并显示分区线；不需要自动划分时关掉本开关，
+         自动分区线**隐藏**，改由用户手动划分（复用上面已有的「调网格」）。
+         实现口径（与三级 ry-worst-off 同一范式）：状态只用一个 body 类
+         `ry-zoneauto-off` 表达，**分区数据照常计算、下游照常消费**，只控「显隐」。
+         这样做的好处：关掉开关只影响画面，不改变分区数/面积/水力结果 ——
+         避免「一关开关，材料统计跟着变」这种让人摸不着头脑的联动。
+         静态契约：verify_ry_tool.js 锁了本控件的存在与 id。 -->
+    <label class="pp-check-label" id="ppZoneAutoWrap" for="ppZoneAutoChk" title="开启=自动划分并把分区线画出来；关闭=隐藏自动划分的分区线，改由「调网格」手动划分。注意：关闭只影响显示，分区数/面积/水力计算不受影响。">
+      <input type="checkbox" id="ppZoneAutoChk" checked>
+      <span id="ppZoneAutoTxt">地块划分</span>
+    </label>
     <button class="pp-btn-ghost" id="ppResetCuts" title="恢复系统默认分区线位置（撤销所有拖动与合并）">重置网格</button>
     <!-- 任务K（2026-09-26）：分区面积锁定按钮。开启后拖动/微调网格线只整体平移分区，各区面积不变；合并/重置/重新分区/旋转会先自动解锁 -->
     <button class="pp-btn-ghost" id="ppLockArea" title="锁定分区面积：开启后拖动网格线只整体平移分区，不改变各区面积（如 18 亩保持 18 亩）；例外：最外侧分区线拖到地块边线可直接合并减区；合并/重置/重新分区/旋转等操作会先自动解锁">🔓 锁定面积</button>
@@ -13817,6 +13834,7 @@ ppPullLiftDh();                                              // 首屏对齐一�
     hoverCut:null,
     lastSelectedCut:null,
     areaLocked:false, // 分区面积锁定：开启后拖动/微调网格线只整体平移、各区面积不变（任务K 2026-09-26）
+    zoneAuto:true,    // [v185] 地块划分开关：true=自动划分并显示分区线；false=隐藏自动分区线（改手动，见 ppSetZoneAuto）
     history:[]
   };
 
@@ -15432,6 +15450,70 @@ ppPullLiftDh();                                              // 首屏对齐一�
       if(typeof window.ppRefreshDiagramIfVisible==='function')window.ppRefreshDiagramIfVisible();
     });
   }
+  /* ===== [v185 2026-10-03] 地块划分开关（用户要求）=====
+   * 用户诉求：拼接/大地块传到二级管路页面后默认**自动划分**；不需要自动划分时
+   *   关掉本开关即可**隐藏自动划分的分区线**，改由用户**手动划分**（复用「调网格」）。
+   *
+   * 口径（与三级 ry-worst-off 同一范式，务必守住）：
+   *   · 分区数据**照常计算**（calcPlan / ppGetZoneLayout / ppGetZoneCuts 一律不动），
+   *     SVG 里分区层也**照常渲染**，只用一个 body 类 ry-zoneauto-off 门控 CSS 显隐。
+   *     这样「关开关」绝不会改变分区数 / 面积 / 水力 / 材料任何结果 ——
+   *     否则用户会看到「一关开关材料表就变了」这种莫名联动。
+   *   · 关闭时自动切到「调网格」模式，把「手动划分」的入口直接递到手上（用户点开关的目的就是手动划分）。
+   *   · 状态持久化到 localStorage['runye_zone_auto']，刷新/切页后保持。
+   */
+  function ppZoneAutoOn(){ return ppState.zoneAuto !== false; }
+  function ppApplyZoneAutoUI(){
+    var on = ppZoneAutoOn();
+    if(document.body) document.body.classList.toggle('ry-zoneauto-off', !on);
+    var chk=document.getElementById('ppZoneAutoChk');
+    if(chk && chk.checked !== on) chk.checked = on;
+    var txt=document.getElementById('ppZoneAutoTxt');
+    if(txt) txt.textContent = on ? '地块划分' : '地块划分（手动）';
+    var wrap=document.getElementById('ppZoneAutoWrap');
+    if(wrap) wrap.title = on
+      ? '开启=自动划分并把分区线画出来；关闭=隐藏自动划分的分区线，改由「调网格」手动划分。注意：关闭只影响显示，分区数/面积/水力计算不受影响。'
+      : '当前：已隐藏自动划分的分区线，请用「调网格」手动划分。重新勾选可恢复自动划分显示。';
+  }
+  function ppSetZoneAuto(on){
+    on = !!on;
+    ppState.zoneAuto = on;
+    try{ localStorage.setItem('runye_zone_auto', on ? '1' : '0'); }catch(e){}
+    ppApplyZoneAutoUI();
+    /* 关闭时把「手动划分」入口递到手上：切到调网格模式（分区数据不变，只是可拖动分区线）。
+       开启时若正处在调网格模式则退回浏览态 —— 自动划分已恢复，不需要再拖线。 */
+    try{
+      if(!on){
+        ppState.mode='adjustCut';
+        document.querySelectorAll('#ppToolbar .pp-btn[data-mode]').forEach(function(b){
+          b.classList.toggle('active', b.getAttribute('data-mode')==='adjustCut');
+        });
+        ppRender();
+      } else if(ppState.mode==='adjustCut'){
+        ppState.mode='main';
+        document.querySelectorAll('#ppToolbar .pp-btn[data-mode]').forEach(function(b){
+          b.classList.toggle('active', b.getAttribute('data-mode')==='main');
+        });
+        ppRender();
+      }
+    }catch(e){}
+  }
+  // 初始态：读存档；首次（无存档）默认开 = 自动划分，与现状一致（向后兼容，老流程零变化）
+  (function ppInitZoneAuto(){
+    try{
+      var s=localStorage.getItem('runye_zone_auto');
+      ppState.zoneAuto = (s===null) ? true : (s!=='0');
+    }catch(e){ ppState.zoneAuto = true; }
+    ppApplyZoneAutoUI();
+    var chk=document.getElementById('ppZoneAutoChk');
+    if(chk){
+      if(chk.checked !== ppZoneAutoOn()) chk.checked = ppZoneAutoOn();
+      chk.addEventListener('change',function(){ ppSetZoneAuto(chk.checked); });
+    }
+    window.ppSetZoneAuto=ppSetZoneAuto;
+    window.ppZoneAutoOn=ppZoneAutoOn;
+  })();
+
   var ppLockAreaBtn=document.getElementById('ppLockArea');
   if(ppLockAreaBtn){
     ppLockAreaBtn.addEventListener('click',function(){
@@ -15640,7 +15722,7 @@ ppPullLiftDh();                                              // 首屏对齐一�
     var zoneCols=['rgba(191,88,88,.30)','rgba(214,162,73,.30)','rgba(75,173,111,.30)','rgba(84,127,196,.30)'];
     var zoneStrokes=['rgba(51,65,85,.28)','rgba(51,65,85,.28)','rgba(51,65,85,.28)','rgba(51,65,85,.28)'];
     var labelParts=[];
-    parts.push('<g clip-path="url(#ppPlotClip)">');
+    parts.push('<g clip-path="url(#ppPlotClip)" class="pp-zone-layer">');
     for(var zr=0;zr<zoneCuts.rows;zr++){
       for(var zc=0;zc<zoneCuts.cols;zc++){
         var zi=zr*zoneCuts.cols+zc;
@@ -15702,9 +15784,9 @@ ppPullLiftDh();                                              // 首屏对齐一�
         }
       }
     }
-    parts.push(labelParts.join(''));
+    parts.push('<g class="pp-zone-label">'+labelParts.join('')+'</g>');
 
-    parts.push('<g fill="none" stroke="#334155" stroke-width="1" stroke-dasharray="7,5" opacity="0.48">');
+    parts.push('<g class="pp-zone-label" fill="none" stroke="#334155" stroke-width="1" stroke-dasharray="7,5" opacity="0.48">');
     for(var bz=0;bz<zoneCuts.xPos.length;bz++){
       var bv1=ts(zoneCuts.xPos[bz],b.minY),bv2=ts(zoneCuts.xPos[bz],b.minY+b.h);
       parts.push('<line x1="'+bv1.x.toFixed(1)+'" y1="'+bv1.y.toFixed(1)+'" x2="'+bv2.x.toFixed(1)+'" y2="'+bv2.y.toFixed(1)+'"/>');
@@ -17504,6 +17586,29 @@ bindUI();
         window.measuredPolygon = [];
         window.__runyeMapFramePoly = null;
       }
+
+      /* [v185 2026-10-03] 拼接地块：把子地块环一并换算成本地米坐标存到全局。
+         子地块之间可能有道路/田埂隔开 —— 二级页需要各自的原环才能「分别布管」，
+         所以这里必须换算并保留，而不是只留下一个外轮廓。
+         换算口径与主地块严格一致（同 clat / 同首点经度原点），保证两者叠得上。 */
+      try{
+        if(d.merged && Array.isArray(d.subPlots) && d.subPlots.length && window.__runyeGeoBase){
+          var _b=window.__runyeGeoBase, _mlat=6378137*Math.PI/180, _cos=Math.cos(_b.refLat*Math.PI/180);
+          window.__runyeSubPlots = d.subPlots.map(function(s){
+            var ll=s.polyLatLng||[];
+            return {
+              id:s.id, name:s.name, mu:s.mu, sqm:s.sqm, crop:s.crop,
+              polyLatLng: ll.map(function(q){return [+q[0],+q[1]];}),
+              center: s.center || null,
+              poly: ll.map(function(q){
+                return { x:+((q[1]-_b.refLng)*_mlat*_cos).toFixed(2), y:+((q[0]-_b.refLat)*_mlat).toFixed(2) };
+              })
+            };
+          });
+        } else {
+          window.__runyeSubPlots = null;
+        }
+      }catch(eSub){ window.__runyeSubPlots=null; }
 
       if(typeof updatePlan === 'function') updatePlan();
       // 落库 + 桥接地块中心：地图实测回传的地块持久化到 runye_plot_library，并写回 runye_db_v1(地块中心)

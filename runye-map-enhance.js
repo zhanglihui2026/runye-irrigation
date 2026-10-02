@@ -55,7 +55,20 @@
       '.rym-layer-panel input{margin-right:5px;vertical-align:-1px}' +
       '.ry-field-mode #map path{stroke-width:3.5px !important}' +
       '.ry-field-mode .leaflet-popup-content{font-size:14px;font-weight:600}' +
-      '.ry-field-mode .rym-layer-panel{background:#fff8e1;border:2px solid #f59e0b}';
+      '.ry-field-mode .rym-layer-panel{background:#fff8e1;border:2px solid #f59e0b}' +
+      /* [v185] 拼接多选：选中地块加粗描边（Leaflet 图层级样式已另设，此处补一条 CSS 兜底） */
+      '.rym-sel-badge{position:absolute;z-index:1000;background:#7c3aed;color:#fff;' +
+      'font:11px/1.4 system-ui,sans-serif;padding:2px 6px;border-radius:9px;white-space:nowrap;' +
+      'box-shadow:0 1px 3px rgba(0,0,0,.3);pointer-events:none}' +
+      '.rym-merge-bar{position:absolute;left:50%;transform:translateX(-50%);bottom:16px;z-index:1200;' +
+      'background:#fff;border:1px solid #cbd5e1;box-shadow:0 2px 10px rgba(0,0,0,.18);padding:7px 12px;' +
+      'font:12px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif;color:#334155;border-radius:6px;' +
+      'display:flex;align-items:center;gap:9px}' +
+      '.rym-merge-bar b{color:#7c3aed}' +
+      '.rym-merge-bar button{font:12px/1.4 inherit;padding:3px 11px;border-radius:4px;' +
+      'border:1px solid #cbd5e1;background:#f8fafc;cursor:pointer}' +
+      '.rym-merge-bar button.rym-mb-go{background:#7c3aed;border-color:#7c3aed;color:#fff;font-weight:600}' +
+      '.rym-merge-bar button.rym-mb-go:disabled{background:#c4b5fd;border-color:#c4b5fd;cursor:not-allowed}';
     document.head.appendChild(css);
   }
 
@@ -70,11 +83,40 @@
         networkGroup: L.layerGroup().addTo(map),
         dripGroup: L.layerGroup().addTo(map),
         deviceGroup: L.layerGroup().addTo(map),
-        panelEl: null
+        panelEl: null,
+        /* [v185] 拼接多选态：被选中的地块 id 集合。刷新渲染后按此重画高亮。 */
+        selected: {},
+        /* 每个地块 id → 它的 L.polygon 图层（供高亮与点击切换） */
+        plotLayers: {}
       };
+      state.mergeOpts = opts || {};
+      state.mergePick = !!(opts && opts.mergePick);
+      state.onMergeDone = (opts && typeof opts.onMergeDone === 'function') ? opts.onMergeDone : null;
       buildPanel(state, opts);
       renderPlots(state, opts);
       renderNetwork(state, opts);
+      state.toggleSelect = function (id) {
+        if (!id) return;
+        if (state.selected[id]) delete state.selected[id]; else state.selected[id] = 1;
+        applySelection(state);
+      };
+      state.getSelectedIds = function () {
+        return Object.keys(state.selected);
+      };
+      state.clearSelection = function () {
+        state.selected = {};
+        applySelection(state);
+      };
+      state.mergeSelected = function (o) {
+        return doMergeSelected(state, o);
+      };
+      /* 兜底入口：面板里没有「拼接多选」勾选框时，宿主页仍可直接翻内部态 */
+      state.mergeSetPick = function (on) {
+        state.mergePick = !!on;
+        if (!on) { try { state.clearSelection(); } catch (e) {} }
+        try { if (state.refresh) state.refresh(); } catch (e) {}
+        return state.mergePick;
+      };
       function autoFit(){
         try{
           if(opts && opts.autoFit === false) return;
@@ -91,7 +133,16 @@
       }
       state.refresh = function () { renderPlots(state, opts); renderNetwork(state, opts); };
       autoFit();
-      return { ok: true, refresh: state.refresh, setLayer: state.setLayer };
+      return {
+        ok: true,
+        refresh: state.refresh,
+        setLayer: state.setLayer,
+        toggleSelect: state.toggleSelect,
+        getSelectedIds: state.getSelectedIds,
+        clearSelection: state.clearSelection,
+        mergeSelected: state.mergeSelected,
+        mergeSetPick: state.mergeSetPick
+      };
     } catch (e) {
       return { ok: false, reason: '初始化异常: ' + (e && e.message) };
     }
@@ -111,6 +162,10 @@
      * 不在本脚本的图层组里）⇒ 只在宿主页显式传了 opts.onMeasure 时才加这一行，
      * 别的引用页（如 index.html）不会凭空多出一个「勾了没反应」死控件。 */
     if (opts && typeof opts.onMeasure === 'function') ROWS.push(['measure', '测量框']);
+    /* [v185] 拼接模式：勾上后单击地块 = 多选（不弹气泡），底部出现「拼接为大地块」操作条。
+     * 只在宿主页显式传了 opts.onMergeMode 时才出现，避免其它引用页多出死控件。 */
+    var hasMergeRow = !!(opts && typeof opts.onMergeMode === 'function');
+    if (hasMergeRow) ROWS.push(['mergepick', '🔗 拼接多选']);
     el.innerHTML = '<div class="rym-lp-t">图层</div>' + ROWS.map(function (r) {
       var on = (saved[r[0]] !== false);   // 默认全开；只有显式存过 false 才关
       return '<label><input type="checkbox" data-rym="' + r[0] + '"' + (on ? ' checked' : '') + '> ' + r[1] + '</label>';
@@ -124,6 +179,13 @@
     function apply(k, on) {
       if (k === 'measure') {                 // 页面级测量框：转交宿主页实现
         if (opts && typeof opts.onMeasure === 'function') { try { opts.onMeasure(on); } catch (e) {} }
+        return;
+      }
+      if (k === 'mergepick') {               // [v185] 拼接多选模式：交给宿主页与本模块共同处理
+        state.mergePick = !!on;
+        if (!on) { try { state.clearSelection(); } catch (e) {} }
+        if (opts && typeof opts.onMergeMode === 'function') { try { opts.onMergeMode(on); } catch (e) {} }
+        try { if (state.refresh) state.refresh(); } catch (e) {}
         return;
       }
       var g = null;
@@ -257,13 +319,153 @@
   function displayLL(ll, opts) {
     return ll.map(function(p){ var pair=RunyeGeo.coordPair(p); return opts && opts.toDisplay ? opts.toDisplay(pair) : pair; });
   }
+
+  /* =====================================================================
+   * [v185] 拼接多选：状态 → 画面
+   * ---------------------------------------------------------------------
+   * 交互契约：opts.mergePick === true 时（地图页开启「拼接」模式），
+   *   单击地块 = 选中/取消（不弹气泡）；已是拼接地块 = 提示先「撤销拼接」。
+   * 只改图层样式，不重建图层 —— 避免每次勾选都重画整张图。
+   * ===================================================================== */
+
+  /** 把 state.selected 反映到图层样式 + 底部操作条 */
+  function applySelection(state) {
+    var ids = Object.keys(state.selected || {});
+    Object.keys(state.plotLayers || {}).forEach(function (id) {
+      var rec = state.plotLayers[id];
+      if (!rec || !rec.layer) return;
+      var on = !!state.selected[id];
+      try {
+        rec.layer.setStyle(on
+          ? { color: '#7c3aed', weight: 4, fillColor: '#a78bfa', fillOpacity: 0.34, dashArray: null }
+          : rec.baseStyle);
+      } catch (e) {}
+      if (rec.label) {
+        try {
+          if (on) rec.layer.bindTooltip(rec.label, { permanent: true, direction: 'center', className: 'rym-sel-badge' });
+          else rec.layer.unbindTooltip();
+        } catch (e) {}
+      }
+    });
+    renderMergeBar(state, ids);
+  }
+
+  /** 底部「已选 N 块」操作条：仅在拼接模式下、且选中 ≥1 时出现 */
+  function renderMergeBar(state, ids) {
+    var host = state.map.getContainer();
+    var bar = state.mergeBar;
+    if (!state.mergePick || !ids || !ids.length) {
+      if (bar && bar.parentNode) bar.parentNode.removeChild(bar);
+      state.mergeBar = null;
+      return;
+    }
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.className = 'rym-merge-bar';
+      L.DomEvent.disableClickPropagation(bar);
+      host.appendChild(bar);
+      state.mergeBar = bar;
+    }
+    var names = ids.map(function (id) {
+      var rec = state.plotLayers[id];
+      return rec ? (rec.name || id) : id;
+    });
+    bar.innerHTML = '<span>已选 <b>' + ids.length + '</b> 块：' + escapeHtml(names.join('、')) + '</span>' +
+      '<button type="button" class="rym-mb-go"' + (ids.length < 2 ? ' disabled' : '') + '>拼接为大地块</button>' +
+      '<button type="button" class="rym-mb-clear">清空选择</button>';
+    var go = bar.querySelector('.rym-mb-go');
+    var cl = bar.querySelector('.rym-mb-clear');
+    if (go) go.onclick = function () { doMergeSelected(state, {}); };
+    if (cl) cl.onclick = function () { state.clearSelection(); };
+  }
+
+  /** 执行拼接：把当前选中的地块合成一个大地块写入地块库，原小地块移到 mergedInto 归档区 */
+  function doMergeSelected(state, o) {
+    o = o || {};
+    var ids = Object.keys(state.selected || {});
+    if (ids.length < 2) return { ok: false, reason: '至少选择 2 个地块' };
+    var lib;
+    try { lib = JSON.parse(localStorage.getItem('runye_plot_library') || '[]'); }
+    catch (e) { return { ok: false, reason: '地块库读取失败' }; }
+    if (!Array.isArray(lib)) lib = [];
+
+    var picked = [];
+    lib.forEach(function (p) { if (p && ids.indexOf(p.id) >= 0) picked.push(p); });
+    if (picked.length < 2) return { ok: false, reason: '选中的地块已不存在（可能刚被删除）' };
+    // 已是拼接地块的不能重复拼（否则会丢失上一次的子地块归属）
+    var nested = picked.filter(function (p) { return p.merged; });
+    if (nested.length) {
+      return { ok: false, reason: '「' + (nested[0].name || nested[0].id) + '」本身已是拼接地块，请先「撤销拼接」后再拼' };
+    }
+
+    var big = mergePlots(picked, { name: o.name });
+    if (!big) return { ok: false, reason: '拼接失败：子地块缺少有效环' };
+
+    // 原小地块保留在库里但标记归属：体现「保留子地块」，且它们可再被还原
+    var rest = lib.map(function (p) {
+      if (ids.indexOf(p.id) < 0) return p;
+      var c = JSON.parse(JSON.stringify(p));
+      c.mergedInto = big.id;
+      return c;
+    });
+    rest.push(big);
+    try { localStorage.setItem('runye_plot_library', JSON.stringify(rest)); }
+    catch (e) { return { ok: false, reason: '写入地块库失败：' + e.message }; }
+
+    state.selected = {};
+    if (state.refresh) state.refresh();
+    // 刷新后图层对象已重建，选中态自然清空；操作条也要收回
+    state.mergePick = false;
+    renderMergeBar(state, []);
+    // 通知宿主页（地图页左栏「我的地块」列表需要跟着重列）
+    if (state.onMergeDone) { try { state.onMergeDone(big); } catch (e) {} }
+    return { ok: true, merged: big };
+  }
+
+  /** 撤销拼接：把大地块拆回子地块（子地块原本就在库里，只需解除归档与大地块） */
+  function doUnmerge(state, bigId) {
+    var lib;
+    try { lib = JSON.parse(localStorage.getItem('runye_plot_library') || '[]'); }
+    catch (e) { return { ok: false, reason: '地块库读取失败' }; }
+    var big = lib.filter(function (p) { return p && p.id === bigId; })[0];
+    var chk = canUnmerge(big);
+    if (!chk.ok) return { ok: false, reason: chk.reason };
+    var rest = [];
+    lib.forEach(function (p) {
+      if (!p) return;
+      if (p.id === bigId) return;                 // 丢掉大地块本身
+      if (p.mergedInto === bigId) { var c = JSON.parse(JSON.stringify(p)); delete c.mergedInto; rest.push(c); }
+      else rest.push(p);
+    });
+    // 子地块如果已被删掉，就按大地块里的快照补回来
+    var have = {};
+    rest.forEach(function (p) { have[p.id] = 1; });
+    (big.subPlots || []).forEach(function (s) {
+      if (!have[s.id]) rest.push({
+        id: s.id, name: s.name, mu: s.mu, sqm: s.sqm, crop: s.crop,
+        polyLatLng: s.polyLatLng, center: s.center, source: 'map', crs: 'GCJ-02', ts: Date.now(), note: ''
+      });
+    });
+    try { localStorage.setItem('runye_plot_library', JSON.stringify(rest)); }
+    catch (e) { return { ok: false, reason: '写入地块库失败：' + e.message }; }
+    if (state && state.refresh) state.refresh();
+    return { ok: true, restored: chk.count };
+  }
+
   function renderPlots(state, opts) {
     state.plotGroup.clearLayers();
+    state.plotLayers = state.plotLayers || {};
+    state.plotLayers = {};
     var plots = (opts && opts.plots) ? opts.plots : readPlotLibrary();
     var fromLib = !(opts && opts.plots);
     var drawn = 0, skipped = 0, healed = 0, cleaned = 0;
+    /* [v185] 已被拼接进大地块的原小地块不单独画（大地块的外轮廓已含它），
+       但仍留在库里（保留子地块）→ 只在 popup 里提示它属于哪个大地块。 */
+    var mergedAway = {};
+    plots.forEach(function (p) { if (p && p.mergedInto) mergedAway[p.id] = p.mergedInto; });
     plots.forEach(function (p) {
       try {
+        if (p && p.mergedInto) return;   // 归档中的子地块：跳过绘制（由大地块代表）
         var rawLL = p.polyLatLng;
         var ll = validRingLL(rawLL);
         if (!ll) {
@@ -286,12 +488,33 @@
           p.sqm=Math.round(RunyeGeo.geodesicArea(ll)); p.mu=+(p.sqm/666.67).toFixed(2); healed++;
         }
         var color = p.color || cropColor(p.crop);
-        var poly = L.polygon(displayLL(ll, opts), { color: color, weight: 2, fillColor: color, fillOpacity: 0.18 });
+        /* [v185] 拼接地块：外轮廓用紫色加粗实线 + 淡紫填充，与普通地块一眼区分；
+           内部再把各子地块的环画成细虚线（「保留子地块」的可视化 —— 用户能看到
+           这大地块是由哪几块拼成的，后续才能分别布管）。 */
+        var isMerged = !!p.merged;
+        var baseStyle = isMerged
+          ? { color: '#7c3aed', weight: 3.5, fillColor: '#a78bfa', fillOpacity: 0.16 }
+          : { color: color, weight: 2, fillColor: color, fillOpacity: 0.18 };
+        var poly = L.polygon(displayLL(ll, opts), baseStyle);
         var mu = (p.mu != null) ? p.mu : (RunyeGeo.geodesicArea(ll) / 666.67);
+        var subHtml = '';
+        if (isMerged && p.subPlots && p.subPlots.length) {
+          var subRows = p.subPlots.map(function (s, i) {
+            return '<div style="margin-left:2px">· ' + escapeHtml(s.name || ('子地块' + (i + 1))) +
+              (s.mu != null ? '（' + (+s.mu).toFixed(2) + ' 亩）' : '') + '</div>';
+          }).join('');
+          subHtml = '<div style="margin-top:5px;border-top:1px dashed #cbd5e1;padding-top:4px">' +
+            '<b style="color:#7c3aed">由 ' + p.subPlots.length + ' 个子地块拼接</b>' +
+            '<div style="color:#64748b;margin-top:2px">各子地块可分别布置管道，再用总管互连</div>' +
+            subRows + '</div>' +
+            '<button id="rymUnmerge" style="margin-top:5px;padding:3px 12px;background:#7c3aed;color:#fff;border:0;cursor:pointer;font-size:12px">↩ 撤销拼接</button>';
+        }
         poly.bindPopup(
           '<div style="font:12px/1.6 system-ui,sans-serif;min-width:190px">' +
-          '<b style="color:#15803d">' + escapeHtml(p.name || '未命名地块') + '</b><br>' +
+          '<b style="color:' + (isMerged ? '#7c3aed' : '#15803d') + '">' +
+          escapeHtml(p.name || '未命名地块') + (isMerged ? '（拼接地块）' : '') + '</b><br>' +
           '面积：<b>' + (+mu).toFixed(2) + '</b> 亩　顶点：' + ll.length + ' 个' +
+          subHtml +
           '<label style="display:block;margin-top:5px">作物 <input id="rymCrop" style="width:88%;padding:2px 4px;border:1px solid #cbd5e1" value="' + escapeHtml(p.crop || '') + '" placeholder="如：七彩花生"></label>' +
           '<label style="display:block;margin-top:3px">备注 <textarea id="rymNote" rows="2" style="width:88%;padding:2px 4px;border:1px solid #cbd5e1" placeholder="地形/水源/备注">' + escapeHtml(p.note || '') + '</textarea></label>' +
           '<button id="rymSave" style="margin-top:5px;padding:3px 12px;background:#16a34a;color:#fff;border:0;cursor:pointer;font-size:12px">保存</button>' +
@@ -299,8 +522,7 @@
         );
         poly.on('popupopen', function () {
           var btn = document.getElementById('rymSave');
-          if (!btn) return;
-          btn.onclick = function () {
+          if (btn) btn.onclick = function () {
             var crop = (document.getElementById('rymCrop') || {}).value || '';
             var note = (document.getElementById('rymNote') || {}).value || '';
             try {
@@ -311,11 +533,43 @@
             try { state.refresh(); } catch (e) {}
             poly.closePopup();
           };
+          var ub = document.getElementById('rymUnmerge');
+          if (ub) ub.onclick = function () {
+            if (!confirm('撤销拼接？\n将把「' + (p.name || '该地块') + '」拆回 ' + ((p.subPlots || []).length) + ' 个子地块。')) return;
+            var r = doUnmerge(state, p.id);
+            if (!r.ok) alert('撤销拼接失败：' + r.reason);
+          };
         });
-        if (typeof opts.onPick === 'function') {
+        // 点击：拼接选择模式下 = 切换选中；否则沿用宿主页 onPick
+        if (state.mergePick) {
+          poly.on('click', function (e) {
+            try {
+              if (L.DomEvent && e) L.DomEvent.stopPropagation(e);
+              if (p.merged) { state.map.openPopup ? null : null; alert('「' + (p.name || '该地块') + '」已是拼接地块。\n如需重拼，请先在气泡里「撤销拼接」。'); return; }
+              state.toggleSelect(p.id);
+            } catch (err) {}
+          });
+        } else if (typeof opts.onPick === 'function') {
           poly.on('click', function () { try { opts.onPick(p); } catch (e) {} });
         }
         poly.addTo(state.plotGroup);
+        // 记录图层，供 applySelection 改样式 / 操作条取名字
+        state.plotLayers[p.id] = {
+          layer: poly, baseStyle: baseStyle, name: p.name || p.id,
+          label: (p.name || '地块') + ' ✓'
+        };
+        /* 子地块环（细虚线）—— 只在拼接模式下画，避免平常视图被虚线噪声干扰 */
+        if (isMerged && state.mergePick && p.subPlots && p.subPlots.length) {
+          p.subPlots.forEach(function (s) {
+            try {
+              if (!s.polyLatLng || s.polyLatLng.length < 3) return;
+              L.polygon(displayLL(s.polyLatLng, opts), {
+                color: '#7c3aed', weight: 1.2, opacity: 0.75, dashArray: '5,4',
+                fillColor: '#a78bfa', fillOpacity: 0.10, interactive: false
+              }).addTo(state.plotGroup);
+            } catch (e) {}
+          });
+        }
         drawn++;
       } catch (e) {
         skipped++;
@@ -518,9 +772,169 @@
     return plots;
   }
 
+  /* =====================================================================
+   * [v185 2026-10-03] 地块拼接（merge）
+   * ---------------------------------------------------------------------
+   * 用户诉求：在地图上画几个相邻小地块 → 拼接成一个大地块；各小地块各自
+   *          布管，再用总管互连；拼接后的大地块传给二级管路页面。
+   *
+   * 设计口径（已与用户确认）：**保留子地块 + 外层综合轮廓**
+   *   · 大地块仍是一个地块实体（进地块库、能传递到二级页）；
+   *   · 但内部记住由哪几个子地块组成（subPlots），子地块环各自保留
+   *     —— 这样后续才能「分别对每个子地块布管」。
+   *
+   * 为什么不做几何并集？并集会抹掉子地块边界，就再也拆不回子地块了。
+   * 本模块只做「外层综合轮廓」的构造：取全部子地块顶点的凸包。
+   *
+   * 注意：本模块是纯函数，不依赖 Leaflet、不碰 DOM，浏览器/Node 均可测。
+   * ===================================================================== */
+
+  /** 凸包（Andrew monotone chain）。输入 [[lat,lng],...]，输出逆时针/顺时针环（首尾不重复）。
+   *  退化情形（共线、重复点、<3 个不同点）返回入参的一个去重副本，由调用方判定是否可用。 */
+  function convexHull(points) {
+    var pts = (points || []).map(function (p) {
+      return Array.isArray(p) ? [+p[0], +p[1]] : [+p.lat, +p.lng];
+    }).filter(function (p) {
+      return isFinite(p[0]) && isFinite(p[1]);
+    });
+    if (pts.length < 3) return pts;
+    // 去重（同经纬度只留一个），并按 (lng, lat) 字典序排序
+    var seen = {}, uniq = [];
+    pts.forEach(function (p) {
+      var k = p[0] + ',' + p[1];
+      if (!seen[k]) { seen[k] = 1; uniq.push(p); }
+    });
+    if (uniq.length < 3) return uniq;
+    uniq.sort(function (a, b) { return a[1] - b[1] || a[0] - b[0]; });
+
+    function cross(o, a, b) {
+      // 用经纬度直接叉积：局部范围内（<数公里）足够了，且与「米坐标」叉积符号一致
+      return (a[1] - o[1]) * (b[0] - o[0]) - (a[0] - o[0]) * (b[1] - o[1]);
+    }
+    var lower = [];
+    for (var i = 0; i < uniq.length; i++) {
+      while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], uniq[i]) <= 0) lower.pop();
+      lower.push(uniq[i]);
+    }
+    var upper = [];
+    for (var j = uniq.length - 1; j >= 0; j--) {
+      while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], uniq[j]) <= 0) upper.pop();
+      upper.push(uniq[j]);
+    }
+    lower.pop(); upper.pop();
+    return lower.concat(upper);
+  }
+
+  /** 把若干地块拼成「大地块」数据对象（纯函数，不改动入参）。
+   *  @param {Array} subPlots  子地块数组，每个至少要有 id + polyLatLng（或可重建）
+   *  @param {Object} opts     { name, crop, id, ts }
+   *  @returns {Object|null}   大地块对象；子地块不足 2 个或有无效环时返回 null
+   *
+   *  返回对象新增字段：
+   *    merged:true            标记这是拼接地块（二级页据此进入「手动划分」默认态）
+   *    subPlots:[{id,name,mu,sqm,polyLatLng,center,crop}]  子地块快照（各自保留环）
+   *    polyLatLng             外层综合轮廓（凸包）
+   *    poly / geo / center / mu / sqm / crs  与普通地块同构，下游零改动可用
+   */
+  function mergePlots(subPlots, opts) {
+    opts = opts || {};
+    var list = (subPlots || []).filter(function (p) { return p && p.polyLatLng && p.polyLatLng.length >= 3; });
+    if (list.length < 2) return null;
+
+    // 子地块快照：只留下游真正要用的字段，避免把一堆临时字段带进库
+    var subs = list.map(function (p) {
+      var subRing = p.polyLatLng.map(function (q) { return [+q[0], +q[1]]; });
+      // 子地块也要有 center：供「分别布管」定位、以及自身面积重算
+      var ctr = p.center;
+      if (!ctr || !isFinite(ctr.lat) || !isFinite(ctr.lng)) {
+        var sLat = 0, sLng = 0;
+        subRing.forEach(function (q) { sLat += q[0]; sLng += q[1]; });
+        ctr = { lat: +(sLat / subRing.length).toFixed(6), lng: +(sLng / subRing.length).toFixed(6) };
+      } else {
+        ctr = { lat: +ctr.lat, lng: +ctr.lng };
+      }
+      // 面积同理：入参没带就算一个，别让下游拿到 null
+      var sSqm = (typeof p.sqm === 'number' && p.sqm > 0) ? p.sqm : Math.round(RunyeGeo.geodesicArea(subRing));
+      var sMu = (typeof p.mu === 'number' && p.mu > 0) ? p.mu : +(sSqm / 666.67).toFixed(2);
+      return {
+        id: p.id,
+        name: p.name || '',
+        mu: sMu,
+        sqm: sSqm,
+        crop: p.crop || '',
+        polyLatLng: subRing,
+        center: ctr
+      };
+    });
+
+    // 外层综合轮廓 = 全部子地块顶点凸包
+    var allPts = [];
+    subs.forEach(function (s) { allPts = allPts.concat(s.polyLatLng); });
+    var hull = convexHull(allPts);
+    if (hull.length < 3) return null;
+    var outer = RunyeGeo.normalizeRing(hull);
+
+    var sqm = Math.round(RunyeGeo.geodesicArea(outer));
+    var mu = +(sqm / 666.67).toFixed(2);
+
+    // 与普通地块同构的字段：本地米坐标（原点=首点经度 / 平均纬度，与地图页保存地块一致）
+    var lats = outer.map(function (p) { return p[0]; });
+    var lngs = outer.map(function (p) { return p[1]; });
+    var clat = lats.reduce(function (a, b) { return a + b; }, 0) / lats.length;
+    var sn = lngs.reduce(function (a, b) { return a + b; }, 0) / lngs.length;
+    var R = 6378137, mlat = R * Math.PI / 180, cosLat = Math.cos(clat * Math.PI / 180);
+    var poly = outer.map(function (p) {
+      return {
+        x: Math.round((p[1] - lngs[0]) * mlat * cosLat * 100) / 100,
+        y: Math.round((p[0] - clat) * mlat * 100) / 100
+      };
+    });
+
+    var ids = subs.map(function (s) { return s.id; }).filter(Boolean).join('|');
+    return {
+      id: opts.id || ('mg' + Date.now() + Math.floor(Math.random() * 1000)),
+      name: opts.name || (list.length + ' 块拼接地块'),
+      merged: true,
+      subPlots: subs,
+      subIds: ids,
+      mu: mu,
+      sqm: sqm,
+      poly: poly,
+      polyLatLng: outer,
+      center: { lat: +clat.toFixed(6), lng: +sn.toFixed(6) },
+      geo: { refLat: +clat.toFixed(6), refLng: +outer[0][1].toFixed(6), proj: 'mercatorLocal', ts: Date.now() },
+      crop: opts.crop || (list[0] && list[0].crop) || '',
+      source: 'merge',
+      crs: 'GCJ-02',
+      ts: opts.ts || Date.now(),
+      note: opts.note || ''
+    };
+  }
+
+  /** 拆分校验：确认一个「拼接地块」能否还原成子地块（供「撤销拼接」与闸门使用）。
+   *  返回 {ok, count, reason}。 */
+  function canUnmerge(plot) {
+    if (!plot || !plot.merged) return { ok: false, count: 0, reason: '不是拼接地块' };
+    var subs = plot.subPlots || [];
+    if (subs.length < 2) return { ok: false, count: subs.length, reason: '子地块少于 2 个' };
+    for (var i = 0; i < subs.length; i++) {
+      if (!subs[i].polyLatLng || subs[i].polyLatLng.length < 3) {
+        return { ok: false, count: subs.length, reason: '第 ' + (i + 1) + ' 个子地块缺环' };
+      }
+    }
+    return { ok: true, count: subs.length, reason: '' };
+  }
+
   return {
     attach: attach,
     export: { geoJSON: buildGeoJSON, kml: buildKML, download: download },
-    parse: { geoJSON: parseGeoJSON, kml: parseKML }
+    parse: { geoJSON: parseGeoJSON, kml: parseKML },
+    merge: {
+      plots: mergePlots,
+      hull: convexHull,
+      canUnmerge: canUnmerge,
+      /* [v185] 宿主页离线用法：直接操作地块库，不需要地图实例 */
+      unmerge: function (bigId) { return doUnmerge(null, bigId); }
+    }
   };
 });

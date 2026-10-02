@@ -7,6 +7,8 @@ name: 代码体检（语法 / 静态契约 / 单测）
 #
 # ★ 明确**不**在 CI 里跑的东西，以及原因：
 #   · tests/*.smoke.cjs 与 _p1/* 探针：需要本机 Edge + CDP，CI 上必红（假红比没有更坏）；
+#     >>> 例外：tests/plot_merge.smoke.cjs（v185 起）是纯 Node 契约（无浏览器依赖），
+#         已作为步骤 ④ 显式纳入 —— 用**逐个列名**而非通配，正是为了不牵进其余 7 个渲染态 smoke。
 #   · verify_*.js：按 .gitignore L29 不入库，CI 上根本不存在（引用它 = 第一次推送就红）；
 #   · _p1/_gates.cjs 里依赖 Edge 的 e2e/shot 项：同上。
 #   这些留给本地全量批跑 `node _p1/_gates.cjs`（跑前先 `node _p1/_spawnprobe.cjs` 看 SPAWN_OK）。
@@ -63,3 +65,12 @@ jobs:
       #    这些 *.test.cjs 全部零依赖、无硬编码 Windows 路径，可跨平台。
       - name: ③ 单测（tests/*.test.cjs）
         run: node --test tests/*.test.cjs
+
+      # ④ v185 起补一条**零依赖的 smoke**：tests/plot_merge.smoke.cjs 只做纯函数几何
+      #    与源码文本契约（不启浏览器、不连 Edge），因此可以在 CI 上安全执行。
+      #    这正是上面「★ 不在 CI 里跑 *.smoke.cjs」的**唯一例外**，故必须逐个显式列名
+      #    （绝不用 tests/*.smoke.cjs 通配 —— 其余 7 个都依赖 puppeteer-core，通配必红）。
+      #    覆盖：地块拼接「保留子地块 + 外层凸包」的几何正确性、传递字段完备性、
+      #          以及二级页「地块划分」开关「只控显隐、不影响任何计算」的口径。
+      - name: ④ 地块拼接 + 划分开关契约（tests/plot_merge.smoke.cjs）
+        run: node --test tests/plot_merge.smoke.cjs

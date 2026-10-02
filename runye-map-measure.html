@@ -198,6 +198,14 @@
         <h4 class="sec-t">我的地块</h4>
         <div class="pill-list" id="myPlotList" hidden></div>
         <div class="hint" id="myPlotHint">保存/导入后的地块列在这里；点击飞到该地块，×删除。</div>
+        <!-- [v185 2026-10-03] 多地块拼接：勾选若干相邻小地块 → 拼接为一个大地块
+             （保留子地块 + 外层综合轮廓）。拼好的大地块可直接「回传设计工具」
+             传给二级管路页面；各子地块可分别布管，再用总管互连。 -->
+        <div class="save-row">
+          <button class="mbtn" id="btnMerge">🔗 拼接地块</button>
+          <button class="mbtn" id="btnMergeExit" hidden>✓ 完成拼接</button>
+        </div>
+        <div class="hint" id="mergeHint" hidden></div>
         <div class="save-row">
           <button class="mbtn" id="btnExportProj">💾 导出工程</button>
           <button class="mbtn" id="btnImportProj">📂 导入工程</button>
@@ -1007,7 +1015,19 @@
       var lib=lsGet('runye_plot_library',[]);
       var saved=lib.filter(function(p){return p.id===pid;})[0];
       var nm=saved?saved.name:'';
-      localStorage.setItem('runyeMeasuredArea', JSON.stringify({plotId:pid, name:nm, mu:mu, sqm:sqm, poly:latlngs(), ts:Date.now(), source:'map'}));
+      var payload={plotId:pid, name:nm, mu:mu, sqm:sqm, poly:latlngs(), ts:Date.now(), source:'map'};
+      /* [v185] 若当前地块是「拼接地块」，把子地块环一并传给二级管路页面。
+         为什么必须传：子地块之间可能有**道路 / 田埂**要隔开，二级页要按实际
+         分隔关系分别布管、再用总管相连 —— 少了子地块环，二级页只能看到一个
+         外轮廓，就没法体现「哪里是隔开的」。 */
+      if(saved && saved.merged && saved.subPlots && saved.subPlots.length){
+        payload.merged=true;
+        payload.subPlots=saved.subPlots.map(function(s){
+          return { id:s.id, name:s.name, mu:s.mu, sqm:s.sqm, crop:s.crop,
+                   polyLatLng:s.polyLatLng, center:s.center };
+        });
+      }
+      localStorage.setItem('runyeMeasuredArea', JSON.stringify(payload));
       var btn=document.getElementById('btnCopy');
       btn.textContent='回传中…';
       setTimeout(function(){ window.location.href='index.html#areaTool'; }, 350);
@@ -1057,8 +1077,52 @@
 
   // [map-enhance] 把地块库叠加到卫星图（隔离模块，失败不影响测量主流程）
   var rymHandle=null;
-  try{ if(window.RunyeMapEnhance) rymHandle=window.RunyeMapEnhance.attach(map, {onMeasure:setMeasureOn, toDisplay:toDisplay, autoFit:!lsGet(K_VIEW,null)}); }catch(e){}
+  try{ if(window.RunyeMapEnhance) rymHandle=window.RunyeMapEnhance.attach(map, {onMeasure:setMeasureOn, toDisplay:toDisplay, autoFit:!lsGet(K_VIEW,null), onMergeMode:onMergeModeChange, mergePick:false, onMergeDone:function(){ renderMyPlots(); }}); }catch(e){}
 
+  /* ===== [v185 2026-10-03] 多地块拼接 =====
+   * 用户诉求：画几个相邻小地块 → 拼接成一个大地块；各小地块分别布管，
+   *   再用总管互连；拼好的大地块直接传给二级管路页面。
+   * 交互：点「🔗 拼接地块」进入拼接模式 → 单击地图上的地块多选（紫色高亮）
+   *   → 底部操作条「拼接为大地块」→ 生成大地块（保留子地块 + 外层综合轮廓）。
+   * 拼接模式的开关同时驱动 RunyeMapEnhance 的图层面板里「🔗 拼接多选」勾选框，
+   *   两处状态始终一致（避免「按钮说开着、面板说关着」的分裂）。 */
+  var mergeMode=false;
+  function onMergeModeChange(on){ mergeMode=!!on; syncMergeUI(); }
+  function syncMergeUI(){
+    var b=document.getElementById('btnMerge'), x=document.getElementById('btnMergeExit'), h=document.getElementById('mergeHint');
+    if(b){ b.classList.toggle('btn-on', mergeMode); b.textContent=mergeMode?'🔗 拼接中…':'🔗 拼接地块'; }
+    if(x) x.hidden=!mergeMode;
+    if(h){
+      h.hidden=!mergeMode;
+      h.textContent=mergeMode?'拼接模式：单击地块选中（可多选），底部「拼接为大地块」。再次点击已选地块可取消选中。':'';
+    }
+  }
+  function setMergeMode(on){
+    on=!!on;
+    mergeMode=on;
+    if(rymHandle){
+      // 优先走面板勾选框（会触发 apply('mergepick') → 本模块 state.mergePick 同步）
+      if(!(rymHandle.setLayer && rymHandle.setLayer('mergepick', on))){
+        // 面板里没有这一行（例如 opts.onMergeMode 未生效）就直接翻内部态
+        try{ if(rymHandle.mergeSetPick) rymHandle.mergeSetPick(on); }catch(e){}
+      }
+    }
+    if(on){
+      // 拼接模式下先退出绘制/加点/测距，避免单击既落点又选地块
+      try{ if(typeof drawing!=='undefined' && drawing) setDrawing(false); }catch(e){}
+      try{ if(typeof setAddMode==='function') setAddMode(false); }catch(e){}
+      try{ if(typeof measuring!=='undefined' && measuring) document.getElementById('btnMeasure').click(); }catch(e){}
+    }
+    syncMergeUI();
+  }
+  document.getElementById('btnMerge').onclick=function(){ setMergeMode(!mergeMode); };
+  document.getElementById('btnMergeExit').onclick=function(){ setMergeMode(false); };
+  syncMergeUI();
+
+  /* 拼接完成/撤销后模块内部会 refresh 重绘，但地图页左侧「我的地块」列表属于
+   * 宿主页 DOM，模块管不到 ⇒ 由本页自己重列。模块的底部操作条点「拼接为大地块」
+   * 时无法回调本页，所以这里注册一个轻量轮询式兜底：模块写完库会改 ts，
+   * 用 storage 事件最干净（同一页面内 storage 事件不触发，故仍以按钮为主线）。 */
   function refreshPlotLibrary(){
     if(rymHandle && rymHandle.refresh) rymHandle.refresh();
     renderMyPlots();
@@ -1150,8 +1214,12 @@
       var row=document.createElement('div'); row.className='place-item';
       var go=document.createElement('button');
       go.type='button'; go.className='place-go';
-      go.textContent='📍 '+(p.name||'地块')+'（'+(p.mu!=null?p.mu:'?')+'亩）';
-      go.title=p.name||'';
+      // [v185] 拼接地块：前缀「🔗」并在名称后显示子地块数；归档中的子地块加「⊂」前缀
+      var prefix = p.merged ? '🔗' : (p.mergedInto ? '⊂' : '📍');
+      var suffix = p.merged ? '（'+(p.subPlots?p.subPlots.length:0)+'块拼接）' : '';
+      go.textContent=prefix+' '+(p.name||'地块')+suffix+'（'+(p.mu!=null?p.mu:'?')+'亩）';
+      go.title = p.merged ? ('由 '+(p.subPlots||[]).length+' 个子地块拼接而成：'+(p.subPlots||[]).map(function(s){return s.name||s.id;}).join('、'))
+                          : (p.name||'');
       go.onclick=function(){
         var ll=p.polyLatLng;
         if(ll && ll.length>=3){ try{ map.fitBounds(L.latLngBounds(displayRing(ll)),{padding:[40,40],maxZoom:17}); }catch(e){} }
@@ -1165,7 +1233,23 @@
         renderMyPlots();
         if(typeof rymHandle!=='undefined' && rymHandle && rymHandle.refresh){ try{ rymHandle.refresh(); }catch(e){} }
       };
-      row.appendChild(go); row.appendChild(del); box.appendChild(row);
+      row.appendChild(go);
+      // [v185] 拼接地块多给一个「↩ 撤销拼接」按钮（拆回子地块）
+      if(p.merged){
+        var un=document.createElement('button');
+        un.type='button'; un.className='place-del'; un.textContent='↩'; un.title='撤销拼接，拆回 '+(p.subPlots?p.subPlots.length:0)+' 个子地块';
+        un.onclick=function(){
+          if(!confirm('撤销拼接？\n将把「'+(p.name||'该地块')+'」拆回 '+((p.subPlots||[]).length)+' 个子地块。')) return;
+          try{
+            var r=RunyeMapEnhance.merge.unmerge(p.id);
+            if(!r.ok){ alert('撤销拼接失败：'+r.reason); return; }
+            renderMyPlots();
+            if(rymHandle && rymHandle.refresh) rymHandle.refresh();
+          }catch(e){ alert('撤销拼接失败：'+e.message); }
+        };
+        row.appendChild(un);
+      }
+      row.appendChild(del); box.appendChild(row);
     });
     box.hidden = arr.length===0;
   }
