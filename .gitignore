@@ -53,6 +53,20 @@ runye_v100_merge.cjs
 # 下划线开头的排查/校验文本快照（纯调试产物；.py 不在此列，_delcards.py 已被跟踪不受影响）
 _*.txt
 
+# 2026-10-02：根目录/子目录散落的下划线开头临时文件（GitHub Desktop Changes 曾一次性列出 138 个、30.5MB）
+# 编辑改稿脚本 / CDP 验证截图脚本 / 过程截图 / 缺陷注入测试页 / shell 辅助
+# 说明：gitignore 不影响已跟踪文件，_delcards.py 仍被跟踪、其改动照常显示
+_*.py
+_*.cjs
+_*.js
+_*.png
+_*.html
+_*.sh
+
+# 散落的过程截图与验证输出日志（目录已由 shots_*/ 覆盖）
+shots_*.png
+verify_*_out.txt
+
 # v98~v105 时代历史调试探针/本地闸门器/单测（28 个，22:3x 用户桌面端 Changes 清单清净到 0；均无页面运行时依赖）
 runye_v98*
 runye_v101*
