@@ -478,7 +478,7 @@
         var c=pair.split(','); return [parseFloat(c[1]), parseFloat(c[0])];
       }).filter(function(p){return isFinite(p[0])&&isFinite(p[1]);});
     }
-    var plots=[];
+    var plots=[], skipped=[];   /* skipped：无效轨迹/环线（自相交、退化等），跳过而非抛错毁掉整份导入（2026-10-02 审查修复） */
     descendants(doc,'Placemark').forEach(function(pm){
       var name=firstText(pm,'name'), crop='';
       descendants(pm,'Data').forEach(function(d){if(d.getAttribute('name')==='crop') crop=firstText(d,'value');});
@@ -498,17 +498,23 @@
           return [parseFloat(p[1]), parseFloat(p[0])]; // -> [lat,lng]
         }).filter(function(p){return isFinite(p[0])&&isFinite(p[1]);});
         if(pts.length<3) return;
-        var ll=RunyeGeo.normalizeRing(pts);          // 自动去首尾重复点并校验
-        plots.push({name:name,crop:crop,polyLatLng:ll,source:'track'});
+        // 单条轨迹无效（自相交/共线退化 → normalizeRing 抛错）只跳过它，不毁整份导入
+        try{
+          var ll=RunyeGeo.normalizeRing(pts);          // 自动去首尾重复点并校验
+          plots.push({name:name,crop:crop,polyLatLng:ll,source:'track'});
+        }catch(e){ skipped.push(name||'未命名轨迹'); }
       });
-      // 3) 普通 <LineString>：闭合环线当作地块边界
+      // 3) 普通 <LineString>：闭合环线当作地块边界（同样跳过无效环线）
       descendants(pm,'LineString').forEach(function(ls){
         var pts=ringFromCoordText(firstText(ls,'coordinates'));
         if(pts.length<3) return;
-        var ll=RunyeGeo.normalizeRing(pts);
-        plots.push({name:name,crop:crop,polyLatLng:ll,source:'linestring'});
+        try{
+          var ll=RunyeGeo.normalizeRing(pts);
+          plots.push({name:name,crop:crop,polyLatLng:ll,source:'linestring'});
+        }catch(e){ skipped.push(name||'未命名环线'); }
       });
     });
+    if(skipped.length) plots.skipped=skipped;   // 附加属性：调用方按需提示（旧调用方不受影响）
     return plots;
   }
 

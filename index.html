@@ -5639,6 +5639,8 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     };
   </script>
   <script src="runye-nav.js"></script>
+  <!-- [NEW MODULE: DXF 导出] 入口：删除本行即卸载（不改动任何原有逻辑） -->
+  <script src="runye-dxf.js"></script>
   <!-- [NEW MODULE: pipe_optim] 入口：删除本行即卸载本隔离模块（不改动任何原有逻辑） -->
   <script src="pipe_optim_ui.js"></script>
 </div>
@@ -6435,6 +6437,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     </div>
 
     <button class="tl-ws-btn" id="tlAutoPipe" type="button" onclick="tlAutoGenerate()" title="按当前参数生成 / 重新生成三级管线平面图（生成后右侧「管段管径与损失」表逐段列出管长与管径）">🔄 生成管线图</button>
+    <button class="tl-ws-btn" id="tlDxfExport" type="button" style="margin-top:6px" title="把地块边界/管道/管径标注/地块名/水泵位置导出为 R12 DXF，CAD 直接打开" onclick="if(window.runyeDxf)runyeDxf.export()">📐 导出 CAD(DXF)</button>
     <span class="tl-ws-hint" id="tlWsHint">点「阀门/三通/弯头/节点」后再点管线即插入配件</span>
   </div>
   <div id="tlWsContent"><div class="tl-ws-empty">请先生成三级管线平面图（点左侧「生成管线图」）</div></div>

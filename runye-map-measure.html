@@ -1103,7 +1103,7 @@
         // 按扩展名或文件头判断 KML（兼容 .kml/.kmz 文本与奥维导出）
         if(/\.kml$/i.test(f.name) || /<kml[\s>]/i.test(text.slice(0,800))) arr=RunyeMapEnhance.parse.kml(text);
         else arr=RunyeMapEnhance.parse.geoJSON(text);
-        if(!arr || !arr.length){ alert('未能从文件中解析出地块多边形（需要至少一个闭合多边形）。'); return; }
+        if(!arr || !arr.length){ alert('未能从文件中解析出地块多边形（需要至少一个闭合多边形）。'+((arr&&arr.skipped&&arr.skipped.length)?'\\n其中跳过无效轨迹/环线：'+arr.skipped.join('、'):'')); return; }
         var lib=[]; try{ lib=JSON.parse(localStorage.getItem('runye_plot_library')||'[]'); }catch(err){ lib=[]; }
         var allLL=[];
         arr.forEach(function(p){
@@ -1130,7 +1130,8 @@
         localStorage.setItem('runye_plot_library', JSON.stringify(lib));
         refreshPlotLibrary();
         if(allLL.length){ try{ map.fitBounds(L.latLngBounds(displayRing(allLL)),{padding:[30,30],maxZoom:17}); }catch(err){} }
-        alert('已导入 '+arr.length+' 个地块到地块库，并定位到导入范围。');
+        var skipMsg=(arr.skipped&&arr.skipped.length)?'\\n跳过 '+arr.skipped.length+' 条无效轨迹/环线（自相交或退化）：'+arr.skipped.join('、'):'';
+        alert('已导入 '+arr.length+' 个地块到地块库，并定位到导入范围。'+skipMsg);
       }catch(err){ alert('导入失败：'+err.message); }
       e.target.value='';
     };
