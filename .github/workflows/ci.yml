@@ -1,0 +1,65 @@
+name: 代码体检（语法 / 静态契约 / 单测）
+
+# 由来（v184 · 2026-10-02）：本地闸门一直靠人手跑 _p1/_gates.cjs，而它只跑得动
+# 需要本机 Edge 的渲染态探针；仓库里「无需浏览器」的那部分（语法、静态契约、单测）
+# 此前**没有任何自动哨兵**——改坏了要等下一次人工全跑才发现。
+# 本工作流把这三类纯语义检查搬进 CI，让每次推送都有一道底线。
+#
+# ★ 明确**不**在 CI 里跑的东西，以及原因：
+#   · tests/*.smoke.cjs 与 _p1/* 探针：需要本机 Edge + CDP，CI 上必红（假红比没有更坏）；
+#   · verify_*.js：按 .gitignore L29 不入库，CI 上根本不存在（引用它 = 第一次推送就红）；
+#   · _p1/_gates.cjs 里依赖 Edge 的 e2e/shot 项：同上。
+#   这些留给本地全量批跑 `node _p1/_gates.cjs`（跑前先 `node _p1/_spawnprobe.cjs` 看 SPAWN_OK）。
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:  # 允许在 Actions 页面手动触发
+
+permissions:
+  contents: read
+
+jobs:
+  static-and-unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+
+      - name: 配置 Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # ① 语法：把**仓库里真实存在的**每个 .js/.cjs 交给 node --check。
+      #    用 git ls-files 而不是 find——口径 = 「入库了什么就查什么」，
+      #    避免把本地未跟踪的临时脚本也算进来（那会让 CI 与本地结论不一致）。
+      - name: ① 语法检查（仓库内全部 .js / .cjs）
+        run: |
+          bad=0
+          n=0
+          while IFS= read -r f; do
+            n=$((n + 1))
+            if ! node --check "$f" 2>/tmp/check_err.txt; then
+              echo "::error file=$f::node --check 失败"
+              cat /tmp/check_err.txt
+              bad=$((bad + 1))
+            fi
+          done < <(git ls-files '*.js' '*.cjs')
+          echo "语法检查：共 $n 个文件，失败 $bad 个"
+          if [ "$bad" -ne 0 ]; then exit 1; fi
+          # 空集保护：一个文件都没查到说明枚举口径坏了，不能让「全绿」建立在空集上
+          if [ "$n" -lt 50 ]; then echo "::error::枚举到的文件数异常（$n < 50），检查 git ls-files 口径"; exit 1; fi
+
+      # ② 静态契约：内联 <script> 可编译 / HTML id 唯一 / 关键常量单一来源。
+      #    该脚本零依赖、零浏览器、可跨平台，输出自带退出码（红就非 0）。
+      - name: ② 静态契约（内联脚本可编译 / HTML id 唯一 / 常量单一来源）
+        run: node ci_check_static.cjs
+
+      # ③ 单测：必须显式列文件——`node --test tests/` 在 Node 22 上会 MODULE_NOT_FOUND。
+      #    这些 *.test.cjs 全部零依赖、无硬编码 Windows 路径，可跨平台。
+      - name: ③ 单测（tests/*.test.cjs）
+        run: node --test tests/*.test.cjs

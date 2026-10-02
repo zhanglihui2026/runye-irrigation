@@ -72,7 +72,12 @@
 
   /* 批量补录常用 PE 外径系列（2026-09-26）：90/110/140/160/200/225 管材+等径三通+90°弯头+球阀 */
   (function () {
-    var D = [90, 110, 140, 160, 200, 225];
+    /* 2026-10-02 修复：此处原为 [90,110,140,160,200,225]，但 Ø110 组已在上面 items 里
+       显式定义（GEN-PIPE-110 / GEN-TEE-110-110-110 / GEN-ELBOW-110-90 / GEN-VALVE-110），
+       批量补录又把 110 加了一遍 ⇒ all() 里 4 条同 id 重复项（37 条 vs 唯一 33 条）。
+       get() 取首条所以运行时无感，但任何「列出全部型号」的界面会重复显示；
+       且 all().length 之类的判据会被悄悄污染。去掉 110 即可。 */
+    var D = [90, 140, 160, 200, 225];
     D.forEach(function (d) {
       CATALOG.items.push({ id: 'GEN-PIPE-' + d, type: 'pipe', brand: '通用示意', model: 'PE直管 Ø' + d,
         material: 'PE100', pressure: '0.4MPa', placeholder: 0,

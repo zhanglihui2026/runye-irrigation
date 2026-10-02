@@ -256,11 +256,20 @@ const AE = require('../tl-workspace/tl-auto-edits.js');
   const before = JSON.stringify(d);
   ok(AE.applyTo(d) === d, '只改径 → applyTo 原引用返回（几何零改动）');
   ok(JSON.stringify(d) === before, '改径不写平面数据（红线）');
+  /* 2026-10-02 契约更新（v145 用户约定）：改径（cals）**不进任何存档** ——
+     「调整管径之后才跳出，每次打开网页都应清空」。持久化快照只含几何类编辑
+     （改长 / 配件 / 平移），改径仅会话内有效。
+     ⇒ serialize() 必须返回**空** cals；restore() 必须把会话内的改径清掉（不复活）。
+        （原断言为「serialize 含 cals + restore 回环复原」，那是 v145 之前的口径。） */
   const snap = AE.serialize();
-  ok(snap.cals && snap.cals['main-0'] === 110.5 && snap.cals['branch-0'] === 75, 'serialize 含 cals');
+  ok(snap.cals && typeof snap.cals === 'object' && Object.keys(snap.cals).length === 0,
+    'serialize 不含改径（v145：改径不入存档）');
   ok(AE.clearCaliber('main-0', 'test') && AE.caliberOf('main-0') === null, 'clearCaliber → 移除');
   ok(AE.clearCaliber('main-0') === false, '重复清除 → false');
-  ok(AE.restore(snap) === true && AE.caliberOf('main-0') === 110.5 && AE.caliberOf('branch-0') === 75, 'restore 回环：cals 复原');
+  AE.setCaliber('main-0', 110.5, d, 'test');
+  ok(AE.caliberOf('main-0') === 110.5 && AE.caliberOf('branch-0') === 75, 'restore 前：会话内改径仍在');
+  ok(AE.restore(snap) === true && Object.keys(AE.calibersMap()).length === 0,
+    'restore 后改径不复活（v145：存档只带几何编辑）');
   const legacy = JSON.parse(JSON.stringify(snap)); delete legacy.cals;
   ok(AE.restore(legacy) === true && Object.keys(AE.calibersMap()).length === 0, '旧存档无 cals 字段 → 兼容（清空）');
   const badc = JSON.parse(JSON.stringify(snap)); badc.cals = { 'bad-pid': 160 };

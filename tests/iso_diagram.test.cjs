@@ -220,9 +220,27 @@ console.log('== iso-diagram 纯几何回归 ==');
   }), '整段连接平行Z轴且精确终止于展开后的支管接入点');
   ok((svg.match(/data-symbol="valve"/g)||[]).length === m.valves.length + 1, '全部自动阀门和图例采用通用阀门符号');
   ok(JSON.stringify(d) === original, '渲染不改变平面数据');
-  ok(svg.includes('标高/埋深待设计确认') && svg.includes('不按比例'), '不虚构施工标高及比例');
-  /* 2026-09-15 契约更新：标注简化 —— 管道引线标注只剩总管 1 条，主管/支管规格并入图例；默认不标阀门编号 */
-  ok((svg.match(/data-pipe-note="1"/g) || []).length === 1, '管道引线标注仅剩总管 1 条（主管/支管不再逐根标注）');
+  /* 2026-10-02 契约更新（v181，用户要求「总管/主管/支管标高都标上，主管支管管径也标上，
+     不要每条都标注那样太乱」）：
+     ① 标高不再是「待设计确认」占位 —— 改为按「管道埋深」参数（window.RyBuryDepth）推算真实标高；
+        「不虚构」原则以另一种形式保留：必须显式声明推算依据 + 不按比例 + 非施工放样依据，
+        且旧的占位文案不得复活。
+     ② 引线标注由「只剩总管 1 条」改为「每类管各 1 条」（总管/主管/支管），仍然不逐根标注。 */
+  ok(!svg.includes('标高/埋深待设计确认')
+    && svg.includes('不按比例')
+    && svg.includes('按管道埋深参数推算')
+    && svg.includes('非施工放样依据'),
+    '不虚构施工标高及比例（v181 口径：按埋深参数推算并显式声明依据）');
+  ok((svg.match(/data-pipe-note="1"/g) || []).length === 3,
+    '管道引线标注每类管各 1 条（总管/主管/支管，共 3 条；实际 '
+    + (svg.match(/data-pipe-note="1"/g) || []).length + ' 条）');
+  /* v181 锁：每条引线标注必须同时带「管径」与「标高」两段文字（防退回只标管径） */
+  ok(/总管 [^<]*Ø\d+[^<]*· 标高 [^<]*</.test(svg)
+    && /主管 [^<]*Ø\d+[^<]*· 标高 [^<]*</.test(svg)
+    && /支管 [^<]*Ø\d+[^<]*· 标高 [^<]*</.test(svg),
+    '三类管的引线标注均为「管径 + 标高」合并式');
+  ok(svg.includes('标高 -0.600') && svg.includes('标高 ±0.000'),
+    '总管/主管标高 = 埋深 -0.600、支管 = 地表 ±0.000（默认 600mm）');
   ok(svg.includes('总管 Ø200') && svg.includes('主管 Ø110') && svg.includes('支管 Ø63'), '图例文字含三类管道规格');
   const valveLabelCount = (svg.match(new RegExp('>' + m.valves[0].id + ' Ø', 'g')) || []).length
     + (svg.match(new RegExp('>' + m.valves[m.valves.length - 1].id + ' Ø', 'g')) || []).length;

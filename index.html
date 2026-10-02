@@ -624,6 +624,14 @@ body.mat-resizing *{cursor:col-resize!important}
 }
 .materials-card .price-input:focus{border-color:var(--g-500);box-shadow:0 0 0 3px var(--g-100)}
 .materials-card .price-input::-webkit-inner-spin-button{opacity:.4;height:20px}
+/* v184（P5）：管材单价自证行（材料表单价 ⇄ 设置页价目表） */
+.materials-card .mat-selfcheck{margin-top:10px;font-size:12px;line-height:1.7;color:var(--s-400)}
+.materials-card .mat-selfcheck.ok{color:#15803d}
+.materials-card .mat-selfcheck.bad{color:#dc2626;font-weight:600}
+.materials-card .mat-selfcheck .mat-price-resync{
+  border:1.5px solid currentColor;background:transparent;border-radius:8px;
+  padding:3px 10px;font-size:12px;font-weight:600;color:inherit;cursor:pointer;transition:var(--transition)}
+.materials-card .mat-selfcheck .mat-price-resync:hover{background:#fee2e2}
 .materials-card .material-qty-input{
   width:82px;border:1.5px solid var(--s-200);border-radius:8px;
   padding:5px 6px;font-size:13px;font-weight:600;color:var(--s-800);
@@ -6931,7 +6939,8 @@ function doIrrImport(text){
       if(typeof computeThreeLevel!=='function') return;
       var r0=computeThreeLevel(); if(!r0||!r0.frontPipe||!r0.frontPipe.od) return;
       var pd={}; try{ pd=JSON.parse(localStorage.getItem('runye_tlEconPrices')||'{}')||{}; }catch(e){}
-      var DEF={50:6,63:9,75:12,90:17,110:24,125:30,140:37,160:47,180:60,200:73,220:88,225:92,250:113,280:141,315:178,355:225,400:286,450:362,500:447};
+      /* v184（P6）：默认单价表收敛为单一来源 TL_PIPE_PRICE_DEF（原此处另有第 3 份字面量副本） */
+      var DEF=TL_PIPE_PRICE_DEF;
       function pOf(od){ var k=Math.round(od); var v=(typeof pd[k]==='number'&&pd[k]>0)?pd[k]:DEF[k]; return (v>0?v:0); }
       var f=pOf(r0.frontPipe.od), m=pOf(r0.mainPipe.od), b=pOf(r0.branchPipe.od);
       if(!(f>0&&m>0&&b>0)) return;
@@ -7027,7 +7036,7 @@ function doIrrImport(text){
         });
       });
       renderRow(0);
-    }catch(e){ box.innerHTML='<div style="color:#dc2626">分析失败:'+e.message+'</div>'; }
+    }catch(e){ box.innerHTML='<div style="color:#dc2626">分析失败:'+esc(e.message)+'</div>'; }
   });
 })();
 </script>
@@ -7331,7 +7340,17 @@ function doIrrImport(text){
 // ===== CONSTANTS =====
 const C_HAZEN = 150;
 const SDR = 13.6;
+/* —— 两套管径序列，用途不同，**刻意不等**（2026-10-02 收敛为单一来源并写明关系）——
+   ① PE_OD_SERIES：**自动选管**候选（水力计算 selectPipe / 改径下拉的档位来源），
+      只收标准 PE100 外径系列（GB/T 13663 首选档），共 18 档。
+   ② CAL_SERIES ：**手动改径菜单 + 单价表**的档位，= ① + 用户点名的非标规格 Ø220
+      （菜单里该档带「（非标）」角标；见 19119 行起的「图面改径菜单」注释），共 19 档。
+   历史上 ② 被抄成三份（改径菜单内联 / 设置页 SERIES / 经济面板单价表），任何一处改档
+   都会悄悄漂移 —— 现统一由本处 CAL_SERIES 提供，其余位置只引用。
+   契约：`_p1/_verify_series_contract.cjs`（CAL_SERIES ⊇ PE_OD_SERIES 且恰多 Ø220；
+   全文件只允许出现这一份 19 档字面量）。 */
 const PE_OD_SERIES = [50, 63, 75, 90, 110, 125, 140, 160, 180, 200, 225, 250, 280, 315, 355, 400, 450, 500];
+const CAL_SERIES = [50, 63, 75, 90, 110, 125, 140, 160, 180, 200, 220, 225, 250, 280, 315, 355, 400, 450, 500];
 const SAFETY_FACTOR = 1.10;
 const MARGIN_HEAD = 2;
 const MU_TO_SQM = 666.67;
@@ -7848,6 +7867,29 @@ function fmt(n, d=2) { return n.toFixed(d); }
 function fmt0(n) { return Math.round(n).toLocaleString(); }
 
 // material prices persist across re-renders
+/* ===== v184（2026-10-02，P5/P6）：管材单价表「单一来源」=====
+   同一张 19 档价目表原先在 3 处各写一份字面量 —— 设置页自动预填的 DEF（L6934）、
+   经济面板 PRICES_DEFAULT、设置页 PDEF。「同一事实三份记录」必然改一处漏一处。
+   现收敛为本表**唯一一处**；上述三处一律改为引用本全局（var 使其挂到 window，
+   供后面的独立 <script> 块取用）。
+   层次：runye_tlEconPrices（用户在设置页/经济面板改的价，覆盖层）
+        > TL_PIPE_PRICE_DEF（本表，默认值）。
+   锁定：verify_settings.js S7 —— 本表在 index.html 中只允许出现 1 次、19 档键集与
+   CAL_SERIES 一致、关键档位（160/220/225/500）抽验数值，防收敛时被静默改价。 */
+var TL_PIPE_PRICE_DEF = { 50: 6, 63: 9, 75: 12, 90: 17, 110: 24, 125: 30, 140: 37, 160: 47, 180: 60,
+  200: 73, 220: 88, 225: 92, 250: 113, 280: 141, 315: 178, 355: 225, 400: 286, 450: 362, 500: 447 };
+/* 按管径取「价目表单价」：覆盖层优先，其次默认表；取不到（不在表内）返回 ''。 */
+function tlPipePriceByOd(od) {
+  var k = Math.round(Number(od));
+  if (!(k > 0)) return '';
+  var over = {};
+  try { over = JSON.parse(localStorage.getItem('runye_tlEconPrices') || '{}') || {}; } catch (e) { over = {}; }
+  var v = (typeof over[k] === 'number' && over[k] > 0) ? over[k] : TL_PIPE_PRICE_DEF[k];
+  return (typeof v === 'number' && v > 0) ? v : '';
+}
+/* 材料表中「按管径取价」的三行（其余行是按套计件，不参与管径联动） */
+var MAT_PIPE_KEYS = ['frontPipe', 'mainPipe', 'branchPipe'];
+
 const materialPrices = {mainPipe:32, branchPipe:16, tape:0.075};
 const materialQtyOverrides = {};
 const customMaterials = {c1:{name:'',spec:'',qty:'',price:''},c2:{name:'',spec:'',qty:'',price:''},c3:{name:'',spec:'',qty:'',price:''}};
@@ -7862,8 +7904,50 @@ function getMaterialPipeSpecs(r) {
   };
 }
 
+/* v184（P5）：管材单价自证 —— 「材料表三行单价」与「设置页价目表在同一图面管径下的单价」
+   是同一事实的两处记录，必须一致。若被手改（matTbl.priceF 覆盖）就会分叉，此处红字点名，
+   并提供一键「按价目表重取」。把报告 §3.C「同一根 Ø160 主管，材料表 32 元/m、设置页 47 元/m」
+   从「用户看不见的口径打架」变成「用户可见的哨兵」。
+   rows: [{key,label,od,price}]，数据全部来自 DOM 文本/数值，仍经 esc() 兜底。 */
+function matRenderSelfCheck(rows) {
+  var box = document.getElementById('matSelfCheck');
+  if (!box) return;
+  /* ★ 这里**不要**用 esc()：esc 定义在后面的独立 <script> 里、并非全局
+     （v184 首版调用它 → ReferenceError，又被外层 try/catch 吞掉 → 自证行永远空白）。
+     用同脚本内的 matEsc（v169 材料表专用转义）最稳。自检失败必须**可见**，不许静默。 */
+  try {
+    var refs = [], diffs = [];
+    rows.forEach(function (r) {
+      var ref = tlPipePriceByOd(r.od);
+      if (ref === '') return;
+      refs.push(matEsc(r.label) + ' Ø' + matEsc(String(r.od)) + ' = ' + ref + ' 元/m');
+      if (Math.abs((Number(r.price) || 0) - Number(ref)) > 1e-9) {
+        diffs.push(matEsc(r.label) + ' Ø' + matEsc(String(r.od)) + '：材料表 ' + (Number(r.price) || 0) + ' vs 价目表 ' + ref + ' 元/m');
+      }
+    });
+    if (!refs.length) {
+      box.className = 'mat-selfcheck';
+      box.textContent = '管材单价：图面管径不在价目表中，未做自证。';
+      return;
+    }
+    if (diffs.length) {
+      box.className = 'mat-selfcheck bad';
+      box.innerHTML = '⚠ 管材单价与设置页价目表不一致：' + diffs.join('；')
+        + '　<button type="button" class="mat-price-resync">↺ 按价目表重取</button>';
+    } else {
+      box.className = 'mat-selfcheck ok';
+      box.textContent = '✓ 管材单价与设置页价目表一致（' + refs.join(' · ') + '）';
+    }
+  } catch (eSelf) {
+    box.className = 'mat-selfcheck bad';
+    box.textContent = '⚠ 管材单价自证计算失败：' + (eSelf && eSelf.message ? eSelf.message : eSelf);
+  }
+}
+
 function updateMaterialTotals() {
   let grand = 0;
+  let pfDirty = false;
+  const pipeRows = [];
   document.querySelectorAll('.materials-card tbody tr').forEach(tr => {
     const isCustom = tr.classList.contains('custom-row');
     let qty, price;
@@ -7881,10 +7965,35 @@ function updateMaterialTotals() {
     } else {
       qty = parseFloat(tr.dataset.qty) || 0;
       const input = tr.querySelector('.price-input');
-      price = parseFloat(input.value) || 0;
+      const rawIn = String(input.value == null ? '' : input.value).trim();
+      price = parseFloat(rawIn) || 0;
       materialPrices[tr.dataset.key] = price;
-      if (input.dataset.formula) { matTbl.priceF = matTbl.priceF || {}; matTbl.priceF[tr.dataset.key] = input.dataset.formula; matTblSave(); }
-      else if (matTbl.priceF && matTbl.priceF[tr.dataset.key]) { delete matTbl.priceF[tr.dataset.key]; matTblSave(); }
+      /* v184（P5）：**单价持久化唯一写入点**。
+         原实现只有「公式格」写 matTbl.priceF，纯数值手改只进内存 materialPrices（const 对象）
+         ⇒ 刷新即丢，与工具条「输入单价后自动汇总」的承诺不符。
+         现在把「要不要留覆盖」的判断集中在此（与 auto 值比较，相等就不留，免得把当前自动值
+         冻结成永久覆盖；清空即删除覆盖，回到自动取值）。
+         ⚠ 不要把写入分散到别的事件里：v184 首版曾在 document 的 change 里再写一次，
+           结果本函数末尾的 delete 分支立刻把它删掉（两个写入者互相打架），手改永远存不下来。 */
+      const fKey = tr.dataset.key;
+      const autoRef = (MAT_PIPE_KEYS.indexOf(fKey) >= 0) ? tlPipePriceByOd(tr.dataset.od) : null;
+      matTbl.priceF = matTbl.priceF || {};
+      const had = matTbl.priceF[fKey];
+      var want;
+      if (input.dataset.formula) {
+        want = input.dataset.formula;                                     /* v171：公式格存公式串 */
+      } else if (rawIn === '' || (autoRef !== null && Number(rawIn) === Number(autoRef))) {
+        want = undefined;                                                 /* 空 / 与价目表自动值相同 */
+      } else if (autoRef === null && rawIn === String(materialPrices[fKey] || '')) {
+        want = undefined;                                                 /* 非管材行且等于内存默认值 */
+      } else {
+        want = rawIn;                                                     /* 用户手改 ⇒ 记为覆盖 */
+      }
+      if (want === undefined) {
+        if (had !== undefined) { delete matTbl.priceF[fKey]; pfDirty = true; }
+      } else if (String(had) !== String(want)) {
+        matTbl.priceF[fKey] = want; pfDirty = true;
+      }
     }
     /* v180：若该格被用户手工改过（matTbl.edits），合计/亩均不覆盖，保留用户值 */
     const ovTotal = matEditFor(tr.dataset.key, 'total');
@@ -7900,9 +8009,17 @@ function updateMaterialTotals() {
         : '—';
     }
     grand += subtotal;
+    /* v184（P5）：收集管材三行的「行名 / 图面管径 / 当前单价」供自证行比对 */
+    if (MAT_PIPE_KEYS.indexOf(tr.dataset.key) >= 0) {
+      var td0 = tr.querySelector('td');
+      pipeRows.push({ key: tr.dataset.key, label: td0 ? td0.textContent.trim() : tr.dataset.key,
+        od: tr.dataset.od || '', price: price });
+    }
   });
+  if (pfDirty) matTblSave();
   const gt = document.querySelector('.materials-card .grand-total-val');
   if (gt) gt.textContent = '¥ ' + fmt0(grand);
+  matRenderSelfCheck(pipeRows);
 }
 
 /* ===== v169（2026-10-01 用户要求）：材料表做成可编辑表格（腾讯文档式）=====
@@ -7917,8 +8034,16 @@ let matTbl = (function () {
   return { ver: 1, notes: {}, extraCols: [], extraCells: {}, colW: {}, custom: [], priceF: {}, migrated: false };
 })();
 function matTblSave() { try { localStorage.setItem(MAT_TBL_KEY, JSON.stringify(matTbl)); } catch (e) {} }
-/* v171：自动行单价优先取持久化公式(matTbl.priceF)，否则取内存 materialPrices */
-function matPriceVal(key) { return (matTbl.priceF && matTbl.priceF[key]) ? matTbl.priceF[key] : (materialPrices[key] || ''); }
+/* v171：自动行单价优先取持久化覆盖(matTbl.priceF：公式串或用户改的数值)，否则回退默认值。
+   v184（P5）：管材三行（总管/主管/支管）在**没有用户覆盖**时，按 `od`（图面实际管径）
+   从价目表自动带出 —— 消除「材料表默认 32 元/m、设置页同径显示 47 元/m」的两套口径。
+   od 缺省（不传）时退回旧行为，保证非管材行与旧调用点逐字节不变。 */
+function matPriceVal(key, od) {
+  var f = matTbl.priceF ? matTbl.priceF[key] : null;
+  if (f !== null && f !== undefined && f !== '') return f;
+  if (od > 0 && MAT_PIPE_KEYS.indexOf(key) >= 0) return tlPipePriceByOd(od);
+  return materialPrices[key] || '';
+}
 function matEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 const MAT_BASE_COLS = [
   ['mat', 190, '材料'], ['spec', 215, '规格'], ['qty', 150, '估算数量'],
@@ -9070,7 +9195,7 @@ function render() {
             var b = ndBuckets[key];
             var dk = 'nodeFit-' + k;
             ndRows.push('<tr data-key="' + dk + '" data-qty="' + b.qty + '">'
-              + '<td>' + b.name + '</td><td>' + b.spec + '</td><td><span class="qty-text">' + b.qty + '</span><span class="unit-tag">套</span></td>'
+              + '<td>' + matEsc(b.name) + '</td><td>' + matEsc(b.spec) + '</td><td><span class="qty-text">' + b.qty + '</span><span class="unit-tag">套</span></td>'
               + '<td><input class="price-input" type="text" inputmode="decimal" min="0" step="1" placeholder="0" value="' + (materialPrices[dk] || '') + '"><span class="unit-tag">元/套</span></td>'
               + '<td class="total-cell">—</td>'
               + '<td class="permu-cell">—</td>'
@@ -9148,65 +9273,65 @@ function render() {
             ${matColgroup()}
             <thead><tr>${matBaseHeads()}${matExtraHeads()}</tr></thead>
             <tbody>
-              <tr data-key="frontPipe" data-qty="${(matFrontLen * 1.1).toFixed(1)}" data-permu="${permuOf(matFrontLen)}">
+              <tr data-key="frontPipe" data-od="${specFrontOd}" data-qty="${(matFrontLen * 1.1).toFixed(1)}" data-permu="${permuOf(matFrontLen)}">
                 <td>总管</td><td>Ø ${specFrontOd} mm</td><td><span class="qty-text">${(matFrontLen * 1.1).toFixed(1)}</span><span class="unit-tag">m</span></td>
-                <td><input class="price-input" type="text" inputmode="decimal" min="0" step="0.1" placeholder="0" value="${matPriceVal('frontPipe')}""><span class="unit-tag">元/m</span></td>
+                <td><input class="price-input" type="text" inputmode="decimal" min="0" step="0.1" placeholder="0" value="${matPriceVal('frontPipe', specFrontOd)}"><span class="unit-tag">元/m</span></td>
                 <td class="total-cell">—</td>
                 <td class="permu-cell">${permuOf(matFrontLen)} m/亩 · —</td>
                 ${matRowTail("frontPipe")}
               </tr>
-              <tr data-key="mainPipe" data-qty="${(matMainLen * 1.1).toFixed(1)}" data-permu="${permuOf(matMainLen)}">
+              <tr data-key="mainPipe" data-od="${specMainOd}" data-qty="${(matMainLen * 1.1).toFixed(1)}" data-permu="${permuOf(matMainLen)}">
                 <td>主管</td><td>Ø ${specMainOd} mm</td><td><span class="qty-text">${(matMainLen * 1.1).toFixed(1)}</span><span class="unit-tag">m</span></td>
-                <td><input class="price-input" type="text" inputmode="decimal" min="0" step="0.1" placeholder="0" value="${matPriceVal('mainPipe')}""><span class="unit-tag">元/m</span></td>
+                <td><input class="price-input" type="text" inputmode="decimal" min="0" step="0.1" placeholder="0" value="${matPriceVal('mainPipe', specMainOd)}"><span class="unit-tag">元/m</span></td>
                 <td class="total-cell">—</td>
                 <td class="permu-cell">${permuOf(matMainLen)} m/亩 · —</td>
                 ${matRowTail("mainPipe")}
               </tr>
-              <tr data-key="branchPipe" data-qty="${(matBranchLen * 1.1).toFixed(1)}" data-permu="${permuOf(matBranchLen)}">
+              <tr data-key="branchPipe" data-od="${specBranchOd}" data-qty="${(matBranchLen * 1.1).toFixed(1)}" data-permu="${permuOf(matBranchLen)}">
                 <td>支管</td><td>Ø ${specBranchOd} mm</td><td><span class="qty-text">${(matBranchLen * 1.1).toFixed(1)}</span><span class="unit-tag">m</span></td>
-                <td><input class="price-input" type="text" inputmode="decimal" min="0" step="0.1" placeholder="0" value="${matPriceVal('branchPipe')}""><span class="unit-tag">元/m</span></td>
+                <td><input class="price-input" type="text" inputmode="decimal" min="0" step="0.1" placeholder="0" value="${matPriceVal('branchPipe', specBranchOd)}"><span class="unit-tag">元/m</span></td>
                 <td class="total-cell">—</td>
                 <td class="permu-cell">${permuOf(matBranchLen)} m/亩 · —</td>
                 ${matRowTail("branchPipe")}
               </tr>
               <tr data-key="tape" data-qty="${(matTapeLen * 1.1).toFixed(1)}" data-permu="${permuOf(matTapeLen)}">
                 <td>滴灌带</td><td>Ø ${r.tapeOD} mm</td><td><span class="qty-text">${(matTapeLen * 1.1).toFixed(1)}</span><span class="unit-tag">m</span></td>
-                <td><input class="price-input" type="text" inputmode="decimal" min="0" step="0.1" placeholder="0" value="${matPriceVal('tape')}""><span class="unit-tag">元/m</span></td>
+                <td><input class="price-input" type="text" inputmode="decimal" min="0" step="0.1" placeholder="0" value="${matPriceVal('tape')}"><span class="unit-tag">元/m</span></td>
                 <td class="total-cell">—</td>
                 <td class="permu-cell">${permuOf(matTapeLen)} m/亩 · —</td>
                 ${matRowTail("tape")}
               </tr>
               <tr data-key="tapeJoint" data-qty="${(r.totalTapes * 1.05).toFixed(1)}">
                 <td>滴灌带接头</td><td>同滴灌带</td><td>${fmt0(r.totalTapes * 1.05)} 套</td>
-                <td><input class="price-input" type="text" inputmode="decimal" min="0" step="0.5" placeholder="0" value="${matPriceVal('tapeJoint')}""><span class="unit-tag">元/套</span></td>
+                <td><input class="price-input" type="text" inputmode="decimal" min="0" step="0.5" placeholder="0" value="${matPriceVal('tapeJoint')}"><span class="unit-tag">元/套</span></td>
                 <td class="total-cell">—</td>
                 <td class="permu-cell">—</td>
                 ${matRowTail("tapeJoint")}
               </tr>
               <tr data-key="zoneTee" data-qty="${zoneValveN}">
                 <td>分区三通</td><td>${zoneValveSpec}</td><td>${zoneValveN} 套</td>
-                <td><input class="price-input" type="text" inputmode="decimal" min="0" step="1" placeholder="0" value="${matPriceVal('zoneTee')}""><span class="unit-tag">元/套</span></td>
+                <td><input class="price-input" type="text" inputmode="decimal" min="0" step="1" placeholder="0" value="${matPriceVal('zoneTee')}"><span class="unit-tag">元/套</span></td>
                 <td class="total-cell">—</td>
                 <td class="permu-cell">—</td>
                 ${matRowTail("zoneTee")}
               </tr>
               <tr data-key="zoneValve" data-qty="${zoneValveN}">
                 <td>分区电动阀</td><td>Ø ${specBranchOd} mm · 电动</td><td>${zoneValveN} 套</td>
-                <td><input class="price-input" type="text" inputmode="decimal" min="0" step="1" placeholder="0" value="${matPriceVal('zoneValve')}""><span class="unit-tag">元/套</span></td>
+                <td><input class="price-input" type="text" inputmode="decimal" min="0" step="1" placeholder="0" value="${matPriceVal('zoneValve')}"><span class="unit-tag">元/套</span></td>
                 <td class="total-cell">—</td>
                 <td class="permu-cell">—</td>
                 ${matRowTail("zoneValve")}
               </tr>
               <tr data-key="teeJoint" data-qty="${teeN}">
                 <td>主管接入三通</td><td>${teeSpec}</td><td>${teeN > 0 ? teeN + ' 套' : '—'}</td>
-                <td><input class="price-input" type="text" inputmode="decimal" min="0" step="1" placeholder="0" value="${matPriceVal('teeJoint')}""><span class="unit-tag">元/套</span></td>
+                <td><input class="price-input" type="text" inputmode="decimal" min="0" step="1" placeholder="0" value="${matPriceVal('teeJoint')}"><span class="unit-tag">元/套</span></td>
                 <td class="total-cell">—</td>
                 <td class="permu-cell">—</td>
                 ${matRowTail("teeJoint")}
               </tr>
               <tr data-key="frontValve" data-qty="${teeN}">
                 <td>主管接入阀</td><td>Ø ${specMainOd} mm</td><td>${teeN > 0 ? teeN + ' 套' : '—'}</td>
-                <td><input class="price-input" type="text" inputmode="decimal" min="0" step="1" placeholder="0" value="${matPriceVal('frontValve')}""><span class="unit-tag">元/套</span></td>
+                <td><input class="price-input" type="text" inputmode="decimal" min="0" step="1" placeholder="0" value="${matPriceVal('frontValve')}"><span class="unit-tag">元/套</span></td>
                 <td class="total-cell">—</td>
                 <td class="permu-cell">—</td>
                 ${matRowTail("frontValve")}
@@ -9217,6 +9342,9 @@ function render() {
             </tbody>
             <tfoot><tr><td colspan="4">材料总计</td><td class="grand-total-val">¥ 0</td><td colspan="${2 + (matTbl.extraCols || []).length}"></td></tr></tfoot>
           </table></div>
+          <!-- v184（P5）：管材单价自证行 —— 由 updateMaterialTotals() 每次重算填入
+               （不用 tfoot 第二行，避免与 matRebuildFoot 的 colspan 重建机制耦合） -->
+          <div class="mat-selfcheck" id="matSelfCheck" aria-live="polite"></div>
         </article>
       </div>
     </div>
@@ -11840,7 +11968,7 @@ function tlAutoGenerate(options) {
     console.error('[tlAutoGenerate] Error:', err);
     var errDiv = document.getElementById('tlDiagramContent');
     if(errDiv) {
-      errDiv.innerHTML = '<div style="color:#dc2626;padding:20px;font-size:14px;border:1px solid #fca5a5;background:#fef2f2;border-radius:8px;">⚠️ 生成图纸时出错：' + err.message + '<br><br>请截图此错误信息反馈。</div>';
+      errDiv.innerHTML = '<div style="color:#dc2626;padding:20px;font-size:14px;border:1px solid #fca5a5;background:#fef2f2;border-radius:8px;">⚠️ 生成图纸时出错：' + esc(err.message) + '<br><br>请截图此错误信息反馈。</div>';
       document.getElementById('tlDiagramWrap').style.display='block';
     } else {
       alert('生成图纸时出错：' + err.message);
@@ -11926,7 +12054,7 @@ function tlPrintDiagram() {
   var titleText=title?title.textContent:'📋 三级管线施工简图';
   var w=window.open('','_blank');
   if(!w){alert('请允许弹出窗口以打印图纸');return;}
-  w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+titleText+'</title>');
+  w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+esc(titleText)+'</title>');
   w.document.write('<style>body{margin:0;padding:20px;font-family:system-ui,-apple-system,sans-serif;background:#fff;color:#333}');
   w.document.write('h2{margin:0 0 12px 0;font-size:18px;color:#1a3c1a}');
   w.document.write('.meta{margin-bottom:16px;font-size:13px;color:#666}');
@@ -11934,7 +12062,7 @@ function tlPrintDiagram() {
   w.document.write('svg{max-width:100%;height:auto;display:block}');
   w.document.write('@media print{body{padding:0} .no-print{display:none}}');
   w.document.write('</style></head><body>');
-  w.document.write('<h2>'+titleText+'</h2>');
+  w.document.write('<h2>'+esc(titleText)+'</h2>');
   // 打印参数
   var bar1=document.getElementById('tlPlanBar');
   var bar2=document.getElementById('tlPlanBar2');
@@ -12661,6 +12789,28 @@ document.addEventListener('input', function(e) {
       e.target.classList.contains('custom-qty')) {
     updateMaterialTotals();
   }
+});
+
+/* v184（P5）：「↺ 按价目表重取」—— 清掉管材三行的人工覆盖，回到按图面管径自动取价。
+   就地更新输入框（不整体 render()），避免打断用户正在编辑的其它单元格。
+   ⚠ 单价的「写入」只在 updateMaterialTotals 里发生（唯一写入点）；这里只清覆盖 + 回填值，
+     不另写 priceF —— v184 首版在这里（以及 change 事件里）各写一次，与 updateMaterialTotals
+     末尾的清理逻辑互相打架，导致手改永远存不下来。 */
+document.addEventListener('click', function (e) {
+  const t = e.target;
+  if (!t.classList || !t.classList.contains('mat-price-resync')) return;
+  e.preventDefault();
+  matTbl.priceF = matTbl.priceF || {};
+  MAT_PIPE_KEYS.forEach(function (k) { delete matTbl.priceF[k]; });
+  matTblSave();
+  document.querySelectorAll('.materials-card tbody tr[data-key]').forEach(function (tr) {
+    const k = tr.dataset.key;
+    if (MAT_PIPE_KEYS.indexOf(k) < 0) return;
+    const inp = tr.querySelector('.price-input');
+    const ref = tlPipePriceByOd(tr.dataset.od);
+    if (inp && ref !== '') { inp.value = ref; materialPrices[k] = ref; }
+  });
+  updateMaterialTotals();
 });
 
 // 首笔计算等待 native 桥接就绪：确保浏览器端真正走 C++（inner/hazen/velocity/local/christiansen），
@@ -16532,7 +16682,7 @@ ppPullLiftDh();                                              // 首屏对齐一�
     arr.forEach(function(p){
       var item=document.createElement('div');
       item.className='at-lib-item'+(p.id===window.currentPlotId?' current':'');
-      item.innerHTML='<div class="pli-main"><div class="pli-name">'+esc(p.name)+' <span class="pli-crop">'+(p.crop||'七彩花生')+'</span></div><div class="pli-meta">'+((p.mu!=null)?p.mu.toFixed(2):'0')+' 亩 · '+srcLabel(p.source)+' · '+fmtDate(p.ts)+'</div></div><div class="pli-actions"><button class="at-btn-action pli-btn" data-act="current">设为当前</button><button class="at-btn-action pli-btn" data-act="rename">重命名</button><button class="at-btn-action danger pli-btn" data-act="del">删除</button></div>';
+      item.innerHTML='<div class="pli-main"><div class="pli-name">'+esc(p.name)+' <span class="pli-crop">'+esc(p.crop||'七彩花生')+'</span></div><div class="pli-meta">'+((p.mu!=null)?p.mu.toFixed(2):'0')+' 亩 · '+srcLabel(p.source)+' · '+fmtDate(p.ts)+'</div></div><div class="pli-actions"><button class="at-btn-action pli-btn" data-act="current">设为当前</button><button class="at-btn-action pli-btn" data-act="rename">重命名</button><button class="at-btn-action danger pli-btn" data-act="del">删除</button></div>';
       item.querySelector('[data-act="current"]').addEventListener('click',function(){ setCurrent(p.id); });
       item.querySelector('[data-act="rename"]').addEventListener('click',function(){ renamePlot(p.id); });
       item.querySelector('[data-act="del"]').addEventListener('click',function(){ delPlot(p.id); });
@@ -19117,7 +19267,8 @@ var ISO_FITTING_UI_OFF = true;
    （不进 SVG、不改静态 DOM）；数据走共享层 RyTlAutoEdits.cals，只作显示标注，
    不参与水力计算、不进材料清单（红线同阶段2）。220 为用户点名非标规格。 —— */
 (function () {
-  var CAL_SERIES = [50, 63, 75, 90, 110, 125, 140, 160, 180, 200, 220, 225, 250, 280, 315, 355, 400, 450, 500];
+  /* 2026-10-02：档位改引全局单一来源 CAL_SERIES（含非标 Ø220，菜单里带「（非标）」角标），
+     本处不再自带一份字面量。 */
   var AE = window.RyTlAutoEdits;
   var menu = null;
   var target = null;   /* {view:'ws'|'iso', pid} */
@@ -19866,7 +20017,8 @@ var ISO_FITTING_UI_OFF = true;
      · 管材单价为占位价（面板内可改，localStorage 记忆）；电价/年运行小时/折旧年限可改；
      · 年均总成本 = 管材投入 ÷ 折旧年限 + 功率 × 年运行小时 × 电价，升序排列即经济性排序。 */
   window.tlEconPanel = (function () {
-    var PRICES_DEFAULT = { 50: 6, 63: 9, 75: 12, 90: 17, 110: 24, 125: 30, 140: 37, 160: 47, 180: 60, 200: 73, 220: 88, 225: 92, 250: 113, 280: 141, 315: 178, 355: 225, 400: 286, 450: 362, 500: 447 };
+    /* v184（P6）：默认单价表收敛为单一来源 TL_PIPE_PRICE_DEF（原此处另有第 2 份字面量副本） */
+    var PRICES_DEFAULT = TL_PIPE_PRICE_DEF;
     var ASSUM_KEY = 'runye_tlEconAssum', PRICE_KEY = 'runye_tlEconPrices';
     var st = { open: false, sel: -1, selF: null, selM: null, selB: null, cache: null, cacheKey: '' };
     function assum() {
@@ -21484,9 +21636,11 @@ var ISO_FITTING_UI_OFF = true;
     tickW: '建筑斜短线的描边宽度。',
     font: '尺寸数字的字号。'
   };
-  var SERIES = [50, 63, 75, 90, 110, 125, 140, 160, 180, 200, 220, 225, 250, 280, 315, 355, 400, 450, 500];
-  var PDEF = { 50: 6, 63: 9, 75: 12, 90: 17, 110: 24, 125: 30, 140: 37, 160: 47, 180: 60, 200: 73,
-               220: 88, 225: 92, 250: 113, 280: 141, 315: 178, 355: 225, 400: 286, 450: 362, 500: 447 };
+  /* 2026-10-02：档位改引全局单一来源 CAL_SERIES（见文件头部常量区注释），不再自带字面量副本 */
+  var SERIES = CAL_SERIES;
+  /* v184（P6）：设置页默认单价表收敛为单一来源 TL_PIPE_PRICE_DEF（原此处另有第 1 份字面量副本；
+     三份副本的一致性原先靠 verify_settings.js S7 比对，现改为「只允许存在一份」的结构契约）。 */
+  var PDEF = TL_PIPE_PRICE_DEF;
   var ADEF = { price: 0.65, hours: 1200, years: 8 };
 
   /* ---- window.RyBuryDepth：管道埋深 mm（2026-09-28 用户要求：暂定 600，可调；

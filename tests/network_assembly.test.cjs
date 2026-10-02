@@ -30,10 +30,27 @@ ok(REAL.get('GEN-ELBOW-110-90') && REAL.get('GEN-ELBOW-110-90').type === 'elbow'
   '发布目录：110 等径 90° 弯头已补录（递归接管「接弯头」需要）');
 ok(REAL.get('GEN-VALVE-110') && REAL.get('GEN-VALVE-110').type === 'valve',
   '发布目录：110 阀门已补录（管中插阀 / 白圈接阀门需要）');
-ok(REAL.all().length === 4, '发布目录：本阶段 110 等径闭环共 4 条目（管/三通/弯头/阀门）');
-ok(!REAL.get('GEN-RED-110-90') && !REAL.get('GEN-CAP-110') && !REAL.get('GEN-PIPE-90') && !REAL.get('GEN-ELB-110-90'),
-  '发布目录：异径 / 封堵 / 非 110 口径仍未收录（反向断言：不得误扩散）');
-ok(REAL.version === '2026.09.15-1', '发布目录：版本已递增（2026.09.15-1）');
+/* 2026-10-02 契约更新：发布目录已从「110 等径 4 条目」扩到整套常用 PE 外径系列
+   （90/110/140/160/200/225 的 管+等径三通+90°弯头+球阀，再加减径接头与异径三通）。
+   断言随之改为「口径无关的结构性判据」，避免每加一档就报红：
+     · 唯一 id 数 == 条目总数（2026-10-02 修的重复录入 bug：曾经 37 条里 4 条同 id）
+     · 封堵（cap）仍未收录（引擎支持但暂无型号条目）
+     · 版本号格式合法且不倒退
+   注意：`all()` 是浅拷贝数组，此处只读，不会污染目录。 */
+const REAL_ALL = REAL.all();
+const REAL_IDS = REAL_ALL.map(function (x) { return x.id; });
+const REAL_UNIQ = REAL_IDS.filter(function (v, i) { return REAL_IDS.indexOf(v) === i; });
+ok(REAL_UNIQ.length === REAL_IDS.length,
+  '发布目录：无重复 id（唯一 ' + REAL_UNIQ.length + ' / 总数 ' + REAL_IDS.length + '）');
+ok(REAL_UNIQ.length >= 33, '发布目录：条目数不少于 2026-10-02 基线 33（实际 ' + REAL_UNIQ.length + '）');
+ok(!REAL.get('GEN-CAP-110'),
+  '发布目录：封堵仍未收录（反向断言：不因扩系列而误加 cap）');
+ok(!!REAL.get('GEN-PIPE-90') && !!REAL.get('GEN-RED-110-90') && !!REAL.get('GEN-TEE-160-160-110'),
+  '发布目录：90 系列 / 异径接头 / 异径三通已收录（扩系列后应存在）');
+ok(REAL_ALL.every(function (x) { return x.id && x.type && x.source; }),
+  '发布目录：每条都有 id/type/source（结构完整性）');
+ok(/^\d{4}\.\d{2}\.\d{2}-\d+$/.test(REAL.version) && REAL.version >= '2026.09.15-1',
+  '发布目录：版本号格式合法且不倒退（实际 ' + REAL.version + '）');
 ok(FIXTURE.get('GEN-TEE-110-110-90') && FIXTURE.get('GEN-TEE-110-110-90').type === 'tee', '夹具目录：三通型号存在');
 ok(CAT.portCount('tee') === 3 && CAT.portCount('valve') === 2 && CAT.portCount('elbow') === 2 && CAT.portCount('reducer') === 2 && CAT.portCount('cap') === 1, '夹具目录：固定接口数契约（阀/弯/异径=2 三通=3 封堵=1）');
 ok(CAT.level() === 'generic', '夹具目录：当前为通用施工示意级');

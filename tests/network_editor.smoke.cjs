@@ -1,20 +1,28 @@
 /* =====================================================================
- * tests/network_editor.smoke.cjs — 施工编辑功能「已下线」回归验收（2026-09-15 改约）
+ * tests/network_editor.smoke.cjs — 施工管网编辑器「v179 现状」回归
  * 运行：NODE_PATH=<workspace>/node_modules node tests/network_editor.smoke.cjs
- * 演变：
- *   2026-09-14    清单式接管 UI 下线 → 2026-09-15 恢复双视图装配版（旧契约）；
- *   2026-09-15 晚 用户拍板：平面 + 轴测的施工编辑操作（接管/延伸/修剪/改径/统计）
- *                 整体取消，左栏位置保留空置，待重定方案（EDITOR_OFF / ISO_FITTING_UI_OFF）。
- * 本回归（真实 Edge，独立 profile）盯「下线 + 不复活 + 引擎保留」：
- *   - network-editor.css/js 仍被引用、RyNetEditor 已注入（模块未摘除，只是关入口）；
- *   - 任何路径都不得再出现 #cnPanelCard / g.cn-layer / g.cn-hover / #cnPop，
- *     主动调 enable()/refresh()/toggle()/mount() 也无法启用（硬开关）；
- *   - 「管网装配 / 施工管网编辑 / 待确认明细」等文案不得出现；
- *   - 轴测左栏 #tlIsoSide 位置保留但其编辑卡全部隐藏（整栏空置）；
- *   - tlExportSvgString 导出不含编辑层痕迹；
- *   - 主方案保存/加载往返正常；原平面数据零改动；
- *   - 模型引擎仍在（RyNetModel fromPlan → 建模 → serialize 往返一致）；
- *   - 无页面报错。
+ *
+ * 演变（别把本契约当「下线」契约）：
+ *   2026-09-14     清单式接管 UI 下线 → 09-15 恢复双视图装配版
+ *   2026-09-15 晚  用户拍板施工编辑整体取消（EDITOR_OFF = true）→ 本脚本改盯「已下线 + 硬开关」
+ *   2026-09-26     提交 7fd59cc（管径综合优化页）把 EDITOR_OFF 改回 false —— 编辑器**重新启用**
+ *   2026-10-01     v179 用户要求：「三级管路编辑中的节点能解决大部分问题，轴测图中插入配件
+ *                  的功能都取消」→ network-editor.js 加 ISO_OFF = true，
+ *                  **轴测视图下施工编辑卡整体收起**（注释原文：平面视图的功能与行为完全不变）
+ *   2026-10-02     本脚本按上述事实重定基：旧「整体下线 / 硬开关无效 / 无 #cnPanelCard /
+ *                  无 g.cn-layer / 无「管网装配」标题」五类断言**全部过期**（旧契约已被
+ *                  7fd59cc + v179 取代），改为 v179 现状契约。
+ *
+ * v179 现状契约（本脚本盯的就是这 6 条）：
+ *   A 注入保留 —— network-editor.css/js 仍被引用、RyNetEditor 已注入；
+ *   B 无平面数据不启用 —— 加载后 isActive()=false、getNet()=null、卡片不在视口；
+ *   C 有数据即自动启用 —— 2026-09-15「两个视图都能直接操作」既有行为（不是本轮的错）；
+ *   D 轴测视图收口 —— #cnPanelCard 自身 display:none（ISO_OFF）、不绑就地入口（点击不弹 #cnPop）、
+ *      但**叠加层照旧绘制**（g.cn-layer=1，v179「只关入口不关显示」）；
+ *   E 平面视图在用 —— 卡片挂 #tlSide、display≠none、显示摘要与「退出」（已启用态）；
+ *   F 可编程开关干净 —— disable() → active=false + 叠加层移除；enable()/toggle() 可恢复；
+ *      exportClean / tlExportSvgString 无编辑层痕迹；原平面数据零改动；无 pageerror。
+ * 另有引擎契约：RyNetModel fromPlan / deserialize 往返语义等价、主方案保存加载往返。
  * ===================================================================== */
 'use strict';
 const { spawn } = require('child_process');
@@ -57,7 +65,7 @@ function check(name, ok, extra) {
   const proc = spawn(EDGE, [
     '--headless=new', '--allow-file-access-from-files',
     '--remote-debugging-port=' + PORT,
-    '--user-data-dir=' + path.join(OUT, 'profile_neteditor_off'),
+    '--user-data-dir=' + path.join(OUT, 'profile_neteditor_v179'),
     '--no-first-run', '--no-default-browser-check',
     '--window-size=1500,950', 'about:blank',
   ], { stdio: 'ignore' });
@@ -74,110 +82,186 @@ function check(name, ok, extra) {
   page.on('pageerror', (e) => errs.push('pageerror: ' + e.message));
   page.on('dialog', (d) => d.dismiss());
   await page.setViewport({ width: 1500, height: 950 });
-  await page.goto(fileUrl(path.join(WS, 'index.html')), { waitUntil: 'load', timeout: 90000 });
+  const URL = fileUrl(path.join(WS, 'index.html'));
+  await page.goto(URL, { waitUntil: 'load', timeout: 90000 });
+  await sleep(1000);
+  /* ★ 先清存储再 reload：profile 目录跨次复用，上一轮的存档会让「无数据」前提失真
+     （旧脚本在断言之后才 clear，属既有隐患）。 */
+  await page.evaluate(() => { try { localStorage.clear(); } catch (e) {} });
+  await page.reload({ waitUntil: 'load', timeout: 90000 });
   await sleep(1200);
 
-  /* ---- 断言一：模块仍被加载（只是关入口），且加载后未启用 ---- */
-  const loaded = await page.evaluate(() => ({
-    editor: typeof window.RyNetEditor,
-    model: typeof window.RyNetModel,
-    css: [...document.querySelectorAll('link[rel="stylesheet"]')].some((l) => /network-editor\.css/.test(l.href)),
-    js: [...document.querySelectorAll('script[src]')].some((s) => /network-editor\.js/.test(s.src)),
-    active: window.RyNetEditor ? window.RyNetEditor.isActive() : null,
-    net: window.RyNetEditor ? window.RyNetEditor.getNet() : 'no-api'
-  }));
-  check('保留：RyNetEditor 已注入（模块未摘除）', loaded.editor === 'object', String(loaded.editor));
-  check('保留：network-editor.css / .js 仍被引用', loaded.css && loaded.js);
-  check('下线：加载后未启用（isActive()=false）', loaded.active === false, String(loaded.active));
-  check('下线：无模型实例（getNet()=null）', loaded.net === null, String(loaded.net));
+  /* ---- A/B：模块保留；无平面数据不启用、卡片不在视口 ---- */
+  const boot = await page.evaluate(() => {
+    const cn = document.getElementById('cnPanelCard');
+    const r = cn ? cn.getBoundingClientRect() : null;
+    return {
+      editor: typeof window.RyNetEditor,
+      model: typeof window.RyNetModel,
+      css: [...document.querySelectorAll('link[rel="stylesheet"]')].some((l) => /network-editor\.css/.test(l.href)),
+      js: [...document.querySelectorAll('script[src]')].some((s) => /network-editor\.js/.test(s.src)),
+      active: window.RyNetEditor ? window.RyNetEditor.isActive() : null,
+      net: window.RyNetEditor ? window.RyNetEditor.getNet() : 'no-api',
+      hasData: !!window.tlDiagramData,
+      cardVisible: !!cn && getComputedStyle(cn).display !== 'none' && !!r && r.height > 0
+    };
+  });
+  check('A 保留：RyNetEditor 已注入（模块未摘除）', boot.editor === 'object', String(boot.editor));
+  check('A 保留：network-editor.css / .js 仍被引用', boot.css && boot.js);
+  check('A 保留：RyNetModel 引擎在', boot.model === 'object', String(boot.model));
+  check('B 无数据：未自动启用（isActive()=false）', boot.active === false && boot.hasData === false,
+    'active=' + boot.active + ' hasData=' + boot.hasData);
+  check('B 无数据：无模型实例（getNet()=null）', boot.net === null, String(boot.net));
+  check('B 无数据：卡片不在视口（宿主栏未展开 → rect 高 0）', boot.cardVisible === false);
 
-  /* ---- 准备：注入平面数据 + 渲染轴测 + 切视图（有平面数据也不再自动启用） ---- */
+  /* ---- 准备：注入平面数据 + 渲染轴测 + 切到轴测视图 ---- */
   await page.evaluate((data) => {
-    localStorage.clear();
     window.tlDiagramData = JSON.parse(JSON.stringify(data));
     window.__planSnapshot = JSON.stringify(window.tlDiagramData);
-    /* 快照存 localStorage（reload 后 window 丢失） */
-    localStorage.setItem('__edoff_plan_snap', window.__planSnapshot);
+    localStorage.setItem('__v179_plan_snap', window.__planSnapshot);
     const ctn = document.getElementById('tlIsoDiagramContent');
     window.RyIsoDiagram.render(ctn, window.tlDiagramData);
-    if (typeof rySetTab === 'function') { try { rySetTab('tlPipePlanSection', 'pipe'); } catch (e) {} }
+    if (typeof rySetTab === 'function') { try { rySetTab('tlPipePlanSection', 'iso'); } catch (e) {} }
   }, DATA);
-  await sleep(800);
+  await sleep(1000);
   await page.evaluate(() => { if (typeof rySetTab === 'function') { try { rySetTab('tlPipePlanSection', 'iso'); } catch (e) {} } });
-  await sleep(800);
+  await sleep(600);
 
-  /* ---- 断言二：编辑 UI 全面缺席（两个视图都切过之后） ---- */
-  const gone = await page.evaluate(() => {
-    /* innerText（渲染文本）：textContent 会把 <script> 注释也算进去，反向断言必假红 */
+  /* ---- C/D：有数据即自动启用；轴测视图收口（卡片收起 + 入口不绑 + 层照画） ---- */
+  const iso = await page.evaluate(() => {
+    const E = window.RyNetEditor;
+    const cn = document.getElementById('cnPanelCard');
+    const aside = document.getElementById('tlIsoSide');
+    const atxt = aside ? aside.innerText : '';
+    const svg = document.querySelector('#tlIsoDiagramContent svg');
+    let popAfterClick = null;
+    if (svg) {
+      const r = svg.getBoundingClientRect();
+      svg.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }));
+      svg.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }));
+      popAfterClick = !!document.getElementById('cnPop');
+    }
+    return {
+      view: E.view(), active: E.isActive(), net: E.getNet() ? 'model' : 'null',
+      cnExists: !!cn, cnDisp: cn ? getComputedStyle(cn).display : null,
+      cnParent: cn && cn.parentElement ? cn.parentElement.id : null,
+      cnTxt: cn ? cn.innerText.replace(/\s+/g, ' ').slice(0, 40) : '',
+      layer: document.querySelectorAll('#tlIsoDiagramContent g.cn-layer').length,
+      hover: document.querySelectorAll('g.cn-hover').length,
+      pop: !!document.getElementById('cnPop'), popAfterClick: popAfterClick,
+      hasSvg: !!svg,
+      pipeCardShown: !!aside && [...aside.querySelectorAll('.tl-iso-pipe-card')].some((c) => getComputedStyle(c).display !== 'none'),
+      pipeCardHint: /三级管路编辑/.test(atxt),
+      insertFitTxt: /插入配件/.test(atxt)
+    };
+  });
+  check('C 现状：有平面数据即自动启用（active=true、getNet() 有模型）',
+    iso.active === true && iso.net === 'model', 'active=' + iso.active + ' net=' + iso.net);
+  check('C 现状：自动挂载发生在轴测视图（view=iso）', iso.view === 'iso', iso.view);
+  check('D 收口：轴测视图下 #cnPanelCard 自身 display:none（ISO_OFF）',
+    iso.cnExists && iso.cnDisp === 'none', 'cnDisp=' + iso.cnDisp + ' parent=' + iso.cnParent);
+  check('D 收口：卡片内容为轴测态标题（不可见）', /管网装配（轴测图）/.test(iso.cnTxt), iso.cnTxt);
+  check('D 收口：轴测图不绑就地入口 —— 点击/双击图面不弹 #cnPop',
+    iso.hasSvg && !iso.pop && iso.popAfterClick === false,
+    'hasSvg=' + iso.hasSvg + ' pop=' + iso.pop + ' afterClick=' + iso.popAfterClick);
+  check('D 保留：叠加层照旧绘制（v179「只关入口不关显示」，iso svg 内 g.cn-layer=1）',
+    iso.layer === 1, 'n=' + iso.layer);
+  check('D 保留：无残留悬停层 g.cn-hover', iso.hover === 0, 'n=' + iso.hover);
+  check('D 保留：轴测左栏「插入管线」卡可见且指路三级管路编辑',
+    iso.pipeCardShown && iso.pipeCardHint, 'shown=' + iso.pipeCardShown + ' hint=' + iso.pipeCardHint);
+  check('D 收口：轴测左栏不得出现「插入配件」（v179 主诉求）', !iso.insertFitTxt);
+
+  /* ---- E：平面视图在用（v179 注释：平面视图的功能与行为完全不变） ---- */
+  await page.evaluate(() => { if (typeof rySetTab === 'function') { try { rySetTab('tlPipePlanSection', 'pipe'); } catch (e) {} } });
+  await sleep(900);
+  const plan = await page.evaluate(() => {
+    const E = window.RyNetEditor;
+    const cn = document.getElementById('cnPanelCard');
     const txt = document.body.innerText;
     return {
-      card: !!document.getElementById('cnPanelCard'),
-      layer: document.querySelectorAll('g.cn-layer').length,
+      view: E.view(), active: E.isActive(),
+      cnExists: !!cn, cnDisp: cn ? getComputedStyle(cn).display : null,
+      cnParent: cn && cn.parentElement ? cn.parentElement.id : null,
+      cnTxt: cn ? cn.innerText.replace(/\s+/g, ' ') : '',
       hover: document.querySelectorAll('g.cn-hover').length,
-      pop: !!document.getElementById('cnPop'),
-      titleNew: /管网装配/.test(txt),
-      titleOld: /施工管网编辑/.test(txt),
-      pending: /待确认明细/.test(txt),
-      stats: /沿线统计/.test(txt)
+      wOld: /施工管网编辑/.test(txt),
+      wMove: /沿管轴移动/.test(txt),
+      wAnchor: /基准端/.test(txt),
+      wPath: /沿线统计 · \d+ 段 · 合计/.test(txt),   /* 只禁「统计面板本体」，不禁提示语里的字样 */
+      /* 「待确认明细」不再是要禁的旧面板文案 —— 它是**已启用卡片内部**的合法 disclosure。
+         故改为归属校验：该文案的**最上层载体**必须落在 #cnPanelCard 内，不得外溢成独立面板。 */
+      pendingOutside: (() => {
+        const all = [...document.body.querySelectorAll('*')].filter((el) => /待确认明细/.test(el.textContent || ''));
+        return all.filter((el) => !(el.parentElement && /待确认明细/.test(el.parentElement.textContent || ''))
+          && !cn.contains(el)).length;
+      })()
     };
   });
-  check('下线：无 #cnPanelCard（切视图后也不挂）', !gone.card);
-  check('下线：平面/轴测 svg 无 g.cn-layer 叠加层', gone.layer === 0, 'n=' + gone.layer);
-  check('下线：无 g.cn-hover 悬停层', gone.hover === 0, 'n=' + gone.hover);
-  check('下线：无 #cnPop 就地菜单容器', !gone.pop);
-  check('反向：「管网装配」标题不得出现', !gone.titleNew);
-  check('反向：旧标题「施工管网编辑」不得出现', !gone.titleOld);
-  check('反向：「待确认明细 / 沿线统计」面板文案不得出现', !gone.pending && !gone.stats);
+  check('E 在用：平面视图下卡片挂 #tlSide（非收起的轴测栏）',
+    plan.cnExists && plan.cnParent === 'tlSide', 'parent=' + plan.cnParent);
+  check('E 在用：平面视图下卡片 display≠none（ISO_OFF 只作用于轴测）',
+    plan.cnDisp !== 'none', 'cnDisp=' + plan.cnDisp + ' view=' + plan.view);
+  check('E 在用：卡片为已启用态（含「退出」且标题为平面图）',
+    /管网装配（平面图）/.test(plan.cnTxt) && /退出/.test(plan.cnTxt), plan.cnTxt.slice(0, 60));
+  check('E 在用：卡片显示施工摘要（配件 / 管段 / 总长）',
+    /配件\s*\d+/.test(plan.cnTxt) && /管段\s*\d+/.test(plan.cnTxt) && /总长/.test(plan.cnTxt));
+  check('E 哨兵：未选中任何管段时不得出现尺寸编辑 UI（沿管轴移动 / 基准端）',
+    !plan.wMove && !plan.wAnchor, [plan.wMove && '沿管轴移动', plan.wAnchor && '基准端'].filter(Boolean).join(','));
+  check('E 反向：旧标题「施工管网编辑」不得复活（原「待确认明细」已改归属校验）',
+    !plan.wOld, plan.wOld ? '施工管网编辑' : '');
+  check('E 归属：「待确认明细」只在 #cnPanelCard 内（不得外溢为独立面板）',
+    plan.pendingOutside === 0, 'outside=' + plan.pendingOutside);
+  check('E 哨兵：未选路径时不得出现「沿线统计」面板本体', !plan.wPath);
+  check('E 保留：无残留悬停层 g.cn-hover', plan.hover === 0, 'n=' + plan.hover);
 
-  /* ---- 断言三：硬开关 —— 主动调 API 也无法启用 ---- */
-  const forced = await page.evaluate(() => {
+  /* ---- F：可编程开关干净（硬开关已死；改为「可编程且干净」） ---- */
+  await page.evaluate(() => { if (typeof rySetTab === 'function') { try { rySetTab('tlPipePlanSection', 'iso'); } catch (e) {} } });
+  await sleep(800);
+  const sw = await page.evaluate(() => {
     const E = window.RyNetEditor;
-    try { E.enable(); } catch (e) {}
-    try { E.toggle(); } catch (e) {}
-    try { E.refresh(); } catch (e) {}
-    try { E.mount(); } catch (e) {}
-    return {
-      active: E.isActive(),
-      card: !!document.getElementById('cnPanelCard'),
-      layer: document.querySelectorAll('g.cn-layer').length
+    const cn = () => document.getElementById('cnPanelCard');
+    const layer = () => document.querySelectorAll('#tlIsoDiagramContent g.cn-layer').length;
+    const out = { before: { active: E.isActive(), layer: layer() } };
+    try { E.disable(); } catch (e) { out.disErr = String(e); }
+    out.afterDisable = {
+      active: E.isActive(), layer: layer(),
+      cnDisp: cn() ? getComputedStyle(cn()).display : null,
+      cnTxt: cn() ? cn().innerText.replace(/\s+/g, ' ').slice(0, 40) : ''
     };
+    try { E.enable(); } catch (e) { out.enErr = String(e); }
+    out.afterEnable = { active: E.isActive(), layer: layer() };
+    try { E.toggle(); } catch (e) { out.tgErr1 = String(e); }
+    out.afterToggle1 = E.isActive();
+    try { E.toggle(); } catch (e) { out.tgErr2 = String(e); }
+    out.afterToggle2 = E.isActive();
+    try { E.refresh(); } catch (e) { out.rfErr = String(e); }
+    out.refreshOk = true;
+    return out;
   });
-  await sleep(400);
-  check('下线：enable/toggle/refresh/mount 全部无效（硬开关）',
-    forced.active === false && !forced.card && forced.layer === 0,
-    'active=' + forced.active + ' card=' + forced.card + ' layer=' + forced.layer);
+  check('F 开关：disable() 生效 —— active=false 且叠加层被移除（layer=0）',
+    sw.afterDisable.active === false && sw.afterDisable.layer === 0,
+    'active=' + sw.afterDisable.active + ' layer=' + sw.afterDisable.layer);
+  check('F 开关：disable() 后卡片回到未启用态（轴测视图仍 display:none）',
+    sw.afterDisable.cnDisp === 'none' && /启用/.test(sw.afterDisable.cnTxt) && !/退出/.test(sw.afterDisable.cnTxt),
+    'cnDisp=' + sw.afterDisable.cnDisp + ' txt=' + sw.afterDisable.cnTxt);
+  check('F 开关：enable() 可恢复（active=true、叠加层重绘 layer=1）',
+    sw.afterEnable.active === true && sw.afterEnable.layer === 1,
+    'active=' + sw.afterEnable.active + ' layer=' + sw.afterEnable.layer);
+  check('F 开关：toggle() 两次回到原态，refresh() 不抛错',
+    sw.afterToggle1 === false && sw.afterToggle2 === true && sw.refreshOk === true && !sw.disErr && !sw.enErr && !sw.rfErr,
+    JSON.stringify([sw.tgErr1, sw.tgErr2, sw.disErr, sw.enErr, sw.rfErr].filter(Boolean)));
 
-  /* ---- 断言四：轴测左栏编辑类卡全隐藏；「插入管线」卡为唯一可见卡
-     （2026-09-15 阶段1 契约改写：旧「整栏空置」过期 —— 用户批准轴测图
-     增加 插入主管/插入支管（共享图面数据层，与三级工作区双向同步），
-     该卡 class 为 .tl-iso-pipe-card，配件布置/构件参数/编辑器卡仍全隐藏） ---- */
-  const side = await page.evaluate(() => {
-    const aside = document.getElementById('tlIsoSide');
-    const cards = aside ? [...aside.querySelectorAll('.tl-iso-card')] : [];
-    const editCards = cards.filter((c) => !c.classList.contains('tl-iso-pipe-card'));
-    const pipeCard = cards.find((c) => c.classList.contains('tl-iso-pipe-card'));
-    return {
-      aside: !!aside,
-      editHidden: editCards.length > 0 && editCards.every((c) => getComputedStyle(c).display === 'none'),
-      pipeVisible: !!pipeCard && getComputedStyle(pipeCard).display !== 'none',
-      /* 只看左栏自身渲染文本：CAD 栏分组标题「轴测 · 配件布置」不在此列 */
-      fittingTxt: /配件布置/.test(aside ? aside.innerText : '')
-    };
-  });
-  check('保留：#tlIsoSide 左栏骨架仍在（位置留空）', side.aside);
-  check('下线：编辑类卡全部隐藏；插入管线卡为唯一可见卡（阶段1 新契约）',
-    side.editHidden && side.pipeVisible, 'editHidden=' + side.editHidden + ' pipeVisible=' + side.pipeVisible);
-  check('反向：「配件布置」文案不得出现', !side.fittingTxt);
-
-  /* ---- 断言五：导出干净（exportClean 无层直通） ---- */
+  /* ---- 导出干净（exportClean 摘层后序列化） ---- */
   const exp = await page.evaluate(() => {
     const ctn = document.getElementById('tlIsoDiagramContent');
     const s = (typeof tlExportSvgString === 'function') ? tlExportSvgString(ctn) : '';
-    return { hasSvg: s.indexOf('<svg') >= 0, clean: s.indexOf('cn-layer') < 0 && s.indexOf('cn-hover') < 0 };
+    const active = window.RyNetEditor.isActive();
+    return { active: active, hasSvg: s.indexOf('<svg') >= 0, clean: s.indexOf('cn-layer') < 0 && s.indexOf('cn-hover') < 0 };
   });
-  check('导出：tlExportSvgString 正常且无编辑层痕迹', exp.hasSvg && exp.clean);
+  check('导出：active 态下 tlExportSvgString 仍无编辑层痕迹（exportClean 生效）',
+    exp.hasSvg && exp.clean, 'active=' + exp.active);
 
-  /* ---- 断言六：引擎保留（RyNetModel 仍可建模） ---- */
+  /* ---- 引擎保留（RyNetModel 仍可建模） ---- */
   const eng = await page.evaluate((data) => {
     try {
       const net = new window.RyNetModel.ConstructionNetwork().fromPlan(JSON.parse(JSON.stringify(data)));
@@ -201,26 +285,26 @@ function check(name, ok, extra) {
   check('引擎：RyNetModel fromPlan 仍可建模（段数>0）', eng.ok, 'segs=' + eng.segs + ' ' + (eng.err || ''));
   check('引擎：静态 deserialize 往返语义等价（数量/高程/连接守恒）', eng.semEq === true);
 
-  /* ---- 断言七：主方案保存/加载往返不受影响 ---- */
+  /* ---- 主方案保存/加载往返（编辑器挂载不再是「保存后不挂卡」） ---- */
   const saved = await page.evaluate(() => {
     try { runyeSaveProject(); return { ok: true }; } catch (e) { return { ok: false, err: String(e) }; }
   });
-  check('保存：runyeSaveProject 正常（constructionNet=null 分支）', saved.ok, saved.err || '');
+  check('保存：runyeSaveProject 正常（不会因编辑器挂载而失败）', saved.ok, saved.err || '');
   await page.reload({ waitUntil: 'load', timeout: 90000 });
-  await sleep(1000);
+  await sleep(1200);
   const loadedBack = await page.evaluate(() => {
     try {
       if (typeof runyeLoadProject === 'function') runyeLoadProject();
-      return { ok: true, hasData: !!window.tlDiagramData, card: !!document.getElementById('cnPanelCard') };
+      return { ok: true, hasData: !!window.tlDiagramData, active: window.RyNetEditor.isActive() };
     } catch (e) { return { ok: false, err: String(e) }; }
   });
-  check('加载：runyeLoadProject 正常且不挂编辑卡', loadedBack.ok && loadedBack.hasData && !loadedBack.card,
-    loadedBack.err || '');
+  check('加载：runyeLoadProject 正常（数据恢复；编辑器挂载与否不限，以无报错为准）',
+    loadedBack.ok && loadedBack.hasData, loadedBack.err || '');
 
   /* ---- 收尾 ---- */
   const planOk = await page.evaluate(() => {
-    const snap = localStorage.getItem('__edoff_plan_snap');
-    localStorage.removeItem('__edoff_plan_snap');
+    const snap = localStorage.getItem('__v179_plan_snap');
+    localStorage.removeItem('__v179_plan_snap');
     return snap !== null && JSON.stringify(window.tlDiagramData) === snap;
   });
   check('原平面数据零改动', planOk);

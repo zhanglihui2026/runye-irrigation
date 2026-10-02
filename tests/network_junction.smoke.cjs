@@ -1,14 +1,18 @@
 /* =====================================================================
- * tests/network_junction.smoke.cjs — 「改管长 → 接头随动」引擎抽查 + 编辑 UI 下线回归
+ * tests/network_junction.smoke.cjs — 「改管长 → 接头随动」引擎抽查 + 施工编辑器 v179 现状回归
  * 运行：NODE_PATH=<workspace>/node_modules node tests/network_junction.smoke.cjs
- * 演变：
+ * 演变（旧「已下线」契约已被取代，勿照旧口径改回）：
  *   2026-09-15 早 本脚本曾用真实鼠标驱动左栏「沿管轴移动 / 基准端」UI（21 项）；
- *   2026-09-15 晚 用户拍板施工编辑 UI 整体下线（平面+轴测，左栏空置待重定）。
- *                 → UI 交互断言随之退役，随动/锚点契约改由**模型 API 直驱**抽查，
- *                   完整契约仍由 tests/network_junction_move.test.cjs（100 项）覆盖。
+ *   2026-09-15 晚 用户拍板施工编辑 UI 整体取消（EDITOR_OFF = true）→ UI 断言退役；
+ *   2026-09-26 提交 7fd59cc 把 EDITOR_OFF 改回 false（编辑器重新启用）；
+ *   2026-10-01 v179 只收**轴测**入口（ISO_OFF），平面视图行为不变；
+ *   2026-10-02 本脚本重定基：A 段「无卡片 / 硬开关无效」过期，改为 v179 现状。
  * 本回归（真实 Edge，独立 profile）盯：
- *   A) 编辑 UI 已下线：无 #cnPanelCard / cn-layer /「沿管轴移动」「基准端」入口，
- *      enable() 硬开关无效；
+ *   A) 施工编辑器 v179 现状（平面视图在用 + 可编程开关干净）：有平面数据即自动启用、
+ *      卡片挂 #tlSide 且不收起、disable()/enable() 可编程且生效；
+ *      未选中任何管段时「沿管轴移动 / 基准端」编辑 UI 不得出现（哨兵）；
+ *      ★ 叠加层计数不在此断言 —— 本脚本不渲染平面 svg，该项在
+ *        tests/network_editor.smoke.cjs 里以真实 svg 做非平凡断言。
  *   B) 引擎保留（API 直驱）：
  *      1) 改上游主管段 18→21 → 三通 T-V1 沿主管轴滑 3m，阀门 V1 随动，
  *         锚固支管两子段重新切分且长度和守恒（M9 场景）；
@@ -87,25 +91,38 @@ function check(name, ok, extra) {
   }, DATA);
   await sleep(800);
 
-  /* ---- A) 编辑 UI 已下线 ---- */
+  /* ---- A) 施工编辑器 v179 现状：平面视图在用 + 可编程开关干净 ---- */
   const ui = await page.evaluate(() => {
     const E = window.RyNetEditor;
-    try { E.enable(); } catch (e) {}
-    try { E.refresh(); } catch (e) {}
+    const cn = () => document.getElementById('cnPanelCard');
+    const cardDisp = () => (cn() ? getComputedStyle(cn()).display : 'missing');
+    const out = { injected: typeof E, autoActive: E.isActive(), hasNet: !!E.getNet() };
+    try { E.refresh(); } catch (e) { out.refreshErr = String(e); }
+    out.afterRefresh = { active: E.isActive(), disp: cardDisp(), parent: cn() && cn().parentElement ? cn().parentElement.id : null };
+    try { E.disable(); } catch (e) { out.disErr = String(e); }
+    out.afterDisable = { active: E.isActive(), disp: cardDisp(),
+      txt: cn() ? cn().innerText.replace(/\s+/g, ' ').slice(0, 24) : '' };
+    try { E.enable(); } catch (e) { out.enErr = String(e); }
+    out.afterEnable = { active: E.isActive(), disp: cardDisp() };
     const txt = document.body.innerText;
-    return {
-      active: E.isActive(),
-      card: !!document.getElementById('cnPanelCard'),
-      layer: document.querySelectorAll('g.cn-layer').length,
-      wMove: /沿管轴移动/.test(txt),
-      wAnchor: /基准端/.test(txt),
-      wConfirm: /确认修改|确认延伸|确认修剪/.test(txt)
-    };
+    out.wMove = /沿管轴移动/.test(txt);
+    out.wAnchor = /基准端/.test(txt);
+    out.wConfirm = /确认修改|确认延伸|确认修剪/.test(txt);
+    return out;
   });
-  check('下线：enable/refresh 无效（active=false、无卡片、无叠加层）',
-    ui.active === false && !ui.card && ui.layer === 0,
-    'active=' + ui.active + ' card=' + ui.card + ' layer=' + ui.layer);
-  check('反向：「沿管轴移动 / 基准端 / 确认修改」等编辑入口文案不得出现',
+  check('A 现状：有平面数据即自动启用（平面视图施工编辑器在用）',
+    ui.injected === 'object' && ui.autoActive === true && ui.hasNet === true,
+    'injected=' + ui.injected + ' active=' + ui.autoActive + ' net=' + ui.hasNet);
+  check('A 在用：卡片挂 #tlSide 且未收起（ISO_OFF 只作用于轴测）',
+    ui.afterRefresh.parent === 'tlSide' && ui.afterRefresh.disp !== 'none',
+    'parent=' + ui.afterRefresh.parent + ' disp=' + ui.afterRefresh.disp);
+  check('A 开关：disable()→false 且卡片回未启用态；enable() 可恢复（非硬开关）',
+    ui.afterDisable.active === false && ui.afterEnable.active === true &&
+    /启用/.test(ui.afterDisable.txt) && !/退出/.test(ui.afterDisable.txt) &&
+    !ui.disErr && !ui.enErr && !ui.refreshErr,
+    'dis=' + ui.afterDisable.active + ' en=' + ui.afterEnable.active +
+    ' txt=' + ui.afterDisable.txt + ' err=' + [ui.disErr, ui.enErr, ui.refreshErr].filter(Boolean).join('|'));
+  check('A 哨兵：未选中任何管段时不得出现「沿管轴移动 / 基准端 / 确认*」编辑 UI',
     !ui.wMove && !ui.wAnchor && !ui.wConfirm,
     [ui.wMove && '沿管轴移动', ui.wAnchor && '基准端', ui.wConfirm && '确认*'].filter(Boolean).join(','));
 
