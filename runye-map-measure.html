@@ -165,7 +165,9 @@
         <h4 class="sec-t">绘制</h4>
         <div class="tools">
           <button class="mbtn" id="btnDraw">✏️ 开始画框</button>
-          <button class="mbtn" id="btnFinish">✅ 完成</button>
+          <!-- [v186] 「完成」的语义已升级为「定稿本块 + 清空 + 继续画下一块」，
+               按钮文案随之改，让用户一眼知道点完还能接着画（见 btnFinish 处理函数）。 -->
+          <button class="mbtn" id="btnFinish">✅ 完成并画下一块</button>
           <button class="mbtn" id="btnAddPt">➕ 加点</button>
           <button class="mbtn" id="btnUndo">↩ 撤销</button>
           <button class="mbtn" id="btnMeasure">📏 测距</button>
@@ -179,7 +181,7 @@
         <div class="row"><span class="k">平方</span><span class="v"><span id="sq">0</span><small>㎡</small></span></div>
         <div class="row"><span class="k">周长</span><span class="v"><span id="peri">0</span><small>m</small></span></div>
         <div class="row"><span class="k">顶点</span><span class="v"><span id="pts">0</span><small>个</small></span></div>
-        <div class="hint">点击地图添加顶点；拖动顶点可微调；「完成」自动闭合并计算。画完点「➕ 加点」，拖动框线上的 ⊕ 手柄（或贴着框线单击）即可继续增加标点，把地块贴得更准。面积按真实球面经纬度计算。</div>
+        <div class="hint">点击地图添加顶点；拖动顶点可微调；「完成并画下一块」会自动保存本块、清空画布并让你**接着画下一块**（可连画多块小地块）。画完点「🔗 拼接地块」把它们拼成一个大地块。画完点「➕ 加点」，拖动框线上的 ⊕ 手柄（或贴着框线单击）即可继续增加标点，把地块贴得更准。面积按真实球面经纬度计算。</div>
         <div class="save-row">
           <button class="mbtn mbtn-primary" id="btnCopy">↩ 回传设计工具</button>
           <button class="mbtn mbtn-primary" id="btnSavePlot">💾 保存地块</button>
@@ -745,8 +747,8 @@
     if(drawing) map.dragging.disable(); else map.dragging.enable();
     btnDraw.textContent = drawing ? '✏️ 绘制中…' : '✏️ 开始画框';
     document.getElementById('tip').textContent = drawing
-      ? '十字光标处即落点：依次点击地块边界顶点；拖动已有顶点可微调，点「完成」闭合。'
-      : '点击「✏️ 开始画框」后，在卫星图上依次点击地块边界顶点即可。';
+      ? '十字光标处即落点：依次点击地块边界顶点；点「完成」即可定稿并**直接接着画下一块**（可连画多块，最后再拼接）。'
+      : '点击「✏️ 开始画框」后，在卫星图上依次点击地块边界顶点即可；点「完成」自动保存该块、清空画布并继续下一块。';
   }
   btnDraw.onclick=function(){ setDrawing(!drawing); };
   // [v153] 加点模式开关：需先有框（≥2 点）才有「边」可插点
@@ -758,7 +760,36 @@
     if(rubber){measureGroup.removeLayer(rubber);rubber=null;}
     refresh();
     if(addMode) setAddMode(false);  // [v153] 完成后顺手退出加点模式
-    if(drawing) setDrawing(false); // 闭合后退出绘制，恢复地图拖拽与缩放查看
+    /* ===== [v186 2026-10-03] 「完成」= 本块定稿 → 清空 → 紧接着画下一块 =====
+     * 用户报（截图）：点「完成」闭合成一块之后，没法再画第二块、第三块小地块，
+     *   也就谈不上「把这几块拼起来」。
+     * 根因：原实现只 setDrawing(false)，points/markers 仍被刚闭合的那块占着 ⇒
+     *   再点「开始画框」是**往第一块上继续加点**，而不是开一块新的。
+     * 对策（用户拍板：自动入库 + 清空 + 继续画）：
+     *   ① 有 ≥3 个有效顶点 → 自动存入地块库（免去「还得再点一次保存」，也防手一抖
+     *      点了完成却没保存、刷新就没了）；不足 3 点视为无效草稿，不存、只清。
+     *   ② 清空画布（points/markers/poly + currentMapPlotId 复位），使下一块从零开始。
+     *   ③ 保持绘制态（drawing 仍为 on）并给出提示 —— 用户可以**连续画**，
+     *      想停就再点一次「开始画框」退出。
+     * 注意：入库走 saveCurrentDraftToLibrary()，与「💾 保存地块」共用同一套字段
+     *      （含 polyLatLng/center/geo），保证地图叠加与回传二级页都拿得到经纬度。
+     */
+    var hadShape = points.length>=3 && geodesicArea(points)>0;
+    if(hadShape){
+      var saved = saveCurrentDraftToLibrary({silent:true});
+      clearDraft();
+      if(!drawing) setDrawing(true);      // 保持可继续画：面板已清空，落点即新块
+      tip(saved
+        ? '✅ 已保存「'+saved.name+'」（'+saved.mu+' 亩）并清空画布 —— 可直接点击画下一块，画完继续点「完成」。'
+        : '已清空画布 —— 可直接点击画下一块。');
+    } else {
+      // 无效草稿（点太少）：只清空，不入库
+      clearDraft();
+      if(!drawing) setDrawing(true);
+      tip(points.length===0
+        ? '已清空。请点击地图依次描绘下一块的边界顶点，画完点「完成」。'
+        : '顶点不足 3 个、无法成块，已清空。请重新描绘地块边界。');
+    }
   };
   document.getElementById('btnUndo').onclick=function(){
     if(points.length===0) return;
@@ -773,13 +804,11 @@
     if(addMode) buildMidHandles();
   };
   document.getElementById('btnClear').onclick=function(){
-    setAddMode(false);                 // [v153] 点全没了，加点模式一并退出（⊕ 手柄随模式清除）
-    currentMapPlotId=null;
-    if(measuring) finishMeasure();
-    points=[]; markers.forEach(function(m){measureGroup.removeLayer(m);}); markers=[];
-    lastAdded=null;
-    if(poly){measureGroup.removeLayer(poly);poly=null;} if(rubber){measureGroup.removeLayer(rubber);rubber=null;}
-    refresh();
+    /* [v186] 改走共用的 clearDraft()：原来这里有一份和「完成」几乎重复的清空逻辑，
+       两处一旦不同步（例如漏清 lastAdded）就会出现「清完还能撤销出鬼影」这类怪象。
+       收成一份后，「完成」与「清除」的清空口径天然一致。 */
+    clearDraft();
+    tip('已清空画布，可重新开始描绘地块。');
   };
 
   // 底图切换
@@ -1034,14 +1063,20 @@
     }catch(e){ alert('写入失败：'+e.message); }
   };
 
-  // 保存到地块库（与精准灌溉页共用 localStorage['runye_plot_library']），可累计多个地块
-  document.getElementById('btnSavePlot').onclick=function(){
+  /* ===== [v186 2026-10-03] 地块定稿 / 清空 两个原子操作 =====
+   * 从原「💾 保存地块」里抽出「把当前画布上的草稿存进地块库」这一段，
+   * 供两处复用：① 用户点「💾 保存地块」；② 用户点「完成」自动定稿（连续绘制）。
+   * 抽出的好处是**字段构造只有一份**（polyLatLng / center / geo / crs），
+   * 不会再出现「自动存的那份比手存的少字段」这种隐性不一致。
+   * @returns {Object|null} 存成功返回 plot；无效草稿或写库失败返回 null
+   */
+  function saveCurrentDraftToLibrary(opts){
+    opts=opts||{};
     var mu=parseFloat((geodesicArea(points)/666.67).toFixed(2));
-    if(!isFinite(mu) || mu<=0){ alert('请先在地图上画框测量出有效面积再保存'); return; }
+    if(!isFinite(mu) || mu<=0){ if(!opts.silent) alert('请先在地图上画框测量出有效面积再保存'); return null; }
     var sqm=Math.round(geodesicArea(points));
-    var name='';
     var arr=[]; try{ arr=JSON.parse(localStorage.getItem('runye_plot_library')||'[]'); }catch(e){ arr=[]; }
-    if(!name) name='地块 '+(arr.length+1);
+    var name='地块 '+(arr.length+1);
     // 经纬度 → 本地米坐标（与精准灌溉页 applyMapMeasuredArea 一致），便于「设为当前」回填
     var poly=latlngs(), xs=[], ys=[];
     if(poly && poly.length>=3){
@@ -1069,10 +1104,33 @@
     plot.crs='GCJ-02';
     if(previous){plot.crop=previous.crop;plot.note=previous.note;arr=arr.map(function(p){return p.id===plot.id?plot:p;});}
     else arr.push(plot);
-    try{ localStorage.setItem('runye_plot_library', JSON.stringify(arr)); }catch(e){ alert('保存失败：'+e.message); return; }
+    try{ localStorage.setItem('runye_plot_library', JSON.stringify(arr)); }
+    catch(e){ if(!opts.silent) alert('保存失败：'+e.message); return null; }
     currentMapPlotId=plot.id;
     refreshPlotLibrary();
-    alert('已保存到地块库：'+name+'（'+mu+' 亩）\n可在精准灌溉页「地块库」设为当前，或在数字农业页选择。');
+    return plot;
+  }
+
+  /** 清空画布草稿（点/标点/多边形/橡皮筋/加点手柄），不动地块库。
+   *  [v186] 抽出来是为了让「完成」与「🗑 清除」共用同一个清空口径 ——
+   *  两份清空逻辑最容易出现「漏清一个数组」⇒ 下次绘制串到上一块上。 */
+  function clearDraft(){
+    setAddMode(false);                 // [v153] 点全没了，加点模式一并退出（⊕ 手柄随模式清除）
+    if(measuring) finishMeasure();
+    points=[]; markers.forEach(function(m){measureGroup.removeLayer(m);}); markers=[];
+    lastAdded=null;
+    if(poly){measureGroup.removeLayer(poly);poly=null;}
+    if(rubber){measureGroup.removeLayer(rubber);rubber=null;}
+    currentMapPlotId=null;             // 复位「正在编辑的地块」：下一块才会拿到新 id
+    refresh();
+  }
+  window.__ryClearDraft=clearDraft;    // 供契约测试直接驱动（不依赖 UI 点击）
+
+  // 保存到地块库（与精准灌溉页共用 localStorage['runye_plot_library']），可累计多个地块
+  document.getElementById('btnSavePlot').onclick=function(){
+    var plot=saveCurrentDraftToLibrary({silent:false});
+    if(!plot) return;
+    alert('已保存到地块库：'+plot.name+'（'+plot.mu+' 亩）\n可在精准灌溉页「地块库」设为当前，或在数字农业页选择。');
   };
 
   // [map-enhance] 把地块库叠加到卫星图（隔离模块，失败不影响测量主流程）
