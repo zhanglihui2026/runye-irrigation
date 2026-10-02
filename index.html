@@ -10730,6 +10730,69 @@ function tlAutoGenerate(options) {
   parts.push('</g>');
 
   // Source —— 标签贴在水源点（总管顶端）左侧，用短折线引线连到水源点
+  /* v180（2026-10-02 用户要求「三级管路编辑插入的节点及连线转成管道后要在三级简图里显示」）：
+     简图（tlAutoGenerate）原先只画 front/main/branch 三类自动管 + 阀门/交接三通，
+     完全不渲染三级工作区插入的「节点连线」（RyTlNodes.links，紫色 L-## 线）与节点圆点 ——
+     工作区里能看见、材料表也统计（v168 连线 / v151 节点配件），唯独简图缺这一层。
+     本段在「已画管线」之上补画：同管连线=沿宿主管折线取弧长子段；跨管连线=两节点平面直连；
+     节点=紫色圆点 + 连接度角标。几何取本函数已绘制的 frontPipe/mainPipes/branchPipes
+     （与下方已落 SVG 的管线逐点同源），不用 AE.effPts（会再叠 lens/moves，导致错位）。
+     只补显示层，不进 tlDiagramData / 水力 / 材料（材料已由 v168 单独统计）。整段删除即卸载。 */
+  try {
+    if (window.RyTlNodes && typeof window.RyTlNodes.links === 'function' && typeof window.RyTlNodes.nodeById === 'function') {
+      var tlNL = window.RyTlNodes.links() || [];
+      if (tlNL.length) {
+        function tlPipePtsOf(pid) {
+          if (pid === 'front') return frontPipe;
+          if (pid && pid.indexOf('main-') === 0) { var miN = parseInt(pid.slice(5), 10); return (miN >= 0 && miN < mainPipes.length) ? mainPipes[miN] : null; }
+          if (pid && pid.indexOf('branch-') === 0) { var biN = parseInt(pid.slice(7), 10); return (biN >= 0 && biN < branchPipes.length) ? branchPipes[biN] : null; }
+          return null;
+        }
+        function tlPolyLen(pts) { var L = 0; for (var i = 0; i + 1 < pts.length; i++) L += Math.hypot(pts[i+1].x - pts[i].x, pts[i+1].y - pts[i].y); return L; }
+        function tlPointAtM(pts, atM) { var len = tlPolyLen(pts), left = Math.max(0, Math.min(atM, len)); for (var i = 0; i + 1 < pts.length; i++) { var seg = Math.hypot(pts[i+1].x - pts[i].x, pts[i+1].y - pts[i].y); if (seg > 0 && left <= seg) { var t = left / seg; return { x: pts[i].x + (pts[i+1].x - pts[i].x) * t, y: pts[i].y + (pts[i+1].y - pts[i].y) * t }; } left -= seg; } var e = pts[pts.length-1]; return { x: e.x, y: e.y }; }
+        function tlSliceArc(pts, a, b) { if (!pts || pts.length < 2 || !(b - a > 1e-6)) return null; var out = [], tot = 0; for (var i = 0; i + 1 < pts.length && tot < b; i++) { var ax = pts[i].x, ay = pts[i].y, bx = pts[i+1].x, by = pts[i+1].y, sg = Math.hypot(bx - ax, by - ay); if (tot + sg <= a) { tot += sg; continue; } var t0 = Math.max(0, sg > 0 ? (a - tot) / sg : 0), t1 = Math.min(1, sg > 0 ? (b - tot) / sg : 1); if (!out.length) out.push({ x: ax + (bx - ax) * t0, y: ay + (by - ay) * t0 }); if (t1 >= 1) out.push({ x: bx, y: by }); else out.push({ x: ax + (bx - ax) * t1, y: ay + (by - ay) * t1 }); tot += sg; if (t1 < 1) break; } return out.length >= 2 ? out : null; }
+        function tlPosOfNode(nd) { var ep = tlPipePtsOf(nd.pid); if (!ep) return null; return tlPointAtM(ep, Math.max(0, Math.min(nd.atM, tlPolyLen(ep)))); }
+        var tlNLSvg = [];
+        tlNL.forEach(function (lk) {
+          var na = window.RyTlNodes.nodeById(lk.a), nb = window.RyTlNodes.nodeById(lk.b);
+          if (!na || !nb) return;
+          var odTxt = (lk.od != null) ? (' \u00d8' + lk.od) : '';
+          if (na.pid === nb.pid) {
+            var ep = tlPipePtsOf(na.pid); if (!ep) return;
+            var L = tlPolyLen(ep);
+            var a1 = Math.max(0, Math.min(na.atM, L)), b1 = Math.max(0, Math.min(nb.atM, L));
+            if (!(Math.abs(b1 - a1) > 1e-6)) return;
+            var sub = tlSliceArc(ep, Math.min(a1, b1), Math.max(a1, b1)); if (!sub) return;
+            var d = ''; sub.forEach(function (p, i) { var q = ts(p.x, p.y); d += (i ? 'L' : 'M') + q.x.toFixed(1) + ' ' + q.y.toFixed(1); });
+            var mp = sub[Math.floor(sub.length / 2)], mq = ts(mp.x, mp.y);
+            tlNLSvg.push('<path data-tlnodelink="' + lk.id + '" d="' + d + '" fill="none" stroke="#7c3aed" stroke-width="4" stroke-dasharray="2,4" stroke-linecap="round" opacity="0.92"/>');
+            tlNLSvg.push('<text x="' + (mq.x + 6).toFixed(1) + '" y="' + (mq.y - 6).toFixed(1) + '" font-size="9.5" font-weight="700" fill="#6d28d9" paint-order="stroke" stroke="#fff" stroke-width="2.5">' + lk.id + ' ' + Math.abs(b1 - a1).toFixed(1) + 'm' + odTxt + '</text>');
+          } else {
+            var pa = tlPosOfNode(na), pb = tlPosOfNode(nb); if (!pa || !pb) return;
+            var qa = ts(pa.x, pa.y), qb = ts(pb.x, pb.y);
+            var dc = Math.hypot(pb.x - pa.x, pb.y - pa.y); if (!(dc > 1e-6)) return;
+            tlNLSvg.push('<path data-tlnodelink="' + lk.id + '" d="M' + qa.x.toFixed(1) + ' ' + qa.y.toFixed(1) + 'L' + qb.x.toFixed(1) + ' ' + qb.y.toFixed(1) + '" fill="none" stroke="#7c3aed" stroke-width="4" stroke-dasharray="2,4" stroke-linecap="round" opacity="0.92"/>');
+            tlNLSvg.push('<text x="' + ((qa.x + qb.x) / 2 + 6).toFixed(1) + '" y="' + ((qa.y + qb.y) / 2 - 6).toFixed(1) + '" font-size="9.5" font-weight="700" fill="#6d28d9" paint-order="stroke" stroke="#fff" stroke-width="2.5">' + lk.id + ' ' + dc.toFixed(1) + 'm \u8de4\u63a5' + odTxt + '</text>');
+          }
+        });
+        if (tlNLSvg.length) parts.push('<g data-tlnodelink-layer="1">' + tlNLSvg.join('') + '</g>');
+        /* 节点圆点（与连线同层，置于连线之上；工作区紫色圆点 + 连接度角标） */
+        var ndListAll = (window.RyTlNodes.list && window.RyTlNodes.list()) || [];
+        var tlNdSvg = [];
+        ndListAll.forEach(function (nd) {
+          var pos = tlPosOfNode(nd); if (!pos) return;
+          var q = ts(pos.x, pos.y);
+          var deg = (window.RyTlNodes.degreeOf ? window.RyTlNodes.degreeOf(nd.id) : 0);
+          var cnt = (window.RyTlNodes.fitTotal ? window.RyTlNodes.fitTotal(nd) : 0);
+          tlNdSvg.push('<circle data-tlnode="' + nd.id + '" cx="' + q.x.toFixed(1) + '" cy="' + q.y.toFixed(1) + '" r="5.5" fill="#7c3aed" stroke="#fff" stroke-width="1.4"/>');
+          if (deg > 0) tlNdSvg.push('<circle cx="' + (q.x + 6.5).toFixed(1) + '" cy="' + (q.y + 6.5).toFixed(1) + '" r="4.5" fill="#fff" stroke="#f59e0b" stroke-width="1.1"/>' + '<text x="' + (q.x + 6.5).toFixed(1) + '" y="' + (q.y + 8.8).toFixed(1) + '" font-size="6.5" font-weight="700" fill="#b45309" text-anchor="middle">' + deg + '</text>');
+          if (cnt > 0) tlNdSvg.push('<circle cx="' + (q.x + 6.5).toFixed(1) + '" cy="' + (q.y - 6.5).toFixed(1) + '" r="4.5" fill="#fff" stroke="#7c3aed" stroke-width="1.1"/>' + '<text x="' + (q.x + 6.5).toFixed(1) + '" y="' + (q.y - 4.2).toFixed(1) + '" font-size="6.5" font-weight="700" fill="#6d28d9" text-anchor="middle">' + cnt + '</text>');
+        });
+        if (tlNdSvg.length) parts.push('<g data-tlnode-layer="1">' + tlNdSvg.join('') + '</g>');
+      }
+    }
+  } catch (eNdLink) { }
+
   if(sourcePos){
     var sp=ts(sourcePos.x,sourcePos.y);
     parts.push('<circle cx="'+sp.x.toFixed(1)+'" cy="'+sp.y.toFixed(1)+'" r="10" fill="#f59e0b" stroke="#fff" stroke-width="2"/>');
