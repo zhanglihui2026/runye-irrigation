@@ -472,17 +472,41 @@
     if(doc.getElementsByTagName('parsererror').length) throw new Error('KML XML 格式错误');
     function descendants(el, name){return Array.prototype.slice.call(el.getElementsByTagNameNS('*',name));}
     function firstText(el,name){var nodes=descendants(el,name);return nodes.length?nodes[0].textContent.trim():'';}
+    // 标准 <coordinates>："lng,lat[,alt] lng,lat..." -> [[lat,lng],...]
+    function ringFromCoordText(s){
+      return s.split(/\s+/).filter(Boolean).map(function(pair){
+        var c=pair.split(','); return [parseFloat(c[1]), parseFloat(c[0])];
+      }).filter(function(p){return isFinite(p[0])&&isFinite(p[1]);});
+    }
     var plots=[];
     descendants(doc,'Placemark').forEach(function(pm){
       var name=firstText(pm,'name'), crop='';
       descendants(pm,'Data').forEach(function(d){if(d.getAttribute('name')==='crop') crop=firstText(d,'value');});
+      // 1) 标准多边形
       descendants(pm,'Polygon').forEach(function(poly){
         if(descendants(poly,'innerBoundaryIs').length) throw new Error('暂不支持带内孔的地块，请先拆分为无孔多边形');
         var outer=descendants(poly,'outerBoundaryIs');
         if(outer.length!==1) throw new Error('KML 地块缺少唯一外边界');
         var coords=firstText(outer[0],'coordinates');
-        var ll=RunyeGeo.normalizeRing(coords.split(/\s+/).map(function(pair){var c=pair.split(',');return [parseFloat(c[1]),parseFloat(c[0])];}));
+        var ll=RunyeGeo.normalizeRing(ringFromCoordText(coords));
         plots.push({name:name,crop:crop,polyLatLng:ll});
+      });
+      // 2) 奥维轨迹 <gx:Track>（.ovkml）：一串打点当作闭合地块边界
+      descendants(pm,'Track').forEach(function(trk){
+        var pts=descendants(trk,'coord').map(function(n){
+          var p=n.textContent.trim().split(/\s+/);   // "lng lat alt"
+          return [parseFloat(p[1]), parseFloat(p[0])]; // -> [lat,lng]
+        }).filter(function(p){return isFinite(p[0])&&isFinite(p[1]);});
+        if(pts.length<3) return;
+        var ll=RunyeGeo.normalizeRing(pts);          // 自动去首尾重复点并校验
+        plots.push({name:name,crop:crop,polyLatLng:ll,source:'track'});
+      });
+      // 3) 普通 <LineString>：闭合环线当作地块边界
+      descendants(pm,'LineString').forEach(function(ls){
+        var pts=ringFromCoordText(firstText(ls,'coordinates'));
+        if(pts.length<3) return;
+        var ll=RunyeGeo.normalizeRing(pts);
+        plots.push({name:name,crop:crop,polyLatLng:ll,source:'linestring'});
       });
     });
     return plots;
