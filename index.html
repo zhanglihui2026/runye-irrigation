@@ -10588,8 +10588,20 @@ function tlRefreshTlNodesLayer() {
   var geo = window.__tlPlanGeo; var host = document.getElementById('tlDiagramContent');
   if (!geo || !host) return;
   var svg = host.querySelector('svg'); if (!svg) return;
+  /* v183（2026-10-02 用户报「三级简图新增紫色节点/连线偏移，应位于管道上」）：
+     刷新层必须挂进 #tlPlotGroup（地块组）——简图的地块/管线/内联节点层全在该组内，
+     且组上带「整体拖拽」transform=translate(x,y)（tlInitDrag，localStorage tl-plot-pos）。
+     首版把刷新层 appendChild 到 svg 根：地块组一旦被拖动过，任何节点变更（加/移/删）
+     触发刷新后节点层跳出组、不随 transform → 节点/连线整体偏移 (−tx,−ty)、脱离管道。 */
+  var plotG = svg.querySelector('#tlPlotGroup');
+  var parentG = plotG || svg;
   var old = svg.querySelectorAll('[data-tlnodelink-layer],[data-tlnode-layer]');
-  for (var i = 0; i < old.length; i++) { if (old[i].parentNode) old[i].parentNode.removeChild(old[i]); }
+  /* 锚点：旧层里最后一个挂在组内的元素的 nextSibling —— 生成时内联层位于「滴灌带之后、
+     水源/阀门/交接符号之前」，按锚点插回可保持与整图重生成完全一致的叠放次序；
+     无旧层（生成时无节点，首个节点由刷新补画）时退化为组末尾追加。 */
+  var anchor = null, oi;
+  for (oi = 0; oi < old.length; oi++) { if (old[oi].parentNode === parentG) anchor = old[oi].nextSibling; }
+  for (oi = 0; oi < old.length; oi++) { if (old[oi].parentNode) old[oi].parentNode.removeChild(old[oi]); }
   var frag = tlBuildTlNodesLayer(geo); if (!frag) return;
   /* DOMParser 解析为 SVG 命名空间，再 importNode 进主 svg（避免 innerHTML 在 SVG 元素上的命名空间陷阱） */
   var parsed = new DOMParser().parseFromString('<svg xmlns="http://www.w3.org/2000/svg">' + frag + '</svg>', 'image/svg+xml');
@@ -10597,7 +10609,11 @@ function tlRefreshTlNodesLayer() {
   /* 必须先快照再importNode：importNode 是「复制」不摘除源节点，若写成 while(psvg.firstChild) + importNode
      则 firstChild 永不推进 → 死循环卡死页面（appendChild 是「移动」才可边遍历边摘）。 */
   var kids = Array.prototype.slice.call(psvg ? psvg.childNodes : []);
-  for (var ki = 0; ki < kids.length; ki++) svg.appendChild(document.importNode(kids[ki], true));
+  for (var ki = 0; ki < kids.length; ki++) {
+    var imp = document.importNode(kids[ki], true);
+    if (anchor && anchor.parentNode === parentG) parentG.insertBefore(imp, anchor);
+    else parentG.appendChild(imp);
+  }
 }
 /* v180b：挂「工作区改动 → 简图实时刷新」的订阅。
    ⚠ 必须在 tl-nodes.js 加载【之后】调用：本函数定义在主脚本内，而 tl-nodes.js 在文件末尾才加载，
@@ -11494,10 +11510,13 @@ function tlAutoGenerate(options) {
      只补显示层，不进 tlDiagramData / 水力 / 材料（材料已由 v168 单独统计）。整段删除即卸载。 */
   try {
     /* v180b（2026-10-02）：节点/连线图层抽成 tlBuildTlNodesLayer()（节点与连线各自独立渲染，
-       仅加节点、无连线也显示）。实时刷新由 tlRefreshTlNodesLayer 订阅 RyTlNodes 完成。 */
+       仅加节点、无连线也显示）。实时刷新由 tlRefreshTlNodesLayer 订阅 RyTlNodes 完成。
+       v183（2026-10-02）：无节点/连线时也落一个**空锚点组** —— 实时刷新靠「旧层 nextSibling」
+       定位插入点（保持与整图重生成的叠放次序一致：滴灌带之后、水源/阀门/交接符号之前）；
+       无锚点时只能 append 到地块组末尾，层序与重生成不一致（节点圆点会压在阀门符号之上）。 */
     var tlNodeLayerSvg = tlBuildTlNodesLayer({ frontPipe: frontPipe, mainPipes: mainPipes, branchPipes: branchPipes, ts: ts });
-    if (tlNodeLayerSvg) parts.push(tlNodeLayerSvg);
-  } catch (eNdLink) { }
+    parts.push(tlNodeLayerSvg || '<g data-tlnode-layer="1"></g>');
+  } catch (eNdLink) { parts.push('<g data-tlnode-layer="1"></g>'); }
 
   if(sourcePos){
     var sp=ts(sourcePos.x,sourcePos.y);
