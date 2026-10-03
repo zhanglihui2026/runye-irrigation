@@ -1466,7 +1466,20 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
   font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit;
 }
 .pp-btn-generate:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(22,163,74,.4)}
-.pp-check-label{display:flex;align-items:center;gap:4px;font-size:12px;color:rgba(255,255,255,.75);cursor:pointer;white-space:nowrap}
+/* [v188 2026-10-03] 修正「地块划分」开关文字看不见（用户反馈：工具栏这里什么都没有）。
+   根因：.pp-check-label 的 color:rgba(255,255,255,.75) 是给**深色**工具栏写的，
+   而二级管路页的工具栏在工具模式下是**浅色**面板
+   （实测 #ppToolbar 背景 = rgb(247,250,249)，来自 body.ry-tool #pipePlanSection .pp-toolbar 的 --ry-panel），
+   ⇒ 白字叠浅底，真渲染实测对比度仅 1.04:1，肉眼完全不可见，只剩一个绿色对勾孤零零挂着。
+   ⚠ 选择器必须写 `#pipePlanSection .pp-toolbar`，**不能**写 `.pp-stage>.pp-toolbar` ——
+   真实 DOM 链是 SECTION#pipePlanSection > .pp-body > .pp-stage > .ry-pane-edit > #ppToolbar，
+   即工具条是 .ry-pane-edit 的子节点、不是 .pp-stage 的直接子节点（用 Edge 真渲染 + CSSOM
+   rule.matches() 逐条核对确认，`.pp-stage>.pp-toolbar` 在本页一条都没命中）。
+   修法：给出「浅底工具轨里用深色文字」的对照规则；对比度门槛不放宽，把颜色改到真可读。 */
+.pp-check-label{display:flex;align-items:center;gap:5px;font-size:12px;color:rgba(255,255,255,.75);cursor:pointer;white-space:nowrap}
+#pipePlanSection .pp-toolbar>.pp-check-label{color:#334155;font-weight:500}
+#pipePlanSection .pp-toolbar>.pp-check-label:hover{color:#0f172a}
+body.ry-zoneauto-off #pipePlanSection .pp-toolbar>.pp-check-label{color:#b45309}
 .pp-check-label input{accent-color:#16a34a;margin:0;width:14px;height:14px}
 /* [v185 2026-10-03] 地块划分开关：关闭（body.ry-zoneauto-off）时隐藏施工简图里的分区层。
    与三级 ry-worst-off 同一范式 —— 分区照常计算与渲染，只由 CSS 门控显隐，
@@ -15169,8 +15182,10 @@ ppPullLiftDh();                                              // 首屏对齐一�
       document.querySelectorAll('#ppToolbar .pp-btn[data-mode]').forEach(function(b){b.classList.remove('active');});
       btn.classList.add('active');
       // Show fine-tune group only in adjustCut mode
-      var fg=document.getElementById('ppCutFineGroup');
-      if(fg)fg.style.display=ppState.mode==='adjustCut'?'inline-flex':'none';
+      // [v188] 改用统一入口 ppSyncFineGroup()，与「地块划分」开关那条路径共用同一口径，
+      //        避免「两条路径各写一遍、改一处漏一处」（本次就是这个 bug）。
+      if(typeof ppSyncFineGroup==='function') ppSyncFineGroup();
+      else { var fg=document.getElementById('ppCutFineGroup'); if(fg)fg.style.display=ppState.mode==='adjustCut'?'inline-flex':'none'; }
       ppRender();
     });
   });
@@ -15475,6 +15490,16 @@ ppPullLiftDh();                                              // 首屏对齐一�
       ? '开启=自动划分并把分区线画出来；关闭=隐藏自动划分的分区线，改由「调网格」手动划分。注意：关闭只影响显示，分区数/面积/水力计算不受影响。'
       : '当前：已隐藏自动划分的分区线，请用「调网格」手动划分。重新勾选可恢复自动划分显示。';
   }
+  /* [v188 2026-10-03] 把「模式切换要同步微调箭头组显隐」这件事归一到一个函数。
+     起因（Edge 真渲染实测）：从「地块划分」开关切到 adjustCut 时，
+     按钮 active 变了、mode 也变了，但 #ppCutFineGroup 仍是 display:none ——
+     因为它的显隐原本只写在「调网格」按钮的 click 处理器里（见 ppSetMode 那段），
+     开关这条路径绕过了它 ⇒ 用户看到「按钮亮了却没有微调箭头」，属真实功能不一致。
+     （与既有 ppSetMode 里的写法保持同一口径：adjustCut → inline-flex，否则 none。） */
+  function ppSyncFineGroup(){
+    var fg=document.getElementById('ppCutFineGroup');
+    if(fg) fg.style.display = (ppState.mode==='adjustCut') ? 'inline-flex' : 'none';
+  }
   function ppSetZoneAuto(on){
     on = !!on;
     ppState.zoneAuto = on;
@@ -15488,12 +15513,14 @@ ppPullLiftDh();                                              // 首屏对齐一�
         document.querySelectorAll('#ppToolbar .pp-btn[data-mode]').forEach(function(b){
           b.classList.toggle('active', b.getAttribute('data-mode')==='adjustCut');
         });
+        ppSyncFineGroup();
         ppRender();
       } else if(ppState.mode==='adjustCut'){
         ppState.mode='main';
         document.querySelectorAll('#ppToolbar .pp-btn[data-mode]').forEach(function(b){
           b.classList.toggle('active', b.getAttribute('data-mode')==='main');
         });
+        ppSyncFineGroup();
         ppRender();
       }
     }catch(e){}

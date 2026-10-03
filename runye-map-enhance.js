@@ -331,21 +331,32 @@
   /** 把 state.selected 反映到图层样式 + 底部操作条 */
   function applySelection(state) {
     var ids = Object.keys(state.selected || {});
+    var SEL_STYLE = { color: '#7c3aed', weight: 4, fillColor: '#a78bfa', fillOpacity: 0.34, dashArray: null };
     Object.keys(state.plotLayers || {}).forEach(function (id) {
       var rec = state.plotLayers[id];
       if (!rec || !rec.layer) return;
       var on = !!state.selected[id];
-      try {
-        rec.layer.setStyle(on
-          ? { color: '#7c3aed', weight: 4, fillColor: '#a78bfa', fillOpacity: 0.34, dashArray: null }
-          : rec.baseStyle);
-      } catch (e) {}
-      if (rec.label) {
+      /* [v187] 拼接地块由 N 个子地块环组成 ⇒ 选中/取消必须**逐圈**应用，
+       *   否则只有第一圈变色，看起来像「选了半块」，很容易被当成 bug。
+       *   普通地块的 rec.layers 长度就是 1，走同一条路径，无分支差异。 */
+      var all = (rec.layers && rec.layers.length) ? rec.layers : [rec.layer];
+      all.forEach(function (L2, i) {
         try {
-          if (on) rec.layer.bindTooltip(rec.label, { permanent: true, direction: 'center', className: 'rym-sel-badge' });
-          else rec.layer.unbindTooltip();
+          if (on) {
+            L2.setStyle(SEL_STYLE);
+          } else if (all.length > 1 && L2._rySubStyle) {
+            L2.setStyle(L2._rySubStyle);       // 还原该子地块自己的作物色
+          } else {
+            L2.setStyle(rec.baseStyle);
+          }
         } catch (e) {}
-      }
+        if (rec.label) {
+          try {
+            if (on) L2.bindTooltip(rec.label, { permanent: true, direction: 'center', className: 'rym-sel-badge' });
+            else L2.unbindTooltip();
+          } catch (e) {}
+        }
+      });
     });
     renderMergeBar(state, ids);
   }
@@ -488,14 +499,54 @@
           p.sqm=Math.round(RunyeGeo.geodesicArea(ll)); p.mu=+(p.sqm/666.67).toFixed(2); healed++;
         }
         var color = p.color || cropColor(p.crop);
-        /* [v185] 拼接地块：外轮廓用紫色加粗实线 + 淡紫填充，与普通地块一眼区分；
-           内部再把各子地块的环画成细虚线（「保留子地块」的可视化 —— 用户能看到
-           这大地块是由哪几块拼成的，后续才能分别布管）。 */
-        var isMerged = !!p.merged;
+        /* ===== [v187 2026-10-03] 拼接地块：只画「各自轮廓线」，外面不再加外框 =====
+         * 用户原话：「地块拼接之后 是各自的轮廓线，外面不用再加一个框。」
+         * 旧实现画两层：① 外层凸包大框（紫粗实线）② 子地块环（紫细虚线，且**只在拼接模式下**画）
+         *   ⇒ 平时视图看到的是「一个包住所有小地块的大框」，等于把子地块信息藏起来了，
+         *     而子地块恰恰是后续「分别布管」的依据。且凸包会把 L 形/凹形地块的角补满，
+         *     面积比实际大（已知偏差），画出来还误导。
+         * 新实现：**去掉外层凸包框**，改为把每个子地块各自画一圈**独立闭合**的轮廓线，
+         *   颜色用**各自的作物色**（与未拼接时观感一致，一眼区分不同子地块）。
+         * 这样「拼接」在数据上仍是一个大地块（传递到二级页仍带 subPlots），
+         *   但在地图上呈现为「几块各自的地」——正是用户要的。
+         * 注意：交互层（popup / 点击选中 / 撤销拼接）必须保留，否则去掉外框就点不到。
+         *   做法：给每个子地块环挂上同一套 popup 与 click 处理器，任一块都能唤起。
+         * 另加一个「描边兜底」的不可见外轮廓（opacity 0）——不参与视觉，
+         *   仅用于 `fitBounds` / 选中态改样式时有一个代表整块的几何可引用。 */
+        var isMerged = !!(p.merged && p.subPlots && p.subPlots.length);
         var baseStyle = isMerged
-          ? { color: '#7c3aed', weight: 3.5, fillColor: '#a78bfa', fillOpacity: 0.16 }
+          ? { color: '#7c3aed', weight: 2.5, fillColor: '#a78bfa', fillOpacity: 0.12 }
           : { color: color, weight: 2, fillColor: color, fillOpacity: 0.18 };
-        var poly = L.polygon(displayLL(ll, opts), baseStyle);
+        /* --- 图层集合：普通地块 = 1 个多边形；拼接地块 = N 个子地块各自一圈 ---
+         * 统一放进 `layers` 数组，后面的 popup / click / 选中样式都按数组处理。 */
+        var layers = [];
+        if (isMerged) {
+          p.subPlots.forEach(function (s, si) {
+            if (!s.polyLatLng || s.polyLatLng.length < 3) return;
+            var sLL = validRingLL(s.polyLatLng);
+            if (!sLL) return;
+            /* 子地块自己的作物色：库里没写就退回大地块的，再退回调色板 */
+            var sColor = s.color || cropColor(s.crop || p.crop);
+            var sStyle = { color: sColor, weight: 2.5, fillColor: sColor, fillOpacity: 0.22 };
+            var sPoly = L.polygon(displayLL(sLL, opts), sStyle);
+            sPoly._rySubIdx = si;
+            sPoly._rySubStyle = sStyle;     // 取消选中时还原「这块自己的颜色」，而不是大地块的底色
+            layers.push(sPoly);
+          });
+        }
+        if (!layers.length) {
+          // 普通地块，或拼接地块的 subPlots 全不可用（退化兜底：画凸包外轮廓，别让地块消失）
+          layers.push(L.polygon(displayLL(ll, opts), baseStyle));
+        }
+        var poly = layers[0];        // 代表层：fitBounds / 记录 plotLayers 用
+        var outerGhost = null;
+        if (isMerged && layers.length > 1) {
+          /* 不可见外轮廓：不参与视觉，只为「整块的包围盒」留一个几何引用。
+           * interactive:false + opacity 0 ⇒ 既看不到也点不到，不会挡子地块的点击。 */
+          outerGhost = L.polygon(displayLL(ll, opts), {
+            color: '#7c3aed', weight: 0, opacity: 0, fillOpacity: 0, interactive: false
+          });
+        }
         var mu = (p.mu != null) ? p.mu : (RunyeGeo.geodesicArea(ll) / 666.67);
         var subHtml = '';
         if (isMerged && p.subPlots && p.subPlots.length) {
@@ -509,7 +560,11 @@
             subRows + '</div>' +
             '<button id="rymUnmerge" style="margin-top:5px;padding:3px 12px;background:#7c3aed;color:#fff;border:0;cursor:pointer;font-size:12px">↩ 撤销拼接</button>';
         }
-        poly.bindPopup(
+        /* ===== 交互绑定：popup / 点击 / 加入图层组 =====
+         * 拼接地块有 N 个子地块环 ⇒ **每一圈都要能唤起同一套气泡与点击**，
+         * 否则用户点到「没有外框的那部分」就没反应（去掉外框后最易踩的坑）。
+         * 用 forEach 逐层绑定，行为与单层时完全一致。 */
+        var popupHtml =
           '<div style="font:12px/1.6 system-ui,sans-serif;min-width:190px">' +
           '<b style="color:' + (isMerged ? '#7c3aed' : '#15803d') + '">' +
           escapeHtml(p.name || '未命名地块') + (isMerged ? '（拼接地块）' : '') + '</b><br>' +
@@ -518,9 +573,8 @@
           '<label style="display:block;margin-top:5px">作物 <input id="rymCrop" style="width:88%;padding:2px 4px;border:1px solid #cbd5e1" value="' + escapeHtml(p.crop || '') + '" placeholder="如：七彩花生"></label>' +
           '<label style="display:block;margin-top:3px">备注 <textarea id="rymNote" rows="2" style="width:88%;padding:2px 4px;border:1px solid #cbd5e1" placeholder="地形/水源/备注">' + escapeHtml(p.note || '') + '</textarea></label>' +
           '<button id="rymSave" style="margin-top:5px;padding:3px 12px;background:#16a34a;color:#fff;border:0;cursor:pointer;font-size:12px">保存</button>' +
-          '</div>'
-        );
-        poly.on('popupopen', function () {
+          '</div>';
+        var onPopupOpen = function () {
           var btn = document.getElementById('rymSave');
           if (btn) btn.onclick = function () {
             var crop = (document.getElementById('rymCrop') || {}).value || '';
@@ -531,7 +585,7 @@
               localStorage.setItem('runye_plot_library', JSON.stringify(lib));
             } catch (e) { alert('保存失败：' + e.message); return; }
             try { state.refresh(); } catch (e) {}
-            poly.closePopup();
+            layers.forEach(function (L2) { try { L2.closePopup(); } catch (e) {} });
           };
           var ub = document.getElementById('rymUnmerge');
           if (ub) ub.onclick = function () {
@@ -539,37 +593,31 @@
             var r = doUnmerge(state, p.id);
             if (!r.ok) alert('撤销拼接失败：' + r.reason);
           };
+        };
+        var onClickPick = function (e) { try { opts.onPick(p); } catch (err) {} };
+        var onClickMerge = function (e) {
+          try {
+            if (L.DomEvent && e) L.DomEvent.stopPropagation(e);
+            if (p.merged) { alert('「' + (p.name || '该地块') + '」已是拼接地块。\n如需重拼，请先在气泡里「撤销拼接」。'); return; }
+            state.toggleSelect(p.id);
+          } catch (err) {}
+        };
+        layers.forEach(function (L2) {
+          L2.bindPopup(popupHtml);
+          L2.on('popupopen', onPopupOpen);
+          if (state.mergePick) L2.on('click', onClickMerge);
+          else if (typeof opts.onPick === 'function') L2.on('click', onClickPick);
+          L2.addTo(state.plotGroup);
         });
-        // 点击：拼接选择模式下 = 切换选中；否则沿用宿主页 onPick
-        if (state.mergePick) {
-          poly.on('click', function (e) {
-            try {
-              if (L.DomEvent && e) L.DomEvent.stopPropagation(e);
-              if (p.merged) { state.map.openPopup ? null : null; alert('「' + (p.name || '该地块') + '」已是拼接地块。\n如需重拼，请先在气泡里「撤销拼接」。'); return; }
-              state.toggleSelect(p.id);
-            } catch (err) {}
-          });
-        } else if (typeof opts.onPick === 'function') {
-          poly.on('click', function () { try { opts.onPick(p); } catch (e) {} });
-        }
-        poly.addTo(state.plotGroup);
-        // 记录图层，供 applySelection 改样式 / 操作条取名字
+        if (outerGhost) outerGhost.addTo(state.plotGroup);
+        /* 记录图层，供 applySelection 改样式 / 操作条取名字。
+         * ★ layers 是数组：拼接地块要能把**每一圈**都切成选中态，
+         *   否则会出现「只有第一个子地块变色、其余的没反应」的怪现象。 */
         state.plotLayers[p.id] = {
-          layer: poly, baseStyle: baseStyle, name: p.name || p.id,
+          layer: poly, layers: layers, ghost: outerGhost,
+          baseStyle: baseStyle, name: p.name || p.id,
           label: (p.name || '地块') + ' ✓'
         };
-        /* 子地块环（细虚线）—— 只在拼接模式下画，避免平常视图被虚线噪声干扰 */
-        if (isMerged && state.mergePick && p.subPlots && p.subPlots.length) {
-          p.subPlots.forEach(function (s) {
-            try {
-              if (!s.polyLatLng || s.polyLatLng.length < 3) return;
-              L.polygon(displayLL(s.polyLatLng, opts), {
-                color: '#7c3aed', weight: 1.2, opacity: 0.75, dashArray: '5,4',
-                fillColor: '#a78bfa', fillOpacity: 0.10, interactive: false
-              }).addTo(state.plotGroup);
-            } catch (e) {}
-          });
-        }
         drawn++;
       } catch (e) {
         skipped++;
