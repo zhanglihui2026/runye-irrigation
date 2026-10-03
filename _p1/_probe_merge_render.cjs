@@ -347,6 +347,38 @@ console.log('\n=== T6 ★★ v189 核心：块间有缝时必须逐块画（拿�
      c3.length === 2 && c3[0] !== c3[1], '实际 ' + c3.join(','));
 }
 
+console.log('\n=== T7 ★★ v190 老记录面积自愈：凸包口径 → 成员之和 ===');
+{
+  /* 用户截图反馈（2026-10-03）：两块地中间隔一条路，要求「单独计算面积」「空地不要填充」。
+   * 渲染已逐块画（T6），但**老版本存库的成组记录** sqm/mu 是凸包口径（把缝也算进去了）。
+   * 期望：渲染时把 sqm/mu 自愈成「成员之和」——否则老记录上「单独计算面积」仍是错的。 */
+  const GAP = 0.00003;
+  const oA = rect(B[0], B[1], 0.0002, 0.0002, { id: 'oa', name: '左块', crop: '七彩花生' });
+  const oB = rect(B[0], B[1] + 0.0002 + GAP, 0.0002, 0.0002, { id: 'ob', name: '右块', crop: '水稻' });
+  const G2 = M.merge.plots([oA, oB], { name: '老口径成组' });
+  if (!G2) { console.log('!! 自愈样本造数据失败'); process.exitCode = 2; return; }
+  const memberSum = Math.round(G2.sqm);                       // 新口径 = 成员之和（≈941㎡）
+  const hullSqm = Math.round(require(path.join(ROOT, 'runye-geo.js')).geodesicArea(G2.polyLatLng));
+  ok('（前提）缝确实存在：凸包面积 > 成员之和 ≥20㎡', hullSqm - memberSum >= 20,
+     '凸包=' + hullSqm + ' 成员和=' + memberSum);
+  /* 伪造一条「老口径」记录：sqm 抬成凸包值、无 polyLatLngSet（老库形态） */
+  const oldRec = JSON.parse(JSON.stringify(G2));
+  oldRec.sqm = hullSqm; oldRec.mu = +(hullSqm / 666.67).toFixed(2);
+  delete oldRec.polyLatLngSet; delete oldRec.polySetM;
+  const B4 = boot([]);
+  B4.mod.attach(B4.map, { plots: [oldRec] });
+  ok('★★ 老记录渲染后 sqm 自愈为成员之和', oldRec.sqm === memberSum,
+     '自愈后=' + oldRec.sqm + ' 期望=' + memberSum + '（凸包口径=' + hullSqm + '）');
+  ok('★★ mu 同步自愈', Math.abs(oldRec.mu - memberSum / 666.67) < 0.01, 'mu=' + oldRec.mu);
+  /* 精确性：不是「随便改」，口径正确时必须原样不动 */
+  const okRec = JSON.parse(JSON.stringify(G2));
+  delete okRec.polyLatLngSet; delete okRec.polySetM;           // 口径已对，只缺新字段
+  const B5 = boot([]);
+  B5.mod.attach(B5.map, { plots: [okRec] });
+  ok('口径已正确的记录不被改动（原样保留）', okRec.sqm === memberSum,
+     'sqm=' + okRec.sqm + ' 期望=' + memberSum);
+}
+
 console.log('\n========================================');
 console.log((INJECT ? '【注入模式】' : '') + '成组块绘制契约：PASS=' + pass + '  FAIL=' + fail);
 if (fail) console.log('  失败项：' + fails.join(' / '));

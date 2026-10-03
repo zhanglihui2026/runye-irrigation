@@ -504,6 +504,25 @@
         if(typeof p.sqm!=='number' || !isFinite(p.sqm) || p.sqm<=0 || typeof p.mu!=='number' || !isFinite(p.mu) || p.mu<=0){
           p.sqm=Math.round(RunyeGeo.geodesicArea(ll)); p.mu=+(p.sqm/666.67).toFixed(2); healed++;
         }
+        /* ★ v190 2026-10-03 成组地块面积自愈（用户截图反馈：「单独计算面积」「不要自动填充」）：
+         * 老版本（v185 拼接）存进地块库的成组记录，sqm/mu 是**凸包口径** —— 把块间空隙
+         * （道路/水渠/空地）也算了进去。v189 起面积口径 = **各成员之和**（空地不计入）。
+         * 老记录sqm 合法但口径错误，上面的自愈拦不住 ⇒ 这里单独校正：
+         * 若 merged 记录的 sqm 与成员之和偏差 >0.5%，按成员之和回写（含写回地块库，
+         * 走下方既有的 healed 回写通道）。否则用户在老记录上看到的总面积仍是「吞了空地」的数。 */
+        if(p.merged && p.subPlots && p.subPlots.length){
+          var _sum=0, _ok=true;
+          p.subPlots.forEach(function(s){
+            var v=(typeof s.sqm==='number' && isFinite(s.sqm) && s.sqm>0) ? s.sqm
+                : (s.polyLatLng && s.polyLatLng.length>=3 ? Math.round(RunyeGeo.geodesicArea(s.polyLatLng)) : 0);
+            if(!(v>0)) _ok=false; else _sum+=v;
+          });
+          if(_ok && _sum>0 && Math.abs(_sum-(p.sqm||0)) > _sum*0.005){
+            p.sqm=Math.round(_sum);
+            p.mu=+(_sum/666.67).toFixed(2);
+            healed++;
+          }
+        }
         var color = p.color || cropColor(p.crop);
         /* ===== [v187/v189 2026-10-03] 成组地块：只画「各自轮廓线」，外面不加框，也不合并几何 =====
          * 用户原话（v187）：「地块拼接之后 是各自的轮廓线，外面不用再加一个框。」
