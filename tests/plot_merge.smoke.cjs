@@ -483,7 +483,10 @@ test('③-i 回传入口（v191）：成组地块必须能**被显式选中回�
   assert.match(MAP_SRC, /className='place-send'/, '「我的地块」列表应有 .place-send 按钮');
   const sendCount = (MAP_SRC.match(/className='place-send'/g) || []).length;
   assert.strictEqual(sendCount, 1, 'place-send 按钮应在列表渲染里构造 1 处，实际 ' + sendCount + ' 处');
-  assert.match(MAP_SRC, /row\.appendChild\(sd\);/, 'place-send 必须真的挂进每一行（否则成组地块仍选不中）');
+  /* ★ 这条必须剥注释：把 `row.appendChild(sd);` 注释掉之后，源码里那串字符**还在**，
+     不剥注释的话断言照样通过 ⇒ 注入静默失效、契约恒绿（实测踩到）。 */
+  const MAP_NC = stripComments(MAP_SRC);
+  assert.match(MAP_NC, /row\.appendChild\(sd\);/, 'place-send 必须真的挂进每一行（否则成组地块仍选不中）');
 
   /* 成组时面积必须是 Σ 成员环，绝不采信库里可能是凸包口径的旧 sqm */
   const bp = MAP_SRC.indexOf('function buildPlotPayload(');
