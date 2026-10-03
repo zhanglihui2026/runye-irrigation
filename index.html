@@ -1441,6 +1441,14 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
 .pp-sep{width:1px;height:24px;background:rgba(255,255,255,.1);margin:0 4px}
 .pp-cut-fine-group{display:inline-flex;gap:2px;align-items:center;margin-left:4px}
 .pp-fine-btn{min-width:30px!important;padding:0 6px!important;font-size:15px!important;line-height:1}
+/* [v193] 成组编辑切换组：整组 / 逐块（+ 子地块下拉、总管）。非成组地块整组隐藏 */
+.pp-group-edit{display:inline-flex;gap:3px;align-items:center}
+.pp-ge-title{font-size:11.5px;color:rgba(255,255,255,.6);margin-right:2px}
+.pp-ge-row{display:inline-flex;gap:3px}
+.pp-ge-sel{height:26px;max-width:132px;font:inherit;font-size:11.5px;padding:0 4px;
+  border:1px solid rgba(255,255,255,.18);border-radius:7px;background:rgba(0,0,0,.2);color:inherit}
+/* [v193] 整组态下被禁用的块级编辑按钮：可看出是「暂时不能点」，而不是坏了 */
+#ppToolbar .pp-ge-disabled{opacity:.38;cursor:not-allowed;text-decoration:line-through}
 .pp-angle-control{
   display:inline-flex;align-items:center;gap:5px;height:30px;padding:0 8px;
   border:1px solid rgba(255,255,255,.1);border-radius:8px;
@@ -3942,6 +3950,22 @@ body.ry-tool #pipePlanSection #ppToolbar>.pp-sep{
   width:100%;height:1px;margin:3px 0;flex:0 0 auto;background:var(--ry-line);
 }
 body.ry-tool #pipePlanSection #ppToolbar>.pp-sep:has(+ .pp-btn-generate){margin-top:auto}
+/* [v193] 成组编辑切换组：竖排下整宽、标题独占一行、两个模式键并排等分 */
+body.ry-tool #pipePlanSection #ppToolbar>.pp-group-edit{
+  display:flex;flex-direction:row;flex-wrap:wrap;justify-content:center;align-content:center;
+  width:100%;box-sizing:border-box;height:auto;gap:4px;padding:6px;
+  border:1px solid var(--ry-line);border-radius:8px;
+}
+body.ry-tool #pipePlanSection #ppToolbar>.pp-group-edit>.pp-ge-title{flex:1 1 100%;text-align:center;font-size:11.5px}
+body.ry-tool #pipePlanSection #ppToolbar>.pp-group-edit>.pp-ge-row{display:flex;gap:3px;flex:1 1 100%}
+/* ★ 不能用 padding:0!important —— verify_eng_skin 的纪律：padding/margin 的 !important
+   只允许在「标题条」与「工具模式栏位齐平」两处（布局类属性带 !important 会破坏响应式断点）。
+   这里的选择器本身已有 2 个 id + 4 个类，特异性足够压过 .pp-btn-ghost 的内边距，无需 !important。 */
+body.ry-tool #pipePlanSection #ppToolbar>.pp-group-edit>.pp-ge-row>.pp-ge-mode{flex:1 1 0;min-width:0;height:26px;padding:0}
+body.ry-tool #pipePlanSection #ppToolbar>.pp-group-edit>.pp-ge-sel,
+body.ry-tool #pipePlanSection #ppToolbar>.pp-group-edit>#ppGeTrunk{
+  flex:1 1 100%;width:100%;max-width:none;height:26px;
+}
 /* 微调箭头组（仅「调网格」模式出现）：四键并排等分 */
 body.ry-tool #pipePlanSection #ppToolbar>.pp-cut-fine-group{gap:3px;margin:0}
 body.ry-tool #pipePlanSection #ppToolbar>.pp-cut-fine-group>.pp-fine-btn{
@@ -6053,6 +6077,24 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
       <input type="checkbox" id="ppZoneAutoChk" checked>
       <span id="ppZoneAutoTxt">地块划分</span>
     </label>
+    <!-- ===== [v193 2026-10-03] 成组地块「整组 / 逐块」编辑切换 =====
+         用户原话：「成组地块传导到二级管路之后，进一步编辑的话，再给我一个切换按钮，
+           这个单独编辑，跟三级管路编辑页面分开，否则我担心跟原来的一些计算规则跟逻辑搞混了。」
+         ★ 设计原则（用户拍板）：**不写成组的“新算法”，而是让成组退化成“多次单块”**
+           —— 逐块模式下 ppState.polyPts 就是那一块自己的环，分区/布管/面积/材料/水力
+           全部走现有单地块逻辑，**一行都不改** ⇒ 结构上不可能串味。
+         · 整组：看全局（各成员环都画、空隙留空）
+         · 逐块：一次只编辑一块，每块一套独立结果；总管单独一层手动画（不自动吸附）
+         非成组地块时整个控件隐藏，不打扰。 -->
+    <span class="pp-group-edit" id="ppGroupEditWrap" style="display:none">
+      <span class="pp-ge-title">成组编辑</span>
+      <span class="pp-ge-row">
+        <button type="button" class="pp-btn-ghost pp-ge-mode active" id="ppGeWhole" data-ge="whole">整组</button>
+        <button type="button" class="pp-btn-ghost pp-ge-mode" id="ppGePerPlot" data-ge="perPlot">逐块</button>
+      </span>
+      <select class="pp-ge-sel" id="ppGePlotSel" style="display:none" title="选择当前要编辑的子地块"></select>
+      <button type="button" class="pp-btn-ghost pp-ge-mode" id="ppGeTrunk" data-mode="trunk" style="display:none" title="总管：跨子地块手动连接，不自动吸附，不计入各块的水力/材料">总管</button>
+    </span>
     <span class="pp-sep"></span>
     <button class="pp-btn-generate" id="ppGenerate">生成施工图</button>
     <button class="pp-btn-ghost" id="ppDownload" style="display:none">📥 下载</button>
@@ -12589,7 +12631,31 @@ function tlOpenSystemDiagram() {
    rySetTab 编程进入（顶部导航复位走这条路），只是不再有底部按钮；被删按钮的视图
    不会出现在高亮循环里（无匹配按钮 → 全部熄灭，属预期，勿"修复"）。
    左属性栏始终保留，只有右主区换面板；不再整屏替换，切换时不跳版。 */
+/* ===== [v193 2026-10-03] 成组地块暂不进「三级管路设计」页 =====
+ * 用户原话：「这个单独编辑，跟三级管路编辑页面分开，否则我担心跟原来的一些计算规则
+ *   跟逻辑搞混了，容易出错」；用户拍板 ②「先不让成组地块进三级页」。
+ * 理由：三级按「一个地块 = 一套分区 + 一套管网」计算，成组地块进去必然把块间空隙
+ *   当实体面积算进来 —— 与二级页「空隙不算面积」的口径直接冲突。
+ * ★ 必须**同时**拦 rySetTab（切视图）与 ryShowSection（切功能区）两条路：
+ *   只拦一条，导航会从另一条绕进去。 */
+function ryIsGroupPlot(){
+  var s=window.__runyeSubPlots;
+  return !!(s && s.length>=2);
+}
+function ryGroupThirdLevelGuard(){
+  if(!ryIsGroupPlot())return false;
+  var n=window.__runyeSubPlots.length;
+  alert('当前地块是「成组地块」（'+n+' 块）。\n\n'
+    +'成组地块暂不进入三级管路设计：三级按「一个地块 = 一套分区 + 一套管网」计算，\n'
+    +'进去会把块间空隙当成实体面积算进去，与二级页「空隙不计面积」的口径冲突。\n\n'
+    +'请先在二级管路页用「逐块」模式分别编辑每一块；\n'
+    +'或到在线地图把成组地块拆成单个地块后再进三级。');
+  return true;
+}
+
 function rySetTab(sectionId, view) {
+  /* [v193] 成组地块拦截三级页入口（三条路都要拦，见上方说明） */
+  if(sectionId==='tlPipePlanSection' && typeof ryGroupThirdLevelGuard==='function' && ryGroupThirdLevelGuard())return;
   var sec = document.getElementById(sectionId);
   if (!sec) return;
   sec.setAttribute('data-ry-view', view);
@@ -13947,6 +14013,9 @@ ppPullLiftDh();                                              // 首屏对齐一�
     ppHintEl.style.display='none';ppToolbar.style.display='flex';
     ppEmpty.style.display='none';ppLegend.style.display='flex';
     ppState.polyPts=window.measuredPolygon.map(function(p){return{x:p.x,y:p.y};});
+    /* [v193] 成组地块：初始化「整组 / 逐块」编辑状态（非成组 → 置 null，UI 自动隐藏）。
+       必须在 ppUpdateTransform 之前，因为整组/逐块会决定 bounds 用的是外框还是某一块。 */
+    ppInitGroupEdit();
     ppResetCutSnap('');
     ppUpdateTransform();ppRender();
   }
@@ -14103,7 +14172,9 @@ ppPullLiftDh();                                              // 首屏对齐一�
    * 环用 ppGetRotatedSubRings()（与 ppGetRotatedPlotPoints 同口径临时旋转），
    * 数据/面积层用 ppGetSubPlotRings()（数据坐标，与 polyPts/zoneCuts 同空间）。 */
   function ppGetSubPlotRings(){
-    var subs=window.__runyeSubPlots;
+    /* [v193] 按编辑模式取环：整组=全部成员环；逐块=只有当前那一块。
+       ⇒ 下游（画布 / 施工图 / 面积 / 点位判定）不用改一行就自动跟着模式走。 */
+    var subs=ppGroupActiveSubs();
     if(!subs||!subs.length)return null;
     var rings=[];
     subs.forEach(function(s){
@@ -14128,6 +14199,246 @@ ppPullLiftDh();                                              // 首屏对齐一�
     if(!subs||!subs.length)return;
     subs.forEach(function(s){
       if(s&&Array.isArray(s.poly)&&s.poly.length>=3)s.poly=s.poly.map(fn);
+    });
+  }
+
+  /* ================= [v193 2026-10-03] 成组地块「整组 / 逐块」编辑 =================
+   * 用户原话：「成组地块传到二级管路之后，进一步编辑的话，再给我一个切换按钮，这个
+   *   单独编辑，跟三级管路编辑页面分开，否则我担心跟原来的一些计算规则跟逻辑搞混了。」
+   * 用户拍板：① 逐块单独编辑 ② 先不让成组地块进三级页 ③ 各块结果完全独立
+   *          ④ 旋转/镜像作用于整组 ⑤ 施工图出一张总图
+   *
+   * ★★ 设计原则：**不写成组的“新算法”，而是让成组退化成“多次单块”**。
+   *   逐块模式下 ppState.polyPts 就是那一块自己的环 ⇒ 分区 / 布管 / 面积 / 材料 / 水力
+   *   **全部走现有单地块逻辑，一行都不改** ⇒ 结构上不可能与单块规则串味。
+   *   这正是用户担心的那件事的解法：不是“小心别搞混”，而是“根本没有两套规则”。
+   *
+   * 两种模式：
+   *   · whole   整组：只读总览 —— 画全部成员环 + 全部块的管线（合并显示）+ 总管；
+   *                    **不可编辑管线**（编辑必须切到逐块，否则分不清画的是哪块）
+   *   · perPlot 逐块：一次只编辑一块，ppState 整份换成本块的 slot
+   *
+   * 每块一份 slot 的字段（PP_SLOT_KEYS）—— 视图类（zoom/pan/transform）与
+   * 整组类（plotRotationDeg / plotMirror / zoneAuto / mode）**不进 slot**，切块时保持不变。
+   */
+  var PP_SLOT_KEYS=['polyPts','mainPipes','branchPipes','subBranchPipes','source','valves',
+    'pipeIds','nextPipeId','hiddenPipes','cutOverrides','cutSnap','mergePreview','areaLocked'];
+
+  function ppCloneJSON(v){ try{ return JSON.parse(JSON.stringify(v===undefined?null:v)); }catch(e){ return null; } }
+
+  function ppCaptureSlot(){
+    var s={};
+    PP_SLOT_KEYS.forEach(function(k){ s[k]=ppCloneJSON(ppState[k]); });
+    return s;
+  }
+  function ppApplySlot(s){
+    if(!s)return;
+    PP_SLOT_KEYS.forEach(function(k){ ppState[k]=ppCloneJSON(s[k]); });
+  }
+  function ppBlankSlot(polyPts){
+    return {
+      polyPts:(polyPts||[]).map(function(q){return{x:+q.x,y:+q.y};}),
+      mainPipes:[],branchPipes:[],subBranchPipes:[],source:null,valves:[],
+      pipeIds:{main:[],branch:[],subbranch:[]},nextPipeId:1,
+      hiddenPipes:{main:{},branch:{},subbranch:{}},
+      cutOverrides:{x:{},y:{}},cutSnap:{sig:'',x:null,y:null},mergePreview:null,areaLocked:false
+    };
+  }
+
+  /* 载入成组地块时初始化（非成组 → 置 null，UI 自动隐藏） */
+  function ppInitGroupEdit(){
+    var subs=window.__runyeSubPlots;
+    if(!subs||subs.length<2){ window.__runyeGroupEdit=null; ppSyncGroupEditUI(); return false; }
+    var frame=(window.measuredPolygon||[]).map(function(p){return{x:+p.x,y:+p.y};});
+    window.__runyeGroupEdit={
+      active:true, mode:'whole', current:0,
+      framePts:frame,                                   // 整组模式用的参考外框（不参与面积）
+      slots:subs.map(function(s){ return ppBlankSlot(s.poly); }),
+      trunkPipes:[], trunkHidden:{}                     // 总管：跨块手动画，不进各块统计
+    };
+    ppSyncGroupEditUI();
+    return true;
+  }
+
+  /* 当前编辑对象的环：非成组=null（走 polyPts）；整组=全部成员环；逐块=[当前块] */
+  function ppGroupActiveSubs(){
+    var subs=window.__runyeSubPlots;
+    if(!subs||!subs.length)return null;
+    var ge=window.__runyeGroupEdit;
+    if(ge&&ge.active&&ge.mode==='perPlot'){
+      var one=subs[ge.current];
+      return one?[one]:null;
+    }
+    return subs;
+  }
+
+  function ppSetGroupMode(mode){
+    var ge=window.__runyeGroupEdit;
+    if(!ge||!ge.active)return;
+    mode=(mode==='perPlot')?'perPlot':'whole';
+    if(ge.mode===mode){ ppSyncGroupEditUI(); return; }
+    if(mode==='perPlot'){
+      /* 整组 → 逐块：整组态的管线是「各块合并出来的只读视图」，不存档；
+         直接载入当前块的 slot（坐标都是同一世界坐标系，无需换算） */
+      ge.mode='perPlot';
+      ppApplySlot(ge.slots[ge.current]);
+      ppState.history=[];                 // 撤销栈不跨块
+    }else{
+      /* 逐块 → 整组：先把当前块存回 slot，再切成外框 + 合并视图 */
+      ge.slots[ge.current]=ppCaptureSlot();
+      ge.mode='whole';
+      ppState.polyPts=ge.framePts.map(function(p){return{x:p.x,y:p.y};});
+      var merged=ppCollectGroupAllPipes();
+      ppState.mainPipes=merged.main; ppState.branchPipes=merged.branch;
+      ppState.subBranchPipes=merged.subbranch;
+      ppState.source=null; ppState.valves=[];
+      ppState.pipeIds={main:[],branch:[],subbranch:[]}; ppState.nextPipeId=1;
+      ppState.hiddenPipes={main:{},branch:{},subbranch:{}};
+      ppEnsurePipeIds('main');ppEnsurePipeIds('branch');ppEnsurePipeIds('subbranch');
+      ppState.history=[];
+    }
+    /* 模式跟着切：整组态只剩「总管」可画，逐块态没有总管（总管是整组级对象）。
+       不跟着切的话，切完仍停在被禁用的模式上，画面上看不出为什么点不动。 */
+    if(mode==='whole'){ if(ppGroupEditBlocks(ppState.mode))ppState.mode='trunk'; }
+    else { if(ppState.mode==='trunk')ppState.mode='main'; }
+    ppState.currentLine=[]; ppState.hoverPt=null; ppState.dragCut=null; ppState.hoverCut=null;
+    ppResetCutSnap('');
+    ppUpdateTransform(); ppRender();
+    ppSyncGroupEditUI();
+    ppRefreshDiagramOrReset();
+  }
+
+  function ppSelectGroupPlot(i){
+    var ge=window.__runyeGroupEdit;
+    if(!ge||!ge.active)return;
+    i=parseInt(i,10)||0;
+    if(i<0||i>=ge.slots.length||i===ge.current)return;
+    if(ge.mode==='perPlot') ge.slots[ge.current]=ppCaptureSlot();   // 存档旧块
+    ge.current=i;
+    if(ge.mode==='perPlot') ppApplySlot(ge.slots[i]);               // 载入新块
+    ppState.currentLine=[]; ppState.hoverPt=null;
+    ppState.dragCut=null; ppState.hoverCut=null; ppState.history=[];
+    ppResetCutSnap('');
+    ppUpdateTransform(); ppRender();
+    ppSyncGroupEditUI();
+    ppUpdateAutoPipeButton(); ppUpdatePickResult(null);
+    ppRefreshDiagramOrReset();
+  }
+
+  /* 整组态的「只读合并视图」：各块管线 + 总管（用于总览与出总图） */
+  function ppCollectGroupAllPipes(){
+    var ge=window.__runyeGroupEdit;
+    var out={main:[],branch:[],subbranch:[]};
+    if(!ge||!ge.active)return out;
+    ge.slots.forEach(function(s){
+      (s.mainPipes||[]).forEach(function(l){out.main.push(l.map(function(p){return{x:p.x,y:p.y};}));});
+      (s.branchPipes||[]).forEach(function(l){out.branch.push(l.map(function(p){return{x:p.x,y:p.y};}));});
+      (s.subBranchPipes||[]).forEach(function(l){out.subbranch.push(l.map(function(p){return{x:p.x,y:p.y};}));});
+    });
+    return out;
+  }
+
+  /* [v193] 旋转落定 / 镜像后：把变换作用到**整组的全部对象** ——
+     各块的环与管线、参考外框、总管（用户拍板 ④：旋转/镜像作用于整组）。
+     opt.clearPipes=true（重新分区会清空管线）时只转几何、顺带清空各块管线与总管。
+     结束后把当前块 slot 回灌 ppState —— 这样调用方里对 ppState 的那一份变换会被
+     正确结果覆盖，不会「转两次」。 */
+  function ppXformGroupAll(fn,opt){
+    var ge=window.__runyeGroupEdit;
+    if(!ge||!ge.active)return false;
+    opt=opt||{};
+    if(Array.isArray(ge.framePts))ge.framePts=ge.framePts.map(fn);
+    ge.slots.forEach(function(s){
+      if(Array.isArray(s.polyPts))s.polyPts=s.polyPts.map(fn);
+      if(opt.clearPipes){
+        s.mainPipes=[];s.branchPipes=[];s.subBranchPipes=[];s.source=null;s.valves=[];
+      }else{
+        ['mainPipes','branchPipes','subBranchPipes'].forEach(function(k){
+          if(Array.isArray(s[k]))s[k]=s[k].map(function(l){return l.map(fn);});
+        });
+        if(s.source)s.source=fn(s.source);
+        if(Array.isArray(s.valves))s.valves=s.valves.map(fn);
+      }
+    });
+    if(opt.clearPipes)ge.trunkPipes=[];
+    else if(Array.isArray(ge.trunkPipes))ge.trunkPipes=ge.trunkPipes.map(function(l){return l.map(fn);});
+    if(ge.mode==='perPlot'&&ge.slots[ge.current])ppApplySlot(ge.slots[ge.current]);
+    else if(ge.mode==='whole')ppState.polyPts=ge.framePts.map(function(p){return{x:p.x,y:p.y};});
+    return true;
+  }
+
+  /* 整组态：块级编辑一律拦掉，只留「总管」（整组级对象）与「管线拾取」（只读量长度）。
+     ★ 不拦的后果：整组态画的管线落在哪个块、算进谁的水力，无从判断 —— 正是用户担心的串味。 */
+  function ppGroupEditBlocks(mode){
+    var ge=window.__runyeGroupEdit;
+    if(!ge||!ge.active||ge.mode!=='whole')return false;
+    return !(mode==='trunk'||mode==='pickPipe');
+  }
+  /* 总管：成组地块专属的跨块连接层，独立于 ppState（不进任何一块的水力/材料统计）。 */
+  function ppAddTrunkPipe(line){
+    var ge=window.__runyeGroupEdit;
+    if(!ge||!ge.active)return;
+    if(!Array.isArray(ge.trunkPipes))ge.trunkPipes=[];
+    ge.trunkPipes.push(line.map(function(p){return{x:p.x,y:p.y};}));
+  }
+  function ppDrawGroupTrunk(){
+    var ge=window.__runyeGroupEdit;
+    if(!ge||!ge.active||!ge.trunkPipes||!ge.trunkPipes.length)return;
+    ge.trunkPipes.forEach(function(l,i){
+      if(ge.trunkHidden&&ge.trunkHidden['t'+i])ppDrawLine(l,'rgba(100,116,139,.55)',4,[7,5]);
+      else ppDrawLine(l,'#7c3aed',5);
+    });
+  }
+
+  function ppSyncGroupEditUI(){
+    var ge=window.__runyeGroupEdit;
+    var wrap=document.getElementById('ppGroupEditWrap');
+    var bWhole=document.getElementById('ppGeWhole');
+    var bPer=document.getElementById('ppGePerPlot');
+    var sel=document.getElementById('ppGePlotSel');
+    var bTrunk=document.getElementById('ppGeTrunk');
+    var on=!!(ge&&ge.active&&ge.slots&&ge.slots.length>=2);
+    if(!wrap)return;
+    wrap.style.display=on?'':'none';
+    if(!on)return;
+    if(bWhole)bWhole.classList.toggle('active',ge.mode==='whole');
+    if(bPer)bPer.classList.toggle('active',ge.mode==='perPlot');
+    if(sel){
+      sel.style.display=(ge.mode==='perPlot')?'':'none';
+      var subs=window.__runyeSubPlots||[];
+      var keep=sel.value;
+      sel.innerHTML='';
+      subs.forEach(function(s,i){
+        var op=document.createElement('option');
+        op.value=String(i);
+        op.textContent=(s&&s.name)||('子地块'+(i+1));
+        sel.appendChild(op);
+      });
+      sel.value=String(ge.current);
+      if(keep&&sel.value!==keep)sel.value=String(ge.current);
+    }
+    /* 总管属于「整组级」对象 —— 只有整组态能一眼看到全部块，所以只在整组态给按钮。
+       （总管本身在两种模式下都画，见 ppDrawGroupTrunk。） */
+    if(bTrunk)bTrunk.style.display=(ge.mode==='whole')?'':'none';
+    /* 整组态：把块级编辑按钮（主管/支管/一级管/水源/阀门/调网格）置灰禁用 ——
+       与其点了再弹窗报错，不如根本点不动，从交互上杜绝「在整组态画了不知算哪块的管」。 */
+    document.querySelectorAll('#ppToolbar [data-mode]').forEach(function(b){
+      var m=b.getAttribute('data-mode');
+      var blocked=on&&ge.mode==='whole'&&ppGroupEditBlocks(m);
+      b.classList.toggle('pp-ge-disabled',!!blocked);
+      if(blocked){
+        /* 原 title 先存起来，解除禁用时原样还回去（调网格的 title 是长说明，不能丢） */
+        if(!b.hasAttribute('data-ge-title0'))b.setAttribute('data-ge-title0', b.getAttribute('title')||'');
+        b.setAttribute('disabled','disabled');
+        b.title='整组为总览态：块级编辑请切到「逐块」';
+      }else{
+        b.removeAttribute('disabled');
+        if(b.hasAttribute('data-ge-title0')){
+          var t0=b.getAttribute('data-ge-title0');
+          if(t0)b.setAttribute('title',t0); else b.removeAttribute('title');
+          b.removeAttribute('data-ge-title0');
+        }
+      }
     });
   }
 
@@ -14975,6 +15286,10 @@ ppPullLiftDh();                                              // 首屏对齐一�
     ppTracePlotPath();
     ppCtx.stroke();
 
+    /* [v193] 总管（成组地块跨块连接层）：独立于 ppState 的 mainPipes…，
+       所以**天然不进任何一块的水力与材料统计**（用户拍板 ③）。 */
+    ppDrawGroupTrunk();
+
     // Main pipes
     ppState.mainPipes.forEach(function(l,idx){
       if(!ppIsPipeHidden('main',idx))ppDrawLine(l,'#185FA5',4);
@@ -15016,8 +15331,9 @@ ppPullLiftDh();                                              // 首屏对齐一�
 
     // Current line being drawn
     if(ppState.currentLine.length>0){
-      var c=ppState.mode==='main'?'#185FA5':ppState.mode==='branch'?'#16a34a':ppState.mode==='subbranch'?'#185FA5':'rgba(0,0,0,.35)';
-      var w=ppState.mode==='main'?4:ppState.mode==='branch'?2.5:ppState.mode==='subbranch'?2:1.5;
+      /* [v193] 'trunk' 与已落线的总管同色同宽（#7c3aed / 5），画的时候就能认出来 */
+      var c=ppState.mode==='main'?'#185FA5':ppState.mode==='branch'?'#16a34a':ppState.mode==='subbranch'?'#185FA5':ppState.mode==='trunk'?'#7c3aed':'rgba(0,0,0,.35)';
+      var w=ppState.mode==='main'?4:ppState.mode==='branch'?2.5:ppState.mode==='subbranch'?2:ppState.mode==='trunk'?5:1.5;
       ppDrawLine(ppState.currentLine,c,w);
       // Vertices
       ppCtx.fillStyle=c;
@@ -15045,13 +15361,13 @@ ppPullLiftDh();                                              // 首屏对齐一�
 
     // Mode hint
     ppCtx.fillStyle='rgba(0,0,0,.45)';ppCtx.font='10px sans-serif';ppCtx.textAlign='left';
-    var mt=ppState.mode==='main'?'主管':ppState.mode==='branch'?'支管':ppState.mode==='subbranch'?'一级管':ppState.mode==='source'?'水源':ppState.mode==='pickPipe'?'管线拾取':ppState.mode==='maskPipe'?'遮蔽管线':ppState.mode==='adjustCut'?'调网格':'阀门';
+    var mt=ppState.mode==='main'?'主管':ppState.mode==='branch'?'支管':ppState.mode==='subbranch'?'一级管':ppState.mode==='source'?'水源':ppState.mode==='pickPipe'?'管线拾取':ppState.mode==='maskPipe'?'遮蔽管线':ppState.mode==='adjustCut'?'调网格':ppState.mode==='trunk'?'总管':'阀门';
     var lt=ppState.lineDrawMode==='ortho'?'横竖锁定':'自由线段';
     var modeHint=ppState.mode==='pickPipe'?'模式: '+mt+'  ·  点击主管、支管或一级管自动计算长度  ·  回退撤销上一步  ·  滚轮缩放  ·  空格+拖拽平移':ppState.mode==='maskPipe'?'模式: '+mt+'  ·  点击管线切换遮蔽，遮蔽后不进入施工图  ·  回退撤销上一步  ·  滚轮缩放  ·  空格+拖拽平移':ppState.mode==='adjustCut'?'模式: '+mt+'  ·  拖拽圆点移动分区线  ·  ↑↓←→微调选中线(0.3m/次)  ·  回退撤销上一步  ·  滚轮缩放  ·  空格+拖拽平移':'模式: '+mt+'  ·  '+lt+'  ·  点击添加点  ·  双击结束  ·  回退撤销上一步  ·  滚轮缩放  ·  空格+拖拽平移';
     ppCtx.fillText(modeHint,10,20);
 
     // Length tooltip while drawing
-    if(ppState.currentLine.length>0&&ppState.hoverPt&&ppState.mouseWorld&&(ppState.mode==='main'||ppState.mode==='branch'||ppState.mode==='subbranch')){
+    if(ppState.currentLine.length>0&&ppState.hoverPt&&ppState.mouseWorld&&(ppState.mode==='main'||ppState.mode==='branch'||ppState.mode==='subbranch'||ppState.mode==='trunk')){
       var last=ppState.currentLine[ppState.currentLine.length-1];
       var mw=ppGetConstrainedPoint(ppState.mouseWorld);
       var segLen=ppLineLen([last,mw]);
@@ -15254,6 +15570,9 @@ ppPullLiftDh();                                              // 首屏对齐一�
           ppState.valves.push(valvePt);ppRender();ppMouseDownPos=null;return;
         }
         if(ppState.mode==='adjustCut'){ppMouseDownPos=null;return;}
+        /* [v193] 整组态不允许落块级管线的点 —— 按钮已置灰，这里是兜底
+           （模式也可能被脚本/键盘改动，不能只靠按钮 disable 这一道）。 */
+        if(ppGroupEditBlocks(ppState.mode)){ppMouseDownPos=null;return;}
         ppPushHistory();
         var linePt=ppToMeters(pos.x,pos.y);
         linePt=ppGetConstrainedPoint(linePt);
@@ -15280,10 +15599,7 @@ ppPullLiftDh();                                              // 首屏对齐一�
   ppCanvas.addEventListener('dblclick',function(){
     if(ppState.mode==='pickPipe'||ppState.mode==='maskPipe'||ppState.mode==='adjustCut')return;
     if(ppState.currentLine.length<2){ppState.currentLine=[];ppRender();return;}
-    ppPushHistory();
-    if(ppState.mode==='main')ppAddPipe('main',ppState.currentLine);
-    else if(ppState.mode==='branch')ppAddPipe('branch',ppState.currentLine);
-    else if(ppState.mode==='subbranch')ppAddPipe('subbranch',ppState.currentLine);
+    ppFinishCurrentLine();   /* [v193] 统一入口（含新增的「总管」），不再在这里单列三种 */
     ppUpdatePickResult(null);
     ppState.currentLine=[];ppState.hoverPt=null;ppRender();ppUpdateAutoPipeButton();
     ppRefreshMaterials();
@@ -15294,30 +15610,48 @@ ppPullLiftDh();                                              // 首屏对齐一�
     if(ppState.currentLine.length>0){ppState.currentLine.pop();ppUpdatePickResult(null);ppRender();ppUpdateAutoPipeButton();}
   });
 
+  /* [v193] 把「结束当前线段落到哪一类管线」抽出来 —— 原逻辑散在 dblclick 与模式按钮
+     两处，新增「总管」必须同时改两处，正是典型的「改一处漏一处」。 */
+  function ppFinishCurrentLine(){
+    if(ppState.currentLine.length<2)return;
+    ppPushHistory();
+    if(ppState.mode==='main')ppAddPipe('main',ppState.currentLine);
+    else if(ppState.mode==='branch')ppAddPipe('branch',ppState.currentLine);
+    else if(ppState.mode==='subbranch')ppAddPipe('subbranch',ppState.currentLine);
+    else if(ppState.mode==='trunk')ppAddTrunkPipe(ppState.currentLine);
+  }
+  /* [v193] 模式切换的统一入口（原为模式按钮点击里的内联逻辑）。
+     「总管」按钮是 .pp-btn-ghost.pp-ge-mode，不在 '#ppToolbar .pp-btn[data-mode]' 选择器里，
+     原来的委托抓不到它 —— 抽成本函数后两条路径共用同一口径。 */
+  function ppSetMode(mode){
+    if(ppGroupEditBlocks(mode)){
+      alert('整组是总览态，块级管线编辑请切到「逐块」再选子地块。');
+      ppSyncGroupEditUI();
+      return;
+    }
+    ppFinishCurrentLine();
+    ppState.currentLine=[];ppState.mode=mode;
+    ppState.hoverCut=null;
+    ppCanvas.style.cursor=ppState.mode==='adjustCut'?'default':'crosshair';
+    ppUpdateAutoPipeButton();
+    ppRefreshMaterials();
+    if(ppState.mode!=='pickPipe'&&ppState.mode!=='maskPipe'&&ppState.mode!=='adjustCut')ppUpdatePickResult(null);
+    /* 高亮：原来只扫 .pp-btn[data-mode]，总管按钮扫不到 ⇒ 点总管后主管仍亮着。
+       改成扫全部 [data-mode]，一次 toggle 到位。 */
+    document.querySelectorAll('#ppToolbar [data-mode]').forEach(function(b){
+      b.classList.toggle('active', b.getAttribute('data-mode')===mode);
+    });
+    // Show fine-tune group only in adjustCut mode
+    // [v188] 改用统一入口 ppSyncFineGroup()，与「地块划分」开关那条路径共用同一口径，
+    //        避免「两条路径各写一遍、改一处漏一处」（本次就是这个 bug）。
+    if(typeof ppSyncFineGroup==='function') ppSyncFineGroup();
+    else { var fg=document.getElementById('ppCutFineGroup'); if(fg)fg.style.display=ppState.mode==='adjustCut'?'inline-flex':'none'; }
+    ppRender();
+  }
+
   // Mode buttons
   document.querySelectorAll('#ppToolbar .pp-btn[data-mode]').forEach(function(btn){
-    btn.addEventListener('click',function(){
-      if(ppState.currentLine.length>=2){
-        ppPushHistory();
-        if(ppState.mode==='main')ppAddPipe('main',ppState.currentLine);
-        else if(ppState.mode==='branch')ppAddPipe('branch',ppState.currentLine);
-        else if(ppState.mode==='subbranch')ppAddPipe('subbranch',ppState.currentLine);
-      }
-      ppState.currentLine=[];ppState.mode=btn.dataset.mode;
-      ppState.hoverCut=null;
-      ppCanvas.style.cursor=ppState.mode==='adjustCut'?'default':'crosshair';
-      ppUpdateAutoPipeButton();
-      ppRefreshMaterials();
-      if(ppState.mode!=='pickPipe'&&ppState.mode!=='maskPipe'&&ppState.mode!=='adjustCut')ppUpdatePickResult(null);
-      document.querySelectorAll('#ppToolbar .pp-btn[data-mode]').forEach(function(b){b.classList.remove('active');});
-      btn.classList.add('active');
-      // Show fine-tune group only in adjustCut mode
-      // [v188] 改用统一入口 ppSyncFineGroup()，与「地块划分」开关那条路径共用同一口径，
-      //        避免「两条路径各写一遍、改一处漏一处」（本次就是这个 bug）。
-      if(typeof ppSyncFineGroup==='function') ppSyncFineGroup();
-      else { var fg=document.getElementById('ppCutFineGroup'); if(fg)fg.style.display=ppState.mode==='adjustCut'?'inline-flex':'none'; }
-      ppRender();
-    });
+    btn.addEventListener('click',function(){ ppSetMode(btn.dataset.mode); });
   });
 
   function ppSetLineDrawMode(mode){
@@ -15467,6 +15801,12 @@ ppPullLiftDh();                                              // 首屏对齐一�
     window.measuredPolygon=ppState.polyPts.map(function(p){return{x:p.x,y:p.y};});
     /* [v190] 子地块环随主轮廓一起旋转落定（同一 center/deg），否则两者错位、空隙位置错乱 */
     ppXformSubRings(function(pt){return ppRotatePoint(pt,deg,_rotC);});
+    /* [v193] 旋转作用于整组：各块的环/管线/外框/总管一起转（用户拍板 ④）。
+       重新分区本来就会清空管线 ⇒ clearPipes:true，避免各块留下旋转前的旧坐标。 */
+    ppXformGroupAll(function(pt){return ppRotatePoint(pt,deg,_rotC);},{clearPipes:true});
+    /* measuredPolygon 始终代表「整个成组地块」的外框，不能停在某一块的环上 */
+    var geRot=window.__runyeGroupEdit;
+    if(geRot&&geRot.active)window.measuredPolygon=geRot.framePts.map(function(p){return{x:p.x,y:p.y};});
     ppState.plotRotationDeg=0;
     var angleInput=document.getElementById('ppPlotAngle');
     if(angleInput)angleInput.value=0;
@@ -15543,6 +15883,7 @@ ppPullLiftDh();                                              // 首屏对齐一�
       if(ppState.source)ppState.source=tf(ppState.source);
       ppState.valves=ppState.valves.map(tf);
       ppXformSubRings(tf); // [v190] 子地块环随主轮廓一起撤销镜像
+      ppXformGroupAll(tf); // [v193] 各块 slot / 外框 / 总管同步撤销
     }
     // 再应用新镜像（以当前几何中心为轴）
     if(mode!=='none'){
@@ -15555,12 +15896,15 @@ ppPullLiftDh();                                              // 首屏对齐一�
       if(ppState.source)ppState.source=tf2(ppState.source);
       ppState.valves=ppState.valves.map(tf2);
       ppXformSubRings(tf2); // [v190] 子地块环随主轮廓一起应用新镜像
+      ppXformGroupAll(tf2); // [v193] 各块 slot / 外框 / 总管同步应用
     }
     ppState.plotMirror=mode;
     // 镜像后世界坐标翻转，手动分区线位置失效，恢复默认划分（可用「回退」撤销）
     ppResetCutSnap('');
     // 同步全局多边形（面积标签 / 三级传导保持一致）
-    window.measuredPolygon=ppState.polyPts.map(function(p){return{x:p.x,y:p.y};});
+    // [v193] 成组时 measuredPolygon 恒为整组外框（逐块态 ppState.polyPts 只是其中一块）
+    var geMir=window.__runyeGroupEdit;
+    window.measuredPolygon=(geMir&&geMir.active?geMir.framePts:ppState.polyPts).map(function(p){return{x:p.x,y:p.y};});
     ppSyncMirrorUI();
     ppUpdateTransform();ppRender();
     if(typeof ppRefreshDiagramOrReset==='function')ppRefreshDiagramOrReset();
@@ -15580,6 +15924,18 @@ ppPullLiftDh();                                              // 首屏对齐一�
   if(ppRepartitionBtn){
     ppRepartitionBtn.addEventListener('click',ppRepartitionFromRotatedPlot);
   }
+
+  /* ===== [v193] 成组编辑切换：整组 / 逐块 + 选择子地块 + 总管 ===== */
+  (function bindGroupEditUI(){
+    var bWhole=document.getElementById('ppGeWhole');
+    var bPer=document.getElementById('ppGePerPlot');
+    var sel=document.getElementById('ppGePlotSel');
+    var bTrunk=document.getElementById('ppGeTrunk');
+    if(bWhole)bWhole.addEventListener('click',function(){ ppSetGroupMode('whole'); });
+    if(bPer)bPer.addEventListener('click',function(){ ppSetGroupMode('perPlot'); });
+    if(sel)sel.addEventListener('change',function(){ ppSelectGroupPlot(parseInt(this.value,10)||0); });
+    if(bTrunk)bTrunk.addEventListener('click',function(){ ppSetMode('trunk'); });
+  })();
 
   // 任务K（2026-09-26）：分区面积锁定按钮的 UI 同步与自动解锁
   function ppUpdateLockAreaBtn(){
@@ -15791,7 +16147,30 @@ ppPullLiftDh();                                              // 首屏对齐一�
     return'<polygon points="'+p2.x.toFixed(1)+','+p2.y.toFixed(1)+' '+x1.toFixed(1)+','+y1.toFixed(1)+' '+x2.toFixed(1)+','+y2.toFixed(1)+'" fill="'+color+'"/>';
   }
 
+  /* [v193] 施工图 = **一张总图**（用户拍板 ⑤）：逐块态出图时，临时把 ppState 换成
+     整组视图（外框 + 各块管线合并 + 总管），出完立刻还原 —— ppState 仍停在当前块，
+     编辑态不受影响。整组态本来就已是整组视图，直接走 core。 */
   function ppGenerateDiagram(options){
+    var ge=window.__runyeGroupEdit;
+    if(!(ge&&ge.active&&ge.mode==='perPlot'))return ppGenerateDiagramCore(options);
+    ge.slots[ge.current]=ppCaptureSlot();          // 先存档当前块，合并视图才拿得到最新
+    var back=ppCaptureSlot();                      // 出图后原样还原
+    var mode0=ge.mode;                             // ★ 连 mode 一起临时切成 whole：
+    try{                                           //   否则 ppGroupActiveSubs() 仍只返回当前块，
+      ge.mode='whole';                             //   画的就不是「一张总图」而是「当前块的图」。
+      ppState.polyPts=ge.framePts.map(function(p){return{x:p.x,y:p.y};});
+      var m=ppCollectGroupAllPipes();
+      ppState.mainPipes=m.main; ppState.branchPipes=m.branch; ppState.subBranchPipes=m.subbranch;
+      ppState.source=null; ppState.valves=[];
+      ppState.hiddenPipes={main:{},branch:{},subbranch:{}};
+      ppEnsurePipeIds('main');ppEnsurePipeIds('branch');ppEnsurePipeIds('subbranch');
+      return ppGenerateDiagramCore(options);
+    } finally {
+      ge.mode=mode0;                               // 先还原 mode，再还原 slot
+      ppApplySlot(back);
+    }
+  }
+  function ppGenerateDiagramCore(options){
     options=options||{};
     var doScroll=options.scroll!==false;
     if(!ppState.polyPts.length){alert('请先在面积测量工具中描绘边界');return;}
@@ -16030,6 +16409,23 @@ ppPullLiftDh();                                              // 首屏对齐一�
     var showPipeNoteMain=ppHasVisiblePipe('main');
     var showPipeNoteBranch=ppHasVisiblePipe('branch');
     parts.push('<path d="'+d+'" fill="none" stroke="#1a4731" stroke-width="2.2"/>');
+
+    /* [v193] 总管（成组地块跨块连接层）：
+       · **不进裁剪组** —— 它本来就要穿过块间空隙，裁到地块里就断了；
+       · 不累加 actualMainTotal / actualBranchTotal ⇒ 不影响各块的材料与水力（拍板 ③）。 */
+    (function(){
+      var ge=window.__runyeGroupEdit;
+      if(!ge||!ge.active||!ge.trunkPipes||!ge.trunkPipes.length)return;
+      parts.push('<g id="ppTrunkLayer">');
+      ge.trunkPipes.forEach(function(l,i){
+        if(ge.trunkHidden&&ge.trunkHidden['t'+i])return;
+        if(!l||l.length<2)return;
+        var td='';
+        for(var k=0;k<l.length;k++){var p=ts(l[k].x,l[k].y);td+=(k===0?'M':'L')+p.x.toFixed(1)+' '+p.y.toFixed(1)+' ';}
+        parts.push('<path d="'+td+'" fill="none" stroke="#7c3aed" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>');
+      });
+      parts.push('</g>');
+    })();
 
     // Main pipes & branch pipes — clipped to plot boundary
     parts.push('<g clip-path="url(#ppPlotClip)">');
@@ -17986,6 +18382,8 @@ threeDModelingSection:'经济指标分析 · 入口预留（方案确定后上�
   /* 单视口：显示指定功能区，其余隐藏；同步导航高亮与底部状态栏。
      仅工具模式使用；非工具模式由下面的滚动逻辑接管。 */
   function ryShowSection(sec, link){
+    /* [v193] 成组地块拦截三级页入口（与 rySetTab 里的拦截互为兜底） */
+    if(sec && sec.id==='tlPipePlanSection' && typeof ryGroupThirdLevelGuard==='function' && ryGroupThirdLevelGuard())return;
     var all=document.querySelectorAll('main > .ry-sec');
     for(var i=0;i<all.length;i++){ all[i].classList.toggle('ry-active', all[i]===sec); }
     /* 2026-09-12：写 body[data-ry-sec]，供底部状态栏里的主区 Tab 条判断该显示哪一组
@@ -18032,6 +18430,9 @@ threeDModelingSection:'经济指标分析 · 入口预留（方案确定后上�
   items.forEach(function(it){
     it.link.addEventListener('click', function(e){
       e.preventDefault();
+      /* [v193] 成组地块拦截三级页入口：在导航这里就 return，
+         否则 rySetTab / ryShowSection 里的拦截会各弹一次窗（一次点击两声 alert）。 */
+      if(it.sec && it.sec.id==='tlPipePlanSection' && typeof ryGroupThirdLevelGuard==='function' && ryGroupThirdLevelGuard())return;
       /* 若目标区块停在满屏视图（.sys-view 施工图 / .pipe-view 管线图），
          点导航应回到绘图编辑区，而非停留在简图区 —— 先退出满屏态。 */
       if(it.sec.classList.contains('sys-view')) it.sec.classList.remove('sys-view');

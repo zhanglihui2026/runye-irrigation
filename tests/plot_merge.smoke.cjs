@@ -33,9 +33,12 @@ const bodyOf = (src, fnName, len) => {
   const i = src.indexOf('function ' + fnName + '(');
   return i < 0 ? '' : stripComments(src.slice(i, i + (len || 3000)));
 };
-/* 统计某个函数体内某串出现的次数（「存在性」不够 —— 见 ppApplyMirror 的坑） */
-const countIn = (src, fnName, needle) => {
-  const b = bodyOf(src, fnName);
+/* 统计某个函数体内某串出现的次数（「存在性」不够 —— 见 ppApplyMirror 的坑）
+ * ★ len 必须显式给：bodyOf 默认切 3000 字符，短函数会**切进下一个函数**，
+ *   把邻居的同名调用也算进来 ⇒ 断言数虚高（实测：ppSetGroupMode 数出 2 次，
+ *   其中 1 次其实是紧随其后的 ppSelectGroupPlot 的）。 */
+const countIn = (src, fnName, needle, len) => {
+  const b = bodyOf(src, fnName, len || 3000);
   if (!b) return -1;
   return (b.match(new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
 };
@@ -452,10 +455,17 @@ test('③-h 消费口径（v190）：子地块环传到了就必须**真的被�
   const mirrorCalls = countIn(INDEX_SRC, 'ppApplyMirror', 'ppXformSubRings(');
   assert.strictEqual(mirrorCalls, 2,
     'ppApplyMirror 应同步子地块环 2 次（撤销旧镜像 + 应用新镜像），实际 ' + mirrorCalls + ' 次');
-  /* 施工图 SVG 的 d 也是一条独立代码路径（与画布不共用），必须单独盯 */
-  const gd = INDEX_SRC.indexOf('function ppGenerateDiagram(');
-  assert.ok(gd > 0 && INDEX_SRC.slice(gd, gd + 4000).indexOf('ppGetRotatedSubRings()') >= 0,
-    '施工图 ppGenerateDiagram 的 SVG d 必须按成员环拼（与画布是两条独立路径）');
+  /* 施工图 SVG 的 d 也是一条独立代码路径（与画布不共用），必须单独盯。
+     [v193] 出图入口已拆成两层：
+       · ppGenerateDiagram(options)      —— 公开入口；成组 + 逐块态时先临时切整组视图
+       · ppGenerateDiagramCore(options)  —— 真正拼 SVG 的那份
+     所以「d 按成员环拼」这条要查的是 **Core**；同时补一条「入口必须委托给 Core」，
+     防止有人把 Core 改名/复制一份后入口不再走它。 */
+  const gd = INDEX_SRC.indexOf('function ppGenerateDiagramCore(');
+  assert.ok(gd > 0 && INDEX_SRC.slice(gd, gd + 6000).indexOf('ppGetRotatedSubRings()') >= 0,
+    '施工图 ppGenerateDiagramCore 的 SVG d 必须按成员环拼（与画布是两条独立路径）');
+  assert.match(INDEX_SRC, /function ppGenerateDiagram\(options\)\{[\s\S]{0,600}ppGenerateDiagramCore\(options\)/,
+    'ppGenerateDiagram 必须把出图委托给 ppGenerateDiagramCore（前面只加一层整组视图切换）');
 
   /* 反向断言：面积不得再退化成「整块外框裁剪」的唯一口径 */
   const a = INDEX_SRC.indexOf('function ppZoneActualAreaM2(');
@@ -524,4 +534,10 @@ test('③-j 参考线（v191 用户拍板）：块间空隙留空，但保留淡
   assert.match(after, /stroke-dasharray|setLineDash\(\[7,5\]\)/, '裁剪之外仍要画网格（虚线）');
   assert.match(after, /cuts\.xPos\.length/, '竖向网格线覆盖整个外框（含块间空隙）');
   assert.match(after, /cuts\.yPos\.length/, '横向网格线覆盖整个外框（含块间空隙）');
+});
+
+test('③-k 成组编辑「整组 / 逐块」（v193）：切换控件 + 各块独立 + 三级页隔离', () => {
+  /* 断言本体在 tests/_v193_group_edit_contract.cjs —— 与 _p1/_gate_v193_contract.cjs
+     的注入体检共用同一份，避免「契约一份、体检另一份」的漂移。 */
+  require('./_v193_group_edit_contract.cjs')(INDEX_SRC, { stripComments, bodyOf, countIn });
 });
