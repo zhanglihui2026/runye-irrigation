@@ -5942,7 +5942,11 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
   <div class="at-main">
     <div class="at-sidebar">
       <div class="at-section at-entry-section">
-        <input type="file" id="atFileInput" accept="image/*" style="display:none">
+        <!-- [v196] accept 不写 "image/*"：属性值里的 /* 会被契约工具 stripComments
+             当成块注释起点，一直吞到 600 行后的 CSS 注释才闭合 ⇒ NC 里成组页
+             HTML 整段消失、静态契约假绿（_gate v25 恒绿实测抓到）。
+             扩展名列表与 image/* 在文件选择器里过滤效果等价。 -->
+        <input type="file" id="atFileInput" accept=".png,.jpg,.jpeg,.webp,.gif,.bmp" style="display:none">
         <div class="at-btn-group">
           <button class="at-btn-action" onclick="document.getElementById('atFileInput').click()">📁 上传图片</button>
           <button class="at-btn-action" id="atBtnMapMeasure" onclick="window.open('runye-map-measure.html','_blank')">🗺️ 地图在线测量</button>
@@ -6275,11 +6279,12 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
       </div>
       <div class="gr-btns">
         <button type="button" class="pp-btn-ghost gr-btn" id="grTrunkDraw" title="进入画总管：在图上点击加点，双击结束，右键退回上一点">✎ 画总管</button>
-        <button type="button" class="pp-btn-ghost gr-btn" id="grTrunkAuto" title="自动连线：从水源点连到各块主管的最近端点">⚡ 自动生成</button>
+        <!-- [v196] 「⚡ 自动生成」撤掉：用户原话「总管我会根据实际情况，手动画」——
+             自动连线猜不出水源和走向，生成一版还要删，反而碍事。只留手画。 -->
         <button type="button" class="pp-btn-ghost gr-btn" id="grTrunkDel" title="删除选中的总管（先在图上点选一根）">🗑 删除选中</button>
         <button type="button" class="pp-btn-ghost gr-btn" id="grTrunkClear" title="清除全部总管">清空</button>
       </div>
-      <div class="gr-hint" id="grTrunkHint">总图里点一根总管可选中；画总管时点击加点、双击结束、右键退回上一点。</div>
+      <div class="gr-hint" id="grTrunkHint">总管请按实际情况手动画：点「✎ 画总管」后在图上点击加点、双击结束、右键退回上一点；点一根已画的总管可选中删除。</div>
     </div>
 
     <!-- 子地块列表：每块一条，带「进入三级页」入口 -->
@@ -6301,7 +6306,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
 
   <div class="pp-stage">
     <div class="pp-toolbar" id="grToolbar">
-      <span class="pp-tool-hint" id="grHint">整组总览：各块已布的管线为只读，总管可在本页编辑</span>
+      <span class="pp-tool-hint" id="grHint">整组总览：分区线与各块主管/支管为只读，总管在本页手动画</span>
       <span class="pp-sep"></span>
       <button type="button" class="pp-btn-ghost" id="grFit" title="缩放至适应窗口">⤢ 适应</button>
       <button type="button" class="pp-btn-ghost" id="grZoomOut" title="缩小">－</button>
@@ -6317,6 +6322,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     <div class="pp-legend" id="grLegend">
       <span class="pp-legend-item"><i style="background:#185FA5"></i>各块主管</span>
       <span class="pp-legend-item"><i style="background:#16a34a"></i>各块支管</span>
+      <span class="pp-legend-item"><i style="background:repeating-linear-gradient(90deg,#334155 0 4px,transparent 4px 7px)"></i>分区线（各块内部划分）</span>
       <span class="pp-legend-item"><i style="background:#7c3aed"></i>总管（本页编辑）</span>
       <span class="pp-legend-item"><i style="background:#f59e0b;border-radius:50%;width:10px;height:10px"></i>水源</span>
     </div>
@@ -14261,6 +14267,30 @@ ppPullLiftDh();                                              // 首屏对齐一�
       if(!ge||!ge.active||ge.mode!=='perPlot') return null;
       try{ return ppCaptureSlot(); }catch(e){ return null; }
     },
+    /* [v196] 供「成组管路」页按块画分区线（用户原话：「这个页面要把管路跟每个地块
+       分区都显示出来」）。分区几何**必须复用本 IIFE 内的同一套函数**（ppGetZoneLayout /
+       ppGetZoneCuts），不写第二份算法 —— 但这两个函数内部读全局 ppState.cutSnap /
+       cutOverrides，而每块自己的快照在 slot 里 ⇒ 由本桥做「换入 → 算 → 还原」
+       （try/finally；ppGetZoneCuts 在 sig 不匹配时会经 ppResetCutSnap 改写
+       cutSnap 和 mergePreview，两个都要还原）。
+       ★ 成组页 IIFE 里没有 ppState / ppGetZoneCuts（跨 IIFE 够不着）——
+         v196 第一版直接引用直接 ReferenceError（group_work 探针 FATAL 抓到）。 */
+    zoneCutsFor: function(bb, planN, cutSnap, cutOverrides){
+      if(!bb||!(bb.w>0.5)||!(bb.h>0.5))return null;
+      var keepSnap=ppState.cutSnap, keepOv=ppState.cutOverrides, keepMp=ppState.mergePreview;
+      try{
+        ppState.cutSnap=cutSnap||{sig:'',x:null,y:null};
+        ppState.cutOverrides=cutOverrides||{x:{},y:{}};
+        var zl=ppGetZoneLayout(bb,planN);
+        return ppGetZoneCuts(bb,zl);
+      }catch(e){ return null; }
+      finally{ ppState.cutSnap=keepSnap; ppState.cutOverrides=keepOv; ppState.mergePreview=keepMp; }
+    },
+    /* 非标分区判断用的两个纯函数桥（成组页只算本块自己的环，不能走
+       ppZoneActualAreaM2 —— 那个在成组时会经 ppGetSubPlotRings() 把全部
+       成员环都裁剪进来，本块 cell 会被别的块污染）。 */
+    clipPolyToRect: function(poly,x0,y0,x1,y1){ try{ return ppClipPolyToRect(poly,x0,y0,x1,y1); }catch(e){ return null; } },
+    polyArea: function(poly){ try{ return ppPolyArea(poly); }catch(e){ return 0; } },
     /* v98d：三级画布拖动「组边界线」→ 复用二级的分区线位置（写回共享 cutSnap），二级/三级同步。
        allowMerge=false 时不触发「拖到邻线即合并」，以保护手动分组的区号不失效。 */
     cutDragBegin: function(){ try{ ppPushHistory(); }catch(e){} },
@@ -23012,6 +23042,30 @@ var ISO_FITTING_UI_OFF = true;
     var i = window.__runyeTlBlock;
     return (i == null) ? null : W.blocks[i];
   }
+
+  /* ---------------- 各块分区线（只读，v196） ----------------
+     用户原话：「这个页面要把管路跟每个地块分区都显示出来，这样我才能判断后续怎么规整。」
+     ⇒ 分区几何走 RunyeBridge.zoneCutsFor()（内部**就是二级页同一套**
+       ppGetZoneLayout / ppGetZoneCuts，换入本块 slot 的分区快照、算完还原）——
+       不写第二份算法（v193 铁律：成组退化成「多次单块」，一行规则都不改）。
+     ★★ 本 IIFE 里没有 ppState / ppGetZoneCuts（二级页 IIFE 私有，跨块够不着）——
+       v196 第一版直接引用直接 ReferenceError，group_work 探针 FATAL 抓到。 */
+  function grZonesFor(b) {
+    if (!b.ring || b.ring.length < 3) return null;
+    var B = window.RunyeBridge;
+    if (!B || !B.zoneCutsFor) return null;
+    var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    b.ring.forEach(function (p) {
+      if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+    });
+    if (!isFinite(minX) || maxX - minX < 0.5 || maxY - minY < 0.5) return null;
+    var bb = { minX: minX, minY: minY, w: maxX - minX, h: maxY - minY };
+    /* 分区数与二级页同源：读同一个输入框（planN / fld_N），整组共用一个口径 */
+    var elN = document.getElementById('planN'), elF = document.getElementById('fld_N');
+    var planN = parseInt(elN && elN.value) || parseInt(elF && elF.value) || 4;
+    return B.zoneCutsFor(bb, planN, b.slot && b.slot.cutSnap, b.slot && b.slot.cutOverrides);
+  }
   function grRender() {
     if (!ctx) return;
     grResize();
@@ -23027,6 +23081,50 @@ var ISO_FITTING_UI_OFF = true;
       ctx.fill();
       ctx.strokeStyle = (b === cb) ? '#7c3aed' : 'rgba(26,71,49,.65)';
       ctx.lineWidth = (b === cb) ? 2.5 : 2; ctx.setLineDash([]); ctx.stroke();
+    });
+    /* 各块分区线（只读，v196）：虚线画每块内部的分区网格，非标区琥珀描边 ——
+       口径与二级页一致（裁剪到本块环内，贯穿 bbox 线）。用户要在这里判断
+       「后续怎么规整」，必须看得见每块内部是怎么分的。 */
+    W.blocks.forEach(function (b) {
+      var cuts = grZonesFor(b);
+      if (!cuts || !cuts.xPos || cuts.xPos.length < 2 || !cuts.yPos || cuts.yPos.length < 2) return;
+      ctx.save();
+      ctx.beginPath();
+      b.ring.forEach(function (p, i) { var q = toC(p.x, p.y); i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y); });
+      ctx.closePath();
+      ctx.clip();
+      ctx.strokeStyle = 'rgba(51,65,85,.45)';
+      ctx.lineWidth = 1.2;
+      ctx.setLineDash([6, 4]);
+      cuts.xPos.forEach(function (x) {
+        var p1 = toC(x, cuts.yPos[0]), p2 = toC(x, cuts.yPos[cuts.yPos.length - 1]);
+        ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+      });
+      cuts.yPos.forEach(function (y) {
+        var p1 = toC(cuts.xPos[0], y), p2 = toC(cuts.xPos[cuts.xPos.length - 1], y);
+        ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+      });
+      /* 非标分区（实际面积 < 标准 97%）：琥珀描边 —— 判断口径与二级页 ppDrawZones 相同；
+         面积只算本块自己的环（走纯函数桥，不走 ppZoneActualAreaM2 —— 成组时它会把
+         全部成员环都裁剪进来，本块 cell 会被别的块污染）。 */
+      var XB = window.RunyeBridge;
+      ctx.setLineDash([]);
+      ctx.lineWidth = 1.4;
+      for (var zr = 0; zr < cuts.rows; zr++) {
+        for (var zc = 0; zc < cuts.cols; zc++) {
+          var cell = XB && XB.clipPolyToRect
+            ? XB.clipPolyToRect(b.ring, cuts.xPos[zc], cuts.yPos[zr], cuts.xPos[zc + 1], cuts.yPos[zr + 1])
+            : null;
+          var mu = (cell && XB.polyArea ? XB.polyArea(cell) : 0) / 666.67;
+          var stdMu = (cuts.xPlan[zc] || 0) * (cuts.yPlan[zr] || 0) / 666.67;
+          if (stdMu > 0 && mu < stdMu * 0.97 && mu > 0.05) {
+            var q1 = toC(cuts.xPos[zc], cuts.yPos[zr]), q2 = toC(cuts.xPos[zc + 1], cuts.yPos[zr + 1]);
+            ctx.strokeStyle = 'rgba(217,119,6,.9)';
+            ctx.strokeRect(q1.x, q1.y, q2.x - q1.x, q2.y - q1.y);
+          }
+        }
+      }
+      ctx.restore();
     });
     /* 各块已布的管线：只读（块级的编辑一律回二级页逐块模式 / 三级页，不在本页改） */
     W.blocks.forEach(function (b) {
@@ -23069,33 +23167,9 @@ var ISO_FITTING_UI_OFF = true;
     return best;
   }
 
-  /* ---------------- 总管自动生成 ----------------
-     规则：取一个公共水源点（各块里第一个有水源的；都没有就用外框底边中点），
-           从它连到每一块「主管的最近端点」。只连各自那一块，不跨块串。 */
-  function grAutoTrunk() {
-    if (!W.blocks.length) return;
-    var src = null;
-    W.blocks.forEach(function (b) { if (!src && b.slot && b.slot.source) src = { x: b.slot.source.x, y: b.slot.source.y }; });
-    if (!src) {
-      var minX = Infinity, maxX = -Infinity, maxY = -Infinity;
-      (W.frame || []).forEach(function (p) {
-        if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x; if (p.y > maxY) maxY = p.y;
-      });
-      if (!isFinite(minX)) return;
-      src = { x: (minX + maxX) / 2, y: maxY + 12 };
-    }
-    var out = [];
-    W.blocks.forEach(function (b) {
-      var s = b.slot || {}, pts = [];
-      (s.mainPipes || []).forEach(function (l) { if (l && l.length) { pts.push(l[0]); pts.push(l[l.length - 1]); } });
-      if (!pts.length) return;
-      var best = pts[0], bd = Infinity;
-      pts.forEach(function (p) { var d = dist(p, src); if (d < bd) { bd = d; best = p; } });
-      out.push([{ x: src.x, y: src.y }, { x: best.x, y: best.y }]);
-    });
-    W.trunk.lines = out; W.sel = -1;
-    grRender(); grRenderTrunk(); grRenderMat();
-  }
+  /* [v196] 原「总管自动生成 grAutoTrunk」整个撤掉：用户原话「总管我会根据
+     实际情况，手动画」—— 自动连线猜不出水源与走向，生成的还要删，反而碍事。
+     总管 = 本页手画（✎ 画总管），画完照旧计入材料汇总的总管行。 */
 
   /* ---------------- 面板渲染 ---------------- */
   function grRenderBar() {
@@ -23268,10 +23342,6 @@ var ISO_FITTING_UI_OFF = true;
       grHint(W.mode === 'draw'
         ? '画总管中：点击加点，双击结束（收线后自动退出画线模式），右键退回上一点，Esc 取消。'
         : '总图里点一根总管可选中；画总管时点击加点、双击结束、右键退回上一点。');
-    });
-    click('grTrunkAuto', function () {
-      grExitDraw('自动生成了总管，点图可选中一根；不满意可删除或再点「✎ 画总管」手画。');
-      grAutoTrunk(); grRender();
     });
     click('grTrunkDel', function () {
       /* ★ 想删除就不是想画线 —— 先退出画线模式，否则用户点图想「选中」、实际还在加点 */

@@ -199,4 +199,48 @@ module.exports = function v193GroupEditContracts(INDEX_SRC, helpers) {
   /* 空态文案：0 块时面积要显示「—」而不是「0.00 亩」（后者像「有地块但面积为 0」） */
   assert.match(bodyOf(INDEX_SRC, 'grRenderBar', 900), /n\s*\?\s*fmt\(mu,\s*2\)\s*:\s*'—'/,
     'grRenderBar 在 0 块时面积应显示「—」');
+
+  /* =========================================================================
+     --- ⑭ [v196] 成组管路页：各块分区线必须画出来；总管只留手画 ---
+     =========================================================================
+     用户原话：「这个页面要把管路跟每个地块分区都显示出来，这样我才能判断后续怎么规整，
+     只显示主管跟支管，总管不用显示，总管我会根据实际情况，手动画。」
+     ⇒ ① 分区几何必须**走 RunyeBridge.zoneCutsFor 桥**（内部就是二级页同一套
+        ppGetZoneLayout/ppGetZoneCuts）—— v196 第一版在成组页 IIFE 里直接引用
+        ppState/ppGetZoneCuts，跨 IIFE 够不着，group_work 探针 FATAL 实测抓到。
+       ② 「⚡ 自动生成总管」按钮与 grAutoTrunk 整个撤掉（用户手动画）。 */
+  assert.match(NC, /zoneCutsFor:\s*function/,
+    'RunyeBridge 应有 zoneCutsFor()（成组页分区线走二级页同一套分区几何）');
+  /* ★ swap-restore 必须完整：ppGetZoneCuts 在 sig 不匹配时会经 ppResetCutSnap
+     改写 ppState.cutSnap 和 mergePreview —— 不还原就会污染二级页当前状态。
+     ★★ zoneCutsFor 是**对象方法**（zoneCutsFor: function(...)）—— bodyOf 只认
+       'function zoneCutsFor(' 永远切不到它 ⇒ zcf 恒为空串，三条还原断言变成
+       「对空串恒红」的假红（红的原因不是缺陷本身）。必须用方法签名锚切窗口。 */
+  const zi = NC.indexOf('zoneCutsFor: function(');
+  assert.ok(zi >= 0, 'RunyeBridge.zoneCutsFor 方法签名必须存在（对象方法锚）');
+  const zcf = NC.slice(zi, zi + 1200);
+  assert.match(zcf, /finally/,
+    'zoneCutsFor 必须 try/finally（分区快照换入后无论成败都要还原）');
+  assert.match(zcf, /cutSnap\s*=\s*keepSnap/, 'zoneCutsFor 必须还原 cutSnap');
+  assert.match(zcf, /cutOverrides\s*=\s*keepOv/, 'zoneCutsFor 必须还原 cutOverrides');
+  assert.match(zcf, /mergePreview\s*=\s*keepMp/, 'zoneCutsFor 必须还原 mergePreview');
+  /* grZonesFor 必须走桥 —— 反向断言正是第一版 ReferenceError 的形状 */
+  const gz = bodyOf(NC, 'grZonesFor', 1800);
+  assert.match(gz, /RunyeBridge/, 'grZonesFor 应取 window.RunyeBridge');
+  assert.match(gz, /zoneCutsFor\(/, 'grZonesFor 必须调 RunyeBridge.zoneCutsFor()');
+  assert.ok(!/ppState|ppGetZoneCuts|ppGetZoneLayout|ppZoneActualAreaM2/.test(gz),
+    '成组页 IIFE 里不得直接引用二级页私有（ppState / ppGetZoneCuts / ppGetZoneLayout / ppZoneActualAreaM2）—— 跨 IIFE 够不着，直接引用就是 ReferenceError');
+  /* grRender 里要有分区绘制段（裁剪到块环 + 非标琥珀描边只算本块自己的环） */
+  const grd = bodyOf(NC, 'grRender', 4200);
+  assert.match(grd, /grZonesFor\(/, 'grRender 应逐块调 grZonesFor 画分区线');
+  assert.match(grd, /217,119,6/, '非标分区应有琥珀描边（口径同二级页）');
+  assert.match(grd, /clipPolyToRect/, '分区面积必须裁剪到本块环（不得走 ppZoneActualAreaM2）');
+  /* 「⚡ 自动生成」撤掉。★★ 按钮断言必须用**原始 INDEX_SRC**（不走 NC）：
+     stripComments 会把 accept="image/*" 属性值里的 /* 当块注释起点、一直吞到
+     600 行后的 CSS 注释才闭合 ⇒ NC 里成组页整段 HTML 消失 ⇒ 走 NC 的按钮
+     反向断言恒真（假绿，_gate v25 恒绿实测抓到）。（index.html 已把 accept
+     改成扩展名列表根治，但断言仍钉在原始源码上，防同类问题复发。） */
+  assert.ok(!/id="grTrunkAuto"/.test(INDEX_SRC), '「⚡ 自动生成」按钮应已撤掉（用户手动画总管）');
+  assert.ok(!/function\s+grAutoTrunk\b/.test(NC), 'grAutoTrunk 函数应已删（死代码会让人以为还在自动生成）');
+  assert.match(NC, /分区线/, '图例应有「分区线」项');
 };
