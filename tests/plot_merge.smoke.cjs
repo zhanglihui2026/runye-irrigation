@@ -388,11 +388,58 @@ test('③-g 传递口径（v189）：回传二级页的是**各子地块本身**
   assert.match(seg, /polyLatLngSet/, '应优先用权威几何 polyLatLngSet（各成员环集合）');
   assert.match(seg, /ringSet\s*&&\s*ringSet\[i\]/, '应逐环取 polyLatLngSet[i]，保证「各子地块本身」被传出');
 
-  /* 二级页消费段：必须逐子地块换算成本地米坐标，而不是只留一个外轮廓 */
-  const k2 = INDEX_SRC.indexOf('window.__runyeSubPlots');
-  assert.ok(k2 > 0, '二级页应把子地块存到 window.__runyeSubPlots');
+  /* 二级页消费段：必须逐子地块换算成本地米坐标，而不是只留一个外轮廓。
+     ★ 锚点不能用「首个 window.__runyeSubPlots」——v190 新增了 ppGetSubPlotRings 等 helper，
+       它们出现在真正的消费点之前，会让切片窗口偏离（实测踩到：③-g 误报「应校验 d.subPlots 是数组」）。
+       改用**赋值语句**本身做锚点，既唯一又语义明确。 */
+  const k2 = INDEX_SRC.indexOf('window.__runyeSubPlots = d.subPlots.map(');
+  assert.ok(k2 > 0, '二级页应把子地块换算后赋给 window.__runyeSubPlots（锚点：赋值语句）');
   const seg2 = INDEX_SRC.slice(Math.max(0, k2 - 900), k2 + 900);
   assert.match(seg2, /Array\.isArray\(d\.subPlots\)/, '应校验 d.subPlots 是数组');
   assert.match(seg2, /polyLatLng:\s*ll\.map/, '应保留每个子地块自己的 polyLatLng');
   assert.match(seg2, /poly:\s*ll\.map/, '应换算每个子地块自己的本地米坐标 poly');
+});
+
+test('③-h 消费口径（v190）：子地块环传到了就必须**真的被用**——只写不读 = 等于没传', () => {
+  /* 用户原话（第二次发火）：「在线地图中两个地块之间明显是有空隙的，你怎么就给吃掉了。」
+     真因：v189 三层都传对了，但二级页绘制/算面积仍只用 ppState.polyPts（外框/凸包）
+     ⇒ 数据在、下游不消费，空隙照样被吞。
+     ⇒ 静态契约：**写入点存在** 且 **读取点 ≥ 4 处**（画布 / 施工图 / 面积 / 点位判定），
+        外加旋转落定与镜像的同步变换，缺一条就是「只写不读」。 */
+  assert.match(INDEX_SRC, /function ppGetSubPlotRings\(\)/, '应有 ppGetSubPlotRings（数据坐标环，供面积/点位判定）');
+  assert.match(INDEX_SRC, /function ppGetRotatedSubRings\(\)/, '应有 ppGetRotatedSubRings（显示层旋转环）');
+  assert.match(INDEX_SRC, /function ppXformSubRings\(fn\)/, '应有 ppXformSubRings（旋转落定/镜像时同步变换）');
+
+  const count = (re) => (INDEX_SRC.match(re) || []).length;
+  /* 「写入 1 处、读取 0 处」就是本次 bug 的形状 —— 直接断言读取点数量 */
+  const reads = count(/ppGetSubPlotRings\(\)|ppGetRotatedSubRings\(\)|ppXformSubRings\(/g);
+  assert.ok(reads >= 6, '子地块环的读取/同步调用点应 ≥ 6 处（三件套定义 3 + 消费 ≥3），实际 ' + reads + ' 处');
+
+  /* 逐个消费点：必须落在正确的函数体内，而不是只定义不用 */
+  const inFn = (fnName, needle) => {
+    const i = INDEX_SRC.indexOf('function ' + fnName + '(');
+    if (i < 0) return false;
+    /* 取该函数往下 2500 字符（这些函数都不长）作为函数体窗口 */
+    return INDEX_SRC.slice(i, i + 2500).indexOf(needle) >= 0;
+  };
+  assert.ok(inFn('ppTracePlotPath', 'ppGetRotatedSubRings()'),
+    '画布绘制 ppTracePlotPath 必须按成员环画（否则画布继续吞空隙）');
+  assert.ok(inFn('ppPointInPlot', 'ppGetSubPlotRings()'),
+    '点位判定 ppPointInPlot 必须按成员环判（否则空隙里能放阀门）');
+  assert.ok(inFn('ppZoneActualAreaM2', 'ppGetSubPlotRings()'),
+    '分区面积 ppZoneActualAreaM2 必须按成员环求和（否则空隙被并进面积）');
+  assert.ok(inFn('ppRepartitionFromRotatedPlot', 'ppXformSubRings('),
+    '旋转落定必须同步变换子地块环（否则主轮廓转了、子块没转）');
+  assert.ok(inFn('ppApplyMirror', 'ppXformSubRings('),
+    '镜像必须同步变换子地块环');
+  /* 施工图 SVG 的 d 也是一条独立代码路径（与画布不共用），必须单独盯 */
+  const gd = INDEX_SRC.indexOf('function ppGenerateDiagram(');
+  assert.ok(gd > 0 && INDEX_SRC.slice(gd, gd + 4000).indexOf('ppGetRotatedSubRings()') >= 0,
+    '施工图 ppGenerateDiagram 的 SVG d 必须按成员环拼（与画布是两条独立路径）');
+
+  /* 反向断言：面积不得再退化成「整块外框裁剪」的唯一口径 */
+  const a = INDEX_SRC.indexOf('function ppZoneActualAreaM2(');
+  const abody = INDEX_SRC.slice(a, a + 1500);
+  assert.match(abody, /var rings=ppGetSubPlotRings\(\);/, 'ppZoneActualAreaM2 应优先取成员环');
+  assert.match(abody, /sum\+=ppPolyArea\(ppClipPolyToRect\(rings\[ri\]/, '面积应为 Σ 各成员环裁剪面积');
 });

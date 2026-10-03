@@ -14065,6 +14065,15 @@ ppPullLiftDh();                                              // 首屏对齐一�
     if(!ppState.polyPts||ppState.polyPts.length<3)return true;
     var fn=window.atPointInPolygon||atPointInPolygon;
     if(typeof fn!=='function')return true;
+    /* [v190] 成组地块：落在**任一成员环**内才算地块内 —— 落在块间空隙里不算
+       （否则空隙里能放阀门/吸管线，与「空隙不算面积」矛盾）。 */
+    var rings=ppGetSubPlotRings();
+    if(rings){
+      for(var i=0;i<rings.length;i++){
+        if(rings[i].length>=3&&fn(point,rings[i]))return true;
+      }
+      return false;
+    }
     return fn(point,ppState.polyPts);
   }
 
@@ -14075,6 +14084,50 @@ ppPullLiftDh();                                              // 首屏对齐一�
     var b=ppGetBounds();
     var center={x:b.minX+b.w/2,y:b.minY+b.h/2};
     return ppState.polyPts.map(function(p){return ppRotatePoint(p,deg,center);});
+  }
+
+  /* ===== [v190 2026-10-03] 成组地块的「各子地块环」（本地米坐标） =====
+   * 用户原话：「在线地图中两个地块之间明显是有空隙的，你怎么就给吃掉了。」
+   * 地图侧回传的 payload.subPlots（各子地块自己的环）由 applyMapMeasuredArea 存到
+   * window.__runyeSubPlots。v189 只存不用 ⇒ 二级页仍画 ppState.polyPts（凸包），空隙被吞。
+   * v190 起绘制/算面积优先按这些环：
+   *   · 画布（ppTracePlotPath）与施工图（ppGenerateDiagram 的 d）按每个环各画一圈，
+   *     块间空隙自然留空；
+   *   · 分区实际面积（ppZoneActualAreaM2）= Σ 各环裁剪到分区内的面积（空隙不计入）；
+   *   · 点位判定（ppPointInPlot）= 落在任一成员环内（落在空隙里不算地块内）。
+   * ★ 坐标同步：这些环与 ppState.polyPts 同一世界坐标系，但**必须跟随旋转/镜像同步变换**
+   *   （同步点：ppRepartitionFromRotatedPlot 旋转落定、ppApplyMirror 两次镜像），
+   *   否则主轮廓转了、子地块环没转，两者错位。
+   * 「地块角度」输入框（ppState.plotRotationDeg）只影响显示、不重写数据 —— 所以显示层的
+   * 环用 ppGetRotatedSubRings()（与 ppGetRotatedPlotPoints 同口径临时旋转），
+   * 数据/面积层用 ppGetSubPlotRings()（数据坐标，与 polyPts/zoneCuts 同空间）。 */
+  function ppGetSubPlotRings(){
+    var subs=window.__runyeSubPlots;
+    if(!subs||!subs.length)return null;
+    var rings=[];
+    subs.forEach(function(s){
+      if(s&&Array.isArray(s.poly)&&s.poly.length>=3){
+        rings.push(s.poly.map(function(q){return{x:+q.x,y:+q.y};}));
+      }
+    });
+    return rings.length?rings:null;
+  }
+  function ppGetRotatedSubRings(){
+    var rings=ppGetSubPlotRings();
+    if(!rings)return null;
+    var deg=parseFloat(ppState.plotRotationDeg)||0;
+    if(!deg)return rings;
+    var b=ppGetBounds();
+    var center={x:b.minX+b.w/2,y:b.minY+b.h/2};
+    return rings.map(function(r){return r.map(function(p){return ppRotatePoint(p,deg,center);});});
+  }
+  /* 对 window.__runyeSubPlots 里的环就地应用变换（旋转落定 / 镜像时随主轮廓一起变） */
+  function ppXformSubRings(fn){
+    var subs=window.__runyeSubPlots;
+    if(!subs||!subs.length)return;
+    subs.forEach(function(s){
+      if(s&&Array.isArray(s.poly)&&s.poly.length>=3)s.poly=s.poly.map(fn);
+    });
   }
 
   // Deep clone pipe planning state for undo
@@ -14407,9 +14460,22 @@ ppPullLiftDh();                                              // 首屏对齐一�
   // 分区网格 cell(zc,zr) 实际落在线段多边形内的面积（m²）
   // plotPoly 与 zoneCuts 须处于同一世界坐标（米）
   function ppZoneActualAreaM2(zc,zr,zoneCuts,plotPoly){
-    if(!plotPoly||plotPoly.length<3)return zoneCuts.xPlan[zc]*zoneCuts.yPlan[zr];
+    var nom=zoneCuts.xPlan[zc]*zoneCuts.yPlan[zr];
     var x0=zoneCuts.xPos[zc], y0=zoneCuts.yPos[zr];
     var x1=zoneCuts.xPos[zc+1], y1=zoneCuts.yPos[zr+1];
+    /* [v190] 成组地块：分区实际面积 = Σ「各成员环裁剪到本分区」的面积。
+       ★ 块间空隙不属于任何一个成员环 ⇒ 不计入面积（用户原话：
+         「两个地块之间有 3 米，那这个三米就留着…不要自动填充面积，这里就空着」）。
+       若按 ppState.polyPts（= 外框/凸包）算，空隙会被当成地块面积吞掉。 */
+    var rings=ppGetSubPlotRings();
+    if(rings){
+      var sum=0;
+      for(var ri=0;ri<rings.length;ri++){
+        sum+=ppPolyArea(ppClipPolyToRect(rings[ri],x0,y0,x1,y1));
+      }
+      return sum;
+    }
+    if(!plotPoly||plotPoly.length<3)return nom;
     var clipped=ppClipPolyToRect(plotPoly,x0,y0,x1,y1);
     return ppPolyArea(clipped);
   }
@@ -14616,8 +14682,21 @@ ppPullLiftDh();                                              // 首屏对齐一�
   }
 
   function ppTracePlotPath(){
-    var pts=ppGetRotatedPlotPoints();
+    /* [v190] 成组地块：把**每个成员环**作为一条子路径画进同一条 path
+     * （fill 用 nonzero 绕向，互不相交的环各自填充，块间空隙自然留空）。 */
+    var rings=ppGetRotatedSubRings();
     ppCtx.beginPath();
+    if(rings){
+      rings.forEach(function(r){
+        for(var i=0;i<r.length;i++){
+          var p=ppToCanvas(r[i].x,r[i].y);
+          if(i===0)ppCtx.moveTo(p.x,p.y);else ppCtx.lineTo(p.x,p.y);
+        }
+        ppCtx.closePath();
+      });
+      return;
+    }
+    var pts=ppGetRotatedPlotPoints();
     for(var i=0;i<pts.length;i++){
       var p=ppToCanvas(pts[i].x,pts[i].y);
       if(i===0)ppCtx.moveTo(p.x,p.y);else ppCtx.lineTo(p.x,p.y);
@@ -15380,9 +15459,13 @@ ppPullLiftDh();                                              // 首屏对齐一�
     if(!deg){alert('请先输入地块旋转角度，再点击重新分区');return;}
     if(ppHasPipeContent()&&!confirm('重新分区会清除当前绘制的管线、阀门和水源，是否继续？'))return;
     ppPushHistory();
+    var _rotB=ppGetBounds();
+    var _rotC={x:_rotB.minX+_rotB.w/2,y:_rotB.minY+_rotB.h/2};
     var rotatedPts=ppGetRotatedPlotPoints();
     ppState.polyPts=rotatedPts.map(function(p){return{x:p.x,y:p.y};});
     window.measuredPolygon=ppState.polyPts.map(function(p){return{x:p.x,y:p.y};});
+    /* [v190] 子地块环随主轮廓一起旋转落定（同一 center/deg），否则两者错位、空隙位置错乱 */
+    ppXformSubRings(function(pt){return ppRotatePoint(pt,deg,_rotC);});
     ppState.plotRotationDeg=0;
     var angleInput=document.getElementById('ppPlotAngle');
     if(angleInput)angleInput.value=0;
@@ -15458,6 +15541,7 @@ ppPullLiftDh();                                              // 首屏对齐一�
       if(ppState.subBranchPipes)ppState.subBranchPipes=ppState.subBranchPipes.map(function(l){return l.map(tf);});
       if(ppState.source)ppState.source=tf(ppState.source);
       ppState.valves=ppState.valves.map(tf);
+      ppXformSubRings(tf); // [v190] 子地块环随主轮廓一起撤销镜像
     }
     // 再应用新镜像（以当前几何中心为轴）
     if(mode!=='none'){
@@ -15469,6 +15553,7 @@ ppPullLiftDh();                                              // 首屏对齐一�
       if(ppState.subBranchPipes)ppState.subBranchPipes=ppState.subBranchPipes.map(function(l){return l.map(tf2);});
       if(ppState.source)ppState.source=tf2(ppState.source);
       ppState.valves=ppState.valves.map(tf2);
+      ppXformSubRings(tf2); // [v190] 子地块环随主轮廓一起应用新镜像
     }
     ppState.plotMirror=mode;
     // 镜像后世界坐标翻转，手动分区线位置失效，恢复默认划分（可用「回退」撤销）
@@ -15747,13 +15832,20 @@ ppPullLiftDh();                                              // 首屏对齐一�
     var ox=pad+(drawW-plotDisplayW*s)/2,oy=pad+(drawH-plotDisplayH*s)/2;
     function ts(mx,my){return{x:(mx-displayB.minX)*plotScaleX*s+ox,y:(my-displayB.minY)*plotScaleY*s+oy};}
 
+    /* [v190] 成组地块：施工图里**每个成员环各写一条子路径**（M…L…Z 循环），
+       块间空隙不写进 d ⇒ 底色填充 / 分区裁剪 / 描边都自然留出空隙，
+       与画布 ppTracePlotPath 同口径（都用 ppGetRotatedSubRings）。 */
     var d='';
-    var plotPts=ppGetRotatedPlotPoints();
-    for(var i=0;i<plotPts.length;i++){
-      var p=ts(plotPts[i].x,plotPts[i].y);
-      d+=(i===0?'M':'L')+p.x.toFixed(1)+' '+p.y.toFixed(1)+' ';
-    }
-    d+='Z';
+    var _svgRings=ppGetRotatedSubRings()||[ppGetRotatedPlotPoints()];
+    _svgRings.forEach(function(rg){
+      if(!rg||rg.length<3)return;
+      for(var i=0;i<rg.length;i++){
+        var p=ts(rg[i].x,rg[i].y);
+        d+=(i===0?'M':'L')+p.x.toFixed(1)+' '+p.y.toFixed(1)+' ';
+      }
+      d+='Z ';
+    });
+    d=d.trim();
 
     var planN=parseInt(document.getElementById('planN')?.value)||4;
     var zoneLayout=ppGetZoneLayout(b,planN);
