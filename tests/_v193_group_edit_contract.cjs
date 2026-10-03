@@ -259,4 +259,23 @@ module.exports = function v193GroupEditContracts(INDEX_SRC, helpers) {
   assert.match(ppd, /mode\s*===\s*'perPlot'/, 'ppGetPlanDims 应识别成组逐块模式（v197）');
   assert.match(ppd, /w\s*:\s*b\.w,\s*h\s*:\s*b\.h/,
     '逐块时 dims 必须取本块 bounds（sx=sy=1，设定亩数才落地）');
+
+  /* =========================================================================
+     --- ⑯ [v198] 成组管路页：主管/支管必须有尺寸标注 ---
+     =========================================================================
+     用户原话：「这个页面增加尺寸标注，显示主管 支管。」
+     ⇒ 每根主管/支管在长度中点标管长（白底小牌、屏幕字号）；grRender 的标注层
+       必须画在**所有线之后**（否则被线压住）。 */
+  assert.match(NC, /function\s+grLabel\(/, 'grRender 应有 grLabel()（白底尺寸标注）');
+  assert.match(NC, /function\s+grMidOf\(/, 'grMidOf()（折线长度中点）应存在');
+  const grd16 = bodyOf(NC, 'grRender', 5200);
+  /* ★ 分色各断一条：只删一种时另一条仍顶住 ⇒ 断言恒绿的假捕获（v28 首版实测） */
+  assert.match(grd16, /grLabel\(fmt\(sumLen\(\[l\]\),\s*1\),\s*grMidOf\(l\),\s*'#185FA5'\)/,
+    '主管应逐根标注管长（蓝字）');
+  assert.match(grd16, /grLabel\(fmt\(sumLen\(\[l\]\),\s*1\),\s*grMidOf\(l\),\s*'#15803d'\)/,
+    '支管应逐根标注管长（绿字）');
+  /* 反向：标注调用必须在 strokeLines 之后（同一 grRender 内先画线后标字） */
+  assert.ok(grd16.indexOf('grLabel(') > grd16.indexOf('strokeLines('),
+    '尺寸标注必须画在管线之后（标注层在最上，不被线压住）');
+  assert.match(NC, /管长/, '图例应有「线上数字=管长(m)」说明');
 };

@@ -226,7 +226,11 @@ const CASES = [
 
   { id: 'v27', name: '★ 逐块分区退回整组规划 dims（18 亩/区实际切出 ≈7.9 亩，v197 主缺陷）',
     anchor: "    if(gePer&&gePer.active&&gePer.mode==='perPlot'&&b&&b.w>0&&b.h>0){\n      return { w:b.w, h:b.h };\n    }",
-    rep: '    /* v27 逐块不再取本块 bounds */' }
+    rep: '    /* v27 逐块不再取本块 bounds */' },
+
+  { id: 'v28', name: '主管/支管尺寸标注被去掉（用户看不到每根管多长）',
+    anchor: "      (s.mainPipes || []).forEach(function (l) {\n        if (l && l.length >= 2) grLabel(fmt(sumLen([l]), 1), grMidOf(l), '#185FA5');\n      });\n      (s.branchPipes || []).forEach(function (l) {\n        if (l && l.length >= 2) grLabel(fmt(sumLen([l]), 1), grMidOf(l), '#15803d');\n      });",
+    rep: '      /* v28 标注不画 */' }
 ];
 
 let caught = 0, missed = 0, drift = 0;

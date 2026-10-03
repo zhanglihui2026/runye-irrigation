@@ -6322,6 +6322,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     <div class="pp-legend" id="grLegend">
       <span class="pp-legend-item"><i style="background:#185FA5"></i>各块主管</span>
       <span class="pp-legend-item"><i style="background:#16a34a"></i>各块支管</span>
+      <span class="pp-legend-item" title="每根主管/支管中点的白底数字 = 该管长度（米）">线上数字 = 管长 (m)</span>
       <span class="pp-legend-item"><i style="background:repeating-linear-gradient(90deg,#334155 0 4px,transparent 4px 7px)"></i>分区线（各块内部划分）</span>
       <span class="pp-legend-item"><i style="background:#7c3aed"></i>总管（本页编辑）</span>
       <span class="pp-legend-item"><i style="background:#f59e0b;border-radius:50%;width:10px;height:10px"></i>水源</span>
@@ -23053,6 +23054,36 @@ var ISO_FITTING_UI_OFF = true;
       ctx.stroke();
     });
   }
+  /* ---------------- 尺寸标注（v198） ----------------
+     用户原话：「这个页面增加尺寸标注，显示主管 支管。」
+     每根主管/支管在**长度中点**标出管长（m）：白底小牌 + 屏幕像素字号（不随缩放），
+     主管蓝字 / 支管绿字，与线色对应；图例加「线上数字=管长(m)」。 */
+  function grMidOf(l) {
+    var total = 0, segs = [], i, d;
+    for (i = 0; i + 1 < l.length; i++) { d = dist(l[i], l[i + 1]); segs.push(d); total += d; }
+    var half = total / 2, acc = 0;
+    for (i = 0; i + 1 < l.length; i++) {
+      if (acc + segs[i] >= half) {
+        var t = segs[i] ? (half - acc) / segs[i] : 0;
+        return { x: l[i].x + (l[i + 1].x - l[i].x) * t, y: l[i].y + (l[i + 1].y - l[i].y) * t };
+      }
+      acc += segs[i];
+    }
+    return l[Math.floor(l.length / 2)] || null;
+  }
+  function grLabel(text, wp, color) {
+    if (!wp) return;
+    var q = toC(wp.x, wp.y);
+    ctx.font = '10px sans-serif';
+    var w = ctx.measureText(text).width + 6;
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    ctx.fillRect(q.x - w / 2, q.y - 7, w, 14);
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, q.x, q.y);
+    ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+  }
+
   function curBlock() {
     var i = window.__runyeTlBlock;
     return (i == null) ? null : W.blocks[i];
@@ -23151,6 +23182,16 @@ var ISO_FITTING_UI_OFF = true;
         var q = toC(s.source.x, s.source.y);
         ctx.fillStyle = '#f59e0b'; ctx.beginPath(); ctx.arc(q.x, q.y, 6, 0, Math.PI * 2); ctx.fill();
       }
+    });
+    /* [v198] 主管/支管尺寸标注：画完所有线再统一标（标注层在最上，不被线压住） */
+    W.blocks.forEach(function (b) {
+      var s = b.slot || {};
+      (s.mainPipes || []).forEach(function (l) {
+        if (l && l.length >= 2) grLabel(fmt(sumLen([l]), 1), grMidOf(l), '#185FA5');
+      });
+      (s.branchPipes || []).forEach(function (l) {
+        if (l && l.length >= 2) grLabel(fmt(sumLen([l]), 1), grMidOf(l), '#15803d');
+      });
     });
     /* 总管：本页唯一可编辑的图层 */
     (W.trunk.lines || []).forEach(function (l, i) {
