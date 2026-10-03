@@ -201,7 +201,28 @@ const CASES = [
 
   { id: 'v21', name: '0 块时面积显示 0.00 亩（像「有地块但面积为 0」）',
     anchor: "    if ($('grTotalMu')) $('grTotalMu').textContent = n ? fmt(mu, 2) : '—';",
-    rep: "    if ($('grTotalMu')) $('grTotalMu').textContent = fmt(mu, 2);" }
+    rep: "    if ($('grTotalMu')) $('grTotalMu').textContent = fmt(mu, 2);" },
+
+  /* --- ⑭ [v196] 成组页分区线 / 总管只手画 --- */
+  { id: 'v22', name: '★ grZonesFor 退回直接引二级页私有（跨 IIFE 够不着 ⇒ ReferenceError）',
+    anchor: '    return B.zoneCutsFor(bb, planN, b.slot && b.slot.cutSnap, b.slot && b.slot.cutOverrides);',
+    rep: '    return ppGetZoneCuts(bb, ppGetZoneLayout(bb, planN));   /* v22 退回跨 IIFE 直引 */' },
+
+  { id: 'v23', name: '删掉 RunyeBridge.zoneCutsFor（分区几何桥消失）',
+    anchor: '    zoneCutsFor: function(bb, planN, cutSnap, cutOverrides){',
+    rep: '    zoneCutsForRemoved: function(bb, planN, cutSnap, cutOverrides){' },
+
+  { id: 'v24', name: 'zoneCutsFor 不还原分区快照（污染二级页当前 cutSnap / cutOverrides）',
+    anchor: '      finally{ ppState.cutSnap=keepSnap; ppState.cutOverrides=keepOv; ppState.mergePreview=keepMp; }',
+    rep: '      finally{ }   /* v24 不还原 */' },
+
+  { id: 'v25', name: '「⚡ 自动生成」按钮复活（用户已拍板手动画总管）',
+    anchor: '        <button type="button" class="pp-btn-ghost gr-btn" id="grTrunkDel" title="删除选中的总管（先在图上点选一根）">🗑 删除选中</button>',
+    rep: '        <button type="button" class="pp-btn-ghost gr-btn" id="grTrunkAuto" title="自动连线">⚡ 自动生成</button>\n        <button type="button" class="pp-btn-ghost gr-btn" id="grTrunkDel" title="删除选中的总管（先在图上点选一根）">🗑 删除选中</button>' },
+
+  { id: 'v26', name: 'grRender 不画分区线（用户看不到每块内部怎么分，没法判断怎么规整）',
+    anchor: '      var cuts = grZonesFor(b);',
+    rep: '      var cuts = null;   /* v26 分区线不画 */' }
 ];
 
 let caught = 0, missed = 0, drift = 0;
