@@ -230,7 +230,11 @@ const CASES = [
 
   { id: 'v28', name: '主管/支管尺寸标注被去掉（用户看不到每根管多长）',
     anchor: "      (s.mainPipes || []).forEach(function (l) {\n        if (l && l.length >= 2) grLabel(fmt(sumLen([l]), 1), grMidOf(l), '#185FA5');\n      });\n      (s.branchPipes || []).forEach(function (l) {\n        if (l && l.length >= 2) grLabel(fmt(sumLen([l]), 1), grMidOf(l), '#15803d');\n      });",
-    rep: '      /* v28 标注不画 */' }
+    rep: '      /* v28 标注不画 */' },
+
+  { id: 'v29', name: '★ 左栏「入口压力」镜像对被删（改值不进扬程链路 / 建了第二份数据源）',
+    anchor: "var PP_LIFTDH_PAIRS = [['planLift', 'fld_lift'], ['planDh', 'fld_dh'], ['planTapePressure', 'fld_tapePressure']];",
+    rep: "var PP_LIFTDH_PAIRS = [['planLift', 'fld_lift'], ['planDh', 'fld_dh']];" }
 ];
 
 let caught = 0, missed = 0, drift = 0;

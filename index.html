@@ -6098,6 +6098,11 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     <span class="pp-sep-vert"></span>
     <span class="pp-plan-item"><span class="pp-plan-label">分区划定</span><input type="number" id="planZoneMuManual" value="18" min="0.1" step="0.1" style="width:58px">亩/区</span>
     <span class="pp-plan-item"><span class="pp-plan-label">目标流速</span><input type="number" id="planTargetV" value="1.5" min="0.3" max="5" step="0.1">m/s</span>
+    <!-- 2026-10-04 v199 用户要求：左栏增加「入口压力」输入 —— 与 01 一级表单「滴灌带入口工作压力
+         fld_tapePressure」**同一个物理量**（扬程计算式条里的「入口压力」= bar×10.2m），
+         双向镜像同 v91 机制（PP_LIFTDH_PAIRS）。调节后水泵扬程/计算式条实时跟随。
+         需要撤掉：删本 item + PP_LIFTDH_PAIRS 里的镜像对 + 下方 calcPlan 触发循环里的一项。 -->
+    <span class="pp-plan-item"><span class="pp-plan-label">入口压力</span><input type="number" id="planTapePressure" value="1" min="0" step="0.1" title="滴灌带入口工作压力（bar）：计入水泵扬程（×10.2 折算水头），与 01 一级表单同源联动">bar</span>
     <input type="hidden" id="planN" value="4">
     <input type="hidden" id="planZoneMode" value="manual">
   </div>
@@ -14081,7 +14086,8 @@ window.ppRenderHeadBreakdown = ppRenderHeadBreakdown;
        使既有 render() 也读到新值）→ calcPlan()
      · fld_* 变值（扬程计算式条内联编辑 / 恢复默认参数）→ 回填面板框
    注：赋值 .value 不触发事件，故不会形成回环。 */
-var PP_LIFTDH_PAIRS = [['planLift', 'fld_lift'], ['planDh', 'fld_dh']];
+/* v199：'planTapePressure' ⇄ 'fld_tapePressure'（二级左栏「入口压力」镜像，同 v91 机制） */
+var PP_LIFTDH_PAIRS = [['planLift', 'fld_lift'], ['planDh', 'fld_dh'], ['planTapePressure', 'fld_tapePressure']];
 function ppPullLiftDh() {                                   // fld_* → 面板
   PP_LIFTDH_PAIRS.forEach(function (pr) {
     var src = document.getElementById(pr[1]), dst = document.getElementById(pr[0]);
@@ -14099,7 +14105,7 @@ function ppLiftDhCapture(ev) {                              // 捕获阶段：�
 }
 document.addEventListener('input', ppLiftDhCapture, true);
 document.addEventListener('change', ppLiftDhCapture, true);
-['planLift', 'planDh'].forEach(function (id) {              // 面板框改值后重算二级
+['planLift', 'planDh', 'planTapePressure'].forEach(function (id) {   // 面板框改值后重算二级（v199 含入口压力）
   var el = document.getElementById(id);
   if (!el) return;
   el.addEventListener('input', calcPlan);

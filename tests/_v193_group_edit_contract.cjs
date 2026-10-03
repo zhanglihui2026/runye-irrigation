@@ -278,4 +278,17 @@ module.exports = function v193GroupEditContracts(INDEX_SRC, helpers) {
   assert.ok(grd16.indexOf('grLabel(') > grd16.indexOf('strokeLines('),
     '尺寸标注必须画在管线之后（标注层在最上，不被线压住）');
   assert.match(NC, /管长/, '图例应有「线上数字=管长(m)」说明');
+
+  /* =========================================================================
+     --- ⑰ [v199] 二级左栏「入口压力」输入（fld_tapePressure 镜像） ---
+     =========================================================================
+     用户原话：「左侧工具栏增加入口压力输入。」
+     入口压力 = 01 一级表单「滴灌带入口工作压力 fld_tapePressure」（扬程计算式条的
+     「入口压力」= bar×10.2m）。★ 必须**镜像** fld_*（v91 机制），不得建第二份数据源 ——
+     calcPlan / 扬程分解 / 计算式条内联编辑全都只认 fld_*。 */
+  assert.match(NC, /id="planTapePressure"/, '二级左栏应有「入口压力」输入框（v199）');
+  assert.match(NC, /\[\s*'planTapePressure',\s*'fld_tapePressure'\s*\]/,
+    '入口压力必须与 fld_tapePressure 双向镜像（同一物理量，不得建第二份数据源）');
+  assert.match(NC, /'planLift',\s*'planDh',\s*'planTapePressure'\]/,
+    '入口压力改值后必须触发 calcPlan 重算（扬程/计算式条实时跟随）');
 };
