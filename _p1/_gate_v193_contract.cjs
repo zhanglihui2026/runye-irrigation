@@ -213,7 +213,7 @@ const CASES = [
     rep: '    zoneCutsForRemoved: function(bb, planN, cutSnap, cutOverrides){' },
 
   { id: 'v24', name: 'zoneCutsFor 不还原分区快照（污染二级页当前 cutSnap / cutOverrides）',
-    anchor: '      finally{ ppState.cutSnap=keepSnap; ppState.cutOverrides=keepOv; ppState.mergePreview=keepMp; }',
+    anchor: '      finally{ ppState.cutSnap=keepSnap; ppState.cutOverrides=keepOv; ppState.mergePreview=keepMp; ppOwnDimOverride=keepOwn; }',
     rep: '      finally{ }   /* v24 不还原 */' },
 
   { id: 'v25', name: '「⚡ 自动生成」按钮复活（用户已拍板手动画总管）',
@@ -225,8 +225,28 @@ const CASES = [
     rep: '      var cuts = null;   /* v26 分区线不画 */' },
 
   { id: 'v27', name: '★ 逐块分区退回整组规划 dims（18 亩/区实际切出 ≈7.9 亩，v197 主缺陷）',
-    anchor: "    if(gePer&&gePer.active&&gePer.mode==='perPlot'&&b&&b.w>0&&b.h>0){\n      return { w:b.w, h:b.h };\n    }",
+    anchor: "    if((ppOwnDimOverride||(gePer&&gePer.active&&gePer.mode==='perPlot'))&&b&&b.w>0&&b.h>0){\n      return { w:b.w, h:b.h };\n    }",
     rep: '    /* v27 逐块不再取本块 bounds */' },
+
+  { id: 'v30', name: '★ [v201] 整组态「自动管路」不再逐块落档（管只留在合并视图里 ⇒ 成组管路页永远看不到）',
+    anchor: "    if (ppIsGroupWhole()) {\n      var geW = window.__runyeGroupEdit;",
+    rep: '    if (false) { /* v30 整组态不逐块生成 */ var geW = window.__runyeGroupEdit;' },
+
+  { id: 'v31', name: '★ [v201] 整组态逐块生成不按本块尺寸（退回整组估算 dims，主管根数 36≠14，口径又串了）',
+    anchor: '        var r = ppBuildAutoPipes(s.polyPts, planN, isThree, true);',
+    rep: '        var r = ppBuildAutoPipes(s.polyPts, planN, isThree, false);   /* v31 不按本块尺寸 */' },
+
+  { id: 'v32', name: '[v201] 成组管路页「⚡ 生成各块管路」按钮被删（用户在这页点不到布管）',
+    anchor: '      <button type="button" class="pp-btn-ghost" id="grPipeAuto" title="按每块自己的分区，逐块生成主管与支管（与二级页「自动管路」同一套规则）；生成结果写回各块，本页立即显示并标注管长">⚡ 生成各块管路</button>',
+    rep: '      <!-- v32 按钮被删 -->' },
+
+  { id: 'v33', name: '[v201] 整组态「清除管路」不再落回各块 slot（二级页清了、成组管路页还画着）',
+    anchor: '    if(ppIsGroupWhole()){\n      window.__runyeGroupEdit.slots.forEach(function(s){',
+    rep: '    if(false){ /* v33 不落回各块 */ window.__runyeGroupEdit.slots.forEach(function(s){' },
+
+  { id: 'v34', name: '[v201] zoneCutsFor 不按本块尺寸算分区（成组管路页的分区线退回整组口径）',
+    anchor: "        ppOwnDimOverride=true;   /* [v201] 传进来的 bb 就是某一块的 bbox ⇒ 按本块尺寸分区 */",
+    rep: '        /* v34 不按本块尺寸 */' },
 
   { id: 'v28', name: '主管/支管尺寸标注被去掉（用户看不到每根管多长）',
     anchor: "      (s.mainPipes || []).forEach(function (l) {\n        if (l && l.length >= 2) grLabel(fmt(sumLen([l]), 1), grMidOf(l), '#185FA5');\n      });\n      (s.branchPipes || []).forEach(function (l) {\n        if (l && l.length >= 2) grLabel(fmt(sumLen([l]), 1), grMidOf(l), '#15803d');\n      });",

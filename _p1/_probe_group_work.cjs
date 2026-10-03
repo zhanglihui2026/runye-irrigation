@@ -569,8 +569,11 @@ const FIX = {
       b1Tl: !!W.blocks[1].tlData,
       b0Tl: !!W.blocks[0].tlData,
       barShown: getComputedStyle(document.getElementById('grTlBackBar')).display !== 'none',
+      /* [v201] 只取「三级…」标签：列表里新加了「未布管 / 主管 n ／ 支管 n」状态标签，
+         再把所有 .gr-tag 都当成三级标签数就会对不上（实测 4 个）。 */
       tags: Array.prototype.slice.call(document.querySelectorAll('#grBlocks .gr-tag'))
         .map((t) => t.textContent.trim())
+        .filter((t) => t.indexOf('三级') === 0)
     };
   });
   console.log('        ' + JSON.stringify(g7));

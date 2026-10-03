@@ -291,4 +291,49 @@ module.exports = function v193GroupEditContracts(INDEX_SRC, helpers) {
     '入口压力必须与 fld_tapePressure 双向镜像（同一物理量，不得建第二份数据源）');
   assert.match(NC, /'planLift',\s*'planDh',\s*'planTapePressure'\]/,
     '入口压力改值后必须触发 calcPlan 重算（扬程/计算式条实时跟随）');
+
+  /* =========================================================================
+     --- ⑱ [v201] 整组态自动布管必须逐块落档 + 本块尺寸口径 + 组页一键生成 ---
+     =========================================================================
+     用户原话：「尺寸标注没有，主管跟支管未显示，要显示出来。」
+     根因（_p1/_diag_v201_group_pipes.cjs 实测，路径 A）：回传后默认「整组」态，
+       点「自动管路」产物只落在整组合并视图 ppState 里，ppSetGroupMode 明确
+       「整组态的管线不存档」⇒ 一根都没进 ge.slots[i] ⇒ 成组管路页无从画起。
+     ⇒ 三个结构性前提，缺一不可：
+       ① ppBuildAutoPipes 纯内核存在，且整组态逐块调用并写回 ge.slots[i]；
+       ② 内核带 useOwnDims（ppGetPlanDims 的 ppOwnDimOverride 通道）——
+         否则整组态拿整组估算 dims 去切每一块（实测 36 根 vs 逐块 14 根，
+         v197 同类口径串味复发）；
+       ③ 成组管路页有「⚡ 生成各块管路」按钮，且走桥（不写第二份算法）。 */
+  const zcfW = NC.indexOf('zoneCutsFor: function(');
+  assert.ok(zcfW > 0, 'RunyeBridge.zoneCutsFor 桥应存在（v196）');
+  const zcf18 = NC.slice(zcfW, zcfW + 1200);
+  assert.match(zcf18, /ppOwnDimOverride=true/,
+    'zoneCutsFor 必须按本块 bbox 尺寸算分区（否则成组管路页的分区线退回整组口径）');
+  assert.match(NC, /var ppOwnDimOverride=false/, 'ppOwnDimOverride 开关应存在（v201）');
+  assert.match(NC, /function\s+ppBuildAutoPipes\(/, '应有自动布管纯内核 ppBuildAutoPipes()');
+  const bapW = NC.indexOf('function ppBuildAutoPipes(');
+  const bap = NC.slice(bapW, bapW + 3000);
+  assert.match(bap, /ppOwnDimOverride/, '内核应接 useOwnDims → ppOwnDimOverride（本块尺寸口径）');
+  assert.match(bap, /finally\{ ppState\.polyPts=keepPoly/, '内核必须还原 ppState.polyPts（swap-restore）');
+  const agW = NC.indexOf('function ppAutoGeneratePipes(');
+  const ag = NC.slice(agW, agW + 4200);
+  assert.match(ag, /ppIsGroupWhole\(\)/, '整组态必须走「逐块生成」分支');
+  assert.match(ag, /ppBuildAutoPipes\(s\.polyPts,\s*planN,\s*isThree,\s*true\)/,
+    '整组态逐块生成必须按本块尺寸（useOwnDims=true，否则主管根数与逐块态对不上）');
+  assert.match(ag, /ppCollectGroupAllPipes\(\)/,
+    '整组视图必须用既有合并函数（与 ppSetGroupMode 同一套口径，不写第二份）');
+  assert.match(ag, /ppSlotRebuildIds\(s\)/, '写回 slot 后必须重建 pipeIds/hiddenPipes');
+  assert.match(NC, /function\s+ppIsGroupWhole\(/, '应有 ppIsGroupWhole() 判定');
+  assert.match(NC, /autoPipesWhole:\s*function/, 'RunyeBridge 应暴露 autoPipesWhole（组页一键布管的唯一入口）');
+  assert.match(NC, /clearPipesWhole:\s*function/, 'RunyeBridge 应暴露 clearPipesWhole');
+  const cpW = NC.indexOf('function ppClearPipes(');
+  const cp = NC.slice(cpW, cpW + 1400);
+  assert.match(cp, /ppIsGroupWhole\(\)/, '整组态「清除管路」必须落回各块 slot（与生成对称）');
+  /* 组页侧：按钮存在（HTML 属性断言一律钉原始 INDEX_SRC，v196 stripComments 陷阱） */
+  assert.ok(INDEX_SRC.indexOf('id="grPipeAuto"') > 0, '成组管路页应有「⚡ 生成各块管路」按钮');
+  assert.ok(INDEX_SRC.indexOf('id="grPipeClear"') > 0, '成组管路页应有「🗑 清除各块管路」按钮');
+  const grIife = NC.slice(NC.indexOf('window.__runyeGroupWork = W'));
+  assert.match(grIife, /autoPipesWhole\(\)/, '组页生成必须走桥（不得在本页重写布管算法）');
+  assert.match(grIife, /未布管/, '子地块列表应标出「未布管」状态（让用户分辨「没数据」与「页面坏了」）');
 };

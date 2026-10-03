@@ -6311,7 +6311,10 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
 
   <div class="pp-stage">
     <div class="pp-toolbar" id="grToolbar">
-      <span class="pp-tool-hint" id="grHint">整组总览：分区线与各块主管/支管为只读，总管在本页手动画</span>
+      <span class="pp-tool-hint" id="grHint">各块管路还没布时这里只有分区线：点「⚡ 生成各块管路」按各块自己的分区逐块布管</span>
+      <span class="pp-sep"></span>
+      <button type="button" class="pp-btn-ghost" id="grPipeAuto" title="按每块自己的分区，逐块生成主管与支管（与二级页「自动管路」同一套规则）；生成结果写回各块，本页立即显示并标注管长">⚡ 生成各块管路</button>
+      <button type="button" class="pp-btn-ghost" id="grPipeClear" title="清除全组各块已布的主管/支管/一级管（不影响本页手画的总管）">🗑 清除各块管路</button>
       <span class="pp-sep"></span>
       <button type="button" class="pp-btn-ghost" id="grFit" title="缩放至适应窗口">⤢ 适应</button>
       <button type="button" class="pp-btn-ghost" id="grZoomOut" title="缩小">－</button>
@@ -14151,6 +14154,16 @@ ppPullLiftDh();                                              // 首屏对齐一�
     history:[]
   };
 
+  /* [v201] 「此刻正在按**某一块自己的环**算分区」的临时开关。
+     ★ 为什么还需要它（v197 只认 mode==='perPlot' 不够）：
+        ① 整组态跑「自动管路」是逐块调 ppBuildAutoPipes —— 彼时 ge.mode 仍是
+           'whole'，若无此开关就会拿**整组估算 dims** 去切每一块 ⇒ 同一块
+           在整组态生成 36 根主管、切到逐块态却只有 14 根（实测），口径串了；
+        ② 「成组管路」页画各块分区线走 RunyeBridge.zoneCutsFor(bb,…)，
+           bb 就是那一块的 bbox ⇒ 同样必须按本块尺寸算。
+       单地块 / 二级页整组视图不受影响（那条路径不置此标志）。 */
+  var ppOwnDimOverride=false;
+
   function ppGetPlanDims(b){
     /* [v197] 成组**逐块**模式：分区以「本块真实尺寸」为准（sx=sy=1）。
        ★★ 为什么（2026-10-04 用户实测截图抓到）：runyePlanDims 是按**回传时刻的
@@ -14164,7 +14177,7 @@ ppPullLiftDh();                                              // 首屏对齐一�
        ★ 单地块与整组模式不变：dims 本来就由实测面积推算（sx≈1），是设定口径；
          整组视图用户已认可（截图 1），不动。 */
     var gePer=window.__runyeGroupEdit;
-    if(gePer&&gePer.active&&gePer.mode==='perPlot'&&b&&b.w>0&&b.h>0){
+    if((ppOwnDimOverride||(gePer&&gePer.active&&gePer.mode==='perPlot'))&&b&&b.w>0&&b.h>0){
       return { w:b.w, h:b.h };
     }
     var aEl=document.getElementById('planA');
@@ -14284,6 +14297,11 @@ ppPullLiftDh();                                              // 首屏对齐一�
          用户在二级页画完管**直接切到成组管路页**时，slots[i] 还是旧的 ⇒ 刚画的管看不见。
          （_p1/_probe_group_work.cjs 的 G5c 实测抓到：二级页 mainPipes=1，组页 slot=0。）
        ppCaptureSlot() 是纯函数（只读 ppState 造一个新对象），不会动 ge.slots。 */
+    /* [v201] 成组管路页要能「一键给全组各块布管 / 清管」。
+       ppAutoGeneratePipes / ppClearPipes 全在 IIFE 里 ⇒ 只在本侧暴露入口，
+       内部**就是二级页同一套**（已按整组态逐块生成、写回各块 slot）—— 不写第二份算法。 */
+    autoPipesWhole: function(){ try{ ppAutoGeneratePipes(); return true; }catch(e){ return false; } },
+    clearPipesWhole: function(){ try{ ppClearPipes(); return true; }catch(e){ return false; } },
     groupLiveSlot: function(){
       var ge=window.__runyeGroupEdit;
       if(!ge||!ge.active||ge.mode!=='perPlot') return null;
@@ -14299,14 +14317,15 @@ ppPullLiftDh();                                              // 首屏对齐一�
          v196 第一版直接引用直接 ReferenceError（group_work 探针 FATAL 抓到）。 */
     zoneCutsFor: function(bb, planN, cutSnap, cutOverrides){
       if(!bb||!(bb.w>0.5)||!(bb.h>0.5))return null;
-      var keepSnap=ppState.cutSnap, keepOv=ppState.cutOverrides, keepMp=ppState.mergePreview;
+      var keepSnap=ppState.cutSnap, keepOv=ppState.cutOverrides, keepMp=ppState.mergePreview, keepOwn=ppOwnDimOverride;
       try{
         ppState.cutSnap=cutSnap||{sig:'',x:null,y:null};
         ppState.cutOverrides=cutOverrides||{x:{},y:{}};
+        ppOwnDimOverride=true;   /* [v201] 传进来的 bb 就是某一块的 bbox ⇒ 按本块尺寸分区 */
         var zl=ppGetZoneLayout(bb,planN);
         return ppGetZoneCuts(bb,zl);
       }catch(e){ return null; }
-      finally{ ppState.cutSnap=keepSnap; ppState.cutOverrides=keepOv; ppState.mergePreview=keepMp; }
+      finally{ ppState.cutSnap=keepSnap; ppState.cutOverrides=keepOv; ppState.mergePreview=keepMp; ppOwnDimOverride=keepOwn; }
     },
     /* 非标分区判断用的两个纯函数桥（成组页只算本块自己的环，不能走
        ppZoneActualAreaM2 —— 那个在成组时会经 ppGetSubPlotRings() 把全部
@@ -15987,6 +16006,18 @@ ppPullLiftDh();                                              // 首屏对齐一�
 
   function ppClearPipes(){
     ppPushHistory();
+    /* [v201] 整组态的「清除管路」必须落到各块 slot —— 与整组态的生成互为逆操作。
+       否则只有二级页的合并视图清了、各块 slot 还在 ⇒ 成组管路页照样把管画出来，
+       用户点「清除管路」却看着管子还在（第二份「两页不一致」的坑）。 */
+    if(ppIsGroupWhole()){
+      window.__runyeGroupEdit.slots.forEach(function(s){
+        if(!s)return;
+        s.mainPipes=[];s.branchPipes=[];s.subBranchPipes=[];s.source=null;s.valves=[];
+        ppSlotRebuildIds(s);
+      });
+      /* 同步推给「成组管路」页，避免它停在旧画面 */
+      setTimeout(function(){ try{ ppSyncGroupEditUI(); }catch(e){} },0);
+    }
     ppState.mainPipes=[];ppState.branchPipes=[];ppState.subBranchPipes=[];
     ppState.source=null;ppState.valves=[];ppState.currentLine=[];ppState.hiddenPipes={main:{},branch:{},subbranch:{}};ppState.pipeIds={main:[],branch:[],subbranch:[]};ppState.nextPipeId=1;ppState.cutOverrides={x:{},y:{}};ppResetCutSnap('');ppUpdatePickResult(null);ppRender();
     ppUpdateAutoPipeButton();
@@ -15994,70 +16025,145 @@ ppPullLiftDh();                                              // 首屏对齐一�
     ppRefreshMaterials();
   }
 
-  function ppAutoGeneratePipes(){
-    if(!ppState.polyPts.length){alert('请先在面积测量工具中描绘边界');return;}
-    ppPushHistory();
+  /* [v201] 自动布管的**纯几何内核**：给一套环点 → 算出该块内部的主管 / 支管 /
+     一级管 / 阀门。*不写* ppState —— 只在其间临时借 ppState.polyPts 以复用既有
+     ppGetBounds / ppGetZoneLayout / ppGetZoneCuts / ppPointInPlot，finally 原样还原
+     （与 RunyeBridge.zoneCutsFor 同款 swap-restore）。
+     ★★ 为什么必须拆出来（用户实测：「尺寸标注没有，主管跟支管未显示」，
+        证据 _p1/_diag_v201_group_pipes.cjs 路径 A）：
+        旧代码整组态点「自动管路」时，拿的是**外框 bounds** 一把梭 ——
+        ① 把块间空隙当成地布了管；② 产物只落在整组合并视图 ppState 里，
+           而 ppSetGroupMode 明确写着「整组态的管线是只读视图、不存档」
+           ⇒ 一根都没进 ge.slots[i] ⇒ 成组管路页永远画不出来、jimmy尺寸标注也无从标。
+        拆出来之后整组态 =「对每一块各调一次本函数」，与 v193 铁律一致
+        （成组 = 多次单块，一行布管规则都不改写）。 */
+  function ppBuildAutoPipes(polyPts, planN, isThree, useOwnDims) {
+    var out = { main: [], branch: [], subbranch: [], valves: [] };
+    var keepPoly = ppState.polyPts, keepOwn = ppOwnDimOverride;
+    try {
+      ppState.polyPts = (polyPts || []).map(function (p) { return { x: p.x, y: p.y }; });
+      if (useOwnDims) ppOwnDimOverride = true;   /* 见 ppGetPlanDims 处 [v201] 说明 */
+      if (ppState.polyPts.length < 3) return out;
+      var b = ppGetBounds();
+      var cuts = ppGetZoneCuts(b, ppGetZoneLayout(b, planN));
 
-    var b=ppGetBounds();
-    var planN=parseInt(document.getElementById('planN')?.value)||parseInt(document.getElementById('fld_N')?.value)||4;
-    var layout=ppGetZoneLayout(b,planN);
-    var cuts=ppGetZoneCuts(b,layout);
-
-    ppState.mainPipes=[];
-    ppState.branchPipes=[];
-    ppState.subBranchPipes=[];
-    ppState.valves=[];
-    ppState.currentLine=[];
-    ppState.hiddenPipes={main:{},branch:{},subbranch:{}};
-    ppState.pipeIds={main:[],branch:[],subbranch:[]};
-    ppState.nextPipeId=1;
-    ppUpdatePickResult(null);
-
-    var isThree=ppState.pipeLevel==='three';
-
-    for(var zr=0;zr<cuts.rows;zr++){
-      for(var zc=0;zc<cuts.cols;zc++){
-        var zx=cuts.xPos[zc],zy=cuts.yPos[zr];
-        var zoneW=cuts.xSrc[zc],zoneH=cuts.ySrc[zr];
-        var centerX=zx+zoneW/2,centerY=zy+zoneH/2;
-        var fixedSideIsHorizontal=cuts.xPlan[zc]>=cuts.yPlan[zr];
-        if(fixedSideIsHorizontal){
-          var mainX=zx+zoneW*0.40;
-          ppAddPipe('main',[{x:mainX,y:zy},{x:mainX,y:zy+zoneH}]);
-          // 支管两端各缩进一段距离（分区边长 6%，4~14m），不与分区边缘相接，使各地块支管视觉上独立断开
-          var gapV2=Math.min(Math.max(zoneH*0.06,4),14,zoneH*0.22);
-          ppAddPipe('branch',[{x:centerX,y:zy+gapV2},{x:centerX,y:zy+zoneH-gapV2}]);
-          if(ppPointInPlot({x:centerX,y:centerY}))ppState.valves.push({x:centerX,y:centerY});
-          // Three-level: sub-branch pipes perpendicular to branch (horizontal)
-          if(isThree){
-            var nSub=Math.max(2,Math.floor(zoneH/15));
-            for(var sb=1;sb<=nSub;sb++){
-              var sbY=zy+zoneH*sb/(nSub+1);
-              ppAddPipe('subbranch',[{x:zx+zoneW*0.15,y:sbY},{x:zx+zoneW*0.85,y:sbY}]);
+      for (var zr = 0; zr < cuts.rows; zr++) {
+        for (var zc = 0; zc < cuts.cols; zc++) {
+          var zx = cuts.xPos[zc], zy = cuts.yPos[zr];
+          var zoneW = cuts.xSrc[zc], zoneH = cuts.ySrc[zr];
+          var centerX = zx + zoneW / 2, centerY = zy + zoneH / 2;
+          var fixedSideIsHorizontal = cuts.xPlan[zc] >= cuts.yPlan[zr];
+          if (fixedSideIsHorizontal) {
+            var mainX = zx + zoneW * 0.40;
+            out.main.push([{ x: mainX, y: zy }, { x: mainX, y: zy + zoneH }]);
+            // 支管两端各缩进一段距离（分区边长 6%，4~14m），不与分区边缘相接，使各地块支管视觉上独立断开
+            var gapV2 = Math.min(Math.max(zoneH * 0.06, 4), 14, zoneH * 0.22);
+            out.branch.push([{ x: centerX, y: zy + gapV2 }, { x: centerX, y: zy + zoneH - gapV2 }]);
+            if (ppPointInPlot({ x: centerX, y: centerY })) out.valves.push({ x: centerX, y: centerY });
+            // Three-level: sub-branch pipes perpendicular to branch (horizontal)
+            if (isThree) {
+              var nSub = Math.max(2, Math.floor(zoneH / 15));
+              for (var sb = 1; sb <= nSub; sb++) {
+                var sbY = zy + zoneH * sb / (nSub + 1);
+                out.subbranch.push([{ x: zx + zoneW * 0.15, y: sbY }, { x: zx + zoneW * 0.85, y: sbY }]);
+              }
             }
-          }
-        }else{
-          var mainY=zy+zoneH*0.40;
-          ppAddPipe('main',[{x:zx,y:mainY},{x:zx+zoneW,y:mainY}]);
-          // 支管两端缩进，与分区边缘留出空隙
-          var gapH2=Math.min(Math.max(zoneW*0.06,4),14,zoneW*0.22);
-          ppAddPipe('branch',[{x:zx+gapH2,y:centerY},{x:zx+zoneW-gapH2,y:centerY}]);
-          if(ppPointInPlot({x:centerX,y:centerY}))ppState.valves.push({x:centerX,y:centerY});
-          // Three-level: sub-branch pipes perpendicular to branch (vertical)
-          if(isThree){
-            var nSub2=Math.max(2,Math.floor(zoneW/15));
-            for(var sb2=1;sb2<=nSub2;sb2++){
-              var sbX=zx+zoneW*sb2/(nSub2+1);
-              ppAddPipe('subbranch',[{x:sbX,y:zy+zoneH*0.15},{x:sbX,y:zy+zoneH*0.85}]);
+          } else {
+            var mainY = zy + zoneH * 0.40;
+            out.main.push([{ x: zx, y: mainY }, { x: zx + zoneW, y: mainY }]);
+            // 支管两端缩进，与分区边缘留出空隙
+            var gapH2 = Math.min(Math.max(zoneW * 0.06, 4), 14, zoneW * 0.22);
+            out.branch.push([{ x: zx + gapH2, y: centerY }, { x: zx + zoneW - gapH2, y: centerY }]);
+            if (ppPointInPlot({ x: centerX, y: centerY })) out.valves.push({ x: centerX, y: centerY });
+            // Three-level: sub-branch pipes perpendicular to branch (vertical)
+            if (isThree) {
+              var nSub2 = Math.max(2, Math.floor(zoneW / 15));
+              for (var sb2 = 1; sb2 <= nSub2; sb2++) {
+                var sbX = zx + zoneW * sb2 / (nSub2 + 1);
+                out.subbranch.push([{ x: sbX, y: zy + zoneH * 0.15 }, { x: sbX, y: zy + zoneH * 0.85 }]);
+              }
             }
           }
         }
       }
+    } finally { ppState.polyPts = keepPoly; ppOwnDimOverride = keepOwn; }
+    return out;
+  }
+
+  /* [v201] 给某个 slot 重建 pipeIds / hiddenPipes / nextPipeId（长度必须对得上，
+     否则 ppPipeKey(type,i) 取到 undefined ⇒ 隐藏判定与拾取都对不上号）。 */
+  function ppSlotRebuildIds(s) {
+    if (!s) return;
+    s.pipeIds = { main: [], branch: [], subbranch: [] };
+    s.hiddenPipes = { main: {}, branch: {}, subbranch: {} };
+    var map = [['main', 'mainPipes', 'm'], ['branch', 'branchPipes', 'b'], ['subbranch', 'subBranchPipes', 's']];
+    var maxN = 0;
+    map.forEach(function (t) {
+      var arr = s[t[1]] || [], pre = t[2];
+      for (var i = 0; i < arr.length; i++) { s.pipeIds[t[0]].push(pre + (i + 1)); maxN = Math.max(maxN, i + 1); }
+    });
+    s.nextPipeId = maxN + 1;
+  }
+
+  function ppIsGroupWhole() {
+    var ge = window.__runyeGroupEdit;
+    return !!(ge && ge.active && ge.mode === 'whole' && ge.slots && ge.slots.length >= 2);
+  }
+
+  function ppAutoGeneratePipes() {
+    if (!ppState.polyPts.length) { alert('请先在面积测量工具中描绘边界'); return; }
+    ppPushHistory();
+
+    var planN = parseInt(document.getElementById('planN')?.value) || parseInt(document.getElementById('fld_N')?.value) || 4;
+    var isThree = ppState.pipeLevel === 'three';
+
+    /* [v201] 整组态：逐块生成、逐块存档到 ge.slots[i]，整组视图 = 各块之和。
+       ★ 不再用外框 bounds 一把梭 —— 那样既把块间空隙当成了地，产物又无处可存
+         （用户实测：成组管路页一根管都看不到）。合并走既有的 ppCollectGroupAllPipes，
+         与 ppSetGroupMode 里「逐块 → 整组」的合并口径严格同一套。 */
+    if (ppIsGroupWhole()) {
+      var geW = window.__runyeGroupEdit;
+      geW.slots.forEach(function (s) {
+        if (!s || !s.polyPts || s.polyPts.length < 3) return;
+        var r = ppBuildAutoPipes(s.polyPts, planN, isThree, true);
+        s.mainPipes = r.main; s.branchPipes = r.branch; s.subBranchPipes = r.subbranch;
+        s.valves = r.valves; s.source = null;
+        s.cutOverrides = { x: {}, y: {} }; s.mergePreview = null;
+        ppSlotRebuildIds(s);
+      });
+      var mg = ppCollectGroupAllPipes();
+      ppState.mainPipes = mg.main; ppState.branchPipes = mg.branch; ppState.subBranchPipes = mg.subbranch;
+      ppState.source = null; ppState.valves = [];
+      ppState.pipeIds = { main: [], branch: [], subbranch: [] }; ppState.nextPipeId = 1;
+      ppState.hiddenPipes = { main: {}, branch: {}, subbranch: {} };
+      ppState.currentLine = [];
+      ppEnsurePipeIds('main'); ppEnsurePipeIds('branch'); ppEnsurePipeIds('subbranch');
+      ppUpdatePickResult(null);
+      ppResetCutSnap('');
+      ppRender();
+      ppUpdateAutoPipeButton();
+      if (typeof window.ppRefreshDiagramIfVisible === 'function') window.ppRefreshDiagramIfVisible();
+      ppRefreshMaterials();
+      /* 立刻推给「成组管路」页 —— 它只看得到 slots，不刷新就还是空的 */
+      ppSyncGroupEditUI();
+      return;
     }
+
+    /* 单块 / 逐块态：照旧写 ppState（行为与 v201 之前完全一致） */
+    var r2 = ppBuildAutoPipes(ppState.polyPts, planN, isThree);
+    ppState.mainPipes = r2.main;
+    ppState.branchPipes = r2.branch;
+    ppState.subBranchPipes = r2.subbranch;
+    ppState.valves = r2.valves;
+    ppState.currentLine = [];
+    ppState.hiddenPipes = { main: {}, branch: {}, subbranch: {} };
+    ppState.pipeIds = { main: [], branch: [], subbranch: [] }; ppState.nextPipeId = 1;
+    ppUpdatePickResult(null);
+    ppEnsurePipeIds('main'); ppEnsurePipeIds('branch'); ppEnsurePipeIds('subbranch');
 
     ppRender();
     ppUpdateAutoPipeButton();
-    if(typeof window.ppRefreshDiagramIfVisible==='function') window.ppRefreshDiagramIfVisible();
+    if (typeof window.ppRefreshDiagramIfVisible === 'function') window.ppRefreshDiagramIfVisible();
     ppRefreshMaterials();
   }
 
@@ -23263,10 +23369,17 @@ var ISO_FITTING_UI_OFF = true;
       var ml = sumLen(s.mainPipes), bl = sumLen(s.branchPipes);
       var d = document.createElement('div');
       d.className = 'gr-block' + (window.__runyeTlBlock === i ? ' cur' : '');
+      var hasPipe = ((s.mainPipes || []).length + (s.branchPipes || []).length + (s.subBranchPipes || []).length) > 0;
+      /* [v201] 「这块还没布管」必须在列表里说清楚 —— 用户原话：「主管跟支管未显示，
+         要显示出来」。若只是画布空白，用户无法分辨是「页面坏了」还是「这块本来就没管」；
+         补一枚状态标签，一眼就知道该去点「⚡ 生成各块管路」还是等着看结果。 */
+      var pipeTag = hasPipe
+        ? '<span class="gr-tag">主管 ' + (s.mainPipes || []).length + ' ／ 支管 ' + (s.branchPipes || []).length + '</span>'
+        : '<span class="gr-tag no">未布管</span>';
       d.innerHTML =
         '<div class="gr-block-hd"><span>' + esc(b.name) + '</span>' +
         '<span class="gr-block-mu">' + fmt(num(b.mu, 0), 2) + ' 亩</span></div>' +
-        '<div class="gr-block-meta">主管 ' + fmt(ml, 1) + ' m ／ 支管 ' + fmt(bl, 1) + ' m' +
+        '<div class="gr-block-meta">主管 ' + fmt(ml, 1) + ' m ／ 支管 ' + fmt(bl, 1) + ' m ／ ' + pipeTag +
         (b.tlData ? ' ／ <span class="gr-tag">三级已生成</span>' : ' ／ <span class="gr-tag no">三级未生成</span>') + '</div>' +
         '<div class="gr-block-btns">' +
         '<button type="button" class="pp-btn-ghost gr-btn" data-act="tl" data-i="' + i + '">▶ 进入三级页</button>' +
@@ -23305,7 +23418,31 @@ var ISO_FITTING_UI_OFF = true;
     h += '</tbody></table>';
     box.innerHTML = h;
   }
-  function grRefreshUI() { grRenderBar(); grRenderTrunk(); grRenderBlocks(); grRenderMat(); grRender(); }
+  /* 本页工具栏的操作反馈（总管区已有 grHint，别混用两条 —— 否则用户分不清
+     这句是「说总管的」还是「说各块管路的」）。用完 6 秒还原默认说明。
+     ★ 默认说明随状态变：没布管时告诉用户去点生成按钮，布好之后回到「只读」说明
+       —— 静态一句两面不讨好：空画布时它像在搪塞，画满管子时又显得多此一举。 */
+  function grDefaultHint() {
+    var n = 0;
+    W.blocks.forEach(function (b) { if (b.slot) n += (b.slot.mainPipes || []).length; });
+    return n
+      ? '整组总览：分区线与各块主管/支管（含管长标注）为只读，总管在本页手动画'
+      : '各块还没布管：点「⚡ 生成各块管路」按每块自己的分区逐块布管，总管在本页手动画';
+  }
+  var grHintT = 0;
+  function grHint2(msg) {
+    var el = $('grHint'); if (!el) return;
+    el.textContent = msg;
+    try { clearTimeout(grHintT); } catch (e) { }
+    grHintT = setTimeout(function () {
+      grHintT = 0;
+      var e2 = $('grHint'); if (e2) e2.textContent = grDefaultHint();
+    }, 6000);
+  }
+  function grRefreshUI() {
+    grRenderBar(); grRenderTrunk(); grRenderBlocks(); grRenderMat(); grRender();
+    var h = $('grHint'); if (h && !grHintT) h.textContent = grDefaultHint();
+  }
 
   /* ---------------- 按块进入三级页 ---------------- */
   function grEnterBlock(i) {
@@ -23397,6 +23534,107 @@ var ISO_FITTING_UI_OFF = true;
       sel.addEventListener('change', function () { W.trunk.dn = parseInt(this.value, 10) || W.trunk.dn; grRenderTrunk(); grRenderMat(); });
     }
     var click = function (id, fn) { var e = $(id); if (e) e.addEventListener('click', fn); };
+    /* [v201] 「⚡ 生成各块管路」：把二级页的整个状态机先切到**整组态**，
+       再调用二级页那一套 ppAutoGeneratePipes()（内部已按整组态逐块生成、
+       逐块写回 ge.slots[i]），最后把二级页恢复回原来的块/模式。
+       ★ 为什么必须绕这一圈而不是在本页算：布管规则（0.40 定主管、支管缩进 6%、
+         哪边做固定边）全都在二级页 IIFE 里，且要与二级页的分区严格同源 ——
+         v193 铁律：不写第二份算法。
+       ★ 先切整组态的原因：当时若在「逐块」态，setGroupMode('whole') 会先把
+         当前块 ppCaptureSlot() 存盘 ⇒ 用户在二级页刚画的管不会因为本页操作丢掉。 */
+    function grKeepMode() {
+      var ge = window.__runyeGroupEdit;
+      return ge && ge.active ? { mode: ge.mode, current: ge.current } : null;
+    }
+    /* [v195 教训] 覆盖确认**不能**用 window.confirm —— iframe / 部分 WebView 会静默
+       返回 false ⇒ 用户点了「⚡ 生成」却毫无反应（正是用户报过一次的「点了不能弄」）。
+       改用与「清空」同款的两段式：已有管时才先变红「⚠ 覆盖已有管路？」，3 秒内再点执行。 */
+    var grPipeAutoArm = 0;
+    function grDisarmPipeAuto() {
+      grPipeAutoArm = 0;
+      var b2 = $('grPipeAuto');
+      if (b2) { b2.textContent = '⚡ 生成各块管路'; b2.classList.remove('gr-btn-arm'); }
+    }
+    var grPipeClearArm = 0;
+    function grDisarmPipeClear() {
+      grPipeClearArm = 0;
+      var b3 = $('grPipeClear');
+      if (b3) { b3.textContent = '🗑 清除各块管路'; b3.classList.remove('gr-btn-arm'); }
+    }
+    function grGenerateAllPipes(armed) {
+      var B = window.RunyeBridge;
+      if (!W.blocks.length) { grHint2('当前不是成组地块。请先在在线地图把两个及以上地块成组后回传。'); return; }
+      if (!B || !B.setGroupMode || !B.autoPipesWhole) { grHint2('自动布管接口未就绪，请刷新页面重试。'); return; }
+      var had = 0;
+      W.blocks.forEach(function (b) {
+        if (!b.slot) return;
+        had += (b.slot.mainPipes || []).length + (b.slot.branchPipes || []).length + (b.slot.subBranchPipes || []).length;
+      });
+      if (had && !armed) {
+        var btn = $('grPipeAuto');
+        var again = (grPipeAutoArm > 0) && (Date.now() - grPipeAutoArm < 3000);
+        if (!again) {
+          grPipeAutoArm = Date.now();
+          if (btn) { btn.textContent = '⚠ 覆盖已有 ' + had + ' 根管？'; btn.classList.add('gr-btn-arm'); }
+          grHint2('各块已有管路：3 秒内再点一次即覆盖全部重生成，超时自动取消。');
+          setTimeout(grDisarmPipeAuto, 3000);
+          return;
+        }
+      }
+      grDisarmPipeAuto();
+      var keep = grKeepMode();
+      try {
+        B.setGroupMode('whole');
+        if (!B.autoPipesWhole()) { grHint2('生成失败，请先在二级管路页确认地块边界与分区数。'); return; }
+      } finally {
+        if (keep && keep.mode === 'perPlot') {
+          try { B.setGroupMode('perPlot'); } catch (e) { }
+          try { B.selectGroupPlot(keep.current || 0); } catch (e) { }
+        }
+      }
+      grSync(); grFit(); grRefreshUI();
+      var has = 0;
+      W.blocks.forEach(function (b) { if (b.slot) has += (b.slot.mainPipes || []).length; });
+      grHint2(has ? ('已按各块分区生成主管/支管（共 ' + has + ' 根主管），线上数字为管长（m）。') : '未生成任何管线，请检查各块边界是否有效。');
+    }
+    function grClearAllPipes(armed) {
+      var B = window.RunyeBridge;
+      if (!W.blocks.length) { grHint2('当前不是成组地块。'); return; }
+      if (!B || !B.clearPipesWhole) { grHint2('清除接口未就绪，请刷新页面重试。'); return; }
+      var n = 0;
+      W.blocks.forEach(function (b) {
+        if (!b.slot) return;
+        n += (b.slot.mainPipes || []).length + (b.slot.branchPipes || []).length + (b.slot.subBranchPipes || []).length;
+      });
+      if (!n) { grHint2('各块当前没有管线可清除。'); return; }
+      /* 与「清空总管」同款的两段式：清管局不可逆，一次误点不能就把整套布管抹了 */
+      if (!armed) {
+        var btn = $('grPipeClear');
+        var again = (grPipeClearArm > 0) && (Date.now() - grPipeClearArm < 3000);
+        if (!again) {
+          grPipeClearArm = Date.now();
+          if (btn) { btn.textContent = '⚠ 确认清除 ' + n + ' 根管？'; btn.classList.add('gr-btn-arm'); }
+          grHint2('3 秒内再点一次即清除全组各块管路，超时自动取消。');
+          setTimeout(grDisarmPipeClear, 3000);
+          return;
+        }
+      }
+      grDisarmPipeClear();
+      var keep = grKeepMode();
+      try {
+        B.setGroupMode('whole');
+        B.clearPipesWhole();
+      } finally {
+        if (keep && keep.mode === 'perPlot') {
+          try { B.setGroupMode('perPlot'); } catch (e) { }
+          try { B.selectGroupPlot(keep.current || 0); } catch (e) { }
+        }
+      }
+      grSync(); grFit(); grRefreshUI();
+      grHint2('已清除全组各块的管路（共 ' + n + ' 根），本页手画的总管不受影响。');
+    }
+    click('grPipeAuto', function () { grExitDraw(); grGenerateAllPipes(); });
+    click('grPipeClear', function () { grExitDraw(); grClearAllPipes(); });
     click('grTrunkDraw', function () {
       W.mode = (W.mode === 'draw') ? 'pick' : 'draw';
       W.draw = W.draw || [];
