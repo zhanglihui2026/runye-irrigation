@@ -243,4 +243,20 @@ module.exports = function v193GroupEditContracts(INDEX_SRC, helpers) {
   assert.ok(!/id="grTrunkAuto"/.test(INDEX_SRC), '「⚡ 自动生成」按钮应已撤掉（用户手动画总管）');
   assert.ok(!/function\s+grAutoTrunk\b/.test(NC), 'grAutoTrunk 函数应已删（死代码会让人以为还在自动生成）');
   assert.match(NC, /分区线/, '图例应有「分区线」项');
+
+  /* =========================================================================
+     --- ⑮ [v197] 成组逐块：分区规划尺寸必须 = 本块真实 bounds ---
+     =========================================================================
+     用户原话：「这个分区是按照18亩划分的，逐块划分却不是，要改成统一的，
+     按照设定的亩数划分才行。」（2026-10-04 实测截图：整组 9 区 ≈18 亩/区，
+     逐块 12 区却只有 3.3~8.9 亩/区。）
+     根因：runyePlanDims 是按**回传时刻整组实测面积**算的全局规划尺寸（650×420）；
+     逐块拿本块 bounds（300×400）去除以它 ⇒ sx·sy≈块/整组 ≈0.44
+     ⇒ 18 亩/区实际切出 ≈7.9 亩，且区数按整组 dims 切（11×3），与整组对不上。
+     修法（v189 原则：改上游）：ppGetPlanDims 在 perPlot 直接返回本块 bounds ——
+     布管/材料/水力/三级页（走 Bridge.getZoneCuts / getPlanDims）全链路自动跟随。 */
+  const ppd = bodyOf(NC, 'ppGetPlanDims', 1600);
+  assert.match(ppd, /mode\s*===\s*'perPlot'/, 'ppGetPlanDims 应识别成组逐块模式（v197）');
+  assert.match(ppd, /w\s*:\s*b\.w,\s*h\s*:\s*b\.h/,
+    '逐块时 dims 必须取本块 bounds（sx=sy=1，设定亩数才落地）');
 };

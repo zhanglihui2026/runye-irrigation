@@ -472,6 +472,52 @@ const FIX = {
   check('B5e 两份 slot 各自记账（1 / 0）', b5.slot0 === 1 && b5.slot1 === 0,
     'slot0=' + b5.slot0 + ' slot1=' + b5.slot1);
 
+  /* ---------- B10 [v197] 逐块分区按本块真实尺寸 ----------
+     用户原话：「这个分区是按照18亩划分的，逐块划分却不是，要改成统一的，
+     按照设定的亩数划分才行。」实测（2026-10-04 截图）：runyePlanDims 是按**整组**
+     实测面积算的全局规划尺寸（650×420），逐块拿本块 bounds（300×400）去除以它
+     ⇒ sx·sy≈0.44 ⇒ 18 亩/区实际切出 ≈7.9 亩，且区数按整组 dims 切对不上。
+     修法（上游）：ppGetPlanDims 在 perPlot 直接返回本块 bounds（sx=sy=1）。
+     B5 结束时正处于「块 0 逐块态」，正好验证。 */
+  console.log('\n— B10 逐块分区 = 本块真实尺寸口径（v197） —');
+  const b10 = await page.evaluate(() => {
+    const B = window.RunyeBridge;
+    const g = window.__ge, st = g.st();
+    const bb = (function () {
+      const b = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+      st.polyPts.forEach(function (q) {
+        b.minX = Math.min(b.minX, q.x); b.minY = Math.min(b.minY, q.y);
+        b.maxX = Math.max(b.maxX, q.x); b.maxY = Math.max(b.maxY, q.y);
+      });
+      return b;
+    })();
+    const dims = B.getPlanDims();
+    const cuts = B.getZoneCuts();
+    if (!cuts) return { err: 'cuts=null' };
+    const ring = st.polyPts.map((p) => ({ x: p.x, y: p.y }));
+    const cells = [];
+    for (let zr = 0; zr < cuts.rows; zr++) {
+      for (let zc = 0; zc < cuts.cols; zc++) {
+        const clipped = B.clipPolyToRect(ring, cuts.xPos[zc], cuts.yPos[zr], cuts.xPos[zc + 1], cuts.yPos[zr + 1]);
+        cells.push(B.polyArea(clipped || []) / 666.67);
+      }
+    }
+    const manualMu = parseFloat((document.getElementById('planZoneMuManual') || {}).value) || 0;
+    return {
+      dimsW: +dims.w.toFixed(1), dimsH: +dims.h.toFixed(1),
+      bbW: +(bb.maxX - bb.minX).toFixed(1), bbH: +(bb.maxY - bb.minY).toFixed(1),
+      cols: cuts.cols, rows: cuts.rows, manualMu: manualMu,
+      mx: +Math.max.apply(null, cells).toFixed(1)
+    };
+  });
+  console.log('        ' + JSON.stringify(b10));
+  check('B10a 逐块态规划尺寸=本块真实 bounds（不再除以整组 dims，v197）',
+    !b10.err && Math.abs(b10.dimsW - b10.bbW) < 0.5 && Math.abs(b10.dimsH - b10.bbH) < 0.5,
+    'dims=' + b10.dimsW + 'x' + b10.dimsH + ' bb=' + b10.bbW + 'x' + b10.bbH);
+  check('B10b 最大分区 ≈ 设定亩数（18 亩/区落地；余量/边界区只会更小）',
+    !b10.err && Math.abs(b10.mx - b10.manualMu) <= 1.0,
+    'mx=' + b10.mx + ' 亩, 设定=' + b10.manualMu);
+
   /* ---------- B6 总管不进各块统计 ----------
      [v194] 二级页已**不能画**总管（入口在「成组管路」页）。这里改测后半段 ——
      **只读渲染 + 不串味**：直接给 __runyeGroupEdit.trunkPipes 塞一根

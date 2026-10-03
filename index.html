@@ -14145,6 +14145,21 @@ ppPullLiftDh();                                              // 首屏对齐一�
   };
 
   function ppGetPlanDims(b){
+    /* [v197] 成组**逐块**模式：分区以「本块真实尺寸」为准（sx=sy=1）。
+       ★★ 为什么（2026-10-04 用户实测截图抓到）：runyePlanDims 是按**回传时刻的
+         实测面积**（整组）算的全局规划尺寸（如 650×420）；逐块编辑拿本块 bounds
+         （如 300×400）去除以整组 dims ⇒ sx·sy≈块/整组面积比 ≈0.44
+         ⇒ 「18 亩/区」实际切出 ≈7.9 亩的区（用户截图 6.4~8.9 亩），且区数按
+         整组 dims 切（11×3），整组 9 区 vs 逐块 33 区对不上 —— 设定形同虚设。
+       ⇒ 修在上游（v189 原则：改这里而不是改渲染）：逐块时 dims=本块 bounds，
+         每区 = 固定边×另一边 = 真实的 18 亩；布管/材料/水力/三级页（走
+         Bridge.getZoneCuts / getPlanDims）**全链路自动跟随**，无需各自改。
+       ★ 单地块与整组模式不变：dims 本来就由实测面积推算（sx≈1），是设定口径；
+         整组视图用户已认可（截图 1），不动。 */
+    var gePer=window.__runyeGroupEdit;
+    if(gePer&&gePer.active&&gePer.mode==='perPlot'&&b&&b.w>0&&b.h>0){
+      return { w:b.w, h:b.h };
+    }
     var aEl=document.getElementById('planA');
     var bEl=document.getElementById('planB');
     var stDims=window.runyePlanDims||{};

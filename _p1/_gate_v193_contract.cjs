@@ -222,7 +222,11 @@ const CASES = [
 
   { id: 'v26', name: 'grRender 不画分区线（用户看不到每块内部怎么分，没法判断怎么规整）',
     anchor: '      var cuts = grZonesFor(b);',
-    rep: '      var cuts = null;   /* v26 分区线不画 */' }
+    rep: '      var cuts = null;   /* v26 分区线不画 */' },
+
+  { id: 'v27', name: '★ 逐块分区退回整组规划 dims（18 亩/区实际切出 ≈7.9 亩，v197 主缺陷）',
+    anchor: "    if(gePer&&gePer.active&&gePer.mode==='perPlot'&&b&&b.w>0&&b.h>0){\n      return { w:b.w, h:b.h };\n    }",
+    rep: '    /* v27 逐块不再取本块 bounds */' }
 ];
 
 let caught = 0, missed = 0, drift = 0;
