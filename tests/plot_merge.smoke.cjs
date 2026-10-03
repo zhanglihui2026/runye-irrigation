@@ -411,16 +411,30 @@ test('③-h 消费口径（v190）：子地块环传到了就必须**真的被�
   assert.match(INDEX_SRC, /function ppXformSubRings\(fn\)/, '应有 ppXformSubRings（旋转落定/镜像时同步变换）');
 
   const count = (re) => (INDEX_SRC.match(re) || []).length;
+
+  /* ★ 必须先剥注释再数：把调用写成 `/* [inject] *\/ ppXformSubRings(tf2);` 之后，
+     源码里那串字符**还在**，只数文本会照样数到 ⇒ 注入静默失效、契约恒绿（实测踩到）。 */
+  const stripComments = (s) => s
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:"'`\\])\/\/[^\n]*/g, '$1');
+  const bodyOf = (fnName, len) => {
+    const i = INDEX_SRC.indexOf('function ' + fnName + '(');
+    return i < 0 ? '' : stripComments(INDEX_SRC.slice(i, i + (len || 3000)));
+  };
+  /* 统计某个函数体内某串出现的次数（「存在性」不够 —— 见下方 ppApplyMirror 的坑） */
+  const countIn = (fnName, needle) => {
+    const b = bodyOf(fnName);
+    if (!b) return -1;
+    return (b.match(new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
+  };
   /* 「写入 1 处、读取 0 处」就是本次 bug 的形状 —— 直接断言读取点数量 */
   const reads = count(/ppGetSubPlotRings\(\)|ppGetRotatedSubRings\(\)|ppXformSubRings\(/g);
   assert.ok(reads >= 6, '子地块环的读取/同步调用点应 ≥ 6 处（三件套定义 3 + 消费 ≥3），实际 ' + reads + ' 处');
 
   /* 逐个消费点：必须落在正确的函数体内，而不是只定义不用 */
   const inFn = (fnName, needle) => {
-    const i = INDEX_SRC.indexOf('function ' + fnName + '(');
-    if (i < 0) return false;
-    /* 取该函数往下 2500 字符（这些函数都不长）作为函数体窗口 */
-    return INDEX_SRC.slice(i, i + 2500).indexOf(needle) >= 0;
+    const b = bodyOf(fnName, 2500);   // 这些函数都不长；已剥注释
+    return !!b && b.indexOf(needle) >= 0;
   };
   assert.ok(inFn('ppTracePlotPath', 'ppGetRotatedSubRings()'),
     '画布绘制 ppTracePlotPath 必须按成员环画（否则画布继续吞空隙）');
@@ -430,8 +444,12 @@ test('③-h 消费口径（v190）：子地块环传到了就必须**真的被�
     '分区面积 ppZoneActualAreaM2 必须按成员环求和（否则空隙被并进面积）');
   assert.ok(inFn('ppRepartitionFromRotatedPlot', 'ppXformSubRings('),
     '旋转落定必须同步变换子地块环（否则主轮廓转了、子块没转）');
-  assert.ok(inFn('ppApplyMirror', 'ppXformSubRings('),
-    '镜像必须同步变换子地块环');
+  /* ★ ppApplyMirror 里必须**两处**都同步：① 先撤销上一次镜像 ② 再应用新镜像。
+     只查「函数体内存在调用」会被①蒙混过关（注入掉②仍绿 —— 实测踩到），
+     故按次数断言（与「判据要能区分正反例」同一条原则）。 */
+  const mirrorCalls = countIn('ppApplyMirror', 'ppXformSubRings(');
+  assert.strictEqual(mirrorCalls, 2,
+    'ppApplyMirror 应同步子地块环 2 次（撤销旧镜像 + 应用新镜像），实际 ' + mirrorCalls + ' 次');
   /* 施工图 SVG 的 d 也是一条独立代码路径（与画布不共用），必须单独盯 */
   const gd = INDEX_SRC.indexOf('function ppGenerateDiagram(');
   assert.ok(gd > 0 && INDEX_SRC.slice(gd, gd + 4000).indexOf('ppGetRotatedSubRings()') >= 0,
