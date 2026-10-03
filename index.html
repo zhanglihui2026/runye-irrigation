@@ -775,7 +775,7 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
 
 
 
-/* ===== 04 管路规划与施工简图 ===== */
+/* ===== 二级管路 · 管路规划与施工简图 ===== */
 
 
 
@@ -1371,7 +1371,7 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
 }
 
 
-/* ===== 04 管路规划与施工简图 ===== */
+/* ===== 二级管路 · 管路规划与施工简图 ===== */
 #pipePlanSection{
   background:linear-gradient(165deg,var(--dg-700) 0%,var(--dg-800) 100%);
   border-radius:var(--radius);padding:24px;margin:24px auto 0;max-width:1120px;
@@ -6062,7 +6062,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
 </section>
 
 
-<!-- ===== 04 管路规划与施工简图 ===== -->
+<!-- ===== 二级管路 · 管路规划与施工简图 ===== -->
 <section id="pipePlanSection" class="ry-sec" data-ry-view="edit">
   <!-- 标题栏「04 二级管路规划与施工简图 · 未测量」已按要求取消（原 .pp-title 整条删除）。
        如需恢复：从 git 历史取回该 .pp-title 整块即可（含 span.badge 04 与 span#planAreaTag）。
@@ -18423,7 +18423,7 @@ bindUI();
       var d = JSON.parse(raw);
       if(!d || !d.sqm){ localStorage.removeItem('runyeMeasuredArea'); return; }
 
-      // 写入全局实测面积（㎡），驱动「04 管路规划」的计算
+      // 写入全局实测面积（㎡），驱动「二级管路」的计算
       window.measuredArea = d.sqm;
       window.measuredPolygonSource='map';
       window.currentPlotId=null;
@@ -18508,7 +18508,8 @@ bindUI();
     var banner = document.createElement('div');
     banner.id = 'mapMeasuredBanner';
     banner.style.cssText = 'margin:10px 16px 0;padding:10px 14px;background:#e8f5e9;border:1px solid #a5d6a7;border-left:4px solid #2e7d32;font-size:13px;color:#1b5e20;display:flex;align-items:center;gap:12px;flex-wrap:wrap';
-    banner.innerHTML = '🗺️ <b>地图实测面积已回传：' + d.mu + ' 亩（' + d.sqm + ' ㎡）</b>，已自动填入「04 管路规划」参与计算。' +
+    /* [v200] 用户指正：页面叫「二级管路」（导航同名），不叫「二级管路」——旧编号叫法已废弃 */
+    banner.innerHTML = '🗺️ <b>地图实测面积已回传：' + d.mu + ' 亩（' + d.sqm + ' ㎡）</b>，已自动填入「二级管路」参与计算。' +
       '<span style="flex:1"></span>' +
       '<button id="mapBannerClear" style="height:30px;padding:0 14px;border:1px solid #2e7d32;background:#fff;color:#2e7d32;cursor:pointer;font-size:12px;">清除回传</button>';
     sec.insertBefore(banner, sec.firstChild);
