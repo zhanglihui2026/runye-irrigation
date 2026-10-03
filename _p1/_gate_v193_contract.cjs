@@ -38,7 +38,7 @@ const helpers = { stripComments, bodyOf, countIn };
 
 /* 锚点里的换行必须写 \r?\n（index.html 是 CRLF，字面 \n 会静默 0 命中 ⇒ 注入假生效） */
 const rep1 = (s, anchor, rep, tag) => {
-  const parts = anchor.split('\n').map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const parts = anchor.replace(/\r/g, '').split('\n').map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
   const re = new RegExp(parts.join('\\r?\\n'));
   const cnt = (s.match(re) || []).length;
   if (cnt !== 1) { console.error('  [漂移] ' + tag + '：期望 1 处，实际 ' + cnt + ' :: ' + anchor.slice(0, 60)); return null; }

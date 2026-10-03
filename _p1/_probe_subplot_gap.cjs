@@ -60,7 +60,7 @@ function makeInjectedCopy() {
   /* ★ 锚点里的换行要写成 \r?\n：index.html 经 git checkout 后是 **CRLF**，
      用字面 '\n' 匹配会静默 0 命中 ⇒ 注入失效、体检假绿（实测踩到 inject 2/5）。 */
   const sub1 = (anchor, rep, tag) => {
-    const parts = anchor.split('\n').map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const parts = anchor.replace(/\r/g, '').split('\n').map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
     const re = new RegExp(parts.join('\\r?\\n'));
     const cnt = (s.match(re) || []).length;
     if (cnt !== 1) { console.error('[inject] 锚点' + tag + ' 漂移：期望 1 处，实际 ' + cnt + ' 处 :: ' + anchor.slice(0, 70)); process.exit(2); }

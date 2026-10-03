@@ -56,7 +56,7 @@ function makeInjectedCopy() {
   const applied = [];
   /* ★ 同理：锚点里的换行写成 \r?\n，兼容 CRLF/LF（否则静默 0 命中 ⇒ 体检假绿） */
   const sub1 = (anchor, rep, tag) => {
-    const parts = anchor.split('\n').map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const parts = anchor.replace(/\r/g, '').split('\n').map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
     const re = new RegExp(parts.join('\\r?\\n'));
     const cnt = (s.match(re) || []).length;
     if (cnt !== 1) { console.error('[inject] 锚点' + tag + ' 漂移：期望 1 处，实际 ' + cnt + ' 处 :: ' + anchor.slice(0, 60)); process.exit(2); }

@@ -32,7 +32,7 @@ function makeInjectedCopy() {
   let s = s0;
   const applied = [];
   const sub1 = (anchor, rep, tag) => {
-    const parts = anchor.split('\n').map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const parts = anchor.replace(/\r/g, '').split('\n').map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
     const re = new RegExp(parts.join('\\r?\\n'));
     const cnt = (s.match(re) || []).length;
     if (cnt !== 1) { console.error('[inject] 锚点' + tag + ' 漂移：期望 1 处，实际 ' + cnt); process.exit(2); }
