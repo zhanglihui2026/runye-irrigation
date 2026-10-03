@@ -23,6 +23,23 @@ const ENHANCE_SRC = fs.readFileSync(path.join(ROOT, 'runye-map-enhance.js'), 'ut
 const INDEX_SRC = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 const MAP_SRC = fs.readFileSync(path.join(ROOT, 'runye-map-measure.html'), 'utf8');
 
+/* ---- 静态判据公用工具（提到顶层，供 ③-h/③-i/③-j 共用）----
+ * ★ 必须先剥注释再数：把调用写成 `/* [inject] *\/ ppXformSubRings(tf2);` 之后，
+ *   源码里那串字符**还在**，只数文本会照样数到 ⇒ 注入静默失效、契约恒绿（实测踩到）。 */
+const stripComments = (s) => s
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .replace(/(^|[^:"'`\\])\/\/[^\n]*/g, '$1');
+const bodyOf = (src, fnName, len) => {
+  const i = src.indexOf('function ' + fnName + '(');
+  return i < 0 ? '' : stripComments(src.slice(i, i + (len || 3000)));
+};
+/* 统计某个函数体内某串出现的次数（「存在性」不够 —— 见 ppApplyMirror 的坑） */
+const countIn = (src, fnName, needle) => {
+  const b = bodyOf(src, fnName);
+  if (!b) return -1;
+  return (b.match(new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
+};
+
 /* ---------- 测试夹具：三亚附近两块相邻矩形 ---------- */
 const B = [18.25, 109.51];
 function rect(lat0, lng0, dLat, dLng) {
@@ -412,28 +429,13 @@ test('③-h 消费口径（v190）：子地块环传到了就必须**真的被�
 
   const count = (re) => (INDEX_SRC.match(re) || []).length;
 
-  /* ★ 必须先剥注释再数：把调用写成 `/* [inject] *\/ ppXformSubRings(tf2);` 之后，
-     源码里那串字符**还在**，只数文本会照样数到 ⇒ 注入静默失效、契约恒绿（实测踩到）。 */
-  const stripComments = (s) => s
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/(^|[^:"'`\\])\/\/[^\n]*/g, '$1');
-  const bodyOf = (fnName, len) => {
-    const i = INDEX_SRC.indexOf('function ' + fnName + '(');
-    return i < 0 ? '' : stripComments(INDEX_SRC.slice(i, i + (len || 3000)));
-  };
-  /* 统计某个函数体内某串出现的次数（「存在性」不够 —— 见下方 ppApplyMirror 的坑） */
-  const countIn = (fnName, needle) => {
-    const b = bodyOf(fnName);
-    if (!b) return -1;
-    return (b.match(new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
-  };
   /* 「写入 1 处、读取 0 处」就是本次 bug 的形状 —— 直接断言读取点数量 */
   const reads = count(/ppGetSubPlotRings\(\)|ppGetRotatedSubRings\(\)|ppXformSubRings\(/g);
   assert.ok(reads >= 6, '子地块环的读取/同步调用点应 ≥ 6 处（三件套定义 3 + 消费 ≥3），实际 ' + reads + ' 处');
 
   /* 逐个消费点：必须落在正确的函数体内，而不是只定义不用 */
   const inFn = (fnName, needle) => {
-    const b = bodyOf(fnName, 2500);   // 这些函数都不长；已剥注释
+    const b = bodyOf(INDEX_SRC, fnName, 2500);   // 这些函数都不长；已剥注释
     return !!b && b.indexOf(needle) >= 0;
   };
   assert.ok(inFn('ppTracePlotPath', 'ppGetRotatedSubRings()'),
@@ -447,7 +449,7 @@ test('③-h 消费口径（v190）：子地块环传到了就必须**真的被�
   /* ★ ppApplyMirror 里必须**两处**都同步：① 先撤销上一次镜像 ② 再应用新镜像。
      只查「函数体内存在调用」会被①蒙混过关（注入掉②仍绿 —— 实测踩到），
      故按次数断言（与「判据要能区分正反例」同一条原则）。 */
-  const mirrorCalls = countIn('ppApplyMirror', 'ppXformSubRings(');
+  const mirrorCalls = countIn(INDEX_SRC, 'ppApplyMirror', 'ppXformSubRings(');
   assert.strictEqual(mirrorCalls, 2,
     'ppApplyMirror 应同步子地块环 2 次（撤销旧镜像 + 应用新镜像），实际 ' + mirrorCalls + ' 次');
   /* 施工图 SVG 的 d 也是一条独立代码路径（与画布不共用），必须单独盯 */
@@ -460,4 +462,63 @@ test('③-h 消费口径（v190）：子地块环传到了就必须**真的被�
   const abody = INDEX_SRC.slice(a, a + 1500);
   assert.match(abody, /var rings=ppGetSubPlotRings\(\);/, 'ppZoneActualAreaM2 应优先取成员环');
   assert.match(abody, /sum\+=ppPolyArea\(ppClipPolyToRect\(rings\[ri\]/, '面积应为 Σ 各成员环裁剪面积');
+});
+
+test('③-i 回传入口（v191）：成组地块必须能**被显式选中回传**，不能只认 currentMapPlotId', () => {
+  /* 用户原话（第三次）：「还是不行，两个地块成组之后不能直接传给二级页面吗，
+     一定要整合成一个地块才行吗？你检查一下逻辑是怎么样的。」
+     ★ 真因：原回传按钮 btnCopy 写的是
+         pid = currentMapPlotId || ('pm'+Date.now());  saved = 库里取 pid;  if(saved.merged) 带 subPlots
+       而 currentMapPlotId **只在「保存地块」时赋值**、「完成」后被置回 null；
+       成组地块由 RunyeMapEnhance.merge **直接写进地块库**，从不设置 currentMapPlotId。
+       ⇒ 在地图上点成组地块只是 fitBounds 飞过去 ⇒ saved 是「最后画的那个子地块」
+       ⇒ saved.merged === false ⇒ payload.subPlots 一个都不带。
+     ⇒ 不是「传过去又被整合」，是**成组地块压根没被选中过**。
+     修法：回传对象改成**显式指定的地块**（列表每条一个「→ 回传」），payload 由
+     buildPlotPayload(plot) 统一构造。本契约把这几条钉死，防止退回旧写法。 */
+  assert.match(MAP_SRC, /function buildPlotPayload\(plot/, '应有 buildPlotPayload(plot)：按**指定地块**构造 payload');
+  assert.match(MAP_SRC, /function sendPlotToDesign\(/, '应有 sendPlotToDesign：把指定地块写回传并跳转');
+
+  /* 列表每条（含成组地块）都要有「→ 回传」入口 */
+  assert.match(MAP_SRC, /className='place-send'/, '「我的地块」列表应有 .place-send 按钮');
+  const sendCount = (MAP_SRC.match(/className='place-send'/g) || []).length;
+  assert.strictEqual(sendCount, 1, 'place-send 按钮应在列表渲染里构造 1 处，实际 ' + sendCount + ' 处');
+  assert.match(MAP_SRC, /row\.appendChild\(sd\);/, 'place-send 必须真的挂进每一行（否则成组地块仍选不中）');
+
+  /* 成组时面积必须是 Σ 成员环，绝不采信库里可能是凸包口径的旧 sqm */
+  const bp = MAP_SRC.indexOf('function buildPlotPayload(');
+  assert.ok(bp > 0, '应能找到 buildPlotPayload');
+  const bpBody = stripComments(MAP_SRC.slice(bp, bp + 2600));
+  assert.match(bpBody, /payload\.subPlots=out;/, '成组时应带上各子地块环');
+  assert.match(bpBody, /payload\.sqm=Math\.round\(sum\);/, '面积应改写为 Σ 成员环（不是外框）');
+  assert.match(bpBody, /payload\.mu=\+\(sum\/666\.67\)\.toFixed\(2\);/, '亩数同步为 Σ 成员环');
+  /* ★ 反向断言（防止退回「只认 currentMapPlotId」的旧写法）：
+     buildPlotPayload 的入参是 plot（地块记录），不是从 currentMapPlotId 里取 */
+  assert.ok(!/function buildPlotPayload\(\s*\)/.test(MAP_SRC), 'buildPlotPayload 必须接受 plot 入参（不能退回只认 currentMapPlotId）');
+  /* btnCopy 仍要能处理「当前画布草稿」这条老路径（没有它，未保存的地块就传不了了） */
+  const bc = MAP_SRC.indexOf("document.getElementById('btnCopy').onclick");
+  assert.ok(bc > 0, 'btnCopy 入口应仍在');
+  assert.match(stripComments(MAP_SRC.slice(bc, bc + 1200)), /sendPlotToDesign\(/, 'btnCopy 也应走统一的 sendPlotToDesign');
+});
+
+test('③-j 参考线（v191 用户拍板）：块间空隙留空，但保留淡虚线做参考', () => {
+  /* 用户选择：「保留淡虚线做参考」—— 空隙不填充、不算面积，但要能看见网格延伸过去，
+     方便对齐两边的分区编号。
+     ⇒ 画布 ppDrawZones 的网格线必须画在**地块裁剪之外**（覆盖整个外框），
+       否则空隙会变成一个彻底的洞，两边分区对不上。
+     探针侧由 _p1/_probe_subplot_gap.cjs 的 A2g（按行统计「横跨空隙的线」）实测，
+     这里只钉住「网格线在 clip 之外」这个结构性前提。 */
+  const dz = INDEX_SRC.indexOf('function ppDrawZones(');
+  assert.ok(dz > 0, '应能找到 ppDrawZones');
+  /* 切片边界要**卡在 ppDrawZones 自己的函数尾**：拍脑袋写死 4200 字符会切不满
+     （实测锚点在 4200 之外 ⇒ 假红），切太长又会带进下一个函数造成假绿。
+     ⇒ 用「下一个顶层 function 定义」当右边界。 */
+  const body = INDEX_SRC.slice(dz, dz + 20000);
+  const clipEnd = body.indexOf('ppCtx.restore(); // 结束地块裁剪');
+  assert.ok(clipEnd > 0, 'ppDrawZones 应有「结束地块裁剪」的那次 restore（锚点）');
+  const nextFn = body.indexOf('\n  function ', clipEnd + 10);
+  const after = stripComments(body.slice(clipEnd, nextFn > 0 ? nextFn : clipEnd + 4000));
+  assert.match(after, /stroke-dasharray|setLineDash\(\[7,5\]\)/, '裁剪之外仍要画网格（虚线）');
+  assert.match(after, /cuts\.xPos\.length/, '竖向网格线覆盖整个外框（含块间空隙）');
+  assert.match(after, /cuts\.yPos\.length/, '横向网格线覆盖整个外框（含块间空隙）');
 });

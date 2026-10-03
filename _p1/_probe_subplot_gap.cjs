@@ -57,10 +57,14 @@ function makeInjectedCopy() {
   const orig = fs.readFileSync(SRC_HTML, 'utf8');
   let s = orig;
   const applied = [];
+  /* ★ 锚点里的换行要写成 \r?\n：index.html 经 git checkout 后是 **CRLF**，
+     用字面 '\n' 匹配会静默 0 命中 ⇒ 注入失效、体检假绿（实测踩到 inject 2/5）。 */
   const sub1 = (anchor, rep, tag) => {
-    const cnt = s.split(anchor).length - 1;
+    const parts = anchor.split('\n').map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const re = new RegExp(parts.join('\\r?\\n'));
+    const cnt = (s.match(re) || []).length;
     if (cnt !== 1) { console.error('[inject] 锚点' + tag + ' 漂移：期望 1 处，实际 ' + cnt + ' 处 :: ' + anchor.slice(0, 70)); process.exit(2); }
-    s = s.replace(anchor, rep);
+    s = s.replace(re, rep);
     applied.push(tag);
   };
 
@@ -83,6 +87,12 @@ function makeInjectedCopy() {
     /* 镜像不同步子地块环 ⇒ A4 必须红 */
     sub1('ppXformSubRings(tf2); // [v190] 子地块环随主轮廓一起应用新镜像',
       '/* [inject 4] ppXformSubRings(tf2); */', '4');
+  }
+  if (INJ === 6 || INJ === 99) {
+    /* 去掉画布的分区网格虚线（两条循环各一处，锚点已确认唯一）
+       ⇒ 空隙里连参考线都没有 ⇒ A2g 必须红（证明那条「有淡虚线」的断言不是恒绿） */
+    sub1('for(var bx=0;bx<cuts.xPos.length;bx++){', 'for(var bx=0;bx<0;bx++){ // [inject 6] 去掉竖向网格线', '6a');
+    sub1('for(var by=0;by<cuts.yPos.length;by++){', 'for(var by=0;by<0;by++){ // [inject 6] 去掉横向网格线', '6b');
   }
   if (INJ === 5 || INJ === 99) {
     /* 画布绘制退回「只描外框」⇒ 空隙被填色 ⇒ A2f 必须红
@@ -306,11 +316,44 @@ const FIX = {
        实测画布并非纯白（有底色/网格），硬编码 white 会让判据失真。 */
     const corner = ctx.getImageData(4, 4, 1, 1).data;
     const corner2 = ctx.getImageData(c.width - 5, 4, 1, 1).data;
+    /* ★ 用户拍板「空隙保留淡虚线做参考」⇒ 空隙里**应该**有网格虚线，
+       只是不能有色块填充。判据：扫整个空隙矩形，统计「与画布空白不同色」的像素数。
+       · = 0    ⇒ 连参考线都没有（空隙成了彻底的洞，对齐困难）
+       · 占比高 ⇒ 又被当实体填色了（回到 bug）
+       所以两头都要卡：> 0 且占比 < 25%。 */
+    const g1 = toC(302, 25), g2 = toC(328, 375);
+    const gx = Math.round(Math.min(g1.x, g2.x)), gy = Math.round(Math.min(g1.y, g2.y));
+    const gw = Math.max(1, Math.round(Math.abs(g2.x - g1.x))), gh = Math.max(1, Math.round(Math.abs(g2.y - g1.y)));
+    const img = ctx.getImageData(gx, gy, gw, gh).data;
+    const bg = [corner[0], corner[1], corner[2]];
+    /* ★ 判据必须**按行**统计，不能只数总数 —— 实测踩到的假绿：
+       空隙区 13×175 px 里有 183 个「非背景」像素，看着像「有参考线」，
+       但注入掉网格线后只少了 8 个 ⇒ 那 175 个其实是**地块描边的竖边溢出**，
+       跟「有没有参考线」毫无关系（判据测的不是它声称的东西）。
+       ⇒ 改为数**每一行**的非背景像素数：
+         · 地块描边是**竖**的 ⇒ 每行只有 1~2 个像素
+         · 网格横线是**横**的 ⇒ 某几行会**整行跨越空隙宽度**（≈ gw）
+       只有后者才算「有参考线」。 */
+    let nonBg = 0, total = 0, maxRow = 0, wideRows = 0;
+    for (let ry = 0; ry < gh; ry++) {
+      let rowCnt = 0;
+      for (let rx = 0; rx < gw; rx++) {
+        const i = (ry * gw + rx) * 4;
+        total++;
+        if (Math.sqrt((img[i] - bg[0]) ** 2 + (img[i + 1] - bg[1]) ** 2 + (img[i + 2] - bg[2]) ** 2) > 3) {
+          nonBg++; rowCnt++;
+        }
+      }
+      if (rowCnt > maxRow) maxRow = rowCnt;
+      if (rowCnt >= gw * 0.6) wideRows++;
+    }
     return {
+      gapMaxRow: maxRow, gapWideRows: wideRows,
       inA: at(150, 200), inB: at(480, 200),
       gap: at(315, 200), gap2: at(315, 120), gap3: at(315, 300),
       bgRef: [corner[0], corner[1], corner[2], corner[3]],
-      bgRef2: [corner2[0], corner2[1], corner2[2], corner2[3]]
+      bgRef2: [corner2[0], corner2[1], corner2[2], corner2[3]],
+      gapBox: { x: gx, y: gy, w: gw, h: gh }, gapNonBg: nonBg, gapTotal: total
     };
   });
   {
@@ -334,6 +377,15 @@ const FIX = {
       check('A2f 块间空隙与画布空白同色（色距 < 10）⇒ 空隙确实没被填充',
         dG < 10 && dG2 < 10 && dG3 < 10,
         dG.toFixed(1) + ' / ' + dG2.toFixed(1) + ' / ' + dG3.toFixed(1));
+      /* 用户拍板：空隙「保留淡虚线做参考」。两头都要卡，缺一头就是退化 */
+      const ratio = px.gapTotal ? (px.gapNonBg / px.gapTotal) : 0;
+      console.log('        空隙区 ' + px.gapBox.w + '×' + px.gapBox.h + ' px：非背景 ' +
+        px.gapNonBg + ' / ' + px.gapTotal + ' = ' + (ratio * 100).toFixed(1) +
+        '% ；单行最多 ' + px.gapMaxRow + ' px，整行跨越的行数 ' + px.gapWideRows);
+      check('A2g 空隙里有**横跨的**淡虚线参考（整行跨越的行数 ≥ 1）—— 用户要求「保留淡虚线做参考」',
+        px.gapWideRows >= 1, '跨越行数 ' + px.gapWideRows + ' / 单行最多 ' + px.gapMaxRow + ' px');
+      check('A2h 但没有被当实体填色（非背景占比 < 25%）',
+        ratio < 0.25, '占比 ' + (ratio * 100).toFixed(1) + '%');
     }
     /* 把「地块划分」关回单区，供后续 A3/A4 用 */
     await page.evaluate(async () => {

@@ -16970,6 +16970,19 @@ ppPullLiftDh();                                              // 首屏对齐一�
         plot.geo = { refLat:+base.refLat.toFixed(6), refLng:+base.refLng.toFixed(6), proj:'mercatorLocal' };
       }
     }catch(ePll){}
+    /* [v191] 成组地块：把各子地块环一并落库（本地米 poly + 经纬度 polyLatLng）。
+       否则「设为当前 / 刷新」后只剩凸包外框，块间空隙被吞、看起来像合并。 */
+    try{
+      var subs=window.__runyeSubPlots;
+      if(subs && subs.length){
+        plot.merged=true; plot.grouped=true;
+        plot.subPlots=subs.map(function(s){
+          return { id:s.id, name:s.name, mu:s.mu, sqm:s.sqm, crop:s.crop,
+                   poly:(s.poly||[]).map(function(q){return{x:Math.round((q.x||0)*100)/100,y:Math.round((q.y||0)*100)/100};}),
+                   polyLatLng:s.polyLatLng||null };
+        });
+      }
+    }catch(eSub){}
     if(exist){ arr=arr.map(function(x){ return x.id===id?plot:x; }); }
     else { arr.push(plot); }
     saveLib(arr); window.currentPlotId=id; renderLib();
@@ -17031,6 +17044,21 @@ ppPullLiftDh();                                              // 首屏对齐一�
     window.__runyeMapFramePoly = (window.__runyeGeoBase && Array.isArray(p.poly) && p.poly.length>=3)
       ? (p.mapFramePoly || (p.polyLatLng && window.RunyeGeo ? RunyeGeo.polyLL2m(p.polyLatLng,p.geo) : p.poly)).map(function(q){return {x:q.x,y:q.y};}) : null;
     window.currentPlotId=id;
+    /* [v191] 恢复成组地块的各子环（本地米坐标，与 measuredPolygon 同坐标系）。
+       无库存子环则置 null，二级页回退画单块凸包。 */
+    try{
+      if(p && Array.isArray(p.subPlots) && p.subPlots.length){
+        var _rec=[];
+        p.subPlots.forEach(function(s){
+          if(s && Array.isArray(s.poly) && s.poly.length>=3){
+            _rec.push({ id:s.id, name:s.name, mu:s.mu, sqm:s.sqm, crop:s.crop,
+                        polyLatLng:s.polyLatLng||null,
+                        poly:s.poly.map(function(q){return{x:+q.x,y:+q.y};}) });
+          }
+        });
+        window.__runyeSubPlots=_rec.length?_rec:null;
+      } else { window.__runyeSubPlots=null; }
+    }catch(e){ window.__runyeSubPlots=null; }
     try{ if(typeof updatePlan==='function') updatePlan(); }catch(e){}
     try{ if(typeof window.ppLoadPolygon==='function') window.ppLoadPolygon(); }catch(e){}
     try{ if(typeof window.ppGenerateDiagram==='function') window.ppGenerateDiagram({scroll:false}); }catch(e){}
