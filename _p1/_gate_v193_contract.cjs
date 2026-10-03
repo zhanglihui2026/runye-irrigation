@@ -54,13 +54,15 @@ const CASES = [
     anchor: "    if(ge.mode==='perPlot') ge.slots[ge.current]=ppCaptureSlot();   // 存档旧块",
     rep: '    /* k2 不存档 */' },
 
+  /* [v194] 二级页总管入口已撤 ⇒ 放行表只剩 pickPipe */
   { id: 'k3', name: 'ppGroupEditBlocks 恒放行（整组态不再拦块级编辑）',
-    anchor: "    return !(mode==='trunk'||mode==='pickPipe');",
+    anchor: "    return mode!=='pickPipe';",
     rep: '    return false;' },
 
-  { id: 'k4', name: '总管 push 进 ppState.mainPipes（混进各块的水力/材料）',
-    anchor: '    ge.trunkPipes.push(line.map(function(p){return{x:p.x,y:p.y};}));',
-    rep: '    ppState.mainPipes.push(line.map(function(p){return{x:p.x,y:p.y};}));' },
+  /* [v194] k4 原来的注入点（ppAddTrunkPipe）已随入口一起删了 ⇒ 换成「入口复活」类缺陷 */
+  { id: 'k4', name: '二级页总管按钮 #ppGeTrunk 复活（同一份数据两个入口）',
+    anchor: '        <button type="button" class="pp-btn-ghost pp-ge-mode" id="ppGePerPlot" data-ge="perPlot">逐块</button>',
+    rep: '        <button type="button" class="pp-btn-ghost pp-ge-mode" id="ppGePerPlot" data-ge="perPlot">逐块</button>\r\n        <button type="button" id="ppGeTrunk">总管</button>' },
 
   { id: 'k5', name: 'ryShowSection 去掉三级页拦截（导航能绕进去）',
     anchor: "    if(sec && sec.id==='tlPipePlanSection' && typeof ryGroupThirdLevelGuard==='function' && ryGroupThirdLevelGuard())return;",
@@ -84,7 +86,122 @@ const CASES = [
 
   { id: 'k10', name: 'ppLoadPolygon 不再初始化成组编辑状态',
     anchor: '    ppInitGroupEdit();',
-    rep: '    /* k10 */' }
+    rep: '    /* k10 */' },
+
+  /* =======================================================================
+     [v194] 成组管路页 / 按块进三级页 的注入用例
+     ======================================================================= */
+
+  /* --- ⑤ 总管编辑入口唯一性（反向断言组） --- */
+  { id: 'v1', name: '二级页 ppAddTrunkPipe 复活（总管又能从二级页落线了）',
+    anchor: '  function ppDrawGroupTrunk(){',
+    rep: '  function ppAddTrunkPipe(){ }\r\n  function ppDrawGroupTrunk(){' },
+
+  { id: 'v2', name: "二级页 trunk 模式复活（模式会带出画线入口，等于入口开回来）",
+    anchor: '  function ppDrawGroupTrunk(){',
+    rep: "  function ppDrawGroupTrunk(){\r\n    if(ppState.mode==='trunk')return;" },
+
+  { id: 'v3', name: '施工图 #ppTrunkLayer 消失（总图上看不见总管）',
+    anchor: '      parts.push(\'<g id="ppTrunkLayer">\');',
+    rep: '      parts.push(\'<g id="ppTrunkLayerX">\');' },
+
+  { id: 'v4', name: 'grSync 不迁移旧总管（v193 在二级页画的总管凭空消失）',
+    anchor: '    if (!W.trunk.lines.length && ge && ge.trunkPipes && ge.trunkPipes.length) {\r\n      W.trunk.lines = clone(ge.trunkPipes);\r\n    }',
+    rep: '    /* v4 不迁移 */' },
+
+  /* --- ⑩ grEnterBlock / grBackFromTl ---
+     ★ v5 原来是「把两条语句交换顺序」—— 那是**恒真断言**（ppSelectGroupPlot 内部
+       自己会 ppApplySlot，谁先谁后结果一样），注入后红的是**源码文本**不是行为。
+       换成下面 v5a/v5b/v5c 三条各自独立可失效的注入。 */
+  { id: 'v5a', name: 'grEnterBlock 不确保逐块模式（整组态下 polyPts 还是外框 ⇒ 分区网格拿外框的）',
+    anchor: '    if (B && B.setGroupMode) { try { B.setGroupMode(\'perPlot\'); } catch (e) { } }',
+    rep: '    /* v5a 不切逐块模式 */' },
+
+  { id: 'v5b', name: 'grEnterBlock 不切二级页的块（三级页分区网格拿的是别的块）',
+    anchor: '    if (B && B.selectGroupPlot) { try { B.selectGroupPlot(i); } catch (e) { } }',
+    rep: '    /* v5b 不切块 */' },
+
+  { id: 'v5c', name: 'grEnterBlock 不换 measuredPolygon（三级页按整组外框算面积）',
+    anchor: '    window.measuredPolygon = b.ring.map(function (p) { return { x: p.x, y: p.y }; });',
+    rep: '    /* v5c 不换环 */' },
+
+  { id: 'v5d', name: 'grSync 退回用 measuredPolygon 当外框（按块编辑中刷新 ⇒ 外框被污染成那一块）',
+    anchor: '    W.frame = clone((ge && ge.framePts && ge.framePts.length) ? ge.framePts : (window.measuredPolygon || []));',
+    rep: '    W.frame = clone(window.measuredPolygon || []);' },
+
+  { id: 'v6', name: 'grEnterBlock 不记块号（返回条不知道在算第几块，拦截也永远放行）',
+    anchor: '    window.__runyeTlBlock = i;',
+    rep: '    /* v6 不记 */' },
+
+  { id: 'v7', name: 'grBackFromTl 不存档本块三级结果（换块再回来结果就没了）',
+    anchor: '      W.blocks[i].tlData = clone(window.tlDiagramData);',
+    rep: '      /* v7 不存档 */' },
+
+  { id: 'v8', name: 'grBackFromTl 不清 __runyeTlBlock（成组拦截从此永远放行）',
+    anchor: '    window.__runyeTlBlock = null;',
+    rep: '    /* v8 不清 */' },
+
+  /* --- ⑪ 放行与返回条 --- */
+  { id: 'v9', name: 'ryGroupThirdLevelGuard 去掉按块放行（成组管路页点进去被自己拦住）',
+    anchor: '  if(window.__runyeTlBlock!=null)return false;',
+    rep: '  if(false)return false;' },
+
+  { id: 'v10', name: '三级页返回条 #grTlBackBar 消失（算完不知道算到谁头上）',
+    anchor: '  <div id="grTlBackBar" class="gr-tl-bar" style="display:none">',
+    rep: '  <div id="grTlBackBarX" class="gr-tl-bar" style="display:none">' },
+
+  { id: 'v11', name: '返回条上的「返回成组管路」按钮消失（进得去出不来）',
+    anchor: '    <button type="button" class="gr-tl-btn" id="grTlBackBtn"',
+    rep: '    <button type="button" class="gr-tl-btn" id="grTlBackBtnX"' },
+
+  /* --- ⑨ 新页位置与注册 --- */
+  { id: 'v12', name: '#grPipeSection 被改名/删除（成组管路页整页没了）',
+    anchor: '<section id="grPipeSection" class="ry-sec" data-ry-view="overview">',
+    rep: '<section id="grPipeSectionX" class="ry-sec" data-ry-view="overview">' },
+
+  { id: 'v13', name: '#grPipeSection 少了 .ry-sec（ryShowSection 扫不到 ⇒ 导航点了没反应）',
+    anchor: '<section id="grPipeSection" class="ry-sec" data-ry-view="overview">',
+    rep: '<section id="grPipeSection" class="ry-secX" data-ry-view="overview">' },
+
+  /* 注：⑨ 的「runye-nav.js 里要有入口」这条**无法**用改 index.html 的方式注入
+     （它读的是另一个文件）⇒ 由 tests/plot_merge.smoke.cjs 的 ③-k 直接对
+     runye-nav.js 现读现测，这里不重复。 */
+
+  /* --- ⑫ 汇总口径 --- */
+  { id: 'v14', name: '汇总不再分「各块明细」（只剩一个总数，看不出各块多少）',
+    anchor: '    h += \'<tr class="gr-grp"><td colspan="5">各块明细（互不串味，各块独立口径）</td></tr>\';',
+    rep: '    h += \'<tr class="gr-grp"><td colspan="5">全部（互不串味，各块独立口径）</td></tr>\';' },
+
+  { id: 'v15', name: '汇总不再有「整组总管」单独一组（总管被摊进各块）',
+    anchor: '    h += \'<tr class="gr-grp"><td colspan="5">整组总管</td></tr>\';',
+    rep: '    h += \'<tr class="gr-grp"><td colspan="5">总管</td></tr>\';' },
+
+  { id: 'v16', name: '汇总没有合计行（拿不出整组报价）',
+    anchor: '    h += \'<tr class="gr-sum"><td>合计</td><td>\'',
+    rep: '    h += \'<tr class="gr-sum"><td>总</td><td>\'' },
+
+  { id: 'v17', name: '合计行漏加总管长度（整组主管量偏小）',
+    anchor: '      fmt(tMain + tk, 1) + \'</td><td>\' + fmt(tBr, 1) + \'</td><td>\' + fmt(tSb, 1) + \'</td></tr>\';',
+    rep: '      fmt(tMain, 1) + \'</td><td>\' + fmt(tBr, 1) + \'</td><td>\' + fmt(tSb, 1) + \'</td></tr>\';' },
+
+  { id: 'v18', name: '★ 总管长度并进各块主管（正是用户担心的「串味」）',
+    anchor: '      tMain += ml; tBr += bl; tSb += sl;',
+    rep: '      tMain += ml; tMain += tk; tBr += bl; tSb += sl;' },
+
+  /* --- ⑬ 二级页「正在编辑的那一块」必须实时可见 ---
+     ★ 这一条是 _p1/_probe_group_work.cjs 的 G5c **实测**抓出来的真 bug
+       （静态契约当时没覆盖 ⇒ 补上；行为侧由 G5c 长期盯）。 */
+  { id: 'v19', name: '★ grSync 退回只读 slots[i]（二级页画完直接切过来 ⇒ 刚画的管看不见）',
+    anchor: '    var live = (B && B.groupLiveSlot) ? B.groupLiveSlot() : null;',
+    rep: '    var live = null;   /* v19 退回只读快照 */' },
+
+  { id: 'v20', name: '删掉 RunyeBridge.groupLiveSlot（组页拿不到实时快照）',
+    anchor: '    groupLiveSlot: function(){',
+    rep: '    groupLiveSlotRemoved: function(){' },
+
+  { id: 'v21', name: '0 块时面积显示 0.00 亩（像「有地块但面积为 0」）',
+    anchor: "    if ($('grTotalMu')) $('grTotalMu').textContent = n ? fmt(mu, 2) : '—';",
+    rep: "    if ($('grTotalMu')) $('grTotalMu').textContent = fmt(mu, 2);" }
 ];
 
 let caught = 0, missed = 0, drift = 0;

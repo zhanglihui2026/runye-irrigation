@@ -7,9 +7,16 @@
  */
 'use strict';
 const assert = require('node:assert');
+const fs = require('fs');
+const path = require('path');
+
+/* 跨页导航是 runye-nav.js 的 ITEMS（唯一出处）。它不参与「注入体检」（体检只改 index.html），
+   所以这里自己读一份即可 —— 不用把它塞进参数里让调用方多背一个包袱。 */
+const NAV_SRC = fs.readFileSync(path.join(__dirname, '..', 'runye-nav.js'), 'utf8');
 
 module.exports = function v193GroupEditContracts(INDEX_SRC, helpers) {
   const { stripComments, bodyOf, countIn } = helpers;
+  const ENHANCE_NAV_SRC = NAV_SRC;
   /* 用户原话（第四次）：「成组地块传到二级管路之后，进一步编辑的话，再给我一个切换按钮，
      这个单独编辑，跟三级管路编辑页面分开，否则我担心跟原来的一些计算规则跟逻辑搞混了。」
      用户拍板：① 逐块单独编辑 ② 先不让成组地块进三级页 ③ 水力和材料各块完全独立
@@ -22,12 +29,14 @@ module.exports = function v193GroupEditContracts(INDEX_SRC, helpers) {
      这里只钉住**结构性前提**，防止有人把结构改掉而行为探针恰好没覆盖到。 */
   const NC = stripComments(INDEX_SRC);
 
-  /* --- ① 切换控件与状态机存在且在载入时初始化 --- */
-  ['ppGroupEditWrap', 'ppGeWhole', 'ppGePerPlot', 'ppGePlotSel', 'ppGeTrunk'].forEach(function (id) {
+  /* --- ① 切换控件与状态机存在且在载入时初始化 ---
+     [v194] #ppGeTrunk 与 ppAddTrunkPipe 已按用户决策撤掉（总管统一在「成组管路」页编辑），
+     见下方 ⑤ 的**反向断言**。 */
+  ['ppGroupEditWrap', 'ppGeWhole', 'ppGePerPlot', 'ppGePlotSel'].forEach(function (id) {
     assert.ok(INDEX_SRC.indexOf('id="' + id + '"') > 0, '工具栏应有 #' + id);
   });
   ['ppInitGroupEdit', 'ppGroupActiveSubs', 'ppSetGroupMode', 'ppSelectGroupPlot',
-    'ppGroupEditBlocks', 'ppAddTrunkPipe', 'ppXformGroupAll'].forEach(function (fn) {
+    'ppGroupEditBlocks', 'ppXformGroupAll', 'ppDrawGroupTrunk'].forEach(function (fn) {
       assert.match(NC, new RegExp('function ' + fn + '\\('), '应有 ' + fn + '()');
     });
   /* ★ ppInitGroupEdit 必须在 ppLoadPolygon 里、且**早于** polyPts 之后的变换：
@@ -53,8 +62,8 @@ module.exports = function v193GroupEditContracts(INDEX_SRC, helpers) {
   /* --- ④ 整组态必须拦住块级编辑（只留总管 / 只读拾取） --- */
   assert.match(bodyOf(INDEX_SRC, 'ppGroupEditBlocks', 600), /ge\.mode!=='whole'/,
     'ppGroupEditBlocks 只在整组态生效（逐块态不能拦）');
-  assert.match(bodyOf(INDEX_SRC, 'ppGroupEditBlocks', 600), /mode==='trunk'\|\|mode==='pickPipe'/,
-    '整组态只放行「总管」与「管线拾取」（块级一律拦掉）');
+  assert.match(bodyOf(INDEX_SRC, 'ppGroupEditBlocks', 600), /mode!=='pickPipe'/,
+    '整组态只放行「管线拾取」（块级一律拦掉；总管已迁去成组管路页）');
   /* 拦了还不够，得有**消费点**：模式切换、画布落点、按钮置灰 —— 三处（缺一处就能绕） */
   const blockUses = (NC.match(/ppGroupEditBlocks\(/g) || []).length;
   assert.ok(blockUses >= 4, 'ppGroupEditBlocks 的消费点应 ≥ 4 处（定义1 + 模式切换 + 画布落点 + 按钮置灰），实际 ' + blockUses);
@@ -63,14 +72,22 @@ module.exports = function v193GroupEditContracts(INDEX_SRC, helpers) {
   assert.ok(bodyOf(INDEX_SRC, 'ppSyncGroupEditUI', 2600).indexOf("setAttribute('disabled','disabled')") >= 0,
     'ppSyncGroupEditUI 必须把块级按钮置灰（与其点了报错，不如根本点不动）');
 
-  /* --- ⑤ 总管是独立一层，绝不混进各块的统计（拍板 ③） --- */
-  const atp = bodyOf(INDEX_SRC, 'ppAddTrunkPipe', 600);
-  assert.match(atp, /ge\.trunkPipes\.push\(/, '总管必须落到 ge.trunkPipes（整组级）');
-  /* ★ 反向断言：绝不能 push 进 ppState 的任何一类管线 —— 那正是用户担心的「串味」 */
-  assert.ok(!/ppState\.(mainPipes|branchPipes|subBranchPipes)\.push\(/.test(atp),
-    'ppAddTrunkPipe 不得把总管 push 进 ppState 的管线数组（否则混进各块水力/材料）');
-  /* 施工图里总管要单独一层、且不进裁剪组（它本来就要穿过块间空隙） */
-  assert.match(NC, /id="ppTrunkLayer"/, '施工图应有独立的 #ppTrunkLayer');
+  /* --- ⑤ 总管：编辑入口唯一（成组管路页），二级页只剩只读渲染（v194 拍板 ③） ---
+     ★ 为什么要有反向断言：总管是**整组级**对象，二级页能画 + 新页也能画
+       ⇒ 同一份数据两个入口，必然改一处漏一处。这里钉死「二级页不能再有入口」。 */
+  assert.ok(!/id="ppGeTrunk"/.test(INDEX_SRC),
+    '二级页不得再有 #ppGeTrunk 按钮（总管编辑入口必须唯一：成组管路页）');
+  assert.ok(!/function ppAddTrunkPipe\(/.test(NC),
+    '二级页不得再有 ppAddTrunkPipe()（总管不再由二级页落线）');
+  assert.ok(!/ppState\.mode==='trunk'/.test(NC),
+    '二级页不得再有 trunk 模式（模式会带出画线入口，等于又把入口开回来了）');
+  /* 但只读渲染必须还在：二级施工图画的是「一张总图」，总管要在上面看得见 */
+  assert.match(NC, /id="ppTrunkLayer"/, '施工图应有独立的 #ppTrunkLayer（只读，不进裁剪组）');
+  assert.match(bodyOf(INDEX_SRC, 'ppDrawGroupTrunk', 700), /ge\.trunkPipes/,
+    'ppDrawGroupTrunk 应渲染 ge.trunkPipes（与成组管路页同一份数据）');
+  /* 迁移：历史数据（v193 在二级页画的总管）要能被新页接管，不能凭空消失 */
+  assert.match(bodyOf(INDEX_SRC, 'grSync', 2200), /ge\.trunkPipes/,
+    'grSync 必须迁移 __runyeGroupEdit.trunkPipes（旧数据不丢）');
 
   /* --- ⑥ 成组地块进不了三级页（拍板 ②）：三条路都要拦，缺一条就能绕进去 --- */
   assert.match(NC, /function ryIsGroupPlot\(\)/, '应有 ryIsGroupPlot（成组判定）');
@@ -94,4 +111,92 @@ module.exports = function v193GroupEditContracts(INDEX_SRC, helpers) {
   assert.match(gdw, /ge\.mode='whole'/, '出图前必须临时切成整组视图（否则画的是当前块的图）');
   assert.match(gdw, /ge\.mode=mode0/, '出完图必须把 mode 还原（否则编辑态被偷偷改掉）');
   assert.match(gdw, /finally\{|finally \{|finally\s*\{/, '还原必须放在 finally 里（中途 return / 抛错也要还原）');
+
+  /* =========================================================================
+     --- ⑨ ~ ⑫ [v194] 成组管路页 + 按块进入三级页 ---
+     ========================================================================= */
+
+  /* --- ⑨ 新页存在，且插在「二级管路」与「三级管路编辑」之间（工作流顺序） --- */
+  const iGr = INDEX_SRC.indexOf('<section id="grPipeSection"');
+  const iPp = INDEX_SRC.indexOf('<section id="pipePlanSection"');
+  const iTl = INDEX_SRC.indexOf('<section id="tlPipePlanSection"');
+  assert.ok(iGr > 0, '应有 #grPipeSection（成组管路页）');
+  assert.ok(iPp < iGr && iGr < iTl,
+    '#grPipeSection 必须位于二级与三级之间（二级逐块画管 → 本页总管 → 三级按块深入）');
+  assert.match(INDEX_SRC, /<section id="grPipeSection" class="ry-sec"/,
+    '#grPipeSection 必须带 .ry-sec（否则 ryShowSection 的 "main > .ry-sec" 扫不到它）');
+  /* 导航：runye-nav.js 是跨页共用的唯一出处，漏了这一项 = 整页没有入口 */
+  assert.match(ENHANCE_NAV_SRC, /hash:\s*'grPipeSection'/,
+    'runye-nav.js 的 ITEMS 里应有「成组管路」入口（跨页导航的唯一出处）');
+
+  /* --- ⑩ 按块进入三级页：三件事缺一不可 ---
+     tlAutoGenerate() 的输入只有两个：measuredPolygon（当单地块用）与
+     RunyeBridge.getZoneCuts()（内部读二级页的 ppState.polyPts）。⇒ 必须**同时**摆对：
+       a) measuredPolygon = 这一块的环
+       b) ppState.polyPts  = 这一块的环（靠 setGroupMode + selectGroupPlot）
+     ★★ 曾经这里写的是「selectGroupPlot 必须早于 measuredPolygon」—— 那是**恒真断言**：
+        ppSelectGroupPlot() 内部自己就会 ppApplySlot()，两条语句谁先谁后结果完全一样，
+        注入「交换顺序」只会让**源码文本**变红，行为一点没变（断言测的不是它声称的东西）。
+        ⇒ 改成下面三条各自独立可失效的断言，行为侧由 _p1/_probe_group_work.cjs 的 G6 实测。 */
+  const geb = bodyOf(INDEX_SRC, 'grEnterBlock', 1600);
+  assert.match(geb, /selectGroupPlot/, 'grEnterBlock 必须把二级页切到那一块');
+  /* ★ setGroupMode('perPlot') 不是装饰：ppSelectGroupPlot 只在 ge.mode==='perPlot'
+       时才 ppApplySlot()。若二级页停在**整组态**，光调 selectGroupPlot 只会改 ge.current，
+       ppState.polyPts 仍是外框 ⇒ getZoneCuts() 返回外框的分区网格，三级页分区全错。 */
+  assert.match(geb, /setGroupMode\(/, 'grEnterBlock 必须确保二级页处于逐块模式（否则 polyPts 还是外框）');
+  assert.match(geb, /measuredPolygon\s*=\s*b\.ring/, 'grEnterBlock 必须把 measuredPolygon 换成该块的环');
+  assert.match(geb, /__runyeTlBlock\s*=\s*i/, 'grEnterBlock 必须记下当前块号（供返回条与拦截放行用）');
+  /* ★ 隐藏的地雷：grSync() 会用 window.measuredPolygon 当整组外框的兜底。
+       若在「按块编辑中」刷新（此时 measuredPolygon 已是**某一块**的环），
+       W.frame 就被污染成那一块 ⇒ 返回成组页时外框丢失。
+       ⇒ 必须优先取二级页的 ge.framePts，只有它没有时才退回 measuredPolygon。 */
+  assert.match(bodyOf(INDEX_SRC, 'grSync', 2200), /ge\.framePts[\s\S]{0,160}?measuredPolygon/,
+    'grSync 必须优先用 ge.framePts 当整组外框（measuredPolygon 在按块编辑时会变成某一块）');
+  /* 返回：先存本块的三级结果，再恢复整组外框 —— 少了前者，换块回来结果就没了 */
+  const gbk = bodyOf(INDEX_SRC, 'grBackFromTl', 1400);
+  assert.match(gbk, /tlData\s*=\s*clone\(window\.tlDiagramData\)/, '返回时必须把本块的三级结果存档');
+  assert.match(gbk, /measuredPolygon\s*=\s*clone\(window\.__runyeGroupFrame\)/, '返回时必须恢复整组外框');
+  assert.match(gbk, /__runyeTlBlock\s*=\s*null/, '返回时必须清掉「按块编辑」标记（否则成组拦截永远放行）');
+
+  /* --- ⑪ 按块编辑时三级页必须放行，且界面上必须写明是第几块 --- */
+  assert.match(bodyOf(INDEX_SRC, 'ryGroupThirdLevelGuard', 700), /window\.__runyeTlBlock!=null/,
+    'ryGroupThirdLevelGuard 必须在「按块进入」时放行（此刻口径确实就是单地块）');
+  assert.match(INDEX_SRC, /id="grTlBackBar"/, '三级页应有「按块编辑」返回条（算完不知道算到谁头上就完了）');
+  assert.match(INDEX_SRC, /id="grTlBackBtn"/, '返回条上要有「返回成组管路」按钮');
+
+  /* --- ⑫ 汇总口径：各块明细 + 总管单独一行 + 合计（拍板 ④） --- */
+  const gmat = bodyOf(INDEX_SRC, 'grRenderMat', 2400);
+  assert.match(gmat, /各块明细/, '汇总必须分「各块明细」组');
+  assert.match(gmat, /整组总管/, '汇总必须有「整组总管」单独一组');
+  /* ★ 不能只写 /合计/ —— 空态提示文案里也有「分块明细与合计」四字，会把断言顶住
+     （v16 注入「把合计行改名」时契约仍全绿，就是这个原因）。必须钉到 gr-sum 那一行。 */
+  assert.match(gmat, /class="gr-sum"><td>合计<\/td>/, '汇总必须有合计行（且必须是 gr-sum 那一行）');
+  /* ★ 反向断言：总管长度绝不能并进任何一块的明细 —— 那正是「串味」 */
+  assert.ok(!/tMain\s*\+=\s*tk/.test(gmat),
+    '总管长度不得并进各块的主管合计（各块口径必须独立）');
+  assert.match(gmat, /tMain\s*\+\s*tk/, '合计行应把总管长度加进去（总价才拿得出来）');
+
+  /* =========================================================================
+     --- ⑬ [v194] 二级页「正在编辑的那一块」必须能被组页实时读到 ---
+     =========================================================================
+     ★★ 这条是 _p1/_probe_group_work.cjs 的 G5c 实测抓出来的真 bug：
+        grSync 原来只读 __runyeGroupEdit.slots[i]，而 slots[i] 只在
+        「切块 / 切模式」时才从 ppState 捕获一次。
+        ⇒ 用户在二级页画完管**直接切到成组管路页**，组页看到的还是切块前的快照，
+          刚画的管在总览和汇总里**都不出现**（实测：二级页 mainPipes=1，组页 slot=0）。
+        修法：RunyeBridge 暴露 groupLiveSlot()（内部调纯函数 ppCaptureSlot()），
+        grSync 对「当前正在编辑的那一块」优先取实时的一份。 */
+  assert.match(NC, /groupLiveSlot:\s*function/,
+    'RunyeBridge 应有 groupLiveSlot()（把二级页正在编辑的那一块取出来）');
+  const gsy = bodyOf(INDEX_SRC, 'grSync', 2600);
+  assert.match(gsy, /groupLiveSlot/, 'grSync 必须调 groupLiveSlot() 取实时快照');
+  /* ★ 正则要留空格：源码写的是 `i === liveIdx`（带空格），写成 /i===liveIdx/ 永远 0 命中。 */
+  assert.match(gsy, /i\s*===\s*liveIdx/, 'grSync 只对「当前正在编辑的那一块」用实时快照（其余仍读 slot）');
+  /* 反向：不得退回「只读 slots[i]」—— 那个 bug 的形状就是缺了 live 这一路 */
+  assert.ok(/live/.test(gsy) && /slot:\s*\(/.test(gsy),
+    'grSync 的 slot 取值必须是「实时优先、快照兜底」二选一结构');
+
+  /* 空态文案：0 块时面积要显示「—」而不是「0.00 亩」（后者像「有地块但面积为 0」） */
+  assert.match(bodyOf(INDEX_SRC, 'grRenderBar', 900), /n\s*\?\s*fmt\(mu,\s*2\)\s*:\s*'—'/,
+    'grRenderBar 在 0 块时面积应显示「—」');
 };

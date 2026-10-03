@@ -18,6 +18,10 @@
     { label: '地块绘制',     hash: 'areaTool',                 pre: 1 },
     { label: '在线地图',     href: 'runye-map-measure.html',   pre: 1 },
     { label: '二级管路',     hash: 'pipePlanSection',          pre: 1 },
+    /* [v194] 成组管路：整组总览 + 总管编辑 + 按块进入三级页。
+       ★ 仅成组地块才有意义 —— 非成组时该页显示空态提示，导航项保留（不玩"显隐猜谜"，
+       点进去看到一句明确的说明，比点了没反应强）。 */
+    { label: '成组管路',     hash: 'grPipeSection',       pre: 1, title: '成组地块：全组总览 + 总管编辑 + 按块进入三级管路设计' },
     { label: '三级管路编辑', hash: 'tlPipePlanSection',   pre: 1 },
     { label: '轴测图',       act: 'iso', page: 'index.html',   pre: 1, title: '三级管线轴测图（先「生成管线图」再点）' },
     { label: '经济指标分析', hash: 'threeDModelingSection', pre: 1, title: '管径经济指标分析：前期管材投入 vs 后期电费，找年均总成本最低的平衡点' },

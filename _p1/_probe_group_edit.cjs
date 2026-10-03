@@ -81,8 +81,9 @@ function makeInjectedCopy() {
   };
 
   if (INJ === 1 || INJ === 99) {
-    /* 整组态不再拦任何东西 ⇒ 块级按钮不会置灰 ⇒ B2 必须红 */
-    sub1("    return !(mode==='trunk'||mode==='pickPipe');",
+    /* 整组态不再拦任何东西 ⇒ 块级按钮不会置灰、画布也拦不住 ⇒ B2 必须红
+       [v194] 二级页已无总管模式 ⇒ 放行表里只剩 pickPipe */
+    sub1("    return mode!=='pickPipe';",
       "    return false; // [inject 1] 整组态不再拦块级编辑", '1');
   }
   if (INJ === 2 || INJ === 99) {
@@ -112,9 +113,11 @@ function makeInjectedCopy() {
       "    ge.slots.forEach(function(s,si){\n      if(Array.isArray(s.polyPts)&&si===ge.current)s.polyPts=s.polyPts.map(fn); // [inject 6] 只转当前块", '6');
   }
   if (INJ === 7 || INJ === 99) {
-    /* 总管改成塞进 ppState.mainPipes ⇒ 混进各块统计 ⇒ B6 必须红 */
-    sub1("    ge.trunkPipes.push(line.map(function(p){return{x:p.x,y:p.y};}));",
-      "    ppState.mainPipes.push(line.map(function(p){return{x:p.x,y:p.y};})); // [inject 7] 总管塞进 mainPipes", '7');
+    /* [v194] 二级页已不在 ppAddTrunkPipe 里落线，改注入**合并口径**本身：
+       ppCollectGroupAllPipes 把总管也算进合并视图 ⇒ 总管混进整组统计 ⇒ B6 必须红。
+       （B6 特意把 trunk 塞在「切回整组」之前，切整组才会跑这条合并路径。） */
+    sub1("    });\n    return out;",
+      "    });\n    (ge.trunkPipes||[]).forEach(function(l){out.main.push(l.map(function(p){return{x:p.x,y:p.y};}));}); // [inject 7] 总管混进合并视图\n    return out;", '7');
   }
 
   /* ⚠ 副本必须与 index.html 同目录：页面 css/js 是相对路径，放别处全 404。 */
@@ -309,36 +312,53 @@ const FIX = {
   check('B1c 每个子地块一份编辑槽（2 块）', b1.slots === 2, 'slots=' + b1.slots);
   check('B1d 子地块下拉已填充 2 项', b1.opts === 2, 'options=' + b1.opts);
 
-  /* ---------- B2 整组态：块级编辑被拦 ---------- */
-  console.log('\n— B2 整组态 = 总览（块级编辑禁用，只留总管）—');
-  const b2 = await page.evaluate(async () => {
+  /* ---------- B2 整组态：块级编辑被拦（[v194] 二级页不再有总管入口）---------- */
+  console.log('\n— B2 整组态 = 总览（块级编辑禁用，二级页不再有总管入口）—');
+  const b2 = await page.evaluate(() => {
     const q = (m) => document.querySelector('#ppToolbar .pp-btn[data-mode="' + m + '"]');
     /* ★ 只断言**页面上真的存在**的模式按钮（subbranch / pickPipe 没有对应按钮，
        写成 null 会把断言拖成永远的“缺失”，反而掩盖真正的回归）。 */
     const modes = ['main', 'branch', 'source', 'valve', 'maskPipe', 'adjustCut'];
     const out = {}; let present = 0;
     modes.forEach(function (m) { const b = q(m); if (b) { present++; out[m] = b.disabled; } else out[m] = 'MISSING'; });
-    const trunk = document.getElementById('ppGeTrunk');
-    /* 兜底：先切到允许的模式（总管），再硬点「主管」，断言切不过去 */
-    document.getElementById('ppGeTrunk').click();
-    await new Promise((r) => setTimeout(r, 250));
-    const modeBefore = window.RunyeBridge.state.mode;
-    const bm = q('main'); if (bm) bm.click();
-    await new Promise((r) => setTimeout(r, 250));
-    const modeAfter = window.RunyeBridge.state.mode;
-    return {
-      disabled: out, present: present,
-      trunkShown: !!trunk && getComputedStyle(trunk).display !== 'none',
-      modeBefore: modeBefore, modeAfter: modeAfter
-    };
+    /* [v194] 总管编辑入口已迁到「成组管路」页 ⇒ 二级页**任何模式下都不该**再有入口。
+       ★ 断言「没有」而不是「隐藏」：留着按钮就有哪天被重新接上线的可能，
+         而「隐藏」的按钮在别的模式下又会冒出来 —— 那正是「同一份数据两个入口」。 */
+    return { disabled: out, present: present, trunkGone: document.getElementById('ppGeTrunk') === null };
   });
-  console.log('        disabled = ' + JSON.stringify(b2.disabled) + ' / 点主管：' + b2.modeBefore + ' → ' + b2.modeAfter);
+  console.log('        disabled = ' + JSON.stringify(b2.disabled) +
+    ' / 存在按钮 ' + b2.present + ' 个 / 无总管入口 ' + b2.trunkGone);
   const allBlocked = Object.keys(b2.disabled).every((m) => b2.disabled[m] === true);
   check('B2a 整组态：主管/支管/水源/阀门/遮蔽管线/调网格 全部禁用（' + b2.present + ' 个按钮都在）',
     allBlocked && b2.present >= 6, JSON.stringify(b2.disabled));
-  check('B2b 整组态：「总管」按钮可见（总管是整组级对象）', b2.trunkShown === true);
-  check('B2c 兜底：硬点「主管」也切不过去（仍停在 trunk）',
-    b2.modeBefore === 'trunk' && b2.modeAfter === 'trunk', b2.modeBefore + ' → ' + b2.modeAfter);
+  check('B2b [v194] 二级页没有总管入口（总管统一在「成组管路」页编辑）', b2.trunkGone === true);
+
+  /* B2c/B2d 兜底：按钮 disable 只是 UI 层 —— 绕过 ppSetMode 直接把 state.mode 改成 'main'，
+     再用**真实鼠标**点画布，仍应落不上点（真正的闸门在 ppCanvas 的 mousedown 里）。
+     ★ 反向对照：必须同时确认 mousedown **真的到达了画布** ——
+       否则「没落上点」可能只是坐标没点中，是假绿。 */
+  const b2c = await page.evaluate(async () => {
+    const g = window.__ge, st = g.st();
+    /* ★ 为什么不用 puppeteer 的真实鼠标点击（page.mouse.click）：
+       画布**正中心**在 2 块夹具下恰好落在分区线上 ⇒ mousedown 走 dragCut 分支、
+       mouseup 执行 ppCommitMerge() ⇒ **改掉了分区布局**，后面 B4/B5/B6 全线被污染
+       （实测：真实点击后 B5 的 5 条断言全红，跳过就全绿）。
+       ⇒ 改用与 B5（正向对照）**完全相同**的合成事件机制，唯一变量只有「整组守卫」。
+     ★ 落点也要躲开分区线：选地块左上角 (20,20)，远离任何内部界线。 */
+    window.__evCount = 0;
+    const c = document.getElementById('ppCanvas');
+    c.addEventListener('mouseup', function () { window.__evCount++; }, true);
+    window.RunyeBridge.state.mode = 'main';      // 最强攻击：连 ppSetMode 都绕过
+    const n0 = st.mainPipes.length;
+    g.draw([{ x: 20, y: 20 }, { x: 80, y: 20 }]);
+    await new Promise((r) => setTimeout(r, 300));
+    return { ev: window.__evCount, mode: st.mode, cur: st.currentLine.length, n0: n0, n: st.mainPipes.length };
+  });
+  console.log('        强制 mode=' + b2c.mode + ' → 合成点击画布：mouseup 命中 ' + b2c.ev +
+    ' 次 / currentLine ' + b2c.cur + ' / mainPipes ' + b2c.n0 + '→' + b2c.n);
+  check('B2c 反向对照：事件确实到达了画布（否则下一条是假绿）', b2c.ev >= 2, 'mouseup×' + b2c.ev);
+  check('B2d 兜底：绕过按钮直接置 mode=main，点画布仍落不上点',
+    b2c.cur === 0 && b2c.n === b2c.n0, 'currentLine=' + b2c.cur + ' mainPipes ' + b2c.n0 + '→' + b2c.n);
 
   /* ---------- B4 画布：整组 vs 逐块 到底画了几块 ---------- */
   console.log('\n— B4 画布像素：整组画两块 / 逐块只画当前块 —');
@@ -386,19 +406,20 @@ const FIX = {
   const b3 = await page.evaluate(() => {
     const q = (m) => document.querySelector('#ppToolbar .pp-btn[data-mode="' + m + '"]');
     const sel = document.getElementById('ppGePlotSel');
-    const trunk = document.getElementById('ppGeTrunk');
     return {
       selShown: !!sel && getComputedStyle(sel).display !== 'none',
       mainDisabled: q('main') ? q('main').disabled : null,
       branchDisabled: q('branch') ? q('branch').disabled : null,
-      trunkShown: !!trunk && getComputedStyle(trunk).display !== 'none',
+      /* [v194] 逐块态同样不该有总管入口 —— 总管是**整组级**对象，
+         逐块态画出来的「总管」根本不知道该算到哪个块头上。 */
+      trunkGone: document.getElementById('ppGeTrunk') === null,
       polyPts0: JSON.stringify(window.RunyeBridge.state.polyPts)
     };
   });
-  console.log('        ' + JSON.stringify({ selShown: b3.selShown, mainDisabled: b3.mainDisabled, branchDisabled: b3.branchDisabled, trunkShown: b3.trunkShown }));
+  console.log('        ' + JSON.stringify({ selShown: b3.selShown, mainDisabled: b3.mainDisabled, branchDisabled: b3.branchDisabled, trunkGone: b3.trunkGone }));
   check('B3a 逐块态：子地块下拉出现', b3.selShown === true);
   check('B3b 逐块态：主管/支管解禁（能编辑了）', b3.mainDisabled === false && b3.branchDisabled === false);
-  check('B3c 逐块态：「总管」按钮隐藏（总管属于整组级）', b3.trunkShown === false);
+  check('B3c [v194] 逐块态也没有总管入口（入口唯一：成组管路页）', b3.trunkGone === true);
 
   /* ---------- B5 各块完全独立（拍板 ③）---------- */
   console.log('\n— B5 各块编辑结果互不串味 —');
@@ -410,12 +431,25 @@ const FIX = {
   });
   const b5 = await page.evaluate(async () => {
     const g = window.__ge, st = g.st();
+    const dbg = {};
     /* 走真实路径：点「主管」按钮 → 在画布落两点 → 双击收线 */
     document.querySelector('#ppToolbar .pp-btn[data-mode="main"]').click();
     await new Promise((r) => setTimeout(r, 200));
     const mode = st.mode;
+    dbg.ppM = (function () {
+      const b = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+      st.polyPts.forEach(function (q) {
+        b.minX = Math.min(b.minX, q.x); b.minY = Math.min(b.minY, q.y);
+        b.maxX = Math.max(b.maxX, q.x); b.maxY = Math.max(b.maxY, q.y);
+      });
+      return b;
+    })();
+    dbg.c1 = g.toClient(60, 200); dbg.c2 = g.toClient(240, 200);
+    dbg.rect = (function () { const r = document.getElementById('ppCanvas').getBoundingClientRect(); return { w: r.width, h: r.height, l: r.left, t: r.top }; })();
     g.draw([{ x: 60, y: 200 }, { x: 240, y: 200 }]);
     await new Promise((r) => setTimeout(r, 300));
+    dbg.curAfterDraw = st.currentLine.length;
+    dbg.mainAfterDraw = st.mainPipes.length;
     const n0 = st.mainPipes.length;
     /* 切到块 1：那里不该有这根管 */
     const sel = document.getElementById('ppGePlotSel');
@@ -426,7 +460,7 @@ const FIX = {
     sel.value = '0'; sel.dispatchEvent(new Event('change', { bubbles: true }));
     await new Promise((r) => setTimeout(r, 400));
     const n0b = st.mainPipes.length;
-    return { mode: mode, n0: n0, n1: n1, n0b: n0b,
+    return { mode: mode, n0: n0, n1: n1, n0b: n0b, dbg: dbg,
              slot0: (g.ge().slots[0].mainPipes || []).length,
              slot1: (g.ge().slots[1].mainPipes || []).length };
   });
@@ -438,35 +472,44 @@ const FIX = {
   check('B5e 两份 slot 各自记账（1 / 0）', b5.slot0 === 1 && b5.slot1 === 0,
     'slot0=' + b5.slot0 + ' slot1=' + b5.slot1);
 
-  /* ---------- B6 总管不进各块统计 ---------- */
-  console.log('\n— B6 总管：独立一层，不进各块的水力/材料 —');
+  /* ---------- B6 总管不进各块统计 ----------
+     [v194] 二级页已**不能画**总管（入口在「成组管路」页）。这里改测后半段 ——
+     **只读渲染 + 不串味**：直接给 __runyeGroupEdit.trunkPipes 塞一根
+     （等价于新页画完回填 / v193 历史数据迁移过来的情况），
+     断言它只出现在 #ppTrunkLayer，不进任何一块的统计。 */
+  console.log('\n— B6 总管：独立一层，不进各块的水力/材料（[v194] 二级页只读渲染）—');
   const b6 = await page.evaluate(async () => {
     const g = window.__ge, st = g.st();
-    /* 回到整组态（总管只在整组态可画） */
+    /* ★ 必须在**切回整组之前**把总管塞进去：切整组会跑 ppCollectGroupAllPipes
+       合并各 slot，合并口径一旦把 trunkPipes 算进去，这里立刻看得出来
+       （塞在切完之后才塞 ⇒ 合并已经跑完 ⇒ 断言会假绿）。 */
+    g.ge().trunkPipes = [[{ x: 150, y: 380 }, { x: 480, y: 380 }]];   // 横穿块间空隙
     document.getElementById('ppGeWhole').click();
     await new Promise((r) => setTimeout(r, 500));
-    const mergedMain = st.mainPipes.length;      // 合并视图：块0 的那 1 根
-    document.getElementById('ppGeTrunk').click();
-    await new Promise((r) => setTimeout(r, 300));
-    const mode = st.mode;
-    g.draw([{ x: 150, y: 380 }, { x: 480, y: 380 }]);   // 横穿块间空隙
-    await new Promise((r) => setTimeout(r, 300));
-    const afterMain = st.mainPipes.length;
+    const mergedMain = st.mainPipes.length;
+    const mode = st.mode;                        // 整组态应落在「管线拾取」，不是 trunk
     const trunkN = (g.ge().trunkPipes || []).length;
     /* 回到逐块块0：它的主管数必须还是 1（总管没混进去） */
     document.getElementById('ppGePerPlot').click();
     await new Promise((r) => setTimeout(r, 400));
     const perMain = st.mainPipes.length;
-    return { mode: mode, mergedMain: mergedMain, afterMain: afterMain, trunkN: trunkN, perMain: perMain,
-             inSlot: (g.ge().slots[0].mainPipes || []).length };
+    const inSlotsAny = g.ge().slots.map(function (s) { return (s.mainPipes || []).length; });
+    return {
+      mode: mode, mergedMain: mergedMain, trunkN: trunkN, perMain: perMain,
+      inSlot: (g.ge().slots[0].mainPipes || []).length, inSlotsAny: inSlotsAny,
+      slotsSum: inSlotsAny.reduce(function (a, n) { return a + n; }, 0)
+    };
   });
   console.log('        ' + JSON.stringify(b6));
-  check('B6a 点「总管」真的进到 trunk 模式（前置闸门）', b6.mode === 'trunk', 'mode=' + b6.mode);
-  check('B6b 总管画上了（1 根）', b6.trunkN === 1, 'trunk=' + b6.trunkN);
-  check('B6c 总管**没有**混进 mainPipes（画前后根数不变）', b6.mergedMain === b6.afterMain,
-    b6.mergedMain + ' → ' + b6.afterMain);
+  check('B6a [v194] 整组态落在「管线拾取」而不是 trunk（二级页已无总管模式）',
+    b6.mode === 'pickPipe', 'mode=' + b6.mode);
+  check('B6b 前置闸门：总管数据确实塞进去了（1 根）', b6.trunkN === 1, 'trunk=' + b6.trunkN);
+  check('B6c 合并视图 = 各块之和（总管**没有**混进整组统计）', b6.mergedMain === b6.slotsSum,
+    'merged=' + b6.mergedMain + ' Σslots=' + b6.slotsSum);
   check('B6d 回逐块(0)：该块主管仍是 1 根（总管不算它的）', b6.perMain === 1 && b6.inSlot === 1,
     'state=' + b6.perMain + ' slot=' + b6.inSlot);
+  check('B6e 总管也没进任何一份 slot（各 slot 根数 [1,0]）',
+    JSON.stringify(b6.inSlotsAny) === '[1,0]', JSON.stringify(b6.inSlotsAny));
 
   /* ---------- B9 施工图 = 一张总图（拍板 ⑤）---------- */
   console.log('\n— B9 施工图：逐块态出图仍是一张总图 —');
@@ -495,7 +538,7 @@ const FIX = {
   });
   console.log('        ' + JSON.stringify(b9));
   check('B9a 逐块态出图 = 一张总图（2 条子路径 = 两个成员环都在）', b9.mCount === 2, 'M×' + b9.mCount);
-  check('B9b 总图里有总管层（1 根）', b9.trunkPaths === 1, 'paths=' + b9.trunkPaths);
+  check('B9b 总图里有总管层（1 根，只读渲染来自 ge.trunkPipes）', b9.trunkPaths === 1, 'paths=' + b9.trunkPaths);
   check('B9c 出完图 ppState 还原到当前块（不会停在外框上）', b9.polyIsBlock0 === true);
   check('B9d 出完图当前块的主管数不变（出图是只读的）', b9.mainPipes === 1, 'n=' + b9.mainPipes);
 

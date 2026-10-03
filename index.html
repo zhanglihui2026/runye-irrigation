@@ -3087,6 +3087,107 @@ body > .ry-nav .main-header{display:none!important}
   #tlPipePlanSection .pp-grip:hover::before,
   #tlPipePlanSection .pp-grip.dragging::before{background:var(--g-600);width:4px;margin-left:-2px}
 }
+/* ===== [v194] 04b 成组管路页 #grPipeSection =====
+   版式与二级/三级同源（左参数栏 ｜ 图纸区），但不接 .pp-grip 列宽拖拽、不接底部 ry-tabs。 */
+#grPipeSection > .pp-body{
+  flex:0 0 auto;
+  height:calc(100vh - var(--fn-nav-h));
+  min-height:520px;box-sizing:border-box;display:grid;
+  grid-template-columns:var(--pp-side-w,clamp(272px,20vw,318px)) minmax(0,1fr);
+  column-gap:0;row-gap:0;padding:10px 14px 8px;
+}
+#grPipeSection > .pp-body>.pp-side{grid-column:1}
+#grPipeSection > .pp-body>.pp-stage{grid-column:2}
+#grPipeSection .pp-side,
+#grPipeSection .pp-stage{min-width:0;min-height:0}
+#grPipeSection .pp-side{overflow:auto}
+#grPipeSection .pp-stage{display:flex;flex-direction:column}
+#grPipeSection #grCanvasWrap{flex:1 1 auto;position:relative;min-height:0}
+#grPipeSection #grCanvas{display:block;width:100%;height:100%}
+/* 卡片：标题 + 内容，左栏里竖向堆叠 */
+.gr-card{border:1px solid rgba(31,41,55,.14);border-radius:8px;padding:8px 9px;margin:0 0 8px;background:rgba(255,255,255,.5)}
+.gr-card-title{font-weight:700;font-size:12px;color:#1f2937;margin-bottom:6px}
+.gr-row{display:flex;align-items:center;gap:5px;margin:4px 0;font-size:11.5px}
+.gr-label{color:#64748b;white-space:nowrap}
+.gr-val{font-weight:700;color:#0f766e;min-width:36px;display:inline-block;text-align:right}
+/* #94a3b8 在浅底上只有 2.56:1（verify_text_contrast 实测不达标）⇒ 与 .gr-label 同色系调深 */
+.gr-unit{color:#5f6b7a;font-size:10.5px}
+.gr-sel{height:24px;font:inherit;font-size:11.5px;padding:0 4px;border:1px solid rgba(31,41,55,.18);border-radius:6px;background:#fff}
+.gr-btns{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.gr-btn{height:24px!important;padding:0 7px!important;font-size:11.5px!important}
+.gr-btn.active{background:rgba(124,58,237,.18);border-color:rgba(124,58,237,.5);color:#5b21b6;font-weight:600}
+.gr-hint{color:#5f6b7a;font-size:10.5px;line-height:1.5;margin-top:5px}
+.gr-empty{color:#5f6b7a;font-size:11px;line-height:1.6}
+/* 子地块列表 */
+.gr-block{margin:5px 0;padding:6px 7px;border:1px solid rgba(31,41,55,.12);border-radius:6px;background:rgba(255,255,255,.7)}
+.gr-block.cur{border-color:rgba(124,58,237,.55);background:rgba(124,58,237,.07)}
+.gr-block-hd{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:#1f2937}
+.gr-block-mu{color:#0f766e;font-weight:700}
+.gr-block-meta{color:#64748b;font-size:10.5px;margin:3px 0 5px}
+.gr-block-btns{display:flex;gap:4px}
+.gr-block-btns .gr-btn{flex:1 1 0}
+.gr-tag{font-size:10px;padding:1px 5px;border-radius:4px;background:rgba(22,163,74,.14);color:#166534}
+.gr-tag.no{background:rgba(100,116,139,.14);color:#64748b}
+/* 材料汇总表 */
+.gr-mat table{width:100%;border-collapse:collapse;font-size:11px}
+.gr-mat th,.gr-mat td{padding:3px 4px;text-align:right;border-bottom:1px solid rgba(31,41,55,.1)}
+.gr-mat th:first-child,.gr-mat td:first-child{text-align:left}
+.gr-mat .gr-sum td{font-weight:700;border-top:2px solid rgba(31,41,55,.25);border-bottom:0}
+.gr-mat .gr-grp td{text-align:left;color:#64748b;font-weight:600;background:rgba(31,41,55,.04)}
+/* 三级页顶部的「按块编辑」返回条 */
+.gr-tl-bar{display:flex;align-items:center;gap:8px;margin:0 0 8px;padding:6px 10px;
+  border:1px solid rgba(124,58,237,.35);border-radius:8px;background:rgba(124,58,237,.08);
+  font-size:12px;color:#5b21b6}
+.gr-tl-tag{font-weight:700;padding:2px 7px;border-radius:5px;background:#7c3aed;color:#fff;font-size:10.5px;white-space:nowrap}
+.gr-tl-sep{color:#a78bfa}
+.gr-tl-btn{margin-left:auto;height:26px;padding:0 10px;font:inherit;font-size:11.5px;cursor:pointer;
+  border:1px solid rgba(124,58,237,.45);border-radius:6px;background:#fff;color:#5b21b6;white-space:nowrap}
+.gr-tl-btn:hover{background:#7c3aed;color:#fff}
+
+/* —— [v194] 新页复用二级页的 .pp-* 时，必须**整体改写成浅色卡片风** ——
+   .pp-plan-bar / .pp-plan-label / .pp-plan-val / .pp-btn-ghost / .pp-tool-hint /
+   .pp-empty / .pp-legend-item 这些类的配色是**为二级页的深色舞台设计的**
+   （如 .pp-plan-label 是 rgba(255,255,255,.4)、.pp-plan-val 是 #bbf7d0），
+   而它们的深色背景写在 #pipePlanSection 作用域里 —— 新页复用后就成了
+   「亮色文字 + 无深色底」⇒ 满屏 1:1 的低对比文字。
+   ★ verify_text_contrast 实测：v193 基线 7/7 通过，v194 新页一次性引入 21 处不达标。
+   ★ 为什么不直接复制 #pipePlanSection 那套作用域规则：那套规则的底色绑死在
+     rgb(39,46,63) 的深色舞台上，搬过来只会把整页刷黑、与 .gr-* 的卡片风格打架。
+     新页是「总览页」，视觉上本就该与二级页区分开。 —— */
+#grPipeSection .pp-side{
+  align-self:start;max-height:100%;
+  display:flex;flex-direction:column;gap:8px;
+  padding:9px;border-radius:12px;
+  background:linear-gradient(180deg,#f8fbf9 0%,#f2f7f4 100%);
+  border:1px solid #dde8e1;
+}
+#grPipeSection .pp-side>*{flex:0 0 auto}
+#grPipeSection .pp-stage{background:#fff;border:1px solid #e4ece7;border-radius:12px;padding:9px}
+#grPipeSection .pp-plan-bar{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  padding:8px 11px;margin:0 0 8px;border-radius:10px;
+  background:#fff;border:1px solid #e4ece7;font-size:11px;
+}
+#grPipeSection .pp-plan-item{color:#4b5563}
+#grPipeSection .pp-plan-label{color:#5b6570}
+#grPipeSection .pp-plan-val{color:#0f766e;font-size:12px;font-weight:700}
+#grPipeSection .pp-toolbar{
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+  padding:6px 8px;margin-bottom:6px;border-radius:8px;
+  background:#f4f8f6;border:1px solid #e4ece7;
+}
+#grPipeSection .pp-tool-hint{color:#4b5563;font-size:11.5px}
+#grPipeSection .pp-sep{width:1px;height:20px;background:rgba(31,41,55,.18);margin:0 2px}
+#grPipeSection .pp-btn-ghost{
+  background:#fff;color:#1f2937;border:1px solid rgba(31,41,55,.22);
+  border-radius:8px;cursor:pointer;font-family:inherit;
+}
+#grPipeSection .pp-btn-ghost:hover{background:#eef4f1;color:#1f2937}
+#grPipeSection .pp-empty{color:#4b5563}
+#grPipeSection .pp-empty .big-icon{opacity:.35}
+#grPipeSection .pp-legend{padding:8px 4px 0}
+#grPipeSection .pp-legend-item{color:#4b5563}
+
 #tlPipePlanSection .pp-side,
 #tlPipePlanSection .pp-stage{min-width:0;min-height:0}
 #tlPipePlanSection .pp-side{
@@ -3962,8 +4063,8 @@ body.ry-tool #pipePlanSection #ppToolbar>.pp-group-edit>.pp-ge-row{display:flex;
    只允许在「标题条」与「工具模式栏位齐平」两处（布局类属性带 !important 会破坏响应式断点）。
    这里的选择器本身已有 2 个 id + 4 个类，特异性足够压过 .pp-btn-ghost 的内边距，无需 !important。 */
 body.ry-tool #pipePlanSection #ppToolbar>.pp-group-edit>.pp-ge-row>.pp-ge-mode{flex:1 1 0;min-width:0;height:26px;padding:0}
-body.ry-tool #pipePlanSection #ppToolbar>.pp-group-edit>.pp-ge-sel,
-body.ry-tool #pipePlanSection #ppToolbar>.pp-group-edit>#ppGeTrunk{
+/* [v194] 原 #ppGeTrunk 已从工具栏移除（总管统一在「成组管路」页编辑），这里只剩下拉 */
+body.ry-tool #pipePlanSection #ppToolbar>.pp-group-edit>.pp-ge-sel{
   flex:1 1 100%;width:100%;max-width:none;height:26px;
 }
 /* 微调箭头组（仅「调网格」模式出现）：四键并排等分 */
@@ -6093,7 +6194,10 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
         <button type="button" class="pp-btn-ghost pp-ge-mode" id="ppGePerPlot" data-ge="perPlot">逐块</button>
       </span>
       <select class="pp-ge-sel" id="ppGePlotSel" style="display:none" title="选择当前要编辑的子地块"></select>
-      <button type="button" class="pp-btn-ghost pp-ge-mode" id="ppGeTrunk" data-mode="trunk" style="display:none" title="总管：跨子地块手动连接，不自动吸附，不计入各块的水力/材料">总管</button>
+      <!-- [v194] 原「总管」按钮已按用户决策撤掉：总管统一在「成组管路」页（#grPipeSection）编辑。
+           理由：总管是**整组级**对象，在二级页能画、新页也能画 ⇒ 同一份数据两个入口，
+           必然出现改一处漏一处。这里只保留**只读显示**（ppDrawGroupTrunk / 施工图 #ppTrunkLayer），
+           编辑入口唯一。历史数据（__runyeGroupEdit.trunkPipes）由新页 grSync() 一次性迁移。 -->
     </span>
     <span class="pp-sep"></span>
     <button class="pp-btn-generate" id="ppGenerate">生成施工图</button>
@@ -6134,8 +6238,100 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
   </div><!-- /.pp-body -->
 </section>
 
-<!-- ===== 04 三级管路规划与施工简图（移至主页面，位于二级简图下方） ===== -->
+<!-- ===== 04b 成组管路（v194）：整组总览 + 总管编辑 + 按块进入三级页 =====
+     放在「二级管路」与「三级管路编辑」之间，正好对上工作流：
+       二级页逐块画主管/支管 → 本页看全组、画总管 → 点某一块进三级页做深度设计。
+     ★ 为什么要单独一页（而不是把整组塞进三级页）：三级页的数据模型 tlDiagramData
+       是**单个地块**的（一个 poly + 一套 zones + 一套管网），全站 88 处引用它。
+       整组进去等于要把那 88 处在「多地块」口径上重过一遍。
+       本页只做**组级**的事（总览 + 总管 + 汇总），块级的重活仍走三级页、按块分别进。
+     ★ 本页不带 .ry-tabs（不参与底部视图切换条），也不带 .pp-grip（不做列宽拖拽）：
+       少一套机制就少一处要 verify_ry_tool 纳管的 DOM。 -->
+<section id="grPipeSection" class="ry-sec" data-ry-view="overview">
+  <div class="pp-body">
+  <aside class="pp-side" id="grSide">
+    <div class="pp-plan-bar" id="grBar" style="margin-bottom:8px">
+      <span class="pp-plan-item"><span class="pp-plan-label">成组地块</span><span class="pp-plan-val" id="grPlotName">—</span></span>
+      <span class="pp-plan-item"><span class="pp-plan-label">子地块</span><span class="pp-plan-val" id="grBlockCount">0</span>块</span>
+      <span class="pp-plan-item"><span class="pp-plan-label">总面积</span><span class="pp-plan-val" id="grTotalMu">0</span>亩</span>
+    </div>
+
+    <!-- 总管：整组级对象。它跨块、走在块间空隙里，不属于任何一块，
+         所以**不进任何一块的水力与材料**（v193 拍板 ③），只在汇总里单独一行。 -->
+    <div class="gr-card" id="grTrunkCard">
+      <div class="gr-card-title">总管</div>
+      <div class="gr-row">
+        <span class="gr-label">管径</span>
+        <select id="grTrunkDn" class="gr-sel" title="总管管径（外径 mm）"></select>
+        <span class="gr-unit" id="grTrunkMat">—</span>
+      </div>
+      <div class="gr-row">
+        <span class="gr-label">长度</span><span class="gr-val" id="grTrunkLen">0.0</span><span class="gr-unit">m</span>
+        <span class="gr-label" style="margin-left:10px">根数</span><span class="gr-val" id="grTrunkN">0</span>
+      </div>
+      <div class="gr-btns">
+        <button type="button" class="pp-btn-ghost gr-btn" id="grTrunkDraw" title="进入画总管：在图上点击加点，双击结束，右键退回上一点">✎ 画总管</button>
+        <button type="button" class="pp-btn-ghost gr-btn" id="grTrunkAuto" title="自动连线：从水源点连到各块主管的最近端点">⚡ 自动生成</button>
+        <button type="button" class="pp-btn-ghost gr-btn" id="grTrunkDel" title="删除选中的总管（先在图上点选一根）">🗑 删除选中</button>
+        <button type="button" class="pp-btn-ghost gr-btn" id="grTrunkClear" title="清除全部总管">清空</button>
+      </div>
+      <div class="gr-hint" id="grTrunkHint">总图里点一根总管可选中；画总管时点击加点、双击结束、右键退回上一点。</div>
+    </div>
+
+    <!-- 子地块列表：每块一条，带「进入三级页」入口 -->
+    <div class="gr-card" id="grBlockCard">
+      <div class="gr-card-title">子地块（逐块进入三级管路设计）</div>
+      <div id="grBlocks" class="gr-blocks">
+        <div class="gr-empty">当前不是成组地块。请先在在线地图把两个及以上地块成组后回传。</div>
+      </div>
+    </div>
+
+    <!-- 材料汇总：各块明细 + 总管 + 全组合计 -->
+    <div class="gr-card" id="grMatCard">
+      <div class="gr-card-title">材料汇总</div>
+      <div id="grMat" class="gr-mat">
+        <div class="gr-empty">各块在三级页生成管线图后，这里列出分块明细与合计。</div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="pp-stage">
+    <div class="pp-toolbar" id="grToolbar">
+      <span class="pp-tool-hint" id="grHint">整组总览：各块已布的管线为只读，总管可在本页编辑</span>
+      <span class="pp-sep"></span>
+      <button type="button" class="pp-btn-ghost" id="grFit" title="缩放至适应窗口">⤢ 适应</button>
+      <button type="button" class="pp-btn-ghost" id="grZoomOut" title="缩小">－</button>
+      <button type="button" class="pp-btn-ghost" id="grZoomIn" title="放大">＋</button>
+    </div>
+    <div class="pp-canvas-wrap" id="grCanvasWrap">
+      <canvas id="grCanvas"></canvas>
+      <div class="pp-empty" id="grEmpty">
+        <div class="big-icon">🧩</div>
+        <p>成组地块回传后，这里显示全组总览与总管</p>
+      </div>
+    </div>
+    <div class="pp-legend" id="grLegend">
+      <span class="pp-legend-item"><i style="background:#185FA5"></i>各块主管</span>
+      <span class="pp-legend-item"><i style="background:#16a34a"></i>各块支管</span>
+      <span class="pp-legend-item"><i style="background:#7c3aed"></i>总管（本页编辑）</span>
+      <span class="pp-legend-item"><i style="background:#f59e0b;border-radius:50%;width:10px;height:10px"></i>水源</span>
+    </div>
+  </div>
+  </div><!-- /.pp-body -->
+</section>
+
+  <!-- ===== 04 三级管路规划与施工简图（移至主页面，位于二级简图下方） ===== -->
 <section id="tlPipePlanSection" class="ry-sec" data-ry-view="ws">
+  <!-- [v194] 按块进入三级页时的返回条：只在「从成组管路页进来」时显示。
+       ★ 必须有这条：三级页按单地块口径算，用户在这一页改的是**某一块**，
+         界面上必须一直写明「现在是第几块」，否则算完不知道算到谁头上了。 -->
+  <div id="grTlBackBar" class="gr-tl-bar" style="display:none">
+    <span class="gr-tl-tag">成组·按块编辑</span>
+    <strong id="grTlBlockName">—</strong>
+    <span class="gr-tl-sep">·</span>
+    <span id="grTlBlockInfo">—</span>
+    <button type="button" class="gr-tl-btn" id="grTlBackBtn" title="保存本块的三级结果并返回成组管路页">◀ 返回成组管路</button>
+  </div>
   <!-- 标题栏（05 徽章 +「三级管路规划与施工简图」+ 副标题「多分区联合灌溉 · 一键生成管线图」）
        已按要求取消，section 直接从参数条开始。
        恢复：把下面这段放回本 section 首行即可，配套 CSS 原值见样式区注释。
@@ -12644,6 +12840,10 @@ function ryIsGroupPlot(){
 }
 function ryGroupThirdLevelGuard(){
   if(!ryIsGroupPlot())return false;
+  /* [v194] 放行「按块进入」：从成组管路页进来时，measuredPolygon 已换成**某一块**的环，
+     二级页也已切到那一块 ⇒ 此刻三级页的口径确实就是单地块，不该拦。
+     ★ 判断依据只能是这个显式标记，不能用别的状态反推 —— 反推必然在某种组合下判错。 */
+  if(window.__runyeTlBlock!=null)return false;
   var n=window.__runyeSubPlots.length;
   alert('当前地块是「成组地块」（'+n+' 块）。\n\n'
     +'成组地块暂不进入三级管路设计：三级按「一个地块 = 一套分区 + 一套管网」计算，\n'
@@ -12651,6 +12851,14 @@ function ryGroupThirdLevelGuard(){
     +'请先在二级管路页用「逐块」模式分别编辑每一块；\n'
     +'或到在线地图把成组地块拆成单个地块后再进三级。');
   return true;
+}
+
+/* [v194] 二级页成组态变化 → 同步「成组管路」页。
+   两页看的是同一份 __runyeGroupEdit，但二级页改了之后新页不会自己知道
+   （新页只在切入时刷新）⇒ 这里主动推一次。
+   ★ 只推刷新、不推切换：否则在二级页干活时被莫名跳走。 */
+function grSyncSecondLevelToGroupPage(){
+  try{ if(typeof window.grRefreshGroupPage==='function') window.grRefreshGroupPage(); }catch(e){}
 }
 
 function rySetTab(sectionId, view) {
@@ -14033,6 +14241,22 @@ ppPullLiftDh();                                              // 首屏对齐一�
       return ppGetZoneCuts(b,zl);
     },
     getPlanDims: function(){ return ppGetPlanDims(ppGetBounds()); },
+    /* [v194] 供「成组管路」页驱动二级页的整组/逐块状态机（pp* 全在 IIFE 里，外面够不着）。
+       成组管路页要「按块进入三级页」，必须先让二级页切到那一块 —— 因为三级页的
+       分区网格走 getZoneCuts()（读 ppState.polyPts），不切就会拿错那一块的分区。 */
+    groupEdit: function(){ return window.__runyeGroupEdit||null; },
+    setGroupMode: function(m){ if(typeof ppSetGroupMode==='function') ppSetGroupMode(m); },
+    selectGroupPlot: function(i){ if(typeof ppSelectGroupPlot==='function') ppSelectGroupPlot(i); },
+    /* [v194] 把二级页**此刻正在编辑**的那一块取出来（逐块态才有意义；整组态是合并视图）。
+       ★ 为什么必须有它：ge.slots[i] 只在「切块 / 切模式」时才从 ppState 捕获，
+         用户在二级页画完管**直接切到成组管路页**时，slots[i] 还是旧的 ⇒ 刚画的管看不见。
+         （_p1/_probe_group_work.cjs 的 G5c 实测抓到：二级页 mainPipes=1，组页 slot=0。）
+       ppCaptureSlot() 是纯函数（只读 ppState 造一个新对象），不会动 ge.slots。 */
+    groupLiveSlot: function(){
+      var ge=window.__runyeGroupEdit;
+      if(!ge||!ge.active||ge.mode!=='perPlot') return null;
+      try{ return ppCaptureSlot(); }catch(e){ return null; }
+    },
     /* v98d：三级画布拖动「组边界线」→ 复用二级的分区线位置（写回共享 cutSnap），二级/三级同步。
        allowMerge=false 时不触发「拖到邻线即合并」，以保护手动分组的区号不失效。 */
     cutDragBegin: function(){ try{ ppPushHistory(); }catch(e){} },
@@ -14297,10 +14521,11 @@ ppPullLiftDh();                                              // 首屏对齐一�
       ppEnsurePipeIds('main');ppEnsurePipeIds('branch');ppEnsurePipeIds('subbranch');
       ppState.history=[];
     }
-    /* 模式跟着切：整组态只剩「总管」可画，逐块态没有总管（总管是整组级对象）。
+    /* 模式跟着切：[v194] 整组态没有任何可画的块级模式了（总管已迁去「成组管路」页），
+       统一落到「管线拾取」（只读量长度）；逐块态回到「主管」。
        不跟着切的话，切完仍停在被禁用的模式上，画面上看不出为什么点不动。 */
-    if(mode==='whole'){ if(ppGroupEditBlocks(ppState.mode))ppState.mode='trunk'; }
-    else { if(ppState.mode==='trunk')ppState.mode='main'; }
+    if(mode==='whole'){ if(ppGroupEditBlocks(ppState.mode))ppState.mode='pickPipe'; }
+    else { if(ppState.mode==='pickPipe')ppState.mode='main'; }
     ppState.currentLine=[]; ppState.hoverPt=null; ppState.dragCut=null; ppState.hoverCut=null;
     ppResetCutSnap('');
     ppUpdateTransform(); ppRender();
@@ -14367,20 +14592,17 @@ ppPullLiftDh();                                              // 首屏对齐一�
     return true;
   }
 
-  /* 整组态：块级编辑一律拦掉，只留「总管」（整组级对象）与「管线拾取」（只读量长度）。
-     ★ 不拦的后果：整组态画的管线落在哪个块、算进谁的水力，无从判断 —— 正是用户担心的串味。 */
+  /* 整组态：块级编辑一律拦掉，只留「管线拾取」（只读量长度）。
+     ★ 不拦的后果：整组态画的管线落在哪个块、算进谁的水力，无从判断 —— 正是用户担心的串味。
+     [v194] 总管改为在「成组管路」页统一编辑，二级页不再有总管模式 ⇒ 放行表里去掉 'trunk'。 */
   function ppGroupEditBlocks(mode){
     var ge=window.__runyeGroupEdit;
     if(!ge||!ge.active||ge.mode!=='whole')return false;
-    return !(mode==='trunk'||mode==='pickPipe');
+    return mode!=='pickPipe';
   }
-  /* 总管：成组地块专属的跨块连接层，独立于 ppState（不进任何一块的水力/材料统计）。 */
-  function ppAddTrunkPipe(line){
-    var ge=window.__runyeGroupEdit;
-    if(!ge||!ge.active)return;
-    if(!Array.isArray(ge.trunkPipes))ge.trunkPipes=[];
-    ge.trunkPipes.push(line.map(function(p){return{x:p.x,y:p.y};}));
-  }
+  /* 总管：成组地块专属的跨块连接层，独立于 ppState（不进任何一块的水力/材料统计）。
+     [v194] 这里只剩**只读渲染** —— 编辑入口已迁到「成组管路」页（#grPipeSection），
+     二级页不再提供 ppAddTrunkPipe / trunk 模式，避免同一份数据两个入口。 */
   function ppDrawGroupTrunk(){
     var ge=window.__runyeGroupEdit;
     if(!ge||!ge.active||!ge.trunkPipes||!ge.trunkPipes.length)return;
@@ -14396,11 +14618,12 @@ ppPullLiftDh();                                              // 首屏对齐一�
     var bWhole=document.getElementById('ppGeWhole');
     var bPer=document.getElementById('ppGePerPlot');
     var sel=document.getElementById('ppGePlotSel');
-    var bTrunk=document.getElementById('ppGeTrunk');
     var on=!!(ge&&ge.active&&ge.slots&&ge.slots.length>=2);
     if(!wrap)return;
     wrap.style.display=on?'':'none';
-    if(!on)return;
+    if(!on){ grSyncSecondLevelToGroupPage(); return; }
+    /* [v194] 成组态有变化就同步给「成组管路」页（它俩看的是同一份 __runyeGroupEdit） */
+    grSyncSecondLevelToGroupPage();
     if(bWhole)bWhole.classList.toggle('active',ge.mode==='whole');
     if(bPer)bPer.classList.toggle('active',ge.mode==='perPlot');
     if(sel){
@@ -14417,9 +14640,6 @@ ppPullLiftDh();                                              // 首屏对齐一�
       sel.value=String(ge.current);
       if(keep&&sel.value!==keep)sel.value=String(ge.current);
     }
-    /* 总管属于「整组级」对象 —— 只有整组态能一眼看到全部块，所以只在整组态给按钮。
-       （总管本身在两种模式下都画，见 ppDrawGroupTrunk。） */
-    if(bTrunk)bTrunk.style.display=(ge.mode==='whole')?'':'none';
     /* 整组态：把块级编辑按钮（主管/支管/一级管/水源/阀门/调网格）置灰禁用 ——
        与其点了再弹窗报错，不如根本点不动，从交互上杜绝「在整组态画了不知算哪块的管」。 */
     document.querySelectorAll('#ppToolbar [data-mode]').forEach(function(b){
@@ -15331,9 +15551,8 @@ ppPullLiftDh();                                              // 首屏对齐一�
 
     // Current line being drawn
     if(ppState.currentLine.length>0){
-      /* [v193] 'trunk' 与已落线的总管同色同宽（#7c3aed / 5），画的时候就能认出来 */
-      var c=ppState.mode==='main'?'#185FA5':ppState.mode==='branch'?'#16a34a':ppState.mode==='subbranch'?'#185FA5':ppState.mode==='trunk'?'#7c3aed':'rgba(0,0,0,.35)';
-      var w=ppState.mode==='main'?4:ppState.mode==='branch'?2.5:ppState.mode==='subbranch'?2:ppState.mode==='trunk'?5:1.5;
+      var c=ppState.mode==='main'?'#185FA5':ppState.mode==='branch'?'#16a34a':ppState.mode==='subbranch'?'#185FA5':'rgba(0,0,0,.35)';
+      var w=ppState.mode==='main'?4:ppState.mode==='branch'?2.5:ppState.mode==='subbranch'?2:1.5;
       ppDrawLine(ppState.currentLine,c,w);
       // Vertices
       ppCtx.fillStyle=c;
@@ -15361,13 +15580,13 @@ ppPullLiftDh();                                              // 首屏对齐一�
 
     // Mode hint
     ppCtx.fillStyle='rgba(0,0,0,.45)';ppCtx.font='10px sans-serif';ppCtx.textAlign='left';
-    var mt=ppState.mode==='main'?'主管':ppState.mode==='branch'?'支管':ppState.mode==='subbranch'?'一级管':ppState.mode==='source'?'水源':ppState.mode==='pickPipe'?'管线拾取':ppState.mode==='maskPipe'?'遮蔽管线':ppState.mode==='adjustCut'?'调网格':ppState.mode==='trunk'?'总管':'阀门';
+    var mt=ppState.mode==='main'?'主管':ppState.mode==='branch'?'支管':ppState.mode==='subbranch'?'一级管':ppState.mode==='source'?'水源':ppState.mode==='pickPipe'?'管线拾取':ppState.mode==='maskPipe'?'遮蔽管线':ppState.mode==='adjustCut'?'调网格':'阀门';
     var lt=ppState.lineDrawMode==='ortho'?'横竖锁定':'自由线段';
     var modeHint=ppState.mode==='pickPipe'?'模式: '+mt+'  ·  点击主管、支管或一级管自动计算长度  ·  回退撤销上一步  ·  滚轮缩放  ·  空格+拖拽平移':ppState.mode==='maskPipe'?'模式: '+mt+'  ·  点击管线切换遮蔽，遮蔽后不进入施工图  ·  回退撤销上一步  ·  滚轮缩放  ·  空格+拖拽平移':ppState.mode==='adjustCut'?'模式: '+mt+'  ·  拖拽圆点移动分区线  ·  ↑↓←→微调选中线(0.3m/次)  ·  回退撤销上一步  ·  滚轮缩放  ·  空格+拖拽平移':'模式: '+mt+'  ·  '+lt+'  ·  点击添加点  ·  双击结束  ·  回退撤销上一步  ·  滚轮缩放  ·  空格+拖拽平移';
     ppCtx.fillText(modeHint,10,20);
 
     // Length tooltip while drawing
-    if(ppState.currentLine.length>0&&ppState.hoverPt&&ppState.mouseWorld&&(ppState.mode==='main'||ppState.mode==='branch'||ppState.mode==='subbranch'||ppState.mode==='trunk')){
+    if(ppState.currentLine.length>0&&ppState.hoverPt&&ppState.mouseWorld&&(ppState.mode==='main'||ppState.mode==='branch'||ppState.mode==='subbranch')){
       var last=ppState.currentLine[ppState.currentLine.length-1];
       var mw=ppGetConstrainedPoint(ppState.mouseWorld);
       var segLen=ppLineLen([last,mw]);
@@ -15618,7 +15837,6 @@ ppPullLiftDh();                                              // 首屏对齐一�
     if(ppState.mode==='main')ppAddPipe('main',ppState.currentLine);
     else if(ppState.mode==='branch')ppAddPipe('branch',ppState.currentLine);
     else if(ppState.mode==='subbranch')ppAddPipe('subbranch',ppState.currentLine);
-    else if(ppState.mode==='trunk')ppAddTrunkPipe(ppState.currentLine);
   }
   /* [v193] 模式切换的统一入口（原为模式按钮点击里的内联逻辑）。
      「总管」按钮是 .pp-btn-ghost.pp-ge-mode，不在 '#ppToolbar .pp-btn[data-mode]' 选择器里，
@@ -15930,11 +16148,9 @@ ppPullLiftDh();                                              // 首屏对齐一�
     var bWhole=document.getElementById('ppGeWhole');
     var bPer=document.getElementById('ppGePerPlot');
     var sel=document.getElementById('ppGePlotSel');
-    var bTrunk=document.getElementById('ppGeTrunk');
     if(bWhole)bWhole.addEventListener('click',function(){ ppSetGroupMode('whole'); });
     if(bPer)bPer.addEventListener('click',function(){ ppSetGroupMode('perPlot'); });
     if(sel)sel.addEventListener('change',function(){ ppSelectGroupPlot(parseInt(this.value,10)||0); });
-    if(bTrunk)bTrunk.addEventListener('click',function(){ ppSetMode('trunk'); });
   })();
 
   // 任务K（2026-09-26）：分区面积锁定按钮的 UI 同步与自动解锁
@@ -18189,6 +18405,8 @@ bindUI();
       try{
         if(d.merged && Array.isArray(d.subPlots) && d.subPlots.length && window.__runyeGeoBase){
           var _b=window.__runyeGeoBase, _mlat=6378137*Math.PI/180, _cos=Math.cos(_b.refLat*Math.PI/180);
+          /* [v194] 成组管路页要显示成组地块的名（列表里的「→ 回传」带的是 d.name） */
+          window.__runyeGroupName = d.name || '成组地块';
           window.__runyeSubPlots = d.subPlots.map(function(s, si){
             var ll=s.polyLatLng||[];
             return {
@@ -18402,6 +18620,9 @@ threeDModelingSection:'经济指标分析 · 入口预留（方案确定后上�
     /* v142：材料清单页数据取三级简图口径（管长/实际管径/分区阀与三通数量），
        图面改动后切入本页时重渲染一次，保证统计与三级简图同源最新。 */
     try{ if(sec && sec.id==='detailsSection' && typeof window.render==='function') window.render(); }catch(err){}
+    /* [v194] 切入成组管路页时重排一次：只调刷新、不调切换（否则递归）。
+       隐藏期间画布宽高量到 0，不重排就是一张空白。 */
+    try{ if(sec && sec.id==='grPipeSection' && typeof window.grRefreshGroupPage==='function') window.grRefreshGroupPage(); }catch(err){}
     if(typeof window.ryStatusUpdate==='function') window.ryStatusUpdate(sec);
   }
   window.ryShowSection=ryShowSection;
@@ -22660,6 +22881,464 @@ var ISO_FITTING_UI_OFF = true;
     fr.readAsText(file, 'utf-8');
     e.target.value = '';
   });
+})();
+</script>
+
+<script>
+/* ============================================================================
+   [v194 2026-10-03] 04b「成组管路」页：整组总览 + 总管编辑 + 按块进入三级页
+   ----------------------------------------------------------------------------
+   用户原话：「二级管路逐块编辑完之后，要跳转……我要在新的页面进一步编辑，
+             二级页面逐块生成主管及支管，进入新的页面进一步编辑 生成总管。」
+   用户拍板：① 混合：新建组级页做总管与总览，三级页按块分别进入
+             ② 总管 = 画线 + 定管径 + 进材料清单
+             ③ 二级页的总管按钮移到本页统一管理
+             ④ 既出各块明细，也汇总一张总清单
+
+   ★★ 为什么三级页能「零改动按块进入」：
+       tlAutoGenerate() 的输入只有两个：
+         · window.measuredPolygon              —— 被当成**单个地块**的多边形
+         · window.RunyeBridge.getZoneCuts()    —— 分区网格，内部读二级页 ppState.polyPts
+       而 v193 的逐块切换本来就会把 ppState.polyPts 换成那一块的环。
+       ⇒ 「按块进三级页」= 切到该块 → 把同一条环写进 measuredPolygon → 生成。
+       三级页内部一行都不用改（全站 88 处引用 tlDiagramData 的地方也都不用改）。
+
+   ★ 本页只做**组级**的事。块级的重活（自动布管 / 管径 / 水力 / 系统图 / 轴测图）
+     全部仍走三级页，按块分别进 —— 这正是「各块完全独立」的结构保证。
+   ============================================================================ */
+(function () {
+  'use strict';
+  function $(id) { return document.getElementById(id); }
+  function clone(v) { try { return JSON.parse(JSON.stringify(v === undefined ? null : v)); } catch (e) { return null; } }
+  function num(v, d) { v = parseFloat(v); return isFinite(v) ? v : (d || 0); }
+  function fmt(v, n) { if (!isFinite(v)) return '—'; return v.toFixed(n === undefined ? 1 : n); }
+  function dist(a, b) { var dx = a.x - b.x, dy = a.y - b.y; return Math.sqrt(dx * dx + dy * dy); }
+  function sumLen(lines) {
+    var t = 0;
+    (lines || []).forEach(function (l) {
+      for (var i = 0; i + 1 < l.length; i++) t += dist(l[i], l[i + 1]);
+    });
+    return t;
+  }
+
+  /* ---------------- 数据层 ---------------- */
+  var W = { blocks: [], trunk: { lines: [], dn: 110 }, frame: null, sel: -1, draw: null, mode: 'pick' };
+  window.__runyeGroupWork = W;
+
+  /* 从二级页接管：各块环 / 各块的编辑结果 / 外框；并把 v193 在二级页画的总管迁过来 */
+  function grSync() {
+    var subs = window.__runyeSubPlots, ge = window.__runyeGroupEdit;
+    if (!subs || subs.length < 2) { W.blocks = []; W.frame = null; return false; }
+    var old = W.blocks.slice();
+    W.frame = clone((ge && ge.framePts && ge.framePts.length) ? ge.framePts : (window.measuredPolygon || []));
+    /* ★ 二级页**正在编辑**的那一块：slots[i] 是上次切块/切模式时的快照，
+       用户在二级页画完管直接切过来时它还没更新 ⇒ 必须优先取实时的一份。 */
+    var B = window.RunyeBridge;
+    var live = (B && B.groupLiveSlot) ? B.groupLiveSlot() : null;
+    var liveIdx = live && ge ? ge.current : -1;
+    W.blocks = subs.map(function (s, i) {
+      var prev = old[i] || {};
+      return {
+        id: s.id, name: s.name || ('子地块' + (i + 1)),
+        mu: (typeof s.mu === 'number' && isFinite(s.mu)) ? s.mu : (s.sqm ? s.sqm / 666.67 : 0),
+        ring: (s.poly || []).map(function (q) { return { x: +q.x, y: +q.y }; }),
+        slot: (i === liveIdx) ? live : ((ge && ge.slots[i]) ? clone(ge.slots[i]) : null),
+        tlData: prev.tlData || null,     /* 该块跑过的三级结果：按块存档，换块不丢 */
+        tlAt: prev.tlAt || null
+      };
+    });
+    /* v193 的总管存在 __runyeGroupEdit.trunkPipes；v194 起归本页管，旧数据一次性迁过来 */
+    if (!W.trunk.lines.length && ge && ge.trunkPipes && ge.trunkPipes.length) {
+      W.trunk.lines = clone(ge.trunkPipes);
+    }
+    if (W.sel >= W.trunk.lines.length) W.sel = -1;
+    return true;
+  }
+
+  /* ---------------- 画布：整组总览 ---------------- */
+  var cvs = $('grCanvas'), ctx = cvs ? cvs.getContext('2d') : null;
+  var view = { minX: 0, minY: 0, w: 1, h: 1, scale: 1, ox: 0, oy: 0 };
+
+  function grResize() {
+    if (!cvs) return;
+    var r = cvs.parentNode.getBoundingClientRect();
+    var dpr = window.devicePixelRatio || 1;
+    var w = Math.max(1, Math.round(r.width)), h = Math.max(1, Math.round(r.height));
+    if (cvs.width !== Math.round(w * dpr) || cvs.height !== Math.round(h * dpr)) {
+      cvs.width = Math.round(w * dpr); cvs.height = Math.round(h * dpr);
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    view.cw = w; view.ch = h;
+  }
+  function grFit() {
+    var pts = [];
+    W.blocks.forEach(function (b) { pts = pts.concat(b.ring); });
+    (W.trunk.lines || []).forEach(function (l) { pts = pts.concat(l); });
+    if (!pts.length && W.frame) pts = W.frame;
+    if (!pts.length) return;
+    var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    pts.forEach(function (p) {
+      if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+    });
+    view.minX = minX; view.minY = minY; view.w = Math.max(1, maxX - minX); view.h = Math.max(1, maxY - minY);
+    grFitScale();
+  }
+  function grFitScale() {
+    var pad = 34;
+    var s = Math.min(((view.cw || 600) - pad * 2) / view.w, ((view.ch || 400) - pad * 2) / view.h);
+    view.scale = isFinite(s) && s > 0 ? s : 1;
+    view.ox = ((view.cw || 600) - view.w * view.scale) / 2 - view.minX * view.scale;
+    view.oy = ((view.ch || 400) - view.h * view.scale) / 2 - view.minY * view.scale;
+  }
+  function toC(mx, my) { return { x: mx * view.scale + view.ox, y: my * view.scale + view.oy }; }
+  function toW(cx, cy) { return { x: (cx - view.ox) / view.scale, y: (cy - view.oy) / view.scale }; }
+
+  function strokeLines(lines, color, w) {
+    ctx.strokeStyle = color; ctx.lineWidth = w; ctx.setLineDash([]);
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    (lines || []).forEach(function (l) {
+      if (!l || l.length < 2) return;
+      ctx.beginPath();
+      l.forEach(function (p, i) { var q = toC(p.x, p.y); i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y); });
+      ctx.stroke();
+    });
+  }
+  function curBlock() {
+    var i = window.__runyeTlBlock;
+    return (i == null) ? null : W.blocks[i];
+  }
+  function grRender() {
+    if (!ctx) return;
+    grResize();
+    ctx.fillStyle = '#dfe4e2'; ctx.fillRect(0, 0, view.cw || cvs.width, view.ch || cvs.height);
+    var cb = curBlock();
+    /* 各块环：整组态都画出来，当前正在编辑的那一块高亮 */
+    W.blocks.forEach(function (b) {
+      if (!b.ring || b.ring.length < 3) return;
+      ctx.beginPath();
+      b.ring.forEach(function (p, i) { var q = toC(p.x, p.y); i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y); });
+      ctx.closePath();
+      ctx.fillStyle = (b === cb) ? 'rgba(124,58,237,.12)' : 'rgba(26,71,49,.06)';
+      ctx.fill();
+      ctx.strokeStyle = (b === cb) ? '#7c3aed' : 'rgba(26,71,49,.65)';
+      ctx.lineWidth = (b === cb) ? 2.5 : 2; ctx.setLineDash([]); ctx.stroke();
+    });
+    /* 各块已布的管线：只读（块级的编辑一律回二级页逐块模式 / 三级页，不在本页改） */
+    W.blocks.forEach(function (b) {
+      var s = b.slot || {};
+      strokeLines(s.mainPipes, 'rgba(24,95,165,.85)', 3);
+      strokeLines(s.branchPipes, 'rgba(22,163,74,.85)', 2);
+      strokeLines(s.subBranchPipes, 'rgba(24,95,165,.55)', 1.6);
+      if (s.source) {
+        var q = toC(s.source.x, s.source.y);
+        ctx.fillStyle = '#f59e0b'; ctx.beginPath(); ctx.arc(q.x, q.y, 6, 0, Math.PI * 2); ctx.fill();
+      }
+    });
+    /* 总管：本页唯一可编辑的图层 */
+    (W.trunk.lines || []).forEach(function (l, i) {
+      strokeLines([l], (i === W.sel) ? '#f59e0b' : '#7c3aed', (i === W.sel) ? 7 : 5);
+    });
+    /* 正在画的那根 */
+    if (W.draw && W.draw.length) {
+      strokeLines([W.draw], '#7c3aed', 4);
+      ctx.fillStyle = '#7c3aed';
+      W.draw.forEach(function (p) {
+        var q = toC(p.x, p.y); ctx.beginPath(); ctx.arc(q.x, q.y, 3, 0, Math.PI * 2); ctx.fill();
+      });
+    }
+  }
+
+  /* 点选总管：点到折线任一段 ±6px 内就算选中 */
+  function grPick(wp) {
+    var best = -1, bd = 6 / view.scale;
+    (W.trunk.lines || []).forEach(function (l, i) {
+      for (var k = 0; k + 1 < l.length; k++) {
+        var a = l[k], b = l[k + 1];
+        var vx = b.x - a.x, vy = b.y - a.y, len2 = vx * vx + vy * vy;
+        var t = len2 ? ((wp.x - a.x) * vx + (wp.y - a.y) * vy) / len2 : 0;
+        t = t < 0 ? 0 : (t > 1 ? 1 : t);
+        var d = Math.sqrt((wp.x - (a.x + vx * t)) ** 2 + (wp.y - (a.y + vy * t)) ** 2);
+        if (d < bd) { bd = d; best = i; }
+      }
+    });
+    return best;
+  }
+
+  /* ---------------- 总管自动生成 ----------------
+     规则：取一个公共水源点（各块里第一个有水源的；都没有就用外框底边中点），
+           从它连到每一块「主管的最近端点」。只连各自那一块，不跨块串。 */
+  function grAutoTrunk() {
+    if (!W.blocks.length) return;
+    var src = null;
+    W.blocks.forEach(function (b) { if (!src && b.slot && b.slot.source) src = { x: b.slot.source.x, y: b.slot.source.y }; });
+    if (!src) {
+      var minX = Infinity, maxX = -Infinity, maxY = -Infinity;
+      (W.frame || []).forEach(function (p) {
+        if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x; if (p.y > maxY) maxY = p.y;
+      });
+      if (!isFinite(minX)) return;
+      src = { x: (minX + maxX) / 2, y: maxY + 12 };
+    }
+    var out = [];
+    W.blocks.forEach(function (b) {
+      var s = b.slot || {}, pts = [];
+      (s.mainPipes || []).forEach(function (l) { if (l && l.length) { pts.push(l[0]); pts.push(l[l.length - 1]); } });
+      if (!pts.length) return;
+      var best = pts[0], bd = Infinity;
+      pts.forEach(function (p) { var d = dist(p, src); if (d < bd) { bd = d; best = p; } });
+      out.push([{ x: src.x, y: src.y }, { x: best.x, y: best.y }]);
+    });
+    W.trunk.lines = out; W.sel = -1;
+    grRender(); grRenderTrunk(); grRenderMat();
+  }
+
+  /* ---------------- 面板渲染 ---------------- */
+  function grRenderBar() {
+    var n = W.blocks.length, mu = 0;
+    W.blocks.forEach(function (b) { mu += num(b.mu, 0); });
+    if ($('grPlotName')) $('grPlotName').textContent = W.blocks.length ? (window.__runyeGroupName || '成组地块') : '—';
+    if ($('grBlockCount')) $('grBlockCount').textContent = String(n);
+    /* 没有成组地块时显示「—」而不是「0.00 亩」—— 后者会让人以为「有地块、面积为 0」 */
+    if ($('grTotalMu')) $('grTotalMu').textContent = n ? fmt(mu, 2) : '—';
+    if ($('grEmpty')) $('grEmpty').style.display = W.blocks.length ? 'none' : 'block';
+  }
+  function grRenderTrunk() {
+    var len = sumLen(W.trunk.lines), n = (W.trunk.lines || []).length;
+    if ($('grTrunkLen')) $('grTrunkLen').textContent = fmt(len, 1);
+    if ($('grTrunkN')) $('grTrunkN').textContent = String(n);
+    if ($('grTrunkMat')) $('grTrunkMat').textContent = 'Ø' + W.trunk.dn + ' mm PE';
+    if ($('grTrunkDraw')) $('grTrunkDraw').classList.toggle('active', W.mode === 'draw');
+  }
+  function grRenderBlocks() {
+    var box = $('grBlocks'); if (!box) return;
+    if (!W.blocks.length) {
+      box.innerHTML = '<div class="gr-empty">当前不是成组地块。请先在在线地图把两个及以上地块成组后回传。</div>';
+      return;
+    }
+    box.innerHTML = '';
+    W.blocks.forEach(function (b, i) {
+      var s = b.slot || {};
+      var ml = sumLen(s.mainPipes), bl = sumLen(s.branchPipes);
+      var d = document.createElement('div');
+      d.className = 'gr-block' + (window.__runyeTlBlock === i ? ' cur' : '');
+      d.innerHTML =
+        '<div class="gr-block-hd"><span>' + esc(b.name) + '</span>' +
+        '<span class="gr-block-mu">' + fmt(num(b.mu, 0), 2) + ' 亩</span></div>' +
+        '<div class="gr-block-meta">主管 ' + fmt(ml, 1) + ' m ／ 支管 ' + fmt(bl, 1) + ' m' +
+        (b.tlData ? ' ／ <span class="gr-tag">三级已生成</span>' : ' ／ <span class="gr-tag no">三级未生成</span>') + '</div>' +
+        '<div class="gr-block-btns">' +
+        '<button type="button" class="pp-btn-ghost gr-btn" data-act="tl" data-i="' + i + '">▶ 进入三级页</button>' +
+        '<button type="button" class="pp-btn-ghost gr-btn" data-act="l2" data-i="' + i + '">✎ 二级改这块的管</button>' +
+        '</div>';
+      box.appendChild(d);
+    });
+  }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
+
+  /* 材料汇总：各块明细 + 总管 + 合计。
+     ★ 只汇总**长度**，不编造价 —— 造价要等各块在三级页算完才有口径，这里不臆造金额。 */
+  function grRenderMat() {
+    var box = $('grMat'); if (!box) return;
+    if (!W.blocks.length) {
+      box.innerHTML = '<div class="gr-empty">各块在三级页生成管线图后，这里列出分块明细与合计。</div>';
+      return;
+    }
+    var rows = [], tMain = 0, tBr = 0, tSb = 0;
+    W.blocks.forEach(function (b) {
+      var s = b.slot || {};
+      var ml = sumLen(s.mainPipes), bl = sumLen(s.branchPipes), sl = sumLen(s.subBranchPipes);
+      tMain += ml; tBr += bl; tSb += sl;
+      rows.push({ name: b.name, mu: num(b.mu, 0), m: ml, b: bl, s: sl });
+    });
+    var tk = sumLen(W.trunk.lines);
+    var h = '<table><thead><tr><th>分项</th><th>亩</th><th>主管 m</th><th>支管 m</th><th>一级管 m</th></tr></thead><tbody>';
+    h += '<tr class="gr-grp"><td colspan="5">各块明细（互不串味，各块独立口径）</td></tr>';
+    rows.forEach(function (r) {
+      h += '<tr><td>' + esc(r.name) + '</td><td>' + fmt(r.mu, 2) + '</td><td>' + fmt(r.m, 1) + '</td><td>' + fmt(r.b, 1) + '</td><td>' + fmt(r.s, 1) + '</td></tr>';
+    });
+    h += '<tr class="gr-grp"><td colspan="5">整组总管</td></tr>';
+    h += '<tr><td>总管 Ø' + W.trunk.dn + '</td><td>—</td><td>' + fmt(tk, 1) + '</td><td>—</td><td>—</td></tr>';
+    h += '<tr class="gr-sum"><td>合计</td><td>' + fmt(rows.reduce(function (a, r) { return a + r.mu; }, 0), 2) + '</td><td>' +
+      fmt(tMain + tk, 1) + '</td><td>' + fmt(tBr, 1) + '</td><td>' + fmt(tSb, 1) + '</td></tr>';
+    h += '</tbody></table>';
+    box.innerHTML = h;
+  }
+  function grRefreshUI() { grRenderBar(); grRenderTrunk(); grRenderBlocks(); grRenderMat(); grRender(); }
+
+  /* ---------------- 按块进入三级页 ---------------- */
+  function grEnterBlock(i) {
+    var b = W.blocks[i]; if (!b || !b.ring || b.ring.length < 3) return;
+    var B = window.RunyeBridge;
+    /* ① 先让二级页切到这一块 —— 三级页的分区网格走 RunyeBridge.getZoneCuts()，
+          它内部读二级页的 ppState.polyPts；不切就拿到别的块的分区。 */
+    if (B && B.setGroupMode) { try { B.setGroupMode('perPlot'); } catch (e) { } }
+    if (B && B.selectGroupPlot) { try { B.selectGroupPlot(i); } catch (e) { } }
+    /* ② measuredPolygon 换成这一块的环 —— tlAutoGenerate 把它当**单个地块**用 */
+    if (!window.__runyeGroupFrame) window.__runyeGroupFrame = clone(W.frame);
+    window.measuredPolygon = b.ring.map(function (p) { return { x: p.x, y: p.y }; });
+    /* ③ 放行三级页的成组拦截：此刻口径确实就是单地块 */
+    window.__runyeTlBlock = i;
+    grShowTl();
+  }
+  function grShowTl() {
+    try { if (typeof rySetTab === 'function') rySetTab('tlPipePlanSection', 'ws'); } catch (e) { }
+    try { if (window.ryShowSection) window.ryShowSection($('tlPipePlanSection'), null); } catch (e) { }
+    try { if (typeof tlAutoGenerate === 'function') tlAutoGenerate({ scroll: false }); } catch (e) { }
+    grRenderTlBar();
+  }
+  function grRenderTlBar() {
+    var bar = $('grTlBackBar'); if (!bar) return;
+    var i = window.__runyeTlBlock;
+    if (i == null || !W.blocks[i]) { bar.style.display = 'none'; return; }
+    var b = W.blocks[i];
+    bar.style.display = 'flex';
+    if ($('grTlBlockName')) $('grTlBlockName').textContent = '第 ' + (i + 1) + ' 块：' + b.name;
+    if ($('grTlBlockInfo')) {
+      $('grTlBlockInfo').textContent = fmt(num(b.mu, 0), 2) + ' 亩 ／ 全组共 ' + W.blocks.length +
+        ' 块（本页按单地块口径计算，各块独立）';
+    }
+  }
+  /* 返回：先把本块的三级结果存档，再把整组状态恢复回去 */
+  function grBackFromTl() {
+    var i = window.__runyeTlBlock;
+    if (i != null && W.blocks[i]) {
+      W.blocks[i].tlData = clone(window.tlDiagramData);
+      W.blocks[i].tlAt = new Date().toISOString();
+    }
+    window.__runyeTlBlock = null;
+    if (window.__runyeGroupFrame && window.__runyeGroupFrame.length) {
+      window.measuredPolygon = clone(window.__runyeGroupFrame);
+    }
+    try { if (window.ryShowSection) window.ryShowSection($('grPipeSection'), null); } catch (e) { }
+    grSync(); grRefreshUI(); grRenderTlBar();
+  }
+  window.grBackFromTl = grBackFromTl;
+
+  /* ---------------- 事件绑定 ---------------- */
+  function grBind() {
+    /* 管径下拉：接 PE_OD_SERIES（单一来源，见 P10 契约），取不到再兜底 */
+    var sel = $('grTrunkDn');
+    if (sel) {
+      var series = (typeof PE_OD_SERIES !== 'undefined' && PE_OD_SERIES.length)
+        ? PE_OD_SERIES : [50, 63, 75, 90, 110, 125, 140, 160, 180, 200, 225, 250, 315, 355, 400];
+      sel.innerHTML = '';
+      series.forEach(function (d) {
+        var o = document.createElement('option'); o.value = String(d); o.textContent = 'Ø ' + d + ' mm';
+        sel.appendChild(o);
+      });
+      sel.value = String(W.trunk.dn);
+      sel.addEventListener('change', function () { W.trunk.dn = parseInt(this.value, 10) || W.trunk.dn; grRenderTrunk(); grRenderMat(); });
+    }
+    var click = function (id, fn) { var e = $(id); if (e) e.addEventListener('click', fn); };
+    click('grTrunkDraw', function () {
+      W.mode = (W.mode === 'draw') ? 'pick' : 'draw';
+      W.draw = W.draw || [];
+      if (W.mode !== 'draw') W.draw = null;
+      grRenderTrunk(); grRender();
+      if ($('grTrunkHint')) $('grTrunkHint').textContent = W.mode === 'draw'
+        ? '画总管中：点击加点，双击结束，右键退回上一点，Esc 取消。'
+        : '总图里点一根总管可选中；画总管时点击加点、双击结束、右键退回上一点。';
+    });
+    click('grTrunkAuto', function () { grAutoTrunk(); grRender(); });
+    click('grTrunkDel', function () {
+      if (W.sel < 0) { if ($('grTrunkHint')) $('grTrunkHint').textContent = '先在图上点选一根总管，再点删除。'; return; }
+      W.trunk.lines.splice(W.sel, 1); W.sel = -1;
+      grRender(); grRenderTrunk(); grRenderMat();
+    });
+    click('grTrunkClear', function () {
+      if (!W.trunk.lines.length) return;
+      if (!window.confirm('清除全部总管（' + W.trunk.lines.length + ' 根）？')) return;
+      W.trunk.lines = []; W.sel = -1; W.draw = null;
+      grRender(); grRenderTrunk(); grRenderMat();
+    });
+    click('grFit', function () { grFit(); grRender(); });
+    click('grZoomIn', function () { grZoom(1.2); });
+    click('grZoomOut', function () { grZoom(1 / 1.2); });
+    click('grTlBackBtn', function () { grBackFromTl(); });
+
+    /* 子地块列表：两个入口（三级页 / 二级页）走事件委托 */
+    var box = $('grBlocks');
+    if (box) box.addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('button[data-act]') : null;
+      if (!b) return;
+      var i = parseInt(b.getAttribute('data-i'), 10);
+      if (b.getAttribute('data-act') === 'tl') { grEnterBlock(i); return; }
+      /* 「二级改这块的管」：切到二级页并停在这一块，让用户在逐块模式下直接改 */
+      var B = window.RunyeBridge;
+      if (B && B.setGroupMode) { try { B.setGroupMode('perPlot'); } catch (err) { } }
+      if (B && B.selectGroupPlot) { try { B.selectGroupPlot(i); } catch (err) { } }
+      try { if (window.ryShowSection) window.ryShowSection($('pipePlanSection'), null); } catch (err) { }
+    });
+
+    /* 画布：画总管 / 点选 */
+    if (cvs) {
+      cvs.addEventListener('click', function (e) {
+        if (!W.blocks.length) return;
+        var r = cvs.getBoundingClientRect();
+        var wp = toW(e.clientX - r.left, e.clientY - r.top);
+        if (W.mode === 'draw') { W.draw = W.draw || []; W.draw.push(wp); grRender(); return; }
+        W.sel = grPick(wp);
+        grRender();
+        if ($('grTrunkHint')) $('grTrunkHint').textContent = W.sel >= 0
+          ? '已选中第 ' + (W.sel + 1) + ' 根总管（长度 ' + fmt(sumLen([W.trunk.lines[W.sel]]), 1) + ' m），点「删除选中」移除。'
+          : '总图里点一根总管可选中；画总管时点击加点、双击结束、右键退回上一点。';
+      });
+      cvs.addEventListener('dblclick', function () {
+        if (W.mode !== 'draw' || !W.draw) return;
+        if (W.draw.length >= 2) W.trunk.lines.push(W.draw.slice());
+        W.draw = null;
+        grRender(); grRenderTrunk(); grRenderMat();
+      });
+      cvs.addEventListener('contextmenu', function (e) {
+        e.preventDefault();
+        if (W.mode === 'draw' && W.draw && W.draw.length) { W.draw.pop(); grRender(); }
+      });
+      cvs.addEventListener('wheel', function (e) {
+        if (!W.blocks.length) return;
+        e.preventDefault();
+        var r = cvs.getBoundingClientRect();
+        var cp = { x: e.clientX - r.left, y: e.clientY - r.top };
+        var wp = toW(cp.x, cp.y);
+        var k = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+        view.scale *= k;
+        view.ox = cp.x - wp.x * view.scale; view.oy = cp.y - wp.y * view.scale;
+        grRender();
+      }, { passive: false });
+    }
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && W.mode === 'draw') { W.draw = null; W.mode = 'pick'; grRenderTrunk(); grRender(); }
+      if ((e.key === 'Delete' || e.key === 'Backspace') && W.sel >= 0 && document.activeElement === document.body) {
+        W.trunk.lines.splice(W.sel, 1); W.sel = -1; grRender(); grRenderTrunk(); grRenderMat();
+      }
+    });
+  }
+  function grZoom(k) {
+    var cx = (view.cw || 600) / 2, cy = (view.ch || 400) / 2;
+    var wp = toW(cx, cy);
+    view.scale *= k;
+    view.ox = cx - wp.x * view.scale; view.oy = cy - wp.y * view.scale;
+    grRender();
+  }
+
+  /* ---------------- 对外入口 ----------------
+     ★ refresh 与 show 必须分开：ryShowSection 里会回调 grRefreshGroupPage，
+       若 show 内部再调自己就成无限递归了（与「detailsSection 回调 window.render」
+       同一处机制，那边也是只回调刷新、不回调切换）。 */
+  window.grRefreshGroupPage = function () {
+    grSync(); grFit(); grRefreshUI(); grRenderTlBar();
+  };
+  window.grShowGroupPage = function () {
+    try { if (window.ryShowSection) window.ryShowSection($('grPipeSection'), null); } catch (e) { }
+    window.grRefreshGroupPage();
+  };
+  window.grEnterTlForBlock = grEnterBlock;
+  /* 主区切换 / 窗口尺寸变化时，若本页正显示就重排一次（隐藏期间量到的宽高是 0） */
+  window.addEventListener('resize', function () {
+    var sec = $('grPipeSection');
+    if (sec && sec.classList.contains('ry-active')) { grResize(); grFitScale(); grRender(); }
+  });
+  grBind();
 })();
 </script>
 
