@@ -1,11 +1,17 @@
-/* _p1/_probe_merge_render.cjs · v187 拼接块「只画各自轮廓线」绘制契约
+/* _p1/_probe_merge_render.cjs · v187/v189 成组块「只画各自轮廓线」绘制契约
  *
- * 用户诉求（原话）：「地块拼接之后 是各自的轮廓线，外面不用再加一个框。」
+ * 用户诉求（原话 v187）：「地块拼接之后 是各自的轮廓线，外面不用再加一个框。」
+ * 用户纠正（原话 v189）：「这个不是拼接是地块成组……这些小地块之间有的道路、间隔
+ *   那些都要保留，而不是给拼接起来，比如说两个地块间距有 3 米，那这个三米就留着。」
  *
  * 为什么必须观测**实际绘制**而不是查源码文本：
  *   「有没有调 L.polygon」在源码里一眼可见，但「调了几次、每次画的是谁、什么颜色、
  *    交互层还在不在」只有真跑 renderPlots 才知道。旧实现的两层（凸包外框 + 子块虚线）
  *   也是「调了 L.polygon」—— 光看有没有调用完全分不出来。
+ *
+ * ★ v189 新增：权威几何必须是 polyLatLngSet（各成员环集合，块间空隙保留），
+ *   而不是 polyLatLng（凸包）。故断言里额外构造一个「凸包 ≠ 成员环集合」的样本：
+ *   故意把两个子地块之间留 3m 缝，若渲染改回凸包，可见环数会掉到 1 ⇒ 精确报红。
  *
  * 做法：桩掉 Leaflet（记录每一次 L.polygon 的环长与样式）+ 桩 localStorage 提供地块库，
  *       真调 RunyeMapEnhance.attach(...) → renderPlots 走一遍，对**绘制结果**下断言。
@@ -24,13 +30,10 @@ const SRC_FILE = 'runye-map-enhance.js';
 
 let SRC = fs.readFileSync(path.join(ROOT, SRC_FILE), 'utf8');
 
-/* --inject：把拼接块改回「画可见的外层凸包框」（旧 v185 行为） */
+/* --inject：把成组块改回「画可见的外层凸包框」（旧 v185 行为） */
 if (INJECT) {
   const before = SRC;
-  SRC = SRC.replace(
-    "          layers.push(L.polygon(displayLL(ll, opts), baseStyle));",
-    "          layers.push(L.polygon(displayLL(ll, opts), baseStyle));");
-  // 让「拼接地块」重新走单层凸包路径（等价于 v185 的可见外框）
+  // 让「成组地块」重新走单层凸包路径（等价于 v185 的可见外框）
   SRC = SRC.replace('var isMerged = !!(p.merged && p.subPlots && p.subPlots.length);',
                     'var isMerged = false; // [inject] 回退为旧行为：把凸包当可见外框画');
   if (SRC === before) { console.log('!! 注入未命中（锚点已漂移），请核对 ' + SRC_FILE + ' 的 isMerged 定义'); process.exitCode = 2; return; }
@@ -186,9 +189,9 @@ const S2 = rect(B[0], B[1] + D, D, D, { id: 's2', name: '子块2', crop: '水稻
 const S3 = rect(B[0] + D, B[1], D, D, { id: 's3', name: '子块3', crop: '玉米' });
 const SOLO = rect(B[0] + 0.01, B[1] + 0.01, D, D, { id: 'solo', name: '单块地', crop: '大豆' });
 
-/* 用真 merge 模块造出拼接地块 */
+/* 用真 merge 模块造出成组地块 */
 const M = require(path.join(ROOT, SRC_FILE));
-const BIG = M.merge.plots([S1, S2, S3], { name: '三块拼接' });
+const BIG = M.merge.plots([S1, S2, S3], { name: '三块成组' });
 if (!BIG) { console.log('!! 造数据失败：merge.plots 返回 null'); process.exitCode = 2; return; }
 const LIB = [BIG, SOLO,
   Object.assign({}, S1, { mergedInto: BIG.id }),
@@ -207,17 +210,22 @@ if (!ATTACH || !ATTACH.ok) {
   return;
 }
 
-console.log('=== T1 拼接块只画「各自轮廓线」，不画可见外框 ===');
+console.log('=== T1 成组块只画「各自轮廓线」，不画可见外框 ===');
 {
-  /* 拼接地块 3 个子块 + 独立地块 1 块 = 应有 4 个多边形。
+  /* 成组地块 3 个子块 + 独立地块 1 块 = 应有 4 个多边形。
    * 另有 1 个不可见外轮廓（ghost，interactive:false + opacity 0）——它不算「可见外框」。 */
   const visible = drawnPolys.filter(l => l._interactive);
   const ghosts = drawnPolys.filter(l => !l._interactive);
   ok('可见多边形共 4 个（3 子块 + 1 独立地块）', visible.length === 4,
      '实际 ' + visible.length + ' 个（环长 ' + visible.map(l => l._ringLen).join(',') + '）');
+  /* ★ 判据必须用**凸包顶点数**当锚点，而不是「weight>=3 且 fillOpacity>=0.16」。
+   *   —— 后者是「用样式反推几何」的间接判据：凸包 layer 的样式由 `baseStyle` 决定，
+   *   万一将来 baseStyle 变细/变淡（合理改动），这条断言就会**恒绿**，失去鉴别力。
+   *   实测：--inject（把成组块退化成画凸包）时，凸包=1 个可见环、环长=5（= hull 顶点数），
+   *   而旧写法仍 PASS ⇒ 假绿。改用环长锚点后注入必红。 */
   ok('★ 不存在「环长 = 凸包顶点数」的可见大框',
-     !visible.some(l => l._style && l._style.weight >= 3 && l._style.fillOpacity >= 0.16),
-     '可见层样式 weight/fillOpacity = ' + visible.map(l => (l._style.weight + '/' + l._style.fillOpacity)).join(' '));
+     !visible.some(l => l._ringLen === BIG.polyLatLng.length && BIG.polyLatLng.length > 4),
+     '凸包环长=' + BIG.polyLatLng.length + ' 可见环长=' + visible.map(l => l._ringLen).join(','));
   ok('不可见外轮廓 ≤ 1 个（仅作包围盒引用，opacity 0）', ghosts.length <= 1,
      '实际 ' + ghosts.length + ' 个');
   if (ghosts.length) {
@@ -281,7 +289,7 @@ console.log('\n=== T4 交互不能因为「去掉外框」而丢：popup / 点�
   const withPopup = visible.filter(l => l._popup);
   ok('★ 每个可见子地块环都挂了 popup（任一块都能点出气泡）',
      withPopup.length === visible.length, withPopup.length + '/' + visible.length);
-  ok('popup 含「撤销拼接」按钮（拼接地块仍可拆回）',
+  ok('popup 含「解散成组」按钮（成组地块仍可拆回）',
      withPopup.some(l => /rymUnmerge/.test(l._popup)));
   const withClick = visible.filter(l => (l._handlers.click || []).length > 0);
   /* ⚠ 原断言「visible 全部必须绑 click」是**期望写错**，不是功能坏：
@@ -307,12 +315,40 @@ console.log('\n=== T4 交互不能因为「去掉外框」而丢：popup / 点�
 console.log('\n=== T5 mergedInto 归档的原小地块不重复绘制 ===');
 {
   const visible = drawnPolys.filter(l => l._interactive);
-  ok('★ 归档子地块未额外出现（3 个子块只在拼接块里各画 1 次）',
+  ok('★ 归档子地块未额外出现（3 个子块只在成组块里各画 1 次）',
      visible.length === 4, '可见层 ' + visible.length + ' 个（期望 4：3 子块 + 1 独立）');
 }
 
+console.log('\n=== T6 ★★ v189 核心：块间有缝时必须逐块画（拿凸包画会并成一块）===');
+{
+  /* 构造两块**中间留 3.3m 空隙**（模拟道路/水渠/无法利用的空地）。
+   * 期望：可见环数 = 2（各自独立）。
+   * 若渲染改回凸包/并集，会出现 1 个「含全部顶点的大环」⇒ 本断言精确报红。
+   * 这正是 v189 用户纠正的核心：「那这个三米就留着」。 */
+  const GAP = 0.00003;                       // ≈3.3m
+  const gapA = rect(B[0], B[1], 0.0002, 0.0002, { id: 'ga', name: '左块', crop: '七彩花生' });
+  const gapB = rect(B[0], B[1] + 0.0002 + GAP, 0.0002, 0.0002, { id: 'gb', name: '右块', crop: '水稻' });
+  const G = M.merge.plots([gapA, gapB], { name: '带缝成组' });
+  if (!G) { console.log('!! 带缝样本造数据失败'); process.exitCode = 2; return; }
+  /* 反向对照：凸包顶点数（若渲染走凸包，可见大环就是这个长度） */
+  const hullLen = G.polyLatLng.length;
+  const ringSetLen = (G.polyLatLngSet || []).length;
+
+  const B3 = boot([G, Object.assign({}, gapA, { mergedInto: G.id }), Object.assign({}, gapB, { mergedInto: G.id })]);
+  B3.mod.attach(B3.map, { plots: [G, Object.assign({}, gapA, { mergedInto: G.id }), Object.assign({}, gapB, { mergedInto: G.id })] });
+  const vis3 = B3.drawnPolys.filter(l => l._interactive);
+  ok('★★ 带缝成组：可见环 = 2 个（逐块各自一圈，缝保留）',
+     vis3.length === 2, '实际 ' + vis3.length + ' 个（环长 ' + vis3.map(l => l._ringLen).join(',') + '）');
+  ok('★★ 不存在「环长 = 凸包顶点数」的可见大环（= 没被并成一块）',
+     !vis3.some(l => l._ringLen === hullLen && hullLen > 4),
+     '凸包环长=' + hullLen + ' 权威环数=' + ringSetLen + ' 可见环长=' + vis3.map(l => l._ringLen).join(','));
+  const c3 = vis3.map(l => l._style && l._style.color);
+  ok('★ 两块各自作物色（七彩花生 / 水稻），不是统一底色',
+     c3.length === 2 && c3[0] !== c3[1], '实际 ' + c3.join(','));
+}
+
 console.log('\n========================================');
-console.log((INJECT ? '【注入模式】' : '') + '拼接块绘制契约：PASS=' + pass + '  FAIL=' + fail);
+console.log((INJECT ? '【注入模式】' : '') + '成组块绘制契约：PASS=' + pass + '  FAIL=' + fail);
 if (fail) console.log('  失败项：' + fails.join(' / '));
 if (INJECT) {
   const caught = fail > 0;

@@ -46,9 +46,12 @@ const S3 = rect(B[0] + D, B[1], '玉米', '子块3', 's3');
 /* 凸包（= 三块拼起来的外包矩形），模拟 merge.plots 的产物 */
 const hullLatLng = [[B[0], B[1]], [B[0], B[1] + 2 * D], [B[0] + 2 * D, B[1] + 2 * D], [B[0] + 2 * D, B[1]]];
 const BIG = {
-  id: 'big1', name: '三块拼接', mu: 8.4, sqm: 5700, crop: '七彩花生',
+  id: 'big1', name: '三块成组', mu: 8.4, sqm: 5700, crop: '七彩花生',
   merged: true,
-  polyLatLng: hullLatLng,
+  grouped: true,                       // ★ v189 正式语义
+  polyLatLng: hullLatLng,              // 参考外框（凸包）
+  hullLatLng: hullLatLng,              // ★ v189 显式命名，防误当轮廓
+  polyLatLngSet: [S1.polyLatLng, S2.polyLatLng, S3.polyLatLng],  // ★ 权威几何：各成员环（空隙保留）
   subPlots: [
     { id: 's1', name: '子块1', crop: '七彩花生', polyLatLng: S1.polyLatLng },
     { id: 's2', name: '子块2', crop: '水稻', polyLatLng: S2.polyLatLng },
@@ -56,7 +59,7 @@ const BIG = {
   ],
   center: { lat: B[0] + D, lng: B[1] + D },
   geo: { refLat: B[0] + D, refLng: B[1], proj: 'mercatorLocal' },
-  source: 'map', crs: 'GCJ-02'
+  source: 'group', crs: 'GCJ-02'
 };
 const LIB = [BIG];
 

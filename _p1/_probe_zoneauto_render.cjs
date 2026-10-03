@@ -53,12 +53,29 @@ function makeInjectedCopy() {
     applied.push('1: 注掉 v188 深色文字规则');
   }
   if (INJ === 2 || INJ === 99) {
-    /* 把 ppSyncFineGroup 的两处调用注掉 → 微调组不再随开关显隐 → 4.5 必须红 */
-    const a2 = 'ppSyncFineGroup();\n        ppRender();';
+    /* 把 ppSyncFineGroup 在「关掉分区」分支里的那次调用注掉
+       → 微调组不再随开关从 adjustCut 退出 → 4.5b（关闭后微调组收起）必须红。
+       锚点带足上下文，避免命中别处同名调用（15237 行那处是另一条路径）。 */
+    const a2 = `          b.classList.toggle('active', b.getAttribute('data-mode')==='main');
+        });
+        ppSyncFineGroup();`;
     const cnt = s.split(a2).length - 1;
-    if (cnt !== 2) { console.error('[inject] 锚点2 漂移：期望 2 处，实际 ' + cnt + ' 处'); process.exit(2); }
-    s = s.split(a2).join('/* [inject 2] ppSyncFineGroup(); */\n        ppRender();');
-    applied.push('2: 注掉 ppSyncFineGroup 的 2 处调用');
+    if (cnt !== 1) { console.error('[inject] 锚点2 漂移：期望 1 处，实际 ' + cnt + ' 处'); process.exit(2); }
+    s = s.replace(a2, `          b.classList.toggle('active', b.getAttribute('data-mode')==='main');
+        });
+        /* [inject 2] ppSyncFineGroup(); */`);
+    applied.push('2: 注掉 ppSetZoneAuto 里退出 adjustCut 时的 ppSyncFineGroup()');
+  }
+  if (INJ === 3 || INJ === 99) {
+    /* ★★ v189 核心缺陷注入：把「关闭 → 返回 1×1 单区」退回成旧的「数据照常算、
+     *   只在末端隐藏」半吊子实现 —— 即让短路分支失效。
+     *   期望：4.5 / 4.8b / 5.3（分区数）必须红，而 4.2（body 类）仍绿
+     *   —— 精确证明「真的不划分」与「只是把线藏起来」被区分开了。 */
+    const a3 = 'if(!ppZoneAutoOn()){';
+    const cnt3 = s.split(a3).length - 1;
+    if (cnt3 !== 1) { console.error('[inject] 锚点3 漂移：期望 1 处，实际 ' + cnt3 + ' 处'); process.exit(2); }
+    s = s.replace(a3, 'if(false){ /* [inject 3] 短路失效：退回「只藏线、数据照算」的旧行为 */');
+    applied.push('3: 让「关闭=不划分」短路失效（退化回旧半吊子实现）');
   }
   /* ⚠ 临时副本必须写在**与 index.html 同一目录**：页面的 css/js 都是相对路径引用，
      放到 _verify_out/ 会让它们全部 404 ⇒ 脚本没跑 ⇒ #pipePlanSection 恒 display:none
@@ -172,6 +189,55 @@ function contrast(a, b) {
     }
   }
 
+  /* ★★ 生成施工图 —— 不生成就**根本没有分区层**，则 4.x 的分区数断言无从谈起。
+   *   路径：window.measuredPolygon（本地米坐标）→ window.ppLoadPolygon() → window.ppGenerateDiagram()。
+   *   为什么必须真生成：分区层 <g class="pp-zone-layer"> 是 ppGenerateDiagram 里拼 SVG 出来的，
+   *   未生成时 #ppDiagramContent 只有一句「请先生成施工图」的空态文案（实测 exists:false）。
+   *
+   * ★★★ 地块尺寸必须**足够大**，否则本组断言**退化、恒绿**（实测踩到）：
+   *   分区数下限由 `calcZoneLayout` 的 `minN = max(ceil(W/S)*ceil(H/S), ceil(W*H/S²))` 决定，
+   *   其中 S = 2 × planTapeLaySide（默认 100 ⇒ S=200m）。
+   *   · 用 60m×40m 的小地块：minN = max(1×1, 1) = 1 ⇒ 开/关**都**是 1 区
+   *     ⇒ 「关闭后塌到 1」与「开启后回到 ≥2」两头都测不出区别（假绿）。
+   *   · 用 600m×400m：minN = max(3×2, 6) = 6 ⇒ 开启 = 6 区、关闭 = 1 区，差异一目了然。
+   *   这与「测试样本必须能区分出正反例」是同一条原则：**先问有没有反例能让断言变红**。 */
+  {
+    const genOk = await page.evaluate(() => {
+      try {
+        const W = 600, H = 400;             // 600m × 400m = 36ha，确保自动划分出多区
+        window.measuredPolygon = [
+          { x: 0, y: 0 }, { x: W, y: 0 }, { x: W, y: H }, { x: 0, y: H }
+        ];
+        window.measuredArea = W * H;
+        window.measuredPolygonSource = 'area';
+        if (typeof window.ppLoadPolygon === 'function') window.ppLoadPolygon();
+        if (typeof window.ppGenerateDiagram === 'function') { window.ppGenerateDiagram({ scroll: false }); return true; }
+        return false;
+      } catch (e) { return false; }
+    });
+    await sleep(900);
+    const zoneProbe = await page.evaluate(() => {
+      const g = document.querySelector('#ppDiagramContent g.pp-zone-layer');
+      return { hasSvg: !!document.querySelector('#ppDiagramContent svg'), hasZoneLayer: !!g, rects: g ? g.querySelectorAll('rect').length : -1 };
+    });
+    if (!genOk || !zoneProbe.hasZoneLayer || zoneProbe.rects < 1) {
+      console.error('\n[FATAL] 施工图未生成 / 没有分区层，后续分区数断言无效。');
+      console.error('        ' + JSON.stringify(zoneProbe));
+      try { await browser.disconnect(); } catch (e) {}
+      try { proc.kill(); } catch (e) {}
+      process.exit(2);
+    }
+    /* 基准非空闸门：必须是「多区」才有对照意义（1 区的话本组断言全无鉴别力）。 */
+    if (zoneProbe.rects < 2) {
+      console.error('\n[FATAL] 基准地块只分出 ' + zoneProbe.rects + ' 个区 —— 本组「关掉塌到 1」断言将恒绿、无鉴别力。');
+      console.error('        请把 window.measuredPolygon 的尺寸调大（当前 600×400 仍不足说明 S 被改大了）。');
+      try { await browser.disconnect(); } catch (e) {}
+      try { proc.kill(); } catch (e) {}
+      process.exit(2);
+    }
+    console.log('[setup] 施工图已生成：' + JSON.stringify(zoneProbe));
+  }
+
   /* ---- 量测：#ppZoneAutoWrap / #ppZoneAutoTxt ---- */
   const probe = () => page.evaluate(() => {
     const wrap = document.getElementById('ppZoneAutoWrap');
@@ -257,8 +323,43 @@ function contrast(a, b) {
   check('3.1 文字对比度 >= 3.0（肉眼可见）', ratio !== null && ratio >= 3.0, ratio === null ? 'n/a' : ratio.toFixed(2) + ':1');
   check('3.2 文字对比度 >= 4.5（小字 AA 达标）', ratio !== null && ratio >= 4.5, ratio === null ? 'n/a' : ratio.toFixed(2) + ':1');
 
-  console.log('\n=== [4] 开关语义（关掉 = 隐藏自动分区线 + 切调网格）===');
+  console.log('\n=== [4] 开关语义（v189：关掉 = **真的不自动划分**，整块当一个区）===');
   check('4.1 默认勾选 = 自动划分开启', p.chkChecked === true, 'checked=' + p.chkChecked);
+  /* ★★ v189 核心断言（前置于「关」操作之前必须先拿到「开」时的分区数）：
+   *   开关关闭 = ppGetZoneLayout 直接返回 1×1 单区布局 ⇒ 全链路（分区线/分区数/
+   *   面积/水力/材料/三级工作区）都应看到**一个区**。这是「真的不划分」与
+   *   「只是把线藏起来」的唯一分水岭 —— 后者数据仍是 N 区，一测就露。
+   *   怎么观测：分区线图层里每个分区一个 <rect>（源码 15800 行），故「rect 数 = 分区数」。
+   *   ⚠ 基准必须选**大**地块：分区下限 minN = max(ceil(W/S)*ceil(H/S), ceil(W·H/S²))，
+   *     S = 2×「单边铺设长度」（默认 200m）；地块太小时 minN=1 ⇒ 开/关都是 1 区 ⇒ 恒绿。
+   *     本探针用 600m×400m（minN=6）⇒ 开启 20 区、关闭 1 区，差异明确。 */
+  const zonesOn = await page.evaluate(() => {
+    /* 分区层的真实结构（源码 15782 行）：<g class="pp-zone-layer"> 下**每个分区一个 <rect>**
+       —— 所以「rect 数」就是「分区数」，可直接量。 */
+    const g = document.querySelector('#ppDiagramContent g.pp-zone-layer');
+    if (!g) return { exists: false, n: -1 };
+    return { exists: true, n: g.querySelectorAll('rect').length };
+  });
+  check('4.1b 开启时确有多条分区线（基准非空，否则下面 4.5b 无从对照）',
+    zonesOn.exists && zonesOn.n >= 2, JSON.stringify(zonesOn));
+
+  /* ★ 4.1c 先进入「调网格」模式，让微调组（#ppCutFineGroup）处于展开态 ——
+   *   这样 4.5b 的「关闭后收起」才有反例可测。
+   *   为什么必须先展开：不点「调网格」时微调组本来就是 none，4.5b 会**恒绿**
+   *   （实测：--inject 2 注掉 ppSyncFineGroup 调用后，4.5b 仍 PASS ⇒ 断言无鉴别力）。
+   *   这与「一致性烟测只取全 0 的样本」是同一种病：**样本退化 ⇒ 绿得毫无信息量**。 */
+  const entered = await page.evaluate(() => {
+    const b = document.querySelector('#ppToolbar .pp-btn[data-mode="adjustCut"]');
+    if (!b) return { ok: false, reason: 'no-btn' };
+    b.click();
+    const fg = document.getElementById('ppCutFineGroup');
+    return { ok: true, active: b.classList.contains('active'), fineDisplay: fg ? getComputedStyle(fg).display : 'missing' };
+  });
+  await sleep(500);
+  check('4.1c 前置：能进入「调网格」且微调组展开（给 4.5b 造出可测的反例）',
+    entered.ok && entered.active === true && entered.fineDisplay !== 'none',
+    JSON.stringify(entered));
+
   /* 点一下 → 关 */
   await page.evaluate(() => {
     const chk = document.getElementById('ppZoneAutoChk');
@@ -268,14 +369,24 @@ function contrast(a, b) {
   await sleep(600);
   const off = await probe();
   check('4.2 关闭后 body.ry-zoneauto-off 已加', off.bodyZoneAutoOff === true);
-  check('4.3 关闭后文案变为「地块划分（手动）」', off.txtText === '地块划分（手动）', 'txt=' + JSON.stringify(off.txtText));
+  check('4.3 关闭后文案变为「地块划分（不划分）」', off.txtText === '地块划分（不划分）', 'txt=' + JSON.stringify(off.txtText));
   check('4.4 关闭后文字仍可见（对比度不劣化）', off.txtRect && off.txtRect.w > 0, JSON.stringify(off.txtRect));
+  /* ★★ 核心：关闭后分区数必须塌到 1（而不是「线藏了、数据还是 N 区」）。
+   *   注意判据要能区分「隐藏」与「真的只有 1 个」：
+   *   · 只数节点数 —— 若实现是「CSS 隐藏」节点数仍 = N ⇒ 报红（正是我们要抓的）。
+   *   · 反向对照 4.8b 会在重新开启后断言节点数回到 ≥2，证明本判据非恒真。 */
+  const zonesOff = await page.evaluate(() => {
+    const g = document.querySelector('#ppDiagramContent g.pp-zone-layer');
+    if (!g) return { exists: false, n: -1 };
+    /* 「rect 数 = 分区数」。另外读一个独立证据：标签层里的「N区」文字个数。 */
+    const labels = document.querySelectorAll('#ppDiagramContent g.pp-zone-label text');
+    return { exists: true, n: g.querySelectorAll('rect').length, labels: labels.length };
+  });
+  check('4.5 ★★ 关闭后分区数塌到 1（真的不划分，不是把线藏起来）',
+    zonesOff.exists && zonesOff.n <= 1, JSON.stringify(zonesOff));
+  /* 微调组：关闭后应**收起**（v189 起不再自动切到调网格）；开启时才按模式显隐 */
   const ctlSel = await page.evaluate(() => {
     const b = document.querySelector('#ppToolbar .pp-btn[data-mode="adjustCut"]');
-    /* ppState 是 IIFE 内局部变量、未挂 window，不能直接读；
-       模式提示文案又是画在 canvas 上的（ppCtx.fillText），DOM 里也读不到。
-       改用**可观测 DOM 代理**：#ppCutFineGroup（微调箭头组）仅在 adjustCut 模式显示
-       （源码第 15186 行：fg.style.display = ppState.mode==='adjustCut' ? 'inline-flex' : 'none'）。 */
     const fg = document.getElementById('ppCutFineGroup');
     return {
       active: !!b && b.classList.contains('active'),
@@ -283,13 +394,16 @@ function contrast(a, b) {
       fineDisplay: fg ? getComputedStyle(fg).display : 'missing',
     };
   });
-  check('4.5 关闭后自动切到「调网格」模式（按钮 active + 微调组出现）',
-    /* 注意：源码写的是 display:'inline-flex'，但该组是 flex 容器的子项，
-       getComputedStyle 会做「块级化」计算返回 'flex'。故判据用 !== 'none'，
-       不锁字面值（否则会因浏览器规范化而假红）。 */
-    ctlSel.btnExists && ctlSel.active === true && ctlSel.fineDisplay !== 'none',
+  check('4.5b ★ 关闭后从「调网格」退出且微调组收起（不是残留展开）',
+    ctlSel.btnExists && ctlSel.active === false && ctlSel.fineDisplay === 'none',
     JSON.stringify(ctlSel));
-  /* 反向对照：开启（非调网格）时微调组必须收起 —— 证明上面那条不是恒真 */
+  check('4.5c 关闭后调网格相关按钮被禁用（视觉置灰 + 不可点）',
+    await page.evaluate(() => {
+      const b = document.querySelector('#ppToolbar .pp-btn[data-mode="adjustCut"]');
+      if (!b) return false;
+      const cs = getComputedStyle(b);
+      return cs.pointerEvents === 'none' && parseFloat(cs.opacity) < 0.9;
+    }), '见 body.ry-zoneauto-off 下的置灰规则');
 
   if (SHOT) {
     await page.screenshot({ path: path.join(OUT, 'zoneauto_off.png') });
@@ -305,13 +419,23 @@ function contrast(a, b) {
   const on = await probe();
   check('4.6 恢复开启后 body 类移除', on.bodyZoneAutoOff === false);
   check('4.7 恢复开启后文案回到「地块划分」', on.txtText === '地块划分', 'txt=' + JSON.stringify(on.txtText));
-  /* 反向对照：开启（非调网格）时微调组必须收起 —— 证明 4.5 那条不是恒真 */
+  /* 反向对照：重新开启后仍应**停在 main 模式**（不自动回到调网格）⇒ 微调组保持收起 */
   const fineWhenOn = await page.evaluate(() => {
     const fg = document.getElementById('ppCutFineGroup');
-    return fg ? getComputedStyle(fg).display : 'missing';
+    const b = document.querySelector('#ppToolbar .pp-btn[data-mode="adjustCut"]');
+    return { display: fg ? getComputedStyle(fg).display : 'missing', active: !!b && b.classList.contains('active') };
   });
-  check('4.8 恢复开启后微调组收起（反向对照，证明 4.5 不是恒真）',
-    fineWhenOn === 'none', 'display=' + fineWhenOn);
+  check('4.8 恢复开启后仍是 main 模式、微调组收起（与 4.5b 同口径）',
+    fineWhenOn.display === 'none' && fineWhenOn.active === false, JSON.stringify(fineWhenOn));
+  /* ★★ 反向对照（关键）：重新开启后分区数必须回到 ≥2。
+   *   这一条是 4.5 的「另一头」—— 证明 4.5 不是恒真（否则关/开都 =1 也能绿）。 */
+  const zonesBack = await page.evaluate(() => {
+    const g = document.querySelector('#ppDiagramContent g.pp-zone-layer');
+    if (!g) return { exists: false, n: -1 };
+    return { exists: true, n: g.querySelectorAll('rect').length };
+  });
+  check('4.8b ★★ 恢复开启后分区数回到 ≥2（证明 4.5 不是恒真）',
+    zonesBack.exists && zonesBack.n >= 2, JSON.stringify(zonesBack));
   if (SHOT) {
     await page.screenshot({ path: path.join(OUT, 'zoneauto_on.png') });
   }
@@ -329,7 +453,28 @@ function contrast(a, b) {
   await sleep(700);
   const afterReload = await probe();
   check('5.1 关闭态刷新后保持关闭', afterReload.bodyZoneAutoOff === true);
-  check('5.2 关闭态刷新后文字仍「地块划分（手动）」', afterReload.txtText === '地块划分（手动）', 'txt=' + JSON.stringify(afterReload.txtText));
+  check('5.2 关闭态刷新后文字仍「地块划分（不划分）」', afterReload.txtText === '地块划分（不划分）', 'txt=' + JSON.stringify(afterReload.txtText));
+  /* ★★ 刷新后仍必须是「真的 1 个区」—— 证明持久化恢复的是行为而不只是外观。
+     ⚠ reload 后 window.measuredPolygon 丢失（它只活在内存里，不写 localStorage），
+       施工图自然也没了 ⇒ 必须**重新给地块 + 重新生成**再量，否则量到的是「无图层」
+       （= 假红：不是功能坏，是样本没准备好）。这与「关掉时 20→1」是同一块地。 */
+  await page.evaluate(() => {
+    try {
+      const W = 600, H = 400;
+      window.measuredPolygon = [{ x: 0, y: 0 }, { x: W, y: 0 }, { x: W, y: H }, { x: 0, y: H }];
+      window.measuredArea = W * H; window.measuredPolygonSource = 'area';
+      if (typeof window.ppLoadPolygon === 'function') window.ppLoadPolygon();
+      if (typeof window.ppGenerateDiagram === 'function') window.ppGenerateDiagram({ scroll: false });
+    } catch (e) {}
+  });
+  await sleep(900);
+  const zonesAfterReload = await page.evaluate(() => {
+    const g = document.querySelector('#ppDiagramContent g.pp-zone-layer');
+    if (!g) return { exists: false, n: -1 };
+    return { exists: true, n: g.querySelectorAll('rect').length };
+  });
+  check('5.3 ★★ 关闭态刷新后重新生成，分区数仍为 1（行为持久化，不只是外观）',
+    zonesAfterReload.exists && zonesAfterReload.n <= 1, JSON.stringify(zonesAfterReload));
 
   console.log('\n=== [6] 无页面错误 ===');
   check('6.1 无 pageerror', errs.length === 0, errs.slice(0, 3).join(' | '));

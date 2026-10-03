@@ -1481,11 +1481,22 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
 #pipePlanSection .pp-toolbar>.pp-check-label:hover{color:#0f172a}
 body.ry-zoneauto-off #pipePlanSection .pp-toolbar>.pp-check-label{color:#b45309}
 .pp-check-label input{accent-color:#16a34a;margin:0;width:14px;height:14px}
-/* [v185 2026-10-03] 地块划分开关：关闭（body.ry-zoneauto-off）时隐藏施工简图里的分区层。
-   与三级 ry-worst-off 同一范式 —— 分区照常计算与渲染，只由 CSS 门控显隐，
-   这样「关开关」永远不会改变面积/水力/材料任何计算结果。 */
+/* [v185 建 / v189 改语义 2026-10-03] 地块划分开关。
+   v189 起语义是「真的划不划分区」——关闭后 ppGetZoneLayout 直接返回 1×1 单区布局，
+   所以画面上本来就是「一个区、没有内部线」，**不需要再用 CSS 去隐藏分区层**。
+   下面这两条 display:none 仅作为**兜底**保留：万一有哪条渲染路径仍按旧缓存画出了
+   分区层（例如某处没走到 ppGetZoneLayout），也不至于让用户看到不该有的线。 */
 body.ry-zoneauto-off #ppDiagramContent .pp-zone-layer{display:none}
 body.ry-zoneauto-off #ppDiagramContent .pp-zone-label{display:none}
+/* 关闭划分后「调网格 / 重置网格 / 锁定面积 / 重新分区 / 分区旋转」均无意义（没有内部线可操作）
+   ⇒ 置灰不可点，避免用户点了没反应或产生困惑。开启时自动恢复。 */
+body.ry-zoneauto-off #ppToolbar>.pp-btn[data-mode="adjustCut"],
+body.ry-zoneauto-off #ppResetCuts,
+body.ry-zoneauto-off #ppLockArea,
+body.ry-zoneauto-off #ppRepartition,
+body.ry-zoneauto-off #ppRotateZones{
+  opacity:.4;pointer-events:none;cursor:not-allowed;
+}
 .pp-select-sm{padding:5px 8px;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:rgba(0,0,0,.25);color:rgba(255,255,255,.8);font-size:12px;font-family:inherit;cursor:pointer;outline:none}
 .pp-select-sm:focus{border-color:#16a34a}
 .pp-canvas-wrap{
@@ -6003,15 +6014,12 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     <button class="pp-btn" data-mode="valve" style="display:none">阀门</button>
     <button class="pp-btn" data-mode="maskPipe" style="display:none">遮蔽管线</button>
     <button class="pp-btn" data-mode="adjustCut" title="拖动分区线调整分区；把一条线拖到相邻线上松手即可合并分区（分区数随之减少），误操作可用「回退」撤销">调网格</button>
-    <!-- [v185 2026-10-03] 地块划分开关（用户要求）：
-         平时（大地块）传过来后自动划分并显示分区线；不需要自动划分时关掉本开关，
-         自动分区线**隐藏**，改由用户手动划分（复用上面已有的「调网格」）。
-         实现口径（与三级 ry-worst-off 同一范式）：状态只用一个 body 类
-         `ry-zoneauto-off` 表达，**分区数据照常计算、下游照常消费**，只控「显隐」。
-         这样做的好处：关掉开关只影响画面，不改变分区数/面积/水力结果 ——
-         避免「一关开关，材料统计跟着变」这种让人摸不着头脑的联动。
+    <!-- [v185 建 / v189 改语义 2026-10-03] 地块划分开关（用户要求）：
+         开启（默认）= 按左侧面板参数**自动划分**地块（画出分区线）；
+         关闭 = 本块**不自动划分**（整块作为一个区参与面积/水力/材料计算）。
+         ⚠ 用户明确纠正过：不是「只显示/隐藏分区线」，而是**真的划不划分区**。
          静态契约：verify_ry_tool.js 锁了本控件的存在与 id。 -->
-    <label class="pp-check-label" id="ppZoneAutoWrap" for="ppZoneAutoChk" title="开启=自动划分并把分区线画出来；关闭=隐藏自动划分的分区线，改由「调网格」手动划分。注意：关闭只影响显示，分区数/面积/水力计算不受影响。">
+    <label class="pp-check-label" id="ppZoneAutoWrap" for="ppZoneAutoChk" title="开启=按左侧面板参数自动划分地块（画出分区线）。关闭=本块不自动划分，整块作为一个区参与面积/水力/材料计算。">
       <input type="checkbox" id="ppZoneAutoChk" checked>
       <span id="ppZoneAutoTxt">地块划分</span>
     </label>
@@ -13864,6 +13872,48 @@ ppPullLiftDh();                                              // 首屏对齐一�
   }
 
   function ppGetZoneLayout(b,planN){
+    /* [v189 2026-10-03] 用户纠正口径（务必守住）：
+       「地块划分」开关**关闭** = 该地块**完全不自动划分分区**（整块当一个区），
+       而**不是**之前实现的「只是把分区线藏起来、数据照常算」。
+       用户原话：「如果这个开关关闭之后，地块就不自动划分分区了，你修改过来。」
+       ⇒ 做法：在最上游 ppGetZoneLayout 直接返回「1 列 × 1 行」的单区布局，
+         于是所有下游（分区线渲染 / 分区数 / 面积 / 水力 / 材料 / 三级工作区）
+         拿到的都是「一个区」，**天然全链路一致**，不会出现「画面是一个区、
+         计算按四个区」这种自相矛盾。
+       ⇒ 为什么改这里而不是改渲染：渲染只是末端；改末端会留下「数据仍是 4 区」
+         的半吊子状态（正是上一版被用户否掉的那种做法）。
+       ⇒ 三个开关口径的分工（别混）：
+         · 本开关 = 要不要**自动划分**（关闭 → 不划，整块一区）；
+         · 「调网格」= 自动划分之后，**手动微调**分区线位置；
+         · 「重置网格」= 把分区线恢复成系统默认位置。
+       ★★ 单位口径（v189 修正，踩过坑）：`zoneW/zoneH` 必须是 **plan 米**，
+         而不是 `b.w/b.h`（后者是 SVG 像素包围盒）。原因：下游 `ppGetZoneCuts`
+         拿 `zoneW/zoneH` 去和 `ppGetPlanDims()` 的 plan 米（planA/planB）做运算
+         (`ppSplitLength(dims.w, xDesign)`)；单位一旦混用，像素值通常远大于 plan 米，
+         `ppSplitLength` 的 `while` 会多切一刀 ⇒ 关闭分区后仍会残留 2 个分区（实测）。
+       ★★ 第二个坑（也是实测踩到）：`ppGetZoneCuts` 里有**长短边互换**逻辑 ——
+         `longIsX = dims.w >= dims.h; xDesign = longIsX ? shortSide : longSide;`
+         ⇒ `xDesign` 取的是 `zoneW/zoneH` 里**较短**的那条！所以只把「对应轴」给足
+         （如 zoneW=planW=600 / zoneH=planH=400）会被换成 xDesign=400 < 600
+         ⇒ `ppSplitLength(600,400)` = [400,200] ⇒ **仍切 2 格**。
+         ⇒ 正确做法：`zoneW/zoneH` **两条都给「整块的对角上限」**（≥ max(planW,planH)），
+           这样无论长短边怎么互换，`ppSplitLength(total, step>=total)` 都只返回 1 段。
+           取 `Math.hypot(w,h)` 作为统一的「比任何边都大」的安全上界，
+           保证 `step ≥ total` 恒成立（hypot ≥ max(W,H) ≥ 任何单边）。 */
+    if(!ppZoneAutoOn()){
+      /* 取「根本不切」的等价布局：设计边长给「比整块任何边都大」的值，
+         `ppSplitLength(total,total)` 的 `while(total-used > step+0.05)` 立即为假 ⇒ 返回 [total]（1 段）。
+         ⇒ 1 × 1 = 1 个区，全链路一致。 */
+      var _d0=ppGetPlanDims(b);
+      var _big=Math.hypot(_d0.w||1,_d0.h||1);   // ≥ max(planW,planH)，长短边互换后仍 ≥ 任何边
+      return {
+        cols:1, rows:1, N:1,
+        zoneW:_big, zoneH:_big,
+        drawZoneW:_big, drawZoneH:_big,
+        zoneArea:(_d0.w||1)*(_d0.h||1), rotated:false,
+        autoOff:true
+      };
+    }
     var dims=ppGetPlanDims(b);
     var base=calcPlanZoneLayout(dims.w,dims.h,planN,getManualPlanZoneMu());
     var cols=ppState.zoneRotated?base.rows:base.cols;
@@ -15465,16 +15515,20 @@ ppPullLiftDh();                                              // 首屏对齐一�
       if(typeof window.ppRefreshDiagramIfVisible==='function')window.ppRefreshDiagramIfVisible();
     });
   }
-  /* ===== [v185 2026-10-03] 地块划分开关（用户要求）=====
-   * 用户诉求：拼接/大地块传到二级管路页面后默认**自动划分**；不需要自动划分时
-   *   关掉本开关即可**隐藏自动划分的分区线**，改由用户**手动划分**（复用「调网格」）。
+  /* ===== [v185 建 / v189 改语义] 地块划分开关（用户要求）=====
+   * 用户诉求：大地块传到二级管路页面后默认**自动划分**分区（按左侧面板参数）；
+   *   不需要自动划分时，关掉本开关 = **该地块不再自动划分分区**（整块当一个区）。
    *
-   * 口径（与三级 ry-worst-off 同一范式，务必守住）：
-   *   · 分区数据**照常计算**（calcPlan / ppGetZoneLayout / ppGetZoneCuts 一律不动），
-   *     SVG 里分区层也**照常渲染**，只用一个 body 类 ry-zoneauto-off 门控 CSS 显隐。
-   *     这样「关开关」绝不会改变分区数 / 面积 / 水力 / 材料任何结果 ——
-   *     否则用户会看到「一关开关材料表就变了」这种莫名联动。
-   *   · 关闭时自动切到「调网格」模式，把「手动划分」的入口直接递到手上（用户点开关的目的就是手动划分）。
+   * ⚠ v189 语义纠正（2026-10-03，用户原话）：
+   *   「这个是显示分区线的的，而不是点击之后开启分区线调节的，你理解错了，
+   *     我的意思是 如果这个开关关闭之后，地块就不自动划分分区了，你修改过来。」
+   *   ⇒ 上一版把本开关实现成「只隐藏分区线、数据照常按 N 区算」是**错的**；
+   *     正确口径是**真的不划分**：关闭后分区数=1，面积/水力/材料全按整块算。
+   *   ⇒ 实现落在最上游 ppGetZoneLayout（开关关闭 → 返回 1×1 单区布局），
+   *     全链路天然一致，不留「画面一个区、数据四个区」的半吊子状态。
+   *   ⇒ 不再「关闭时自动切到调网格模式」—— 那是上一版错误语义下的附带行为；
+   *     现在的口径下关闭=不划分，没有「需要用户去手动调线」这回事
+   *     （想手动划分：保持开关打开，然后用「调网格」微调）。
    *   · 状态持久化到 localStorage['runye_zone_auto']，刷新/切页后保持。
    */
   function ppZoneAutoOn(){ return ppState.zoneAuto !== false; }
@@ -15484,18 +15538,16 @@ ppPullLiftDh();                                              // 首屏对齐一�
     var chk=document.getElementById('ppZoneAutoChk');
     if(chk && chk.checked !== on) chk.checked = on;
     var txt=document.getElementById('ppZoneAutoTxt');
-    if(txt) txt.textContent = on ? '地块划分' : '地块划分（手动）';
+    if(txt) txt.textContent = on ? '地块划分' : '地块划分（不划分）';
     var wrap=document.getElementById('ppZoneAutoWrap');
     if(wrap) wrap.title = on
-      ? '开启=自动划分并把分区线画出来；关闭=隐藏自动划分的分区线，改由「调网格」手动划分。注意：关闭只影响显示，分区数/面积/水力计算不受影响。'
-      : '当前：已隐藏自动划分的分区线，请用「调网格」手动划分。重新勾选可恢复自动划分显示。';
+      ? '开启=按左侧面板参数自动划分地块（画出分区线）。关闭=本块不自动划分，整块作为一个区参与面积/水力/材料计算。'
+      : '当前：本块不自动划分分区（整块当一个区）。重新勾选可按左侧面板参数自动划分。';
   }
   /* [v188 2026-10-03] 把「模式切换要同步微调箭头组显隐」这件事归一到一个函数。
-     起因（Edge 真渲染实测）：从「地块划分」开关切到 adjustCut 时，
-     按钮 active 变了、mode 也变了，但 #ppCutFineGroup 仍是 display:none ——
-     因为它的显隐原本只写在「调网格」按钮的 click 处理器里（见 ppSetMode 那段），
-     开关这条路径绕过了它 ⇒ 用户看到「按钮亮了却没有微调箭头」，属真实功能不一致。
-     （与既有 ppSetMode 里的写法保持同一口径：adjustCut → inline-flex，否则 none。） */
+     起因（Edge 真渲染实测）：从「调网格」进入 adjustCut 时，按钮 active 变了、
+     mode 也变了，但 #ppCutFineGroup 仍是 display:none 的话就会「按钮亮了却没有微调箭头」。
+     与既有 ppSetMode 里的写法保持同一口径：adjustCut → inline-flex，否则 none。 */
   function ppSyncFineGroup(){
     var fg=document.getElementById('ppCutFineGroup');
     if(fg) fg.style.display = (ppState.mode==='adjustCut') ? 'inline-flex' : 'none';
@@ -15505,24 +15557,21 @@ ppPullLiftDh();                                              // 首屏对齐一�
     ppState.zoneAuto = on;
     try{ localStorage.setItem('runye_zone_auto', on ? '1' : '0'); }catch(e){}
     ppApplyZoneAutoUI();
-    /* 关闭时把「手动划分」入口递到手上：切到调网格模式（分区数据不变，只是可拖动分区线）。
-       开启时若正处在调网格模式则退回浏览态 —— 自动划分已恢复，不需要再拖线。 */
+    /* 开关改变的是「分区怎么算」⇒ 必须重算 + 重绘下游，而不只是切个 CSS 类。
+       ppRender 负责二级画布；ppRefreshDiagramIfVisible 负责施工简图/材料联动。 */
     try{
-      if(!on){
-        ppState.mode='adjustCut';
-        document.querySelectorAll('#ppToolbar .pp-btn[data-mode]').forEach(function(b){
-          b.classList.toggle('active', b.getAttribute('data-mode')==='adjustCut');
-        });
-        ppSyncFineGroup();
-        ppRender();
-      } else if(ppState.mode==='adjustCut'){
+      if(ppState.mode==='adjustCut' && !on){
+        /* 关闭划分后「调网格」失去意义（没有内部线可拖）⇒ 退出该模式，避免残留按钮高亮。 */
         ppState.mode='main';
         document.querySelectorAll('#ppToolbar .pp-btn[data-mode]').forEach(function(b){
           b.classList.toggle('active', b.getAttribute('data-mode')==='main');
         });
         ppSyncFineGroup();
-        ppRender();
       }
+      ppRender();
+      if(typeof window.ppRefreshDiagramIfVisible==='function') window.ppRefreshDiagramIfVisible();
+      /* 三级页若在跑，也要跟着变（它读同一份分区网格）。 */
+      if(typeof window.tlRefreshFromPlan==='function'){ try{ window.tlRefreshFromPlan(); }catch(e){} }
     }catch(e){}
   }
   // 初始态：读存档；首次（无存档）默认开 = 自动划分，与现状一致（向后兼容，老流程零变化）
@@ -17614,17 +17663,19 @@ bindUI();
         window.__runyeMapFramePoly = null;
       }
 
-      /* [v185 2026-10-03] 拼接地块：把子地块环一并换算成本地米坐标存到全局。
-         子地块之间可能有道路/田埂隔开 —— 二级页需要各自的原环才能「分别布管」，
-         所以这里必须换算并保留，而不是只留下一个外轮廓。
-         换算口径与主地块严格一致（同 clat / 同首点经度原点），保证两者叠得上。 */
+      /* [v185/v189 2026-10-03] 成组地块：把各子地块环一并换算成本地米坐标存到全局。
+         子地块之间可能有道路/田埂/水渠/空地隔开 —— 二级页需要各自的**原环**才能
+         「分别布管、总管互连」，所以这里必须逐块换算并保留，而不是只留一个外轮廓。
+         ★ v189 语义纠正：传进来的是**各子地块本身**（不是合并后的大块），
+           块间空隙原样保留；换算口径与主地块严格一致（同 clat / 同首点经度原点），
+           保证各子地块与主地块叠得上。 */
       try{
         if(d.merged && Array.isArray(d.subPlots) && d.subPlots.length && window.__runyeGeoBase){
           var _b=window.__runyeGeoBase, _mlat=6378137*Math.PI/180, _cos=Math.cos(_b.refLat*Math.PI/180);
-          window.__runyeSubPlots = d.subPlots.map(function(s){
+          window.__runyeSubPlots = d.subPlots.map(function(s, si){
             var ll=s.polyLatLng||[];
             return {
-              id:s.id, name:s.name, mu:s.mu, sqm:s.sqm, crop:s.crop,
+              id:s.id, name:s.name||('子地块'+(si+1)), mu:s.mu, sqm:s.sqm, crop:s.crop,
               polyLatLng: ll.map(function(q){return [+q[0],+q[1]];}),
               center: s.center || null,
               poly: ll.map(function(q){

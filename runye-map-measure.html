@@ -181,7 +181,7 @@
         <div class="row"><span class="k">平方</span><span class="v"><span id="sq">0</span><small>㎡</small></span></div>
         <div class="row"><span class="k">周长</span><span class="v"><span id="peri">0</span><small>m</small></span></div>
         <div class="row"><span class="k">顶点</span><span class="v"><span id="pts">0</span><small>个</small></span></div>
-        <div class="hint">点击地图添加顶点；拖动顶点可微调；「完成并画下一块」会自动保存本块、清空画布并让你**接着画下一块**（可连画多块小地块）。画完点「🔗 拼接地块」把它们拼成一个大地块。画完点「➕ 加点」，拖动框线上的 ⊕ 手柄（或贴着框线单击）即可继续增加标点，把地块贴得更准。面积按真实球面经纬度计算。</div>
+        <div class="hint">点击地图添加顶点；拖动顶点可微调；「完成并画下一块」会自动保存本块、清空画布并让你**接着画下一块**（可连画多块小地块）。画完点「🔗 地块成组」把它们编成一组便于一起操作（**各块的轮廓与块间空隙原样保留**，不会并成一块）。画完点「➕ 加点」，拖动框线上的 ⊕ 手柄（或贴着框线单击）即可继续增加标点，把地块贴得更准。面积按真实球面经纬度计算。</div>
         <div class="save-row">
           <button class="mbtn mbtn-primary" id="btnCopy">↩ 回传设计工具</button>
           <button class="mbtn mbtn-primary" id="btnSavePlot">💾 保存地块</button>
@@ -200,12 +200,13 @@
         <h4 class="sec-t">我的地块</h4>
         <div class="pill-list" id="myPlotList" hidden></div>
         <div class="hint" id="myPlotHint">保存/导入后的地块列在这里；点击飞到该地块，×删除。</div>
-        <!-- [v185 2026-10-03] 多地块拼接：勾选若干相邻小地块 → 拼接为一个大地块
-             （保留子地块 + 外层综合轮廓）。拼好的大地块可直接「回传设计工具」
+        <!-- [v185/v189 2026-10-03] 多地块成组：勾选若干相邻小地块 → 编为一组便于一起操作。
+             ★ 语义：只成组、不改几何；各块轮廓与块间道路/间隔/水渠/空地**原样保留**。
+             成组后可直接「回传设计工具」把**各子地块**（而不是合并后的大块）
              传给二级管路页面；各子地块可分别布管，再用总管互连。 -->
         <div class="save-row">
-          <button class="mbtn" id="btnMerge">🔗 拼接地块</button>
-          <button class="mbtn" id="btnMergeExit" hidden>✓ 完成拼接</button>
+          <button class="mbtn" id="btnMerge">🔗 地块成组</button>
+          <button class="mbtn" id="btnMergeExit" hidden>✓ 完成成组</button>
         </div>
         <div class="hint" id="mergeHint" hidden></div>
         <div class="save-row">
@@ -747,7 +748,7 @@
     if(drawing) map.dragging.disable(); else map.dragging.enable();
     btnDraw.textContent = drawing ? '✏️ 绘制中…' : '✏️ 开始画框';
     document.getElementById('tip').textContent = drawing
-      ? '十字光标处即落点：依次点击地块边界顶点；点「完成」即可定稿并**直接接着画下一块**（可连画多块，最后再拼接）。'
+      ? '十字光标处即落点：依次点击地块边界顶点；点「完成」即可定稿并**直接接着画下一块**（可连画多块，最后再成组）。'
       : '点击「✏️ 开始画框」后，在卫星图上依次点击地块边界顶点即可；点「完成」自动保存该块、清空画布并继续下一块。';
   }
   btnDraw.onclick=function(){ setDrawing(!drawing); };
@@ -1045,16 +1046,28 @@
       var saved=lib.filter(function(p){return p.id===pid;})[0];
       var nm=saved?saved.name:'';
       var payload={plotId:pid, name:nm, mu:mu, sqm:sqm, poly:latlngs(), ts:Date.now(), source:'map'};
-      /* [v185] 若当前地块是「拼接地块」，把子地块环一并传给二级管路页面。
-         为什么必须传：子地块之间可能有**道路 / 田埂**要隔开，二级页要按实际
-         分隔关系分别布管、再用总管相连 —— 少了子地块环，二级页只能看到一个
-         外轮廓，就没法体现「哪里是隔开的」。 */
-      if(saved && saved.merged && saved.subPlots && saved.subPlots.length){
+      /* [v185/v189] 若当前地块是「成组地块」，把**各子地块本身**一并传给二级管路页面。
+         为什么必须传：子地块之间可能有**道路 / 田埂 / 水渠 / 无法利用的空地**要隔开，
+         二级页要按实际分隔关系分别布管、再用总管相连 —— 少了子地块环，二级页只能
+         看到一个外轮廓，就没法体现「哪里是隔开的」。
+         ★ v189 语义纠正：传的是**各子地块本身的环**（polyLatLngSet / subPlots[].polyLatLng），
+           不是合并后的大块；块间空隙原样保留。优先用权威几何 polyLatLngSet。 */
+      if(saved && saved.merged && ((saved.polyLatLngSet && saved.polyLatLngSet.length) || (saved.subPlots && saved.subPlots.length))){
         payload.merged=true;
-        payload.subPlots=saved.subPlots.map(function(s){
-          return { id:s.id, name:s.name, mu:s.mu, sqm:s.sqm, crop:s.crop,
-                   polyLatLng:s.polyLatLng, center:s.center };
-        });
+        payload.grouped=true;              // v189 正式语义：成组（几何不合并）
+        var ringSet=saved.polyLatLngSet;
+        var subs=saved.subPlots||[];
+        var n=Math.max(subs.length, (ringSet&&ringSet.length)||0);
+        var out=[];
+        for(var i=0;i<n;i++){
+          var s=subs[i]||{};
+          var ring=(ringSet&&ringSet[i])?ringSet[i]:s.polyLatLng;
+          if(!ring || ring.length<3) continue;
+          out.push({ id:s.id||(pid+'-sub'+i), name:s.name||('子地块'+(i+1)),
+                     mu:s.mu, sqm:s.sqm, crop:s.crop,
+                     polyLatLng:ring, center:s.center });
+        }
+        if(out.length) payload.subPlots=out;
       }
       localStorage.setItem('runyeMeasuredArea', JSON.stringify(payload));
       var btn=document.getElementById('btnCopy');
@@ -1137,22 +1150,23 @@
   var rymHandle=null;
   try{ if(window.RunyeMapEnhance) rymHandle=window.RunyeMapEnhance.attach(map, {onMeasure:setMeasureOn, toDisplay:toDisplay, autoFit:!lsGet(K_VIEW,null), onMergeMode:onMergeModeChange, mergePick:false, onMergeDone:function(){ renderMyPlots(); }}); }catch(e){}
 
-  /* ===== [v185 2026-10-03] 多地块拼接 =====
-   * 用户诉求：画几个相邻小地块 → 拼接成一个大地块；各小地块分别布管，
-   *   再用总管互连；拼好的大地块直接传给二级管路页面。
-   * 交互：点「🔗 拼接地块」进入拼接模式 → 单击地图上的地块多选（紫色高亮）
-   *   → 底部操作条「拼接为大地块」→ 生成大地块（保留子地块 + 外层综合轮廓）。
-   * 拼接模式的开关同时驱动 RunyeMapEnhance 的图层面板里「🔗 拼接多选」勾选框，
+  /* ===== [v185/v189 2026-10-03] 多地块成组 =====
+   * 用户诉求：画几个相邻小地块 → **成组**便于一起操作；各小地块分别布管，
+   *   再用总管互连；成组后把**各子地块本身**传给二级管路页面。
+   * ★ 语义纠正（v189）：这是成组、不是拼接 —— 不改几何、不消除块间空隙。
+   * 交互：点「🔗 地块成组」进入成组模式 → 单击地图上的地块多选（紫色高亮）
+   *   → 底部操作条「成组（保留各自轮廓）」→ 生成成组地块（各成员环各自保留）。
+   * 成组模式的开关同时驱动 RunyeMapEnhance 的图层面板里「🔗 地块成组」勾选框，
    *   两处状态始终一致（避免「按钮说开着、面板说关着」的分裂）。 */
   var mergeMode=false;
   function onMergeModeChange(on){ mergeMode=!!on; syncMergeUI(); }
   function syncMergeUI(){
     var b=document.getElementById('btnMerge'), x=document.getElementById('btnMergeExit'), h=document.getElementById('mergeHint');
-    if(b){ b.classList.toggle('btn-on', mergeMode); b.textContent=mergeMode?'🔗 拼接中…':'🔗 拼接地块'; }
+    if(b){ b.classList.toggle('btn-on', mergeMode); b.textContent=mergeMode?'🔗 成组中…':'🔗 地块成组'; }
     if(x) x.hidden=!mergeMode;
     if(h){
       h.hidden=!mergeMode;
-      h.textContent=mergeMode?'拼接模式：单击地块选中（可多选），底部「拼接为大地块」。再次点击已选地块可取消选中。':'';
+      h.textContent=mergeMode?'成组模式：单击地块选中（可多选），底部「成组（保留各自轮廓）」。再次点击已选地块可取消选中。各块轮廓与块间空隙都会保留。':'';
     }
   }
   function setMergeMode(on){
@@ -1166,7 +1180,7 @@
       }
     }
     if(on){
-      // 拼接模式下先退出绘制/加点/测距，避免单击既落点又选地块
+      // 成组模式下先退出绘制/加点/测距，避免单击既落点又选地块
       try{ if(typeof drawing!=='undefined' && drawing) setDrawing(false); }catch(e){}
       try{ if(typeof setAddMode==='function') setAddMode(false); }catch(e){}
       try{ if(typeof measuring!=='undefined' && measuring) document.getElementById('btnMeasure').click(); }catch(e){}
@@ -1177,10 +1191,9 @@
   document.getElementById('btnMergeExit').onclick=function(){ setMergeMode(false); };
   syncMergeUI();
 
-  /* 拼接完成/撤销后模块内部会 refresh 重绘，但地图页左侧「我的地块」列表属于
-   * 宿主页 DOM，模块管不到 ⇒ 由本页自己重列。模块的底部操作条点「拼接为大地块」
-   * 时无法回调本页，所以这里注册一个轻量轮询式兜底：模块写完库会改 ts，
-   * 用 storage 事件最干净（同一页面内 storage 事件不触发，故仍以按钮为主线）。 */
+  /* 成组完成/解散后模块内部会 refresh 重绘，但地图页左侧「我的地块」列表属于
+   * 宿主页 DOM，模块管不到 ⇒ 由本页自己重列。模块的底部操作条点「成组」时
+   * 模块会通过 opts.onMergeDone 回调本页（doMergeSelected 里 state.onMergeDone）。 */
   function refreshPlotLibrary(){
     if(rymHandle && rymHandle.refresh) rymHandle.refresh();
     renderMyPlots();
@@ -1272,11 +1285,11 @@
       var row=document.createElement('div'); row.className='place-item';
       var go=document.createElement('button');
       go.type='button'; go.className='place-go';
-      // [v185] 拼接地块：前缀「🔗」并在名称后显示子地块数；归档中的子地块加「⊂」前缀
+      // [v185/v189] 成组地块：前缀「🔗」并在名称后显示子地块数；归档中的子地块加「⊂」前缀
       var prefix = p.merged ? '🔗' : (p.mergedInto ? '⊂' : '📍');
-      var suffix = p.merged ? '（'+(p.subPlots?p.subPlots.length:0)+'块拼接）' : '';
+      var suffix = p.merged ? '（'+(p.subPlots?p.subPlots.length:0)+'块成组）' : '';
       go.textContent=prefix+' '+(p.name||'地块')+suffix+'（'+(p.mu!=null?p.mu:'?')+'亩）';
-      go.title = p.merged ? ('由 '+(p.subPlots||[]).length+' 个子地块拼接而成：'+(p.subPlots||[]).map(function(s){return s.name||s.id;}).join('、'))
+      go.title = p.merged ? ('由 '+(p.subPlots||[]).length+' 个子地块成组（轮廓与块间空隙保留）：'+(p.subPlots||[]).map(function(s){return s.name||s.id;}).join('、'))
                           : (p.name||'');
       go.onclick=function(){
         var ll=p.polyLatLng;
@@ -1292,18 +1305,18 @@
         if(typeof rymHandle!=='undefined' && rymHandle && rymHandle.refresh){ try{ rymHandle.refresh(); }catch(e){} }
       };
       row.appendChild(go);
-      // [v185] 拼接地块多给一个「↩ 撤销拼接」按钮（拆回子地块）
+      // [v185/v189] 成组地块多给一个「↩ 解散成组」按钮（拆回子地块）
       if(p.merged){
         var un=document.createElement('button');
-        un.type='button'; un.className='place-del'; un.textContent='↩'; un.title='撤销拼接，拆回 '+(p.subPlots?p.subPlots.length:0)+' 个子地块';
+        un.type='button'; un.className='place-del'; un.textContent='↩'; un.title='解散成组，拆回 '+(p.subPlots?p.subPlots.length:0)+' 个子地块（轮廓与块间空隙本来就没动过）';
         un.onclick=function(){
-          if(!confirm('撤销拼接？\n将把「'+(p.name||'该地块')+'」拆回 '+((p.subPlots||[]).length)+' 个子地块。')) return;
+          if(!confirm('解散成组？\n将把「'+(p.name||'该地块')+'」拆回 '+((p.subPlots||[]).length)+' 个子地块。')) return;
           try{
             var r=RunyeMapEnhance.merge.unmerge(p.id);
-            if(!r.ok){ alert('撤销拼接失败：'+r.reason); return; }
+            if(!r.ok){ alert('解散成组失败：'+r.reason); return; }
             renderMyPlots();
             if(rymHandle && rymHandle.refresh) rymHandle.refresh();
-          }catch(e){ alert('撤销拼接失败：'+e.message); }
+          }catch(e){ alert('解散成组失败：'+e.message); }
         };
         row.appendChild(un);
       }

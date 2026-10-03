@@ -56,7 +56,7 @@
       '.ry-field-mode #map path{stroke-width:3.5px !important}' +
       '.ry-field-mode .leaflet-popup-content{font-size:14px;font-weight:600}' +
       '.ry-field-mode .rym-layer-panel{background:#fff8e1;border:2px solid #f59e0b}' +
-      /* [v185] 拼接多选：选中地块加粗描边（Leaflet 图层级样式已另设，此处补一条 CSS 兜底） */
+      /* [v185] 成组多选：选中地块加粗描边（Leaflet 图层级样式已另设，此处补一条 CSS 兜底） */
       '.rym-sel-badge{position:absolute;z-index:1000;background:#7c3aed;color:#fff;' +
       'font:11px/1.4 system-ui,sans-serif;padding:2px 6px;border-radius:9px;white-space:nowrap;' +
       'box-shadow:0 1px 3px rgba(0,0,0,.3);pointer-events:none}' +
@@ -84,7 +84,7 @@
         dripGroup: L.layerGroup().addTo(map),
         deviceGroup: L.layerGroup().addTo(map),
         panelEl: null,
-        /* [v185] 拼接多选态：被选中的地块 id 集合。刷新渲染后按此重画高亮。 */
+        /* [v185] 成组多选态：被选中的地块 id 集合。刷新渲染后按此重画高亮。 */
         selected: {},
         /* 每个地块 id → 它的 L.polygon 图层（供高亮与点击切换） */
         plotLayers: {}
@@ -110,7 +110,7 @@
       state.mergeSelected = function (o) {
         return doMergeSelected(state, o);
       };
-      /* 兜底入口：面板里没有「拼接多选」勾选框时，宿主页仍可直接翻内部态 */
+      /* 兜底入口：面板里没有「地块成组」勾选框时，宿主页仍可直接翻内部态 */
       state.mergeSetPick = function (on) {
         state.mergePick = !!on;
         if (!on) { try { state.clearSelection(); } catch (e) {} }
@@ -162,10 +162,12 @@
      * 不在本脚本的图层组里）⇒ 只在宿主页显式传了 opts.onMeasure 时才加这一行，
      * 别的引用页（如 index.html）不会凭空多出一个「勾了没反应」死控件。 */
     if (opts && typeof opts.onMeasure === 'function') ROWS.push(['measure', '测量框']);
-    /* [v185] 拼接模式：勾上后单击地块 = 多选（不弹气泡），底部出现「拼接为大地块」操作条。
+    /* [v185] 成组模式：勾上后单击地块 = 多选（不弹气泡），底部出现「成组」操作条。
+     * [v189 2026-10-03] 用户纠正：这里不是「拼接成一个大块」，而是**地块成组**（编组），
+     *   各子地块的几何/轮廓/块间空隙（道路、间隔、水渠、无法利用的空地）**原样保留**。
      * 只在宿主页显式传了 opts.onMergeMode 时才出现，避免其它引用页多出死控件。 */
     var hasMergeRow = !!(opts && typeof opts.onMergeMode === 'function');
-    if (hasMergeRow) ROWS.push(['mergepick', '🔗 拼接多选']);
+    if (hasMergeRow) ROWS.push(['mergepick', '🔗 地块成组']);
     el.innerHTML = '<div class="rym-lp-t">图层</div>' + ROWS.map(function (r) {
       var on = (saved[r[0]] !== false);   // 默认全开；只有显式存过 false 才关
       return '<label><input type="checkbox" data-rym="' + r[0] + '"' + (on ? ' checked' : '') + '> ' + r[1] + '</label>';
@@ -181,7 +183,7 @@
         if (opts && typeof opts.onMeasure === 'function') { try { opts.onMeasure(on); } catch (e) {} }
         return;
       }
-      if (k === 'mergepick') {               // [v185] 拼接多选模式：交给宿主页与本模块共同处理
+      if (k === 'mergepick') {               // [v185] 地块成组模式：交给宿主页与本模块共同处理
         state.mergePick = !!on;
         if (!on) { try { state.clearSelection(); } catch (e) {} }
         if (opts && typeof opts.onMergeMode === 'function') { try { opts.onMergeMode(on); } catch (e) {} }
@@ -321,10 +323,12 @@
   }
 
   /* =====================================================================
-   * [v185] 拼接多选：状态 → 画面
+   * [v185] 地块成组：状态 → 画面
    * ---------------------------------------------------------------------
-   * 交互契约：opts.mergePick === true 时（地图页开启「拼接」模式），
-   *   单击地块 = 选中/取消（不弹气泡）；已是拼接地块 = 提示先「撤销拼接」。
+   * 交互契约：opts.mergePick === true 时（地图页开启「地块成组」模式），
+   *   单击地块 = 选中/取消（不弹气泡）；已成组地块 = 提示先「解散成组」。
+   * [v189 2026-10-03] 用户纠正：这是**成组**，不是拼接 —— 子地块之间
+   *   的道路/间隔/水渠/空地一律保留，几何不做任何合并。
    * 只改图层样式，不重建图层 —— 避免每次勾选都重画整张图。
    * ===================================================================== */
 
@@ -336,7 +340,7 @@
       var rec = state.plotLayers[id];
       if (!rec || !rec.layer) return;
       var on = !!state.selected[id];
-      /* [v187] 拼接地块由 N 个子地块环组成 ⇒ 选中/取消必须**逐圈**应用，
+      /* [v187] 成组地块由 N 个子地块环组成 ⇒ 选中/取消必须**逐圈**应用，
        *   否则只有第一圈变色，看起来像「选了半块」，很容易被当成 bug。
        *   普通地块的 rec.layers 长度就是 1，走同一条路径，无分支差异。 */
       var all = (rec.layers && rec.layers.length) ? rec.layers : [rec.layer];
@@ -361,7 +365,7 @@
     renderMergeBar(state, ids);
   }
 
-  /** 底部「已选 N 块」操作条：仅在拼接模式下、且选中 ≥1 时出现 */
+  /** 底部「已选 N 块」操作条：仅在成组模式下、且选中 ≥1 时出现 */
   function renderMergeBar(state, ids) {
     var host = state.map.getContainer();
     var bar = state.mergeBar;
@@ -382,7 +386,7 @@
       return rec ? (rec.name || id) : id;
     });
     bar.innerHTML = '<span>已选 <b>' + ids.length + '</b> 块：' + escapeHtml(names.join('、')) + '</span>' +
-      '<button type="button" class="rym-mb-go"' + (ids.length < 2 ? ' disabled' : '') + '>拼接为大地块</button>' +
+      '<button type="button" class="rym-mb-go"' + (ids.length < 2 ? ' disabled' : '') + '>成组（保留各自轮廓）</button>' +
       '<button type="button" class="rym-mb-clear">清空选择</button>';
     var go = bar.querySelector('.rym-mb-go');
     var cl = bar.querySelector('.rym-mb-clear');
@@ -390,7 +394,9 @@
     if (cl) cl.onclick = function () { state.clearSelection(); };
   }
 
-  /** 执行拼接：把当前选中的地块合成一个大地块写入地块库，原小地块移到 mergedInto 归档区 */
+  /** 执行成组：把当前选中的地块编为一个「成组地块」写入地块库。
+   *  [v189 2026-10-03] 语义：**不改几何、不消除块间空隙**。原小地块移到 mergedInto 归档区，
+   *   成组地块以 polyLatLngSet（各成员环集合）为权威几何，块间的道路/间隔/水渠/空地原样保留。 */
   function doMergeSelected(state, o) {
     o = o || {};
     var ids = Object.keys(state.selected || {});
@@ -403,14 +409,14 @@
     var picked = [];
     lib.forEach(function (p) { if (p && ids.indexOf(p.id) >= 0) picked.push(p); });
     if (picked.length < 2) return { ok: false, reason: '选中的地块已不存在（可能刚被删除）' };
-    // 已是拼接地块的不能重复拼（否则会丢失上一次的子地块归属）
+    // 已成组的不能再重复成组（否则会丢失上一次的子地块归属）
     var nested = picked.filter(function (p) { return p.merged; });
     if (nested.length) {
-      return { ok: false, reason: '「' + (nested[0].name || nested[0].id) + '」本身已是拼接地块，请先「撤销拼接」后再拼' };
+      return { ok: false, reason: '「' + (nested[0].name || nested[0].id) + '」本身已是成组地块，请先「解散成组」后再成组' };
     }
 
     var big = mergePlots(picked, { name: o.name });
-    if (!big) return { ok: false, reason: '拼接失败：子地块缺少有效环' };
+    if (!big) return { ok: false, reason: '成组失败：子地块缺少有效环' };
 
     // 原小地块保留在库里但标记归属：体现「保留子地块」，且它们可再被还原
     var rest = lib.map(function (p) {
@@ -433,7 +439,7 @@
     return { ok: true, merged: big };
   }
 
-  /** 撤销拼接：把大地块拆回子地块（子地块原本就在库里，只需解除归档与大地块） */
+  /** 解散成组：把成组地块拆回子地块（子地块原本就在库里，只需解除归档与成组地块本身） */
   function doUnmerge(state, bigId) {
     var lib;
     try { lib = JSON.parse(localStorage.getItem('runye_plot_library') || '[]'); }
@@ -470,13 +476,13 @@
     var plots = (opts && opts.plots) ? opts.plots : readPlotLibrary();
     var fromLib = !(opts && opts.plots);
     var drawn = 0, skipped = 0, healed = 0, cleaned = 0;
-    /* [v185] 已被拼接进大地块的原小地块不单独画（大地块的外轮廓已含它），
-       但仍留在库里（保留子地块）→ 只在 popup 里提示它属于哪个大地块。 */
+    /* [v185] 已成组的原小地块不单独画（由成组地块代表），
+       但仍留在库里（保留子地块）→ 只在 popup 里提示它属于哪个成组地块。 */
     var mergedAway = {};
     plots.forEach(function (p) { if (p && p.mergedInto) mergedAway[p.id] = p.mergedInto; });
     plots.forEach(function (p) {
       try {
-        if (p && p.mergedInto) return;   // 归档中的子地块：跳过绘制（由大地块代表）
+        if (p && p.mergedInto) return;   // 归档中的子地块：跳过绘制（由成组地块代表）
         var rawLL = p.polyLatLng;
         var ll = validRingLL(rawLL);
         if (!ll) {
@@ -499,43 +505,65 @@
           p.sqm=Math.round(RunyeGeo.geodesicArea(ll)); p.mu=+(p.sqm/666.67).toFixed(2); healed++;
         }
         var color = p.color || cropColor(p.crop);
-        /* ===== [v187 2026-10-03] 拼接地块：只画「各自轮廓线」，外面不再加外框 =====
-         * 用户原话：「地块拼接之后 是各自的轮廓线，外面不用再加一个框。」
-         * 旧实现画两层：① 外层凸包大框（紫粗实线）② 子地块环（紫细虚线，且**只在拼接模式下**画）
-         *   ⇒ 平时视图看到的是「一个包住所有小地块的大框」，等于把子地块信息藏起来了，
-         *     而子地块恰恰是后续「分别布管」的依据。且凸包会把 L 形/凹形地块的角补满，
-         *     面积比实际大（已知偏差），画出来还误导。
-         * 新实现：**去掉外层凸包框**，改为把每个子地块各自画一圈**独立闭合**的轮廓线，
-         *   颜色用**各自的作物色**（与未拼接时观感一致，一眼区分不同子地块）。
-         * 这样「拼接」在数据上仍是一个大地块（传递到二级页仍带 subPlots），
-         *   但在地图上呈现为「几块各自的地」——正是用户要的。
-         * 注意：交互层（popup / 点击选中 / 撤销拼接）必须保留，否则去掉外框就点不到。
-         *   做法：给每个子地块环挂上同一套 popup 与 click 处理器，任一块都能唤起。
+        /* ===== [v187/v189 2026-10-03] 成组地块：只画「各自轮廓线」，外面不加框，也不合并几何 =====
+         * 用户原话（v187）：「地块拼接之后 是各自的轮廓线，外面不用再加一个框。」
+         * 用户原话（v189）：「正确理解地块拼接，实际上不是拼接是地块成组，我可能一个大地块分开画
+         *   很多小地块，这些小地块在一起操作……这些小地块之间有的道路、间隔 那些都要保留，
+         *   而不是给拼接起来，比如说两个地块间距有 3 米，那这个三米就留着。」
+         *
+         * ⇒ 权威几何是 `polyLatLngSet`（**各成员环的集合**，互不合并、块间空隙原样保留），
+         *   而不是 `polyLatLng`（那是凸包，只作包围盒/飞行的参考外框，画出来会吞掉空隙）。
+         * 绘制规则（优先级从高到低）：
+         *   ① 成组地块 ⇒ 优先按 `polyLatLngSet` 的**每一个环**各画一圈独立闭合轮廓；
+         *      环缺失时退回 `subPlots[].polyLatLng`（老库兼容）；再退回凸包（不让地块消失）。
+         *   ② 普通地块 ⇒ 画它自己的单环。
+         * 颜色用**各成员自己的作物色**（与未成组时观感一致，一眼区分不同子地块）。
+         * 注意：交互层（popup / 点击选中 / 解散成组）必须保留，否则去掉外框就点不到。
+         *   做法：给每个成员环挂上同一套 popup 与 click 处理器，任一块都能唤起。
          * 另加一个「描边兜底」的不可见外轮廓（opacity 0）——不参与视觉，
          *   仅用于 `fitBounds` / 选中态改样式时有一个代表整块的几何可引用。 */
         var isMerged = !!(p.merged && p.subPlots && p.subPlots.length);
         var baseStyle = isMerged
           ? { color: '#7c3aed', weight: 2.5, fillColor: '#a78bfa', fillOpacity: 0.12 }
           : { color: color, weight: 2, fillColor: color, fillOpacity: 0.18 };
-        /* --- 图层集合：普通地块 = 1 个多边形；拼接地块 = N 个子地块各自一圈 ---
+        /* --- 图层集合：普通地块 = 1 个多边形；成组地块 = N 个成员各自一圈 ---
          * 统一放进 `layers` 数组，后面的 popup / click / 选中样式都按数组处理。 */
         var layers = [];
         if (isMerged) {
-          p.subPlots.forEach(function (s, si) {
-            if (!s.polyLatLng || s.polyLatLng.length < 3) return;
-            var sLL = validRingLL(s.polyLatLng);
-            if (!sLL) return;
-            /* 子地块自己的作物色：库里没写就退回大地块的，再退回调色板 */
-            var sColor = s.color || cropColor(s.crop || p.crop);
-            var sStyle = { color: sColor, weight: 2.5, fillColor: sColor, fillOpacity: 0.22 };
-            var sPoly = L.polygon(displayLL(sLL, opts), sStyle);
-            sPoly._rySubIdx = si;
-            sPoly._rySubStyle = sStyle;     // 取消选中时还原「这块自己的颜色」，而不是大地块的底色
-            layers.push(sPoly);
-          });
+          /* ★ 权威几何：polyLatLngSet（各成员环集合）。与 subPlots 一一对应时用 subPlots 的
+           *   颜色/名称；只有环、没有对应 subPlot 时（异常库）也照样画出来，不丢几何。 */
+          var ringSet = (p.polyLatLngSet && p.polyLatLngSet.length) ? p.polyLatLngSet : null;
+          if (ringSet) {
+            ringSet.forEach(function (ring, si) {
+              var sLL = validRingLL(ring);
+              if (!sLL || sLL.length < 3) return;
+              var meta = (p.subPlots && p.subPlots[si]) || {};
+              var sColor = meta.color || cropColor(meta.crop || p.crop);
+              var sStyle = { color: sColor, weight: 2.5, fillColor: sColor, fillOpacity: 0.22 };
+              var sPoly = L.polygon(displayLL(sLL, opts), sStyle);
+              sPoly._rySubIdx = si;
+              sPoly._rySubStyle = sStyle;     // 取消选中时还原「这块自己的颜色」，而不是成组地块的底色
+              layers.push(sPoly);
+            });
+          }
+          /* 老库兼容：没有 polyLatLngSet 时退回 subPlots[].polyLatLng（几何等价，仍保留空隙） */
+          if (!layers.length) {
+            p.subPlots.forEach(function (s, si) {
+              if (!s.polyLatLng || s.polyLatLng.length < 3) return;
+              var sLL = validRingLL(s.polyLatLng);
+              if (!sLL) return;
+              /* 子地块自己的作物色：库里没写就退回成组地块的，再退回调色板 */
+              var sColor = s.color || cropColor(s.crop || p.crop);
+              var sStyle = { color: sColor, weight: 2.5, fillColor: sColor, fillOpacity: 0.22 };
+              var sPoly = L.polygon(displayLL(sLL, opts), sStyle);
+              sPoly._rySubIdx = si;
+              sPoly._rySubStyle = sStyle;
+              layers.push(sPoly);
+            });
+          }
         }
         if (!layers.length) {
-          // 普通地块，或拼接地块的 subPlots 全不可用（退化兜底：画凸包外轮廓，别让地块消失）
+          // 普通地块，或成组地块的成员环全不可用（退化兜底：画参考外框，别让地块消失）
           layers.push(L.polygon(displayLL(ll, opts), baseStyle));
         }
         var poly = layers[0];        // 代表层：fitBounds / 记录 plotLayers 用
@@ -555,19 +583,19 @@
               (s.mu != null ? '（' + (+s.mu).toFixed(2) + ' 亩）' : '') + '</div>';
           }).join('');
           subHtml = '<div style="margin-top:5px;border-top:1px dashed #cbd5e1;padding-top:4px">' +
-            '<b style="color:#7c3aed">由 ' + p.subPlots.length + ' 个子地块拼接</b>' +
+            '<b style="color:#7c3aed">由 ' + p.subPlots.length + ' 个子地块成组（各自轮廓 / 块间空隙保留）</b>' +
             '<div style="color:#64748b;margin-top:2px">各子地块可分别布置管道，再用总管互连</div>' +
             subRows + '</div>' +
-            '<button id="rymUnmerge" style="margin-top:5px;padding:3px 12px;background:#7c3aed;color:#fff;border:0;cursor:pointer;font-size:12px">↩ 撤销拼接</button>';
+            '<button id="rymUnmerge" style="margin-top:5px;padding:3px 12px;background:#7c3aed;color:#fff;border:0;cursor:pointer;font-size:12px">↩ 解散成组</button>';
         }
         /* ===== 交互绑定：popup / 点击 / 加入图层组 =====
-         * 拼接地块有 N 个子地块环 ⇒ **每一圈都要能唤起同一套气泡与点击**，
+         * 成组地块有 N 个成员环 ⇒ **每一圈都要能唤起同一套气泡与点击**，
          * 否则用户点到「没有外框的那部分」就没反应（去掉外框后最易踩的坑）。
          * 用 forEach 逐层绑定，行为与单层时完全一致。 */
         var popupHtml =
           '<div style="font:12px/1.6 system-ui,sans-serif;min-width:190px">' +
           '<b style="color:' + (isMerged ? '#7c3aed' : '#15803d') + '">' +
-          escapeHtml(p.name || '未命名地块') + (isMerged ? '（拼接地块）' : '') + '</b><br>' +
+          escapeHtml(p.name || '未命名地块') + (isMerged ? '（成组地块）' : '') + '</b><br>' +
           '面积：<b>' + (+mu).toFixed(2) + '</b> 亩　顶点：' + ll.length + ' 个' +
           subHtml +
           '<label style="display:block;margin-top:5px">作物 <input id="rymCrop" style="width:88%;padding:2px 4px;border:1px solid #cbd5e1" value="' + escapeHtml(p.crop || '') + '" placeholder="如：七彩花生"></label>' +
@@ -589,16 +617,16 @@
           };
           var ub = document.getElementById('rymUnmerge');
           if (ub) ub.onclick = function () {
-            if (!confirm('撤销拼接？\n将把「' + (p.name || '该地块') + '」拆回 ' + ((p.subPlots || []).length) + ' 个子地块。')) return;
+            if (!confirm('解散成组？\n将把「' + (p.name || '该地块') + '」拆回 ' + ((p.subPlots || []).length) + ' 个子地块（各自的轮廓与块间空隙本来就没动过）。')) return;
             var r = doUnmerge(state, p.id);
-            if (!r.ok) alert('撤销拼接失败：' + r.reason);
+            if (!r.ok) alert('解散成组失败：' + r.reason);
           };
         };
         var onClickPick = function (e) { try { opts.onPick(p); } catch (err) {} };
         var onClickMerge = function (e) {
           try {
             if (L.DomEvent && e) L.DomEvent.stopPropagation(e);
-            if (p.merged) { alert('「' + (p.name || '该地块') + '」已是拼接地块。\n如需重拼，请先在气泡里「撤销拼接」。'); return; }
+            if (p.merged) { alert('「' + (p.name || '该地块') + '」已是成组地块。\n如需重新成组，请先在气泡里「解散成组」。'); return; }
             state.toggleSelect(p.id);
           } catch (err) {}
         };
@@ -611,8 +639,8 @@
         });
         if (outerGhost) outerGhost.addTo(state.plotGroup);
         /* 记录图层，供 applySelection 改样式 / 操作条取名字。
-         * ★ layers 是数组：拼接地块要能把**每一圈**都切成选中态，
-         *   否则会出现「只有第一个子地块变色、其余的没反应」的怪现象。 */
+         * ★ layers 是数组：成组地块要能把**每一圈**都切成选中态，
+         *   否则会出现「只有第一个成员变色、其余的没反应」的怪现象。 */
         state.plotLayers[p.id] = {
           layer: poly, layers: layers, ghost: outerGhost,
           baseStyle: baseStyle, name: p.name || p.id,
@@ -821,18 +849,21 @@
   }
 
   /* =====================================================================
-   * [v185 2026-10-03] 地块拼接（merge）
+   * [v185/v189 2026-10-03] 地块成组（group）
    * ---------------------------------------------------------------------
-   * 用户诉求：在地图上画几个相邻小地块 → 拼接成一个大地块；各小地块各自
-   *          布管，再用总管互连；拼接后的大地块传给二级管路页面。
+   * 用户诉求：在地图上画几个相邻小地块 → **成组**便于一起操作；各小地块各自
+   *          布管，再用总管互连；成组后把**各子地块本身**传给二级管路页面。
    *
-   * 设计口径（已与用户确认）：**保留子地块 + 外层综合轮廓**
-   *   · 大地块仍是一个地块实体（进地块库、能传递到二级页）；
-   *   · 但内部记住由哪几个子地块组成（subPlots），子地块环各自保留
-   *     —— 这样后续才能「分别对每个子地块布管」。
+   * ★ v189 用户纠正后的设计口径：**只成组，不拼接几何**
+   *   · 原小地块仍留在库里（只是被标记 mergedInto 归到组下）；
+   *   · 另生成一个「成组地块」实体（进地块库、能传递到二级页）；
+   *   · 权威几何 = polyLatLngSet（**各成员环的集合**），块与块之间的
+   *     道路 / 间隔 / 水渠 / 空地**原样保留**，不得被并进来；
+   *   · 凸包（hullLatLng / polyLatLng）**仅作参考外框**（包围盒 / 飞行定位 / 居中），
+   *     不参与面积、不参与渲染，避免「看起来连成一片」的误导。
    *
-   * 为什么不做几何并集？并集会抹掉子地块边界，就再也拆不回子地块了。
-   * 本模块只做「外层综合轮廓」的构造：取全部子地块顶点的凸包。
+   * 为什么不做几何并集、也不拿凸包当轮廓？两者都会抹掉子地块边界与块间空隙，
+   * 就再也拆不回、也画不出「各自的地」了。
    *
    * 注意：本模块是纯函数，不依赖 Leaflet、不碰 DOM，浏览器/Node 均可测。
    * ===================================================================== */
@@ -873,23 +904,38 @@
     return lower.concat(upper);
   }
 
-  /** 把若干地块拼成「大地块」数据对象（纯函数，不改动入参）。
+  /** 把若干地块**成组**（纯函数，不改动入参）。
    *  @param {Array} subPlots  子地块数组，每个至少要有 id + polyLatLng（或可重建）
    *  @param {Object} opts     { name, crop, id, ts }
-   *  @returns {Object|null}   大地块对象；子地块不足 2 个或有无效环时返回 null
+   *  @returns {Object|null}   组对象；子地块不足 2 个或有无效环时返回 null
    *
-   *  返回对象新增字段：
-   *    merged:true            标记这是拼接地块（二级页据此进入「手动划分」默认态）
-   *    subPlots:[{id,name,mu,sqm,polyLatLng,center,crop}]  子地块快照（各自保留环）
-   *    polyLatLng             外层综合轮廓（凸包）
-   *    poly / geo / center / mu / sqm / crs  与普通地块同构，下游零改动可用
+   *  ★★ 语义（v189 2026-10-03 用户纠正，务必守住）：
+   *    用户原话：「这个不是拼接是地块成组，我可能一个大地块分开画很多小地块，
+   *      这些小地块在一起操作，我是这个意思，而不是把这些地块拼成一个大地块，
+   *      这些小地块之间有的道路、间隔 那些都要保留，而不是给拼接起来，
+   *      比如说两个地块间距有 3 米，那这个三米就留着，是一块空地好了，
+   *      这块空地可能是无法使用的地块，也可能是道路 也可能是水渠。」
+   *    ⇒ 「成组」= 把这些小地块**编成一组便于批量操作**，几何上**各自独立**，
+   *      块与块之间的空隙（道路/水渠/空地）**原样保留**，不得被并进来。
+   *    ⇒ 旧实现（凸包当主轮廓）是**错的**：凸包会把 3 米间隔一起吞掉，
+   *      二级页拿到的是一个「假装连成一片」的大块。
+   *
+   *  返回对象字段：
+   *    grouped:true           标记这是**成组**地块（保留 merged 字段名做向后兼容）
+   *    merged:true            （同 grouped，老代码/老库仍认这个键）
+   *    subPlots:[...]         成员快照（各自完整几何/作物/面积）
+   *    polyLatLngSet:[[...]]  **成组后的权威几何 = 各成员环的集合**（多环，互不合并）
+   *    polyLatLng             仅供包围盒/飞行的**参考外框**（凸包）—— 不是可见轮廓，
+   *                           二级页**不得**把它当作地块边界参与布管/划分
+   *    hullLatLng             同上（显式命名，避免被误当轮廓）
+   *    poly / geo / center / mu / sqm / crs  与普通地块同构，供下游兜底读取
    */
   function mergePlots(subPlots, opts) {
     opts = opts || {};
     var list = (subPlots || []).filter(function (p) { return p && p.polyLatLng && p.polyLatLng.length >= 3; });
     if (list.length < 2) return null;
 
-    // 子地块快照：只留下游真正要用的字段，避免把一堆临时字段带进库
+    // 成员快照：只留下游真正要用的字段，避免把一堆临时字段带进库
     var subs = list.map(function (p) {
       var subRing = p.polyLatLng.map(function (q) { return [+q[0], +q[1]]; });
       // 子地块也要有 center：供「分别布管」定位、以及自身面积重算
@@ -901,9 +947,14 @@
       } else {
         ctr = { lat: +ctr.lat, lng: +ctr.lng };
       }
-      // 面积同理：入参没带就算一个，别让下游拿到 null
-      var sSqm = (typeof p.sqm === 'number' && p.sqm > 0) ? p.sqm : Math.round(RunyeGeo.geodesicArea(subRing));
-      var sMu = (typeof p.mu === 'number' && p.mu > 0) ? p.mu : +(sSqm / 666.67).toFixed(2);
+      /* 面积：★ v189 起**一律以几何实测为准**（RunyeGeo.geodesicArea(subRing)），
+         不再优先采信入参的 sqm/mu —— 那两个字段可能是旧值/四舍五入值，
+         而「成组面积」现在直接等于成员面积之和，一个陈旧数字会被放大成整组误差。
+         （实测踩到过：入参 sqm=666.67 而真实几何只有 ~470㎡，成组后 1333 vs 941，
+           差 41%，根因就是采信了入参。） */
+      var sSqm = Math.round(RunyeGeo.geodesicArea(subRing));
+      if (!(sSqm > 0)) sSqm = (typeof p.sqm === 'number' && p.sqm > 0) ? p.sqm : 0;
+      var sMu = +(sSqm / 666.67).toFixed(2);
       return {
         id: p.id,
         name: p.name || '',
@@ -915,17 +966,26 @@
       };
     });
 
-    // 外层综合轮廓 = 全部子地块顶点凸包
+    // 参考外框 = 全部成员顶点凸包。★ 只作包围盒/飞行定位用，**不是**地块边界。
     var allPts = [];
     subs.forEach(function (s) { allPts = allPts.concat(s.polyLatLng); });
     var hull = convexHull(allPts);
     if (hull.length < 3) return null;
     var outer = RunyeGeo.normalizeRing(hull);
 
-    var sqm = Math.round(RunyeGeo.geodesicArea(outer));
+    /* ★ 权威几何 = 成员环集合（多环，互不合并，空隙保留）。
+       GeoJSON MultiPolygon 的口径：每个成员一个独立 ring。 */
+    var polySet = subs.map(function (s) { return s.polyLatLng.map(function (q) { return [+q[0], +q[1]]; }); });
+
+    /* 面积 = 各成员面积之和（**不是**凸包面积 —— 凸包会把道路/水渠/空地算进来，
+       那正是用户明确要求不要的）。 */
+    var sqmSum = 0;
+    subs.forEach(function (s) { sqmSum += (typeof s.sqm === 'number' && s.sqm > 0) ? s.sqm : 0; });
+    if (!(sqmSum > 0)) sqmSum = Math.round(subs.reduce(function (a, s) { return a + RunyeGeo.geodesicArea(s.polyLatLng); }, 0));
+    var sqm = Math.round(sqmSum);
     var mu = +(sqm / 666.67).toFixed(2);
 
-    // 与普通地块同构的字段：本地米坐标（原点=首点经度 / 平均纬度，与地图页保存地块一致）
+    // 与普通地块同构的字段（按参考外框换算，仅供兜底显示/居中；下游应以 polyLatLngSet 为准）
     var lats = outer.map(function (p) { return p[0]; });
     var lngs = outer.map(function (p) { return p[1]; });
     var clat = lats.reduce(function (a, b) { return a + b; }, 0) / lats.length;
@@ -937,32 +997,45 @@
         y: Math.round((p[0] - clat) * mlat * 100) / 100
       };
     });
+    /* 成员环的本地米坐标集合（供二级页直接画「各自轮廓」用，不必自己再换算一遍）。 */
+    var polySetM = polySet.map(function (ring) {
+      return ring.map(function (p) {
+        return {
+          x: Math.round((p[1] - lngs[0]) * mlat * cosLat * 100) / 100,
+          y: Math.round((p[0] - clat) * mlat * 100) / 100
+        };
+      });
+    });
 
     var ids = subs.map(function (s) { return s.id; }).filter(Boolean).join('|');
     return {
       id: opts.id || ('mg' + Date.now() + Math.floor(Math.random() * 1000)),
-      name: opts.name || (list.length + ' 块拼接地块'),
-      merged: true,
+      name: opts.name || (list.length + ' 块成组地块'),
+      grouped: true,          // v189 正式语义：成组（几何不合并）
+      merged: true,           // 向后兼容：老库/老代码仍按 merged 判定
       subPlots: subs,
       subIds: ids,
+      polyLatLngSet: polySet,   // ★ 权威：各成员环（空隙保留）
+      polySetM: polySetM,       // 同上的本地米坐标版
+      polyLatLng: outer,        // ⚠ 仅供包围盒/飞行定位（凸包），非可见轮廓
+      hullLatLng: outer,        // 显式命名，防止被误当轮廓
       mu: mu,
       sqm: sqm,
       poly: poly,
-      polyLatLng: outer,
       center: { lat: +clat.toFixed(6), lng: +sn.toFixed(6) },
       geo: { refLat: +clat.toFixed(6), refLng: +outer[0][1].toFixed(6), proj: 'mercatorLocal', ts: Date.now() },
       crop: opts.crop || (list[0] && list[0].crop) || '',
-      source: 'merge',
+      source: 'group',
       crs: 'GCJ-02',
       ts: opts.ts || Date.now(),
       note: opts.note || ''
     };
   }
 
-  /** 拆分校验：确认一个「拼接地块」能否还原成子地块（供「撤销拼接」与闸门使用）。
+  /** 拆分校验：确认一个「成组地块」能否还原成子地块（供「解散成组」与闸门使用）。
    *  返回 {ok, count, reason}。 */
   function canUnmerge(plot) {
-    if (!plot || !plot.merged) return { ok: false, count: 0, reason: '不是拼接地块' };
+    if (!plot || !plot.merged) return { ok: false, count: 0, reason: '不是成组地块' };
     var subs = plot.subPlots || [];
     if (subs.length < 2) return { ok: false, count: subs.length, reason: '子地块少于 2 个' };
     for (var i = 0; i < subs.length; i++) {
