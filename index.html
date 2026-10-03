@@ -1484,11 +1484,17 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
    即工具条是 .ry-pane-edit 的子节点、不是 .pp-stage 的直接子节点（用 Edge 真渲染 + CSSOM
    rule.matches() 逐条核对确认，`.pp-stage>.pp-toolbar` 在本页一条都没命中）。
    修法：给出「浅底工具轨里用深色文字」的对照规则；对比度门槛不放宽，把颜色改到真可读。 */
-.pp-check-label{display:flex;align-items:center;gap:5px;font-size:12px;color:rgba(255,255,255,.75);cursor:pointer;white-space:nowrap}
-#pipePlanSection .pp-toolbar>.pp-check-label{color:#334155;font-weight:500}
-#pipePlanSection .pp-toolbar>.pp-check-label:hover{color:#0f172a}
-body.ry-zoneauto-off #pipePlanSection .pp-toolbar>.pp-check-label{color:#b45309}
-.pp-check-label input{accent-color:#16a34a;margin:0;width:14px;height:14px}
+/* [v188→v202] 这块 CSS 原是给「地块划分」checkbox（.pp-check-label）的：
+   v188 修白字叠浅底看不见，v202 起控件改成切换按钮（#ppZoneAutoBtn），
+   checkbox 相关规则随之移除（全库已无 .pp-check-label 元素，避免留死代码误导后人）。 */
+/* [v202] 「地块划分」开关由 checkbox 改为切换按钮（用户要求与面板其它按钮统一）。
+   关闭态：按钮文字改「地块不划分」+ 琥珀描边 —— 和 body.ry-zoneauto-off 联动的
+   兜底规则同一信号源（JS 侧 ppApplyZoneAutoUI 已切 active/文案，这里只管颜色）。 */
+#pipePlanSection .pp-toolbar>.pp-btn-ghost#ppZoneAutoBtn{white-space:nowrap}
+body.ry-zoneauto-off #ppZoneAutoBtn{
+  color:#b45309!important;border-color:rgba(217,119,6,.55)!important;
+  background:rgba(217,119,6,.08)!important;font-weight:600;
+}
 /* [v185 建 / v189 改语义 2026-10-03] 地块划分开关。
    v189 起语义是「真的划不划分区」——关闭后 ppGetZoneLayout 直接返回 1×1 单区布局，
    所以画面上本来就是「一个区、没有内部线」，**不需要再用 CSS 去隐藏分区层**。
@@ -6181,16 +6187,15 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     <button class="pp-btn-ghost" id="ppRepartition" title="将当前旋转后的地块作为新基准重新切割分区">重新分区</button>
     <!-- v132（2026-09-23 用户要求）：分区旋转90° 移到「重新分区」下面（组内收尾） -->
     <button class="pp-btn-ghost" id="ppRotateZones">↻ 分区旋转90°</button>
-    <!-- [v185 建 / v189 改语义 / v192 挪位 2026-10-03] 地块划分开关（用户要求）：
+    <!-- [v185 建 / v189 改语义 / v192 挪位 / v202 改按钮 2026-10-04] 地块划分开关（用户要求）：
          开启（默认）= 按左侧面板参数**自动划分**地块（画出分区线）；
          关闭 = 本块**不自动划分**（整块作为一个区参与面积/水力/材料计算）。
          ⚠ 用户明确纠正过：不是「只显示/隐藏分区线」，而是**真的划不划分区**。
          [v192] 用户要求把它从「调网格」下面挪到「分区旋转90°」下面（右栏最底部）。
-         静态契约：verify_ry_tool.js 锁了本控件的存在与 id。 -->
-    <label class="pp-check-label" id="ppZoneAutoWrap" for="ppZoneAutoChk" title="开启=按左侧面板参数自动划分地块（画出分区线）。关闭=本块不自动划分，整块作为一个区参与面积/水力/材料计算。">
-      <input type="checkbox" id="ppZoneAutoChk" checked>
-      <span id="ppZoneAutoTxt">地块划分</span>
-    </label>
+         [v202] 用户原话：「这个按钮跟这个面板上的其他按钮一样，点击执行，不要勾选，
+           勾选的话 整体看起来不统一。」⇒ checkbox 改成与「↻ 分区旋转90°」同款的
+           切换按钮（active 高亮 = 正在自动划分），状态语义与持久化（runye_zone_auto）不变。 -->
+    <button type="button" class="pp-btn-ghost" id="ppZoneAutoBtn" title="开启=按左侧面板参数自动划分地块（画出分区线）。关闭=本块不自动划分，整块作为一个区参与面积/水力/材料计算。">地块划分</button>
     <!-- ===== [v193 2026-10-03] 成组地块「整组 / 逐块」编辑切换 =====
          用户原话：「成组地块传导到二级管路之后，进一步编辑的话，再给我一个切换按钮，
            这个单独编辑，跟三级管路编辑页面分开，否则我担心跟原来的一些计算规则跟逻辑搞混了。」
@@ -16352,17 +16357,21 @@ ppPullLiftDh();                                              // 首屏对齐一�
    *   · 状态持久化到 localStorage['runye_zone_auto']，刷新/切页后保持。
    */
   function ppZoneAutoOn(){ return ppState.zoneAuto !== false; }
+  /* [v202] 开关控件由 checkbox 改为切换按钮（用户原话：「点击执行，不要勾选，
+     勾选的话 整体看起来不统一」）。active 高亮 = 正在自动划分，与「↻ 分区旋转90°」
+     的 active 口径一致；关闭时给琥珀描边提示「现在是整块一区」。
+     旧 id（ppZoneAutoChk/ppZoneAutoWrap/ppZoneAutoTxt）已随 checkbox 一起移除。 */
   function ppApplyZoneAutoUI(){
     var on = ppZoneAutoOn();
     if(document.body) document.body.classList.toggle('ry-zoneauto-off', !on);
-    var chk=document.getElementById('ppZoneAutoChk');
-    if(chk && chk.checked !== on) chk.checked = on;
-    var txt=document.getElementById('ppZoneAutoTxt');
-    if(txt) txt.textContent = on ? '地块划分' : '地块划分（不划分）';
-    var wrap=document.getElementById('ppZoneAutoWrap');
-    if(wrap) wrap.title = on
-      ? '开启=按左侧面板参数自动划分地块（画出分区线）。关闭=本块不自动划分，整块作为一个区参与面积/水力/材料计算。'
-      : '当前：本块不自动划分分区（整块当一个区）。重新勾选可按左侧面板参数自动划分。';
+    var btn=document.getElementById('ppZoneAutoBtn');
+    if(btn){
+      btn.classList.toggle('active', on);
+      btn.textContent = on ? '地块划分' : '地块不划分';
+      btn.title = on
+        ? '正在自动划分：按左侧面板参数切分区。点击后本块不自动划分，整块作为一个区参与面积/水力/材料计算。'
+        : '当前：本块不自动划分分区（整块当一个区）。点击恢复按左侧面板参数自动划分。';
+    }
   }
   /* [v188 2026-10-03] 把「模式切换要同步微调箭头组显隐」这件事归一到一个函数。
      起因（Edge 真渲染实测）：从「调网格」进入 adjustCut 时，按钮 active 变了、
@@ -16401,10 +16410,10 @@ ppPullLiftDh();                                              // 首屏对齐一�
       ppState.zoneAuto = (s===null) ? true : (s!=='0');
     }catch(e){ ppState.zoneAuto = true; }
     ppApplyZoneAutoUI();
-    var chk=document.getElementById('ppZoneAutoChk');
-    if(chk){
-      if(chk.checked !== ppZoneAutoOn()) chk.checked = ppZoneAutoOn();
-      chk.addEventListener('change',function(){ ppSetZoneAuto(chk.checked); });
+    var btn=document.getElementById('ppZoneAutoBtn');
+    if(btn){
+      btn.classList.toggle('active', ppZoneAutoOn());
+      btn.addEventListener('click',function(){ ppSetZoneAuto(!ppZoneAutoOn()); });
     }
     window.ppSetZoneAuto=ppSetZoneAuto;
     window.ppZoneAutoOn=ppZoneAutoOn;
