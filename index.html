@@ -3183,6 +3183,10 @@ body > .ry-nav .main-header{display:none!important}
   border-radius:8px;cursor:pointer;font-family:inherit;
 }
 #grPipeSection .pp-btn-ghost:hover{background:#eef4f1;color:#1f2937}
+/* 两段式「清空」的武装态：第一次点后按钮变红，3 秒内再点才真清
+   （颜色/边框/字重是允许带 !important 的三类；布局属性不带 —— eng_skin 纪律） */
+#grPipeSection .gr-btn-arm{background:#dc2626!important;border-color:#dc2626!important;color:#fff!important;font-weight:700}
+#grPipeSection .gr-btn-arm:hover{background:#b91c1c!important;color:#fff!important}
 #grPipeSection .pp-empty{color:#4b5563}
 #grPipeSection .pp-empty .big-icon{opacity:.35}
 #grPipeSection .pp-legend{padding:8px 4px 0}
@@ -23215,7 +23219,32 @@ var ISO_FITTING_UI_OFF = true;
   }
   window.grBackFromTl = grBackFromTl;
 
-  /* ---------------- 事件绑定 ---------------- */
+  /* ---------------- 事件绑定 ----------------
+     ★ [v195] 两个总管交互的辅助（用户反馈「清空跟删除选中都不能弄」的根因在这里）：
+       ① 双击收线后 W.mode 仍停在 'draw' ⇒ 用户接下来点图想「选中」，实际还在**加点**
+         （截图里那道紫色折线就是反复点击攒出来的 W.draw）⇒ 「删除选中」永远提示「先点选」。
+         （二级页收线后停在画线模式是**故意的**——那边要连续画多根管；总管通常只画一根，
+           停在画线模式是陷阱，不是便利。）
+       ② 「清空」靠 window.confirm ⇒ 在 iframe 未声明 allow-modals / 部分内嵌 WebView /
+         无头环境里 confirm 会被**静默吞掉返回 false** ⇒ 点了没反应。
+         换成两段式按钮（第一次点变红「⚠ 确认清空？」，3 秒内再点才真清），不依赖原生弹窗。 */
+  function grHint(msg) { if ($('grTrunkHint')) $('grTrunkHint').textContent = msg; }
+  /* 想删除/清空就不是想画线 —— 先退出画线模式再执行。返回是否真的退出了。 */
+  function grExitDraw() {
+    if (W.mode !== 'draw') return false;
+    W.mode = 'pick'; W.draw = null;
+    grRenderTrunk(); grRender();
+    return true;
+  }
+  /* 两段式清空的「解除武装」：超时 / 清完 / 没东西可清 时把按钮还原。
+     ★ grClearArm 必须声明在 **IIFE 作用域**（本文件是 'use strict'）——
+       若在 grBind() 里 var，grDisarmClear 里对它赋值就是对未声明变量赋值 ⇒ ReferenceError。 */
+  var grClearArm = 0;
+  function grDisarmClear() {
+    grClearArm = 0;
+    var btn = $('grTrunkClear');
+    if (btn) { btn.textContent = '清空'; btn.classList.remove('gr-btn-arm'); }
+  }
   function grBind() {
     /* 管径下拉：接 PE_OD_SERIES（单一来源，见 P10 契约），取不到再兜底 */
     var sel = $('grTrunkDn');
@@ -23236,21 +23265,44 @@ var ISO_FITTING_UI_OFF = true;
       W.draw = W.draw || [];
       if (W.mode !== 'draw') W.draw = null;
       grRenderTrunk(); grRender();
-      if ($('grTrunkHint')) $('grTrunkHint').textContent = W.mode === 'draw'
-        ? '画总管中：点击加点，双击结束，右键退回上一点，Esc 取消。'
-        : '总图里点一根总管可选中；画总管时点击加点、双击结束、右键退回上一点。';
+      grHint(W.mode === 'draw'
+        ? '画总管中：点击加点，双击结束（收线后自动退出画线模式），右键退回上一点，Esc 取消。'
+        : '总图里点一根总管可选中；画总管时点击加点、双击结束、右键退回上一点。');
     });
-    click('grTrunkAuto', function () { grAutoTrunk(); grRender(); });
+    click('grTrunkAuto', function () {
+      grExitDraw('自动生成了总管，点图可选中一根；不满意可删除或再点「✎ 画总管」手画。');
+      grAutoTrunk(); grRender();
+    });
     click('grTrunkDel', function () {
-      if (W.sel < 0) { if ($('grTrunkHint')) $('grTrunkHint').textContent = '先在图上点选一根总管，再点删除。'; return; }
+      /* ★ 想删除就不是想画线 —— 先退出画线模式，否则用户点图想「选中」、实际还在加点 */
+      grExitDraw();
+      if (W.sel < 0) { grHint('先在图上点一根总管（点线上任意位置），再点删除。'); return; }
+      var n = W.trunk.lines.length;
       W.trunk.lines.splice(W.sel, 1); W.sel = -1;
       grRender(); grRenderTrunk(); grRenderMat();
+      grHint('已删除 1 根（剩 ' + (n - 1) + ' 根）。');
     });
+    /* [v195] 清空改**两段式确认**：不再依赖 window.confirm ——
+       iframe 未声明 allow-modals / 部分内嵌 WebView / 无头环境里 confirm 会被
+       静默吞掉返回 false ⇒ 用户点了「清空」什么都没发生（正是本次反馈）。
+       做法：第一次点 → 按钮变红「⚠ 确认清空？」；3 秒内再点才真清；超时自动还原。
+       （grClearArm 声明在 IIFE 作用域，见 grDisarmClear 上方的注释。） */
     click('grTrunkClear', function () {
-      if (!W.trunk.lines.length) return;
-      if (!window.confirm('清除全部总管（' + W.trunk.lines.length + ' 根）？')) return;
-      W.trunk.lines = []; W.sel = -1; W.draw = null;
+      var btn = $('grTrunkClear');
+      grExitDraw();
+      if (!W.trunk.lines.length) { grHint('当前没有总管可清空。'); grDisarmClear(); return; }
+      if (!grClearArm) {
+        grClearArm = Date.now();
+        if (btn) { btn.textContent = '⚠ 确认清空？'; btn.classList.add('gr-btn-arm'); }
+        grHint('再点一次「确认清空」删除全部 ' + W.trunk.lines.length + ' 根总管（3 秒内有效）。');
+        setTimeout(grDisarmClear, 3000);
+        return;
+      }
+      var n = W.trunk.lines.length;
+      W.trunk.lines = []; W.sel = -1; W.draw = null; grClearArm = 0;
+      grDisarmClear();
       grRender(); grRenderTrunk(); grRenderMat();
+      grHint('已清空 ' + n + ' 根总管。');
     });
     click('grFit', function () { grFit(); grRender(); });
     click('grZoomIn', function () { grZoom(1.2); });
@@ -23286,9 +23338,17 @@ var ISO_FITTING_UI_OFF = true;
       });
       cvs.addEventListener('dblclick', function () {
         if (W.mode !== 'draw' || !W.draw) return;
-        if (W.draw.length >= 2) W.trunk.lines.push(W.draw.slice());
+        var got = W.draw.length >= 2;
+        if (got) W.trunk.lines.push(W.draw.slice());
         W.draw = null;
+        /* ★ [v195] 收线即退出画线模式：总管通常只画一根，停在画线模式会让用户
+             以为「点图 = 选中」，实际还在加点（本轮反馈「删除选中不能用」的根因）。
+             二级页停在画线模式是对的（那边要连续画多根管）；总管这边不是。 */
+        W.mode = 'pick';
         grRender(); grRenderTrunk(); grRenderMat();
+        if ($('grTrunkHint')) $('grTrunkHint').textContent = got
+          ? '已收线（共 ' + W.trunk.lines.length + ' 根）。点图可选中一根；再点「✎ 画总管」继续画下一根。'
+          : '不足两点未收线。再点「✎ 画总管」重新画。';
       });
       cvs.addEventListener('contextmenu', function (e) {
         e.preventDefault();
