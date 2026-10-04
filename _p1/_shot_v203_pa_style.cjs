@@ -64,8 +64,8 @@ const check = (n, ok, extra) => { console.log((ok ? '  [PASS] ' : '  [FAIL] ') +
       paneHColor: gs('.pa-pane-h', 'color'),
       itemName: gs('.pa-item .nm', 'fontSize'),
       itemDs: gs('.pa-item .ds', 'fontSize'),
-      btnH: gs('.pa-btn', 'height'),
-      btnFs: gs('.pa-btn', 'fontSize'),
+      btnH: gs('.pa-toolbar .pa-btn', 'height'),
+      btnFs: gs('.pa-toolbar .pa-btn', 'fontSize'),
       inputH: gs('.pa-field input', 'height'),
       inputFs: gs('.pa-field input', 'fontSize'),
       leftBg: gs('.pa-left', 'backgroundImage'),
@@ -76,7 +76,9 @@ const check = (n, ok, extra) => { console.log((ok ? '  [PASS] ' : '  [FAIL] ') +
   });
   check('③ 分组标题 11px + 主站绿 #2f6d43', st.paneH === '11px' && st.paneHColor === 'rgb(47, 109, 67)', JSON.stringify({ f: st.paneH, c: st.paneHColor }));
   check('④ 素材名 11.5px / 说明 10.5px（原 13/11）', st.itemName === '11.5px' && st.itemDs === '10.5px', JSON.stringify({ nm: st.itemName, ds: st.itemDs }));
-  check('⑤ 按钮高 24px / 11.5px（原约 33px/13px）', st.btnH === '24px' && st.btnFs === '11.5px', JSON.stringify({ h: st.btnH, f: st.btnFs }));
+  /* [v212] 「⚡ 载入示例管路」挪到左侧素材库顶部（做成 28px 大按钮），画布工具条按钮仍是 24px。
+     断言目标必须是 .pa-toolbar 里的按钮 —— 裸 .pa-btn 现在先命中左栏那个大按钮（假红）。 */
+  check('⑤ 画布工具条按钮高 24px / 11.5px（原约 33px/13px）', st.btnH === '24px' && st.btnFs === '11.5px', JSON.stringify({ h: st.btnH, f: st.btnFs }));
   check('⑥ 输入框高 24px / 11.5px（原约 35px/13px）', st.inputH === '24px' && st.inputFs === '11.5px', JSON.stringify({ h: st.inputH, f: st.inputFs }));
   check('⑦ 侧栏底 = 主站浅绿渐变（rgb 形式断言）', /248, 251, 249/.test(st.leftBg || '') && /242, 247, 244/.test(st.leftBg || ''), (st.leftBg || '').slice(0, 90));
   check('⑧ 表头浅绿 #f2f7f4 + 字 #475569（原实心绿底白字）', st.thBg === 'rgb(242, 247, 244)' && st.thColor === 'rgb(71, 85, 105)', JSON.stringify({ bg: st.thBg, c: st.thColor }));

@@ -81,6 +81,9 @@
 
   /* 左侧素材库 */
   .pa-lib{overflow-y:auto;padding:9px;flex:1;}
+  /* [v212] 素材库顶部的「载入示例管路」：固定在标题下方不随列表滚动，占满栏宽 */
+  .pa-lib-top{padding:9px 9px 0;flex:none;}
+  .pa-lib-top .pa-cta{width:100%;justify-content:center;height:28px;font-size:12px;}
   .pa-lib-group{font-size:10.5px;font-weight:700;color:#94a3b8;letter-spacing:1px;margin:8px 3px 5px;}
   .pa-item{
     display:flex;align-items:center;gap:8px;padding:7px 8px;margin-bottom:6px;
@@ -241,6 +244,12 @@
     <!-- 左：素材库 -->
     <div class="pa-col pa-left">
       <div class="pa-pane-h">管件素材库 <small>点击或拖入画布</small></div>
+      <!-- [v212] 用户原话：「载入示例管路放在左侧工具栏顶部」—— 从画布工具条挪到素材库顶部。
+           一键出示例对新用户最友好，而画布工具条少一个高亮大按钮后不再喧宾夺主。
+           id 保持 btnExample，JS 与验证脚本零改动。 -->
+      <div class="pa-lib-top">
+        <button class="pa-btn primary pa-cta" id="btnExample" title="载入一条示例管路（直管→弯头→直管→变径→直管）">⚡ 载入示例管路</button>
+      </div>
       <div class="pa-lib" id="paLib">
         <div class="pa-lib-group">直管（可设长度）</div>
         <div class="pa-item" data-add="straight"><div class="ic" id="ic_straight"></div><div><div class="nm">直管</div><div class="ds">管径 32–110mm</div></div></div>
@@ -277,7 +286,7 @@
             <button class="pa-btn" id="btnRot" title="旋转选中管件 90°（R；按住 Shift 逆时针）：绕左端 L 口转，下游自动跟着接好">↻ 旋转</button>
             <button class="pa-btn" id="btnMove" title="自由移动模式：打开后拖动不会被邻近端口吸住（用于把已接好的管件挪开）；关闭时拖到附近会自动接驳">✥ 移动</button>
           </div>
-          <button class="pa-btn primary" id="btnExample">⚡ 载入示例管路</button>
+          <!-- [v212] 「⚡ 载入示例管路」已挪到左侧素材库顶部（用户要求），此处移除 -->
           <!-- [v210] 四视图切换：俯视 / 前视 / 侧视 / 轴测。
                同一份拼装几何的四种画法（组件坐标/管长/管径/连接/水力一点不变），只换投影。 -->
           <div class="seg" id="segView">
