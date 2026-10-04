@@ -43,7 +43,26 @@
   .pa-status.off{background:#fef2f2;color:#dc2626;border-color:#fecaca;}
   .pa-status .dot{width:7px;height:7px;border-radius:50%;background:currentColor;}
 
-  .pa-main{flex:1;display:grid;grid-template-columns:236px 1fr 340px;min-height:0;}
+  /* [v205] 三列 → 五列：左栏 ｜ 左拖拽条 ｜ 画布 ｜ 右拖拽条 ｜ 右栏。
+     列宽走 CSS 变量（与主站二级管路页 --pp-side-w/--pp-tool-w 同一套机制）：
+     拖动改变量即可改宽，双击拖拽条恢复默认；持久化 localStorage。 */
+  .pa-main{flex:1;display:grid;
+    grid-template-columns:var(--pa-left-w,236px) 10px minmax(0,1fr) 10px var(--pa-right-w,340px);
+    min-height:0;}
+  /* 拖拽条 = 主站 .pp-grip 同款：整条 10px 都是热区，平时 2px 浅灰线，
+     悬停/拖动变 4px 品牌绿；拖拽中锁定全局光标与选中。 */
+  .pa-grip{
+    position:relative;align-self:stretch;min-width:0;
+    cursor:col-resize;touch-action:none;
+    -webkit-user-select:none;user-select:none;
+  }
+  .pa-grip::before{
+    content:"";position:absolute;top:0;bottom:0;left:50%;
+    width:2px;margin-left:-1px;background:var(--pa-line);
+  }
+  .pa-grip:hover::before,.pa-grip.dragging::before{background:#16a34a;width:4px;margin-left:-2px}
+  body.pa-col-resizing,
+  body.pa-col-resizing *{cursor:col-resize!important;-webkit-user-select:none!important;user-select:none!important}
   .pa-col{min-height:0;display:flex;flex-direction:column;}
   /* 侧栏底色 = 主站参数栏同款浅绿渐变（原为纯白，现与其他页统一） */
   .pa-left,.pa-right{
@@ -200,6 +219,9 @@
       </div>
     </div>
 
+    <!-- [v205] 左拖拽条：拖动调左栏宽度，双击恢复默认 -->
+    <div class="pa-grip" id="paGripL" title="拖动调整素材库宽度 · 双击恢复默认" role="separator" aria-orientation="vertical"></div>
+
     <!-- 中：画布 -->
     <div class="pa-col">
       <div class="pa-canvas-wrap" id="paWrap">
@@ -224,6 +246,9 @@
         <div class="pa-toast" id="paToast"></div>
       </div>
     </div>
+
+    <!-- [v205] 右拖拽条：拖动调右栏宽度，双击恢复默认 -->
+    <div class="pa-grip" id="paGripR" title="拖动调整右侧面板宽度 · 双击恢复默认" role="separator" aria-orientation="vertical"></div>
 
     <!-- 右：双面板 -->
     <div class="pa-col pa-right">
@@ -994,6 +1019,101 @@
   render(); recompute();
   window.RyPipeAssembler={ addFromLib:addFromLib, loadExample:loadExample,
     getTopology:function(){ return buildTopology(computeHydraulic()); } };
+})();
+
+/* ---------- [v205] 左右栏宽度可拖拽（与主站二级管路页 .pp-grip 同一套机制） ----------
+ * 用户原话：「左侧 右侧工具栏都改为宽度可调节的」。
+ * 做法（照搬主站成熟实现，仅适配本页结构）：
+ *   1. .pa-main 五列网格：左栏 ｜ grip ｜ 画布 ｜ grip ｜ 右栏；拖动改写
+ *      CSS 变量 --pa-left-w / --pa-right-w，列宽即时变化（SVG 画布 width:100% 自适应）。
+ *   2. 松手持久化 localStorage('runye_pa_panel_w')，下次进入自动恢复；
+ *      双击拖拽条恢复该侧默认宽度。
+ *   3. 边界：下限保证面板内容不被压瘪，上限保证画布不被挤没；
+ *      窗口尺寸变化后把已拖出的宽度重新夹回合法区间。 */
+(function(){
+  var root=document.querySelector('.pa-main');
+  var left=document.querySelector('.pa-left');
+  var right=document.querySelector('.pa-right');
+  var gL=document.getElementById('paGripL'), gR=document.getElementById('paGripR');
+  if(!root||!left||!right||!gL||!gR) return;
+
+  var KEY='runye_pa_panel_w';
+  var MIN_L=180,MAX_L=460,MIN_R=240,MAX_R=520,CANVAS_MIN=320;
+  var DEF_L=236,DEF_R=340;
+
+  function clampNum(v,lo,hi){ v=parseFloat(v); if(isNaN(v)) return null; return Math.max(lo,Math.min(hi,v)); }
+  function loadWs(){ try{ return JSON.parse(localStorage.getItem(KEY))||{}; }catch(e){ return {}; } }
+  function saveWs(o){ try{ localStorage.setItem(KEY,JSON.stringify(o)); }catch(e){} }
+  function inner(){ return root.clientWidth-20; }                       /* 减两条 grip(10×2) */
+  function maxL(){ return Math.max(MIN_L,Math.min(MAX_L,inner()-CANVAS_MIN-MIN_R)); }
+  function maxR(){ return Math.max(MIN_R,Math.min(MAX_R,inner()-CANVAS_MIN-MIN_L)); }
+  function apply(which,px){
+    var prop=(which==='left')?'--pa-left-w':'--pa-right-w';
+    if(px==null) root.style.removeProperty(prop); else root.style.setProperty(prop,px+'px');
+  }
+
+  /* 启动即恢复上次拖出的宽度（越界夹回合法区间） */
+  var ws=loadWs();
+  var sL=clampNum(ws.left,MIN_L,MAX_L), sR=clampNum(ws.right,MIN_R,MAX_R);
+  if(sL!=null) apply('left',Math.min(sL,maxL()));
+  if(sR!=null) apply('right',Math.min(sR,maxR()));
+
+  var EV=window.PointerEvent
+    ? {down:'pointerdown',move:'pointermove',up:'pointerup',cancel:'pointercancel'}
+    : {down:'mousedown',move:'mousemove',up:'mouseup',cancel:'blur'};
+  var drag=null;
+
+  function beginDrag(e,which,grip){
+    if(e.button!=null&&e.button!==0) return;              /* 只响应左键 */
+    drag={which:which,grip:grip,x:e.clientX,
+          w:(which==='left'?left:right).getBoundingClientRect().width};
+    grip.classList.add('dragging');
+    document.body.classList.add('pa-col-resizing');
+    if(e.preventDefault) e.preventDefault();
+  }
+  function onMove(e){
+    if(!drag) return;
+    var dx=e.clientX-drag.x;
+    if(drag.which==='left'){
+      var w=clampNum(drag.w+dx,MIN_L,maxL());
+      if(w!=null) apply('left',w);
+    }else{
+      var w2=clampNum(drag.w-dx,MIN_R,maxR());            /* 向左拖＝右栏变宽 */
+      if(w2!=null) apply('right',w2);
+    }
+    if(e.preventDefault) e.preventDefault();
+  }
+  function endDrag(){
+    if(!drag) return;
+    var which=drag.which,grip=drag.grip;
+    drag=null;
+    grip.classList.remove('dragging');
+    document.body.classList.remove('pa-col-resizing');
+    var o=loadWs();
+    o[which]=Math.round((which==='left'?left:right).getBoundingClientRect().width);
+    saveWs(o);
+  }
+  function bind(grip,which){
+    grip.addEventListener(EV.down,function(e){ beginDrag(e,which,grip); });
+    grip.addEventListener('dblclick',function(){          /* 双击恢复该侧默认 */
+      var o=loadWs(); delete o[which]; saveWs(o);
+      apply(which,null);
+    });
+  }
+  bind(gL,'left'); bind(gR,'right');
+  document.addEventListener(EV.move,onMove);
+  document.addEventListener(EV.up,endDrag);
+  document.addEventListener(EV.cancel,endDrag);
+  window.addEventListener('blur',endDrag);                /* 指针移出窗口兜底收尾 */
+
+  /* 窗口尺寸变化后重新夹回合法区间（拖拽进行中不干预，否则跟手打架） */
+  window.addEventListener('resize',function(){
+    if(drag) return;
+    var o=loadWs();
+    var l=clampNum(o.left,MIN_L,MAX_L), r=clampNum(o.right,MIN_R,MAX_R);
+    if(l!=null) apply('left',Math.min(l,maxL()));
+    if(r!=null) apply('right',Math.min(r,maxR()));
+  });
 })();
 </script>
 </body>

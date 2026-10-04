@@ -83,6 +83,44 @@ const check = (n, ok, extra) => { console.log((ok ? '  [PASS] ' : '  [FAIL] ') +
   check('⑨b 品牌标题条已整行撤掉（v204）', hdr.headerGone);
   check('⑨c 状态徽标在画布工具条里（id 不变，JS 零改动）', hdr.statusInToolbar && hdr.statusTxt.length > 0, hdr.statusTxt);
 
+  /* ===== [v205] 左右栏宽度可拖拽 ===== */
+  const g = await page.evaluate(() => ({
+    l: !!document.getElementById('paGripL'), r: !!document.getElementById('paGripR'),
+    cursor: getComputedStyle(document.getElementById('paGripL')).cursor,
+    cols: getComputedStyle(document.querySelector('.pa-main')).gridTemplateColumns
+  }));
+  check('⑮ 两条拖拽条存在 + col-resize 光标', g.l && g.r && g.cursor === 'col-resize', JSON.stringify(g).slice(0, 120));
+  const w0 = await page.evaluate(() => document.querySelector('.pa-left').getBoundingClientRect().width);
+  const gl = await page.$('#paGripL');
+  const gb = await gl.boundingBox();
+  await page.mouse.move(gb.x + gb.width / 2, gb.y + 300);
+  await page.mouse.down();
+  await page.mouse.move(gb.x + gb.width / 2 + 80, gb.y + 300, { steps: 6 });
+  await page.mouse.up();
+  await sleep(300);
+  const w1 = await page.evaluate(() => ({
+    left: document.querySelector('.pa-left').getBoundingClientRect().width,
+    saved: JSON.parse(localStorage.getItem('runye_pa_panel_w') || '{}').left
+  }));
+  check('⑯ 左拖 +80px：列宽跟手（236→约316）', Math.abs(w1.left - (w0 + 80)) < 3, 'w=' + w1.left.toFixed(1));
+  check('⑰ 松手落库（runye_pa_panel_w.left）', Math.abs((w1.saved || 0) - (w0 + 80)) < 3, 'saved=' + w1.saved);
+  const gr = await page.$('#paGripR');
+  const grb = await gr.boundingBox();
+  await page.mouse.move(grb.x + grb.width / 2, grb.y + 300);
+  await page.mouse.down();
+  await page.mouse.move(grb.x + grb.width / 2 - 60, grb.y + 300, { steps: 6 });
+  await page.mouse.up();
+  await sleep(300);
+  const w2 = await page.evaluate(() => document.querySelector('.pa-right').getBoundingClientRect().width);
+  check('⑱ 右拖 -60px：右栏变宽（340→约400）', Math.abs(w2 - 400) < 3, 'w=' + w2.toFixed(1));
+  await page.evaluate(() => document.getElementById('paGripL').dispatchEvent(new MouseEvent('dblclick', { bubbles: true })));
+  await sleep(200);
+  const w3 = await page.evaluate(() => ({
+    left: document.querySelector('.pa-left').getBoundingClientRect().width,
+    saved: JSON.parse(localStorage.getItem('runye_pa_panel_w') || '{}')
+  }));
+  check('⑲ 双击左拖拽条恢复默认 236px 且落库项删除', Math.abs(w3.left - 236) < 2 && w3.saved.left === undefined, 'w=' + w3.left.toFixed(1) + ' saved=' + JSON.stringify(w3.saved));
+
   /* ③ 功能不回归 */
   await page.evaluate(() => document.getElementById('btnExample').click());
   await sleep(700);
