@@ -12737,7 +12737,7 @@ function tlAutoGenerate(options) {
     var meta=dd.meta||{}, mpipes=(meta.pipes)||{};
     var segDn={ front:dnOf(mpipes.front), main:dnOf(mpipes.main)||90, branch:dnOf(mpipes.branch)||63 };
     var segments=[];
-    function pushSegs(arr,dn,prefix){ if(!arr) return; for(var i=0;i<arr.length;i++){ var ll=ln2ll(arr[i]); if(ll) segments.push({id:prefix+i, name:prefix+(i+1), dn:dn, latLng:ll}); } }
+    function pushSegs(arr,dn,prefix){ if(!arr) return; for(var i=0;i<arr.length;i++){ var ll=ln2ll(arr[i]); if(ll) segments.push({id:prefix+i, name:prefix+(i+1), dn:dn, kind:prefix, latLng:ll}); } }
     if(dd.frontPipe) pushSegs([dd.frontPipe], segDn.front||segDn.main, 'front');
     pushSegs(dd.mainPipes, segDn.main, 'main');
     pushSegs(dd.branchPipes, segDn.branch, 'branch');

@@ -692,7 +692,7 @@
     if (dn > 63) return { color: '#f59e0b', weight: 4 };
     return { color: '#3b82f6', weight: 3 };
   }
-  /* ==== [v230] 地块回传后裁剪：地块以外的管段/滴灌带不画（2026-10-04 用户要求） ====
+  /* ==== [v230] 地块回传后裁剪：地块以外的主管/支管/滴灌带不画；总管(front)与水源保留（2026-10-04 用户要求） ====
    * 用户原话：「在线地图页面中，地块回传回来之后，地块以外的滴灌带 主管 支管要裁剪掉。」
    * 做法：渲染管段/滴灌带前，收集地块库全部地块环作裁剪边界（与管网同一地图 GCJ 口径）；
    * 折线按相邻两点拆段，逐段对地块环做平面裁剪（单地块尺度内 lat/lng 当平面用）：
@@ -702,7 +702,7 @@
    * ★ 裁剪边界：普通地块用 polyLatLng；成组地块用 polyLatLngSet（各成员环集合）——
    *   不能用凸包 polyLatLng（会吞掉块间空隙，管子会画进空地里）；
    *   归档子地块（mergedInto）跳过（其环已由成组地块代表）。
-   * ★ 地块库为空 ⇒ 不裁剪（与旧行为一致）。水源点/阀门（设备层）不受影响。 */
+   * ★ 地块库为空 ⇒ 不裁剪（与旧行为一致）。水源点/阀门/总管(front)（设备及跨地块互连总管）不受影响。 */
   function clipPlotRings() {
     var rings = [];
     function pushRing(rg) {
@@ -781,6 +781,9 @@
         var sLL = validRingLL(s.latLng, 2);   // 同样挡住含 null 顶点的管段（否则 _project 抛错连累全部矢量层）
         if (!sLL) return;
         var st = dnStyle(s.dn);
+        /* [v232] 总管(front) 不裁剪：地块回传后只裁 主管/支管/滴灌带，总管跨地块互连须整段可见。
+           s.kind 由三级管路生成写入（'front'/'main'/'branch'）；旧 localStorage 无 kind 时回退 id/name 前缀 'front' 判定。 */
+        var isTrunk = (s.kind === 'front') || (typeof s.id === 'string' && s.id.indexOf('front') === 0) || (typeof s.name === 'string' && s.name.indexOf('front') === 0);
         var length = s.len;
         if (typeof length !== 'number' || !isFinite(length) || length<0) {
           length=0;
@@ -801,7 +804,7 @@
         var pts = sLL.map(RunyeGeo.coordPair), pieces = [];
         for (var pi = 1; pi < pts.length; pi++) {
           var pa = pts[pi - 1], pb = pts[pi];
-          var ivs = clipRings.length ? clipSegIntervals(pa, pb, clipRings) : [[0, 1]];
+          var ivs = (isTrunk || !clipRings.length) ? [[0, 1]] : clipSegIntervals(pa, pb, clipRings);
           for (var ii = 0; ii < ivs.length; ii++) pieces.push([lerpPair(pa, pb, ivs[ii][0]), lerpPair(pa, pb, ivs[ii][1])]);
         }
         pieces.forEach(function (pc) {
