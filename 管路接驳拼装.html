@@ -184,6 +184,28 @@
   }
   .pa-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
   .pa-toast.warn{background:#a16207;box-shadow:0 6px 20px rgba(161,98,7,.35);}
+
+  /* [v207] 画布右键菜单（管道改管径 / 配件换选型）——与右栏同一套 11.5px 口径 */
+  .pa-menu{
+    position:absolute;z-index:40;min-width:176px;max-width:250px;background:#fff;
+    border:1px solid var(--pa-line2);border-radius:10px;padding:7px 8px;
+    box-shadow:0 10px 28px rgba(15,23,42,.18);display:none;
+  }
+  .pa-menu.show{display:block;}
+  .pa-menu-h{font-size:11.5px;font-weight:800;color:#14532d;padding:1px 3px 5px;display:flex;align-items:center;gap:6px;}
+  .pa-menu-h small{margin-left:auto;font-weight:600;color:#94a3b8;font-size:10.5px;}
+  .pa-menu-t{font-size:10.5px;font-weight:700;color:#94a3b8;letter-spacing:.06em;margin:8px 3px 4px;}
+  .pa-menu .pa-chip{padding:2px 7px;}
+  .pa-menu-list{display:flex;flex-direction:column;gap:1px;}
+  .pa-menu-i{
+    display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:6px;cursor:pointer;
+    font-size:11.5px;font-weight:600;color:var(--pa-ink);user-select:none;
+  }
+  .pa-menu-i small{margin-left:auto;font-weight:600;color:#94a3b8;font-size:10.5px;}
+  .pa-menu-i:hover{background:#f0fdf4;color:#15803d;}
+  .pa-menu-i.danger{color:#dc2626;}
+  .pa-menu-i.danger:hover{background:#fef2f2;}
+  .pa-menu-sep{height:1px;background:var(--pa-line2);margin:8px 0 5px;}
   .pa-glyph{font-size:14px;font-weight:800;}
 </style>
 </head>
@@ -243,9 +265,11 @@
           <div class="pa-status" id="paStatus" title="拼装/水力状态"><span class="dot"></span><span id="paStatusTxt">待拼装</span></div>
         </div>
         <svg id="paSvg" xmlns="http://www.w3.org/2000/svg"></svg>
-        <div class="pa-hint">操作：左侧点击/拖拽管件入画布 → 拖动管件使端口靠近即自动吸附接驳 → 选中可改参数、Delete 删除 → 滚轮缩放。</div>
+        <div class="pa-hint">操作：左侧点击/拖入管件，靠近即自动吸附 → 选中可改参数 → ★右键管道直接改管径 · 右键配件直接换选型 → 拖直管右端「⇔」手柄自由调管长 → Delete 删除 · 滚轮缩放。</div>
         <div class="pa-zoom" id="paZoomTxt">缩放 100%</div>
         <div class="pa-toast" id="paToast"></div>
+        <!-- [v207] 画布右键菜单：管道改管径 / 配件换选型（内容由 JS 按选中管件的类型构造） -->
+        <div class="pa-menu" id="paMenu"></div>
       </div>
     </div>
 
@@ -357,6 +381,62 @@
       case 'tee': return side==='L'||side==='R'?c.mainDn:c.branchDn;
     }
     return c.dn;
+  }
+
+  /* ===================================================================
+   *  [v207] 口径联动：管道改直径之后，相邻配件随之改变
+   *  ------------------------------------------------------------------
+   *  用户原话：「管道改变直径之后 配件随之改变」。
+   *  做法是把某个管件的端口当作「新口径的源头」，沿连接关系向邻居扩散，
+   *  **边界**是「本来就该异径」的两种管件（否则会把用户有意保留的大小头拉平）：
+   *    · 同心变径 reducer：只改迎面那一侧（大口 / 小口），**不跨过去**；
+   *    · 异径三通 tee：只改迎面那一段 —— 从 L/R 进只改主管并继续走另一个主管口，
+   *                     从支管 B 进只改支管，不再往外扩散；
+   *    · 其余单口径件（直管 / 弯头 / 直通 / 堵头）：整件口径改为新值，
+   *      并继续向**它的其余端口**扩散（所以整段同口径管路会一起改到位，不会出现
+   *      「管件改了、下一段管子没改」的假一致性）。
+   * =================================================================== */
+  function applyDnToPort(c, side, dn){
+    if(!c) return false;
+    switch(c.kind){
+      case 'straight': case 'elbow90': case 'elbow45': case 'couple': case 'cap':
+        if(c.dn===dn) return false; c.dn=dn; return true;
+      case 'reducer':
+        if(side==='L'){ if(c.bigDn===dn) return false; c.bigDn=dn; return true; }
+        if(c.smallDn===dn) return false; c.smallDn=dn; return true;
+      case 'tee': {
+        var key=(side==='L'||side==='R')?'mainDn':'branchDn';
+        if(c[key]===dn) return false; c[key]=dn; return true;
+      }
+    }
+    return false;
+  }
+  /* 从入口侧进入后，还应从哪些端口继续往外扩散（空数组 = 到此为止） */
+  function exitSides(c, entrySide){
+    switch(c.kind){
+      case 'reducer': return [];
+      case 'tee': return entrySide==='B'? [] : (entrySide==='L'?['R']:['L']);
+      default: return LIB[c.kind].ports.filter(function(s){ return s!==entrySide; });
+    }
+  }
+  /* 返回被改动口径的管件个数（不含自身） */
+  function propagateDn(compId, sides){
+    var src=findComp(compId); if(!src) return 0;
+    var visited={}, queue=[], n=0;
+    (sides||LIB[src.kind].ports).forEach(function(s){
+      visited[connKey(compId,s)]=true; queue.push({id:compId,side:s});
+    });
+    while(queue.length){
+      var cur=queue.shift();
+      var pt=partnerOf(cur.id,cur.side); if(!pt) continue;
+      var pc=findComp(pt.id); if(!pc) continue;
+      if(applyDnToPort(pc, pt.side, portDn(findComp(cur.id),cur.side))) n++;
+      exitSides(pc,pt.side).forEach(function(s){
+        var key=connKey(pc.id,s); if(visited[key]) return;
+        visited[key]=true; queue.push({id:pc.id,side:s});
+      });
+    }
+    return n;
   }
 
   /* ---------- 状态 ---------- */
@@ -661,6 +741,30 @@
       vp.appendChild(el('line',{x1:t1.x,y1:t1.y,x2:t2.x,y2:t2.y,
         stroke:'#16a34a','stroke-width':2.5,'stroke-dasharray':'6 5',opacity:.85}));
     }
+    /* 6) [v207] 直管长度手柄 —— 顶层图层，保证在下游管件之上仍可命中 */
+    var lenLayer=el('g',{id:'paLenLayer'});
+    vp.appendChild(lenLayer);
+    S.components.forEach(function(c){
+      if(c.kind!=='straight') return;
+      var q=P(c.x+c.len*SCALE+LH_OFF, c.y);
+      lenHandle(lenLayer,c.id,q.x,q.y);
+    });
+  }
+
+  /* [v207] 直管右端的「调管长」手柄：拖动它 = 自由调节该段管长（下游跟着走）。
+     ★ 必须画在**所有组件之上**的独立图层（render 末尾统一追加），不能挂在各自的组件 <g> 里：
+       手柄位于管尾再往右 14px，而管尾通常接着下一段管子／弯头 —— 挂在组件里的话它会被
+       后画的下游管件盖住，pointerdown 命中的是下游管件 ⇒ 拖手柄变成「拖下游管件」（实测会把
+       整条链拖出 60px 错位缝且管长纹丝不动）。提到顶层后才有确定优先级。
+     平面与轴测都画：轴测下取投影后的点，但手柄本身仍是**屏幕正向**的小方块，不会被斜切。 */
+  var LH_OFF=14;   // 手柄相对右端口的外移量（px）
+  function lenHandle(g,id,sx,sy){
+    var hg=el('g',{class:'pa-lenhandle','data-id':id,style:'cursor:ew-resize;'});
+    var ti=el('title',{}); ti.textContent='拖动调节管长'; hg.appendChild(ti);
+    hg.appendChild(el('rect',{x:sx-7,y:sy-7,width:14,height:14,rx:4,fill:'#fff',stroke:'#16a34a','stroke-width':1.8}));
+    hg.appendChild(el('path',{d:'M '+(sx-4)+' '+sy+' L '+(sx-1)+' '+(sy-3)+' L '+(sx-1)+' '+(sy+3)+' Z',fill:'#16a34a'}));
+    hg.appendChild(el('path',{d:'M '+(sx+4)+' '+sy+' L '+(sx+1)+' '+(sy-3)+' L '+(sx+1)+' '+(sy+3)+' Z',fill:'#16a34a'}));
+    g.appendChild(hg);
   }
 
   function drawComp(c){
@@ -784,9 +888,19 @@
   }
 
   svg.addEventListener('pointerdown',function(e){
+    closeMenu();
+    /* [v207] 只响应鼠标主键：右键的职责是「选中 + 弹菜单」，绝不能顺手进入拖拽状态
+       （否则松手会走 pointerup 的 move 分支再跑一次自动吸附，可能把邻近端口粘上）。 */
+    if(e.button!=null && e.button!==0) return;
+    var lenEl=e.target.closest('.pa-lenhandle');   // [v207] 直管右端：调管长
     var portEl=e.target.closest('.pa-port');
     var compEl=e.target.closest('.pa-comp');
     var p=svgPoint(e);
+    if(lenEl){
+      var lc=findComp(lenEl.getAttribute('data-id')); if(!lc) return;
+      drag.mode='len'; drag.id=lc.id; drag.len0=lc.len; drag.px0=p.x;
+      selectComp(lc.id); svg.setPointerCapture(e.pointerId); return;
+    }
     if(portEl){
       drag.mode='port'; drag.id=portEl.getAttribute('data-id'); drag.side=portEl.getAttribute('data-side');
       var c=findComp(drag.id); var pp=portPos(c,drag.side);
@@ -805,7 +919,16 @@
 
   svg.addEventListener('pointermove',function(e){
     var p=svgPoint(e);
-    if(drag.mode==='move'){
+    if(drag.mode==='len'){
+      /* [v207] 沿管道轴向（= 规划坐标的 x 方向）拖动改管长；轴测视图下 svgPoint 已反投影，
+         鼠标沿 iso 斜向走，换算回来仍然只动 x ⇒ 手感与平面完全一致。 */
+      var lc=findComp(drag.id); if(!lc) return;
+      var raw=(drag.len0*SCALE+(p.x-drag.px0))/SCALE;
+      var nl=Math.max(0.1,Math.min(500,Math.round(raw*10)/10));
+      if(nl===lc.len) return;
+      setPipeLen(lc,nl);
+      render();
+    } else if(drag.mode==='move'){
       var c=findComp(drag.id); c.x=p.x-drag.dx; c.y=p.y-drag.dy; render();
     } else if(drag.mode==='port'){
       drag.tmp.x2=p.x; drag.tmp.y2=p.y;
@@ -820,7 +943,10 @@
   });
 
   svg.addEventListener('pointerup',function(e){
-    if(drag.mode==='port'){
+    if(drag.mode==='len'){
+      /* 实时画法已在 pointermove 完成，这里只补历史 + 水力/材料刷新 */
+      pushHistory(); recompute(); renderProps();
+    } else if(drag.mode==='port'){
       var p=svgPoint(e);
       var near=nearestPort(p, drag.id, drag.side, 26/S.zoom);
       if(near){
@@ -845,34 +971,225 @@
     drag.mode=null; drag.id=null;
   });
 
-  function nearestPort(p, selfId, selfSide, radius){
+  /* anyDn=true 时不再要求口径相同（供 v207 的「就近自动吸附」使用：先把本侧端口
+     口径改成对面端口的口径再接 —— 否则默认 DN110 的新配件永远吸不上 DN90 的管子）。
+     不传第 5 参 = 保持原有「异径不吸附」口径，手工拉端口接驳的手感完全不变。 */
+  function nearestPort(p, selfId, selfSide, radius, anyDn){
     var best=null, bd=radius;
     S.components.forEach(function(c){
       if(c.id===selfId) return;
       LIB[c.kind].ports.forEach(function(side){
         if(isPortConnected(c.id,side)) return;
-        if(portDn(c,side)!==portDn(findComp(selfId),selfSide)) return; // 异径不吸附
+        if(!anyDn && portDn(c,side)!==portDn(findComp(selfId),selfSide)) return; // 异径不吸附
         var pp=portPos(c,side); var d=Math.hypot(pp.x-p.x,pp.y-p.y);
         if(d<bd){ bd=d; best={id:c.id,side:side,dist:d}; }
       });
     });
     return best;
   }
-  function autoSnap(selfId){
-    var mc=findComp(selfId); if(!mc) return;
+
+  /* ------------------------------------------------------------------
+   *  [v207] 几何联动小工具（换选型 / 改管长都要用）
+   * ------------------------------------------------------------------ */
+  function alignPortTo(compId, side, pos){        // 移动 comp，使其 side 端口落在 pos
+    var c=findComp(compId); if(!c) return;
+    var l=portLocal(c,side); c.x=pos.x-l.x; c.y=pos.y-l.y;
+  }
+  /* 收集「除了 anchorSide 那一侧之外」与 comp 连通的所有组件（用于让下游跟着一起动） */
+  function collectBranch(compId, anchorSide){
+    var seen={}; seen[compId]=true; var out=[], q=[];
+    S.connections.forEach(function(k){
+      if(k.a.id===compId && k.a.side!==anchorSide) q.push(k.b.id);
+      if(k.b.id===compId && k.b.side!==anchorSide) q.push(k.a.id);
+    });
+    while(q.length){
+      var id=q.shift(); if(seen[id]) continue; seen[id]=true; out.push(id);
+      S.connections.forEach(function(k){
+        if(k.a.id===id&&!seen[k.b.id]) q.push(k.b.id);
+        if(k.b.id===id&&!seen[k.a.id]) q.push(k.a.id);
+      });
+    }
+    return out;
+  }
+  /* 以 root 为**不动**的锚点，把整条连通链重新对齐（宽松：只动每个刚被访问到的组件）。
+     用途：换选型后新件几何不同了（直通 28px vs 三通 96px），下游必须跟着重排，
+     否则会出现「逻辑已接、画面却在错位」的缝隙。 */
+  function cascadeAlign(rootId){
+    var visited={}; visited[rootId]=true; var order=[rootId], i=0;
+    while(i<order.length){
+      var id=order[i++];
+      /* 每条边只让「未访问的一端」去对齐「已访问的一端」⇒ 不会互相拉扯 */
+      S.connections.slice().forEach(function(k){
+        var va=visited[k.a.id], vb=visited[k.b.id];
+        if(va&&!vb){ alignPortTo(k.b.id,k.b.side,portPos(findComp(k.a.id),k.a.side)); visited[k.b.id]=true; order.push(k.b.id); }
+        else if(!va&&vb){ alignPortTo(k.a.id,k.a.side,portPos(findComp(k.b.id),k.b.side)); visited[k.a.id]=true; order.push(k.a.id); }
+      });
+    }
+  }
+  /* 改管长：以 L 口为锚，把下游整条链平移同样距离，避免接口被拉开成缝 */
+  function setPipeLen(c, newLen){
+    if(!c) return;
+    newLen=Math.max(0.1, Math.min(500, Math.round((+newLen||0.1)*10)/10));
+    var dpx=(newLen-c.len)*SCALE;
+    c.len=newLen;
+    if(Math.abs(dpx)>1e-9){
+      collectBranch(c.id,'L').forEach(function(id){ var b=findComp(id); if(b) b.x+=dpx; });
+    }
+  }
+
+  /* [v207] 就近自动吸附（替代原 autoSnap）：
+     ① 半径放宽到 34/zoom（好吸，但仍远小于常规管件尺寸，不至于乱粘）；
+     ② 允许异径命中 —— 命中后先把本侧口径改成对面口径再连接，实现「配件随管道」。 */
+  function smartSnapIt(selfId, radius){
+    var mc=findComp(selfId); if(!mc) return 0;
+    var made=0;
     LIB[mc.kind].ports.forEach(function(side){
       if(isPortConnected(mc.id,side)) return;
-      var mp=portPos(mc,side);
-      var near=nearestPort(mp, selfId, side, 22/S.zoom);
-      if(near){
-        var res=tryConnect(mc.id,side,near.id,near.side);
-        if(res.ok){
-          var oc=findComp(near.id); var op=portPos(oc,near.side); var ml=portLocal(mc,side);
-          mc.x=op.x-ml.x; mc.y=op.y-ml.y;
-        }
+      var near=nearestPort(portPos(mc,side), mc.id, side, radius, true);
+      if(!near) return;
+      var nc=findComp(near.id); if(!nc) return;
+      /* 三通例外：L/R 共用一个 mainDn，别让后吸附的一侧把先接好的一侧改掉 */
+      var skip=(mc.kind==='tee' && side!=='B' && isPortConnected(mc.id, side==='L'?'R':'L'));
+      if(!skip) applyDnToPort(mc, side, portDn(nc,near.side));
+      var r=tryConnect(mc.id,side,near.id,near.side);
+      if(r.ok){
+        alignPortTo(mc.id, side, portPos(nc,near.side));
+        made++;
+        if(r.loop) toast('自动接驳（检测到管网闭环，请注意校验）','warn');
       }
     });
+    return made;
   }
+  function autoSnap(selfId){ return smartSnapIt(selfId, 34/S.zoom); }
+
+  /* [v207] 原位换选型：新件顶替旧件，尽量保住旧连接（按端口顺序一一对应），
+     并把新件几何变化引起的下游错位重新排齐。 */
+  function switchKind(oldId, newKind){
+    var oc=findComp(oldId);
+    if(!oc||!LIB[newKind]||oc.kind===newKind) return null;
+    var oldPorts=LIB[oc.kind].ports, newPorts=LIB[newKind].ports;
+    var links=[];
+    S.connections.forEach(function(k){
+      if(k.a.id===oldId) links.push({self:k.a.side,oId:k.b.id,oSide:k.b.side});
+      else if(k.b.id===oldId) links.push({self:k.b.side,oId:k.a.id,oSide:k.a.side});
+    });
+    var keep={x:oc.x,y:oc.y,len:oc.len,dn:oc.dn,bigDn:oc.bigDn,smallDn:oc.smallDn,mainDn:oc.mainDn,branchDn:oc.branchDn};
+    S.connections=S.connections.filter(function(k){return k.a.id!==oldId&&k.b.id!==oldId;});
+    S.components=S.components.filter(function(c){return c.id!==oldId;});
+    var nc=addComp(newKind,keep.x,keep.y);
+    if(LIB[newKind].dns && keep.dn) nc.dn=keep.dn;
+    if(LIB[newKind].hasLen && keep.len) nc.len=keep.len;
+    if(newKind==='reducer' && keep.bigDn){ nc.bigDn=keep.bigDn; nc.smallDn=keep.smallDn; }
+    if(newKind==='tee' && keep.mainDn){ nc.mainDn=keep.mainDn; nc.branchDn=keep.branchDn; }
+    if(S.selected===oldId) S.selected=nc.id;
+    var made=0, dropped=0;
+    links.forEach(function(lk){
+      var i=oldPorts.indexOf(lk.self);
+      var oc2=findComp(lk.oId);
+      if(i<0||i>=newPorts.length||!oc2){ dropped++; return; }
+      applyDnToPort(nc, newPorts[i], portDn(oc2,lk.oSide));   // 本侧口径跟随对面 ⇒ 一定接得上
+      if(tryConnect(nc.id,newPorts[i],lk.oId,lk.oSide).ok) made++; else dropped++;
+    });
+    cascadeAlign(nc.id);
+    pushHistory(); recompute(); render(); renderProps();
+    toast('已切换为「'+LIB[newKind].label+'」'+(dropped?'（'+dropped+' 处连接因端口数不同被移除）':''));
+    return nc;
+  }
+
+  /* ===================================================================
+   *  [v207] 画布右键菜单
+   *    · 管道（cat='pipe'）右键 → 直接选直径，改完相邻配件自动跟随
+   *    · 配件（cat='fitting'）右键 → 直接切换选型（原位替换，尽量保住原连接）
+   *  菜单用鼠标坐标定位在 .pa-canvas-wrap 内；点到别处 / Esc / 再次操作画布都会关掉。
+   * =================================================================== */
+  var wrapEl=document.getElementById('paWrap');
+  var menuEl=document.getElementById('paMenu');
+  var ALL_KINDS=Object.keys(LIB);
+  var FIT_KINDS=ALL_KINDS.filter(function(k){ return LIB[k].cat==='fitting'; });
+  var KIND_GLYPH={straight:'━',elbow90:'┗',elbow45:'◣',reducer:'◗',tee:'┳',couple:'┃',cap:'⊣'};
+  function dnSum(c){ return LIB[c.kind].ports.map(function(s){ return portDn(c,s); }).join(' / '); }
+  function closeMenu(){ if(menuEl) menuEl.classList.remove('show'); }
+
+  /* 改管径：右键菜单与右栏口径 chip 共用同一条路径 ——
+     先改自身，再沿连通关系把相邻管件同步到位（遇同心变径 / 三通支管停止）。 */
+  function setPipeDn(c, dn){
+    if(!c) return 0;
+    if(LIB[c.kind].dns) c.dn=dn;
+    else if(c.kind==='reducer'){ c.bigDn=dn; c.smallDn=dn; }
+    else if(c.kind==='tee'){ c.mainDn=dn; c.branchDn=dn; }
+    var n=propagateDn(c.id);
+    pushHistory(); recompute(); render(); renderProps();
+    toast('管径改为 DN'+dn+(n?'，已同步 '+n+' 个相邻管件':''));
+    return n;
+  }
+
+  function menuChips(list,cur,act){
+    return '<div class="pa-chips">'+list.map(function(d){
+      return '<div class="pa-chip'+(cur===d?' on':'')+'" data-act="'+act+'" data-val="'+d+'">'+d+'</div>';
+    }).join('')+'</div>';
+  }
+  function menuKinds(list){
+    return '<div class="pa-menu-list">'+list.map(function(k){
+      return '<div class="pa-menu-i" data-act="kind" data-val="'+k+'"><span class="pa-glyph">'+(KIND_GLYPH[k]||'·')
+        +'</span>'+LIB[k].label+'<small>ζ='+LIB[k].zeta+'</small></div>';
+    }).join('')+'</div>';
+  }
+  function openMenu(clientX,clientY,c){
+    var L=LIB[c.kind], h='';
+    h+='<div class="pa-menu-h">'+L.label+'<small>DN '+dnSum(c)+'</small></div>';
+    if(L.cat==='pipe'){
+      h+='<div class="pa-menu-t">管径 DN（mm）</div>'+menuChips(DN_LIST,c.dn,'dn');
+      h+='<div class="pa-menu-t">切换为管件</div>'+menuKinds(FIT_KINDS.filter(function(k){return k!==c.kind;}));
+    } else {
+      h+='<div class="pa-menu-t">配件选型</div>'+menuKinds(ALL_KINDS.filter(function(k){return k!==c.kind;}));
+      if(L.dns) h+='<div class="pa-menu-t">口径 DN（mm）</div>'+menuChips(DN_LIST,c.dn,'dn');
+      if(c.kind==='reducer'){
+        h+='<div class="pa-menu-t">大口 DN（左）</div>'+menuChips(DN_LIST,c.bigDn,'bigdn');
+        h+='<div class="pa-menu-t">小口 DN（右）</div>'+menuChips(DN_LIST,c.smallDn,'smalldn');
+      }
+      if(c.kind==='tee'){
+        h+='<div class="pa-menu-t">主管 DN（左/右）</div>'+menuChips(DN_LIST,c.mainDn,'maindn');
+        h+='<div class="pa-menu-t">支管 DN（下）</div>'+menuChips(DN_LIST,c.branchDn,'branchdn');
+      }
+    }
+    h+='<div class="pa-menu-sep"></div><div class="pa-menu-list">'
+      +'<div class="pa-menu-i danger" data-act="del"><span class="pa-glyph">🗑</span>删除该管件</div></div>';
+    menuEl.setAttribute('data-id',c.id);
+    menuEl.innerHTML=h;
+    menuEl.classList.add('show');
+    /* 定位（相对画布容器），越界回夹，保证菜单不会被工具条/边缘裁掉 */
+    var r=wrapEl.getBoundingClientRect();
+    var x=clientX-r.left+4, y=clientY-r.top+4;
+    if(x+menuEl.offsetWidth>r.width-6) x=Math.max(6,r.width-menuEl.offsetWidth-6);
+    if(y+menuEl.offsetHeight>r.height-6) y=Math.max(6,r.height-menuEl.offsetHeight-6);
+    menuEl.style.left=x+'px'; menuEl.style.top=y+'px';
+  }
+
+  menuEl.addEventListener('click',function(e){
+    var it=e.target.closest('[data-act]'); if(!it) return;
+    var act=it.getAttribute('data-act'), val=it.getAttribute('data-val');
+    var c=findComp(menuEl.getAttribute('data-id'));
+    closeMenu(); if(!c) return;
+    if(act==='del'){ deleteComp(c.id); return; }
+    if(act==='kind'){ switchKind(c.id,val); return; }
+    if(act==='dn'){ setPipeDn(c,+val); return; }
+    /* 变径/三通的分口径：只改对应那一段的性质，不动其它端口 */
+    if(act==='bigdn') c.bigDn=+val;
+    else if(act==='smalldn') c.smallDn=+val;
+    else if(act==='maindn') c.mainDn=+val;
+    else if(act==='branchdn') c.branchDn=+val;
+    pushHistory(); recompute(); render(); renderProps();
+  });
+
+  svg.addEventListener('contextmenu',function(e){
+    e.preventDefault();
+    var compEl=e.target.closest('.pa-comp');
+    if(!compEl){ closeMenu(); return; }
+    var c=findComp(compEl.getAttribute('data-id')); if(!c){ closeMenu(); return; }
+    selectComp(c.id);              /* 顺带选中，右栏属性同步显示这一件 */
+    openMenu(e.clientX,e.clientY,c);
+  });
+  document.addEventListener('mousedown',function(e){ if(menuEl&&!menuEl.contains(e.target)) closeMenu(); });
 
   svg.addEventListener('wheel',function(e){
     e.preventDefault();
@@ -918,16 +1235,21 @@
     box.innerHTML=h;
 
     if(L.hasLen){ var lenI=document.getElementById('pLen');
-      lenI.addEventListener('change',function(){ c.len=Math.max(0.1,+lenI.value||0.1); pushHistory(); recompute(); }); }
+      /* [v207] 既有缺陷修复：原版改完只 recompute 不 render ⇒ 画布上的管长纹丝不动，
+         还要等用户拖一下才变（数据在、图不变）。改长还要把下游一起带走才不留缝。 */
+      lenI.addEventListener('change',function(){ setPipeLen(c,+lenI.value||0.1);
+        pushHistory(); recompute(); render(); }); }
     if(L.dns){ document.getElementById('pDn').addEventListener('click',function(e){
-      var chip=e.target.closest('.pa-chip'); if(!chip) return; c.dn=+chip.getAttribute('data-dn'); pushHistory(); recompute(); }); }
+      var chip=e.target.closest('.pa-chip'); if(!chip) return;
+      /* [v207] 同上：改口径既不重绘也不刷新选中态；并接上「配件随之改变」的联动 */
+      setPipeDn(c,+chip.getAttribute('data-dn')); }); }
     if(c.kind==='reducer'){
-      document.getElementById('pBig').addEventListener('change',function(e){ c.bigDn=+e.target.value; pushHistory(); recompute(); });
-      document.getElementById('pSmall').addEventListener('change',function(e){ c.smallDn=+e.target.value; pushHistory(); recompute(); });
+      document.getElementById('pBig').addEventListener('change',function(e){ c.bigDn=+e.target.value; pushHistory(); recompute(); render(); });
+      document.getElementById('pSmall').addEventListener('change',function(e){ c.smallDn=+e.target.value; pushHistory(); recompute(); render(); });
     }
     if(c.kind==='tee'){
-      document.getElementById('pMain').addEventListener('change',function(e){ c.mainDn=+e.target.value; pushHistory(); recompute(); });
-      document.getElementById('pBranch').addEventListener('change',function(e){ c.branchDn=+e.target.value; pushHistory(); recompute(); });
+      document.getElementById('pMain').addEventListener('change',function(e){ c.mainDn=+e.target.value; pushHistory(); recompute(); render(); });
+      document.getElementById('pBranch').addEventListener('change',function(e){ c.branchDn=+e.target.value; pushHistory(); recompute(); render(); });
     }
     document.getElementById('pDel').addEventListener('click',function(){ deleteComp(c.id); });
   }
@@ -1031,10 +1353,16 @@
   /* ===================================================================
    *  工具栏
    * =================================================================== */
-  function addFromLib(kind, sx, sy){
+  /* snap=true ⇒ 落点即吸附（[v207] 从素材库拖入画布时把管件放到管道口附近会自动接驳，
+     并把配件口径改成管道口径；左侧**点击**添加不吸附 —— 那种方式本来就是排着往下摆，
+     自动连成串反而会超预期）。 */
+  function addFromLib(kind, sx, sy, snap){
     var x = sx!=null? sx : 70 + (S.components.length%5)*46;
     var y = sy!=null? sy : 120 + (S.components.length%4)*54;
-    var c=addComp(kind,x,y); pushHistory(); recompute(); selectComp(c.id);
+    var c=addComp(kind,x,y);
+    var n = snap? smartSnapIt(c.id, 40/S.zoom) : 0;
+    pushHistory(); recompute(); selectComp(c.id);
+    if(n) toast('已自动接驳 '+n+' 处');
     return c;
   }
   // 左侧点击添加
@@ -1049,8 +1377,8 @@
   document.getElementById('paWrap').addEventListener('dragover',function(e){ e.preventDefault(); });
   document.getElementById('paWrap').addEventListener('drop',function(e){
     e.preventDefault(); var kind=e.dataTransfer.getData('text/pa'); if(!kind) return;
-    var r=svg.getBoundingClientRect(); var p=svgPoint({clientX:e.clientX,clientY:e.clientY});
-    addFromLib(kind,p.x,p.y);
+    var p=svgPoint({clientX:e.clientX,clientY:e.clientY});
+    addFromLib(kind,p.x,p.y,true);   /* [v207] 拖入即就近吸附 */
   });
 
   document.getElementById('btnClear').addEventListener('click',function(){
@@ -1094,6 +1422,7 @@
 
   // 删除键
   window.addEventListener('keydown',function(e){
+    if(e.key==='Escape'){ closeMenu(); return; }   /* [v207] 右键菜单 Esc 关闭 */
     if((e.key==='Delete'||e.key==='Backspace') && S.selected && document.activeElement.tagName!=='INPUT' && document.activeElement.tagName!=='SELECT'){
       deleteComp(S.selected); e.preventDefault();
     }
@@ -1158,7 +1487,16 @@
   /* ---------- 启动 ---------- */
   render(); recompute();
   window.RyPipeAssembler={ addFromLib:addFromLib, loadExample:loadExample,
-    getTopology:function(){ return buildTopology(computeHydraulic()); } };
+    getTopology:function(){ return buildTopology(computeHydraulic()); },
+    /* [v207] 交互内核对外暴露：给自动化验证走**真实入口**（不是手工塞数据造假数据） */
+    setPipeDn:setPipeDn, setPipeLen:setPipeLen, switchKind:switchKind,
+    smartSnap:smartSnapIt, propagateDn:propagateDn, openMenuAt:function(id,clientX,clientY){
+      var c=findComp(id); if(!c) return false; selectComp(c.id); openMenu(clientX,clientY,c); return true; },
+    closeMenu:closeMenu,
+    getComps:function(){ return S.components.map(function(c){ return JSON.parse(JSON.stringify(c)); }); },
+    getConns:function(){ return JSON.parse(JSON.stringify(S.connections)); },
+    portPosOf:function(id,side){ var c=findComp(id); return c? portPos(c,side) : null; },
+    getSel:function(){ return S.selected; } };
 })();
 
 /* ---------- [v205] 左右栏宽度可拖拽（与主站二级管路页 .pp-grip 同一套机制） ----------
