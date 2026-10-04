@@ -39,6 +39,11 @@ const check = (n, ok, extra) => { console.log((ok ? '  [PASS] ' : '  [FAIL] ') +
   page.on('pageerror', (e) => errs.push(e.message));
   await page.setViewport({ width: 1500, height: 950 });
   await page.goto(fileUrl(path.join(WS, '管路接驳拼装.html')), { waitUntil: 'load', timeout: 90000 });
+  await sleep(1200);
+  /* ★ 必须先清库并重载：本脚本复用同一个 Edge profile，上一次跑出的面板宽度/视图
+     会留在 localStorage 里，导致「默认 236/340」的基准断言被上一次结果顶掉（实测 ⑱ 假红）。 */
+  await page.evaluate(() => { try { localStorage.clear(); } catch (e) { } });
+  await page.reload({ waitUntil: 'load' });
   await sleep(1500);
 
   /* ① 导航同源 */
@@ -124,6 +129,12 @@ const check = (n, ok, extra) => { console.log((ok ? '  [PASS] ' : '  [FAIL] ') +
   /* ③ 功能不回归 */
   await page.evaluate(() => document.getElementById('btnExample').click());
   await sleep(700);
+  const plan = await page.evaluate(() => ({
+    view: window.RyPipeAssembler ? null : null,
+    tot: document.getElementById('rTot').textContent,
+    mat: (document.getElementById('matTable').querySelector('tbody').textContent || '').slice(0, 40),
+    btn: document.getElementById('btnIso').textContent
+  }));
   const fn = await page.evaluate(() => ({
     comps: document.querySelectorAll('#paSvg .pa-comp').length,
     tot: document.getElementById('rTot').textContent,
@@ -135,6 +146,45 @@ const check = (n, ok, extra) => { console.log((ok ? '  [PASS] ' : '  [FAIL] ') +
   check('⑪ 水力合计有数值', /^\d+(\.\d+)? m$/.test(fn.tot), 'ΔH=' + fn.tot);
   check('⑫ 材料清单有行', fn.mat.indexOf('直管') >= 0, fn.mat);
   check('⑬ 头部状态正常', fn.status.length > 0, fn.status);
+
+  /* ===== [v206] 轴测图切换 ===== */
+  const before = await page.evaluate(() => ({
+    planFirst: (window.RyPipeAssembler.getTopology().components[0] || {}),
+    n: window.RyPipeAssembler.getTopology().components.length,
+    tot: document.getElementById('rTot').textContent
+  }));
+  await page.evaluate(() => document.getElementById('btnIso').click());
+  await sleep(700);
+  const iso = await page.evaluate(() => {
+    const svgEl = document.getElementById('paSvg');
+    const comps = svgEl.querySelectorAll('.pa-comp');
+    const first = comps[0] ? comps[0].getBoundingClientRect() : null;
+    const t = window.RyPipeAssembler.getTopology();
+    return {
+      btn: document.getElementById('btnIso').textContent,
+      hasGrid: svgEl.querySelectorAll('path[stroke="#cbd5e1"]').length > 0,
+      ellipses: svgEl.querySelectorAll('ellipse').length,
+      comps: comps.length,
+      firstW: first ? Math.round(first.width) : 0,
+      tot: document.getElementById('rTot').textContent
+    };
+  });
+  check('⑳ 轴测按钮存在且切换成「▤ 平面图」（当前=轴测）', /平面图/.test(iso.btn), iso.btn);
+  /* 端面数 = Σ(每段折线 2 个端帽)：2直管+1直通+1弯头+1弯头+1三通支管+1堵头 = 7 段 ×2 = 14，
+     其中 1 个堵头端帽是独立的 ellipse（非 isoStroke 生成）⇒ isoStroke 端帽 12 + 堵头 1 = 13。
+     断言按「≥8 即为圆管画法生效」来写（平面图态 ellipse=0，足够区分）。 */
+  check('㉑ 轴测底纹与圆管端面已画（网格 + 端面椭圆）', iso.hasGrid && iso.ellipses >= 8, 'ellipse=' + iso.ellipses);
+  check('㉒ 组件数不变（只是换画法，不是重建）', iso.comps === 5, 'comps=' + iso.comps);
+  check('㉓ 水力结果与平面视图一致（数据未变）', iso.tot === before.tot, 'plan=' + before.tot + ' iso=' + iso.tot);
+  await page.screenshot({ path: path.join(OUT, 'pa_v206_iso.png') });
+  await page.evaluate(() => document.getElementById('btnIso').click());
+  await sleep(500);
+  const back = await page.evaluate(() => ({
+    btn: document.getElementById('btnIso').textContent,
+    hasGrid: document.querySelectorAll('#paSvg path[stroke="#cbd5e1"]').length > 0,
+    tot: document.getElementById('rTot').textContent
+  }));
+  check('㉔ 切回平面：按钮复原、底纹消失、水力一致', /轴测图/.test(back.btn) && !back.hasGrid && back.tot === before.tot, JSON.stringify(back));
 
   check('⑭ 全程无 JS 报错', errs.length === 0, errs.join('|').slice(0, 160));
 

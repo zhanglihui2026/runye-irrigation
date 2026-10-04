@@ -236,6 +236,8 @@
             <button class="pa-btn" id="btnZoomOut">－</button>
           </div>
           <button class="pa-btn primary" id="btnExample">⚡ 载入示例管路</button>
+          <!-- [v206] 轴测图切换：同一份拼装几何，只换投影画法（组件坐标/管长/管径/水力不变） -->
+          <button class="pa-btn" id="btnIso" title="平面图 / 轴测图 切换：轴测按等轴测投影画出圆管（含厚度与端面），数据不变">⛶ 轴测图</button>
           <div class="spacer"></div>
           <button class="pa-btn warn" id="btnClear">清空画布</button>
           <div class="pa-status" id="paStatus" title="拼装/水力状态"><span class="dot"></span><span id="paStatusTxt">待拼装</span></div>
@@ -361,6 +363,8 @@
   var S={components:[],connections:[],selected:null,
     flow:25,C:150,sdr:13.6,includeLocal:true,
     zoom:1,panX:0,panY:0,
+    /* [v206] 视图：'plan'=平面（默认，与以往完全一致）；'iso'=轴测（同一套几何，只换投影画法） */
+    view:'plan',
     history:[],future:[], seq:1};
 
   function uid(p){ return (p||'c')+(S.seq++); }
@@ -557,6 +561,70 @@
   function el(name,attrs){ var e=document.createElementNS(SVGNS,name);
     for(var k in attrs) e.setAttribute(k,attrs[k]); return e; }
 
+  /* ===================================================================
+   *  [v206] 轴测投影：规划坐标(x,y) → 屏幕坐标
+   *  等轴测（30°）：sx=(x-y)·cos30，sy=(x+y)·sin30（地面平面，z=0）。
+   *  ★ 为什么不用 SVG matrix 整个套一层：非等比矩阵会把 stroke 一起斜切，
+   *    圆管会变成扁带子（宽窄随方向变），完全不像管子 ⇒ 必须**逐点投影**，
+   *    线宽始终用屏幕像素，管子才是均匀粗细的圆柱。
+   *  ★ 数据是同一份（组件坐标/管长/管径/水力一点没变），只换画法。
+   */
+  var ISO_A=Math.cos(Math.PI/6), ISO_B=Math.sin(Math.PI/6);
+  function isoOn(){ return S.view==='iso'; }
+  function P(x,y){ return isoOn()? {x:(x-y)*ISO_A, y:(x+y)*ISO_B} : {x:x,y:y}; }
+  function Pinv(sx,sy){
+    if(!isoOn()) return {x:sx,y:sy};
+    return {x:(sx/ISO_A+sy/ISO_B)/2, y:(sy/ISO_B-sx/ISO_A)/2};
+  }
+  /* 轴测管段：下移的阴影给厚度感 + 主体圆管 + 两端椭圆端面（圆柱封口） */
+  function isoStroke(g,pts,sw,col,dash){
+    var i,d='',d2='';
+    for(i=0;i<pts.length;i++){
+      d+=(i?' L ':'M ')+pts[i].x+' '+pts[i].y;
+      d2+=(i?' L ':'M ')+pts[i].x+' '+(pts[i].y+sw*0.42);
+    }
+    g.appendChild(el('path',{d:d2,fill:'none',stroke:'rgba(15,23,42,.20)','stroke-width':sw,'stroke-linecap':'round','stroke-linejoin':'round'}));
+    g.appendChild(el('path',{d:d,fill:'none',stroke:col,'stroke-width':sw,'stroke-linecap':'round','stroke-linejoin':'round',
+      'stroke-dasharray':dash||''}));
+    [pts[0],pts[pts.length-1]].forEach(function(p){
+      g.appendChild(el('ellipse',{cx:p.x,cy:p.y,rx:sw*0.5,ry:sw*0.33,fill:col,stroke:'rgba(255,255,255,.7)','stroke-width':1}));
+    });
+  }
+  /* 轴测多边形（法兰/变径体）：逐点投影后连线，形状自动变成斜平行四边形 */
+  function isoPoly(g,planPts,fill,stroke,dash){
+    var pts=planPts.map(function(p){ return P(p.x,p.y); });
+    var d=''; for(var i=0;i<pts.length;i++) d+=(i?' L ':'M ')+pts[i].x+' '+pts[i].y;
+    d+=' Z';
+    g.appendChild(el('path',{d:d,fill:fill,stroke:stroke,'stroke-width':1.5,'stroke-dasharray':dash||''}));
+  }
+
+  /* [v206] 轴测底纹：两组与轴平行的细线（沿 x 轴 / 沿 y 轴），给「立体平放」的方位参照。
+     范围跟随当前组件包围盒自动铺满，空画布也给一片默认范围，不至于空白得像坏了。 */
+  function drawIsoGrid(){
+    var minx=-400,miny=-400,maxx=900,maxy=900, n=0;
+    S.components.forEach(function(c){ LIB[c.kind].ports.forEach(function(s){
+      var p=portPos(c,s);
+      minx=Math.min(minx,p.x);miny=Math.min(miny,p.y);
+      maxx=Math.max(maxx,p.x);maxy=Math.max(maxy,p.y); n++; }); });
+    if(!n){ minx=-300;miny=-300;maxx=900;maxy=700; }
+    var step=100, pad=200, d='';
+    for(var x=Math.floor((minx-pad)/step)*step; x<=maxx+pad; x+=step){
+      var a=P(x,miny-pad), b=P(x,maxy+pad); d+='M '+a.x+' '+a.y+' L '+b.x+' '+b.y+' ';
+    }
+    for(var y=Math.floor((miny-pad)/step)*step; y<=maxy+pad; y+=step){
+      var c2=P(minx-pad,y), e2=P(maxx+pad,y); d+='M '+c2.x+' '+c2.y+' L '+e2.x+' '+e2.y+' ';
+    }
+    vp.appendChild(el('path',{d:d,fill:'none',stroke:'#cbd5e1','stroke-width':1,opacity:.55}));
+    /* 两根轴向指示：X 绿、Y 蓝，标出轴测的走向基准 */
+    var o=P(0,0), ax=P(160,0), ay=P(0,160);
+    vp.appendChild(el('path',{d:'M '+o.x+' '+o.y+' L '+ax.x+' '+ax.y,fill:'none',stroke:'#16a34a','stroke-width':2,opacity:.7}));
+    vp.appendChild(el('path',{d:'M '+o.x+' '+o.y+' L '+ay.x+' '+ay.y,fill:'none',stroke:'#2563eb','stroke-width':2,opacity:.7}));
+    var tx=el('text',{x:ax.x+8,y:ax.y,fill:'#16a34a','font-size':12,'font-weight':800,'font-family':'Microsoft YaHei,sans-serif'});
+    tx.textContent='X'; vp.appendChild(tx);
+    var ty=el('text',{x:ay.x+8,y:ay.y,fill:'#2563eb','font-size':12,'font-weight':800,'font-family':'Microsoft YaHei,sans-serif'});
+    ty.textContent='Y'; vp.appendChild(ty);
+  }
+
   var vp=null; // viewport <g>
   function ensureVp(){
     while(svg.firstChild) svg.removeChild(svg.firstChild);
@@ -567,25 +635,30 @@
 
   function render(){
     ensureVp();
-    // 1) 连接处的接驳节点
+    /* 1) 轴测模式下先铺一层等轴测网格底纹，帮助判断走向（平面模式不加，保持原样） */
+    if(isoOn()) drawIsoGrid();
+    // 2) 连接处的接驳节点
     S.connections.forEach(function(k){
       var ca=findComp(k.a.id), cb=findComp(k.b.id); if(!ca||!cb) return;
       var pa=portPos(ca,k.a.side), pb=portPos(cb,k.b.side);
       var d=portDn(ca,k.a.side);
-      vp.appendChild(el('circle',{cx:pa.x,cy:pa.y,r:Math.max(5,dnWidth(d)/2+2),
+      var A=P(pa.x,pa.y), B=P(pb.x,pb.y);
+      var cx=(A.x+B.x)/2, cy=(A.y+B.y)/2;
+      vp.appendChild(el('circle',{cx:cx,cy:cy,r:Math.max(5,dnWidth(d)/2+2),
         fill:'#fff',stroke:dnColor(d),'stroke-width':2}));
     });
-    // 2) 组件本体
+    // 3) 组件本体
     S.components.forEach(function(c){ drawComp(c); });
-    // 3) 悬空端口标记（黄色）
+    // 4) 悬空端口标记（黄色）
     openPorts().forEach(function(op){
-      var c=findComp(op.id); if(!c) return; var p=portPos(c,op.side);
-      vp.appendChild(el('circle',{cx:p.x,cy:p.y,r:7,fill:'none',stroke:'#eab308','stroke-width':2.5}));
-      vp.appendChild(el('circle',{cx:p.x,cy:p.y,r:2.5,fill:'#eab308'}));
+      var c=findComp(op.id); if(!c) return; var p=portPos(c,op.side), q=P(p.x,p.y);
+      vp.appendChild(el('circle',{cx:q.x,cy:q.y,r:7,fill:'none',stroke:'#eab308','stroke-width':2.5}));
+      vp.appendChild(el('circle',{cx:q.x,cy:q.y,r:2.5,fill:'#eab308'}));
     });
-    // 4) 拖拽连线预览
+    // 5) 拖拽连线预览（轴测下同样走投影，预览线与被吸的端口才会重合）
     if(drag.mode==='port' && drag.tmp){
-      vp.appendChild(el('line',{x1:drag.tmp.x1,y1:drag.tmp.y1,x2:drag.tmp.x2,y2:drag.tmp.y2,
+      var t1=P(drag.tmp.x1,drag.tmp.y1), t2=P(drag.tmp.x2,drag.tmp.y2);
+      vp.appendChild(el('line',{x1:t1.x,y1:t1.y,x2:t2.x,y2:t2.y,
         stroke:'#16a34a','stroke-width':2.5,'stroke-dasharray':'6 5',opacity:.85}));
     }
   }
@@ -597,6 +670,57 @@
     var col = LIB[c.kind].cat==='pipe'? dnColor(c.dn) : (c.kind==='reducer'? '#0d9488' : dnColor(c.dn||110));
     var sw = LIB[c.kind].cat==='pipe'? dnWidth(c.dn) : dnWidth(c.dn||110);
     var w=c.x,h=c.y;
+
+    /* [v206] 轴测：同一份几何，逐点投影后按「圆管」画（阴影+主体+两端椭圆端面） */
+    if(isoOn()){
+      var mid=function(a,b){ return {x:(a.x+b.x)/2,y:(a.y+b.y)/2}; };
+      if(c.kind==='straight'){
+        var L=c.len*SCALE;
+        var p1=P(w,h), p2=P(w+L,h);
+        isoStroke(g,[p1,p2],sw,col);
+        g.appendChild(labelMid(mid(p1,p2).x,mid(p1,p2).y-sw/2-7,c.dn+' · '+fmt1(c.len)+'m',col));
+      } else if(c.kind==='couple'){
+        isoStroke(g,[P(w,h),P(w+28,h)],sw,col);
+        isoPoly(g,[{x:w+8,y:h-sw/2-3},{x:w+20,y:h-sw/2-3},{x:w+20,y:h+sw/2+3},{x:w+8,y:h+sw/2+3}],'#fff',col);
+      } else if(c.kind==='elbow90'){
+        var a1=P(w,h),a2=P(w+64,h),a3=P(w+64,h+64);
+        isoStroke(g,[a1,a2,a3],sw,col);
+        g.appendChild(labelMid(a3.x+10,a3.y+14,c.dn+'弯',col));
+      } else if(c.kind==='elbow45'){
+        var b1=P(w,h),b2=P(w+64,h+64);
+        isoStroke(g,[b1,b2],sw,col);
+        g.appendChild(labelMid(b2.x+10,b2.y+14,c.dn+'弯',col));
+      } else if(c.kind==='reducer'){
+        var rb=dnWidth(c.bigDn), rs=dnWidth(c.smallDn);
+        isoPoly(g,[{x:w,y:h-rb/2},{x:w,y:h+rb/2},{x:w+56,y:h+rs/2},{x:w+56,y:h-rs/2}],'#ccfbf1','#0f766e','4 3');
+        var rm=mid(P(w,h),P(w+56,h));
+        g.appendChild(labelMid(rm.x,rm.y-rb/2-8,c.bigDn+'→'+c.smallDn,'#0f766e'));
+      } else if(c.kind==='tee'){
+        var mw=dnWidth(c.mainDn), bw=dnWidth(c.branchDn);
+        isoStroke(g,[P(w,h),P(w+96,h)],mw,col);
+        isoStroke(g,[P(w+48,h),P(w+48,h-60)],bw,dnColor(c.branchDn));
+        var tm=P(w+48,h-60);
+        g.appendChild(labelMid(tm.x,tm.y-14,c.mainDn+'⊢'+c.branchDn,dnColor(c.branchDn)));
+      } else if(c.kind==='cap'){
+        isoStroke(g,[P(w,h),P(w+18,h)],sw,col);
+        var ce=P(w+18,h);
+        g.appendChild(el('ellipse',{cx:ce.x,cy:ce.y,rx:sw*0.5+4,ry:sw*0.5+2,fill:'#fff',stroke:col,'stroke-width':2.5}));
+      }
+      if(sel){
+        var q0=P(w,h), q1=P(w+96,h+64);
+        var xs=[q0.x,q1.x], ys=[q0.y,q1.y];
+        g.appendChild(el('rect',{x:Math.min(xs[0],xs[1])-8,y:Math.min(ys[0],ys[1])-12,
+          width:Math.abs(xs[1]-xs[0])+16,height:Math.abs(ys[1]-ys[0])+24,rx:8,
+          fill:'none',stroke:'#16a34a','stroke-width':1.5,'stroke-dasharray':'5 4',opacity:.7}));
+      }
+      LIB[c.kind].ports.forEach(function(side){
+        var p=portPos(c,side), q=P(p.x,p.y);
+        g.appendChild(el('circle',{cx:q.x,cy:q.y,r:6,fill:'#fff',stroke:dnColor(portDn(c,side)),
+          'stroke-width':2.5,class:'pa-port','data-id':c.id,'data-side':side,style:'cursor:crosshair;'}));
+      });
+      vp.appendChild(g);
+      return;
+    }
 
     if(c.kind==='straight'){
       var L=c.len*SCALE;
@@ -651,9 +775,12 @@
    *  交互：拖拽组件 / 端口接驳 / 平移 / 缩放
    * =================================================================== */
   var drag={mode:null,id:null,side:null,dx:0,dy:0,tmp:null,sx:0,sy:0};
+  /* [v206] 返回值一律是**规划坐标**（屏幕 → 反轴测投影），
+     这样命中判定、拖拽、吸附全部照旧按规划坐标算，轴测只是「画法」不影响数据。 */
   function svgPoint(evt){
     var pt=svg.createSVGPoint(); pt.x=evt.clientX; pt.y=evt.clientY;
-    var m=vp.getScreenCTM().inverse(); var p=pt.matrixTransform(m); return {x:p.x,y:p.y};
+    var m=vp.getScreenCTM().inverse(); var p=pt.matrixTransform(m);
+    return Pinv(p.x,p.y);
   }
 
   svg.addEventListener('pointerdown',function(e){
@@ -685,8 +812,8 @@
       // 高亮最近兼容端口
       var near=nearestPort(p, drag.id, drag.side, 26/S.zoom);
       render();
-      if(near){ var nc=findComp(near.id); var np=portPos(nc,near.side);
-        vp.appendChild(el('circle',{cx:np.x,cy:np.y,r:9,fill:'none',stroke:'#16a34a','stroke-width':3})); }
+      if(near){ var nc=findComp(near.id); var np=portPos(nc,near.side); var nq=P(np.x,np.y);
+        vp.appendChild(el('circle',{cx:nq.x,cy:nq.y,r:9,fill:'none',stroke:'#16a34a','stroke-width':3})); }
     } else if(drag.mode==='pan'){
       S.panX=drag.panX0+(e.clientX-drag.sx); S.panY=drag.panY0+(e.clientY-drag.sy); applyTransform();
     }
@@ -934,14 +1061,27 @@
   document.getElementById('btnFit').addEventListener('click',function(){
     if(!S.components.length){ S.zoom=1;S.panX=0;S.panY=0;applyTransform();return; }
     var minx=1e9,miny=1e9,maxx=-1e9,maxy=-1e9;
-    S.components.forEach(function(c){ LIB[c.kind].ports.forEach(function(s){ var p=portPos(c,s);
-      minx=Math.min(minx,p.x);miny=Math.min(miny,p.y);maxx=Math.max(maxx,p.x);maxy=Math.max(maxy,p.y); }); });
+    /* [v206] 轴测下必须按**投影后**的屏幕包围盒取（否则 layout 会按平面尺寸算，图被切边） */
+    S.components.forEach(function(c){ LIB[c.kind].ports.forEach(function(s){
+      var p=portPos(c,s), q=P(p.x,p.y);
+      minx=Math.min(minx,q.x);miny=Math.min(miny,q.y);maxx=Math.max(maxx,q.x);maxy=Math.max(maxy,q.y); }); });
     var pad=60, w=maxx-minx+pad*2, h=maxy-miny+pad*2;
     var rect=svg.getBoundingClientRect();
     S.zoom=Math.max(0.3,Math.min(2,Math.min(rect.width/w,rect.height/h)));
     S.panX=(rect.width-w*S.zoom)/2 - (minx-pad)*S.zoom;
     S.panY=(rect.height-h*S.zoom)/2 - (miny-pad)*S.zoom;
     applyTransform(); document.getElementById('paZoomTxt').textContent='缩放 '+Math.round(S.zoom*100)+'%';
+  });
+  /* [v206] 视图切换：平面图 ⇄ 轴测图。
+     ★ 只改 S.view + 重绘，组件坐标一动不动 ⇒ 两种视图下拼装关系、水力、材料完全相同；
+       切换后自动「适应画布」（轴测投影后横向会变宽，不重新适应会被切边）。 */
+  document.getElementById('btnIso').addEventListener('click',function(){
+    var toIso=S.view!=='iso';
+    S.view=toIso?'iso':'plan';
+    this.textContent=toIso?'▤ 平面图':'⛶ 轴测图';
+    this.classList.toggle('primary',toIso);   /* 轴测态高亮，一眼看出当前是哪个视图 */
+    render();
+    document.getElementById('btnFit').click();
   });
   document.getElementById('btnZoomIn').addEventListener('click',function(){ S.zoom=Math.min(3,S.zoom*1.15);applyTransform();document.getElementById('paZoomTxt').textContent='缩放 '+Math.round(S.zoom*100)+'%'; });
   document.getElementById('btnZoomOut').addEventListener('click',function(){ S.zoom=Math.max(0.3,S.zoom/1.15);applyTransform();document.getElementById('paZoomTxt').textContent='缩放 '+Math.round(S.zoom*100)+'%'; });
