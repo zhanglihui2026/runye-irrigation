@@ -749,6 +749,12 @@
       var q=P(c.x+c.len*SCALE+LH_OFF, c.y);
       lenHandle(lenLayer,c.id,q.x,q.y);
     });
+    /* 7) [v208] 拖动中的吸附提示（绿圈）：让「快要吸上了」在拖动全程可见 */
+    if(drag.mode==='move' && drag.snapHint){
+      var sh=P(drag.snapHint.x,drag.snapHint.y);
+      vp.appendChild(el('circle',{cx:sh.x,cy:sh.y,r:11,fill:'none',stroke:'#16a34a','stroke-width':3,opacity:.9}));
+      vp.appendChild(el('circle',{cx:sh.x,cy:sh.y,r:3.5,fill:'#16a34a'}));
+    }
   }
 
   /* [v207] 直管右端的「调管长」手柄：拖动它 = 自由调节该段管长（下游跟着走）。
@@ -878,7 +884,8 @@
   /* ===================================================================
    *  交互：拖拽组件 / 端口接驳 / 平移 / 缩放
    * =================================================================== */
-  var drag={mode:null,id:null,side:null,dx:0,dy:0,tmp:null,sx:0,sy:0};
+  var drag={mode:null,id:null,side:null,dx:0,dy:0,tmp:null,sx:0,sy:0,
+    snapHint:null,len0:0,px0:0};   /* [v207] len0/px0=调管长；[v208] snapHint=拖动中的吸附提示 */
   /* [v206] 返回值一律是**规划坐标**（屏幕 → 反轴测投影），
      这样命中判定、拖拽、吸附全部照旧按规划坐标算，轴测只是「画法」不影响数据。 */
   function svgPoint(evt){
@@ -929,11 +936,23 @@
       setPipeLen(lc,nl);
       render();
     } else if(drag.mode==='move'){
-      var c=findComp(drag.id); c.x=p.x-drag.dx; c.y=p.y-drag.dy; render();
+      var c=findComp(drag.id); if(!c) return;
+      moveWithBranch(c, p.x-drag.dx, p.y-drag.dy);
+      /* [v208] **拖动过程中就实时磁吸**：靠近可接驳端口时整串被“吸”过去对位并高亮提示。
+         以前只在松手那一刻判定、全程零反馈 ⇒ 用户拖过去压根不知道能不能吸上，
+         手一松就偏了（实测 24 屏幕px 之外就接不上），体感就是「不会自动吸附」。 */
+      drag.snapHint=null;
+      var hit=snapCandidate(drag.id, snapRadiusPx());
+      if(hit){
+        var hc=findComp(hit.id), hp=portPos(hc,hit.side), hl=portLocal(c,hit.selfSide);
+        moveWithBranch(c, hp.x-hl.x, hp.y-hl.y);
+        drag.snapHint={x:hp.x,y:hp.y};
+      }
+      render();
     } else if(drag.mode==='port'){
       drag.tmp.x2=p.x; drag.tmp.y2=p.y;
       // 高亮最近兼容端口
-      var near=nearestPort(p, drag.id, drag.side, 26/S.zoom);
+      var near=nearestPort(p, drag.id, drag.side, 26);
       render();
       if(near){ var nc=findComp(near.id); var np=portPos(nc,near.side); var nq=P(np.x,np.y);
         vp.appendChild(el('circle',{cx:nq.x,cy:nq.y,r:9,fill:'none',stroke:'#16a34a','stroke-width':3})); }
@@ -948,7 +967,7 @@
       pushHistory(); recompute(); renderProps();
     } else if(drag.mode==='port'){
       var p=svgPoint(e);
-      var near=nearestPort(p, drag.id, drag.side, 26/S.zoom);
+      var near=nearestPort(p, drag.id, drag.side, 26);
       if(near){
         var res=tryConnect(drag.id,drag.side,near.id,near.side);
         if(res.ok){
@@ -964,29 +983,44 @@
       }
       drag.tmp=null;
     } else if(drag.mode==='move'){
-      // 落点自动吸附：移动组件的每个空闲端口靠近兼容端口则接驳
-      autoSnap(drag.id);
+      // 落点接驳：拖动过程中已实时磁吸对位，这里正式建立连接
+      var made=autoSnap(drag.id);
+      if(made) toast('已自动接驳 '+made+' 处');
       pushHistory(); recompute();
     }
-    drag.mode=null; drag.id=null;
+    drag.mode=null; drag.id=null; drag.snapHint=null;
   });
 
   /* anyDn=true 时不再要求口径相同（供 v207 的「就近自动吸附」使用：先把本侧端口
      口径改成对面端口的口径再接 —— 否则默认 DN110 的新配件永远吸不上 DN90 的管子）。
      不传第 5 参 = 保持原有「异径不吸附」口径，手工拉端口接驳的手感完全不变。 */
-  function nearestPort(p, selfId, selfSide, radius, anyDn){
-    var best=null, bd=radius;
+  /* ★ [v208] radius 的语义 = **屏幕像素**（用户肉眼看到的距离，恒定手感）：
+       ① 先用 P() 投影 —— 轴测下必须这样（椭的 skew 会让规划距离严重失准）；
+       ② P() 出来的是 viewport 坐标，**不含缩放**（zoom 挂在 #paVp 的 transform 上），
+          所以还要 ×S.zoom 才是真正的屏幕像素 —— 漏乘就会 zoom=2 时实际半径翻倍。
+       以前写「26/S.zoom」在平面图恰好等价，但轴测下错得离谱，两边都不好维护。 */
+  function nearestPort(p, selfId, selfSide, radiusPx, anyDn){
+    var best=null, bd=radiusPx;
+    var ref=P(p.x,p.y);
     S.components.forEach(function(c){
       if(c.id===selfId) return;
       LIB[c.kind].ports.forEach(function(side){
         if(isPortConnected(c.id,side)) return;
         if(!anyDn && portDn(c,side)!==portDn(findComp(selfId),selfSide)) return; // 异径不吸附
-        var pp=portPos(c,side); var d=Math.hypot(pp.x-p.x,pp.y-p.y);
+        var pp=portPos(c,side), pq=P(pp.x,pp.y);
+        var d=Math.hypot(pq.x-ref.x,pq.y-ref.y)*S.zoom;   /* viewport → 屏幕 */
         if(d<bd){ bd=d; best={id:c.id,side:side,dist:d}; }
       });
     });
     return best;
   }
+  /* [v208] 吸附半径：以**屏幕像素**给一个恒定手感（以前的实际有效半径只有 ~24px，
+     用户根本感觉不到「会吸附」）。两个约束：
+       · 常量 SNAP_PX=56 屏幕px —— 约是端口黄圈直径的两倍，够「粘」不会误粘；
+       · 缩得很小（zoom→0.3）时，56 屏幕px 换算成模型距离会大到走到哪粘到哪，
+         所以再按模型距离夹到 [10,45] 个 viewport 单位。 */
+  var SNAP_PX=56;
+  function snapRadiusPx(){ return Math.max(10*S.zoom, Math.min(45*S.zoom, SNAP_PX)); }
 
   /* ------------------------------------------------------------------
    *  [v207] 几何联动小工具（换选型 / 改管长都要用）
@@ -1037,15 +1071,40 @@
     }
   }
 
-  /* [v207] 就近自动吸附（替代原 autoSnap）：
-     ① 半径放宽到 34/zoom（好吸，但仍远小于常规管件尺寸，不至于乱粘）；
-     ② 允许异径命中 —— 命中后先把本侧口径改成对面口径再连接，实现「配件随管道」。 */
-  function smartSnapIt(selfId, radius){
+  /* 移动一个组件到 (nx,ny)，并把与它连通的**整条串**一起平移同样位移。
+     ★ 必要性：磁吸对位改的是这一件的位置，但它往往已经连着下游一串；只挪它会把
+       已接好的 A—B 拉出缝（视觉上像断开了）。所以必须整串一起走。
+     ★ anchorSide：给定则在 AnyAI 平移时**跳过这一侧的邻居**（含刚接上的目标件）。
+       不这么做会出现「永远差一个位移」的对不齐故障 —— 把 mc 对齐到对面端口时，
+       若把对面那串也一起平移，目标端口自己跟着跑了，两者始终相差 Δ。 */
+  function moveWithBranch(c, nx, ny, anchorSide){
+    if(!c) return;
+    var dx=nx-c.x, dy=ny-c.y;
+    if(Math.abs(dx)<1e-9 && Math.abs(dy)<1e-9) return;
+    collectBranch(c.id, anchorSide||'').forEach(function(id){ var b=findComp(id); if(b){ b.x+=dx; b.y+=dy; } });
+    c.x=nx; c.y=ny;
+  }
+
+  /* [v208] 就近自动吸附（替代原 autoSnap）：
+     ① 半径按**屏幕像素**给（snapRadiusPx），平面/轴测手感一致；
+     ② 允许异径命中 —— 命中后先把本侧口径改成对面口径再连接，实现「配件随管道」
+        （否则素材库里默认 DN110 的配件永远吸不上 DN90 的管子）。 */
+  function snapCandidate(selfId, radiusPx){
+    var mc=findComp(selfId); if(!mc) return null;
+    var best=null, bd=1e9;
+    LIB[mc.kind].ports.forEach(function(side){
+      if(isPortConnected(mc.id,side)) return;
+      var near=nearestPort(portPos(mc,side), mc.id, side, radiusPx, true);
+      if(near && near.dist<bd){ bd=near.dist; best={id:near.id,side:near.side,selfSide:side,dist:near.dist}; }
+    });
+    return best;
+  }
+  function smartSnapIt(selfId, radiusPx){
     var mc=findComp(selfId); if(!mc) return 0;
     var made=0;
     LIB[mc.kind].ports.forEach(function(side){
       if(isPortConnected(mc.id,side)) return;
-      var near=nearestPort(portPos(mc,side), mc.id, side, radius, true);
+      var near=nearestPort(portPos(mc,side), mc.id, side, radiusPx, true);
       if(!near) return;
       var nc=findComp(near.id); if(!nc) return;
       /* 三通例外：L/R 共用一个 mainDn，别让后吸附的一侧把先接好的一侧改掉 */
@@ -1053,14 +1112,16 @@
       if(!skip) applyDnToPort(mc, side, portDn(nc,near.side));
       var r=tryConnect(mc.id,side,near.id,near.side);
       if(r.ok){
-        alignPortTo(mc.id, side, portPos(nc,near.side));
+        var op=portPos(nc,near.side), ml=portLocal(mc,side);
+        /* 带上「除刚接上这一侧之外」的旧串：目标那一侧必须留在原地，否则永远差一个位移 */
+        moveWithBranch(mc, op.x-ml.x, op.y-ml.y, side);
         made++;
         if(r.loop) toast('自动接驳（检测到管网闭环，请注意校验）','warn');
       }
     });
     return made;
   }
-  function autoSnap(selfId){ return smartSnapIt(selfId, 34/S.zoom); }
+  function autoSnap(selfId){ return smartSnapIt(selfId, snapRadiusPx()); }
 
   /* [v207] 原位换选型：新件顶替旧件，尽量保住旧连接（按端口顺序一一对应），
      并把新件几何变化引起的下游错位重新排齐。 */
@@ -1360,7 +1421,7 @@
     var x = sx!=null? sx : 70 + (S.components.length%5)*46;
     var y = sy!=null? sy : 120 + (S.components.length%4)*54;
     var c=addComp(kind,x,y);
-    var n = snap? smartSnapIt(c.id, 40/S.zoom) : 0;
+    var n = snap? smartSnapIt(c.id, snapRadiusPx()) : 0;
     pushHistory(); recompute(); selectComp(c.id);
     if(n) toast('已自动接驳 '+n+' 处');
     return c;

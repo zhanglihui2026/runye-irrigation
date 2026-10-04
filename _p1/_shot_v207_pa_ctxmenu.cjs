@@ -27,6 +27,7 @@ const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const puppeteer = require('puppeteer-core');
+const killTree = require('./_edge_kill.cjs');
 
 const WS = 'C:\\Users\\AHS\\runye-irrigation';
 const EDGE = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
@@ -53,7 +54,7 @@ const TAG = process.env.PA_TAG || '';                       /* 开 Edge profile 
     try { browser = await puppeteer.connect({ browserURL: 'http://127.0.0.1:' + PORT, defaultViewport: null }); break; }
     catch (e) { await sleep(400); }
   }
-  if (!browser) { console.error('Edge connect failed'); proc.kill(); process.exit(1); }
+  if (!browser) { console.error('Edge connect failed'); killTree(proc.pid); process.exit(1); }
   const page = await browser.newPage();
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message));
@@ -227,13 +228,16 @@ const TAG = process.env.PA_TAG || '';                       /* 开 Edge profile 
   const tee = comps.filter((c) => c.kind === 'tee')[0];
   check('④c 原弯头已消失、新三通顶替其位置', !byId(comps, e1.id) && !!tee, 'comps=' + comps.map((c) => c.kind).join(','));
   check('④d 连接数一条不丢（仍是 ' + connBefore4 + ' 条）', conns.length === connBefore4, 'conns=' + conns.length);
-  const teeConns = conns.filter((k) => k.a.id === tee.id || k.b.id === tee.id);
+  /* ★ 健壮性（教训 19）：换选型失败时 tee 会不存在，这里必须退化成「断言失败」而不是抛异常 ——
+       一处异常会让整条脚本半途崩，后面的断言全没机会执行，诊断信息大幅缩水。 */
+  const teeId = tee ? tee.id : null;
+  const teeConns = conns.filter((k) => teeId && (k.a.id === teeId || k.b.id === teeId));
   check('④e 三通的左右两个口都还接着原来那两段', teeConns.length === 2, JSON.stringify(teeConns.map((k) => k.a.side + '-' + k.b.side)));
-  check('④f 三通口径沿用被替代弯头的（DN75 主管）', tee.mainDn === 75, 'main=' + tee.mainDn + ' branch=' + tee.branchDn);
+  check('④f 三通口径沿用被替代弯头的（DN75 主管）', !!tee && tee.mainDn === 75, tee ? ('main=' + tee.mainDn + ' branch=' + tee.branchDn) : '三通未生成');
   const gap5 = await maxGap();
   check('⑤ 换选型后整链重新排齐（连接两端严格重合）', near0(gap5), 'maxGap=' + gap5.toFixed(3));
   const leftIds = comps.map((c) => c.id).sort().join(',');
-  const wantIds = beforeIds.filter((i) => i !== e1.id).concat([tee.id]).sort().join(',');
+  const wantIds = beforeIds.filter((i) => i !== e1.id).concat([teeId]).sort().join(',');
   check('④g 只换了被替换那一件，其余组件（含 ID）全部保留', leftIds === wantIds,
     leftIds + ' vs ' + wantIds);
 
@@ -316,6 +320,6 @@ const TAG = process.env.PA_TAG || '';                       /* 开 Edge profile 
   console.log('\n=== 汇总：' + pass + ' 通过 / ' + fail + ' 失败 ===');
   await page.screenshot({ path: path.join(OUT, 'pa_v207_final.png') });
   try { await browser.disconnect(); } catch (e) { }
-  proc.kill();
+  killTree(proc.pid);
   process.exit(fail ? 1 : 0);
 })().catch((e) => { console.error('EXCEPTION: ' + e.stack); process.exit(2); });
