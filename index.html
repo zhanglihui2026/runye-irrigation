@@ -10148,7 +10148,12 @@ function computeThreeLevel() {
   // 支管沿用现有均分流量及 Christiansen 折减规则。
   var hydraulicPath = null;
   var appliedPipes = tlAppliedPipeOverride();
-  if (appliedPipes && wp.fromFigure && wp.zones && window.RyPipePathLoss) {
+  /* [v226]（2026-10-04 用户要求）逐组水头损失：工作区分组说明框切到某组时实时显示该组的
+     最不利路径损失。不再依赖「图面已改径」——只要有图面路径就按**当前管径**（改径值优先，
+     否则设计管径）逐组算一遍，与水泵扬程校核（RyPipePathLoss）同一套 长度/流量/Christiansen 口径；
+     hydraulicPath（扬程校核）的赋值仍严格限定 appliedPipes 存在 ⇒ 除新增 groupLoss 外零行为变化。 */
+  var groupLoss = null;
+  if (wp.fromFigure && wp.zones && window.RyPipePathLoss) {
     var pathZones = wp.zones.map(function (z) {
       var area = zoneStat ? (zoneStat.cells[z.zi] || 0) : flowAreaM2;
       return { zi: z.zi, run: z.run, main: z.main, branch: z.branch > 0 ? z.branch : branchLen,
@@ -10173,21 +10178,39 @@ function computeThreeLevel() {
       pathGroups = pathGroups.filter(Boolean);
     }
     var pathCheck = window.RyPipePathLoss.calculate({ zones: pathZones, groups: pathGroups,
-      calibers: appliedPipes.calibers, frontOd: frontPipe.od, mainOd: mainPipe.od, branchOd: branchPipe.od,
+      calibers: appliedPipes ? appliedPipes.calibers : null, frontOd: frontPipe.od, mainOd: mainPipe.od, branchOd: branchPipe.od,
       branchCount: branchCount, branchF: branchF, innerDiam: peInnerDiam, hazen: hazenWilliams });
-    hydraulicPath = pathCheck.worst;
-    if (hydraulicPath) {
-      frontPipeLoss = hydraulicPath.frontPipeLoss; mainLoss = hydraulicPath.mainLoss; branchLoss = hydraulicPath.branchLoss;
-      frontLenUsed = hydraulicPath.front + readNumber('planSrcDist', 0, { min: 0 }); mainLenUsed = hydraulicPath.main; branchLenUsed = hydraulicPath.branch;   /* 任务⑮：计入水源距离 */
-    }
-    /* 2026-09-24（用户要求）：面板管径选择按钮 —— 手动选管已并入 tlPipeOdOverride.calibers
-       （tlBuildPipeOverride），沿程损失在上方 hydraulicPath 校核中已按新管径计算；此处把
-       r.*Pipe.od 同步为手动选管值并据相同长度重算各段损失，供面板流速/返回对象/图例同源使用。 */
-    if (window.tlManualCals) {
-      var _mc = window.tlManualCals;
-      if (_mc.front != null) { frontPipe.od = _mc.front; frontPipe.id = peInnerDiam(_mc.front); frontPipeLoss = hazenWilliams(frontLenUsed, combinedFlow, frontPipe.id); }
-      if (_mc.main != null) { mainPipe.od = _mc.main; mainPipe.id = peInnerDiam(_mc.main); mainLoss = hazenWilliams(mainLenUsed, zoneFlow, mainPipe.id); }
-      if (_mc.branch != null) { branchPipe.od = _mc.branch; branchPipe.id = peInnerDiam(_mc.branch); branchLoss = hazenWilliams(branchLenUsed, branchFlow, branchPipe.id) * branchF; }
+    /* [v226] 每组取本组 total 最大的一行 = 该组最不利分区路径；flow = 组内各分区流量和（m³/h） */
+    groupLoss = pathGroups.map(function (ids, gi) {
+      var rows = pathCheck.paths.filter(function (p) { return p.groupIndex === gi; });
+      if (!rows.length) return null;
+      var w = rows[0];
+      for (var ri = 1; ri < rows.length; ri++) if (rows[ri].total > w.total) w = rows[ri];
+      var flow = 0;
+      for (var fi = 0; fi < ids.length; fi++) {
+        for (var zj = 0; zj < pathZones.length; zj++) {
+          if (pathZones[zj].zi === ids[fi]) { flow += pathZones[zj].flow; break; }
+        }
+      }
+      return { members: ids.slice(), zi: w.zoneIndex, flow: flow,
+        front: w.front, main: w.main, branch: w.branch,
+        frontLoss: w.frontPipeLoss, mainLoss: w.mainLoss, branchLoss: w.branchLoss, total: w.total };
+    });
+    if (appliedPipes) {
+      hydraulicPath = pathCheck.worst;
+      if (hydraulicPath) {
+        frontPipeLoss = hydraulicPath.frontPipeLoss; mainLoss = hydraulicPath.mainLoss; branchLoss = hydraulicPath.branchLoss;
+        frontLenUsed = hydraulicPath.front + readNumber('planSrcDist', 0, { min: 0 }); mainLenUsed = hydraulicPath.main; branchLenUsed = hydraulicPath.branch;   /* 任务⑮：计入水源距离 */
+      }
+      /* 2026-09-24（用户要求）：面板管径选择按钮 —— 手动选管已并入 tlPipeOdOverride.calibers
+         （tlBuildPipeOverride），沿程损失在上方 hydraulicPath 校核中已按新管径计算；此处把
+         r.*Pipe.od 同步为手动选管值并据相同长度重算各段损失，供面板流速/返回对象/图例同源使用。 */
+      if (window.tlManualCals) {
+        var _mc = window.tlManualCals;
+        if (_mc.front != null) { frontPipe.od = _mc.front; frontPipe.id = peInnerDiam(_mc.front); frontPipeLoss = hazenWilliams(frontLenUsed, combinedFlow, frontPipe.id); }
+        if (_mc.main != null) { mainPipe.od = _mc.main; mainPipe.id = peInnerDiam(_mc.main); mainLoss = hazenWilliams(mainLenUsed, zoneFlow, mainPipe.id); }
+        if (_mc.branch != null) { branchPipe.od = _mc.branch; branchPipe.id = peInnerDiam(_mc.branch); branchLoss = hazenWilliams(branchLenUsed, branchFlow, branchPipe.id) * branchF; }
+      }
     }
   }
 
@@ -10247,6 +10270,9 @@ function computeThreeLevel() {
     branchPipe, branchLoss, branchFlow, branchLen: branchLenUsed, branchSpan, layoutSides, tapsPerBranch, branchF,
     /* 最远分区最不利路径（2026-09-16）：wp=来源与分区号，*LenUsed=各段实际采用长度（米） */
     wp, hydraulicPath, frontLenUsed, mainLenUsed, branchLenUsed,
+    /* [v226] 逐组水头损失：groupLoss[g]={members:[分区号0基], zi:本组最不利分区, flow:组流量m³/h,
+       front/main/branch:路径长度m, frontLoss/mainLoss/branchLoss/total:水头损失m}；无图面路径时 null */
+    groupLoss,
     /* 流量口径（2026-09-21）：flowAreaM2=最大分区实际面积(m²)，flowAreaSrc='figureMaxZone'|'input' */
     flowAreaM2, flowZoneMu, flowAreaSrc,
     /* v95 联合分区：combinedAreaM2=最大一组实际面积和(m²)；worstGroup={g:组号(0基),zones:分区序号(0基),sum:m²}；
@@ -10268,6 +10294,32 @@ function computeThreeLevel() {
     intensity, mainAll, branchAll, branchAlternatives
   };
 }
+
+/* [v226]（2026-10-04 用户要求）分组说明框（tl-workspace buildGroupInfo）实时读口：
+   返回第 g 组（0 基）的流量与最不利路径水头损失。每次读取都**现算** computeThreeLevel
+   （唯一事实源，纯数学无副作用）⇒ 改管径 / 改分组 / 改参数后切组立刻是最新值；
+   无图面路径 / 无该组时返回 null（面板降级不显示损失行）。手动组按成员集合匹配
+   （pathGroups 里未分组单区组追加在尾部，序号与手动组号不保证对齐）。 */
+window.tlGroupLossOf = function (g) {
+  try {
+    if (typeof g !== 'number' || g < 0 || !isFinite(g)) return null;
+    var r = computeThreeLevel();
+    if (!r || !r.groupLoss) return null;
+    var mg = (window.tlManualGroups && window.tlManualGroups.length) ? window.tlManualGroups[g] : null;
+    if (mg && mg.length) {
+      for (var i = 0; i < r.groupLoss.length; i++) {
+        var e = r.groupLoss[i];
+        if (!e || e.members.length !== mg.length) continue;
+        var hit = true;
+        for (var k = 0; k < mg.length; k++) { if (e.members.indexOf(mg[k]) < 0) { hit = false; break; } }
+        if (hit) return e;
+      }
+      return null;
+    }
+    return r.groupLoss[g] || null;
+  } catch (e2) { return null;
+  }
+};
 
 function renderTLDerivation(r) {
   const existPressureM = r.existPressure * 10.2;

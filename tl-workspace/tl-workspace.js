@@ -119,6 +119,30 @@
     for (var zi = g * tlN; zi < Math.min((g + 1) * tlN, tlTotal); zi++) a.push(zi + 1);
     return a;
   }
+  /* [v226]（2026-10-04 用户要求）当前组水头损失行：读宿主 window.tlGroupLossOf(g)——
+     宿主侧**每次现算** computeThreeLevel（唯一事实源）⇒ 切组 / 改管径 / 改分组后立即最新；
+     桥缺失（单测桩环境）或无图面路径时返回 ''，面板静默降级。 */
+  function groupLossLine(g) {
+    if (typeof window === 'undefined' || typeof window.tlGroupLossOf !== 'function') return '';
+    var L = window.tlGroupLossOf(g);
+    if (!L || !isFinite(L.total)) return '';
+    function f2(v) { return (isFinite(v) ? v : 0).toFixed(2); }
+    return '<br>本轮水头损失 ≈ ' + f2(L.total) + ' m'
+      + '（总管 ' + f2(L.frontLoss) + ' + 主管 ' + f2(L.mainLoss) + ' + 支管 ' + f2(L.branchLoss) + '）';
+  }
+  /* [v226] 流量行：优先用桥里**本组实际**流量（组内各分区流量和，m³/h）；
+     桥缺失时退回数据包 combinedFlow（最大组口径）。★ 精确到小数点后两位（用户要求）；
+     ★ 单位修正 L/h → m³/h：combinedFlow 实为 m³/h（与左栏「联合流量 153.1 m³/h」同源同值，
+       第三十九轮修图例时已确认单位，本框当时漏改）。 */
+  function groupFlowTxt(g, cfFallback) {
+    var v = null;
+    if (typeof window !== 'undefined' && typeof window.tlGroupLossOf === 'function') {
+      var L = window.tlGroupLossOf(g);
+      if (L && isFinite(L.flow) && L.flow > 0) v = L.flow;
+    }
+    if (v == null && cfFallback != null && cfFallback !== '' && isFinite(cfFallback)) v = Number(cfFallback);
+    return (v == null) ? '' : ('本轮合灌流量 ≈ ' + v.toFixed(2) + ' m³/h');
+  }
   function buildGroupInfo(g) {
     var d = lastDataRef; if (!d || !d.zones) return '';
     /* [v215] 手动分组模式下成员表以 window.tlManualGroups 为准 —— 原实现无论什么模式都按
@@ -128,21 +152,24 @@
       var mem215 = (mg215[g] || []).map(function (z) { return z + 1; });
       if (!mem215.length) return '';
       var cf215 = (d.meta && d.meta.flowModel) ? d.meta.flowModel.combinedFlow : null;
+      var flow215 = groupFlowTxt(g, cf215);
       return '手动联合灌溉组 M' + (g + 1) + ' · 共 ' + mg215.length + ' 组之一<br>'
         + '含 区 ' + mem215.join('、') + '<br>'
         + mem215.length + ' 区同轮灌溉'
-        + ((cf215 != null && cf215 !== '') ? ('<br>本轮合灌流量 ≈ ' + cf215 + ' L/h') : '');
+        + (flow215 ? ('<br>' + flow215) : '')
+        + groupLossLine(g);
     }
     var tlN = (typeof d.combinedN === 'number' && d.combinedN >= 1) ? d.combinedN : 2;
     var z = d.zones, zcN = z.cols || (z.xPos.length - 1), zrN = z.rows || (z.yPos.length - 1);
     var tlTotal = zcN * zrN, M = Math.ceil(tlTotal / tlN);
     var members = tlGroupMembers(g, tlN, tlTotal);
     var cf = (d.meta && d.meta.flowModel) ? d.meta.flowModel.combinedFlow : null;
-    var cfTxt = (cf != null && cf !== '') ? ('本轮合灌流量 ≈ ' + cf + ' L/h') : '';
+    var flowTxt = groupFlowTxt(g, cf);
     return '联合灌溉组 G' + (g + 1) + ' · 共 ' + M + ' 组之一<br>'
       + '含 区 ' + members.join('、') + '<br>'
       + members.length + ' 区同轮灌溉'
-      + (cfTxt ? ('<br>' + cfTxt) : '');
+      + (flowTxt ? ('<br>' + flowTxt) : '')
+      + groupLossLine(g);
   }
   function applyGroupHighlight() {
     if (typeof document === 'undefined') return;
