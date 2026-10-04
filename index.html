@@ -3272,6 +3272,31 @@ body > .ry-nav .main-header{display:none!important}
 .tl-plan-result .pp-cal-sel{width:100%;max-width:100%;box-sizing:border-box;font:inherit;font-size:11px;font-weight:700;color:#b45309;text-align:center;text-align-last:center;background:#fff7ed;border:1px solid #fed7aa;border-radius:5px;padding:1px 2px;cursor:pointer}
 .tl-plan-result .pp-cal-sel:focus{outline:none;border-color:#f59e0b}
 .tl-plan-result .pp-cal-sel option{color:#1f2937;font-weight:400}
+/* ★ v225（2026-10-04 用户要求）：「目标流速」挪到结果栏标题「水力计算结果」右侧、与标题同一行。
+   ① 标题是 ::before 伪元素（三处定义：#tlPipePlanSection…:3242 / .tl-plan-result:3243 / #ryCadSide…:5309），
+      **不是真实 DOM 节点** ⇒ 不可能把 input 塞进标题里，只能让本行与标题行并排；
+   ② #tlSide 会被搬进 #ryCadGrpTl（双宿主），故规则一律挂 **id 前缀 #tlPlanBar2**（与祖先无关）；
+      .pp-plan-item 的通用规则在 CAD 宿主下特异性 (1,3,0) 且源序更后 ⇒ 覆盖项统一加 !important；
+   ③ 结果栏 position:relative 建立定位上下文，本行绝对定位贴到标题行右端（top 按「标题行垂直居中」实测取值，
+      right=11px 与栏内右内边距对齐）。 */
+#tlPlanBar2.tl-plan-result{position:relative}
+#tlPlanBar2.tl-plan-result.pp-plan-bar-result>.pp-plan-item.tl-target-v-row{
+  position:absolute;top:5px;right:11px;z-index:2;
+  display:inline-flex!important;align-items:center;gap:4px;
+  width:auto!important;min-height:0!important;padding:0!important;border-bottom:0!important;background:transparent;
+}
+#tlPlanBar2.tl-plan-result.pp-plan-bar-result>.pp-plan-item.tl-target-v-row>.pp-plan-label:first-child{margin-right:0!important;flex:0 0 auto!important}
+#tlPlanBar2 .tl-target-v-row input{
+  /* ★ 尺寸不在这里改：本行保留 pp-plan-item 类，输入框沿用 .pp-plan-item input 的
+     64×24（:3285 / :5320 双宿主各一份），与面板其它输入框同款 —— 实测本行 136px、
+     栏内容宽 251px，标题只占 69px，无需压缩。
+     这里只补「浅色兜底」：通用 .pp-plan-item input 是按「深绿底面板」写的（白字+透明底），
+     万一将来本行丢了 pp-plan-item 类，输入框也不会变成本白字隐形。 */
+  box-sizing:border-box;text-align:right;flex:0 0 auto;
+  font-size:11px;font-weight:400;color:#1a1a1a;background:#fff;border:1px solid #dde8e1;
+}
+#tlPlanBar2 .tl-target-v-row input:focus{border-color:#16a34a;outline:none}
+#tlPlanBar2 .tl-target-v-row .tl-tv-unit{font-size:11px;color:#475569;white-space:nowrap;flex:0 0 auto}
 #tlPipePlanSection .pp-side .pp-btn-ghost{color:#333;border-color:#ccc;background:#f8f9fa}
 /* v98e：左栏「手动分组」状态块改表格显示（组 / 分区 / 面积 + 合计） */
 .tl-grp-cap{font-size:11px;font-weight:700;color:#2f6d43;margin:0 0 4px}
@@ -6451,9 +6476,16 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     </div>
     <!-- 2026-09-16 用户要求：左栏面板「总管长度」输入取消（总管长度仍可在下方水力参数卡
          「联合灌溉 总管选型」里调整，tl_frontPipeLen 保留；tlUpdatePlanBar 不再覆盖它） -->
-    <span class="pp-plan-item"><span class="pp-plan-label">目标流速</span><input type="number" id="tlPlanTargetV" value="1.5" min="0.3" max="5" step="0.1">m/s</span>
+    <!-- [v225]（2026-10-04 用户要求）「目标流速」已挪到下方结果栏标题「水力计算结果」右侧、
+         与标题同一行（见 #tlPlanBar2 内 .tl-target-v-row）。
+         id 不变 ⇒ tlUpdatePlanBar 的 readNumber('tlPlanTargetV') 与两个监听器零改动。 -->
   </div>
   <div class="pp-plan-bar pp-plan-bar-result tl-plan-result" id="tlPlanBar2">
+    <!-- [v225]（2026-10-04 用户要求）「目标流速」从上方参数栏挪到本栏标题「水力计算结果」右侧、
+         与标题文字同一行。★ 标题是 ::before 伪元素（不是真实 DOM），塞不进去 ⇒
+         本行改用绝对定位贴到标题行右端（样式见 .tl-target-v-row，规则一律挂 #tlPlanBar2 id 前缀，
+         与「#tlSide 被搬进 #ryCadGrpTl」的双宿主无关）。 -->
+    <span class="pp-plan-item tl-target-v-row"><span class="pp-plan-label">目标流速</span><input type="number" id="tlPlanTargetV" value="1.5" min="0.3" max="5" step="0.1" title="设计流速（m/s）：管径选型的基准，改动后会实时重算管径 / 扬程 / 流速"><span class="tl-tv-unit">m/s</span></span>
     <!-- ★ v109 关键发现（2026-09-22）：三级页切 tab 时本栏随 #tlSide 被**搬移**进 CAD 侧栏
          #ryCadGrpTl —— 失去 #tlPipePlanSection 祖先后，v107 挂该前缀的列布局规则全部失效
          （computed style 实证 flex=0 1 auto / margin-right:auto），用户看到的正是旧布局错位。
