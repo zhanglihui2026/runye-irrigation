@@ -283,7 +283,7 @@
           <!-- [v210] 编辑：复制 / 旋转 / 移动（选中一个管件后可用；快捷键 Ctrl+D / R / 方向键） -->
           <div class="seg">
             <button class="pa-btn" id="btnDup" title="复制选中管件（Ctrl+D）：连口径/管长一起复制，错开落位便于再拖动">⧉ 复制</button>
-            <button class="pa-btn" id="btnRot" title="旋转选中管件 90°（R；按住 Shift 逆时针）：绕左端 L 口转，下游自动跟着接好">↻ 旋转</button>
+            <button class="pa-btn" id="btnRot" title="旋转选中管件：弹出方向轴选择（X+/Y+/X−/Y−，箭头=当前视图下的实际走向，轴测图里也一样）；另有 ±90° 步进。快捷键 R / Shift+R">↻ 旋转</button>
             <button class="pa-btn" id="btnMove" title="自由移动模式：打开后拖动不会被邻近端口吸住（用于把已接好的管件挪开）；关闭时拖到附近会自动接驳">✥ 移动</button>
           </div>
           <!-- [v212] 「⚡ 载入示例管路」已挪到左侧素材库顶部（用户要求），此处移除 -->
@@ -300,7 +300,7 @@
           <div class="pa-status" id="paStatus" title="拼装/水力状态"><span class="dot"></span><span id="paStatusTxt">待拼装</span></div>
         </div>
         <svg id="paSvg" xmlns="http://www.w3.org/2000/svg"></svg>
-        <div class="pa-hint">操作：左侧点击/拖入管件，靠近即自动吸附 → 选中可改参数 → ★右键管道直接改管径 · 右键配件直接换选型 → 拖直管右端「⇔」手柄自由调管长 → ★复制 Ctrl+D · 旋转 R（Shift 反向）· 方向键微调移动（Shift 加速）→ 俯视/前视/侧视/轴测四种画法随时切换 → Delete 删除 · 滚轮缩放。</div>
+        <div class="pa-hint">操作：左侧点击/拖入管件，靠近即自动吸附 → 选中可改参数 → ★右键管道直接改管径 · 右键配件直接换选型 → 拖直管右端「⇔」手柄自由调管长 → ★复制 Ctrl+D · 旋转 ↻ 选方向轴（X+/Y+/X−/Y−，箭头随视图变；R = ±90°）· 方向键微调移动（Shift 加速）→ 俯视/前视/侧视/轴测四种画法随时切换 → Delete 删除 · 滚轮缩放。</div>
         <div class="pa-zoom" id="paZoomTxt">缩放 100%</div>
         <div class="pa-toast" id="paToast"></div>
         <!-- [v207] 画布右键菜单：管道改管径 / 配件换选型（内容由 JS 按选中管件的类型构造） -->
@@ -760,8 +760,9 @@
       d2+=(i?' L ':'M ')+pts[i].x+' '+(pts[i].y+sw*0.42);
     }
     g.appendChild(el('path',{d:d2,fill:'none',stroke:'rgba(15,23,42,.20)','stroke-width':sw,'stroke-linecap':'round','stroke-linejoin':'round'}));
+    /* class="pa-main"：主描边标记（阴影/高光都不带），验证脚本靠它精确量管身几何 */
     g.appendChild(el('path',{d:d,fill:'none',stroke:col,'stroke-width':sw,'stroke-linecap':'round','stroke-linejoin':'round',
-      'stroke-dasharray':dash||''}));
+      'stroke-dasharray':dash||'',class:'pa-main'}));
     /* [v209] 轴测管身也加一道高光（沿屏幕纵向上移一点），与平面视图的圆管质感一致 */
     g.appendChild(el('path',{d:d,fill:'none',stroke:'rgba(255,255,255,.42)','stroke-width':Math.max(1.1,sw*0.28),
       'stroke-linecap':'round','stroke-linejoin':'round',transform:'translate(0,'+(-sw*0.26)+')'}));
@@ -907,7 +908,7 @@
     if(ny>0){ nx=-nx; ny=-ny; }                    /* 统一让法线朝「上/左上」，光源在右上 */
     var hi=sw*0.27, lo=sw*0.32;
     g.appendChild(el('line',{x1:x1,y1:y1,x2:x2,y2:y2,stroke:shade(col,-0.5),'stroke-width':sw+2.2,'stroke-linecap':'round'}));
-    g.appendChild(el('line',{x1:x1,y1:y1,x2:x2,y2:y2,stroke:col,'stroke-width':sw,'stroke-linecap':'round'}));
+    g.appendChild(el('line',{x1:x1,y1:y1,x2:x2,y2:y2,stroke:col,'stroke-width':sw,'stroke-linecap':'round',class:'pa-main'}));
     g.appendChild(el('line',{x1:x1+nx*hi,y1:y1+ny*hi,x2:x2+nx*hi,y2:y2+ny*hi,
       stroke:'rgba(255,255,255,.50)','stroke-width':Math.max(1.1,sw*0.32),'stroke-linecap':'round'}));
     g.appendChild(el('line',{x1:x1-nx*lo,y1:y1-ny*lo,x2:x2-nx*lo,y2:y2-ny*lo,
@@ -916,7 +917,7 @@
   /* 折线版（弯头）：同一条 path 叠三层，拐角处用 round join 保住圆润 */
   function pipePath(g,d,col,sw){
     g.appendChild(el('path',{d:d,fill:'none',stroke:shade(col,-0.5),'stroke-width':sw+2.2,'stroke-linecap':'round','stroke-linejoin':'round'}));
-    g.appendChild(el('path',{d:d,fill:'none',stroke:col,'stroke-width':sw,'stroke-linecap':'round','stroke-linejoin':'round'}));
+    g.appendChild(el('path',{d:d,fill:'none',stroke:col,'stroke-width':sw,'stroke-linecap':'round','stroke-linejoin':'round',class:'pa-main'}));
     g.appendChild(el('path',{d:d,fill:'none',stroke:'rgba(255,255,255,.42)','stroke-width':Math.max(1.1,sw*0.28),
       'stroke-linecap':'round','stroke-linejoin':'round',transform:'translate(0,'+(-sw*0.26)+')'}));
   }
@@ -1338,15 +1339,7 @@
     toast('已复制「'+LIB[c.kind].label+'」（Ctrl+D 可继续复制）');
     return n;
   }
-  function rotateComp(id, deg){
-    var c=findComp(id); if(!c) return false;
-    var d=((+deg||0)%360+360)%360;
-    c.rot=((+c.rot||0)+d)%360;
-    cascadeAlign(c.id);
-    pushHistory(); recompute(); render(); renderProps();
-    toast('已旋转 '+d+'°（当前 '+c.rot+'°，绕左端接口旋转）');
-    return true;
-  }
+  /* rotateComp / setRot / commitRot 在 [v213] 方向轴一节（与视图投影一起定义，箭头要用 P()） */
   /* 方向键微调：连续按一串只在**停手后**压一次历史，否则撤销要按几十次才退回去 */
   var nudgeTimer=null;
   function nudgeComp(id, dx, dy){
@@ -1364,6 +1357,61 @@
     toast(S.moveMode? '自由移动：已关闭自动吸附（可把已接好的管件挪开）'
                     : '自动吸附已恢复：拖到附近会自动接驳');
     return S.moveMode;
+  }
+
+  /* ===================================================================
+   *  [v213] 旋转的方向轴选择
+   *  ------------------------------------------------------------------
+   *  用户原话：「按钮旋转要有方向轴选择，我不单单是在平面图上旋转，
+   *             我想在轴测图上用方向轴选择。」
+   *  以前 ↻ 只会「+90°」，用户没法说清"我要这根管沿轴测图的 X 轴走 / 沿 Y 轴走"。
+   *  现在点 ↻ 弹出**方向轴选择**：
+   *    · 四个选项 X+ / Y+ / X− / Y−（= 绝对角度 0/90/180/270）；
+   *    · ★ 箭头不是写死的符号，而是把该方向的单位向量**用当前视图的投影 P() 算一遍**
+   *      再取最接近的箭头 —— 俯视里 X+ 是 →、Y+ 是 ↓；切到轴测后 X+ 变 ↘、Y+ 变 ↙，
+   *      正好和画布上那两根绿 X / 蓝 Y 轴向指示一致。用户在哪个视图里选，看到的就是
+   *      那个视图里的真实走向。
+   *  另保留「↻ +90° / ↺ −90°」步进，习惯顺手转的还是一下就转。
+   * =================================================================== */
+  function dirGlyph(vx,vy){
+    var l=Math.hypot(vx,vy)||1; vx/=l; vy/=l;
+    var arrows=[[1,0,'→'],[0.707,0.707,'↘'],[0,1,'↓'],[-0.707,0.707,'↙'],
+                [-1,0,'←'],[-0.707,-0.707,'↖'],[0,-1,'↑'],[0.707,-0.707,'↗']];
+    var best=0, bd=-2;
+    for(var i=0;i<arrows.length;i++){
+      var d=vx*arrows[i][0]+vy*arrows[i][1];
+      if(d>bd){ bd=d; best=i; }
+    }
+    return arrows[best][2];
+  }
+  /* 四个方向轴在**当前视图**下的样子（rot=deg 时组件局部 +x 轴指向 plan 方向 (cos,sin)） */
+  function rotAxisOptions(){
+    return [[0,'X+ (向右)'],[90,'Y+ (向下)'],[180,'X− (向左)'],[270,'Y− (向上)']].map(function(d){
+      var a=d[0]*Math.PI/180;
+      var p=P(Math.cos(a), Math.sin(a));       // 投影后的屏幕方向
+      return { deg:d[0], name:d[1], glyph:dirGlyph(p.x,p.y) };
+    });
+  }
+  function commitRot(c, deg, msg){
+    c.rot=((+deg||0)%360+360)%360;
+    cascadeAlign(c.id);
+    pushHistory(); recompute(); render(); renderProps();
+    toast(msg);
+    return true;
+  }
+  /* 步进旋转（R / Shift+R / 菜单里的 ±90°）：在当前角度上加减 */
+  function rotateComp(id, delta){
+    var c=findComp(id); if(!c) return false;
+    var d=((+delta||0)%360+360)%360;
+    var next=(((+c.rot||0)+d)%360+360)%360;
+    return commitRot(c, next, '已旋转 '+d+'°（当前 '+next+'°，绕左端接口旋转）');
+  }
+  /* 直接转到某个方向轴（绝对角度） */
+  function setRot(id, deg){
+    var c=findComp(id); if(!c) return false;
+    var d=((+deg||0)%360+360)%360;
+    if(d===((+c.rot||0)%360+360)%360) return false;   // 已在该方向上，不动也不压历史
+    return commitRot(c, d, '已对齐方向轴 '+d+'°（绕左端接口旋转）');
   }
 
   /* ===================================================================
@@ -1447,20 +1495,48 @@
         h+='<div class="pa-menu-t">支管 DN（下）</div>'+menuChips(DN_LIST,c.branchDn,'branchdn');
       }
     }
-    /* [v210] 复制 / 旋转也放进右键菜单：手在画布上时不必绕去工具条 */
-    h+='<div class="pa-menu-sep"></div><div class="pa-menu-list">'
+    /* [v210] 复制 / 旋转也放进右键菜单：手在画布上时不必绕去工具条
+       [v213] 旋转给「方向轴选择」，不再只有 +90° 一条路 */
+    h+='<div class="pa-menu-sep"></div>'
+      +'<div class="pa-menu-t">旋转方向轴（箭头=当前视图走向）</div>'
+      +rotAxisChips(c)
+      +'<div class="pa-menu-list">'
       +'<div class="pa-menu-i" data-act="dup"><span class="pa-glyph">⧉</span>复制该管件<small>Ctrl+D</small></div>'
-      +'<div class="pa-menu-i" data-act="rot"><span class="pa-glyph">↻</span>旋转 90°<small>R</small></div>'
       +'<div class="pa-menu-i danger" data-act="del"><span class="pa-glyph">🗑</span>删除该管件</div></div>';
     menuEl.setAttribute('data-id',c.id);
     menuEl.innerHTML=h;
     menuEl.classList.add('show');
-    /* 定位（相对画布容器），越界回夹，保证菜单不会被工具条/边缘裁掉 */
+    placeMenu(clientX,clientY);
+  }
+  /* 定位（相对画布容器），越界回夹，保证菜单不会被工具条/边缘裁掉 */
+  function placeMenu(clientX,clientY){
     var r=wrapEl.getBoundingClientRect();
     var x=clientX-r.left+4, y=clientY-r.top+4;
     if(x+menuEl.offsetWidth>r.width-6) x=Math.max(6,r.width-menuEl.offsetWidth-6);
     if(y+menuEl.offsetHeight>r.height-6) y=Math.max(6,r.height-menuEl.offsetHeight-6);
     menuEl.style.left=x+'px'; menuEl.style.top=y+'px';
+  }
+  /* [v213] 方向轴 chips（右键菜单与 ↻ 按钮弹层共用同一份，箭头随当前视图变） */
+  function rotAxisChips(c){
+    var cur=((+c.rot||0)%360+360)%360;
+    return '<div class="pa-chips">'+rotAxisOptions().map(function(o){
+      return '<div class="pa-chip'+(cur===o.deg?' on':'')+'" data-act="rotaxis" data-val="'+o.deg
+        +'" title="转到 '+o.name+'，即 '+o.deg+'°">'+o.glyph+' '+o.deg+'°</div>';
+    }).join('')+'</div>';
+  }
+  /* [v213] ↻ 按钮弹出的「方向轴选择」层：四个绝对方向轴 + 两个步进 */
+  function openRotAxisMenu(clientX,clientY,c){
+    var h='<div class="pa-menu-h">'+LIB[c.kind].label+'<small>绕左端接口旋转</small></div>'
+      +'<div class="pa-menu-t">方向轴（箭头 = 当前视图下的实际走向）</div>'
+      +rotAxisChips(c)
+      +'<div class="pa-menu-t">步进</div><div class="pa-chips">'
+      +'<div class="pa-chip" data-act="rot" data-val="90" title="顺时针转 90°">↻ +90°</div>'
+      +'<div class="pa-chip" data-act="rot" data-val="-90" title="逆时针转 90°">↺ −90°</div>'
+      +'</div>';
+    menuEl.setAttribute('data-id',c.id);
+    menuEl.innerHTML=h;
+    menuEl.classList.add('show');
+    placeMenu(clientX,clientY);
   }
 
   menuEl.addEventListener('click',function(e){
@@ -1470,7 +1546,9 @@
     closeMenu(); if(!c) return;
     if(act==='del'){ deleteComp(c.id); return; }
     if(act==='dup'){ duplicateComp(c.id); return; }
-    if(act==='rot'){ rotateComp(c.id,90); return; }
+    /* [v213] rot=步进（±90），rotaxis=直接对齐某个方向轴 */
+    if(act==='rot'){ rotateComp(c.id, +val||90); return; }
+    if(act==='rotaxis'){ setRot(c.id, +val); return; }
     if(act==='kind'){ switchKind(c.id,val); return; }
     if(act==='dn'){ setPipeDn(c,+val); return; }
     /* 变径/三通的分口径：只改对应那一段的性质，不动其它端口 */
@@ -1708,9 +1786,13 @@
     if(!S.selected){ toast('请先选中一个管件','warn'); return; }
     duplicateComp(S.selected);
   });
+  /* [v213] ↻ 旋转 → 弹出「方向轴选择」（四个绝对方向轴 + ±90° 步进）。
+     箭头用当前视图的投影算：轴测图下看到的就是轴测里的真实走向（X+ ↘ / Y+ ↙）。 */
   document.getElementById('btnRot').addEventListener('click',function(e){
     if(!S.selected){ toast('请先选中一个管件','warn'); return; }
-    rotateComp(S.selected, e.shiftKey? -90 : 90);
+    var r=this.getBoundingClientRect();
+    var c=findComp(S.selected);
+    openRotAxisMenu(r.left+r.width/2, r.bottom+8, c);
   });
   document.getElementById('btnMove').addEventListener('click',function(){
     setMoveMode(!S.moveMode);
@@ -1812,7 +1894,8 @@
     /* [v207] 交互内核对外暴露：给自动化验证走**真实入口**（不是手工塞数据造假数据） */
     setPipeDn:setPipeDn, setPipeLen:setPipeLen, switchKind:switchKind,
     /* [v210] 复制 / 旋转 / 移动 / 视图 */
-    duplicateComp:duplicateComp, rotateComp:rotateComp, nudgeComp:nudgeComp,
+    duplicateComp:duplicateComp, rotateComp:rotateComp, setRot:setRot, nudgeComp:nudgeComp,
+    rotAxisOptions:rotAxisOptions,
     setMoveMode:setMoveMode, getMoveMode:function(){ return !!S.moveMode; },
     setView:setView, getView:function(){ return S.view; },
     portLocalOf:function(id,side){ var c=findComp(id); return c? portLocal(c,side) : null; },

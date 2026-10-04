@@ -18,7 +18,7 @@
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
-const puppeteer = require('puppeteer-core');
+const puppeteer = require('./_pptr.cjs');   /* [v213] 统一兜底入口：批跑环境常缺 NODE_PATH */
 const killTree = require('./_edge_kill.cjs');
 
 const WS = 'C:\\Users\\AHS\\runye-irrigation';

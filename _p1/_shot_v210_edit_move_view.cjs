@@ -24,7 +24,7 @@
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
-const puppeteer = require('puppeteer-core');
+const puppeteer = require('./_pptr.cjs');   /* [v213] 统一兜底入口：批跑环境常缺 NODE_PATH */
 const killTree = require('./_edge_kill.cjs');
 
 const WS = 'C:\\Users\\AHS\\runye-irrigation';
@@ -108,6 +108,27 @@ const run = (k) => !ONLY.length || ONLY.indexOf(k) >= 0;
       x2: +l.getAttribute('x2'), y2: +l.getAttribute('y2')
     }));
   }, id);
+  /* [v213] 主描边（.pa-main，页面里专门给验证脚本留的标记）：
+     平面/前/侧视下是 <line>，轴测下是 <path> —— 统一从这里取，四种视图都能量管身。 */
+  const compMainSeg = (id) => R((cid) => {
+    const g = document.querySelector('#paSvg .pa-comp[data-id="' + cid + '"]');
+    if (!g) return null;
+    const pick = (l) => ({
+      x1: +l.getAttribute('x1'), y1: +l.getAttribute('y1'),
+      x2: +l.getAttribute('x2'), y2: +l.getAttribute('y2')
+    });
+    let best = null, bl = 0;
+    g.querySelectorAll('.pa-main').forEach((l) => {
+      const s = l.tagName.toLowerCase() === 'line' ? pick(l) : (() => {
+        const m = (l.getAttribute('d') || '').match(/^M\s*(-?[\d.]+)[ ,](-?[\d.]+)\s*L\s*(-?[\d.]+)[ ,](-?[\d.]+)/);
+        return m ? { x1: +m[1], y1: +m[2], x2: +m[3], y2: +m[4] } : null;
+      })();
+      if (!s) return;
+      const L2 = Math.hypot(s.x2 - s.x1, s.y2 - s.y1);
+      if (L2 > bl) { bl = L2; best = s; }
+    });
+    return best;
+  }, id);
   const menuVisible = () => R(() => {
     const m = document.getElementById('paMenu');
     return { show: m.classList.contains('show'), disp: getComputedStyle(m).display, id: m.getAttribute('data-id') };
@@ -121,6 +142,7 @@ const run = (k) => !ONLY.length || ONLY.indexOf(k) >= 0;
   }, sel, val);
   const menuItems = () => R(() => Array.prototype.slice.call(
     document.querySelectorAll('#paMenu [data-act]')).map((e) => e.getAttribute('data-act') + ':' + (e.getAttribute('data-val') || '')));
+  const menuActs = menuItems;   /* 别名：本脚本里两种叫法 */
   const dropLib = (kind, planX, planY) => page.evaluate((k, px, py) => {
     const svg = document.getElementById('paSvg'), vp = document.getElementById('paVp');
     const p = svg.createSVGPoint(); p.x = px; p.y = py;
@@ -240,9 +262,24 @@ const run = (k) => !ONLY.length || ONLY.indexOf(k) >= 0;
   let a1 = comps[0], a2 = comps[2];
   const rL0 = await R((id) => window.RyPipeAssembler.portPosOf(id, 'L'), a1.id);
   const tot0 = await R(() => document.getElementById('rTot').textContent);
+  /* [v213] ↻ 现在弹出「方向轴选择」层：真实点击按钮 + 真实点击层里的「+90°」chip */
+  const rotViaMenu = async (val) => {
+    await page.click('#btnRot');
+    await sleep(300);
+    const ok = await clickMenuItem('#paMenu .pa-chip[data-act="rot"]', val);
+    await sleep(350);
+    return ok;
+  };
   await clickComp(a1);
-  await page.click('#btnRot');
-  await sleep(400);
+  check('③0 点 ↻ 弹出方向轴选择层（含四个方向轴 + ±90° 步进）', await (async () => {
+    await page.click('#btnRot'); await sleep(300);
+    const acts = await menuActs();
+    await page.keyboard.press('Escape'); await sleep(200);
+    return ['rotaxis:0','rotaxis:90','rotaxis:180','rotaxis:270','rot:90','rot:-90']
+      .every((k) => acts.indexOf(k) >= 0);
+  })(), JSON.stringify(await menuActs()).slice(0, 120));
+  check('③0b 点「↻ +90°」步进 chip 完成旋转', await rotViaMenu('90') === true);
+  await sleep(200);
   comps = await getComps(); conns = await getConns();
   const rot1 = byId(comps, a1.id).rot;
   check('③a 工具条「↻ 旋转」把 rot 从 0 转到 90', rot1 === 90, 'rot=' + rot1);
@@ -288,12 +325,15 @@ const run = (k) => !ONLY.length || ONLY.indexOf(k) >= 0;
 
   const a3 = (await getComps())[4];
   await rightClickComp(a3);
-  const hasRot = (await menuItems()).indexOf('rot:') >= 0;
-  check('③j 右键菜单里有「旋转 90°」', hasRot, (await menuItems()).join(' | '));
-  await clickMenuItem('#paMenu .pa-menu-i[data-act="rot"]', null);
+  /* [v213] 右键菜单里的旋转从「旋转 90°」一项升级为四个方向轴 chip（rotaxis:0/90/180/270） */
+  const acts3 = await menuItems();
+  const hasAxes = ['rotaxis:0', 'rotaxis:90', 'rotaxis:180', 'rotaxis:270'].every((k) => acts3.indexOf(k) >= 0);
+  check('③j 右键菜单里有四个方向轴（X+/Y+/X−/Y−）', hasAxes, acts3.join(' | '));
+  const okAxis = await clickMenuItem('#paMenu .pa-chip[data-act="rotaxis"]', '90');
+  check('③j2 菜单里找到「Y+ 轴(90°)」并完成点击', okAxis === true);
   await sleep(350);
   comps = await getComps();
-  check('③k 右键菜单旋转生效', byId(comps, a3.id).rot === 90, 'rot=' + byId(comps, a3.id).rot);
+  check('③k 右键菜单按方向轴旋转生效（rot→90）', byId(comps, a3.id).rot === 90, 'rot=' + byId(comps, a3.id).rot);
   check('③l 三次旋转之后整条链依然无缝', near0(await maxGap()), 'maxGap=' + (await maxGap()).toFixed(3));
   await page.screenshot({ path: path.join(OUT, 'pa_v210_rot.png') });
   } /* end ③ */
@@ -439,8 +479,24 @@ const run = (k) => !ONLY.length || ONLY.indexOf(k) >= 0;
   check('⑤l0 前视下能点中并选中首段直管', await R(() => window.RyPipeAssembler.getSel()) === b1.id,
     'sel=' + (await R(() => window.RyPipeAssembler.getSel())) + ' / b1=' + b1.id);
   const beforeRot = await portScreen();
-  await page.click('#btnRot');
-  await sleep(400);
+  const frontAxes = await (async () => {
+    await page.click('#btnRot'); await sleep(300);
+    const items = await R(() => Array.prototype.slice.call(
+      document.querySelectorAll('#paMenu .pa-chip[data-act="rotaxis"]'))
+      .map((e) => e.getAttribute('data-val') + ':' + e.textContent.trim()));
+    await page.keyboard.press('Escape'); await sleep(200);
+    return items;
+  })();
+  check('⑤l-0b 前视下的方向轴菜单也在，且箭头仍是 →/↓（前视只压缩、不换向）',
+    frontAxes.length === 4 && frontAxes[0].indexOf('→') >= 0 && frontAxes[1].indexOf('↓') >= 0,
+    JSON.stringify(frontAxes));
+  check('⑤l-0c 通过方向轴菜单直接对齐 90°（Y+ 轴）', await (async () => {
+    await page.click('#btnRot'); await sleep(300);
+    const ok = await clickMenuItem('#paMenu .pa-chip[data-act="rotaxis"]', '90');
+    await sleep(350);
+    return ok;
+  })() === true);
+  await sleep(200);
   comps = await getComps();
   const afterRot = await portScreen();
   check('⑤l 前视下旋转：数据层 rot=90 且 R 口转到 L 口正下方',
@@ -451,6 +507,42 @@ const run = (k) => !ONLY.length || ONLY.indexOf(k) >= 0;
     Math.abs(afterRot[b1.id + ':R'].y - beforeRot[b1.id + ':R'].y) > 1,
     beforeRot[b1.id + ':R'].y.toFixed(2) + ' → ' + afterRot[b1.id + ':R'].y.toFixed(2));
   await page.screenshot({ path: path.join(OUT, 'pa_v210_views.png') });
+
+  /* ===== [v213] 轴测图下的方向轴选择（用户核心诉求）===== */
+  await clickView('iso');
+  comps = await getComps(); b1 = byId(comps, b1.id);
+  await clickComp(b1);
+  const isoAxes = await (async () => {
+    await page.click('#btnRot'); await sleep(300);
+    const items = await R(() => Array.prototype.slice.call(
+      document.querySelectorAll('#paMenu .pa-chip[data-act="rotaxis"]'))
+      .map((e) => e.getAttribute('data-val') + ':' + e.textContent.trim()));
+    await page.keyboard.press('Escape'); await sleep(200);
+    return items;
+  })();
+  /* 轴测下 X+ 走 ↘（cos30,sin30）、Y+ 走 ↙（-cos30,sin30）、X− ↖、Y− ↗ —— 与画布上
+     绿 X / 蓝 Y 轴向指示完全一致。箭头若还是俯视的 →/↓，用户在轴测里就没法选了。 */
+  check('⑤n 轴测下方向轴箭头 = ↘/↙/↖/↗（跟画布 X/Y 轴向指示一致）',
+    isoAxes.length === 4 && isoAxes[0].indexOf('↘') >= 0 && isoAxes[1].indexOf('↙') >= 0 &&
+    isoAxes[2].indexOf('↖') >= 0 && isoAxes[3].indexOf('↗') >= 0, JSON.stringify(isoAxes));
+  /* 对齐到 Y− 轴（270°）：管身应真的沿轴测 ↗ 方向走 (Δx=+L·cos30, Δy=−L·sin30) */
+  const okYm = await (async () => {
+    await page.click('#btnRot'); await sleep(300);
+    const ok = await clickMenuItem('#paMenu .pa-chip[data-act="rotaxis"]', '270');
+    await sleep(400);
+    return ok;
+  })();
+  comps = await getComps();
+  const segIso = await compMainSeg(b1.id);
+  const Lpx2 = byId(comps, b1.id).len * 12;
+  const IA = Math.cos(Math.PI / 6), IB = Math.sin(Math.PI / 6);
+  check('⑤o 轴测下对齐 Y− 轴：管身真的沿 ↗ 走（Δx=+L·cos30, Δy=−L·sin30）',
+    okYm === true && byId(comps, b1.id).rot === 270 && !!segIso &&
+    Math.abs((segIso.x2 - segIso.x1) - Lpx2 * IA) < 0.6 &&
+    Math.abs((segIso.y2 - segIso.y1) + Lpx2 * IB) < 0.6,
+    'rot=' + byId(comps, b1.id).rot + ' seg=' + JSON.stringify(segIso) + ' 期望Δ=(' +
+    (Lpx2 * IA).toFixed(1) + ',' + (-Lpx2 * IB).toFixed(1) + ')');
+  await page.screenshot({ path: path.join(OUT, 'pa_v213_iso_axis.png') });
   await clickView('plan');
   } /* end ⑤ */
 

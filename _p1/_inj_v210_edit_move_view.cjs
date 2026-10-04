@@ -5,7 +5,7 @@
  *   只挑「会红的编号」还不够：还要看「实际红条」里没有意料之外的条目，
  *   否则说明断言之间互相稀释（v207 教训：整串联动把 ⑨c/⑨d 的信号冲淡了）。
  *
- * 11 个缺陷，覆盖本次四项需求的每一条关键性质：
+ * 16 个缺陷，覆盖本次四项需求的每一条关键性质：
  *   K1 复制不带属性      → ②b
  *   K2 复制原地重合      → ②c
  *   K3 复制继承连接      → ②d
@@ -19,6 +19,10 @@
  *   K11 视图切换动数据   → ⑤f
  *   K12 前/侧视不压缩    → ⑤j
  *   K13 高亮不同步       → ⑤b
+ * [v213] 方向轴选择：
+ *   K14 箭头不随视图变   → ⑤n
+ *   K15 方向轴当成步进   → ⑤o
+ *   K16 方向轴不重排下游 → ③l
  */
 'use strict';
 const path = require('path');
@@ -48,8 +52,8 @@ runCases({
       from: '    cascadeAlign(c.id);\n    pushHistory(); recompute(); render(); renderProps();',
       to: '    /*cascadeAlign(c.id);*/\n    pushHistory(); recompute(); render(); renderProps();', env: { PA_ONLY: '3' }, red: ['③d'] },
     { n: 'K6 旋转绕错中心（L 口也跟着跑了）→ ③b',
-      from: '    c.rot=((+c.rot||0)+d)%360;',
-      to: '    c.rot=((+c.rot||0)+d)%360; c.x+=5; c.y+=5;', env: { PA_ONLY: '3' }, red: ['③b'] },
+      from: '    c.rot=((+deg||0)%360+360)%360;',
+      to: '    c.rot=((+deg||0)%360+360)%360; c.x+=5; c.y+=5;', env: { PA_ONLY: '3' }, red: ['③b'] },
     { n: 'K7 画法不应用 rot（数据转了、图没转）→ ③g2',
       from: '    var q=rotPt(lx,ly,c.rot||0); return {x:c.x+q.x, y:c.y+q.y};',
       to: '    var q={x:lx,y:ly}; return {x:c.x+q.x, y:c.y+q.y};', env: { PA_ONLY: '3' }, red: ['③g2'] },
@@ -71,6 +75,19 @@ runCases({
       to: '  var FRONT_K=1;      // ≈0.342', env: { PA_ONLY: '5' }, red: ['⑤j'] },
     { n: 'K13 视图高亮不同步（点了侧视却亮着俯视）→ ⑤b',
       from: "segs[i].classList.toggle('on', segs[i].getAttribute('data-view')===v);",
-      to: "segs[i].classList.toggle('on', segs[i].getAttribute('data-view')==='plan');", env: { PA_ONLY: '5' }, red: ['⑤b'] }
+      to: "segs[i].classList.toggle('on', segs[i].getAttribute('data-view')==='plan');", env: { PA_ONLY: '5' }, red: ['⑤b'] },
+    /* [v213] 方向轴选择 */
+    { n: 'K14 方向轴箭头不随视图变（轴测里还是俯视的 →/↓）→ ⑤n',
+      from: "      var p=P(Math.cos(a), Math.sin(a));       // 投影后的屏幕方向",
+      to: "      var p={x:Math.cos(a), y:Math.sin(a)};       // 投影后的屏幕方向",
+      env: { PA_ONLY: '5' }, red: ['⑤n'] },
+    { n: 'K15 方向轴菜单把 rot 当成了步进（+90 而不是对齐）→ ⑤o',
+      from: '    return commitRot(c, d, \'已对齐方向轴 \'+d+\'°（绕左端接口旋转）\');',
+      to: '    return commitRot(c, ((+c.rot||0)+d)%360, \'已对齐方向轴 \'+d+\'°（绕左端接口旋转）\');',
+      env: { PA_ONLY: '5' }, red: ['⑤o'] },
+    { n: 'K16 方向轴选择变成「不重排下游」（接口被拉开）→ ③k 或 ③l',
+      from: '    cascadeAlign(c.id);\n    pushHistory(); recompute(); render(); renderProps();',
+      to: '    /*cascadeAlign(c.id);*/\n    pushHistory(); recompute(); render(); renderProps();',
+      env: { PA_ONLY: '3' }, red: ['③l'] },
   ]
 }).then((r) => { process.exitCode = r.bad ? 1 : 0; });
