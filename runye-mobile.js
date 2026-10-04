@@ -84,7 +84,7 @@
     var file = location.pathname.split('/').pop();
     if (query.matches && ['','index.html','runye-landing.html','runye-map-measure.html'].indexOf(file) >= 0) {
       var stage = location.hash === '#tlPipePlanSection' ? '#third' : location.hash === '#pipePlanSection' ? '#second' : '';
-      location.replace('runye-mobile-map-preview.html?v=237' + stage); return;
+      location.replace('runye-mobile-map-preview.html?v=238' + stage); return;
     }
     if (!ready || !query.matches) return;
     if (file === 'index.html' || !file) {
