@@ -23,6 +23,9 @@
        点进去看到一句明确的说明，比点了没反应强）。 */
     { label: '成组管路',     hash: 'grPipeSection',       pre: 1, title: '成组地块：全组总览 + 总管编辑 + 按块进入三级管路设计' },
     { label: '三级管路编辑', hash: 'tlPipePlanSection',   pre: 1 },
+    /* [v203] 管路拼装：管件级接驳拼装子模块（独立页）。跨页链接 ⇒ runye-nav.js
+       按 curFile() 自动给当前页加 active，与其他工具页同一套高亮口径。 */
+    { label: '管路拼装',     href: '管路接驳拼装.html',   pre: 1, title: '管路接驳拼装：管件级拼装 + 单向水力计算' },
     { label: '轴测图',       act: 'iso', page: 'index.html',   pre: 1, title: '三级管线轴测图（先「生成管线图」再点）' },
     { label: '经济指标分析', hash: 'threeDModelingSection', pre: 1, title: '管径经济指标分析：前期管材投入 vs 后期电费，找年均总成本最低的平衡点' },
     { label: '过滤系统',     hash: 'filterSystemSection', pre: 1, title: '过滤系统 · GREEN 型单体并联机组（初稿）' },

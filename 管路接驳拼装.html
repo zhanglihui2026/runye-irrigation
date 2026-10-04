@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>润野灌溉 · 管路接驳拼装子模块</title>
+<link rel="stylesheet" href="runye-theme.css" />
+<link rel="stylesheet" href="runye-nav.css" />
+<!-- [v203] 不引 runye-typography.css：全站其他页面（index/在线地图/查询器/系统图）都不引它，
+     且它带全局 `input,select,button,td…{font-size:13px !important}`，会把本页按主站口径
+     写的 11/11.5px 侧栏字号整体顶掉 —— 正是「两侧工具栏文字大小与其他页不统一」的元凶。 -->
+<style>
+  /* ===== 模块专属样式（v203 与全站设计语言统一） =====
+     基准 = index.html 二级/成组/三级管路页的侧栏口径（用户要求：
+     「页面风格跟其他页面统一，两侧工具栏文字大小这些都统一」）：
+     · 侧栏底 linear-gradient(180deg,#f8fbf9,#f2f7f4) + 边 #dde8e1 + 圆角 12
+     · 分组标题 11px/700 #2f6d43（字距 .05em，分隔线 #eaf1ec）
+     · 正文 11~11.5px；标签 #64748b；数值 700 #0f766e
+     · 输入框高 24px/11.5px（数字右对齐）；按钮高 24px 幽灵款
+     · 表头浅绿 #f2f7f4 + 字 #475569（不用实心绿底白字——非本站语言）
+     顶部导航皮肤 = runye-nav.css（与其他页同一份），本块只管页内组件。 */
+  :root{
+    --pa-bg:#f4f8f6; --pa-panel:#fff;
+    --pa-line:#dde8e1; --pa-line2:#e4ece7; --pa-line3:#eaf1ec;
+    --pa-ink:#1f2937; --pa-sub:#64748b; --pa-head:#2f6d43;
+    --pa-ok:#16a34a; --pa-warn:#a16207; --pa-bad:#dc2626;
+    --pa-accent:#16a34a; --pa-accent2:#0f766e;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{
+    font-family:"Microsoft YaHei","PingFang SC","Segoe UI",system-ui,sans-serif;
+    color:var(--pa-ink); background:var(--pa-bg); overflow:hidden;
+    display:flex;flex-direction:column;   /* 导航 auto + 品牌条 auto + 主区 flex:1，不写死导航高度 */
+  }
+  /* —— 顶部：站内同源导航（runye-nav.js 注入）+ 纤薄品牌/状态条 —— */
+  .pa-header{
+    flex:0 0 auto; display:flex; align-items:center; gap:10px; padding:6px 14px;
+    background:#fff; border-bottom:1px solid var(--pa-line);
+  }
+  .pa-logo{
+    width:24px;height:24px;border-radius:7px;
+    background:linear-gradient(135deg,#15803d,#0d9488);color:#fff;font-weight:800;
+    display:flex;align-items:center;justify-content:center;font-size:12px;
+  }
+  .pa-title{font-size:13px;font-weight:800;color:#14532d;letter-spacing:.5px;}
+  .pa-sub{font-size:10.5px;color:#94a3b8;}
+  .pa-header .spacer{flex:1;}
+  .pa-status{
+    font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;
+    background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;display:flex;align-items:center;gap:6px;
+  }
+  .pa-status.off{background:#fef2f2;color:#dc2626;border-color:#fecaca;}
+  .pa-status .dot{width:7px;height:7px;border-radius:50%;background:currentColor;}
+
+  .pa-main{flex:1;display:grid;grid-template-columns:236px 1fr 340px;min-height:0;}
+  .pa-col{min-height:0;display:flex;flex-direction:column;}
+  /* 侧栏底色 = 主站参数栏同款浅绿渐变（原为纯白，现与其他页统一） */
+  .pa-left,.pa-right{
+    background:linear-gradient(180deg,#f8fbf9 0%,#f2f7f4 100%);
+  }
+  .pa-left{border-right:1px solid var(--pa-line);}
+  .pa-right{border-left:1px solid var(--pa-line);}
+
+  /* 分组小标题：与主站「地块与灌溉参数」同一口径（11px/700/#2f6d43/#eaf1ec 分隔线） */
+  .pa-pane-h{
+    font-size:11px;font-weight:700;color:var(--pa-head);letter-spacing:.05em;
+    padding:10px 12px 7px;border-bottom:1px solid var(--pa-line3);
+    display:flex;align-items:center;gap:8px;flex:none;
+  }
+  .pa-pane-h small{font-weight:600;color:#94a3b8;margin-left:auto;font-size:10.5px;letter-spacing:0;}
+
+  /* 左侧素材库 */
+  .pa-lib{overflow-y:auto;padding:9px;flex:1;}
+  .pa-lib-group{font-size:10.5px;font-weight:700;color:#94a3b8;letter-spacing:1px;margin:8px 3px 5px;}
+  .pa-item{
+    display:flex;align-items:center;gap:8px;padding:7px 8px;margin-bottom:6px;
+    border:1px solid rgba(31,41,55,.14);border-radius:8px;background:#fff;cursor:grab;
+    transition:all .15s ease;user-select:none;
+  }
+  .pa-item:hover{border-color:#16a34a;background:#f0fdf4;box-shadow:0 2px 8px rgba(22,163,74,.12);}
+  .pa-item:active{cursor:grabbing;}
+  .pa-item .ic{width:26px;height:26px;border-radius:6px;flex:none;display:flex;align-items:center;justify-content:center;}
+  .pa-item .nm{font-size:11.5px;font-weight:700;color:var(--pa-ink);}
+  .pa-item .ds{font-size:10.5px;color:var(--pa-sub);}
+  .pa-legend{margin-top:6px;padding:9px 3px 3px;border-top:1px dashed var(--pa-line2);}
+  .pa-legend .row{display:flex;align-items:center;gap:8px;font-size:10.5px;margin:4px 0;color:var(--pa-sub);}
+  .pa-legend .sw{width:20px;height:7px;border-radius:3px;}
+
+  /* 中间画布 */
+  .pa-canvas-wrap{flex:1;position:relative;overflow:hidden;background:
+     radial-gradient(circle at 1px 1px,#dbe4ee 1px,transparent 0) 0 0/22px 22px,#eef3f8;}
+  #paSvg{width:100%;height:100%;display:block;cursor:default;}
+  /* 工具条 = 成组管路页工具轨同款（#f4f8f6 底 + #e4ece7 边 + 8px 圆角） */
+  .pa-toolbar{
+    position:absolute;top:10px;left:10px;right:10px;display:flex;gap:6px;align-items:center;
+    background:#f4f8f6;border:1px solid var(--pa-line2);
+    border-radius:8px;padding:6px 8px;box-shadow:0 2px 8px rgba(15,23,42,.06);z-index:5;
+  }
+  .pa-toolbar .seg{display:flex;gap:5px;}
+  .pa-btn{
+    height:24px;border:1px solid rgba(31,41,55,.22);background:#fff;color:var(--pa-ink);
+    font-size:11.5px;font-weight:600;padding:0 8px;border-radius:8px;cursor:pointer;
+    transition:all .15s;font-family:inherit;display:inline-flex;align-items:center;line-height:1;
+  }
+  .pa-btn:hover{border-color:#16a34a;color:#15803d;background:#eef4f1;}
+  .pa-btn.primary{
+    background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;border-color:#16a34a;
+    box-shadow:0 2px 8px rgba(22,163,74,.25);height:26px;font-weight:700;padding:0 12px;
+  }
+  .pa-btn.primary:hover{background:linear-gradient(135deg,#15803d,#166534);color:#fff;}
+  .pa-btn.warn{color:#dc2626;border-color:#fecaca;}
+  .pa-btn.warn:hover{background:#fef2f2;}
+  .pa-btn:disabled{opacity:.45;cursor:not-allowed;}
+  .pa-toolbar .spacer{flex:1;}
+  .pa-hint{position:absolute;left:10px;bottom:10px;font-size:10.5px;color:#5f6b7a;
+    background:rgba(255,255,255,.88);padding:5px 9px;border-radius:8px;border:1px solid var(--pa-line2);max-width:60%;}
+  .pa-zoom{position:absolute;right:10px;bottom:10px;font-size:10.5px;color:var(--pa-sub);
+    background:rgba(255,255,255,.88);padding:5px 9px;border-radius:8px;border:1px solid var(--pa-line2);}
+
+  /* 右侧面板 */
+  .pa-r-top{flex:0 0 42%;border-bottom:1px solid var(--pa-line);display:flex;flex-direction:column;min-height:0;}
+  .pa-r-bot{flex:1;display:flex;flex-direction:column;min-height:0;}
+  .pa-r-scroll{overflow-y:auto;flex:1;padding:10px 12px;}
+  .pa-empty{color:var(--pa-sub);font-size:11.5px;text-align:center;padding:26px 10px;line-height:1.8;}
+
+  .pa-field{margin-bottom:9px;}
+  .pa-field label{display:block;font-size:11px;font-weight:600;color:var(--pa-sub);margin-bottom:3px;}
+  .pa-field input,.pa-field select{
+    width:100%;height:24px;padding:2px 6px;border:1px solid var(--pa-line2);border-radius:6px;
+    font-size:11.5px;font-family:inherit;color:var(--pa-ink);background:#fff;box-sizing:border-box;
+  }
+  .pa-field input[type="number"]{text-align:right;}   /* 数字右对齐 = 主站参数栏口径 */
+  .pa-field input:focus,.pa-field select:focus{outline:none;border-color:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.10);}
+  .pa-row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .pa-chips{display:flex;flex-wrap:wrap;gap:5px;}
+  .pa-chip{
+    border:1px solid rgba(31,41,55,.22);background:#fff;border-radius:6px;padding:3px 8px;font-size:11px;
+    font-weight:600;color:var(--pa-ink);cursor:pointer;transition:all .15s;
+  }
+  .pa-chip:hover{border-color:#16a34a;color:#15803d;background:#f0fdf4;}
+  .pa-chip.on{background:#16a34a;color:#fff;border-color:#16a34a;}
+
+  .pa-kv{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;padding:4px 0;border-bottom:1px dashed #eef3f0;}
+  .pa-kv>span:first-child{color:var(--pa-sub);}
+  .pa-kv b{color:var(--pa-ink);}
+  .pa-kv .v{font-weight:700;color:var(--pa-accent2);font-variant-numeric:tabular-nums;}
+  .pa-kv .v.ok{color:var(--pa-ok);} .pa-kv .v.bad{color:var(--pa-bad);} .pa-kv .v.warn{color:var(--pa-warn);}
+
+  .pa-mini-h{font-size:11px;font-weight:700;color:var(--pa-head);letter-spacing:.05em;
+    margin:11px 0 5px;padding-bottom:4px;border-bottom:1px solid var(--pa-line3);
+    display:flex;align-items:center;gap:6px;}
+  .pa-mat{border:1px solid var(--pa-line2);border-radius:8px;overflow:hidden;}
+  .pa-mat table{width:100%;border-collapse:collapse;font-size:11px;}
+  /* 表头 = 主站表格口径（浅绿底 + 深灰字），不用实心绿底白字 */
+  .pa-mat th{background:#f2f7f4;color:#475569;font-weight:600;font-size:10.5px;padding:5px 8px;text-align:left;border-bottom:1px solid var(--pa-line2);}
+  .pa-mat td{padding:4px 8px;border-top:1px solid #eef2f7;color:#334155;}
+  .pa-mat tr:nth-child(even) td{background:#f8fbf9;}
+
+  .pa-alert{font-size:11px;padding:7px 9px;border-radius:8px;margin-bottom:6px;display:flex;gap:7px;align-items:flex-start;line-height:1.5;}
+  .pa-alert.bad{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;}
+  .pa-alert.warn{background:#fefce8;color:#a16207;border:1px solid #fde68a;}
+  .pa-alert.ok{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;}
+  .pa-alert .mk{font-weight:900;flex:none;}
+
+  .pa-json{
+    font-family:ui-monospace,Consolas,monospace;font-size:11px;background:#0f172a;color:#a5f3fc;
+    border-radius:8px;padding:10px;max-height:200px;overflow:auto;white-space:pre;line-height:1.45;
+  }
+  .pa-collapse{font-size:10.5px;color:var(--pa-accent2);cursor:pointer;user-select:none;font-weight:700;}
+  .pa-toast{
+    position:absolute;top:60px;left:50%;transform:translateX(-50%);background:#dc2626;color:#fff;
+    padding:8px 14px;border-radius:8px;font-size:12px;font-weight:700;box-shadow:0 6px 20px rgba(220,38,38,.35);
+    z-index:30;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;
+  }
+  .pa-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .pa-toast.warn{background:#a16207;box-shadow:0 6px 20px rgba(161,98,7,.35);}
+  .pa-glyph{font-size:14px;font-weight:800;}
+</style>
+</head>
+<body>
+  <!-- [v203] 顶部功能区导航：与其他工具页（在线地图等）完全同源 ——
+       皮肤 = runye-nav.css、按钮清单 = runye-nav.js（唯一出处）；
+       当前页「管路拼装」由 runye-nav.js 按 href 自动高亮，无需本页写 active。 -->
+  <nav class="fn-nav" aria-label="功能区导航">
+    <div class="fn-inner" data-ry-fnnav data-base="index.html#"></div>
+  </nav>
+  <script src="runye-nav.js"></script>
+
+  <div class="pa-header">
+    <div class="pa-logo">润</div>
+    <div>
+      <div class="pa-title">管路接驳拼装</div>
+      <div class="pa-sub">面板 · 绘图区 · 单向水力计算</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="pa-status" id="paStatus"><span class="dot"></span><span id="paStatusTxt">待拼装</span></div>
+  </div>
+
+  <div class="pa-main">
+    <!-- 左：素材库 -->
+    <div class="pa-col pa-left">
+      <div class="pa-pane-h">管件素材库 <small>点击或拖入画布</small></div>
+      <div class="pa-lib" id="paLib">
+        <div class="pa-lib-group">直管（可设长度）</div>
+        <div class="pa-item" data-add="straight"><div class="ic" id="ic_straight"></div><div><div class="nm">直管</div><div class="ds">管径 32–110mm</div></div></div>
+        <div class="pa-lib-group">管件（绑定局部阻力系数）</div>
+        <div class="pa-item" data-add="elbow90"><div class="ic" id="ic_elbow90"></div><div><div class="nm">90°弯头</div><div class="ds">ζ=0.5</div></div></div>
+        <div class="pa-item" data-add="elbow45"><div class="ic" id="ic_elbow45"></div><div><div class="nm">45°弯头</div><div class="ds">ζ=0.3</div></div></div>
+        <div class="pa-item" data-add="reducer"><div class="ic" id="ic_reducer"></div><div><div class="nm">同心变径</div><div class="ds">110→90（可调）</div></div></div>
+        <div class="pa-item" data-add="tee"><div class="ic" id="ic_tee"></div><div><div class="nm">异径三通</div><div class="ds">ζ=1.0</div></div></div>
+        <div class="pa-item" data-add="couple"><div class="ic" id="ic_couple"></div><div><div class="nm">直通</div><div class="ds">ζ=0.1</div></div></div>
+        <div class="pa-item" data-add="cap"><div class="ic" id="ic_cap"></div><div><div class="nm">堵头</div><div class="ds">封闭端口</div></div></div>
+        <div class="pa-legend" id="paLegend"></div>
+      </div>
+    </div>
+
+    <!-- 中：画布 -->
+    <div class="pa-col">
+      <div class="pa-canvas-wrap" id="paWrap">
+        <div class="pa-toolbar">
+          <div class="seg">
+            <button class="pa-btn" id="btnUndo" title="撤销">↶ 撤销</button>
+            <button class="pa-btn" id="btnRedo" title="重做">↷ 重做</button>
+          </div>
+          <div class="seg">
+            <button class="pa-btn" id="btnFit" title="适应画布">⤢ 适应</button>
+            <button class="pa-btn" id="btnZoomIn">＋</button>
+            <button class="pa-btn" id="btnZoomOut">－</button>
+          </div>
+          <button class="pa-btn primary" id="btnExample">⚡ 载入示例管路</button>
+          <div class="spacer"></div>
+          <button class="pa-btn warn" id="btnClear">清空画布</button>
+        </div>
+        <svg id="paSvg" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div class="pa-hint">操作：左侧点击/拖拽管件入画布 → 拖动管件使端口靠近即自动吸附接驳 → 选中可改参数、Delete 删除 → 滚轮缩放。</div>
+        <div class="pa-zoom" id="paZoomTxt">缩放 100%</div>
+        <div class="pa-toast" id="paToast"></div>
+      </div>
+    </div>
+
+    <!-- 右：双面板 -->
+    <div class="pa-col pa-right">
+      <div class="pa-r-top">
+        <div class="pa-pane-h">选中管件属性 <small id="paSelKind">未选中</small></div>
+        <div class="pa-r-scroll" id="paProps">
+          <div class="pa-empty">在画布中选中一个管件<br>即可在此编辑管径 / 长度 / 阻力系数</div>
+        </div>
+      </div>
+      <div class="pa-r-bot">
+        <div class="pa-pane-h">水力计算 · 材料清单 <small>实时</small></div>
+        <div class="pa-r-scroll" id="paResults">
+          <!-- 水力输入 -->
+          <div class="pa-field"><label>设计流量 Q（m³/h）</label><input type="number" id="inFlow" value="25" min="0" step="1"></div>
+          <div class="pa-row2">
+            <div class="pa-field"><label>海曾系数 C</label><input type="number" id="inC" value="150" min="80" step="5"></div>
+            <div class="pa-field"><label>管材 SDR</label>
+              <select id="inSDR"><option value="11">SDR11</option><option value="13.6" selected>SDR13.6</option><option value="17">SDR17</option><option value="21">SDR21</option></select>
+            </div>
+          </div>
+          <div class="pa-field" style="display:flex;align-items:center;gap:8px;">
+            <input type="checkbox" id="inLocal" checked style="width:auto;"> <label style="margin:0;">计入管件局部水头损失</label>
+          </div>
+
+          <div class="pa-mini-h">▣ 整条管路压力损失</div>
+          <div class="pa-kv"><span>沿程水头损失 hf</span><span class="v" id="rHf">—</span></div>
+          <div class="pa-kv"><span>局部水头损失 hξ</span><span class="v" id="rHl">—</span></div>
+          <div class="pa-kv"><span>合计损失 ΔH</span><span class="v" id="rTot">—</span></div>
+          <div class="pa-kv"><span>最不利流速 v</span><span class="v" id="rV">—</span></div>
+          <div class="pa-kv"><span>设计流量 Q</span><span class="v" id="rQ">—</span></div>
+
+          <div class="pa-mini-h">▣ 材料清单（自动同步）</div>
+          <div class="pa-mat"><table id="matTable"><thead><tr><th>规格</th><th>数量</th><th>总长(m)</th></tr></thead><tbody><tr><td colspan="3" style="color:#94a3b8;text-align:center;">暂无管件</td></tr></tbody></table></div>
+
+          <div class="pa-mini-h">▣ 校验结果 <span class="pa-collapse" id="btnJson">展开拓扑JSON ▾</span></div>
+          <div id="paAlerts"><div class="pa-alert ok"><span class="mk">✓</span><span>画布为空，等待拼装。</span></div></div>
+          <pre class="pa-json" id="paJson" style="display:none;"></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ============================================================================
+ * 润野灌溉 · 管路接驳拼装子模块  (第一版)
+ *  - 纯前端、单文件、零构建；数据不落外部文件，拼装结果以拓扑JSON直接送入
+ *    本系统水力计算内核（此处复用与 hc-core.js 完全一致的 Hazen-Williams 口径）。
+ *  - 与水力内核接口：window.RyPipeAssembler.pushTopology(json) → 内核消费；
+ *    内核返回口径见 hc-core：hf=1.113e9·L·Q^1.852/(C^1.852·D^4.87)，D 为内径(mm)。
+ * ========================================================================== */
+(function(){
+  'use strict';
+
+  /* ---------- 口径 / 水力（与 hc-core.js 同式同常数） ---------- */
+  var G2 = 19.62;            // 2g
+  function innerDiam(od, sdr){ var s = parseFloat(sdr)||13.6; return s>0 ? od*(1-2/s) : od; }
+  function hazen(L,Q,d,C){    // L:m, Q:m³/h, d:内径mm, C
+    L=+L||0; Q=+Q||0; d=+d||0; C=+C||150;
+    if(L<=0||Q<=0||d<=0||C<=0) return 0;
+    return 1.113e9*L*Math.pow(Q,1.852)/(Math.pow(C,1.852)*Math.pow(d,4.87));
+  }
+  function velocity(Q,d){ Q=+Q||0; d=+d||0; if(Q<=0||d<=0) return 0;
+    return Q/3600/(Math.PI*Math.pow(d/1000,2)/4); }
+  function localLoss(v,z){ v=+v||0; z=+z||0; if(v<=0||z<=0) return 0; return z*v*v/G2; }
+  function statusOf(v){ if(v>=0.8&&v<=2.0) return '可选'; if(v>2.0) return '流速偏高'; return '流速偏低'; }
+
+  /* ---------- 管径配色 ---------- */
+  var DN_LIST=[110,90,75,63,50,40,32];
+  var DN_COLOR={110:'#e11d48',90:'#ea580c',75:'#ca8a04',63:'#16a34a',50:'#0891b2',40:'#2563eb',32:'#7c3aed'};
+  function dnColor(d){ return DN_COLOR[d]||'#64748b'; }
+  function dnWidth(d){ return Math.max(7, Math.min(17, (+d||32)/7)); }
+
+  /* ---------- 管件库定义 ---------- */
+  var LIB={
+    straight:{label:'直管',cat:'pipe',ports:['L','R'],hasLen:true,zeta:0,
+      dns:DN_LIST, defDn:110},
+    elbow90:{label:'90°弯头',cat:'fitting',ports:['L','R'],zeta:0.5,dns:DN_LIST,defDn:110},
+    elbow45:{label:'45°弯头',cat:'fitting',ports:['L','R'],zeta:0.3,dns:DN_LIST,defDn:110},
+    reducer:{label:'同心变径',cat:'fitting',ports:['L','R'],zeta:0.2,adjust:true,bigDn:110,smallDn:90},
+    tee:{label:'异径三通',cat:'fitting',ports:['L','R','B'],zeta:1.0,mainDn:110,branchDn:90},
+    couple:{label:'直通',cat:'fitting',ports:['L','R'],zeta:0.1,dns:DN_LIST,defDn:110},
+    cap:{label:'堵头',cat:'fitting',ports:['L'],zeta:0,dns:DN_LIST,defDn:110}
+  };
+
+  /* ---------- 端口几何（组件局部坐标，原点=左侧L口锚点） ---------- */
+  var SCALE=12;              // px / m（直管长度）
+  function portLocal(c,side){
+    switch(c.kind){
+      case 'straight': return side==='L'?{x:0,y:0}:{x:c.len*SCALE,y:0};
+      case 'elbow90':  return side==='L'?{x:0,y:0}:{x:64,y:64};
+      case 'elbow45':  return side==='L'?{x:0,y:0}:{x:64,y:64};
+      case 'reducer':  return side==='L'?{x:0,y:0}:{x:56,y:0};
+      case 'tee':      return side==='L'?{x:0,y:0}: side==='R'?{x:96,y:0}:{x:48,y:-60};
+      case 'couple':   return side==='L'?{x:0,y:0}:{x:28,y:0};
+      case 'cap':      return {x:0,y:0};
+    }
+    return {x:0,y:0};
+  }
+  function portPos(c,side){ var p=portLocal(c,side); return {x:c.x+p.x,y:c.y+p.y}; }
+  function portDn(c,side){
+    switch(c.kind){
+      case 'straight': case 'elbow90': case 'elbow45': case 'couple': case 'cap': return c.dn;
+      case 'reducer': return side==='L'?c.bigDn:c.smallDn;
+      case 'tee': return side==='L'||side==='R'?c.mainDn:c.branchDn;
+    }
+    return c.dn;
+  }
+
+  /* ---------- 状态 ---------- */
+  var S={components:[],connections:[],selected:null,
+    flow:25,C:150,sdr:13.6,includeLocal:true,
+    zoom:1,panX:0,panY:0,
+    history:[],future:[], seq:1};
+
+  function uid(p){ return (p||'c')+(S.seq++); }
+
+  function addComp(kind, x, y, props){
+    var L=LIB[kind]; var c={id:uid('c'),kind:kind,x:x,y:y};
+    if(L.dns) c.dn=L.defDn;
+    if(L.hasLen) c.len=(props&&props.len)||5;
+    if(L.adjust){ c.bigDn=L.bigDn; c.smallDn=L.smallDn; }
+    if(kind==='tee'){ c.mainDn=L.mainDn; c.branchDn=L.branchDn; }
+    if(props) Object.assign(c,props);
+    S.components.push(c); return c;
+  }
+
+  /* ---------- 连接 / 端口图 ---------- */
+  function connKey(id,side){ return id+':'+side; }
+  function partnerOf(compId,side){
+    for(var i=0;i<S.connections.length;i++){
+      var k=S.connections[i];
+      if(k.a.id===compId&&k.a.side===side) return k.b;
+      if(k.b.id===compId&&k.b.side===side) return k.a;
+    }
+    return null;
+  }
+  function isPortConnected(compId,side){ return !!partnerOf(compId,side); }
+  function allPorts(c){
+    return LIB[c.kind].ports.map(function(s){ return {side:s,dn:portDn(c,s),pos:portPos(c,s)}; });
+  }
+  function findComp(id){ for(var i=0;i<S.components.length;i++) if(S.components[i].id===id) return S.components[i]; return null; }
+
+  function tryConnect(aId,aSide,bId,bSide){
+    if(aId===bId) return {ok:false,msg:'不能自接'};
+    var ca=findComp(aId), cb=findComp(bId); if(!ca||!cb) return {ok:false};
+    var da=portDn(ca,aSide), db=portDn(cb,bSide);
+    if(da!==db) return {ok:false,msg:'异径端口('+da+'≠'+db+')禁止硬接，请加同心变径过渡'};
+    if(isPortConnected(aId,aSide)||isPortConnected(bId,bSide)) return {ok:false,msg:'端口已占用'};
+    // 闭环检测（组件连通性成环则警告，但仍允许）
+    S.connections.push({id:uid('k'),a:{id:aId,side:aSide},b:{id:bId,side:bSide}});
+    var loop=hasLoop();
+    if(loop) return {ok:true,loop:true};
+    return {ok:true};
+  }
+
+  /* 组件连通图成环检测（无向，节点=组件，边=连接） */
+  function hasLoop(){
+    var adj={}; S.components.forEach(function(c){adj[c.id]=[];});
+    S.connections.forEach(function(k){ if(adj[k.a.id]&&adj[k.b.id]){adj[k.a.id].push(k.b.id);adj[k.b.id].push(k.a.id);} });
+    var visited={},parent={};
+    var loop=false;
+    function dfs(u,p){
+      visited[u]=true; parent[u]=p;
+      for(var i=0;i<adj[u].length;i++){ var v=adj[u][i];
+        if(!visited[v]) dfs(v,u);
+        else if(v!==p) loop=true;
+      }
+    }
+    S.components.forEach(function(c){ if(!visited[c.id]) dfs(c.id,null); });
+    return loop;
+  }
+
+  /* ---------- 拓扑遍历：从任一悬空口出发，DFS 收集所有开路路径 ---------- */
+  function openPorts(){ // 未连接且未被堵头封闭的端口
+    var capped={};
+    S.connections.forEach(function(k){
+      var pa=findComp(k.a.id), pb=findComp(k.b.id);
+      if(pa&&pa.kind==='cap') capped[connKey(k.a.id,k.a.side)]=true;
+      if(pb&&pb.kind==='cap') capped[connKey(k.b.id,k.b.side)]=true;
+    });
+    var ops=[];
+    S.components.forEach(function(c){
+      LIB[c.kind].ports.forEach(function(s){
+        if(!isPortConnected(c.id,s) && !capped[connKey(c.id,s)]) ops.push({id:c.id,side:s});
+      });
+    });
+    return ops;
+  }
+
+  function buildPaths(){
+    // 兼容端口图：port(connect) → 另一端 port
+    var link={};
+    S.connections.forEach(function(k){ link[connKey(k.a.id,k.a.side)]=k.b; link[connKey(k.b.id,k.b.side)]=k.a; });
+    var starts=openPorts();
+    var paths=[];
+    starts.forEach(function(st){
+      // 从 st 出发，组件级 DFS，避免重复访问组件
+      (function walk(compId,entrySide,visited,acc){
+        var c=findComp(compId); if(!c) return;
+        acc.push({comp:c, inSide:entrySide});
+        // 收集该组件其它端口
+        var outs=LIB[c.kind].ports.filter(function(s){ return s!==entrySide || LIB[c.kind].ports.length===1; });
+        var progress=false;
+        outs.forEach(function(s){
+          if(visited[c.id]) return;
+          var nxt=link[connKey(c.id,s)];
+          if(!nxt) return; // 悬空（开路末端）→ 记录路径
+          if(visited[nxt.id]) return; // 防环
+          progress=true;
+          var nv=Object.assign({},visited); nv[c.id]=true;
+          walk(nxt.id,nxt.side,nv,acc.slice());
+        });
+        if(!progress){
+          // 到达开路末端（或只有单口组件）
+          paths.push(acc.slice());
+        }
+      })(st.id, st.side, {}, []);
+    });
+    // 去重（每条物理路径会被两端各生成一次；用组件 id 集合做集合级去重，避免反向重复导致损失翻倍）
+    var seen={}, uniq=[];
+    paths.forEach(function(p){
+      var key=p.map(function(e){return e.comp.id;}).sort().join('|');
+      if(!seen[key]){ seen[key]=true; uniq.push(p); }
+    });
+    return uniq;
+  }
+
+  /* ---------- 水力计算（复用内核口径） ---------- */
+  function computeHydraulic(){
+    var Q=S.flow, C=S.C, sdr=S.sdr;
+    var paths=buildPaths();
+    var pathResults=[];
+    var maxV=0, totalPipeLen=0, totalHf=0, totalLocal=0;
+    paths.forEach(function(p){
+      var hf=0, hl=0, vmax=0, plen=0, lastV=0;
+      for(var i=0;i<p.length;i++){
+        var e=p[i], c=e.comp;
+        if(LIB[c.kind].cat==='pipe'){
+          var d=innerDiam(c.dn,sdr), v=velocity(Q,d);
+          hf+=hazen(c.len,Q,d,C); plen+=c.len; lastV=v;
+          if(v>vmax)v=vmax=v; if(v>maxV)maxV=v;
+        } else if(LIB[c.kind].cat==='fitting' && c.kind!=='cap'){
+          var z=LIB[c.kind].zeta;
+          // 变径取出口侧（小口径）流速；其它取相邻管流速，无相邻则取 lastV
+          var useV=lastV;
+          if(c.kind==='reducer'){
+            var dout=innerDiam(c.smallDn,sdr); useV=velocity(Q,dout);
+          }
+          if(S.includeLocal) hl+=localLoss(useV,z);
+        }
+      }
+      totalHf+=hf; totalLocal+=hl; totalPipeLen+=plen;
+      pathResults.push({len:plen,hf:hf,hl:hl,total:hf+hl,vmax:vmax,comps:p.length});
+    });
+    var worst=pathResults.reduce(function(m,r){return (r.total>(m?m.total:-1))?r:m;},null);
+    return {Q:Q,C:C,sdr:sdr,paths:pathResults,worst:worst,
+      totalHf:totalHf,totalLocal:totalLocal,total:totalHf+totalLocal,
+      maxV:maxV,pipeLen:totalPipeLen,status:statusOf(maxV),
+      loop:hasLoop(), openCount:openPorts().length};
+  }
+
+  /* ---------- 材料清单 ---------- */
+  function computeMaterials(){
+    var pipes={}, fittings={};
+    S.components.forEach(function(c){
+      if(LIB[c.kind].cat==='pipe'){
+        var k='DN'+c.dn;
+        pipes[k]=pipes[k]||{dn:c.dn,count:0,len:0};
+        pipes[k].count++; pipes[k].len+=c.len;
+      } else {
+        var label=LIB[c.kind].label;
+        if(c.kind==='reducer') label='变径 '+c.bigDn+'→'+c.smallDn;
+        if(c.kind==='tee') label='三通 '+c.mainDn+'/'+c.branchDn;
+        fittings[label]=fittings[label]||{label:label,count:0};
+        fittings[label].count++;
+      }
+    });
+    return {pipes:pipes, fittings:fittings};
+  }
+
+  /* ---------- 拓扑JSON（送内核） ---------- */
+  function buildTopology(hyd){
+    var comps=S.components.map(function(c){
+      var o={id:c.id,kind:c.kind};
+      if(LIB[c.kind].cat==='pipe'){o.dn=c.dn;o.len=c.len;}
+      if(c.kind==='reducer'){o.bigDn=c.bigDn;o.smallDn=c.smallDn;}
+      if(c.kind==='tee'){o.mainDn=c.mainDn;o.branchDn=c.branchDn;}
+      o.zeta=LIB[c.kind].zeta; o.x=Math.round(c.x); o.y=Math.round(c.y);
+      return o;
+    });
+    var conns=S.connections.map(function(k){return {id:k.id,a:k.a,b:k.b};});
+    return {module:'runye-pipe-assembler',v:1,generatedAt:new Date().toISOString(),
+      flow_m3h:hyd.Q,C:hyd.C,sdr:hyd.sdr,
+      components:comps,connections:conns,
+      hydraulic:{total_hf:+hyd.totalHf.toFixed(4),total_local:+hyd.totalLocal.toFixed(4),
+        total:+hyd.total.toFixed(4),max_velocity:+hyd.maxV.toFixed(3),status:hyd.status,
+        paths:hyd.paths.length},
+      materials:computeMaterials()};
+  }
+
+  /* ===================================================================
+   *  渲染
+   * =================================================================== */
+  var svg=document.getElementById('paSvg');
+  var SVGNS='http://www.w3.org/2000/svg';
+  function el(name,attrs){ var e=document.createElementNS(SVGNS,name);
+    for(var k in attrs) e.setAttribute(k,attrs[k]); return e; }
+
+  var vp=null; // viewport <g>
+  function ensureVp(){
+    while(svg.firstChild) svg.removeChild(svg.firstChild);
+    vp=el('g',{id:'paVp',transform:'translate('+S.panX+','+S.panY+') scale('+S.zoom+')'});
+    svg.appendChild(vp);
+  }
+  function applyTransform(){ if(vp) vp.setAttribute('transform','translate('+S.panX+','+S.panY+') scale('+S.zoom+')'); }
+
+  function render(){
+    ensureVp();
+    // 1) 连接处的接驳节点
+    S.connections.forEach(function(k){
+      var ca=findComp(k.a.id), cb=findComp(k.b.id); if(!ca||!cb) return;
+      var pa=portPos(ca,k.a.side), pb=portPos(cb,k.b.side);
+      var d=portDn(ca,k.a.side);
+      vp.appendChild(el('circle',{cx:pa.x,cy:pa.y,r:Math.max(5,dnWidth(d)/2+2),
+        fill:'#fff',stroke:dnColor(d),'stroke-width':2}));
+    });
+    // 2) 组件本体
+    S.components.forEach(function(c){ drawComp(c); });
+    // 3) 悬空端口标记（黄色）
+    openPorts().forEach(function(op){
+      var c=findComp(op.id); if(!c) return; var p=portPos(c,op.side);
+      vp.appendChild(el('circle',{cx:p.x,cy:p.y,r:7,fill:'none',stroke:'#eab308','stroke-width':2.5}));
+      vp.appendChild(el('circle',{cx:p.x,cy:p.y,r:2.5,fill:'#eab308'}));
+    });
+    // 4) 拖拽连线预览
+    if(drag.mode==='port' && drag.tmp){
+      vp.appendChild(el('line',{x1:drag.tmp.x1,y1:drag.tmp.y1,x2:drag.tmp.x2,y2:drag.tmp.y2,
+        stroke:'#16a34a','stroke-width':2.5,'stroke-dasharray':'6 5',opacity:.85}));
+    }
+  }
+
+  function drawComp(c){
+    var g=el('g',{class:'pa-comp','data-id':c.id,style:'cursor:move;'});
+    if(S.selected===c.id) g.setAttribute('filter','drop-shadow(0 0 0 #16a34a)');
+    var sel = S.selected===c.id;
+    var col = LIB[c.kind].cat==='pipe'? dnColor(c.dn) : (c.kind==='reducer'? '#0d9488' : dnColor(c.dn||110));
+    var sw = LIB[c.kind].cat==='pipe'? dnWidth(c.dn) : dnWidth(c.dn||110);
+    var w=c.x,h=c.y;
+
+    if(c.kind==='straight'){
+      var L=c.len*SCALE;
+      g.appendChild(el('line',{x1:w,y1:h,x2:w+L,y2:h,stroke:col,'stroke-width':sw,'stroke-linecap':'round'}));
+      g.appendChild(labelMid(w+L/2,h-sw/2-6,c.dn+' · '+fmt1(c.len)+'m',col));
+    } else if(c.kind==='couple'){
+      g.appendChild(el('line',{x1:w,y1:h,x2:w+28,y2:h,stroke:col,'stroke-width':sw,'stroke-linecap':'round'}));
+      g.appendChild(el('rect',{x:w+8,y:h-sw/2-3,width:12,height:sw+6,rx:3,fill:'#fff',stroke:col,'stroke-width':1.5}));
+    } else if(c.kind==='elbow90'){
+      g.appendChild(el('path',{d:'M '+w+' '+h+' H '+(w+64)+' V '+(h+64),fill:'none',stroke:col,'stroke-width':sw,'stroke-linecap':'round','stroke-linejoin':'round'}));
+      g.appendChild(labelMid(w+64+6,h+64,c.dn+'弯',col));
+    } else if(c.kind==='elbow45'){
+      g.appendChild(el('line',{x1:w,y1:h,x2:w+64,y2:h+64,stroke:col,'stroke-width':sw,'stroke-linecap':'round'}));
+      g.appendChild(labelMid(w+64+6,h+64,c.dn+'弯',col));
+    } else if(c.kind==='reducer'){
+      var swb=dnWidth(c.bigDn), sws=dnWidth(c.smallDn);
+      var pts=[w+','+(h-swb/2), w+','+(h+swb/2), (w+56)+','+(h+sws/2), (w+56)+','+(h-sws/2)].join(' ');
+      var grad=el('linearGradient',{id:'rg_'+c.id,x1:'0',y1:'0',x2:'1',y2:'0'});
+      grad.appendChild(el('stop',{offset:'0',['stop-color']:dnColor(c.bigDn)}));
+      grad.appendChild(el('stop',{offset:'1',['stop-color']:dnColor(c.smallDn)}));
+      g.appendChild(grad);
+      g.appendChild(el('polygon',{points:pts,fill:'url(#rg_'+c.id+')',stroke:'#0f766e','stroke-width':1.5,'stroke-dasharray':'4 3'}));
+      g.appendChild(labelMid(w+28,h-swb/2-8,c.bigDn+'→'+c.smallDn,'#0f766e'));
+    } else if(c.kind==='tee'){
+      var mw=dnWidth(c.mainDn), bw=dnWidth(c.branchDn);
+      g.appendChild(el('line',{x1:w,y1:h,x2:w+96,y2:h,stroke:col,'stroke-width':mw,'stroke-linecap':'round'}));
+      g.appendChild(el('line',{x1:w+48,y1:h,x2:w+48,y2:h-60,stroke:dnColor(c.branchDn),'stroke-width':bw,'stroke-linecap':'round'}));
+      g.appendChild(labelMid(w+48,h-66,c.mainDn+'⊢'+c.branchDn,dnColor(c.branchDn)));
+    } else if(c.kind==='cap'){
+      g.appendChild(el('line',{x1:w,y1:h,x2:w+18,y2:h,stroke:col,'stroke-width':sw,'stroke-linecap':'round'}));
+      g.appendChild(el('path',{d:'M '+(w+18)+' '+(h-sw/2-2)+' a '+ (sw/2+5) +' '+(sw/2+5)+' 0 0 1 0 '+(sw+4+4),fill:'none',stroke:col,'stroke-width':2.5}));
+    }
+
+    if(sel){ g.appendChild(el('rect',{x:w-6,y:h-22,width:120,height:44,rx:8,fill:'none',stroke:'#16a34a','stroke-width':1.5,'stroke-dasharray':'5 4',opacity:.7})); }
+
+    // 端口把手（可拖拽接驳）
+    LIB[c.kind].ports.forEach(function(side){
+      var p=portLocal(c,side), px=w+p.x, py=h+p.y;
+      var dot=el('circle',{cx:px,cy:py,r:6,fill:'#fff',stroke:dnColor(portDn(c,side)),'stroke-width':2.5,class:'pa-port','data-id':c.id,'data-side':side,style:'cursor:crosshair;'});
+      g.appendChild(dot);
+    });
+
+    vp.appendChild(g);
+  }
+  function labelMid(x,y,txt,col){
+    var t=el('text',{x:x,y:y,fill:col||'#475569','font-size':11,'font-weight':700,'text-anchor':'middle','font-family':'Microsoft YaHei,sans-serif'});
+    t.textContent=txt; return t;
+  }
+  function fmt1(v){ return (Math.round((+v||0)*10)/10); }
+
+  /* ===================================================================
+   *  交互：拖拽组件 / 端口接驳 / 平移 / 缩放
+   * =================================================================== */
+  var drag={mode:null,id:null,side:null,dx:0,dy:0,tmp:null,sx:0,sy:0};
+  function svgPoint(evt){
+    var pt=svg.createSVGPoint(); pt.x=evt.clientX; pt.y=evt.clientY;
+    var m=vp.getScreenCTM().inverse(); var p=pt.matrixTransform(m); return {x:p.x,y:p.y};
+  }
+
+  svg.addEventListener('pointerdown',function(e){
+    var portEl=e.target.closest('.pa-port');
+    var compEl=e.target.closest('.pa-comp');
+    var p=svgPoint(e);
+    if(portEl){
+      drag.mode='port'; drag.id=portEl.getAttribute('data-id'); drag.side=portEl.getAttribute('data-side');
+      var c=findComp(drag.id); var pp=portPos(c,drag.side);
+      drag.tmp={x1:pp.x,y1:pp.y,x2:p.x,y2:p.y};
+      svg.setPointerCapture(e.pointerId);
+    } else if(compEl){
+      drag.mode='move'; drag.id=compEl.getAttribute('data-id');
+      var c2=findComp(drag.id); drag.dx=p.x-c2.x; drag.dy=p.y-c2.y;
+      selectComp(drag.id);
+      svg.setPointerCapture(e.pointerId);
+    } else {
+      drag.mode='pan'; drag.sx=e.clientX; drag.sy=e.clientY; drag.panX0=S.panX; drag.panY0=S.panY;
+      selectComp(null);
+    }
+  });
+
+  svg.addEventListener('pointermove',function(e){
+    var p=svgPoint(e);
+    if(drag.mode==='move'){
+      var c=findComp(drag.id); c.x=p.x-drag.dx; c.y=p.y-drag.dy; render();
+    } else if(drag.mode==='port'){
+      drag.tmp.x2=p.x; drag.tmp.y2=p.y;
+      // 高亮最近兼容端口
+      var near=nearestPort(p, drag.id, drag.side, 26/S.zoom);
+      render();
+      if(near){ var nc=findComp(near.id); var np=portPos(nc,near.side);
+        vp.appendChild(el('circle',{cx:np.x,cy:np.y,r:9,fill:'none',stroke:'#16a34a','stroke-width':3})); }
+    } else if(drag.mode==='pan'){
+      S.panX=drag.panX0+(e.clientX-drag.sx); S.panY=drag.panY0+(e.clientY-drag.sy); applyTransform();
+    }
+  });
+
+  svg.addEventListener('pointerup',function(e){
+    if(drag.mode==='port'){
+      var p=svgPoint(e);
+      var near=nearestPort(p, drag.id, drag.side, 26/S.zoom);
+      if(near){
+        var res=tryConnect(drag.id,drag.side,near.id,near.side);
+        if(res.ok){
+          if(res.loop) toast('已接驳（检测到管网闭环，请注意校验）','warn');
+          else toast('端口吸附接驳成功');
+          // 吸附对齐：移动被拖组件使其端口与对方重合
+          var mc=findComp(drag.id), oc=findComp(near.id);
+          var op=portPos(oc,near.side);
+          var ml=portLocal(mc,drag.side);
+          mc.x=op.x-ml.x; mc.y=op.y-ml.y;
+          pushHistory(); recompute();
+        } else if(res.msg){ toast(res.msg); }
+      }
+      drag.tmp=null;
+    } else if(drag.mode==='move'){
+      // 落点自动吸附：移动组件的每个空闲端口靠近兼容端口则接驳
+      autoSnap(drag.id);
+      pushHistory(); recompute();
+    }
+    drag.mode=null; drag.id=null;
+  });
+
+  function nearestPort(p, selfId, selfSide, radius){
+    var best=null, bd=radius;
+    S.components.forEach(function(c){
+      if(c.id===selfId) return;
+      LIB[c.kind].ports.forEach(function(side){
+        if(isPortConnected(c.id,side)) return;
+        if(portDn(c,side)!==portDn(findComp(selfId),selfSide)) return; // 异径不吸附
+        var pp=portPos(c,side); var d=Math.hypot(pp.x-p.x,pp.y-p.y);
+        if(d<bd){ bd=d; best={id:c.id,side:side,dist:d}; }
+      });
+    });
+    return best;
+  }
+  function autoSnap(selfId){
+    var mc=findComp(selfId); if(!mc) return;
+    LIB[mc.kind].ports.forEach(function(side){
+      if(isPortConnected(mc.id,side)) return;
+      var mp=portPos(mc,side);
+      var near=nearestPort(mp, selfId, side, 22/S.zoom);
+      if(near){
+        var res=tryConnect(mc.id,side,near.id,near.side);
+        if(res.ok){
+          var oc=findComp(near.id); var op=portPos(oc,near.side); var ml=portLocal(mc,side);
+          mc.x=op.x-ml.x; mc.y=op.y-ml.y;
+        }
+      }
+    });
+  }
+
+  svg.addEventListener('wheel',function(e){
+    e.preventDefault();
+    var f=e.deltaY<0?1.1:0.9;
+    S.zoom=Math.max(0.3,Math.min(3,S.zoom*f));
+    applyTransform(); document.getElementById('paZoomTxt').textContent='缩放 '+Math.round(S.zoom*100)+'%';
+  },{passive:false});
+
+  /* ===================================================================
+   *  选择与属性面板
+   * =================================================================== */
+  function selectComp(id){
+    S.selected=id; render(); renderProps();
+  }
+  function renderProps(){
+    var box=document.getElementById('paProps');
+    var kindTxt=document.getElementById('paSelKind');
+    if(!S.selected){ kindTxt.textContent='未选中';
+      box.innerHTML='<div class="pa-empty">在画布中选中一个管件<br>即可在此编辑管径 / 长度 / 阻力系数</div>'; return; }
+    var c=findComp(S.selected); var L=LIB[c.kind];
+    kindTxt.textContent=L.label+' · ζ='+L.zeta;
+    var h='';
+    h+='<div style="font-size:12.5px;font-weight:800;color:#14532d;margin-bottom:8px;">'+L.label+'</div>';
+    if(L.hasLen){
+      h+='<div class="pa-field"><label>管长（m）</label><input type="number" id="pLen" value="'+fmt1(c.len)+'" min="0.1" step="0.5"></div>';
+    }
+    if(L.dns){
+      h+='<div class="pa-field"><label>管径 DN（mm）</label><div class="pa-chips" id="pDn">';
+      L.dns.forEach(function(d){ h+='<div class="pa-chip'+(c.dn===d?' on':'')+'" data-dn="'+d+'">'+d+'</div>'; });
+      h+='</div></div>';
+    }
+    if(c.kind==='reducer'){
+      h+='<div class="pa-row2"><div class="pa-field"><label>大口 DN</label><select id="pBig">'+DN_LIST.map(function(d){return '<option'+(c.bigDn===d?' selected':'')+'>'+d+'</option>';}).join('')+'</select></div>'
+        +'<div class="pa-field"><label>小口 DN</label><select id="pSmall">'+DN_LIST.map(function(d){return '<option'+(c.smallDn===d?' selected':'')+'>'+d+'</option>';}).join('')+'</select></div></div>';
+    }
+    if(c.kind==='tee'){
+      h+='<div class="pa-row2"><div class="pa-field"><label>主管 DN</label><select id="pMain">'+DN_LIST.map(function(d){return '<option'+(c.mainDn===d?' selected':'')+'>'+d+'</option>';}).join('')+'</select></div>'
+        +'<div class="pa-field"><label>支管 DN</label><select id="pBranch">'+DN_LIST.map(function(d){return '<option'+(c.branchDn===d?' selected':'')+'>'+d+'</option>';}).join('')+'</select></div></div>';
+    }
+    h+='<div class="pa-kv"><span>局部阻力系数 ζ</span><span class="v">'+L.zeta+'</span></div>';
+    h+='<div class="pa-kv"><span>端口口径</span><span class="v">'+LIB[c.kind].ports.map(function(s){return portDn(c,s);}).join(' / ')+'</span></div>';
+    h+='<button class="pa-btn warn" id="pDel" style="width:100%;margin-top:10px;">🗑 删除该管件</button>';
+    box.innerHTML=h;
+
+    if(L.hasLen){ var lenI=document.getElementById('pLen');
+      lenI.addEventListener('change',function(){ c.len=Math.max(0.1,+lenI.value||0.1); pushHistory(); recompute(); }); }
+    if(L.dns){ document.getElementById('pDn').addEventListener('click',function(e){
+      var chip=e.target.closest('.pa-chip'); if(!chip) return; c.dn=+chip.getAttribute('data-dn'); pushHistory(); recompute(); }); }
+    if(c.kind==='reducer'){
+      document.getElementById('pBig').addEventListener('change',function(e){ c.bigDn=+e.target.value; pushHistory(); recompute(); });
+      document.getElementById('pSmall').addEventListener('change',function(e){ c.smallDn=+e.target.value; pushHistory(); recompute(); });
+    }
+    if(c.kind==='tee'){
+      document.getElementById('pMain').addEventListener('change',function(e){ c.mainDn=+e.target.value; pushHistory(); recompute(); });
+      document.getElementById('pBranch').addEventListener('change',function(e){ c.branchDn=+e.target.value; pushHistory(); recompute(); });
+    }
+    document.getElementById('pDel').addEventListener('click',function(){ deleteComp(c.id); });
+  }
+
+  function deleteComp(id){
+    S.components=S.components.filter(function(c){return c.id!==id;});
+    S.connections=S.connections.filter(function(k){return k.a.id!==id&&k.b.id!==id;});
+    if(S.selected===id) S.selected=null;
+    pushHistory(); recompute();
+  }
+
+  /* ===================================================================
+   *  结果刷新（水力 / 材料 / 校验 / 拓扑）
+   * =================================================================== */
+  var MAX_LEN=1000, MAX_LOSS=30; // 阈值（m），超出红色告警
+  function recompute(){
+    var hyd=computeHydraulic();
+    // 头部状态
+    var st=document.getElementById('paStatus'), stt=document.getElementById('paStatusTxt');
+    if(S.components.length===0){ st.classList.add('off'); stt.textContent='待拼装'; }
+    else if(hyd.loop){ st.classList.add('off'); stt.textContent='检测到闭环'; }
+    else if(hyd.openCount===1){ st.classList.add('off'); stt.textContent='端口未封闭'; }
+    else if(hyd.openCount>2){ st.classList.add('off'); stt.textContent='存在悬空端口'; }
+    else { st.classList.remove('off'); stt.textContent='已送入水力内核 ✓'; }
+
+    // 结果面板
+    document.getElementById('rHf').textContent=fmt3(hyd.totalHf)+' m';
+    document.getElementById('rHl').textContent=fmt3(hyd.totalLocal)+' m';
+    var tot=document.getElementById('rTot');
+    tot.textContent=fmt3(hyd.total)+' m';
+    tot.className='v'+(hyd.total>MAX_LOSS?' bad':' ok');
+    var rv=document.getElementById('rV');
+    rv.textContent=hyd.maxV?fmt2(hyd.maxV)+' m/s ('+hyd.status+')':'—';
+    rv.className='v'+(hyd.maxV>2?' bad':(hyd.maxV&&hyd.maxV<0.8?' warn':' ok'));
+    document.getElementById('rQ').textContent=hyd.Q+' m³/h';
+
+    // 材料清单
+    var mat=computeMaterials(); var tb=document.getElementById('matTable').querySelector('tbody');
+    var rows='';
+    Object.keys(mat.pipes).forEach(function(k){ var p=mat.pipes[k];
+      rows+='<tr><td>直管 '+k+'</td><td>'+p.count+'</td><td>'+fmt1(p.len)+'</td></tr>'; });
+    Object.keys(mat.fittings).forEach(function(k){ var f=mat.fittings[k];
+      rows+='<tr><td>'+f.label+'</td><td>'+f.count+'</td><td>—</td></tr>'; });
+    tb.innerHTML=rows||'<tr><td colspan="3" style="color:#94a3b8;text-align:center;">暂无管件</td></tr>';
+
+    // 校验
+    var al=document.getElementById('paAlerts'); var html='';
+    if(S.components.length===0){
+      html='<div class="pa-alert ok"><span class="mk">✓</span><span>画布为空，等待拼装。</span></div>';
+    } else {
+      if(hyd.openCount===2)
+        html+='<div class="pa-alert ok"><span class="mk">✓</span><span>两端开放（进水口→出水口），黄色标记为待接水源 / 出水点，拓扑已送入内核。</span></div>';
+      else if(hyd.openCount===0)
+        html+='<div class="pa-alert ok"><span class="mk">✓</span><span>所有端口均已封闭（含堵头），系统闭合。</span></div>';
+      else
+        html+='<div class="pa-alert warn"><span class="mk">▲</span><span>存在 '+hyd.openCount+' 个未封闭端口（黄色标记），请接驳或加堵头封闭。</span></div>';
+      if(hyd.loop)
+        html+='<div class="pa-alert warn"><span class="mk">↻</span><span>检测到管网闭环（成环），请确认是否为有意的环网布置。</span></div>';
+      if(hyd.pipeLen>MAX_LEN)
+        html+='<div class="pa-alert bad"><span class="mk">✕</span><span>管材总长 '+fmt1(hyd.pipeLen)+'m 超出 '+MAX_LEN+'m 限值，建议分段或提管径。</span></div>';
+      if(hyd.total>MAX_LOSS)
+        html+='<div class="pa-alert bad"><span class="mk">✕</span><span>整条管路压力损失 '+fmt3(hyd.total)+'m 超出 '+MAX_LOSS+'m 限值，请校核管径/流量。</span></div>';
+      if(hyd.maxV>2)
+        html+='<div class="pa-alert warn"><span class="mk">▲</span><span>最不利流速 '+fmt2(hyd.maxV)+'m/s 偏高（&gt;2.0），建议放大管径。</span></div>';
+      if(hyd.paths.length>1)
+        html+='<div class="pa-alert ok"><span class="mk">✓</span><span>共 '+hyd.paths.length+' 条开路路径，已按各支管满流量保守估算（精确分流为 v2 功能）。</span></div>';
+      if(!html) html='<div class="pa-alert ok"><span class="mk">✓</span><span>校验通过，拓扑已送入水力内核。</span></div>';
+    }
+    al.innerHTML=html;
+
+    // 拓扑JSON
+    var json=buildTopology(hyd);
+    document.getElementById('paJson').textContent=JSON.stringify(json,null,2);
+    if(window.RyHcCoreBridge) window.RyHcCoreBridge(json); // 预留内核入口
+  }
+
+  function fmt2(v){ return (Math.round((+v||0)*100)/100).toFixed(2); }
+  function fmt3(v){ return (Math.round((+v||0)*1000)/1000).toFixed(3); }
+
+  /* ===================================================================
+   *  历史（撤销/重做）
+   * =================================================================== */
+  function snapshot(){ return JSON.stringify({components:S.components,connections:S.connections,flow:S.flow,C:S.C,sdr:S.sdr,includeLocal:S.includeLocal}); }
+  function pushHistory(){
+    S.history.push(snapshot()); if(S.history.length>80) S.history.shift(); S.future.length=0;
+    document.getElementById('btnUndo').disabled=S.history.length<=1;
+    document.getElementById('btnRedo').disabled=true;
+  }
+  function restore(s){
+    var o=JSON.parse(s);
+    S.components=o.components; S.connections=o.connections; S.flow=o.flow; S.C=o.C; S.sdr=o.sdr; S.includeLocal=o.includeLocal;
+    if(S.selected && !findComp(S.selected)) S.selected=null;
+  }
+  document.getElementById('btnUndo').addEventListener('click',function(){
+    if(S.history.length<=1) return; S.future.push(S.history.pop()); restore(S.history[S.history.length-1]); recompute();
+  });
+  document.getElementById('btnRedo').addEventListener('click',function(){
+    if(!S.future.length) return; var s=S.future.pop(); S.history.push(s); restore(s); recompute();
+  });
+
+  /* ===================================================================
+   *  工具栏
+   * =================================================================== */
+  function addFromLib(kind, sx, sy){
+    var x = sx!=null? sx : 70 + (S.components.length%5)*46;
+    var y = sy!=null? sy : 120 + (S.components.length%4)*54;
+    var c=addComp(kind,x,y); pushHistory(); recompute(); selectComp(c.id);
+    return c;
+  }
+  // 左侧点击添加
+  document.querySelectorAll('.pa-item').forEach(function(it){
+    it.addEventListener('click',function(){ addFromLib(it.getAttribute('data-add')); });
+  });
+  // 左侧拖拽添加
+  document.querySelectorAll('.pa-item').forEach(function(it){
+    it.setAttribute('draggable','true');
+    it.addEventListener('dragstart',function(e){ e.dataTransfer.setData('text/pa',it.getAttribute('data-add')); });
+  });
+  document.getElementById('paWrap').addEventListener('dragover',function(e){ e.preventDefault(); });
+  document.getElementById('paWrap').addEventListener('drop',function(e){
+    e.preventDefault(); var kind=e.dataTransfer.getData('text/pa'); if(!kind) return;
+    var r=svg.getBoundingClientRect(); var p=svgPoint({clientX:e.clientX,clientY:e.clientY});
+    addFromLib(kind,p.x,p.y);
+  });
+
+  document.getElementById('btnClear').addEventListener('click',function(){
+    if(!S.components.length) return;
+    if(!confirm('确认清空画布所有管件？')) return;
+    S.components=[]; S.connections=[]; S.selected=null; pushHistory(); recompute();
+  });
+  document.getElementById('btnFit').addEventListener('click',function(){
+    if(!S.components.length){ S.zoom=1;S.panX=0;S.panY=0;applyTransform();return; }
+    var minx=1e9,miny=1e9,maxx=-1e9,maxy=-1e9;
+    S.components.forEach(function(c){ LIB[c.kind].ports.forEach(function(s){ var p=portPos(c,s);
+      minx=Math.min(minx,p.x);miny=Math.min(miny,p.y);maxx=Math.max(maxx,p.x);maxy=Math.max(maxy,p.y); }); });
+    var pad=60, w=maxx-minx+pad*2, h=maxy-miny+pad*2;
+    var rect=svg.getBoundingClientRect();
+    S.zoom=Math.max(0.3,Math.min(2,Math.min(rect.width/w,rect.height/h)));
+    S.panX=(rect.width-w*S.zoom)/2 - (minx-pad)*S.zoom;
+    S.panY=(rect.height-h*S.zoom)/2 - (miny-pad)*S.zoom;
+    applyTransform(); document.getElementById('paZoomTxt').textContent='缩放 '+Math.round(S.zoom*100)+'%';
+  });
+  document.getElementById('btnZoomIn').addEventListener('click',function(){ S.zoom=Math.min(3,S.zoom*1.15);applyTransform();document.getElementById('paZoomTxt').textContent='缩放 '+Math.round(S.zoom*100)+'%'; });
+  document.getElementById('btnZoomOut').addEventListener('click',function(){ S.zoom=Math.max(0.3,S.zoom/1.15);applyTransform();document.getElementById('paZoomTxt').textContent='缩放 '+Math.round(S.zoom*100)+'%'; });
+
+  // 水力输入
+  document.getElementById('inFlow').addEventListener('input',function(){ S.flow=Math.max(0,+this.value||0); recompute(); });
+  document.getElementById('inC').addEventListener('input',function(){ S.C=Math.max(80,+this.value||150); recompute(); });
+  document.getElementById('inSDR').addEventListener('change',function(){ S.sdr=+this.value; recompute(); });
+  document.getElementById('inLocal').addEventListener('change',function(){ S.includeLocal=this.checked; recompute(); });
+
+  // 删除键
+  window.addEventListener('keydown',function(e){
+    if((e.key==='Delete'||e.key==='Backspace') && S.selected && document.activeElement.tagName!=='INPUT' && document.activeElement.tagName!=='SELECT'){
+      deleteComp(S.selected); e.preventDefault();
+    }
+    if((e.ctrlKey||e.metaKey)&&e.key==='z'){ document.getElementById('btnUndo').click(); e.preventDefault(); }
+    if((e.ctrlKey||e.metaKey)&&e.key==='y'){ document.getElementById('btnRedo').click(); e.preventDefault(); }
+  });
+
+  // 拓扑JSON 展开
+  document.getElementById('btnJson').addEventListener('click',function(){
+    var j=document.getElementById('paJson'); var t=this;
+    if(j.style.display==='none'){ j.style.display='block'; t.textContent='收起拓扑JSON ▴'; }
+    else { j.style.display='none'; t.textContent='展开拓扑JSON ▾'; }
+  });
+
+  // toast
+  var toastTimer=null;
+  function toast(msg,warn){
+    var t=document.getElementById('paToast'); t.textContent=msg; t.className='pa-toast show'+(warn?' warn':'');
+    clearTimeout(toastTimer); toastTimer=setTimeout(function(){ t.className='pa-toast'+(warn?' warn':''); },2200);
+  }
+
+  /* ===================================================================
+   *  示例管路：110直管5m → 110弯头 → 110直管3m → 110×90变径 → 90直管6m
+   * =================================================================== */
+  function loadExample(){
+    S.components=[]; S.connections=[]; S.selected=null;
+    var s1=addComp('straight',80,220,{dn:110,len:5});
+    var e1=addComp('elbow90',140,220,{dn:110});           // L=(140,220) 对齐 s1.R
+    var s2=addComp('straight',204,284,{dn:110,len:3});    // L=(204,284) 对齐 e1.R(140+64,220+64)
+    var r1=addComp('reducer',240,284,{bigDn:110,smallDn:90}); // L=(240,284) 对齐 s2.R(204+36,284)
+    var s3=addComp('straight',296,284,{dn:90,len:6});     // L=(296,284) 对齐 r1.R(240+56,284)
+    tryConnect(s1.id,'R',e1.id,'L');
+    tryConnect(e1.id,'R',s2.id,'L');
+    tryConnect(s2.id,'R',r1.id,'L');
+    tryConnect(r1.id,'R',s3.id,'L');
+    pushHistory(); recompute();
+    render();   /* [v203] 既有缺陷修复：原版只 recompute 不 render ⇒ 载入示例后画布空白，
+                   要等用户拖一下才出现（数据在、图不在）。 */
+    document.getElementById('btnFit').click();
+  }
+  document.getElementById('btnExample').addEventListener('click',loadExample);
+
+  /* ===================================================================
+   *  左侧素材图标（内联SVG色块）
+   * =================================================================== */
+  function setIcon(id,svgStr){ var e=document.getElementById(id); if(e) e.innerHTML=svgStr; }
+  setIcon('ic_straight','<svg width="30" height="30"><rect x="4" y="12" width="22" height="6" rx="3" fill="#16a34a"/></svg>');
+  setIcon('ic_elbow90','<svg width="30" height="30"><path d="M5 15 H18 V25" stroke="#16a34a" stroke-width="6" fill="none" stroke-linecap="round"/></svg>');
+  setIcon('ic_elbow45','<svg width="30" height="30"><line x1="5" y1="15" x2="22" y2="24" stroke="#16a34a" stroke-width="6" stroke-linecap="round"/></svg>');
+  setIcon('ic_reducer','<svg width="30" height="30"><polygon points="4,11 4,19 24,16 24,14" fill="#0d9488"/></svg>');
+  setIcon('ic_tee','<svg width="30" height="30"><line x1="4" y1="15" x2="26" y2="15" stroke="#16a34a" stroke-width="5" stroke-linecap="round"/><line x1="15" y1="15" x2="15" y2="6" stroke="#0891b2" stroke-width="5" stroke-linecap="round"/></svg>');
+  setIcon('ic_couple','<svg width="30" height="30"><rect x="6" y="12" width="18" height="6" rx="3" fill="#16a34a"/><rect x="11" y="10" width="8" height="10" rx="2" fill="#fff" stroke="#16a34a"/></svg>');
+  setIcon('ic_cap','<svg width="30" height="30"><line x1="4" y1="15" x2="14" y2="15" stroke="#16a34a" stroke-width="6" stroke-linecap="round"/><path d="M14 9 a7 7 0 0 1 0 12" fill="none" stroke="#16a34a" stroke-width="2.5"/></svg>');
+
+  // 左侧图例
+  (function(){
+    var html='<div class="pa-lib-group" style="margin-top:0;">管径配色</div>';
+    DN_LIST.forEach(function(d){ html+='<div class="row"><span class="sw" style="background:'+dnColor(d)+'"></span>DN'+d+'</div>'; });
+    document.getElementById('paLegend').innerHTML=html;
+  })();
+
+  /* ---------- 启动 ---------- */
+  render(); recompute();
+  window.RyPipeAssembler={ addFromLib:addFromLib, loadExample:loadExample,
+    getTopology:function(){ return buildTopology(computeHydraulic()); } };
+})();
+</script>
+</body>
+</html>
