@@ -18102,6 +18102,40 @@ ppPullLiftDh();                                              // 首屏对齐一�
     return plot;
   };
 
+  /* ---------- [v219 2026-10-04 用户要求] 地块库「设为当前」也要自动垂直镜像 ----------
+   * 用户原话：「存入地块库的地块 点击设为当前之后，地块也要自动垂直镜像。」
+   * 背景：v217 只管了「在线地图回传」那一条入口（applyMapMeasuredArea）。地块库里存的 .poly
+   *       （本地米）对**地图来源**的地块而言可能是**两种口径之一**：
+   *         · v217 之前落库 / 地图页自行落库（btnSavePlot）⇒ 仍是「地图口径」（北 = +y，图面上下颠倒）
+   *         · v217 之后由本页落库（poly 取自 measuredPolygon）⇒ 已经是镜像后的图面口径
+   *       ⇒ 若「每次设为当前都无脑翻一次」，正本页存的那些会被翻回去（负负得正）。
+   *         ★ 这是本轮最容易踩的坑 —— 幂等必须**用几何判据**保证，不能靠版本号或记忆。
+   * 判据：拿一个**独立于 poly 的参考 REF**（= 地图口径，来自 p.mapFramePoly 或由 polyLatLng 还原）
+   *       与 poly 比一比（容差 0.5 m，覆盖台账里 poly 保留 2 位小数造成的量化误差）：
+   *         poly ≈ REF      ⇒ 未镜像 ⇒ 翻一次；
+   *         poly ≈ mirror(REF) ⇒ 已镜像 ⇒ 原样不动。
+   *       两者都不像 ⇒ 不翻（宁可不翻，也不猜）。
+   * ★ REF 若退化成 poly 自身（地块没有经纬度、只能落到 `p.poly` 兜底）⇒ 恒满足第一条 ⇒ 会误翻
+   *   手画地块。所以调用方必须先判断「REF 是否独立于 poly」，退化情形一律不进本函数。
+   * ★ 主环与子环必须同口径：同一个翻转决定要让 __runyeSubPlots 的每个环一起跟上，
+   *   否则子地块与外框上下错位（v217 在 applyMapMeasuredArea 里就是这么配对的）。 */
+  function ryOrientPlotPoly(poly, ref) {
+    var NO = { pts: poly, flipped: false };
+    try {
+      if (!Array.isArray(poly) || poly.length < 3 || !Array.isArray(ref) || ref.length !== poly.length) return NO;
+      var dSame = 0, dFlip = 0, tol = 0.5;
+      for (var i = 0; i < poly.length; i++) {
+        var px = +poly[i].x, py = +poly[i].y, rx = +ref[i].x, ry = +ref[i].y;
+        if (!isFinite(px) || !isFinite(py) || !isFinite(rx) || !isFinite(ry)) return NO;
+        dSame = Math.max(dSame, Math.abs(px - rx), Math.abs(py - ry));
+        dFlip = Math.max(dFlip, Math.abs(px - rx), Math.abs(py + ry));
+      }
+      if (dFlip <= tol && dFlip < dSame) return NO;                                   /* 已是图面口径 */
+      if (dSame <= tol) return { pts: poly.map(function (q) { return { x: +q.x, y: -(+q.y) }; }), flipped: true };
+      return NO;
+    } catch (e) { return NO; }
+  }
+
   function saveCurrent(){
     var area=window.measuredArea||0;
     if(area<=0){ toast('请先测量/生成地块再保存'); return; }
@@ -18149,16 +18183,30 @@ ppPullLiftDh();                                              // 首屏对齐一�
     window.__runyeMapFramePoly = (window.__runyeGeoBase && Array.isArray(p.poly) && p.poly.length>=3)
       ? (p.mapFramePoly || (p.polyLatLng && window.RunyeGeo ? RunyeGeo.polyLL2m(p.polyLatLng,p.geo) : p.poly)).map(function(q){return {x:q.x,y:q.y};}) : null;
     window.currentPlotId=id;
+    /* [v219] 上面的 __runyeMapFramePoly 就是「地图口径」参考 REF。只有 REF **独立于 p.poly**
+       （来自 p.mapFramePoly 或 polyLatLng 还原）时才能用几何判据定方向；退化到 p.poly 本身
+       （无经纬度的手画地块）恒等于 REF ⇒ 不翻（手画的地块本来就是图面口径）。 */
+    var _v219Flip = false;
+    try {
+      var _refInd = !!(p.mapFramePoly || (p.polyLatLng && p.polyLatLng.length >= 3 && p.geo && window.RunyeGeo));
+      if (_refInd && window.__runyeMapFramePoly && Array.isArray(window.measuredPolygon) &&
+          window.__runyeMapFramePoly.length === window.measuredPolygon.length) {
+        var _o = ryOrientPlotPoly(window.measuredPolygon, window.__runyeMapFramePoly);
+        if (_o.flipped) { window.measuredPolygon = _o.pts; _v219Flip = true; }
+      }
+    } catch (e219) { }
     /* [v191] 恢复成组地块的各子环（本地米坐标，与 measuredPolygon 同坐标系）。
-       无库存子环则置 null，二级页回退画单块凸包。 */
+       无库存子环则置 null，二级页回退画单块凸包。
+       ★ [v219] 主环翻了子环必须跟着翻，否则子地块相对外框上下错位。 */
     try{
       if(p && Array.isArray(p.subPlots) && p.subPlots.length){
         var _rec=[];
         p.subPlots.forEach(function(s){
           if(s && Array.isArray(s.poly) && s.poly.length>=3){
+            var _ring = s.poly.map(function(q){return{x:+q.x,y:_v219Flip?-(+q.y):+q.y};});
             _rec.push({ id:s.id, name:s.name, mu:s.mu, sqm:s.sqm, crop:s.crop,
                         polyLatLng:s.polyLatLng||null,
-                        poly:s.poly.map(function(q){return{x:+q.x,y:+q.y};}) });
+                        poly:_ring });
           }
         });
         window.__runyeSubPlots=_rec.length?_rec:null;
