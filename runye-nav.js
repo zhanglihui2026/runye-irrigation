@@ -71,9 +71,14 @@
         a.href = base + it.hash;
         if (!base) a.setAttribute('data-target', it.hash);
       } else {
-        a.href = it.href;
+        // [v235] 移动端直接进新的手机地图预览页；桌面端仍走旧地图页
+        var navHref = it.href;
+        if (navHref === 'runye-map-measure.html' && global.RyMobile && global.RyMobile.isActive()) {
+          navHref = 'runye-mobile-map-preview.html';
+        }
+        a.href = navHref;
         /* 当前页高亮：仅普通站内链接参与（锚点项由页面自有逻辑管理 active） */
-        if (curFile() === it.href.split('#')[0]) a.classList.add('active');
+        if (curFile() === navHref.split('#')[0]) a.classList.add('active');
       }
       if (it.pre && marker) el.insertBefore(a, marker);
       else el.appendChild(a);
