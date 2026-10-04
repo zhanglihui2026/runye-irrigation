@@ -10,6 +10,7 @@ const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const puppeteer = require('puppeteer-core');
+const killTree = require('./_edge_kill.cjs');
 
 const WS = 'C:\\Users\\AHS\\runye-irrigation';
 const EDGE = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
@@ -33,7 +34,7 @@ const check = (n, ok, extra) => { console.log((ok ? '  [PASS] ' : '  [FAIL] ') +
     try { browser = await puppeteer.connect({ browserURL: 'http://127.0.0.1:' + PORT, defaultViewport: null }); break; }
     catch (e) { await sleep(400); }
   }
-  if (!browser) { console.error('Edge connect failed'); proc.kill(); process.exit(1); }
+  if (!browser) { console.error('Edge connect failed'); killTree(proc.pid); process.exit(1); }
   const page = await browser.newPage();
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message));
@@ -133,7 +134,7 @@ const check = (n, ok, extra) => { console.log((ok ? '  [PASS] ' : '  [FAIL] ') +
     view: window.RyPipeAssembler ? null : null,
     tot: document.getElementById('rTot').textContent,
     mat: (document.getElementById('matTable').querySelector('tbody').textContent || '').slice(0, 40),
-    btn: document.getElementById('btnIso').textContent
+    view: window.RyPipeAssembler.getView()
   }));
   const fn = await page.evaluate(() => ({
     comps: document.querySelectorAll('#paSvg .pa-comp').length,
@@ -153,15 +154,17 @@ const check = (n, ok, extra) => { console.log((ok ? '  [PASS] ' : '  [FAIL] ') +
     n: window.RyPipeAssembler.getTopology().components.length,
     tot: document.getElementById('rTot').textContent
   }));
-  await page.evaluate(() => document.getElementById('btnIso').click());
+  await page.evaluate(() => window.RyPipeAssembler.setView('iso'));
   await sleep(700);
   const iso = await page.evaluate(() => {
     const svgEl = document.getElementById('paSvg');
     const comps = svgEl.querySelectorAll('.pa-comp');
     const first = comps[0] ? comps[0].getBoundingClientRect() : null;
     const t = window.RyPipeAssembler.getTopology();
+    const on = document.querySelector('#segView .vw.on');
     return {
-      btn: document.getElementById('btnIso').textContent,
+      view: window.RyPipeAssembler.getView(),
+      onView: on ? on.getAttribute('data-view') : null,
       hasGrid: svgEl.querySelectorAll('path[stroke="#cbd5e1"]').length > 0,
       ellipses: svgEl.querySelectorAll('ellipse').length,
       comps: comps.length,
@@ -169,7 +172,10 @@ const check = (n, ok, extra) => { console.log((ok ? '  [PASS] ' : '  [FAIL] ') +
       tot: document.getElementById('rTot').textContent
     };
   });
-  check('⑳ 轴测按钮存在且切换成「▤ 平面图」（当前=轴测）', /平面图/.test(iso.btn), iso.btn);
+  /* [v210] 视图改为四段控件（俯视/前视/侧视/轴测）：断言「当前视图 = iso」且**高亮段也是 iso**
+     （后者专门拦「状态变了、按钮没跟着亮」这种骗人的 UI） */
+  check('⑳ 切到轴测：S.view=iso 且分段控件高亮在 iso 上', iso.view === 'iso' && iso.onView === 'iso',
+    JSON.stringify({ v: iso.view, on: iso.onView }));
   /* 端面数 = Σ(每段折线 2 个端帽)：2直管+1直通+1弯头+1弯头+1三通支管+1堵头 = 7 段 ×2 = 14，
      其中 1 个堵头端帽是独立的 ellipse（非 isoStroke 生成）⇒ isoStroke 端帽 12 + 堵头 1 = 13。
      断言按「≥8 即为圆管画法生效」来写（平面图态 ellipse=0，足够区分）。 */
@@ -177,14 +183,19 @@ const check = (n, ok, extra) => { console.log((ok ? '  [PASS] ' : '  [FAIL] ') +
   check('㉒ 组件数不变（只是换画法，不是重建）', iso.comps === 5, 'comps=' + iso.comps);
   check('㉓ 水力结果与平面视图一致（数据未变）', iso.tot === before.tot, 'plan=' + before.tot + ' iso=' + iso.tot);
   await page.screenshot({ path: path.join(OUT, 'pa_v206_iso.png') });
-  await page.evaluate(() => document.getElementById('btnIso').click());
+  await page.evaluate(() => window.RyPipeAssembler.setView('plan'));
   await sleep(500);
-  const back = await page.evaluate(() => ({
-    btn: document.getElementById('btnIso').textContent,
-    hasGrid: document.querySelectorAll('#paSvg path[stroke="#cbd5e1"]').length > 0,
-    tot: document.getElementById('rTot').textContent
-  }));
-  check('㉔ 切回平面：按钮复原、底纹消失、水力一致', /轴测图/.test(back.btn) && !back.hasGrid && back.tot === before.tot, JSON.stringify(back));
+  const back = await page.evaluate(() => {
+    const on = document.querySelector('#segView .vw.on');
+    return {
+      view: window.RyPipeAssembler.getView(),
+      onView: on ? on.getAttribute('data-view') : null,
+      hasGrid: document.querySelectorAll('#paSvg path[stroke="#cbd5e1"]').length > 0,
+      tot: document.getElementById('rTot').textContent
+    };
+  });
+  check('㉔ 切回俯视：视图与高亮都回到 plan、底纹消失、水力一致',
+    back.view === 'plan' && back.onView === 'plan' && !back.hasGrid && back.tot === before.tot, JSON.stringify(back));
 
   check('⑭ 全程无 JS 报错', errs.length === 0, errs.join('|').slice(0, 160));
 
@@ -192,6 +203,6 @@ const check = (n, ok, extra) => { console.log((ok ? '  [PASS] ' : '  [FAIL] ') +
   console.log('[shot] _verify_out/pa_v203_style.png');
 
   console.log('\n==== v203 风格统一复现：PASS ' + pass + ' / FAIL ' + fail + ' ====');
-  await browser.disconnect(); proc.kill();
+  await browser.disconnect(); killTree(proc.pid);
   process.exit(fail ? 1 : 0);
 })().catch((e) => { console.error('[FATAL]', e.message); process.exit(1); });

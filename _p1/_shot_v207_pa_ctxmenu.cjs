@@ -273,14 +273,18 @@ const TAG = process.env.PA_TAG || '';                       /* 开 Edge profile 
 
   console.log('\n=== ⑩ 轴测视图下同样可用 ===');
   const preIso = JSON.stringify((await getComps()).map((c) => [c.id, c.x, c.y, c.len, c.dn]));
-  await page.click('#btnIso');
+  await page.evaluate(() => window.RyPipeAssembler.setView('iso'));
   await sleep(500);
-  const isoInfo = await R(() => ({
-    handles: document.querySelectorAll('.pa-lenhandle').length,
-    straights: window.RyPipeAssembler.getComps().filter((c) => c.kind === 'straight').length,
-    btn: document.getElementById('btnIso').textContent.trim()
-  }));
-  check('⑩a 切到轴测图且每根直管都有手柄', isoInfo.btn.indexOf('平面图') >= 0 && isoInfo.handles === isoInfo.straights,
+  const isoInfo = await R(() => {
+    const on = document.querySelector('#segView .vw.on');
+    return {
+      handles: document.querySelectorAll('.pa-lenhandle').length,
+      straights: window.RyPipeAssembler.getComps().filter((c) => c.kind === 'straight').length,
+      view: window.RyPipeAssembler.getView(),
+      onView: on ? on.getAttribute('data-view') : null
+    };
+  });
+  check('⑩a 切到轴测图且每根直管都有手柄', isoInfo.view === 'iso' && isoInfo.onView === 'iso' && isoInfo.handles === isoInfo.straights,
     JSON.stringify(isoInfo));
   check('⑩a2 切视图不动数据（组件几何一字未改）',
     JSON.stringify((await getComps()).map((c) => [c.id, c.x, c.y, c.len, c.dn])) === preIso);
@@ -306,12 +310,13 @@ const TAG = process.env.PA_TAG || '';                       /* 开 Edge profile 
     check('⑩c 轴测下拖完仍严格对接', near0(gap10), 'maxGap=' + gap10.toFixed(3));
     await page.screenshot({ path: path.join(OUT, 'pa_v207_iso_len.png') });
   }
-  await page.click('#btnIso');   /* 切回平面 */
+  await page.evaluate(() => window.RyPipeAssembler.setView('plan'));   /* 切回俯视 */
   await sleep(400);
   const planAgain = await R(() => window.RyPipeAssembler.getTopology());
   const connCount = (await getConns()).length;
-  check('⑩d 切回平面图后画布照常渲染且拓扑完整', !!planAgain && connCount === (await getConns()).length,
-    'conns=' + connCount + ' comps=' + (planAgain.topo ? planAgain.topo.components.length : '?'));
+  const backView = await R(() => window.RyPipeAssembler.getView());
+  check('⑩d 切回俯视图后画布照常渲染且拓扑完整', !!planAgain && backView === 'plan' && connCount === (await getConns()).length,
+    'view=' + backView + ' conns=' + connCount + ' comps=' + (planAgain.topo ? planAgain.topo.components.length : '?'));
 
   console.log('\n=== ⑪ 无 JS 报错 ===');
   check('⑪ 全程无 pageerror / console.error', errs.length === 0, errs.slice(0, 3).join(' || '));

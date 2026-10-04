@@ -12,12 +12,13 @@ const killTree = require('./_edge_kill.cjs');
 
 const TIMEOUT_MS = parseInt(process.env.INJ_TIMEOUT || '300000', 10);
 
-function runOnce(ws, script, file, port, tag) {
+function runOnce(ws, script, file, port, tag, extraEnv) {
   return new Promise((resolve) => {
     const p = spawn(process.execPath, [path.join(ws, script)], {
       cwd: ws, stdio: ['ignore', 'pipe', 'pipe'],
       env: Object.assign({}, process.env,
-        { PA_PAGE: file, PA_TAG: '_' + tag, PA_PORT: String(port), NODE_PATH: process.env.NODE_PATH || '' })
+        { PA_PAGE: file, PA_TAG: '_' + tag, PA_PORT: String(port), NODE_PATH: process.env.NODE_PATH || '' },
+        extraEnv || {})
     });
     let out = '';
     const timer = setTimeout(() => {
@@ -41,6 +42,9 @@ async function runCases(opt) {
   const base = fs.readFileSync(src, 'utf8');
   let ok = 0, bad = 0, port = opt.basePort || 9700;
   for (const cs of opt.cases) {
+    /* 每个用例开跑前先清扫上一轮遗留的孤儿 Edge（v208 教训 J3/J4：
+       孤儿累积 ⇒ 机器变慢 ⇒ CDP 超时 ⇒ 用例被误判成"坏闸门"） */
+    killTree.sweepTestEdges();
     const pats = cs.pat || [[cs.from, cs.to]];
     let cur = base, badAnchor = false;
     pats.forEach((p) => {
@@ -51,7 +55,13 @@ async function runCases(opt) {
     if (badAnchor) { bad++; continue; }
     const file = '_tmp_inj_' + (++port) + '.html';
     fs.writeFileSync(path.join(ws, file), cur, 'utf8');
-    const r = await runOnce(ws, script, file, port, tag(cs, port));
+    let r = await runOnce(ws, script, file, port, tag(cs, port), cs.env);
+    /* ★ 环境抖动重试：注入体检要连跑十几个完整浏览器会话，机器一卡就会 ProtocolError。
+       "运行异常"重试一次，取第二次结果 —— 重试仍异常才真算异常（不能把环境噪音当成缺陷）。 */
+    if (/SPAWN-ERROR|\[RUNNER\]|EXCEPTION:|ProtocolError|Target closed/.test(r.out)) {
+      killTree.sweepTestEdges();
+      r = await runOnce(ws, script, file, port, tag(cs, port) + 'r', cs.env);
+    }
     const failed = r.out.split('\n').filter((l) => l.indexOf('[FAIL]') >= 0).map((l) => l.replace(/^.*\[FAIL\]\s*/, '').trim());
     const m = r.out.match(/=== 汇总：(\d+) 通过 \/ (\d+) 失败 ===/);
     const crashed = !m || /SPAWN-ERROR|\[RUNNER\]|EXCEPTION:/.test(r.out);
@@ -70,6 +80,7 @@ async function runCases(opt) {
     try { fs.unlinkSync(path.join(ws, file)); } catch (e) { }
   }
   console.log('\n=== 注入体检：' + ok + '/' + opt.cases.length + ' 个缺陷被闸门拦下 ===');
+  killTree.sweepTestEdges();
   return { ok: ok, bad: bad };
 }
 function tag(cs, port) { return String(port); }

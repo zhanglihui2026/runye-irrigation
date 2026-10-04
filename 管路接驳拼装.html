@@ -103,10 +103,12 @@
   /* 工具条 = 成组管路页工具轨同款（#f4f8f6 底 + #e4ece7 边 + 8px 圆角） */
   .pa-toolbar{
     position:absolute;top:10px;left:10px;right:10px;display:flex;gap:6px;align-items:center;
+    /* [v210] 按钮变多（复制/旋转/移动 + 四视图）⇒ 允许换行，窄屏也不会挤出容器 */
+    flex-wrap:wrap;row-gap:6px;
     background:#f4f8f6;border:1px solid var(--pa-line2);
     border-radius:8px;padding:6px 8px;box-shadow:0 2px 8px rgba(15,23,42,.06);z-index:5;
   }
-  .pa-toolbar .seg{display:flex;gap:5px;}
+  .pa-toolbar .seg{display:flex;gap:5px;flex:0 0 auto;}
   .pa-btn{
     height:24px;border:1px solid rgba(31,41,55,.22);background:#fff;color:var(--pa-ink);
     font-size:11.5px;font-weight:600;padding:0 8px;border-radius:8px;cursor:pointer;
@@ -121,6 +123,9 @@
   .pa-btn.warn{color:#dc2626;border-color:#fecaca;}
   .pa-btn.warn:hover{background:#fef2f2;}
   .pa-btn:disabled{opacity:.45;cursor:not-allowed;}
+  /* [v210] 分段控件的当前项（四视图切换用）：浅绿底 + 绿边 + 加粗，与侧栏选中态同一语言 */
+  .pa-btn.on{background:#e7f4ec;border-color:#16a34a;color:#15803d;font-weight:700;}
+  .pa-btn.on:hover{background:#dcefe3;}
   .pa-toolbar .spacer{flex:1;}
   .pa-hint{position:absolute;left:10px;bottom:10px;font-size:10.5px;color:#5f6b7a;
     background:rgba(255,255,255,.88);padding:5px 9px;border-radius:8px;border:1px solid var(--pa-line2);max-width:60%;}
@@ -131,6 +136,15 @@
   .pa-r-top{flex:0 0 42%;border-bottom:1px solid var(--pa-line);display:flex;flex-direction:column;min-height:0;}
   .pa-r-bot{flex:1;display:flex;flex-direction:column;min-height:0;}
   .pa-r-scroll{overflow-y:auto;flex:1;padding:10px 12px;}
+  /* [v210] 侧栏滚动条改最窄（与 hydraulic-calc / filter-system 同一套 5px 口径）：
+     默认的系统滚动条又宽又灰，在 236px 窄栏里占掉一大条，视觉上很突兀。
+     ★ 只写 ::-webkit-scrollbar、刻意不写 scrollbar-width/scrollbar-color ——
+       Firefox 一旦支持 scrollbar-width 反而会变宽，保持与其他页一致的实测口径。 */
+  .pa-lib::-webkit-scrollbar,.pa-r-scroll::-webkit-scrollbar{width:4px;height:4px}
+  .pa-lib::-webkit-scrollbar-track,.pa-r-scroll::-webkit-scrollbar-track,
+  .pa-lib::-webkit-scrollbar-corner,.pa-r-scroll::-webkit-scrollbar-corner{background:transparent}
+  .pa-lib::-webkit-scrollbar-thumb,.pa-r-scroll::-webkit-scrollbar-thumb{background:#bfd3c6;border-radius:2px}
+  .pa-lib::-webkit-scrollbar-thumb:hover,.pa-r-scroll::-webkit-scrollbar-thumb:hover{background:#9db8a7}
   .pa-empty{color:var(--pa-sub);font-size:11.5px;text-align:center;padding:26px 10px;line-height:1.8;}
 
   .pa-field{margin-bottom:9px;}
@@ -257,15 +271,27 @@
             <button class="pa-btn" id="btnZoomIn">＋</button>
             <button class="pa-btn" id="btnZoomOut">－</button>
           </div>
+          <!-- [v210] 编辑：复制 / 旋转 / 移动（选中一个管件后可用；快捷键 Ctrl+D / R / 方向键） -->
+          <div class="seg">
+            <button class="pa-btn" id="btnDup" title="复制选中管件（Ctrl+D）：连口径/管长一起复制，错开落位便于再拖动">⧉ 复制</button>
+            <button class="pa-btn" id="btnRot" title="旋转选中管件 90°（R；按住 Shift 逆时针）：绕左端 L 口转，下游自动跟着接好">↻ 旋转</button>
+            <button class="pa-btn" id="btnMove" title="自由移动模式：打开后拖动不会被邻近端口吸住（用于把已接好的管件挪开）；关闭时拖到附近会自动接驳">✥ 移动</button>
+          </div>
           <button class="pa-btn primary" id="btnExample">⚡ 载入示例管路</button>
-          <!-- [v206] 轴测图切换：同一份拼装几何，只换投影画法（组件坐标/管长/管径/水力不变） -->
-          <button class="pa-btn" id="btnIso" title="平面图 / 轴测图 切换：轴测按等轴测投影画出圆管（含厚度与端面），数据不变">⛶ 轴测图</button>
+          <!-- [v210] 四视图切换：俯视 / 前视 / 侧视 / 轴测。
+               同一份拼装几何的四种画法（组件坐标/管长/管径/连接/水力一点不变），只换投影。 -->
+          <div class="seg" id="segView">
+            <button class="pa-btn vw on" data-view="plan" title="俯视图（平面布置）：X / Y 等比，原始尺寸">▤ 俯视</button>
+            <button class="pa-btn vw" data-view="front" title="前视图：沿纵深按 cos70° 压缩 —— 相当于从正前方低角度看地面">▭ 前视</button>
+            <button class="pa-btn vw" data-view="side" title="侧视图：沿横向按 cos70° 压缩 —— 相当于从正侧方低角度看地面">▯ 侧视</button>
+            <button class="pa-btn vw" data-view="iso" title="轴测图：等轴测 30° 投影，圆管带厚度与端面">⛶ 轴测</button>
+          </div>
           <div class="spacer"></div>
           <button class="pa-btn warn" id="btnClear">清空画布</button>
           <div class="pa-status" id="paStatus" title="拼装/水力状态"><span class="dot"></span><span id="paStatusTxt">待拼装</span></div>
         </div>
         <svg id="paSvg" xmlns="http://www.w3.org/2000/svg"></svg>
-        <div class="pa-hint">操作：左侧点击/拖入管件，靠近即自动吸附 → 选中可改参数 → ★右键管道直接改管径 · 右键配件直接换选型 → 拖直管右端「⇔」手柄自由调管长 → Delete 删除 · 滚轮缩放。</div>
+        <div class="pa-hint">操作：左侧点击/拖入管件，靠近即自动吸附 → 选中可改参数 → ★右键管道直接改管径 · 右键配件直接换选型 → 拖直管右端「⇔」手柄自由调管长 → ★复制 Ctrl+D · 旋转 R（Shift 反向）· 方向键微调移动（Shift 加速）→ 俯视/前视/侧视/轴测四种画法随时切换 → Delete 删除 · 滚轮缩放。</div>
         <div class="pa-zoom" id="paZoomTxt">缩放 100%</div>
         <div class="pa-toast" id="paToast"></div>
         <!-- [v207] 画布右键菜单：管道改管径 / 配件换选型（内容由 JS 按选中管件的类型构造） -->
@@ -346,6 +372,15 @@
   var DN_COLOR={110:'#e11d48',90:'#ea580c',75:'#ca8a04',63:'#16a34a',50:'#0891b2',40:'#2563eb',32:'#7c3aed'};
   function dnColor(d){ return DN_COLOR[d]||'#64748b'; }
   function dnWidth(d){ return Math.max(7, Math.min(17, (+d||32)/7)); }
+  /* [v209] 明暗派生：amt>0 提亮、amt<0 压暗（管身的暗部描边/阴影用它，不必再维护第二套色表） */
+  function shade(hex, amt){
+    var s=String(hex||'');
+    if(s.charAt(0)!=='#') return s;                 // 已经是 rgb() 之类就直接放过
+    var n=parseInt(s.slice(1),16); if(isNaN(n)) return s;
+    var r=(n>>16)&255, gg=(n>>8)&255, b=n&255;
+    var f=function(v){ return amt>=0? Math.round(v+(255-v)*amt) : Math.round(v*(1+amt)); };
+    return 'rgb('+f(r)+','+f(gg)+','+f(b)+')';
+  }
 
   /* ---------- 管件库定义 ---------- */
   var LIB={
@@ -361,7 +396,17 @@
 
   /* ---------- 端口几何（组件局部坐标，原点=左侧L口锚点） ---------- */
   var SCALE=12;              // px / m（直管长度）
-  function portLocal(c,side){
+
+  /* [v210] 组件朝向 rot（度，0/90/180/270），绕 L 口（局部原点）旋转。
+     ★ 关键取舍：把旋转**统一收在 portLocal 里**。所有上层逻辑（连接、吸附、对位、
+       包围盒、适应画布）都只依赖 portPos ⇒ 旋转自动生效，一处都不用改；
+       若改成在各绘制处各自处理，就会变成「画是转了、接口没转」。 */
+  function rotPt(x,y,deg){
+    var d=+deg||0; if(!d) return {x:x,y:y};
+    var a=d*Math.PI/180, ca=Math.cos(a), sa=Math.sin(a);
+    return {x:x*ca-y*sa, y:x*sa+y*ca};
+  }
+  function baseLocal(c,side){
     switch(c.kind){
       case 'straight': return side==='L'?{x:0,y:0}:{x:c.len*SCALE,y:0};
       case 'elbow90':  return side==='L'?{x:0,y:0}:{x:64,y:64};
@@ -372,6 +417,14 @@
       case 'cap':      return {x:0,y:0};
     }
     return {x:0,y:0};
+  }
+  function portLocal(c,side){
+    var p=baseLocal(c,side);
+    return rotPt(p.x,p.y,c.rot||0);
+  }
+  /* 组件局部坐标（先旋转）→ 规划坐标 */
+  function localToPlan(c,lx,ly){
+    var q=rotPt(lx,ly,c.rot||0); return {x:c.x+q.x, y:c.y+q.y};
   }
   function portPos(c,side){ var p=portLocal(c,side); return {x:c.x+p.x,y:c.y+p.y}; }
   function portDn(c,side){
@@ -443,8 +496,12 @@
   var S={components:[],connections:[],selected:null,
     flow:25,C:150,sdr:13.6,includeLocal:true,
     zoom:1,panX:0,panY:0,
-    /* [v206] 视图：'plan'=平面（默认，与以往完全一致）；'iso'=轴测（同一套几何，只换投影画法） */
+    /* [v206] 视图：'plan'=俯视（默认，与以往完全一致）；'iso'=轴测（同一套几何，只换投影画法）
+       [v210] 增加 'front' 前视 / 'side' 侧视 —— 四视图共用同一份数据。 */
     view:'plan',
+    /* [v210] 自由移动模式：打开后拖动**不自动吸附**（用于把已接好的管件挪开），
+       关闭时拖到附近会自动接驳（v208 行为）。默认关闭，保持既有手感。 */
+    moveMode:false,
     history:[],future:[], seq:1};
 
   function uid(p){ return (p||'c')+(S.seq++); }
@@ -651,11 +708,31 @@
    */
   var ISO_A=Math.cos(Math.PI/6), ISO_B=Math.sin(Math.PI/6);
   function isoOn(){ return S.view==='iso'; }
-  function P(x,y){ return isoOn()? {x:(x-y)*ISO_A, y:(x+y)*ISO_B} : {x:x,y:y}; }
-  function Pinv(sx,sy){
-    if(!isoOn()) return {x:sx,y:sy};
-    return {x:(sx/ISO_A+sy/ISO_B)/2, y:(sy/ISO_B-sx/ISO_A)/2};
+  /* [v210] 正交三视图：同一份 (x,y) 数据的四种画法。
+       plan  俯视（原平面图）：sx=x,        sy=y
+       front 前视：**沿纵深压缩** —— sx=x,          sy=FRONT_K·y（从正前方低角度看地面）
+       side  侧视：**沿横向压缩** —— sx=FRONT_K·x,  sy=y（从正侧方低角度看地面）
+       iso   轴测（v206 的等轴测 30°）
+     ★ 为什么前/侧视用「压缩」而不是把 y 抹平：本页数据是**平面布置**（没有高程 z），
+       真正的正交前视会把所有东西压成一条线，什么也看不出来；按 cos(70°)≈0.342 压缩
+       被投影的那个方向，既是标准正交投影（绕该轴倾斜 70°），又保留了管路走向与连接关系。
+     ★ 一样是数据零改动：只换画法，连接/吸附/拖长全部照旧（Pinv 反投影保证命中与拖拽）。 */
+  var FRONT_K=Math.cos(70*Math.PI/180);      // ≈0.342
+  function viewK(){
+    if(S.view==='front') return {kx:1, ky:FRONT_K};
+    if(S.view==='side')  return {kx:FRONT_K, ky:1};
+    return {kx:1, ky:1};
   }
+  function P(x,y){
+    if(isoOn()) return {x:(x-y)*ISO_A, y:(x+y)*ISO_B};
+    var k=viewK(); return {x:x*k.kx, y:y*k.ky};
+  }
+  function Pinv(sx,sy){
+    if(isoOn()) return {x:(sx/ISO_A+sy/ISO_B)/2, y:(sy/ISO_B-sx/ISO_A)/2};
+    var k=viewK(); return {x:sx/k.kx, y:sy/k.ky};
+  }
+  /* 组件局部坐标 → 屏幕：先按 rot 旋转，再按当前视图投影（画法统一入口） */
+  function PR(c,lx,ly){ var q=localToPlan(c,lx,ly); return P(q.x,q.y); }
   /* 轴测管段：下移的阴影给厚度感 + 主体圆管 + 两端椭圆端面（圆柱封口） */
   function isoStroke(g,pts,sw,col,dash){
     var i,d='',d2='';
@@ -666,16 +743,51 @@
     g.appendChild(el('path',{d:d2,fill:'none',stroke:'rgba(15,23,42,.20)','stroke-width':sw,'stroke-linecap':'round','stroke-linejoin':'round'}));
     g.appendChild(el('path',{d:d,fill:'none',stroke:col,'stroke-width':sw,'stroke-linecap':'round','stroke-linejoin':'round',
       'stroke-dasharray':dash||''}));
+    /* [v209] 轴测管身也加一道高光（沿屏幕纵向上移一点），与平面视图的圆管质感一致 */
+    g.appendChild(el('path',{d:d,fill:'none',stroke:'rgba(255,255,255,.42)','stroke-width':Math.max(1.1,sw*0.28),
+      'stroke-linecap':'round','stroke-linejoin':'round',transform:'translate(0,'+(-sw*0.26)+')'}));
     [pts[0],pts[pts.length-1]].forEach(function(p){
       g.appendChild(el('ellipse',{cx:p.x,cy:p.y,rx:sw*0.5,ry:sw*0.33,fill:col,stroke:'rgba(255,255,255,.7)','stroke-width':1}));
     });
   }
-  /* 轴测多边形（法兰/变径体）：逐点投影后连线，形状自动变成斜平行四边形 */
-  function isoPoly(g,planPts,fill,stroke,dash){
-    var pts=planPts.map(function(p){ return P(p.x,p.y); });
-    var d=''; for(var i=0;i<pts.length;i++) d+=(i?' L ':'M ')+pts[i].x+' '+pts[i].y;
-    d+=' Z';
-    g.appendChild(el('path',{d:d,fill:fill,stroke:stroke,'stroke-width':1.5,'stroke-dasharray':dash||''}));
+  /* ===================================================================
+   *  [v210] 统一画法：几何一律用**组件局部坐标**定义，经 PR()（旋转 → 视图投影）
+   *  到屏幕，再决定描边质感（平面圆管高光 / 轴测圆柱阴影+端面）。
+   *  ------------------------------------------------------------------
+   *  ★ 为什么必须统一：v206 起平面与轴测各写了一遍坐标（pipeLine vs isoStroke），
+   *    v210 引入「旋转 rot」和「前视/侧视」后就是 4 视图 × 2 套坐标 = 8 处要同步改，
+   *    任何一处漏改都会变成「画转了、接口没转」或「轴测下变形」。
+   *    统一成一条路径后：几何只有一份，画法差异只剩描边质感。
+   *  ★ 依然坚持**逐点投影**而不是给 <g> 套 SVG matrix：前/侧视是非等比压缩，
+   *    套矩阵会把 stroke 一起压扁（管子变扁带子），只有逐点投影能保证线宽恒定。
+   * =================================================================== */
+  function pathOf(pts){
+    var d=''; for(var i=0;i<pts.length;i++) d+=(i?' L ':'M ')+pts[i].x+' '+pts[i].y; return d;
+  }
+  /* 局部坐标数组 → 屏幕多边形（法兰、变径体、堵头端盖都用它，四种视图都不变形） */
+  function projPoly(g,c,localPts,fill,stroke,dash,sw){
+    var pts=localPts.map(function(p){ return PR(c,p.x,p.y); });
+    g.appendChild(el('path',{d:pathOf(pts)+' Z',fill:fill,stroke:stroke||'none',
+      'stroke-width':sw||1.5,'stroke-dasharray':dash||'','stroke-linejoin':'round'}));
+  }
+  /* 管段（两点）：轴测走圆柱画法，其余视图走圆管画法 */
+  function drawSeg(g,c,p1,p2,col,sw,dash){
+    var a=PR(c,p1.x,p1.y), b=PR(c,p2.x,p2.y);
+    if(isoOn()) isoStroke(g,[a,b],sw,col,dash);
+    else pipeLine(g,a.x,a.y,b.x,b.y,col,sw);
+  }
+  /* 折线管段（弯头） */
+  function drawSegs(g,c,pts,col,sw,dash){
+    var sp=pts.map(function(p){ return PR(c,p.x,p.y); });
+    if(isoOn()) isoStroke(g,sp,sw,col,dash);
+    else pipePath(g,pathOf(sp),col,sw);
+  }
+  /* 标签沿管子**法线**外移：管子转到任何角度，标签都在管子的同一侧（不会压在管身上） */
+  function lblOff(a,b,amt){
+    var dx=b.x-a.x, dy=b.y-a.y, len=Math.hypot(dx,dy)||1;
+    var nx=-dy/len, ny=dx/len;
+    if(ny>0){ nx=-nx; ny=-ny; }
+    return {x:nx*amt, y:ny*amt};
   }
 
   /* [v206] 轴测底纹：两组与轴平行的细线（沿 x 轴 / 沿 y 轴），给「立体平放」的方位参照。
@@ -715,8 +827,9 @@
 
   function render(){
     ensureVp();
-    /* 1) 轴测模式下先铺一层等轴测网格底纹，帮助判断走向（平面模式不加，保持原样） */
-    if(isoOn()) drawIsoGrid();
+    /* 1) [v210] 非俯视（前视/侧视/轴测）都铺一层底纹网格：投影压缩后没有参照就看不出走向。
+          平面（俯视）保持原样不加，避免干扰既有观感。 */
+    if(S.view!=='plan') drawIsoGrid();
     // 2) 连接处的接驳节点
     S.connections.forEach(function(k){
       var ca=findComp(k.a.id), cb=findComp(k.b.id); if(!ca||!cb) return;
@@ -746,7 +859,7 @@
     vp.appendChild(lenLayer);
     S.components.forEach(function(c){
       if(c.kind!=='straight') return;
-      var q=P(c.x+c.len*SCALE+LH_OFF, c.y);
+      var q=PR(c, c.len*SCALE+LH_OFF, 0);       /* [v210] 随 rot 与视图一起走 */
       lenHandle(lenLayer,c.id,q.x,q.y);
     });
     /* 7) [v208] 拖动中的吸附提示（绿圈）：让「快要吸上了」在拖动全程可见 */
@@ -755,6 +868,38 @@
       vp.appendChild(el('circle',{cx:sh.x,cy:sh.y,r:11,fill:'none',stroke:'#16a34a','stroke-width':3,opacity:.9}));
       vp.appendChild(el('circle',{cx:sh.x,cy:sh.y,r:3.5,fill:'#16a34a'}));
     }
+  }
+
+  /* ===================================================================
+   *  [v209] 管身质感：把「一根扁平色条」画成「一根圆管」
+   *  ------------------------------------------------------------------
+   *  以前管身只有一条纯色 stroke，看起来像线条而不像管子。现在叠四层：
+   *    ① 暗色描边（sw+2.2）→ 让管子从背景和相邻管件里「立」出来；
+   *    ② 主色管身（sw）→ 仍是管径配色，DN 语义一眼可辨；
+   *    ③ 顶部高光（偏白、细）→ 圆柱受光面；
+   *    ④ 底部暗部（偏黑、更细）→ 圆柱背光面。
+   *  ★ 为什么不用 linearGradient：<line> 的 objectBoundingBox 高度为 0，
+   *    垂直渐变会直接失效；改成纯 stroke 叠加，任意缩放/轴测都不会变形。
+   *  ★ 高光/暗部沿**法线**偏移：水平管取上下、竖管取左右，光照方向始终正确。
+   * =================================================================== */
+  function pipeLine(g,x1,y1,x2,y2,col,sw){
+    var dx=x2-x1, dy=y2-y1, len=Math.hypot(dx,dy)||1;
+    var nx=-dy/len, ny=dx/len;
+    if(ny>0){ nx=-nx; ny=-ny; }                    /* 统一让法线朝「上/左上」，光源在右上 */
+    var hi=sw*0.27, lo=sw*0.32;
+    g.appendChild(el('line',{x1:x1,y1:y1,x2:x2,y2:y2,stroke:shade(col,-0.5),'stroke-width':sw+2.2,'stroke-linecap':'round'}));
+    g.appendChild(el('line',{x1:x1,y1:y1,x2:x2,y2:y2,stroke:col,'stroke-width':sw,'stroke-linecap':'round'}));
+    g.appendChild(el('line',{x1:x1+nx*hi,y1:y1+ny*hi,x2:x2+nx*hi,y2:y2+ny*hi,
+      stroke:'rgba(255,255,255,.50)','stroke-width':Math.max(1.1,sw*0.32),'stroke-linecap':'round'}));
+    g.appendChild(el('line',{x1:x1-nx*lo,y1:y1-ny*lo,x2:x2-nx*lo,y2:y2-ny*lo,
+      stroke:'rgba(2,6,23,.22)','stroke-width':Math.max(1,sw*0.26),'stroke-linecap':'round'}));
+  }
+  /* 折线版（弯头）：同一条 path 叠三层，拐角处用 round join 保住圆润 */
+  function pipePath(g,d,col,sw){
+    g.appendChild(el('path',{d:d,fill:'none',stroke:shade(col,-0.5),'stroke-width':sw+2.2,'stroke-linecap':'round','stroke-linejoin':'round'}));
+    g.appendChild(el('path',{d:d,fill:'none',stroke:col,'stroke-width':sw,'stroke-linecap':'round','stroke-linejoin':'round'}));
+    g.appendChild(el('path',{d:d,fill:'none',stroke:'rgba(255,255,255,.42)','stroke-width':Math.max(1.1,sw*0.28),
+      'stroke-linecap':'round','stroke-linejoin':'round',transform:'translate(0,'+(-sw*0.26)+')'}));
   }
 
   /* [v207] 直管右端的「调管长」手柄：拖动它 = 自由调节该段管长（下游跟着走）。
@@ -773,110 +918,94 @@
     g.appendChild(hg);
   }
 
+  /* 组件的局部外廓点（用于选中框 / 适应画布的包围盒）：随 rot 一起转、随视图一起投影 */
+  function localHull(c){
+    var pts=[{x:0,y:0}];
+    switch(c.kind){
+      case 'straight': pts.push({x:c.len*SCALE,y:0}); break;
+      case 'couple':   pts.push({x:28,y:0}); break;
+      case 'elbow90': case 'elbow45': pts.push({x:64,y:64}); break;
+      case 'reducer':  pts.push({x:56,y:0}); break;
+      case 'tee':      pts.push({x:96,y:0},{x:48,y:-60}); break;
+      case 'cap':      pts.push({x:18,y:0}); break;
+    }
+    return pts;
+  }
+  /* 半圆采样（堵头端盖）：局部点集 → 逐点投影，任何角度/视图都不变形 */
+  function capArc(rr){
+    var pts=[], i;
+    for(i=0;i<=16;i++){ var th=-Math.PI/2+Math.PI*i/16; pts.push({x:18+rr*Math.cos(th)*0.8, y:rr*Math.sin(th)}); }
+    return pts;
+  }
+
   function drawComp(c){
     var g=el('g',{class:'pa-comp','data-id':c.id,style:'cursor:move;'});
     if(S.selected===c.id) g.setAttribute('filter','drop-shadow(0 0 0 #16a34a)');
     var sel = S.selected===c.id;
     var col = LIB[c.kind].cat==='pipe'? dnColor(c.dn) : (c.kind==='reducer'? '#0d9488' : dnColor(c.dn||110));
     var sw = LIB[c.kind].cat==='pipe'? dnWidth(c.dn) : dnWidth(c.dn||110);
-    var w=c.x,h=c.y;
-
-    /* [v206] 轴测：同一份几何，逐点投影后按「圆管」画（阴影+主体+两端椭圆端面） */
-    if(isoOn()){
-      var mid=function(a,b){ return {x:(a.x+b.x)/2,y:(a.y+b.y)/2}; };
-      if(c.kind==='straight'){
-        var L=c.len*SCALE;
-        var p1=P(w,h), p2=P(w+L,h);
-        isoStroke(g,[p1,p2],sw,col);
-        g.appendChild(labelMid(mid(p1,p2).x,mid(p1,p2).y-sw/2-7,c.dn+' · '+fmt1(c.len)+'m',col));
-      } else if(c.kind==='couple'){
-        isoStroke(g,[P(w,h),P(w+28,h)],sw,col);
-        isoPoly(g,[{x:w+8,y:h-sw/2-3},{x:w+20,y:h-sw/2-3},{x:w+20,y:h+sw/2+3},{x:w+8,y:h+sw/2+3}],'#fff',col);
-      } else if(c.kind==='elbow90'){
-        var a1=P(w,h),a2=P(w+64,h),a3=P(w+64,h+64);
-        isoStroke(g,[a1,a2,a3],sw,col);
-        g.appendChild(labelMid(a3.x+10,a3.y+14,c.dn+'弯',col));
-      } else if(c.kind==='elbow45'){
-        var b1=P(w,h),b2=P(w+64,h+64);
-        isoStroke(g,[b1,b2],sw,col);
-        g.appendChild(labelMid(b2.x+10,b2.y+14,c.dn+'弯',col));
-      } else if(c.kind==='reducer'){
-        var rb=dnWidth(c.bigDn), rs=dnWidth(c.smallDn);
-        isoPoly(g,[{x:w,y:h-rb/2},{x:w,y:h+rb/2},{x:w+56,y:h+rs/2},{x:w+56,y:h-rs/2}],'#ccfbf1','#0f766e','4 3');
-        var rm=mid(P(w,h),P(w+56,h));
-        g.appendChild(labelMid(rm.x,rm.y-rb/2-8,c.bigDn+'→'+c.smallDn,'#0f766e'));
-      } else if(c.kind==='tee'){
-        var mw=dnWidth(c.mainDn), bw=dnWidth(c.branchDn);
-        isoStroke(g,[P(w,h),P(w+96,h)],mw,col);
-        isoStroke(g,[P(w+48,h),P(w+48,h-60)],bw,dnColor(c.branchDn));
-        var tm=P(w+48,h-60);
-        g.appendChild(labelMid(tm.x,tm.y-14,c.mainDn+'⊢'+c.branchDn,dnColor(c.branchDn)));
-      } else if(c.kind==='cap'){
-        isoStroke(g,[P(w,h),P(w+18,h)],sw,col);
-        var ce=P(w+18,h);
-        g.appendChild(el('ellipse',{cx:ce.x,cy:ce.y,rx:sw*0.5+4,ry:sw*0.5+2,fill:'#fff',stroke:col,'stroke-width':2.5}));
-      }
-      if(sel){
-        var q0=P(w,h), q1=P(w+96,h+64);
-        var xs=[q0.x,q1.x], ys=[q0.y,q1.y];
-        g.appendChild(el('rect',{x:Math.min(xs[0],xs[1])-8,y:Math.min(ys[0],ys[1])-12,
-          width:Math.abs(xs[1]-xs[0])+16,height:Math.abs(ys[1]-ys[0])+24,rx:8,
-          fill:'none',stroke:'#16a34a','stroke-width':1.5,'stroke-dasharray':'5 4',opacity:.7}));
-      }
-      LIB[c.kind].ports.forEach(function(side){
-        var p=portPos(c,side), q=P(p.x,p.y);
-        g.appendChild(el('circle',{cx:q.x,cy:q.y,r:6,fill:'#fff',stroke:dnColor(portDn(c,side)),
-          'stroke-width':2.5,class:'pa-port','data-id':c.id,'data-side':side,style:'cursor:crosshair;'}));
-      });
-      vp.appendChild(g);
-      return;
-    }
+    var L=function(lx,ly){ return PR(c,lx,ly); };
 
     if(c.kind==='straight'){
-      var L=c.len*SCALE;
-      g.appendChild(el('line',{x1:w,y1:h,x2:w+L,y2:h,stroke:col,'stroke-width':sw,'stroke-linecap':'round'}));
-      g.appendChild(labelMid(w+L/2,h-sw/2-6,c.dn+' · '+fmt1(c.len)+'m',col));
+      var LL=c.len*SCALE, a=L(0,0), b=L(LL,0);
+      drawSeg(g,c,{x:0,y:0},{x:LL,y:0},col,sw);
+      var o=lblOff(a,b,sw/2+8);
+      g.appendChild(labelMid((a.x+b.x)/2+o.x,(a.y+b.y)/2+o.y,c.dn+' · '+fmt1(c.len)+'m',col));
     } else if(c.kind==='couple'){
-      g.appendChild(el('line',{x1:w,y1:h,x2:w+28,y2:h,stroke:col,'stroke-width':sw,'stroke-linecap':'round'}));
-      g.appendChild(el('rect',{x:w+8,y:h-sw/2-3,width:12,height:sw+6,rx:3,fill:'#fff',stroke:col,'stroke-width':1.5}));
+      drawSeg(g,c,{x:0,y:0},{x:28,y:0},col,sw);
+      projPoly(g,c,[{x:8,y:-sw/2-3},{x:20,y:-sw/2-3},{x:20,y:sw/2+3},{x:8,y:sw/2+3}],'#fff',shade(col,-0.35),'',1.6);
     } else if(c.kind==='elbow90'){
-      g.appendChild(el('path',{d:'M '+w+' '+h+' H '+(w+64)+' V '+(h+64),fill:'none',stroke:col,'stroke-width':sw,'stroke-linecap':'round','stroke-linejoin':'round'}));
-      g.appendChild(labelMid(w+64+6,h+64,c.dn+'弯',col));
+      drawSegs(g,c,[{x:0,y:0},{x:64,y:0},{x:64,y:64}],col,sw);
+      var e9=L(64,64); g.appendChild(labelMid(e9.x+10,e9.y+14,c.dn+'弯',col));
     } else if(c.kind==='elbow45'){
-      g.appendChild(el('line',{x1:w,y1:h,x2:w+64,y2:h+64,stroke:col,'stroke-width':sw,'stroke-linecap':'round'}));
-      g.appendChild(labelMid(w+64+6,h+64,c.dn+'弯',col));
+      drawSeg(g,c,{x:0,y:0},{x:64,y:64},col,sw);
+      var e4=L(64,64); g.appendChild(labelMid(e4.x+10,e4.y+14,c.dn+'弯',col));
     } else if(c.kind==='reducer'){
       var swb=dnWidth(c.bigDn), sws=dnWidth(c.smallDn);
-      var pts=[w+','+(h-swb/2), w+','+(h+swb/2), (w+56)+','+(h+sws/2), (w+56)+','+(h-sws/2)].join(' ');
       var grad=el('linearGradient',{id:'rg_'+c.id,x1:'0',y1:'0',x2:'1',y2:'0'});
       grad.appendChild(el('stop',{offset:'0',['stop-color']:dnColor(c.bigDn)}));
       grad.appendChild(el('stop',{offset:'1',['stop-color']:dnColor(c.smallDn)}));
       g.appendChild(grad);
-      g.appendChild(el('polygon',{points:pts,fill:'url(#rg_'+c.id+')',stroke:'#0f766e','stroke-width':1.5,'stroke-dasharray':'4 3'}));
-      g.appendChild(labelMid(w+28,h-swb/2-8,c.bigDn+'→'+c.smallDn,'#0f766e'));
+      projPoly(g,c,[{x:0,y:-swb/2},{x:0,y:swb/2},{x:56,y:sws/2},{x:56,y:-sws/2}],
+        'url(#rg_'+c.id+')','#0f766e','4 3',1.5);
+      var rp=L(28,-swb/2-8);
+      g.appendChild(labelMid(rp.x,rp.y,c.bigDn+'→'+c.smallDn,'#0f766e'));
     } else if(c.kind==='tee'){
       var mw=dnWidth(c.mainDn), bw=dnWidth(c.branchDn);
-      g.appendChild(el('line',{x1:w,y1:h,x2:w+96,y2:h,stroke:col,'stroke-width':mw,'stroke-linecap':'round'}));
-      g.appendChild(el('line',{x1:w+48,y1:h,x2:w+48,y2:h-60,stroke:dnColor(c.branchDn),'stroke-width':bw,'stroke-linecap':'round'}));
-      g.appendChild(labelMid(w+48,h-66,c.mainDn+'⊢'+c.branchDn,dnColor(c.branchDn)));
+      drawSeg(g,c,{x:0,y:0},{x:96,y:0},col,mw);
+      drawSeg(g,c,{x:48,y:0},{x:48,y:-60},dnColor(c.branchDn),bw);
+      var tp=L(48,-60); g.appendChild(labelMid(tp.x,tp.y-12,c.mainDn+'⊢'+c.branchDn,dnColor(c.branchDn)));
     } else if(c.kind==='cap'){
-      g.appendChild(el('line',{x1:w,y1:h,x2:w+18,y2:h,stroke:col,'stroke-width':sw,'stroke-linecap':'round'}));
-      g.appendChild(el('path',{d:'M '+(w+18)+' '+(h-sw/2-2)+' a '+ (sw/2+5) +' '+(sw/2+5)+' 0 0 1 0 '+(sw+4+4),fill:'none',stroke:col,'stroke-width':2.5}));
+      drawSeg(g,c,{x:0,y:0},{x:18,y:0},col,sw);
+      projPoly(g,c,capArc(sw/2+5),'#fff',shade(col,-0.45),'',2.5);
     }
 
-    if(sel){ g.appendChild(el('rect',{x:w-6,y:h-22,width:120,height:44,rx:8,fill:'none',stroke:'#16a34a','stroke-width':1.5,'stroke-dasharray':'5 4',opacity:.7})); }
+    /* 选中框：按**投影后的**外廓点取包围盒（旋转 / 前侧视 / 轴测都不会框错） */
+    if(sel){
+      var bb={x0:1e9,y0:1e9,x1:-1e9,y1:-1e9};
+      localHull(c).forEach(function(p){ var q=L(p.x,p.y);
+        bb.x0=Math.min(bb.x0,q.x); bb.y0=Math.min(bb.y0,q.y);
+        bb.x1=Math.max(bb.x1,q.x); bb.y1=Math.max(bb.y1,q.y); });
+      var pd=sw/2+14;
+      g.appendChild(el('rect',{x:bb.x0-pd,y:bb.y0-pd,width:Math.max(24,(bb.x1-bb.x0)+pd*2),
+        height:Math.max(24,(bb.y1-bb.y0)+pd*2),rx:8,
+        fill:'none',stroke:'#16a34a','stroke-width':1.5,'stroke-dasharray':'5 4',opacity:.7}));
+    }
 
-    // 端口把手（可拖拽接驳）
+    /* 端口把手（可拖拽接驳）—— portPos 已含 rot，再走一次视图投影即可 */
     LIB[c.kind].ports.forEach(function(side){
-      var p=portLocal(c,side), px=w+p.x, py=h+p.y;
-      var dot=el('circle',{cx:px,cy:py,r:6,fill:'#fff',stroke:dnColor(portDn(c,side)),'stroke-width':2.5,class:'pa-port','data-id':c.id,'data-side':side,style:'cursor:crosshair;'});
-      g.appendChild(dot);
+      var p=portPos(c,side), q=P(p.x,p.y);
+      g.appendChild(el('circle',{cx:q.x,cy:q.y,r:6,fill:'#fff',stroke:dnColor(portDn(c,side)),
+        'stroke-width':2.5,class:'pa-port','data-id':c.id,'data-side':side,style:'cursor:crosshair;'}));
     });
 
     vp.appendChild(g);
   }
   function labelMid(x,y,txt,col){
-    var t=el('text',{x:x,y:y,fill:col||'#475569','font-size':11,'font-weight':700,'text-anchor':'middle','font-family':'Microsoft YaHei,sans-serif'});
+    /* [v209] 白描边打底（paint-order:stroke 先描后填）：管件标签压在管子/网格上也读得清 */
+    var t=el('text',{x:x,y:y,fill:col||'#475569','font-size':11,'font-weight':700,'text-anchor':'middle',
+      'font-family':'Microsoft YaHei,sans-serif','paint-order':'stroke',
+      stroke:'rgba(255,255,255,.92)','stroke-width':3,'stroke-linejoin':'round'});
     t.textContent=txt; return t;
   }
   function fmt1(v){ return (Math.round((+v||0)*10)/10); }
@@ -885,7 +1014,7 @@
    *  交互：拖拽组件 / 端口接驳 / 平移 / 缩放
    * =================================================================== */
   var drag={mode:null,id:null,side:null,dx:0,dy:0,tmp:null,sx:0,sy:0,
-    snapHint:null,len0:0,px0:0};   /* [v207] len0/px0=调管长；[v208] snapHint=拖动中的吸附提示 */
+    snapHint:null,len0:0,px0:0,py0:0};   /* [v207] len0/px0=调管长；[v208] snapHint=拖动中的吸附提示；[v210] py0 */
   /* [v206] 返回值一律是**规划坐标**（屏幕 → 反轴测投影），
      这样命中判定、拖拽、吸附全部照旧按规划坐标算，轴测只是「画法」不影响数据。 */
   function svgPoint(evt){
@@ -905,7 +1034,7 @@
     var p=svgPoint(e);
     if(lenEl){
       var lc=findComp(lenEl.getAttribute('data-id')); if(!lc) return;
-      drag.mode='len'; drag.id=lc.id; drag.len0=lc.len; drag.px0=p.x;
+      drag.mode='len'; drag.id=lc.id; drag.len0=lc.len; drag.px0=p.x; drag.py0=p.y;
       selectComp(lc.id); svg.setPointerCapture(e.pointerId); return;
     }
     if(portEl){
@@ -927,10 +1056,13 @@
   svg.addEventListener('pointermove',function(e){
     var p=svgPoint(e);
     if(drag.mode==='len'){
-      /* [v207] 沿管道轴向（= 规划坐标的 x 方向）拖动改管长；轴测视图下 svgPoint 已反投影，
-         鼠标沿 iso 斜向走，换算回来仍然只动 x ⇒ 手感与平面完全一致。 */
+      /* [v207] 沿管道轴向拖动改管长；轴测/前/侧视下 svgPoint 已反投影回规划坐标，
+         [v210] 再把鼠标位移**投影到管子轴向**（rot 方向）—— 管子转到任意角度，
+         拖手柄都只改长度、不会把管子拽歪。 */
       var lc=findComp(drag.id); if(!lc) return;
-      var raw=(drag.len0*SCALE+(p.x-drag.px0))/SCALE;
+      var ax=axisVec(lc);
+      var along=(p.x-drag.px0)*ax.x + (p.y-drag.py0)*ax.y;
+      var raw=(drag.len0*SCALE+along)/SCALE;
       var nl=Math.max(0.1,Math.min(500,Math.round(raw*10)/10));
       if(nl===lc.len) return;
       setPipeLen(lc,nl);
@@ -942,7 +1074,8 @@
          以前只在松手那一刻判定、全程零反馈 ⇒ 用户拖过去压根不知道能不能吸上，
          手一松就偏了（实测 24 屏幕px 之外就接不上），体感就是「不会自动吸附」。 */
       drag.snapHint=null;
-      var hit=snapCandidate(drag.id, snapRadiusPx());
+      /* [v210] 自由移动模式下不吸附：已接好的管件要能干脆地挪开，而不是一放手又被粘回去 */
+      var hit=S.moveMode? null : snapCandidate(drag.id, snapRadiusPx());
       if(hit){
         var hc=findComp(hit.id), hp=portPos(hc,hit.side), hl=portLocal(c,hit.selfSide);
         moveWithBranch(c, hp.x-hl.x, hp.y-hl.y);
@@ -984,7 +1117,7 @@
       drag.tmp=null;
     } else if(drag.mode==='move'){
       // 落点接驳：拖动过程中已实时磁吸对位，这里正式建立连接
-      var made=autoSnap(drag.id);
+      var made=S.moveMode? 0 : autoSnap(drag.id);
       if(made) toast('已自动接驳 '+made+' 处');
       pushHistory(); recompute();
     }
@@ -1060,14 +1193,21 @@
       });
     }
   }
-  /* 改管长：以 L 口为锚，把下游整条链平移同样距离，避免接口被拉开成缝 */
+  /* [v210] 管子轴向单位向量（沿 rot 方向）：改管长 / 拖手柄都要按**轴向**位移，
+     不能写死 x 方向 —— 否则管件旋转 90° 之后变成竖管，下游还被横向平移，接口直接拉开。 */
+  function axisVec(c){
+    var r=((+c.rot||0))*Math.PI/180;
+    return {x:Math.cos(r), y:Math.sin(r)};
+  }
+  /* 改管长：以 L 口为锚，把下游整条链沿轴向平移同样距离，避免接口被拉开成缝 */
   function setPipeLen(c, newLen){
     if(!c) return;
     newLen=Math.max(0.1, Math.min(500, Math.round((+newLen||0.1)*10)/10));
     var dpx=(newLen-c.len)*SCALE;
     c.len=newLen;
     if(Math.abs(dpx)>1e-9){
-      collectBranch(c.id,'L').forEach(function(id){ var b=findComp(id); if(b) b.x+=dpx; });
+      var ax=axisVec(c);
+      collectBranch(c.id,'L').forEach(function(id){ var b=findComp(id); if(b){ b.x+=dpx*ax.x; b.y+=dpx*ax.y; } });
     }
   }
 
@@ -1158,9 +1298,84 @@
   }
 
   /* ===================================================================
+   *  [v210] 复制 / 旋转 / 移动
+   *  ------------------------------------------------------------------
+   *  ① 复制 duplicateComp：深拷贝整件（口径 / 管长 / 变径与三通的分口径 / 朝向 rot
+   *     全带上），**复制体不继承连接**（否则两个组件共用同一条 connection，删一个会
+   *     把另一个的拓扑也弄乱，且两件重合看不出复制成功）⇒ 错开 36px 落位，拖到别处即可。
+   *  ② 旋转 rotateComp：绕**左端 L 口**（局部原点）转 rot 度。转完必须 cascadeAlign
+   *     重新排齐下游 —— 端口位置随旋转变了，不排齐就会在接口处拉开一道缝。
+   *  ③ 移动：拖动本体即移动（v208 已升级为整串联动 + 拖动中实时磁吸）；这里补
+   *     方向键微调（±1px / Shift ±10px）与「自由移动模式」（关掉吸附，专用于挪开已接件）。
+   * =================================================================== */
+  function duplicateComp(id){
+    var c=findComp(id); if(!c) return null;
+    var n=JSON.parse(JSON.stringify(c));
+    n.id=uid('c');
+    n.x=c.x+36; n.y=c.y+36;      /* 错开落位：原地重合的话既看不出复制成功，也抓不到底下那件 */
+    S.components.push(n);
+    S.selected=n.id;
+    pushHistory(); recompute(); render(); renderProps();
+    toast('已复制「'+LIB[c.kind].label+'」（Ctrl+D 可继续复制）');
+    return n;
+  }
+  function rotateComp(id, deg){
+    var c=findComp(id); if(!c) return false;
+    var d=((+deg||0)%360+360)%360;
+    c.rot=((+c.rot||0)+d)%360;
+    cascadeAlign(c.id);
+    pushHistory(); recompute(); render(); renderProps();
+    toast('已旋转 '+d+'°（当前 '+c.rot+'°，绕左端接口旋转）');
+    return true;
+  }
+  /* 方向键微调：连续按一串只在**停手后**压一次历史，否则撤销要按几十次才退回去 */
+  var nudgeTimer=null;
+  function nudgeComp(id, dx, dy){
+    var c=findComp(id); if(!c) return false;
+    moveWithBranch(c, c.x+dx, c.y+dy);
+    recompute(); render();
+    clearTimeout(nudgeTimer);
+    nudgeTimer=setTimeout(function(){ pushHistory(); }, 450);
+    return true;
+  }
+  function setMoveMode(on){
+    S.moveMode=!!on;
+    var b=document.getElementById('btnMove');
+    if(b) b.classList.toggle('primary', S.moveMode);
+    toast(S.moveMode? '自由移动：已关闭自动吸附（可把已接好的管件挪开）'
+                    : '自动吸附已恢复：拖到附近会自动接驳');
+    return S.moveMode;
+  }
+
+  /* ===================================================================
+   *  [v210] 四视图切换：俯视 / 前视 / 侧视 / 轴测
+   *  ------------------------------------------------------------------
+   *  与 v206 同一条铁律：只改 S.view + 重绘，组件坐标 / 管长 / 管径 / 连接 / 水力
+   *  一动不动 ⇒ 四种视图下拼装关系与计算结果完全相同（切换后自动「适应画布」，
+   *  因为前/侧视压缩后包围盒尺寸变了，不重新适应会被切边）。
+   * =================================================================== */
+  var VIEWS=['plan','front','side','iso'];
+  function setView(v){
+    if(VIEWS.indexOf(v)<0) v='plan';
+    S.view=v;
+    var segs=document.querySelectorAll('#segView .vw');
+    for(var i=0;i<segs.length;i++) segs[i].classList.toggle('on', segs[i].getAttribute('data-view')===v);
+    render();
+    document.getElementById('btnFit').click();
+    return S.view;
+  }
+  (function(){
+    var segs=document.querySelectorAll('#segView .vw');
+    for(var i=0;i<segs.length;i++){
+      segs[i].addEventListener('click',function(){ setView(this.getAttribute('data-view')); });
+    }
+  })();
+
+  /* ===================================================================
    *  [v207] 画布右键菜单
    *    · 管道（cat='pipe'）右键 → 直接选直径，改完相邻配件自动跟随
    *    · 配件（cat='fitting'）右键 → 直接切换选型（原位替换，尽量保住原连接）
+   *    · [v210] 另加 复制 / 旋转，与工具条、快捷键共用同一条实现
    *  菜单用鼠标坐标定位在 .pa-canvas-wrap 内；点到别处 / Esc / 再次操作画布都会关掉。
    * =================================================================== */
   var wrapEl=document.getElementById('paWrap');
@@ -1213,7 +1428,10 @@
         h+='<div class="pa-menu-t">支管 DN（下）</div>'+menuChips(DN_LIST,c.branchDn,'branchdn');
       }
     }
+    /* [v210] 复制 / 旋转也放进右键菜单：手在画布上时不必绕去工具条 */
     h+='<div class="pa-menu-sep"></div><div class="pa-menu-list">'
+      +'<div class="pa-menu-i" data-act="dup"><span class="pa-glyph">⧉</span>复制该管件<small>Ctrl+D</small></div>'
+      +'<div class="pa-menu-i" data-act="rot"><span class="pa-glyph">↻</span>旋转 90°<small>R</small></div>'
       +'<div class="pa-menu-i danger" data-act="del"><span class="pa-glyph">🗑</span>删除该管件</div></div>';
     menuEl.setAttribute('data-id',c.id);
     menuEl.innerHTML=h;
@@ -1232,6 +1450,8 @@
     var c=findComp(menuEl.getAttribute('data-id'));
     closeMenu(); if(!c) return;
     if(act==='del'){ deleteComp(c.id); return; }
+    if(act==='dup'){ duplicateComp(c.id); return; }
+    if(act==='rot'){ rotateComp(c.id,90); return; }
     if(act==='kind'){ switchKind(c.id,val); return; }
     if(act==='dn'){ setPipeDn(c,+val); return; }
     /* 变径/三通的分口径：只改对应那一段的性质，不动其它端口 */
@@ -1421,7 +1641,9 @@
     var x = sx!=null? sx : 70 + (S.components.length%5)*46;
     var y = sy!=null? sy : 120 + (S.components.length%4)*54;
     var c=addComp(kind,x,y);
-    var n = snap? smartSnapIt(c.id, snapRadiusPx()) : 0;
+    /* [v210] 自由移动模式下连「拖入即吸附」也一起关掉 —— 否则刚放下的管件照样被粘住，
+       用户会以为开关失效（一处开关必须管住所有吸附入口，不能只管拖动）。 */
+    var n = (snap && !S.moveMode)? smartSnapIt(c.id, snapRadiusPx()) : 0;
     pushHistory(); recompute(); selectComp(c.id);
     if(n) toast('已自动接驳 '+n+' 处');
     return c;
@@ -1461,16 +1683,18 @@
     S.panY=(rect.height-h*S.zoom)/2 - (miny-pad)*S.zoom;
     applyTransform(); document.getElementById('paZoomTxt').textContent='缩放 '+Math.round(S.zoom*100)+'%';
   });
-  /* [v206] 视图切换：平面图 ⇄ 轴测图。
-     ★ 只改 S.view + 重绘，组件坐标一动不动 ⇒ 两种视图下拼装关系、水力、材料完全相同；
-       切换后自动「适应画布」（轴测投影后横向会变宽，不重新适应会被切边）。 */
-  document.getElementById('btnIso').addEventListener('click',function(){
-    var toIso=S.view!=='iso';
-    S.view=toIso?'iso':'plan';
-    this.textContent=toIso?'▤ 平面图':'⛶ 轴测图';
-    this.classList.toggle('primary',toIso);   /* 轴测态高亮，一眼看出当前是哪个视图 */
-    render();
-    document.getElementById('btnFit').click();
+  /* [v210] 复制 / 旋转 / 自由移动：三个按钮与快捷键、右键菜单共用 duplicateComp /
+     rotateComp / setMoveMode，改一处三处同时生效（不存在「按钮能复制、快捷键不能」）。 */
+  document.getElementById('btnDup').addEventListener('click',function(){
+    if(!S.selected){ toast('请先选中一个管件','warn'); return; }
+    duplicateComp(S.selected);
+  });
+  document.getElementById('btnRot').addEventListener('click',function(e){
+    if(!S.selected){ toast('请先选中一个管件','warn'); return; }
+    rotateComp(S.selected, e.shiftKey? -90 : 90);
+  });
+  document.getElementById('btnMove').addEventListener('click',function(){
+    setMoveMode(!S.moveMode);
   });
   document.getElementById('btnZoomIn').addEventListener('click',function(){ S.zoom=Math.min(3,S.zoom*1.15);applyTransform();document.getElementById('paZoomTxt').textContent='缩放 '+Math.round(S.zoom*100)+'%'; });
   document.getElementById('btnZoomOut').addEventListener('click',function(){ S.zoom=Math.max(0.3,S.zoom/1.15);applyTransform();document.getElementById('paZoomTxt').textContent='缩放 '+Math.round(S.zoom*100)+'%'; });
@@ -1481,14 +1705,31 @@
   document.getElementById('inSDR').addEventListener('change',function(){ S.sdr=+this.value; recompute(); });
   document.getElementById('inLocal').addEventListener('change',function(){ S.includeLocal=this.checked; recompute(); });
 
-  // 删除键
+  // 删除键 / [v210] 复制·旋转·移动快捷键
+  function typing(){ var a=document.activeElement; return !!a && (a.tagName==='INPUT'||a.tagName==='SELECT'||a.tagName==='TEXTAREA'); }
   window.addEventListener('keydown',function(e){
     if(e.key==='Escape'){ closeMenu(); return; }   /* [v207] 右键菜单 Esc 关闭 */
-    if((e.key==='Delete'||e.key==='Backspace') && S.selected && document.activeElement.tagName!=='INPUT' && document.activeElement.tagName!=='SELECT'){
-      deleteComp(S.selected); e.preventDefault();
+    if((e.key==='Delete'||e.key==='Backspace') && S.selected && !typing()){
+      deleteComp(S.selected); e.preventDefault(); return;
     }
-    if((e.ctrlKey||e.metaKey)&&e.key==='z'){ document.getElementById('btnUndo').click(); e.preventDefault(); }
-    if((e.ctrlKey||e.metaKey)&&e.key==='y'){ document.getElementById('btnRedo').click(); e.preventDefault(); }
+    if((e.ctrlKey||e.metaKey)&&e.key==='z'){ document.getElementById('btnUndo').click(); e.preventDefault(); return; }
+    if((e.ctrlKey||e.metaKey)&&e.key==='y'){ document.getElementById('btnRedo').click(); e.preventDefault(); return; }
+    /* [v210] Ctrl+D 复制 */
+    if((e.ctrlKey||e.metaKey)&&(e.key==='d'||e.key==='D')){
+      if(S.selected){ duplicateComp(S.selected); e.preventDefault(); } return;
+    }
+    if(typing()) return;
+    /* [v210] R 旋转（Shift 反向）；必须排除 Ctrl/Meta/Alt —— Ctrl+R 是浏览器刷新，不能拦 */
+    if((e.key==='r'||e.key==='R') && !e.ctrlKey && !e.metaKey && !e.altKey){
+      if(S.selected){ rotateComp(S.selected, e.shiftKey? -90 : 90); e.preventDefault(); } return;
+    }
+    /* [v210] 方向键微调移动（Shift 加速：10px/次）；走 moveWithBranch ⇒ 下游整串一起走 */
+    if(S.selected && ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].indexOf(e.key)>=0){
+      var st=e.shiftKey?10:1;
+      var dx=(e.key==='ArrowLeft'? -st : e.key==='ArrowRight'? st : 0);
+      var dy=(e.key==='ArrowUp'? -st : e.key==='ArrowDown'? st : 0);
+      nudgeComp(S.selected,dx,dy); e.preventDefault();
+    }
   });
 
   // 拓扑JSON 展开
@@ -1551,6 +1792,11 @@
     getTopology:function(){ return buildTopology(computeHydraulic()); },
     /* [v207] 交互内核对外暴露：给自动化验证走**真实入口**（不是手工塞数据造假数据） */
     setPipeDn:setPipeDn, setPipeLen:setPipeLen, switchKind:switchKind,
+    /* [v210] 复制 / 旋转 / 移动 / 视图 */
+    duplicateComp:duplicateComp, rotateComp:rotateComp, nudgeComp:nudgeComp,
+    setMoveMode:setMoveMode, getMoveMode:function(){ return !!S.moveMode; },
+    setView:setView, getView:function(){ return S.view; },
+    portLocalOf:function(id,side){ var c=findComp(id); return c? portLocal(c,side) : null; },
     smartSnap:smartSnapIt, propagateDn:propagateDn, openMenuAt:function(id,clientX,clientY){
       var c=findComp(id); if(!c) return false; selectComp(c.id); openMenu(clientX,clientY,c); return true; },
     closeMenu:closeMenu,
