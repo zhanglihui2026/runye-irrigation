@@ -17857,10 +17857,17 @@ ppPullLiftDh();                                              // 首屏对齐一�
        的 GCJ-02 经纬度，反投结果与地图页 btnSavePlot 存的 polyLatLng 同坐标系。 */
     try{
       var base=window.__runyeGeoBase;
+      /* [v217] measuredPolygon 自 v217 起是**垂直镜像后**的图面坐标
+         （y = −(lat−refLat)·mlat，见 applyMapMeasuredArea），故反算经纬度必须取反号：
+         lat = refLat − y/mlat。仍写成 `+` 会把地块南北整个翻过去 ⇒ 在线地图叠加的框线跟着翻。
+         ★ 刻意**不改数据来源**（仍用 measuredPolygon）：改成读 __runyeMapFramePoly 会让
+           polyLatLng 不再随旋转/镜像变化 ⇒ 既有闸门 R2「旋转后框线与基线一致」退化成恒绿
+           （实测 J2 注入不再命中），属于把判据改废。这里的取舍：保住闸门有效性。
+         （base 存在 ⟺ 来源是地图回传 ⟺ measuredPolygon 已镜像，故减号在此分支恒正确。） */
       if(base && isFinite(base.refLat) && isFinite(base.refLng) && window.measuredPolygon && window.measuredPolygon.length>=3){
         var R=6378137, mlat=R*Math.PI/180, cosLat=Math.cos(base.refLat*Math.PI/180);
         var pll=window.measuredPolygon.map(function(pt){
-          return [ +(base.refLat + pt.y/mlat).toFixed(7), +(base.refLng + pt.x/(mlat*cosLat)).toFixed(7) ];
+          return [ +(base.refLat - pt.y/mlat).toFixed(7), +(base.refLng + pt.x/(mlat*cosLat)).toFixed(7) ];
         });
         plot.polyLatLng = pll;
         var sl=0,sn=0; pll.forEach(function(q){ sl+=q[0]; sn+=q[1]; });
@@ -18670,7 +18677,16 @@ bindUI();
           xs.push((p[1] - lngs[0]) * mlat * cosLat);
           ys.push((p[0] - clat) * mlat);
         });
-        window.measuredPolygon = xs.map(function(x,i){return {x:x, y:ys[i]};});
+        /* [v217 2026-10-04 用户要求] 在线地图回传的地块自动**垂直镜像**一次：
+           上面 ys=(lat−clat)·mlat 把「北」编成了 +y，而画布 y 轴向下 ⇒ 地图里「北在上」的
+           地块到二级页是上下颠倒的（图片测量路径用屏幕像素、天然正确，只有 map 路径被翻）。
+           ⇒ 供图面用的 measuredPolygon 取 −y（北 → 屏幕上方），与在线地图大体方向对应。
+            ★ 只翻「供图面」的这一份：__runyeMapFramePoly 仍是地图口径（北 = +y，不翻），
+              反投段 fInv 是仿射逆（det 取 abs）⇒ 反射同样成立，地图侧方位自动不变。
+            ★ 幂等：本函数只在 localStorage['runyeMeasuredArea'] 存在时动作，且末尾 removeItem
+              （每次「回传」恰好消费一次）；刷新/读存档走 setCurrent / ryAutoRestoreProject，
+              读的都是已定向好的数据 ⇒ 不会叠加第二次。 */
+        window.measuredPolygon = xs.map(function(x,i){return {x:x, y:-ys[i]};});
         /* [map-enhance 2026-09-29] 「地图口径」地块顶点：二级页旋转/镜像一律不得改动它，
            反投时以它为基准把整张图还原到地图方位（见 tlAutoGenerate 反投段）。 */
         window.__runyeMapFramePoly = xs.map(function(x,i){return {x:x, y:ys[i]};});
@@ -18698,8 +18714,9 @@ bindUI();
               id:s.id, name:s.name||('子地块'+(si+1)), mu:s.mu, sqm:s.sqm, crop:s.crop,
               polyLatLng: ll.map(function(q){return [+q[0],+q[1]];}),
               center: s.center || null,
+              /* [v217] 与主地块同一口径：y 取反（垂直镜像），否则子地块与外框上下错位 */
               poly: ll.map(function(q){
-                return { x:+((q[1]-_b.refLng)*_mlat*_cos).toFixed(2), y:+((q[0]-_b.refLat)*_mlat).toFixed(2) };
+                return { x:+((q[1]-_b.refLng)*_mlat*_cos).toFixed(2), y:-(+((q[0]-_b.refLat)*_mlat).toFixed(2)) };
               })
             };
           });
