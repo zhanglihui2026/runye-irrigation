@@ -409,8 +409,10 @@ const run = (k) => !ONLY.length || ONLY.indexOf(k) >= 0;
   check('⑤h 水力结果不变（ΔH ' + totV0 + '）',
     (await R(() => document.getElementById('rTot').textContent)) === totV0);
 
-  /* 前视压缩 Y、侧视压缩 X：用**渲染出来的端口坐标**验证（画法层面的真证据） */
-  const c1 = (await getComps())[1];           // elbow90：L 与 R 口之间 Δx=64、Δy=64
+  /* 前视压缩 Y、侧视压缩 X：用**渲染出来的端口坐标**验证（画法层面的真证据）。
+     ★ 基准值不写死 64：弯头画廓尺寸以后还会调（v211 已从 64 缩到 40），
+       先在俯视下量出 Δ 作为基准，再对比前/侧视的压缩量 —— 自校准，改尺寸不用改脚本。 */
+  const c1 = (await getComps())[1];           // elbow90：L 与 R 口
   const K = Math.cos(70 * Math.PI / 180);     // ≈0.342
   const dOf = async () => {
     const ps = await portScreen();
@@ -423,12 +425,12 @@ const run = (k) => !ONLY.length || ONLY.indexOf(k) >= 0;
   const dFront = await dOf();
   await clickView('side');
   const dSide = await dOf();
-  check('⑤i 俯视：Δx=64 / Δy=64（基准不失真）',
-    Math.abs(dPlan.dx - 64) < 0.01 && Math.abs(dPlan.dy - 64) < 0.01, JSON.stringify(dPlan));
-  check('⑤j 前视：**纵向按 cos70° 压缩**（Δy≈' + (64 * K).toFixed(1) + '，Δx 仍是 64）',
-    Math.abs(dFront.dy - 64 * K) < 0.6 && Math.abs(dFront.dx - 64) < 0.01, JSON.stringify(dFront));
-  check('⑤k 侧视：**横向按 cos70° 压缩**（Δx≈' + (64 * K).toFixed(1) + '，Δy 仍是 64）',
-    Math.abs(dSide.dx - 64 * K) < 0.6 && Math.abs(dSide.dy - 64) < 0.01, JSON.stringify(dSide));
+  check('⑤i 俯视：Δx===Δy（弯头两条直角边等长，基准不失真）',
+    Math.abs(dPlan.dx - dPlan.dy) < 0.01 && dPlan.dx > 10, JSON.stringify(dPlan) + ' A=' + dPlan.dx);
+  check('⑤j 前视：**纵向按 cos70° 压缩**（Δy≈' + (dPlan.dy * K).toFixed(1) + '，Δx 不变）',
+    Math.abs(dFront.dy - dPlan.dy * K) < 0.6 && Math.abs(dFront.dx - dPlan.dx) < 0.01, JSON.stringify(dFront));
+  check('⑤k 侧视：**横向按 cos70° 压缩**（Δx≈' + (dPlan.dx * K).toFixed(1) + '，Δy 不变）',
+    Math.abs(dSide.dx - dPlan.dx * K) < 0.6 && Math.abs(dSide.dy - dPlan.dy) < 0.01, JSON.stringify(dSide));
 
   /* 非俯视视图下旋转同样生效（画法统一入口 PR() 的判别样本） */
   await clickView('front');

@@ -211,8 +211,40 @@ const TAG = process.env.PA_TAG || '';                       /* 开 Edge profile 
   const beforeIds = (await getComps()).map((c) => c.id);
   const connBefore4 = (await getConns()).length;
   const e1now = byId(await getComps(), e1.id);
-  /* elbow90 的几何是 (x,y)→H→(x+64)→V→(y+64)，点第一段横边的中点必命中它本体 */
-  const elbowMid = await planToClient(e1now.x + 32, e1now.y);
+  /* 落点自证：从**页面真实渲染出的线段**里挑一点，并且必须用 elementFromPoint 反查
+     「这一点到底归谁」，确认属于目标组件才点。
+     ★ 为什么不能按「L 口 + 固定偏移」算：直管的「调管长」手柄画在顶层图层上，
+       就压在下游管件第一段管身上 —— 弯头从 64px 缩到 40px 后，L 口 +12px 恰好落在手柄的
+       14×14 方块里 ⇒ 右键命中的是手柄而不是弯头（实测 ④a 全红）。 */
+  const compClickPoint = (id) => R((cid) => {
+    const g = document.querySelector('#paSvg .pa-comp[data-id="' + cid + '"]');
+    if (!g) return null;
+    const svg = document.getElementById('paSvg'), vp = document.getElementById('paVp');
+    const segs = [];
+    g.querySelectorAll('path[d]').forEach(function (p) {
+      const m = (p.getAttribute('d') || '').match(/^M\s*(-?[\d.]+)[ ,](-?[\d.]+)\s*L\s*(-?[\d.]+)[ ,](-?[\d.]+)/);
+      if (m) segs.push([+m[1], +m[2], +m[3], +m[4]]);
+    });
+    g.querySelectorAll('line').forEach(function (l) {
+      segs.push([+l.getAttribute('x1'), +l.getAttribute('y1'), +l.getAttribute('x2'), +l.getAttribute('y2')]);
+    });
+    const out = [];
+    segs.forEach(function (s) {
+      if (s.some(function (n) { return !isFinite(n); })) return;
+      if (Math.hypot(s[2] - s[0], s[3] - s[1]) < 8) return;
+      [0.5, 0.65, 0.35, 0.8, 0.2].forEach(function (f) {
+        const pt = svg.createSVGPoint();
+        pt.x = s[0] + (s[2] - s[0]) * f; pt.y = s[1] + (s[3] - s[1]) * f;
+        const q = pt.matrixTransform(vp.getScreenCTM());
+        const hit = document.elementFromPoint(q.x, q.y);
+        const owner = hit && hit.closest ? hit.closest('.pa-comp') : null;
+        if (owner && owner.getAttribute('data-id') === cid) out.push({ x: q.x, y: q.y });
+      });
+    });
+    return out.length ? out[0] : null;
+  }, id);
+  const elbowMid = await compClickPoint(e1.id);
+  check('④0 找得到弯头管身上的可落点（自证：该点归属于弯头本体）', !!elbowMid, JSON.stringify(elbowMid));
   await page.mouse.click(elbowMid.x, elbowMid.y, { button: 'right' });
   await sleep(300);
   mv = await menuVisible();

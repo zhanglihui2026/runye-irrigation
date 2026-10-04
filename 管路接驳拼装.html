@@ -397,6 +397,16 @@
   /* ---------- 端口几何（组件局部坐标，原点=左侧L口锚点） ---------- */
   var SCALE=12;              // px / m（直管长度）
 
+  /* [v211] 管件画廓尺寸（px）＝ 弯头/三通的**接口间距**。
+     以前弯头两段各 64px、三通主管 96px / 支管 60px，和管径（DN90 管身只有 ~13px 粗）
+     完全无关，画出来比例很夸张（用户反馈：「三通跟弯头的样式 比例有点夸张了，缩小一些吧」）
+     ⇒ 统一收到约 62%（弯头 40 / 三通 56×36）。
+     ★ 必须抽成常量：baseLocal（接口几何）与 drawComp（画法）、localHull（选中框/包围盒）
+       都要引用同一份数字 —— 同一事实存两份记录、靠人记住同步，必然漂移。 */
+  var ELBOW_A=40;      // 弯头：L→R 的两条直角边长
+  var TEE_MAIN=56;     // 三通：主管 L→R 长度
+  var TEE_BR=36;       // 三通：支管长度（朝 -y）
+
   /* [v210] 组件朝向 rot（度，0/90/180/270），绕 L 口（局部原点）旋转。
      ★ 关键取舍：把旋转**统一收在 portLocal 里**。所有上层逻辑（连接、吸附、对位、
        包围盒、适应画布）都只依赖 portPos ⇒ 旋转自动生效，一处都不用改；
@@ -409,10 +419,10 @@
   function baseLocal(c,side){
     switch(c.kind){
       case 'straight': return side==='L'?{x:0,y:0}:{x:c.len*SCALE,y:0};
-      case 'elbow90':  return side==='L'?{x:0,y:0}:{x:64,y:64};
-      case 'elbow45':  return side==='L'?{x:0,y:0}:{x:64,y:64};
+      case 'elbow90':  return side==='L'?{x:0,y:0}:{x:ELBOW_A,y:ELBOW_A};
+      case 'elbow45':  return side==='L'?{x:0,y:0}:{x:ELBOW_A,y:ELBOW_A};
       case 'reducer':  return side==='L'?{x:0,y:0}:{x:56,y:0};
-      case 'tee':      return side==='L'?{x:0,y:0}: side==='R'?{x:96,y:0}:{x:48,y:-60};
+      case 'tee':      return side==='L'?{x:0,y:0}: side==='R'?{x:TEE_MAIN,y:0}:{x:TEE_MAIN/2,y:-TEE_BR};
       case 'couple':   return side==='L'?{x:0,y:0}:{x:28,y:0};
       case 'cap':      return {x:0,y:0};
     }
@@ -924,9 +934,9 @@
     switch(c.kind){
       case 'straight': pts.push({x:c.len*SCALE,y:0}); break;
       case 'couple':   pts.push({x:28,y:0}); break;
-      case 'elbow90': case 'elbow45': pts.push({x:64,y:64}); break;
+      case 'elbow90': case 'elbow45': pts.push({x:ELBOW_A,y:ELBOW_A}); break;
       case 'reducer':  pts.push({x:56,y:0}); break;
-      case 'tee':      pts.push({x:96,y:0},{x:48,y:-60}); break;
+      case 'tee':      pts.push({x:TEE_MAIN,y:0},{x:TEE_MAIN/2,y:-TEE_BR}); break;
       case 'cap':      pts.push({x:18,y:0}); break;
     }
     return pts;
@@ -955,11 +965,11 @@
       drawSeg(g,c,{x:0,y:0},{x:28,y:0},col,sw);
       projPoly(g,c,[{x:8,y:-sw/2-3},{x:20,y:-sw/2-3},{x:20,y:sw/2+3},{x:8,y:sw/2+3}],'#fff',shade(col,-0.35),'',1.6);
     } else if(c.kind==='elbow90'){
-      drawSegs(g,c,[{x:0,y:0},{x:64,y:0},{x:64,y:64}],col,sw);
-      var e9=L(64,64); g.appendChild(labelMid(e9.x+10,e9.y+14,c.dn+'弯',col));
+      drawSegs(g,c,[{x:0,y:0},{x:ELBOW_A,y:0},{x:ELBOW_A,y:ELBOW_A}],col,sw);
+      var e9=L(ELBOW_A,ELBOW_A); g.appendChild(labelMid(e9.x+10,e9.y+14,c.dn+'弯',col));
     } else if(c.kind==='elbow45'){
-      drawSeg(g,c,{x:0,y:0},{x:64,y:64},col,sw);
-      var e4=L(64,64); g.appendChild(labelMid(e4.x+10,e4.y+14,c.dn+'弯',col));
+      drawSeg(g,c,{x:0,y:0},{x:ELBOW_A,y:ELBOW_A},col,sw);
+      var e4=L(ELBOW_A,ELBOW_A); g.appendChild(labelMid(e4.x+10,e4.y+14,c.dn+'弯',col));
     } else if(c.kind==='reducer'){
       var swb=dnWidth(c.bigDn), sws=dnWidth(c.smallDn);
       var grad=el('linearGradient',{id:'rg_'+c.id,x1:'0',y1:'0',x2:'1',y2:'0'});
@@ -972,9 +982,9 @@
       g.appendChild(labelMid(rp.x,rp.y,c.bigDn+'→'+c.smallDn,'#0f766e'));
     } else if(c.kind==='tee'){
       var mw=dnWidth(c.mainDn), bw=dnWidth(c.branchDn);
-      drawSeg(g,c,{x:0,y:0},{x:96,y:0},col,mw);
-      drawSeg(g,c,{x:48,y:0},{x:48,y:-60},dnColor(c.branchDn),bw);
-      var tp=L(48,-60); g.appendChild(labelMid(tp.x,tp.y-12,c.mainDn+'⊢'+c.branchDn,dnColor(c.branchDn)));
+      drawSeg(g,c,{x:0,y:0},{x:TEE_MAIN,y:0},col,mw);
+      drawSeg(g,c,{x:TEE_MAIN/2,y:0},{x:TEE_MAIN/2,y:-TEE_BR},dnColor(c.branchDn),bw);
+      var tp=L(TEE_MAIN/2,-TEE_BR); g.appendChild(labelMid(tp.x,tp.y-12,c.mainDn+'⊢'+c.branchDn,dnColor(c.branchDn)));
     } else if(c.kind==='cap'){
       drawSeg(g,c,{x:0,y:0},{x:18,y:0},col,sw);
       projPoly(g,c,capArc(sw/2+5),'#fff',shade(col,-0.45),'',2.5);
@@ -1753,9 +1763,9 @@
     S.components=[]; S.connections=[]; S.selected=null;
     var s1=addComp('straight',80,220,{dn:110,len:5});
     var e1=addComp('elbow90',140,220,{dn:110});           // L=(140,220) 对齐 s1.R
-    var s2=addComp('straight',204,284,{dn:110,len:3});    // L=(204,284) 对齐 e1.R(140+64,220+64)
-    var r1=addComp('reducer',240,284,{bigDn:110,smallDn:90}); // L=(240,284) 对齐 s2.R(204+36,284)
-    var s3=addComp('straight',296,284,{dn:90,len:6});     // L=(296,284) 对齐 r1.R(240+56,284)
+    var s2=addComp('straight',180,260,{dn:110,len:3});    // L=(180,260) 对齐 e1.R(140+40,220+40)
+    var r1=addComp('reducer',216,260,{bigDn:110,smallDn:90}); // L=(216,260) 对齐 s2.R(180+36,260)
+    var s3=addComp('straight',272,260,{dn:90,len:6});     // L=(272,260) 对齐 r1.R(216+56,260)
     tryConnect(s1.id,'R',e1.id,'L');
     tryConnect(e1.id,'R',s2.id,'L');
     tryConnect(s2.id,'R',r1.id,'L');
