@@ -692,12 +692,90 @@
     if (dn > 63) return { color: '#f59e0b', weight: 4 };
     return { color: '#3b82f6', weight: 3 };
   }
+  /* ==== [v230] 地块回传后裁剪：地块以外的管段/滴灌带不画（2026-10-04 用户要求） ====
+   * 用户原话：「在线地图页面中，地块回传回来之后，地块以外的滴灌带 主管 支管要裁剪掉。」
+   * 做法：渲染管段/滴灌带前，收集地块库全部地块环作裁剪边界（与管网同一地图 GCJ 口径）；
+   * 折线按相邻两点拆段，逐段对地块环做平面裁剪（单地块尺度内 lat/lng 当平面用）：
+   *   1) 段与所有环边求交点参数 t∈[0,1]，连同端点 0/1 排序；
+   *   2) 相邻 t 的中点做射线法包含测试，落在任一地块内 ⇒ 保留该子区间；
+   *   3) 合并重叠区间后逐段重画（样式/弹窗与原整线一致）。
+   * ★ 裁剪边界：普通地块用 polyLatLng；成组地块用 polyLatLngSet（各成员环集合）——
+   *   不能用凸包 polyLatLng（会吞掉块间空隙，管子会画进空地里）；
+   *   归档子地块（mergedInto）跳过（其环已由成组地块代表）。
+   * ★ 地块库为空 ⇒ 不裁剪（与旧行为一致）。水源点/阀门（设备层）不受影响。 */
+  function clipPlotRings() {
+    var rings = [];
+    function pushRing(rg) {
+      var r = validRingLL(rg, 3);
+      if (!r) return;
+      var ring = [];
+      for (var i = 0; i < r.length; i++) ring.push(RunyeGeo.coordPair(r[i]));
+      if (ring.length >= 3) rings.push(ring);
+    }
+    (readPlotLibrary() || []).forEach(function (p) {
+      if (!p || p.mergedInto) return;
+      if (p.merged && p.subPlots && p.subPlots.length) {
+        var set = (p.polyLatLngSet && p.polyLatLngSet.length) ? p.polyLatLngSet : null;
+        if (set) set.forEach(pushRing);
+        else p.subPlots.forEach(function (s) { if (s && s.polyLatLng) pushRing(s.polyLatLng); });
+        return;
+      }
+      pushRing(p.polyLatLng);
+    });
+    return rings;
+  }
+  function _segX(a, b, c, d) {
+    var d1l = b[0] - a[0], d1g = b[1] - a[1], d2l = d[0] - c[0], d2g = d[1] - c[1];
+    var den = d1l * d2g - d1g * d2l;
+    if (Math.abs(den) < 1e-15) return null;
+    var t = ((c[0] - a[0]) * d2g - (c[1] - a[1]) * d2l) / den;
+    var u = ((c[0] - a[0]) * d1g - (c[1] - a[1]) * d1l) / den;
+    if (t < -1e-12 || t > 1 + 1e-12 || u < -1e-9 || u > 1 + 1e-9) return null;
+    return Math.min(1, Math.max(0, t));
+  }
+  function _inRing(pt, ring) {
+    var x = pt[0], y = pt[1], inside = false;
+    for (var i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      var xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+      if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
+    }
+    return inside;
+  }
+  function _inAnyRing(pt, rings) {
+    for (var i = 0; i < rings.length; i++) if (_inRing(pt, rings[i])) return true;
+    return false;
+  }
+  function lerpPair(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]; }
+  function clipSegIntervals(a, b, rings) {
+    var hits = [0, 1], i, t;
+    for (i = 0; i < rings.length; i++) {
+      var ring = rings[i];
+      for (var k = 0; k < ring.length; k++) {
+        t = _segX(a, b, ring[k], ring[(k + 1) % ring.length]);
+        if (t !== null) hits.push(t);
+      }
+    }
+    hits.sort(function (x, y) { return x - y; });
+    var ivs = [];
+    for (i = 0; i < hits.length - 1; i++) {
+      var mid = (hits[i] + hits[i + 1]) / 2;
+      if (_inAnyRing(lerpPair(a, b, mid), rings)) ivs.push([hits[i], hits[i + 1]]);
+    }
+    var merged = [];
+    ivs.forEach(function (iv) {
+      var m0 = merged[merged.length - 1];
+      if (m0 && iv[0] <= m0[1] + 1e-12) { if (iv[1] > m0[1]) m0[1] = iv[1]; }
+      else merged.push([iv[0], iv[1]]);
+    });
+    return merged;
+  }
   function renderNetwork(state, opts) {
     state.networkGroup.clearLayers();
     state.dripGroup.clearLayers();
     state.deviceGroup.clearLayers();
     var net = (opts && opts.network) ? opts.network : readNetwork();
     if (!net) return { drawn: 0 };
+    var clipRings = clipPlotRings();   /* [v230] 有地块才裁剪 */
     (net.segments || []).forEach(function (s) {
       try {
         var sLL = validRingLL(s.latLng, 2);   // 同样挡住含 null 顶点的管段（否则 _project 抛错连累全部矢量层）
@@ -711,17 +789,26 @@
             length+=RunyeGeo.hav({lat:a[0],lng:a[1]},{lat:b[0],lng:b[1]});
           }
         }
-        var line = L.polyline(displayLL(sLL, opts), { color: st.color, weight: st.weight, opacity: 0.9 });
-        line.bindPopup(
+        var popup =
           '<div style="font:12px/1.6 system-ui,sans-serif;min-width:150px">' +
           '<b style="color:#15803d">' + escapeHtml(s.name || s.id || '管段') + '</b><br>' +
           '管径：DN' + escapeHtml(s.dn || '—') + '<br>' +
           '长度：' + escapeHtml(length.toFixed(1)) + ' m<br>' +
           (s.q != null ? '流量：' + escapeHtml((+s.q).toFixed(2)) + ' m³/h<br>' : '') +
           (s.v != null ? '流速：' + escapeHtml((+s.v).toFixed(2)) + ' m/s<br>' : '') +
-          '</div>'
-        );
-        line.addTo(state.networkGroup);
+          '</div>';
+        /* [v230] 逐段裁剪：折线按相邻两点拆段，落在地块外的部分不画（弹窗随每一段保留） */
+        var pts = sLL.map(RunyeGeo.coordPair), pieces = [];
+        for (var pi = 1; pi < pts.length; pi++) {
+          var pa = pts[pi - 1], pb = pts[pi];
+          var ivs = clipRings.length ? clipSegIntervals(pa, pb, clipRings) : [[0, 1]];
+          for (var ii = 0; ii < ivs.length; ii++) pieces.push([lerpPair(pa, pb, ivs[ii][0]), lerpPair(pa, pb, ivs[ii][1])]);
+        }
+        pieces.forEach(function (pc) {
+          var line = L.polyline(displayLL(pc, opts), { color: st.color, weight: st.weight, opacity: 0.9 });
+          line.bindPopup(popup);
+          line.addTo(state.networkGroup);
+        });
       } catch (e) {}
     });
     if (net.sourcePos && isFinite(net.sourcePos.lat) && isFinite(net.sourcePos.lng)) {
@@ -746,13 +833,21 @@
         } catch (e) {}
       });
     }
-    /* 滴灌带：青色细虚线（net.dripTapes = [[{lat,lng},{lat,lng}], ...]） */
+    /* 滴灌带：青色细虚线（net.dripTapes = [[{lat,lng},{lat,lng}], ...]）；[v230] 同样裁剪到地块内 */
     if (net.dripTapes && net.dripTapes.length) {
       net.dripTapes.forEach(function (line) {
         try {
           var dLL = validRingLL(line, 2);
           if (!dLL) return;
-          L.polyline(displayLL(dLL, opts), { color: '#06b6d4', weight: 1, opacity: 0.65, dashArray: '3,3' }).addTo(state.dripGroup);
+          var dpts = dLL.map(RunyeGeo.coordPair), pieces = [];
+          for (var pi = 1; pi < dpts.length; pi++) {
+            var pa = dpts[pi - 1], pb = dpts[pi];
+            var ivs = clipRings.length ? clipSegIntervals(pa, pb, clipRings) : [[0, 1]];
+            for (var ii = 0; ii < ivs.length; ii++) pieces.push([lerpPair(pa, pb, ivs[ii][0]), lerpPair(pa, pb, ivs[ii][1])]);
+          }
+          pieces.forEach(function (pc) {
+            L.polyline(displayLL(pc, opts), { color: '#06b6d4', weight: 1, opacity: 0.65, dashArray: '3,3' }).addTo(state.dripGroup);
+          });
         } catch (e) {}
       });
     }
