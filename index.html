@@ -1103,12 +1103,13 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
   cursor:pointer;white-space:nowrap;
 }
 .tl-trigger-btn-inline:hover{background:#15803d;border-color:#166534;transform:translateY(-1px);box-shadow:0 4px 12px rgba(37,99,235,.4)}
-#tlZoneCountGroup button{
+/* [v215] 轮灌演示 chips 与「轮灌组数」按钮同款（同一视觉语言，左栏一栏到底） */
+#tlZoneCountGroup button, #tlDemoChips button{
   font-size:11px;font-weight:400;padding:3px 10px;border-radius:6px;
   border:1px solid var(--s-200);background:#fff;color:var(--s-600);cursor:pointer;transition:var(--transition);
 }
-#tlZoneCountGroup button.selected{background:var(--g-700);color:#fff;border-color:var(--g-700)}
-#tlZoneCountGroup button:hover:not(.selected){background:var(--s-50)}
+#tlZoneCountGroup button.selected, #tlDemoChips button.selected{background:var(--g-700);color:#fff;border-color:var(--g-700)}
+#tlZoneCountGroup button:hover:not(.selected), #tlDemoChips button:hover:not(.selected){background:var(--s-50)}
 
 /* ===== Three-level view: blue theme overrides for hardcoded green elements ===== */
 #threeLevelView .step{
@@ -6392,6 +6393,13 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
       <button type="button" id="tlGroupInitBtn" title="一键回到初始化设计：分区数回初始、清空手动分组与已建联合组、清掉手动拖过的分界线，并按初始设计重新生成图面。不影响「保存分组」已存的档 —— 误点后可点「调出分组」找回。" style="font-size:10px;padding:2px 8px;border:1px solid #cbd5e1;background:#fff;border-radius:4px;cursor:pointer;color:#334155">↺ 恢复初始化</button>
     </span>
     <div id="tlGroupStatus" style="margin-top:6px;font-size:11px;line-height:1.5;color:#64748b">分组：自动（按 N=2 均分）</div>
+    <!-- [v215] 轮灌演示（用户 2026-10-04）：点组号 → 该组分区高亮、其余淡化；▶轮播 2 秒一组自动切换
+         （交互参照过滤系统反冲洗组态 chips）；■ 退出恢复。chips 由 tlRenderDemoChips() 按
+         当前分组（自动 N 均分 / 手动 M 组）动态生成，无图时整行隐藏。 -->
+    <div id="tlDemoBar" style="display:none;margin-top:6px;font-size:11px;line-height:1.7;color:#64748b">
+      <span style="font-weight:700;color:#334155">轮灌演示</span>
+      <span id="tlDemoChips" style="display:inline-flex;gap:4px;flex-wrap:wrap;margin-left:4px;vertical-align:middle"></span>
+    </div>
     <!-- 2026-09-16 用户要求：左栏面板「总管长度」输入取消（总管长度仍可在下方水力参数卡
          「联合灌溉 总管选型」里调整，tl_frontPipeLen 保留；tlUpdatePlanBar 不再覆盖它） -->
     <span class="pp-plan-item"><span class="pp-plan-label">目标流速</span><input type="number" id="tlPlanTargetV" value="1.5" min="0.3" max="5" step="0.1">m/s</span>
@@ -10513,9 +10521,127 @@ window.tlSteppedZoneCuts = tlSteppedZoneCuts;
 window.tlRefreshGroupStatus = function () {
   var el = document.getElementById('tlGroupStatus'); if (!el) return;
   var mg = (typeof window !== 'undefined') ? (window.tlManualGroups || []) : [];
-  if (!mg.length) { el.innerHTML = '分组：自动（按 N=' + tlGetZoneCount() + ' 均分）'; el.style.color = '#64748b'; return; }
+  if (!mg.length) { el.innerHTML = '分组：自动（按 N=' + tlGetZoneCount() + ' 均分）'; el.style.color = '#64748b'; if (typeof tlRenderDemoChips === 'function') { try { tlRenderDemoChips(); } catch (e) { } } return; }
   var share = tlSteppedZoneCuts();          /* v100：并上阶梯覆盖表 ⇒ 与画布同源 */
   var poly = (typeof window !== 'undefined') ? window.measuredPolygon : null;
+
+/* ---------- [v215] 轮灌演示（2026-10-04 用户请求） ----------
+ * 用户原话：「这里增加一个轮灌区 来回切换的按钮，我点击哪个轮灌区 右侧分区就跟着变化颜色，
+ *            这样我能比较直观的看到，轮灌区是怎么样的，类似过滤系统演示反冲洗动画一样。」
+ * 交互范式照搬过滤系统反冲洗 chips（一组一钮 + 复位钮 + 改状态后重涂）：
+ *   · 点「组N / MN」→ 该组分区加深（groupFillHi）、其余淡化（灰 6%）——两视图同步：
+ *       工作区走 RyTlWs.setSelGroup → applyGroupHighlight（selGroup 分支 v98 起就有、一直没入口）；
+ *       三级简图走本文件 tlApplyDemoHighlight（rect 同带 data-zi/data-g/data-fill/data-stroke）。
+ *   · ▶ 轮播 → setInterval 2 秒一组来回切换；再点 ⏸ 暂停；■ 退出恢复原色。
+ *   · 演示与「图上点分区成组」互斥：启动时清 tlPendingSel / tlGroupMode（applyGroupHighlight
+ *     里待选蓝高亮优先级高于 selGroup，不清会盖住演示色）。
+ *   · 演示态挂 window.__tlDemoGroup（单一份），render()/tlAutoGenerate 重渲染后各自恢复，
+ *     不靠人记住同步（同一事实只存一份）。 */
+var tlDemoTimer = null, tlDemoIdx = 0;
+function tlDemoGroupCount() {
+  var total = tlGroupZoneCount(); if (!total) return 0;
+  var mg = (window.tlManualGroups && window.tlManualGroups.length) ? window.tlManualGroups : null;
+  if (mg) return mg.length;                                   /* 手动模式：只演示已合并的组（未分组区保持灰底） */
+  return Math.max(1, Math.ceil(total / Math.max(1, tlGetZoneCount())));
+}
+/* 三级简图侧演示高亮：三态重涂（恢复=还原 data-fill+data-stroke 虚线；选中=加深+深描边；其余=淡化灰） */
+function tlApplyDemoHighlight(g) {
+  var svg = document.querySelector('#tlDiagramContent svg'); if (!svg) return;
+  var hi = (window.RyTlWs && window.RyTlWs.groupFillHiCss) ? window.RyTlWs.groupFillHiCss : null;
+  var rects = svg.querySelectorAll('rect[data-zi]');
+  for (var i = 0; i < rects.length; i++) {
+    var r = rects[i];
+    if (!r.getAttribute('data-stroke')) r.setAttribute('data-stroke', r.getAttribute('stroke') || '');
+    var grp = parseInt(r.getAttribute('data-g'), 10);
+    if (g == null) {
+      r.setAttribute('fill', r.getAttribute('data-fill'));
+      var st = r.getAttribute('data-stroke');
+      if (st) r.setAttribute('stroke', st); else r.removeAttribute('stroke');
+      r.removeAttribute('stroke-width');
+    } else if (grp === g) {
+      r.setAttribute('fill', hi ? hi(grp) : r.getAttribute('data-fill'));
+      r.setAttribute('stroke', '#1f2937'); r.setAttribute('stroke-width', '1.6');
+    } else {
+      r.setAttribute('fill', 'rgba(100,116,139,0.06)');
+      r.removeAttribute('stroke'); r.removeAttribute('stroke-width');
+    }
+  }
+}
+window.tlApplyDemoHighlight = tlApplyDemoHighlight;
+/* chips 选中态/播放按钮文案同步（chips 内容重建后也靠它恢复状态） */
+function tlDemoChipSync() {
+  var box = document.getElementById('tlDemoChips'); if (!box) return;
+  var cur = window.__tlDemoGroup;
+  var bs = box.querySelectorAll('button[data-demo-g]');
+  for (var i = 0; i < bs.length; i++) {
+    var g = parseInt(bs[i].getAttribute('data-demo-g'), 10);
+    if (bs[i].classList) bs[i].className = (cur === g ? 'selected' : '');
+  }
+  var pb = document.getElementById('tlDemoPlay');
+  if (pb) pb.innerHTML = tlDemoTimer ? '⏸ 暂停' : '▶ 轮播';
+  var eb = document.getElementById('tlDemoExit');
+  if (eb) eb.disabled = (cur == null && !tlDemoTimer);
+}
+/* 重建 chips：分组（N/手动）一变就走这里 —— tlRefreshGroupStatus 与 tlAutoGenerate 都会调 */
+function tlRenderDemoChips() {
+  var bar = document.getElementById('tlDemoBar'), box = document.getElementById('tlDemoChips');
+  if (!bar || !box) return;
+  var M = tlDemoGroupCount();
+  if (M <= 0) { bar.style.display = 'none'; box.innerHTML = ''; if (tlDemoTimer) tlDemoStop(); return; }
+  bar.style.display = '';
+  /* 越界守卫：重分组后组数变少 ⇒ 立刻退出演示，不指向不存在的组 */
+  if (window.__tlDemoGroup != null && window.__tlDemoGroup >= M) { tlDemoStop(); return; }
+  var manual = !!(window.tlManualGroups && window.tlManualGroups.length);
+  var h = '';
+  for (var g = 0; g < M; g++) {
+    var lbl = manual ? ('M' + (g + 1)) : ('组' + (g + 1));
+    h += '<button type="button" data-demo-g="' + g + '" title="高亮第 ' + (g + 1) + ' 轮灌组（该组分区加深、其余淡化）">' + lbl + '</button>';
+  }
+  h += '<button type="button" id="tlDemoPlay" title="自动轮流高亮各组（2 秒一组），再点暂停">▶ 轮播</button>';
+  h += '<button type="button" id="tlDemoExit" title="退出演示，所有分区恢复原色">■ 退出</button>';
+  box.innerHTML = h;
+  tlDemoChipSync();
+}
+window.tlRenderDemoChips = tlRenderDemoChips;
+/* 设置演示组（g=null 退出）；两视图同步重涂 */
+function tlDemoSet(g) {
+  window.__tlDemoGroup = (g == null ? null : g);
+  window.tlGroupMode = false; window.tlPendingSel = [];    /* 与待选蓝高亮互斥（tlHi 优先会盖演示色） */
+  if (window.RyTlWs && window.RyTlWs.setSelGroup) { try { window.RyTlWs.setSelGroup(g); } catch (e) { } }
+  tlApplyDemoHighlight(g);
+  tlDemoChipSync();
+}
+function tlDemoPlayToggle() {
+  var M = tlDemoGroupCount(); if (M <= 0) return;
+  if (tlDemoTimer) { clearInterval(tlDemoTimer); tlDemoTimer = null; tlDemoChipSync(); return; }
+  tlDemoIdx = (window.__tlDemoGroup != null) ? window.__tlDemoGroup : -1;
+  tlDemoIdx = (tlDemoIdx + 1) % M; tlDemoSet(tlDemoIdx);   /* 点下立即切组，不等 2 秒 */
+  tlDemoTimer = setInterval(function () {
+    var Mc = tlDemoGroupCount(); if (Mc <= 0) { tlDemoStop(); return; }   /* 重分组后组数变化兜底 */
+    tlDemoIdx = (tlDemoIdx + 1) % Mc;
+    tlDemoSet(tlDemoIdx);
+  }, 2000);
+  tlDemoChipSync();
+}
+function tlDemoStop() {
+  if (tlDemoTimer) { clearInterval(tlDemoTimer); tlDemoTimer = null; }
+  tlDemoSet(null);
+}
+/* chips 事件委托（chips 是动态重建的，只挂一次） */
+(function () {
+  var box = document.getElementById('tlDemoChips'); if (!box) return;
+  box.addEventListener('click', function (e) {
+    var t = e.target; if (!t || !t.closest) return;
+    var gb = t.closest('[data-demo-g]');
+    if (gb) {
+      if (tlDemoTimer) { clearInterval(tlDemoTimer); tlDemoTimer = null; }   /* 手点组 = 接管，轮播暂停 */
+      tlDemoSet(parseInt(gb.getAttribute('data-demo-g'), 10)); return;
+    }
+    if (t.closest('#tlDemoPlay')) { tlDemoPlayToggle(); return; }
+    if (t.closest('#tlDemoExit')) { tlDemoStop(); return; }
+  });
+})();
+
   var cells = (share && poly && poly.length >= 3 && typeof ryZoneAreaGroups === 'function') ? ryZoneAreaGroups(share, poly, share.cols * share.rows).cells : null;
   /* v98e：表格显示（组 / 分区 / 面积），末行给合计 */
   var rows = '', total = 0;
@@ -10535,6 +10661,7 @@ window.tlRefreshGroupStatus = function () {
 function tlGroupZoneCount() {
   var d = (typeof window !== 'undefined') ? window.tlDiagramData : null;
   var z = d && d.zones; if (!z) return 0;
+  if (typeof tlRenderDemoChips === 'function') { try { tlRenderDemoChips(); } catch (e) { } }   /* [v215] 分组一变，演示 chips 重建 */
   var zc = z.cols || (z.xPos ? z.xPos.length - 1 : 0);
   var zr = z.rows || (z.yPos ? z.yPos.length - 1 : 0);
   return zc * zr;
@@ -11276,7 +11403,7 @@ function tlAutoGenerate(options) {
       var isPartial=tlPartialFlags[zi];
       var cellFill = (tlManualActive && grp < 0) ? tlUngroupedFill : ((typeof window!=='undefined'&&window.RyTlWs&&window.RyTlWs.groupFillCss)?window.RyTlWs.groupFillCss(grp):zoneCols[zi%zoneCols.length]);
       var cellStroke=isPartial?'rgba(217,119,6,.85)':'rgba(51,65,85,.28)';
-      gzSvg.push('<rect x="'+r1.x.toFixed(1)+'" y="'+r1.y.toFixed(1)+'" width="'+(r2.x-r1.x).toFixed(1)+'" height="'+(r2.y-r1.y).toFixed(1)+'" fill="'+cellFill+'" stroke="'+cellStroke+'" stroke-width="1" stroke-dasharray="6,3" data-zi="'+zi+'" data-g="'+grp+'" data-fill="'+cellFill+'"/>');
+      gzSvg.push('<rect x="'+r1.x.toFixed(1)+'" y="'+r1.y.toFixed(1)+'" width="'+(r2.x-r1.x).toFixed(1)+'" height="'+(r2.y-r1.y).toFixed(1)+'" fill="'+cellFill+'" stroke="'+cellStroke+'" stroke-width="1" stroke-dasharray="6,3" data-zi="'+zi+'" data-g="'+grp+'" data-fill="'+cellFill+'" data-stroke="'+cellStroke+'"/>');
     }
   }
   /* 组边界深线：同行内组号变化处画竖向；行与行之间组号变化画横向（仅自动分组模式；手动分组靠色带区分） */
@@ -12130,6 +12257,10 @@ function tlAutoGenerate(options) {
      整段删除即卸载，不影响主流程。 */
   try { (function(){
     var dd = window.tlDiagramData; if(!dd || dd.world!=='meter') return;
+  /* [v215] 轮灌演示跨重渲染：简图整棵重建后立刻按当前演示组重涂 + 演示 chips 重建
+     （组数随 N/手动分组变化；chips 内部自带越界退出守卫。工作区侧由 RyTlWs.render 内恢复）。 */
+  try { if (window.__tlDemoGroup != null) tlApplyDemoHighlight(window.__tlDemoGroup); } catch (e) { }
+  try { if (typeof tlRenderDemoChips === 'function') tlRenderDemoChips(); } catch (e) { }
     var base = window.__runyeGeoBase || null;
     if(!base || typeof base.refLat!=='number' || typeof base.refLng!=='number' || !isFinite(base.refLat) || !isFinite(base.refLng)){
       localStorage.removeItem('runye_network_layout');

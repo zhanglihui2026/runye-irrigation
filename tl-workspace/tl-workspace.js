@@ -121,6 +121,18 @@
   }
   function buildGroupInfo(g) {
     var d = lastDataRef; if (!d || !d.zones) return '';
+    /* [v215] 手动分组模式下成员表以 window.tlManualGroups 为准 —— 原实现无论什么模式都按
+       N 均分算成员，手动合并（如 6 区并 1 组）时会显示错误成员（演示面板直读，必须正确）。 */
+    var mg215 = (typeof window !== 'undefined') ? window.tlManualGroups : null;
+    if (mg215 && mg215.length) {
+      var mem215 = (mg215[g] || []).map(function (z) { return z + 1; });
+      if (!mem215.length) return '';
+      var cf215 = (d.meta && d.meta.flowModel) ? d.meta.flowModel.combinedFlow : null;
+      return '手动联合灌溉组 M' + (g + 1) + ' · 共 ' + mg215.length + ' 组之一<br>'
+        + '含 区 ' + mem215.join('、') + '<br>'
+        + mem215.length + ' 区同轮灌溉'
+        + ((cf215 != null && cf215 !== '') ? ('<br>本轮合灌流量 ≈ ' + cf215 + ' L/h') : '');
+    }
     var tlN = (typeof d.combinedN === 'number' && d.combinedN >= 1) ? d.combinedN : 2;
     var z = d.zones, zcN = z.cols || (z.xPos.length - 1), zrN = z.rows || (z.yPos.length - 1);
     var tlTotal = zcN * zrN, M = Math.ceil(tlTotal / tlN);
@@ -143,6 +155,10 @@
     for (var i = 0; i < rects.length; i++) {
       var r = rects[i], g = parseInt(r.getAttribute('data-g'), 10);
       var zi = parseInt(r.getAttribute('data-zi'), 10);
+      /* [v215] 首次触碰时记下原始描边：底图走「克隆简图」路径时 rect 自带虚线描边，
+         旧恢复逻辑直接 removeAttribute('stroke') 会把虚线边框一并删掉（演示退出后分区裸奔）。
+         恢复一律还原 data-stroke，高亮才覆盖。 */
+      if (!r.getAttribute('data-stroke')) r.setAttribute('data-stroke', r.getAttribute('stroke') || '');
       var inPending = tlSel.indexOf(zi) >= 0;
       if (tlHi) {
         if (inPending) {
@@ -150,11 +166,15 @@
           r.setAttribute('stroke', '#1d4ed8'); r.setAttribute('stroke-width', '2');
         } else {
           r.setAttribute('fill', r.getAttribute('data-fill'));
-          r.removeAttribute('stroke'); r.removeAttribute('stroke-width');
+          var st0 = r.getAttribute('data-stroke');
+          if (st0) r.setAttribute('stroke', st0); else r.removeAttribute('stroke');
+          r.removeAttribute('stroke-width');
         }
       } else if (selGroup === null) {
         r.setAttribute('fill', r.getAttribute('data-fill'));
-        r.removeAttribute('stroke'); r.removeAttribute('stroke-width');
+        var st1 = r.getAttribute('data-stroke');
+        if (st1) r.setAttribute('stroke', st1); else r.removeAttribute('stroke');
+        r.removeAttribute('stroke-width');
       } else if (g === selGroup) {
         r.setAttribute('fill', groupFillHi(g));
         r.setAttribute('stroke', '#1f2937'); r.setAttribute('stroke-width', '1.6');
@@ -2859,7 +2879,10 @@
     return s;
   }
   function render(ctn, data) {
-    selGroup = null;                                  // 切换/重渲染 → 清空分组高亮
+    /* [v215] 轮灌演示进行中（window.__tlDemoGroup）不清高亮：任何全量重渲染都会重建 rect，
+       若在这里清成 null，演示色立刻被打回原形、要等下一个轮播 tick 才回来。
+       有演示态则保留组号，并在本函数末尾重涂。 */
+    selGroup = (typeof window !== 'undefined' && window.__tlDemoGroup != null) ? window.__tlDemoGroup : null;
     if (!ctn) return false;
     if (!data || data.version !== 1) {
       ctn.innerHTML = '<div class="tl-ws-empty">请先生成三级管线平面图（点左侧「生成管线图」）</div>';
@@ -2890,6 +2913,8 @@
     /* v146（2026-09-25 用户反馈「总管还是没有分段」）：路径测算命中线层（#tlPathLayer）
        挂在本函数整棵重建的 svg 上 → 重建后按需补挂（模式未开时 syncLayer 直接返回）。 */
     try { if (global.RyTlPathMeasure && global.RyTlPathMeasure.syncLayer) global.RyTlPathMeasure.syncLayer(); } catch (e) { }
+    /* [v215] 演示态跨重渲染：重建后立刻按演示组重涂（手动点组选中的场景仍走旧路径清空） */
+    if (selGroup !== null) { try { applyGroupHighlight(); } catch (e) { } }
     return true;
   }
 
@@ -2927,6 +2952,11 @@
      rerenderKeepView 才能同步 —— 只 render 会重建整幅图、丢掉视口与选中态。 */
   api.rerenderKeepView = rerenderKeepView;
   api.groupFillCss = function (g) { return groupFill(g); };   /* 供三级简图分区上色带（单一调色板） */
+  /* [v215] 轮灌演示入口：左栏「轮灌演示」chips → 高亮某组（groupFillHi）、淡化其余；g=null 退出恢复。
+     渲染逻辑全部复用 applyGroupHighlight()（selGroup 分支早已完整，v98 删入口后一直无人调用）。 */
+  api.setSelGroup = function (g) { selGroup = (g == null ? null : g); applyGroupHighlight(); };
+  api.getSelGroup = function () { return selGroup; };
+  api.groupFillHiCss = function (g) { return groupFillHi(g); };   /* 供三级简图同款高亮色（单一调色板） */
   /* 三级简图「联合灌溉分组」图例（2026-09-16 补全）：纯 HTML 覆盖层，不进简图 SVG（不破坏下载/打印成图）。
      仅展示色带+每组含哪些区+本轮合灌流量；不重涂简图分区（保持简图既有配色）。 */
   api.buildGroupLegend = function (data) {
