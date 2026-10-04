@@ -1146,6 +1146,22 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
 }
 #threeLevelView .pp-plan-item{color:#334155}
 #threeLevelView .pp-plan-label{color:#64748b}
+/* [v221] 左栏「保存分组/调出分组/恢复初始化」蓝色样式（2026-10-04 用户要求）：
+   色板取本页既有蓝色强调系（#eff6ff 底 / #bfdbfe→#93c5fd 边 / #1d4ed8 字），
+   与三通插入弹窗标题、路径水头损失提示同一蓝色语系。
+   ⚠ 双宿主：ry-tool 模式下 #tlSide 被搬进 #ryCadGrpTl 轨道，普通模式回到
+   #tlPipePlanSection 内（见「搬入/搬回」IIFE）—— 两个前缀都要写，缺一即失配。
+   ⚠ 不写 border-radius：全站扁平化规则 body *{border-radius:0!important} 有意压平。 */
+#tlPipePlanSection .tl-group-btn,
+#ryCadGrpTl .tl-group-btn{
+  font-size:11px;line-height:1;padding:5px 10px;white-space:nowrap;
+  border:1px solid #bfdbfe;background:#eff6ff;
+  cursor:pointer;color:#1d4ed8;transition:background .15s,border-color .15s;
+}
+#tlPipePlanSection .tl-group-btn:hover,
+#ryCadGrpTl .tl-group-btn:hover{background:#dbeafe;border-color:#93c5fd}
+#tlPipePlanSection .tl-group-btn:active,
+#ryCadGrpTl .tl-group-btn:active{background:#bfdbfe}
 #threeLevelView .pp-plan-val{color:#15803d}
 #threeLevelView .pp-plan-item input,
 #threeLevelView .pp-plan-item select{
@@ -6114,7 +6130,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
          另一边 = 单区面积 ÷ 固定边，调节后分区宽度自动跟随。
          消费点：planZoneFixedSide() → calcZoneLayout / calcManualZoneLayout / ppGetZoneCuts。
          需要撤掉：删本 item，并把 planZoneFixedSide 三处消费点还原为 MAX_ZONE_SIDE。 -->
-    <span class="pp-plan-item"><span class="pp-plan-label">单边铺设长度</span><input type="number" id="planTapeLaySide" value="100" min="10" step="10" title="滴灌带在分区内单边铺设长度；分区固定边 = 此值，调节后分区划分自动跟随">m</span>
+    <span class="pp-plan-item"><span class="pp-plan-label">单边铺设长度</span><input type="number" id="planTapeLaySide" value="100" min="10" step="10" title="滴灌带在分区内单边铺设长度；分区固定边 = 单边长度×2，调节后分区划分自动跟随">m</span>
     <span class="pp-plan-item"><span class="pp-plan-label">滴灌带间距</span><input type="number" id="planTapeSpacing" value="0.4" min="0.1" step="0.1">m</span>
     <span class="pp-plan-item"><span class="pp-plan-label">滴孔间距</span><input type="number" id="planEmitterSpacing" value="0.3" min="0.05" step="0.05">m</span>
     <span class="pp-plan-item"><span class="pp-plan-label">滴头流量</span><input type="number" id="planEmitterFlow" value="0.8" min="0.1" step="0.1">L/h</span>
@@ -6395,6 +6411,20 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
         <button type="button" data-n="4">4区</button>
       </div>
     </span>
+    <!-- [v220]（2026-10-04 用户要求）「按面积成组」：与上方 N 区均分**互补**的第二种联合灌溉划分方式。
+         用户原话：「增加一个功能，是跟现有联合灌溉区的划分做互补的，就是设定联合灌溉区为 36 亩，
+         自动按顺序累加二级管路传递过来的分区面积，累计到 36 亩范围内作为一个联合灌溉区，
+         这样我可以把 3/4/5 个小灌溉区合成一个联合灌溉区」。
+         · 分区网格（二级传来的划分）不动，只改联合灌溉组：结果写入 window.tlManualGroups
+           （与手动合并同一份状态）⇒ 着色/组标注/联合流量/演示 chips/保存调出**零改动**全复用；
+         · 点上方 1/2/3/4 区按钮 = 既有「清空 tlManualGroups」路径 ⇒ 自动回到均分，天然互斥。
+         [v221] 整组从「联合灌溉」行内挪出、独占一行：原 inline 挤在同一 .pp-plan-item 里，
+         左栏 278px 宽度不够 ⇒ 按钮被压成 26px 竖条（文字竖排）。拆行使 .pp-plan-bar 的
+         flex-wrap 自然换行 —— 与下方「保存分组」行同构。 -->
+    <span class="pp-plan-item" style="gap:5px;min-height:22px">
+      <input type="number" id="tlAreaGroupMu" value="36" min="0.1" step="1" title="每个联合灌溉区的目标面积（亩）：按分区顺序累加，累计不超过该值就并成一组" style="width:56px;font-size:11px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px;color:#334155">亩
+      <button type="button" id="tlAreaGroupBtn" title="按目标面积把分区按顺序累加成联合灌溉组（每累计到目标亩数即断组开新组）" style="font-size:11px;padding:3px 10px;border:1px solid #cbd5e1;background:#fff;border-radius:4px;cursor:pointer;color:#334155">按面积成组</button>
+    </span>
     <!-- [v216]（2026-10-04 用户要求）「保存分组 / 调出分组 / 恢复初始化」三钮并一行，
          「手动分组 / 联合分区」标签与「分组：自动…」「⊕ 变更时自动」提示文字全部取消。
          v112（2026-09-22）：手动分组「保存 / 调出」——点上方自动 N 区按钮会清空手动分组（既有行为），
@@ -6402,9 +6432,11 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
          调出=恢复快照并走 tlApplyGroups 重生成图面。
          v177（2026-10-01）：恢复初始化复用「点 N 区按钮」那条既有复位路径，状态清理只有一份实现。 -->
     <span class="pp-plan-item" style="gap:5px;min-height:22px;flex-wrap:wrap">
-      <button type="button" id="tlGroupSaveBtn" title="保存当前手动分组；点上方自动按钮清空后可重新调出" style="font-size:10px;padding:2px 7px;border:1px solid #cbd5e1;background:#fff;border-radius:4px;cursor:pointer;color:#334155">保存分组</button>
-      <button type="button" id="tlGroupRestoreBtn" title="调出已保存的手动分组" style="font-size:10px;padding:2px 7px;border:1px solid #cbd5e1;background:#fff;border-radius:4px;cursor:pointer;color:#334155">调出分组</button>
-      <button type="button" id="tlGroupInitBtn" title="一键回到初始化设计：分区数回初始、清空手动分组与已建联合组、清掉手动拖过的分界线，并按初始设计重新生成图面。不影响「保存分组」已存的档 —— 误点后可点「调出分组」找回。" style="font-size:10px;padding:2px 7px;border:1px solid #cbd5e1;background:#fff;border-radius:4px;cursor:pointer;color:#334155">↺ 恢复初始化</button>
+      <!-- [v221]（2026-10-04 用户要求）三钮由裸白样式改为蓝色样式（.tl-group-btn，见样式区），
+           色板取本页既有蓝色强调系 #eff6ff/#bfdbfe/#1d4ed8（与三通插入弹窗、路径损失提示同源） -->
+      <button type="button" class="tl-group-btn" id="tlGroupSaveBtn" title="保存当前手动分组；点上方自动按钮清空后可重新调出">保存分组</button>
+      <button type="button" class="tl-group-btn" id="tlGroupRestoreBtn" title="调出已保存的手动分组">调出分组</button>
+      <button type="button" class="tl-group-btn" id="tlGroupInitBtn" title="一键回到初始化设计：分区数回初始、清空手动分组与已建联合组、清掉手动拖过的分界线，并按初始设计重新生成图面。不影响「保存分组」已存的档 —— 误点后可点「调出分组」找回。">↺ 恢复初始化</button>
     </span>
     <!-- [v216] 「分组：自动（按 N=2 均分）/ 手动分组表格」文字行已按用户要求取消
          （手动分组明细看右侧「联合灌溉分组」面板）；tlRefreshGroupStatus 保留，
@@ -7481,7 +7513,7 @@ function doIrrImport(text){
         <div class="hm-row"><label>吸水管 DN</label>
           <select id="cfg_suctionDN" data-dn="吸水管"></select>
         </div>
-        <div class="hm-row"><label>供水主管 DN</label>
+        <div class="hm-row"><label>供水主管 Ø</label>
           <select id="cfg_mainDN" data-dn="供水主管"></select>
         </div>
         <div class="hm-chk">
@@ -7866,6 +7898,8 @@ function calcZoneLayout(width, height, requestedN) {
         zoneArea,
         drawZoneW,
         drawZoneH,
+        designW: drawZoneW,
+        designH: drawZoneH,
         score
       };
     }
@@ -7879,7 +7913,9 @@ function calcZoneLayout(width, height, requestedN) {
     zoneH: totalArea / minN / S,  // 2026-09-28：另一边不钳 S
     zoneArea: totalArea / minN,
     drawZoneW: safeW / minCols,
-    drawZoneH: safeH / minRows
+    drawZoneH: safeH / minRows,
+    designW: safeW / minCols,
+    designH: safeH / minRows
   };
 }
 
@@ -7919,6 +7955,8 @@ function calcManualZoneLayout(width, height, manualMu) {
     zoneArea: fixedSide * derivedSide,
     drawZoneW: safeW / cols,
     drawZoneH: safeH / rows,
+    designW: xDesign,
+    designH: yDesign,
     manual: true
   };
 }
@@ -10979,6 +11017,59 @@ window.tlMergeIndices = function (sel) {
   mg.push(sel.slice()); window.tlManualGroups = mg;
   tlApplyGroups();
 };
+/* ---------- [v220 2026-10-04 用户要求] 按目标面积把分区顺序累加成联合灌溉组 ----------
+ * 用户原话：「设定联合灌溉区为 36 亩，自动按顺序累加二级管路传递过来的分区面积，
+ *            累计到 36 亩范围内作为一个联合灌溉区，这样我可以把 3/4/5 个小灌溉区合成一个联合灌溉区。」
+ * 算法：贪心顺序累加 —— zi 从 0 起，累计 ≤ 目标就并入当前组；下一个加进去会超、且当前组非空
+ *       ⇒ 断组开新组。单区自身就超目标时独占一组（不许空组、不许回退，保证覆盖全部分区）。
+ * 面积口径：ryZoneAreaGroups（与工作区组标注同一来源，已含阶梯覆盖 tlZoneGx/Gy + 地块多边形裁剪）
+ *           ⇒ 「标出来的亩数」和「分组用的亩数」必然一致，同一事实只存一份。
+ * 落点：window.tlManualGroups（与手动合并同一份状态）+ tlApplyGroups() ⇒ 着色/组标注/联合流量/
+ *       演示 chips/保存调出全链路零改动复用；点上方 N 区按钮即回到均分（既有清空路径，天然互补）。 */
+function tlGroupByArea() {
+  /* 反馈直接写 #atToast（页面统一的 toast 元素）。⚠ 不能调 atShowToast——它在面积工具 IIFE
+     （13544 起）内部，本函数所在 script 块不可见（实测 typeof=undefined）；也不能兜底 alert——
+     headless/自动化环境会整页阻塞（首轮体检实测 CDP 超时卡死）。任何失败静默，不影响分组。 */
+  function _tlToast(m) {
+    try {
+      var t = document.getElementById('atToast');
+      if (!t) return;
+      t.textContent = m; t.classList.add('show');
+      if (_tlToast._t) clearTimeout(_tlToast._t);
+      _tlToast._t = setTimeout(function () { t.classList.remove('show'); }, 2600);
+    } catch (e) { }
+  }
+  var inp = document.getElementById('tlAreaGroupMu');
+  var targetMu = inp ? parseFloat(inp.value) : NaN;
+  if (!isFinite(targetMu) || targetMu <= 0) { _tlToast('请先填写有效的目标面积（亩）'); return false; }
+  var d = window.tlDiagramData;
+  var z = d && d.zones;
+  var total = z ? ((z.cols || (z.xPos ? z.xPos.length - 1 : 0)) * (z.rows || (z.yPos ? z.yPos.length - 1 : 0))) : 0;
+  if (!(total > 0)) { _tlToast('请先生成三级管线平面图'); return false; }
+  var areas = null;
+  try {
+    var r = ryZoneAreaGroups(z, d.poly, total);
+    if (r && r.ok && r.cells && r.cells.length === total) areas = r.cells;
+  } catch (eA) { }
+  if (!areas) { _tlToast('分区面积计算失败，请重新生成管线图'); return false; }
+  var MU = 666.67, targetM2 = targetMu * MU;
+  var groups = [], cur = [], sum = 0;
+  for (var zi = 0; zi < total; zi++) {
+    var a = areas[zi] || 0;
+    if (cur.length && sum + a > targetM2) { groups.push(cur); cur = []; sum = 0; }   /* 加不下 ⇒ 断组 */
+    cur.push(zi); sum += a;
+  }
+  if (cur.length) groups.push(cur);
+  window.tlManualGroups = groups;
+  tlApplyGroups();
+  var detail = groups.map(function (g, gi) {
+    var s = 0; for (var i = 0; i < g.length; i++) s += (areas[g[i]] || 0);
+    return 'M' + (gi + 1) + '=' + (s / MU).toFixed(1) + '亩(区' + g.map(function (x) { return x + 1; }).join('/') + ')';
+  }).join('，');
+  _tlToast('已按 ' + targetMu + ' 亩成 ' + groups.length + ' 组：' + detail);
+  return true;
+}
+window.tlGroupByArea = tlGroupByArea;
 /* 面板按钮接线（v98） */
 (function () {
   var mb = document.getElementById('tlGroupMergeBtn');
@@ -10992,6 +11083,12 @@ window.tlMergeIndices = function (sel) {
   if (gsb) gsb.addEventListener('click', window.tlSaveManualGroups);
   var grb = document.getElementById('tlGroupRestoreBtn');
   if (grb) grb.addEventListener('click', window.tlRestoreManualGroups);
+  /* [v220]「按面积成组」按钮接线：点击即执行（与页面其它按钮同一范式，不勾选）。
+     Enter 键在输入框里也触发（改完目标亩数直接回车，少一次移动鼠标）。 */
+  var ab = document.getElementById('tlAreaGroupBtn');
+  if (ab) ab.addEventListener('click', tlGroupByArea);
+  var ai = document.getElementById('tlAreaGroupMu');
+  if (ai) ai.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); tlGroupByArea(); } });
   /* v177（2026-10-01 用户请求⑲）：「↺ 恢复初始化」= 回到初始化设计。
      刻意【不重写一套复位逻辑】，而是程序化点击「2 区」按钮 —— 那条路径（上方 #tlZoneCountGroup
      的 click 处理器）已经在做全套：清 tlManualGroups、tlZoneStepClear()、清 cutOffX/Y、
@@ -14555,12 +14652,16 @@ ppPullLiftDh();                                              // 首屏对齐一�
     }
     var dims=ppGetPlanDims(b);
     var base=calcPlanZoneLayout(dims.w,dims.h,planN,getManualPlanZoneMu());
-    var cols=ppState.zoneRotated?base.rows:base.cols;
-    var rows=ppState.zoneRotated?base.cols:base.rows;
+    // 计算与图面共用轴向切分尺寸；旋转后按地块实际边长重新计数。
+    var xDesign=ppState.zoneRotated?base.designH:base.designW;
+    var yDesign=ppState.zoneRotated?base.designW:base.designH;
+    var cols=splitZoneLength(dims.w,xDesign).length;
+    var rows=splitZoneLength(dims.h,yDesign).length;
     return {
       cols:cols,
       rows:rows,
-      N:base.N,
+      N:cols*rows,
+      designW:xDesign, designH:yDesign,
       zoneW:ppState.zoneRotated?base.zoneH:base.zoneW,
       zoneH:ppState.zoneRotated?base.zoneW:base.zoneH,
       drawZoneW:ppState.zoneRotated?base.drawZoneH:base.drawZoneW,
@@ -15309,13 +15410,10 @@ ppPullLiftDh();                                              // 首屏对齐一�
 
   function ppGetZoneCuts(b,layout){
     var dims=ppGetPlanDims(b);
-    /* 2026-09-24：上限跟随面板「单边铺设长度」×2（原固定 MAX_ZONE_SIDE=200，单边120→双边240 不得被钳回200） */
-    /* 2026-09-28：zoneW=固定边(单边×2)，zoneH=另一边(面积/固定边)；按大小分长/短，长边沿放另一边，短边沿放固定边 */
-    var longSide=Math.max(layout.zoneW,layout.zoneH);
-    var shortSide=Math.min(layout.zoneW,layout.zoneH);
+    // 不再按长短边重排；手动/自动布局给出的轴向尺寸是唯一来源。
     var longIsX=dims.w>=dims.h;
-    var xDesign=(longIsX!==layout.rotated)?shortSide:longSide;
-    var yDesign=(longIsX!==layout.rotated)?longSide:shortSide;
+    var xDesign=layout.designW || (longIsX?layout.zoneH:layout.zoneW);
+    var yDesign=layout.designH || (longIsX?layout.zoneW:layout.zoneH);
     var xPlan=ppSplitLength(dims.w,xDesign);
     var yPlan=ppSplitLength(dims.h,yDesign);
     var sx=b.w/dims.w,sy=b.h/dims.h;
@@ -18514,7 +18612,7 @@ function drawSVG(cfg, W, H) {
   g.push('<line x1="' + bendX + '" y1="' + yMain + '" x2="' + bendX + '" y2="' + topY + '" stroke="' + blue + '" stroke-width="' + mw + '" marker-end="url(#arrow)"/>');
   var dnX = x + (end - x) / 3;
   var avX = bendX - 56;                    // 排气阀固定在弯折点左侧的水平管段上
-  if (cfg.show.dn) txt(dnX, yMain + 30, '供水主管 DN' + cfg.mainDN, 12.5, blueT);
+  if (cfg.show.dn) txt(dnX, yMain + 30, '供水主管 Ø' + cfg.mainDN, 12.5, blueT);
   tag(bendX + 26, yMain - 34, '10', { r: 10 });
   txt(bendX, topY - 20, '至各轮灌区（滴灌带/滴头）', 12, blueT);
   if (cfg.airValve) {
@@ -18590,7 +18688,7 @@ function drawSVG(cfg, W, H) {
     }
 
     var noteY = lgY + Math.ceil(legendItems.length / lgCols) * lgRowGap + 12;
-    txt(40, noteY, '注：管径为参考值，最终以水力计算确定；吸肥管接于水泵进水侧（吸水管）。', 11.5, '#555', 'start');
+    txt(40, noteY, '注：管材Ø为外径，设备DN为公称接口，两者不可直接等同；吸水管须独立核查流速、吸程及接口。吸肥管接于泵前吸水管。', 11.5, '#555', 'start');
   }
 
   g.push('</svg>');
@@ -18669,7 +18767,7 @@ function buildTable() {
   rows.push(['7', '压力表', '0~1.0 MPa', '块', '1', '泵后监测']);
   if (cfg.checkValve) rows.push(['8', '止回阀', 'DN' + cfg.suctionDN, '个', '1', '防肥液/水回流']);
   rows.push(['9', '过滤器', cfg.filter + ' DN' + cfg.suctionDN, '套', '1', '按水源水质选型']);
-  rows.push(['10', '供水主管', 'DN' + cfg.mainDN + ' PE/PVC', 'm', '\u2014', '至各轮灌区']);
+  rows.push(['10', '供水主管', 'Ø' + cfg.mainDN + ' mm PE/PVC（外径）', 'm', '\u2014', '至各轮灌区']);
   if (cfg.airValve) rows.push(['11', '排气阀', 'DN25', '个', '1', '主管首端高点']);
 
   var h = '<table><thead><tr>' +
@@ -18692,7 +18790,7 @@ function buildTable() {
 function buildNotes() {
   var notes = [
     '<b>系统组成与流程：</b>水源（蓄水池）→ 底阀+滤网 → 吸水管 →（吸肥管/施肥器接入）→ 水泵 → 过滤器 → 供水主管 → 各轮灌区（滴灌带/滴头）。本图范围为水源至供水主管段，主干分支与田间管网另图绘制。',
-    '<b>流量与管径确定：</b>设计流量 Q = 灌溉面积 × 设计灌水率（或毛灌水定额 ÷ 轮灌周期 ÷ 日运行时间）。吸水管、主管流速取 1.0~1.5 m/s，管径 d = 1000×√(4Q/πv)。示例：Q≈20 m³/h 时吸水管 DN100、供水主管 DN90；Q 每增加一倍升一级管径。',
+    '<b>流量与管径确定：</b>设计流量 Q = 灌溉面积 × 设计灌水率（或毛灌水定额 ÷ 轮灌周期 ÷ 日运行时间）。吸水管、主管流速取 1.0~1.5 m/s，管道内径 d = 1000×√(4Q/(3600πv))，Q 用 m³/h、v 用 m/s、d 用 mm。例：Q=20 m³/h、v=1.5 m/s，所需内径约 68.7 mm；管材外径须结合壁厚选取，设备接口 DN 按厂家核对，不能按流量翻倍机械升一级。',
     '<b>水泵选型：</b>流量按系统最大设计流量的 1.1 倍取；扬程 H = 净扬程 + 管路沿程/局部损失 + 过滤器损失（约 5~8 m）+ 灌水器工作压力（滴头 10~15 m）。自吸泵吸程一般 ≤ 5~6 m，水位落差超出时应改用离心泵配底阀灌水或潜水泵。',
     '<b>过滤器选型：</b>水源为塘/河水（含泥沙、藻类、悬浮物）时，建议砂石过滤器 + 叠片过滤器二级过滤；井水、清水可用叠片式或网式。过滤精度 100~130 目，出口压损 ≤ 7 m；过滤器前后设压力表，压差 &gt; 0.05 MPa 时及时反冲洗。',
     '<b>吸肥装置：</b>本图按吸肥管接于吸水管（泵前）布置，配置施肥罐与调节阀，利用泵前负压吸入肥液；亦可采用泵后旁路文丘里施肥器方案。施肥浓度控制 0.1%~0.3%，施肥完毕用清水冲洗管路 10~15 min，防止肥液结晶堵塞灌水器。',
