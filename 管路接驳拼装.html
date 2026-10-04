@@ -35,8 +35,10 @@
   }
   /* —— [v204] 品牌标题条已按用户要求整行撤掉（fn-nav 已标明当前页，重复占高度）。
      状态徽标挪进画布工具条右端（见 .pa-toolbar 内 #paStatus），规则保留在此。 —— */
+  /* [v214] 状态徽标：原为 999px 纯胶囊，与工具条里一排直角按钮同框时最扎眼 ⇒ 一并改直角。
+     （内部的 .dot 是 50% 圆点指示灯，不是按钮，保留圆形。） */
   .pa-status{
-    font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;
+    font-size:11px;font-weight:700;padding:3px 10px;border-radius:0;
     background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;display:flex;align-items:center;gap:6px;
     flex:none;
   }
@@ -112,9 +114,13 @@
     border-radius:8px;padding:6px 8px;box-shadow:0 2px 8px rgba(15,23,42,.06);z-index:5;
   }
   .pa-toolbar .seg{display:flex;gap:5px;flex:0 0 auto;}
+  /* [v214] 按钮形状与其他页统一：以前 8px 圆角配 24px 高度 ⇒ 圆角/半高 = 0.67，看着就是胶囊；
+     实测二级系统图 / 主站 index 的按钮 border-radius **全是 0**（直角方钮）⇒ 本页跟随改 0。
+     ★ 只改「按钮族」（.pa-btn / .pa-chip / .pa-menu-i / .pa-status）：
+       面板容器（.pa-menu/.pa-toolbar/.pa-mat/.pa-item）与输入框各页本就各有取值，不在此列。 */
   .pa-btn{
     height:24px;border:1px solid rgba(31,41,55,.22);background:#fff;color:var(--pa-ink);
-    font-size:11.5px;font-weight:600;padding:0 8px;border-radius:8px;cursor:pointer;
+    font-size:11.5px;font-weight:600;padding:0 8px;border-radius:0;cursor:pointer;
     transition:all .15s;font-family:inherit;display:inline-flex;align-items:center;line-height:1;
   }
   .pa-btn:hover{border-color:#16a34a;color:#15803d;background:#eef4f1;}
@@ -161,7 +167,7 @@
   .pa-row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
   .pa-chips{display:flex;flex-wrap:wrap;gap:5px;}
   .pa-chip{
-    border:1px solid rgba(31,41,55,.22);background:#fff;border-radius:6px;padding:3px 8px;font-size:11px;
+    border:1px solid rgba(31,41,55,.22);background:#fff;border-radius:0;padding:3px 8px;font-size:11px;
     font-weight:600;color:var(--pa-ink);cursor:pointer;transition:all .15s;
   }
   .pa-chip:hover{border-color:#16a34a;color:#15803d;background:#f0fdf4;}
@@ -215,7 +221,7 @@
   .pa-menu .pa-chip{padding:2px 7px;}
   .pa-menu-list{display:flex;flex-direction:column;gap:1px;}
   .pa-menu-i{
-    display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:6px;cursor:pointer;
+    display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:0;cursor:pointer;
     font-size:11.5px;font-weight:600;color:var(--pa-ink);user-select:none;
   }
   .pa-menu-i small{margin-left:auto;font-weight:600;color:#94a3b8;font-size:10.5px;}
