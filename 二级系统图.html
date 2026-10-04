@@ -253,7 +253,7 @@ input[type="reset"],
     <div class="row"><label>吸水管 DN</label>
       <input type="number" id="cfg_suctionDN" list="dn_list" min="25" max="500" step="1" title="可输入任意管径，或从下拉建议中选择">
     </div>
-    <div class="row"><label>供水主管 DN</label>
+    <div class="row"><label>供水主管 Ø</label>
       <input type="number" id="cfg_mainDN" list="dn_list" min="25" max="500" step="1" title="可输入任意管径，或从下拉建议中选择">
     </div>
     <datalist id="dn_list"></datalist>
@@ -577,7 +577,7 @@ function drawSVG(cfg, W, H) {
   g.push('<line x1="' + bendX + '" y1="' + yMain + '" x2="' + bendX + '" y2="' + topY + '" stroke="' + blue + '" stroke-width="' + mw + '" marker-end="url(#arrow)"/>');
   var dnX = x + (end - x) / 3;
   var avX = bendX - 56;                    // 排气阀固定在弯折点左侧的水平管段上
-  if (cfg.show.dn) txt(dnX, yMain + 30, '供水主管 DN' + cfg.mainDN, 12.5, blueT);
+  if (cfg.show.dn) txt(dnX, yMain + 30, '供水主管 Ø' + cfg.mainDN, 12.5, blueT);
   tag(bendX + 26, yMain - 34, '11', { r: 10 });
   txt(bendX, topY - 20, '至各轮灌区（滴灌带/滴头）', 12, blueT);
   if (cfg.airValve) {
@@ -660,7 +660,7 @@ function drawSVG(cfg, W, H) {
     }
 
     var noteY = lgY + Math.ceil(legendItems.length / lgCols) * lgRowGap + 12;
-    txt(40, noteY, '注：管径为参考值，最终以水力计算确定；吸肥管接于水泵进水侧（吸水管）。', 11.5, '#555', 'start');
+    txt(40, noteY, '注：管材Ø为外径，设备DN为公称接口，两者不可直接等同；吸水管须独立核查流速、吸程及接口。吸肥管接于泵前吸水管。', 11.5, '#555', 'start');
   }
 
   g.push('</svg>');
@@ -761,7 +761,7 @@ function buildTable() {
   if (cfg.checkValve) rows.push(['8', '止回阀', 'DN' + cfg.suctionDN, '个', '1', '防肥液/水回流']);
   rows.push(['9', '过滤器', cfg.filter + ' DN' + cfg.suctionDN, '套', '1', '按水源水质选型']);
   rows.push(['10', '压力表', '0~1.0 MPa', '块', '1', '过滤器后监测']);
-  rows.push(['11', '供水主管', 'DN' + cfg.mainDN + ' PE/PVC', 'm', '\u2014', '至各轮灌区']);
+  rows.push(['11', '供水主管', 'Ø' + cfg.mainDN + ' mm PE/PVC（外径）', 'm', '\u2014', '至各轮灌区']);
   if (cfg.airValve) rows.push(['12', '排气阀', 'DN25', '个', '1', '主管首端高点']);
 
   var h = '<table><thead><tr>' +
@@ -906,7 +906,7 @@ function initZoneBlocks() {
 function buildNotes() {
   var notes = [
     '<b>系统组成与流程：</b>水源（蓄水池）→ 底阀+滤网 → 吸水管 →（吸肥管/施肥器接入）→ 水泵 → 过滤器 → 供水主管 → 各轮灌区（滴灌带/滴头）。本图范围为水源至供水主管段，主干分支与田间管网另图绘制。',
-    '<b>流量与管径确定：</b>设计流量 Q = 灌溉面积 × 设计灌水率（或毛灌水定额 ÷ 轮灌周期 ÷ 日运行时间）。吸水管、主管流速取 1.0~1.5 m/s，管径 d = 1000×√(4Q/πv)。示例：Q≈20 m³/h 时吸水管 DN100、供水主管 DN90；Q 每增加一倍升一级管径。',
+    '<b>流量与管径确定：</b>设计流量 Q = 灌溉面积 × 设计灌水率（或毛灌水定额 ÷ 轮灌周期 ÷ 日运行时间）。吸水管、主管流速取 1.0~1.5 m/s，管道内径 d = 1000×√(4Q/(3600πv))，Q 用 m³/h、v 用 m/s、d 用 mm。例：Q=20 m³/h、v=1.5 m/s，所需内径约 68.7 mm；管材外径须结合壁厚选取，设备接口 DN 按厂家核对，不能按流量翻倍机械升一级。',
     '<b>水泵选型：</b>流量按系统最大设计流量的 1.1 倍取；扬程 H = 净扬程 + 管路沿程/局部损失 + 过滤器损失（约 5~8 m）+ 灌水器工作压力（滴头 10~15 m）。自吸泵吸程一般 ≤ 5~6 m，水位落差超出时应改用离心泵配底阀灌水或潜水泵。',
     '<b>过滤器选型：</b>水源为塘/河水（含泥沙、藻类、悬浮物）时，建议砂石过滤器 + 叠片过滤器二级过滤；井水、清水可用叠片式或网式。过滤精度 100~130 目，出口压损 ≤ 7 m；过滤器前后设压力表，压差 &gt; 0.05 MPa 时及时反冲洗。',
     '<b>吸肥装置：</b>本图按吸肥管接于吸水管（泵前）布置，配置施肥罐与调节阀，利用泵前负压吸入肥液；亦可采用泵后旁路文丘里施肥器方案。施肥浓度控制 0.1%~0.3%，施肥完毕用清水冲洗管路 10~15 min，防止肥液结晶堵塞灌水器。',

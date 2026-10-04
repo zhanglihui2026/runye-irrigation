@@ -357,7 +357,7 @@ function M(up, flat, down){
   for(let i=0;i<up.length;i++){ m.push([up[i], flat[i], (down&&down[i]!==undefined)?down[i]:null]); }
   return m;
 }
-const NB = null; // null 表示超限/无数据
+const NB = null; // 原表未给可用值；不推断为空值一定超过800m
 
 const PRODUCTS = {
   typhoon:{
@@ -375,30 +375,25 @@ const PRODUCTS = {
   pc16010:{
     name:"防虹吸压力补偿管", sub:"内径14.20mm · 壁厚1.00mm · 外径16.20mm · 压力0.5~3.5bar", tag:"PC",
     spec:"内径14.20mm｜壁厚1.00mm｜外径16.20mm｜最大工作压力0.5~3.5bar",
+    minPressure:0.4, maxPressure:3.5,
+    source:"https://www.netafim.com/globalassets/products/drippers-and-dripperlines/dripnet-pc/new-product-sheets/dripnet-pc-as-hwd-technical-product-sheet.pdf", sourcePages:"7–9",
     note:"平地(坡度0%)条件下测得，末端最小工作压力0.4bar",
-    pressures:[1.0,1.6,2.2], slopes:[0], spacingUnit:"m",
+    pressures:[1.0,1.5,2.0], slopes:[0], spacingUnit:"m",
     spacings:[0.2,0.3,0.4,0.5], flows:[1.6,2.0,3.0,3.8],
-    data:{
-      "0.2":{ "1.6":[[87],[110],[127]], "2.0":[[75],[95],[110]], "3.0":[[58],[73],[84]], "3.8":[[49],[63],[72]] },
-      "0.3":{ "1.6":[[121],[154],[177]], "2.0":[[104],[133],[153]], "3.0":[[80],[102],[118]], "3.8":[[69],[88],[101]] },
-      "0.4":{ "1.6":[[151],[193],[222]], "2.0":[[130],[166],[192]], "3.0":[[100],[128],[148]], "3.8":[[86],[110],[127]] },
-      "0.5":{ "1.6":[[179],[228],[263]], "2.0":[[155],[198],[228]], "3.0":[[119],[152],[175]], "3.8":[[103],[131],[151]] }
-    }
+    data:{"0.2":{"1.6":[[68],[83],[95]],"2.0":[[58],[72],[82]],"3.0":[[45],[55],[63]],"3.8":[[38],[47],[54]]},"0.3":{"1.6":[[96],[118],[134]],"2.0":[[83],[102],[116]],"3.0":[[63],[78],[89]],"3.8":[[54],[67],[76]]},"0.4":{"1.6":[[121],[150],[170]],"2.0":[[105],[129],[147]],"3.0":[[80],[99],[113]],"3.8":[[69],[85],[97]]},"0.5":{"1.6":[[145],[179],[204]],"2.0":[[125],[155],[177]],"3.0":[[96],[119],[136]],"3.8":[[83],[102],[116]]}}
   },
   pc16250:{
-    name:"防虹吸压力补偿管", sub:"内径15.50mm · 壁厚1.00mm · 外径16.76mm · 压力0.4~2.8bar", tag:"PC",
-    spec:"内径15.50mm｜壁厚1.00mm｜外径16.76mm｜最大工作压力0.4~2.8bar",
+    name:"防虹吸压力补偿管", sub:"内径15.50mm · 壁厚0.63mm · 外径16.76mm · 压力0.4~2.8bar", tag:"PC",
+    spec:"内径15.50mm｜壁厚0.63mm｜外径16.76mm｜最大工作压力0.4~2.8bar",
+    minPressure:0.4, maxPressure:2.8,
+    source:"https://www.netafim.com/globalassets/products/drippers-and-dripperlines/dripnet-pc/new-product-sheets/dripnet-pc-as-twd--mwd-technical-product-sheet.pdf", sourcePages:"11–13",
     note:"平地(坡度0%)条件下测得，末端最小工作压力0.4bar",
     pressures:[1.0,1.6,2.2], slopes:[0], spacingUnit:"m",
     spacings:[0.2,0.3,0.4,0.5], flows:[0.6,1.0,1.6,2.0,3.0,3.8],
-    data:{
-      "0.2":{ "0.6":[[155],[197],[226]], "1.0":[[111],[141],[162]], "1.6":[[87],[110],[127]], "2.0":[[75],[95],[110]], "3.0":[[58],[73],[84]], "3.8":[[49],[63],[72]] },
-      "0.3":{ "0.6":[[217],[276],[318]], "1.0":[[155],[198],[227]], "1.6":[[121],[154],[177]], "2.0":[[104],[133],[153]], "3.0":[[80],[102],[118]], "3.8":[[69],[88],[101]] },
-      "0.4":{ "1.0":[[196],[249],[287]], "1.6":[[151],[193],[222]], "2.0":[[130],[166],[192]], "3.0":[[100],[128],[148]], "3.8":[[86],[110],[127]] },
-      "0.5":{ "1.6":[[179],[228],[263]], "2.0":[[155],[198],[228]], "3.0":[[119],[152],[175]], "3.8":[[103],[131],[151]] }
-    }
+    data:{"0.2":{"0.6":[[164],[209],[241]],"1.0":[[118],[150],[172]],"1.6":[[87],[110],[127]],"2.0":[[75],[95],[110]],"3.0":[[58],[73],[84]],"3.8":[[49],[63],[72]]},"0.3":{"0.6":[[228],[290],[335]],"1.0":[[164],[208],[240]],"1.6":[[121],[154],[177]],"2.0":[[104],[133],[153]],"3.0":[[80],[102],[118]],"3.8":[[69],[88],[101]]},"0.4":{"0.6":[[284],[363],[418]],"1.0":[[204],[261],[300]],"1.6":[[151],[192],[222]],"2.0":[[130],[166],[192]],"3.0":[[100],[128],[148]],"3.8":[[86],[110],[127]]},"0.5":{"0.6":[[336],[430],[496]],"1.0":[[242],[309],[356]],"1.6":[[179],[228],[263]],"2.0":[[155],[198],[228]],"3.0":[[119],[152],[175]],"3.8":[[103],[131],[151]]}}
   },
   pc23009_2:{
+    minPressure:0.4,
     name:"大口径压力补偿管", sub:"内径20.80mm · 流量2.0 L/h · 最低压力0.4bar", tag:"PC·2.0",
     spec:"内径20.80mm｜流量2.0 L/h｜最低考虑压力0.4bar",
     note:"同时考虑入口压力(0.2~1.0bar)与坡度",
@@ -413,6 +408,7 @@ const PRODUCTS = {
     }
   },
   pc23009_3:{
+    minPressure:0.4,
     name:"大口径压力补偿管", sub:"内径20.80mm · 流量3.0 L/h · 最低压力0.4bar", tag:"PC·3.0",
     spec:"内径20.80mm｜流量3.0 L/h｜最低考虑压力0.4bar",
     note:"同时考虑入口压力(0.2~1.0bar)与坡度",
@@ -427,6 +423,7 @@ const PRODUCTS = {
     }
   },
   uniwine:{
+    minPressure:0.5,
     name:"葡萄园专用压力补偿管", sub:"内径14.20mm · 流量0.7 L/h · 最低压力0.5bar", tag:"葡萄园",
     spec:"内径14.20mm｜流量0.7 L/h｜最低考虑压力0.5bar",
     note:"同时考虑入口压力(0.2~1.0bar)与坡度",
@@ -454,13 +451,18 @@ const slopeLabel = s => (s>0?("上坡 "+s+"%(逆坡)"):(s<0?("下坡 "+Math.abs(
 const fmtKey = v => (v % 1 === 0 ? v.toFixed(1) : v.toString());
 
 function getProduct(){ return PRODUCTS[cur.prod]; }
+function pressureValid(p,pi){
+  const pressure=p.pressures[pi];
+  return (p.minPressure==null||pressure>=p.minPressure)&&(p.maxPressure==null||pressure<=p.maxPressure);
+}
 function curMatrix(){
   const p = getProduct();
   const sp = fmtKey(cur.spacing), fl = fmtKey(cur.flow);
   const spData = p.data[sp];
   if(!spData) return null;
   const mat = spData[fl];
-  return mat || null;
+  if(!mat) return null;
+  return mat.map((row,pi)=>row.map(v=>pressureValid(p,pi)?v:null));
 }
 function curVal(){
   const m = curMatrix();
@@ -534,14 +536,17 @@ function renderResult(){
   const flagEl = document.getElementById("rFlag");
   if(v===null||v===undefined){
     lenEl.textContent = "—";
-    metaEl.innerHTML = `该产品在 <b>${p.pressures[cur.pIdx]} bar</b> / <b>${slopeLabel(p.slopes[cur.sIdx])}</b> 下计算长度超过 800m 上限，不推荐。`;
+    metaEl.innerHTML = pressureValid(p,cur.pIdx)
+      ? `该产品在 <b>${p.pressures[cur.pIdx]} bar</b> / <b>${slopeLabel(p.slopes[cur.sIdx])}</b> 下无有效长度数据；可能为缺失或不适用，请核对厂家原表。`
+      : `入口压力 <b>${p.pressures[cur.pIdx]} bar</b> 不在本产品设定的有效工作压力范围内，不提供推荐长度。`;
     flagEl.style.display="none";
     return;
   }
   lenEl.textContent = v;
   metaEl.innerHTML = `产品：<b>${p.name}</b>（${p.sub}）<br>`
     + `滴头间距 <b>${cur.spacing}${p.spacingUnit}</b>｜流量 <b>${cur.flow} L/h</b><br>`
-    + `入口压力 <b>${p.pressures[cur.pIdx]} bar</b>｜<b>${slopeLabel(p.slopes[cur.sIdx])}</b>`;
+    + `入口压力 <b>${p.pressures[cur.pIdx]} bar</b>｜<b>${slopeLabel(p.slopes[cur.sIdx])}</b>`
+    + (p.source ? `<br>数据来源：<a href="${p.source}" target="_blank" rel="noopener">Netafim 对应型号技术表（第 ${p.sourcePages} 页）</a>；仅按表列条件查询。` : "");
   if(v>800){ flagEl.style.display="inline-block"; flagEl.textContent="⚠ 超过 800m 建议上限"; }
   else { flagEl.style.display="none"; }
 }
@@ -587,7 +592,7 @@ function renderHeatmap(){
     p.slopes.forEach((s,si)=>{
       const td = document.createElement("td");
       const v = m[pi][si];
-      if(v===null){ td.className="cell null"; td.textContent="—"; }
+      if(v===null){ td.className="cell null"; td.textContent="—"; td.title=pressureValid(p,pi)?"无有效数据，请核对厂家原表":"入口压力不在有效工作范围内"; }
       else{
         td.className="cell" + (pi===cur.pIdx && si===cur.sIdx ? " sel":"");
         td.style.background = heat(v,min,max);
@@ -614,6 +619,7 @@ function renderChart(){
     // 多条线：x=压力, y=长度, 每条线一个坡度
     let allVals=[];
     m.forEach(row=>row.forEach(c=>{ if(c!==null) allVals.push(c); }));
+    if(!allVals.length){ note.textContent="当前组合无有效长度数据，请核对工作压力与厂家原表。"; return; }
     const ymax = Math.max(...allVals)*1.05;
     const xmin=0, xmax=p.pressures.length-1;
     const X = i => padL + (xmax===0?0:(i-xmin)/(xmax-xmin))*(W-padL-padR);

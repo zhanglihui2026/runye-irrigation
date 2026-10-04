@@ -74,3 +74,8 @@ runye_v104*
 runye_v105*
 runye_gates.cjs
 tests/
+
+# 2026-10-04：仅纳入本次分区/查询器回归，其余本地测试继续忽略
+!tests/
+tests/*
+!tests/partition_query.test.cjs
