@@ -6428,7 +6428,11 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
   <div class="pp-body">
   <aside class="pp-side" id="tlSide">
   <div class="pp-plan-bar" id="tlPlanBar" style="margin-bottom:8px">
-    <span class="pp-plan-item"><span class="pp-plan-label">联合灌溉</span>
+    <span class="pp-plan-item"><span class="pp-plan-label" style="margin-right:0">联合灌溉</span>
+      <!-- [v227]（2026-10-04 用户要求）标签 margin-right:0：下方「面积成组」行与本行同构
+           （4 字标签列 + 5px 间距），「36」输入框左缘才能与「1区」按钮左缘精确对齐
+           （原通用规则 .pp-plan-item>.pp-plan-label:first-child 的 margin-right:auto 会把
+           后随内容推到行尾，两行后随内容宽度不同 ⇒ 左缘必然错开）。 -->
       <div role="group" id="tlZoneCountGroup" data-init-n="2" style="display:inline-flex;gap:4px">
         <button type="button" data-n="1">1区</button>
         <button type="button" data-n="2" class="selected">2区</button>
@@ -6446,9 +6450,13 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
          [v221] 整组从「联合灌溉」行内挪出、独占一行：原 inline 挤在同一 .pp-plan-item 里，
          左栏 278px 宽度不够 ⇒ 按钮被压成 26px 竖条（文字竖排）。拆行使 .pp-plan-bar 的
          flex-wrap 自然换行 —— 与下方「保存分组」行同构。 -->
-    <!-- [v224]（2026-10-04 用户要求）「按面积分组」按钮挪到亩数输入框**前面**：先按按钮、再填亩数 -->
+    <!-- [v224]（2026-10-04 用户要求）「按面积分组」按钮挪到亩数输入框**前面**：先按按钮、再填亩数
+         [v227]（2026-10-04 用户要求）① 文案「按面积成组」→「面积成组」；② 去掉外框（无边框/无底色），
+         字号字色与「联合灌溉」标签同款（复用 .pp-plan-label + color:inherit，仍保留按钮语义与点击接线）；
+         ③ 标签 margin-right:0 —— 与上方「联合灌溉」行同构（4 字标签列 + 5px 间距），
+         「36」输入框左缘与「1区」按钮左缘精确对齐（结构对齐，不靠魔法数）。 -->
     <span class="pp-plan-item" style="gap:5px;min-height:22px">
-      <button type="button" id="tlAreaGroupBtn" title="按目标面积把分区按顺序累加成联合灌溉组（每累计到目标亩数即断组开新组）" style="font-size:11px;padding:3px 10px;border:1px solid #cbd5e1;background:#fff;border-radius:4px;cursor:pointer;color:#334155">按面积成组</button>
+      <button type="button" id="tlAreaGroupBtn" class="pp-plan-label" title="按目标面积把分区按顺序累加成联合灌溉组（每累计到目标亩数即断组开新组）" style="margin-right:0;background:none;border:none;padding:0;font:inherit;color:inherit;cursor:pointer">面积成组</button>
       <input type="number" id="tlAreaGroupMu" value="36" min="0.1" step="1" title="每个联合灌溉区的目标面积（亩）：按分区顺序累加，累计不超过该值就并成一组" style="width:56px;font-size:11px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px;color:#334155">亩
     </span>
     <!-- [v216]（2026-10-04 用户要求）「保存分组 / 调出分组 / 恢复初始化」三钮并一行，
