@@ -6376,23 +6376,20 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
         <button type="button" data-n="4">4区</button>
       </div>
     </span>
-    <!-- v112（2026-09-22 用户要求）：手动分组「保存 / 调出」——点上方自动 N 区按钮会清空手动分组（既有行为），
+    <!-- [v216]（2026-10-04 用户要求）「保存分组 / 调出分组 / 恢复初始化」三钮并一行，
+         「手动分组 / 联合分区」标签与「分组：自动…」「⊕ 变更时自动」提示文字全部取消。
+         v112（2026-09-22）：手动分组「保存 / 调出」——点上方自动 N 区按钮会清空手动分组（既有行为），
          保存=当前手动分组深拷贝快照（内存 + localStorage 按地块名分槽持久，刷新页面也在）；
-         调出=恢复快照并走 tlApplyGroups 重生成图面。 -->
-    <span class="pp-plan-item" style="gap:6px;min-height:22px">
-      <span class="pp-plan-label" style="color:#64748b">手动分组</span>
-      <button type="button" id="tlGroupSaveBtn" title="保存当前手动分组；点上方自动按钮清空后可重新调出" style="font-size:10px;padding:2px 8px;border:1px solid #cbd5e1;background:#fff;border-radius:4px;cursor:pointer;color:#334155">保存分组</button>
-      <button type="button" id="tlGroupRestoreBtn" title="调出已保存的手动分组" style="font-size:10px;padding:2px 8px;border:1px solid #cbd5e1;background:#fff;border-radius:4px;cursor:pointer;color:#334155">调出分组</button>
-      <span id="tlGroupSnapHint" style="font-size:10px;color:#94a3b8"></span>
+         调出=恢复快照并走 tlApplyGroups 重生成图面。
+         v177（2026-10-01）：恢复初始化复用「点 N 区按钮」那条既有复位路径，状态清理只有一份实现。 -->
+    <span class="pp-plan-item" style="gap:5px;min-height:22px;flex-wrap:wrap">
+      <button type="button" id="tlGroupSaveBtn" title="保存当前手动分组；点上方自动按钮清空后可重新调出" style="font-size:10px;padding:2px 7px;border:1px solid #cbd5e1;background:#fff;border-radius:4px;cursor:pointer;color:#334155">保存分组</button>
+      <button type="button" id="tlGroupRestoreBtn" title="调出已保存的手动分组" style="font-size:10px;padding:2px 7px;border:1px solid #cbd5e1;background:#fff;border-radius:4px;cursor:pointer;color:#334155">调出分组</button>
+      <button type="button" id="tlGroupInitBtn" title="一键回到初始化设计：分区数回初始、清空手动分组与已建联合组、清掉手动拖过的分界线，并按初始设计重新生成图面。不影响「保存分组」已存的档 —— 误点后可点「调出分组」找回。" style="font-size:10px;padding:2px 7px;border:1px solid #cbd5e1;background:#fff;border-radius:4px;cursor:pointer;color:#334155">↺ 恢复初始化</button>
     </span>
-    <!-- v177（2026-10-01 用户请求⑲）：一键回到初始化设计。
-         刻意复用「点 N 区按钮」那条既有、已验证的完整复位路径（见下方接线），
-         使状态清理只有一份实现；初始分区数取自 #tlZoneCountGroup 的 data-init-n（单一事实来源）。 -->
-    <span class="pp-plan-item" style="gap:6px;min-height:22px">
-      <span class="pp-plan-label" style="color:#64748b">联合分区</span>
-      <button type="button" id="tlGroupInitBtn" title="一键回到初始化设计：分区数回初始、清空手动分组与已建联合组、清掉手动拖过的分界线，并按初始设计重新生成图面。不影响「保存分组」已存的档 —— 误点后可点「调出分组」找回。" style="font-size:10px;padding:2px 8px;border:1px solid #cbd5e1;background:#fff;border-radius:4px;cursor:pointer;color:#334155">↺ 恢复初始化</button>
-    </span>
-    <div id="tlGroupStatus" style="margin-top:6px;font-size:11px;line-height:1.5;color:#64748b">分组：自动（按 N=2 均分）</div>
+    <!-- [v216] 「分组：自动（按 N=2 均分）/ 手动分组表格」文字行已按用户要求取消
+         （手动分组明细看右侧「联合灌溉分组」面板）；tlRefreshGroupStatus 保留，
+         现在只负责「分组一变 → 轮灌演示 chips 重建」这一件事。 -->
     <!-- [v215] 轮灌演示（用户 2026-10-04）：点组号 → 该组分区高亮、其余淡化；▶轮播 2 秒一组自动切换
          （交互参照过滤系统反冲洗组态 chips）；■ 退出恢复。chips 由 tlRenderDemoChips() 按
          当前分组（自动 N 均分 / 手动 M 组）动态生成，无图时整行隐藏。 -->
@@ -10518,12 +10515,6 @@ function tlSteppedZoneCuts() {
   return out;
 }
 window.tlSteppedZoneCuts = tlSteppedZoneCuts;
-window.tlRefreshGroupStatus = function () {
-  var el = document.getElementById('tlGroupStatus'); if (!el) return;
-  var mg = (typeof window !== 'undefined') ? (window.tlManualGroups || []) : [];
-  if (!mg.length) { el.innerHTML = '分组：自动（按 N=' + tlGetZoneCount() + ' 均分）'; el.style.color = '#64748b'; if (typeof tlRenderDemoChips === 'function') { try { tlRenderDemoChips(); } catch (e) { } } return; }
-  var share = tlSteppedZoneCuts();          /* v100：并上阶梯覆盖表 ⇒ 与画布同源 */
-  var poly = (typeof window !== 'undefined') ? window.measuredPolygon : null;
 
 /* ---------- [v215] 轮灌演示（2026-10-04 用户请求） ----------
  * 用户原话：「这里增加一个轮灌区 来回切换的按钮，我点击哪个轮灌区 右侧分区就跟着变化颜色，
@@ -10642,26 +10633,18 @@ function tlDemoStop() {
   });
 })();
 
-  var cells = (share && poly && poly.length >= 3 && typeof ryZoneAreaGroups === 'function') ? ryZoneAreaGroups(share, poly, share.cols * share.rows).cells : null;
-  /* v98e：表格显示（组 / 分区 / 面积），末行给合计 */
-  var rows = '', total = 0;
-  for (var i = 0; i < mg.length; i++) {
-    var sum = 0; for (var k = 0; k < mg[i].length; k++) { var zi = mg[i][k]; sum += (cells ? (cells[zi] || 0) : 0); }
-    total += sum;
-    rows += '<tr><td class="tl-grp-g">M' + (i + 1) + '</td><td class="tl-grp-z">区' + mg[i].map(function (z) { return z + 1; }).join('/') + '</td><td class="tl-grp-a">' + (sum / 666.67).toFixed(1) + '</td></tr>';
-  }
-  el.innerHTML = '<div class="tl-grp-cap">手动分组 · 共 ' + mg.length + ' 组</div>' +
-    '<table class="tl-grp-table"><thead><tr><th>组</th><th>分区</th><th class="tl-grp-a">面积(亩)</th></tr></thead>' +
-    '<tbody>' + rows + '</tbody>' +
-    '<tfoot><tr><td colspan="2">合计</td><td class="tl-grp-a">' + (total / 666.67).toFixed(1) + '</td></tr></tfoot></table>';
-  el.style.color = '#0f172a';
+window.tlRefreshGroupStatus = function () {
+  /* [v216] 左栏「分组：自动… / 手动分组表格」文字行已按用户要求取消（明细看右侧面板）。
+     ★ 本函数现在只剩一个职责：分组一变 → 轮灌演示 chips 重建。
+     不能保留旧的 `if (!el) return;` —— status DOM 删掉后那行会让函数在 chips 重建
+     之前就返回，演示行永远不出现（删 DOM 必须连带重审函数内所有提前返回）。 */
+  if (typeof tlRenderDemoChips === 'function') { try { tlRenderDemoChips(); } catch (e) { } }
 };
 /* v98 手动分区成组（面板入口）：右侧「联合灌溉分组」面板列出全部分区，勾选 → 合并为一组。
    状态仍挂在 window.tlManualGroups（与画布着色 / 流量重算共用）。 */
 function tlGroupZoneCount() {
   var d = (typeof window !== 'undefined') ? window.tlDiagramData : null;
   var z = d && d.zones; if (!z) return 0;
-  if (typeof tlRenderDemoChips === 'function') { try { tlRenderDemoChips(); } catch (e) { } }   /* [v215] 分组一变，演示 chips 重建 */
   var zc = z.cols || (z.xPos ? z.xPos.length - 1 : 0);
   var zr = z.rows || (z.yPos ? z.yPos.length - 1 : 0);
   return zc * zr;
@@ -12251,16 +12234,16 @@ function tlAutoGenerate(options) {
   var svgStr=parts.join('');
   tlDiagramSVG=svgStr;
   document.getElementById('tlDiagramContent').innerHTML=svgStr;
+  /* [v215] 轮灌演示跨重渲染：简图整棵重建后立刻按当前演示组重涂 + 演示 chips 重建
+     （组数随 N/手动分组变化；chips 内部自带越界退出守卫。工作区侧由 RyTlWs.render 内恢复）。 */
+  try { if (window.__tlDemoGroup != null) tlApplyDemoHighlight(window.__tlDemoGroup); } catch (e) { }
+  try { if (typeof tlRenderDemoChips === 'function') tlRenderDemoChips(); } catch (e) { }
   /* [map-enhance] 管网反投卫星图（2026-09-26）：把 tlDiagramData 米坐标管线按当前 geo 基准
      反投成经纬度，写入 localStorage['runye_network_layout']，地图页 runye-map-enhance.js 读取后
      在卫星图叠加真实主管/支管/水源点。无 geo 基准（手动画矩形、未经地图回传）时静默跳过。
      整段删除即卸载，不影响主流程。 */
   try { (function(){
     var dd = window.tlDiagramData; if(!dd || dd.world!=='meter') return;
-  /* [v215] 轮灌演示跨重渲染：简图整棵重建后立刻按当前演示组重涂 + 演示 chips 重建
-     （组数随 N/手动分组变化；chips 内部自带越界退出守卫。工作区侧由 RyTlWs.render 内恢复）。 */
-  try { if (window.__tlDemoGroup != null) tlApplyDemoHighlight(window.__tlDemoGroup); } catch (e) { }
-  try { if (typeof tlRenderDemoChips === 'function') tlRenderDemoChips(); } catch (e) { }
     var base = window.__runyeGeoBase || null;
     if(!base || typeof base.refLat!=='number' || typeof base.refLng!=='number' || !isFinite(base.refLat) || !isFinite(base.refLng)){
       localStorage.removeItem('runye_network_layout');
