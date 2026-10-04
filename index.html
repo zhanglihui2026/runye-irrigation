@@ -6467,6 +6467,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     <span class="pp-plan-item" style="gap:5px;min-height:22px">
       <button type="button" id="tlAreaGroupBtn" class="pp-plan-label" title="按目标面积把分区按顺序累加成联合灌溉组（每累计到目标亩数即断组开新组）" style="margin-right:0;background:none;border:none;padding:0;font:inherit;color:inherit;cursor:pointer">面积成组</button>
       <input type="number" id="tlAreaGroupMu" value="36" min="0.1" step="1" title="每个联合灌溉区的目标面积（亩）：按分区顺序累加，累计不超过该值就并成一组" style="width:56px;font-size:11px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px;color:#334155">亩
+      <button type="button" id="tlAreaGroupCalcBtn" class="pp-plan-label" title="按目标亩数从第一个分区起累加：累计不超目标亩数就并入同组，超过阈值就断开开新组，依次递推自动组合联合灌溉区" style="margin-left:6px;background:none;border:none;padding:0;font:inherit;color:#1d4ed8;cursor:pointer">按亩自动组合</button>
     </span>
     <!-- [v216]（2026-10-04 用户要求）「保存分组 / 调出分组 / 恢复初始化」三钮原在左栏并一行，
          「手动分组 / 联合分区」标签与「分组：自动…」「⊕ 变更时自动」提示文字全部取消。
@@ -11238,6 +11239,8 @@ window.tlGroupByArea = tlGroupByArea;
   if (ab) ab.addEventListener('click', tlGroupByArea);
   var ai = document.getElementById('tlAreaGroupMu');
   if (ai) ai.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); tlGroupByArea(); } });
+  var acb = document.getElementById('tlAreaGroupCalcBtn');
+  if (acb) acb.addEventListener('click', tlGroupByArea);
   /* v177（2026-10-01 用户请求⑲）：「↺ 恢复初始化」= 回到初始化设计。
      刻意【不重写一套复位逻辑】，而是程序化点击「2 区」按钮 —— 那条路径（上方 #tlZoneCountGroup
      的 click 处理器）已经在做全套：清 tlManualGroups、tlZoneStepClear()、清 cutOffX/Y、
