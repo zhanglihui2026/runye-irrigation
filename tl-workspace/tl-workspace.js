@@ -190,6 +190,15 @@
     }
     var info = document.getElementById('tlWsGroupInfo');
     if (info) info.innerHTML = (!tlHi && selGroup !== null) ? buildGroupInfo(selGroup) : '';
+    /* [v218 2026-10-04 用户请求] 水流动画 + 阀门开启：与分区变色共用**同一份演示态**，
+       所以挂在 applyGroupHighlight 这一个出口上 —— 重涂高亮必然同步重涂水流，不必再记第二处状态。
+       实现在 index.html 的 window.tlDemoRenderFlow（两个画布共用一份）；缺失时静默降级（单测桩环境无 SVG）。 */
+    try {
+      if (typeof global.tlDemoRenderFlow === 'function') {
+        var sv = cv.querySelector('svg');
+        global.tlDemoRenderFlow(sv, (!tlHi && selGroup !== null) ? selGroup : null);
+      }
+    } catch (eFlow) { }
   }
   function groupInfoHtml() {
     return '<div id="tlWsGroupInfo" style="display:block;position:absolute;bottom:10px;left:10px;max-width:42%;background:rgba(255,255,255,.96);border:1px solid #1f2937;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.12);padding:6px 11px;font:11.5px/1.55 system-ui,sans-serif;color:#1f2937;pointer-events:none;text-align:left;z-index:6"></div>';

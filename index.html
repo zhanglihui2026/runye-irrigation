@@ -5704,6 +5704,25 @@ body.ry-worst-off [data-tlworst]{display:none}
 .tl-worst-flow{stroke-dasharray:6 7;animation:tlWorstFlow .9s linear infinite;pointer-events:none}
 @keyframes tlWorstFlow{to{stroke-dashoffset:-26}}
 
+/* ===== [v218 2026-10-04 用户要求] 轮灌演示：把水流动起来 + 阀门转起来表示「开」=====
+   用户原话：「轮灌区切换的动画演示时，要把水流模拟出来，从水源过来是怎么走的，哪几个阀门开启，
+             可以让阀门转动之类的方式模拟阀门开启。」
+   与上一条 .tl-worst-flow 同族（同为 dash 流动），但**必须另起类名**：
+     · 不复用 data-tlworst（会被 wsStripLabels 剥掉）、不带 data-tlpipe/data-tlpipe-seg
+       （verify_v162_hidden.cjs 会按那两个属性换色）；
+     · 全部 pointer-events:none —— 否则 verify_v172_layers.cjs 的 elementFromPoint 会假红。
+   水流方向 = 路径绘制方向（水源 → 该组各分区），dashoffset 递减 ⇒ 视觉上朝末端跑。
+   阀门：0°→90° 一次转到位（闸阀「 quarter-turn 」语义）， forwards 保持开启态；
+         transform-box:view-box 让 transform-origin 走 viewBox 用户单位（避免各浏览器原点歧义）。 */
+.tl-demo-flow{stroke-dasharray:7 9;animation:tlDemoFlow .85s linear infinite;pointer-events:none}
+@keyframes tlDemoFlow{to{stroke-dashoffset:-32}}
+.tl-demo-valve-open{pointer-events:none;transform-box:view-box;animation:tlValveOpen .5s cubic-bezier(.34,.9,.3,1) forwards}
+@keyframes tlValveOpen{from{transform:rotate(0deg)}to{transform:rotate(90deg)}}
+.tl-demo-valve-ring{pointer-events:none;animation:tlValveRing 1.7s ease-in-out infinite}
+@keyframes tlValveRing{0%,100%{opacity:.28}50%{opacity:.85}}
+.tl-demo-src{pointer-events:none;animation:tlSrcPulse 1.5s ease-in-out infinite}
+@keyframes tlSrcPulse{0%,100%{opacity:.9;stroke-width:2.5}50%{opacity:.25;stroke-width:5}}
+
 /* 接管：搬进工具栏的 .pp-side 去掉「独立栏」外观，宽度撑满分组。
    特异性与孪生规则齐平（1,3,1）+ 本段在孪生段之后 → 后来居上，零 !important 之争。 */
 body.ry-tool #ryCadSide [data-pp] .pp-side{
@@ -10557,7 +10576,188 @@ function tlApplyDemoHighlight(g) {
       r.removeAttribute('stroke'); r.removeAttribute('stroke-width');
     }
   }
+  /* [v218] 同一份演示态 ⇒ 水流动画 + 阀门开启一并重涂（g=null 时整层清除） */
+  try { if (typeof tlDemoRenderFlow === 'function') tlDemoRenderFlow(svg, g); } catch (eFl) { }
 }
+/* ---------- [v218 2026-10-04 用户请求] 轮灌演示 · 水流动画 + 阀门开启 ----------
+ * 用户原话：「轮灌区切换的动画演示时，要把水流模拟出来，从水源过来是怎么走的，
+ *            哪几个阀门开启，可以让阀门转动之类的方式模拟阀门开启。」
+ * 设计（两个画布一套实现，靠宿主 svg 传入）：
+ *   · 路线几何**只从 DOM 读**（已画好的 path[data-tlpipe] / rect[data-zi] / 红⊗阀门圆），
+ *     不重算、不引入第二份世界↔屏幕变换 —— 「画出来的就是动画走的」，自动跟随
+ *     手工改长 / 平移 / 隐藏分段等既有编辑，不需要同步第二处数据（同一事实只存一份）。
+ *     实测（_p1/_probe_v218_geom.cjs）：简图与工作区两个宿主都完整保留
+ *     path[data-tlpipe="front|main-N|branch-N"]、rect[data-zi][data-g]、
+ *     circle[fill="#ef4444"]（分区阀）⇒ 这套 DOM 后处理两处通用。
+ *   · 每条线路 = 水源 → 总管（沿走向到该区取水点）→ 接入短管 → 该区主管 → 支管。
+ *     总管走向（从哪一端起算）由 tlDiagramData.frontPipe 与 sourcePos 的**下标对应**决定：
+ *     path 的点与 world 数组同序同长 ⇒ 拿 nearest(sourcePos) 的下标即可，无需逆变换。
+ *   · 阀门：落在**本组分**区矩形内的那些红⊗ = 本轮开启的阀门 ⇒ 加绿色张合环 + 手柄转 90°。
+ *     不改动 ryValveSVG 一个字节（verify_valve_size.cjs 有 EQ1/EQ2 字节级基线），只叠加。
+ *   · 退出演示 / 切换组 ⇒ 整层 [data-tlflow] 删除重建（幂等）。 */
+function tlFlowParseD(d) {                       /* "M x y L x y …" → [[x,y],…] */
+  var nums = String(d || '').match(/-?\d+(?:\.\d+)?/g) || [];
+  var pts = [];
+  for (var i = 0; i + 1 < nums.length; i += 2) pts.push([+nums[i], +nums[i + 1]]);
+  return pts;
+}
+function tlFlowNear(p, pts) {                    /* 点 p 到折线 pts 的最近点 {q,i,d} */
+  var best = null;
+  for (var i = 0; i + 1 < pts.length; i++) {
+    var a = pts[i], b = pts[i + 1];
+    var dx = b[0] - a[0], dy = b[1] - a[1], c = dx * dx + dy * dy;
+    var t = c === 0 ? 0 : ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / c;
+    if (t < 0) t = 0; else if (t > 1) t = 1;
+    var q = [a[0] + dx * t, a[1] + dy * t], dd = Math.sqrt(Math.pow(p[0] - q[0], 2) + Math.pow(p[1] - q[1], 2));
+    if (!best || dd < best.d) best = { q: q, i: i, d: dd };
+  }
+  return best || { q: pts[0], i: 0, d: Infinity };
+}
+function tlFlowLen(p, q) { return Math.sqrt(Math.pow(p[0] - q[0], 2) + Math.pow(p[1] - q[1], 2)); }
+function tlFlowClear(svg) {
+  if (!svg || !svg.querySelectorAll) return;
+  var old = svg.querySelectorAll('[data-tlflow]');
+  for (var i = 0; i < old.length; i++) { if (old[i].parentNode) old[i].parentNode.removeChild(old[i]); }
+}
+/* 组装某个区的水路折线（屏幕坐标） */
+function tlFlowRoute(svg, fPts, zi) {
+  var mEl = svg.querySelector('path[data-tlpipe="main-' + zi + '"]');
+  if (!mEl) return null;
+  var mPts = tlFlowParseD(mEl.getAttribute('d'));
+  if (mPts.length < 2) return null;
+  /* 入水端 = 靠总管更近的那一端（同 tlWorstPathLen 的 useStart 判据） */
+  var r0 = tlFlowNear(mPts[0], fPts), r1 = tlFlowNear(mPts[mPts.length - 1], fPts);
+  var useStart = !!r0 && (!r1 || r0.d <= r1.d);
+  var mp = useStart ? mPts : mPts.slice().reverse();
+  var tap = tlFlowNear(mp[0], fPts);
+  if (!tap) return null;
+  /* 总管：从水源端到取水点（只保留参与本路径的那一段） */
+  var sub = [fPts[0]];
+  for (var k = 1; k <= tap.i; k++) sub.push(fPts[k]);
+  if (tlFlowLen(sub[sub.length - 1], tap.q) > 0.5) sub.push(tap.q);
+  var out = sub.concat([mp[0]]);                 /* 接入短管（总监→该区主管，一般是一小段斜线） */
+  for (var j = 0; j < mp.length; j++) out.push(mp[j]);
+  /* 支管：从主管上最近的落点接进去（支管通常挂在主管中后段） */
+  var bEl = svg.querySelector('path[data-tlpipe="branch-' + zi + '"]');
+  if (bEl) {
+    var bPts = tlFlowParseD(bEl.getAttribute('d'));
+    if (bPts.length >= 2) {
+      var s0 = tlFlowNear(bPts[0], mp), s1 = tlFlowNear(bPts[bPts.length - 1], mp);
+      var bp = (s0 && (!s1 || s0.d <= s1.d)) ? bPts : bPts.slice().reverse();
+      out.push(tlFlowNear(bp[0], mp).q);
+      for (var m = 0; m < bp.length; m++) out.push(bp[m]);
+    }
+  }
+  return out;
+}
+/* 本轮演示：svg=宿主 <svg>，g=组号（null = 退出演示） */
+function tlDemoRenderFlow(svg, g) {
+  tlFlowClear(svg);
+  if (!svg || g == null || !svg.querySelectorAll) return;
+  try {
+    var zis = [];
+    var rects = svg.querySelectorAll('rect[data-zi]');
+    for (var i = 0; i < rects.length; i++) {
+      if (parseInt(rects[i].getAttribute('data-g'), 10) === g) zis.push(parseInt(rects[i].getAttribute('data-zi'), 10));
+    }
+    if (!zis.length) return;
+    var fEl = svg.querySelector('path[data-tlpipe="front"]:not([data-tlpipe-ref])') || svg.querySelector('path[data-tlpipe="front"]');
+    if (!fEl) return;
+    var fPts = tlFlowParseD(fEl.getAttribute('d'));
+    if (fPts.length < 2) return;
+    /* 水源端：world 数组与 path 同序同长 ⇒ 用最近 sourcePos 的下标判断要不要反序 */
+    var dd = window.tlDiagramData;
+    if (dd && dd.sourcePos && dd.frontPipe && dd.frontPipe.length === fPts.length) {
+      var bi = 0, bd = Infinity;
+      for (var s = 0; s < dd.frontPipe.length; s++) {
+        var wd = tlFlowLen([dd.frontPipe[s].x, dd.frontPipe[s].y], [dd.sourcePos.x, dd.sourcePos.y]);
+        if (wd < bd) { bd = wd; bi = s; }
+      }
+      if (bi !== 0) fPts = fPts.slice().reverse();
+    }
+    var NS = 'http://www.w3.org/2000/svg';
+    var layer = document.createElementNS(NS, 'g');
+    layer.setAttribute('data-tlflow', 'g' + g);
+    layer.setAttribute('pointer-events', 'none');
+    var routes = [], opened = [];
+    for (var z = 0; z < zis.length; z++) {
+      var pts = tlFlowRoute(svg, fPts, zis[z]);
+      if (pts && pts.length >= 2) routes.push(pts);
+    }
+    if (!routes.length) return;
+    /* ① 水源脉冲圈：取所有 #f59e0b 里离总管起点最近的那枚 */
+    var srcs = svg.querySelectorAll('circle[fill="#f59e0b"]');
+    var best = null;
+    for (var c = 0; c < srcs.length; c++) {
+      var cx = +srcs[c].getAttribute('cx'), cy = +srcs[c].getAttribute('cy'), rr = +srcs[c].getAttribute('r') || 6;
+      var d0 = tlFlowLen([cx, cy], fPts[0]);
+      if (!best || d0 < best.d) best = { cx: cx, cy: cy, r: rr, d: d0 };
+    }
+    if (best) {
+      var ring = document.createElementNS(NS, 'circle');
+      ring.setAttribute('data-tlflow', 'src');
+      ring.setAttribute('cx', best.cx); ring.setAttribute('cy', best.cy);
+      ring.setAttribute('r', Math.max(9, best.r + 3));
+      ring.setAttribute('fill', 'none'); ring.setAttribute('stroke', '#0284c7'); ring.setAttribute('stroke-width', '2.5');
+      ring.setAttribute('class', 'tl-demo-src');
+      layer.appendChild(ring);
+    }
+    /* ② 水流线（先宽光晕，再流线）—— 流向 = 数组顺序（水源 → 分区末端） */
+    for (var t = 0; t < routes.length; t++) {
+      var d = '';
+      for (var p = 0; p < routes[t].length; p++) d += (p ? ' L' : 'M') + routes[t][p][0].toFixed(1) + ' ' + routes[t][p][1].toFixed(1);
+      var halo = document.createElementNS(NS, 'path');
+      halo.setAttribute('data-tlflow', 'halo'); halo.setAttribute('d', d); halo.setAttribute('fill', 'none');
+      halo.setAttribute('stroke', '#38bdf8'); halo.setAttribute('stroke-width', '9'); halo.setAttribute('stroke-opacity', '.3');
+      halo.setAttribute('stroke-linecap', 'round'); halo.setAttribute('stroke-linejoin', 'round');
+      halo.setAttribute('class', 'tl-demo-flow-halo');
+      var flow = document.createElementNS(NS, 'path');
+      flow.setAttribute('data-tlflow', 'flow'); flow.setAttribute('d', d); flow.setAttribute('fill', 'none');
+      flow.setAttribute('stroke', '#0284c7'); flow.setAttribute('stroke-width', '2.6');
+      flow.setAttribute('stroke-linecap', 'round'); flow.setAttribute('stroke-linejoin', 'round');
+      flow.setAttribute('class', 'tl-demo-flow');
+      layer.appendChild(halo); layer.appendChild(flow);
+    }
+    /* ③ 本组各分区内的红⊗阀 ⇒ 绿环 + 手柄转 90°（= 开启） */
+    for (var v = 0; v < zis.length; v++) {
+      var rc = null;
+      for (var q = 0; q < rects.length; q++) { if (parseInt(rects[q].getAttribute('data-zi'), 10) === zis[v]) { rc = rects[q]; break; } }
+      if (!rc) continue;
+      var rx = +rc.getAttribute('x'), ry = +rc.getAttribute('y');
+      var rw = +rc.getAttribute('width'), rh = +rc.getAttribute('height');
+      if (!(rw > 0 && rh > 0)) continue;
+      var vs = svg.querySelectorAll('circle[fill="#ef4444"]');
+      for (var w = 0; w < vs.length; w++) {
+        var vx = +vs[w].getAttribute('cx'), vy = +vs[w].getAttribute('cy'), vr = +vs[w].getAttribute('r') || 6.5;
+        if (vx < rx || vx > rx + rw || vy < ry || vy > ry + rh) continue;   /* 不在本分区内 ⇒ 不是这一区的阀 */
+        opened.push([vx, vy, vr]);
+        var gv = document.createElementNS(NS, 'g');
+        gv.setAttribute('data-tlflow', 'valve');
+        var ri = document.createElementNS(NS, 'circle');
+        ri.setAttribute('cx', vx); ri.setAttribute('cy', vy); ri.setAttribute('r', vr + 4.5);
+        ri.setAttribute('fill', 'none'); ri.setAttribute('stroke', '#16a34a'); ri.setAttribute('stroke-width', '2');
+        ri.setAttribute('class', 'tl-demo-valve-ring');
+        /* 阀杆：初始横向（关），动画转到纵向（开）—— 视觉上就是「阀门打开了」 */
+        var hb = document.createElementNS(NS, 'g');
+        hb.setAttribute('class', 'tl-demo-valve-open');
+        hb.setAttribute('style', 'transform-origin:' + vx.toFixed(1) + 'px ' + vy.toFixed(1) + 'px');
+        var ln = document.createElementNS(NS, 'line');
+        ln.setAttribute('x1', vx - vr - 3.2); ln.setAttribute('y1', vy);
+        ln.setAttribute('x2', vx + vr + 3.2); ln.setAttribute('y2', vy);
+        ln.setAttribute('stroke', '#166534'); ln.setAttribute('stroke-width', '2.6'); ln.setAttribute('stroke-linecap', 'round');
+        var hb2 = document.createElementNS(NS, 'rect');
+        hb2.setAttribute('x', vx + vr + 1.4); hb2.setAttribute('y', vy - 3.4);
+        hb2.setAttribute('width', '7'); hb2.setAttribute('height', '6.8'); hb2.setAttribute('rx', '1.6');
+        hb2.setAttribute('fill', '#16a34a');
+        hb.appendChild(ln); hb.appendChild(hb2);
+        gv.appendChild(ri); gv.appendChild(hb);
+        layer.appendChild(gv);
+      }
+    }
+    if (layer.childNodes.length) svg.appendChild(layer);
+  } catch (eF) { }
+}
+window.tlDemoRenderFlow = tlDemoRenderFlow;
 window.tlApplyDemoHighlight = tlApplyDemoHighlight;
 /* chips 选中态/播放按钮文案同步（chips 内容重建后也靠它恢复状态） */
 function tlDemoChipSync() {
