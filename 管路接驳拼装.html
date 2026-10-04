@@ -289,7 +289,7 @@
           <!-- [v210] 编辑：复制 / 旋转 / 移动（选中一个管件后可用；快捷键 Ctrl+D / R / 方向键） -->
           <div class="seg">
             <button class="pa-btn" id="btnDup" title="复制选中管件（Ctrl+D）：连口径/管长一起复制，错开落位便于再拖动">⧉ 复制</button>
-            <button class="pa-btn" id="btnRot" title="旋转选中管件：弹出方向轴选择（X+/Y+/X−/Y−，箭头=当前视图下的实际走向，轴测图里也一样）；另有 ±90° 步进。快捷键 R / Shift+R">↻ 旋转</button>
+            <button class="pa-btn" id="btnRot" title="旋转选中管件：弹出三轴旋转（绕 Z=平面方向轴 X+/Y+/X−/Y− · 绕 X=出口朝天/朝地 · 绕 Y=主轴立起；箭头=当前视图下的实际走向，轴测图里也一样）；另有 ±90° 步进。快捷键 R / Shift+R（Z 轴）">↻ 旋转</button>
             <button class="pa-btn" id="btnMove" title="自由移动模式：打开后拖动不会被邻近端口吸住（用于把已接好的管件挪开）；关闭时拖到附近会自动接驳">✥ 移动</button>
           </div>
           <!-- [v212] 「⚡ 载入示例管路」已挪到左侧素材库顶部（用户要求），此处移除 -->
@@ -306,7 +306,7 @@
           <div class="pa-status" id="paStatus" title="拼装/水力状态"><span class="dot"></span><span id="paStatusTxt">待拼装</span></div>
         </div>
         <svg id="paSvg" xmlns="http://www.w3.org/2000/svg"></svg>
-        <div class="pa-hint">操作：左侧点击/拖入管件，靠近即自动吸附 → 选中可改参数 → ★右键管道直接改管径 · 右键配件直接换选型 → 拖直管右端「⇔」手柄自由调管长 → ★复制 Ctrl+D · 旋转 ↻ 选方向轴（X+/Y+/X−/Y−，箭头随视图变；R = ±90°）· 方向键微调移动（Shift 加速）→ 俯视/前视/侧视/轴测四种画法随时切换 → Delete 删除 · 滚轮缩放。</div>
+        <div class="pa-hint">操作：左侧点击/拖入管件，靠近即自动吸附 → 选中可改参数 → ★右键管道直接改管径 · 右键配件直接换选型 → 拖直管右端「⇔」手柄自由调管长 → ★复制 Ctrl+D · 旋转 ↻ 三轴选择（绕 Z 方向轴 / 绕 X 出口朝天 · 绕 Y 主轴立起，箭头随视图变；R = Z 轴 ±90°）· 方向键微调移动（Shift 加速）→ 俯视/前视/侧视/轴测四种画法随时切换 → Delete 删除 · 滚轮缩放。</div>
         <div class="pa-zoom" id="paZoomTxt">缩放 100%</div>
         <div class="pa-toast" id="paToast"></div>
         <!-- [v207] 画布右键菜单：管道改管径 / 配件换选型（内容由 JS 按选中管件的类型构造） -->
@@ -426,10 +426,31 @@
      ★ 关键取舍：把旋转**统一收在 portLocal 里**。所有上层逻辑（连接、吸附、对位、
        包围盒、适应画布）都只依赖 portPos ⇒ 旋转自动生效，一处都不用改；
        若改成在各绘制处各自处理，就会变成「画是转了、接口没转」。 */
-  function rotPt(x,y,deg){
-    var d=+deg||0; if(!d) return {x:x,y:y};
-    var a=d*Math.PI/180, ca=Math.cos(a), sa=Math.sin(a);
-    return {x:x*ca-y*sa, y:x*sa+y*ca};
+  /* [v210→v222] rotPt（平面 2D 旋转）已并入 rot3（三轴），勿再新增 2D 旋转路径 */
+  /* ===================================================================
+   *  [v222] 三轴朝向：绕 X / Y / Z 轴分别旋转（用户原话：
+   *    「配件旋转要能沿着X Y Z轴分别旋转才行」）
+   *  ------------------------------------------------------------------
+   *  以前只有 c.rot（绕 Z 轴 = 俯视平面内旋转），弯头/三通的端口永远躺在
+   *  地面里 —— 没法表达「立管朝上 / 朝下」。现在组件增加三个朝向分量：
+   *    · c.rot  绕 **Z 轴**（竖直轴，俯视平面内，= 原 rot，完全兼容）；
+   *    · c.rx   绕 **X 轴**（把局部 +y 翻进/出地面 —— 弯头出口朝天/朝地）；
+   *    · c.ry   绕 **Y 轴**（把主轴 L→R 翻出地面 —— 立管）；
+   *    · c.z    组件原点（L 口）高程（mm 级无所谓，单位与坐标一致 = px）。
+   *  旋转次序（固定，外旋式）：先 Rx(rx) → 再 Ry(ry) → 再 Rz(rot)。
+   *  90° 倍数下该次序能覆盖全部 24 个轴向，且点同一颗芯片增量可预测。
+   *  ★ 仍然坚持「单一路径」铁律：3D 旋转只发生在 portLocal3 / PR 这一个入口，
+   *    连接 / 吸附 / 对位 / 包围盒 / 适应画布拿到的都是旋转后的结果，一处不用改。
+   *  ★ 连接是显式拓扑（S.connections），不按平面距离匹配 ⇒ 端口翻出平面后
+   *    拓扑依旧成立；只有「就近吸附」的距离判断改为走投影（P3）—— 高度差
+   *    自然计入屏幕距离，不同高度的端口不会在轴测/前/侧视里误吸。
+   * =================================================================== */
+  function rot3(x,y,z,rx,ry,rz){
+    var ax=(+rx||0)*Math.PI/180, ay=(+ry||0)*Math.PI/180, az=(+rz||0)*Math.PI/180, t;
+    if(ax){ var ca=Math.cos(ax), sa=Math.sin(ax); t=y*ca-z*sa; z=y*sa+z*ca; y=t; }
+    if(ay){ var cb=Math.cos(ay), sb=Math.sin(ay); t=x*cb+z*sb; z=z*cb-x*sb; x=t; }
+    if(az){ var cc=Math.cos(az), sc=Math.sin(az); t=x*cc-y*sc; y=x*sc+y*cc; x=t; }
+    return {x:x,y:y,z:z};
   }
   function baseLocal(c,side){
     switch(c.kind){
@@ -443,15 +464,26 @@
     }
     return {x:0,y:0};
   }
-  function portLocal(c,side){
+  /* 端口局部坐标（三轴全旋）→ 3D */
+  function portLocal3(c,side){
     var p=baseLocal(c,side);
-    return rotPt(p.x,p.y,c.rot||0);
+    return rot3(p.x,p.y,0,c.rx,c.ry,c.rot||0);
   }
-  /* 组件局部坐标（先旋转）→ 规划坐标 */
+  /* 兼容口径：平面投影（俯视布局/历史调用方），z 丢弃 */
+  function portLocal(c,side){
+    var p=portLocal3(c,side); return {x:p.x,y:p.y};
+  }
+  /* 组件局部坐标（三轴全旋）→ 规划坐标（平面） */
   function localToPlan(c,lx,ly){
-    var q=rotPt(lx,ly,c.rot||0); return {x:c.x+q.x, y:c.y+q.y};
+    var q=rot3(lx,ly,0,c.rx,c.ry,c.rot||0); return {x:c.x+q.x, y:c.y+q.y};
   }
-  function portPos(c,side){ var p=portLocal(c,side); return {x:c.x+p.x,y:c.y+p.y}; }
+  /* 端口世界坐标（3D：含高程） */
+  function portPos3(c,side){
+    var p=portLocal3(c,side);
+    return {x:c.x+p.x, y:c.y+p.y, z:(+c.z||0)+p.z};
+  }
+  /* 端口平面坐标（俯视口径，兼容既有调用方） */
+  function portPos(c,side){ var p=portPos3(c,side); return {x:p.x,y:p.y}; }
   function portDn(c,side){
     switch(c.kind){
       case 'straight': case 'elbow90': case 'elbow45': case 'couple': case 'cap': return c.dn;
@@ -752,12 +784,24 @@
     if(isoOn()) return {x:(x-y)*ISO_A, y:(x+y)*ISO_B};
     var k=viewK(); return {x:x*k.kx, y:y*k.ky};
   }
+  /* [v222] 含高程的投影：z 沿屏幕竖直方向抬升（四视图统一规则）——
+       plan  俯视：z 不画（俯视本来就是「往地上看」，高度不可见）；
+       front 前视：sy = FRONT_K·y − z（z=0 时与旧画法逐像素一致）；
+       side  侧视：sy = y − z（同上）；
+       iso   轴测：sy = (x+y)·sin30 − z（标准轴测立高）。
+     ★ z=0 的既有拼装在四种视图下的渲染与 v222 之前逐像素相同（零回归）。 */
+  function P3(x,y,z){
+    var p=P(x,y); p.y-=(+z||0); return p;
+  }
   function Pinv(sx,sy){
     if(isoOn()) return {x:(sx/ISO_A+sy/ISO_B)/2, y:(sy/ISO_B-sx/ISO_A)/2};
     var k=viewK(); return {x:sx/k.kx, y:sy/k.ky};
   }
-  /* 组件局部坐标 → 屏幕：先按 rot 旋转，再按当前视图投影（画法统一入口） */
-  function PR(c,lx,ly){ var q=localToPlan(c,lx,ly); return P(q.x,q.y); }
+  /* 组件局部坐标 → 屏幕：三轴旋转（+高程）→ 当前视图投影（画法统一入口） */
+  function PR(c,lx,ly,lz){
+    var q=rot3(lx,ly,lz||0,c.rx,c.ry,c.rot||0);
+    return P3(c.x+q.x, c.y+q.y, (+c.z||0)+q.z);
+  }
   /* 轴测管段：下移的阴影给厚度感 + 主体圆管 + 两端椭圆端面（圆柱封口） */
   function isoStroke(g,pts,sw,col,dash){
     var i,d='',d2='';
@@ -833,14 +877,17 @@
       var c2=P(minx-pad,y), e2=P(maxx+pad,y); d+='M '+c2.x+' '+c2.y+' L '+e2.x+' '+e2.y+' ';
     }
     vp.appendChild(el('path',{d:d,fill:'none',stroke:'#cbd5e1','stroke-width':1,opacity:.55}));
-    /* 两根轴向指示：X 绿、Y 蓝，标出轴测的走向基准 */
-    var o=P(0,0), ax=P(160,0), ay=P(0,160);
+    /* 三根轴向指示：X 绿、Y 蓝、[v222] Z 红（竖直=高程方向，绕 X/Y 旋转的翻转基准） */
+    var o=P3(0,0,0), ax=P3(160,0,0), ay=P3(0,160,0), az=P3(0,0,160);
     vp.appendChild(el('path',{d:'M '+o.x+' '+o.y+' L '+ax.x+' '+ax.y,fill:'none',stroke:'#16a34a','stroke-width':2,opacity:.7}));
     vp.appendChild(el('path',{d:'M '+o.x+' '+o.y+' L '+ay.x+' '+ay.y,fill:'none',stroke:'#2563eb','stroke-width':2,opacity:.7}));
+    vp.appendChild(el('path',{d:'M '+o.x+' '+o.y+' L '+az.x+' '+az.y,fill:'none',stroke:'#dc2626','stroke-width':2,opacity:.7,'stroke-dasharray':'5 4'}));
     var tx=el('text',{x:ax.x+8,y:ax.y,fill:'#16a34a','font-size':12,'font-weight':800,'font-family':'Microsoft YaHei,sans-serif'});
     tx.textContent='X'; vp.appendChild(tx);
     var ty=el('text',{x:ay.x+8,y:ay.y,fill:'#2563eb','font-size':12,'font-weight':800,'font-family':'Microsoft YaHei,sans-serif'});
     ty.textContent='Y'; vp.appendChild(ty);
+    var tz=el('text',{x:az.x+8,y:az.y,fill:'#dc2626','font-size':12,'font-weight':800,'font-family':'Microsoft YaHei,sans-serif'});
+    tz.textContent='Z'; vp.appendChild(tz);
   }
 
   var vp=null; // viewport <g>
@@ -859,9 +906,9 @@
     // 2) 连接处的接驳节点
     S.connections.forEach(function(k){
       var ca=findComp(k.a.id), cb=findComp(k.b.id); if(!ca||!cb) return;
-      var pa=portPos(ca,k.a.side), pb=portPos(cb,k.b.side);
+      var pa=portPos3(ca,k.a.side), pb=portPos3(cb,k.b.side);
       var d=portDn(ca,k.a.side);
-      var A=P(pa.x,pa.y), B=P(pb.x,pb.y);
+      var A=P3(pa.x,pa.y,pa.z), B=P3(pb.x,pb.y,pb.z);
       var cx=(A.x+B.x)/2, cy=(A.y+B.y)/2;
       vp.appendChild(el('circle',{cx:cx,cy:cy,r:Math.max(5,dnWidth(d)/2+2),
         fill:'#fff',stroke:dnColor(d),'stroke-width':2}));
@@ -870,13 +917,13 @@
     S.components.forEach(function(c){ drawComp(c); });
     // 4) 悬空端口标记（黄色）
     openPorts().forEach(function(op){
-      var c=findComp(op.id); if(!c) return; var p=portPos(c,op.side), q=P(p.x,p.y);
+      var c=findComp(op.id); if(!c) return; var p=portPos3(c,op.side), q=P3(p.x,p.y,p.z);
       vp.appendChild(el('circle',{cx:q.x,cy:q.y,r:7,fill:'none',stroke:'#eab308','stroke-width':2.5}));
       vp.appendChild(el('circle',{cx:q.x,cy:q.y,r:2.5,fill:'#eab308'}));
     });
     // 5) 拖拽连线预览（轴测下同样走投影，预览线与被吸的端口才会重合）
     if(drag.mode==='port' && drag.tmp){
-      var t1=P(drag.tmp.x1,drag.tmp.y1), t2=P(drag.tmp.x2,drag.tmp.y2);
+      var t1=P3(drag.tmp.x1,drag.tmp.y1,drag.tmp.z1||0), t2=P3(drag.tmp.x2,drag.tmp.y2,0);
       vp.appendChild(el('line',{x1:t1.x,y1:t1.y,x2:t2.x,y2:t2.y,
         stroke:'#16a34a','stroke-width':2.5,'stroke-dasharray':'6 5',opacity:.85}));
     }
@@ -890,7 +937,7 @@
     });
     /* 7) [v208] 拖动中的吸附提示（绿圈）：让「快要吸上了」在拖动全程可见 */
     if(drag.mode==='move' && drag.snapHint){
-      var sh=P(drag.snapHint.x,drag.snapHint.y);
+      var sh=P3(drag.snapHint.x,drag.snapHint.y,drag.snapHint.z||0);
       vp.appendChild(el('circle',{cx:sh.x,cy:sh.y,r:11,fill:'none',stroke:'#16a34a','stroke-width':3,opacity:.9}));
       vp.appendChild(el('circle',{cx:sh.x,cy:sh.y,r:3.5,fill:'#16a34a'}));
     }
@@ -1018,9 +1065,9 @@
         fill:'none',stroke:'#16a34a','stroke-width':1.5,'stroke-dasharray':'5 4',opacity:.7}));
     }
 
-    /* 端口把手（可拖拽接驳）—— portPos 已含 rot，再走一次视图投影即可 */
+    /* 端口把手（可拖拽接驳）—— portPos3 已含三轴旋转与高程，再走一次视图投影即可 */
     LIB[c.kind].ports.forEach(function(side){
-      var p=portPos(c,side), q=P(p.x,p.y);
+      var p=portPos3(c,side), q=P3(p.x,p.y,p.z);
       g.appendChild(el('circle',{cx:q.x,cy:q.y,r:6,fill:'#fff',stroke:dnColor(portDn(c,side)),
         'stroke-width':2.5,class:'pa-port','data-id':c.id,'data-side':side,style:'cursor:crosshair;'}));
     });
@@ -1065,8 +1112,8 @@
     }
     if(portEl){
       drag.mode='port'; drag.id=portEl.getAttribute('data-id'); drag.side=portEl.getAttribute('data-side');
-      var c=findComp(drag.id); var pp=portPos(c,drag.side);
-      drag.tmp={x1:pp.x,y1:pp.y,x2:p.x,y2:p.y};
+      var c=findComp(drag.id); var pp=portPos3(c,drag.side);
+      drag.tmp={x1:pp.x,y1:pp.y,z1:pp.z,x2:p.x,y2:p.y};
       svg.setPointerCapture(e.pointerId);
     } else if(compEl){
       drag.mode='move'; drag.id=compEl.getAttribute('data-id');
@@ -1103,9 +1150,9 @@
       /* [v210] 自由移动模式下不吸附：已接好的管件要能干脆地挪开，而不是一放手又被粘回去 */
       var hit=S.moveMode? null : snapCandidate(drag.id, snapRadiusPx());
       if(hit){
-        var hc=findComp(hit.id), hp=portPos(hc,hit.side), hl=portLocal(c,hit.selfSide);
-        moveWithBranch(c, hp.x-hl.x, hp.y-hl.y);
-        drag.snapHint={x:hp.x,y:hp.y};
+        var hc=findComp(hit.id), hp=portPos3(hc,hit.side), hl=portLocal3(c,hit.selfSide);
+        moveWithBranch(c, hp.x-hl.x, hp.y-hl.y, hit.selfSide, hp.z-hl.z);
+        drag.snapHint={x:hp.x,y:hp.y,z:hp.z};
       }
       render();
     } else if(drag.mode==='port'){
@@ -1113,7 +1160,7 @@
       // 高亮最近兼容端口
       var near=nearestPort(p, drag.id, drag.side, 26);
       render();
-      if(near){ var nc=findComp(near.id); var np=portPos(nc,near.side); var nq=P(np.x,np.y);
+      if(near){ var nc=findComp(near.id); var np=portPos3(nc,near.side); var nq=P3(np.x,np.y,np.z);
         vp.appendChild(el('circle',{cx:nq.x,cy:nq.y,r:9,fill:'none',stroke:'#16a34a','stroke-width':3})); }
     } else if(drag.mode==='pan'){
       S.panX=drag.panX0+(e.clientX-drag.sx); S.panY=drag.panY0+(e.clientY-drag.sy); applyTransform();
@@ -1132,11 +1179,11 @@
         if(res.ok){
           if(res.loop) toast('已接驳（检测到管网闭环，请注意校验）','warn');
           else toast('端口吸附接驳成功');
-          // 吸附对齐：移动被拖组件使其端口与对方重合
+          // 吸附对齐：移动被拖组件使其端口与对方重合（[v222] 含高程 z）
           var mc=findComp(drag.id), oc=findComp(near.id);
-          var op=portPos(oc,near.side);
-          var ml=portLocal(mc,drag.side);
-          mc.x=op.x-ml.x; mc.y=op.y-ml.y;
+          var op=portPos3(oc,near.side);
+          var ml=portLocal3(mc,drag.side);
+          mc.x=op.x-ml.x; mc.y=op.y-ml.y; mc.z=(+op.z||0)-ml.z;
           pushHistory(); recompute();
         } else if(res.msg){ toast(res.msg); }
       }
@@ -1160,13 +1207,13 @@
        以前写「26/S.zoom」在平面图恰好等价，但轴测下错得离谱，两边都不好维护。 */
   function nearestPort(p, selfId, selfSide, radiusPx, anyDn){
     var best=null, bd=radiusPx;
-    var ref=P(p.x,p.y);
+    var ref=P3(p.x,p.y,p.z||0);                    /* [v222] 参考点也走含高程投影 */
     S.components.forEach(function(c){
       if(c.id===selfId) return;
       LIB[c.kind].ports.forEach(function(side){
         if(isPortConnected(c.id,side)) return;
         if(!anyDn && portDn(c,side)!==portDn(findComp(selfId),selfSide)) return; // 异径不吸附
-        var pp=portPos(c,side), pq=P(pp.x,pp.y);
+        var pp=portPos3(c,side), pq=P3(pp.x,pp.y,pp.z);
         var d=Math.hypot(pq.x-ref.x,pq.y-ref.y)*S.zoom;   /* viewport → 屏幕 */
         if(d<bd){ bd=d; best={id:c.id,side:side,dist:d}; }
       });
@@ -1184,9 +1231,9 @@
   /* ------------------------------------------------------------------
    *  [v207] 几何联动小工具（换选型 / 改管长都要用）
    * ------------------------------------------------------------------ */
-  function alignPortTo(compId, side, pos){        // 移动 comp，使其 side 端口落在 pos
+  function alignPortTo(compId, side, pos){        // 移动 comp，使其 side 端口落在 pos（[v222] 含高程）
     var c=findComp(compId); if(!c) return;
-    var l=portLocal(c,side); c.x=pos.x-l.x; c.y=pos.y-l.y;
+    var l=portLocal3(c,side); c.x=pos.x-l.x; c.y=pos.y-l.y; c.z=(+pos.z||0)-l.z;
   }
   /* 收集「除了 anchorSide 那一侧之外」与 comp 连通的所有组件（用于让下游跟着一起动） */
   function collectBranch(compId, anchorSide){
@@ -1214,17 +1261,18 @@
       /* 每条边只让「未访问的一端」去对齐「已访问的一端」⇒ 不会互相拉扯 */
       S.connections.slice().forEach(function(k){
         var va=visited[k.a.id], vb=visited[k.b.id];
-        if(va&&!vb){ alignPortTo(k.b.id,k.b.side,portPos(findComp(k.a.id),k.a.side)); visited[k.b.id]=true; order.push(k.b.id); }
-        else if(!va&&vb){ alignPortTo(k.a.id,k.a.side,portPos(findComp(k.b.id),k.b.side)); visited[k.a.id]=true; order.push(k.a.id); }
+        if(va&&!vb){ alignPortTo(k.b.id,k.b.side,portPos3(findComp(k.a.id),k.a.side)); visited[k.b.id]=true; order.push(k.b.id); }
+        else if(!va&&vb){ alignPortTo(k.a.id,k.a.side,portPos3(findComp(k.b.id),k.b.side)); visited[k.a.id]=true; order.push(k.a.id); }
       });
     }
   }
   /* [v210] 管子轴向单位向量（沿 rot 方向）：改管长 / 拖手柄都要按**轴向**位移，
-     不能写死 x 方向 —— 否则管件旋转 90° 之后变成竖管，下游还被横向平移，接口直接拉开。 */
-  function axisVec(c){
-    var r=((+c.rot||0))*Math.PI/180;
-    return {x:Math.cos(r), y:Math.sin(r)};
+     不能写死 x 方向 —— 否则管件旋转 90° 之后变成竖管，下游还被横向平移，接口直接拉开。
+     [v222] 升级为三轴全旋的 3D 轴向（绕 Y 转成竖管后 z 分量非零，下游要跟着升降）。 */
+  function axisVec3(c){
+    return rot3(1,0,0,c.rx,c.ry,c.rot||0);
   }
+  function axisVec(c){ var a=axisVec3(c); return {x:a.x,y:a.y}; }
   /* 改管长：以 L 口为锚，把下游整条链沿轴向平移同样距离，避免接口被拉开成缝 */
   function setPipeLen(c, newLen){
     if(!c) return;
@@ -1232,8 +1280,9 @@
     var dpx=(newLen-c.len)*SCALE;
     c.len=newLen;
     if(Math.abs(dpx)>1e-9){
-      var ax=axisVec(c);
-      collectBranch(c.id,'L').forEach(function(id){ var b=findComp(id); if(b){ b.x+=dpx*ax.x; b.y+=dpx*ax.y; } });
+      var ax=axisVec3(c);
+      collectBranch(c.id,'L').forEach(function(id){ var b=findComp(id); if(b){
+        b.x+=dpx*ax.x; b.y+=dpx*ax.y; b.z=(+b.z||0)+dpx*ax.z; } });
     }
   }
 
@@ -1243,12 +1292,14 @@
      ★ anchorSide：给定则在 AnyAI 平移时**跳过这一侧的邻居**（含刚接上的目标件）。
        不这么做会出现「永远差一个位移」的对不齐故障 —— 把 mc 对齐到对面端口时，
        若把对面那串也一起平移，目标端口自己跟着跑了，两者始终相差 Δ。 */
-  function moveWithBranch(c, nx, ny, anchorSide){
+  function moveWithBranch(c, nx, ny, anchorSide, nz){
     if(!c) return;
     var dx=nx-c.x, dy=ny-c.y;
-    if(Math.abs(dx)<1e-9 && Math.abs(dy)<1e-9) return;
-    collectBranch(c.id, anchorSide||'').forEach(function(id){ var b=findComp(id); if(b){ b.x+=dx; b.y+=dy; } });
-    c.x=nx; c.y=ny;
+    var dz=(nz==null)? 0 : (nz-(+c.z||0));
+    if(Math.abs(dx)<1e-9 && Math.abs(dy)<1e-9 && Math.abs(dz)<1e-9) return;
+    collectBranch(c.id, anchorSide||'').forEach(function(id){ var b=findComp(id); if(b){
+      b.x+=dx; b.y+=dy; if(dz) b.z=(+b.z||0)+dz; } });
+    c.x=nx; c.y=ny; if(nz!=null) c.z=nz;
   }
 
   /* [v208] 就近自动吸附（替代原 autoSnap）：
@@ -1260,7 +1311,7 @@
     var best=null, bd=1e9;
     LIB[mc.kind].ports.forEach(function(side){
       if(isPortConnected(mc.id,side)) return;
-      var near=nearestPort(portPos(mc,side), mc.id, side, radiusPx, true);
+      var near=nearestPort(portPos3(mc,side), mc.id, side, radiusPx, true);
       if(near && near.dist<bd){ bd=near.dist; best={id:near.id,side:near.side,selfSide:side,dist:near.dist}; }
     });
     return best;
@@ -1270,7 +1321,7 @@
     var made=0;
     LIB[mc.kind].ports.forEach(function(side){
       if(isPortConnected(mc.id,side)) return;
-      var near=nearestPort(portPos(mc,side), mc.id, side, radiusPx, true);
+      var near=nearestPort(portPos3(mc,side), mc.id, side, radiusPx, true);
       if(!near) return;
       var nc=findComp(near.id); if(!nc) return;
       /* 三通例外：L/R 共用一个 mainDn，别让后吸附的一侧把先接好的一侧改掉 */
@@ -1278,9 +1329,10 @@
       if(!skip) applyDnToPort(mc, side, portDn(nc,near.side));
       var r=tryConnect(mc.id,side,near.id,near.side);
       if(r.ok){
-        var op=portPos(nc,near.side), ml=portLocal(mc,side);
-        /* 带上「除刚接上这一侧之外」的旧串：目标那一侧必须留在原地，否则永远差一个位移 */
-        moveWithBranch(mc, op.x-ml.x, op.y-ml.y, side);
+        var op=portPos3(nc,near.side), ml=portLocal3(mc,side);
+        /* 带上「除刚接上这一侧之外」的旧串：目标那一侧必须留在原地，否则永远差一个位移
+           [v222] 第 5 参把高程也对齐 —— 端口翻出平面（绕 X/Y 旋转）后同样吸得上 */
+        moveWithBranch(mc, op.x-ml.x, op.y-ml.y, side, op.z-ml.z);
         made++;
         if(r.loop) toast('自动接驳（检测到管网闭环，请注意校验）','warn');
       }
@@ -1300,10 +1352,15 @@
       if(k.a.id===oldId) links.push({self:k.a.side,oId:k.b.id,oSide:k.b.side});
       else if(k.b.id===oldId) links.push({self:k.b.side,oId:k.a.id,oSide:k.a.side});
     });
-    var keep={x:oc.x,y:oc.y,len:oc.len,dn:oc.dn,bigDn:oc.bigDn,smallDn:oc.smallDn,mainDn:oc.mainDn,branchDn:oc.branchDn};
+    var keep={x:oc.x,y:oc.y,z:oc.z,len:oc.len,dn:oc.dn,bigDn:oc.bigDn,smallDn:oc.smallDn,mainDn:oc.mainDn,branchDn:oc.branchDn,
+      rx:oc.rx,ry:oc.ry,rot:oc.rot};   /* [v222] 朝向与高程也跟着走 */
     S.connections=S.connections.filter(function(k){return k.a.id!==oldId&&k.b.id!==oldId;});
     S.components=S.components.filter(function(c){return c.id!==oldId;});
     var nc=addComp(newKind,keep.x,keep.y);
+    if(keep.z!=null) nc.z=keep.z;                       /* [v222] 高程跟走 */
+    if(keep.rx) nc.rx=keep.rx;                          /* [v222] 三轴朝向跟走 */
+    if(keep.ry) nc.ry=keep.ry;
+    if(keep.rot) nc.rot=keep.rot;
     if(LIB[newKind].dns && keep.dn) nc.dn=keep.dn;
     if(LIB[newKind].hasLen && keep.len) nc.len=keep.len;
     if(newKind==='reducer' && keep.bigDn){ nc.bigDn=keep.bigDn; nc.smallDn=keep.smallDn; }
@@ -1390,11 +1447,16 @@
     }
     return arrows[best][2];
   }
-  /* 四个方向轴在**当前视图**下的样子（rot=deg 时组件局部 +x 轴指向 plan 方向 (cos,sin)） */
-  function rotAxisOptions(){
+  /* 四个方向轴在**当前视图**下的样子（rot=deg 时组件局部 +x 轴指向 plan 方向 (cos,sin)）
+     [v222] 先做三轴全旋再投影 —— 已有 rx/ry 时箭头仍与真实走向一致 */
+  function rotAxisOptions(c){
+    var rx=(c&&c.rx)||0, ry=(c&&c.ry)||0;
     return [[0,'X+ (向右)'],[90,'Y+ (向下)'],[180,'X− (向左)'],[270,'Y− (向上)']].map(function(d){
-      var a=d[0]*Math.PI/180;
-      var p=P(Math.cos(a), Math.sin(a));       // 投影后的屏幕方向
+      /* 「对齐到 d」= Rz(d)∘Ry(ry)∘Rx(rx) 施加在 +x 单位向量上。
+         ⚠ 不能写 rot3(cos d, sin d, 0, rx, ry, cur) —— (cos,sin) 已经是转过 d 的结果，
+         再乘一次 cur 就双重旋转（v210 ⑤n 回归抓出来的）。 */
+      var v=rot3(1,0,0,rx,ry,d[0]);
+      var p=P3(v.x,v.y,v.z);       // 投影后的屏幕方向（含高程抬升）
       return { deg:d[0], name:d[1], glyph:dirGlyph(p.x,p.y) };
     });
   }
@@ -1525,17 +1587,59 @@
   /* [v213] 方向轴 chips（右键菜单与 ↻ 按钮弹层共用同一份，箭头随当前视图变） */
   function rotAxisChips(c){
     var cur=((+c.rot||0)%360+360)%360;
-    return '<div class="pa-chips">'+rotAxisOptions().map(function(o){
+    return '<div class="pa-chips">'+rotAxisOptions(c).map(function(o){
       return '<div class="pa-chip'+(cur===o.deg?' on':'')+'" data-act="rotaxis" data-val="'+o.deg
         +'" title="转到 '+o.name+'，即 '+o.deg+'°">'+o.glyph+' '+o.deg+'°</div>';
     }).join('')+'</div>';
   }
-  /* [v213] ↻ 按钮弹出的「方向轴选择」层：四个绝对方向轴 + 两个步进 */
+  /* [v222] 绕 X / Y 轴的 90° 倍数旋转芯片。
+     箭头不是写死的：X 轴旋转动的是「横向」（局部 +y，弯头的出口方向），
+     Y 轴旋转动的是「主轴」（局部 +x）—— 分别把假设旋转后的向量投影到当前视图，
+     用户在哪个视图里看，箭头就是那个视图里的真实走向。 */
+  function rotAxis3Chips(c,axis){
+    var cur=(((axis==='x')?c.rx:c.ry)||0)%360;
+    var curTxt=(cur===0)?'':(cur===180?'（当前 180°）':'（当前 '+((cur===90)?'+90°':'−90°')+'）');
+    function chip(delta,label,tt){
+      return '<div class="pa-chip" data-act="rot3" data-axis="'+axis+'" data-val="'+delta+'" title="'+tt+'">'+label+'</div>';
+    }
+    function glyphAfter(delta){
+      var rx=(+c.rx||0)+(axis==='x'?delta:0);
+      var ry=(+c.ry||0)+(axis==='y'?delta:0);
+      var v=(axis==='x')? rot3(0,1,0,rx,ry,c.rot||0) : rot3(1,0,0,rx,ry,c.rot||0);
+      var p=P(v.x,v.y);
+      return dirGlyph(p.x, p.y-v.z);            /* 方向向量的投影：屏幕 y 抬 −z */
+    }
+    return '<div class="pa-chips">'
+      + chip(90, glyphAfter(90)+' +90°', '绕 '+axis.toUpperCase()+' 轴正转 90°'+curTxt)
+      + chip(-90, glyphAfter(-90)+' −90°', '绕 '+axis.toUpperCase()+' 轴反转 90°'+curTxt)
+      + chip(180, glyphAfter(180)+' 180°', '绕 '+axis.toUpperCase()+' 轴翻转 180°'+curTxt)
+      + ((cur!==0)? '<div class="pa-chip" data-act="rot3" data-axis="'+axis+'" data-val="'+(-cur)+'" title="归零（回到底面）">⟲ 0°</div>' : '')
+      + '</div>';
+  }
+  /* [v222] 绕 X / Y 轴旋转的实现（绕 Z 走既有 rotateComp）。 */
+  function rotAxis3(id, axis, delta){
+    var c=findComp(id); if(!c) return false;
+    if(axis!=='x'&&axis!=='y') return rotateComp(id,delta);
+    var d=((+delta||0)%360+360)%360;
+    var key=(axis==='x')?'rx':'ry';
+    c[key]=(((+c[key]||0)+d)%360+360)%360;
+    cascadeAlign(c.id);
+    pushHistory(); recompute(); render(); renderProps();
+    var n=function(v){ v=((+v||0)%360+360)%360; return v; };
+    toast('已绕 '+axis.toUpperCase()+' 轴旋转 '+d+'°（朝向 X '+n(c.rx)+'° / Y '+n(c.ry)+'° / Z '+n(c.rot)+'°）');
+    return true;
+  }
+  /* [v213] ↻ 按钮弹出的「方向轴选择」层：四个绝对方向轴 + 两个步进
+     [v222] 增加「绕 X 轴 / 绕 Y 轴」两组（真三维朝向） */
   function openRotAxisMenu(clientX,clientY,c){
     var h='<div class="pa-menu-h">'+LIB[c.kind].label+'<small>绕左端接口旋转</small></div>'
-      +'<div class="pa-menu-t">方向轴（箭头 = 当前视图下的实际走向）</div>'
+      +'<div class="pa-menu-t">绕 Z 轴 · 方向轴（箭头 = 当前视图下的实际走向）</div>'
       +rotAxisChips(c)
-      +'<div class="pa-menu-t">步进</div><div class="pa-chips">'
+      +'<div class="pa-menu-t">绕 X 轴（出口朝天 / 朝地）</div>'
+      +rotAxis3Chips(c,'x')
+      +'<div class="pa-menu-t">绕 Y 轴（主轴立起 / 翻面）</div>'
+      +rotAxis3Chips(c,'y')
+      +'<div class="pa-menu-t">步进（绕 Z）</div><div class="pa-chips">'
       +'<div class="pa-chip" data-act="rot" data-val="90" title="顺时针转 90°">↻ +90°</div>'
       +'<div class="pa-chip" data-act="rot" data-val="-90" title="逆时针转 90°">↺ −90°</div>'
       +'</div>';
@@ -1552,9 +1656,11 @@
     closeMenu(); if(!c) return;
     if(act==='del'){ deleteComp(c.id); return; }
     if(act==='dup'){ duplicateComp(c.id); return; }
-    /* [v213] rot=步进（±90），rotaxis=直接对齐某个方向轴 */
+    /* [v213] rot=步进（±90），rotaxis=直接对齐某个方向轴
+       [v222] rot3=绕 X / Y 轴旋转（真三维朝向） */
     if(act==='rot'){ rotateComp(c.id, +val||90); return; }
     if(act==='rotaxis'){ setRot(c.id, +val); return; }
+    if(act==='rot3'){ rotAxis3(c.id, it.getAttribute('data-axis'), +val); return; }
     if(act==='kind'){ switchKind(c.id,val); return; }
     if(act==='dn'){ setPipeDn(c,+val); return; }
     /* 变径/三通的分口径：只改对应那一段的性质，不动其它端口 */
@@ -1615,6 +1721,13 @@
     }
     h+='<div class="pa-kv"><span>局部阻力系数 ζ</span><span class="v">'+L.zeta+'</span></div>';
     h+='<div class="pa-kv"><span>端口口径</span><span class="v">'+LIB[c.kind].ports.map(function(s){return portDn(c,s);}).join(' / ')+'</span></div>';
+    /* [v222] 三轴朝向（绕左端接口）：X=出口翻上/翻下 · Y=主轴立起 · Z=平面转向 */
+    (function(){
+      var n=function(v){ v=((+v||0)%360+360)%360; return v; };
+      h+='<div class="pa-kv"><span>朝向 X / Y / Z</span><span class="v">'
+        +n(c.rx)+'° / '+n(c.ry)+'° / '+n(c.rot)+'°</span></div>';
+      if((+c.z||0)!==0) h+='<div class="pa-kv"><span>接口高程</span><span class="v">'+fmt1(c.z)+'</span></div>';
+    })();
     h+='<button class="pa-btn warn" id="pDel" style="width:100%;margin-top:10px;">🗑 删除该管件</button>';
     box.innerHTML=h;
 
@@ -1775,9 +1888,10 @@
   document.getElementById('btnFit').addEventListener('click',function(){
     if(!S.components.length){ S.zoom=1;S.panX=0;S.panY=0;applyTransform();return; }
     var minx=1e9,miny=1e9,maxx=-1e9,maxy=-1e9;
-    /* [v206] 轴测下必须按**投影后**的屏幕包围盒取（否则 layout 会按平面尺寸算，图被切边） */
+    /* [v206] 轴测下必须按**投影后**的屏幕包围盒取（否则 layout 会按平面尺寸算，图被切边）
+       [v222] 走含高程投影 —— 立管/翻起的端口也要框进来 */
     S.components.forEach(function(c){ LIB[c.kind].ports.forEach(function(s){
-      var p=portPos(c,s), q=P(p.x,p.y);
+      var p=portPos3(c,s), q=P3(p.x,p.y,p.z);
       minx=Math.min(minx,q.x);miny=Math.min(miny,q.y);maxx=Math.max(maxx,q.x);maxy=Math.max(maxy,q.y); }); });
     var pad=60, w=maxx-minx+pad*2, h=maxy-miny+pad*2;
     var rect=svg.getBoundingClientRect();
@@ -1902,6 +2016,12 @@
     /* [v210] 复制 / 旋转 / 移动 / 视图 */
     duplicateComp:duplicateComp, rotateComp:rotateComp, setRot:setRot, nudgeComp:nudgeComp,
     rotAxisOptions:rotAxisOptions,
+    /* [v222] 三轴旋转：绕 X / Y 轴 + 3D 端口坐标（自动化验证走真实入口） */
+    rotAxis3:rotAxis3,
+    portPos3Of:function(id,side){ var c=findComp(id); return c? portPos3(c,side) : null; },
+    rot3Of:function(x,y,z,rx,ry,rz){ return rot3(x,y,z,rx,ry,rz); },
+    setPipeLenOf:function(id,len){ var c=findComp(id); if(!c) return false; setPipeLen(c,len);
+      pushHistory(); recompute(); render(); renderProps(); return true; },
     setMoveMode:setMoveMode, getMoveMode:function(){ return !!S.moveMode; },
     setView:setView, getView:function(){ return S.view; },
     portLocalOf:function(id,side){ var c=findComp(id); return c? portLocal(c,side) : null; },
