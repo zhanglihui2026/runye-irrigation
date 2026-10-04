@@ -6421,9 +6421,10 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
          [v221] 整组从「联合灌溉」行内挪出、独占一行：原 inline 挤在同一 .pp-plan-item 里，
          左栏 278px 宽度不够 ⇒ 按钮被压成 26px 竖条（文字竖排）。拆行使 .pp-plan-bar 的
          flex-wrap 自然换行 —— 与下方「保存分组」行同构。 -->
+    <!-- [v224]（2026-10-04 用户要求）「按面积分组」按钮挪到亩数输入框**前面**：先按按钮、再填亩数 -->
     <span class="pp-plan-item" style="gap:5px;min-height:22px">
-      <input type="number" id="tlAreaGroupMu" value="36" min="0.1" step="1" title="每个联合灌溉区的目标面积（亩）：按分区顺序累加，累计不超过该值就并成一组" style="width:56px;font-size:11px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px;color:#334155">亩
       <button type="button" id="tlAreaGroupBtn" title="按目标面积把分区按顺序累加成联合灌溉组（每累计到目标亩数即断组开新组）" style="font-size:11px;padding:3px 10px;border:1px solid #cbd5e1;background:#fff;border-radius:4px;cursor:pointer;color:#334155">按面积成组</button>
+      <input type="number" id="tlAreaGroupMu" value="36" min="0.1" step="1" title="每个联合灌溉区的目标面积（亩）：按分区顺序累加，累计不超过该值就并成一组" style="width:56px;font-size:11px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px;color:#334155">亩
     </span>
     <!-- [v216]（2026-10-04 用户要求）「保存分组 / 调出分组 / 恢复初始化」三钮并一行，
          「手动分组 / 联合分区」标签与「分组：自动…」「⊕ 变更时自动」提示文字全部取消。
