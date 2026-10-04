@@ -10657,7 +10657,12 @@ function tlFlowClear(svg) {
   var old = svg.querySelectorAll('[data-tlflow]');
   for (var i = 0; i < old.length; i++) { if (old[i].parentNode) old[i].parentNode.removeChild(old[i]); }
 }
-/* 组装某个区的水路折线（屏幕坐标） */
+/* 组装某个区的水路折线（屏幕坐标）
+   [v223] 返回 { pts:折线, valves:[途经阀门] } —— 「主管→支管」那一段必须**经过阀门**
+   （用户原话：「主管出来的水流进入支管那一段，要跟主管到支管的阀门对应」）：
+   图面上每根支管的阀是挂在主管上的红⊗（斜连接管连接），旧版水流直接从主管
+   斜切进支管起点 ⇒ 水流线与阀门位置对不上。现在水流沿「主管取水点 → 阀门中心
+   → 支管」走，与图面画法（三通→连接管→阀→支管）一一对应。 */
 function tlFlowRoute(svg, fPts, zi) {
   var mEl = svg.querySelector('path[data-tlpipe="main-' + zi + '"]');
   if (!mEl) return null;
@@ -10675,18 +10680,41 @@ function tlFlowRoute(svg, fPts, zi) {
   if (tlFlowLen(sub[sub.length - 1], tap.q) > 0.5) sub.push(tap.q);
   var out = sub.concat([mp[0]]);                 /* 接入短管（总监→该区主管，一般是一小段斜线） */
   for (var j = 0; j < mp.length; j++) out.push(mp[j]);
-  /* 支管：从主管上最近的落点接进去（支管通常挂在主管中后段） */
+  /* 支管：从主管上最近的落点接进去（支管通常挂在主管中后段）
+     [v223] 接入点取「该支管阀门」在主管上的垂足 —— 水流先到阀再到支管 */
   var bEl = svg.querySelector('path[data-tlpipe="branch-' + zi + '"]');
+  var passed = [];
   if (bEl) {
     var bPts = tlFlowParseD(bEl.getAttribute('d'));
     if (bPts.length >= 2) {
       var s0 = tlFlowNear(bPts[0], mp), s1 = tlFlowNear(bPts[bPts.length - 1], mp);
       var bp = (s0 && (!s1 || s0.d <= s1.d)) ? bPts : bPts.slice().reverse();
-      out.push(tlFlowNear(bp[0], mp).q);
+      /* 该支管的阀门 = 离支管起点最近的红⊗。排除两类「不是支管阀」的红圈：
+        ① 总管×主管交接阀（<g data-junction-valve> 内）②水源标记（紧贴总管起点）。
+        半径 60px：阀与支管起点本就重合/相邻（斜连接管很短），超出的不认。 */
+      var vv = null;
+      var vs = svg.querySelectorAll('circle[fill="#ef4444"]');
+      for (var w = 0; w < vs.length; w++) {
+        if (vs[w].closest && vs[w].closest('[data-junction-valve]')) continue;
+        var vx = +vs[w].getAttribute('cx'), vy = +vs[w].getAttribute('cy');
+        var dv = tlFlowLen([vx, vy], bp[0]);
+        if (dv > 60) continue;
+        if (tlFlowLen([vx, vy], fPts[0]) < 12) continue;      /* 水源标记排除 */
+        if (!vv || dv < vv.d) vv = { x: vx, y: vy, d: dv, r: +vs[w].getAttribute('r') || 6.5 };
+      }
+      if (vv) {
+        /* 主管取水点改为「阀门在主管上的垂足」，水流：主管 → 阀 → 支管 */
+        var jt = tlFlowNear([vv.x, vv.y], mp);
+        out.push(jt.q);
+        out.push([vv.x, vv.y]);
+        passed.push(vv);
+      } else {
+        out.push(tlFlowNear(bp[0], mp).q);                    /* 找不到阀 ⇒ 退回旧行为 */
+      }
       for (var m = 0; m < bp.length; m++) out.push(bp[m]);
     }
   }
-  return out;
+  return { pts: out, valves: passed };
 }
 /* 本轮演示：svg=宿主 <svg>，g=组号（null = 退出演示） */
 function tlDemoRenderFlow(svg, g) {
@@ -10719,8 +10747,17 @@ function tlDemoRenderFlow(svg, g) {
     layer.setAttribute('pointer-events', 'none');
     var routes = [], opened = [];
     for (var z = 0; z < zis.length; z++) {
-      var pts = tlFlowRoute(svg, fPts, zis[z]);
-      if (pts && pts.length >= 2) routes.push(pts);
+      var rr = tlFlowRoute(svg, fPts, zis[z]);
+      if (rr && rr.pts && rr.pts.length >= 2) {
+        routes.push(rr.pts);
+        /* [v223] 水流经过的支管阀 ⇒ 一并视为开启（与矩形内阀门按位置去重，4px 容差） */
+        for (var pv = 0; pv < rr.valves.length; pv++) {
+          var pvx = rr.valves[pv].x, pvy = rr.valves[pv].y, pvr = rr.valves[pv].r;
+          var dup = false;
+          for (var od = 0; od < opened.length; od++) { if (tlFlowLen([pvx, pvy], opened[od]) < 4) { dup = true; break; } }
+          if (!dup) opened.push([pvx, pvy, pvr]);
+        }
+      }
     }
     if (!routes.length) return;
     /* ① 水源脉冲圈：取所有 #f59e0b 里离总管起点最近的那枚 */
@@ -10768,29 +10805,36 @@ function tlDemoRenderFlow(svg, g) {
       for (var w = 0; w < vs.length; w++) {
         var vx = +vs[w].getAttribute('cx'), vy = +vs[w].getAttribute('cy'), vr = +vs[w].getAttribute('r') || 6.5;
         if (vx < rx || vx > rx + rw || vy < ry || vy > ry + rh) continue;   /* 不在本分区内 ⇒ 不是这一区的阀 */
-        opened.push([vx, vy, vr]);
-        var gv = document.createElementNS(NS, 'g');
-        gv.setAttribute('data-tlflow', 'valve');
-        var ri = document.createElementNS(NS, 'circle');
-        ri.setAttribute('cx', vx); ri.setAttribute('cy', vy); ri.setAttribute('r', vr + 4.5);
-        ri.setAttribute('fill', 'none'); ri.setAttribute('stroke', '#16a34a'); ri.setAttribute('stroke-width', '2');
-        ri.setAttribute('class', 'tl-demo-valve-ring');
-        /* 阀杆：初始横向（关），动画转到纵向（开）—— 视觉上就是「阀门打开了」 */
-        var hb = document.createElementNS(NS, 'g');
-        hb.setAttribute('class', 'tl-demo-valve-open');
-        hb.setAttribute('style', 'transform-origin:' + vx.toFixed(1) + 'px ' + vy.toFixed(1) + 'px');
-        var ln = document.createElementNS(NS, 'line');
-        ln.setAttribute('x1', vx - vr - 3.2); ln.setAttribute('y1', vy);
-        ln.setAttribute('x2', vx + vr + 3.2); ln.setAttribute('y2', vy);
-        ln.setAttribute('stroke', '#166534'); ln.setAttribute('stroke-width', '2.6'); ln.setAttribute('stroke-linecap', 'round');
-        var hb2 = document.createElementNS(NS, 'rect');
-        hb2.setAttribute('x', vx + vr + 1.4); hb2.setAttribute('y', vy - 3.4);
-        hb2.setAttribute('width', '7'); hb2.setAttribute('height', '6.8'); hb2.setAttribute('rx', '1.6');
-        hb2.setAttribute('fill', '#16a34a');
-        hb.appendChild(ln); hb.appendChild(hb2);
-        gv.appendChild(ri); gv.appendChild(hb);
-        layer.appendChild(gv);
+        /* [v223] 与水流途经阀门按位置去重（4px）—— 同一枚阀只画一个开启环 */
+        var dup2 = false;
+        for (var od2 = 0; od2 < opened.length; od2++) { if (tlFlowLen([vx, vy], opened[od2]) < 4) { dup2 = true; break; } }
+        if (!dup2) opened.push([vx, vy, vr]);
       }
+    }
+    /* [v223] 统一画「开启」环 + 转柄：集合来源 = 水流途经的支管阀 + 分区矩形内的阀 */
+    for (var v2 = 0; v2 < opened.length; v2++) {
+      var vx2 = opened[v2][0], vy2 = opened[v2][1], vr2 = opened[v2][2];
+      var gv = document.createElementNS(NS, 'g');
+      gv.setAttribute('data-tlflow', 'valve');
+      var ri = document.createElementNS(NS, 'circle');
+      ri.setAttribute('cx', vx2); ri.setAttribute('cy', vy2); ri.setAttribute('r', vr2 + 4.5);
+      ri.setAttribute('fill', 'none'); ri.setAttribute('stroke', '#16a34a'); ri.setAttribute('stroke-width', '2');
+      ri.setAttribute('class', 'tl-demo-valve-ring');
+      /* 阀杆：初始横向（关），动画转到纵向（开）—— 视觉上就是「阀门打开了」 */
+      var hb = document.createElementNS(NS, 'g');
+      hb.setAttribute('class', 'tl-demo-valve-open');
+      hb.setAttribute('style', 'transform-origin:' + vx2.toFixed(1) + 'px ' + vy2.toFixed(1) + 'px');
+      var ln = document.createElementNS(NS, 'line');
+      ln.setAttribute('x1', vx2 - vr2 - 3.2); ln.setAttribute('y1', vy2);
+      ln.setAttribute('x2', vx2 + vr2 + 3.2); ln.setAttribute('y2', vy2);
+      ln.setAttribute('stroke', '#166534'); ln.setAttribute('stroke-width', '2.6'); ln.setAttribute('stroke-linecap', 'round');
+      var hb2 = document.createElementNS(NS, 'rect');
+      hb2.setAttribute('x', vx2 + vr2 + 1.4); hb2.setAttribute('y', vy2 - 3.4);
+      hb2.setAttribute('width', '7'); hb2.setAttribute('height', '6.8'); hb2.setAttribute('rx', '1.6');
+      hb2.setAttribute('fill', '#16a34a');
+      hb.appendChild(ln); hb.appendChild(hb2);
+      gv.appendChild(ri); gv.appendChild(hb);
+      layer.appendChild(gv);
     }
     if (layer.childNodes.length) svg.appendChild(layer);
   } catch (eF) { }
