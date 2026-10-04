@@ -82,8 +82,9 @@
   function syncMode() {
     document.documentElement.classList.toggle('ry-mobile', query.matches);
     var file = location.pathname.split('/').pop();
-    if (query.matches && file === 'runye-landing.html') {
-      location.replace('runye-map-measure.html'); return;
+    if (query.matches && ['','index.html','runye-landing.html','runye-map-measure.html'].indexOf(file) >= 0) {
+      var stage = location.hash === '#tlPipePlanSection' ? '#third' : location.hash === '#pipePlanSection' ? '#second' : '';
+      location.replace('runye-mobile-map-preview.html?v=237' + stage); return;
     }
     if (!ready || !query.matches) return;
     if (file === 'index.html' || !file) {

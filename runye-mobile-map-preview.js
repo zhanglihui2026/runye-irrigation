@@ -107,5 +107,6 @@
  map.on('moveend',function(){var p=fromDisplay(map.getCenter());$('coordinates').textContent=p[0].toFixed(5)+'°N '+p[1].toFixed(5)+'°E';});
  document.querySelectorAll('[data-base]').forEach(function(b){b.onclick=function(){if(base===b.dataset.base)return;var p=fromDisplay(map.getCenter()),zoom=map.getZoom();base=b.dataset.base;map.removeLayer(base==='satellite'?street:satellite);(base==='satellite'?satellite:street).addTo(map);map.setView(display(p),zoom);$('mapSource').textContent=base==='satellite'?'高德卫星':'OpenStreetMap';document.querySelectorAll('[data-base]').forEach(function(other){other.classList.toggle('active',other===b);});renderLayers();};});
  window.RyMobileMapPreview={getMap:function(){return map;},getState:function(){return {mode:mode,panel:panel,drawing:drawing,points:points.map(function(p){return p.slice();}),partition:partition,visibility:Object.assign({},visibility),layers:Object.keys(layers).reduce(function(r,k){r[k]=layers[k].getLayers().length;return r;},{})};}};
- syncSummary();
+ function openLinkedStage(){var stage=location.hash.slice(1);if(stage==='second'||stage==='third')openPanel(stage);}
+ window.addEventListener('hashchange',openLinkedStage);openLinkedStage();syncSummary();
 })();
