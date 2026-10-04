@@ -1162,6 +1162,15 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
 #ryCadGrpTl .tl-group-btn:hover{background:#dbeafe;border-color:#93c5fd}
 #tlPipePlanSection .tl-group-btn:active,
 #ryCadGrpTl .tl-group-btn:active{background:#bfdbfe}
+/* [v229] 三钮移至右侧「联合灌溉分组」面板（#tlGroupPanel），蓝色样式在新宿主生效；
+   width:100% 使其与面板内 .tl-ws-btn 等宽竖向排列。 */
+#tlGroupPanel .tl-group-btn{
+  font-size:11px;line-height:1;padding:5px 10px;white-space:nowrap;width:100%;
+  border:1px solid #bfdbfe;background:#eff6ff;
+  cursor:pointer;color:#1d4ed8;transition:background .15s,border-color .15s;
+}
+#tlGroupPanel .tl-group-btn:hover{background:#dbeafe;border-color:#93c5fd}
+#tlGroupPanel .tl-group-btn:active{background:#bfdbfe}
 #threeLevelView .pp-plan-val{color:#15803d}
 #threeLevelView .pp-plan-item input,
 #threeLevelView .pp-plan-item select{
@@ -6459,19 +6468,14 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
       <button type="button" id="tlAreaGroupBtn" class="pp-plan-label" title="按目标面积把分区按顺序累加成联合灌溉组（每累计到目标亩数即断组开新组）" style="margin-right:0;background:none;border:none;padding:0;font:inherit;color:inherit;cursor:pointer">面积成组</button>
       <input type="number" id="tlAreaGroupMu" value="36" min="0.1" step="1" title="每个联合灌溉区的目标面积（亩）：按分区顺序累加，累计不超过该值就并成一组" style="width:56px;font-size:11px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px;color:#334155">亩
     </span>
-    <!-- [v216]（2026-10-04 用户要求）「保存分组 / 调出分组 / 恢复初始化」三钮并一行，
+    <!-- [v216]（2026-10-04 用户要求）「保存分组 / 调出分组 / 恢复初始化」三钮原在左栏并一行，
          「手动分组 / 联合分区」标签与「分组：自动…」「⊕ 变更时自动」提示文字全部取消。
          v112（2026-09-22）：手动分组「保存 / 调出」——点上方自动 N 区按钮会清空手动分组（既有行为），
          保存=当前手动分组深拷贝快照（内存 + localStorage 按地块名分槽持久，刷新页面也在）；
          调出=恢复快照并走 tlApplyGroups 重生成图面。
-         v177（2026-10-01）：恢复初始化复用「点 N 区按钮」那条既有复位路径，状态清理只有一份实现。 -->
-    <span class="pp-plan-item" style="gap:5px;min-height:22px;flex-wrap:wrap">
-      <!-- [v221]（2026-10-04 用户要求）三钮由裸白样式改为蓝色样式（.tl-group-btn，见样式区），
-           色板取本页既有蓝色强调系 #eff6ff/#bfdbfe/#1d4ed8（与三通插入弹窗、路径损失提示同源） -->
-      <button type="button" class="tl-group-btn" id="tlGroupSaveBtn" title="保存当前手动分组；点上方自动按钮清空后可重新调出">保存分组</button>
-      <button type="button" class="tl-group-btn" id="tlGroupRestoreBtn" title="调出已保存的手动分组">调出分组</button>
-      <button type="button" class="tl-group-btn" id="tlGroupInitBtn" title="一键回到初始化设计：分区数回初始、清空手动分组与已建联合组、清掉手动拖过的分界线，并按初始设计重新生成图面。不影响「保存分组」已存的档 —— 误点后可点「调出分组」找回。">↺ 恢复初始化</button>
-    </span>
+         v177（2026-10-01）：恢复初始化复用「点 N 区按钮」那条既有复位路径，状态清理只有一份实现。
+         [v229]（2026-10-04 用户要求）三钮已从左栏移到右侧「联合灌溉分组」面板体、清空勾选行之下，
+         竖向排列（id 不变 ⇒ v216/v177 原接线零改动；外观沿用 v221 蓝色，新增 #tlGroupPanel 祖先选择器）。 -->
     <!-- [v216] 「分组：自动（按 N=2 均分）/ 手动分组表格」文字行已按用户要求取消
          （手动分组明细看右侧「联合灌溉分组」面板）；tlRefreshGroupStatus 保留，
          现在只负责「分组一变 → 轮灌演示 chips 重建」这一件事。 -->
@@ -6741,6 +6745,14 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
         <div class="tl-gp-actions">
           <button class="tl-ws-btn" id="tlGroupMergeBtn" type="button" title="将勾选的 2 个及以上分区合并为一个联合灌溉组">⊕ 合并为一组</button>
           <button class="tl-ws-btn" id="tlGroupClearSel" type="button" title="清空当前勾选">清空勾选</button>
+        </div>
+        <!-- [v229]（2026-10-04 用户要求）「保存分组 / 调出分组 / 恢复初始化」三钮从左栏移到此处
+             （右侧「联合灌溉分组」面板体、清空勾选行之下），竖向排列。
+             id 不变 ⇒ v216/v177 原接线（getElementById）零改动；外观沿用 v221 蓝色，见样式区 #tlGroupPanel 祖先。 -->
+        <div class="tl-gp-save" style="display:flex;flex-direction:column;gap:6px;margin:8px 0">
+          <button type="button" class="tl-group-btn" id="tlGroupSaveBtn" title="保存当前手动分组；点上方自动按钮清空后可重新调出">保存分组</button>
+          <button type="button" class="tl-group-btn" id="tlGroupRestoreBtn" title="调出已保存的手动分组">调出分组</button>
+          <button type="button" class="tl-group-btn" id="tlGroupInitBtn" title="一键回到初始化设计：分区数回初始、清空手动分组与已建联合组、清掉手动拖过的分界线，并按初始设计重新生成图面。不影响「保存分组」已存的档 —— 误点后可点「调出分组」找回。">↺ 恢复初始化</button>
         </div>
         <div class="tl-gp-hint">已建联合组（点 ✕ 删除该组）：</div>
         <div id="tlGroupList" class="tl-gp-groups"></div>
