@@ -130,6 +130,8 @@
 </style>
 <link rel="stylesheet" href="runye-theme.css">
   <link rel="stylesheet" href="runye-nav.css">
+<link rel="stylesheet" href="runye-mobile.css">
+<script src="runye-mobile.js"></script>
 </head>
 <body>
 <div id="app">
@@ -1096,7 +1098,7 @@
       localStorage.setItem('runyeMeasuredArea', JSON.stringify(payload));
       if(btnEl){ var old=btnEl.textContent; btnEl.textContent='回传中…';
         setTimeout(function(){ btnEl.textContent=old; }, 1200); }
-      setTimeout(function(){ window.location.href='index.html#areaTool'; }, 350);
+      setTimeout(function(){ window.location.href='index.html#'+(window.RyMobile && window.RyMobile.isActive() ? 'pipePlanSection' : 'areaTool'); }, 350);
     }catch(e){ alert('写入失败：'+e.message); }
   }
 

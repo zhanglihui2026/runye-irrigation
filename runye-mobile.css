@@ -1,0 +1,59 @@
+/* 类仅由手机断点添加；设备横屏和浏览器地址栏变化均使用动态视口高度。 */
+.ry-mobile-bar,.ry-mobile-zoom{display:none}
+html.ry-mobile{--fn-nav-h:48px;height:100%;overflow:hidden}
+html.ry-mobile body{margin:0;height:100vh;height:100dvh;overflow:hidden}
+html.ry-mobile .fn-nav .fn-inner{height:48px;padding:0!important;max-width:none;overflow:hidden}
+html.ry-mobile .fn-nav .fn-link{display:none!important}
+html.ry-mobile .fn-nav .fn-link[data-ry-mobile-nav]{display:inline-flex!important;flex:1 1 0;justify-content:center;min-width:0;height:48px;padding:0 4px;font-size:14px}
+html.ry-mobile .ry-nav .main-header,
+html.ry-mobile .ry-statusbar,
+html.ry-mobile #ryCadSide{display:none!important}
+html.ry-mobile body > main{height:calc(100vh - 49px);height:calc(100dvh - 49px);padding:0!important;overflow:hidden}
+html.ry-mobile body > main > *{display:none!important}
+html.ry-mobile body > main > #pipePlanSection.ry-active,
+html.ry-mobile body > main > #tlPipePlanSection.ry-active{position:relative;display:flex!important;flex-direction:column;height:100%!important;min-height:0!important;max-width:none;margin:0!important;padding:0!important;border:0;border-radius:0;overflow:hidden}
+html.ry-mobile .ry-mobile-bar{display:flex;flex:none;height:44px;gap:8px;padding:3px 8px;background:#f4f7f5;border-bottom:1px solid #d5ded8}
+html.ry-mobile .ry-mobile-bar button{min-height:38px;padding:0 12px;border:1px solid #a8bcae;background:#fff;color:#173e32;font:inherit;font-size:14px}
+html.ry-mobile :is(#pipePlanSection,#tlPipePlanSection) > .pp-body{position:relative;display:flex;flex:1;flex-direction:column;min-width:0;min-height:0;width:100%;max-width:100%;height:auto;margin:0;padding:0;gap:0;overflow:hidden}
+html.ry-mobile :is(#pipePlanSection,#tlPipePlanSection) .pp-side{display:none!important}
+html.ry-mobile :is(#pipePlanSection,#tlPipePlanSection)[data-mobile-panel="open"] > .pp-body > :is(#ppSide,#tlSide){display:flex!important;position:absolute;inset:0 0 auto;z-index:40;width:100%;max-height:80%;max-height:calc(100% - 60px);overflow:auto;gap:8px;padding:10px;background:#f7faf8;border-bottom:2px solid #a8bcae;box-sizing:border-box}
+html.ry-mobile :is(#pipePlanSection,#tlPipePlanSection) .pp-stage{display:flex;flex:1;flex-direction:column;min-width:0;min-height:0;width:100%;max-width:100%;height:100%;padding:0;overflow:hidden}
+html.ry-mobile :is(#pipePlanSection,#tlPipePlanSection) .pp-grip,
+html.ry-mobile #tlWsSegStatsGrip,
+html.ry-mobile #tlWsStats,
+html.ry-mobile #tlWsOverlays{display:none!important}
+html.ry-mobile :is(#pipePlanSection,#tlPipePlanSection) .ry-pane{flex:1;min-width:0;min-height:0;width:100%;max-width:100%;height:100%;overflow:hidden}
+html.ry-mobile #pipePlanSection[data-ry-view="edit"] .ry-pane-edit,
+html.ry-mobile #tlPipePlanSection[data-ry-view="ws"] .ry-pane-ws{display:flex;flex-direction:column}
+html.ry-mobile #pipePlanSection #ppToolbar,
+html.ry-mobile #tlPipePlanSection #tlWsToolbar{flex:none;order:-1;display:flex;flex-direction:row;flex-wrap:nowrap;align-items:center;width:100%;max-width:100%;max-height:60px;min-width:0;gap:6px;margin:0;padding:6px;overflow-x:auto;overflow-y:hidden;grid-column:auto;grid-row:auto;background:#f4f7f5}
+html.ry-mobile :is(#ppToolbar,#tlWsToolbar) > *{flex:none;white-space:nowrap}
+html.ry-mobile :is(#ppToolbar,#tlWsToolbar) button{min-height:40px;font-size:13px}
+html.ry-mobile #tlWsToolbar .tl-ws-btn{width:auto;min-width:70px;padding:0 10px}
+html.ry-mobile #pipePlanSection #ppCanvasWrap,
+html.ry-mobile #tlPipePlanSection #tlWsContent{position:relative;flex:1;min-height:0;height:auto!important;width:100%;margin:0;overflow:hidden;border-radius:0}
+html.ry-mobile #pipePlanSection #ppLegend{flex:none;margin:0;padding:4px 8px;font-size:10px}
+html.ry-mobile #ppPickResult{flex:none;margin:0;max-height:54px;overflow:auto}
+html.ry-mobile .pp-diagram-wrap{flex:1;min-width:0;min-height:0;height:100%!important;max-height:none;margin:0!important;overflow:auto}
+html.ry-mobile :is(#ppDiagramContent,#tlDiagramContent){min-width:0;padding:4px}
+html.ry-mobile :is(#ppDiagramContent,#tlDiagramContent) > svg{display:block;width:100%;height:auto;max-width:100%}
+html.ry-mobile :is(#pipePlanSection,#tlPipePlanSection) input:not([type="checkbox"]):not([type="range"]),
+html.ry-mobile :is(#pipePlanSection,#tlPipePlanSection) select{max-width:100%;font-size:16px;min-height:36px}
+html.ry-mobile #app{height:100vh;height:100dvh;overflow:hidden}
+html.ry-mobile #app > .main{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+html.ry-mobile #app .side{display:none!important}
+html.ry-mobile #app .main[data-mobile-panel="open"] .side{display:flex!important;position:absolute;top:44px;left:0;right:0;z-index:1150;width:100%!important;max-height:calc(100% - 100px);border:0;border-bottom:2px solid #a8bcae;overflow:auto}
+html.ry-mobile #app .side-grip{display:none}
+html.ry-mobile #app .map-wrap{flex:1;min-height:0;min-width:0;width:100%}
+html.ry-mobile #app .tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+html.ry-mobile #app :is(.search-row,.sr-list,.pill-list,.hint){grid-column:1/-1;min-width:0}
+html.ry-mobile #app .side input{font-size:16px;min-height:40px}
+html.ry-mobile #app .mbtn{min-height:40px;font-size:13px;white-space:normal;height:auto}
+html.ry-mobile #app .warn{max-width:calc(100% - 16px);width:max-content;top:8px;padding:6px;font-size:12px}
+html.ry-mobile #app .tip{left:8px;bottom:max(8px,env(safe-area-inset-bottom));max-width:calc(100% - 16px);font-size:11px;padding:6px}
+html.ry-mobile #tlWsContent,html.ry-mobile #ppCanvas{touch-action:none}
+html.ry-mobile #tlWsLayerPanel{left:auto!important;right:8px!important;top:68px!important;width:min(238px,calc(100% - 16px))!important;max-height:calc(100% - 120px)!important}
+html.ry-mobile #tlWsLayerPanelGrip{display:none}
+html.ry-mobile #tlPipePlanSection[data-ry-view="ws"] > .ry-mobile-zoom{display:flex;position:absolute;right:8px;bottom:max(8px,env(safe-area-inset-bottom));gap:4px;z-index:45}
+html.ry-mobile .ry-mobile-zoom button{min-width:40px;min-height:40px;padding:0 8px;border:1px solid #a8bcae;background:#fff;color:#173e32;font-size:14px}
+@media print{.ry-mobile-bar{display:none!important}}

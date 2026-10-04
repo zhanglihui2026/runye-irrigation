@@ -5820,6 +5820,8 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
 }
 
 </style>
+<link rel="stylesheet" href="runye-mobile.css">
+<script src="runye-mobile.js"></script>
 </head>
 <body>
 
@@ -13466,6 +13468,7 @@ function grSyncSecondLevelToGroupPage(){
 }
 
 function rySetTab(sectionId, view) {
+  if(window.RyMobile && window.RyMobile.isActive() && sectionId==='tlPipePlanSection' && (view==='sys' || view==='iso')) view='ws';
   /* [v193] 成组地块拦截三级页入口（三条路都要拦，见上方说明） */
   if(sectionId==='tlPipePlanSection' && typeof ryGroupThirdLevelGuard==='function' && ryGroupThirdLevelGuard())return;
   var sec = document.getElementById(sectionId);
@@ -19369,7 +19372,7 @@ threeDModelingSection:'经济指标分析 · 入口预留（方案确定后上�
        · window.ryShowSection / window.ryJumpToSection 也没挂上去
      宽屏当时"看起来还能切"只是因为浏览器原生锚点跳转兜了底；
      一旦功能区真的按 display:none 收起，锚点就无处可跳，表现为"点了没反应"。 */
-  function isTool(){ return document.body.classList.contains('ry-tool'); }
+  function isTool(){ return document.body.classList.contains('ry-tool') || (window.RyMobile && window.RyMobile.isActive()); }
 
   var items=[];
   Array.prototype.slice.call(nav.querySelectorAll('.fn-link')).forEach(function(a){
@@ -19418,6 +19421,7 @@ threeDModelingSection:'经济指标分析 · 入口预留（方案确定后上�
   /* 单视口：显示指定功能区，其余隐藏；同步导航高亮与底部状态栏。
      仅工具模式使用；非工具模式由下面的滚动逻辑接管。 */
   function ryShowSection(sec, link){
+    if(window.RyMobile && window.RyMobile.isActive() && sec && window.RyMobile.sections.indexOf(sec.id)<0) sec=document.getElementById('pipePlanSection');
     /* [v193] 成组地块拦截三级页入口（与 rySetTab 里的拦截互为兜底） */
     if(sec && sec.id==='tlPipePlanSection' && typeof ryGroupThirdLevelGuard==='function' && ryGroupThirdLevelGuard())return;
     var all=document.querySelectorAll('main > .ry-sec');
@@ -19451,6 +19455,7 @@ threeDModelingSection:'经济指标分析 · 入口预留（方案确定后上�
      用途：地块库「设为当前」确认后，直接跳到「二级管路制图区」查看生成的施工简图。
      传入要素 id（如 'pipePlanSection'）；同步点亮对应导航项。 */
   window.ryJumpToSection=function(id){
+    if(window.RyMobile && window.RyMobile.isActive() && window.RyMobile.sections.indexOf(id)<0) id='pipePlanSection';
     var el=document.getElementById(id);
     if(!el) return false;
     /* 清理历史满屏态（.sys-view / .pipe-view 已由主区 Tab 取代，这里只做兼容清理） */
@@ -22823,6 +22828,7 @@ var ISO_FITTING_UI_OFF = true;
     bodyEl = document.createElement('div');
     bodyEl.style.cssText = 'padding:7px 9px 9px';
     panel.appendChild(head); panel.appendChild(bodyEl);
+    if(window.RyMobile && window.RyMobile.isActive()){ collapsed=true; bodyEl.style.display='none'; panel.querySelector('#tlWsLayerPanelCaret').textContent='▸'; }
     var ctn = document.getElementById('tlWsContent');
     var host = (ctn && ctn.parentNode) ? ctn.parentNode : document.body;
     host.appendChild(panel);

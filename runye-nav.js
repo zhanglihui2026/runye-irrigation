@@ -54,6 +54,7 @@
       if (localAction) a.type = 'button';
       a.className = 'fn-link';
       a.setAttribute('data-ry-navitem', '1');
+      if(it.href==='runye-map-measure.html' || it.hash==='pipePlanSection' || it.hash==='tlPipePlanSection') a.setAttribute('data-ry-mobile-nav','1');
       a.textContent = it.label;
       if (it.title) a.title = it.title;
       if (it.act && !localAction) {
