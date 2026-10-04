@@ -1110,6 +1110,15 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
 }
 #tlZoneCountGroup button.selected, #tlDemoChips button.selected{background:var(--g-700);color:#fff;border-color:var(--g-700)}
 #tlZoneCountGroup button:hover:not(.selected), #tlDemoChips button:hover:not(.selected){background:var(--s-50)}
+/* [v233]「按亩自动组合」实体按钮：与「1区..4区」同款白底描边；成组生效后 .on 点亮
+   （绿底白字 = .selected 同一视觉语言）。全站扁平化，不写 border-radius。 */
+#tlAreaGroupCalcBtn{
+  font-size:11px;font-weight:400;padding:3px 10px;
+  border:1px solid var(--s-200);background:#fff;color:var(--s-600);cursor:pointer;transition:var(--transition);
+  margin-left:6px;vertical-align:middle;
+}
+#tlAreaGroupCalcBtn.on{background:var(--g-700);color:#fff;border-color:var(--g-700)}
+#tlAreaGroupCalcBtn:hover:not(.on){background:var(--s-50)}
 
 /* ===== Three-level view: blue theme overrides for hardcoded green elements ===== */
 #threeLevelView .step{
@@ -6467,7 +6476,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     <span class="pp-plan-item" style="gap:5px;min-height:22px">
       <button type="button" id="tlAreaGroupBtn" class="pp-plan-label" title="按目标面积把分区按顺序累加成联合灌溉组（每累计到目标亩数即断组开新组）" style="margin-right:0;background:none;border:none;padding:0;font:inherit;color:inherit;cursor:pointer">面积成组</button>
       <input type="number" id="tlAreaGroupMu" value="36" min="0.1" step="1" title="每个联合灌溉区的目标面积（亩）：按分区顺序累加，累计不超过该值就并成一组" style="width:56px;font-size:11px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px;color:#334155">亩
-      <button type="button" id="tlAreaGroupCalcBtn" class="pp-plan-label" title="按目标亩数从第一个分区起累加：累计不超目标亩数就并入同组，超过阈值就断开开新组，依次递推自动组合联合灌溉区" style="margin-left:6px;background:none;border:none;padding:0;font:inherit;color:#1d4ed8;cursor:pointer">按亩自动组合</button>
+      <button type="button" id="tlAreaGroupCalcBtn" title="按目标亩数从第一个分区起累加：累计不超目标亩数就并入同组，超过阈值就断开开新组，依次递推自动组合联合灌溉区">按亩自动组合</button>
     </span>
     <!-- [v216]（2026-10-04 用户要求）「保存分组 / 调出分组 / 恢复初始化」三钮原在左栏并一行，
          「手动分组 / 联合分区」标签与「分组：自动…」「⊕ 变更时自动」提示文字全部取消。
@@ -11233,6 +11242,8 @@ window.tlGroupByArea = tlGroupByArea;
   if (gsb) gsb.addEventListener('click', window.tlSaveManualGroups);
   var grb = document.getElementById('tlGroupRestoreBtn');
   if (grb) grb.addEventListener('click', window.tlRestoreManualGroups);
+  /* [v233] 调出分组后当前分组未必来自按亩计算 ⇒ 熄灭「按亩自动组合」高亮防误导。 */
+  if (grb) grb.addEventListener('click', function () { if (acb) acb.classList.remove('on'); });
   /* [v220]「按面积成组」按钮接线：点击即执行（与页面其它按钮同一范式，不勾选）。
      Enter 键在输入框里也触发（改完目标亩数直接回车，少一次移动鼠标）。 */
   var ab = document.getElementById('tlAreaGroupBtn');
@@ -11240,7 +11251,13 @@ window.tlGroupByArea = tlGroupByArea;
   var ai = document.getElementById('tlAreaGroupMu');
   if (ai) ai.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); tlGroupByArea(); } });
   var acb = document.getElementById('tlAreaGroupCalcBtn');
-  if (acb) acb.addEventListener('click', tlGroupByArea);
+  /* [v233] 成组成功（tlGroupByArea 返回 true）才点亮 .on；失败（无图/亩数非法）保持原样。 */
+  if (acb) acb.addEventListener('click', function () {
+    if (tlGroupByArea() !== false) acb.classList.add('on');
+  });
+  /* 点 1/2/3/4 区（均分）= 既有路径清空按亩分组 ⇒ 高亮同步熄灭（程序化 .click() 也会冒泡到这里，覆盖「恢复初始化」）。 */
+  var zcg = document.getElementById('tlZoneCountGroup');
+  if (zcg) zcg.addEventListener('click', function () { if (acb) acb.classList.remove('on'); });
   /* v177（2026-10-01 用户请求⑲）：「↺ 恢复初始化」= 回到初始化设计。
      刻意【不重写一套复位逻辑】，而是程序化点击「2 区」按钮 —— 那条路径（上方 #tlZoneCountGroup
      的 click 处理器）已经在做全套：清 tlManualGroups、tlZoneStepClear()、清 cutOffX/Y、
