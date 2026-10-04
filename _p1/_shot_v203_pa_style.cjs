@@ -65,8 +65,7 @@ const check = (n, ok, extra) => { console.log((ok ? '  [PASS] ' : '  [FAIL] ') +
       leftBg: gs('.pa-left', 'backgroundImage'),
       thBg: gs('.pa-mat th', 'backgroundColor'),
       thColor: gs('.pa-mat th', 'color'),
-      kvFs: gs('.pa-kv', 'fontSize'),
-      subFs: gs('.pa-sub', 'fontSize')
+      kvFs: gs('.pa-kv', 'fontSize')
     };
   });
   check('③ 分组标题 11px + 主站绿 #2f6d43', st.paneH === '11px' && st.paneHColor === 'rgb(47, 109, 67)', JSON.stringify({ f: st.paneH, c: st.paneHColor }));
@@ -75,7 +74,14 @@ const check = (n, ok, extra) => { console.log((ok ? '  [PASS] ' : '  [FAIL] ') +
   check('⑥ 输入框高 24px / 11.5px（原约 35px/13px）', st.inputH === '24px' && st.inputFs === '11.5px', JSON.stringify({ h: st.inputH, f: st.inputFs }));
   check('⑦ 侧栏底 = 主站浅绿渐变（rgb 形式断言）', /248, 251, 249/.test(st.leftBg || '') && /242, 247, 244/.test(st.leftBg || ''), (st.leftBg || '').slice(0, 90));
   check('⑧ 表头浅绿 #f2f7f4 + 字 #475569（原实心绿底白字）', st.thBg === 'rgb(242, 247, 244)' && st.thColor === 'rgb(71, 85, 105)', JSON.stringify({ bg: st.thBg, c: st.thColor }));
-  check('⑨ 键值行/副标题 ≤11.5px', parseFloat(st.kvFs) <= 11.5 && parseFloat(st.subFs) <= 10.5, JSON.stringify({ kv: st.kvFs, sub: st.subFs }));
+  check('⑨ 键值行 ≤11.5px（标题条已撤，无 pa-sub 断言）', parseFloat(st.kvFs) <= 11.5, JSON.stringify({ kv: st.kvFs }));
+  const hdr = await page.evaluate(() => ({
+    headerGone: !document.querySelector('.pa-header'),
+    statusInToolbar: !!(document.querySelector('.pa-toolbar #paStatus')),
+    statusTxt: (document.getElementById('paStatusTxt') || {}).textContent || ''
+  }));
+  check('⑨b 品牌标题条已整行撤掉（v204）', hdr.headerGone);
+  check('⑨c 状态徽标在画布工具条里（id 不变，JS 零改动）', hdr.statusInToolbar && hdr.statusTxt.length > 0, hdr.statusTxt);
 
   /* ③ 功能不回归 */
   await page.evaluate(() => document.getElementById('btnExample').click());

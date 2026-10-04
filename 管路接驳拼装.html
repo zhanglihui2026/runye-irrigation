@@ -31,24 +31,14 @@
   body{
     font-family:"Microsoft YaHei","PingFang SC","Segoe UI",system-ui,sans-serif;
     color:var(--pa-ink); background:var(--pa-bg); overflow:hidden;
-    display:flex;flex-direction:column;   /* 导航 auto + 品牌条 auto + 主区 flex:1，不写死导航高度 */
+    display:flex;flex-direction:column;   /* 导航 auto + 主区 flex:1，不写死导航高度 */
   }
-  /* —— 顶部：站内同源导航（runye-nav.js 注入）+ 纤薄品牌/状态条 —— */
-  .pa-header{
-    flex:0 0 auto; display:flex; align-items:center; gap:10px; padding:6px 14px;
-    background:#fff; border-bottom:1px solid var(--pa-line);
-  }
-  .pa-logo{
-    width:24px;height:24px;border-radius:7px;
-    background:linear-gradient(135deg,#15803d,#0d9488);color:#fff;font-weight:800;
-    display:flex;align-items:center;justify-content:center;font-size:12px;
-  }
-  .pa-title{font-size:13px;font-weight:800;color:#14532d;letter-spacing:.5px;}
-  .pa-sub{font-size:10.5px;color:#94a3b8;}
-  .pa-header .spacer{flex:1;}
+  /* —— [v204] 品牌标题条已按用户要求整行撤掉（fn-nav 已标明当前页，重复占高度）。
+     状态徽标挪进画布工具条右端（见 .pa-toolbar 内 #paStatus），规则保留在此。 —— */
   .pa-status{
     font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;
     background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;display:flex;align-items:center;gap:6px;
+    flex:none;
   }
   .pa-status.off{background:#fef2f2;color:#dc2626;border-color:#fecaca;}
   .pa-status .dot{width:7px;height:7px;border-radius:50%;background:currentColor;}
@@ -187,15 +177,10 @@
   </nav>
   <script src="runye-nav.js"></script>
 
-  <div class="pa-header">
-    <div class="pa-logo">润</div>
-    <div>
-      <div class="pa-title">管路接驳拼装</div>
-      <div class="pa-sub">面板 · 绘图区 · 单向水力计算</div>
-    </div>
-    <div class="spacer"></div>
-    <div class="pa-status" id="paStatus"><span class="dot"></span><span id="paStatusTxt">待拼装</span></div>
-  </div>
+  <!-- [v204] 用户原话：「红框的标题 没啥用取消吧」—— 品牌标题条（润 logo +
+       「管路接驳拼装 / 面板·绘图区·单向水力计算」）整行撤掉：顶部 fn-nav 已写明当前页，
+       再挂一行大标题纯占高度。唯一有功能的是右侧状态徽标（paStatus/paStatusTxt，
+       JS 在写）⇒ 原位挪进画布工具条右端，id 不变、JS 零改动。 -->
 
   <div class="pa-main">
     <!-- 左：素材库 -->
@@ -231,6 +216,7 @@
           <button class="pa-btn primary" id="btnExample">⚡ 载入示例管路</button>
           <div class="spacer"></div>
           <button class="pa-btn warn" id="btnClear">清空画布</button>
+          <div class="pa-status" id="paStatus" title="拼装/水力状态"><span class="dot"></span><span id="paStatusTxt">待拼装</span></div>
         </div>
         <svg id="paSvg" xmlns="http://www.w3.org/2000/svg"></svg>
         <div class="pa-hint">操作：左侧点击/拖拽管件入画布 → 拖动管件使端口靠近即自动吸附接驳 → 选中可改参数、Delete 删除 → 滚轮缩放。</div>
