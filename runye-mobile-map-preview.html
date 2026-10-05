@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>润野灌溉 · 手机地图界面预览</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><link rel="stylesheet" href="runye-mobile-map-preview.css?v=242">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><link rel="stylesheet" href="runye-mobile-map-preview.css?v=246">
 
 <!-- PWA: independent installation and offline support -->
 <link rel="manifest" href="manifest.webmanifest">
@@ -11,8 +11,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="apple-touch-icon" sizes="180x180" href="pwa/icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="pwa/icons/icon-192.png">
-<link rel="stylesheet" href="pwa/pwa.css?v=1">
-<script defer src="pwa/pwa.js?v=1"></script>
+<link rel="stylesheet" href="pwa/pwa.css?v=2">
+<script defer src="pwa/pwa.js?v=2"></script>
+<link rel="stylesheet" href="runye-terrain.css?v=245"><script src="runye-terrain.js?v=245"></script>
 </head><body>
 <svg class="symbols" xmlns="http://www.w3.org/2000/svg"><defs>
 <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol>
@@ -36,6 +37,11 @@
  <button class="map-button" data-panel="layers" aria-label="切换地图图层"><svg><use href="#i-layer"/></svg><span>图层</span></button>
  <button class="map-button" id="fitButton" aria-label="定位到地块"><svg><use href="#i-target"/></svg><span>地块</span></button>
  <div class="zoom-group"><button id="zoomIn" aria-label="放大地图">＋</button><hr><button id="zoomOut" aria-label="缩小地图">－</button></div>
+ <div class="map-angle" role="group" aria-label="分区线旋转">
+  <button id="anglePlus" aria-label="分区角度增加1度" title="增加1°">↶<small>＋1°</small></button>
+  <label for="partitionAngle">角度</label><div class="map-angle-value"><input id="partitionAngle" aria-label="分区角度" type="number" inputmode="decimal" value="0" min="-180" max="180" step="1"><span>°</span></div>
+  <button id="angleMinus" aria-label="分区角度减少1度" title="减少1°">↷<small>−1°</small></button>
+ </div>
 </aside>
 <div class="crosshair" aria-hidden="true"></div>
 <div class="map-info"><span id="coordinates">18.25280°N 109.51190°E</span><span id="mapSource">高德卫星</span></div>
@@ -57,9 +63,7 @@
     <label>滴头流量<div><input id="emitterFlow" type="number" inputmode="decimal" value="0.8" min="0.1" step="0.1"><span>L/h</span></div></label>
     <label>单边铺设长度<div><input id="tapeLength" type="number" inputmode="decimal" value="100" min="10"><span>m</span></div></label>
    </div><div class="area-field"><label for="zoneArea">每个分区目标面积</label><div><input id="zoneArea" type="number" inputmode="decimal" value="18" min="0.1" step="0.1"><span>亩 / 区</span></div></div>
-   <div class="area-field"><label for="partitionAngle">分区角度</label><div><input id="partitionAngle" type="number" inputmode="decimal" value="0" min="-180" max="180" step="1"><span>°</span></div></div>
-   <div class="angle-controls"><button id="angleMinus" class="secondary" aria-label="分区角度减少1度">−1°</button><input id="angleSlider" aria-label="分区角度滑条" type="range" min="-180" max="180" value="0" step="1"><button id="anglePlus" class="secondary" aria-label="分区角度增加1度">＋1°</button></div>
-   <p class="sheet-note small-note">角度范围 −180°～180°，正角度逆时针、负角度顺时针旋转分区网格。地块边界和地图保持固定。</p>
+   <p class="sheet-note small-note">地图右侧直接调整分区角度，范围 −180°～180°，正角度逆时针、负角度顺时针旋转分区网格。地块边界和地图保持固定。</p>
    <p class="sheet-note small-note" id="partitionDimensions"></p><p class="sheet-note small-note" id="partitionResult" role="status"></p>
    <div class="layer-note"><span class="swatch boundary"></span>地块边界 <span class="swatch division"></span>分区图层 <small>边缘分区按地块裁切，面积可能不足目标</small></div>
    <div class="sheet-actions"><button id="previewSecond" class="secondary">重新划分 / 查看</button><button id="toThird" class="primary">进入三级规划 →</button></div>
@@ -110,5 +114,5 @@
 </section>
 <nav class="bottom-tools" aria-label="规划工具条"><button data-panel="draw" class="active"><svg><use href="#i-draw"/></svg><span>地块</span></button><button data-panel="second"><svg><use href="#i-grid"/></svg><span>二级规划</span></button><button data-panel="third"><svg><use href="#i-pipe"/></svg><span>三级规划</span></button><button data-panel="layers"><svg><use href="#i-layer"/></svg><span>图层</span></button><button data-panel="settings"><svg><use href="#i-settings"/></svg><span>设置</span></button><button data-panel="more"><svg><use href="#i-more"/></svg><span>更多</span></button></nav>
 <div id="toast" role="status" hidden></div><input id="importFile" type="file" accept=".kml,.geojson,.json,.ovkml" hidden>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="runye-geo.js?v=242"></script><script src="runye-map-enhance.js?v=242"></script><script src="runye-mobile-partition.js?v=242"></script><script src="runye-mobile-map-preview.js?v=242"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="runye-geo.js?v=242"></script><script src="runye-map-enhance.js?v=242"></script><script src="runye-mobile-partition.js?v=242"></script><script src="runye-mobile-map-preview.js?v=246"></script>
 </body></html>

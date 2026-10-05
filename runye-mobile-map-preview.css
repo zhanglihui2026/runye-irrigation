@@ -2,7 +2,7 @@
 body.sheet-open .selection-card,body.sheet-open .draw-strip{display:none!important}body.drawing .crosshair{display:none}
 @media(max-width:350px){.topbar{gap:6px;left:9px;right:9px}.search{padding:0 7px}.search svg{display:none}.selection-card{gap:7px;padding:9px}.selection-card strong{font-size:18px}.selection-card b{font-size:11px}.compact{font-size:10px}.layer-list small{display:none}.sheet-scroll{padding:11px 14px}.field-grid{gap:10px 12px}}
 @media(max-height:520px){.topbar{top:8px}.mode-chip{top:57px}.left-rail,.right-rail{top:88px}.right-rail{gap:5px}.right-rail .map-button{min-height:40px}.map-button span{display:none}.zoom-group button{height:32px}.bottom-tools{height:53px}.bottom-tools button{gap:2px;font-size:10px}.bottom-tools svg{width:20px;height:20px}.tool-sheet{left:auto;width:min(380px,50vw);bottom:53px;max-height:calc(100dvh - 62px);border-radius:10px 0 0 0}.sheet-heading{padding:7px 14px}.sheet-heading span{display:none}.sheet-heading h2{font-size:14px}.sheet-scroll{padding:10px 14px}.selection-card,.draw-strip{right:auto;width:min(370px,calc(50vw - 20px));bottom:86px}.map-info{bottom:62px}.sheet-open .right-rail{display:none}.leaflet-control-attribution{bottom:53px}.leaflet-control-scale{margin-bottom:70px!important}}
-.angle-controls{display:flex;align-items:center;gap:10px;margin:10px 0}.angle-controls button{flex:none;padding:9px 12px;min-height:40px}.angle-controls input{flex:1;min-width:0;accent-color:#286646}.zone-label{white-space:nowrap;font-size:10px!important}
+.zone-label{white-space:nowrap;font-size:10px!important}
 
 /* Shared type scale for every expandable map panel. */
 .tool-sheet{--sheet-title:var(--ry-font-title,18px);--sheet-body:var(--ry-font-main,14px);--sheet-label:var(--ry-font-main,14px);--sheet-note:var(--ry-font-menu,11px);--sheet-number:var(--ry-font-main,14px);line-height:1.5}
@@ -28,7 +28,7 @@ body.sheet-open .selection-card,body.sheet-open .draw-strip{display:none!importa
 .field-grid label>div{margin-top:4px;padding:5px 0}
 .area-field{margin:16px 0;padding:12px 0}
 .area-field input{min-height:42px;width:72px}
-.sheet-actions button,.angle-controls button,.base-options button,.segments button{font-size:var(--sheet-note);line-height:1.4;min-height:44px}
+.sheet-actions button,.base-options button,.segments button{font-size:var(--sheet-note);line-height:1.4;min-height:44px}
 .sheet-actions{gap:10px;margin-top:16px}
 .layer-note,.layer-note small{font-size:var(--sheet-note);line-height:1.6;color:#68786d}
 .layer-note{gap:4px;margin-top:12px}
@@ -41,8 +41,8 @@ body.sheet-open .selection-card,body.sheet-open .draw-strip{display:none!importa
 .layer-list input:before{width:27px;height:27px;top:2px;left:2px}
 .layer-list input:checked:before{left:22px}
 .compact-list label{min-height:52px}
-.angle-controls{gap:12px;margin:12px 0}
-.angle-controls input{min-height:32px}
+
+
 @media(max-width:350px){.sheet-scroll{padding:12px 14px 16px}.field-grid{gap:14px 12px}.tool-grid button{padding:12px 10px}.tool-grid small{font-size:var(--sheet-note)}.list-action{flex-wrap:wrap;gap:4px 10px}.layer-list small{display:block}}
 @media(max-height:520px){.sheet-heading{padding:8px 14px}.sheet-scroll{padding:12px 14px 16px}}
 
@@ -76,3 +76,13 @@ body.drawing #drawCount{flex:none;text-align:center;color:#f5f4de;line-height:1.
 body.drawing .map-info{bottom:calc(115px + env(safe-area-inset-bottom))}
 body.drawing .leaflet-control-attribution{bottom:105px}
 body.drawing .leaflet-control-scale{margin-bottom:125px!important}
+
+/* Main-map partition rotation, directly below the zoom buttons. */
+.map-angle{width:45px;background:#fffffff2;border:1px solid #ddd;border-radius:5px;box-shadow:0 1px 6px #0002;overflow:hidden;text-align:center;color:#345b40}
+.map-angle>button{display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;min-height:44px;padding:3px 0;border:0;background:transparent;color:inherit;font-size:23px;line-height:1}
+.map-angle small,.map-angle>label{font-size:var(--ry-font-menu,11px);line-height:1.3}.map-angle small{margin-top:2px}.map-angle>label{display:block;padding-top:4px;border-top:1px solid #e1e1e1}
+.map-angle-value{display:flex;align-items:center;justify-content:center;padding:4px 1px 5px;border-bottom:1px solid #e1e1e1;font-size:var(--ry-font-main,14px)}
+.map-angle-value input{width:33px;min-width:0;border:0;background:transparent;text-align:center;padding:0;color:inherit;font-size:inherit;appearance:textfield;-moz-appearance:textfield}.map-angle-value input::-webkit-inner-spin-button,.map-angle-value input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.map-angle-value span{font-size:var(--ry-font-menu,11px)}.map-angle button:disabled,.map-angle input:disabled{opacity:.4;cursor:default}body.drawing .map-angle{display:none}
+@media(max-height:700px){.right-rail{top:calc(env(safe-area-inset-top) + 70px);gap:5px}.map-angle>button{min-height:36px;font-size:18px;padding:2px 0}.map-angle small{font-size:10px;margin-top:1px}.map-angle>label{font-size:10px}}
+@media(max-height:520px){.right-rail{top:calc(env(safe-area-inset-top) + 58px)}.map-angle>button{min-height:30px;font-size:19px}.map-angle small{display:none}.map-angle-value{padding:3px 1px}.map-angle>label{padding-top:2px}}

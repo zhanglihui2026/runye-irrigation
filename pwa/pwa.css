@@ -1,5 +1,8 @@
 .ry-pwa-install{position:fixed;right:16px;bottom:16px;z-index:2000;display:flex;flex-direction:column;gap:4px;border:1px solid #d1d5db;border-radius:10px;padding:10px 16px;background:#fff;color:#15803d;box-shadow:0 3px 16px #0002;font:14px system-ui;cursor:pointer}
 .ry-pwa-install small{font-size:11px;color:#64748b}
+/* [v230 2026-10-05] 浮动安装提示的 × 关闭钮：贴右上角，不挤占文字；悬停加深 */
+.ry-pwa-close{position:absolute;top:2px;right:6px;width:18px;height:18px;line-height:16px;text-align:center;border-radius:50%;font-size:14px;color:#94a3b8;cursor:pointer;user-select:none}
+.ry-pwa-close:hover{color:#334155;background:#f1f5f9}
 .ry-pwa-install[hidden],.ry-pwa-status[hidden]{display:none}
 .ry-pwa-status{position:fixed;left:12px;right:12px;top:8px;z-index:3000;margin:0;padding:8px;background:#fff7d6;color:#713f12;border-radius:8px;font:11px/1.6 system-ui}
 .ry-pwa-dialog{position:fixed;inset:0;box-sizing:border-box;width:calc(100% - 40px);max-width:380px;max-height:calc(100% - 48px);margin:auto;overflow:auto;border:0;border-radius:16px;padding:24px;background:#fff;color:#1e293b;font:var(--ry-font-main,14px)/1.8 system-ui,-apple-system,"PingFang SC",sans-serif}

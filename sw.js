@@ -1,6 +1,6 @@
 /* Runye PWA v1. Increment VERSION when changing the offline shell. */
 'use strict';
-const VERSION = 'v1';
+const VERSION = 'v3-map-angle';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
@@ -16,6 +16,8 @@ const CORE = [
   "hydraulic-calc/native-bridge.js",
   "hydraulic-calc/pipe-path-loss.js",
   "index.html",
+  "runye-terrain.js",
+  "runye-terrain.css",
   "irrigation-bridge.js",
   "iso-diagram/editor.js",
   "iso-diagram/iso-diagram.css",

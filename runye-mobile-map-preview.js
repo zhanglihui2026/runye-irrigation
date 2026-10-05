@@ -3,7 +3,7 @@
  var $=function(id){return document.getElementById(id);};
  var map=null, base='satellite', mode='draw', panel=null, drawing=false, points=[], plotName='新建地块',groups=2;
  var visibility={boundary:true,second:true,third:true,branch:true}, layers={};
- var toastTimer,partition=null,drawBackup=null,draftGuide=null;
+ var toastTimer,partition=null,drawBackup=null,draftGuide=null,lastAngle=0;
  var settingsKey='runye_mobile_settings_v1';
  var settingRules={fontMain:[14,10,24],fontMenu:[11,9,20],fontTitle:[18,14,26],tapeSpacing:[0.4,0.1],emitterSpacing:[0.3,0.05],emitterFlow:[0.8,0.1],tapeLength:[100,10],zoneArea:[18,0.1],partitionAngle:[0,-180,180],pumpLift:[5,0],terrainRise:[5,0],sourceDistance:[0,0],inletPressure:[1,0]};
  var settings={};Object.keys(settingRules).forEach(function(key){settings[key]=settingRules[key][0];});
@@ -12,7 +12,7 @@
  function fillSettings(){document.querySelectorAll('[data-setting]').forEach(function(input){input.value=settings[input.dataset.setting];});$('settingsStatus').textContent='';}
  function applySettings(){
   var style=document.documentElement.style;style.setProperty('--ry-font-main',settings.fontMain+'px');style.setProperty('--ry-font-menu',settings.fontMenu+'px');style.setProperty('--ry-font-title',settings.fontTitle+'px');
-  ['tapeSpacing','emitterSpacing','emitterFlow','tapeLength','zoneArea','partitionAngle'].forEach(function(key){$(key).value=settings[key];});$('angleSlider').value=settings.partitionAngle;
+  ['tapeSpacing','emitterSpacing','emitterFlow','tapeLength','zoneArea','partitionAngle'].forEach(function(key){$(key).value=settings[key];});lastAngle=settings.partitionAngle;
   $('hydraulicSummary').textContent='供水初始值：提升 '+settings.pumpLift+' m · 高差 '+settings.terrainRise+' m · 水源距离 '+settings.sourceDistance+' m · 入口 '+settings.inletPressure+' bar';
   renderLayers();
  }
@@ -59,6 +59,7 @@
   document.querySelectorAll('[data-summary-area]').forEach(function(el){el.textContent=points.length>=3?'当前地块 · 约 '+mu+' 亩':'尚未选择地块';});
   $('drawCount').textContent=points.length?'已添加 '+points.length+' 个点'+(points.length>=3?' · 约 '+mu+' 亩 · 回到起点点击确定完成':' · 移动地图后点击确定继续'):'移动地图对准黄色光标，再点击确定';
   $('undoPoint').disabled=!points.length;
+  ['angleMinus','anglePlus','partitionAngle'].forEach(function(id){$(id).disabled=drawing||points.length<3;});
   $('confirmPoint').classList.toggle('can-close',canCloseDrawing());
  }
  function canCloseDrawing(){return !!(drawing&&map&&points.length>=3&&map.latLngToContainerPoint(display(points[0])).distanceTo(map.latLngToContainerPoint(map.getCenter()))<=12);}
@@ -131,10 +132,10 @@
  document.querySelectorAll('[data-layer]').forEach(function(input){input.onchange=function(){visibility[input.dataset.layer]=input.checked;document.querySelectorAll('[data-layer="'+input.dataset.layer+'"]').forEach(function(other){other.checked=input.checked;});renderLayers();};});
  document.querySelectorAll('[data-group]').forEach(function(b){b.onclick=function(){groups=Number(b.dataset.group);document.querySelectorAll('[data-group]').forEach(function(other){other.classList.toggle('active',other===b);});renderLayers();};});
  ['zoneArea','tapeLength'].forEach(function(id){$(id).oninput=renderLayers;});
- function setAngle(value){var a=Math.max(-180,Math.min(180,Number(value)||0));$('partitionAngle').value=a;$('angleSlider').value=a;renderLayers();}
- $('partitionAngle').oninput=function(){var a=this.valueAsNumber;if(!Number.isFinite(a)||a<-180||a>180)return;$('angleSlider').value=a;renderLayers();};
- $('partitionAngle').onchange=function(){setAngle(Number.isFinite(this.valueAsNumber)?this.valueAsNumber:$('angleSlider').value);};
- $('angleSlider').oninput=function(){setAngle(this.value);};
+ function showAngleLayer(){if(mode==='draw'&&!drawing&&points.length>=3){mode='second';if(!panel)document.querySelectorAll('.bottom-tools button').forEach(function(b){b.classList.toggle('active',b.dataset.panel===mode);});}}
+ function setAngle(value){var a=Math.max(-180,Math.min(180,Number(value)||0));lastAngle=a;$('partitionAngle').value=a;showAngleLayer();renderLayers();}
+ $('partitionAngle').oninput=function(){var a=this.valueAsNumber;if(!Number.isFinite(a)||a<-180||a>180)return;lastAngle=a;showAngleLayer();renderLayers();};
+ $('partitionAngle').onchange=function(){setAngle(Number.isFinite(this.valueAsNumber)?this.valueAsNumber:lastAngle);};
  $('angleMinus').onclick=function(){setAngle(Number($('partitionAngle').value)-1);};$('anglePlus').onclick=function(){setAngle(Number($('partitionAngle').value)+1);};
  $('searchForm').onsubmit=function(e){e.preventDefault();var m=$('searchInput').value.trim().match(/^(-?\d+(?:\.\d+)?)\s*[,，\s]\s*(-?\d+(?:\.\d+)?)$/);if(m&&map&&Math.abs(Number(m[1]))<=90&&Math.abs(Number(m[2]))<=180){var p=gcj([Number(m[1]),Number(m[2])]);map.setView(display(p),16);toast('已定位到输入坐标');}else toast('界面预览可输入经纬度，如 18.3651,109.1762');};
  $('fitButton').onclick=fit;$('zoomIn').onclick=function(){if(map)map.zoomIn();};$('zoomOut').onclick=function(){if(map)map.zoomOut();};

@@ -41,6 +41,31 @@
       try { await prompt.prompt(); await prompt.userChoice; } catch (error) { guide(); }
     });
     (host || document.body).appendChild(button);
+    /* [v230 2026-10-05 用户要求] 浮动安装提示要能关闭：「不然它跳出来，影响我操作」。
+       · 仅浮动形态（无 [data-content="more"] 宿主、挂在 body 上那种）给 × 关闭钮；
+         嵌在「设置」面板里的那份本身随面板开合，不加。
+       · 点 × 隐藏并写入 localStorage（runye_pwa_install_dismissed=1）——
+         本机此后不再弹出；想再装可走浏览器菜单，或清掉该键恢复提示。 */
+    if (!host) {
+      var dismissed = false;
+      try { dismissed = localStorage.getItem('runye_pwa_install_dismissed') === '1'; } catch (eDismiss) { }
+      if (dismissed) button.hidden = true;
+      if (!button.hidden) {
+        var closer = document.createElement('span');
+        closer.className = 'ry-pwa-close';
+        closer.textContent = '×';
+        closer.setAttribute('role', 'button');
+        closer.setAttribute('aria-label', '关闭安装提示，不再弹出');
+        closer.title = '关闭（不再弹出）';
+        /* 用 span 而非 button：HTML 不允许 button 嵌 button；stopPropagation 防触发安装 */
+        closer.addEventListener('click', function (eClose) {
+          eClose.stopPropagation();
+          button.hidden = true;
+          try { localStorage.setItem('runye_pwa_install_dismissed', '1'); } catch (eStore) { }
+        });
+        button.appendChild(closer);
+      }
+    }
     status = document.createElement('p'); status.id = 'ryPwaStatus';
     status.className = host ? 'sheet-note small-note' : 'ry-pwa-status';
     status.setAttribute('role', 'status'); (host || document.body).appendChild(status);
