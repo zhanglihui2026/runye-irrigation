@@ -29,9 +29,15 @@ const MAP_SRC = fs.readFileSync(path.join(ROOT, 'runye-map-measure.html'), 'utf8
 const stripComments = (s) => s
   .replace(/\/\*[\s\S]*?\*\//g, '')
   .replace(/(^|[^:"'`\\])\/\/[^\n]*/g, '$1');
-const bodyOf = (src, fnName, len) => {
-  const i = src.indexOf('function ' + fnName + '(');
-  return i < 0 ? '' : stripComments(src.slice(i, i + (len || 3000)));
+const bodyOf = (src, fnName) => {
+  const start = src.indexOf('function ' + fnName + '(');
+  if(start < 0) return '';
+  // Parse complete functions so growing UI code cannot truncate a contract or include its neighbour.
+  for(let end=src.indexOf('}', start);end>=0;end=src.indexOf('}', end+1)) {
+    const candidate=src.slice(start,end+1);
+    try {new (require('node:vm').Script)(candidate);return stripComments(candidate);} catch(e) {}
+  }
+  throw new Error('Incomplete function: '+fnName);
 };
 /* 统计某个函数体内某串出现的次数（「存在性」不够 —— 见 ppApplyMirror 的坑）
  * ★ len 必须显式给：bodyOf 默认切 3000 字符，短函数会**切进下一个函数**，
@@ -251,13 +257,12 @@ test('②-e 模块导出 merge 命名空间（plots/hull/canUnmerge/unmerge 四�
 /* =========================================================================
  * ③ 二级页「地块划分」开关
  * ========================================================================= */
-test('③-a 开关控件存在且 id/文案齐全，默认 checked（=自动划分，向后兼容）', () => {
+test('③-a 自动划分切换按钮存在，默认开启且绑定切换动作', () => {
   assert.match(MAP_SRC, /id="btnMerge"/, '地图页应有「拼接地块」入口');
-  const mChk = INDEX_SRC.match(/<input type="checkbox" id="ppZoneAutoChk"([^>]*)>/);
-  assert.ok(mChk, 'index.html 必须有 #ppZoneAutoChk');
-  assert.match(mChk[1], /checked/, '#ppZoneAutoChk 默认应为 checked（默认自动划分）');
-  assert.match(INDEX_SRC, /id="ppZoneAutoTxt"/, '应有文案节点 #ppZoneAutoTxt');
-  assert.match(INDEX_SRC, /id="ppZoneAutoWrap"/, '应有包裹节点 #ppZoneAutoWrap');
+  assert.match(INDEX_SRC, /<button[^>]*id="ppZoneAutoBtn"[^>]*>地块划分<\/button>/);
+  assert.match(INDEX_SRC, /zoneAuto:true/);
+  assert.match(bodyOf(INDEX_SRC,'ppApplyZoneAutoUI'), /classList.toggle\('active', on\)/);
+  assert.match(INDEX_SRC, /btn.addEventListener\('click',function\(\)\{ ppSetZoneAuto\(!ppZoneAutoOn\(\)\); \}\)/);
 });
 
 test('③-b 门控口径（v189）：关开关 = **真的不划分**，必须进入分区计算路径', () => {

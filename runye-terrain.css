@@ -1,8 +1,53 @@
-.rt-open{font:inherit;cursor:pointer;border:1px solid #bfd3cc;border-radius:6px;padding:6px 10px;background:#edf7f2;color:#176943;margin:5px}
-.rt-dialog{box-sizing:border-box;width:min(680px,calc(100vw - 24px));max-height:calc(100dvh - 28px);overflow:auto;border:1px solid #dce5df;border-radius:14px;padding:18px;color:#25372d;background:#fff;font-size:var(--ry-font-main,14px);line-height:1.5}
-.rt-dialog::backdrop{background:rgba(15,30,22,.48)}
-.rt-dialog header{display:flex;align-items:center;justify-content:space-between;gap:12px}.rt-dialog h3{font-size:var(--ry-font-title,18px);margin:0}.rt-dialog h4{font-size:inherit;margin:16px 0 6px}
-.rt-dialog button{font:inherit;min-height:40px;border-radius:7px;border:1px solid #b6ccbf;padding:8px 14px;cursor:pointer;background:#eef6f1;color:#226746}.rt-dialog footer button{background:#257b52;color:white;border:0;width:100%;margin:10px 0}
-.rt-dialog .rt-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.rt-dialog label{display:block}.rt-dialog .rt-grid label{display:flex;flex-direction:column;justify-content:space-between}.rt-dialog input[type=number]{box-sizing:border-box;display:block;width:100%;min-height:40px;font:inherit;padding:7px;border:1px solid #bccbc1;border-radius:6px;background:white;color:#25372d;margin-top:4px}.rt-dialog footer{position:static;padding:0;margin:0;border:0;background:transparent}
-.rt-dialog .rt-switch{display:flex;gap:8px;align-items:center;margin-top:14px}.rt-switch input{width:18px;height:18px}.rt-note{font-size:var(--ry-font-menu,11px);color:#617368;margin:10px 0}.rt-dialog fieldset{min-width:0;border:1px solid #e0e9e3;border-radius:8px;margin:10px 0;padding:10px}.rt-dialog legend{padding:0 4px}.rt-dialog p{overflow-wrap:anywhere}.rt-results article{background:#f5f9f6;border-radius:8px;padding:10px;margin:8px 0}.rt-results p{margin:5px 0}.rt-warn,.rt-status{color:#a04c11}
-@media(max-width:420px){.rt-dialog{padding:12px}.rt-dialog .rt-grid{gap:10px}}
+/* [v247] 字号显式 11px（v245e 12px，用户要求再缩小一点）：插在 .pp-side 里会被宿主继承成 16px 大字（实测踩坑） */
+.rt-open{font:inherit;font-size:11px;cursor:pointer;border:1px solid #116447;border-radius:6px;padding:6px 10px;background:#116447;color:#fff;margin:5px}
+/* [v247 2026-10-05 用户要求] 平时也用深绿块白字（v245e 是浅绿底、仅展开反白 → 现统一）；hover 加深作反馈。
+   按钮绿 = 站点生成按钮实测值 #116447（原 --g-600 亮绿偏浅，用户指出不对） */
+.rt-open:hover{background:#0d5038;border-color:#0d5038}
+.rt-open[aria-expanded="true"]{background:#116447;border-color:#116447;color:#fff}
+/* [v245d 2026-10-05] 展开样式逐项对齐二级工具栏（#ryCadSide .ry-cad-grp / .pp-plan-item 实测值）：
+   标题条 = summary：12px/600 #24443a、#f4f9f6 底、9px 10px、▾ 前缀、hover #eaf3ed、整条可点收起；
+   字段   = pp-plan-item：11px/400 #4a6259、gap 5px、行 padding 2px 0；
+   输入框：11px/400 #243c35、1px solid #d6e1da 方角、白底、64px 宽、数值右对齐、高 24px；
+   内容区 padding 8px；note/结果 11px。配色变量均带回退值。 */
+.rt-panel{box-sizing:border-box;width:100%;margin:6px 0;border:1px solid #e4ede7;border-radius:8px;color:#4a6259;background:#fff;font-size:11px;line-height:1.6;overflow:hidden}
+.rt-panel header{display:flex;align-items:center;gap:6px;padding:9px 10px;background:#f4f9f6;cursor:pointer;user-select:none;line-height:1.6}
+.rt-panel header::before{content:'▾';font-size:10px;color:#7d8f86}
+.rt-panel header:hover{background:#eaf3ed}
+.rt-panel h3{font-size:12px;font-weight:600;color:#24443a;margin:0}
+.rt-panel h4,.rt-panel fieldset legend{font-size:12px;font-weight:600;color:#24443a;margin:10px 0 4px;padding:0}
+.rt-panel .rt-body{padding:8px}
+.rt-panel button{font:inherit;font-size:11px;min-height:26px;border-radius:4px;border:1px solid #d6e1da;padding:3px 9px;cursor:pointer;background:#fff;color:#4a6259}
+.rt-panel footer button{background:#116447;color:#fff;border:0;width:100%;margin:10px 0 2px;min-height:32px;font-size:12px;font-weight:600;border-radius:4px;cursor:pointer}
+/* 字段行式：标签左、输入框右（64px 定宽、数值右对齐，同工具栏） */
+.rt-panel .rt-grid{display:flex;flex-direction:column;gap:4px}
+.rt-panel label{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:400;color:#4a6259;padding:2px 0}
+.rt-panel input[type=number]{box-sizing:border-box;flex:0 0 64px;min-width:0;width:64px;min-height:24px;font:inherit;font-size:11px;font-weight:400;padding:2px 6px;border:1px solid #d6e1da;border-radius:0;background:#fff;color:#243c35;margin-top:0;text-align:right;transition:border-color .12s}
+.rt-panel input[type=number]:focus{outline:none;border-color:var(--g-500,#22c55e)}
+.rt-panel footer{position:static;padding:0;margin:0;border:0;background:transparent}
+.rt-panel .rt-switch{font-weight:400;color:#4a6259}
+.rt-switch input{width:14px;height:14px;flex:0 0 auto;accent-color:var(--g-600,#16a34a)}
+.rt-note{font-size:11px;color:#8aa094;margin:8px 0;line-height:1.6}
+/* fieldset：去边框，legend 作小节标题 */
+.rt-panel fieldset{min-width:0;border:0;margin:10px 0 2px;padding:0}
+.rt-panel fieldset .rt-grid{margin-top:4px}
+.rt-panel p{overflow-wrap:anywhere;margin:6px 0}
+.rt-results article{background:#f8fafc;border-radius:4px;padding:8px;margin:8px 0}
+.rt-results p{margin:4px 0;font-size:11px}
+.rt-results b{color:#334155}
+.rt-warn,.rt-status{color:#b45309}
+.rt-status{font-size:11px}
+@media(max-width:420px){.rt-panel .rt-body{padding:6px}}
+/* [v246 2026-10-05 用户要求] 三级页（#tlPlanBar）/ 二级页（#ppPlanBar）「地形高程」按钮都挪到标题行：与「地块与灌溉参数」
+   （.pp-plan-bar::before 伪元素）同一行、右端对齐（截图红框位置）。
+   参照 v225 .tl-target-v-row 先例：标题是伪元素塞不进 DOM，只能绝对定位——
+   #tlPlanBar 建 relative 上下文 + 按钮贴标题行右端（top 实测与标题行垂直居中，
+   right=11px 与栏内右内边距对齐）。规则挂 #tlPlanBar id 前缀：#tlSide 会被搬进
+   #ryCadSide（双宿主），与祖先选择器无关。
+   展开面板仍 insertAdjacentElement(afterend) 插在按钮之后：按钮脱流后面板成为
+   首个在流子元素，紧贴标题下方，展开/收起逻辑零改动。
+   max-width=内容宽-96px（标题约84px+缓冲）：窄栏防重叠，超长（·已启用 ▾）省略号兜底。 */
+#ppPlanBar,#tlPlanBar{position:relative}
+#ppPlanBar>.rt-open,#tlPlanBar>.rt-open{
+  position:absolute;top:4px;right:11px;z-index:2;
+  margin:0;padding:2px 9px;
+  max-width:calc(100% - 96px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

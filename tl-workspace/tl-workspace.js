@@ -127,8 +127,9 @@
     var L = window.tlGroupLossOf(g);
     if (!L || !isFinite(L.total)) return '';
     function f2(v) { return (isFinite(v) ? v : 0).toFixed(2); }
-    return '<br>本轮水头损失 ≈ ' + f2(L.total) + ' m'
-      + '（总管 ' + f2(L.frontLoss) + ' + 主管 ' + f2(L.mainLoss) + ' + 支管 ' + f2(L.branchLoss) + '）';
+    /* [v227]（2026-10-05 用户要求）水头损失行红色加粗，图面上更醒目 */
+    return '<br><b style="color:#dc2626;">本轮水头损失 ≈ ' + f2(L.total) + ' m</b>'
+      + '<b style="color:#dc2626;">（总管 ' + f2(L.frontLoss) + ' + 主管 ' + f2(L.mainLoss) + ' + 支管 ' + f2(L.branchLoss) + '）</b>';
   }
   /* [v226] 流量行：优先用桥里**本组实际**流量（组内各分区流量和，m³/h）；
      桥缺失时退回数据包 combinedFlow（最大组口径）。★ 精确到小数点后两位（用户要求）；
@@ -141,7 +142,8 @@
       if (L && isFinite(L.flow) && L.flow > 0) v = L.flow;
     }
     if (v == null && cfFallback != null && cfFallback !== '' && isFinite(cfFallback)) v = Number(cfFallback);
-    return (v == null) ? '' : ('本轮合灌流量 ≈ ' + v.toFixed(2) + ' m³/h');
+    /* [v227]（2026-10-05 用户要求）流量行红色加粗，图面上更醒目 */
+    return (v == null) ? '' : ('<b style="color:#dc2626;">本轮合灌流量 ≈ ' + v.toFixed(2) + ' m³/h</b>');
   }
   function buildGroupInfo(g) {
     var d = lastDataRef; if (!d || !d.zones) return '';
@@ -1963,6 +1965,43 @@
     if (!u || !viewState) return null;
     return userToData(u);
   }
+  /* ---------- [v242] 双击「地块轮廓外面」= 退出块编辑（回「成组管路」页） ----------
+     用户原话：「…类似CAD那种，双击进入块编辑，或者是在布局的窗口内双击进入图纸编辑，
+               在视口外面 双击就退出了。」
+     ★ [v242 更正] 用户随后更正了落点：「我这里双击进入的是二级页面，不是三级页面，更正一下。」
+       ⇒ **本页这一下不再是「双击手势的对称另一半」**：从成组页双击地块进的是**二级页**
+         （grEnterPlotL2 → pipePlanSection，分区线在那边才拖得动），本页只是「▶ 进入三级页」
+         按钮那条路的目标。两半的对称关系因此落在：成组页双击 ↔ 二级页双击轮廓外
+         （index.html 的 ppCanExitByDbl / ppExitToGroupPage）。
+       这一下保留的理由：从「▶ 进入三级页」按块进来时（window.__runyeTlBlock != null），
+       用户同样会顺手双击轮廓外想回去 —— 保留一致的 CAD 手感。
+       单独进三级页时没有「上一页」可退，双击仍保持原义 = 适应窗口（zoomFit）。
+     ★ 判据用渲染时记录的 viewState.poly（与命中测试同源，不另写一份几何）；
+       拿不到轮廓 / 拿不到点 / 轮廓不合法的情形一律【当作在图上】，绝不误退出。
+     ★ 为什么不是「双击整个画布就退出」：地块轮廓外本来还有说明框、材料表等图面内容，
+       一刀切会把这些区域也变成退出键，用户想双击放大会被弹出页面。 */
+  function wsPointInPlot(el, e) {
+    var poly = (viewState && viewState.poly) || [];
+    if (poly.length < 3) return true;
+    var p = rawDataPoint(el, e);
+    if (!p) return true;
+    var inside = false;
+    for (var i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      var a = poly[i], b = poly[j];
+      if (!a || !b) return true;
+      if (((a.y > p.y) !== (b.y > p.y)) &&
+        (p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x)) inside = !inside;
+    }
+    return inside;
+  }
+  function wsExitBlockEdit(el, e) {
+    if (typeof window === 'undefined' || !el) return false;
+    if (window.__runyeTlBlock == null) return false;
+    if (typeof window.grBackFromTl !== 'function') return false;
+    if (wsPointInPlot(el, e)) return false;
+    window.grBackFromTl();
+    return true;
+  }
   /* 点 → 最近自动管线（有效几何，tolM 米）：{pid, along}；仅底图克隆路径启用 */
   function pickAutoPipe(p, tolM) {
     var data = lastDataRef;
@@ -2684,7 +2723,11 @@
         var n = draft.pts.length;
         if (n >= 2 && Math.hypot(draft.pts[n - 1].x - draft.pts[n - 2].x, draft.pts[n - 1].y - draft.pts[n - 2].y) < 0.05) draft.pts.pop();
         commitDraft();
-      } else if (!mode) { zoomFit(); }      // 非插入模式双击 = 适应窗口（对齐轴测图交互）
+      } else if (!mode) {
+        /* 非插入模式双击 = 适应窗口（对齐轴测图交互）
+           [v242] 但「从成组页按块进来」时，双击在地块轮廓【外面】= 退回成组页（CAD 式）。 */
+        if (!wsExitBlockEdit(currentEL(ctn), e)) zoomFit();
+      }
     });
     /* 键盘：Enter 结束 / Esc 取消草稿（无草稿时退出插入模式）。挂容器（tabIndex=-1 可聚焦） */
     ctn.addEventListener('keydown', function (e) {

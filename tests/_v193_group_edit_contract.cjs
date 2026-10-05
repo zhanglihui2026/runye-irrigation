@@ -154,7 +154,8 @@ module.exports = function v193GroupEditContracts(INDEX_SRC, helpers) {
     'grSync 必须优先用 ge.framePts 当整组外框（measuredPolygon 在按块编辑时会变成某一块）');
   /* 返回：先存本块的三级结果，再恢复整组外框 —— 少了前者，换块回来结果就没了 */
   const gbk = bodyOf(INDEX_SRC, 'grBackFromTl', 1400);
-  assert.match(gbk, /tlData\s*=\s*clone\(window\.tlDiagramData\)/, '返回时必须把本块的三级结果存档');
+  assert.match(gbk, /grSaveBlockTl\(\)/, '返回时必须存档本块');
+  assert.match(bodyOf(INDEX_SRC,'grSaveBlockTl'), /tlData\s*=\s*clone\(window\.tlDiagramData\)/, '存档须来自本块三级结果');
   assert.match(gbk, /measuredPolygon\s*=\s*clone\(window\.__runyeGroupFrame\)/, '返回时必须恢复整组外框');
   assert.match(gbk, /__runyeTlBlock\s*=\s*null/, '返回时必须清掉「按块编辑」标记（否则成组拦截永远放行）');
 
@@ -193,7 +194,7 @@ module.exports = function v193GroupEditContracts(INDEX_SRC, helpers) {
   /* ★ 正则要留空格：源码写的是 `i === liveIdx`（带空格），写成 /i===liveIdx/ 永远 0 命中。 */
   assert.match(gsy, /i\s*===\s*liveIdx/, 'grSync 只对「当前正在编辑的那一块」用实时快照（其余仍读 slot）');
   /* 反向：不得退回「只读 slots[i]」—— 那个 bug 的形状就是缺了 live 这一路 */
-  assert.ok(/live/.test(gsy) && /slot:\s*\(/.test(gsy),
+  assert.ok(/live/.test(gsy) && /var slot\s*=\s*\(/.test(gsy),
     'grSync 的 slot 取值必须是「实时优先、快照兜底」二选一结构');
 
   /* 空态文案：0 块时面积要显示「—」而不是「0.00 亩」（后者像「有地块但面积为 0」） */
@@ -270,14 +271,14 @@ module.exports = function v193GroupEditContracts(INDEX_SRC, helpers) {
   assert.match(NC, /function\s+grMidOf\(/, 'grMidOf()（折线长度中点）应存在');
   const grd16 = bodyOf(NC, 'grRender', 5200);
   /* ★ 分色各断一条：只删一种时另一条仍顶住 ⇒ 断言恒绿的假捕获（v28 首版实测） */
-  assert.match(grd16, /grLabel\(fmt\(sumLen\(\[l\]\),\s*1\),\s*grMidOf\(l\),\s*'#185FA5'\)/,
-    '主管应逐根标注管长（蓝字）');
-  assert.match(grd16, /grLabel\(fmt\(sumLen\(\[l\]\),\s*1\),\s*grMidOf\(l\),\s*'#15803d'\)/,
-    '支管应逐根标注管长（绿字）');
+  assert.match(grd16, /grLabel\([^;]+zMain\[z\]\.mainDn,\s*grMidOf\(l\),\s*'#185FA5'\)/,
+    '主管应逐根标注管径（蓝字）');
+  assert.match(grd16, /grLabel\([^;]+zBr\[z\]\.branchDn,\s*grMidOf\(l\),\s*'#15803d'\)/,
+    '支管应逐根标注管径（绿字）');
   /* 反向：标注调用必须在 strokeLines 之后（同一 grRender 内先画线后标字） */
   assert.ok(grd16.indexOf('grLabel(') > grd16.indexOf('strokeLines('),
     '尺寸标注必须画在管线之后（标注层在最上，不被线压住）');
-  assert.match(NC, /管长/, '图例应有「线上数字=管长(m)」说明');
+  assert.match(INDEX_SRC, /线上数字[^<]*管径/, '图例应说明线上数字表示管径');
 
   /* =========================================================================
      --- ⑰ [v199] 二级左栏「入口压力」输入（fld_tapePressure 镜像） ---
@@ -286,7 +287,7 @@ module.exports = function v193GroupEditContracts(INDEX_SRC, helpers) {
      入口压力 = 01 一级表单「滴灌带入口工作压力 fld_tapePressure」（扬程计算式条的
      「入口压力」= bar×10.2m）。★ 必须**镜像** fld_*（v91 机制），不得建第二份数据源 ——
      calcPlan / 扬程分解 / 计算式条内联编辑全都只认 fld_*。 */
-  assert.match(NC, /id="planTapePressure"/, '二级左栏应有「入口压力」输入框（v199）');
+  assert.match(INDEX_SRC, /<input[^>]*id="planTapePressure"/, '二级左栏应有「入口压力」输入框（v199）');
   assert.match(NC, /\[\s*'planTapePressure',\s*'fld_tapePressure'\s*\]/,
     '入口压力必须与 fld_tapePressure 双向镜像（同一物理量，不得建第二份数据源）');
   assert.match(NC, /'planLift',\s*'planDh',\s*'planTapePressure'\]/,
@@ -313,9 +314,9 @@ module.exports = function v193GroupEditContracts(INDEX_SRC, helpers) {
   assert.match(NC, /var ppOwnDimOverride=false/, 'ppOwnDimOverride 开关应存在（v201）');
   assert.match(NC, /function\s+ppBuildAutoPipes\(/, '应有自动布管纯内核 ppBuildAutoPipes()');
   const bapW = NC.indexOf('function ppBuildAutoPipes(');
-  const bap = NC.slice(bapW, bapW + 3000);
+  const bap = bodyOf(NC,'ppBuildAutoPipes');
   assert.match(bap, /ppOwnDimOverride/, '内核应接 useOwnDims → ppOwnDimOverride（本块尺寸口径）');
-  assert.match(bap, /finally\{ ppState\.polyPts=keepPoly/, '内核必须还原 ppState.polyPts（swap-restore）');
+  assert.match(bap, /finally\s*\{\s*ppState\.polyPts\s*=\s*keepPoly/, '内核必须还原 ppState.polyPts（swap-restore）');
   const agW = NC.indexOf('function ppAutoGeneratePipes(');
   const ag = NC.slice(agW, agW + 4200);
   assert.match(ag, /ppIsGroupWhole\(\)/, '整组态必须走「逐块生成」分支');

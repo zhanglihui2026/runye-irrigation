@@ -1121,10 +1121,17 @@
       var lib=lsGet('runye_plot_library',[]);
       var saved=currentMapPlotId?lib.filter(function(p){return p.id===currentMapPlotId;})[0]:null;
       if(saved){ sendPlotToDesign(saved, this); return; }
+      /* [v249 2026-10-05 用户要求] 「完成并画下一块」之后画布已清空、currentMapPlotId 已复位，
+         用户随时可能就此停手点回传——此时「当前地块」= 刚定稿入库的最近一块（按 ts 取最新，
+         成组与否一视同仁）。画布还有草稿时不兜底：半成品仍走下方草稿路径（原行为）。 */
+      if(!points.length && lib.length){
+        saved=lib.reduce(function(a,b){return (!a || (b.ts||0)>(a.ts||0)) ? b : a;}, null);
+        if(saved){ sendPlotToDesign(saved, this); return; }
+      }
     }catch(e){}
     /* 否则回退：把当前画布上的草稿作为一个新地块回传 */
     var mu=parseFloat((geodesicArea(points)/666.67).toFixed(2));
-    if(!isFinite(mu) || mu<=0){ alert('请先画框测量出有效面积'); return; }
+    if(!isFinite(mu) || mu<=0){ alert('画布为空，地块库里也没有可回传的地块——请先画框测量出有效面积'); return; }
     sendPlotToDesign({ id:currentMapPlotId||('pm'+Date.now()), name:'', polyLatLng:latlngs() }, this);
   };
 

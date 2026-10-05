@@ -79,3 +79,9 @@ tests/
 !tests/
 tests/*
 !tests/partition_query.test.cjs
+
+# 成组管路真实面积与独立状态回归
+!tests/group_planning.test.cjs
+
+# 手动高程与压力校核回归
+!tests/terrain.test.cjs

@@ -1,0 +1,44 @@
+/* [v251 2026-10-05] AI 灌溉方案规划面板
+   配色/字号全部沿用 runye-terrain.css（v245d/e 实测锚点）：
+   面板 11px #4a6259；标题条 12px/600 #24443a + #f4f9f6 底；输入框 1px #d6e1da 方角白底；
+   主按钮绿 #116447（= .pp-btn-generate 实测值）；提示/告警琥珀 #b45309。
+   字号在 .pp-side / .gr-side 里会被宿主继承，故每处显式写死。
+   [v253 2026-10-05] 悬浮面板化：.ai-open 左栏按钮删除；定位/尺寸/投影由 JS 内联
+   （同 #tlWsLayerPanel 款），此处只留字体/配色基底；标题栏 = 图层控制同款（灰底、move 光标、
+   sticky 吸顶、↔ 调宽手柄、▾/▸ 折叠箭头）。 */
+/* [v253] 悬浮面板基底（定位/尺寸/投影见 JS 内联） */
+.ai-panel{box-sizing:border-box;color:#4a6259;background:#fff;font-size:11px;line-height:1.6;overflow:hidden}
+/* 标题栏：图层控制同款——灰底、move 光标、sticky 吸顶、触屏禁手势 */
+.ai-panel header{display:flex;align-items:center;gap:6px;padding:6px 9px;background:#f1f5f9;border-bottom:1px solid #e2e8f0;cursor:move;user-select:none;touch-action:none;position:sticky;top:0}
+.ai-panel header:hover{background:#e8eef4}
+.ai-grip{cursor:ew-resize;color:#94a3b8;padding:0 3px;user-select:none;touch-action:none;font-size:12px}
+.ai-caret{color:#64748b;font-size:11px}
+.ai-panel h3{font-size:12px;font-weight:600;color:#24443a;margin:0;flex:1 1 auto}
+.ai-tag{font-size:10px;font-weight:400;color:#7d8f86;border:1px solid #d6e1da;border-radius:8px;padding:0 5px;background:#fff}
+.ai-panel .ai-body{padding:8px}
+.ai-label{display:block;font-size:11px;font-weight:400;color:#4a6259;padding:2px 0 3px}
+.ai-panel textarea{box-sizing:border-box;width:100%;font:inherit;font-size:11px;font-weight:400;color:#243c35;background:#fff;border:1px solid #d6e1da;border-radius:0;padding:5px 6px;resize:vertical;line-height:1.55}
+.ai-panel textarea:focus{outline:none;border-color:var(--g-500,#22c55e)}
+.ai-panel textarea.ai-out,.ai-panel textarea.ai-json{font-family:ui-monospace,Consolas,"Courier New",monospace;font-size:10.5px;white-space:pre;overflow-wrap:normal;overflow-x:auto}
+.ai-actions{display:flex;gap:6px;margin:7px 0 0}
+.ai-actions button{flex:1 1 0;min-width:0;font:inherit;font-size:11px;min-height:30px;border-radius:4px;border:1px solid #d6e1da;padding:3px 6px;cursor:pointer;background:#fff;color:#4a6259}
+.ai-actions button:first-child{background:#116447;border-color:#116447;color:#fff;font-weight:600}
+.ai-actions button:hover{filter:brightness(0.97)}
+.ai-status{font-size:11px;color:#5b7268;margin:7px 0 0;overflow-wrap:anywhere}
+.ai-status.ai-err{color:#b45309;background:#fdf8ee;border:1px solid #f0e2c4;border-radius:4px;padding:6px}
+.ai-block{margin:8px 0 0;background:#f8fafc;border:1px solid #e6ecf2;border-radius:4px;padding:7px}
+.ai-block-head{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:11px;color:#334155;margin-bottom:5px}
+.ai-block-head span{display:flex;align-items:center;gap:5px}
+.ai-block button{font:inherit;font-size:11px;min-height:24px;border-radius:4px;border:1px solid #d6e1da;padding:2px 8px;cursor:pointer;background:#fff;color:#4a6259}
+.ai-block button[data-ai="copy"],.ai-block button[data-ai="confirm"]{background:#116447;border-color:#116447;color:#fff;font-weight:600}
+.ai-remark-text{font-size:11px;color:#334155;background:#f8fafc;border-radius:4px;padding:7px;margin:0}
+.ai-risk{margin:6px 0 0;padding-left:16px}
+.ai-risk li{font-size:11px;color:#b45309;margin:2px 0}
+.ai-note{font-size:11px;color:#8aa094;margin:8px 0 0;line-height:1.6}
+/* [v255] 在线生成：主按钮进行中的禁用态；接口地址行（默认只在需要改地址时才动它） */
+.ai-actions button:disabled{background:#94a3b8;border-color:#94a3b8;color:#fff;cursor:progress}
+.ai-api{display:flex;align-items:center;gap:5px;margin:7px 0 0}
+.ai-api label{font-size:10.5px;color:#8aa094;flex:0 0 auto}
+.ai-api input{flex:1 1 auto;min-width:0;font:inherit;font-size:10.5px;color:#243c35;background:#fff;border:1px solid #d6e1da;border-radius:0;padding:3px 5px}
+.ai-api input:focus{outline:none;border-color:var(--g-500,#22c55e)}
+@media(max-width:420px){.ai-panel .ai-body{padding:6px}.ai-actions{flex-direction:column}}

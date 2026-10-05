@@ -1,118 +1,118 @@
-<!doctype html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>润野灌溉 · 手机地图界面预览</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><link rel="stylesheet" href="runye-mobile-map-preview.css?v=246">
-
-<!-- PWA: independent installation and offline support -->
-<link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#15803d">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="润野灌溉">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="apple-touch-icon" sizes="180x180" href="pwa/icons/apple-touch-icon.png">
-<link rel="icon" type="image/png" sizes="192x192" href="pwa/icons/icon-192.png">
-<link rel="stylesheet" href="pwa/pwa.css?v=2">
-<script defer src="pwa/pwa.js?v=2"></script>
-<link rel="stylesheet" href="runye-terrain.css?v=245"><script src="runye-terrain.js?v=245"></script>
-</head><body>
-<svg class="symbols" xmlns="http://www.w3.org/2000/svg"><defs>
-<symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol>
-<symbol id="i-layer" viewBox="0 0 24 24"><path d="m12 3 10 6-10 6L2 9Z M2 13l10 6 10-6 M2 17l10 6 10-6"/></symbol>
-<symbol id="i-draw" viewBox="0 0 24 24"><path d="m4 19 1-6L16 2l5 5-11 11-6 1Z M13 5l5 5 M3 22h18"/></symbol>
-<symbol id="i-import" viewBox="0 0 24 24"><path d="M12 3v12 m-5-5 5 5 5-5 M4 16v5h16v-5"/></symbol>
-<symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 12h18 M12 3v18"/></symbol>
-<symbol id="i-pipe" viewBox="0 0 24 24"><path d="M4 3v6h16v12 M8 9v10 M14 9v10 M4 17h4 M10 17h4 M16 17h4"/><circle cx="4" cy="3" r="1"/></symbol>
-<symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 1v4 M12 19v4 M1 12h4 M19 12h4"/></symbol>
-<symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
-<symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 6h16 M4 12h16 M4 18h16"/><circle cx="8" cy="6" r="2" fill="white"/><circle cx="16" cy="12" r="2" fill="white"/><circle cx="10" cy="18" r="2" fill="white"/></symbol>
-<symbol id="i-back" viewBox="0 0 24 24"><path d="m10 5-7 7 7 7 M3 12h18"/></symbol>
-</defs></svg>
-<div id="map" aria-label="在线地图"></div>
-<div id="mapFailure" hidden>在线地图暂未加载，请检查网络后重试。</div>
-<header class="topbar">
- <form id="searchForm" class="search"><svg><use href="#i-search"/></svg><input id="searchInput" aria-label="搜索地点或经纬度" placeholder="搜索地点 / 经纬度"><button type="submit">搜索</button></form>
- <button class="icon-button top-layer" data-panel="layers" aria-label="打开图层"><svg><use href="#i-layer"/></svg></button>
-</header>
-<aside class="right-rail">
- <button class="map-button" data-panel="layers" aria-label="切换地图图层"><svg><use href="#i-layer"/></svg><span>图层</span></button>
- <button class="map-button" id="fitButton" aria-label="定位到地块"><svg><use href="#i-target"/></svg><span>地块</span></button>
- <div class="zoom-group"><button id="zoomIn" aria-label="放大地图">＋</button><hr><button id="zoomOut" aria-label="缩小地图">－</button></div>
- <div class="map-angle" role="group" aria-label="分区线旋转">
-  <button id="anglePlus" aria-label="分区角度增加1度" title="增加1°">↶<small>＋1°</small></button>
-  <label for="partitionAngle">角度</label><div class="map-angle-value"><input id="partitionAngle" aria-label="分区角度" type="number" inputmode="decimal" value="0" min="-180" max="180" step="1"><span>°</span></div>
-  <button id="angleMinus" aria-label="分区角度减少1度" title="减少1°">↷<small>−1°</small></button>
- </div>
-</aside>
-<div class="crosshair" aria-hidden="true"></div>
-<div class="map-info"><span id="coordinates">18.25280°N 109.51190°E</span><span id="mapSource">高德卫星</span></div>
-<div class="selection-card" id="selectionCard" hidden><div><span class="mini-label">当前地块</span><strong id="plotArea">0.00 <small>亩</small></strong></div><div><b id="plotName">新建地块</b><span id="plotStatus">边界已闭合</span></div><button id="nextStage" class="primary compact">二级规划 →</button></div>
-<div class="draw-strip" id="drawStrip" hidden><span id="drawCount" role="status">移动地图对准光标，再点击确定</span><div class="draw-actions"><button id="undoPoint" aria-label="返回，撤销上一个边界点"><span class="draw-action-icon">↶</span><span>返回</span></button><button id="confirmPoint" aria-label="确定，添加光标位置或闭合地块"><span class="draw-action-icon">◎</span><span>确定</span></button><button id="cancelDrawing" aria-label="取消绘制并恢复原地块"><span class="draw-action-icon">×</span><span>取消</span></button></div></div>
-<section class="tool-sheet" id="toolSheet" hidden aria-label="地图工具面板">
- <div class="sheet-grip"></div><div class="sheet-heading"><div><span id="sheetKicker">地块工具</span><h2 id="sheetTitle">描绘与导入</h2></div><button class="close-sheet" id="closeSheet" aria-label="收起工具条">×</button></div>
- <div class="sheet-scroll">
-  <div class="sheet-panel" data-content="draw">
-   <p class="sheet-note">画出地块边界，后续管路规划都叠加在这张地图上。</p>
-   <div class="tool-grid"><button id="startDrawing"><svg><use href="#i-draw"/></svg><b>光标绘制地块</b><small>移动地图，确定光标位置</small></button><button id="importButton"><svg><use href="#i-import"/></svg><b>导入奥维轨迹</b><small>KML / GeoJSON 文件</small></button></div>
-   <button class="list-action" id="demoButton"><span>查看示例地块</span><small>体验二级与三级图层 →</small></button>
-  </div>
-  <div class="sheet-panel" data-content="second" hidden>
-   <div class="plot-line"><span class="outline-dot"></span><b data-summary-area>尚未选择地块</b><span>边界图层</span></div>
-   <h3>滴灌带参数</h3><div class="field-grid">
-    <label>滴灌带间距<div><input id="tapeSpacing" type="number" inputmode="decimal" value="0.4" min="0.1" step="0.1"><span>m</span></div></label>
-    <label>滴孔间距<div><input id="emitterSpacing" type="number" inputmode="decimal" value="0.3" min="0.05" step="0.05"><span>m</span></div></label>
-    <label>滴头流量<div><input id="emitterFlow" type="number" inputmode="decimal" value="0.8" min="0.1" step="0.1"><span>L/h</span></div></label>
-    <label>单边铺设长度<div><input id="tapeLength" type="number" inputmode="decimal" value="100" min="10"><span>m</span></div></label>
-   </div><div class="area-field"><label for="zoneArea">每个分区目标面积</label><div><input id="zoneArea" type="number" inputmode="decimal" value="18" min="0.1" step="0.1"><span>亩 / 区</span></div></div>
-   <p class="sheet-note small-note">地图右侧直接调整分区角度，范围 −180°～180°，正角度逆时针、负角度顺时针旋转分区网格。地块边界和地图保持固定。</p>
-   <p class="sheet-note small-note" id="partitionDimensions"></p><p class="sheet-note small-note" id="partitionResult" role="status"></p>
-   <div class="layer-note"><span class="swatch boundary"></span>地块边界 <span class="swatch division"></span>分区图层 <small>边缘分区按地块裁切，面积可能不足目标</small></div>
-   <div class="sheet-actions"><button id="previewSecond" class="secondary">重新划分 / 查看</button><button id="toThird" class="primary">进入三级规划 →</button></div>
-  </div>
-  <div class="sheet-panel" data-content="third" hidden>
-   <div class="plot-line"><span class="outline-dot"></span><b data-summary-area>尚未选择地块</b><span>三级管路图层</span></div>
-   <h3>联合灌溉分组</h3><div class="segments" id="groupSegments"><button data-group="1">1 区</button><button data-group="2" class="active">2 区</button><button data-group="3">3 区</button><button data-group="4">4 区</button></div>
-   <div class="area-field"><label for="groupArea">联合灌溉目标面积</label><div><input id="groupArea" type="number" inputmode="decimal" value="36" min="0.1"><span>亩 / 组</span></div></div>
-   <div class="layer-list compact-list"><label><span class="swatch trunk"></span><b>主管</b><input data-layer="third" type="checkbox" checked></label><label><span class="swatch branch"></span><b>支管 / 一级管</b><input data-layer="branch" type="checkbox" checked></label><label><span class="swatch division"></span><b>分区与边界</b><input data-layer="second" type="checkbox" checked></label></div>
-   <p class="sheet-note small-note">当前用于查看界面、图层和操作顺序，管径与水力计算待下一轮接入。</p>
-   <p class="sheet-note small-note" id="hydraulicSummary"></p>
-   <div class="sheet-actions"><button id="backSecond" class="secondary">← 二级参数</button><button id="previewThird" class="primary">查看管路图层</button></div>
-  </div>
-  <div class="sheet-panel" data-content="layers" hidden>
-   <h3>在线底图</h3><div class="base-options"><button data-base="satellite" class="active">卫星影像</button><button data-base="street">街道地图</button></div>
-   <h3>规划图层</h3><div class="layer-list"><label><span class="swatch boundary"></span><b>地块边界</b><small>始终显示地块位置</small><input data-layer="boundary" type="checkbox" checked></label><label><span class="swatch division"></span><b>二级分区</b><small>分区边界与面积</small><input data-layer="second" type="checkbox" checked></label><label><span class="swatch trunk"></span><b>主管</b><small>管路走向</small><input data-layer="third" type="checkbox" checked></label><label><span class="swatch branch"></span><b>支管 / 一级管</b><small>分区内支管</small><input data-layer="branch" type="checkbox" checked></label></div>
-   <p class="sheet-note small-note">展开工具条切换图层，地图位置与缩放保持不变。</p>
-  </div>
-  <div class="sheet-panel" data-content="more" hidden><h3>项目与地图</h3><button class="list-action" id="moreImport"><span>导入奥维轨迹</span><small>KML / GeoJSON →</small></button><button class="list-action" id="moreDemo"><span>加载示例地块</span><small>查看完整界面 →</small></button><button class="list-action" id="clearPlot"><span>清除当前地块</span><small>重新绘制 →</small></button><p class="sheet-note small-note">润野灌溉 · 手机地图界面预览<br>参考地图应用的全屏底图与展开工具条布局。</p></div>
-  <div class="sheet-panel" data-content="settings" hidden>
-   <form id="settingsForm">
-    <h3>页面字体</h3><div class="field-grid">
-     <label>参数与数值<div><input data-setting="fontMain" type="number" inputmode="numeric" min="10" max="24" step="1" required><span>px</span></div></label>
-     <label>菜单与说明<div><input data-setting="fontMenu" type="number" inputmode="numeric" min="9" max="20" step="1" required><span>px</span></div></label>
-     <label>标题文字<div><input data-setting="fontTitle" type="number" inputmode="numeric" min="14" max="26" step="1" required><span>px</span></div></label>
-    </div>
-    <h3 class="settings-section">地块划分初始参数</h3><div class="field-grid">
-     <label>滴灌带间距<div><input data-setting="tapeSpacing" type="number" inputmode="decimal" min="0.1" step="any" required><span>m</span></div></label>
-     <label>滴孔间距<div><input data-setting="emitterSpacing" type="number" inputmode="decimal" min="0.05" step="any" required><span>m</span></div></label>
-     <label>滴头流量<div><input data-setting="emitterFlow" type="number" inputmode="decimal" min="0.1" step="any" required><span>L/h</span></div></label>
-     <label>单边铺设长度<div><input data-setting="tapeLength" type="number" inputmode="decimal" min="10" step="any" required><span>m</span></div></label>
-     <label>每区目标面积<div><input data-setting="zoneArea" type="number" inputmode="decimal" min="0.1" step="any" required><span>亩</span></div></label>
-     <label>分区初始角度<div><input data-setting="partitionAngle" type="number" inputmode="decimal" min="-180" max="180" step="1" required><span>°</span></div></label>
-    </div>
-    <h3 class="settings-section">供水初始参数</h3><div class="field-grid">
-     <label>水泵提升高度<div><input data-setting="pumpLift" type="number" inputmode="decimal" min="0" step="any" required><span>m</span></div></label>
-     <label>地形高差<div><input data-setting="terrainRise" type="number" inputmode="decimal" min="0" step="any" required><span>m</span></div></label>
-     <label>水源距离<div><input data-setting="sourceDistance" type="number" inputmode="decimal" min="0" step="any" required><span>m</span></div></label>
-     <label>入口压力<div><input data-setting="inletPressure" type="number" inputmode="decimal" min="0" step="any" required><span>bar</span></div></label>
-    </div>
-    <p class="sheet-note small-note">入口压力指滴灌带入口工作压力。保存后应用到当前规划，并作为下次打开的初始值；设置保存在本机浏览器中。</p>
-    <p class="sheet-note small-note">供水参数作为初始值保存，水力计算待后续接入。</p>
-    <p id="settingsStatus" class="sheet-note small-note" role="status"></p>
-    <div class="sheet-actions"><button id="resetSettings" type="button" class="secondary">恢复默认</button><button type="submit" class="primary">保存并应用</button></div>
-   </form>
-  </div>
- </div>
-</section>
-<nav class="bottom-tools" aria-label="规划工具条"><button data-panel="draw" class="active"><svg><use href="#i-draw"/></svg><span>地块</span></button><button data-panel="second"><svg><use href="#i-grid"/></svg><span>二级规划</span></button><button data-panel="third"><svg><use href="#i-pipe"/></svg><span>三级规划</span></button><button data-panel="layers"><svg><use href="#i-layer"/></svg><span>图层</span></button><button data-panel="settings"><svg><use href="#i-settings"/></svg><span>设置</span></button><button data-panel="more"><svg><use href="#i-more"/></svg><span>更多</span></button></nav>
-<div id="toast" role="status" hidden></div><input id="importFile" type="file" accept=".kml,.geojson,.json,.ovkml" hidden>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="runye-geo.js?v=242"></script><script src="runye-map-enhance.js?v=242"></script><script src="runye-mobile-partition.js?v=242"></script><script src="runye-mobile-map-preview.js?v=246"></script>
-</body></html>
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>润野灌溉 · 手机地图界面预览</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><link rel="stylesheet" href="runye-mobile-map-preview.css?v=246">
+
+<!-- PWA: independent installation and offline support -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#15803d">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="润野灌溉">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" sizes="180x180" href="pwa/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="pwa/icons/icon-192.png">
+<link rel="stylesheet" href="pwa/pwa.css?v=2">
+<script defer src="pwa/pwa.js?v=2"></script>
+<link rel="stylesheet" href="runye-terrain.css?v=254"><script src="runye-terrain.js?v=256"></script>
+</head><body>
+<svg class="symbols" xmlns="http://www.w3.org/2000/svg"><defs>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol>
+<symbol id="i-layer" viewBox="0 0 24 24"><path d="m12 3 10 6-10 6L2 9Z M2 13l10 6 10-6 M2 17l10 6 10-6"/></symbol>
+<symbol id="i-draw" viewBox="0 0 24 24"><path d="m4 19 1-6L16 2l5 5-11 11-6 1Z M13 5l5 5 M3 22h18"/></symbol>
+<symbol id="i-import" viewBox="0 0 24 24"><path d="M12 3v12 m-5-5 5 5 5-5 M4 16v5h16v-5"/></symbol>
+<symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 12h18 M12 3v18"/></symbol>
+<symbol id="i-pipe" viewBox="0 0 24 24"><path d="M4 3v6h16v12 M8 9v10 M14 9v10 M4 17h4 M10 17h4 M16 17h4"/><circle cx="4" cy="3" r="1"/></symbol>
+<symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 1v4 M12 19v4 M1 12h4 M19 12h4"/></symbol>
+<symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+<symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 6h16 M4 12h16 M4 18h16"/><circle cx="8" cy="6" r="2" fill="white"/><circle cx="16" cy="12" r="2" fill="white"/><circle cx="10" cy="18" r="2" fill="white"/></symbol>
+<symbol id="i-back" viewBox="0 0 24 24"><path d="m10 5-7 7 7 7 M3 12h18"/></symbol>
+</defs></svg>
+<div id="map" aria-label="在线地图"></div>
+<div id="mapFailure" hidden>在线地图暂未加载，请检查网络后重试。</div>
+<header class="topbar">
+ <form id="searchForm" class="search"><svg><use href="#i-search"/></svg><input id="searchInput" aria-label="搜索地点或经纬度" placeholder="搜索地点 / 经纬度"><button type="submit">搜索</button></form>
+ <button class="icon-button top-layer" data-panel="layers" aria-label="打开图层"><svg><use href="#i-layer"/></svg></button>
+</header>
+<aside class="right-rail">
+ <button class="map-button" data-panel="layers" aria-label="切换地图图层"><svg><use href="#i-layer"/></svg><span>图层</span></button>
+ <button class="map-button" id="fitButton" aria-label="定位到地块"><svg><use href="#i-target"/></svg><span>地块</span></button>
+ <div class="zoom-group"><button id="zoomIn" aria-label="放大地图">＋</button><hr><button id="zoomOut" aria-label="缩小地图">－</button></div>
+ <div class="map-angle" role="group" aria-label="分区线旋转">
+  <button id="anglePlus" aria-label="分区角度增加1度" title="增加1°">↶<small>＋1°</small></button>
+  <label for="partitionAngle">角度</label><div class="map-angle-value"><input id="partitionAngle" aria-label="分区角度" type="number" inputmode="decimal" value="0" min="-180" max="180" step="1"><span>°</span></div>
+  <button id="angleMinus" aria-label="分区角度减少1度" title="减少1°">↷<small>−1°</small></button>
+ </div>
+</aside>
+<div class="crosshair" aria-hidden="true"></div>
+<div class="map-info"><span id="coordinates">18.25280°N 109.51190°E</span><span id="mapSource">高德卫星</span></div>
+<div class="selection-card" id="selectionCard" hidden><div><span class="mini-label">当前地块</span><strong id="plotArea">0.00 <small>亩</small></strong></div><div><b id="plotName">新建地块</b><span id="plotStatus">边界已闭合</span></div><button id="nextStage" class="primary compact">二级规划 →</button></div>
+<div class="draw-strip" id="drawStrip" hidden><span id="drawCount" role="status">移动地图对准光标，再点击确定</span><div class="draw-actions"><button id="undoPoint" aria-label="返回，撤销上一个边界点"><span class="draw-action-icon">↶</span><span>返回</span></button><button id="confirmPoint" aria-label="确定，添加光标位置或闭合地块"><span class="draw-action-icon">◎</span><span>确定</span></button><button id="cancelDrawing" aria-label="取消绘制并恢复原地块"><span class="draw-action-icon">×</span><span>取消</span></button></div></div>
+<section class="tool-sheet" id="toolSheet" hidden aria-label="地图工具面板">
+ <div class="sheet-grip"></div><div class="sheet-heading"><div><span id="sheetKicker">地块工具</span><h2 id="sheetTitle">描绘与导入</h2></div><button class="close-sheet" id="closeSheet" aria-label="收起工具条">×</button></div>
+ <div class="sheet-scroll">
+  <div class="sheet-panel" data-content="draw">
+   <p class="sheet-note">画出地块边界，后续管路规划都叠加在这张地图上。</p>
+   <div class="tool-grid"><button id="startDrawing"><svg><use href="#i-draw"/></svg><b>光标绘制地块</b><small>移动地图，确定光标位置</small></button><button id="importButton"><svg><use href="#i-import"/></svg><b>导入奥维轨迹</b><small>KML / GeoJSON 文件</small></button></div>
+   <button class="list-action" id="demoButton"><span>查看示例地块</span><small>体验二级与三级图层 →</small></button>
+  </div>
+  <div class="sheet-panel" data-content="second" hidden>
+   <div class="plot-line"><span class="outline-dot"></span><b data-summary-area>尚未选择地块</b><span>边界图层</span></div>
+   <h3>滴灌带参数</h3><div class="field-grid">
+    <label>滴灌带间距<div><input id="tapeSpacing" type="number" inputmode="decimal" value="0.4" min="0.1" step="0.1"><span>m</span></div></label>
+    <label>滴孔间距<div><input id="emitterSpacing" type="number" inputmode="decimal" value="0.3" min="0.05" step="0.05"><span>m</span></div></label>
+    <label>滴头流量<div><input id="emitterFlow" type="number" inputmode="decimal" value="0.8" min="0.1" step="0.1"><span>L/h</span></div></label>
+    <label>单边铺设长度<div><input id="tapeLength" type="number" inputmode="decimal" value="100" min="10"><span>m</span></div></label>
+   </div><div class="area-field"><label for="zoneArea">每个分区目标面积</label><div><input id="zoneArea" type="number" inputmode="decimal" value="18" min="0.1" step="0.1"><span>亩 / 区</span></div></div>
+   <p class="sheet-note small-note">地图右侧直接调整分区角度，范围 −180°～180°，正角度逆时针、负角度顺时针旋转分区网格。地块边界和地图保持固定。</p>
+   <p class="sheet-note small-note" id="partitionDimensions"></p><p class="sheet-note small-note" id="partitionResult" role="status"></p>
+   <div class="layer-note"><span class="swatch boundary"></span>地块边界 <span class="swatch division"></span>分区图层 <small>边缘分区按地块裁切，面积可能不足目标</small></div>
+   <div class="sheet-actions"><button id="previewSecond" class="secondary">重新划分 / 查看</button><button id="toThird" class="primary">进入三级规划 →</button></div>
+  </div>
+  <div class="sheet-panel" data-content="third" hidden>
+   <div class="plot-line"><span class="outline-dot"></span><b data-summary-area>尚未选择地块</b><span>三级管路图层</span></div>
+   <h3>联合灌溉分组</h3><div class="segments" id="groupSegments"><button data-group="1">1 区</button><button data-group="2" class="active">2 区</button><button data-group="3">3 区</button><button data-group="4">4 区</button></div>
+   <div class="area-field"><label for="groupArea">联合灌溉目标面积</label><div><input id="groupArea" type="number" inputmode="decimal" value="36" min="0.1"><span>亩 / 组</span></div></div>
+   <div class="layer-list compact-list"><label><span class="swatch trunk"></span><b>主管</b><input data-layer="third" type="checkbox" checked></label><label><span class="swatch branch"></span><b>支管 / 一级管</b><input data-layer="branch" type="checkbox" checked></label><label><span class="swatch division"></span><b>分区与边界</b><input data-layer="second" type="checkbox" checked></label></div>
+   <p class="sheet-note small-note">当前用于查看界面、图层和操作顺序，管径与水力计算待下一轮接入。</p>
+   <p class="sheet-note small-note" id="hydraulicSummary"></p>
+   <div class="sheet-actions"><button id="backSecond" class="secondary">← 二级参数</button><button id="previewThird" class="primary">查看管路图层</button></div>
+  </div>
+  <div class="sheet-panel" data-content="layers" hidden>
+   <h3>在线底图</h3><div class="base-options"><button data-base="satellite" class="active">卫星影像</button><button data-base="street">街道地图</button></div>
+   <h3>规划图层</h3><div class="layer-list"><label><span class="swatch boundary"></span><b>地块边界</b><small>始终显示地块位置</small><input data-layer="boundary" type="checkbox" checked></label><label><span class="swatch division"></span><b>二级分区</b><small>分区边界与面积</small><input data-layer="second" type="checkbox" checked></label><label><span class="swatch trunk"></span><b>主管</b><small>管路走向</small><input data-layer="third" type="checkbox" checked></label><label><span class="swatch branch"></span><b>支管 / 一级管</b><small>分区内支管</small><input data-layer="branch" type="checkbox" checked></label></div>
+   <p class="sheet-note small-note">展开工具条切换图层，地图位置与缩放保持不变。</p>
+  </div>
+  <div class="sheet-panel" data-content="more" hidden><h3>项目与地图</h3><button class="list-action" id="moreImport"><span>导入奥维轨迹</span><small>KML / GeoJSON →</small></button><button class="list-action" id="moreDemo"><span>加载示例地块</span><small>查看完整界面 →</small></button><button class="list-action" id="clearPlot"><span>清除当前地块</span><small>重新绘制 →</small></button><p class="sheet-note small-note">润野灌溉 · 手机地图界面预览<br>参考地图应用的全屏底图与展开工具条布局。</p></div>
+  <div class="sheet-panel" data-content="settings" hidden>
+   <form id="settingsForm">
+    <h3>页面字体</h3><div class="field-grid">
+     <label>参数与数值<div><input data-setting="fontMain" type="number" inputmode="numeric" min="10" max="24" step="1" required><span>px</span></div></label>
+     <label>菜单与说明<div><input data-setting="fontMenu" type="number" inputmode="numeric" min="9" max="20" step="1" required><span>px</span></div></label>
+     <label>标题文字<div><input data-setting="fontTitle" type="number" inputmode="numeric" min="14" max="26" step="1" required><span>px</span></div></label>
+    </div>
+    <h3 class="settings-section">地块划分初始参数</h3><div class="field-grid">
+     <label>滴灌带间距<div><input data-setting="tapeSpacing" type="number" inputmode="decimal" min="0.1" step="any" required><span>m</span></div></label>
+     <label>滴孔间距<div><input data-setting="emitterSpacing" type="number" inputmode="decimal" min="0.05" step="any" required><span>m</span></div></label>
+     <label>滴头流量<div><input data-setting="emitterFlow" type="number" inputmode="decimal" min="0.1" step="any" required><span>L/h</span></div></label>
+     <label>单边铺设长度<div><input data-setting="tapeLength" type="number" inputmode="decimal" min="10" step="any" required><span>m</span></div></label>
+     <label>每区目标面积<div><input data-setting="zoneArea" type="number" inputmode="decimal" min="0.1" step="any" required><span>亩</span></div></label>
+     <label>分区初始角度<div><input data-setting="partitionAngle" type="number" inputmode="decimal" min="-180" max="180" step="1" required><span>°</span></div></label>
+    </div>
+    <h3 class="settings-section">供水初始参数</h3><div class="field-grid">
+     <label>水泵提升高度<div><input data-setting="pumpLift" type="number" inputmode="decimal" min="0" step="any" required><span>m</span></div></label>
+     <label>地形高差<div><input data-setting="terrainRise" type="number" inputmode="decimal" min="0" step="any" required><span>m</span></div></label>
+     <label>水源距离<div><input data-setting="sourceDistance" type="number" inputmode="decimal" min="0" step="any" required><span>m</span></div></label>
+     <label>入口压力<div><input data-setting="inletPressure" type="number" inputmode="decimal" min="0" step="any" required><span>bar</span></div></label>
+    </div>
+    <p class="sheet-note small-note">入口压力指滴灌带入口工作压力。保存后应用到当前规划，并作为下次打开的初始值；设置保存在本机浏览器中。</p>
+    <p class="sheet-note small-note">供水参数作为初始值保存，水力计算待后续接入。</p>
+    <p id="settingsStatus" class="sheet-note small-note" role="status"></p>
+    <div class="sheet-actions"><button id="resetSettings" type="button" class="secondary">恢复默认</button><button type="submit" class="primary">保存并应用</button></div>
+   </form>
+  </div>
+ </div>
+</section>
+<nav class="bottom-tools" aria-label="规划工具条"><button data-panel="draw" class="active"><svg><use href="#i-draw"/></svg><span>地块</span></button><button data-panel="second"><svg><use href="#i-grid"/></svg><span>二级规划</span></button><button data-panel="third"><svg><use href="#i-pipe"/></svg><span>三级规划</span></button><button data-panel="layers"><svg><use href="#i-layer"/></svg><span>图层</span></button><button data-panel="settings"><svg><use href="#i-settings"/></svg><span>设置</span></button><button data-panel="more"><svg><use href="#i-more"/></svg><span>更多</span></button></nav>
+<div id="toast" role="status" hidden></div><input id="importFile" type="file" accept=".kml,.geojson,.json,.ovkml" hidden>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="runye-geo.js?v=242"></script><script src="runye-map-enhance.js?v=242"></script><script src="runye-mobile-partition.js?v=242"></script><script src="runye-mobile-map-preview.js?v=246"></script>
+</body></html>
