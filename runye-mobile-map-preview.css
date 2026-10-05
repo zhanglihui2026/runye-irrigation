@@ -5,12 +5,12 @@ body.sheet-open .selection-card,body.sheet-open .draw-strip{display:none!importa
 .angle-controls{display:flex;align-items:center;gap:10px;margin:10px 0}.angle-controls button{flex:none;padding:9px 12px;min-height:40px}.angle-controls input{flex:1;min-width:0;accent-color:#286646}.zone-label{white-space:nowrap;font-size:10px!important}
 
 /* Shared type scale for every expandable map panel. */
-.tool-sheet{--sheet-title:18px;--sheet-body:14px;--sheet-label:14px;--sheet-note:11px;--sheet-number:14px;line-height:1.5}
+.tool-sheet{--sheet-title:var(--ry-font-title,18px);--sheet-body:var(--ry-font-main,14px);--sheet-label:var(--ry-font-main,14px);--sheet-note:var(--ry-font-menu,11px);--sheet-number:var(--ry-font-main,14px);line-height:1.5}
 .sheet-heading{padding:10px 16px 12px}
-.sheet-heading span{font-size:11px;line-height:1.4;color:#68786d;margin-bottom:3px}
+.sheet-heading span{font-size:var(--sheet-note);line-height:1.4;color:#68786d;margin-bottom:3px}
 .sheet-heading h2{font-size:var(--sheet-title);line-height:1.4;font-weight:600}
 .sheet-scroll{padding:14px 16px 18px}
-.sheet-panel h3{font-size:16px;line-height:1.5;margin-bottom:12px}
+.sheet-panel h3{font-size:calc(var(--ry-font-title,18px) - 2px);line-height:1.5;margin-bottom:12px}
 .sheet-note,.small-note{font-size:var(--sheet-note);line-height:1.65;color:#68786d}
 .tool-grid b,.list-action{font-size:var(--sheet-note);line-height:1.5}
 .layer-list b{font-size:var(--sheet-body);line-height:1.5}
@@ -46,12 +46,15 @@ body.sheet-open .selection-card,body.sheet-open .draw-strip{display:none!importa
 @media(max-width:350px){.sheet-scroll{padding:12px 14px 16px}.field-grid{gap:14px 12px}.tool-grid button{padding:12px 10px}.tool-grid small{font-size:var(--sheet-note)}.list-action{flex-wrap:wrap;gap:4px 10px}.layer-list small{display:block}}
 @media(max-height:520px){.sheet-heading{padding:8px 14px}.sheet-scroll{padding:12px 14px 16px}}
 
-/* Map controls use the smaller menu scale from the supplied Ovi screenshots. */
-.search input{font-size:14px}.search button{font-size:11px}
-.bottom-tools button{font-size:11px}
-.map-button span{font-size:11px}
-.selection-card b,.selection-card strong{font-size:14px}.selection-card #plotStatus{font-size:11px}
-.selection-card .mini-label{font-size:11px}.selection-card strong small{font-size:11px}
-.selection-card .compact{font-size:11px;min-height:42px}
-.draw-strip>span,.draw-strip>button{font-size:11px}
+/* Page text follows the saved font preferences. */
+.search input{font-size:var(--ry-font-main,14px)}.search button{font-size:var(--ry-font-menu,11px)}
+.bottom-tools button,.map-button span{font-size:var(--ry-font-menu,11px)}
+.bottom-tools span{max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.selection-card b,.selection-card strong{font-size:var(--ry-font-main,14px)}
+.selection-card #plotStatus,.selection-card .mini-label,.selection-card strong small,.selection-card .compact{font-size:var(--ry-font-menu,11px)}
+.selection-card .compact{min-height:42px}
+.draw-strip>span,.draw-strip>button,#toast{font-size:var(--ry-font-menu,11px)}
 .draw-strip>button{min-height:42px}
+.leaflet-tooltip.zone-label{font-size:var(--ry-font-menu,11px)!important}
+.settings-section{margin-top:24px!important}
+#settingsStatus:empty{display:none}
