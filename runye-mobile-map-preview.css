@@ -57,4 +57,22 @@ body.sheet-open .selection-card,body.sheet-open .draw-strip{display:none!importa
 .draw-strip>button{min-height:42px}
 .leaflet-tooltip.zone-label{font-size:var(--ry-font-menu,11px)!important}
 .settings-section{margin-top:24px!important}
-#settingsStatus:empty{display:none}
+#settingsStatus:empty{display:none}/* Center cursor drawing: move the map, then confirm the coordinate under the cross. */
+.crosshair{width:32px;height:32px;filter:drop-shadow(0 1px 2px #0008)}
+.crosshair:before{width:32px;height:2px;top:15px;background:#ffe000}
+.crosshair:after{height:32px;width:2px;left:15px;background:#ffe000}
+body.drawing .crosshair{display:block}
+body.drawing .bottom-tools{display:none}
+body.drawing .draw-strip{left:0;right:0;bottom:0;width:auto;border-radius:8px 8px 0 0;display:flex;flex-direction:column;gap:8px;padding:9px 14px calc(8px + env(safe-area-inset-bottom));background:#262b2ae8;color:#fff;backdrop-filter:blur(8px)}
+body.drawing #drawCount{flex:none;text-align:center;color:#f5f4de;line-height:1.5;font-size:var(--ry-font-menu,11px)}
+.draw-actions{display:flex;justify-content:space-evenly;gap:20px;width:100%}
+.draw-actions button{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:64px;min-height:64px;padding:0 8px;border:0;background:none;color:#fff;font-size:var(--ry-font-menu,11px);line-height:1.3}
+.draw-actions .draw-action-icon{display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:50%;font-size:29px;line-height:1;color:#fff;box-shadow:0 1px 6px #0003}
+#undoPoint .draw-action-icon{background:#3589ed}
+#confirmPoint .draw-action-icon{background:#ff933d}
+#confirmPoint.can-close .draw-action-icon{background:#329a65}
+#cancelDrawing .draw-action-icon{background:#f1645b}
+.draw-actions button:disabled{opacity:.4}
+body.drawing .map-info{bottom:calc(115px + env(safe-area-inset-bottom))}
+body.drawing .leaflet-control-attribution{bottom:105px}
+body.drawing .leaflet-control-scale{margin-bottom:125px!important}

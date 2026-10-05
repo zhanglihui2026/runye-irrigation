@@ -69,7 +69,7 @@
         });
       } else if (it.hash) {
         if (global.RyMobile && global.RyMobile.isActive() && (it.hash === 'pipePlanSection' || it.hash === 'tlPipePlanSection')) {
-          a.href = 'runye-mobile-map-preview.html?v=240#' + (it.hash === 'pipePlanSection' ? 'second' : 'third');
+          a.href = 'runye-mobile-map-preview.html?v=241#' + (it.hash === 'pipePlanSection' ? 'second' : 'third');
         } else {
           a.href = base + it.hash;
           if (!base) a.setAttribute('data-target', it.hash);
@@ -78,7 +78,7 @@
         // [v235] 移动端直接进新的手机地图预览页；桌面端仍走旧地图页
         var navHref = it.href;
         if (navHref === 'runye-map-measure.html' && global.RyMobile && global.RyMobile.isActive()) {
-          navHref = 'runye-mobile-map-preview.html?v=240';
+          navHref = 'runye-mobile-map-preview.html?v=241';
         }
         a.href = navHref;
         /* 当前页高亮：仅普通站内链接参与（锚点项由页面自有逻辑管理 active） */

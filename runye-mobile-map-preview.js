@@ -3,7 +3,7 @@
  var $=function(id){return document.getElementById(id);};
  var map=null, base='satellite', mode='draw', panel=null, drawing=false, points=[], plotName='新建地块',groups=2;
  var visibility={boundary:true,second:true,third:true,branch:true}, layers={};
- var toastTimer,partition=null;
+ var toastTimer,partition=null,drawBackup=null,draftGuide=null;
  var settingsKey='runye_mobile_settings_v1';
  var settingRules={fontMain:[14,10,24],fontMenu:[11,9,20],fontTitle:[18,14,26],tapeSpacing:[0.4,0.1],emitterSpacing:[0.3,0.05],emitterFlow:[0.8,0.1],tapeLength:[100,10],zoneArea:[18,0.1],partitionAngle:[0,0,180],pumpLift:[5,0],terrainRise:[5,0],sourceDistance:[0,0],inletPressure:[1,0]};
  var settings={};Object.keys(settingRules).forEach(function(key){settings[key]=settingRules[key][0];});
@@ -57,15 +57,23 @@
   $('plotStatus').textContent=mode==='draw'?'边界已闭合':mode==='second'?'二级分区 · '+(partition?partition.zones.length:0)+' 区':'三级管路 · 界面示意';
   $('nextStage').textContent=mode==='draw'?'二级规划 →':mode==='second'?'三级规划 →':'规划工具 ↑';
   document.querySelectorAll('[data-summary-area]').forEach(function(el){el.textContent=points.length>=3?'当前地块 · 约 '+mu+' 亩':'尚未选择地块';});
-  $('drawCount').textContent=points.length?'已添加 '+points.length+' 个边界点':'点击地图添加边界点';
-  $('finishDrawing').disabled=points.length<3;
+  $('drawCount').textContent=points.length?'已添加 '+points.length+' 个点'+(points.length>=3?' · 约 '+mu+' 亩 · 回到起点点击确定完成':' · 移动地图后点击确定继续'):'移动地图对准黄色光标，再点击确定';
+  $('undoPoint').disabled=!points.length;
+  $('confirmPoint').classList.toggle('can-close',canCloseDrawing());
+ }
+ function canCloseDrawing(){return !!(drawing&&map&&points.length>=3&&map.latLngToContainerPoint(display(points[0])).distanceTo(map.latLngToContainerPoint(map.getCenter()))<=12);}
+ function updateDraftGuide(){
+  if(!draftGuide)return;draftGuide.clearLayers();if(!drawing||!points.length)return;
+  var cursor=fromDisplay(map.getCenter());
+  L.polyline([display(points[points.length-1]),display(cursor)],{color:'#ffe000',weight:2,dashArray:'5,5',interactive:false}).addTo(draftGuide);
+  if(points.length>=3)L.circleMarker(display(points[0]),{radius:12,color:canCloseDrawing()?'#59d58c':'#ffe000',weight:2,fillOpacity:0,interactive:false}).addTo(draftGuide);
  }
  function addLines(group,segs,style){segs.forEach(function(s){L.polyline(s.map(display),Object.assign({interactive:false},style)).addTo(group);});}
  function renderLayers(){
   if(!map)return;
   Object.keys(layers).forEach(function(k){layers[k].clearLayers();if(map.hasLayer(layers[k]))map.removeLayer(layers[k]);});
   if(points.length){
-   if(points.length>=3)L.polygon(points.map(display),{color:'#ffad2b',weight:2,fillColor:'#f9d967',fillOpacity:.09,interactive:false}).addTo(layers.boundary);
+   if(points.length>=3&&!drawing)L.polygon(points.map(display),{color:'#ffad2b',weight:2,fillColor:'#f9d967',fillOpacity:.09,interactive:false}).addTo(layers.boundary);
    else L.polyline(points.map(display),{color:'#ffad2b',weight:2,interactive:false}).addTo(layers.boundary);
    if(drawing)points.forEach(function(p){L.marker(display(p),{icon:L.divIcon({className:'vertex',iconSize:[9,9],iconAnchor:[4.5,4.5]}),interactive:false}).addTo(layers.boundary);});
   }
@@ -81,13 +89,24 @@
    addLines(layers.third,partition.main,{color:'#185fa5',weight:3});
    partition.zones.forEach(function(zone){addLines(layers.branch,zone.branch,{color:'#16a34a',weight:2});if(mode==='third')addLines(layers.branch,zone.subbranch,{color:'#54a9e8',weight:1.5});});
   }
-  Object.keys(layers).forEach(function(k){if(visibility[k])layers[k].addTo(map);});syncSummary();
+  Object.keys(layers).forEach(function(k){if(visibility[k]||(drawing&&k==='boundary'))layers[k].addTo(map);});updateDraftGuide();syncSummary();
  }
  function fit(){if(map&&points.length)map.fitBounds(L.latLngBounds(points.map(display)),{paddingTopLeft:[75,110],paddingBottomRight:[70,190],maxZoom:18});else if(map)map.setView([18.2528,109.5119],15);}
- function setDrawing(on){drawing=on;document.body.classList.toggle('drawing',on);$('drawStrip').hidden=!on;if(map){if(on)map.dragging.disable();else map.dragging.enable();}syncSummary();renderLayers();}
- $('startDrawing').onclick=function(){if(!map){toast('地图尚未加载，请检查网络');return;}mode='draw';points=[];plotName='新建地块';setDrawing(true);closePanel();toast('依次点击地块边界，至少添加 3 个点');};
- $('undoPoint').onclick=function(){points.pop();renderLayers();};
- $('finishDrawing').onclick=function(){if(points.length<3)return;setDrawing(false);toast('地块已闭合，下一步设置二级规划参数');};
+ function setDrawing(on){drawing=on;document.body.classList.toggle('drawing',on);$('drawStrip').hidden=!on;if(map)map.dragging.enable();syncSummary();renderLayers();}
+ $('startDrawing').onclick=function(){if(!map){toast('地图尚未加载，请检查网络');return;}drawBackup={points:points.map(function(p){return p.slice();}),plotName:plotName,mode:mode};mode='draw';points=[];plotName='新建地块';closePanel();setDrawing(true);toast('移动地图对准黄色光标，点击确定添加点；回到起点确定完成');};
+ $('undoPoint').onclick=function(){if(!drawing)return;points.pop();renderLayers();};
+ $('confirmPoint').onclick=function(){
+  if(!drawing||!map)return;
+  map.stop();
+  if(canCloseDrawing()){
+   if(area()<1){toast('地块面积过小或边界未形成有效面积，请返回调整点位');return;}
+   drawBackup=null;setDrawing(false);toast('地块已闭合，可进入二级规划');return;
+  }
+  var point=fromDisplay(map.getCenter());
+  if(points.some(function(p){return map.distance(display(point),display(p))<.1;})){toast('请移动地图选择不同的边界点，至少需要三个点');return;}
+  points.push(point);renderLayers();
+ };
+ $('cancelDrawing').onclick=function(){if(!drawing)return;if(drawBackup){points=drawBackup.points;plotName=drawBackup.plotName;mode=drawBackup.mode;}else points=[];drawBackup=null;setDrawing(false);toast('已取消本次绘制');};
  $('nextStage').onclick=function(){openPanel(mode==='draw'?'second':mode==='second'?'third':'third');};
  $('previewSecond').onclick=function(){if(points.length<3){toast('请先绘制地块或加载示例');return;}mode='second';renderLayers();closePanel();};
  $('toThird').onclick=function(){if(points.length<3){toast('请先选择地块');return;}openPanel('third');};
@@ -124,7 +143,8 @@
  var street=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{subdomains:'abc',maxZoom:19,attribution:'© OpenStreetMap'});
  satellite.addTo(map);L.control.scale({imperial:false,position:'bottomleft'}).addTo(map);
  Object.keys(visibility).forEach(function(k){layers[k]=L.layerGroup();});
- map.on('click',function(e){if(!drawing)return;points.push(fromDisplay(e.latlng));renderLayers();});
+ draftGuide=L.layerGroup().addTo(map);
+ map.on('move zoom',function(){if(drawing){updateDraftGuide();syncSummary();}});
  map.on('moveend',function(){var p=fromDisplay(map.getCenter());$('coordinates').textContent=p[0].toFixed(5)+'°N '+p[1].toFixed(5)+'°E';});
  document.querySelectorAll('[data-base]').forEach(function(b){b.onclick=function(){if(base===b.dataset.base)return;var p=fromDisplay(map.getCenter()),zoom=map.getZoom();base=b.dataset.base;map.removeLayer(base==='satellite'?street:satellite);(base==='satellite'?satellite:street).addTo(map);map.setView(display(p),zoom);$('mapSource').textContent=base==='satellite'?'高德卫星':'OpenStreetMap';document.querySelectorAll('[data-base]').forEach(function(other){other.classList.toggle('active',other===b);});renderLayers();};});
  window.RyMobileMapPreview={getMap:function(){return map;},getState:function(){return {mode:mode,panel:panel,drawing:drawing,points:points.map(function(p){return p.slice();}),partition:partition,settings:Object.assign({},settings),visibility:Object.assign({},visibility),layers:Object.keys(layers).reduce(function(r,k){r[k]=layers[k].getLayers().length;return r;},{})};}};

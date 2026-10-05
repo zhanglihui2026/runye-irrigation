@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>润野灌溉 · 手机地图界面预览</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><link rel="stylesheet" href="runye-mobile-map-preview.css?v=240">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><link rel="stylesheet" href="runye-mobile-map-preview.css?v=241">
 </head><body>
 <svg class="symbols" xmlns="http://www.w3.org/2000/svg"><defs>
 <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol>
@@ -28,13 +28,13 @@
 <div class="crosshair" aria-hidden="true"></div>
 <div class="map-info"><span id="coordinates">18.25280°N 109.51190°E</span><span id="mapSource">高德卫星</span></div>
 <div class="selection-card" id="selectionCard" hidden><div><span class="mini-label">当前地块</span><strong id="plotArea">0.00 <small>亩</small></strong></div><div><b id="plotName">新建地块</b><span id="plotStatus">边界已闭合</span></div><button id="nextStage" class="primary compact">二级规划 →</button></div>
-<div class="draw-strip" id="drawStrip" hidden><span id="drawCount">点击地图添加边界点</span><button id="undoPoint">撤销</button><button id="finishDrawing" class="primary">完成地块</button></div>
+<div class="draw-strip" id="drawStrip" hidden><span id="drawCount" role="status">移动地图对准光标，再点击确定</span><div class="draw-actions"><button id="undoPoint" aria-label="返回，撤销上一个边界点"><span class="draw-action-icon">↶</span><span>返回</span></button><button id="confirmPoint" aria-label="确定，添加光标位置或闭合地块"><span class="draw-action-icon">◎</span><span>确定</span></button><button id="cancelDrawing" aria-label="取消绘制并恢复原地块"><span class="draw-action-icon">×</span><span>取消</span></button></div></div>
 <section class="tool-sheet" id="toolSheet" hidden aria-label="地图工具面板">
  <div class="sheet-grip"></div><div class="sheet-heading"><div><span id="sheetKicker">地块工具</span><h2 id="sheetTitle">描绘与导入</h2></div><button class="close-sheet" id="closeSheet" aria-label="收起工具条">×</button></div>
  <div class="sheet-scroll">
   <div class="sheet-panel" data-content="draw">
    <p class="sheet-note">画出地块边界，后续管路规划都叠加在这张地图上。</p>
-   <div class="tool-grid"><button id="startDrawing"><svg><use href="#i-draw"/></svg><b>手动画地块</b><small>点击地图添加边界点</small></button><button id="importButton"><svg><use href="#i-import"/></svg><b>导入奥维轨迹</b><small>KML / GeoJSON 文件</small></button></div>
+   <div class="tool-grid"><button id="startDrawing"><svg><use href="#i-draw"/></svg><b>光标绘制地块</b><small>移动地图，确定光标位置</small></button><button id="importButton"><svg><use href="#i-import"/></svg><b>导入奥维轨迹</b><small>KML / GeoJSON 文件</small></button></div>
    <button class="list-action" id="demoButton"><span>查看示例地块</span><small>体验二级与三级图层 →</small></button>
   </div>
   <div class="sheet-panel" data-content="second" hidden>
@@ -98,5 +98,5 @@
 </section>
 <nav class="bottom-tools" aria-label="规划工具条"><button data-panel="draw" class="active"><svg><use href="#i-draw"/></svg><span>地块</span></button><button data-panel="second"><svg><use href="#i-grid"/></svg><span>二级规划</span></button><button data-panel="third"><svg><use href="#i-pipe"/></svg><span>三级规划</span></button><button data-panel="layers"><svg><use href="#i-layer"/></svg><span>图层</span></button><button data-panel="settings"><svg><use href="#i-settings"/></svg><span>设置</span></button><button data-panel="more"><svg><use href="#i-more"/></svg><span>更多</span></button></nav>
 <div id="toast" role="status" hidden></div><input id="importFile" type="file" accept=".kml,.geojson,.json,.ovkml" hidden>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="runye-geo.js?v=240"></script><script src="runye-map-enhance.js?v=240"></script><script src="runye-mobile-partition.js?v=240"></script><script src="runye-mobile-map-preview.js?v=240"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="runye-geo.js?v=241"></script><script src="runye-map-enhance.js?v=241"></script><script src="runye-mobile-partition.js?v=241"></script><script src="runye-mobile-map-preview.js?v=241"></script>
 </body></html>
