@@ -5,7 +5,7 @@
  var visibility={boundary:true,second:true,third:true,branch:true}, layers={};
  var toastTimer,partition=null,drawBackup=null,draftGuide=null;
  var settingsKey='runye_mobile_settings_v1';
- var settingRules={fontMain:[14,10,24],fontMenu:[11,9,20],fontTitle:[18,14,26],tapeSpacing:[0.4,0.1],emitterSpacing:[0.3,0.05],emitterFlow:[0.8,0.1],tapeLength:[100,10],zoneArea:[18,0.1],partitionAngle:[0,0,180],pumpLift:[5,0],terrainRise:[5,0],sourceDistance:[0,0],inletPressure:[1,0]};
+ var settingRules={fontMain:[14,10,24],fontMenu:[11,9,20],fontTitle:[18,14,26],tapeSpacing:[0.4,0.1],emitterSpacing:[0.3,0.05],emitterFlow:[0.8,0.1],tapeLength:[100,10],zoneArea:[18,0.1],partitionAngle:[0,-180,180],pumpLift:[5,0],terrainRise:[5,0],sourceDistance:[0,0],inletPressure:[1,0]};
  var settings={};Object.keys(settingRules).forEach(function(key){settings[key]=settingRules[key][0];});
  function validSetting(key,value){var rule=settingRules[key];return typeof value==='number'&&Number.isFinite(value)&&value>=rule[1]&&(rule.length<3||value<=rule[2])&&(!/^font|partitionAngle$/.test(key)||Number.isInteger(value));}
  try{var saved=JSON.parse(localStorage.getItem(settingsKey));if(saved&&saved.version===1&&saved.values)Object.keys(settingRules).forEach(function(key){if(validSetting(key,saved.values[key]))settings[key]=saved.values[key];});}catch(e){}
@@ -131,8 +131,10 @@
  document.querySelectorAll('[data-layer]').forEach(function(input){input.onchange=function(){visibility[input.dataset.layer]=input.checked;document.querySelectorAll('[data-layer="'+input.dataset.layer+'"]').forEach(function(other){other.checked=input.checked;});renderLayers();};});
  document.querySelectorAll('[data-group]').forEach(function(b){b.onclick=function(){groups=Number(b.dataset.group);document.querySelectorAll('[data-group]').forEach(function(other){other.classList.toggle('active',other===b);});renderLayers();};});
  ['zoneArea','tapeLength'].forEach(function(id){$(id).oninput=renderLayers;});
- function setAngle(value){var a=Math.max(0,Math.min(180,Number(value)||0));$('partitionAngle').value=a;$('angleSlider').value=a;renderLayers();}
- $('partitionAngle').oninput=function(){setAngle(this.value);};$('angleSlider').oninput=function(){setAngle(this.value);};
+ function setAngle(value){var a=Math.max(-180,Math.min(180,Number(value)||0));$('partitionAngle').value=a;$('angleSlider').value=a;renderLayers();}
+ $('partitionAngle').oninput=function(){var a=this.valueAsNumber;if(!Number.isFinite(a)||a<-180||a>180)return;$('angleSlider').value=a;renderLayers();};
+ $('partitionAngle').onchange=function(){setAngle(Number.isFinite(this.valueAsNumber)?this.valueAsNumber:$('angleSlider').value);};
+ $('angleSlider').oninput=function(){setAngle(this.value);};
  $('angleMinus').onclick=function(){setAngle(Number($('partitionAngle').value)-1);};$('anglePlus').onclick=function(){setAngle(Number($('partitionAngle').value)+1);};
  $('searchForm').onsubmit=function(e){e.preventDefault();var m=$('searchInput').value.trim().match(/^(-?\d+(?:\.\d+)?)\s*[,，\s]\s*(-?\d+(?:\.\d+)?)$/);if(m&&map&&Math.abs(Number(m[1]))<=90&&Math.abs(Number(m[2]))<=180){var p=gcj([Number(m[1]),Number(m[2])]);map.setView(display(p),16);toast('已定位到输入坐标');}else toast('界面预览可输入经纬度，如 18.3651,109.1762');};
  $('fitButton').onclick=fit;$('zoomIn').onclick=function(){if(map)map.zoomIn();};$('zoomOut').onclick=function(){if(map)map.zoomOut();};
