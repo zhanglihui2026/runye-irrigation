@@ -39,10 +39,26 @@
   var KEY = '__ry_undo_tmp__';  // 临时存档 key（每次用完即删，不污染用户存档）
   var INPUT_MERGE_MS = 600;     // 连续输入合并成一步
 
-  var stack = [];               // 快照字符串栈（含基线 stack[0]）
-  var top = -1;
+  /* ★ 每页一个独立的撤销栈（v284c 实测修正）：
+     原实现是「一个全局栈 + 每次进入目标页就 stack=[] 重设基线」，
+     后果是**中途去别的页（哪怕只是去材料清单看一眼）再回来，历史全被清空**
+     （实测：布管后栈深 1 → 往返一次 → 栈深 0，Ctrl+Z 提示「没有可回退的步骤」），
+     这与「不管做了什么指令，只要 Ctrl+Z 就回退上一步」不符。
+     改成 ALL[secId] = {stack, top}：首次进入某页时建立该页基线与栈，
+     之后再进出只切换当前栈、原样保留历史；撤销也只在本页栈内回退，
+     天然不会把别页的状态撤到当前页来。 */
+  var ALL = {};                 // secId -> {stack: [], top: -1}
   var timer = 0;
   var pending = false;
+
+  function slot(id) {
+    if (!ALL[id]) ALL[id] = { stack: [], top: -1 };
+    return ALL[id];
+  }
+  function curSlot() {
+    var id = activeSec();
+    return (id && SECS.indexOf(id) >= 0) ? slot(id) : null;
+  }
 
   function activeSec() {
     var s = document.querySelector('main > .ry-sec.ry-active');
@@ -104,10 +120,11 @@
     }
   }
 
-  /* ★ 按页重置基线（本轮实测踩到）：快照是整站级的，但**页面上下文**是分页的。
+  /* ★ 基线必须**按页**建立（本轮实测踩到）：快照是整站级的，但**页面上下文**是分页的。
      若基线拍在"成组页还没进入（__runyeGroupEdit 尚未建立）"的时刻，
      用户在成组页布完管按 Ctrl+Z 会退到"整页空掉"—— 那不是他要的"上一步"。
-     ⇒ 每当前激活页变化到某个目标页时，把栈重置为"进入这一页时的状态"作为新基线。
+     ⇒ 首次进入某目标页时，为该页单独建栈并把"进入这一页时的状态"作为它的 stack[0]；
+       再次进出**不重设**（否则去趟一趟杠料清单就丢光全部历史）。
      （定时器 + 手势钩子双保险：程序化切页不会产生 click，只靠手势钩子会漏。） */
   var lastSec = null, resetT = 0;
   /* immediate=true 时**同步**拍基线（必须用于手势钩子：那里正处在"操作前"，
@@ -119,24 +136,27 @@
     if (id === lastSec) return false;
     lastSec = id;
     if (SECS.indexOf(id) < 0) return false;
-    stack = []; top = -1;
+    var S = slot(id);
+    /* ★ 该页已有基线 ⇒ 原样保留历史（这就是“往返不清空”的关键），只清掉待拍的基线定时器。 */
+    if (S.top >= 0) { clearTimeout(resetT); return true; }
     clearTimeout(resetT);
-    if (immediate) { var s = capture(); if (s) push(s); return true; }
-    resetT = setTimeout(function () { var s = capture(); if (s) push(s); }, 400);
+    if (immediate) { var s = capture(); if (s) pushTo(S, s); return true; }
+    resetT = setTimeout(function () { var s = capture(); if (s) pushTo(S, s); }, 400);
     return true;
   }
   setInterval(function () { syncSection(false); }, 1000);
 
-  function push(snap) {
-    if (!snap) return false;
-    if (top >= 0 && stack[top] === snap) return false;   // 没变化 → 不入栈
-    stack = stack.slice(0, top + 1);
-    stack.push(snap);
-    if (stack.length > MAX) stack.shift();
-    top = stack.length - 1;
+  function pushTo(S, snap) {
+    if (!S || !snap) return false;
+    if (S.top >= 0 && S.stack[S.top] === snap) return false;   // 没变化 → 不入栈
+    S.stack = S.stack.slice(0, S.top + 1);
+    S.stack.push(snap);
+    if (S.stack.length > MAX) S.stack.shift();
+    S.top = S.stack.length - 1;
     refreshTitle();
     return true;
   }
+  function push(snap) { return pushTo(curSlot(), snap); }
 
   /* 手势结束 → 下一轮事件循环取快照（此刻本轮处理器的写入已全部落地）。
      pending 保证同一次手势里的 pointerup + click 只跑一次。 */
@@ -197,19 +217,20 @@
   }
 
   function undo() {
-    if (top <= 0) { tip('没有可回退的步骤'); return false; }
+    var S = curSlot();
+    if (!S || S.top <= 0) { tip('没有可回退的步骤'); return false; }
     /* ★ 向前跳过「与当前状态相同」的快照。
        入栈时机不总能完美命中「操作前」（实测：按钮绑在 pointerdown、程序化 click()
        不产生 pointer 事件……都可能让栈里出现连续两份"操作后"），只做 top-- 就会退到
        一份和现在一模一样的快照 ⇒ 用户看到的就是"按了没反应"。
        改成"退到第一个和现在不同的状态"，撤销语义才稳。 */
     var cur = capture();
-    var i = top - 1;
-    while (i >= 0 && stack[i] === cur) i--;
-    if (i < 0) { top = 0; tip('没有可回退的步骤'); return false; }
-    top = i;
-    restore(stack[i]);
-    tip('已回退上一步（还可回退 ' + top + ' 步）');
+    var i = S.top - 1;
+    while (i >= 0 && S.stack[i] === cur) i--;
+    if (i < 0) { S.top = 0; tip('没有可回退的步骤'); return false; }
+    S.top = i;
+    restore(S.stack[i]);
+    tip('已回退上一步（还可回退 ' + S.top + ' 步）');
     return true;
   }
 
@@ -270,17 +291,20 @@
         b.style.cssText = 'font-size:11px;opacity:.72;margin-left:6px';
         host.appendChild(b);
       }
-      b.textContent = top > 0 ? '↩ 可回退 ' + top + ' 步' : '';
+      var S = curSlot();
+      var n = S ? S.top : -1;
+      b.textContent = n > 0 ? '↩ 可回退 ' + n + ' 步' : '';
     } catch (e) { }
   }
 
-  /* 基线：等主站初始化完成（首次能取到快照）再压入 stack[0] */
+  /* 预热：等主站初始化完成（能取到快照）即可；基线不再在这里压 ——
+     每页的基线由 syncSection 在**首次进入该页**时建立（否则会把别的页的状态当成本页基线）。 */
   (function boot() {
     var tries = 0;
     (function step() {
       tries++;
       var s = capture();
-      if (s) { push(s); return; }
+      if (s) return;
       if (tries < 40) setTimeout(step, 300);
     })();
   })();
@@ -289,18 +313,19 @@
     undo: undo,
     capture: capture,
     push: push,
-    depth: function () { return top; },
-    debug: function () { return { top: top, len: stack.length, target: isTarget(), sec: activeSec() }; },
+    depth: function () { var S = curSlot(); return S ? S.top : -1; },
+    debug: function () { var S = curSlot(); return { top: S ? S.top : -1, len: S ? S.stack.length : 0, target: isTarget(), sec: activeSec(), pages: Object.keys(ALL) }; },
     /* 诊断用：把栈里每一份快照的关键字段摊开（"按了没反应"时第一手要看的东西） */
     dump: function () {
+      var S = curSlot(); if (!S) return [];
       var out = [];
-      for (var i = 0; i <= top && i < stack.length; i++) {
+      for (var i = 0; i <= S.top && i < S.stack.length; i++) {
         try {
-          var d = JSON.parse(stack[i]);
+          var d = JSON.parse(S.stack[i]);
           var pp = d.pipePlan || {};
           var m = pp.mainPipes ? pp.mainPipes.length : null;
           if (m === null && pp.mains) m = pp.mains.length;
-          out.push({ i: i, pm: m, ppKeys: Object.keys(pp).slice(0, 10), size: stack[i].length });
+          out.push({ i: i, pm: m, ppKeys: Object.keys(pp).slice(0, 10), size: S.stack[i].length });
         } catch (e) { out.push({ i: i, parse: 'fail' }); }
       }
       return out;
