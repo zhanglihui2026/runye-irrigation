@@ -171,6 +171,23 @@
       global.__ryUndoQuiet = false;
       try { global.localStorage.removeItem(KEY); } catch (e2) { }
     }
+    /* ★ 三级页「联合灌溉 1/2/3/4 区」按钮组的高亮是**纯 DOM 状态**，不在工程快照里（快照只有 tlDiagramData.combinedN）。
+       撤销后数据回到上一步、按钮却仍停在旧选项，界面与数据不一致
+       （实测：点「4 区」→ Ctrl+Z，combinedN 已回 2，按钮仍高亮「4 区」）。
+       恢复后按 combinedN 把高亮同步回去；只做这一件事，不重建整条重算链。 */
+    try {
+      if (activeSec() === 'tlPipePlanSection') {
+        var zcn = global.tlDiagramData ? global.tlDiagramData.combinedN : null;
+        if (typeof zcn === 'number' && isFinite(zcn)) {
+          var zcg = document.getElementById('tlZoneCountGroup');
+          if (zcg) {
+            zcg.querySelectorAll('button').forEach(function (b) {
+              b.classList.toggle('selected', String(b.getAttribute('data-n')) === String(zcn));
+            });
+          }
+        }
+      }
+    } catch (e5) { }
     /* 成组页的画布是自绘的，恢复后要让它重画一次（其余两页由 runyeLoadProject 内部刷新）。 */
     try {
       if (activeSec() === 'grPipeSection' && typeof global.grRefreshGroupPage === 'function') {
