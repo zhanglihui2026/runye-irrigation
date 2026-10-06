@@ -53,6 +53,29 @@
     return !!id && SECS.indexOf(id) >= 0;
   }
 
+  /* 快照里凡是「时间戳」都要抹平：runyeSaveProject 每次都写 savedAt，
+     isoDiagram.editor / terrain / constructionNet 等子对象里也可能带自己的时间字段。
+     只要有一处时间戳，两份内容完全相同的快照字符串就永不相等
+     ⇒ push 去重、undo 的「跳过相同项」双双失效 ⇒ 按 Ctrl+Z 看起来没反应。
+     恢复时这些字段无人读取，抹平无副作用。 */
+  function stripVolatile(o, depth) {
+    depth = depth || 0;
+    if (!o || typeof o !== 'object' || depth > 8) return o;
+    if (Object.prototype.toString.call(o) === '[object Array]') {
+      for (var i = 0; i < o.length; i++) {
+        if (o[i] && typeof o[i] === 'object') stripVolatile(o[i], depth + 1);
+      }
+      return o;
+    }
+    for (var k in o) {
+      var v = o[k];
+      if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v)) o[k] = '';
+      else if (typeof v === 'number' && v > 1e12 && v < 2e12) o[k] = 0;   // 毫秒级时间戳
+      else if (v && typeof v === 'object') stripVolatile(v, depth + 1);
+    }
+    return o;
+  }
+
   /* 快照：借用主站工程序列化（静默、走临时 key、立即清理）。
      __ryUndoQuiet 让主站跳过两个与"存档"无关的副作用（重算材料量 / 分享到数字农业），
      否则每次点一下都要全量重算一遍材料清单。 */
@@ -63,6 +86,15 @@
     try {
       global.runyeSaveProject(true, KEY);           // ★ (silent, key)
       var s = global.localStorage.getItem(KEY);
+      /* ★ 归一化 savedAt 后才能当快照用：runyeSaveProject 每次都写
+         `savedAt:new Date().toISOString()`，两次相隔 1ms 的快照字符串也永不相等
+         ⇒ push 的去重彻底失效 ⇒ 同一状态被反复入栈 ⇒ 按一次 Ctrl+Z 只是退到
+         "同一状态的另一份副本"，表现就是"按了没反应"（本轮 M2 实测抓到）。
+         恢复时 savedAt 无人读取，置空无副作用。 */
+      if (s) {
+        try { s = JSON.stringify(stripVolatile(JSON.parse(s))); }
+        catch (e5) { /* 解析不动就原样用 */ }
+      }
       return s || null;
     } catch (e) {
       return null;
@@ -112,8 +144,16 @@
     syncSection(true);                          /* 先保证基线是本页的、且拍在"操作前" */
     if (!isTarget() || pending) return;
     pending = true;
+    /* ★ 改成「操作前 / 操作后」双快照：完整回归探针实测同一份代码在两条路径下结论相反
+       （最小路径 28→0 通过、完整路径 U1② 停在 28），说明只靠"与栈顶比对"会把
+       某一次的"操作后状态"当成基线 ⇒ 那一步就变得不可撤销。
+       捕获阶段一定是"操作前"，先入栈它（与栈顶相同会被 push 去重跳过），
+       再入栈"操作后" ⇒ 撤销必然回到这一步之前，不再依赖基线时机。
+       代价是每次手势多一次序列化；capture 内部已跳过材料重算，实测可接受。 */
+    var pre = capture();
     setTimeout(function () {
       pending = false;
+      if (pre) push(pre);
       push(capture());
     }, 0);
   }
@@ -125,7 +165,8 @@
       global.localStorage.setItem(KEY, snap);
       if (typeof global.runyeLoadProject === 'function') global.runyeLoadProject(KEY, true);  // ★ (key, silent)
     } catch (e) {
-      /* 恢复失败不抛给用户，保持界面可用 */
+      /* 恢复失败不抛给用户，保持界面可用；但要留下现场，否则"按了没反应"无从查起 */
+      try { global.__ryUndoLastError = String((e && e.message) || e); } catch (e4) { }
     } finally {
       global.__ryUndoQuiet = false;
       try { global.localStorage.removeItem(KEY); } catch (e2) { }
@@ -140,8 +181,17 @@
 
   function undo() {
     if (top <= 0) { tip('没有可回退的步骤'); return false; }
-    top--;
-    restore(stack[top]);
+    /* ★ 向前跳过「与当前状态相同」的快照。
+       入栈时机不总能完美命中「操作前」（实测：按钮绑在 pointerdown、程序化 click()
+       不产生 pointer 事件……都可能让栈里出现连续两份"操作后"），只做 top-- 就会退到
+       一份和现在一模一样的快照 ⇒ 用户看到的就是"按了没反应"。
+       改成"退到第一个和现在不同的状态"，撤销语义才稳。 */
+    var cur = capture();
+    var i = top - 1;
+    while (i >= 0 && stack[i] === cur) i--;
+    if (i < 0) { top = 0; tip('没有可回退的步骤'); return false; }
+    top = i;
+    restore(stack[i]);
     tip('已回退上一步（还可回退 ' + top + ' 步）');
     return true;
   }
@@ -167,7 +217,12 @@
   }
 
   /* —— 事件挂接 —— */
-  ['pointerup', 'click', 'change'].forEach(function (t) {
+  /* ★ 必须是 pointerdown，不能是 pointerup：本工程不少按钮（含 #ppAutoPipe 自动管路）
+     把动作绑在 **pointerdown / mousedown** 上，等 pointerup 冒泡到 document 时
+     动作早已执行完 ⇒ "操作前"快照拍到的其实是"操作后"（dump 实测：
+     栈里第二项 pm 就已经是 28 根）⇒ 按一次 Ctrl+Z 退到它，表现就是"没反应"。
+     捕获阶段的 pointerdown 一定早于元素上的任何处理器。 */
+  ['pointerdown', 'click', 'change'].forEach(function (t) {
     document.addEventListener(t, mark, true);
   });
   /* 输入类：连续敲键合并成一步（否则每敲一个字符都算一步） */
@@ -218,6 +273,20 @@
     capture: capture,
     push: push,
     depth: function () { return top; },
-    debug: function () { return { top: top, len: stack.length, target: isTarget(), sec: activeSec() }; }
+    debug: function () { return { top: top, len: stack.length, target: isTarget(), sec: activeSec() }; },
+    /* 诊断用：把栈里每一份快照的关键字段摊开（"按了没反应"时第一手要看的东西） */
+    dump: function () {
+      var out = [];
+      for (var i = 0; i <= top && i < stack.length; i++) {
+        try {
+          var d = JSON.parse(stack[i]);
+          var pp = d.pipePlan || {};
+          var m = pp.mainPipes ? pp.mainPipes.length : null;
+          if (m === null && pp.mains) m = pp.mains.length;
+          out.push({ i: i, pm: m, ppKeys: Object.keys(pp).slice(0, 10), size: stack[i].length });
+        } catch (e) { out.push({ i: i, parse: 'fail' }); }
+      }
+      return out;
+    }
   };
 })(window);
