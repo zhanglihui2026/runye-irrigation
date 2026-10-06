@@ -242,16 +242,20 @@
     return point;
   }
 
-  /* 45°正面斜轴测：X 水平，Y 向右上45°，Z 竖直；轴向比例1:1:1。
-   * 先按空间坐标构造管线，再投影，禁止在屏幕坐标硬造管道折点。 */
+  /* 45°正面斜轴测：X 水平，Y 向右下45°，Z 竖直；轴向比例1:1:1。
+   * 先按空间坐标构造管线，再投影，禁止在屏幕坐标硬造管道折点。
+   * [v255c 2026-10-06 用户要求] 旧式 Y 向「右上45°」（screenY = −y·√½ − z）投影行列式为负，
+   *   整幅图相对平面图上下镜像 —— 平面图顶部的水源在轴测图里跑到底部（探针实测
+   *   fraction_plan=0.000 vs fraction_iso=1.000）。改为 Y 向「右下45°」
+   *   （screenY = +y·√½ − z），行列式转正，轴测图与地块分区/管路规划方向一致。 */
   function projectIso(x, y, z, k) {
     k = k || 1;
-    return { x: (x + y * Math.SQRT1_2) * k, y: (-y * Math.SQRT1_2 - z) * k };
+    return { x: (x + y * Math.SQRT1_2) * k, y: (y * Math.SQRT1_2 - z) * k };
   }
-  /* 同层逆投影（z 已知）：用于可逆性自检 */
+  /* 同层逆投影（z 已知）：用于可逆性自检（与 projectIso 同步改，round-trip 已探针验证） */
   function unprojectIso(sx, sy, z, k) {
     k = k || 1;
-    var y = -(sy / k + z) / Math.SQRT1_2;
+    var y = (sy / k + z) / Math.SQRT1_2;
     return { x: sx / k - y * Math.SQRT1_2, y: y };
   }
 

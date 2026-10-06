@@ -221,13 +221,13 @@
         var paC = A.pointAt(na.pid, d, na.atM), pbC = A.pointAt(nb.pid, d, nb.atM);
         if (!paC || !pbC) return;
         var nmC = (A.pipeName ? A.pipeName(na.pid) : pipeNameOf(na.pid)) + ' → ' + (A.pipeName ? A.pipeName(nb.pid) : pipeNameOf(nb.pid));
-        out.push({ id: lk.id, pid: null, name: nmC, cross: true, len: Math.hypot(pbC.x - paC.x, pbC.y - paC.y), od: lk.od });
+        out.push({ id: lk.id, pid: null, pidA:na.pid,pidB:nb.pid,atA:na.atM,atB:nb.atM,name: nmC, cross: true, len: Math.hypot(pbC.x - paC.x, pbC.y - paC.y), od: lk.od });
         return;
       }
       var ep = A.effPts(na.pid, d); if (!ep) return;
       var L = A.polylineLen(ep);
       var a1 = Math.max(0, Math.min(na.atM, L)), b1 = Math.max(0, Math.min(nb.atM, L));
-      out.push({ id: lk.id, pid: lk.pid, name: A.pipeName ? A.pipeName(lk.pid) : pipeNameOf(lk.pid), len: Math.abs(b1 - a1), od: lk.od });
+      out.push({ id: lk.id, pid: lk.pid,pidA:na.pid,pidB:nb.pid,atA:na.atM,atB:nb.atM,name: A.pipeName ? A.pipeName(lk.pid) : pipeNameOf(lk.pid), len: Math.abs(b1 - a1), od: lk.od });
     });
     return out;
   }

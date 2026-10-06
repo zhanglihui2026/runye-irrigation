@@ -1,5 +1,5 @@
 /* ============================================================================
-   导出施工图为 CAD（DXF R12，文本格式）
+   导出施工图为 CAD（DXF 2004，文本格式）
    ----------------------------------------------------------------------------
    平面图来源：window.tlDiagramSVG（App 自带的权威 SVG 字符串，导 PNG/打印同一份），
    从它解析，绝不碰 DOM 里的轴测图/系统图克隆，避免互相叠加。
@@ -17,6 +17,8 @@
     { name: 'PIPE_FRONT',   color: 6  },
     { name: 'PIPE_MAIN',    color: 5  },
     { name: 'PIPE_BRANCH',  color: 3  },
+    { name: 'PIPE_TAPE', color: 4 },
+    { name: 'PIPE_LINK', color: 6 },
     { name: 'SYMBOL',       color: 1  },
     { name: 'TEXT',         color: 2  }
   ];
@@ -28,13 +30,18 @@
      CAD 里看似「轴测图叠加在平面图上」。 */
   function tlPipeLayer(el){
     var p = el.getAttribute('data-tlpipe') || el.getAttribute('data-tlpipe-seg') || '';
+    if(el.hasAttribute('data-tltape'))return 'PIPE_TAPE';
+    if(el.hasAttribute('data-tlnodelink'))return 'PIPE_LINK';
+    if(el.hasAttribute('data-tlstub')||el.hasAttribute('data-connector'))return 'PIPE_MAIN';
+    var manual=el.closest('[data-manpipe]');
+    if(manual){var id=manual.getAttribute('data-manpipe'),list=global.RyTlEditPipes&&global.RyTlEditPipes.list?global.RyTlEditPipes.list():[],m=list.find(function(q){return q.id===id;});return m&&m.kind==='main'?'PIPE_MAIN':'PIPE_BRANCH';}
     if (!p) return null;
     if (p === 'front' || p.indexOf('front-') === 0) return 'PIPE_FRONT';
     if (p.indexOf('main') === 0) return 'PIPE_MAIN';
     if (p.indexOf('branch') === 0) return 'PIPE_BRANCH';
     return null;
   }
-  function optKey(layer){ return layer==='PIPE_FRONT'?'front':(layer==='PIPE_MAIN'?'main':'branch'); }
+  function optKey(layer){ if(layer==='PIPE_TAPE')return 'tape';if(layer==='PIPE_LINK')return 'front';return layer==='PIPE_FRONT'?'front':(layer==='PIPE_MAIN'?'main':'branch'); }
 
   // 解析一段 SVG 字符串为 SVG 元素；失败回退 DOM 查询
   function parseSvgString(str){
@@ -62,36 +69,44 @@
     /* SVG y 向下、CAD y 向上：y 取负（2026-10-02 修复——旧版整幅图上下镜像） */
     return function(sx,sy){ return [(sx-ox)/s+minX, -((sy-oy)/s+minY)]; };
   }
+  // Separate M subpaths: disconnected pipe runs must never gain a joining segment.
   function parsePathD(d){
-    var cmds=d.match(/[MmLlHhVvZz][^MmLlHhVvZz]*/g)||[];
-    var pts=[],cx=0,cy=0;
-    cmds.forEach(function(c){
-      var t=c.trim(),op=t[0],nums=t.slice(1).trim().split(/[\s,]+/).map(parseFloat),i=0;
-      while(i<nums.length){
-        var x=nums[i],y=nums[i+1];
-        if(op==='M'||op==='m'){ cx=(op==='m'?cx:0)+x; cy=(op==='m'?cy:0)+(y||0); pts.push([cx,cy]); i+=2; op=(op==='m'?'l':'L'); }
-        else if(op==='L'||op==='l'){ cx=(op==='l'?cx:0)+x; cy=(op==='l'?cy:0)+y; pts.push([cx,cy]); i+=2; }
-        else if(op==='H'||op==='h'){ cx=(op==='h'?cx:0)+x; pts.push([cx,cy]); i+=1; }
-        else if(op==='V'||op==='v'){ cy=(op==='v'?cy:0)+x; pts.push([cx,cy]); i+=1; }
-        else { break; }
-      }
-    });
-    return pts;
+    if(/[AaCcQqSsTt]/.test(d))return [];
+    var t=d.match(/[MmLlHhVvZz]|[-+]?(?:\d*\.\d+|\d+\.?\d*)(?:[eE][-+]?\d+)?/g)||[],out=[],pts=[],cx=0,cy=0,op='',i=0;
+    function flush(closed){if(pts.length>1)out.push({pts:pts,closed:closed});pts=[];}
+    while(i<t.length){
+      if(/^[a-z]$/i.test(t[i])){op=t[i++];if(op==='Z'||op==='z'){if(pts.length){cx=pts[0][0];cy=pts[0][1];}flush(true);continue;}if(op==='M'||op==='m')flush(false);}
+      var rel=op===op.toLowerCase(),u=op.toUpperCase(),a=Number(t[i++]);if(!isFinite(a))return [];
+      if(u==='H')cx=rel?cx+a:a;else if(u==='V')cy=rel?cy+a:a;
+      else if(u==='M'||u==='L'){var b=Number(t[i++]);if(!isFinite(b))return [];cx=(rel?cx:0)+a;cy=(rel?cy:0)+b;if(u==='M')op=rel?'l':'L';}else return [];
+      pts.push([cx,cy]);
+    }flush(false);return out;
   }
-  function f(n){ return (Math.round(n*100)/100).toString(); }
-  function entLine(a,b,layer){ return ['0','LINE','8',layer,'10',f(a[0]),'20',f(a[1]),'11',f(b[0]),'21',f(b[1])].join('\n'); }
-  /* R12(AC1009) 没有 LWPOLYLINE（R13+ 实体）——多段线必须用 POLYLINE+VERTEX+SEQEND。
-     （2026-10-02 修复：旧版全部多段线是 LWPOLYLINE，AutoCAD 按 R12 打开时地块/分区丢失或报无效实体） */
-  function entPoly(pts,layer,closed){
-    var o=['0','POLYLINE','8',layer,'66','1','70',closed?'1':'0'];
-    pts.forEach(function(p){ o.push('0','VERTEX','8',layer,'10',f(p[0]),'20',f(p[1])); });
-    o.push('0','SEQEND','8',layer);
-    return o.join('\n');
+  function f(n){ return (Math.round(n*1000000)/1000000).toString(); }
+  var nextHandle=256, lineTypes={};
+  function handle(){return (nextHandle++).toString(16).toUpperCase();}
+  function attr(el,name){for(var p=el;p&&p.tagName;p=p.parentElement){var v=p.style&&p.style.getPropertyValue(name);if(v)return v;v=p.getAttribute(name);if(v!==null)return v;}return null;}
+  function rgb(c){
+    c=norm(c);if(/^#[0-9a-f]{3}$/.test(c))c='#'+c.slice(1).split('').map(function(x){return x+x;}).join('');
+    if(/^#[0-9a-f]{6}$/.test(c))return parseInt(c.slice(1),16);
+    var m=c.match(/^rgba?\(([^)]+)\)$/);if(m){var a=m[1].split(/[ ,/]+/).slice(0,3).map(function(x){return x.indexOf('%')>=0?Math.round(parseFloat(x)*2.55):Math.round(Number(x));});if(a.length===3&&a.every(function(v){return isFinite(v)&&v>=0&&v<=255;}))return (a[0]<<16)+(a[1]<<8)+a[2];}
+    var named={black:0,white:16777215,red:16711680,blue:255,green:32768,yellow:16776960,gray:8421504,grey:8421504};return named[c];
   }
-  function entCircle(c,rad,layer){ return ['0','CIRCLE','8',layer,'10',f(c[0]),'20',f(c[1]),'40',f(rad)].join('\n'); }
-  /* R12 DXF 是纯 ASCII 格式：中文/Ø/· 等非 ASCII 字符用 \U+XXXX 转义
-     （AutoCAD 2000+/中望/浩辰通用支持；2026-10-02 修复——旧版直接写 UTF-8 字节，
-      CAD 按 ANSI 读取显示乱码，ezdxf 校验报 4 个解码错误） */
+  function matrix(el){var m=new DOMMatrix(),chain=[];for(var p=el;p&&p.tagName;p=p.parentElement)chain.unshift(p);chain.forEach(function(p){var v=p.getAttribute('transform');if(v){var list=p.transform&&p.transform.baseVal,tm=list&&list.consolidate();if(tm)m=m.multiply(tm.matrix);}});return m;}
+  function styleFor(el,scale,m){
+    var stroke=attr(el,'stroke'),color=rgb(stroke||attr(el,'fill')),sw=parseFloat(attr(el,'stroke-width'));
+    var width=(isFinite(sw)&&sw>0?sw:1)*Math.sqrt(Math.abs(m.a*m.d-m.b*m.c))/scale;
+    var dash=attr(el,'stroke-dasharray'),type='BYLAYER';
+    if(dash&&dash!=='none'){var a=dash.split(/[ ,]+/).map(Number).filter(function(v){return isFinite(v)&&v>=0;});if(a.length&&a.some(function(v){return v>0;})){if(a.length%2)a=a.concat(a);a=a.map(function(v,i){return (i%2?-1:1)*v/scale;});var key=a.map(f).join(',');type=Object.keys(lineTypes).find(function(k){return lineTypes[k].key===key;});if(!type){type='RY_DASH_'+(Object.keys(lineTypes).length+1);lineTypes[type]={key:key,pattern:a};}}}
+    return {color:color,width:width,type:type};
+  }
+  function baseEntity(type,layer,sty){var o=['0',type,'5',handle(),'100','AcDbEntity','8',layer,'6',sty.type||'BYLAYER'];if(sty.color!==undefined)o.push('420',String(sty.color));return o;}
+  // AutoCAD 2004 supports true RGB colors and lightweight editable PL entities.
+  function entPoly(pts,layer,closed,sty){
+    var o=baseEntity('LWPOLYLINE',layer,sty);o.push('100','AcDbPolyline','90',String(pts.length),'70',closed?'1':'0','43',f(sty.width));
+    pts.forEach(function(p){o.push('10',f(p[0]),'20',f(p[1]));});return o.join('\n');
+  }
+  function entCircle(c,rad,layer,sty){return baseEntity('CIRCLE',layer,sty).concat(['100','AcDbCircle','10',f(c[0]),'20',f(c[1]),'30','0','40',f(rad)]).join('\n');}
   function escText(s){
     var o='';
     for(var i=0;i<s.length;i++){
@@ -100,28 +115,21 @@
     }
     return o;
   }
-  function entText(p,h,str,layer){ return ['0','TEXT','8',layer,'10',f(p[0]),'20',f(p[1]),'40',f(h),'1',escText(str)].join('\n'); }
+  function entText(p,h,str,layer,sty){ return baseEntity('TEXT',layer,sty).concat(['100','AcDbText','10',f(p[0]),'20',f(p[1]),'30','0','40',f(h),'1',escText(str),'7','STANDARD','100','AcDbText']).join('\n'); }
 
   var SKIP_IDS = { tlFrameGroup:1, tlTitleGroup:1, tlHeaderGroup:1, tlCalcBookGroup:1, tlLegendGroup:1 };
   /* 导出密码（2026-10-02 用户要求）：DXF 导出前须在对话框输入。前端口令门，防误用而非加密。 */
   var EXPORT_PWD = '230230';
 
-  /* R12 最小表组：LTYPE(CONTINUOUS) + STYLE(STANDARD，TEXT 实体必需) + LAYER。
-     （2026-10-02 修复：旧版只有 LAYER 表，且整个 TABLES 段排在 ENTITIES 之后） */
   function tablesSection(){
-    var o=['0','SECTION','2','TABLES',
-      '0','TABLE','2','LTYPE','70','1',
-      '0','LTYPE','2','CONTINUOUS','70','0','3','Solid line','72','65','73','0','40','0.0',
-      '0','ENDTAB',
-      '0','TABLE','2','STYLE','70','1',
-      '0','STYLE','2','STANDARD','70','0','40','0.0','41','1.0','50','0.0','71','0','42','2.5','3','txt','4','',
-      '0','ENDTAB',
-      '0','TABLE','2','LAYER','70',String(LAYERS.length)];
-    LAYERS.forEach(function(L){
-      o.push('0','LAYER','2',L.name,'70','0','62',String(L.color),'6','CONTINUOUS');
-    });
-    o.push('0','ENDTAB','0','ENDSEC');
-    return o.join('\n');
+    var o=['0','SECTION','2','TABLES'];
+    function table(name,count){o.push('0','TABLE','2',name,'5',handle(),'100','AcDbSymbolTable','70',String(count));}
+    function record(type,sub){o.push('0',type,'5',handle(),'100','AcDbSymbolTableRecord','100',sub);}
+    table('LTYPE',3+Object.keys(lineTypes).length);
+    ['BYBLOCK','BYLAYER','CONTINUOUS'].forEach(function(n){record('LTYPE','AcDbLinetypeTableRecord');o.push('2',n,'70','0','3',n,'72','65','73','0','40','0');});
+    Object.keys(lineTypes).forEach(function(n){var a=lineTypes[n].pattern;record('LTYPE','AcDbLinetypeTableRecord');o.push('2',n,'70','0','3','Imported SVG dash','72','65','73',String(a.length),'40',f(a.reduce(function(s,v){return s+Math.abs(v);},0)));a.forEach(function(v){o.push('49',f(v),'74','0');});});o.push('0','ENDTAB');
+    table('STYLE',1);record('STYLE','AcDbTextStyleTableRecord');o.push('2','STANDARD','70','0','40','0','41','1','50','0','71','0','42','2.5','3','txt','4','','0','ENDTAB');
+    table('LAYER',LAYERS.length);LAYERS.forEach(function(L){record('LAYER','AcDbLayerTableRecord');o.push('2',L.name,'70','0','62',String(L.color),'6','CONTINUOUS','370','-3');});o.push('0','ENDTAB','0','ENDSEC');return o.join('\n');
   }
 
   function buildDxf(source, opts){
@@ -141,50 +149,35 @@
       inv = makeInv(pv);
       scale = pv.s;
     }
-    var ents = [];
-
+    if(!isFinite(scale)||scale<=0){alert('图纸比例无效，请重新生成管线图。');return null;}
+    nextHandle=256;lineTypes={};var ents=[];
     svg.querySelectorAll('*').forEach(function(el){
-      var p=el.parentElement, inSkip=false;
-      while(p && p!==svg){ if(p.id && SKIP_IDS[p.id]){ inSkip=true; break; } p=p.parentElement; }
-      if(inSkip) return;
-      var tag=el.tagName.toLowerCase();
-      if(tag==='path'){
-        if(el.getAttribute('data-tlworst')) return;          // 最不利路径高亮线，非实体管线
-        var d=el.getAttribute('d'); if(!d) return;
-        var pts=parsePathD(d).map(function(q){return inv(q[0],q[1]);});
-        if(pts.length<2) return;
-        var pl=tlPipeLayer(el);
-        if(pl){                                              // 管线（含遮蔽分段）
-          if(!opts[optKey(pl)]) return;
-          ents.push(entPoly(pts,pl,/z\s*$/i.test(d.trim())));
-          return;
-        }
-        if(!opts.plot) return;                               // 其余 path = 地块边界/手工管线
-        if(norm(el.getAttribute('stroke'))==='none') return; // 只填充不描边的地块底纹，跳过
-        ents.push(entPoly(pts,'PLOT',/z\s*$/i.test(d.trim())));
-      } else if(tag==='line'){
-        return;                                              // 平面图 line 全是辅助线/尺寸线/斜短线/图例线，一律不导
-      } else if(tag==='rect'){
-        if(!opts.zone) return;
-        var x=parseFloat(el.getAttribute('x')),y=parseFloat(el.getAttribute('y'));
-        var w=parseFloat(el.getAttribute('width')),h=parseFloat(el.getAttribute('height'));
-        if(!isFinite(w)||w<=0||!isFinite(h)||h<=0) return;
-        var r=[inv(x,y),inv(x+w,y),inv(x+w,y+h),inv(x,y+h)];
-        ents.push(entPoly(r,'ZONE',true));
-      } else if(tag==='circle'){
-        if(!opts.symbol) return;
-        var c=inv(parseFloat(el.getAttribute('cx')),parseFloat(el.getAttribute('cy')));
-        ents.push(entCircle(c,parseFloat(el.getAttribute('r'))/scale,'SYMBOL'));
-      } else if(tag==='text'){
-        if(!opts.text) return;
-        var s2=inv(parseFloat(el.getAttribute('x')),parseFloat(el.getAttribute('y')));
-        var fs=parseFloat(el.getAttribute('font-size'))||12;
-        ents.push(entText(s2,fs/scale,(el.textContent||'').trim(),'TEXT'));
+      var p=el,inSkip=false;while(p&&p!==svg){var tn=p.tagName.toLowerCase();if(SKIP_IDS[p.id]||tn==='defs'||tn==='clippath'||tn==='marker'||tn==='symbol'||p.style.display==='none'||p.getAttribute('display')==='none'){inSkip=true;break;}p=p.parentElement;}if(inSkip)return;
+      if(el.hasAttribute('data-tlpipe-ref')||el.hasAttribute('data-tlworst')||el.classList.contains('tl-worst-flow')||el.classList.contains('tl-demo-flow'))return;
+      var tag=el.tagName.toLowerCase();if(!/^(path|polygon|polyline|line|rect|circle|text)$/.test(tag))return;
+      var stroke=norm(attr(el,'stroke'));if(tag!=='text'&&(!stroke||stroke==='none'||stroke==='transparent'))return;
+      var m=matrix(el),sty=styleFor(el,scale,m);
+      function xy(x,y){return inv(m.a*x+m.c*y+m.e,m.b*x+m.d*y+m.f);}
+      function poly(a,layer,closed){if(a.length>=2&&a.every(function(q){return q.every(Number.isFinite);}))ents.push(entPoly(a.map(function(q){return xy(q[0],q[1]);}),layer,closed,sty));}
+      var pl=tlPipeLayer(el);
+      if(tag==='path'||tag==='polygon'||tag==='polyline'||tag==='line'){
+        if(pl&&!opts[optKey(pl)])return;
+        if(!pl){if(tag==='line')return;if(!opts.plot)return;pl='PLOT';}
+        if(tag==='path')parsePathD(el.getAttribute('d')||'').forEach(function(run){poly(run.pts,pl,run.closed);});
+        else if(tag==='line')poly([[+el.getAttribute('x1'),+el.getAttribute('y1')],[+el.getAttribute('x2'),+el.getAttribute('y2')]],pl,false);
+        else {var n=(el.getAttribute('points')||'').trim().split(/[\s,]+/).map(Number),a=[];for(var i=0;i+1<n.length;i+=2)a.push([n[i],n[i+1]]);poly(a,pl,tag==='polygon');}
+      }else if(tag==='rect'){
+        if(!opts.zone||el.closest('[data-manpipe]'))return;
+        var x=+(el.getAttribute('x')||0),y=+(el.getAttribute('y')||0),w=+el.getAttribute('width'),h=+el.getAttribute('height');if(w>0&&h>0)poly([[x,y],[x+w,y],[x+w,y+h],[x,y+h]],'ZONE',true);
+      }else if(tag==='circle'){
+        if(!opts.symbol)return;var rad=+el.getAttribute('r');if(rad>0)ents.push(entCircle(xy(+(el.getAttribute('cx')||0),+(el.getAttribute('cy')||0)),rad*Math.sqrt(Math.abs(m.a*m.d-m.b*m.c))/scale,'SYMBOL',sty));
+      }else if(tag==='text'){
+        if(!opts.text)return;sty.color=rgb(attr(el,'fill'));var x=parseFloat(el.getAttribute('x')||0),y=parseFloat(el.getAttribute('y')||0),h=parseFloat(attr(el,'font-size'))||12;if(isFinite(x)&&isFinite(y))ents.push(entText(xy(x,y),h/scale,(el.textContent||'').trim(),'TEXT',sty));
       }
     });
 
     if(!ents.length){ alert('按当前勾选没有可导出的内容。'); return null; }
-    var head=['0','SECTION','2','HEADER','9','$ACADVER','1','AC1009','0','ENDSEC'];
+    var head=['0','SECTION','2','HEADER','9','$ACADVER','1','AC1018','9','$INSUNITS','70',source==='iso'?'0':'6','9','$DWGCODEPAGE','3','ANSI_1252','0','ENDSEC'];
     /* 标准段序：HEADER → TABLES → ENTITIES → EOF（2026-10-02 修复：旧版 ENTITIES 排在 TABLES 前） */
     return head.join('\n')+'\n'
       + tablesSection()+'\n'
@@ -222,6 +215,8 @@
       +'<label style="display:block;font-size:13.5px;margin:3px 0"><input type="checkbox" class="ryDxfOpt" data-k="front" checked> 总管</label>'
       +'<label style="display:block;font-size:13.5px;margin:3px 0"><input type="checkbox" class="ryDxfOpt" data-k="main" checked> 主管</label>'
       +'<label style="display:block;font-size:13.5px;margin:3px 0"><input type="checkbox" class="ryDxfOpt" data-k="branch" checked> 支管</label>'
+      +'<label style="display:block;font-size:13.5px;margin:3px 0"><input type="checkbox" class="ryDxfOpt" data-k="tape" checked> 滴灌带</label>'
+      +'<div style="font-size:11px;color:#64748b;margin:8px 0">管线、边界导出为 PL，保留颜色与图示宽度（不是管径）；平面图单位为米。轴测图为示意图。</div>'
       +'<label style="display:block;font-size:13.5px;margin:3px 0"><input type="checkbox" class="ryDxfOpt" data-k="symbol" checked> 水泵/阀门符号</label>'
       +'<label style="display:block;font-size:13.5px;margin:3px 0"><input type="checkbox" class="ryDxfOpt" data-k="text" checked> 文字/标注</label>'
       +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">'

@@ -22,6 +22,39 @@
     });
     return out;
   }
+  /* [v280 2026-10-06 用户要求] 二级页「滴灌带压差改善 / 地形高差」两个按钮并排一行、各占一半。
+     原本两个按钮各管各的：压差改善由 runye-inverse-design.js 插在「单边铺设长度」那行之后（整行块），
+     地形高差由本文件插在「地形高差」那行之后、并被 runye-terrain.css 绝对定位到标题行右端
+     ⇒ 一个在标题行、一个在参数行，隔得老远（用户截图指的就是这个）。
+     现在共用一个行容器 .ri-btn-row（谁先建谁建，行落在压差改善原来的位置上）：
+       · 传进来的按钮进容器；同时把已在容器里的 .ri-entry 排到最前
+         ⇒ 无论两个脚本谁先跑，最终顺序恒为「滴灌带压差改善 在左、地形高差 在右」；
+       · 拿不到 #ppPlanBar（或没有可插入的锚点）就返回 null，调用方退回原行为。
+     由 runye-inverse-design.js 通过 root.RyPlanBtnRow 复用（该文件是 defer，晚于本文件执行）。 */
+  function planBtnRow(btn) {
+    var d = root.document;
+    if (!d) return null;
+    var bar = d.getElementById('ppPlanBar');
+    if (!bar) return null;
+    var row = bar.querySelector('.ri-btn-row');
+    if (!row) {
+      var ri = bar.querySelector('.ri-entry');
+      var item = d.getElementById('planTapeLaySide');
+      var anchor = ri || (item && item.closest ? item.closest('.pp-plan-item') : null);
+      if (!anchor) return null;
+      row = d.createElement('span');
+      row.className = 'ri-btn-row';
+      anchor.insertAdjacentElement('afterend', row);
+      if (ri) row.appendChild(ri);
+    }
+    if (btn) {
+      row.appendChild(btn);
+      var first = row.querySelector('.ri-entry');
+      if (first && first.parentElement === row && row.firstChild !== first) row.insertBefore(first, row.firstChild);
+    }
+    return row;
+  }
+  root.RyPlanBtnRow = planBtnRow;
   // All elevations share one datum. Lift is from the water surface to the pump outlet datum.
   function assess(p, source, losses, o) {
     if (!p || !finite(p.high) || !finite(source)) return null;
@@ -124,7 +157,10 @@
     if (openBtn === btn && !panel.hidden) { collapse(); return; }
     if (openBtn) openBtn.setAttribute('aria-expanded', 'false');
     openBtn = btn;
-    btn.insertAdjacentElement('afterend', panel);
+    /* [v280] 按钮现在住在 .ri-btn-row 行容器里：面板必须插到**整行之后**，
+       否则会落进行容器（flex 横排），面板被压成半宽、挤在按钮旁边。 */
+    var rowHost = (btn.closest && btn.closest('.ri-btn-row')) || btn;
+    rowHost.insertAdjacentElement('afterend', panel);
     var list = entries();
     panel.innerHTML = '<form><header data-collapse title="点击收起面板"><h3>手动地形高程</h3></header><div class="rt-body">' +
       '<label class="rt-switch"><input type="checkbox" data-terrain="enabled" ' + (state.enabled ? 'checked' : '') + '>启用手动高程</label>' +
@@ -173,7 +209,8 @@
         /* [v245c] 用户要求：成组页「地形高程」放左栏最顶（成组地块条之后、总管卡之前） */
         if (side && top && top.parentElement === side) side.insertBefore(b, top); else host.prepend(b); }
       else if (id === 'tlPlanBar') host.prepend(b);
-      else if (id === 'planDh') host.closest('.pp-plan-item').insertAdjacentElement('afterend', b);
+      /* [v280] 二级页：进「压差改善 / 地形高差」那一行（各占一半）；建不起行就退回原行为 */
+      else if (id === 'planDh') { if (!planBtnRow(b)) host.closest('.pp-plan-item').insertAdjacentElement('afterend', b); }
       else if (id === 'fld_dh' || id === 'tl_dh') host.closest('.field').insertAdjacentElement('afterend', b);
       else host.insertAdjacentElement('afterend', b);
     });

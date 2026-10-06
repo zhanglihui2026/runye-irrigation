@@ -7,15 +7,31 @@
    （同 #tlWsLayerPanel 款），此处只留字体/配色基底；标题栏 = 图层控制同款（灰底、move 光标、
    sticky 吸顶、↔ 调宽手柄、▾/▸ 折叠箭头）。 */
 /* [v253] 悬浮面板基底（定位/尺寸/投影见 JS 内联） */
-.ai-panel{box-sizing:border-box;color:#4a6259;background:#fff;font-size:11px;line-height:1.6;overflow:hidden}
+/* [v258] display:flex + 列向**必须写在类上**，不能只写内联：
+   syncSection() 用 panel.style.display='' 复位可见性，会把内联 display 抹掉，
+   此处不回退成 flex 的话面板会退回 block → .ai-body 的 flex:1 失效 → 高度手柄被挤出面板不可点。 */
+/* [v278 2026-10-06 用户要求] 顶端不越导航、底端不越状态栏。本行是**声明式**的兜底；
+   面板被拖到更低处时，JS syncMaxH() 会写内联 max-height 覆盖它（顶越低、可用高越小，固定值兜不住）。内容再长也只在 .ai-body 内部滚动。
+   [v279 2026-10-06 用户要求] 展开态「顶端紧贴导航栏、底端紧贴状态栏」（上下贴满、看起来更紧凑）：
+   top/bottom 同时给死（各贴两条栏自己的 1px 边线）⇒ 面板自然拉伸成右侧整列，高度不再随内容；
+   留白由 20px 收到 1px（= 可拉伸高度 100vh − 36 − 1 − 30 − 1）。 */
+.ai-panel{box-sizing:border-box;color:#4a6259;background:#fff;font-size:11px;line-height:1.6;overflow:hidden;display:flex;flex-direction:column;top:calc(var(--fn-nav-h,36px) + 1px);bottom:calc(var(--ry-status-h,30px) + 1px);max-height:calc(100vh - var(--fn-nav-h,36px) - 1px - var(--ry-status-h,30px) - 1px)}
 /* 标题栏：图层控制同款——灰底、move 光标、sticky 吸顶、触屏禁手势 */
 .ai-panel header{display:flex;align-items:center;gap:6px;padding:6px 9px;background:#f1f5f9;border-bottom:1px solid #e2e8f0;cursor:move;user-select:none;touch-action:none;position:sticky;top:0}
 .ai-panel header:hover{background:#e8eef4}
 .ai-grip{cursor:ew-resize;color:#94a3b8;padding:0 3px;user-select:none;touch-action:none;font-size:12px}
 .ai-caret{color:#64748b;font-size:11px}
+/* [v258] 底部高度手柄：竖条状拖拽区，居中、hover 显绿，ew 语义换 ns */
+.ai-grip-v{display:block;height:9px;margin:0;cursor:ns-resize;user-select:none;touch-action:none;
+  background:linear-gradient(to bottom,#f1f5f9,#e6ecf2);border-top:1px solid #e2e8f0;
+  position:relative;flex:0 0 auto}
+.ai-grip-v::after{content:"";position:absolute;left:50%;top:50%;width:34px;height:2px;
+  margin:-1px 0 0 -17px;border-radius:2px;background:#b6c2cd}
+.ai-grip-v:hover::after{background:#116447}
 .ai-panel h3{font-size:12px;font-weight:600;color:#24443a;margin:0;flex:1 1 auto}
 .ai-tag{font-size:10px;font-weight:400;color:#7d8f86;border:1px solid #d6e1da;border-radius:8px;padding:0 5px;background:#fff}
-.ai-panel .ai-body{padding:8px}
+.ai-panel .ai-body{padding:8px;overflow:auto;flex:1 1 auto;min-height:0}
+/* [v258] 面板列向布局：header / body / 高度手柄 三段，body 吃掉剩余高度并内部滚动 */
 .ai-label{display:block;font-size:11px;font-weight:400;color:#4a6259;padding:2px 0 3px}
 .ai-panel textarea{box-sizing:border-box;width:100%;font:inherit;font-size:11px;font-weight:400;color:#243c35;background:#fff;border:1px solid #d6e1da;border-radius:0;padding:5px 6px;resize:vertical;line-height:1.55}
 .ai-panel textarea:focus{outline:none;border-color:var(--g-500,#22c55e)}
@@ -42,3 +58,37 @@
 .ai-api input{flex:1 1 auto;min-width:0;font:inherit;font-size:10.5px;color:#243c35;background:#fff;border:1px solid #d6e1da;border-radius:0;padding:3px 5px}
 .ai-api input:focus{outline:none;border-color:var(--g-500,#22c55e)}
 @media(max-width:420px){.ai-panel .ai-body{padding:6px}.ai-actions{flex-direction:column}}
+/* [v277 2026-10-06 用户要求] 折叠态 = 贴右缘的竖排标签条（对齐「工具栏」折叠标签 .pp-rail-tab-float）：
+   用户原话「箭头指向的悬浮面板，收齐时候也是右侧折叠吧」。收起后不再是一条横在右上角的标题条，
+   而是贴视口右缘、竖排写「AI灌溉方案规划」的窄条（点整条即展开，回到原悬浮位）。
+   展开态的宽度/位置/拖动/调宽/调高一律不变；折叠类由 runye-ai-plan.js 的 setCollapsed() 挂摘。
+   ★ 定位/尺寸/底色/圆角必须 !important：面板这些值全写在 JS 的 inline cssText 上（同 #tlWsLayerPanel 款，
+     见 buildPanel），类选择器不抬 !important 一律压不住内联。
+   ★ right 取 --ai-fold-right（JS 现算，默认 0px = 贴视口右缘）：二级右侧工具轨展开时轨内按钮顶到视口右缘只剩 7px，贴 0 会压住按钮文字（真渲染实测「垂直」被压 8px），故轨展开时让到轨外。
+   ★ top 用 --fn-nav-h + 10px（而不是 8px）：面板是 fixed 挂 body 的根上下文元素，
+     写 8px 会压在吸顶导航与右上「设置」上；也要刻意避开 50% 处那条「工具栏」折叠标签（z9995 恒置顶）。 */
+.ai-panel.ai-folded{
+  left:auto !important;right:var(--ai-fold-right,0px) !important;top:calc(var(--fn-nav-h,36px) + 10px) !important;
+  /* [v279] 必须摘掉 bottom：展开态内联了 bottom:…（上下贴满），折叠态若不清掉，
+     竖条会从 46px 一路拉到视口底部（height:auto + 上下都给死 ⇒ 拉伸成满高细条）。 */
+  bottom:auto !important;
+  width:auto !important;min-width:26px;height:auto !important;
+  background:#fbfdfc !important;border:1px solid #b9d2c5 !important;
+  border-right:0 !important;border-radius:8px 0 0 8px !important;
+  box-shadow:0 2px 10px rgba(15,23,42,.12) !important;
+}
+.ai-panel.ai-folded:hover{background:#f2f8f4 !important}
+/* 标题栏变成竖条本体：去横条底色/下边线，四周留白改竖排内距，内容居中（同「工具栏」标签 14px 5px） */
+.ai-panel.ai-folded header,
+.ai-panel.ai-folded header:hover{
+  background:transparent;border-bottom:0;padding:14px 5px;
+  justify-content:center;gap:0;cursor:pointer;
+}
+.ai-panel.ai-folded .ai-title{
+  flex:0 0 auto;writing-mode:vertical-rl;text-orientation:upright;
+  letter-spacing:5px;line-height:1.4;font-size:12px;font-weight:600;color:#2f6d43;
+}
+/* 折叠态里「云端版」标签、↔ 调宽手柄、▾ 折叠箭头全部让位（点整条即展开） */
+.ai-panel.ai-folded .ai-tag,
+.ai-panel.ai-folded .ai-grip,
+.ai-panel.ai-folded .ai-caret{display:none}

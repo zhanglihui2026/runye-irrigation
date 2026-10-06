@@ -21,22 +21,17 @@
 'use strict';
 
 /* ============================ 一、固定配置 ============================ */
-const MODEL = 'deepseek-reasoner';                                    /* 推理模型，速度较慢但算得更稳 */
-const TEMPERATURE = 0.1;
+const MODEL = process.env.AI_MODEL || 'deepseek-flash';                                    /* 推理模型，速度较慢但算得更稳 */
 const UPSTREAM_URL = 'https://api.deepseek.com/chat/completions';
 const ALLOWED_ORIGIN = 'https://zhanglihui2026.github.io';            /* 唯一放行的前端域名 */
 /* 超时等参数在每次调用时读取，改环境变量后不用等冷启动才生效 */
 function timeoutMs() { const n = Number(process.env.AI_UPSTREAM_TIMEOUT_MS); return (isFinite(n) && n > 0) ? n : 150000; } /* 150s：reasoner 会先思考再输出 */
 const MAX_BODY_BYTES = 262144;                                                  /* 256 KB */
 
-/* 测试期：每人 5 次，记在进程内存里。
-   注意：Serverless 每次冷启动都是新进程、多实例之间也不共享，所以线上会重置 ——
-   后期接数据库时，只须把下面的 readUsed() / incrUsed() 换成数据库读写即可，其余逻辑不动。 */
+/* 每用户5次：服务端身份、持久原子预占；没有线上内存回退。 */
 const FREE_LIMIT = 5;
-const USED = Object.create(null);
-function readUsed(uid) { return USED[uid] || 0; }
-function incrUsed(uid) { USED[uid] = (USED[uid] || 0) + 1; return USED[uid]; }
-
+const quota = require('../lib/ai-quota.cjs');
+const schema = require('../runye-ai-plan.js');
 /* ============================ 二、内置 System Prompt ============================ */
 const SYSTEM_PROMPT = [
   '你是资深灌溉工程设计工程师（AI 灌溉方案规划 Agent）。',
@@ -49,7 +44,7 @@ const SYSTEM_PROMPT = [
   '              "tape_lay_side":100, "zone_mu":18, "src_distance":0,',
   '              "pump_lift":5, "terrain_dh":5, "tape_pressure":1, "target_velocity":1.5,',
   '              "main_pipe_od":160, "branch_pipe_od":90 },',
-  '  "remark": "方案说明（必须给出复算过程的关键数字）",',
+  '  "remark": "候选参数的设计理由（数值校核以工具复算为准）",',
   '  "risks": ["风险提示"] }',
   '',
   '【字段与单位（固定，不得改名）】',
@@ -64,21 +59,15 @@ const SYSTEM_PROMPT = [
   'zone_mu 0.5~200；src_distance 0~2000；pump_lift 0~300；terrain_dh -200~300；',
   'tape_pressure 0~10；target_velocity 0.3~5。',
   '',
-  '【工程约束（必须逐条核算，禁止拍脑袋）】',
-  '1. 每亩流量 = 667 ÷ tape_spacing ÷ emitter_spacing × emitter_flow ÷ 1000（m³/h·亩）；',
-  '   单区流量 Q = 每亩流量 × zone_mu。',
-  '2. 支管 / 主管规格按 Q = v × A 反算内径（流速上限 2.0 m/s），PE 管必须按 SDR 壁厚折算内径，',
-  '   再向上取标准外径规格；Ø110 流速超 2.0 m/s 时必须加大规格或写「双支管分流、每根流量减半」，',
-  '   并在 risks 里提示水锤风险。不得照抄示例里的 90。',
-  '3. 滴灌带总米数 = 地块面积 ÷ tape_spacing；条数 = 总米数 ÷ tape_lay_side（按地块总面积算，不是单区）。',
-  '4. 水泵扬程 = 水泵提升高度 + 地形高差 + 入口压力(1 bar ≈ 10.2 m) + 沿程与局部损失',
-  '   + 过滤施肥装置损失(按 5 m) + 安全余量(2 m)，再乘 1.1 安全系数；',
-  '   沿程损失须按 Darcy–Weisbach 结合管长与流量核算，不得给偏小值。',
-  '5. remark 必须写清：分区数量与单区尺寸、单区流量 m³/h、主管/支管规格与实际流速、',
-  '   水泵扬程 m 与轴功率 kW（效率按 70%）、滴灌带条数与总米数、主管长度 m。',
-  '6. 所有数字必须自洽、可复算，互相矛盾的方案视为错误。',
-  '7. 用户填写的灌溉需求优先级最高；与当前设计参数冲突时，一律以用户需求为准。',
-  '8. 坡度未实测时不得根据水源高差或地块面积反推坡度。'
+  '【工程规则】',
+  '每亩流量 = 666.67 ÷ tape_spacing ÷ emitter_spacing × emitter_flow ÷ 1000，单位 m³/h。',
+  '模型只给候选设计参数和理由，不自行宣称已完成管损、扬程、功率或管路生成校核。',
+  '这些结果必须由润野现有引擎按真实轮灌、管路、内径、Hazen–Williams和页面泵效率复算。',
+  '实测水源距离、提升高度、高程和设备工况为锁定条件，不得被需求文字覆盖。',
+  '仅修改可优化的滴灌带参数、单区面积和目标流速；管径仅供参考，最终由引擎选定。',
+  '成组地块以各子块边界为准，外框含间隙，不是可灌溉面积；各层高程不可合并为一个坡度。',
+  '数据不足时在risks说明，禁止把示例参数写成实测值。',
+  '坡度未实测时不得根据水源高差或地块面积反推坡度。'
 ].join('\n');
 
 /* ============================ 三、工具函数 ============================ */
@@ -89,7 +78,7 @@ function setCors(res) {
   res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Max-Age', '86400');
 }
 function reply(res, httpStatus, code, msg, data, extra) {
@@ -124,16 +113,19 @@ function buildUserPrompt(p) {
   L.push('- 顶点数：' + poly.length + '（平面相对坐标，单位 m，按手绘顺序）');
   L.push('- 顶点坐标：[' + (pts || '（无）') + ']');
   L.push('');
+  if (Array.isArray(p.groups) && p.groups.length) { L.push('成组子地块边界（外框只供定位，不含间隙的真实面积为各块之和）：'); p.groups.forEach(g=>L.push(JSON.stringify(g))); }
+  if (p.terrain) L.push('各层实测高程：'+JSON.stringify(p.terrain));
+  if (p.conditions) L.push('引擎工况：'+JSON.stringify(p.conditions));
   L.push('## 二、地形与水源');
   L.push('- 地形高差：' + fmt(isNum(p.terrain_dh) ? p.terrain_dh : null, 2) + ' m；坡度：' + (isNum(p.slope) ? fmt(p.slope, 2) + '%' : '未测量（不得推算）'));
   L.push('- 水泵提升高度：' + fmt(isNum(p.pump_lift) ? p.pump_lift : null, 2) + ' m');
   L.push('- 水源距离：' + fmt(isNum(p.src_distance) ? p.src_distance : null, 0) + ' m');
   L.push('- 滴灌带入口工作压力：' + fmt(isNum(p.tape_pressure) ? p.tape_pressure : null, 2) + ' bar');
   L.push('');
-  L.push('## 三、灌溉需求（用户填写，最高优先级）');
+  L.push('## 三、灌溉需求（用户填写，须服从实测工况及工程约束）');
   L.push(String(p.user_text && String(p.user_text).trim() ? String(p.user_text).trim() : '（用户未填写，请按地块条件给出常规滴灌方案）'));
   L.push('');
-  L.push('## 四、当前设计参数（可在此基础上调整；与第三节冲突时以第三节为准）');
+  L.push('## 四、当前设计参数（仅设计项可优化；实测项锁定）');
   L.push('- 滴灌带间距 ' + (isNum(cur.tape_spacing) ? cur.tape_spacing : 0.4) + ' m；滴孔间距 ' + (isNum(cur.emitter_spacing) ? cur.emitter_spacing : 0.3) + ' m；滴头流量 ' + (isNum(cur.emitter_flow) ? cur.emitter_flow : 0.8) + ' L/h');
   L.push('- 单边铺设长度 ' + (isNum(cur.tape_lay_side) ? cur.tape_lay_side : 100) + ' m；单区 ' + (isNum(cur.zone_mu) ? cur.zone_mu : 18) + ' 亩；目标流速 ' + (isNum(cur.target_velocity) ? cur.target_velocity : 1.5) + ' m/s');
   L.push('');
@@ -164,7 +156,7 @@ async function callDeepSeek(messages) {
     const init = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
-      body: JSON.stringify({ model: MODEL, messages: messages, temperature: TEMPERATURE, stream: false })
+      body: JSON.stringify({ model: MODEL, messages: messages, thinking: { type: 'enabled' }, response_format: { type: 'json_object' }, stream: false })
     };
     if (ctrl) init.signal = ctrl.signal;
     const r = await fetch(UPSTREAM_URL, init);
@@ -196,6 +188,7 @@ async function callDeepSeek(messages) {
 
 function readBody(req) {
   if (req.body !== undefined && req.body !== null) {
+    if (Buffer.byteLength(typeof req.body === 'string' ? req.body : JSON.stringify(req.body), 'utf8') > MAX_BODY_BYTES) return { __tooBig: true };
     if (typeof req.body === 'string') { try { return JSON.parse(req.body); } catch (e) { return null; } }
     return req.body;
   }
@@ -204,7 +197,7 @@ function readBody(req) {
     req.on('data', c => {
       if (stop) return;
       raw += c;
-      if (raw.length > MAX_BODY_BYTES) { stop = true; resolve({ __tooBig: true }); }
+      if (Buffer.byteLength(raw, 'utf8') > MAX_BODY_BYTES) { stop = true; resolve({ __tooBig: true }); }
     });
     req.on('end', () => {
       if (stop) return;
@@ -215,6 +208,25 @@ function readBody(req) {
   });
 }
 
+function ringArea(poly) {
+  if(!Array.isArray(poly)||poly.length<3||poly.length>2000||poly.some(p=>!p||!isNum(p.x)||!isNum(p.y))) return null;
+  const ring=poly.length>3&&poly[0].x===poly[poly.length-1].x&&poly[0].y===poly[poly.length-1].y?poly.slice(0,-1):poly;
+  if(new Set(ring.map(p=>p.x+','+p.y)).size<3) return null;
+  function cross(a,b,c){return(b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x);}
+  function on(a,b,c){return Math.abs(cross(a,b,c))<1e-9&&c.x>=Math.min(a.x,b.x)-1e-9&&c.x<=Math.max(a.x,b.x)+1e-9&&c.y>=Math.min(a.y,b.y)-1e-9&&c.y<=Math.max(a.y,b.y)+1e-9;}
+  function intersect(a,b,c,d){return cross(a,b,c)*cross(a,b,d)<0&&cross(c,d,a)*cross(c,d,b)<0||on(a,b,c)||on(a,b,d)||on(c,d,a)||on(c,d,b);}
+  for(let i=0;i<ring.length;i++)for(let j=i+1;j<ring.length;j++){if(j===i+1||i===0&&j===ring.length-1)continue;if(intersect(ring[i],ring[(i+1)%ring.length],ring[j],ring[(j+1)%ring.length]))return null;}
+  let sum=0;for(let i=0,j=ring.length-1;i<ring.length;j=i++)sum+=ring[j].x*ring[i].y-ring[i].x*ring[j].y;
+  return Math.abs(sum/2)>1e-6?Math.abs(sum/2):null;
+}
+function validateGeometry(p){
+  let area=ringArea(p.polygon);if(area===null)return '地块需要至少3个有效不同顶点、非零面积且不能自交，坐标单位为米。';
+  if(p.groups!=null){if(!Array.isArray(p.groups)||p.groups.length>100)return '成组地块格式或数量无效。';if(p.groups.length){const areas=p.groups.map(g=>g&&ringArea(g.poly));if(areas.some(a=>a===null||a===undefined))return '子地块边界无效。';area=areas.reduce((a,b)=>a+b,0);}}
+  if(p.area!=null&&(!isNum(p.area)||p.area<=0||Math.abs(p.area-area)>Math.max(1,area*.01)))return '地块面积与真实边界不一致，请重新测量。';
+  p.area=area;
+  for(const k of ['slope','terrain_dh','pump_lift','src_distance','tape_pressure'])if(p[k]!=null&&!isNum(p[k]))return k+' 必须为有限数字。';
+  if(p.user_text!=null&&(typeof p.user_text!=='string'||p.user_text.length>10000))return '需求文字格式或长度无效。';return null;
+}
 /* ============================ 四、主入口 ============================ */
 module.exports = async function handler(req, res) {
   const origin = (req.headers && req.headers.origin) ? String(req.headers.origin) : '';
@@ -229,9 +241,11 @@ module.exports = async function handler(req, res) {
   /* GET：部署自检（打开 https://<域名>/api/ai-irrigation 就能看到） */
   if (req.method === 'GET') {
     return reply(res, 200, 0, 'ok', null, {
-      service: 'runye-ai-irrigation', model: MODEL, temperature: TEMPERATURE,
+      service: 'runye-ai-irrigation', model: MODEL,
       key_configured: !!process.env.DEEPSEEK_API_KEY,
-      free_limit: FREE_LIMIT, quota_store: 'memory（进程内存，冷启动会重置）'
+      quota_configured: !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN),
+      access_configured: !!process.env.AI_ACCESS_TOKENS,
+      free_limit: FREE_LIMIT, quota_store: '持久原子额度（未配置时暂停调用）'
     });
   }
   if (req.method !== 'POST') return reply(res, 405, 405, '只支持 POST（自检可用 GET），当前方法：' + req.method);
@@ -240,20 +254,13 @@ module.exports = async function handler(req, res) {
   if (body && body.__tooBig) return reply(res, 413, 413, '请求体过大（上限 ' + MAX_BODY_BYTES + ' 字节），请简化地块顶点后重试。');
   if (!body || typeof body !== 'object' || Array.isArray(body)) return reply(res, 400, 400, '请求体必须是 JSON 对象：{ user_id, polygon, area, slope, user_text }。');
 
-  /* ---- 参数校验 ---- */
-  const uid = body.user_id == null ? '' : String(body.user_id).trim();
-  if (!uid) return reply(res, 400, 400, '缺少 user_id：网页端会自动生成并保存在浏览器本地，请勿清空站点数据。');
-  if (!/^[A-Za-z0-9_\-:.]{1,64}$/.test(uid)) return reply(res, 400, 400, 'user_id 格式不合法（只允许字母、数字、_ - : .，长度 1~64）。');
-  if (!Array.isArray(body.polygon)) return reply(res, 400, 400, 'polygon 必须是数组：[{x,y}, ...]。');
-  if (body.area !== undefined && body.area !== null && !isNum(Number(body.area))) return reply(res, 400, 400, 'area 必须是数字（单位 m²）。');
-  if (body.slope !== undefined && body.slope !== null && !isNum(Number(body.slope))) return reply(res, 400, 400, 'slope 必须是数字（单位 %）。');
-
-  /* ---- 次数校验（测试期写死每人 5 次） ---- */
-  const used = readUsed(uid);
-  if (used >= FREE_LIMIT) {
-    return reply(res, 429, 429, '本账号 AI 调用次数已用完（测试期每人 ' + FREE_LIMIT + ' 次，已用 ' + used + ' 次）。请稍后再试或联系作者开通。', null, { quota_left: 0 });
-  }
-
+  const geometryError = validateGeometry(body);
+  if (geometryError) return reply(res,400,400,geometryError);
+  let reservation;
+  try { reservation = await quota.reserve(quota.identity(req)); }
+  catch(e) { return reply(res,e.code || 503,e.code || 503,e.message,null,{quota_left:e.code===429?0:null}); }
+  let settled=false;
+  try {
   /* ---- 调大模型（超时 / 网络 / HTTP 错误在此全部捕获，不扣次数） ---- */
   const t0 = Date.now();
   let content;
@@ -263,37 +270,38 @@ module.exports = async function handler(req, res) {
       { role: 'user', content: buildUserPrompt(body) }
     ]);
   } catch (e) {
-    return reply(res, e.http || 502, e.code || 502, e.message || '调用大模型失败。', null, { quota_left: FREE_LIMIT - used });
+    return reply(res, e.http || 502, e.code || 502, e.message || '调用大模型失败。', null, { quota_left: reservation.left + 1 });
   }
 
   /* ---- JSON 合法性校验（不合法不扣次数，并把原文片段回传便于排查） ---- */
   const jsonText = stripFences(content);
   if (!jsonText) {
-    return reply(res, 422, 422, '大模型返回内容为空，无法解析为 JSON。请重试一次。', null, { quota_left: FREE_LIMIT - used, raw: String(content).slice(0, 300) });
+    return reply(res, 422, 422, '大模型返回内容为空，无法解析为 JSON。请重试一次。', null, { quota_left: reservation.left + 1, raw: String(content).slice(0, 300) });
   }
   let plan = null;
   try { plan = JSON.parse(jsonText); }
   catch (e) {
-    return reply(res, 422, 422, '大模型返回的内容不是合法 JSON，已拒绝（本次不扣次数）：' + String(e && e.message || e) + '。请重试一次。', null, { quota_left: FREE_LIMIT - used, raw: String(content).slice(0, 300) });
+    return reply(res, 422, 422, '大模型返回的内容不是合法 JSON，已拒绝（本次不扣次数）：' + String(e && e.message || e) + '。请重试一次。', null, { quota_left: reservation.left + 1, raw: String(content).slice(0, 300) });
   }
   if (!plan || typeof plan !== 'object' || Array.isArray(plan)) {
-    return reply(res, 422, 422, '大模型返回的不是 JSON 对象（应为 { "version":1, "design":{...} }）。请重试一次。', null, { quota_left: FREE_LIMIT - used, raw: String(content).slice(0, 300) });
+    return reply(res, 422, 422, '大模型返回的不是 JSON 对象（应为 { "version":1, "design":{...} }）。请重试一次。', null, { quota_left: reservation.left + 1, raw: String(content).slice(0, 300) });
   }
 
-  /* ---- 成功：扣次数，data 回传「大模型返回的 JSON 字符串」 ---- */
-  const usedNow = incrUsed(uid);
-  return reply(res, 200, 0, 'ok', JSON.stringify(plan), {
-    quota_left: Math.max(0, FREE_LIMIT - usedNow),
-    model: MODEL,
-    elapsed_ms: Date.now() - t0,
-    quota_store: 'memory（进程内存，冷启动会重置，后期换数据库）'
-  });
+  const checked=schema.validate(plan);
+  if(!checked.ok) return reply(res,422,422,'模型方案参数校验未通过，本次不扣次数：'+checked.msg,null,{quota_left:reservation.left+1});
+  checked.plan.plot.area_m2=body.area;
+  settled=true; // 提交结果不确定时保留预占，不恢复额度以免超发。
+  const left=await quota.finish(reservation,true);
+  return reply(res,200,0,'ok',JSON.stringify(checked.plan),{quota_left:left,model:MODEL,elapsed_ms:Date.now()-t0,quota_store:'持久原子额度',request_id:body.request_id||null});
+  } catch(e) { return reply(res,503,503,'额度提交暂不可用，请联系作者核查；未重复调用模型。'); }
+  finally { if(!settled) { try { await quota.finish(reservation,false); } catch(e) { /* 保留预占，人工核查 */ } } }
+
 };
 module.exports.default = module.exports;
 
 /* 供本地契约测试使用（不参与线上运行） */
 module.exports.__test = {
   SYSTEM_PROMPT: SYSTEM_PROMPT, buildUserPrompt: buildUserPrompt, stripFences: stripFences,
-  MODEL: MODEL, TEMPERATURE: TEMPERATURE, ALLOWED_ORIGIN: ALLOWED_ORIGIN, FREE_LIMIT: FREE_LIMIT,
-  _USED: USED, _reset: function () { Object.keys(USED).forEach(k => { delete USED[k]; }); }
+  MODEL: MODEL, ALLOWED_ORIGIN: ALLOWED_ORIGIN, FREE_LIMIT: FREE_LIMIT,
+  validateGeometry, _reset: quota._reset
 };

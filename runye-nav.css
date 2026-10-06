@@ -50,3 +50,38 @@ html{--fn-nav-h:36px}
   .fn-nav .fn-link{padding:0 10px;font-size:12px}
 }
 @media print{.fn-nav{display:none!important}}
+
+/* ═══ [v247 2026-10-06] 「更多 ▾」折叠组 ═══════════════════════════════════
+   清单在 runye-nav.js 的 MORE_ITEMS（管路拼装 / 经济指标分析 / 数字化建模 /
+   滴灌带查询）+ pipe_optim_ui.js 追加的「管网优化详细分析」。
+   ★ 面板必须 position:fixed —— .fn-inner 是 overflow-x:auto 的滚动容器，
+     absolute 后代会被 overflow-y:hidden 裁掉（只露出一条 36px 的缝）。
+   ★ 不能给 .fn-nav/.fn-inner 加 transform/filter/will-change：那会把 fixed
+     的包含块改回导航自身，面板立刻被裁（与上面同一条规则的两面）。 */
+.fn-nav .fn-more{
+  position:relative;display:flex;align-items:center;flex:none;
+}
+.fn-nav .fn-more-btn .fn-more-caret{
+  font-size:9px;margin-left:2px;display:inline-block;
+  transition:transform .16s ease;
+}
+.fn-nav .fn-more.open .fn-more-caret{transform:rotate(180deg)}
+.fn-nav .fn-more-panel{
+  position:fixed;z-index:99999;min-width:176px;
+  display:flex;flex-direction:column;
+  padding:4px 0;margin:0;
+  background:var(--u-nav);
+  border:1px solid var(--u-nav-active);border-radius:0 0 8px 8px;
+  box-shadow:0 10px 26px rgba(0,0,0,.30);
+  list-style:none;
+}
+.fn-nav .fn-more-panel[hidden]{display:none}
+/* 面板项：竖排全宽、左对齐；去掉顶层项那条 2px 下划线（竖排里没有"选中下划"语义） */
+.fn-nav .fn-more-panel .fn-link{
+  width:100%;box-sizing:border-box;
+  height:34px;padding:0 16px;
+  justify-content:flex-start;text-align:left;
+  border-bottom:0;border-radius:0;
+}
+.fn-nav .fn-more-panel .fn-link:hover{background:var(--u-nav-hover)}
+.fn-nav .fn-more-panel .fn-link.active{background:var(--u-nav-active);border-bottom:0}

@@ -1,25 +1,9 @@
-/* [v251 2026-10-05] AI 灌溉方案规划 · 本地测试版
-   网页端只做两件事：① 把「地块坐标 + 面积 + 地形 + 需求文字」拼成一段提示词文本导出；
-   ② 导入本地 Python 脚本调用大模型后返回的 JSON，校验后写回现有输入框并调用现有
-   calcPlan()（布管 + 水力计算 + 渲染），不改任何原有引擎代码。
-   网页端不调用任何大模型 API。
-   面板形态沿用 v245「手动地形高程」：左侧栏内联折叠面板，不用弹窗。
-   [v253 2026-10-05] 悬浮面板化（用户要求）：从左侧栏拿出来 → 制图区右上角常驻浮层，
-   对齐三级页「图层控制」面板同款属性（拖动/双击复位/单击折叠/↔调宽/记忆/手机默认折叠）；
-   左栏 .ai-open 触发按钮移除，position:fixed 跨页常驻。缓存 js?v=255、css?v=254，PWA v18。
-   [v255 2026-10-06 用户要求] 上云端：面板新增【在线生成】——把「地块多边形 + 面积 + 坡度 + 需求文字」
-   POST 给 Vercel Serverless 函数 api/plan.js（函数里读 DeepSeek Key、做次数校验、调大模型、
-   JSON 校验、扣次数、回传 JSON）；拿到结果后走既有的 validate → apply → calcPlan 通道出图。
-   网页端依旧不持有任何密钥；离线流程（导出文本 → 本地脚本 → 导入 JSON）完整保留作回退。
-   user_id 由浏览器首次生成后存 localStorage；接口地址可用面板底部输入框覆盖后存 localStorage。
-   [v256 2026-10-06] 接口换成 Vercel 的 api/ai-irrigation.js（模型 deepseek-reasoner / temperature 0.1）：
-     返回格式改为 {code, msg, data(JSON 字符串), quota_left}；测试期每人 5 次由云端写死。
-     前端拿到 data 字符串后仍走既有的 parse → validate → apply → calcPlan 通道，绘图引擎一行未动。 */
+/* AI规划 v260：候选预览、地块版本核对、实测工况锁定、原引擎重建复算与撤销。在线额度绑定服务端用户，每人5次。 */
 (function (root) {
   'use strict';
   var MU_TO_SQM = 666.67;
   var SCHEMA_VERSION = 1;
-  var STORE_KEY = 'runye_ai_plan_v1';
+  var STORE_KEY = 'runye_ai_plan_v1', PROVENANCE_KEY = 'runye_ai_plan_provenance_v1';
 
   /* 字段定义：key / 中文名 / 单位 / 工程合理范围 / 是否必填 / 默认值 / 落地输入框 id
      落地 id 全部是现有页面已有输入框 —— 导入只写值 + 调 calcPlan()，不新增引擎逻辑。 */
@@ -167,8 +151,12 @@
     var dhFallback = domNum('planDh', domNum('fld_dh', 5));
     var dh = root.RyTerrain && typeof root.RyTerrain.resolveDh === 'function' ? root.RyTerrain.resolveDh(dhFallback, false) : dhFallback;
     var lift = domNum('planLift', domNum('fld_lift', 5));
+    var terrain = root.RyTerrain && root.RyTerrain.exportState ? root.RyTerrain.exportState() : null;
+    if(terrain) { var selected = ge && ge.active && Array.isArray(root.__runyeSubPlots) ? (ge.mode==='perPlot' ? [root.__runyeSubPlots[ge.current]] : root.__runyeSubPlots) : null; var keys=selected ? selected.filter(Boolean).map(function(p){return 'plot:'+(p.id!=null?p.id:JSON.stringify(p.poly));}) : ['plot:'+(root.currentPlotId || JSON.stringify(root.measuredPolygon))]; var relevant={};keys.forEach(function(k){if(terrain.plots && terrain.plots[k])relevant[k]=terrain.plots[k];});terrain.plots=relevant; }
     var slope = null; // 水源相对高差不能推导地块坡度，需实测坡向与水平距离。
     return {
+      terrain: terrain,
+      conditions: { existing_pressure: domNum('fld_existPressure',0), filter_loss: domNum('fld_filterLoss',5), pump_efficiency: domNum('fld_efficiency',65), simultaneous_zones: domNum('planN',1), pipe_loss_method:'Hazen-Williams' },
       poly: poly, groups: groups, area_m2: r2(area), mu: r2(area / MU_TO_SQM), bbox_w: bb.w, bbox_h: bb.h,
       terrain_dh: r2(dh), slope_percent: slope,
       pump_lift: lift, src_distance: domNum('planSrcDist', 0), tape_pressure: domNum('planTapePressure', domNum('fld_tapePressure', 1)),
@@ -225,16 +213,44 @@
     return L.join('\n');
   }
 
+  var lastUndo=null;
+  function fingerprint() {
+    var c=collect(),ge=root.__runyeGroupEdit, b=root.RunyeBridge;
+    return JSON.stringify({plot:root.currentPlotId,poly:c.poly,groups:c.groups,area:c.area_m2,terrain:c.terrain,conditions:c.conditions,cur:c.cur,lift:c.pump_lift,source:c.src_distance,pressure:c.tape_pressure,mode:ge&&ge.mode,current:ge&&ge.current,pipes:b&&b.state&&[b.state.mainPipes,b.state.branchPipes,b.state.subBranchPipes],slots:ge&&ge.slots,trunk:ge&&ge.trunkPipes,cuts:b&&b.state&&b.state.cutSnap,rotated:b&&b.state&&b.state.zoneRotated});
+  }
+  function clone(v){return v == null?v:JSON.parse(JSON.stringify(v));}
+  function capture(){
+    var nodes=root.document.querySelectorAll?Array.from(root.document.querySelectorAll('input[id],select[id]')):FIELDS.reduce(function(a,f){return a.concat(f.ids.map(el).filter(Boolean));},[]);
+    return {nodes:nodes.map(function(n){return {node:n,value:n.value,checked:n.checked};}),state:clone(root.RunyeBridge&&root.RunyeBridge.state),group:clone(root.__runyeGroupEdit),groupRef:root.__runyeGroupEdit,blocks:clone(root.__runyeGroupWork&&root.__runyeGroupWork.blocks),data:clone(root.planData)};
+  }
+  function restore(s){
+    s.nodes.forEach(function(p){p.node.value=p.value;if(p.checked!==undefined)p.node.checked=p.checked;});
+    if(s.state&&root.RunyeBridge&&root.RunyeBridge.state){var target=root.RunyeBridge.state;Object.keys(target).forEach(function(k){delete target[k];});Object.assign(target,clone(s.state));}
+    if(s.group){var g=s.groupRef;Object.keys(g).forEach(function(k){delete g[k];});Object.assign(g,clone(s.group));root.__runyeGroupEdit=g;}if(s.blocks&&root.__runyeGroupWork)root.__runyeGroupWork.blocks=clone(s.blocks);root.planData=clone(s.data);
+    if(typeof root.calcPlan==='function')try{root.calcPlan();}catch(e){}
+    if(typeof root.grRefreshGroupPage==='function'&&s.group&&s.group.active)root.grRefreshGroupPage();
+  }
+  function undoApply(){if(!lastUndo)return false;restore(lastUndo);lastUndo=null;return true;}
   /* ---------- 4. 应用（写现有输入框 + 调现有 calcPlan） ---------- */
-  function apply(plan) {
+  function apply(plan, options) {
+    options = options || {};
     if (!root.document) return { ok: false, kind: 'nodom', msg: '当前环境不支持渲染。' };
     if (!plan || !plan.design) return { ok: false, kind: 'missing', msg: 'AI 方案参数不全：没有 design 字段。' };
     var checked = validate(plan); if (!checked.ok) return checked; plan = checked.plan;
     if (typeof root.calcPlan !== 'function') return { ok: false, kind: 'nodom', msg: '未找到计算入口 calcPlan()，请确认页面已完整加载。' };
     var c = collect();
     if (!(c.area_m2 > 0)) return { ok: false, kind: 'noplot', msg: '尚未绘制地块：请先在画布上描绘地块边界并确认面积，再导入方案。' };
-    var d = plan.design, written = [], terrainOverride = root.RyTerrain && root.RyTerrain.exportState().enabled && isNum(d.terrain_dh);
+    if(isNum(plan.plot&&plan.plot.area_m2) && Math.abs(plan.plot.area_m2-c.area_m2)>Math.max(1,c.area_m2*.01)) return {ok:false,msg:'方案地块面积与当前边界不一致，未应用，请核对地块。'};
+    var d = plan.design, lockedWarnings = [];
+    ['pump_lift','terrain_dh','src_distance','tape_pressure'].forEach(function(k) { if(isNum(d[k])) { delete d[k]; lockedWarnings.push(k==='terrain_dh'?'已保留手动高程或原地形高差；AI建议未覆盖。':'已保留实测工况：'+FIELDS.filter(function(f){return f.key===k;})[0].name); } });
+    var written = [], terrainOverride = root.RyTerrain && root.RyTerrain.exportState().enabled && isNum(d.terrain_dh);
     if (terrainOverride) delete d.terrain_dh;
+    var bridge=root.RunyeBridge, hasPipes=!!(bridge && bridge.state && ['mainPipes','branchPipes','subBranchPipes'].some(function(k){return (bridge.state[k]||[]).length;}));
+    var layoutChanged=FIELDS.some(function(f){return ['tape_lay_side','zone_mu','tape_spacing'].indexOf(f.key)>=0 && isNum(d[f.key]) && f.ids.some(function(id){var n=el(id);return n&&Number(n.value)!==d[f.key];});});
+    if(hasPipes && layoutChanged && !options.rebuild) return {ok:false,kind:'rebuild',msg:'分区参数会改变现有管路，请在预览中确认按原规则重建；尚未修改参数。'};
+    if(options.rebuild && (!bridge || typeof bridge.autoPipesWhole!=='function')) return {ok:false,msg:'当前页面尚未加载布管入口，未写入参数。'};
+    var undo=capture();
+    try {
     FIELDS.forEach(function (f) {
       var v = d[f.key];
       if (!isNum(v)) return;
@@ -248,11 +264,13 @@
     if (isNum(d.zone_mu)) { var mode = el('planZoneMode'); if (mode) mode.value = 'manual'; }
     if (typeof root.calcPlan !== 'function') return { ok: false, kind: 'nodom', msg: '未找到计算入口 calcPlan()，请确认页面已完整加载。' };
     root.calcPlan();
+    if(options.rebuild && !bridge.autoPipesWhole()) throw new Error('按原规则生成管路失败');
+    if(options.rebuild) root.calcPlan();
     /* 成组页在编辑态时，同步刷新成组视图（沿用 RyTerrain 的刷新约定） */
     if (root.__runyeGroupEdit && root.__runyeGroupEdit.active && typeof root.grRefreshGroupPage === 'function') {
       try { root.grRefreshGroupPage(); } catch (e) { }
     }
-    var pd = root.planData || null, warnings = (plan.warnings || []).slice();
+    var pd = root.planData || null, warnings = (plan.warnings || []).concat(lockedWarnings);
     if (terrainOverride) warnings.push('已保留手动高程数据；AI 地形高差未覆盖测量设置。');
     if (pd) {
       if (isNum(d.main_pipe_od) && isNum(pd.mainPipeODValue) && Math.abs(pd.mainPipeODValue - d.main_pipe_od) > 1) {
@@ -265,10 +283,12 @@
     if (isNum(plan.plot && plan.plot.area_m2) && Math.abs(plan.plot.area_m2 - c.area_m2) / Math.max(c.area_m2, 1) > 0.5) {
       warnings.push('方案里的地块面积 ' + plan.plot.area_m2.toFixed(1) + ' m² 与当前实测 ' + c.area_m2.toFixed(1) + ' m² 相差较大，请核对是否为同一地块');
     }
+    lastUndo=undo;
     return {
-      ok: true, written: written, warnings: warnings,
+      ok: true, rebuilt:!!options.rebuild, written: written, warnings: warnings,
       summary: pd ? { pumpFlow: pd.zoneFlow, pumpHead: pd.pumpHead, mainOD: pd.mainPipeODValue, branchOD: pd.branchPipeODValue, zones: pd.zoneCols + '×' + pd.zoneRows } : null
     };
+      } catch(e) { restore(undo); return {ok:false,msg:'应用失败，原参数与管路已恢复：'+e.message}; }
   }
 
   /* ---------- 4.5 云端接口（v255）：user_id / 接口地址 / POST ---------- */
@@ -278,6 +298,7 @@
     try { var v = root.localStorage.getItem(API_CFG_KEY); if (v && /^https?:\/\//.test(v)) return v; } catch (e) { }
     return DEFAULT_API;
   }
+  function accessToken() { return panel && panel.querySelector ? String((panel.querySelector('[data-ai=access]') || {}).value || '').trim() : ''; }
   /* user_id：本机首次生成后常驻 localStorage，只用于次数统计，不含任何个人信息 */
   function uid() {
     try {
@@ -294,7 +315,7 @@
         if (ctrl) { try { ctrl.abort(); } catch (e) { } }
         reject(new Error('请求超时（' + Math.round(timeoutMs / 1000) + ' 秒未返回）'));
       }, timeoutMs);
-      var init = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) };
+      var init = { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization':'Bearer '+accessToken() }, body: JSON.stringify(payload) };
       if (ctrl) init.signal = ctrl.signal;
       root.fetch(url, init).then(function (r) {
         return r.text().then(function (t) {
@@ -312,12 +333,14 @@
   /* [v256] 新接口的错误码（{code,msg}）→ 一句「接下来怎么办」 */
   function errHint(code) {
     var H = {
+      401: '（请填写作者分配的有效用户访问码）',
+      503: '（用户额度服务未配置或暂不可用，请联系作者；不会回退到可重置计数）',
       400: '（请求参数不对：请确认已画好地块、需求已填写）',
       403: '（网页域名不在接口白名单：核对接口地址是不是本项目自己的 Vercel 域名）',
       405: '（接口只接受 POST，多半是地址填错了）',
       413: '（地块顶点太多，请简化边界后重试）',
       422: '（大模型这次没按要求输出 JSON，本次不扣次数，可再点一次）',
-      429: '（次数已用完，或上游限流：稍后再试；测试期每人 5 次）',
+      429: '（本用户共5次；处理中请求会预占额度，已用完的额度不会自动重置）',
       500: '（服务端未配置 DeepSeek 密钥：需到 Vercel 项目里添加 DEEPSEEK_API_KEY 后重新部署）',
       502: '（上游大模型调用失败：常见原因是余额不足或网络问题）',
       504: '（推理模型较慢、这次超时了，可再点一次）'
@@ -327,7 +350,9 @@
 
   var api = {
     SCHEMA_VERSION: SCHEMA_VERSION, FIELDS: FIELDS, ADVISORY: ADVISORY,
-    parse: parse, validate: validate, collect: collect, buildPrompt: buildPrompt, apply: apply, schemaHint: schemaHint
+    parse: parse, validate: validate, collect: collect, buildPrompt: buildPrompt, apply: apply, fingerprint:fingerprint, undo:undoApply, schemaHint: schemaHint,
+    apiBase: apiBase, getAccessToken: accessToken,
+    getProvenance: function(){ try{return root.localStorage.getItem(PROVENANCE_KEY)==='ai'?'ai':'manual';}catch(e){return 'manual';} }
   };
   root.RyAiPlan = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
@@ -335,6 +360,8 @@
 
   /* ---------- 5. 面板 UI（左侧栏内联折叠，风格对齐「手动地形高程」） ---------- */
   var doc = root.document, panel, openBtn, store = { req: '', remark: '', risks: [] };
+  /* [v277] 标题栏提示语：折叠态会临时换成「点击展开…」，故原文抽成常量，收起/展开两处共用一份。 */
+  var HEAD_TITLE = '拖动 = 移动面板 · 双击 = 回右上角默认位 · 单击 = 折叠/展开（收起后贴右缘成竖条）';
   try { var saved = JSON.parse(root.localStorage.getItem(STORE_KEY) || 'null'); if (saved && typeof saved === 'object') store = { req: saved.req || '', remark: saved.remark || '', risks: Array.isArray(saved.risks) ? saved.risks : [] }; } catch (e) { }
   function persist() { try { root.localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) { } }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -358,13 +385,106 @@
   /* [v253 2026-10-05 用户要求] 悬浮面板化——对齐三级页「图层控制」面板（#tlWsLayerPanel）同款属性：
      标题栏 拖动=移动 / 双击=回右上默认位 / 单击=折叠展开；↔ 手柄调宽 200~480px；
      位置/宽度 localStorage 记忆；fixed 定位跨页常驻（03/04/成组页都可用）。 */
-  var POS_KEY = 'runye_aiPanel_pos', W_KEY = 'runye_aiPanel_w';
+  var POS_KEY = 'runye_aiPanel_pos', W_KEY = 'runye_aiPanel_w', H_KEY = 'runye_aiPanel_h';
   var collapsed = false, manualPos = false;
+  /* [v258] 高度下限；hgMax()/topMin() 必须是**外层作用域**函数——
+     setCollapsed() 也会调它们，而 setCollapsed 定义在 buildPanel 之外（展开分支会命中）。
+     [v278 2026-10-06 用户要求] 顶端不得越过导航栏、底端不得越过状态栏：
+       · 顶 = 吸顶导航（.fn-nav，高 --fn-nav-h=36px + 1px 下边线）下沿 + EDGE_PAD；
+       · 底 = 状态栏（body.ry-tool .ry-statusbar：fixed、height:--ry-status-h=30px、1px 上边线）上沿 − EDGE_PAD；
+       · 可用高度由这两条推出 ⇒ 内容再长也只让 .ai-body 内部滚动，不再把面板顶出屏幕。
+     同款约束的既有先例：#ryCadSide{top:var(--fn-nav-h,36px);bottom:calc(var(--ry-status-h,30px) + 1px)}。 */
+  var HG_MIN = 160;
+  /* [v279 2026-10-06 用户要求] 展开态「顶端紧贴导航栏、底端紧贴状态栏」⇒ 顶底视觉间隙改 0：
+     顶 = 导航下沿（--fn-nav-h + 1px 下边线）、底 = 状态栏上沿（--ry-status-h + 1px 上边线）。
+     间隙 0 之后，拖动下界 = 状态栏上沿 − 面板高，正好等于 topMin() ⇒ 纵向被自然钉死在贴边位。 */
+  var EDGE_PAD = 0;
+  function navBottom() {
+    var n = doc.querySelector('.fn-nav');
+    if (n) { var r = n.getBoundingClientRect(); if (r.height > 0 && r.bottom > 0) return r.bottom; }
+    var h = 0; try { h = parseFloat(getComputedStyle(doc.documentElement).getPropertyValue('--fn-nav-h')) || 0; } catch (e) { }
+    return h > 0 ? h : 36;
+  }
+  /* [v278c] ★ 状态栏只有**真的 fixed** 时，它的 rect.top 才是「底部常驻栏的上沿」。
+     窄屏（实测 ≤900px）会摘掉 body.ry-tool ⇒ .ry-statusbar 变回 static、跑到文档末尾
+     （_p1/_dbg278_status.cjs 实测 900×600：position:static、rect.top=7045、height=26px、
+       --ry-status-h 为空）⇒ 拿它当底界会把面板撑到 2054px 高、底落到 2100（视口才 600），
+       而且「bottom ≤ 7045」这条断言**恒真**，等于没测。
+     ⇒ 不是 fixed 就没有「常驻状态栏」可避让，退化成「不越出视口」。 */
+  function statusTop() {
+    var vh = root.innerHeight || doc.documentElement.clientHeight || 800;
+    var el = doc.getElementById('ryStatusBar');
+    if (el) {
+      var pos = '';
+      try { pos = getComputedStyle(el).position || ''; } catch (e) { }
+      if (pos === 'fixed') {
+        var r = el.getBoundingClientRect();
+        if (r.height > 0 && r.top > 0) return r.top;
+      }
+    }
+    return vh - 1;                        /* 无常驻状态栏 ⇒ 以视口下沿为界 */
+  }
+  /* 顶的安全下限：只许在导航之下（拖动、位置记忆恢复、双击复位三处共用） */
+  function topMin() { return Math.round(navBottom() + EDGE_PAD); }
+  /* 当前顶位下面板还能有多高（底不许进状态栏） */
+  function hgMax() {
+    var top = (panel && panel.offsetTop) || topMin();
+    return Math.max(HG_MIN, Math.round(statusTop() - EDGE_PAD - top));
+  }
+  /* 把可用高度写进内联 max-height：height:auto（内容自适应）时也要兜住底部 ——
+     CSS 类里那条 max-height 是按「默认顶位」算的，兜不住「用户把面板往下拖过」的情形（顶越低、可用高度越小）。
+     折叠态是贴右缘的竖条、不参与这条约束 ⇒ 清掉内联值，交回 CSS 类。 */
+  function syncMaxH() {
+    if (!panel) return;
+    if (collapsed) { panel.style.maxHeight = ''; return; }
+    panel.style.maxHeight = hgMax() + 'px';
+  }
+  /* [v277] 折叠标签的水平落点：默认贴视口右缘（right:0，与「工具栏」折叠标签 .pp-rail-tab-float 同款）；
+     但二级右侧工具轨**展开**时，轨内按钮顶到视口右缘只剩 7px —— 贴 0 会压住按钮文字
+     （_p1/_v277_ai_fold_e2e.cjs 真渲染实测：横向侵入 21px、「垂直」按钮文字被压 8px；
+       而展开态面板侵入 0px ⇒ 「收起来反而比展开更碍事」，不能接受）。
+     故轨展开时量轨左缘、把标签让到轨外；轨宽可被用户拖（--pp-tool-w）⇒ 只能量不能写死。
+     ★ 必须用**布局宽度** tb.offsetWidth + 舞台右缘（两者都不含 transform）：工具轨展开带过渡
+       （transition ... transform .18s，折叠态 translateX(24px)），而类一变观察器就回调 ——
+       getBoundingClientRect 会量到过渡中间态，算出的让位量偏大 16px，标签反倒压住按钮（实测过）。 */
+  function foldRightPx() {
+    var st = doc.querySelector('#pipePlanSection .pp-stage');
+    var tb = doc.querySelector('#pipePlanSection #ppToolbar');
+    if (!st || !tb || st.classList.contains('pp-rail-off')) return 0;
+    var railW = tb.offsetWidth || 0;
+    var stR = st.getBoundingClientRect().right;
+    if (!(railW > 0) || !(stR > 0)) return 0;
+    return Math.max(0, Math.round((root.innerWidth || 0) - stR) + railW + 2);
+  }
+  /* 只在折叠态需要；写进面板自己的内联自定义属性，由 CSS 的 var(--ai-fold-right,0px) 取用 */
+  function syncFoldPos() {
+    if (!panel || !collapsed) return;
+    panel.style.setProperty('--ai-fold-right', foldRightPx() + 'px');
+  }
   function setCollapsed(c) {
     collapsed = !!c;
     if (!panel) return;
+    /* [v277 2026-10-06 用户要求] 折叠态 = 贴右缘的竖排标签条（样式见 runye-ai-plan.css .ai-folded）：
+       收起后不再是横在右上角的标题条，而是贴右缘写「AI灌溉方案规划」的窄条，点整条即展开。
+       只挂一个类，定位/尺寸/竖排全部交给 CSS（含 !important 压内联），展开态一切照旧。 */
+    panel.classList.toggle('ai-folded', collapsed);
+    syncFoldPos();
+    var hdr = panel.querySelector('[data-head]');
+    if (hdr) hdr.title = collapsed ? '点击展开「AI灌溉方案规划」面板' : HEAD_TITLE;
     var body = panel.querySelector('.ai-body'), caret = panel.querySelector('[data-caret]');
     if (body) body.style.display = collapsed ? 'none' : '';
+    /* [v258] 折叠态：高度交还内容（否则收起来仍撑着一个空高盒）。
+       [v279] 展开态也一律 auto：上贴导航、下贴状态栏（内联 top+bottom）自然拉伸，
+       高度记忆 H_KEY 不再参与（↕ 手柄已撤）——否则一条旧存档的高度会把面板拉离贴边位。 */
+    var vg = panel.querySelector('[data-grip-v]');
+    if (vg) vg.style.display = collapsed ? 'none' : '';
+    if (collapsed) {
+      panel.style.height = 'auto';
+    } else {
+      panel.style.height = 'auto';
+    }
+    /* [v278] 折叠态清掉内联 max-height（贴边竖条不参与顶/底约束），展开态按当前顶位重算 */
+    syncMaxH();
     if (caret) caret.textContent = collapsed ? '\u25b8' : '\u25be';
   }
   function refresh() {
@@ -394,6 +514,23 @@
     slot.querySelector('[data-ai="close"]').onclick = function () { slot.innerHTML = ''; setStatus(''); };
     setStatus('已生成导出文本（' + text.length + ' 字）：地块坐标 + 面积 + 地形 + 需求。');
   }
+  function preview(plan, expected){
+    var slot=panel.querySelector('[data-ai="slot"]');
+    var changes=FIELDS.filter(function(f){return ['pump_lift','terrain_dh','src_distance','tape_pressure'].indexOf(f.key)<0 && isNum(plan.design[f.key]);}).map(function(f){var n=el(f.ids[0]);return f.name+'：'+(n?n.value:'—')+' → '+plan.design[f.key]+' '+f.unit;});
+    slot.innerHTML='<div class="ai-block"><b>待应用方案</b><p>'+esc(changes.join('；'))+'</p><p>实测高程、水源距离、提升高度及入口压力保持原值。模型说明仅供参考；数值以工具复算为准。</p><label><input type="checkbox" data-ai="replace"> 确认按原规则重建管路（包含已有手工调整；应用后可撤销）</label><button type="button" data-ai="apply">应用并生成管路</button><button type="button" data-ai="discard">取消</button></div>';
+    slot.querySelector('[data-ai="discard"]').onclick=function(){slot.innerHTML='';setStatus('已取消，原规划未修改。');};
+    slot.querySelector('[data-ai="apply"]').onclick=function(){
+      if(expected!==fingerprint()){setStatus('地块或参数已改变，旧方案未应用，请重新生成。',true);return;}
+      if(!slot.querySelector('[data-ai="replace"]').checked){setStatus('请确认管路重建后再应用，原规划尚未修改。',true);return;}
+      var ap=apply(plan,{rebuild:true});if(!ap.ok){setStatus(ap.msg,true);return;}
+      try { root.localStorage.setItem(PROVENANCE_KEY, 'ai'); } catch (e) { }
+      store.remark='模型建议（未作工程复算）：'+(plan.remark||'');store.risks=(plan.risks||[]).concat(ap.warnings||[]);persist();renderRemark();
+      var r=ap.summary;setStatus('已按原规则生成并复算。'+(r?'主管 Ø'+r.mainOD+' mm；支管 Ø'+r.branchOD+' mm；分区 '+r.zones+'；泵扬程 '+r.pumpHead.toFixed(1)+' m。':''));
+      var applied=fingerprint();slot.innerHTML='<button type="button" data-ai="undo">撤销本次应用</button>';
+      slot.querySelector('[data-ai="undo"]').onclick=function(){if(fingerprint()!==applied){setStatus('应用后规划已有修改，为避免覆盖，请使用原页面的撤销操作。',true);return;}undoApply();slot.innerHTML='';setStatus('已恢复应用前的参数与管路。');};
+    };
+    setStatus('已取得候选方案，尚未修改规划；请检查参数后应用。');
+  }
   function doImport() {
     var slot = panel.querySelector('[data-ai="slot"]');
     slot.innerHTML = '<div class="ai-block"><div class="ai-block-head"><span>粘贴大模型返回的完整 JSON</span>' +
@@ -404,16 +541,7 @@
     slot.querySelector('[data-ai="confirm"]').onclick = function () {
       var res = parse(ta.value);
       if (!res.ok) { setStatus(res.msg, true); return; }
-      var ap = apply(res.plan);
-      if (!ap.ok) { setStatus(ap.msg, true); return; }
-      store.remark = res.plan.remark || '';
-      store.risks = (res.plan.risks || []).concat(ap.warnings || []);
-      persist(); renderRemark();
-      slot.innerHTML = '';
-      var s = ap.summary;
-      var cur = doc.querySelector('.ry-sec.ry-active');
-      var hint = (cur && cur.id !== 'pipePlanSection' && cur.id !== 'grPipeSection') ? '已写入参数，请切到「04 二级管路规划」查看图纸。' : '';
-      setStatus('已导入并渲染：' + ap.written.join('；') + (s ? '。计算结果：主管 Ø' + s.mainOD + ' mm、支管 Ø' + s.branchOD + ' mm、分区 ' + s.zones + '、水泵扬程 ' + (isNum(s.pumpHead) ? s.pumpHead.toFixed(1) : '—') + ' m。' : '。') + hint);
+      preview(res.plan, fingerprint());
     };
     ta.focus();
     setStatus('粘贴 JSON 后点「确认导入」；参数超出工程合理范围会拒绝渲染。');
@@ -427,6 +555,8 @@
     store.req = req; persist();
     var c = collect();
     if (!(c.area_m2 > 0)) { setStatus('尚未绘制地块：请先在画布上描绘地块边界并确认面积，再点在线生成。', true); return; }
+    if(!panel.querySelector('[data-ai=access]').value.trim()){setStatus('请先填写用户访问码，每个用户共5次。',true);return;}
+    var expected=fingerprint();
     var old = btn.textContent;
     btn.disabled = true; btn.textContent = '生成中…';
     setStatus('已提交云端：正在调用大模型推算方案，通常 10~40 秒，请勿重复点击。');
@@ -434,7 +564,7 @@
       user_id: uid(),
       polygon: c.poly, groups: c.groups, area: c.area_m2, mu: c.mu, slope: c.slope_percent,
       terrain_dh: c.terrain_dh, pump_lift: c.pump_lift, src_distance: c.src_distance, tape_pressure: c.tape_pressure,
-      cur: c.cur, user_text: req
+      terrain:c.terrain, conditions:c.conditions, cur: c.cur, user_text: req
     };
     postPlan(apiBase(), payload, 180000).then(function (data) {
       btn.disabled = false; btn.textContent = old;
@@ -444,19 +574,10 @@
       }
       var res = parse(typeof data.data === 'string' ? data.data : JSON.stringify(data.data));
       if (!res.ok) { setStatus('云端返回的方案校验未通过：' + res.msg, true); return; }
-      var ap;
-      try { ap = apply(res.plan); }
-      catch (e) { setStatus('方案写入图纸时出错：' + ((e && e.message) || e) + '。参数已记在面板里，可改用「导入JSON」重试。', true); return; }
-      if (!ap.ok) { setStatus(ap.msg, true); return; }
-      store.remark = res.plan.remark || '';
-      store.risks = (res.plan.risks || []).concat(ap.warnings || []);
-      persist(); renderRemark();
-      var s = ap.summary;
-      var left = (data && typeof data.quota_left === 'number')
-        ? ('；剩余 ' + data.quota_left + ' 次（测试期每人 5 次，云端记在内存、冷启动会重置）') : '';
-      setStatus('已在线生成并渲染：' + ap.written.join('；') +
-        (s ? '。计算结果：主管 Ø' + s.mainOD + ' mm、支管 Ø' + s.branchOD + ' mm、分区 ' + s.zones +
-          '、水泵扬程 ' + (isNum(s.pumpHead) ? s.pumpHead.toFixed(1) : '—') + ' m' : '') + left);
+      if(expected!==fingerprint()){setStatus('生成期间地块或参数发生变化，返回方案未写入当前地块。请重新生成。',true);return;}
+      preview(res.plan,expected);
+      if(typeof data.quota_left==='number')setStatus('已取得候选方案，尚未应用；本用户剩余 '+data.quota_left+' 次。');
+
     }).catch(function (err) {
       btn.disabled = false; btn.textContent = old;
       setStatus('连不上云端接口（' + ((err && err.message) || err) + '）。可改用「导出文本 → 本地 Python 脚本 → 导入 JSON」的离线流程。', true);
@@ -469,9 +590,9 @@
     panel.setAttribute('aria-label', 'AI灌溉方案规划');
     /* [v253] 定位/尺寸/投影内联（同 #tlWsLayerPanel 款）：fixed 挂 body 跨页常驻，
        默认视口右上（right:136px 避让二级页右侧固定工具列）；面板不再用 hidden（常驻可折叠）。 */
-    panel.style.cssText = 'position:fixed;top:8px;right:136px;z-index:9993;width:262px;max-height:70vh;overflow:auto;background:rgba(255,255,255,.97);border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 10px 28px rgba(15,23,42,.18)';
+    panel.style.cssText = 'position:fixed;top:calc(var(--fn-nav-h,36px) + 1px);right:136px;bottom:calc(var(--ry-status-h,30px) + 1px);z-index:9993;width:262px;background:rgba(255,255,255,.97);border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 10px 28px rgba(15,23,42,.18);display:flex;flex-direction:column;overflow:hidden';
     panel.innerHTML =
-      '<header data-head title="拖动 = 移动面板 · 双击 = 回右上角默认位 · 单击 = 折叠/展开">' +
+      '<header data-head title="' + HEAD_TITLE + '">' +
       '<h3 class="ai-title">AI灌溉方案规划</h3><span class="ai-tag">云端版</span>' +
       '<span class="ai-grip" data-grip title="左右拖动调节面板宽度（200~480px，自动记忆）">\u2194</span>' +
       '<span class="ai-caret" data-caret>\u25be</span></header>' +
@@ -486,17 +607,26 @@
       '<p class="ai-status" role="status" data-ai="status"></p>' +
       '<div class="ai-slot" data-ai="slot"></div>' +
       '<div class="ai-remark" data-ai="remark" hidden></div>' +
+      '<div class="ai-api"><label>访问码</label><input type="password" data-ai="access" autocomplete="off" placeholder="每用户5次，向作者领取"></div>' +
       '<div class="ai-api"><label>接口</label>' +
       '<input type="text" data-ai="api" spellcheck="false" placeholder="云端接口地址（默认官方，一般不用改）"></div>' +
       '<p class="ai-note">在线生成：网页把地块与需求发给云端函数，云端调大模型并把方案 JSON 发回来，网页不持密钥。' +
       '断网或次数用完时，可用「导出文本 → 本地脚本 → 导入JSON」的离线流程。</p>' +
       '</div>';
+    /* [v279 2026-10-06 用户要求] ↕ 高度手柄撤掉：展开态改为「上下贴满」（导航下沿 → 状态栏上沿），
+       高度由 内联 top + bottom 拉伸决定，用户不再拖定高度 ⇒ 手柄留在这里没有意义。
+       下方 `var vgrip = panel.querySelector('[data-grip-v]')` 与 `if (vgrip){…}` 整块随之成为死支，
+       但**保留原函数体 + 空值守卫**（本项目既有纪律：删元素保留函数体并加空值守卫，便于日后回退）。 */
     var head = panel.querySelector('[data-head]');
     /* 标题栏拖动 = 移动面板（>4px 判拖动；fixed 下 offsetParent=null → 以视口为界 clamp）；
        双击 = 回右上默认位；单击 = 折叠/展开（拖动后抑制误触）。同 #tlWsLayerPanel。 */
     var dragPid = null, dragStart = null, moved = false, suppressClick = false;
     head.addEventListener('pointerdown', function (e) {
       if (e.button !== 0) return;
+      /* [v277] 折叠态是贴右缘的竖条（定位由 CSS !important 接管）：此时拖动既看不出效果，
+         又会在 pointerup 把「竖条的坐标」写进 POS_KEY ⇒ 展开后面板落到视口外。故折叠态不启动拖动，
+         单击照旧走 click 分支展开（pointermove/pointerup 因 dragPid===null 全部提前返回，无副作用）。 */
+      if (collapsed) return;
       dragPid = e.pointerId; moved = false;
       dragStart = { x: e.clientX, y: e.clientY, l: panel.offsetLeft, t: panel.offsetTop };
       try { head.setPointerCapture(e.pointerId); } catch (err) { }
@@ -509,8 +639,10 @@
       var op = panel.offsetParent || doc.documentElement;
       var w = panel.offsetWidth || 262, h = panel.offsetHeight || 120;
       var L = Math.max(4, Math.min(dragStart.l + dx, (op.clientWidth || 1200) - w - 4));
-      var T = Math.max(4, Math.min(dragStart.t + dy, (op.clientHeight || 800) - h - 4));
+      /* [v278] 纵向：上不过导航、下不把底推进状态栏（顶的上界 = 状态栏上沿 − 面板高 − 间隙） */
+      var T = Math.max(topMin(), Math.min(dragStart.t + dy, Math.round(statusTop() - h - EDGE_PAD)));
       panel.style.left = L + 'px'; panel.style.top = T + 'px'; panel.style.right = 'auto';
+      syncMaxH();
     });
     function aiEndDrag(e) {
       if (dragPid === null || (e && e.pointerId !== dragPid)) return;
@@ -519,6 +651,7 @@
         manualPos = true;
         try { localStorage.setItem(POS_KEY, JSON.stringify({ x: panel.offsetLeft, y: panel.offsetTop })); } catch (err) { }
       }
+      syncMaxH();
     }
     head.addEventListener('pointerup', aiEndDrag);
     head.addEventListener('pointercancel', aiEndDrag);
@@ -527,8 +660,12 @@
       setCollapsed(!collapsed);
     });
     head.addEventListener('dblclick', function () {
-      manualPos = false; panel.style.left = 'auto'; panel.style.right = '136px'; panel.style.top = '8px';
+      manualPos = false; panel.style.left = 'auto'; panel.style.right = '136px'; panel.style.top = 'calc(var(--fn-nav-h,36px) + 1px)';
       try { localStorage.removeItem(POS_KEY); } catch (err) { }
+      /* [v258] 双击复位同时放开高度限制，回到内容自适应 */
+      panel.style.height = 'auto';
+      syncMaxH();
+      try { localStorage.removeItem(H_KEY); } catch (err) { }
     });
     /* ↔ 手柄调宽（同 #tlWsLayerPanelGrip）：右锚定拖左加宽 / 左锚定拖右加宽，200~480px + 记忆 */
     var grip = panel.querySelector('[data-grip]'), rPid = null, rStart = null;
@@ -553,6 +690,34 @@
       grip.addEventListener('pointerup', aiEndR);
       grip.addEventListener('pointercancel', aiEndR);
     }
+    /* [v258 2026-10-06 用户要求] ↕ 底部手柄调高（对齐宽度手柄做法）：
+       top 锚定 → 向下长高；上限 = 视口底留 40px（且不小于 200）；160px 起。
+       注意：panel 已去掉 max-height:70vh，改由本手柄 + 恢复时的 clamp 控制，否则拖不高。
+       上界函数 hgMax() 在外层作用域定义（setCollapsed 也要用），此处不再重复声明。 */
+    var hPid = null, hStart = null;
+    var vgrip = panel.querySelector('[data-grip-v]');
+    if (vgrip) {
+      vgrip.addEventListener('pointerdown', function (e) {
+        if (e.button !== 0) return;
+        hPid = e.pointerId;
+        hStart = { y: e.clientY, h: panel.offsetHeight };
+        try { vgrip.setPointerCapture(e.pointerId); } catch (err) { }
+        e.preventDefault(); e.stopPropagation();
+      });
+      vgrip.addEventListener('pointermove', function (e) {
+        if (hPid === null || e.pointerId !== hPid || !hStart) return;
+        var nh = hStart.h + (e.clientY - hStart.y);
+        panel.style.height = Math.max(HG_MIN, Math.min(hgMax(), nh)) + 'px';
+        e.preventDefault();
+      });
+      function aiEndH() {
+        if (hPid === null) return;
+        hPid = null;
+        try { localStorage.setItem(H_KEY, String(panel.offsetHeight)); } catch (err) { }
+      }
+      vgrip.addEventListener('pointerup', aiEndH);
+      vgrip.addEventListener('pointercancel', aiEndH);
+    }
     panel.querySelector('[data-ai="online"]').onclick = doOnline;
     panel.querySelector('[data-ai="export"]').onclick = doExport;
     panel.querySelector('[data-ai="import"]').onclick = doImport;
@@ -569,11 +734,27 @@
     doc.body.appendChild(panel);
     /* 恢复宽度/位置记忆（有位置存档=手动定位，默认右上不再自动对齐）；手机端默认折叠（同图层控制） */
     try { var sw = parseInt(localStorage.getItem(W_KEY), 10); if (isFinite(sw) && sw >= 200 && sw <= 480) panel.style.width = sw + 'px'; } catch (e) { }
+    /* [v258] 恢复高度记忆：按当前视口重新 clamp（换屏/缩窗后不越界） */
+    try {
+      var sh = parseInt(localStorage.getItem(H_KEY), 10);
+      if (isFinite(sh) && sh >= 160) panel.style.height = Math.max(HG_MIN, Math.min(sh, hgMax())) + 'px';
+    } catch (e) { }
+    /* 双击标题栏复位时高度一并回到自适应（下次拖动前不锁死） */
     try {
       var sp = JSON.parse(localStorage.getItem(POS_KEY) || 'null');
-      if (sp && isFinite(sp.x) && isFinite(sp.y)) { manualPos = true; panel.style.left = sp.x + 'px'; panel.style.top = sp.y + 'px'; panel.style.right = 'auto'; }
+      /* [v278] 存档里的顶位也要夹：老存档存过 top:8px（旧默认位）⇒ 不夹会照样压在导航上。
+         [v279] 夹取后必然落在 topMin() = 导航下沿（贴边）——纵向只剩左右可拖。 */
+      if (sp && isFinite(sp.x) && isFinite(sp.y)) { manualPos = true; panel.style.left = sp.x + 'px'; panel.style.right = 'auto'; panel.style.top = Math.max(topMin(), Math.min(sp.y, Math.round(statusTop() - HG_MIN - EDGE_PAD))) + 'px'; }
     } catch (e) { }
+    /* [v278] 位置定下来后再夹一次 max-height：顶越低，可用高度越小 */
+    syncMaxH();
     if (root.RyMobile && root.RyMobile.isActive()) setCollapsed(true);
+    /* [v277] 折叠标签落点的跟随：视口尺寸变、工具轨折叠态变、轨宽被拖都要重算 */
+    root.addEventListener('resize', function () { syncFoldPos(); syncMaxH(); });
+    try {
+      var stEl = doc.querySelector('#pipePlanSection .pp-stage');
+      if (stEl && root.MutationObserver) new root.MutationObserver(syncFoldPos).observe(stEl, { attributes: true, attributeFilter: ['class', 'style'] });
+    } catch (e) { }
     /* [v254 2026-10-05 用户要求] 只在二级管路页显示：读当前活动 section 的 id，非二级页隐藏面板。
        双保险：① MutationObserver 盯各 .ry-sec 的 class（覆盖任何切换路径）；
        ② 包装 window.ryShowSection 兜底（页签切换主入口，切换后异步同步一次）。

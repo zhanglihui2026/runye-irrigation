@@ -37,7 +37,11 @@
 .rt-warn,.rt-status{color:#b45309}
 .rt-status{font-size:11px}
 @media(max-width:420px){.rt-panel .rt-body{padding:6px}}
-/* [v246 2026-10-05 用户要求] 三级页（#tlPlanBar）/ 二级页（#ppPlanBar）「地形高程」按钮都挪到标题行：与「地块与灌溉参数」
+/* [v280 2026-10-06 用户要求] 二级页（#ppPlanBar）的「地形高差」按钮**不再**贴标题行右端：
+   它已下移，与「滴灌带压差改善」并排一行、各占一半（行容器 .ri-btn-row，见 runye-inverse-design.css；
+   建行/排序逻辑见 runye-terrain.js 的 planBtnRow()）。下面这条绝对定位规则现在只服务三级页；
+   二级页仅在行容器建不起来（没有 #ppPlanBar 等内容锚点）时用它兜底。
+   [v246 2026-10-05 用户要求] 三级页（#tlPlanBar）/ 二级页（#ppPlanBar）「地形高程」按钮都挪到标题行：与「地块与灌溉参数」
    （.pp-plan-bar::before 伪元素）同一行、右端对齐（截图红框位置）。
    参照 v225 .tl-target-v-row 先例：标题是伪元素塞不进 DOM，只能绝对定位——
    #tlPlanBar 建 relative 上下文 + 按钮贴标题行右端（top 实测与标题行垂直居中，

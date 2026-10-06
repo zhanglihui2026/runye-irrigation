@@ -96,6 +96,45 @@
   .ry-pin{background:transparent;border:none}
   /* 地图 */
   .map-wrap{flex:1;position:relative;min-width:0}
+  /* ===== [v283 2026-10-06] 「回传设计工具 / 保存地块」并入右侧「分区角度」悬浮面板**内部顶端**
+     （用户截图指定：放在这个面板里面、且在「当前设计地块」下拉之上）。
+     v282 曾让它们浮在地图左上角，本轮撤掉那个绝对定位容器 ⇒ 恢复为面板内正常流
+     （position:static），button 的 id 与 JS 绑定依然零改动。 */
+  .map-float-actions{display:flex;flex-direction:column;gap:5px}
+  .map-float-actions .mbtn{height:28px;padding:0 8px;font-size:12px;text-align:center;font-weight:700;
+    border:1px solid var(--g-600);background:#fff;color:var(--g-700);border-radius:4px}
+  .map-float-actions .mbtn:hover{background:var(--g-50);color:var(--g-700)}
+  .map-float-actions .mbtn-primary{background:var(--g-600);color:#fff}
+  .map-float-actions .mbtn-primary:hover{background:var(--g-700);color:#fff}
+  /* ===== [v282] 分区角度悬浮面板：形态仿手机端 runye-mobile-map-preview.html 的
+     .map-angle（↶＋1° / 角度输入 / ↷−1° 竖排）；默认靠地图区右侧，标题栏可拖动，位置记忆。 */
+  .ry-angle-panel{position:absolute;right:12px;top:96px;z-index:1150;width:150px;
+    background:rgba(255,255,255,.97);border:1px solid var(--g-600);border-radius:6px;
+    box-shadow:0 3px 12px rgba(15,23,42,.25);overflow:hidden;font-size:12px}
+  .ry-angle-head{display:flex;align-items:center;gap:6px;padding:5px 7px;background:var(--g-600);
+    color:#fff;cursor:move;user-select:none;touch-action:none;font-size:12px;font-weight:700;line-height:1.2}
+  .ry-angle-head .ah-t{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ry-angle-head .ah-fold{flex:none;width:20px;height:20px;border:0;background:transparent;color:#fff;
+    font:inherit;font-size:13px;line-height:1;cursor:pointer;padding:0}
+  .ry-angle-body{padding:7px;display:flex;flex-direction:column;gap:6px}
+  .ry-angle-panel.folded .ry-angle-body{display:none}
+  #mapPartitionTools select{width:100%;height:28px;font-size:11px;font-family:inherit;
+    border:1px solid var(--s-300);background:#fff;color:var(--s-700);padding:0 4px}
+  /* 竖排角度组：↶＋1° 上 / 角度输入中 / ↷−1° 下（与手机端 .map-angle 同形态） */
+  .map-angle-row{display:flex;flex-direction:column;gap:5px;align-items:stretch}
+  .map-angle-row .ang-btn{height:28px;display:flex;align-items:center;justify-content:center;gap:4px;
+    padding:0 6px;font:inherit;font-size:13px;border:1px solid var(--s-300);background:#fff;
+    color:var(--s-700);cursor:pointer}
+  .map-angle-row .ang-btn:hover{border-color:var(--g-600);color:var(--g-700);background:var(--g-50)}
+  .map-angle-row .ang-btn small{font-size:10px;font-weight:600}
+  .map-angle-value{display:flex;align-items:center;gap:3px;justify-content:center}
+  .map-angle-value input{width:100%;min-width:0;height:28px;text-align:center;font:inherit;font-size:13px;
+    font-weight:700;color:var(--g-700);border:1px solid var(--s-300);background:#fff}
+  .map-angle-value input:focus{outline:1px solid var(--g-600)}
+  .map-angle-value span{font-size:12px;color:var(--s-500);font-weight:600}
+  .ry-angle-panel .save-row{margin-top:0;display:flex;flex-direction:column;gap:5px}
+  .ry-angle-panel .save-row .mbtn{height:28px;font-size:11px;padding:0 4px;text-align:center}
+  .ry-angle-panel .hint{margin-top:2px;font-size:10px;line-height:1.35}
   #map{position:absolute;top:0;left:0;right:0;bottom:0;background:#dfe6e9}
   /* 操作提示条 */
   .tip{position:absolute;left:14px;bottom:14px;background:rgba(15,23,42,.82);color:#fff;padding:8px 14px;font-size:12px;z-index:1000;border-radius:var(--radius);max-width:60%}
@@ -129,7 +168,7 @@
    恢复原值：git show HEAD:runye-map-measure.html ===== */
 </style>
 <link rel="stylesheet" href="runye-theme.css">
-  <link rel="stylesheet" href="runye-nav.css?v=242">
+  <link rel="stylesheet" href="runye-nav.css?v=250">
 <link rel="stylesheet" href="runye-mobile.css?v=242">
 <script src="runye-mobile.js?v=242"></script>
 
@@ -153,10 +192,11 @@
   <nav class="fn-nav" aria-label="功能区导航">
     <div class="fn-inner" data-ry-fnnav data-base="index.html#"></div>
   </nav>
-  <script src="runye-nav.js?v=242"></script>
+  <script src="runye-nav.js?v=250"></script>
   <!-- [NEW MODULE: map-enhance] 实景叠加图层（2026-09-26）：删除下两行即卸载，不影响其他逻辑 -->
   <script src="runye-geo.js"></script>
   <script src="runye-map-enhance.js"></script>
+<script src="runye-map-partition.js?v=261"></script>
   <!-- [NEW MODULE: pipe_optim] 导航按钮与主页同源（2026-09-23 用户要求：三页导航一致） -->
   <script src="pipe_optim_ui.js"></script>
   <div class="main">
@@ -201,10 +241,6 @@
         <div class="row"><span class="k">顶点</span><span class="v"><span id="pts">0</span><small>个</small></span></div>
         <div class="hint">点击地图添加顶点；拖动顶点可微调；「完成并画下一块」会自动保存本块、清空画布并让你**接着画下一块**（可连画多块小地块）。画完点「🔗 地块成组」把它们编成一组便于一起操作（**各块的轮廓与块间空隙原样保留**，不会并成一块）。画完点「➕ 加点」，拖动框线上的 ⊕ 手柄（或贴着框线单击）即可继续增加标点，把地块贴得更准。面积按真实球面经纬度计算。</div>
         <div class="save-row">
-          <button class="mbtn mbtn-primary" id="btnCopy">↩ 回传设计工具</button>
-          <button class="mbtn mbtn-primary" id="btnSavePlot">💾 保存地块</button>
-        </div>
-        <div class="save-row">
           <button class="mbtn" id="btnGeoJSON">⬇ GeoJSON</button>
           <button class="mbtn" id="btnKML">⬇ KML</button>
         </div>
@@ -238,6 +274,76 @@
     <div class="side-grip" id="mapSideGrip" title="拖动调节工具栏宽度；双击恢复默认"></div>
     <div class="map-wrap">
       <div id="map"></div>
+      <!-- ===== [v282] 分区角度悬浮面板 =====
+           形态仿手机端 runye-mobile-map-preview.html 的 .map-angle：↶＋1° / 角度输入 / ↷−1° 竖排。
+           原「分区角度」那一节（id=mapPartitionTools）整体迁入（runye-map-partition.js 只按 id 取 box，
+           再用 querySelector 取内部 select / input / [role=status] / [data-angle-*]，
+           故「搬容器不改结构」= JS 逻辑零改动）。默认靠地图区右侧，标题栏可拖动，位置记忆。 -->
+      <div class="ry-angle-panel" id="ryAnglePanel">
+        <div class="ry-angle-head" id="ryAngleHead" title="按住这里可拖动面板">
+          <span class="ah-t">分区角度</span>
+          <button class="ah-fold" id="ryAngleFold" type="button" aria-label="折叠或展开分区角度面板" title="折叠/展开">▾</button>
+        </div>
+        <div class="ry-angle-body">
+          <!-- [v283 2026-10-06] 「↩ 回传设计工具」「💾 保存地块」：用户截图指定放在**本面板内部顶端**、
+               「当前设计地块」下拉之上（v282 曾浮在地图左上角）。button id 与 JS 绑定仍零改动。
+               ★ 必须留在 section#mapPartitionTools **之外** —— 该 section 是分区角度模块
+                 按 id 取的盒子，往里塞无关按钮会改变其 querySelector('input') 的落点语义。 -->
+          <div class="map-float-actions" id="mapFloatActions">
+            <button class="mbtn mbtn-primary" id="btnCopy">↩ 回传设计工具</button>
+            <button class="mbtn mbtn-primary" id="btnSavePlot">💾 保存地块</button>
+          </div>
+          <section id="mapPartitionTools">
+            <select aria-label="选择分区地块"></select>
+            <div class="map-angle-row">
+              <button class="ang-btn" type="button" data-angle-plus title="增加1°">↶<small>＋1°</small></button>
+              <div class="map-angle-value"><input aria-label="地图分区角度" type="number" min="-180" max="180" step="1" value="0"><span>°</span></div>
+              <button class="ang-btn" type="button" data-angle-minus title="减少1°">↷<small>－1°</small></button>
+            </div>
+            <div class="save-row"><button class="mbtn mbtn-primary" data-angle-apply>应用并重新划分</button><button class="mbtn" data-angle-send>回二级继续规划</button></div>
+            <p class="hint" role="status">只调整分区方向，地块边界不动。正角度从东向北旋转。</p>
+          </section>
+        </div>
+      </div>
+      <script>
+      /* [v282] 分区角度悬浮面板：拖动 + 折叠 + 位置记忆。
+         面板是 .map-wrap 的 absolute 子元素 ⇒ left/top 相对地图区定位，
+         clamp 在地图区内避免拖出视野；位置与折叠状态写 localStorage。 */
+      (function(){
+        var panel=document.getElementById('ryAnglePanel'),head=document.getElementById('ryAngleHead'),
+            fold=document.getElementById('ryAngleFold'),wrap=panel&&panel.parentNode;
+        if(!panel||!head||!fold||!wrap)return;
+        var KEY='ryAnglePanelPos',FOLD='ryAnglePanelFolded';
+        function place(l,t){
+          panel.style.right='auto';
+          var maxL=Math.max(0,wrap.clientWidth-panel.offsetWidth-4),
+              maxT=Math.max(0,wrap.clientHeight-panel.offsetHeight-4);
+          panel.style.left=Math.max(0,Math.min(l,maxL))+'px';
+          panel.style.top =Math.max(0,Math.min(t,maxT))+'px';
+        }
+        function save(){try{localStorage.setItem(KEY,JSON.stringify({l:panel.offsetLeft,t:panel.offsetTop}));}catch(e){}}
+        /* 默认位置：地图区右侧上部。仅无记忆时写入，绝不覆盖用户拖过的位置。 */
+        var saved=null;try{saved=JSON.parse(localStorage.getItem(KEY)||'null');}catch(e){}
+        if(saved&&typeof saved.l==='number'&&typeof saved.t==='number'){place(saved.l,saved.t);}
+        else{place(wrap.clientWidth-panel.offsetWidth-12,96);}
+        try{if(localStorage.getItem(FOLD)==='1'){panel.classList.add('folded');fold.textContent='▸';}}catch(e){}
+        var dragging=false,ox=0,oy=0;
+        head.addEventListener('pointerdown',function(e){
+          if(e.target===fold||fold.contains(e.target))return;
+          dragging=true;ox=e.clientX-panel.offsetLeft;oy=e.clientY-panel.offsetTop;
+          try{head.setPointerCapture(e.pointerId);}catch(err){}
+          e.preventDefault();
+        });
+        head.addEventListener('pointermove',function(e){if(dragging)place(e.clientX-ox,e.clientY-oy);});
+        function end(){if(!dragging)return;dragging=false;save();}
+        head.addEventListener('pointerup',end);head.addEventListener('pointercancel',end);
+        fold.addEventListener('click',function(){
+          var f=panel.classList.toggle('folded');fold.textContent=f?'▸':'▾';
+          try{localStorage.setItem(FOLD,f?'1':'0');}catch(e){}
+        });
+        window.addEventListener('resize',function(){place(panel.offsetLeft,panel.offsetTop);});
+      })();
+      </script>
       <div class="warn" id="warn">⚠️ 地图瓦片加载失败，请检查网络（本工具需要联网获取卫星影像）。</div>
       <div class="tip" id="tip">点击「✏️ 开始画框」后，在卫星图上依次点击地块边界顶点即可。</div>
     </div>
@@ -1100,6 +1206,7 @@
         payload.mu=+(sum/666.67).toFixed(2);
       }
     }
+    if(plot && plot.partitionPlan)payload.partitionPlan=JSON.parse(JSON.stringify(plot.partitionPlan));
     return payload;
   }
 
@@ -1110,7 +1217,7 @@
       localStorage.setItem('runyeMeasuredArea', JSON.stringify(payload));
       if(btnEl){ var old=btnEl.textContent; btnEl.textContent='回传中…';
         setTimeout(function(){ btnEl.textContent=old; }, 1200); }
-      setTimeout(function(){ window.location.href='index.html#'+(window.RyMobile && window.RyMobile.isActive() ? 'pipePlanSection' : 'areaTool'); }, 350);
+      setTimeout(function(){ window.location.href='index.html#'+'pipePlanSection'; }, 350);
     }catch(e){ alert('写入失败：'+e.message); }
   }
 
@@ -1256,8 +1363,11 @@
   function refreshPlotLibrary(){
     if(rymHandle && rymHandle.refresh) rymHandle.refresh();
     renderMyPlots();
+    if(partitionHandle)partitionHandle.refresh();
   }
 
+  window.RyMapHost={payload:buildPlotPayload,send:sendPlotToDesign,toDisplay:toDisplay,refresh:refreshPlotLibrary};
+  var partitionHandle=window.RyMapPartition && RyMapPartition.attach(map);
   // [map-enhance] 导出：把当前画框 + 地块库全部带坐标地块打包成 GeoJSON / KML
   function collectPlotsForExport(){
     var arr=[];
@@ -1361,8 +1471,8 @@
       var sd=document.createElement('button');
       sd.type='button'; sd.className='place-send'; sd.textContent='→';
       sd.title=p.merged
-        ? ('把「'+(p.name||'该成组地块')+'」回传到二级管路页：'+((p.subPlots||[]).length)+' 个子地块各自的环都会带过去，块间空隙保留')
-        : ('把「'+(p.name||'该地块')+'」回传到二级管路页');
+        ? ('把「'+(p.name||'该成组地块')+'」回传到地块分区页：'+((p.subPlots||[]).length)+' 个子地块各自的环都会带过去，块间空隙保留')
+        : ('把「'+(p.name||'该地块')+'」回传到地块分区页');
       sd.onclick=function(){
         if(p.mergedInto){ alert('这是已归入成组的子地块，请回传它所属的成组地块（🔗 那一条）。'); return; }
         sendPlotToDesign(p, this);

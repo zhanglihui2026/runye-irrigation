@@ -85,3 +85,8 @@ tests/*
 
 # 手动高程与压力校核回归
 !tests/terrain.test.cjs
+
+# AI方案与原子额度回归
+!tests/ai_online_guard.test.cjs
+!tests/ai_plan.test.cjs
+!tests/desktop_new_features.test.cjs

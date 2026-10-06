@@ -1,0 +1,36 @@
+/* [v273 2026-10-06 用户要求] ① 文字与「地形高差」标签同大（.pp-plan-label=11px）；
+   ③ 宽度布满工具栏列（width:100% + border-box，随左栏拖宽resizer 自动跟随）。
+   [v276 2026-10-06 用户要求] ② 底色改深绿 #116447（=卡片头「地形高差▾」chip 同色
+   var(--u-accent-2)，v273 的中绿渐变偏亮被否）；④ 文字水平居中（原 text-align:left）。 */
+.ri-entry{grid-column:1/-1;width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid #0d5039;border-radius:7px;color:#fff;background:#116447;cursor:pointer;text-align:center;font-size:11px;line-height:1.2;font-family:inherit}
+.ri-entry:hover{filter:brightness(1.08)}
+#ryInverseDialog{position:fixed;inset:0;margin:auto!important;width:min(720px,90vw);max-height:88vh;padding:0;border:1px solid #d4ded8;border-radius:12px;color:#263d31;background:#fff;font-size:14px}
+#ryInverseDialog::backdrop{background:#162d2380}
+#ryInverseDialog header{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid #dce6df}
+#ryInverseDialog .ri-body{padding:0 20px 20px;overflow:auto;max-height:calc(88vh - 66px)}
+#ryInverseDialog section{margin-top:16px;padding:14px;border:1px solid #dce6df;border-radius:8px}
+#ryInverseDialog h3{margin:0 0 10px;font-size:16px}
+#ryInverseDialog p{line-height:1.6;margin:10px 0}
+#ryInverseDialog label{display:flex;flex-direction:column;gap:6px;margin:10px 0}
+#ryInverseDialog input{padding:8px;width:100%;box-sizing:border-box;border:1px solid #becdc3;border-radius:5px;font-size:14px}
+#ryInverseDialog button{padding:8px 12px;border:1px solid #b6d5c3;border-radius:6px;background:#eff8f2;color:#17623e;cursor:pointer;font-size:14px}
+#ryInverseDialog button:disabled{opacity:.5;cursor:default}
+#ryInverseDialog .ri-fields{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+#ryInverseDialog .ri-option{margin:10px 0;padding:12px;background:#f5f8f6;border-radius:6px}
+#riMessage{color:#9c4a17}
+@media(max-width:760px){.ri-entry{display:none}}
+
+/* [v280 2026-10-06 用户要求] 「滴灌带压差改善 / 地形高程」并排一行、各占一半。
+   [v281 2026-10-06 用户要求] 这一条改成「一整条工具栏」：
+     · 上下尺寸缩小：min-height 24px（对齐同面板 .pp-plan-item input 的 24px 量级），padding 2px 6px；
+     · 左右满布：行 flex:1 1 100% + width:100% + box-sizing:border-box
+       ⇒ 与工具栏内容区等宽，随左栏拖宽（--pp-side-w）自动跟随；
+     · 两个按钮之间不留白：gap:0；改用 1px 浅色竖线（border-left）分隔；
+     · 圆角/描边挪到行容器上、按钮自身去边框 —— 否则相邻两条 1px 描边会叠成 2px 粗线，也做不出「满布」。 */
+.ri-btn-row{display:flex;align-items:stretch;gap:0;flex:1 1 100%;width:100%;box-sizing:border-box;margin:8px 0 4px;
+  border:1px solid #0d5039;border-radius:7px;overflow:hidden;grid-column:1/-1}
+.ri-btn-row>.ri-entry,.ri-btn-row>.rt-open{flex:1 1 0;width:auto;min-width:0;margin:0;padding:2px 6px;min-height:24px;
+  box-sizing:border-box;border:0;border-radius:0;text-align:center;font-family:inherit;font-size:11px;line-height:1.2;
+  color:#fff;background:#116447;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ri-btn-row>.rt-open{border-left:1px solid rgba(255,255,255,.45)}
+.ri-btn-row>.ri-entry:hover,.ri-btn-row>.rt-open:hover{background:#0d5038}

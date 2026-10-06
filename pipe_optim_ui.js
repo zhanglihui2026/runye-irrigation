@@ -60,7 +60,7 @@
     var out = { ok: false, reason: '', data: null, poly: [], flowModel: null, plot: null, source: null };
     var snap = (typeof global !== 'undefined') ? global.tlDiagramData : null;
     if (!snap) {
-      out.reason = '未检测到三级管线图数据（window.tlDiagramData 为空）。请先在「三级管路编辑」中生成三级管线平面图，再打开本分析。';
+      out.reason = '未检测到三级管线图数据（window.tlDiagramData 为空）。请先在「管路规划」中生成三级管线平面图，再打开本分析。';
       return out;
     }
     // —— 深拷贝：与原站对象完全独立，只读使用，绝不写回 ——
@@ -462,14 +462,20 @@
 
   /* ========================================================================
    * 11) 注入导航按钮（零侵入：不带 data-ry-navitem，原 render 不会清除）
+   *   [v247] 导航加了「更多 ▾」折叠组 ⇒ 本按钮追加进 .fn-more-panel（面板竖排），
+   *          找不到面板（旧缓存 runye-nav.js）才退回 .fn-inner。
    * ===================================================================== */
   function injectNavButton() {
-    var nav = document.querySelector('.fn-inner[data-ry-fnnav]') || document.querySelector('[data-ry-fnnav]');
+    var nav = (global.RyFnNav && typeof global.RyFnNav.getMorePanel === 'function' && global.RyFnNav.getMorePanel())
+      || document.querySelector('.fn-inner .fn-more-panel')
+      || document.querySelector('.fn-inner[data-ry-fnnav]')
+      || document.querySelector('[data-ry-fnnav]');
     if (!nav) return false;
+    var inPanel = nav.classList.contains('fn-more-panel');
     if (nav.querySelector('[data-ry-pipeoptim]')) return true; // 已注入
     var btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'fn-link';                 // 复用原导航皮肤
+    btn.className = 'fn-link' + (inPanel ? ' fn-more-item' : '');  // 复用原导航皮肤
     btn.setAttribute('data-ry-pipeoptim', '1'); // 关键：不带 data-ry-navitem
     btn.textContent = '管网优化详细分析';
     btn.title = '管网优化详细分析（Jaya 群智能 · 只读）';
