@@ -346,6 +346,7 @@
         spCount = lay.heads.length; spGroups = lay.groupCount;
       }
     }
+    var spLg = $('spLegend'); if (spLg) spLg.hidden = !spCount; /* 图例随叠加层显隐 */
     $('elevDotWrap').hidden = !state.elevations.some(function (r) { return r.data_type === 'rtk_xyz'; });
     /* 视图管理：几何数据变化（fit 改变）→ 重置全览；仅标签变化（单位切换）→ 保持用户缩放/平移 */
     var fitKey = vx.toFixed(1) + ',' + vy.toFixed(1) + ',' + vw.toFixed(1) + ',' + vh.toFixed(1);
@@ -675,6 +676,21 @@
     warnBox.innerHTML = res.warn.map(esc).join('<br>');
   }
 
+  /* 图例（v289b）：内容由 SP_COLORS 单一来源生成，避免与画布配色两处维护 */
+  function buildSpLegend() {
+    var lg = $('spLegend');
+    if (!lg) return;
+    var dots = SP_COLORS.map(function (c, i) {
+      return '<span class="tl-dot" style="background:' + c + '">' + (i + 1) + '</span>';
+    }).join('');
+    lg.innerHTML =
+      '<span class="tl-item"><span class="tl-swatch tl-plot"></span>地块边界</span>' +
+      '<span class="tl-item"><span class="tl-swatch tl-main"></span>干管</span>' +
+      '<span class="tl-item"><span class="tl-swatch tl-lat"></span>支管</span>' +
+      '<span class="tl-item"><span class="tl-swatch tl-range"></span>喷射范围（半径 R）</span>' +
+      '<span class="tl-item">喷头颜色 = 轮灌组' + dots + '<em>（第 9 组起颜色循环）</em></span>';
+  }
+
   function bindSprinkler() {
     try {
       var saved = JSON.parse(localStorage.getItem(SP_KEY) || 'null');
@@ -683,6 +699,7 @@
     $('spCalc').addEventListener('click', calcSprinkler);
     $('spReset').addEventListener('click', function () { spFill(SP_DEFAULTS); spSave(); calcSprinkler(); });
     $('spOverlay').addEventListener('change', drawCanvas); /* 切换喷灌布置叠加层 */
+    buildSpLegend();
     ['spCrop', 'spEtc', 'spEta', 'spSoil', 'spSlope', 'spRange', 'spFlow', 'spPressure', 'spLayout', 'spK', 'spHeads']
       .forEach(function (id) { $(id).addEventListener('change', function () { if (spCalculated) calcSprinkler(); }); });
   }
