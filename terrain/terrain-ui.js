@@ -352,6 +352,7 @@
             '"><title>' + esc('第 ' + h.g + ' 轮灌组 · 喷头 ' + (i + 1) + ' · R=' + lay.range_m + 'm') + '</title></circle>');
         });
         spCount = lay.heads.length; spGroups = lay.groupCount;
+        buildSpLegend(lay); /* 图例随布置结果刷新管径/流量 */
       }
     }
     var spLg = $('spLegend'); if (spLg) spLg.hidden = !spCount; /* 图例随叠加层显隐 */
@@ -752,16 +753,22 @@
   }
 
   /* 图例（v289b）：内容由 SP_COLORS 单一来源生成，避免与画布配色两处维护 */
-  function buildSpLegend() {
+  function buildSpLegend(lay) {
     var lg = $('spLegend');
     if (!lg) return;
     var dots = SP_COLORS.map(function (c, i) {
       return '<span class="tl-dot" style="background:' + c + '">' + (i + 1) + '</span>';
     }).join('');
+    /* 管径（v293）：有喷头流量参数时显示 Φ 与流量；无则退回纯线型说明 */
+    var mainTxt = '干管', latTxt = '支管';
+    if (lay && lay.ok && lay.mainDN && lay.latDN) {
+      mainTxt = '干管 Φ' + lay.mainDN.dn + '（' + lay.mainFlow.toFixed(1) + ' m³/h）';
+      latTxt = '支管 Φ' + lay.latDN.dn + '（' + lay.latFlow.toFixed(1) + ' m³/h）';
+    }
     lg.innerHTML =
       '<span class="tl-item"><span class="tl-swatch tl-plot"></span>地块边界</span>' +
-      '<span class="tl-item"><span class="tl-swatch tl-main"></span>干管</span>' +
-      '<span class="tl-item"><span class="tl-swatch tl-lat"></span>支管</span>' +
+      '<span class="tl-item"><span class="tl-swatch tl-main"></span>' + mainTxt + '</span>' +
+      '<span class="tl-item"><span class="tl-swatch tl-lat"></span>' + latTxt + '</span>' +
       '<span class="tl-item"><span class="tl-swatch tl-div"></span>轮灌组分区线</span>' +
       '<span class="tl-item"><span class="tl-swatch tl-range"></span>喷射范围（半径 R）</span>' +
       '<span class="tl-item">喷头颜色 = 轮灌组' + dots + '<em>（第 9 组起颜色循环）</em></span>';

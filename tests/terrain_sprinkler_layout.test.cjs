@@ -84,6 +84,19 @@ L2.zonePolys.forEach(z => {
 });
 ok(perOk, '每组面积 = 组内喷头数×S×row（含首末部分行组）');
 
+/* ---------- 5d. 管径初估（v293） ---------- */
+console.log('[5d] 管径');
+const d30 = core.pipeDN(30, 1.5);
+ok(d30 && Math.abs(d30.theory - 84.1) < 0.1 && d30.dn === 90, '干管 30 m³/h@1.5m/s → 理论 84.1mm → DN90（实际 ' + (d30 && d30.theory.toFixed(1)) + '→' + (d30 && d30.dn) + '）');
+const d10 = core.pipeDN(10, 1.5);
+ok(d10.dn === 50, '10 m³/h → 理论 48.6mm → DN50（向上贴标，注入「向下取」会变红）');
+ok(core.pipeDN(0, 1.5) === null && core.pipeDN(30, 0) === null, '反例：零流量/零流速 → null');
+const L2b = core.sprinklerLayout([{ poly: sq100 }], { range_m: 10, spacing_k: 1.1, layout: 'square', heads_per_shift: 12, flow_m3h: 2.5 });
+ok(L2b.mainDN && L2b.mainDN.dn === 90 && Math.abs(L2b.mainFlow - 30) < 1e-9, '布置图：干管流量 12×2.5=30 → Φ90');
+ok(L2b.latDN && Math.abs(L2b.latFlow - 22.5) < 1e-9 && L2b.latDN.dn === 90, '布置图：最不利支管 min(12,9)×2.5=22.5 m³/h → Φ90');
+const L2c = core.sprinklerLayout([{ poly: sq100 }], { range_m: 10, spacing_k: 1.1, layout: 'square' });
+ok(L2c.mainDN === null, '未填喷头流量 → 不出管径（图例不显示 Φ）');
+
 /* ---------- 6. 错误路径（注入缺陷必须命中） ---------- */
 console.log('[6] 错误路径');
 ok(core.sprinklerLayout([{ poly: sq100 }], { range_m: 0 }).ok === false, '反例：R=0 → 报错');

@@ -403,6 +403,18 @@
     return inside;
   }
 
+  /* 管径初估（v293）：经济流速法 d=sqrt(4Q/(3600πv))，向上贴标准 PE/PVC 公称径。
+     规划级估算——精确水力计算（沿程损失/多工况校核）属后续阶段。 */
+  var PIPE_DN = [32, 40, 50, 63, 75, 90, 110, 125, 140, 160, 180, 200, 225, 250, 280, 315];
+  function pipeDN(flowM3h, v) {
+    if (!(flowM3h > 0) || !(v > 0)) return null;
+    var dmm = 1000 * Math.sqrt(4 * flowM3h / (3600 * Math.PI * v));
+    for (var i = 0; i < PIPE_DN.length; i++) {
+      if (PIPE_DN[i] >= dmm) return { dn: PIPE_DN[i], theory: dmm, flow: flowM3h, v: v };
+    }
+    return { dn: PIPE_DN[PIPE_DN.length - 1], theory: dmm, flow: flowM3h, v: v, warn: '超过最大标准径 315' };
+  }
+
   function sprinklerLayout(plots, input) {
     input = input || {};
     var R = input.range_m, k = input.spacing_k;
@@ -543,10 +555,25 @@
       }
     }
 
+    /* 管径初估（v293）：干管=轮灌组流量（1.5 m/s）；支管=最不利单管流量
+       （轮灌组内同一支管最多同时工作喷头数 ≤ min(每组头数, 该行头数)，1.2 m/s） */
+    var mainDN = null, latDN = null, mainFlow = 0, latFlow = 0;
+    var qf = isNum(input.flow_m3h) ? input.flow_m3h : 0;
+    if (qf > 0 && heads.length) {
+      var nShift = Math.min(N, heads.length);
+      var maxRowHeads = 0;
+      rowsAgg.forEach(function (ra) { maxRowHeads = Math.max(maxRowHeads, ra.xs.length); });
+      mainFlow = nShift * qf;
+      latFlow = Math.min(nShift, maxRowHeads) * qf;
+      mainDN = pipeDN(mainFlow, 1.5);
+      latDN = pipeDN(latFlow, 1.2);
+    }
+
     return {
       ok: true, range_m: R, spacing: S, rowSpacing: row, layout: layout,
       heads: heads, groupCount: groupCount, headsPerShift: Math.min(N, heads.length),
-      laterals: laterals, mainline: mainline, dividers: dividers, zonePolys: zonePolys
+      laterals: laterals, mainline: mainline, dividers: dividers, zonePolys: zonePolys,
+      mainDN: mainDN, latDN: latDN, mainFlow: mainFlow, latFlow: latFlow
     };
   }
 
@@ -613,6 +640,7 @@
     sprinklerEstimate: sprinklerEstimate,
     pointInPolygon: pointInPolygon,
     sprinklerLayout: sprinklerLayout,
+    pipeDN: pipeDN,
     SOIL_INTENSITY: SOIL_INTENSITY,
     soilLabel: soilLabel,
     classifyElevFile: classifyElevFile,
