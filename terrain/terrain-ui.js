@@ -812,25 +812,44 @@
         rings.push({ ring: d.poly, name: d.name || '', sqm: d.sqm });
       }
       if (!rings.length) return;
-      var added = 0, bad = 0;
+      var added = 0, updated = 0, bad = 0;
       rings.forEach(function (r, i) {
         var c = D.lonlatToLocalMeters(r.ring);
         if (!c.ok) { bad++; return; }
         var base = r.name || d.name || '在线地图地块';
-        state.plots.push({
-          id: 'map_' + Date.now() + '_' + i,
-          name: base + (rings.length > 1 ? '#' + (added + 1) : ''),
-          poly: c.points.map(function (pt) { return { x: Math.round(pt.x * 100) / 100, y: Math.round(pt.y * 100) / 100 }; }),
-          level: null, source: '在线地图',
-          _mapSqm: isFinite(r.sqm) ? r.sqm : null
-        });
-        added++;
+        var name = base + (rings.length > 1 ? '#' + (added + updated + 1) : '');
+        var poly = c.points.map(function (pt) { return { x: Math.round(pt.x * 100) / 100, y: Math.round(pt.y * 100) / 100 }; });
+        var sqmNew = D.polygonAreaM2(poly);
+        /* 去重（v292）：已有同名在线地图地块且面积差 <1% → 原地更新几何，不重复新增。
+           否则同一块地每点一次「回传地形模块」就多一份副本，地块总数与总面积虚增。 */
+        var hit = -1;
+        for (var pi = 0; pi < state.plots.length; pi++) {
+          var p = state.plots[pi];
+          if (p.name !== name || !Array.isArray(p.poly) || p.poly.length < 3) continue;
+          var sqmOld = D.polygonAreaM2(p.poly);
+          if (sqmOld > 0 && sqmNew > 0 && Math.abs(sqmOld - sqmNew) / sqmNew < 0.01) { hit = pi; break; }
+        }
+        if (hit >= 0) {
+          state.plots[hit].poly = poly;
+          state.plots[hit]._mapSqm = isFinite(r.sqm) ? r.sqm : state.plots[hit]._mapSqm;
+          updated++;
+        } else {
+          state.plots.push({
+            id: 'map_' + Date.now() + '_' + i,
+            name: name,
+            poly: poly,
+            level: null, source: '在线地图',
+            _mapSqm: isFinite(r.sqm) ? r.sqm : null
+          });
+          added++;
+        }
       });
-      if (added) {
+      if (added || updated) {
         setUnit('mu'); /* 回传导入成功：面积显示默认切为亩（内部恒为平方米） */
         persistAndRender();
         banner('warn',
           '✓ 在线地图回传已导入 <b>' + added + '</b> 个地块（WGS-84 经纬度已按局部米制投影，面积已按<b>亩</b>显示）。' +
+          (updated ? '另有 <b>' + updated + '</b> 个同名地块已<b>原地更新</b>（未重复导入）。' : '') +
           '注意：<b>非 CGCS2000 平面坐标</b>——工程放样/水力计算前请以 CGCS2000 成果文件导入为准。' +
           (bad ? '另有 ' + bad + ' 个无效环已跳过。' : ''));
       }
