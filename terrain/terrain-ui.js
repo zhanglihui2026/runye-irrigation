@@ -337,6 +337,9 @@
         lay.laterals.forEach(function (l) {  /* 支管（沿行） */
           out.push('<polyline class="t-sp-lateral" points="' + l.pts.map(function (pt) { return pt.x.toFixed(1) + ',' + (flip - pt.y).toFixed(1); }).join(' ') + '"/>');
         });
+        lay.dividers.forEach(function (d) {  /* 轮灌组分区线（虚线） */
+          out.push('<polyline class="t-sp-divider" points="' + d.pts.map(function (pt) { return pt.x.toFixed(1) + ',' + (flip - pt.y).toFixed(1); }).join(' ') + '"/>');
+        });
         out.push('<polyline class="t-sp-main" points="' + lay.mainline.pts.map(function (pt) { return pt.x.toFixed(1) + ',' + (flip - pt.y).toFixed(1); }).join(' ') + '"/>');  /* 干管 */
         lay.heads.forEach(function (h, i) {  /* 喷头：颜色 = 轮灌组 */
           out.push('<circle class="t-sp-head" fill="' + SP_COLORS[(h.g - 1) % SP_COLORS.length] +
@@ -687,6 +690,7 @@
       '<span class="tl-item"><span class="tl-swatch tl-plot"></span>地块边界</span>' +
       '<span class="tl-item"><span class="tl-swatch tl-main"></span>干管</span>' +
       '<span class="tl-item"><span class="tl-swatch tl-lat"></span>支管</span>' +
+      '<span class="tl-item"><span class="tl-swatch tl-div"></span>轮灌组分区线</span>' +
       '<span class="tl-item"><span class="tl-swatch tl-range"></span>喷射范围（半径 R）</span>' +
       '<span class="tl-item">喷头颜色 = 轮灌组' + dots + '<em>（第 9 组起颜色循环）</em></span>';
   }

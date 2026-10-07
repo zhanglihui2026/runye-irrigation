@@ -64,6 +64,14 @@ ok(L2.laterals.every(l => Math.abs(l.pts[0].y - l.pts[1].y) < 1e-9), '支管水�
 ok(Math.abs(L2.mainline.pts[0].x - L2.mainline.pts[1].x) < 1e-9, '干管竖直（两端 x 相同）');
 ok(Math.abs(L2.mainline.pts[0].y - Math.max(...ys2)) < 1e-6 && Math.abs(L2.mainline.pts[1].y - Math.min(...ys2)) < 1e-6, '干管纵跨首末行');
 
+/* ---------- 5b. 轮灌组分区线（v289c） ---------- */
+console.log('[5b] 分区线');
+ok(L2.dividers.length === L2.groupCount - 1, '分区线恰 = 组数-1（' + L2.dividers.length + ' 条，注入「漏画/多画」会变红）');
+ok(L2.dividers.every(d => Math.abs(d.pts[0].x - d.pts[1].x) < 1e-9 || Math.abs(d.pts[0].y - d.pts[1].y) < 1e-9), '每条分区线为水平或垂直的直段');
+const vCount = L2.dividers.filter(d => Math.abs(d.pts[0].x - d.pts[1].x) < 1e-9).length;
+const hCount = L2.dividers.filter(d => Math.abs(d.pts[0].y - d.pts[1].y) < 1e-9).length;
+ok(vCount === 4 && hCount === 2, '81头/每组12：精确 4 竖 + 2 横（实际 ' + vCount + '+' + hCount + '）');
+
 /* ---------- 6. 错误路径（注入缺陷必须命中） ---------- */
 console.log('[6] 错误路径');
 ok(core.sprinklerLayout([{ poly: sq100 }], { range_m: 0 }).ok === false, '反例：R=0 → 报错');

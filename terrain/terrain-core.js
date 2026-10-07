@@ -478,10 +478,34 @@
     var yTop = rowsAgg[0].y, yBot = rowsAgg[rowsAgg.length - 1].y;
     var mainline = { pts: [{ x: cx, y: yTop }, { x: cx, y: yBot }] };
 
+    /* 分区线（v289c）：相邻喷头组号变化处画分隔线——
+       同行内切换 = 竖线（跨该行行带宽）；换行处切换 = 横线（跨两行的横向范围）。
+       恰好 groupCount-1 条，与轮灌组一一对应。 */
+    function rowExtentOf(y) {
+      for (var i = 0; i < rowsAgg.length; i++) {
+        if (Math.abs(rowsAgg[i].y - y) <= row / 2)
+          return { minX: Math.min.apply(null, rowsAgg[i].xs), maxX: Math.max.apply(null, rowsAgg[i].xs) };
+      }
+      return null;
+    }
+    var dividers = [];
+    for (var di = 1; di < heads.length; di++) {
+      if (heads[di].g === heads[di - 1].g) continue;
+      var h1 = heads[di - 1], h2 = heads[di];
+      if (Math.abs(h1.y - h2.y) <= row / 2) {
+        var vx = (h1.x + h2.x) / 2;
+        dividers.push({ pts: [{ x: vx, y: h1.y - row / 2 }, { x: vx, y: h1.y + row / 2 }] });
+      } else {
+        var e1 = rowExtentOf(h1.y), e2 = rowExtentOf(h2.y);
+        var my = (h1.y + h2.y) / 2;
+        dividers.push({ pts: [{ x: Math.min(e1.minX, e2.minX), y: my }, { x: Math.max(e1.maxX, e2.maxX), y: my }] });
+      }
+    }
+
     return {
       ok: true, range_m: R, spacing: S, rowSpacing: row, layout: layout,
       heads: heads, groupCount: groupCount, headsPerShift: Math.min(N, heads.length),
-      laterals: laterals, mainline: mainline
+      laterals: laterals, mainline: mainline, dividers: dividers
     };
   }
 
