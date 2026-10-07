@@ -295,6 +295,31 @@ body.t-col-resizing .t-stage{pointer-events:none}   /* 拖拽中不让画布吃�
 .t-sp-legend .tl-dot{display:inline-flex;width:14px;height:14px;border-radius:50%;color:#fff;font-size:9.5px;align-items:center;justify-content:center;border:1px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.08);margin-left:2px}
 .t-elev-dot.small{fill:#e59a90;opacity:.55}
 
+/* —— 水流走向 + 扩散动画（v298c）：仅演示态 #tCanvas.t-demo-on 生效 ——
+   叙事时序（每组 2.2s）：干管水流常流 → 支管水流点亮（.0s）
+   → 喷头弹出（.18s）→ 喷射圆从喷头扩散弹出 + 涟漪波纹（.22s） */
+@keyframes tDashFlowMain{to{stroke-dashoffset:-76}}   /* 周期 19px×4 无缝循环 */
+@keyframes tDashFlowLat{to{stroke-dashoffset:-56}}    /* 周期 14px×4 无缝循环 */
+@keyframes tSpread{from{transform:scale(.2)}to{transform:scale(1)}}
+@keyframes tHeadPop{from{transform:scale(.3)}to{transform:scale(1)}}
+@keyframes tRipple{from{transform:scale(.22);opacity:.55}to{transform:scale(1.12);opacity:0}}
+/* 水流叠加线：默认全隐；管体实线不动，蓝色水流虚线沿管线流动 */
+.t-sp-mainflow,.t-sp-latflow{fill:none;stroke:#38bdf8;stroke-linecap:round;pointer-events:none;opacity:0;transition:opacity .25s}
+.t-sp-mainflow{stroke-width:1.6}
+.t-sp-latflow{stroke-width:1.1}
+#tCanvas.t-demo-on .t-sp-mainflow{opacity:1;stroke-dasharray:12 7;animation:tDashFlowMain 1.1s linear infinite}
+#tCanvas.t-demo-on .t-sp-latflow.t-sp-flow-on{opacity:.95;stroke-dasharray:8 6;animation:tDashFlowLat .9s linear infinite}
+/* 喷射圆扩散弹出：scale 基准 = 圆自身包围盒中心（fill-box） */
+.t-sp-circle,.t-sp-head{transform-box:fill-box;transform-origin:center}
+.t-sp-circle.t-sp-active{animation:tSpread .6s ease-out .22s both}
+.t-sp-head.t-sp-active{animation:tHeadPop .35s ease-out .18s both}
+/* 涟漪波纹：JS 按激活组喷头动态注入，扩散淡出后自移除 */
+.t-sp-ripple{fill:none;stroke-width:1.5;vector-effect:non-scaling-stroke;pointer-events:none;transform-box:fill-box;transform-origin:center;animation:tRipple 1.05s ease-out .22s both}
+@media(prefers-reduced-motion:reduce){
+  #tCanvas.t-demo-on .t-sp-mainflow,#tCanvas.t-demo-on .t-sp-latflow.t-sp-flow-on{animation:none}
+  .t-sp-circle.t-sp-active,.t-sp-head.t-sp-active,.t-sp-ripple{animation:none}
+}
+
 /* 底栏（旧版遗留：回传/清空已移入左栏「地块清单」卡，本段仅防御性保留） */
 .t-foot { display: flex; gap: 10px; padding: 10px 16px 20px; align-items: center; }
 .t-foot .t-hint { font-size: 11px; color: var(--u-ink-3); }

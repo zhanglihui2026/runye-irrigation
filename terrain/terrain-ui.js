@@ -358,9 +358,17 @@
           out.push('<circle class="t-sp-circle" data-g="' + h.g + '" fill="' + cc + '" stroke="' + cc + '" cx="' + h.x.toFixed(1) + '" cy="' + (flip - h.y).toFixed(1) + '" r="' + lay.range_m.toFixed(1) + '"/>');
         });
         lay.laterals.forEach(function (l) {  /* 支管（沿行） */
-          out.push('<polyline class="t-sp-lateral" points="' + l.pts.map(function (pt) { return pt.x.toFixed(1) + ',' + (flip - pt.y).toFixed(1); }).join(' ') + '"/>');
+          var latPts = l.pts.map(function (pt) { return pt.x.toFixed(1) + ',' + (flip - pt.y).toFixed(1); }).join(' ');
+          out.push('<polyline class="t-sp-lateral" points="' + latPts + '"/>');
+          /* 水流走向叠加线（v298c）：data-gs = 该行包含的轮灌组集合（行内可跨组），
+             演示态下激活组命中该行时点亮流动虚线（干管→支管→喷头的水到达叙事） */
+          var gs = {};
+          lay.heads.forEach(function (h) { if (Math.abs(h.y - l.pts[0].y) < 0.01) gs[h.g] = 1; });
+          out.push('<polyline class="t-sp-latflow" data-gs="' + Object.keys(gs).join(',') + '" points="' + latPts + '"/>');
         });
-        out.push('<polyline class="t-sp-main" points="' + lay.mainline.pts.map(function (pt) { return pt.x.toFixed(1) + ',' + (flip - pt.y).toFixed(1); }).join(' ') + '"/>');  /* 干管 */
+        var mainPts = lay.mainline.pts.map(function (pt) { return pt.x.toFixed(1) + ',' + (flip - pt.y).toFixed(1); }).join(' ');
+        out.push('<polyline class="t-sp-main" points="' + mainPts + '"/>');  /* 干管 */
+        out.push('<polyline class="t-sp-mainflow" points="' + mainPts + '"/>');  /* 干管水流叠加线（v298c）：演示态常流 */
         lay.heads.forEach(function (h, i) {  /* 喷头：颜色 = 轮灌组 */
           out.push('<circle class="t-sp-head" data-g="' + h.g + '" fill="' + SP_COLORS[(h.g - 1) % SP_COLORS.length] +
             '" cx="' + h.x.toFixed(1) + '" cy="' + (flip - h.y).toFixed(1) + '" r="' + (vh * 0.005).toFixed(2) +
@@ -718,22 +726,47 @@
     warnBox.innerHTML = res.warn.map(esc).join('<br>');
   }
 
-  /* 轮灌演示（v290）：分组依次点亮——当前组满亮、其余压暗；再点停止并清空高亮 */
+  /* 轮灌演示（v290）：分组依次点亮——当前组满亮、其余压暗；再点停止并清空高亮。
+     v298c 水流叙事：演示态 #tCanvas.t-demo-on 下干管水流线常流；
+     激活组所在行的支管水流线点亮（水沿干管→支管到达）；喷头弹出、
+     喷射圆从喷头扩散弹出并叠加涟漪波纹（水洒开）。 */
   var spDemoTimer = null, spDemoStep = 0;
   function applySpDemo() {
     var svg = $('tCanvas');
+    svg.classList.add('t-demo-on');
+    svg.querySelectorAll('.t-sp-ripple').forEach(function (el) { el.remove(); });  /* 上一组涟漪清理（不依赖 animationend） */
     svg.querySelectorAll('[data-g]').forEach(function (el) {
       var on = +el.getAttribute('data-g') === spDemoStep;
       el.classList.toggle('t-sp-active', on);
       el.classList.toggle('t-sp-dim', !on);
     });
+    svg.querySelectorAll('.t-sp-latflow').forEach(function (el) {
+      var gs = ',' + (el.getAttribute('data-gs') || '') + ',';
+      el.classList.toggle('t-sp-flow-on', gs.indexOf(',' + spDemoStep + ',') >= 0);
+    });
+    /* 涟漪波纹：激活组每个喷头一个扩散环（组色描边，扩散淡出） */
+    var cc = SP_COLORS[(spDemoStep - 1) % SP_COLORS.length];
+    svg.querySelectorAll('.t-sp-circle[data-g="' + spDemoStep + '"]').forEach(function (c) {
+      var rp = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      rp.setAttribute('class', 't-sp-ripple');
+      rp.setAttribute('cx', c.getAttribute('cx'));
+      rp.setAttribute('cy', c.getAttribute('cy'));
+      rp.setAttribute('r', c.getAttribute('r'));
+      rp.setAttribute('stroke', cc);
+      rp.addEventListener('animationend', function () { if (rp.parentNode) rp.parentNode.removeChild(rp); });
+      svg.appendChild(rp);
+    });
   }
   function stopSpDemo() {
     if (spDemoTimer) { clearInterval(spDemoTimer); spDemoTimer = null; }
     var btn = $('spDemo'); if (btn) btn.textContent = '\u25B6 \u8f6e\u704c\u6f14\u793a';
-    $('tCanvas').querySelectorAll('.t-sp-active, .t-sp-dim').forEach(function (el) {
+    var svg = $('tCanvas');
+    svg.classList.remove('t-demo-on');
+    svg.querySelectorAll('.t-sp-active, .t-sp-dim').forEach(function (el) {
       el.classList.remove('t-sp-active'); el.classList.remove('t-sp-dim');
     });
+    svg.querySelectorAll('.t-sp-latflow.t-sp-flow-on').forEach(function (el) { el.classList.remove('t-sp-flow-on'); });
+    svg.querySelectorAll('.t-sp-ripple').forEach(function (el) { el.remove(); });
   }
   function spDemoTick() {
     var gs = {};  /* 分区多边形已隐藏，组数按画布上 data-g 去重统计 */
