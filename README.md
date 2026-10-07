@@ -9,7 +9,7 @@
 | `index.html` | 润野灌溉设计工具主程序（精准灌溉 / 实际方案 / 面积测量 / 管路规划 / 材料清单），并承载「数字农业」导航入口 |
 | `irrigation-bridge.js` | 灌溉 ↔ 数字农业最小桥接层（协议 v1，key `runye_digital_bridge_v1`） |
 | `runye-landing.html` | 导航门户页 |
-| `runye-map-measure.html` | 在线地图面积测量（Leaflet + 高德卫星瓦片，支持在卫星图上画框实测亩数并回传设计工具） |
+| `runye-map-measure.html` | 在线地图面积测量（Leaflet + 高德卫星瓦片，支持在卫星图上画框实测亩数并回传地块绘制） |
 | `runye-irrigation-illustrated-manual.html` | 使用说明 |
 | `二级系统图.html` | 二级管路系统图（接收主程序计算结果） |
 | `三级系统图.html` | 三级管路系统图（接收主程序计算结果） |

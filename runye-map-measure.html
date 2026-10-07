@@ -79,7 +79,7 @@
   .place-del{flex:none;width:26px;height:26px;border:1px solid var(--s-300);background:#fff;color:var(--s-500);
     font:inherit;font-size:13px;line-height:1;cursor:pointer}
   .place-del:hover{border-color:#dc2626;color:#dc2626;background:#fef2f2}
-  /* [v191 2026-10-03] 「→ 回传二级管路」按钮：把**这条地块记录**（含成组地块）传给设计工具 */
+  /* [v191 2026-10-03] 「→ 回传二级管路」按钮：把**这条地块记录**（含成组地块）传给地块绘制 */
   .place-send{flex:none;width:30px;height:26px;border:1px solid var(--g-600);background:var(--g-50);color:var(--g-700);
     font:inherit;font-size:13px;line-height:1;cursor:pointer;border-radius:3px}
   .place-send:hover{background:var(--g-600);color:#fff}
@@ -95,7 +95,7 @@
   .ry-pin{background:transparent;border:none}
   /* 地图 */
   .map-wrap{flex:1;position:relative;min-width:0}
-  /* ===== [v283 2026-10-06] 「回传设计工具 / 保存地块」并入右侧「分区角度」悬浮面板**内部顶端**
+  /* ===== [v283 2026-10-06] 「回传地块绘制 / 保存地块」并入右侧「分区角度」悬浮面板**内部顶端**
      （用户截图指定：放在这个面板里面、且在「当前设计地块」下拉之上）。
      v282 曾让它们浮在地图左上角，本轮撤掉那个绝对定位容器 ⇒ 恢复为面板内正常流
      （position:static），button 的 id 与 JS 绑定依然零改动。 */
@@ -255,7 +255,7 @@
         <div class="hint" id="myPlotHint">保存/导入后的地块列在这里；点击飞到该地块，×删除。</div>
         <!-- [v185/v189 2026-10-03] 多地块成组：勾选若干相邻小地块 → 编为一组便于一起操作。
              ★ 语义：只成组、不改几何；各块轮廓与块间道路/间隔/水渠/空地**原样保留**。
-             成组后可直接「回传设计工具」把**各子地块**（而不是合并后的大块）
+             成组后可直接「回传地块绘制」把**各子地块**（而不是合并后的大块）
              传给二级管路页面；各子地块可分别布管，再用总管互连。 -->
         <div class="save-row">
           <button class="mbtn" id="btnMerge">🔗 地块成组</button>
@@ -284,12 +284,12 @@
           <button class="ah-fold" id="ryAngleFold" type="button" aria-label="折叠或展开分区角度面板" title="折叠/展开">▾</button>
         </div>
         <div class="ry-angle-body">
-          <!-- [v283 2026-10-06] 「↩ 回传设计工具」「💾 保存地块」：用户截图指定放在**本面板内部顶端**、
+          <!-- [v283 2026-10-06] 「↩ 回传地块绘制」「💾 保存地块」：用户截图指定放在**本面板内部顶端**、
                「当前设计地块」下拉之上（v282 曾浮在地图左上角）。button id 与 JS 绑定仍零改动。
                ★ 必须留在 section#mapPartitionTools **之外** —— 该 section 是分区角度模块
                  按 id 取的盒子，往里塞无关按钮会改变其 querySelector('input') 的落点语义。 -->
           <div class="map-float-actions" id="mapFloatActions">
-            <button class="mbtn mbtn-primary" id="btnCopy">回传设计工具</button>
+            <button class="mbtn mbtn-primary" id="btnCopy">回传地块绘制</button>
             <!-- [NEW MODULE: 地形模块 v286d] 回传地形模块：卸载=删除本行 + sendPlotToTerrain/btnCopyTerrain 那两段 JS -->
             <button class="mbtn" id="btnCopyTerrain">回传地形模块</button>
             <button class="mbtn mbtn-primary" id="btnSavePlot">💾 保存地块</button>
@@ -1159,7 +1159,7 @@
   };
   renderPlaces();
 
-  /* ===== [v191 2026-10-03] 回传设计工具：改成「显式指定地块」，不再只认 currentMapPlotId =====
+  /* ===== [v191 2026-10-03] 回传地块绘制：改成「显式指定地块」，不再只认 currentMapPlotId =====
    * ★ 真因（用户「还是不行」）：原实现里
    *     pid = currentMapPlotId || ('pm'+Date.now())
    *   而 currentMapPlotId **只在「保存地块」时赋值**、「完成」后还会被置回 null；
@@ -1211,7 +1211,7 @@
   }
 
   /* ===== [NEW MODULE: 地形模块 v286d 2026-10-07] 「⛰️ 回传地形模块」 =====
-     与「回传设计工具」同一道理：复用 buildPlotPayload 取当前地块（显式地块→最新入库→草稿），
+     与「回传地块绘制」同一道理：复用 buildPlotPayload 取当前地块（显式地块→最新入库→草稿），
      但写入地形模块契约 runye_terrain_incoming 并跳转 terrain/index.html。
      坐标口径：payload.poly/subPlots 为 WGS-84 经纬度环，由地形模块做局部米制投影后导入；
      面积 sqm 沿用地图实测（geodesicArea），随 payload 一并带给地形模块备查。
@@ -1252,7 +1252,7 @@
     }catch(e){ alert('写入失败：'+e.message); }
   }
 
-  // 回传设计工具：写入 localStorage，并跳转到 index.html 的面积测量工具（03 面积测量工具）
+  // 回传地块绘制：写入 localStorage，并跳转到 index.html 的面积测量工具（03 面积测量工具）
   document.getElementById('btnCopy').onclick=function(){
     /* 已保存的地块（含成组）：直接按库里那条记录回传，环/面积/子地块都以记录为准 */
     try{
