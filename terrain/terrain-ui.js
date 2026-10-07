@@ -363,6 +363,74 @@
     }
   }
 
+  /* ---------------- 左栏宽度拖拽（复刻主页 .pp-grip 行为） ----------------
+     拖动改写 --t-side-w；localStorage 记忆（越界夹回）；双击恢复默认。
+     rAF 节流派发 resize，画布 SVG preserveAspectRatio 自适应，无需重算。 */
+
+  var GRIP_KEY = 'runye_terrain_grip_w';
+  var GRIP_MIN = 220, GRIP_MAX = 520, CANVAS_MIN = 360;
+
+  function gripClamp(px, maxPx) { return Math.max(GRIP_MIN, Math.min(GRIP_MAX, px, maxPx)); }
+  function gripMax() {
+    var body = document.querySelector('.t-body');
+    return Math.max(GRIP_MIN, Math.min(GRIP_MAX, (body ? body.clientWidth : 1200) - 28 - 10 - CANVAS_MIN));
+  }
+  function gripApply(px) {
+    var body = document.querySelector('.t-body');
+    if (body) body.style.setProperty('--t-side-w', px + 'px');
+  }
+  function initGrip() {
+    var grip = $('tGrip'), side = document.querySelector('.t-side');
+    if (!grip || !side) return;
+    /* 恢复上次宽度（越界夹回） */
+    try {
+      var saved = parseInt(localStorage.getItem(GRIP_KEY), 10);
+      if (Number.isFinite(saved)) gripApply(gripClamp(saved, gripMax()));
+    } catch (e) { /* 无痕模式等忽略 */ }
+
+    var EV = window.PointerEvent
+      ? { down: 'pointerdown', move: 'pointermove', up: 'pointerup', cancel: 'pointercancel' }
+      : { down: 'mousedown', move: 'mousemove', up: 'mouseup', cancel: 'blur' };
+    var drag = null, pend = false;
+    function refit() {
+      if (pend) return; pend = true;
+      var run = function () { pend = false; try { window.dispatchEvent(new Event('resize')); } catch (e) {} };
+      if (window.requestAnimationFrame) window.requestAnimationFrame(run); else setTimeout(run, 16);
+    }
+    grip.addEventListener(EV.down, function (e) {
+      if (e.button != null && e.button !== 0) return;
+      drag = { x: e.clientX, w: side.getBoundingClientRect().width };
+      grip.classList.add('dragging');
+      document.body.classList.add('t-col-resizing');
+      if (e.preventDefault) e.preventDefault();
+    });
+    document.addEventListener(EV.move, function (e) {
+      if (!drag) return;
+      gripApply(gripClamp(drag.w + (e.clientX - drag.x), gripMax()));
+      refit();
+    });
+    document.addEventListener(EV.up, function () {
+      if (!drag) return;
+      drag = null;
+      grip.classList.remove('dragging');
+      document.body.classList.remove('t-col-resizing');
+      try {
+        var px = side.getBoundingClientRect().width;
+        localStorage.setItem(GRIP_KEY, String(Math.round(px)));
+      } catch (e) {}
+    });
+    document.addEventListener(EV.cancel, function () {
+      if (!drag) return;
+      drag = null; grip.classList.remove('dragging');
+      document.body.classList.remove('t-col-resizing');
+    });
+    grip.addEventListener('dblclick', function () {
+      var body = document.querySelector('.t-body');
+      if (body) body.style.removeProperty('--t-side-w');
+      try { localStorage.removeItem(GRIP_KEY); } catch (e) {}
+    });
+  }
+
   /* ---------------- 事件绑定与启动 ---------------- */
 
   function persistAndRender() {
@@ -438,6 +506,7 @@
 
   document.addEventListener('DOMContentLoaded', function () {
     bind();
+    initGrip();
     setUnit(areaUnit); /* 同步单位按钮初始态（含持久化偏好恢复） */
     persistAndRender();
   });

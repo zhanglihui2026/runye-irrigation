@@ -1,149 +1,217 @@
 /* ============================================================
    terrain.css — 润野灌溉 地形模块 · 独立样式（阶段1）
    [NEW MODULE: 地形模块] 仅作用于 terrain/ 页面，不影响主页。
+   ------------------------------------------------------------
+   [v286c 2026-10-07 用户要求] 页面风格完全复制「地块分区」：
+     · 字体/颜色/圆角/阴影 → 与主页 :root 同名同值 design tokens
+       （g-* 绿阶取主页最终覆盖层的低饱和值，--u-* 取工作区层）
+     · 背景 → 主页 36px 网格渐变；body 字体 → var(--font)、#2f3b35
+     · 滚动条 → v144 全站统一 5px（thumb #c9d6ce / hover #9db4a8；
+       刻意不写 scrollbar-width 标准属性，防 Chromium 121+ 失效）
+     · 左栏宽度可拖拽 → 复刻 .pp-grip：三列 grid（栏｜10px 拖拽条｜
+       制图区），JS 拖写 --t-side-w，localStorage 记忆、双击恢复
    ============================================================ */
-:root {
-  --tg: #2e7d32; --tg-dark: #1b5e20;
-  --warn-bg: #fff8e1; --warn-bd: #f0a000; --warn-tx: #7a5200;
-  --ok-bg: #e8f5e9; --ok-bd: #2e7d32; --ok-tx: #1b5e20;
-  --bad-bg: #fdecea; --bad-bd: #d32f2f; --bad-tx: #a31515;
-  --bd: #d8d8d8; --muted: #888;
-}
-* { box-sizing: border-box; }
-body {
-  margin: 0; font-family: "Microsoft YaHei", system-ui, sans-serif;
-  background: #f4f6f4; color: #222; font-size: 14px;
-}
-body.t-engineering { background: #f3f6f9; }
 
-/* 顶栏（模式条：导航下方全宽细条） */
+:root{
+  /* —— 与主页同名同值：品牌绿阶（最终覆盖层，低饱和） —— */
+  --g-50:#f0f9f4; --g-100:#e1f2e8; --g-200:#bddfcb; --g-300:#91c5a9;
+  --g-400:#5ea683; --g-500:#348e66; --g-600:#238056; --g-700:#196544;
+  --g-800:#174f39; --g-900:#153e2f;
+  --dg-700:#24543f; --dg-800:#1d4434; --dg-900:#17382c;
+  /* —— 工作区层 --u-* —— */
+  --u-bg:#edf3f1; --u-bg-2:#eff6f3; --u-panel:#f7faf9; --u-canvas:#ffffff;
+  --u-line:#c5d6cf; --u-line-2:#dce7e2;
+  --u-ink:#243c35; --u-ink-2:#4a6259; --u-ink-3:#586e65;
+  --u-accent:#18835e; --u-accent-2:#116447; --u-accent-bg:#e0f2e9; --u-accent-line:#9bcbb4;
+  --u-nav:#173e32; --u-nav-active:#2d604b; --u-nav-ink:#d9e9df;
+  --u-warn:#92601a; --u-warn-bg:#fff5df; --u-warn-line:#e8cc92;
+  --u-err:#a84339;  --u-err-bg:#fff0ed;  --u-err-line:#e9bcb5;
+  /* —— 设计 tokens（与主页一致） —— */
+  --font:system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  --radius:8px; --radius-sm:8px; --radius-xs:6px;
+  --shadow:0 10px 28px rgba(15,23,42,.07),0 0 0 1px rgba(15,23,42,.06);
+  --transition:all .22s cubic-bezier(.4,0,.2,1);
+  /* —— 模块局部 —— */
+  --t-side-w:clamp(272px,20vw,318px);   /* 拖拽条 JS 实时改写 */
+  --t-grip-w:10px;
+}
+
+*{box-sizing:border-box}
+/* v144 全站滚动条统一：5px 细条（与主页同值；不写标准属性防失效） */
+*::-webkit-scrollbar{width:5px;height:5px}
+*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-corner{background:transparent}
+*::-webkit-scrollbar-thumb{background:#c9d6ce;border-radius:3px}
+*::-webkit-scrollbar-thumb:hover{background:#9db4a8}
+
+body{
+  margin:0;
+  font-family:var(--font);color:#2f3b35;line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+  background:
+    linear-gradient(90deg,rgba(20,83,45,.055) 1px,transparent 1px),
+    linear-gradient(0deg,rgba(20,83,45,.045) 1px,transparent 1px),
+    linear-gradient(135deg,#f8faf7 0%,#edf4ef 48%,#f4f7fb 100%);
+  background-size:36px 36px,36px 36px,auto;
+  font-size:14px;
+}
+button{cursor:pointer;font-family:inherit}
+input{font-family:inherit;font-size:inherit}
+a{color:inherit;text-decoration:none}
+
+/* —— 模式条（导航下方全宽细条；白底浅绿，同主页 topbar 观感） —— */
 .t-top {
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-  background: var(--tg); color: #fff; padding: 5px 16px;
+  background: rgba(248,250,247,.86); color: var(--u-ink);
+  padding: 6px 16px; border-bottom: 1px solid rgba(15,23,42,.08);
 }
-.t-top h1 { font-size: 14px; margin: 0; font-weight: 600; }
-.t-top .t-sub { font-size: 11px; opacity: .85; }
+.t-top h1 { font-size: 14px; margin: 0; font-weight: 600; color: var(--u-nav); }
+.t-top .t-sub { font-size: 11px; color: var(--u-ink-3); }
 .t-spacer { flex: 1; }
 .t-modebtn {
-  border: 1px solid rgba(255,255,255,.6); background: transparent; color: #fff;
-  padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;
+  border: 1px solid var(--u-line); background: #fff; color: var(--u-ink-2);
+  padding: 4px 12px; border-radius: var(--radius-xs); cursor: pointer;
+  font-size: 12px; transition: var(--transition);
 }
-.t-modebtn.on { background: #fff; color: var(--tg-dark); font-weight: 700; }
+.t-modebtn.on { background: var(--g-600); border-color: var(--g-600); color: #fff; font-weight: 700; }
+.t-modebtn:hover:not(.on) { border-color: var(--g-500); color: var(--g-700); }
 
-/* 提示条 */
-.t-banner { padding: 7px 16px; font-size: 12.5px; border-bottom: 1px solid var(--bd); }
-.t-warn  { background: var(--warn-bg); color: var(--warn-tx); border-left: 4px solid var(--warn-bd); }
-.t-ok    { background: var(--ok-bg);   color: var(--ok-tx);   border-left: 4px solid var(--ok-bd); }
-.t-danger{ background: var(--bad-bg);  color: var(--bad-tx);  border-left: 4px solid var(--bad-bd); }
+/* —— 提示条 —— */
+.t-banner { padding: 7px 16px; font-size: 12.5px; border-bottom: 1px solid var(--u-line-2); }
+.t-warn  { background: var(--u-warn-bg); color: var(--u-warn); border-left: 3px solid var(--u-warn-line); }
+.t-ok    { background: var(--u-accent-bg); color: var(--u-accent-2); border-left: 3px solid var(--u-accent-line); }
+.t-danger{ background: var(--u-err-bg); color: var(--u-err); border-left: 3px solid var(--u-err-line); }
 
-/* —— 主体两列（复刻「地块分区」pp-body 版式，骨架在 index.html 内联） —— */
-
-/* 左：工具栏（同 .pp-side 骨架：竖排卡片、栏内滚动、浅绿渐变） */
+/* —— 主体三列（复刻「地块分区」pp-body：栏｜拖拽条｜制图区） ——
+   骨架 grid 在 index.html 内联；窄屏降级单列由本表兜底。 —— */
 .t-side{
-  align-self:start;max-height:100%;
+  align-self:stretch;max-height:100%;
   display:flex;flex-direction:column;gap:8px;
   overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
   padding:9px;border-radius:12px;
   background:linear-gradient(180deg,#f8fbf9 0%,#f2f7f4 100%);
   border:1px solid #dde8e1;
+  min-width:0;
 }
 .t-side>*{flex:0 0 auto}
 
-/* 右：制图区（同 .pp-stage：纵向 flex，画布撑满剩余高度） */
+/* 拖拽条（复刻 .pp-grip：宽屏显形；细线 2px → hover/拖动 4px 加深） */
+.t-grip{display:none}
+@media(min-width:1101px){
+  .t-grip{
+    display:block;position:relative;align-self:stretch;min-width:0;
+    cursor:col-resize;touch-action:none;
+    -webkit-user-select:none;user-select:none;
+  }
+  .t-grip::before{
+    content:"";position:absolute;top:0;bottom:0;left:50%;
+    width:2px;margin-left:-1px;background:#dde8e1;
+  }
+  .t-grip:hover::before,
+  .t-grip.dragging::before{background:var(--g-600);width:4px;margin-left:-2px}
+}
+body.t-col-resizing{-webkit-user-select:none;user-select:none;cursor:col-resize}
+body.t-col-resizing .t-stage{pointer-events:none}   /* 拖拽中不让画布吃指针 */
+
+/* 右：制图区 */
 .t-stage{display:flex;flex-direction:column;min-width:0;min-height:0}
 .t-canvas-head{
   display:flex;align-items:center;gap:10px;
-  padding:6px 10px;font-size:13px;color:var(--tg-dark);
+  padding:6px 10px;font-size:13px;color:var(--u-nav-active);
 }
 .t-canvas-head b{font-size:13px}
-.t-canvas-head span{color:var(--muted);font-size:11.5px}
-.t-chk{margin-left:auto;font-size:11.5px;color:var(--muted);cursor:pointer;user-select:none}
+.t-canvas-head span{color:var(--u-ink-3);font-size:11.5px}
+.t-chk{margin-left:auto;font-size:11.5px;color:var(--u-ink-2);cursor:pointer;user-select:none}
 .t-canvas-wrap{
   flex:1 1 auto;min-height:0;position:relative;
-  background:#fff;border:1px solid #dde8e1;border-radius:10px;
+  background:var(--u-canvas);border:1px solid #dde8e1;border-radius:10px;
   overflow:hidden;
 }
 #tCanvas{display:block;width:100%;height:100%}
+
+/* —— 卡片（左栏内；白卡 + 深绿标题，同二级参数卡观感） —— */
+.t-card {
+  background: #fff; border: 1px solid #dbe7e0; border-radius: var(--radius-xs);
+  padding: 10px 12px;
+}
+.t-card h2 { font-size: 13px; margin: 0 0 8px; color: var(--u-nav-active); border-bottom: 1px solid #eef3f0; padding-bottom: 5px; }
+.t-card h2 small { color: var(--u-ink-3); font-weight: 400; margin-left: 4px; font-size: 11px; }
 
 /* 按钮组（左栏竖排） */
 .t-btncol{display:flex;flex-direction:column;gap:6px}
 .t-btncol .t-btn{width:100%;text-align:left}
 
-/* 按钮 */
+/* 按钮（绿阶取主页低饱和 g-600/g-700） */
 .t-btn {
-  border: 1px solid var(--tg); background: var(--tg); color: #fff;
-  padding: 7px 12px; border-radius: 4px; cursor: pointer; font-size: 13px;
+  border: 1px solid var(--g-600); background: var(--g-600); color: #fff;
+  padding: 7px 12px; border-radius: var(--radius-xs); cursor: pointer;
+  font-size: 13px; transition: var(--transition);
 }
-.t-btn:hover { background: var(--tg-dark); }
-.t-btn.ghost { background: #fff; color: var(--tg); }
-.t-btn.danger { background: #fff; color: var(--bad-bd); border-color: var(--bad-bd); }
+.t-btn:hover { background: var(--g-700); border-color: var(--g-700); }
+.t-btn.ghost { background: #fff; color: var(--g-700); }
+.t-btn.ghost:hover { background: var(--g-50); }
+.t-btn.danger { background: #fff; color: var(--u-err); border-color: var(--u-err); }
+.t-btn.danger:hover { background: var(--u-err-bg); }
 .t-btn:disabled { opacity: .45; cursor: not-allowed; }
 .t-btnrow { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
 
-/* 卡片（左栏内，宽度随栏） */
-.t-card {
-  background: #fff; border: 1px solid #dbe7e0; border-radius: 8px;
-  padding: 10px 12px;
-}
-.t-card h2 { font-size: 13px; margin: 0 0 8px; color: #2d604b; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-.t-card h2 small { color: var(--muted); font-weight: 400; margin-left: 4px; font-size: 11px; }
-
-/* 地块列表 */
+/* 地块清单 */
 .t-plot {
   display: flex; align-items: center; gap: 6px; padding: 6px 7px;
-  border: 1px solid #e4e4e4; border-radius: 4px; margin-bottom: 6px; font-size: 12.5px;
+  border: 1px solid var(--u-line-2); border-radius: var(--radius-xs); margin-bottom: 6px; font-size: 12.5px;
+  background: #fff;
 }
 .t-plot b { flex-shrink: 0; }
-.t-lv { background: #ede7f6; color: #5e35b1; font-size: 11px; padding: 1px 6px; border-radius: 8px; }
-.t-src { color: var(--muted); font-size: 11px; }
+.t-lv { background: var(--g-100); color: var(--g-800); font-size: 11px; padding: 1px 6px; border-radius: 8px; }
+.t-src { color: var(--u-ink-3); font-size: 11px; }
 .t-area { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 600; }
 .t-del {
-  border: none; background: transparent; color: #c62828; cursor: pointer;
+  border: none; background: transparent; color: var(--u-err); cursor: pointer;
   font-size: 14px; padding: 2px 6px;
 }
-.t-empty { color: var(--muted); font-size: 12px; padding: 12px 4px; }
+.t-empty { color: var(--u-ink-3); font-size: 12px; padding: 12px 4px; }
+#canvasEmpty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;line-height:2;color:var(--u-ink-3)}
 
 /* 面积卡片 */
-.t-unit { display: inline-flex; border: 1px solid var(--bd); border-radius: 4px; overflow: hidden; margin-bottom: 8px; }
-.t-unit button { border: none; background: #fff; padding: 4px 12px; cursor: pointer; font-size: 12px; }
-.t-unit button.on { background: var(--tg); color: #fff; }
+.t-unit { display: inline-flex; border: 1px solid var(--u-line-2); border-radius: var(--radius-xs); overflow: hidden; margin-bottom: 8px; }
+.t-unit button { border: none; background: #fff; padding: 4px 12px; cursor: pointer; font-size: 12px; color: var(--u-ink-2); }
+.t-unit button.on { background: var(--g-600); color: #fff; }
 .t-arearow {
   display: flex; align-items: baseline; gap: 8px;
-  padding: 8px 10px; border: 1px solid #e0e0e0; border-radius: 5px;
+  padding: 8px 10px; border: 1px solid var(--u-line-2); border-radius: var(--radius-xs);
+  background: #fff;
 }
-.t-arearow .t-big { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; margin-left: auto; }
-.t-note { font-size: 11px; color: var(--muted); }
-.t-arearow.t-locked { background: #f5f5f5; color: #aaa; }
-.t-arearow.t-locked .t-big { color: #aaa; }
+.t-arearow .t-big { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; margin-left: auto; color: var(--g-800); }
+.t-note { font-size: 11px; color: var(--u-ink-3); }
+.t-arearow.t-locked { background: #f5f6f5; color: #a8b3ad; }
+.t-arearow.t-locked .t-big { color: #a8b3ad; }
 .t-arearow.t-locked::after { content: "🔒"; margin-left: auto; }
 
 /* 高程面板 */
 .t-tabs { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
 .t-tabs button {
-  border: 1px solid var(--bd); background: #fafafa; border-radius: 4px 4px 0 0;
-  padding: 6px 10px; cursor: pointer; font-size: 12px;
+  border: 1px solid var(--u-line-2); background: #fafbfa; border-radius: var(--radius-xs) var(--radius-xs) 0 0;
+  padding: 6px 10px; cursor: pointer; font-size: 12px; color: var(--u-ink-2);
 }
-.t-tabs button.on { background: var(--tg); border-color: var(--tg); color: #fff; }
+.t-tabs button.on { background: var(--g-600); border-color: var(--g-600); color: #fff; }
 .t-elev {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  border: 1px solid #e4e4e4; border-radius: 4px; padding: 6px 8px; margin-bottom: 6px; font-size: 12px;
+  border: 1px solid var(--u-line-2); border-radius: var(--radius-xs); padding: 6px 8px; margin-bottom: 6px; font-size: 12px;
 }
-.t-elev span { color: var(--muted); }
-.t-elev-dsm { border-color: var(--warn-bd); background: var(--warn-bg); }
-.t-dsm-tag { color: var(--bad-tx); font-style: normal; font-weight: 700; font-size: 11px; }
-.t-cs { font-size: 12px; color: var(--muted); margin-top: 6px; }
-.t-cs b { color: var(--tg-dark); }
+.t-elev span { color: var(--u-ink-3); }
+.t-elev-dsm { border-color: var(--u-warn-line); background: var(--u-warn-bg); }
+.t-dsm-tag { color: var(--u-err); font-style: normal; font-weight: 700; font-size: 11px; }
+.t-cs { font-size: 12px; color: var(--u-ink-3); margin-top: 6px; }
+.t-cs b { color: var(--u-nav-active); }
 
 /* 制图区 SVG 元素 */
-.t-poly-face{fill:rgba(46,125,50,.10);stroke:var(--tg);stroke-width:1.5;vector-effect:non-scaling-stroke}
-.t-poly-face:hover{fill:rgba(46,125,50,.22)}
-.t-poly-vtx{fill:#fff;stroke:var(--tg-dark);stroke-width:1;vector-effect:non-scaling-stroke}
-.t-poly-label{font-family:"Microsoft YaHei",sans-serif;fill:#1b5e20;paint-order:stroke;stroke:rgba(255,255,255,.85);stroke-width:2px;pointer-events:none}
-.t-elev-dot{fill:#c62828;opacity:.75}
-.t-elev-dot.small{fill:#e57373;opacity:.55}
-.t-gridline{stroke:#eef3ef;stroke-width:1;vector-effect:non-scaling-stroke}
+.t-poly-face{fill:rgba(35,128,86,.10);stroke:var(--g-600);stroke-width:1.5;vector-effect:non-scaling-stroke}
+.t-poly-face:hover{fill:rgba(35,128,86,.22)}
+.t-poly-vtx{fill:#fff;stroke:var(--g-700);stroke-width:1;vector-effect:non-scaling-stroke}
+.t-poly-label{font-family:var(--font);fill:var(--g-900);paint-order:stroke;stroke:rgba(255,255,255,.85);stroke-width:2px;pointer-events:none}
+.t-elev-dot{fill:#c65b4e;opacity:.75}
+.t-elev-dot.small{fill:#e59a90;opacity:.55}
 
 /* 底栏（旧版遗留：回传/清空已移入左栏「地块清单」卡，本段仅防御性保留） */
 .t-foot { display: flex; gap: 10px; padding: 10px 16px 20px; align-items: center; }
-.t-foot .t-hint { font-size: 11px; color: var(--muted); }
-
+.t-foot .t-hint { font-size: 11px; color: var(--u-ink-3); }

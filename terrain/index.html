@@ -14,19 +14,26 @@
 <link rel="stylesheet" href="terrain.css">
 <style>
   /* 页面骨架（仅本页）：复刻「地块分区」pp-body 版式 ——
-     高度 = 视口减导航；grid 两列：左工具栏 clamp(272px,20vw,318px) ｜ 右制图区 minmax(0,1fr) */
+     三列 grid：左工具栏(var --t-side-w，可拖拽) ｜ 拖拽条 10px ｜ 右制图区 1fr；
+     高度 = 视口减导航与模式条；拖拽条样式/行为见 terrain.css + terrain-ui.js */
   .t-body{
     height:calc(100vh - var(--fn-nav-h,48px) - 42px); /* 42px = 模式条 */
     min-height:480px;box-sizing:border-box;
-    display:grid;grid-template-columns:clamp(272px,20vw,318px) minmax(0,1fr);
+    display:grid;
+    grid-template-columns:var(--t-side-w,clamp(272px,20vw,318px)) var(--t-grip-w,10px) minmax(0,1fr);
     column-gap:0;row-gap:0;padding:8px 10px 8px 8px;
   }
+  .t-body>.t-side{grid-column:1;grid-row:1}
+  .t-body>.t-grip{grid-column:2;grid-row:1}
+  .t-body>.t-stage{grid-column:3;grid-row:1}
   .t-panel{display:none;border-top:1px dashed #ddd;padding-top:8px;margin-top:4px;}
   .t-panel.on{display:block;}
   .t-hintbox{font-size:11px;color:#888;background:#fafafa;border:1px dashed #ddd;border-radius:4px;padding:8px 10px;margin-top:8px;line-height:1.7;}
-  @media (max-width:760px){
+  @media (max-width:1100px){
     .t-body{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(320px,1fr);height:auto;}
-    .t-side{max-height:none!important;}
+    .t-body>.t-side{grid-column:1;grid-row:1;max-height:none!important}
+    .t-body>.t-grip{display:none}
+    .t-body>.t-stage{grid-column:1;grid-row:2}
   }
 </style>
 </head>
@@ -120,6 +127,9 @@
       <div class="t-hintbox">回传 = 写入与地图测量页相同的 localStorage 契约，主页「地块分区」自动接住面积与轮廓。</div>
     </div>
   </aside>
+
+  <!-- 拖拽条（复刻 .pp-grip：拖动调左栏宽度，双击恢复默认；JS 在 terrain-ui.js） -->
+  <div class="t-grip" id="tGrip" role="separator" aria-orientation="vertical" title="拖动调整工具栏宽度 · 双击恢复默认"></div>
 
   <!-- 右：制图区（SVG 画布，绘制已导入地块轮廓 / RTK 高程点；空态给引导提示） -->
   <section class="t-stage">
