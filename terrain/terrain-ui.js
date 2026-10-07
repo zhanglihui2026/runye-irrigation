@@ -336,14 +336,12 @@
           var c = SP_COLORS[(z.g - 1) % SP_COLORS.length];
           out.push('<polygon class="t-sp-zone" data-g="' + z.g + '" fill="' + c + '" stroke="' + c + '" points="' + d + '"/>');
         });
-        lay.heads.forEach(function (h) {  /* 喷射范围 */
-          out.push('<circle class="t-sp-circle" data-g="' + h.g + '" cx="' + h.x.toFixed(1) + '" cy="' + (flip - h.y).toFixed(1) + '" r="' + lay.range_m.toFixed(1) + '"/>');
+        lay.heads.forEach(function (h) {  /* 喷射范围：按轮灌组着色（v295 分区改用辐射范围区分） */
+          var cc = SP_COLORS[(h.g - 1) % SP_COLORS.length];
+          out.push('<circle class="t-sp-circle" data-g="' + h.g + '" fill="' + cc + '" stroke="' + cc + '" cx="' + h.x.toFixed(1) + '" cy="' + (flip - h.y).toFixed(1) + '" r="' + lay.range_m.toFixed(1) + '"/>');
         });
         lay.laterals.forEach(function (l) {  /* 支管（沿行） */
           out.push('<polyline class="t-sp-lateral" points="' + l.pts.map(function (pt) { return pt.x.toFixed(1) + ',' + (flip - pt.y).toFixed(1); }).join(' ') + '"/>');
-        });
-        lay.dividers.forEach(function (d) {  /* 轮灌组分区线（虚线） */
-          out.push('<polyline class="t-sp-divider" points="' + d.pts.map(function (pt) { return pt.x.toFixed(1) + ',' + (flip - pt.y).toFixed(1); }).join(' ') + '"/>');
         });
         out.push('<polyline class="t-sp-main" points="' + lay.mainline.pts.map(function (pt) { return pt.x.toFixed(1) + ',' + (flip - pt.y).toFixed(1); }).join(' ') + '"/>');  /* 干管 */
         lay.heads.forEach(function (h, i) {  /* 喷头：颜色 = 轮灌组 */
@@ -769,7 +767,6 @@
       '<span class="tl-item"><span class="tl-swatch tl-plot"></span>地块边界</span>' +
       '<span class="tl-item"><span class="tl-swatch tl-main"></span>' + mainTxt + '</span>' +
       '<span class="tl-item"><span class="tl-swatch tl-lat"></span>' + latTxt + '</span>' +
-      '<span class="tl-item"><span class="tl-swatch tl-div"></span>轮灌组分区线</span>' +
       '<span class="tl-item"><span class="tl-swatch tl-range"></span>喷射范围（半径 R）</span>' +
       '<span class="tl-item">喷头颜色 = 轮灌组' + dots + '<em>（第 9 组起颜色循环）</em></span>';
   }
