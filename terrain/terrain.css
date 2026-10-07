@@ -272,6 +272,11 @@ body.t-col-resizing .t-stage{pointer-events:none}   /* 拖拽中不让画布吃�
 .t-poly-vtx{fill:#fff;stroke:var(--g-700);stroke-width:1;vector-effect:non-scaling-stroke}
 .t-poly-label{font-family:var(--font);fill:var(--g-900);paint-order:stroke;stroke:rgba(255,255,255,.85);stroke-width:2px;pointer-events:none}
 .t-elev-dot{fill:#c65b4e;opacity:.75}
+/* 喷灌布置叠加（v289）：喷射范围圆 / 支管 / 干管 / 喷头（按轮灌组着色） */
+.t-sp-circle{fill:rgba(37,99,235,.08);stroke:rgba(37,99,235,.40);stroke-width:1;vector-effect:non-scaling-stroke;pointer-events:none}
+.t-sp-lateral{stroke:#2563eb;stroke-width:1.4;vector-effect:non-scaling-stroke;fill:none;opacity:.9;pointer-events:none}
+.t-sp-main{stroke:#1e40af;stroke-width:3;vector-effect:non-scaling-stroke;fill:none;pointer-events:none}
+.t-sp-head{stroke:#fff;stroke-width:1;vector-effect:non-scaling-stroke}
 .t-elev-dot.small{fill:#e59a90;opacity:.55}
 
 /* 底栏（旧版遗留：回传/清空已移入左栏「地块清单」卡，本段仅防御性保留） */

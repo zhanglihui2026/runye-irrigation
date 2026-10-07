@@ -385,6 +385,106 @@
     };
   }
 
+
+  /* ---------------- 喷灌布置图生成（v289，纯函数） ----------------
+     在地块联合 bbox 上按喷头间距 S=R·k、行距（三角形 0.866S / 方形 S）铺网格，
+     点在多边形内过滤，行序编号分轮灌组（每组 heads_per_shift 个），
+     干管 = 过喷头群质心的竖向线，支管 = 每行喷头一条水平线。
+     返回几何供 terrain-ui drawCanvas 直接绘制（地块分区=喷头按组着色）。 */
+
+  function pointInPolygon(x, y, poly) {
+    if (!Array.isArray(poly) || poly.length < 3) return false;
+    var inside = false;
+    for (var i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      var xi = poly[i].x, yi = poly[i].y, xj = poly[j].x, yj = poly[j].y;
+      if (!isNum(xi) || !isNum(yi) || !isNum(xj) || !isNum(yj)) continue;
+      if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
+    }
+    return inside;
+  }
+
+  function sprinklerLayout(plots, input) {
+    input = input || {};
+    var R = input.range_m, k = input.spacing_k;
+    if (!(R > 0)) return { ok: false, error: '喷头射程必须为正数' };
+    var polys = (plots || []).filter(function (p) { return Array.isArray(p && p.poly) && p.poly.length >= 3; });
+    if (!polys.length) return { ok: false, error: '请先在地块清单中导入或绘制地块' };
+
+    var layout = input.layout === 'square' ? 'square' : 'tri';
+    if (!(k > 0.4) || k > 1.6) k = Math.min(1.6, Math.max(0.5, k || 1.1)); /* 与 sprinklerEstimate 同夹取 */
+    var S = R * k;
+    var row = layout === 'tri' ? S * Math.sqrt(3) / 2 : S;
+
+    /* 联合 bbox */
+    var B = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+    polys.forEach(function (p) {
+      var b = bboxOf(p.poly);
+      B.minX = Math.min(B.minX, b.minX); B.minY = Math.min(B.minY, b.minY);
+      B.maxX = Math.max(B.maxX, b.maxX); B.maxY = Math.max(B.maxY, b.maxY);
+    });
+
+    /* 超限拦截必须在生成之前（否则大 bbox × 小 S 直接撑爆内存/卡死主线程） */
+    var gnx = Math.ceil((B.maxX - B.minX) / S) + 2, gny = Math.ceil((B.maxY - B.minY) / row) + 2;
+    if (gnx * gny > 200000) return { ok: false, error: '喷头网格规模过大（' + (gnx * gny) + ' 点），请增大射程或减小地块范围后再出布置图' };
+
+    /* 生成网格：首选居中偏移(S/2, row/2)；若一个点都落不进地块，换偏移重试，最后兜底质心 */
+    function gen(ox, oy) {
+      var heads = [];
+      var ny = Math.max(1, Math.ceil((B.maxY - B.minY - oy * row) / row) + 1);
+      for (var r = 0; r < ny; r++) {
+        var y = B.minY + oy * row + r * row;
+        var xoff = (layout === 'tri' && (r % 2)) ? S / 2 : 0;  /* 三角形奇数行错位 S/2 */
+        var nx = Math.max(1, Math.ceil((B.maxX - B.minX - ox * S - xoff) / S) + 1);
+        for (var c = 0; c < nx; c++) {
+          var x = B.minX + ox * S + xoff + c * S;
+          for (var pi = 0; pi < polys.length; pi++) {
+            if (pointInPolygon(x, y, polys[pi].poly)) { heads.push({ x: x, y: y }); break; }
+          }
+        }
+      }
+      return heads;
+    }
+    var heads = [], tried = [[0.5, 0.5], [0.25, 0.25], [0.75, 0.75], [0, 0]];
+    for (var t = 0; t < tried.length && !heads.length; t++) heads = gen(tried[t][0], tried[t][1]);
+    if (!heads.length) {
+      /* 兜底：第一地块顶点均值（凹多边形可能落外，仅极端小地块的展示兜底） */
+      var p0 = polys[0].poly, sx = 0, sy = 0;
+      p0.forEach(function (pt) { sx += pt.x; sy += pt.y; });
+      heads = [{ x: sx / p0.length, y: sy / p0.length }];
+    }
+    if (heads.length > 4000) return { ok: false, error: '喷头数超过 4000（地块过大或射程过小），请增大射程或减小间距系数后再出布置图' };
+
+    /* 轮灌组：按 y 行序（北为上故 y 大先画）→ 行内 x 升序，连续 N 个一组 */
+    var N = Math.max(1, Math.round(input.heads_per_shift || 12));
+    heads.sort(function (a, b) { return (Math.abs(a.y - b.y) > row / 2) ? (b.y - a.y) : (a.x - b.x); });
+    heads.forEach(function (h, i) { h.g = Math.floor(i / N) + 1; });
+    var groupCount = heads.length ? heads[heads.length - 1].g : 0;
+
+    /* 支管：按行聚合（y 相同容差 row/2），每行一条水平线段；干管：过质心的竖向线段 */
+    var rowsAgg = [];
+    heads.forEach(function (h) {
+      var rr = rowsAgg.find(function (ra) { return Math.abs(ra.y - h.y) <= row / 2; });
+      if (!rr) { rr = { y: h.y, xs: [] }; rowsAgg.push(rr); }
+      rr.xs.push(h.x);
+    });
+    rowsAgg.sort(function (a, b) { return b.y - a.y; });
+    var laterals = rowsAgg.map(function (ra) {
+      var minX = Math.min.apply(null, ra.xs), maxX = Math.max.apply(null, ra.xs);
+      return { pts: [{ x: minX, y: ra.y }, { x: maxX, y: ra.y }] };
+    });
+    var cx = 0, cy = 0;
+    heads.forEach(function (h) { cx += h.x; cy += h.y; });
+    cx /= heads.length; cy /= heads.length;
+    var yTop = rowsAgg[0].y, yBot = rowsAgg[rowsAgg.length - 1].y;
+    var mainline = { pts: [{ x: cx, y: yTop }, { x: cx, y: yBot }] };
+
+    return {
+      ok: true, range_m: R, spacing: S, rowSpacing: row, layout: layout,
+      heads: heads, groupCount: groupCount, headsPerShift: Math.min(N, heads.length),
+      laterals: laterals, mainline: mainline
+    };
+  }
+
   function soilLabel(key) {
     return { sand: '沙土', sandyloam: '沙壤土', loam: '壤土', clayloam: '黏壤土', clay: '黏土' }[key] || key;
   }
@@ -446,6 +546,8 @@
     parseCSV: parseCSV,
     lonlatToLocalMeters: lonlatToLocalMeters,
     sprinklerEstimate: sprinklerEstimate,
+    pointInPolygon: pointInPolygon,
+    sprinklerLayout: sprinklerLayout,
     SOIL_INTENSITY: SOIL_INTENSITY,
     soilLabel: soilLabel,
     classifyElevFile: classifyElevFile,

@@ -325,6 +325,27 @@
         });
       });
     }
+    /* 喷灌布置叠加（v289）：勾选时按山地喷灌当前参数直接绘制
+       分区（喷头按轮灌组着色）/ 管道布置（干管+支管）/ 喷头 / 喷射范围圆 */
+    var spCount = 0, spGroups = 0;
+    if ($('spOverlay') && $('spOverlay').checked) {
+      var lay = D.sprinklerLayout(polys, spRead());
+      if (lay.ok) {
+        lay.heads.forEach(function (h) {  /* 喷射范围 */
+          out.push('<circle class="t-sp-circle" cx="' + h.x.toFixed(1) + '" cy="' + (flip - h.y).toFixed(1) + '" r="' + lay.range_m.toFixed(1) + '"/>');
+        });
+        lay.laterals.forEach(function (l) {  /* 支管（沿行） */
+          out.push('<polyline class="t-sp-lateral" points="' + l.pts.map(function (pt) { return pt.x.toFixed(1) + ',' + (flip - pt.y).toFixed(1); }).join(' ') + '"/>');
+        });
+        out.push('<polyline class="t-sp-main" points="' + lay.mainline.pts.map(function (pt) { return pt.x.toFixed(1) + ',' + (flip - pt.y).toFixed(1); }).join(' ') + '"/>');  /* 干管 */
+        lay.heads.forEach(function (h, i) {  /* 喷头：颜色 = 轮灌组 */
+          out.push('<circle class="t-sp-head" fill="' + SP_COLORS[(h.g - 1) % SP_COLORS.length] +
+            '" cx="' + h.x.toFixed(1) + '" cy="' + (flip - h.y).toFixed(1) + '" r="' + (vh * 0.005).toFixed(2) +
+            '"><title>' + esc('第 ' + h.g + ' 轮灌组 · 喷头 ' + (i + 1) + ' · R=' + lay.range_m + 'm') + '</title></circle>');
+        });
+        spCount = lay.heads.length; spGroups = lay.groupCount;
+      }
+    }
     $('elevDotWrap').hidden = !state.elevations.some(function (r) { return r.data_type === 'rtk_xyz'; });
     /* 视图管理：几何数据变化（fit 改变）→ 重置全览；仅标签变化（单位切换）→ 保持用户缩放/平移 */
     var fitKey = vx.toFixed(1) + ',' + vy.toFixed(1) + ',' + vw.toFixed(1) + ',' + vh.toFixed(1);
@@ -341,7 +362,7 @@
     svg.removeAttribute('hidden');
     emptyBox.style.display = 'none';
     meta.textContent = polys.length + ' 个地块 · ' + fmtArea(D.plotsTotalAreaM2(state.plots)) +
-      (dotCount ? ' · 高程点 ' + dotCount : '') + ' · 坐标 ' + (state._cs && state._cs.label ? state._cs.label : '未校验');
+      (dotCount ? ' · 高程点 ' + dotCount : '') + (spCount ? ' · 喷头 ' + spCount + ' · 轮灌组 ' + spGroups : '') + ' · 坐标 ' + (state._cs && state._cs.label ? state._cs.label : '未校验');
   }
 
   /* ---------------- 制图区视图导航（滚轮缩放 / 拖拽平移 / 复位） ----------------
@@ -600,6 +621,7 @@
      输入变更后若已有结果则自动重算。 */
 
   var SP_KEY = 'runye_terrain_sprinkler_v1';
+  var SP_COLORS = ['#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed', '#0891b2', '#be185d', '#4d7c0f']; /* 轮灌组着色 */
   var SP_DEFAULTS = { crop: '', etc: 4.5, eta: 0.7, soil: 'loam', slope: 8,
                       range: 15, flow: 2.5, pressure: 300, layout: 'tri', k: 1.1, heads: 12 };
   var spCalculated = false;
@@ -660,6 +682,7 @@
     } catch (e) { /* 损坏用默认 */ }
     $('spCalc').addEventListener('click', calcSprinkler);
     $('spReset').addEventListener('click', function () { spFill(SP_DEFAULTS); spSave(); calcSprinkler(); });
+    $('spOverlay').addEventListener('change', drawCanvas); /* 切换喷灌布置叠加层 */
     ['spCrop', 'spEtc', 'spEta', 'spSoil', 'spSlope', 'spRange', 'spFlow', 'spPressure', 'spLayout', 'spK', 'spHeads']
       .forEach(function (id) { $(id).addEventListener('change', function () { if (spCalculated) calcSprinkler(); }); });
   }
