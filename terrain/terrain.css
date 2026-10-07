@@ -4,32 +4,35 @@
    ------------------------------------------------------------
    [v286c 2026-10-07 用户要求] 页面风格完全复制「地块分区」：
      · 字体/颜色/圆角/阴影 → 与主页 :root 同名同值 design tokens
-       （g-* 绿阶取主页最终覆盖层的低饱和值，--u-* 取工作区层）
-     · 背景 → 主页 36px 网格渐变；body 字体 → var(--font)、#2f3b35
-     · 滚动条 → v144 全站统一 5px（thumb #c9d6ce / hover #9db4a8；
-       刻意不写 scrollbar-width 标准属性，防 Chromium 121+ 失效）
-     · 左栏宽度可拖拽 → 复刻 .pp-grip：三列 grid（栏｜10px 拖拽条｜
-       制图区），JS 拖写 --t-side-w，localStorage 记忆、双击恢复
+   [v298b 2026-10-08 用户要求] 扁平化对齐主页「地块分区」最终观感：
+     · token 全套换主页最终覆盖层（index.html :root 扁平段）同值：
+       低饱和灰绿 --g-600:#4b7264（原鲜绿 #238056）、文字 #263238 系、
+       --radius*=0（全直角）、--shadow=1px 描边（去层叠投影）
+     · body 背景：撤 36px 绿网格 + 三段渐变 → 纯浅灰 var(--u-bg)
+     · 组件级去残留：t-side/t-canvas-wrap/图例/导航钮的圆角、
+       渐变底、box-shadow 全部打平；边线统一 --u-line/#d7dddf 系
+     · 布局骨架（三列 grid/拖拽条/尺寸/选择器名）一律不动 —— 探针
+       结构断言与拖拽记忆行为不受影响
    ============================================================ */
 
 :root{
-  /* —— 与主页同名同值：品牌绿阶（最终覆盖层，低饱和） —— */
-  --g-50:#f0f9f4; --g-100:#e1f2e8; --g-200:#bddfcb; --g-300:#91c5a9;
-  --g-400:#5ea683; --g-500:#348e66; --g-600:#238056; --g-700:#196544;
-  --g-800:#174f39; --g-900:#153e2f;
-  --dg-700:#24543f; --dg-800:#1d4434; --dg-900:#17382c;
-  /* —— 工作区层 --u-* —— */
-  --u-bg:#edf3f1; --u-bg-2:#eff6f3; --u-panel:#f7faf9; --u-canvas:#ffffff;
-  --u-line:#c5d6cf; --u-line-2:#dce7e2;
-  --u-ink:#243c35; --u-ink-2:#4a6259; --u-ink-3:#586e65;
-  --u-accent:#18835e; --u-accent-2:#116447; --u-accent-bg:#e0f2e9; --u-accent-line:#9bcbb4;
-  --u-nav:#173e32; --u-nav-active:#2d604b; --u-nav-ink:#d9e9df;
-  --u-warn:#92601a; --u-warn-bg:#fff5df; --u-warn-line:#e8cc92;
-  --u-err:#a84339;  --u-err-bg:#fff0ed;  --u-err-line:#e9bcb5;
-  /* —— 设计 tokens（与主页一致） —— */
+  /* —— 与主页最终扁平层同名同值：品牌绿阶（低饱和灰绿） —— */
+  --g-50:#f3f6f5; --g-100:#e4ece9; --g-200:#cddbd6; --g-300:#a9c1ba;
+  --g-400:#7f9f96; --g-500:#5f8578; --g-600:#4b7264; --g-700:#3f6f60;
+  --g-800:#35594e; --g-900:#2b4a41;
+  --dg-700:#4e5f59; --dg-800:#3a4a45; --dg-900:#26322e;
+  /* —— 工作区层 --u-*（主页最终层同值） —— */
+  --u-bg:#eef1f2; --u-bg-2:#f3f5f5; --u-panel:#ffffff; --u-canvas:#ffffff;
+  --u-line:#d7dddf; --u-line-2:#e4e8ea;
+  --u-ink:#263238; --u-ink-2:#5a656a; --u-ink-3:#626c75;
+  --u-accent:#3f6f60; --u-accent-2:#5d8c7b; --u-accent-bg:#edf3f1; --u-accent-line:#c7d8d2;
+  --u-nav:#173e32; --u-nav-active:#3f6f60; --u-nav-ink:#d9e9df;
+  --u-warn:#a8792c; --u-warn-bg:#fbf5ea; --u-warn-line:#e8cc92;
+  --u-err:#9a4f49;  --u-err-bg:#fbefee;  --u-err-line:#e9bcb5;
+  /* —— 设计 tokens（与主页最终扁平层一致：直角 + 1px 描边） —— */
   --font:system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
-  --radius:8px; --radius-sm:8px; --radius-xs:6px;
-  --shadow:0 10px 28px rgba(15,23,42,.07),0 0 0 1px rgba(15,23,42,.06);
+  --radius:0; --radius-sm:0; --radius-xs:0;
+  --shadow:0 0 0 1px rgba(38,50,56,.07);
   --transition:all .22s cubic-bezier(.4,0,.2,1);
   /* —— 模块局部 —— */
   --t-side-w:clamp(272px,20vw,318px);   /* 拖拽条 JS 实时改写 */
@@ -46,13 +49,9 @@
 
 body{
   margin:0;
-  font-family:var(--font);color:#2f3b35;line-height:1.6;
+  font-family:var(--font);color:var(--u-ink);line-height:1.6;
   -webkit-font-smoothing:antialiased;
-  background:
-    linear-gradient(90deg,rgba(20,83,45,.055) 1px,transparent 1px),
-    linear-gradient(0deg,rgba(20,83,45,.045) 1px,transparent 1px),
-    linear-gradient(135deg,#f8faf7 0%,#edf4ef 48%,#f4f7fb 100%);
-  background-size:36px 36px,36px 36px,auto;
+  background:var(--u-bg);   /* [v298b] 撤绿网格+渐变 → 主页扁平层纯浅灰底 */
   font-size:14px;
 }
 button{cursor:pointer;font-family:inherit}
@@ -64,7 +63,7 @@ details.t-fold { padding: 0; }
 details.t-fold > summary {
   list-style: none; cursor: pointer; user-select: none;
   font-size: 13px; font-weight: 600; color: var(--u-nav-active);
-  padding: 9px 12px; border-bottom: 1px solid #eef3f0;
+  padding: 9px 12px; border-bottom: 1px solid var(--u-line-2);
   display: flex; align-items: baseline; gap: 4px;
 }
 details.t-fold > summary::-webkit-details-marker { display: none; }
@@ -87,7 +86,7 @@ details.t-fold > .t-cardbody { padding: 10px 12px; }
 .t-sprow input, .t-sprow select {
   flex: 1 1 auto; min-width: 0; font-family: inherit; font-size: 12.5px;
   padding: 4px 6px; border: 1px solid var(--u-line-2); border-radius: var(--radius-xs);
-  background: #fff; color: var(--u-ink);
+  background: var(--u-panel); color: var(--u-ink);
 }
 .t-sprow input:focus, .t-sprow select:focus { outline: none; border-color: var(--g-500); }
 .t-sprow span { flex: 0 0 auto; font-size: 11px; color: var(--u-ink-3); }
@@ -104,17 +103,17 @@ details.t-fold > .t-cardbody { padding: 10px 12px; }
 }
 .t-spwarn:empty { display: none; }
 
-/* —— 模式条（导航下方全宽细条；白底浅绿，同主页 topbar 观感） —— */
+/* —— 模式条（导航下方全宽细条；白底 + 1px 下边，同主页顶栏扁平观感） —— */
 .t-top {
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-  background: rgba(248,250,247,.86); color: var(--u-ink);
-  padding: 6px 16px; border-bottom: 1px solid rgba(15,23,42,.08);
+  background: var(--u-panel); color: var(--u-ink);
+  padding: 6px 16px; border-bottom: 1px solid var(--u-line);
 }
-.t-top h1 { font-size: 14px; margin: 0; font-weight: 600; color: var(--u-nav); }
+.t-top h1 { font-size: 14px; margin: 0; font-weight: 600; color: var(--u-ink); }
 .t-top .t-sub { font-size: 11px; color: var(--u-ink-3); }
 .t-spacer { flex: 1; }
 .t-modebtn {
-  border: 1px solid var(--u-line); background: #fff; color: var(--u-ink-2);
+  border: 1px solid var(--u-line); background: var(--u-panel); color: var(--u-ink-2);
   padding: 4px 12px; border-radius: var(--radius-xs); cursor: pointer;
   font-size: 12px; transition: var(--transition);
 }
@@ -133,9 +132,9 @@ details.t-fold > .t-cardbody { padding: 10px 12px; }
   align-self:stretch;max-height:100%;
   display:flex;flex-direction:column;gap:8px;
   overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
-  padding:9px;border-radius:12px;
-  background:linear-gradient(180deg,#f8fbf9 0%,#f2f7f4 100%);
-  border:1px solid #dde8e1;
+  padding:9px;border-radius:0;
+  background:var(--u-bg-2);           /* [v298b] 撤渐变 → 扁平浅灰次级底 */
+  border:1px solid var(--u-line);
   min-width:0;
 }
 .t-side>*{flex:0 0 auto}
@@ -150,7 +149,7 @@ details.t-fold > .t-cardbody { padding: 10px 12px; }
   }
   .t-grip::before{
     content:"";position:absolute;top:0;bottom:0;left:50%;
-    width:2px;margin-left:-1px;background:#dde8e1;
+    width:2px;margin-left:-1px;background:var(--u-line);
   }
   .t-grip:hover::before,
   .t-grip.dragging::before{background:var(--g-600);width:4px;margin-left:-2px}
@@ -169,50 +168,50 @@ body.t-col-resizing .t-stage{pointer-events:none}   /* 拖拽中不让画布吃�
 .t-chk{margin-left:auto;font-size:11.5px;color:var(--u-ink-2);cursor:pointer;user-select:none}
 .t-canvas-wrap{
   flex:1 1 auto;min-height:0;position:relative;
-  background:var(--u-canvas);border:1px solid #dde8e1;border-radius:10px;
+  background:var(--u-canvas);border:1px solid var(--u-line);border-radius:0;
   overflow:hidden;
 }
 #tCanvas{display:block;width:100%;height:100%;cursor:grab}
 .t-canvas-wrap.t-panning #tCanvas{cursor:grabbing}
 .t-canvas-wrap.t-panning{user-select:none}
 
-/* 缩放控件（画布右上角小工具条，主页工具条同观感） */
+/* 缩放控件（画布右上角小工具条；[v298b] 去投影，白底 1px 边直角） */
 .t-canvas-nav{
   position:absolute;top:10px;right:10px;z-index:5;
   display:flex;flex-direction:column;gap:4px;
 }
 .t-canvas-nav button{
   width:30px;height:30px;border:1px solid var(--u-line);
-  background:rgba(255,255,255,.94);color:var(--u-ink-2);
+  background:var(--u-panel);color:var(--u-ink-2);
   border-radius:var(--radius-xs);cursor:pointer;font-size:15px;line-height:1;
   transition:var(--transition);
-  box-shadow:0 1px 4px rgba(15,23,42,.08);
+  box-shadow:none;
 }
 .t-canvas-nav button:hover{background:var(--g-50);color:var(--g-700);border-color:var(--g-400)}
 .t-navhint{margin-left:auto;font-size:11px;color:var(--u-ink-3);opacity:.8}
 
-/* —— 卡片（左栏内；白卡 + 深绿标题，同二级参数卡观感） —— */
+/* —— 卡片（左栏内；白卡直角 + 1px 边，同主页扁平面板） —— */
 .t-card {
-  background: #fff; border: 1px solid #dbe7e0; border-radius: var(--radius-xs);
+  background: var(--u-panel); border: 1px solid var(--u-line-2); border-radius: var(--radius-xs);
   padding: 10px 12px;
 }
-.t-card h2 { font-size: 13px; margin: 0 0 8px; color: var(--u-nav-active); border-bottom: 1px solid #eef3f0; padding-bottom: 5px; }
+.t-card h2 { font-size: 13px; margin: 0 0 8px; color: var(--u-nav-active); border-bottom: 1px solid var(--u-line-2); padding-bottom: 5px; }
 .t-card h2 small { color: var(--u-ink-3); font-weight: 400; margin-left: 4px; font-size: 11px; }
 
 /* 按钮组（左栏竖排） */
 .t-btncol{display:flex;flex-direction:column;gap:6px}
 .t-btncol .t-btn{width:100%;text-align:left}
 
-/* 按钮（绿阶取主页低饱和 g-600/g-700） */
+/* 按钮（绿阶取主页最终扁平层低饱和 g-600/g-700） */
 .t-btn {
   border: 1px solid var(--g-600); background: var(--g-600); color: #fff;
   padding: 7px 12px; border-radius: var(--radius-xs); cursor: pointer;
   font-size: 13px; transition: var(--transition);
 }
 .t-btn:hover { background: var(--g-700); border-color: var(--g-700); }
-.t-btn.ghost { background: #fff; color: var(--g-700); }
+.t-btn.ghost { background: var(--u-panel); color: var(--g-700); }
 .t-btn.ghost:hover { background: var(--g-50); }
-.t-btn.danger { background: #fff; color: var(--u-err); border-color: var(--u-err); }
+.t-btn.danger { background: var(--u-panel); color: var(--u-err); border-color: var(--u-err); }
 .t-btn.danger:hover { background: var(--u-err-bg); }
 .t-btn:disabled { opacity: .45; cursor: not-allowed; }
 .t-btnrow { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
@@ -221,10 +220,10 @@ body.t-col-resizing .t-stage{pointer-events:none}   /* 拖拽中不让画布吃�
 .t-plot {
   display: flex; align-items: center; gap: 6px; padding: 6px 7px;
   border: 1px solid var(--u-line-2); border-radius: var(--radius-xs); margin-bottom: 6px; font-size: 12.5px;
-  background: #fff;
+  background: var(--u-panel);
 }
 .t-plot b { flex-shrink: 0; }
-.t-lv { background: var(--g-100); color: var(--g-800); font-size: 11px; padding: 1px 6px; border-radius: 8px; }
+.t-lv { background: var(--g-100); color: var(--g-800); font-size: 11px; padding: 1px 6px; border-radius: 0; }
 .t-src { color: var(--u-ink-3); font-size: 11px; }
 .t-area { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 600; }
 .t-del {
@@ -236,23 +235,23 @@ body.t-col-resizing .t-stage{pointer-events:none}   /* 拖拽中不让画布吃�
 
 /* 面积卡片 */
 .t-unit { display: inline-flex; border: 1px solid var(--u-line-2); border-radius: var(--radius-xs); overflow: hidden; margin-bottom: 8px; }
-.t-unit button { border: none; background: #fff; padding: 4px 12px; cursor: pointer; font-size: 12px; color: var(--u-ink-2); }
+.t-unit button { border: none; background: var(--u-panel); padding: 4px 12px; cursor: pointer; font-size: 12px; color: var(--u-ink-2); }
 .t-unit button.on { background: var(--g-600); color: #fff; }
 .t-arearow {
   display: flex; align-items: baseline; gap: 8px;
   padding: 8px 10px; border: 1px solid var(--u-line-2); border-radius: var(--radius-xs);
-  background: #fff;
+  background: var(--u-panel);
 }
 .t-arearow .t-big { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; margin-left: auto; color: var(--g-800); }
 .t-note { font-size: 11px; color: var(--u-ink-3); }
-.t-arearow.t-locked { background: #f5f6f5; color: #a8b3ad; }
+.t-arearow.t-locked { background: var(--u-bg-2); color: #a8b3ad; }
 .t-arearow.t-locked .t-big { color: #a8b3ad; }
 .t-arearow.t-locked::after { content: "🔒"; margin-left: auto; }
 
 /* 高程面板 */
 .t-tabs { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
 .t-tabs button {
-  border: 1px solid var(--u-line-2); background: #fafbfa; border-radius: var(--radius-xs) var(--radius-xs) 0 0;
+  border: 1px solid var(--u-line-2); background: var(--u-bg-2); border-radius: var(--radius-xs) var(--radius-xs) 0 0;
   padding: 6px 10px; cursor: pointer; font-size: 12px; color: var(--u-ink-2);
 }
 .t-tabs button.on { background: var(--g-600); border-color: var(--g-600); color: #fff; }
@@ -267,8 +266,8 @@ body.t-col-resizing .t-stage{pointer-events:none}   /* 拖拽中不让画布吃�
 .t-cs b { color: var(--u-nav-active); }
 
 /* 制图区 SVG 元素 */
-.t-poly-face{fill:rgba(35,128,86,.10);stroke:var(--g-600);stroke-width:1.5;vector-effect:non-scaling-stroke}
-.t-poly-face:hover{fill:rgba(35,128,86,.22)}
+.t-poly-face{fill:rgba(75,114,100,.10);stroke:var(--g-600);stroke-width:1.5;vector-effect:non-scaling-stroke}
+.t-poly-face:hover{fill:rgba(75,114,100,.22)}
 .t-poly-vtx{fill:#fff;stroke:var(--g-700);stroke-width:1;vector-effect:non-scaling-stroke}
 .t-poly-label{font-family:var(--font);fill:var(--g-900);paint-order:stroke;stroke:rgba(255,255,255,.85);stroke-width:2px;pointer-events:none}
 .t-elev-dot{fill:#c65b4e;opacity:.75}
@@ -283,13 +282,13 @@ body.t-col-resizing .t-stage{pointer-events:none}   /* 拖拽中不让画布吃�
 .t-sp-circle,.t-sp-head,.t-sp-lateral{transition:opacity .5s}
 .t-sp-dim{opacity:.15}
 .t-sp-head.t-sp-active{stroke-width:2.5}
-/* 喷灌布置图例（v289b）：制图区底部横排 */
-.t-sp-legend{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);z-index:6;max-width:calc(100% - 20px);display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;justify-content:center;padding:5px 12px;cursor:move;touch-action:none;border:1px solid #dde8e1;border-radius:8px;background:rgba(255,255,255,.94);box-shadow:0 2px 8px rgba(0,0,0,.12);font-size:11.5px;color:var(--u-ink-2,#374151)}
+/* 喷灌布置图例（v289b）：制图区底部横排；[v298b] 直角化+去投影 */
+.t-sp-legend{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);z-index:6;max-width:calc(100% - 20px);display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;justify-content:center;padding:5px 12px;cursor:move;touch-action:none;border:1px solid var(--u-line);border-radius:0;background:var(--u-panel);box-shadow:none;font-size:11.5px;color:var(--u-ink-2,#374151)}
 .t-sp-legend[hidden]{display:none} /* 防 display:flex 覆盖 hidden 属性 */
 .t-sp-legend .tl-item{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .t-sp-legend em{font-style:normal;color:var(--u-ink-3,#9ca3af)}
-.t-sp-legend .tl-swatch{display:inline-block;width:18px;height:12px;border-radius:2px;flex:none}
-.tl-plot{border:1.5px solid #178056;background:rgba(35,128,86,.12)}
+.t-sp-legend .tl-swatch{display:inline-block;width:18px;height:12px;border-radius:0;flex:none}
+.tl-plot{border:1.5px solid #4b7264;background:rgba(75,114,100,.12)}
 .tl-main{height:0;border-top:3px solid #1e40af;border-radius:0}
 .tl-lat{height:0;border-top:1.5px solid #2563eb}
 .tl-range{border:1px solid rgba(37,99,235,.4);background:rgba(37,99,235,.08);border-radius:50%}
