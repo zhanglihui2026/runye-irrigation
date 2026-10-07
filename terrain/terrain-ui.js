@@ -709,6 +709,48 @@
     applySpDemo();
   }
 
+  /* 图例拖动（v291）：按住图例可在制图区内任意拖动，位置持久化；
+     首次拖动把「底部居中」换成自由 left/top，指针捕获保证拖出元素也不丢事件 */
+  function initLegendDrag() {
+    var lg = $('spLegend'), wrap = $('canvasWrap');
+    if (!lg || !wrap) return;
+    var drag = null;
+    function freePosition() {
+      var lr = lg.getBoundingClientRect(), wr = wrap.getBoundingClientRect();
+      lg.style.left = (lr.left - wr.left) + 'px';
+      lg.style.top = (lr.top - wr.top) + 'px';
+      lg.style.right = 'auto'; lg.style.bottom = 'auto'; lg.style.transform = 'none';
+    }
+    lg.addEventListener('pointerdown', function (e) {
+      if (e.button !== 0) return;
+      freePosition();
+      var lr = lg.getBoundingClientRect(), wr = wrap.getBoundingClientRect();
+      drag = { dx: e.clientX - lr.left, dy: e.clientY - lr.top, w: lr.width, h: lr.height };
+      lg.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    lg.addEventListener('pointermove', function (e) {
+      if (!drag) return;
+      var wr = wrap.getBoundingClientRect();
+      var x = Math.max(4, Math.min(e.clientX - wr.left - drag.dx, wr.width - drag.w - 4));
+      var y = Math.max(4, Math.min(e.clientY - wr.top - drag.dy, wr.height - drag.h - 4));
+      lg.style.left = x + 'px'; lg.style.top = y + 'px';
+    });
+    lg.addEventListener('pointerup', function () {
+      if (!drag) return;
+      drag = null;
+      try { localStorage.setItem('runye_terrain_legend_pos', JSON.stringify({ left: lg.style.left, top: lg.style.top })); } catch (e) {}
+    });
+    /* 恢复上次拖动位置 */
+    try {
+      var pos = JSON.parse(localStorage.getItem('runye_terrain_legend_pos') || 'null');
+      if (pos && pos.left && pos.top) {
+        lg.style.left = pos.left; lg.style.top = pos.top;
+        lg.style.right = 'auto'; lg.style.bottom = 'auto'; lg.style.transform = 'none';
+      }
+    } catch (e) {}
+  }
+
   /* 图例（v289b）：内容由 SP_COLORS 单一来源生成，避免与画布配色两处维护 */
   function buildSpLegend() {
     var lg = $('spLegend');
@@ -734,6 +776,7 @@
     $('spReset').addEventListener('click', function () { spFill(SP_DEFAULTS); spSave(); calcSprinkler(); });
     $('spOverlay').addEventListener('change', drawCanvas); /* 切换喷灌布置叠加层 */
     buildSpLegend();
+    initLegendDrag();
     $('spDemo').addEventListener('click', function () {
       if (spDemoTimer) { stopSpDemo(); return; }
       spDemoStep = 0;

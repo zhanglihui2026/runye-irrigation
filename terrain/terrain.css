@@ -284,7 +284,7 @@ body.t-col-resizing .t-stage{pointer-events:none}   /* 拖拽中不让画布吃�
 .t-sp-dim{opacity:.15}
 .t-sp-head.t-sp-active{stroke-width:2.5}
 /* 喷灌布置图例（v289b）：制图区底部横排 */
-.t-sp-legend{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);z-index:6;max-width:calc(100% - 20px);display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;justify-content:center;padding:5px 12px;border:1px solid #dde8e1;border-radius:8px;background:rgba(255,255,255,.94);box-shadow:0 2px 8px rgba(0,0,0,.12);font-size:11.5px;color:var(--u-ink-2,#374151)}
+.t-sp-legend{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);z-index:6;max-width:calc(100% - 20px);display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;justify-content:center;padding:5px 12px;cursor:move;touch-action:none;border:1px solid #dde8e1;border-radius:8px;background:rgba(255,255,255,.94);box-shadow:0 2px 8px rgba(0,0,0,.12);font-size:11.5px;color:var(--u-ink-2,#374151)}
 .t-sp-legend[hidden]{display:none} /* 防 display:flex 覆盖 hidden 属性 */
 .t-sp-legend .tl-item{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .t-sp-legend em{font-style:normal;color:var(--u-ink-3,#9ca3af)}
