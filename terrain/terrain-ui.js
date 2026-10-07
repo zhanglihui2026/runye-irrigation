@@ -504,11 +504,60 @@
     persistAndRender();
   }
 
+  /* ---------------- 接住在线地图「回传地形模块」 ----------------
+     契约（map-measure sendPlotToTerrain 写入）：runye_terrain_incoming =
+     buildPlotPayload 的结构 —— { name, poly:[{lat,lng}], subPlots:[{name,polyLatLng,sqm}], sqm, mu }。
+     导入：经纬度环 → 局部米制投影（core.lonlatToLocalMeters）→ 加入地块清单；
+     读到即清除 key，避免下次打开重复导入。 */
+
+  function consumeIncoming() {
+    var raw = null;
+    try { raw = localStorage.getItem('runye_terrain_incoming'); } catch (e) { return; }
+    if (!raw) return;
+    try {
+      var d = JSON.parse(raw);
+      localStorage.removeItem('runye_terrain_incoming');
+      if (!d || typeof d !== 'object') return;
+      var rings = [];
+      if (Array.isArray(d.subPlots) && d.subPlots.length) {
+        d.subPlots.forEach(function (s) {
+          if (s && Array.isArray(s.polyLatLng) && s.polyLatLng.length >= 3)
+            rings.push({ ring: s.polyLatLng, name: s.name || '', sqm: s.sqm });
+        });
+      } else if (Array.isArray(d.poly) && d.poly.length >= 3) {
+        rings.push({ ring: d.poly, name: d.name || '', sqm: d.sqm });
+      }
+      if (!rings.length) return;
+      var added = 0, bad = 0;
+      rings.forEach(function (r, i) {
+        var c = D.lonlatToLocalMeters(r.ring);
+        if (!c.ok) { bad++; return; }
+        var base = r.name || d.name || '在线地图地块';
+        state.plots.push({
+          id: 'map_' + Date.now() + '_' + i,
+          name: base + (rings.length > 1 ? '#' + (added + 1) : ''),
+          poly: c.points.map(function (pt) { return { x: Math.round(pt.x * 100) / 100, y: Math.round(pt.y * 100) / 100 }; }),
+          level: null, source: '在线地图',
+          _mapSqm: isFinite(r.sqm) ? r.sqm : null
+        });
+        added++;
+      });
+      if (added) {
+        persistAndRender();
+        banner('warn',
+          '✓ 在线地图回传已导入 <b>' + added + '</b> 个地块（WGS-84 经纬度已按局部米制投影，面积与地图实测一致）。' +
+          '注意：<b>非 CGCS2000 平面坐标</b>——工程放样/水力计算前请以 CGCS2000 成果文件导入为准。' +
+          (bad ? '另有 ' + bad + ' 个无效环已跳过。' : ''));
+      }
+    } catch (e) { /* 契约损坏：清除防卡死 */ try { localStorage.removeItem('runye_terrain_incoming'); } catch (e2) {} }
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     bind();
     initGrip();
     setUnit(areaUnit); /* 同步单位按钮初始态（含持久化偏好恢复） */
     persistAndRender();
+    consumeIncoming(); /* 必须在 persistAndRender 之后：用自己的导入提示条收尾 */
   });
 
   /* 供测试/自动化探针使用 */

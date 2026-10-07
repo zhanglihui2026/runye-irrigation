@@ -293,6 +293,28 @@
     return null; /* 阶段1：恒 null（无高程 → 降级提示），阶段2实现插值 */
   }
 
+  /* ---------------- 在线地图回传：经纬度 → 局部米制投影 ----------------
+     接住「回传地形模块」的 WGS-84 经纬度环（{lat,lng} 或 [lat,lng]），
+     以首点为原点做等距圆柱投影（米）：小地块范围内面积/形状误差可忽略。
+     ★ 口径声明：结果不是 CGCS2000 平面坐标，仅用于地图回传成果的
+     预览/面积参考；工程放样与水力计算仍应以 CGCS2000 成果文件导入为准。 */
+
+  function lonlatToLocalMeters(ring) {
+    if (!Array.isArray(ring) || ring.length < 3) return { ok: false, error: '环点数不足（<3）' };
+    function latOf(p) { return Array.isArray(p) ? p[0] : p.lat; }
+    function lngOf(p) { return Array.isArray(p) ? p[1] : (p.lng != null ? p.lng : p.lon); }
+    var o = ring[0], lat0 = latOf(o) * Math.PI / 180;
+    if (!isFinite(lat0)) return { ok: false, error: '首点坐标无效' };
+    var R = 6378137, kx = Math.PI / 180 * R * Math.cos(lat0), ky = Math.PI / 180 * R;
+    var out = [];
+    for (var i = 0; i < ring.length; i++) {
+      var la = latOf(ring[i]), ln = lngOf(ring[i]);
+      if (!isFinite(la) || !isFinite(ln)) return { ok: false, error: '第' + (i + 1) + '点坐标非数值' };
+      out.push({ x: (ln - lngOf(o)) * kx, y: (la - latOf(o)) * ky });
+    }
+    return { ok: true, points: out, origin: { lat: latOf(o), lng: lngOf(o) } };
+  }
+
   /* ---------------- 存储层 ----------------
     地块 plots + 高程记录 elevations 持久化到 localStorage。
      rtk 点云超 MAX_PERSIST_POINTS 时抽样保存（保首尾），并在 meta 标记 thinned。 */
@@ -348,6 +370,7 @@
     detectCoordSystem: detectCoordSystem,
     parseSHP: parseSHP,
     parseCSV: parseCSV,
+    lonlatToLocalMeters: lonlatToLocalMeters,
     classifyElevFile: classifyElevFile,
     buildElevRecord: buildElevRecord,
     sampleAlongPath: sampleAlongPath,

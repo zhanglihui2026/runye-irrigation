@@ -290,6 +290,8 @@
                  按 id 取的盒子，往里塞无关按钮会改变其 querySelector('input') 的落点语义。 -->
           <div class="map-float-actions" id="mapFloatActions">
             <button class="mbtn mbtn-primary" id="btnCopy">↩ 回传设计工具</button>
+            <!-- [NEW MODULE: 地形模块 v286d] 回传地形模块：卸载=删除本行 + sendPlotToTerrain/btnCopyTerrain 那两段 JS -->
+            <button class="mbtn" id="btnCopyTerrain">⛰️ 回传地形模块</button>
             <button class="mbtn mbtn-primary" id="btnSavePlot">💾 保存地块</button>
           </div>
           <section id="mapPartitionTools">
@@ -1208,7 +1210,38 @@
     return payload;
   }
 
-  function sendPlotToDesign(plot, btnEl){
+  /* ===== [NEW MODULE: 地形模块 v286d 2026-10-07] 「⛰️ 回传地形模块」 =====
+     与「回传设计工具」同一道理：复用 buildPlotPayload 取当前地块（显式地块→最新入库→草稿），
+     但写入地形模块契约 runye_terrain_incoming 并跳转 terrain/index.html。
+     坐标口径：payload.poly/subPlots 为 WGS-84 经纬度环，由地形模块做局部米制投影后导入；
+     面积 sqm 沿用地图实测（geodesicArea），随 payload 一并带给地形模块备查。
+     卸载：删除本函数 + btnCopyTerrain onclick + HTML 里 id="btnCopyTerrain" 按钮即可。 */
+  function sendPlotToTerrain(plot, btnEl){
+    var payload=buildPlotPayload(plot, currentMapPlotId||null);
+    if(!payload){ alert('该地块没有有效的边界环，无法回传。'); return; }
+    try{
+      localStorage.setItem('runye_terrain_incoming', JSON.stringify(payload));
+      if(btnEl){ var old=btnEl.textContent; btnEl.textContent='回传中…';
+        setTimeout(function(){ btnEl.textContent=old; }, 1200); }
+      setTimeout(function(){ window.location.href='terrain/index.html'; }, 350);
+    }catch(e){ alert('写入失败：'+e.message); }
+  }
+  document.getElementById('btnCopyTerrain').onclick=function(){
+    /* 取地块逻辑与 btnCopy 同源；不改动 btnCopy 任何原有代码 */
+    try{
+      var lib=lsGet('runye_plot_library',[]);
+      var saved=currentMapPlotId?lib.filter(function(p){return p.id===currentMapPlotId;})[0]:null;
+      if(saved){ sendPlotToTerrain(saved, this); return; }
+      if(!points.length && lib.length){
+        saved=lib.reduce(function(a,b){return (!a || (b.ts||0)>(a.ts||0)) ? b : a;}, null);
+        if(saved){ sendPlotToTerrain(saved, this); return; }
+      }
+    }catch(e){}
+    var mu=parseFloat((geodesicArea(points)/666.67).toFixed(2));
+    if(!isFinite(mu) || mu<=0){ alert('画布为空，地块库里也没有可回传的地块——请先画框测量出有效面积'); return; }
+    sendPlotToTerrain({ id:currentMapPlotId||('pm'+Date.now()), name:'', polyLatLng:latlngs() }, this);
+  };
+    function sendPlotToDesign(plot, btnEl){
     var payload=buildPlotPayload(plot, currentMapPlotId||null);
     if(!payload){ alert('该地块没有有效的边界环，无法回传。'); return; }
     try{
