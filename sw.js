@@ -1,6 +1,6 @@
 /* Runye PWA v1. Increment VERSION when changing the offline shell. */
 'use strict';
-const VERSION = 'v286-terrain-stage1';
+const VERSION = 'v288-no-icons';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

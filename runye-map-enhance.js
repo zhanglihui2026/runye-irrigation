@@ -623,8 +623,8 @@
           /* [NEW MODULE: 地形模块 v286f] 弹窗回传按钮组：opts 回调跨作用域调页面局部函数， */
           /* 卸载 = 删除本按钮组 + onPopupOpen 里 rymSendDesign/rymSendTerrain 两段绑定。 */
           '<div style="margin-top:6px;display:flex;gap:4px">' +
-          '<button id="rymSendDesign" style="flex:1;padding:3px 6px;background:#15803d;color:#fff;border:0;cursor:pointer;font-size:11.5px">↩ 回传设计工具</button>' +
-          '<button id="rymSendTerrain" style="flex:1;padding:3px 6px;background:#fff;color:#15803d;border:1px solid #15803d;cursor:pointer;font-size:11.5px">⛰️ 回传地形模块</button>' +
+          '<button id="rymSendDesign" style="flex:1;padding:3px 6px;background:#15803d;color:#fff;border:0;cursor:pointer;font-size:11.5px">回传设计工具</button>' +
+          '<button id="rymSendTerrain" style="flex:1;padding:3px 6px;background:#fff;color:#15803d;border:1px solid #15803d;cursor:pointer;font-size:11.5px">回传地形模块</button>' +
           '</div>' +
           '</div>';
         var onPopupOpen = function () {
