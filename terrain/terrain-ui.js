@@ -331,11 +331,7 @@
     if ($('spOverlay') && $('spOverlay').checked) {
       var lay = D.sprinklerLayout(polys, spRead());
       if (lay.ok) {
-        lay.zonePolys.forEach(function (z) {  /* 分区范围（v290 闭合多边形，按组着色） */
-          var d = z.pts.map(function (pt) { return pt.x.toFixed(1) + ',' + (flip - pt.y).toFixed(1); }).join(' ');
-          var c = SP_COLORS[(z.g - 1) % SP_COLORS.length];
-          out.push('<polygon class="t-sp-zone" data-g="' + z.g + '" fill="' + c + '" stroke="' + c + '" points="' + d + '"/>');
-        });
+        /* 分区范围多边形自 v296 起不再绘制：分区完全由喷头辐射圆着色呈现（core 仍输出 zonePolys 备用） */
         lay.heads.forEach(function (h) {  /* 喷射范围：按轮灌组着色（v295 分区改用辐射范围区分） */
           var cc = SP_COLORS[(h.g - 1) % SP_COLORS.length];
           out.push('<circle class="t-sp-circle" data-g="' + h.g + '" fill="' + cc + '" stroke="' + cc + '" cx="' + h.x.toFixed(1) + '" cy="' + (flip - h.y).toFixed(1) + '" r="' + lay.range_m.toFixed(1) + '"/>');
@@ -702,7 +698,9 @@
     });
   }
   function spDemoTick() {
-    var total = $('tCanvas').querySelectorAll('.t-sp-zone').length;
+    var gs = {};  /* 分区多边形已隐藏，组数按画布上 data-g 去重统计 */
+    $('tCanvas').querySelectorAll('[data-g]').forEach(function (el) { gs[el.getAttribute('data-g')] = 1; });
+    var total = Object.keys(gs).length;
     if (!total) { stopSpDemo(); return; }
     spDemoStep = spDemoStep % total + 1;
     applySpDemo();
