@@ -595,6 +595,75 @@
     persistAndRender();
   }
 
+  /* ---------------- 山地喷灌设计 · 参数区（v287） ----------------
+     表单持久化独立 key；「估算」与地块汇总面积联动；
+     输入变更后若已有结果则自动重算。 */
+
+  var SP_KEY = 'runye_terrain_sprinkler_v1';
+  var SP_DEFAULTS = { crop: '', etc: 4.5, eta: 0.7, soil: 'loam', slope: 8,
+                      range: 15, flow: 2.5, pressure: 300, layout: 'tri', k: 1.1, heads: 12 };
+  var spCalculated = false;
+
+  function spRead() {
+    return {
+      crop: ($('spCrop').value || '').trim(),
+      etc: parseFloat($('spEtc').value), eta: parseFloat($('spEta').value),
+      soil: $('spSoil').value, slope: parseFloat($('spSlope').value),
+      range_m: parseFloat($('spRange').value), flow_m3h: parseFloat($('spFlow').value),
+      pressure_kpa: parseFloat($('spPressure').value), layout: $('spLayout').value,
+      spacing_k: parseFloat($('spK').value), heads_per_shift: parseInt($('spHeads').value, 10)
+    };
+  }
+  function spFill(v) {
+    $('spCrop').value = v.crop || '';
+    $('spEtc').value = v.etc; $('spEta').value = v.eta; $('spSoil').value = v.soil;
+    $('spSlope').value = v.slope; $('spRange').value = v.range_m; $('spFlow').value = v.flow_m3h;
+    $('spPressure').value = v.pressure_kpa; $('spLayout').value = v.layout;
+    $('spK').value = v.spacing_k; $('spHeads').value = v.heads_per_shift;
+  }
+  function spSave() { try { localStorage.setItem(SP_KEY, JSON.stringify(spRead())); } catch (e) {} }
+
+  function calcSprinkler() {
+    var area = D.plotsTotalAreaM2(state.plots);
+    var input = spRead();
+    spSave();
+    var res = D.sprinklerEstimate(input, area);
+    var box = $('spResult'), warnBox = $('spWarn');
+    if (!res.ok) {
+      box.hidden = true;
+      warnBox.hidden = false; warnBox.className = 't-spwarn';
+      warnBox.textContent = res.error;
+      spCalculated = false;
+      return;
+    }
+    spCalculated = true;
+    var rows = [
+      '喷头间距 <b>' + res.spacing.toFixed(1) + ' m</b> × 行距 ' + res.rowSpacing.toFixed(1) + ' m（' + (res.layout === 'tri' ? '正三角形' : '正方形') + '）',
+      '单喷头控制面积 <b>' + Math.round(res.headArea) + ' ㎡</b>',
+      '总灌溉面积 <b>' + fmtArea(area) + '</b> → 需喷头约 <b>' + res.headCount + '</b> 个',
+      '轮灌组数 <b>' + res.shiftCount + '</b> 组（每组 ' + res.headsPerShift + ' 个同时工作）',
+      '系统流量 <b>' + res.systemFlow.toFixed(1) + ' m³/h</b>',
+      '组合喷灌强度 <b>' + res.precipRate.toFixed(1) + ' mm/h</b>（' + D.soilLabel(res.soil) + '允许 ' + res.precipAllow + '）' + (res.precipOk ? ' ✓' : ' ✗')
+    ];
+    if (res.dailyHours != null) rows.push('满足日耗水 ' + input.etc + ' mm/d 需日喷洒约 <b>' + res.dailyHours.toFixed(1) + ' 小时</b>（η=' + input.eta + '）');
+    box.innerHTML = rows.join('<br>');
+    box.hidden = false;
+    warnBox.hidden = res.warn.length === 0;
+    warnBox.className = 't-spwarn';
+    warnBox.innerHTML = res.warn.map(esc).join('<br>');
+  }
+
+  function bindSprinkler() {
+    try {
+      var saved = JSON.parse(localStorage.getItem(SP_KEY) || 'null');
+      if (saved && typeof saved === 'object') spFill(Object.assign({}, SP_DEFAULTS, saved));
+    } catch (e) { /* 损坏用默认 */ }
+    $('spCalc').addEventListener('click', calcSprinkler);
+    $('spReset').addEventListener('click', function () { spFill(SP_DEFAULTS); spSave(); calcSprinkler(); });
+    ['spCrop', 'spEtc', 'spEta', 'spSoil', 'spSlope', 'spRange', 'spFlow', 'spPressure', 'spLayout', 'spK', 'spHeads']
+      .forEach(function (id) { $(id).addEventListener('change', function () { if (spCalculated) calcSprinkler(); }); });
+  }
+
   /* ---------------- 接住在线地图「回传地形模块」 ----------------
      契约（map-measure sendPlotToTerrain 写入）：runye_terrain_incoming =
      buildPlotPayload 的结构 —— { name, poly:[{lat,lng}], subPlots:[{name,polyLatLng,sqm}], sqm, mu }。
@@ -646,6 +715,7 @@
   document.addEventListener('DOMContentLoaded', function () {
     bind();
     initGrip();
+    bindSprinkler();
     setUnit(areaUnit); /* 同步单位按钮初始态（含持久化偏好恢复） */
     persistAndRender();
     consumeIncoming(); /* 必须在 persistAndRender 之后：用自己的导入提示条收尾 */

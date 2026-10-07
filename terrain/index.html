@@ -60,74 +60,120 @@
 
 <main class="t-body">
 
-  <!-- 左：工具栏（全部功能按钮集中于此，竖排卡片式，同「地块分区」参数栏骨架） -->
+  <!-- 左：工具栏（[v287] 现有内容包进 <details> 默认全部折叠；底部新增山地喷灌设计参数区） -->
   <aside class="t-side">
-    <div class="t-card">
-      <h2>地块边界 <small>多子多边形 · 梯田分层预留</small></h2>
-      <div class="t-btncol">
-        <button class="t-btn" onclick="document.getElementById('fileSHP').click()">📁 导入 shp 边界</button>
-        <button class="t-btn ghost" onclick="document.getElementById('filePRJ').click()">🧭 上传 .prj 校验坐标系</button>
-        <button class="t-btn ghost" onclick="document.getElementById('fileBoundaryCSV').click()">📋 导入 RTK 边界 CSV (X,Y)</button>
-        <button class="t-btn ghost" id="btnAddManual">✍ 手动粘贴顶点</button>
+    <details class="t-card t-fold">
+      <summary>地块边界 <small>多子多边形 · 梯田分层预留</small></summary>
+      <div class="t-cardbody">
+        <div class="t-btncol">
+          <button class="t-btn" onclick="document.getElementById('fileSHP').click()">📁 导入 shp 边界</button>
+          <button class="t-btn ghost" onclick="document.getElementById('filePRJ').click()">🧭 上传 .prj 校验坐标系</button>
+          <button class="t-btn ghost" onclick="document.getElementById('fileBoundaryCSV').click()">📋 导入 RTK 边界 CSV (X,Y)</button>
+          <button class="t-btn ghost" id="btnAddManual">✍ 手动粘贴顶点</button>
+        </div>
+        <input type="file" id="fileSHP" hidden>
+        <input type="file" id="filePRJ" hidden>
+        <input type="file" id="fileBoundaryCSV" hidden>
+        <div class="t-cs">坐标系：<b id="csResult">未校验</b><br><span style="font-size:11px">导入 shp 后请一并上传同名 .prj；无 prj 时按坐标数值启发式判断</span></div>
       </div>
-      <input type="file" id="fileSHP" hidden>
-      <input type="file" id="filePRJ" hidden>
-      <input type="file" id="fileBoundaryCSV" hidden>
-      <div class="t-cs">坐标系：<b id="csResult">未校验</b><br><span style="font-size:11px">导入 shp 后请一并上传同名 .prj；无 prj 时按坐标数值启发式判断</span></div>
-    </div>
+    </details>
 
-    <div class="t-card">
-      <h2>面积 <small>底层统一平方米</small></h2>
-      <div class="t-unit">
-        <button id="unitSqm" class="on">㎡</button>
-        <button id="unitMu">亩</button>
+    <details class="t-card t-fold">
+      <summary>面积 <small>底层统一平方米</small></summary>
+      <div class="t-cardbody">
+        <div class="t-unit">
+          <button id="unitSqm" class="on">㎡</button>
+          <button id="unitMu">亩</button>
+        </div>
+        <div class="t-arearow">
+          <span>水平投影</span>
+          <span class="t-big" id="areaProj">—</span>
+        </div>
+        <div class="t-note" id="areaProjNote" style="margin:-4px 0 8px">鞋带公式 · 水平投影</div>
+        <div class="t-arearow t-locked" id="areaSurfCard" title="需要上传高程数据才可计算">
+          <span>地表斜面</span>
+          <span class="t-big" id="areaSurf">—</span>
+        </div>
+        <div class="t-note" id="areaSurfNote" style="margin:-4px 0 2px">需要上传高程数据才可计算</div>
       </div>
-      <div class="t-arearow">
-        <span>水平投影</span>
-        <span class="t-big" id="areaProj">—</span>
-      </div>
-      <div class="t-note" id="areaProjNote" style="margin:-4px 0 8px">鞋带公式 · 水平投影</div>
-      <div class="t-arearow t-locked" id="areaSurfCard" title="需要上传高程数据才可计算">
-        <span>地表斜面</span>
-        <span class="t-big" id="areaSurf">—</span>
-      </div>
-      <div class="t-note" id="areaSurfNote" style="margin:-4px 0 2px">需要上传高程数据才可计算</div>
-    </div>
+    </details>
 
-    <div class="t-card">
-      <h2>高程数据源 <small>仅上传/登记 · 采集由外部设备完成</small></h2>
-      <div class="t-tabs">
-        <button id="tabRtk" class="on">RTK 点 (X,Y,Z)</button>
-        <button id="tabDtm">DTM (tif)</button>
-        <button id="tabDsm">DSM（仅预览）</button>
+    <details class="t-card t-fold">
+      <summary>高程数据源 <small>仅上传/登记 · 采集由外部设备完成</small></summary>
+      <div class="t-cardbody">
+        <div class="t-tabs">
+          <button id="tabRtk" class="on">RTK 点 (X,Y,Z)</button>
+          <button id="tabDtm">DTM (tif)</button>
+          <button id="tabDsm">DSM（仅预览）</button>
+        </div>
+        <div class="t-panel on" id="panelRtk">
+          <button class="t-btn" onclick="document.getElementById('fileElevCSV').click()">⬆ 上传 RTK 高程 CSV</button>
+          <input type="file" id="fileElevCSV" hidden>
+          <div class="t-hintbox">由 RTK 手簿导出的 X,Y,Z 点列（逗号/分号/Tab），软件不做现场采集与 RTK 驱动。</div>
+        </div>
+        <div class="t-panel" id="panelDtm">
+          <button class="t-btn" onclick="document.getElementById('fileDTM').click()">⬆ 上传 DTM 栅格 tif</button>
+          <input type="file" id="fileDTM" hidden>
+          <div class="t-hintbox">无人机航测 DTM（数字地形模型 = 纯地面）。tif 边界约束（shp）配套上传属阶段2；本阶段仅登记元信息。</div>
+        </div>
+        <div class="t-panel" id="panelDsm">
+          <button class="t-btn danger" onclick="document.getElementById('fileDSM').click()">⬆ 上传 DSM 栅格 tif（仅预览）</button>
+          <input type="file" id="fileDSM" hidden>
+          <div class="t-hintbox"><b style="color:#a31515">DSM 含树冠/建筑高程，仅可预览，禁止用于工程水力计算。</b>识别到 DSM 会自动标记低置信度并警示。</div>
+        </div>
+        <div id="elevList" style="margin-top:10px"></div>
       </div>
-      <div class="t-panel on" id="panelRtk">
-        <button class="t-btn" onclick="document.getElementById('fileElevCSV').click()">⬆ 上传 RTK 高程 CSV</button>
-        <input type="file" id="fileElevCSV" hidden>
-        <div class="t-hintbox">由 RTK 手簿导出的 X,Y,Z 点列（逗号/分号/Tab），软件不做现场采集与 RTK 驱动。</div>
-      </div>
-      <div class="t-panel" id="panelDtm">
-        <button class="t-btn" onclick="document.getElementById('fileDTM').click()">⬆ 上传 DTM 栅格 tif</button>
-        <input type="file" id="fileDTM" hidden>
-        <div class="t-hintbox">无人机航测 DTM（数字地形模型 = 纯地面）。tif 边界约束（shp）配套上传属阶段2；本阶段仅登记元信息。</div>
-      </div>
-      <div class="t-panel" id="panelDsm">
-        <button class="t-btn danger" onclick="document.getElementById('fileDSM').click()">⬆ 上传 DSM 栅格 tif（仅预览）</button>
-        <input type="file" id="fileDSM" hidden>
-        <div class="t-hintbox"><b style="color:#a31515">DSM 含树冠/建筑高程，仅可预览，禁止用于工程水力计算。</b>识别到 DSM 会自动标记低置信度并警示。</div>
-      </div>
-      <div id="elevList" style="margin-top:10px"></div>
-    </div>
+    </details>
 
-    <div class="t-card">
-      <h2>地块清单</h2>
-      <div id="plotList"></div>
-      <div class="t-btnrow" style="margin-top:8px">
-        <button class="t-btn" id="btnSendHome">↩ 回传主页参与计算</button>
-        <button class="t-btn danger" id="btnClear">🗑 清空</button>
+    <details class="t-card t-fold">
+      <summary>地块清单</summary>
+      <div class="t-cardbody">
+        <div id="plotList"></div>
+        <div class="t-btnrow" style="margin-top:8px">
+          <button class="t-btn" id="btnSendHome">↩ 回传主页参与计算</button>
+          <button class="t-btn danger" id="btnClear">🗑 清空</button>
+        </div>
+        <div class="t-hintbox">回传 = 写入与地图测量页相同的 localStorage 契约，主页「地块分区」自动接住面积与轮廓。</div>
       </div>
-      <div class="t-hintbox">回传 = 写入与地图测量页相同的 localStorage 契约，主页「地块分区」自动接住面积与轮廓。</div>
-    </div>
+    </details>
+
+    <!-- [v287 NEW] 山地喷灌设计 · 参数输入区（调研依据见 terrain-core.js sprinklerEstimate 注释） -->
+    <details class="t-card t-fold" id="spCard" open>
+      <summary>山地喷灌设计 <small>参数输入 · 估算</small></summary>
+      <div class="t-cardbody">
+        <div class="t-spgroup">作物与需水</div>
+        <div class="t-sprow"><label>作物</label><input id="spCrop" type="text" placeholder="如果树/油茶/牧草"></div>
+        <div class="t-sprow"><label>设计日耗水 ETc</label><input id="spEtc" type="number" value="4.5" min="0" max="15" step="0.1"><span>mm/d</span></div>
+        <div class="t-sprow"><label>灌溉水利用系数 η</label><input id="spEta" type="number" value="0.7" min="0.4" max="1" step="0.05"></div>
+        <div class="t-spgroup">土壤与地形</div>
+        <div class="t-sprow"><label>土壤质地</label><select id="spSoil">
+          <option value="sand">沙土（允许 20 mm/h）</option>
+          <option value="sandyloam">沙壤土（15）</option>
+          <option value="loam" selected>壤土（12）</option>
+          <option value="clayloam">黏壤土（10）</option>
+          <option value="clay">黏土（8）</option>
+        </select></div>
+        <div class="t-sprow"><label>地块平均坡度</label><input id="spSlope" type="number" value="8" min="0" max="45" step="0.5"><span>°</span></div>
+        <div class="t-spgroup">喷头与布置</div>
+        <div class="t-sprow"><label>喷头射程 R</label><input id="spRange" type="number" value="15" min="1" max="60" step="0.5"><span>m</span></div>
+        <div class="t-sprow"><label>喷头流量 q</label><input id="spFlow" type="number" value="2.5" min="0.1" max="30" step="0.1"><span>m³/h</span></div>
+        <div class="t-sprow"><label>工作压力</label><input id="spPressure" type="number" value="300" min="100" max="800" step="10"><span>kPa</span></div>
+        <div class="t-sprow"><label>布置方式</label><select id="spLayout">
+          <option value="tri" selected>正三角形（坡地推荐）</option>
+          <option value="square">正方形</option>
+        </select></div>
+        <div class="t-sprow"><label>间距系数 k（×R）</label><input id="spK" type="number" value="1.1" min="0.4" max="1.6" step="0.05"></div>
+        <div class="t-spgroup">轮灌与水源</div>
+        <div class="t-sprow"><label>同时工作喷头数</label><input id="spHeads" type="number" value="12" min="1" max="500" step="1"><span>个</span></div>
+        <div class="t-btnrow" style="margin-top:6px">
+          <button class="t-btn" id="spCalc">⚡ 估算</button>
+          <button class="t-btn ghost" id="spReset">恢复默认</button>
+        </div>
+        <div id="spResult" class="t-spresult" hidden></div>
+        <div id="spWarn" hidden></div>
+        <div class="t-hintbox">参数依据：GB/T 50085《喷灌工程技术规范》+ 坡地喷灌实测研究（间距 0.8~1.2R、三角形布置、300kPa）+ IRRICAD/OpenCAD 输入范式。山地惯例：支管沿等高线布置、主管垂直等高线。详细水力计算属后续阶段。</div>
+      </div>
+    </details>
   </aside>
 
   <!-- 拖拽条（复刻 .pp-grip：拖动调左栏宽度，双击恢复默认；JS 在 terrain-ui.js） -->

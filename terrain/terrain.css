@@ -59,6 +59,51 @@ button{cursor:pointer;font-family:inherit}
 input{font-family:inherit;font-size:inherit}
 a{color:inherit;text-decoration:none}
 
+/* —— 折叠卡（[v287] 原生 details：默认全部收起，点标题展开） —— */
+details.t-fold { padding: 0; }
+details.t-fold > summary {
+  list-style: none; cursor: pointer; user-select: none;
+  font-size: 13px; font-weight: 600; color: var(--u-nav-active);
+  padding: 9px 12px; border-bottom: 1px solid #eef3f0;
+  display: flex; align-items: baseline; gap: 4px;
+}
+details.t-fold > summary::-webkit-details-marker { display: none; }
+details.t-fold > summary::after {
+  content: "▾"; margin-left: auto; color: var(--u-ink-3); font-size: 11px;
+  transition: transform .18s ease;
+}
+details.t-fold:not([open]) > summary::after { transform: rotate(-90deg); }
+details.t-fold > summary small { color: var(--u-ink-3); font-weight: 400; font-size: 11px; }
+details.t-fold > .t-cardbody { padding: 10px 12px; }
+
+/* —— 山地喷灌参数表单 —— */
+.t-spgroup {
+  font-size: 11px; color: var(--u-accent-2); font-weight: 700;
+  border-left: 3px solid var(--g-500); padding-left: 6px; margin: 8px 0 6px;
+}
+.t-spgroup:first-child { margin-top: 0; }
+.t-sprow { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.t-sprow label { flex: 0 0 auto; width: 108px; font-size: 12px; color: var(--u-ink-2); }
+.t-sprow input, .t-sprow select {
+  flex: 1 1 auto; min-width: 0; font-family: inherit; font-size: 12.5px;
+  padding: 4px 6px; border: 1px solid var(--u-line-2); border-radius: var(--radius-xs);
+  background: #fff; color: var(--u-ink);
+}
+.t-sprow input:focus, .t-sprow select:focus { outline: none; border-color: var(--g-500); }
+.t-sprow span { flex: 0 0 auto; font-size: 11px; color: var(--u-ink-3); }
+.t-spresult {
+  margin-top: 8px; padding: 8px 10px; border: 1px solid var(--u-accent-line);
+  background: var(--u-accent-bg); border-radius: var(--radius-xs);
+  font-size: 12px; line-height: 1.9; color: var(--u-ink);
+}
+.t-spresult b { color: var(--g-800); }
+.t-spwarn {
+  margin-top: 6px; padding: 7px 10px; border: 1px solid var(--u-warn-line);
+  background: var(--u-warn-bg); border-radius: var(--radius-xs);
+  font-size: 11.5px; line-height: 1.8; color: var(--u-warn);
+}
+.t-spwarn:empty { display: none; }
+
 /* —— 模式条（导航下方全宽细条；白底浅绿，同主页 topbar 观感） —— */
 .t-top {
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;

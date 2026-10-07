@@ -315,6 +315,80 @@
     return { ok: true, points: out, origin: { lat: latOf(o), lng: lngOf(o) } };
   }
 
+  /* ---------------- 山地喷灌设计 · 参数估算（纯函数） ----------------
+     参数依据（2026-10-07 调研综合）：
+     · GB/T 50085《喷灌工程技术规范》：灌溉水利用系数 η≈0.7（坡地定喷式）、
+       允许喷灌强度按土壤（沙土20/沙壤15/壤土12/黏壤10/黏土8 mm/h，坡地取低档）
+     · 坡地学术研究（雨鸟 LF1200/R5000 实测+弹道模型）：坡地喷头间距宜为
+       平地射程 R 的 0.8~1.2 倍；三角形布置均匀度优于方形；工作压力影响最大
+       （300kPa 附近）；坡度 >15°（约27%）需谨慎，>20% 建议低压补偿
+     · IRRICAD / OpenCADIrrication / Qirri 的输入范式：地块+坡度、喷头
+       (射程/流量/压力)、布置(三角形/方形)+间距系数、轮灌组(同时工作喷头数)、
+       水源流量，输出喷头数/轮灌组/系统流量/组合强度校核(CU 阶段2)          */
+
+  var SOIL_INTENSITY = { sand: 20, sandyloam: 15, loam: 12, clayloam: 10, clay: 8 };
+
+  /* input: {range_m, flow_m3h, pressure_kpa, layout('tri'|'square'), spacing_k,
+             heads_per_shift, soil, slope_deg, etc_mm, eta}
+     areaM2: 汇总灌溉面积（来自地块清单）
+     返回 { ok, warn[], spacing, rowSpacing, headArea, headCount,
+            shiftCount, systemFlow, precipRate, precipOk }              */
+  function sprinklerEstimate(input, areaM2) {
+    input = input || {};
+    var warn = [];
+    var R = input.range_m, q = input.flow_m3h, k = input.spacing_k;
+    if (!(R > 0) || !(q > 0)) return { ok: false, error: '喷头射程与流量必须为正数' };
+    if (!(areaM2 > 0)) return { ok: false, error: '请先在地块清单中导入或绘制地块' };
+    if (!(k > 0.4) || k > 1.6) { k = Math.min(1.6, Math.max(0.5, k || 1.1)); warn.push('间距系数超出常规(0.4~1.6)，已夹回 ' + k); }
+
+    var layout = input.layout === 'square' ? 'square' : 'tri';
+    var S = R * k;                                   /* 喷头间距 */
+    var row = layout === 'tri' ? S * Math.sqrt(3) / 2 /* 三角形行距 0.866S */
+                              : S;                    /* 方形行距 = S */
+    var headArea = layout === 'tri' ? S * row : S * S;
+
+    var headCount = Math.ceil(areaM2 / headArea);
+    var N = Math.max(1, Math.round(input.heads_per_shift || 12));
+    if (N > headCount) N = headCount;
+    var shiftCount = Math.ceil(headCount / N);
+    var systemFlow = N * q;
+
+    /* 组合喷灌强度 ρ = 1000·q / A_cover（A_cover=单喷头理论覆盖圆），与土壤允许值校核 */
+    var precipRate = 1000 * q / (Math.PI * R * R);
+    var soil = SOIL_INTENSITY[input.soil] ? input.soil : 'loam';
+    var allow = SOIL_INTENSITY[soil];
+    var slope = Number(input.slope_deg) || 0;
+    if (slope > 8) allow = Math.max(5, allow - 2);   /* 坡地径流风险：允许强度降档 */
+    var precipOk = precipRate <= allow;
+    if (!precipOk) warn.push('组合喷灌强度 ' + precipRate.toFixed(1) + ' mm/h 超过 ' + soilLabel(soil) + '允许值 ' + allow + ' mm/h（坡地已降档）：建议换低流量喷嘴或缩短灌水历时');
+
+    /* 坡度建议（学术结论：>15° 常规喷头均匀度难保证） */
+    if (slope > 15) warn.push('坡度 ' + slope + '° 超过 15°：常规喷头水量分布明显恶化，建议改用压力补偿喷头/微喷或分台面单独设计');
+    else if (slope > 8) warn.push('坡度 ' + slope + '°：建议支管沿等高线布置、喷头间距取 0.8~1.0R 下限');
+
+    var eta = (input.eta > 0 && input.eta <= 1) ? input.eta : 0.7;
+    var etc = (input.etc_mm > 0) ? input.etc_mm : 0;
+    var dailyHours = null;
+    if (etc > 0 && systemFlow > 0) {
+      var sysRate = 1000 * systemFlow / areaM2;     /* 轮灌组全开时的系统折算降水强度 mm/h */
+      dailyHours = etc / (eta * sysRate);           /* 满足日耗水所需的日纯喷洒小时数 */
+    }
+
+    return {
+      ok: true, warn: warn,
+      spacing: S, rowSpacing: row, headArea: headArea,
+      headCount: headCount, headsPerShift: N, shiftCount: shiftCount,
+      systemFlow: systemFlow, precipRate: precipRate,
+      precipAllow: allow, precipOk: precipOk,
+      dailyHours: dailyHours > 0 ? dailyHours : null,
+      soil: soil, layout: layout
+    };
+  }
+
+  function soilLabel(key) {
+    return { sand: '沙土', sandyloam: '沙壤土', loam: '壤土', clayloam: '黏壤土', clay: '黏土' }[key] || key;
+  }
+
   /* ---------------- 存储层 ----------------
     地块 plots + 高程记录 elevations 持久化到 localStorage。
      rtk 点云超 MAX_PERSIST_POINTS 时抽样保存（保首尾），并在 meta 标记 thinned。 */
@@ -371,6 +445,9 @@
     parseSHP: parseSHP,
     parseCSV: parseCSV,
     lonlatToLocalMeters: lonlatToLocalMeters,
+    sprinklerEstimate: sprinklerEstimate,
+    SOIL_INTENSITY: SOIL_INTENSITY,
+    soilLabel: soilLabel,
     classifyElevFile: classifyElevFile,
     buildElevRecord: buildElevRecord,
     sampleAlongPath: sampleAlongPath,
