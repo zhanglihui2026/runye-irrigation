@@ -121,6 +121,7 @@
     $('unitSqm').classList.toggle('on', u === 'sqm');
     $('unitMu').classList.toggle('on', u === 'mu');
     renderPlots();
+    drawCanvas(); /* 画布标签面积随单位 */
   }
 
   /* ---------------- 导入：shp ---------------- */
@@ -251,6 +252,87 @@
     }).join('');
   }
 
+  /* ---------------- 制图区（SVG 画布，同「地块分区」右侧图纸区角色） ----------------
+     按 CGCS2000 平面坐标绘制：地块多边形（绿）+ 顶点 + 名称/面积标签；
+     RTK 高程点（红点，可开关，仅当与地块视野相交时绘制）。
+     viewBox 适配全部地块联合 bbox → 浏览器自动缩放，无需手写平移缩放（阶段2 再加）。 */
+
+  function bboxOfPoly(poly) {
+    var b = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+    poly.forEach(function (pt) {
+      if (pt.x < b.minX) b.minX = pt.x; if (pt.y < b.minY) b.minY = pt.y;
+      if (pt.x > b.maxX) b.maxX = pt.x; if (pt.y > b.maxY) b.maxY = pt.y;
+    });
+    return b;
+  }
+
+  function drawCanvas() {
+    var svg = $('tCanvas'), emptyBox = $('canvasEmpty'), meta = $('canvasMeta');
+    var polys = state.plots.filter(function (p) { return Array.isArray(p.poly) && p.poly.length >= 3; });
+    if (!polys.length) {
+      svg.setAttribute('hidden', '');
+      emptyBox.style.display = '';
+      meta.textContent = '暂无地块数据';
+      $('elevDotWrap').hidden = true;
+      return;
+    }
+    /* 联合 bbox + 5% 视野余量 */
+    var B = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+    polys.forEach(function (p) {
+      var b = bboxOfPoly(p.poly);
+      B.minX = Math.min(B.minX, b.minX); B.minY = Math.min(B.minY, b.minY);
+      B.maxX = Math.max(B.maxX, b.maxX); B.maxY = Math.max(B.maxY, b.maxY);
+    });
+    var w = B.maxX - B.minX, h = B.maxY - B.minY;
+    if (!(w > 0)) w = Math.max(1, h * 0.01);
+    if (!(h > 0)) h = Math.max(1, w * 0.01);
+    var pad = Math.max(w, h) * 0.05;
+    var vx = B.minX - pad, vy = B.minY - pad, vw = w + pad * 2, vh = h + pad * 2;
+    var flip = B.maxY + B.minY; /* y' = flip - y ：北为上（SVG y 向下） */
+    var fs = (vh * 0.035).toFixed(2); /* 标签字号随视野缩放 */
+
+    var out = [];
+    /* 地块多边形 */
+    polys.forEach(function (p, i) {
+      var pts = p.poly.map(function (pt) {
+        return (Math.round(pt.x * 100) / 100).toFixed(1) + ',' + (Math.round((flip - pt.y) * 100) / 100).toFixed(1);
+      }).join(' ');
+      out.push('<polygon class="t-poly-face" points="' + pts + '"><title>' + esc(p.name || ('地块' + (i + 1))) + '</title></polygon>');
+      /* 顶点小圆 */
+      p.poly.forEach(function (pt) {
+        out.push('<circle class="t-poly-vtx" cx="' + pt.x.toFixed(1) + '" cy="' + (flip - pt.y).toFixed(1) + '" r="' + (vh * 0.006).toFixed(2) + '"/>');
+      });
+      /* 标签：名称 + 面积，置于第一顶点旁（质心在凹多边形可能落外） */
+      var lp = p.poly[0];
+      var area = D.polygonAreaM2(p.poly);
+      var lbl = esc(p.name || ('地块' + (i + 1))) + ' ' + (areaUnit === 'mu' ? D.sqmToMu(area) + '亩' : Math.round(area) + '㎡');
+      out.push('<text class="t-poly-label" x="' + (lp.x + vw * 0.008).toFixed(1) + '" y="' + (flip - lp.y - vh * 0.008).toFixed(1) +
+               '" font-size="' + fs + '">' + lbl + '</text>');
+    });
+    /* RTK 高程点（开关开且点落在视野内才画；超过 3000 点抽稀） */
+    var showDots = $('elevDots').checked;
+    var dotCount = 0;
+    if (showDots) {
+      state.elevations.forEach(function (r) {
+        if (r.data_type !== 'rtk_xyz' || !Array.isArray(r.point_list) || !r.point_list.length) return;
+        var step = Math.ceil(r.point_list.length / 3000);
+        r.point_list.forEach(function (pt, i) {
+          if (i % step) return;
+          if (pt.x < B.minX || pt.x > B.maxX || pt.y < B.minY || pt.y > B.maxY) return;
+          out.push('<circle class="t-elev-dot" cx="' + pt.x.toFixed(1) + '" cy="' + (flip - pt.y).toFixed(1) + '" r="' + (vh * 0.004).toFixed(2) + '"><title>X ' + pt.x + '\nY ' + pt.y + '\nZ ' + pt.z + '</title></circle>');
+          dotCount++;
+        });
+      });
+    }
+    $('elevDotWrap').hidden = !state.elevations.some(function (r) { return r.data_type === 'rtk_xyz'; });
+    svg.setAttribute('viewBox', vx.toFixed(1) + ' ' + vy.toFixed(1) + ' ' + vw.toFixed(1) + ' ' + vh.toFixed(1));
+    svg.innerHTML = out.join('');
+    svg.removeAttribute('hidden');
+    emptyBox.style.display = 'none';
+    meta.textContent = polys.length + ' 个地块 · ' + fmtArea(D.plotsTotalAreaM2(state.plots)) +
+      (dotCount ? ' · 高程点 ' + dotCount : '') + ' · 坐标 ' + (state._cs && state._cs.label ? state._cs.label : '未校验');
+  }
+
   /* ---------------- 回传主页 ---------------- */
 
   function sendHome() {
@@ -287,6 +369,7 @@
     D.saveState(state);
     renderPlots();
     renderElev();
+    drawCanvas();
     applyMode();
   }
 
@@ -313,6 +396,7 @@
 
     $('btnSendHome').addEventListener('click', sendHome);
     $('btnAddManual').addEventListener('click', addManual);
+    $('elevDots').addEventListener('change', drawCanvas);
     $('btnClear').addEventListener('click', function () {
       if (!state.plots.length && !state.elevations.length) return;
       if (confirm('清空全部地块与高程登记记录？（不可恢复）')) { state.plots = []; state.elevations = []; persistAndRender(); }

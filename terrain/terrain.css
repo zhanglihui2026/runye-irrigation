@@ -16,34 +16,58 @@ body {
 }
 body.t-engineering { background: #f3f6f9; }
 
-/* 顶栏 */
+/* 顶栏（模式条：导航下方全宽细条） */
 .t-top {
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-  background: var(--tg); color: #fff; padding: 10px 16px;
+  background: var(--tg); color: #fff; padding: 5px 16px;
 }
-.t-top h1 { font-size: 16px; margin: 0; font-weight: 600; }
+.t-top h1 { font-size: 14px; margin: 0; font-weight: 600; }
 .t-top .t-sub { font-size: 11px; opacity: .85; }
 .t-spacer { flex: 1; }
 .t-modebtn {
   border: 1px solid rgba(255,255,255,.6); background: transparent; color: #fff;
-  padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;
+  padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;
 }
 .t-modebtn.on { background: #fff; color: var(--tg-dark); font-weight: 700; }
 
 /* 提示条 */
-.t-banner { padding: 9px 16px; font-size: 13px; border-bottom: 1px solid var(--bd); }
+.t-banner { padding: 7px 16px; font-size: 12.5px; border-bottom: 1px solid var(--bd); }
 .t-warn  { background: var(--warn-bg); color: var(--warn-tx); border-left: 4px solid var(--warn-bd); }
 .t-ok    { background: var(--ok-bg);   color: var(--ok-tx);   border-left: 4px solid var(--ok-bd); }
 .t-danger{ background: var(--bad-bg);  color: var(--bad-tx);  border-left: 4px solid var(--bad-bd); }
 
-/* 布局 */
-.t-wrap { display: flex; gap: 14px; padding: 14px; align-items: flex-start; flex-wrap: wrap; }
-.t-card {
-  background: #fff; border: 1px solid var(--bd); border-radius: 6px;
-  padding: 12px 14px; flex: 1 1 380px; min-width: 340px;
+/* —— 主体两列（复刻「地块分区」pp-body 版式，骨架在 index.html 内联） —— */
+
+/* 左：工具栏（同 .pp-side 骨架：竖排卡片、栏内滚动、浅绿渐变） */
+.t-side{
+  align-self:start;max-height:100%;
+  display:flex;flex-direction:column;gap:8px;
+  overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
+  padding:9px;border-radius:12px;
+  background:linear-gradient(180deg,#f8fbf9 0%,#f2f7f4 100%);
+  border:1px solid #dde8e1;
 }
-.t-card h2 { font-size: 14px; margin: 0 0 10px; color: var(--tg-dark); border-bottom: 1px solid #eee; padding-bottom: 6px; }
-.t-card h2 small { color: var(--muted); font-weight: 400; margin-left: 6px; }
+.t-side>*{flex:0 0 auto}
+
+/* 右：制图区（同 .pp-stage：纵向 flex，画布撑满剩余高度） */
+.t-stage{display:flex;flex-direction:column;min-width:0;min-height:0}
+.t-canvas-head{
+  display:flex;align-items:center;gap:10px;
+  padding:6px 10px;font-size:13px;color:var(--tg-dark);
+}
+.t-canvas-head b{font-size:13px}
+.t-canvas-head span{color:var(--muted);font-size:11.5px}
+.t-chk{margin-left:auto;font-size:11.5px;color:var(--muted);cursor:pointer;user-select:none}
+.t-canvas-wrap{
+  flex:1 1 auto;min-height:0;position:relative;
+  background:#fff;border:1px solid #dde8e1;border-radius:10px;
+  overflow:hidden;
+}
+#tCanvas{display:block;width:100%;height:100%}
+
+/* 按钮组（左栏竖排） */
+.t-btncol{display:flex;flex-direction:column;gap:6px}
+.t-btncol .t-btn{width:100%;text-align:left}
 
 /* 按钮 */
 .t-btn {
@@ -56,10 +80,18 @@ body.t-engineering { background: #f3f6f9; }
 .t-btn:disabled { opacity: .45; cursor: not-allowed; }
 .t-btnrow { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
 
+/* 卡片（左栏内，宽度随栏） */
+.t-card {
+  background: #fff; border: 1px solid #dbe7e0; border-radius: 8px;
+  padding: 10px 12px;
+}
+.t-card h2 { font-size: 13px; margin: 0 0 8px; color: #2d604b; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+.t-card h2 small { color: var(--muted); font-weight: 400; margin-left: 4px; font-size: 11px; }
+
 /* 地块列表 */
 .t-plot {
-  display: flex; align-items: center; gap: 8px; padding: 7px 8px;
-  border: 1px solid #e4e4e4; border-radius: 4px; margin-bottom: 6px; font-size: 13px;
+  display: flex; align-items: center; gap: 6px; padding: 6px 7px;
+  border: 1px solid #e4e4e4; border-radius: 4px; margin-bottom: 6px; font-size: 12.5px;
 }
 .t-plot b { flex-shrink: 0; }
 .t-lv { background: #ede7f6; color: #5e35b1; font-size: 11px; padding: 1px 6px; border-radius: 8px; }
@@ -76,11 +108,11 @@ body.t-engineering { background: #f3f6f9; }
 .t-unit button { border: none; background: #fff; padding: 4px 12px; cursor: pointer; font-size: 12px; }
 .t-unit button.on { background: var(--tg); color: #fff; }
 .t-arearow {
-  display: flex; align-items: baseline; gap: 10px;
-  padding: 10px 12px; border: 1px solid #e0e0e0; border-radius: 5px; margin-bottom: 8px;
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 8px 10px; border: 1px solid #e0e0e0; border-radius: 5px;
 }
-.t-arearow .t-big { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.t-arearow .t-note { font-size: 11px; color: var(--muted); }
+.t-arearow .t-big { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; margin-left: auto; }
+.t-note { font-size: 11px; color: var(--muted); }
 .t-arearow.t-locked { background: #f5f5f5; color: #aaa; }
 .t-arearow.t-locked .t-big { color: #aaa; }
 .t-arearow.t-locked::after { content: "🔒"; margin-left: auto; }
@@ -102,13 +134,16 @@ body.t-engineering { background: #f3f6f9; }
 .t-cs { font-size: 12px; color: var(--muted); margin-top: 6px; }
 .t-cs b { color: var(--tg-dark); }
 
-/* 底栏 */
-.t-foot {
-  display: flex; gap: 10px; padding: 10px 16px 20px; align-items: center;
-}
+/* 制图区 SVG 元素 */
+.t-poly-face{fill:rgba(46,125,50,.10);stroke:var(--tg);stroke-width:1.5;vector-effect:non-scaling-stroke}
+.t-poly-face:hover{fill:rgba(46,125,50,.22)}
+.t-poly-vtx{fill:#fff;stroke:var(--tg-dark);stroke-width:1;vector-effect:non-scaling-stroke}
+.t-poly-label{font-family:"Microsoft YaHei",sans-serif;fill:#1b5e20;paint-order:stroke;stroke:rgba(255,255,255,.85);stroke-width:2px;pointer-events:none}
+.t-elev-dot{fill:#c62828;opacity:.75}
+.t-elev-dot.small{fill:#e57373;opacity:.55}
+.t-gridline{stroke:#eef3ef;stroke-width:1;vector-effect:non-scaling-stroke}
+
+/* 底栏（旧版遗留：回传/清空已移入左栏「地块清单」卡，本段仅防御性保留） */
+.t-foot { display: flex; gap: 10px; padding: 10px 16px 20px; align-items: center; }
 .t-foot .t-hint { font-size: 11px; color: var(--muted); }
 
-/* 窄屏 */
-@media (max-width: 760px) {
-  .t-card { min-width: 0; flex-basis: 100%; }
-}
