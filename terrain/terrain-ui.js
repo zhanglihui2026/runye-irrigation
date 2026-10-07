@@ -675,7 +675,6 @@
   var SP_COLORS = ['#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed', '#0891b2', '#be185d', '#4d7c0f']; /* 轮灌组着色 */
   var SP_DEFAULTS = { crop: '', etc: 4.5, eta: 0.7, soil: 'loam', slope: 8,
                       range: 15, flow: 2.5, pressure: 300, layout: 'tri', k: 1.1, heads: 12 };
-  var spCalculated = false;
 
   function spRead() {
     return {
@@ -706,10 +705,8 @@
       box.hidden = true;
       warnBox.hidden = false; warnBox.className = 't-spwarn';
       warnBox.textContent = res.error;
-      spCalculated = false;
       return;
     }
-    spCalculated = true;
     var rows = [
       '喷头间距 <b>' + res.spacing.toFixed(1) + ' m</b> × 行距 ' + res.rowSpacing.toFixed(1) + ' m（' + (res.layout === 'tri' ? '正三角形' : '正方形') + '）',
       '单喷头控制面积 <b>' + Math.round(res.headArea) + ' ㎡</b>',
@@ -724,6 +721,10 @@
     warnBox.hidden = res.warn.length === 0;
     warnBox.className = 't-spwarn';
     warnBox.innerHTML = res.warn.map(esc).join('<br>');
+    /* v298e：参数生效后重绘制图区——分区（辐射圆着色）/管道/喷头/图例管径
+       全部按新参数重建（drawCanvas 内部 spRead() 实时读参数）。
+       无效参数（res.ok=false）已在上方 return，画布保留旧布置只报警告。 */
+    drawCanvas();
   }
 
   /* 轮灌演示（v290）：分组依次点亮——当前组满亮、其余压暗；再点停止并清空高亮。
@@ -857,8 +858,17 @@
       spDemoTimer = setInterval(spDemoTick, 2200);
       $('spDemo').textContent = '\u23F8 \u505c\u6b62\u6f14\u793a';
     }); /* 轮灌演示动画 */
+    /* v298e：参数改动即时生效——change（下拉/步进/失焦）立即重算；
+       打字过程用 input 事件 + 350ms 防抖（合并中间态）。
+       不再要求先点过「估算」：图上已按参数画布置，参数一改就必须重算分区与管径。
+       无效输入（如清空再打字）由 calcSprinkler 报警告并保留旧布置。 */
+    var spInputTimer = null;
+    function spAutoCalc() { clearTimeout(spInputTimer); spInputTimer = setTimeout(calcSprinkler, 350); }
     ['spCrop', 'spEtc', 'spEta', 'spSoil', 'spSlope', 'spRange', 'spFlow', 'spPressure', 'spLayout', 'spK', 'spHeads']
-      .forEach(function (id) { $(id).addEventListener('change', function () { if (spCalculated) calcSprinkler(); }); });
+      .forEach(function (id) {
+        $(id).addEventListener('change', function () { clearTimeout(spInputTimer); calcSprinkler(); });
+        $(id).addEventListener('input', spAutoCalc);
+      });
   }
 
   /* ---------------- 接住在线地图「回传地形模块」 ----------------
