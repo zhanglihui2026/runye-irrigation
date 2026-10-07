@@ -274,6 +274,7 @@
       emptyBox.style.display = '';
       meta.textContent = '暂无地块数据';
       $('elevDotWrap').hidden = true;
+      canvasView = null; canvasFitKey = '';
       return;
     }
     /* 联合 bbox + 5% 视野余量 */
@@ -325,12 +326,101 @@
       });
     }
     $('elevDotWrap').hidden = !state.elevations.some(function (r) { return r.data_type === 'rtk_xyz'; });
-    svg.setAttribute('viewBox', vx.toFixed(1) + ' ' + vy.toFixed(1) + ' ' + vw.toFixed(1) + ' ' + vh.toFixed(1));
+    /* 视图管理：几何数据变化（fit 改变）→ 重置全览；仅标签变化（单位切换）→ 保持用户缩放/平移 */
+    var fitKey = vx.toFixed(1) + ',' + vy.toFixed(1) + ',' + vw.toFixed(1) + ',' + vh.toFixed(1);
+    if (!canvasView || fitKey !== canvasFitKey) {
+      canvasFitKey = fitKey;
+      canvasView = {
+        x: vx, y: vy, w: vw, h: vh,
+        w0: vw,                                  /* 缩放上下限基准（全览宽度） */
+        fx: vx, fy: vy, fw: vw, fh: vh           /* 复位目标 */
+      };
+    }
+    canvasApplyView();
     svg.innerHTML = out.join('');
     svg.removeAttribute('hidden');
     emptyBox.style.display = 'none';
     meta.textContent = polys.length + ' 个地块 · ' + fmtArea(D.plotsTotalAreaM2(state.plots)) +
       (dotCount ? ' · 高程点 ' + dotCount : '') + ' · 坐标 ' + (state._cs && state._cs.label ? state._cs.label : '未校验');
+  }
+
+  /* ---------------- 制图区视图导航（滚轮缩放 / 拖拽平移 / 复位） ----------------
+     view = 当前 viewBox {x,y,w,h}；fit = 数据联合 bbox + 5% 余量。
+     · 缩放/平移只改 view 并应用 viewBox，不重绘内容；
+     · 几何数据变化（导入/删除）时 fit 变化 → 自动重置全览；
+       单位切换只改标签文字 → fit 不变 → 保持用户视图。 */
+
+  var canvasView = null, canvasFitKey = '';
+
+  function canvasApplyView() {
+    var svg = $('tCanvas');
+    if (!canvasView) return;
+    svg.setAttribute('viewBox',
+      canvasView.x.toFixed(2) + ' ' + canvasView.y.toFixed(2) + ' ' +
+      canvasView.w.toFixed(2) + ' ' + canvasView.h.toFixed(2));
+  }
+
+  function canvasZoomAt(svgPt, factor) {
+    if (!canvasView) return;
+    var w = canvasView.w * factor, h = canvasView.h * factor;
+    if (w < canvasView.w0 * 0.02 || w > canvasView.w0 * 4) return; /* 2%~400% */
+    canvasView.x = svgPt.x - (svgPt.x - canvasView.x) * factor;
+    canvasView.y = svgPt.y - (svgPt.y - canvasView.y) * factor;
+    canvasView.w = w; canvasView.h = h;
+    canvasApplyView();
+  }
+
+  function svgPointFromEvent(e) {
+    var svg = $('tCanvas');
+    var pt = svg.createSVGPoint ? svg.createSVGPoint() : null;
+    if (!pt) return null;
+    pt.x = e.clientX; pt.y = e.clientY;
+    var ctm = svg.getScreenCTM();
+    if (!ctm) return null;
+    return pt.matrixTransform(ctm.inverse());
+  }
+
+  function initCanvasNav() {
+    var wrap = $('canvasWrap'), svg = $('tCanvas');
+    if (!wrap || !svg) return;
+
+    /* 滚轮缩放（以鼠标位置为锚） */
+    wrap.addEventListener('wheel', function (e) {
+      if (!canvasView) return;
+      e.preventDefault();
+      var p = svgPointFromEvent(e);
+      if (p) canvasZoomAt(p, e.deltaY > 0 ? 1.15 : 1 / 1.15);
+    }, { passive: false });
+
+    /* 拖拽平移（grab / grabbing；拖拽期间缩放比例不变，用起点 CTM 换算） */
+    var pan = null;
+    wrap.addEventListener('pointerdown', function (e) {
+      if (!canvasView || e.button !== 0) return;
+      var ctm = svg.getScreenCTM();
+      if (!ctm || !ctm.a) return;
+      pan = { x: e.clientX, y: e.clientY, vx: canvasView.x, vy: canvasView.y, sx: ctm.a };
+      wrap.classList.add('t-panning');
+      if (e.preventDefault) e.preventDefault();
+    });
+    document.addEventListener('pointermove', function (e) {
+      if (!pan) return;
+      canvasView.x = pan.vx - (e.clientX - pan.x) / pan.sx;
+      canvasView.y = pan.vy - (e.clientY - pan.y) / pan.sx;
+      canvasApplyView();
+    });
+    document.addEventListener('pointerup', function () { if (pan) { pan = null; wrap.classList.remove('t-panning'); } });
+    document.addEventListener('pointercancel', function () { if (pan) { pan = null; wrap.classList.remove('t-panning'); } });
+
+    /* +/−/复位 按钮 */
+    $('zoomIn').addEventListener('click', function () {
+      if (canvasView) canvasZoomAt({ x: canvasView.x + canvasView.w / 2, y: canvasView.y + canvasView.h / 2 }, 1 / 1.3);
+    });
+    $('zoomOut').addEventListener('click', function () {
+      if (canvasView) canvasZoomAt({ x: canvasView.x + canvasView.w / 2, y: canvasView.y + canvasView.h / 2 }, 1.3);
+    });
+    $('zoomReset').addEventListener('click', function () {
+      if (canvasView) { canvasView = { x: canvasView.fx, y: canvasView.fy, w: canvasView.fw, h: canvasView.fh, w0: canvasView.fw, fx: canvasView.fx, fy: canvasView.fy, fw: canvasView.fw, fh: canvasView.fh }; canvasApplyView(); }
+    });
   }
 
   /* ---------------- 回传主页 ---------------- */
@@ -465,6 +555,7 @@
     $('btnSendHome').addEventListener('click', sendHome);
     $('btnAddManual').addEventListener('click', addManual);
     $('elevDots').addEventListener('change', drawCanvas);
+    initCanvasNav();
     $('btnClear').addEventListener('click', function () {
       if (!state.plots.length && !state.elevations.length) return;
       if (confirm('清空全部地块与高程登记记录？（不可恢复）')) { state.plots = []; state.elevations = []; persistAndRender(); }

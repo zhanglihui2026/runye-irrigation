@@ -127,7 +127,24 @@ body.t-col-resizing .t-stage{pointer-events:none}   /* 拖拽中不让画布吃�
   background:var(--u-canvas);border:1px solid #dde8e1;border-radius:10px;
   overflow:hidden;
 }
-#tCanvas{display:block;width:100%;height:100%}
+#tCanvas{display:block;width:100%;height:100%;cursor:grab}
+.t-canvas-wrap.t-panning #tCanvas{cursor:grabbing}
+.t-canvas-wrap.t-panning{user-select:none}
+
+/* 缩放控件（画布右上角小工具条，主页工具条同观感） */
+.t-canvas-nav{
+  position:absolute;top:10px;right:10px;z-index:5;
+  display:flex;flex-direction:column;gap:4px;
+}
+.t-canvas-nav button{
+  width:30px;height:30px;border:1px solid var(--u-line);
+  background:rgba(255,255,255,.94);color:var(--u-ink-2);
+  border-radius:var(--radius-xs);cursor:pointer;font-size:15px;line-height:1;
+  transition:var(--transition);
+  box-shadow:0 1px 4px rgba(15,23,42,.08);
+}
+.t-canvas-nav button:hover{background:var(--g-50);color:var(--g-700);border-color:var(--g-400)}
+.t-navhint{margin-left:auto;font-size:11px;color:var(--u-ink-3);opacity:.8}
 
 /* —— 卡片（左栏内；白卡 + 深绿标题，同二级参数卡观感） —— */
 .t-card {

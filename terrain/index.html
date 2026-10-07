@@ -135,10 +135,16 @@
   <section class="t-stage">
     <div class="t-canvas-head">
       <b>制图区</b><span id="canvasMeta">暂无地块数据</span>
+      <span class="t-navhint">滚轮缩放 · 拖拽平移</span>
       <label class="t-chk" id="elevDotWrap" hidden><input type="checkbox" id="elevDots" checked> 显示高程点</label>
     </div>
     <div class="t-canvas-wrap" id="canvasWrap">
       <svg id="tCanvas" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" hidden></svg>
+      <div class="t-canvas-nav" id="tCanvasNav">
+        <button id="zoomIn" title="放大">＋</button>
+        <button id="zoomOut" title="缩小">－</button>
+        <button id="zoomReset" title="复位全览">⌂</button>
+      </div>
       <div class="t-empty" id="canvasEmpty">暂无地块。请在左侧工具栏「导入 shp 边界」「导入 RTK 边界 CSV」或「手动粘贴顶点」。<br>导入后此处按 CGCS2000 平面坐标绘制地块轮廓。</div>
     </div>
   </section>
