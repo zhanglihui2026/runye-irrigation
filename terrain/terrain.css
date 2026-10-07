@@ -1,0 +1,114 @@
+/* ============================================================
+   terrain.css — 润野灌溉 地形模块 · 独立样式（阶段1）
+   [NEW MODULE: 地形模块] 仅作用于 terrain/ 页面，不影响主页。
+   ============================================================ */
+:root {
+  --tg: #2e7d32; --tg-dark: #1b5e20;
+  --warn-bg: #fff8e1; --warn-bd: #f0a000; --warn-tx: #7a5200;
+  --ok-bg: #e8f5e9; --ok-bd: #2e7d32; --ok-tx: #1b5e20;
+  --bad-bg: #fdecea; --bad-bd: #d32f2f; --bad-tx: #a31515;
+  --bd: #d8d8d8; --muted: #888;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; font-family: "Microsoft YaHei", system-ui, sans-serif;
+  background: #f4f6f4; color: #222; font-size: 14px;
+}
+body.t-engineering { background: #f3f6f9; }
+
+/* 顶栏 */
+.t-top {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  background: var(--tg); color: #fff; padding: 10px 16px;
+}
+.t-top h1 { font-size: 16px; margin: 0; font-weight: 600; }
+.t-top .t-sub { font-size: 11px; opacity: .85; }
+.t-spacer { flex: 1; }
+.t-modebtn {
+  border: 1px solid rgba(255,255,255,.6); background: transparent; color: #fff;
+  padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;
+}
+.t-modebtn.on { background: #fff; color: var(--tg-dark); font-weight: 700; }
+
+/* 提示条 */
+.t-banner { padding: 9px 16px; font-size: 13px; border-bottom: 1px solid var(--bd); }
+.t-warn  { background: var(--warn-bg); color: var(--warn-tx); border-left: 4px solid var(--warn-bd); }
+.t-ok    { background: var(--ok-bg);   color: var(--ok-tx);   border-left: 4px solid var(--ok-bd); }
+.t-danger{ background: var(--bad-bg);  color: var(--bad-tx);  border-left: 4px solid var(--bad-bd); }
+
+/* 布局 */
+.t-wrap { display: flex; gap: 14px; padding: 14px; align-items: flex-start; flex-wrap: wrap; }
+.t-card {
+  background: #fff; border: 1px solid var(--bd); border-radius: 6px;
+  padding: 12px 14px; flex: 1 1 380px; min-width: 340px;
+}
+.t-card h2 { font-size: 14px; margin: 0 0 10px; color: var(--tg-dark); border-bottom: 1px solid #eee; padding-bottom: 6px; }
+.t-card h2 small { color: var(--muted); font-weight: 400; margin-left: 6px; }
+
+/* 按钮 */
+.t-btn {
+  border: 1px solid var(--tg); background: var(--tg); color: #fff;
+  padding: 7px 12px; border-radius: 4px; cursor: pointer; font-size: 13px;
+}
+.t-btn:hover { background: var(--tg-dark); }
+.t-btn.ghost { background: #fff; color: var(--tg); }
+.t-btn.danger { background: #fff; color: var(--bad-bd); border-color: var(--bad-bd); }
+.t-btn:disabled { opacity: .45; cursor: not-allowed; }
+.t-btnrow { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+
+/* 地块列表 */
+.t-plot {
+  display: flex; align-items: center; gap: 8px; padding: 7px 8px;
+  border: 1px solid #e4e4e4; border-radius: 4px; margin-bottom: 6px; font-size: 13px;
+}
+.t-plot b { flex-shrink: 0; }
+.t-lv { background: #ede7f6; color: #5e35b1; font-size: 11px; padding: 1px 6px; border-radius: 8px; }
+.t-src { color: var(--muted); font-size: 11px; }
+.t-area { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 600; }
+.t-del {
+  border: none; background: transparent; color: #c62828; cursor: pointer;
+  font-size: 14px; padding: 2px 6px;
+}
+.t-empty { color: var(--muted); font-size: 12px; padding: 12px 4px; }
+
+/* 面积卡片 */
+.t-unit { display: inline-flex; border: 1px solid var(--bd); border-radius: 4px; overflow: hidden; margin-bottom: 8px; }
+.t-unit button { border: none; background: #fff; padding: 4px 12px; cursor: pointer; font-size: 12px; }
+.t-unit button.on { background: var(--tg); color: #fff; }
+.t-arearow {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 10px 12px; border: 1px solid #e0e0e0; border-radius: 5px; margin-bottom: 8px;
+}
+.t-arearow .t-big { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.t-arearow .t-note { font-size: 11px; color: var(--muted); }
+.t-arearow.t-locked { background: #f5f5f5; color: #aaa; }
+.t-arearow.t-locked .t-big { color: #aaa; }
+.t-arearow.t-locked::after { content: "🔒"; margin-left: auto; }
+
+/* 高程面板 */
+.t-tabs { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+.t-tabs button {
+  border: 1px solid var(--bd); background: #fafafa; border-radius: 4px 4px 0 0;
+  padding: 6px 10px; cursor: pointer; font-size: 12px;
+}
+.t-tabs button.on { background: var(--tg); border-color: var(--tg); color: #fff; }
+.t-elev {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  border: 1px solid #e4e4e4; border-radius: 4px; padding: 6px 8px; margin-bottom: 6px; font-size: 12px;
+}
+.t-elev span { color: var(--muted); }
+.t-elev-dsm { border-color: var(--warn-bd); background: var(--warn-bg); }
+.t-dsm-tag { color: var(--bad-tx); font-style: normal; font-weight: 700; font-size: 11px; }
+.t-cs { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.t-cs b { color: var(--tg-dark); }
+
+/* 底栏 */
+.t-foot {
+  display: flex; gap: 10px; padding: 10px 16px 20px; align-items: center;
+}
+.t-foot .t-hint { font-size: 11px; color: var(--muted); }
+
+/* 窄屏 */
+@media (max-width: 760px) {
+  .t-card { min-width: 0; flex-basis: 100%; }
+}

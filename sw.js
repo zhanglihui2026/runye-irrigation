@@ -1,6 +1,6 @@
 /* Runye PWA v1. Increment VERSION when changing the offline shell. */
 'use strict';
-const VERSION = 'v285b-iso-nomirror';
+const VERSION = 'v286-terrain-stage1';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
@@ -65,6 +65,10 @@ const CORE = [
   "runye-nav.css",
   "runye-nav.js",
   "runye-theme.css",
+  "terrain/index.html",
+  "terrain/terrain-core.js",
+  "terrain/terrain-ui.js",
+  "terrain/terrain.css",
   "tl-workspace/tl-auto-edits.js",
   "tl-workspace/tl-edit-pipes.js",
   "tl-workspace/tl-nodes.js",

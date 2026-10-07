@@ -27,6 +27,8 @@
     /* [v250 2026-10-06 用户要求] 在线地图 移到 地块绘制 之前 */
     { label: '在线地图',     href: 'runye-map-measure.html',   pre: 1 },
     { label: '地块绘制',     hash: 'areaTool',                 pre: 1 },
+    /* [NEW MODULE: 地形模块] 阶段1 基础框架（terrain/ 独立目录，卸载=删除本行+terrain/+sw.js 条目） */
+    { label: '地形模块',     href: 'terrain/index.html',       pre: 1, title: '地形模块：shp/RTK边界导入、CGCS2000校验、面积、高程数据源登记' },
     /* [v250 2026-10-06 用户要求] 「二级管路」改名「地块分区」；
        [v250] 「三级管路编辑」改名「管路规划」（底部状态栏 NAMES 映射与
        pipe_optim_ui 提示文案同步改名）。hash/id 不变，仅显示名变。 */
