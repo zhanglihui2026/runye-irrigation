@@ -103,6 +103,11 @@ details.t-fold > .t-cardbody { padding: 10px 12px; }
 }
 .t-spwarn:empty { display: none; }
 
+/* 喷灌布置勾选行（v298g）：勾选框挨着文字、整行在卡内水平居中。
+   覆盖 .t-sprow input 的 flex:1——checkbox 被拉宽会把文字推到最右。 */
+label.t-sp-overlay { justify-content: center; }
+label.t-sp-overlay input { flex: 0 0 auto; width: auto; }
+
 /* —— 模式条（导航下方全宽细条；白底 + 1px 下边，同主页顶栏扁平观感） —— */
 .t-top {
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
