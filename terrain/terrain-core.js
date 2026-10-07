@@ -555,8 +555,9 @@
       }
     }
 
-    /* 管径初估（v293）：干管=轮灌组流量（1.5 m/s）；支管=最不利单管流量
-       （轮灌组内同一支管最多同时工作喷头数 ≤ min(每组头数, 该行头数)，1.2 m/s） */
+    /* 管径初估（v294）：干管=轮灌组流量 @1.2 m/s（长距离输水取低流速减损失）；
+       支管=最不利单管流量（组内同一支管最多同时工作喷头数 ≤ min(每组头数, 该行头数)）
+       @1.5 m/s（管段短允许较高流速）——保证主管 ≥ 支管的工程惯例 */
     var mainDN = null, latDN = null, mainFlow = 0, latFlow = 0;
     var qf = isNum(input.flow_m3h) ? input.flow_m3h : 0;
     if (qf > 0 && heads.length) {
@@ -565,8 +566,8 @@
       rowsAgg.forEach(function (ra) { maxRowHeads = Math.max(maxRowHeads, ra.xs.length); });
       mainFlow = nShift * qf;
       latFlow = Math.min(nShift, maxRowHeads) * qf;
-      mainDN = pipeDN(mainFlow, 1.5);
-      latDN = pipeDN(latFlow, 1.2);
+      mainDN = pipeDN(mainFlow, 1.2);
+      latDN = pipeDN(latFlow, 1.5);
     }
 
     return {

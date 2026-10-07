@@ -92,8 +92,9 @@ const d10 = core.pipeDN(10, 1.5);
 ok(d10.dn === 50, '10 m³/h → 理论 48.6mm → DN50（向上贴标，注入「向下取」会变红）');
 ok(core.pipeDN(0, 1.5) === null && core.pipeDN(30, 0) === null, '反例：零流量/零流速 → null');
 const L2b = core.sprinklerLayout([{ poly: sq100 }], { range_m: 10, spacing_k: 1.1, layout: 'square', heads_per_shift: 12, flow_m3h: 2.5 });
-ok(L2b.mainDN && L2b.mainDN.dn === 90 && Math.abs(L2b.mainFlow - 30) < 1e-9, '布置图：干管流量 12×2.5=30 → Φ90');
-ok(L2b.latDN && Math.abs(L2b.latFlow - 22.5) < 1e-9 && L2b.latDN.dn === 90, '布置图：最不利支管 min(12,9)×2.5=22.5 m³/h → Φ90');
+ok(L2b.mainDN && L2b.mainDN.dn === 110 && Math.abs(L2b.mainDN.theory - 94.0) < 0.1 && Math.abs(L2b.mainFlow - 30) < 1e-9, '布置图：干管 30 m³/h@1.2m/s → 理论 94.0mm → Φ110');
+ok(L2b.latDN && Math.abs(L2b.latFlow - 22.5) < 1e-9 && L2b.latDN.dn === 75, '布置图：最不利支管 22.5 m³/h@1.5m/s → 理论 72.9mm → Φ75（注入「流速不换位」会变红）');
+ok(L2b.mainDN.dn >= L2b.latDN.dn, '主管 ≥ 支管（工程惯例不变量）');
 const L2c = core.sprinklerLayout([{ poly: sq100 }], { range_m: 10, spacing_k: 1.1, layout: 'square' });
 ok(L2c.mainDN === null, '未填喷头流量 → 不出管径（图例不显示 Φ）');
 

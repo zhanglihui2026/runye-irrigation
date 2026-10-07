@@ -854,6 +854,7 @@
       if (added || updated) {
         setUnit('mu'); /* 回传导入成功：面积显示默认切为亩（内部恒为平方米） */
         persistAndRender();
+        incomingBannerShown = true;
         banner('warn',
           '✓ 在线地图回传已导入 <b>' + added + '</b> 个地块（WGS-84 经纬度已按局部米制投影，面积已按<b>亩</b>显示）。' +
           (updated ? '另有 <b>' + updated + '</b> 个同名地块已<b>原地更新</b>（未重复导入）。' : '') +
@@ -863,13 +864,38 @@
     } catch (e) { /* 契约损坏：清除防卡死 */ try { localStorage.removeItem('runye_terrain_incoming'); } catch (e2) {} }
   }
 
+  /* v292b：清理历史版本积累的重复导入副本（同名+同源+面积差<1% 只留最早一份） */
+  var incomingBannerShown = false;
+  function dedupePlots() {
+    var removed = 0;
+    for (var i = state.plots.length - 1; i >= 0; i--) {
+      var p = state.plots[i];
+      if (p.source !== '在线地图' || !Array.isArray(p.poly) || p.poly.length < 3) continue;
+      var sqm = D.polygonAreaM2(p.poly);
+      for (var j = 0; j < i; j++) {
+        var q = state.plots[j];
+        if (q.name !== p.name || q.source !== '在线地图' || !Array.isArray(q.poly) || q.poly.length < 3) continue;
+        var sqmQ = D.polygonAreaM2(q.poly);
+        if (sqmQ > 0 && sqm > 0 && Math.abs(sqmQ - sqm) / sqmQ < 0.01) {
+          state.plots.splice(i, 1); removed++; break;
+        }
+      }
+    }
+    if (removed) D.saveState(state);
+    return removed;
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     bind();
     initGrip();
     bindSprinkler();
     setUnit(areaUnit); /* 同步单位按钮初始态（含持久化偏好恢复） */
+    var dedupRemoved = dedupePlots(); /* 清理历史重复导入副本（v292b） */
     persistAndRender();
     consumeIncoming(); /* 必须在 persistAndRender 之后：用自己的导入提示条收尾 */
+    if (dedupRemoved > 0 && !incomingBannerShown) {
+      banner('ok', '✓ 已自动清理 <b>' + dedupRemoved + '</b> 个重复导入的地块副本（同名同面积的在线地图地块只保留一个），总面积已修正。');
+    }
   });
 
   /* 供测试/自动化探针使用 */
