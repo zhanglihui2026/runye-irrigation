@@ -57,8 +57,10 @@
     return p.split('/').pop() || 'index.html';
   }
   /* 单个导航项 → 元素（顶层与「更多」面板共用同一套皮肤/属性逻辑） */
-  function makeItem(it, base) {
-    var localAction = it.act && curFile() === it.page;
+  function makeItem(it, base, root) {
+    /* [v286g] root=子目录页声明的根前缀（如 terrain/ 页的 ../）：
+       有 root 的页面绝不是 act 宿主页（主页在站点根）⇒ act 项恒为跨页 <a>。 */
+    var localAction = it.act && curFile() === it.page && !root;
     var a = document.createElement(localAction ? 'button' : 'a');
     if (localAction) a.type = 'button';
     a.className = 'fn-link';
@@ -67,7 +69,7 @@
     a.textContent = it.label;
     if (it.title) a.title = it.title;
     if (it.act && !localAction) {
-      a.href = it.page + '#nav-' + it.act;
+      a.href = root + it.page + '#nav-' + it.act;
     } else if (localAction) {
       /* 动作按钮：点击调页面注册的 window.RyFnNavActions[act]（无注册则忽略） */
       a.setAttribute('data-ry-navact', it.act);
@@ -80,7 +82,7 @@
       if (global.RyMobile && global.RyMobile.isActive() && (it.hash === 'pipePlanSection' || it.hash === 'tlPipePlanSection')) {
         a.href = 'runye-mobile-map-preview.html?v=242#' + (it.hash === 'pipePlanSection' ? 'second' : 'third');
       } else {
-        a.href = base + it.hash;
+        a.href = root + base + it.hash;
         if (!base) a.setAttribute('data-target', it.hash);
       }
     } else {
@@ -89,7 +91,7 @@
       if (navHref === 'runye-map-measure.html' && global.RyMobile && global.RyMobile.isActive()) {
         navHref = 'runye-mobile-map-preview.html?v=242';
       }
-      a.href = navHref;
+      a.href = root + navHref;
       /* 当前页高亮：仅普通站内链接参与（锚点项由页面自有逻辑管理 active） */
       if (curFile() === navHref.split('#')[0]) a.classList.add('active');
     }
@@ -100,7 +102,7 @@
      坐标在打开时按触发钮实时算，滚动/改窗即收起。 */
   var morePanelEl = null;
   var moreGlobalsBound = false;
-  function buildMore(base) {
+  function buildMore(base, root) {
     var wrap = document.createElement('div');
     wrap.className = 'fn-more';
     wrap.setAttribute('data-ry-navitem', '1');
@@ -120,7 +122,7 @@
     panel.className = 'fn-more-panel';
     panel.hidden = true;
     panel.setAttribute('role', 'menu');
-    MORE_ITEMS.forEach(function (it) { panel.appendChild(makeItem(it, base)); });
+    MORE_ITEMS.forEach(function (it) { panel.appendChild(makeItem(it, base, root)); });
     wrap.appendChild(btn);
     wrap.appendChild(panel);
     morePanelEl = panel;
@@ -183,18 +185,20 @@
   }
   function mount(el) {
     var base = el.getAttribute('data-base') || '';
+    /* [v286g] 子目录页（如 terrain/index.html）声明 data-root="../"，站内相对链接统一上跳一级 */
+    var root = el.getAttribute('data-root') || '';
     /* 重复调用防护：只清本渲染器注入的节点，保留页面静态子项 */
     Array.prototype.slice.call(el.querySelectorAll('[data-ry-navitem]')).forEach(function (n) {
       if (n.parentNode) n.parentNode.removeChild(n);
     });
     var marker = el.firstElementChild;
     ITEMS.forEach(function (it) {
-      var a = makeItem(it, base);
+      var a = makeItem(it, base, root);
       if (it.pre && marker) el.insertBefore(a, marker);
       else el.appendChild(a);
     });
     /* [v247] 折叠组追加在末尾（⚙️设置 带 order:999 仍钉在最右，视觉顺序不受 DOM 影响） */
-    var more = buildMore(base);
+    var more = buildMore(base, root);
     lastWrap = more;
     el.appendChild(more);
   }

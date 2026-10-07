@@ -39,11 +39,13 @@
 </head>
 <body>
 
-<!-- 顶部功能区导航（与主页/在线地图页同一份清单：runye-nav.js 唯一出处） -->
+<!-- 顶部功能区导航（与主页/在线地图页同一份清单：runye-nav.js 唯一出处）
+     data-root="../"：本页在 terrain/ 子目录 —— [v286g] 站内相对链接统一上跳一级，
+     否则锚点项跳回本页、跨页项 404（act 项还会被误判成主页内按钮）。 -->
 <nav class="fn-nav" aria-label="功能区导航">
-  <div class="fn-inner" data-ry-fnnav data-base="index.html#"></div>
+  <div class="fn-inner" data-ry-fnnav data-base="index.html#" data-root="../"></div>
 </nav>
-<script src="../runye-nav.js?v=286"></script>
+<script src="../runye-nav.js?v=287"></script>
 
 <!-- 模式条：标题 + 预览/工程切换（全宽细条，位于导航与工作区之间） -->
 <header class="t-top">
