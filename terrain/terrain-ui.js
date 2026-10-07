@@ -96,14 +96,27 @@
     $('areaProjNote').textContent = state.plots.length > 1
       ? '共 ' + state.plots.length + ' 个子多边形（含梯台预留位），已汇总'
       : '鞋带公式 · 水平投影';
-    /* 地表斜面面积卡：无高程 → 置灰锁定 */
+    /* 地表斜面面积卡（v298 P1-5）：有 RTK 高程 → 平均坡度近似开放；无 → 置灰锁定 */
     var surf = $('areaSurfCard');
     var has = hasElevation();
     surf.classList.toggle('t-locked', !has);
-    $('areaSurf').textContent = has ? '待开放' : '—';
-    $('areaSurfNote').textContent = has
-      ? '已具备高程数据 · 表面积引擎阶段2开放'
-      : '需要上传高程数据才可计算';
+    var surfTxt = '—', surfNote = '需要上传高程数据才可计算';
+    if (has) {
+      var rtkPts = [];
+      state.elevations.forEach(function (r) {
+        if (r.data_type === 'rtk_xyz' && Array.isArray(r.point_list)) rtkPts = rtkPts.concat(r.point_list);
+      });
+      var sa = D.surfaceAreaApprox(D.plotsTotalAreaM2(state.plots), rtkPts);
+      if (sa.ok) {
+        surfTxt = fmtArea(sa.surfSqm);
+        surfNote = '近似 · 平均坡度 ' + sa.slopeDeg.toFixed(1) + '°（' + sa.n + ' 点拟合 · 精细 TIN 积分属阶段2）';
+      } else {
+        surfTxt = '—';
+        surfNote = '已登记高程暂不可用：' + sa.error;
+      }
+    }
+    $('areaSurf').textContent = surfTxt;
+    $('areaSurfNote').textContent = surfNote;
     $('btnSendHome').disabled = total <= 0;
   }
 
@@ -132,18 +145,25 @@
       var r = D.parseSHP(reader.result);
       if (!r.ok) { banner('danger', '✕ shp 解析失败：' + esc(r.error)); return; }
       /* 同目录 .prj：让用户一并选择（阶段1 不做 zip/多文件拖拽，明示即可） */
-      state.plots = state.plots.concat(r.features.map(function (f, i) {
-        return {
+      var shpWarns = [];
+      var kept = [];
+      r.features.forEach(function (f, i) {
+        var s = D.sanitizeRing(f.poly);
+        if (!s.ok) { shpWarns.push('要素#' + (i + 1) + ' 已跳过：' + s.error); return; }
+        shpWarns = shpWarns.concat(s.warn.map(function (w) { return '要素#' + (i + 1) + '：' + w; }));
+        kept.push({
           id: 'shp_' + Date.now() + '_' + i,
           name: (file.name.replace(/\.shp$/i, '')) + (r.features.length > 1 ? '#' + (i + 1) : ''),
-          poly: f.poly.map(function (pt) { return { x: Math.round(pt.x * 100) / 100, y: Math.round(pt.y * 100) / 100 }; }),
+          poly: s.pts.map(function (pt) { return { x: Math.round(pt.x * 100) / 100, y: Math.round(pt.y * 100) / 100 }; }),
           level: null, source: 'shp',
           _zHint: f.zHint, _ringsDropped: f.ringsDropped
-        };
-      }));
+        });
+      });
+      state.plots = state.plots.concat(kept);
       persistAndRender();
       banner('warn',
-        'shp 已解析出 <b>' + r.features.length + '</b> 个面要素。' +
+        'shp 已解析出 <b>' + kept.length + '</b> 个面要素' + (kept.length < r.features.length ? '（<b>' + (r.features.length - kept.length) + '</b> 个坏环已跳过）' : '') + '。' +
+        (shpWarns.length ? '<br>' + shpWarns.map(esc).join('<br>') : '') +
         '<b>请同时上传同名 .prj 文件做 CGCS2000 校验</b>（未校验前按数值启发式判断）。' +
         (r.features.some(function (f) { return f.ringsDropped; }) ? ' 部分要素含内环/洞（阶段1 未参与计算，阶段2 处理）。' : ''));
     };
@@ -173,17 +193,18 @@
       if (cs.cs === 'lonlat') {
         banner('danger', '✕ ' + esc(cs.warn)); return; /* 经纬度 → 锁面积，拒绝导入 */
       }
-      var ring = r.points.map(function (p) { return { x: p.x, y: p.y }; });
+      var s = D.sanitizeRing(r.points);
+      if (!s.ok) { banner('danger', '✕ 边界环无效：' + esc(s.error)); return; }
       state.plots.push({
         id: 'csv_' + Date.now(),
         name: file.name.replace(/\.(csv|txt)$/i, ''),
-        poly: ring.map(function (pt) { return { x: Math.round(pt.x * 100) / 100, y: Math.round(pt.y * 100) / 100 }; }),
+        poly: s.pts.map(function (pt) { return { x: Math.round(pt.x * 100) / 100, y: Math.round(pt.y * 100) / 100 }; }),
         level: null, source: 'RTK边界CSV'
       });
       persistAndRender();
       $('csResult').textContent = cs.label;
-      banner(cs.confidence === 'medium' ? 'warn' : 'danger',
-        '边界 CSV 已导入 ' + r.points.length + ' 点。' + esc(cs.warn || ('坐标系：' + cs.label)));
+      banner(s.warn.length ? 'warn' : (cs.confidence === 'medium' ? 'warn' : 'danger'),
+        '边界 CSV 已导入 ' + s.pts.length + ' 点' + (s.warn.length ? '（' + esc(s.warn.join('；')) + '）' : '') + '。' + esc(cs.warn || ('坐标系：' + cs.label)));
     };
     reader.readAsText(file);
   }
@@ -454,7 +475,10 @@
   function sendHome() {
     var total = D.plotsTotalAreaM2(state.plots);
     if (total <= 0) return;
-    /* 用最大子多边形做回传轮廓（主页 measuredPolygon 单环契约） */
+    /* 主环用最大子多边形（兼容旧版主页单环消费方）；全部子多边形另经 subPlots 多环回传
+       （v298 P0-3：主页二级管路「成组地块」按各子环分别布管，不再吞掉块间空隙）。
+       ★ isXY: terrain 的 poly 是 CGCS2000 平面米坐标（画布口径 y 向下），
+         主页必须跳过经纬度投影与 v217 垂直镜像，直接入画。 */
     var best = null, bestA = -1;
     state.plots.forEach(function (p) {
       var a = D.polygonAreaM2(p.poly);
@@ -468,6 +492,17 @@
       sqm: Math.round(total * 100) / 100,
       mu: D.sqmToMu(total),
       poly: best.poly,
+      isXY: true,
+      subPlots: state.plots.map(function (p, i) {
+        var a = D.polygonAreaM2(p.poly);
+        return {
+          id: p.id || ('st' + i),
+          name: p.name || ('子地块' + (i + 1)),
+          sqm: Math.round(a * 100) / 100,
+          mu: D.sqmToMu(a),
+          poly: p.poly
+        };
+      }),
       source: 'terrain'
     };
     try {
@@ -610,15 +645,18 @@
     if (!txt) return;
     var r = D.parseCSV(txt, { minPoints: 3 });
     if (!r.ok) { banner('danger', '✕ 顶点解析失败：' + esc(r.error)); return; }
+    var s = D.sanitizeRing(r.points);
+    if (!s.ok) { banner('danger', '✕ 边界环无效：' + esc(s.error)); return; }
     var lv = prompt('梯田层级（可留空 = 不分层；填 1/2/3… 表示第几级台面）：', '');
     var level = lv && /^\d+$/.test(lv.trim()) ? +lv.trim() : null;
     state.plots.push({
       id: 'man_' + Date.now(),
       name: '手动地块' + (state.plots.length + 1),
-      poly: r.points.map(function (p) { return { x: p.x, y: p.y }; }),
+      poly: s.pts.map(function (pt) { return { x: Math.round(pt.x * 100) / 100, y: Math.round(pt.y * 100) / 100 }; }),
       level: level, source: '手动'
     });
     persistAndRender();
+    if (s.warn.length) banner('warn', '手动地块已导入，但：' + esc(s.warn.join('；')));
   }
 
   /* ---------------- 山地喷灌设计 · 参数区（v287） ----------------

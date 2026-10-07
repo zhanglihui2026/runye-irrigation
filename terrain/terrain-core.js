@@ -54,6 +54,109 @@
     return Math.abs(s) / 2;
   }
 
+  /* ---------------- 环预处理 sanitizeRing（v298 P0-2，纯函数） ----------------
+     导入环的三道防线：①去相邻重复点（含首尾闭合重复）；②自交检测并告警（标记不静默）；
+     ③可选离群点过滤（opts.outlierK：点到质心距离 > 中位数×K 才剔除，默认不启用）。
+     只清洗与告警，不改形状（除重复点/离群点），面积交给 polygonAreaM2。 */
+
+  function segProperX(a, b, c, d) {
+    function o(px, py, qx, qy, rx, ry) {
+      var v = (qx - px) * (ry - qy) - (qy - py) * (rx - qx);
+      return v > 1e-9 ? 1 : (v < -1e-9 ? -1 : 0);
+    }
+    var o1 = o(a.x, a.y, b.x, b.y, c.x, c.y), o2 = o(a.x, a.y, b.x, b.y, d.x, d.y);
+    var o3 = o(c.x, c.y, d.x, d.y, a.x, a.y), o4 = o(c.x, c.y, d.x, d.y, b.x, b.y);
+    return (o1 !== o2 && o3 !== o4);
+  }
+
+  function sanitizeRing(poly, opts) {
+    opts = opts || {};
+    var warn = [];
+    if (!Array.isArray(poly) || poly.length < 3) return { ok: false, error: '环点数不足 3' };
+    var pts = poly.map(function (p) { return { x: +p.x, y: +p.y }; });
+    for (var vi = 0; vi < pts.length; vi++) {
+      if (!isNum(pts[vi].x) || !isNum(pts[vi].y)) return { ok: false, error: '第 ' + (vi + 1) + ' 点坐标非数值' };
+    }
+    /* ① 相邻重复点（含首尾闭合重复） */
+    var ded = [pts[0]];
+    for (var i = 1; i < pts.length; i++) {
+      var last = ded[ded.length - 1];
+      if (Math.abs(pts[i].x - last.x) > 1e-9 || Math.abs(pts[i].y - last.y) > 1e-9) ded.push(pts[i]);
+    }
+    if (ded.length > 1 && Math.abs(ded[0].x - ded[ded.length - 1].x) < 1e-9 && Math.abs(ded[0].y - ded[ded.length - 1].y) < 1e-9) ded.pop();
+    var removedDups = pts.length - ded.length;
+    if (removedDups > 0) warn.push('已去重 ' + removedDups + ' 个相邻/闭合重复点');
+    pts = ded;
+    if (pts.length < 3) return { ok: false, error: '去重后有效点数不足 3（输入环退化）' };
+
+    /* ③ 可选离群点过滤：先启用再检自交，保证检测对象是清洗后的环 */
+    var removedOutliers = 0;
+    if (opts.outlierK > 0) {
+      var cx = 0, cy = 0;
+      pts.forEach(function (pt) { cx += pt.x; cy += pt.y; });
+      cx /= pts.length; cy /= pts.length;
+      var ds = pts.map(function (pt) { return Math.hypot(pt.x - cx, pt.y - cy); });
+      var sorted = ds.slice().sort(function (a, b) { return a - b; });
+      var med = sorted[Math.floor(sorted.length / 2)];
+      if (med > 0) {
+        var keep = [];
+        pts.forEach(function (pt, idx) {
+          if (ds[idx] > med * opts.outlierK) { removedOutliers++; warn.push('已过滤离群点 1 个（距质心 ' + ds[idx].toFixed(1) + 'm > 中位数×' + opts.outlierK + '）'); }
+          else keep.push(pt);
+        });
+        if (removedOutliers && keep.length >= 3) pts = keep;
+        else if (removedOutliers) warn.push('离群点过滤后点数不足，已放弃过滤');
+      }
+    }
+
+    /* ② 自交检测（O(n²) 跨立检验，排除相邻边；>5000 点跳过防卡顿） */
+    var selfInt = 0, n = pts.length;
+    if (n <= 5000) {
+      for (i = 0; i < n; i++) {
+        for (var j = i + 2; j < n; j++) {
+          if (i === 0 && j === n - 1) continue; /* 首尾边相邻 */
+          if (segProperX(pts[i], pts[(i + 1) % n], pts[j], pts[(j + 1) % n])) selfInt++;
+        }
+      }
+      if (selfInt > 0) warn.push('检测到边界自交 ' + selfInt + ' 处（如「8」字形）：面积与喷灌布置可能失真，请检查/修正边界数据');
+    } else {
+      warn.push('环点数 ' + n + ' 过多，跳过自交检测');
+    }
+
+    return { ok: true, pts: pts, warn: warn, removedDups: removedDups, removedOutliers: removedOutliers, selfInt: selfInt };
+  }
+
+  /* ---------------- 地表斜面面积近似（v298 P1-5，纯函数） ----------------
+     用 RTK 点云最小二乘拟合平面 z = a·x + b·y + c，平均坡度 = atan(√(a²+b²))，
+     表面积 ≈ 水平投影面积 / cos(平均坡度)。规划级近似——精细 TIN 积分属阶段2。 */
+
+  function surfaceAreaApprox(horizSqm, rtkPoints) {
+    var pts = (Array.isArray(rtkPoints) ? rtkPoints : []).filter(function (p) {
+      return isNum(p && p.x) && isNum(p.y) && isNum(p.z);
+    });
+    if (pts.length < 3) return { ok: false, error: 'RTK 高程点不足 3 个' };
+    var horiz = horizSqm;
+    if (!(horiz > 0)) return { ok: false, error: '水平投影面积无效（请先导入地块）' };
+    /* 均值中心化后拟合 w = a·u + b·v（u=x−x̄, v=y−ȳ, w=z−z̄；截距 c 不影响坡度）。
+       必须中心化：CGCS2000 原始坐标 ~1e6 m，未中心化正规方程行列式因灾难性
+       相消退化为 ~1e11，而相对阈值 ~1e18，真实数据恒被误判「退化」（v298 探针实测）。 */
+    var mx = 0, my = 0, mz = 0, n = pts.length;
+    pts.forEach(function (p) { mx += p.x; my += p.y; mz += p.z; });
+    mx /= n; my /= n; mz /= n;
+    var Suu = 0, Svv = 0, Suv = 0, Suw = 0, Svw = 0;
+    pts.forEach(function (p) {
+      var u = p.x - mx, v = p.y - my, w = p.z - mz;
+      Suu += u * u; Svv += v * v; Suv += u * v; Suw += u * w; Svw += v * w;
+    });
+    var D = Suu * Svv - Suv * Suv;
+    if (D < 1e-9 * Math.max(1e-12, Suu * Svv)) return { ok: false, error: 'RTK 点平面分布退化（共线/过少），无法拟合坡面' };
+    var a = (Suw * Svv - Svw * Suv) / D;
+    var b = (Svw * Suu - Suw * Suv) / D;
+    var slope = Math.atan(Math.hypot(a, b));
+    var surf = horiz / Math.cos(slope);
+    return { ok: true, surfSqm: surf, slopeDeg: slope * 180 / Math.PI, n: n, horizSqm: horiz };
+  }
+
   function sqmToMu(sqm) {
     return isNum(sqm) ? Math.round(sqm / MU_SQM * 100) / 100 : 0;
   }
@@ -289,8 +392,113 @@
   /* 沿管线轨迹采样高程 —— 阶段1 接口桩（阶段2接入高程插值引擎）。
      path: [{x,y},...] 管线折点；step: 采样步长（米）。
      无高程数据时按契约返回 null，调用方据此走「水力计算锁定/提示」降级路径。 */
-  function sampleAlongPath(path, step) {
-    return null; /* 阶段1：恒 null（无高程 → 降级提示），阶段2实现插值 */
+  function sampleAlongPath(path, step, elevPoints) {
+    if (!Array.isArray(path) || path.length < 2) return null;
+    if (!(step > 0)) return null;
+    var pts = (Array.isArray(elevPoints) ? elevPoints : []).filter(function (p) {
+      return isNum(p && p.x) && isNum(p.y) && isNum(p.z);
+    });
+    if (pts.length < 3) return null; /* 无有效高程数据 → 降级路径（保持契约） */
+
+    /* 折线等步长采样点 */
+    var segs = [], total = 0, i;
+    for (i = 0; i < path.length - 1; i++) {
+      var a = path[i], b = path[i + 1];
+      if (!isNum(a && a.x) || !isNum(a && a.y) || !isNum(b && b.x) || !isNum(b && b.y)) return null;
+      var L = Math.hypot(b.x - a.x, b.y - a.y);
+      if (L > 1e-9) { segs.push({ ax: a.x, ay: a.y, bx: b.x, by: b.y, L: L }); total += L; }
+    }
+    if (!(total > 0)) return null;
+    var nS = Math.max(2, Math.floor(total / step) + 1);
+    var samples = [];
+    for (var k = 0; k < nS; k++) {
+      var dTarget = Math.min(total, k * step), acc = 0, px = path[0].x, py = path[0].y;
+      for (i = 0; i < segs.length; i++) {
+        if (dTarget <= acc + segs[i].L || i === segs.length - 1) {
+          var t = segs[i].L > 0 ? Math.min(1, (dTarget - acc) / segs[i].L) : 0;
+          px = segs[i].ax + (segs[i].bx - segs[i].ax) * t;
+          py = segs[i].ay + (segs[i].by - segs[i].ay) * t;
+          break;
+        }
+        acc += segs[i].L;
+      }
+      samples.push({ x: px, y: py });
+    }
+
+    /* Delaunay 三角网（Bowyer-Watson，点数上限 3000，超限/退化走 IDW） */
+    var triIdx = delaunayTris(pts);
+
+    function triZ(p) {
+      for (var t = 0; t < triIdx.length; t++) {
+        var A = pts[triIdx[t][0]], B = pts[triIdx[t][1]], C = pts[triIdx[t][2]];
+        var den = (B.y - C.y) * (A.x - C.x) + (C.x - B.x) * (A.y - C.y);
+        if (Math.abs(den) < 1e-12) continue;
+        var w1 = ((B.y - C.y) * (p.x - C.x) + (C.x - B.x) * (p.y - C.y)) / den;
+        var w2 = ((C.y - A.y) * (p.x - C.x) + (A.x - C.x) * (p.y - C.y)) / den;
+        var w3 = 1 - w1 - w2;
+        if (w1 >= -1e-9 && w2 >= -1e-9 && w3 >= -1e-9) return w1 * A.z + w2 * B.z + w3 * C.z;
+      }
+      return null; /* 凸包外 */
+    }
+    function idwZ(p) { /* k 近邻反距离加权（d=0 直接取该点 z） */
+      var arr = pts.map(function (q) { return { d: Math.hypot(q.x - p.x, q.y - p.y), z: q.z }; })
+                   .sort(function (a, b) { return a.d - b.d; }).slice(0, 6);
+      if (arr[0].d < 1e-9) return arr[0].z;
+      var ws = 0, vz = 0;
+      arr.forEach(function (it) { var w = 1 / (it.d * it.d); ws += w; vz += w * it.z; });
+      return vz / ws;
+    }
+
+    return samples.map(function (p) {
+      var z = triZ(p);
+      if (z === null) z = idwZ(p);
+      return { x: p.x, y: p.y, z: z };
+    });
+  }
+
+  /* Bowyer-Watson 增量 Delaunay（超三角形法）；共线/退化返回 []（调用方走 IDW） */
+  function delaunayTris(pts) {
+    var n = pts.length;
+    if (n < 3) return [];
+    var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    pts.forEach(function (p) {
+      if (p.x < minX) minX = p.x; if (p.y < minY) minY = p.y;
+      if (p.x > maxX) maxX = p.x; if (p.y > maxY) maxY = p.y;
+    });
+    var dmax = Math.max(maxX - minX, maxY - minY, 1) * 20;
+    var mx = (minX + maxX) / 2, my = (minY + maxY) / 2;
+    var P = pts.concat([{ x: mx - dmax, y: my - dmax }, { x: mx, y: my + dmax }, { x: mx + dmax, y: my - dmax }]);
+    function inCircum(t, px, py) {
+      var a = P[t[0]], b = P[t[1]], c = P[t[2]];
+      var ad = a.x * a.x + a.y * a.y, bd = b.x * b.x + b.y * b.y, cd = c.x * c.x + c.y * c.y;
+      var D = (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
+      if (Math.abs(D) < 1e-12) return false;
+      var ux = ((ad * (b.y - c.y) + bd * (c.y - a.y) + cd * (a.y - b.y)) / D - px);
+      var uy = ((ad * (c.x - b.x) + bd * (a.x - c.x) + cd * (b.x - a.x)) / D - py);
+      return ux * ux + uy * uy < 1e-6; /* 含圆周（容差半径 1e-3 m） */
+    }
+    var tris = [[n, n + 1, n + 2]];
+    for (var i = 0; i < n; i++) {
+      var bad = [], good = [];
+      tris.forEach(function (t) { (inCircum(t, P[i].x, P[i].y) ? bad : good).push(t); });
+      var edges = [];
+      bad.forEach(function (t) {
+        for (var k = 0; k < 3; k++) {
+          var e = [t[k], t[(k + 1) % 3]].sort(function (a, b) { return a - b; });
+          var cnt = 0;
+          bad.forEach(function (tt) {
+            for (var k2 = 0; k2 < 3; k2++) {
+              var e2 = [tt[k2], tt[(k2 + 1) % 3]].sort(function (a, b) { return a - b; });
+              if (e2[0] === e[0] && e2[1] === e[1]) { cnt++; break; }
+            }
+          });
+          if (cnt === 1) edges.push(e);
+        }
+      });
+      tris = good;
+      edges.forEach(function (e) { tris.push([e[0], e[1], i]); });
+    }
+    return tris.filter(function (t) { return t[0] < n && t[1] < n && t[2] < n; });
   }
 
   /* ---------------- 在线地图回传：经纬度 → 局部米制投影 ----------------
@@ -353,8 +561,10 @@
     var shiftCount = Math.ceil(headCount / N);
     var systemFlow = N * q;
 
-    /* 组合喷灌强度 ρ = 1000·q / A_cover（A_cover=单喷头理论覆盖圆），与土壤允许值校核 */
-    var precipRate = 1000 * q / (Math.PI * R * R);
+    /* 组合喷灌强度 ρ = 1000·q / headArea（单喷头实际控制面积=间距×行距，含重叠修正），
+       与土壤允许值校核。v298 修正：旧分母用理论覆盖圆 πR²，三角形布置下喷洒圆重叠，
+       组合强度被系统性低估 30~40%，黏土/坡地场景会漏判超标（P0-1）。 */
+    var precipRate = 1000 * q / headArea;
     var soil = SOIL_INTENSITY[input.soil] ? input.soil : 'loam';
     var allow = SOIL_INTENSITY[soil];
     var slope = Number(input.slope_deg) || 0;
@@ -640,6 +850,8 @@
     lonlatToLocalMeters: lonlatToLocalMeters,
     sprinklerEstimate: sprinklerEstimate,
     pointInPolygon: pointInPolygon,
+    sanitizeRing: sanitizeRing,
+    surfaceAreaApprox: surfaceAreaApprox,
     sprinklerLayout: sprinklerLayout,
     pipeDN: pipeDN,
     SOIL_INTENSITY: SOIL_INTENSITY,

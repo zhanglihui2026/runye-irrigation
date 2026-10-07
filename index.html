@@ -19726,7 +19726,16 @@ bindUI();
       try{ if(window.runyeSetCurrentPlot) window.runyeSetCurrentPlot(null); }catch(e){}
 
       // 由真实经纬度换算成本地米坐标，供 A/B 边长估算
-      if(d.poly && d.poly.length >= 3){
+      /* [v298 P0-3] terrain 模块回传（d.isXY）：poly/subPlots 已是 CGCS2000 平面米坐标
+         （terrain 画布口径，y 向下），与主页画布同口径 ⇒ 跳过经纬度投影与 v217 镜像，
+         直接入画。旧版把 {x,y} 当 [lat,lng] 解析会得到 NaN 环。 */
+      var isXY = !!d.isXY || (Array.isArray(d.poly) && d.poly.length >= 3 && d.poly[0] &&
+                 typeof d.poly[0] === 'object' && !Array.isArray(d.poly[0]) && ('x' in d.poly[0]));
+      if(d.poly && d.poly.length >= 3 && isXY){
+        window.measuredPolygon = d.poly.map(function(p){ return { x:+p.x, y:+p.y }; });
+        window.__runyeGeoBase = null;
+        window.__runyeMapFramePoly = null;
+      } else if(d.poly && d.poly.length >= 3){
         var lats = d.poly.map(function(p){return p[0];});
         var lngs = d.poly.map(function(p){return p[1];});
         var clat = lats.reduce(function(a,b){return a+b;},0) / lats.length;
@@ -19763,7 +19772,19 @@ bindUI();
            块间空隙原样保留；换算口径与主地块严格一致（同 clat / 同首点经度原点），
            保证各子地块与主地块叠得上。 */
       try{
-        if(d.merged && Array.isArray(d.subPlots) && d.subPlots.length && window.__runyeGeoBase){
+        if(isXY && Array.isArray(d.subPlots) && d.subPlots.length){
+          /* [v298 P0-3] terrain 多环直通：子环已是米坐标，无需投影/镜像/GeoBase。
+             字段口径与 v185 成组消费方一致（id/name/sqm/poly），二级管路页按块分别布管。 */
+          window.__runyeGroupName = d.name || '地形模块地块';
+          window.__runyeSubPlots = d.subPlots.map(function(s, si){
+            var ll=Array.isArray(s.poly)?s.poly:[];
+            return {
+              id:s.id||('st'+si), name:s.name||('子地块'+(si+1)),
+              sqm:s.sqm||0, mu:s.mu||undefined, crop:s.crop||null,
+              poly: ll.map(function(q){ return { x:+q.x, y:+q.y }; })
+            };
+          });
+        } else if(d.merged && Array.isArray(d.subPlots) && d.subPlots.length && window.__runyeGeoBase){
           var _b=window.__runyeGeoBase, _mlat=6378137*Math.PI/180, _cos=Math.cos(_b.refLat*Math.PI/180);
           /* [v194] 成组管路页要显示成组地块的名（列表里的「→ 回传」带的是 d.name） */
           window.__runyeGroupName = d.name || '成组地块';
