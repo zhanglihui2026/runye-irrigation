@@ -1345,7 +1345,10 @@
 
   // [map-enhance] 把地块库叠加到卫星图（隔离模块，失败不影响测量主流程）
   var rymHandle=null;
-  try{ if(window.RunyeMapEnhance) rymHandle=window.RunyeMapEnhance.attach(map, {onMeasure:setMeasureOn, toDisplay:toDisplay, autoFit:!lsGet(K_VIEW,null), onMergeMode:onMergeModeChange, mergePick:false, onMergeDone:function(){ renderMyPlots(); }}); }catch(e){}
+  /* [NEW MODULE: 地形模块 v286f] onSendDesign/onSendTerrain：地块弹窗「回传」按钮 → 页面局部回传函数（跳对应页）。 */
+  try{ if(window.RunyeMapEnhance) rymHandle=window.RunyeMapEnhance.attach(map, {onMeasure:setMeasureOn, toDisplay:toDisplay, autoFit:!lsGet(K_VIEW,null), onMergeMode:onMergeModeChange, mergePick:false, onMergeDone:function(){ renderMyPlots(); }, 
+    onSendDesign:function(p){ sendPlotToDesign(p, document.getElementById('btnCopy')); }, 
+    onSendTerrain:function(p){ sendPlotToTerrain(p, document.getElementById('btnCopyTerrain')); }}); }catch(e){}
 
   /* ===== [v185/v189 2026-10-03] 多地块成组 =====
    * 用户诉求：画几个相邻小地块 → **成组**便于一起操作；各小地块分别布管，

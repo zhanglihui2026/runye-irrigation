@@ -620,6 +620,12 @@
           '<label style="display:block;margin-top:5px">作物 <input id="rymCrop" style="width:88%;padding:2px 4px;border:1px solid #cbd5e1" value="' + escapeHtml(p.crop || '') + '" placeholder="如：七彩花生"></label>' +
           '<label style="display:block;margin-top:3px">备注 <textarea id="rymNote" rows="2" style="width:88%;padding:2px 4px;border:1px solid #cbd5e1" placeholder="地形/水源/备注">' + escapeHtml(p.note || '') + '</textarea></label>' +
           '<button id="rymSave" style="margin-top:5px;padding:3px 12px;background:#16a34a;color:#fff;border:0;cursor:pointer;font-size:12px">保存</button>' +
+          /* [NEW MODULE: 地形模块 v286f] 弹窗回传按钮组：opts 回调跨作用域调页面局部函数， */
+          /* 卸载 = 删除本按钮组 + onPopupOpen 里 rymSendDesign/rymSendTerrain 两段绑定。 */
+          '<div style="margin-top:6px;display:flex;gap:4px">' +
+          '<button id="rymSendDesign" style="flex:1;padding:3px 6px;background:#15803d;color:#fff;border:0;cursor:pointer;font-size:11.5px">↩ 回传设计工具</button>' +
+          '<button id="rymSendTerrain" style="flex:1;padding:3px 6px;background:#fff;color:#15803d;border:1px solid #15803d;cursor:pointer;font-size:11.5px">⛰️ 回传地形模块</button>' +
+          '</div>' +
           '</div>';
         var onPopupOpen = function () {
           var btn = document.getElementById('rymSave');
@@ -634,6 +640,11 @@
             try { state.refresh(); } catch (e) {}
             layers.forEach(function (L2) { try { L2.closePopup(); } catch (e) {} });
           };
+          /* [NEW MODULE: 地形模块 v286f] 弹窗回传按钮绑定（opts 回调由 attach 传入） */
+          var sd = document.getElementById('rymSendDesign');
+          if (sd) sd.onclick = function () { if (typeof opts.onSendDesign === 'function') opts.onSendDesign(p); };
+          var st = document.getElementById('rymSendTerrain');
+          if (st) st.onclick = function () { if (typeof opts.onSendTerrain === 'function') opts.onSendTerrain(p); };
           var ub = document.getElementById('rymUnmerge');
           if (ub) ub.onclick = function () {
             if (!confirm('解散成组？\n将把「' + (p.name || '该地块') + '」拆回 ' + ((p.subPlots || []).length) + ' 个子地块（各自的轮廓与块间空隙本来就没动过）。')) return;
