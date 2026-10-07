@@ -331,8 +331,13 @@
     if ($('spOverlay') && $('spOverlay').checked) {
       var lay = D.sprinklerLayout(polys, spRead());
       if (lay.ok) {
+        lay.zonePolys.forEach(function (z) {  /* 分区范围（v290 闭合多边形，按组着色） */
+          var d = z.pts.map(function (pt) { return pt.x.toFixed(1) + ',' + (flip - pt.y).toFixed(1); }).join(' ');
+          var c = SP_COLORS[(z.g - 1) % SP_COLORS.length];
+          out.push('<polygon class="t-sp-zone" data-g="' + z.g + '" fill="' + c + '" stroke="' + c + '" points="' + d + '"/>');
+        });
         lay.heads.forEach(function (h) {  /* 喷射范围 */
-          out.push('<circle class="t-sp-circle" cx="' + h.x.toFixed(1) + '" cy="' + (flip - h.y).toFixed(1) + '" r="' + lay.range_m.toFixed(1) + '"/>');
+          out.push('<circle class="t-sp-circle" data-g="' + h.g + '" cx="' + h.x.toFixed(1) + '" cy="' + (flip - h.y).toFixed(1) + '" r="' + lay.range_m.toFixed(1) + '"/>');
         });
         lay.laterals.forEach(function (l) {  /* 支管（沿行） */
           out.push('<polyline class="t-sp-lateral" points="' + l.pts.map(function (pt) { return pt.x.toFixed(1) + ',' + (flip - pt.y).toFixed(1); }).join(' ') + '"/>');
@@ -342,7 +347,7 @@
         });
         out.push('<polyline class="t-sp-main" points="' + lay.mainline.pts.map(function (pt) { return pt.x.toFixed(1) + ',' + (flip - pt.y).toFixed(1); }).join(' ') + '"/>');  /* 干管 */
         lay.heads.forEach(function (h, i) {  /* 喷头：颜色 = 轮灌组 */
-          out.push('<circle class="t-sp-head" fill="' + SP_COLORS[(h.g - 1) % SP_COLORS.length] +
+          out.push('<circle class="t-sp-head" data-g="' + h.g + '" fill="' + SP_COLORS[(h.g - 1) % SP_COLORS.length] +
             '" cx="' + h.x.toFixed(1) + '" cy="' + (flip - h.y).toFixed(1) + '" r="' + (vh * 0.005).toFixed(2) +
             '"><title>' + esc('第 ' + h.g + ' 轮灌组 · 喷头 ' + (i + 1) + ' · R=' + lay.range_m + 'm') + '</title></circle>');
         });
@@ -350,6 +355,7 @@
       }
     }
     var spLg = $('spLegend'); if (spLg) spLg.hidden = !spCount; /* 图例随叠加层显隐 */
+    if (spDemoTimer) applySpDemo(); /* 动画进行中重绘后恢复当前组高亮 */
     $('elevDotWrap').hidden = !state.elevations.some(function (r) { return r.data_type === 'rtk_xyz'; });
     /* 视图管理：几何数据变化（fit 改变）→ 重置全览；仅标签变化（单位切换）→ 保持用户缩放/平移 */
     var fitKey = vx.toFixed(1) + ',' + vy.toFixed(1) + ',' + vw.toFixed(1) + ',' + vh.toFixed(1);
@@ -679,6 +685,30 @@
     warnBox.innerHTML = res.warn.map(esc).join('<br>');
   }
 
+  /* 轮灌演示（v290）：分组依次点亮——当前组满亮、其余压暗；再点停止并清空高亮 */
+  var spDemoTimer = null, spDemoStep = 0;
+  function applySpDemo() {
+    var svg = $('tCanvas');
+    svg.querySelectorAll('[data-g]').forEach(function (el) {
+      var on = +el.getAttribute('data-g') === spDemoStep;
+      el.classList.toggle('t-sp-active', on);
+      el.classList.toggle('t-sp-dim', !on);
+    });
+  }
+  function stopSpDemo() {
+    if (spDemoTimer) { clearInterval(spDemoTimer); spDemoTimer = null; }
+    var btn = $('spDemo'); if (btn) btn.textContent = '\u25B6 \u8f6e\u704c\u6f14\u793a';
+    $('tCanvas').querySelectorAll('.t-sp-active, .t-sp-dim').forEach(function (el) {
+      el.classList.remove('t-sp-active'); el.classList.remove('t-sp-dim');
+    });
+  }
+  function spDemoTick() {
+    var total = $('tCanvas').querySelectorAll('.t-sp-zone').length;
+    if (!total) { stopSpDemo(); return; }
+    spDemoStep = spDemoStep % total + 1;
+    applySpDemo();
+  }
+
   /* 图例（v289b）：内容由 SP_COLORS 单一来源生成，避免与画布配色两处维护 */
   function buildSpLegend() {
     var lg = $('spLegend');
@@ -704,6 +734,13 @@
     $('spReset').addEventListener('click', function () { spFill(SP_DEFAULTS); spSave(); calcSprinkler(); });
     $('spOverlay').addEventListener('change', drawCanvas); /* 切换喷灌布置叠加层 */
     buildSpLegend();
+    $('spDemo').addEventListener('click', function () {
+      if (spDemoTimer) { stopSpDemo(); return; }
+      spDemoStep = 0;
+      spDemoTick();
+      spDemoTimer = setInterval(spDemoTick, 2200);
+      $('spDemo').textContent = '\u23F8 \u505c\u6b62\u6f14\u793a';
+    }); /* 轮灌演示动画 */
     ['spCrop', 'spEtc', 'spEta', 'spSoil', 'spSlope', 'spRange', 'spFlow', 'spPressure', 'spLayout', 'spK', 'spHeads']
       .forEach(function (id) { $(id).addEventListener('change', function () { if (spCalculated) calcSprinkler(); }); });
   }

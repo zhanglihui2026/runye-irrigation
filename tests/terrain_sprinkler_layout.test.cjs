@@ -72,6 +72,18 @@ const vCount = L2.dividers.filter(d => Math.abs(d.pts[0].x - d.pts[1].x) < 1e-9)
 const hCount = L2.dividers.filter(d => Math.abs(d.pts[0].y - d.pts[1].y) < 1e-9).length;
 ok(vCount === 4 && hCount === 2, '81头/每组12：精确 4 竖 + 2 横（实际 ' + vCount + '+' + hCount + '）');
 
+/* ---------- 5c. 分区范围多边形（v290） ---------- */
+console.log('[5c] 分区范围多边形');
+ok(L2.zonePolys.length === L2.groupCount, '每组一个闭合多边形（' + L2.zonePolys.length + ' 个）');
+const zoneAreaSum = L2.zonePolys.reduce((t, z) => t + core.polygonAreaM2(z.pts), 0);
+ok(Math.abs(zoneAreaSum - 81 * 11 * 11) < 1e-6, 'Σ分区面积 = 81头×S×row = 9801（实际 ' + zoneAreaSum.toFixed(3) + '，注入「描迹错边」会变红）');
+let perOk = true;
+L2.zonePolys.forEach(z => {
+  const n = L2.heads.filter(h => h.g === z.g).length;
+  if (Math.abs(core.polygonAreaM2(z.pts) - n * 11 * 11) > 1e-6) perOk = false;
+});
+ok(perOk, '每组面积 = 组内喷头数×S×row（含首末部分行组）');
+
 /* ---------- 6. 错误路径（注入缺陷必须命中） ---------- */
 console.log('[6] 错误路径');
 ok(core.sprinklerLayout([{ poly: sq100 }], { range_m: 0 }).ok === false, '反例：R=0 → 报错');

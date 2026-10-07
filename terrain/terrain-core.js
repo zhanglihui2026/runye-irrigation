@@ -478,6 +478,47 @@
     var yTop = rowsAgg[0].y, yBot = rowsAgg[rowsAgg.length - 1].y;
     var mainline = { pts: [{ x: cx, y: yTop }, { x: cx, y: yBot }] };
 
+    /* 分区范围多边形（v290）：每组的行段（该组在某行的喷头横向跨度 × 行带高）
+       拼成闭合直角多边形——右缘自上而下描迹、左缘自下而上闭合。
+       方形布置下每组多边形面积恰 = 组内喷头数 × S × row（可精确断言）。 */
+    var zonePolys = [];
+    for (var zg = 1; zg <= groupCount; zg++) {
+      var segs = [];
+      heads.forEach(function (h) {
+        if (h.g !== zg) return;
+        var last = segs[segs.length - 1];
+        if (last && Math.abs(last.yMid - h.y) <= row / 2) {
+          last.L = Math.min(last.L, h.x - S / 2); last.R = Math.max(last.R, h.x + S / 2);
+        } else {
+          segs.push({ yMid: h.y, yT: h.y - row / 2, yB: h.y + row / 2, L: h.x - S / 2, R: h.x + S / 2 });
+        }
+      });
+      if (!segs.length) continue;
+      function dedupe(pts) {
+        var out = [];
+        pts.forEach(function (pt) {
+          var p = out[out.length - 1];
+          if (!p || Math.abs(p.x - pt.x) > 1e-9 || Math.abs(p.y - pt.y) > 1e-9) out.push(pt);
+        });
+        return out;
+      }
+      /* 东缘自南向北 → 北缘 → 西缘自北向南 → 南缘闭合（segs 已按北→南排序） */
+      var pts = [];
+      for (var si = segs.length - 1; si >= 0; si--) {
+        pts.push({ x: segs[si].R, y: segs[si].yT });
+        pts.push({ x: segs[si].R, y: segs[si].yB });
+        if (si > 0) pts.push({ x: segs[si - 1].R, y: segs[si].yB });
+      }
+      pts.push({ x: segs[0].L, y: segs[0].yB });
+      for (si = 0; si < segs.length; si++) {
+        pts.push({ x: segs[si].L, y: segs[si].yB });
+        pts.push({ x: segs[si].L, y: segs[si].yT });
+        if (si < segs.length - 1) pts.push({ x: segs[si + 1].L, y: segs[si].yT });
+      }
+      pts.push({ x: segs[segs.length - 1].R, y: segs[segs.length - 1].yT });
+      zonePolys.push({ g: zg, pts: dedupe(pts) });
+    }
+
     /* 分区线（v289c）：相邻喷头组号变化处画分隔线——
        同行内切换 = 竖线（跨该行行带宽）；换行处切换 = 横线（跨两行的横向范围）。
        恰好 groupCount-1 条，与轮灌组一一对应。 */
@@ -505,7 +546,7 @@
     return {
       ok: true, range_m: R, spacing: S, rowSpacing: row, layout: layout,
       heads: heads, groupCount: groupCount, headsPerShift: Math.min(N, heads.length),
-      laterals: laterals, mainline: mainline, dividers: dividers
+      laterals: laterals, mainline: mainline, dividers: dividers, zonePolys: zonePolys
     };
   }
 
