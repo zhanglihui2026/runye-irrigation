@@ -279,7 +279,7 @@ body.t-col-resizing .t-stage{pointer-events:none}   /* 拖拽中不让画布吃�
 /* 喷灌布置叠加（v289）：喷射范围圆 / 支管 / 干管 / 喷头（按轮灌组着色） */
 .t-sp-circle{fill-opacity:.10;stroke-opacity:.45;stroke-width:1;vector-effect:non-scaling-stroke;pointer-events:none;transition:fill-opacity .5s,opacity .5s}
 .t-sp-circle.t-sp-active{fill-opacity:.42;stroke-opacity:.95}
-.t-sp-lateral{stroke:#5c6b78;stroke-width:1.4;vector-effect:non-scaling-stroke;fill:none;opacity:.9;pointer-events:none}
+.t-sp-lateral{stroke:#15803d;stroke-width:1.4;vector-effect:non-scaling-stroke;fill:none;opacity:.9;pointer-events:none}
 .t-sp-main{stroke:#1e40af;stroke-width:3;vector-effect:non-scaling-stroke;fill:none;pointer-events:none}
 .t-sp-head{stroke:#fff;stroke-width:1;vector-effect:non-scaling-stroke}
 .t-sp-zone{fill-opacity:.10;stroke-opacity:.9;stroke-width:1.5;vector-effect:non-scaling-stroke;pointer-events:none;transition:fill-opacity .5s,opacity .5s}
@@ -295,7 +295,7 @@ body.t-col-resizing .t-stage{pointer-events:none}   /* 拖拽中不让画布吃�
 .t-sp-legend .tl-swatch{display:inline-block;width:18px;height:12px;border-radius:0;flex:none}
 .tl-plot{border:1.5px solid #4b7264;background:rgba(75,114,100,.12)}
 .tl-main{height:0;border-top:3px solid #1e40af;border-radius:0}
-.tl-lat{height:0;border-top:1.5px solid #5c6b78}
+.tl-lat{height:0;border-top:1.5px solid #15803d}
 .tl-range{border:1px solid rgba(37,99,235,.4);background:rgba(37,99,235,.08);border-radius:50%}
 .t-sp-legend .tl-dot{display:inline-flex;width:14px;height:14px;border-radius:50%;color:#fff;font-size:9.5px;align-items:center;justify-content:center;border:1px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.08);margin-left:2px}
 .t-elev-dot.small{fill:#e59a90;opacity:.55}
