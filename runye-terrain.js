@@ -94,6 +94,11 @@
     var ring = root.measuredPolygon;
     return ring && ring.length >= 3 ? [{ key: 'plot:' + (root.currentPlotId || JSON.stringify(ring)), name: '当前地块 / 梯田层' }] : [];
   }
+  function importedProfile(entry, index) {
+    var src = root.__runyeImportedTerrain, rows = src && Array.isArray(src.plots) ? src.plots : [];
+    var row = rows[index];
+    return row && finite(row.maxZ) && finite(row.minZ) ? row : null;
+  }
   function escape(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function input(name, v, extra) { return '<input type="number" step="any" inputmode="decimal" data-terrain="' + name + '" value="' + (finite(v) ? v : '') + '" ' + (extra || '') + '>'; }
   function number(id, fallback) { var el = doc.getElementById(id), v = el && el.value.trim() !== '' ? Number(el.value) : NaN; return finite(v) ? v : fallback; }
@@ -167,7 +172,7 @@
       '<p class="rt-note">所有高程使用同一基准；没有绝对高程时，可把水源设为0，填写相对高程。水源以泵站出水点为基准，井内水面至出水点的提升仍填写原“水泵提升高度”。启用且高程完整时，替代原“地形高差”，不重复叠加。</p>' +
       '<div class="rt-grid"><label>水源出水点高程（m）' + input('source', state.source) + '</label><label>实际供水泵扬程（m，可选）' + input('pumpHead', state.pumpHead, 'min="0"') + '</label><label>末端允许最大压力（bar，可选）' + input('maxPressure', state.maxPressure, 'min="0.01"') + '</label></div>' +
       '<p class="rt-note">允许最大压力请按实际滴灌带、阀门等设备填写。实际供水泵扬程用于剩余压力校核，不填写时只估算所需扬程。负高程和下坡高差均支持。</p>' +
-      '<h4>地块 / 梯田层</h4>' + (list.length ? list.map(function (e, i) { var p = state.plots[e.key] || {}; return '<fieldset data-row="' + i + '"><legend>' + escape(e.name) + '</legend><div class="rt-grid"><label>最高点 / 平台高程（m）' + input('high', p.high) + '</label><label>最低点高程（m，可选）' + input('low', p.low) + '</label></div></fieldset>'; }).join('') : '<p>请先绘制或选择地块。各层梯田分别成组后，可逐层填写。</p>') +
+      '<h4>地块 / 梯田层</h4>' + (list.length ? list.map(function (e, i) { var p = state.plots[e.key] || {}, imp = importedProfile(e, i); return '<fieldset data-row="' + i + '"><legend>' + escape(e.name) + '</legend>' + (imp ? '<p class="rt-note">已带入 RTK 建议范围：' + imp.minZ.toFixed(2) + '–' + imp.maxZ.toFixed(2) + ' m（' + imp.pointCount + ' 点，请复核后保存）</p>' : '') + '<div class="rt-grid"><label>最高点 / 平台高程（m）' + input('high', finite(p.high) ? p.high : (imp ? imp.maxZ : null)) + '</label><label>最低点高程（m，可选）' + input('low', finite(p.low) ? p.low : (imp ? imp.minZ : null)) + '</label></div></fieldset>'; }).join('') : '<p>请先绘制或选择地块。各层梯田分别成组后，可逐层填写。</p>') +
       '<p class="rt-note">最低点留空时按平台高程计算；有坡地请填写最低点，才能检查低处压力。每层高程不会改变原有布管走向。</p><p class="rt-status" role="status"></p><footer><button type="submit">保存并应用</button></footer><div class="rt-report">' + report() + '</div></div></form>';
     panel.querySelector('[data-collapse]').onclick = collapse;
     panel.querySelector('form').onsubmit = function (event) {

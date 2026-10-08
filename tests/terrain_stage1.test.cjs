@@ -52,6 +52,8 @@ const c3 = core.parseCSV('X\tY\tZ\n1\t2\t3\n4\t5\t6\n7\t8\t9\n');
 ok(c3.ok && c3.hasZ, 'Tab 分隔 → 正常');
 const c4 = core.parseCSV('X,Y\nabc,def\n1,2\n3,4\n5,6');
 ok(c4.ok && c4.points.length === 3 && c4.skippedRows === 2, '坏行(字母)+表头被跳过 → 3 有效点');
+const c5 = core.parseCSV('X,Y,Z\n1,2,10\n2,3,11\n3,4,12\n4,5,13\n5,6,14\n6,7,15\n7,8,16\n8,9,17\n9,10,18\n10,11,19\n11,12,20\n12,13,21\n13,14,22\n14,15,23\n15,16,24\n16,17,25\n17,18,26\n18,19,27\n19,20,28\n20,21,');
+ok(c5.ok && c5.hasZ && c5.missingZRows === 1 && c5.zCount === 19, 'RTK 零星缺 Z（1/20）→ 保留有效点并报告缺失');
 ok(!core.parseCSV('X,Y\n1,2\n3,4').ok, '反例：有效行不足 3 → error');
 ok(!core.parseCSV('').ok, '反例：空文件 → error');
 ok(!core.parseCSV('a;b;c\nd;e;f\ng;h;i').ok, '反例：全字母 → error');
@@ -108,15 +110,19 @@ ok(cls3.ok && cls3.data_type === 'dsm_raster' && cls3.previewOnly === true, '文
 const cls4 = core.classifyElevFile('result.tif');
 ok(cls4.ok && cls4.needConfirm === true, '反例：无名可辨 tif → needConfirm 人工确认');
 ok(!core.classifyElevFile('boundary.shp').ok, '反例：.shp 不是高程文件 → error');
-const rec1 = core.buildElevRecord({ data_type: 'rtk_xyz', point_list: Array.from({ length: 25 }, (_, i) => ({ x: i, y: i, z: i })), file_name: 'a.csv' });
-ok(rec1.ok && rec1.record.confidence === 'high', 'rtk 25 点 → 置信度 high');
+const rec1 = core.buildElevRecord({ data_type: 'rtk_xyz', point_list: Array.from({ length: 100 }, (_, i) => ({ x: i, y: i, z: i })), coverage_area_m2: 10000, file_name: 'a.csv' });
+ok(rec1.ok && rec1.record.confidence === 'high', 'RTK 100 点且覆盖密度足够 → 置信度 high');
 const rec2 = core.buildElevRecord({ data_type: 'rtk_xyz', point_list: [{ x: 1, y: 2, z: 3 }], file_name: 'b.csv' });
-ok(rec2.ok && rec2.record.confidence === 'medium', '反例：rtk 1 点 → 降为 medium');
+ok(rec2.ok && rec2.record.confidence === 'low', '反例：RTK 1 点 → 低置信度');
+const recSparse = core.buildElevRecord({ data_type: 'rtk_xyz', point_list: Array.from({ length: 25 }, (_, i) => ({ x: i, y: i, z: i })), coverage_area_m2: 100000, file_name: 'sparse.csv' });
+ok(recSparse.ok && recSparse.record.confidence === 'medium', '反例：25 点覆盖 10 ha → 不高估为高置信度');
+const cleaned = core.filterElevationOutliers([{x:0,y:0,z:100},{x:1,y:0,z:101},{x:2,y:0,z:99},{x:3,y:0,z:100},{x:4,y:0,z:102},{x:5,y:0,z:101},{x:6,y:0,z:100},{x:7,y:0,z:999}]);
+ok(cleaned.removed === 1 && cleaned.points.length === 7, 'RTK 明显飞点（999m）→ 保守剔除');
 const rec3 = core.buildElevRecord({ data_type: 'dsm_raster', point_list: [], file_name: 'd.tif' });
 ok(rec3.ok && rec3.record.confidence === 'low' && rec3.record.meta.preview_only === true, 'DSM → 置信度强制 low + previewOnly');
 /* 契约字段完整性（用户给定 JSON 契约） */
 ok(['data_type', 'point_list', 'raster_info', 'boundary_constraint', 'confidence'].every(k => k in rec1.record), '输出结构含全部契约字段 {data_type,point_list,raster_info,boundary_constraint,confidence}');
-ok(core.sampleAlongPath([{ x: 0, y: 0 }, { x: 1, y: 1 }], 5) === null, 'sampleAlongPath 阶段1桩恒 null（调用方走降级）');
+ok(core.sampleAlongPath([{ x: 0, y: 0 }, { x: 1, y: 1 }], 5) === null, '无高程数据时 sampleAlongPath → null 降级');
 ok(!core.buildElevRecord({ data_type: 'xxx' }).ok, '反例：未知类型 → error');
 
 /* ---------- 6. 存储层（mock localStorage） ---------- */
@@ -186,6 +192,12 @@ ok(!core.sprinklerEstimate({}, 60000).ok, '反例：空参数 → error');
 /* 间距系数越界夹回 */
 const s5 = core.sprinklerEstimate(Object.assign({}, base, { spacing_k: 5 }), 60000);
 ok(s5.ok && s5.warn.some(w => /夹回/.test(w)), '间距系数 5 → 夹回 1.6 并告警');
+const s6 = core.sprinklerEstimate(Object.assign({}, base, { source_flow_m3h: 20 }), 60000);
+ok(s6.ok && s6.sourceFlowOk === false && s6.warn.some(w => /水源可用流量/.test(w)), '水源 20 m³/h < 当前组 30 m³/h → 明确告警');
+const s7 = core.sprinklerEstimate(Object.assign({}, base, { rated_flow_m3h: 2.5, rated_pressure_kpa: 300 }), 60000);
+ok(s7.ok && s7.nozzleOk === true && Math.abs(s7.expectedFlow - 2.5) < 1e-9, '铭牌 q/P 与输入一致 → 喷嘴曲线校核通过');
+const s8 = core.sprinklerEstimate(Object.assign({}, base, { rated_flow_m3h: 1, rated_pressure_kpa: 300 }), 60000);
+ok(s8.ok && s8.nozzleOk === false && s8.warn.some(w => /喷嘴额定曲线/.test(w)), '铭牌 q/P 不一致 → 喷嘴曲线校核告警');
 
 /* ---------- [5f] sanitizeRing 环预处理（v298 P0-2） ---------- */
 console.log('[5f] sanitizeRing（正例手算 + 注入反例）');

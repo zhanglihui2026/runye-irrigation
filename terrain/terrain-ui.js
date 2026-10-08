@@ -58,7 +58,7 @@
       if (ds.length === state.elevations.length && state.elevations.length) {
         banner('warn', '已有高程数据均为 DSM（仅预览）：请上传 RTK 点或 DTM 才可用于工程水力计算。');
       } else {
-        banner('ok', '✓ 工程模式：已具备可用高程数据，可回传主页参与计算。');
+        banner('ok', '✓ 工程模式：已具备可用 RTK 高程点，可回传主页并在「地形高程」中确认采用。');
       }
     }
   }
@@ -70,7 +70,12 @@
   }
 
   function hasElevation() {
-    return state.elevations.some(function (r) { return !(r.meta && r.meta.preview_only); });
+    /* 仅登记元信息的 tif 没有像素值，不能作为水力高程数据。 */
+    return state.elevations.some(function (r) {
+      return r && r.data_type === 'rtk_xyz' && Array.isArray(r.point_list) && r.point_list.filter(function (p) {
+        return Number.isFinite(p && p.x) && Number.isFinite(p.y) && Number.isFinite(p.z);
+      }).length >= 3 && !(r.meta && r.meta.preview_only);
+    });
   }
 
   /* ---------------- 地块列表渲染 ---------------- */
@@ -156,6 +161,7 @@
           name: (file.name.replace(/\.shp$/i, '')) + (r.features.length > 1 ? '#' + (i + 1) : ''),
           poly: s.pts.map(function (pt) { return { x: Math.round(pt.x * 100) / 100, y: Math.round(pt.y * 100) / 100 }; }),
           level: null, source: 'shp',
+          _cs: state._cs && state._cs.cs || 'unknown',
           _zHint: f.zHint, _ringsDropped: f.ringsDropped
         });
       });
@@ -199,7 +205,7 @@
         id: 'csv_' + Date.now(),
         name: file.name.replace(/\.(csv|txt)$/i, ''),
         poly: s.pts.map(function (pt) { return { x: Math.round(pt.x * 100) / 100, y: Math.round(pt.y * 100) / 100 }; }),
-        level: null, source: 'RTK边界CSV'
+        level: null, source: 'RTK边界CSV', _cs: cs.cs || 'unknown'
       });
       persistAndRender();
       $('csResult').textContent = cs.label;
@@ -216,16 +222,20 @@
     reader.onload = function () {
       var r = D.parseCSV(reader.result, { minPoints: 4 });
       if (!r.ok) { banner('danger', '✕ 高程 CSV 解析失败：' + esc(r.error)); return; }
-      if (!r.hasZ) { banner('danger', '✕ 该文件无第三列 Z 值：RTK 高程点 CSV 需为「X,Y,Z」三列。若这是边界文件，请用「RTK 边界 CSV」入口。'); return; }
+      if (!r.hasZ) { banner('danger', '✕ 可用 Z 值不足：RTK 高程点 CSV 需为「X,Y,Z」三列，且至少 95% 有 Z。若这是边界文件，请用「RTK 边界 CSV」入口。'); return; }
+      var cleaned = D.filterElevationOutliers(r.points);
+      if (cleaned.points.length < 4) { banner('danger', '✕ 剔除无效高程后点数不足，未导入。'); return; }
       var cls = { ok: true, data_type: 'rtk_xyz' };
       var built = D.buildElevRecord({
-        data_type: cls.data_type, point_list: r.points,
-        file_name: file.name, file_size: file.size
+        data_type: cls.data_type, point_list: cleaned.points,
+        coverage_area_m2: D.plotsTotalAreaM2(state.plots), file_name: file.name, file_size: file.size
       });
       if (!built.ok) { banner('danger', '✕ ' + esc(built.error)); return; }
       state.elevations.push(built.record);
       persistAndRender();
-      banner('ok', '✓ RTK 高程点已登记：<b>' + r.points.length + '</b> 点（置信度 ' + built.record.confidence + '）。沿管线采样与表面积引擎阶段2接入。');
+      banner(cleaned.removed || r.missingZRows ? 'warn' : 'ok', '✓ RTK 高程点已登记：<b>' + cleaned.points.length + '</b> 点（置信度 ' + built.record.confidence + '）' +
+        (r.missingZRows ? '；已跳过 ' + r.missingZRows + ' 行缺失 Z' : '') +
+        (cleaned.removed ? '；已剔除 ' + cleaned.removed + ' 个明显高程飞点' : '') + '。');
     };
     reader.readAsText(file);
   }
@@ -237,12 +247,13 @@
     var previewOnly = dtype === 'dsm_raster';
     var built = D.buildElevRecord({
       data_type: dtype,
-      point_list: [], /* tif 像素阶段1不解析（仅上传登记 + 元信息），阶段2接像素采样 */
+      point_list: [], /* tif 像素尚不解析：只登记文件，绝不作为已可用高程 */
       raster_info: { format: 'tif', note: '阶段1 仅登记元信息，像素读取阶段2实现' },
       file_name: file.name, file_size: file.size
     });
     if (!built.ok) { banner('danger', '✕ ' + esc(built.error)); return; }
     if (previewOnly) built.record.meta.preview_only = true;
+    built.record.meta.hydraulic_usable = false;
     state.elevations.push(built.record);
     persistAndRender();
     if (previewOnly) {
@@ -250,7 +261,7 @@
     } else if (cls.needConfirm) {
       banner('warn', '✓ 栅格已登记（暂按 DTM）。' + esc(cls.note));
     } else {
-      banner('ok', '✓ ' + esc(D.ELEV_TYPES[dtype].label) + ' 已登记。像素级采样阶段2接入，当前仅参与「已具备高程数据」状态判定。');
+      banner('warn', '✓ ' + esc(D.ELEV_TYPES[dtype].label) + ' 文件已登记，但当前版本尚未读取 tif 像素，<b>不会用于水力或表面积计算</b>。请先导入 RTK XYZ，或待栅格解析功能接入后使用。');
     }
   }
 
@@ -263,11 +274,12 @@
     box.innerHTML = state.elevations.map(function (r, i) {
       var t = D.ELEV_TYPES[r.data_type] || {};
       var bad = r.meta && r.meta.preview_only;
+      var unavailable = r.meta && r.meta.hydraulic_usable === false;
       return '<div class="t-elev' + (bad ? ' t-elev-dsm' : '') + '">' +
         '<b>' + esc(t.label || r.data_type) + '</b>' +
         '<span>' + esc(r.meta.file_name) + ' · ' + esc((r.point_list.length ? r.point_list.length + ' 点' : '栅格元信息')) +
         ' · 置信度 ' + esc(r.confidence) + '</span>' +
-        (bad ? '<em class="t-dsm-tag">仅预览 · 禁用于水力</em>' : '') +
+        (bad ? '<em class="t-dsm-tag">仅预览 · 禁用于水力</em>' : (unavailable ? '<em class="t-dsm-tag">文件已登记 · 像素未解析</em>' : '')) +
         (r.meta && r.meta.thinned ? '<em>持久化已抽样(' + r.meta.thinned_from + '→' + r.point_list.length + ')</em>' : '') +
         '<button class="t-del" data-edelete="' + i + '">✕</button></div>';
     }).join('');
@@ -480,6 +492,19 @@
 
   /* ---------------- 回传主页 ---------------- */
 
+  function elevationProfiles() {
+    var pts = [];
+    state.elevations.forEach(function (r) {
+      if (r && r.data_type === 'rtk_xyz' && Array.isArray(r.point_list)) pts = pts.concat(r.point_list);
+    });
+    return state.plots.map(function (plot) {
+      var inside = pts.filter(function (p) { return Number.isFinite(p && p.z) && D.pointInPolygon(p.x, p.y, plot.poly); });
+      if (!inside.length) return { id: plot.id, pointCount: 0, minZ: null, maxZ: null };
+      var zs = inside.map(function (p) { return p.z; });
+      return { id: plot.id, pointCount: inside.length, minZ: Math.min.apply(null, zs), maxZ: Math.max.apply(null, zs) };
+    });
+  }
+
   function sendHome() {
     var total = D.plotsTotalAreaM2(state.plots);
     if (total <= 0) return;
@@ -496,6 +521,11 @@
       banner('danger', '✕ 预览模式下不回传。请先切换到「工程模式」（明确成果用于工程）。');
       return;
     }
+    var csList = state.plots.map(function (p) { return p._cs || 'unknown'; }).filter(function (v, i, a) { return a.indexOf(v) === i; });
+    if (csList.length > 1) {
+      banner('danger', '✕ 当前地块混用了坐标基准（' + esc(csList.join(' / ')) + '），不能合并回传水力计算。请仅保留同一坐标系的地块。');
+      return;
+    }
     var payload = {
       sqm: Math.round(total * 100) / 100,
       mu: D.sqmToMu(total),
@@ -508,10 +538,11 @@
           name: p.name || ('子地块' + (i + 1)),
           sqm: Math.round(a * 100) / 100,
           mu: D.sqmToMu(a),
-          poly: p.poly
+          poly: p.poly, _cs: p._cs || 'unknown'
         };
       }),
-      source: 'terrain'
+      source: 'terrain', coordinateSystem: csList[0] || 'unknown',
+      terrainProfile: { source: 'rtk_xyz', plots: elevationProfiles() }
     };
     try {
       localStorage.setItem('runyeMeasuredArea', JSON.stringify(payload));
@@ -674,7 +705,7 @@
   var SP_KEY = 'runye_terrain_sprinkler_v1';
   var SP_COLORS = ['#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed', '#0891b2', '#be185d', '#4d7c0f']; /* 轮灌组着色 */
   var SP_DEFAULTS = { crop: '', etc: 4.5, eta: 0.7, soil: 'loam', slope: 8,
-                      range: 15, flow: 2.5, pressure: 300, layout: 'tri', k: 1.1, heads: 12 };
+                      range: 15, flow: 2.5, pressure: 300, ratedFlow: '', ratedPressure: '', sourceFlow: '', layout: 'tri', k: 1.1, heads: 12 };
 
   function spRead() {
     return {
@@ -683,6 +714,8 @@
       soil: $('spSoil').value, slope: parseFloat($('spSlope').value),
       range_m: parseFloat($('spRange').value), flow_m3h: parseFloat($('spFlow').value),
       pressure_kpa: parseFloat($('spPressure').value), layout: $('spLayout').value,
+      rated_flow_m3h: parseFloat($('spRatedFlow').value), rated_pressure_kpa: parseFloat($('spRatedPressure').value),
+      source_flow_m3h: parseFloat($('spSourceFlow').value),
       spacing_k: parseFloat($('spK').value), heads_per_shift: parseInt($('spHeads').value, 10)
     };
   }
@@ -691,6 +724,9 @@
     $('spEtc').value = v.etc; $('spEta').value = v.eta; $('spSoil').value = v.soil;
     $('spSlope').value = v.slope; $('spRange').value = v.range_m; $('spFlow').value = v.flow_m3h;
     $('spPressure').value = v.pressure_kpa; $('spLayout').value = v.layout;
+    $('spRatedFlow').value = v.rated_flow_m3h || v.ratedFlow || '';
+    $('spRatedPressure').value = v.rated_pressure_kpa || v.ratedPressure || '';
+    $('spSourceFlow').value = v.source_flow_m3h || v.sourceFlow || '';
     $('spK').value = v.spacing_k; $('spHeads').value = v.heads_per_shift;
   }
   function spSave() { try { localStorage.setItem(SP_KEY, JSON.stringify(spRead())); } catch (e) {} }
@@ -715,6 +751,8 @@
       '系统流量 <b>' + res.systemFlow.toFixed(1) + ' m³/h</b>',
       '组合喷灌强度 <b>' + res.precipRate.toFixed(1) + ' mm/h</b>（' + D.soilLabel(res.soil) + '允许 ' + res.precipAllow + '）' + (res.precipOk ? ' ✓' : ' ✗')
     ];
+    if (res.sourceFlow != null) rows.push('水源流量校核 <b>' + res.sourceFlow.toFixed(1) + ' m³/h</b> → ' + (res.sourceFlowOk ? '满足当前轮灌组 ✓' : '不足 ✗'));
+    if (res.expectedFlow != null) rows.push('喷嘴曲线换算流量 <b>' + res.expectedFlow.toFixed(2) + ' m³/h</b> → ' + (res.nozzleOk ? '与输入一致 ✓' : '偏差过大 ✗'));
     if (res.dailyHours != null) rows.push('满足日耗水 ' + input.etc + ' mm/d 需日喷洒约 <b>' + res.dailyHours.toFixed(1) + ' 小时</b>（η=' + input.eta + '）');
     box.innerHTML = rows.join('<br>');
     box.hidden = false;
@@ -926,7 +964,8 @@
           state.plots.push({
             id: 'map_' + Date.now() + '_' + i,
             name: name,
-            poly: poly,
+            /* 每一环以自身首点建局部投影，多个环并不天然共用一个工程坐标原点。 */
+            poly: poly, _cs: 'local-wgs84@' + c.origin.lat.toFixed(6) + ',' + c.origin.lng.toFixed(6),
             level: null, source: '在线地图',
             _mapSqm: isFinite(r.sqm) ? r.sqm : null
           });

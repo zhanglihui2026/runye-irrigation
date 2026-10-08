@@ -158,6 +158,8 @@
         <div class="t-sprow"><label>喷头射程 R</label><input id="spRange" type="number" value="15" min="1" max="60" step="0.5"><span>m</span></div>
         <div class="t-sprow"><label>喷头流量 q</label><input id="spFlow" type="number" value="2.5" min="0.1" max="30" step="0.1"><span>m³/h</span></div>
         <div class="t-sprow"><label>工作压力</label><input id="spPressure" type="number" value="300" min="100" max="800" step="10"><span>kPa</span></div>
+        <div class="t-sprow"><label>喷嘴额定流量（可选）</label><input id="spRatedFlow" type="number" min="0.01" max="30" step="0.01" placeholder="按铭牌填写"><span>m³/h</span></div>
+        <div class="t-sprow"><label>喷嘴额定压力（可选）</label><input id="spRatedPressure" type="number" min="10" max="1000" step="1" placeholder="按铭牌填写"><span>kPa</span></div>
         <div class="t-sprow"><label>布置方式</label><select id="spLayout">
           <option value="tri" selected>正三角形（坡地推荐）</option>
           <option value="square">正方形</option>
@@ -165,6 +167,7 @@
         <div class="t-sprow"><label>间距系数 k（×R）</label><input id="spK" type="number" value="1.1" min="0.4" max="1.6" step="0.05"></div>
         <div class="t-spgroup">轮灌与水源</div>
         <div class="t-sprow"><label>同时工作喷头数</label><input id="spHeads" type="number" value="12" min="1" max="500" step="1"><span>个</span></div>
+        <div class="t-sprow"><label>水源可用流量（可选）</label><input id="spSourceFlow" type="number" min="0.1" max="10000" step="0.1" placeholder="实测或水泵铭牌"><span>m³/h</span></div>
         <div class="t-btnrow" style="margin-top:6px">
           <button class="t-btn" id="spCalc">估算</button>
           <button class="t-btn ghost" id="spReset">恢复默认</button>

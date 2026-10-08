@@ -310,29 +310,33 @@
     var lines = String(text || '').split(/\r\n|\r|\n/);
     var delim = opts.delim;
     if (!delim) {
-      /* 取首个非空行数列数最多的分隔符 */
       var probe = '';
       for (var i = 0; i < lines.length && i < 20; i++) if (lines[i].trim()) { probe = lines[i]; break; }
       var cand = [',', ';', '\t'], best = ',', bestN = 0;
       cand.forEach(function (c) { var n = probe.split(c).length - 1; if (n > bestN) { bestN = n; best = c; } });
       delim = best;
     }
-    var points = [], skipped = 0, headerSkipped = false;
+    var points = [], skipped = 0, missingZRows = 0;
     lines.forEach(function (ln) {
       if (!ln.trim()) return;
       var cells = ln.split(delim).map(function (s) { return s.trim(); });
-      var nums = cells.map(parseFloat).filter(isNum);
-      if (nums.length < 2) { skipped++; return; }
-      /* 表头：该行非数字单元占比高 → 跳过 */
-      if (!headerSkipped && nums.length < cells.length * 0.6) { headerSkipped = true; skipped++; return; }
-      var p = { x: nums[0], y: nums[1] };
-      if (nums.length >= 3) p.z = nums[2];
+      /* 高程 CSV 的列位必须稳定：旧逻辑会 filter 掉空 Z，再把后续数字列错当 Z。 */
+      var x = parseFloat(cells[0]), y = parseFloat(cells[1]);
+      if (!isNum(x) || !isNum(y)) { skipped++; return; }
+      var p = { x: x, y: y };
+      if (cells.length >= 3) {
+        var z = parseFloat(cells[2]);
+        if (isNum(z)) p.z = z;
+        else missingZRows++;
+      }
       points.push(p);
     });
     if (points.length < (opts.minPoints || 3))
       return { ok: false, error: '有效坐标行不足（解析到 ' + points.length + ' 行，至少 ' + (opts.minPoints || 3) + ' 行）。请确认文件为「X,Y」或「X,Y,Z」格式、分隔符为逗号/分号/Tab' };
-    var hasZ = points.every(function (p) { return 'z' in p; }) && points.length > 0;
-    return { ok: true, points: points, hasZ: hasZ, skippedRows: skipped };
+    var zCount = points.filter(function (p) { return isNum(p.z); }).length;
+    /* RTK 手簿偶有空值：允许少量缺失，但不能把缺 Z 的文件伪装为可插值点云。 */
+    var hasZ = zCount >= Math.max(3, Math.ceil(points.length * 0.95));
+    return { ok: true, points: points, hasZ: hasZ, zCount: zCount, missingZRows: missingZRows, skippedRows: skipped };
   }
 
   /* ---------------- 高程数据源统一接口层 ----------------
@@ -363,13 +367,33 @@
     return { ok: false, error: '不支持的高程文件类型「' + ext + '」。阶段1 支持：CSV/TXT（RTK 点）与 TIF/TIFF（DTM/DSM 栅格）' };
   }
 
+  /* 保守剔除 RTK 明显飞点。全局高程差可能是真实山地，故只剔除同时超过
+     6×MAD 且至少相差 15m 的孤立大偏差；结果必须由导入提示明确说明。 */
+  function filterElevationOutliers(points) {
+    var valid = (points || []).filter(function (p) { return isNum(p && p.x) && isNum(p.y) && isNum(p.z); });
+    if (valid.length < 8) return { points: valid, removed: 0, threshold: null };
+    var zs = valid.map(function (p) { return p.z; }).sort(function (a, b) { return a - b; });
+    var median = zs[Math.floor(zs.length / 2)];
+    var devs = zs.map(function (z) { return Math.abs(z - median); }).sort(function (a, b) { return a - b; });
+    var mad = devs[Math.floor(devs.length / 2)];
+    var threshold = Math.max(15, mad * 6);
+    var kept = valid.filter(function (p) { return Math.abs(p.z - median) <= threshold; });
+    return { points: kept, removed: valid.length - kept.length, threshold: threshold, median: median };
+  }
+
   /* 组装统一输出记录（严格按用户契约字段）。
      tif 原文件阶段1不持久化（localStorage 容量限制），仅记录元信息。 */
   function buildElevRecord(input) {
     var t = ELEV_TYPES[input.data_type];
     if (!t) return { ok: false, error: '未知高程类型 ' + input.data_type };
     var conf = 'medium';
-    if (input.data_type === 'rtk_xyz') conf = (input.point_list && input.point_list.length >= 20) ? 'high' : 'medium';
+    if (input.data_type === 'rtk_xyz') {
+      var n = (input.point_list || []).filter(function (p) { return isNum(p && p.x) && isNum(p.y) && isNum(p.z); }).length;
+      var coverage = Number(input.coverage_area_m2) || 0;
+      var density = coverage > 0 ? n / coverage : 0;
+      /* 20 点无法代表起伏地形；高置信度同时要求足够点数和已知地块覆盖密度。 */
+      conf = n >= 50 && coverage > 0 && density >= 0.001 ? 'high' : (n >= 10 ? 'medium' : 'low');
+    }
     if (t.previewOnly) conf = 'low';
     return {
       ok: true,
@@ -383,15 +407,16 @@
           file_name: input.file_name || '',
           file_size: input.file_size || 0,
           preview_only: t.previewOnly,
+          hydraulic_usable: input.data_type === 'rtk_xyz' && (input.point_list || []).length >= 3,
+          coverage_area_m2: Number(input.coverage_area_m2) || 0,
           registered_at: Date.now()
         }
       }
     };
   }
 
-  /* 沿管线轨迹采样高程 —— 阶段1 接口桩（阶段2接入高程插值引擎）。
-     path: [{x,y},...] 管线折点；step: 采样步长（米）。
-     无高程数据时按契约返回 null，调用方据此走「水力计算锁定/提示」降级路径。 */
+  /* 沿管线轨迹采样高程：path 为 [{x,y},...] 管线折点，step 为采样步长（米）。
+     优先 Delaunay 线性插值，凸包外或退化点云以 IDW 兜底；无有效高程才返回 null。 */
   function sampleAlongPath(path, step, elevPoints) {
     if (!Array.isArray(path) || path.length < 2) return null;
     if (!(step > 0)) return null;
@@ -545,7 +570,8 @@
     input = input || {};
     var warn = [];
     var R = input.range_m, q = input.flow_m3h, k = input.spacing_k;
-    if (!(R > 0) || !(q > 0)) return { ok: false, error: '喷头射程与流量必须为正数' };
+    var pressure = Number(input.pressure_kpa);
+    if (!(R > 0) || !(q > 0) || !(pressure > 0)) return { ok: false, error: '喷头射程、流量和工作压力必须为正数' };
     if (!(areaM2 > 0)) return { ok: false, error: '请先在地块清单中导入或绘制地块' };
     if (!(k > 0.4) || k > 1.6) { k = Math.min(1.6, Math.max(0.5, k || 1.1)); warn.push('间距系数超出常规(0.4~1.6)，已夹回 ' + k); }
 
@@ -560,6 +586,24 @@
     if (N > headCount) N = headCount;
     var shiftCount = Math.ceil(headCount / N);
     var systemFlow = N * q;
+
+    /* 水源能力只校核当前轮灌组的瞬时需求；主管管损/泵扬程仍交给主页完整水力引擎。 */
+    var sourceFlow = Number(input.source_flow_m3h);
+    var sourceFlowOk = null;
+    if (sourceFlow > 0) {
+      sourceFlowOk = sourceFlow + 1e-9 >= systemFlow;
+      if (!sourceFlowOk) warn.push('当前轮灌组需水 ' + systemFlow.toFixed(1) + ' m³/h，超过水源可用流量 ' + sourceFlow.toFixed(1) + ' m³/h：请减少同时工作喷头数或增加轮灌组');
+    }
+    if (pressure < 150 || pressure > 500) warn.push('工作压力 ' + pressure.toFixed(0) + ' kPa 超出常见喷头 150–500 kPa 区间：请核对喷嘴厂家曲线');
+
+    /* q 与 P 不能仅凭两个数判断对错。用户填入喷嘴铭牌额定 q/P 后，才按 q∝√P 作可追溯校核。 */
+    var ratedFlow = Number(input.rated_flow_m3h), ratedPressure = Number(input.rated_pressure_kpa);
+    var expectedFlow = null, nozzleOk = null;
+    if (ratedFlow > 0 && ratedPressure > 0) {
+      expectedFlow = ratedFlow * Math.sqrt(pressure / ratedPressure);
+      nozzleOk = Math.abs(q - expectedFlow) / expectedFlow <= 0.10;
+      if (!nozzleOk) warn.push('输入流量 ' + q.toFixed(2) + ' m³/h 与喷嘴额定曲线换算值 ' + expectedFlow.toFixed(2) + ' m³/h 相差超过 10%：请核对喷嘴型号、压力或流量单位');
+    }
 
     /* 组合喷灌强度 ρ = 1000·q / headArea（单喷头实际控制面积=间距×行距，含重叠修正），
        与土壤允许值校核。v298 修正：旧分母用理论覆盖圆 πR²，三角形布置下喷洒圆重叠，
@@ -590,6 +634,8 @@
       headCount: headCount, headsPerShift: N, shiftCount: shiftCount,
       systemFlow: systemFlow, precipRate: precipRate,
       precipAllow: allow, precipOk: precipOk,
+      sourceFlow: sourceFlow > 0 ? sourceFlow : null, sourceFlowOk: sourceFlowOk,
+      expectedFlow: expectedFlow, nozzleOk: nozzleOk,
       dailyHours: dailyHours > 0 ? dailyHours : null,
       soil: soil, layout: layout
     };
@@ -858,6 +904,7 @@
     soilLabel: soilLabel,
     classifyElevFile: classifyElevFile,
     buildElevRecord: buildElevRecord,
+    filterElevationOutliers: filterElevationOutliers,
     sampleAlongPath: sampleAlongPath,
     loadState: loadState,
     saveState: saveState
