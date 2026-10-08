@@ -55,6 +55,16 @@
   table{border-collapse:collapse;width:100%;background:#fff;font-size:11px;margin:6px 0 14px}
   th,td{border:1px solid var(--s-200);padding:4px 6px;text-align:right;white-space:nowrap}
   th{background:var(--s-100);color:var(--s-600);font-weight:600}
+  /* [v315 2026-10-08 用户要求] 结果表表头冻结 + 点击管段跳转行高亮。
+     ⚠ 实现：**不能**用页面级 th sticky——.result 有 overflow-x:auto（宽表横向滚动用），
+     sticky 祖先链上任一非 visible 的 overflow 会把 th 锁进该容器（探针实测 thTop 随页滚走）。
+     故用「表容器冻结」：.tblfreeze 限高 + overflow:auto，th 在容器内 sticky top:0 恒钉容器顶；
+     点击管段 scrollIntoView(block:center) 对嵌套滚动容器同样自动滚到位。 */
+  .tblfreeze{max-height:calc(100vh - 200px);overflow:auto;border:1px solid var(--s-200)}
+  #segTable th,#tapeTable th,#sugTable th{position:sticky;top:0;z-index:5;box-shadow:0 1px 0 var(--s-200)}
+  /* 点击管线图管段跳转到的表格行：黄色闪烁 2 次，一眼锁定「具体参数」行 */
+  @keyframes hydRowFlash{0%,100%{background:transparent}50%{background:#fef08a}}
+  #segTable tr.hyd-row-hit td{animation:hydRowFlash 1.1s ease-in-out 2}
   td.l,th.l{text-align:left}
   tr.over td{color:var(--r-600);font-weight:700}
   tr.worst td{background:var(--g-50)}
@@ -151,11 +161,11 @@
         <h3 class="rt">水力管线图</h3>
         <div class="hyd-map" id="hydDiagram" aria-label="水力管线图"></div>
         <h3 class="rt">逐段水力校核</h3>
-        <table id="segTable"></table>
+        <div class="tblfreeze"><table id="segTable"></table></div>
         <h3 class="rt">滴灌带多孔出流（Christiansen 修正）</h3>
-        <table id="tapeTable"></table>
+        <div class="tblfreeze"><table id="tapeTable"></table></div>
         <h3 class="rt">建议管径（流速上限内选最小 PE 外径，Guyri 口径）</h3>
-        <table id="sugTable"></table>
+        <div class="tblfreeze"><table id="sugTable"></table></div>
         <h3 class="rt">EPANET 对照（epanet-js WASM）</h3>
         <div class="card" style="max-width:860px">
           <div style="font-size:11px;color:var(--s-500);line-height:1.6">
@@ -415,7 +425,16 @@
         if (!r) return;
         $('hydTip').innerHTML = '<b>' + esc(r.name) + '</b> · 流量 ' + f(r.Q, 3) + ' m³/h<br>流速 ' + f(r.v, 2) + ' m/s · 沿程 ' + f(r.hf, 3) + ' m · 本段合计 ' + f(r.htot, 3) + ' m';
         var tr = document.querySelector('[data-hydrow="' + r.i + '"]');
-        if (tr) tr.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        /* [v315 2026-10-08 用户要求] 跳转的同时给目标行上高亮闪烁——长表里
+        「跳到了哪一行」要看得见；先清旧行，再 void offsetWidth 重启动画 */
+        if (tr) {
+          document.querySelectorAll('#segTable tr.hyd-row-hit').forEach(function (x) { x.classList.remove('hyd-row-hit'); });
+          void tr.offsetWidth;
+          tr.classList.add('hyd-row-hit');
+          /* v315：.tblfreeze 容器冻结下 th 恒钉容器顶——scrollIntoView 滚容器内 scrollTop
+             即可，行到哪表头都在，无需额外校正（本页 window 不滚，滚动容器是 .result/.tblfreeze） */
+          tr.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }
       });
     });
   }
