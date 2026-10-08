@@ -3400,6 +3400,8 @@ body > .ry-nav .main-header{display:none!important}
 /* ===== [v252 2026-10-06 用户要求]「水力计算结果」面板默认折叠 =====
    #ppPlanBar2（二级）/ #tlPlanBar2（三级）载入即加 pp-res-head + pp-res-off：
    只露标题一行（水力计算结果 ▸），点标题行展开（▾）、再点收起；不记忆状态，每次进入默认折叠。
+   [v306 2026-10-08 用户要求] 三级改为默认展开：tlPlanBar2 载入只加 pp-res-head 不加 pp-res-off
+   （见 ppResCollapse init 的 defaultOff 参数）；下列箭头/折叠 CSS 机制不变，两态皆可到达。
    折叠态隐藏全部字段行与分隔线；三级栏「目标流速」行（.tl-target-v-row，v225 绝对定位在
    标题行右端）属标题行内容，折叠时保留可输入。
    标题是各宿主 ::before 伪元素 ⇒ 箭头直接拼进 content 按宿主重写（content 无法追加，
@@ -17366,21 +17368,25 @@ ppPullLiftDh();                                              // 首屏对齐一�
   })();
 
   /* ===== [v252 2026-10-06 用户要求]「水力计算结果」面板默认折叠：
-         #ppPlanBar2（二级）/ #tlPlanBar2（三级）载入即折叠，只露标题行；
-         点标题行展开、再点收起；每次进入页面默认折叠（不记忆展开态）。
-         输入框/下拉/按钮上的点击不触发折叠（目标流速、改径重算交互不受影响）。
-         CSS 侧：标题行箭头按五宿主重写 ::before content；字段行 display:none!important。 ===== */
+         点标题行展开、再点收起；输入框/下拉/按钮上的点击不触发折叠
+         （目标流速、改径重算交互不受影响）。
+         CSS 侧：标题行箭头按五宿主重写 ::before content；字段行 display:none!important。
+         [v306 2026-10-08 用户要求] 默认态按页面区分：地块分区页（二级 ppPlanBar2）
+         保持载入即折叠（v252 原行为）；管路规划页（三级 tlPlanBar2）默认展开 ——
+         init 增加 defaultOff 参数，tlPlanBar2 只加 pp-res-head（点击可折叠）不加
+         pp-res-off（初始展开）。两宿主均为静态 HTML，init 载入一次可靠。 ===== */
   (function ppResCollapse(){
-    function init(bar){
+    function init(bar, defaultOff){
       if(!bar)return;
-      bar.classList.add('pp-res-head','pp-res-off');
+      bar.classList.add('pp-res-head');
+      if(defaultOff)bar.classList.add('pp-res-off');
       bar.addEventListener('click',function(e){
         if(e.target&&e.target.closest&&e.target.closest('input,select,button'))return;
         bar.classList.toggle('pp-res-off');
       });
     }
-    init(document.getElementById('ppPlanBar2'));
-    init(document.getElementById('tlPlanBar2'));
+    init(document.getElementById('ppPlanBar2'), true);
+    init(document.getElementById('tlPlanBar2'), false);
 
   /* ===== [v255 2026-10-06 用户要求] 水源方向可调：三级管线简图右键水源点，
          水源换到总管另一端（左右端/上下端互换）。事件委托挂 document 的 contextmenu，
