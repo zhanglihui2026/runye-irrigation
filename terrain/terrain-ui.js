@@ -895,6 +895,12 @@
         rings.push({ ring: d.poly, name: d.name || '', sqm: d.sqm });
       }
       if (!rings.length) return;
+      /* v298j（用户要求）：新回传**直接替换**之前回传的地块——
+         旧 source==='在线地图' 的全部移除后再导入（手绘/shp/CSV 等其他来源不动），
+         避免「几个地块同时传过来叠成一团」。地图页「点哪个传哪个」的选中行为不变。 */
+      var beforeCnt = state.plots.length;
+      state.plots = state.plots.filter(function (p) { return p.source !== '在线地图'; });
+      var replaced = beforeCnt - state.plots.length;
       var added = 0, updated = 0, bad = 0;
       rings.forEach(function (r, i) {
         var c = D.lonlatToLocalMeters(r.ring);
@@ -933,6 +939,7 @@
         incomingBannerShown = true;
         banner('warn',
           '✓ 在线地图回传已导入 <b>' + added + '</b> 个地块（WGS-84 经纬度已按局部米制投影，面积已按<b>亩</b>显示）。' +
+          (replaced ? '本次为<b>替换导入</b>：已移除之前回传的 <b>' + replaced + '</b> 个在线地图地块（其他来源地块不受影响）。' : '') +
           (updated ? '另有 <b>' + updated + '</b> 个同名地块已<b>原地更新</b>（未重复导入）。' : '') +
           '注意：<b>非 CGCS2000 平面坐标</b>——工程放样/水力计算前请以 CGCS2000 成果文件导入为准。' +
           (bad ? '另有 ' + bad + ' 个无效环已跳过。' : ''));
