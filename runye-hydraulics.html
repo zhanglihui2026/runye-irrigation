@@ -70,6 +70,13 @@
   .empty b{color:var(--g-700)}
   .pathline{font-size:12px;background:#fff;border:1px solid var(--s-200);padding:8px 10px;margin:4px 0 8px;line-height:1.8}
   .pathline .arrow{color:var(--g-600);font-weight:700;padding:0 2px}
+  .hyd-map{position:relative;height:390px;border:1px solid var(--s-200);background:linear-gradient(135deg,#f8fafc,#eef6f1);overflow:hidden;margin:5px 0 12px}
+  .hyd-map svg{width:100%;height:100%;display:block}.hyd-base{fill:none;stroke-linecap:round;stroke-linejoin:round}
+  .hyd-flow{fill:none;stroke:#fff;stroke-width:2.2;stroke-linecap:round;stroke-dasharray:10 12;animation:hydFlow 1.35s linear infinite;pointer-events:none;opacity:.9}
+  .hyd-pipe{cursor:pointer}.hyd-pipe:hover .hyd-base,.hyd-pipe.selected .hyd-base{stroke-width:8!important;filter:drop-shadow(0 0 3px rgba(15,23,42,.45))}
+  .hyd-tip{position:absolute;right:10px;bottom:10px;max-width:310px;background:rgba(15,23,42,.88);color:#fff;padding:7px 9px;border-radius:5px;font-size:11px;line-height:1.55;pointer-events:none}
+  .hyd-legend{position:absolute;left:10px;top:10px;background:rgba(255,255,255,.94);border:1px solid var(--s-200);padding:6px 8px;font-size:10px;line-height:1.65;color:var(--s-600)}
+  @keyframes hydFlow{to{stroke-dashoffset:-22}}
   pre.inp{background:#0f172a;color:#e2e8f0;font:11px/1.5 Consolas,monospace;padding:10px;overflow:auto;
     max-height:260px;margin:6px 0;white-space:pre}
   .row2{display:flex;gap:6px}
@@ -135,8 +142,14 @@
         <div class="sum-grid" id="sumGrid"></div>
         <h3 class="rt">拓扑与诊断</h3>
         <div class="pathline" id="treeLine"></div>
+        <div class="pathline" id="diagLine"></div>
+        <div class="row2" style="max-width:360px;margin:0 0 8px">
+          <button class="mbtn" id="btnMapHydraulic">🗺 在地图查看水力状态</button>
+        </div>
         <h3 class="rt">最不利路径（逐段累计）</h3>
         <div class="pathline" id="pathLine"></div>
+        <h3 class="rt">水力管线图</h3>
+        <div class="hyd-map" id="hydDiagram" aria-label="水力管线图"></div>
         <h3 class="rt">逐段水力校核</h3>
         <table id="segTable"></table>
         <h3 class="rt">滴灌带多孔出流（Christiansen 修正）</h3>
@@ -146,8 +159,8 @@
         <h3 class="rt">EPANET 对照（epanet-js WASM）</h3>
         <div class="card" style="max-width:860px">
           <div style="font-size:11px;color:var(--s-500);line-height:1.6">
-            由本页拓扑自动生成 .inp（JUNCTIONS/PIPES/PUMPS/COORDINATES），支管流量落下游节点为 demand，
-            泵按功率泵（本页轴功率）。自研递推与 EPANET 数值互为对照。
+            由本页拓扑自动生成 .inp（JUNCTIONS/PIPES/COORDINATES）；每条滴灌带的直接需求写入对应支管下游节点，
+            并把本页局部损失换算为 EPANET 管件损失系数。供水端使用需求扬程作为固定水头边界；泵曲线选型仍由润野主计算负责。
           </div>
           <div class="row2" style="margin-top:6px">
             <button class="mbtn" id="btnCopyInp">复制 .inp 内容</button>
@@ -167,7 +180,8 @@
   var Core = window.RyHydCore;
   if (!Core) { document.getElementById('srcCard').textContent = '计算核心加载失败（runye-hydraulics-core.js）'; return; }
   var CFG_KEY = 'runye_hydraulics_check_cfg_v1';   /* 只在用户点「校核」时写（站内约定） */
-  var lastFull = null, lastNet = null;
+  var MAP_OVERLAY_KEY = 'runye_hydraulic_overlay_v1';
+  var lastFull = null, lastNet = null, lastDesign = null;
 
   function $(id) { return document.getElementById(id); }
   function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
@@ -212,8 +226,23 @@
     try { return JSON.parse(localStorage.getItem('runye_network_layout') || 'null'); }
     catch (e) { return null; }
   }
+  function readDesign() {
+    try { return JSON.parse(localStorage.getItem('runye_hydraulic_design_v1') || 'null'); }
+    catch (e) { return null; }
+  }
   function renderSrc() {
-    var net = readNet(), el = $('srcCard');
+    var net = readNet(), design = readDesign(), el = $('srcCard');
+    if (design && design.version === 1 && design.geometry && design.hydraulics) {
+      var g = design.geometry, h = design.hydraulics;
+      el.innerHTML = '<div class="kv"><span class="k">来源</span><span class="v">三级规划最终数据</span></div>' +
+        '<div class="kv"><span class="k">总管 / 主管 / 支管</span><span class="v">' +
+        (g.frontPipe ? 1 : 0) + ' / ' + ((g.mainPipes || []).length) + ' / ' + ((g.branchPipes || []).length) + ' 段</span></div>' +
+        '<div class="kv"><span class="k">联合设计流量</span><span class="v">' + f(h.combinedFlow, 2) + ' m³/h</span></div>' +
+        '<div class="kv"><span class="k">滴灌带入口压力</span><span class="v">' + f(h.tapePressureM, 1) + ' m</span></div>' +
+        '<div class="kv"><span class="k">生成时间</span><span class="v">' + (design.generatedAt || '—') + '</span></div>' +
+        '<div class="kv"><span class="k">管径同步</span><span class="v">' + (design.caliberAppliedAt ? new Date(design.caliberAppliedAt).toLocaleString('zh-CN') : '未改径') + '</span></div>';
+      return;
+    }
     if (!net) {
       el.innerHTML = '<span style="color:var(--r-600);font-weight:700">未找到已布置管网</span><br>' +
         '<span style="font-size:11px;color:var(--s-500)">去 <a href="runye-map-measure.html">在线地图</a> 布置管网，' +
@@ -238,10 +267,11 @@
   /* ---------- 校核主流程 ---------- */
   function run() {
     var net = readNet();
+    var design = readDesign();
     renderSrc();
     var opts = readOpts();
     saveCfg();
-    if (!net || net.needsReplan || !(net.segments || []).length) {
+    if ((!design || design.version !== 1) && (!net || net.needsReplan || !(net.segments || []).length)) {
       $('emptyBox').style.display = '';
       $('out').style.display = 'none';
       return;
@@ -249,8 +279,21 @@
     $('emptyBox').style.display = 'none';
     $('out').style.display = '';
     lastNet = net;
-    var full = Core.compute(net, opts);
+    lastDesign = design;
+    var full = (design && design.version === 1 && Core.computeDesign) ? Core.computeDesign(design, opts) : Core.compute(net, opts);
     lastFull = full;
+    if (!full.valid) {
+      $('warnBox').textContent = '⛔ 无法启动水力校核：\n' + full.blockers.map(function (x) { return '• ' + x; }).join('\n') +
+        '\n\n请回三级管路规划页重新生成管线图后再读取。';
+      $('out').style.display = 'none';
+      $('emptyBox').style.display = '';
+      $('emptyBox').textContent = '当前没有可用的三级规划最终水力数据。';
+      return;
+    }
+    try {
+      var overlay = Core.mapOverlay && Core.mapOverlay(full, net);
+      if (overlay) localStorage.setItem(MAP_OVERLAY_KEY, JSON.stringify(overlay));
+    } catch (e) { }
     renderAll(full);
   }
 
@@ -267,7 +310,7 @@
     $('sumGrid').innerHTML =
       sumCard('系统总流量', f(full.qTotal, 3), ' m³/h = ' + f(full.qTotal * 3600, 0) + ' L/h') +
       sumCard('最不利路径损失', worst ? f(worst.loss, 2) : '—', ' m（含滴头压力）', worst && worst.loss > 999 ? 'err' : '') +
-      sumCard('需求扬程 TDH', f(full.tdh, 2), ' m（+高差 ' + f(full.opts.elev, 1) + ' +首部 ' + f(full.opts.headLoss, 1) + '）') +
+      sumCard('需求扬程 TDH', f(full.tdh, 2), full.mode === 'design' ? ' m（三级规划入口压力口径）' : ' m（+高差 ' + f(full.opts.elev, 1) + ' +首部 ' + f(full.opts.headLoss, 1) + '）') +
       sumCard('轴功率 / 电机档', f(full.power, 2), ' kW → 选 ' + f(full.motorKw, 2) + ' kW（η=' + full.opts.pumpEff + '）');
     function sumCard(t, n, d, cls) {
       return '<div class="sum"><div class="t">' + esc(t) + '</div><div class="n ' + (cls || '') + '">' + esc(n) +
@@ -275,18 +318,29 @@
     }
     /* 拓扑行 */
     var tr = full.tree;
-    $('treeLine').innerHTML = '管段 <b>' + tr.segs.length + '</b> 段（搭接切分后）· 节点 <b>' + tr.nodes.length +
+    $('treeLine').innerHTML = (full.mode === 'design' ? '三级规划最终管段 <b>' + tr.segs.length + '</b> 段 · ' :
+      '管段 <b>' + tr.segs.length + '</b> 段（搭接切分后）· 节点 <b>' + tr.nodes.length +
       '</b> · 树内 <b>' + tr.order.length + '</b> 段' +
       (tr.loops.length ? ' · <span style="color:var(--r-600)">环 ' + tr.loops.length + '</span>' : '') +
       (tr.orphans.length ? ' · <span style="color:var(--r-600)">未连通 ' + tr.orphans.length + '</span>' : '') +
-      ' · 滴灌带挂接 <b>' + full.tapeRows.filter(function (t) { return t.attached; }).length + '/' + full.tapeRows.length + '</b>';
+      ' · 滴灌带挂接 <b>' + full.tapeRows.filter(function (t) { return t.attached; }).length + '/' + full.tapeRows.length + '</b>');
+    var count = { ok: 0, over_velocity: 0, disconnected: 0, loop: 0, no_demand: 0 };
+    full.segRows.forEach(function (r) { count[r.status] = (count[r.status] || 0) + 1; });
+    $('diagLine').innerHTML =
+      '<b>图上状态</b>：<span style="color:#15803d">正常 ' + count.ok + '</span>　' +
+      '<span style="color:#dc2626">超流速 ' + count.over_velocity + '</span>　' +
+      '<span style="color:#d97706">未连通 ' + count.disconnected + '</span>　' +
+      '<span style="color:#7c3aed">环网 ' + count.loop + '</span>　' +
+      '<span style="color:#64748b">无需求 ' + count.no_demand + '</span><br>' +
+      '<span style="color:var(--s-500)">已同步到在线地图；开启“水力状态”图层后，右键管段查看流量、流速和损失。</span>';
     /* 最不利路径 */
     if (worst) {
       $('pathLine').innerHTML = worst.path.map(function (si, i) {
         var nm = esc(tr.segs[si].name || tr.segs[si].id);
         return (i ? '<span class="arrow">→</span>' : '') + nm;
       }).join('') + '　<span style="color:var(--s-500)">路径损失 ' + f(worst.loss, 2) +
-        ' m（其中滴灌带 ' + f(worst.tapeHf, 2) + ' + 滴头压力 ' + f(full.opts.dripHead, 1) + '）</span>';
+        (full.mode === 'design' ? ' m（已计入滴灌带入口压力，不计滴灌带带内损失）' :
+          ' m（其中滴灌带 ' + f(worst.tapeHf, 2) + ' + 滴头压力 ' + f(full.opts.dripHead, 1) + '）') + '</span>';
     } else {
       $('pathLine').textContent = '未能构建最不利路径（拓扑为空或全部成环/孤立）。';
     }
@@ -297,12 +351,13 @@
       '<th>内径 mm</th><th>流速 m/s</th><th>沿程 m</th><th>局部 m</th><th>合计 m</th></tr>';
     full.segRows.forEach(function (r, i) {
       var cls = (worstSet[r.i] ? 'worst ' : '') + (r.over ? 'over' : '');
-      h += '<tr class="' + cls + '"><td class="l">' + esc(r.name) + '</td><td class="l">' + kindTag(r.kind) +
+      h += '<tr data-hydrow="' + r.i + '" class="' + cls + '"><td class="l">' + esc(r.name) + '</td><td class="l">' + kindTag(r.kind) +
         '</td><td>' + f(r.L, 1) + '</td><td>' + f(r.Q, 3) + '</td><td>' + f(r.od, 0) + '</td><td>' + f(r.idm, 1) +
         '</td><td>' + f(r.v, 2) + (r.over ? ' ⚠' : '') + '</td><td>' + f(r.hf, 3) + '</td><td>' + f(r.hloc, 3) +
         '</td><td>' + f(r.htot, 3) + '</td></tr>';
     });
     $('segTable').innerHTML = h;
+    renderHydDiagram(full);
     /* 滴灌带表 */
     h = '<tr><th>带号</th><th class="l">挂接支管</th><th>带长 m</th><th>出口数 N</th><th>F 修正</th>' +
       '<th>流量 L/h</th><th>带流速 m/s</th><th>带损 m</th></tr>';
@@ -312,13 +367,15 @@
         '</td><td>' + t.N + '</td><td>' + f(t.F, 3) + '</td><td>' + f(t.qLh, 0) + '</td><td>' + f(t.v, 2) +
         '</td><td>' + f(t.hf, 3) + '</td></tr>';
     });
-    if (!full.tapeRows.length) h = '<tr><td class="l" style="text-align:center">布置中无滴灌带（dripTapes 为空）</td></tr>';
+    if (!full.tapeRows.length) h = '<tr><td class="l" style="text-align:center">' +
+      (full.mode === 'design' ? '本次按三级规划的滴灌带入口压力校核，未计入滴灌带多孔出流。' : '布置中无滴灌带（dripTapes 为空）') + '</td></tr>';
     $('tapeTable').innerHTML = h;
     /* 建议管径 */
-    var sg = Core.suggestOD(lastNet, full.opts);
+    var sg = full.mode === 'design' ? null : Core.suggestOD(lastNet, full.opts);
     h = '<tr><th class="l">段</th><th class="l">类别</th><th>流量 m³/h</th><th>现外径 mm</th><th>现合计损失 m</th>' +
       '<th>建议外径 mm</th><th>新流速 m/s</th><th>新合计损失 m</th></tr>';
-    sg.rows.forEach(function (r) {
+    if (!sg) h += '<tr><td colspan="8" class="l">三级规划结果已采用最终管径；当前先校核至滴灌带入口，管径方案可在三级规划页调整后重新生成。</td></tr>';
+    (sg ? sg.rows : []).forEach(function (r) {
       h += '<tr><td class="l">' + esc(r.name) + '</td><td class="l">' + kindTag(r.kind) + '</td><td>' + f(r.Q, 3) +
         '</td><td>' + f(r.curOd, 0) + '</td><td>' + f(r.curHf, 3) + '</td><td>' +
         (r.needChange ? '<b style="color:var(--g-700)">' + r.sugOd + '</b>' : f(r.sugOd, 0)) + '</td><td>' +
@@ -326,12 +383,45 @@
     });
     $('sugTable').innerHTML = h;
     /* inp */
-    $('inpBox').textContent = Core.toInp(full, lastNet);
+    $('inpBox').textContent = full.mode === 'design' ? '三级规划水力快照已用于管路校核；EPANET 拓扑导出将在管段连接关系持久化后启用。' : Core.toInp(full, lastNet);
     $('epanetOut').innerHTML = '';
   }
 
+  function renderHydDiagram(full) {
+    var host = $('hydDiagram');
+    if (!host) return;
+    var rows = full.segRows.filter(function (r) { return r.points && r.points.length >= 2; });
+    if (!rows.length) { host.innerHTML = '<div class="empty" style="height:100%;border:0">当前数据没有可显示的最终管线几何。</div>'; return; }
+    var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    rows.forEach(function (r) { r.points.forEach(function (p) { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y); }); });
+    var spanX = Math.max(1, maxX - minX), spanY = Math.max(1, maxY - minY), pad = Math.max(spanX, spanY) * 0.08;
+    var width = spanX + pad * 2, height = spanY + pad * 2;
+    function pt(p) { return (p.x - minX + pad).toFixed(2) + ',' + (maxY - p.y + pad).toFixed(2); }
+    function color(r) { return r.status === 'over_velocity' ? '#dc2626' : r.status === 'disconnected' ? '#d97706' : r.status === 'loop' ? '#7c3aed' : r.status === 'no_demand' ? '#94a3b8' : (r.kind === 'front' ? '#0f766e' : r.kind === 'main' ? '#2563eb' : '#16a34a'); }
+    function weight(r) { return r.kind === 'front' ? 7 : r.kind === 'main' ? 5 : 3.5; }
+    var paths = rows.map(function (r) {
+      var d = 'M ' + r.points.map(pt).join(' L '), c = color(r), dash = r.status === 'ok' ? '' : ' stroke-dasharray="8 5"';
+      return '<g class="hyd-pipe" data-hydi="' + r.i + '"><path class="hyd-base" d="' + d + '" stroke="' + c + '" stroke-width="' + weight(r) + '"' + dash + '/>' +
+        (r.Q > 0 ? '<path class="hyd-flow" d="' + d + '"/>' : '') + '</g>';
+    }).join('');
+    host.innerHTML = '<svg viewBox="0 0 ' + width.toFixed(2) + ' ' + height.toFixed(2) + '" preserveAspectRatio="xMidYMid meet">' + paths + '</svg>' +
+      '<div class="hyd-legend"><b>流动虚线＝水流方向</b><br><span style="color:#0f766e">■</span> 总管　<span style="color:#2563eb">■</span> 主管　<span style="color:#16a34a">■</span> 支管<br>点击任意管段查看水力数据</div>' +
+      '<div class="hyd-tip" id="hydTip">已显示三级规划最终管线。点击管段查看流量、流速和损失。</div>';
+    host.querySelectorAll('[data-hydi]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        host.querySelectorAll('.hyd-pipe.selected').forEach(function (x) { x.classList.remove('selected'); });
+        el.classList.add('selected');
+        var r = full.segRows.filter(function (x) { return x.i === +el.getAttribute('data-hydi'); })[0];
+        if (!r) return;
+        $('hydTip').innerHTML = '<b>' + esc(r.name) + '</b> · 流量 ' + f(r.Q, 3) + ' m³/h<br>流速 ' + f(r.v, 2) + ' m/s · 沿程 ' + f(r.hf, 3) + ' m · 本段合计 ' + f(r.htot, 3) + ' m';
+        var tr = document.querySelector('[data-hydrow="' + r.i + '"]');
+        if (tr) tr.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      });
+    });
+  }
+
   /* ---------- EPANET 对照 ---------- */
-  function inpText() { return lastFull ? Core.toInp(lastFull, lastNet) : ''; }
+  function inpText() { return lastFull && lastFull.valid && lastFull.mode !== 'design' ? Core.toInp(lastFull, lastNet) : ''; }
   $('btnCopyInp').onclick = function () {
     var t = inpText();
     function okMsg() { $('epanetOut').textContent = '已复制到剪贴板。'; }
@@ -361,7 +451,8 @@
        ws.writeFile → model.open/solveH/close → getNodeValues(NodeProperty.X) 返回全部节点数组。 */
   $('btnRunEpanet').onclick = function () {
     var out = $('epanetOut');
-    if (!lastFull) { out.textContent = '请先校核。'; return; }
+    if (!lastFull || !lastFull.valid) { out.textContent = '请先完成有效的水力校核。'; return; }
+    if (lastFull.mode === 'design') { out.textContent = '当前已按三级规划最终结果完成入口压力校核；EPANET 需等待管段连接关系持久化后生成。'; return; }
     out.textContent = '正在加载 epanet-js WASM（约 0.7MB）…';
     var sources = ['pwa/vendor/epanet/index.mjs', 'https://unpkg.com/epanet-js@0.9.0/dist/index.mjs'];
     tryLoad(0);
@@ -387,17 +478,17 @@
           return { ws: ws, heads: heads, press: press, flows: flows };
         });
       }).then(function (r) {
-        var h = '<b style="color:var(--g-700)">EPANET 运行成功</b>（引擎 v' + r.ws.version + '，单位制 LPM，水库水头=本页 TDH）<br>' +
+        var h = '<b style="color:var(--g-700)">EPANET 运行成功</b>（引擎 v' + r.ws.version + '，单位制 LPM，固定水头边界=本页需求扬程 TDH）<br>' +
           '<table style="max-width:640px"><tr><th class="l">对象</th><th>EPANET 水头 m</th><th>EPANET 压力 m</th><th>本页对照</th></tr>';
+        var labels = Core.epanetNodeLabels ? Core.epanetNodeLabels(lastFull) : [];
         for (var n = 0; n < r.heads.length; n++) {
-          var lbl = n < lastFull.tree.nodes.length ? ('节点 J' + n) : '水库';
+          var lbl = labels[n] || ('节点 #' + n);
           h += '<tr><td class="l">' + esc(lbl) + '</td><td>' + f(r.heads[n], 3) + '</td><td>' + f(r.press[n], 3) + '</td><td class="l" style="text-align:left;color:var(--s-500)">' +
-            (n === 0 ? '水源，水头=本页 TDH=' + f(lastFull.tdh, 2) : '') + '</td></tr>';
+            (lbl === '供水边界 Rsrc' ? '供水边界，水头=TDH ' + f(lastFull.tdh, 2) + ' m' : '') + '</td></tr>';
         }
         h += '<tr><td colspan="4" style="text-align:left;background:var(--s-100)">管段流量 LPM（应与「逐段水力校核」表同比例一致）：</td></tr><tr><td colspan="4" style="text-align:left">' +
           r.flows.map(function (q, i2) { return 'P' + i2 + '=' + f(q, 3); }).join('　') + '</td></tr></table>' +
-          '<div style="font-size:10px;color:var(--s-500);margin-top:4px">注：EPANET 网络只含输水管（不含滴灌带多孔出流），' +
-          '极小流量/粗管径下数值求解可能不收敛或退化——以本页自研校核为准，EPANET 用于独立交叉验证。</div>';
+          '<div style="font-size:10px;color:var(--s-500);margin-top:4px">本次复核按实际管段、直接滴灌需求及局部损失生成 EPANET 输入；滴灌带多孔出流仍由润野的 Christiansen 校核承担。这里使用固定水头边界校验管网，不等同于水泵曲线选型。</div>';
         out.innerHTML = h;
       }).catch(function (e) {
         if (i + 1 < sources.length) { tryLoad(i + 1); return; }
@@ -410,6 +501,7 @@
   /* ---------- 事件 ---------- */
   $('btnRun').onclick = run;
   $('btnReload').onclick = function () { renderSrc(); run(); };
+  $('btnMapHydraulic').onclick = function () { window.location.href = 'runye-map-measure.html#hydraulic'; };
   document.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target && e.target.tagName === 'INPUT') run(); });
 
   restoreCfg();

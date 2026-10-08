@@ -22,6 +22,24 @@
     catch (e) { return []; }
   }
 
+  /* 水力校核页生成的只读快照。时间戳不一致时宁可不画，避免把旧方案结果套到新管网。 */
+  function readHydraulicOverlay(net) {
+    try {
+      var o = JSON.parse(localStorage.getItem('runye_hydraulic_overlay_v1') || 'null');
+      if (!o || o.version !== 1 || !o.items) return null;
+      if (o.networkTs && net && net.ts && o.networkTs !== net.ts) return null;
+      return o;
+    } catch (e) { return null; }
+  }
+  function hydraulicStyle(rec, fallback) {
+    if (!rec) return fallback;
+    if (rec.status === 'over_velocity') return { color: '#dc2626', weight: 5, dashArray: null, label: '超流速' };
+    if (rec.status === 'disconnected') return { color: '#d97706', weight: 4, dashArray: '7,5', label: '未连通' };
+    if (rec.status === 'loop') return { color: '#7c3aed', weight: 4, dashArray: '5,4', label: '环网待复核' };
+    if (rec.status === 'no_demand') return { color: '#94a3b8', weight: 3, dashArray: '3,5', label: '无灌水需求' };
+    return { color: '#15803d', weight: Math.max(3, fallback.weight), dashArray: null, label: '水力正常' };
+  }
+
   function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
@@ -53,6 +71,8 @@
       'padding-left:6px;margin-bottom:4px;letter-spacing:1px}' +
       '.rym-layer-panel label{display:block;cursor:pointer;user-select:none}' +
       '.rym-layer-panel input{margin-right:5px;vertical-align:-1px}' +
+      '.rym-hyd-legend{margin-top:5px;padding-top:5px;border-top:1px solid #e2e8f0;font-size:10px;line-height:1.65;color:#475569}' +
+      '.rym-hyd-legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin:0 3px 0 5px;vertical-align:0}' +
       '.ry-field-mode #map path{stroke-width:3.5px !important}' +
       '.ry-field-mode .leaflet-popup-content{font-size:14px;font-weight:600}' +
       '.ry-field-mode .rym-layer-panel{background:#fff8e1;border:2px solid #f59e0b}' +
@@ -90,6 +110,7 @@
         plotLayers: {}
       };
       state.mergeOpts = opts || {};
+      state.hydraulicOn = true;
       state.mergePick = !!(opts && opts.mergePick);
       state.onMergeDone = (opts && typeof opts.onMergeDone === 'function') ? opts.onMergeDone : null;
       buildPanel(state, opts);
@@ -157,7 +178,7 @@
     var LS_KEY = 'runye_map_layers';
     var saved = {};
     try { saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}; } catch (e) { saved = {}; }
-    var ROWS = [['plot', '地块'], ['network', '管网'], ['drip', '滴灌带'], ['device', '设备']];
+    var ROWS = [['plot', '地块'], ['network', '管网'], ['hydraulic', '水力状态'], ['drip', '滴灌带'], ['device', '设备']];
     /* [v152 2026-09-29] 「测量框」是宿主页面级的图层（poly/顶点/橡皮筋/面积文字都在页面里，
      * 不在本脚本的图层组里）⇒ 只在宿主页显式传了 opts.onMeasure 时才加这一行，
      * 别的引用页（如 index.html）不会凭空多出一个「勾了没反应」死控件。 */
@@ -172,6 +193,9 @@
       var on = (saved[r[0]] !== false);   // 默认全开；只有显式存过 false 才关
       return '<label><input type="checkbox" data-rym="' + r[0] + '"' + (on ? ' checked' : '') + '> ' + r[1] + '</label>';
     }).join('') +
+      '<div class="rym-hyd-legend"><b>水力图例</b><br><i style="background:#15803d"></i>正常' +
+      '<i style="background:#dc2626"></i>超流速<i style="background:#d97706"></i>未连通' +
+      '<i style="background:#7c3aed"></i>环网<i style="background:#94a3b8"></i>无需求</div>' +
       '<label style="margin-top:4px;border-top:1px solid #e2e8f0;padding-top:4px">' +
       '<input type="checkbox" data-rym="fieldmode"' + (saved.fieldmode ? ' checked' : '') + '> ☀️ 田间模式</label>';
     state.map.getContainer().appendChild(el);
@@ -188,6 +212,11 @@
         if (!on) { try { state.clearSelection(); } catch (e) {} }
         if (opts && typeof opts.onMergeMode === 'function') { try { opts.onMergeMode(on); } catch (e) {} }
         try { if (state.refresh) state.refresh(); } catch (e) {}
+        return;
+      }
+      if (k === 'hydraulic') {
+        state.hydraulicOn = !!on;
+        try { renderNetwork(state, opts); } catch (e) {}
         return;
       }
       var g = null;
@@ -797,12 +826,15 @@
     state.deviceGroup.clearLayers();
     var net = (opts && opts.network) ? opts.network : readNetwork();
     if (!net) return { drawn: 0 };
+    var hydraulic = state.hydraulicOn ? readHydraulicOverlay(net) : null;
     var clipRings = clipPlotRings();   /* [v230] 有地块才裁剪 */
     (net.segments || []).forEach(function (s) {
       try {
         var sLL = validRingLL(s.latLng, 2);   // 同样挡住含 null 顶点的管段（否则 _project 抛错连累全部矢量层）
         if (!sLL) return;
         var st = dnStyle(s.dn);
+        var hrec = hydraulic && hydraulic.items && hydraulic.items[s.id];
+        if (hrec) st = hydraulicStyle(hrec, st);
         /* [v232] 总管(front) 不裁剪：地块回传后只裁 主管/支管/滴灌带，总管跨地块互连须整段可见。
            s.kind 由三级管路生成写入（'front'/'main'/'branch'）；旧 localStorage 无 kind 时回退 id/name 前缀 'front' 判定。 */
         var isTrunk = (s.kind === 'front') || (typeof s.id === 'string' && s.id.indexOf('front') === 0) || (typeof s.name === 'string' && s.name.indexOf('front') === 0);
@@ -821,6 +853,11 @@
           '长度：' + escapeHtml(length.toFixed(1)) + ' m<br>' +
           (s.q != null ? '流量：' + escapeHtml((+s.q).toFixed(2)) + ' m³/h<br>' : '') +
           (s.v != null ? '流速：' + escapeHtml((+s.v).toFixed(2)) + ' m/s<br>' : '') +
+          (hrec ? '<hr style="border:0;border-top:1px solid #e2e8f0;margin:4px 0">' +
+            '<b style="color:' + st.color + '">水力：' + escapeHtml(st.label) + '</b><br>' +
+            '流量：' + escapeHtml((+hrec.flow).toFixed(3)) + ' m³/h<br>' +
+            '流速：' + escapeHtml((+hrec.velocity).toFixed(2)) + ' m/s<br>' +
+            '本段损失：' + escapeHtml((+hrec.loss).toFixed(3)) + ' m<br>' : '') +
           '</div>';
         /* [v230] 逐段裁剪：折线按相邻两点拆段，落在地块外的部分不画（弹窗随每一段保留） */
         var pts = sLL.map(RunyeGeo.coordPair), pieces = [];
@@ -830,7 +867,7 @@
           for (var ii = 0; ii < ivs.length; ii++) pieces.push([lerpPair(pa, pb, ivs[ii][0]), lerpPair(pa, pb, ivs[ii][1])]);
         }
         pieces.forEach(function (pc) {
-          var line = L.polyline(displayLL(pc, opts), { color: st.color, weight: st.weight, opacity: 0.9 });
+          var line = L.polyline(displayLL(pc, opts), { color: st.color, weight: st.weight, opacity: 0.9, dashArray: st.dashArray || null });
           /* [v298k] 管段弹窗与地块弹窗同口径：也改右键唤起（左键只留给画框顶点/拾取） */
           line.bindPopup(popup);
           line.off('click', line._openPopup);

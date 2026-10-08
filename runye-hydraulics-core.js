@@ -80,18 +80,21 @@
   };
 
   /* ---------------- 几何工具 ---------------- */
+  /* 地图回传的管线使用 [lat,lng]，滴灌带使用 {lat,lng}；两种格式必须同等处理。 */
+  function latOf(p) { return Array.isArray(p) ? +p[0] : +(p && p.lat); }
+  function lngOf(p) { return Array.isArray(p) ? +p[1] : +(p && p.lng); }
   function toPlane(latLng, origin) {
     var m = 6378137 * Math.PI / 180;
     var co = Math.cos(origin.lat * Math.PI / 180);
-    return { x: (latLng[1] - origin.lng) * m * co, y: (latLng[0] - origin.lat) * m };
+    return { x: (lngOf(latLng) - origin.lng) * m * co, y: (latOf(latLng) - origin.lat) * m };
   }
   function polylineLen(latLng) {
     var R = 6378137, s = 0;
     for (var i = 1; i < latLng.length; i++) {
       var a = latLng[i - 1], b = latLng[i];
-      var dLa = (b[0] - a[0]) * Math.PI / 180, dLo = (b[1] - a[1]) * Math.PI / 180;
+      var dLa = (latOf(b) - latOf(a)) * Math.PI / 180, dLo = (lngOf(b) - lngOf(a)) * Math.PI / 180;
       var h = Math.sin(dLa / 2) * Math.sin(dLa / 2) +
-        Math.cos(a[0] * Math.PI / 180) * Math.cos(b[0] * Math.PI / 180) *
+        Math.cos(latOf(a) * Math.PI / 180) * Math.cos(latOf(b) * Math.PI / 180) *
         Math.sin(dLo / 2) * Math.sin(dLo / 2);
       s += 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
     }
@@ -146,7 +149,11 @@
             var a = ll[bi - 1], b = ll[bi];
             var ins = [a[0] + (b[0] - a[0]) * bt, a[1] + (b[1] - a[1]) * bt];
             (ev[fi] = ev[fi] || []);
-            if (!ev[fi].some(function (x) { return x.k === bi; })) ev[fi].push({ k: bi, t: bt, ins: ins });
+            /* 同一条直管可能接入多条支管：不能只按区间 k 去重，否则第二个三通会
+               被吞掉并成为孤立段。只合并同一投影点（约 1 mm）即可。 */
+            if (!ev[fi].some(function (x) { return x.k === bi && Math.abs(x.t - bt) < 1e-5; })) {
+              ev[fi].push({ k: bi, t: bt, ins: ins });
+            }
             break;                                     /* 该端点只挂在最近的一段上 */
           }
         }
@@ -156,11 +163,12 @@
     segs.forEach(function (s, fi) {
       var es = ev[fi];
       if (!es || !es.length) { out.push(s); return; }
-      es.sort(function (x, y) { return x.k - y.k; });  /* 按区间升序重建折线 */
+      es.sort(function (x, y) { return x.k === y.k ? x.t - y.t : x.k - y.k; });
       var newLL = [s.latLng[0]], cuts = [];
       for (var k = 1; k < s.latLng.length; k++) {
-        var e2 = es.filter(function (x) { return x.k === k; })[0];
-        if (e2) { newLL.push(e2.ins); cuts.push(newLL.length - 1); }
+        /* 一段折线区间内可有多个三通，按投影位置依次插入。 */
+        var atK = es.filter(function (x) { return x.k === k; });
+        atK.forEach(function (e2) { newLL.push(e2.ins); cuts.push(newLL.length - 1); });
         newLL.push(s.latLng[k]);
       }
       if (!cuts.length) { out.push(s); return; }
@@ -174,7 +182,8 @@
         var suf = 'abcdefghijklmnop'[pi] || 'x';
         out.push(Object.assign({}, s, { latLng: ll,
           id: (s.id || 'seg' + fi) + '_' + suf,
-          name: (s.name || s.id || 'seg' + (fi + 1)) + '_' + suf }));
+          name: (s.name || s.id || 'seg' + (fi + 1)) + '_' + suf,
+          sourceId: s.sourceId || s.id || ('seg' + fi) }));
       });
       splitCount++;
     });
@@ -201,8 +210,9 @@
     /* 局部平面原点 = 全部点包围盒中心 */
     var mnLa = 90, mxLa = -90, mnLo = 180, mxLo = -180;
     segs.forEach(function (s) { s.latLng.forEach(function (p) {
-      if (p[0] < mnLa) mnLa = p[0]; if (p[0] > mxLa) mxLa = p[0];
-      if (p[1] < mnLo) mnLo = p[1]; if (p[1] > mxLo) mxLo = p[1];
+      var lat = latOf(p), lng = lngOf(p);
+      if (lat < mnLa) mnLa = lat; if (lat > mxLa) mxLa = lat;
+      if (lng < mnLo) mnLo = lng; if (lng > mxLo) mxLo = lng;
     }); });
     res.origin = { lat: (mnLa + mxLa) / 2, lng: (mnLo + mxLo) / 2 };
 
@@ -365,6 +375,14 @@
     var tapes = attachTapes(tree, net, o);
     var flows = assignFlows(tree, tapes, o);
     var warnings = tree.warnings.concat(tapes.warnings);
+    var blockers = [];
+    if (!tree.order.length) blockers.push('没有从水源连通的有效管网');
+    if (!tapes.tapes.length) blockers.push('未读到滴灌带，无法建立灌水需求');
+    if (tapes.tapes.length && !tapes.tapes.some(function (t) { return t.attached && t.q > 0; })) {
+      blockers.push('滴灌带均未成功挂接到支管，不能以零流量进行校核');
+    }
+    /* 地图反投会把同一施工线拆成独立显示段，偶有未连通/成环不应把其余已连通
+       分区的校核一并封死。它们保留在 warnings；只有系统总流量为零时才阻断。 */
 
     /* 逐段 */
     var segRows = tree.segs.map(function (s, i) {
@@ -377,6 +395,16 @@
       var hloc = hf * o.localRatio;
       return { i: i, name: s.name || s.id, kind: s.kind || '?', L: L, Q: Q, od: od, idm: idm,
         v: v, over: v > o.vmax + 1e-9, hf: hf, hloc: hloc, htot: hf + hloc };
+    });
+    var orphanSet = {}, loopSet = {};
+    tree.orphans.forEach(function (i) { orphanSet[i] = true; });
+    tree.loops.forEach(function (r) { loopSet[r.seg] = true; });
+    segRows.forEach(function (r) {
+      var s = tree.segs[r.i] || {};
+      r.sourceId = s.sourceId || s.id || r.name;
+      r.connected = tree.edges[r.i] && tree.edges[r.i].up >= 0;
+      r.status = r.over ? 'over_velocity' : (orphanSet[r.i] ? 'disconnected' :
+        (loopSet[r.i] ? 'loop' : (r.Q <= 0 ? 'no_demand' : 'ok')));
     });
     flows.zero.forEach(function (i) { warnings.push('段「' + segRows[i].name + '」流量为 0（无滴灌带挂接）'); });
 
@@ -436,7 +464,8 @@
     var P = qTotal > 0 ? 2.725e-3 * qTotal * tdh / o.pumpEff : 0;   /* kW */
     var motorKw = dc && dc.motor ? dc.motor(P) : 0;
 
-    return { opts: o, tree: tree, segRows: segRows, tapeRows: tapeRows, paths: paths,
+    if (qTotal <= 0 && !blockers.length) blockers.push('系统总流量为零，不能生成水力结果');
+    return { valid: !blockers.length, blockers: blockers, opts: o, tree: tree, segRows: segRows, tapeRows: tapeRows, paths: paths,
       worst: worst, pathLoss: pathLoss, tdh: tdh, qTotal: qTotal, power: P,
       motorKw: motorKw, warnings: warnings };
   }
@@ -469,18 +498,18 @@
      需求口径：每条支管段的流量落到其**下游节点** demand（主干流量由 EPANET 沿树自算，
      与本模块递推互为对照）。孤立/成环段不入 inp。 */
   function toInp(full, net, opts) {
+    if (!full || !full.valid) return '';
     var o = full.opts || Object.assign({}, DEF, opts || {});
-    var demand = {};                                   /* nodeIdx -> 支管流量之和 m³/h */
-    full.tree.segs.forEach(function (s, i) {
-      if (s.kind !== 'branch') return;
-      var e = full.tree.edges[i];
-      if (e.down < 0) return;
-      demand[e.down] = (demand[e.down] || 0) + (full.segRows[i].Q || 0);
+    var demand = {};                                   /* nodeIdx -> 该节点的直接滴灌需求 m³/h */
+    full.tapeRows.forEach(function (t) {
+      if (!t.attached || t.segIdx < 0) return;
+      var e = full.tree.edges[t.segIdx];
+      if (e.down >= 0) demand[e.down] = (demand[e.down] || 0) + (t.q || 0);
     });
     var m3hToLpm = function (q) { return Math.round(q * 1000 / 60 * 100) / 100; };
     var L = [];
     L.push('[TITLE]');
-    L.push(';; Runye v299 auto-generated from runye_network_layout');
+    L.push(';; Runye EPANET hydraulic check, auto-generated from runye_network_layout');
     L.push('[OPTIONS]');
     L.push(' UNITS           LPM');               /* 实测 EPANET 2.3.5 只认 UNITS，"FLOW UNITS" 报 200 */
     L.push(' TRIALS         400');                /* 宽收敛：管路水损相对水头极小的网络（滴灌常见，
@@ -489,6 +518,8 @@
     L.push('[JUNCTIONS]');
     L.push(';ID           Elev    Demand');
     full.tree.nodes.forEach(function (nd, ni) {
+      /* 根节点由 Rsrc 水库直接代表；同时生成 Jroot 会造成未连接节点（EPANET 233）。 */
+      if (ni === full.tree.root) return;
       var dm = m3hToLpm(demand[ni] || 0);
       L.push(' J' + String(ni).padEnd(11) + ' 0        ' + dm);
     });
@@ -500,20 +531,113 @@
       var e = full.tree.edges[i];
       if (e.up < 0) return;
       var idm = hc.innerDiam(+s.dn || 0, o.caliber);   /* mm */
+      var from = e.up === full.tree.root ? 'Rsrc' : ('J' + e.up);
+      var v = full.segRows[i].v || 0;
+      var minor = v > 0 ? (full.segRows[i].hloc || 0) / (v * v / (2 * 9.80665)) : 0;
       L.push(' P' + String(i).padEnd(11) +
-        ('J' + e.up).padEnd(14) + ' ' + ('J' + e.down).padEnd(14) +
+        from.padEnd(14) + ' ' + ('J' + e.down).padEnd(14) +
         String(Math.round(polylineLen(s.latLng) * 100) / 100).padEnd(7) + ' ' +
         (Math.round(idm * 1000) / 1000).toFixed(3).padEnd(7) + ' ' +
-        String(o.C).padEnd(10) + ' 0         Open');
+        String(o.C).padEnd(10) + ' ' + minor.toFixed(5).padEnd(9) + ' Open');
     });
     L.push('[COORDINATES]');
     L.push(';Node           X-Coord          Y-Coord');
     full.tree.nodes.forEach(function (nd, ni) {
+      if (ni === full.tree.root) return;
       L.push(' J' + String(ni).padEnd(11) + ' ' + nd.x.toFixed(2).padEnd(16) + ' ' + nd.y.toFixed(2));
     });
-    L.push(' Rsrc         0                0');
+    var root = full.tree.nodes[full.tree.root] || { x: 0, y: 0 };
+    L.push(' Rsrc         ' + root.x.toFixed(2) + '             ' + root.y.toFixed(2));
     L.push('[END]');
     return L.join('\n') + '\n';
+  }
+
+  function epanetNodeLabels(full) {
+    if (!full || !full.tree) return [];
+    var out = [];
+    full.tree.nodes.forEach(function (nd, ni) { if (ni !== full.tree.root) out.push('节点 J' + ni); });
+    out.push('供水边界 Rsrc');
+    return out;
+  }
+
+  /* 地图图层只读快照：把分裂后的计算段按原始管段合并，绝不改写设计管网。 */
+  function mapOverlay(full, net) {
+    if (!full || !full.valid) return null;
+    var priority = { ok: 0, no_demand: 1, loop: 2, disconnected: 3, over_velocity: 4 };
+    var items = {};
+    full.segRows.forEach(function (r) {
+      var id = r.sourceId || r.name;
+      var old = items[id];
+      if (!old || priority[r.status] >= priority[old.status]) {
+        items[id] = { status: r.status, name: r.name, kind: r.kind, flow: r.Q, velocity: r.v,
+          loss: r.htot, connected: r.connected };
+      } else {
+        old.flow += r.Q;
+        old.loss += r.htot;
+        old.velocity = Math.max(old.velocity, r.v);
+      }
+    });
+    return { version: 1, networkTs: net && net.ts || null, calculatedAt: Date.now(),
+      vmax: full.opts.vmax, qTotal: full.qTotal, tdh: full.tdh, items: items };
+  }
+
+  function meterPolylineLen(points) {
+    var total = 0;
+    for (var i = 1; points && i < points.length; i++) {
+      var a = points[i - 1], b = points[i];
+      if (!a || !b || !isFinite(a.x) || !isFinite(a.y) || !isFinite(b.x) || !isFinite(b.y)) continue;
+      total += Math.sqrt(Math.pow(b.x - a.x, 2) + Math.pow(b.y - a.y, 2));
+    }
+    return total;
+  }
+
+  /* 三级规划最终数据的专用入口：不从地图/滴灌带几何反推，而是直接使用规划时已算定的
+     联合流量、单区流量和滴灌带入口压力，只校核输水管至滴灌带入口。 */
+  function computeDesign(design, opts) {
+    var o = Object.assign({}, DEF, opts || {});
+    var h = design && design.hydraulics, g = design && design.geometry;
+    if (!h || !g) return { valid: false, blockers: ['未找到三级管路规划最终数据'], warnings: [] };
+    var rows = [], sourceSeq = 0;
+    function add(role, lines, q, pipe) {
+      (lines || []).forEach(function (line, i) {
+        var L = meterPolylineLen(line);
+        if (!(L > 0) || !(q > 0)) return;
+        var od = +(pipe && pipe.od) || 0;
+        var idm = hc.innerDiam(od, o.caliber);
+        var v = hc.velocity(q, idm);
+        var hf = hc.hazen(L, q, idm, o.C);
+        var hloc = hf * o.localRatio;
+        var prefix = role === 'front' ? 'front' : role;
+        rows.push({ i: sourceSeq, sourceId: prefix + (role === 'front' ? '0' : '-' + i),
+          name: role === 'front' ? '总管' : (role === 'main' ? '主管' : '支管') + (i + 1), kind: role,
+          points: JSON.parse(JSON.stringify(line)), L: L, Q: q, od: od, idm: idm, v: v, over: v > o.vmax + 1e-9,
+          hf: hf, hloc: hloc, htot: hf + hloc, connected: true, status: v > o.vmax + 1e-9 ? 'over_velocity' : 'ok' });
+        sourceSeq++;
+      });
+    }
+    add('front', g.frontPipe ? [g.frontPipe] : [], +h.combinedFlow || 0, h.frontPipe);
+    add('main', g.mainPipes, +h.zoneFlow || 0, h.mainPipe);
+    add('branch', g.branchPipes, +h.branchFlow || 0, h.branchPipe);
+    if (!rows.length) return { valid: false, blockers: ['三级规划最终数据中没有可校核的管段或流量'], warnings: [] };
+    function maxRole(role) {
+      var best = null;
+      rows.forEach(function (r) { if (r.kind === role && (!best || r.htot > best.htot)) best = r; });
+      return best;
+    }
+    var path = [maxRole('front'), maxRole('main'), maxRole('branch')].filter(Boolean).map(function (r) { return r.i; });
+    var worstLoss = path.reduce(function (sum, i) { return sum + rows[i].htot; }, 0);
+    var tapeHead = +h.tapePressureM || 0;
+    var baseHead = (+h.lift || 0) + (+h.dh || 0) + tapeHead + (+h.filterLoss || 0);
+    var tdh = Math.max(baseHead + worstLoss, +h.pumpHead || 0);
+    var qTotal = +h.combinedFlow || +h.zoneFlow || 0;
+    var power = qTotal > 0 ? 2.725e-3 * qTotal * tdh / ((+h.efficiency || 0.65)) : 0;
+    var tree = { segs: rows.map(function (r) { return { id: r.sourceId, name: r.name, kind: r.kind }; }),
+      nodes: [], order: rows.map(function (r) { return r.i; }), loops: [], orphans: [] };
+    return { valid: true, mode: 'design', blockers: [], opts: o, tree: tree, segRows: rows, tapeRows: [],
+      paths: [{ path: path, loss: worstLoss + tapeHead, tapeHf: 0 }],
+      worst: { path: path, loss: worstLoss + tapeHead, tapeHf: 0 }, pathLoss: worstLoss,
+      tdh: tdh, qTotal: qTotal, power: power, motorKw: dc && dc.motor ? dc.motor(power) : 0,
+      warnings: ['数据源：三级管路规划最终结果。仅校核总管、主管、支管至滴灌带入口；不计滴灌带多孔出流损失。'] };
   }
 
   /* 兜底 Christiansen（design-core 缺席时，公式同式） */
@@ -526,6 +650,7 @@
     DEF: DEF, polylineLen: polylineLen, ptPolyDist: ptPolyDist,
     christiansenF: christiansenF,
     buildTree: buildTree, attachTapes: attachTapes, assignFlows: assignFlows,
-    compute: compute, suggestOD: suggestOD, toInp: toInp
+    compute: compute, suggestOD: suggestOD, toInp: toInp, epanetNodeLabels: epanetNodeLabels,
+    mapOverlay: mapOverlay, computeDesign: computeDesign
   };
 });

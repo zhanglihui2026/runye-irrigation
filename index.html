@@ -12915,6 +12915,19 @@ function tlAutoGenerate(options) {
     flowModel: { zoneFlow: r.zoneFlow, branchFlow: r.branchFlow, combinedFlow: r.combinedFlow, zoneCount: r.zoneCount, branchCount: r.branchCount },
     pump: { flow: (pumpFlowEl ? pumpFlowEl.textContent : ''), head: (pumpHeadEl ? pumpHeadEl.textContent : ''), power: (pumpPowerEl ? pumpPowerEl.textContent : '') },
     pipes: { front: (frontPipeEl ? frontPipeEl.textContent : ''), main: (mainPipeEl ? mainPipeEl.textContent : ''), branch: (branchPipeEl ? branchPipeEl.textContent : '') } };
+  /* 水力校核页唯一计算来源：保存三级规划的最终几何与已确定的设计流量。
+     地图反投只承担显示，不再用滴灌带像素/坐标反推流量。 */
+  try {
+    localStorage.setItem('runye_hydraulic_design_v1', JSON.stringify({ version: 1, ts: Date.now(),
+      generatedAt: window.tlDiagramData.generatedAt,
+      geometry: { frontPipe: JSON.parse(JSON.stringify(window.tlDiagramData.frontPipe || [])),
+        mainPipes: JSON.parse(JSON.stringify(window.tlDiagramData.mainPipes || [])),
+        branchPipes: JSON.parse(JSON.stringify(window.tlDiagramData.branchPipes || [])) },
+      hydraulics: { combinedFlow: r.combinedFlow, zoneFlow: r.zoneFlow, branchFlow: r.branchFlow,
+        tapePressureM: r.tapePressureM, lift: r.lift, dh: r.dh, filterLoss: r.filterLoss,
+        efficiency: r.efficiency, pumpHead: r.pumpHead,
+        frontPipe: { od: r.frontPipe.od }, mainPipe: { od: r.mainPipe.od }, branchPipe: { od: r.branchPipe.od } } }));
+  } catch (eHydSnapshot) { }
   /* v136：meta.live（图面实际值快照）随生成初始化——此刻实际==设计；此后每次改径重算
      由 tlPumpUpdateRun 收口刷新（见 tlSyncIsoMeta）。meta.pipes 设计口径不动（消费红线）。 */
   try { window.tlSyncIsoMeta && window.tlSyncIsoMeta(); } catch (eIsoMeta) { }
@@ -19734,6 +19747,9 @@ bindUI();
       window.measuredArea = d.sqm;
       window.measuredPolygonSource='map';
       window.currentPlotId=null;
+      /* terrain 页只回传已落在各地块内的 RTK 高低程摘要；不回传整片点云，
+         由用户在「地形高程」面板确认后才写入正式水力计算。 */
+      window.__runyeImportedTerrain = d.terrainProfile && d.terrainProfile.source === 'rtk_xyz' ? d.terrainProfile : null;
       /* v161：先清跨页恢复锚点（本函数随后的 runyePersistMeasuredPlot 会按新地块写回） */
       try{ if(window.runyeSetCurrentPlot) window.runyeSetCurrentPlot(null); }catch(e){}
 
