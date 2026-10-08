@@ -383,7 +383,7 @@
     });
     $('sugTable').innerHTML = h;
     /* inp */
-    $('inpBox').textContent = full.mode === 'design' ? '三级规划水力快照已用于管路校核；EPANET 拓扑导出将在管段连接关系持久化后启用。' : Core.toInp(full, lastNet);
+    $('inpBox').textContent = full.mode === 'design' ? Core.toInpDesign(full) : Core.toInp(full, lastNet);
     $('epanetOut').innerHTML = '';
   }
 
@@ -421,7 +421,10 @@
   }
 
   /* ---------- EPANET 对照 ---------- */
-  function inpText() { return lastFull && lastFull.valid && lastFull.mode !== 'design' ? Core.toInp(lastFull, lastNet) : ''; }
+  function inpText() {
+    if (!lastFull || !lastFull.valid) return '';
+    return lastFull.mode === 'design' ? Core.toInpDesign(lastFull) : Core.toInp(lastFull, lastNet);
+  }
   $('btnCopyInp').onclick = function () {
     var t = inpText();
     function okMsg() { $('epanetOut').textContent = '已复制到剪贴板。'; }
@@ -452,7 +455,7 @@
   $('btnRunEpanet').onclick = function () {
     var out = $('epanetOut');
     if (!lastFull || !lastFull.valid) { out.textContent = '请先完成有效的水力校核。'; return; }
-    if (lastFull.mode === 'design') { out.textContent = '当前已按三级规划最终结果完成入口压力校核；EPANET 需等待管段连接关系持久化后生成。'; return; }
+    if (!inpText()) { out.textContent = '当前最终管线缺少可恢复的端点拓扑，请回三级规划重新生成管线图。'; return; }
     out.textContent = '正在加载 epanet-js WASM（约 0.7MB）…';
     var sources = ['pwa/vendor/epanet/index.mjs', 'https://unpkg.com/epanet-js@0.9.0/dist/index.mjs'];
     tryLoad(0);

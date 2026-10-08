@@ -553,11 +553,78 @@
   }
 
   function epanetNodeLabels(full) {
+    if (full && full.epanetLabels) return full.epanetLabels.slice();
     if (!full || !full.tree) return [];
     var out = [];
     full.tree.nodes.forEach(function (nd, ni) { if (ni !== full.tree.root) out.push('节点 J' + ni); });
     out.push('供水边界 Rsrc');
     return out;
+  }
+
+  /* 三级规划快照以米制平面坐标保存。按端点聚类恢复供水拓扑供 EPANET 求解：
+     总管起点为水源，支管远端为直接需水点。滴灌带的带内多孔出流仍由
+     Christiansen 校核，但入口流量会作为 EPANET 的节点需求参与管网求解。 */
+  function toInpDesign(full) {
+    if (!full || !full.valid || full.mode !== 'design') return '';
+    var rows = (full.segRows || []).filter(function (r) { return r.points && r.points.length >= 2 && r.L > 0; });
+    if (!rows.length) return '';
+    var tol = Math.max(0.05, Math.min(1, +(full.opts && full.opts.snapTol) || 0.5));
+    var nodes = [], edges = [];
+    function nodeFor(p) {
+      for (var i = 0; i < nodes.length; i++) {
+        var dx = nodes[i].x - p.x, dy = nodes[i].y - p.y;
+        if (dx * dx + dy * dy <= tol * tol) return i;
+      }
+      nodes.push({ x: +p.x, y: +p.y, edges: [] });
+      return nodes.length - 1;
+    }
+    rows.forEach(function (r, i) {
+      var a = nodeFor(r.points[0]), b = nodeFor(r.points[r.points.length - 1]);
+      if (a === b) return;
+      var e = { row: r, idx: i, a: a, b: b };
+      edges.push(e); nodes[a].edges.push(e); nodes[b].edges.push(e);
+    });
+    if (!edges.length) return '';
+    var root = edges[0].a;
+    for (var f = 0; f < edges.length; f++) if (edges[f].row.kind === 'front') { root = edges[f].a; break; }
+    var dist = nodes.map(function () { return Infinity; }), queue = [root]; dist[root] = 0;
+    while (queue.length) {
+      var u = queue.shift();
+      nodes[u].edges.forEach(function (e) {
+        var v = e.a === u ? e.b : e.a;
+        if (dist[v] !== Infinity) return;
+        dist[v] = dist[u] + (e.row.L || 0); queue.push(v);
+      });
+    }
+    var demand = nodes.map(function () { return 0; });
+    edges.forEach(function (e) {
+      if (e.row.kind !== 'branch' || dist[e.a] === Infinity || dist[e.b] === Infinity) return;
+      var end = dist[e.a] > dist[e.b] ? e.a : e.b;
+      demand[end] += Math.max(0, +e.row.Q || 0);
+    });
+    var m3hToLpm = function (q) { return Math.round(q * 1000 / 60 * 100) / 100; };
+    var L = ['[TITLE]', ';; Runye EPANET check generated from final three-level irrigation plan',
+      '[OPTIONS]', ' UNITS           LPM', ' TRIALS         400', ' ACCURACY       0.01',
+      '[JUNCTIONS]', ';ID           Elev    Demand'];
+    nodes.forEach(function (n, i) { if (i !== root && dist[i] !== Infinity) L.push(' J' + String(i).padEnd(11) + ' 0        ' + m3hToLpm(demand[i])); });
+    L.push('[RESERVOIRS]', ' Rsrc         ' + (Math.round((full.tdh || 0) * 100) / 100));
+    L.push('[PIPES]', ';ID           Node1          Node2           Length  Diam    Roughness  MinorLoss Status');
+    edges.forEach(function (e, i) {
+      if (dist[e.a] === Infinity || dist[e.b] === Infinity) return;
+      var r = e.row, d = hc.innerDiam(+r.od || 0, full.opts && full.opts.caliber), v = r.v || 0;
+      var minor = v > 0 ? (r.hloc || 0) / (v * v / (2 * 9.80665)) : 0;
+      var from = e.a === root ? 'Rsrc' : ('J' + e.a), to = e.b === root ? 'Rsrc' : ('J' + e.b);
+      L.push(' P' + String(i).padEnd(11) + from.padEnd(14) + ' ' + to.padEnd(14) + ' ' +
+        String(Math.round(r.L * 100) / 100).padEnd(7) + ' ' + (Math.round(d * 1000) / 1000).toFixed(3).padEnd(7) + ' ' +
+        String(full.opts.C).padEnd(10) + ' ' + minor.toFixed(5).padEnd(9) + ' Open');
+    });
+    L.push('[COORDINATES]', ';Node           X-Coord          Y-Coord');
+    nodes.forEach(function (n, i) { if (i !== root && dist[i] !== Infinity) L.push(' J' + String(i).padEnd(11) + ' ' + n.x.toFixed(2).padEnd(16) + ' ' + n.y.toFixed(2)); });
+    L.push(' Rsrc         ' + nodes[root].x.toFixed(2) + '             ' + nodes[root].y.toFixed(2), '[END]');
+    /* EPANET 的 getNodeValues 顺序为 Junctions 后 Reservoirs；显示标签须与之同序。 */
+    full.epanetLabels = nodes.map(function (n, i) { return i === root || dist[i] === Infinity ? null : ('节点 J' + i); })
+      .filter(Boolean).concat(['供水边界 Rsrc']);
+    return L.join('\n') + '\n';
   }
 
   /* 地图图层只读快照：把分裂后的计算段按原始管段合并，绝不改写设计管网。 */
@@ -650,7 +717,7 @@
     DEF: DEF, polylineLen: polylineLen, ptPolyDist: ptPolyDist,
     christiansenF: christiansenF,
     buildTree: buildTree, attachTapes: attachTapes, assignFlows: assignFlows,
-    compute: compute, suggestOD: suggestOD, toInp: toInp, epanetNodeLabels: epanetNodeLabels,
+    compute: compute, suggestOD: suggestOD, toInp: toInp, toInpDesign: toInpDesign, epanetNodeLabels: epanetNodeLabels,
     mapOverlay: mapOverlay, computeDesign: computeDesign
   };
 });
