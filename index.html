@@ -8400,6 +8400,7 @@ function tlBindCalSels() {
       tlBuildPipeOverride();
       if (typeof tlUpdatePlanBar === 'function') tlUpdatePlanBar();
       if (typeof window.tlSyncIsoMeta === 'function') window.tlSyncIsoMeta();
+      if (typeof window.tlSyncHydDesignSnapshot === 'function') window.tlSyncHydDesignSnapshot();
     });
   });
 }
@@ -22221,6 +22222,27 @@ var ISO_FITTING_UI_OFF = true;
     }
     return true;
   };
+  /* [v307 2026-10-08 用户反馈「改径结果未传递给水力计算页」] 把管路规划页最新改径结果
+     （管径三项+扬程）同步进 localStorage 快照 runye_hydraulic_design_v1——水力计算页
+     (runye-hydraulics.html) readDesign/computeDesign 的唯一数据源。只覆盖 pumpHead 与
+     三类管 od + caliberAppliedAt 时间戳，其余字段保留生成管线图时的设计口径；水力页按
+     新 od 自算逐段损失/流速，口径自然一致。调用点：① tlBindCalSels 管径下拉 change
+     ② tlPumpUpdateRun（更新水泵扬程/经济面板应用/图面改径 三路收口）。 */
+  window.tlSyncHydDesignSnapshot = function () {
+    try {
+      var raw = JSON.parse(localStorage.getItem('runye_hydraulic_design_v1') || 'null');
+      if (!raw || raw.version !== 1 || !raw.hydraulics) return false;
+      var r = computeThreeLevel();
+      if (!r || !r.frontPipe || !r.mainPipe || !r.branchPipe) return false;
+      raw.hydraulics.pumpHead = r.pumpHead;
+      raw.hydraulics.frontPipe = { od: r.frontPipe.od };
+      raw.hydraulics.mainPipe = { od: r.mainPipe.od };
+      raw.hydraulics.branchPipe = { od: r.branchPipe.od };
+      raw.caliberAppliedAt = Date.now();
+      localStorage.setItem('runye_hydraulic_design_v1', JSON.stringify(raw));
+      return true;
+    } catch (eSync) { return false; }
+  };
   window.tlPumpUpdateRun = function () {
     var st = window.tlPumpOverrideStat();
     if (st.n > 0 && (!window.RyPipePathLoss || !tlWorstPathLen().fromFigure)) return false;
@@ -22235,6 +22257,7 @@ var ISO_FITTING_UI_OFF = true;
     /* v136：meta.live 实时快照 + 轴测图重渲染（若已挂载）——图例/信息行跟着实际值走。
        redraw 内部无图面时自动空转；此收口覆盖 经济面板应用/图面改径/更新水泵扬程 三条路。 */
     try { window.tlSyncIsoMeta && window.tlSyncIsoMeta(); } catch (e) { }
+    try { if (typeof window.tlSyncHydDesignSnapshot === 'function') window.tlSyncHydDesignSnapshot(); } catch (eHydSync) { }
     try { if (window.RyIsoDiagram && window.RyIsoDiagram.redraw) window.RyIsoDiagram.redraw(); } catch (e) { }
     try {
       var r1 = computeThreeLevel();
