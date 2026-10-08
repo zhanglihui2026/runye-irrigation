@@ -50,7 +50,7 @@
 <!-- 模式条：标题 + 预览/工程切换（全宽细条，位于导航与工作区之间） -->
 <header class="t-top">
   <h1>⛰️ 地形模块</h1>
-  <span class="t-sub">阶段1 · 边界导入 / 坐标系校验 / 面积 / 高程数据源登记</span>
+  <span class="t-sub">阶段1 · 边界导入 / 坐标系校验 / 面积 / 高程数据登记</span>
   <span class="t-spacer"></span>
   <button class="t-modebtn on" id="modePreview" title="成果不用于工程放样与水力计算">预览模式</button>
   <button class="t-modebtn" id="modeEng" title="成果用于工程：无高程数据时将给出风险提示">工程模式</button>
@@ -99,7 +99,7 @@
     </details>
 
     <details class="t-card t-fold">
-      <summary>高程数据源 <small>仅上传/登记 · 采集由外部设备完成</small></summary>
+      <summary>高程数据 <small>仅上传/登记 · 采集由外部设备完成</small></summary>
       <div class="t-cardbody">
         <div class="t-tabs">
           <button id="tabRtk" class="on">RTK 点 (X,Y,Z)</button>
@@ -166,11 +166,11 @@
         <div class="t-spgroup">轮灌与水源</div>
         <div class="t-sprow"><label>同时工作喷头数</label><input id="spHeads" type="number" value="12" min="1" max="500" step="1"><span>个</span></div>
         <div class="t-btnrow" style="margin-top:6px">
-          <button class="t-btn" id="spCalc">⚡ 估算</button>
+          <button class="t-btn" id="spCalc">估算</button>
           <button class="t-btn ghost" id="spReset">恢复默认</button>
+          <button class="t-btn ghost" id="spDemo" type="button">▶ 轮灌演示</button>
         </div>
         <label class="t-sprow t-sp-overlay" style="cursor:pointer"><input type="checkbox" id="spOverlay" checked> 图上显示喷灌布置</label>
-        <button class="t-btn ghost" id="spDemo" type="button" style="margin-top:6px">▶ 轮灌演示</button>
         <div id="spResult" class="t-spresult" hidden></div>
         <div id="spWarn" hidden></div>
         <div class="t-hintbox">参数依据：GB/T 50085《喷灌工程技术规范》+ 坡地喷灌实测研究（间距 0.8~1.2R、三角形布置、300kPa）+ IRRICAD/OpenCAD 输入范式。山地惯例：支管沿等高线布置、主管垂直等高线。详细水力计算属后续阶段。</div>
