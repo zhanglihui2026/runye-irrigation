@@ -661,7 +661,18 @@
           } catch (err) {}
         };
         layers.forEach(function (L2) {
+          /* [v298k 2026-10-08 用户要求] 地块弹窗改「右键唤起」：bindPopup 默认把左键 click
+           * 注册成开窗（Leaflet 内部注册 click:_openPopup），用户实测左键弹窗会盖住/抢走
+           * 「✅ 完成并画下一块」等按钮的点击。⇒ off 掉 _openPopup（与 Leaflet unbindPopup
+           * 同一手法；vendored leaflet.js 已核实该属性名未被混淆），改挂 contextmenu——
+           * 命中图层时 Leaflet 已对原生 contextmenu preventDefault（_fireDOMEvent 内
+           * "contextmenu"===e&&O(t)），不会弹浏览器右键菜单；事件自带 latlng，开在右键处。
+           * 左键语义不变：成组点选 onClickMerge / 分区拾取 onClickPick。 */
           L2.bindPopup(popupHtml);
+          L2.off('click', L2._openPopup);
+          L2.on('contextmenu', function (e) {
+            try { L2.openPopup(e && e.latlng); } catch (err) {}
+          });
           L2.on('popupopen', onPopupOpen);
           if (state.mergePick) L2.on('click', onClickMerge);
           else if (typeof opts.onPick === 'function') L2.on('click', onClickPick);
@@ -820,7 +831,12 @@
         }
         pieces.forEach(function (pc) {
           var line = L.polyline(displayLL(pc, opts), { color: st.color, weight: st.weight, opacity: 0.9 });
+          /* [v298k] 管段弹窗与地块弹窗同口径：也改右键唤起（左键只留给画框顶点/拾取） */
           line.bindPopup(popup);
+          line.off('click', line._openPopup);
+          line.on('contextmenu', function (e) {
+            try { line.openPopup(e && e.latlng); } catch (err) {}
+          });
           line.addTo(state.networkGroup);
         });
       } catch (e) {}

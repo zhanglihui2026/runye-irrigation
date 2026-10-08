@@ -406,7 +406,10 @@ test('③-g 传递口径（v189）：回传二级页的是**各子地块本身**
      传递到二级管路页面，」⇒ 回传 payload 必须逐子地块带各自的环（保留块间空隙）。 */
   const k = MAP_SRC.indexOf("localStorage.setItem('runyeMeasuredArea'");
   assert.ok(k > 0, '应能找到回传写入点');
-  const seg = MAP_SRC.slice(Math.max(0, k - 2600), k);
+  /* ★ 窗口 3600（2026-10-08 实测）：buildPlotPayload 的 ringSet/polyLatLngSet 行距
+     「runyeMeasuredArea 写入点」已达 3099 字符（v286d 回传注释块 + v191 注释块加长所致），
+     旧窗口 2600 切不到 ⇒ ③-g 恒红（存量脆性，与功能无关）。留余量取 3600。 */
+  const seg = MAP_SRC.slice(Math.max(0, k - 3600), k);
   assert.match(seg, /payload\.subPlots\s*=/, '成组地块回传时应带 subPlots（各子地块本身）');
   assert.match(seg, /payload\.grouped\s*=\s*true/, 'v189 应显式打 grouped:true 标记');
   /* 权威几何优先：先取 polyLatLngSet，缺失才退回 subPlots[].polyLatLng */
@@ -419,7 +422,11 @@ test('③-g 传递口径（v189）：回传二级页的是**各子地块本身**
        改用**赋值语句**本身做锚点，既唯一又语义明确。 */
   const k2 = INDEX_SRC.indexOf('window.__runyeSubPlots = d.subPlots.map(');
   assert.ok(k2 > 0, '二级页应把子地块换算后赋给 window.__runyeSubPlots（锚点：赋值语句）');
-  const seg2 = INDEX_SRC.slice(Math.max(0, k2 - 900), k2 + 900);
+  /* ★ 窗口上限 1400（2026-10-08 实测）：v298 P0-3 在 v194 消费分支**前面**新增了
+     isXY 米坐标直通分支（其 __runyeSubPlots 赋值没有 polyLatLng 字段——经纬度环
+     直通时本就不需要），锚点命中的首个赋值之后 922 字符才是 v194 分支的
+     polyLatLng: ll.map ⇒ 旧窗口 +900 切不到（差 22 字符）。扩到 +1400 覆盖。 */
+  const seg2 = INDEX_SRC.slice(Math.max(0, k2 - 900), k2 + 1400);
   assert.match(seg2, /Array\.isArray\(d\.subPlots\)/, '应校验 d.subPlots 是数组');
   assert.match(seg2, /polyLatLng:\s*ll\.map/, '应保留每个子地块自己的 polyLatLng');
   assert.match(seg2, /poly:\s*ll\.map/, '应换算每个子地块自己的本地米坐标 poly');
