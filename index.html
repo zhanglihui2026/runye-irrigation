@@ -16764,6 +16764,11 @@ ppPullLiftDh();                                              // 首屏对齐一�
         /* [v193] 整组态不允许落块级管线的点 —— 按钮已置灰，这里是兜底
            （模式也可能被脚本/键盘改动，不能只靠按钮 disable 这一道）。 */
         if(ppGroupEditBlocks(ppState.mode)){ppMouseDownPos=null;return;}
+        /* [v304 2026-10-08 用户要求] 手动管线绘制禁用：v96 已隐藏绘制模式按钮，但默认 mode='main'
+           时画布干净左键点击仍在此落管线点（右键撤点、双击/右键成线照旧），用户点选查看时屡屡误画。
+           现对 main/branch/subbranch 三种落点全部拦截——「自动管路」生成的管线、调网格/平移缩放/
+           回退/双击地块进出 等交互均不经过此路径，零影响。恢复绘制：删掉下面这行 guard 即可。 */
+        if(ppState.mode==='main'||ppState.mode==='branch'||ppState.mode==='subbranch'){ppMouseDownPos=null;return;}
         ppPushHistory();
         var linePt=ppToMeters(pos.x,pos.y);
         linePt=ppGetConstrainedPoint(linePt);
