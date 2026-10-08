@@ -220,6 +220,12 @@ body.t-col-resizing .t-stage{pointer-events:none}   /* 拖拽中不让画布吃�
 .t-btn.danger:hover { background: var(--u-err-bg); }
 .t-btn:disabled { opacity: .45; cursor: not-allowed; }
 .t-btnrow { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+/* [v308 2026-10-08 用户要求] 山地喷灌设计按钮行：估算/恢复默认/轮灌演示三钮一行对齐
+   （窄栏 272px 时 wrap 下三钮内容总宽 ~241px 超 cardbody 可用 ~228px，轮灌演示被挤到第二行；
+   实测最宽钮「▶ 轮灌演示」文本 93px，故不做三等分——改为 nowrap + 缩 gap/padding 压总需求
+   到 ~219px + flex-grow 铺满富余；min-width 保持 auto（=文本宽）保证收缩永不截断文字） */
+#spCard .t-btnrow { flex-wrap: nowrap; gap: 4px; }
+#spCard .t-btnrow .t-btn { flex: 1 1 auto; padding-left: 10px; padding-right: 10px; white-space: nowrap; }
 
 /* 地块清单 */
 .t-plot {
