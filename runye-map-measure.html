@@ -854,6 +854,34 @@
     rubber=L.polyline([toDisplay(last),[e.latlng.lat,e.latlng.lng]],{color:'#ff6b00',weight:2,dashArray:'6,4',opacity:.9}).addTo(measureGroup);
   });
   map.on('mouseout', function(){ if(rubber){ measureGroup.removeLayer(rubber); rubber=null; } });
+  /* ===== [v310 2026-10-08 用户要求] 绘制态右键=截止确认 =====
+   * 用户报：点「✅ 完成并画下一块」后绘制态保持开启（v186 连续绘制），左键落点仍在给
+   * **新块**加顶点；此时右键既开不了地块弹窗（绘制中 overlay-pane path 被 pointer-events:none
+   * 禁掉，v298k 的 contextmenu 弹窗收不到事件）、也没有任何截止手段 ⇒ 表现为「右键出弹窗
+   * 好像有问题」「想停停不下来」。
+   * 对策（绘制态 map 级 contextmenu = 截止确认）：
+   *   ① 当前草稿 ≥3 有效顶点 → 先走 saveCurrentDraftToLibrary 入库（与「完成」同一口径，不丢活）；
+   *   ② clearDraft + setDrawing(false) 退出绘制态；
+   *   ③ 退出后 overlay 恢复可交互：左键点选地块 / 右键开 v298k 弹窗 → 「回传」送地块分区页。
+   * 非绘制态直接 return：右键语义完全留给 v298k 地块弹窗，不截胡。
+   * 原生菜单：Leaflet _fireDOMEvent 对 contextmenu 仅在「有命中目标」时 preventDefault
+   * （vendored pwa/vendor/leaflet.js 已核实 "contextmenu"===e&&O(t) 在 targets 非空分支内），
+   * 挂上本监听后 targets=[map] 恒非空 ⇒ 绘制态右键不再弹浏览器原生菜单。 */
+  map.on('contextmenu', function(){
+    if(!drawing) return;                  // 非绘制态：右键=v298k 地块弹窗，不截胡
+    var hadShape = points.length>=3 && geodesicArea(points)>0;
+    var savedName='';
+    if(hadShape){
+      var saved=saveCurrentDraftToLibrary({silent:true});
+      if(saved) savedName=saved.name;
+    }
+    clearDraft();
+    setDrawing(false);
+    tip(hadShape
+      ? (savedName ? '✅ 右键截止：已保存「'+savedName+'」并退出绘制 —— 左键点选地块，或右键地块开弹窗回传分区。'
+                   : '右键截止：已退出绘制（入库失败，草稿已清）—— 左键点选地块，或右键地块开弹窗回传分区。')
+      : '右键截止：已退出绘制（草稿不足 3 点未入库）—— 左键点选地块，或右键地块开弹窗回传分区。');
+  });
 
   // ===== 按钮 =====
   var btnDraw=document.getElementById('btnDraw');
@@ -867,7 +895,7 @@
     if(drawing) map.dragging.disable(); else map.dragging.enable();
     btnDraw.textContent = drawing ? '✏️ 绘制中…' : '✏️ 开始画框';
     document.getElementById('tip').textContent = drawing
-      ? '十字光标处即落点：依次点击地块边界顶点；点「完成」即可定稿并**直接接着画下一块**（可连画多块，最后再成组）。'
+      ? '十字光标处即落点：依次点击地块边界顶点；点「完成」即可定稿并**直接接着画下一块**（可连画多块，最后再成组；想停时**右键地图**截止）。'
       : '点击「✏️ 开始画框」后，在卫星图上依次点击地块边界顶点即可；点「完成」自动保存该块、清空画布并继续下一块。';
   }
   btnDraw.onclick=function(){ setDrawing(!drawing); };
@@ -900,7 +928,7 @@
       clearDraft();
       if(!drawing) setDrawing(true);      // 保持可继续画：面板已清空，落点即新块
       tip(saved
-        ? '✅ 已保存「'+saved.name+'」（'+saved.mu+' 亩）并清空画布 —— 可直接点击画下一块，画完继续点「完成」。'
+        ? '✅ 已保存「'+saved.name+'」（'+saved.mu+' 亩）并清空画布 —— 可直接点击画下一块，画完继续点「完成」；不想再画右键地图截止。'
         : '已清空画布 —— 可直接点击画下一块。');
     } else {
       // 无效草稿（点太少）：只清空，不入库
