@@ -732,7 +732,7 @@
     panel.querySelector('[data-ai="req"]').value = store.req || '';
     panel.querySelector('[data-ai="req"]').addEventListener('change', function () { store.req = this.value; persist(); });
     doc.body.appendChild(panel);
-    /* 恢复宽度/位置记忆（有位置存档=手动定位，默认右上不再自动对齐）；手机端默认折叠（同图层控制） */
+    /* 恢复宽度/位置记忆（有位置存档=手动定位，默认右上不再自动对齐）；[v303] 桌面端也默认折叠（原仅手机端），点右缘竖条即可展开 */
     try { var sw = parseInt(localStorage.getItem(W_KEY), 10); if (isFinite(sw) && sw >= 200 && sw <= 480) panel.style.width = sw + 'px'; } catch (e) { }
     /* [v258] 恢复高度记忆：按当前视口重新 clamp（换屏/缩窗后不越界） */
     try {
@@ -748,7 +748,7 @@
     } catch (e) { }
     /* [v278] 位置定下来后再夹一次 max-height：顶越低，可用高度越小 */
     syncMaxH();
-    if (root.RyMobile && root.RyMobile.isActive()) setCollapsed(true);
+    setCollapsed(true); /* [v303 2026-10-08 用户要求] 默认折叠（原仅手机端），点右缘竖条展开 */
     /* [v277] 折叠标签落点的跟随：视口尺寸变、工具轨折叠态变、轨宽被拖都要重算 */
     root.addEventListener('resize', function () { syncFoldPos(); syncMaxH(); });
     try {
