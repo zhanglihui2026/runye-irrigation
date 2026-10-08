@@ -1,6 +1,6 @@
 /* Runye PWA v1. Increment VERSION when changing the offline shell. */
 'use strict';
-const VERSION = 'v304-hydraulic-pipe-diagram';
+const VERSION = 'v311-plot-rclick-nav-hyd';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
