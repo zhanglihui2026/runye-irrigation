@@ -207,7 +207,10 @@ console.log('== iso-diagram 纯几何回归 ==');
   iso.clearManual();
   const d = mkData(), original = JSON.stringify(d), m = iso.buildModel(d);
   const x = iso.projectIso(1,0,0,1), y = iso.projectIso(0,1,0,1), z = iso.projectIso(0,0,1,1);
-  ok(x.x === 1 && x.y === 0 && Math.abs(y.x + y.y) < 1e-12 && y.y < 0 && z.x === 0 && z.y === -1, 'X水平/Y45度/Z竖直');
+  /* [v305 2026-10-08] 期望随 v255c（2026-10-06 镜像修复）同步：Y 向投影已从「右上45°」
+     改为「右下45°」（projectIso(0,1,0) = (√½, +√½)）——本行漏改导致自 v255c 起一直红
+     （遗留红，非本轮引入）。Y 期望改为 x===y（45° 斜）且 y.y>0（右下）；X/Z 不变。 */
+  ok(x.x === 1 && x.y === 0 && Math.abs(y.x - y.y) < 1e-12 && y.y > 0 && z.x === 0 && z.y === -1, 'X水平/Y右下45度/Z竖直（v305 同步 v255c）');
   const svg = iso.renderSVG(d);
   const routes = [...svg.matchAll(/data-connector="main-branch" d="M([\d.-]+) ([\d.-]+) L([\d.-]+) ([\d.-]+)"/g)];
   const valves = m.valves.filter(v => v.conn);

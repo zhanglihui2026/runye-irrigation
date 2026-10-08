@@ -967,7 +967,10 @@
     if (mainNote0) pipeNote(mainNote0, HEIGHTS.main, '主管 ' + pipeTxt('main', '管径待定') + ' · 标高 ' + buryElevTxt(), 20);
     var branchNote0 = firstVis(model.branches || [], function (i) { return 'branch-' + i; });
     if (branchNote0) pipeNote(branchNote0, HEIGHTS.branch, '支管 ' + pipeTxt('branch', '管径待定') + ' · 标高 ±0.000', -24);   /* offset -24：支管 z 最高，向上引出 —— 多分区密集图 z 层像素差变小，向下引出会叠上主管标注（2026-10-02 48 区实测） */
-    s.push('<g data-ryfix="1" transform="translate(65 655)" pointer-events="none" fill="none" stroke="#555" stroke-width="0.8"><path d="M0 -32 V0 H38 M0 0 L27 -27"/><g stroke="none" fill="#333" font-family="system-ui" font-size="10"><text x="40" y="4">X</text><text x="28" y="-29">Y</text><text x="-4" y="-37">Z</text></g></g>');
+    /* [v305 2026-10-08 用户反馈「轴测图方向不对」] 角标 Y 箭头随 v255c 投影方向同步：
+       v255c 把 Y 向投影从「右上45°」改为「右下45°」（行列式转正的镜像修复），本角标漏改
+       仍画 Y 右上 ⇒ 图形与角标矛盾、读图误判方向。现 Y 箭头/字母同步右下（X 水平右、Z 竖直上不变）。 */
+    s.push('<g data-ryfix="1" transform="translate(65 655)" pointer-events="none" fill="none" stroke="#555" stroke-width="0.8"><path d="M0 -32 V0 H38 M0 0 L27 27"/><g stroke="none" fill="#333" font-family="system-ui" font-size="10"><text x="40" y="4">X</text><text x="28" y="33">Y</text><text x="-4" y="-37">Z</text></g></g>');
 
     /* 11b) 最远水路（轴测图，2026-09-24 用户要求）—— 与平面图 tlWorstPathMarkSVG 同款紫色标注：
        总管段(z=front 高程) + 接入立管(front→main) + 主管段(z=main 高程) + 末端圆点 + 标签。
