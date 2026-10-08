@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>润野 · 水力校核（v299 · 自动读已布置管网）</title>
+<style>
+  :root{
+    --g-700:#15803d; --g-600:#16a34a; --g-500:#22c55e; --g-50:#f0fdf4; --g-100:#dcfce7;
+    --s-700:#334155; --s-600:#475569; --s-500:#64748b; --s-300:#cbd5e1; --s-200:#e2e8f0; --s-100:#f1f5f9;
+    --r-600:#dc2626; --a-600:#d97706;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100vh;font-family:-apple-system,"PingFang SC","Microsoft YaHei",Segoe UI,sans-serif;
+    color:var(--s-700);background:#f7f5f0}
+  #app{display:flex;flex-direction:column;min-height:100vh}
+  /* ===== 顶部功能区导航：皮肤=runye-nav.css、清单=runye-nav.js（唯一出处） ===== */
+  .fn-nav{position:sticky;top:0;z-index:1200;flex:none;background:#fff;border-bottom:1px solid var(--s-200)}
+  .fn-nav .fn-inner{padding:0 12px}
+  /* ===== 主体：左参数栏 + 右结果区 ===== */
+  .main{flex:1;display:flex;min-height:0;align-items:stretch}
+  .side{flex:none;width:280px;background:#fff;border-right:1px solid var(--s-300);overflow-y:auto;
+    padding:12px;display:flex;flex-direction:column;gap:12px}
+  .side::-webkit-scrollbar{width:5px;height:5px}
+  .side::-webkit-scrollbar-thumb{background:#bfd3c6;border-radius:2px}
+  .sec-t{margin:0 0 6px;font-size:11px;color:var(--s-500);font-weight:700;letter-spacing:1px;
+    border-left:3px solid var(--g-600);padding-left:8px;line-height:1.4}
+  .card{border:1px solid var(--s-200);background:#fff;padding:8px;font-size:12px;line-height:1.5}
+  .kv{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px dashed var(--s-100)}
+  .kv:last-child{border-bottom:0}
+  .kv .k{color:var(--s-500)}
+  .kv .v{font-weight:600;color:var(--s-700)}
+  .kv .v.warn{color:var(--a-600)}
+  .kv .v.err{color:var(--r-600)}
+  .frm{display:grid;grid-template-columns:1fr 86px;gap:5px 8px;align-items:center}
+  .frm label{font-size:11px;color:var(--s-600)}
+  .frm input{height:28px;padding:0 6px;border:1px solid var(--s-300);font:inherit;font-size:12px;
+    background:#fff;color:var(--s-700);width:100%}
+  .frm input:focus{outline:1px solid var(--g-600)}
+  .frm .hint2{grid-column:1/3;font-size:10px;color:var(--s-500)}
+  .mbtn{height:34px;padding:0 9px;border:1px solid var(--s-300);background:#fff;color:var(--s-700);
+    cursor:pointer;font-size:12px;font-weight:600;text-align:left;font-family:inherit;width:100%}
+  .mbtn:hover{border-color:var(--g-600);color:var(--g-700);background:var(--g-50)}
+  .mbtn-primary{background:var(--g-600);color:#fff;border-color:var(--g-600);text-align:center}
+  .mbtn-primary:hover{background:var(--g-700);color:#fff}
+  .hint{font-size:10px;color:var(--s-500);line-height:1.5;margin-top:4px}
+  .result{flex:1;min-width:0;padding:14px;overflow-x:auto}
+  .sum-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px}
+  .sum{border:1px solid var(--s-200);background:#fff;padding:10px}
+  .sum .t{font-size:10px;color:var(--s-500);letter-spacing:1px}
+  .sum .n{font-size:20px;font-weight:700;color:var(--g-700);margin-top:2px}
+  .sum .n small{font-size:11px;font-weight:400;color:var(--s-500)}
+  .sum .n.err{color:var(--r-600)}
+  .sum .d{font-size:10px;color:var(--s-500);margin-top:2px}
+  table{border-collapse:collapse;width:100%;background:#fff;font-size:11px;margin:6px 0 14px}
+  th,td{border:1px solid var(--s-200);padding:4px 6px;text-align:right;white-space:nowrap}
+  th{background:var(--s-100);color:var(--s-600);font-weight:600}
+  td.l,th.l{text-align:left}
+  tr.over td{color:var(--r-600);font-weight:700}
+  tr.worst td{background:var(--g-50)}
+  .tag{display:inline-block;padding:0 5px;border-radius:2px;font-size:10px;font-weight:600}
+  .tag.front{background:#111827;color:#fff}
+  .tag.main{background:#185FA5;color:#fff}
+  .tag.branch{background:#16a34a;color:#fff}
+  .warnbox{border:1px solid #fde68a;background:#fffbeb;color:#92400e;padding:7px 9px;font-size:11px;
+    line-height:1.6;margin-bottom:10px;white-space:pre-wrap}
+  .warnbox:empty{display:none}
+  .empty{border:1px dashed var(--s-300);background:#fff;padding:28px 20px;text-align:center;color:var(--s-500);
+    font-size:12px;line-height:2}
+  .empty b{color:var(--g-700)}
+  .pathline{font-size:12px;background:#fff;border:1px solid var(--s-200);padding:8px 10px;margin:4px 0 8px;line-height:1.8}
+  .pathline .arrow{color:var(--g-600);font-weight:700;padding:0 2px}
+  pre.inp{background:#0f172a;color:#e2e8f0;font:11px/1.5 Consolas,monospace;padding:10px;overflow:auto;
+    max-height:260px;margin:6px 0;white-space:pre}
+  .row2{display:flex;gap:6px}
+  .row2 .mbtn{flex:1;text-align:center}
+  h3.rt{margin:18px 0 0;font-size:12px;color:var(--s-600);border-left:3px solid var(--g-600);padding-left:8px}
+</style>
+<link rel="stylesheet" href="runye-theme.css">
+<link rel="stylesheet" href="runye-nav.css?v=250">
+</head>
+<body>
+<div id="app">
+  <nav class="fn-nav" aria-label="功能区导航">
+    <div class="fn-inner" data-ry-fnnav data-base="index.html#"></div>
+  </nav>
+  <script src="runye-nav.js?v=250"></script>
+  <!-- [v299 水力校核] 计算核心（UMD）：hc-core/design-core 为全站口径唯一出处，必须先载 -->
+  <script src="hydraulic-calc/hc-core.js"></script>
+  <script src="hydraulic-calc/design-core.js"></script>
+  <script src="runye-hydraulics-core.js"></script>
+  <div class="main">
+    <aside class="side">
+      <section>
+        <div class="sec-t">数据源 · 已布置管网</div>
+        <div class="card" id="srcCard">读取中…</div>
+        <button class="mbtn" id="btnReload" style="margin-top:6px">↻ 重新读取管网</button>
+        <div class="hint">数据来自主页「生成管线图」反投卫星图的 <b>runye_network_layout</b>（只读）。
+          没有数据？先去 <a href="runye-map-measure.html">在线地图</a> 布置管网或回主页生成管线图。</div>
+      </section>
+      <section>
+        <div class="sec-t">计算参数</div>
+        <div class="card">
+          <div class="frm" id="frmParams">
+            <label>海森系数 C（PE 150）</label><input id="pC" type="number" value="150" step="5" min="100" max="160">
+            <label>管径口径（SDR）</label><input id="pCaliber" type="text" value="sdr13.6" list="calList">
+            <datalist id="calList"><option value="sdr13.6"><option value="sdr17"><option value="sdr21"><option value="id"></datalist>
+            <label>局部损失比例（%）</label><input id="pLocal" type="number" value="10" step="1" min="0" max="50">
+            <label>滴头流量 q（L/h）</label><input id="pQdrip" type="number" value="1.38" step="0.01" min="0.1">
+            <label>滴头间距（m）</label><input id="pSpacing" type="number" value="0.3" step="0.05" min="0.1">
+            <label>滴灌带内径（mm）</label><input id="pTapeID" type="number" value="14.2" step="0.1" min="8">
+            <label>滴头工作压力（m）</label><input id="pDripHead" type="number" value="10" step="0.5" min="0">
+            <label>水源→田间高差（m）</label><input id="pElev" type="number" value="0" step="0.5">
+            <label>首部损失（过滤施肥，m）</label><input id="pHeadLoss" type="number" value="3" step="0.5" min="0">
+            <label>泵组效率 η（0~1）</label><input id="pEff" type="number" value="0.6" step="0.05" min="0.2" max="0.9">
+            <label>流速上限（m/s）</label><input id="pVmax" type="number" value="2.0" step="0.1" min="0.5">
+            <label>端点吸附容差（m）</label><input id="pSnap" type="number" value="3" step="1" min="1" max="20">
+            <label>滴灌带挂接容差（m）</label><input id="pTapeSnap" type="number" value="8" step="1" min="2" max="30">
+            <div class="hint2">管径口径 sdr13.6/sdr17/sdr21=外径折算内径；id=输入即内径</div>
+          </div>
+        </div>
+        <button class="mbtn mbtn-primary" id="btnRun" style="margin-top:6px">▶ 读取并校核</button>
+        <div class="hint">参数只在本页使用，不回写布置数据；口径与主页三级水力计算同源（hc-core/design-core）。</div>
+      </section>
+    </aside>
+    <div class="result" id="result">
+      <div class="empty" id="emptyBox">
+        <b>水力校核 · v299</b><br>
+        自动读取在线地图/主页反投的已布置管网（总管→主管→支管→滴灌带），<br>
+        重建树状拓扑 → 逐段流量递推 → 全链路水损 → 最不利路径 → 需求扬程与水泵选型。<br>
+        点左侧 <b>「▶ 读取并校核」</b> 开始。
+      </div>
+      <div id="out" style="display:none">
+        <div class="warnbox" id="warnBox"></div>
+        <div class="sum-grid" id="sumGrid"></div>
+        <h3 class="rt">拓扑与诊断</h3>
+        <div class="pathline" id="treeLine"></div>
+        <h3 class="rt">最不利路径（逐段累计）</h3>
+        <div class="pathline" id="pathLine"></div>
+        <h3 class="rt">逐段水力校核</h3>
+        <table id="segTable"></table>
+        <h3 class="rt">滴灌带多孔出流（Christiansen 修正）</h3>
+        <table id="tapeTable"></table>
+        <h3 class="rt">建议管径（流速上限内选最小 PE 外径，Guyri 口径）</h3>
+        <table id="sugTable"></table>
+        <h3 class="rt">EPANET 对照（epanet-js WASM）</h3>
+        <div class="card" style="max-width:860px">
+          <div style="font-size:11px;color:var(--s-500);line-height:1.6">
+            由本页拓扑自动生成 .inp（JUNCTIONS/PIPES/PUMPS/COORDINATES），支管流量落下游节点为 demand，
+            泵按功率泵（本页轴功率）。自研递推与 EPANET 数值互为对照。
+          </div>
+          <div class="row2" style="margin-top:6px">
+            <button class="mbtn" id="btnCopyInp">复制 .inp 内容</button>
+            <button class="mbtn" id="btnDownInp">下载 .inp 文件</button>
+            <button class="mbtn" id="btnRunEpanet">▶ 运行 EPANET 对照</button>
+          </div>
+          <pre class="inp" id="inpBox"></pre>
+          <div id="epanetOut" style="font-size:11px;line-height:1.6"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  'use strict';
+  var Core = window.RyHydCore;
+  if (!Core) { document.getElementById('srcCard').textContent = '计算核心加载失败（runye-hydraulics-core.js）'; return; }
+  var CFG_KEY = 'runye_hydraulics_check_cfg_v1';   /* 只在用户点「校核」时写（站内约定） */
+  var lastFull = null, lastNet = null;
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function f(v, n) { var x = Number(v); return isFinite(x) ? x.toFixed(n === undefined ? 3 : n) : '—'; }
+
+  /* ---------- 参数读取 / 恢复 ---------- */
+  function readOpts() {
+    return {
+      C: +$('pC').value || 150,
+      caliber: ($('pCaliber').value || 'sdr13.6').trim(),
+      localRatio: (+$('pLocal').value || 0) / 100,
+      qDrip: +$('pQdrip').value || 1.38,
+      dripSpacing: +$('pSpacing').value || 0.3,
+      tapeID: +$('pTapeID').value || 14.2,
+      dripHead: +$('pDripHead').value || 0,
+      elev: +$('pElev').value || 0,
+      headLoss: +$('pHeadLoss').value || 0,
+      pumpEff: Math.min(0.9, Math.max(0.2, +$('pEff').value || 0.6)),
+      vmax: +$('pVmax').value || 2,
+      snapTol: +$('pSnap').value || 3,
+      tapeSnapTol: +$('pTapeSnap').value || 8
+    };
+  }
+  function saveCfg() {
+    try { localStorage.setItem(CFG_KEY, JSON.stringify(readOpts())); } catch (e) { }
+  }
+  function restoreCfg() {
+    try {
+      var c = JSON.parse(localStorage.getItem(CFG_KEY) || 'null');
+      if (!c) return;
+      var map = { pC: 'C', pCaliber: 'caliber', pLocal: 'localRatio', pQdrip: 'qDrip', pSpacing: 'dripSpacing',
+        pTapeID: 'tapeID', pDripHead: 'dripHead', pElev: 'elev', pHeadLoss: 'headLoss', pEff: 'pumpEff',
+        pVmax: 'vmax', pSnap: 'snapTol', pTapeSnap: 'tapeSnapTol' };
+      Object.keys(map).forEach(function (id) {
+        if (c[map[id]] !== undefined) $(id).value = map[id] === 'localRatio' ? Math.round(c[map[id]] * 100) : c[map[id]];
+      });
+    } catch (e) { }
+  }
+
+  /* ---------- 数据源 ---------- */
+  function readNet() {
+    try { return JSON.parse(localStorage.getItem('runye_network_layout') || 'null'); }
+    catch (e) { return null; }
+  }
+  function renderSrc() {
+    var net = readNet(), el = $('srcCard');
+    if (!net) {
+      el.innerHTML = '<span style="color:var(--r-600);font-weight:700">未找到已布置管网</span><br>' +
+        '<span style="font-size:11px;color:var(--s-500)">去 <a href="runye-map-measure.html">在线地图</a> 布置管网，' +
+        '或回主页「生成管线图」后回来校核。</span>';
+      return;
+    }
+    if (net.needsReplan) {
+      el.innerHTML = '<span style="color:var(--a-600);font-weight:700">管网已重新划分，待回二级重新规划</span><br>' +
+        '<span style="font-size:11px;color:var(--s-500)">当前无有效管段（needsReplan）。</span>';
+      return;
+    }
+    var segs = (net.segments || []).length, tapes = (net.dripTapes || []).length;
+    el.innerHTML =
+      '<div class="kv"><span class="k">管段</span><span class="v">' + segs + ' 段</span></div>' +
+      '<div class="kv"><span class="k">滴灌带</span><span class="v">' + tapes + ' 条</span></div>' +
+      '<div class="kv"><span class="k">水源</span><span class="v">' + (net.sourcePos ? '有' : '无（自动降级）') + '</span></div>' +
+      '<div class="kv"><span class="k">坐标系</span><span class="v">' + esc(net.crs || '—') + '</span></div>' +
+      (net.ts ? '<div class="kv"><span class="k">生成时间</span><span class="v">' +
+        new Date(net.ts).toLocaleString('zh-CN') + '</span></div>' : '');
+  }
+
+  /* ---------- 校核主流程 ---------- */
+  function run() {
+    var net = readNet();
+    renderSrc();
+    var opts = readOpts();
+    saveCfg();
+    if (!net || net.needsReplan || !(net.segments || []).length) {
+      $('emptyBox').style.display = '';
+      $('out').style.display = 'none';
+      return;
+    }
+    $('emptyBox').style.display = 'none';
+    $('out').style.display = '';
+    lastNet = net;
+    var full = Core.compute(net, opts);
+    lastFull = full;
+    renderAll(full);
+  }
+
+  function kindTag(k) {
+    var name = k === 'front' ? '总管' : k === 'main' ? '主管' : k === 'branch' ? '支管' : k;
+    return '<span class="tag ' + esc(k) + '">' + esc(name) + '</span>';
+  }
+
+  function renderAll(full) {
+    /* 告警 */
+    $('warnBox').textContent = full.warnings.length ? '⚠ ' + full.warnings.join('\n⚠ ') : '';
+    /* 汇总卡 */
+    var worst = full.worst;
+    $('sumGrid').innerHTML =
+      sumCard('系统总流量', f(full.qTotal, 3), ' m³/h = ' + f(full.qTotal * 3600, 0) + ' L/h') +
+      sumCard('最不利路径损失', worst ? f(worst.loss, 2) : '—', ' m（含滴头压力）', worst && worst.loss > 999 ? 'err' : '') +
+      sumCard('需求扬程 TDH', f(full.tdh, 2), ' m（+高差 ' + f(full.opts.elev, 1) + ' +首部 ' + f(full.opts.headLoss, 1) + '）') +
+      sumCard('轴功率 / 电机档', f(full.power, 2), ' kW → 选 ' + f(full.motorKw, 2) + ' kW（η=' + full.opts.pumpEff + '）');
+    function sumCard(t, n, d, cls) {
+      return '<div class="sum"><div class="t">' + esc(t) + '</div><div class="n ' + (cls || '') + '">' + esc(n) +
+        '<small>' + esc(d) + '</small></div></div>';
+    }
+    /* 拓扑行 */
+    var tr = full.tree;
+    $('treeLine').innerHTML = '管段 <b>' + tr.segs.length + '</b> 段（搭接切分后）· 节点 <b>' + tr.nodes.length +
+      '</b> · 树内 <b>' + tr.order.length + '</b> 段' +
+      (tr.loops.length ? ' · <span style="color:var(--r-600)">环 ' + tr.loops.length + '</span>' : '') +
+      (tr.orphans.length ? ' · <span style="color:var(--r-600)">未连通 ' + tr.orphans.length + '</span>' : '') +
+      ' · 滴灌带挂接 <b>' + full.tapeRows.filter(function (t) { return t.attached; }).length + '/' + full.tapeRows.length + '</b>';
+    /* 最不利路径 */
+    if (worst) {
+      $('pathLine').innerHTML = worst.path.map(function (si, i) {
+        var nm = esc(tr.segs[si].name || tr.segs[si].id);
+        return (i ? '<span class="arrow">→</span>' : '') + nm;
+      }).join('') + '　<span style="color:var(--s-500)">路径损失 ' + f(worst.loss, 2) +
+        ' m（其中滴灌带 ' + f(worst.tapeHf, 2) + ' + 滴头压力 ' + f(full.opts.dripHead, 1) + '）</span>';
+    } else {
+      $('pathLine').textContent = '未能构建最不利路径（拓扑为空或全部成环/孤立）。';
+    }
+    /* 逐段表 */
+    var worstSet = {};
+    if (worst) worst.path.forEach(function (si) { worstSet[si] = true; });
+    var h = '<tr><th class="l">段</th><th class="l">类别</th><th>长度 m</th><th>流量 m³/h</th><th>外径 mm</th>' +
+      '<th>内径 mm</th><th>流速 m/s</th><th>沿程 m</th><th>局部 m</th><th>合计 m</th></tr>';
+    full.segRows.forEach(function (r, i) {
+      var cls = (worstSet[r.i] ? 'worst ' : '') + (r.over ? 'over' : '');
+      h += '<tr class="' + cls + '"><td class="l">' + esc(r.name) + '</td><td class="l">' + kindTag(r.kind) +
+        '</td><td>' + f(r.L, 1) + '</td><td>' + f(r.Q, 3) + '</td><td>' + f(r.od, 0) + '</td><td>' + f(r.idm, 1) +
+        '</td><td>' + f(r.v, 2) + (r.over ? ' ⚠' : '') + '</td><td>' + f(r.hf, 3) + '</td><td>' + f(r.hloc, 3) +
+        '</td><td>' + f(r.htot, 3) + '</td></tr>';
+    });
+    $('segTable').innerHTML = h;
+    /* 滴灌带表 */
+    h = '<tr><th>带号</th><th class="l">挂接支管</th><th>带长 m</th><th>出口数 N</th><th>F 修正</th>' +
+      '<th>流量 L/h</th><th>带流速 m/s</th><th>带损 m</th></tr>';
+    full.tapeRows.forEach(function (t) {
+      h += '<tr><td>#' + (t.idx + 1) + '</td><td class="l">' + esc(t.segName) +
+        (t.attached ? '' : ' <span style="color:var(--a-600)">未挂接</span>') + '</td><td>' + f(t.len, 1) +
+        '</td><td>' + t.N + '</td><td>' + f(t.F, 3) + '</td><td>' + f(t.qLh, 0) + '</td><td>' + f(t.v, 2) +
+        '</td><td>' + f(t.hf, 3) + '</td></tr>';
+    });
+    if (!full.tapeRows.length) h = '<tr><td class="l" style="text-align:center">布置中无滴灌带（dripTapes 为空）</td></tr>';
+    $('tapeTable').innerHTML = h;
+    /* 建议管径 */
+    var sg = Core.suggestOD(lastNet, full.opts);
+    h = '<tr><th class="l">段</th><th class="l">类别</th><th>流量 m³/h</th><th>现外径 mm</th><th>现合计损失 m</th>' +
+      '<th>建议外径 mm</th><th>新流速 m/s</th><th>新合计损失 m</th></tr>';
+    sg.rows.forEach(function (r) {
+      h += '<tr><td class="l">' + esc(r.name) + '</td><td class="l">' + kindTag(r.kind) + '</td><td>' + f(r.Q, 3) +
+        '</td><td>' + f(r.curOd, 0) + '</td><td>' + f(r.curHf, 3) + '</td><td>' +
+        (r.needChange ? '<b style="color:var(--g-700)">' + r.sugOd + '</b>' : f(r.sugOd, 0)) + '</td><td>' +
+        f(r.sugV, 2) + '</td><td>' + f(r.sugHf, 3) + '</td></tr>';
+    });
+    $('sugTable').innerHTML = h;
+    /* inp */
+    $('inpBox').textContent = Core.toInp(full, lastNet);
+    $('epanetOut').innerHTML = '';
+  }
+
+  /* ---------- EPANET 对照 ---------- */
+  function inpText() { return lastFull ? Core.toInp(lastFull, lastNet) : ''; }
+  $('btnCopyInp').onclick = function () {
+    var t = inpText();
+    function okMsg() { $('epanetOut').textContent = '已复制到剪贴板。'; }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(okMsg, fallback);
+      else fallback();
+    } catch (e) { fallback(); }
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = t; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); okMsg(); } catch (e2) { $('epanetOut').textContent = '复制失败，请手动选择文本。'; }
+      ta.remove();
+    }
+  };
+  $('btnDownInp').onclick = function () {
+    try {
+      var blob = new Blob([inpText()], { type: 'text/plain' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'runye-hydraulics-' + new Date().toISOString().slice(0, 10) + '.inp';
+      document.body.appendChild(a); a.click(); setTimeout(function () { a.remove(); URL.revokeObjectURL(a.href); }, 100);
+    } catch (e) { $('epanetOut').textContent = '下载失败：' + e.message; }
+  };
+  /* epanet-js 动态加载：自托管 pwa/vendor/epanet 优先（离线可用），CDN 兜底，失败给降级说明。
+     实测接口（epanet-js@0.9.0，OWA-EPANET 2.3.5 wasm 内嵌）：
+       new Workspace() → await ws.loadModule() → new Project(ws) →
+       ws.writeFile → model.open/solveH/close → getNodeValues(NodeProperty.X) 返回全部节点数组。 */
+  $('btnRunEpanet').onclick = function () {
+    var out = $('epanetOut');
+    if (!lastFull) { out.textContent = '请先校核。'; return; }
+    out.textContent = '正在加载 epanet-js WASM（约 0.7MB）…';
+    var sources = ['pwa/vendor/epanet/index.mjs', 'https://unpkg.com/epanet-js@0.9.0/dist/index.mjs'];
+    tryLoad(0);
+    function tryLoad(i) {
+      if (i >= sources.length) {
+        out.innerHTML = 'epanet-js 运行时不可用（本地缺 pwa/vendor/epanet 且无 CDN）。<b>降级方案</b>：' +
+          '点「下载 .inp 文件」导入桌面版 EPANET 2.2+ 运行对照——本页生成的 .inp 即其输入文件。';
+        return;
+      }
+      import(sources[i]).then(function (mod) {
+        var Workspace = mod.Workspace, Project = mod.Project, NodeProperty = mod.NodeProperty, LinkProperty = mod.LinkProperty;
+        if (!Workspace || !Project) throw new Error('toolkit 接口不符');
+        var ws = new Workspace();
+        return ws.loadModule().then(function () {
+          var model = new Project(ws);
+          ws.writeFile('runye.inp', inpText());
+          model.open('runye.inp', 'report.rpt', 'out.bin');
+          model.solveH();
+          var heads = Array.from(model.getNodeValues(NodeProperty.Head)).map(Number);
+          var press = Array.from(model.getNodeValues(NodeProperty.Pressure)).map(Number);
+          var flows = Array.from(model.getLinkValues(LinkProperty.Flow)).map(Number);
+          model.close();
+          return { ws: ws, heads: heads, press: press, flows: flows };
+        });
+      }).then(function (r) {
+        var h = '<b style="color:var(--g-700)">EPANET 运行成功</b>（引擎 v' + r.ws.version + '，单位制 LPM，水库水头=本页 TDH）<br>' +
+          '<table style="max-width:640px"><tr><th class="l">对象</th><th>EPANET 水头 m</th><th>EPANET 压力 m</th><th>本页对照</th></tr>';
+        for (var n = 0; n < r.heads.length; n++) {
+          var lbl = n < lastFull.tree.nodes.length ? ('节点 J' + n) : '水库';
+          h += '<tr><td class="l">' + esc(lbl) + '</td><td>' + f(r.heads[n], 3) + '</td><td>' + f(r.press[n], 3) + '</td><td class="l" style="text-align:left;color:var(--s-500)">' +
+            (n === 0 ? '水源，水头=本页 TDH=' + f(lastFull.tdh, 2) : '') + '</td></tr>';
+        }
+        h += '<tr><td colspan="4" style="text-align:left;background:var(--s-100)">管段流量 LPM（应与「逐段水力校核」表同比例一致）：</td></tr><tr><td colspan="4" style="text-align:left">' +
+          r.flows.map(function (q, i2) { return 'P' + i2 + '=' + f(q, 3); }).join('　') + '</td></tr></table>' +
+          '<div style="font-size:10px;color:var(--s-500);margin-top:4px">注：EPANET 网络只含输水管（不含滴灌带多孔出流），' +
+          '极小流量/粗管径下数值求解可能不收敛或退化——以本页自研校核为准，EPANET 用于独立交叉验证。</div>';
+        out.innerHTML = h;
+      }).catch(function (e) {
+        if (i + 1 < sources.length) { tryLoad(i + 1); return; }
+        out.innerHTML = 'EPANET 运行失败：' + esc(String(e && e.message || e)).slice(0, 200) +
+          '<br>极小流量/粗管径网络可能数值不收敛——以本页自研校核为准；也可点「下载 .inp 文件」到桌面版 EPANET 运行。';
+      });
+    }
+  };
+
+  /* ---------- 事件 ---------- */
+  $('btnRun').onclick = run;
+  $('btnReload').onclick = function () { renderSrc(); run(); };
+  document.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target && e.target.tagName === 'INPUT') run(); });
+
+  restoreCfg();
+  renderSrc();
+  run();
+})();
+</script>
+</body>
+</html>

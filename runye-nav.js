@@ -48,6 +48,9 @@
      act 项不放这里（轴测图/系统图留在顶层）；管网优化详细分析由 pipe_optim_ui.js 追加进面板。 */
   var MORE_ITEMS = [
     { label: '管路拼装',     href: '管路接驳拼装.html',         title: '管路接驳拼装：管件级拼装 + 单向水力计算' },
+    /* [v299 2026-10-08 用户要求] 水力校核：独立模块（自动读 runye_network_layout，
+       树状拓扑+全链路水损+滴灌带多孔出流+水泵选型+EPANET WASM 对照），原软件逻辑零改动 */
+    { label: '水力校核',     href: 'runye-hydraulics.html',     title: '水力校核：自动读已布置管网，逐段流量/流速/水损 + 最不利路径 + 需求扬程与水泵选型' },
     { label: '经济指标分析', hash: 'threeDModelingSection',     title: '管径经济指标分析：前期管材投入 vs 后期电费，找年均总成本最低的平衡点' },
     { label: '数字化建模',   hash: 'parametricModelingSection', title: '数字化建模 · 参数化节点建模' },
     { label: '滴灌带查询',   href: '耐特菲姆滴灌带长度查询器.html' }
@@ -111,7 +114,7 @@
     btn.className = 'fn-link fn-more-btn';
     btn.setAttribute('aria-expanded', 'false');
     btn.setAttribute('aria-haspopup', 'true');
-    btn.title = '更多工具：管路拼装 / 经济指标分析 / 数字化建模 / 滴灌带查询 / 管网优化详细分析';
+    btn.title = '更多工具：管路拼装 / 水力校核 / 经济指标分析 / 数字化建模 / 滴灌带查询 / 管网优化详细分析';
     var caret = document.createElement('span');
     caret.className = 'fn-more-caret';
     caret.setAttribute('aria-hidden', 'true');

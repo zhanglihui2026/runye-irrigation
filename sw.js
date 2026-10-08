@@ -1,6 +1,6 @@
 /* Runye PWA v1. Increment VERSION when changing the offline shell. */
 'use strict';
-const VERSION = 'v298k-plot-popup-rclick';
+const VERSION = 'v299-hydraulics-check';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
@@ -42,6 +42,8 @@ const CORE = [
   "pwa/pwa.css",
   "pwa/pwa.js",
   "pwa/vendor/LICENSE",
+  "pwa/vendor/epanet/index.mjs",
+  "pwa/vendor/epanet/slim/index.mjs",
   "pwa/vendor/images/layers-2x.png",
   "pwa/vendor/images/layers.png",
   "pwa/vendor/images/marker-icon-2x.png",
@@ -52,6 +54,8 @@ const CORE = [
   "runye-dxf.js",
   "runye-material-audit.js",
   "runye-geo.js",
+  "runye-hydraulics.html",
+  "runye-hydraulics-core.js",
   "runye-landing.html",
   "runye-map-enhance.js",
   "runye-map-partition.js",
