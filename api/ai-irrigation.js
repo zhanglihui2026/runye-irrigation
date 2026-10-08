@@ -32,6 +32,20 @@ const MAX_BODY_BYTES = 262144;                                                  
 const FREE_LIMIT = 5;
 const quota = require('../lib/ai-quota.cjs');
 const schema = require('../runye-ai-plan.js');
+
+/* 在线大模型是会员功能。默认关闭：只有后台明确配置 AI_MEMBER_TOKENS 后，
+   对应会员访问码才可越过此门槛；校验发生在额度预占和 DeepSeek 请求之前。 */
+function requireMember(req) {
+  let members;
+  try { members = JSON.parse(process.env.AI_MEMBER_TOKENS || '{}'); }
+  catch (e) { throw Object.assign(new Error('会员服务配置无效，在线 AI 规划已暂停。'), { code: 503 }); }
+  const header = String(req.headers && req.headers.authorization || '');
+  const token = header.indexOf('Bearer ') === 0 ? header.slice(7) : '';
+  if (!token || !members || typeof members !== 'object' || !Object.prototype.hasOwnProperty.call(members, token)) {
+    throw Object.assign(new Error('在线 AI 规划为会员功能，请先注册会员并获取会员访问码。'), { code: 403 });
+  }
+  return members[token];
+}
 /* ============================ 二、内置 System Prompt ============================ */
 const SYSTEM_PROMPT = [
   '你是资深灌溉工程设计工程师（AI 灌溉方案规划 Agent）。',
@@ -245,6 +259,7 @@ module.exports = async function handler(req, res) {
       key_configured: !!process.env.DEEPSEEK_API_KEY,
       quota_configured: !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN),
       access_configured: !!process.env.AI_ACCESS_TOKENS,
+      membership_configured: !!process.env.AI_MEMBER_TOKENS,
       free_limit: FREE_LIMIT, quota_store: '持久原子额度（未配置时暂停调用）'
     });
   }
@@ -254,6 +269,8 @@ module.exports = async function handler(req, res) {
   if (body && body.__tooBig) return reply(res, 413, 413, '请求体过大（上限 ' + MAX_BODY_BYTES + ' 字节），请简化地块顶点后重试。');
   if (!body || typeof body !== 'object' || Array.isArray(body)) return reply(res, 400, 400, '请求体必须是 JSON 对象：{ user_id, polygon, area, slope, user_text }。');
 
+  try { requireMember(req); }
+  catch (e) { return reply(res, e.code || 403, e.code || 403, e.message); }
   const geometryError = validateGeometry(body);
   if (geometryError) return reply(res,400,400,geometryError);
   let reservation;
@@ -303,5 +320,5 @@ module.exports.default = module.exports;
 module.exports.__test = {
   SYSTEM_PROMPT: SYSTEM_PROMPT, buildUserPrompt: buildUserPrompt, stripFences: stripFences,
   MODEL: MODEL, ALLOWED_ORIGIN: ALLOWED_ORIGIN, FREE_LIMIT: FREE_LIMIT,
-  validateGeometry, _reset: quota._reset
+  validateGeometry, requireMember, _reset: quota._reset
 };

@@ -555,7 +555,7 @@
     store.req = req; persist();
     var c = collect();
     if (!(c.area_m2 > 0)) { setStatus('尚未绘制地块：请先在画布上描绘地块边界并确认面积，再点在线生成。', true); return; }
-    if(!panel.querySelector('[data-ai=access]').value.trim()){setStatus('请先填写用户访问码，每个用户共5次。',true);return;}
+    if(!panel.querySelector('[data-ai=access]').value.trim()){setStatus('在线 AI 规划为会员功能。请先注册会员并填写会员访问码；每位会员仍共5次。',true);return;}
     var expected=fingerprint();
     var old = btn.textContent;
     btn.disabled = true; btn.textContent = '生成中…';
@@ -600,17 +600,17 @@
       '<label class="ai-label">灌溉需求描述</label>' +
       '<textarea class="ai-text" data-ai="req" rows="3" placeholder="描述你的灌溉设计需求，例如：辣椒地块，主管160PE，支管90PE，滴灌带间距0.7m..."></textarea>' +
       '<div class="ai-actions">' +
-      '<button type="button" data-ai="online">在线生成</button>' +
+      '<button type="button" data-ai="online">会员在线生成</button>' +
       '<button type="button" data-ai="export">导出文本</button>' +
       '<button type="button" data-ai="import">导入JSON</button>' +
       '</div>' +
       '<p class="ai-status" role="status" data-ai="status"></p>' +
       '<div class="ai-slot" data-ai="slot"></div>' +
       '<div class="ai-remark" data-ai="remark" hidden></div>' +
-      '<div class="ai-api"><label>访问码</label><input type="password" data-ai="access" autocomplete="off" placeholder="每用户5次，向作者领取"></div>' +
+      '<div class="ai-api"><label>会员访问码</label><input type="password" data-ai="access" autocomplete="off" placeholder="注册会员后获取；每会员共5次"></div>' +
       '<div class="ai-api"><label>接口</label>' +
       '<input type="text" data-ai="api" spellcheck="false" placeholder="云端接口地址（默认官方，一般不用改）"></div>' +
-      '<p class="ai-note">在线生成：网页把地块与需求发给云端函数，云端调大模型并把方案 JSON 发回来，网页不持密钥。' +
+      '<p class="ai-note">在线 AI 规划仅向已注册会员开放。网页把地块与需求发给云端函数，云端调大模型并把方案 JSON 发回来，网页不持密钥。' +
       '断网或次数用完时，可用「导出文本 → 本地脚本 → 导入JSON」的离线流程。</p>' +
       '</div>';
     /* [v279 2026-10-06 用户要求] ↕ 高度手柄撤掉：展开态改为「上下贴满」（导航下沿 → 状态栏上沿），

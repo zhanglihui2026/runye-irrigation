@@ -1,6 +1,7 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const repo=require('path').join(__dirname,'..');const handler=require(repo+'/api/ai-irrigation.js');
 process.env.NODE_ENV='test';process.env.AI_QUOTA_TEST_MODE='1';process.env.AI_ACCESS_TOKENS=JSON.stringify({'audit-token-alpha':'account-a','audit-token-rotated':'account-a','audit-token-beta':'account-b'});process.env.DEEPSEEK_API_KEY='test-placeholder';
+process.env.AI_MEMBER_TOKENS=JSON.stringify({'audit-token-alpha':'member-a','audit-token-rotated':'member-a','audit-token-beta':'member-b'});
 const good={version:1,design:{tape_spacing:.4,emitter_spacing:.3,emitter_flow:.8}};
 function body(){return{user_id:'ignored-browser-id',polygon:[{x:0,y:0},{x:200,y:0},{x:200,y:100},{x:0,y:100}],area:20000};}
 let response=good,calls=0,last;
@@ -13,7 +14,8 @@ test('empty and out of range plans return 422 without consuming success quota',a
 test('invalid geometry blocked before paid model call',async()=>{reset();for(const polygon of [[],[{x:'bad',y:0},{x:10,y:0},{x:0,y:10}],[{x:0,y:0},{x:10,y:10},{x:0,y:10},{x:10,y:0}]])assert.equal((await run({...body(),polygon})).code,400);assert.equal(calls,0);});
 test('wrong area and oversized pre-parsed body rejected',async()=>{reset();assert.equal((await run({...body(),area:50000})).code,400);assert.equal((await run({...body(),padding:'x'.repeat(270000)})).code,413);assert.equal(calls,0);});
 test('child geometry and measured conditions are included; model does not invent hydraulic results',async()=>{reset();const prompt=handler.__test.buildUserPrompt({...body(),groups:[{name:'梯田甲',poly:[{x:0,y:0},{x:5,y:0},{x:0,y:5}]}],conditions:{pump_efficiency:65},terrain:{source:100}});assert.match(prompt,/梯田甲/);assert.match(prompt,/pump_efficiency/);assert.match(handler.__test.SYSTEM_PROMPT,/Hazen/);assert.doesNotMatch(handler.__test.SYSTEM_PROMPT,/Darcy|效率按 70/);await run();assert.equal(last.temperature,undefined);assert.equal(last.response_format.type,'json_object');});
-test('missing credentials rejected; production cannot fall back to memory quota',async()=>{reset();assert.equal((await run(body(),'')).code,401);process.env.VERCEL='1';try{assert.equal((await run()).code,503);assert.equal(calls,0);}finally{delete process.env.VERCEL;}});
+test('missing membership code rejected; production cannot fall back to memory quota',async()=>{reset();assert.equal((await run(body(),'')).code,403);process.env.VERCEL='1';try{assert.equal((await run()).code,503);assert.equal(calls,0);}finally{delete process.env.VERCEL;}});
+test('non-members are blocked before quota reservation and DeepSeek',async()=>{reset();const saved=process.env.AI_MEMBER_TOKENS;try{delete process.env.AI_MEMBER_TOKENS;const r=await run();assert.equal(r.code,403);assert.match(r.msg,/注册会员/);assert.equal(calls,0);}finally{process.env.AI_MEMBER_TOKENS=saved;}});
 test('persistent quota REST commands survive handler reload and isolate failures',async()=>{
  reset();const savedFetch=global.fetch,store=new Map();let modelCalls=0;
  process.env.VERCEL='1';process.env.UPSTASH_REDIS_REST_URL='https://quota.test';process.env.UPSTASH_REDIS_REST_TOKEN='test-redis-token';
