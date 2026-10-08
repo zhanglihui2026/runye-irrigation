@@ -23,10 +23,6 @@
   @media(max-width:768px){
     .fn-nav .fn-inner{padding:0 16px}
   }
-  /* 侧栏标题栏：品牌字自导航移入此处（2026-09-13） */
-  .side-brand{flex:none;padding:0 0 6px;border-bottom:1px solid var(--s-100)}
-  .side-brand strong{display:block;font-size:13px;font-weight:700;color:var(--g-700);letter-spacing:1px}
-  .side-brand small{display:block;margin-top:1px;font-size:10px;color:var(--s-500)}
   /* 主体：左侧工具栏 + 地图（2026-09-13 改版：原绿色顶部操作条与右侧浮动测量面板
      的全部内容集中到左侧工具栏，地图占满其余空间） */
   .main{flex:1;position:relative;display:flex;min-height:0}
@@ -187,7 +183,7 @@
 <div id="app">
   <!-- 顶部功能区导航（2026-09-13 去重）：皮肤 = runye-nav.css、按钮清单 = runye-nav.js
        （与主页同一份 ITEMS —— 主页隐藏的「管网布置/数据对比」不在清单，两页按钮集一致）；
-       当前页「在线地图」由 runye-nav.js 自动高亮；品牌字在左侧工具栏 .side-brand -->
+       当前页「在线地图」由 runye-nav.js 自动高亮；v302 品牌字 .side-brand 已按用户要求取消 -->
   <nav class="fn-nav" aria-label="功能区导航">
     <div class="fn-inner" data-ry-fnnav data-base="index.html#"></div>
   </nav>
@@ -202,7 +198,6 @@
     <!-- 左侧工具栏：原绿色顶部操作条（搜索/定位/底图/画框四键）+ 右侧浮动「测量结果」面板
          的全部内容集中于此（2026-09-13）。全部元素 id 未变，JS 逻辑零改动 -->
     <aside class="side">
-      <div class="side-brand"><strong>润野灌溉</strong><small>地图面积测量 · 在线卫星图</small></div>
       <section>
         <h4 class="sec-t">地图</h4>
         <div class="tools">
