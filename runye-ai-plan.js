@@ -638,6 +638,7 @@
   function doAdminLogin() {
     if (panel.__adminIn) {
       panel.__adminIn = false;
+      var access = panel.querySelector('[data-ai=access]'); if (access) access.value = '';
       try { sessionStorage.removeItem(ADMIN_KEY); } catch (e) { }
       setAdminUI(null); setStatus('已退出管理员登录。'); return;
     }
@@ -898,7 +899,10 @@
   function installSmartWorkbench() {
     var KEY='runye_smart_threads_v1', threads=[], active='';
     try { var saved=JSON.parse(root.localStorage.getItem(KEY)||'null'); if(saved&&Array.isArray(saved.threads)){threads=saved.threads;active=saved.active;} } catch(e){}
-    threads=threads.filter(function(t){return t&&typeof t.id==='string'&&Array.isArray(t.messages);}).slice(0,30);
+    threads=threads.filter(function(t){return t&&typeof t.id==='string'&&Array.isArray(t.messages);}).slice(0,30).map(function(t){
+      return {id:t.id,title:typeof t.title==='string'?t.title.slice(0,80):'新的规划',updated:t.updated,
+        messages:t.messages.filter(function(m){return m&&(m.role==='user'||m.role==='assistant')&&typeof m.text==='string';}).slice(-12).map(function(m){return {role:m.role,text:m.text.slice(0,5000)};})};
+    });
     if(!threads.length){active=String(Date.now());threads=[{id:active,title:'新的规划',messages:conversation.slice(),updated:Date.now()}];}
     if(!threads.some(function(t){return t.id===active;}))active=threads[0].id;
     conversation=threads.filter(function(t){return t.id===active;})[0].messages.slice(-12);
@@ -929,6 +933,20 @@
     }
     grid.querySelector('.smart-new').onclick=function(){if(pending()){setStatus('请等当前方案生成完成后再新建对话。',true);return;}saveCurrent();active=String(Date.now());threads.unshift({id:active,title:'新的规划',messages:[],updated:Date.now()});threads=threads.slice(0,30);conversation=[];req.value='';slot.innerHTML='';remark.hidden=true;setStatus('新对话已创建，继续使用当前地块。');renderConversation();persistThreads();drawHistory();drawPlot();req.focus();};
     grid.querySelector('.smart-example').onclick=function(){req.value='滴头流量 1.38 L/h，滴孔间距 0.3 m，滴灌带间距 0.8 m，单边铺设长度 60 m，每区流量不超过 80 m³/h，请重新规划地块。';req.focus();};
+    /* [v341 2026-10-09 用户要求] 左右栏宽可拖动：手柄贴两列分界，拖动改 grid-template-columns 并持久化 */
+    var COLS_KEY='runye_smart_cols_v1',colW={l:220,r:360};
+    try{var cs=JSON.parse(root.localStorage.getItem(COLS_KEY)||'null');if(cs&&isFinite(cs.l)&&isFinite(cs.r)){colW.l=Math.min(420,Math.max(160,cs.l));colW.r=Math.min(520,Math.max(260,cs.r));}}catch(e){}
+    var colsWide=function(){return root.innerWidth>1050;};
+    function colsStr(){return colW.l+'px minmax(280px,1fr) '+colW.r+'px';}
+    function applyCols(){if(colsWide()){grid.style.gridTemplateColumns=colsStr();}else{grid.style.gridTemplateColumns='';}placeGrips();}
+    function placeGrips(){var gl=grid.querySelector('.smart-grip-l'),gr=grid.querySelector('.smart-grip-r');if(!gl||!gr)return;var cw=grid.clientWidth;gl.style.left=(colW.l-4)+'px';gr.style.left=(cw-colW.r-4)+'px';gl.style.display=gr.style.display=colsWide()?'':'none';}
+    function startDrag(e,which){var sx=e.clientX,sl=colW.l,sr=colW.r;
+      function mv(ev){if(which==='l'){colW.l=Math.min(420,Math.max(160,sl+ev.clientX-sx));}else{colW.r=Math.min(520,Math.max(260,sr-(ev.clientX-sx)));}grid.style.gridTemplateColumns=colsStr();placeGrips();}
+      function up(){doc.removeEventListener('pointermove',mv);doc.removeEventListener('pointerup',up);var g=grid.querySelector('.smart-grip-'+which);if(g)g.classList.remove('dragging');try{root.localStorage.setItem(COLS_KEY,JSON.stringify(colW));}catch(e){}}
+      doc.addEventListener('pointermove',mv);doc.addEventListener('pointerup',up);}
+    ['l','r'].forEach(function(k){var g=doc.createElement('div');g.className='smart-grip smart-grip-'+k;g.title='拖动调整栏宽';g.addEventListener('pointerdown',function(e){if(!colsWide())return;e.preventDefault();g.classList.add('dragging');startDrag(e,k);});grid.appendChild(g);});
+    applyCols();
+    root.addEventListener('resize',applyCols);
     if(root.MutationObserver){new root.MutationObserver(function(){saveCurrent();drawPlot();}).observe(log,{childList:true});new root.MutationObserver(drawPlot).observe(slot,{childList:true,subtree:true});}
     renderConversation();drawHistory();drawPlot();
   }
