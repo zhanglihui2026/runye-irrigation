@@ -11056,23 +11056,43 @@ function tlFlowRoute(svg, fPts, zi) {
     if (bPts.length >= 2) {
       var s0 = tlFlowNear(bPts[0], mp), s1 = tlFlowNear(bPts[bPts.length - 1], mp);
       var bp = (s0 && (!s1 || s0.d <= s1.d)) ? bPts : bPts.slice().reverse();
-      /* 该支管的阀门 = 离支管起点最近的红⊗。排除两类「不是支管阀」的红圈：
-        ① 总管×主管交接阀（<g data-junction-valve> 内）②水源标记（紧贴总管起点）。
-        半径 60px：阀与支管起点本就重合/相邻（斜连接管很短），超出的不认。 */
+      /* [v354] 该支管的阀门 = 「挂在支管线上」的红⊗：阀心到支管折线的垂距 ≤ 8px。
+        旧判据「离支管起点 ≤60px」只在 18 亩小分区成立——阀画在支管中部
+        （离起点≈半个分区边长），联合灌溉大分区（75~83 亩）阀离支管起点上百米、
+        折算屏幕远超 60px ⇒ 永远找不到阀，水流退回「主管垂足直插支管」、与阀门错位
+        （用户实测 5 区错位）。改按垂距归属：阀本来就画在支管线上（与支管同 x/y），
+        垂距≈0；斜接管锚点/别区的阀垂距大，天然排除。
+        仍排除两类「不是支管阀」的红圈：① 总管×主管交接阀（<g data-junction-valve> 内）
+        ② 水源标记（紧贴总管起点）。 */
       var vv = null;
       var vs = svg.querySelectorAll('circle[fill="#ef4444"]');
       for (var w = 0; w < vs.length; w++) {
         if (vs[w].closest && vs[w].closest('[data-junction-valve]')) continue;
         var vx = +vs[w].getAttribute('cx'), vy = +vs[w].getAttribute('cy');
-        var dv = tlFlowLen([vx, vy], bp[0]);
-        if (dv > 60) continue;
         if (tlFlowLen([vx, vy], fPts[0]) < 12) continue;      /* 水源标记排除 */
-        if (!vv || dv < vv.d) vv = { x: vx, y: vy, d: dv, r: +vs[w].getAttribute('r') || 6.5 };
+        var nb = tlFlowNear([vx, vy], bPts);
+        if (!nb || nb.d > 8) continue;                        /* 不挂在本支管线上 ⇒ 不是本支管的阀 */
+        if (!vv || nb.d < vv.d) vv = { x: vx, y: vy, d: nb.d, r: +vs[w].getAttribute('r') || 6.5 };
       }
       if (vv) {
-        /* 主管取水点改为「阀门在主管上的垂足」，水流：主管 → 阀 → 支管 */
-        var jt = tlFlowNear([vv.x, vv.y], mp);
-        out.push(jt.q);
+        /* [v354] 主管进入点优先取「主管×支管交接三通方块」（rect[data-junction-tee]）——
+          图面上阀→主管是 45° 斜接管、锚点处有三通方块；水流从同一锚点进入，
+          与图面画法逐段重合（旧版取垂足 ⇒ 接入段与斜接管/阀门错位）。
+          三通方块 rect 以左上角存坐标（9×9，中心 = x+4.5/y+4.5）。
+          约束：距阀 ≤40px（斜接管长度量级）且锚点必须落在主管上（≤6px）。 */
+        var jbest = null;
+        var tees = svg.querySelectorAll('rect[data-junction-tee]');
+        for (var t2 = 0; t2 < tees.length; t2++) {
+          if (tees[t2].getAttribute('data-junction-front')) continue;   /* 总管×主管交接阀不认 */
+          var tx2 = +tees[t2].getAttribute('x') + 4.5, ty2 = +tees[t2].getAttribute('y') + 4.5;
+          var dt2 = tlFlowLen([vv.x, vv.y], [tx2, ty2]);
+          if (dt2 > 40) continue;
+          var pr = tlFlowNear([tx2, ty2], mp);
+          if (!pr || pr.d > 6) continue;                    /* 锚点必须真的在本主管上 */
+          if (!jbest || dt2 < jbest.d) jbest = { q: pr.q, d: dt2 };
+        }
+        if (!jbest) jbest = { q: tlFlowNear([vv.x, vv.y], mp).q };      /* 无三通标记 ⇒ 垂足兜底 */
+        out.push(jbest.q);
         out.push([vv.x, vv.y]);
         passed.push(vv);
       } else {
