@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>润野灌溉 · 技术架构规划 v1.0</title>
+<style>
+body{font-family:-apple-system,"Microsoft YaHei",sans-serif;max-width:960px;margin:0 auto;padding:40px 24px;color:#334155;line-height:1.8;background:#fafaf9}
+h1{font-size:24px;color:#15803d;border-bottom:3px solid #15803d;padding-bottom:8px;margin-bottom:24px}
+h2{font-size:18px;color:#1e293b;margin-top:32px;border-left:4px solid #15803d;padding-left:10px}
+h3{font-size:15px;color:#334155;margin-top:20px}
+table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13px}
+th{background:#15803d;color:#fff;padding:8px 10px;text-align:left}
+td{border:1px solid #e2e8f0;padding:6px 10px}
+tr:nth-child(even){background:#f8fafc}
+code{background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px;color:#15803d}
+.arch{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin:12px 0;font-family:Consolas,monospace;font-size:12px;line-height:1.6;white-space:pre;overflow-x:auto}
+.box{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:12px 16px;margin:12px 0}
+.warn{background:#fef3c7;border-color:#fde68a}
+.warn{background:#fef3c7;border:1px solid #fde68a;border-radius:6px;padding:12px 16px;margin:12px 0}
+ul,ol{padding-left:24px}
+li{margin-bottom:4px}
+.tag{display:inline-block;background:#dcfce7;color:#15803d;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600}
+</style>
+</head>
+<body>
+
+<h1>润野灌溉 · 技术架构规划 v1.0</h1>
+<p>海南五丰农业科技有限公司 · 2026-10-09</p>
+
+<h2>一、现状盘点</h2>
+
+<p>你现在的项目已经是一个有规模的产品了，但文件比较散。我帮你分一下类：</p>
+
+<table>
+<tr><th>类别</th><th>文件</th><th>职责</th></tr>
+<tr><td rowspan="3"><b>核心计算引擎</b></td><td><code>hydraulic-calc/hc-core.js</code></td><td>水力公式库（Hazen-Williams、内径折算等），全站口径唯一出处</td></tr>
+<tr><td><code>hydraulic-calc/design-core.js</code></td><td>三级规划设计计算（联合流量、管径推荐、泵选型）</td></tr>
+<tr><td><code>runye-hydraulics-core.js</code></td><td>管网拓扑重建 + 逐段递推 + 最不利路径 + 毛管逐滴头模拟</td></tr>
+<tr><td rowspan="4"><b>页面</b></td><td><code>index.html</code></td><td>主页/三级规划入口</td></tr>
+<tr><td><code>runye-map-measure.html</code></td><td>在线地图布置管网</td></tr>
+<tr><td><code>runye-hydraulics.html</code></td><td>水力校核（刚改成三栏软件感布局）</td></tr>
+<tr><td><code>runye-ai-chat-test.html</code></td><td>AI对话助手（测试版）</td></tr>
+<tr><td rowspan="3"><b>框架</b></td><td><code>runye-nav.js/css</code></td><td>顶部导航栏</td></tr>
+<tr><td><code>runye-theme.css</code></td><td>全站配色变量</td></tr>
+<tr><td><code>sw.js</code></td><td>PWA离线缓存</td></tr>
+<tr><td rowspan="3"><b>功能模块</b></td><td><code>runye-terrain.js</code></td><td>地形高程分析</td></tr>
+<tr><td><code>runye-material-audit.js</code></td><td>材料审核</td></tr>
+<tr><td><code>runye-undo.js</code></td><td>撤销重做</td></tr>
+<tr><td><b>EPANET对照</b></td><td><code>_tmp_epanet/</code></td><td>EPANET WASM引擎，用于结果对照验证</td></tr>
+</table>
+
+<div class="warn">
+<b>现在的问题：</b>根目录下有大量 <code>_v160_pre.html</code>、<code>_tmp_dbg.html</code>、<code>verify_*.js</code> 等临时文件，和正式代码混在一起。建议后面统一清理到 <code>_archive/</code> 目录。
+</div>
+
+<h2>二、目标架构（三层）</h2>
+
+<p>不管以后加多少功能，都按这三层来组织，互不干扰：</p>
+
+<div class="arch">
+┌─────────────────────────────────────────────────────┐
+│  第三层：界面层（UI Pages）                           │
+│  index.html · map-measure · hydraulics · ai-chat     │
+│  quote.html · report.html · settings.html             │
+│  每个页面独立，通过 runye-nav 导航，通过 localStorage 传数据 │
+├─────────────────────────────────────────────────────┤
+│  第二层：业务服务层（Services）                        │
+│  ryHydraulic  · ryMap  · ryQuote  · ryReport  · ryAI │
+│  每个服务是一个 JS 对象，页面调它，它不关心页面长什么样    │
+├─────────────────────────────────────────────────────┤
+│  第一层：计算引擎层（Core Engine）                     │
+│  hc-core（水力公式）· design-core（设计）              │
+│  hydraulics-core（管网递推）· epanet-wasm（对照）      │
+│  纯计算，输入参数→输出结果，不碰DOM，不碰页面            │
+└─────────────────────────────────────────────────────┘
+</div>
+
+<h3>分层原则</h3>
+<ol>
+<li><b>引擎层不碰页面</b>：<code>hc-core.js</code> 和 <code>hydraulics-core.js</code> 只做数学，输入参数输出数字，不操作DOM</li>
+<li><b>服务层不碰样式</b>：<code>ryQuote</code> 算材料清单时只返回数据，不写HTML</li>
+<li><b>页面层不写公式</b>：页面只负责收集用户输入、调服务、显示结果。所有计算逻辑往下沉到服务层和引擎层</li>
+</ol>
+
+<h2>三、水力计算引擎怎么工作</h2>
+
+<p>这是你产品最核心的部分，已经比较完整了：</p>
+
+<div class="arch">
+用户输入（地图上画的管网 + 参数）
+        │
+        ▼
+┌─ hydraulics-core.js ─────────────────────────┐
+│ 1. 拓扑重建                                    │
+│    地图坐标 → 树状结构（BFS建树）               │
+│    T形三通分裂、端点吸附聚类                     │
+│                                                │
+│ 2. 逐段流量递推（从末端往起点推）                │
+│    末端滴灌带 → 支管 → 主管 → 总管              │
+│    每段流量 = 下游所有出流量之和                 │
+│                                                │
+│ 3. 逐段水损计算（Hazen-Williams公式）           │
+│    hf = 1.113e9 × L × Q^1.852 / (C^1.852 × d^4.87) │
+│    局部损失 = 沿程 × 10%                       │
+│                                                │
+│ 4. 找最不利路径                                 │
+│    从水肥站到最远滴灌带入口，累计损失最大的那条路   │
+│                                                │
+│ 5. 毛管逐滴头模拟（simulateLateral）            │
+│    从入口逐滴头推压力，q=k×P^x 耦合，迭代4轮     │
+│    输出真实DU、压力分布曲线                      │
+│                                                │
+│ 6. 选型建议                                    │
+│    TDH → 泵功率 → 电机档                       │
+│    逐段推荐最小管径（流速≤2.0m/s）               │
+└────────────────────────────────────────────────┘
+        │
+        ▼
+   返回结果对象 → 页面渲染 / AI对话调用
+</div>
+
+<table>
+<tr><th>公式</th><th>口径</th><th>出处</th></tr>
+<tr><td>Hazen-Williams沿程损失</td><td>C=150（PE管）</td><td>hc-core.js</td></tr>
+<tr><td>内径折算</td><td>ID = OD×(1-2/SDR13.6)</td><td>hc-core.js</td></tr>
+<tr><td>多孔出流修正</td><td>Christiansen F系数</td><td>design-core.js</td></tr>
+<tr><td>滴头流量-压力关系</td><td>q = qRef × (P/pRef)^x</td><td>hydraulics-core.js simulateLateral()</td></tr>
+<tr><td>流速上限</td><td>2.0 m/s</td><td>页面参数可调</td></tr>
+</table>
+
+<h2>四、后续功能怎么接入</h2>
+
+<p>以后加新功能，按这个套路走：</p>
+
+<h3>新增一个"材料报价"功能</h3>
+<ol>
+<li><b>引擎层</b>：如果需要计算（比如管材单价×长度），写到 <code>hydraulic-calc/quote-core.js</code></li>
+<li><b>服务层</b>：新建 <code>ry-quote.js</code>，提供 <code>RyQuote.generate(segRows, tapeRows)</code> 返回报价数据</li>
+<li><b>页面层</b>：AI对话里说"出报价"→ 调 <code>RyQuote.generate()</code> → 结果卡片显示在右侧</li>
+<li><b>导航</b>：在 <code>runye-nav.js</code> 加一个菜单项</li>
+</ol>
+
+<h3>新增一个功能时的文件命名规则</h3>
+<table>
+<tr><th>类型</th><th>命名规则</th><th>例子</th></tr>
+<tr><td>新页面</td><td><code>runye-功能名.html</code></td><td><code>runye-quote.html</code></td></tr>
+<tr><td>新计算模块</td><td><code>功能名-core.js</code> 放 hydraulic-calc/</td><td><code>hydraulic-calc/quote-core.js</code></td></tr>
+<tr><td>新服务</td><td><code>runye-功能名.js</code> 放根目录</td><td><code>runye-quote.js</code></td></tr>
+<tr><td>新样式</td><td>优先复用 runye-theme.css，不另开</td><td>—</td></tr>
+</table>
+
+<h2>五、数据怎么流转</h2>
+
+<p>页面之间通过 localStorage 传数据，不需要后端：</p>
+
+<div class="arch">
+地图布置页                    水力校核页                  AI对话页
+runye-map-measure.html  →   runye-hydraulics.html  →  runye-ai-chat.html
+        │                           │                          │
+        ▼                           ▼                          ▼
+  localStorage:              localStorage:            localStorage:
+  runye_network_layout       runye_hydraulic_overlay  （读上面两个）
+  (管网坐标/拓扑)             (着色数据)
+</div>
+
+<table>
+<tr><th>Key</th><th>谁写</th><th>谁读</th><th>内容</th></tr>
+<tr><td><code>runye_network_layout</code></td><td>地图布置页</td><td>水力校核、AI</td><td>管网坐标、管段、滴灌带位置</td></tr>
+<tr><td><code>runye_hydraulic_design_v1</code></td><td>三级规划</td><td>水力校核、AI</td><td>最终几何、设计流量、管径</td></tr>
+<tr><td><code>runye_hydraulic_overlay_v1</code></td><td>水力校核</td><td>地图页（着色）</td><td>每段的流量/流速/损失</td></tr>
+<tr><td><code>runye_hydraulics_check_cfg</code></td><td>水力校核</td><td>水力校核</td><td>用户上次的参数（记忆）</td></tr>
+</table>
+
+<h2>六、发展路线建议</h2>
+
+<h3>近期（1-2个月）：把现有功能串起来</h3>
+<ol>
+<li><b>AI对话页接真实计算</b>：现在是假数据，把 <code>runye-hydraulics-core.js</code> 接进去，说"算一下"真出结果</li>
+<li><b>材料报价模块</b>：管段长度×管径单价，自动出清单和总价</li>
+<li><b>清理临时文件</b>：根目录的 <code>_v*_pre.html</code>、<code>verify_*.js</code>、<code>_tmp_*.html</code> 统一移到 <code>_archive/</code></li>
+<li><b>导航栏更新</b>：加AI助手入口，按使用频率排序</li>
+</ol>
+
+<h3>中期（3-6个月）：做深专业能力</h3>
+<ol>
+<li><b>全毛管批量模拟</b>：现在只算最差一条，以后每条毛管都算DU，出全图均匀度</li>
+<li><b>轮灌组设计</b>：自动分轮灌组，算每组同时工作的支管数，优化水泵选型</li>
+<li><b>冲洗工况校核</b>：滴灌带定期冲洗时的流量和压力校核</li>
+<li><b>地形坡度修正</b>：接入DEM高程数据，不是手填坡度</li>
+<li><b>导出PDF设计报告</b>：把校核结果+材料清单+图纸打包成一份给客户的报告</li>
+</ol>
+
+<h3>远期（6个月+）：产品化</h3>
+<ol>
+<li><b>接大模型API</b>：AI对话从规则匹配升级到真·自然语言理解</li>
+<li><b>多项目管理</b>：现在只有一个项目，以后要能存多个地块、切换</li>
+<li><b>客户分享链接</b>：生成一个链接发给种植户看结果，不用装软件</li>
+<li><b>手机端适配</b>：现场踏勘时手机上就能看管网和参数</li>
+<li><b>云同步</b>：现在是localStorage存在本地，以后加个简单后端同步项目</li>
+</ol>
+
+<h2>七、一个重要的建议：不要急着换框架</h2>
+
+<div class="box">
+<p>你现在是纯HTML+JS，没有React、没有构建工具。<b>这个状态其实很好</b>——双击文件就能跑，不需要Node.js环境，不需要打包。</p>
+<p>等代码量超过50个JS文件、或者多人协作的时候，再考虑：</p>
+<ul>
+<li>打包工具：Vite（最简单，10分钟上手）</li>
+<li>框架：暂时不需要，原生JS够用</li>
+<li>后端：等需要多项目同步时再加，用什么都行</li>
+</ul>
+<p>epanet-js用Next.js是因为它有团队、要登录、要云函数。你现在一个人、纯本地用，不需要这些复杂度。</p>
+</div>
+
+</body>
+</html>

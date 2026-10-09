@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>润野 · 水力校核（v299 · 自动读已布置管网）</title>
+<title>润野 · 水力校核（管网与毛管校核）</title>
 <style>
   :root{
     --g-700:#15803d; --g-600:#16a34a; --g-500:#22c55e; --g-50:#f0fdf4; --g-100:#dcfce7;
@@ -11,18 +11,25 @@
     --r-600:#dc2626; --a-600:#d97706;
   }
   *{box-sizing:border-box}
-  html,body{margin:0;min-height:100vh;font-family:-apple-system,"PingFang SC","Microsoft YaHei",Segoe UI,sans-serif;
+  html,body{margin:0;height:100vh;overflow:hidden;font-family:-apple-system,"PingFang SC","Microsoft YaHei",Segoe UI,sans-serif;
     color:var(--s-700);background:#f7f5f0}
-  #app{display:flex;flex-direction:column;min-height:100vh}
+  #app{display:flex;flex-direction:column;height:100vh}
   /* ===== 顶部功能区导航：皮肤=runye-nav.css、清单=runye-nav.js（唯一出处） ===== */
-  .fn-nav{position:sticky;top:0;z-index:1200;flex:none;background:#fff;border-bottom:1px solid var(--s-200)}
+  .fn-nav{flex:none;background:#fff;border-bottom:1px solid var(--s-200)}
   .fn-nav .fn-inner{padding:0 12px}
-  /* ===== 主体：左参数栏 + 右结果区 ===== */
-  .main{flex:1;display:flex;min-height:0;align-items:stretch}
-  .side{flex:none;width:280px;background:#fff;border-right:1px solid var(--s-300);overflow-y:auto;
-    padding:12px;display:flex;flex-direction:column;gap:12px}
+  /* ===== 主体：左参数 + 中间画布/表格 + 右属性 ===== */
+  .main{flex:1;display:flex;min-height:0;align-items:stretch;overflow:hidden}
+  .side{flex:none;width:260px;background:#fff;border-right:1px solid var(--s-300);overflow-y:auto;
+    padding:10px;display:flex;flex-direction:column;gap:10px}
   .side::-webkit-scrollbar{width:5px;height:5px}
-  .side::-webkit-scrollbar-thumb{background:#bfd3c6;border-radius:2px}
+  .side::-webkit-scrollbar-thumb{background:rgba(188,211,198,.25);border-radius:2px}
+  /* [v319 2026-10-09 用户要求] 全站滚动条最窄化：5px 与 .side 统一；webkit 前缀 + 标准属性双保险 */
+  *::-webkit-scrollbar{width:5px;height:5px}
+  *::-webkit-scrollbar-track{background:transparent}
+  *::-webkit-scrollbar-thumb{background:rgba(188,211,198,.25);border-radius:2.5px}
+  *::-webkit-scrollbar-thumb:hover{background:#9db8a8}
+  *::-webkit-scrollbar-corner{background:transparent}
+  html{scrollbar-width:thin;scrollbar-color:#bfd3c6 transparent}
   .sec-t{margin:0 0 6px;font-size:11px;color:var(--s-500);font-weight:700;letter-spacing:1px;
     border-left:3px solid var(--g-600);padding-left:8px;line-height:1.4}
   .card{border:1px solid var(--s-200);background:#fff;padding:8px;font-size:12px;line-height:1.5}
@@ -32,24 +39,33 @@
   .kv .v{font-weight:600;color:var(--s-700)}
   .kv .v.warn{color:var(--a-600)}
   .kv .v.err{color:var(--r-600)}
-  .frm{display:grid;grid-template-columns:1fr 86px;gap:5px 8px;align-items:center}
+  .frm{display:grid;grid-template-columns:1fr 80px;gap:4px 8px;align-items:center}
   .frm label{font-size:11px;color:var(--s-600)}
-  .frm input{height:28px;padding:0 6px;border:1px solid var(--s-300);font:inherit;font-size:12px;
+  .frm input{height:26px;padding:0 6px;border:1px solid var(--s-300);font:inherit;font-size:12px;
     background:#fff;color:var(--s-700);width:100%}
   .frm input:focus{outline:1px solid var(--g-600)}
   .frm .hint2{grid-column:1/3;font-size:10px;color:var(--s-500)}
-  .mbtn{height:34px;padding:0 9px;border:1px solid var(--s-300);background:#fff;color:var(--s-700);
+  .mbtn{height:32px;padding:0 9px;border:1px solid var(--s-300);background:#fff;color:var(--s-700);
     cursor:pointer;font-size:12px;font-weight:600;text-align:left;font-family:inherit;width:100%}
   .mbtn:hover{border-color:var(--g-600);color:var(--g-700);background:var(--g-50)}
   .mbtn-primary{background:var(--g-600);color:#fff;border-color:var(--g-600);text-align:center}
   .mbtn-primary:hover{background:var(--g-700);color:#fff}
   .hint{font-size:10px;color:var(--s-500);line-height:1.5;margin-top:4px}
-  .result{flex:1;min-width:0;padding:14px;overflow-x:auto}
-  .sum-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px}
-  .sum{border:1px solid var(--s-200);background:#fff;padding:10px}
+  /* 中间区：上地图 + 下表格，整体可滚 */
+  .result{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;padding:0}
+  .result-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border-bottom:1px solid var(--s-200);flex:none}
+  .result-head h1{font-size:15px;line-height:1.2;color:#1e293b;margin:0;font-weight:700}
+  .result-head p{font-size:10px;line-height:1.5;color:var(--s-500);margin:2px 0 0}
+  .result-badge{flex:none;border:1px solid #bbf7d0;background:var(--g-50);color:var(--g-700);padding:3px 8px;font-size:10px;font-weight:700;white-space:nowrap}
+  .result-body{flex:1;overflow-y:auto;overflow-x:hidden;padding:10px 14px} /* [v319] 纵向 12→10 */
+  .overview{display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:10px;align-items:stretch;margin-bottom:12px}
+  .scope-card{border:1px solid var(--s-200);background:#fff;padding:8px 10px;font-size:10px;line-height:1.6;color:var(--s-600)}
+  .scope-card b{display:block;color:var(--s-700);font-size:11px;margin-bottom:3px}.scope-card .ok{color:var(--g-700);font-weight:700}.scope-card .limit{color:#92400e;margin-top:4px}
+  .sum-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px;margin-bottom:10px}
+  .sum{border:1px solid var(--s-200);background:#fff;padding:8px}
   .sum .t{font-size:10px;color:var(--s-500);letter-spacing:1px}
-  .sum .n{font-size:20px;font-weight:700;color:var(--g-700);margin-top:2px}
-  .sum .n small{font-size:11px;font-weight:400;color:var(--s-500)}
+  .sum .n{font-size:17px;font-weight:700;color:var(--g-700);margin-top:2px}
+  .sum .n small{font-size:10px;font-weight:400;color:var(--s-500)}
   .sum .n.err{color:var(--r-600)}
   .sum .d{font-size:10px;color:var(--s-500);margin-top:2px}
   table{border-collapse:collapse;width:100%;background:#fff;font-size:11px;margin:6px 0 14px}
@@ -60,8 +76,9 @@
      sticky 祖先链上任一非 visible 的 overflow 会把 th 锁进该容器（探针实测 thTop 随页滚走）。
      故用「表容器冻结」：.tblfreeze 限高 + overflow:auto，th 在容器内 sticky top:0 恒钉容器顶；
      点击管段 scrollIntoView(block:center) 对嵌套滚动容器同样自动滚到位。 */
-  .tblfreeze{max-height:calc(100vh - 200px);overflow:auto;border:1px solid var(--s-200)}
+  .tblfreeze{max-height:calc(100vh - 200px);overflow:auto;border:1px solid var(--s-200)} /* [v319] 全高自适应（verify 41 契约值；窄滚动条配合一屏多看两行） */
   #segTable th,#tapeTable th,#sugTable th{position:sticky;top:0;z-index:5;box-shadow:0 1px 0 var(--s-200)}
+  .tblfreeze table{margin:0} /* [v319] 冻结容器内表贴合边框，消底部 14px 空白 */
   /* 点击管线图管段跳转到的表格行：黄色闪烁 2 次，一眼锁定「具体参数」行 */
   @keyframes hydRowFlash{0%,100%{background:transparent}50%{background:#fef08a}}
   #segTable tr.hyd-row-hit td{animation:hydRowFlash 1.1s ease-in-out 2}
@@ -80,7 +97,7 @@
   .empty b{color:var(--g-700)}
   .pathline{font-size:12px;background:#fff;border:1px solid var(--s-200);padding:8px 10px;margin:4px 0 8px;line-height:1.8}
   .pathline .arrow{color:var(--g-600);font-weight:700;padding:0 2px}
-  .hyd-map{position:relative;height:390px;border:1px solid var(--s-200);background:linear-gradient(135deg,#f8fafc,#eef6f1);overflow:hidden;margin:5px 0 12px}
+  .hyd-map{position:relative;height:340px;border:1px solid var(--s-200);background:linear-gradient(135deg,#f8fafc,#eef6f1);overflow:hidden;margin:5px 0 12px;border-radius:6px}
   .hyd-map svg{width:100%;height:100%;display:block}.hyd-base{fill:none;stroke-linecap:round;stroke-linejoin:round}
   .hyd-flow{fill:none;stroke:#fff;stroke-width:2.2;stroke-linecap:round;stroke-dasharray:10 12;animation:hydFlow 1.35s linear infinite;pointer-events:none;opacity:.9}
   .hyd-pipe{cursor:pointer}.hyd-pipe:hover .hyd-base,.hyd-pipe.selected .hyd-base{stroke-width:8!important;filter:drop-shadow(0 0 3px rgba(15,23,42,.45))}
@@ -88,10 +105,54 @@
   .hyd-legend{position:absolute;left:10px;top:10px;background:rgba(255,255,255,.94);border:1px solid var(--s-200);padding:6px 8px;font-size:10px;line-height:1.65;color:var(--s-600)}
   @keyframes hydFlow{to{stroke-dashoffset:-22}}
   pre.inp{background:#0f172a;color:#e2e8f0;font:11px/1.5 Consolas,monospace;padding:10px;overflow:auto;
-    max-height:260px;margin:6px 0;white-space:pre}
+    max-height:420px;margin:0;white-space:pre}
+  /* [v316 2026-10-09 用户要求] 宽屏利用右侧留白：DU 估算与 EPANET 对照改两栏紧凑排版
+     （原两卡 max-width:860px，宽屏右侧空 300px+）；≤1100px 回落单栏 */
+  .du-grid{display:grid;grid-template-columns:300px 1fr;gap:10px} /* [v316b] 删 align-items:start：右栏随行高拉伸，与左栏底部对齐 */
+  .du-grid .sum-grid{margin-bottom:0} /* [v316b] 消左栏尾距：grid item 建 BFC 会把 sum-grid 的 10px 下距计入行高，右栏盒底随之比 0.37 卡低 10px */
+  .epa-grid{display:grid;grid-template-columns:340px 1fr;gap:10px;align-items:start}
+  @media(max-width:1100px){.du-grid,.epa-grid{grid-template-columns:1fr}}
+  /* [v316b 2026-10-09 用户要求] 曲线图容器撑满右栏剩余高度并与左栏底对齐；descHtml 留盒外 */
+  #latChart{display:flex;flex-direction:column}
+  .lat-chart-box{border:1px solid var(--s-200);background:#f8fafc;flex:1;min-height:160px;position:relative;box-sizing:border-box} /* [v316b] min-height 仅单栏兜底；盒高随 flex:1（行高由左栏决定）与左栏底对齐 */
+  .lat-chart-box svg{position:absolute;inset:5px;width:calc(100% - 10px);height:calc(100% - 10px)} /* [v316b] absolute 填充：svg 不参与固有尺寸计算（height:100% 会被两遍布局计入盒 content 高，把行高托大 ~10px 破坏对齐） */
   .row2{display:flex;gap:6px}
   .row2 .mbtn{flex:1;text-align:center}
-  h3.rt{margin:18px 0 0;font-size:12px;color:var(--s-600);border-left:3px solid var(--g-600);padding-left:8px}
+  h3.rt{margin:16px 0 7px;font-size:12px;color:var(--s-600);border-left:3px solid var(--g-600);padding-left:8px} /* [v319] 分节标题上距 22→16，紧凑 */
+  .section-note{font-size:10px;color:var(--s-500);margin:-2px 0 7px;line-height:1.55}
+  .mode-lock{opacity:.56;background:var(--s-100)!important;cursor:not-allowed}
+  @media(max-width:900px){.main{display:block}.side{width:auto;border-right:0;border-bottom:1px solid var(--s-300)}.overview{grid-template-columns:1fr}.result{padding:14px}.result-head{display:block}.result-badge{display:inline-block;margin-top:8px}}
+  /* ===== 右属性面板 + 底部状态栏（软件感布局） ===== */
+  .right-props{flex:none;width:260px;background:#fff;border-left:1px solid var(--s-200);display:flex;flex-direction:column;overflow-y:auto}
+  .rp-tabs{display:flex;border-bottom:1px solid var(--s-200);flex:none}
+  .rp-tab{flex:1;text-align:center;padding:8px 4px;font-size:12px;cursor:pointer;color:var(--s-500);border-bottom:2px solid transparent}
+  .rp-tab.active{color:var(--g-700);border-bottom-color:var(--g-600);font-weight:600}
+  .rp-body{padding:10px;flex:1}
+  .rp-empty{font-size:11px;color:var(--s-500);line-height:1.7;padding:10px 4px}
+  .rp-asset{font-size:13px;font-weight:700;color:var(--s-700);margin-bottom:2px}
+  .rp-type{font-size:10px;color:var(--s-500);margin-bottom:8px}
+  .rp-table{width:100%;border-collapse:collapse;font-size:11px}
+  .rp-table td{padding:4px 0;border-bottom:1px solid #f1f5f9}
+  .rp-table td:first-child{color:var(--s-500)}
+  .rp-table td:last-child{text-align:right;font-weight:600}
+  .rp-table .ok{color:var(--g-700)}
+  .rp-table .bad{color:var(--r-600)}
+  .rp-warn{margin-top:8px;padding:6px 8px;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;font-size:10px;color:var(--r-600);line-height:1.5}
+  .statusbar{flex:none;height:26px;background:#fff;border-top:1px solid var(--s-200);display:flex;align-items:center;padding:0 12px;gap:16px;font-size:10px;color:var(--s-500)}
+  .statusbar .st-ok{color:var(--g-700)}
+  .statusbar .st-warn{color:var(--a-600)}
+  .statusbar .st-bad{color:var(--r-600)}
+  .statusbar .sp{flex:1}
+  /* [v322 2026-10-09 用户要求] 全站扁平化：滚动条隐形（轨道透明、滑块常态极淡、悬停显形；5px 基准不变） */
+  *::-webkit-scrollbar-track{background:transparent}
+  *::-webkit-scrollbar-thumb{background:rgba(188,211,198,.25)}
+  *::-webkit-scrollbar-thumb:hover{background:rgba(188,211,198,.8)}
+  *::-webkit-scrollbar-corner{background:transparent}
+  /* [v322] 左右栏与中间区直接相接 + 卡片弱化 */
+  .side{border-right-color:transparent}
+  .right-props{border-left-color:transparent}
+  .result-head{border-bottom-color:transparent}
+  .card{border-color:var(--s-100)}
 </style>
 <link rel="stylesheet" href="runye-theme.css">
 <link rel="stylesheet" href="runye-nav.css?v=250">
@@ -126,7 +187,10 @@
             <label>滴头流量 q（L/h）</label><input id="pQdrip" type="number" value="1.38" step="0.01" min="0.1">
             <label>滴头间距（m）</label><input id="pSpacing" type="number" value="0.3" step="0.05" min="0.1">
             <label>滴灌带内径（mm）</label><input id="pTapeID" type="number" value="14.2" step="0.1" min="8">
-            <label>滴头工作压力（m）</label><input id="pDripHead" type="number" value="10" step="0.5" min="0">
+            <label>滴头额定压力（毛管模拟，m）</label><input id="pDripHead" type="number" value="10" step="0.5" min="0">
+            <label>流量指数 x（非补偿0.5/补偿0.15）</label><input id="pXExp" type="number" value="0.5" step="0.05" min="0.05" max="1">
+            <label>毛管坡度（上坡+/下坡− m/m）</label><input id="pSlope" type="number" value="0" step="0.001" min="-0.05" max="0.05">
+            <label>毛管长度（m，三级规划模式用）</label><input id="pTapeLen" type="number" value="80" step="5" min="10" max="200">
             <label>水源→田间高差（m）</label><input id="pElev" type="number" value="0" step="0.5">
             <label>首部损失（过滤施肥，m）</label><input id="pHeadLoss" type="number" value="3" step="0.5" min="0">
             <label>泵组效率 η（0~1）</label><input id="pEff" type="number" value="0.6" step="0.05" min="0.2" max="0.9">
@@ -137,19 +201,26 @@
           </div>
         </div>
         <button class="mbtn mbtn-primary" id="btnRun" style="margin-top:6px">▶ 读取并校核</button>
-        <div class="hint">参数只在本页使用，不回写布置数据；口径与主页三级水力计算同源（hc-core/design-core）。</div>
+        <div class="hint" id="paramHint">参数只在本页使用，不回写布置数据；口径与主页三级水力计算同源（hc-core/design-core）。</div>
       </section>
     </aside>
     <div class="result" id="result">
+      <div class="result-head">
+        <div><h1>水力校核</h1><p id="resultIntro">读取已布置管网，重建拓扑，逐段递推水损。</p></div>
+        <div class="result-badge" id="resultBadge">未运行</div>
+      </div>
+      <div class="result-body" id="resultBody">
       <div class="empty" id="emptyBox">
-        <b>水力校核 · v299</b><br>
+        <b>水力校核</b><br>
         自动读取在线地图/主页反投的已布置管网（总管→主管→支管→滴灌带），<br>
         重建树状拓扑 → 逐段流量递推 → 全链路水损 → 最不利路径 → 需求扬程与水泵选型。<br>
         点左侧 <b>「▶ 读取并校核」</b> 开始。
       </div>
       <div id="out" style="display:none">
-        <div class="warnbox" id="warnBox"></div>
-        <div class="sum-grid" id="sumGrid"></div>
+        <div class="overview">
+          <div><div class="warnbox" id="warnBox"></div><div class="sum-grid" id="sumGrid"></div></div>
+          <aside class="scope-card" id="checkScope"></aside>
+        </div>
         <h3 class="rt">拓扑与诊断</h3>
         <div class="pathline" id="treeLine"></div>
         <div class="pathline" id="diagLine"></div>
@@ -159,29 +230,67 @@
         <h3 class="rt">最不利路径（逐段累计）</h3>
         <div class="pathline" id="pathLine"></div>
         <h3 class="rt">水力管线图</h3>
+        <div class="section-note">白色流线表示供水方向；点击管段可定位下方明细行。颜色用于识别管段类别和异常状态。</div>
         <div class="hyd-map" id="hydDiagram" aria-label="水力管线图"></div>
         <h3 class="rt">逐段水力校核</h3>
         <div class="tblfreeze"><table id="segTable"></table></div>
         <h3 class="rt">滴灌带多孔出流（Christiansen 修正）</h3>
         <div class="tblfreeze"><table id="tapeTable"></table></div>
+        <h3 class="rt">代表毛管逐滴头模拟 · DU 估算</h3>
+        <div class="card" id="lateralCard">
+          <div class="du-grid">
+            <div>
+              <div style="font-size:11px;color:var(--s-500);line-height:1.6">
+                对最不利路径的<b>一条代表毛管</b>做逐滴头压力-流量耦合模拟：
+                每个滴头实际压力决定其出水量（q=k·P^x），迭代4轮收敛。
+                输出该毛管的 DU 估算与沿程压力曲线；它不替代全项目逐条毛管的均匀度校核。
+              </div>
+              <div class="sum-grid" id="latSum" style="margin-top:8px"></div>
+              <div id="latWarn" class="warnbox" style="margin-top:6px"></div>
+            </div>
+            <div id="latChart"></div>
+          </div>
+        </div>
         <h3 class="rt">建议管径（流速上限内选最小 PE 外径，Guyri 口径）</h3>
         <div class="tblfreeze"><table id="sugTable"></table></div>
         <h3 class="rt">EPANET 对照（epanet-js WASM）</h3>
-        <div class="card" style="max-width:860px">
-          <div style="font-size:11px;color:var(--s-500);line-height:1.6">
-            由本页拓扑自动生成 .inp（JUNCTIONS/PIPES/COORDINATES）；每条滴灌带的直接需求写入对应支管下游节点，
-            并把本页局部损失换算为 EPANET 管件损失系数。供水端使用需求扬程作为固定水头边界；泵曲线选型仍由润野主计算负责。
+        <div class="card">
+          <div class="epa-grid">
+            <div>
+              <div style="font-size:11px;color:var(--s-500);line-height:1.6">
+                由本页拓扑自动生成 .inp（JUNCTIONS/PIPES/COORDINATES）；末端灌水流量写入对应支管下游节点，
+                并把本页局部损失换算为 EPANET 管件损失系数。供水端使用需求扬程作为固定水头边界；泵曲线选型仍由润野主计算负责。
+              </div>
+              <div class="row2" style="margin-top:6px">
+                <button class="mbtn" id="btnCopyInp">复制 .inp 内容</button>
+                <button class="mbtn" id="btnDownInp">下载 .inp 文件</button>
+                <button class="mbtn" id="btnRunEpanet">▶ 运行 EPANET 对照</button>
+              </div>
+              <div id="epanetOut" style="font-size:11px;line-height:1.6;margin-top:6px"></div>
+            </div>
+            <pre class="inp" id="inpBox"></pre>
           </div>
-          <div class="row2" style="margin-top:6px">
-            <button class="mbtn" id="btnCopyInp">复制 .inp 内容</button>
-            <button class="mbtn" id="btnDownInp">下载 .inp 文件</button>
-            <button class="mbtn" id="btnRunEpanet">▶ 运行 EPANET 对照</button>
-          </div>
-          <pre class="inp" id="inpBox"></pre>
-          <div id="epanetOut" style="font-size:11px;line-height:1.6"></div>
         </div>
       </div>
+      </div><!-- /result-body -->
     </div>
+    <aside class="right-props" id="rightProps">
+      <div class="rp-tabs">
+        <div class="rp-tab active" data-rptab="asset">资产属性</div>
+        <div class="rp-tab" data-rptab="lateral">毛管模拟</div>
+      </div>
+      <div class="rp-body" id="rpBody">
+        <div class="rp-empty">点选图中任意管段<br>查看流量、流速、损失和压力</div>
+      </div>
+    </aside>
+  </div>
+  <div class="statusbar" id="statusbar">
+    <span>单位: m³/h</span>
+    <span>公式: Hazen-Williams</span>
+    <span id="stAssets">—</span>
+    <span class="sp"></span>
+    <span id="stStatus">就绪</span>
+    <span id="stWarn" style="display:none"></span>
   </div>
 </div>
 <script>
@@ -207,6 +316,9 @@
       dripSpacing: +$('pSpacing').value || 0.3,
       tapeID: +$('pTapeID').value || 14.2,
       dripHead: +$('pDripHead').value || 0,
+      xExp: +$('pXExp').value || 0.5,
+      slope: +$('pSlope').value || 0,
+      tapeLen: +$('pTapeLen').value || 80,
       elev: +$('pElev').value || 0,
       headLoss: +$('pHeadLoss').value || 0,
       pumpEff: Math.min(0.9, Math.max(0.2, +$('pEff').value || 0.6)),
@@ -223,8 +335,8 @@
       var c = JSON.parse(localStorage.getItem(CFG_KEY) || 'null');
       if (!c) return;
       var map = { pC: 'C', pCaliber: 'caliber', pLocal: 'localRatio', pQdrip: 'qDrip', pSpacing: 'dripSpacing',
-        pTapeID: 'tapeID', pDripHead: 'dripHead', pElev: 'elev', pHeadLoss: 'headLoss', pEff: 'pumpEff',
-        pVmax: 'vmax', pSnap: 'snapTol', pTapeSnap: 'tapeSnapTol' };
+        pTapeID: 'tapeID', pDripHead: 'dripHead', pXExp: 'xExp', pSlope: 'slope', pTapeLen: 'tapeLen', pElev: 'elev',
+        pHeadLoss: 'headLoss', pEff: 'pumpEff', pVmax: 'vmax', pSnap: 'snapTol', pTapeSnap: 'tapeSnapTol' };
       Object.keys(map).forEach(function (id) {
         if (c[map[id]] !== undefined) $(id).value = map[id] === 'localRatio' ? Math.round(c[map[id]] * 100) : c[map[id]];
       });
@@ -274,11 +386,25 @@
         new Date(net.ts).toLocaleString('zh-CN') + '</span></div>' : '');
   }
 
+  /* 三级规划快照已经带入提升高度、地形高差、首部损失和泵效；这些输入不应看起来还会
+     改变主计算。滴头参数保留给下方“代表毛管”模拟使用。 */
+  function syncParameterMode(isDesign) {
+    ['pElev', 'pHeadLoss', 'pEff', 'pSnap', 'pTapeSnap'].forEach(function (id) {
+      var el = $(id); if (!el) return;
+      el.disabled = !!isDesign;
+      el.classList.toggle('mode-lock', !!isDesign);
+    });
+    $('paramHint').innerHTML = isDesign
+      ? '<b>三级规划模式：</b>提升高度、地形高差、首部损失、泵效与管网几何已由三级规划锁定；可调整管材口径、局部损失、流速上限及代表毛管参数。'
+      : '参数只在本页使用，不回写布置数据；口径与主页三级水力计算同源（hc-core/design-core）。';
+  }
+
   /* ---------- 校核主流程 ---------- */
   function run() {
     var net = readNet();
     var design = readDesign();
     renderSrc();
+    syncParameterMode(!!(design && design.version === 1));
     var opts = readOpts();
     saveCfg();
     if ((!design || design.version !== 1) && (!net || net.needsReplan || !(net.segments || []).length)) {
@@ -315,13 +441,32 @@
   function renderAll(full) {
     /* 告警 */
     $('warnBox').textContent = full.warnings.length ? '⚠ ' + full.warnings.join('\n⚠ ') : '';
+    var isDesign = full.mode === 'design';
+    $('resultBadge').textContent = isDesign ? '三级规划最终数据' : '地图布置管网';
+    $('resultIntro').textContent = isDesign
+      ? '按三级规划的最终几何和设计流量校核输水管网；毛管均匀度在下方以代表毛管单独估算。'
+      : '从已布置的管网重建拓扑，校核逐段流量、流速、水损、最不利路径与泵组扬程。';
+    $('checkScope').innerHTML = isDesign
+      ? '<b>本次校核范围</b><span class="ok">已校核：总管、主管、支管至滴灌带入口。</span><br>提升高度、地形高差、首部损失和泵效取三级规划快照。<div class="limit">滴灌带带内损失不计入本页 TDH；下方仅对一条代表毛管给出 DU 估算。</div>'
+      : '<b>本次校核范围</b><span class="ok">已校核：总管、主管、支管及已挂接滴灌带。</span><br>流量由滴头流量、间距和实际滴灌带长度汇总得到。<div class="limit">未挂接、孤立或成环管段会明确列为告警，不参与最不利路径。</div>';
+    /* 底部状态栏 */
+    var overCount = full.segRows.filter(function(r){return r.over;}).length;
+    $('stAssets').textContent = '管段 ' + full.segRows.length + ' 段 / 滴灌带 ' + full.tapeRows.length + ' 条';
+    $('stStatus').innerHTML = '<span class="st-ok">✓ 计算完成</span>';
+    if (overCount > 0) {
+      $('stWarn').style.display = '';
+      $('stWarn').className = 'st-bad';
+      $('stWarn').textContent = '⚠ ' + overCount + ' 段流速超标';
+    } else {
+      $('stWarn').style.display = 'none';
+    }
     /* 汇总卡 */
     var worst = full.worst;
     $('sumGrid').innerHTML =
-      sumCard('系统总流量', f(full.qTotal, 3), ' m³/h = ' + f(full.qTotal * 3600, 0) + ' L/h') +
+      sumCard('系统总流量', f(full.qTotal, 3), ' m³/h = ' + f(full.qTotal * 1000, 0) + ' L/h') + /* [v320] m³/h→L/h ×1000（原 ×3600）*/
       sumCard('最不利路径损失', worst ? f(worst.loss, 2) : '—', ' m（含滴头压力）', worst && worst.loss > 999 ? 'err' : '') +
       sumCard('需求扬程 TDH', f(full.tdh, 2), full.mode === 'design' ? ' m（三级规划入口压力口径）' : ' m（+高差 ' + f(full.opts.elev, 1) + ' +首部 ' + f(full.opts.headLoss, 1) + '）') +
-      sumCard('轴功率 / 电机档', f(full.power, 2), ' kW → 选 ' + f(full.motorKw, 2) + ' kW（η=' + full.opts.pumpEff + '）');
+      sumCard('轴功率 / 电机档', f(full.power, 2), ' kW → 选 ' + f(full.motorKw, 2) + ' kW（η=' + f(full.pumpEffUsed || full.opts.pumpEff, 2) + '）');
     function sumCard(t, n, d, cls) {
       return '<div class="sum"><div class="t">' + esc(t) + '</div><div class="n ' + (cls || '') + '">' + esc(n) +
         '<small>' + esc(d) + '</small></div></div>';
@@ -380,6 +525,8 @@
     if (!full.tapeRows.length) h = '<tr><td class="l" style="text-align:center">' +
       (full.mode === 'design' ? '本次按三级规划的滴灌带入口压力校核，未计入滴灌带多孔出流。' : '布置中无滴灌带（dripTapes 为空）') + '</td></tr>';
     $('tapeTable').innerHTML = h;
+    /* ── 毛管逐滴头模拟（真实DU + 压力分布曲线） ── */
+    renderLateralSim(full);
     /* 建议管径 */
     var sg = full.mode === 'design' ? null : Core.suggestOD(lastNet, full.opts);
     h = '<tr><th class="l">段</th><th class="l">类别</th><th>流量 m³/h</th><th>现外径 mm</th><th>现合计损失 m</th>' +
@@ -395,6 +542,124 @@
     /* inp */
     $('inpBox').textContent = full.mode === 'design' ? Core.toInpDesign(full) : Core.toInp(full, lastNet);
     $('epanetOut').innerHTML = '';
+  }
+
+  /* ── 毛管逐滴头模拟：找最差毛管 → 跑模拟 → 出DU+曲线图 ── */
+  function renderLateralSim(full) {
+    var latSum = $('latSum'), latChart = $('latChart'), latWarn = $('latWarn');
+    if (!latSum || !latChart || !latWarn) return;
+
+    var o = full.opts;
+    var pInlet, tapeLen, tapeDesc;
+
+    if (full.mode === 'design') {
+      /* 三级规划模式：用设计数据里的毛管入口压力 + 用户填的毛管长度 */
+      var h = lastDesign && lastDesign.hydraulics;
+      if (!h || !h.tapePressureM) {
+        latSum.innerHTML = '<div class="sum"><div class="t">逐滴头模拟</div><div class="n" style="font-size:13px">设计数据中缺少毛管入口压力，无法模拟。</div></div>';
+        latChart.innerHTML = ''; latWarn.textContent = '';
+        return;
+      }
+      pInlet = +h.tapePressureM;
+      tapeLen = o.tapeLen || 80;
+      tapeDesc = '三级规划入口压力 ' + f(pInlet, 1) + ' m · 毛管长 ' + tapeLen + ' m';
+    } else {
+      /* 地图布置模式：找挂接损失最大的毛管 */
+      var worstTape = null;
+      full.tapeRows.forEach(function (t) {
+        if (t.attached && (!worstTape || t.hf > worstTape.hf)) worstTape = t;
+      });
+      if (!worstTape) {
+        latSum.innerHTML = '<div class="sum"><div class="t">逐滴头模拟</div><div class="n" style="font-size:13px">没有已挂接的滴灌带，无法模拟。</div></div>';
+        latChart.innerHTML = ''; latWarn.textContent = '';
+        return;
+      }
+      pInlet = o.dripHead + worstTape.hf;
+      tapeLen = worstTape.len;
+      tapeDesc = '最差毛管 #' + (worstTape.idx + 1) + ' · 长 ' + f(tapeLen, 1) + ' m · 入口压 ' + f(pInlet, 1) + ' m';
+    }
+
+    var sim = Core.simulateLateral({
+      tapeLen: tapeLen,
+      tapeID: o.tapeID,
+      spacing: o.dripSpacing,
+      qRef: o.qDrip,
+      pRef: o.dripHead || 10,
+      xExp: o.xExp || 0.5,
+      pInlet: pInlet,
+      C: o.C,
+      slope: o.slope || 0
+    });
+
+    /* DU 判定颜色 */
+    var duColor = sim.DU >= 90 ? 'var(--g-700)' : sim.DU >= 80 ? 'var(--a-600)' : 'var(--r-600)';
+    var duLabel = sim.DU >= 90 ? '优秀' : sim.DU >= 80 ? '合格' : '不合格';
+
+    /* 汇总卡 */
+    latSum.innerHTML =
+      '<div class="sum"><div class="t">真实 DU</div><div class="n" style="color:' + duColor + '">' +
+        f(sim.DU, 1) + '<small>% · ' + duLabel + '</small></div></div>' +
+      '<div class="sum"><div class="t">入口压力 / 末端压力</div><div class="n">' +
+        f(sim.pMax, 1) + ' / ' + f(sim.pMin, 1) + '<small>m</small></div></div>' +
+      '<div class="sum"><div class="t">滴头流量范围</div><div class="n">' +
+        f(sim.qMin, 2) + ' ~ ' + f(sim.qMax, 2) + '<small>L/h（均值 ' + f(sim.qAvg, 2) + '）</small></div></div>' +
+      '<div class="sum"><div class="t">最大毛管流速</div><div class="n" style="color:' + (sim.maxV > 2 ? 'var(--r-600)' : '') + '">' +
+        f(sim.maxV, 2) + '<small>m/s</small></div></div>';
+
+    /* 报警 */
+    latWarn.textContent = sim.warn.length ? '⚠ ' + sim.warn.join('\n⚠ ') : '';
+
+    /* 模拟条件说明 */
+    var descHtml = '<div style="font-size:11px;color:var(--s-500);margin:4px 0 2px">' + esc(tapeDesc) +
+      ' · ' + sim.N + ' 个滴头 · 流量指数 x=' + (o.xExp || 0.5) + (o.slope ? ' · 坡度 ' + (o.slope > 0 ? '+' : '') + o.slope : ' · 水平') + '</div>';
+
+    /* ── SVG 压力+流量曲线 ── */
+    var W = 820, H = 260, padL = 50, padR = 55, padT = 20, padB = 35;
+    var plotW = W - padL - padR, plotH = H - padT - padB;
+    var emitters = sim.emitters;
+    var maxDist = emitters[emitters.length - 1].dist;
+    var pMax = sim.pMax * 1.1;
+    var qMax = sim.qMax * 1.15;
+
+    function xPix(d) { return padL + (d / maxDist) * plotW; }
+    function yP(p) { return padT + plotH - (p / pMax) * plotH; }
+    function yQ(q) { return padT + plotH - (q / qMax) * plotH; }
+
+    /* 压力线（绿色）+ 流量线（蓝色） */
+    var pPts = emitters.map(function (e) { return xPix(e.dist).toFixed(1) + ',' + yP(e.pressure).toFixed(1); }).join(' ');
+    var qPts = emitters.map(function (e) { return xPix(e.dist).toFixed(1) + ',' + yQ(e.q).toFixed(1); }).join(' ');
+
+    /* 额定压力参考线 */
+    var pRefY = yP(sim.pMax - (sim.pMax - sim.pMin) * 0.3); /* 仅示意，不画死 */
+
+    var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%">' +
+      /* 网格 */
+      '<line x1="' + padL + '" y1="' + (padT + plotH) + '" x2="' + (W - padR) + '" y2="' + (padT + plotH) + '" stroke="#cbd5e1" stroke-width="1"/>' +
+      '<line x1="' + padL + '" y1="' + padT + '" x2="' + padL + '" y2="' + (padT + plotH) + '" stroke="#cbd5e1" stroke-width="1"/>' +
+      /* 压力线 */
+      '<polyline points="' + pPts + '" fill="none" stroke="#16a34a" stroke-width="2"/>' +
+      /* 流量线 */
+      '<polyline points="' + qPts + '" fill="none" stroke="#2563eb" stroke-width="1.8" stroke-dasharray="6 3"/>' +
+      /* X轴标签 */
+      '<text x="' + (padL + plotW / 2) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="11" fill="#64748b">距毛管入口距离 (m) — 共 ' + maxDist.toFixed(1) + ' m · ' + sim.N + ' 个滴头</text>' +
+      /* 左Y轴标签（压力） */
+      '<text x="14" y="12" font-size="10" fill="#16a34a">压力 m</text>' + /* [v316b] 轴标签提到顶部留白带，避开图例带与入口标注 */
+      /* 右Y轴标签（流量） */
+      '<text x="' + (W - padR + 6) + '" y="12" font-size="10" fill="#2563eb">L/h</text>' + /* [v316b] 同上 */
+      /* 入口标注 */
+      '<circle cx="' + xPix(0) + '" cy="' + yP(emitters[0].pressure) + '" r="3.5" fill="#16a34a"/>' +
+      '<text x="' + (xPix(0) + 8) + '" y="' + (yP(emitters[0].pressure) + 13) + '" font-size="10" fill="#16a34a">入口 ' + f(emitters[0].pressure, 1) + 'm</text>' +
+      /* 末端标注 */
+      '<circle cx="' + xPix(maxDist) + '" cy="' + yP(emitters[emitters.length - 1].pressure) + '" r="3.5" fill="#dc2626"/>' +
+      '<text x="' + (xPix(maxDist) - 6) + '" y="' + (yP(emitters[emitters.length - 1].pressure) + 16) + '" text-anchor="end" font-size="10" fill="#dc2626">末端 ' + f(emitters[emitters.length - 1].pressure, 1) + 'm</text>' +
+      /* 图例 */
+      '<rect x="' + (padL + 8) + '" y="' + (padT + 4) + '" width="12" height="2.5" fill="#16a34a"/>' +
+      '<text x="' + (padL + 24) + '" y="' + (padT + 7) + '" font-size="10" fill="#475569">压力分布</text>' +
+      '<line x1="' + (padL + 90) + '" y1="' + (padT + 5) + '" x2="' + (padL + 102) + '" y2="' + (padT + 5) + '" stroke="#2563eb" stroke-width="1.8" stroke-dasharray="4 2"/>' +
+      '<text x="' + (padL + 108) + '" y="' + (padT + 7) + '" font-size="10" fill="#475569">滴头流量</text>' +
+      '</svg>';
+
+    latChart.innerHTML = descHtml + '<div class="lat-chart-box">' + svg + '</div>'; /* [v316b] svg 包盒：flex 列内撑满剩余高、与左栏底对齐 */
   }
 
   function renderHydDiagram(full) {
@@ -423,7 +688,23 @@
         el.classList.add('selected');
         var r = full.segRows.filter(function (x) { return x.i === +el.getAttribute('data-hydi'); })[0];
         if (!r) return;
+        /* 更新浮动提示 */
         $('hydTip').innerHTML = '<b>' + esc(r.name) + '</b> · 流量 ' + f(r.Q, 3) + ' m³/h<br>流速 ' + f(r.v, 2) + ' m/s · 沿程 ' + f(r.hf, 3) + ' m · 本段合计 ' + f(r.htot, 3) + ' m';
+        /* 更新右侧属性面板 */
+        var kindName = r.kind === 'front' ? '总管' : r.kind === 'main' ? '主管' : '支管';
+        var vColor = r.over ? 'bad' : 'ok';
+        $('rpBody').innerHTML =
+          '<div class="rp-asset">' + esc(r.name) + '</div>' +
+          '<div class="rp-type">' + esc(kindName) + ' · ' + f(r.L, 1) + ' m</div>' +
+          '<table class="rp-table">' +
+          '<tr><td>外径 / 内径</td><td>' + f(r.od, 0) + ' / ' + f(r.idm, 1) + ' mm</td></tr>' +
+          '<tr><td>流量</td><td class="ok">' + f(r.Q, 3) + ' m³/h</td></tr>' +
+          '<tr><td>流速</td><td class="' + vColor + '">' + f(r.v, 2) + ' m/s' + (r.over ? ' ⚠' : '') + '</td></tr>' +
+          '<tr><td>沿程损失</td><td>' + f(r.hf, 3) + ' m</td></tr>' +
+          '<tr><td>局部损失</td><td>' + f(r.hloc, 3) + ' m</td></tr>' +
+          '<tr><td>本段合计</td><td>' + f(r.htot, 3) + ' m</td></tr>' +
+          '</table>' +
+          (r.over ? '<div class="rp-warn">⚠ 流速 ' + f(r.v, 2) + ' m/s 超过建议上限 ' + f(full.opts.vmax, 1) + ' m/s，建议放大管径。</div>' : '');
         var tr = document.querySelector('[data-hydrow="' + r.i + '"]');
         /* [v315 2026-10-08 用户要求] 跳转的同时给目标行上高亮闪烁——长表里
         「跳到了哪一行」要看得见；先清旧行，再 void offsetWidth 重启动画 */

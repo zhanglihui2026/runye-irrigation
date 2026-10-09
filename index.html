@@ -1401,7 +1401,7 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
 #areaTool .at-toast.show{opacity:1}
 #areaTool .at-sidebar::-webkit-scrollbar{width:5px}
 #areaTool .at-sidebar::-webkit-scrollbar-track{background:#f5f5f5}
-#areaTool .at-sidebar::-webkit-scrollbar-thumb{background:#ccc;border-radius:3px}
+#areaTool .at-sidebar::-webkit-scrollbar-thumb{background:rgba(188,211,198,.25);border-radius:3px}
 
 /* ===== 05 三级管路规划与施工简图（移至主页面，二级简图下方） ===== */
 #tlPipePlanSection{
@@ -4494,7 +4494,7 @@ body.ry-tool #tlPipePlanSection[data-ry-view="iso"][data-ry-clean="1"] > .pp-bod
 /* 滚动条最窄（2026-09-15 用户要求）：统计栏内 4px 细条 */
 /* v144：.tl-iso-stats 滚动条由全局 *::-webkit-scrollbar 统一（标准属性会让 webkit 伪元素失效） */
 .tl-iso-stats::-webkit-scrollbar{width:5px;height:5px}
-.tl-iso-stats::-webkit-scrollbar-thumb{background:#bfd3c6;border-radius:2px}
+.tl-iso-stats::-webkit-scrollbar-thumb{background:rgba(188,211,198,.25);border-radius:2px}
 .tl-iso-stats::-webkit-scrollbar-thumb:hover{background:#9db8a7}
 .tl-iso-stats::-webkit-scrollbar-track,.tl-iso-stats::-webkit-scrollbar-corner{background:transparent}
 /* 分区材料统计左右折叠（2026-09-15 用户要求）：收起 = 右缘窄条（标题竖排、箭头朝左），
@@ -5921,11 +5921,11 @@ body.ry-tool.ry-cad-vp #ryCadSide[data-ry-open="0"]{width:40px}
 *::-webkit-scrollbar{width:5px;height:5px}
 *::-webkit-scrollbar-track{background:transparent}
 *::-webkit-scrollbar-corner{background:transparent}
-*::-webkit-scrollbar-thumb{background:#c9d6ce;border-radius:3px}
+*::-webkit-scrollbar-thumb{background:rgba(188,211,198,.25);border-radius:3px}
 *::-webkit-scrollbar-thumb:hover{background:#9db4a8}
 #ryCadSide .ry-cad-grps::-webkit-scrollbar, .pp-side::-webkit-scrollbar{width:5px;height:5px}
 #ryCadSide .ry-cad-grps::-webkit-scrollbar-track, .pp-side::-webkit-scrollbar-track{background:transparent}
-#ryCadSide .ry-cad-grps::-webkit-scrollbar-thumb, .pp-side::-webkit-scrollbar-thumb{background:#c9d6ce;border-radius:2px}
+#ryCadSide .ry-cad-grps::-webkit-scrollbar-thumb, .pp-side::-webkit-scrollbar-thumb{background:rgba(188,211,198,.25);border-radius:2px}
 #ryCadSide .ry-cad-grps::-webkit-scrollbar-thumb:hover, .pp-side::-webkit-scrollbar-thumb:hover{background:#9db4a8}
 #ryCadSide[data-ry-open="0"] .ry-cad-grps{display:none}
 #ryCadSide .ry-cad-grp{border-bottom:1px solid #e4ede7}
@@ -6467,9 +6467,9 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     <!-- [v246 2026-10-06 用户要求] 「地块角度」与「重新分区」两个高频控件已搬到做图区
          左上角快捷条常驻（同一节点、同一 id，未复制第二份）。恢复：把快捷条里那两行
          搬回本处即可；两个控件本身一行代码都没改。 -->
-    <!-- v132（2026-09-23 用户要求）：分区旋转90° 移到「重新分区」下面（组内收尾）。
-         [v246 2026-10-06] 「重新分区」已搬到做图区左上角快捷条 ⇒ 本组现以「分区旋转90°」收尾。 -->
-    <button class="pp-btn-ghost" id="ppRotateZones">↻ 分区旋转90°</button>
+    <!-- v132/v246 见上；[v328 2026-10-09 用户要求] 「分区旋转90°」也搬到做图区快捷条
+         （重新分区与生成施工图之间，同一节点、同一 id，未复制第二份）。
+         恢复：把快捷条里 id="ppRotateZones" 那行搬回本处即可。 -->
     <!-- [v185 建 / v189 改语义 / v192 挪位 / v202 改按钮 2026-10-04] 地块划分开关（用户要求）：
          开启（默认）= 按左侧面板参数**自动划分**地块（画出分区线）；
          关闭 = 本块**不自动划分**（整块作为一个区参与面积/水力/材料计算）。
@@ -6546,7 +6546,11 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
         <input id="ppPlotAngle" type="number" value="0" min="-180" max="180" step="1">
         <span>°</span>
       </label>
+      <!-- [v325] AI 规划入口按钮 -->
+      <button class="pp-btn-ghost" id="ppAiPlan" title="带当前地块参数跳转 AI 助手，通过对话完成规划；规划结果回传本页应用">🤖 AI规划</button>
       <button class="pp-btn-ghost" id="ppRepartition" title="将当前旋转后的地块作为新基准重新切割分区">重新分区</button>
+      <!-- [v328 2026-10-09 用户要求] 右侧工具栏「分区旋转90°」搬到此处（同一节点、同一 id，未复制第二份；v132/v246 同模式） -->
+      <button class="pp-btn-ghost" id="ppRotateZones">↻ 分区旋转90°</button>
       <button class="pp-btn-generate" id="ppGenerate" title="汇总当前分区、管线与水力参数生成施工图（v248 起常驻本条）">生成施工图</button>
     </div>
 <button type="button" class="pp-rail-toggle pp-rail-tab" id="ppRailToggle" aria-expanded="false" title="展开工具栏">工具栏</button>
@@ -6966,7 +6970,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
         /* v124：头部（标题/管长/下拉/假设）锁定不动，只有中部表格区滚动；取消悬浮卡片，贴合右缘 */
         #tlEconPanel .te-mid{flex:1 1 auto;min-height:0;overflow:auto;padding-right:2px}
         #tlEconPanel .te-mid::-webkit-scrollbar{width:5px;height:5px}
-        #tlEconPanel .te-mid::-webkit-scrollbar-thumb{background:#bfd3c6;border-radius:2px}
+        #tlEconPanel .te-mid::-webkit-scrollbar-thumb{background:rgba(188,211,198,.25);border-radius:2px}
         #tlEconPanel .te-mid::-webkit-scrollbar-thumb:hover{background:#9db8a7}
         #tlEconPanel .te-mid::-webkit-scrollbar-track,#tlEconPanel .te-mid::-webkit-scrollbar-corner{background:transparent}
         #tlEconPanel .te-foot{flex:0 0 auto}
@@ -17130,11 +17134,11 @@ ppPullLiftDh();                                              // 首屏对齐一�
     ppRefreshMaterials();
   }
 
-  function ppRepartitionFromRotatedPlot(){
+  function ppRepartitionFromRotatedPlot(opts){ /* [v326] opts.aiApply=AI规划回传应用：跳过旋转角度校验（deg=0 旋转为恒等变换，重切流程复用；手动点击不受影响） */
     ppUnlockArea(); // 重新分区会改变各区面积，锁定态自动解除（任务K 2026-09-26）
     if(!ppState.polyPts.length){alert('请先在面积测量工具中描绘边界');return;}
     var deg=parseFloat(ppState.plotRotationDeg)||0;
-    if(!deg){alert('请先输入地块旋转角度，再点击重新分区');return;}
+    if(!deg&&!(opts&&opts.aiApply)){alert('请先输入地块旋转角度，再点击重新分区');return;} /* [v326] AI规划应用无需旋转角度 */
     if(ppHasPipeContent()&&!confirm('重新分区会清除当前绘制的管线、阀门和水源，是否继续？'))return;
     ppPushHistory();
     var _rotB=ppGetBounds();
@@ -17267,6 +17271,68 @@ ppPullLiftDh();                                              // 首屏对齐一�
   if(ppRepartitionBtn){
     ppRepartitionBtn.addEventListener('click',ppRepartitionFromRotatedPlot);
   }
+  /* ===== [v325 2026-10-09 用户要求] AI 规划闭环：带地块信息跳 AI 助手；回传结果提示应用 ===== */
+  (function ppAiPlanFlow(){
+    function snapshot(){
+      function g(id){var el=document.getElementById(id);return el?el.value:null;}
+      return {lift:g('planLift'),tapeLaySide:g('planTapeLaySide'),tapeSpacing:g('planTapeSpacing'),
+        emitterSpacing:g('planEmitterSpacing'),emitterFlow:g('planEmitterFlow'),
+        zoneMu:g('planZoneMuManual'),targetV:g('planTargetV'),tapePressure:g('planTapePressure'),zones:g('planN')};
+    }
+    var btn=document.getElementById('ppAiPlan');
+    if(btn)btn.addEventListener('click',function(){
+      try{localStorage.setItem('runye_ai_plan_v1',JSON.stringify({mode:'request',at:Date.now(),params:snapshot()}));}catch(e){}
+      /* [v327] 跳转前静默存档全量方案 + 写一次性锚：返回本页时恢复（页内手画/图片测量边界无地块库锚，v161 自动恢复不覆盖） */
+      try{if(typeof window.runyeSaveProject==='function')window.runyeSaveProject(true);}catch(e){}
+      try{localStorage.setItem('runye_aiplot_anchor_v1',JSON.stringify({at:Date.now()}));}catch(e){}
+      /* [v331b 2026-10-09 用户要求] AI规划同样走独立窗口（旧对话页已被智能规划工作台替代重定向）：
+         主窗口原地不动、地块分区手动规划不受影响；弹窗内 v327 锚自动恢复当前边界。 */
+      var _smartWin=window.open('index.html?smart=1#pipePlanSection','runye_smart','width=1180,height=860');
+      if(!_smartWin)location.href='index.html?smart=1#pipePlanSection';
+    });
+    function applyPlan(plan){
+      function set(id,v){var el=document.getElementById(id);
+        if(el&&v!==null&&v!==undefined&&isFinite(+v)){el.value=v;
+          el.dispatchEvent(new Event('change',{bubbles:true}));el.dispatchEvent(new Event('input',{bubbles:true}));}}
+      var p=plan.params||{};
+      set('planZoneMuManual',p.zoneMu);set('planTargetV',p.targetV);set('planTapePressure',p.tapePressure);
+      set('planTapeLaySide',p.tapeLaySide);set('planTapeSpacing',p.tapeSpacing);
+      set('planEmitterSpacing',p.emitterSpacing);set('planEmitterFlow',p.emitterFlow);set('planLift',p.lift);
+      try{var t3=document.getElementById('tlPlanTargetV');
+        if(t3&&p.targetV!==null&&p.targetV!==undefined&&isFinite(+p.targetV)){t3.value=p.targetV;t3.dispatchEvent(new Event('input',{bubbles:true}));}}catch(e){}
+      if(typeof ppRepartitionFromRotatedPlot==='function'){try{ppRepartitionFromRotatedPlot({aiApply:true});}catch(e){}} /* [v326] */
+    }
+    function checkPlan(){
+      var w=null;try{w=JSON.parse(localStorage.getItem('runye_ai_plan_v1')||'null');}catch(e){}
+      if(!w||w.mode!=='plan')return;
+      var btn2=document.getElementById('ppAiPlan');if(!btn2)return;
+      if(document.getElementById('ppAiPlanNotice'))return;
+      var p=w.params||{},desc=[];
+      if(p.zones!=null)desc.push('共 '+p.zones+' 区');
+      if(p.zoneMu!=null)desc.push('每区 '+p.zoneMu+' 亩');
+      if(p.tapePressure!=null)desc.push('入口压力 '+p.tapePressure+' bar');
+      if(p.targetV!=null)desc.push('目标流速 '+p.targetV+' m/s');
+      if(p.emitterFlow!=null)desc.push('滴头流量 '+p.emitterFlow+' L/h');
+      var bar=document.createElement('div');
+      bar.id='ppAiPlanNotice';
+      bar.style.cssText='position:absolute;top:44px;left:10px;z-index:4;background:#f0fdf4;border:1px solid #bbd8c6;color:#15803d;font-size:11.5px;padding:6px 10px;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.08);display:flex;gap:8px;align-items:center;white-space:nowrap';
+      bar.innerHTML='🤖 AI 规划：'+(desc.join('，')||'参数已更新')+
+        ' <button id="ppAiPlanApply" type="button" style="border:0;background:#15803d;color:#fff;border-radius:4px;padding:3px 10px;cursor:pointer;font-size:11px">应用并重新分区</button>'+
+        '<button id="ppAiPlanSkip" type="button" style="border:1px solid #cbd5e1;background:#fff;color:#64748b;border-radius:4px;padding:3px 8px;cursor:pointer;font-size:11px">忽略</button>';
+      var host=btn2.closest('.pp-canvas-wrap')||btn2.parentElement.parentElement;
+      host.appendChild(bar);
+      document.getElementById('ppAiPlanApply').onclick=function(){
+        applyPlan(w);
+        try{localStorage.setItem('runye_ai_plan_v1',JSON.stringify({mode:'applied',at:Date.now()}));}catch(e){}
+        bar.remove();};
+      document.getElementById('ppAiPlanSkip').onclick=function(){
+        try{localStorage.setItem('runye_ai_plan_v1',JSON.stringify({mode:'applied',at:Date.now()}));}catch(e){}
+        bar.remove();};
+    }
+    setTimeout(checkPlan,600);setTimeout(checkPlan,2500);setTimeout(checkPlan,6000);
+    window.addEventListener('storage',function(e){if(e.key==='runye_ai_plan_v1')checkPlan();});
+  })();
+
 
   /* ===== [v248 2026-10-06 用户要求] 快捷条(#ppQuickBar)整条可拖动：按住左侧抓手拖，
          位置存 localStorage('ppQuickBarPos')；恢复与拖动中都夹紧在画布范围内，
@@ -18825,8 +18891,35 @@ ppPullLiftDh();                                              // 首屏对齐一�
       try{ if(typeof atShowToast==='function') atShowToast('已恢复上次地块与划分'); }catch(e){}
     }catch(e){ try{ console.warn('[v161] auto restore skipped:',e&&e.message); }catch(_){} }
   }
-  if(document.readyState==='complete') setTimeout(ryAutoRestoreProject,0);
-  else window.addEventListener('load',function(){ setTimeout(ryAutoRestoreProject,0); });
+  /* [v327] AI规划往返恢复：点「AI规划」跳助手页前已静默存档（runyeSaveProject）+写一次性锚
+     （runye_aiplot_anchor_v1）。返回本页时消费锚，静默恢复快照——页内手画/图片测量的边界
+     没有 runye_current_plot_v1 锚，v161 自动恢复不覆盖，来回一趟就丢地块、无法重新划分。 */
+  function ryAiRestoreProject(){
+    var had=false;
+    try{had=!!localStorage.getItem('runye_aiplot_anchor_v1');}catch(e){}
+    if(!had)return;
+    try{localStorage.removeItem('runye_aiplot_anchor_v1');}catch(e){}
+    try{
+      if(window.__runyeAutoRestored)return;                 /* v161 已恢复 → 锚冗余 */
+      if(localStorage.getItem('runyeMeasuredArea'))return;  /* 地图回传优先 */
+      var raw=localStorage.getItem(SAVE_KEY);if(!raw)return;
+      var snap=null;try{snap=JSON.parse(raw);}catch(e){return;}
+      if(!snap||!Array.isArray(snap.measuredPolygon)||snap.measuredPolygon.length<3)return;
+      window.runyeLoadProject({key:SAVE_KEY,silent:true});
+      var _ryAlert0=window.alert;
+      try{
+        window.alert=function(){};
+        var _ryPoly=(typeof window.ppGetPolyPts==='function')?window.ppGetPolyPts():(window.measuredPolygon||[]);
+        if(_ryPoly&&_ryPoly.length>=3&&typeof window.ppGenerateDiagram==='function')window.ppGenerateDiagram({scroll:false});
+        if((window.measuredPolygon||[]).length>=3&&typeof tlAutoGenerate==='function')tlAutoGenerate({scroll:false,stay:true});
+      }catch(e){}finally{window.alert=_ryAlert0;}
+      try{if(typeof renderThreeLevel==='function')renderThreeLevel();}catch(e){}
+      try{if(typeof tlUpdatePlanBar==='function')tlUpdatePlanBar();}catch(e){}
+      try{if(typeof atShowToast==='function')atShowToast('已恢复跳转 AI 助手前的地块与划分');}catch(e){}
+    }catch(e){}
+  }
+  if(document.readyState==='complete') setTimeout(function(){ryAutoRestoreProject();ryAiRestoreProject();},0);
+  else window.addEventListener('load',function(){ setTimeout(function(){ryAutoRestoreProject();ryAiRestoreProject();},0); });
 
   /* 切页（含整页跳到「在线地图」）前留存当前完整状态 —— pagehide 是最后可靠时机。
      有它之后，用户「生成施工图」再切页也不会丢图面，无需在每个生成函数里插桩；
@@ -23971,6 +24064,18 @@ var ISO_FITTING_UI_OFF = true;
   #rySetModal .rs-nav{width:110px;flex:0 0 110px}
   #rySetModal .rs-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
+  /* [v322 2026-10-09 用户要求] 全站扁平化：滚动条隐形（轨道透明、滑块常态极淡、悬停显形；5px 基准不变） */
+  *::-webkit-scrollbar-track{background:transparent}
+  *::-webkit-scrollbar-thumb{background:rgba(188,211,198,.25)}
+  *::-webkit-scrollbar-thumb:hover{background:rgba(188,211,198,.8)}
+  *::-webkit-scrollbar-corner{background:transparent}
+  /* [v322] 栏线融合：左右工具栏与中间区直接相接（分界靠底色差） */
+  body.ry-tool #pipePlanSection .pp-side, body.ry-tool #tlPipePlanSection .pp-side{border-right-color:transparent}
+  body.ry-tool #areaTool .at-sidebar{border-right-color:transparent}
+  body.ry-tool #designInput .mw-col-right{border-left-color:transparent;border-right-color:transparent}
+  body.ry-tool #pipePlanSection #ppToolbar{border-left-color:transparent;border-right-color:transparent}
+  body.ry-tool #ryCadSide [data-pp="pipePlanSection"] .pp-side, body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-side{border-right-color:transparent}
+  body.ry-tool #ryCadSide [data-pp="pipePlanSection"] #ppToolbar{border-left-color:transparent;border-right-color:transparent}
 </style>
 <div id="rySetMask"></div>
 <div id="rySetModal" role="dialog" aria-modal="true" aria-label="设置">

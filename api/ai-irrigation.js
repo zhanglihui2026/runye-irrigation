@@ -31,20 +31,72 @@ const MAX_BODY_BYTES = 262144;                                                  
 /* 每用户5次：服务端身份、持久原子预占；没有线上内存回退。 */
 const FREE_LIMIT = 5;
 const quota = require('../lib/ai-quota.cjs');
+const crypto = require('node:crypto'); /* [v329] 注册访问码生成 */
 const schema = require('../runye-ai-plan.js');
 
 /* 在线大模型是会员功能。默认关闭：只有后台明确配置 AI_MEMBER_TOKENS 后，
    对应会员访问码才可越过此门槛；校验发生在额度预占和 DeepSeek 请求之前。 */
-function requireMember(req) {
+function requireMember(req, extraMembers) {
   let members;
   try { members = JSON.parse(process.env.AI_MEMBER_TOKENS || '{}'); }
   catch (e) { throw Object.assign(new Error('会员服务配置无效，在线 AI 规划已暂停。'), { code: 503 }); }
+  if (extraMembers && typeof extraMembers === 'object') {
+    for (const k in extraMembers) { if (!Object.prototype.hasOwnProperty.call(members, k)) members[k] = extraMembers[k]; } /* [v329] 合并云端自助注册会员 */
+  }
   const header = String(req.headers && req.headers.authorization || '');
   const token = header.indexOf('Bearer ') === 0 ? header.slice(7) : '';
   if (!token || !members || typeof members !== 'object' || !Object.prototype.hasOwnProperty.call(members, token)) {
-    throw Object.assign(new Error('在线 AI 规划为会员功能，请先注册会员并获取会员访问码。'), { code: 403 });
+    throw Object.assign(new Error('在线 AI 规划为会员功能，请先点面板「注册会员」开通并填写会员访问码。'), { code: 403 });
   }
   return members[token];
+}
+
+/* ===================== [v329] 会员自助注册 + 管理员不限次 =====================
+   注册：POST {action:'register'} → 随机访问码 + 稳定 userId 存 Redis 哈希
+   runye:ai:members:v1（code→userId）；测试模式（NODE_ENV=test 且 AI_QUOTA_TEST_MODE=1
+   且非 Vercel）走进程内存便于本地联调。AI_SELF_REGISTER=0 一键关闭自助注册；
+   名单上限 MEMBERS_CAP 防止灌水。访问码只回显一次，页面不落 localStorage。
+   管理员：env AI_MEMBER_TOKENS 里值加 'admin:' 前缀（如 {"xxx":"admin:boss"}），
+   或 env AI_ADMIN_USERS 列出用户编号（逗号分隔）→ 调用时跳过额度预占与扣减。 */
+const MEMBERS_KEY = 'runye:ai:members:v1', MEMBERS_CAP = 1000;
+let testMembers = {};
+async function redisCmd(...args) {
+  const url = process.env.UPSTASH_REDIS_REST_URL, token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token || !/^https:\/\//.test(url)) return null;
+  const r = await fetch(url, { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify(args), signal: AbortSignal.timeout(10000) });
+  const data = await r.json(); if (!r.ok || data.error) return null; return data.result;
+}
+async function getRedisMembers() {
+  try {
+    if (quota.testMode()) return testMembers;
+    const r = await redisCmd('HGETALL', MEMBERS_KEY);
+    if (!Array.isArray(r)) return {};
+    const m = {}; for (let i = 0; i + 1 < r.length; i += 2) m[String(r[i])] = String(r[i + 1]);
+    return m;
+  } catch (e) { return {}; }
+}
+async function registerMember(req, res) {
+  if (String(process.env.AI_SELF_REGISTER || '1') === '0') return reply(res, 403, 403, '自助注册已关闭，请联系作者开通会员。');
+  if (!quota.testMode()) {
+    const url = process.env.UPSTASH_REDIS_REST_URL, tk = process.env.UPSTASH_REDIS_REST_TOKEN;
+    if (!url || !tk || !/^https:\/\//.test(url)) return reply(res, 503, 503, '注册服务未配置（云端存储），暂无法自助注册，请联系作者开通。');
+  }
+  let cnt = null; try { cnt = await redisCmd('HLEN', MEMBERS_KEY); } catch (e) { cnt = null; }
+  if (cnt != null && cnt >= MEMBERS_CAP) return reply(res, 403, 403, '注册名额已满，请联系作者处理。');
+  const code = crypto.randomBytes(24).toString('hex'), userId = 'u' + crypto.randomBytes(12).toString('hex');
+  if (quota.testMode()) { testMembers[code] = userId; }
+  else { const w = await redisCmd('HSET', MEMBERS_KEY, code, userId); if (w == null) return reply(res, 503, 503, '注册写入失败，请稍后再试。'); }
+  return reply(res, 200, 0, '注册成功：会员访问码只显示这一次，请立即复制保存。', JSON.stringify({ access_code: code, free_limit: FREE_LIMIT }), { plan: 'member-code' });
+}
+
+/* [v330] 管理员登录验证：面板「管理员登录」用。校验 Bearer 码 → 返回身份与管理员标记。 */
+async function whoami(req, res) {
+  let memberExtra = null;
+  try { memberExtra = await getRedisMembers(); } catch (e) { memberExtra = null; }
+  let ident;
+  try { requireMember(req, memberExtra); ident = quota.identity(req, memberExtra); }
+  catch (e) { return reply(res, e.code || 401, e.code || 401, e.message); }
+  return reply(res, 200, 0, 'ok', JSON.stringify({ user_id: ident.userId, admin: ident.admin, free_limit: ident.admin ? null : FREE_LIMIT }), { quota_left: ident.admin ? '不限' : null });
 }
 /* ============================ 二、内置 System Prompt ============================ */
 const SYSTEM_PROMPT = [
@@ -260,6 +312,8 @@ module.exports = async function handler(req, res) {
       quota_configured: !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN),
       access_configured: !!process.env.AI_ACCESS_TOKENS,
       membership_configured: !!process.env.AI_MEMBER_TOKENS,
+      self_register: String(process.env.AI_SELF_REGISTER || '1') !== '0', /* [v329] 面板自助注册开关状态 */
+      admin_hint: 'AI_MEMBER_TOKENS 值加 admin: 前缀，或 AI_ADMIN_USERS 列出编号 → 该用户不限次', /* [v329] */
       free_limit: FREE_LIMIT, quota_store: '持久原子额度（未配置时暂停调用）'
     });
   }
@@ -268,14 +322,23 @@ module.exports = async function handler(req, res) {
   let body = await readBody(req);
   if (body && body.__tooBig) return reply(res, 413, 413, '请求体过大（上限 ' + MAX_BODY_BYTES + ' 字节），请简化地块顶点后重试。');
   if (!body || typeof body !== 'object' || Array.isArray(body)) return reply(res, 400, 400, '请求体必须是 JSON 对象：{ user_id, polygon, area, slope, user_text }。');
+  if (body.action === 'register') return registerMember(req, res); /* [v329] 会员自助注册（在会员校验/几何校验之前，无需访问码） */
+  if (body.action === 'whoami') return whoami(req, res); /* [v330] 管理员登录身份验证（无需几何校验） */
 
-  try { requireMember(req); }
+  let memberExtra = null;
+  try { memberExtra = await getRedisMembers(); } catch (e) { memberExtra = null; } /* [v329] 云端注册名单 */
+  try { requireMember(req, memberExtra); }
   catch (e) { return reply(res, e.code || 403, e.code || 403, e.message); }
   const geometryError = validateGeometry(body);
   if (geometryError) return reply(res,400,400,geometryError);
-  let reservation;
-  try { reservation = await quota.reserve(quota.identity(req)); }
-  catch(e) { return reply(res,e.code || 503,e.code || 503,e.message,null,{quota_left:e.code===429?0:null}); }
+  let reservation = null, ident = null;
+  try { ident = quota.identity(req, memberExtra); }
+  catch (e) { return reply(res, e.code || 503, e.code || 503, e.message); }
+  if (!ident.admin) {
+    try { reservation = await quota.reserve(ident.key); }
+    catch (e) { return reply(res, e.code || 503, e.code || 503, e.message, null, { quota_left: e.code === 429 ? 0 : null }); }
+  } /* [v329] 管理员不受5次限制：跳过额度预占与扣减 */
+  const qLeft = () => reservation ? reservation.left + 1 : '不限'; /* [v329] 管理员次数显示 */
   let settled=false;
   try {
   /* ---- 调大模型（超时 / 网络 / HTTP 错误在此全部捕获，不扣次数） ---- */
@@ -287,31 +350,31 @@ module.exports = async function handler(req, res) {
       { role: 'user', content: buildUserPrompt(body) }
     ]);
   } catch (e) {
-    return reply(res, e.http || 502, e.code || 502, e.message || '调用大模型失败。', null, { quota_left: reservation.left + 1 });
+    return reply(res, e.http || 502, e.code || 502, e.message || '调用大模型失败。', null, { quota_left: qLeft() });
   }
 
   /* ---- JSON 合法性校验（不合法不扣次数，并把原文片段回传便于排查） ---- */
   const jsonText = stripFences(content);
   if (!jsonText) {
-    return reply(res, 422, 422, '大模型返回内容为空，无法解析为 JSON。请重试一次。', null, { quota_left: reservation.left + 1, raw: String(content).slice(0, 300) });
+    return reply(res, 422, 422, '大模型返回内容为空，无法解析为 JSON。请重试一次。', null, { quota_left: qLeft(), raw: String(content).slice(0, 300) });
   }
   let plan = null;
   try { plan = JSON.parse(jsonText); }
   catch (e) {
-    return reply(res, 422, 422, '大模型返回的内容不是合法 JSON，已拒绝（本次不扣次数）：' + String(e && e.message || e) + '。请重试一次。', null, { quota_left: reservation.left + 1, raw: String(content).slice(0, 300) });
+    return reply(res, 422, 422, '大模型返回的内容不是合法 JSON，已拒绝（本次不扣次数）：' + String(e && e.message || e) + '。请重试一次。', null, { quota_left: qLeft(), raw: String(content).slice(0, 300) });
   }
   if (!plan || typeof plan !== 'object' || Array.isArray(plan)) {
-    return reply(res, 422, 422, '大模型返回的不是 JSON 对象（应为 { "version":1, "design":{...} }）。请重试一次。', null, { quota_left: reservation.left + 1, raw: String(content).slice(0, 300) });
+    return reply(res, 422, 422, '大模型返回的不是 JSON 对象（应为 { "version":1, "design":{...} }）。请重试一次。', null, { quota_left: qLeft(), raw: String(content).slice(0, 300) });
   }
 
   const checked=schema.validate(plan);
-  if(!checked.ok) return reply(res,422,422,'模型方案参数校验未通过，本次不扣次数：'+checked.msg,null,{quota_left:reservation.left+1});
+  if(!checked.ok) return reply(res,422,422,'模型方案参数校验未通过，本次不扣次数：'+checked.msg,null,{quota_left:qLeft()});
   checked.plan.plot.area_m2=body.area;
   settled=true; // 提交结果不确定时保留预占，不恢复额度以免超发。
-  const left=await quota.finish(reservation,true);
+  const left=reservation?await quota.finish(reservation,true):'不限'; /* [v329] 管理员不限次 */
   return reply(res,200,0,'ok',JSON.stringify(checked.plan),{quota_left:left,model:MODEL,elapsed_ms:Date.now()-t0,quota_store:'持久原子额度',request_id:body.request_id||null});
   } catch(e) { return reply(res,503,503,'额度提交暂不可用，请联系作者核查；未重复调用模型。'); }
-  finally { if(!settled) { try { await quota.finish(reservation,false); } catch(e) { /* 保留预占，人工核查 */ } } }
+  finally { if(!settled&&reservation) { try { await quota.finish(reservation,false); } catch(e) { /* 保留预占，人工核查 */ } } } /* [v329] 管理员无预占可还 */
 
 };
 module.exports.default = module.exports;

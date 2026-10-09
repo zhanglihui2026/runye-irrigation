@@ -23,6 +23,9 @@
   'use strict';
   /* 顶层常驻项（pre:1 = 注入到本页静态特有项之前） */
   var ITEMS = [
+    /* [v331 2026-10-09 用户要求] 智能规划改独立窗口：win:1 → 点击后主窗口原地不动（先静默存档
+       地块快照 + 写复原锚），弹出新窗口跑全屏对话；主窗口地块分区手动规划功能分毫不动。 */
+    { label: '智能规划', href: 'index.html?smart=1#pipePlanSection', win: 1, title: '独立窗口打开：AI 对话规划（主窗口地块分区不受影响）' },
     { label: '标准分区预设', hash: 'designInput',              pre: 1 },
     /* [v250 2026-10-06 用户要求] 在线地图 移到 地块绘制 之前 */
     { label: '在线地图',     href: 'runye-map-measure.html',   pre: 1 },
@@ -96,6 +99,16 @@
         navHref = 'runye-mobile-map-preview.html?v=242';
       }
       a.href = root + navHref;
+      /* [v331] 独立窗口项：preventDefault 后弹窗，主窗口原地不动；先存档快照+写锚（v327 恢复机制复用） */
+      if (it.win) {
+        a.addEventListener('click', function (e) {
+          e.preventDefault();
+          try { if (typeof global.runyeSaveProject === 'function') global.runyeSaveProject(true); } catch (err) { }
+          try { localStorage.setItem('runye_aiplot_anchor_v1', JSON.stringify({ at: Date.now(), src: 'smart-popup' })); } catch (err) { }
+          var w = global.open(a.href, 'runye_smart', 'width=1180,height=860');
+          if (!w) global.location.href = a.href; /* 弹窗被拦截 → 回退本页跳转（旧行为） */
+        });
+      }
       /* 当前页高亮：仅普通站内链接参与（锚点项由页面自有逻辑管理 active） */
       if (curFile() === navHref.split('#')[0]) a.classList.add('active');
     }

@@ -1,6 +1,6 @@
 /* Runye PWA v1. Increment VERSION when changing the offline shell. */
 'use strict';
-const VERSION = 'v315-hyd-table-freeze';
+const VERSION = 'v333-font-tiers-release';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
@@ -22,6 +22,7 @@ const CORE = [
   "runye-terrain.css",
   "runye-ai-plan.js",
   "runye-ai-plan.css",
+  "runye-ai-chat-test.html",
   "irrigation-bridge.js",
   "iso-diagram/editor.js",
   "iso-diagram/iso-diagram.css",

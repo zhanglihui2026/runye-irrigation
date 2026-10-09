@@ -152,7 +152,7 @@
   .pa-lib::-webkit-scrollbar,.pa-r-scroll::-webkit-scrollbar{width:4px;height:4px}
   .pa-lib::-webkit-scrollbar-track,.pa-r-scroll::-webkit-scrollbar-track,
   .pa-lib::-webkit-scrollbar-corner,.pa-r-scroll::-webkit-scrollbar-corner{background:transparent}
-  .pa-lib::-webkit-scrollbar-thumb,.pa-r-scroll::-webkit-scrollbar-thumb{background:#bfd3c6;border-radius:2px}
+  .pa-lib::-webkit-scrollbar-thumb,.pa-r-scroll::-webkit-scrollbar-thumb{background:rgba(188,211,198,.25);border-radius:2px}
   .pa-lib::-webkit-scrollbar-thumb:hover,.pa-r-scroll::-webkit-scrollbar-thumb:hover{background:#9db8a7}
   .pa-empty{color:var(--pa-sub);font-size:11.5px;text-align:center;padding:26px 10px;line-height:1.8;}
 
@@ -230,6 +230,14 @@
   .pa-menu-i.danger:hover{background:#fef2f2;}
   .pa-menu-sep{height:1px;background:var(--pa-line2);margin:8px 0 5px;}
   .pa-glyph{font-size:14px;font-weight:800;}
+  /* [v322 2026-10-09 用户要求] 全站扁平化：滚动条隐形（轨道透明、滑块常态极淡、悬停显形；5px 基准不变） */
+  *::-webkit-scrollbar-track{background:transparent}
+  *::-webkit-scrollbar-thumb{background:rgba(188,211,198,.25)}
+  *::-webkit-scrollbar-thumb:hover{background:rgba(188,211,198,.8)}
+  *::-webkit-scrollbar-corner{background:transparent}
+  /* [v322] 左右栏线融合 */
+  .pa-left{border-right-color:transparent}
+  .pa-right{border-left-color:transparent}
 </style>
 </head>
 <body>

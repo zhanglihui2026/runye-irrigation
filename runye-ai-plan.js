@@ -2,6 +2,23 @@
 (function (root) {
   'use strict';
   var MU_TO_SQM = 666.67;
+  var smartEntry = !!(root.location && /[?&]smart=1(?:&|$)/.test(root.location.search));
+  var conversation = [];
+  try { conversation = JSON.parse(root.sessionStorage.getItem('runye_ai_conversation_v1') || '[]'); } catch (e) {}
+  if (!Array.isArray(conversation)) conversation = [];
+  conversation = conversation.filter(function(m){return m && (m.role === 'user' || m.role === 'assistant') && typeof m.text === 'string';}).slice(-12);
+  function renderConversation() {
+    if (!panel) return;
+    var log = panel.querySelector('[data-ai=conversation]'); if (!log) return;
+    log.innerHTML = conversation.map(function(m){return '<div class="ai-chat-turn '+m.role+'"><b>'+ (m.role==='user'?'我的需求':'规划建议') +'</b><p>'+esc(m.text)+'</p></div>';}).join('');
+    log.scrollTop=log.scrollHeight;
+  }
+  function addConversation(role,text){
+    conversation.push({role:role,text:String(text).slice(0,5000)});conversation=conversation.slice(-12);
+    try{root.sessionStorage.setItem('runye_ai_conversation_v1',JSON.stringify(conversation));}catch(e){}
+    renderConversation();
+  }
+
   var SCHEMA_VERSION = 1;
   var STORE_KEY = 'runye_ai_plan_v1', PROVENANCE_KEY = 'runye_ai_plan_provenance_v1';
 
@@ -307,7 +324,7 @@
       return u;
     } catch (e) { return 'u_web_anonymous'; }
   }
-  function postPlan(url, payload, timeoutMs) {
+  function postPlan(url, payload, timeoutMs, tokenOverride) { /* [v330] 第4参：管理员登录用指定码验证 */
     return new Promise(function (resolve, reject) {
       if (typeof root.fetch !== 'function') { reject(new Error('当前浏览器不支持 fetch，请更新浏览器或改用离线流程')); return; }
       var ctrl = (typeof root.AbortController === 'function') ? new root.AbortController() : null;
@@ -315,7 +332,8 @@
         if (ctrl) { try { ctrl.abort(); } catch (e) { } }
         reject(new Error('请求超时（' + Math.round(timeoutMs / 1000) + ' 秒未返回）'));
       }, timeoutMs);
-      var init = { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization':'Bearer '+accessToken() }, body: JSON.stringify(payload) };
+      var tok = (tokenOverride === undefined) ? accessToken() : tokenOverride; /* [v330] */
+      var init = { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization':'Bearer '+tok }, body: JSON.stringify(payload) };
       if (ctrl) init.signal = ctrl.signal;
       root.fetch(url, init).then(function (r) {
         return r.text().then(function (t) {
@@ -525,7 +543,7 @@
       var ap=apply(plan,{rebuild:true});if(!ap.ok){setStatus(ap.msg,true);return;}
       try { root.localStorage.setItem(PROVENANCE_KEY, 'ai'); } catch (e) { }
       store.remark='模型建议（未作工程复算）：'+(plan.remark||'');store.risks=(plan.risks||[]).concat(ap.warnings||[]);persist();renderRemark();
-      var r=ap.summary;setStatus('已按原规则生成并复算。'+(r?'主管 Ø'+r.mainOD+' mm；支管 Ø'+r.branchOD+' mm；分区 '+r.zones+'；泵扬程 '+r.pumpHead.toFixed(1)+' m。':''));
+      var r=ap.summary;addConversation('assistant','方案已应用并完成复算。'+(r?'分区 '+r.zones+' 个，泵扬程 '+r.pumpHead.toFixed(1)+' m。':'')+'可以继续告诉我需要调整的地方。');setStatus('已按原规则生成并复算。'+(r?'主管 Ø'+r.mainOD+' mm；支管 Ø'+r.branchOD+' mm；分区 '+r.zones+'；泵扬程 '+r.pumpHead.toFixed(1)+' m。':''));
       var applied=fingerprint();slot.innerHTML='<button type="button" data-ai="undo">撤销本次应用</button>';
       slot.querySelector('[data-ai="undo"]').onclick=function(){if(fingerprint()!==applied){setStatus('应用后规划已有修改，为避免覆盖，请使用原页面的撤销操作。',true);return;}undoApply();slot.innerHTML='';setStatus('已恢复应用前的参数与管路。');};
     };
@@ -551,11 +569,16 @@
   function doOnline() {
     var btn = panel.querySelector('[data-ai="online"]');
     var reqEl = panel.querySelector('[data-ai="req"]');
-    var req = reqEl ? reqEl.value : '';
+    if (btn.disabled) return;
+    var req = reqEl ? reqEl.value.trim() : '';
+    if (!req) { setStatus('请先说出你的规划需求。', true); return; }
+    if (req.length > 5000) { setStatus('本次需求请控制在 5000 字以内。',true); return; }
     store.req = req; persist();
     var c = collect();
     if (!(c.area_m2 > 0)) { setStatus('尚未绘制地块：请先在画布上描绘地块边界并确认面积，再点在线生成。', true); return; }
     if(!panel.querySelector('[data-ai=access]').value.trim()){setStatus('在线 AI 规划为会员功能。请先注册会员并填写会员访问码；每位会员仍共5次。',true);return;}
+    var history = conversation.slice(-4).map(function(m){return {role:m.role,text:m.text.slice(0,800)};});
+    addConversation('user',req);
     var expected=fingerprint();
     var old = btn.textContent;
     btn.disabled = true; btn.textContent = '生成中…';
@@ -564,7 +587,7 @@
       user_id: uid(),
       polygon: c.poly, groups: c.groups, area: c.area_m2, mu: c.mu, slope: c.slope_percent,
       terrain_dh: c.terrain_dh, pump_lift: c.pump_lift, src_distance: c.src_distance, tape_pressure: c.tape_pressure,
-      terrain:c.terrain, conditions:c.conditions, cur: c.cur, user_text: req
+      terrain:c.terrain, conditions:c.conditions, cur: c.cur, user_text: (history.length ? '以下是此前对话，仅作需求上下文，以本次需求和当前地块为准：\n'+history.map(function(m){return (m.role==='user'?'用户：':'此前建议：')+m.text;}).join('\n')+'\n本次需求：' : '') + req
     };
     postPlan(apiBase(), payload, 180000).then(function (data) {
       btn.disabled = false; btn.textContent = old;
@@ -575,12 +598,74 @@
       var res = parse(typeof data.data === 'string' ? data.data : JSON.stringify(data.data));
       if (!res.ok) { setStatus('云端返回的方案校验未通过：' + res.msg, true); return; }
       if(expected!==fingerprint()){setStatus('生成期间地块或参数发生变化，返回方案未写入当前地块。请重新生成。',true);return;}
+      addConversation('assistant',(res.plan.remark || '已生成候选方案。')+'\n请核对下面的参数变化，确认后应用；系统会重新划分、生成管路并进行水力复算。');
       preview(res.plan,expected);
       if(typeof data.quota_left==='number')setStatus('已取得候选方案，尚未应用；本用户剩余 '+data.quota_left+' 次。');
 
     }).catch(function (err) {
       btn.disabled = false; btn.textContent = old;
       setStatus('连不上云端接口（' + ((err && err.message) || err) + '）。可改用「导出文本 → 本地 Python 脚本 → 导入 JSON」的离线流程。', true);
+    });
+  }
+  /* [v329 用户要求] 会员自助注册入口：面板内一键开通，成功后访问码自动填入（码只显示一次，提醒保存）。 */
+  function doRegister() {
+    var btn = panel.querySelector('[data-ai="reg"]');
+    var old = btn.textContent;
+    btn.disabled = true; btn.textContent = '注册中…';
+    setStatus('正在为你开通会员，请稍候…');
+    postPlan(apiBase(), { action: 'register', user_id: uid() }, 30000).then(function (data) {
+      btn.disabled = false; btn.textContent = old;
+      if (!data || data.code !== 0) { setStatus('注册失败：' + ((data && data.msg) || '未知错误'), true); return; }
+      var info = {};
+      try { info = JSON.parse(typeof data.data === 'string' ? data.data : '{}'); } catch (e) { }
+      var acc = panel.querySelector('[data-ai="access"]');
+      if (acc && info.access_code) acc.value = info.access_code;
+      setStatus('✅ 注册成功！会员访问码已自动填入，请复制保存：' + (info.access_code || '（未取到，请重试）') + '（每位会员共 5 次；码丢失无法找回，请联系作者重置。）');
+    }).catch(function (err) {
+      btn.disabled = false; btn.textContent = old;
+      setStatus('注册连不上云端接口（' + ((err && err.message) || err) + '）。', true);
+    });
+  }
+  /* [v330 用户要求] 管理员登录入口：内嵌表单贴管理访问码 → 云端 whoami 验证 → 徽标 + 不限次。
+     登录态存 sessionStorage（切页保持、关浏览器即清），不写 localStorage（访问码不落盘约定）。 */
+  var ADMIN_KEY = 'runye_ai_admin_code';
+  function setAdminUI(uidStr) {
+    var b = panel.querySelector('[data-ai="adminBtn"]'), bd = panel.querySelector('[data-ai="adminBadge"]');
+    if (!b) return;
+    if (panel.__adminIn) { b.textContent = '退出'; if (bd) bd.textContent = '🛡 管理员' + (uidStr ? ' ' + uidStr : '') + ' · 不限次'; }
+    else { b.textContent = '🛡 登录'; if (bd) bd.textContent = ''; }
+  }
+  function doAdminLogin() {
+    if (panel.__adminIn) {
+      panel.__adminIn = false;
+      try { sessionStorage.removeItem(ADMIN_KEY); } catch (e) { }
+      setAdminUI(null); setStatus('已退出管理员登录。'); return;
+    }
+    var slot = panel.querySelector('[data-ai="slot"]');
+    slot.innerHTML = '<div class="ai-block"><div class="ai-block-head"><span>管理员登录（粘贴管理访问码）</span>' +
+      '<span><button type="button" data-ai="alogin">登录</button><button type="button" data-ai="acancel">取消</button></span></div>' +
+      '<input type="password" class="ai-json" data-ai="acode" placeholder="管理员访问码（与会员码同形态，由作者配发）" style="width:100%;margin-top:4px"></div>';
+    slot.querySelector('[data-ai="acancel"]').onclick = function () { slot.innerHTML = ''; setStatus(''); };
+    slot.querySelector('[data-ai="alogin"]').onclick = doAdminVerify;
+    slot.querySelector('[data-ai="acode"]').focus();
+  }
+  function doAdminVerify() {
+    var code = String((panel.querySelector('[data-ai="acode"]') || {}).value || '').trim();
+    if (!code) { setStatus('请输入管理员访问码。', true); return; }
+    setStatus('正在验证管理员身份…');
+    postPlan(apiBase(), { action: 'whoami' }, 15000, code).then(function (data) {
+      var info = {};
+      try { info = JSON.parse(typeof data.data === 'string' ? data.data : '{}'); } catch (e) { }
+      if (!data || data.code !== 0) { setStatus('管理员登录失败：' + ((data && data.msg) || '未知错误'), true); return; }
+      if (!info.admin) { setStatus('该访问码不是管理员（普通会员仍受 5 次限制）。', true); return; }
+      panel.__adminIn = true;
+      var acc = panel.querySelector('[data-ai="access"]'); if (acc) acc.value = code;
+      try { sessionStorage.setItem(ADMIN_KEY, code); } catch (e) { }
+      panel.querySelector('[data-ai="slot"]').innerHTML = '';
+      setAdminUI(info.user_id || '');
+      setStatus('✅ 管理员已登录' + (info.user_id ? '（' + info.user_id + '）' : '') + '：在线 AI 规划不限次数。');
+    }).catch(function (err) {
+      setStatus('验证连不上云端接口（' + ((err && err.message) || err) + '）。', true);
     });
   }
   function buildPanel() {
@@ -597,20 +682,24 @@
       '<span class="ai-grip" data-grip title="左右拖动调节面板宽度（200~480px，自动记忆）">\u2194</span>' +
       '<span class="ai-caret" data-caret>\u25be</span></header>' +
       '<div class="ai-body">' +
-      '<label class="ai-label">灌溉需求描述</label>' +
+      '<div class="ai-conversation" data-ai="conversation" role="log" aria-live="polite"></div>' +
+      '<label class="ai-label">告诉我怎么规划（可继续补充或修改）</label>' +
       '<textarea class="ai-text" data-ai="req" rows="3" placeholder="描述你的灌溉设计需求，例如：辣椒地块，主管160PE，支管90PE，滴灌带间距0.7m..."></textarea>' +
       '<div class="ai-actions">' +
-      '<button type="button" data-ai="online">会员在线生成</button>' +
+      '<button type="button" data-ai="online">发送并生成方案</button>' +
       '<button type="button" data-ai="export">导出文本</button>' +
       '<button type="button" data-ai="import">导入JSON</button>' +
+      '<button type="button" data-ai="reg" title="自助开通会员：获取专属访问码并自动填入（每人5次；管理员不限次）">注册会员</button>' + /* [v329] */
+
       '</div>' +
       '<p class="ai-status" role="status" data-ai="status"></p>' +
       '<div class="ai-slot" data-ai="slot"></div>' +
       '<div class="ai-remark" data-ai="remark" hidden></div>' +
-      '<div class="ai-api"><label>会员访问码</label><input type="password" data-ai="access" autocomplete="off" placeholder="注册会员后获取；每会员共5次"></div>' +
+      '<div class="ai-api"><label>会员访问码</label><input type="password" data-ai="access" autocomplete="off" placeholder="点「注册会员」自助获取；每会员共5次"></div>' + /* [v329] */
+      '<div class="ai-api ai-admin"><label>管理员</label><button type="button" class="ai-admin-btn" data-ai="adminBtn" title="管理员用管理访问码登录；登录后在线 AI 规划不限次数">🛡 登录</button><span class="ai-admin-badge" data-ai="adminBadge"></span></div>' + /* [v330] */
       '<div class="ai-api"><label>接口</label>' +
       '<input type="text" data-ai="api" spellcheck="false" placeholder="云端接口地址（默认官方，一般不用改）"></div>' +
-      '<p class="ai-note">在线 AI 规划仅向已注册会员开放。网页把地块与需求发给云端函数，云端调大模型并把方案 JSON 发回来，网页不持密钥。' +
+      '<p class="ai-note">在线 AI 规划仅向已注册会员开放：没有访问码可点「注册会员」自助开通（每人 5 次，管理员不限次）。网页把地块与需求发给云端函数，云端调大模型并把方案 JSON 发回来，网页不持密钥。' + /* [v329] */
       '断网或次数用完时，可用「导出文本 → 本地脚本 → 导入JSON」的离线流程。</p>' +
       '</div>';
     /* [v279 2026-10-06 用户要求] ↕ 高度手柄撤掉：展开态改为「上下贴满」（导航下沿 → 状态栏上沿），
@@ -719,6 +808,21 @@
       vgrip.addEventListener('pointercancel', aiEndH);
     }
     panel.querySelector('[data-ai="online"]').onclick = doOnline;
+    panel.querySelector('[data-ai="reg"]').onclick = doRegister; /* [v329] 会员自助注册 */
+    panel.querySelector('[data-ai="adminBtn"]').onclick = doAdminLogin; /* [v330] 管理员登录 */
+    (function () { /* [v330] 会话内恢复管理员登录态：验证通过才亮徽标 */
+      var c = null; try { c = sessionStorage.getItem(ADMIN_KEY); } catch (e) { }
+      if (!c) return;
+      postPlan(apiBase(), { action: 'whoami' }, 15000, c).then(function (data) {
+        var info = {};
+        try { info = JSON.parse(typeof data.data === 'string' ? data.data : '{}'); } catch (e) { }
+        if (data && data.code === 0 && info.admin) {
+          panel.__adminIn = true;
+          var acc = panel.querySelector('[data-ai="access"]'); if (acc) acc.value = c;
+          setAdminUI(info.user_id || '');
+        } else { try { sessionStorage.removeItem(ADMIN_KEY); } catch (e) { } }
+      }).catch(function () { });
+    })();
     panel.querySelector('[data-ai="export"]').onclick = doExport;
     panel.querySelector('[data-ai="import"]').onclick = doImport;
     var apiIn = panel.querySelector('[data-ai="api"]');
@@ -776,8 +880,59 @@
       root.ryShowSection = function (sec) { var r = origShow.apply(this, arguments); setTimeout(syncSection, 0); return r; };
     }
     syncSection();
+    renderConversation();
+    var reqBox=panel.querySelector('[data-ai=req]');
+    reqBox.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();doOnline();}});
+    if (smartEntry) {
+      doc.body.classList.add('ry-smart-entry');
+      if(typeof root.ryShowSection==='function') root.ryShowSection(doc.getElementById('pipePlanSection'));
+      setCollapsed(false);syncSection();
+      panel.querySelector('.ai-title').textContent='智能规划';
+      var guide=doc.createElement('div');guide.className='ai-smart-guide';
+      guide.innerHTML='<b>说出需求，自动规划地块</b><p>① 在左侧确认地块边界　② 描述滴灌与分区要求　③ 检查方案并应用</p><p>例如：滴头 1.38 L/h，滴孔间距 0.3 m，带间距 0.8 m，单边长 60 m，每区流量不超过 80 m³/h。</p><a href="runye-map-measure.html">绘制或导入地块</a> · <a href="index.html#pipePlanSection">返回地块分区</a>';
+      panel.querySelector('.ai-body').prepend(guide);
+      installSmartWorkbench();
+    }
   }
   /* [v253] 左栏 .ai-open 触发按钮全部移除：悬浮面板本身就是常驻入口（可折叠/可拖走/可调宽） */
+  function installSmartWorkbench() {
+    var KEY='runye_smart_threads_v1', threads=[], active='';
+    try { var saved=JSON.parse(root.localStorage.getItem(KEY)||'null'); if(saved&&Array.isArray(saved.threads)){threads=saved.threads;active=saved.active;} } catch(e){}
+    threads=threads.filter(function(t){return t&&typeof t.id==='string'&&Array.isArray(t.messages);}).slice(0,30);
+    if(!threads.length){active=String(Date.now());threads=[{id:active,title:'新的规划',messages:conversation.slice(),updated:Date.now()}];}
+    if(!threads.some(function(t){return t.id===active;}))active=threads[0].id;
+    conversation=threads.filter(function(t){return t.id===active;})[0].messages.slice(-12);
+    var body=panel.querySelector('.ai-body'), log=panel.querySelector('[data-ai=conversation]'), req=panel.querySelector('[data-ai=req]');
+    var actions=panel.querySelector('.ai-actions'), status=panel.querySelector('[data-ai=status]'), slot=panel.querySelector('[data-ai=slot]'), remark=panel.querySelector('[data-ai=remark]');
+    var oldSettings=Array.prototype.slice.call(panel.querySelectorAll('.ai-api,.ai-note'));
+    var grid=doc.createElement('div');grid.className='smart-workbench';
+    grid.innerHTML='<aside class="smart-history"><div class="smart-brand">润野 · 智能规划</div><button class="smart-new" type="button">＋ 新建对话</button><div class="smart-label">历史对话 · 本机保存</div><div class="smart-thread-list"></div><a class="smart-back" href="index.html#pipePlanSection">返回地块分区 ↗</a></aside><section class="smart-center"><header class="smart-chat-head"><h2>把需求说出来，让规划更简单</h2><p>描述作物、滴灌参数和分区要求，生成方案后在右侧确认应用。</p></header><div class="smart-welcome"><b>今天想怎样规划地块？</b><p>例如：滴头流量 1.38 L/h，滴孔间距 0.3 m，带间距 0.8 m，单边长 60 m，每区流量不超过 80 m³/h。</p><button type="button" class="smart-example">填入这个示例</button></div><div class="smart-composer"><label>继续补充你的要求</label><div class="smart-compose-bottom"></div><details class="smart-settings"><summary>会员与连接设置</summary></details></div></section><aside class="smart-results"><header><h2>规划成果</h2><p>当前地块与待应用方案</p></header><div class="smart-result-scroll"><div class="smart-plot"></div><div class="smart-result-empty">还没有候选方案。发送需求后，参数变化及应用按钮会显示在这里。</div></div></aside>';
+    body.innerHTML='';body.appendChild(grid);
+    var center=grid.querySelector('.smart-center'), composer=grid.querySelector('.smart-composer');
+    center.insertBefore(log,composer);composer.insertBefore(req,composer.querySelector('.smart-compose-bottom'));
+    composer.querySelector('.smart-compose-bottom').appendChild(actions);composer.appendChild(status);
+    oldSettings.forEach(function(n){grid.querySelector('.smart-settings').appendChild(n);});
+    var results=grid.querySelector('.smart-result-scroll');results.appendChild(slot);results.appendChild(remark);
+    req.value='';req.placeholder='说说你的地块怎么种、想怎么分区…';req.rows=3;
+    panel.querySelector('[data-ai=online]').textContent='发送需求 ↑';
+    var header=panel.querySelector('[data-head]');header.style.display='none';
+    function pending(){return panel.querySelector('[data-ai=online]').disabled;}
+    function persistThreads(){try{root.localStorage.setItem(KEY,JSON.stringify({active:active,threads:threads}));root.sessionStorage.setItem('runye_ai_conversation_v1',JSON.stringify(conversation));}catch(e){status.textContent='本机存储空间不足，对话暂时只能保留在当前页面。';}}
+    function saveCurrent(){var t=threads.filter(function(t){return t.id===active;})[0];t.messages=conversation.slice(-12);t.updated=Date.now();var first=conversation.filter(function(m){return m.role==='user';})[0];if(first)t.title=first.text.slice(0,22);persistThreads();drawHistory();}
+    function drawHistory(){var list=grid.querySelector('.smart-thread-list');list.innerHTML='';threads.forEach(function(t){var b=doc.createElement('button');b.type='button';b.className='smart-thread'+(t.id===active?' selected':'');b.textContent=t.title||'新的规划';b.title=b.textContent;b.setAttribute('aria-pressed',String(t.id===active));b.onclick=function(){if(pending()){setStatus('当前方案正在生成，请完成后再切换对话。',true);return;}active=t.id;conversation=t.messages.slice(-12);req.value='';slot.innerHTML='';remark.hidden=true;setStatus('已切换对话。右侧显示当前地块；历史对话不会恢复旧地块或旧方案。');renderConversation();persistThreads();drawHistory();drawPlot();};list.appendChild(b);});grid.querySelector('.smart-welcome').hidden=conversation.length>0;}
+    function drawPlot(){var c=collect(), ring=c.poly||[], host=grid.querySelector('.smart-plot');
+      if(ring.length<3){host.innerHTML='<p>还没有地块边界，请先绘制或导入。</p><a href="runye-map-measure.html">绘制 / 导入地块 ↗</a>';return;}
+      var xs=ring.map(function(p){return p.x;}),ys=ring.map(function(p){return p.y;}),x=Math.min.apply(null,xs),y=Math.min.apply(null,ys),w=Math.max(1,Math.max.apply(null,xs)-x),h=Math.max(1,Math.max.apply(null,ys)-y),k=Math.min(300/w,170/h);
+      var points=ring.map(function(p){return (20+(p.x-x)*k).toFixed(2)+','+(20+(y+h-p.y)*k).toFixed(2);}).join(' ');
+      host.innerHTML='<div class="smart-area"><b>'+esc(Number(c.mu||0).toFixed(2))+'</b> 亩 <span>当前地块</span></div><svg viewBox="0 0 340 210" role="img" aria-label="当前地块边界"><polygon points="'+points+'" fill="#dff0e5" stroke="#15803d" stroke-width="2"/></svg><a href="index.html#pipePlanSection">查看分区及完整管路成果 ↗</a><p>此处显示当前地块边界；应用后的完整分区与管路可通过上方链接查看。</p>';
+      grid.querySelector('.smart-result-empty').hidden=!!slot.textContent.trim();
+    }
+    grid.querySelector('.smart-new').onclick=function(){if(pending()){setStatus('请等当前方案生成完成后再新建对话。',true);return;}saveCurrent();active=String(Date.now());threads.unshift({id:active,title:'新的规划',messages:[],updated:Date.now()});threads=threads.slice(0,30);conversation=[];req.value='';slot.innerHTML='';remark.hidden=true;setStatus('新对话已创建，继续使用当前地块。');renderConversation();persistThreads();drawHistory();drawPlot();req.focus();};
+    grid.querySelector('.smart-example').onclick=function(){req.value='滴头流量 1.38 L/h，滴孔间距 0.3 m，滴灌带间距 0.8 m，单边铺设长度 60 m，每区流量不超过 80 m³/h，请重新规划地块。';req.focus();};
+    if(root.MutationObserver){new root.MutationObserver(function(){saveCurrent();drawPlot();}).observe(log,{childList:true});new root.MutationObserver(drawPlot).observe(slot,{childList:true,subtree:true});}
+    renderConversation();drawHistory();drawPlot();
+  }
+
   function init() {
     buildPanel();
     refresh();

@@ -324,7 +324,7 @@
       var len = polylineLen(tape);
       var N = Math.max(0, Math.floor(len / o.dripSpacing));
       var q = N * o.qDrip;                             /* L/h */
-      var rec = { idx: ti, len: len, N: N, qLh: q, q: q / 3600, seg: -1, end: 0, dist: best.d, attached: false };
+      var rec = { idx: ti, len: len, N: N, qLh: q, q: q / 1000 /* [v320] L/h→m³/h 应 ÷1000（原 ÷3600 得 L/s，流量低 3.6 倍）*/, seg: -1, end: 0, dist: best.d, attached: false };
       if (best.seg >= 0 && best.d <= o.tapeSnapTol) { rec.seg = best.seg; rec.end = best.end; rec.attached = true; }
       else out.unattached.push(ti);
       out.tapes.push(rec);
@@ -364,7 +364,7 @@
         break;                                         /* 树中父段唯一 */
       }
     }
-    for (var f = 0; f < n; f++) Q[f] = qLh[f] / 3600;
+    for (var f = 0; f < n; f++) Q[f] = qLh[f] / 1000; /* [v320] L/h→m³/h ÷1000：hc.hazen(1.113e9)/velocity/泵 2.725e-3/EPANET demand 契约均为 m³/h；原 ÷3600 全链路低 3.6 倍 */
     return { Q: Q, qLh: qLh, tapesBySeg: tapesBySeg, zero: Q.map(function (q, i) { return q <= 0 ? i : -1; }).filter(function (i) { return i >= 0; }) };
   }
 
@@ -467,7 +467,7 @@
     if (qTotal <= 0 && !blockers.length) blockers.push('系统总流量为零，不能生成水力结果');
     return { valid: !blockers.length, blockers: blockers, opts: o, tree: tree, segRows: segRows, tapeRows: tapeRows, paths: paths,
       worst: worst, pathLoss: pathLoss, tdh: tdh, qTotal: qTotal, power: P,
-      motorKw: motorKw, warnings: warnings };
+      motorKw: motorKw, pumpEffUsed: o.pumpEff, warnings: warnings };
   }
 
   /* ---------------- 建议管径（逐段，Guyri 口径第一版） ---------------- */
@@ -697,14 +697,23 @@
     var baseHead = (+h.lift || 0) + (+h.dh || 0) + tapeHead + (+h.filterLoss || 0);
     var tdh = Math.max(baseHead + worstLoss, +h.pumpHead || 0);
     var qTotal = +h.combinedFlow || +h.zoneFlow || 0;
-    var power = qTotal > 0 ? 2.725e-3 * qTotal * tdh / ((+h.efficiency || 0.65)) : 0;
+    var pumpEffUsed = +h.efficiency || 0.65;
+    var power = qTotal > 0 ? 2.725e-3 * qTotal * tdh / pumpEffUsed : 0;
+    /* EPANET 将每根支管远端作为一个需水节点。只有这些节点流量之和与三级联合流量
+       一致时，两套结果才可作数值对照；不一致时仍允许导出，但必须醒目提示。 */
+    var epanetDemandTotal = rows.filter(function (r) { return r.kind === 'branch'; }).reduce(function (sum, r) { return sum + r.Q; }, 0);
+    var warnings = ['数据源：三级管路规划最终结果。仅校核总管、主管、支管至滴灌带入口；不计滴灌带多孔出流损失。'];
+    if (qTotal > 0 && epanetDemandTotal > 0 && Math.abs(epanetDemandTotal - qTotal) / qTotal > 0.02) {
+      warnings.push('EPANET 末端需水量合计 ' + epanetDemandTotal.toFixed(3) + ' m³/h，与三级联合流量 ' + qTotal.toFixed(3) +
+        ' m³/h 不一致；请回三级规划检查分区、轮灌组和支管数量后再将两套结果作数值对照。');
+    }
     var tree = { segs: rows.map(function (r) { return { id: r.sourceId, name: r.name, kind: r.kind }; }),
       nodes: [], order: rows.map(function (r) { return r.i; }), loops: [], orphans: [] };
     return { valid: true, mode: 'design', blockers: [], opts: o, tree: tree, segRows: rows, tapeRows: [],
       paths: [{ path: path, loss: worstLoss + tapeHead, tapeHf: 0 }],
       worst: { path: path, loss: worstLoss + tapeHead, tapeHf: 0 }, pathLoss: worstLoss,
-      tdh: tdh, qTotal: qTotal, power: power, motorKw: dc && dc.motor ? dc.motor(power) : 0,
-      warnings: ['数据源：三级管路规划最终结果。仅校核总管、主管、支管至滴灌带入口；不计滴灌带多孔出流损失。'] };
+      tdh: tdh, qTotal: qTotal, power: power, motorKw: dc && dc.motor ? dc.motor(power) : 0, pumpEffUsed: pumpEffUsed,
+      epanetDemandTotal: epanetDemandTotal, warnings: warnings };
   }
 
   /* 兜底 Christiansen（design-core 缺席时，公式同式） */
@@ -713,11 +722,132 @@
     return 1 / 2.852 + 1 / (2 * N) + Math.sqrt(0.852) / (6 * N * N);
   }
 
+  /* ============================================================
+     逐滴头毛管模拟（Per-emitter lateral simulation）
+     ── 输入 ──────────────────────────────────────────────────
+       tapeLen    毛管总长 m
+       tapeID     滴灌带内径 mm
+       spacing    滴头间距 m
+       qRef       滴头额定流量 L/h（在 P_ref 下）
+       pRef       额定压力 m（默认 10 m = 0.1 MPa）
+       xExp       流量指数（紊流非补偿≈0.5，压力补偿≈0.1~0.2）
+       pInlet     毛管入口压力 m（支管出口压力）
+       C          Hazen-Williams 系数
+       slope      毛管坡度（上坡=+m/m，下坡=−m/m；水平=0）
+     ── 输出 ──────────────────────────────────────────────────
+       emitters: [{dist, pressure, q, pipeQ, v}]  逐滴头
+       DU         分配均匀度 = 最低25%平均流量 / 整体平均流量
+       qMin/qMax/qAvg  滴头流量极值
+       pMin/pMax       压力极值
+       warn       超流速/低压等提示
+     ── 算法 ────────────────────────────────────────────────────
+       迭代3轮：先按均匀流量估压→按实际压力算各滴头流量→
+       按新流量重算管内流速与沿程损失→更新压力分布。
+     ============================================================ */
+  function simulateLateral(opts) {
+    var o = Object.assign({
+      tapeLen: 80, tapeID: 14.2, spacing: 0.3,
+      qRef: 1.38, pRef: 10, xExp: 0.5,
+      pInlet: 12, C: 150, slope: 0
+    }, opts || {});
+
+    var N = Math.max(2, Math.floor(o.tapeLen / o.spacing));
+    var s = o.spacing;
+    var idm = o.tapeID;
+
+    /* 每段（相邻两滴头之间）长度 = spacing；最后一段可能不足 */
+    var segLen = new Array(N);
+    for (var i = 0; i < N; i++) {
+      var d0 = i * s, d1 = Math.min((i + 1) * s, o.tapeLen);
+      segLen[i] = Math.max(0.1, d1 - d0);
+    }
+
+    /* 初始化：所有滴头按额定流量 */
+    var q = new Array(N);
+    for (var j = 0; j < N; j++) q[j] = o.qRef;
+
+    var emitters = [];
+    var DU = 0, qMin = 0, qMax = 0, qAvg = 0, pMin = 0, pMax = 0;
+    var warn = [];
+
+    for (var iter = 0; iter < 4; iter++) {
+      /* 从末端往入口累加管内流量：pipeQ[i] = 滴头 i 到末端的总流量（m³/h） */
+      var pipeQ = new Array(N);
+      pipeQ[N - 1] = q[N - 1];
+      for (var k = N - 2; k >= 0; k--) pipeQ[k] = pipeQ[k + 1] + q[k];
+      /* pipeQ 单位 L/h → m³/h */
+      for (var k2 = 0; k2 < N; k2++) pipeQ[k2] = pipeQ[k2] / 1000;
+
+      /* 从入口往末端推压力 */
+      var P = o.pInlet;
+      emitters = [];
+      var maxV = 0;
+      for (var m = 0; m < N; m++) {
+        var dist = m * s + segLen[m] / 2;
+        /* 该滴头处管内流速（m/s） */
+        var area = Math.PI * Math.pow(idm / 1000, 2) / 4;
+        var v = pipeQ[m] > 0 ? pipeQ[m] / 3600 / area : 0;
+        if (v > maxV) maxV = v;
+
+        /* 该滴头压力（当前位置） */
+        emitters.push({
+          dist: dist, pressure: P, q: q[m],
+          pipeQ: pipeQ[m], v: v
+        });
+
+        /* 算本段损失，推到下一个滴头 */
+        if (m < N - 1) {
+          var hf = hc.hazen(segLen[m], pipeQ[m], idm, o.C);
+          /* 坡度：上坡压力降低（重力），下坡压力升高 */
+          var dh_elev = o.slope * segLen[m];
+          P = P - hf - dh_elev;
+        }
+      }
+
+      /* 按新压力更新滴头流量 q = qRef * (P/PRef)^x */
+      for (var n = 0; n < N; n++) {
+        var pr = Math.max(0.5, emitters[n].pressure);
+        q[n] = o.qRef * Math.pow(pr / o.pRef, o.xExp);
+      }
+    }
+
+    /* 统计 */
+    var flows = emitters.map(function (e) { return e.q; });
+    var pressures = emitters.map(function (e) { return e.pressure; });
+    qAvg = flows.reduce(function (a, b) { return a + b; }, 0) / N;
+    qMin = Math.min.apply(null, flows);
+    qMax = Math.max.apply(null, flows);
+    pMin = Math.min.apply(null, pressures);
+    pMax = Math.max.apply(null, pressures);
+
+    /* DU = 最低25%滴头平均流量 / 整体平均流量 */
+    var sorted = flows.slice().sort(function (a, b) { return a - b; });
+    var lowCount = Math.max(1, Math.floor(N * 0.25));
+    var lowAvg = 0;
+    for (var li = 0; li < lowCount; li++) lowAvg += sorted[li];
+    lowAvg /= lowCount;
+    DU = qAvg > 0 ? (lowAvg / qAvg * 100) : 0;
+
+    /* 报警 */
+    if (maxV > 2.0) warn.push('毛管内最大流速 ' + maxV.toFixed(2) + ' m/s，超过 2.0 m/s 上限');
+    if (pMin < 5) warn.push('最远端滴头压力仅 ' + pMin.toFixed(1) + ' m，低于 5 m，滴头可能不工作');
+    if (DU < 80) warn.push('DU = ' + DU.toFixed(1) + '%，低于 80% 合格线，出水不均匀');
+
+    return {
+      N: N, spacing: s, emitters: emitters,
+      DU: DU, qMin: qMin, qMax: qMax, qAvg: qAvg,
+      pMin: pMin, pMax: pMax, maxV: maxV,
+      slope: o.slope, tapeLen: o.tapeLen, tapeID: o.tapeID,
+      warn: warn
+    };
+  }
+
   return {
     DEF: DEF, polylineLen: polylineLen, ptPolyDist: ptPolyDist,
     christiansenF: christiansenF,
     buildTree: buildTree, attachTapes: attachTapes, assignFlows: assignFlows,
     compute: compute, suggestOD: suggestOD, toInp: toInp, toInpDesign: toInpDesign, epanetNodeLabels: epanetNodeLabels,
-    mapOverlay: mapOverlay, computeDesign: computeDesign
+    mapOverlay: mapOverlay, computeDesign: computeDesign,
+    simulateLateral: simulateLateral
   };
 });

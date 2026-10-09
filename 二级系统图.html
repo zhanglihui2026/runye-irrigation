@@ -165,6 +165,13 @@ input[type="reset"],
 }
 /* ===== /RY-NAV ===== */
 
+  /* [v322 2026-10-09 用户要求] 全站扁平化：滚动条隐形（轨道透明、滑块常态极淡、悬停显形；5px 基准不变） */
+  *::-webkit-scrollbar-track{background:transparent}
+  *::-webkit-scrollbar-thumb{background:rgba(188,211,198,.25)}
+  *::-webkit-scrollbar-thumb:hover{background:rgba(188,211,198,.8)}
+  *::-webkit-scrollbar-corner{background:transparent}
+  /* [v322] 导航 tab 分隔线扁平化 */
+  .ry-nav .nav-link{border-right-color:transparent}
 </style>
   <link rel="stylesheet" href="runye-theme.css">
 </head>

@@ -32,7 +32,7 @@
      标准属性——两者并存会让 webkit 伪元素整条失效，实测回退 11px 标准条（第六十五轮） */
   .side::-webkit-scrollbar,.sr-list::-webkit-scrollbar{width:5px;height:5px}
   .side::-webkit-scrollbar-track,.sr-list::-webkit-scrollbar-track{background:transparent}
-  .side::-webkit-scrollbar-thumb,.sr-list::-webkit-scrollbar-thumb{background:#bfd3c6;border-radius:2px}
+  .side::-webkit-scrollbar-thumb,.sr-list::-webkit-scrollbar-thumb{background:rgba(188,211,198,.25);border-radius:2px}
   .side::-webkit-scrollbar-thumb:hover,.sr-list::-webkit-scrollbar-thumb:hover{background:#9db8a7}
   /* 左侧工具栏宽度拖拽条（2026-09-20）：拖动写 --mapSideW + localStorage 记忆，双击恢复默认；
      没拖过不写任何变量，默认宽度 250px 逐像素不变 */
@@ -161,6 +161,13 @@
    .mobile-menu-btn 及 @media(max-width:768px) 手机端规则）已一并删除。
    2026-09-13 起页面顶部改为「功能区导航 .fn-nav + 左侧工具栏 .side」结构。
    恢复原值：git show HEAD:runye-map-measure.html ===== */
+  /* [v322 2026-10-09 用户要求] 全站扁平化：滚动条隐形（轨道透明、滑块常态极淡、悬停显形；5px 基准不变） */
+  *::-webkit-scrollbar-track{background:transparent}
+  *::-webkit-scrollbar-thumb{background:rgba(188,211,198,.25)}
+  *::-webkit-scrollbar-thumb:hover{background:rgba(188,211,198,.8)}
+  *::-webkit-scrollbar-corner{background:transparent}
+  /* [v322] 左栏与画布直接相接 */
+  .side{border-right-color:transparent}
 </style>
 <link rel="stylesheet" href="runye-theme.css">
   <link rel="stylesheet" href="runye-nav.css?v=250">

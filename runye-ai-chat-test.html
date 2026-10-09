@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta http-equiv="refresh" content="0;url=index.html?smart=1#pipePlanSection">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>润野灌溉 · AI 协同规划</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;height:100vh;overflow:hidden;display:flex;flex-direction:column;background:#f5f5f5;color:#334155}
+
+/* ===== 顶栏 ===== */
+.topbar{height:44px;background:#fff;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;padding:0 14px;flex:none}
+.topbar .logo{font-weight:700;font-size:14px;color:#15803d}
+.topbar .file{font-size:12px;color:#64748b;background:#f1f5f9;padding:3px 10px;border-radius:4px;margin-left:12px}
+.topbar .sp{flex:1}
+.topbar .badge{font-size:10px;color:#15803d;background:#f0fdf4;border:1px solid #bbf7d0;padding:2px 8px;border-radius:10px}
+
+/* ===== 三栏主体 ===== */
+.main{flex:1;display:flex;overflow:hidden}
+
+/* 左工具栏 */
+.leftbar{width:60px;background:#fff;border-right:1px solid #e2e8f0;display:flex;flex-direction:column;align-items:center;padding:10px 0;gap:4px;flex:none}
+.tool{width:40px;height:40px;border:none;background:transparent;border-radius:8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:18px;color:#64748b;gap:2px}
+.tool small{font-size:8px;color:#94a3b8}
+.tool:hover{background:#f1f5f9}
+.tool.active{background:#dcfce7;color:#15803d}
+.tool.active small{color:#15803d}
+
+/* 中间对话区 */
+.chat-area{flex:1;display:flex;flex-direction:column;min-width:0;background:#fafaf9}
+.chat-msgs{flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:16px}
+.msg{display:flex;gap:10px;max-width:85%}
+.msg .avatar{width:32px;height:32px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:14px}
+.msg.ai .avatar{background:#15803d;color:#fff}
+.msg.user{flex-direction:row-reverse;margin-left:auto}
+.msg.user .avatar{background:#e2e8f0;color:#475569}
+.msg .bubble{padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.7}
+.msg.ai .bubble{background:#fff;border:1px solid #e2e8f0;border-top-left-radius:4px}
+.msg.user .bubble{background:#15803d;color:#fff;border-top-right-radius:4px}
+.msg .bubble b{font-weight:600}
+.msg .bubble .hl{color:#15803d;font-weight:600}
+.msg.user .bubble .hl{color:#bbf7d0}
+
+/* 快捷按钮 */
+.quick-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.quick{padding:5px 12px;border:1px solid #86efac;background:#f0fdf4;color:#15803d;border-radius:14px;font-size:11px;cursor:pointer}
+.quick:hover{background:#dcfce7}
+
+/* 输入框 */
+.chat-input{flex:none;padding:12px 20px;background:#fff;border-top:1px solid #e2e8f0}
+.chat-input .box{display:flex;gap:8px;align-items:flex-end;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:12px;padding:8px 12px}
+.chat-input textarea{flex:1;border:none;background:transparent;resize:none;font-size:13px;font-family:inherit;line-height:1.5;outline:none;max-height:100px;color:#334155}
+.chat-input .send{width:36px;height:36px;border:none;background:#15803d;color:#fff;border-radius:8px;cursor:pointer;font-size:16px;flex:none}
+.chat-input .send:hover{background:#16a34a}
+.chat-input .hint{font-size:10px;color:#94a3b8;margin-top:4px;text-align:center}
+
+/* 右侧成果区 */
+.rightbar{width:340px;background:#fff;border-left:1px solid #e2e8f0;display:flex;flex-direction:column;flex:none}
+.rb-header{padding:10px 14px;border-bottom:1px solid #e2e8f0;font-size:12px;font-weight:600;color:#475569;display:flex;align-items:center;justify-content:space-between}
+.rb-body{flex:1;overflow-y:auto;padding:12px}
+.rb-empty{color:#94a3b8;font-size:12px;text-align:center;padding:40px 10px;line-height:2}
+.card{border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin-bottom:10px}
+.card h4{font-size:11px;color:#64748b;margin-bottom:6px;letter-spacing:.5px}
+.card .big{font-size:22px;font-weight:700;color:#15803d}
+.card .big small{font-size:11px;font-weight:400;color:#94a3b8}
+.card .row{display:flex;justify-content:space-between;font-size:11px;padding:3px 0;color:#64748b}
+.card .row b{color:#334155}
+.card .row.warn{color:#d97706}
+.card .row.bad{color:#dc2626}
+.mini-chart{height:80px;background:#f8fafc;border-radius:6px;margin-top:6px;position:relative;overflow:hidden}
+.tag{display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;margin-right:4px}
+.tag-ok{background:#dcfce7;color:#15803d}
+.tag-warn{background:#fef3c7;color:#92400e}
+.tag-bad{background:#fee2e2;color:#dc2626}
+
+/* 底部状态栏 */
+.statusbar{height:26px;background:#fff;border-top:1px solid #e2e8f0;display:flex;align-items:center;padding:0 14px;font-size:10px;color:#94a3b8;gap:16px;flex:none}
+.statusbar .sp{flex:1}
+.statusbar .ok{color:#15803d}
+
+/* 打字中省略号 */
+.typing{display:inline-flex;gap:3px;padding:4px 0}
+.typing span{width:6px;height:6px;background:#94a3b8;border-radius:50%;animation:blink 1.2s infinite}
+.typing span:nth-child(2){animation-delay:.2s}
+.typing span:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,60%,100%{opacity:.3}30%{opacity:1}}
+
+/* 工作台化改版：保留演示逻辑，仅重构信息层级与响应布局。 */
+:root{--ink:#17352b;--muted:#6b7d76;--line:#dbe7df;--canvas:#edf3ef;--green:#16844b;--deep:#0f5132;--soft:#e9f7ee}
+body{background:var(--canvas);color:var(--ink)}
+.topbar{height:58px;padding:0 22px;background:rgba(255,255,255,.95);box-shadow:0 1px 0 rgba(15,81,50,.06)}.topbar .logo{font-size:16px;color:var(--deep);letter-spacing:.2px}.topbar .file{padding:5px 10px;background:var(--soft);color:#367556;border:0;margin-left:14px}.topbar .badge{font-size:11px;color:#627a6e;border-color:#cde8d6;background:#f5fbf7}
+.leftbar{width:224px;align-items:stretch;padding:16px 12px;background:#f9fcfa;border-color:var(--line);gap:3px}.workspace{padding:0 8px 14px;margin-bottom:4px;border-bottom:1px solid var(--line)}.workspace .eyebrow{display:block;color:#81958a;font-size:10px;letter-spacing:1px;margin-bottom:5px}.workspace b{display:block;font-size:13px;color:var(--ink)}.workspace span{display:block;color:var(--muted);font-size:11px;margin-top:5px;line-height:1.5}.tool{width:100%;height:42px;padding:0 10px;flex-direction:row;justify-content:flex-start;gap:10px;font-size:17px;border-radius:7px}.tool small{font-size:12px;color:#64748b}.tool.active{background:var(--soft);color:var(--green);box-shadow:inset 3px 0 0 var(--green)}.tool.active small{color:var(--deep);font-weight:700}.left-note{margin-top:auto;padding:10px;border:1px solid var(--line);border-radius:8px;background:#fff;font-size:10px;line-height:1.65;color:var(--muted)}
+.chat-area{background:var(--canvas)}.chat-head{padding:15px 24px 12px;background:rgba(255,255,255,.76);border-bottom:1px solid var(--line)}.chat-head .kicker{font-size:10px;letter-spacing:1px;color:var(--green);font-weight:700}.chat-head h1{font-size:16px;line-height:1.45;margin-top:2px;color:var(--ink)}.chat-head p{font-size:11px;line-height:1.55;color:var(--muted);margin-top:2px}.chat-msgs{padding:22px clamp(18px,4vw,52px);gap:18px}.msg{max-width:760px}.msg .avatar{width:30px;height:30px;font-size:13px;box-shadow:0 1px 2px rgba(15,23,42,.12)}.msg.ai .avatar{background:linear-gradient(135deg,#16844b,#0f6a3b)}.msg .bubble{padding:12px 14px;font-size:13px;line-height:1.8;box-shadow:0 1px 2px rgba(15,23,42,.04)}.msg.ai .bubble{border-color:var(--line)}.msg.user .bubble{background:var(--deep)}.quick{padding:6px 11px;border-color:#b9dfc5;background:#f4fbf6;color:#187243;font-size:11px}.chat-input{padding:12px clamp(18px,4vw,52px) 15px;background:rgba(255,255,255,.94);border-color:var(--line)}.chat-input .box{border-color:#c9dcd0;background:#f7faf8;border-radius:10px;padding:9px 10px}.chat-input .box:focus-within{border-color:#40a36b;box-shadow:0 0 0 3px rgba(22,132,75,.11)}.chat-input .send{background:var(--green);border-radius:7px}.chat-input .hint{text-align:left;padding-left:2px;color:#82948a}
+.rightbar{width:350px;background:#fbfdfb;border-color:var(--line)}.rb-header{padding:15px 16px 12px;color:var(--ink);font-size:13px}.rb-header small{display:block;color:var(--muted);font-size:10px;font-weight:400;margin-top:3px}.rb-body{padding:12px}.rb-empty{margin:26px 4px;border:1px dashed #c9ddd0;border-radius:10px;background:#fff;padding:28px 16px;color:var(--muted);font-size:11px}.card{border-color:var(--line);border-radius:9px;padding:12px;box-shadow:0 1px 2px rgba(15,23,42,.025)}.card h4{color:#527064;font-size:11px}.card .big{color:var(--deep)}.card .row{padding:4px 0}.statusbar{height:30px;padding:0 18px;background:#f9fcfa;border-color:var(--line);color:#71847a}.statusbar .ok{color:var(--green);font-weight:700}
+@media(max-width:1000px){.leftbar{width:66px;padding:12px 9px}.workspace,.left-note{display:none}.tool{justify-content:center;padding:0}.tool small{display:none}.rightbar{width:300px}}@media(max-width:760px){body{height:auto;min-height:100vh;overflow:auto}.main{min-height:calc(100vh - 88px)}.leftbar{display:none}.rightbar{display:none}.chat-msgs{min-height:55vh}.topbar .file{display:none}.chat-head{padding:13px 16px}.statusbar{display:none}.chat-input{position:sticky;bottom:0;padding:10px 14px}.msg{max-width:94%}}
+
+
+html,body{height:100%;height:100dvh;overflow:hidden;min-height:0}
+.main,.chat-area,.rightbar{min-height:0}.main{min-height:0;flex:1}
+.chat-msgs,.rb-body{min-height:0;overscroll-behavior:contain}
+.topbar,.chat-head,.chat-input,.rb-header,.statusbar{flex-shrink:0}
+.leftbar{width:68px;padding:10px 6px}.workspace,.left-note{display:none}.tool{height:54px;flex-direction:column;justify-content:center;gap:3px;padding:3px;text-decoration:none}.tool small{display:block;font-size:10px}
+.rightbar{width:clamp(330px,34vw,490px)}.msg{max-width:95%}.bubble{overflow-wrap:anywhere;min-width:0}.bubble.user-text{white-space:pre-wrap}
+.card table{width:100%;border-collapse:collapse;font-size:11px}.card th,.card td{padding:7px 4px;border-bottom:1px solid #e2e8f0;text-align:right}.card th:first-child,.card td:first-child{text-align:left}.card .scroll{overflow:auto;max-height:280px}.card p{font-size:11px;line-height:1.7;color:#64748b;margin:8px 0}.card h4{display:flex;justify-content:space-between}.card button,.result-toggle{border:1px solid #bbd8c6;border-radius:5px;background:#f0fdf4;color:#15803d;padding:5px 9px;cursor:pointer}.quick:focus-visible,a:focus-visible,button:focus-visible{outline:2px solid #15803d;outline-offset:2px}.result-toggle{display:none}.error{color:#dc2626}.note{color:#d97706}.chat-input textarea{min-height:42px}.fn-nav{flex:none;background:#fff;border-bottom:1px solid #dbe7df}.statusbar{height:28px}
+@media(max-width:760px){.topbar{height:48px;padding:0 12px}.topbar .badge{font-size:10px}.leftbar{display:none}.rightbar{display:none;position:absolute;z-index:20;right:0;top:85px;bottom:28px;width:min(94vw,430px);box-shadow:-8px 0 30px #17352b22}.rightbar.visible{display:flex}.result-toggle{display:block}.chat-msgs{min-height:0;padding:14px}.chat-input{position:static;padding:10px}.chat-head{padding:10px 14px}.chat-head h1{font-size:14px}.chat-head p{font-size:11px}.statusbar{display:flex;gap:6px;font-size:10px}.main{min-height:0}.msg{max-width:100%}}
+@media print{html,body{height:auto;overflow:visible;background:white}.topbar,.fn-nav,.leftbar,.chat-area,.statusbar,.rb-header button,.card button{display:none!important}.main,.rightbar,.rb-body{display:block!important;position:static;width:100%;height:auto;overflow:visible}.card{break-inside:avoid}.card .scroll{max-height:none;overflow:visible}.rb-header{font-size:20px}.card table{font-size:11px}}
+
+  /* [v322 2026-10-09 用户要求] 全站扁平化：滚动条隐形（轨道透明、滑块常态极淡、悬停显形；5px 基准不变） */
+  *::-webkit-scrollbar-track{background:transparent}
+  *::-webkit-scrollbar-thumb{background:rgba(188,211,198,.25)}
+  *::-webkit-scrollbar-thumb:hover{background:rgba(188,211,198,.8)}
+  *::-webkit-scrollbar-corner{background:transparent}
+  /* [v322] 左右栏线融合 */
+  .leftbar{border-right-color:transparent}
+  .rightbar{border-left-color:transparent}
+  /* [v324 2026-10-09 用户要求] AI 使用锁：注册/登录体系 UI */
+  .auth-bar{flex:none;display:flex;align-items:center;gap:8px;padding:6px 14px;background:#f0fdf4;border-bottom:1px solid #dbe7df;font-size:11px;color:#367556}
+  .auth-bar .sp{flex:1}
+  .ab-link{border:1px solid #bbd8c6;background:#fff;color:#15803d;border-radius:5px;padding:3px 10px;cursor:pointer;font-size:11px}
+  .ab-link:hover{background:#dcfce7}
+  .auth-mask{position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:99}
+  .auth-modal{width:330px;background:#fff;border-radius:10px;padding:16px;box-shadow:0 12px 40px rgba(0,0,0,.25);display:flex;flex-direction:column;gap:10px;max-height:80vh;overflow-y:auto}
+  .am-tabs{display:flex;align-items:center;gap:6px}
+  .am-tab{border:1px solid #e2e8f0;background:#f8fafc;color:#475569;border-radius:6px;padding:5px 14px;cursor:pointer;font-size:12px}
+  .am-tab.active{background:#15803d;border-color:#15803d;color:#fff}
+  .am-tabs .sp{flex:1}
+  .am-x{border:0;background:transparent;font-size:18px;color:#94a3b8;cursor:pointer;line-height:1}
+  .auth-modal label{font-size:11px;color:#64748b;display:flex;flex-direction:column;gap:4px}
+  .auth-modal input{height:30px;border:1px solid #dbe7df;border-radius:6px;padding:0 8px;font:inherit;font-size:13px}
+  .am-msg{font-size:11px;min-height:14px;color:#dc2626;white-space:pre-wrap}
+  .am-msg.ok{color:#15803d}
+  .am-go{height:34px;border:0;border-radius:6px;background:#15803d;color:#fff;font-size:13px;font-weight:600;cursor:pointer}
+  .am-go:hover{background:#166534}
+  .am-note{font-size:10px;color:#94a3b8;margin:0;line-height:1.6}
+  .um-tbl{width:100%;border-collapse:collapse;font-size:11px}
+  .um-tbl td,.um-tbl th{border-bottom:1px solid #f1f5f9;padding:5px 4px;text-align:left}
+  .um-del{border:1px solid #fecaca;background:#fef2f2;color:#dc2626;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:10px}
+</style>
+<link rel="stylesheet" href="runye-nav.css">
+</head>
+<body>
+
+<nav class="fn-nav" aria-label="功能导航"><div class="fn-inner" data-ry-fnnav data-base="index.html#"></div></nav>
+<main class="main">
+ <aside class="leftbar" aria-label="工具栏">
+  <a class="tool" href="runye-map-measure.html" title="在线地图">⌖<small>地图</small></a>
+  <a class="tool" href="runye-hydraulics.html" title="水力校核">⚡<small>校核</small></a>
+  <button class="tool active" aria-current="page" title="AI助手">✦<small>助手</small></button>
+  <button class="tool" data-say="出个报价" title="材料估价">▤<small>估价</small></button>
+  <button class="tool" data-say="导出PDF" title="打印报告">▧<small>报告</small></button>
+ </aside>
+ <section class="chat-area" aria-label="规划对话">
+    <div class="auth-bar" id="authBar"></div>
+<div class="chat-msgs" id="msgs" role="log" aria-live="polite"></div>
+  <form class="chat-input" id="composer"><div class="box"><textarea id="input" aria-label="输入种植条件或问题" rows="2" placeholder="例如：我种葡萄，帮我算一下"></textarea><button class="send" type="submit" aria-label="发送">↑</button></div><div class="hint">Enter 发送 · Shift+Enter 换行 · 本地规则识别与计算，不调用在线模型</div></form>
+ </section>
+ <aside class="rightbar" id="results" aria-label="方案成果"><header class="rb-header"><span>方案成果<small id="resultMeta">尚未计算</small></span><span id="rbCount">0 项</span></header><div class="rb-body" id="rbBody"><div class="rb-empty">计算后，这里会显示水力汇总、管材建议和滴灌带压力曲线。</div></div></aside>
+</main>
+<footer class="statusbar"><span id="cropStatus">通用滴灌参数</span><span class="sp"></span><span id="status">就绪</span></footer>  <div class="auth-mask" id="authMask" style="display:none">
+    <div class="auth-modal">
+      <div class="am-tabs"><button class="am-tab active" data-amt="login" type="button">登录</button><button class="am-tab" data-amt="reg" type="button">注册</button><span class="sp"></span><button class="am-x" id="authClose" type="button" aria-label="关闭">×</button></div>
+      <div class="am-msg" id="authMsg"></div>
+      <label>用户名<input id="authUser" autocomplete="username"></label>
+      <label>密码<input id="authPass" type="password" autocomplete="current-password"></label>
+      <label id="authPass2Row" style="display:none">确认密码<input id="authPass2" type="password" autocomplete="new-password"></label>
+      <button id="authGo" class="am-go" type="button">登录</button>
+      <p class="am-note">注册信息仅保存在本机浏览器，用于区分使用者与免费试用计数；管理员账号不受次数限制。</p>
+    </div>
+  </div>
+  <div class="auth-mask" id="userMask" style="display:none">
+    <div class="auth-modal">
+      <div class="am-tabs"><b style="font-size:13px;color:#334155">用户管理（管理员）</b><span class="sp"></span><button class="am-x" id="userClose" type="button" aria-label="关闭">×</button></div>
+      <div id="userList"></div>
+      <p class="am-note">管理员账号不受免费试用次数限制；内置账号 admin 初始密码 runye2026，请妥善保管。</p>
+    </div>
+  </div>
+
+<script src="hydraulic-calc/hc-core.js"></script><script src="hydraulic-calc/design-core.js"></script><script src="runye-hydraulics-core.js"></script><script src="runye-nav.js"></script>
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id), Core=window.RyHydCore;
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=(n,d=2)=>Number.isFinite(n)?n.toFixed(d):'—';
+const profiles={辣椒:{qRef:1.38,pRef:10},番茄:{qRef:2,pRef:10},葡萄:{qRef:4,pRef:15}};
+let crop='',profile={qRef:1.38,pRef:10},revision=0,last=null,busy=false;
+function read(key){try{return JSON.parse(localStorage.getItem(key)||'null');}catch(e){return null;}}
+function source(){const d=read('runye_hydraulic_design_v1'),n=read('runye_network_layout');return d&&d.version===1&&d.geometry&&d.hydraulics?{kind:'design',data:d}:n&&!n.needsReplan&&Array.isArray(n.segments)&&n.segments.length?{kind:'network',data:n}:null;}
+function signature(src){return JSON.stringify(src);}
+function options(){return Object.assign({},Core.DEF,{C:150,caliber:'sdr13.6',localRatio:.10,vmax:2,qDrip:profile.qRef,dripHead:profile.pRef,dripSpacing:.3,tapeID:14.2,xExp:.5,slope:0,tapeLen:80});}
+function message(text){const row=document.createElement('div');row.className='msg ai';row.innerHTML='<div class="avatar">🌾</div><div class="bubble"></div>';row.lastChild.textContent=text;row.lastChild.style.whiteSpace='pre-wrap';$('msgs').appendChild(row);$('msgs').scrollTop=$('msgs').scrollHeight;if(window.__histPush)window.__histPush('a',text);/* [v327] */}
+function card(id,title,html){$('rbBody').querySelector('.rb-empty')?.remove();let el=$(id);if(!el){el=document.createElement('article');el.className='card';el.id=id;$('rbBody').appendChild(el);}el.innerHTML='<h4>'+esc(title)+'</h4>'+html;$('rbCount').textContent=$('rbBody').querySelectorAll('.card').length+' 项';}
+function row(label,value){return '<div class="row"><span>'+esc(label)+'</span><b>'+esc(value)+'</b></div>';}
+function invalidate(reason){last=null;$('rbBody').innerHTML='<div class="rb-empty">'+esc(reason)+'</div>';$('rbCount').textContent='0 项';$('resultMeta').textContent='需要重新计算';}
+function ready(){if(!last){message('先说“帮我算一下”，我算出用水量和扬程后，再帮你选泵、估材料费。');return false;}if(last.rev!==revision||last.sig!==signature(source())){invalidate('管网或作物参数已变化，请重新计算。');message('管网或参数有更新，请先重新算一次，避免沿用旧结果。');return false;}return true;}
+function updateContext(){const src=source();const sn=$('sourceName');if(sn)sn.textContent=src?(src.kind==='design'?'三级规划最终数据':'地图布置管网'):'未找到管网';const ctx=$('context');if(ctx)ctx.textContent=src?'已读取本机保存的管网。计算结果与水力校核页使用同一核心。':'先到地图布置管网，或到管路规划生成管线图，再回来计算。'; /* [v321] chat-head 已按用户要求取消，context 节点不在时跳过 */}
+function simulation(full,src,o){let length=o.tapeLen,head;
+ if(src.kind==='design'){head=+src.data.hydraulics.tapePressureM;}else{const tape=full.tapeRows.filter(t=>t.attached).sort((a,b)=>b.hf-a.hf)[0];if(!tape)return null;length=tape.len;head=o.dripHead+tape.hf;}
+ if(!(head>0&&length>0&&length/o.dripSpacing<=20000))return null;
+ const s=Core.simulateLateral({tapeLen:length,tapeID:o.tapeID,spacing:o.dripSpacing,qRef:o.qDrip,pRef:o.dripHead,xExp:o.xExp,pInlet:head,C:o.C,slope:o.slope});
+ return s.emitters.every(e=>Number.isFinite(e.pressure)&&e.pressure>0)&&Number.isFinite(s.DU)?s:null;
+}
+function chart(s){if(!s)return '<p>没有足够的滴灌带数据，或压力异常，暂不显示均匀度。</p>';
+ const w=360,h=150,left=40,top=16,bottom=28,max=Math.max(1,s.pMax)*1.1,min=Math.min(0,s.pMin),range=max-min;
+ const points=s.emitters.filter((e,i)=>i%Math.max(1,Math.ceil(s.emitters.length/180))===0||i===s.emitters.length-1).map(e=>(left+e.dist/s.tapeLen*(w-left-12)).toFixed(2)+','+(top+(max-e.pressure)/range*(h-top-bottom)).toFixed(2)).join(' ');
+ return '<svg viewBox="0 0 360 150" role="img" aria-label="代表滴灌带沿程压力曲线"><path d="M40 16V122H348" fill="none" stroke="#94a3b8"/><polyline points="'+points+'" fill="none" stroke="#15803d" stroke-width="2"/><text x="3" y="13" font-size="10">压力 m</text><text x="4" y="32" font-size="10">'+fmt(max,1)+'</text><text x="23" y="124" font-size="10">0</text><text x="40" y="143" font-size="10">0 m</text><text x="292" y="143" font-size="10">'+fmt(s.tapeLen,1)+' m</text></svg><p>代表滴灌带 '+fmt(s.tapeLen,1)+' m；压力 '+fmt(s.pMin,1)+'～'+fmt(s.pMax,1)+' m；出水均匀度 DU '+fmt(s.DU,1)+'%。仅代表这一条带，非整块地实测值。</p>';
+}
+function calculate(){invalidate('正在计算…');const src=source();if(!src){updateContext();message('还没找到管网。请先到“地图”画管线，或到“管路规划”生成管线图，保存后再回来。');return;}
+ const o=options(),full=src.kind==='design'?Core.computeDesign(src.data,o):Core.compute(src.data,o);
+ if(!full.valid)throw new Error((full.blockers||['管网数据不完整']).join('；'));
+ if(src.kind==='network'&&full.tapeRows.some(t=>t.qLh>0&&Math.abs(t.q-t.qLh/1000)>1e-8))throw new Error('地图水力核心的流量单位换算尚有偏差，已停止输出错误结果。请先到管路规划生成最终管线图，再使用三级规划数据计算。');
+ if(![full.qTotal,full.tdh,full.power].every(Number.isFinite)||full.qTotal<=0||full.tdh<0||full.segRows.some(r=>![r.L,r.Q,r.v,r.htot,r.idm].every(Number.isFinite)||r.idm<=0))throw new Error('管径、长度或流量不完整，请到管路规划检查后重新生成。');
+ const sim=simulation(full,src,o),over=full.segRows.filter(r=>r.over).length;
+ last={full,src,sim,opts:o,sig:signature(src),rev:revision};
+ $('resultMeta').textContent=new Date().toLocaleTimeString('zh-CN')+' · '+(src.kind==='design'?'三级规划':'地图管网');
+ card('summaryCard','水力校核汇总','<div class="big">'+fmt(full.tdh)+' <small>m 需求扬程</small></div>'+row('每小时需水',fmt(full.qTotal)+' m³/h')+row('计算功率',fmt(full.power)+' kW')+row('电机参考档位',fmt(full.motorKw)+' kW')+row('流速偏快',over+' 段')+row('代表带均匀度 DU',sim?fmt(sim.DU,1)+'%':'暂不可算')+'<p>'+esc(src.kind==='design'?'沿用三级规划设计流量，计算到滴灌带入口；作物预设仅用于下方代表带模拟。':'滴灌带用水量按当前作物预设计算。')+'</p>');
+ const suggestions=src.kind==='network'?Core.suggestOD(src.data,o).rows:null;
+ card('pipeCard','逐段管材建议','<div class="scroll"><table><tr><th>管段</th><th>长度 m</th><th>现外径</th><th>建议</th></tr>'+full.segRows.map((r,i)=>'<tr><td>'+esc(r.name)+'</td><td>'+fmt(r.L,1)+'</td><td>'+fmt(r.od,0)+'</td><td>'+esc(suggestions&&suggestions[i]?('De'+suggestions[i].sugOd):r.over?'回规划页增大管径':'沿用 De'+fmt(r.od,0))+'</td></tr>').join('')+'</table></div><p>建议按流速筛选，修改管径后需要重新校核。</p>');
+ card('pressureCard','滴灌带压力曲线',chart(sim));
+ const warnings=(full.warnings||[]).concat(sim?sim.warn:[]);if(warnings.length)card('noticeCard','需要留意','<p>'+warnings.map(esc).join('<br>')+'</p>');
+ message('算好了：每小时需要 '+fmt(full.qTotal)+' 立方米水，所需扬程约 '+fmt(full.tdh)+' 米，计算功率 '+fmt(full.power)+' 千瓦，电机可参考 '+fmt(full.motorKw)+' 千瓦档。\n'+(over?'有 '+over+' 段管子流速偏快，请先处理。':'按当前参数没有发现流速超限。')+'\n'+(sim?'代表滴灌带的出水均匀度约 '+fmt(sim.DU,1)+'%。':'暂时不能可靠给出滴灌带均匀度。')+'\n'+(warnings.length?'还有 '+warnings.length+' 条计算范围或注意事项，请看方案面板。\n':'')+'要出材料估价吗？');
+ updateContext();
+}
+// Only quote known dimensions; unknown diameters and missing tape quantity stay unpriced.
+function quote(){if(!ready())return;const {full,src}=last,groups={};
+ const add=(name,qty,price,unit='m')=>{const key=name;groups[key]||(groups[key]={name,qty:0,price,unit});groups[key].qty+=qty;};
+ const lines=src.kind==='network'?(src.data.segments||[]).map(s=>({od:+s.dn,L:Core.polylineLen(s.latLng),kind:s.kind})):full.segRows;
+ lines.forEach(r=>add((r.kind==='front'?'总管':r.kind==='main'?'主管':'支管')+' De'+r.od,r.L,({90:13,110:18})[r.od]??null));
+ let tapeLength=null;if(src.kind==='network'&&Array.isArray(src.data.dripTapes)&&src.data.dripTapes.length)tapeLength=src.data.dripTapes.reduce((n,t)=>n+Core.polylineLen(t),0);
+ if(tapeLength!==null)add('滴灌带',tapeLength,3);add('水泵＋过滤＋施肥设备',1,6800,'套');
+ const items=Object.values(groups);if(items.some(x=>!Number.isFinite(x.qty)||x.qty<0))throw new Error('材料长度异常，无法估价。');
+ const total=items.reduce((n,x)=>n+(x.price===null?0:Math.round(x.qty*x.price*100)/100),0);const missing=items.some(x=>x.price===null)||tapeLength===null;
+ card('quoteCard','材料估价 · '+(missing?'部分小计':'已知材料合计'),'<div class="big">¥'+fmt(total)+'</div><div class="scroll"><table><tr><th>材料</th><th>数量</th><th>单价 ¥</th><th>金额 ¥</th></tr>'+items.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+fmt(x.qty,1)+esc(x.unit)+'</td><td>'+(x.price===null?'待询价':fmt(x.price))+'</td><td>'+(x.price===null?'未计入':fmt(Math.round(x.qty*x.price*100)/100))+'</td></tr>').join('')+'</table></div><p>'+(tapeLength===null?'缺少本方案滴灌带总长，未计入滴灌带费用。':'')+'除 De90、De110 外的规格暂无单价，列为待询价。设备按约 6800 元/套暂估，不代表实际选型报价；不含人工、运费、管件和损耗。均为用户提供的参考单价。</p>');
+ message('按已有长度和参考单价，'+(missing?'能计价的部分小计':'材料小计')+'约 '+fmt(total)+' 元。缺长度、缺单价的项目已标出，实际采购还要询价。要导出 PDF 吗？');
+}
+function pump(){if(!ready())return;const f=last.full;card('pumpCard','水泵选型参考',row('流量',fmt(f.qTotal)+' m³/h')+row('扬程',fmt(f.tdh)+' m')+row('计算功率',fmt(f.power)+' kW')+row('参考电机',fmt(f.motorKw)+' kW')+'<p>购买时请让厂家确认：该水泵在上述流量下能够达到所需扬程。</p>');message('选泵重点看：每小时 '+fmt(f.qTotal)+' 立方米流量时，扬程能达到 '+fmt(f.tdh)+' 米。电机参考 '+fmt(f.motorKw)+' 千瓦档，不能只看铭牌功率。要出材料估价吗？');}
+/* [v325 2026-10-09 用户要求] AI 规划意图解析：分区数/亩区/入口压力/目标流速/滴头流量/滴灌带间距 → 写回规划 */
+  function ppPlanIntent(text){var p={},hit=false,m;
+    m=text.match(/每区\s*([0-9.]+)\s*亩|([0-9.]+)\s*亩\s*\/?\s*区|按\s*([0-9.]+)\s*亩/);
+    if(m){p.zoneMu=+(m[1]||m[2]||m[3]);hit=true;}
+    m=text.match(/分\s*成?\s*([0-9]+)\s*个?\s*区|([0-9]+)\s*个区/);
+    if(m){p.zones=+(m[1]||m[2]);hit=true;}
+    m=text.match(/入口压力\s*(?:调到|改为|设为|设成|到)?\s*([0-9.]+)/);
+    if(m){p.tapePressure=+m[1];hit=true;}
+    m=text.match(/目标流速\s*(?:调到|改为|设为|设成|到)?\s*([0-9.]+)/);
+    if(m){p.targetV=+m[1];hit=true;}
+    m=text.match(/滴头流量\s*(?:调到|改为|设为|设成|到)?\s*([0-9.]+)/);
+    if(m){p.emitterFlow=+m[1];hit=true;}
+    m=text.match(/滴灌带间距\s*(?:调到|改为|设为|设成|到)?\s*([0-9.]+)/);
+    if(m){p.tapeSpacing=+m[1];hit=true;}
+    if(!hit)return false;
+    var cur=window.__aiParcel||{};
+    if(p.zones!=null&&p.zoneMu==null&&cur.zoneMu!=null&&+cur.zones>0){
+      p.zoneMu=+(cur.zoneMu*cur.zones/p.zones).toFixed(1);}
+    try{localStorage.setItem('runye_ai_plan_v1',JSON.stringify({mode:'plan',at:Date.now(),params:p,note:text}));}catch(e){}
+    var d=[];
+    if(p.zones!=null)d.push('共 '+p.zones+' 区');
+    if(p.zoneMu!=null)d.push('每区 '+p.zoneMu+' 亩');
+    if(p.tapePressure!=null)d.push('入口压力 '+p.tapePressure+' bar');
+    if(p.targetV!=null)d.push('目标流速 '+p.targetV+' m/s');
+    if(p.emitterFlow!=null)d.push('滴头流量 '+p.emitterFlow+' L/h');
+    if(p.tapeSpacing!=null)d.push('滴灌带间距 '+p.tapeSpacing+' m');
+    message('已生成地块规划：'+d.join('，')+'。\n回到顶部导航「地块分区」页，画布左上会出现「🤖 AI 规划」提示条，点「应用并重新分区」即可生效；管路规划自动沿用新分区。如需继续调整，直接继续说。');
+    return true;}
+
+  function respond(text){if(ppPlanIntent(text))return;const chosen=Object.keys(profiles).find(k=>text.includes(k));if(chosen){crop=chosen;profile={...profiles[chosen]};revision++;invalidate('已切换作物预设，请重新计算。');$('cropStatus').textContent=crop+' · '+profile.qRef+' L/h · '+profile.pRef+' m';message('已选 '+crop+' 滴灌预设：每个滴头每小时 '+profile.qRef+' 升，额定压力 '+profile.pRef+' 米。预设供试算，实际仍需核对滴灌带型号。');}
+ if(/喷灌/.test(text)){message('当前对话计算支持滴灌。喷灌需要喷头流量和布置模型，请到对应规划页面设置。');return;}
+ if(/PDF|pdf|导出|报告|打印/.test(text)){if(ready()){message('已打开打印窗口，在打印机中选择“另存为 PDF”，即可保存右侧当前成果。');window.print();}return;}
+ if(/报价|估价|材料|多少钱|清单/.test(text)){quote();return;}
+ if(/泵|功率|扬程/.test(text)&&!/算|校核/.test(text)){pump();return;}
+ if(/算|校核|计算|看看/.test(text)){calculate();return;}
+ if(/DU|du|均匀|压力曲线/.test(text)){if(ready())message(last.sim?'这条代表滴灌带的均匀度约 '+fmt(last.sim.DU,1)+'%，压力范围 '+fmt(last.sim.pMin,1)+'～'+fmt(last.sim.pMax,1)+' 米。请看右侧曲线。':'当前没有可用的代表带模拟结果。');return;}
+ if(!chosen)message('你可以说“我种辣椒”“帮我算一下”“泵要多大”“出个报价”或“导出 PDF”。当前按本地规则理解这些指令。');
+}
+function send(text){if(busy||!text.trim())return;if(!Auth.gate())return;busy=true;const d=document.createElement('div');d.className='msg user';d.innerHTML='<div class="avatar">我</div><div class="bubble user-text"></div>';d.lastChild.textContent=text;$('msgs').appendChild(d);if(window.__histPush)window.__histPush('u',text);/* [v327] */$('input').value='';$('status').textContent='计算中…';setTimeout(()=>{try{if(!Core)throw new Error('计算核心没有加载，请刷新后重试。');respond(text);}catch(e){invalidate('未生成有效结果');message('这次没能完成：'+e.message);}finally{busy=false;$('status').textContent='就绪';$('msgs').scrollTop=$('msgs').scrollHeight;}},30);}
+$('composer').addEventListener('submit',e=>{e.preventDefault();send($('input').value);});$('input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();send($('input').value);}});
+document.querySelectorAll('[data-say]').forEach(b=>b.addEventListener('click',()=>send(b.dataset.say)));
+const trEl=$('toggleResults');if(trEl)trEl.addEventListener('click',()=>{const on=$('results').classList.toggle('visible');trEl.setAttribute('aria-expanded',on);trEl.textContent=on?'关闭成果':'成果';}); /* [v323] topbar 已按用户要求取消，按钮不在时跳过 */
+/* [v324 2026-10-09 用户要求] AI 使用锁 + 注册/登录（纯前端 localStorage 软锁） */
+const Auth=(function(){
+  const KU='runye_users_v1',KS='runye_session_v1',KN='runye_ai_trial_v1',FREE=5,SALT='::runye-salt';
+  const hash=s=>{let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))>>>0;return 'h'+h.toString(36)+'_'+s.length;};
+  const read=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch(e){return null;}};
+  const write=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}};
+  const users=()=>{let w=read(KU);if(!w||!Array.isArray(w.users)){w={users:[{u:'admin',h:hash('runye2026'+SALT),role:'admin',t:'内置账号'}]};write(KU,w);}return w.users;};
+  const saveUsers=arr=>write(KU,{users:arr});
+  const me=()=>{const s=read(KS);if(!s)return null;return users().find(x=>x.u===s.u&&x.h===s.h)||null;};
+  const trial=()=>{const t=read(KN);return t&&typeof t.n==='number'?t.n:0;};
+  const isAdmin=()=>{const m=me();return !!m&&m.role==='admin';};
+  function setMode(mode){const m=$('authMsg');if(m){m.textContent='';m.className='am-msg';}
+    document.querySelectorAll('[data-amt]').forEach(b=>b.classList.toggle('active',b.dataset.amt===mode));
+    $('authPass2Row').style.display=mode==='reg'?'':'none';
+    $('authGo').textContent=mode==='reg'?'注册并登录':'登录';
+    $('authGo').dataset.mode=mode;}
+  function openModal(mode,note){const mask=$('authMask');if(!mask)return;setMode(mode||'login');
+    const m=$('authMsg');if(m&&note){m.textContent=note;}
+    $('authUser').value='';$('authPass').value='';$('authPass2').value='';
+    mask.style.display='flex';const u=$('authUser');if(u)u.focus();}
+  function closeModal(){const mask=$('authMask');if(mask)mask.style.display='none';}
+  function refreshBar(){const bar=$('authBar');if(!bar)return;
+    const m=me();
+    if(m){bar.innerHTML='<span>'+(m.role==='admin'?'🛡 管理员':'👤')+' '+esc(m.u)+'</span><span class="sp"></span>'
+      +(m.role==='admin'?'<button id="authUsers" class="ab-link" type="button">用户管理</button>':'')
+      +'<button id="authOut" class="ab-link" type="button">退出</button>';
+      const o=$('authOut');if(o)o.onclick=()=>{write(KS,null);refreshBar();message('已退出登录。');};
+      const um=$('authUsers');if(um)um.onclick=openUsers;
+    }else{const n=trial(),left=Math.max(0,FREE-n);
+      bar.innerHTML='<span>未登录 · 免费试用已用 '+n+'/'+FREE+' 条'+(left>0?'（剩 '+left+' 条）':'（已用完）')+'</span><span class="sp"></span><button id="authIn" class="ab-link" type="button">登录 / 注册</button>';
+      const i=$('authIn');if(i)i.onclick=()=>openModal('login',left>0?'':'免费试用已用完，请登录或注册后继续。');}}
+  function gate(){const m=me();
+    if(m)return true;
+    const n=trial();
+    if(n>=FREE){openModal('login','免费试用已用完（'+FREE+' 条）。登录或注册后可无限使用。');return false;}
+    write(KN,{n:n+1});refreshBar();return true;}
+  function go(){const mode=$('authGo').dataset.mode||'login';
+    const u=$('authUser').value.trim(),p=$('authPass').value;
+    const msg=$('authMsg');const err=t=>{msg.textContent=t;msg.className='am-msg';};
+    if(!/^[A-Za-z0-9_\u4e00-\u9fa5]{2,20}$/.test(u))return err('用户名 2~20 位，可用中文/字母/数字/下划线。');
+    if(p.length<6)return err('密码至少 6 位。');
+    let arr=users();
+    if(mode==='reg'){const p2=$('authPass2').value;
+      if(p!==p2)return err('两次输入的密码不一致。');
+      if(arr.some(x=>x.u===u))return err('该用户名已注册，请直接登录。');
+      arr.push({u:u,h:hash(p+SALT),role:'user',t:new Date().toLocaleDateString()});saveUsers(arr);
+      write(KS,{u:u,h:hash(p+SALT)});closeModal();refreshBar();message('注册成功，欢迎 '+u+'！已为你解锁全部使用。');return;}
+    const hit=arr.find(x=>x.u===u&&x.h===hash(p+SALT));
+    if(!hit)return err('用户名或密码不对。');
+    write(KS,{u:u,h:hit.h});closeModal();refreshBar();
+    message(hit.role==='admin'?'管理员 '+u+' 已登录，不受试用次数限制。':'欢迎回来，'+u+'！已登录，可无限使用。');}
+  function openUsers(){const mask=$('userMask');if(!mask)return;
+    const rows=users().map((x,i)=>'<tr><td>'+esc(x.u)+'</td><td>'+(x.role==='admin'?'管理员':'注册用户')+'</td><td>'+esc(x.t||'—')+'</td><td>'
+      +((x.role==='admin')?'—':'<button class="um-del" data-i="'+i+'" type="button">删除</button>')+'</td></tr>').join('');
+    const list=$('userList');
+    list.innerHTML='<table class="um-tbl"><tr><th>用户名</th><th>角色</th><th>注册</th><th>操作</th></tr>'+rows+'</table>';
+    list.querySelectorAll('.um-del').forEach(b=>b.onclick=()=>{const i=+b.dataset.i;const arr=users();
+      if(!arr[i]||arr[i].role==='admin')return;arr.splice(i,1);saveUsers(arr);openUsers();});
+    mask.style.display='flex';}
+  function init(){
+    const ac=$('authClose');if(ac)ac.onclick=closeModal;
+    const uc=$('userClose');if(uc)uc.onclick=()=>{const m=$('userMask');if(m)m.style.display='none';};
+    document.querySelectorAll('[data-amt]').forEach(b=>b.onclick=()=>setMode(b.dataset.amt));
+    const g=$('authGo');if(g)g.onclick=go;
+    [$('authPass'),$('authPass2'),$('authUser')].forEach(i=>{if(i)i.onkeydown=e=>{if(e.key==='Enter')go();};});
+    refreshBar();}
+  return {gate:gate,refreshBar:refreshBar,openModal:openModal,isAdmin:isAdmin,init:init,me:me};
+})();
+Auth.init();
+/* [v327 用户要求] 聊天记录持久化：切页（AI规划往返/刷新）不丢对话；同一轮 AI规划请求不重复播报 */
+(function(){var H='runye_ai_chat_hist_v1';
+ window.__histPush=function(r,t){try{var h=null;h=JSON.parse(localStorage.getItem(H)||'null')||{reqAt:null,msgs:[]};
+   h.msgs.push({r:r,t:String(t)});if(h.msgs.length>300)h.msgs=h.msgs.slice(-300);
+   localStorage.setItem(H,JSON.stringify(h));}catch(e){}};
+ window.__histReqAt=function(at){try{var h=null;h=JSON.parse(localStorage.getItem(H)||'null')||{reqAt:null,msgs:[]};h.reqAt=at;localStorage.setItem(H,JSON.stringify(h));}catch(e){}};
+ window.__histGetReqAt=function(){try{var h=JSON.parse(localStorage.getItem(H)||'null');return h?h.reqAt:null;}catch(e){return null;}};
+ window.__histHas=function(){try{var h=JSON.parse(localStorage.getItem(H)||'null');return !!(h&&h.msgs&&h.msgs.length);}catch(e){return false;}};/* [v327b] */
+ try{var h=JSON.parse(localStorage.getItem(H)||'null');
+   if(h&&Array.isArray(h.msgs)&&h.msgs.length){var box=document.getElementById('msgs');
+     h.msgs.forEach(function(m){var row=document.createElement('div');row.className='msg '+(m.r==='u'?'user':'ai');
+       row.innerHTML=m.r==='u'?'<div class="avatar">我</div><div class="bubble user-text"></div>':'<div class="avatar">🌾</div><div class="bubble"></div>';
+       row.lastChild.textContent=m.t;row.lastChild.style.whiteSpace='pre-wrap';box.appendChild(row);});
+     box.scrollTop=box.scrollHeight;}}catch(e){}})();
+/* [v325 2026-10-09 用户要求] 读取地块分区页带来的地块信息（AI规划入口） */
+(function(){var w=null;try{w=JSON.parse(localStorage.getItem('runye_ai_plan_v1')||'null');}catch(e){}
+ if(w&&w.mode==='request'&&w.params){window.__aiParcel=w.params;
+   var p=w.params,d=[];
+   if(p.lift!=null)d.push('水泵提升高度 '+p.lift+' m');
+   if(p.zoneMu!=null)d.push('分区划定 '+p.zoneMu+' 亩/区');
+   if(p.zones!=null)d.push('当前 '+p.zones+' 区');
+   if(p.tapeSpacing!=null)d.push('滴灌带间距 '+p.tapeSpacing+' m');
+   if(p.emitterSpacing!=null)d.push('滴孔间距 '+p.emitterSpacing+' m');
+   if(p.emitterFlow!=null)d.push('滴头流量 '+p.emitterFlow+' L/h');
+   if(p.tapeLaySide!=null)d.push('单边铺设长度 '+p.tapeLaySide+' m');
+   if(p.targetV!=null)d.push('目标流速 '+p.targetV+' m/s');
+   if(p.tapePressure!=null)d.push('入口压力 '+p.tapePressure+' bar');
+   setTimeout(function(){if(window.__histGetReqAt&&window.__histGetReqAt()===w.at)return;message('已读取地块分区的当前参数：\n· '+d.join('\n· ')+'\n\n直接告诉我怎么规划，例如：「分成 12 个区」「每区 15 亩」「入口压力调到 1.2 bar」「目标流速 1.2」，也可以一句话说全。定好后回「地块分区」页点「应用并重新分区」即可生效，管路规划会自动沿用。');if(window.__histReqAt)window.__histReqAt(w.at);},400);}})();/* [v327] */
+
+
+window.addEventListener('storage',e=>{if(['runye_network_layout','runye_hydraulic_design_v1'].includes(e.key)){invalidate('管网已更新，请重新计算。');updateContext();}});
+updateContext();if(!(window.__histHas&&window.__histHas()))message('你好！我会读取你保存的管网，用润野计算核心帮你试算。可以先说作物名称，也可以直接说“帮我算一下”。默认每个滴头 1.38 L/h、间距 0.3 m。');/* [v327b] */
+})();
+
+</script>
+</body>
+</html>
