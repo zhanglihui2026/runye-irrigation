@@ -183,3 +183,9 @@ body.ry-smart-entry .ai-panel{z-index:10000!important}
 .smart-nav a[href="index.html#areaTool"]{display:none}
 .smart-nav-more{display:none}
 .smart-workbench .smart-chat-head,.smart-workbench .smart-results>header{display:block;cursor:default}
+
+/* [v348] 规划成果缩略图：AI 应用成功后自动截二级简图进右栏（11px=辅助档） */
+.smart-plan-thumb{margin:0 0 14px;border:1px solid #d3ded7;border-radius:6px;background:#fff;overflow:hidden}
+.smart-plan-thumb[hidden]{display:none}
+.smart-plan-thumb .smart-plan-thumb-head{font-size:11px;color:#527561;padding:6px 10px;background:#eef3f0;border-bottom:1px solid #d3ded7}
+.smart-plan-thumb img{display:block;width:100%;max-height:230px;object-fit:contain;background:#fff}
