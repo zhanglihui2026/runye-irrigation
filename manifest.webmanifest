@@ -4,7 +4,7 @@
   "short_name": "润野灌溉",
   "description": "在线地图、地块划分与灌溉管路规划",
   "lang": "zh-CN",
-  "start_url": "./index.html?source=pwa",
+  "start_url": "./index.html?smart=1#pipePlanSection",
   "scope": "./",
   "display": "standalone",
   "display_override": [
