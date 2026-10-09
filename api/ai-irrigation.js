@@ -21,7 +21,9 @@
 'use strict';
 
 /* ============================ 一、固定配置 ============================ */
-const MODEL = process.env.AI_MODEL || 'deepseek-flash';                                    /* 推理模型，速度较慢但算得更稳 */
+/* [v353] 默认模型名用官方首页确认的现役名（deepseek-v4-flash，支持 thinking 思考模式）；
+ * 可用 env AI_MODEL 覆盖（如 deepseek-v4-pro，更强但更慢）。 */
+const MODEL = process.env.AI_MODEL || 'deepseek-v4-flash';                          /* 推理模型，速度较慢但算得更稳 */
 const UPSTREAM_URL = 'https://api.deepseek.com/chat/completions';
 const ALLOWED_ORIGIN = 'https://zhanglihui2026.github.io';            /* 放行的线上前端域名 */
 /* [v334 2026-10-09] 本机调试放行：localhost/127.0.0.1 任意端口 + file://（Origin: null）。 */
@@ -381,6 +383,8 @@ module.exports = async function handler(req, res) {
   finally { if(!settled&&reservation) { try { await quota.finish(reservation,false); } catch(e) { /* 保留预占，人工核查 */ } } } /* [v329] 管理员无预占可还 */
 
 };
+module.exports.maxDuration = 300; /* [v353] 显式声明（代码级优先级最高）：思考模型耗时可达 2 分钟以上，
+ * 防项目级默认时长低于 150s 上游超时被平台提前掐死；Hobby 计划上限恰为 300s。 */
 module.exports.default = module.exports;
 
 /* 供本地契约测试使用（不参与线上运行） */
