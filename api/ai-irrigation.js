@@ -23,7 +23,11 @@
 /* ============================ 一、固定配置 ============================ */
 const MODEL = process.env.AI_MODEL || 'deepseek-flash';                                    /* 推理模型，速度较慢但算得更稳 */
 const UPSTREAM_URL = 'https://api.deepseek.com/chat/completions';
-const ALLOWED_ORIGIN = 'https://zhanglihui2026.github.io';            /* 唯一放行的前端域名 */
+const ALLOWED_ORIGIN = 'https://zhanglihui2026.github.io';            /* 放行的线上前端域名 */
+/* [v334 2026-10-09] 本机调试放行：localhost/127.0.0.1 任意端口 + file://（Origin: null）。 */
+/* 取舍：沙箱 iframe 的 fetch 同样是 Origin: null——额度按用户编号限次、访问码即凭证，个人工具可接受。 */
+const LOCAL_ORIGIN_RE = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+function originAllowed(o) { return !o || o === ALLOWED_ORIGIN || o === 'null' || LOCAL_ORIGIN_RE.test(o); }
 /* 超时等参数在每次调用时读取，改环境变量后不用等冷启动才生效 */
 function timeoutMs() { const n = Number(process.env.AI_UPSTREAM_TIMEOUT_MS); return (isFinite(n) && n > 0) ? n : 150000; } /* 150s：reasoner 会先思考再输出 */
 const MAX_BODY_BYTES = 262144;                                                  /* 256 KB */
@@ -140,8 +144,8 @@ const SYSTEM_PROMPT = [
 function isNum(v) { return typeof v === 'number' && isFinite(v); }
 function fmt(v, d) { return isNum(v) ? v.toFixed(d == null ? 1 : d) : '—'; }
 
-function setCors(res) {
-  res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
+function setCors(res, origin) {
+  res.setHeader('Access-Control-Allow-Origin', (origin && origin !== ALLOWED_ORIGIN) ? origin : ALLOWED_ORIGIN);
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -296,12 +300,12 @@ function validateGeometry(p){
 /* ============================ 四、主入口 ============================ */
 module.exports = async function handler(req, res) {
   const origin = (req.headers && req.headers.origin) ? String(req.headers.origin) : '';
-  /* 只允许 GitHub Pages 域名；没有 Origin 的（curl / 服务端直连）放行，方便自测 */
-  if (origin && origin !== ALLOWED_ORIGIN) {
-    setCors(res);
-    return reply(res, 403, 403, '来源域名不在白名单：' + origin + '（本接口只允许 ' + ALLOWED_ORIGIN + ' 访问）');
+  /* [v334] 放行：GitHub Pages 线上域名 + 本机调试（localhost/127.0.0.1/file:// 的 null）；无 Origin（curl/服务端直连）放行 */
+  if (!originAllowed(origin)) {
+    setCors(res, origin);
+    return reply(res, 403, 403, '来源域名不在白名单：' + origin + '（本接口只允许 ' + ALLOWED_ORIGIN + ' 与本机来源访问）');
   }
-  setCors(res);
+  setCors(res, origin);
   if (req.method === 'OPTIONS') { res.statusCode = 204; res.end(); return; }
 
   /* GET：部署自检（打开 https://<域名>/api/ai-irrigation 就能看到） */
