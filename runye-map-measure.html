@@ -197,7 +197,7 @@
   <script src="runye-nav.js?v=346"></script>
   <!-- [NEW MODULE: map-enhance] 实景叠加图层（2026-09-26）：删除下两行即卸载，不影响其他逻辑 -->
   <script src="runye-geo.js"></script>
-  <script src="runye-map-enhance.js"></script>
+  <script src="runye-map-enhance.js?v=352"></script>
 <script src="runye-map-partition.js?v=261"></script>
   <!-- [NEW MODULE: pipe_optim] 导航按钮与主页同源（2026-09-23 用户要求：三页导航一致） -->
   <script src="pipe_optim_ui.js"></script>
@@ -1378,7 +1378,9 @@
   /* [NEW MODULE: 地形模块 v286f] onSendDesign/onSendTerrain：地块弹窗「回传」按钮 → 页面局部回传函数（跳对应页）。 */
   try{ if(window.RunyeMapEnhance) rymHandle=window.RunyeMapEnhance.attach(map, {onMeasure:setMeasureOn, toDisplay:toDisplay, autoFit:!lsGet(K_VIEW,null), onMergeMode:onMergeModeChange, mergePick:false, onMergeDone:function(){ renderMyPlots(); }, 
     onSendDesign:function(p){ sendPlotToDesign(p, document.getElementById('btnCopy')); }, 
-    onSendTerrain:function(p){ sendPlotToTerrain(p, document.getElementById('btnCopyTerrain')); }}); }catch(e){}
+    onSendTerrain:function(p){ sendPlotToTerrain(p, document.getElementById('btnCopyTerrain')); }, 
+    /* [NEW MODULE: 地块删除 v352] 弹窗删除地块后刷新「我的地块」列表 */
+    onPlotsChanged:function(){ renderMyPlots(); }}); }catch(e){}
 
   /* ===== [v185/v189 2026-10-03] 多地块成组 =====
    * 用户诉求：画几个相邻小地块 → **成组**便于一起操作；各小地块分别布管，

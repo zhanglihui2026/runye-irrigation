@@ -655,6 +655,9 @@
           '<button id="rymSendDesign" style="flex:1;padding:3px 6px;background:#15803d;color:#fff;border:0;cursor:pointer;font-size:11.5px">回传地块绘制</button>' +
           '<button id="rymSendTerrain" style="flex:1;padding:3px 6px;background:#fff;color:#15803d;border:1px solid #15803d;cursor:pointer;font-size:11.5px">回传地形模块</button>' +
           '</div>' +
+          /* [NEW MODULE: 地块删除 v352] 弹窗删除按钮（confirm 二次确认；成组地块连同子地块一起删）。 */
+          /* 卸载 = 删除本按钮行 + onPopupOpen 里 rymDel 绑定段 + 宿主页 attach 的 onPlotsChanged 回调。 */
+          '<button id="rymDel" style="margin-top:6px;width:100%;padding:3px 6px;background:#fff;color:#dc2626;border:1px solid #dc2626;cursor:pointer;font-size:11.5px">🗑 删除地块</button>' +
           '</div>';
         var onPopupOpen = function () {
           var btn = document.getElementById('rymSave');
@@ -674,6 +677,24 @@
           if (sd) sd.onclick = function () { if (typeof opts.onSendDesign === 'function') opts.onSendDesign(p); };
           var st = document.getElementById('rymSendTerrain');
           if (st) st.onclick = function () { if (typeof opts.onSendTerrain === 'function') opts.onSendTerrain(p); };
+          /* [NEW MODULE: 地块删除 v352] 删除：confirm 二次确认（成组地块连同子地块一起删）→
+           * 移出 runye_plot_library → 关弹窗 → state.refresh() 重画叠加 → onPlotsChanged 通知宿主刷列表。 */
+          var delBtn = document.getElementById('rymDel');
+          if (delBtn) delBtn.onclick = function () {
+            var subN = (p.merged && p.subPlots ? p.subPlots.length : 0);
+            var msg = '确定删除地块「' + (p.name || '未命名地块') + '」？'
+              + (subN ? '\n该地块是成组地块，将连同 ' + subN + ' 个子地块一起删除。' : '')
+              + '\n删除后不可恢复。';
+            if (!confirm(msg)) return;
+            try {
+              var lib = JSON.parse(localStorage.getItem('runye_plot_library') || '[]');
+              var now = lib.filter(function (x) { return x && x.id !== p.id && x.mergedInto !== p.id; });
+              localStorage.setItem('runye_plot_library', JSON.stringify(now));
+            } catch (e) { alert('删除失败：' + e.message); return; }
+            layers.forEach(function (L2) { try { L2.closePopup(); } catch (e) {} });
+            try { state.refresh(); } catch (e) {}
+            if (typeof opts.onPlotsChanged === 'function') { try { opts.onPlotsChanged(p); } catch (e) {} }
+          };
           var ub = document.getElementById('rymUnmerge');
           if (ub) ub.onclick = function () {
             if (!confirm('解散成组？\n将把「' + (p.name || '该地块') + '」拆回 ' + ((p.subPlots || []).length) + ' 个子地块（各自的轮廓与块间空隙本来就没动过）。')) return;
