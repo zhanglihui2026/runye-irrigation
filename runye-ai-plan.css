@@ -185,4 +185,4 @@ body.ry-smart-entry .ai-panel{z-index:10000!important}
 .smart-workbench .smart-chat-head,.smart-workbench .smart-results>header{display:block;cursor:default}
 
 /* [v349] 已划分态：smart-plot（当前地块块）内嵌二级简图实截，替代手绘 SVG 边界 */
-.smart-plot img.smart-plot-snap{display:block;width:100%;max-height:230px;object-fit:contain;background:#fff;border:1px solid #e3ebe5;border-radius:6px;margin:8px 0 6px}
+.smart-plot canvas.smart-plot-live{display:block;width:100%;background:#fff;border:1px solid #e3ebe5;border-radius:6px;margin:8px 0 6px}
