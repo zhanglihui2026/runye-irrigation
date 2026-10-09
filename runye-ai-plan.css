@@ -176,4 +176,10 @@ body.ry-smart-entry .ai-panel{z-index:10000!important}
 .smart-titlebar .smart-tb-spacer{flex:1 1 auto}
 .smart-titlebar a.smart-tb-link{flex:none;font-size:12px;font-weight:400;color:#d3e8dc;text-decoration:none;border:1px solid #3a6b54;border-radius:4px;padding:3px 10px}
 .smart-titlebar a.smart-tb-link:hover{background:#275c45;color:#fff}
+
+/* [v345 2026-10-09 线上简化·用户指令] 智能窗口左栏只留三项：在线地图/地块分区/管路规划。
+   「地块绘制」(index.html#areaTool) 与「更多功能」折叠组(12子项)暂时隐藏；
+   恢复：删除本块两条规则即可。 */
+.smart-nav a[href="index.html#areaTool"]{display:none}
+.smart-nav-more{display:none}
 .smart-workbench .smart-chat-head,.smart-workbench .smart-results>header{display:block;cursor:default}
