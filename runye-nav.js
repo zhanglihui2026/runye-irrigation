@@ -22,38 +22,33 @@
 (function (global) {
   'use strict';
   /* 顶层常驻项（pre:1 = 注入到本页静态特有项之前） */
+  /* [v346 2026-10-09 用户指令] 导航收敛：顶层只留 智能规划/在线地图/地块分区/管路规划/过滤系统/水力校核，
+     其余全部并入 MORE_ITEMS「更多 ▾」；「更多」内项目线上锁（本地全放行，线上点击拦截+toast，
+     见 buildMore 内 v346 段与 openLinkedSection 内 v346 段）。 */
   var ITEMS = [
-    /* [v331 2026-10-09 用户要求] 智能规划改独立窗口：win:1 → 点击后主窗口原地不动（先静默存档
-       地块快照 + 写复原锚），弹出新窗口跑全屏对话；主窗口地块分区手动规划功能分毫不动。 */
+    /* [v331] 智能规划独立窗口：win:1 点击弹新窗全屏对话，主窗口原地不动 */
     { label: '智能规划', href: 'index.html?smart=1#pipePlanSection', win: 1, title: '独立窗口打开：AI 对话规划（主窗口地块分区不受影响）' },
-    { label: '标准分区预设', hash: 'designInput',              pre: 1 },
-    /* [v250 2026-10-06 用户要求] 在线地图 移到 地块绘制 之前 */
+    /* [v250] 在线地图 移到 地块绘制 之前（v346 起地块绘制折叠进「更多」） */
     { label: '在线地图',     href: 'runye-map-measure.html',   pre: 1 },
-    { label: '地块绘制',     hash: 'areaTool',                 pre: 1 },
-    /* [NEW MODULE: 地形模块] 阶段1 基础框架（terrain/ 独立目录，卸载=删除本行+terrain/+sw.js 条目） */
-    { label: '地形模块',     href: 'terrain/index.html',       pre: 1, title: '地形模块：shp/RTK边界导入、CGCS2000校验、面积、高程数据源登记' },
-    /* [v250 2026-10-06 用户要求] 「二级管路」改名「地块分区」；
-       [v250] 「三级管路编辑」改名「管路规划」（底部状态栏 NAMES 映射与
-       pipe_optim_ui 提示文案同步改名）。hash/id 不变，仅显示名变。 */
+    /* [v250] 「二级管路」改名「地块分区」、「三级管路编辑」改名「管路规划」（hash/id 不变，仅显示名变） */
     { label: '地块分区',     hash: 'pipePlanSection',          pre: 1 },
     { label: '管路规划',     hash: 'tlPipePlanSection',        pre: 1 },
-    /* [v247] 成组管路：整组总览 + 总管编辑 + 按块进入三级页。用户拍板放到「三级管路编辑」之后。
-       ★ 仅成组地块才有意义 —— 非成组时该页显示空态提示，导航项保留（不玩"显隐猜谜"，
-       点进去看到一句明确的说明，比点了没反应强）。 */
-    { label: '多地块规划',   hash: 'grPipeSection',            pre: 1, title: '成组地块：全组总览 + 总管编辑 + 按块进入管路规划' },
-    /* [v311 2026-10-08 用户要求] 水力校核 从「更多」提回顶级导航项（跟轴测图/材料清单一样
-       点击直跳；v299 折叠语义废止）。模块说明沿用 v299：独立模块（自动读 runye_network_layout，
+    { label: '过滤系统',     hash: 'filterSystemSection',      pre: 1, title: '过滤系统 · GREEN 型单体并联机组（初稿）' },
+    /* [v311 2026-10-08 用户要求] 水力校核 顶级导航项（独立模块：自动读 runye_network_layout，
        树状拓扑+全链路水损+滴灌带多孔出流+水泵选型+EPANET WASM 对照），原软件逻辑零改动 */
     { label: '水力校核',     href: 'runye-hydraulics.html',     title: '水力校核：自动读已布置管网，逐段流量/流速/水损 + 最不利路径 + 需求扬程与水泵选型' },
-    /* [v247] 材料清单移到「管路拼装」之前（管路拼装本身已折叠进「更多」） */
-    { label: '材料清单',     hash: 'detailsSection',           pre: 1 },
-    { label: '轴测图',       act: 'iso', page: 'index.html',   pre: 1, title: '三级管线轴测图（先「生成管线图」再点）' },
-    { label: '过滤系统',     hash: 'filterSystemSection',      pre: 1, title: '过滤系统 · GREEN 型单体并联机组（初稿）' },
-    { label: '系统图',       act: 'sys', page: 'index.html',   pre: 1, title: '三级系统图（供水首部系统图）' }
   ];
   /* [v247] 折叠进「更多 ▾」的低频项：面板竖排，点开才见。
      act 项不放这里（轴测图/系统图留在顶层）；管网优化详细分析由 pipe_optim_ui.js 追加进面板。 */
   var MORE_ITEMS = [
+    { label: '地块绘制',     hash: 'areaTool',                 title: '地块绘制工具（比例尺 / 绘制边界 / 地块库）' },
+    /* [NEW MODULE: 地形模块] 卸载=删除本行+terrain/+sw.js 条目 */
+    { label: '地形模块',     href: 'terrain/index.html',       title: '地形模块：shp/RTK边界导入、CGCS2000校验、面积、高程数据源登记' },
+    { label: '多地块规划',   hash: 'grPipeSection',            title: '成组地块：全组总览 + 总管编辑 + 按块进入管路规划' },
+    /* [v247] 材料清单保持在「管路拼装」之前 */
+    { label: '材料清单',     hash: 'detailsSection' },
+    { label: '轴测图',       act: 'iso', page: 'index.html',   title: '三级管线轴测图（先「生成管线图」再点）' },
+    { label: '系统图',       act: 'sys', page: 'index.html',   title: '三级系统图（供水首部系统图）' },
     { label: '管路拼装',     href: '管路接驳拼装.html',         title: '管路接驳拼装：管件级拼装 + 单向水力计算' },
     { label: '经济指标分析', hash: 'threeDModelingSection',     title: '管径经济指标分析：前期管材投入 vs 后期电费，找年均总成本最低的平衡点' },
     { label: '数字化建模',   hash: 'parametricModelingSection', title: '数字化建模 · 参数化节点建模' },
@@ -62,6 +57,29 @@
   function curFile() {
     var p = decodeURIComponent((global.location && global.location.pathname) || '');
     return p.split('/').pop() || 'index.html';
+  }
+  /* [v346] 线上锁环境判定：本地(localhost/127.0.0.1/file://)全放行；其余域名=线上，「更多」项锁定。
+     以后放开某功能：把它从 MORE_ITEMS 挪回 ITEMS 即可；整体关锁=删 IS_ONLINE 判定。 */
+  var IS_ONLINE = (function () {
+    if (!global.location) return false;
+    /* [v346] 测试钩子：?env=online 强制按线上锁运行（只能强锁不能强解锁，供本地预览/探针） */
+    if (/[?&]env=online(?:&|$)/.test(global.location.search || '')) return true;
+    if (global.location.protocol === 'file:') return false;
+    var h = global.location.hostname || '';
+    return !!h && h !== 'localhost' && h !== '127.0.0.1';
+  })();
+  /* [v346] 锁定提示 toast（样式在 runye-nav.css 的 .ry-nav-toast 段） */
+  function showToast(msg) {
+    var d = document.createElement('div');
+    d.className = 'ry-nav-toast';
+    d.setAttribute('role', 'status');
+    d.textContent = msg;
+    document.body.appendChild(d);
+    setTimeout(function () { d.classList.add('show'); }, 10);
+    setTimeout(function () {
+      d.classList.remove('show');
+      setTimeout(function () { if (d.parentNode) d.parentNode.removeChild(d); }, 300);
+    }, 2400);
   }
   /* 单个导航项 → 元素（顶层与「更多」面板共用同一套皮肤/属性逻辑） */
   function makeItem(it, base, root) {
@@ -128,7 +146,7 @@
     btn.className = 'fn-link fn-more-btn';
     btn.setAttribute('aria-expanded', 'false');
     btn.setAttribute('aria-haspopup', 'true');
-    btn.title = '更多工具：管路拼装 / 经济指标分析 / 数字化建模 / 滴灌带查询 / 管网优化详细分析';
+    btn.title = '更多工具：地块绘制 / 地形模块 / 多地块规划 / 材料清单 / 轴测图 / 系统图 / 管路拼装 / 经济指标分析 / 数字化建模 / 滴灌带查询 / 管网优化详细分析';
     var caret = document.createElement('span');
     caret.className = 'fn-more-caret';
     caret.setAttribute('aria-hidden', 'true');
@@ -140,6 +158,18 @@
     panel.hidden = true;
     panel.setAttribute('role', 'menu');
     MORE_ITEMS.forEach(function (it) { panel.appendChild(makeItem(it, base, root)); });
+    /* [v346] 线上锁：捕获阶段委托拦截面板内所有项（含 pipe_optim_ui 注入的「管网优化详细分析」）——
+       stopImmediatePropagation 同时阻断 href 跳转与页面既有 data-target 处理器 */
+    if (IS_ONLINE) {
+      panel.addEventListener('click', function (e) {
+        var t = e.target && e.target.closest ? e.target.closest('.fn-link') : null;
+        if (!t) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        close();
+        showToast('「' + (t.textContent || '').trim() + '」功能即将开放，敬请期待');
+      }, true);
+    }
     wrap.appendChild(btn);
     wrap.appendChild(panel);
     morePanelEl = panel;
@@ -245,6 +275,11 @@
     var all = ITEMS.concat(MORE_ITEMS);   /* [v247] 折叠项也要能被 #hash 直达 */
     var item = all.filter(function (it) { return it.hash === hash || (it.act && 'nav-' + it.act === hash); })[0];
     if (!item) return;
+    /* [v346] 线上锁：折叠项的 #hash 直达同样拦截 */
+    if (IS_ONLINE && MORE_ITEMS.indexOf(item) !== -1) {
+      showToast('「' + item.label + '」功能即将开放，敬请期待');
+      return;
+    }
     if (item.act && global.RyFnNavActions && typeof global.RyFnNavActions[item.act] === 'function') {
       global.RyFnNavActions[item.act]();
     } else if (item.hash && typeof global.ryJumpToSection === 'function') {
