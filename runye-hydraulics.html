@@ -29,7 +29,9 @@
   *::-webkit-scrollbar-thumb{background:rgba(188,211,198,.25);border-radius:2.5px}
   *::-webkit-scrollbar-thumb:hover{background:#9db8a8}
   *::-webkit-scrollbar-corner{background:transparent}
-  html{scrollbar-width:thin;scrollbar-color:#bfd3c6 transparent}
+  /* [v347 2026-10-09 用户反馈] 原此处写有 html 级标准滚动条属性——Chromium 121+ 会让全站
+     ::-webkit-scrollbar 5px 细条失效落成 ~11px 粗条（同 index.html 全局口径注释），
+     已删除，回到纯 webkit 5px 口径与其他页统一。 */
   .sec-t{margin:0 0 6px;font-size:11px;color:var(--s-500);font-weight:700;letter-spacing:1px;
     border-left:3px solid var(--g-600);padding-left:8px;line-height:1.4}
   .card{border:1px solid var(--s-200);background:#fff;padding:8px;font-size:12px;line-height:1.5}
