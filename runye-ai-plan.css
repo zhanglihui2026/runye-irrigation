@@ -120,6 +120,18 @@ body.ry-smart-entry .ai-panel .ai-body{display:block!important;height:100%;max-h
 .smart-steps span{display:block;font-size:12px;color:#527561;line-height:1.6;margin-top:2px}
 .smart-steps a{display:inline-block;font-size:11px;color:#15803d;text-decoration:none;margin-top:2px}
 .smart-steps a:hover{text-decoration:underline}
+/* [v338 2026-10-09] 左栏 WorkBuddy 式工具导航：4 主项(图标+14px)+「更多功能」折叠组(子项12px) */
+.smart-nav{display:flex;flex-direction:column;gap:2px;margin:16px 0 0;padding-top:14px;border-top:1px dashed #d7e4da}
+.smart-nav a,.smart-nav-more summary{display:flex;align-items:center;gap:9px;padding:8px 9px;border-radius:7px;font-size:14px;color:#2c4a3c;text-decoration:none;cursor:pointer;user-select:none;list-style:none}
+.smart-nav a:hover{background:#dfece3;color:#145a35}
+.smart-nav svg{flex:none;width:16px;height:16px;fill:none;stroke:#4d6458;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
+.smart-nav a:hover svg{stroke:#145a35}
+.smart-nav-more summary::-webkit-details-marker{display:none}
+.smart-nav-more summary::after{content:'▸';margin-left:auto;font-size:10px;color:#84948a;transition:transform .15s}
+.smart-nav-more[open] summary::after{transform:rotate(90deg)}
+.smart-nav-more{margin-top:2px}
+.smart-nav-sub{display:flex;flex-direction:column;gap:1px;margin:3px 0 0;padding:0 0 0 8px}
+.smart-nav-sub a{font-size:12px;padding:6px 9px;color:#4d6458}
 /* [v336 2026-10-09] 有历史对话时也保留三步指引入口：chat-head 折叠面板（空对话态隐藏避免与大卡重复） */
 .smart-howto{margin:10px 0 0;flex:1 1 100%}
 .smart-howto summary{cursor:pointer;font-size:12px;color:#15803d;user-select:none;width:-moz-fit-content;width:fit-content}
