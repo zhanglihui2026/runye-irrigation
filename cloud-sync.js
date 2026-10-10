@@ -303,32 +303,56 @@ function cloudSignInSms(phone, code){
     return {ok:true, uid:cloudUid, phone:cloudPhone};
   }
   var mainP;
-  /* [v365] 分流：新号（is_user===false）严格复刻官方智能注册闭包 ——
-     官方 signUp 闭包对新号调 authApi.signUp({phone_number, verification_token, verification_code})，
-     必须「同时」带 verification_token 与 6 位 verification_code 原文。
-     旧 signInWithSms 内部只带 token 不带 code ⇒ 服务端报 invalid_argument（根因坐实）。
-     老号走 verifyOtp（内部 is_user:true → /v1/signin），老号已实测可行。 */
-  var isNewUser = (info.is_user === false) || (info.is_user === 0);
+  /* [v368] 统一路由：自己先 verify 一次拿 verification_token（验证码只消费一次），再按 is_user 选端点。
+     实测教训：getVerification 返回的 is_user 字段**可能缺失**（undefined）——
+     v365 的 `is_user === false` 判定把缺字段的全新号误判成老号 → 走登录 → USER_NOT_FOUND。
+     新判定：is_user !== true 一律先走注册（signUp 智能注册并登录）；
+     双向兜底：撞上 USER_NOT_FOUND / ALREADY_EXISTS 时用同一 verification_token 补走对面端点。 */
   var api = (a && a.oauthInstance && a.oauthInstance.authApi) || null;
-  if(isNewUser && api && typeof api.verify === 'function' && typeof api.signUp === 'function'){
+  if(vid && api && typeof api.verify === 'function' && typeof api.signUp === 'function'){
     mainP = Promise.resolve(api.verify({ verification_id: vid, verification_code: codeStr })).then(function(v){
-      if(v && v.error_code){ smsDiag('new_verify', v); throw v; }
+      if(v && v.error_code){ smsDiag('verify', v); throw v; }
       var vt = v && v.verification_token;
-      if(!vt){ smsDiag('new_verify_notoken', v); throw { error_code: 'verify_no_token' }; }
-      return Promise.resolve(api.signUp({
-        phone_number: pn,
-        verification_token: vt,
-        verification_code: codeStr
-      })).then(function(sr){
-        if(sr && sr.error_code){ smsDiag('new_signup', sr); throw sr; }
-        smsDiag('new_signup_ok', { has_credentials: true });
+      if(!vt){ smsDiag('verify_notoken', v); throw { error_code: 'verify_no_token' }; }
+      smsDiag('verify_ok', { is_user: info.is_user });
+      var isAlready = function(e){
+        return /ALREADY_EXISTS|already_exists/i.test(JSON.stringify(e || {}));
+      };
+      var isNotFound = function(e){
+        return /USER_NOT_FOUND|not_found|User not exist/i.test(JSON.stringify(e || {}));
+      };
+      var trySignIn = function(){
+        if(typeof api.signIn !== 'function') return Promise.reject({ error_code: 'no_signin_api' });
+        return Promise.resolve(api.signIn({ username: pn, verification_token: vt })).then(function(sr){
+          if(sr && sr.error_code){ smsDiag('signin', sr); throw sr; }
+          return sr;
+        });
+      };
+      var trySignUp = function(){
+        return Promise.resolve(api.signUp({
+          phone_number: pn,
+          verification_token: vt,
+          verification_code: codeStr
+        })).then(function(sr){
+          if(sr && sr.error_code){ smsDiag('signup', sr); throw sr; }
+          return sr;
+        });
+      };
+      var first = (info.is_user === true) ? trySignIn : trySignUp;
+      return first().catch(function(e1){
+        smsDiag('first_path_fail', e1);
+        if(isNotFound(e1) || isAlready(e1)){
+          smsDiag('cross_fallback', { to: (info.is_user === true) ? 'signUp' : 'signIn' });
+          return (info.is_user === true) ? trySignUp().catch(function(e2){
+            /* 已存在但 signUp 仍拒 ⇒ 退回 signIn（老号兜底闭环） */
+            if(isAlready(e2) || isNotFound(e2)) return trySignIn();
+            throw e2;
+          }) : trySignIn();
+        }
+        throw e1;
+      }).then(function(){
         return Promise.resolve(a.getSession ? a.getSession() : null).then(function(gs){ return (gs && gs.data) || {}; });
       });
-    }).then(finish);
-  } else if(vid && a && typeof a.verifyOtp === 'function'){
-    mainP = Promise.resolve(a.verifyOtp({ token: codeStr, messageId: vid, phone: pn })).then(function(res){
-      if(res && res.error){ smsDiag('verifyOtp', res.error); throw res.error; }
-      return res && res.data;
     }).then(finish);
   } else if(a && typeof a.signInWithSms === 'function'){
     mainP = Promise.resolve(a.signInWithSms({
@@ -340,7 +364,7 @@ function cloudSignInSms(phone, code){
       return finish(res && res.data);
     });
   } else {
-    return Promise.resolve({ok:false, error:{msg:'SDK 不支持短信验证码登录（verifyOtp/signInWithSms 均缺失）'}});
+    return Promise.resolve({ok:false, error:{msg:'SDK 不支持短信验证码登录（verify/signInWithSms 均缺失）'}});
   }
   /* [v365] 不再做盲重试：验证码是一次性的，重试只会把真实错误污染成「验证码失效」。
      失败原样上抛，错误对象带 rawErr 供界面/诊断展示。 */
