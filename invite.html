@@ -2932,7 +2932,7 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
 
   <!-- [v362] 真数据层：CloudBase SDK（自托管 bundle）+ 云同步 + 权益层 -->
   <script src="pwa/vendor/cloudbase-js-sdk-3.8.2.bundle.js?v=362"></script>
-  <script src="cloud-sync.js?v=362"></script>
+  <script src="cloud-sync.js?v=365"></script>
   <script src="runye-entitle.js?v=362"></script>
 
 <script id="ry-ui">
@@ -3231,6 +3231,32 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
   function errText(r) {
     return (r && r.error && r.error.msg) || (r && r.message) || '未知错误';
   }
+  /* [v365] 持久错误横幅：失败不自动消失，附原始错误码 —— 用户截图一次即可远程定位 */
+  function showErrBanner(text, detail) {
+    try {
+      var b = document.getElementById('ryErrBanner');
+      if (!b) {
+        b = document.createElement('div');
+        b.id = 'ryErrBanner';
+        b.style.cssText = 'position:fixed;left:10px;right:10px;bottom:76px;z-index:9999;background:#fff2f0;border:1px solid #ffccc7;color:#a8071a;border-radius:10px;padding:10px 12px;font-size:12px;line-height:1.5;box-shadow:0 4px 12px rgba(0,0,0,.12);word-break:break-all;';
+        var close = document.createElement('span');
+        close.textContent = '×';
+        close.style.cssText = 'float:right;font-size:16px;line-height:1;padding:0 2px;cursor:pointer;';
+        close.onclick = function () { b.remove(); };
+        b.appendChild(close);
+        var t = document.createElement('div');
+        t.id = 'ryErrBannerText';
+        b.appendChild(t);
+        var d = document.createElement('div');
+        d.id = 'ryErrBannerDetail';
+        d.style.cssText = 'margin-top:4px;color:#c0483c;font-size:11px;';
+        b.appendChild(d);
+        document.body.appendChild(b);
+      }
+      document.getElementById('ryErrBannerText').textContent = text;
+      document.getElementById('ryErrBannerDetail').textContent = detail || '';
+    } catch (e) {}
+  }
   function startCooldown(btn, timerKey) {
     var left = 60;
     btn.disabled = true;
@@ -3308,7 +3334,7 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
     cs.signInSms(p, c).then(function (r) {
       btn.disabled = false; btn.textContent = oldTxt;
       if (r && r.ok) afterLogin(null);   /* 注册卡就在页面上，无弹窗可关 */
-      else toast('登录失败：' + errText(r));
+      else { var t = '注册失败：' + errText(r); toast(t); showErrBanner(t, r && r.rawErr ? JSON.stringify(r.rawErr) : ''); }
     });
   }
 
@@ -3323,7 +3349,7 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
     cs.signInSms(p, c).then(function (r) {
       if (btn) { btn.disabled = false; btn.textContent = oldTxt; }
       if (r && r.ok) afterLogin('mLogin');
-      else toast('登录失败：' + errText(r));
+      else { var t = '登录失败：' + errText(r); toast(t); showErrBanner(t, r && r.rawErr ? JSON.stringify(r.rawErr) : ''); }
     });
   }
 
