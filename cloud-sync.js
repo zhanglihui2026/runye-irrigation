@@ -51,8 +51,15 @@ function normCloudErr(e) {
     /* [v365] 服务端 gRPC/网关错误对象：{error_code, message, requestId} —— 原始码必须透传到 UI */
     var ec = e.error_code || e.errorCode || e.code;
     var m = e.message || e.errMsg || e.errmsg || e.desc;
-    if (m) return { msg: String(m) + (ec ? '（' + ec + '）' : ''), code: ec, requestId: e.requestId || e.request_id || '' };
-    if (ec) return { msg: '操作失败（' + ec + '）', code: ec, requestId: e.requestId || e.request_id || '' };
+    /* [v369] 对象形态也映射频率/额度类错误码（截图案例：{error_code:'resource_exhausted'}） */
+    var ECMAP = {
+      resource_exhausted: '发送太频繁或额度已达上限：同一号码 30 秒仅 1 条、每日有发送上限。请 1 分钟后再试；若反复出现，可能是当日/当月短信额度用完',
+      RESOURCE_EXHAUSTED: '发送太频繁或额度已达上限，请 1 分钟后再试',
+      not_found: '该手机号尚未注册，请返回用「注册」方式获取验证码',
+      invalid_argument: '验证码不正确或已失效，请重新获取短信验证码'
+    };
+    if (m) return { msg: String(m) + (ec && ECMAP[ec] ? '' : (ec ? '（' + ec + '）' : '')), code: ec, requestId: e.requestId || e.request_id || '', hint: ECMAP[ec] || '' };
+    if (ec) return { msg: ECMAP[ec] || ('操作失败（' + ec + '）'), code: ec, requestId: e.requestId || e.request_id || '' };
     if (e.code) return { msg: String(e.code) };
     return e;
   }
@@ -62,13 +69,22 @@ function normCloudErr(e) {
       INVALID_PARAM: '验证码不正确或已失效，请重新获取短信验证码',
       ParamError: '验证码不正确或已失效，请重新获取短信验证码',
       OperationDenied: '操作被拒绝，请稍后再试',
-      InternalError: '服务繁忙，请稍后再试'
+      InternalError: '服务繁忙，请稍后再试',
+      /* [v369] 发送频率/额度类：同号 30 秒 1 条、每日有上限、套餐月额度 */
+      resource_exhausted: '发送太频繁或额度已达上限：同一号码 30 秒仅 1 条、每日有发送上限。请 1 分钟后再试；若反复出现，可能是当日/当月短信额度用完',
+      RESOURCE_EXHAUSTED: '发送太频繁或额度已达上限，请 1 分钟后再试'
     };
     return { msg: MAP[e] || ('操作失败（' + e + '）') };
   }
   return { msg: '操作失败，请稍后再试' };
 }
 var lastSmsAt = 0;                    // 上次发码时间（前端节流用）
+/* [v369] 冷却时间持久化：微信杀 webview / 刷新后 lastSmsAt 丢失，
+   用户立刻再点发送 → 服务端 resource_exhausted。与票据同享 sessionStorage。 */
+var SMS_AT_KEY = 'cloudSmsAt_' + (typeof ENV_ID !== 'undefined' ? ENV_ID : 'env');
+function smsAtSave(t) { try { sessionStorage.setItem(SMS_AT_KEY, String(t)); } catch (e) {} }
+function smsAtLoad() { try { var v = parseInt(sessionStorage.getItem(SMS_AT_KEY), 10); return isFinite(v) ? v : 0; } catch (e) { return 0; } }
+if (!lastSmsAt) lastSmsAt = smsAtLoad();
 
 /* 监听 ESM 加载完成事件（head 里的 <script type="module"> 派发） */
 window.addEventListener('cloudbase-ready', function(){
@@ -242,6 +258,7 @@ function cloudSendSmsCode(phone){
     lastSmsTicket = { phone: pn, verificationInfo: info };
     smsTicketSave(lastSmsTicket);
     lastSmsAt = Date.now();
+    smsAtSave(lastSmsAt);
     return {ok:true, phone:pn, cooldown:SMS_RESEND_SEC};
   }).catch(function(e){ smsDiag('getVerification_throw', e); return {ok:false, error:normCloudErr((e && e.error) || e)}; });
 }
