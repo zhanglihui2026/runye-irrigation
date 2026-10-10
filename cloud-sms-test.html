@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>手机号登录 + 云函数调用 实测 · 润野</title>
+<!-- 临时诊断页。[v359] SDK 改为本地自托管 bundle（普通 script 同步加载，不再依赖 jsdelivr） -->
+<script src="pwa/vendor/cloudbase-js-sdk-3.8.2.bundle.js?v=359"></script>
+<script src="cloud-sync.js?v=359"></script>
+<style>
+  body{font-family:"Microsoft YaHei",system-ui,sans-serif;background:#f5f7f5;color:#1e293b;padding:20px;line-height:1.6;max-width:900px;margin:0 auto}
+  h1{font-size:18px;margin:0 0 4px}
+  .sub{color:#64748b;font-size:13px;margin-bottom:16px}
+  .card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:12px}
+  h2{font-size:14px;margin:0 0 10px;color:#334155}
+  input{font-size:16px;padding:9px 10px;border:1px solid #cbd5e1;border-radius:8px;width:190px}
+  button{font-size:14px;padding:10px 16px;border:none;background:#185FA5;color:#fff;border-radius:8px;cursor:pointer;margin:4px 6px 4px 0}
+  button:disabled{background:#9bbfe6;cursor:default}
+  .ghost{background:#0d9488}
+  .ok{color:#16a34a}.warn{color:#d97706}.err{color:#dc2626}.muted{color:#94a3b8}
+  #log{background:#0f172a;color:#e2e8f0;font-family:Consolas,monospace;font-size:13px;padding:12px;border-radius:10px;white-space:pre-wrap;max-height:380px;overflow:auto}
+  .tip{font-size:12px;color:#64748b;margin-top:8px}
+  table{border-collapse:collapse;font-size:13px;width:100%}
+  th,td{border:1px solid #e2e8f0;padding:5px 8px;text-align:left;font-family:Consolas,monospace}
+  th{background:#f8fafc;font-weight:600}
+  label{font-size:13px;color:#475569;display:inline-flex;align-items:center;gap:6px;margin-bottom:8px}
+</style>
+</head>
+<body>
+<h1>手机号登录 + 云函数调用 实测</h1>
+<div class="sub">
+  验证目标：<b>非匿名的登录用户能不能调用云函数</b>（当前环境里匿名用户被 <code>EXCEED_AUTHORITY</code> 拦下）。<br>
+  全程只填两个框，结果会自动汇总 —— 最后点【复制结果】发我即可，不用截图。
+</div>
+
+<div class="card">
+  <h2>① 登录前状态</h2>
+  <div>SDK / 云端就绪：<span class="v" id="s-ready">检测中…</span></div>
+  <div>匿名 UID（若已匿名登录）：<span class="v" id="s-anonuid">—</span></div>
+  <label><input type="checkbox" id="doAnon" checked> 先匿名登录一次（用来验证「匿名转正后 UID 是否不变」）</label>
+</div>
+
+<div class="card">
+  <h2>② 手机号 + 验证码</h2>
+  <input id="phone" type="tel" placeholder="13800000000" maxlength="11" inputmode="numeric">
+  <button id="btnSend" disabled>1. 发送验证码</button>
+  <span id="sendMsg" class="muted"></span>
+  <div style="margin-top:10px">
+    <input id="code" type="tel" placeholder="6 位验证码" maxlength="6" inputmode="numeric">
+    <button id="btnLogin" class="ghost" disabled>2. 登录并调用云函数</button>
+  </div>
+  <div class="tip">每发一条短信约 50 资源点（≈5 分钱）。同号 60 秒内不能重发。</div>
+</div>
+
+<div class="card">
+  <h2>③ 运行日志</h2>
+  <div id="log">等待开始…</div>
+  <button id="btnCopy" style="background:#475569">复制结果（发我）</button>
+  <span id="copyMsg" class="muted"></span>
+</div>
+
+<div class="card">
+  <h2>④ 历史对比（同号第二次登录时看这里）</h2>
+  <table>
+    <thead><tr><th>时间</th><th>手机号</th><th>匿名 UID</th><th>登录后 UID</th><th>UID 是否不变</th></tr></thead>
+    <tbody id="hist"><tr><td colspan="5" class="muted">（还没有记录）</td></tr></tbody>
+  </table>
+</div>
+
+<script>
+var HIST_KEY = '_runye_sms_test_hist';
+var report = [];                 /* 结构化结果，供复制 */
+function L(s, cls){
+  var el = document.getElementById('log');
+  if(el.firstChild && el.firstChild.nodeType === 3) el.innerHTML = '';
+  var line = document.createElement('div');
+  if(cls) line.className = cls;
+  line.textContent = s;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+function rec(txt, cls){ report.push((cls ? ('[' + cls.toUpperCase() + '] ') : '') + txt); L(txt, cls); }
+function sleep(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+function $ (id){ return document.getElementById(id); }
+
+/* 从 localStorage 的凭证里解 JWT，看这次会话到底是什么身份 */
+function jwtInfo(){
+  try{
+    var raw = localStorage.getItem('credentials_' + CLOUDBASE_ENV_ID);
+    if(!raw) return { err: 'localStorage 里没有 credentials_' + CLOUDBASE_ENV_ID };
+    var tok = JSON.parse(raw).access_token;
+    if(!tok) return { err: '凭证里没有 access_token' };
+    var p = JSON.parse(atob(tok.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return {
+      sub: p.sub, is_anonymous: p.is_anonymous, role: p.role, scope: p.scope,
+      provider: (p.meta && p.meta.provider) || (p.app_metadata && p.app_metadata.provider) || null,
+      user_type: p.user_type, is_system_admin: p.is_system_admin
+    };
+  }catch(e){ return { err: String(e && e.message || e) }; }
+}
+
+async function callFn(name, data){
+  window._cloudLastError = null;
+  var r = await window.CloudSync.callFn(name, data);
+  var e = window._cloudLastError;
+  return { result: r, error: e ? { code: e.code, msg: e.msg } : null };
+}
+
+async function boot(){
+  /* 等 SDK ESM 落地（盲等会出假阴性，这里等条件）。
+     注意：@cloudbase/js-sdk 的 jsdelivr +esm 包会再去拉一层依赖，
+     冷缓存下可能要十几秒 —— 所以进度要显示出来，按钮也必须等就绪才可点
+     （v1 的 bug：按钮初始就是可点的，用户点太早只会看到"云端未初始化"）。 */
+  for(var i = 0; i < 240; i++){
+    if(typeof cloudbase !== 'undefined' && typeof CloudSync !== 'undefined' && CloudSync.available()) break;
+    if(i % 4 === 0){
+      $('s-ready').innerHTML = '<span class="warn">正在加载 SDK…（已等 ' + (i / 2) + ' 秒，冷缓存下可能要十几秒）</span>';
+    }
+    await sleep(500);
+  }
+  if(typeof cloudbase === 'undefined'){
+    $('s-ready').innerHTML = '<span class="err">SDK 加载失败（120 秒未就绪）—— ' +
+      '八成是浏览器取不到 cdn.jsdelivr.net（扩展拦截 / 代理 / 跟踪防护）。' +
+      '请按 F12 看 Console 里那条红色 CORS/网络错误截图给我。</span>';
+    $('sendMsg').innerHTML = '<span class="err">按钮保持禁用，直到 SDK 就绪</span>';
+    return;
+  }
+  if(typeof CloudSync === 'undefined'){
+    $('s-ready').innerHTML = '<span class="err">cloud-sync.js 未加载</span>';
+    return;
+  }
+  if(!CloudSync.available()){
+    $('s-ready').innerHTML = '<span class="err">不可用：' + CloudSync.reasonUnavailable() + '</span>';
+    return;
+  }
+
+  $('s-ready').innerHTML = '<span class="warn">SDK 已就绪，正在初始化…</span>';
+  var ok = await CloudSync.init();
+  $('s-ready').innerHTML = ok ? '<span class="ok">就绪 ✓ 可以开始</span>' : '<span class="err">init 失败</span>';
+  $('btnSend').disabled = !ok;
+  loadHist();
+}
+
+$('btnSend').addEventListener('click', async function(){
+  var btn = this; btn.disabled = true;
+  $('sendMsg').textContent = '';
+  var phone = $('phone').value.trim();
+
+  if($('doAnon').checked && !CloudSync.uid){
+    L('— 先匿名登录…');
+    var ok = await CloudSync.ensureAnon();
+    L('  匿名登录 ' + (ok ? '成功' : '失败') + '  uid=' + (CloudSync.uid || '(null)'), ok ? 'ok' : 'warn');
+  }
+  $('s-anonuid').textContent = CloudSync.uid || '—';
+  rec('匿名 UID：' + (CloudSync.uid || '(无)'));
+
+  L('— 发送短信验证码到 ' + phone + ' …');
+  var r = await CloudSync.sendSmsCode(phone);
+  if(r && r.ok){
+    $('sendMsg').innerHTML = '<span class="ok">已发送，请查收短信</span>';
+    $('btnLogin').disabled = false;
+    rec('发送验证码成功 → ' + phone, 'ok');
+  }else{
+    var msg = (r && r.error && (r.error.msg || r.error.message)) || JSON.stringify(r);
+    $('sendMsg').innerHTML = '<span class="err">发送失败：' + msg + '</span>';
+    rec('发送验证码失败：' + msg, 'err');
+    btn.disabled = false;
+  }
+});
+
+$('btnLogin').addEventListener('click', async function(){
+  var btn = this; btn.disabled = true;
+  var phone = $('phone').value.trim(), code = $('code').value.trim();
+  var uid0 = CloudSync.uid || null;
+
+  L('');
+  L('================ 开始实测 ================');
+  rec('手机号：' + phone);
+
+  /* 1) 登录 */
+  L('[1] signInWithSms …');
+  var r = await CloudSync.signInSms(phone, code);
+  if(!r || !r.ok){
+    var m = (r && r.error && (r.error.msg || r.error.message)) || JSON.stringify(r);
+    rec('登录失败：' + m, 'err');
+    btn.disabled = false; return;
+  }
+  var uid1 = CloudSync.uid;
+  rec('登录成功  uid=' + uid1 + '  phone=' + CloudSync.phone, 'ok');
+  if(uid0) rec('UID 是否保持不变：' + (uid0 === uid1 ? '是 ✓' : '否 ✗（' + uid0 + ' → ' + uid1 + '）'), uid0 === uid1 ? 'ok' : 'warn');
+
+  /* 2) 身份 */
+  var j = jwtInfo();
+  rec('会话身份：' + JSON.stringify(j), 'ok');
+  L('[2] 会话身份 → ' + JSON.stringify(j));
+
+  /* 3) 调 ryEntitle */
+  L('[3] callFunction(ryEntitle, {action:get}) …');
+  var e1 = await callFn('ryEntitle', { action: 'get' });
+  rec('ryEntitle → ' + JSON.stringify(e1), (e1.result && e1.result.code === 0) ? 'ok' : 'err');
+  L('    ' + JSON.stringify(e1));
+
+  /* 4) 调 syncDb */
+  L('[4] callFunction(syncDb, {action:get}) …');
+  var e2 = await callFn('syncDb', { action: 'get' });
+  rec('syncDb → ' + JSON.stringify(e2), (e2.result !== null) ? 'ok' : 'err');
+  L('    ' + JSON.stringify(e2));
+
+  /* 5) 结论 */
+  var pass = !!(e1.result && e1.result.code === 0);
+  var concl = pass
+    ? '结论：✅ 非匿名登录用户可以调用云函数 —— 云端链路通了'
+    : '结论：❌ 即使手机号登录也调不通（' + ((e1.error && e1.error.code) || '未知') + '）—— 说明这是环境级的全局拦截，不是"匿名"的问题';
+  L('');
+  L(concl, pass ? 'ok' : 'err');
+  rec(concl, pass ? 'ok' : 'err');
+
+  saveHist(phone, uid0, uid1);
+  btn.disabled = false;
+});
+
+$('btnCopy').addEventListener('click', async function(){
+  var text = '【润野 · 手机号登录实测结果】\n' + report.join('\n');
+  try{
+    await navigator.clipboard.writeText(text);
+    $('copyMsg').innerHTML = '<span class="ok">已复制到剪贴板 ✓ 直接粘给我</span>';
+  }catch(e){
+    var ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); $('copyMsg').innerHTML = '<span class="ok">已复制 ✓</span>'; }
+    catch(e2){ $('copyMsg').innerHTML = '<span class="err">复制失败，请手动选中日志区复制</span>'; }
+    document.body.removeChild(ta);
+  }
+});
+
+function loadHist(){
+  var list = [];
+  try{ list = JSON.parse(localStorage.getItem(HIST_KEY) || '[]'); }catch(e){ list = []; }
+  var tb = $('hist');
+  if(!list.length){ tb.innerHTML = '<tr><td colspan="5" class="muted">（还没有记录）</td></tr>'; return; }
+  tb.innerHTML = list.map(function(h){
+    var same = (h.anonUid && h.uid) ? (h.anonUid === h.uid ? '<span class="ok">是</span>' : '<span class="warn">否</span>') : '<span class="muted">—</span>';
+    return '<tr><td>' + h.at + '</td><td>' + h.phone + '</td><td>' + (h.anonUid || '—') +
+           '</td><td>' + (h.uid || '—') + '</td><td>' + same + '</td></tr>';
+  }).join('');
+}
+function saveHist(phone, anonUid, uid){
+  var list = [];
+  try{ list = JSON.parse(localStorage.getItem(HIST_KEY) || '[]'); }catch(e){ list = []; }
+  list.push({ at: new Date().toLocaleString('zh-CN'), phone: phone, anonUid: anonUid || '', uid: uid || '' });
+  try{ localStorage.setItem(HIST_KEY, JSON.stringify(list.slice(-10))); }catch(e){}
+  loadHist();
+}
+
+boot();
+</script>
+</body>
+</html>
