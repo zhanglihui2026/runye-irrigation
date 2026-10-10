@@ -3007,7 +3007,9 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
     try { return new URL('index.html', location.href).toString(); } catch (e) { return 'index.html'; }
   }
   function inviteUrl(kind) {
-    var u = toolUrl().split('#')[0] + '?ref=' + encodeURIComponent(view.myCode || '');
+    /* [v362b] 邀请链接必须落在本 H5（注册页），不是工具页 —— B 打开先看到注册页 */
+    var base = String(location.href || '').split('#')[0].split('?')[0];
+    var u = base + '?ref=' + encodeURIComponent(view.myCode || '');
     return kind === 'group' ? u + '&from=group' : u;
   }
 
