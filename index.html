@@ -5086,7 +5086,7 @@ body.ry-tool #tlPipePlanSection .pp-side .pp-plan-item,
 <link rel="stylesheet" href="runye-terrain.css?v=255">
 <script src="runye-terrain.js?v=257"></script>
 <link rel="stylesheet" href="runye-ai-plan.css?v=353">
-<script src="runye-ai-plan.js?v=355"></script>
+<script src="runye-ai-plan.js?v=356"></script>
 <link rel="stylesheet" href="runye-case-library.css?v=277">
 <script src="runye-case-library.js?v=277"></script>
 <script src="runye-geo.js"></script>
@@ -18919,10 +18919,10 @@ ppPullLiftDh();                                              // 首屏对齐一�
       try{
         window.alert=function(){};
         var _ryPoly=(typeof window.ppGetPolyPts==='function')?window.ppGetPolyPts():(window.measuredPolygon||[]);
-        if(_ryPoly && _ryPoly.length>=3 && typeof window.ppGenerateDiagram==='function') window.ppGenerateDiagram({scroll:false});
-        if((window.measuredPolygon||[]).length>=3 && typeof tlAutoGenerate==='function') tlAutoGenerate({scroll:false,stay:true});
+        /* [v356] 方案B懒重放：打开只恢复状态；图面重放延迟到首次进入管路相关页
+           （ryShowSection 收口消费 __ryLazyReplay），打开不再卡在同步生成上 */
+        if(_ryPoly && _ryPoly.length>=3) window.__ryLazyReplay=true;
       }catch(e){}finally{ window.alert=_ryAlert0; }
-      try{ if(typeof renderThreeLevel==='function') renderThreeLevel(); }catch(e){}
       try{ if(typeof tlUpdatePlanBar==='function') tlUpdatePlanBar(); }catch(e){}
       try{ if(typeof atShowToast==='function') atShowToast('已恢复上次地块与划分'); }catch(e){}
     }catch(e){ try{ console.warn('[v161] auto restore skipped:',e&&e.message); }catch(_){} }
@@ -18946,10 +18946,9 @@ ppPullLiftDh();                                              // 首屏对齐一�
       try{
         window.alert=function(){};
         var _ryPoly=(typeof window.ppGetPolyPts==='function')?window.ppGetPolyPts():(window.measuredPolygon||[]);
-        if(_ryPoly&&_ryPoly.length>=3&&typeof window.ppGenerateDiagram==='function')window.ppGenerateDiagram({scroll:false});
-        if((window.measuredPolygon||[]).length>=3&&typeof tlAutoGenerate==='function')tlAutoGenerate({scroll:false,stay:true});
+        /* [v356] 方案B懒重放：同 v161/v355——打开只恢复状态，重放延迟到进管路页 */
+        if(_ryPoly&&_ryPoly.length>=3)window.__ryLazyReplay=true;
       }catch(e){}finally{window.alert=_ryAlert0;}
-      try{if(typeof renderThreeLevel==='function')renderThreeLevel();}catch(e){}
       try{if(typeof tlUpdatePlanBar==='function')tlUpdatePlanBar();}catch(e){}
       try{if(typeof atShowToast==='function')atShowToast('已恢复跳转 AI 助手前的地块与划分');}catch(e){}
     }catch(e){}
@@ -18977,10 +18976,10 @@ ppPullLiftDh();                                              // 首屏对齐一�
       try{
         window.alert=function(){};
         var _ryPoly=(typeof window.ppGetPolyPts==='function')?window.ppGetPolyPts():(window.measuredPolygon||[]);
-        if(_ryPoly && _ryPoly.length>=3 && typeof window.ppGenerateDiagram==='function') window.ppGenerateDiagram({scroll:false});
-        if((window.measuredPolygon||[]).length>=3 && typeof tlAutoGenerate==='function') tlAutoGenerate({scroll:false,stay:true});
+        /* [v356] 方案B懒重放：打开只恢复状态；图面重放延迟到首次进入管路相关页
+           （ryShowSection 收口消费 __ryLazyReplay），打开不再卡在同步生成上 */
+        if(_ryPoly && _ryPoly.length>=3) window.__ryLazyReplay=true;
       }catch(e){}finally{ window.alert=_ryAlert0; }
-      try{ if(typeof renderThreeLevel==='function') renderThreeLevel(); }catch(e){}
       try{ if(typeof tlUpdatePlanBar==='function') tlUpdatePlanBar(); }catch(e){}
       try{ if(typeof atShowToast==='function') atShowToast('已恢复上次生成的施工图'); }catch(e){}
     }catch(e){ try{ console.warn('[v355] ppGen restore skipped:',e&&e.message); }catch(_){} }
@@ -20212,6 +20211,22 @@ threeDModelingSection:'经济指标分析 · 入口预留（方案确定后上�
     /* [v194] 切入成组管路页时重排一次：只调刷新、不调切换（否则递归）。
        隐藏期间画布宽高量到 0，不重排就是一张空白。 */
     try{ if(sec && sec.id==='grPipeSection' && typeof window.grRefreshGroupPage==='function') window.grRefreshGroupPage(); }catch(err){}
+    /* [v356] 方案B懒重放消费点：打开时各恢复链只置 __ryLazyReplay 不重放图面；
+       首次切入二级/三级管路页在这里一次性重放（静音弹窗），随后的 v355 ws 钩子
+       用重放出的新鲜数据补渲染工作区。用户不进管路页就永不重放——打开零图面成本。 */
+    try{
+      if(window.__ryLazyReplay && sec && (sec.id==='pipePlanSection'||sec.id==='tlPipePlanSection')){
+        window.__ryLazyReplay=false;
+        var _la0=window.alert;
+        try{
+          window.alert=function(){};
+          if(typeof window.ppGenerateDiagram==='function') window.ppGenerateDiagram({scroll:false});
+          if((window.measuredPolygon||[]).length>=3 && typeof tlAutoGenerate==='function') tlAutoGenerate({scroll:false,stay:true});
+        }catch(e){}finally{ window.alert=_la0; }
+        try{ if(typeof renderThreeLevel==='function') renderThreeLevel(); }catch(e){}
+        try{ if(typeof tlUpdatePlanBar==='function') tlUpdatePlanBar(); }catch(e){}
+      }
+    }catch(err){}
     /* [v355] 三级停在 ws 视图切入、图面数据已在而画布仍是初始空态提示时，就地补渲染一次。
        背景：整页重载后 data-ry-view 本就是 "ws"，导航点击（data-ry-view!=='ws' 才调 rySetTab）
        会跳过渲染 ⇒ v161/v355 恢复链重放出的 tlDiagramData 永远不被画进 #tlWsContent，
