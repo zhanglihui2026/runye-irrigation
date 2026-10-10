@@ -278,20 +278,35 @@
         if (!bind || !bind.uid) return { ok: false, code: -3, message: '邀请码不存在或已失效' };
         if (bind.uid === mySub) return { ok: false, code: -4, message: '不能绑定自己为邀请人' };
         return readOne(T_INV, mySub).then(function (inv) {
-          if (inv && inv.inviter) return { ok: false, code: -2, message: '已绑定邀请人，不可变更' };
+          /* 两步写入必须可重试：旧版先写 ry_invite.inviter，随后 ry_links 若失败，
+             下次会直接返回 -2 并清掉邀请码，造成“账号已登录但邀请进度永远 0”。 */
+          function ensureLink(repaired) {
+            return d.from(T_LINKS).select('id,inviter_uid,code,status').eq('invited_uid', mySub).then(function (lr) {
+              if (lr && lr.error) { setErr('bind_link_lookup', lr.error); return { ok: false, code: -98, message: '邀请关系核对失败，请重试' }; }
+              var rows = (lr && lr.data) || [];
+              var same = rows.filter(function (x) { return x.inviter_uid === bind.uid || x.code === ref; })[0];
+              if (same) return self.refresh().then(function () { return { ok: true, existed: true, repaired: !!repaired }; });
+              if (rows.length) return { ok: false, code: -2, message: '已绑定其他邀请人，不可变更' };
+              return d.from(T_LINKS).insert({
+                inviter_uid: bind.uid, invited_uid: mySub, code: ref, status: 'registered',
+                nick: maskPhone(window.CloudSync && window.CloudSync.phone) || ('用户' + mySub.slice(-4)),
+                via_group: !!viaGroup
+              }).then(function (r3) {
+                if (r3 && r3.error) { setErr('bind_link', r3.error); return { ok: false, code: -98, message: '邀请关系写入失败，请重试' }; }
+                return self.refresh().then(function () { return { ok: true, repaired: !!repaired }; });
+              });
+            });
+          }
+          if (inv && inv.inviter) {
+            if (inv.inviter !== ref) return { ok: false, code: -2, message: '已绑定其他邀请人，不可变更' };
+            return ensureLink(true);
+          }
           var wInv = inv
             ? d.from(T_INV).update({ inviter: ref }).eq('_id', mySub)
             : d.from(T_INV).insert({ _id: mySub, code: makeCode(mySub), inviter: ref, reward_claimed: false, claims: [], rewards: [] });
           return wInv.then(function (r2) {
-            if (r2 && r2.error) { setErr('bind_inv', r2.error); return { ok: false, code: -98, message: '写入失败' }; }
-            return d.from(T_LINKS).insert({
-              inviter_uid: bind.uid, code: ref,
-              nick: maskPhone(window.CloudSync && window.CloudSync.phone) || ('用户' + mySub.slice(-4)),
-              via_group: !!viaGroup
-            }).then(function (r3) {
-              if (r3 && r3.error) { setErr('bind_link', r3.error); return { ok: false, code: -98, message: '写入失败' }; }
-              return self.refresh().then(function () { return { ok: true }; });
-            });
+            if (r2 && r2.error) { setErr('bind_inv', r2.error); return { ok: false, code: -98, message: '邀请人写入失败，请重试' }; }
+            return ensureLink(false);
           });
         });
       }).catch(function (e) { setErr('bind_throw', e); return { ok: false, code: -99, message: '网络异常' }; });

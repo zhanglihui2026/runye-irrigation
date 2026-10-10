@@ -286,7 +286,7 @@
     <div class="body">
       <div class="field"><input type="tel" id="lPhone" placeholder="请输入手机号" maxlength="11" inputmode="numeric" style="font-size:16px"></div>
       <div class="field" style="margin-top:10px"><input type="text" id="lCode" placeholder="请输入 6 位验证码" maxlength="6" inputmode="numeric" style="font-size:16px"><button class="btn-code" onclick="sendLoginCode()">获取验证码</button></div>
-      <button class="btn btn-primary" style="margin-top:14px" id="btnLoginSubmit" onclick="doLogin()">登录</button>
+      <button class="btn btn-primary" style="margin-top:14px" onclick="doLogin()">登录</button>
       <button class="btn-close gray" onclick="closeModal('mLogin')">取消</button>
     </div>
   </div></div>
@@ -2933,7 +2933,7 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
   <!-- [v362] 真数据层：CloudBase SDK（自托管 bundle）+ 云同步 + 权益层 -->
   <script src="pwa/vendor/cloudbase-js-sdk-3.8.2.bundle.js?v=362"></script>
   <script src="cloud-sync.js?v=365b"></script>
-  <script src="runye-entitle.js?v=362"></script>
+  <script src="runye-entitle.js?v=366"></script>
 
 <script id="ry-ui">
 /* [v362] 邀友 H5 真数据层 —— 替换原 mock 状态机。
@@ -3008,7 +3008,7 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
   }
   /* [v365b] H5 版本徽章（远程排障：截图即知对方跑的哪版）+ 邀请链接落本 H5（v364b 修复）+
      t=时间戳 nonce：微信/手机浏览器对 HTML 强缓存，唯一 URL 强制拉新版。 */
-  var H5_VERSION = 'v365b';
+  var H5_VERSION = 'v366';
   function inviteUrl(kind) {
     var base = String(location.href || '').split('#')[0].split('?')[0];
     var u = base + '?ref=' + encodeURIComponent(view.myCode || '') + '&t=' + Date.now();
@@ -3083,14 +3083,18 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
   function renderInvite() {
     var p = progress();
 
-    $('progNum').textContent = String(p.capped);
-    $('progBar').style.width = (p.capped / C.CAP * 100) + '%';
+    var activated = Math.min(C.CAP, (p.capped || 0) + (p.cooling || 0));
+    var activateRemain = Math.max(0, C.CAP - activated);
+    $('progNum').textContent = String(activated);
+    $('progBar').style.width = (activated / C.CAP * 100) + '%';
     $('gpNum').textContent = String(p.fromGroup);
 
     if (p.reached) {
       $('progTip').innerHTML = '已达成 <b>3 位</b>有效邀请' + (view.rewardClaimed ? '，会员权益已发放（见下方奖励记录）。' : '，权益将自动发放。');
+    } else if (activated >= C.CAP && p.cooling) {
+      $('progTip').innerHTML = '已激活 <b>3 位</b>好友，其中 <b>' + p.cooling + ' 位</b>处于 3 天冷静期；到期后自动计入奖励。';
     } else {
-      $('progTip').innerHTML = '还差 <b>' + p.remain + ' 位</b>好友完成注册 + 激活，即可获赠同等时长会员。';
+      $('progTip').innerHTML = '还差 <b>' + activateRemain + ' 位</b>好友完成注册 + 激活；激活后显示进度，3 天冷静期满计入奖励。';
     }
     var stTxt = view.rewardClaimed ? '已发放 · 同一会员权益仅 1 次'
       : (p.reached ? '待发放 · 即将自动到账' : '会员权益待发放 · 邀满 3 人即赠');
@@ -3098,7 +3102,7 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
     var coolingTxt = p.cooling ? '（含 ' + p.cooling + ' 位冷静期中，不计入）' : '';
     var pendingTxt = p.pending ? '（含 ' + p.pending + ' 位仅注册未激活，不计入）' : '';
     $('progSplit').textContent = '其中邀请注册 ' + p.fromInvite + ' 人 · 群裂变 ' + p.fromGroup +
-      ' 人（共享 3 人上限）' + coolingTxt + pendingTxt;
+      ' 人（奖励已生效 ' + p.capped + '/' + C.CAP + '）' + coolingTxt + pendingTxt;
 
     var list = $('invList');
     list.innerHTML = '';
@@ -3312,8 +3316,12 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
       var ref = currentRef();
       var bindP = ref ? Promise.resolve(en.bindRef(ref, false)) : Promise.resolve(null);
       return bindP.then(function (r) {
-        if (r && r.ok) { toast('已建立好友邀请关系 ✓'); clearRef(); }
-        else if (r && r.code === -2) clearRef();
+        if (r && r.ok) { toast(r.repaired ? '邀请关系已自动修复 ✓' : '已建立好友邀请关系 ✓'); clearRef(); }
+        else if (r && r.code === -2) { toast((r && r.message) || '已绑定其他邀请人'); clearRef(); }
+        else if (ref) {
+          var bt = '登录成功，但邀请关系未建立：' + ((r && r.message) || '请稍后重试');
+          toast(bt); showErrBanner(bt, '邀请码已保留，刷新页面会自动重试。');
+        }
         syncView(); renderAll();
         go('invite');
         checkReward();

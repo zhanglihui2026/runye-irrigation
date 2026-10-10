@@ -359,7 +359,10 @@
     if (code) {
       p.appendChild(row('我的邀请码', code, true));
       var pr = en.progress();
-      p.appendChild(row('邀请进度', (pr.capped || 0) + ' / 3' + (pr.remain ? '（还差 ' + pr.remain + ' 人）' : '')));
+      var activated = Math.min(3, (pr.capped || 0) + (pr.cooling || 0));
+      var remainActive = Math.max(0, 3 - activated);
+      p.appendChild(row('已激活进度', activated + ' / 3' + (remainActive ? '（还差 ' + remainActive + ' 人）' : '')));
+      if (pr.cooling) p.appendChild(row('奖励生效进度', (pr.capped || 0) + ' / 3（' + pr.cooling + ' 人冷静期中）'));
     } else {
       p.appendChild(tip('尚未获取到邀请码（云端未就绪），稍后重试或刷新页面。', true));
     }
