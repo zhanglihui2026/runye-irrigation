@@ -27,32 +27,37 @@
      见 buildMore 内 v346 段与 openLinkedSection 内 v346 段）。 */
   var ITEMS = [
     /* [v331] 智能规划独立窗口：win:1 点击弹新窗全屏对话，主窗口原地不动 */
-    { label: '智能规划', href: 'index.html?smart=1#pipePlanSection', win: 1, title: '独立窗口打开：AI 对话规划（主窗口地块分区不受影响）' },
+    /* [v358] feat = 会员功能 key（见 runye-entitle.js 的 FEATURES）：
+         ai-plan / online-map / zone-split / pipe-layout  → L1 注册会员（匿名试用也放行）
+         hydraulic-check / pro-others                     → L2 高级会员 */
+    { label: '智能规划', href: 'index.html?smart=1#pipePlanSection', win: 1, feat: 'ai-plan', title: '独立窗口打开：AI 对话规划（主窗口地块分区不受影响）' },
     /* [v250] 在线地图 移到 地块绘制 之前（v346 起地块绘制折叠进「更多」） */
-    { label: '在线地图',     href: 'runye-map-measure.html',   pre: 1 },
+    { label: '在线地图',     href: 'runye-map-measure.html',   pre: 1, feat: 'online-map' },
     /* [v250] 「二级管路」改名「地块分区」、「三级管路编辑」改名「管路规划」（hash/id 不变，仅显示名变） */
-    { label: '地块分区',     hash: 'pipePlanSection',          pre: 1 },
-    { label: '管路规划',     hash: 'tlPipePlanSection',        pre: 1 },
-    { label: '过滤系统',     hash: 'filterSystemSection',      pre: 1, title: '过滤系统 · GREEN 型单体并联机组（初稿）' },
+    { label: '地块分区',     hash: 'pipePlanSection',          pre: 1, feat: 'zone-split' },
+    { label: '管路规划',     hash: 'tlPipePlanSection',        pre: 1, feat: 'pipe-layout' },
+    { label: '过滤系统',     hash: 'filterSystemSection',      pre: 1, feat: 'pro-others', title: '过滤系统 · GREEN 型单体并联机组（初稿）' },
     /* [v311 2026-10-08 用户要求] 水力校核 顶级导航项（独立模块：自动读 runye_network_layout，
        树状拓扑+全链路水损+滴灌带多孔出流+水泵选型+EPANET WASM 对照），原软件逻辑零改动 */
-    { label: '水力校核',     href: 'runye-hydraulics.html',     title: '水力校核：自动读已布置管网，逐段流量/流速/水损 + 最不利路径 + 需求扬程与水泵选型' },
+    { label: '水力校核',     href: 'runye-hydraulics.html',     feat: 'hydraulic-check', title: '水力校核：自动读已布置管网，逐段流量/流速/水损 + 最不利路径 + 需求扬程与水泵选型' },
   ];
   /* [v247] 折叠进「更多 ▾」的低频项：面板竖排，点开才见。
      act 项不放这里（轴测图/系统图留在顶层）；管网优化详细分析由 pipe_optim_ui.js 追加进面板。 */
   var MORE_ITEMS = [
-    { label: '地块绘制',     hash: 'areaTool',                 title: '地块绘制工具（比例尺 / 绘制边界 / 地块库）' },
+    /* [v358] feat 说明：'pro-others' = 高级会员通配键（L1 四大功能之外的全部）；
+       feat:'' = 完全免费、不参与门控。滴灌带查询器是公开查询小工具，本期保持免费。 */
+    { label: '地块绘制',     hash: 'areaTool',                 feat: 'pro-others', title: '地块绘制工具（比例尺 / 绘制边界 / 地块库）' },
     /* [NEW MODULE: 地形模块] 卸载=删除本行+terrain/+sw.js 条目 */
-    { label: '地形模块',     href: 'terrain/index.html',       title: '地形模块：shp/RTK边界导入、CGCS2000校验、面积、高程数据源登记' },
-    { label: '多地块规划',   hash: 'grPipeSection',            title: '成组地块：全组总览 + 总管编辑 + 按块进入管路规划' },
+    { label: '地形模块',     href: 'terrain/index.html',       feat: 'pro-others', title: '地形模块：shp/RTK边界导入、CGCS2000校验、面积、高程数据源登记' },
+    { label: '多地块规划',   hash: 'grPipeSection',            feat: 'pro-others', title: '成组地块：全组总览 + 总管编辑 + 按块进入管路规划' },
     /* [v247] 材料清单保持在「管路拼装」之前 */
-    { label: '材料清单',     hash: 'detailsSection' },
-    { label: '轴测图',       act: 'iso', page: 'index.html',   title: '三级管线轴测图（先「生成管线图」再点）' },
-    { label: '系统图',       act: 'sys', page: 'index.html',   title: '三级系统图（供水首部系统图）' },
-    { label: '管路拼装',     href: '管路接驳拼装.html',         title: '管路接驳拼装：管件级拼装 + 单向水力计算' },
-    { label: '经济指标分析', hash: 'threeDModelingSection',     title: '管径经济指标分析：前期管材投入 vs 后期电费，找年均总成本最低的平衡点' },
-    { label: '数字化建模',   hash: 'parametricModelingSection', title: '数字化建模 · 参数化节点建模' },
-    { label: '滴灌带查询',   href: '耐特菲姆滴灌带长度查询器.html' }
+    { label: '材料清单',     hash: 'detailsSection',           feat: 'bom-export' },
+    { label: '轴测图',       act: 'iso', page: 'index.html',   feat: 'drawing-export', title: '三级管线轴测图（先「生成管线图」再点）' },
+    { label: '系统图',       act: 'sys', page: 'index.html',   feat: 'drawing-export', title: '三级系统图（供水首部系统图）' },
+    { label: '管路拼装',     href: '管路接驳拼装.html',         feat: 'pro-others', title: '管路接驳拼装：管件级拼装 + 单向水力计算' },
+    { label: '经济指标分析', hash: 'threeDModelingSection',     feat: 'pro-others', title: '管径经济指标分析：前期管材投入 vs 后期电费，找年均总成本最低的平衡点' },
+    { label: '数字化建模',   hash: 'parametricModelingSection', feat: 'pro-others', title: '数字化建模 · 参数化节点建模' },
+    { label: '滴灌带查询',   href: '耐特菲姆滴灌带长度查询器.html', feat: '' }
   ];
   function curFile() {
     var p = decodeURIComponent((global.location && global.location.pathname) || '');
@@ -81,6 +86,28 @@
       setTimeout(function () { if (d.parentNode) d.parentNode.removeChild(d); }, 300);
     }, 2400);
   }
+  /* [v358 2026-10-10] 会员门控判定（唯一入口）。
+     三态 fail-open —— 只有「已确认无权限」才锁：
+       a) 权益层未加载（离线 / 脚本缺失 / 老页面没引 runye-entitle.js）
+          → 放行：完全保持旧行为，接入本模块的页面零回归；
+       b) 已加载但还没拿到服务端真相（RyEntitle.ready()===false）
+          → 放行：网络抖动 / 云函数还没部署 / SDK 加载慢，都不该把老用户当场锁死；
+       c) 已拿到真相 → 严格按 RyEntitle.can(feature) 判定。
+     b → c 的切换由 RyEntitle.onChange → RyFnNav.render() 重新渲染（见文件末尾订阅）。 */
+  function gate(feature) {
+    if (!feature) return true;                      /* 未标注 feat = 免费功能，不参与门控 */
+    var E = global.RyEntitle;
+    if (!E || typeof E.can !== 'function') return true;
+    if (E.mockPlan) return E.can(feature);          /* 本地联调钩子 ?rymock= */
+    if (typeof E.ready === 'function' && !E.ready()) return true;
+    return E.can(feature);
+  }
+  /* [v358] 无权限点击 → 升级引导（面板由 runye-member-ui.js 提供；未加载则退化为 toast） */
+  function showUpgrade(label) {
+    var U = global.RyMemberUI;
+    if (U && typeof U.showUpgrade === 'function') { U.showUpgrade(label); return; }
+    showToast('「' + label + '」为高级会员功能 · 邀请好友即可开通');
+  }
   /* 单个导航项 → 元素（顶层与「更多」面板共用同一套皮肤/属性逻辑） */
   function makeItem(it, base, root) {
     /* [v286g] root=子目录页声明的根前缀（如 terrain/ 页的 ../）：
@@ -91,8 +118,23 @@
     a.className = 'fn-link';
     a.setAttribute('data-ry-navitem', '1');
     if (it.href === 'runye-map-measure.html' || it.hash === 'pipePlanSection' || it.hash === 'tlPipePlanSection') a.setAttribute('data-ry-mobile-nav', '1');
-    a.textContent = it.label;
-    if (it.title) a.title = it.title;
+    /* [v358] 锁定态：「·锁」标记 + 捕获阶段拦截（阻断 href 跳转 / data-target 处理器 /
+       act 动作 / win 独立窗口 四条路径，与 v346 的线上锁同一手法） */
+    var locked = !gate(it.feat);
+    a.textContent = locked ? (it.label + ' ·锁') : it.label;
+    if (locked) {
+      a.classList.add('fn-locked');
+      a.setAttribute('data-ry-locked', '1');
+      a.setAttribute('aria-disabled', 'true');
+      a.title = '「' + it.label + '」为高级会员功能 · 点击查看开通方式';
+      a.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        showUpgrade(it.label);
+      }, true);
+    } else if (it.title) {
+      a.title = it.title;
+    }
     if (it.act && !localAction) {
       a.href = root + it.page + '#nav-' + it.act;
     } else if (localAction) {
@@ -249,6 +291,24 @@
     lastWrap = more;
     el.appendChild(more);
   }
+  /* [v358] 权益就绪 / 等级变化 → 重新渲染导航（锁定态随之收紧或放宽）。
+     时序说明：runye-nav.js 在解析到即渲染，此时权益大概率还没拉回来（ready()=false，全放行）；
+     等 RyEntitle.init() 返回后 emit，这里重渲染一次才真正上锁。 */
+  (function () {
+    var E = global.RyEntitle;
+    if (E && typeof E.onChange === 'function') {
+      E.onChange(function () { try { global.RyFnNav.render(); } catch (e) { } });
+    }
+    /* 权益层晚于导航加载（脚本顺序颠倒）时的兜底 */
+    document.addEventListener('ryentitle-ready', function () {
+      try {
+        if (global.RyEntitle && typeof global.RyEntitle.onChange === 'function') {
+          global.RyEntitle.onChange(function () { try { global.RyFnNav.render(); } catch (e) { } });
+        }
+        global.RyFnNav.render();
+      } catch (e) { }
+    });
+  })();
   global.RyFnNav = {
     items: ITEMS,
     moreItems: MORE_ITEMS,
@@ -280,6 +340,8 @@
       showToast('「' + item.label + '」功能即将开放，敬请期待');
       return;
     }
+    /* [v358] 会员门控：#hash 直达走与点击完全相同的 gate，避免「点按钮被拦、直接输网址却能进」 */
+    if (!gate(item.feat)) { showUpgrade(item.label); return; }
     if (item.act && global.RyFnNavActions && typeof global.RyFnNavActions[item.act] === 'function') {
       global.RyFnNavActions[item.act]();
     } else if (item.hash && typeof global.ryJumpToSection === 'function') {
