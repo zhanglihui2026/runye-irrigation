@@ -551,6 +551,19 @@
   function boot() {
     var en = E();
     if (!en) { mountPills(); return; }
+    /* [v364b] 兜底：带 ?ref= 落到工具页的邀请链接（旧缓存/外部入口），一律转到 H5 注册页。
+       invite.html 不加载本脚本，无循环风险。 */
+    try {
+      var ref0 = (typeof refFromUrl === 'function') ? refFromUrl() : '';
+      if (ref0 && !/invite\.html$/.test(String(location.pathname))) {
+        var pg0 = invitePage();
+        if (pg0) {
+          var grp = /[?&]from=group/.test(String(location.search)) ? '&from=group' : '';
+          location.replace(pg0.split('#')[0].split('?')[0] + '?ref=' + encodeURIComponent(ref0) + grp);
+          return;
+        }
+      }
+    } catch (e) { /* 转跳失败则按原 v361 流程本地处理 */ }
     if (typeof en.onChange === 'function') en.onChange(refreshPills);
     mountPills();
     mountAcceptBar();   /* [v361] 邀请链接落地：未登录先出接受条并暂存码 */

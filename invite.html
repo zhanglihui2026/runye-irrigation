@@ -2932,7 +2932,7 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
 
   <!-- [v362] 真数据层：CloudBase SDK（自托管 bundle）+ 云同步 + 权益层 -->
   <script src="pwa/vendor/cloudbase-js-sdk-3.8.2.bundle.js?v=362"></script>
-  <script src="cloud-sync.js?v=364"></script>
+  <script src="cloud-sync.js?v=362"></script>
   <script src="runye-entitle.js?v=362"></script>
 
 <script id="ry-ui">
@@ -3006,8 +3006,11 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
   function toolUrl() {
     try { return new URL('index.html', location.href).toString(); } catch (e) { return 'index.html'; }
   }
+  /* [v364b] 邀请链接必须落在本 H5（invite.html），不是工具页 ——
+     v362b 热修曾直接改在 invite.html 上，重建时被本源文件回退，这次改在源头。 */
   function inviteUrl(kind) {
-    var u = toolUrl().split('#')[0] + '?ref=' + encodeURIComponent(view.myCode || '');
+    var base = String(location.href || '').split('#')[0].split('?')[0];
+    var u = base + '?ref=' + encodeURIComponent(view.myCode || '');
     return kind === 'group' ? u + '&from=group' : u;
   }
 
