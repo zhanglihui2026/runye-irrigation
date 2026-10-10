@@ -107,9 +107,10 @@ async function callFn(name, data){
 }
 
 async function boot(){
-  /* 等 SDK ESM 落地（盲等会出假阴性，这里等条件）。
-     注意：@cloudbase/js-sdk 的 jsdelivr +esm 包会再去拉一层依赖，
-     冷缓存下可能要十几秒 —— 所以进度要显示出来，按钮也必须等就绪才可点
+  /* 等 SDK 落地（盲等会出假阴性，这里等条件）。
+     [v359] SDK 已自托管为本地 bundle（pwa/vendor/cloudbase-js-sdk-3.8.2.bundle.js），
+     普通 <script> 同步加载，正常情况页面打开即就绪；若就绪慢，只可能是
+     bundle 文件 404 或被浏览器扩展拦截 —— 所以进度要显示出来，按钮必须等就绪才可点
      （v1 的 bug：按钮初始就是可点的，用户点太早只会看到"云端未初始化"）。 */
   for(var i = 0; i < 240; i++){
     if(typeof cloudbase !== 'undefined' && typeof CloudSync !== 'undefined' && CloudSync.available()) break;
@@ -120,8 +121,8 @@ async function boot(){
   }
   if(typeof cloudbase === 'undefined'){
     $('s-ready').innerHTML = '<span class="err">SDK 加载失败（120 秒未就绪）—— ' +
-      '八成是浏览器取不到 cdn.jsdelivr.net（扩展拦截 / 代理 / 跟踪防护）。' +
-      '请按 F12 看 Console 里那条红色 CORS/网络错误截图给我。</span>';
+      '本地 bundle（pwa/vendor/cloudbase-js-sdk-3.8.2.bundle.js）可能 404 或被浏览器扩展拦截。' +
+      '请按 F12 看 Console / Network 里那条红色网络错误截图给我。</span>';
     $('sendMsg').innerHTML = '<span class="err">按钮保持禁用，直到 SDK 就绪</span>';
     return;
   }

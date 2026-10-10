@@ -19,13 +19,17 @@
 | 文件 | 改动 | commit |
 |---|---|---|
 | `pwa/vendor/cloudbase-js-sdk-3.8.2.bundle.js` | **新增**，787,218 字节，esbuild 打包的自包含 IIFE（`@cloudbase/js-sdk@3.8.2` + 全部 10 个依赖） | `c2cbc0e` |
-| `index.html` | 在 `cloud-sync.js` 之前注入 bundle `<script>`（CRLF 保留）；jsdelivr 注释更新 | `c2cbc0e` |
-| `cloud-sms-test.html` | 头部内联 module（jsdelivr import）→ 本地 bundle 标签；`cloud-sync.js?v=358→359` | `c2cbc0e` |
+| `index.html` | 在 `cloud-sync.js` 之前注入 bundle `<script>`（CRLF 保留）；jsdelivr 注释更新。注：该提交同时带上 index 里此前会话已改好但未提交的会员接入块（+10 行） | `c2cbc0e` |
+| `cloud-sms-test.html` | **git 层面是新增整页**（258 行，此前从未入库）；工作区改动为头部内联 module（jsdelivr import）→ 本地 bundle 标签、`cloud-sync.js?v=358→359` | `c2cbc0e` |
+| `README.md` | 随 `c2cbc0e` 一并提交（文首加 AGENT_HANDOFF 指引；**初版 §1 漏列，已补正**） | `c2cbc0e` |
 | `cloud-diag.html` | 同上（**未提交**，见 §5-3） | — |
-| `cloud-sync.js` | `cloudInit()` 重写：SDK 未就绪时 250ms 轮询最多等 10s，再判 `sdk_not_loaded`（修复「首调碰上 SDK 未就绪 ⇒ 永久失败直到刷新」） | 未提交（被 gitignore） |
+| `cloud-sync.js` | `cloudInit()` 重写：SDK 未就绪时轮询等待（v359b 起为墙钟 10s 上限）再判 `sdk_not_loaded`（**未提交**，被 gitignore） | — |
 | `AGENT_HANDOFF.md` | 缺陷表 #1/#2/#3 标已修复；进度节更新；新增 gitignore 发布阻塞项一节 | `c2cbc0e` + `bbafe2a` |
 | `_sdk_verify.html` | **新增** SDK 冒烟页（被 `_*.html` gitignore 挡住，仅本地用） | — |
 | `runye-member-ui.js` | **未改**（其 jsdelivr import 降级为 bundle 404 时的兜底，保留是刻意的） | — |
+
+**工作区遗留（非本轮产物，审核已登记）**：`runye-nav.js` 有未提交差异（+80/-18，v358 会员导航门控，
+历史会话遗留）——本轮测试覆盖的是「带该前置差异」的集成状态，单独检出三个 commit 不等价于本地运行态。
 
 两个本地 commit：`c2cbc0e`（代码+文档）、`bbafe2a`（交接文档补充）。**均未 push**（发布纪律：等用户下令）。
 
@@ -115,3 +119,54 @@ grep -c '^import\|import("' C:/Users/AHS/runye-irrigation/pwa/vendor/cloudbase-j
 - **`CloudSync.callFn` 吞错误**：catch 后置 `_cloudLastError` 并返回 null —— 判「成功还是被拦」必须裸调
   `callFunction` 抓原始 `err.code`，且 `_cloudLastError` 要在调用**之后**读。
 - **curl 打 localhost 被沙箱代理拦成 502**：加 `--noproxy '*'`；后台服务用 `run_in_background` 起才不会被回收。
+
+---
+
+## 8. v359b —— 审核回应与修复（2026-10-10 19:20）
+
+> 审核报告：[REVIEW_v359_RESULT.md](REVIEW_v359_RESULT.md)，结论「需修改，暂不放行」。
+> 本节逐条回应：**接受并已修 6 项、部分接受并已修正表述 4 项、待用户授权 2 项**。
+> 修复后全套验证已重跑（见下），**请审核 agent 复核 v359b**。
+
+### 8.1 已修复（P1/P2 全部采纳）
+
+| 审核条目 | 修复 | 验证 |
+|---|---|---|
+| **P1 并发初始化回归**（§4-4：并发下 initCalls=2，真实 SDK 两次 init 返回不同实例） | `cloudInit()` 重写：并发共享同一 pending Promise + 双重检查 `cloudApp`；等待改为**墙钟 10s deadline**（原 40 次 setTimeout 计数后台节流会拉长）；成功后只清 `sdk_not_loaded`/`init_failed` 两类初始化阶段旧错误（§5-4 一并修） | `_verify_v359b.cjs`：CloudSync 定义瞬间（boot 前）并发 3 次 init → **真实 init 恰好 1 次**（修复前=2）、三调用全 true、uid 正常、页面错误 0。RESULT: PASS |
+| **P1 构建脚本与产物不匹配**（§5-2：旧 `_bundle_sdk.cjs` 重跑会用 ESM 覆盖 IIFE） | 新写 **`build_sdk_bundle.cjs`**（项目根，已入库）：入口=挂全局派发事件的 wrapper、`--format=iife` 写死、版本钉死（esbuild 0.28.2 / js-sdk 3.8.2 / adapter-interface 0.7.1 / adapter-wx_mp 1.3.1，`--save-exact` 落盘 package.json）、构建后自检（体积/裸导入/全局/事件）不过即 exit 1 | 重跑产物 SHA `3da5dab8…` 与审核报告记录 **逐字节一致**（可复现性实锤） |
+| **P2 探针可假绿**（§5-3） | `_verify_pages.cjs`：ok 判定补上 `pageErrors===0` 与 uid 非空；`_verify_sdk_bundle.cjs`：V4 补 anon=true、新增 V5/V6 要求 R2/R3 **必须有定论**（OK 或 THREW，SKIPPED/超时即 FAIL） | 两探针补严后重跑全 PASS |
+| **P2 诊断文案过时**（§5-5） | cloud-sms-test「八成 jsdelivr」→ 本地 bundle 404 归因；cloud-diag「ESM 注入」→ 本地 bundle、「init（匿名登录）」→「仅初始化，不含登录」；cloud-sync 注释同步更新 | 改后 grep 复核 |
+| **依赖许可材料缺失**（§5-7） | 新增 `pwa/vendor/CLOUDBASE_SDK_LICENSE.txt`（35KB）：11 个直接依赖的版本+license 声明 + 各包许可全文；`@cloudbase/wx-cloud-client-sdk` 未声明 license 已在文件中标注待人工补核 | 已入库 |
+| **废弃中间产物**（§2 登记的 `cloudbase-js-sdk-3.8.2.esm.js`） | 移入 `_backup_20261010_sdkbundle/`（非删除，可追溯） | vendor 目录已清爽 |
+
+### 8.2 部分接受 —— 已修正表述
+
+1. **「index 无任何外部请求」过度概括**：成立。修正为「**SDK/会员链路 0 次 jsdelivr 请求**」；
+   `index.html:27` 的 `beacon.cdn.qq.com` 遥测与认证业务请求本就联网，与 SDK 自托管无关。
+2. **「永久失败直到刷新」措辞过重**：成立。旧版 `cloudInit()` 函数本身再次调用可重试；
+   缺陷实际影响是 **boot 链路的单次调用**碰上 SDK 未就绪即整轮失败（fail-open 放行）。
+   AGENT_HANDOFF 已按此口径修正。
+3. **「EXCEED_AUTHORITY 与代码无关」的时效**：接受「历史结论 ≠ 永久结论」。
+   v359b 已**当场复测**：R2（ryEntitle）/ R3（不存在函数）均再度 `EXCEED_AUTHORITY`（网关 403，requestId 在探针输出）。
+   结论更新为「截至 2026-10-10 19:15 仍成立」。
+4. **SW「在线永不卡旧版」绝对化**：接受。network-first 机制属实（审核模拟合约 PASS），
+   但 fetch 受 HTTP 缓存影响、非 2xx 回退缓存、`key()` 剥 query 等边界成立 ——
+   发布时的缓存保证改为**条件化表述**，完整性留给发布前检查（§8.3）。
+
+### 8.3 待用户授权（本轮不动）
+
+- `.gitignore` 是否移出 `cloud-sync.js`、会员三件套是否 `git add` —— 发布决策，等用户下令。
+- 手机号短信实测（唯一未知数）—— 等用户跑 `cloud-sms-test.html`。
+
+### 8.4 v359b 验证汇总（全部在审核后重跑）
+
+```
+闸门 verify_ry_tool.js        → 42 项全过，exit 0
+_verify_pages.cjs（补严版）    → 三页面 PASS（jsdelivr=0 / anon / uid / 页面错误=0）
+_verify_sdk_bundle.cjs（补严版）→ V1~V6 全过；R2/R3 现场复测均 EXCEED_AUTHORITY
+_verify_v359b.cjs（新增）      → 并发回归修复实证：真实 init=1（修复前=2）
+build_sdk_bundle.cjs          → 产物 SHA 与审核记录逐字节一致（可复现）
+```
+
+环境差异说明：审核沙箱 Edge 无法启动（§3④）；本环境 Edge 正常，上表全部真实浏览器证据。
+审核记录的「Python 3.13.14 与指定 3.13.12 不同」——3.13.14 为系统 fallback 解释器，与验证结论无碍。
