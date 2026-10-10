@@ -286,7 +286,7 @@
     <div class="body">
       <div class="field"><input type="tel" id="lPhone" placeholder="请输入手机号" maxlength="11" inputmode="numeric" style="font-size:16px"></div>
       <div class="field" style="margin-top:10px"><input type="text" id="lCode" placeholder="请输入 6 位验证码" maxlength="6" inputmode="numeric" style="font-size:16px"><button class="btn-code" onclick="sendLoginCode()">获取验证码</button></div>
-      <button class="btn btn-primary" style="margin-top:14px" onclick="doLogin()">登录</button>
+      <button class="btn btn-primary" style="margin-top:14px" id="btnLoginSubmit" onclick="doLogin()">登录</button>
       <button class="btn-close gray" onclick="closeModal('mLogin')">取消</button>
     </div>
   </div></div>
@@ -2932,15 +2932,15 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
 
   <!-- [v362] 真数据层：CloudBase SDK（自托管 bundle）+ 云同步 + 权益层 -->
   <script src="pwa/vendor/cloudbase-js-sdk-3.8.2.bundle.js?v=362"></script>
-  <script src="cloud-sync.js?v=365b"></script>
-  <script src="runye-entitle.js?v=366"></script>
+  <script src="cloud-sync.js?v=367b"></script>
+  <script src="runye-entitle.js?v=367"></script>
 
 <script id="ry-ui">
 /* [v362] 邀友 H5 真数据层 —— 替换原 mock 状态机。
  * 数据源：window.CloudSync（登录/短信/rdb）+ window.RyEntitle（权益/邀请/进度）。
  * 原则：UI 结构与 DOM id 全部沿用原版；只换数据来源。
  *   「授权激活」概念取消：账号体系=手机号，注册即有账号；
- *   「激活」= 在润野工具里保存一次方案（onSaved 推进 ry_links 行）。 */
+ *   [v367] 注册即激活：bindRef 直接写 valid，无冷静期；onSaved 仅做存量行迁移。 */
 (function () {
   'use strict';
   var C = RYCore;
@@ -3074,7 +3074,7 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
       $('heroSub').textContent = '山地梯田滴灌快速设计工具。完成注册后即赠 30 天注册会员（L1），解锁四大主功能，也可再邀 3 位同行续期。';
     } else {
       box.hidden = true;
-      $('heroTitle').innerHTML = '润野灌溉<br>邀 3 位同行激活，会员免费续';
+      $('heroTitle').innerHTML = '润野灌溉<br>邀 3 位同行注册，会员免费续';
       $('heroSub').textContent = '山地梯田滴灌快速设计工具，助你轻松规划农田灌溉方案。点开即用，无需下载。';
     }
   }
@@ -3083,31 +3083,28 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
   function renderInvite() {
     var p = progress();
 
-    var activated = Math.min(C.CAP, (p.capped || 0) + (p.cooling || 0));
+    /* [v367 规则改版] 注册即激活、无冷静期：注册成功即刻计入 3/3 */
+    var activated = Math.min(C.CAP, p.capped || 0);
     var activateRemain = Math.max(0, C.CAP - activated);
     $('progNum').textContent = String(activated);
     $('progBar').style.width = (activated / C.CAP * 100) + '%';
     $('gpNum').textContent = String(p.fromGroup);
 
     if (p.reached) {
-      $('progTip').innerHTML = '已达成 <b>3 位</b>有效邀请' + (view.rewardClaimed ? '，会员权益已发放（见下方奖励记录）。' : '，权益将自动发放。');
-    } else if (activated >= C.CAP && p.cooling) {
-      $('progTip').innerHTML = '已激活 <b>3 位</b>好友，其中 <b>' + p.cooling + ' 位</b>处于 3 天冷静期；到期后自动计入奖励。';
+      $('progTip').innerHTML = '已达成 <b>3 位</b>好友注册' + (view.rewardClaimed ? '，会员权益已发放（见下方奖励记录）。' : '，权益将自动发放。');
     } else {
-      $('progTip').innerHTML = '还差 <b>' + activateRemain + ' 位</b>好友完成注册 + 激活；激活后显示进度，3 天冷静期满计入奖励。';
+      $('progTip').innerHTML = '还差 <b>' + activateRemain + ' 位</b>好友注册；注册成功即刻计入，无需其他操作。';
     }
     var stTxt = view.rewardClaimed ? '已发放 · 同一会员权益仅 1 次'
       : (p.reached ? '待发放 · 即将自动到账' : '会员权益待发放 · 邀满 3 人即赠');
     $('progState').textContent = stTxt;
-    var coolingTxt = p.cooling ? '（含 ' + p.cooling + ' 位冷静期中，不计入）' : '';
-    var pendingTxt = p.pending ? '（含 ' + p.pending + ' 位仅注册未激活，不计入）' : '';
     $('progSplit').textContent = '其中邀请注册 ' + p.fromInvite + ' 人 · 群裂变 ' + p.fromGroup +
-      ' 人（奖励已生效 ' + p.capped + '/' + C.CAP + '）' + coolingTxt + pendingTxt;
+      ' 人（已计入 ' + p.capped + '/' + C.CAP + '）';
 
     var list = $('invList');
     list.innerHTML = '';
     if (!view.invites.length) {
-      list.appendChild(el('div', 'empty', '还没有邀请记录。把上方专属链接发给同行，对方注册并激活后即出现在这里。'));
+      list.appendChild(el('div', 'empty', '还没有邀请记录。把上方专属链接发给同行，对方注册成功后即出现在这里。'));
     } else {
       view.invites.forEach(function (it) {
         var row = el('div', 'inv');
@@ -3115,9 +3112,7 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
         var info = el('span', 'info');
         info.appendChild(el('div', 'n', it.nick + (it.viaGroup ? ' · 来自群' : '')));
         var s = '';
-        if (it.status === 'registered') s = '已注册 · 待激活（在工具里保存方案即激活）';
-        else if (it.status === 'cooling') s = '已激活 · 冷静期至 ' + C.fmtDate(it.activatedAt + C.COOL_DAYS * C.DAY) + '（到期后计入）';
-        else if (it.status === 'valid') s = '已激活 · 已生效' + (it.activatedAt ? '（' + C.fmtDate(it.activatedAt + C.COOL_DAYS * C.DAY) + ' 计入）' : '');
+        if (it.status === 'registered' || it.status === 'cooling' || it.status === 'valid') s = '已注册 · 已生效';
         else s = '账号已注销/解绑 · 不计入';
         info.appendChild(el('div', 's', s));
         row.appendChild(info);
@@ -3218,7 +3213,7 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
       checking = false;
       syncView(); renderAll();
       if (r && r.ok && r.granted > 0) {
-        $('rewardTip').innerHTML = '你已成功邀请 3 位新用户完成注册并激活。<br>同等时长会员权益已发放到你的账号。';
+        $('rewardTip').innerHTML = '你已成功邀请 3 位新用户完成注册。<br>同等时长会员权益已发放到你的账号。';
         var s = en.state;
         var r0 = (s && s.rewards && s.rewards[0]) || {};
         $('rewardLine').innerHTML = '到账权益：<b>' + (r.planName || '注册会员') + ' ' + r.granted + ' 天</b><br>当前有效期：' +
@@ -3427,7 +3422,7 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
     g.textAlign = 'center';
     g.fillText('润野灌溉', W / 2, 138);
     g.font = '28px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
-    g.fillText('邀 3 位同行激活账号', W / 2, 208);
+    g.fillText('邀 3 位同行注册账号', W / 2, 208);
     g.fillText('你的会员免费续', W / 2, 252);
     g.font = '24px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
     g.fillStyle = 'rgba(255,255,255,.85)';

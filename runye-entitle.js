@@ -112,26 +112,19 @@
       history: [{ at: now, days: TRIAL_DAYS, plan: 'L1', planName: '注册会员', from: now, to: now + TRIAL_DAYS * DAY, src: 'register' }] };
   }
 
-  /* ---------- 进度计算（冷静期动态迁移，不落库） ----------
-     links 行（inviter_uid = 我的 sub）：registered → pending；
-     cooling 且 activated_at 满 3 天 → 视为 valid（迁移由被邀请人心跳时推进，
-     邀请人侧只读，不能替写 —— 与云函数版「就地迁移落库」的差异点）。 */
+  /* ---------- 进度计算 ----------
+     [v367 规则改版] 注册即激活、取消 3 天冷静期：
+     valid / cooling / registered 一律立即计入（cooling/registered 为存量行，兼容读）。 */
   function computeProgress(links, now) {
-    var fromInvite = 0, cooling = 0, pending = 0, fromGroup = 0;
+    var fromInvite = 0, fromGroup = 0;
     for (var i = 0; i < links.length; i++) {
       var it = links[i];
-      if (it.status === 'valid') { fromInvite++; continue; }
-      if (it.status === 'cooling') {
-        if (it.activated_at && (now - ms(it.activated_at)) >= COOL_MS) fromInvite++;
-        else cooling++;
-        continue;
-      }
-      if (it.status === 'registered') pending++;
+      if (it.status === 'valid' || it.status === 'cooling' || it.status === 'registered') fromInvite++;
     }
     var total = fromInvite + fromGroup;
     var capped = Math.min(total, CAP);
     return { fromInvite: fromInvite, fromGroup: fromGroup, total: total, capped: capped,
-      cooling: cooling, pending: pending, remain: Math.max(0, CAP - capped), reached: capped >= CAP };
+      cooling: 0, pending: 0, remain: Math.max(0, CAP - capped), reached: capped >= CAP };
   }
   function loadLinks(mySub) {
     return db().from(T_LINKS).select('*').eq('inviter_uid', mySub).then(function (r) {
@@ -287,8 +280,9 @@
               var same = rows.filter(function (x) { return x.inviter_uid === bind.uid || x.code === ref; })[0];
               if (same) return self.refresh().then(function () { return { ok: true, existed: true, repaired: !!repaired }; });
               if (rows.length) return { ok: false, code: -2, message: '已绑定其他邀请人，不可变更' };
+              /* [v367 规则改版] 注册即激活：links 行直接写 valid（原 registered→cooling→valid 三段已废） */
               return d.from(T_LINKS).insert({
-                inviter_uid: bind.uid, invited_uid: mySub, code: ref, status: 'registered',
+                inviter_uid: bind.uid, invited_uid: mySub, code: ref, status: 'valid', activated_at: iso(Date.now()),
                 nick: maskPhone(window.CloudSync && window.CloudSync.phone) || ('用户' + mySub.slice(-4)),
                 via_group: !!viaGroup
               }).then(function (r3) {
@@ -369,8 +363,9 @@
     },
 
     /* ---------- 激活判定 ----------
-       [v360d] 心跳 = 首次激活自己 + 把自己的 ry_links 行从 registered 推进到 cooling
-       （原云函数版由服务端通知上级；rdb 直连下跨用户写不可行，改为被邀请人自写共享行）。 */
+       [v367 规则改版] 注册即激活：新绑定直接写 valid（见 bindRef）。
+       心跳保留两项职责：① 首次激活自己的权益行；② 把存量的 registered/cooling 行推进为 valid（老数据迁移），
+       三段状态机（registered→cooling→valid）与 3 天冷静期已废止。 */
     onSaved: function () {
       var now = Date.now();
       if (now - lastHb < HB_INTERVAL) return;
@@ -385,10 +380,10 @@
         return w1.then(function () {
           return d.from(T_LINKS).select('id,status').eq('invited_uid', mySub).then(function (r) {
             if (r && r.error) return;
-            var updates = ((r && r.data) || []).filter(function (x) { return x.status === 'registered'; });
+            var updates = ((r && r.data) || []).filter(function (x) { return x.status !== 'valid'; });
             return updates.reduce(function (p, x) {
               return p.then(function () {
-                return d.from(T_LINKS).update({ status: 'cooling', activated_at: iso(now) }).eq('id', x.id)
+                return d.from(T_LINKS).update({ status: 'valid', activated_at: iso(now) }).eq('id', x.id)
                   .catch(function () {});
               });
             }, Promise.resolve());

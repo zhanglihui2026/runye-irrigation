@@ -359,10 +359,10 @@
     if (code) {
       p.appendChild(row('我的邀请码', code, true));
       var pr = en.progress();
-      var activated = Math.min(3, (pr.capped || 0) + (pr.cooling || 0));
+      /* [v367 规则改版] 注册即激活、无冷静期：注册成功即刻计入 */
+      var activated = Math.min(3, pr.capped || 0);
       var remainActive = Math.max(0, 3 - activated);
-      p.appendChild(row('已激活进度', activated + ' / 3' + (remainActive ? '（还差 ' + remainActive + ' 人）' : '')));
-      if (pr.cooling) p.appendChild(row('奖励生效进度', (pr.capped || 0) + ' / 3（' + pr.cooling + ' 人冷静期中）'));
+      p.appendChild(row('邀请进度', activated + ' / 3' + (remainActive ? '（还差 ' + remainActive + ' 人注册）' : '')));
     } else {
       p.appendChild(tip('尚未获取到邀请码（云端未就绪），稍后重试或刷新页面。', true));
     }
@@ -425,7 +425,7 @@
     acts.appendChild(bClose);
 
     p.appendChild(acts);
-    p.appendChild(tip('邀请 3 位好友注册并完成激活，即可升级高级会员（出图 / 导出清单 / 水利校验等全部功能）。'));
+    p.appendChild(tip('邀请 3 位好友注册成功，即可升级高级会员（出图 / 导出清单 / 水利校验等全部功能）。注册即刻计入，无需好友再做其他操作。'));
     return p;
   }
 
@@ -514,7 +514,7 @@
       box.appendChild(p1);
       var p2 = document.createElement('p');
       p2.className = 'ry-mbr-tip';
-      p2.textContent = '邀请 3 位好友注册并激活，即可升级高级会员（含出图 / 导出清单 / 水利校验等全部功能）。';
+      p2.textContent = '邀请 3 位好友注册成功，即可升级高级会员（含出图 / 导出清单 / 水利校验等全部功能）。注册即刻计入。';
       box.appendChild(p2);
       /* 未登录时把登录框直接放进引导里：用户在这里第一次意识到「要开通」，
          必须当场能注册，而不是先关弹窗再去找入口。 */
