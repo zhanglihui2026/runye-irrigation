@@ -399,7 +399,9 @@
     bCopy.textContent = '复制邀请链接';
     bCopy.disabled = !code;
     bCopy.addEventListener('click', function () {
+      /* [v365b] t=时间戳 nonce：防微信 webview 用缓存的旧 HTML（旧 HTML 引旧 JS，修复永远到不了对方手机） */
       var url = en.inviteUrl(invitePage() || (location && location.href) || '');
+      url += (url.indexOf('?') >= 0 ? '&' : '?') + 't=' + Date.now();
       copyText(url, bCopy);
     });
     acts.appendChild(bCopy);

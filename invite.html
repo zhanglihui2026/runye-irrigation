@@ -2932,7 +2932,7 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
 
   <!-- [v362] 真数据层：CloudBase SDK（自托管 bundle）+ 云同步 + 权益层 -->
   <script src="pwa/vendor/cloudbase-js-sdk-3.8.2.bundle.js?v=362"></script>
-  <script src="cloud-sync.js?v=365"></script>
+  <script src="cloud-sync.js?v=365b"></script>
   <script src="runye-entitle.js?v=362"></script>
 
 <script id="ry-ui">
@@ -3006,12 +3006,25 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
   function toolUrl() {
     try { return new URL('index.html', location.href).toString(); } catch (e) { return 'index.html'; }
   }
-  /* [v364b] 邀请链接必须落在本 H5（invite.html），不是工具页 ——
-     v362b 热修曾直接改在 invite.html 上，重建时被本源文件回退，这次改在源头。 */
+  /* [v365b] H5 版本徽章（远程排障：截图即知对方跑的哪版）+ 邀请链接落本 H5（v364b 修复）+
+     t=时间戳 nonce：微信/手机浏览器对 HTML 强缓存，唯一 URL 强制拉新版。 */
+  var H5_VERSION = 'v365b';
   function inviteUrl(kind) {
     var base = String(location.href || '').split('#')[0].split('?')[0];
-    var u = base + '?ref=' + encodeURIComponent(view.myCode || '');
+    var u = base + '?ref=' + encodeURIComponent(view.myCode || '') + '&t=' + Date.now();
     return kind === 'group' ? u + '&from=group' : u;
+  }
+  function mountVersionBadge() {
+    try {
+      var b = document.getElementById('ryH5Version');
+      if (!b) {
+        b = document.createElement('div');
+        b.id = 'ryH5Version';
+        b.style.cssText = 'position:fixed;left:6px;bottom:4px;z-index:9998;font-size:10px;color:#999;opacity:.75;pointer-events:none;';
+        (document.body || document.documentElement).appendChild(b);
+      }
+      b.textContent = H5_VERSION + ' · ' + new Date().toISOString().slice(0, 16);
+    } catch (e) {}
   }
 
   /* ---------- 视图同步（权益层 → 渲染视图） ---------- */
@@ -3513,6 +3526,7 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
   }
 
   function boot() {
+    try { mountVersionBadge(); } catch (e0) {}
     cs = window.CloudSync || null;
     en = window.RyEntitle || null;
     if (!cs || !en) { renderLanding(); return; }   /* 云端脚本缺失：页面仍可浏览，登录不可用 */
