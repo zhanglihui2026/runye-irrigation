@@ -2932,7 +2932,7 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
 
   <!-- [v362] 真数据层：CloudBase SDK（自托管 bundle）+ 云同步 + 权益层 -->
   <script src="pwa/vendor/cloudbase-js-sdk-3.8.2.bundle.js?v=362"></script>
-  <script src="cloud-sync.js?v=369b"></script>
+  <script src="cloud-sync.js?v=370b"></script>
   <script src="runye-entitle.js?v=366"></script>
 
 <script id="ry-ui">
@@ -3008,7 +3008,7 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
   }
   /* [v365b] H5 版本徽章（远程排障：截图即知对方跑的哪版）+ 邀请链接落本 H5（v364b 修复）+
      t=时间戳 nonce：微信/手机浏览器对 HTML 强缓存，唯一 URL 强制拉新版。 */
-  var H5_VERSION = 'v369';
+  var H5_VERSION = 'v370';
   function inviteUrl(kind) {
     var base = String(location.href || '').split('#')[0].split('?')[0];
     var u = base + '?ref=' + encodeURIComponent(view.myCode || '') + '&t=' + Date.now();
@@ -3320,6 +3320,7 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
         syncView(); renderAll();
         go('invite');
         checkReward();
+        try { promptSetPwd(); } catch (eP) {}   /* [v370] 首次登录引导设密码 */
       });
     }).catch(function (e) {
       syncView();
@@ -3355,6 +3356,7 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
   }
 
   function doLogin() {
+    if (pwdMode) { doLoginPwd(); return; }
     var p = $('lPhone').value.trim();
     var c = $('lCode').value.trim();
     if (!C.validatePhone(p)) { toast('请输入正确的 11 位手机号'); return; }
@@ -3528,8 +3530,104 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
     return false;
   }
 
+  /* ---------- [v370] 密码登录：注册成功后引导设密，之后手机号+密码登录 ---------- */
+  var pwdMode = false;                       /* 登录弹窗当前模式：false=验证码 true=密码 */
+  var PWD_DISMISS_KEY = 'ryPwdPromptDismissed';
+  function ensurePwdDom() {
+    if ($('lPwd')) return;
+    var sheet = document.querySelector('#mLogin .sheet .body');
+    if (!sheet) return;
+    /* 密码输入框（默认隐藏） */
+    var f = document.createElement('div');
+    f.className = 'field';
+    f.style.marginTop = '10px';
+    f.style.display = 'none';
+    f.id = 'lPwdRow';
+    f.innerHTML = '<input type="password" id="lPwd" placeholder="请输入密码（8-32 位，含字母和数字）" style="font-size:16px">';
+    sheet.insertBefore(f, $('btnLoginSubmit'));
+    /* 模式切换链接 */
+    var t = document.createElement('div');
+    t.id = 'lToggle';
+    t.style.cssText = 'text-align:right;margin-top:8px;font-size:12px;color:#1a7f4b;cursor:pointer;';
+    t.textContent = '用密码登录 ›';
+    t.onclick = toggleLoginMode;
+    sheet.insertBefore(t, $('btnLoginSubmit'));
+  }
+  function toggleLoginMode() {
+    pwdMode = !pwdMode;
+    var codeRow = $('lCode') ? $('lCode').parentNode : null;
+    var btnCode = $('btnLoginCode');
+    var pwdRow = $('lPwdRow');
+    if (!codeRow || !pwdRow) return;
+    codeRow.style.display = pwdMode ? 'none' : '';
+    if (btnCode) btnCode.style.display = pwdMode ? 'none' : '';
+    pwdRow.style.display = pwdMode ? '' : 'none';
+    $('lToggle').textContent = pwdMode ? '‹ 用验证码登录' : '用密码登录 ›';
+    $('btnLoginSubmit').textContent = pwdMode ? '登录（密码）' : '登录';
+  }
+  function doLoginPwd() {
+    var p = $('lPhone').value.trim();
+    var pw = $('lPwd') ? $('lPwd').value : '';
+    if (!C.validatePhone(p)) { toast('请输入正确的 11 位手机号'); return; }
+    if (!pw) { toast('请输入密码'); return; }
+    if (!cs || typeof cs.signInPassword !== 'function') { toast('云端未就绪，请稍后再试'); return; }
+    var btn = $('btnLoginSubmit');
+    if (btn) { btn.disabled = true; var oldTxt = btn.textContent; btn.textContent = '登录中…'; }
+    cs.signInPassword(p, pw).then(function (r) {
+      if (btn) { btn.disabled = false; btn.textContent = '登录（密码）'; }
+      if (r && r.ok) afterLogin('mLogin');
+      else { var t = '登录失败：' + errText(r); toast(t); showErrBanner(t, r && r.rawErr ? JSON.stringify(r.rawErr) : ''); }
+    });
+  }
+  /* 注册/登录成功后：无密码则引导设置一次（可跳过，跳过本设备不再弹） */
+  function promptSetPwd() {
+    if (!cs || typeof cs.hasPassword !== 'function') return;
+    var dismissed = false;
+    try { dismissed = localStorage.getItem(PWD_DISMISS_KEY) === '1'; } catch (e) {}
+    if (dismissed) return;
+    Promise.resolve(cs.hasPassword()).then(function (has) {
+      if (has) return;
+      showSetPwdSheet();
+    }).catch(function () {});
+  }
+  function showSetPwdSheet() {
+    if ($('ryPwdSheet')) return;
+    var ov = document.createElement('div');
+    ov.id = 'ryPwdSheet';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:9990;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;';
+    var card = document.createElement('div');
+    card.style.cssText = 'background:#fff;width:100%;border-radius:16px 16px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));';
+    card.innerHTML =
+      '<div style="font-size:17px;font-weight:700;color:#1a3a2a">设置登录密码</div>' +
+      '<div style="font-size:12px;color:#777;margin-top:6px;line-height:1.6">设置后可用「手机号 + 密码」登录，不再依赖短信验证码（短信有每日条数限制）。建议密码 8-32 位，同时包含字母和数字。</div>' +
+      '<input id="ryPwdInput" type="password" placeholder="设置密码（8-32 位，含字母和数字）" style="width:100%;box-sizing:border-box;margin-top:12px;padding:12px;border:1px solid #ddd;border-radius:10px;font-size:15px">' +
+      '<div style="display:flex;gap:10px;margin-top:14px">' +
+      '<button id="ryPwdSkip" style="flex:1;padding:12px;border:1px solid #ddd;background:#f7f7f7;border-radius:10px;font-size:15px">暂不设置</button>' +
+      '<button id="ryPwdSave" style="flex:1;padding:12px;border:0;background:#1a7f4b;color:#fff;border-radius:10px;font-size:15px;font-weight:600">保存并启用</button>' +
+      '</div>';
+    ov.appendChild(card);
+    document.body.appendChild(ov);
+    $('ryPwdSkip').onclick = function () {
+      try { localStorage.setItem(PWD_DISMISS_KEY, '1'); } catch (e) {}
+      ov.remove(); toast('已跳过，可稍后在「我的邀请」页设置');
+    };
+    $('ryPwdSave').onclick = function () {
+      var pw = $('ryPwdInput').value;
+      if (!/^[A-Za-z0-9_\-!@#$%^&*.]{8,32}$/.test(pw) || !/[A-Za-z]/.test(pw) || !/\d/.test(pw)) {
+        toast('密码需 8-32 位，且同时包含字母和数字'); return;
+      }
+      $('ryPwdSave').disabled = true; $('ryPwdSave').textContent = '保存中…';
+      cs.setPassword(pw).then(function (r) {
+        $('ryPwdSave').disabled = false; $('ryPwdSave').textContent = '保存并启用';
+        if (r && r.ok) { ov.remove(); toast('密码已设置，下次可用密码登录'); }
+        else toast('设置失败：' + errText(r));
+      });
+    };
+  }
+
   function boot() {
     try { mountVersionBadge(); } catch (e0) {}
+    try { ensurePwdDom(); } catch (eP0) {}    /* [v370] 登录弹窗注入密码模式 DOM */
     cs = window.CloudSync || null;
     en = window.RyEntitle || null;
     if (!cs || !en) { renderLanding(); return; }   /* 云端脚本缺失：页面仍可浏览，登录不可用 */

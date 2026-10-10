@@ -394,6 +394,68 @@ function cloudSignInSms(phone, code){
   });
 }
 
+/* ===== [v370] 密码登录：注册成功后引导设密码，之后手机号+密码登录，绕开短信频率限制 =====
+   官方能力（bundle 实证）：a.setPassword({new_password})（PATCH /v1/user/password，首次设密无需旧密）；
+   a.signInWithPassword({phone, password})；用户信息 hasPassword 标志（或 password==='SET'）。
+   密码规则沿用官方：8-32 位，须含字母和数字。 */
+function validatePassword(pw){
+  pw = String(pw === null || pw === undefined ? '' : pw);
+  if(pw.length < 8 || pw.length > 32) return '';
+  return /[A-Za-z]/.test(pw) && /\d/.test(pw) ? pw : '';
+}
+function cloudHasPassword(){
+  if(!cloudApp) return Promise.resolve(false);
+  var a = cloudAuth();
+  if(!a || typeof a.getSession !== 'function') return Promise.resolve(false);
+  return Promise.resolve(a.getSession()).then(function(gs){
+    var u = gs && gs.data && gs.data.user;
+    return !!(u && (u.has_password || u.hasPassword || u.password === 'SET'));
+  }).catch(function(){ return false; });
+}
+function cloudSetPassword(pw){
+  pw = validatePassword(pw);
+  if(!pw) return Promise.resolve({ok:false, error:{msg:'密码需 8-32 位，且同时包含字母和数字'}});
+  if(!cloudApp) return Promise.resolve({ok:false, error:{msg:'云端未初始化'}});
+  var a = cloudAuth();
+  if(!a || typeof a.setPassword !== 'function')
+    return Promise.resolve({ok:false, error:{msg:'SDK 不支持设置密码'}});
+  return Promise.resolve(a.setPassword({ new_password: pw })).then(function(res){
+    if(res && res.error) return {ok:false, error:normCloudErr(res.error)};
+    if(res && res.error_code) return {ok:false, error:normCloudErr(res)};
+    smsDiag('set_password_ok', {});
+    return {ok:true};
+  }).catch(function(e){ smsDiag('set_password_throw', e); return {ok:false, error:normCloudErr((e && e.error) || e), rawErr: String(e)}; });
+}
+function cloudSignInPassword(phone, pw){
+  var pn = normPhone(phone);
+  if(!pn) return Promise.resolve({ok:false, error:{msg:'手机号格式不正确'}});
+  pw = String(pw === null || pw === undefined ? '' : pw);
+  if(!pw) return Promise.resolve({ok:false, error:{msg:'请输入密码'}});
+  if(!cloudApp) return Promise.resolve({ok:false, error:{msg:'云端未初始化'}});
+  var a = cloudAuth();
+  if(!a || typeof a.signInWithPassword !== 'function')
+    return Promise.resolve({ok:false, error:{msg:'SDK 不支持密码登录'}});
+  return Promise.resolve(a.signInWithPassword({ phone: pn, password: pw })).then(function(res){
+    if(res && res.error){ smsDiag('pwd_signin', res.error); throw res.error; }
+    return Promise.resolve(a.getSession ? a.getSession() : null).then(function(gs){
+      var d = (gs && gs.data) || {};
+      var u = d.user || (d.session && d.session.user) || null;
+      var uid = u ? (u.id || u.uid || u._id) : null;
+      if(!uid) return {ok:false, error:{msg:'登录成功但未拿到 uid'}};
+      cloudUid = uid; cloudPhone = pn;
+      cloudReady = true; cloudEmitStatus();
+      cloudEntitleAfterLogin();
+      return {ok:true, uid:cloudUid, phone:cloudPhone};
+    });
+  }).catch(function(e){
+    smsDiag('pwd_signin_throw', e);
+    var rawErr; try { rawErr = JSON.parse(JSON.stringify(e)); } catch(_e){ rawErr = String(e); }
+    var err = normCloudErr((e && e.error) || e);
+    err.raw = rawErr;
+    return {ok:false, error:err, rawErr:rawErr};
+  });
+}
+
 /* 云端加载：通过云函数读取 user_db/{uid}.json */
 function cloudLoad(){
   if(!cloudReady || !cloudApp){
@@ -608,6 +670,10 @@ window.CloudSync = {
   sendSmsCode: cloudSendSmsCode,
   signInSms: cloudSignInSms,
   smsCooldown: cloudSmsCooldown,
+  /* [v370] 密码登录三件套 */
+  hasPassword: cloudHasPassword,
+  setPassword: cloudSetPassword,
+  signInPassword: cloudSignInPassword,
   restore: cloudRestore,
   calcStage: cloudCalcStage,
   getPlans: cloudGetPlans,
