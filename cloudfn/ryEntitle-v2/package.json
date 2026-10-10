@@ -1,0 +1,8 @@
+{
+  "name": "ryEntitle",
+  "version": "2.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "pg": "^8.11.3"
+  }
+}
