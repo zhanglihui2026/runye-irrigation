@@ -53,6 +53,12 @@
 </div>
 
 <div class="card">
+  <h2>②B 数据读写回环（功能级实锤 · 用当前登录态，无需再发短信）</h2>
+  <button id="btnRound" class="ghost">3. 写入 → 读回 → 清理（syncDb kv 三连）</button>
+  <span id="roundMsg" class="muted">登录成功后再点（未登录会失败，这本身也是有效信号）</span>
+</div>
+
+<div class="card">
   <h2>③ 运行日志</h2>
   <div id="log">等待开始…</div>
   <button id="btnCopy" style="background:#475569">复制结果（发我）</button>
@@ -252,6 +258,48 @@ function saveHist(phone, anonUid, uid){
   try{ localStorage.setItem(HIST_KEY, JSON.stringify(list.slice(-10))); }catch(e){}
   loadHist();
 }
+
+/* ===== ②B 读写回环（v359c）：登录后点，验证 syncDb 真正能存取 ===== */
+function lastErrStr(){
+  var e = window._cloudLastError;
+  return e ? (e.code + ': ' + String(e.msg || '').slice(0, 120)) : '（无 _cloudLastError，可能是返回了失败形状）';
+}
+$('btnRound').onclick = async function(){
+  var btn = this; btn.disabled = true;
+  $('roundMsg').innerHTML = '<span class="warn">测试中…</span>';
+  L('=============== ②B 数据读写回环（syncDb kv 三连） ===============');
+  rec('—— ②B 读写回环 ——');
+  if(!CloudSync.uid){
+    L('[B0] 当前未登录（uid 为空）—— 先完成 ② 登录再点本按钮', 'warn');
+    rec('未登录，跳过');
+    $('roundMsg').innerHTML = '<span class="err">请先登录</span>';
+    btn.disabled = false; return;
+  }
+  var key = '__ry_sms_test_' + Date.now();
+  var val = { hello: 'runye', n: 42, ts: new Date().toISOString() };
+  L('[B1] kvSet("' + key + '") …');
+  var w = await CloudSync.kvSet(key, val);
+  L('  kvSet → ' + (w ? '成功（result.code===0）' : '失败 ' + lastErrStr()), w ? 'ok' : 'err');
+  rec('kvSet: ' + (w ? '成功' : '失败 ' + lastErrStr()));
+  L('[B2] kvGet("' + key + '") 读回 …');
+  var g = await CloudSync.kvGet(key);
+  var same = !!g && JSON.stringify(g) === JSON.stringify(val);
+  L('  kvGet → ' + (g ? ('拿到数据 ' + JSON.stringify(g).slice(0, 120)) : '空') +
+    (same ? ' —— 与写入完全一致' : ''), same ? 'ok' : (g ? 'warn' : 'err'));
+  rec('kvGet: ' + (same ? '读回一致（功能级实锤 ✓）' : (g ? '返回但内容不一致: ' + JSON.stringify(g).slice(0, 120) : '空 ' + lastErrStr())));
+  L('[B3] kvRemove 清理测试键 …');
+  var rm = await CloudSync.kvRemove(key);
+  L('  kvRemove → ' + (rm ? '成功' : '失败（不影响结论）'), rm ? 'ok' : 'warn');
+  rec('kvRemove: ' + (rm ? '成功' : '失败'));
+  if(w && same){
+    L('=== 读写回环通过：syncDb 真实可用，会员数据链路功能级打通 ✓ ===', 'ok');
+    $('roundMsg').innerHTML = '<span class="ok">回环通过 ✓（会员数据链路功能级打通）</span>';
+  } else {
+    L('=== 读写回环未通过 —— 点【复制结果】发我 ===', 'err');
+    $('roundMsg').innerHTML = '<span class="err">未通过，复制日志发我</span>';
+  }
+  btn.disabled = false;
+};
 
 boot();
 </script>
