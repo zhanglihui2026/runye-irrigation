@@ -2,7 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 // Pure regression for the real group controller; no browser or third-party dependency.
 const root=process.env.RUNYE_TEST_ROOT || path.join(__dirname,'..');
-const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+const html = require('../expand_index.cjs')(path.join(__dirname, '..', 'index.html'));
 function functionSource(name){const start=html.indexOf('function '+name+'(');assert(start>=0);for(let end=html.indexOf('}',start);end>=0;end=html.indexOf('}',end+1)){const text=html.slice(start,end+1);try{new vm.Script(text);return text;}catch(e){}}throw Error(name);}
 function fixture(){
  const inputs={planTapeSpacing:{value:'.4'},planEmitterSpacing:{value:'.3'},planEmitterFlow:{value:'.8'},planTapeLaySide:{value:'100'},planN:{value:'4'},planIntensity:{textContent:'999'}};

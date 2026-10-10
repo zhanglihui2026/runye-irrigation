@@ -1,0 +1,55 @@
+
+#rySetMask{position:fixed;inset:0;background:rgba(15,23,42,.42);z-index:9998;display:none}
+#rySetMask.open{display:block}
+#rySetModal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(780px,94vw);max-height:88vh;
+  background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 18px 48px rgba(15,23,42,.22);
+  z-index:9999;display:none;flex-direction:column;font-size:13px;color:#0f172a}
+#rySetModal.open{display:flex}
+#rySetModal .rs-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #e2e8f0}
+#rySetModal .rs-title{font-size:15px;font-weight:700}
+#rySetModal .rs-x{border:0;background:transparent;font-size:16px;line-height:1;color:#64748b;cursor:pointer;padding:3px 8px;border-radius:6px}
+#rySetModal .rs-x:hover{background:#f1f5f9;color:#0f172a}
+#rySetModal .rs-mid{display:flex;min-height:0;flex:1}
+#rySetModal .rs-nav{width:162px;flex:0 0 162px;border-right:1px solid #e2e8f0;background:#f8fafc;padding:8px}
+#rySetModal .rs-nav button{display:block;width:100%;text-align:left;padding:7px 10px;font-size:12.5px;border:0;border-radius:7px;
+  background:transparent;color:#475569;cursor:pointer;margin-bottom:2px;font-family:inherit}
+#rySetModal .rs-nav button:hover{background:#eef2f7}
+#rySetModal .rs-nav button.on{background:#fff;color:#0e7490;font-weight:700;box-shadow:inset 2px 0 0 #0891b2}
+#rySetModal .rs-body{flex:1;min-width:0;overflow:auto;padding:16px}
+#rySetModal .rs-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 16px;
+  border-top:1px solid #e2e8f0;background:#f8fafc}
+#rySetModal h4{margin:0 0 5px;font-size:13px;font-weight:700}
+#rySetModal .rs-note{font-size:11.5px;color:#64748b;line-height:1.6;margin:0 0 12px}
+#rySetModal .rs-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+#rySetModal .rs-row>label{width:92px;flex:0 0 92px;font-size:12px;color:#475569}
+#rySetModal .rs-unit{font-size:12px;color:#64748b}
+#rySetModal input[type=number]{width:96px;padding:4px 7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;font-family:inherit}
+#rySetModal input[type=range]{width:220px}
+#rySetModal .rs-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 10px;margin:6px 0 14px}
+#rySetModal .rs-cell{display:flex;align-items:center;gap:5px}
+#rySetModal .rs-phi{width:38px;flex:0 0 38px;font-size:11.5px;color:#64748b;text-align:right}
+#rySetModal .rs-cell input{width:100%;min-width:0;padding:3px 6px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px}
+#rySetModal .rs-sep{border:0;border-top:1px dashed #e2e8f0;margin:14px 0}
+#rySetModal button.rs-btn{padding:5px 12px;font-size:12px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;
+  color:#334155;cursor:pointer;font-family:inherit}
+#rySetModal button.rs-btn:hover{background:#f1f5f9}
+#rySetModal button.rs-btn.primary{background:#0e7490;border-color:#0e7490;color:#fff}
+#rySetModal button.rs-btn.primary:hover{background:#155e75}
+#rySetModal button.rs-btn.ghost{border-color:#e2e8f0;color:#64748b}
+#rySetModal .rs-badge{font-size:12px;color:#0e7490;font-weight:700;min-width:46px;display:inline-block}
+@media(max-width:560px){
+  #rySetModal .rs-nav{width:110px;flex:0 0 110px}
+  #rySetModal .rs-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+  /* [v322 2026-10-09 用户要求] 全站扁平化：滚动条隐形（轨道透明、滑块常态极淡、悬停显形；5px 基准不变） */
+  *::-webkit-scrollbar-track{background:transparent}
+  *::-webkit-scrollbar-thumb{background:rgba(188,211,198,.25)}
+  *::-webkit-scrollbar-thumb:hover{background:rgba(188,211,198,.8)}
+  *::-webkit-scrollbar-corner{background:transparent}
+  /* [v322] 栏线融合：左右工具栏与中间区直接相接（分界靠底色差） */
+  body.ry-tool #pipePlanSection .pp-side, body.ry-tool #tlPipePlanSection .pp-side{border-right-color:transparent}
+  body.ry-tool #areaTool .at-sidebar{border-right-color:transparent}
+  body.ry-tool #designInput .mw-col-right{border-left-color:transparent;border-right-color:transparent}
+  body.ry-tool #pipePlanSection #ppToolbar{border-left-color:transparent;border-right-color:transparent}
+  body.ry-tool #ryCadSide [data-pp="pipePlanSection"] .pp-side, body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-side{border-right-color:transparent}
+  body.ry-tool #ryCadSide [data-pp="pipePlanSection"] #ppToolbar{border-left-color:transparent;border-right-color:transparent}

@@ -148,7 +148,7 @@ ok(H.summary(null).taps === 8, 'summary(null) 走默认预设，不抛异常');
 
 /* ---------- 10. ★ 与 index.html 同口径交叉校验 ---------- */
 console.log('\n[10] 与 index.html 同口径交叉校验');
-const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+const html = require('../expand_index.cjs')(path.join(__dirname, '..', 'index.html'));
 function grab(re, label) {
   const m = html.match(re);
   ok(!!m, '能从 index.html 抽到 ' + label);

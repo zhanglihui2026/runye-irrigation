@@ -3,7 +3,7 @@ const path = require('path');
 const vm = require('vm');
 const assert = require('node:assert/strict');
 const root = path.join(__dirname, '..');
-const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const html = require('../expand_index.cjs')(path.join(__dirname, '..', 'index.html'));
 function extract(s, name) {
   const start = s.indexOf('function ' + name + '(');
   assert.ok(start >= 0, name + ' 缺失');
@@ -103,7 +103,7 @@ for (const product of ['pc16010','pc16250']) {
   }
 }
 for (const file of ['index.html','二级系统图.html','三级系统图.html','耐特菲姆滴灌带长度查询器.html']) {
-  const source=fs.readFileSync(path.join(root,file),'utf8');
+  const source=require('../expand_index.cjs')(path.join(root,file));  /* [v357] index.html 拆分后拼回虚拟单文件视图（对其他文件无 mod 外链=原样） */
   let inline=0;
   for(const m of source.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
     if(/\bsrc\s*=/.test(m[1])||/type\s*=\s*["'](?:application\/json|module)/i.test(m[1]))continue;

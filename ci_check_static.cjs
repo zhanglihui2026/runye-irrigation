@@ -31,7 +31,9 @@ function check(name, ok, extra) {
   if (ok) pass++; else fail++;
 }
 
-const html = fs.readFileSync(INDEX, 'utf8');
+/* [v357] 单文件已拆分：mod/ 外链拼回虚拟单文件视图，①②③ 锚不变 */
+const expandIndex = require('./expand_index.cjs');
+const html = expandIndex(INDEX);
 
 /* ---------- ① 内联 <script> 语法 ---------- */
 const inline = [];

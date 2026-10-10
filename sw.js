@@ -1,11 +1,47 @@
 /* Runye PWA v1. Increment VERSION when changing the offline shell. */
 'use strict';
-const VERSION = 'v356-lazy-replay';
+const VERSION = 'v357-split';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
 const RUNTIME_CACHE = PREFIX + VERSION + '-runtime';
 const CORE = [
+  /* [v357] 单文件拆分产物 */
+  "mod/inline-01.js",
+  "mod/inline-02.js",
+  "mod/inline-03.js",
+  "mod/inline-04.js",
+  "mod/inline-05.js",
+  "mod/inline-06.js",
+  "mod/inline-07.js",
+  "mod/inline-08.js",
+  "mod/inline-09.js",
+  "mod/inline-10.js",
+  "mod/inline-11.js",
+  "mod/inline-12.js",
+  "mod/inline-13.js",
+  "mod/inline-14.js",
+  "mod/inline-15.js",
+  "mod/inline-16.js",
+  "mod/inline-17.js",
+  "mod/inline-18.js",
+  "mod/inline-19.js",
+  "mod/inline-20.js",
+  "mod/inline-21.js",
+  "mod/inline-22.js",
+  "mod/inline-23.js",
+  "mod/inline-24.js",
+  "mod/inline-25.js",
+  "mod/inline-26.js",
+  "mod/inline-27.js",
+  "mod/inline-28.js",
+  "mod/inline-29.js",
+  "mod/inline-30.js",
+  "mod/style-01.css",
+  "mod/style-02.css",
+  "mod/style-03.css",
+  "mod/style-04.css",
+  "mod/style-05.css",
   "filter-system/filter-system.css",
   "filter-system/filter-system.js",
   "hydraulic-calc/design-core.js",

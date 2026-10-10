@@ -1,0 +1,46 @@
+
+        #tlIsoDiagramWrap{position:relative}
+        /* v126：宽度可拖 —— var(--tlEconW) 挂在 #tlIsoDiagramWrap 上，没拖过走 clamp 回退值；拖拽条 #tlEconGrip 同读该变量贴在面板左缘 */
+        /* v129：top 46→0 直接贴顶部导航栏，不再留白（v124 曾定 46 给工具栏让高——工具栏按钮组在左侧，右半本就空着） */
+        #tlEconPanel{position:absolute;top:0;right:0;bottom:0;width:var(--tlEconW,clamp(400px,36vw,560px));overflow:hidden;display:flex;flex-direction:column;background:#fff;border:1px solid #c5d6cc;border-right:0;border-radius:0;box-shadow:none;z-index:40;font-size:12px;color:#1f2937;padding:10px 12px}
+        #tlEconGrip{position:absolute;top:0;bottom:0;right:calc(var(--tlEconW,clamp(400px,36vw,560px)) - 3px);width:7px;cursor:col-resize;z-index:41;display:none;background:transparent;border-radius:3px}
+        #tlEconGrip:hover,#tlEconGrip.on{background:rgba(45,96,75,.28)}
+        /* v127：面板收起后的右侧折叠细条（与左侧「⚙ 工具栏」收起条同一交互语言：点条展开） */
+        #tlEconRail{position:absolute;top:0;bottom:0;right:0;width:30px;display:none;align-items:center;justify-content:flex-start;padding-top:14px;background:#f4f9f5;border:1px solid #c5d6cc;border-right:0;border-radius:0;cursor:pointer;z-index:39;font-size:12.5px;font-weight:700;color:#2d604b;writing-mode:vertical-rl;letter-spacing:4px;user-select:none}
+        #tlEconRail:hover{background:#e6f2ea}
+        /* v127：面板展开时顶部工具栏让位（按钮组左移到面板左缘以内；--tlEconW 实时跟随拖宽） */
+        #tlIsoToolbar.te-padded{padding-right:var(--tlEconW,clamp(400px,36vw,560px))}
+        /* v124：头部（标题/管长/下拉/假设）锁定不动，只有中部表格区滚动；取消悬浮卡片，贴合右缘 */
+        #tlEconPanel .te-mid{flex:1 1 auto;min-height:0;overflow:auto;padding-right:2px}
+        #tlEconPanel .te-mid::-webkit-scrollbar{width:5px;height:5px}
+        #tlEconPanel .te-mid::-webkit-scrollbar-thumb{background:rgba(188,211,198,.25);border-radius:2px}
+        #tlEconPanel .te-mid::-webkit-scrollbar-thumb:hover{background:#9db8a7}
+        #tlEconPanel .te-mid::-webkit-scrollbar-track,#tlEconPanel .te-mid::-webkit-scrollbar-corner{background:transparent}
+        #tlEconPanel .te-foot{flex:0 0 auto}
+        #tlEconPanel .te-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+        #tlEconPanel .te-head b{font-size:13px;color:#14532d}
+        #tlEconPanel .te-close{margin-left:auto;border:0;background:transparent;font-size:16px;cursor:pointer;color:#64748b;line-height:1}
+        #tlEconPanel .te-sub{font-size:11px;color:#475569;margin-bottom:6px;line-height:1.5}
+        #tlEconPanel .te-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;font-size:11.5px}
+        #tlEconPanel .te-row select{padding:3px 4px;font-size:12px;border:1px solid #c5d6cc;border-radius:6px;background:#fff}
+        #tlEconPanel .te-row input{width:58px;padding:3px 4px;font-size:11.5px;border:1px solid #c5d6cc;border-radius:6px}
+        #tlEconPanel table{width:100%;border-collapse:collapse;font-size:10.5px;color:#334155}
+        #tlEconPanel th,#tlEconPanel td{padding:3px 4px;text-align:right;border-bottom:1px solid #e3ece6;white-space:nowrap;cursor:pointer}
+        #tlEconPanel th{position:sticky;top:0;background:#f4f9f5;color:#243c35;font-weight:600;border-bottom:1.5px solid #c6d8cc;z-index:1}
+        /* v129：第一列(组合 总/主/支)收紧到内容宽——此前均分多余宽度，与「管材投入」列之间空出大片留白 */
+        #tlEconPanel td:first-child,#tlEconPanel th:first-child{text-align:left;width:1%}
+        #tlEconPanel tr.sel td{background:#dcfce7}
+        #tlEconPanel tr.des td:first-child::after{content:"（设计）";color:#94a3b8;font-size:9.5px}
+        #tlEconPanel tr.min td.te-annual{color:#15803d;font-weight:700}
+        #tlEconPanel .te-note{font-size:10.5px;color:#5b6b66;line-height:1.6;margin-top:6px}
+        #tlEconPanel .te-foot{display:flex;align-items:center;gap:8px;margin-top:8px}
+        #tlEconPanel .te-sum{flex:1;font-size:11px;color:#334155;line-height:1.5}
+        #tlEconPanel .te-apply{border:0;background:#2d604b;color:#fff;border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer;white-space:nowrap}
+        #tlEconPanel .te-apply:hover{background:#24503e}
+        #tlEconPanel details{margin-top:6px;font-size:11px;color:#475569}
+        #tlEconPanel .te-prices{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:4px}
+        #tlEconPanel .te-prices label{font-size:10px;color:#64748b;display:grid;grid-template-columns:auto 1fr;align-items:center;gap:2px}
+        #tlEconPanel .te-prices input{width:100%;padding:2px 3px;font-size:10.5px;border:1px solid #cbd5e1;border-radius:4px}
+        /* v134：下拉切换→表格跳转时选中行闪黄一次，视觉反馈明确 */
+        @keyframes teflash{0%{background-color:#fcd34d}100%{background-color:transparent}}
+      

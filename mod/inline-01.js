@@ -1,0 +1,1 @@
+/* [v344] 默认打开智能规划：仅当无参数且无锚点时跳转；?full=1 或 #锚点 仍进完整工具 */if(!location.search&&!location.hash)location.replace('index.html?smart=1#pipePlanSection');
