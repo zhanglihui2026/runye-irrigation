@@ -1,0 +1,3521 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>润野灌溉 · 邀友赠会员</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232E7D4F'/%3E%3Cpath d='M16 5c4.5 6 7.5 9.5 7.5 13a7.5 7.5 0 0 1-15 0c0-3.5 3-7 7.5-13z' fill='%23EAF6EC'/%3E%3Cpath d='M13.5 18.5a2.6 2.6 0 0 0 2.5 2.6' stroke='%234CA46A' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --green-900:#1B4D34;--green-700:#2E7D4F;--green-500:#4CA46A;--green-100:#E8F3EA;
+    --water:#2E9E8F;--water-100:#E3F2EF;--bg:#F2F0E8;--card:#FFFFFF;--ink:#1E2A22;
+    --muted:#5A6659;--line:#E5E3D9;--danger:#C4483B;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  button,input,textarea{font-family:inherit;font-size:inherit}
+  html{-webkit-text-size-adjust:100%}
+  body{font-family:-apple-system,"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh}
+  .app{max-width:480px;margin:0 auto;background:var(--bg);min-height:100vh;padding-bottom:calc(110px + env(safe-area-inset-bottom));position:relative;box-shadow:0 0 40px rgba(20,35,26,.08)}
+  /* 顶部品牌栏 */
+  .header{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.95);backdrop-filter:blur(6px);border-bottom:1px solid var(--line);padding:12px 16px;display:flex;align-items:center;gap:10px}
+  .header .logo{width:30px;height:30px;border-radius:9px;background:var(--green-700);display:flex;align-items:center;justify-content:center;flex:none}
+  .header .name{font-size:16px;font-weight:800;color:var(--green-900)}
+  .header .name small{display:block;font-size:11.5px;color:var(--muted);font-weight:500;margin-top:1px}
+  .header .badge{margin-left:auto;font-size:11px;font-weight:600;color:var(--water);background:var(--water-100);padding:4px 9px;border-radius:12px}
+  /* 视图 */
+  .view{display:none}
+  .view.on{display:block;animation:fade .22s ease}
+  @keyframes fade{from{opacity:.4}to{opacity:1}}
+  /* hero */
+  .hero{background:linear-gradient(160deg,var(--green-900),var(--green-700));color:#fff;padding:22px 20px 40px;position:relative;overflow:hidden}
+  .hero .wave{position:absolute;right:-24px;bottom:-40px;opacity:.16;width:210px;height:210px}
+  .hero .tag{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.26);border-radius:20px;padding:5px 11px;font-size:12px}
+  .hero h1{font-size:23px;font-weight:900;margin-top:14px;line-height:1.4}
+  .hero p{font-size:13px;opacity:.92;margin-top:9px;line-height:1.6}
+  /* 卡片 */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;margin:14px 14px 0;padding:16px}
+  .card h2{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:800;color:var(--green-900)}
+  .card h2 svg{flex:none}
+  .card .desc{font-size:13px;color:#48564d;line-height:1.75;margin-top:9px}
+  .card .desc b{color:var(--green-700)}
+  /* 表单 */
+  .reg-form{margin-top:14px}
+  .field{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:11px;padding:12px;background:#fafaf6}
+  .field + .field{margin-top:10px}
+  .field.err{border-color:var(--danger);background:#FDF4F3}
+  .field input{border:none;outline:none;background:transparent;flex:1;font-size:16px;color:var(--ink);min-width:0}
+  .field .btn-code{border:none;background:none;color:var(--green-700);font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;padding:8px 0 8px 12px;min-height:44px}
+  .field .btn-code:disabled{color:var(--muted);cursor:default}
+  .agree{display:flex;align-items:flex-start;gap:8px;margin:12px 2px;font-size:12.5px;color:var(--muted);line-height:1.6}
+  .agree input{width:18px;height:18px;margin-top:1px;accent-color:var(--green-700);flex:none}
+  .agree a{color:var(--water);font-weight:600;text-decoration:underline}
+  .agree.shake{animation:shake .3s}
+  @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+  .btn{display:block;width:100%;border:none;border-radius:12px;padding:14px;font-size:16px;font-weight:700;cursor:pointer;transition:.15s}
+  .btn-primary{background:var(--green-700);color:#fff}
+  .btn-primary:active{background:var(--green-900)}
+  .btn-primary:disabled{background:#a9b8ad;cursor:default}
+  .btn-text{background:none;border:none;color:var(--water);font-size:13px;font-weight:600;padding:12px;cursor:pointer;display:block;width:100%}
+  /* 进度卡 */
+  .prog{background:linear-gradient(160deg,var(--green-900),var(--green-700));color:#fff;border-radius:16px;margin:14px 14px 0;padding:20px;position:relative;overflow:hidden}
+  .prog .wave{position:absolute;right:-16px;bottom:-22px;opacity:.16;width:190px;height:190px}
+  .prog .lbl{font-size:12px;opacity:.9}
+  .prog .num{display:flex;align-items:baseline;gap:6px;margin-top:6px}
+  .prog .num .big{font-size:38px;font-weight:900;line-height:1}
+  .prog .num .of{font-size:14px;opacity:.85}
+  .prog .bar{height:10px;background:rgba(255,255,255,.22);border-radius:6px;margin-top:13px;overflow:hidden}
+  .prog .bar i{display:block;height:100%;background:linear-gradient(90deg,#8FD6A6,#F0C060);border-radius:6px;transition:width .5s}
+  .prog .tip{font-size:13px;margin-top:13px;line-height:1.6}
+  .prog .state{margin-top:10px;font-size:12px;display:inline-flex;gap:6px;align-items:center;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.26);border-radius:18px;padding:6px 12px}
+  .prog .split{font-size:12px;opacity:.9;margin-top:10px;line-height:1.7}
+  /* 分享 */
+  .share{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+  .share button{border:1px solid var(--line);background:#fff;border-radius:13px;padding:14px;cursor:pointer;text-align:center}
+  .share button:active{background:#f6f6f1}
+  .share .ic{width:38px;height:38px;border-radius:11px;margin:0 auto;display:flex;align-items:center;justify-content:center;color:#fff}
+  .share .t{font-size:13.5px;font-weight:700;color:var(--green-900);margin-top:8px;display:block}
+  .share .d{font-size:11.5px;color:var(--muted);margin-top:3px}
+  .share .copy .ic{background:var(--green-700)}
+  .share .poster .ic{background:var(--water)}
+  .linkbox{margin-top:12px;background:#fafaf6;border:1px dashed var(--line);border-radius:10px;padding:11px 13px;font-size:12px;color:var(--muted);word-break:break-all;line-height:1.7}
+  .linkbox b{color:var(--green-700)}
+  /* 群裂变 */
+  .gp-prog{background:var(--green-100);border-radius:11px;padding:12px 14px;margin-top:13px}
+  .gp-num{font-size:13px;color:#2c5a40;font-weight:700;display:flex;align-items:baseline;gap:5px}
+  .gp-num b{font-size:19px;color:var(--green-900)}
+  .gp-hint{font-size:12.5px;color:var(--muted);margin-top:13px;line-height:1.7;background:#fafaf6;border:1px dashed var(--line);border-radius:10px;padding:11px 13px}
+  .gp-hint b{color:var(--green-700)}
+  /* 列表 */
+  .list-title{font-size:14px;font-weight:800;color:var(--green-900);margin:18px 14px 10px;display:flex;align-items:center;justify-content:space-between}
+  .list-title .link{font-size:12px;color:var(--muted);font-weight:500}
+  .inv{display:flex;align-items:center;gap:11px;background:#fff;border:1px solid var(--line);border-radius:13px;padding:12px 13px;margin:0 14px 9px}
+  .inv .av{flex:none;width:36px;height:36px;border-radius:50%;background:var(--green-100);color:var(--green-700);font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  .inv .info{flex:1;min-width:0}
+  .inv .n{font-size:13.5px;font-weight:600;word-break:break-all}
+  .inv .s{font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.5}
+  .tag{flex:none;font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:13px}
+  .tag.activate{background:#FDF2E3;color:#B07D24}
+  .tag.cooling{background:var(--water-100);color:var(--water)}
+  .tag.done{background:var(--green-100);color:var(--green-700)}
+  .tag.invalid{background:#F7E6E3;color:var(--danger)}
+  .empty{margin:0 14px;background:#fff;border:1px dashed var(--line);border-radius:13px;padding:22px 16px;text-align:center;font-size:13px;color:var(--muted);line-height:1.7}
+  /* 账号卡 */
+  .acct{background:#fff;border:1px solid var(--line);border-radius:14px;margin:0 14px;padding:6px 16px}
+  .acct-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px dashed var(--line);font-size:13px;gap:10px}
+  .acct-row:last-child{border-bottom:none}
+  .acct-row .k{color:var(--muted);flex:none}
+  .acct-row .v{font-weight:600;text-align:right;word-break:break-all}
+  .acct-row .v.act{color:var(--green-700)}
+  .acct-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:4px 0 12px}
+  .link-btn{border:1px solid var(--line);background:#fff;border-radius:10px;padding:11px;font-size:13px;cursor:pointer;text-align:center;min-height:44px}
+  .link-btn.logout{color:var(--danger);border-color:#e6c7c3;grid-column:1/-1}
+  /* 会员等级 */
+  .plan-row{display:flex;gap:10px;padding:12px 0;border-bottom:1px dashed var(--line);align-items:flex-start}
+  .plan-row:last-child{border-bottom:none}
+  .plan-tag{flex:none;font-size:11.5px;font-weight:800;padding:4px 9px;border-radius:8px;background:#f0efe9;color:var(--muted);margin-top:1px;white-space:nowrap}
+  .plan-row.cur .plan-tag{background:var(--green-700);color:#fff}
+  .plan-body{flex:1;min-width:0}
+  .plan-name{font-size:13.5px;font-weight:700;color:var(--ink)}
+  .plan-row.cur .plan-name{color:var(--green-700)}
+  .plan-feat{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.65}
+  /* 演示工具 */
+  .demo{margin:18px 14px 0;background:#FFFBF0;border:1px dashed #E0CE9A;border-radius:13px;padding:13px}
+  .demo .dt{font-size:12px;font-weight:800;color:#8A6D1F;display:flex;align-items:center;gap:6px}
+  .demo .dd{font-size:11.5px;color:#8A6D1F;opacity:.9;margin-top:4px;line-height:1.6}
+  .demo .db{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+  .demo .db button{border:1px solid #E0CE9A;background:#fff;border-radius:9px;padding:9px;font-size:12px;color:#8A6D1F;cursor:pointer;min-height:40px}
+  /* 底部导航 */
+  .tabbar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:#fff;border-top:1px solid var(--line);display:flex;z-index:25;box-shadow:0 -4px 20px rgba(0,0,0,.05);padding-bottom:env(safe-area-inset-bottom)}
+  .tabbar button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 0 12px;color:var(--muted);font-size:11.5px;background:none;border:none;cursor:pointer}
+  .tabbar button.active{color:var(--green-700)}
+  .tabbar button.active svg{fill:var(--green-700)}
+  .tabbar button svg{fill:#a8b0aa}
+  /* 弹窗 */
+  .modal{position:fixed;inset:0;background:rgba(10,18,12,.55);display:none;align-items:flex-end;justify-content:center;z-index:40;backdrop-filter:blur(2px)}
+  .modal.on{display:flex}
+  .sheet{background:#fff;width:100%;max-width:480px;border-radius:20px 20px 0 0;padding:18px 20px 28px;animation:up .28s ease;max-height:88vh;overflow-y:auto;position:relative}
+  @keyframes up{from{transform:translateY(40px);opacity:.6}to{transform:translateY(0);opacity:1}}
+  .sheet .grab{width:40px;height:4px;background:var(--line);border-radius:2px;margin:0 auto 14px}
+  .sheet .x{position:absolute;right:14px;top:14px;width:32px;height:32px;border:none;background:#f0efe9;border-radius:50%;color:var(--muted);font-size:16px;line-height:1;cursor:pointer}
+  .sheet h3{font-size:17px;font-weight:800;color:var(--green-900);text-align:center}
+  .sheet .lead{font-size:12.5px;color:var(--muted);text-align:center;margin-top:6px;line-height:1.6}
+  .sheet .body{margin-top:14px}
+  .rules{list-style:none}
+  .rules li{display:flex;gap:9px;font-size:13px;line-height:1.75;color:#3c4a41;margin-bottom:9px}
+  .rules .num{flex:none;width:19px;height:19px;border-radius:50%;background:var(--green-100);color:var(--green-700);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:2px}
+  .rules b{color:var(--green-900)}
+  .doc{font-size:13px;line-height:1.8;color:#3c4a41}
+  .doc h4{font-size:13.5px;color:var(--green-900);margin:14px 0 6px}
+  .doc h4:first-child{margin-top:0}
+  .doc p{margin-bottom:8px}
+  .btn-close{display:block;width:100%;border:none;border-radius:12px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;margin-top:14px}
+  .btn-close.gray{background:#f0efe9;color:var(--ink)}
+  .btn-close.green{background:var(--green-700);color:#fff}
+  .reward{text-align:center;padding:6px 0 2px}
+  .reward .ring{width:74px;height:74px;border-radius:50%;margin:0 auto;background:radial-gradient(circle,#8FD6A6,var(--green-700));display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 0 0 10px var(--green-100)}
+  .reward h3{font-size:19px;margin-top:14px}
+  .reward .tip{font-size:13px;color:var(--muted);margin-top:8px;line-height:1.7}
+  .reward-line{background:var(--green-100);border-radius:12px;padding:13px;font-size:13px;color:#2c5a40;line-height:1.75;margin-top:13px;text-align:left}
+  /* 海报 */
+  .poster-wrap{width:232px;margin:12px auto 0;border-radius:16px;overflow:hidden;border:1px solid var(--line);box-shadow:0 12px 30px rgba(0,0,0,.15);background:#fff}
+  .poster-wrap img{display:block;width:100%;height:auto}
+  .poster-tip{font-size:12px;color:var(--muted);text-align:center;margin-top:10px;line-height:1.6}
+  /* toast */
+  .toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);background:rgba(20,30,24,.92);color:#fff;font-size:13px;padding:11px 20px;border-radius:24px;opacity:0;transition:.25s;z-index:60;max-width:80%;text-align:center;pointer-events:none}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  @media(min-width:500px){.app{margin:16px auto;border-radius:22px;min-height:calc(100vh - 32px);box-shadow:0 24px 60px rgba(20,35,26,.16)}.tabbar{max-width:480px;border-radius:0 0 22px 22px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="header" id="hd">
+    <span class="logo"><svg width="18" height="18" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#fff"/><path d="M16 5c4.5 6 7.5 9.5 7.5 13a7.5 7.5 0 0 1-15 0c0-3.5 3-7 7.5-13z" fill="#2E7D4F"/><path d="M13.5 18.5a2.6 2.6 0 0 0 2.5 2.6" stroke="#4CA46A" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg></span>
+    <span class="name">润野灌溉<small>邀友赠会员 · 手机网页版</small></span>
+    <span class="badge" id="hdBadge">点开即用 · 无需下载</span>
+  </header>
+
+  <!-- ===== 视图：落地页（未登录） ===== -->
+  <div class="view on" id="vLanding">
+    <div class="hero">
+      <svg class="wave" viewBox="0 0 210 210" fill="none"><path d="M0 62Q55 22 105 58T210 52" stroke="#fff" stroke-width="2"/><path d="M0 94Q55 54 105 90T210 84" stroke="#fff" stroke-width="2" opacity=".7"/><path d="M0 126Q55 86 105 122T210 116" stroke="#fff" stroke-width="2" opacity=".45"/></svg>
+      <span class="tag" id="heroTInviter" hidden><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#fff" stroke-width="2"/><circle cx="9" cy="10" r="1.6" fill="#fff"/><circle cx="15" cy="10" r="1.6" fill="#fff"/><path d="M8.5 14.5c1 1.2 2.2 1.8 3.5 1.8s2.5-.6 3.5-1.8" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></svg><span id="heroTInviterName"></span></span>
+      <h1 id="heroTitle">润野灌溉<br>邀 3 位同行激活，会员免费续</h1>
+      <p id="heroSub">山地梯田滴灌快速设计工具，助你轻松规划农田灌溉方案。点开即用，无需下载。</p>
+    </div>
+
+    <div class="card">
+      <h2><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="4" stroke="#2E7D4F" stroke-width="1.8"/><path d="M12 16V8M8.5 11.5L12 8l3.5 3.5" stroke="#2E7D4F" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="formTitle">注册即参与活动</span></h2>
+      <p class="desc">新用户手机号注册即赠 <b>30 天注册会员（L1）</b>，解锁四大主功能。通过好友链接注册即自动锁定邀请关系；也可再邀 3 位同行续期。</p>
+      <div class="reg-form">
+        <div class="field" id="fPhone">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="7" y="2" width="10" height="20" rx="3" stroke="#8a948c" stroke-width="1.6"/><path d="M11 18h2" stroke="#8a948c" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <input type="tel" id="phone" placeholder="请输入手机号" maxlength="11" inputmode="numeric" autocomplete="tel">
+          <button class="btn-code" id="btnCode" onclick="sendCode()">获取验证码</button>
+        </div>
+        <div class="field" id="fCode">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="4" y="10" width="16" height="11" rx="3" stroke="#8a948c" stroke-width="1.6"/><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="#8a948c" stroke-width="1.6"/></svg>
+          <input type="text" id="vcode" placeholder="请输入 6 位验证码" maxlength="6" inputmode="numeric" autocomplete="one-time-code">
+        </div>
+        <label class="agree" id="agreeWrap"><input type="checkbox" id="agree"><span>我已阅读并同意<a onclick="openModal('mAgreement')">《用户协议》</a>、<a onclick="openModal('mPrivacy')">《隐私政策》</a>与<a onclick="openModal('mRules')">《活动规则》</a></span></label>
+        <button class="btn btn-primary" id="btnSubmit" onclick="doRegister()">注册 / 登录</button>
+        <button class="btn-text" onclick="openModal('mLogin')">已注册过？直接登录 →</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3c4.2 5.6 7 8.9 7 12.2A7 7 0 0 1 5 15.2C5 11.9 7.8 8.6 12 3z" stroke="#2E9E8F" stroke-width="1.8" stroke-linejoin="round"/></svg>润野灌溉是什么</h2>
+      <p class="desc">面向山地、梯田等复杂地形的农田灌溉设计软件：滴灌带间距规划、PVC 管径测算、水泵扬程功率计算，快速输出可落地的灌溉方案，减少试错与浪费。</p>
+      <p style="margin-top:12px"><a style="color:var(--water);font-weight:600;font-size:13px" onclick="openModal('mRules')">查看完整活动规则 →</a></p>
+    </div>
+  </div>
+
+  <!-- ===== 视图：邀请中心（登录后） ===== -->
+  <div class="view" id="vInvite">
+    <div class="prog">
+      <svg class="wave" viewBox="0 0 210 210" fill="none"><path d="M0 62Q55 22 105 58T210 52" stroke="#fff" stroke-width="2"/><path d="M0 94Q55 54 105 90T210 84" stroke="#fff" stroke-width="2" opacity=".7"/><path d="M0 126Q55 86 105 122T210 116" stroke="#fff" stroke-width="2" opacity=".45"/></svg>
+      <div class="lbl">你的邀请进度（邀请注册 + 群裂变 共享 3 人上限）</div>
+      <div class="num"><span class="big" id="progNum">0</span><span class="of">/ 3 位有效邀请</span></div>
+      <div class="bar"><i id="progBar" style="width:0%"></i></div>
+      <div class="tip" id="progTip"></div>
+      <span class="state" id="progState"></span>
+      <div class="split" id="progSplit"></div>
+    </div>
+
+    <div class="card">
+      <h2><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 12l4-4m0 0H5m3 0v3" stroke="#2E7D4F" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 12a7 7 0 1 0 2-4.9" stroke="#2E7D4F" stroke-width="1.8" stroke-linecap="round"/></svg>把专属链接发给同行</h2>
+      <p class="desc">同行通过你的链接<b>注册并授权激活润野账号</b>，即锁定你为邀请人，绑定后不可变更。</p>
+      <div class="share">
+        <button class="copy" onclick="copyInvite()"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="11" height="11" rx="3" stroke="#fff" stroke-width="1.8"/><path d="M5 15V5a3 3 0 0 1 3-3h10" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></svg></span><span class="t">复制邀请链接</span><span class="d">发给同行好友 / 社群</span></button>
+        <button class="poster" onclick="openPoster()"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="4" stroke="#fff" stroke-width="1.8"/><circle cx="8.5" cy="8.5" r="1.6" fill="#fff"/><path d="M21 15.5l-4.5-4.5-9 9M3 12.5l4-4 3.5 3.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="t">生成邀请海报</span><span class="d">存图后发给同行</span></button>
+      </div>
+      <div class="linkbox" id="inviteLinkBox"></div>
+    </div>
+
+    <div class="card">
+      <h2><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#2E9E8F" stroke-width="1.8"/><path d="M8 9.5h8M8 13h5M8 16.5h3" stroke="#2E9E8F" stroke-width="1.8" stroke-linecap="round"/></svg>群裂变 · 技术交流群</h2>
+      <p class="desc">邀请同行进入润野灌溉技术交流群，群内同样使用你的专属链接；<b>奖励只以「注册 + 授权激活」计数为准，进群本身不直接产生奖励</b>。</p>
+      <div class="gp-prog">
+        <div class="gp-num">其中来自群裂变：<b id="gpNum">0</b> 人</div>
+      </div>
+      <div class="share">
+        <button class="copy" onclick="copyInvite('group')"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M8 6h9a2 2 0 0 1 2 2v8M8 6L5 9m3-3L5 6" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 8H7a2 2 0 0 0-2 2v8" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="t">复制群内专属链接</span><span class="d">群内发给同行</span></button>
+        <button class="poster" onclick="openModal('mGroup')"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 4a8 8 0 0 1 8 8M12 9a3 3 0 0 1 3 3" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="17" r="2" fill="#fff"/></svg></span><span class="t">漏计核销申请</span><span class="d">人工核对后补计</span></button>
+      </div>
+      <div class="gp-hint"><b>说明：</b>群是交流入口，计数全自动、以防刷规则为准。若你邀请的同行<b>已完成注册激活但未被自动计入</b>（如链接丢失、跨设备注册），可提交核销，运营核对「注册手机号 + 激活记录」后<b>按实际人数补计</b>，与邀请注册共享同一 3 人上限。</div>
+    </div>
+
+    <div class="list-title">邀请明细<span class="link" onclick="openModal('mRules')">规则说明</span></div>
+    <div id="invList"></div>
+
+    <div class="list-title">核销工单</div>
+    <div id="claimList"></div>
+
+    <div class="list-title">奖励记录</div>
+    <div class="acct" id="rewardBox"></div>
+
+    <div class="list-title">会员等级与功能</div>
+    <div class="acct" id="planBox"></div>
+
+    <div class="list-title">我的账号</div>
+    <div class="acct">
+      <div class="acct-row"><span class="k">手机号</span><span class="v" id="acctPhone"></span></div>
+      <div class="acct-row"><span class="k">润野账号</span><span class="v act" id="acctRunye"></span></div>
+      <div class="acct-row"><span class="k">会员等级</span><span class="v act" id="acctPlan"></span></div>
+      <div class="acct-row"><span class="k">会员有效期</span><span class="v act" id="acctExpire"></span></div>
+      <div class="acct-actions">
+        <button class="link-btn" onclick="openModal('mAgreement')">用户协议</button>
+        <button class="link-btn" onclick="openModal('mPrivacy')">隐私政策</button>
+        <button class="link-btn logout" onclick="doLogout()">退出登录</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 底部导航 -->
+  <div class="tabbar">
+    <button class="active" id="tabHome" onclick="go('home')"><svg width="21" height="21" viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z"/></svg>活动首页</button>
+    <button id="tabInvite" onclick="go('invite')"><svg width="21" height="21" viewBox="0 0 24 24"><path d="M16 11c1.7 0 3-1.3 3-3s-1.3-3-3-3-3 1.3-3 3 1.3 3 3 3zm-8 0c1.7 0 3-1.3 3-3S9.7 5 8 5 5 6.3 5 8s1.3 3 3 3zm0 2c-2.3 0-7 1.2-7 3.5V19h14v-2.5c0-2.3-4.7-3.5-7-3.5zm8 0c-.3 0-.6 0-1 .1 1.3 1 2 2.1 2 3.4V19h6v-2.5c0-2.3-4.7-3.5-7-3.5z"/></svg>我的邀请</button>
+  </div>
+
+  <!-- ===== 弹窗：登录 ===== -->
+  <div class="modal" id="mLogin"><div class="sheet">
+    <button class="x" onclick="closeModal('mLogin')" aria-label="关闭">✕</button>
+    <div class="grab"></div>
+    <h3>已注册用户登录</h3>
+    <p class="lead">用原手机号登录，邀请进度与会员权益保持不变。</p>
+    <div class="body">
+      <div class="field"><input type="tel" id="lPhone" placeholder="请输入手机号" maxlength="11" inputmode="numeric" style="font-size:16px"></div>
+      <div class="field" style="margin-top:10px"><input type="text" id="lCode" placeholder="请输入 6 位验证码" maxlength="6" inputmode="numeric" style="font-size:16px"><button class="btn-code" onclick="sendLoginCode()">获取验证码</button></div>
+      <button class="btn btn-primary" style="margin-top:14px" onclick="doLogin()">登录</button>
+      <button class="btn-close gray" onclick="closeModal('mLogin')">取消</button>
+    </div>
+  </div></div>
+
+  <!-- ===== 弹窗：漏计核销申请 ===== -->
+  <div class="modal" id="mGroup"><div class="sheet">
+    <button class="x" onclick="closeModal('mGroup')" aria-label="关闭">✕</button>
+    <div class="grab"></div>
+    <h3>漏计核销申请</h3>
+    <p class="lead">仅用于「已完成注册激活但未被自动计入」的补计，运营核对注册与激活记录后发放。</p>
+    <div class="body">
+      <div class="field"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3" stroke="#8a948c" stroke-width="1.6"/><path d="M3.5 19c.7-3 2.8-4.5 5.5-4.5s4.8 1.5 5.5 4.5" stroke="#8a948c" stroke-width="1.6" stroke-linecap="round"/><circle cx="17" cy="9" r="2.2" stroke="#8a948c" stroke-width="1.6"/><path d="M17 14.5c1.5 0 2.8.7 3.5 1.8" stroke="#8a948c" stroke-width="1.6" stroke-linecap="round"/></svg><input type="number" id="claimCount" min="1" max="20" step="1" placeholder="需补计人数（1-20）" style="font-size:16px"></div>
+      <div class="field" style="margin-top:10px;align-items:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="margin-top:3px"><path d="M4 6h16M4 12h16M4 18h10" stroke="#8a948c" stroke-width="1.6" stroke-linecap="round"/></svg><textarea id="claimNames" placeholder="填写这些同行的注册手机号后 4 位，便于核对（选填）" style="border:none;outline:none;background:transparent;flex:1;min-height:56px;font-size:16px;font-family:inherit;resize:none;color:var(--ink)"></textarea></div>
+      <div class="gp-hint" style="margin-top:12px"><b>提示：</b>人工核对需 1-2 个工作日，结果可在下方「核销工单」查看。虚假申报将被驳回并取消相关权益。</div>
+      <button class="btn btn-primary" style="margin-top:14px" onclick="submitClaim()">提交核销申请</button>
+      <button class="btn-close gray" onclick="closeModal('mGroup')">取消</button>
+    </div>
+  </div></div>
+
+  <!-- ===== 弹窗：活动规则 ===== -->
+  <div class="modal" id="mRules"><div class="sheet">
+    <button class="x" onclick="closeModal('mRules')" aria-label="关闭">✕</button>
+    <div class="grab"></div>
+    <h3>邀友赠会员 · 活动规则</h3>
+    <p class="lead">润野灌溉会员邀请 3 位新用户激活账号，赠同等时长会员</p>
+    <div class="body">
+      <ul class="rules">
+        <li><span class="num">1</span><span>会员用户分享专属邀请链接，好友点开即<b>锁定你为邀请人</b>，绑定后不可变更。</span></li>
+        <li><span class="num">2</span><span>新用户手机号注册并激活，即成为<b>注册会员（L1）</b>，赠 <b>30 天</b>，解锁<b>地块分区、AI 智能规划、管路规划、在线地图</b>四大功能，到期可邀友续期。</span></li>
+        <li><span class="num">3</span><span><b>高级会员（L2）</b>：在注册会员基础上，再解锁<b>出图、导出清单、水利校验</b>等其余全部功能。</span></li>
+        <li><span class="num">4</span><span><b>有效邀请 = 新手机号完成注册 + 成功激活润野灌溉账号</b>，缺一不可；仅注册未激活不计入。</span></li>
+        <li><span class="num">5</span><span>仅统计<b>直接邀请</b>（下级的下级不计入），无多层奖励。</span></li>
+        <li><span class="num">6</span><span>激活后进入<b>3 天冷静期</b>，账号正常保留才计为有效；期间注销/解绑则不计入，已计入的<b>扣回进度</b>（已发放的会员权益不再收回）。</span></li>
+        <li><span class="num">7</span><span>邀满 3 人，自动赠送<b>与当前所持等级同等时长</b>的会员权益（注册会员续 30 天；高级会员续其已购时长），<b>有效期顺延、等级不变</b>。</span></li>
+        <li><span class="num">8</span><span><b>邀请注册与群裂变共享同一 3 人上限</b>，合计满 3 人即触发奖励，不叠加、不重复发放。</span></li>
+        <li><span class="num">9</span><span>同一会员订单<b>仅可触发 1 次</b>；超额邀请可获图纸模板等额外福利（另行通知）。</span></li>
+        <li><span class="num">10</span><span><b>群裂变</b>：技术交流群为交流入口，<b>进群本身不产生奖励</b>；奖励以通过你的链接完成注册激活为准。已激活但漏计的，可提交人工核销补计。</span></li>
+        <li><span class="num">11</span><span>防刷：同一设备/IP 批量注册、虚假账号不计入有效邀请；恶意刷量、虚假申报平台有权取消权益。</span></li>
+        <li><span class="num">12</span><span>本活动仅赠送<b>软件权益</b>，<b>不涉及现金、返现、佣金</b>；已达成并发放的权益不因活动调整而收回，平台保留活动调整、暂停、终止的权利。</span></li>
+      </ul>
+      <div class="gp-hint" style="margin-top:12px"><b>活动期限：</b>以本页面公告为准。<b>主办：</b>润野灌溉。<b>咨询与申诉：</b>请在润野灌溉小程序 / 软件内通过「联系客服」提交，我们将在 3 个工作日内答复。</div>
+      <button class="btn-close gray" onclick="closeModal('mRules')">我知道了</button>
+    </div>
+  </div></div>
+
+  <!-- ===== 弹窗：用户协议 ===== -->
+  <div class="modal" id="mAgreement"><div class="sheet">
+    <button class="x" onclick="closeModal('mAgreement')" aria-label="关闭">✕</button>
+    <div class="grab"></div>
+    <h3>用户协议</h3>
+    <p class="lead">润野灌溉 · 邀友赠会员活动</p>
+    <div class="body">
+      <div class="doc">
+        <h4>一、服务内容</h4>
+        <p>本协议是你与润野灌溉之间，就使用「邀友赠会员」活动页面所订立的协议。本活动赠予的均为<b>软件使用权益</b>，不含任何现金、返现或佣金。</p>
+        <h4>二、账号与使用</h4>
+        <p>1. 你应使用本人真实手机号注册，并对账号下的一切行为负责。<br>2. 邀请关系以首次点击的邀请链接为准，一经绑定不可变更。<br>3. 激活润野账号须通过官方授权流程完成，本页不收集你的润野账号密码。</p>
+        <h4>三、奖励发放</h4>
+        <p>1. 有效邀请需同时满足「注册」与「授权激活」，并通过 3 天冷静期。<br>2. 邀满 3 人自动发放，同一会员订单仅发放 1 次。<br>3. 冷静期内注销、解绑或经判定为虚假账号的，平台有权扣回相应进度与权益。</p>
+        <h4>四、行为规范</h4>
+        <p>禁止使用任何技术手段批量注册、刷量或虚假申报。一经发现，平台有权取消相关权益并保留追责权利。</p>
+        <h4>五、协议变更与终止</h4>
+        <p>平台保留活动调整、暂停、终止的权利；<b>已达成且已发放的权益不受影响</b>。争议应友好协商，协商不成提交主办方所在地法院解决。</p>
+      </div>
+      <button class="btn-close gray" onclick="closeModal('mAgreement')">我已阅读</button>
+    </div>
+  </div></div>
+
+  <!-- ===== 弹窗：隐私政策 ===== -->
+  <div class="modal" id="mPrivacy"><div class="sheet">
+    <button class="x" onclick="closeModal('mPrivacy')" aria-label="关闭">✕</button>
+    <div class="grab"></div>
+    <h3>隐私政策</h3>
+    <p class="lead">我们收集什么、为什么收集、如何保护</p>
+    <div class="body">
+      <div class="doc">
+        <h4>一、收集的信息</h4>
+        <p>1. <b>手机号</b>：用于注册、登录与身份识别。<br>2. <b>验证码</b>：仅用于当次身份校验，校验后立即失效。<br>3. <b>邀请与激活记录</b>：注册时间、授权激活时间、邀请关系，用于计算奖励。<br>4. <b>设备标识与 IP 地址</b>：仅用于<b>风控防刷</b>（识别批量注册与异常聚集）。</p>
+        <h4>二、使用目的</h4>
+        <p>上述信息仅用于：完成注册登录、判定邀请关系与奖励发放、防范虚假注册与刷量、履行法定义务。<b>我们不会将上述信息用于无关的商业推销。</b></p>
+        <h4>三、存储与保护</h4>
+        <p>信息存储于境内服务器，传输全程 HTTPS 加密。手机号与设备标识在活动结束后按最短必要期限保存，法律另有规定的从其规定。</p>
+        <h4>四、共享</h4>
+        <p>为发送短信验证码，我们需将手机号提供给具备资质的短信服务商，其仅可在本服务目的范围内使用。除此之外不向第三方共享个人信息，法律法规要求或你另行授权的除外。</p>
+        <h4>五、你的权利</h4>
+        <p>你可通过润野灌溉小程序 / 软件内「联系客服」查阅、复制、更正、删除你的个人信息，或撤回同意。撤回后可能影响活动参与。</p>
+      </div>
+      <button class="btn-close gray" onclick="closeModal('mPrivacy')">我已阅读</button>
+    </div>
+  </div></div>
+
+  <!-- ===== 弹窗：奖励达成 ===== -->
+  <div class="modal" id="mReward"><div class="sheet">
+    <button class="x" onclick="closeModal('mReward')" aria-label="关闭">✕</button>
+    <div class="grab"></div>
+    <div class="reward">
+      <div class="ring"><svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path d="M12 3l1.8 5.2L19 9l-4.2 3.3L16.4 18 12 15 7.6 18l1.6-5.7L5 9l5.2-.8z" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+      <h3>邀友目标达成！</h3>
+      <p class="tip" id="rewardTip"></p>
+    </div>
+    <div class="reward-line" id="rewardLine"></div>
+    <button class="btn-close green" onclick="closeModal('mReward')">知道了，去软件看看</button>
+  </div></div>
+
+  <!-- ===== 弹窗：海报预览 ===== -->
+  <div class="modal" id="mPoster"><div class="sheet">
+    <button class="x" onclick="closeModal('mPoster')" aria-label="关闭">✕</button>
+    <div class="grab"></div>
+    <h3>邀请海报</h3>
+    <p class="lead">长按图片保存到相册，再发给同行或社群</p>
+    <div class="poster-wrap"><img id="posterImg" alt="润野灌溉邀请海报"></div>
+    <p class="poster-tip" id="posterTip">海报生成中…</p>
+    <button class="btn-close gray" onclick="closeModal('mPoster')">关闭</button>
+  </div></div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script id="ry-qr">
+//---------------------------------------------------------------------
+//
+// QR Code Generator for JavaScript
+//
+// Copyright (c) 2009 Kazuhiko Arase
+//
+// URL: http://www.d-project.com/
+//
+// Licensed under the MIT license:
+//  http://www.opensource.org/licenses/mit-license.php
+//
+// The word 'QR Code' is registered trademark of
+// DENSO WAVE INCORPORATED
+//  http://www.denso-wave.com/qrcode/faqpatent-e.html
+//
+//---------------------------------------------------------------------
+
+var qrcode = function() {
+
+  //---------------------------------------------------------------------
+  // qrcode
+  //---------------------------------------------------------------------
+
+  /**
+   * qrcode
+   * @param typeNumber 1 to 40
+   * @param errorCorrectionLevel 'L','M','Q','H'
+   */
+  var qrcode = function(typeNumber, errorCorrectionLevel) {
+
+    var PAD0 = 0xEC;
+    var PAD1 = 0x11;
+
+    var _typeNumber = typeNumber;
+    var _errorCorrectionLevel = QRErrorCorrectionLevel[errorCorrectionLevel];
+    var _modules = null;
+    var _moduleCount = 0;
+    var _dataCache = null;
+    var _dataList = [];
+
+    var _this = {};
+
+    var makeImpl = function(test, maskPattern) {
+
+      _moduleCount = _typeNumber * 4 + 17;
+      _modules = function(moduleCount) {
+        var modules = new Array(moduleCount);
+        for (var row = 0; row < moduleCount; row += 1) {
+          modules[row] = new Array(moduleCount);
+          for (var col = 0; col < moduleCount; col += 1) {
+            modules[row][col] = null;
+          }
+        }
+        return modules;
+      }(_moduleCount);
+
+      setupPositionProbePattern(0, 0);
+      setupPositionProbePattern(_moduleCount - 7, 0);
+      setupPositionProbePattern(0, _moduleCount - 7);
+      setupPositionAdjustPattern();
+      setupTimingPattern();
+      setupTypeInfo(test, maskPattern);
+
+      if (_typeNumber >= 7) {
+        setupTypeNumber(test);
+      }
+
+      if (_dataCache == null) {
+        _dataCache = createData(_typeNumber, _errorCorrectionLevel, _dataList);
+      }
+
+      mapData(_dataCache, maskPattern);
+    };
+
+    var setupPositionProbePattern = function(row, col) {
+
+      for (var r = -1; r <= 7; r += 1) {
+
+        if (row + r <= -1 || _moduleCount <= row + r) continue;
+
+        for (var c = -1; c <= 7; c += 1) {
+
+          if (col + c <= -1 || _moduleCount <= col + c) continue;
+
+          if ( (0 <= r && r <= 6 && (c == 0 || c == 6) )
+              || (0 <= c && c <= 6 && (r == 0 || r == 6) )
+              || (2 <= r && r <= 4 && 2 <= c && c <= 4) ) {
+            _modules[row + r][col + c] = true;
+          } else {
+            _modules[row + r][col + c] = false;
+          }
+        }
+      }
+    };
+
+    var getBestMaskPattern = function() {
+
+      var minLostPoint = 0;
+      var pattern = 0;
+
+      for (var i = 0; i < 8; i += 1) {
+
+        makeImpl(true, i);
+
+        var lostPoint = QRUtil.getLostPoint(_this);
+
+        if (i == 0 || minLostPoint > lostPoint) {
+          minLostPoint = lostPoint;
+          pattern = i;
+        }
+      }
+
+      return pattern;
+    };
+
+    var setupTimingPattern = function() {
+
+      for (var r = 8; r < _moduleCount - 8; r += 1) {
+        if (_modules[r][6] != null) {
+          continue;
+        }
+        _modules[r][6] = (r % 2 == 0);
+      }
+
+      for (var c = 8; c < _moduleCount - 8; c += 1) {
+        if (_modules[6][c] != null) {
+          continue;
+        }
+        _modules[6][c] = (c % 2 == 0);
+      }
+    };
+
+    var setupPositionAdjustPattern = function() {
+
+      var pos = QRUtil.getPatternPosition(_typeNumber);
+
+      for (var i = 0; i < pos.length; i += 1) {
+
+        for (var j = 0; j < pos.length; j += 1) {
+
+          var row = pos[i];
+          var col = pos[j];
+
+          if (_modules[row][col] != null) {
+            continue;
+          }
+
+          for (var r = -2; r <= 2; r += 1) {
+
+            for (var c = -2; c <= 2; c += 1) {
+
+              if (r == -2 || r == 2 || c == -2 || c == 2
+                  || (r == 0 && c == 0) ) {
+                _modules[row + r][col + c] = true;
+              } else {
+                _modules[row + r][col + c] = false;
+              }
+            }
+          }
+        }
+      }
+    };
+
+    var setupTypeNumber = function(test) {
+
+      var bits = QRUtil.getBCHTypeNumber(_typeNumber);
+
+      for (var i = 0; i < 18; i += 1) {
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+        _modules[Math.floor(i / 3)][i % 3 + _moduleCount - 8 - 3] = mod;
+      }
+
+      for (var i = 0; i < 18; i += 1) {
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+        _modules[i % 3 + _moduleCount - 8 - 3][Math.floor(i / 3)] = mod;
+      }
+    };
+
+    var setupTypeInfo = function(test, maskPattern) {
+
+      var data = (_errorCorrectionLevel << 3) | maskPattern;
+      var bits = QRUtil.getBCHTypeInfo(data);
+
+      // vertical
+      for (var i = 0; i < 15; i += 1) {
+
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+
+        if (i < 6) {
+          _modules[i][8] = mod;
+        } else if (i < 8) {
+          _modules[i + 1][8] = mod;
+        } else {
+          _modules[_moduleCount - 15 + i][8] = mod;
+        }
+      }
+
+      // horizontal
+      for (var i = 0; i < 15; i += 1) {
+
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+
+        if (i < 8) {
+          _modules[8][_moduleCount - i - 1] = mod;
+        } else if (i < 9) {
+          _modules[8][15 - i - 1 + 1] = mod;
+        } else {
+          _modules[8][15 - i - 1] = mod;
+        }
+      }
+
+      // fixed module
+      _modules[_moduleCount - 8][8] = (!test);
+    };
+
+    var mapData = function(data, maskPattern) {
+
+      var inc = -1;
+      var row = _moduleCount - 1;
+      var bitIndex = 7;
+      var byteIndex = 0;
+      var maskFunc = QRUtil.getMaskFunction(maskPattern);
+
+      for (var col = _moduleCount - 1; col > 0; col -= 2) {
+
+        if (col == 6) col -= 1;
+
+        while (true) {
+
+          for (var c = 0; c < 2; c += 1) {
+
+            if (_modules[row][col - c] == null) {
+
+              var dark = false;
+
+              if (byteIndex < data.length) {
+                dark = ( ( (data[byteIndex] >>> bitIndex) & 1) == 1);
+              }
+
+              var mask = maskFunc(row, col - c);
+
+              if (mask) {
+                dark = !dark;
+              }
+
+              _modules[row][col - c] = dark;
+              bitIndex -= 1;
+
+              if (bitIndex == -1) {
+                byteIndex += 1;
+                bitIndex = 7;
+              }
+            }
+          }
+
+          row += inc;
+
+          if (row < 0 || _moduleCount <= row) {
+            row -= inc;
+            inc = -inc;
+            break;
+          }
+        }
+      }
+    };
+
+    var createBytes = function(buffer, rsBlocks) {
+
+      var offset = 0;
+
+      var maxDcCount = 0;
+      var maxEcCount = 0;
+
+      var dcdata = new Array(rsBlocks.length);
+      var ecdata = new Array(rsBlocks.length);
+
+      for (var r = 0; r < rsBlocks.length; r += 1) {
+
+        var dcCount = rsBlocks[r].dataCount;
+        var ecCount = rsBlocks[r].totalCount - dcCount;
+
+        maxDcCount = Math.max(maxDcCount, dcCount);
+        maxEcCount = Math.max(maxEcCount, ecCount);
+
+        dcdata[r] = new Array(dcCount);
+
+        for (var i = 0; i < dcdata[r].length; i += 1) {
+          dcdata[r][i] = 0xff & buffer.getBuffer()[i + offset];
+        }
+        offset += dcCount;
+
+        var rsPoly = QRUtil.getErrorCorrectPolynomial(ecCount);
+        var rawPoly = qrPolynomial(dcdata[r], rsPoly.getLength() - 1);
+
+        var modPoly = rawPoly.mod(rsPoly);
+        ecdata[r] = new Array(rsPoly.getLength() - 1);
+        for (var i = 0; i < ecdata[r].length; i += 1) {
+          var modIndex = i + modPoly.getLength() - ecdata[r].length;
+          ecdata[r][i] = (modIndex >= 0)? modPoly.getAt(modIndex) : 0;
+        }
+      }
+
+      var totalCodeCount = 0;
+      for (var i = 0; i < rsBlocks.length; i += 1) {
+        totalCodeCount += rsBlocks[i].totalCount;
+      }
+
+      var data = new Array(totalCodeCount);
+      var index = 0;
+
+      for (var i = 0; i < maxDcCount; i += 1) {
+        for (var r = 0; r < rsBlocks.length; r += 1) {
+          if (i < dcdata[r].length) {
+            data[index] = dcdata[r][i];
+            index += 1;
+          }
+        }
+      }
+
+      for (var i = 0; i < maxEcCount; i += 1) {
+        for (var r = 0; r < rsBlocks.length; r += 1) {
+          if (i < ecdata[r].length) {
+            data[index] = ecdata[r][i];
+            index += 1;
+          }
+        }
+      }
+
+      return data;
+    };
+
+    var createData = function(typeNumber, errorCorrectionLevel, dataList) {
+
+      var rsBlocks = QRRSBlock.getRSBlocks(typeNumber, errorCorrectionLevel);
+
+      var buffer = qrBitBuffer();
+
+      for (var i = 0; i < dataList.length; i += 1) {
+        var data = dataList[i];
+        buffer.put(data.getMode(), 4);
+        buffer.put(data.getLength(), QRUtil.getLengthInBits(data.getMode(), typeNumber) );
+        data.write(buffer);
+      }
+
+      // calc num max data.
+      var totalDataCount = 0;
+      for (var i = 0; i < rsBlocks.length; i += 1) {
+        totalDataCount += rsBlocks[i].dataCount;
+      }
+
+      if (buffer.getLengthInBits() > totalDataCount * 8) {
+        throw 'code length overflow. ('
+          + buffer.getLengthInBits()
+          + '>'
+          + totalDataCount * 8
+          + ')';
+      }
+
+      // end code
+      if (buffer.getLengthInBits() + 4 <= totalDataCount * 8) {
+        buffer.put(0, 4);
+      }
+
+      // padding
+      while (buffer.getLengthInBits() % 8 != 0) {
+        buffer.putBit(false);
+      }
+
+      // padding
+      while (true) {
+
+        if (buffer.getLengthInBits() >= totalDataCount * 8) {
+          break;
+        }
+        buffer.put(PAD0, 8);
+
+        if (buffer.getLengthInBits() >= totalDataCount * 8) {
+          break;
+        }
+        buffer.put(PAD1, 8);
+      }
+
+      return createBytes(buffer, rsBlocks);
+    };
+
+    _this.addData = function(data, mode) {
+
+      mode = mode || 'Byte';
+
+      var newData = null;
+
+      switch(mode) {
+      case 'Numeric' :
+        newData = qrNumber(data);
+        break;
+      case 'Alphanumeric' :
+        newData = qrAlphaNum(data);
+        break;
+      case 'Byte' :
+        newData = qr8BitByte(data);
+        break;
+      case 'Kanji' :
+        newData = qrKanji(data);
+        break;
+      default :
+        throw 'mode:' + mode;
+      }
+
+      _dataList.push(newData);
+      _dataCache = null;
+    };
+
+    _this.isDark = function(row, col) {
+      if (row < 0 || _moduleCount <= row || col < 0 || _moduleCount <= col) {
+        throw row + ',' + col;
+      }
+      return _modules[row][col];
+    };
+
+    _this.getModuleCount = function() {
+      return _moduleCount;
+    };
+
+    _this.make = function() {
+      if (_typeNumber < 1) {
+        var typeNumber = 1;
+
+        for (; typeNumber < 40; typeNumber++) {
+          var rsBlocks = QRRSBlock.getRSBlocks(typeNumber, _errorCorrectionLevel);
+          var buffer = qrBitBuffer();
+
+          for (var i = 0; i < _dataList.length; i++) {
+            var data = _dataList[i];
+            buffer.put(data.getMode(), 4);
+            buffer.put(data.getLength(), QRUtil.getLengthInBits(data.getMode(), typeNumber) );
+            data.write(buffer);
+          }
+
+          var totalDataCount = 0;
+          for (var i = 0; i < rsBlocks.length; i++) {
+            totalDataCount += rsBlocks[i].dataCount;
+          }
+
+          if (buffer.getLengthInBits() <= totalDataCount * 8) {
+            break;
+          }
+        }
+
+        _typeNumber = typeNumber;
+      }
+
+      makeImpl(false, getBestMaskPattern() );
+    };
+
+    _this.createTableTag = function(cellSize, margin) {
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      var qrHtml = '';
+
+      qrHtml += '<table style="';
+      qrHtml += ' border-width: 0px; border-style: none;';
+      qrHtml += ' border-collapse: collapse;';
+      qrHtml += ' padding: 0px; margin: ' + margin + 'px;';
+      qrHtml += '">';
+      qrHtml += '<tbody>';
+
+      for (var r = 0; r < _this.getModuleCount(); r += 1) {
+
+        qrHtml += '<tr>';
+
+        for (var c = 0; c < _this.getModuleCount(); c += 1) {
+          qrHtml += '<td style="';
+          qrHtml += ' border-width: 0px; border-style: none;';
+          qrHtml += ' border-collapse: collapse;';
+          qrHtml += ' padding: 0px; margin: 0px;';
+          qrHtml += ' width: ' + cellSize + 'px;';
+          qrHtml += ' height: ' + cellSize + 'px;';
+          qrHtml += ' background-color: ';
+          qrHtml += _this.isDark(r, c)? '#000000' : '#ffffff';
+          qrHtml += ';';
+          qrHtml += '"/>';
+        }
+
+        qrHtml += '</tr>';
+      }
+
+      qrHtml += '</tbody>';
+      qrHtml += '</table>';
+
+      return qrHtml;
+    };
+
+    _this.createSvgTag = function(cellSize, margin, alt, title) {
+
+      var opts = {};
+      if (typeof arguments[0] == 'object') {
+        // Called by options.
+        opts = arguments[0];
+        // overwrite cellSize and margin.
+        cellSize = opts.cellSize;
+        margin = opts.margin;
+        alt = opts.alt;
+        title = opts.title;
+      }
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      // Compose alt property surrogate
+      alt = (typeof alt === 'string') ? {text: alt} : alt || {};
+      alt.text = alt.text || null;
+      alt.id = (alt.text) ? alt.id || 'qrcode-description' : null;
+
+      // Compose title property surrogate
+      title = (typeof title === 'string') ? {text: title} : title || {};
+      title.text = title.text || null;
+      title.id = (title.text) ? title.id || 'qrcode-title' : null;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var c, mc, r, mr, qrSvg='', rect;
+
+      rect = 'l' + cellSize + ',0 0,' + cellSize +
+        ' -' + cellSize + ',0 0,-' + cellSize + 'z ';
+
+      qrSvg += '<svg version="1.1" xmlns="http://www.w3.org/2000/svg"';
+      qrSvg += !opts.scalable ? ' width="' + size + 'px" height="' + size + 'px"' : '';
+      qrSvg += ' viewBox="0 0 ' + size + ' ' + size + '" ';
+      qrSvg += ' preserveAspectRatio="xMinYMin meet"';
+      qrSvg += (title.text || alt.text) ? ' role="img" aria-labelledby="' +
+          escapeXml([title.id, alt.id].join(' ').trim() ) + '"' : '';
+      qrSvg += '>';
+      qrSvg += (title.text) ? '<title id="' + escapeXml(title.id) + '">' +
+          escapeXml(title.text) + '</title>' : '';
+      qrSvg += (alt.text) ? '<description id="' + escapeXml(alt.id) + '">' +
+          escapeXml(alt.text) + '</description>' : '';
+      qrSvg += '<rect width="100%" height="100%" fill="white" cx="0" cy="0"/>';
+      qrSvg += '<path d="';
+
+      for (r = 0; r < _this.getModuleCount(); r += 1) {
+        mr = r * cellSize + margin;
+        for (c = 0; c < _this.getModuleCount(); c += 1) {
+          if (_this.isDark(r, c) ) {
+            mc = c*cellSize+margin;
+            qrSvg += 'M' + mc + ',' + mr + rect;
+          }
+        }
+      }
+
+      qrSvg += '" stroke="transparent" fill="black"/>';
+      qrSvg += '</svg>';
+
+      return qrSvg;
+    };
+
+    _this.createDataURL = function(cellSize, margin) {
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var min = margin;
+      var max = size - margin;
+
+      return createDataURL(size, size, function(x, y) {
+        if (min <= x && x < max && min <= y && y < max) {
+          var c = Math.floor( (x - min) / cellSize);
+          var r = Math.floor( (y - min) / cellSize);
+          return _this.isDark(r, c)? 0 : 1;
+        } else {
+          return 1;
+        }
+      } );
+    };
+
+    _this.createImgTag = function(cellSize, margin, alt) {
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+
+      var img = '';
+      img += '<img';
+      img += '\u0020src="';
+      img += _this.createDataURL(cellSize, margin);
+      img += '"';
+      img += '\u0020width="';
+      img += size;
+      img += '"';
+      img += '\u0020height="';
+      img += size;
+      img += '"';
+      if (alt) {
+        img += '\u0020alt="';
+        img += escapeXml(alt);
+        img += '"';
+      }
+      img += '/>';
+
+      return img;
+    };
+
+    var escapeXml = function(s) {
+      var escaped = '';
+      for (var i = 0; i < s.length; i += 1) {
+        var c = s.charAt(i);
+        switch(c) {
+        case '<': escaped += '&lt;'; break;
+        case '>': escaped += '&gt;'; break;
+        case '&': escaped += '&amp;'; break;
+        case '"': escaped += '&quot;'; break;
+        default : escaped += c; break;
+        }
+      }
+      return escaped;
+    };
+
+    var _createHalfASCII = function(margin) {
+      var cellSize = 1;
+      margin = (typeof margin == 'undefined')? cellSize * 2 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var min = margin;
+      var max = size - margin;
+
+      var y, x, r1, r2, p;
+
+      var blocks = {
+        '██': '█',
+        '█ ': '▀',
+        ' █': '▄',
+        '  ': ' '
+      };
+
+      var blocksLastLineNoMargin = {
+        '██': '▀',
+        '█ ': '▀',
+        ' █': ' ',
+        '  ': ' '
+      };
+
+      var ascii = '';
+      for (y = 0; y < size; y += 2) {
+        r1 = Math.floor((y - min) / cellSize);
+        r2 = Math.floor((y + 1 - min) / cellSize);
+        for (x = 0; x < size; x += 1) {
+          p = '█';
+
+          if (min <= x && x < max && min <= y && y < max && _this.isDark(r1, Math.floor((x - min) / cellSize))) {
+            p = ' ';
+          }
+
+          if (min <= x && x < max && min <= y+1 && y+1 < max && _this.isDark(r2, Math.floor((x - min) / cellSize))) {
+            p += ' ';
+          }
+          else {
+            p += '█';
+          }
+
+          // Output 2 characters per pixel, to create full square. 1 character per pixels gives only half width of square.
+          ascii += (margin < 1 && y+1 >= max) ? blocksLastLineNoMargin[p] : blocks[p];
+        }
+
+        ascii += '\n';
+      }
+
+      if (size % 2 && margin > 0) {
+        return ascii.substring(0, ascii.length - size - 1) + Array(size+1).join('▀');
+      }
+
+      return ascii.substring(0, ascii.length-1);
+    };
+
+    _this.createASCII = function(cellSize, margin) {
+      cellSize = cellSize || 1;
+
+      if (cellSize < 2) {
+        return _createHalfASCII(margin);
+      }
+
+      cellSize -= 1;
+      margin = (typeof margin == 'undefined')? cellSize * 2 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var min = margin;
+      var max = size - margin;
+
+      var y, x, r, p;
+
+      var white = Array(cellSize+1).join('██');
+      var black = Array(cellSize+1).join('  ');
+
+      var ascii = '';
+      var line = '';
+      for (y = 0; y < size; y += 1) {
+        r = Math.floor( (y - min) / cellSize);
+        line = '';
+        for (x = 0; x < size; x += 1) {
+          p = 1;
+
+          if (min <= x && x < max && min <= y && y < max && _this.isDark(r, Math.floor((x - min) / cellSize))) {
+            p = 0;
+          }
+
+          // Output 2 characters per pixel, to create full square. 1 character per pixels gives only half width of square.
+          line += p ? white : black;
+        }
+
+        for (r = 0; r < cellSize; r += 1) {
+          ascii += line + '\n';
+        }
+      }
+
+      return ascii.substring(0, ascii.length-1);
+    };
+
+    _this.renderTo2dContext = function(context, cellSize) {
+      cellSize = cellSize || 2;
+      var length = _this.getModuleCount();
+      for (var row = 0; row < length; row++) {
+        for (var col = 0; col < length; col++) {
+          context.fillStyle = _this.isDark(row, col) ? 'black' : 'white';
+          context.fillRect(row * cellSize, col * cellSize, cellSize, cellSize);
+        }
+      }
+    }
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrcode.stringToBytes
+  //---------------------------------------------------------------------
+
+  qrcode.stringToBytesFuncs = {
+    'default' : function(s) {
+      var bytes = [];
+      for (var i = 0; i < s.length; i += 1) {
+        var c = s.charCodeAt(i);
+        bytes.push(c & 0xff);
+      }
+      return bytes;
+    }
+  };
+
+  qrcode.stringToBytes = qrcode.stringToBytesFuncs['default'];
+
+  //---------------------------------------------------------------------
+  // qrcode.createStringToBytes
+  //---------------------------------------------------------------------
+
+  /**
+   * @param unicodeData base64 string of byte array.
+   * [16bit Unicode],[16bit Bytes], ...
+   * @param numChars
+   */
+  qrcode.createStringToBytes = function(unicodeData, numChars) {
+
+    // create conversion map.
+
+    var unicodeMap = function() {
+
+      var bin = base64DecodeInputStream(unicodeData);
+      var read = function() {
+        var b = bin.read();
+        if (b == -1) throw 'eof';
+        return b;
+      };
+
+      var count = 0;
+      var unicodeMap = {};
+      while (true) {
+        var b0 = bin.read();
+        if (b0 == -1) break;
+        var b1 = read();
+        var b2 = read();
+        var b3 = read();
+        var k = String.fromCharCode( (b0 << 8) | b1);
+        var v = (b2 << 8) | b3;
+        unicodeMap[k] = v;
+        count += 1;
+      }
+      if (count != numChars) {
+        throw count + ' != ' + numChars;
+      }
+
+      return unicodeMap;
+    }();
+
+    var unknownChar = '?'.charCodeAt(0);
+
+    return function(s) {
+      var bytes = [];
+      for (var i = 0; i < s.length; i += 1) {
+        var c = s.charCodeAt(i);
+        if (c < 128) {
+          bytes.push(c);
+        } else {
+          var b = unicodeMap[s.charAt(i)];
+          if (typeof b == 'number') {
+            if ( (b & 0xff) == b) {
+              // 1byte
+              bytes.push(b);
+            } else {
+              // 2bytes
+              bytes.push(b >>> 8);
+              bytes.push(b & 0xff);
+            }
+          } else {
+            bytes.push(unknownChar);
+          }
+        }
+      }
+      return bytes;
+    };
+  };
+
+  //---------------------------------------------------------------------
+  // QRMode
+  //---------------------------------------------------------------------
+
+  var QRMode = {
+    MODE_NUMBER :    1 << 0,
+    MODE_ALPHA_NUM : 1 << 1,
+    MODE_8BIT_BYTE : 1 << 2,
+    MODE_KANJI :     1 << 3
+  };
+
+  //---------------------------------------------------------------------
+  // QRErrorCorrectionLevel
+  //---------------------------------------------------------------------
+
+  var QRErrorCorrectionLevel = {
+    L : 1,
+    M : 0,
+    Q : 3,
+    H : 2
+  };
+
+  //---------------------------------------------------------------------
+  // QRMaskPattern
+  //---------------------------------------------------------------------
+
+  var QRMaskPattern = {
+    PATTERN000 : 0,
+    PATTERN001 : 1,
+    PATTERN010 : 2,
+    PATTERN011 : 3,
+    PATTERN100 : 4,
+    PATTERN101 : 5,
+    PATTERN110 : 6,
+    PATTERN111 : 7
+  };
+
+  //---------------------------------------------------------------------
+  // QRUtil
+  //---------------------------------------------------------------------
+
+  var QRUtil = function() {
+
+    var PATTERN_POSITION_TABLE = [
+      [],
+      [6, 18],
+      [6, 22],
+      [6, 26],
+      [6, 30],
+      [6, 34],
+      [6, 22, 38],
+      [6, 24, 42],
+      [6, 26, 46],
+      [6, 28, 50],
+      [6, 30, 54],
+      [6, 32, 58],
+      [6, 34, 62],
+      [6, 26, 46, 66],
+      [6, 26, 48, 70],
+      [6, 26, 50, 74],
+      [6, 30, 54, 78],
+      [6, 30, 56, 82],
+      [6, 30, 58, 86],
+      [6, 34, 62, 90],
+      [6, 28, 50, 72, 94],
+      [6, 26, 50, 74, 98],
+      [6, 30, 54, 78, 102],
+      [6, 28, 54, 80, 106],
+      [6, 32, 58, 84, 110],
+      [6, 30, 58, 86, 114],
+      [6, 34, 62, 90, 118],
+      [6, 26, 50, 74, 98, 122],
+      [6, 30, 54, 78, 102, 126],
+      [6, 26, 52, 78, 104, 130],
+      [6, 30, 56, 82, 108, 134],
+      [6, 34, 60, 86, 112, 138],
+      [6, 30, 58, 86, 114, 142],
+      [6, 34, 62, 90, 118, 146],
+      [6, 30, 54, 78, 102, 126, 150],
+      [6, 24, 50, 76, 102, 128, 154],
+      [6, 28, 54, 80, 106, 132, 158],
+      [6, 32, 58, 84, 110, 136, 162],
+      [6, 26, 54, 82, 110, 138, 166],
+      [6, 30, 58, 86, 114, 142, 170]
+    ];
+    var G15 = (1 << 10) | (1 << 8) | (1 << 5) | (1 << 4) | (1 << 2) | (1 << 1) | (1 << 0);
+    var G18 = (1 << 12) | (1 << 11) | (1 << 10) | (1 << 9) | (1 << 8) | (1 << 5) | (1 << 2) | (1 << 0);
+    var G15_MASK = (1 << 14) | (1 << 12) | (1 << 10) | (1 << 4) | (1 << 1);
+
+    var _this = {};
+
+    var getBCHDigit = function(data) {
+      var digit = 0;
+      while (data != 0) {
+        digit += 1;
+        data >>>= 1;
+      }
+      return digit;
+    };
+
+    _this.getBCHTypeInfo = function(data) {
+      var d = data << 10;
+      while (getBCHDigit(d) - getBCHDigit(G15) >= 0) {
+        d ^= (G15 << (getBCHDigit(d) - getBCHDigit(G15) ) );
+      }
+      return ( (data << 10) | d) ^ G15_MASK;
+    };
+
+    _this.getBCHTypeNumber = function(data) {
+      var d = data << 12;
+      while (getBCHDigit(d) - getBCHDigit(G18) >= 0) {
+        d ^= (G18 << (getBCHDigit(d) - getBCHDigit(G18) ) );
+      }
+      return (data << 12) | d;
+    };
+
+    _this.getPatternPosition = function(typeNumber) {
+      return PATTERN_POSITION_TABLE[typeNumber - 1];
+    };
+
+    _this.getMaskFunction = function(maskPattern) {
+
+      switch (maskPattern) {
+
+      case QRMaskPattern.PATTERN000 :
+        return function(i, j) { return (i + j) % 2 == 0; };
+      case QRMaskPattern.PATTERN001 :
+        return function(i, j) { return i % 2 == 0; };
+      case QRMaskPattern.PATTERN010 :
+        return function(i, j) { return j % 3 == 0; };
+      case QRMaskPattern.PATTERN011 :
+        return function(i, j) { return (i + j) % 3 == 0; };
+      case QRMaskPattern.PATTERN100 :
+        return function(i, j) { return (Math.floor(i / 2) + Math.floor(j / 3) ) % 2 == 0; };
+      case QRMaskPattern.PATTERN101 :
+        return function(i, j) { return (i * j) % 2 + (i * j) % 3 == 0; };
+      case QRMaskPattern.PATTERN110 :
+        return function(i, j) { return ( (i * j) % 2 + (i * j) % 3) % 2 == 0; };
+      case QRMaskPattern.PATTERN111 :
+        return function(i, j) { return ( (i * j) % 3 + (i + j) % 2) % 2 == 0; };
+
+      default :
+        throw 'bad maskPattern:' + maskPattern;
+      }
+    };
+
+    _this.getErrorCorrectPolynomial = function(errorCorrectLength) {
+      var a = qrPolynomial([1], 0);
+      for (var i = 0; i < errorCorrectLength; i += 1) {
+        a = a.multiply(qrPolynomial([1, QRMath.gexp(i)], 0) );
+      }
+      return a;
+    };
+
+    _this.getLengthInBits = function(mode, type) {
+
+      if (1 <= type && type < 10) {
+
+        // 1 - 9
+
+        switch(mode) {
+        case QRMode.MODE_NUMBER    : return 10;
+        case QRMode.MODE_ALPHA_NUM : return 9;
+        case QRMode.MODE_8BIT_BYTE : return 8;
+        case QRMode.MODE_KANJI     : return 8;
+        default :
+          throw 'mode:' + mode;
+        }
+
+      } else if (type < 27) {
+
+        // 10 - 26
+
+        switch(mode) {
+        case QRMode.MODE_NUMBER    : return 12;
+        case QRMode.MODE_ALPHA_NUM : return 11;
+        case QRMode.MODE_8BIT_BYTE : return 16;
+        case QRMode.MODE_KANJI     : return 10;
+        default :
+          throw 'mode:' + mode;
+        }
+
+      } else if (type < 41) {
+
+        // 27 - 40
+
+        switch(mode) {
+        case QRMode.MODE_NUMBER    : return 14;
+        case QRMode.MODE_ALPHA_NUM : return 13;
+        case QRMode.MODE_8BIT_BYTE : return 16;
+        case QRMode.MODE_KANJI     : return 12;
+        default :
+          throw 'mode:' + mode;
+        }
+
+      } else {
+        throw 'type:' + type;
+      }
+    };
+
+    _this.getLostPoint = function(qrcode) {
+
+      var moduleCount = qrcode.getModuleCount();
+
+      var lostPoint = 0;
+
+      // LEVEL1
+
+      for (var row = 0; row < moduleCount; row += 1) {
+        for (var col = 0; col < moduleCount; col += 1) {
+
+          var sameCount = 0;
+          var dark = qrcode.isDark(row, col);
+
+          for (var r = -1; r <= 1; r += 1) {
+
+            if (row + r < 0 || moduleCount <= row + r) {
+              continue;
+            }
+
+            for (var c = -1; c <= 1; c += 1) {
+
+              if (col + c < 0 || moduleCount <= col + c) {
+                continue;
+              }
+
+              if (r == 0 && c == 0) {
+                continue;
+              }
+
+              if (dark == qrcode.isDark(row + r, col + c) ) {
+                sameCount += 1;
+              }
+            }
+          }
+
+          if (sameCount > 5) {
+            lostPoint += (3 + sameCount - 5);
+          }
+        }
+      };
+
+      // LEVEL2
+
+      for (var row = 0; row < moduleCount - 1; row += 1) {
+        for (var col = 0; col < moduleCount - 1; col += 1) {
+          var count = 0;
+          if (qrcode.isDark(row, col) ) count += 1;
+          if (qrcode.isDark(row + 1, col) ) count += 1;
+          if (qrcode.isDark(row, col + 1) ) count += 1;
+          if (qrcode.isDark(row + 1, col + 1) ) count += 1;
+          if (count == 0 || count == 4) {
+            lostPoint += 3;
+          }
+        }
+      }
+
+      // LEVEL3
+
+      for (var row = 0; row < moduleCount; row += 1) {
+        for (var col = 0; col < moduleCount - 6; col += 1) {
+          if (qrcode.isDark(row, col)
+              && !qrcode.isDark(row, col + 1)
+              &&  qrcode.isDark(row, col + 2)
+              &&  qrcode.isDark(row, col + 3)
+              &&  qrcode.isDark(row, col + 4)
+              && !qrcode.isDark(row, col + 5)
+              &&  qrcode.isDark(row, col + 6) ) {
+            lostPoint += 40;
+          }
+        }
+      }
+
+      for (var col = 0; col < moduleCount; col += 1) {
+        for (var row = 0; row < moduleCount - 6; row += 1) {
+          if (qrcode.isDark(row, col)
+              && !qrcode.isDark(row + 1, col)
+              &&  qrcode.isDark(row + 2, col)
+              &&  qrcode.isDark(row + 3, col)
+              &&  qrcode.isDark(row + 4, col)
+              && !qrcode.isDark(row + 5, col)
+              &&  qrcode.isDark(row + 6, col) ) {
+            lostPoint += 40;
+          }
+        }
+      }
+
+      // LEVEL4
+
+      var darkCount = 0;
+
+      for (var col = 0; col < moduleCount; col += 1) {
+        for (var row = 0; row < moduleCount; row += 1) {
+          if (qrcode.isDark(row, col) ) {
+            darkCount += 1;
+          }
+        }
+      }
+
+      var ratio = Math.abs(100 * darkCount / moduleCount / moduleCount - 50) / 5;
+      lostPoint += ratio * 10;
+
+      return lostPoint;
+    };
+
+    return _this;
+  }();
+
+  //---------------------------------------------------------------------
+  // QRMath
+  //---------------------------------------------------------------------
+
+  var QRMath = function() {
+
+    var EXP_TABLE = new Array(256);
+    var LOG_TABLE = new Array(256);
+
+    // initialize tables
+    for (var i = 0; i < 8; i += 1) {
+      EXP_TABLE[i] = 1 << i;
+    }
+    for (var i = 8; i < 256; i += 1) {
+      EXP_TABLE[i] = EXP_TABLE[i - 4]
+        ^ EXP_TABLE[i - 5]
+        ^ EXP_TABLE[i - 6]
+        ^ EXP_TABLE[i - 8];
+    }
+    for (var i = 0; i < 255; i += 1) {
+      LOG_TABLE[EXP_TABLE[i] ] = i;
+    }
+
+    var _this = {};
+
+    _this.glog = function(n) {
+
+      if (n < 1) {
+        throw 'glog(' + n + ')';
+      }
+
+      return LOG_TABLE[n];
+    };
+
+    _this.gexp = function(n) {
+
+      while (n < 0) {
+        n += 255;
+      }
+
+      while (n >= 256) {
+        n -= 255;
+      }
+
+      return EXP_TABLE[n];
+    };
+
+    return _this;
+  }();
+
+  //---------------------------------------------------------------------
+  // qrPolynomial
+  //---------------------------------------------------------------------
+
+  function qrPolynomial(num, shift) {
+
+    if (typeof num.length == 'undefined') {
+      throw num.length + '/' + shift;
+    }
+
+    var _num = function() {
+      var offset = 0;
+      while (offset < num.length && num[offset] == 0) {
+        offset += 1;
+      }
+      var _num = new Array(num.length - offset + shift);
+      for (var i = 0; i < num.length - offset; i += 1) {
+        _num[i] = num[i + offset];
+      }
+      return _num;
+    }();
+
+    var _this = {};
+
+    _this.getAt = function(index) {
+      return _num[index];
+    };
+
+    _this.getLength = function() {
+      return _num.length;
+    };
+
+    _this.multiply = function(e) {
+
+      var num = new Array(_this.getLength() + e.getLength() - 1);
+
+      for (var i = 0; i < _this.getLength(); i += 1) {
+        for (var j = 0; j < e.getLength(); j += 1) {
+          num[i + j] ^= QRMath.gexp(QRMath.glog(_this.getAt(i) ) + QRMath.glog(e.getAt(j) ) );
+        }
+      }
+
+      return qrPolynomial(num, 0);
+    };
+
+    _this.mod = function(e) {
+
+      if (_this.getLength() - e.getLength() < 0) {
+        return _this;
+      }
+
+      var ratio = QRMath.glog(_this.getAt(0) ) - QRMath.glog(e.getAt(0) );
+
+      var num = new Array(_this.getLength() );
+      for (var i = 0; i < _this.getLength(); i += 1) {
+        num[i] = _this.getAt(i);
+      }
+
+      for (var i = 0; i < e.getLength(); i += 1) {
+        num[i] ^= QRMath.gexp(QRMath.glog(e.getAt(i) ) + ratio);
+      }
+
+      // recursive call
+      return qrPolynomial(num, 0).mod(e);
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // QRRSBlock
+  //---------------------------------------------------------------------
+
+  var QRRSBlock = function() {
+
+    var RS_BLOCK_TABLE = [
+
+      // L
+      // M
+      // Q
+      // H
+
+      // 1
+      [1, 26, 19],
+      [1, 26, 16],
+      [1, 26, 13],
+      [1, 26, 9],
+
+      // 2
+      [1, 44, 34],
+      [1, 44, 28],
+      [1, 44, 22],
+      [1, 44, 16],
+
+      // 3
+      [1, 70, 55],
+      [1, 70, 44],
+      [2, 35, 17],
+      [2, 35, 13],
+
+      // 4
+      [1, 100, 80],
+      [2, 50, 32],
+      [2, 50, 24],
+      [4, 25, 9],
+
+      // 5
+      [1, 134, 108],
+      [2, 67, 43],
+      [2, 33, 15, 2, 34, 16],
+      [2, 33, 11, 2, 34, 12],
+
+      // 6
+      [2, 86, 68],
+      [4, 43, 27],
+      [4, 43, 19],
+      [4, 43, 15],
+
+      // 7
+      [2, 98, 78],
+      [4, 49, 31],
+      [2, 32, 14, 4, 33, 15],
+      [4, 39, 13, 1, 40, 14],
+
+      // 8
+      [2, 121, 97],
+      [2, 60, 38, 2, 61, 39],
+      [4, 40, 18, 2, 41, 19],
+      [4, 40, 14, 2, 41, 15],
+
+      // 9
+      [2, 146, 116],
+      [3, 58, 36, 2, 59, 37],
+      [4, 36, 16, 4, 37, 17],
+      [4, 36, 12, 4, 37, 13],
+
+      // 10
+      [2, 86, 68, 2, 87, 69],
+      [4, 69, 43, 1, 70, 44],
+      [6, 43, 19, 2, 44, 20],
+      [6, 43, 15, 2, 44, 16],
+
+      // 11
+      [4, 101, 81],
+      [1, 80, 50, 4, 81, 51],
+      [4, 50, 22, 4, 51, 23],
+      [3, 36, 12, 8, 37, 13],
+
+      // 12
+      [2, 116, 92, 2, 117, 93],
+      [6, 58, 36, 2, 59, 37],
+      [4, 46, 20, 6, 47, 21],
+      [7, 42, 14, 4, 43, 15],
+
+      // 13
+      [4, 133, 107],
+      [8, 59, 37, 1, 60, 38],
+      [8, 44, 20, 4, 45, 21],
+      [12, 33, 11, 4, 34, 12],
+
+      // 14
+      [3, 145, 115, 1, 146, 116],
+      [4, 64, 40, 5, 65, 41],
+      [11, 36, 16, 5, 37, 17],
+      [11, 36, 12, 5, 37, 13],
+
+      // 15
+      [5, 109, 87, 1, 110, 88],
+      [5, 65, 41, 5, 66, 42],
+      [5, 54, 24, 7, 55, 25],
+      [11, 36, 12, 7, 37, 13],
+
+      // 16
+      [5, 122, 98, 1, 123, 99],
+      [7, 73, 45, 3, 74, 46],
+      [15, 43, 19, 2, 44, 20],
+      [3, 45, 15, 13, 46, 16],
+
+      // 17
+      [1, 135, 107, 5, 136, 108],
+      [10, 74, 46, 1, 75, 47],
+      [1, 50, 22, 15, 51, 23],
+      [2, 42, 14, 17, 43, 15],
+
+      // 18
+      [5, 150, 120, 1, 151, 121],
+      [9, 69, 43, 4, 70, 44],
+      [17, 50, 22, 1, 51, 23],
+      [2, 42, 14, 19, 43, 15],
+
+      // 19
+      [3, 141, 113, 4, 142, 114],
+      [3, 70, 44, 11, 71, 45],
+      [17, 47, 21, 4, 48, 22],
+      [9, 39, 13, 16, 40, 14],
+
+      // 20
+      [3, 135, 107, 5, 136, 108],
+      [3, 67, 41, 13, 68, 42],
+      [15, 54, 24, 5, 55, 25],
+      [15, 43, 15, 10, 44, 16],
+
+      // 21
+      [4, 144, 116, 4, 145, 117],
+      [17, 68, 42],
+      [17, 50, 22, 6, 51, 23],
+      [19, 46, 16, 6, 47, 17],
+
+      // 22
+      [2, 139, 111, 7, 140, 112],
+      [17, 74, 46],
+      [7, 54, 24, 16, 55, 25],
+      [34, 37, 13],
+
+      // 23
+      [4, 151, 121, 5, 152, 122],
+      [4, 75, 47, 14, 76, 48],
+      [11, 54, 24, 14, 55, 25],
+      [16, 45, 15, 14, 46, 16],
+
+      // 24
+      [6, 147, 117, 4, 148, 118],
+      [6, 73, 45, 14, 74, 46],
+      [11, 54, 24, 16, 55, 25],
+      [30, 46, 16, 2, 47, 17],
+
+      // 25
+      [8, 132, 106, 4, 133, 107],
+      [8, 75, 47, 13, 76, 48],
+      [7, 54, 24, 22, 55, 25],
+      [22, 45, 15, 13, 46, 16],
+
+      // 26
+      [10, 142, 114, 2, 143, 115],
+      [19, 74, 46, 4, 75, 47],
+      [28, 50, 22, 6, 51, 23],
+      [33, 46, 16, 4, 47, 17],
+
+      // 27
+      [8, 152, 122, 4, 153, 123],
+      [22, 73, 45, 3, 74, 46],
+      [8, 53, 23, 26, 54, 24],
+      [12, 45, 15, 28, 46, 16],
+
+      // 28
+      [3, 147, 117, 10, 148, 118],
+      [3, 73, 45, 23, 74, 46],
+      [4, 54, 24, 31, 55, 25],
+      [11, 45, 15, 31, 46, 16],
+
+      // 29
+      [7, 146, 116, 7, 147, 117],
+      [21, 73, 45, 7, 74, 46],
+      [1, 53, 23, 37, 54, 24],
+      [19, 45, 15, 26, 46, 16],
+
+      // 30
+      [5, 145, 115, 10, 146, 116],
+      [19, 75, 47, 10, 76, 48],
+      [15, 54, 24, 25, 55, 25],
+      [23, 45, 15, 25, 46, 16],
+
+      // 31
+      [13, 145, 115, 3, 146, 116],
+      [2, 74, 46, 29, 75, 47],
+      [42, 54, 24, 1, 55, 25],
+      [23, 45, 15, 28, 46, 16],
+
+      // 32
+      [17, 145, 115],
+      [10, 74, 46, 23, 75, 47],
+      [10, 54, 24, 35, 55, 25],
+      [19, 45, 15, 35, 46, 16],
+
+      // 33
+      [17, 145, 115, 1, 146, 116],
+      [14, 74, 46, 21, 75, 47],
+      [29, 54, 24, 19, 55, 25],
+      [11, 45, 15, 46, 46, 16],
+
+      // 34
+      [13, 145, 115, 6, 146, 116],
+      [14, 74, 46, 23, 75, 47],
+      [44, 54, 24, 7, 55, 25],
+      [59, 46, 16, 1, 47, 17],
+
+      // 35
+      [12, 151, 121, 7, 152, 122],
+      [12, 75, 47, 26, 76, 48],
+      [39, 54, 24, 14, 55, 25],
+      [22, 45, 15, 41, 46, 16],
+
+      // 36
+      [6, 151, 121, 14, 152, 122],
+      [6, 75, 47, 34, 76, 48],
+      [46, 54, 24, 10, 55, 25],
+      [2, 45, 15, 64, 46, 16],
+
+      // 37
+      [17, 152, 122, 4, 153, 123],
+      [29, 74, 46, 14, 75, 47],
+      [49, 54, 24, 10, 55, 25],
+      [24, 45, 15, 46, 46, 16],
+
+      // 38
+      [4, 152, 122, 18, 153, 123],
+      [13, 74, 46, 32, 75, 47],
+      [48, 54, 24, 14, 55, 25],
+      [42, 45, 15, 32, 46, 16],
+
+      // 39
+      [20, 147, 117, 4, 148, 118],
+      [40, 75, 47, 7, 76, 48],
+      [43, 54, 24, 22, 55, 25],
+      [10, 45, 15, 67, 46, 16],
+
+      // 40
+      [19, 148, 118, 6, 149, 119],
+      [18, 75, 47, 31, 76, 48],
+      [34, 54, 24, 34, 55, 25],
+      [20, 45, 15, 61, 46, 16]
+    ];
+
+    var qrRSBlock = function(totalCount, dataCount) {
+      var _this = {};
+      _this.totalCount = totalCount;
+      _this.dataCount = dataCount;
+      return _this;
+    };
+
+    var _this = {};
+
+    var getRsBlockTable = function(typeNumber, errorCorrectionLevel) {
+
+      switch(errorCorrectionLevel) {
+      case QRErrorCorrectionLevel.L :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 0];
+      case QRErrorCorrectionLevel.M :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 1];
+      case QRErrorCorrectionLevel.Q :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 2];
+      case QRErrorCorrectionLevel.H :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 3];
+      default :
+        return undefined;
+      }
+    };
+
+    _this.getRSBlocks = function(typeNumber, errorCorrectionLevel) {
+
+      var rsBlock = getRsBlockTable(typeNumber, errorCorrectionLevel);
+
+      if (typeof rsBlock == 'undefined') {
+        throw 'bad rs block @ typeNumber:' + typeNumber +
+            '/errorCorrectionLevel:' + errorCorrectionLevel;
+      }
+
+      var length = rsBlock.length / 3;
+
+      var list = [];
+
+      for (var i = 0; i < length; i += 1) {
+
+        var count = rsBlock[i * 3 + 0];
+        var totalCount = rsBlock[i * 3 + 1];
+        var dataCount = rsBlock[i * 3 + 2];
+
+        for (var j = 0; j < count; j += 1) {
+          list.push(qrRSBlock(totalCount, dataCount) );
+        }
+      }
+
+      return list;
+    };
+
+    return _this;
+  }();
+
+  //---------------------------------------------------------------------
+  // qrBitBuffer
+  //---------------------------------------------------------------------
+
+  var qrBitBuffer = function() {
+
+    var _buffer = [];
+    var _length = 0;
+
+    var _this = {};
+
+    _this.getBuffer = function() {
+      return _buffer;
+    };
+
+    _this.getAt = function(index) {
+      var bufIndex = Math.floor(index / 8);
+      return ( (_buffer[bufIndex] >>> (7 - index % 8) ) & 1) == 1;
+    };
+
+    _this.put = function(num, length) {
+      for (var i = 0; i < length; i += 1) {
+        _this.putBit( ( (num >>> (length - i - 1) ) & 1) == 1);
+      }
+    };
+
+    _this.getLengthInBits = function() {
+      return _length;
+    };
+
+    _this.putBit = function(bit) {
+
+      var bufIndex = Math.floor(_length / 8);
+      if (_buffer.length <= bufIndex) {
+        _buffer.push(0);
+      }
+
+      if (bit) {
+        _buffer[bufIndex] |= (0x80 >>> (_length % 8) );
+      }
+
+      _length += 1;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrNumber
+  //---------------------------------------------------------------------
+
+  var qrNumber = function(data) {
+
+    var _mode = QRMode.MODE_NUMBER;
+    var _data = data;
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return _data.length;
+    };
+
+    _this.write = function(buffer) {
+
+      var data = _data;
+
+      var i = 0;
+
+      while (i + 2 < data.length) {
+        buffer.put(strToNum(data.substring(i, i + 3) ), 10);
+        i += 3;
+      }
+
+      if (i < data.length) {
+        if (data.length - i == 1) {
+          buffer.put(strToNum(data.substring(i, i + 1) ), 4);
+        } else if (data.length - i == 2) {
+          buffer.put(strToNum(data.substring(i, i + 2) ), 7);
+        }
+      }
+    };
+
+    var strToNum = function(s) {
+      var num = 0;
+      for (var i = 0; i < s.length; i += 1) {
+        num = num * 10 + chatToNum(s.charAt(i) );
+      }
+      return num;
+    };
+
+    var chatToNum = function(c) {
+      if ('0' <= c && c <= '9') {
+        return c.charCodeAt(0) - '0'.charCodeAt(0);
+      }
+      throw 'illegal char :' + c;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrAlphaNum
+  //---------------------------------------------------------------------
+
+  var qrAlphaNum = function(data) {
+
+    var _mode = QRMode.MODE_ALPHA_NUM;
+    var _data = data;
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return _data.length;
+    };
+
+    _this.write = function(buffer) {
+
+      var s = _data;
+
+      var i = 0;
+
+      while (i + 1 < s.length) {
+        buffer.put(
+          getCode(s.charAt(i) ) * 45 +
+          getCode(s.charAt(i + 1) ), 11);
+        i += 2;
+      }
+
+      if (i < s.length) {
+        buffer.put(getCode(s.charAt(i) ), 6);
+      }
+    };
+
+    var getCode = function(c) {
+
+      if ('0' <= c && c <= '9') {
+        return c.charCodeAt(0) - '0'.charCodeAt(0);
+      } else if ('A' <= c && c <= 'Z') {
+        return c.charCodeAt(0) - 'A'.charCodeAt(0) + 10;
+      } else {
+        switch (c) {
+        case ' ' : return 36;
+        case '$' : return 37;
+        case '%' : return 38;
+        case '*' : return 39;
+        case '+' : return 40;
+        case '-' : return 41;
+        case '.' : return 42;
+        case '/' : return 43;
+        case ':' : return 44;
+        default :
+          throw 'illegal char :' + c;
+        }
+      }
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qr8BitByte
+  //---------------------------------------------------------------------
+
+  var qr8BitByte = function(data) {
+
+    var _mode = QRMode.MODE_8BIT_BYTE;
+    var _data = data;
+    var _bytes = qrcode.stringToBytes(data);
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return _bytes.length;
+    };
+
+    _this.write = function(buffer) {
+      for (var i = 0; i < _bytes.length; i += 1) {
+        buffer.put(_bytes[i], 8);
+      }
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrKanji
+  //---------------------------------------------------------------------
+
+  var qrKanji = function(data) {
+
+    var _mode = QRMode.MODE_KANJI;
+    var _data = data;
+
+    var stringToBytes = qrcode.stringToBytesFuncs['SJIS'];
+    if (!stringToBytes) {
+      throw 'sjis not supported.';
+    }
+    !function(c, code) {
+      // self test for sjis support.
+      var test = stringToBytes(c);
+      if (test.length != 2 || ( (test[0] << 8) | test[1]) != code) {
+        throw 'sjis not supported.';
+      }
+    }('\u53cb', 0x9746);
+
+    var _bytes = stringToBytes(data);
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return ~~(_bytes.length / 2);
+    };
+
+    _this.write = function(buffer) {
+
+      var data = _bytes;
+
+      var i = 0;
+
+      while (i + 1 < data.length) {
+
+        var c = ( (0xff & data[i]) << 8) | (0xff & data[i + 1]);
+
+        if (0x8140 <= c && c <= 0x9FFC) {
+          c -= 0x8140;
+        } else if (0xE040 <= c && c <= 0xEBBF) {
+          c -= 0xC140;
+        } else {
+          throw 'illegal char at ' + (i + 1) + '/' + c;
+        }
+
+        c = ( (c >>> 8) & 0xff) * 0xC0 + (c & 0xff);
+
+        buffer.put(c, 13);
+
+        i += 2;
+      }
+
+      if (i < data.length) {
+        throw 'illegal char at ' + (i + 1);
+      }
+    };
+
+    return _this;
+  };
+
+  //=====================================================================
+  // GIF Support etc.
+  //
+
+  //---------------------------------------------------------------------
+  // byteArrayOutputStream
+  //---------------------------------------------------------------------
+
+  var byteArrayOutputStream = function() {
+
+    var _bytes = [];
+
+    var _this = {};
+
+    _this.writeByte = function(b) {
+      _bytes.push(b & 0xff);
+    };
+
+    _this.writeShort = function(i) {
+      _this.writeByte(i);
+      _this.writeByte(i >>> 8);
+    };
+
+    _this.writeBytes = function(b, off, len) {
+      off = off || 0;
+      len = len || b.length;
+      for (var i = 0; i < len; i += 1) {
+        _this.writeByte(b[i + off]);
+      }
+    };
+
+    _this.writeString = function(s) {
+      for (var i = 0; i < s.length; i += 1) {
+        _this.writeByte(s.charCodeAt(i) );
+      }
+    };
+
+    _this.toByteArray = function() {
+      return _bytes;
+    };
+
+    _this.toString = function() {
+      var s = '';
+      s += '[';
+      for (var i = 0; i < _bytes.length; i += 1) {
+        if (i > 0) {
+          s += ',';
+        }
+        s += _bytes[i];
+      }
+      s += ']';
+      return s;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // base64EncodeOutputStream
+  //---------------------------------------------------------------------
+
+  var base64EncodeOutputStream = function() {
+
+    var _buffer = 0;
+    var _buflen = 0;
+    var _length = 0;
+    var _base64 = '';
+
+    var _this = {};
+
+    var writeEncoded = function(b) {
+      _base64 += String.fromCharCode(encode(b & 0x3f) );
+    };
+
+    var encode = function(n) {
+      if (n < 0) {
+        // error.
+      } else if (n < 26) {
+        return 0x41 + n;
+      } else if (n < 52) {
+        return 0x61 + (n - 26);
+      } else if (n < 62) {
+        return 0x30 + (n - 52);
+      } else if (n == 62) {
+        return 0x2b;
+      } else if (n == 63) {
+        return 0x2f;
+      }
+      throw 'n:' + n;
+    };
+
+    _this.writeByte = function(n) {
+
+      _buffer = (_buffer << 8) | (n & 0xff);
+      _buflen += 8;
+      _length += 1;
+
+      while (_buflen >= 6) {
+        writeEncoded(_buffer >>> (_buflen - 6) );
+        _buflen -= 6;
+      }
+    };
+
+    _this.flush = function() {
+
+      if (_buflen > 0) {
+        writeEncoded(_buffer << (6 - _buflen) );
+        _buffer = 0;
+        _buflen = 0;
+      }
+
+      if (_length % 3 != 0) {
+        // padding
+        var padlen = 3 - _length % 3;
+        for (var i = 0; i < padlen; i += 1) {
+          _base64 += '=';
+        }
+      }
+    };
+
+    _this.toString = function() {
+      return _base64;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // base64DecodeInputStream
+  //---------------------------------------------------------------------
+
+  var base64DecodeInputStream = function(str) {
+
+    var _str = str;
+    var _pos = 0;
+    var _buffer = 0;
+    var _buflen = 0;
+
+    var _this = {};
+
+    _this.read = function() {
+
+      while (_buflen < 8) {
+
+        if (_pos >= _str.length) {
+          if (_buflen == 0) {
+            return -1;
+          }
+          throw 'unexpected end of file./' + _buflen;
+        }
+
+        var c = _str.charAt(_pos);
+        _pos += 1;
+
+        if (c == '=') {
+          _buflen = 0;
+          return -1;
+        } else if (c.match(/^\s$/) ) {
+          // ignore if whitespace.
+          continue;
+        }
+
+        _buffer = (_buffer << 6) | decode(c.charCodeAt(0) );
+        _buflen += 6;
+      }
+
+      var n = (_buffer >>> (_buflen - 8) ) & 0xff;
+      _buflen -= 8;
+      return n;
+    };
+
+    var decode = function(c) {
+      if (0x41 <= c && c <= 0x5a) {
+        return c - 0x41;
+      } else if (0x61 <= c && c <= 0x7a) {
+        return c - 0x61 + 26;
+      } else if (0x30 <= c && c <= 0x39) {
+        return c - 0x30 + 52;
+      } else if (c == 0x2b) {
+        return 62;
+      } else if (c == 0x2f) {
+        return 63;
+      } else {
+        throw 'c:' + c;
+      }
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // gifImage (B/W)
+  //---------------------------------------------------------------------
+
+  var gifImage = function(width, height) {
+
+    var _width = width;
+    var _height = height;
+    var _data = new Array(width * height);
+
+    var _this = {};
+
+    _this.setPixel = function(x, y, pixel) {
+      _data[y * _width + x] = pixel;
+    };
+
+    _this.write = function(out) {
+
+      //---------------------------------
+      // GIF Signature
+
+      out.writeString('GIF87a');
+
+      //---------------------------------
+      // Screen Descriptor
+
+      out.writeShort(_width);
+      out.writeShort(_height);
+
+      out.writeByte(0x80); // 2bit
+      out.writeByte(0);
+      out.writeByte(0);
+
+      //---------------------------------
+      // Global Color Map
+
+      // black
+      out.writeByte(0x00);
+      out.writeByte(0x00);
+      out.writeByte(0x00);
+
+      // white
+      out.writeByte(0xff);
+      out.writeByte(0xff);
+      out.writeByte(0xff);
+
+      //---------------------------------
+      // Image Descriptor
+
+      out.writeString(',');
+      out.writeShort(0);
+      out.writeShort(0);
+      out.writeShort(_width);
+      out.writeShort(_height);
+      out.writeByte(0);
+
+      //---------------------------------
+      // Local Color Map
+
+      //---------------------------------
+      // Raster Data
+
+      var lzwMinCodeSize = 2;
+      var raster = getLZWRaster(lzwMinCodeSize);
+
+      out.writeByte(lzwMinCodeSize);
+
+      var offset = 0;
+
+      while (raster.length - offset > 255) {
+        out.writeByte(255);
+        out.writeBytes(raster, offset, 255);
+        offset += 255;
+      }
+
+      out.writeByte(raster.length - offset);
+      out.writeBytes(raster, offset, raster.length - offset);
+      out.writeByte(0x00);
+
+      //---------------------------------
+      // GIF Terminator
+      out.writeString(';');
+    };
+
+    var bitOutputStream = function(out) {
+
+      var _out = out;
+      var _bitLength = 0;
+      var _bitBuffer = 0;
+
+      var _this = {};
+
+      _this.write = function(data, length) {
+
+        if ( (data >>> length) != 0) {
+          throw 'length over';
+        }
+
+        while (_bitLength + length >= 8) {
+          _out.writeByte(0xff & ( (data << _bitLength) | _bitBuffer) );
+          length -= (8 - _bitLength);
+          data >>>= (8 - _bitLength);
+          _bitBuffer = 0;
+          _bitLength = 0;
+        }
+
+        _bitBuffer = (data << _bitLength) | _bitBuffer;
+        _bitLength = _bitLength + length;
+      };
+
+      _this.flush = function() {
+        if (_bitLength > 0) {
+          _out.writeByte(_bitBuffer);
+        }
+      };
+
+      return _this;
+    };
+
+    var getLZWRaster = function(lzwMinCodeSize) {
+
+      var clearCode = 1 << lzwMinCodeSize;
+      var endCode = (1 << lzwMinCodeSize) + 1;
+      var bitLength = lzwMinCodeSize + 1;
+
+      // Setup LZWTable
+      var table = lzwTable();
+
+      for (var i = 0; i < clearCode; i += 1) {
+        table.add(String.fromCharCode(i) );
+      }
+      table.add(String.fromCharCode(clearCode) );
+      table.add(String.fromCharCode(endCode) );
+
+      var byteOut = byteArrayOutputStream();
+      var bitOut = bitOutputStream(byteOut);
+
+      // clear code
+      bitOut.write(clearCode, bitLength);
+
+      var dataIndex = 0;
+
+      var s = String.fromCharCode(_data[dataIndex]);
+      dataIndex += 1;
+
+      while (dataIndex < _data.length) {
+
+        var c = String.fromCharCode(_data[dataIndex]);
+        dataIndex += 1;
+
+        if (table.contains(s + c) ) {
+
+          s = s + c;
+
+        } else {
+
+          bitOut.write(table.indexOf(s), bitLength);
+
+          if (table.size() < 0xfff) {
+
+            if (table.size() == (1 << bitLength) ) {
+              bitLength += 1;
+            }
+
+            table.add(s + c);
+          }
+
+          s = c;
+        }
+      }
+
+      bitOut.write(table.indexOf(s), bitLength);
+
+      // end code
+      bitOut.write(endCode, bitLength);
+
+      bitOut.flush();
+
+      return byteOut.toByteArray();
+    };
+
+    var lzwTable = function() {
+
+      var _map = {};
+      var _size = 0;
+
+      var _this = {};
+
+      _this.add = function(key) {
+        if (_this.contains(key) ) {
+          throw 'dup key:' + key;
+        }
+        _map[key] = _size;
+        _size += 1;
+      };
+
+      _this.size = function() {
+        return _size;
+      };
+
+      _this.indexOf = function(key) {
+        return _map[key];
+      };
+
+      _this.contains = function(key) {
+        return typeof _map[key] != 'undefined';
+      };
+
+      return _this;
+    };
+
+    return _this;
+  };
+
+  var createDataURL = function(width, height, getPixel) {
+    var gif = gifImage(width, height);
+    for (var y = 0; y < height; y += 1) {
+      for (var x = 0; x < width; x += 1) {
+        gif.setPixel(x, y, getPixel(x, y) );
+      }
+    }
+
+    var b = byteArrayOutputStream();
+    gif.write(b);
+
+    var base64 = base64EncodeOutputStream();
+    var bytes = b.toByteArray();
+    for (var i = 0; i < bytes.length; i += 1) {
+      base64.writeByte(bytes[i]);
+    }
+    base64.flush();
+
+    return 'data:image/gif;base64,' + base64;
+  };
+
+  //---------------------------------------------------------------------
+  // returns qrcode function.
+
+  return qrcode;
+}();
+
+// multibyte support
+!function() {
+
+  qrcode.stringToBytesFuncs['UTF-8'] = function(s) {
+    // http://stackoverflow.com/questions/18729405/how-to-convert-utf8-string-to-byte-array
+    function toUTF8Array(str) {
+      var utf8 = [];
+      for (var i=0; i < str.length; i++) {
+        var charcode = str.charCodeAt(i);
+        if (charcode < 0x80) utf8.push(charcode);
+        else if (charcode < 0x800) {
+          utf8.push(0xc0 | (charcode >> 6),
+              0x80 | (charcode & 0x3f));
+        }
+        else if (charcode < 0xd800 || charcode >= 0xe000) {
+          utf8.push(0xe0 | (charcode >> 12),
+              0x80 | ((charcode>>6) & 0x3f),
+              0x80 | (charcode & 0x3f));
+        }
+        // surrogate pair
+        else {
+          i++;
+          // UTF-16 encodes 0x10000-0x10FFFF by
+          // subtracting 0x10000 and splitting the
+          // 20 bits of 0x0-0xFFFFF into two halves
+          charcode = 0x10000 + (((charcode & 0x3ff)<<10)
+            | (str.charCodeAt(i) & 0x3ff));
+          utf8.push(0xf0 | (charcode >>18),
+              0x80 | ((charcode>>12) & 0x3f),
+              0x80 | ((charcode>>6) & 0x3f),
+              0x80 | (charcode & 0x3f));
+        }
+      }
+      return utf8;
+    }
+    return toUTF8Array(s);
+  };
+
+}();
+
+(function (factory) {
+  if (typeof define === 'function' && define.amd) {
+      define([], factory);
+  } else if (typeof exports === 'object') {
+      module.exports = factory();
+  }
+}(function () {
+    return qrcode;
+}));
+
+</script>
+
+<script id="ry-core">
+/* ============================================================
+   RYCore —— 纯逻辑层（不依赖 DOM，可被 Node 直接加载做单测）
+   ============================================================ */
+var RYCore = (function () {
+  'use strict';
+
+  var CAP = 3;            // 邀请注册 + 群裂变 共享上限
+  var COOL_DAYS = 3;      // 冷静期天数
+  var TRIAL_DAYS = 30;    // 新客授权激活后赠送的体验会员天数（"同等时长"的基数）
+  var DAY = 86400000;
+
+  var ST = {
+    REG: 'registered',   // 已注册，未激活 —— 不计入
+    COOL: 'cooling',     // 已激活，冷静期内 —— 不计入
+    VALID: 'valid',      // 冷静期已过且账号正常 —— 计入
+    INVALID: 'invalid'   // 冷静期内注销/解绑 —— 不计入，已计入的扣回
+  };
+  var ST_TEXT = {
+    registered: '待激活', cooling: '冷静中', valid: '已生效', invalid: '已失效'
+  };
+
+  /* ---- 会员等级（本期只做 L1 / L2 两级）----
+     L1 注册会员：限时 30 天（注册即得），四大主功能，可邀友续期
+     L2 高级会员：L1 + 出图/导出清单/水利校验等其余全部功能
+     注：L3（VIP）暂不实现，等级卖点未定，避免权益模型过早复杂化。 */
+  var PLANS = {
+    L1: { key: 'L1', name: '注册会员', days: 30, limited: true,
+          features: ['地块分区', 'AI 智能规划', '管路规划', '在线地图'] },
+    L2: { key: 'L2', name: '高级会员', days: 365, limited: true,
+          features: ['注册会员全部功能', '出图', '导出清单', '水利校验', '其余全部功能'] }
+  };
+  var PLAN_ORDER = ['L1', 'L2'];
+  function planOf(p) { return PLANS[p] || PLANS.L1; }
+  /* 「同等时长」的基数：以该等级自身的权益周期为准 */
+  function planDays(state) {
+    var pl = planOf(state && state.plan);
+    return (state && isNum(state.memberDays) && state.memberDays > 0) ? state.memberDays : pl.days;
+  }
+
+  function isNum(v) { return typeof v === 'number' && isFinite(v); }
+  function nowMs() { return Date.now(); }
+
+  function validatePhone(p) {
+    return /^1[3-9]\d{9}$/.test(String(p == null ? '' : p).trim());
+  }
+  function validateCode(c) {
+    return /^\d{6}$/.test(String(c == null ? '' : c).trim());
+  }
+  function maskPhone(p) {
+    var s = String(p == null ? '' : p);
+    return s.length === 11 ? s.slice(0, 3) + '****' + s.slice(7) : s;
+  }
+  function addDays(ts, n) { return new Date(ts).getTime() + n * DAY; }
+  function fmtDate(ts) {
+    var d = new Date(ts), p = function (x) { return x < 10 ? '0' + x : '' + x; };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  }
+  function daysBetween(a, b) { return Math.ceil((b - a) / DAY); }
+
+  /* ---- 邀请 URL 与 ref ---- */
+  function buildInviteUrl(base, code) {
+    var b = String(base || '').split('#')[0].split('?')[0];
+    return b + '?ref=' + encodeURIComponent(code || '');
+  }
+  function parseRef(search) {
+    var s = String(search || '');
+    var m = /(?:^|&|\?)ref=([^&#]*)/.exec(s);
+    if (!m) return '';
+    try { return decodeURIComponent(m[1]); } catch (e) { return m[1]; }
+  }
+  function makeCode(seed) {
+    var s = String(seed == null ? '' : seed) + '|' + nowMs() + '|' + Math.random();
+    var h = 2166136261;
+    for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = (h * 16777619) >>> 0; }
+    return 'RY' + h.toString(36).toUpperCase().slice(0, 8);
+  }
+
+  /* ---- 进度计算：邀请注册 + 群裂变 共享 CAP ---- */
+  function computeProgress(state, now) {
+    now = isNum(now) ? now : nowMs();
+    var invites = (state && state.invites) || [];
+    var claims = (state && state.claims) || [];
+    var fromInvite = 0, cooling = 0, pending = 0;
+    for (var i = 0; i < invites.length; i++) {
+      var s = invites[i].status;
+      if (s === ST.VALID) fromInvite++;
+      else if (s === ST.COOL) cooling++;
+      else if (s === ST.REG) pending++;
+    }
+    var fromGroup = 0;
+    for (var j = 0; j < claims.length; j++) {
+      if (claims[j].status === 'approved') fromGroup += (claims[j].approvedCount || 0);
+    }
+    var total = fromInvite + fromGroup;
+    var capped = Math.min(total, CAP);
+    return {
+      fromInvite: fromInvite, fromGroup: fromGroup, total: total,
+      capped: capped, cooling: cooling, pending: pending,
+      remain: Math.max(0, CAP - capped),
+      reached: capped >= CAP
+    };
+  }
+
+  /* ---- 冷静期迁移：cooling 满 3 天 -> valid ---- */
+  function transitionInvites(state, now) {
+    now = isNum(now) ? now : nowMs();
+    var invites = (state && state.invites) || [];
+    var changed = 0;
+    for (var i = 0; i < invites.length; i++) {
+      var it = invites[i];
+      if (it.status === ST.COOL && isNum(it.activatedAt) && now - it.activatedAt >= COOL_DAYS * DAY) {
+        it.status = ST.VALID;
+        it.validAt = now;
+        changed++;
+      }
+    }
+    return changed;
+  }
+
+  /* ---- 注销 / 解绑：扣回（cooling 与 valid 均可被判失效） ---- */
+  function invalidateInvite(state, id) {
+    var invites = (state && state.invites) || [];
+    for (var i = 0; i < invites.length; i++) {
+      if (invites[i].id === id &&
+          (invites[i].status === ST.COOL || invites[i].status === ST.VALID)) {
+        invites[i].status = ST.INVALID;
+        invites[i].invalidAt = nowMs();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /* ---- 激活某位已注册好友（进入冷静期） ---- */
+  function activateInvite(state, id, now) {
+    now = isNum(now) ? now : nowMs();
+    var invites = (state && state.invites) || [];
+    for (var i = 0; i < invites.length; i++) {
+      if (invites[i].id === id && invites[i].status === ST.REG) {
+        invites[i].status = ST.COOL;
+        invites[i].activatedAt = now;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /* ---- 冷却到期时间 ---- */
+  function coolUntil(invite) {
+    if (!invite || !isNum(invite.activatedAt)) return null;
+    return invite.activatedAt + COOL_DAYS * DAY;
+  }
+
+  /* ---- 奖励：可否发放 ---- */
+  function canGrant(state, now) {
+    var p = computeProgress(state, now);
+    return !!p.reached && !state.rewardClaimed;
+  }
+
+  /* ---- 奖励：发放（幂等，返回新增天数；不可发放返回 0） ---- */
+  function grantReward(state, now) {
+    now = isNum(now) ? now : nowMs();
+    if (!canGrant(state, now)) return 0;
+    // 「同等时长」= 当前所持等级的权益周期（L1 续 30 天，L2 续其购买时长）
+    var days = planDays(state);
+    var pl = planOf(state.plan);
+    var cur = isNum(state.memberExpire) ? state.memberExpire : now;
+    var from = cur > now ? cur : now;
+    var to = addDays(from, days);
+    state.memberExpire = to;
+    state.rewardClaimed = true;
+    state.grantedDays = days;
+    state.rewards = state.rewards || [];
+    state.rewards.unshift({
+      at: now, days: days, plan: pl.key, planName: pl.name, from: from, to: to,
+      source: '邀满 ' + CAP + ' 人 · 赠' + pl.name + '同等时长'
+    });
+    return days;
+  }
+
+  /* ---- 核销工单 ---- */
+  function validateClaimCount(n) {
+    var v = Number(n);
+    return isNum(v) && v === Math.floor(v) && v >= 1 && v <= 20 ? v : 0;
+  }
+
+  /* ---- 初始状态 ---- */
+  function createState(opts) {
+    opts = opts || {};
+    var now = isNum(opts.now) ? opts.now : nowMs();
+    return {
+      loggedIn: false,
+      phone: '', nick: '', runyeAccount: '', activated: false,
+      plan: 'L1',                      // 会员等级：L1 注册会员 / L2 高级会员
+      memberDays: TRIAL_DAYS,          // 当前等级的权益周期天数（"同等时长"基数）
+      memberExpire: 0,
+      myCode: opts.myCode || makeCode(opts.phone || 'anon'),
+      inviter: opts.inviter || '',      // 我的上级邀请码
+      invites: [],
+      claims: [],
+      rewards: [],
+      rewardClaimed: false,
+      createdAt: now
+    };
+  }
+
+  return {
+    CAP: CAP, COOL_DAYS: COOL_DAYS, TRIAL_DAYS: TRIAL_DAYS, DAY: DAY,
+    ST: ST, ST_TEXT: ST_TEXT, PLANS: PLANS, PLAN_ORDER: PLAN_ORDER,
+    planOf: planOf, planDays: planDays,
+    isNum: isNum, nowMs: nowMs,
+    validatePhone: validatePhone, validateCode: validateCode, maskPhone: maskPhone,
+    addDays: addDays, fmtDate: fmtDate, daysBetween: daysBetween,
+    buildInviteUrl: buildInviteUrl, parseRef: parseRef, makeCode: makeCode,
+    computeProgress: computeProgress, transitionInvites: transitionInvites,
+    invalidateInvite: invalidateInvite, activateInvite: activateInvite,
+    coolUntil: coolUntil, canGrant: canGrant, grantReward: grantReward,
+    validateClaimCount: validateClaimCount, createState: createState
+  };
+})();
+if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; }
+</script>
+
+  <!-- [v362] 真数据层：CloudBase SDK（自托管 bundle）+ 云同步 + 权益层 -->
+  <script src="pwa/vendor/cloudbase-js-sdk-3.8.2.bundle.js?v=362"></script>
+  <script src="cloud-sync.js?v=362"></script>
+  <script src="runye-entitle.js?v=362"></script>
+
+<script id="ry-ui">
+/* [v362] 邀友 H5 真数据层 —— 替换原 mock 状态机。
+ * 数据源：window.CloudSync（登录/短信/rdb）+ window.RyEntitle（权益/邀请/进度）。
+ * 原则：UI 结构与 DOM id 全部沿用原版；只换数据来源。
+ *   「授权激活」概念取消：账号体系=手机号，注册即有账号；
+ *   「激活」= 在润野工具里保存一次方案（onSaved 推进 ry_links 行）。 */
+(function () {
+  'use strict';
+  var C = RYCore;
+  var state = null;            /* RyEntitle.state 镜像 */
+  var view = {                 /* 渲染视图（原 renderInvite 的 state 语义） */
+    loggedIn: false, phone: '', nick: '', myCode: '',
+    invites: [], claims: [], rewards: [], rewardClaimed: false,
+    plan: 'L1', memberExpire: 0, memberDays: 30
+  };
+  var codeTimer = null, codeTimerL = null;
+  var modalStack = [];
+  var en = null, cs = null;
+  var REF_KEY_TOOL = 'runye_ref_code';   /* 与工具页 runye-member-ui 共用 */
+  var REF_KEY_H5 = 'RY_INVITE_REF';      /* 原 H5 键，保留兼容 */
+
+  /* ---------- 小工具 ---------- */
+  function now() { return Date.now(); }
+  function ms(x) { if (x == null) return 0; if (typeof x === 'number') return x; var t = Date.parse(x); return isNaN(t) ? 0 : t; }
+  function iso(t) { return new Date(t).toISOString(); }
+
+  var toastTimer;
+  function toast(m) {
+    var t = document.getElementById('toast');
+    t.textContent = m; t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 1900);
+  }
+  function $(id) { return document.getElementById(id); }
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function openModal(id) { $(id).classList.add('on'); modalStack.push(id); history.pushState({ modal: id }, ''); }
+  function closeModal(id) { $(id).classList.remove('on'); var i = modalStack.indexOf(id); if (i >= 0) modalStack.splice(i, 1); }
+  function closeTop() {
+    if (modalStack.length) closeModal(modalStack[modalStack.length - 1]);
+  }
+
+  /* ---------- 邀请码 / ref ---------- */
+  function currentRef() {
+    var r = C.parseRef(location.search);
+    if (!r) { try { r = localStorage.getItem(REF_KEY_TOOL) || localStorage.getItem(REF_KEY_H5) || ''; } catch (e) {} }
+    return String(r || '').trim();
+  }
+  function stashRef(ref) {
+    try { localStorage.setItem(REF_KEY_TOOL, ref); localStorage.setItem(REF_KEY_H5, ref); } catch (e) {}
+  }
+  function clearRef() {
+    try { localStorage.removeItem(REF_KEY_TOOL); localStorage.removeItem(REF_KEY_H5); } catch (e) {}
+    try {
+      if (C.parseRef(location.search)) {
+        var qs = new URLSearchParams(location.search);
+        qs.delete('ref');
+        var s = qs.toString();
+        history.replaceState(null, '', location.pathname + (s ? '?' + s : '') + location.hash);
+      }
+    } catch (e) {}
+  }
+
+  /* 工具页地址（同仓库根） */
+  function toolUrl() {
+    try { return new URL('index.html', location.href).toString(); } catch (e) { return 'index.html'; }
+  }
+  function inviteUrl(kind) {
+    var u = toolUrl().split('#')[0] + '?ref=' + encodeURIComponent(view.myCode || '');
+    return kind === 'group' ? u + '&from=group' : u;
+  }
+
+  /* ---------- 视图同步（权益层 → 渲染视图） ---------- */
+  function effStatus(it) {
+    if (it.status === 'cooling' && it.activated_at && now() - ms(it.activated_at) >= C.COOL_DAYS * C.DAY) return 'valid';
+    return it.status;
+  }
+  function syncView() {
+    view.loggedIn = !!(cs && cs.phone);
+    view.phone = (cs && cs.phone) || '';
+    view.nick = view.phone ? ('用户' + view.phone.slice(-4)) : '';
+    var s = en ? en.state : null;
+    if (s && !s.trial) {
+      view.myCode = s.code || '';
+      view.invites = (s.invites || []).map(function (it) {
+        return { id: it.id, nick: it.nick || '?', status: effStatus(it),
+          registeredAt: ms(it.registered_at), activatedAt: ms(it.activated_at), viaGroup: !!it.via_group };
+      });
+      view.claims = s.claims || [];
+      view.rewards = (s.rewards || []).map(function (r) {
+        return { at: ms(r.at), days: r.days, plan: r.plan, planName: r.planName,
+          from: ms(r.from), to: ms(r.to), source: r.src || ('邀满 3 人 · 赠' + (r.planName || '注册会员') + '同等时长') };
+      });
+      view.rewardClaimed = !!s.rewardClaimed;
+      view.plan = (s.entitle && s.entitle.plan) || 'L1';
+      view.memberExpire = (s.entitle && s.entitle.expireAt) || 0;
+      view.memberDays = (s.entitle && s.entitle.memberDays) || 30;
+    } else {
+      view.myCode = ''; view.invites = []; view.claims = []; view.rewards = [];
+      view.rewardClaimed = false; view.plan = 'L1'; view.memberExpire = 0;
+    }
+  }
+  function progress() {
+    return (en && en.ready()) ? en.progress() :
+      { capped: 0, fromInvite: 0, fromGroup: 0, cooling: 0, pending: 0, remain: C.CAP, reached: false };
+  }
+
+  /* ---------- 落地页 ---------- */
+  function renderLanding() {
+    var ref = C.parseRef(location.search);
+    if (ref) stashRef(ref);
+    var box = $('heroTInviter');
+    if (ref) {
+      box.hidden = false;
+      $('heroTInviterName').textContent = ref + ' 邀请你体验';
+      $('heroTitle').innerHTML = '润野灌溉<br>注册激活，你也有一份';
+      $('heroSub').textContent = '山地梯田滴灌快速设计工具。完成注册后即赠 30 天注册会员（L1），解锁四大主功能，也可再邀 3 位同行续期。';
+    } else {
+      box.hidden = true;
+      $('heroTitle').innerHTML = '润野灌溉<br>邀 3 位同行激活，会员免费续';
+      $('heroSub').textContent = '山地梯田滴灌快速设计工具，助你轻松规划农田灌溉方案。点开即用，无需下载。';
+    }
+  }
+
+  /* ---------- 邀请中心渲染（沿用原 DOM id） ---------- */
+  function renderInvite() {
+    var p = progress();
+
+    $('progNum').textContent = String(p.capped);
+    $('progBar').style.width = (p.capped / C.CAP * 100) + '%';
+    $('gpNum').textContent = String(p.fromGroup);
+
+    if (p.reached) {
+      $('progTip').innerHTML = '已达成 <b>3 位</b>有效邀请' + (view.rewardClaimed ? '，会员权益已发放（见下方奖励记录）。' : '，权益将自动发放。');
+    } else {
+      $('progTip').innerHTML = '还差 <b>' + p.remain + ' 位</b>好友完成注册 + 激活，即可获赠同等时长会员。';
+    }
+    var stTxt = view.rewardClaimed ? '已发放 · 同一会员权益仅 1 次'
+      : (p.reached ? '待发放 · 即将自动到账' : '会员权益待发放 · 邀满 3 人即赠');
+    $('progState').textContent = stTxt;
+    var coolingTxt = p.cooling ? '（含 ' + p.cooling + ' 位冷静期中，不计入）' : '';
+    var pendingTxt = p.pending ? '（含 ' + p.pending + ' 位仅注册未激活，不计入）' : '';
+    $('progSplit').textContent = '其中邀请注册 ' + p.fromInvite + ' 人 · 群裂变 ' + p.fromGroup +
+      ' 人（共享 3 人上限）' + coolingTxt + pendingTxt;
+
+    var list = $('invList');
+    list.innerHTML = '';
+    if (!view.invites.length) {
+      list.appendChild(el('div', 'empty', '还没有邀请记录。把上方专属链接发给同行，对方注册并激活后即出现在这里。'));
+    } else {
+      view.invites.forEach(function (it) {
+        var row = el('div', 'inv');
+        row.appendChild(el('span', 'av', (it.nick || '?').charAt(0)));
+        var info = el('span', 'info');
+        info.appendChild(el('div', 'n', it.nick + (it.viaGroup ? ' · 来自群' : '')));
+        var s = '';
+        if (it.status === 'registered') s = '已注册 · 待激活（在工具里保存方案即激活）';
+        else if (it.status === 'cooling') s = '已激活 · 冷静期至 ' + C.fmtDate(it.activatedAt + C.COOL_DAYS * C.DAY) + '（到期后计入）';
+        else if (it.status === 'valid') s = '已激活 · 已生效' + (it.activatedAt ? '（' + C.fmtDate(it.activatedAt + C.COOL_DAYS * C.DAY) + ' 计入）' : '');
+        else s = '账号已注销/解绑 · 不计入';
+        info.appendChild(el('div', 's', s));
+        row.appendChild(info);
+        row.appendChild(el('span', 'tag ' + it.status, C.ST_TEXT[it.status] || it.status));
+        list.appendChild(row);
+      });
+    }
+
+    var cl = $('claimList');
+    cl.innerHTML = '';
+    if (!view.claims.length) {
+      cl.appendChild(el('div', 'empty', '暂无核销工单。若有同行已激活但漏计，可提交核销补计。'));
+    } else {
+      view.claims.forEach(function (c) {
+        var row = el('div', 'inv');
+        row.appendChild(el('span', 'av', '核'));
+        var info = el('span', 'info');
+        info.appendChild(el('div', 'n', '补计 ' + c.count + ' 人'));
+        var st = c.status === 'approved' ? '已通过 · 计入 ' + (c.approvedCount || 0) + ' 人'
+          : c.status === 'rejected' ? '已驳回' : '审核中 · 预计 1-2 个工作日';
+        info.appendChild(el('div', 's', C.fmtDate(c.at) + ' 提交 · ' + st + (c.names ? ' · ' + c.names : '')));
+        row.appendChild(info);
+        row.appendChild(el('span', 'tag ' + (c.status === 'approved' ? 'done' : c.status === 'rejected' ? 'invalid' : 'cooling'),
+          c.status === 'approved' ? '已计入' : c.status === 'rejected' ? '已驳回' : '审核中'));
+        cl.appendChild(row);
+      });
+    }
+
+    var rb = $('rewardBox');
+    rb.innerHTML = '';
+    if (!view.rewards.length) {
+      var r1 = el('div', 'acct-row');
+      r1.appendChild(el('span', 'k', '会员权益'));
+      r1.appendChild(el('span', 'v', '邀满 3 人后自动发放'));
+      rb.appendChild(r1);
+      var r2 = el('div', 'acct-row');
+      r2.appendChild(el('span', 'k', '发放状态'));
+      r2.appendChild(el('span', 'v act', '待发放 · ' + p.capped + '/' + C.CAP));
+      rb.appendChild(r2);
+    } else {
+      view.rewards.forEach(function (r) {
+        var a = el('div', 'acct-row');
+        a.appendChild(el('span', 'k', '赠送 ' + r.days + ' 天'));
+        a.appendChild(el('span', 'v act', C.fmtDate(r.from) + ' → ' + C.fmtDate(r.to)));
+        rb.appendChild(a);
+        var b = el('div', 'acct-row');
+        b.appendChild(el('span', 'k', '来源'));
+        b.appendChild(el('span', 'v', r.source));
+        rb.appendChild(b);
+      });
+    }
+
+    var pb = $('planBox');
+    pb.innerHTML = '';
+    C.PLAN_ORDER.forEach(function (k) {
+      var pl = C.PLANS[k];
+      var cur = view.plan === k;
+      var row = el('div', 'plan-row' + (cur ? ' cur' : ''));
+      row.appendChild(el('span', 'plan-tag', pl.name));
+      var b = el('span', 'plan-body');
+      b.appendChild(el('div', 'plan-name', pl.name + (cur ? ' · 当前等级' : '') +
+        ' · ' + pl.days + ' 天' + (pl.limited ? '（限时）' : '')));
+      b.appendChild(el('div', 'plan-feat', pl.features.join('、')));
+      row.appendChild(b);
+      pb.appendChild(row);
+    });
+
+    $('acctPhone').textContent = C.maskPhone(view.phone);
+    $('acctRunye').textContent = view.loggedIn ? '已绑定（手机号即账号）' : '未激活';
+    $('acctPlan').textContent = C.planOf(view.plan).name;
+    $('acctExpire').textContent = view.memberExpire ? C.fmtDate(view.memberExpire) : '—';
+    $('inviteLinkBox').innerHTML = '';
+    if (view.myCode) {
+      var lb = el('span');
+      lb.appendChild(el('b', null, '我的邀请码：' + view.myCode));
+      $('inviteLinkBox').appendChild(lb);
+      $('inviteLinkBox').appendChild(document.createElement('br'));
+      $('inviteLinkBox').appendChild(document.createTextNode(inviteUrl()));
+      var open = el('a', null, '打开润野灌溉工具 →');
+      open.href = toolUrl();
+      open.style.cssText = 'display:inline-block;margin-top:6px;color:var(--water,#2E7D4F);font-size:12px';
+      $('inviteLinkBox').appendChild(document.createElement('br'));
+      $('inviteLinkBox').appendChild(open);
+    } else {
+      $('inviteLinkBox').appendChild(el('span', null, '登录后生成专属邀请码'));
+    }
+  }
+
+  function renderAll() { renderInvite(); }
+
+  /* ---------- 奖励：达标自动发放（幂等） ---------- */
+  var checking = false;
+  function checkReward() {
+    var p = progress();
+    if (!p.reached || view.rewardClaimed || !en || checking) return;
+    checking = true;
+    en.grant().then(function (r) {
+      checking = false;
+      syncView(); renderAll();
+      if (r && r.ok && r.granted > 0) {
+        $('rewardTip').innerHTML = '你已成功邀请 3 位新用户完成注册并激活。<br>同等时长会员权益已发放到你的账号。';
+        var s = en.state;
+        var r0 = (s && s.rewards && s.rewards[0]) || {};
+        $('rewardLine').innerHTML = '到账权益：<b>' + (r.planName || '注册会员') + ' ' + r.granted + ' 天</b><br>当前有效期：' +
+          C.fmtDate(ms(r0.from)) + ' → ' + C.fmtDate(ms(r0.to)) + '。';
+        openModal('mReward');
+      }
+    }, function () { checking = false; });
+  }
+
+  /* ---------- 视图切换 ---------- */
+  function go(v) {
+    if (v === 'invite' && !view.loggedIn) {
+      toast('请先注册或登录');
+      openModal('mLogin');
+      return;
+    }
+    $('vLanding').classList.toggle('on', v === 'home');
+    $('vInvite').classList.toggle('on', v === 'invite');
+    $('tabHome').classList.toggle('active', v === 'home');
+    $('tabInvite').classList.toggle('active', v === 'invite');
+    if (v === 'invite') renderAll();
+    window.scrollTo(0, 0);
+  }
+
+  /* ---------- 注册 / 登录（真·CloudBase 短信） ---------- */
+  function markErr(fieldId, on) { $(fieldId).classList.toggle('err', !!on); }
+  function errText(r) {
+    return (r && r.error && r.error.msg) || (r && r.message) || '未知错误';
+  }
+  function startCooldown(btn, timerKey) {
+    var left = 60;
+    btn.disabled = true;
+    var set = function () {
+      left--;
+      btn.textContent = left > 0 ? left + 's 后重发' : '获取验证码';
+      if (left <= 0) { clearInterval(timerKey.t); timerKey.t = null; btn.disabled = false; }
+    };
+    timerKey.t = setInterval(set, 1000);
+  }
+  var cdReg = { t: null }, cdLogin = { t: null };
+
+  function sendCode() {
+    var p = $('phone').value.trim();
+    if (!C.validatePhone(p)) { markErr('fPhone', true); toast('请输入正确的 11 位手机号'); return; }
+    markErr('fPhone', false);
+    if (cdReg.t) return;
+    if (!cs || typeof cs.sendSmsCode !== 'function') { toast('云端未就绪，请稍后再试'); return; }
+    cs.sendSmsCode(p).then(function (r) {
+      if (r && r.ok) { toast('验证码已发送至 ' + r.phone); startCooldown($('btnCode'), cdReg); }
+      else toast('发送失败：' + errText(r));
+    });
+  }
+  function sendLoginCode() {
+    var p = $('lPhone').value.trim();
+    if (!C.validatePhone(p)) { toast('请输入正确的 11 位手机号'); return; }
+    if (cdLogin.t) return;
+    if (!cs || typeof cs.sendSmsCode !== 'function') { toast('云端未就绪，请稍后再试'); return; }
+    cs.sendSmsCode(p).then(function (r) {
+      if (r && r.ok) { toast('验证码已发送至 ' + r.phone); startCooldown($('btnLoginCode'), cdLogin); }
+      else toast('发送失败：' + errText(r));
+    });
+  }
+
+  function afterLogin(closeId) {
+    closeModal(closeId);
+    toast('登录成功，正在同步权益…');
+    var initP = en.onLogin ? en.onLogin() : en.init(true);
+    Promise.resolve(initP).then(function () {
+      var ref = currentRef();
+      var bindP = ref ? Promise.resolve(en.bindRef(ref, false)) : Promise.resolve(null);
+      return bindP.then(function (r) {
+        if (r && r.ok) { toast('已建立好友邀请关系 ✓'); clearRef(); }
+        else if (r && r.code === -2) clearRef();
+        syncView(); renderAll();
+        go('invite');
+        checkReward();
+      });
+    }).catch(function (e) {
+      syncView();
+      toast('权益同步失败，请稍后下拉刷新重试');
+    });
+  }
+
+  function doRegister() {
+    var p = $('phone').value.trim();
+    var c = $('vcode').value.trim();
+    var a = $('agree').checked;
+    var ok = true;
+    if (!C.validatePhone(p)) { markErr('fPhone', true); toast('请输入正确的 11 位手机号'); ok = false; }
+    else markErr('fPhone', false);
+    if (!C.validateCode(c)) { markErr('fCode', true); if (ok) toast('请输入 6 位数字验证码'); ok = false; }
+    else markErr('fCode', false);
+    if (!a) {
+      var w = $('agreeWrap');
+      w.classList.add('shake');
+      setTimeout(function () { w.classList.remove('shake'); }, 320);
+      if (ok) toast('请先勾选同意用户协议、隐私政策与活动规则');
+      ok = false;
+    }
+    if (!ok) return;
+    if (!cs || typeof cs.signInSms !== 'function') { toast('云端未就绪，请稍后再试'); return; }
+    $('btnSubmit').disabled = true;
+    cs.signInSms(p, c).then(function (r) {
+      $('btnSubmit').disabled = false;
+      if (r && r.ok) afterLogin(null);   /* 注册卡就在页面上，无弹窗可关 */
+      else toast('登录失败：' + errText(r));
+    });
+  }
+
+  function doLogin() {
+    var p = $('lPhone').value.trim();
+    var c = $('lCode').value.trim();
+    if (!C.validatePhone(p)) { toast('请输入正确的 11 位手机号'); return; }
+    if (!C.validateCode(c)) { toast('请输入 6 位数字验证码'); return; }
+    if (!cs || typeof cs.signInSms !== 'function') { toast('云端未就绪，请稍后再试'); return; }
+    cs.signInSms(p, c).then(function (r) {
+      if (r && r.ok) afterLogin('mLogin');
+      else toast('登录失败：' + errText(r));
+    });
+  }
+
+  function doLogout() {
+    if (cs && typeof cs.logout === 'function') {
+      cs.logout().then(function () {
+        if (en && en.reset) en.reset();
+        syncView();
+        toast('已退出登录');
+        go('home');
+      });
+    } else toast('如需更换账号，请清除浏览器数据后重试');
+  }
+
+  /* ---------- 分享 ---------- */
+  function copyInvite(kind) {
+    if (!view.myCode) { toast('请先登录生成专属邀请码'); return; }
+    var u = inviteUrl(kind);
+    var done = function () { toast('邀请链接已复制，发给同行即可'); };
+    var fail = function () {
+      var ta = document.createElement('textarea');
+      ta.value = u; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(ta);
+      if (ok) done();
+      else toast('复制失败，请长按上方链接手动复制');
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(u).then(done, fail);
+    } else fail();
+  }
+
+  /* ---------- 海报（canvas + 内联 QR） ---------- */
+  function drawPoster() {
+    var W = 600, H = 900;
+    var cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    var g = cv.getContext('2d');
+    var url = inviteUrl();
+
+    var grad = g.createLinearGradient(0, 0, W * .4, H * .6);
+    grad.addColorStop(0, '#1B4D34'); grad.addColorStop(1, '#2E7D4F');
+    g.fillStyle = grad; g.fillRect(0, 0, W, 380);
+
+    g.fillStyle = '#fff';
+    g.fillRect(60, 96, 72, 72);
+    g.fillStyle = '#2E7D4F';
+    g.fillRect(76, 108, 40, 48);
+
+    g.fillStyle = '#fff';
+    g.font = 'bold 44px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+    g.textAlign = 'center';
+    g.fillText('润野灌溉', W / 2, 138);
+    g.font = '28px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+    g.fillText('邀 3 位同行激活账号', W / 2, 208);
+    g.fillText('你的会员免费续', W / 2, 252);
+    g.font = '24px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+    g.fillStyle = 'rgba(255,255,255,.85)';
+    g.fillText('山地梯田滴灌设计工具 · 点开即用', W / 2, 306);
+
+    var cx = 50, cy = 340, cw = W - 100, ch = 460, r = 28;
+    g.fillStyle = '#fff';
+    g.beginPath();
+    g.moveTo(cx + r, cy);
+    g.lineTo(cx + cw - r, cy); g.quadraticCurveTo(cx + cw, cy, cx + cw, cy + r);
+    g.lineTo(cx + cw, cy + ch - r); g.quadraticCurveTo(cx + cw, cy + ch, cx + cw - r, cy + ch);
+    g.lineTo(cx + r, cy + ch); g.quadraticCurveTo(cx, cy + ch, cx, cy + ch - r);
+    g.lineTo(cx, cy + r); g.quadraticCurveTo(cx, cy, cx + r, cy);
+    g.closePath(); g.fill();
+
+    var qr;
+    try {
+      qr = qrcode(0, 'M');
+      qr.addData(url);
+      qr.make();
+    } catch (e) { qr = null; }
+    var size = 300, ox = (W - size) / 2, oy = cy + 44;
+    if (qr) {
+      var cnt = qr.getModuleCount(), cell = size / cnt;
+      g.fillStyle = '#1B4D34';
+      for (var r2 = 0; r2 < cnt; r2++) {
+        for (var c2 = 0; c2 < cnt; c2++) {
+          if (qr.isDark(r2, c2)) g.fillRect(ox + c2 * cell, oy + r2 * cell, cell + .5, cell + .5);
+        }
+      }
+    } else {
+      g.fillStyle = '#eee'; g.fillRect(ox, oy, size, size);
+      g.fillStyle = '#999'; g.font = '22px sans-serif';
+      g.fillText('二维码生成失败，请复制链接', W / 2, oy + size / 2);
+    }
+
+    g.fillStyle = '#5A6659';
+    g.font = '24px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+    g.fillText('长按识别二维码 · 领取会员', W / 2, oy + size + 44);
+
+    g.fillStyle = '#E8F3EA';
+    g.fillRect(0, 820, W, 80);
+    g.fillStyle = '#2E7D4F';
+    g.font = 'bold 26px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+    g.fillText((view.nick || '润野用户') + ' 邀请你加入', W / 2, 866);
+
+    return cv.toDataURL('image/png');
+  }
+
+  function openPoster() {
+    if (!view.myCode) { toast('请先登录生成专属邀请码'); return; }
+    openModal('mPoster');
+    $('posterTip').textContent = '海报生成中…';
+    setTimeout(function () {
+      try {
+        var url = drawPoster();
+        $('posterImg').src = url;
+        $('posterTip').textContent = '长按上方图片保存到相册，再发给同行或社群。';
+      } catch (e) {
+        $('posterTip').textContent = '海报生成失败，请使用「复制邀请链接」分享。';
+      }
+    }, 60);
+  }
+
+  /* ---------- 核销 ---------- */
+  function submitClaim() {
+    var n = C.validateClaimCount($('claimCount').value);
+    if (!n) { toast('请填写 1-20 之间的整数人数'); return; }
+    var names = ($('claimNames').value || '').trim();
+    if (names.length > 200) { toast('备注过长（≤200 字）'); return; }
+    if (!en || typeof en.claim !== 'function') { toast('云端未就绪，请稍后再试'); return; }
+    en.claim(n, names).then(function (r) {
+      if (r && r.ok) {
+        $('claimCount').value = ''; $('claimNames').value = '';
+        closeModal('mGroup');
+        syncView(); renderAll();
+        toast('核销申请已提交，可在「核销工单」查看进度');
+      } else toast((r && r.message) || '提交失败，请稍后再试');
+    });
+  }
+
+  /* ---------- 暴露到全局（内联事件） ---------- */
+  window.toast = toast; window.openModal = openModal; window.closeModal = closeModal;
+  window.go = go; window.sendCode = sendCode; window.sendLoginCode = sendLoginCode;
+  window.doRegister = doRegister; window.doLogin = doLogin; window.doLogout = doLogout;
+  window.copyInvite = copyInvite; window.openPoster = openPoster; window.submitClaim = submitClaim;
+  window.closeTop = closeTop;
+
+  /* ---------- 启动 ---------- */
+  renderLanding();
+  syncView();
+
+  function showInviteIfLogged() {
+    if (view.loggedIn) {
+      $('vLanding').classList.remove('on');
+      $('vInvite').classList.add('on');
+      $('tabHome').classList.remove('active');
+      $('tabInvite').classList.add('active');
+      renderAll();
+      checkReward();
+      return true;
+    }
+    return false;
+  }
+
+  function boot() {
+    cs = window.CloudSync || null;
+    en = window.RyEntitle || null;
+    if (!cs || !en) { renderLanding(); return; }   /* 云端脚本缺失：页面仍可浏览，登录不可用 */
+    var pre = (typeof cs.ensureAnon === 'function') ? cs.ensureAnon() : Promise.resolve(false);
+    Promise.resolve(pre).then(function () { return en.init(); }).then(function () {
+      syncView();
+      if (!showInviteIfLogged()) renderLanding();
+    }).catch(function () { renderLanding(); });
+    if (typeof en.onChange === 'function') {
+      en.onChange(function () { syncView(); if (view.loggedIn) renderAll(); });
+    }
+  }
+  if (window.cloudbase) boot();
+  else {
+    window.addEventListener('cloudbase-ready', boot, false);
+    setTimeout(boot, 6000);   /* SDK 兜底：超时也进（登录时会再提示未就绪） */
+  }
+
+  var ph = $('phone');
+  if (ph) ph.addEventListener('input', function () {
+    ph.value = ph.value.replace(/\D/g, '').slice(0, 11);
+  });
+  var vc = $('vcode');
+  if (vc) vc.addEventListener('input', function () {
+    vc.value = vc.value.replace(/\D/g, '').slice(0, 6);
+  });
+  var lp = $('lPhone');
+  if (lp) lp.addEventListener('input', function () {
+    lp.value = lp.value.replace(/\D/g, '').slice(0, 11);
+  });
+  var lc = $('lCode');
+  if (lc) lc.addEventListener('input', function () {
+    lc.value = lc.value.replace(/\D/g, '').slice(0, 6);
+  });
+})();
+
+</script>
+</body>
+</html>

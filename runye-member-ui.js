@@ -16,13 +16,15 @@
 (function () {
   'use strict';
 
-  /* 邀请落地页（会员 H5）地址：部署后填入，或用 window.RY_INVITE_PAGE_URL 覆盖 */
-  var INVITE_PAGE = '';
+  /* 邀请落地页（会员 H5）：v362 起指向真数据邀友页（同仓库根 invite.html） */
+  var INVITE_PAGE = 'invite.html';
 
   function E() { return window.RyEntitle || null; }
   function invitePage() {
-    if (window.RY_INVITE_PAGE_URL) return String(window.RY_INVITE_PAGE_URL);
-    return INVITE_PAGE;
+    var p = window.RY_INVITE_PAGE_URL ? String(window.RY_INVITE_PAGE_URL) : INVITE_PAGE;
+    if (!p) return '';
+    /* 绝对化：复制/分享出去的必须是完整 URL，不能是相对路径 */
+    try { return new URL(p, (location && location.href) || '').toString(); } catch (e) { return p; }
   }
 
   /* ---------- [v361] 裂变闭环：?ref= 邀请码的消费 ----------
