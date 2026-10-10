@@ -36,6 +36,34 @@ var cloudSdkLoaded = false;          // SDK ESM 是否已挂到 window.cloudbase
 /* [v359] 手机号 + 短信验证码登录的状态 */
 var cloudPhone = '';                                  // 已登录手机号（带区号，如 '+86 13800000000'）
 var lastSmsTicket = null;             // { phone, verificationInfo } —— signInWithSms 第三步要用
+/* [v363] 票据持久化（sessionStorage）：微信 iOS 切到短信 App 常杀掉 webview 重载页面，
+   内存票据丢失 → 提交时报「请先获取短信验证码」。同 tab 重载后恢复，解决该类失败。 */
+var SMS_TICKET_KEY = 'cloudSmsTicket_' + (typeof ENV_ID !== 'undefined' ? ENV_ID : 'env');
+function smsTicketSave(t) { try { sessionStorage.setItem(SMS_TICKET_KEY, JSON.stringify(t)); } catch (e) {} }
+function smsTicketLoad() { try { var s = sessionStorage.getItem(SMS_TICKET_KEY); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
+function smsTicketClear() { try { sessionStorage.removeItem(SMS_TICKET_KEY); } catch (e) {} }
+if (!lastSmsTicket) lastSmsTicket = smsTicketLoad();
+/* [v363] 云端错误归一化：SDK 把业务错误抛成裸字符串（如 'invalid_argument'），
+   UI 层拿不到 .msg 只会显示「未知错误」。翻译常见码为人话。 */
+function normCloudErr(e) {
+  if (e && typeof e === 'object') {
+    if (e.msg) return e;
+    var m = e.message || e.errMsg || e.errmsg || e.desc || e.code;
+    if (m) return { msg: String(m) };
+    return e;
+  }
+  if (typeof e === 'string') {
+    var MAP = {
+      invalid_argument: '验证码不正确或已失效，请重新获取短信验证码',
+      INVALID_PARAM: '验证码不正确或已失效，请重新获取短信验证码',
+      ParamError: '验证码不正确或已失效，请重新获取短信验证码',
+      OperationDenied: '操作被拒绝，请稍后再试',
+      InternalError: '服务繁忙，请稍后再试'
+    };
+    return { msg: MAP[e] || ('操作失败（' + e + '）') };
+  }
+  return { msg: '操作失败，请稍后再试' };
+}
 var lastSmsAt = 0;                    // 上次发码时间（前端节流用）
 
 /* 监听 ESM 加载完成事件（head 里的 <script type="module"> 派发） */
@@ -204,11 +232,12 @@ function cloudSendSmsCode(phone){
   if(!a || typeof a.getVerification !== 'function')
     return Promise.resolve({ok:false, error:{msg:'SDK 不支持短信验证码登录（getVerification 缺失）'}});
   return Promise.resolve(a.getVerification({ phone_number: pn })).then(function(res){
-    if(res && res.error) return {ok:false, error:res.error};
+    if(res && res.error) return {ok:false, error:normCloudErr(res.error)};
     lastSmsTicket = { phone: pn, verificationInfo: (res && res.data) || res || null };
+    smsTicketSave(lastSmsTicket);
     lastSmsAt = Date.now();
     return {ok:true, phone:pn, cooldown:SMS_RESEND_SEC};
-  }).catch(function(e){ return {ok:false, error:(e && e.error) || e}; });
+  }).catch(function(e){ return {ok:false, error:normCloudErr((e && e.error) || e)}; });
 }
 /* 第三步：校验验证码并登录（未注册手机号即完成注册） */
 function cloudSignInSms(phone, code){
@@ -216,8 +245,9 @@ function cloudSignInSms(phone, code){
   if(!pn) return Promise.resolve({ok:false, error:{msg:'手机号格式不正确'}});
   if(!/^\d{6}$/.test(String(code === null || code === undefined ? '' : code).trim()))
     return Promise.resolve({ok:false, error:{msg:'验证码为 6 位数字'}});
+  if(!lastSmsTicket) lastSmsTicket = smsTicketLoad();
   if(!lastSmsTicket || lastSmsTicket.phone !== pn)
-    return Promise.resolve({ok:false, error:{msg:'请先获取短信验证码'}});
+    return Promise.resolve({ok:false, error:{msg:'验证码已失效或与手机号不匹配，请重新获取短信验证码'}});
   if(!cloudApp) return Promise.resolve({ok:false, error:{msg:'云端未初始化'}});
   var a = cloudAuth();
   if(!a || typeof a.signInWithSms !== 'function')
@@ -227,16 +257,17 @@ function cloudSignInSms(phone, code){
     verificationCode: String(code).trim(),
     phoneNum: pn
   })).then(function(res){
-    if(res && res.error) return {ok:false, error:res.error};
+    if(res && res.error) return {ok:false, error:normCloudErr(res.error)};
     var u = res && res.data && res.data.user;
     cloudUid = (u && (u.id || u.uid || u._id)) || cloudUid;
     if(!cloudUid) return {ok:false, error:{msg:'登录成功但未拿到 uid'}};
     cloudPhone = pn;
     lastSmsTicket = null;
+    smsTicketClear();
     cloudReady = true; cloudEmitStatus();
     cloudEntitleAfterLogin();     /* 转正后必须重拉权益，否则界面假清零 */
     return {ok:true, uid:cloudUid, phone:cloudPhone};
-  }).catch(function(e){ return {ok:false, error:(e && e.error) || e}; });
+  }).catch(function(e){ return {ok:false, error:normCloudErr((e && e.error) || e)}; });
 }
 
 /* 云端加载：通过云函数读取 user_db/{uid}.json */
@@ -323,7 +354,7 @@ function cloudGetPlans(){
 function cloudLogout(){
   try{ if(cloudApp && cloudAuth() && cloudAuth().signOut) cloudAuth().signOut(); }catch(e){}
   cloudUid = null; cloudPhone = ''; cloudReady = false; cloudSyncing = false;
-  lastSmsTicket = null; lastSmsAt = 0; cloudEmitStatus();
+  lastSmsTicket = null; smsTicketClear(); lastSmsAt = 0; cloudEmitStatus();
 }
 
 /* ===== [v360 2026-10-10] KV 接口迁移：callFunction(syncDb) → app.rdb() 直连 PG（路线C） =====
