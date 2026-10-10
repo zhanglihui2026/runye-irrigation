@@ -232,14 +232,32 @@ function cloudSendSmsCode(phone){
   if(!a || typeof a.getVerification !== 'function')
     return Promise.resolve({ok:false, error:{msg:'SDK 不支持短信验证码登录（getVerification 缺失）'}});
   return Promise.resolve(a.getVerification({ phone_number: pn })).then(function(res){
-    if(res && res.error) return {ok:false, error:normCloudErr(res.error)};
-    lastSmsTicket = { phone: pn, verificationInfo: (res && res.data) || res || null };
+    if(res && res.error){ smsDiag('getVerification', res.error); return {ok:false, error:normCloudErr(res.error)}; }
+    var info = (res && res.data) || res || null;
+    smsDiag('getVerification_ok', { verification_id: !!(info && (info.verification_id || info.verificationId)), is_user: !!(info && info.is_user) });
+    lastSmsTicket = { phone: pn, verificationInfo: info };
     smsTicketSave(lastSmsTicket);
     lastSmsAt = Date.now();
     return {ok:true, phone:pn, cooldown:SMS_RESEND_SEC};
-  }).catch(function(e){ return {ok:false, error:normCloudErr((e && e.error) || e)}; });
+  }).catch(function(e){ smsDiag('getVerification_throw', e); return {ok:false, error:normCloudErr((e && e.error) || e)}; });
 }
-/* 第三步：校验验证码并登录（未注册手机号即完成注册） */
+/* [v364 2026-10-10] 短信原始错误诊断池：任何一环的裸错误都存这里，供远程排障 */
+function smsDiag(stage, raw){
+  try{
+    window.__rySmsDiag = window.__rySmsDiag || [];
+    window.__rySmsDiag.push({ t: Date.now(), stage: stage, raw: (typeof raw === 'string' ? raw : JSON.parse(JSON.stringify(raw))) });
+    if(window.__rySmsDiag.length > 20) window.__rySmsDiag.shift();
+    try{ sessionStorage.setItem('rySmsDiag', JSON.stringify(window.__rySmsDiag.slice(-5))); }catch(e2){}
+  }catch(e){}
+  return raw;
+}
+/* 第三步：校验验证码并登录（未注册手机号即完成注册）。
+   [v364] 改走官方推荐的 auth.verifyOtp({token, messageId, phone})：
+   messageId = getVerification 返回的 verification_id（官方文档明确此组合）。
+   verifyOtp 内部强制 is_user:true → 走 /v1/signin 服务端「智能注册并登录」端点，
+   用户不存在时由服务端自动建户 —— 修复新号注册报 invalid_argument 的问题。
+   （旧 signInWithSms 三步式对新号走客户端 /v1/signup 端点，被 PG 环境服务端拒绝。）
+   verifyOtp 失败时兜底重试旧 signInWithSms 一次（老号老通道已验证可行）。 */
 function cloudSignInSms(phone, code){
   var pn = normPhone(phone);
   if(!pn) return Promise.resolve({ok:false, error:{msg:'手机号格式不正确'}});
@@ -250,23 +268,67 @@ function cloudSignInSms(phone, code){
     return Promise.resolve({ok:false, error:{msg:'验证码已失效或与手机号不匹配，请重新获取短信验证码'}});
   if(!cloudApp) return Promise.resolve({ok:false, error:{msg:'云端未初始化'}});
   var a = cloudAuth();
-  if(!a || typeof a.signInWithSms !== 'function')
-    return Promise.resolve({ok:false, error:{msg:'SDK 不支持短信验证码登录（signInWithSms 缺失）'}});
-  return Promise.resolve(a.signInWithSms({
-    verificationInfo: lastSmsTicket.verificationInfo,
-    verificationCode: String(code).trim(),
-    phoneNum: pn
-  })).then(function(res){
-    if(res && res.error) return {ok:false, error:normCloudErr(res.error)};
-    var u = res && res.data && res.data.user;
-    cloudUid = (u && (u.id || u.uid || u._id)) || cloudUid;
-    if(!cloudUid) return {ok:false, error:{msg:'登录成功但未拿到 uid'}};
+  var info = lastSmsTicket.verificationInfo || {};
+  var vid = info.verification_id || info.verificationId || (info.data && info.data.verification_id) || '';
+  var codeStr = String(code).trim();
+  function extractUser(d){
+    var u = d && d.user;
+    if(!u && d && d.session) u = d.session.user;
+    return u ? (u.id || u.uid || u._id) : null;
+  }
+  function finish(d){
+    var uid = extractUser(d);
+    if(!uid){
+      /* verifyOtp 的 data 可能只带 session；兜底从 SDK 会话取 */
+      return Promise.resolve(a.getSession ? a.getSession() : null).then(function(gs){
+        var gu = gs && gs.data && gs.data.user;
+        var g = gu ? (gu.id || gu.uid || gu._id) : null;
+        if(!g) return {ok:false, error:{msg:'登录成功但未拿到 uid'}};
+        return done(g);
+      }).catch(function(){ return {ok:false, error:{msg:'登录成功但未拿到 uid'}}; });
+    }
+    return Promise.resolve(done(uid));
+  }
+  function done(uid){
+    cloudUid = uid;
     cloudPhone = pn;
     lastSmsTicket = null;
     smsTicketClear();
     cloudReady = true; cloudEmitStatus();
     cloudEntitleAfterLogin();     /* 转正后必须重拉权益，否则界面假清零 */
     return {ok:true, uid:cloudUid, phone:cloudPhone};
+  }
+  var mainP;
+  if(vid && a && typeof a.verifyOtp === 'function'){
+    mainP = Promise.resolve(a.verifyOtp({ token: codeStr, messageId: vid, phone: pn })).then(function(res){
+      if(res && res.error){ smsDiag('verifyOtp', res.error); throw res.error; }
+      return res && res.data;
+    }).then(finish);
+  } else if(a && typeof a.signInWithSms === 'function'){
+    mainP = Promise.resolve(a.signInWithSms({
+      verificationInfo: info,
+      verificationCode: codeStr,
+      phoneNum: pn
+    })).then(function(res){
+      if(res && res.error){ smsDiag('signInWithSms', res.error); throw res.error; }
+      return finish(res && res.data);
+    });
+  } else {
+    return Promise.resolve({ok:false, error:{msg:'SDK 不支持短信验证码登录（verifyOtp/signInWithSms 均缺失）'}});
+  }
+  return mainP.catch(function(e){
+    /* 兜底：verifyOtp 失败且老通道可用时重试一次（仅当老通道存在且与主通道不同） */
+    if(a && typeof a.verifyOtp === 'function' && typeof a.signInWithSms === 'function' && vid){
+      return Promise.resolve(a.signInWithSms({
+        verificationInfo: info,
+        verificationCode: codeStr,
+        phoneNum: pn
+      })).then(function(res){
+        if(res && res.error){ smsDiag('signInWithSms_fallback', res.error); throw res.error; }
+        return finish(res && res.data);
+      });
+    }
+    throw e;
   }).catch(function(e){ return {ok:false, error:normCloudErr((e && e.error) || e)}; });
 }
 
