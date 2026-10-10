@@ -25,6 +25,94 @@
     return INVITE_PAGE;
   }
 
+  /* ---------- [v361] 裂变闭环：?ref= 邀请码的消费 ----------
+     之前只有「分享」没有「成团」：bindRef() 全项目零调用，好友打开
+     邀请链接后没人读 ?ref= 参数，邀请人进度永远 0/3。补齐三段：
+       ① 未登录：码暂存 localStorage + 底部接受条（点「立即注册」直达登录框）
+       ② 注册/登录成功（doLogin）或启动就绪（boot）后：自动 bindRef
+       ③ 绑定成功或本已绑定（-2）⇒ 清 URL 参数与暂存，只绑一次
+     面板内另留手动填码入口作兜底（扫码打字等场景）。 */
+  var REF_STORE = 'runye_ref_code';
+
+  function refFromUrl() {
+    try {
+      var m = /[?&]ref=(RY[0-9A-Z]+)\b/.exec(String(location.search || ''));
+      return m ? m[1] : '';
+    } catch (e) { return ''; }
+  }
+  function refStash(code) {
+    try { localStorage.setItem(REF_STORE, String(code)); } catch (e) { }
+  }
+  function refTake() {
+    try { return String(localStorage.getItem(REF_STORE) || ''); } catch (e) { return ''; }
+  }
+  function refClear(code) {
+    try { localStorage.removeItem(REF_STORE); } catch (e) { }
+    try {
+      if (refFromUrl() === code) {
+        var qs = new URLSearchParams(location.search);
+        qs.delete('ref');
+        var s = qs.toString();
+        history.replaceState(null, '', location.pathname + (s ? '?' + s : '') + location.hash);
+      }
+    } catch (e) { }
+  }
+  function loggedIn() {
+    var cs = window.CloudSync;
+    return !!(cs && cs.phone);
+  }
+  function toastBind() {
+    try {
+      var t = document.createElement('div');
+      t.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:12001;'
+        + 'background:#0f172a;color:#fff;border-radius:8px;padding:8px 14px;font-size:13px;font-family:inherit;'
+        + 'box-shadow:0 8px 24px rgba(15,23,42,.25)';
+      t.textContent = '已建立好友邀请关系 ✓';
+      document.body.appendChild(t);
+      setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 2600);
+    } catch (e) { }
+  }
+  /* 自动绑定：无码/未登录时返回 null，否则返回 bindRef 结果 */
+  function autoBind() {
+    var en = E();
+    var code = refFromUrl() || refTake();
+    if (!en || typeof en.bindRef !== 'function' || !code || !loggedIn()) return Promise.resolve(null);
+    return Promise.resolve(en.bindRef(code, false)).then(function (r) {
+      if (r && (r.ok || r.code === -2)) refClear(code);   /* 成功或本已绑定 ⇒ 消费掉 */
+      if (r && r.ok) toastBind();
+      return r;
+    });
+  }
+  /* 未登录访客的底部接受条（邀请链接落地时） */
+  function mountAcceptBar() {
+    var code = refFromUrl() || refTake();
+    if (!code || loggedIn() || document.getElementById('ryRefBar')) return;
+    if (refFromUrl()) refStash(code);
+    var bar = document.createElement('div');
+    bar.id = 'ryRefBar';
+    bar.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:11998;display:flex;gap:10px;'
+      + 'align-items:center;justify-content:center;padding:10px 12px;background:#0f172a;color:#fff;'
+      + 'font-size:13px;font-family:inherit';
+    var span = document.createElement('span');
+    span.textContent = '好友邀请你开通会员 · 注册即建立邀请关系';
+    var b1 = document.createElement('button');
+    b1.type = 'button';
+    b1.style.cssText = 'border:0;background:#fff;color:#0f172a;border-radius:6px;padding:6px 12px;'
+      + 'font-size:12.5px;cursor:pointer;font-family:inherit';
+    b1.textContent = '立即注册';
+    b1.addEventListener('click', function () {
+      var anchor = pills[0] || document.body;
+      openAt(anchor, '会员中心', null);
+    });
+    var b2 = document.createElement('button');
+    b2.type = 'button';
+    b2.style.cssText = 'border:0;background:transparent;color:#94a3b8;cursor:pointer;font-size:12.5px;font-family:inherit';
+    b2.textContent = '暂不';
+    b2.addEventListener('click', function () { if (bar.parentNode) bar.parentNode.removeChild(bar); });
+    bar.appendChild(span); bar.appendChild(b1); bar.appendChild(b2);
+    document.body.appendChild(bar);
+  }
+
   /* ---------- 样式（内联注入：卸载本脚本即消失，不污染其它皮肤文件） ---------- */
   var CSS = [
     '.ry-mbr{position:relative;display:inline-flex;align-items:center;order:998;margin-left:2px}',
@@ -145,8 +233,13 @@
         if (r && r.ok) {
           setMsg('登录成功，正在刷新会员权益…');
           if (timer) { clearInterval(timer); timer = null; }
-          /* 权益已由 cloud-sync 的 cloudEntitleAfterLogin 重新拉取，这里重建面板即可看到新状态 */
-          setTimeout(function () { try { closePanel(); RyMemberUI.openPanel(); } catch (e) { } }, 600);
+          /* 权益已由 cloud-sync 的 cloudEntitleAfterLogin 重新拉取；
+             [v361] 若此前通过邀请链接暂存/带来了 ?ref= 码，登录即自动绑定 */
+          setTimeout(function () {
+            autoBind().then(function () {
+              try { closePanel(); RyMemberUI.openPanel(); } catch (e) { }
+            });
+          }, 600);
         } else {
           setMsg('登录失败：' + ((r && r.error && r.error.msg) || (r && r.message) || '未知错误'), true);
         }
@@ -267,6 +360,32 @@
       p.appendChild(row('邀请进度', (pr.capped || 0) + ' / 3' + (pr.remain ? '（还差 ' + pr.remain + ' 人）' : '')));
     } else {
       p.appendChild(tip('尚未获取到邀请码（云端未就绪），稍后重试或刷新页面。', true));
+    }
+
+    /* [v361] 手动填码兜底：仅登录后显示（匿名期走接受条自动暂存） */
+    if (loggedIn() && typeof en.bindRef === 'function') {
+      var bindRow = document.createElement('div');
+      bindRow.className = 'ry-mbr-lrow';
+      var bindInput = document.createElement('input');
+      bindInput.className = 'ry-mbr-input';
+      bindInput.placeholder = '有好友邀请码？在此填写';
+      bindInput.maxLength = 20;
+      var bindBtn = document.createElement('button');
+      bindBtn.type = 'button';
+      bindBtn.className = 'primary';
+      bindBtn.textContent = '绑定';
+      bindBtn.addEventListener('click', function () {
+        var v = bindInput.value.trim();
+        if (!v) return;
+        bindBtn.disabled = true; bindBtn.textContent = '绑定中…';
+        en.bindRef(v, false).then(function (r) {
+          bindBtn.disabled = false; bindBtn.textContent = '绑定';
+          if (r && r.ok) { toastBind(); closePanel(); RyMemberUI.openPanel(); }
+          else { bindInput.value = ''; bindInput.placeholder = (r && r.message) || '绑定失败'; }
+        });
+      });
+      bindRow.appendChild(bindInput); bindRow.appendChild(bindBtn);
+      p.appendChild(bindRow);
     }
 
     var acts = document.createElement('div');
@@ -396,7 +515,10 @@
       if (en && !en.isActive()) box.appendChild(buildLoginBox());
       openAt(anchor, '开通高级会员', box);
     },
-    close: closePanel
+    close: closePanel,
+    /* [v361] 测试/外部触发：消费 ?ref= 或暂存码 */
+    autoBind: autoBind,
+    refFromUrl: refFromUrl
   };
   window.RyMemberUI = RyMemberUI;
 
@@ -429,11 +551,16 @@
     if (!en) { mountPills(); return; }
     if (typeof en.onChange === 'function') en.onChange(refreshPills);
     mountPills();
+    mountAcceptBar();   /* [v361] 邀请链接落地：未登录先出接受条并暂存码 */
     whenSdk(function () {
       var cs = window.CloudSync;
       var pre = (cs && typeof cs.ensureAnon === 'function') ? cs.ensureAnon() : Promise.resolve(false);
       Promise.resolve(pre).then(function () {
         return en.init();
+      }).then(function () {
+        refreshPills();
+        /* [v361] 登录态访客直接带 ?ref= 打开 ⇒ 启动即自动绑定 */
+        return autoBind();
       }).then(function () {
         refreshPills();
         /* 通知导航：权益已就绪，可以重渲染上锁了 */
