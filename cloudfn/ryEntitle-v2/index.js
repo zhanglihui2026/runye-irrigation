@@ -32,10 +32,17 @@ const ENV_ID = process.env.CLB_ENV_ID || 'runye-irrigation-d3e8xef4540bae5';
 const REGION = process.env.CLB_REGION || 'ap-shanghai';
 const API_KEY = process.env.TCB_API_KEY || '';
 /* 数据网关（PostgREST 规范，API Key = 服务端身份） */
-const RDB_BASE = 'https://' + ENV_ID + '.api.tcloudbasegateway.com/v1/rdb/rest';
-/* auth 网关（与前端 SDK 同源，JWT 反查用户） */
+const RDB_BASE = 'https://' + ENV_ID + '.api.tcloudbasegateway.com/v1/rdb/rest';/* auth 网关（与前端 SDK 同源，JWT 反查用户）
+   [v2b-2 2026-10-11 实测修正] 网关签发的 token（iss=*.api.tcloudbasegateway.com）
+   只能由网关自己验证 —— tcb-api 的 /web/auth/v1/user 没有对应签名钥
+   （报 INVALID_ACCESS_TOKEN: Unable to find a signing key），网关的
+   /auth/v1/user（无 /me）是 404。SDK 实际用的是：
+       GET {env}.api.tcloudbasegateway.com/auth/v1/user/me?client_id={env}
+   ⚠️ 返回体里的 sub 是「SDK uid」，与 JWT payload 的 sub（= RLS auth.uid()，
+   前端 authSub 落库身份）不是同一个 —— 因此验签过后，业务 uid 从 JWT
+   payload 解出，不能用响应体的 sub。 */
+const AUTH_USER_ME_URL = 'https://' + ENV_ID + '.api.tcloudbasegateway.com/auth/v1/user/me?client_id=' + ENV_ID;
 const AUTH_USER_URL = 'https://' + ENV_ID + '.' + REGION + '.tcb-api.tencentcloudapi.com/web/auth/v1/user';
-const AUTH_USER_URL_FALLBACK = 'https://' + ENV_ID + '.api.tcloudbasegateway.com/auth/v1/user';
 
 /* ---------- 业务常量（与 runye-entitle.js v367 同构） ---------- */
 const CAP = 3;                    // 邀请注册 + 群裂变 共享上限
@@ -129,14 +136,23 @@ function isDup(e) {
 }
 
 /* ---------- 身份：JWT → uid ---------- */
+/* 解 JWT payload 的 sub（仅在网关验签通过后调用才可信） */
+function jwtSub(token) {
+  try {
+    const seg = String(token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const p = JSON.parse(Buffer.from(seg + '==='.slice((seg.length + 3) % 4), 'base64').toString('utf8'));
+    return (p && p.sub) ? String(p.sub) : null;
+  } catch (e) { return null; }
+}
 async function verifyUid(token) {
   if (!token) return null;
   try {
-    let r = await httpReq('GET', AUTH_USER_URL, { Authorization: 'Bearer ' + token });
-    if (r.status === 200 && r.body && (r.body.id || r.body.uid)) return String(r.body.id || r.body.uid);
-    /* 兜底：换 auth 网关（与 rdb 同源）再试一次 */
-    r = await httpReq('GET', AUTH_USER_URL_FALLBACK, { Authorization: 'Bearer ' + token });
-    if (r.status === 200 && r.body && (r.body.id || r.body.uid)) return String(r.body.id || r.body.uid);
+    /* 首选：SDK 同款端点（网关验签，token 与签发同源） */
+    const r = await httpReq('GET', AUTH_USER_ME_URL, { Authorization: 'Bearer ' + token });
+    if (r.status === 200 && r.body && r.body.sub) return jwtSub(token);
+    /* 兜底：tcb-api 旧端点（仅当平台日后改用 tcb-api 签发 token 时才可能命中） */
+    const r2 = await httpReq('GET', AUTH_USER_URL, { Authorization: 'Bearer ' + token });
+    if (r2.status === 200 && r2.body && (r2.body.id || r2.body.uid)) return String(r2.body.id || r2.body.uid);
     return null;
   } catch (e) { return null; }
 }

@@ -640,18 +640,32 @@ function cloudAuthSub(){
 function cloudOnStatus(fn){ if(typeof fn === 'function') cloudStatusListeners.push(fn); }
 
 /* ===== [v371] 原始 JWT（Bearer）=====
-   HTTP 访问服务通道（/entitle）用：云函数拿同一 token 调 auth 网关反查 uid，
-   前端无法伪造身份。与 cloudAuthSub 同源（credentials_<envId> 里的 JWT）。 */
+   HTTP 访问服务通道（/entitle）用：云函数拿同一 token 调 auth 网关验签，
+   前端无法伪造身份。与 cloudAuthSub 同源（credentials_<envId> 里的 JWT）。
+   [v371b] 与 authSub 同源匹配：多颗 token 时优先取 payload.sub === authSub()
+   的那颗，避免登录态切换瞬间把旧的匿名 token 发给服务端。 */
 function cloudAuthToken(){
   try{
+    var want = null;
+    try { want = cloudAuthSub(); } catch(_e){ if(want === undefined) want = null; }
+    var first = null;
     for(var i = 0; i < localStorage.length; i++){
       var k = localStorage.key(i);
       if(k && k.indexOf('credentials_') === 0){
         var v = localStorage.getItem(k);
         var m = /eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/.exec(String(v || ''));
-        if(m) return m[0];
+        if(!m) continue;
+        var sub = null;
+        try {
+          var seg = m[0].split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+          var payload = JSON.parse(decodeURIComponent(escape(atob(seg + '==='.slice((seg.length + 3) % 4)))));
+          sub = (payload && payload.sub) ? String(payload.sub) : null;
+        } catch(_e){}
+        if(!first) first = m[0];
+        if(sub && want && sub === want) return m[0];
       }
     }
+    return first;
   }catch(e){}
   return null;
 }
