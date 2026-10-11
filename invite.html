@@ -3008,7 +3008,7 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
   }
   /* [v365b] H5 版本徽章（远程排障：截图即知对方跑的哪版）+ 邀请链接落本 H5（v364b 修复）+
      t=时间戳 nonce：微信/手机浏览器对 HTML 强缓存，唯一 URL 强制拉新版。 */
-  var H5_VERSION = 'v371b';
+  var H5_VERSION = 'v371c';
   function inviteUrl(kind) {
     var base = String(location.href || '').split('#')[0].split('?')[0];
     var u = base + '?ref=' + encodeURIComponent(view.myCode || '') + '&t=' + Date.now();
@@ -3328,7 +3328,12 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
     });
   }
 
+  var registerRequestPending = false;
   function doRegister() {
+    if (registerRequestPending) {
+      toast('注册请求仍在处理中，请勿重复提交；如长时间无响应，可刷新后用“已注册过？直接登录”检查账号');
+      return;
+    }
     var p = $('phone').value.trim();
     var c = $('vcode').value.trim();
     var a = $('agree').checked;
@@ -3347,11 +3352,44 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
     if (!ok) return;
     if (!cs || typeof cs.signInSms !== 'function') { toast('云端未就绪，请稍后再试'); return; }
     var btn = $('btnSubmit');
-    btn.disabled = true; var oldTxt = btn.textContent; btn.textContent = '验证中…';
-    cs.signInSms(p, c).then(function (r) {
-      btn.disabled = false; btn.textContent = oldTxt;
-      if (r && r.ok) afterLogin(null);   /* 注册卡就在页面上，无弹窗可关 */
-      else { var t = '注册失败：' + errText(r); toast(t); showErrBanner(t, r && r.rawErr ? JSON.stringify(r.rawErr) : ''); }
+    registerRequestPending = true;
+    btn.disabled = true;
+    var oldTxt = btn.textContent;
+    btn.textContent = '正在验证…';
+    var settled = false;
+    var timer = setTimeout(function () {
+      if (settled) return;
+      btn.disabled = false;
+      btn.textContent = '等待验证结果…';
+      var msg = '注册请求暂未收到服务器答复';
+      toast(msg + '，请勿重复提交');
+      showErrBanner(msg, '网络较慢或短信验证处理中。请勿重复获取验证码；若长时间无响应，刷新页面后用“已注册过？直接登录”检查账号。');
+    }, 30000);
+    function finishAttempt() {
+      settled = true;
+      clearTimeout(timer);
+      registerRequestPending = false;
+      btn.disabled = false;
+      btn.textContent = oldTxt;
+    }
+    Promise.resolve().then(function () { return cs.signInSms(p, c); }).then(function (r) {
+      finishAttempt();
+      if (r && r.ok) {
+        var prior = document.getElementById('ryErrBanner');
+        if (prior) prior.remove();
+        afterLogin(null);
+      } else {
+        var t = '注册失败：' + errText(r);
+        toast(t);
+        showErrBanner(t, r && r.rawErr ? JSON.stringify(r.rawErr) : '请核对验证码后重试；如果账号可能已创建，请使用“已注册过？直接登录”。');
+      }
+    }).catch(function (e) {
+      finishAttempt();
+      var rawErr;
+      try { rawErr = JSON.stringify(e); } catch (_e) { rawErr = String(e); }
+      var t = '注册/登录请求失败：' + ((e && e.message) || String(e || '未知错误'));
+      toast(t);
+      showErrBanner(t, rawErr || '请检查网络后重试；若账号可能已创建，请使用“已注册过？直接登录”。');
     });
   }
 
