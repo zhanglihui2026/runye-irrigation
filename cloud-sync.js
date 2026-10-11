@@ -638,6 +638,23 @@ function cloudAuthSub(){
 }
 
 function cloudOnStatus(fn){ if(typeof fn === 'function') cloudStatusListeners.push(fn); }
+
+/* ===== [v371] 原始 JWT（Bearer）=====
+   HTTP 访问服务通道（/entitle）用：云函数拿同一 token 调 auth 网关反查 uid，
+   前端无法伪造身份。与 cloudAuthSub 同源（credentials_<envId> 里的 JWT）。 */
+function cloudAuthToken(){
+  try{
+    for(var i = 0; i < localStorage.length; i++){
+      var k = localStorage.key(i);
+      if(k && k.indexOf('credentials_') === 0){
+        var v = localStorage.getItem(k);
+        var m = /eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/.exec(String(v || ''));
+        if(m) return m[0];
+      }
+    }
+  }catch(e){}
+  return null;
+}
 function cloudEmitStatus(){
   var s = cloudReady ? (cloudSyncing ? 'syncing' : 'online') : 'offline';
   cloudStatusListeners.forEach(function(f){ try{ f(s, cloudUid); }catch(e){} });
@@ -664,6 +681,7 @@ window.CloudSync = {
   callFn: cloudCallFn,
   rdb: cloudRdb,                 /* [v360c] rdb 句柄（未登录/SDK 不支持时 null） */
   authSub: cloudAuthSub,         /* [v360c] DB 侧身份 = JWT sub（登录后可能与 uid 不同） */
+  authToken: cloudAuthToken,     /* [v371] 原始 JWT（Bearer），HTTP 访问服务通道用 */
   load: cloudLoad,
   save: cloudSave,
   /* [v359] 账号体系统一为手机号：邮箱三件套与 loginAndPull 已移除（全项目无调用点） */

@@ -286,7 +286,7 @@
     <div class="body">
       <div class="field"><input type="tel" id="lPhone" placeholder="请输入手机号" maxlength="11" inputmode="numeric" style="font-size:16px"></div>
       <div class="field" style="margin-top:10px"><input type="text" id="lCode" placeholder="请输入 6 位验证码" maxlength="6" inputmode="numeric" style="font-size:16px"><button class="btn-code" onclick="sendLoginCode()">获取验证码</button></div>
-      <button class="btn btn-primary" style="margin-top:14px" id="btnLoginSubmit" onclick="doLogin()">登录</button>
+      <button class="btn btn-primary" style="margin-top:14px" onclick="doLogin()">登录</button>
       <button class="btn-close gray" onclick="closeModal('mLogin')">取消</button>
     </div>
   </div></div>
@@ -2932,8 +2932,8 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
 
   <!-- [v362] 真数据层：CloudBase SDK（自托管 bundle）+ 云同步 + 权益层 -->
   <script src="pwa/vendor/cloudbase-js-sdk-3.8.2.bundle.js?v=362"></script>
-  <script src="cloud-sync.js?v=370b"></script>
-  <script src="runye-entitle.js?v=366"></script>
+  <script src="cloud-sync.js?v=371"></script>
+  <script src="runye-entitle.js?v=371"></script>
 
 <script id="ry-ui">
 /* [v362] 邀友 H5 真数据层 —— 替换原 mock 状态机。
@@ -3008,7 +3008,7 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
   }
   /* [v365b] H5 版本徽章（远程排障：截图即知对方跑的哪版）+ 邀请链接落本 H5（v364b 修复）+
      t=时间戳 nonce：微信/手机浏览器对 HTML 强缓存，唯一 URL 强制拉新版。 */
-  var H5_VERSION = 'v370';
+  var H5_VERSION = 'v371';
   function inviteUrl(kind) {
     var base = String(location.href || '').split('#')[0].split('?')[0];
     var u = base + '?ref=' + encodeURIComponent(view.myCode || '') + '&t=' + Date.now();

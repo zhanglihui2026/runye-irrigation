@@ -1,30 +1,41 @@
 'use strict';
 /* ============================================================
-   ryEntitle v2 —— 润野灌溉 · 会员权益与邀请裂变（服务端权威版）
+   ryEntitle v2b —— 润野灌溉 · 会员权益与邀请裂变（服务端权威版）
    ------------------------------------------------------------
-   [v2 2026-10-11] 随「方案二」改造：数据源从云存储切换为 PG 表
-   （ry_entitle / ry_invite / ry_bind / ry_links），通过 DATABASE_URL
-   直连数据库（owner 身份，天然越过 RLS —— 服务端权威写）。
-   前端只传意图（action + 参数），一切判定在本函数内完成：
-     - bindRef  提交邀请码（自邀/-4、重复/-2、码不存在/-3 全部服务端判）
-     - grant    满 3 人发奖（服务端算进度，reward_claimed 幂等锁）
-     - claim    漏计核销工单
-     - get/init 拉取权益与进度（init 顺带建行）
-     - heartbeat存量行迁移（registered/cooling → valid）
-     - ping     无需登录的健康检查（部署验收用）
-   鉴权：前端带 Authorization: Bearer <access_token>（登录态 JWT），
-   本函数用同一 token 调 auth 网关 /auth/v1/user 反查 uid —— 前端无法伪造身份。
-   触发方式：HTTP 访问服务路由（POST，JSON body {action, ...}）。
+   [v2b 2026-10-11] 数据访问层改造：PG TCP 直连（DATABASE_URL + pg）
+   在共享型集群上不可用（控制台提示「共享集群暂不提供直连能力」），
+   改为经 CloudBase 数据网关的 REST 接口（PostgREST 规范）读写同一批表：
+       https://{ENV_ID}.api.tcloudbasegateway.com/v1/rdb/rest/{table}
+   鉴权用「API Key」（服务端身份，等价 service_role，越过 RLS），
+   Key 只存函数环境变量 TCB_API_KEY，绝不进前端。
+   —— 服务端权威写的目标不变；前端依旧带 JWT 调 /entitle。
+
+   本版零 npm 依赖：HTTP 用 Node 内置 https 模块（不依赖 fetch，
+   规避云函数 Node 版本差异），部署 zip 里不需要 node_modules。
+
+   actions（与 v2 完全一致）：
+     ping       无需登录，健康检查（验证 API Key + 网关连通）
+     get/init   拉取权益与进度（init 顺带建行）
+     bindRef    提交邀请码（自邀/-4、重复/-2、码不存在/-3 服务端判）
+     grant      满 3 人发奖（服务端算进度，reward_claimed 幂等锁）
+     claim      漏计核销工单（pending<3 限制）
+     heartbeat  存量行迁移（registered/cooling → valid）
+   鉴权：Authorization: Bearer <access_token> → auth 网关反查 uid。
+   触发：HTTP 访问服务路由（POST，JSON body {action, ...}）。
    返回：{ code, data, message }
    ============================================================ */
 
-const { Client } = require('pg');
+const https = require('https');
 
 /* ---------- 配置（环境变量优先，缺省即润野环境） ---------- */
-const ENV_ID   = process.env.CLB_ENV_ID   || 'runye-irrigation-d3e8xef4540bae5';
-const REGION   = process.env.CLB_REGION   || 'ap-shanghai';
+const ENV_ID = process.env.CLB_ENV_ID || 'runye-irrigation-d3e8xef4540bae5';
+const REGION = process.env.CLB_REGION || 'ap-shanghai';
+const API_KEY = process.env.TCB_API_KEY || '';
+/* 数据网关（PostgREST 规范，API Key = 服务端身份） */
+const RDB_BASE = 'https://' + ENV_ID + '.api.tcloudbasegateway.com/v1/rdb/rest';
 /* auth 网关（与前端 SDK 同源，JWT 反查用户） */
 const AUTH_USER_URL = 'https://' + ENV_ID + '.' + REGION + '.tcb-api.tencentcloudapi.com/web/auth/v1/user';
+const AUTH_USER_URL_FALLBACK = 'https://' + ENV_ID + '.api.tcloudbasegateway.com/auth/v1/user';
 
 /* ---------- 业务常量（与 runye-entitle.js v367 同构） ---------- */
 const CAP = 3;                    // 邀请注册 + 群裂变 共享上限
@@ -34,33 +45,97 @@ const PLANS = {
   L1: { key: 'L1', name: '注册会员', days: 30 },
   L2: { key: 'L2', name: '高级会员', days: 365 }
 };
-const PWD_RULE = /^[A-Za-z0-9_\-!@#$%^&*.]{8,32}$/;   // 备用（当前无密码 action）
 
-/* ---------- 数据库 ---------- */
-function dbConf() {
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error('DATABASE_URL 未配置（请在函数环境变量里配置 PG 连接串）');
-  return { connectionString: url, statement_timeout: 8000, connectionTimeoutMillis: 8000 };
+/* ---------- HTTP（Node 内置 https，零依赖） ---------- */
+function httpReq(method, url, headers, bodyObj) {
+  return new Promise(function (resolve, reject) {
+    let u;
+    try { u = new URL(url); } catch (e) { return reject(e); }
+    const payload = (bodyObj === undefined || bodyObj === null)
+      ? null : Buffer.from(JSON.stringify(bodyObj), 'utf8');
+    const h = Object.assign({ Accept: 'application/json' }, headers || {});
+    if (payload) {
+      h['Content-Type'] = 'application/json';
+      h['Content-Length'] = payload.length;
+    }
+    const req = https.request({
+      hostname: u.hostname,
+      port: 443,
+      path: u.pathname + u.search,
+      method: method,
+      headers: h
+    }, function (res) {
+      const chunks = [];
+      res.on('data', function (c) { chunks.push(c); });
+      res.on('end', function () {
+        const text = Buffer.concat(chunks).toString('utf8');
+        let body = null;
+        try { body = JSON.parse(text); } catch (e) { body = text; }
+        resolve({ status: res.statusCode, body: body });
+      });
+    });
+    req.setTimeout(8000, function () { req.destroy(new Error('HTTP 请求超时（8s）')); });
+    req.on('error', reject);
+    if (payload) req.write(payload);
+    req.end();
+  });
 }
-async function withDb(fn) {
-  const c = new Client(dbConf());
-  await c.connect();
-  try { return await fn(c); } finally { try { await c.end(); } catch (e) {} }
+
+/* ---------- 数据网关 REST（PostgREST）---------- */
+function rdbErr(op, r) {
+  return new Error('rdb ' + op + ' 失败: HTTP ' + r.status + ' ' +
+    JSON.stringify(r.body).slice(0, 300));
+}
+function qsOf(params) {
+  const sp = new URLSearchParams();
+  Object.keys(params || {}).forEach(function (k) {
+    const v = params[k];
+    if (Array.isArray(v)) v.forEach(function (x) { sp.append(k, x); });
+    else sp.append(k, String(v));
+  });
+  return sp.toString();
+}
+async function rdbSelect(table, params) {
+  const r = await httpReq('GET', RDB_BASE + '/' + table + '?' + qsOf(params),
+    { Authorization: 'Bearer ' + API_KEY });
+  if (r.status !== 200) throw rdbErr('select ' + table, r);
+  return Array.isArray(r.body) ? r.body : [];
+}
+async function rdbInsert(table, row, prefer) {
+  const h = { Authorization: 'Bearer ' + API_KEY, Prefer: prefer || 'return=minimal' };
+  const r = await httpReq('POST', RDB_BASE + '/' + table, h, Array.isArray(row) ? row : [row]);
+  if (r.status >= 300) {
+    const e = rdbErr('insert ' + table, r);
+    e.status = r.status;
+    e.body = r.body;
+    throw e;
+  }
+  return Array.isArray(r.body) ? r.body : null;
+}
+async function rdbUpdate(table, filters, patch) {
+  const r = await httpReq('PATCH', RDB_BASE + '/' + table + '?' + qsOf(filters),
+    { Authorization: 'Bearer ' + API_KEY }, patch);
+  if (r.status >= 300) {
+    const e = rdbErr('update ' + table, r);
+    e.status = r.status;
+    e.body = r.body;
+    throw e;
+  }
+  return true;
+}
+function isDup(e) {
+  const s = JSON.stringify(e && e.body || '') + String(e && e.message || '');
+  return (e && e.status === 409) || /duplicate|unique|ry_invite_code_uq/i.test(s);
 }
 
 /* ---------- 身份：JWT → uid ---------- */
-async function httpJson(url, token) {
-  const res = await fetch(url, { headers: token ? { Authorization: 'Bearer ' + token } : {}, signal: AbortSignal.timeout(8000) });
-  const body = await res.json().catch(() => null);
-  return { status: res.status, body: body };
-}
 async function verifyUid(token) {
   if (!token) return null;
   try {
-    let r = await httpJson(AUTH_USER_URL, token);
+    let r = await httpReq('GET', AUTH_USER_URL, { Authorization: 'Bearer ' + token });
     if (r.status === 200 && r.body && (r.body.id || r.body.uid)) return String(r.body.id || r.body.uid);
     /* 兜底：换 auth 网关（与 rdb 同源）再试一次 */
-    r = await httpJson('https://' + ENV_ID + '.api.tcloudbasegateway.com/auth/v1/user', token);
+    r = await httpReq('GET', AUTH_USER_URL_FALLBACK, { Authorization: 'Bearer ' + token });
     if (r.status === 200 && r.body && (r.body.id || r.body.uid)) return String(r.body.id || r.body.uid);
     return null;
   } catch (e) { return null; }
@@ -81,45 +156,49 @@ function iso(ms) { return new Date(ms).toISOString(); }
 function ok(data, message) { return { code: 0, data: data || null, message: message || '' }; }
 function fail(code, message, data) { return { code: code, data: data || null, message: message }; }
 
-/* ---------- 数据访问 ---------- */
-async function getEntitle(c, uid) {
-  const r = await c.query('select * from ry_entitle where _id=$1', [uid]);
-  return r.rows[0] || null;
+/* ---------- 数据访问（REST 版） ---------- */
+async function getEntitle(uid) {
+  const rows = await rdbSelect('ry_entitle', { _id: 'eq.' + uid });
+  return rows[0] || null;
 }
-async function getInvite(c, uid) {
-  const r = await c.query('select * from ry_invite where _id=$1', [uid]);
-  return r.rows[0] || null;
+async function getInvite(uid) {
+  const rows = await rdbSelect('ry_invite', { _id: 'eq.' + uid });
+  return rows[0] || null;
 }
-async function getLinksByInviter(c, uid) {
-  const r = await c.query('select * from ry_links where inviter_uid=$1 order by id desc', [uid]);
-  return r.rows;
+async function getLinksByInviter(uid) {
+  return await rdbSelect('ry_links', { inviter_uid: 'eq.' + uid, order: 'id.desc' });
 }
-async function ensureRows(c, uid, phone) {
-  let ent = await getEntitle(c, uid);
+async function ensureRows(uid, phone) {
+  let ent = await getEntitle(uid);
   if (!ent) {
     const now = new Date();
     const hist = [{ at: Date.now(), days: TRIAL_DAYS, plan: 'L1', planName: '注册会员', from: Date.now(), to: Date.now() + TRIAL_DAYS * DAY, src: 'register' }];
-    await c.query(
-      'insert into ry_entitle (_id, plan, expires_at, member_days, activated_at, phone, history) values ($1,$2,$3,$4,$5,$6,$7) on conflict (_id) do nothing',
-      [uid, 'L1', iso(Date.now() + TRIAL_DAYS * DAY), TRIAL_DAYS, iso(now), phone || null, JSON.stringify(hist)]
-    );
-    ent = await getEntitle(c, uid);
+    await rdbInsert('ry_entitle', {
+      _id: uid, plan: 'L1', expires_at: iso(Date.now() + TRIAL_DAYS * DAY),
+      member_days: TRIAL_DAYS, activated_at: iso(now.getTime()),
+      phone: phone || null, history: hist
+    });
+    ent = await getEntitle(uid);
   }
-  let inv = await getInvite(c, uid);
+  let inv = await getInvite(uid);
   if (!inv) {
-    let code = makeCode(uid), guard = 0;
-    while (guard++ < 5) {
+    let code = makeCode(uid), guard = 0, done = false;
+    while (guard++ < 5 && !done) {
       try {
-        await c.query('insert into ry_invite (_id, uid, code, inviter, reward_claimed, claims, rewards) values ($1,$2,$3,$4,false,$5,$6)',
-          [uid, uid, code, '', JSON.stringify([]), JSON.stringify([])]);
-        break;
+        await rdbInsert('ry_invite', { _id: uid, uid: uid, code: code, inviter: '', reward_claimed: false, claims: [], rewards: [] });
+        done = true;
       } catch (e) {
-        if (String(e.message || '').indexOf('ry_invite_code_uq') >= 0 || String(e.code) === '23505') { code = makeCode(uid + guard); continue; }
+        if (isDup(e)) { code = makeCode(uid + guard); continue; }
         throw e;
       }
     }
-    await c.query('insert into ry_bind (code, uid) values ($1,$2) on conflict (code) do nothing', [code, uid]);
-    inv = await getInvite(c, uid);
+    /* ry_bind：code 主键，已存在则跳过（等价 on conflict do nothing） */
+    const bindRows = await rdbSelect('ry_bind', { code: 'eq.' + code });
+    if (!bindRows.length) {
+      try { await rdbInsert('ry_bind', { code: code, uid: uid }); }
+      catch (e) { if (!isDup(e)) throw e; }
+    }
+    inv = await getInvite(uid);
   }
   return { ent: ent, inv: inv };
 }
@@ -146,56 +225,60 @@ function packState(ent, inv, links) {
 }
 
 /* ---------- actions ---------- */
-async function actGet(c, uid, params) {
+async function actGet(uid, params) {
   const phone = params && params.phone;
-  const { ent, inv } = await ensureRows(c, uid, phone);
-  const links = await getLinksByInviter(c, uid);
+  const { ent, inv } = await ensureRows(uid, phone);
+  const links = await getLinksByInviter(uid);
   return ok(packState(ent, inv, links));
 }
-async function actBindRef(c, uid, params) {
+async function actBindRef(uid, params) {
   const ref = String((params && params.ref) || '').trim();
   const phone = params && params.phone;
   if (ref.indexOf('RY') !== 0) return fail(-1, '邀请码格式不正确');
-  const br = await c.query('select uid from ry_bind where code=$1', [ref]);
-  const bind = br.rows[0];
+  const bindRows = await rdbSelect('ry_bind', { code: 'eq.' + ref });
+  const bind = bindRows[0];
   if (!bind || !bind.uid) return fail(-3, '邀请码不存在或已失效');
   if (String(bind.uid) === String(uid)) return fail(-4, '不能绑定自己为邀请人');
-  const { inv } = await ensureRows(c, uid, phone);
+  const { inv } = await ensureRows(uid, phone);
   if (inv.inviter && inv.inviter !== ref) return fail(-2, '已绑定其他邀请人，不可变更');
-  const same = await c.query('select id from ry_links where invited_uid=$1 and (inviter_uid=$2 or code=$3)', [uid, bind.uid, ref]);
-  if (same.rows.length) {
-    if (!inv.inviter) await c.query('update ry_invite set inviter=$1 where _id=$2', [ref, uid]); /* 修复：links 在而 inviter 空的半程态 */
-    const links = await getLinksByInviter(c, bind.uid); /* 不会走到——返回给前端的应是自己的进度 */
-    const own = await getLinksByInviter(c, uid);
-    const ent2 = await getEntitle(c, uid);
-    const inv2 = await getInvite(c, uid);
+  /* 半程态检查：links 已存在（inviter 或 code 任一匹配） */
+  const orExpr = '(inviter_uid.eq.' + bind.uid + ',code.eq.' + ref + ')';
+  const same = await rdbSelect('ry_links', { invited_uid: 'eq.' + uid, or: orExpr });
+  if (same.length) {
+    if (!inv.inviter) await rdbUpdate('ry_invite', { _id: 'eq.' + uid }, { inviter: ref }); /* 修复半程态 */
+    const own = await getLinksByInviter(uid);
+    const ent2 = await getEntitle(uid);
+    const inv2 = await getInvite(uid);
     return ok(packState(ent2, inv2, own), '已绑定（修复半程态）');
   }
-  const other = await c.query('select id from ry_links where invited_uid=$1', [uid]);
-  if (other.rows.length) return fail(-2, '已绑定其他邀请人，不可变更');
+  const other = await rdbSelect('ry_links', { invited_uid: 'eq.' + uid });
+  if (other.length) return fail(-2, '已绑定其他邀请人，不可变更');
   /* [v367] 注册即激活：直写 valid */
-  await c.query(
-    'insert into ry_links (inviter_uid, invited_uid, code, status, activated_at, nick, via_group) values ($1,$2,$3,$4,$5,$6,$7)',
-    [bind.uid, uid, ref, 'valid', new Date().toISOString(), maskPhone(phone) || ('用户' + String(uid).slice(-4)), !!(params && params.viaGroup)]
-  );
-  if (!inv.inviter) await c.query('update ry_invite set inviter=$1 where _id=$2', [ref, uid]);
-  const ent = await getEntitle(c, uid);
-  const inv2 = await getInvite(c, uid);
-  const own = await getLinksByInviter(c, uid);
+  await rdbInsert('ry_links', {
+    inviter_uid: bind.uid, invited_uid: uid, code: ref, status: 'valid',
+    activated_at: new Date().toISOString(),
+    nick: maskPhone(phone) || ('用户' + String(uid).slice(-4)),
+    via_group: !!(params && params.viaGroup)
+  });
+  if (!inv.inviter) await rdbUpdate('ry_invite', { _id: 'eq.' + uid }, { inviter: ref });
+  const ent = await getEntitle(uid);
+  const inv2 = await getInvite(uid);
+  const own = await getLinksByInviter(uid);
   return ok(packState(ent, inv2, own));
 }
-async function actHeartbeat(c, uid) {
-  const ent = await getEntitle(c, uid);
-  if (ent && !ent.activated_at) await c.query('update ry_entitle set activated_at=$1 where _id=$2', [new Date().toISOString(), uid]);
+async function actHeartbeat(uid) {
+  const ent = await getEntitle(uid);
+  if (ent && !ent.activated_at) await rdbUpdate('ry_entitle', { _id: 'eq.' + uid }, { activated_at: new Date().toISOString() });
   /* 存量行迁移：自己的非 valid links 行推进为 valid */
-  await c.query("update ry_links set status='valid', activated_at=coalesce(activated_at, now()) where invited_uid=$1 and status <> 'valid'", [uid]);
+  await rdbUpdate('ry_links', { invited_uid: 'eq.' + uid, status: 'neq.valid' },
+    { status: 'valid', activated_at: new Date().toISOString() });
   return ok({ done: true });
 }
-async function actGrant(c, uid, params) {
+async function actGrant(uid, params) {
   const phone = params && params.phone;
-  const { ent, inv } = await ensureRows(c, uid, phone);
+  const { ent, inv } = await ensureRows(uid, phone);
   if (!inv) return ok({ granted: 0 });
-  const links = await getLinksByInviter(c, uid);
+  const links = await getLinksByInviter(uid);
   const p = computeProgress(links);
   if (!p.reached || inv.reward_claimed) return ok({ granted: 0 });
   const plan = ent.plan || 'L1';
@@ -205,33 +288,33 @@ async function actGrant(c, uid, params) {
   const to = from + days * DAY;
   const hist = (ent.history || []);
   hist.unshift({ at: now, days: days, plan: plan, planName: PLANS[plan] ? PLANS[plan].name : '注册会员', from: from, to: to, src: 'invite' });
-  await c.query('update ry_entitle set expires_at=$1, member_days=$2, history=$3 where _id=$4',
-    [iso(to), days, JSON.stringify(hist), uid]);
+  await rdbUpdate('ry_entitle', { _id: 'eq.' + uid },
+    { expires_at: iso(to), member_days: days, history: hist });
   const rewards = (inv.rewards || []);
   rewards.unshift({ at: now, days: days, plan: plan, planName: PLANS[plan] ? PLANS[plan].name : '注册会员', from: from, to: to, src: 'invite' });
-  await c.query('update ry_invite set reward_claimed=true, rewards=$1 where _id=$2', [JSON.stringify(rewards), uid]);
-  const ent2 = await getEntitle(c, uid);
-  const inv2 = await getInvite(c, uid);
+  await rdbUpdate('ry_invite', { _id: 'eq.' + uid }, { reward_claimed: true, rewards: rewards });
+  const ent2 = await getEntitle(uid);
+  const inv2 = await getInvite(uid);
   return ok({ granted: days, planName: PLANS[plan] ? PLANS[plan].name : '注册会员', state: packState(ent2, inv2, links) });
 }
-async function actClaim(c, uid, params) {
+async function actClaim(uid, params) {
   const n = Number(params && params.count);
   if (!isFinite(n) || n !== Math.floor(n) || n < 1 || n > 20) return fail(-1, '人数需为 1-20 的整数');
-  const inv = await getInvite(c, uid);
+  const inv = await getInvite(uid);
   if (!inv) return fail(-2, '请先初始化权益');
   const claims = (inv.claims || []);
-  const pending = claims.filter(x => x.status === 'pending').length;
+  const pending = claims.filter(function (x) { return x.status === 'pending'; }).length;
   if (pending >= 3) return fail(-3, '待审核工单过多，请等待处理');
   claims.unshift({ id: 'c' + Date.now() + Math.floor(Math.random() * 1000), count: n,
     names: String((params && params.names) || '').slice(0, 200), status: 'pending', approvedCount: 0, at: Date.now() });
-  await c.query('update ry_invite set claims=$1 where _id=$2', [JSON.stringify(claims), uid]);
+  await rdbUpdate('ry_invite', { _id: 'eq.' + uid }, { claims: claims });
   return ok({ done: true });
 }
 async function actPing() {
-  return await withDb(async c => {
-    const r = await c.query('select now() as t');
-    return ok({ ok: true, dbTime: r.rows[0].t, env: ENV_ID });
-  });
+  if (!API_KEY) throw new Error('TCB_API_KEY 未配置（请在函数环境变量里配置 API Key）');
+  /* 网关连通 + API Key 有效性：读一行（只取 _id 列，最小开销） */
+  const rows = await rdbSelect('ry_entitle', { select: '_id', limit: 1 });
+  return ok({ ok: true, gw: true, rows: rows.length, env: ENV_ID, at: new Date().toISOString() });
 }
 
 /* ---------- 入口 ---------- */
@@ -252,17 +335,15 @@ exports.main = async function (event) {
     const uid = await verifyUid(token);
     if (!uid) return fail(401, '登录态无效或已过期，请重新登录');
 
-    return await withDb(async c => {
-      switch (action) {
-        case 'get':
-        case 'init':    return await actGet(c, uid, body);
-        case 'bindRef': return await actBindRef(c, uid, body);
-        case 'grant':   return await actGrant(c, uid, body);
-        case 'claim':   return await actClaim(c, uid, body);
-        case 'heartbeat': return await actHeartbeat(c, uid);
-        default: return fail(-100, '未知 action：' + action);
-      }
-    });
+    switch (action) {
+      case 'get':
+      case 'init':    return await actGet(uid, body);
+      case 'bindRef': return await actBindRef(uid, body);
+      case 'grant':   return await actGrant(uid, body);
+      case 'claim':   return await actClaim(uid, body);
+      case 'heartbeat': return await actHeartbeat(uid);
+      default: return fail(-100, '未知 action：' + action);
+    }
   } catch (e) {
     return { code: 500, data: null, message: '服务异常：' + (e && e.message || String(e)) };
   }

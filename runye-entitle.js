@@ -13,6 +13,14 @@
         —— 已知取舍：RLS 防跨用户篡改，防不了用户改自己的权益行；
         规模上来后须升级服务端边界（已立案，每次权益架构讨论须提醒用户）。
 
+   [v371 2026-10-11] 方案二落地：服务端权威写（取舍就此闭合）。
+   共享型 PG 集群无 TCP 直连能力 ⇒ 云函数 v2b 改走数据网关 REST + API Key
+   （服务端身份，越过 RLS）；前端 init/get/bindRef/grant/claim/heartbeat
+   全部优先走 HTTP 访问服务通道 /entitle（Bearer JWT，云函数反查 uid），
+   通道不可用（无 token / 网络失败）才降级 v370 原 rdb 逻辑（*Rdb 函数）。
+   服务端返回完整状态包（packState），applyServerState 统一落 state。
+   ⚠️ 降级路径的写操作在 RLS 收紧后会被拒 —— 届时降级仅保证可读。
+
    表（sql/route_c_migration_v1.sql + v2.sql，RLS 全开）：
      ry_entitle(_id=JWT sub, plan, expires_at, member_days, activated_at, history…)
      ry_invite (_id=JWT sub, code, inviter, reward_claimed, claims, rewards…)
@@ -105,6 +113,47 @@
     });
   }
 
+  /* ---------- [v371] HTTP 访问服务通道（方案二：服务端权威写）----------
+     写操作与状态拉取改走 /entitle（HTTP 网关 → ryEntitle 云函数）。
+     云函数持有 API Key（服务端身份）直写 PG —— RLS 防跨用户，服务端写防
+     「用户改自己的权益行」，原已知取舍就此闭合。
+     鉴权：Bearer JWT（localStorage credentials_，云函数用同一 token 反查 uid）。
+     网关域名 2026-10-11 实测：{envId}-1e50596164.{region}.app.tcloudbase.com。
+     降级策略：通道不可用（无 token / 网络失败，callServer 返回 null）时
+     回落旧 rdb 直连逻辑；业务级失败（code≠0）原样透传给调用方。 */
+  var ENT_URL = (typeof window !== 'undefined' && window.RY_ENTITLE_URL) ||
+    'https://runye-irrigation-d3e8xef4540bae5-1e50596164.ap-shanghai.app.tcloudbase.com/entitle';
+
+  function entToken() {
+    try {
+      return (window.CloudSync && typeof window.CloudSync.authToken === 'function')
+        ? window.CloudSync.authToken() : null;
+    } catch (e) { return null; }
+  }
+  function callServer(action, params) {
+    var token = entToken();
+    if (!token || typeof fetch !== 'function') return Promise.resolve(null);
+    var body = Object.assign({ action: action }, params || {});
+    return fetch(ENT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(body)
+    }).then(function (res) { return res.json(); }).then(function (j) {
+      if (!j || typeof j.code !== 'number') return { ok: false, code: -97, message: '服务响应格式异常' };
+      if (j.code !== 0) return { ok: false, code: j.code, message: j.message || '服务处理失败' };
+      return { ok: true, data: j.data || null, message: j.message || '' };
+    }).catch(function () { return null; /* 网络失败 → 调用方降级 */ });
+  }
+  /* 服务端状态包（packState）→ 前端 state（补 trial/anonPolicy 两个前端字段） */
+  function applyServerState(pack) {
+    state = Object.assign({}, pack, { trial: false, anonPolicy: 'trial' });
+    emit();
+    return state;
+  }
+  function entPhone() {
+    try { return (window.CloudSync && window.CloudSync.phone) || ''; } catch (e) { return ''; }
+  }
+
   /* 默认权益行：L1 注册会员，从现在起 30 天 */
   function newEntRow(now) {
     return { _id: sub(), plan: 'L1', expires_at: iso(now + TRIAL_DAYS * DAY),
@@ -139,8 +188,17 @@
       progress: { capped: 0, fromInvite: 0, fromGroup: 0, cooling: 0, pending: 0, remain: CAP, reached: false } };
   }
 
-  /* ---------- 拉取（实名）：权益 + 邀请档案 + 进度 ---------- */
+  /* ---------- 拉取（实名）：权益 + 邀请档案 + 进度 ----------
+     [v371] 服务端优先：init/get 一次调用返回全量状态（建行/算进度都在服务端），
+     通道不可用才降级 rdb 直连（pullAuthRdb，旧行为原样保留）。 */
   function pullAuth(create) {
+    var mySub = sub(); if (!mySub) return Promise.resolve(null);
+    return callServer(create ? 'init' : 'get', { phone: entPhone() }).then(function (r) {
+      if (r && r.ok && r.data && r.data.progress) return applyServerState(r.data);
+      return pullAuthRdb(create);
+    });
+  }
+  function pullAuthRdb(create) {
     var mySub = sub(); if (!mySub || !db()) return Promise.resolve(null);
     var now = Date.now();
     var invP = readOne(T_INV, mySub);
@@ -257,14 +315,74 @@
     progress: function () {
       return (state && state.progress) || { capped: 0, fromInvite: 0, fromGroup: 0, cooling: 0, pending: 0, remain: 3, reached: false };
     },
-    /* 提交邀请码（首次绑定后不可变更）。
-       流程：ry_bind 反查邀请人 → 自己的 ry_invite 记 inviter → 写 ry_links 行（我是被邀请人）。 */
+    /* [v371] 提交邀请码：服务端判自邀/重复/不存在（-4/-2/-3），注册即激活（直写 valid）。
+       通道不可用（无 token / 网络失败）降级 rdb 直连 bindRefRdb。 */
     bindRef: function (ref, viaGroup) {
       var self = this;
-      var mySub = sub(), d = db();
-      if (!mySub || !d) return Promise.resolve({ ok: false, code: -99, message: '请先手机号登录' });
-      ref = String(ref || '').trim();
-      if (ref.indexOf('RY') !== 0) return Promise.resolve({ ok: false, code: -1, message: '邀请码格式不正确' });
+      return callServer('bindRef', { ref: String(ref || '').trim(), phone: entPhone(), viaGroup: !!viaGroup })
+        .then(function (r) {
+          if (!r) return bindRefRdb(ref, viaGroup);
+          if (!r.ok) return { ok: false, code: r.code, message: r.message };
+          if (r.data && r.data.progress) applyServerState(r.data);
+          else return self.refresh();
+          return { ok: true, repaired: /修复半程态/.test(r.message || ''), existed: /修复半程态/.test(r.message || '') };
+        });
+    },
+    /* [v371] 满 3 人发奖：服务端算进度 + reward_claimed 幂等 + 服务端续期。 */
+    grant: function () {
+      var self = this;
+      return callServer('grant', { phone: entPhone() }).then(function (r) {
+        if (!r) return grantRdb();
+        if (!r.ok) return { ok: false, message: r.message || '发放失败' };
+        var d = r.data || {};
+        if (d.state && d.state.progress) applyServerState(d.state);
+        else return self.refresh();
+        return { ok: true, granted: d.granted || 0, planName: d.planName || '' };
+      });
+    },
+    /* [v371] 漏计核销工单（1-20 人；pending<3 限制在服务端）。 */
+    claim: function (count, names) {
+      var self = this;
+      var n = Number(count);
+      if (!isFinite(n) || n !== Math.floor(n) || n < 1 || n > 20)
+        return Promise.resolve({ ok: false, message: '人数需为 1-20 的整数' });
+      return callServer('claim', { count: n, names: names }).then(function (r) {
+        if (!r) return claimRdb(count, names);
+        if (!r.ok) return { ok: false, message: r.message };
+        return self.refresh().then(function () { return { ok: true }; });
+      });
+    },
+
+    /* ---------- 激活判定 ----------
+       [v367] 注册即激活；[v371] 心跳走服务端（激活权益行 + 存量行迁移），失败静默降级 rdb。 */
+    onSaved: function () {
+      var now = Date.now();
+      if (now - lastHb < HB_INTERVAL) return;
+      lastHb = now;
+      if (!sub()) return;
+      callServer('heartbeat', {}).then(function (r) {
+        if (r && r.ok) return;
+        onSavedRdb();
+      }).catch(function () { try { onSavedRdb(); } catch (_e) {} });
+    },
+
+    /* ---------- 展示用 ---------- */
+    inviteUrl: function (base) {
+      var b = String(base || (location && location.href) || '').split('#')[0].split('?')[0];
+      return b + '?ref=' + encodeURIComponent(this.myCode());
+    },
+    FEATURES: FEATURES,
+    PLAN_FEATURES: PLAN_FEATURES,
+    PLAN_NAMES: PLAN_NAMES
+  };
+
+  /* ---------- [v371] rdb 降级路径（通道不可用时兜底，逻辑为 v370 原版） ---------- */
+  function bindRefRdb(ref, viaGroup) {
+    var self = RyEntitle;
+    var mySub = sub(), d = db();
+    if (!mySub || !d) return Promise.resolve({ ok: false, code: -99, message: '请先手机号登录' });
+    ref = String(ref || '').trim();
+    if (ref.indexOf('RY') !== 0) return Promise.resolve({ ok: false, code: -1, message: '邀请码格式不正确' });
       return d.from(T_BIND).select('uid').eq('code', ref).then(function (r) {
         if (r && r.error) { setErr('bind_lookup', r.error); return { ok: false, code: -3, message: '邀请码不存在或已失效' }; }
         var bind = r && r.data && r.data[0];
@@ -304,103 +422,89 @@
           });
         });
       }).catch(function (e) { setErr('bind_throw', e); return { ok: false, code: -99, message: '网络异常' }; });
-    },
-    /* 结算并发放（前端判定 + 幂等：reward_claimed 防重）。
-       已知取舍：奖励天数按自己权益行的 member_days 计，用户可篡改自己的行（立案项）。 */
-    grant: function () {
-      var self = this;
-      var mySub = sub(), d = db();
-      if (!mySub || !d) return Promise.resolve({ ok: false, message: '请先手机号登录' });
-      var now = Date.now();
-      return readOne(T_INV, mySub).then(function (inv) {
-        if (!inv) return self.refresh().then(function () { return { ok: true, granted: 0, planName: '' }; });
-        return loadLinks(mySub).then(function (links) {
-          var p = computeProgress(links, now);
-          if (!p.reached || inv.reward_claimed)
-            return self.refresh().then(function () { return { ok: true, granted: 0, planName: '' }; });
-          return readOne(T_ENT, mySub).then(function (ent) {
-            var plan = (ent && ent.plan) || 'L1';
-            var days = (ent && ent.member_days > 0) ? ent.member_days : (PLAN_DAYS[plan] || 30);
-            var from = (ent && ms(ent.expires_at) > now) ? ms(ent.expires_at) : now;
-            var to = from + days * DAY;
-            var hist = (ent && ent.history) || [];
-            hist.unshift({ at: now, days: days, plan: plan, planName: PLAN_NAMES[plan] || '注册会员', from: from, to: to, src: 'invite' });
-            return d.from(T_ENT).update({ expires_at: iso(to), member_days: days, history: hist }).eq('_id', mySub)
-              .then(function (r1) {
-                if (r1 && r1.error) { setErr('grant_ent', r1.error); return { ok: false, message: '发放失败' }; }
-                var rewards = (inv.rewards) || [];
-                rewards.unshift({ at: now, days: days, plan: plan, planName: PLAN_NAMES[plan] || '注册会员', from: from, to: to, src: 'invite' });
-                return d.from(T_INV).update({ reward_claimed: true, rewards: rewards }).eq('_id', mySub)
-                  .then(function (r2) {
-                    if (r2 && r2.error) setErr('grant_inv', r2.error);
-                    return self.refresh().then(function () { return { ok: true, granted: days, planName: PLAN_NAMES[plan] || '注册会员' }; });
-                  });
-              });
-          });
-        });
-      }).catch(function (e) { setErr('grant_throw', e); return { ok: false, message: '网络异常' }; });
-    },
-    /* 提交漏计核销工单（1-20 人；pending >3 拒收） */
-    claim: function (count, names) {
-      var self = this;
-      var mySub = sub(), d = db();
-      var n = Number(count);
-      if (!isFinite(n) || n !== Math.floor(n) || n < 1 || n > 20)
-        return Promise.resolve({ ok: false, message: '人数需为 1-20 的整数' });
-      if (!mySub || !d) return Promise.resolve({ ok: false, message: '请先手机号登录' });
-      return readOne(T_INV, mySub).then(function (inv) {
-        if (!inv) return { ok: false, message: '请先初始化权益' };
-        var claims = inv.claims || [];
-        var pendingCount = claims.filter(function (c) { return c.status === 'pending'; }).length;
-        if (pendingCount >= 3) return { ok: false, message: '待审核工单过多，请等待处理' };
-        claims.unshift({ id: 'c' + Date.now() + Math.floor(Math.random() * 1000),
-          count: n, names: String(names || '').slice(0, 200), status: 'pending', approvedCount: 0, at: Date.now() });
-        return d.from(T_INV).update({ claims: claims }).eq('_id', mySub).then(function (r) {
-          if (r && r.error) { setErr('claim', r.error); return { ok: false, message: '提交失败' }; }
-          return self.refresh().then(function () { return { ok: true }; });
-        });
-      }).catch(function (e) { setErr('claim_throw', e); return { ok: false, message: '网络异常' }; });
-    },
+  }
 
-    /* ---------- 激活判定 ----------
-       [v367 规则改版] 注册即激活：新绑定直接写 valid（见 bindRef）。
-       心跳保留两项职责：① 首次激活自己的权益行；② 把存量的 registered/cooling 行推进为 valid（老数据迁移），
-       三段状态机（registered→cooling→valid）与 3 天冷静期已废止。 */
-    onSaved: function () {
-      var now = Date.now();
-      if (now - lastHb < HB_INTERVAL) return;
-      lastHb = now;
-      var mySub = sub(), d = db();
-      if (!mySub || !d) return;
-      readOne(T_ENT, mySub).then(function (ent) {
-        var w1 = ent
-          ? (ent.activated_at ? Promise.resolve(true)
-              : d.from(T_ENT).update({ activated_at: iso(now) }).eq('_id', mySub))
-          : Promise.resolve(false);
-        return w1.then(function () {
-          return d.from(T_LINKS).select('id,status').eq('invited_uid', mySub).then(function (r) {
-            if (r && r.error) return;
-            var updates = ((r && r.data) || []).filter(function (x) { return x.status !== 'valid'; });
-            return updates.reduce(function (p, x) {
-              return p.then(function () {
-                return d.from(T_LINKS).update({ status: 'valid', activated_at: iso(now) }).eq('id', x.id)
-                  .catch(function () {});
-              });
-            }, Promise.resolve());
-          });
+  /* [v371] 满 3 人发奖（rdb 降级版，v370 原逻辑） */
+  function grantRdb() {
+    var self = RyEntitle;
+    var mySub = sub(), d = db();
+    if (!mySub || !d) return Promise.resolve({ ok: false, message: '请先手机号登录' });
+    var now = Date.now();
+    return readOne(T_INV, mySub).then(function (inv) {
+      if (!inv) return self.refresh().then(function () { return { ok: true, granted: 0, planName: '' }; });
+      return loadLinks(mySub).then(function (links) {
+        var p = computeProgress(links, now);
+        if (!p.reached || inv.reward_claimed)
+          return self.refresh().then(function () { return { ok: true, granted: 0, planName: '' }; });
+        return readOne(T_ENT, mySub).then(function (ent) {
+          var plan = (ent && ent.plan) || 'L1';
+          var days = (ent && ent.member_days > 0) ? ent.member_days : (PLAN_DAYS[plan] || 30);
+          var from = (ent && ms(ent.expires_at) > now) ? ms(ent.expires_at) : now;
+          var to = from + days * DAY;
+          var hist = (ent && ent.history) || [];
+          hist.unshift({ at: now, days: days, plan: plan, planName: PLAN_NAMES[plan] || '注册会员', from: from, to: to, src: 'invite' });
+          return d.from(T_ENT).update({ expires_at: iso(to), member_days: days, history: hist }).eq('_id', mySub)
+            .then(function (r1) {
+              if (r1 && r1.error) { setErr('grant_ent', r1.error); return { ok: false, message: '发放失败' }; }
+              var rewards = (inv.rewards) || [];
+              rewards.unshift({ at: now, days: days, plan: plan, planName: PLAN_NAMES[plan] || '注册会员', from: from, to: to, src: 'invite' });
+              return d.from(T_INV).update({ reward_claimed: true, rewards: rewards }).eq('_id', mySub)
+                .then(function (r2) {
+                  if (r2 && r2.error) setErr('grant_inv', r2.error);
+                  return self.refresh().then(function () { return { ok: true, granted: days, planName: PLAN_NAMES[plan] || '注册会员' }; });
+                });
+            });
         });
-      }).catch(function (e) { setErr('hb_throw', e); /* 静默，失败不影响保存流程 */ });
-    },
+      });
+    }).catch(function (e) { setErr('grant_throw', e); return { ok: false, message: '网络异常' }; });
+  }
 
-    /* ---------- 展示用 ---------- */
-    inviteUrl: function (base) {
-      var b = String(base || (location && location.href) || '').split('#')[0].split('?')[0];
-      return b + '?ref=' + encodeURIComponent(this.myCode());
-    },
-    FEATURES: FEATURES,
-    PLAN_FEATURES: PLAN_FEATURES,
-    PLAN_NAMES: PLAN_NAMES
-  };
+  /* [v371] 漏计核销工单（rdb 降级版，v370 原逻辑） */
+  function claimRdb(count, names) {
+    var self = RyEntitle;
+    var mySub = sub(), d = db();
+    var n = Number(count);
+    if (!isFinite(n) || n !== Math.floor(n) || n < 1 || n > 20)
+      return Promise.resolve({ ok: false, message: '人数需为 1-20 的整数' });
+    if (!mySub || !d) return Promise.resolve({ ok: false, message: '请先手机号登录' });
+    return readOne(T_INV, mySub).then(function (inv) {
+      if (!inv) return { ok: false, message: '请先初始化权益' };
+      var claims = inv.claims || [];
+      var pendingCount = claims.filter(function (c) { return c.status === 'pending'; }).length;
+      if (pendingCount >= 3) return { ok: false, message: '待审核工单过多，请等待处理' };
+      claims.unshift({ id: 'c' + Date.now() + Math.floor(Math.random() * 1000),
+        count: n, names: String(names || '').slice(0, 200), status: 'pending', approvedCount: 0, at: Date.now() });
+      return d.from(T_INV).update({ claims: claims }).eq('_id', mySub).then(function (r) {
+        if (r && r.error) { setErr('claim', r.error); return { ok: false, message: '提交失败' }; }
+        return self.refresh().then(function () { return { ok: true }; });
+      });
+    }).catch(function (e) { setErr('claim_throw', e); return { ok: false, message: '网络异常' }; });
+  }
+
+  /* [v371] 心跳（rdb 降级版，v370 原逻辑：激活权益行 + 存量行迁移） */
+  function onSavedRdb() {
+    var now = Date.now();
+    var mySub = sub(), d = db();
+    if (!mySub || !d) return;
+    readOne(T_ENT, mySub).then(function (ent) {
+      var w1 = ent
+        ? (ent.activated_at ? Promise.resolve(true)
+            : d.from(T_ENT).update({ activated_at: iso(now) }).eq('_id', mySub))
+        : Promise.resolve(false);
+      return w1.then(function () {
+        return d.from(T_LINKS).select('id,status').eq('invited_uid', mySub).then(function (r) {
+          if (r && r.error) return;
+          var updates = ((r && r.data) || []).filter(function (x) { return x.status !== 'valid'; });
+          return updates.reduce(function (p, x) {
+            return p.then(function () {
+              return d.from(T_LINKS).update({ status: 'valid', activated_at: iso(now) }).eq('id', x.id)
+                .catch(function () {});
+            });
+          }, Promise.resolve());
+        });
+      });
+    }).catch(function (e) { setErr('hb_throw', e); /* 静默，失败不影响保存流程 */ });
+  }
 
   window.RyEntitle = RyEntitle;
 
