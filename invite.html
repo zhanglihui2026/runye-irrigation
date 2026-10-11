@@ -3008,7 +3008,7 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
   }
   /* [v365b] H5 版本徽章（远程排障：截图即知对方跑的哪版）+ 邀请链接落本 H5（v364b 修复）+
      t=时间戳 nonce：微信/手机浏览器对 HTML 强缓存，唯一 URL 强制拉新版。 */
-  var H5_VERSION = 'v371c';
+  var H5_VERSION = 'v371d';
   function inviteUrl(kind) {
     var base = String(location.href || '').split('#')[0].split('?')[0];
     var u = base + '?ref=' + encodeURIComponent(view.myCode || '') + '&t=' + Date.now();
@@ -3305,17 +3305,24 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
 
   function afterLogin(closeId) {
     closeModal(closeId);
-    toast('登录成功，正在同步权益…');
+    toast('手机号验证成功，正在完成账号注册/登录…');
     var initP = en.onLogin ? en.onLogin() : en.init(true);
     Promise.resolve(initP).then(function () {
       var ref = currentRef();
       var bindP = ref ? Promise.resolve(en.bindRef(ref, false)) : Promise.resolve(null);
       return bindP.then(function (r) {
-        if (r && r.ok) { toast(r.repaired ? '邀请关系已自动修复 ✓' : '已建立好友邀请关系 ✓'); clearRef(); }
-        else if (r && r.code === -2) { toast((r && r.message) || '已绑定其他邀请人'); clearRef(); }
-        else if (ref) {
-          var bt = '登录成功，但邀请关系未建立：' + ((r && r.message) || '请稍后重试');
-          toast(bt); showErrBanner(bt, '邀请码已保留，刷新页面会自动重试。');
+        if (r && r.ok) {
+          toast('账号注册/登录成功，邀请关系已建立 ✓');
+          clearRef();
+        } else if (r && r.code === -2) {
+          toast('账号注册/登录成功：' + (r.message || '邀请关系已绑定其他邀请人'));
+          clearRef();
+        } else if (ref) {
+          var bt = '账号注册/登录成功，但邀请关系尚未建立：' + ((r && r.message) || '请稍后重试');
+          toast(bt);
+          showErrBanner(bt, '邀请码已保留，刷新页面会自动重试。');
+        } else {
+          toast('账号注册/登录成功');
         }
         syncView(); renderAll();
         go('invite');
@@ -3324,7 +3331,12 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
       });
     }).catch(function (e) {
       syncView();
-      toast('权益同步失败，请稍后下拉刷新重试');
+      go('invite');
+      var msg = '账号注册/登录成功，但会员信息同步失败';
+      toast(msg + '，请刷新页面重试');
+      var detail = '';
+      try { detail = (e && e.message) || JSON.stringify(e); } catch (_e) { detail = String(e); }
+      showErrBanner(msg, detail || '登录已完成，刷新页面可重新同步。');
     });
   }
 
@@ -3350,12 +3362,18 @@ if (typeof module !== 'undefined' && module.exports) { module.exports = RYCore; 
       ok = false;
     }
     if (!ok) return;
-    if (!cs || typeof cs.signInSms !== 'function') { toast('云端未就绪，请稍后再试'); return; }
+    if (!cs || typeof cs.signInSms !== 'function') {
+      var unavailable = '注册服务暂时未就绪';
+      toast(unavailable + '，请稍后重试');
+      showErrBanner(unavailable, '当前设备尚未完成云端初始化，验证码没有提交。请刷新页面后再试。');
+      return;
+    }
     var btn = $('btnSubmit');
     registerRequestPending = true;
     btn.disabled = true;
     var oldTxt = btn.textContent;
     btn.textContent = '正在验证…';
+    showErrBanner('正在验证手机号…', '请保持页面打开并避免重复提交。');
     var settled = false;
     var timer = setTimeout(function () {
       if (settled) return;
