@@ -22,8 +22,11 @@
    插件接管推迟到权益重渲染之后，「更多」面板随导航重建被清空、注入的「管网优化详细分析」按钮丢失
    → 插件容器判定 null 错落顶栏、面板恒空（compact 闸门 M2/M3/M4 红）。runye-nav.js mount()
    重建前保留面板内外部注入按钮（排除 data-ry-navitem / data-ry-plugin-nav / data-ry-mbr，
-   后两者由 ui-shell 自行重挂防双份），新面板建好后回插。runye-nav.js 在 CORE 白名单内，必须抬版本）。 */
-const VERSION = 'v389-nav-panel-preserve';
+   后两者由 ui-shell 自行重挂防双份），新面板建好后回插。runye-nav.js 在 CORE 白名单内，必须抬版本）→
+   v390-plugin-migrate-4（用户指令：过滤系统/材料清单/轴测图/系统图四项作为外挂插件接入主程序；
+   生成系统图与地块绘制留在主程序不动。新增 plugins/filter-system、material-list、iso-view、sys-view
+   四个壳插件（业务零改动，接管 runye-nav 老导航项 + 重渲染抑制器），八文件进 CORE 白名单，必须抬版本）。 */
+const VERSION = 'v390-plugin-migrate-4';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
@@ -65,6 +68,15 @@ const CORE = [
   /* [v384] 喷灌成果壳插件（terrain 内核宿主，任务书 TASK_sprinkler-pipeline_20261012） */
   "plugins/sprinkler/manifest.json",
   "plugins/sprinkler/main.js",
+  /* [v390] 四功能壳迁移插件：过滤系统 / 材料清单 / 轴测图 / 系统图（业务零改动，只接管导航入口） */
+  "plugins/filter-system/manifest.json",
+  "plugins/filter-system/main.js",
+  "plugins/material-list/manifest.json",
+  "plugins/material-list/main.js",
+  "plugins/iso-view/manifest.json",
+  "plugins/iso-view/main.js",
+  "plugins/sys-view/manifest.json",
+  "plugins/sys-view/main.js",
   /* [v357] 单文件拆分产物 */
   "mod/inline-01.js",
   "mod/inline-02.js",

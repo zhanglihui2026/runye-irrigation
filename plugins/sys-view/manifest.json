@@ -1,0 +1,25 @@
+{
+  "id": "sys-view",
+  "name": "系统图（老模块迁移 · 壳）",
+  "version": "1.0.0",
+  "entry": "main.js",
+  "requires": { "core": ">=1.0.0", "plugins": [] },
+  "ui": {
+    "nav": {
+      "label": "系统图",
+      "order": 17,
+      "icon": "",
+      "title": "三级系统图（供水首部系统图）"
+    }
+  },
+  "permissions": ["ui:nav"],
+  "config": {
+    "takeOverNav": true,
+    "legacySel": ".fn-link[data-ry-navact=sys]",
+    "act": "sys",
+    "beforeLabel": "滴灌带查询",
+    "insertBefore": ".fn-more",
+    "feat": "drawing-export",
+    "_note": "壳迁移（v390 用户指令：系统图作为外挂插件接入主程序）：业务零改动（三级系统图渲染、mod/inline-05.js 的 window.RyFnNavActions.sys → tlShowSysDiagram 链路原样保留），本插件只接管导航入口 —— ① 摘掉 runye-nav.js 渲染的动作老项（data-ry-navact=\"sys\"）；② 「更多 ▾」之前原位补插件项（受 v388 全站插件开关管控）；③ 点击走 window.RyFnNavActions[act]()（缺注册时直接调 tlShowSysDiagram 兜底）。与「⚙️ 生成系统图」静态按钮（#fnSystemDiagram → openTlSystemDiagramFromNav）是两个东西：那个留在主程序不动（用户 2026-10-12 明确）。会员门控 feat=drawing-export 与 runye-nav.js gate() 语义一致（三态 fail-open）。重渲染抑制器防权益就绪再造出老项双入口。子目录页不受影响（act 项在子页是跨页链接）。takeOverNav 置 false = 不碰老入口（灰度用）。"
+  }
+}

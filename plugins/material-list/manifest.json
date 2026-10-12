@@ -1,0 +1,25 @@
+{
+  "id": "material-list",
+  "name": "材料清单（老模块迁移 · 壳）",
+  "version": "1.0.0",
+  "entry": "main.js",
+  "requires": { "core": ">=1.0.0", "plugins": [] },
+  "ui": {
+    "nav": {
+      "label": "材料清单",
+      "order": 15,
+      "icon": "",
+      "title": "材料清单：按当前设计图统计管材 / 管件 / 配套（三级简图口径）"
+    }
+  },
+  "permissions": ["ui:nav"],
+  "config": {
+    "takeOverNav": true,
+    "legacySel": ".fn-link[data-target=detailsSection]",
+    "sectionId": "detailsSection",
+    "beforeLabel": "滴灌带查询",
+    "insertBefore": ".fn-more",
+    "feat": "bom-export",
+    "_note": "壳迁移（v390 用户指令：材料清单作为外挂插件接入主程序）：业务零改动（#detailsSection 区块、inline-18.js 切区、切入时 window.render() 重渲染全部原样保留），本插件只接管导航入口 —— ① 摘老项（legacySel）；② 「更多 ▾」之前原位补插件项（受 v388 全站插件开关管控）；③ 点击走 window.ryJumpToSection('detailsSection')。与 bom 插件（BOM 导出面板）是两个东西：本插件是页面里的「材料清单」功能区入口。会员门控 feat=bom-export 与 runye-nav.js gate() 语义一致（三态 fail-open）。重渲染抑制器防权益就绪再造出老项双入口。takeOverNav 置 false = 不碰老入口（灰度用）。"
+  }
+}

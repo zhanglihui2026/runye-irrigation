@@ -10,6 +10,10 @@
     { "id": "calib", "path": "plugins/calib/" },
     { "id": "hydraulics", "path": "plugins/hydraulics/" },
     { "id": "ai-plan", "path": "plugins/ai-plan/" },
-    { "id": "sprinkler", "path": "plugins/sprinkler/" }
+    { "id": "sprinkler", "path": "plugins/sprinkler/" },
+    { "id": "filter-system", "path": "plugins/filter-system/" },
+    { "id": "material-list", "path": "plugins/material-list/" },
+    { "id": "iso-view", "path": "plugins/iso-view/" },
+    { "id": "sys-view", "path": "plugins/sys-view/" }
   ]
 }

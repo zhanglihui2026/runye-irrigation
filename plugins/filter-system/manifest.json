@@ -1,0 +1,25 @@
+{
+  "id": "filter-system",
+  "name": "过滤系统（老模块迁移 · 壳）",
+  "version": "1.0.0",
+  "entry": "main.js",
+  "requires": { "core": ">=1.0.0", "plugins": [] },
+  "ui": {
+    "nav": {
+      "label": "过滤系统",
+      "order": 14,
+      "icon": "",
+      "title": "过滤系统 · GREEN 型单体并联机组（初稿）"
+    }
+  },
+  "permissions": ["ui:nav"],
+  "config": {
+    "takeOverNav": true,
+    "legacySel": ".fn-link[data-target=filterSystemSection]",
+    "sectionId": "filterSystemSection",
+    "beforeLabel": "滴灌带查询",
+    "insertBefore": ".fn-more",
+    "feat": "pro-others",
+    "_note": "壳迁移（v390 用户指令：过滤系统作为外挂插件接入主程序）：业务零改动（#filterSystemSection 区块与 mod/inline-18.js 的切区逻辑原样保留），本插件只做三件事 —— ① 摘掉 runye-nav.js 渲染的老导航项（选择器 legacySel）；② 在「更多 ▾」之前原位补插件导航项（data-ry-plugin-nav，受 v388 全站插件开关管控）；③ 点击走 window.ryJumpToSection(sectionId) —— 与老锚点同一条切区收口（工具模式切区 / 非工具模式滚动定位，同一 stickyOffset 几何）。会员门控（feat=pro-others）语义与 runye-nav.js gate() 完全一致（三态 fail-open）。重渲染抑制器：权益就绪会把老项再造出来，MutationObserver 见一次摘一次。takeOverNav 置 false = 完全不碰老入口（灰度用）。"
+  }
+}

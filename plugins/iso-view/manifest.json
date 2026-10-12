@@ -1,0 +1,25 @@
+{
+  "id": "iso-view",
+  "name": "轴测图（老模块迁移 · 壳）",
+  "version": "1.0.0",
+  "entry": "main.js",
+  "requires": { "core": ">=1.0.0", "plugins": [] },
+  "ui": {
+    "nav": {
+      "label": "轴测图",
+      "order": 16,
+      "icon": "",
+      "title": "三级管线轴测图（先「生成管线图」再点）"
+    }
+  },
+  "permissions": ["ui:nav"],
+  "config": {
+    "takeOverNav": true,
+    "legacySel": ".fn-link[data-ry-navact=iso]",
+    "act": "iso",
+    "beforeLabel": "滴灌带查询",
+    "insertBefore": ".fn-more",
+    "feat": "drawing-export",
+    "_note": "壳迁移（v390 用户指令：轴测图作为外挂插件接入主程序）：业务零改动（三级轴测图渲染逻辑、mod/inline-05.js 的 window.RyFnNavActions.iso → tlShowIsoDiagram 链路原样保留），本插件只接管导航入口 —— ① 摘掉 runye-nav.js 渲染的动作老项（data-ry-navact=\"iso\"）；② 「更多 ▾」之前原位补插件项（受 v388 全站插件开关管控）；③ 点击走 window.RyFnNavActions[act]()（缺注册时直接调 tlShowIsoDiagram 兜底，与 inline-05 的语义一致）。会员门控 feat=drawing-export 与 runye-nav.js gate() 语义一致（三态 fail-open）。重渲染抑制器防权益就绪再造出老项双入口。子目录页不受影响（那里的 act 项是跨页链接，插件体系只在主页启动）。takeOverNav 置 false = 不碰老入口（灰度用）。"
+  }
+}
