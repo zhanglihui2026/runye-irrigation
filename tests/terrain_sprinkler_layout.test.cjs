@@ -145,6 +145,7 @@ const P8 = core.sprinklerProjectPlan({ zone_min_mu: 50, zone_max_mu: 60, macro_m
 ok(P8.ok && P8.zones.recommended === 9 && P8.zones.feasible && Math.abs(P8.zones.average_mu - 55.56) < 0.01, '500亩按50–60亩目标分为9区，均值55.56亩');
 ok(P8.macrozones.feasible && P8.macrozones.min === 2 && P8.macrozones.max === 2, '500亩按200–250亩划分为2个大灌溉区');
 ok(P8.specifiedNetwork.main_dn_mm === 160 && P8.specifiedNetwork.distribution_dn_mm === 110 && P8.specifiedNetwork.branch_dn_mm === 50 && P8.specifiedNetwork.sprinkler_flow_lh === 350, '任务书规格按字段保留，不被自动管径建议覆盖');
+ok(P8.specifiedNetwork.sprinkler_pressure_bar_min === 2 && P8.specifiedNetwork.sprinkler_pressure_bar_max === 3, '任务书工作压力按2–3bar保留');
 ok(core.sprinklerProjectPlan({}, 121).zones.feasible === false, '反例：无法整分到50–60亩范围时显式报不可行');
 
 /* ---------- 9. 喷灌 BOM 统计（v384 任务书 P0） ---------- */
