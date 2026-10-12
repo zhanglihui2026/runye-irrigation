@@ -91,7 +91,14 @@
     /* Native section navigation exits iframe mode before existing hash/tab handlers run. */
     if (W.RyFrameShell && W.RyFrameShell.isVisible()) {
       var sectionLink = ev.target && ev.target.closest && ev.target.closest('.fn-link, [data-ry-plugin-nav]');
-      if (sectionLink) hide();
+      /* Disclosure controls only open a menu; treating them as navigation hides the active
+         online-map/terrain/hydraulics iframe before the user has selected a destination. */
+      var menuToggle = sectionLink && (
+        (sectionLink.classList && sectionLink.classList.contains('fn-more-btn')) ||
+        (sectionLink.hasAttribute && sectionLink.hasAttribute('data-ry-filemenu') &&
+          sectionLink.getAttribute('aria-haspopup') === 'true')
+      );
+      if (sectionLink && !menuToggle) hide();
     }
   }, true);
 })(window, document);
