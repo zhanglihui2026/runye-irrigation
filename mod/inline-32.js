@@ -218,8 +218,17 @@
     if (!curBtn) return;
     var r = curBtn.getBoundingClientRect();
     panel.style.top = Math.round(r.bottom + 2) + 'px';
-    panel.style.right = Math.max(6, Math.round(W.innerWidth - r.right)) + 'px';
-    panel.style.left = 'auto';
+    /* [v403b 用户截图反馈] 「文件」按钮在顶栏**左侧** → 右对齐会把面板推出视口左边界
+       （实测 320 宽面板左缘 x=-220，可见的只有右缘窄条，文字全被裁掉 = 用户看到的
+       「文字都不能显示」）。改为：按钮在左半屏 → 面板左对齐按钮；靠右的按钮才右对齐。 */
+    var pw = panel.offsetWidth || 320;
+    if (r.left + pw <= W.innerWidth - 12) {
+      panel.style.left = Math.max(6, Math.round(r.left)) + 'px';
+      panel.style.right = 'auto';
+    } else {
+      panel.style.right = Math.max(6, Math.round(W.innerWidth - r.right)) + 'px';
+      panel.style.left = 'auto';
+    }
   }
   function isOpen() { return !!panel && !panel.hidden; }
   function open(btn) {

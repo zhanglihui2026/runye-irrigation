@@ -93,9 +93,11 @@ html{--fn-nav-h:36px}
 /* [v401] 文件按钮不再吸右（order:998 已去）：由 mod/inline-32.js relocate 挂到「地块绘制」之前 */
 .fn-nav .fn-file{position:relative;display:flex;align-items:center;flex:none}
 .fn-nav .fn-file.open .fn-more-caret{transform:rotate(180deg)}
-/* 面板：position:fixed 同 .fn-more-panel（防 .fn-inner overflow 裁切），右对齐触发钮 */
+/* 面板：position:fixed 同 .fn-more-panel（防 .fn-inner overflow 裁切），右对齐触发钮。
+   [v403b 用户反馈] 面板加宽（min-width 232→320）：最长项「地块文件 (GeoJSON/KML/KMZ/奥维)」
+   需完整显示不换行不截断。 */
 .fn-file-panel{
-  position:fixed;z-index:99999;min-width:232px;
+  position:fixed;z-index:99999;min-width:320px;
   display:flex;flex-direction:column;
   padding:6px 0;margin:0;
   background:var(--u-nav);color:var(--u-nav-ink);
