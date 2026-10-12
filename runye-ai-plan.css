@@ -186,3 +186,18 @@ body.ry-smart-entry .ai-panel{z-index:10000!important}
 
 /* [v349] 已划分态：smart-plot（当前地块块）内嵌二级简图实截，替代手绘 SVG 边界 */
 .smart-plot canvas.smart-plot-live{display:block;width:100%;background:#fff;border:1px solid #e3ebe5;border-radius:6px;margin:8px 0 6px}
+
+/* [v366 2026-10-12] 智能规划工作台圆角微调：轻圆角让消息、输入区和操作控件更柔和 */
+body.ry-smart-entry .smart-workbench button,
+body.ry-smart-entry .smart-workbench a.smart-tb-link {
+  border-radius: 6px;
+}
+body.ry-smart-entry .smart-chat-head .smart-howto,
+body.ry-smart-entry .smart-workbench .ai-chat-turn,
+body.ry-smart-entry .smart-workbench .ai-block,
+body.ry-smart-entry .smart-workbench .ai-remark-text,
+body.ry-smart-entry .smart-plot,
+body.ry-smart-entry .smart-result-empty,
+body.ry-smart-entry .smart-composer textarea {
+  border-radius: 8px;
+}
