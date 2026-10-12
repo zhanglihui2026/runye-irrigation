@@ -33,8 +33,9 @@
   }
   window.runyeRenderPlotLib=renderLib;   /* v161：供方案/地块恢复后刷新「当前地块」高亮 */
   // 地图实测回传消费后调用：把当前 window.measuredPolygon 作为地块落库(runye_plot_library)，
-  // 并桥接到数字农业控制台·地块中心(runye_db_v1)，使「在线地图绘制」链能持久化、且地块中心可见。
-  // 与 saveCurrent 共用同一套落库/桥接逻辑，plotId 稳定以支持去重（重复回传同一地块只更新不新增）。
+  // 使「在线地图绘制」链能持久化。plotId 稳定以支持去重（重复回传同一地块只更新不新增）。
+  // [2026-10-12 数字农业剥离] 原先这里还往对端模块的地块中心回写一份，
+  //   该耦合已按用户决定整体切除 —— 对端页面仍在站上，但与灌溉工具零数据往来。
   window.runyePersistMeasuredPlot=function(opts){
     opts=opts||{};
     var area=window.measuredArea||0;
@@ -88,9 +89,6 @@
     // 同步本页「管线绘图区」（管道规划）
     try{ if(window.measuredPolygon && window.measuredPolygon.length>=3 && typeof window.ppLoadPolygon==='function') window.ppLoadPolygon(); }catch(e){}
     try{ if(typeof window.ppGenerateDiagram==='function') window.ppGenerateDiagram({scroll:false}); }catch(e){}
-    // 同步数字农业控制台·地块中心(runye_db_v1)
-    try{ if(window.runyeSharePlotToDigital) window.runyeSharePlotToDigital(); }catch(e){}
-    if(window.runyeBridgeWriteBack) window.runyeBridgeWriteBack(id, plot);
     /* v161：回传落库后该地块即为当前地块 → 记锚点 + 静默留存，供切页返回恢复 */
     try{ if(typeof window.runyeSetCurrentPlot==='function') window.runyeSetCurrentPlot(id); }catch(e){}
     return plot;
@@ -151,9 +149,6 @@
     // 同步到本页「管线绘图区」（管道规划）：即时把刚画好的边界载入管线画布
     try{ if(window.measuredPolygon && window.measuredPolygon.length>=3 && typeof window.ppLoadPolygon==='function') window.ppLoadPolygon(); }catch(e){}
     try{ if(typeof window.ppGenerateDiagram==='function') window.ppGenerateDiagram({scroll:false}); }catch(e){}
-    // 同步到数字农业控制台·地块中心：写 runye_db_v1（runyeBridgeWriteBack 内部处理独立/来自工作台两种来源）
-    try{ if(window.runyeSharePlotToDigital) window.runyeSharePlotToDigital(); }catch(e){}
-    if(window.runyeBridgeWriteBack) window.runyeBridgeWriteBack(id, plot);
     /* v161：保存地块后该地块即为当前地块 → 记锚点 + 静默留存，供切页返回恢复 */
     try{ if(typeof window.runyeSetCurrentPlot==='function') window.runyeSetCurrentPlot(id); }catch(e){}
   }
@@ -209,7 +204,6 @@
     try{ if(typeof updatePlan==='function') updatePlan(); }catch(e){}
     try{ if(typeof window.ppLoadPolygon==='function') window.ppLoadPolygon(); }catch(e){}
     try{ if(typeof window.ppGenerateDiagram==='function') window.ppGenerateDiagram({scroll:false}); }catch(e){}
-    try{ if(typeof window.runyeSharePlotToDigital==='function') window.runyeSharePlotToDigital(); }catch(e){}
     renderLib();
     // 2026-09-13：按用户要求去掉「已设为当前地块」提示（该提示在页面无 toast 容器时兜底为
     // 阻塞式原生 alert，需多点一次「确定」）——点击「设为当前」后直接跳转「二级管路制图区」。

@@ -11,15 +11,15 @@
   body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"Microsoft YaHei",Segoe UI,Roboto,sans-serif;line-height:1.65;}
   .wrap{max-width:920px;margin:0 auto;padding:22px 16px 60px;}
   h1{font-size:22px;margin:0 0 4px;color:var(--teal)}
-  .sub{color:var(--muted);font-size:13px;margin-bottom:18px}
+  .sub{color:var(--muted);font-size:var(--ry-fs-body);margin-bottom:18px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin:14px 0;box-shadow:0 1px 3px rgba(0,0,0,.04)}
   h2{font-size:16px;margin:0 0 10px;color:var(--teal2);border-left:4px solid var(--teal2);padding-left:10px}
-  h3{font-size:14px;margin:14px 0 6px;color:var(--ink)}
-  p{margin:8px 0;font-size:14px}
-  .lead{font-size:14px;color:var(--ink)}
+  h3{font-size:var(--ry-fs-card);margin:14px 0 6px;color:var(--ink)}
+  p{margin:8px 0;font-size:var(--ry-fs-card)}
+  .lead{font-size:var(--ry-fs-card);color:var(--ink)}
   ul{margin:8px 0;padding-left:20px}
-  li{margin:5px 0;font-size:14px}
-  .key{background:#eafaf7;border:1px solid #bfe9e1;border-radius:10px;padding:12px 14px;font-size:14px;color:#0c5048}
+  li{margin:5px 0;font-size:var(--ry-fs-card)}
+  .key{background:#eafaf7;border:1px solid #bfe9e1;border-radius:10px;padding:12px 14px;font-size:var(--ry-fs-card);color:#0c5048}
   table{border-collapse:collapse;width:100%;font-size:12.5px;margin:10px 0}
   th,td{border:1px solid var(--line);padding:7px 8px;text-align:left;vertical-align:top}
   th{background:#eef4f2;color:var(--teal);font-weight:600}
@@ -32,10 +32,12 @@
   .sig b{color:var(--teal)}
   .dot{width:9px;height:9px;border-radius:50%;background:var(--teal);margin-top:6px;flex:none}
   .note{font-size:12.5px;color:var(--muted)}
-  .warn{background:#fff6ec;border:1px solid #f0d3ad;border-radius:10px;padding:10px 12px;font-size:13px;color:#8a5410}
-  .foot{font-size:12px;color:var(--muted);margin-top:24px;border-top:1px solid var(--line);padding-top:12px}
-  code{background:#eef1f0;padding:1px 5px;border-radius:5px;font-size:12px}
+  .warn{background:#fff6ec;border:1px solid #f0d3ad;border-radius:10px;padding:10px 12px;font-size:var(--ry-fs-body);color:#8a5410}
+  .foot{font-size:var(--ry-fs-note);color:var(--muted);margin-top:24px;border-top:1px solid var(--line);padding-top:12px}
+  code{background:#eef1f0;padding:1px 5px;border-radius:5px;font-size:var(--ry-fs-note)}
 </style>
+    <link rel="stylesheet" href="../runye-theme.css?v=1">
+  <link rel="stylesheet" href="../runye-typography.css?v=1">
 </head>
 <body>
 <div class="wrap">

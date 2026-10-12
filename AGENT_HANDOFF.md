@@ -1,8 +1,67 @@
 # 润野灌溉 · 接手须知（Agent Handoff）
 
 > **给接手本项目的 AI agent / 开发者**：先读这一页，再动代码。
-> 最后更新：**2026-10-10** ｜ 当前阶段：**会员体系开发中，架构是否迁移待用户定方向**
+> 最后更新：**2026-10-12（v382）** ｜ 当前阶段：**数据资产化主链路收口进行中**（Step -1 数字农业完全剥离已完成 ✅，下一步 **Step 0 `core/land-store.js` 加壳 + 坐标口径标记**）；插件化阶段五已完成 4 项壳迁移（pipe-optim / hydraulics / pipe-assemble / ai-plan，余滴灌带查询/会员体系，详见「▶ 当前任务」末尾的插件迁移参考）；**会员云调用被平台拦截，架构路线待用户拍板**
+> ⚠ 缓存版本号已由我抬到 **`v382-da-decouple`**（sw.js VERSION + index.html `?v=` 后缀）。此前 v380/v381 两轮别的会话改缓存号的问题已了结。接手动这两个文件前先 `git diff` 看有没有未提交的并行改动。
 > 相关文档：`README.md`（站点结构）｜`CLOUDBASE_SETUP.md`（云开发配置）｜`AI_ONLINE.md`（AI 在线模块）｜`发布与更新说明.md`
+> 插件化：`插件化与数据资产化实施方案.md`（§10 是阶段一交付记录，**§12 是当前主线：架构梳理 + 数据链路 + 六步计划**）｜`PLUGIN_DEV.md`（插件开发说明）｜闸门 `_gate_plugins.cjs` / `_smoke_plugins.cjs`
+> 数据链路：`地块主链路架构规划.md`（多 Agent 分工版）｜`RYPLOT_SCHEMA.md`（ryPlot 现状基线 v1）
+
+---
+
+## ▶ 当前任务（v382 起，接手 agent 从这里开工）
+
+**主线（用户已拍板，见方案文档 §12）**：数据资产化主链路收口，六步计划，**每步跑五道门全绿才算完成；未经用户明确说「发布」，任何一步都不部署**。
+
+| 步 | 内容 | 闸门配套 | 状态 |
+|---|---|---|---|
+| -1 | 数字农业完全剥离 | C40/I40 | ✅ **已完成（v382-da-decouple）** |
+| 0 | `core/land-store.js` 加壳（物理存储仍走 `runye_plot_library`，**零迁移**）+ `geometry.orientation` 坐标口径标记 + 存量修复脚本 | C41 口径标记必填 / C42 rev 冲突拒绝 | **← 下一步开工** |
+| 1 | 收口剩下 5 个写入方 → 全走 land-store | C43 单一口径 | 待 |
+| 2 | `RyMapPartition` 提为共享 ES Module，干掉隐藏 iframe | C44 分区不依赖主页加载 | 待 |
+| 3 | 派生层只读 land；`runye_network_layout` **一步到位**收进 `land.network`，三读方（map-enhance / runye-hydraulics.html / runye-ai-chat-test.html）同轮改 | C45 network 按 land_id 分域 | 待 |
+| 4 | 拆巨石文件：inline-09.js(6002行) / inline-11.js(4029行) / index.html(2911行) | 既有闸门全量回归 | 待 |
+| 5 | 文档收尾 | — | 待 |
+
+**Step 0 开工前必读**（都是上一轮规划期挖出来的，别重新踩）：
+- 双坐标口径（P0）：`measuredPolygon`（图面，y 取反）vs `__runyeMapFramePoly`（地图，y 不取反），**无元数据标记**，现状靠 `ryOrientPlotPoly()` 几何判据（容差 0.5m）猜 —— 猜错不报错。用户已拍板「Step 0 就加标记 + 修存量」。
+- `runye_plot_library` 曾有 6 方写入（Step -1 后 5 方，见方案文档 §12.0.1 表）；`runye_network_layout` 是单例键、多地块互覆盖（Step 3 一步到位收进 `land.network`，不留双写过渡期 —— 用户拍板）。
+- land-store 目标态：L1 主链路生产层 / L2 派生消费层 / L0 Land 数据层；`land_id` 主键 + `rev` 乐观锁；`geometry/partitions/network/derived` 分区。现状数据契约基线在 `RYPLOT_SCHEMA.md`。
+- **C40 假绿教训**（详见方案文档 §12.1）：契约做「剥注释后扫描」会被 `index.html` 第 1145 行注释里的字面量 `/*` 吞掉 60% 文件。C40 已改为零启发式直接扫原文；**新契约要扫描文件时，默认零启发式，别引入注释剥离**。
+
+**Step -1 已知影响面（已向用户同步，勿再"修复"）**：① 花生工具 `peanut-tool.html` 拿不到灌溉地块（改回手工填面积）；② 工作台「绘制边界」握手消失；③ `digital-agriculture/` 页面目录保留但灌溉侧无入口。这三条都是**用户拍板的剥离代价**，不是缺陷。
+
+---
+
+### 附：插件化阶段五参考（壳迁移模板与纪律，仍然有效）
+
+**已迁移**：管路拼装（v378，`plugins/pipe-assemble/`，折叠面板内入口样板）、**AI 规划（v381，`plugins/ai-plan/`，★独立窗口入口样板）**、水力校核（壳迁移 v377 + 真改造 v379：成为水力计算内核宿主）。**剩余**：滴灌带查询（`feat:''` 免费、无门控，最简单）→ 会员体系（卡在 §0 云函数拦截，待用户拍板架构路线，**不要自己动手改架构**）。
+
+**三套现成模板，按老入口形态三选一**（都在闸门看管下，别另起炉灶）：
+- 老入口 = 「更多 ▾」面板内按钮、**注入一次**（老模块自己 `injectNavButton`）→ 抄 `plugins/pipe-optim/`（`container` 定位原面板；参照 C22–C26 契约族）；
+- 老入口 = **顶级导航项**、由 `RyFnNav.render()` 渲染、**权益就绪会重渲染复活** → 抄 `plugins/hydraulics/`（条件 probe 等老项+锚点齐 → 摘除 + 抑制器 MutationObserver → `registerNav({ before })` 插回原位；参照 C35 / I27 / I28）；
+- 老入口 = **「更多 ▾」面板内项、由 `RyFnNav.render()` 渲染、会重渲染复活** → 抄 **`plugins/pipe-assemble/`**（= 上面两条的合体：`container: '.fn-more-panel'` + **`beforeLabel` 按文字落位** + 抑制器 + 门控；参照 C36 / I29–I31）。
+  ⚠ 面板项**不能用 CSS 选择器定位**：`runye-nav.js` 只打 `data-ry-navitem="1"`，且 `href` 随页面有无 `data-base` 在 `#xxx` / `index.html#xxx` 之间变 —— 只能按可见文字找（`core/ui-shell.js` 的 `anchorFor()`，含 `·锁` 归一化）。
+- **★ 老入口是 `win:1`（弹独立窗口）** → 抄 **`plugins/ai-plan/`**（参照 C39 / I36–I39）。
+  ⚠ 这一条最贵：把它写成 `location.assign(href)`，用户正在画的地块分区会在眼前被整页冲掉（v331 的「主窗口不受影响」当场作废）。必须复刻四步：**先 `runyeSaveProject(true)` 静默存档 → 写 `runye_aiplot_anchor_v1` 一次性锚 → `window.open(href,'runye_smart','width=1180,height=860')` → 被拦截才回落本页跳转**；且 href 必须原样带 `?smart=1`，少了 query 打开的就只是普通主页。
+- **多个插件锚同一个元素时**（如 ai-plan 与 hydraulics 都以「更多 ▾」为锚）→ **必须用 `beforeLabel` 指定彼此的相对顺序**。
+  ⚠ 「谁先挂载谁离锚点更近」——插件激活顺序不定，实测出现过导航顺序被倒置（智能规划跑到水力校核后面）。`core/ui-shell.js` 的 `anchorFor()` 现在是「`beforeLabel` 找不到才降级用 `before` 选择器」。
+
+**⛔ 壳迁移必须连会员门控一起搬**（v378 补的洞，别再漏）：老项若有 `feat`（如 `pro-others` / `hydraulic-check` = L2），插件必须把 `gate`/`onLocked` 传给 `registerNav`，且 `gate()` 要沿用 `runye-nav.js` 的**三态 fail-open**（权益层未加载 / `ready()===false` → 放行；拿到真相才严格判）。只搬入口不搬门控 = 老入口锁着、插件入口敞着，**付费功能对全员开放**。
+
+**必守流程**（每一轮都要，六步计划同样适用）：
+1. 迁移 = 壳（manifest.config 驱动，业务零改动，标签只认 `ctx.manifest.ui.nav.label`，禁在 main.js 写死 label）；
+2. 闸门 `_gate_plugins.cjs` 加契约 + **注入变异证明它拦得住**；`_smoke_plugins.cjs` 加真页面检查（跨导航断言必须在 Node 侧编排，`page.evaluate` 活不过导航）；
+3. `verify_nav_compact.js` 的 `WANT_ITEMS`/`WANT_PLUGINS` 期望同步（当前 **16 老项 + 9 插件项**，迁一个改一个；`MORE_WANT` 面板 11 项**顺序**不变也要复验）；`sw.js` 改了 CORE 白名单文件（含 `core/*.js` 全部、`runye-nav.js`）必升 `VERSION`，**新增插件还要把它的 manifest/main 登记进 CORE 列表**（否则 PWA 离线态取不到）。
+4. 全绿（插件闸门 **41 契约 + 40 变异** / 冒烟 **29 项** / verify_nav_compact / verify_nav_switch / verify_ry_tool 均 EXIT=0）→ 更新本文件 + 方案文档 §11.x/§12 + 工作日志。
+5. **冒烟踩坑**：面板内的插件项默认 `hidden`，puppeteer 的 `.click()` 会报 `Node is either not clickable` ⇒ 用 `page.evaluate(() => el.click())`；跨导航断言必须在 Node 侧编排（`page.evaluate` 活不过导航）。
+6. **闸门跑到一半被中断（超时/强杀/崩）后，第一件事跑 `node _check_unmutated.cjs`**（EXIT=0 才干净）。见 §7 作业纪律第 6 条 —— 变异是**就地改源码**的，中断会留下看起来完全正常的"被改坏"的源码。
+
+**⛔ 硬约束**：未经用户明确说「发布」，不做 CloudStudio 部署 / GitHub 推送 / Vercel——只允许本地编辑与本地操作。改 `.md` 一律用编辑工具（python 重写会被回滚）。
+
+**已知抖动**：verify_nav_compact M2 系曾出现一次「权益重渲染正好冲掉面板打开态」，已加重试兜底；若再现 M2b 红（panel.h=0）先怀疑重渲染时序，别急着改断言。
+
+**挂起的用户待办**（完成后提醒，勿代办）：① 登录存 5 条档案实测 `ry_kv` 找回；② 是否删 `index.html` 里 `<script src="pipe_optim_ui.js"></script>`；③ 发布指令；④ 会员云调用 `EXCEED_AUTHORITY` 架构路线三选一（§2 Q1 / §5）。会员体系的云函数调用被平台 `EXCEED_AUTHORITY` 环境级拦截（见 §0/§5，三条候选架构待用户拍板）。
 
 ---
 
@@ -163,6 +222,73 @@
 - 生产环境核查完毕（老版本 + 白名单缺失 + Vercel 后端健康）
 - 本地短信测试页 `cloud-sms-test.html` 已就绪并通过自检
 - **[v359] CloudBase SDK 自托管完成**（2026-10-10）：`pwa/vendor/cloudbase-js-sdk-3.8.2.bundle.js`（768KB，esbuild 打包自包含）；`cloudInit()` 就绪等待已修；闸门 `verify_ry_tool.js` 全部通过；三页面无头复测 PASS（0 jsdelivr 请求 + 匿名登录成功）。**至此会员链路在前端侧已无外部 CDN 依赖**，重测不会再卡在 `sdk_not_loaded`
+- **[v372 2026-10-11] 插件化阶段一上线**：`core/` 六模块 + `plugins.json` + 两个插件（hello-world 样板 / archive 业务样板）
+  + `PLUGIN_DEV.md`。`index.html` 只加了一行 `<script type="module" src="core/bootstrap.js?v=1">`，删掉即整体卸载。
+  **存储已定案走 `ry_kv`（`app.rdb()` + RLS）**，不再尝试云函数（见 §3.1，客户端一律被拦）。
+  闸门：`_gate_plugins.cjs`（13 契约 + 5 注入体检 + 还原复检，全绿）、`_smoke_plugins.cjs`（真实 index.html 冒烟）。
+  ⚠ **存量红灯**：`verify_nav_compact.js` / `verify_nav_switch.js` 在本次改动**前**就已报红（v346 导航收敛后未同步更新），已做 BEFORE/AFTER 对照确认非本次引入，需单独立项。
+- **[v373 2026-10-11] 插件化阶段二 ~ 四完成**：
+  + 阶段二 `plugins/bom/`（复用既有 BOM 内核 `RyMaterialAudit`，非重写）+ archive 插件扩展「实测反馈 / 偏差率」（红=超支、绿=节约）。
+  + 阶段三 `plugins/case-lib/`（相似案例检索 + P25/中位/P75 造价区间 + 报告导出；加权：面积 .4 / 作物 .25 / 区域 .2 / 水源 .15）。
+  + 阶段四 `plugins/pipe-optim/`：**老模块 `pipe_optim_ui.js` 一行业务逻辑都没改**，外面套壳接管入口 + 事件桥接 + 卸载还原。按钮落在**原容器** `fn-more-panel`（位置不变），无「双入口」。
+  + core 增强：`ui-shell` 导航项支持 `container`（自定义容器，被重建冲掉时退回主导航条，**入口不能丢**优先于位置一致）；`event-bus` 登记 `pipe-optim-export`。
+  + SW `VERSION` → `v373-plugin-pipeoptim`（**改 core 文件必须同步改，否则离线态取旧文件**）。
+  + 闸门扩到 **25 契约 + 17 组注入体检**（新增 C22–C26 / I13–I17），全绿；并实测「注入 I13 后 `EXITCODE=1`」证明闸门拦得住。真实页面冒烟 16 项全绿。
+  + ⚠ 两处新踩坑（已写进 `PLUGIN_DEV.md` §9）：① 卸载时**不许摘**老模块弹窗根节点（闭包仍握引用，摘了就「点了没反应」），只 `display:none`；② 等老模块就绪要**等条件**不要写死 sleep（实测 40×50ms ≈ 2317ms，闸门写死 2300ms 会差 17ms 假红）。
+  + 📌 **待用户决策**：① 登录态存 5 条档案后确认都能从 `ry_kv` 找回；② 是否删掉 `index.html` 里 `<script src="pipe_optim_ui.js">` 那一行、完全收归插件（现保留，可逆）。
+- **[v374 2026-10-11 晚] 阶段三补齐「参考方案」**：`core/data-service.js` 新增 `recommend()` ——
+  在 `findSimilar` 之上再给两层：逐管段 DN（首部/主管/支管按**相似度加权投票** `0.5+score`，附 confidence）
+  + 参考拓扑（干管/支管/滴灌带**亩均长度取中位**，不用均值）。case-lib 面板顶部渲染，只做参考、不写回、不改水力计算。
+  口径取舍：加权但留 0.5 底（不让单个高相似案例独断）；取中位（亩均样本长尾重，均值会被带偏）。
+  闸门 **27 契约 + 19 组注入体检**全绿（新增 C27/C28、I18/I19；C28 刻意让「中位 40 ≠ 首值 20 ≠ 均值 60」）。
+  SW `VERSION` → `v374-plugin-reco`。
+- **[v375 2026-10-11 晚] 阶段三第 3 项「水力参数反推」落地（opt-in 硬闸门）**：
+  + `core/data-service.js` 新增纯计算三件套 `hazenLoss()` / `invertHazenC()` / `hazenDefaults()`
+    （公式与 `hydraulic-calc/hc-core.js`、`index.html hazenWilliams()` 同源；默认 C 优先取 `window.C_HAZEN`）。
+  + 新插件 `plugins/calib/`：填 L/Q/D/实测 hf → 反推 C + 与默认 C 偏差 + 理论 vs 实测损失 + **口径文档**（Core 提供，与代码同源）。
+  + **opt-in 三条硬闸门**：勾选框默认不勾；未勾选点写入直接拒绝；勾选后**只写档案 `design.optimization.hazenC`**。
+    ⚠ 主程序 `C_HAZEN` / `hazenWilliams()` **没有任何插件能改** —— ctx 里根本没有这条通道（方案硬性要求）。
+  + 补掉阶段一验收第 4 项：C31 验证 `applyProject` 后主程序 `tlDiagramData` 真的被换成档案快照（此前只验了通道）。
+  + 闸门 → **30 契约 + 23 组注入体检**全绿；冒烟 18 项全绿。SW `VERSION` → `v375-plugin-calib`。
+  + ⚠ **本环境一个坑**：用 python 脚本重写 `.md` **会在下一轮被回滚**（进程内回读是有的、下一轮就没了）；
+    用 Edit/Write 工具写才持久。改文档一律用编辑工具，改完再 grep 复验。
+- **[v376 2026-10-11 晚] 存量红灯清零 + 顺带修掉两条真缺陷**（详见方案文档 §11.8）：
+  + **真缺陷 1 · 插件同名双入口**：bom 插件导航叫「材料清单」撞老导航同名项 → 改名「BOM 导出」；根因是标签写了**两份**（manifest + main.js 写死），archive/bom/case-lib 三个插件统一改为只认 `ctx.manifest.ui.nav.label`；
+  + **真缺陷 2 · 面板锚点 href 漏 `#`**：`runye-nav.js` 拼 `root + base + hash`，主页 `index.html` 无 `data-base` ⇒ `href="detailsSection"`（相对路径）→ 解锁态点「更多 ▾」面板项**跳 404 而不是跳锚点**；且 `mod/inline-18.js` 的事后改写会被权益就绪触发的 `RyFnNav.render()` 重建冲掉（**时好时坏**）。已修为 `root + (base || '#') + it.hash`；
+  + **两条红灯闸门复活**：`verify_nav_compact.js`（根因：v344 起裸 index.html 跳 `?smart=1`，CSS 把 `.fn-nav` 藏了 → 过去整份闸门在量隐藏导航条、0==0 空过；改走 `?full=1&rymock=L2` + 新增 Z 项反空过前置断言 + 期望按 v346 后现状更新）、`verify_nav_switch.js`（导航脚本已抽成 `mod/inline-18.js`，按文件定位；`rySetTab` 在 `mod/inline-09.js`）。**都做了注入体检证明拦得住**；
+  + 插件闸门 → **32 契约 + 25 变异**全绿（新增 C32 同名双入口 / C33 标签单一来源，变异 I24/I25）；真页面冒烟 **19 项**全绿（新增真页面同名双入口体检）；`verify_ry_tool.js` EXIT=0。SW `VERSION` → `v376-nav-href-fix`（改 `runye-nav.js` 必须升，它在 SW CORE 白名单里）。
+  + **§7 开源本地准备（未发布）**：新增 `plugins/_template/`（manifest + main.js + style.css 三件齐、逐行中文注释，复制改名即用；受 C34/I26 闸门看管）；README 增补「插件生态」章节 + **安全声明（Trust-by-code）**（§7 第 4 条要求写进开源 README 的那条）；PLUGIN_DEV.md 快速起步改为「先复制模板」。闸门 → **33 契约 + 26 变异**全绿。
+- **[v377 2026-10-11 深夜] 阶段五壳迁移打样：水力校核 → `plugins/hydraulics/`**（详见方案文档 §11.9）：
+  + **迁移形态**：水力校核是独立页面 + 顶级导航项，与 pipe-optim（面板按钮、注入一次）不同 —— 老项由 `RyFnNav.render()` 渲染、**权益就绪会重渲染复活**。方案 = 条件 probe 等老项 + 摘除 + **抑制器 MutationObserver**（复活一次摘一次）+ `deactivate` 按存根插回原位。业务零改动（href 都在 manifest.config 里）。
+  + **core 增强**：`ui-shell.js` ① `placeIn` 支持 `item.before`（CSS 选择器锚点，插到命中兄弟之前）；② mountNavs 对「锚点暂缺」做**有界重试**（≤20 帧）再退 appendChild —— 真页面权益重渲染分块重建，重挂载常跑在「更多 ▾」重建完成之前。
+  + **runye-nav.js 增强**：`mount()` 重渲染会把老项逐个 appendChild 到末尾、把第三方项（插件/会员徽标）挤到后面 —— 末尾按原相对顺序把它们移回「更多 ▾」之前。
+  + **插件侧真 bug（闸门 C35 抓到）**：hydraulics 模块级 `stopped` 在 deactivate 后不复位，ES 模块只加载一次 ⇒ 第二次 activate 全短路。已在 activate 开头复位状态。
+  + **闸门**：34 契约 + 28 变异全绿（新增 C35 接管+原位+复活抑制、C32 升级为轮询等 7 项导航齐再查同名；I27 matchLabel 写错→C32+C35 双红、I28 core before 失效→C35 红）。真页面冒烟 **23 项**全绿（新增 hydraulics 激活 / 接管+位置 / Node 侧点击→真跳 `runye-hydraulics.html`）。`verify_nav_compact` 期望同步 18 老项 + 7 插件项 + M2 重试消抖；href 注入复检 EXIT=1 拦截有效。`verify_ry_tool` EXIT=0。SW `VERSION` → `v377-plugin-hydraulics`（改 core/ui-shell.js + runye-nav.js 必须升）。
+  + **遗留抖动记录**：verify_nav_compact M2 曾出现一次「权益重渲染正好冲掉打开态」（panel.h=0），已加重试兜底；若再现红色 M2b 先怀疑重渲染时序，别急着改断言。
+
+- **[v378 2026-10-11 深夜] 阶段五第 2 项：管路拼装 → `plugins/pipe-assemble/`**（详见方案文档 §11.10）：
+  + **形态**：独立页面 `管路接驳拼装.html` + 入口在「更多 ▾」**面板内**（`MORE_ITEMS`），由 `RyFnNav.render()` 渲染、**权益就绪会重渲染复活** ⇒ 走「hydraulics 的抑制器 + pipe-optim 的 container」合体方案。
+  + **core 增强（core/ui-shell.js）**：① 抽出 `anchorFor()` —— 落位锚点两种写法共用：`before`（CSS 选择器）/ **`beforeLabel`（按可见文字找兄弟，含 `·锁` 归一化）**，20 次有界重试也共用它；面板项只有 `data-ry-navitem="1"`、`href` 还随页面有无 `data-base` 变，只能按文字定位。② 导航项支持 **`gate` / `onLocked`**（会员门控透传）：锁定态显示「原名 ·锁」+ `data-ry-locked`，且 **gate 在点击那一刻重算**（不是挂载那一刻）；③ 新增 `refreshNavs()`（权益变化后刷新锁定态，不重建节点）。
+  + **★ 补掉 v377 遗留缺陷**：壳迁移只搬了入口、**没搬会员门控** —— 老项 `feat='pro-others'/'hydraulic-check'`（L2）在老入口带「·锁」+升级引导，换成插件导航后闸没了 = **付费功能对全员开放**。hydraulics 与 pipe-assemble 一并接回，`gate()` 沿用 `runye-nav.js` 的三态 fail-open（未加载/未就绪→放行，拿到真相才严格判）。真页面实测：接管后插件项文本为「水力校核 ·锁」「管路拼装 ·锁」（v377 时是无锁的，洞确实存在）。
+  + **闸门**：**35 契约 + 31 变异**全绿（新增 C36：接管 + 面板内原位 + 复活抑制 + **门控行为体检**（造「已确认无权限」权益层断言真变锁定态；**不点按钮** —— 门控若失效会真跳页、把整轮闸门带崩）；I29 matchLabel 写错→C32+C36、I30 core beforeLabel 失效→C36、I31 门控被摘→C36）。真页面冒烟 **26 项**全绿（新增 pipe-assemble 激活 / 面板内原位置（前=系统图、后=经济指标分析）/ DOM click → 真跳 `管路接驳拼装.html`）。`verify_nav_compact` 期望同步 **17 老项 + 8 插件项**（M2 面板 11 项顺序不变）；`verify_nav_switch` / `verify_ry_tool` EXIT=0。SW `VERSION` → `v378-plugin-pipeassemble`。
+  + **§6 余量**：滴灌带查询（`feat:''` 免费、无门控，比本次更简单）→ AI 规划 → 会员体系。
+- **[v381 2026-10-12 早晨] 阶段五第 3 项：智能规划 → `plugins/ai-plan/`**（详见方案文档 §11.12）：
+  + **形态**：`runye-ai-plan.js`（82KB）由主页第 19 行同步加载、业务零改动；入口是 `runye-nav.js` ITEMS 第一条，而它是 **`win:1` 独立窗口**语义 —— 与前三个迁移都不一样。
+  + **★ 最贵的一条**：`open()` 逐行复刻老入口的四步（静默存档 → 写 `runye_aiplot_anchor_v1` 锚 → `window.open(href,'runye_smart','width=1180,height=860')` → 被拦截才回落本页跳转）。写成 `location.assign` 会让用户正在画的地块分区被整页冲掉（v331 要求当场作废）。href 必须原样带 `?smart=1`。
+  + **门控**：`feat:'ai-plan'`（L1），沿用三态 fail-open。第二个入口 `#ppAiPlan`（老设计方案区块内按钮，带参数快照）**不接管**，两套入口不打架。
+  + **顺带登记复用通道**：`window.RyAiPlan` 已挂好（Node 也能 require），插件只暴露 `kernel()/kernelReady()/provenance()`，不重复实现。
+  + **踩坑（真缺陷，已修）**：ai-plan 与 hydraulics 都锚 `.fn-more` 时，**谁先挂载谁离锚点更近**，而插件激活顺序不定 ⇒ 导航顺序被倒置（智能规划跑到水力校核后面，C35 当场红）。修法：`beforeLabel: '水力校核'` + core `anchorFor()` 支持「`beforeLabel` 没命中才降级用 `before` 选择器」。
+  + **闸门**：**38 契约 + 39 变异**全绿。新增 **C39**（接管 + 原位 + 抑制 + **弹窗语义**：stub `window.open` 后点击，断言 open 只调一次、url/窗名/尺寸全对、存档被调用、锚点已写、本页未跳转、回落分支仍在）+ **I36–I39**（匹配串/降级成本页跳转/href 丢 smart=1/不存档）均验证拦得住。真页面冒烟 **29 项**全绿（新增两条：老项已摘且插回「更多 ▾」前；点击确实走 window.open 且参数全对）。`verify_nav_compact` 期望同步 **16 老项 + 9 插件项**（DOM 顺序实测 `ai-plan → hydraulics` ✓）。SW `VERSION` → `v381-plugin-aiplan` 并把 ai-plan 两文件登记进 CORE。
+  + **本轮顺带修掉闸门自身的两个缺陷**（都会产出假信号，详见 §7 第 6/7 条）：① 变异还原改到 `finally`（以前抛错就不还原，留下"被改坏但仍能跑"的源码）；② 「回初始态」改 `goto(GATE_URL)`（以前 `page.reload()` 会停在被上一条带跑的页面上，造成最后两条变异连续超时 + 整轮慢到十几分钟）。另新增 `node _check_unmutated.cjs` 作为中断后的源码体检。
+  + **§6 余量**：滴灌带查询（`feat:''` 免费、无门控）→ 会员体系。
+
+- **[v379 2026-10-12 凌晨] 水力校核「真改造」：从壳变成水力计算内核宿主**（详见方案文档 §11.11）：
+  + **为什么必须改**：主页 `index.html` **不加载** `hydraulic-calc/hc-core.js` 等三件套（只有 `runye-hydraulics.html` 自己用 `<script>` 加载），且插件体系只在主页跑 ⇒ 主页上下文里**根本没有这套内核**。后果是 `core/data-service.js` 的 `hazenLoss` 只能走 v375 抄进去的那份内置实现，**口径回到两份**。
+  + **做了什么**：① `plugins/hydraulics/main.js` 新增串行加载器（`hc-core.js → design-core.js → runye-hydraulics-core.js`，**顺序敏感**：design-core 构造时取 `root.RyHcCore`，hydraulics-core 缺前两者直接 throw），站点根由 `import.meta.url` 反推（防子目录页解析错），等条件不等 sleep，60×50ms 上限，并发共享 promise，失败 fail-open（只 reportError，入口照常可用）；② 加载完 emit 新事件 `hydraulics-core-ready`；③ 通过 api 暴露 `loadCore / coreReady / hazen / christiansenF / compute` 给其它插件用，返回 `null` 表示「内核没到」（不许造一个看起来合理的假数）。
+  + **消灭口径双份**：`core/data-service.js` 的 `hazenLoss` 改为**优先调用** `RyHcCore.hazen()`，没内核才用内置兜底；`hazenDefaults()` 新增 `engine: 'hc-core' | 'builtin'` 字段明示「这个数是哪来的」（UI/归档能答）。已用 Node 交叉校验：内核与内置式在 L/Q/D/C 全组合下**相对偏差 = 0**。
+  + **闸门**：**37 契约 + 35 变异**全绿。新增 **C37**（口径单一来源四条硬断言：无内核兜底能算 / 忠实内核逐值相等 / **挂一个返回值=3.7 的伪装内核，data-service 必须跟着变** ← 唯一能证明「确实在调内核而非各写一份」的断言 / 内核返 0 或 NaN → null）+ **C38**（hydraulics 真把三内核请进主页并能算，含独立手算交叉校验）。变异 **I32**（口径退回自抄）/ **I33**（engine 写死）/ **I34**（关 autoloadCore）/ **I35**（串行链被短路）均验证拦得住。真页面冒烟 **27 项**全绿（新增：三内核齐 + hazen 与手算一致 + Christiansen F 可算 + `engine==='hc-core'`）。SW `VERSION` → `v379-plugin-hydcore`。
+  + ⚠ **踩坑两条**（都写进代码注释）：① `alreadyInPage()` 用「页面里有没有这个 `<script>` 标签」判断是否补载是错的 —— **标签在 ⇏ 全局在**（脚本报错/被移除/测试里被手动删过），会白等到超时；判据只能用目标全局是否出现，拿不到就重新注入（UMD 重挂 global 无副作用）。② 写 C38 时**不能**在里面主动调 `api.loadCore()` —— 否则 I34（关掉 autoload）会被"救活"，闸门再也区分不了「自动加载」与「有人替它加载」。
+  + **§6 余量**：滴灌带查询（`feat:''` 免费、无门控，最简单）→ AI 规划 → 会员体系。
 
 ### 🔄 进行中 —— 会员跑通（用户当前主要要求）
 **唯一未知数**：手机号登录后能否调通云函数？需要用户跑一次实测：
@@ -217,6 +343,21 @@
    （只写"有个 404"无法判断是否要紧，例如 favicon 的 404 就无关）。
 5. **给用户的操作步骤要"别让我点来点去"**：用户已明确要求尽量少手工操作。
    能用脚本探测的先探测，能把结论自动打印出来的就自动打印。
+6. **[v381] 闸门被中断 ≠ 源码干净 —— 必跑 `_check_unmutated.cjs`**。
+   注入体检是**就地改源码**再跑的（写变异 → reload → 跑契约 → 还原）。
+   一旦中断在「已写入变异、尚未还原」这一步，源码就停在变异态，
+   而它看起来就是一份正常源码：能读、能编译、页面能跑，只是行为被悄悄改了。
+   2026-10-12 实测踩到两次：`plugins/ai-plan/manifest.json` 被留在
+   `href` 丢 `?smart=1` + `saveProject:false` 的状态下，整整一轮没人发现。
+   现已在闸门里加 `finally` 还原兜底（抛错也还原），另配 `node _check_unmutated.cjs`
+   作为外部核查。⇒ **中断后先体检，再谈别的。**
+7. **[v381] 「变异体检超时」先怀疑页面被上一条带跑了，别急着改断言**。
+   闸门里凡是「回到初始态」都必须 `goto(GATE_URL)`，**不能 `page.reload()`** ——
+   reload 重载的是当前 URL；若有契约/变异把页面导航走了（实测：I37 把 ai-plan 的
+   `mode` 改成 navigate，C39 那次点击就真的跳到了 index.html），
+   后续所有 reload 都停在 index.html 上，`__bootReady` 永远等不到，
+   表现是「最后两条变异连续超时 + 整轮慢到十几分钟」，很像"变异有毒"，其实不是。
+   闸门已加自救日志：发现不在闸门页会打印 `[闸门自救]`。
 
 ### 🔒 发布纪律（**重要**）
 **改完文件不要自动发布。** 本地改动 + 本地 `git commit` 可以，
@@ -230,3 +371,12 @@
 > 正解是**让用户用手机号登录**，这一步还没实测过。
 > 请先陪用户跑一遍 `cloud-sms-test.html`；
 > 迁移架构、AI 接口开放度、白名单这几件事，**等用户拍板，别自己动手**。
+>
+> **2026-10-11 深夜补注（v378）**：插件化已推进到阶段五第 2 项（水力校核 + 管路拼装壳迁移完成，35 契约+31 变异、真页面冒烟 26 项全绿）。
+> 当前主线 = §6 剩余老模块迁移（滴灌带查询 → AI 规划 → 会员体系），从「▶ 当前任务」一节开工。
+> ⚠ 壳迁移务必连**会员门控**一起搬（v378 补的洞：只搬入口会让 L2 付费功能对全员开放）。
+> 云函数拦截问题依旧挂起（见 §0），等用户拍板架构路线。
+
+> **2026-10-12 补注（v382，主线已切换）**：插件化阶段五已完成 4 项（+ ai-plan v381：38 契约+39 变异、冒烟 29 项全绿）。
+> **当前主线 = 数据资产化主链路收口（方案文档 §12 六步计划）**：Step -1 数字农业完全剥离已交付（41 契约+40 变异全绿，含 C40/I40 与一个值得记住的假绿教训），**下一步 = Step 0 land-store 加壳**，从「▶ 当前任务」一节开工。
+> ⚠ 三条已向用户同步的剥离影响（花生工具手工填面积、工作台握手消失、页面目录保留无入口）**是拍板代价不是缺陷，勿"修复"**。

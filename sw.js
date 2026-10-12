@@ -1,11 +1,54 @@
 /* Runye PWA v1. Increment VERSION when changing the offline shell. */
 'use strict';
-const VERSION = 'v371b-entitle-http';
+/* VERSION 沿革：v380-cache-fix（另一会话的缓存修复）→ v381-plugin-aiplan（本次新增 ai-plan
+   插件 + core/data-service.js、core/event-bus.js、core/ui-shell.js 均在 CORE 白名单内，必须抬版本，
+   否则离线态会取旧文件）→ v382-da-decouple（数字农业与灌溉工具完全剥离：
+   删桥接层文件及其在 index.html 的引入与调用点，CORE 列表同步移除该项）→
+   v383-thin-scrollbar（两项：① 用户要求全站滚动条最窄最短——runye-theme.css 删除压制自定义的
+   标准属性 scrollbar-width（有头实测 Chrome/143 下 thin=10px、默认=15px、仅 webkit 4px=4px），
+   全局 webkit 4px 半透明灰圆角丸，mod/style-01/02/05.css、filter-system、network-editor.css 的
+   5px 覆盖同步对齐；② 用户要求「管网装配（平面图）」功能全部取消——network-editor.js
+   EDITOR_OFF 总开关置 true，卡片/叠加层/观察器整体下线。以上均在 CORE 白名单内，必须抬版本）。 */
+const VERSION = 'v383-thin-scrollbar';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
 const RUNTIME_CACHE = PREFIX + VERSION + '-runtime';
 const CORE = [
+  /* [插件化阶段一 2026-10-11] 插件体系静态资源。
+     ★ 新增插件必须同步登记到本列表，否则 PWA 离线态取不到（在线仍可用：本 SW 为 network-first）。
+     ★ 注意：key() 会抹掉 ?v= 查询串，因此带版本号破缓存与这里的登记互不冲突。 */
+  "plugins.json",
+  "core/bootstrap.js",
+  "core/loader.js",
+  "core/event-bus.js",
+  "core/data-service.js",
+  "core/ui-shell.js",
+  "core/runtime-guard.js",
+  "plugins/hello-world/manifest.json",
+  "plugins/hello-world/main.js",
+  "plugins/archive/manifest.json",
+  "plugins/archive/main.js",
+  "plugins/archive/style.css",
+  "plugins/bom/manifest.json",
+  "plugins/bom/main.js",
+  "plugins/bom/style.css",
+  "plugins/case-lib/manifest.json",
+  "plugins/case-lib/main.js",
+  "plugins/case-lib/style.css",
+  "plugins/pipe-optim/manifest.json",
+  "plugins/pipe-optim/main.js",
+  "plugins/calib/manifest.json",
+  "plugins/calib/main.js",
+  "plugins/calib/style.css",
+  /* [v377] 水力校核壳迁移插件 */
+  "plugins/hydraulics/manifest.json",
+  "plugins/hydraulics/main.js",
+  "plugins/pipe-assemble/manifest.json",
+  "plugins/pipe-assemble/main.js",
+  /* [v381] 智能规划壳迁移插件（独立窗口入口） */
+  "plugins/ai-plan/manifest.json",
+  "plugins/ai-plan/main.js",
   /* [v357] 单文件拆分产物 */
   "mod/inline-01.js",
   "mod/inline-02.js",
@@ -59,7 +102,6 @@ const CORE = [
   "runye-ai-plan.js",
   "runye-ai-plan.css",
   "runye-ai-chat-test.html",
-  "irrigation-bridge.js",
   "iso-diagram/editor.js",
   "iso-diagram/iso-diagram.css",
   "iso-diagram/iso-diagram.js",
@@ -106,6 +148,7 @@ const CORE = [
   "runye-nav.css",
   "runye-nav.js",
   "runye-theme.css",
+  "runye-typography.css",
   "terrain/index.html",
   "terrain/terrain-core.js",
   "terrain/terrain-ui.js",

@@ -1,0 +1,192 @@
+/* plugins/archive/style.css —— 类名一律 archive- 前缀，绝不覆盖主程序与其他插件 */
+
+.archive-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 9997;
+  width: 340px;
+  max-height: 70vh;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #d8dee6;
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(15, 32, 56, .16);
+  padding: 12px 14px;
+  font: 13px/1.6 system-ui, -apple-system, "Microsoft YaHei", sans-serif;
+  color: #1f2b3d;
+}
+
+.archive-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.archive-mode {
+  margin-left: auto;
+  font-size: 12px;
+  color: #6b7787;
+  background: #f2f5f9;
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.archive-x {
+  border: 0;
+  background: transparent;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  color: #8a95a5;
+  padding: 0 2px;
+}
+
+.archive-row {
+  margin-bottom: 8px;
+}
+
+.archive-label {
+  display: block;
+  font-size: 12px;
+  color: #6b7787;
+  margin-bottom: 3px;
+}
+
+.archive-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #d8dee6;
+  border-radius: 6px;
+  padding: 5px 8px;
+  font: inherit;
+  color: inherit;
+  background: #fff;
+}
+
+.archive-input:focus {
+  outline: none;
+  border-color: #4a7cf7;
+}
+
+.archive-btns {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.archive-btn {
+  flex: 1;
+  border: 1px solid #d8dee6;
+  background: #fff;
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.archive-btn.primary {
+  background: #2f6fed;
+  border-color: #2f6fed;
+  color: #fff;
+}
+
+.archive-btn:hover {
+  filter: brightness(1.04);
+}
+
+.archive-list {
+  border-top: 1px solid #eef1f5;
+  padding-top: 8px;
+}
+
+.archive-empty {
+  color: #8a95a5;
+  text-align: center;
+  padding: 12px 0;
+}
+
+.archive-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px dashed #eef1f5;
+}
+
+.archive-item-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.archive-item-title {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.archive-item-sub {
+  font-size: 12px;
+  color: #8a95a5;
+}
+
+.archive-item-ops {
+  display: flex;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.archive-mini {
+  border: 1px solid #d8dee6;
+  background: #fff;
+  border-radius: 5px;
+  padding: 3px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.archive-mini.danger {
+  color: #c0392b;
+  border-color: #f0c8c2;
+}
+
+/* 实测反馈区块 */
+.archive-fb {
+  background: #f8fafc;
+  border: 1px dashed #d8dee6;
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin: 0 0 8px;
+}
+
+.archive-fb-hint {
+  font-size: 12px;
+  color: #6b7787;
+  margin-bottom: 6px;
+}
+
+textarea.archive-input {
+  resize: vertical;
+  min-height: 40px;
+}
+
+/* 偏差率标签：超支=红（中国习惯：增=红），节约=绿 */
+.archive-dev {
+  display: inline-block;
+  font-size: 12px;
+  border-radius: 4px;
+  padding: 0 6px;
+  margin-top: 2px;
+}
+
+.archive-dev.over {
+  color: #c0392b;
+  background: #fdecea;
+}
+
+.archive-dev.under {
+  color: #1e8e3e;
+  background: #e8f5ec;
+}

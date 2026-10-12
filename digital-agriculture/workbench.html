@@ -4,13 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>数字农业工作台 · 地块全周期管理｜润野灌溉</title>
-<link rel="stylesheet" href="../runye-theme.css">
 <style>
   :root{
-    --g-50:#f0fdf4;--g-100:#dcfce7;--g-200:#bbf7d0;--g-500:#22c55e;--g-600:#16a34a;--g-700:#15803d;--g-800:#166534;--g-900:#14532d;
-    --teal:#0d9488;--teal-700:#0f766e;
-    --s-50:#f8fafc;--s-100:#f1f5f9;--s-200:#e2e8f0;--s-300:#cbd5e1;--s-400:#94a3b8;--s-500:#64748b;--s-600:#475569;--s-700:#334155;--s-800:#1e293b;
-    --line:#e2e8f0;--radius:14px;--radius-sm:10px;--shadow:0 2px 8px rgba(15,23,42,.06);--shadow-md:0 6px 20px rgba(15,23,42,.10);
+    --g-50:var(--ry-green-50);--g-100:var(--ry-green-100);--g-200:var(--ry-green-200);--g-500:var(--ry-green-500);--g-600:var(--ry-green-600);--g-700:var(--ry-green-700);--g-800:var(--ry-green-800);--g-900:var(--ry-green-900);
+    --teal:var(--ry-teal);--teal-700:var(--ry-teal-700);
+    --s-50:var(--ry-s-50);--s-100:var(--ry-s-100);--s-200:var(--ry-s-200);--s-300:var(--ry-s-300);--s-400:var(--ry-s-400);--s-500:var(--ry-s-500);--s-600:var(--ry-s-600);--s-700:var(--ry-s-700);--s-800:var(--ry-s-800);
+    --line:var(--ry-s-200);--radius:14px;--radius-sm:10px;--shadow:0 2px 8px rgba(15,23,42,.06);--shadow-md:0 6px 20px rgba(15,23,42,.10);
     --maxw:1280px;--font:"Microsoft YaHei","PingFang SC","Segoe UI",system-ui,-apple-system,sans-serif;
   }
   *{box-sizing:border-box;margin:0;padding:0;}
@@ -114,10 +113,10 @@
   .wb-land-card .lc-row b{color:var(--s-800);font-weight:600;}
 
   /* 地块图形看板卡片 */
-  .wb-land-card .lc-svg-wrap{background:#f8fafc;border:1px solid var(--line);border-radius:var(--radius);padding:8px;margin:10px 0;display:flex;align-items:center;justify-content:center;min-height:140px;}
+  .wb-land-card .lc-svg-wrap{background:var(--ry-s-50);border:1px solid var(--line);border-radius:var(--radius);padding:8px;margin:10px 0;display:flex;align-items:center;justify-content:center;min-height:140px;}
   .wb-land-card .lc-svg-wrap svg.lc-svg{width:100%;height:auto;display:block;}
   .wb-land-card .lc-svg-empty{color:var(--s-400);font-size:12px;text-align:center;padding:18px 8px;}
-  .lc-svg-wrap{background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:8px;margin:10px 0;display:flex;align-items:center;justify-content:center;min-height:140px;}
+  .lc-svg-wrap{background:var(--ry-s-50);border:1px solid var(--line);border-radius:10px;padding:8px;margin:10px 0;display:flex;align-items:center;justify-content:center;min-height:140px;}
   .lc-svg-wrap svg{width:100%;height:auto;display:block;}
   .lc-svg-empty{color:var(--s-400);font-size:12px;text-align:center;padding:18px 8px;}
   .wb-land-card .lc-stage{margin-top:8px;font-size:12px;color:var(--s-600);line-height:1.55;}
@@ -137,7 +136,7 @@
   .wb-back:hover{text-decoration:underline;}
 
   /* 决策卡 */
-  .wb-decision{background:linear-gradient(135deg,#f0fdf4,#ecfeff);border:1px solid var(--g-200);border-radius:14px;padding:16px 18px;margin:14px 0;display:flex;flex-wrap:wrap;gap:20px;align-items:center;}
+  .wb-decision{background:linear-gradient(135deg,var(--ry-green-50),#ecfeff);border:1px solid var(--g-200);border-radius:14px;padding:16px 18px;margin:14px 0;display:flex;flex-wrap:wrap;gap:20px;align-items:center;}
   .wb-decision .dc-block{min-width:120px;}
   .wb-decision .dc-label{font-size:12px;color:var(--s-500);margin-bottom:2px;}
   .wb-decision .dc-phase{font-size:15px;font-weight:800;color:var(--g-700);}
@@ -150,7 +149,7 @@
   .tl-card{background:#fff;border:1px solid var(--g-200);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:6px;transition:box-shadow .15s,transform .15s;}
   .tl-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.08);}
   .tl-card.tl-passed{background:var(--g-50);border-color:var(--g-200);}
-  .tl-card.tl-active{border-color:#22c55e;background:#f0fdf4;box-shadow:0 0 0 1px #22c55e;}
+  .tl-card.tl-active{border-color:var(--ry-green-500);background:var(--ry-green-50);box-shadow:0 0 0 1px var(--ry-green-500);}
   .tl-card-head{display:flex;justify-content:space-between;align-items:center;gap:8px;}
   .tl-card-date{font-size:13px;font-weight:800;color:var(--g-800);}
   .tl-card-win{font-size:11px;color:var(--s-500);background:var(--s-50);padding:2px 6px;border-radius:4px;white-space:nowrap;}
@@ -165,7 +164,7 @@
   .wx-panel{background:#fff;border:1px solid var(--g-200);border-radius:12px;padding:14px;margin:12px 0;}
   .wx-title{font-size:15px;font-weight:700;color:var(--g-800);margin:0 0 10px;display:flex;align-items:center;justify-content:space-between;}
   .wx-sub{font-size:12px;color:var(--s-500);font-weight:400;}
-  .wx-yesterday{display:flex;gap:12px;flex-wrap:wrap;align-items:center;background:linear-gradient(135deg,#f0fdf4,#ecfeff);border:1px solid var(--g-200);border-radius:12px;padding:14px;margin:12px 0;}
+  .wx-yesterday{display:flex;gap:12px;flex-wrap:wrap;align-items:center;background:linear-gradient(135deg,var(--ry-green-50),#ecfeff);border:1px solid var(--g-200);border-radius:12px;padding:14px;margin:12px 0;}
   .wx-yesterday .wx-loc{min-width:180px;}
   .wx-yesterday h3{margin:0 0 2px;font-size:15px;color:var(--g-800);}
   .wx-yesterday .wx-date{font-size:12px;color:var(--s-500);}
@@ -174,14 +173,14 @@
   .wx-yesterday .wx-item-label{font-size:11px;color:var(--s-500);margin-bottom:2px;}
   .wx-yesterday .wx-item-val{font-size:18px;font-weight:800;color:var(--g-700);}
   .wx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin:12px 0;}
-  .wx-card{background:#f8fafc;border:1px solid var(--g-200);border-radius:10px;padding:12px;text-align:center;}
+  .wx-card{background:var(--ry-s-50);border:1px solid var(--g-200);border-radius:10px;padding:12px;text-align:center;}
   .wx-card .wx-card-label{font-size:12px;color:var(--s-500);margin-bottom:4px;}
   .wx-card .wx-card-val{font-size:17px;font-weight:800;color:var(--g-700);line-height:1.2;}
   .wx-card .wx-card-unit{font-size:12px;color:var(--s-400);margin-left:2px;}
-  .wx-card.warn .wx-card-val{color:#dc2626;}
+  .wx-card.warn .wx-card-val{color:var(--ry-danger);}
   .wx-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px;}
   .wx-table th,.wx-table td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:center;white-space:nowrap;}
-  .wx-table th{background:#f8fafc;color:var(--s-600);font-weight:600;position:sticky;top:0;}
+  .wx-table th{background:var(--ry-s-50);color:var(--s-600);font-weight:600;position:sticky;top:0;}
   .wx-table td{color:var(--s-800);}
   .wx-table .wx-td-left{text-align:left;}
   .wx-scroller{max-height:360px;overflow:auto;border:1px solid var(--line);border-radius:8px;}
@@ -205,7 +204,7 @@
   .wb-detail-title .wb-section-title{margin:0 0 4px;padding-left:12px;border-left:4px solid var(--g-600);}
   .wb-detail-title .wb-muted{margin:0;line-height:1.8;}
   .wb-detail-title .wb-muted .wb-date-tag{background:var(--g-50);border:1px solid var(--g-200);padding:2px 8px;font-size:12px;font-weight:700;color:var(--g-700);display:inline-flex;align-items:center;vertical-align:middle;}
-  .wb-header-weather{background:linear-gradient(135deg,#f0fdf4,#ecfeff);border:1px solid var(--g-200);border-radius:12px;padding:10px 14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;min-width:280px;max-width:520px;}
+  .wb-header-weather{background:linear-gradient(135deg,var(--ry-green-50),#ecfeff);border:1px solid var(--g-200);border-radius:12px;padding:10px 14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;min-width:280px;max-width:520px;}
   .wb-header-weather .wh-loc{min-width:140px;}
   .wb-header-weather .wh-loc h3{margin:0 0 2px;font-size:14px;color:var(--g-800);}
   .wb-header-weather .wh-date{font-size:11px;color:var(--s-500);}
@@ -235,7 +234,7 @@
   .rt-灌溉{background:#eff6ff;color:#1d4ed8;}
   .rt-耕作{background:#fff7ed;color:#c2410c;}
   .rt-采收{background:#faf5ff;color:#7e22ce;}
-  .rt-长势{background:#f0fdf4;color:#15803d;}
+  .rt-长势{background:var(--ry-green-50);color:var(--ry-green-700);}
   .wb-rec-meta{font-size:13px;color:var(--s-600);}
   .wb-rec-meta b{color:var(--s-800);}
   .wb-rec-remark{font-size:12px;color:var(--s-500);margin-top:4px;}
@@ -399,7 +398,7 @@
   .wb-pmeta{width:100%;font-size:11px;color:var(--s-400,#8aa0a0);}
   .wb-mkt{margin:6px 0 2px;padding-top:6px;border-top:1px dashed #eef2ee;}
   .wb-mkt-row{display:flex;align-items:baseline;gap:6px;padding:2px 0;font-size:12px;}
-  .wb-more{font-size:12px;font-weight:600;color:var(--g-600,#16a34a);text-decoration:none;margin-left:8px;white-space:nowrap;}
+  .wb-more{font-size:12px;font-weight:600;color:var(--g-600,var(--ry-green-600));text-decoration:none;margin-left:8px;white-space:nowrap;}
   .wb-more:hover{text-decoration:underline;}
   .wb-mkt-m{color:#334;flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .wb-mkt-p{color:var(--g-700,#2e7d52);font-weight:600;white-space:nowrap;}
@@ -630,7 +629,7 @@
   }
   .wb-decision{
     background:#f7fff9;
-    border-color:#bbf7d0;
+    border-color:var(--ry-green-200);
     border-radius:8px;
     padding:14px;
     margin:12px 0;
@@ -689,7 +688,7 @@
   .wb-dcard-h{
     font-size:13px;
     padding:9px 12px;
-    background:#f8fafc;
+    background:var(--ry-s-50);
   }
   .wb-dcard-b{
     padding:12px;
@@ -708,6 +707,8 @@
 
 </style>
 <script src="qicai-huasheng/schedule-core.js"></script>
+    <link rel="stylesheet" href="../runye-theme.css?v=1">
+  <link rel="stylesheet" href="../runye-typography.css?v=1">
 </head>
 <body>
 
@@ -2689,7 +2690,7 @@ function compressPhotoToDataURL(file, maxWidth, cb){
       if(w>maxWidth){ h=Math.round(h*maxWidth/w); w=maxWidth; }
       canvas.width=w; canvas.height=h;
       var ctx=canvas.getContext('2d');
-      ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h);
+      ctx.fillstyle='#fff'; ctx.fillRect(0,0,w,h);
       ctx.drawImage(img,0,0,w,h);
       cb(canvas.toDataURL('image/jpeg',0.85));
     };

@@ -1,10 +1,36 @@
 
 (function(){
+  function resolvePlotRef(d){
+    if(!d || !d.ryPlotRef) return d;
+    var ref=d.ryPlotRef;
+    if(!ref || !ref.id) throw new Error('地图回传地块引用缺少 id');
+    var lib=[];
+    try{ lib=JSON.parse(localStorage.getItem('runye_plot_library')||'[]'); }catch(e){ throw new Error('地块库数据无法读取'); }
+    var p=Array.isArray(lib)?lib.find(function(x){return String(x.id)===String(ref.id);}):null;
+    if(!p) throw new Error('地块库中找不到地块 '+ref.id+'，请回地图重新回传');
+    var ring=Array.isArray(p.polyLatLng)?p.polyLatLng:null;
+    if((!ring || ring.length<3) && p.geojson){
+      try{
+        var g=typeof p.geojson==='string'?JSON.parse(p.geojson):p.geojson;
+        var geom=g&&g.type==='Feature'?g.geometry:g;
+        var coords=geom&&geom.coordinates;
+        if(geom&&geom.type==='Polygon'&&coords&&coords[0]) ring=coords[0].map(function(q){return [+q[1],+q[0]];});
+        else if(geom&&geom.type==='MultiPolygon'&&coords&&coords[0]&&coords[0][0]) ring=coords[0][0].map(function(q){return [+q[1],+q[0]];});
+      }catch(eGeo){ throw new Error('地块 GeoJSON 格式无效'); }
+    }
+    var sqm=Number(p.areaM2)||Number(p.sqm)||Number(ref.areaM2)||0;
+    if(!ring || ring.length<3 || !isFinite(sqm) || sqm<=0) throw new Error('地块边界或面积无效，请先在地图检查地块');
+    return {plotId:p.id,name:p.name||'',sqm:sqm,mu:Number(p.mu)||+(sqm/666.67).toFixed(2),poly:ring,
+      source:p.source||'map',merged:!!p.merged,grouped:!!p.grouped,subPlots:p.subPlots||[],
+      polyLatLngSet:p.polyLatLngSet||null,partitionPlan:p.partitionPlan||null,
+      terrainProfile:p.terrainProfile||null};
+  }
+
   function applyMapMeasuredArea(provided){
     try{
       var raw = provided ? JSON.stringify(provided) : (new URLSearchParams(location.search).has('partitionPreview') ? null : localStorage.getItem('runyeMeasuredArea'));
       if(!raw) return;
-      var d = JSON.parse(raw);
+      var d = resolvePlotRef(JSON.parse(raw));
       if(!d || !d.sqm){ localStorage.removeItem('runyeMeasuredArea'); return; }
 
       // 写入全局实测面积（㎡），驱动「二级管路」的计算
@@ -103,17 +129,13 @@
         (window.__runyeSubPlots||[]).forEach(function(p){p.poly=RyMapPartition.orient(p.poly,d.partitionPlan.angle,ctr);});
       }
       if(typeof updatePlan === 'function') updatePlan();
-      // 落库 + 桥接地块中心：地图实测回传的地块持久化到 runye_plot_library，并写回 runye_db_v1(地块中心)
+      // 落库：地图实测回传的地块持久化到 runye_plot_library
       // 管线绘图区由 runyePersistMeasuredPlot 一并刷新，避免回传后仅内存可见、刷新即丢
+      // [2026-10-12 数字农业剥离] 原「持久化函数缺失时改走对端回写」的回落分支随桥接层
+      //   一并删除；现在持久化函数缺失就是缺失，不再有第二套落库路径可绕。
       try{
         if(typeof window.runyePersistMeasuredPlot==='function'){
           window.runyePersistMeasuredPlot({ plotId:d.plotId||null, name:d.name||null });
-        } else if(window.runyeBridgeWriteBack){
-          var pid=d.plotId||('pm'+Date.now());
-          var fplot={ id:pid, name:d.name||'地图地块', mu:Math.round((d.sqm||0)/666.67*100)/100, sqm:d.sqm||0,
-            poly:(window.measuredPolygon||[]).map(function(pt){return {x:Math.round((pt.x||0)*100)/100,y:Math.round((pt.y||0)*100)/100};}),
-            crop:'七彩花生', source:'map', ts:Date.now(), note:'' };
-          window.runyeBridgeWriteBack(pid, fplot);
         }
       }catch(e){ console.error('map plot persist failed', e); }
       if(window.RyMapPartition && d.partitionPlan){if(typeof ppLoadPolygon==='function')ppLoadPolygon();RyMapPartition.restore(d.partitionPlan);}
@@ -121,7 +143,11 @@
       if(sec) sec.scrollIntoView({behavior:'smooth', block:'start'});
       showMapBanner(d);
       localStorage.removeItem('runyeMeasuredArea');
-    }catch(e){ console.error('applyMapMeasuredArea error', e); }
+    }catch(e){
+      console.error('applyMapMeasuredArea error', e);
+      /* 引用失效时保留 runyeMeasuredArea 供恢复，并把原因明确反馈给用户。 */
+      try{ alert('地块回传未完成：'+(e&&e.message?e.message:'数据读取失败')+'。回地图重新回传后再试。'); }catch(eAlert){}
+    }
   }
 
   function showMapBanner(d){

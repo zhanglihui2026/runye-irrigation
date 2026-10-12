@@ -7,16 +7,16 @@
 <style>
   :root{
     /* 设计令牌 — 与润野主界面统一 */
-    --g-50:#f0fdf4; --g-100:#dcfce7; --g-200:#bbf7d0; --g-300:#86efac;
-    --g-400:#4ade80; --g-500:#22c55e; --g-600:#16a34a; --g-700:#15803d;
-    --g-800:#166534; --g-900:#14532d;
-    --s-50:#f8fafc; --s-100:#f1f5f9; --s-200:#e2e8f0; --s-300:#cbd5e1;
-    --s-400:#94a3b8; --s-500:#64748b; --s-600:#475569; --s-700:#334155;
-    --s-800:#1e293b; --s-900:#0f172a;
+    --g-50:var(--ry-green-50); --g-100:var(--ry-green-100); --g-200:var(--ry-green-200); --g-300:#86efac;
+    --g-400:#4ade80; --g-500:var(--ry-green-500); --g-600:var(--ry-green-600); --g-700:var(--ry-green-700);
+    --g-800:var(--ry-green-800); --g-900:var(--ry-green-900);
+    --s-50:var(--ry-s-50); --s-100:var(--ry-s-100); --s-200:var(--ry-s-200); --s-300:var(--ry-s-300);
+    --s-400:var(--ry-s-400); --s-500:var(--ry-s-500); --s-600:var(--ry-s-600); --s-700:var(--ry-s-700);
+    --s-800:var(--ry-s-800); --s-900:var(--ry-s-900);
     --blue:#3b82f6; --blue-50:#eff6ff; --blue-100:#dbeafe;
     --amber:#f59e0b; --amber-50:#fffbeb; --amber-100:#fef3c7;
     --red:#ef4444; --red-50:#fef2f2; --red-100:#fee2e2;
-    --teal:#0d9488; --teal-50:#f0fdfa; --teal-100:#ccfbf1;
+    --teal:var(--ry-teal); --teal-50:#f0fdfa; --teal-100:#ccfbf1;
     --bg:#f7f5f0;
     --radius:18px; --radius-sm:12px; --radius-xs:8px;
     --shadow:0 2px 8px rgba(0,0,0,.04),0 0 0 1px rgba(0,0,0,.04);
@@ -88,9 +88,9 @@
   }
   table.hm td.cell:hover{transform:scale(1.06);z-index:2;}
   table.hm td.cell.sel{border-color:var(--g-800);box-shadow:0 0 0 3px rgba(22,101,52,.25);}
-  table.hm td.cell.null{color:var(--s-300);background:#f1f5f9 !important;cursor:default;font-weight:400;}
+  table.hm td.cell.null{color:var(--s-300);background:var(--ry-s-100) !important;cursor:default;font-weight:400;}
   .legend{display:flex;align-items:center;gap:10px;font-size:11px;color:var(--s-500);margin-top:10px;justify-content:center;flex-wrap:wrap;}
-  .legend .bar{height:10px;width:160px;border-radius:6px;background:linear-gradient(90deg,#fde68a,#86efac,#15803d);}
+  .legend .bar{height:10px;width:160px;border-radius:6px;background:linear-gradient(90deg,#fde68a,#86efac,var(--ry-green-700));}
   .legend .lab{font-size:11px;}
 
   /* chart */
@@ -138,9 +138,9 @@ input[type="reset"],
 /* ===== RY-NAV: 主页导航嵌入（与 runye-landing 一致） ===== */
 .ry-nav{
   position:sticky;top:0;z-index:1500;
-  --g-50:#f0fdf4;--g-100:#dcfce7;--g-200:#bbf7d0;--g-300:#86efac;--g-400:#4ade80;--g-500:#22c55e;--g-600:#16a34a;--g-700:#15803d;--g-800:#166534;--g-900:#14532d;
-  --teal:#0d9488;--teal-700:#0f766e;
-  --s-50:#f8fafc;--s-100:#f1f5f9;--s-200:#e2e8f0;--s-300:#cbd5e1;--s-400:#94a3b8;--s-500:#64748b;--s-600:#475569;--s-700:#334155;--s-800:#1e293b;--s-900:#0f172a;
+  --g-50:var(--ry-green-50);--g-100:var(--ry-green-100);--g-200:var(--ry-green-200);--g-300:#86efac;--g-400:#4ade80;--g-500:var(--ry-green-500);--g-600:var(--ry-green-600);--g-700:var(--ry-green-700);--g-800:var(--ry-green-800);--g-900:var(--ry-green-900);
+  --teal:var(--ry-teal);--teal-700:var(--ry-teal-700);
+  --s-50:var(--ry-s-50);--s-100:var(--ry-s-100);--s-200:var(--ry-s-200);--s-300:var(--ry-s-300);--s-400:var(--ry-s-400);--s-500:var(--ry-s-500);--s-600:var(--ry-s-600);--s-700:var(--ry-s-700);--s-800:var(--ry-s-800);--s-900:var(--ry-s-900);
   --shadow-sm:0 2px 8px rgba(15,23,42,.06);
   --transition:all .2s ease;
   --maxw:1280px;
@@ -225,8 +225,9 @@ body > .ry-nav{display:none!important}
 .fn-nav .fn-inner{max-width:none;padding:0 12px;}
 
 </style>
-  <link rel="stylesheet" href="runye-theme.css">
   <link rel="stylesheet" href="runye-nav.css?v=346">
+    <link rel="stylesheet" href="runye-theme.css?v=1">
+  <link rel="stylesheet" href="runye-typography.css?v=1">
 </head>
 <body>
 

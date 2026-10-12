@@ -6,16 +6,16 @@
 <title>润野灌溉设计工具｜图文使用说明</title>
 <style>
 :root{
-  --green:#166534;
+  --green:var(--ry-green-800);
   --green-dark:#103d2a;
-  --mint:#dcfce7;
+  --mint:var(--ry-green-100);
   --ink:#14221a;
-  --muted:#64748b;
+  --muted:var(--ry-s-500);
   --line:#d8e2dc;
   --paper:#f6f8f5;
   --card:#ffffff;
-  --blue:#2563eb;
-  --branch:#16a34a;
+  --blue:var(--ry-info);
+  --branch:var(--ry-green-600);
   --red:#ef4444;
   --amber:#f59e0b;
 }
@@ -60,16 +60,16 @@ section{margin-top:32px;background:#fff;border:1px solid var(--line);border-radi
 .step{display:flex;gap:12px;margin:0 0 12px;padding:12px;border:1px solid var(--line);border-radius:8px;background:#fbfdfb;font-size:13px}
 .step::before{counter-increment:step;content:counter(step);width:24px;height:24px;display:grid;place-items:center;background:var(--mint);color:var(--green);border-radius:7px;font-weight:900;flex:0 0 auto}
 .step b{color:var(--green-dark)}
-.note{background:#f0fdf4;border:1px solid #bbf7d0;color:#315c48;border-radius:8px;padding:11px 13px;font-size:13px}
+.note{background:var(--ry-green-50);border:1px solid var(--ry-green-200);color:#315c48;border-radius:8px;padding:11px 13px;font-size:13px}
 .warn{background:#fff7ed;border-color:#fed7aa;color:#9a3412}
 .mock{
-  border:1px solid var(--line);border-radius:10px;background:#f8fafc;overflow:hidden;
+  border:1px solid var(--line);border-radius:10px;background:var(--ry-s-50);overflow:hidden;
   box-shadow:inset 0 0 0 1px rgba(255,255,255,.7);
 }
-.mock-title{background:#166534;color:#fff;font-weight:800;padding:9px 13px;font-size:13px}
+.mock-title{background:var(--ry-green-800);color:#fff;font-weight:800;padding:9px 13px;font-size:13px}
 .mock-body{padding:14px}
 .fields{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.field{height:40px;border:1px solid #d7e2db;border-radius:7px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 10px;font-size:11px;color:#64748b}
+.field{height:40px;border:1px solid #d7e2db;border-radius:7px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 10px;font-size:11px;color:var(--ry-s-500)}
 .field b{font-size:15px;color:var(--green-dark)}
 .result{background:#173f2d;color:#fff;border-radius:10px;padding:16px;margin-top:12px}
 .result-row{display:flex;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.12);padding:8px 0}
@@ -78,7 +78,7 @@ section{margin-top:32px;background:#fff;border:1px solid var(--line);border-radi
 .map-img{position:absolute;left:42%;top:8%;width:22%;height:82%;background:linear-gradient(135deg,#657d4c,#b38b57 48%,#5f8b69);opacity:.9}
 .poly{position:absolute;left:26%;top:16%;width:52%;height:66%}
 .poly svg{width:100%;height:100%}
-.tag{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:#475569;background:#f8fafc;border:1px solid var(--line);border-radius:999px;padding:4px 9px;margin:4px 4px 4px 0}
+.tag{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--ry-s-600);background:var(--ry-s-50);border:1px solid var(--line);border-radius:999px;padding:4px 9px;margin:4px 4px 4px 0}
 .pipe-canvas{height:320px;background:#dfe4e2;border-radius:8px;position:relative;overflow:hidden}
 .zone{position:absolute;border:1px dashed rgba(22,101,52,.45);background:rgba(250,204,21,.18)}
 .z1{left:16%;top:20%;width:23%;height:28%}.z2{left:39%;top:20%;width:23%;height:28%;background:rgba(59,130,246,.14)}.z3{left:62%;top:20%;width:22%;height:28%;background:rgba(34,197,94,.14)}
@@ -91,18 +91,18 @@ section{margin-top:32px;background:#fff;border:1px solid var(--line);border-radi
 .valve{position:absolute;width:18px;height:18px;border-radius:50%;background:var(--red);border:3px solid #fff;transform:translate(-50%,-50%)}
 .v1{left:39%;top:34%}.v2{left:62%;top:34%}.v3{left:84%;top:34%}.v4{left:39%;top:62%}.v5{left:62%;top:62%}.v6{left:84%;top:62%}
 .diagram{
-  background:#fff;border:1px solid #94a3b8;border-radius:4px;padding:18px;min-height:300px;position:relative;
+  background:#fff;border:1px solid var(--ry-s-400);border-radius:4px;padding:18px;min-height:300px;position:relative;
 }
 .diagram h3{text-align:center;margin:0 0 14px;color:var(--green-dark);font-size:16px}
-.scale{position:absolute;right:24px;bottom:22px;font-size:11px;color:#334155}
-.scale i{display:inline-block;width:90px;height:12px;border:1px solid #64748b;border-top:0;margin-left:8px;vertical-align:middle}
+.scale{position:absolute;right:24px;bottom:22px;font-size:11px;color:var(--ry-s-700)}
+.scale i{display:inline-block;width:90px;height:12px;border:1px solid var(--ry-s-500);border-top:0;margin-left:8px;vertical-align:middle}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th,td{border-bottom:1px solid var(--line);padding:8px;text-align:left}
-th{background:#f8fafc;color:#475569}
-td input{width:88px;border:1px solid #cbd5e1;border-radius:6px;padding:6px;text-align:right}
+th{background:var(--ry-s-50);color:var(--ry-s-600)}
+td input{width:88px;border:1px solid var(--ry-s-300);border-radius:6px;padding:6px;text-align:right}
 .flow{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
-.flow span{background:#ecfdf5;border:1px solid #bbf7d0;color:var(--green);padding:7px 11px;border-radius:8px;font-weight:700;font-size:13px}
-.footer{margin-top:36px;text-align:center;color:#64748b;font-size:12px}
+.flow span{background:#ecfdf5;border:1px solid var(--ry-green-200);color:var(--green);padding:7px 11px;border-radius:8px;font-weight:700;font-size:13px}
+.footer{margin-top:36px;text-align:center;color:var(--ry-s-500);font-size:12px}
 @media(max-width:860px){
   .page{padding:22px 16px 48px}
   .hero,.grid{grid-template-columns:1fr}
@@ -147,9 +147,9 @@ input[type="reset"],
 /* ===== RY-NAV: 主页导航嵌入（与精准灌溉页 index.html 完全一致） ===== */
 .ry-nav{
   position:sticky;top:0;z-index:1500;
-  --g-50:#f0fdf4;--g-100:#dcfce7;--g-200:#bbf7d0;--g-300:#86efac;--g-400:#4ade80;--g-500:#22c55e;--g-600:#16a34a;--g-700:#15803d;--g-800:#166534;--g-900:#14532d;
-  --teal:#0d9488;--teal-700:#0f766e;
-  --s-50:#f8fafc;--s-100:#f1f5f9;--s-200:#e2e8f0;--s-300:#cbd5e1;--s-400:#94a3b8;--s-500:#64748b;--s-600:#475569;--s-700:#334155;--s-800:#1e293b;--s-900:#0f172a;
+  --g-50:var(--ry-green-50);--g-100:var(--ry-green-100);--g-200:var(--ry-green-200);--g-300:#86efac;--g-400:#4ade80;--g-500:var(--ry-green-500);--g-600:var(--ry-green-600);--g-700:var(--ry-green-700);--g-800:var(--ry-green-800);--g-900:var(--ry-green-900);
+  --teal:var(--ry-teal);--teal-700:var(--ry-teal-700);
+  --s-50:var(--ry-s-50);--s-100:var(--ry-s-100);--s-200:var(--ry-s-200);--s-300:var(--ry-s-300);--s-400:var(--ry-s-400);--s-500:var(--ry-s-500);--s-600:var(--ry-s-600);--s-700:var(--ry-s-700);--s-800:var(--ry-s-800);--s-900:var(--ry-s-900);
   --shadow-sm:0 2px 8px rgba(15,23,42,.06);
   --transition:all .2s ease;
   --maxw:1280px;
@@ -196,7 +196,8 @@ input[type="reset"],
 /* ===== /RY-NAV ===== */
 
 </style>
-  <link rel="stylesheet" href="runye-theme.css">
+    <link rel="stylesheet" href="runye-theme.css?v=1">
+  <link rel="stylesheet" href="runye-typography.css?v=1">
 </head>
 <body>
 
@@ -376,7 +377,7 @@ input[type="reset"],
       </div>
       <div class="diagram">
         <h3>润野灌溉 · 施工简图</h3>
-        <div class="pipe-canvas" style="height:220px;background:#fff;border:1px dashed #cbd5e1">
+        <div class="pipe-canvas" style="height:220px;background:#fff;border:1px dashed var(--ry-s-300)">
           <div class="plot-line"></div>
           <div class="zone z1"></div><div class="zone z2"></div><div class="zone z3"></div>
           <div class="zone z4"></div><div class="zone z5"></div><div class="zone z6"></div>

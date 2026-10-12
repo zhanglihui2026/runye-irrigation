@@ -12,9 +12,10 @@
         #tlIsoToolbar.te-padded{padding-right:var(--tlEconW,clamp(400px,36vw,560px))}
         /* v124：头部（标题/管长/下拉/假设）锁定不动，只有中部表格区滚动；取消悬浮卡片，贴合右缘 */
         #tlEconPanel .te-mid{flex:1 1 auto;min-height:0;overflow:auto;padding-right:2px}
-        #tlEconPanel .te-mid::-webkit-scrollbar{width:5px;height:5px}
-        #tlEconPanel .te-mid::-webkit-scrollbar-thumb{background:rgba(188,211,198,.25);border-radius:2px}
-        #tlEconPanel .te-mid::-webkit-scrollbar-thumb:hover{background:#9db8a7}
+        /* [v383 2026-10-12 用户要求] 与全站统一最窄最短：5px→4px、拇指半透明灰圆角丸 */
+        #tlEconPanel .te-mid::-webkit-scrollbar{width:4px;height:4px}
+        #tlEconPanel .te-mid::-webkit-scrollbar-thumb{background:rgba(100,116,139,.45);border-radius:999px}
+        #tlEconPanel .te-mid::-webkit-scrollbar-thumb:hover{background:rgba(100,116,139,.72)}
         #tlEconPanel .te-mid::-webkit-scrollbar-track,#tlEconPanel .te-mid::-webkit-scrollbar-corner{background:transparent}
         #tlEconPanel .te-foot{flex:0 0 auto}
         #tlEconPanel .te-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}

@@ -400,6 +400,9 @@
       a.href = url; a.download = '管网优化方案_' + lastBest.name.replace(/\s/g, '') + '_' + Date.now() + '.json';
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      /* [插件化阶段一 2026-10-11] 导出成功后广播事件：archive 插件据此提示「可存入档案」。
+         只发事件，不改动本模块任何计算 / 导出逻辑；删除本行即解除耦合。 */
+      try { document.dispatchEvent(new CustomEvent('ry:pipe-optim-export', { detail: { scheme: lastBest.name, totalCost: lastBest.totalCost } })); } catch (e2) { }
     } catch (e) { setStatus('导出失败：' + (e && e.message || e), true); }
   }
 

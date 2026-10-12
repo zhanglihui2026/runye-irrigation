@@ -1,0 +1,167 @@
+/* plugins/case-lib/style.css —— 类名一律 case- 前缀 */
+
+.case-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 9997;
+  width: 380px;
+  max-height: 72vh;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #d8dee6;
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(15, 32, 56, .16);
+  padding: 12px 14px;
+  font: 13px/1.6 system-ui, -apple-system, "Microsoft YaHei", sans-serif;
+  color: #1f2b3d;
+}
+
+.case-head {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.case-x {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  color: #8a95a5;
+}
+
+.case-row {
+  margin-bottom: 8px;
+}
+
+.case-label {
+  display: block;
+  font-size: 12px;
+  color: #6b7787;
+  margin-bottom: 3px;
+}
+
+.case-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #d8dee6;
+  border-radius: 6px;
+  padding: 5px 8px;
+  font: inherit;
+  color: inherit;
+  background: #fff;
+}
+
+.case-input:focus {
+  outline: none;
+  border-color: #4a7cf7;
+}
+
+.case-btns {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.case-btn {
+  flex: 1;
+  border: 1px solid #d8dee6;
+  background: #fff;
+  border-radius: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.case-btn.primary {
+  background: #2f6fed;
+  border-color: #2f6fed;
+  color: #fff;
+}
+
+.case-empty {
+  color: #8a95a5;
+  text-align: center;
+  padding: 14px 0;
+}
+
+.case-dim {
+  color: #8a95a5;
+  text-align: center;
+  padding: 8px 0;
+}
+
+.case-range {
+  background: #eef4ff;
+  border: 1px solid #d5e3ff;
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.case-warn {
+  color: #a0610a;
+  background: #fff6e5;
+  border: 1px solid #f3e0bd;
+  border-radius: 6px;
+  padding: 5px 10px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+/* [阶段三 参考方案] 逐管段 DN + 参考拓扑 */
+.case-reco {
+  background: #f4fbf6;
+  border: 1px solid #cfe8d7;
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+}
+
+.case-reco-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.case-dn {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.case-dn-item {
+  background: #fff;
+  border: 1px solid #cfe8d7;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 13px;
+}
+
+.case-topo {
+  color: #5b6b7c;
+  font-size: 12px;
+  margin-top: 5px;
+}
+
+.case-hit {
+  padding: 7px 0;
+  border-bottom: 1px dashed #eef1f5;
+}
+
+.case-hit-title {
+  font-weight: 600;
+}
+
+.case-hit-sub {
+  font-size: 12px;
+  color: #6b7787;
+}
+
+.case-why {
+  font-size: 12px;
+  color: #2f6fed;
+}

@@ -25,6 +25,17 @@
   --ry-shadow:0 2px 8px rgba(15,23,42,.06);
   --ry-shadow-md:0 6px 20px rgba(15,23,42,.10);
   --ry-transition:all .2s ease;
+  /* Shared controls and layout */
+  --ry-toolbar-w:280px; --ry-toolbar-h:56px; --ry-toolbar-bg:var(--ry-s-100); --ry-border-w:1px; --ry-focus-w:2px; --ry-focus-offset:1px; --ry-textarea-min-h:76px;
+  --ry-input-h:38px; --ry-input-radius:8px; --ry-input-border:var(--ry-s-300); --ry-input-bg:#fff;
+  /* [v383 2026-10-12 用户要求] 滚动条最窄最短（类参考图：4px 细条、圆角、半透明灰、轨道透明、无箭头按钮）。
+     原 10px 过粗；拇指原带 1px 描边，4px 下描边会吃掉一半可抓面积，故去掉描边改纯色圆角丸。 */
+  --ry-scroll-w:4px; --ry-scroll-track:transparent; --ry-scroll-thumb:rgba(100,116,139,.45); --ry-scroll-thumb-hover:rgba(100,116,139,.72);
+  --ry-space-1:4px; --ry-space-2:8px; --ry-space-3:16px; --ry-space-4:24px;
+  --ry-success:#15803d; --ry-warn:#d97706; --ry-danger:#dc2626; --ry-info:#2563eb; --ry-white:#fff;
+  --ry-btn-gap:6px; --ry-btn-pad-y:10px; --ry-btn-pad-x:20px; --ry-btn-fs:14px; --ry-btn-weight:700;
+  --ry-btn-shadow:0 4px 12px rgba(22,163,74,.25);
+  --ry-table-margin-top:12px; --ry-table-fs:14px; --ry-table-head-pad-y:12px; --ry-table-cell-pad-y:11px; --ry-table-pad-x:14px;
 }
 
 /* ===== 2. 全局基础 ===== */
@@ -45,7 +56,7 @@ a{text-decoration:none;color:inherit;}
   background:#fff;
   position:sticky; top:0; z-index:100;
   box-shadow:var(--ry-shadow);
-  border-bottom:1px solid var(--ry-s-100);
+  border-bottom:var(--ry-border-w) solid var(--ry-s-100);
 }
 .header-inner{
   max-width:var(--ry-maxw); margin:0 auto; padding:0 24px;
@@ -57,7 +68,7 @@ a{text-decoration:none;color:inherit;}
   background:linear-gradient(135deg,var(--ry-green-700),var(--ry-teal));
   display:flex; align-items:center; justify-content:center;
   color:#fff; font-weight:800; font-size:18px;
-  box-shadow:0 4px 12px rgba(22,163,74,.25);
+  box-shadow:var(--ry-btn-shadow);
 }
 .brand-text{display:flex; flex-direction:column; line-height:1.2;}
 .brand-name{font-size:18px; font-weight:800; color:var(--ry-green-800); letter-spacing:.5px;}
@@ -113,33 +124,76 @@ a{text-decoration:none;color:inherit;}
 
 /* ===== 6. 统一按钮（基础 .btn 给中性默认底色，变体再覆盖） ===== */
 .btn{
-  display:inline-flex; align-items:center; justify-content:center; gap:6px;
-  padding:10px 20px; border-radius:var(--ry-radius-sm);
-  font-size:14px; font-weight:700; cursor:pointer;
-  border:1px solid var(--ry-s-200); background:var(--ry-s-100); color:var(--ry-s-700);
+  display:inline-flex; align-items:center; justify-content:center; gap:var(--ry-btn-gap);
+  padding:var(--ry-btn-pad-y) var(--ry-btn-pad-x); border-radius:var(--ry-radius-sm);
+  font-size:var(--ry-btn-fs); font-weight:var(--ry-btn-weight); cursor:pointer;
+  border:var(--ry-border-w) solid var(--ry-s-200); background:var(--ry-s-100); color:var(--ry-s-700);
   transition:var(--ry-transition); font-family:inherit;
 }
 .btn-primary,button.primary{
-  background:var(--ry-green-600); color:#fff; border-color:var(--ry-green-600);
-  box-shadow:0 4px 12px rgba(22,163,74,.25);
+  background:var(--ry-green-600); color:var(--ry-white); border-color:var(--ry-green-600);
+  box-shadow:var(--ry-btn-shadow);
 }
 .btn-primary:hover,button.primary:hover{background:var(--ry-green-700);}
-.btn-light{background:#fff; color:var(--ry-green-700); border-color:var(--ry-green-600);}
+.btn-light{background:var(--ry-white); color:var(--ry-green-700); border-color:var(--ry-green-600);}
 .btn-light:hover{background:var(--ry-green-50);}
 .btn-ghost{background:transparent; color:var(--ry-s-600); border-color:var(--ry-s-200);}
 .btn-ghost:hover{background:var(--ry-s-50); color:var(--ry-s-700);}
 
 /* ===== 7. 统一表格（供后续页面采用 .ry-table；此处同时轻度规范通用 table） ===== */
 .ry-table{
-  width:100%; border-collapse:collapse; margin-top:12px; font-size:14px;
-  background:#fff; border-radius:var(--ry-radius); overflow:hidden; box-shadow:var(--ry-shadow);
+  width:100%; border-collapse:collapse; margin-top:var(--ry-table-margin-top); font-size:var(--ry-table-fs);
+  background:var(--ry-white); border-radius:var(--ry-radius); overflow:hidden; box-shadow:var(--ry-shadow);
 }
-.ry-table th{background:var(--ry-green-600); color:#fff; font-weight:700; padding:12px 14px; text-align:left;}
-.ry-table td{padding:11px 14px; border-bottom:1px solid var(--ry-s-100); color:var(--ry-s-700);}
+.ry-table th{background:var(--ry-green-600); color:var(--ry-white); font-weight:700; padding:var(--ry-table-head-pad-y) var(--ry-table-pad-x); text-align:left;}
+.ry-table td{padding:var(--ry-table-cell-pad-y) var(--ry-table-pad-x); border-bottom:var(--ry-border-w) solid var(--ry-s-100); color:var(--ry-s-700);}
 .ry-table tr:last-child td{border-bottom:none;}
 .ry-table tbody tr:nth-child(even){background:var(--ry-green-50);}
 .ry-table tbody tr:hover{background:var(--ry-green-100);}
 
+
+/* ===== Shared toolbar and form controls (opt-in classes) ===== */
+.ry-toolbar{
+  min-height:var(--ry-toolbar-h);
+  display:flex;
+  align-items:center;
+  gap:var(--ry-space-2);
+  padding:var(--ry-space-2) var(--ry-space-3);
+  background:var(--ry-toolbar-bg);
+  color:var(--ry-s-800);
+  border:var(--ry-border-w) solid var(--ry-s-200);
+  border-radius:var(--ry-radius-sm);
+}
+.ry-input,.ry-select,.ry-textarea{
+  width:100%;
+  min-height:var(--ry-input-h);
+  padding:var(--ry-space-2) var(--ry-space-3);
+  border:var(--ry-border-w) solid var(--ry-input-border);
+  border-radius:var(--ry-input-radius);
+  background:var(--ry-input-bg);
+  color:var(--ry-s-800);
+  font:inherit;
+}
+.ry-textarea{min-height:var(--ry-textarea-min-h); resize:vertical;}
+.ry-input:focus,.ry-select:focus,.ry-textarea:focus{
+  outline:var(--ry-focus-w) solid var(--ry-green-200);
+  outline-offset:var(--ry-focus-offset);
+  border-color:var(--ry-green-600);
+}
+
+/* Native scrollbars: WebKit/Blink and Firefox */
+/* [v383 2026-10-12 用户要求] 全站滚动条最窄最短：4px、圆角丸、半透明灰、轨道透明、隐藏两端箭头按钮。
+   ★ 有头实测（Chrome/143）：标准属性 scrollbar-width/scrollbar-color 一旦设置，Chrome 会整体
+   忽略 ::-webkit-scrollbar 自定义（thin 实测=10px、默认=15px、仅 webkit 4px=4px）——
+   旧版「10px 没变化」的根因就是这行标准属性压掉了自定义。故此处【不得】设标准属性，
+   细滚动条仅由 webkit 伪元素驱动（Firefox 退化为默认宽度，可接受）。
+   注意：注释内不得出现星号斜杠序列（曾致 :root 令牌块被正则吞掉）。 */
+*::-webkit-scrollbar{width:var(--ry-scroll-w);height:var(--ry-scroll-w);}
+*::-webkit-scrollbar-button{display:none;width:0;height:0}
+*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-thumb{background:var(--ry-scroll-thumb);border-radius:999px}
+*::-webkit-scrollbar-thumb:hover{background:var(--ry-scroll-thumb-hover)}
+*::-webkit-scrollbar-corner{background:transparent}
 /* ===== 8. （预留）功能工具条 .topbar 保持各页原有样式，不在此覆盖，避免破坏地图页深绿底白字 ===== */
 
 /* ===== 9. index 内模块工具条（at/hm/tl）轻微对齐到品牌色，避免突兀 ===== */
@@ -149,7 +203,7 @@ a{text-decoration:none;color:inherit;}
 .ghost-btn{
   display:inline-block; margin:14px 0 4px; padding:8px 14px;
   font-size:13px; font-weight:700; cursor:pointer; font-family:inherit;
-  background:transparent; color:var(--ry-s-500); border:1px solid var(--ry-s-200);
+  background:transparent; color:var(--ry-s-500); border:var(--ry-border-w) solid var(--ry-s-200);
   border-radius:var(--ry-radius-sm); transition:var(--ry-transition);
 }
 .ghost-btn:hover{background:var(--ry-s-50); color:var(--ry-s-700); border-color:var(--ry-s-300);}

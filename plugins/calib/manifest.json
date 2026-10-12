@@ -1,0 +1,19 @@
+{
+  "id": "calib",
+  "name": "水力参数标定（C 值反推 · opt-in）",
+  "version": "1.0.0",
+  "entry": "main.js",
+  "requires": { "core": ">=1.0.0", "plugins": [] },
+  "ui": {
+    "nav": {
+      "label": "参数标定",
+      "order": 92,
+      "title": "Hazen-Williams C 值反推（只给参考，默认不改任何计算）"
+    }
+  },
+  "permissions": ["read:diagram", "archive:read", "archive:write", "ui:nav"],
+  "config": {
+    "optInDefault": false,
+    "_note": "optInDefault=false ⇒ 「采纳」勾选框默认不勾；未勾选时本插件绝不写入任何档案（方案硬性要求：不得静默改变现有计算）"
+  }
+}

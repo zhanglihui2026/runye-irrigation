@@ -44,8 +44,8 @@
     return parseInt(document.querySelector('#layoutGroup .selected')?.dataset?.sides||'1',10);
   }
 
-  // 地块数据同步到数字农业已外移至 irrigation-bridge.js（window.runyeSharePlotToDigital / runyeOpenDigitalAgriculture）。
-
+  // [2026-10-12 数字农业剥离] 原「存档后广播地块给对端模块」的耦合已按用户决定整体切除，
+  // 桥接层文件与调用点一并删除；此处只做纯本地存档，不再往外广播。
   window.runyeSaveProject=function(silent,key){
     /* v161：可选第二参 key —— 静默自动留存与「手动保存」共用同一套快照构造，
        不传 key 时写原有 SAVE_KEY，行为与改动前一致。 */
@@ -81,7 +81,6 @@
       ppGenSig:(typeof window.__ryPpGenSig!=='undefined'&&window.__ryPpGenSig)?window.__ryPpGenSig:null
     };
     localStorage.setItem(key||SAVE_KEY,JSON.stringify(data));
-    if(!window.__ryUndoQuiet) window.runyeSharePlotToDigital();   /* [v284] 撤销快照不广播到数字农业 */
     if(silent!==true)projectToast('方案已保存到本机');
   };
 

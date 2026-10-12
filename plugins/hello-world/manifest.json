@@ -1,0 +1,9 @@
+{
+  "id": "hello-world",
+  "name": "协议自检（示例插件）",
+  "version": "1.0.0",
+  "entry": "main.js",
+  "requires": { "core": ">=1.0.0", "plugins": [] },
+  "ui": { "nav": { "label": "协议自检", "order": 98, "icon": "" } },
+  "permissions": ["event:subscribe", "ui:nav"]
+}

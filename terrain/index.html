@@ -36,6 +36,8 @@
     .t-body>.t-stage{grid-column:1;grid-row:2}
   }
 </style>
+    <link rel="stylesheet" href="../runye-theme.css?v=1">
+  <link rel="stylesheet" href="../runye-typography.css?v=1">
 </head>
 <body>
 
@@ -74,7 +76,7 @@
         <input type="file" id="fileSHP" hidden>
         <input type="file" id="filePRJ" hidden>
         <input type="file" id="fileBoundaryCSV" hidden>
-        <div class="t-cs">坐标系：<b id="csResult">未校验</b><br><span style="font-size:11px">导入 shp 后请一并上传同名 .prj；无 prj 时按坐标数值启发式判断</span></div>
+        <div class="t-cs">坐标系：<b id="csResult">未校验</b><br><span style="font-size:var(--ry-fs-tiny)">导入 shp 后请一并上传同名 .prj；无 prj 时按坐标数值启发式判断</span></div>
       </div>
     </details>
 

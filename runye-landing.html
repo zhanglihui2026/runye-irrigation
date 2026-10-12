@@ -6,10 +6,10 @@
 <title>润野灌溉 | Runye Irrigation</title>
 <style>
   :root{
-    --g-50:#f0fdf4;--g-100:#dcfce7;--g-200:#bbf7d0;--g-500:#22c55e;--g-600:#16a34a;--g-700:#15803d;--g-800:#166534;--g-900:#14532d;
-    --teal:#0d9488;--teal-700:#0f766e;
-    --s-50:#f8fafc;--s-100:#f1f5f9;--s-200:#e2e8f0;--s-300:#cbd5e1;--s-400:#94a3b8;--s-500:#64748b;--s-600:#475569;--s-700:#334155;--s-800:#1e293b;--s-900:#0f172a;
-    --red:#dc2626;--blue:#2563eb;--amber:#f59e0b;
+    --g-50:var(--ry-green-50);--g-100:var(--ry-green-100);--g-200:var(--ry-green-200);--g-500:var(--ry-green-500);--g-600:var(--ry-green-600);--g-700:var(--ry-green-700);--g-800:var(--ry-green-800);--g-900:var(--ry-green-900);
+    --teal:var(--ry-teal);--teal-700:var(--ry-teal-700);
+    --s-50:var(--ry-s-50);--s-100:var(--ry-s-100);--s-200:var(--ry-s-200);--s-300:var(--ry-s-300);--s-400:var(--ry-s-400);--s-500:var(--ry-s-500);--s-600:var(--ry-s-600);--s-700:var(--ry-s-700);--s-800:var(--ry-s-800);--s-900:var(--ry-s-900);
+    --red:var(--ry-danger);--blue:var(--ry-info);--amber:#f59e0b;
     --bg:#f7f5f0;--card:#ffffff;
     --shadow:0 10px 30px rgba(15,23,42,.08);--shadow-sm:0 2px 8px rgba(15,23,42,.06);
     --radius-xs:8px;--radius-sm:10px;--radius:14px;
@@ -26,9 +26,9 @@
 /* ===== RY-NAV: 主页导航嵌入（与精准灌溉页 index.html 完全一致） ===== */
 .ry-nav{
   position:sticky;top:0;z-index:1500;
-  --g-50:#f0fdf4;--g-100:#dcfce7;--g-200:#bbf7d0;--g-300:#86efac;--g-400:#4ade80;--g-500:#22c55e;--g-600:#16a34a;--g-700:#15803d;--g-800:#166534;--g-900:#14532d;
-  --teal:#0d9488;--teal-700:#0f766e;
-  --s-50:#f8fafc;--s-100:#f1f5f9;--s-200:#e2e8f0;--s-300:#cbd5e1;--s-400:#94a3b8;--s-500:#64748b;--s-600:#475569;--s-700:#334155;--s-800:#1e293b;--s-900:#0f172a;
+  --g-50:var(--ry-green-50);--g-100:var(--ry-green-100);--g-200:var(--ry-green-200);--g-300:#86efac;--g-400:#4ade80;--g-500:var(--ry-green-500);--g-600:var(--ry-green-600);--g-700:var(--ry-green-700);--g-800:var(--ry-green-800);--g-900:var(--ry-green-900);
+  --teal:var(--ry-teal);--teal-700:var(--ry-teal-700);
+  --s-50:var(--ry-s-50);--s-100:var(--ry-s-100);--s-200:var(--ry-s-200);--s-300:var(--ry-s-300);--s-400:var(--ry-s-400);--s-500:var(--ry-s-500);--s-600:var(--ry-s-600);--s-700:var(--ry-s-700);--s-800:var(--ry-s-800);--s-900:var(--ry-s-900);
   --shadow-sm:0 2px 8px rgba(15,23,42,.06);
   --transition:all .2s ease;
   --maxw:1280px;
@@ -185,13 +185,12 @@ input[type="reset"],
 /* ===== /FLAT-BTN-OVERRIDE ===== */
 
 /* 门户页「返回主页」按钮（门户页导航未包 .ry-nav，单独定义） */
-.nav-home-btn{margin-left:8px;display:inline-flex;align-items:center;gap:6px;padding:9px 16px;background:#15803d;color:#fff;font-size:14px;font-weight:700;text-decoration:none;border:0;border-radius:0;cursor:pointer;transition:all .2s ease;white-space:nowrap;letter-spacing:.5px;}
-.nav-home-btn:hover{background:#166534;}
+.nav-home-btn{margin-left:8px;display:inline-flex;align-items:center;gap:6px;padding:9px 16px;background:var(--ry-green-700);color:#fff;font-size:14px;font-weight:700;text-decoration:none;border:0;border-radius:0;cursor:pointer;transition:all .2s ease;white-space:nowrap;letter-spacing:.5px;}
+.nav-home-btn:hover{background:var(--ry-green-800);}
 @media(max-width:920px){.nav-home-btn{margin:10px 24px 14px;justify-content:center;}}
 
 </style>
-  <link rel="stylesheet" href="runye-theme.css">
-<link rel="stylesheet" href="runye-mobile.css?v=242">
+  <link rel="stylesheet" href="runye-mobile.css?v=242">
 <script src="runye-mobile.js?v=242"></script>
 
 <!-- PWA: independent installation and offline support -->
@@ -205,6 +204,8 @@ input[type="reset"],
 <link rel="icon" type="image/png" sizes="192x192" href="pwa/icons/icon-192.png">
 <link rel="stylesheet" href="pwa/pwa.css?v=2">
 <script defer src="pwa/pwa.js?v=2"></script>
+    <link rel="stylesheet" href="runye-theme.css?v=1">
+  <link rel="stylesheet" href="runye-typography.css?v=1">
 </head>
 <body>
 

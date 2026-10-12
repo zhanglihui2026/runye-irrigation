@@ -8,23 +8,25 @@
 <script src="pwa/vendor/cloudbase-js-sdk-3.8.2.bundle.js?v=359"></script>
 <script src="cloud-sync.js?v=370b"></script>
 <style>
-  body{font-family:"Microsoft YaHei",system-ui,sans-serif;background:#f5f7f5;color:#1e293b;padding:20px;line-height:1.6;max-width:900px;margin:0 auto}
+  body{font-family:"Microsoft YaHei",system-ui,sans-serif;background:#f5f7f5;color:var(--ry-s-800);padding:20px;line-height:1.6;max-width:900px;margin:0 auto}
   h1{font-size:18px;margin:0 0 4px}
-  .sub{color:#64748b;font-size:13px;margin-bottom:16px}
-  .card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:12px}
-  h2{font-size:14px;margin:0 0 10px;color:#334155}
-  input{font-size:16px;padding:9px 10px;border:1px solid #cbd5e1;border-radius:8px;width:190px}
+  .sub{color:var(--ry-s-500);font-size:13px;margin-bottom:16px}
+  .card{background:#fff;border:1px solid var(--ry-s-200);border-radius:10px;padding:14px 16px;margin-bottom:12px}
+  h2{font-size:14px;margin:0 0 10px;color:var(--ry-s-700)}
+  input{font-size:16px;padding:9px 10px;border:1px solid var(--ry-s-300);border-radius:8px;width:190px}
   button{font-size:14px;padding:10px 16px;border:none;background:#185FA5;color:#fff;border-radius:8px;cursor:pointer;margin:4px 6px 4px 0}
   button:disabled{background:#9bbfe6;cursor:default}
-  .ghost{background:#0d9488}
-  .ok{color:#16a34a}.warn{color:#d97706}.err{color:#dc2626}.muted{color:#94a3b8}
-  #log{background:#0f172a;color:#e2e8f0;font-family:Consolas,monospace;font-size:13px;padding:12px;border-radius:10px;white-space:pre-wrap;max-height:380px;overflow:auto}
-  .tip{font-size:12px;color:#64748b;margin-top:8px}
+  .ghost{background:var(--ry-teal)}
+  .ok{color:var(--ry-green-600)}.warn{color:var(--ry-warn)}.err{color:var(--ry-danger)}.muted{color:var(--ry-s-400)}
+  #log{background:var(--ry-s-900);color:var(--ry-s-200);font-family:Consolas,monospace;font-size:13px;padding:12px;border-radius:10px;white-space:pre-wrap;max-height:380px;overflow:auto}
+  .tip{font-size:12px;color:var(--ry-s-500);margin-top:8px}
   table{border-collapse:collapse;font-size:13px;width:100%}
-  th,td{border:1px solid #e2e8f0;padding:5px 8px;text-align:left;font-family:Consolas,monospace}
-  th{background:#f8fafc;font-weight:600}
-  label{font-size:13px;color:#475569;display:inline-flex;align-items:center;gap:6px;margin-bottom:8px}
+  th,td{border:1px solid var(--ry-s-200);padding:5px 8px;text-align:left;font-family:Consolas,monospace}
+  th{background:var(--ry-s-50);font-weight:600}
+  label{font-size:13px;color:var(--ry-s-600);display:inline-flex;align-items:center;gap:6px;margin-bottom:8px}
 </style>
+    <link rel="stylesheet" href="runye-theme.css?v=1">
+  <link rel="stylesheet" href="runye-typography.css?v=1">
 </head>
 <body>
 <h1>手机号登录 + 云函数调用 实测</h1>
@@ -61,7 +63,7 @@
 <div class="card">
   <h2>③ 运行日志</h2>
   <div id="log">等待开始…</div>
-  <button id="btnCopy" style="background:#475569">复制结果（发我）</button>
+  <button id="btnCopy" style="background:var(--ry-s-600)">复制结果（发我）</button>
   <span id="copyMsg" class="muted"></span>
 </div>
 

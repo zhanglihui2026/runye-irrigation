@@ -1388,9 +1388,11 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
 
 #areaTool .at-toast{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.8);color:#fff;padding:9px 22px;border-radius:8px;font-size:13px;z-index:9999;pointer-events:none;opacity:0;transition:opacity .3s}
 #areaTool .at-toast.show{opacity:1}
-#areaTool .at-sidebar::-webkit-scrollbar{width:5px}
-#areaTool .at-sidebar::-webkit-scrollbar-track{background:#f5f5f5}
-#areaTool .at-sidebar::-webkit-scrollbar-thumb{background:rgba(188,211,198,.25);border-radius:3px}
+/* [v383 2026-10-12 用户要求] 与全站统一最窄最短：5px→4px、拇指半透明灰圆角丸、轨道透明 */
+#areaTool .at-sidebar::-webkit-scrollbar{width:4px}
+#areaTool .at-sidebar::-webkit-scrollbar-track{background:transparent}
+#areaTool .at-sidebar::-webkit-scrollbar-thumb{background:rgba(100,116,139,.45);border-radius:999px}
+#areaTool .at-sidebar::-webkit-scrollbar-thumb:hover{background:rgba(100,116,139,.72)}
 
 /* ===== 05 三级管路规划与施工简图（移至主页面，二级简图下方） ===== */
 #tlPipePlanSection{
@@ -4482,9 +4484,10 @@ body.ry-tool #tlPipePlanSection[data-ry-view="iso"][data-ry-clean="1"] > .pp-bod
 #tlWsStatsGrip:hover,#tlWsStatsGrip.on{background:rgba(45,96,75,.30)}
 /* 滚动条最窄（2026-09-15 用户要求）：统计栏内 4px 细条 */
 /* v144：.tl-iso-stats 滚动条由全局 *::-webkit-scrollbar 统一（标准属性会让 webkit 伪元素失效） */
-.tl-iso-stats::-webkit-scrollbar{width:5px;height:5px}
-.tl-iso-stats::-webkit-scrollbar-thumb{background:rgba(188,211,198,.25);border-radius:2px}
-.tl-iso-stats::-webkit-scrollbar-thumb:hover{background:#9db8a7}
+/* [v383 2026-10-12 用户要求] 与全站统一最窄最短：5px→4px、拇指半透明灰圆角丸 */
+.tl-iso-stats::-webkit-scrollbar{width:4px;height:4px}
+.tl-iso-stats::-webkit-scrollbar-thumb{background:rgba(100,116,139,.45);border-radius:999px}
+.tl-iso-stats::-webkit-scrollbar-thumb:hover{background:rgba(100,116,139,.72)}
 .tl-iso-stats::-webkit-scrollbar-track,.tl-iso-stats::-webkit-scrollbar-corner{background:transparent}
 /* 分区材料统计左右折叠（2026-09-15 用户要求）：收起 = 右缘窄条（标题竖排、箭头朝左），
    统计列收窄为 40px、画布列自动加宽；展开 = 完整面板。状态由 JS 切 class + localStorage 记忆。 */

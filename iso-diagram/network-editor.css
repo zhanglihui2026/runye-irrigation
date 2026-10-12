@@ -143,9 +143,10 @@ svg .cn-layer [data-cn-port]:hover { filter: brightness(1.15); }
 .cn-assy { border: 1px solid #dbe7de; background: #fbfdfb; border-radius: 6px; padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; }
 .cn-assy-title { font-size: 11.5px; font-weight: 700; color: #243c35; display: flex; align-items: center; gap: 6px; }
 .cn-assy-list { margin: 0; padding-left: 20px; font-size: 10.5px; color: #33463e; line-height: 1.75; max-height: 150px; overflow-y: auto; }
-.cn-assy-list::-webkit-scrollbar { width: 5px; }
+/* [v383 2026-10-12 用户要求] 与全站统一最窄最短：5px→4px、拇指半透明灰圆角丸 */
+.cn-assy-list::-webkit-scrollbar { width: 4px; }
 .cn-assy-list::-webkit-scrollbar-track { background: transparent; }
-.cn-assy-list::-webkit-scrollbar-thumb { background: #c9d6ce; border-radius: 2px; }
+.cn-assy-list::-webkit-scrollbar-thumb { background: rgba(100,116,139,.45); border-radius: 999px; }
 .cn-assy-empty { font-size: 10.5px; color: #5b6b66; line-height: 1.6; }
 .cn-assy-step { font-size: 10.5px; color: #5b6b66; margin-top: 2px; }
 .cn-assy select.cn-input { max-width: 100%; }

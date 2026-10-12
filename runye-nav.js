@@ -149,7 +149,15 @@
       if (global.RyMobile && global.RyMobile.isActive() && (it.hash === 'pipePlanSection' || it.hash === 'tlPipePlanSection')) {
         a.href = 'runye-mobile-map-preview.html?v=242#' + (it.hash === 'pipePlanSection' ? 'second' : 'third');
       } else {
-        a.href = root + base + it.hash;
+        /* [v376 2026-10-11 修复] 锚点必须带 '#'：
+           base 在子页里声明成 "index.html#"（自带井号），但**主页自己的导航没有 data-base**
+           ⇒ base='' 时这里曾拼出 href="detailsSection"（相对路径），点它直接跳到
+           file/https://.../detailsSection → 404，而不是跳锚点。
+           更隐蔽的是它**时好时坏**：mod/inline-18.js 事后会把这批 href 改写成 '#'+id，
+           但 RyEntitle.onChange → RyFnNav.render() 会**重建**全部导航项（权益就绪时），
+           重建后改写就丢了 ⇒ 权益拉取得早/晚决定用户点下去是跳锚点还是 404。
+           ⇒ 修在源头：base 为空时补 '#'，任何一次渲染都自带正确 href，不再依赖事后改写。 */
+        a.href = root + (base || '#') + it.hash;
         if (!base) a.setAttribute('data-target', it.hash);
       }
     } else {
@@ -290,6 +298,16 @@
     var more = buildMore(base, root);
     lastWrap = more;
     el.appendChild(more);
+    /* [v377] 第三方导航项（插件 data-ry-plugin-nav / 会员徽标等）在 mount 期间被
+       逐个 appendChild 的老项挤到了后面（老项全插到它们之后）。这里把它们按
+       原相对顺序移回「更多 ▾」之前 —— 插件迁移项的「原位置」才保得住
+       （实测：水力校核插件项被挤到 ⚙️设置 后面、跑到智能规划之前）。 */
+    try {
+      var third = el.querySelectorAll('[data-ry-plugin-nav],[data-ry-mbr]');
+      for (var t = 0; t < third.length; t++) {
+        if (third[t].parentNode === el) el.insertBefore(third[t], more);
+      }
+    } catch (e3) { }
   }
   /* [v358] 权益就绪 / 等级变化 → 重新渲染导航（锁定态随之收紧或放宽）。
      时序说明：runye-nav.js 在解析到即渲染，此时权益大概率还没拉回来（ready()=false，全放行）；

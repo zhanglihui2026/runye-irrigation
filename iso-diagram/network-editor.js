@@ -33,8 +33,10 @@
      （接管/延伸/修剪/改径/沿线统计）整体取消，左栏位置保留空置，
      待用户重定方案后再恢复 —— 恢复时把 EDITOR_OFF 改回 false 即可。
      模型引擎（network-model.js）与全部单测不受影响；
-     exportClean 无层可摘 → 直通；exportForProject 恒 null（主方案保存不受影响）。 */
-  var EDITOR_OFF = false;
+     exportClean 无层可摘 → 直通；exportForProject 恒 null（主方案保存不受影响）。
+     2026-10-12 用户再次要求「管网装配（平面图）卡相关的功能全部取消」：
+     连同统计卡 / 待确认明细 / 图例 / 图上叠加层一并下线（恢复方式同上，改回 false）。 */
+  var EDITOR_OFF = true;
 
   var KEY_PREFIX = 'runye_construction_net_v1';
   function storeKey() { return KEY_PREFIX + ':' + (window.currentPlotId || 'current'); }

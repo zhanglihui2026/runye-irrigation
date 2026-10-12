@@ -16,268 +16,266 @@
 }
 
 @media screen{
-  body{
+  body:where(:not(.topbar *)){
     font-size:var(--ry-fs-body);
     line-height:1.5;
   }
 
   /* 顶部品牌 / 导航 */
-  .brand-name,
-  .ry-nav .brand-name,
-  .wb-brand-name,
-  .topbar strong,
-  .brand{
+  .brand-name:where(:not(.topbar *)),
+  .ry-nav .brand-name:where(:not(.topbar *)),
+  .wb-brand-name:where(:not(.topbar *)),
+  .brand:where(:not(.topbar *)){
     font-size:var(--ry-fs-title) !important;
     line-height:1.25;
   }
-  .brand-logo,
-  .ry-nav .brand-logo,
-  .wb-logo{
+  .brand-logo:where(:not(.topbar *)),
+  .ry-nav .brand-logo:where(:not(.topbar *)),
+  .wb-logo:where(:not(.topbar *)){
     font-size:15px !important;
   }
-  .brand-sub,
-  .ry-nav .brand-sub,
-  .wb-brand-sub,
-  .topbar span{
+  .brand-sub:where(:not(.topbar *)),
+  .ry-nav .brand-sub:where(:not(.topbar *)),
+  .wb-brand-sub:where(:not(.topbar *)){
     font-size:var(--ry-fs-tiny) !important;
     line-height:1.35;
   }
-  .nav-link,
-  .ry-nav .nav-link,
-  .nav-home-btn,
-  .ry-nav .nav-home-btn,
-  .wb-header-links a,
-  .wb-nav a,
-  .wb-side-actions a,
-  .wb-side-actions button,
-  .nav-link-pill,
-  .sync-pill,
-  .auth-btn{
+  .nav-link:where(:not(.topbar *)),
+  .ry-nav .nav-link:where(:not(.topbar *)),
+  .nav-home-btn:where(:not(.topbar *)),
+  .ry-nav .nav-home-btn:where(:not(.topbar *)),
+  .wb-header-links a:where(:not(.topbar *)),
+  .wb-nav a:where(:not(.topbar *)),
+  .wb-side-actions a:where(:not(.topbar *)),
+  .wb-side-actions button:where(:not(.topbar *)),
+  .nav-link-pill:where(:not(.topbar *)),
+  .sync-pill:where(:not(.topbar *)),
+  .auth-btn:where(:not(.topbar *)){
     font-size:var(--ry-fs-body) !important;
   }
 
   /* 标题层级 */
-  .section-title,
-  .wb-section-title,
-  .panel-heading h2,
-  .detail-heading h2,
-  .pipe-table-title h3,
-  .control-card h2,
-  .weather-title,
-  .plot-board .board-head h2,
-  .qp-head h2,
-  .sec-head h2,
-  .plan-head h3,
-  .card h2,
-  .no-print h1,
-  aside h2,
-  .tl-header h2,
-  #areaTool .at-topbar h1,
-  #pipePlanSection .pp-title,
-  .pp-diagram-title{
+  .section-title:where(:not(.topbar *)),
+  .wb-section-title:where(:not(.topbar *)),
+  .panel-heading h2:where(:not(.topbar *)),
+  .detail-heading h2:where(:not(.topbar *)),
+  .pipe-table-title h3:where(:not(.topbar *)),
+  .control-card h2:where(:not(.topbar *)),
+  .weather-title:where(:not(.topbar *)),
+  .plot-board .board-head h2:where(:not(.topbar *)),
+  .qp-head h2:where(:not(.topbar *)),
+  .sec-head h2:where(:not(.topbar *)),
+  .plan-head h3:where(:not(.topbar *)),
+  .card h2:where(:not(.topbar *)),
+  .no-print h1:where(:not(.topbar *)),
+  aside h2:where(:not(.topbar *)),
+  .tl-header h2:where(:not(.topbar *)),
+  #areaTool .at-topbar h1:where(:not(.topbar *)),
+  #pipePlanSection .pp-title:where(:not(.topbar *)),
+  .pp-diagram-title:where(:not(.topbar *)){
     font-size:var(--ry-fs-title) !important;
     line-height:1.35;
   }
-  .card h3,
-  .panel h3,
-  .wb-panel h3,
-  .wb-list-head h3,
-  .farm h3,
-  .gate-card h2,
-  .qp-modal-head h3,
-  .diagram h3,
-  .mock-title,
-  .field-plan-head strong,
-  .method-note>div>span{
+  .card h3:where(:not(.topbar *)),
+  .panel h3:where(:not(.topbar *)),
+  .wb-panel h3:where(:not(.topbar *)),
+  .wb-list-head h3:where(:not(.topbar *)),
+  .farm h3:where(:not(.topbar *)),
+  .gate-card h2:where(:not(.topbar *)),
+  .qp-modal-head h3:where(:not(.topbar *)),
+  .diagram h3:where(:not(.topbar *)),
+  .mock-title:where(:not(.topbar *)),
+  .field-plan-head strong:where(:not(.topbar *)),
+  .method-note>div>span:where(:not(.topbar *)){
     font-size:var(--ry-fs-card) !important;
     line-height:1.35;
   }
 
   /* 正文、表单、按钮、表格 */
-  p,
-  li,
-  table,
-  .ry-table,
-  .wb-table,
-  .selection-table,
-  .control-card label,
-  .field>span,
-  .field label,
-  .wb-field label,
-  .wb-field input,
-  .wb-field select,
-  .wb-field textarea,
-  input,
-  select,
-  textarea,
-  button,
-  .btn,
-  .btn-primary,
-  .btn-ghost,
-  .ghost-button,
-  .ghost-btn,
-  .text-button,
-  .primary-btn,
-  .at-btn,
-  .at-btn-action,
-  .wb-btn,
-  .wb-todo,
-  .wb-rec-meta,
-  .result-list,
-  .result-list dd,
-  .operation-card ol,
-  .history-advice-card ol,
-  .note p,
-  .farm p,
-  footer p{
+  p:where(:not(.topbar *)),
+  li:where(:not(.topbar *)),
+  table:where(:not(.topbar *)),
+  .ry-table:where(:not(.topbar *)),
+  .wb-table:where(:not(.topbar *)),
+  .selection-table:where(:not(.topbar *)),
+  .control-card label:where(:not(.topbar *)),
+  .field>span:where(:not(.topbar *)),
+  .field label:where(:not(.topbar *)),
+  .wb-field label:where(:not(.topbar *)),
+  .wb-field input:where(:not(.topbar *)),
+  .wb-field select:where(:not(.topbar *)),
+  .wb-field textarea:where(:not(.topbar *)),
+  input:where(:not(.topbar *)),
+  select:where(:not(.topbar *)),
+  textarea:where(:not(.topbar *)),
+  button:where(:not(.topbar *)),
+  .btn:where(:not(.topbar *)),
+  .btn-primary:where(:not(.topbar *)),
+  .btn-ghost:where(:not(.topbar *)),
+  .ghost-button:where(:not(.topbar *)),
+  .ghost-btn:where(:not(.topbar *)),
+  .text-button:where(:not(.topbar *)),
+  .primary-btn:where(:not(.topbar *)),
+  .at-btn:where(:not(.topbar *)),
+  .at-btn-action:where(:not(.topbar *)),
+  .wb-btn:where(:not(.topbar *)),
+  .wb-todo:where(:not(.topbar *)),
+  .wb-rec-meta:where(:not(.topbar *)),
+  .result-list:where(:not(.topbar *)),
+  .result-list dd:where(:not(.topbar *)),
+  .operation-card ol:where(:not(.topbar *)),
+  .history-advice-card ol:where(:not(.topbar *)),
+  .note p:where(:not(.topbar *)),
+  .farm p:where(:not(.topbar *)),
+  footer p:where(:not(.topbar *)){
     font-size:var(--ry-fs-body) !important;
   }
-  th,
-  td,
-  .ry-table th,
-  .ry-table td,
-  .wb-table th,
-  .wb-table td,
-  .selection-table th,
-  .selection-table td{
+  th:where(:not(.topbar *)),
+  td:where(:not(.topbar *)),
+  .ry-table th:where(:not(.topbar *)),
+  .ry-table td:where(:not(.topbar *)),
+  .wb-table th:where(:not(.topbar *)),
+  .wb-table td:where(:not(.topbar *)),
+  .selection-table th:where(:not(.topbar *)),
+  .selection-table td:where(:not(.topbar *)){
     font-size:var(--ry-fs-body) !important;
     line-height:1.5;
   }
 
   /* 辅助说明 */
-  small,
-  .sub,
-  .wb-sub,
-  .wb-muted,
-  .field-hint,
-  .tip,
-  .src,
-  .note-box,
-  .pipe-table-note,
-  .detail-heading p,
-  .result-list dt,
-  .wb-form-note,
-  .wb-rec-remark,
-  .wb-tl-date,
-  .ii-meta,
-  .pc-meta,
-  .weather-metric span,
-  .section-head span,
-  .quiet-copy,
-  .gate-card p,
-  .plot-board-empty,
-  .daily-advice,
-  .chart-note{
+  small:where(:not(.topbar *)),
+  .sub:where(:not(.topbar *)),
+  .wb-sub:where(:not(.topbar *)),
+  .wb-muted:where(:not(.topbar *)),
+  .field-hint:where(:not(.topbar *)),
+  .tip:where(:not(.topbar *)),
+  .src:where(:not(.topbar *)),
+  .note-box:where(:not(.topbar *)),
+  .pipe-table-note:where(:not(.topbar *)),
+  .detail-heading p:where(:not(.topbar *)),
+  .result-list dt:where(:not(.topbar *)),
+  .wb-form-note:where(:not(.topbar *)),
+  .wb-rec-remark:where(:not(.topbar *)),
+  .wb-tl-date:where(:not(.topbar *)),
+  .ii-meta:where(:not(.topbar *)),
+  .pc-meta:where(:not(.topbar *)),
+  .weather-metric span:where(:not(.topbar *)),
+  .section-head span:where(:not(.topbar *)),
+  .quiet-copy:where(:not(.topbar *)),
+  .gate-card p:where(:not(.topbar *)),
+  .plot-board-empty:where(:not(.topbar *)),
+  .daily-advice:where(:not(.topbar *)),
+  .chart-note:where(:not(.topbar *)){
     font-size:var(--ry-fs-note) !important;
     line-height:1.55;
   }
 
   /* 标签 / 徽章 */
-  .tag,
-  .mod-tag,
-  .npill,
-  .pipe-status,
-  .live-pill,
-  .live-pill-btn,
-  .metric-label,
-  .wb-status,
-  .wb-nav a small,
-  .wb-side-kicker,
-  .wb-brand-sub,
-  .prod .tag,
-  .kpi small,
-  .season-kpi span,
-  .season-kpi em,
-  .plot-card .pc-badge,
-  .plot-card .pc-stage .pcs-label,
-  .plot-card .pc-stage .pcs-days,
-  .plot-card .pc-stage .pcs-target,
-  .plot-card .pc-stage .pcs-foot,
-  .plot-card .pc-stage-empty,
-  .op-viewport-bar .op-cur,
-  .op-view-detail,
-  .legend,
-  .legend .lab{
+  .tag:where(:not(.topbar *)),
+  .mod-tag:where(:not(.topbar *)),
+  .npill:where(:not(.topbar *)),
+  .pipe-status:where(:not(.topbar *)),
+  .live-pill:where(:not(.topbar *)),
+  .live-pill-btn:where(:not(.topbar *)),
+  .metric-label:where(:not(.topbar *)),
+  .wb-status:where(:not(.topbar *)),
+  .wb-nav a small:where(:not(.topbar *)),
+  .wb-side-kicker:where(:not(.topbar *)),
+  .wb-brand-sub:where(:not(.topbar *)),
+  .prod .tag:where(:not(.topbar *)),
+  .kpi small:where(:not(.topbar *)),
+  .season-kpi span:where(:not(.topbar *)),
+  .season-kpi em:where(:not(.topbar *)),
+  .plot-card .pc-badge:where(:not(.topbar *)),
+  .plot-card .pc-stage .pcs-label:where(:not(.topbar *)),
+  .plot-card .pc-stage .pcs-days:where(:not(.topbar *)),
+  .plot-card .pc-stage .pcs-target:where(:not(.topbar *)),
+  .plot-card .pc-stage .pcs-foot:where(:not(.topbar *)),
+  .plot-card .pc-stage-empty:where(:not(.topbar *)),
+  .op-viewport-bar .op-cur:where(:not(.topbar *)),
+  .op-view-detail:where(:not(.topbar *)),
+  .legend:where(:not(.topbar *)),
+  .legend .lab:where(:not(.topbar *)){
     font-size:var(--ry-fs-tiny) !important;
     line-height:1.45;
   }
 
   /* 数据/结果层级，保留必要强调但收窄跨度 */
-  .wb-stat .value,
-  .kpi strong,
-  .card .cost,
-  .total-line b,
-  .donut .center b,
-  .area-strip strong,
-  .optimal-title strong,
-  .diameter-grid strong,
-  .pump-node strong,
-  .network-summary strong,
-  .result .big small{
+  .wb-stat .value:where(:not(.topbar *)),
+  .kpi strong:where(:not(.topbar *)),
+  .card .cost:where(:not(.topbar *)),
+  .total-line b:where(:not(.topbar *)),
+  .donut .center b:where(:not(.topbar *)),
+  .area-strip strong:where(:not(.topbar *)),
+  .optimal-title strong:where(:not(.topbar *)),
+  .diameter-grid strong:where(:not(.topbar *)),
+  .pump-node strong:where(:not(.topbar *)),
+  .network-summary strong:where(:not(.topbar *)),
+  .result .big small:where(:not(.topbar *)){
     font-size:var(--ry-fs-kpi) !important;
     line-height:1.2;
   }
-  .score-card strong,
-  .result .big,
-  .pump-metrics strong{
+  .score-card strong:where(:not(.topbar *)),
+  .result .big:where(:not(.topbar *)),
+  .pump-metrics strong:where(:not(.topbar *)){
     font-size:var(--ry-fs-display) !important;
     line-height:1.08;
   }
-  .hero h1,
-  .hero-title,
-  h1{
+  .hero h1:where(:not(.topbar *)),
+  .hero-title:where(:not(.topbar *)),
+  h1:where(:not(.topbar *)){
     font-size:var(--ry-fs-hero) !important;
     line-height:1.16;
   }
-  .hero-copy h1{
+  .hero-copy h1:where(:not(.topbar *)){
     font-size:var(--ry-fs-kpi) !important;
     line-height:1.25;
   }
-  .hero-copy,
-  .hero-desc,
-  .hero-copy .hero-sub,
-  .hero-sub,
-  .lead{
+  .hero-copy:where(:not(.topbar *)),
+  .hero-desc:where(:not(.topbar *)),
+  .hero-copy .hero-sub:where(:not(.topbar *)),
+  .hero-sub:where(:not(.topbar *)),
+  .lead:where(:not(.topbar *)){
     font-size:15px !important;
     line-height:1.65;
   }
-  .hero-note strong,
-  .hero-note .summary-main strong,
-  .hero-note .summary-area b,
-  .chip b,
-  footer .big{
+  .hero-note strong:where(:not(.topbar *)),
+  .hero-note .summary-main strong:where(:not(.topbar *)),
+  .hero-note .summary-area b:where(:not(.topbar *)),
+  .chip b:where(:not(.topbar *)),
+  footer .big:where(:not(.topbar *)){
     font-size:var(--ry-fs-display) !important;
     line-height:1.08;
   }
-  .chip span,
-  .hero p.sub,
-  .section-sub{
+  .chip span:where(:not(.topbar *)),
+  .hero p.sub:where(:not(.topbar *)),
+  .section-sub:where(:not(.topbar *)){
     font-size:var(--ry-fs-card) !important;
   }
 
   /* 工具页特殊组件 */
-  .confidence{font-size:var(--ry-fs-tiny) !important;}
-  #areaTool .at-empty-state .big-icon,
-  .pp-empty .big-icon{
+  .confidence:where(:not(.topbar *)){font-size:var(--ry-fs-tiny) !important;}
+  #areaTool .at-empty-state .big-icon:where(:not(.topbar *)),
+  .pp-empty .big-icon:where(:not(.topbar *)){
     font-size:34px !important;
   }
-  .history-advice-card,
-  .dec-warn,
-  .dec-note,
-  .op-side-card b,
-  .op-side-card span,
-  .op-side-card ul,
-  .op-single-block b,
-  .op-single-block .op-list-text,
-  .op-single-block .op-mix-text,
-  .qp-modal-body{
+  .history-advice-card:where(:not(.topbar *)),
+  .dec-warn:where(:not(.topbar *)),
+  .dec-note:where(:not(.topbar *)),
+  .op-side-card b:where(:not(.topbar *)),
+  .op-side-card span:where(:not(.topbar *)),
+  .op-side-card ul:where(:not(.topbar *)),
+  .op-single-block b:where(:not(.topbar *)),
+  .op-single-block .op-list-text:where(:not(.topbar *)),
+  .op-single-block .op-mix-text:where(:not(.topbar *)),
+  .qp-modal-body:where(:not(.topbar *)){
     font-size:var(--ry-fs-body) !important;
   }
-  #schedule table tbody td,
-  #dailyLogTable td,
-  #dailyLogTable th,
-  #weatherLogTable td,
-  #weatherLogTable th{
+  #schedule table tbody td:where(:not(.topbar *)),
+  #dailyLogTable td:where(:not(.topbar *)),
+  #dailyLogTable th:where(:not(.topbar *)),
+  #weatherLogTable td:where(:not(.topbar *)),
+  #weatherLogTable th:where(:not(.topbar *)){
     font-size:var(--ry-fs-note) !important;
   }
 

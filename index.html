@@ -937,6 +937,8 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
 <link rel="icon" type="image/png" sizes="192x192" href="pwa/icons/icon-192.png">
 <link rel="stylesheet" href="pwa/pwa.css?v=2">
 <script defer src="pwa/pwa.js?v=2"></script>
+    <link rel="stylesheet" href="runye-theme.css?v=1">
+  <link rel="stylesheet" href="runye-typography.css?v=1">
 </head>
 <body>
 
@@ -959,7 +961,6 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
       </a>
       <nav class="main-nav" id="mainNav">
         <div class="nav-item"><a href="index.html" class="nav-link active">精准灌溉</a></div>
-<div class="nav-item"><a href="digital-agriculture/index.html" class="nav-link">数字农业</a></div>
         <div class="nav-item"><a href="耐特菲姆滴灌带长度查询器.html" class="nav-link">滴灌带查询</a></div>
       </nav>
       <a href="runye-landing.html" class="nav-home-btn">⌂ 返回主页</a>
@@ -1003,7 +1004,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
   <script src="runye-member-ui.js?v=367"></script>
   <!-- 顶部导航动作按钮（系统图/轴测图，runye-nav.js act 项）：动作映射须先于 runye-nav.js 注册 -->
   <script src="mod/inline-05.js?v=357"></script>
-  <script src="runye-nav.js?v=346"></script>
+  <script src="runye-nav.js?v=380"></script>
   <!-- [NEW MODULE: DXF 导出] 入口：删除本行即卸载（不改动任何原有逻辑） -->
   <script src="runye-dxf.js?v=263"></script>
   <!-- [NEW MODULE: pipe_optim] 入口：删除本行即卸载本隔离模块（不改动任何原有逻辑） -->
@@ -1228,7 +1229,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
              如需恢复：<h3><span class="num">5</span> 地块库 <span class="at-lib-count" id="plotLibCount">0</span></h3> -->
         <div class="at-lib-summary" id="plotLibSummary" style="font-size:11px;color:#888;margin-top:4px;">还没有保存的地块</div>
         <div class="at-lib-list" id="plotLibList"></div>
-        <div style="font-size:10px;color:#aaa;margin-top:4px;">「设为当前」回填 04 规划并同步数字农业；可重命名、删除。</div>
+        <div style="font-size:10px;color:#aaa;margin-top:4px;">「设为当前」回填 04 规划；可重命名、删除。</div>
       </div>
       <div class="at-section" style="margin-top:auto">
         <div class="at-btn-group">
@@ -2394,7 +2395,6 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
         </a>
         <nav class="main-nav" id="tl-mainNav">
           <div class="nav-item"><a href="index.html" class="nav-link">精准灌溉</a></div>
-<div class="nav-item"><a href="digital-agriculture/index.html" class="nav-link">数字农业</a></div>
           <div class="nav-item"><a href="耐特菲姆滴灌带长度查询器.html" class="nav-link">滴灌带查询</a></div>
         </nav>
         <a href="runye-landing.html" class="nav-home-btn">⌂ 返回主页</a>
@@ -2536,14 +2536,11 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
 <!-- ===== 地图面积测量回传：消费 runye-map-measure.html 写入的数据 ===== -->
 <script src="mod/inline-16.js?v=357"></script>
 
-<!-- ===== 灌溉 ↔ 数字农业 最小桥接（runyeOpenDigitalAgriculture / runyeSharePlotToDigital / runyeBridgeWriteBack）：实现外置于 irrigation-bridge.js ===== -->
-<script src="irrigation-bridge.js"></script>
-
 <!-- ===== 主区 Tab 绑定 + 底部状态栏 + 视口自适应 ===== -->
 <script src="mod/inline-17.js?v=357"></script>
 
 <!-- ===== 顶部功能区导航：平滑滚动 + 当前区块高亮 + 隐藏区块自动剔除 ===== -->
-<script src="mod/inline-18.js?v=357"></script>
+<script src="mod/inline-18.js?v=380"></script>
 
 <script src="mod/inline-19.js?v=357"></script>
 
@@ -2902,5 +2899,8 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
      必须排在所有主站脚本之后（它复用 window.runyeSaveProject / runyeLoadProject 做快照）。
      ★ 删除本行即完全卸载该功能（其余文件零改动）。 -->
 <script src="runye-undo.js?v=3"></script>
+<!-- [NEW MODULE: core 2026-10-11] 插件化主程序入口（ES Module）。
+     删除本行即整体卸载插件体系，原有功能零影响；插件清单见 plugins.json。 -->
+<script type="module" src="core/bootstrap.js?v=1"></script>
 </body>
 </html>

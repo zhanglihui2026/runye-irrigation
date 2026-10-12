@@ -4874,7 +4874,7 @@ function tlAutoGenerate(options) {
      computeThreeLevel 的「最远分区最不利路径」长度读 window.tlDiagramData；若按原来的顺序
      （先算 r → 再写 tlDiagramData）本幅图的简图参数/水泵扬程会用上一幅图的旧几何。
      故这里先把本次几何快照写入，再重算一次 r，并同步刷新左栏结果条与左下角损失卡。 */
-  window.tlDiagramData = { version: 1, world: 'meter', generatedAt: new Date().toISOString(), plot: { w: plotW, h: plotH },
+  window.tlDiagramData = { version: 1, schemaVersion: 1, world: 'meter', generatedAt: new Date().toISOString(), plot: { w: plotW, h: plotH },
     poly: JSON.parse(JSON.stringify(poly)),
     combinedN: tlGetZoneCount(),   /* 2026-09-16 联合灌溉区数 N，供工作区分组着色读取（简图不变） */
     zones: { cols: cols, rows: rows, xPos: xPos.slice(), yPos: yPos.slice(), xPlan: xPlan.slice(), yPlan: yPlan.slice(), xSrc: xSrc.slice(), ySrc: ySrc.slice(),

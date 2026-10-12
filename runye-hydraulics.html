@@ -6,9 +6,9 @@
 <title>润野 · 水力校核（管网与毛管校核）</title>
 <style>
   :root{
-    --g-700:#15803d; --g-600:#16a34a; --g-500:#22c55e; --g-50:#f0fdf4; --g-100:#dcfce7;
-    --s-700:#334155; --s-600:#475569; --s-500:#64748b; --s-300:#cbd5e1; --s-200:#e2e8f0; --s-100:#f1f5f9;
-    --r-600:#dc2626; --a-600:#d97706;
+    --g-700:var(--ry-green-700); --g-600:var(--ry-green-600); --g-500:var(--ry-green-500); --g-50:var(--ry-green-50); --g-100:var(--ry-green-100);
+    --s-700:var(--ry-s-700); --s-600:var(--ry-s-600); --s-500:var(--ry-s-500); --s-300:var(--ry-s-300); --s-200:var(--ry-s-200); --s-100:var(--ry-s-100);
+    --r-600:var(--ry-danger); --a-600:var(--ry-warn);
   }
   *{box-sizing:border-box}
   html,body{margin:0;height:100vh;overflow:hidden;font-family:-apple-system,"PingFang SC","Microsoft YaHei",Segoe UI,sans-serif;
@@ -56,9 +56,9 @@
   /* 中间区：上地图 + 下表格，整体可滚 */
   .result{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;padding:0}
   .result-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border-bottom:1px solid var(--s-200);flex:none}
-  .result-head h1{font-size:15px;line-height:1.2;color:#1e293b;margin:0;font-weight:700}
+  .result-head h1{font-size:15px;line-height:1.2;color:var(--ry-s-800);margin:0;font-weight:700}
   .result-head p{font-size:10px;line-height:1.5;color:var(--s-500);margin:2px 0 0}
-  .result-badge{flex:none;border:1px solid #bbf7d0;background:var(--g-50);color:var(--g-700);padding:3px 8px;font-size:10px;font-weight:700;white-space:nowrap}
+  .result-badge{flex:none;border:1px solid var(--ry-green-200);background:var(--g-50);color:var(--g-700);padding:3px 8px;font-size:10px;font-weight:700;white-space:nowrap}
   .result-body{flex:1;overflow-y:auto;overflow-x:hidden;padding:10px 14px} /* [v319] 纵向 12→10 */
   .overview{display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:10px;align-items:stretch;margin-bottom:12px}
   .scope-card{border:1px solid var(--s-200);background:#fff;padding:8px 10px;font-size:10px;line-height:1.6;color:var(--s-600)}
@@ -90,7 +90,7 @@
   .tag{display:inline-block;padding:0 5px;border-radius:2px;font-size:10px;font-weight:600}
   .tag.front{background:#111827;color:#fff}
   .tag.main{background:#185FA5;color:#fff}
-  .tag.branch{background:#16a34a;color:#fff}
+  .tag.branch{background:var(--ry-green-600);color:#fff}
   .warnbox{border:1px solid #fde68a;background:#fffbeb;color:#92400e;padding:7px 9px;font-size:11px;
     line-height:1.6;margin-bottom:10px;white-space:pre-wrap}
   .warnbox:empty{display:none}
@@ -99,14 +99,14 @@
   .empty b{color:var(--g-700)}
   .pathline{font-size:12px;background:#fff;border:1px solid var(--s-200);padding:8px 10px;margin:4px 0 8px;line-height:1.8}
   .pathline .arrow{color:var(--g-600);font-weight:700;padding:0 2px}
-  .hyd-map{position:relative;height:340px;border:1px solid var(--s-200);background:linear-gradient(135deg,#f8fafc,#eef6f1);overflow:hidden;margin:5px 0 12px;border-radius:6px}
+  .hyd-map{position:relative;height:340px;border:1px solid var(--s-200);background:linear-gradient(135deg,var(--ry-s-50),#eef6f1);overflow:hidden;margin:5px 0 12px;border-radius:6px}
   .hyd-map svg{width:100%;height:100%;display:block}.hyd-base{fill:none;stroke-linecap:round;stroke-linejoin:round}
   .hyd-flow{fill:none;stroke:#fff;stroke-width:2.2;stroke-linecap:round;stroke-dasharray:10 12;animation:hydFlow 1.35s linear infinite;pointer-events:none;opacity:.9}
   .hyd-pipe{cursor:pointer}.hyd-pipe:hover .hyd-base,.hyd-pipe.selected .hyd-base{stroke-width:8!important;filter:drop-shadow(0 0 3px rgba(15,23,42,.45))}
   .hyd-tip{position:absolute;right:10px;bottom:10px;max-width:310px;background:rgba(15,23,42,.88);color:#fff;padding:7px 9px;border-radius:5px;font-size:11px;line-height:1.55;pointer-events:none}
   .hyd-legend{position:absolute;left:10px;top:10px;background:rgba(255,255,255,.94);border:1px solid var(--s-200);padding:6px 8px;font-size:10px;line-height:1.65;color:var(--s-600)}
   @keyframes hydFlow{to{stroke-dashoffset:-22}}
-  pre.inp{background:#0f172a;color:#e2e8f0;font:11px/1.5 Consolas,monospace;padding:10px;overflow:auto;
+  pre.inp{background:var(--ry-s-900);color:var(--ry-s-200);font:11px/1.5 Consolas,monospace;padding:10px;overflow:auto;
     max-height:420px;margin:0;white-space:pre}
   /* [v316 2026-10-09 用户要求] 宽屏利用右侧留白：DU 估算与 EPANET 对照改两栏紧凑排版
      （原两卡 max-width:860px，宽屏右侧空 300px+）；≤1100px 回落单栏 */
@@ -116,7 +116,7 @@
   @media(max-width:1100px){.du-grid,.epa-grid{grid-template-columns:1fr}}
   /* [v316b 2026-10-09 用户要求] 曲线图容器撑满右栏剩余高度并与左栏底对齐；descHtml 留盒外 */
   #latChart{display:flex;flex-direction:column}
-  .lat-chart-box{border:1px solid var(--s-200);background:#f8fafc;flex:1;min-height:160px;position:relative;box-sizing:border-box} /* [v316b] min-height 仅单栏兜底；盒高随 flex:1（行高由左栏决定）与左栏底对齐 */
+  .lat-chart-box{border:1px solid var(--s-200);background:var(--ry-s-50);flex:1;min-height:160px;position:relative;box-sizing:border-box} /* [v316b] min-height 仅单栏兜底；盒高随 flex:1（行高由左栏决定）与左栏底对齐 */
   .lat-chart-box svg{position:absolute;inset:5px;width:calc(100% - 10px);height:calc(100% - 10px)} /* [v316b] absolute 填充：svg 不参与固有尺寸计算（height:100% 会被两遍布局计入盒 content 高，把行高托大 ~10px 破坏对齐） */
   .row2{display:flex;gap:6px}
   .row2 .mbtn{flex:1;text-align:center}
@@ -134,7 +134,7 @@
   .rp-asset{font-size:13px;font-weight:700;color:var(--s-700);margin-bottom:2px}
   .rp-type{font-size:10px;color:var(--s-500);margin-bottom:8px}
   .rp-table{width:100%;border-collapse:collapse;font-size:11px}
-  .rp-table td{padding:4px 0;border-bottom:1px solid #f1f5f9}
+  .rp-table td{padding:4px 0;border-bottom:1px solid var(--ry-s-100)}
   .rp-table td:first-child{color:var(--s-500)}
   .rp-table td:last-child{text-align:right;font-weight:600}
   .rp-table .ok{color:var(--g-700)}
@@ -156,8 +156,9 @@
   .result-head{border-bottom-color:transparent}
   .card{border-color:var(--s-100)}
 </style>
-<link rel="stylesheet" href="runye-theme.css">
 <link rel="stylesheet" href="runye-nav.css?v=346">
+    <link rel="stylesheet" href="runye-theme.css?v=1">
+  <link rel="stylesheet" href="runye-typography.css?v=1">
 </head>
 <body>
 <div id="app">
@@ -242,7 +243,7 @@
         <div class="card" id="lateralCard">
           <div class="du-grid">
             <div>
-              <div style="font-size:11px;color:var(--s-500);line-height:1.6">
+              <div style="font-size:var(--ry-fs-tiny);color:var(--s-500);line-height:1.6">
                 对最不利路径的<b>一条代表毛管</b>做逐滴头压力-流量耦合模拟：
                 每个滴头实际压力决定其出水量（q=k·P^x），迭代4轮收敛。
                 输出该毛管的 DU 估算与沿程压力曲线；它不替代全项目逐条毛管的均匀度校核。
@@ -259,7 +260,7 @@
         <div class="card">
           <div class="epa-grid">
             <div>
-              <div style="font-size:11px;color:var(--s-500);line-height:1.6">
+              <div style="font-size:var(--ry-fs-tiny);color:var(--s-500);line-height:1.6">
                 由本页拓扑自动生成 .inp（JUNCTIONS/PIPES/COORDINATES）；末端灌水流量写入对应支管下游节点，
                 并把本页局部损失换算为 EPANET 管件损失系数。供水端使用需求扬程作为固定水头边界；泵曲线选型仍由润野主计算负责。
               </div>
@@ -268,7 +269,7 @@
                 <button class="mbtn" id="btnDownInp">下载 .inp 文件</button>
                 <button class="mbtn" id="btnRunEpanet">▶ 运行 EPANET 对照</button>
               </div>
-              <div id="epanetOut" style="font-size:11px;line-height:1.6;margin-top:6px"></div>
+              <div id="epanetOut" style="font-size:var(--ry-fs-tiny);line-height:1.6;margin-top:6px"></div>
             </div>
             <pre class="inp" id="inpBox"></pre>
           </div>

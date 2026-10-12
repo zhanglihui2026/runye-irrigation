@@ -41,10 +41,10 @@
   #rySetModal .rs-nav{width:110px;flex:0 0 110px}
   #rySetModal .rs-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
-  /* [v322 2026-10-09 用户要求] 全站扁平化：滚动条隐形（轨道透明、滑块常态极淡、悬停显形；5px 基准不变） */
+  /* [v383 2026-10-12 用户要求] 滚动条最窄最短，与 runye-theme.css 全局值保持一致（本文件后于 theme 加载，值须相同否则 index 页与全站不一致）：轨道透明、滑块半透明灰、悬停显形 */
   *::-webkit-scrollbar-track{background:transparent}
-  *::-webkit-scrollbar-thumb{background:rgba(188,211,198,.25)}
-  *::-webkit-scrollbar-thumb:hover{background:rgba(188,211,198,.8)}
+  *::-webkit-scrollbar-thumb{background:rgba(100,116,139,.45)}
+  *::-webkit-scrollbar-thumb:hover{background:rgba(100,116,139,.72)}
   *::-webkit-scrollbar-corner{background:transparent}
   /* [v322] 栏线融合：左右工具栏与中间区直接相接（分界靠底色差） */
   body.ry-tool #pipePlanSection .pp-side, body.ry-tool #tlPipePlanSection .pp-side{border-right-color:transparent}

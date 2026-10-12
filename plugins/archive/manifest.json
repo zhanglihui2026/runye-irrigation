@@ -1,0 +1,17 @@
+{
+  "id": "archive",
+  "name": "项目档案",
+  "version": "1.0.0",
+  "entry": "main.js",
+  "requires": { "core": ">=1.0.0", "plugins": [] },
+  "ui": { "nav": { "label": "项目档案", "order": 97, "icon": "" } },
+  "permissions": [
+    "read:diagram",
+    "write:diagram",
+    "archive:read",
+    "archive:write",
+    "event:subscribe",
+    "event:emit",
+    "ui:nav"
+  ]
+}

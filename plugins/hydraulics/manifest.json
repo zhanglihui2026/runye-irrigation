@@ -1,0 +1,25 @@
+{
+  "id": "hydraulics",
+  "name": "水力校核（老模块迁移 · 壳）",
+  "version": "1.0.0",
+  "entry": "main.js",
+  "requires": { "core": ">=1.0.0", "plugins": [] },
+  "ui": {
+    "nav": {
+      "label": "水力校核",
+      "order": 12,
+      "icon": "",
+      "title": "水力校核：自动读已布置管网，逐段流量/流速/水损 + 最不利路径 + 需求扬程与水泵选型"
+    }
+  },
+  "permissions": ["ui:nav"],
+  "config": {
+    "takeOverNav": true,
+    "matchLabel": "水力校核",
+    "href": "runye-hydraulics.html",
+    "insertBefore": ".fn-more",
+    "feat": "hydraulic-check",
+    "autoloadCore": true,
+    "_note": "壳迁移 + 真改造：runye-hydraulics.html 业务零改动，本插件做三件事 —— ① 接管导航入口（原位插回）+ 保住会员门控；② [v379] 作为**水力计算内核宿主**，把 hydraulic-calc/hc-core.js / design-core.js / runye-hydraulics-core.js 请进主页上下文（顺序敏感），并广播 hydraulics-core-ready，让 core/data-service.js 的 hazenLoss 与全站统一到同一个口径；③ 通过 ctx api 向其它插件暴露 hazen / christiansenF / compute。autoloadCore=false 可省掉这 65KB，但 hazenLoss 会退回内置兜底（口径回到两份）。takeOverNav 置 false = 完全不碰老入口（灰度用）。insertBefore 是「更多 ▾」折叠组的选择器 —— 老项原本就在它前面。"
+  }
+}

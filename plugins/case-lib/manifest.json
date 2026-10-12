@@ -1,0 +1,13 @@
+{
+  "id": "case-lib",
+  "name": "案例检索与推荐",
+  "version": "1.0.0",
+  "entry": "main.js",
+  "requires": { "core": ">=1.0.0", "plugins": ["archive"] },
+  "ui": { "nav": { "label": "案例推荐", "order": 95, "icon": "" } },
+  "permissions": [
+    "read:diagram",
+    "archive:read",
+    "ui:nav"
+  ]
+}

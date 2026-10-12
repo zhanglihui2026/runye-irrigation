@@ -19,31 +19,31 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
   body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; background: #f7f5f0; color: #222; }
-  .no-print { background: #16a34a; color: #fff; display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; }
+  .no-print { background: var(--ry-green-600); color: #fff; display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; }
   .no-print h1 { font-size: 16px; font-weight: 600; }
   .no-print .btns button { margin-left: 8px; padding: 6px 14px; border: 1px solid rgba(255,255,255,.6); background: rgba(255,255,255,.12); color: #fff; border-radius: 6px; cursor: pointer; font-size: 13px; }
   .no-print .btns button:hover { background: rgba(255,255,255,.25); }
-  .no-print .btns button.primary { background: #fff; color: #16a34a; border-color: #fff; font-weight: 600; }
+  .no-print .btns button.primary { background: #fff; color: var(--ry-green-600); border-color: #fff; font-weight: 600; }
 
   .layout { display: flex; height: calc(100vh - 44px); }
   aside { width: 292px; min-width: 292px; background: #fff; border-right: 1px solid #d5dbe3; overflow-y: auto; padding: 12px; }
-  aside h2 { font-size: 13px; font-weight: 600; color: #16a34a; margin: 14px 0 8px; padding-bottom: 4px; border-bottom: 1px solid #e4e9f0; }
+  aside h2 { font-size: 13px; font-weight: 600; color: var(--ry-green-600); margin: 14px 0 8px; padding-bottom: 4px; border-bottom: 1px solid #e4e9f0; }
   aside h2:first-child { margin-top: 0; }
   .row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; font-size: 13px; }
   .row label { color: #444; }
   .row input[type=text], .row input[type=number], .row select { width: 138px; padding: 4px 6px; border: 1px solid #c3ccd8; border-radius: 5px; font-size: 13px; background: #fff; }
-  .row input[type=text]:focus, .row select:focus { outline: 1.5px solid #16a34a; border-color: #16a34a; }
+  .row input[type=text]:focus, .row select:focus { outline: 1.5px solid var(--ry-green-600); border-color: var(--ry-green-600); }
   .chk { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: #444; margin-bottom: 4px; }
   .chk label { display: flex; align-items: center; gap: 4px; }
-  .fert-item { border: 1px solid #e0e6ee; border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; background: #f8fafc; }
-  .fert-item .ft { font-size: 12px; color: #16a34a; font-weight: 600; margin-bottom: 5px; }
+  .fert-item { border: 1px solid #e0e6ee; border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; background: var(--ry-s-50); }
+  .fert-item .ft { font-size: 12px; color: var(--ry-green-600); font-weight: 600; margin-bottom: 5px; }
   .fert-item .row { margin-bottom: 4px; }
   .fert-item select { width: 128px; }
   .btn-line { display: flex; gap: 8px; margin-top: 10px; }
   .btn-line button { flex: 1; padding: 7px 0; border-radius: 6px; cursor: pointer; font-size: 13px; }
-  .btn-line .ok { background: #16a34a; color: #fff; border: 1px solid #16a34a; }
-  .btn-line .ok:hover { background: #15803d; }
-  .btn-line .ghost { background: #fff; color: #16a34a; border: 1px solid #16a34a; }
+  .btn-line .ok { background: var(--ry-green-600); color: #fff; border: 1px solid var(--ry-green-600); }
+  .btn-line .ok:hover { background: var(--ry-green-700); }
+  .btn-line .ghost { background: #fff; color: var(--ry-green-600); border: 1px solid var(--ry-green-600); }
   .tip { font-size: 12px; color: #8892a0; margin-top: 10px; line-height: 1.7; }
 
   main { flex: 1; overflow: auto; padding: 20px; display: flex; justify-content: center; align-items: flex-start; }
@@ -51,29 +51,29 @@
   .sheet-inner { position: absolute; left: 8mm; top: 8mm; right: 8mm; bottom: 8mm; border: 1.2mm solid #111; }
   .sheet-inner2 { position: absolute; left: 11mm; top: 11mm; right: 11mm; bottom: 11mm; border: .35mm solid #111; }
   .head { display: flex; align-items: center; justify-content: space-between; padding: 0 5mm; border-bottom: .35mm solid #111; position: absolute; left: 11mm; top: 11mm; right: 11mm; height: 14mm; }
-  .head .proj { font-size: 13pt; font-weight: 700; letter-spacing: 1.5px; color: #15803d; }
+  .head .proj { font-size: 13pt; font-weight: 700; letter-spacing: 1.5px; color: var(--ry-green-700); }
   .head .sub { font-size: 9.5pt; color: #444; }
   .head .code { font-size: 9pt; border: .3mm solid #111; padding: .8mm 2.5mm; color: #333; }
   .svg-zone { position: absolute; left: 13mm; right: 13mm; display: flex; align-items: center; justify-content: center; }
   .svg-zone svg { width: auto; height: 100%; max-width: 100%; }
   /* 设备表 / 设计说明 —— 图纸内可拖拽虚线外框区域 */
   .zb-block { position: absolute; min-width: 80mm; min-height: 42mm; z-index: 5; }
-  .zb-frame { position: absolute; inset: 0; border: .45mm dashed #16a34a; pointer-events: none; }
-  .zb-title { position: absolute; left: 0; top: -6mm; font-size: 10pt; font-weight: 600; color: #15803d; cursor: move; user-select: none; white-space: nowrap; background: #fff; padding: 0 1.5mm 0 0; z-index: 7; line-height: 1.1; }
+  .zb-frame { position: absolute; inset: 0; border: .45mm dashed var(--ry-green-600); pointer-events: none; }
+  .zb-title { position: absolute; left: 0; top: -6mm; font-size: 10pt; font-weight: 600; color: var(--ry-green-700); cursor: move; user-select: none; white-space: nowrap; background: #fff; padding: 0 1.5mm 0 0; z-index: 7; line-height: 1.1; }
   .zb-body { position: absolute; left: 0; right: 0; top: 0; bottom: 0; width: auto; max-width: none; overflow: auto; }
   .zb-body table { width: 100%; border-collapse: collapse; font-size: 7.5pt; }
   .zb-body th, .zb-body td { border: .3mm solid #111; padding: 1mm .8mm; text-align: center; line-height: 1.25; }
-  .zb-body th { background: #dcfce7; }
+  .zb-body th { background: var(--ry-green-100); }
   .zb-body .l { text-align: left; }
   .zb-handle { position: absolute; right: 0; bottom: 0; width: 15px; height: 15px; cursor: nwse-resize; z-index: 6; user-select: none; touch-action: none; }
-  .zb-handle::after { content: ''; position: absolute; right: 3px; bottom: 3px; width: 7px; height: 7px; border-right: 2px solid #16a34a; border-bottom: 2px solid #16a34a; }
+  .zb-handle::after { content: ''; position: absolute; right: 3px; bottom: 3px; width: 7px; height: 7px; border-right: 2px solid var(--ry-green-600); border-bottom: 2px solid var(--ry-green-600); }
   .notes li { font-size: 8.5pt; line-height: 2; margin-left: 0; }
   .sheet.a4 .zb-body table { font-size: 6.6pt; }
   .sheet.a4 .zb-body th, .sheet.a4 .zb-body td { padding: .75mm .5mm; }
   .sheet.a4 .notes li { font-size: 7.5pt; line-height: 1.9; }
   .sign { position: absolute; bottom: 10mm; right: 11mm; border-collapse: collapse; }
   .sign td { border: .35mm solid #111; font-size: 8pt; text-align: center; padding: .6mm 2mm; }
-  .sign .name { font-size: 10.5pt; font-weight: 700; background: #dcfce7; color: #15803d; }
+  .sign .name { font-size: 10.5pt; font-weight: 700; background: var(--ry-green-100); color: var(--ry-green-700); }
   .sign .cap { background: #F1EFE8; font-size: 7.5pt; color: #555; }
   .empty { position: absolute; inset: 11mm; display: flex; align-items: center; justify-content: center; font-size: 14px; color: #8892a0; }
 
@@ -109,9 +109,9 @@ input[type="reset"],
 /* ===== RY-NAV: 主页导航嵌入（与精准灌溉页 index.html 完全一致） ===== */
 .ry-nav{
   position:sticky;top:0;z-index:1500;
-  --g-50:#f0fdf4;--g-100:#dcfce7;--g-200:#bbf7d0;--g-300:#86efac;--g-400:#4ade80;--g-500:#22c55e;--g-600:#16a34a;--g-700:#15803d;--g-800:#166534;--g-900:#14532d;
-  --teal:#0d9488;--teal-700:#0f766e;
-  --s-50:#f8fafc;--s-100:#f1f5f9;--s-200:#e2e8f0;--s-300:#cbd5e1;--s-400:#94a3b8;--s-500:#64748b;--s-600:#475569;--s-700:#334155;--s-800:#1e293b;--s-900:#0f172a;
+  --g-50:var(--ry-green-50);--g-100:var(--ry-green-100);--g-200:var(--ry-green-200);--g-300:#86efac;--g-400:#4ade80;--g-500:var(--ry-green-500);--g-600:var(--ry-green-600);--g-700:var(--ry-green-700);--g-800:var(--ry-green-800);--g-900:var(--ry-green-900);
+  --teal:var(--ry-teal);--teal-700:var(--ry-teal-700);
+  --s-50:var(--ry-s-50);--s-100:var(--ry-s-100);--s-200:var(--ry-s-200);--s-300:var(--ry-s-300);--s-400:var(--ry-s-400);--s-500:var(--ry-s-500);--s-600:var(--ry-s-600);--s-700:var(--ry-s-700);--s-800:var(--ry-s-800);--s-900:var(--ry-s-900);
   --shadow-sm:0 2px 8px rgba(15,23,42,.06);
   --transition:all .2s ease;
   --maxw:1280px;
@@ -173,7 +173,8 @@ input[type="reset"],
   /* [v322] 导航 tab 分隔线扁平化 */
   .ry-nav .nav-link{border-right-color:transparent}
 </style>
-  <link rel="stylesheet" href="runye-theme.css">
+    <link rel="stylesheet" href="runye-theme.css?v=1">
+  <link rel="stylesheet" href="runye-typography.css?v=1">
 </head>
 <body>
 
@@ -207,7 +208,7 @@ input[type="reset"],
 
 
 <header class="no-print">
-  <h1>润野灌溉 · 二级系统图（供水首部系统）<span style="font-size:12px;font-weight:400;opacity:.85;margin-left:10px">独立页面 · 参数来自润野方案计算</span></h1>
+  <h1>润野灌溉 · 二级系统图（供水首部系统）<span style="font-size:var(--ry-fs-note);font-weight:400;opacity:.85;margin-left:10px">独立页面 · 参数来自润野方案计算</span></h1>
   <div class="btns">
     <button onclick="exportSVG()">导出 SVG</button>
     <button onclick="exportPNG()">导出 PNG</button>

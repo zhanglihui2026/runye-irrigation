@@ -13,12 +13,13 @@
 .fs-wrap-body{flex:1 1 auto;min-height:0;min-width:0;display:flex;overflow:hidden}
 .fs-main{flex:1;min-width:0;overflow:auto;padding:8px 10px 22px}
 
-/* ---------- 滚动条：只写 ::-webkit-scrollbar（第六十五轮实测口径，见 hydraulic-calc.css） ---------- */
-.fs-side::-webkit-scrollbar,.fs-main::-webkit-scrollbar{width:5px;height:5px}
+/* ---------- 滚动条：只写 ::-webkit-scrollbar（第六十五轮实测口径，见 hydraulic-calc.css） ----------
+ * [v383 2026-10-12 用户要求] 与全站统一为最窄最短：5px→4px，拇指改半透明灰圆角丸（原 #bfd3c6 实色偏深）。 */
+.fs-side::-webkit-scrollbar,.fs-main::-webkit-scrollbar{width:4px;height:4px}
 .fs-side::-webkit-scrollbar-track,.fs-main::-webkit-scrollbar-track,
 .fs-side::-webkit-scrollbar-corner,.fs-main::-webkit-scrollbar-corner{background:transparent}
-.fs-side::-webkit-scrollbar-thumb,.fs-main::-webkit-scrollbar-thumb{background:#bfd3c6;border-radius:2px}
-.fs-side::-webkit-scrollbar-thumb:hover,.fs-main::-webkit-scrollbar-thumb:hover{background:#9db8a7}
+.fs-side::-webkit-scrollbar-thumb,.fs-main::-webkit-scrollbar-thumb{background:rgba(100,116,139,.45);border-radius:999px}
+.fs-side::-webkit-scrollbar-thumb:hover,.fs-main::-webkit-scrollbar-thumb:hover{background:rgba(100,116,139,.72)}
 
 /* ---------- 回执消息条已取消（v19：整条删除）----------
  * 操作回执改写到页面底部状态栏 #ryStHint（见 filter-system.js planNote），本文件不再有回执条样式。 */

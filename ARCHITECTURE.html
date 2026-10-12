@@ -4,23 +4,25 @@
 <meta charset="UTF-8">
 <title>润野灌溉 · 技术架构规划 v1.0</title>
 <style>
-body{font-family:-apple-system,"Microsoft YaHei",sans-serif;max-width:960px;margin:0 auto;padding:40px 24px;color:#334155;line-height:1.8;background:#fafaf9}
-h1{font-size:24px;color:#15803d;border-bottom:3px solid #15803d;padding-bottom:8px;margin-bottom:24px}
-h2{font-size:18px;color:#1e293b;margin-top:32px;border-left:4px solid #15803d;padding-left:10px}
-h3{font-size:15px;color:#334155;margin-top:20px}
-table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13px}
-th{background:#15803d;color:#fff;padding:8px 10px;text-align:left}
-td{border:1px solid #e2e8f0;padding:6px 10px}
-tr:nth-child(even){background:#f8fafc}
-code{background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px;color:#15803d}
-.arch{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin:12px 0;font-family:Consolas,monospace;font-size:12px;line-height:1.6;white-space:pre;overflow-x:auto}
-.box{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:12px 16px;margin:12px 0}
+body{font-family:-apple-system,"Microsoft YaHei",sans-serif;max-width:960px;margin:0 auto;padding:40px 24px;color:var(--ry-s-700);line-height:1.8;background:#fafaf9}
+h1{font-size:24px;color:var(--ry-green-700);border-bottom:3px solid var(--ry-green-700);padding-bottom:8px;margin-bottom:24px}
+h2{font-size:18px;color:var(--ry-s-800);margin-top:32px;border-left:4px solid var(--ry-green-700);padding-left:10px}
+h3{font-size:15px;color:var(--ry-s-700);margin-top:20px}
+table{border-collapse:collapse;width:100%;margin:12px 0;font-size:var(--ry-fs-body)}
+th{background:var(--ry-green-700);color:#fff;padding:8px 10px;text-align:left}
+td{border:1px solid var(--ry-s-200);padding:6px 10px}
+tr:nth-child(even){background:var(--ry-s-50)}
+code{background:var(--ry-s-100);padding:2px 6px;border-radius:3px;font-size:var(--ry-fs-note);color:var(--ry-green-700)}
+.arch{background:#fff;border:1px solid var(--ry-s-200);border-radius:8px;padding:16px;margin:12px 0;font-family:Consolas,monospace;font-size:var(--ry-fs-note);line-height:1.6;white-space:pre;overflow-x:auto}
+.box{background:var(--ry-green-50);border:1px solid var(--ry-green-200);border-radius:6px;padding:12px 16px;margin:12px 0}
 .warn{background:#fef3c7;border-color:#fde68a}
 .warn{background:#fef3c7;border:1px solid #fde68a;border-radius:6px;padding:12px 16px;margin:12px 0}
 ul,ol{padding-left:24px}
 li{margin-bottom:4px}
-.tag{display:inline-block;background:#dcfce7;color:#15803d;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.tag{display:inline-block;background:var(--ry-green-100);color:var(--ry-green-700);padding:1px 8px;border-radius:10px;font-size:var(--ry-fs-tiny);font-weight:600}
 </style>
+    <link rel="stylesheet" href="runye-theme.css?v=1">
+  <link rel="stylesheet" href="runye-typography.css?v=1">
 </head>
 <body>
 

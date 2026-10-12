@@ -18,6 +18,10 @@
   'use strict';
 
   var Core = (typeof window !== 'undefined') ? window.RyHcCore : null;
+  var Compliance = (typeof window !== 'undefined') ? window.RyComplianceCheck : null;
+  var complianceScriptUrl = (typeof document !== 'undefined' && document.currentScript && document.currentScript.src)
+    ? document.currentScript.src.replace(/hydraulic-calc\.js(?:\?.*)?$/, 'compliance-check.js') : null;
+  var complianceLoadStarted = false;
   var CFG_KEY = 'runye_hydraulic_calc_cfg_v1';
   var SEC_ID = 'threeDModelingSection';
 
@@ -37,6 +41,7 @@
   var rootEl = null;
   var cfg = null;
   var lastSrc = null;   /* 三级方案来源说明（importThreeLevel 写入，展示在左栏顶部 .hc-src）；{title, rows[]} */
+  var complianceResult = null;
   function srcNoteHtml() {
     if (!lastSrc) return '';
     return '<b>' + esc(lastSrc.title || '') + '</b>' +
@@ -159,6 +164,10 @@
       '    <div class="hc-block">' +
       '      <div class="hc-block-h">任意组合对比<span class="hc-block-note" data-hc-out="combNote"></span></div>' +
       '      <div class="hc-table-wrap"><table class="hc-table" id="' + ALL_TABLE_ID + '"></table></div>' +
+      '    </div>' +
+      '    <div class="hc-block hc-compliance" data-hc="compliance">' +
+      '      <div class="hc-block-h">合规检查<span class="hc-block-note">标准判据仅在必要输入齐全时判定</span></div>' +
+      '      <div data-hc-out="complianceBody"></div>' +
       '    </div>' +
       '    <p class="hc-note">' +
       '      沿程水头损失按 Hazen-Williams：<code>hf = 1.113×10⁹ · L · Q^1.852 / (C^1.852 · D^4.87)</code>' +
@@ -456,6 +465,38 @@
     renderNet(res, all);
     renderLegTable(res);
     renderAllTable(all, p);
+    renderCompliance();
+  }
+
+  function renderCompliance() {
+    var box = rootEl && rootEl.querySelector('[data-hc-out="complianceBody"]');
+    if (!box) return;
+    if (!complianceResult) {
+      box.innerHTML = '<p class="hc-note">当前页提供的是管路沿程/局部损失计算；尚未接入灌水器逐点压力与流量、喷头压力或雨量筒实测值，因此不能据此判定国标合规。接入数据后将按 GB/T 50485-2020、GB/T 50085-2007 和适用范围内的 NY/T 4368-2023 逐项检查；缺项显示“未评估”。</p>';
+      return;
+    }
+    var labels = { pass: '合格', warn: '接近限值', fail: '不合格', unassessed: '未评估' };
+    var h = '<div class="hc-compliance-summary">合格 ' + complianceResult.summary.pass + ' · 预警 ' + complianceResult.summary.warn + ' · 不合格 ' + complianceResult.summary.fail + ' · 未评估 ' + complianceResult.summary.unassessed + '</div>';
+    if (!complianceResult.checks.length) h += '<p class="hc-note">没有可判定项。请提供相应的设计值或实测数据。</p>';
+    else {
+      h += '<div class="hc-table-wrap"><table class="hc-table"><thead><tr><th>判据</th><th>实测/计算值</th><th>限值</th><th>状态</th><th>说明</th></tr></thead><tbody>';
+      complianceResult.checks.forEach(function (c) {
+        h += '<tr><td>' + esc(c.item) + '<br><small>' + esc(c.clause) + '</small></td><td>' + (c.actual === null ? '—' : esc(c.actual) + ' ' + esc(c.unit || '')) + '</td><td>' + esc(c.limit || '需补参数') + '</td><td>' + esc(labels[c.status] || c.status) + '</td><td>' + esc(c.suggestion || c.note || '—') + '</td></tr>';
+      });
+      h += '</tbody></table></div>';
+    }
+    h += '<p class="hc-note">' + esc(complianceResult.disclaimer || '设计辅助检查，不替代工程复核与验收。') + '</p>';
+    box.innerHTML = h;
+  }
+
+  function ensureComplianceLoaded() {
+    if (Compliance || !complianceScriptUrl || complianceLoadStarted) return;
+    complianceLoadStarted = true;
+    var script = document.createElement('script');
+    script.src = complianceScriptUrl;
+    script.onload = function () { Compliance = window.RyComplianceCheck || null; renderCompliance(); };
+    script.onerror = function () { complianceLoadStarted = false; };
+    document.head.appendChild(script);
   }
 
   function renderLegTable(res) {
@@ -678,6 +719,7 @@
     if (window.RY_HC_RESERVED) return null;
     var sec = document.getElementById(SEC_ID);
     if (!sec || !Core) return null;
+    ensureComplianceLoaded();
     var wrap = sec.querySelector('.hc-wrap');
     if (!wrap) sec.insertAdjacentHTML('beforeend', shellHtml());
     rootEl = sec.querySelector('.hc-wrap');
@@ -780,6 +822,14 @@
     selectPath: selectPath,
     worstPath: function () { return cfg ? Core.worstPath(cfg) : null; },
     summary: function () { return cfg ? Core.summary(cfg) : null; },
+    /* 合规判据需要额外的灌水器/喷头设计值或实测数据；不会从管损结果伪造这些输入。 */
+    checkCompliance: function (input) {
+      if (!Compliance || typeof Compliance.check !== 'function') return null;
+      complianceResult = Compliance.check(input || {});
+      renderCompliance();
+      return clone(complianceResult);
+    },
+    clearCompliance: function () { complianceResult = null; renderCompliance(); },
     /* 供 e2e 读渲染结果（读 DOM，不信任内部状态） */
     legRows: function () {
       var t = rootEl && rootEl.querySelector('#' + LEG_TABLE_ID);

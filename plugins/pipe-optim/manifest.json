@@ -1,0 +1,13 @@
+{
+  "id": "pipe-optim",
+  "name": "管网优化（老模块迁移样板）",
+  "version": "1.0.0",
+  "entry": "main.js",
+  "requires": { "core": ">=1.0.0", "plugins": [] },
+  "ui": { "nav": { "label": "管网优化", "order": 90, "icon": "", "title": "管网优化详细分析（Jaya 群智能 · 只读）" } },
+  "permissions": ["read:diagram", "event:emit", "ui:nav"],
+  "config": {
+    "takeOverNav": true,
+    "_note": "true=摘掉老模块自注入的按钮、改由插件注册（位置不变）；false=完全不碰老按钮，只做事件桥接（灰度用）"
+  }
+}

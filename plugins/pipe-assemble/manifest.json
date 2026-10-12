@@ -1,0 +1,25 @@
+{
+  "id": "pipe-assemble",
+  "name": "管路接驳拼装（老模块迁移 · 壳）",
+  "version": "1.0.0",
+  "entry": "main.js",
+  "requires": { "core": ">=1.0.0", "plugins": [] },
+  "ui": {
+    "nav": {
+      "label": "管路拼装",
+      "order": 91,
+      "icon": "",
+      "title": "管路接驳拼装：管件级拼装 + 单向水力计算"
+    }
+  },
+  "permissions": ["ui:nav"],
+  "config": {
+    "takeOverNav": true,
+    "matchLabel": "管路拼装",
+    "href": "管路接驳拼装.html",
+    "container": ".fn-more-panel",
+    "beforeLabel": "经济指标分析",
+    "feat": "pro-others",
+    "_note": "壳迁移：管路接驳拼装.html 业务零改动，本插件只接管导航入口（原容器原位置插回）+ 跳转 + 保住会员门控。takeOverNav 置 false = 完全不碰老入口（灰度用）。container/beforeLabel 是老项原来的落点（「更多 ▾」面板内、「系统图」之后「经济指标分析」之前）；beforeLabel 用文字定位是因为 runye-nav.js 渲染的面板项没有稳定 id/class，href 还随页面带不带 data-base 而变。feat='pro-others' = L2 高级会员（与老项 runye-nav.js MORE_ITEMS 里的标注一致，迁移不许把这道闸弄丢）。"
+  }
+}
