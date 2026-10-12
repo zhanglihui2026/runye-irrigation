@@ -299,9 +299,94 @@
     return b;
   }
 
+  /* ===== [v393 2026-10-12 用户指令] 地块角度：复刻「地块分区」的地块旋转 =====
+   * 语义与主页 mod/inline-11.js 的 ppGetRotatedPlotPoints / ppRepartition 完全同口径：
+   *   · 输入框（tPlotAngle → state._plotRot，运行时态不持久化，刷新归零，与 pp 一致）
+   *     只影响**显示**、不重写数据；
+   *   · 旋转轴 = 全部地块的**联合包围盒中心**（单地块即该地块包围盒中心）；
+   *     多地块整组一起转 —— 与地块分区 v193「旋转作用于整组」一致；
+   *   · 喷灌布置叠加由地块多边形推导，drawCanvas 传旋转后的多边形即自动跟随；
+   *   · 「落定基准」（tPlotBake）= ppRepartition 的落定：把旋转后的坐标写成新基准 ——
+   *     地块 poly 与 rtk_xyz 高程点**一起刚性旋转**（保持对位，采样/坡度不失真）；
+   *     栅格（DTM/DSM）不支持旋转，落定前 confirm 提示重新导入。
+   * 回传主页始终发送数据坐标：想回传旋转后的轮廓，先落定再回传（快捷条 title 已注明）。 */
+  function tRotDeg() {
+    var v = parseFloat(state._plotRot);
+    if (!isFinite(v)) v = 0;
+    return Math.max(-180, Math.min(180, v));
+  }
+  function tRotatePoint(pt, deg, center) {
+    if (!deg) return { x: pt.x, y: pt.y };
+    var rad = deg * Math.PI / 180;
+    var c = Math.cos(rad), s = Math.sin(rad);
+    var dx = pt.x - center.x, dy = pt.y - center.y;
+    return { x: center.x + dx * c - dy * s, y: center.y + dx * s + dy * c };
+  }
+  /* 联合包围盒中心（drawCanvas 的 B 同口径；这里只看有效地块） */
+  function tRotCenter(polys) {
+    var B = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+    polys.forEach(function (p) {
+      var b = bboxOfPoly(p.poly);
+      B.minX = Math.min(B.minX, b.minX); B.minY = Math.min(B.minY, b.minY);
+      B.maxX = Math.max(B.maxX, b.maxX); B.maxY = Math.max(B.maxY, b.maxY);
+    });
+    return { x: B.minX + (B.maxX - B.minX) / 2, y: B.minY + (B.maxY - B.minY) / 2 };
+  }
+  function tRotPoly(poly, deg, center) {
+    return poly.map(function (pt) { return tRotatePoint(pt, deg, center); });
+  }
+  /* 当前显示层用的地块集合（deg=0 时原样返回，避免无谓拷贝） */
+  function tViewPolys() {
+    var polys = state.plots.filter(function (p) { return Array.isArray(p.poly) && p.poly.length >= 3; });
+    var deg = tRotDeg();
+    if (!deg || !polys.length) return { polys: polys, deg: 0, center: null };
+    return { polys: polys, deg: deg, center: tRotCenter(polys) };
+  }
+  /* 「落定基准」：把当前旋转角度写成数据新基准（复刻地块分区 ppRepartition 的落定语义）。
+     地块轮廓与 rtk_xyz 高程点一起刚性旋转（同一 center/deg，保持对位，采样/坡度不失真）；
+     栅格（DTM/DSM）网格结构不适用刚性旋转 → confirm 里明示需重新导入。 */
+  function bakeRotation() {
+    var polys = state.plots.filter(function (p) { return Array.isArray(p.poly) && p.poly.length >= 3; });
+    if (!polys.length) { banner('warn', '尚未导入地块，无可落定的轮廓。'); return; }
+    var deg = tRotDeg();
+    if (!deg) { banner('warn', '地块角度为 0°，无需落定。'); return; }
+    var hasRaster = state.elevations.some(function (r) { return r && r.data_type && r.data_type !== 'rtk_xyz'; });
+    var msg = '把当前角度（' + deg + '°）落定为新基准？\n' +
+      '· 地块轮廓坐标将改写为旋转后坐标（不可撤销）\n' +
+      '· RTK 高程点坐标同步旋转（保持与地块对位）' +
+      (hasRaster ? '\n· ⚠ 栅格数据（DTM/DSM）不支持旋转，落定后请重新导入' : '');
+    if (!window.confirm(msg)) return;
+    var rc = tRotCenter(polys);
+    var rnd = function (v) { return Math.round(v * 100) / 100; }; /* 与导入口径一致：保留两位小数 */
+    state.plots.forEach(function (p) {
+      if (Array.isArray(p.poly) && p.poly.length >= 3) {
+        p.poly = tRotPoly(p.poly, deg, rc).map(function (pt) { return { x: rnd(pt.x), y: rnd(pt.y) }; });
+      }
+    });
+    state.elevations.forEach(function (r) {
+      if (r && r.data_type === 'rtk_xyz' && Array.isArray(r.point_list)) {
+        r.point_list = r.point_list.map(function (pt) {
+          var q = tRotatePoint(pt, deg, rc);
+          return { x: rnd(q.x), y: rnd(q.y), z: pt.z };
+        });
+      }
+    });
+    state._plotRot = 0;
+    var inp = $('tPlotAngle'); if (inp) inp.value = 0;
+    persistAndRender();
+    banner('ok', '✓ 已落定：地块轮廓与 RTK 高程点已按 <b>' + deg + '°</b> 刚性旋转并写入新基准。');
+  }
+
   function drawCanvas() {
     var svg = $('tCanvas'), emptyBox = $('canvasEmpty'), meta = $('canvasMeta');
-    var polys = state.plots.filter(function (p) { return Array.isArray(p.poly) && p.poly.length >= 3; });
+    /* [v393] 显示层 = 旋转后的地块集合（deg=0 时即原数据）；
+       视野 bbox 也按旋转后算，保证任意角度都在全览视野内 */
+    var vp = tViewPolys();
+    var rotDeg = vp.deg, rotC = vp.center;
+    var drawPolys = rotDeg
+      ? vp.polys.map(function (p) { return Object.assign({}, p, { poly: tRotPoly(p.poly, rotDeg, rotC) }); })
+      : vp.polys;
+    var polys = drawPolys;
     if (!polys.length) {
       svg.setAttribute('hidden', '');
       emptyBox.style.display = '';
@@ -326,18 +411,19 @@
     var fs = (vh * 0.035).toFixed(2); /* 标签字号随视野缩放 */
 
     var out = [];
-    /* 地块多边形 */
+    /* 地块多边形（[v393] 显示层 = drawPolys，已按地块角度旋转） */
     polys.forEach(function (p, i) {
-      var pts = p.poly.map(function (pt) {
+      var rp = p.poly;
+      var pts = rp.map(function (pt) {
         return (Math.round(pt.x * 100) / 100).toFixed(1) + ',' + (Math.round((flip - pt.y) * 100) / 100).toFixed(1);
       }).join(' ');
       out.push('<polygon class="t-poly-face" points="' + pts + '"><title>' + esc(p.name || ('地块' + (i + 1))) + '</title></polygon>');
       /* 顶点小圆 */
-      p.poly.forEach(function (pt) {
+      rp.forEach(function (pt) {
         out.push('<circle class="t-poly-vtx" cx="' + pt.x.toFixed(1) + '" cy="' + (flip - pt.y).toFixed(1) + '" r="' + (vh * 0.006).toFixed(2) + '"/>');
       });
       /* 标签：名称 + 面积，置于第一顶点旁（质心在凹多边形可能落外） */
-      var lp = p.poly[0];
+      var lp = rp[0];
       var area = D.polygonAreaM2(p.poly);
       var lbl = esc(p.name || ('地块' + (i + 1))) + ' ' + (areaUnit === 'mu' ? D.sqmToMu(area) + '亩' : Math.round(area) + '㎡');
       out.push('<text class="t-poly-label" x="' + (lp.x + vw * 0.008).toFixed(1) + '" y="' + (flip - lp.y - vh * 0.008).toFixed(1) +
@@ -352,8 +438,11 @@
         var step = Math.ceil(r.point_list.length / 3000);
         r.point_list.forEach(function (pt, i) {
           if (i % step) return;
-          if (pt.x < B.minX || pt.x > B.maxX || pt.y < B.minY || pt.y > B.maxY) return;
-          out.push('<circle class="t-elev-dot" cx="' + pt.x.toFixed(1) + '" cy="' + (flip - pt.y).toFixed(1) + '" r="' + (vh * 0.004).toFixed(2) + '"><title>X ' + pt.x + '\nY ' + pt.y + '\nZ ' + pt.z + '</title></circle>');
+          /* [v393] 高程点显示坐标跟随地块角度刚性旋转（保持与旋转后地块对位）；
+             title 恒显原始数据坐标（数据未被改写） */
+          var dp = rotDeg ? tRotatePoint(pt, rotDeg, rotC) : pt;
+          if (dp.x < B.minX || dp.x > B.maxX || dp.y < B.minY || dp.y > B.maxY) return;
+          out.push('<circle class="t-elev-dot" cx="' + dp.x.toFixed(1) + '" cy="' + (flip - dp.y).toFixed(1) + '" r="' + (vh * 0.004).toFixed(2) + '"><title>X ' + pt.x + '\nY ' + pt.y + '\nZ ' + pt.z + '</title></circle>');
           dotCount++;
         });
       });
@@ -661,6 +750,15 @@
     $('btnSendHome').addEventListener('click', sendHome);
     $('btnAddManual').addEventListener('click', addManual);
     $('elevDots').addEventListener('change', drawCanvas);
+    /* [v393] 地块角度：输入即重绘（只影响显示、不重写数据）；「落定基准」改写数据为新基准 */
+    var tAngle = $('tPlotAngle');
+    if (tAngle) tAngle.addEventListener('input', function () {
+      var v = parseFloat(this.value);
+      if (!isFinite(v)) v = 0;
+      state._plotRot = Math.max(-180, Math.min(180, v));
+      drawCanvas();
+    });
+    $('tPlotBake').addEventListener('click', bakeRotation);
     initCanvasNav();
     $('btnClear').addEventListener('click', function () {
       if (!state.plots.length && !state.elevations.length) return;

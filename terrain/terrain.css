@@ -185,6 +185,24 @@ body.t-col-resizing .t-stage{pointer-events:none}   /* 拖拽中不让画布吃�
   position:absolute;top:10px;right:10px;z-index:5;
   display:flex;flex-direction:column;gap:4px;
 }
+
+/* —— [v393] 做图区左上角快捷条：地块角度 + 落定基准（复刻「地块分区」pp-quick，
+     同款白底 1px 边直角去投影，绝对定位不占版面高度） —— */
+.t-quick{
+  position:absolute;top:10px;left:10px;z-index:5;
+  display:flex;align-items:center;gap:8px;
+  background:var(--u-panel);border:1px solid var(--u-line);
+  border-radius:var(--radius-xs);padding:4px 8px;
+  font-size:12px;color:var(--u-ink-2);
+}
+.t-angle-control{display:flex;align-items:center;gap:4px;user-select:none}
+.t-angle-control input{
+  width:60px;height:24px;border:1px solid var(--u-line);
+  background:#fff;color:var(--u-ink);padding:0 4px;
+  border-radius:var(--radius-xs);font-size:12px;
+}
+.t-angle-control input:focus{outline:none;border-color:var(--g-400)}
+.t-quick .t-btn{height:24px;padding:0 8px;font-size:12px}
 .t-canvas-nav button{
   width:30px;height:30px;border:1px solid var(--u-line);
   background:var(--u-panel);color:var(--u-ink-2);

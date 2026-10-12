@@ -229,6 +229,18 @@
     </div>
     <div class="t-canvas-wrap" id="canvasWrap">
       <svg id="tCanvas" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" hidden></svg>
+      <!-- [v393 2026-10-12 用户指令] 做图区左上角快捷条：复刻「地块分区」的「地块角度」——
+           以（多地块联合）包围盒中心为轴旋转地块外轮廓（只影响显示、不重写数据；
+           多地块整组一起转，与地块分区 v193「旋转作用于整组」同口径）；
+           点「落定基准」把旋转后的地块轮廓与 RTK 高程点坐标写成新基准（栅格不转）。 -->
+      <div class="t-quick" id="tQuickBar">
+        <label class="t-angle-control" title="以地块包围盒中心为轴旋转地块外轮廓（多地块整组一起转，只影响显示、不重写数据）；点「落定基准」把旋转后的坐标写成新基准">
+          <span>地块角度</span>
+          <input id="tPlotAngle" type="number" value="0" min="-180" max="180" step="1">
+          <span>°</span>
+        </label>
+        <button class="t-btn ghost" id="tPlotBake" title="把当前旋转角度落定为新基准：地块轮廓与 RTK 高程点坐标一起刚性旋转改写（保持对位；栅格数据 DTM/DSM 不旋转，落定后请重新导入）">落定基准</button>
+      </div>
       <div class="t-canvas-nav" id="tCanvasNav">
         <button id="zoomIn" title="放大">＋</button>
         <button id="zoomOut" title="缩小">－</button>

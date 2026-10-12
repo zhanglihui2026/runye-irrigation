@@ -35,8 +35,12 @@
    v392-iframe-shell（桌面端地图/地形/水力校核 iframe 首进懒加载后常驻，新增 mod/inline-31.js 入 CORE）→
    v393-map-embedded-nav（在线地图在主程序 iframe 内隐藏页面自身功能导航，只保留主导航）→
    v394-bom-nav-merge（材料清单单入口联动 BOM 面板）→
-   v395-embedded-nav-unification（地图/地形/水力子页嵌入时统一隐藏重复功能导航）。 */
-const VERSION = 'v395-embedded-nav-unification';
+   v395-embedded-nav-unification（地图/地形/水力子页嵌入时统一隐藏重复功能导航）→
+   v396-terrain-plot-angle（用户指令：地形模块地块增加旋转角度，复刻地块分区同款——
+   terrain/index.html 制图区左上角快捷条「地块角度+落定基准」；terrain-ui.js 显示层整组
+   刚性旋转（联合包围盒中心为轴，地块/RTK点/喷灌叠加同步跟随，只影响显示不重写数据），
+   落定=地块轮廓与RTK高程点一起改写为新基准（栅格不转）。terrain 三文件均在 CORE 白名单，必须抬版本）。 */
+const VERSION = 'v396-terrain-plot-angle';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
