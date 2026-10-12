@@ -39,8 +39,19 @@
    v396-terrain-plot-angle（用户指令：地形模块地块增加旋转角度，复刻地块分区同款——
    terrain/index.html 制图区左上角快捷条「地块角度+落定基准」；terrain-ui.js 显示层整组
    刚性旋转（联合包围盒中心为轴，地块/RTK点/喷灌叠加同步跟随，只影响显示不重写数据），
-   落定=地块轮廓与RTK高程点一起改写为新基准（栅格不转）。terrain 三文件均在 CORE 白名单，必须抬版本）。 */
-const VERSION = 'v396-terrain-plot-angle';
+   落定=地块轮廓与RTK高程点一起改写为新基准（栅格不转）。terrain 三文件均在 CORE 白名单，必须抬版本）→
+   v397-kmz-import（地图支持直接导入 KMZ：解析 ZIP 中央目录，解压 doc.kml/首个 KML 并复用原导入链路；
+   未引入第三方依赖，地图页面已在 CORE 白名单内）→
+   v398-contour-dxf（TASK_contour-dxf_20261012 路径B：等高线 DXF 解析插件——CAD 另存 DXF →
+   提取 LWPOLYLINE(顶点/38整线高程)/POLYLINE+VERTEX/SPLINE 控制点/LINE 顶点 Z + TEXT/MTEXT 纯数字标注
+   → 高程点集 → 导出 CSV / 写入 terrain 高程状态接口（零新增 localStorage 键）→ 高差建议供水力扬程。
+   无 Z 实体不产点不补 0；terrain 内核动态 import 只读复用零侵入。三文件进 CORE 白名单，必须抬版本）→
+   v399-file-menu（用户指令：导航增加「文件 ▾」统一菜单——所有导入/导出/工程操作收进一个折叠入口。
+   新增 mod/inline-32.js（菜单构建+动作分发：主程序内直接调 runyeDxf/RyIsoDiagram/headModal/runyeSaveProject
+   等，独立页经 RyFrameShell 切 iframe 后触发 btnImport/btnGeoJSON/fileSHP 等按钮）；
+   index.html 加 #fnFileMenu 静态块 + runye-nav.css 加 .fn-file 皮肤。index.html / runye-nav.css /
+   mod/inline-32.js 均在 CORE 白名单，必须抬版本）。 */
+const VERSION = 'v399-file-menu';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
@@ -91,6 +102,10 @@ const CORE = [
   "plugins/iso-view/main.js",
   "plugins/sys-view/manifest.json",
   "plugins/sys-view/main.js",
+  /* [v397] 等高线解析插件（TASK_contour-dxf_20261012，DXF → 高程点 → 地形高差） */
+  "plugins/contour-dxf/manifest.json",
+  "plugins/contour-dxf/main.js",
+  "plugins/contour-dxf/style.css",
   /* [v357] 单文件拆分产物 */
   "mod/inline-01.js",
   "mod/inline-02.js",
@@ -123,6 +138,7 @@ const CORE = [
   "mod/inline-29.js",
   "mod/inline-30.js",
   "mod/inline-31.js",
+  "mod/inline-32.js",
   "mod/style-01.css",
   "mod/style-02.css",
   "mod/style-03.css",

@@ -1,0 +1,15 @@
+{
+  "id": "contour-dxf",
+  "name": "等高线解析（DXF）",
+  "version": "1.0.0",
+  "entry": "main.js",
+  "requires": { "core": ">=1.0.0", "plugins": [] },
+  "ui": { "nav": { "label": "等高线解析", "order": 94, "icon": "",
+    "title": "等高线解析：上传 CAD 导出的 DXF，提取高程点 → 坡面拟合/坡度 → 地形高差（供水力扬程参考）" } },
+  "permissions": ["ui:nav", "read:diagram", "read:bom"],
+  "config": {
+    "beforeLabel": "滴灌带查询",
+    "feat": "pro-others",
+    "_note": "阶段1：DXF 文本解析（LWPOLYLINE/POLYLINE+VERTEX/SPLINE 控制点/LINE + TEXT/MTEXT 高程标注）→ 高程点集 → 导出 CSV / 写入 terrain 高程状态接口（零新增 localStorage 键）。不含 DWG 解析、TIN 插值（阶段2/路径C）。无 Z 实体不产点不补 0（缺 Z 明示）。会员门控 feat=pro-others（三态 fail-open），入口锚 beforeLabel=滴灌带查询（不挤占 hydraulics 与「更多 ▾」毗邻位，同 v390 四插件口径）。"
+  }
+}

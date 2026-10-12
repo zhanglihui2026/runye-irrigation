@@ -250,7 +250,7 @@
           <button class="mbtn" id="btnKML">⬇ KML</button>
         </div>
         <div class="save-row">
-          <button class="mbtn" id="btnImport">⬆ 导入地块(GeoJSON/KML/奥维轨迹)</button>
+          <button class="mbtn" id="btnImport">⬆ 导入地块(GeoJSON/KML/KMZ/奥维轨迹)</button>
         </div>
         <input type="file" id="fileImport" accept=".geojson,.json,.kml,.ovkml,.kmz" style="display:none" />
         <div class="hint">保存后可累计多个地块；在「精准灌溉」页地块库「设为当前」，或在数字农业（水肥决策）页下拉选择。</div>
@@ -1472,47 +1472,111 @@
 
   // [map-enhance] 导入：读取 GeoJSON/KML 文件，解析成地块存入地块库并叠加到地图
   document.getElementById('btnImport').onclick=function(){ document.getElementById('fileImport').click(); };
+  function importTextAsPlots(text, isKml){
+    var arr=null;
+    if(isKml || /<kml[\s>]/i.test(text.slice(0,800))) arr=RunyeMapEnhance.parse.kml(text);
+    else arr=RunyeMapEnhance.parse.geoJSON(text);
+    if(!arr || !arr.length){ alert('未能从文件中解析出地块多边形（需要至少一个闭合多边形）。'+((arr&&arr.skipped&&arr.skipped.length)?'\\n其中跳过无效轨迹/环线：'+arr.skipped.join('、'):'')); return; }
+    var lib=[]; try{ lib=JSON.parse(localStorage.getItem('runye_plot_library')||'[]'); }catch(err){ lib=[]; }
+    var allLL=[];
+    arr.forEach(function(p){
+      var ll=p.polyLatLng; if(!ll || ll.length<3) return;
+      // [GCJ-02 修复 2026-09-28] 导入文件的坐标是标准 WGS-84，转成 GCJ-02 才能贴合高德影像
+      var llGcj = RunyeGeo ? RunyeGeo.polyWgs2Gcj(ll) : ll;
+      var mu=parseFloat((geodesicArea(llGcj)/666.67).toFixed(2));
+      var sqm=Math.round(geodesicArea(llGcj));
+      // 转本地米坐标（与「保存地块」同一原点：首点经度 x、平均纬度 y）
+      var xs=[],ys=[];
+      var lats=llGcj.map(function(q){return q[0];}), lngs=llGcj.map(function(q){return q[1];});
+      var clat=lats.reduce(function(a,b){return a+b;},0)/lats.length;
+      var R=6378137, mlat=R*Math.PI/180, cosLat=Math.cos(clat*Math.PI/180);
+      llGcj.forEach(function(q){ xs.push((q[1]-lngs[0])*mlat*cosLat); ys.push((q[0]-clat)*mlat); });
+      var sn=lngs.reduce(function(a,b){return a+b;},0)/lngs.length;
+      lib.push({ id:'imp'+Date.now()+Math.floor(Math.random()*1000),
+        name:p.name||('导入地'+(lib.length+1)), mu:mu, sqm:sqm,
+        poly:xs.map(function(x,i){return {x:Math.round(x*100)/100,y:Math.round(ys[i]*100)/100};}),
+        polyLatLng:llGcj, center:{lat:+clat.toFixed(6),lng:+sn.toFixed(6)},
+        geo:{refLat:+clat.toFixed(6), refLng:+llGcj[0][1].toFixed(6), proj:'mercatorLocal'},
+        crop:p.crop || '', source:'import', crs:'GCJ-02', ts:Date.now(), note:'' });
+      allLL=allLL.concat(llGcj);
+    });
+    localStorage.setItem('runye_plot_library', JSON.stringify(lib));
+    refreshPlotLibrary();
+    if(allLL.length){ try{ map.fitBounds(L.latLngBounds(displayRing(allLL)),{padding:[30,30],maxZoom:17}); }catch(err){} }
+    var skipMsg=(arr.skipped&&arr.skipped.length)?'\\n跳过 '+arr.skipped.length+' 条无效轨迹/环线（自相交或退化）：'+arr.skipped.join('、'):'';
+    alert('已导入 '+arr.length+' 个地块到地块库，并定位到导入范围。'+skipMsg);
+  }
+  function extractKmlFromZip(bytes){
+    var view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength), eocd=-1;
+    for(var p=Math.max(0,bytes.length-65557);p<=bytes.length-22;p++){
+      if(view.getUint32(p,true)===0x06054b50 && p+22+view.getUint16(p+20,true)===bytes.length) eocd=p;
+    }
+    if(eocd<0) return Promise.reject(new Error('ZIP 目录损坏或不完整'));
+    if(view.getUint16(eocd+4,true)!==0 || view.getUint16(eocd+6,true)!==0) return Promise.reject(new Error('暂不支持分卷 ZIP 文件'));
+    var count=view.getUint16(eocd+10,true), cdOffset=view.getUint32(eocd+16,true), pos=cdOffset, entries=[];
+    if(count===0xffff || cdOffset===0xffffffff) return Promise.reject(new Error('暂不支持 ZIP64 格式'));
+    for(var i=0;i<count;i++){
+      if(pos+46>bytes.length || view.getUint32(pos,true)!==0x02014b50) return Promise.reject(new Error('ZIP 中央目录损坏'));
+      var flags=view.getUint16(pos+8,true), method=view.getUint16(pos+10,true);
+      var compressedSize=view.getUint32(pos+20,true), nameLen=view.getUint16(pos+28,true);
+      var extraLen=view.getUint16(pos+30,true), commentLen=view.getUint16(pos+32,true), localOffset=view.getUint32(pos+42,true);
+      if(compressedSize===0xffffffff || localOffset===0xffffffff) return Promise.reject(new Error('暂不支持 ZIP64 格式'));
+      if(pos+46+nameLen+extraLen+commentLen>bytes.length) return Promise.reject(new Error('ZIP 文件名或目录长度异常'));
+      var name=new TextDecoder('utf-8').decode(bytes.subarray(pos+46,pos+46+nameLen));
+      if(/\.kml$/i.test(name)) entries.push({name:name,flags:flags,method:method,compressedSize:compressedSize,localOffset:localOffset});
+      pos+=46+nameLen+extraLen+commentLen;
+    }
+    if(!entries.length) return Promise.resolve(null);
+    entries.sort(function(a,b){
+      var ad=a.name.split(/[\\/]/).pop().toLowerCase()==='doc.kml', bd=b.name.split(/[\\/]/).pop().toLowerCase()==='doc.kml';
+      return ad===bd?0:(ad?-1:1);
+    });
+    function decodeEntry(entry){
+      if(entry.flags&1) return Promise.reject(new Error('KMZ 中的 KML 已加密，无法读取'));
+      var off=entry.localOffset;
+      if(off+30>bytes.length || view.getUint32(off,true)!==0x04034b50) return Promise.reject(new Error('KML 条目头损坏'));
+      var dataStart=off+30+view.getUint16(off+26,true)+view.getUint16(off+28,true), dataEnd=dataStart+entry.compressedSize;
+      if(dataStart<off || dataEnd>bytes.length) return Promise.reject(new Error('KML 条目数据不完整'));
+      var packed=bytes.subarray(dataStart,dataEnd), stream;
+      if(entry.method===0) return Promise.resolve(new TextDecoder('utf-8').decode(packed));
+      if(entry.method!==8) return Promise.reject(new Error('KML 使用暂不支持的压缩方式（'+entry.method+'）'));
+      if(typeof DecompressionStream==='undefined') return Promise.reject(new Error('当前浏览器不支持 KMZ 解压，请先解压后导入 KML'));
+      try{ stream=new Blob([packed]).stream().pipeThrough(new DecompressionStream('deflate-raw')); }
+      catch(err){ return Promise.reject(new Error('当前浏览器不支持该 KMZ 压缩格式，请先解压后导入 KML')); }
+      return new Response(stream).arrayBuffer().then(function(raw){return new TextDecoder('utf-8').decode(raw);});
+    }
+    var idx=0, lastError=null;
+    function next(){
+      if(idx>=entries.length) return lastError?Promise.reject(lastError):Promise.resolve(null);
+      return decodeEntry(entries[idx++]).then(function(text){return text;},function(err){lastError=err;return next();});
+    }
+    return next();
+  }
+  function handleKmz(file){
+    if(typeof DecompressionStream==='undefined'){
+      alert('当前浏览器不支持 KMZ 解压，请先解压后导入 KML'); return;
+    }
+    var reader=new FileReader();
+    reader.onload=function(){
+      var bytes=new Uint8Array(reader.result||new ArrayBuffer(0));
+      if(bytes.length<4 || bytes[0]!==0x50 || bytes[1]!==0x4b){alert('不是有效的 KMZ/ZIP 文件');return;}
+      extractKmlFromZip(bytes).then(function(text){
+        if(text===null){alert('KMZ 内未找到 KML 文件（doc.kml 或任意 .kml 条目）');return;}
+        importTextAsPlots(text,true);
+      }).catch(function(err){alert('KMZ 解压失败：'+err.message);});
+    };
+    reader.onerror=function(){alert('KMZ 文件读取失败，请重新选择文件。');};
+    reader.readAsArrayBuffer(file);
+  }
   document.getElementById('fileImport').onchange=function(e){
     var f=e.target.files && e.target.files[0];
     if(!f) return;
-    if(/\.kmz$/i.test(f.name)){alert('请先解压 KMZ，再选择其中的 KML 文件。');e.target.value='';return;}
+    if(/\.kmz$/i.test(f.name)){handleKmz(f);e.target.value='';return;}
     var reader=new FileReader();
     reader.onload=function(){
       try{
         var text=String(reader.result||'');
-        var arr=null;
-        // 按扩展名或文件头判断 KML（兼容 .kml/.kmz 文本与奥维导出）
-        if(/\.kml$/i.test(f.name) || /<kml[\s>]/i.test(text.slice(0,800))) arr=RunyeMapEnhance.parse.kml(text);
-        else arr=RunyeMapEnhance.parse.geoJSON(text);
-        if(!arr || !arr.length){ alert('未能从文件中解析出地块多边形（需要至少一个闭合多边形）。'+((arr&&arr.skipped&&arr.skipped.length)?'\\n其中跳过无效轨迹/环线：'+arr.skipped.join('、'):'')); return; }
-        var lib=[]; try{ lib=JSON.parse(localStorage.getItem('runye_plot_library')||'[]'); }catch(err){ lib=[]; }
-        var allLL=[];
-        arr.forEach(function(p){
-          var ll=p.polyLatLng; if(!ll || ll.length<3) return;
-          // [GCJ-02 修复 2026-09-28] 导入文件的坐标是标准 WGS-84，转成 GCJ-02 才能贴合高德影像
-          var llGcj = RunyeGeo ? RunyeGeo.polyWgs2Gcj(ll) : ll;
-          var mu=parseFloat((geodesicArea(llGcj)/666.67).toFixed(2));
-          var sqm=Math.round(geodesicArea(llGcj));
-          // 转本地米坐标（与「保存地块」同一原点：首点经度 x、平均纬度 y）
-          var xs=[],ys=[];
-          var lats=llGcj.map(function(q){return q[0];}), lngs=llGcj.map(function(q){return q[1];});
-          var clat=lats.reduce(function(a,b){return a+b;},0)/lats.length;
-          var R=6378137, mlat=R*Math.PI/180, cosLat=Math.cos(clat*Math.PI/180);
-          llGcj.forEach(function(q){ xs.push((q[1]-lngs[0])*mlat*cosLat); ys.push((q[0]-clat)*mlat); });
-          var sn=lngs.reduce(function(a,b){return a+b;},0)/lngs.length;
-          lib.push({ id:'imp'+Date.now()+Math.floor(Math.random()*1000),
-            name:p.name||('导入地'+(lib.length+1)), mu:mu, sqm:sqm,
-            poly:xs.map(function(x,i){return {x:Math.round(x*100)/100,y:Math.round(ys[i]*100)/100};}),
-            polyLatLng:llGcj, center:{lat:+clat.toFixed(6),lng:+sn.toFixed(6)},
-            geo:{refLat:+clat.toFixed(6), refLng:+llGcj[0][1].toFixed(6), proj:'mercatorLocal'},
-            crop:p.crop || '', source:'import', crs:'GCJ-02', ts:Date.now(), note:'' });
-          allLL=allLL.concat(llGcj);
-        });
-        localStorage.setItem('runye_plot_library', JSON.stringify(lib));
-        refreshPlotLibrary();
-        if(allLL.length){ try{ map.fitBounds(L.latLngBounds(displayRing(allLL)),{padding:[30,30],maxZoom:17}); }catch(err){} }
-        var skipMsg=(arr.skipped&&arr.skipped.length)?'\\n跳过 '+arr.skipped.length+' 条无效轨迹/环线（自相交或退化）：'+arr.skipped.join('、'):'';
-        alert('已导入 '+arr.length+' 个地块到地块库，并定位到导入范围。'+skipMsg);
+        importTextAsPlots(text,/\.kml$/i.test(f.name));
       }catch(err){ alert('导入失败：'+err.message); }
       e.target.value='';
     };
