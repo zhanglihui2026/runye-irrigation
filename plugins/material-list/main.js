@@ -150,7 +150,8 @@ function activate(ctx) {
         label: nc.label || ctx.id,
         title: nc.title || '',
         order: nc.order,
-        beforeLabel: c.beforeLabel || null,   /* [v390] 锚在稳定老项「滴灌带查询」之前，不挤占 hydraulics 与「更多 ▾」的毗邻位（C35） */
+        /* [v402] 材料清单不在用户点名的折叠清单内 —— 保持顶层入口（BOM 面板唯一入口语义不变） */
+        beforeLabel: c.beforeLabel || null,   /* [v390] 锚在稳定老项「滴灌带查询」之前 */
         before: c.insertBefore || null,
         gate: function () { return gate(ctx); },
         onLocked: function () { onLocked(ctx); },

@@ -23,8 +23,8 @@
     "saveProject": true,
     "anchorKey": "runye_aiplot_anchor_v1",
     "feat": "ai-plan",
-    "beforeLabel": "地块绘制",
+    "beforeLabel": "文件 ▾",
     "insertBefore": ".fn-more",
-    "_note": "壳迁移：runye-ai-plan.js 业务零改动，本插件只接管顶级导航入口（原位置插回）+ 弹窗打开 + 保住会员门控。★本入口与前面三个都不一样：它是 win:1 **独立窗口**语义（见 runye-nav.js ITEMS 第一条），不是普通 href 跳转 —— mode 改回 'navigate' 会当场废掉 v331 那条「主窗口地块分区不受影响」。★ href 必须保持 query+hash 原样（?smart=1 才是 AI 工作台入口，丢成裸 index.html 就只是普通主页）。★ saveProject/anchorKey 是 v327 的现场保护：跳转前静默存全量方案并写一次性锚，返回本页时才能恢复边界（页内手画/图片测量边界无地块库锚）。★ order 11 < hydraulics 的 12：两者都插在「更多 ▾」之前，先插的离锚点远 —— 这样 DOM 顺序仍是「智能规划 → 水力校核 → 更多 ▾」，与原导航一致。runye-ai-plan.js 在主页第 19 行已同步加载，故本插件不需要像 hydraulics 那样自带加载器，直接桥接 window.RyAiPlan。"
+    "_note": "壳迁移：runye-ai-plan.js 业务零改动，本插件只接管顶级导航入口（原位置插回）+ 弹窗打开 + 保住会员门控。★本入口与前面三个都不一样：它是 win:1 **独立窗口**语义（见 runye-nav.js ITEMS 第一条），不是普通 href 跳转 —— mode 改回 'navigate' 会当场废掉 v331 那条「主窗口地块分区不受影响」。★ href 必须保持 query+hash 原样（?smart=1 才是 AI 工作台入口，丢成裸 index.html 就只是普通主页）。★ saveProject/anchorKey 是 v327 的现场保护：跳转前静默存全量方案并写一次性锚，返回本页时才能恢复边界（页内手画/图片测量边界无地块库锚）。★ order 11 < hydraulics 的 12：两者都插在「更多 ▾」之前，先插的离锚点远 —— 这样 DOM 顺序仍是「智能规划 → 水力校核 → 更多 ▾」，与原导航一致。runye-ai-plan.js 在主页第 19 行已同步加载，故本插件不需要像 hydraulics 那样自带加载器，直接桥接 window.RyAiPlan。[v402] beforeLabel 改「文件 ▾」：文件按钮成为 runye-nav fileMenu 顶层项（位于「地块绘制」之前），锚它之前 = 保持「智能规划第一」（v391 指令），顺序为「智能规划 → 文件 → 地块绘制」。"
   }
 }

@@ -149,7 +149,10 @@ function activate(ctx) {
         label: nc.label || ctx.id,
         title: nc.title || '',
         order: nc.order,
-        beforeLabel: c.beforeLabel || null,   /* [v390] 锚在稳定老项「滴灌带查询」之前，不挤占 hydraulics 与「更多 ▾」的毗邻位（C35） */
+        /* [v402 用户指令] 过滤系统折叠进导航「更多 ▾」面板（接管的老项也在面板内，
+           插件项原位承接，顶层不再出现） */
+        container: '.fn-more-panel',
+        beforeLabel: c.beforeLabel || null,   /* 面板内锚「滴灌带查询」之前，保持 MORE_ITEMS 相对顺序 */
         before: c.insertBefore || null,
         gate: function () { return gate(ctx); },
         onLocked: function () { onLocked(ctx); },

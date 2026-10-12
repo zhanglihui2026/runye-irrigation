@@ -150,9 +150,13 @@
       fb.addEventListener('click', function (e) {
         e.preventDefault();
         e.stopPropagation();
-        if (global.RyFileMenu && typeof global.RyFileMenu.toggle === 'function') {
-          global.RyFileMenu.toggle(fb);
+        /* [v402] 子页未加载 mod/inline-32（RyFileMenu 不存在）→ 退化跳主页（与
+           hydraulics 等壳插件「壳缺失时按原 href 跳转」同口径），不留无效入口 */
+        if (!global.RyFileMenu || typeof global.RyFileMenu.toggle !== 'function') {
+          global.location.href = (root || '') + 'index.html';
+          return;
         }
+        global.RyFileMenu.toggle(fb);
       });
       return fb;
     }

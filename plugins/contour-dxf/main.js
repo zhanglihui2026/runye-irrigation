@@ -512,6 +512,8 @@ export function activate(ctx) {
       label: nav.label || ctx.id,
       title: nav.title || '',
       order: nav.order,
+      /* [v402 用户指令] 等高线解析折叠进导航「更多 ▾」面板（锚点「滴灌带查询」同在面板内） */
+      container: '.fn-more-panel',
       beforeLabel: cfg(ctx).beforeLabel || null,
       before: cfg(ctx).before || null,
       gate: function () { return gate(ctx); },

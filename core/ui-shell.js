@@ -63,17 +63,21 @@ export function createUiShell(guard) {
 
   /* 每个导航项可自带 container（CSS 选择器），默认挂到主导航条 [data-ry-fnnav]。
      [阶段四 2026-10-11] 老模块迁移需要「按钮落回它原来所在的容器」
-     （pipe_optim 原本在「更多」下拉面板里，迁移后不该跳到主导航条上）。 */
+     （pipe_optim 原本在「更多」下拉面板里，迁移后不该跳到主导航条上）。
+     [v402] 自定义容器缺失（「更多」面板重建窗口期）→ 返回空列表由 mountNavs
+     有界等待，而不是降级 fn-inner —— 降级往返（先挂顶层、面板回来再搬进面板）
+     正是「同名双入口」的根源（实测 C8 after=8 / C32 等高线解析×2）。 */
   function containersFor(item) {
     var sel = (item && item.container) || '[data-ry-fnnav]';
     var list = [];
     try { list = Array.prototype.slice.call(document.querySelectorAll(sel)); } catch (e) { list = []; }
     if (!list.length && sel !== '[data-ry-fnnav]') {
-      /* 自定义容器此刻不存在（导航正在重建、面板被整个换掉）→ 退回默认容器。
-         ★ 这是「入口不能丢」优先于「位置必须一致」：面板没了宁可落回主导航条，
-           也不能让插件变成没有任何入口的死插件。 */
+      item._ctrTries = (item._ctrTries || 0) + 1;
+      if (item._ctrTries <= 20) return list;   /* 等面板重建（≈20 帧），本轮跳过 */
+      /* 重试用尽仍无容器 → 按「入口不能丢」退回主导航条 */
       try { list = Array.prototype.slice.call(document.querySelectorAll('[data-ry-fnnav]')); } catch (e2) { list = []; }
     }
+    if (list.length) item._ctrTries = 0;
     return list;
   }
 
@@ -144,6 +148,18 @@ export function createUiShell(guard) {
     for (var j = 0; j < navItems.length; j++) {
       var item = navItems[j];
       var cs = containersFor(item);
+      if (!cs.length) { waiting = true; continue; }   /* [v402] 等自定义容器重建 */
+      /* [v402] 容器切换防双入口：自定义容器（.fn-more-panel）重建/降级往返期间，
+         同一项可能残留在外层容器（fn-inner 降级挂载）——目标容器挂新项之前，
+         先摘掉不在本次目标容器里的同 id 旧项（与 unregister 同一清理语义）。 */
+      var stale = document.querySelectorAll(navSelector(item.id));
+      for (var s2 = 0; s2 < stale.length; s2++) {
+        var sp = stale[s2].parentNode;
+        if (!sp) continue;
+        var inTargets = false;
+        for (var s3 = 0; s3 < cs.length; s3++) { if (cs[s3] === sp || cs[s3].contains(stale[s2])) { inTargets = true; break; } }
+        if (!inTargets) sp.removeChild(stale[s2]);
+      }
       for (var i = 0; i < cs.length; i++) {
         var box = cs[i];
         var ex = box.querySelector(navSelector(item.id));
