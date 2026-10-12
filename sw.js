@@ -8,8 +8,11 @@
    标准属性 scrollbar-width（有头实测 Chrome/143 下 thin=10px、默认=15px、仅 webkit 4px=4px），
    全局 webkit 4px 半透明灰圆角丸，mod/style-01/02/05.css、filter-system、network-editor.css 的
    5px 覆盖同步对齐；② 用户要求「管网装配（平面图）」功能全部取消——network-editor.js
-   EDITOR_OFF 总开关置 true，卡片/叠加层/观察器整体下线。以上均在 CORE 白名单内，必须抬版本）。 */
-const VERSION = 'v383-thin-scrollbar';
+   EDITOR_OFF 总开关置 true，卡片/叠加层/观察器整体下线。以上均在 CORE 白名单内，必须抬版本）→
+   v384-sprinkler（喷灌专项 TASK_sprinkler-pipeline_20261012 全链路：terrain 直接填间距 12×12 +
+   sprinklerBom/tankVolumeEstimate/boostModel + terrain 页 BOM 落桥 + 新增 plugins/sprinkler 壳插件
+   两文件进 CORE 白名单，必须抬版本）。 */
+const VERSION = 'v384-sprinkler';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
@@ -49,6 +52,9 @@ const CORE = [
   /* [v381] 智能规划壳迁移插件（独立窗口入口） */
   "plugins/ai-plan/manifest.json",
   "plugins/ai-plan/main.js",
+  /* [v384] 喷灌成果壳插件（terrain 内核宿主，任务书 TASK_sprinkler-pipeline_20261012） */
+  "plugins/sprinkler/manifest.json",
+  "plugins/sprinkler/main.js",
   /* [v357] 单文件拆分产物 */
   "mod/inline-01.js",
   "mod/inline-02.js",

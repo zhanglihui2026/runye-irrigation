@@ -573,10 +573,19 @@
     var pressure = Number(input.pressure_kpa);
     if (!(R > 0) || !(q > 0) || !(pressure > 0)) return { ok: false, error: '喷头射程、流量和工作压力必须为正数' };
     if (!(areaM2 > 0)) return { ok: false, error: '请先在地块清单中导入或绘制地块' };
-    if (!(k > 0.4) || k > 1.6) { k = Math.min(1.6, Math.max(0.5, k || 1.1)); warn.push('间距系数超出常规(0.4~1.6)，已夹回 ' + k); }
+
+    /* v384 直接填间距（任务书 20261012 P0）：spacing_m 提供且 >0 时 S=spacing_m，忽略 k 推导。
+       12×12 属用户硬参数：偏离 0.8~1.6R 仅提示不硬拦（GB/T 50085 常规 0.8~1.2R）。 */
+    var sm = Number(input.spacing_m);
+    var fixed = isNum(sm) && sm > 0;
+    if (fixed) {
+      if (sm / R < 0.8 || sm / R > 1.6) warn.push('直接间距 ' + sm + 'm 为射程 R=' + R + 'm 的 ' + (sm / R).toFixed(2) + ' 倍，偏离常规 0.8~1.6R 区间：请核对喷洒均匀度');
+    } else {
+      if (!(k > 0.4) || k > 1.6) { k = Math.min(1.6, Math.max(0.5, k || 1.1)); warn.push('间距系数超出常规(0.4~1.6)，已夹回 ' + k); }
+    }
 
     var layout = input.layout === 'square' ? 'square' : 'tri';
-    var S = R * k;                                   /* 喷头间距 */
+    var S = fixed ? sm : R * k;                      /* 喷头间距 */
     var row = layout === 'tri' ? S * Math.sqrt(3) / 2 /* 三角形行距 0.866S */
                               : S;                    /* 方形行距 = S */
     var headArea = layout === 'tri' ? S * row : S * S;
@@ -631,6 +640,8 @@
     return {
       ok: true, warn: warn,
       spacing: S, rowSpacing: row, headArea: headArea,
+      spacingMode: fixed ? 'fixed' : 'factor',
+      spacing_m: fixed ? sm : null,
       headCount: headCount, headsPerShift: N, shiftCount: shiftCount,
       systemFlow: systemFlow, precipRate: precipRate,
       precipAllow: allow, precipOk: precipOk,
@@ -679,8 +690,17 @@
     if (!polys.length) return { ok: false, error: '请先在地块清单中导入或绘制地块' };
 
     var layout = input.layout === 'square' ? 'square' : 'tri';
-    if (!(k > 0.4) || k > 1.6) k = Math.min(1.6, Math.max(0.5, k || 1.1)); /* 与 sprinklerEstimate 同夹取 */
-    var S = R * k;
+    /* v384 直接填间距（任务书 20261012 P0）：spacing_m >0 时 S=spacing_m 忽略 k；
+       偏离 0.8~1.6R 仅 warn 不拦（12×12 为用户硬参数）。不传时保持 R×k 原行为。 */
+    var sm = Number(input.spacing_m);
+    var fixed = isNum(sm) && sm > 0;
+    var warns = [];
+    if (fixed) {
+      if (sm / R < 0.8 || sm / R > 1.6) warns.push('直接间距 ' + sm + 'm 为射程 R=' + R + 'm 的 ' + (sm / R).toFixed(2) + ' 倍，偏离常规 0.8~1.6R 区间：请核对喷洒均匀度');
+    } else {
+      if (!(k > 0.4) || k > 1.6) k = Math.min(1.6, Math.max(0.5, k || 1.1)); /* 与 sprinklerEstimate 同夹取 */
+    }
+    var S = fixed ? sm : R * k;
     var row = layout === 'tri' ? S * Math.sqrt(3) / 2 : S;
 
     /* 联合 bbox */
@@ -827,10 +847,172 @@
     }
 
     return {
-      ok: true, range_m: R, spacing: S, rowSpacing: row, layout: layout,
+      ok: true, warn: warns,
+      range_m: R, spacing: S, rowSpacing: row, layout: layout,
+      spacingMode: fixed ? 'fixed' : 'factor',
+      spacing_m: fixed ? sm : null,
       heads: heads, groupCount: groupCount, headsPerShift: Math.min(N, heads.length),
       laterals: laterals, mainline: mainline, dividers: dividers, zonePolys: zonePolys,
       mainDN: mainDN, latDN: latDN, mainFlow: mainFlow, latFlow: latFlow
+    };
+  }
+
+  /* ---------------- 喷灌 BOM 统计（v384，任务书 20261012 P0，纯函数） ----------------
+     入参 = sprinklerLayout 返回对象（+ opts 补充喷头流量/立管规格），
+     输出施工预算级清单。全部从 layoutResult 现算——不新开公式、不造假数、缺字段置 null：
+       · 单头流量 L/h：layoutResult 只存组流量 mainFlow=N×q → 反推 q；无流量参数则 null
+       · 管长 = 线段几何长度现算；管径沿用 sprinklerLayout 内 pipeDN 初估口径
+         （mainline@1.2 m/s / laterals@1.5 m/s），不得重写
+       · risers.count = heads.length；valves.count = groupCount（每轮灌组一个总阀）
+     tank/boost/trench/filter/fert 由 P1/P2 补齐，P0 阶段恒为 null。 */
+  function segLenOf(a, b) {
+    var dx = b.x - a.x, dy = b.y - a.y;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  function sprinklerBom(layoutResult, opts) {
+    opts = opts || {};
+    if (!layoutResult || layoutResult.ok !== true || !Array.isArray(layoutResult.heads) || !layoutResult.heads.length)
+      return { ok: false, error: '无有效的喷灌布置结果：请先完成布置计算' };
+    var heads = layoutResult.heads;
+
+    var qM3h = null;
+    if (isNum(opts.flow_m3h) && opts.flow_m3h > 0) qM3h = opts.flow_m3h;
+    else if (layoutResult.mainFlow > 0 && layoutResult.headsPerShift > 0) qM3h = layoutResult.mainFlow / layoutResult.headsPerShift;
+
+    var latLen = 0;
+    (layoutResult.laterals || []).forEach(function (l) {
+      if (!l || !Array.isArray(l.pts)) return;
+      for (var i = 1; i < l.pts.length; i++) latLen += segLenOf(l.pts[i - 1], l.pts[i]);
+    });
+    var mainLen = 0;
+    var ml = layoutResult.mainline;
+    if (ml && Array.isArray(ml.pts)) {
+      for (var j = 1; j < ml.pts.length; j++) mainLen += segLenOf(ml.pts[j - 1], ml.pts[j]);
+    }
+    var r1 = Math.round(mainLen * 10) / 10, r2 = Math.round(latLen * 10) / 10;
+    var mainDn = layoutResult.mainDN ? layoutResult.mainDN.dn : null;
+    var latDn = layoutResult.latDN ? layoutResult.latDN.dn : null;
+
+    /* P2 沟槽土方（任务书 §4.1）：沟深固定 0.5m（需求"沟深50cm"），
+       沟宽按主管 0.5 / 干管 0.4 / 支管 0.3 分档。terrain 几何只有干管（mainline）
+       与支管（laterals）两级——主管段（外线）不在布置图内，档位字段保留但体积不计入，
+       note 明示口径，不造假数。volume = Σ(len × depth × width)。 */
+    var trench = null;
+    var tDepth = isNum(opts.trench_depth_m) && opts.trench_depth_m > 0 ? opts.trench_depth_m : 0.5;
+    var wMain = isNum(opts.trench_w_main_m) && opts.trench_w_main_m > 0 ? opts.trench_w_main_m : 0.5;
+    var wSub = isNum(opts.trench_w_sub_m) && opts.trench_w_sub_m > 0 ? opts.trench_w_sub_m : 0.4;
+    var wLat = isNum(opts.trench_w_lat_m) && opts.trench_w_lat_m > 0 ? opts.trench_w_lat_m : 0.3;
+    if (opts.trench !== false) {
+      var vol = mainLen * tDepth * wSub + latLen * tDepth * wLat;
+      trench = {
+        depth_m: tDepth,
+        widths: { main_m: wMain, sub_m: wSub, lat_m: wLat },
+        volume_m3: Math.round(vol * 10) / 10,
+        note: '按干管 ' + wSub + 'm / 支管 ' + wLat + 'm 沟宽计（主管段不在 terrain 布置图内未计入）；沟深固定 ' + tDepth + 'm'
+      };
+    }
+    /* P2 板框过滤 / 溶肥设施（任务书 §4.2）：勾选启用才计入，各默认 1 套 */
+    var filter = null, fert = null;
+    if (opts.filter && opts.filter.enabled) {
+      filter = {
+        type: '板框过滤',
+        sets: (isNum(opts.filter.sets) && opts.filter.sets > 0) ? opts.filter.sets : 1,
+        note: '茶枯有机肥液过滤，防喷头堵塞'
+      };
+    }
+    if (opts.fert && opts.fert.enabled) {
+      fert = {
+        tank: '溶肥容器', pool: '肥液中转池',
+        sets: (isNum(opts.fert.sets) && opts.fert.sets > 0) ? opts.fert.sets : 1
+      };
+    }
+
+    return {
+      ok: true, version: 1,
+      heads: {
+        count: heads.length,
+        flowLh: qM3h ? Math.round(qM3h * 1000) : null,
+        radius_m: isNum(layoutResult.range_m) ? layoutResult.range_m : null,
+        spacing_m: isNum(layoutResult.spacing) ? Math.round(layoutResult.spacing * 100) / 100 : null
+      },
+      risers: {
+        count: heads.length,
+        od_mm: (isNum(opts.riser_od_mm) && opts.riser_od_mm > 0) ? opts.riser_od_mm : 25,
+        height_m: (isNum(opts.riser_height_m) && opts.riser_height_m > 0) ? opts.riser_height_m : 3
+      },
+      pipes: {
+        mainline: { dn_mm: mainDn, len_m: r1 },
+        laterals: { dn_mm: latDn, len_m: r2 },
+        mainDN: mainDn, latDN: latDn
+      },
+      shifts: { groupCount: layoutResult.groupCount || 0, headsPerShift: layoutResult.headsPerShift || null },
+      valves: { count: layoutResult.groupCount || 0 },
+      /* tank/boost（P1）：UI 先用 tankVolumeEstimate / boostModel 算好再经 opts 传入，
+         BOM 只做装配与合法性过滤——缺参/非法一律 null，不造假数。trench/filter/fert P2 补。 */
+      tank: (opts.tank && opts.tank.volume_m3 > 0)
+        ? { volume_m3: opts.tank.volume_m3, note: opts.tank.note || null } : null,
+      boost: (opts.boost && opts.boost.ok === true && opts.boost.stage1 && opts.boost.stage2)
+        ? { stage1: opts.boost.stage1, stage2: opts.boost.stage2, note: opts.boost.note || null } : null,
+      trench: trench, filter: filter, fert: fert
+    };
+  }
+
+  /* ---------------- 蓄水池容积估算（v384 P1，任务书 20261012 §3.1，纯函数） ----------------
+     V(m³) = area_mu × 667 × etc_mm × days / 1000 / eta
+       days = 供水中断缓冲天数（默认 2）；eta 灌溉水利用系数（默认 0.7）。
+       容积向上取整（工程惯例），标注建议值属性——可按日轮灌制度调整。 */
+  function tankVolumeEstimate(input) {
+    input = input || {};
+    var a = Number(input.area_mu), etc = Number(input.etc_mm), days = Number(input.days), eta = Number(input.eta);
+    if (!(a > 0) || !(etc > 0)) return { ok: false, error: '灌溉亩数与设计日耗水 ETc 必须为正数' };
+    if (!(days > 0)) days = 2;
+    if (!(eta > 0) || eta > 1) eta = 0.7;
+    var v = a * 667 * etc * days / 1000 / eta;
+    return {
+      ok: true,
+      volume_m3: Math.ceil(v),
+      raw_m3: Math.round(v * 100) / 100,
+      days: days, eta: eta,
+      formula: 'V = ' + a + '亩×667×' + etc + 'mm×' + days + 'd / 1000 / ' + eta + ' = ' + v.toFixed(1) + ' m³',
+      note: '蓄水池建议值（按 ' + days + ' 天供水中断缓冲、向上取整），可按日轮灌制度调整'
+    };
+  }
+
+  /* ---------------- 二次加压两段泵模型（v384 P1，任务书 20261012 §3.2，纯函数） ----------------
+     功率口径与 hydraulic-calc/hc-core.js power() 完全一致：
+       P(kW) = 2.725 × Q(m³/h) × H(m) / η / 1000，常数 2.725 = 1000·9.81/3600，η 默认 0.7
+     电机标准功率序列与 hydraulic-calc/design-core.js 同源，按计算功率向上贴标。
+     总扬程按二级加压起点切两段：stage1 = 起点扬程，stage2 = 总扬程 − 起点扬程。 */
+  var MOTOR_SERIES = [0.37, 0.55, 0.75, 1.1, 1.5, 2.2, 3, 4, 5.5, 7.5, 11, 15, 18.5, 22, 30, 37, 45, 55, 75, 90, 110, 132, 160, 200, 250, 315];
+
+  function boostMotorPick(pkw) {
+    for (var i = 0; i < MOTOR_SERIES.length; i++) {
+      if (MOTOR_SERIES[i] >= pkw - 1e-9) return MOTOR_SERIES[i];
+    }
+    return null;   /* 超出 315kW 序列 → null（不造假数，提示另行选型） */
+  }
+
+  function boostModel(input) {
+    input = input || {};
+    var q = Number(input.q_m3h), th = Number(input.total_head_m), sp = Number(input.split_at_m);
+    if (!(q > 0) || !(th > 0)) return { ok: false, error: '流量与总扬程必须为正数' };
+    if (!(sp > 0) || sp >= th) return { ok: false, error: '二级加压起点扬程必须为正且小于总扬程' };
+    var eta = (input.eta > 0 && input.eta <= 1) ? input.eta : 0.7;
+    function stageOf(headM, label) {
+      var pkw = 2.725 * q * headM / eta / 1000;
+      return {
+        flow: q, head: Math.round(headM * 100) / 100,
+        power_kw: Math.round(pkw * 100) / 100,
+        motor_kw: boostMotorPick(pkw),
+        label: label
+      };
+    }
+    return {
+      ok: true, eta: eta, flow: q, total_head_m: th, split_at_m: sp,
+      stage1: stageOf(sp, '主加压（到高位水池/主管起端）'),
+      stage2: stageOf(th - sp, '二次加压（支管入口压力均衡）'),
+      note: '二次加压保障全域水压均衡（分区独立管控）'
     };
   }
 
@@ -899,6 +1081,9 @@
     sanitizeRing: sanitizeRing,
     surfaceAreaApprox: surfaceAreaApprox,
     sprinklerLayout: sprinklerLayout,
+    sprinklerBom: sprinklerBom,
+    tankVolumeEstimate: tankVolumeEstimate,
+    boostModel: boostModel,
     pipeDN: pipeDN,
     SOIL_INTENSITY: SOIL_INTENSITY,
     soilLabel: soilLabel,

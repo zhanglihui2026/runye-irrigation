@@ -1,0 +1,21 @@
+{
+  "id": "sprinkler",
+  "name": "喷灌成果（terrain 内核宿主 · 壳）",
+  "version": "1.0.0",
+  "entry": "main.js",
+  "requires": { "core": ">=1.0.0", "plugins": [] },
+  "ui": {
+    "nav": {
+      "label": "喷灌成果",
+      "order": 13,
+      "title": "喷灌成果：读取 terrain 喷灌设计结果，合并进材料清单与水力口径"
+    }
+  },
+  "permissions": ["read:diagram", "archive:read", "event:subscribe", "event:emit", "ui:nav"],
+  "config": {
+    "autoloadCore": true,
+    "feat": "pro-others",
+    "storageKey": "runyeSprinklerResult",
+    "_note": "壳插件（任务书 TASK_sprinkler-pipeline_20261012）：① 把 terrain/terrain-core.js 请进主页上下文（window.RyTerrainData，纯计算 UMD）并广播 sprinkler-core-ready；② activate 返回值暴露 estimate/layout/bom 透传 API（无内核返回 null，fail-open）；③ 读数据桥 localStorage[storageKey]（terrain 页估算时写入，先 remove 再 set 的全新快照），面板只读展示，不写回 tlDiagramData。类名一律 sp- 前缀。"
+  }
+}

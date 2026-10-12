@@ -382,9 +382,15 @@
         out.push('<polyline class="t-sp-main" points="' + mainPts + '"/>');  /* 干管 */
         out.push('<polyline class="t-sp-mainflow" points="' + mainPts + '"/>');  /* 干管水流叠加线（v298c）：演示态常流 */
         lay.heads.forEach(function (h, i) {  /* 喷头：颜色 = 轮灌组 */
+          var hx = h.x.toFixed(1), hy = (flip - h.y).toFixed(1);
           out.push('<circle class="t-sp-head" data-g="' + h.g + '" fill="' + SP_COLORS[(h.g - 1) % SP_COLORS.length] +
-            '" cx="' + h.x.toFixed(1) + '" cy="' + (flip - h.y).toFixed(1) + '" r="' + (vh * 0.005).toFixed(2) +
+            '" cx="' + hx + '" cy="' + hy + '" r="' + (vh * 0.005).toFixed(2) +
             '"><title>' + esc('第 ' + h.g + ' 轮灌组 · 喷头 ' + (i + 1) + ' · R=' + lay.range_m + 'm') + '</title></circle>');
+          /* v384 P1 立管符号（任务书 §3.3）：每个喷头上方竖短线 + 顶圆点，数量 = heads.length */
+          var rLen = vh * 0.012, rW = Math.max(0.6, vh * 0.002), rDot = Math.max(1, vh * 0.003);
+          out.push('<line class="t-sp-riser" x1="' + hx + '" y1="' + hy + '" x2="' + hx + '" y2="' + (flip - h.y - rLen).toFixed(1) +
+            '" stroke="#475569" stroke-width="' + rW.toFixed(2) + '"/>');
+          out.push('<circle class="t-sp-risertop" cx="' + hx + '" cy="' + (flip - h.y - rLen).toFixed(1) + '" r="' + rDot.toFixed(2) + '" fill="#475569"/>');
         });
         spCount = lay.heads.length; spGroups = lay.groupCount;
         buildSpLegend(lay); /* 图例随布置结果刷新管径/流量 */
@@ -703,11 +709,15 @@
      输入变更后若已有结果则自动重算。 */
 
   var SP_KEY = 'runye_terrain_sprinkler_v1';
+  var SP_BRIDGE_KEY = 'runyeSprinklerResult';   /* v384 任务书 P0：喷灌成果数据桥（plugins/sprinkler 消费） */
   var SP_COLORS = ['#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed', '#0891b2', '#be185d', '#4d7c0f']; /* 轮灌组着色 */
   var SP_DEFAULTS = { crop: '', etc: 4.5, eta: 0.7, soil: 'loam', slope: 8,
-                      range: 15, flow: 2.5, pressure: 300, ratedFlow: '', ratedPressure: '', sourceFlow: '', layout: 'tri', k: 1.1, heads: 12 };
+                      range: 15, flow: 2.5, pressure: 300, ratedFlow: '', ratedPressure: '', sourceFlow: '', layout: 'tri', k: 1.1, heads: 12,
+                      spacing: '', riserOd: 25, riserH: 3, tankV: '', boostQ: '', boostH: '', boostSplit: '',
+                      trenchD: 0.5, twMain: 0.5, twSub: 0.4, twLat: 0.3, filterOn: true, filterN: 1, fertOn: true, fertN: 1 };
 
   function spRead() {
+    var sm = parseFloat($('spSpacing').value);
     return {
       crop: ($('spCrop').value || '').trim(),
       etc: parseFloat($('spEtc').value), eta: parseFloat($('spEta').value),
@@ -716,7 +726,22 @@
       pressure_kpa: parseFloat($('spPressure').value), layout: $('spLayout').value,
       rated_flow_m3h: parseFloat($('spRatedFlow').value), rated_pressure_kpa: parseFloat($('spRatedPressure').value),
       source_flow_m3h: parseFloat($('spSourceFlow').value),
-      spacing_k: parseFloat($('spK').value), heads_per_shift: parseInt($('spHeads').value, 10)
+      spacing_k: parseFloat($('spK').value), heads_per_shift: parseInt($('spHeads').value, 10),
+      spacing_m: (isFinite(sm) && sm > 0) ? sm : null,   /* 留空 = 用间距系数 k（core 内 Number(null)=0 → factor 模式） */
+      riser_od_mm: parseFloat($('spRiserOd').value) || 25,
+      riser_height_m: parseFloat($('spRiserH').value) || 3,
+      tank_v: parseFloat($('spTankV').value) || null,
+      boost_q: parseFloat($('spBoostQ').value) || null,
+      boost_h: parseFloat($('spBoostH').value) || null,
+      boost_split: parseFloat($('spBoostSplit').value) || null,
+      trench_depth_m: parseFloat($('spTrenchD').value) || 0.5,
+      trench_w_main_m: parseFloat($('spTwMain').value) || 0.5,
+      trench_w_sub_m: parseFloat($('spTwSub').value) || 0.4,
+      trench_w_lat_m: parseFloat($('spTwLat').value) || 0.3,
+      filter_on: $('spFilterOn').checked,
+      filter_n: parseInt($('spFilterN').value, 10) || 1,
+      fert_on: $('spFertOn').checked,
+      fert_n: parseInt($('spFertN').value, 10) || 1
     };
   }
   function spFill(v) {
@@ -728,6 +753,21 @@
     $('spRatedPressure').value = v.rated_pressure_kpa || v.ratedPressure || '';
     $('spSourceFlow').value = v.source_flow_m3h || v.sourceFlow || '';
     $('spK').value = v.spacing_k; $('spHeads').value = v.heads_per_shift;
+    $('spSpacing').value = (v.spacing_m != null && isFinite(v.spacing_m) && v.spacing_m > 0) ? v.spacing_m : '';
+    $('spRiserOd').value = v.riser_od_mm || v.riserOd || 25;
+    $('spRiserH').value = v.riser_height_m || v.riserH || 3;
+    $('spTankV').value = (v.tank_v != null && isFinite(v.tank_v)) ? v.tank_v : (v.tankV || '');
+    $('spBoostQ').value = (v.boost_q != null && isFinite(v.boost_q)) ? v.boost_q : (v.boostQ || '');
+    $('spBoostH').value = (v.boost_h != null && isFinite(v.boost_h)) ? v.boost_h : (v.boostH || '');
+    $('spBoostSplit').value = (v.boost_split != null && isFinite(v.boost_split)) ? v.boost_split : (v.boostSplit || '');
+    $('spTrenchD').value = (v.trench_depth_m != null && isFinite(v.trench_depth_m)) ? v.trench_depth_m : (v.trenchD || 0.5);
+    $('spTwMain').value = (v.trench_w_main_m != null && isFinite(v.trench_w_main_m)) ? v.trench_w_main_m : (v.twMain || 0.5);
+    $('spTwSub').value = (v.trench_w_sub_m != null && isFinite(v.trench_w_sub_m)) ? v.trench_w_sub_m : (v.twSub || 0.4);
+    $('spTwLat').value = (v.trench_w_lat_m != null && isFinite(v.trench_w_lat_m)) ? v.trench_w_lat_m : (v.twLat || 0.3);
+    $('spFilterOn').checked = v.filter_on !== false && v.filterOn !== false;
+    $('spFilterN').value = v.filter_n || v.filterN || 1;
+    $('spFertOn').checked = v.fert_on !== false && v.fertOn !== false;
+    $('spFertN').value = v.fert_n || v.fertN || 1;
   }
   function spSave() { try { localStorage.setItem(SP_KEY, JSON.stringify(spRead())); } catch (e) {} }
 
@@ -744,7 +784,7 @@
       return;
     }
     var rows = [
-      '喷头间距 <b>' + res.spacing.toFixed(1) + ' m</b> × 行距 ' + res.rowSpacing.toFixed(1) + ' m（' + (res.layout === 'tri' ? '正三角形' : '正方形') + '）',
+      '喷头间距 <b>' + res.spacing.toFixed(1) + ' m</b> × 行距 ' + res.rowSpacing.toFixed(1) + ' m（' + (res.layout === 'tri' ? '正三角形' : '正方形') + (res.spacingMode === 'fixed' ? ' · 直接填间距' : '') + '）',
       '单喷头控制面积 <b>' + Math.round(res.headArea) + ' ㎡</b>',
       '总灌溉面积 <b>' + fmtArea(area) + '</b> → 需喷头约 <b>' + res.headCount + '</b> 个',
       '轮灌组数 <b>' + res.shiftCount + '</b> 组（每组 ' + res.headsPerShift + ' 个同时工作）',
@@ -763,6 +803,109 @@
        全部按新参数重建（drawCanvas 内部 spRead() 实时读参数）。
        无效参数（res.ok=false）已在上方 return，画布保留旧布置只报警告。 */
     drawCanvas();
+
+    /* v384 任务书 P0：布置 → BOM → 写数据桥 localStorage['runyeSprinklerResult']。
+       与地图回传同款套路：写前 removeItem 再 set，确保每次是全新快照。
+       桥接失败不阻断估算展示（估算结果已在上面渲染完成）。 */
+    try {
+      var lay = D.sprinklerLayout(state.plots, input);
+      if (lay && lay.ok) {
+        /* P1：蓄水池/二次加压填了参数就随 BOM 落桥（core 内 tankVolumeEstimate/boostModel 口径） */
+        var tankOpt = null, boostOpt = null;
+        if (input.tank_v > 0) tankOpt = { volume_m3: input.tank_v, note: '蓄水池（手填/按参数估算）' };
+        if (input.boost_h > 0 && input.boost_split > 0 && input.boost_split < input.boost_h) {
+          var bq = input.boost_q > 0 ? input.boost_q : (res.headsPerShift * input.flow_m3h);
+          boostOpt = D.boostModel({ q_m3h: bq, total_head_m: input.boost_h, split_at_m: input.boost_split });
+        }
+        var bom = D.sprinklerBom(lay, {
+          flow_m3h: input.flow_m3h, riser_od_mm: input.riser_od_mm, riser_height_m: input.riser_height_m,
+          tank: tankOpt, boost: boostOpt,
+          trench_depth_m: input.trench_depth_m, trench_w_main_m: input.trench_w_main_m,
+          trench_w_sub_m: input.trench_w_sub_m, trench_w_lat_m: input.trench_w_lat_m,
+          filter: { enabled: input.filter_on, sets: input.filter_n },
+          fert: { enabled: input.fert_on, sets: input.fert_n }
+        });
+        if (bom && bom.ok) {
+          renderSpBom(bom);
+          var names = state.plots.map(function (p) { return p.name || ''; }).filter(Boolean);
+          var payload = {
+            version: 1, ts: Date.now(),
+            plotRef: {
+              id: state.plots.map(function (p) { return p.id; }).join(','),
+              name: names.join('、') || ('共 ' + state.plots.length + ' 块地块'),
+              mu: Math.round(area / 666.67 * 100) / 100,
+              sqm: Math.round(area * 100) / 100
+            },
+            bom: bom, layout: lay
+          };
+          localStorage.removeItem(SP_BRIDGE_KEY);
+          localStorage.setItem(SP_BRIDGE_KEY, JSON.stringify(payload));
+        }
+      } else {
+        var bomCard = $('spBomCard'); if (bomCard) bomCard.hidden = true;
+      }
+    } catch (e) { /* 桥写失败只影响插件消费，页面估算结果不受影响 */ }
+  }
+
+  /* v384 任务书 P0：喷灌材料清单（BOM）纯展示，样式沿用估算结果区 */
+  function renderSpBom(bom) {
+    var card = $('spBomCard'), box = $('spBom');
+    if (!card || !box || !bom || !bom.ok) return;
+    var rows = [];
+    rows.push('喷头 <b>' + bom.heads.count + '</b> 个' +
+      (bom.heads.flowLh ? ' × ' + bom.heads.flowLh + ' L/h' : '') +
+      ' · R=' + bom.heads.radius_m + ' m · 间距 ' + bom.heads.spacing_m + ' m');
+    rows.push('镀锌立管 <b>' + bom.risers.count + '</b> 根 · Φ' + bom.risers.od_mm + ' mm × ' + bom.risers.height_m + ' m');
+    rows.push('干管 Φ' + (bom.pipes.mainline.dn_mm || '—') + ' × <b>' + bom.pipes.mainline.len_m + '</b> m');
+    rows.push('支管 Φ' + (bom.pipes.laterals.dn_mm || '—') + ' × <b>' + bom.pipes.laterals.len_m + '</b> m');
+    rows.push('轮灌组 <b>' + bom.shifts.groupCount + '</b> 组（每组 ' + bom.shifts.headsPerShift + ' 个同时工作）→ 分区阀门 <b>' + bom.valves.count + '</b> 个');
+    if (bom.tank) rows.push('蓄水池 <b>' + bom.tank.volume_m3 + '</b> m³（' + esc(bom.tank.note || '') + '）');
+    if (bom.boost) rows.push('二次加压：一段泵 <b>' + bom.boost.stage1.power_kw + '</b> kW + 二段泵 <b>' + bom.boost.stage2.power_kw + '</b> kW');
+    if (bom.trench) rows.push('沟槽土方 <b>' + bom.trench.volume_m3 + '</b> m³（深 ' + bom.trench.depth_m + ' m · 干管宽 ' + bom.trench.widths.sub_m + ' / 支管宽 ' + bom.trench.widths.lat_m + ' m）');
+    if (bom.filter) rows.push('板框过滤器 <b>' + bom.filter.sets + '</b> 套（' + esc(bom.filter.note || '') + '）');
+    if (bom.fert) rows.push('溶肥容器 + 肥液中转池 <b>' + bom.fert.sets + '</b> 套');
+    box.innerHTML = rows.join('<br>');
+    card.hidden = false;
+  }
+
+  /* v384 P1：蓄水池按参数估算回填（V = 亩×667×ETc×days/1000/η，days 默认 2 供水中断缓冲） */
+  function calcTank() {
+    var area = D.plotsTotalAreaM2(state.plots);
+    if (!(area > 0)) { banner('warn', '蓄水池估算需要先导入地块（按当前地块亩数计算）'); return; }
+    var r = D.tankVolumeEstimate({
+      area_mu: area / 666.67,
+      etc_mm: parseFloat($('spEtc').value),
+      eta: parseFloat($('spEta').value)
+    });
+    if (!r.ok) { banner('warn', esc(r.error)); return; }
+    $('spTankV').value = r.volume_m3;
+    spSave();
+    banner('ok', '蓄水池建议 <b>' + r.volume_m3 + ' m³</b>（' + esc(r.formula) + '）——建议值，可按日轮灌制度调整');
+  }
+
+  /* v384 P1：两段泵选型展示（P=2.725×Q×H/η/1000，与主页 pump.power 同口径，不另写公式） */
+  function calcBoost() {
+    var box = $('spBoostResult');
+    var th = parseFloat($('spBoostH').value), sp = parseFloat($('spBoostSplit').value);
+    var q = parseFloat($('spBoostQ').value);
+    if (!(q > 0)) {
+      var fl = parseFloat($('spFlow').value), n = parseInt($('spHeads').value, 10);
+      if (fl > 0 && n > 0) q = fl * n;   /* 泵流量留空 → 默认轮灌组流量（与估算同参） */
+    }
+    if (!(q > 0) || !(th > 0) || !(sp > 0) || sp >= th) {
+      box.hidden = false;
+      box.textContent = '请填「泵总扬程」与「二级起点扬程」（起点须小于总扬程）；泵流量留空则按轮灌组流量。';
+      return;
+    }
+    var r = D.boostModel({ q_m3h: q, total_head_m: th, split_at_m: sp });
+    if (!r.ok) { box.hidden = false; box.textContent = r.error; return; }
+    box.hidden = false;
+    box.innerHTML =
+      '系统流量 <b>' + r.flow.toFixed(1) + ' m³/h</b> · η=' + r.eta + '<br>' +
+      '一段泵（主加压 ' + r.stage1.head + ' m）：<b>' + r.stage1.power_kw + ' kW</b> → 电机 ' + (r.stage1.motor_kw != null ? r.stage1.motor_kw + ' kW' : '超标准序列') + '<br>' +
+      '二段泵（二次加压 ' + r.stage2.head + ' m）：<b>' + r.stage2.power_kw + ' kW</b> → 电机 ' + (r.stage2.motor_kw != null ? r.stage2.motor_kw + ' kW' : '超标准序列') + '<br>' +
+      esc(r.note);
+    spSave();
   }
 
   /* 轮灌演示（v290）：分组依次点亮——当前组满亮、其余压暗；再点停止并清空高亮。
@@ -871,10 +1014,20 @@
       mainTxt = '干管 Φ' + lay.mainDN.dn + '（' + lay.mainFlow.toFixed(1) + ' m³/h）';
       latTxt = '支管 Φ' + lay.latDN.dn + '（' + lay.latFlow.toFixed(1) + ' m³/h）';
     }
+    /* v384 P2：勾选启用才进图例（与 BOM 计入口径一致，不造假数） */
+    var extras = '';
+    if ($('spFilterOn') && $('spFilterOn').checked) {
+      extras += '<span class="tl-item"><span class="tl-swatch" style="background:#94a3b8"></span>板框过滤器 ×' + (parseInt($('spFilterN').value, 10) || 1) + '</span>';
+    }
+    if ($('spFertOn') && $('spFertOn').checked) {
+      extras += '<span class="tl-item"><span class="tl-swatch" style="background:#a16207"></span>溶肥容器+中转池 ×' + (parseInt($('spFertN').value, 10) || 1) + '</span>';
+    }
     lg.innerHTML =
       '<span class="tl-item"><span class="tl-swatch tl-plot"></span>地块边界</span>' +
       '<span class="tl-item"><span class="tl-swatch tl-main"></span>' + mainTxt + '</span>' +
       '<span class="tl-item"><span class="tl-swatch tl-lat"></span>' + latTxt + '</span>' +
+      '<span class="tl-item"><span class="tl-swatch" style="background:#475569"></span>立管 Φ' + spRead().riser_od_mm + '×' + spRead().riser_height_m + 'm</span>' +
+      extras +
       '<span class="tl-item"><span class="tl-swatch tl-range"></span>喷射范围（半径 R）</span>' +
       '<span class="tl-item">喷头颜色 = 轮灌组' + dots + '<em>（第 9 组起颜色循环）</em></span>';
   }
@@ -885,6 +1038,8 @@
       if (saved && typeof saved === 'object') spFill(Object.assign({}, SP_DEFAULTS, saved));
     } catch (e) { /* 损坏用默认 */ }
     $('spCalc').addEventListener('click', calcSprinkler);
+    $('spTankCalc').addEventListener('click', calcTank);   /* v384 P1 蓄水池估算 */
+    $('spBoostCalc').addEventListener('click', calcBoost); /* v384 P1 两段泵 */
     $('spReset').addEventListener('click', function () { spFill(SP_DEFAULTS); spSave(); calcSprinkler(); });
     $('spOverlay').addEventListener('change', drawCanvas); /* 切换喷灌布置叠加层 */
     buildSpLegend();

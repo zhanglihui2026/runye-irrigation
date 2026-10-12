@@ -167,9 +167,31 @@
           <option value="square">正方形</option>
         </select></div>
         <div class="t-sprow"><label>间距系数 k（×R）</label><input id="spK" type="number" value="1.1" min="0.4" max="1.6" step="0.05"></div>
+        <div class="t-sprow"><label>直接填间距（m）</label><input id="spSpacing" type="number" min="1" max="60" step="0.5" placeholder="如 12，留空用 k"><span>m</span></div>
+        <div class="t-sprow"><label>立管口径</label><input id="spRiserOd" type="number" value="25" min="10" max="110" step="1"><span>mm</span></div>
+        <div class="t-sprow"><label>立管高度</label><input id="spRiserH" type="number" value="3" min="1" max="10" step="0.5"><span>m</span></div>
         <div class="t-spgroup">轮灌与水源</div>
         <div class="t-sprow"><label>同时工作喷头数</label><input id="spHeads" type="number" value="12" min="1" max="500" step="1"><span>个</span></div>
         <div class="t-sprow"><label>水源可用流量（可选）</label><input id="spSourceFlow" type="number" min="0.1" max="10000" step="0.1" placeholder="实测或水泵铭牌"><span>m³/h</span></div>
+        <div class="t-spgroup">蓄水池与二次加压</div>
+        <div class="t-sprow"><label>蓄水池容积（m³）</label><input id="spTankV" type="number" min="0" max="100000" step="10" placeholder="手填或估算"><span><button class="t-btn ghost" id="spTankCalc" type="button">按参数估算</button></span></div>
+        <div class="t-sprow"><label>泵流量（可选）</label><input id="spBoostQ" type="number" min="0.1" max="10000" step="0.1" placeholder="默认轮灌组流量"><span>m³/h</span></div>
+        <div class="t-sprow"><label>泵总扬程</label><input id="spBoostH" type="number" min="1" max="500" step="1" placeholder="至最不利喷头"><span>m</span></div>
+        <div class="t-sprow"><label>二级起点扬程</label><input id="spBoostSplit" type="number" min="0.1" max="500" step="1" placeholder="如主管末端处"><span>m</span></div>
+        <div class="t-btnrow" style="margin-top:4px">
+          <button class="t-btn ghost" id="spBoostCalc" type="button">算两段泵</button>
+        </div>
+        <div id="spBoostResult" class="t-spresult" hidden></div>
+        <div class="t-spgroup">沟槽施工</div>
+        <div class="t-sprow"><label>沟深（固定）</label><input id="spTrenchD" type="number" value="0.5" min="0.2" max="2" step="0.1"><span>m</span></div>
+        <div class="t-sprow"><label>沟宽·主管（外线）</label><input id="spTwMain" type="number" value="0.5" min="0.2" max="2" step="0.1"><span>m</span></div>
+        <div class="t-sprow"><label>沟宽·干管</label><input id="spTwSub" type="number" value="0.4" min="0.2" max="2" step="0.1"><span>m</span></div>
+        <div class="t-sprow"><label>沟宽·支管</label><input id="spTwLat" type="number" value="0.3" min="0.2" max="2" step="0.1"><span>m</span></div>
+        <div class="t-spgroup">肥液与过滤</div>
+        <label class="t-sprow t-sp-overlay" style="cursor:pointer"><input type="checkbox" id="spFilterOn" checked> 板框过滤器（茶枯肥液防堵）</label>
+        <div class="t-sprow"><label>过滤器数量</label><input id="spFilterN" type="number" value="1" min="1" max="20" step="1"><span>套</span></div>
+        <label class="t-sprow t-sp-overlay" style="cursor:pointer"><input type="checkbox" id="spFertOn" checked> 溶肥容器 + 肥液中转池</label>
+        <div class="t-sprow"><label>溶肥设施数量</label><input id="spFertN" type="number" value="1" min="1" max="20" step="1"><span>套</span></div>
         <div class="t-btnrow" style="margin-top:6px">
           <button class="t-btn" id="spCalc">估算</button>
           <button class="t-btn ghost" id="spReset">恢复默认</button>
@@ -178,6 +200,11 @@
         <label class="t-sprow t-sp-overlay" style="cursor:pointer"><input type="checkbox" id="spOverlay" checked> 图上显示喷灌布置</label>
         <div id="spResult" class="t-spresult" hidden></div>
         <div id="spWarn" hidden></div>
+        <!-- [v384 任务书 P0] 喷灌材料清单：估算后自动生成 BOM 并写入数据桥（localStorage.runyeSprinklerResult） -->
+        <details class="t-card t-fold" id="spBomCard" hidden>
+          <summary>喷灌材料清单（BOM）</summary>
+          <div class="t-cardbody" id="spBom"></div>
+        </details>
         <div class="t-hintbox">参数依据：GB/T 50085《喷灌工程技术规范》+ 坡地喷灌实测研究（间距 0.8~1.2R、三角形布置、300kPa）+ IRRICAD/OpenCAD 输入范式。山地惯例：支管沿等高线布置、主管垂直等高线。详细水力计算属后续阶段。</div>
       </div>
     </details>
