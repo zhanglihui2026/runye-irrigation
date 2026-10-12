@@ -147,7 +147,22 @@ export function createUiShell(guard) {
       for (var i = 0; i < cs.length; i++) {
         var box = cs[i];
         var ex = box.querySelector(navSelector(item.id));
-        if (ex) { applyLock(ex, item); continue; }   /* 已存在则不重复插；只刷新锁定态 */
+        if (ex) {
+          /* [v391] 锚定项重定位：runye-nav 重渲染（权益就绪等）会把第三方项统一挪到
+             「更多 ▾」之前（[v377] 兜底），这会覆盖插件用 before/beforeLabel 声明的位置
+             （如 ai-plan 锚定「地块绘制」= 顶栏第一位）。这里对已有元素按锚点重新就位 ——
+             insertBefore 对已有节点就是移动，无副作用；只有当元素确实跑到了锚点之后
+             才动（compareDocumentPosition 判定），避免同锚点多插件互相推挤造成死循环。
+             锚点此刻缺失则维持原位，等 scheduleRemount 下一帧再试（下方 waiting 分支）。 */
+          if (item.before || item.beforeLabel) {
+            var reAnch = anchorFor(box, item);
+            if (reAnch && reAnch.parentNode === box &&
+                (reAnch.compareDocumentPosition(ex) & Node.DOCUMENT_POSITION_FOLLOWING)) {
+              box.insertBefore(ex, reAnch);
+            }
+          }
+          applyLock(ex, item); continue;   /* 已存在则不重复插；只刷新锁定态 */
+        }
         /* [v377] 锚点暂缺（导航正在分块重建）→ 有界重试等锚点，别急着退回 appendChild：
            真页面实测 RyFnNav.render() 分块追加顶级项，core 的重挂载常跑在「更多 ▾」重建完成之前，
            立即落位会把插件项插到中间（位置错，且不会再被纠正）。

@@ -1,13 +1,13 @@
 {
   "id": "pipe-optim",
-  "name": "管网优化（老模块迁移样板）",
-  "version": "1.0.0",
+  "name": "管网优化（老模块迁移样板 · 入口已脱开主程序）",
+  "version": "1.1.0",
   "entry": "main.js",
   "requires": { "core": ">=1.0.0", "plugins": [] },
   "ui": { "nav": { "label": "管网优化", "order": 90, "icon": "", "title": "管网优化详细分析（Jaya 群智能 · 只读）" } },
   "permissions": ["read:diagram", "event:emit", "ui:nav"],
   "config": {
-    "takeOverNav": true,
-    "_note": "true=摘掉老模块自注入的按钮、改由插件注册（位置不变）；false=完全不碰老按钮，只做事件桥接（灰度用）"
+    "container": ".fn-more-panel",
+    "_note": "[v391] 入口与主程序脱开（用户指令）：老模块 pipe_optim_ui.js 不再自注入导航按钮，本插件直接在「更多 ▾」面板内持有入口（container 指定；面板缺失时 core containersFor 降级到主导航条——入口不能丢）。点击仍调 window.PipeOptim.open()（弹窗业务零改动）；事件桥接（ry:pipe-optim-export → pipe-optim-export）原样。灰度开关：container 置空 = 入口落主导航条。"
   }
 }

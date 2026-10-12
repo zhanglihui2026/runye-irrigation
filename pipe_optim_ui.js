@@ -488,17 +488,14 @@
   }
 
   /* ========================================================================
-   * 12) 初始化（DOM 就绪后注入导航按钮与样式）
+   * 12) 初始化（DOM 就绪后注入样式）
+   *   [v391] 导航入口移交 plugins/pipe-optim（用户指令：管网优化与主程序脱开，作为插件接入）
+   *   —— 本模块不再注入导航按钮（injectNavButton 保留备查但不再调用）；
+   *      弹窗业务 window.PipeOptim 原样保留，插件入口点击时经 window.PipeOptim.open() 调用。
    * ===================================================================== */
   function init() {
     try {
       injectCss();
-      if (!injectNavButton()) {
-        // 导航容器尚未出现（极端时序），等 DOMContentLoaded 再试一次
-        if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', function () { try { injectCss(); injectNavButton(); } catch (e) { } });
-        }
-      }
     } catch (e) { /* 隔离：任何异常都不影响原站 */ }
   }
 

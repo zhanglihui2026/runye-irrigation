@@ -25,8 +25,15 @@
    后两者由 ui-shell 自行重挂防双份），新面板建好后回插。runye-nav.js 在 CORE 白名单内，必须抬版本）→
    v390-plugin-migrate-4（用户指令：过滤系统/材料清单/轴测图/系统图四项作为外挂插件接入主程序；
    生成系统图与地块绘制留在主程序不动。新增 plugins/filter-system、material-list、iso-view、sys-view
-   四个壳插件（业务零改动，接管 runye-nav 老导航项 + 重渲染抑制器），八文件进 CORE 白名单，必须抬版本）。 */
-const VERSION = 'v390-plugin-migrate-4';
+   四个壳插件（业务零改动，接管 runye-nav 老导航项 + 重渲染抑制器），八文件进 CORE 白名单，必须抬版本）→
+   v391-nav-reorder-decouple（用户指令三项：① 顶栏重排——智能规划第一（ai-plan 锚点改「地块绘制」）、
+   地块绘制移到在线地图之前（pre:1 提前）、多地块规划恢复上线（v386 剥离条目原样加回，地形模块之后）；
+   ② 管网优化入口与主程序脱开——pipe_optim_ui.js 不再自注入导航按钮，pipe-optim 插件直接持有
+   「更多」面板入口（config.container），契约 C22/C25/C26 与 I13/I14/I15 同步改写；③ 为让重渲染后
+   锚定项不被 [v377] 兜底挪走，core/ui-shell.js mountNavs 对锚定项按锚点重定位）。
+   runye-nav.js / core/ui-shell.js / pipe_optim_ui.js 均在 CORE 白名单内，必须抬版本）→
+   v392-iframe-shell（桌面端地图/地形/水力校核 iframe 首进懒加载后常驻，新增 mod/inline-31.js 入 CORE）。 */
+const VERSION = 'v392-iframe-shell';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
@@ -108,6 +115,7 @@ const CORE = [
   "mod/inline-28.js",
   "mod/inline-29.js",
   "mod/inline-30.js",
+  "mod/inline-31.js",
   "mod/style-01.css",
   "mod/style-02.css",
   "mod/style-03.css",

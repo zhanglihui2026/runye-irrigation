@@ -33,7 +33,10 @@
          ai-plan / online-map / zone-split / pipe-layout  → L1 注册会员（匿名试用也放行）
          hydraulic-check / pro-others                     → L2 高级会员 */
     { label: '智能规划', href: 'index.html?smart=1#pipePlanSection', win: 1, feat: 'ai-plan', title: '独立窗口打开：AI 对话规划（主窗口地块分区不受影响）' },
-    /* [v250] 在线地图 移到 地块绘制 之前（v346 起地块绘制折叠进「更多」） */
+    /* [v391 2026-10-12 用户指令] 顶栏重排：智能规划第一（由 ai-plan 插件锚定在「地块绘制」
+       之前实现）、地块绘制放到 在线地图 之前 —— 故本条提前并加 pre:1（与 v250 旧序对调）。 */
+    { label: '地块绘制',     hash: 'areaTool',                 pre: 1, feat: 'pro-others', title: '地块绘制工具（比例尺 / 绘制边界 / 地块库）' },
+    /* [v250] 在线地图 移到 地块绘制 之前（v346 起地块绘制折叠进「更多」；v391 按用户指令对调回来） */
     { label: '在线地图',     href: 'runye-map-measure.html',   pre: 1, feat: 'online-map' },
     /* [v250] 「二级管路」改名「地块分区」、「三级管路编辑」改名「管路规划」（hash/id 不变，仅显示名变） */
     { label: '地块分区',     hash: 'pipePlanSection',          pre: 1, feat: 'zone-split' },
@@ -43,18 +46,19 @@
        树状拓扑+全链路水损+滴灌带多孔出流+水泵选型+EPANET WASM 对照），原软件逻辑零改动 */
     { label: '水力校核',     href: 'runye-hydraulics.html',     feat: 'hydraulic-check', title: '水力校核：自动读已布置管网，逐段流量/流速/水损 + 最不利路径 + 需求扬程与水泵选型' },
     /* [v387 2026-10-12 用户指令] 「更多」内容全部展开到顶栏（四功能剥离后「更多」只剩 6 项，
-       没必要再折叠）。「更多 ▾」机制保留：面板仍承接 pipe_optim_ui 注入的「管网优化详细分析」
+       没必要再折叠）。「更多 ▾」机制保留：面板仍承接 pipe-optim 插件的「管网优化」入口
        与将来恢复的功能项。 */
     /* [v358] feat 说明：'pro-others' = 高级会员通配键（L1 四大功能之外的全部）；
        feat:'' = 完全免费、不参与门控。滴灌带查询器是公开查询小工具，保持免费。 */
-    { label: '地块绘制',     hash: 'areaTool',                 feat: 'pro-others', title: '地块绘制工具（比例尺 / 绘制边界 / 地块库）' },
     /* [NEW MODULE: 地形模块] 卸载=删除本行+terrain/+sw.js 条目 */
     { label: '地形模块',     href: 'terrain/index.html',       feat: 'pro-others', title: '地形模块：shp/RTK边界导入、CGCS2000校验、面积、高程数据源登记' },
+    /* [v391 2026-10-12 用户指令] 多地块规划 恢复上线（v386 剥离时业务全保留，此处按原条目加回，
+       位置：地形模块 之后） */
+    { label: '多地块规划',   hash: 'grPipeSection',            feat: 'pro-others', title: '成组地块：全组总览 + 总管编辑 + 按块进入管路规划' },
     /* [v385 2026-10-12 用户指令] 四项功能剥离下线（入口摘除，业务代码/页面全部保留，将来需要时
-       把对应行加回 MORE_ITEMS 或 ITEMS 即可恢复）：多地块规划(#grPipeSection)、管路拼装(独立页+
+       把对应行加回 MORE_ITEMS 或 ITEMS 即可恢复）：多地块规划(已于 v391 恢复)、管路拼装(独立页+
        pipe-assemble 壳插件同步摘除)、经济指标分析(#threeDModelingSection)、数字化建模
        (#parametricModelingSection)。恢复格式照抄下面被注释的原条目。 */
-    /* { label: '多地块规划',   hash: 'grPipeSection',            feat: 'pro-others', title: '成组地块：全组总览 + 总管编辑 + 按块进入管路规划' }, */
     /* { label: '管路拼装',     href: '管路接驳拼装.html',         feat: 'pro-others', title: '管路接驳拼装：管件级拼装 + 单向水力计算' }, */
     /* { label: '经济指标分析', hash: 'threeDModelingSection',     feat: 'pro-others', title: '管径经济指标分析：前期管材投入 vs 后期电费，找年均总成本最低的平衡点' }, */
     /* { label: '数字化建模',   hash: 'parametricModelingSection', feat: 'pro-others', title: '数字化建模 · 参数化节点建模' }, */
@@ -130,6 +134,9 @@
     a.className = 'fn-link';
     a.setAttribute('data-ry-navitem', '1');
     if (it.href === 'runye-map-measure.html' || it.hash === 'pipePlanSection' || it.hash === 'tlPipePlanSection') a.setAttribute('data-ry-mobile-nav', '1');
+    /* [v392] 页面级外挂：桌面端由 RyFrameShell 接管；href/feat 留作移动端和脚本故障兜底。 */
+    var framePage = it.href === 'runye-map-measure.html' ? 'online-map' : it.href === 'terrain/index.html' ? 'terrain' : it.href === 'runye-hydraulics.html' ? 'hydraulics' : '';
+    if (framePage) { a.setAttribute('data-fr-page', framePage); a.setAttribute('data-fr-feature', it.feat || ''); }
     /* [v358] 锁定态：「·锁」标记 + 捕获阶段拦截（阻断 href 跳转 / data-target 处理器 /
        act 动作 / win 独立窗口 四条路径，与 v346 的线上锁同一手法） */
     var locked = !gate(it.feat);
