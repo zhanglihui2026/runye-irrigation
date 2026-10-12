@@ -474,7 +474,9 @@ export function activate(ctx) {
   ctxRef = ctx;
 
   panel = buildPanel();
-  ctx.ui.mountPoint.appendChild(panel);
+  /* ★ 挂 body 而非 mountPoint：createMount 的 slot 默认 display:none，
+     隐藏父容器内 position:fixed 面板不渲染（与 archive/case-lib 同口径） */
+  document.body.appendChild(panel);
 
   var styleEl = document.getElementById('contourDxfCss');
   if (!styleEl) {

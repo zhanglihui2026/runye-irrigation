@@ -49,9 +49,12 @@
    v399-file-menu（用户指令：导航增加「文件 ▾」统一菜单——所有导入/导出/工程操作收进一个折叠入口。
    新增 mod/inline-32.js（菜单构建+动作分发：主程序内直接调 runyeDxf/RyIsoDiagram/headModal/runyeSaveProject
    等，独立页经 RyFrameShell 切 iframe 后触发 btnImport/btnGeoJSON/fileSHP 等按钮）；
-   index.html 加 #fnFileMenu 静态块 + runye-nav.css 加 .fn-file 皮肤。index.html / runye-nav.css /
-   mod/inline-32.js 均在 CORE 白名单，必须抬版本）。 */
-const VERSION = 'v399-file-menu';
+   index.html 加 #fnFileMenu 静态块 + runye-nav.css 加 .fn-file 皮肤。   index.html / runye-nav.css /
+   mod/inline-32.js 均在 CORE 白名单，必须抬版本）→
+   v400-contour-dxf-panel-fix（contour-dxf 面板挂载修复：createMount 槽默认 display:none，
+   position:fixed 面板在隐藏父容器内不渲染 → 改挂 document.body（archive/case-lib 同口径）。
+   plugins/contour-dxf/main.js 在 CORE 白名单，必须抬版本）。 */
+const VERSION = 'v400-contour-dxf-panel-fix';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
