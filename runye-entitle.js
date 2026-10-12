@@ -63,8 +63,8 @@
   var PLAN_NAMES = { L1: '注册会员', L2: '高级会员' };
   var PLAN_DAYS = { L1: 30, L2: 365 };
 
-  /* [2026-10-12] 暂时全站开放所有工具功能；后续讨论 L1/L2 分级时改回 false。 */
-  var ALL_FEATURES_OPEN = true;
+  /* [2026-10-13] 启用 L1/L2 功能门控；具体权限由 PLAN_FEATURES 与 can() 判定。 */
+  var ALL_FEATURES_OPEN = false;
 
   var state = null;
   var lastHb = 0;
