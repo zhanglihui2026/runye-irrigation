@@ -9,6 +9,10 @@
   frames.forEach(function (frame) { byId[frame.getAttribute('data-fr-page')] = frame; });
   function mobile() { return !!(W.RyMobile && typeof W.RyMobile.isActive === 'function' && W.RyMobile.isActive()); }
   function setActiveNav(page, on) {
+    if (on) {
+      var active = D.querySelectorAll('.fn-link.active');
+      for (var a = 0; a < active.length; a++) active[a].classList.remove('active');
+    }
     var selectors = { 'online-map': '[data-fr-page="online-map"]', 'terrain': '[data-fr-page="terrain"]', 'hydraulics': '[data-ry-plugin-nav="hydraulics"]' };
     var list = D.querySelectorAll(selectors[page] || '');
     for (var i = 0; i < list.length; i++) list[i].classList.toggle('active', !!on);
@@ -84,8 +88,3 @@
     }
   }, true);
 })(window, document);
-
-
-
-
-
