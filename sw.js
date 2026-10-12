@@ -62,7 +62,7 @@
    「文件」按钮挂到「地块绘制」之前（mod/inline-32.js relocate + MutationObserver）并去掉 📂 图标。
    runye-nav.js / index.html / runye-nav.css / mod/inline-32.js / 两插件 main.js 均在 CORE
    白名单，必须抬版本）。 */
-const VERSION = 'v402-nav-more-collapse';
+const VERSION = 'v403-file-menu-visible-labels';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
