@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>if(window.self!==window.top)document.documentElement.classList.add('ry-embedded-page');</script>
 <title>地形模块 · 润野灌溉设计软件</title>
 <!-- [NEW MODULE: 地形模块] 阶段1 基础框架：边界导入(shp/RTK CSV) + CGCS2000 校验
      + 水平投影面积(㎡/亩) + 高程数据源统一接口(RTK CSV / DTM / DSM 仅预览)
@@ -23,6 +24,9 @@
     grid-template-columns:var(--t-side-w,clamp(272px,20vw,318px)) var(--t-grip-w,10px) minmax(0,1fr);
     column-gap:0;row-gap:0;padding:8px 10px 8px 8px;
   }
+  /* 主程序 iframe 已提供全站主导航；嵌入时隐藏本页导航，并把工作区高度补回导航高度。 */
+  html.ry-embedded-page .fn-nav{display:none!important}
+  html.ry-embedded-page .t-body{height:calc(100vh - 42px)}
   .t-body>.t-side{grid-column:1;grid-row:1}
   .t-body>.t-grip{grid-column:2;grid-row:1}
   .t-body>.t-stage{grid-column:3;grid-row:1}

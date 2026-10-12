@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<script>if(window.self!==window.top)document.documentElement.classList.add('ry-embedded-page');</script>
 <title>润野 · 水力校核（管网与毛管校核）</title>
 <style>
   :root{
@@ -17,6 +18,8 @@
   /* ===== 顶部功能区导航：皮肤=runye-nav.css、清单=runye-nav.js（唯一出处） ===== */
   .fn-nav{flex:none;background:#fff;border-bottom:1px solid var(--s-200)}
   .fn-nav .fn-inner{padding:0 12px}
+  /* 主程序 iframe 已提供全站主导航；独立打开时仍保留本页导航。 */
+  html.ry-embedded-page .fn-nav{display:none!important}
   /* ===== 主体：左参数 + 中间画布/表格 + 右属性 ===== */
   .main{flex:1;display:flex;min-height:0;align-items:stretch;overflow:hidden}
   .side{flex:none;width:260px;background:#fff;border-right:1px solid var(--s-300);overflow-y:auto;
