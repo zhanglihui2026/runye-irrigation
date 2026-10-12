@@ -6,7 +6,7 @@
    本插件负责：展示、估价汇总、CSV 导出、把 BOM 存进指定项目档案。
    ============================================================ */
 
-var ctx = null, unnav = null, panel = null, linkEl = null;
+var ctx = null, offBus = null, panel = null, linkEl = null;
 var current = null;      /* 最近一次生成的 BOM */
 
 function el(tag, cls, text) {
@@ -40,7 +40,7 @@ function buildPanel() {
   head.appendChild(el('b', null, '材料清单（BOM）'));
   var close = el('button', 'bom-x', '×');
   close.type = 'button'; close.title = '关闭';
-  close.addEventListener('click', function () { p.style.display = 'none'; });
+  close.addEventListener('click', togglePanel);
   head.appendChild(close);
   p.appendChild(head);
 
@@ -69,6 +69,21 @@ function buildPanel() {
 
   p._f = { sel: sel, body: body };
   return p;
+}
+
+function openPanel() {
+  if (!panel) return false;
+  panel.style.display = '';
+  refreshArchives();
+  generate();
+  return true;
+}
+
+function togglePanel() {
+  if (!panel) return false;
+  if (panel.style.display === 'none') return openPanel();
+  panel.style.display = 'none';
+  return true;
 }
 
 /* ---------------- 生成 / 渲染 ---------------- */
@@ -192,24 +207,14 @@ export function activate(c) {
   panel = buildPanel();
   ctx.ui.mountPoint.appendChild(panel);
 
-  if (ctx.ui.registerNav) {
-    /* 标签只认 manifest（单一事实来源）—— 曾经 main.js 里写死「材料清单」，
-       与老导航「更多 ▾」里的「材料清单」撞名，真页面出现同名双入口。 */
-    var bomNav = (ctx.manifest && ctx.manifest.ui && ctx.manifest.ui.nav) || {};
-    unnav = ctx.ui.registerNav({
-      label: bomNav.label || 'BOM 导出',
-      title: bomNav.title || 'BOM 导出：按管径汇总管材 + 管件计数 + 估价 + CSV 导出',
-      onClick: function () {
-        panel.style.display = panel.style.display === 'none' ? '' : 'none';
-        if (panel.style.display !== 'none') { refreshArchives(); if (!current) generate(); }
-      }
-    });
+  if (ctx.events && typeof ctx.events.on === 'function') {
+    offBus = ctx.events.on('bom-open-request', openPanel);
   }
-  ctx.runtime.log('boot', 'bom 插件已激活');
+  ctx.runtime.log('boot', 'bom 插件已激活（由材料清单入口打开面板）');
 }
 
 export function deactivate() {
-  if (unnav) { try { unnav(); } catch (e) { } unnav = null; }
+  if (offBus) { try { offBus(); } catch (e) { } offBus = null; }
   if (panel && panel.parentNode) panel.parentNode.removeChild(panel);
   panel = null;
   if (linkEl && linkEl.parentNode) linkEl.parentNode.removeChild(linkEl);

@@ -1,22 +1,15 @@
 {
   "id": "bom",
   "name": "材料清单（BOM）",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "entry": "main.js",
   "requires": { "core": ">=1.0.0", "plugins": [] },
-  "ui": {
-    "nav": {
-      "label": "BOM 导出",
-      "order": 96,
-      "icon": "",
-      "title": "按当前设计图生成材料清单 + CSV 导出 + 存入项目档案（与老导航「更多 ▾」里的「材料清单」不同：老项跳到页面区块，本项开插件面板）"
-    }
-  },
+  "ui": {},
   "permissions": [
     "read:diagram",
     "read:bom",
     "archive:read",
     "archive:write",
-    "ui:nav"
+    "event:subscribe"
   ]
 }

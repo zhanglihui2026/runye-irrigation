@@ -17,7 +17,9 @@ export const EVENTS = {
   /* [v379] 水力计算内核就绪（hydraulics 插件把 RyHcCore / RyDesignCore / RyHydCore
      请进来之后广播）。订阅者用它来避免「我要算水损但内核还没到」的竞态 ——
      不要各自 setTimeout 猜时间（本仓库已在 _smoke_live 上因盲等吃过整页假阴性）。 */
-  HYDRAULICS_CORE_READY: 'hydraulics-core-ready'
+  HYDRAULICS_CORE_READY: 'hydraulics-core-ready',
+  /* v394：材料清单壳请求打开 BOM 插件面板 */
+  BOM_OPEN_REQUEST: 'bom-open-request'
 };
 
 export function createEventBus() {

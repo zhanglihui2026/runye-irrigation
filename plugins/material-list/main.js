@@ -115,6 +115,7 @@ function activate(ctx) {
         if (sec) sec.scrollIntoView();
       }
       lightSelf();
+      if (ctx.events && typeof ctx.events.emit === 'function') ctx.events.emit('bom-open-request');
     } catch (e) { if (ctxRef) ctxRef.runtime.reportError(e); }
   }
 

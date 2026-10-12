@@ -33,8 +33,9 @@
    锚定项不被 [v377] 兜底挪走，core/ui-shell.js mountNavs 对锚定项按锚点重定位）。
    runye-nav.js / core/ui-shell.js / pipe_optim_ui.js 均在 CORE 白名单内，必须抬版本）→
    v392-iframe-shell（桌面端地图/地形/水力校核 iframe 首进懒加载后常驻，新增 mod/inline-31.js 入 CORE）→
-   v393-map-embedded-nav（在线地图在主程序 iframe 内隐藏页面自身功能导航，只保留主导航）。 */
-const VERSION = 'v393-map-embedded-nav';
+   v393-map-embedded-nav（在线地图在主程序 iframe 内隐藏页面自身功能导航，只保留主导航）→
+   v394-bom-nav-merge（材料清单单入口联动 BOM 面板）。 */
+const VERSION = 'v394-bom-nav-merge';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
