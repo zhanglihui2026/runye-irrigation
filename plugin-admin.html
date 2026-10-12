@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>润野插件管理后台</title>
+  <link rel="stylesheet" href="runye-theme.css?v=1"><link rel="stylesheet" href="runye-typography.css?v=1">
+  <style>
+    :root{color-scheme:light}*{box-sizing:border-box}body{margin:0;background:#f5f7f6;color:#173b30;font:14px/1.5 system-ui,"Microsoft YaHei",sans-serif}
+    header{height:54px;background:#174b3b;color:white;display:flex;align-items:center;padding:0 22px;font-weight:700}
+    main{max-width:1100px;margin:26px auto;padding:0 18px}.head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}.head h1{font-size:22px;margin:0}.muted{color:#718279}.card{background:#fff;border:1px solid #dce6e0;border-radius:10px;padding:18px;margin-bottom:14px;box-shadow:0 2px 8px #173b300c}
+    .row{display:grid;grid-template-columns:minmax(200px,1.2fr) minmax(150px,1fr) 130px 100px;gap:12px;align-items:center;padding:13px 0;border-bottom:1px solid #edf1ee}.row:last-child{border:0}.name{font-weight:650}.state{font-size:12px;color:#718279}.pill{border-radius:999px;padding:4px 9px;font-size:12px;background:#e8f5ec;color:#187648;display:inline-block}.pill.off{background:#f3eeee;color:#a33}.toggle{justify-self:end;display:flex;align-items:center;gap:8px;cursor:pointer}.toggle input{width:18px;height:18px;accent-color:#15803d}.btn{border:1px solid #cbd8d0;background:white;color:#234b3c;border-radius:7px;padding:8px 13px;cursor:pointer}.btn.primary{background:#15803d;color:#fff;border-color:#15803d}.btn:disabled{opacity:.5;cursor:wait}.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.status{padding:12px;border-radius:7px;background:#f2f7f4}.status.err{background:#fff2f0;color:#9d2c22}.foot{font-size:12px;color:#687c71;margin-top:10px}@media(max-width:680px){.row{grid-template-columns:1fr auto}.row .state{grid-column:1}.row .toggle{grid-column:2;grid-row:1/3}.row .pill{grid-column:1;justify-self:start}.head{align-items:flex-start;gap:10px;flex-direction:column}}
+  </style>
+  <script defer src="pwa/vendor/cloudbase-js-sdk-3.8.2.bundle.js?v=359"></script>
+  <script defer src="cloud-sync.js?v=371b"></script>
+</head>
+<body><header>润野灌溉 · 插件管理</header>
+<main>
+  <div class="head"><div><h1>外挂插件控制台</h1><div class="muted">统一控制全站插件是否加载，并检查插件资源是否可连接。</div></div><a class="btn" href="index.html">返回主程序</a></div>
+  <section class="card"><div class="bar"><strong>服务状态：</strong><span id="service" class="status">检查中…</span><span id="account" class="muted"></span></div><p class="foot">开关保存到 CloudBase 的 ry_kv，由主程序启动时读取；关闭后对之后打开或刷新页面的用户生效。</p></section>
+  <section class="card"><div class="bar" style="justify-content:space-between"><strong>插件列表</strong><div class="bar"><button class="btn" id="probe">重新检测接通状态</button><button class="btn primary" id="save" disabled>保存全站设置</button></div></div><div id="list" style="margin-top:10px">正在读取插件清单…</div></section>
+  <section class="card"><strong>权限说明</strong><p class="foot">只有云函数环境变量 <code>RY_PLUGIN_ADMIN_UIDS</code> 中列出的账号 UID 可以保存开关。配置或读取服务暂时不可用时，主程序会继续加载插件，并在这里显示服务异常；这样不会因为后台故障而影响原有工具。</p></section>
+</main>
+<script>
+(function(){
+  'use strict';
+  var ENDPOINT='https://runye-irrigation-d3e8xef4540bae5-1e50596164.ap-shanghai.app.tcloudbase.com/entitle';
+  var state={plugins:[],enabled:{},dirty:false,admin:false};
+  var $=function(id){return document.getElementById(id)};
+  function setService(msg,error){$('service').textContent=msg;$('service').className='status'+(error?' err':'')}
+  function api(action,extra){var token=window.CloudSync&&CloudSync.authToken();return fetch(ENDPOINT,{method:'POST',headers:Object.assign({'Content-Type':'application/json'},token?{Authorization:'Bearer '+token}:{}),body:JSON.stringify(Object.assign({action:action},extra||{})),cache:'no-store'}).then(function(r){return r.json()})}
+  function render(){var host=$('list');host.innerHTML='';state.plugins.forEach(function(p){var row=document.createElement('div');row.className='row';var name=document.createElement('div');name.className='name';name.textContent=p.name+' · '+p.id;var status=document.createElement('div');status.className='state';status.id='conn-'+p.id;status.textContent='尚未检测';var pill=document.createElement('span');pill.className='pill'+(state.enabled[p.id]===false?' off':'');pill.textContent=state.enabled[p.id]===false?'全站已关闭':'全站已开启';pill.id='pill-'+p.id;var label=document.createElement('label');label.className='toggle';label.textContent='启用';var input=document.createElement('input');input.type='checkbox';input.checked=state.enabled[p.id]!==false;input.disabled=!state.admin;input.setAttribute('aria-label','全站启用 '+p.name);input.onchange=function(){state.enabled[p.id]=input.checked;state.dirty=true;$('save').disabled=!state.admin||!state.dirty;pill.className='pill'+(input.checked?'':' off');pill.textContent=input.checked?'全站已开启':'全站已关闭'};label.appendChild(input);row.append(name,status,pill,label);host.appendChild(row)});$('save').disabled=!state.admin||!state.dirty}
+  function probe(){return Promise.all(state.plugins.map(function(p){var el=$('conn-'+p.id);if(!el)return Promise.resolve();el.textContent='检测中…';return fetch(new URL(p.path+'manifest.json',location.href),{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('manifest '+r.status);return r.json()}).then(function(m){return fetch(new URL(p.path+(m.entry||'main.js'),location.href),{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('入口 '+r.status);el.textContent='已接通 · v'+m.version;el.style.color='#187648'})}).catch(function(e){el.textContent='未接通 · '+e.message;el.style.color='#b42318'})}))}
+  function boot(){if(!window.CloudSync){setService('CloudBase 登录组件未加载',true);return}CloudSync.init().then(function(ok){if(!ok)throw new Error('CloudBase 初始化失败');return CloudSync.restore()}).then(function(signed){var uid=CloudSync.authSub();$('account').textContent=signed?'当前账号 UID：'+(uid||'已登录'):'未检测到登录态，请先在主程序登录后再打开后台';return fetch('plugins.json?v='+Date.now(),{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('插件清单 HTTP '+r.status);return r.json()})}).then(function(cfg){state.plugins=cfg.plugins||[];return api('pluginsGet')}).then(function(r){if(!r||r.code!==0)throw new Error((r&&r.message)||'无法读取插件控制配置');state.enabled=r.data.enabled||{};state.admin=!!r.data.admin;setService(state.admin?'服务已连接 · 管理员权限已验证':'服务已连接 · 当前账号没有管理权限',!state.admin);if(!state.admin){$('save').title='请让管理员在云函数环境变量 RY_PLUGIN_ADMIN_UIDS 中登记此 UID';}render();return probe()}).catch(function(e){setService('后台连接失败：'+(e.message||e),true);$('list').textContent='无法读取插件状态；主程序不会受此后台故障影响。'})}
+  $('save').onclick=function(){if(!state.admin||!state.dirty)return;var btn=$('save');btn.disabled=true;btn.textContent='保存中…';api('pluginsSet',{enabled:state.enabled}).then(function(r){if(!r||r.code!==0)throw new Error((r&&r.message)||'保存失败');state.dirty=false;setService('已保存 · '+r.data.updatedAt,false);render()}).catch(function(e){setService('保存失败：'+(e.message||e),true)}).finally(function(){btn.textContent='保存全站设置';btn.disabled=!state.admin||!state.dirty})};
+  $('probe').onclick=probe;
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+})();
+</script></body></html>

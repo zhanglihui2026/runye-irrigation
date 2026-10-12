@@ -14,8 +14,16 @@
    两文件进 CORE 白名单，必须抬版本）→ v385-global-open（并行会话：全站功能暂全开放）→
    v386-undock（用户指令剥离四功能入口：多地块规划/管路拼装/经济指标分析/数字化建模——runye-nav.js
    MORE_ITEMS 摘四行、智能规划侧栏摘四链接、plugins.json 移除 pipe-assemble 壳插件、CORE 同步移除
-   其两文件；业务文件全部保留，将来把对应行/条目加回即可恢复，必须抬版本）。 */
-const VERSION = 'v386-undock';
+   其两文件；业务文件全部保留，将来把对应行/条目加回即可恢复，必须抬版本）→
+   v387-nav-flat（用户指令：「更多」内容全部展开到顶栏——runye-nav.js 六项移入 ITEMS、
+   MORE_ITEMS 置空保留面板承接管网优化详细分析，必须抬版本）→ v388-plugin-control（全站外挂插件开关：
+   loader 启动前读取服务端配置，新增 plugin-admin.html 与云函数接口；后台纳入 CORE，必须抬版本）→
+   v389-nav-panel-preserve（修复 v388 引入的时序回归：loader 的 controlPromise 网络等待把 pipe-optim
+   插件接管推迟到权益重渲染之后，「更多」面板随导航重建被清空、注入的「管网优化详细分析」按钮丢失
+   → 插件容器判定 null 错落顶栏、面板恒空（compact 闸门 M2/M3/M4 红）。runye-nav.js mount()
+   重建前保留面板内外部注入按钮（排除 data-ry-navitem / data-ry-plugin-nav / data-ry-mbr，
+   后两者由 ui-shell 自行重挂防双份），新面板建好后回插。runye-nav.js 在 CORE 白名单内，必须抬版本）。 */
+const VERSION = 'v389-nav-panel-preserve';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
@@ -103,6 +111,7 @@ const CORE = [
   "hydraulic-calc/native-bridge.js",
   "hydraulic-calc/pipe-path-loss.js",
   "index.html",
+  "plugin-admin.html",
   "runye-inverse-design.js",
   "runye-inverse-design.css",
   "runye-terrain.js",

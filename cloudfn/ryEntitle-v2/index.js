@@ -52,6 +52,9 @@ const PLANS = {
   L1: { key: 'L1', name: '注册会员', days: 30 },
   L2: { key: 'L2', name: '高级会员', days: 365 }
 };
+const PLUGIN_IDS = ['hello-world', 'archive', 'bom', 'case-lib', 'pipe-optim', 'calib', 'hydraulics', 'ai-plan', 'sprinkler'];
+const PLUGIN_CONFIG_ID = 'global:plugin-control';
+const PLUGIN_ADMIN_UIDS = String(process.env.RY_PLUGIN_ADMIN_UIDS || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean);
 
 /* ---------- HTTP（Node 内置 https，零依赖） ---------- */
 function httpReq(method, url, headers, bodyObj) {
@@ -332,6 +335,38 @@ async function actPing() {
   const rows = await rdbSelect('ry_entitle', { select: '_id', limit: 1 });
   return ok({ ok: true, gw: true, rows: rows.length, env: ENV_ID, at: new Date().toISOString() });
 }
+async function actPluginsGet(token) {
+  let stored = null;
+  try {
+    const rows = await rdbSelect('ry_kv', { _id: 'eq.' + PLUGIN_CONFIG_ID, select: 'v' });
+    stored = rows[0] && rows[0].v;
+  } catch (e) {
+    /* Reads are intentionally surfaced so the loader can mark control unavailable. */
+    throw e;
+  }
+  const enabled = {};
+  PLUGIN_IDS.forEach(function (id) { enabled[id] = true; });
+  if (stored && stored.enabled && typeof stored.enabled === 'object') {
+    PLUGIN_IDS.forEach(function (id) { if (typeof stored.enabled[id] === 'boolean') enabled[id] = stored.enabled[id]; });
+  }
+  const uid = await verifyUid(token);
+  return ok({ enabled: enabled, updatedAt: stored && stored.updatedAt || null, admin: !!(uid && PLUGIN_ADMIN_UIDS.indexOf(uid) >= 0) });
+}
+async function actPluginsSet(uid, body) {
+  if (!uid || PLUGIN_ADMIN_UIDS.indexOf(uid) < 0) return fail(403, '无插件管理权限');
+  const input = body && body.enabled;
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return fail(-1, '插件开关数据无效');
+  const enabled = {};
+  PLUGIN_IDS.forEach(function (id) {
+    if (typeof input[id] !== 'boolean') throw new Error('缺少插件状态：' + id);
+    enabled[id] = input[id];
+  });
+  const value = { enabled: enabled, updatedAt: new Date().toISOString(), updatedBy: uid };
+  const old = await rdbSelect('ry_kv', { _id: 'eq.' + PLUGIN_CONFIG_ID, select: '_id' });
+  if (old.length) await rdbUpdate('ry_kv', { _id: 'eq.' + PLUGIN_CONFIG_ID }, { v: value, updated_at: value.updatedAt });
+  else await rdbInsert('ry_kv', { _id: PLUGIN_CONFIG_ID, uid: 'system', k: 'global_plugin_control', v: value, updated_at: value.updatedAt });
+  return ok({ enabled: enabled, updatedAt: value.updatedAt });
+}
 
 /* ---------- 入口 ---------- */
 exports.main = async function (event) {
@@ -348,10 +383,13 @@ exports.main = async function (event) {
 
     if (action === 'ping') return await actPing();
 
+    if (action === 'pluginsGet') return await actPluginsGet(token);
+
     const uid = await verifyUid(token);
     if (!uid) return fail(401, '登录态无效或已过期，请重新登录');
 
     switch (action) {
+      case 'pluginsSet': return await actPluginsSet(uid, body);
       case 'get':
       case 'init':    return await actGet(uid, body);
       case 'bindRef': return await actBindRef(uid, body);

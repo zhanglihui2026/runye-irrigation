@@ -13,7 +13,7 @@ import { createEventBus, EVENTS } from './event-bus.js';
 import { createRuntimeGuard } from './runtime-guard.js';
 import { createDataService } from './data-service.js';
 import { createUiShell } from './ui-shell.js';
-import { createLoader } from './loader.js';
+import { createLoader } from './loader.js?v=1';
 
 export var CORE_VERSION = '1.0.0';
 

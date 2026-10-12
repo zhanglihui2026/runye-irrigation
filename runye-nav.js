@@ -24,7 +24,9 @@
   /* 顶层常驻项（pre:1 = 注入到本页静态特有项之前） */
   /* [v346 2026-10-09 用户指令] 导航收敛：顶层只留 智能规划/在线地图/地块分区/管路规划/过滤系统/水力校核，
      其余全部并入 MORE_ITEMS「更多 ▾」；「更多」内项目线上锁（本地全放行，线上点击拦截+toast，
-     见 buildMore 内 v346 段与 openLinkedSection 内 v346 段）。 */
+     见 buildMore 内 v346 段与 openLinkedSection 内 v346 段）。
+     [v387 2026-10-12 用户指令] 「更多」内容全部展开到顶栏（此前四功能剥离使面板只剩 6 项）——
+     下述六项回到 ITEMS 顶层；「更多」按钮与面板保留（承接管网优化详细分析与将来恢复项）。 */
   var ITEMS = [
     /* [v331] 智能规划独立窗口：win:1 点击弹新窗全屏对话，主窗口原地不动 */
     /* [v358] feat = 会员功能 key（见 runye-entitle.js 的 FEATURES）：
@@ -40,28 +42,30 @@
     /* [v311 2026-10-08 用户要求] 水力校核 顶级导航项（独立模块：自动读 runye_network_layout，
        树状拓扑+全链路水损+滴灌带多孔出流+水泵选型+EPANET WASM 对照），原软件逻辑零改动 */
     { label: '水力校核',     href: 'runye-hydraulics.html',     feat: 'hydraulic-check', title: '水力校核：自动读已布置管网，逐段流量/流速/水损 + 最不利路径 + 需求扬程与水泵选型' },
-  ];
-  /* [v247] 折叠进「更多 ▾」的低频项：面板竖排，点开才见。
-     act 项不放这里（轴测图/系统图留在顶层）；管网优化详细分析由 pipe_optim_ui.js 追加进面板。 */
-  var MORE_ITEMS = [
+    /* [v387 2026-10-12 用户指令] 「更多」内容全部展开到顶栏（四功能剥离后「更多」只剩 6 项，
+       没必要再折叠）。「更多 ▾」机制保留：面板仍承接 pipe_optim_ui 注入的「管网优化详细分析」
+       与将来恢复的功能项。 */
     /* [v358] feat 说明：'pro-others' = 高级会员通配键（L1 四大功能之外的全部）；
-       feat:'' = 完全免费、不参与门控。滴灌带查询器是公开查询小工具，本期保持免费。 */
+       feat:'' = 完全免费、不参与门控。滴灌带查询器是公开查询小工具，保持免费。 */
     { label: '地块绘制',     hash: 'areaTool',                 feat: 'pro-others', title: '地块绘制工具（比例尺 / 绘制边界 / 地块库）' },
     /* [NEW MODULE: 地形模块] 卸载=删除本行+terrain/+sw.js 条目 */
     { label: '地形模块',     href: 'terrain/index.html',       feat: 'pro-others', title: '地形模块：shp/RTK边界导入、CGCS2000校验、面积、高程数据源登记' },
     /* [v385 2026-10-12 用户指令] 四项功能剥离下线（入口摘除，业务代码/页面全部保留，将来需要时
-       把对应行加回 MORE_ITEMS 即可恢复）：多地块规划(#grPipeSection)、管路拼装(独立页+pipe-assemble
-       壳插件同步摘除)、经济指标分析(#threeDModelingSection)、数字化建模(#parametricModelingSection)。
-       恢复格式照抄下面被注释的原条目。 */
+       把对应行加回 MORE_ITEMS 或 ITEMS 即可恢复）：多地块规划(#grPipeSection)、管路拼装(独立页+
+       pipe-assemble 壳插件同步摘除)、经济指标分析(#threeDModelingSection)、数字化建模
+       (#parametricModelingSection)。恢复格式照抄下面被注释的原条目。 */
     /* { label: '多地块规划',   hash: 'grPipeSection',            feat: 'pro-others', title: '成组地块：全组总览 + 总管编辑 + 按块进入管路规划' }, */
-    /* [v247] 材料清单保持在「管路拼装」之前 */
-    { label: '材料清单',     hash: 'detailsSection',           feat: 'bom-export' },
-    { label: '轴测图',       act: 'iso', page: 'index.html',   feat: 'drawing-export', title: '三级管线轴测图（先「生成管线图」再点）' },
-    { label: '系统图',       act: 'sys', page: 'index.html',   feat: 'drawing-export', title: '三级系统图（供水首部系统图）' },
     /* { label: '管路拼装',     href: '管路接驳拼装.html',         feat: 'pro-others', title: '管路接驳拼装：管件级拼装 + 单向水力计算' }, */
     /* { label: '经济指标分析', hash: 'threeDModelingSection',     feat: 'pro-others', title: '管径经济指标分析：前期管材投入 vs 后期电费，找年均总成本最低的平衡点' }, */
     /* { label: '数字化建模',   hash: 'parametricModelingSection', feat: 'pro-others', title: '数字化建模 · 参数化节点建模' }, */
+    { label: '材料清单',     hash: 'detailsSection',           feat: 'bom-export' },
+    { label: '轴测图',       act: 'iso', page: 'index.html',   feat: 'drawing-export', title: '三级管线轴测图（先「生成管线图」再点）' },
+    { label: '系统图',       act: 'sys', page: 'index.html',   feat: 'drawing-export', title: '三级系统图（供水首部系统图）' },
     { label: '滴灌带查询',   href: '耐特菲姆滴灌带长度查询器.html', feat: '' }
+  ];
+  /* [v387] 「更多 ▾」折叠面板：顶层展开后暂无固定项，机制保留——
+     管网优化详细分析（pipe_optim_ui.js 注入）仍落这里；将来恢复的功能项也放这里。 */
+  var MORE_ITEMS = [
   ];
   function curFile() {
     var p = decodeURIComponent((global.location && global.location.pathname) || '');
@@ -204,7 +208,7 @@
     btn.className = 'fn-link fn-more-btn';
     btn.setAttribute('aria-expanded', 'false');
     btn.setAttribute('aria-haspopup', 'true');
-    btn.title = '更多工具：地块绘制 / 地形模块 / 材料清单 / 轴测图 / 系统图 / 滴灌带查询 / 管网优化详细分析';
+    btn.title = '更多工具：管网优化详细分析（v387 起其余工具已全部展开到顶栏）';
     var caret = document.createElement('span');
     caret.className = 'fn-more-caret';
     caret.setAttribute('aria-hidden', 'true');
@@ -292,6 +296,27 @@
     var base = el.getAttribute('data-base') || '';
     /* [v286g] 子目录页（如 terrain/index.html）声明 data-root="../"，站内相对链接统一上跳一级 */
     var root = el.getAttribute('data-root') || '';
+    /* [v389] 跨渲染保留「更多」面板里的外部注入按钮（如 pipe_optim_ui.js 的「管网优化详细分析」，
+       标记：不带 data-ry-navitem）。背景：面板整体建在 wrap[data-ry-navitem] 里，本渲染器
+       重建导航时会连面板一起清掉 —— 过去插件接管跑在权益渲染之前（按钮先被插件摘走），
+       时序上掩盖了这个问题；v388 起 loader 先等服务端插件开关（controlPromise 网络 trip）
+       再激活插件，接管被推迟到权益重渲染之后，按钮被清空 → 插件容器判定 null →
+       「管网优化」错落顶栏、面板恒空（compact 闸门 M2/M3/M4 红）。修法：重建前把面板里
+       非本渲染器生成的子节点摘下保存，新面板建好后原样回插 —— 与权益渲染、插件接管
+       谁先谁后无关，面板永远承接住注入项。 */
+    var preserved = [];
+    try {
+      /* 只保留「外部注入」的按钮：插件项（data-ry-plugin-nav）与会员徽标（data-ry-mbr）
+         虽也不带 data-ry-navitem，但它们由 core ui-shell 的 MutationObserver 自行重挂，
+         这里再回插会双份 —— 必须排除。 */
+      Array.prototype.slice.call(el.querySelectorAll('.fn-more-panel')).forEach(function (p) {
+        Array.prototype.slice.call(p.children).forEach(function (c) {
+          if (!c.hasAttribute) return;
+          if (c.hasAttribute('data-ry-navitem') || c.hasAttribute('data-ry-plugin-nav') || c.hasAttribute('data-ry-mbr')) return;
+          preserved.push(c);
+        });
+      });
+    } catch (e0) { }
     /* 重复调用防护：只清本渲染器注入的节点，保留页面静态子项 */
     Array.prototype.slice.call(el.querySelectorAll('[data-ry-navitem]')).forEach(function (n) {
       if (n.parentNode) n.parentNode.removeChild(n);
@@ -306,6 +331,17 @@
     var more = buildMore(base, root);
     lastWrap = more;
     el.appendChild(more);
+    /* [v389] 外部注入按钮回插到新面板（见 mount 开头的 preserved 采集）。
+       只回插仍"孤儿"的节点：若插件接管已把老按钮摘走（legacy 保存、不在 DOM），
+       preserved 里根本不会有它；若它还在 DOM，说明接管未发生，回插让它继续承接。 */
+    try {
+      var newPanel = more.querySelector('.fn-more-panel');
+      if (newPanel) {
+        preserved.forEach(function (c) {
+          if (c && c.parentNode !== newPanel) newPanel.appendChild(c);
+        });
+      }
+    } catch (e4) { }
     /* [v377] 第三方导航项（插件 data-ry-plugin-nav / 会员徽标等）在 mount 期间被
        逐个 appendChild 的老项挤到了后面（老项全插到它们之后）。这里把它们按
        原相对顺序移回「更多 ▾」之前 —— 插件迁移项的「原位置」才保得住

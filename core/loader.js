@@ -208,10 +208,40 @@ export function createLoader(cfg) {
       .then(function (r) { if (!r.ok) throw new Error('plugins.json ' + r.status); return r.json(); })
       .then(function (cfg2) {
         var list = (cfg2 && Array.isArray(cfg2.plugins)) ? cfg2.plugins : [];
+        /* Global kill switches are fetched from the same-origin admin API before any
+           plugin code is imported. If the service is unavailable, fail open to keep
+           the main application usable and expose the degraded control state. */
+        var controlUrl = (cfg2 && cfg2.controlEndpoint) || '';
+        var controlPromise = controlUrl
+          ? fetch(controlUrl, { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'pluginsGet' }) }).then(function (r) {
+              if (!r.ok) throw new Error('插件控制服务 HTTP ' + r.status);
+              return r.json();
+            }).then(function (j) {
+              var data = j && j.data;
+              if (!j || j.code !== 0 || !data || typeof data.enabled !== 'object') throw new Error((j && j.message) || '插件控制响应无效');
+              coreControl.state = 'connected';
+              coreControl.source = 'server';
+              coreControl.enabled = data.enabled;
+            }).catch(function (e) {
+              coreControl.state = 'unavailable';
+              coreControl.error = (e && e.message) || String(e);
+              try { console.warn('[ry:loader] 全局插件开关不可用，暂按全部开启：' + coreControl.error); } catch (_e) { }
+            })
+          : Promise.resolve();
         /* 串行加载：插件依赖判定需要前一个的状态（依赖数组通常很短，串行足够） */
-        var p = Promise.resolve(null);
-        list.forEach(function (e) { p = p.then(function () { return loadOne(e); }); });
-        return p.then(function () { return registry; });
+        return controlPromise.then(function () {
+          var p = Promise.resolve(null);
+          list.forEach(function (e) {
+            p = p.then(function () {
+              if (coreControl.state === 'connected' && coreControl.enabled[e.id] === false) {
+                record(e.id, { status: 'disabled', reason: '管理员已关闭此插件' });
+                return null;
+              }
+              return loadOne(e);
+            });
+          });
+          return p.then(function () { return registry; });
+        });
       })
       .catch(function (e) {
         /* 清单缺失/非法：无感降级 —— 主程序照常跑，只是没有插件 */
@@ -220,12 +250,15 @@ export function createLoader(cfg) {
       });
   }
 
+  var coreControl = { state: 'not-configured', source: '', enabled: Object.create(null), error: '' };
+
   return {
     loadAll: loadAll,
     loadOne: loadOne,
     deactivate: deactivate,
     deactivateAll: deactivateAll,
     registry: function () { return registry; },
-    status: function (id) { return registry[id] || null; }
+    status: function (id) { return registry[id] || null; },
+    controlStatus: function () { return { state: coreControl.state, source: coreControl.source, error: coreControl.error, enabled: Object.assign({}, coreControl.enabled) }; }
   };
 }
