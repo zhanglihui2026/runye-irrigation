@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>润野 · 地图面积测量（在线卫星图 · 免Key）</title>
+<script>if(window.self!==window.top)document.documentElement.classList.add('ry-embedded-page');</script>
 <link rel="stylesheet" href="pwa/vendor/leaflet.css" />
 <style>
   :root{
@@ -19,6 +20,8 @@
      与主页同一份 ITEMS —— 主页隐藏的「管网布置/数据对比」不在清单）。
      本页只保留布局差异：导航条吸顶 + .fn-inner 整幅排布。 */
   .fn-nav{position:sticky;top:0;z-index:1200;flex:none}
+  /* 主程序 iframe 已提供全站主导航，嵌入时隐藏本页独立导航，避免出现第二条。 */
+  html.ry-embedded-page .fn-nav{display:none!important}
   .fn-nav .fn-inner{padding:0 12px}
   @media(max-width:768px){
     .fn-nav .fn-inner{padding:0 16px}
