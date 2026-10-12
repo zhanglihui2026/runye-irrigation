@@ -12,6 +12,8 @@ export function activate(ctx) {
   if (ctx.ui.registerNav) {
     unnav = ctx.ui.registerNav({
       label: ctx.manifest.ui && ctx.manifest.ui.nav ? ctx.manifest.ui.nav.label : '协议自检',
+      /* [v401 用户指令] 协议自检折叠进导航「更多 ▾」面板 */
+      container: '.fn-more-panel',
       onClick: function () { host.style.display = host.style.display === 'none' ? '' : 'none'; }
     });
   }

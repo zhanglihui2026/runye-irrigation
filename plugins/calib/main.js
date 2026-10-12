@@ -208,6 +208,8 @@ export function activate(c) {
       label: nav.label || '参数标定',
       title: nav.title || '',
       order: nav.order,
+      /* [v401 用户指令] 参数标定折叠进导航「更多 ▾」面板 */
+      container: '.fn-more-panel',
       onClick: function () {
         panel.style.display = panel.style.display === 'none' ? '' : 'none';
         if (panel.style.display !== 'none') refreshArchives();

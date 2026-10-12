@@ -53,8 +53,16 @@
    mod/inline-32.js 均在 CORE 白名单，必须抬版本）→
    v400-contour-dxf-panel-fix（contour-dxf 面板挂载修复：createMount 槽默认 display:none，
    position:fixed 面板在隐藏父容器内不渲染 → 改挂 document.body（archive/case-lib 同口径）。
-   plugins/contour-dxf/main.js 在 CORE 白名单，必须抬版本）。 */
-const VERSION = 'v400-contour-dxf-panel-fix';
+   plugins/contour-dxf/main.js 在 CORE 白名单，必须抬版本）→
+   v401-file-menu-complete（补齐等高线 CSV 菜单入口并将 BOM/等高线项定位到面板导出控件；
+   RyFrameShell.show 增加独立页动作的同口径会员门控；菜单保持 .fn-file-panel 独立类）→
+   v402-nav-more-collapse（用户指令：过滤系统/轴测图/系统图/滴灌带查询 折叠进「更多 ▾」
+   （runye-nav.js ITEMS→MORE_ITEMS，v346 线上锁随之退役——面板项已是上线功能）；
+   协议自检(hello-world)/参数标定(calib) 插件 nav 声明 container='.fn-more-panel' 同入面板；
+   「文件」按钮挂到「地块绘制」之前（mod/inline-32.js relocate + MutationObserver）并去掉 📂 图标。
+   runye-nav.js / index.html / runye-nav.css / mod/inline-32.js / 两插件 main.js 均在 CORE
+   白名单，必须抬版本）。 */
+const VERSION = 'v402-nav-more-collapse';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

@@ -18,9 +18,10 @@
     for (var i = 0; i < list.length; i++) list[i].classList.toggle('active', !!on);
   }
   function show(pageId) {
-    if (mobile()) return false;
     var frame = byId[pageId];
     if (!frame) return false;
+    if (pageLocked(pageId)) { notifyLocked(pageLabel(pageId)); return false; }
+    if (mobile()) return false;
     frames.forEach(function (item) { item.hidden = item !== frame; });
     if (frame.getAttribute('data-loaded') !== '1') {
       var src = frame.getAttribute('data-src');
@@ -68,7 +69,13 @@
   function locked(el, feature) {
     return !!(el && (el.getAttribute('data-ry-locked') === '1' || el.getAttribute('aria-disabled') === 'true')) || !allowed(feature);
   }
-  W.RyFrameShell = { show: show, hide: hide, isVisible: isVisible, pageId: pageId, _byId: function (id) { return byId[id] || null; } };
+  function pageFeature(page) { return page === 'online-map' ? 'online-map' : page === 'terrain' ? 'pro-others' : page === 'hydraulics' ? 'hydraulic-check' : ''; }
+  function pageLabel(page) { return page === 'online-map' ? '在线地图' : page === 'terrain' ? '地形模块' : '水力校核'; }
+  function pageLocked(page) {
+    var link = D.querySelector('[data-fr-page="' + page + '"]');
+    return locked(link, pageFeature(page));
+  }
+  W.RyFrameShell = { show: show, hide: hide, isVisible: isVisible, pageId: pageId, isLocked: pageLocked, _byId: function (id) { return byId[id] || null; } };
   /* raw nav links + plugin-owned hydraulics nav. Keep legacy href fallback if unavailable/mobile/locked. */
   D.addEventListener('click', function (ev) {
     var target = ev.target && ev.target.closest ? ev.target.closest('[data-fr-page],[data-ry-plugin-nav="hydraulics"]') : null;

@@ -90,8 +90,8 @@ html{--fn-nav-h:36px}
    独立皮肤，不复用 .fn-more 面板（避免 verify 的 .fn-nav .fn-more-panel 选择器
    与 runye-nav.js mount() 的 preserved 采集误匹配文件面板）。
    按钮在 ⚙️设置 左侧（order 998，设置 999）。 */
-.fn-nav .fn-file{position:relative;display:flex;align-items:center;flex:none;order:998}
-.fn-nav .fn-file-btn .fn-file-ico{font-size:12px;margin-right:2px}
+/* [v401] 文件按钮不再吸右（order:998 已去）：由 mod/inline-32.js relocate 挂到「地块绘制」之前 */
+.fn-nav .fn-file{position:relative;display:flex;align-items:center;flex:none}
 .fn-nav .fn-file.open .fn-more-caret{transform:rotate(180deg)}
 /* 面板：position:fixed 同 .fn-more-panel（防 .fn-inner overflow 裁切），右对齐触发钮 */
 .fn-nav .fn-file-panel{

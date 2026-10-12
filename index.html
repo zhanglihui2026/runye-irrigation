@@ -996,16 +996,10 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
            但视觉上按 CAD·SketchUp 惯例把齿轮钉在最右端（margin-left:auto 吸走剩余空白 +
            order:999 让它越过后面两项）—— 故 DOM 顺序 ≠ 视觉顺序，见 verify_settings.js S1。
            ※ verify_nav_compact.js 的 D 项按 DOM 顺序点名，本改动不影响它。 -->
-      <!-- 文件 ▾ 折叠菜单（v395-file-menu 2026-10-12）：统一导入/导出/工程入口。
-           静态项只在本页出现；皮肤独立（.fn-file 系列，不复用 .fn-more 面板 ——
-           避免与「更多 ▾」的 verify/重渲染采集逻辑互相干扰）；逻辑在 mod/inline-32.js。
-           DOM 顺序：在 ⚙️设置 之前；视觉上文件按钮紧挨 ⚙️设置 左侧（order 998）。 -->
-      <div class="fn-file" id="fnFileMenu">
-        <button type="button" class="fn-link fn-file-btn" id="fnFileBtn" aria-expanded="false" aria-haspopup="true" title="文件：导入 / 导出 / 工程 统一入口">
-          <span class="fn-file-ico">📂</span> 文件 <span class="fn-more-caret">▾</span>
-        </button>
-        <div class="fn-file-panel" id="fnFilePanel" role="menu" hidden></div>
-      </div>
+      <!-- 文件 ▾ 折叠菜单（v395-file-menu）：[v402 用户指令] 静态块删除——「文件」改为
+           runye-nav.js 真顶层项（ITEMS 内 fileMenu:1，位于「地块绘制」之前，无图标），
+           面板本体由 mod/inline-32.js 按 RyFileMenu.toggle(btn) 动态创建，彻底消除
+           静态块 relocate 与插件锚定的位置竞态。 -->
       <button class="fn-link" type="button" id="fnSettings" style="margin-left:auto;order:999" onclick="ryOpenSettings()" title="设置 · 管材单价 / 造价假设 / 标注与文字 / 标注几何">⚙️ 设置</button>
     </div>
   </nav>
@@ -2914,8 +2908,8 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
 <script src="mod/inline-29.js?v=357"></script>
 
 <script src="mod/inline-30.js?v=357"></script>
-<script src="mod/inline-31.js?v=392"></script>
-<script src="mod/inline-32.js?v=395"></script>
+<script src="mod/inline-31.js?v=401"></script>
+<script src="mod/inline-32.js?v=401"></script>
 
 <div class="mat-flash" id="matFlash"></div>
 <!-- [v284 2026-10-06] 地块分区 / 管路规划 / 多地块规划 三页的 Ctrl+Z 回退。

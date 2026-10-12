@@ -23,10 +23,13 @@
   'use strict';
   /* 顶层常驻项（pre:1 = 注入到本页静态特有项之前） */
   /* [v346 2026-10-09 用户指令] 导航收敛：顶层只留 智能规划/在线地图/地块分区/管路规划/过滤系统/水力校核，
-     其余全部并入 MORE_ITEMS「更多 ▾」；「更多」内项目线上锁（本地全放行，线上点击拦截+toast，
-     见 buildMore 内 v346 段与 openLinkedSection 内 v346 段）。
-     [v387 2026-10-12 用户指令] 「更多」内容全部展开到顶栏（此前四功能剥离使面板只剩 6 项）——
-     下述六项回到 ITEMS 顶层；「更多」按钮与面板保留（承接管网优化详细分析与将来恢复项）。 */
+     其余全部并入 MORE_ITEMS「更多 ▾」。
+     [v387 2026-10-12 用户指令] 「更多」内容全部展开到顶栏——六项回到 ITEMS 顶层。
+     [v401 2026-10-12 用户指令] 顶栏二次收敛：过滤系统/轴测图/系统图/滴灌带查询 折叠回「更多 ▾」
+     （协议自检/参数标定由插件侧 container='.fn-more-panel' 同步折叠）。
+     ★ v346 的「更多内项目线上锁」随本次解除：折叠项全部是已上线功能（各自带 feat 会员门控，
+       由 makeItem 的 gate() 兜底），线上整体拦截会把正式功能锁死 —— 面板委托拦截与
+       openLinkedSection 的 hash 直达拦截一并移除，IS_ONLINE 保留作诊断备用。 */
   var ITEMS = [
     /* [v331] 智能规划独立窗口：win:1 点击弹新窗全屏对话，主窗口原地不动 */
     /* [v358] feat = 会员功能 key（见 runye-entitle.js 的 FEATURES）：
@@ -35,13 +38,16 @@
     { label: '智能规划', href: 'index.html?smart=1#pipePlanSection', win: 1, feat: 'ai-plan', title: '独立窗口打开：AI 对话规划（主窗口地块分区不受影响）' },
     /* [v391 2026-10-12 用户指令] 顶栏重排：智能规划第一（由 ai-plan 插件锚定在「地块绘制」
        之前实现）、地块绘制放到 在线地图 之前 —— 故本条提前并加 pre:1（与 v250 旧序对调）。 */
+    /* [v402 2026-10-12 用户指令] 「文件」成为真顶层项（fileMenu:1，放「地块绘制」之前）：
+       由本渲染器产出 DOM，顺序=数组顺序（彻底消除静态块 relocate 与插件锚定的位置竞态）；
+       去掉 📂 图标。面板本体由 mod/inline-32.js 动态创建（RyFileMenu.toggle(btn)）。 */
+    { label: '文件',         fileMenu: 1, pre: 1, feat: '', title: '文件：导入 / 导出 / 工程 统一入口' },
     { label: '地块绘制',     hash: 'areaTool',                 pre: 1, feat: 'pro-others', title: '地块绘制工具（比例尺 / 绘制边界 / 地块库）' },
     /* [v250] 在线地图 移到 地块绘制 之前（v346 起地块绘制折叠进「更多」；v391 按用户指令对调回来） */
     { label: '在线地图',     href: 'runye-map-measure.html',   pre: 1, feat: 'online-map' },
     /* [v250] 「二级管路」改名「地块分区」、「三级管路编辑」改名「管路规划」（hash/id 不变，仅显示名变） */
     { label: '地块分区',     hash: 'pipePlanSection',          pre: 1, feat: 'zone-split' },
     { label: '管路规划',     hash: 'tlPipePlanSection',        pre: 1, feat: 'pipe-layout' },
-    { label: '过滤系统',     hash: 'filterSystemSection',      pre: 1, feat: 'pro-others', title: '过滤系统 · GREEN 型单体并联机组（初稿）' },
     /* [v311 2026-10-08 用户要求] 水力校核 顶级导航项（独立模块：自动读 runye_network_layout，
        树状拓扑+全链路水损+滴灌带多孔出流+水泵选型+EPANET WASM 对照），原软件逻辑零改动 */
     { label: '水力校核',     href: 'runye-hydraulics.html',     feat: 'hydraulic-check', title: '水力校核：自动读已布置管网，逐段流量/流速/水损 + 最不利路径 + 需求扬程与水泵选型' },
@@ -62,21 +68,25 @@
     /* { label: '管路拼装',     href: '管路接驳拼装.html',         feat: 'pro-others', title: '管路接驳拼装：管件级拼装 + 单向水力计算' }, */
     /* { label: '经济指标分析', hash: 'threeDModelingSection',     feat: 'pro-others', title: '管径经济指标分析：前期管材投入 vs 后期电费，找年均总成本最低的平衡点' }, */
     /* { label: '数字化建模',   hash: 'parametricModelingSection', feat: 'pro-others', title: '数字化建模 · 参数化节点建模' }, */
-    { label: '材料清单',     hash: 'detailsSection',           feat: 'bom-export' },
+    { label: '材料清单',     hash: 'detailsSection',           feat: 'bom-export' }
+  ];
+  /* [v401 2026-10-12 用户指令] 「更多 ▾」折叠面板：过滤系统/轴测图/系统图/滴灌带查询 折叠于此；
+     协议自检（hello-world）/ 参数标定（calib）由插件 nav 声明 container='.fn-more-panel' 同入面板；
+     pipe_optim_ui.js 的「管网优化详细分析」注入项仍落这里。
+     feat 说明：'pro-others' = 高级会员通配键；feat:'' = 完全免费（滴灌带查询是公开查询小工具）。 */
+  var MORE_ITEMS = [
+    { label: '过滤系统',     hash: 'filterSystemSection',      feat: 'pro-others', title: '过滤系统 · GREEN 型单体并联机组（初稿）' },
     { label: '轴测图',       act: 'iso', page: 'index.html',   feat: 'drawing-export', title: '三级管线轴测图（先「生成管线图」再点）' },
     { label: '系统图',       act: 'sys', page: 'index.html',   feat: 'drawing-export', title: '三级系统图（供水首部系统图）' },
     { label: '滴灌带查询',   href: '耐特菲姆滴灌带长度查询器.html', feat: '' }
-  ];
-  /* [v387] 「更多 ▾」折叠面板：顶层展开后暂无固定项，机制保留——
-     管网优化详细分析（pipe_optim_ui.js 注入）仍落这里；将来恢复的功能项也放这里。 */
-  var MORE_ITEMS = [
   ];
   function curFile() {
     var p = decodeURIComponent((global.location && global.location.pathname) || '');
     return p.split('/').pop() || 'index.html';
   }
-  /* [v346] 线上锁环境判定：本地(localhost/127.0.0.1/file://)全放行；其余域名=线上，「更多」项锁定。
-     以后放开某功能：把它从 MORE_ITEMS 挪回 ITEMS 即可；整体关锁=删 IS_ONLINE 判定。 */
+  /* [v346→v401] 线上锁已退役：v401 起「更多」面板承接的全部是已上线功能（feat 会员门控兜底），
+     v346 的线上整体拦截（面板委托 + hash 直达）两处已移除。IS_ONLINE 暂留诊断备用
+     （?env=online 测试钩子语义不变），当前无消费者。 */
   var IS_ONLINE = (function () {
     if (!global.location) return false;
     /* [v346] 测试钩子：?env=online 强制按线上锁运行（只能强锁不能强解锁，供本地预览/探针） */
@@ -106,10 +116,6 @@
           → 放行：网络抖动 / 云函数还没部署 / SDK 加载慢，都不该把老用户当场锁死；
        c) 已拿到真相 → 严格按 RyEntitle.can(feature) 判定。
      b → c 的切换由 RyEntitle.onChange → RyFnNav.render() 重新渲染（见文件末尾订阅）。 */
-  function allFeaturesOpen() {
-    var E = global.RyEntitle;
-    return !!(E && typeof E.allFeaturesOpen === 'function' && E.allFeaturesOpen());
-  }
   function gate(feature) {
     if (!feature) return true;                      /* 未标注 feat = 免费功能，不参与门控 */
     var E = global.RyEntitle;
@@ -129,6 +135,27 @@
     /* [v286g] root=子目录页声明的根前缀（如 terrain/ 页的 ../）：
        有 root 的页面绝不是 act 宿主页（主页在站点根）⇒ act 项恒为跨页 <a>。 */
     var localAction = it.act && curFile() === it.page && !root;
+    /* [v402] 「文件」项：button 触发 mod/inline-32.js 的 RyFileMenu.toggle（面板动态创建，
+       本页未加载 inline-32（子页）时点击无害——只切 aria 态）；文字恒为「文件 ▾」。 */
+    if (it.fileMenu) {
+      var fb = document.createElement('button');
+      fb.type = 'button';
+      fb.className = 'fn-link';
+      fb.setAttribute('data-ry-navitem', '1');
+      fb.setAttribute('data-ry-filemenu', '1');
+      fb.setAttribute('aria-haspopup', 'true');
+      fb.setAttribute('aria-expanded', 'false');
+      fb.title = it.title || '';
+      fb.textContent = '文件 ▾';
+      fb.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (global.RyFileMenu && typeof global.RyFileMenu.toggle === 'function') {
+          global.RyFileMenu.toggle(fb);
+        }
+      });
+      return fb;
+    }
     var a = document.createElement(localAction ? 'button' : 'a');
     if (localAction) a.type = 'button';
     a.className = 'fn-link';
@@ -215,7 +242,7 @@
     btn.className = 'fn-link fn-more-btn';
     btn.setAttribute('aria-expanded', 'false');
     btn.setAttribute('aria-haspopup', 'true');
-    btn.title = '更多工具：管网优化详细分析（v387 起其余工具已全部展开到顶栏）';
+    btn.title = '更多工具：过滤系统 / 轴测图 / 系统图 / 滴灌带查询 / 管网优化详细分析';
     var caret = document.createElement('span');
     caret.className = 'fn-more-caret';
     caret.setAttribute('aria-hidden', 'true');
@@ -227,18 +254,8 @@
     panel.hidden = true;
     panel.setAttribute('role', 'menu');
     MORE_ITEMS.forEach(function (it) { panel.appendChild(makeItem(it, base, root)); });
-    /* [v346] 线上锁：捕获阶段委托拦截面板内所有项（含 pipe_optim_ui 注入的「管网优化详细分析」）——
-       stopImmediatePropagation 同时阻断 href 跳转与页面既有 data-target 处理器 */
-    if (IS_ONLINE && !allFeaturesOpen()) {
-      panel.addEventListener('click', function (e) {
-        var t = e.target && e.target.closest ? e.target.closest('.fn-link') : null;
-        if (!t) return;
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        close();
-        showToast('「' + (t.textContent || '').trim() + '」功能即将开放，敬请期待');
-      }, true);
-    }
+    /* [v401] v346 线上锁已解除：面板内全部是已上线功能（feat 会员门控由 makeItem 的 gate 兜底），
+       委托拦截会把正式功能对线上用户锁死（toast「即将开放」），与现状矛盾。 */
     wrap.appendChild(btn);
     wrap.appendChild(panel);
     morePanelEl = panel;
@@ -404,11 +421,7 @@
     var all = ITEMS.concat(MORE_ITEMS);   /* [v247] 折叠项也要能被 #hash 直达 */
     var item = all.filter(function (it) { return it.hash === hash || (it.act && 'nav-' + it.act === hash); })[0];
     if (!item) return;
-    /* [v346] 线上锁：折叠项的 #hash 直达同样拦截 */
-    if (IS_ONLINE && !allFeaturesOpen() && MORE_ITEMS.indexOf(item) !== -1) {
-      showToast('「' + item.label + '」功能即将开放，敬请期待');
-      return;
-    }
+    /* [v401] v346 折叠项 hash 直达拦截已解除（同面板拦截：功能已上线，feat 门控兜底） */
     /* [v358] 会员门控：#hash 直达走与点击完全相同的 gate，避免「点按钮被拦、直接输网址却能进」 */
     if (!gate(item.feat)) { showUpgrade(item.label); return; }
     if (item.act && global.RyFnNavActions && typeof global.RyFnNavActions[item.act] === 'function') {
