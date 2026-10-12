@@ -8,7 +8,6 @@
     { "id": "pipe-optim", "path": "plugins/pipe-optim/" },
     { "id": "calib", "path": "plugins/calib/" },
     { "id": "hydraulics", "path": "plugins/hydraulics/" },
-    { "id": "pipe-assemble", "path": "plugins/pipe-assemble/" },
     { "id": "ai-plan", "path": "plugins/ai-plan/" },
     { "id": "sprinkler", "path": "plugins/sprinkler/" }
   ]

@@ -712,8 +712,8 @@
   var SP_BRIDGE_KEY = 'runyeSprinklerResult';   /* v384 任务书 P0：喷灌成果数据桥（plugins/sprinkler 消费） */
   var SP_COLORS = ['#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed', '#0891b2', '#be185d', '#4d7c0f']; /* 轮灌组着色 */
   var SP_DEFAULTS = { crop: '', etc: 4.5, eta: 0.7, soil: 'loam', slope: 8,
-                      range: 15, flow: 2.5, pressure: 300, ratedFlow: '', ratedPressure: '', sourceFlow: '', layout: 'tri', k: 1.1, heads: 12,
-                      spacing: '', riserOd: 25, riserH: 3, tankV: '', boostQ: '', boostH: '', boostSplit: '',
+                      range: 8.5, flow: 0.35, pressure: 250, ratedFlow: '', ratedPressure: '', sourceFlow: '', layout: 'square', k: 1.1, heads: 255,
+                      spacing: 12, riserOd: 25, riserH: 3, zoneMin: 50, zoneMax: 60, macroMin: 200, macroMax: 250, tankV: '', boostQ: '', boostH: '', boostSplit: '',
                       trenchD: 0.5, twMain: 0.5, twSub: 0.4, twLat: 0.3, filterOn: true, filterN: 1, fertOn: true, fertN: 1 };
 
   function spRead() {
@@ -728,6 +728,8 @@
       source_flow_m3h: parseFloat($('spSourceFlow').value),
       spacing_k: parseFloat($('spK').value), heads_per_shift: parseInt($('spHeads').value, 10),
       spacing_m: (isFinite(sm) && sm > 0) ? sm : null,   /* 留空 = 用间距系数 k（core 内 Number(null)=0 → factor 模式） */
+      zone_min_mu: parseFloat($('spZoneMin').value), zone_max_mu: parseFloat($('spZoneMax').value),
+      macro_min_mu: parseFloat($('spMacroMin').value), macro_max_mu: parseFloat($('spMacroMax').value),
       riser_od_mm: parseFloat($('spRiserOd').value) || 25,
       riser_height_m: parseFloat($('spRiserH').value) || 3,
       tank_v: parseFloat($('spTankV').value) || null,
@@ -754,6 +756,8 @@
     $('spSourceFlow').value = v.source_flow_m3h || v.sourceFlow || '';
     $('spK').value = v.spacing_k; $('spHeads').value = v.heads_per_shift;
     $('spSpacing').value = (v.spacing_m != null && isFinite(v.spacing_m) && v.spacing_m > 0) ? v.spacing_m : '';
+    $('spZoneMin').value = v.zone_min_mu || v.zoneMin || 50; $('spZoneMax').value = v.zone_max_mu || v.zoneMax || 60;
+    $('spMacroMin').value = v.macro_min_mu || v.macroMin || 200; $('spMacroMax').value = v.macro_max_mu || v.macroMax || 250;
     $('spRiserOd').value = v.riser_od_mm || v.riserOd || 25;
     $('spRiserH').value = v.riser_height_m || v.riserH || 3;
     $('spTankV').value = (v.tank_v != null && isFinite(v.tank_v)) ? v.tank_v : (v.tankV || '');
@@ -781,6 +785,9 @@
       box.hidden = true;
       warnBox.hidden = false; warnBox.className = 't-spwarn';
       warnBox.textContent = res.error;
+      /* 输入已无效时清掉旧 BOM 与共享快照，避免下游插件继续展示上一轮的过期方案。 */
+      var staleBom = $('spBomCard'); if (staleBom) staleBom.hidden = true;
+      try { localStorage.removeItem(SP_BRIDGE_KEY); } catch (e) {}
       return;
     }
     var rows = [
@@ -791,6 +798,13 @@
       '系统流量 <b>' + res.systemFlow.toFixed(1) + ' m³/h</b>',
       '组合喷灌强度 <b>' + res.precipRate.toFixed(1) + ' mm/h</b>（' + D.soilLabel(res.soil) + '允许 ' + res.precipAllow + '）' + (res.precipOk ? ' ✓' : ' ✗')
     ];
+    var projectPlan = D.sprinklerProjectPlan(input, area / 666.67, null);
+    if (projectPlan && projectPlan.ok) {
+      rows.push('地理灌溉小区建议 <b>' + projectPlan.zones.recommended + '</b> 个，平均 ' + projectPlan.zones.average_mu + ' 亩/区' + (projectPlan.zones.feasible ? '（符合 50–60 亩）' : '（总面积无法整分到目标范围，请调整边界）'));
+      rows.push('200–250 亩大灌溉区：' + (projectPlan.macrozones.feasible ? projectPlan.macrozones.min + (projectPlan.macrozones.max > projectPlan.macrozones.min ? '–' + projectPlan.macrozones.max : '') + ' 个' : '当前总面积无法按该范围划分'));
+      rows.push('<b>任务书固定管径：</b>主管 PE DN160 · 干管 PE DN110 · 小区支管 PE DN50（规格记录，不等于水力校核通过）');
+      rows.push('配套要求：380V 三相四线 · PE 热熔 · 每个地理小区独立阀 · 板框过滤 · 溶肥容器/中转池 · 二次加压');
+    }
     if (res.sourceFlow != null) rows.push('水源流量校核 <b>' + res.sourceFlow.toFixed(1) + ' m³/h</b> → ' + (res.sourceFlowOk ? '满足当前轮灌组 ✓' : '不足 ✗'));
     if (res.expectedFlow != null) rows.push('喷嘴曲线换算流量 <b>' + res.expectedFlow.toFixed(2) + ' m³/h</b> → ' + (res.nozzleOk ? '与输入一致 ✓' : '偏差过大 ✗'));
     if (res.dailyHours != null) rows.push('满足日耗水 ' + input.etc + ' mm/d 需日喷洒约 <b>' + res.dailyHours.toFixed(1) + ' 小时</b>（η=' + input.eta + '）');
@@ -810,6 +824,7 @@
     try {
       var lay = D.sprinklerLayout(state.plots, input);
       if (lay && lay.ok) {
+        var plan = D.sprinklerProjectPlan(input, area / 666.67, lay);
         /* P1：蓄水池/二次加压填了参数就随 BOM 落桥（core 内 tankVolumeEstimate/boostModel 口径） */
         var tankOpt = null, boostOpt = null;
         if (input.tank_v > 0) tankOpt = { volume_m3: input.tank_v, note: '蓄水池（手填/按参数估算）' };
@@ -818,13 +833,17 @@
           boostOpt = D.boostModel({ q_m3h: bq, total_head_m: input.boost_h, split_at_m: input.boost_split });
         }
         var bom = D.sprinklerBom(lay, {
-          flow_m3h: input.flow_m3h, riser_od_mm: input.riser_od_mm, riser_height_m: input.riser_height_m,
+          flow_m3h: input.flow_m3h, riser_od_mm: input.riser_od_mm, riser_height_m: input.riser_height_m, project: plan,
           tank: tankOpt, boost: boostOpt,
           trench_depth_m: input.trench_depth_m, trench_w_main_m: input.trench_w_main_m,
           trench_w_sub_m: input.trench_w_sub_m, trench_w_lat_m: input.trench_w_lat_m,
           filter: { enabled: input.filter_on, sets: input.filter_n },
           fert: { enabled: input.fert_on, sets: input.fert_n }
         });
+        if (bom && bom.ok && plan && plan.ok) {
+          bom.project = plan;
+          bom.pipes.specified = plan.specifiedNetwork;
+        }
         if (bom && bom.ok) {
           renderSpBom(bom);
           var names = state.plots.map(function (p) { return p.name || ''; }).filter(Boolean);
@@ -856,9 +875,16 @@
       (bom.heads.flowLh ? ' × ' + bom.heads.flowLh + ' L/h' : '') +
       ' · R=' + bom.heads.radius_m + ' m · 间距 ' + bom.heads.spacing_m + ' m');
     rows.push('镀锌立管 <b>' + bom.risers.count + '</b> 根 · Φ' + bom.risers.od_mm + ' mm × ' + bom.risers.height_m + ' m');
-    rows.push('干管 Φ' + (bom.pipes.mainline.dn_mm || '—') + ' × <b>' + bom.pipes.mainline.len_m + '</b> m');
-    rows.push('支管 Φ' + (bom.pipes.laterals.dn_mm || '—') + ' × <b>' + bom.pipes.laterals.len_m + '</b> m');
-    rows.push('轮灌组 <b>' + bom.shifts.groupCount + '</b> 组（每组 ' + bom.shifts.headsPerShift + ' 个同时工作）→ 分区阀门 <b>' + bom.valves.count + '</b> 个');
+    rows.push('布置图估算干管 Φ' + (bom.pipes.mainline.dn_mm || '—') + ' × <b>' + bom.pipes.mainline.len_m + '</b> m');
+    rows.push('布置图估算支管 Φ' + (bom.pipes.laterals.dn_mm || '—') + ' × <b>' + bom.pipes.laterals.len_m + '</b> m');
+    if (bom.project) {
+      rows.push('<b>任务书指定规格（非水力校核结果）</b>：主管 PE DN160 · 干管 PE DN110 · 小区支管 PE DN50；以上布置线长度仅为示意量，不含全场主管路由。');
+      rows.push('380V 三相四线 · PE 热熔连接 · 每个地理灌溉小区设独立总阀（沿道路定位需现场管线图）');
+      rows.push('地理小区 <b>' + bom.project.zones.recommended + '</b> 个，平均 ' + bom.project.zones.average_mu + ' 亩/区' + (bom.project.zones.feasible ? '' : '（未落入 50–60 亩范围）'));
+      rows.push('200–250 亩大灌溉区：' + (bom.project.macrozones.feasible ? bom.project.macrozones.min + (bom.project.macrozones.max > bom.project.macrozones.min ? '–' + bom.project.macrozones.max : '') + ' 个' : '当前面积无法满足范围'));
+      rows.push('<b>待补资料/校核：</b>' + bom.project.notes.map(esc).join('<br>'));
+    }
+    rows.push('轮灌运行批次 <b>' + bom.shifts.groupCount + '</b> 组（每组 ' + bom.shifts.headsPerShift + ' 个同时工作）；地理小区总阀约 <b>' + (bom.valves.count == null ? '待按小区确定' : bom.valves.count + ' 个') + '</b>');
     if (bom.tank) rows.push('蓄水池 <b>' + bom.tank.volume_m3 + '</b> m³（' + esc(bom.tank.note || '') + '）');
     if (bom.boost) rows.push('二次加压：一段泵 <b>' + bom.boost.stage1.power_kw + '</b> kW + 二段泵 <b>' + bom.boost.stage2.power_kw + '</b> kW');
     if (bom.trench) rows.push('沟槽土方 <b>' + bom.trench.volume_m3 + '</b> m³（深 ' + bom.trench.depth_m + ' m · 干管宽 ' + bom.trench.widths.sub_m + ' / 支管宽 ' + bom.trench.widths.lat_m + ' m）');
@@ -1011,8 +1037,8 @@
     /* 管径（v293）：有喷头流量参数时显示 Φ 与流量；无则退回纯线型说明 */
     var mainTxt = '干管', latTxt = '支管';
     if (lay && lay.ok && lay.mainDN && lay.latDN) {
-      mainTxt = '干管 Φ' + lay.mainDN.dn + '（' + lay.mainFlow.toFixed(1) + ' m³/h）';
-      latTxt = '支管 Φ' + lay.latDN.dn + '（' + lay.latFlow.toFixed(1) + ' m³/h）';
+      mainTxt = '布置图初估干管 Φ' + lay.mainDN.dn + '（' + lay.mainFlow.toFixed(1) + ' m³/h）';
+      latTxt = '布置图初估支管 Φ' + lay.latDN.dn + '（' + lay.latFlow.toFixed(1) + ' m³/h）';
     }
     /* v384 P2：勾选启用才进图例（与 BOM 计入口径一致，不造假数） */
     var extras = '';
@@ -1057,7 +1083,7 @@
        无效输入（如清空再打字）由 calcSprinkler 报警告并保留旧布置。 */
     var spInputTimer = null;
     function spAutoCalc() { clearTimeout(spInputTimer); spInputTimer = setTimeout(calcSprinkler, 350); }
-    ['spCrop', 'spEtc', 'spEta', 'spSoil', 'spSlope', 'spRange', 'spFlow', 'spPressure', 'spLayout', 'spK', 'spHeads']
+    ['spCrop', 'spEtc', 'spEta', 'spSoil', 'spSlope', 'spRange', 'spFlow', 'spPressure', 'spLayout', 'spK', 'spSpacing', 'spHeads', 'spZoneMin', 'spZoneMax', 'spMacroMin', 'spMacroMax']
       .forEach(function (id) {
         $(id).addEventListener('change', function () { clearTimeout(spInputTimer); calcSprinkler(); });
         $(id).addEventListener('input', spAutoCalc);

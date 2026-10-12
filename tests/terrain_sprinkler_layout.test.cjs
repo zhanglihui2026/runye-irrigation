@@ -138,6 +138,14 @@ const E8w = core.sprinklerEstimate({ range_m: 10, flow_m3h: 2.5, pressure_kpa: 3
 ok(E8w.ok === true && E8w.warn.some(w => w.indexOf('偏离') >= 0), 'estimate：1.7R → 偏离告警');
 /* 回归：不传 spacing_m 行为与旧版完全一致 */
 ok(L2.heads.length === 81 && L2.spacingMode === 'factor' && L2.spacing_m === null, '回归：不传 spacing_m → S=R×k=11、spacingMode=factor、spacing_m=null');
+const E8p = core.sprinklerEstimate({ range_m: 8.5, flow_m3h: 0.35, pressure_kpa: 250, spacing_m: 12, layout: 'square' }, 550 * 666.67);
+ok(E8p.ok && E8p.headCount === Math.ceil(550 * 666.67 / 144), '任务书喷头参数 350L/h、12×12m：按面积计算点位数');
+ok(core.sprinklerEstimate({ range_m: 8.5, flow_m3h: 0.35, pressure_kpa: 2500, spacing_m: 12 }, 550 * 666.67).ok === false, '反例：2500kPa（2.5MPa）压力拒绝估算，避免单位错误');
+const P8 = core.sprinklerProjectPlan({ zone_min_mu: 50, zone_max_mu: 60, macro_min_mu: 200, macro_max_mu: 250, flow_m3h: 0.35, range_m: 8.5 }, 500, L8);
+ok(P8.ok && P8.zones.recommended === 9 && P8.zones.feasible && Math.abs(P8.zones.average_mu - 55.56) < 0.01, '500亩按50–60亩目标分为9区，均值55.56亩');
+ok(P8.macrozones.feasible && P8.macrozones.min === 2 && P8.macrozones.max === 2, '500亩按200–250亩划分为2个大灌溉区');
+ok(P8.specifiedNetwork.main_dn_mm === 160 && P8.specifiedNetwork.distribution_dn_mm === 110 && P8.specifiedNetwork.branch_dn_mm === 50 && P8.specifiedNetwork.sprinkler_flow_lh === 350, '任务书规格按字段保留，不被自动管径建议覆盖');
+ok(core.sprinklerProjectPlan({}, 121).zones.feasible === false, '反例：无法整分到50–60亩范围时显式报不可行');
 
 /* ---------- 9. 喷灌 BOM 统计（v384 任务书 P0） ---------- */
 console.log('[9] sprinklerBom');
@@ -148,7 +156,9 @@ ok(B9.risers.count === 81 && B9.risers.od_mm === 25 && B9.risers.height_m === 3,
 ok(Math.abs(B9.pipes.mainline.len_m - 88) < 1e-6 && B9.pipes.mainline.dn_mm === 110, '干管长 = 竖跨 88m、Φ110（实际 ' + B9.pipes.mainline.len_m + '）');
 ok(Math.abs(B9.pipes.laterals.len_m - 792) < 1e-6 && B9.pipes.laterals.dn_mm === 75, '支管长 = 9 行×88m = 792m、Φ75（实际 ' + B9.pipes.laterals.len_m + '）');
 ok(B9.shifts.groupCount === 7 && B9.shifts.headsPerShift === 12, '轮灌组 = ceil(81/12) = 7 组 × 12 头');
-ok(B9.valves.count === B9.shifts.groupCount, '分区阀门数 = 轮灌组数');
+ok(B9.valves.count === null, '未提供地理分区方案时阀门数留空，不再冒用轮灌组数');
+const B9P = core.sprinklerBom(L2b, { project: P8 });
+ok(B9P.valves.count === 9 && B9P.valves.basis === 'geographic-irrigation-zones', '提供分区方案后按地理小区数统计独立阀门');
 ok(B9.tank === null && B9.boost === null && B9.filter === null && B9.fert === null, '未填 tank/boost/filter/fert → 恒 null（不造假数）');
 ok(B9.trench && Math.abs(B9.trench.depth_m - 0.5) < 1e-9 && Math.abs(B9.trench.widths.sub_m - 0.4) < 1e-9 && Math.abs(B9.trench.widths.lat_m - 0.3) < 1e-9, 'P2 沟槽默认档：深 0.5 / 干管宽 0.4 / 支管宽 0.3');
 const B9n = core.sprinklerBom(L2c);

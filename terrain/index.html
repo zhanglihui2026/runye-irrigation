@@ -47,7 +47,7 @@
 <nav class="fn-nav" aria-label="功能区导航">
   <div class="fn-inner" data-ry-fnnav data-base="index.html#" data-root="../"></div>
 </nav>
-<script src="../runye-nav.js?v=346"></script>
+<script src="../runye-nav.js?v=385-global-open"></script>
 
 <!-- 模式条：标题 + 预览/工程切换（全宽细条，位于导航与工作区之间） -->
 <header class="t-top">
@@ -157,21 +157,24 @@
         </select></div>
         <div class="t-sprow"><label>地块平均坡度</label><input id="spSlope" type="number" value="8" min="0" max="45" step="0.5"><span>°</span></div>
         <div class="t-spgroup">喷头与布置</div>
-        <div class="t-sprow"><label>喷头射程 R</label><input id="spRange" type="number" value="15" min="1" max="60" step="0.5"><span>m</span></div>
-        <div class="t-sprow"><label>喷头流量 q</label><input id="spFlow" type="number" value="2.5" min="0.1" max="30" step="0.1"><span>m³/h</span></div>
-        <div class="t-sprow"><label>工作压力</label><input id="spPressure" type="number" value="300" min="100" max="800" step="10"><span>kPa</span></div>
+        <div class="t-sprow"><label>喷头射程 R（任务书 7–10）</label><input id="spRange" type="number" value="8.5" min="1" max="60" step="0.5"><span>m</span></div>
+        <div class="t-sprow"><label>喷头流量 q（任务书 350）</label><input id="spFlow" type="number" value="0.35" min="0.01" max="30" step="0.01"><span>m³/h</span></div>
+        <div class="t-sprow"><label>喷头工作压力（已确认 2–3 bar）</label><input id="spPressure" type="number" value="250" min="100" max="3000" step="10"><span>kPa</span></div>
+        <div class="t-hintbox">任务书压力范围 2–3 bar = 200–300 kPa；当前以 250 kPa 中值估算。喷头最终流量与工作压力请按具体型号厂家曲线复核。</div>
         <div class="t-sprow"><label>喷嘴额定流量（可选）</label><input id="spRatedFlow" type="number" min="0.01" max="30" step="0.01" placeholder="按铭牌填写"><span>m³/h</span></div>
         <div class="t-sprow"><label>喷嘴额定压力（可选）</label><input id="spRatedPressure" type="number" min="10" max="1000" step="1" placeholder="按铭牌填写"><span>kPa</span></div>
         <div class="t-sprow"><label>布置方式</label><select id="spLayout">
-          <option value="tri" selected>正三角形（坡地推荐）</option>
-          <option value="square">正方形</option>
+          <option value="tri">正三角形（坡地推荐）</option>
+          <option value="square" selected>正方形（任务书 12×12）</option>
         </select></div>
         <div class="t-sprow"><label>间距系数 k（×R）</label><input id="spK" type="number" value="1.1" min="0.4" max="1.6" step="0.05"></div>
-        <div class="t-sprow"><label>直接填间距（m）</label><input id="spSpacing" type="number" min="1" max="60" step="0.5" placeholder="如 12，留空用 k"><span>m</span></div>
-        <div class="t-sprow"><label>立管口径</label><input id="spRiserOd" type="number" value="25" min="10" max="110" step="1"><span>mm</span></div>
+        <div class="t-sprow"><label>直接填间距（任务书 12×12）</label><input id="spSpacing" type="number" value="12" min="1" max="60" step="0.5" placeholder="如 12，留空用 k"><span>m</span></div>
+        <div class="t-sprow"><label>立管口径（任务书 25）</label><input id="spRiserOd" type="number" value="25" min="10" max="110" step="1"><span>mm</span></div>
         <div class="t-sprow"><label>立管高度</label><input id="spRiserH" type="number" value="3" min="1" max="10" step="0.5"><span>m</span></div>
-        <div class="t-spgroup">轮灌与水源</div>
-        <div class="t-sprow"><label>同时工作喷头数</label><input id="spHeads" type="number" value="12" min="1" max="500" step="1"><span>个</span></div>
+        <div class="t-spgroup">地理分区与轮灌</div>
+        <div class="t-sprow"><label>单灌溉小区面积</label><input id="spZoneMin" type="number" value="50" min="1" max="10000" step="1"><span>–</span><input id="spZoneMax" type="number" value="60" min="1" max="10000" step="1"><span>亩</span></div>
+        <div class="t-sprow"><label>大灌溉区面积</label><input id="spMacroMin" type="number" value="200" min="1" max="100000" step="10"><span>–</span><input id="spMacroMax" type="number" value="250" min="1" max="100000" step="10"><span>亩</span></div>
+        <div class="t-sprow"><label>同时工作喷头数</label><input id="spHeads" type="number" value="255" min="1" max="4000" step="1"><span>个</span></div>
         <div class="t-sprow"><label>水源可用流量（可选）</label><input id="spSourceFlow" type="number" min="0.1" max="10000" step="0.1" placeholder="实测或水泵铭牌"><span>m³/h</span></div>
         <div class="t-spgroup">蓄水池与二次加压</div>
         <div class="t-sprow"><label>蓄水池容积（m³）</label><input id="spTankV" type="number" min="0" max="100000" step="10" placeholder="手填或估算"><span><button class="t-btn ghost" id="spTankCalc" type="button">按参数估算</button></span></div>
@@ -194,7 +197,7 @@
         <div class="t-sprow"><label>溶肥设施数量</label><input id="spFertN" type="number" value="1" min="1" max="20" step="1"><span>套</span></div>
         <div class="t-btnrow" style="margin-top:6px">
           <button class="t-btn" id="spCalc">估算</button>
-          <button class="t-btn ghost" id="spReset">恢复默认</button>
+          <button class="t-btn ghost" id="spReset">载入任务书参数</button>
           <button class="t-btn ghost" id="spDemo" type="button">▶ 轮灌演示</button>
         </div>
         <label class="t-sprow t-sp-overlay" style="cursor:pointer"><input type="checkbox" id="spOverlay" checked> 图上显示喷灌布置</label>

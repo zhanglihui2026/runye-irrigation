@@ -573,6 +573,7 @@
     var pressure = Number(input.pressure_kpa);
     if (!(R > 0) || !(q > 0) || !(pressure > 0)) return { ok: false, error: '喷头射程、流量和工作压力必须为正数' };
     if (!(areaM2 > 0)) return { ok: false, error: '请先在地块清单中导入或绘制地块' };
+    if (pressure > 1000) return { ok: false, error: '喷头工作压力 ' + pressure + ' kPa（' + (pressure / 1000).toFixed(2) + ' MPa）远超常见喷灌喷头范围，已停止估算。请核实是否把 2–3 bar 写成了 2–3 MPa。' };
 
     /* v384 直接填间距（任务书 20261012 P0）：spacing_m 提供且 >0 时 S=spacing_m，忽略 k 推导。
        12×12 属用户硬参数：偏离 0.8~1.6R 仅提示不硬拦（GB/T 50085 常规 0.8~1.2R）。 */
@@ -604,6 +605,7 @@
       if (!sourceFlowOk) warn.push('当前轮灌组需水 ' + systemFlow.toFixed(1) + ' m³/h，超过水源可用流量 ' + sourceFlow.toFixed(1) + ' m³/h：请减少同时工作喷头数或增加轮灌组');
     }
     if (pressure < 150 || pressure > 500) warn.push('工作压力 ' + pressure.toFixed(0) + ' kPa 超出常见喷头 150–500 kPa 区间：请核对喷嘴厂家曲线');
+    if (pressure < 200 || pressure > 300) warn.push('当前压力不在任务书 2–3 bar（200–300 kPa）范围内：请核对喷头型号和设计压力');
 
     /* q 与 P 不能仅凭两个数判断对错。用户填入喷嘴铭牌额定 q/P 后，才按 q∝√P 作可追溯校核。 */
     var ratedFlow = Number(input.rated_flow_m3h), ratedPressure = Number(input.rated_pressure_kpa);
@@ -649,6 +651,41 @@
       expectedFlow: expectedFlow, nozzleOk: nozzleOk,
       dailyHours: dailyHours > 0 ? dailyHours : null,
       soil: soil, layout: layout
+    };
+  }
+
+  /* 项目工程约束汇总：把设计任务书要求与估算布置分开，避免轮灌组被误当成
+     地理灌溉小区，也避免自动管径建议覆盖用户指定的 PE 公称口径。 */
+  function sprinklerProjectPlan(input, areaMu, layoutResult) {
+    input = input || {};
+    var total = Number(areaMu) || 0;
+    if (!(total > 0)) return { ok: false, error: '地块总面积必须大于 0 亩' };
+    var zoneMin = Number(input.zone_min_mu) || 50;
+    var zoneMax = Number(input.zone_max_mu) || 60;
+    var macroMin = Number(input.macro_min_mu) || 200;
+    var macroMax = Number(input.macro_max_mu) || 250;
+    if (!(zoneMin > 0 && zoneMax >= zoneMin && macroMin > 0 && macroMax >= macroMin))
+      return { ok: false, error: '灌溉小区/大区面积范围无效' };
+    var minZones = Math.ceil(total / zoneMax);
+    var maxZones = Math.floor(total / zoneMin);
+    var zoneFeasible = minZones <= maxZones;
+    var recommendedZones = zoneFeasible ? minZones : Math.max(1, Math.round(total / ((zoneMin + zoneMax) / 2)));
+    var zoneArea = total / recommendedZones;
+    var macroCountMin = Math.ceil(total / macroMax);
+    var macroCountMax = Math.floor(total / macroMin);
+    var heads = layoutResult && Array.isArray(layoutResult.heads) ? layoutResult.heads.length : null;
+    return {
+      ok: true, area_mu: Math.round(total * 100) / 100,
+      zones: { min: minZones, max: maxZones, recommended: recommendedZones, average_mu: Math.round(zoneArea * 100) / 100, feasible: zoneFeasible, target_min_mu: zoneMin, target_max_mu: zoneMax },
+      macrozones: { min: macroCountMin, max: Math.max(macroCountMin, macroCountMax), feasible: macroCountMin <= macroCountMax, target_min_mu: macroMin, target_max_mu: macroMax },
+      heads: heads,
+      specifiedNetwork: { main_dn_mm: 160, distribution_dn_mm: 110, branch_dn_mm: 50, riser_dn_mm: 25, riser_height_m: 3, sprinkler_count: heads, sprinkler_flow_lh: Number(input.flow_m3h) > 0 ? Math.round(Number(input.flow_m3h) * 1000) : null, sprinkler_radius_m: Number(input.range_m) || null, sprinkler_interface_mm: 20, sprinkler_pressure_bar_min: 2, sprinkler_pressure_bar_max: 3, sprinkler_pressure_kpa_used: Number(input.pressure_kpa) || null, spacing_m: 12, trench_depth_m: 0.5, voltage: '380 V 三相四线', jointing: 'PE 热熔连接', valve: '每个 50–60 亩灌溉小区设独立总阀；阀门位置需结合道路图确定', filter: '板框过滤茶枯有机肥液', secondary_boost: true },
+      notes: [
+        '指定管径按任务书列出；地形布置图只含示意干管/支管，长度不是全场施工量，且未完成沿程损失/节点压力校核。',
+        '当前只按面积估算 50–60 亩小区数量，没有自动切出地理边界；轮灌组是同时启停的运行批次，不等同于地理小区。',
+        '蓄水池容积、主泵/二次泵扬程与电机功率必须结合水源流量、地形高差、管线长度及喷头厂家曲线校核后确定。',
+        '12×12m 点位布置按当前地块轮廓做平面估算，边界、道路避让、梯田台面与喷洒均匀度仍需现场复核。'
+      ]
     };
   }
 
@@ -899,6 +936,7 @@
        与支管（laterals）两级——主管段（外线）不在布置图内，档位字段保留但体积不计入，
        note 明示口径，不造假数。volume = Σ(len × depth × width)。 */
     var trench = null;
+    var project = opts.project && opts.project.ok ? opts.project : null;
     var tDepth = isNum(opts.trench_depth_m) && opts.trench_depth_m > 0 ? opts.trench_depth_m : 0.5;
     var wMain = isNum(opts.trench_w_main_m) && opts.trench_w_main_m > 0 ? opts.trench_w_main_m : 0.5;
     var wSub = isNum(opts.trench_w_sub_m) && opts.trench_w_sub_m > 0 ? opts.trench_w_sub_m : 0.4;
@@ -947,7 +985,9 @@
         mainDN: mainDn, latDN: latDn
       },
       shifts: { groupCount: layoutResult.groupCount || 0, headsPerShift: layoutResult.headsPerShift || null },
-      valves: { count: layoutResult.groupCount || 0 },
+      /* 地理小区阀数按 50–60 亩小区统计；轮灌组是运行批次，不可代替地理分区阀数。 */
+      valves: { count: project ? project.zones.recommended : null, basis: project ? 'geographic-irrigation-zones' : null },
+      operationGroups: { count: layoutResult.groupCount || 0, headsPerShift: layoutResult.headsPerShift || null },
       /* tank/boost（P1）：UI 先用 tankVolumeEstimate / boostModel 算好再经 opts 传入，
          BOM 只做装配与合法性过滤——缺参/非法一律 null，不造假数。trench/filter/fert P2 补。 */
       tank: (opts.tank && opts.tank.volume_m3 > 0)
@@ -1077,6 +1117,7 @@
     parseCSV: parseCSV,
     lonlatToLocalMeters: lonlatToLocalMeters,
     sprinklerEstimate: sprinklerEstimate,
+    sprinklerProjectPlan: sprinklerProjectPlan,
     pointInPolygon: pointInPolygon,
     sanitizeRing: sanitizeRing,
     surfaceAreaApprox: surfaceAreaApprox,

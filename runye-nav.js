@@ -49,14 +49,18 @@
     { label: '地块绘制',     hash: 'areaTool',                 feat: 'pro-others', title: '地块绘制工具（比例尺 / 绘制边界 / 地块库）' },
     /* [NEW MODULE: 地形模块] 卸载=删除本行+terrain/+sw.js 条目 */
     { label: '地形模块',     href: 'terrain/index.html',       feat: 'pro-others', title: '地形模块：shp/RTK边界导入、CGCS2000校验、面积、高程数据源登记' },
-    { label: '多地块规划',   hash: 'grPipeSection',            feat: 'pro-others', title: '成组地块：全组总览 + 总管编辑 + 按块进入管路规划' },
+    /* [v385 2026-10-12 用户指令] 四项功能剥离下线（入口摘除，业务代码/页面全部保留，将来需要时
+       把对应行加回 MORE_ITEMS 即可恢复）：多地块规划(#grPipeSection)、管路拼装(独立页+pipe-assemble
+       壳插件同步摘除)、经济指标分析(#threeDModelingSection)、数字化建模(#parametricModelingSection)。
+       恢复格式照抄下面被注释的原条目。 */
+    /* { label: '多地块规划',   hash: 'grPipeSection',            feat: 'pro-others', title: '成组地块：全组总览 + 总管编辑 + 按块进入管路规划' }, */
     /* [v247] 材料清单保持在「管路拼装」之前 */
     { label: '材料清单',     hash: 'detailsSection',           feat: 'bom-export' },
     { label: '轴测图',       act: 'iso', page: 'index.html',   feat: 'drawing-export', title: '三级管线轴测图（先「生成管线图」再点）' },
     { label: '系统图',       act: 'sys', page: 'index.html',   feat: 'drawing-export', title: '三级系统图（供水首部系统图）' },
-    { label: '管路拼装',     href: '管路接驳拼装.html',         feat: 'pro-others', title: '管路接驳拼装：管件级拼装 + 单向水力计算' },
-    { label: '经济指标分析', hash: 'threeDModelingSection',     feat: 'pro-others', title: '管径经济指标分析：前期管材投入 vs 后期电费，找年均总成本最低的平衡点' },
-    { label: '数字化建模',   hash: 'parametricModelingSection', feat: 'pro-others', title: '数字化建模 · 参数化节点建模' },
+    /* { label: '管路拼装',     href: '管路接驳拼装.html',         feat: 'pro-others', title: '管路接驳拼装：管件级拼装 + 单向水力计算' }, */
+    /* { label: '经济指标分析', hash: 'threeDModelingSection',     feat: 'pro-others', title: '管径经济指标分析：前期管材投入 vs 后期电费，找年均总成本最低的平衡点' }, */
+    /* { label: '数字化建模',   hash: 'parametricModelingSection', feat: 'pro-others', title: '数字化建模 · 参数化节点建模' }, */
     { label: '滴灌带查询',   href: '耐特菲姆滴灌带长度查询器.html', feat: '' }
   ];
   function curFile() {
@@ -94,6 +98,10 @@
           → 放行：网络抖动 / 云函数还没部署 / SDK 加载慢，都不该把老用户当场锁死；
        c) 已拿到真相 → 严格按 RyEntitle.can(feature) 判定。
      b → c 的切换由 RyEntitle.onChange → RyFnNav.render() 重新渲染（见文件末尾订阅）。 */
+  function allFeaturesOpen() {
+    var E = global.RyEntitle;
+    return !!(E && typeof E.allFeaturesOpen === 'function' && E.allFeaturesOpen());
+  }
   function gate(feature) {
     if (!feature) return true;                      /* 未标注 feat = 免费功能，不参与门控 */
     var E = global.RyEntitle;
@@ -196,7 +204,7 @@
     btn.className = 'fn-link fn-more-btn';
     btn.setAttribute('aria-expanded', 'false');
     btn.setAttribute('aria-haspopup', 'true');
-    btn.title = '更多工具：地块绘制 / 地形模块 / 多地块规划 / 材料清单 / 轴测图 / 系统图 / 管路拼装 / 经济指标分析 / 数字化建模 / 滴灌带查询 / 管网优化详细分析';
+    btn.title = '更多工具：地块绘制 / 地形模块 / 材料清单 / 轴测图 / 系统图 / 滴灌带查询 / 管网优化详细分析';
     var caret = document.createElement('span');
     caret.className = 'fn-more-caret';
     caret.setAttribute('aria-hidden', 'true');
@@ -210,7 +218,7 @@
     MORE_ITEMS.forEach(function (it) { panel.appendChild(makeItem(it, base, root)); });
     /* [v346] 线上锁：捕获阶段委托拦截面板内所有项（含 pipe_optim_ui 注入的「管网优化详细分析」）——
        stopImmediatePropagation 同时阻断 href 跳转与页面既有 data-target 处理器 */
-    if (IS_ONLINE) {
+    if (IS_ONLINE && !allFeaturesOpen()) {
       panel.addEventListener('click', function (e) {
         var t = e.target && e.target.closest ? e.target.closest('.fn-link') : null;
         if (!t) return;
@@ -354,7 +362,7 @@
     var item = all.filter(function (it) { return it.hash === hash || (it.act && 'nav-' + it.act === hash); })[0];
     if (!item) return;
     /* [v346] 线上锁：折叠项的 #hash 直达同样拦截 */
-    if (IS_ONLINE && MORE_ITEMS.indexOf(item) !== -1) {
+    if (IS_ONLINE && !allFeaturesOpen() && MORE_ITEMS.indexOf(item) !== -1) {
       showToast('「' + item.label + '」功能即将开放，敬请期待');
       return;
     }

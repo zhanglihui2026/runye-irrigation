@@ -11,8 +11,11 @@
    EDITOR_OFF 总开关置 true，卡片/叠加层/观察器整体下线。以上均在 CORE 白名单内，必须抬版本）→
    v384-sprinkler（喷灌专项 TASK_sprinkler-pipeline_20261012 全链路：terrain 直接填间距 12×12 +
    sprinklerBom/tankVolumeEstimate/boostModel + terrain 页 BOM 落桥 + 新增 plugins/sprinkler 壳插件
-   两文件进 CORE 白名单，必须抬版本）。 */
-const VERSION = 'v384-sprinkler';
+   两文件进 CORE 白名单，必须抬版本）→ v385-global-open（并行会话：全站功能暂全开放）→
+   v386-undock（用户指令剥离四功能入口：多地块规划/管路拼装/经济指标分析/数字化建模——runye-nav.js
+   MORE_ITEMS 摘四行、智能规划侧栏摘四链接、plugins.json 移除 pipe-assemble 壳插件、CORE 同步移除
+   其两文件；业务文件全部保留，将来把对应行/条目加回即可恢复，必须抬版本）。 */
+const VERSION = 'v386-undock';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
@@ -47,8 +50,7 @@ const CORE = [
   /* [v377] 水力校核壳迁移插件 */
   "plugins/hydraulics/manifest.json",
   "plugins/hydraulics/main.js",
-  "plugins/pipe-assemble/manifest.json",
-  "plugins/pipe-assemble/main.js",
+  /* [v385] 管路拼装壳插件随四功能剥离下线（页面文件保留，恢复时把两行加回） */
   /* [v381] 智能规划壳迁移插件（独立窗口入口） */
   "plugins/ai-plan/manifest.json",
   "plugins/ai-plan/main.js",

@@ -63,6 +63,9 @@
   var PLAN_NAMES = { L1: '注册会员', L2: '高级会员' };
   var PLAN_DAYS = { L1: 30, L2: 365 };
 
+  /* [2026-10-12] 暂时全站开放所有工具功能；后续讨论 L1/L2 分级时改回 false。 */
+  var ALL_FEATURES_OPEN = true;
+
   var state = null;
   var lastHb = 0;
   var listeners = [];
@@ -286,7 +289,9 @@
       return Math.max(0, Math.ceil((e - Date.now()) / DAY));
     },
     isActive: function () { return !this.isTrial() && this.expireAt() > Date.now(); },
+    allFeaturesOpen: function () { return ALL_FEATURES_OPEN; },
     can: function (feature) {
+      if (ALL_FEATURES_OPEN) return true;
       if (this.mockPlan) return this.canWith(this.mockPlan, feature);
       if (this.isActive()) return this.canWith(this.plan(), feature);
       if (this.isTrial() && this.anonPolicy() === 'trial') return this.canWith('L1', feature);
@@ -305,10 +310,10 @@
       return this.planName() + ' · ' + this.daysLeft() + ' 天';
     },
     features: function () {
-      var list = PLAN_FEATURES[this.plan()] || PLAN_FEATURES.L1;
+      var list = ALL_FEATURES_OPEN ? Object.keys(FEATURES) : (PLAN_FEATURES[this.plan()] || PLAN_FEATURES.L1);
       return list.map(function (k) { return FEATURES[k] || k; });
     },
-    featureKeys: function () { return (PLAN_FEATURES[this.plan()] || PLAN_FEATURES.L1).slice(); },
+    featureKeys: function () { return (ALL_FEATURES_OPEN ? Object.keys(FEATURES) : (PLAN_FEATURES[this.plan()] || PLAN_FEATURES.L1)).slice(); },
 
     /* ---------- 邀请 ---------- */
     myCode: function () { return (state && state.code) || ''; },

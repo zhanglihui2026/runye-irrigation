@@ -215,10 +215,13 @@ function renderPanel() {
   body.appendChild(fmtRow('镀锌立管', (ri.count != null ? ri.count + ' 根' : '—') + (ri.od_mm ? ' · Φ' + ri.od_mm + '×' + ri.height_m + ' m' : '')));
   var pi = b.pipes || {};
   var ml = pi.mainline || {}, lt = pi.laterals || {};
-  body.appendChild(fmtRow('干管', (ml.dn_mm ? 'Φ' + ml.dn_mm : '—') + (ml.len_m != null ? ' × ' + ml.len_m + ' m' : '')));
-  body.appendChild(fmtRow('支管', (lt.dn_mm ? 'Φ' + lt.dn_mm : '—') + (lt.len_m != null ? ' × ' + lt.len_m + ' m' : '')));
+  body.appendChild(fmtRow('布置图估算干管', (ml.dn_mm ? 'Φ' + ml.dn_mm : '—') + (ml.len_m != null ? ' × ' + ml.len_m + ' m' : '')));
+  body.appendChild(fmtRow('布置图估算支管', (lt.dn_mm ? 'Φ' + lt.dn_mm : '—') + (lt.len_m != null ? ' × ' + lt.len_m + ' m' : '')));
+  if (pi.specified) body.appendChild(fmtRow('任务书固定管径', '主管 DN' + pi.specified.main_dn_mm + ' / 干管 DN' + pi.specified.distribution_dn_mm + ' / 小区支管 DN' + pi.specified.branch_dn_mm));
   var sh = b.shifts || {};
-  body.appendChild(fmtRow('轮灌组', (sh.groupCount != null ? sh.groupCount + ' 组' : '—') + (sh.headsPerShift ? '（每组 ' + sh.headsPerShift + ' 个）' : '') + ' · 阀门 ' + ((b.valves && b.valves.count) || 0) + ' 个'));
+  body.appendChild(fmtRow('轮灌运行批次', (sh.groupCount != null ? sh.groupCount + ' 组' : '—') + (sh.headsPerShift ? '（每组 ' + sh.headsPerShift + ' 个）' : '')));
+  if (b.valves && b.valves.count != null) body.appendChild(fmtRow('地理小区总阀', b.valves.count + ' 个（按分区面积估算）'));
+  if (b.project && b.project.zones) body.appendChild(fmtRow('50–60 亩小区', b.project.zones.recommended + ' 个，平均 ' + b.project.zones.average_mu + ' 亩'));
   if (b.tank) body.appendChild(fmtRow('蓄水池', (b.tank.volume_m3 != null ? b.tank.volume_m3 + ' m³' : '—')));
   if (b.boost && b.boost.stage1 && b.boost.stage2) body.appendChild(fmtRow('二次加压', '一段 ' + b.boost.stage1.power_kw + ' kW + 二段 ' + b.boost.stage2.power_kw + ' kW'));
   if (b.trench) body.appendChild(fmtRow('沟槽土方', (b.trench.volume_m3 != null ? b.trench.volume_m3 + ' m³' : '—') + '（深 ' + b.trench.depth_m + ' m）'));
@@ -227,7 +230,7 @@ function renderPanel() {
 
   var foot = el('div', 'sp-foot');
   foot.style.cssText = 'font-size:11px;opacity:.6;margin-top:6px;';
-  foot.textContent = '快照时间 ' + (data.ts ? new Date(data.ts).toLocaleString('zh-CN') : '—') + ' · 只读展示，详细布置见 terrain 页';
+  foot.textContent = '快照时间 ' + (data.ts ? new Date(data.ts).toLocaleString('zh-CN') : '—') + ' · 管径/长度与泵参数尚需全网水力及现场路线校核，详细布置见 terrain 页';
   body.appendChild(foot);
 }
 
