@@ -30,6 +30,20 @@ function money(n) {
   return (Math.round(n * 100) / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function hasBomFeature() {
+  var ent = (typeof window !== 'undefined') ? window.RyEntitle : null;
+  if (!ent || typeof ent.can !== 'function') return false;
+  if (typeof ent.ready === 'function' && !ent.ready()) return false;
+  return ent.can('bom-export');
+}
+function requireBomFeature() {
+  if (hasBomFeature()) return true;
+  var ui = window.RyMemberUI;
+  if (ui && typeof ui.showUpgrade === 'function') ui.showUpgrade('BOM 清单');
+  else toast('BOM 清单为高级会员功能 · 邀请好友即可开通');
+  return false;
+}
+
 /* ---------------- 面板 ---------------- */
 function buildPanel() {
   var p = el('div', 'bom-panel');
@@ -72,6 +86,7 @@ function buildPanel() {
 }
 
 function openPanel() {
+  if (!requireBomFeature()) return false;
   if (!panel) return false;
   panel.style.display = '';
   refreshArchives();
@@ -88,6 +103,7 @@ function togglePanel() {
 
 /* ---------------- 生成 / 渲染 ---------------- */
 function generate() {
+  if (!requireBomFeature()) return;
   if (!ctx || !ctx.data.readBom) { toast('BOM 权限未开通'); return; }
   var bom = ctx.data.readBom();
   if (!bom) { toast('还没生成三级管网，出不了清单'); current = null; render(); return; }
@@ -131,6 +147,7 @@ function render() {
 
 /* ---------------- CSV 导出 ---------------- */
 function exportCsv() {
+  if (!requireBomFeature()) return;
   if (!current || !current.items.length) { toast('先生成清单'); return; }
   var rows = [['名称', '规格', '数量', '单位', '单价(元)', '金额(元)']];
   current.items.forEach(function (it) {
@@ -175,6 +192,7 @@ function refreshArchives() {
 }
 
 function saveIntoArchive() {
+  if (!requireBomFeature()) return;
   if (!current) { toast('先生成清单'); return; }
   if (!ctx || !ctx.data.saveArchive) { toast('存档权限未开通'); return; }
   var id = panel._f.sel.value;

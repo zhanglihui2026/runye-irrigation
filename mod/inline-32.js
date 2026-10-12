@@ -33,12 +33,12 @@
       { label: '坐标系 .prj 校验', type: 'page', page: 'terrain', action: 'ryFileClickPRJ', title: '地形模块「上传 .prj 校验坐标系」文件选择器' }
     ]},
     { title: '导出', items: [
-      { label: 'CAD 图纸 (DXF)', type: 'fn', action: 'ryFileExportDxf', title: '导出当前管线图为 2004 DXF（CAD 直接打开）' },
-      { label: '轴测图 SVG', type: 'fn', action: 'ryFileExportIsoSvg', title: '下载三级管线轴测图 SVG' },
-      { label: '系统图 SVG / PNG / 打印', type: 'fn', action: 'ryFileExportHead', title: '滴灌供水首部系统图：导出 SVG / PNG / 打印' },
+      { label: 'CAD 图纸 (DXF)', type: 'fn', action: 'ryFileExportDxf', feat: 'drawing-export', title: '高级会员功能：导出当前管线图为 2004 DXF（CAD 直接打开）' },
+      { label: '轴测图 SVG', type: 'fn', action: 'ryFileExportIsoSvg', feat: 'drawing-export', title: '高级会员功能：下载三级管线轴测图 SVG' },
+      { label: '系统图 SVG / PNG / 打印', type: 'fn', action: 'ryFileExportHead', feat: 'drawing-export', title: '高级会员功能：滴灌供水首部系统图导出 / 打印' },
       { label: '地块 GeoJSON', type: 'page', page: 'online-map', action: 'ryFileExportGeoJSON', title: '在线地图页导出全部地块为 GeoJSON' },
       { label: '地块 KML', type: 'page', page: 'online-map', action: 'ryFileExportKML', title: '在线地图页导出全部地块为 KML' },
-      { label: 'BOM 清单 CSV', type: 'fn', action: 'ryFileExportBom', title: '打开材料清单面板并定位 CSV 导出按钮' },
+      { label: 'BOM 清单 CSV', type: 'fn', action: 'ryFileExportBom', feat: 'bom-export', title: '高级会员功能：打开材料清单并导出 CSV' },
       { label: '等高线高程 CSV', type: 'fn', action: 'ryFileExportContourCSV', title: '打开等高线解析面板；解析 DXF 后导出高程点 CSV' }
     ]},
     { title: '工程', items: [
@@ -61,6 +61,20 @@
         setTimeout(function () { if (d.parentNode) d.parentNode.removeChild(d); }, 300);
       }, 2400);
     } catch (e) { }
+  }
+  function canUseFeature(feature) {
+    if (!feature) return true;
+    var ent = W.RyEntitle;
+    if (!ent || typeof ent.can !== 'function') return false;
+    if (typeof ent.ready === 'function' && !ent.ready()) return false;
+    return ent.can(feature);
+  }
+  function requireFeature(feature, label) {
+    if (canUseFeature(feature)) return true;
+    var ui = W.RyMemberUI;
+    if (ui && typeof ui.showUpgrade === 'function') ui.showUpgrade(label);
+    else toast('「' + label + '」为高级会员功能 · 邀请好友即可开通');
+    return false;
   }
   function clickInFrame(win, id) {
     if (!win) return false;
@@ -197,11 +211,18 @@
         var a = D.createElement('button');
         a.type = 'button';
         a.className = 'fn-file-item';
-        a.textContent = it.label;
-        if (it.title) a.title = it.title;
+        var locked = !!it.feat && !canUseFeature(it.feat);
+        a.textContent = locked ? (it.label + ' ·锁') : it.label;
+        if (locked) {
+          a.classList.add('fn-locked');
+          a.setAttribute('data-ry-locked', '1');
+          a.setAttribute('aria-disabled', 'true');
+          a.title = '「' + it.label + '」为高级会员功能 · 点击查看开通方式';
+        } else if (it.title) a.title = it.title;
         a.setAttribute('data-ry-filemenu', '1');
         a.addEventListener('click', function (e) {
           e.stopPropagation();
+          if (!requireFeature(it.feat, it.label)) return;
           close();
           var act = ACTIONS[it.action];
           if (!act) { toast('该动作未实现'); return; }

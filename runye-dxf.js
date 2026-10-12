@@ -121,6 +121,20 @@
   /* 导出密码（2026-10-02 用户要求）：DXF 导出前须在对话框输入。前端口令门，防误用而非加密。 */
   var EXPORT_PWD = '230230';
 
+  function canExportDrawing() {
+    var ent = global.RyEntitle;
+    if (!ent || typeof ent.can !== 'function') return false;
+    if (typeof ent.ready === 'function' && !ent.ready()) return false;
+    return ent.can('drawing-export');
+  }
+  function requireDrawingExport() {
+    if (canExportDrawing()) return true;
+    var ui = global.RyMemberUI;
+    if (ui && typeof ui.showUpgrade === 'function') ui.showUpgrade('CAD 图纸');
+    else alert('CAD 图纸导出为高级会员功能，请先开通高级会员。');
+    return false;
+  }
+
   function tablesSection(){
     var o=['0','SECTION','2','TABLES'];
     function table(name,count){o.push('0','TABLE','2',name,'5',handle(),'100','AcDbSymbolTable','70',String(count));}
@@ -133,6 +147,7 @@
   }
 
   function buildDxf(source, opts){
+    if (!requireDrawingExport()) return null;
     var svg = sourceSvg(source);
     if(!svg){ alert('未找到'+(source==='iso'?'轴测图':'平面布置图')+'。请先在三级页点「生成管线图」。'); return null; }
     var inv, scale;
@@ -195,6 +210,7 @@
   }
 
   function showDialog(){
+    if (!requireDrawingExport()) return;
     var old=document.getElementById('ryDxfDlg'); if(old) old.remove();
     var hasPlan=!!(window.tlDiagramSVG && window.tlDiagramSVG.indexOf('<svg')>=0);
     var hasIso=!!document.querySelector('#tlIsoDiagramContent svg');
