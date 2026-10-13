@@ -2397,13 +2397,30 @@ ppPullLiftDh();                                              // 首屏对齐一�
            **严格多数**方向强制给全体分区；平票不强改（维持各分区原朝向）。
            自然朝向判定与下方生成循环同一套（cuts.xPlan/yPlan，已含拖线/合并结果），
            投票与生成永远看同一份 cuts ⇒ 不存在两套规则。 */
+      /* [v416 2026-10-13 用户口径] 布管方向单一事实来源 —— 与三级页共用 RyZoneGeometry.tapeAxisOf。
+         优先级（硬约束在前，冲突时牺牲后者）：
+           ① 滴灌带 ∥ tapeAxis，主管 ∥ 支管 ⊥ tapeAxis（同一函数一次算出，不可能被违反）；
+           ② 全块方向统一（少数服从多数）；
+           ③ 各分区带长尽量贴合「单边铺设长度×2」S（软目标，冲突时牺牲 → 支管略增）。
+         ★ 旧 v229 用「分区宽高比」投票、三级用「逐区判向」，两套判据在混合朝向地块上会让
+           少数派分区的滴灌带与多数派管道平行（用户实测截图），现统一由 tapeAxisOf 出唯一
+           tapeAxis。RyZoneGeometry 缺失时退回旧投票，行为不变。 */
       if (forceDir !== 'v' && forceDir !== 'h') {
-        var votesV = 0;
-        for (var vr = 0; vr < cuts.rows; vr++)
-          for (var vc = 0; vc < cuts.cols; vc++)
-            votesV += (cuts.xPlan[vc] >= cuts.yPlan[vr]) ? 1 : -1;
-        if (votesV > 0) forceDir = 'v';
-        else if (votesV < 0) forceDir = 'h';
+        var _ryG = (typeof window !== 'undefined') ? window.RyZoneGeometry : null;
+        var _ryAx = (_ryG && typeof _ryG.tapeAxisOf === 'function')
+          ? _ryG.tapeAxisOf(cuts, ((typeof planZoneFixedSide === 'function') ? planZoneFixedSide() : 200))
+          : null;
+        if (_ryAx && _ryAx.ok) {
+          try { window.__ryTapeAxisReport = _ryAx; } catch (eRep) { }   /* 三级页/探针共用同一份代价报告 */
+          forceDir = (_ryAx.tapeAxis === 'x') ? 'v' : 'h';   /* 带 ∥ x ⇒ 主管·支管竖直（⊥ 带） */
+        } else {
+          var votesV = 0;
+          for (var vr = 0; vr < cuts.rows; vr++)
+            for (var vc = 0; vc < cuts.cols; vc++)
+              votesV += (cuts.xPlan[vc] >= cuts.yPlan[vr]) ? 1 : -1;
+          if (votesV > 0) forceDir = 'v';
+          else if (votesV < 0) forceDir = 'h';
+        }
       }
 
       for (var zr = 0; zr < cuts.rows; zr++) {

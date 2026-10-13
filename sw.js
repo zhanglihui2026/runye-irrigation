@@ -86,8 +86,13 @@
    v414-flow-geometry（将轮灌演示的 SVG 折线路径解析、最近点与距离计算提取为纯模块并纳入离线 CORE 缓存）→
    v415-pipe3d（新增三级管网 3D 预览：runye-pipe3d.js 读 window.tlDiagramData 用 Three.js 渲染总管/主管/
    支管/弯头/阀门/水源/滴灌带三维示意，自写轨道控制；three.min.js r147 本地自托管懒加载。
-   两文件进 CORE 白名单，必须抬版本）。 */
-const VERSION = 'v415-pipe3d';
+   两文件进 CORE 白名单，必须抬版本）→
+   v416-tape-axis（布管方向单一事实来源：RyZoneGeometry 新增 axisFit/tapeAxisOf 纯函数——一次算出
+   tapeAxis/pipeAxis/segs/代价报告，滴灌带 ∥ tapeAxis、主管∥支管 ⊥ tapeAxis 由构造保证；投票判据由
+   「分区宽高比」改为「贴合单边铺设长度 S 的程度」，平票由更省支管一侧破平；带长超 S 自动分段。
+   二级 ppBuildAutoPipes（原 v229 投票）与三级 tlAutoGenerate（原 v150b 逐区判向）改消费同一函数。
+   mod/zone-geometry.js / inline-09.js / inline-11.js 均在 CORE 白名单，必须抬版本）。 */
+const VERSION = 'v416-tape-axis';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

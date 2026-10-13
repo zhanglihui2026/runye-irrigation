@@ -4420,7 +4420,18 @@ function tlAutoGenerate(options) {
      原每分区独立判向（xPlan[zc]>=yPlan[zr]）→ 窄长分区会单独翻转向，同一张图上主管/支管方向不一。
      改为全图按分区数投票取多数方向（majFixedH），三级自布管的主管/支管/滴灌带/总管全部统一按多数方向布管；
      二级传导（ppHasPipes）几何不动，滴灌带方向也维持按分区几何（与二级支管一致）。 */
+  /* [v416 2026-10-13 用户口径] 方向单一事实来源：滴灌带 ∥ tapeAxis、主管∥支管 ⊥ tapeAxis。
+     —— 旧实现「管道按多数派、滴灌带按单分区宽高比」两套判据会在混合朝向地块上互相平行，
+        现统一由 RyZoneGeometry.tapeAxisOf 一次算出（判据改为「贴合单边铺设长度」，
+        平票由更省支管的一侧破平）。RyZoneGeometry 缺失时退回旧投票，行为不变。 */
+  var tlAxisReport=null;
   var majFixedH=(function(){
+    var G=window.RyZoneGeometry;
+    if(G&&typeof G.tapeAxisOf==='function'){
+      var ax=G.tapeAxisOf({cols:cols,rows:rows,xPlan:xPlan,yPlan:yPlan,xSrc:xSrc,ySrc:ySrc,xPos:xPos,yPos:yPos},
+                          (typeof planZoneFixedSide==='function'?planZoneFixedSide():200));
+      if(ax&&ax.ok){ tlAxisReport=ax; try{window.__ryTapeAxisReport=ax;}catch(eRep){} return ax.tapeAxis==='x'; }
+    }
     var h=0, v=0;
     for(var rv=0;rv<rows;rv++){ for(var cv=0;cv<cols;cv++){ if(xPlan[cv]>=yPlan[rv]) h++; else v++; } }
     return h>=v;
@@ -4479,7 +4490,7 @@ function tlAutoGenerate(options) {
     for(var zcT=0;zcT<cols;zcT++){
       var zxT=xPos[zcT], zyT=yPos[zrT];
       var zwT=xSrc[zcT], zhT=ySrc[zrT];
-      var fixedH=ppHasPipes?(xPlan[zcT]>=yPlan[zrT]):majFixedH;   /* v150b：自布管时统一多数方向；二级复用维持原判 */
+      var fixedH=majFixedH;   /* [v416] 全图统一跟随滴灌带轴（v150b 的逐区判向已废：它会让少数派分区的滴灌带与多数派管道平行） */
       var cxT=zxT+zwT/2, cyT=zyT+zhT/2;
       // 滴灌带端点距分区边缘留间隙（约边长的 6%，最小 2m），不触到分区端头
       var endGapX=Math.max(2,zwT*0.06), endGapY=Math.max(2,zhT*0.06);
@@ -4488,13 +4499,27 @@ function tlAutoGenerate(options) {
       var ty0=zyT+Math.max(3,zhT*0.05), ty1=zyT+zhT-Math.max(3,zhT*0.05);
       var tx0=zxT+Math.max(3,zwT*0.05), tx1=zxT+zwT-Math.max(3,zwT*0.05);
       var nTape=Math.max(3,Math.min(8,Math.round((fixedH?zhT:zwT)/12)));
+      /* [v416] 兜底：带长超过单边铺设长度×2 → 沿带向切成 nSeg 段（段间留 1.5m 接缝缺口） */
+      var nSeg=1;
+      if(tlAxisReport&&tlAxisReport.segs&&tlAxisReport.segs.length===cols*rows) nSeg=Math.max(1,tlAxisReport.segs[zrT*cols+zcT]||1);
       for(var tT=0;tT<nTape;tT++){
+        var pA,pB;
         if(fixedH){
           var ty=ty0+(ty1-ty0)*(tT+0.5)/nTape;
-          dripTapes.push([{x:cxT-halfX,y:ty},{x:cxT+halfX,y:ty}]);
+          pA={x:cxT-halfX,y:ty}; pB={x:cxT+halfX,y:ty};
         }else{
           var tx=tx0+(tx1-tx0)*(tT+0.5)/nTape;
-          dripTapes.push([{x:tx,y:cyT-halfY},{x:tx,y:cyT+halfY}]);
+          pA={x:tx,y:cyT-halfY}; pB={x:tx,y:cyT+halfY};
+        }
+        if(nSeg<=1){ dripTapes.push([pA,pB]); continue; }
+        for(var sgT=0;sgT<nSeg;sgT++){
+          var a0=sgT/nSeg, a1=(sgT+1)/nSeg;
+          var qA={x:pA.x+(pB.x-pA.x)*a0,y:pA.y+(pB.y-pA.y)*a0};
+          var qB={x:pA.x+(pB.x-pA.x)*a1,y:pA.y+(pB.y-pA.y)*a1};
+          var ln=Math.hypot(qB.x-qA.x,qB.y-qA.y);
+          var gp=ln>6?0.75:0;   /* 接缝缺口（单侧缩进），短段不缩 */
+          var ux=ln>0?(qB.x-qA.x)/ln:0, uy=ln>0?(qB.y-qA.y)/ln:0;
+          dripTapes.push([{x:qA.x+ux*gp,y:qA.y+uy*gp},{x:qB.x-ux*gp,y:qB.y-uy*gp}]);
         }
       }
     }
@@ -4502,7 +4527,9 @@ function tlAutoGenerate(options) {
 
   // ===== Front main pipe (总管) — perpendicular to main pipes =====
   // Determine main pipe direction from first zone
-  var firstFixedSideIsHorizontal = ppHasPipes ? (xPlan[0] >= yPlan[0]) : majFixedH;   /* v150b：自布管时随多数方向 */
+  /* [v416] 总管同样随全图统一方向：旧代码在「二级传导」分支按第 0 分区宽高比判向，
+     混合朝向地块上会与多数方向（majFixedH）相反 ⇒ 总管与主管不再垂直。现一律随 majFixedH。 */
+  var firstFixedSideIsHorizontal = majFixedH;
   var frontPipe = null;
   // Source position: at the edge of the plot, at the midpoint of the first row/column of zones
   if (firstFixedSideIsHorizontal) {
@@ -4850,6 +4877,19 @@ function tlAutoGenerate(options) {
   parts.push('<circle cx="'+(lx+245)+'" cy="'+(ly+2)+'" r="5" fill="#ef4444"/><text x="'+(lx+256)+'" y="'+(ly+2)+'" dominant-baseline="central" fill="#991b1b">阀门</text>');
   parts.push('<line x1="'+(lx+300)+'" y1="'+(ly+2)+'" x2="'+(lx+312)+'" y2="'+(ly+2)+'" stroke="#67e8f9" stroke-width="1.4" stroke-dasharray="3,3"/><text x="'+(lx+316)+'" y="'+(ly+2)+'" dominant-baseline="central" fill="#155e75">滴灌带</text>');
   parts.push('</g>');
+
+  /* [v416] 方向代价如实告知：全图统一方向后，少数派分区会「带长偏短 / 支管略增」，
+     超限分区已自动分段——不静默取舍，用户可据此回调「单边铺设长度」或分区数。 */
+  try {
+    var _ar = tlAxisReport || window.__ryTapeAxisReport || null;
+    if (_ar && _ar.report && (_ar.report.shortZones > 0 || _ar.report.overZones > 0)) {
+      var _rp = _ar.report, _tot = Math.max(1, cols * rows);
+      var _tx = '布管方向：滴灌带' + (_ar.tapeAxis === 'x' ? '横向' : '纵向') + '敷设 · 主管支管垂直（全图统一）';
+      if (_rp.shortZones > 0) _tx += '；' + _rp.shortZones + '/' + _tot + ' 个分区带长短于最优（均 ' + _rp.avgTape.toFixed(0) + 'm / 最优 ' + _rp.avgOpt.toFixed(0) + 'm，支管略增）';
+      if (_rp.overZones > 0) _tx += '；' + _rp.overZones + ' 个分区带长超单边铺设长度，已自动分段';
+      parts.push('<text x="40" y="' + (iy + 38) + '" font-size="9.5" font-weight="600" fill="#92400e">' + _tx + '</text>');
+    }
+  } catch (eAxisHint) { }
 
   /* 最不利路径标注（第四十七轮）：必须放在 window.tlDiagramData 落地**之后**（本函数 8632 行）才画 ——
      标注几何由 tlWorstPathLen 读 tlDiagramData 得出；早于快照落地会标到上一幅图的旧几何。 */
