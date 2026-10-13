@@ -62,8 +62,13 @@
    「文件」按钮挂到「地块绘制」之前（mod/inline-32.js relocate + MutationObserver）并去掉 📂 图标。
    runye-nav.js / index.html / runye-nav.css / mod/inline-32.js / 两插件 main.js 均在 CORE
    白名单，必须抬版本）→
-   v406-terrain-angle-cachebust（地形「地块角度」线上反馈无效排查：代码端独立页/嵌入iframe/真实键击/落定基准全链路实测全部生效，判定为用户端陈旧缓存（terrain 两脚本无版本参数）；terrain/index.html 两 script 加 ?v=406-angle 破缓存，必须抬版本）。 */
-const VERSION = 'v406-terrain-angle-cachebust';
+   v406-terrain-angle-cachebust（地形「地块角度」线上反馈无效排查：代码端独立页/嵌入iframe/真实键击/落定基准全链路实测全部生效，判定为用户端陈旧缓存（terrain 两脚本无版本参数）；terrain/index.html 两 script 加 ?v=406-angle 破缓存，必须抬版本）→
+   v407-terrain-angle-persist（用户再报「地块角度一直为0不能调整」+截图横幅「0°无需落定」：
+   实锤与地块分区的真实差异——pp 的 plotRotationDeg 随状态持久化（inline-11 3944/3998/4008），
+   terrain 刷新即丢（原注释误称与 pp 一致）→ terrain-core load/saveState 白名单加入 _plotRot；
+   terrain-ui 输入框状态回填（pp 4008 同口径）+ change 兜底回显 + 反馈横幅 + 绘制异常可见化。
+   terrain 三文件 + sw 均在 CORE 白名单，必须抬版本）。 */
+const VERSION = 'v407-terrain-angle-persist';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

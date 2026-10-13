@@ -301,7 +301,7 @@
 
   /* ===== [v393 2026-10-12 用户指令] 地块角度：复刻「地块分区」的地块旋转 =====
    * 语义与主页 mod/inline-11.js 的 ppGetRotatedPlotPoints / ppRepartition 完全同口径：
-   *   · 输入框（tPlotAngle → state._plotRot，运行时态不持久化，刷新归零，与 pp 一致）
+   *   · 输入框（tPlotAngle → state._plotRot，[v407] 随状态持久化、刷新保留—— pp 实际就是持久化的（inline-11 3944/3998/4008），原注释「刷新归零与 pp 一致」有误，已纠正）
    *     只影响**显示**、不重写数据；
    *   · 旋转轴 = 全部地块的**联合包围盒中心**（单地块即该地块包围盒中心）；
    *     多地块整组一起转 —— 与地块分区 v193「旋转作用于整组」一致；
@@ -379,6 +379,9 @@
 
   function drawCanvas() {
     var svg = $('tCanvas'), emptyBox = $('canvasEmpty'), meta = $('canvasMeta');
+    /* [v407] 角度输入框 ← 状态回填（对齐地块分区 pp 4008 行口径；输入中不抢焦点） */
+    var tAi = $('tPlotAngle');
+    if (tAi && document.activeElement !== tAi && parseFloat(tAi.value) !== tRotDeg()) tAi.value = tRotDeg();
     /* [v393] 显示层 = 旋转后的地块集合（deg=0 时即原数据）；
        视野 bbox 也按旋转后算，保证任意角度都在全览视野内 */
     var vp = tViewPolys();
@@ -750,14 +753,33 @@
     $('btnSendHome').addEventListener('click', sendHome);
     $('btnAddManual').addEventListener('click', addManual);
     $('elevDots').addEventListener('change', drawCanvas);
-    /* [v393] 地块角度：输入即重绘（只影响显示、不重写数据）；「落定基准」改写数据为新基准 */
+    /* [v393] 地块角度：输入即重绘（只影响显示、不重写数据）；「落定基准」改写数据为新基准。
+       [v407] 稳健化：input 即时重绘 + change 兜底回显 + 绘制异常可见化（不再静默失败） */
     var tAngle = $('tPlotAngle');
-    if (tAngle) tAngle.addEventListener('input', function () {
-      var v = parseFloat(this.value);
-      if (!isFinite(v)) v = 0;
-      state._plotRot = Math.max(-180, Math.min(180, v));
-      drawCanvas();
-    });
+    function tApplyAngle(echo) {
+      var v = parseFloat(tAngle.value);
+      if (!isFinite(v)) {
+        if (tAngle.validity && tAngle.validity.badInput) { banner('warn', '地块角度请输入 -180 ~ 180 的数字。'); return; }
+        v = 0;
+      }
+      v = Math.max(-180, Math.min(180, v));
+      state._plotRot = v;
+      D.saveState(state);  /* [v407] 角度即时落盘（对齐 pp：设完角度刷新/重进不丢） */
+      if (echo) tAngle.value = v;
+      try { drawCanvas(); } catch (err) {
+        banner('danger', '✕ 旋转绘制失败：' + esc(err && err.message || String(err)) + ' —— 请截图反馈。');
+      }
+    }
+    if (tAngle) {
+      tAngle.addEventListener('input', function () { tApplyAngle(false); });
+      tAngle.addEventListener('change', function () {
+        var before = tRotDeg();
+        tApplyAngle(true);
+        var after = tRotDeg();
+        if (after) banner('ok', '✓ 已按 <b>' + after + '°</b> 旋转显示（仅显示、不改数据）；确认无误后点「落定基准」写入新基准。');
+        else if (before) banner('ok', '已恢复 0°（原始朝向）。');
+      });
+    }
     $('tPlotBake').addEventListener('click', bakeRotation);
     initCanvasNav();
     $('btnClear').addEventListener('click', function () {
