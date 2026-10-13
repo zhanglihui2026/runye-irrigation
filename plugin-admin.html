@@ -68,6 +68,7 @@
       <p class="foot">加天数：从「当前时间与到期时间的较晚者」顺延；设到期日：直接写绝对到期日（当天 23:59:59）；等级：只改等级与后续奖励基数（改到期日/加天数才动到期时间）。所有变更写入用户 history（src=admin，可追溯）。</p>
       <div id="gResult" class="foot"></div>
       <div class="detail"><b>最近操作记录（最多 10 条）</b><div id="mHist" style="margin-top:6px"></div></div>
+      <div class="detail"><div class="bar" style="justify-content:space-between"><b>邀请绑定关系</b><button class="btn" id="mBindBtn">查看该用户的绑定关系</button></div><div id="mBind" class="foot">（点右上按钮加载：邀请码 / 邀请进度 / 名下被邀请人）</div></div>
     </section>
   </section>
 
@@ -155,8 +156,31 @@
       tb.appendChild(tr);
     });
     t.appendChild(tb);h.appendChild(t);
+    $('mBind').innerHTML='（点上方按钮加载：邀请码 / 邀请进度 / 名下被邀请人）';
     $('mDetailCard').scrollIntoView({behavior:'smooth',block:'nearest'});
   }
+  $('mBindBtn').onclick=function(){
+    if(!curMember){return}
+    var host=$('mBind');host.textContent='加载中…';
+    api('adminMemberBind',{uid:curMember.uid}).then(function(r){
+      if(!r||r.code!==0)throw new Error((r&&r.message)||'读取失败');
+      var d=r.data;
+      host.innerHTML='<div class="grid2"><div class="kv"><b>该用户邀请码</b><span style="font-family:monospace">'+esc(d.code||'—')+'</span></div>'+
+        '<div class="kv"><b>邀请进度</b>'+d.progress.capped+' / 3（剩余名额 '+d.progress.remain+'）</div>'+
+        '<div class="kv"><b>发奖状态</b>'+(d.progress.reached?'已达标（可领/已领）':'未达标')+'</div></div>';
+      if(!d.links.length){host.insertAdjacentHTML('beforeend','<div class="foot">该用户名下还没有绑定任何被邀请人。</div>');return}
+      var t=document.createElement('table');t.className='mt';
+      t.innerHTML='<thead><tr><th>被邀请人 UID</th><th>昵称/手机</th><th>状态</th><th>绑定时间</th><th>来源</th></tr></thead>';
+      var tb=document.createElement('tbody');
+      d.links.forEach(function(x){
+        var tr=document.createElement('tr');
+        tr.innerHTML='<td style="font-family:monospace">'+esc(x.invited_uid)+'</td><td>'+esc(x.nick||'—')+'</td><td><span class="pill'+(x.status==='valid'?'':' off')+'">'+esc(x.status)+'</span></td><td>'+fmtDay(x.activated_at)+'</td><td>'+(x.via_group?'群裂变':'邀请码')+'</td>';
+        tb.appendChild(tr);
+      });
+      t.appendChild(tb);host.appendChild(t);
+    }).catch(function(e){host.innerHTML='<span class="err">'+esc(e.message||e)+'</span>'+(String(e.message||'').indexOf('未知 action')>=0?'<div class="foot">⚠ 云函数版本过旧（缺 adminMemberBind），请上传最新部署包。</div>':'')});
+  };
+
   function search(q){var btn=$('mSearch');btn.disabled=true;$('mList').textContent='查询中…';return api('adminMembers',q!=null?{q:q}:{}).then(function(r){
       if(!r||r.code!==0)throw new Error((r&&r.message)||'查询失败');
       renderMembers(r.data.members);

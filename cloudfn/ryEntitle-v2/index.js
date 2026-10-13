@@ -515,6 +515,21 @@ async function actAdminMemberGrant(uid, body) {
     member_days: patch.member_days, grantedDays: grantedDays, planChanged: planChanged } });
 }
 
+/* [v409] 管理员查看某用户的邀请绑定关系（邀请码 + 进度 + 名下 links） */
+async function actAdminMemberBind(uid, body) {
+  if (!isAdminUid(uid)) return fail(403, '无会员管理权限');
+  const target = String((body && body.uid) || '').trim();
+  if (!/^[0-9]{5,}$/.test(target)) return fail(-1, 'UID 无效（数字串）');
+  const inv = await getInvite(target);
+  const links = await getLinksByInviter(target);
+  return ok({
+    uid: target,
+    code: (inv && inv.code) || '',
+    progress: computeProgress(links),
+    links: links.slice(0, 50)
+  });
+}
+
 /* ---------- 入口 ---------- */
 exports.main = async function (event) {
   try {
@@ -541,6 +556,7 @@ exports.main = async function (event) {
       case 'configSet': return await actConfigSet(uid, body);
       case 'adminMembers': return await actAdminMembers(uid, body);
       case 'adminMemberGrant': return await actAdminMemberGrant(uid, body);
+      case 'adminMemberBind': return await actAdminMemberBind(uid, body);
       case 'get':
       case 'init':    return await actGet(uid, body);
       case 'bindRef': return await actBindRef(uid, body);

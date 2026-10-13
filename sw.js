@@ -71,8 +71,11 @@
    v408-member-admin-console（用户指令：会员管理与规则参数并入 plugin-admin 统一后台——
    云函数 v2c 新增 configGet/configSet/adminMembers/adminMemberGrant（ry_kv global:member-config，
    管理员复用 RY_PLUGIN_ADMIN_UIDS）；runye-entitle.js 启动拉取云端规则覆盖内置默认（fail-open）；
-   plugin-admin.html 扩展三页签（插件/会员管理/规则参数）。plugin-admin.html 在 CORE 白名单，必须抬版本）。 */
-const VERSION = 'v408-member-admin-console';
+   plugin-admin.html 扩展三页签（插件/会员管理/规则参数）。plugin-admin.html 在 CORE 白名单，必须抬版本）→
+   v409-member-bind-view（用户要测邀请绑定关系：云函数 v2c-3 新增 adminMemberBind（管理员查某用户
+   邀请码/进度/名下 links）；后台会员详情新增「邀请绑定关系」懒加载块。plugin-admin.html 在 CORE
+   白名单，必须抬版本）。 */
+const VERSION = 'v409-member-bind-view';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
