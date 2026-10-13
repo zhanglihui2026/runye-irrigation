@@ -468,6 +468,7 @@ async function actAdminMemberGrant(uid, body) {
   if (!/^[0-9]{5,}$/.test(target)) return fail(-1, 'UID 无效（数字串）');
   const hasDays = body.addDays != null && body.addDays !== '';
   const hasExp = body.setExpire != null && body.setExpire !== '';
+  const setExpire = hasExp ? String(body.setExpire) : null;  /* [v2c-fix] 原漏定义，走「设到期日」路径会 ReferenceError */
   const plan = body.plan ? String(body.plan) : null;
   if (!hasDays && !hasExp && !plan) return fail(-1, '请至少提供：加天数 / 设定到期日 / 调整等级 之一');
   let addDays = null;
