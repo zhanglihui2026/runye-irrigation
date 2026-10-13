@@ -2,37 +2,241 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>润野插件管理后台</title>
+  <title>润野管理后台</title>
   <link rel="stylesheet" href="runye-theme.css?v=1"><link rel="stylesheet" href="runye-typography.css?v=1">
   <style>
     :root{color-scheme:light}*{box-sizing:border-box}body{margin:0;background:#f5f7f6;color:#173b30;font:14px/1.5 system-ui,"Microsoft YaHei",sans-serif}
     header{height:54px;background:#174b3b;color:white;display:flex;align-items:center;padding:0 22px;font-weight:700}
     main{max-width:1100px;margin:26px auto;padding:0 18px}.head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}.head h1{font-size:22px;margin:0}.muted{color:#718279}.card{background:#fff;border:1px solid #dce6e0;border-radius:10px;padding:18px;margin-bottom:14px;box-shadow:0 2px 8px #173b300c}
     .row{display:grid;grid-template-columns:minmax(200px,1.2fr) minmax(150px,1fr) 130px 100px;gap:12px;align-items:center;padding:13px 0;border-bottom:1px solid #edf1ee}.row:last-child{border:0}.name{font-weight:650}.state{font-size:12px;color:#718279}.pill{border-radius:999px;padding:4px 9px;font-size:12px;background:#e8f5ec;color:#187648;display:inline-block}.pill.off{background:#f3eeee;color:#a33}.toggle{justify-self:end;display:flex;align-items:center;gap:8px;cursor:pointer}.toggle input{width:18px;height:18px;accent-color:#15803d}.btn{border:1px solid #cbd8d0;background:white;color:#234b3c;border-radius:7px;padding:8px 13px;cursor:pointer}.btn.primary{background:#15803d;color:#fff;border-color:#15803d}.btn:disabled{opacity:.5;cursor:wait}.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.status{padding:12px;border-radius:7px;background:#f2f7f4}.status.err{background:#fff2f0;color:#9d2c22}.foot{font-size:12px;color:#687c71;margin-top:10px}@media(max-width:680px){.row{grid-template-columns:1fr auto}.row .state{grid-column:1}.row .toggle{grid-column:2;grid-row:1/3}.row .pill{grid-column:1;justify-self:start}.head{align-items:flex-start;gap:10px;flex-direction:column}}
+    /* [v408] 统一后台：页签 + 会员管理 + 规则参数 */
+    .tabs{display:flex;gap:8px;margin-bottom:16px}.tab{border:1px solid #cbd8d0;background:#fff;color:#234b3c;border-radius:8px;padding:9px 18px;cursor:pointer;font-weight:650}.tab.on{background:#174b3b;border-color:#174b3b;color:#fff}
+    input,select{border:1px solid #cbd8d0;border-radius:7px;padding:8px 10px;font:inherit;background:#fff}
+    table.mt{width:100%;border-collapse:collapse;font-size:13px}table.mt th,table.mt td{padding:9px 8px;border-bottom:1px solid #edf1ee;text-align:left;white-space:nowrap}table.mt th{color:#5b6f65;font-weight:650;background:#f6faf8}
+    .mbtn{border:1px solid #cbd8d0;background:#fff;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px}.mbtn:hover{background:#eef5f1}
+    .detail{margin-top:14px;border-top:2px solid #dce6e0;padding-top:14px}
+    .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:10px 0}
+    .kv{background:#f6faf8;border:1px solid #e3ede7;border-radius:8px;padding:9px 12px}.kv b{display:block;font-size:12px;color:#5b6f65;font-weight:650;margin-bottom:3px}
+    .feats{display:flex;flex-wrap:wrap;gap:8px 16px;margin:8px 0}.feats label{display:flex;align-items:center;gap:5px;font-size:13px}.feats input{width:16px;height:16px;accent-color:#15803d}
+    .planbox{border:1px solid #e3ede7;border-radius:9px;padding:13px;margin:10px 0;background:#fbfdfc}
+    .planbox h3{margin:0 0 8px;font-size:15px}
+    .ok{color:#187648}.err{color:#b42318}
+    [hidden]{display:none!important}
   </style>
   <script defer src="pwa/vendor/cloudbase-js-sdk-3.8.2.bundle.js?v=359"></script>
   <script defer src="cloud-sync.js?v=371b"></script>
 </head>
-<body><header>润野灌溉 · 插件管理</header>
+<body><header>润野灌溉 · 管理后台</header>
 <main>
-  <div class="head"><div><h1>外挂插件控制台</h1><div class="muted">统一控制全站插件是否加载，并检查插件资源是否可连接。</div></div><a class="btn" href="index.html">返回主程序</a></div>
-  <section class="card"><div class="bar"><strong>服务状态：</strong><span id="service" class="status">检查中…</span><span id="account" class="muted"></span></div><p class="foot">开关保存到 CloudBase 的 ry_kv，由主程序启动时读取；关闭后对之后打开或刷新页面的用户生效。</p></section>
-  <section class="card"><div class="bar" style="justify-content:space-between"><strong>插件列表</strong><div class="bar"><button class="btn" id="probe">重新检测接通状态</button><button class="btn primary" id="save" disabled>保存全站设置</button></div></div><div id="list" style="margin-top:10px">正在读取插件清单…</div></section>
-  <section class="card"><strong>权限说明</strong><p class="foot">只有云函数环境变量 <code>RY_PLUGIN_ADMIN_UIDS</code> 中列出的账号 UID 可以保存开关。配置或读取服务暂时不可用时，主程序会继续加载插件，并在这里显示服务异常；这样不会因为后台故障而影响原有工具。</p></section>
+  <div class="head"><div><h1>统一管理后台</h1><div class="muted">插件开关 · 会员管理 · 会员规则参数。写操作需要管理员账号（云函数环境变量 RY_PLUGIN_ADMIN_UIDS）。</div></div><a class="btn" href="index.html">返回主程序</a></div>
+
+  <div class="tabs">
+    <button class="tab on" data-tab="plugins">外挂插件</button>
+    <button class="tab" data-tab="members">会员管理</button>
+    <button class="tab" data-tab="config">规则参数</button>
+  </div>
+
+  <!-- ============ 页签1：外挂插件（原控制台原样保留） ============ -->
+  <section id="sec-plugins">
+    <section class="card"><div class="bar"><strong>服务状态：</strong><span id="service" class="status">检查中…</span><span id="account" class="muted"></span></div><p class="foot">开关保存到 CloudBase 的 ry_kv，由主程序启动时读取；关闭后对之后打开或刷新页面的用户生效。</p></section>
+    <section class="card"><div class="bar" style="justify-content:space-between"><strong>插件列表</strong><div class="bar"><button class="btn" id="probe">重新检测接通状态</button><button class="btn primary" id="save" disabled>保存全站设置</button></div></div><div id="list" style="margin-top:10px">正在读取插件清单…</div></section>
+    <section class="card"><strong>权限说明</strong><p class="foot">只有云函数环境变量 <code>RY_PLUGIN_ADMIN_UIDS</code> 中列出的账号 UID 可以保存开关。配置或读取服务暂时不可用时，主程序会继续加载插件，并在这里显示服务异常；这样不会因为后台故障而影响原有工具。</p></section>
+  </section>
+
+  <!-- ============ 页签2：会员管理 [v408] ============ -->
+  <section id="sec-members" hidden>
+    <section class="card">
+      <div class="bar" style="justify-content:space-between"><strong>会员检索</strong><span id="mPerm" class="muted"></span></div>
+      <div class="bar" style="margin-top:10px">
+        <input id="mQ" placeholder="手机号或 UID（数字串，≥4 位）" style="min-width:260px" inputmode="numeric">
+        <button class="btn primary" id="mSearch">查询</button>
+        <button class="btn" id="mAll">列出最近到期（前 50）</button>
+      </div>
+      <p class="foot">检索当前账号（含未注册权益行的用户也可通过 UID 直接开通）。点「管理」展开操作面板。</p>
+      <div id="mList" style="margin-top:6px">尚未查询。</div>
+    </section>
+    <section class="card" id="mDetailCard" hidden>
+      <strong>会员详情与操作</strong>
+      <div class="grid2" id="mInfo"></div>
+      <div class="bar" style="margin-top:12px;align-items:flex-end;flex-wrap:wrap">
+        <div><b style="display:block;font-size:12px;color:#5b6f65">加天数</b><input id="gDays" type="number" min="1" max="3650" placeholder="如 90" style="width:120px"></div>
+        <div><b style="display:block;font-size:12px;color:#5b6f65">设到期日</b><input id="gExp" type="date" style="width:160px"></div>
+        <div><b style="display:block;font-size:12px;color:#5b6f65">等级</b><select id="gPlan"><option value="">保持不变</option><option value="L1">L1 注册会员</option><option value="L2">L2 高级会员</option></select></div>
+        <div><b style="display:block;font-size:12px;color:#5b6f65">备注（选填）</b><input id="gNote" placeholder="如 客服补偿" style="width:170px"></div>
+        <button class="btn primary" id="gRun">执行变更</button>
+      </div>
+      <p class="foot">加天数：从「当前时间与到期时间的较晚者」顺延；设到期日：直接写绝对到期日（当天 23:59:59）；等级：只改等级与后续奖励基数（改到期日/加天数才动到期时间）。所有变更写入用户 history（src=admin，可追溯）。</p>
+      <div id="gResult" class="foot"></div>
+      <div class="detail"><b>最近操作记录（最多 10 条）</b><div id="mHist" style="margin-top:6px"></div></div>
+    </section>
+  </section>
+
+  <!-- ============ 页签3：规则参数 [v408] ============ -->
+  <section id="sec-config" hidden>
+    <section class="card">
+      <div class="bar" style="justify-content:space-between"><strong>会员规则（全站生效）</strong><span id="cMeta" class="muted"></span></div>
+      <div class="planbox" style="margin-top:12px"><h3>注册试用</h3><div class="bar"><label class="bar">注册赠送天数 <input id="cTrial" type="number" min="1" max="3650" style="width:110px"></label></div></div>
+      <div class="planbox"><h3>L1（基础等级）</h3>
+        <div class="bar"><label class="bar">显示名称 <input id="cNameL1" style="width:140px"></label><label class="bar">单次奖励天数 <input id="cDaysL1" type="number" min="1" max="3650" style="width:110px"></label></div>
+        <div class="feats" id="cFeatL1"></div>
+      </div>
+      <div class="planbox"><h3>L2（高级等级）</h3>
+        <div class="bar"><label class="bar">显示名称 <input id="cNameL2" style="width:140px"></label><label class="bar">单次奖励天数 <input id="cDaysL2" type="number" min="1" max="3650" style="width:110px"></label></div>
+        <div class="feats" id="cFeatL2"></div>
+      </div>
+      <div class="bar"><button class="btn primary" id="cSave">保存全站规则</button><span id="cResult" class="foot"></span></div>
+      <p class="foot">保存到 CloudBase 的 ry_kv（global:member-config）；所有用户**下次打开/刷新页面**后按新规则判定。功能勾选说明：「其余高级功能」= 该等级可解锁除列举项之外的全部功能。</p>
+    </section>
+  </section>
 </main>
 <script>
 (function(){
   'use strict';
   var ENDPOINT='https://runye-irrigation-d3e8xef4540bae5-1e50596164.ap-shanghai.app.tcloudbase.com/entitle';
   var state={plugins:[],enabled:{},dirty:false,admin:false};
+  var FEATS={'zone-split':'地块分区','ai-plan':'AI 智能规划','pipe-layout':'管路规划','online-map':'在线地图','drawing-export':'出图','bom-export':'导出清单','hydraulic-check':'水利校验','pro-others':'其余高级功能'};
   var $=function(id){return document.getElementById(id)};
   function setService(msg,error){$('service').textContent=msg;$('service').className='status'+(error?' err':'')}
-  function api(action,extra){var token=window.CloudSync&&CloudSync.authToken();return fetch(ENDPOINT,{method:'POST',headers:Object.assign({'Content-Type':'application/json'},token?{Authorization:'Bearer '+token}:{}),body:JSON.stringify(Object.assign({action:action},extra||{})),cache:'no-store'}).then(function(r){return r.json()})}
+  function api(action,extra){var token=window.CloudSync&&CloudSync.authToken();var h={'Content-Type':'application/json'};if(token)h.Authorization='Bearer '+token;return fetch(ENDPOINT,{method:'POST',headers:h,body:JSON.stringify(Object.assign({action:action},extra||{})),cache:'no-store'}).then(function(r){return r.json()})}
+  function fmtDay(v){if(!v)return '—';var d=new Date(v);if(isNaN(d.getTime()))return '—';return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2)}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+
+  /* ---------- 页签切换 ---------- */
+  Array.prototype.forEach.call(document.querySelectorAll('.tab'),function(t){
+    t.onclick=function(){
+      Array.prototype.forEach.call(document.querySelectorAll('.tab'),function(x){x.classList.toggle('on',x===t)});
+      ['plugins','members','config'].forEach(function(k){$('sec-'+k).hidden=(t.getAttribute('data-tab')!==k)});
+      if(t.getAttribute('data-tab')==='config'&&!configLoaded)loadConfig();
+    };
+  });
+
+  /* ---------- 页签1：插件（原逻辑不变） ---------- */
   function render(){var host=$('list');host.innerHTML='';state.plugins.forEach(function(p){var row=document.createElement('div');row.className='row';var name=document.createElement('div');name.className='name';name.id='nm-'+p.id;name.textContent=p.id;var status=document.createElement('div');status.className='state';status.id='conn-'+p.id;status.textContent='尚未检测';var pill=document.createElement('span');pill.className='pill'+(state.enabled[p.id]===false?' off':'');pill.textContent=state.enabled[p.id]===false?'全站已关闭':'全站已开启';pill.id='pill-'+p.id;var label=document.createElement('label');label.className='toggle';label.textContent='启用';var input=document.createElement('input');input.type='checkbox';input.checked=state.enabled[p.id]!==false;input.disabled=!state.admin;input.setAttribute('aria-label','全站启用 '+p.id);input.onchange=function(){state.enabled[p.id]=input.checked;state.dirty=true;$('save').disabled=!state.admin||!state.dirty;pill.className='pill'+(input.checked?'':' off');pill.textContent=input.checked?'全站已开启':'全站已关闭'};label.appendChild(input);row.append(name,status,pill,label);host.appendChild(row)});$('save').disabled=!state.admin||!state.dirty}
   function probe(){return Promise.all(state.plugins.map(function(p){var el=$('conn-'+p.id);if(!el)return Promise.resolve();el.textContent='检测中…';return fetch(new URL(p.path+'manifest.json',location.href),{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('manifest '+r.status);return r.json()}).then(function(m){var nm=$('nm-'+p.id);if(nm&&m.name)nm.textContent=m.name+' · '+p.id;return fetch(new URL(p.path+(m.entry||'main.js'),location.href),{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('入口 '+r.status);el.textContent='已接通 · v'+m.version;el.style.color='#187648'})}).catch(function(e){el.textContent='未接通 · '+e.message;el.style.color='#b42318'})}))}
-  function boot(){if(!window.CloudSync){setService('CloudBase 登录组件未加载',true);return}CloudSync.init().then(function(ok){if(!ok)throw new Error('CloudBase 初始化失败');return CloudSync.restore()}).then(function(signed){var uid=CloudSync.authSub();$('account').textContent=signed?'当前账号 UID：'+(uid||'已登录'):'未检测到登录态，请先在主程序登录后再打开后台';return fetch('plugins.json?v='+Date.now(),{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('插件清单 HTTP '+r.status);return r.json()})}).then(function(cfg){state.plugins=cfg.plugins||[];return api('pluginsGet')}).then(function(r){if(!r||r.code!==0)throw new Error((r&&r.message)||'无法读取插件控制配置');state.enabled=r.data.enabled||{};state.admin=!!r.data.admin;setService(state.admin?'服务已连接 · 管理员权限已验证':'服务已连接 · 当前账号没有管理权限',!state.admin);if(!state.admin){$('save').title='请让管理员在云函数环境变量 RY_PLUGIN_ADMIN_UIDS 中登记此 UID';}render();return probe()}).catch(function(e){setService('后台连接失败：'+(e.message||e),true);$('list').textContent='无法读取插件状态；主程序不会受此后台故障影响。'})}
   $('save').onclick=function(){if(!state.admin||!state.dirty)return;var btn=$('save');btn.disabled=true;btn.textContent='保存中…';api('pluginsSet',{enabled:state.enabled}).then(function(r){if(!r||r.code!==0)throw new Error((r&&r.message)||'保存失败');state.dirty=false;setService('已保存 · '+r.data.updatedAt,false);render()}).catch(function(e){setService('保存失败：'+(e.message||e),true)}).finally(function(){btn.textContent='保存全站设置';btn.disabled=!state.admin||!state.dirty})};
   $('probe').onclick=probe;
+
+  /* ---------- 页签2：会员管理 ---------- */
+  var curMember=null;
+  function permText(){$('mPerm').textContent=state.admin?'管理员权限已验证 ✓':(state.plugins.length?'当前账号没有管理权限（只读）':'')}
+  function planPill(plan,exp){var active=exp&&new Date(exp).getTime()>Date.now();return '<span class="pill'+(active?'':' off')+'">'+esc(plan||'L1')+(active?' · 有效':' · 已到期')+'</span>'}
+  function renderMembers(ms){var host=$('mList');if(!ms||!ms.length){host.textContent='无匹配记录。';return}
+    var t=document.createElement('table');t.className='mt';
+    t.innerHTML='<thead><tr><th>UID</th><th>手机号</th><th>等级</th><th>到期日</th><th>状态</th><th>操作</th></tr></thead>';
+    var tb=document.createElement('tbody');
+    ms.forEach(function(m){
+      var tr=document.createElement('tr');
+      var active=m.expires_at&&new Date(m.expires_at).getTime()>Date.now();
+      tr.innerHTML='<td style="font-family:monospace">'+esc(m.uid)+'</td><td>'+esc(m.phone||'—')+'</td><td>'+esc(m.plan||'L1')+'</td><td>'+fmtDay(m.expires_at)+'</td><td>'+(active?'<span class="pill">有效</span>':'<span class="pill off">已到期</span>')+'</td>';
+      var td=document.createElement('td');var b=document.createElement('button');b.className='mbtn';b.textContent='管理';
+      b.onclick=function(){openDetail(m)};td.appendChild(b);tr.appendChild(td);tb.appendChild(tr);
+    });
+    t.appendChild(tb);host.innerHTML='';host.appendChild(t);
+  }
+  function openDetail(m){
+    curMember=m;$('mDetailCard').hidden=false;$('gResult').textContent='';$('gResult').className='foot';
+    $('mInfo').innerHTML=
+      '<div class="kv"><b>UID</b><span style="font-family:monospace">'+esc(m.uid)+'</span></div>'+
+      '<div class="kv"><b>手机号</b>'+esc(m.phone||'—')+'</div>'+
+      '<div class="kv"><b>当前等级</b>'+esc(m.plan||'L1')+'</div>'+
+      '<div class="kv"><b>到期时间</b>'+fmtDay(m.expires_at)+'</div>'+
+      '<div class="kv"><b>单次奖励天数</b>'+(m.member_days||0)+'</div>'+
+      '<div class="kv"><b>注册激活</b>'+fmtDay(m.activated_at)+'</div>';
+    var h=$('mHist');h.innerHTML='';
+    var hist=m.history||[];
+    if(!hist.length){h.textContent='（无记录）';return}
+    var t=document.createElement('table');t.className='mt';
+    t.innerHTML='<thead><tr><th>时间</th><th>来源</th><th>天数</th><th>等级</th><th>从</th><th>到</th><th>备注</th></tr></thead>';
+    var tb=document.createElement('tbody');
+    hist.forEach(function(x){
+      var tr=document.createElement('tr');
+      var src={'register':'注册','invite':'邀请奖励','admin':'管理员'}[x.src]||x.src||'—';
+      tr.innerHTML='<td>'+fmtDay(x.at)+'</td><td>'+esc(src)+'</td><td>'+(x.days||0)+'</td><td>'+esc(x.planName||x.plan||'')+'</td><td>'+fmtDay(x.from)+'</td><td>'+fmtDay(x.to)+'</td><td>'+esc(x.note||'')+'</td>';
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb);h.appendChild(t);
+    $('mDetailCard').scrollIntoView({behavior:'smooth',block:'nearest'});
+  }
+  function search(q){var btn=$('mSearch');btn.disabled=true;$('mList').textContent='查询中…';return api('adminMembers',q!=null?{q:q}:{}).then(function(r){
+      if(!r||r.code!==0)throw new Error((r&&r.message)||'查询失败');
+      renderMembers(r.data.members);
+      if(state.admin===false)$('mPerm').textContent='当前账号没有管理权限（服务端只读）';
+    }).catch(function(e){$('mList').innerHTML='<span class="err">'+esc(e.message||e)+'</span>'+(String(e.message||'').indexOf('未知 action')>=0?'<div class="foot">⚠ 云函数尚未部署 v2c 新版 —— 请先在 CloudBase 控制台上传新部署包（见 cloudfn/ryEntitle-v2/）。</div>':'')})
+    .finally(function(){btn.disabled=false;permText()})}
+  $('mSearch').onclick=function(){var q=String($('mQ').value||'').trim();if(q)search(q)};
+  $('mAll').onclick=function(){search(null)};
+  $('mQ').addEventListener('keydown',function(e){if(e.key==='Enter'){var q=String($('mQ').value||'').trim();if(q)search(q)}});
+  $('gRun').onclick=function(){
+    if(!curMember){return}
+    if(!state.admin){$('gResult').textContent='✕ 当前账号没有管理权限。';$('gResult').className='foot err';return}
+    var days=String($('gDays').value||'').trim();
+    var exp=String($('gExp').value||'').trim();
+    var plan=$('gPlan').value;
+    var note=String($('gNote').value||'').trim();
+    if(!days&&!exp&&!plan){$('gResult').textContent='请至少填写：加天数 / 设到期日 / 调整等级 之一。';$('gResult').className='foot err';return}
+    var body={uid:curMember.uid};if(days)body.addDays=Number(days);if(exp)body.setExpire=exp;if(plan)body.plan=plan;if(note)body.note=note;
+    var btn=$('gRun');btn.disabled=true;btn.textContent='执行中…';
+    api('adminMemberGrant',body).then(function(r){
+      if(!r||r.code!==0)throw new Error((r&&r.message)||'执行失败');
+      var m=r.data.member;
+      $('gResult').innerHTML='<span class="ok">✓ 已完成：等级 '+esc(m.plan)+(m.grantedDays?'，顺延 '+m.grantedDays+' 天':'')+'，新到期日 '+fmtDay(m.expires_at)+'。用户下次刷新页面生效。</span>';
+      return search(String(curMember.uid));
+    }).catch(function(e){$('gResult').innerHTML='<span class="err">✕ '+esc(e.message||e)+'</span>'+(String(e.message||'').indexOf('未知 action')>=0?'<div class="foot">⚠ 云函数尚未部署 v2c 新版。</div>':'')})
+    .finally(function(){btn.disabled=false;btn.textContent='执行变更'});
+  };
+
+  /* ---------- 页签3：规则参数 ---------- */
+  var configLoaded=false;
+  function featBoxes(hostId,features){
+    var host=$(hostId);host.innerHTML='';
+    Object.keys(FEATS).forEach(function(k){
+      var l=document.createElement('label');
+      var c=document.createElement('input');c.type='checkbox';c.value=k;c.checked=features.indexOf(k)>=0;
+      l.appendChild(c);l.appendChild(document.createTextNode(FEATS[k]));
+      host.appendChild(l);
+    });
+  }
+  function readFeatBoxes(hostId){
+    var out=[];Array.prototype.forEach.call($(hostId).querySelectorAll('input'),function(c){if(c.checked)out.push(c.value)});
+    return out;
+  }
+  function loadConfig(){
+    api('configGet',{}).then(function(r){
+      if(!r||r.code!==0)throw new Error((r&&r.message)||'读取失败');
+      var cfg=r.data.config||{};
+      $('cTrial').value=cfg.trialDays||30;
+      var p1=(cfg.plans&&cfg.plans.L1)||{},p2=(cfg.plans&&cfg.plans.L2)||{};
+      $('cNameL1').value=p1.name||'注册会员';$('cDaysL1').value=p1.days||30;
+      $('cNameL2').value=p2.name||'高级会员';$('cDaysL2').value=p2.days||365;
+      featBoxes('cFeatL1',p1.features||['zone-split','ai-plan','pipe-layout','online-map']);
+      featBoxes('cFeatL2',p2.features||Object.keys(FEATS));
+      $('cMeta').textContent=r.data.updatedAt?('云端最后修改：'+r.data.updatedAt.replace('T',' ').slice(0,16)+' UTC'):'尚无云端配置（显示内置默认）';
+      configLoaded=true;
+      if(!state.admin){Array.prototype.forEach.call($('sec-config').querySelectorAll('input,button'),function(x){x.disabled=true});$('cResult').textContent='当前账号没有管理权限（只读）。'}
+    }).catch(function(e){
+      /* 读取失败也预填内置默认，避免表单空白（仅管理员可改） */
+      $('cTrial').value=30;
+      $('cNameL1').value='注册会员';$('cDaysL1').value=30;featBoxes('cFeatL1',['zone-split','ai-plan','pipe-layout','online-map']);
+      $('cNameL2').value='高级会员';$('cDaysL2').value=365;featBoxes('cFeatL2',Object.keys(FEATS));
+      $('cResult').innerHTML='<span class="err">'+esc(e.message||e)+'</span>'+(String(e.message||'').indexOf('未知 action')>=0?' ⚠ 云函数尚未部署 v2c 新版（配置不可读写，主程序判定不受影响）。':'');
+    });
+  }
+  $('cSave').onclick=function(){
+    if(!state.admin){$('cResult').textContent='✕ 当前账号没有管理权限。';return}
+    var cfg={trialDays:Number($('cTrial').value)||30,plans:{
+      L1:{name:String($('cNameL1').value||'注册会员'),days:Number($('cDaysL1').value)||30,features:readFeatBoxes('cFeatL1')},
+      L2:{name:String($('cNameL2').value||'高级会员'),days:Number($('cDaysL2').value)||365,features:readFeatBoxes('cFeatL2')}}};
+    if(!cfg.plans.L1.features.length||!cfg.plans.L2.features.length){$('cResult').textContent='✕ 每个等级至少勾选一个功能。';return}
+    var btn=$('cSave');btn.disabled=true;btn.textContent='保存中…';
+    api('configSet',{config:cfg}).then(function(r){
+      if(!r||r.code!==0)throw new Error((r&&r.message)||'保存失败');
+      $('cResult').innerHTML='<span class="ok">✓ 已保存（'+String(r.data.updatedAt||'').replace('T',' ').slice(0,16)+' UTC）。用户下次打开/刷新页面生效。</span>';
+    }).catch(function(e){$('cResult').innerHTML='<span class="err">✕ '+esc(e.message||e)+'</span>'+(String(e.message||'').indexOf('未知 action')>=0?' ⚠ 云函数尚未部署 v2c 新版。':'')})
+    .finally(function(){btn.disabled=false;btn.textContent='保存全站规则'});
+  };
+
+  /* ---------- 启动（插件读取成功后再做会员权限回显） ---------- */
+  function boot(){if(!window.CloudSync){setService('CloudBase 登录组件未加载',true);return}CloudSync.init().then(function(ok){if(!ok)throw new Error('CloudBase 初始化失败');return CloudSync.restore()}).then(function(signed){var uid=CloudSync.authSub();$('account').textContent=signed?'当前账号 UID：'+(uid||'已登录'):'未检测到登录态，请先在主程序登录后再打开后台';return fetch('plugins.json?v='+Date.now(),{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('插件清单 HTTP '+r.status);return r.json()})}).then(function(cfg){state.plugins=cfg.plugins||[];return api('pluginsGet')}).then(function(r){if(!r||r.code!==0)throw new Error((r&&r.message)||'无法读取插件控制配置');state.enabled=r.data.enabled||{};state.admin=!!r.data.admin;setService(state.admin?'服务已连接 · 管理员权限已验证':'服务已连接 · 当前账号没有管理权限',!state.admin);if(!state.admin){$('save').title='请让管理员在云函数环境变量 RY_PLUGIN_ADMIN_UIDS 中登记此 UID';}render();permText();return probe()}).catch(function(e){setService('后台连接失败：'+(e.message||e),true);$('list').textContent='无法读取插件状态；主程序不会受此后台故障影响。'})}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
 </script></body></html>

@@ -66,6 +66,48 @@
   /* [2026-10-13] 启用 L1/L2 功能门控；具体权限由 PLAN_FEATURES 与 can() 判定。 */
   var ALL_FEATURES_OPEN = false;
 
+  /* [v408] 云端规则配置（管理员在 plugin-admin 后台调整，存 ry_kv global:member-config）：
+     trialDays / plans{L1,L2 → name,days,features} 拉取成功即覆盖上面内置默认值；
+     拉取失败静默（fail-open 沿用内置默认），不影响任何判定。 */
+  function applyMemberConfig(cfg) {
+    if (!cfg || typeof cfg !== 'object') return false;
+    var changed = false;
+    var td = Number(cfg.trialDays);
+    if (isFinite(td) && td >= 1 && td <= 3650 && Math.floor(td) !== TRIAL_DAYS) { TRIAL_DAYS = Math.floor(td); changed = true; }
+    var plans = cfg.plans || {};
+    ['L1', 'L2'].forEach(function (k) {
+      var p = plans[k];
+      if (!p || typeof p !== 'object') return;
+      if (typeof p.name === 'string' && p.name.trim() && PLAN_NAMES[k] !== p.name.trim()) { PLAN_NAMES[k] = p.name.trim().slice(0, 20); changed = true; }
+      var dd = Number(p.days);
+      if (isFinite(dd) && dd >= 1 && dd <= 3650 && Math.floor(dd) !== PLAN_DAYS[k]) { PLAN_DAYS[k] = Math.floor(dd); changed = true; }
+      if (Array.isArray(p.features)) {
+        var fs = p.features.filter(function (x) { return !!FEATURES[x]; });
+        if (fs.length && JSON.stringify(fs) !== JSON.stringify(PLAN_FEATURES[k])) { PLAN_FEATURES[k] = fs; changed = true; }
+      }
+    });
+    return changed;
+  }
+  var configSynced = false;
+  function syncMemberConfig() {
+    if (configSynced || typeof fetch !== 'function') return;
+    configSynced = true;
+    var direct = fetch(ENT_URL, {
+      method: 'POST', cache: 'no-store',
+      headers: (function () {
+        var h = { 'Content-Type': 'application/json' };
+        var t = entToken(); if (t) h['Authorization'] = 'Bearer ' + t;
+        return h;
+      })(),
+      body: JSON.stringify({ action: 'configGet' })
+    }).then(function (res) { return res.json(); }).catch(function () { return null; });
+    direct.then(function (j) {
+      if (j && j.code === 0 && j.data && j.data.config) {
+        if (applyMemberConfig(j.data.config)) { try { emit(); } catch (_e) {} }
+      }
+    }).catch(function () {});
+  }
+
   var state = null;
   var lastHb = 0;
   var listeners = [];
@@ -512,6 +554,8 @@
   }
 
   window.RyEntitle = RyEntitle;
+  /* [v408] 页面加载即同步一次云端会员规则（失败静默，沿内置默认） */
+  try { syncMemberConfig(); } catch (_eCfg) {}
 
   /* [v358] 本地联调钩子：?rymock=L1|L2|trial|locked
      只允许在 file:// / localhost / 127.0.0.1 生效 —— 线上域名一律忽略，

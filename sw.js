@@ -67,8 +67,12 @@
    实锤与地块分区的真实差异——pp 的 plotRotationDeg 随状态持久化（inline-11 3944/3998/4008），
    terrain 刷新即丢（原注释误称与 pp 一致）→ terrain-core load/saveState 白名单加入 _plotRot；
    terrain-ui 输入框状态回填（pp 4008 同口径）+ change 兜底回显 + 反馈横幅 + 绘制异常可见化。
-   terrain 三文件 + sw 均在 CORE 白名单，必须抬版本）。 */
-const VERSION = 'v407-terrain-angle-persist';
+   terrain 三文件 + sw 均在 CORE 白名单，必须抬版本）→
+   v408-member-admin-console（用户指令：会员管理与规则参数并入 plugin-admin 统一后台——
+   云函数 v2c 新增 configGet/configSet/adminMembers/adminMemberGrant（ry_kv global:member-config，
+   管理员复用 RY_PLUGIN_ADMIN_UIDS）；runye-entitle.js 启动拉取云端规则覆盖内置默认（fail-open）；
+   plugin-admin.html 扩展三页签（插件/会员管理/规则参数）。plugin-admin.html 在 CORE 白名单，必须抬版本）。 */
+const VERSION = 'v408-member-admin-console';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

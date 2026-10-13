@@ -13,6 +13,13 @@
    本版零 npm 依赖：HTTP 用 Node 内置 https 模块（不依赖 fetch，
    规避云函数 Node 版本差异），部署 zip 里不需要 node_modules。
 
+   [v2c 2026-10-13 统一管理后台] 新增会员管理 + 规则配置 actions：
+     configGet          读取全局会员规则（免登录可读，fail-open 回默认值）
+     configSet          保存全局会员规则（管理员白名单）
+     adminMembers       搜索会员（手机号/UID，管理员白名单）
+     adminMemberGrant   给会员加天数/升级等级/设到期日（管理员白名单，写 history src=admin）
+     规则配置存 ry_kv 主键 global:member-config；管理员复用 RY_PLUGIN_ADMIN_UIDS。
+
    actions（与 v2 完全一致）：
      ping       无需登录，健康检查（验证 API Key + 网关连通）
      get/init   拉取权益与进度（init 顺带建行）
@@ -55,6 +62,56 @@ const PLANS = {
 const PLUGIN_IDS = ['hello-world', 'archive', 'bom', 'case-lib', 'pipe-optim', 'calib', 'hydraulics', 'ai-plan', 'sprinkler'];
 const PLUGIN_CONFIG_ID = 'global:plugin-control';
 const PLUGIN_ADMIN_UIDS = String(process.env.RY_PLUGIN_ADMIN_UIDS || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+/* [v2c] 会员规则配置（ry_kv）与功能清单（与 runye-entitle.js FEATURES 同构） */
+const MEMBER_CONFIG_ID = 'global:member-config';
+const FEATURE_KEYS = ['zone-split', 'ai-plan', 'pipe-layout', 'online-map', 'drawing-export', 'bom-export', 'hydraulic-check', 'pro-others'];
+const FEATURE_NAMES = {
+  'zone-split': '地块分区', 'ai-plan': 'AI 智能规划', 'pipe-layout': '管路规划', 'online-map': '在线地图',
+  'drawing-export': '出图', 'bom-export': '导出清单', 'hydraulic-check': '水利校验', 'pro-others': '其余高级功能'
+};
+function isAdminUid(uid) { return !!(uid && PLUGIN_ADMIN_UIDS.indexOf(uid) >= 0); }
+function defaultMemberConfig() {
+  return {
+    trialDays: TRIAL_DAYS,
+    plans: {
+      L1: { name: PLANS.L1.name, days: PLANS.L1.days,
+        features: ['zone-split', 'ai-plan', 'pipe-layout', 'online-map'] },
+      L2: { name: PLANS.L2.name, days: PLANS.L2.days, features: FEATURE_KEYS.slice() }
+    }
+  };
+}
+function sanitizeMemberConfig(v) {
+  const d = defaultMemberConfig();
+  const out = { trialDays: d.trialDays, plans: {} };
+  const td = Number(v && v.trialDays);
+  if (isFinite(td) && td >= 1 && td <= 3650) out.trialDays = Math.floor(td);
+  ['L1', 'L2'].forEach(function (k) {
+    const p = v && v.plans && v.plans[k];
+    const def = d.plans[k];
+    const o = { name: def.name, days: def.days, features: def.features.slice() };
+    if (p && typeof p === 'object') {
+      if (typeof p.name === 'string' && p.name.trim()) o.name = p.name.trim().slice(0, 20);
+      const dd = Number(p.days);
+      if (isFinite(dd) && dd >= 1 && dd <= 3650) o.days = Math.floor(dd);
+      if (Array.isArray(p.features)) {
+        const fs = p.features.filter(function (x) { return FEATURE_KEYS.indexOf(x) >= 0; });
+        if (fs.length) o.features = fs;
+      }
+    }
+    out.plans[k] = o;
+  });
+  return out;
+}
+async function readMemberConfig() {
+  try {
+    const rows = await rdbSelect('ry_kv', { _id: 'eq.' + MEMBER_CONFIG_ID, select: 'v' });
+    const v = rows[0] && rows[0].v;
+    if (v && typeof v === 'object' && v.plans) {
+      return { config: sanitizeMemberConfig(v), updatedAt: v.updatedAt || null, updatedBy: v.updatedBy || null };
+    }
+  } catch (e) { /* 读失败 fail-open 回默认 */ }
+  return { config: defaultMemberConfig(), updatedAt: null, updatedBy: null };
+}
 
 /* ---------- HTTP（Node 内置 https，零依赖） ---------- */
 function httpReq(method, url, headers, bodyObj) {
@@ -368,6 +425,94 @@ async function actPluginsSet(uid, body) {
   return ok({ enabled: enabled, updatedAt: value.updatedAt });
 }
 
+/* ---------- [v2c] 会员规则配置（ry_kv global:member-config） ---------- */
+async function actConfigGet(token) {
+  const uid = await verifyUid(token);
+  const r = await readMemberConfig();
+  return ok({ config: r.config, updatedAt: r.updatedAt, updatedBy: r.updatedBy, admin: isAdminUid(uid) });
+}
+async function actConfigSet(uid, body) {
+  if (!isAdminUid(uid)) return fail(403, '无会员管理权限');
+  const cfg = sanitizeMemberConfig(body && body.config);
+  const value = { trialDays: cfg.trialDays, plans: cfg.plans,
+    updatedAt: new Date().toISOString(), updatedBy: uid };
+  const old = await rdbSelect('ry_kv', { _id: 'eq.' + MEMBER_CONFIG_ID, select: '_id' });
+  if (old.length) await rdbUpdate('ry_kv', { _id: 'eq.' + MEMBER_CONFIG_ID }, { v: value, updated_at: value.updatedAt });
+  else await rdbInsert('ry_kv', { _id: MEMBER_CONFIG_ID, uid: 'system', k: 'member_config', v: value, updated_at: value.updatedAt });
+  return ok({ config: cfg, updatedAt: value.updatedAt });
+}
+
+/* ---------- [v2c] 会员搜索 / 开通续期（管理员） ---------- */
+async function actAdminMembers(uid, body) {
+  if (!isAdminUid(uid)) return fail(403, '无会员管理权限');
+  const q = String((body && body.q) || '').trim();
+  let rows;
+  if (q) {
+    if (!/^[0-9]{4,20}$/.test(q)) return fail(-1, '搜索词需为手机号或 UID 数字串（≥4 位）');
+    const orExpr = '(phone.like.*' + q + '*,_id.eq.' + q + ')';
+    rows = await rdbSelect('ry_entitle', { or: orExpr, limit: 50 });
+  } else {
+    rows = await rdbSelect('ry_entitle', { order: 'expires_at.desc.nullslast', limit: 50 });
+  }
+  return ok({
+    members: rows.map(function (m) {
+      return { uid: m._id, plan: m.plan, expires_at: m.expires_at || null,
+        member_days: m.member_days || 0, activated_at: m.activated_at || null,
+        phone: maskPhone(m.phone), history: (m.history || []).slice(0, 10) };
+    })
+  });
+}
+async function actAdminMemberGrant(uid, body) {
+  if (!isAdminUid(uid)) return fail(403, '无会员管理权限');
+  const target = String((body && body.uid) || '').trim();
+  if (!/^[0-9]{5,}$/.test(target)) return fail(-1, 'UID 无效（数字串）');
+  const hasDays = body.addDays != null && body.addDays !== '';
+  const hasExp = body.setExpire != null && body.setExpire !== '';
+  const plan = body.plan ? String(body.plan) : null;
+  if (!hasDays && !hasExp && !plan) return fail(-1, '请至少提供：加天数 / 设定到期日 / 调整等级 之一');
+  let addDays = null;
+  if (hasDays) {
+    addDays = Number(body.addDays);
+    if (!isFinite(addDays) || addDays < 1 || addDays > 3650 || addDays !== Math.floor(addDays))
+      return fail(-1, '天数需为 1-3650 的整数');
+  }
+  if (plan && !PLANS[plan]) return fail(-1, '等级无效（L1/L2）');
+  let ent = await getEntitle(target);
+  if (!ent) {
+    await ensureRows(target, null);
+    ent = await getEntitle(target);
+  }
+  if (!ent) return fail(-2, '目标用户不存在且初始化失败');
+  const now = Date.now();
+  const curExp = ent.expires_at ? Date.parse(ent.expires_at) : 0;
+  const from = (curExp > now) ? curExp : now;
+  const newPlan = (plan && PLANS[plan]) ? plan : (ent.plan || 'L1');
+  let to = from;
+  let grantedDays = 0;
+  if (hasExp) {
+    const t = Date.parse(setExpire);
+    if (!isFinite(t)) return fail(-1, '到期日无效（示例 2026-12-31）');
+    to = t + DAY - 1;
+    grantedDays = Math.max(0, Math.round((to - from) / DAY));
+  } else if (hasDays) {
+    grantedDays = Math.floor(addDays);
+    to = from + grantedDays * DAY;
+  }
+  const planChanged = newPlan !== ent.plan;
+  const hist = (ent.history || []).slice();
+  hist.unshift({
+    at: now, days: grantedDays, plan: newPlan, planName: PLANS[newPlan].name,
+    from: from, to: to, src: 'admin',
+    note: String((body && body.note) || '').slice(0, 80)
+  });
+  const patch = { plan: newPlan, expires_at: iso(to),
+    member_days: planChanged ? PLANS[newPlan].days : (ent.member_days || 0),
+    history: hist };
+  await rdbUpdate('ry_entitle', { _id: 'eq.' + target }, patch);
+  return ok({ member: { uid: target, plan: newPlan, expires_at: iso(to),
+    member_days: patch.member_days, grantedDays: grantedDays, planChanged: planChanged } });
+}
+
 /* ---------- 入口 ---------- */
 exports.main = async function (event) {
   try {
@@ -384,12 +529,16 @@ exports.main = async function (event) {
     if (action === 'ping') return await actPing();
 
     if (action === 'pluginsGet') return await actPluginsGet(token);
+    if (action === 'configGet') return await actConfigGet(token);
 
     const uid = await verifyUid(token);
     if (!uid) return fail(401, '登录态无效或已过期，请重新登录');
 
     switch (action) {
       case 'pluginsSet': return await actPluginsSet(uid, body);
+      case 'configSet': return await actConfigSet(uid, body);
+      case 'adminMembers': return await actAdminMembers(uid, body);
+      case 'adminMemberGrant': return await actAdminMemberGrant(uid, body);
       case 'get':
       case 'init':    return await actGet(uid, body);
       case 'bindRef': return await actBindRef(uid, body);
