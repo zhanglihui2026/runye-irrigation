@@ -41,6 +41,19 @@
     });
   }
 
+  /* [v410] 高程色带：蓝(低)→青→绿→黄→橙→红(高)，t∈[0,1] */
+  var ELEV_STOPS = ['2563eb', '06b6d4', '22c55e', 'eab308', 'f97316', 'dc2626'];
+  function elevColor(t) {
+    t = Math.max(0, Math.min(1, t)) * (ELEV_STOPS.length - 1);
+    var i = Math.min(ELEV_STOPS.length - 2, Math.floor(t)), f = t - i;
+    var a = ELEV_STOPS[i], b2 = ELEV_STOPS[i + 1], c3 = '#';
+    for (var c = 0; c < 3; c++) {
+      var v = Math.round(parseInt(a.substr(c * 2, 2), 16) * (1 - f) + parseInt(b2.substr(c * 2, 2), 16) * f);
+      c3 += ('0' + v.toString(16)).slice(-2);
+    }
+    return c3;
+  }
+
   /* ---------------- 模式切换 ---------------- */
 
   function applyMode() {
@@ -277,7 +290,7 @@
       var unavailable = r.meta && r.meta.hydraulic_usable === false;
       return '<div class="t-elev' + (bad ? ' t-elev-dsm' : '') + '">' +
         '<b>' + esc(t.label || r.data_type) + '</b>' +
-        '<span>' + esc(r.meta.file_name) + ' · ' + esc((r.point_list.length ? r.point_list.length + ' 点' : '栅格元信息')) +
+        '<span>' + esc((r.meta && r.meta.file_name) || r.data_type) + ' · ' + esc((r.point_list.length ? r.point_list.length + ' 点' : '栅格元信息')) +
         ' · 置信度 ' + esc(r.confidence) + '</span>' +
         (bad ? '<em class="t-dsm-tag">仅预览 · 禁用于水力</em>' : (unavailable ? '<em class="t-dsm-tag">文件已登记 · 像素未解析</em>' : '')) +
         (r.meta && r.meta.thinned ? '<em>持久化已抽样(' + r.meta.thinned_from + '→' + r.point_list.length + ')</em>' : '') +
@@ -390,11 +403,40 @@
       ? vp.polys.map(function (p) { return Object.assign({}, p, { poly: tRotPoly(p.poly, rotDeg, rotC) }); })
       : vp.polys;
     var polys = drawPolys;
+    /* [v410] 高程数据收集（rtk_xyz 抽稀 ≤3000）+ 可视化开关 + 地块坡度缓存（数据坐标，旋转不改变坡度） */
+    var rtkPts = [];
+    state.elevations.forEach(function (r) {
+      if (r && r.data_type === 'rtk_xyz' && Array.isArray(r.point_list) && r.point_list.length) {
+        var stp = Math.ceil(r.point_list.length / 3000);
+        r.point_list.forEach(function (pt, i) { if (i % stp === 0) rtkPts.push(pt); });
+      }
+    });
+    var showShade = !!($('elevShade') && $('elevShade').checked);
+    var showContour = !!($('elevContours') && $('elevContours').checked);
+    var zminE = 0, zmaxE = 0;
+    if (rtkPts.length) {
+      zminE = Infinity; zmaxE = -Infinity;
+      rtkPts.forEach(function (p) { if (p.z < zminE) zminE = p.z; if (p.z > zmaxE) zmaxE = p.z; });
+    }
+    var slopeInfo = null;
+    if (rtkPts.length >= 3 && polys.length && polys.length <= 60) {
+      var sKey = rtkPts.length + ':' + polys.length + ':' + polys.map(function (p) { return p.poly ? p.poly.length : 0; }).join(',');
+      if (slopeCacheKey !== sKey) {
+        slopeCacheKey = sKey; slopeCache = [];
+        var stepS = Math.max(1, Math.ceil(rtkPts.length / 2500));
+        polys.forEach(function (p) {
+          var inside = rtkPts.filter(function (pt, i) { return i % stepS === 0 && D.pointInPolygon(pt.x, pt.y, p.poly); });
+          var f = inside.length >= 3 ? D.planeSlope(inside) : { ok: false };
+          slopeCache.push(f.ok ? Math.round(f.slopeDeg * 10) / 10 : null);
+        });
+      }
+      slopeInfo = slopeCache;
+    }
     if (!polys.length) {
       svg.setAttribute('hidden', '');
       emptyBox.style.display = '';
       meta.textContent = '暂无地块数据';
-      $('elevDotWrap').hidden = true;
+      $('elevTools').hidden = true;
       canvasView = null; canvasFitKey = '';
       return;
     }
@@ -428,10 +470,37 @@
       /* 标签：名称 + 面积，置于第一顶点旁（质心在凹多边形可能落外） */
       var lp = rp[0];
       var area = D.polygonAreaM2(p.poly);
-      var lbl = esc(p.name || ('地块' + (i + 1))) + ' ' + (areaUnit === 'mu' ? D.sqmToMu(area) + '亩' : Math.round(area) + '㎡');
+      var lbl = esc(p.name || ('地块' + (i + 1))) + ' ' + (areaUnit === 'mu' ? D.sqmToMu(area) + '亩' : Math.round(area) + '㎡')
+        + (slopeInfo && slopeInfo[i] != null ? ' · 坡度 ' + slopeInfo[i].toFixed(1) + '°' : '');
       out.push('<text class="t-poly-label" x="' + (lp.x + vw * 0.008).toFixed(1) + '" y="' + (flip - lp.y - vh * 0.008).toFixed(1) +
                '" font-size="' + fs + '">' + lbl + '</text>');
     });
+    /* [v410] 等高线：数据坐标网格场 → marching squares → 端点随地块角度刚性旋转 */
+    if (showContour && rtkPts.length >= 5) {
+      var B0 = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+      vp.polys.forEach(function (p) {
+        var b0 = bboxOfPoly(p.poly);
+        B0.minX = Math.min(B0.minX, b0.minX); B0.minY = Math.min(B0.minY, b0.minY);
+        B0.maxX = Math.max(B0.maxX, b0.maxX); B0.maxY = Math.max(B0.maxY, b0.maxY);
+      });
+      var padE = Math.max(B0.maxX - B0.minX, B0.maxY - B0.minY) * 0.02;
+      B0.minX -= padE; B0.minY -= padE; B0.maxX += padE; B0.maxY += padE;
+      var ck = rtkPts.length + ':' + [B0.minX, B0.minY, B0.maxX, B0.maxY].map(function (v) { return Math.round(v * 100) / 100; }).join(',');
+      if (elevFieldKey !== ck) {
+        elevFieldKey = ck;
+        elevField = D.buildElevField(rtkPts, B0, 44);
+        elevContourData = elevField ? D.contourSegments(elevField, 8) : null;
+      }
+      if (elevContourData) {
+        elevContourData.forEach(function (cl) {
+          for (var si = 0; si < cl.segs.length; si += 4) {
+            var q1 = rotDeg ? tRotatePoint({ x: cl.segs[si], y: cl.segs[si + 1] }, rotDeg, rotC) : { x: cl.segs[si], y: cl.segs[si + 1] };
+            var q2 = rotDeg ? tRotatePoint({ x: cl.segs[si + 2], y: cl.segs[si + 3] }, rotDeg, rotC) : { x: cl.segs[si + 2], y: cl.segs[si + 3] };
+            out.push('<polyline class="t-elev-contour" points="' + q1.x.toFixed(1) + ',' + (flip - q1.y).toFixed(1) + ' ' + q2.x.toFixed(1) + ',' + (flip - q2.y).toFixed(1) + '"/>');
+          }
+        });
+      }
+    }
     /* RTK 高程点（开关开且点落在视野内才画；超过 3000 点抽稀） */
     var showDots = $('elevDots').checked;
     var dotCount = 0;
@@ -445,7 +514,12 @@
              title 恒显原始数据坐标（数据未被改写） */
           var dp = rotDeg ? tRotatePoint(pt, rotDeg, rotC) : pt;
           if (dp.x < B.minX || dp.x > B.maxX || dp.y < B.minY || dp.y > B.maxY) return;
-          out.push('<circle class="t-elev-dot" cx="' + dp.x.toFixed(1) + '" cy="' + (flip - dp.y).toFixed(1) + '" r="' + (vh * 0.004).toFixed(2) + '"><title>X ' + pt.x + '\nY ' + pt.y + '\nZ ' + pt.z + '</title></circle>');
+          var shadeAttr = '';
+          if (showShade && isFinite(zminE)) {
+            var tv = (zmaxE - zminE) > 0 ? (pt.z - zminE) / (zmaxE - zminE) : 0.5;
+            shadeAttr = ' style="fill:' + elevColor(tv) + '"';
+          }
+          out.push('<circle class="t-elev-dot"' + shadeAttr + ' cx="' + dp.x.toFixed(1) + '" cy="' + (flip - dp.y).toFixed(1) + '" r="' + (vh * 0.004).toFixed(2) + '"><title>X ' + pt.x + '\nY ' + pt.y + '\nZ ' + pt.z + '</title></circle>');
           dotCount++;
         });
       });
@@ -490,7 +564,14 @@
     }
     var spLg = $('spLegend'); if (spLg) spLg.hidden = !spCount; /* 图例随叠加层显隐 */
     if (spDemoTimer) applySpDemo(); /* 动画进行中重绘后恢复当前组高亮 */
-    $('elevDotWrap').hidden = !state.elevations.some(function (r) { return r.data_type === 'rtk_xyz'; });
+    /* [v410] 高程图例（着色/等高线开启且点足够时显示） */
+    var lgE = $('elevLegend');
+    if (lgE) {
+      var wantLg = rtkPts.length >= 5 && (showShade || showContour);
+      lgE.hidden = !wantLg;
+      if (wantLg) lgE.innerHTML = '<span>' + zminE.toFixed(1) + ' m</span><i></i><span>' + zmaxE.toFixed(1) + ' m</span>';
+    }
+    $('elevTools').hidden = !state.elevations.some(function (r) { return r && r.data_type === 'rtk_xyz'; });
     /* 视图管理：几何数据变化（fit 改变）→ 重置全览；仅标签变化（单位切换）→ 保持用户缩放/平移 */
     var fitKey = vx.toFixed(1) + ',' + vy.toFixed(1) + ',' + vw.toFixed(1) + ',' + vh.toFixed(1);
     if (!canvasView || fitKey !== canvasFitKey) {
@@ -516,6 +597,9 @@
        单位切换只改标签文字 → fit 不变 → 保持用户视图。 */
 
   var canvasView = null, canvasFitKey = '';
+  /* [v410] 高程可视化缓存（等高线场按数据窗口缓存；坡度按数据签名缓存） */
+  var elevFieldKey = '', elevField = null, elevContourData = null;
+  var slopeCacheKey = '', slopeCache = null;
 
   function canvasApplyView() {
     var svg = $('tCanvas');
@@ -753,6 +837,9 @@
     $('btnSendHome').addEventListener('click', sendHome);
     $('btnAddManual').addEventListener('click', addManual);
     $('elevDots').addEventListener('change', drawCanvas);
+    /* [v410-fix] 着色/等高线开关同样触发重绘（v410 遗漏监听，勾选后画面不刷新） */
+    $('elevShade').addEventListener('change', drawCanvas);
+    $('elevContours').addEventListener('change', drawCanvas);
     /* [v393] 地块角度：输入即重绘（只影响显示、不重写数据）；「落定基准」改写数据为新基准。
        [v407] 稳健化：input 即时重绘 + change 兜底回显 + 绘制异常可见化（不再静默失败） */
     var tAngle = $('tPlotAngle');

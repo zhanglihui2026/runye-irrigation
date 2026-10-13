@@ -74,8 +74,12 @@
    plugin-admin.html 扩展三页签（插件/会员管理/规则参数）。plugin-admin.html 在 CORE 白名单，必须抬版本）→
    v409-member-bind-view（用户要测邀请绑定关系：云函数 v2c-3 新增 adminMemberBind（管理员查某用户
    邀请码/进度/名下 links）；后台会员详情新增「邀请绑定关系」懒加载块。plugin-admin.html 在 CORE
-   白名单，必须抬版本）。 */
-const VERSION = 'v409-member-bind-view';
+   白名单，必须抬版本）→
+   v410-terrain-elev-viz（地形深化一：RTK 高程可视化——terrain-core 新增 planeSlope/buildElevField/
+   contourSegments 纯函数（IDW 高程场 + marching squares 等高线）；terrain-ui 制图区新增「高程着色」
+   「等高线」开关 + 色带图例 + 地块标签坡度标注，全部显示层语义随地块角度旋转；terrain/index.html
+   elevTools 开关组 + elevLegend，?v=410-elev。terrain 三文件在 CORE 白名单，必须抬版本）。 */
+const VERSION = 'v410-terrain-elev-viz';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

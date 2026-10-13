@@ -352,3 +352,8 @@ body.t-col-resizing .t-stage{pointer-events:none}   /* 拖拽中不让画布吃�
 /* 底栏（旧版遗留：回传/清空已移入左栏「地块清单」卡，本段仅防御性保留） */
 .t-foot { display: flex; gap: 10px; padding: 10px 16px 20px; align-items: center; }
 .t-foot .t-hint { font-size: 11px; color: var(--u-ink-3); }
+
+/* —— [v410] 高程可视化：等高线 / 高程图例 —— */
+.t-elev-contour{fill:none;stroke:#64748b;stroke-width:1px;opacity:.55;vector-effect:non-scaling-stroke}
+.t-elev-legend{position:absolute;right:10px;bottom:44px;background:rgba(255,255,255,.92);border:1px solid #d7e3dc;border-radius:6px;padding:5px 9px;font-size:11px;color:#334155;display:flex;align-items:center;gap:6px;pointer-events:none;z-index:5}
+.t-elev-legend i{display:inline-block;width:80px;height:8px;border-radius:4px;background:linear-gradient(90deg,#2563eb,#06b6d4,#22c55e,#eab308,#f97316,#dc2626)}

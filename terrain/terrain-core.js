@@ -1104,6 +1104,117 @@
     }
   }
 
+  /* ---------------- [v410] 高程可视化纯函数：坡度 / 高程场 / 等高线 ----------------
+     供 terrain-ui 制图区「高程着色 / 等高线」图层使用，全部显示层语义（不重写数据）。 */
+
+  /* 平面拟合坡度（与 surfaceAreaApprox 同口径：中心化最小二乘，抗 CGCS2000 大坐标退化）。 */
+  function planeSlope(rtkPoints) {
+    var pts = (Array.isArray(rtkPoints) ? rtkPoints : []).filter(function (p) {
+      return isNum(p && p.x) && isNum(p.y) && isNum(p.z);
+    });
+    if (pts.length < 3) return { ok: false, error: '高程点不足 3 个' };
+    var mx = 0, my = 0, mz = 0, n = pts.length;
+    pts.forEach(function (p) { mx += p.x; my += p.y; mz += p.z; });
+    mx /= n; my /= n; mz /= n;
+    var Suu = 0, Svv = 0, Suv = 0, Suw = 0, Svw = 0;
+    pts.forEach(function (p) {
+      var u = p.x - mx, v = p.y - my, w = p.z - mz;
+      Suu += u * u; Svv += v * v; Suv += u * v; Suw += u * w; Svw += v * w;
+    });
+    var D0 = Suu * Svv - Suv * Suv;
+    if (D0 < 1e-9 * Math.max(1e-12, Suu * Svv)) return { ok: false, error: '点分布退化' };
+    var a = (Suw * Svv - Svw * Suv) / D0;
+    var b = (Svw * Suu - Suw * Suv) / D0;
+    return { ok: true, slopeDeg: Math.atan(Math.hypot(a, b)) * 180 / Math.PI, n: n };
+  }
+
+  /* RTK 点 → 网格高程场（IDW：k 近邻反距离平方加权；点超 1200 先抽样）。
+     bbox={minX,minY,maxX,maxY}（数据坐标），n=单边格数。返回 {x0,y0,dx,dy,n,z[][],zmin,zmax}。 */
+  function buildElevField(points, bbox, n) {
+    var pts = (Array.isArray(points) ? points : []).filter(function (p) {
+      return isNum(p && p.x) && isNum(p.y) && isNum(p.z);
+    });
+    if (pts.length < 5 || !(n >= 8)) return null;
+    if (pts.length > 1200) {
+      var step = Math.ceil(pts.length / 1200);
+      pts = pts.filter(function (p, i) { return i % step === 0; });
+    }
+    var w = bbox.maxX - bbox.minX, h = bbox.maxY - bbox.minY;
+    if (!(w > 0) || !(h > 0)) return null;
+    var gdx = w / (n - 1), gdy = h / (n - 1);
+    var zmin = Infinity, zmax = -Infinity;
+    pts.forEach(function (p) { if (p.z < zmin) zmin = p.z; if (p.z > zmax) zmax = p.z; });
+    var K = Math.min(8, pts.length);
+    var z = new Array(n);
+    for (var gy = 0; gy < n; gy++) {
+      var row = new Array(n);
+      var y = bbox.minY + gy * gdy;
+      for (var gx = 0; gx < n; gx++) {
+        var x = bbox.minX + gx * gdx;
+        /* k 近邻：插入法维护长度 ≤K 的按 d2 升序表（避免每节点全排序） */
+        var bd = [], bz = [];
+        for (var i = 0; i < pts.length; i++) {
+          var ddx = pts[i].x - x, ddy = pts[i].y - y;
+          var d2 = ddx * ddx + ddy * ddy;
+          if (bd.length >= K && d2 >= bd[K - 1]) continue;
+          var j = bd.length;
+          if (j < K) { bd.push(0); bz.push(0); }
+          while (j > 0 && bd[j - 1] > d2) { bd[j] = bd[j - 1]; bz[j] = bz[j - 1]; j--; }
+          bd[j] = d2; bz[j] = pts[i].z;
+          if (bd.length > K) { bd.length = K; bz.length = K; }
+        }
+        var sw = 0, sz = 0;
+        for (var k2 = 0; k2 < bd.length; k2++) {
+          var wgt = 1 / Math.max(1e-6, bd[k2]);
+          sw += wgt; sz += wgt * bz[k2];
+        }
+        row[gx] = sz / sw;
+      }
+      z[gy] = row;
+    }
+    return { x0: bbox.minX, y0: bbox.minY, dx: gdx, dy: gdy, n: n, z: z, zmin: zmin, zmax: zmax };
+  }
+
+  /* marching squares：高程场 → 等高线段集合 [{z, segs:[x1,y1,x2,y2,...]}]（数据坐标扁平数组）。
+     角点编码 bit0=左上(TL) bit1=右上(TR) bit2=左下(BL) bit3=右下(BR)，位=该角高于等值线。 */
+  function contourSegments(field, count) {
+    if (!field || !(count >= 2)) return [];
+    var n = field.n, z = field.z;
+    function ip(xa, ya, za, xb, yb, zb, lv) {
+      var t = (lv - za) / (zb - za);
+      return [xa + (xb - xa) * t, ya + (yb - ya) * t];
+    }
+    var out = [];
+    for (var li = 1; li <= count; li++) {
+      var lv = field.zmin + (field.zmax - field.zmin) * li / (count + 1);
+      var segs = [];
+      for (var gy = 0; gy < n - 1; gy++) {
+        for (var gx = 0; gx < n - 1; gx++) {
+          var z00 = z[gy][gx], z10 = z[gy][gx + 1], z01 = z[gy + 1][gx], z11 = z[gy + 1][gx + 1];
+          var code = (z00 > lv ? 1 : 0) | (z10 > lv ? 2 : 0) | (z01 > lv ? 4 : 0) | (z11 > lv ? 8 : 0);
+          if (code === 0 || code === 15) continue;
+          var x0 = field.x0 + gx * field.dx, y0 = field.y0 + gy * field.dy;
+          var bot = (z00 !== z10) ? ip(x0, y0, z00, x0 + field.dx, y0, z10, lv) : null;
+          var top = (z01 !== z11) ? ip(x0, y0 + field.dy, z01, x0 + field.dx, y0 + field.dy, z11, lv) : null;
+          var lef = (z00 !== z01) ? ip(x0, y0, z00, x0, y0 + field.dy, z01, lv) : null;
+          var rig = (z10 !== z11) ? ip(x0 + field.dx, y0, z10, x0 + field.dx, y0 + field.dy, z11, lv) : null;
+          var pairs = {
+            1: [[lef, bot]], 2: [[bot, rig]], 3: [[lef, rig]], 4: [[lef, top]],
+            5: [[bot, top]], 6: [[bot, lef], [rig, top]], 7: [[rig, top]], 8: [[rig, top]],
+            9: [[lef, top], [bot, rig]], 10: [[bot, rig], [lef, top]], 11: [[lef, top]],
+            12: [[lef, rig]], 13: [[bot, rig]], 14: [[lef, bot]]
+          }[code];
+          (pairs || []).forEach(function (pr) {
+            if (!pr[0] || !pr[1]) return;
+            segs.push(pr[0][0], pr[0][1], pr[1][0], pr[1][1]);
+          });
+        }
+      }
+      if (segs.length) out.push({ z: lv, segs: segs });
+    }
+    return out;
+  }
+
   /* ---------------- 导出 ---------------- */
 
   return {
@@ -1124,6 +1235,9 @@
     pointInPolygon: pointInPolygon,
     sanitizeRing: sanitizeRing,
     surfaceAreaApprox: surfaceAreaApprox,
+    planeSlope: planeSlope,
+    buildElevField: buildElevField,
+    contourSegments: contourSegments,
     sprinklerLayout: sprinklerLayout,
     sprinklerBom: sprinklerBom,
     tankVolumeEstimate: tankVolumeEstimate,
