@@ -61,8 +61,9 @@
    协议自检(hello-world)/参数标定(calib) 插件 nav 声明 container='.fn-more-panel' 同入面板；
    「文件」按钮挂到「地块绘制」之前（mod/inline-32.js relocate + MutationObserver）并去掉 📂 图标。
    runye-nav.js / index.html / runye-nav.css / mod/inline-32.js / 两插件 main.js 均在 CORE
-   白名单，必须抬版本）。 */
-const VERSION = 'v405-frame-menu-toggle';
+   白名单，必须抬版本）→
+   v406-terrain-angle-cachebust（地形「地块角度」线上反馈无效排查：代码端独立页/嵌入iframe/真实键击/落定基准全链路实测全部生效，判定为用户端陈旧缓存（terrain 两脚本无版本参数）；terrain/index.html 两 script 加 ?v=406-angle 破缓存，必须抬版本）。 */
+const VERSION = 'v406-terrain-angle-cachebust';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
