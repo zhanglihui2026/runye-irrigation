@@ -61,6 +61,7 @@ const PLANS = {
 };
 const PLUGIN_IDS = ['hello-world', 'archive', 'bom', 'case-lib', 'pipe-optim', 'calib', 'hydraulics', 'ai-plan', 'sprinkler'];
 const PLUGIN_CONFIG_ID = 'global:plugin-control';
+const FN_VERSION = 'v2c-2-fix-setexpire';  /* [v2c-2] configGet 回显，用于确认部署版本 */
 const PLUGIN_ADMIN_UIDS = String(process.env.RY_PLUGIN_ADMIN_UIDS || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean);
 /* [v2c] 会员规则配置（ry_kv）与功能清单（与 runye-entitle.js FEATURES 同构） */
 const MEMBER_CONFIG_ID = 'global:member-config';
@@ -429,7 +430,7 @@ async function actPluginsSet(uid, body) {
 async function actConfigGet(token) {
   const uid = await verifyUid(token);
   const r = await readMemberConfig();
-  return ok({ config: r.config, updatedAt: r.updatedAt, updatedBy: r.updatedBy, admin: isAdminUid(uid) });
+  return ok({ config: r.config, updatedAt: r.updatedAt, updatedBy: r.updatedBy, admin: isAdminUid(uid), fn: FN_VERSION });
 }
 async function actConfigSet(uid, body) {
   if (!isAdminUid(uid)) return fail(403, '无会员管理权限');
