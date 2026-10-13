@@ -318,6 +318,13 @@
     DEFAULT_ANON_POLICY: 'trial',
     isTrial: function () { return !!(state && state.trial); },
     ready: function () { return !!state; },
+    /* 权益门控三态：未取得服务端状态时必须等待，不能伪装成允许或无权。 */
+    access: function (feature) {
+      if (!feature) return 'allowed';
+      if (this.mockPlan) return this.can(feature) ? 'allowed' : 'denied';
+      if (!state) return 'pending';
+      return this.can(feature) ? 'allowed' : 'denied';
+    },
     anonPolicy: function () { return (state && state.anonPolicy) || this.DEFAULT_ANON_POLICY; },
 
     /* ---------- 判定（与云函数版语义一致，原样保留） ---------- */

@@ -52,6 +52,11 @@ export function createUiShell(guard) {
         catch (e) { if (guard) guard.reportError(item.id, e, 'nav-locked'); }
         return;
       }
+      if (isPending(item)) {
+        try { if (typeof item.onPending === 'function') item.onPending(ev); }
+        catch (e) { if (guard) guard.reportError(item.id, e, 'nav-pending'); }
+        return;
+      }
       try {
         if (typeof item.onClick === 'function') item.onClick(ev);
       } catch (e) {
@@ -123,20 +128,30 @@ export function createUiShell(guard) {
   /* [v378] 锁定态：老导航项被会员门控拦住时会显示「原名 ·锁」并引导升级。
      插件接管的入口**必须保留这道闸** —— 否则「老入口锁着、插件入口敞着」，
      付费功能等于对全员开放（这是迁移本身引入的越权，不是原有行为）。
-     gate 由插件提供（它才知道 feat 键与三态 fail-open 语义），core 只负责表现。 */
-  function isLocked(item) { return !!(item && typeof item.gate === 'function' && !item.gate()); }
+     gate 与 pending 由插件提供（它知道 feat 键和权益状态），core 负责锁定、等待态及点击分发。 */
+  function isPending(item) { return !!(item && typeof item.pending === 'function' && item.pending()); }
+  function isLocked(item) { return !isPending(item) && !!(item && typeof item.gate === 'function' && !item.gate()); }
 
   function applyLock(b, item) {
+    var pending = isPending(item);
     var locked = isLocked(item);
     var label = item.label || item.id;
-    b.textContent = locked ? (label + ' ·锁') : label;
+    b.textContent = locked ? (label + ' ·锁') : pending ? (label + ' ·同步中') : label;
     try { b.classList.toggle('fn-locked', locked); } catch (e) { }
+    try { b.classList.toggle('fn-pending', pending); } catch (e) { }
     if (locked) {
+      b.removeAttribute('data-ry-pending');
       b.setAttribute('data-ry-locked', '1');
       b.setAttribute('aria-disabled', 'true');
       b.title = '「' + label + '」为高级会员功能 · 点击查看开通方式';
+    } else if (pending) {
+      b.removeAttribute('data-ry-locked');
+      b.setAttribute('data-ry-pending', '1');
+      b.setAttribute('aria-disabled', 'true');
+      b.title = '正在同步会员权益，请稍后重试';
     } else {
       b.removeAttribute('data-ry-locked');
+      b.removeAttribute('data-ry-pending');
       b.removeAttribute('aria-disabled');
       b.title = item.title || '';
     }

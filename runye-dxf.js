@@ -129,6 +129,16 @@
   }
   function requireDrawingExport() {
     if (canExportDrawing()) return true;
+    var ent = global.RyEntitle;
+    if (ent && typeof ent.access === 'function' && ent.access('drawing-export') === 'pending') {
+      var d = document.createElement('div');
+      d.className = 'ry-nav-toast'; d.setAttribute('role', 'status');
+      d.textContent = '正在同步会员权益，请稍后重试。';
+      document.body.appendChild(d);
+      setTimeout(function () { d.classList.add('show'); }, 10);
+      setTimeout(function () { d.classList.remove('show'); setTimeout(function () { if (d.parentNode) d.parentNode.removeChild(d); }, 300); }, 2400);
+      return false;
+    }
     var ui = global.RyMemberUI;
     if (ui && typeof ui.showUpgrade === 'function') ui.showUpgrade('CAD 图纸');
     else alert('CAD 图纸导出为高级会员功能，请先开通高级会员。');

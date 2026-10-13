@@ -25,15 +25,21 @@ function cfg(ctx) { return (ctx.manifest && ctx.manifest.config) || {}; }
 function navCfg(ctx) { return (ctx.manifest && ctx.manifest.ui && ctx.manifest.ui.nav) || {}; }
 function norm(t) { return String(t || '').replace(/\s*·\s*锁\s*$/, '').trim(); }
 
-/* 会员门控：语义与 runye-nav.js gate() 完全一致（三态 fail-open） */
+/* 会员门控：按允许、拒绝、同步中三态处理；同步中不触发宿主动作 */
 function gate(ctx) {
   var feat = cfg(ctx).feat;
   if (!feat) return true;
   var E = (typeof window !== 'undefined') ? window.RyEntitle : null;
   if (!E || typeof E.can !== 'function') return true;
+  if (typeof E.access === 'function') return E.access(feat) === 'allowed';
   if (E.mockPlan) return E.can(feat);
   if (typeof E.ready === 'function' && !E.ready()) return true;
   return E.can(feat);
+}
+function pending(ctx) {
+  var feat = cfg(ctx).feat;
+  var E = (typeof window !== 'undefined') ? window.RyEntitle : null;
+  return !!(feat && E && typeof E.access === 'function' && E.access(feat) === 'pending');
 }
 
 function onLocked(ctx) {
@@ -42,6 +48,7 @@ function onLocked(ctx) {
   if (U && typeof U.showUpgrade === 'function') { U.showUpgrade(lb); return; }
   toast('「' + lb + '」为高级会员功能 · 邀请好友即可开通');
 }
+function onPending() { toast('正在同步会员权益，请稍后重试。'); }
 
 function toast(msg) {
   try {
@@ -132,7 +139,9 @@ function activate(ctx) {
         beforeLabel: c.beforeLabel || null,   /* 面板内锚「滴灌带查询」之前，保持 MORE_ITEMS 相对顺序 */
         before: c.insertBefore || null,
         gate: function () { return gate(ctx); },
+        pending: function () { return pending(ctx); },
         onLocked: function () { onLocked(ctx); },
+        onPending: onPending,
         onClick: open
       });
     }

@@ -67,10 +67,10 @@
    实锤与地块分区的真实差异——pp 的 plotRotationDeg 随状态持久化（inline-11 3944/3998/4008），
    terrain 刷新即丢（原注释误称与 pp 一致）→ terrain-core load/saveState 白名单加入 _plotRot；
    terrain-ui 输入框状态回填（pp 4008 同口径）+ change 兜底回显 + 反馈横幅 + 绘制异常可见化。
-   terrain 三文件 + sw 均在 CORE 白名单，必须抬版本）→
-   v408-member-admin-console（用户指令：会员管理与规则参数并入 plugin-admin 统一后台——
-   云函数 v2c 新增 configGet/configSet/adminMembers/adminMemberGrant（ry_kv global:member-config，
-   管理员复用 RY_PLUGIN_ADMIN_UIDS）；runye-entitle.js 启动拉取云端规则覆盖内置默认（fail-open）；
+   terrain 三文件 + sw 均在 CORE 白名单，必须抬版本）→
+   v408-member-admin-console（用户指令：会员管理与规则参数并入 plugin-admin 统一后台——
+   云函数 v2c 新增 configGet/configSet/adminMembers/adminMemberGrant（ry_kv global:member-config，
+   管理员复用 RY_PLUGIN_ADMIN_UIDS）；runye-entitle.js 启动拉取云端规则覆盖内置默认（fail-open）；
    plugin-admin.html 扩展三页签（插件/会员管理/规则参数）。plugin-admin.html 在 CORE 白名单，必须抬版本）→
    v409-member-bind-view（用户要测邀请绑定关系：云函数 v2c-3 新增 adminMemberBind（管理员查某用户
    邀请码/进度/名下 links）；后台会员详情新增「邀请绑定关系」懒加载块。plugin-admin.html 在 CORE
@@ -78,8 +78,16 @@
    v410-terrain-elev-viz（地形深化一：RTK 高程可视化——terrain-core 新增 planeSlope/buildElevField/
    contourSegments 纯函数（IDW 高程场 + marching squares 等高线）；terrain-ui 制图区新增「高程着色」
    「等高线」开关 + 色带图例 + 地块标签坡度标注，全部显示层语义随地块角度旋转；terrain/index.html
-   elevTools 开关组 + elevLegend，?v=410-elev。terrain 三文件在 CORE 白名单，必须抬版本）。 */
-const VERSION = 'v410-terrain-elev-viz';
+   elevTools 开关组 + elevLegend，?v=410-elev。terrain 三文件在 CORE 白名单，必须抬版本）→
+   v411-tier-access（会员权益采用允许/拒绝/同步中三态；未同步期间禁用会员导航和iframe切换，
+   并统一CAD/BOM操作提示；权益脚本进入离线CORE缓存，更新浏览器脚本版本）→
+   v412-material-formulas（拆分材料表纯公式工具并纳入离线 CORE 缓存）→
+   v413-zone-geometry（拆分多边形裁剪与轮灌分区面积纯计算模块并纳入离线 CORE 缓存）→
+   v414-flow-geometry（将轮灌演示的 SVG 折线路径解析、最近点与距离计算提取为纯模块并纳入离线 CORE 缓存）→
+   v415-pipe3d（新增三级管网 3D 预览：runye-pipe3d.js 读 window.tlDiagramData 用 Three.js 渲染总管/主管/
+   支管/弯头/阀门/水源/滴灌带三维示意，自写轨道控制；three.min.js r147 本地自托管懒加载。
+   两文件进 CORE 白名单，必须抬版本）。 */
+const VERSION = 'v415-pipe3d';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
@@ -167,6 +175,9 @@ const CORE = [
   "mod/inline-30.js",
   "mod/inline-31.js",
   "mod/inline-32.js",
+  "mod/material-formulas.js",
+  "mod/zone-geometry.js",
+  "mod/flow-geometry.js",
   "mod/style-01.css",
   "mod/style-02.css",
   "mod/style-03.css",
@@ -218,8 +229,11 @@ const CORE = [
   "pwa/vendor/images/marker-shadow.png",
   "pwa/vendor/leaflet.css",
   "pwa/vendor/leaflet.js",
+  "pwa/vendor/three.min.js",   /* [v415] 管网 3D 预览（three r147 自托管懒加载） */
   "runye-dxf.js",
+  "runye-entitle.js",
   "runye-material-audit.js",
+  "runye-pipe3d.js",   /* [v415] 管网 3D 预览 */
   "runye-geo.js",
   "runye-hydraulics.html",
   "runye-hydraulics-core.js",

@@ -20,6 +20,7 @@
   function show(pageId) {
     var frame = byId[pageId];
     if (!frame) return false;
+    if (pagePending(pageId)) { notifyPending(); return false; }
     if (pageLocked(pageId)) { notifyLocked(pageLabel(pageId)); return false; }
     if (mobile()) return false;
     frames.forEach(function (item) { item.hidden = item !== frame; });
@@ -46,13 +47,14 @@
   }
   function isVisible(pageId) { return !!current && (!pageId || current === pageId) && !shell.hidden; }
   function pageId() { return shell.hidden ? null : current; }
-  function allowed(feature) {
-    if (!feature) return true;
+  function accessState(feature) {
+    if (!feature) return 'allowed';
     var E = W.RyEntitle;
-    if (!E || typeof E.can !== 'function') return true;
-    if (E.mockPlan) return !!E.can(feature);
-    if (typeof E.ready === 'function' && !E.ready()) return true;
-    return !!E.can(feature);
+    if (E && typeof E.access === 'function') return E.access(feature);
+    if (!E || typeof E.can !== 'function') return 'allowed';
+    if (E.mockPlan) return E.can(feature) ? 'allowed' : 'denied';
+    if (typeof E.ready === 'function' && !E.ready()) return 'pending';
+    return E.can(feature) ? 'allowed' : 'denied';
   }
   function notifyLocked(label) {
     var U = W.RyMemberUI;
@@ -66,16 +68,27 @@
       setTimeout(function () { toast.classList.remove('show'); setTimeout(function () { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 300); }, 2400);
     } catch (e) { }
   }
+  function notifyPending() {
+    try {
+      var toast = D.createElement('div');
+      toast.className = 'ry-nav-toast'; toast.setAttribute('role', 'status');
+      toast.textContent = '正在同步会员权益，请稍后重试。';
+      D.body.appendChild(toast);
+      setTimeout(function () { toast.classList.add('show'); }, 10);
+      setTimeout(function () { toast.classList.remove('show'); setTimeout(function () { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 300); }, 2400);
+    } catch (e) { }
+  }
   function locked(el, feature) {
-    return !!(el && (el.getAttribute('data-ry-locked') === '1' || el.getAttribute('aria-disabled') === 'true')) || !allowed(feature);
+    return !!(el && el.getAttribute('data-ry-locked') === '1') || accessState(feature) === 'denied';
   }
   function pageFeature(page) { return page === 'online-map' ? 'online-map' : page === 'terrain' ? 'pro-others' : page === 'hydraulics' ? 'hydraulic-check' : ''; }
   function pageLabel(page) { return page === 'online-map' ? '在线地图' : page === 'terrain' ? '地形模块' : '水力校核'; }
   function pageLocked(page) {
     var link = D.querySelector('[data-fr-page="' + page + '"]');
-    return locked(link, pageFeature(page));
+    return accessState(pageFeature(page)) !== 'pending' && locked(link, pageFeature(page));
   }
-  W.RyFrameShell = { show: show, hide: hide, isVisible: isVisible, pageId: pageId, isLocked: pageLocked, _byId: function (id) { return byId[id] || null; } };
+  function pagePending(page) { return accessState(pageFeature(page)) === 'pending'; }
+  W.RyFrameShell = { show: show, hide: hide, isVisible: isVisible, pageId: pageId, isLocked: pageLocked, isPending: pagePending, _byId: function (id) { return byId[id] || null; } };
   /* raw nav links + plugin-owned hydraulics nav. Keep legacy href fallback if unavailable/mobile/locked. */
   D.addEventListener('click', function (ev) {
     var target = ev.target && ev.target.closest ? ev.target.closest('[data-fr-page],[data-ry-plugin-nav="hydraulics"]') : null;
@@ -84,7 +97,12 @@
       if (!page && target.getAttribute('data-ry-plugin-nav') === 'hydraulics') page = 'hydraulics';
       if (!page || mobile()) return;
       var feature = target.getAttribute('data-fr-feature') || (page === 'online-map' ? 'online-map' : page === 'terrain' ? 'pro-others' : 'hydraulic-check');
-      if (locked(target, feature)) { notifyLocked(page === 'online-map' ? '在线地图' : page === 'terrain' ? '地形模块' : '水力校核'); ev.preventDefault(); ev.stopImmediatePropagation(); return; }
+      var access = accessState(feature);
+      if (access !== 'allowed') {
+        if (access === 'pending') notifyPending();
+        else notifyLocked(page === 'online-map' ? '在线地图' : page === 'terrain' ? '地形模块' : '水力校核');
+        ev.preventDefault(); ev.stopImmediatePropagation(); return;
+      }
       if (W.RyFrameShell && W.RyFrameShell.show(page)) { ev.preventDefault(); ev.stopImmediatePropagation(); }
       return;
     }

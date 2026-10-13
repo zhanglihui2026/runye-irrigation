@@ -1004,20 +1004,22 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     </div>
   </nav>
   <!-- ===== [NEW MODULE: 会员权益] 入口：删掉下面整块即卸载 =====
-       卸载后 runye-nav.js 的 gate() 找不到 window.RyEntitle ⇒ 自动退化为「全放行」，
+       卸载后 runye-nav.js 找不到 window.RyEntitle ⇒ 导航保持兼容放行，具体导出操作仍自行判权，
        页面行为与接入前完全一致（零回归）。
        顺序不可换：cloud-sync → runye-entitle → runye-member-ui → runye-nav（门控在导航渲染时就要判定）。 -->
   <!-- [v359] CloudBase SDK 改为本地自托管 bundle（普通 script 同步加载，国内不依赖 jsdelivr）；
        runye-member-ui.js 里保留的 jsdelivr 动态 import 仅作 bundle 404 时的兜底 -->
 <script defer src="pwa/vendor/cloudbase-js-sdk-3.8.2.bundle.js?v=359"></script>
   <script src="cloud-sync.js?v=371b"></script>
-  <script src="runye-entitle.js?v=408-member-admin"></script>
+  <script src="runye-entitle.js?v=411-tier-access"></script>
   <script src="runye-member-ui.js?v=367"></script>
   <!-- 顶部导航动作按钮（系统图/轴测图，runye-nav.js act 项）：动作映射须先于 runye-nav.js 注册 -->
   <script src="mod/inline-05.js?v=357"></script>
   <script src="runye-nav.js?v=385-global-open"></script>
   <!-- [NEW MODULE: DXF 导出] 入口：删除本行即卸载（不改动任何原有逻辑） -->
   <script src="runye-dxf.js?v=404-tier-gates"></script>
+  <!-- [NEW MODULE: 管网 3D 预览] 入口：删除本行 + #tlTabs 里 #tlBtn3D 即卸载（three.min.js 懒加载） -->
+  <script src="runye-pipe3d.js?v=415-pipe3d"></script>
   <!-- [NEW MODULE: pipe_optim] 入口：删除本行即卸载本隔离模块（不改动任何原有逻辑） -->
   <script src="pipe_optim_ui.js"></script>
 </div>
@@ -2295,6 +2297,9 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     <button type="button" data-ry-view="pipe">三级简图</button>
     <button type="button" data-ry-view="sys">系统简图</button>
     <button type="button" data-ry-view="iso">轴测简图</button>
+    <!-- [v415] 管网 3D 预览入口：非 Tab（无 data-ry-view），不参与 rySetTab 高亮；
+       点击打开全屏 overlay（runye-pipe3d.js），只读 window.tlDiagramData，不回写数据 -->
+    <button type="button" id="tlBtn3D" title="管网 3D 预览（管道/弯头/阀门三维展示，只读）">🧊 3D 模型</button>
   </div>
   <span class="ry-st-tag" id="ryStTag">就绪</span>
   <b id="ryStSection">标准分区预设</b>
@@ -2534,7 +2539,10 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
   </div>
 </div>
 
-<script src="mod/inline-09.js?v=357"></script>
+<script src="mod/material-formulas.js?v=412"></script>
+<script src="mod/zone-geometry.js?v=413"></script>
+<script src="mod/flow-geometry.js?v=414"></script>
+<script src="mod/inline-09.js?v=414-flow-geometry"></script>
 
 <!-- ===== 面积测量工具 JS ===== -->
 <script src="mod/inline-10.js?v=357"></script>

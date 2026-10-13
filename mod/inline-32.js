@@ -105,6 +105,7 @@
     if (!shell || typeof shell.show !== 'function') { toast('独立页容器不可用'); return; }
     var ok = shell.show(page);
     if (!ok) {
+      if (typeof shell.isPending === 'function' && shell.isPending(page)) return;
       if (typeof shell.isLocked !== 'function' || !shell.isLocked(page)) {
         toast('当前设备或页面容器无法打开「' + label + '」，请使用原页面入口操作');
       }

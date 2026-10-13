@@ -27,8 +27,8 @@
      [v387 2026-10-12 用户指令] 「更多」内容全部展开到顶栏——六项回到 ITEMS 顶层。
      [v401 2026-10-12 用户指令] 顶栏二次收敛：过滤系统/轴测图/系统图/滴灌带查询 折叠回「更多 ▾」
      （协议自检/参数标定由插件侧 container='.fn-more-panel' 同步折叠）。
-     ★ v346 的「更多内项目线上锁」随本次解除：折叠项全部是已上线功能（各自带 feat 会员门控，
-       由 makeItem 的 gate() 兜底），线上整体拦截会把正式功能锁死 —— 面板委托拦截与
+     ★ v346 的「更多内项目线上锁」随本次解除：折叠项按各自feat权益门控；权益未同步时显示等待态，
+       不进行跳转或动作，线上整体拦截会把正式功能锁死 —— 面板委托拦截与
        openLinkedSection 的 hash 直达拦截一并移除，IS_ONLINE 保留作诊断备用。 */
   var ITEMS = [
     /* [v331] 智能规划独立窗口：win:1 点击弹新窗全屏对话，主窗口原地不动 */
@@ -108,21 +108,15 @@
       setTimeout(function () { if (d.parentNode) d.parentNode.removeChild(d); }, 300);
     }, 2400);
   }
-  /* [v358 2026-10-10] 会员门控判定（唯一入口）。
-     三态 fail-open —— 只有「已确认无权限」才锁：
-       a) 权益层未加载（离线 / 脚本缺失 / 老页面没引 runye-entitle.js）
-          → 放行：完全保持旧行为，接入本模块的页面零回归；
-       b) 已加载但还没拿到服务端真相（RyEntitle.ready()===false）
-          → 放行：网络抖动 / 云函数还没部署 / SDK 加载慢，都不该把老用户当场锁死；
-       c) 已拿到真相 → 严格按 RyEntitle.can(feature) 判定。
-     b → c 的切换由 RyEntitle.onChange → RyFnNav.render() 重新渲染（见文件末尾订阅）。 */
-  function gate(feature) {
-    if (!feature) return true;                      /* 未标注 feat = 免费功能，不参与门控 */
+  /* 未获得权益状态时显示等待态；旧页面未加载权益层时保留兼容放行。 */
+  function accessState(feature) {
+    if (!feature) return 'allowed';
     var E = global.RyEntitle;
-    if (!E || typeof E.can !== 'function') return true;
-    if (E.mockPlan) return E.can(feature);          /* 本地联调钩子 ?rymock= */
-    if (typeof E.ready === 'function' && !E.ready()) return true;
-    return E.can(feature);
+    if (E && typeof E.access === 'function') return E.access(feature);
+    if (!E || typeof E.can !== 'function') return 'allowed';
+    if (E.mockPlan) return E.can(feature) ? 'allowed' : 'denied';
+    if (typeof E.ready === 'function' && !E.ready()) return 'pending';
+    return E.can(feature) ? 'allowed' : 'denied';
   }
   /* [v358] 无权限点击 → 升级引导（面板由 runye-member-ui.js 提供；未加载则退化为 toast） */
   function showUpgrade(label) {
@@ -170,8 +164,10 @@
     if (framePage) { a.setAttribute('data-fr-page', framePage); a.setAttribute('data-fr-feature', it.feat || ''); }
     /* [v358] 锁定态：「·锁」标记 + 捕获阶段拦截（阻断 href 跳转 / data-target 处理器 /
        act 动作 / win 独立窗口 四条路径，与 v346 的线上锁同一手法） */
-    var locked = !gate(it.feat);
-    a.textContent = locked ? (it.label + ' ·锁') : it.label;
+    var access = accessState(it.feat);
+    var locked = access === 'denied';
+    var syncing = access === 'pending';
+    a.textContent = locked ? (it.label + ' ·锁') : syncing ? (it.label + ' ·同步中') : it.label;
     if (locked) {
       a.classList.add('fn-locked');
       a.setAttribute('data-ry-locked', '1');
@@ -181,6 +177,16 @@
         e.preventDefault();
         if (e.stopImmediatePropagation) e.stopImmediatePropagation();
         showUpgrade(it.label);
+      }, true);
+    } else if (syncing) {
+      a.classList.add('fn-pending');
+      a.setAttribute('data-ry-pending', '1');
+      a.setAttribute('aria-disabled', 'true');
+      a.title = '正在同步会员权益，请稍后重试';
+      a.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        showToast('正在同步会员权益，请稍后重试。');
       }, true);
     } else if (it.title) {
       a.title = it.title;
@@ -381,9 +387,8 @@
       }
     } catch (e3) { }
   }
-  /* [v358] 权益就绪 / 等级变化 → 重新渲染导航（锁定态随之收紧或放宽）。
-     时序说明：runye-nav.js 在解析到即渲染，此时权益大概率还没拉回来（ready()=false，全放行）；
-     等 RyEntitle.init() 返回后 emit，这里重渲染一次才真正上锁。 */
+  /* 权益就绪 / 等级变化 → 重新渲染导航（锁定态或同步等待态随之更新）。
+     首次同步期间受限入口显示等待并拦截动作；缺少权益层的旧页面仍兼容原有放行行为。 */
   (function () {
     var E = global.RyEntitle;
     if (E && typeof E.onChange === 'function') {
@@ -426,8 +431,10 @@
     var item = all.filter(function (it) { return it.hash === hash || (it.act && 'nav-' + it.act === hash); })[0];
     if (!item) return;
     /* [v401] v346 折叠项 hash 直达拦截已解除（同面板拦截：功能已上线，feat 门控兜底） */
-    /* [v358] 会员门控：#hash 直达走与点击完全相同的 gate，避免「点按钮被拦、直接输网址却能进」 */
-    if (!gate(item.feat)) { showUpgrade(item.label); return; }
+    /* [v358] 会员门控：#hash 直达走与点击相同的权益状态判断，避免绕过功能权限 */
+    var access = accessState(item.feat);
+    if (access === 'pending') { showToast('正在同步会员权益，请稍后重试。'); return; }
+    if (access === 'denied') { showUpgrade(item.label); return; }
     if (item.act && global.RyFnNavActions && typeof global.RyFnNavActions[item.act] === 'function') {
       global.RyFnNavActions[item.act]();
     } else if (item.hash && typeof global.ryJumpToSection === 'function') {

@@ -22,36 +22,9 @@ const MAX_ZONE_SIDE = 200;
 const MAIN_PIPE_MIN_OD = 90;
 const BRANCH_PIPE_MAX_OD = 160;
 
-// 多边形面积（鞋带公式）
-function polyAreaM2(poly){
-  if(!poly || poly.length < 3) return 0;
-  var s = 0;
-  for(var i=0;i<poly.length;i++){
-    var a = poly[i], b = poly[(i+1)%poly.length];
-    s += a.x*b.y - b.x*a.y;
-  }
-  return Math.abs(s)/2;
-}
-// 矩形裁剪多边形（Sutherland-Hodgman），用于求各轮灌区与地块的实际交集面积
-function clipPolyToRect(poly, x0, y0, x1, y1){
-  function half(pts, inside, inter){
-    var res = [];
-    for(var i=0;i<pts.length;i++){
-      var cur = pts[i], prev = pts[(i-1+pts.length)%pts.length];
-      var ci = inside(cur), pi = inside(prev);
-      if(ci){ if(!pi) res.push(inter(prev, cur)); res.push(cur); }
-      else if(pi){ res.push(inter(prev, cur)); }
-    }
-    return res;
-  }
-  if(!poly || poly.length < 3) return [];
-  var o = poly;
-  o = half(o, function(p){return p.x>=x0;}, function(a,b){var t=(x0-a.x)/(b.x-a.x);return {x:x0, y:a.y+t*(b.y-a.y)};});
-  o = half(o, function(p){return p.x<=x1;}, function(a,b){var t=(x1-a.x)/(b.x-a.x);return {x:x1, y:a.y+t*(b.y-a.y)};});
-  o = half(o, function(p){return p.y>=y0;}, function(a,b){var t=(y0-a.y)/(b.y-a.y);return {x:a.x+t*(b.x-a.x), y:y0};});
-  o = half(o, function(p){return p.y<=y1;}, function(a,b){var t=(y1-a.y)/(b.y-a.y);return {x:a.x+t*(b.x-a.x), y:y1};});
-  return o;
-}
+// 面积和分区几何由独立纯计算模块提供；保留全局函数名兼容现有调用点。
+function polyAreaM2(poly) { return window.RyZoneGeometry.polyAreaM2(poly); }
+function clipPolyToRect(poly, x0, y0, x1, y1) { return window.RyZoneGeometry.clipPolyToRect(poly, x0, y0, x1, y1); }
 
 /* ===== v98h 三级「阶梯分区」：同一条分区线可按行/列错开（2026-09-21）=====
    背景：分区线在数据模型里是全幅贯通的一条直线（xPos / yPos 各只有一份），所以「拖某一行里的那一段」
@@ -117,12 +90,10 @@ function tlZoneStepCount() {
 }
 /* 单格边界（含阶梯覆盖）。缺省回退基础网格 ⇒ 空表时结果与改动前逐位相同。 */
 function tlZoneGx(cuts, ri, ci) {
-  var o = cuts && cuts.cutOffX, v = o ? o[ri + ',' + ci] : null;
-  return (v != null && isFinite(v)) ? v : cuts.xPos[ci];
+  return window.RyZoneGeometry.zoneGx(cuts, ri, ci);
 }
 function tlZoneGy(cuts, ci, ri) {
-  var o = cuts && cuts.cutOffY, v = o ? o[ci + ',' + ri] : null;
-  return (v != null && isFinite(v)) ? v : cuts.yPos[ri];
+  return window.RyZoneGeometry.zoneGy(cuts, ci, ri);
 }
 /* ===== 分区实际面积与联合分组统计（2026-09-21 v95，L2/L3 共用同一口径）=====
    cuts = {xPos,yPos,xPlan,yPlan,cols,rows}（米制网格，含手动拖拽割缝）；
@@ -130,36 +101,7 @@ function tlZoneGy(cuts, ci, ri) {
    分区序号 zi = zr*cols + zc（行主序，与图面 data-zi / 区号 (zi+1) 一致）；
    组号 g = floor(zi / n)（与图面联合灌溉色带同规则），尾组不足 n 个区按实际参与比较。
    返回 { ok, cells[m²], maxCell, maxCellIndex, groups[{g,sum,zones[]}], maxGroup, maxGroupIndex, groupCount } */
-function ryZoneAreaGroups(cuts, poly, n){
-  var out={ok:false, cells:[], maxCell:0, maxCellIndex:-1, groups:[], maxGroup:0, maxGroupIndex:-1, groupCount:0};
-  try{
-    if(!cuts||!cuts.cols||!cuts.rows||!cuts.xPos||!cuts.yPos) return out;
-    var total=cuts.cols*cuts.rows;
-    if(!(total>0)) return out;
-    var N=Math.max(1, Math.round(n||1));
-    var usePoly=!!(poly&&poly.length>=3);
-    for(var zi=0; zi<total; zi++){
-      var zc=zi%cuts.cols, zr=Math.floor(zi/cuts.cols);
-      var x0=tlZoneGx(cuts,zr,zc), y0=tlZoneGy(cuts,zc,zr), x1=tlZoneGx(cuts,zr,zc+1), y1=tlZoneGy(cuts,zc,zr+1);
-      var a=0;
-      if(usePoly&&x1>x0&&y1>y0) a=polyAreaM2(clipPolyToRect(poly, x0, y0, x1, y1));
-      else if(cuts.xPlan&&cuts.yPlan) a=cuts.xPlan[zc]*cuts.yPlan[zr];
-      if(!(a>0)) a=0;
-      out.cells.push(a);
-      if(a>out.maxCell){ out.maxCell=a; out.maxCellIndex=zi; }
-    }
-    var gc=Math.max(1, Math.ceil(total/N));
-    for(var g=0; g<gc; g++){
-      var sum=0, zs=[];
-      for(var zz=g*N; zz<Math.min((g+1)*N,total); zz++){ sum+=out.cells[zz]; zs.push(zz); }
-      out.groups.push({g:g, sum:sum, zones:zs});
-      if(sum>out.maxGroup){ out.maxGroup=sum; out.maxGroupIndex=g; }
-    }
-    out.groupCount=out.groups.length;
-    out.ok=true;
-  }catch(e){ out.ok=false; }
-  return out;
-}
+function ryZoneAreaGroups(cuts, poly, n) { return window.RyZoneGeometry.zoneAreaGroups(cuts, poly, n); }
 
 function tlMeasureText(str){var w=0;for(var k=0;k<str.length;k++){var ch=str[k];w+=(ch.charCodeAt(0)>255?12:6.5);}return w;}
 
@@ -854,36 +796,12 @@ if (!window._matTblDelegated) {
    求值：先填字面量值，再迭代解析公式（最多 行数+列数 轮）以解开单元格间依赖；自引用标 #REF!。
    显示：公式格平时显示计算结果（原始公式存于 dataset.formula 与存储）；聚焦时还原公式可编辑；失焦重算。
    整段删除即卸载本功能。 */
-function matParseNum(ss) {
-  if (ss == null) return NaN;
-  var t = String(ss).replace(/[¥\s,]/g, '').replace(/元|套|m\/亩|m/g, '').trim();
-  var m = t.match(/-?\d+(?:\.\d+)?/);
-  return m ? parseFloat(m[0]) : NaN;
-}
-function matColLetter(i) { var s = ''; i = i + 1; while (i > 0) { var mm = (i - 1) % 26; s = String.fromCharCode(65 + mm) + s; i = Math.floor((i - 1) / 26); } return s; }
-function matColLetterIndex(letter) { var n = 0; for (var i = 0; i < letter.length; i++) n = n * 26 + (letter.charCodeAt(i) - 64); return n - 1; }
-function matCellRefs(expr) { var refs = [], re = /([A-Z]+\d+)/g, m; while ((m = re.exec(expr))) refs.push(m[1]); return refs; }
-function matEvalExpr(expr, vals) {
-  expr = expr.replace(/SUM\(\s*([A-Z]+\d+)\s*:\s*([A-Z]+\d+)\s*\)/gi, function (mm, a, b) {
-    var ac = a.match(/^([A-Z]+)(\d+)$/), bc = b.match(/^([A-Z]+)(\d+)$/);
-    if (!ac || !bc) return '0';
-    var c1 = matColLetterIndex(ac[1]), c2 = matColLetterIndex(bc[1]), r1 = +ac[2], r2 = +bc[2], sum = 0;
-    for (var c = Math.min(c1, c2); c <= Math.max(c1, c2); c++)
-      for (var r = Math.min(r1, r2); r <= Math.max(r1, r2); r++) { var v = vals[matColLetter(c) + r]; if (typeof v === 'number' && !isNaN(v)) sum += v; }
-    return '(' + sum + ')';
-  });
-  expr = expr.replace(/([A-Z]+\d+)/g, function (mm, ref) { var v = vals[ref]; return (typeof v === 'number' && !isNaN(v)) ? String(v) : '0'; });
-  if (!/^[-+*/().\s\d]+$/.test(expr)) return { err: 'syntax' };
-  try { var rr = Function('"use strict";return (' + expr + ');')(); return { val: rr }; } catch (e) { return { err: e.message }; }
-}
-function matFmtNum(n) {
-  if (!isFinite(n)) return '#ERR!';
-  if (Math.abs(n - Math.round(n)) < 1e-9) return String(Math.round(n));
-  var st = n.toFixed(3);
-  while (st.indexOf('.') >= 0 && st.charAt(st.length - 1) === '0') st = st.slice(0, -1);
-  if (st.charAt(st.length - 1) === '.') st = st.slice(0, -1);
-  return st;
-}
+function matParseNum(ss) { return window.RyMatFormula.parseNum(ss); }
+function matColLetter(i) { return window.RyMatFormula.colLetter(i); }
+function matColLetterIndex(letter) { return window.RyMatFormula.colLetterIndex(letter); }
+function matCellRefs(expr) { return window.RyMatFormula.cellRefs(expr); }
+function matEvalExpr(expr, vals) { return window.RyMatFormula.evalExpr(expr, vals); }
+function matFmtNum(n) { return window.RyMatFormula.fmtNum(n); }
 /* ===== v180（2026-10-02 用户要求「材料表还是要改为跟腾讯文档/飞书类似的在线表格」）=====
    目标：把「一堆散落 <input> 的表」升级为真正的电子表 —— 单元格选中态、行列坐标、纯键盘操作、
    复制粘贴/剪切、拖拽填充柄、公式引用高亮，且**全表自由编辑**。
@@ -2962,25 +2880,10 @@ function tlApplyDemoHighlight(g) {
  *   · 阀门：落在**本组分**区矩形内的那些红⊗ = 本轮开启的阀门 ⇒ 加绿色张合环 + 手柄转 90°。
  *     不改动 ryValveSVG 一个字节（verify_valve_size.cjs 有 EQ1/EQ2 字节级基线），只叠加。
  *   · 退出演示 / 切换组 ⇒ 整层 [data-tlflow] 删除重建（幂等）。 */
-function tlFlowParseD(d) {                       /* "M x y L x y …" → [[x,y],…] */
-  var nums = String(d || '').match(/-?\d+(?:\.\d+)?/g) || [];
-  var pts = [];
-  for (var i = 0; i + 1 < nums.length; i += 2) pts.push([+nums[i], +nums[i + 1]]);
-  return pts;
-}
-function tlFlowNear(p, pts) {                    /* 点 p 到折线 pts 的最近点 {q,i,d} */
-  var best = null;
-  for (var i = 0; i + 1 < pts.length; i++) {
-    var a = pts[i], b = pts[i + 1];
-    var dx = b[0] - a[0], dy = b[1] - a[1], c = dx * dx + dy * dy;
-    var t = c === 0 ? 0 : ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / c;
-    if (t < 0) t = 0; else if (t > 1) t = 1;
-    var q = [a[0] + dx * t, a[1] + dy * t], dd = Math.sqrt(Math.pow(p[0] - q[0], 2) + Math.pow(p[1] - q[1], 2));
-    if (!best || dd < best.d) best = { q: q, i: i, d: dd };
-  }
-  return best || { q: pts[0], i: 0, d: Infinity };
-}
-function tlFlowLen(p, q) { return Math.sqrt(Math.pow(p[0] - q[0], 2) + Math.pow(p[1] - q[1], 2)); }
+/* 几何实现独立于页面；保留历史函数名供路径与演示渲染调用。 */
+function tlFlowParseD(d) { return window.RyFlowGeometry.parsePath(d); }
+function tlFlowNear(p, pts) { return window.RyFlowGeometry.nearestPoint(p, pts); }
+function tlFlowLen(p, q) { return window.RyFlowGeometry.distance(p, q); }
 function tlFlowClear(svg) {
   if (!svg || !svg.querySelectorAll) return;
   var old = svg.querySelectorAll('[data-tlflow]');

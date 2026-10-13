@@ -38,6 +38,11 @@ function hasBomFeature() {
 }
 function requireBomFeature() {
   if (hasBomFeature()) return true;
+  var ent = window.RyEntitle;
+  if (ent && typeof ent.access === 'function' && ent.access('bom-export') === 'pending') {
+    toast('正在同步会员权益，请稍后重试。');
+    return false;
+  }
   var ui = window.RyMemberUI;
   if (ui && typeof ui.showUpgrade === 'function') ui.showUpgrade('BOM 清单');
   else toast('BOM 清单为高级会员功能 · 邀请好友即可开通');
