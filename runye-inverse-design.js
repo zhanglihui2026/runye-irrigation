@@ -26,7 +26,10 @@
     }
     function open(s){scope=s;current=calc();trial=null;el('riTape').textContent='';el('riSource').textContent='';notice('');el('riScope').textContent=s==='tl'?'当前：三级管路规划':s==='plan'?'当前：二级地块规划（使用二级当前滴灌参数）':'当前：一级参数计算（长度应用会同步二级单边铺设长度）';el('riSourceSection').hidden=s!=='tl';dialog.showModal();}
     ['fld','tl'].forEach(function(s){var input=el(s+'_tapeLen');if(!input)return;var b=doc.createElement('button');b.type='button';b.className='ri-entry';b.textContent=s==='tl'?'压差改善 / 水源校核':'求解滴灌带压差改善';b.onclick=function(){open(s);};input.closest('.field').insertAdjacentElement('afterend',b);});
-    var planInput=el('planTapeLaySide');if(planInput){var planButton=doc.createElement('button');planButton.type='button';planButton.className='ri-entry';planButton.textContent='滴灌带压差改善';planButton.onclick=function(){open('plan');};/* [v280 2026-10-06 用户要求] 与「地形高差」并排一行、各占一半：行容器由 runye-terrain.js 的 root.RyPlanBtnRow() 统一管（它建行 + 排序，保证压差改善在左）；取不到就退回原行为 */var planRow=typeof w.RyPlanBtnRow==='function'?w.RyPlanBtnRow(planButton):null;if(!planRow)planInput.closest('.pp-plan-item').insertAdjacentElement('afterend',planButton);}
+    /* [v437 2026-10-14 用户要求] 04 地块分区页取消「滴灌带压差改善」入口按钮（原插入在
+       planTapeLaySide 行后、经 root.RyPlanBtnRow 与「地形高程」并排）：该注入整段移除。
+       'plan' 作用域自此无入口（仅该按钮触发过 open('plan')）；dialog 逻辑不动，
+       未来如需恢复，重加此按钮即可。 */
     try{var prefs=JSON.parse(w.localStorage.getItem(key)||'{}');['Head','Flow','MaxPressure'].forEach(function(k){if(prefs[k]!=null)el('ri'+k).value=prefs[k];});}catch(e){}
     function persist(){try{w.localStorage.setItem(key,JSON.stringify({Head:el('riHead').value,Flow:el('riFlow').value,MaxPressure:el('riMaxPressure').value}));}catch(e){notice('浏览器无法保存水源设置；本次校核仍可进行。');}}
     dialog.addEventListener('click',function(ev){var b=ev.target.closest('button[data-action]');if(!b)return;try{

@@ -690,7 +690,7 @@ export function createDataService(guard) {
     var c = HAZEN.DEFAULT_C;
     try {
       var v = Number((typeof window !== 'undefined') ? window.C_HAZEN : 0);
-      if (v > 0) c = v;
+      if (isFinite(v) && v > 0) c = v;
     } catch (e) { }
     var engine = hazenCore() ? 'hc-core' : 'builtin';
     return {

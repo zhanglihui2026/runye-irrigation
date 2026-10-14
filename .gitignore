@@ -29,6 +29,9 @@ verify_*.js
 verify_*.cjs
 audit_*.js
 docs/
+!docs/
+docs/*
+!docs/architecture.md
 
 # 一次性调试残留（下划线开头的文件；目录由上面的 _*/ 覆盖）
 # 注意：不能用 `_*` 通配——仓库里已有被跟踪的 _delcards.py
@@ -78,6 +81,7 @@ tests/
 !tests/
 tests/*
 !tests/partition_query.test.cjs
+!tests/entitle_flow.test.cjs
 
 # 成组管路真实面积与独立状态回归
 !tests/group_planning.test.cjs
@@ -96,3 +100,9 @@ tests/*
 # AOCI agent host integration (machine-bound; do not commit)
 .codex/config.toml
 .codex/config.toml.backup.*
+
+# graphify 代码分析工具缓存/输出（可再生，不提交）
+graphify-out/
+
+# 一次性调试残留（mjs 未含于上方 _*.js 规则）
+_pdbg_tmp.mjs

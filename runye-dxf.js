@@ -265,4 +265,7 @@
   }
 
   global.runyeDxf = { export: showDialog, buildDxf: buildDxf };
+  if (global.RyEntitle && typeof global.RyEntitle.bindControl === 'function') {
+    global.RyEntitle.bindControl(document.getElementById('tlDxfExport'), 'drawing-export', 'CAD 图纸导出');
+  }
 })(window);

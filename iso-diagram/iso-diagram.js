@@ -2927,7 +2927,28 @@
     clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
     return clone;
   }
+  function requireDrawingExport() {
+    var ent = window.RyEntitle;
+    var status = ent && typeof ent.access === 'function' ? ent.access('drawing-export')
+      : ent && typeof ent.can === 'function' && (!ent.ready || ent.ready())
+        ? (ent.can('drawing-export') ? 'allowed' : 'denied') : 'denied';
+    if (status === 'allowed') return true;
+    if (status === 'pending') {
+      var tip = document.createElement('div');
+      tip.className = 'ry-nav-toast'; tip.setAttribute('role', 'status');
+      tip.textContent = '正在同步会员权益，请稍后重试。';
+      document.body.appendChild(tip);
+      setTimeout(function () { tip.classList.add('show'); }, 10);
+      setTimeout(function () { tip.classList.remove('show'); setTimeout(function () { if (tip.parentNode) tip.parentNode.removeChild(tip); }, 300); }, 2400);
+      return false;
+    }
+    var ui = window.RyMemberUI;
+    if (ui && typeof ui.showUpgrade === 'function') ui.showUpgrade('轴测图导出');
+    else alert('轴测图导出为高级会员功能，请先开通高级会员。');
+    return false;
+  }
   function downloadSVG() {
+    if (!requireDrawingExport()) return;
     var clone = cleanExportSVG(); if (!clone) return;
     var blob = new Blob([clone.outerHTML], { type: 'image/svg+xml;charset=utf-8' });
     var a = document.createElement('a');
@@ -2937,6 +2958,7 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 3000);
   }
   function printSVG() {
+    if (!requireDrawingExport()) return;
     var clone = cleanExportSVG(); if (!clone) return;
     var w = window.open('', '_blank');
     if (!w) { alert('浏览器阻止了打印窗口，请允许弹出窗口后重试'); return; }
@@ -2986,6 +3008,10 @@
     PLACE_TOL: PLACE_TOL, onFittingClick: null, onPlaceResult: null, onFittingContextMenu: null
   };
   if (typeof window !== 'undefined') window.RyIsoDiagram = api;
+  if (typeof window !== 'undefined' && window.RyEntitle && typeof window.RyEntitle.bindControl === 'function') {
+    window.RyEntitle.bindControl(document.getElementById('tlIsoDownload'), 'drawing-export', '轴测图 SVG 导出');
+    window.RyEntitle.bindControl(document.getElementById('tlIsoPrint'), 'drawing-export', '轴测图打印');
+  }
   /* 共享层订阅（双向同步核心，2026-09-15 阶段1）：三级工作区/主方案存档发起的
      手工管线变更 → 本视图保持视口重渲染（Node 环境无 DOM 自动跳过）。 */
   EP.onChange(function () {

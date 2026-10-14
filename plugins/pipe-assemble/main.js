@@ -83,6 +83,11 @@ function gate(ctx) {
   if (typeof E.ready === 'function' && !E.ready()) return true;
   return E.can(feat);
 }
+function pending(ctx) {
+  var feat = cfg(ctx).feat;
+  var E = (typeof window !== 'undefined') ? window.RyEntitle : null;
+  return !!(feat && E && typeof E.access === 'function' && E.access(feat) === 'pending');
+}
 
 /* 锁定态点击 → 升级引导（面板由 runye-member-ui.js 提供；未加载则退化为 toast，
    与 runye-nav.js 的 showToast 同款 DOM/类名，皮肤在 runye-nav.css 的 .ry-nav-toast） */
@@ -174,6 +179,7 @@ function activate(ctx) {
         container: c.container || null,        /* 原容器：回到「更多 ▾」面板里 */
         beforeLabel: c.beforeLabel || null,    /* 原位置：插回「经济指标分析」之前 */
         gate: function () { return gate(ctx); },
+        pending: function () { return pending(ctx); },
         onLocked: function () { onLocked(ctx); },
         onClick: open
       });

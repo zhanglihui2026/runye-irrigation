@@ -122,6 +122,12 @@ html{--fn-nav-h:36px}
 .fn-file-panel .fn-file-item:hover{background:var(--u-nav-hover);color:#fff}
 .fn-file-panel .fn-file-item.fn-locked{opacity:.58;cursor:not-allowed}
 .fn-file-panel .fn-file-item.fn-locked:hover{background:transparent;color:var(--u-nav-ink)}
+.fn-file-panel .fn-file-item.fn-pending{opacity:.72;cursor:wait}
+.fn-file-panel .fn-file-item.fn-pending:hover{background:transparent;color:var(--u-nav-ink)}
+.ry-entitle-control.fn-pending{opacity:.72;cursor:wait}
+.ry-entitle-control.fn-pending::after{content:' ·同步中';font-size:.88em;white-space:nowrap}
+.ry-entitle-control.fn-locked{opacity:.76}
+.ry-entitle-control.fn-locked::after{content:' ·高级会员';font-size:.88em;white-space:nowrap}
 
 /* [v346] 线上锁提示 toast：仅在非本地环境由 runye-nav.js 挂到 body，本地永不出现 */
 .ry-nav-toast{position:fixed;left:50%;bottom:64px;transform:translateX(-50%) translateY(8px);background:#1e4d3a;color:#fff;font-size:13px;line-height:1.5;padding:9px 16px;border-radius:6px;box-shadow:0 4px 16px rgba(15,23,42,.25);opacity:0;transition:opacity .25s,transform .25s;z-index:10050;pointer-events:none;max-width:80vw;text-align:center}

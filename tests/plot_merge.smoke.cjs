@@ -20,7 +20,9 @@ const ROOT = path.join(__dirname, '..');
 const M = require(path.join(ROOT, 'runye-map-enhance.js'));
 const Geo = require(path.join(ROOT, 'runye-geo.js'));
 const ENHANCE_SRC = fs.readFileSync(path.join(ROOT, 'runye-map-enhance.js'), 'utf8');
-const INDEX_SRC = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+// Expand the classic-script modules referenced by index.html so contract checks
+// continue to inspect the real assembled page after source extraction.
+const INDEX_SRC = require(path.join(ROOT, 'expand_index.cjs'))(path.join(ROOT, 'index.html'));
 const MAP_SRC = fs.readFileSync(path.join(ROOT, 'runye-map-measure.html'), 'utf8');
 
 /* ---- 静态判据公用工具（提到顶层，供 ③-h/③-i/③-j 共用）----

@@ -296,6 +296,11 @@ function gate(ctx) {
   if (typeof E.ready === 'function' && !E.ready()) return true;
   return E.can(feat);
 }
+function pending(ctx) {
+  var feat = cfg(ctx).feat;
+  var E = (typeof window !== 'undefined') ? window.RyEntitle : null;
+  return !!(feat && E && typeof E.access === 'function' && E.access(feat) === 'pending');
+}
 
 function onLocked(ctx) {
   var lb = navCfg(ctx).label || ctx.id;
@@ -517,6 +522,7 @@ export function activate(ctx) {
       beforeLabel: cfg(ctx).beforeLabel || null,
       before: cfg(ctx).before || null,
       gate: function () { return gate(ctx); },
+      pending: function () { return pending(ctx); },
       onLocked: function () { onLocked(ctx); },
       onClick: function () {
         panel.style.display = panel.style.display === 'none' ? '' : 'none';

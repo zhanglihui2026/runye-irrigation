@@ -1,6 +1,146 @@
 (function (root) {
   'use strict';
 
+  var MAX_AUTO_ZONE_COUNT = 500;
+  var MAX_AUTO_ZONE_DIMENSION = 1000000000;
+
+  function splitZoneLength(total, step, limit) {
+    var parts = [];
+    var used = 0;
+    var boundedStep = Math.max(1, Number(step) || 1);
+    while (total - used > boundedStep + 0.05) {
+      if (parts.length >= limit) {
+        var error = new RangeError('手动分区数量超过 ' + limit + ' 个上限');
+        error.code = 'manual_zone_count_exceeded';
+        error.requestedCount = parts.length + 1;
+        error.maxCount = limit;
+        throw error;
+      }
+      parts.push(boundedStep);
+      used += boundedStep;
+    }
+    var rest = total - used;
+    if (rest > 0.05) {
+      if (parts.length >= limit) {
+        var restError = new RangeError('手动分区数量超过 ' + limit + ' 个上限');
+        restError.code = 'manual_zone_count_exceeded';
+        restError.requestedCount = parts.length + 1;
+        restError.maxCount = limit;
+        throw restError;
+      }
+      parts.push(rest);
+    }
+    return parts.length ? parts : [total];
+  }
+
+  function splitZoneLengthCount(total, step, limit) {
+    var used = 0, count = 0;
+    var boundedStep = Math.max(1, Number(step) || 1);
+    while (total - used > boundedStep + 0.05) {
+      count++;
+      if (count > limit) return count;
+      used += boundedStep;
+    }
+    var rest = total - used;
+    return count + (rest > 0.05 ? 1 : 0) || 1;
+  }
+
+  function manualZoneLayout(width, height, manualMu, fixedSide, muToSqm, limit) {
+    var w = Number(width), h = Number(height);
+    var safeW = isFinite(w) && w > 0 ? Math.min(w, MAX_AUTO_ZONE_DIMENSION) : 1;
+    var safeH = isFinite(h) && h > 0 ? Math.min(h, MAX_AUTO_ZONE_DIMENSION) : 1;
+    var targetArea = Math.max(0.1, manualMu || 0.1) * muToSqm;
+    var side = Number(fixedSide);
+    if (!isFinite(targetArea) || !isFinite(side) || side <= 0) {
+      var parameterError = new RangeError('手动分区参数超出可计算范围');
+      parameterError.code = 'manual_zone_count_exceeded';
+      parameterError.maxCount = limit;
+      throw parameterError;
+    }
+    var derivedSide = Math.max(1, targetArea / side);
+    if (!isFinite(derivedSide)) {
+      var derivedError = new RangeError('手动分区参数超出可计算范围');
+      derivedError.code = 'manual_zone_count_exceeded';
+      derivedError.maxCount = limit;
+      throw derivedError;
+    }
+    var longIsX = safeW >= safeH;
+    var xDesign = longIsX ? derivedSide : side;
+    var yDesign = longIsX ? side : derivedSide;
+    var xCount = splitZoneLengthCount(safeW, xDesign, limit);
+    var yCount = splitZoneLengthCount(safeH, yDesign, limit);
+    if (xCount * yCount > limit) {
+      var countError = new RangeError('手动分区数量超过 ' + limit + ' 个上限');
+      countError.code = 'manual_zone_count_exceeded';
+      countError.requestedCount = xCount * yCount;
+      countError.maxCount = limit;
+      throw countError;
+    }
+    var xParts = splitZoneLength(safeW, xDesign, limit);
+    var yParts = splitZoneLength(safeH, yDesign, limit);
+    var cols = xParts.length, rows = yParts.length;
+    return {
+      cols: cols, rows: rows, N: cols * rows,
+      zoneW: side, zoneH: derivedSide, zoneArea: side * derivedSide,
+      drawZoneW: safeW / cols, drawZoneH: safeH / rows,
+      designW: xDesign, designH: yDesign, manual: true
+    };
+  }
+
+  function autoZoneLayout(width, height, requestedN, fixedSide) {
+    var side = Number(fixedSide), w = Number(width), h = Number(height);
+    var S = isFinite(side) && side > 0 ? side : 200;
+    var safeW = isFinite(w) && w > 0 ? Math.min(w, MAX_AUTO_ZONE_DIMENSION) : 1;
+    var safeH = isFinite(h) && h > 0 ? Math.min(h, MAX_AUTO_ZONE_DIMENSION) : 1;
+    var totalArea = safeW * safeH;
+    var minCols = Math.max(1, Math.ceil(safeW / S));
+    var minRows = Math.max(1, Math.ceil(safeH / S));
+    var minNBySide = minCols * minRows;
+    var minNByArea = Math.max(1, Math.ceil(totalArea / (S * S)));
+    var minN = Math.max(minNBySide, minNByArea);
+    var requested = parseInt(requestedN, 10) || minN;
+    /* Geometry may itself imply millions of cells (for example imported corrupt
+       coordinates). Keep both the search and downstream grid bounded. In that
+       exceptional case the 500-cell cap takes precedence over the nominal side. */
+    var targetN = Math.min(MAX_AUTO_ZONE_COUNT, Math.max(requested, minN));
+    var geometryFitsCap = minN <= MAX_AUTO_ZONE_COUNT;
+    var firstCol = geometryFitsCap ? Math.min(minCols, targetN) : 1;
+    var minRowForSearch = geometryFitsCap ? Math.min(minRows, targetN) : 1;
+    var best = null;
+
+    for (var cols = firstCol; cols <= targetN; cols++) {
+      var rows = Math.max(minRowForSearch, Math.ceil(targetN / cols));
+      var n = cols * rows;
+      if (n > MAX_AUTO_ZONE_COUNT) continue;
+      var drawZoneW = safeW / cols;
+      var drawZoneH = safeH / rows;
+      var zoneArea = totalArea / n;
+      var derivedSide = zoneArea / S;
+      var aspectError = Math.abs(drawZoneW - drawZoneH);
+      if (!best || n < best.N || (n === best.N && aspectError < best.aspectError)) {
+        best = {
+          cols: cols, rows: rows, N: n,
+          zoneW: S, zoneH: derivedSide, zoneArea: zoneArea,
+          drawZoneW: drawZoneW, drawZoneH: drawZoneH,
+          designW: drawZoneW, designH: drawZoneH, aspectError: aspectError
+        };
+      }
+    }
+
+    if (best) return best;
+    /* The requested/minimum count can be prime-adjacent to the cap and have no
+       valid ceil-grid under it. Use the largest bounded grid below the target. */
+    var fallbackCols = Math.max(1, Math.min(targetN, Math.floor(Math.sqrt(targetN * safeW / safeH)) || 1));
+    var fallbackRows = Math.max(1, Math.floor(MAX_AUTO_ZONE_COUNT / fallbackCols));
+    while (fallbackCols * fallbackRows > targetN && fallbackRows > 1) fallbackRows--;
+    var fallbackN = fallbackCols * fallbackRows;
+    var fw = safeW / fallbackCols, fh = safeH / fallbackRows;
+    var fa = totalArea / fallbackN;
+    return { cols: fallbackCols, rows: fallbackRows, N: fallbackN,
+      zoneW: S, zoneH: fa / S, zoneArea: fa,
+      drawZoneW: fw, drawZoneH: fh, designW: fw, designH: fh };
+  }
+
   function polyAreaM2(poly) {
     if (!poly || poly.length < 3) return 0;
     var s = 0;
@@ -127,6 +267,11 @@
   }
 
   var api = {
+    MAX_AUTO_ZONE_COUNT: MAX_AUTO_ZONE_COUNT,
+    manualZoneLayout: manualZoneLayout,
+    splitZoneLength: splitZoneLength,
+    splitZoneLengthCount: splitZoneLengthCount,
+    autoZoneLayout: autoZoneLayout,
     axisFit: axisFit,
     tapeAxisOf: tapeAxisOf,
     polyAreaM2: polyAreaM2,

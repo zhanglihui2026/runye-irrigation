@@ -14,10 +14,10 @@
       <h1>数字农业</h1>
       <span class="da-ver" id="daVer"></span>
     </header>
-    <p class="da-sub">七彩花生水肥与植保决策、地块全周期管理。可从精准灌溉工具带入当前地块，也可独立使用。</p>
+    <p class="da-sub">七彩花生水肥与植保决策、地块全周期管理。数字农业可独立使用。</p>
 
     <section class="da-plot" id="daPlot" hidden>
-      <h2 id="daPlotTitle">来自精准灌溉的地块</h2>
+      <h2 id="daPlotTitle">历史地块快照</h2>
       <dl id="daPlotDl"></dl>
       <p class="da-src" id="daPlotSrc"></p>
     </section>
@@ -42,7 +42,7 @@
     </section>
 
     <p class="da-foot">
-      数据接口：runye_digital_bridge_v1（v1，只读） ·
+      旧数据兼容：runye_digital_bridge_v1（只读快照） ·
       开发规则见 <a href="AGENTS.md">AGENTS.md</a> ·
       模块说明见 <a href="README.md">README.md</a>
     </p>
@@ -66,7 +66,7 @@
     function showPlot(d) {
       var p = d.plot;
       sec.hidden = false;
-      if (title) title.textContent = '来自精准灌溉的地块';
+      if (title) title.textContent = '历史地块快照';
       var rows = [
         ['地块名称', p.name],
         ['面积', p.areaMu.toFixed(2) + ' 亩' + (p.areaSqm ? '（' + Math.round(p.areaSqm).toLocaleString() + ' m²）' : '')],
@@ -77,7 +77,7 @@
       dl.innerHTML = rows.map(function (r) {
         return '<dt>' + r[0] + '</dt><dd>' + String(r[1]).replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</dd>';
       }).join('');
-      if (src) src.textContent = '数据来源：runye-irrigation（桥接协议 v' + d.version + '，生成于 ' + new Date(d.generatedAt).toLocaleString() + '）';
+      if (src) src.textContent = '本地遗留快照（旧协议 v' + d.version + '，生成于 ' + new Date(d.generatedAt).toLocaleString() + '）';
     }
     function showWarn(msg) {
       sec.hidden = false;

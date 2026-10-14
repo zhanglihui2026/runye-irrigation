@@ -3,10 +3,11 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 // Pure regression for the real group controller; no browser or third-party dependency.
 const root=process.env.RUNYE_TEST_ROOT || path.join(__dirname,'..');
 const html = require('../expand_index.cjs')(path.join(__dirname, '..', 'index.html'));
+const zoneGeometry = require('../mod/zone-geometry.js');
 function functionSource(name){const start=html.indexOf('function '+name+'(');assert(start>=0);for(let end=html.indexOf('}',start);end>=0;end=html.indexOf('}',end+1)){const text=html.slice(start,end+1);try{new vm.Script(text);return text;}catch(e){}}throw Error(name);}
 function fixture(){
  const inputs={planTapeSpacing:{value:'.4'},planEmitterSpacing:{value:'.3'},planEmitterFlow:{value:'.8'},planTapeLaySide:{value:'100'},planN:{value:'4'},planIntensity:{textContent:'999'}};
- const win={addEventListener(){},measuredPolygon:[{x:0,y:0},{x:450,y:0},{x:450,y:200},{x:0,y:200}]};
+ const win={addEventListener(){},RyZoneGeometry:zoneGeometry,measuredPolygon:[{x:0,y:0},{x:450,y:0},{x:450,y:200},{x:0,y:200}]};
  const doc={getElementById:id=>inputs[id] || null,querySelector:()=>null,querySelectorAll:()=>[],addEventListener(){}};
  const box={window:win,document:doc,console,setTimeout,clearTimeout,MAIN_PIPE_MIN_OD:90,BRANCH_PIPE_MAX_OD:160,SDR:13.6,
   selectPipe:(q,v,min,max)=>({od:Math.max(min || 50,50),id:45}),hazenWilliams:(length,q,id)=>length*q/id,christiansenF:()=>1};

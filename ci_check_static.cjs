@@ -12,7 +12,10 @@
  * 而本地又没人跑的问题拦在推送/PR 上：
  *   ① 内联 <script> 语法（vm.Script 编译，不执行、无副作用）；
  *   ② HTML 内重复 id（**先剥 <script> 体与注释**，否则注释里引用的 id 会假红）；
- *   ③ 常量单一来源（管径 CAL_SERIES / PE_OD_SERIES、单价 TL_PIPE_PRICE_DEF 各只允许一处定义）。
+ *   ③ 常量单一来源（管径 CAL_SERIES / PE_OD_SERIES、单价 TL_PIPE_PRICE_DEF 各只允许一处定义）；
+ *   ④ 主页面关键同步脚本的依赖顺序正确；主页面本地脚本及插件清单声明的 manifest/入口
+ *      与 Service Worker CORE 清单一致，未缓存项必须登记为有明确降级行为的可选项，
+ *      且 CORE 资源必须存在且不重复。
  * 退出码：全过 0，任一不过 1（CI 靠退出码判定，别只 console.log 不设码）。
  *
  * 用法：node ci_check_static.cjs
@@ -24,6 +27,7 @@ const vm = require('vm');
 
 const ROOT = __dirname;
 const INDEX = path.join(ROOT, 'index.html');
+const SW = path.join(ROOT, 'sw.js');
 
 let pass = 0, fail = 0;
 function check(name, ok, extra) {
@@ -33,7 +37,9 @@ function check(name, ok, extra) {
 
 /* [v357] 单文件已拆分：mod/ 外链拼回虚拟单文件视图，①②③ 锚不变 */
 const expandIndex = require('./expand_index.cjs');
+const indexSource = fs.readFileSync(INDEX, 'utf8');
 const html = expandIndex(INDEX);
+const sw = fs.readFileSync(SW, 'utf8');
 
 /* ---------- ① 内联 <script> 语法 ---------- */
 const inline = [];
@@ -67,6 +73,102 @@ while ((k = reId.exec(htmlOnly)) !== null) { ids[k[1]] = (ids[k[1]] || 0) + 1; }
 const dupIds = Object.keys(ids).filter((x) => ids[x] > 1);
 check('② HTML 内 id 唯一（静态 DOM 共 ' + Object.keys(ids).length + ' 个 id）',
   dupIds.length === 0, dupIds.map((x) => x + '×' + ids[x]).join(','));
+
+/* ---------- ④ 主页面脚本顺序与离线 CORE ---------- */
+const coreMatch = sw.match(/const CORE = \[([\s\S]*?)\n\];/);
+const coreSource = coreMatch ? coreMatch[1] : '';
+const coreEntries = [...coreSource.matchAll(/^\s*"([^"\r\n]+)"\s*,?(?:\s*\/\*[^\r\n]*\*\/)?\s*$/gm)]
+  .map((entry) => entry[1]);
+const coreSet = new Set(coreEntries);
+const localPageScripts = new Set();
+const missingPageScripts = [];
+const pageScriptTags = [...indexSource.matchAll(/<script\b([^>]*)>/gi)];
+const orderedPageScripts = [];
+for (const match of pageScriptTags) {
+  const attrs = match[1];
+  const srcMatch = attrs.match(/\bsrc\s*=\s*["']([^"']+)["']/i);
+  if (!srcMatch) continue;
+  let url;
+  try { url = new URL(srcMatch[1], 'https://runye.invalid/'); } catch (_) { continue; }
+  if (url.origin !== 'https://runye.invalid') continue;
+  const asset = decodeURIComponent(url.pathname.replace(/^\//, ''));
+  orderedPageScripts.push({ asset, attrs });
+  localPageScripts.add(asset);
+  if (!fs.existsSync(path.join(ROOT, asset))) missingPageScripts.push(asset);
+}
+
+/* index.html 的经典脚本执行顺序是同步依赖契约。CORE 资源检查使用原始入口，
+   因 expandIndex 会把 mod/ 外链替换成内联正文，不能从展开视图恢复真实资源列表或顺序。 */
+const scriptOrderRules = [
+  ['mod/material-formulas.js', 'mod/material-table.js'],
+  ['mod/material-table.js', 'mod/inline-09.js'],
+  ['mod/tl-polyline-geometry.js', 'mod/inline-09.js'],
+  ['mod/plan-calc-render.js', 'mod/inline-09.js'],
+  ['mod/inline-09.js', 'mod/tl-header-layout.js'],
+  ['mod/inline-11.js', 'mod/plot-editor.js'],
+  ['mod/head-system-svg.js', 'mod/inline-14.js']
+];
+const scriptOrderErrors = [];
+for (const [before, after] of scriptOrderRules) {
+  const beforeMatches = orderedPageScripts.filter((item) => item.asset === before);
+  const afterMatches = orderedPageScripts.filter((item) => item.asset === after);
+  if (beforeMatches.length !== 1 || afterMatches.length !== 1) {
+    scriptOrderErrors.push(`${before} → ${after}：两项都必须在 index.html 中且各出现一次`);
+    continue;
+  }
+  const beforeIndex = orderedPageScripts.indexOf(beforeMatches[0]);
+  const afterIndex = orderedPageScripts.indexOf(afterMatches[0]);
+  if (beforeIndex >= afterIndex) scriptOrderErrors.push(`${before} 必须先于 ${after}`);
+}
+const synchronousScriptAssets = [...new Set(scriptOrderRules.flat())];
+for (const asset of synchronousScriptAssets) {
+  const item = orderedPageScripts.find((candidate) => candidate.asset === asset);
+  if (item && (/\b(?:async|defer)(?=\s|=|$)/i.test(item.attrs) || /\btype\s*=\s*["']module["']/i.test(item.attrs))) {
+    scriptOrderErrors.push(`${asset} 必须保持同步经典脚本`);
+  }
+}
+check('④a 同步脚本依赖顺序', scriptOrderErrors.length === 0, scriptOrderErrors.join(' | '));
+
+/* CloudBase 仅提供云端能力；cloud-sync.js 在 SDK 缺失时保留本地模式。 */
+const optionalPageScripts = new Map([
+  ['pwa/vendor/cloudbase-js-sdk-3.8.2.bundle.js', '云端 SDK 可选；缺失时 cloud-sync.js 降级到本地模式']
+]);
+const notCached = [...localPageScripts].filter((asset) => !coreSet.has(asset) && !optionalPageScripts.has(asset));
+const missingCoreFiles = coreEntries.filter((asset) => !fs.existsSync(path.join(ROOT, asset)));
+const duplicateCoreEntries = coreEntries.filter((asset, index) => coreEntries.indexOf(asset) !== index);
+const pluginAssets = ['plugins.json'];
+const pluginManifestErrors = [];
+try {
+  const config = JSON.parse(fs.readFileSync(path.join(ROOT, 'plugins.json'), 'utf8'));
+  for (const plugin of (Array.isArray(config.plugins) ? config.plugins : [])) {
+    const base = String(plugin.path || '').replace(/\\/g, '/').replace(/\/+$/, '') + '/';
+    const manifestPath = base + 'manifest.json';
+    pluginAssets.push(manifestPath);
+    try {
+      const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, manifestPath), 'utf8'));
+      pluginAssets.push(base + (manifest.entry || 'main.js'));
+    } catch (error) {
+      pluginManifestErrors.push(manifestPath + '：' + error.message);
+    }
+  }
+} catch (error) {
+  pluginManifestErrors.push('plugins.json：' + error.message);
+}
+const missingPluginAssets = pluginAssets.filter((asset) => !fs.existsSync(path.join(ROOT, asset)));
+const uncachedPluginAssets = pluginAssets.filter((asset) => !coreSet.has(asset));
+check('④ 主页面本地脚本已纳入 Service Worker CORE（可选项须有明确降级理由）',
+  !!coreMatch && notCached.length === 0 && missingCoreFiles.length === 0 && missingPageScripts.length === 0 && duplicateCoreEntries.length === 0 &&
+    missingPluginAssets.length === 0 && uncachedPluginAssets.length === 0 && pluginManifestErrors.length === 0,
+  [
+    notCached.length ? '未缓存：' + notCached.join(', ') : '',
+    missingCoreFiles.length ? 'CORE 文件缺失：' + missingCoreFiles.join(', ') : '',
+    missingPageScripts.length ? '页面脚本文件缺失：' + missingPageScripts.join(', ') : '',
+    duplicateCoreEntries.length ? 'CORE 重复：' + duplicateCoreEntries.join(', ') : '',
+    missingPluginAssets.length ? '插件文件缺失：' + missingPluginAssets.join(', ') : '',
+    uncachedPluginAssets.length ? '插件资源未缓存：' + uncachedPluginAssets.join(', ') : '',
+    pluginManifestErrors.length ? '插件清单错误：' + pluginManifestErrors.join('; ') : '',
+    optionalPageScripts.size ? '显式可选：' + [...optionalPageScripts].map(([asset, reason]) => asset + '（' + reason + '）').join('; ') : ''
+  ].filter(Boolean).join(' | '));
 
 /* ---------- ③ 常量单一来源 ---------- */
 function countDef(re) { return (html.match(re) || []).length; }

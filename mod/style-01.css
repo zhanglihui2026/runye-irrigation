@@ -2054,28 +2054,15 @@ main,footer{position:relative;z-index:1}
   padding-left:28px;
   padding-right:28px;
 }
-#pipePlanSection .pp-plan-bar,
+/* [v436-pp-normalize] 原 #pipePlanSection 参数栏紧凑段（.pp-plan-bar/.pp-plan-item/
+   .pp-plan-label/.pp-plan-val/input）已删除：样式归一至 mod/ry-panel.css 皮肤块
+   （04 地块分区页参数栏唯一来源）。工具条（.pp-toolbar/.pp-btn）与分隔符规则保留。 */
 #pipePlanSection .pp-toolbar{
   min-height:38px;
   padding:5px 10px;
   margin-bottom:8px;
   gap:8px;
   align-items:center;
-}
-#pipePlanSection .pp-plan-item{
-  min-height:26px;
-  align-items:center;
-}
-#pipePlanSection .pp-plan-label{
-  line-height:1;
-}
-#pipePlanSection .pp-plan-val{
-  font-size:11px;font-weight:400;
-  line-height:1;
-}
-#pipePlanSection .pp-plan-item input{
-  height:24px;
-  padding:2px 6px;
 }
 #pipePlanSection .pp-sep,
 #pipePlanSection .pp-sep-vert{
@@ -2964,56 +2951,13 @@ body > .ry-nav .main-header{display:none!important}
   #pipePlanSection .pp-side,
   #pipePlanSection .pp-stage{min-width:0;min-height:0}
 
-  /* —— 左：参数栏（竖排表单，内容超出时栏内滚动） —— */
-  #pipePlanSection .pp-side{
-    align-self:start;max-height:100%;
-    display:flex;flex-direction:column;gap:8px;
-    overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
-    padding:9px;border-radius:12px;
-    background:linear-gradient(180deg,#f8fbf9 0%,#f2f7f4 100%);
-    border:1px solid #dde8e1;
-  }
-  #pipePlanSection .pp-side>*{flex:0 0 auto}
-  /* 注：updatePlan() 会给两条参数栏写内联 display:flex，故此处必须用 !important 压回竖排块级 */
-  #pipePlanSection .pp-side .pp-plan-bar{
-    display:block!important;margin:0!important;padding:8px 11px;
-    min-height:0;border-radius:10px;
-    background:#fff;border:1px solid #e4ece7;
-    font-size:11px;
-  }
-  #pipePlanSection .pp-side .pp-plan-bar-result{background:#fbfefc}
-  /* 分组小标题用伪元素补齐，不改动 DOM */
-  #pipePlanSection .pp-side .pp-plan-bar::before{
-    content:"地块与灌溉参数";
-    display:block;margin:0 0 4px;padding-bottom:5px;
-    border-bottom:1px solid #eaf1ec;
-    font-size:11px;font-weight:700;letter-spacing:.05em;color:#2f6d43;
-  }
-  #pipePlanSection .pp-side .pp-plan-bar-result::before{content:"水力计算结果"}
-  /* 每个字段独占一行：标签靠左、数值/输入靠右，形成竖排表单 */
-  #pipePlanSection .pp-side .pp-plan-item{
-    display:flex;align-items:center;gap:5px;
-    width:100%;min-height:26px;padding:2px 0;
-    border-bottom:1px dashed #eef3f0;
-  }
-  #pipePlanSection .pp-side .pp-plan-item:last-of-type{border-bottom:0}
-  #pipePlanSection .pp-side .pp-plan-item>.pp-plan-label:first-child{margin-right:auto}
-  #pipePlanSection .pp-side .pp-plan-label{font-size:11px;line-height:1.25;white-space:nowrap}
-  #pipePlanSection .pp-side .pp-plan-val{font-size:11px;font-weight:400}
-  #pipePlanSection .pp-side .pp-plan-item input{
-    width:64px!important;height:24px;padding:2px 6px;
-    box-sizing:border-box;text-align:right;flex:0 0 auto;font-size:11px;font-weight:400;
-  }
-  #pipePlanSection .pp-side .pp-sep-vert{display:none}
-  /* 扬程算式：窄栏内改为换行显示，避免横向滚动 */
-  #pipePlanSection .pp-side .pp-calc-formula{
-    margin:0;padding:6px 9px;
-    white-space:normal;overflow:visible;
-    font-size:11px;line-height:1.5;
-  }
-  #pipePlanSection .pp-side .pp-calc-formula .pp-cf-line,
-  #pipePlanSection .pp-side .pp-calc-formula .pp-cf-line-h{white-space:normal}
-  #pipePlanSection .pp-side .pp-calc-formula .pp-cf-input{width:40px;height:16px;font-size:11px}
+  /* [v436-pp-normalize] 原「左：参数栏（竖排表单）」整段删除：
+     #pipePlanSection .pp-side 容器布局、旧竖排参数卡片（.pp-plan-bar 白卡 /
+     ::before 伪元素标题「地块与灌溉参数」/ .pp-plan-item 竖排行 / input
+     64px!important / .pp-calc-formula 浅色化）全部归一至 mod/ry-panel.css
+     皮肤块（04 页参数栏唯一来源，无需再对抗 JS 内联 display:flex——
+     该内联写入已从 inline-11.js 移除）。
+     #tlPipePlanSection .pp-head-break 保留（土地流转页仍依赖）。 */
   #tlPipePlanSection .pp-side .pp-head-break{margin:0;padding:6px 9px;font-size:11px}
 
   /* —— 右：图纸区 + 版心最右侧的竖排工具面板 ——
@@ -4924,8 +4868,8 @@ body.ry-tool #designInput .mw-shell{
 }
 /* 参数面板：纵向铺满左栏，「恢复示例」沉底收口 */
 body.ry-tool #designInput .input-panel{display:flex;flex-direction:column;min-width:0}
-body.ry-tool #designInput .input-panel>fieldset{flex:0 0 auto;min-width:0}
-body.ry-tool #designInput .input-panel>.panel-foot{margin-top:auto;flex:0 0 auto}
+body.ry-tool #designInput .ryp-body>fieldset{flex:0 0 auto;min-width:0}
+body.ry-tool #designInput .ryp-body>.panel-foot{margin-top:auto;flex:0 0 auto}
 body.ry-tool #designInput .mw-col-right{gap:0}
 /* 三栏之间用 1px 竖线分隔（不靠投影区分） */
 body.ry-tool #designInput .mw-col-right{

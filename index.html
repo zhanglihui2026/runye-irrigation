@@ -12,9 +12,9 @@
 <meta name="description" content="输入地块、滴灌带与水源参数，快速计算灌溉分区、主管支管管径和水泵工作点。"/>
 <link rel="stylesheet" href="mod/style-01.css?v=357">
 <link rel="stylesheet" href="runye-inverse-design.css?v=277">
-<script defer src="runye-inverse-design.js?v=274"></script>
+<script defer src="runye-inverse-design.js?v=437"></script>
 <link rel="stylesheet" href="runye-terrain.css?v=255">
-<script src="runye-terrain.js?v=257"></script>
+<script src="runye-terrain.js?v=437"></script>
 <link rel="stylesheet" href="runye-ai-plan.css?v=366">
 <script src="runye-ai-plan.js?v=385"></script>
 <link rel="stylesheet" href="runye-case-library.css?v=277">
@@ -70,21 +70,9 @@
   gap:8px;
   align-items:center;
 }
-#ryCadSide [data-pp="pipePlanSection"] .pp-plan-item{
-  min-height:26px;
-  align-items:center;
-}
-#ryCadSide [data-pp="pipePlanSection"] .pp-plan-label{
-  line-height:1;
-}
-#ryCadSide [data-pp="pipePlanSection"] .pp-plan-val{
-  font-size:11px;font-weight:400;
-  line-height:1;
-}
-#ryCadSide [data-pp="pipePlanSection"] .pp-plan-item input{
-  height:24px;
-  padding:2px 6px;
-}
+/* [v436-pp-normalize] 原 .pp-plan-item/.pp-plan-label/.pp-plan-val/input 的
+   紧凑行与配色规则已删除：04 页参数栏样式归一至 mod/ry-panel.css 皮肤块。
+   .pp-toolbar（工具条）与 .pp-sep（工具条分隔符）保留。 */
 #ryCadSide [data-pp="pipePlanSection"] .pp-sep,
 #ryCadSide [data-pp="pipePlanSection"] .pp-sep-vert{
   height:20px;
@@ -129,32 +117,9 @@
 }
 #ryCadSide [data-pp="pipePlanSection"] .pp-area-tag{color:rgba(255,255,255,.78)}
 #ryCadSide [data-pp="pipePlanSection"] .pp-area-tag b{color:#fff}
-#ryCadSide [data-pp="pipePlanSection"] .pp-plan-bar{
-  margin:12px 20px 8px;
-  background:#fbfdfb;
-  border:1px solid #d9e4dd;
-  color:#334155;
-}
-#ryCadSide [data-pp="pipePlanSection"] .pp-plan-bar-result{
-  background:#f6f8f7;
-  border-color:#d9e4dd;
-}
-#ryCadSide [data-pp="pipePlanSection"] .pp-plan-item{color:#334155}
-#ryCadSide [data-pp="pipePlanSection"] .pp-plan-label{color:#6b7d73}
-#ryCadSide [data-pp="pipePlanSection"] .pp-plan-val{color:#166534}
-#ryCadSide [data-pp="pipePlanSection"] .pp-plan-item input,
-#ryCadSide [data-pp="pipePlanSection"] .pp-plan-item select,
-#ryCadSide [data-pp="pipePlanSection"] .pp-select-sm{
-  background:#fff;
-  color:#173f2d;
-  border:1px solid #d6e1da;
-}
-#ryCadSide [data-pp="pipePlanSection"] .pp-plan-item input:focus,
-#ryCadSide [data-pp="pipePlanSection"] .pp-plan-item select:focus,
-#ryCadSide [data-pp="pipePlanSection"] .pp-select-sm:focus{
-  border-color:#16a34a;
-  box-shadow:0 0 0 3px rgba(22,163,74,.12);
-}
+/* [v436-pp-normalize] 原 .pp-plan-bar（白卡）/ .pp-plan-bar-result / .pp-plan-item
+   / .pp-plan-label / .pp-plan-val / input·select 配色与 focus 段已删除：
+   04 页参数栏样式归一至 mod/ry-panel.css 皮肤块。 */
 #ryCadSide [data-pp="pipePlanSection"] .pp-sep,
 #ryCadSide [data-pp="pipePlanSection"] .pp-sep-vert{background:#d9e4dd}
 #ryCadSide [data-pp="pipePlanSection"] .pp-hint{color:#5a656a}
@@ -278,51 +243,10 @@
 #ryCadSide [data-pp="pipePlanSection"] > .pp-body>.pp-stage{grid-column:3}
 #ryCadSide [data-pp="pipePlanSection"] .pp-side,
 #ryCadSide [data-pp="pipePlanSection"] .pp-stage{min-width:0;min-height:0}
-#ryCadSide [data-pp="pipePlanSection"] .pp-side{
-    align-self:start;max-height:100%;
-    display:flex;flex-direction:column;gap:8px;
-    overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
-    padding:9px;border-radius:12px;
-    background:linear-gradient(180deg,#f8fbf9 0%,#f2f7f4 100%);
-    border:1px solid #dde8e1;
-  }
-#ryCadSide [data-pp="pipePlanSection"] .pp-side>*{flex:0 0 auto}
-#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-bar{
-    display:block!important;margin:0!important;padding:8px 11px;
-    min-height:0;border-radius:10px;
-    background:#fff;border:1px solid #e4ece7;
-    font-size:11px;
-  }
-#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-bar-result{background:#fbfefc}
-#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-bar::before{
-    content:"地块与灌溉参数";
-    display:block;margin:0 0 4px;padding-bottom:5px;
-    border-bottom:1px solid #eaf1ec;
-    font-size:11px;font-weight:700;letter-spacing:.05em;color:#2f6d43;
-  }
-#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-bar-result::before{content:"水力计算结果"}
-#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-item{
-    display:flex;align-items:center;gap:5px;
-    width:100%;min-height:26px;padding:2px 0;
-    border-bottom:1px dashed #eef3f0;
-  }
-#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-item:last-of-type{border-bottom:0}
-#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-item>.pp-plan-label:first-child{margin-right:auto}
-#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-label{font-size:11px;line-height:1.25;white-space:nowrap}
-#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-val{font-size:11px;font-weight:400}
-#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-item input{
-    width:64px!important;height:24px;padding:2px 6px;
-    box-sizing:border-box;text-align:right;flex:0 0 auto;font-size:11px;font-weight:400;
-  }
-#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-sep-vert{display:none}
-#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-calc-formula{
-    margin:0;padding:6px 9px;
-    white-space:normal;overflow:visible;
-    font-size:11px;line-height:1.5;
-  }
-#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-calc-formula .pp-cf-line,
-#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-calc-formula .pp-cf-line-h{white-space:normal}
-#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-calc-formula .pp-cf-input{width:40px;height:16px;font-size:11px}
+/* [v436-pp-normalize] 原「#pipePlanSection .pp-side 容器布局 + 旧竖排参数卡片
+   （.pp-plan-bar 白卡 / ::before 伪元素标题 / .pp-plan-item 竖排行 / input
+   64px!important / .pp-calc-formula 浅色化）」整段删除：
+   04 页参数栏样式归一至 mod/ry-panel.css 皮肤块（唯一来源）。 */
 #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-head-break{margin:0;padding:6px 9px;font-size:11px}
 #ryCadSide [data-pp="pipePlanSection"] .pp-stage{
     display:grid;
@@ -518,14 +442,18 @@ body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] > .pp-body{
   grid-template-columns:var(--pp-side-w,var(--ry-side-w)) 10px minmax(0,1fr);
   column-gap:0;row-gap:0;padding:0;
 }
-body.ry-tool #ryCadSide [data-pp="pipePlanSection"] .pp-side,
+/* [v436-pp-normalize] 04 页 .pp-side 容器只保留 grid 定位三件套：
+   底色/内边距/间距/滚动/子项伸缩全部归一至 mod/ry-panel.css 皮肤块。
+   原 pp/tl 共用规则拆分，tl 版保持原样（第③刀再处理）。 */
+body.ry-tool #ryCadSide [data-pp="pipePlanSection"] .pp-side{
+  grid-column:1;align-self:stretch;max-height:100%;
+}
 body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-side{
   grid-column:1;align-self:stretch;max-height:100%;
   display:flex;flex-direction:column;gap:8px;
   padding:10px;overflow-y:auto;overscroll-behavior:contain;
   background:var(--ry-panel);border:0;border-right:1px solid var(--ry-line);
 }
-body.ry-tool #ryCadSide [data-pp="pipePlanSection"] .pp-side>*,
 body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-side>*{flex:0 0 auto}
 body.ry-tool #ryCadSide [data-pp="pipePlanSection"] .pp-stage,
 body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-stage{
@@ -937,7 +865,10 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
 <link rel="icon" type="image/png" sizes="192x192" href="pwa/icons/icon-192.png">
 <link rel="stylesheet" href="pwa/pwa.css?v=2">
 <script defer src="pwa/pwa.js?v=2"></script>
-    <link rel="stylesheet" href="runye-theme.css?v=1">
+    <link rel="stylesheet" href="runye-theme.css?v=2">
+    <link rel="stylesheet" href="mod/ry-panel.css?v=436-pp-normalize">
+    <!-- Shoelace 2.15.1（与紧凑分组样板一致）；Shoelace 不可用时保留原生输入控件。 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.1/cdn/themes/light.css">
   <link rel="stylesheet" href="runye-typography.css?v=1">
 <style id="ryFrameShellCss">
   #ryFrameShell{position:fixed;left:0;right:0;top:calc(var(--fn-nav-h,36px) + 1px);bottom:var(--ry-status-h,34px);z-index:20;background:#fff;overflow:hidden}
@@ -1011,8 +942,8 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
        runye-member-ui.js 里保留的 jsdelivr 动态 import 仅作 bundle 404 时的兜底 -->
 <script defer src="pwa/vendor/cloudbase-js-sdk-3.8.2.bundle.js?v=359"></script>
   <script src="cloud-sync.js?v=371b"></script>
-  <script src="runye-entitle.js?v=411-tier-access"></script>
-  <script src="runye-member-ui.js?v=367"></script>
+  <script src="runye-entitle.js?v=429-local-admin"></script>
+  <script src="runye-member-ui.js?v=429-local-admin"></script>
   <!-- 顶部导航动作按钮（系统图/轴测图，runye-nav.js act 项）：动作映射须先于 runye-nav.js 注册 -->
   <script src="mod/inline-05.js?v=357"></script>
   <script src="runye-nav.js?v=385-global-open"></script>
@@ -1051,44 +982,50 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
    <!-- ① 输入设计参数 -->
    <div class="mw-col mw-col-input">
     <!-- INPUT PANEL -->
-    <div class="input-panel">
-      <fieldset>
-        <legend><span class="sk-no">01</span><span>水源与地形</span></legend>
+    <div class="input-panel" id="designParametersPanel" data-ry-panel data-ry-panel-key="designInput" data-ry-reset="372" data-ry-min="300" data-ry-max="420" data-ry-fold-key="ryDesignInputFolded" data-ry-fold-width="48">
+      <div class="ryp-sidebar-head" data-ry-toggle>
+        <span class="ryp-title">设计参数</span>
+        <button class="ryp-fold" type="button" data-ry-fold aria-label="折叠或展开设计参数" aria-expanded="true" data-ry-fold-open="▾" data-ry-fold-closed="▸">▾</button>
+      </div>
+      <button class="ryp-rail-tab" type="button" data-ry-rail aria-label="展开设计参数面板" title="展开设计参数">参数</button>
+      <div class="ryp-body" data-ry-body>
+      <fieldset class="ryp-group">
+        <legend class="ryp-group-head"><sl-icon name="droplet" aria-hidden="true"></sl-icon><span>水源与地形</span></legend>
         <div class="form-grid">
-          <label class="field"><span>水源至最高点高差</span><span class="input-shell"><input id="fld_dh" type="number" min="0" step="1" value="5"><em>m</em></span></label>
-          <label class="field"><span>井/水池提升高度</span><span class="input-shell"><input id="fld_lift" type="number" min="0" step="1" value="5"><em>m</em></span></label>
-          <label class="field"><span>水源已有压力</span><span class="input-shell"><input id="fld_existPressure" type="number" min="0" step="0.1" value="0"><em>bar</em></span></label>
-          <label class="field"><span>过滤与阀门损失</span><span class="input-shell"><input id="fld_filterLoss" type="number" min="0" step="0.5" value="5"><em>m</em></span></label>
+          <div class="field ryp-row"><span class="ryp-key">水源至最高点高差</span><span class="input-shell ryp-value"><input class="ryp-native-fallback" id="fld_dh" type="number" min="0" step="1" value="5" aria-label="水源至最高点高差"><sl-input data-ry-proxy-for="fld_dh" type="number" min="0" step="1" value="5" size="small" aria-label="水源至最高点高差" hidden></sl-input><em>m</em></span></div>
+          <div class="field ryp-row"><span class="ryp-key">井/水池提升高度</span><span class="input-shell ryp-value"><input class="ryp-native-fallback" id="fld_lift" type="number" min="0" step="1" value="5" aria-label="井/水池提升高度"><sl-input data-ry-proxy-for="fld_lift" type="number" min="0" step="1" value="5" size="small" aria-label="井/水池提升高度" hidden></sl-input><em>m</em></span></div>
+          <div class="field ryp-row"><span class="ryp-key">水源已有压力</span><span class="input-shell ryp-value"><input class="ryp-native-fallback" id="fld_existPressure" type="number" min="0" step="0.1" value="0" aria-label="水源已有压力"><sl-input data-ry-proxy-for="fld_existPressure" type="number" min="0" step="0.1" value="0" size="small" aria-label="水源已有压力" hidden></sl-input><em>bar</em></span></div>
+          <div class="field ryp-row"><span class="ryp-key">过滤与阀门损失</span><span class="input-shell ryp-value"><input class="ryp-native-fallback" id="fld_filterLoss" type="number" min="0" step="0.5" value="5" aria-label="过滤与阀门损失"><sl-input data-ry-proxy-for="fld_filterLoss" type="number" min="0" step="0.5" value="5" size="small" aria-label="过滤与阀门损失" hidden></sl-input><em>m</em></span></div>
         </div>
       </fieldset>
 
-      <fieldset>
-        <legend><span class="sk-no">02</span><span>主管与支管</span></legend>
+      <fieldset class="ryp-group">
+        <legend class="ryp-group-head"><sl-icon name="diagram-3" aria-hidden="true"></sl-icon><span>主管与支管</span></legend>
         <div class="form-grid">
-          <label class="field"><span>主管长度</span><span class="input-shell"><input id="fld_mainPipeLen" type="number" min="0" step="1" value="200"><em>m</em></span></label>
-          <label class="field"><span>目标经济流速</span><span class="input-shell"><input id="fld_targetV" type="number" min="0" max="5" step="0.1" value="1.5"><em>m/s</em></span></label>
-          <label class="field"><span>预计水泵效率 η</span><span class="input-shell"><input id="fld_efficiency" type="number" min="1" max="100" step="1" value="65"><em>%</em></span></label>
-          <label class="field"><span>滴灌带入口工作压力</span><span class="input-shell"><input id="fld_tapePressure" type="number" min="0" step="0.1" value="1"><em>bar</em></span></label>
+          <div class="field ryp-row"><span class="ryp-key">主管长度</span><span class="input-shell ryp-value"><input class="ryp-native-fallback" id="fld_mainPipeLen" type="number" min="0" step="1" value="200" aria-label="主管长度"><sl-input data-ry-proxy-for="fld_mainPipeLen" type="number" min="0" step="1" value="200" size="small" aria-label="主管长度" hidden></sl-input><em>m</em></span></div>
+          <div class="field ryp-row"><span class="ryp-key">目标经济流速</span><span class="input-shell ryp-value"><input class="ryp-native-fallback" id="fld_targetV" type="number" min="0" max="5" step="0.1" value="1.5" aria-label="目标经济流速"><sl-input data-ry-proxy-for="fld_targetV" type="number" min="0" max="5" step="0.1" value="1.5" size="small" aria-label="目标经济流速" hidden></sl-input><em>m/s</em></span></div>
+          <div class="field ryp-row"><span class="ryp-key">预计水泵效率 η</span><span class="input-shell ryp-value"><input class="ryp-native-fallback" id="fld_efficiency" type="number" min="1" max="100" step="1" value="65" aria-label="预计水泵效率"><sl-input data-ry-proxy-for="fld_efficiency" type="number" min="1" max="100" step="1" value="65" size="small" aria-label="预计水泵效率" hidden></sl-input><em>%</em></span></div>
+          <div class="field ryp-row"><span class="ryp-key">滴灌带入口工作压力</span><span class="input-shell ryp-value"><input class="ryp-native-fallback" id="fld_tapePressure" type="number" min="0" step="0.1" value="1" aria-label="滴灌带入口工作压力"><sl-input data-ry-proxy-for="fld_tapePressure" type="number" min="0" step="0.1" value="1" size="small" aria-label="滴灌带入口工作压力" hidden></sl-input><em>bar</em></span></div>
         </div>
       </fieldset>
 
-      <fieldset>
-        <legend><span class="sk-no">03</span><span>滴灌带与滴头</span></legend>
+      <fieldset class="ryp-group">
+        <legend class="ryp-group-head"><sl-icon name="layers" aria-hidden="true"></sl-icon><span>滴灌带与滴头</span></legend>
         <div class="form-grid">
-          <label class="field"><span>单条滴灌带长度</span><span class="input-shell"><input id="fld_tapeLen" type="number" min="0" step="1" value="100"><em>m</em></span></label>
-          <label class="field"><span>滴灌带间距 D</span><span class="input-shell"><input id="fld_tapeSpacing" type="number" min="0" step="0.1" value="0.8"><em>m</em></span></label>
-          <label class="field"><span>滴灌带沿线高差</span><span class="input-shell"><input id="fld_tapeDh" type="number" min="0" step="0.1" value="1"><em>m</em></span></label>
-          <label class="field"><span>滴头间距</span><span class="input-shell"><input id="fld_emitterSpacing" type="number" min="0" step="0.05" value="0.3"><em>m</em></span></label>
-          <label class="field"><span>单滴头流量</span><span class="input-shell"><input id="fld_emitterFlow" type="number" min="0" step="0.1" value="0.8"><em>L/h</em></span></label>
-          <label class="field"><span>滴灌带外径</span><span class="input-shell"><input id="fld_tapeOD" type="number" min="0" step="1" value="16"><em>mm</em></span></label>
+          <div class="field ryp-row"><span class="ryp-key">单条滴灌带长度</span><span class="input-shell ryp-value"><input class="ryp-native-fallback" id="fld_tapeLen" type="number" min="0" step="1" value="100" aria-label="单条滴灌带长度"><sl-input data-ry-proxy-for="fld_tapeLen" type="number" min="0" step="1" value="100" size="small" aria-label="单条滴灌带长度" hidden></sl-input><em>m</em></span></div>
+          <div class="field ryp-row"><span class="ryp-key">滴灌带间距 D</span><span class="input-shell ryp-value"><input class="ryp-native-fallback" id="fld_tapeSpacing" type="number" min="0" step="0.1" value="0.8" aria-label="滴灌带间距"><sl-input data-ry-proxy-for="fld_tapeSpacing" type="number" min="0" step="0.1" value="0.8" size="small" aria-label="滴灌带间距" hidden></sl-input><em>m</em></span></div>
+          <div class="field ryp-row"><span class="ryp-key">滴灌带沿线高差</span><span class="input-shell ryp-value"><input class="ryp-native-fallback" id="fld_tapeDh" type="number" min="0" step="0.1" value="1" aria-label="滴灌带沿线高差"><sl-input data-ry-proxy-for="fld_tapeDh" type="number" min="0" step="0.1" value="1" size="small" aria-label="滴灌带沿线高差" hidden></sl-input><em>m</em></span></div>
+          <div class="field ryp-row"><span class="ryp-key">滴头间距</span><span class="input-shell ryp-value"><input class="ryp-native-fallback" id="fld_emitterSpacing" type="number" min="0" step="0.05" value="0.3" aria-label="滴头间距"><sl-input data-ry-proxy-for="fld_emitterSpacing" type="number" min="0" step="0.05" value="0.3" size="small" aria-label="滴头间距" hidden></sl-input><em>m</em></span></div>
+          <div class="field ryp-row"><span class="ryp-key">单滴头流量</span><span class="input-shell ryp-value"><input class="ryp-native-fallback" id="fld_emitterFlow" type="number" min="0" step="0.1" value="0.8" aria-label="单滴头流量"><sl-input data-ry-proxy-for="fld_emitterFlow" type="number" min="0" step="0.1" value="0.8" size="small" aria-label="单滴头流量" hidden></sl-input><em>L/h</em></span></div>
+          <div class="field ryp-row"><span class="ryp-key">滴灌带外径</span><span class="input-shell ryp-value"><input class="ryp-native-fallback" id="fld_tapeOD" type="number" min="0" step="1" value="16" aria-label="滴灌带外径"><sl-input data-ry-proxy-for="fld_tapeOD" type="number" min="0" step="1" value="16" size="small" aria-label="滴灌带外径" hidden></sl-input><em>mm</em></span></div>
         </div>
       </fieldset>
 
-      <fieldset>
-        <legend><span class="sk-no">04</span><span>分区与铺设方式</span></legend>
+      <fieldset class="ryp-group">
+        <legend class="ryp-group-head"><sl-icon name="grid-3x3" aria-hidden="true"></sl-icon><span>分区与铺设方式</span></legend>
         <div class="form-grid">
-          <label class="field"><span>单个分区面积</span><span class="input-shell"><input id="fld_zoneMu" type="number" min="0.1" step="0.1" value="30"><em>亩</em></span></label>
-          <label class="field"><span>分区固定边长</span><span class="input-shell"><input id="fld_zoneFixedSide" type="number" min="1" max="200" step="1" value="200"><em>m</em></span></label>
+          <div class="field ryp-row"><span class="ryp-key">单个分区面积</span><span class="input-shell ryp-value"><input class="ryp-native-fallback" id="fld_zoneMu" type="number" min="0.1" step="0.1" value="30" aria-label="单个分区面积"><sl-input data-ry-proxy-for="fld_zoneMu" type="number" min="0.1" step="0.1" value="30" size="small" aria-label="单个分区面积" hidden></sl-input><em>亩</em></span></div>
+          <div class="field ryp-row"><span class="ryp-key">分区固定边长</span><span class="input-shell ryp-value"><input class="ryp-native-fallback" id="fld_zoneFixedSide" type="number" min="1" max="200" step="1" value="200" aria-label="分区固定边长"><sl-input data-ry-proxy-for="fld_zoneFixedSide" type="number" min="1" max="200" step="1" value="200" size="small" aria-label="分区固定边长" hidden></sl-input><em>m</em></span></div>
           <input id="fld_A" type="hidden" value="200">
           <input id="fld_B" type="hidden" value="100">
           <input id="fld_N" type="hidden" value="1">
@@ -1105,9 +1042,11 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
         </div>
       </fieldset>
 
-<div class="panel-foot">
-        <button class="text-button" onclick="resetDefaults()">恢复示例</button>
+      </div><!-- /.ryp-body -->
+      <div class="panel-foot ryp-panel-foot">
+        <button class="text-button" type="button" onclick="resetDefaults()">恢复默认参数</button>
       </div>
+      <div class="ryp-grip" data-ry-grip title="拖动调整面板宽度 · 双击恢复默认"></div>
 </div><!-- /.input-panel -->
    </div><!-- /.mw-col-input -->
 
@@ -1284,43 +1223,57 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
        （01 版面的面积条与 04 的施工简图），信息不丢失。 -->
   <!-- 版面：左侧参数栏 + 右侧图纸区。参数由顶部横排改为左栏竖排，把整屏高度让给图纸 -->
   <div class="pp-body">
-  <aside class="pp-side" id="ppSide">
+  <aside class="pp-side" id="ppSide" data-ry-panel data-ry-panel-key="ppSide" data-ry-fold-key="ryPpSideFolded">
+  <!-- [v432-pp-side-panel] 套用共享面板规范：深墨绿标题头 + 折叠（mod/ry-panel.js
+       的 rypCollapsible 驱动，记忆键 ryPpSideFolded；与 01 设计参数面板同一实现）。
+       [v433] 按用户要求取消收起细条「参数」——折叠后标题头仍可见、点击即可重新展开，
+       细条属于重复入口。参数与结果包进 [data-ry-body]，折叠时整体隐藏。
+       原字段 ID / 事件绑定一律未动。 -->
+  <div class="ryp-sidebar-head" data-ry-toggle title="点击折叠 / 展开分区参数面板">
+    <span class="ryp-title">地块分区参数</span>
+    <button class="ryp-fold" type="button" data-ry-fold aria-label="折叠或展开分区参数面板" aria-expanded="true" data-ry-fold-open="▾" data-ry-fold-closed="▸">▾</button>
+  </div>
+  <div class="ryp-body" data-ry-body>
   <!-- 地块规划参数 — 第1行：输入参数 -->
   <div class="pp-plan-bar" id="ppPlanBar" style="margin-bottom:8px">
     <!-- 2026-09-20 v91 用户要求：把「水泵提升高度 / 地形高差」做成可设定值，放进本面板、排在「滴灌带间距」之前。
          与 01 一级表单同源：planLift ⇄ fld_lift、planDh ⇄ fld_dh（双向镜像，见下方 JS 块），默认值仍为 5 / 5。
          需要撤掉：删掉本注释与下面两行 item 即可，另删本文件底部 ppPullLiftDh / ppLiftDhCapture 那一整块（含两个 document 监听）与 resetDefaults 里的回填调用。 -->
-    <span class="pp-plan-item"><span class="pp-plan-label">水泵提升高度</span><input type="number" id="planLift" value="5" min="0" step="1">m</span>
-    <span class="pp-plan-item"><span class="pp-plan-label">地形高差</span><input type="number" id="planDh" value="5" min="0" step="1">m</span>
+    <div class="ryp-group-head"><sl-icon name="droplet" aria-hidden="true"></sl-icon>水源与扬程</div>
+    <span class="pp-plan-item"><span class="pp-plan-label">水泵提升高度</span><input class="ryp-native-fallback" type="number" id="planLift" value="5" min="0" step="1" aria-label="水泵提升高度"><sl-input data-ry-proxy-for="planLift" type="number" value="5" min="0" step="1" size="small" aria-label="水泵提升高度" hidden></sl-input>m</span>
+    <span class="pp-plan-item"><span class="pp-plan-label">地形高差</span><input class="ryp-native-fallback" type="number" id="planDh" value="5" min="0" step="1" aria-label="地形高差"><sl-input data-ry-proxy-for="planDh" type="number" value="5" min="0" step="1" size="small" aria-label="地形高差" hidden></sl-input>m</span>
     <!-- 2026-09-24 任务⑮（用户要求）：新增「水源距离」——自动生成时水源贴着地块，实际水源可能在
          地块外一段距离。该距离计入三级总管长度（frontLenUsed）→ 总管沿程损失 → 水泵扬程，
          并计入总管长度统计（结果栏/损失卡/对比表）与材料清单。 -->
-    <span class="pp-plan-item"><span class="pp-plan-label">水源距离</span><input type="number" id="planSrcDist" value="0" min="0" step="1" title="水源到地块边界的距离（m）：计入总管长度 → 总管沿程损失 → 水泵扬程；同时计入总管长度统计与材料清单">m</span>
+    <span class="pp-plan-item"><span class="pp-plan-label">水源距离</span><input class="ryp-native-fallback" type="number" id="planSrcDist" value="0" min="0" step="1" aria-label="水源距离" title="水源到地块边界的距离（m）：计入总管长度 → 总管沿程损失 → 水泵扬程；同时计入总管长度统计与材料清单"><sl-input data-ry-proxy-for="planSrcDist" type="number" value="0" min="0" step="1" size="small" aria-label="水源距离" hidden></sl-input>m</span>
     <!-- 2026-09-24 用户要求：新增「单边铺设长度」（默认100m，可调80/120等）。
          分区划分固定边 = 滴灌带铺设长度 = 此值（2026-09-28 取消双边×2；原默认 2×100=200m）；
          另一边 = 单区面积 ÷ 固定边，调节后分区宽度自动跟随。
          消费点：planZoneFixedSide() → calcZoneLayout / calcManualZoneLayout / ppGetZoneCuts。
          需要撤掉：删本 item，并把 planZoneFixedSide 三处消费点还原为 MAX_ZONE_SIDE。 -->
-    <span class="pp-plan-item"><span class="pp-plan-label">单边铺设长度</span><input type="number" id="planTapeLaySide" value="100" min="10" step="10" title="滴灌带在分区内单边铺设长度；分区固定边 = 单边长度×2，调节后分区划分自动跟随">m</span>
-    <span class="pp-plan-item"><span class="pp-plan-label">滴灌带间距</span><input type="number" id="planTapeSpacing" value="0.4" min="0.1" step="0.1">m</span>
-    <span class="pp-plan-item"><span class="pp-plan-label">滴孔间距</span><input type="number" id="planEmitterSpacing" value="0.3" min="0.05" step="0.05">m</span>
-    <span class="pp-plan-item"><span class="pp-plan-label">滴头流量</span><input type="number" id="planEmitterFlow" value="0.8" min="0.1" step="0.1">L/h</span>
+    <div class="ryp-group-head"><sl-icon name="arrows-expand" aria-hidden="true"></sl-icon>滴灌带铺设</div>
+    <span class="pp-plan-item"><span class="pp-plan-label">单边铺设长度</span><input class="ryp-native-fallback" type="number" id="planTapeLaySide" value="100" min="10" step="10" aria-label="单边铺设长度" title="滴灌带在分区内单边铺设长度；分区固定边 = 单边长度×2，调节后分区划分自动跟随"><sl-input data-ry-proxy-for="planTapeLaySide" type="number" value="100" min="10" step="10" size="small" aria-label="单边铺设长度" hidden></sl-input>m</span>
+    <span class="pp-plan-item"><span class="pp-plan-label">滴灌带间距</span><input class="ryp-native-fallback" type="number" id="planTapeSpacing" value="0.4" min="0.1" step="0.1" aria-label="滴灌带间距"><sl-input data-ry-proxy-for="planTapeSpacing" type="number" value="0.4" min="0.1" step="0.1" size="small" aria-label="滴灌带间距" hidden></sl-input>m</span>
+    <span class="pp-plan-item"><span class="pp-plan-label">滴孔间距</span><input class="ryp-native-fallback" type="number" id="planEmitterSpacing" value="0.3" min="0.05" step="0.05" aria-label="滴孔间距"><sl-input data-ry-proxy-for="planEmitterSpacing" type="number" value="0.3" min="0.05" step="0.05" size="small" aria-label="滴孔间距" hidden></sl-input>m</span>
+    <span class="pp-plan-item"><span class="pp-plan-label">滴头流量</span><input class="ryp-native-fallback" type="number" id="planEmitterFlow" value="0.8" min="0.1" step="0.1" aria-label="滴头流量"><sl-input data-ry-proxy-for="planEmitterFlow" type="number" value="0.8" min="0.1" step="0.1" size="small" aria-label="滴头流量" hidden></sl-input>L/h</span>
     <!-- 2026-09-28 用户要求：取消「单带长度」——与「单边铺设长度」语义重复。
          单条滴灌带长度改由 planTapeLaySide（单边铺设长度）承担（calcPlan tapeLen / 摘要处均已重指向）。
          需要恢复：加回 <span class="pp-plan-item"><span class="pp-plan-label">单带长度</span><input type="number" id="planTapeLen" value="100" min="10" step="10">m</span> 并还原三处消费点。 -->
     <span class="pp-sep-vert"></span>
-    <span class="pp-plan-item"><span class="pp-plan-label">分区划定</span><input type="number" id="planZoneMuManual" value="18" min="0.1" step="0.1" style="width:58px">亩/区</span>
-    <span class="pp-plan-item"><span class="pp-plan-label">目标流速</span><input type="number" id="planTargetV" value="1.5" min="0.3" max="5" step="0.1">m/s</span>
+    <div class="ryp-group-head"><sl-icon name="grid-3x3" aria-hidden="true"></sl-icon>分区与水力</div>
+    <span class="pp-plan-item"><span class="pp-plan-label">分区划定</span><input class="ryp-native-fallback" type="number" id="planZoneMuManual" value="18" min="0.1" step="0.1" style="width:58px" aria-label="分区划定"><sl-input data-ry-proxy-for="planZoneMuManual" type="number" value="18" min="0.1" step="0.1" size="small" aria-label="分区划定" hidden></sl-input>亩/区</span>
+    <span class="pp-plan-item"><span class="pp-plan-label">目标流速</span><input class="ryp-native-fallback" type="number" id="planTargetV" value="1.5" min="0.3" max="5" step="0.1" aria-label="目标流速"><sl-input data-ry-proxy-for="planTargetV" type="number" value="1.5" min="0.3" max="5" step="0.1" size="small" aria-label="目标流速" hidden></sl-input>m/s</span>
     <!-- 2026-10-04 v199 用户要求：左栏增加「入口压力」输入 —— 与 01 一级表单「滴灌带入口工作压力
          fld_tapePressure」**同一个物理量**（扬程计算式条里的「入口压力」= bar×10.2m），
          双向镜像同 v91 机制（PP_LIFTDH_PAIRS）。调节后水泵扬程/计算式条实时跟随。
          需要撤掉：删本 item + PP_LIFTDH_PAIRS 里的镜像对 + 下方 calcPlan 触发循环里的一项。 -->
-    <span class="pp-plan-item"><span class="pp-plan-label">入口压力</span><input type="number" id="planTapePressure" value="1" min="0" step="0.1" title="滴灌带入口工作压力（bar）：计入水泵扬程（×10.2 折算水头），与 01 一级表单同源联动">bar</span>
+    <span class="pp-plan-item"><span class="pp-plan-label">入口压力</span><input class="ryp-native-fallback" type="number" id="planTapePressure" value="1" min="0" step="0.1" aria-label="入口压力" title="滴灌带入口工作压力（bar）：计入水泵扬程（×10.2 折算水头），与 01 一级表单同源联动"><sl-input data-ry-proxy-for="planTapePressure" type="number" value="1" min="0" step="0.1" size="small" aria-label="入口压力" hidden></sl-input>bar</span>
     <input type="hidden" id="planN" value="4">
     <input type="hidden" id="planZoneMode" value="manual">
   </div>
   <!-- 第2行：计算结果 -->
   <div class="pp-plan-bar pp-plan-bar-result" id="ppPlanBar2">
+    <div class="ryp-group-head"><sl-icon name="calculator" aria-hidden="true"></sl-icon>水力计算结果</div>
     <span class="pp-sep-vert"></span>
     <span class="pp-plan-item"><span class="pp-plan-label">每亩流量</span><span class="pp-plan-val" id="planIntensity">—</span>m³/h/亩</span>
     <span class="pp-sep-vert"></span>
@@ -1336,6 +1289,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
   </div>
   <!-- 扬程计算式（紧贴结果栏下方，仅扬程一行，实时跟随输入更新，不换行） -->
   <div id="ppCalcDetail" class="pp-calc-formula pp-calc-h"></div>
+  </div><!-- /ryp-body [v432-pp-side-panel] -->
   <!-- 视图切换（管线编辑 / 二级简图）：2026-09-12 再下移 —— 已搬出左栏，
        落到页面底部状态栏 #ryStatusBar 内、位于「制图」标签之前（见该文件尾部注释）。
        仍是同一个节点、同一个 id —— JS 用 getElementById('ppTabs') 绑定事件，与父节点无关。 -->
@@ -2277,6 +2231,8 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
   <iframe id="frMap" data-fr-page="online-map" data-src="runye-map-measure.html" title="在线地图"></iframe>
   <iframe id="frTerrain" data-fr-page="terrain" data-src="terrain/index.html" title="地形模块"></iframe>
   <iframe id="frHyd" data-fr-page="hydraulics" data-src="runye-hydraulics.html" title="水力校核"></iframe>
+  <!-- [v438] 测试分区：侧边工具面板样板独立页（导航「地块分区」之后） -->
+  <iframe id="frTestPanel" data-fr-page="test-panel" data-src="runye-test-panel.html" title="测试分区"></iframe>
 </div></main>
 
 <!-- ===== 底部状态栏（工具模式）：当前功能区 + 关键结果，常驻视口底部 ===== -->
@@ -2540,18 +2496,30 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
 </div>
 
 <script src="mod/material-formulas.js?v=412"></script>
-<script src="mod/zone-geometry.js?v=416-tape-axis"></script>
+<script src="mod/zone-geometry.js?v=425-manual-zone-geometry"></script>
 <script src="mod/flow-geometry.js?v=414"></script>
-<script src="mod/inline-09.js?v=416-tape-axis"></script>
+<script src="mod/tl-polyline-geometry.js?v=426-tl-polyline-geometry"></script>
+<!-- [v421-mat-table] 材料清单/材料表管理（自 inline-09 迁出）：先于 inline-09 加载 —— inline-09 尾部
+     IIFE 的 ready.then(render) 是微任务，会在两脚本之间触发首屏 render，需要本文件函数已就位 -->
+<script src="mod/material-table.js?v=421-mat-table"></script>
+<!-- [v424-plan-calc-render] 扬程公式与分解展示模块，先于计算控制器和三级调用方装载。 -->
+<script src="mod/plan-calc-render.js?v=424-plan-calc-render"></script>
+<script src="mod/inline-09.js?v=430-shoelace-panel"></script>
+<!-- [v423-header-layout] 三级简图标题布局依赖 inline-09 的 tlMeasureText 与生成时写入的标题状态。 -->
+<script src="mod/tl-header-layout.js?v=423-header-layout"></script>
 
 <!-- ===== 面积测量工具 JS ===== -->
 <script src="mod/inline-10.js?v=357"></script>
 
 <!-- ===== 实际地块规划 JS ===== -->
-<script src="mod/inline-11.js?v=416-tape-axis"></script>
+<script src="mod/inline-11.js?v=420-split"></script>
+<!-- [v420-split] 绘图编辑器 IIFE 自 inline-11 迁出：必须紧随 inline-11 之后同步执行 -->
+<script src="mod/plot-editor.js?v=420-split"></script>
 <script src="mod/inline-12.js?v=357"></script>
 <script src="mod/inline-13.js?v=357"></script>
-<script src="mod/inline-14.js?v=357"></script>
+<!-- [v422-head-system-svg] 纯 SVG 核心先于 inline-14 同步加载。 -->
+<script src="mod/head-system-svg.js?v=422-head-system-svg"></script>
+<script src="mod/inline-14.js?v=422-head-system-svg"></script>
 
 <!-- ===== 嵌入导航：移动端菜单 ===== -->
 <script src="mod/inline-15.js?v=357"></script>
@@ -2624,263 +2592,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     </details>
   </div>
 </aside>
-<script id="ryCadJs">
-/* ═══ 14b. CAD 全局工具栏（2026-09-14；视口切换条已取消，切视口走旧入口） ═══
-   仅真实浏览器（matchMedia 为原生函数）+ body.ry-tool 下接管；闸门 VM 桩 / Node
-   环境零动作。接管 = 把 #ppSide / #tlSide / #tlIsoSide 原节点移入 #ryCadSide
-   对应分组（节点携带全部 id 与事件，业务 JS 不感知）；退出工具模式原样搬回。
-   搬回用 insertBefore 时必须校验参照节点仍在原父节点内 —— 否则先搬回的那个还
-   挂在工具栏里，会抛 NotFoundError；故倒序搬回 + 参照节点失效则退化为 append。 */
-(function(){
-  'use strict';
-  function nativeOk(){ try{ return /native code/.test(String(window.matchMedia)); }catch(err){ return false; } }
-  if(!nativeOk()) return;
-
-  var HOSTS=[
-    {sec:'pipePlanSection',   side:'ppSide',    grp:'ryCadGrpPipe'},
-    {sec:'tlPipePlanSection', side:'tlSide',    grp:'ryCadGrpTl'},
-    {sec:'tlPipePlanSection', side:'tlIsoSide', grp:'ryCadGrpIso'}
-  ];
-  var W_SHUT=40, W_DEF=318, W_MIN=220, GAP=1;
-  /* 展开宽度：用户拖过 → localStorage 记忆（栏宽）；没拖过 wOpen=null，
-     不写任何变量，走 CSS 默认 318px（默认视觉逐像素不变）。 */
-  var wOpen=null;
-  try{
-    var _w=parseInt(localStorage.getItem('ryCadWOpen'),10);
-    if(_w>=W_MIN&&_w<=Math.max(W_MIN,Math.floor((window.innerWidth||1600)*0.46)-16)) wOpen=_w;
-  }catch(err){}
-  var memo={};
-
-  function $(id){ return document.getElementById(id); }
-  function isTool(){ return !!(document.body && document.body.classList.contains('ry-tool')); }
-  function refit(){ try{ window.dispatchEvent(new Event('resize')); }catch(err){} }
-  function railOpen(){ var s=$('ryCadSide'); return !!s && s.getAttribute('data-ry-open')!=='0'; }
-  function applyWidth(){
-    try{
-      /* main 让位 = 左距 1 + 栏宽（2026-09-14 用户要求贴边 1px；折叠 40+1=41） */
-      document.body.style.setProperty('--ry-cad-w',
-        (railOpen()?((wOpen||W_DEF)+GAP):(W_SHUT+GAP))+'px');
-    }catch(err){}
-    if(wOpen!=null){
-      try{ var s=$('ryCadSide'); if(s) s.style.setProperty('--ry-cad-w-open', wOpen+'px'); }catch(err){}
-    }
-    var g=$('ryCadSideGrip');
-    if(g) g.setAttribute('aria-expanded', railOpen()?'true':'false');
-  }
-
-  function moveIn(){
-    var changed=false;
-    for(var i=0;i<HOSTS.length;i++){
-      var h=HOSTS[i], side=$(h.side), grp=$(h.grp), sec=$(h.sec);
-      if(!side||!grp||!sec) continue;
-      if(side.getAttribute('data-ry-inrail')==='1'){
-        if(sec.getAttribute('data-ry-rail')!=='1'){ sec.setAttribute('data-ry-rail','1'); changed=true; }
-        continue;
-      }
-      memo[h.side]={parent:side.parentNode, next:side.nextSibling};
-      var box=grp.querySelector('[data-host="'+h.side+'"]')||grp;
-      box.appendChild(side);
-      side.setAttribute('data-ry-inrail','1');
-      sec.setAttribute('data-ry-rail','1');
-      changed=true;
-    }
-    applyWidth();
-    if(changed) refit();
-  }
-
-  function moveBackOne(h){
-    var side=$(h.side), m=memo[h.side];
-    if(!side||!m) return false;
-    var p=m.parent;
-    if(p&&p.parentNode){
-      var ref=(m.next&&m.next.parentNode===p)?m.next:null;
-      p.insertBefore(side, ref);
-    }
-    side.removeAttribute('data-ry-inrail');
-    var sec=$(h.sec); if(sec) sec.removeAttribute('data-ry-rail');
-    delete memo[h.side];
-    return true;
-  }
-
-  function moveBack(){
-    var changed=false;
-    for(var i=HOSTS.length-1;i>=0;i--){ if(moveBackOne(HOSTS[i])) changed=true; }
-    if(changed) refit();
-  }
-
-  /* 视口切换条已取消（2026-09-14 用户要求）：切视口由顶部导航 / 底部状态栏承担。
-     分组初始默认折叠；切到某管路页时随动展开对应分组（ensureFor(spec)，
-     2026-09-14 追加：点二级→二级组、点三级→三级组、点轴测→轴测配件组）。
-     仅在视口变化那一次触发；用户收起工具栏后不被反复顶开（除非再切视口）。 */
-  var lastSpec=null;
-  function syncAutoExpand(){
-    var cur=curSec();
-    var spec=cur;
-    var el=$(cur);
-    if(el&&el.getAttribute('data-ry-view')) spec=cur+':'+el.getAttribute('data-ry-view');
-    if(lastSpec===null){ lastSpec=spec; return; }
-    if(spec===lastSpec) return;
-    lastSpec=spec;
-    ensureFor(spec);
-  }
-
-  /* 轴测配件分组只在轴测视口出现 */
-  function syncIso(){
-    var tl=$('tlPipePlanSection');
-    var on=!!tl && curSec()==='tlPipePlanSection'
-           && tl.getAttribute('data-ry-view')==='iso';
-    document.body.classList.toggle('ry-cad-iso', on);
-  }
-
-  /* 当前功能区 id：优先 body[data-ry-sec]，为空时回退读 .ry-active
-     （首屏 ryShowSection 可能尚未写入，否则切换条会一开始不显示） */
-  function curSec(){
-    var s=document.body.getAttribute('data-ry-sec')||'';
-    if(s) return s;
-    var a=document.querySelector('main > .ry-sec.ry-active');
-    return a?a.id:'';
-  }
-  /* 工具栏显示门控（2026-09-14 用户要求）：只在二级管路 / 三级管路（含轴测）
-     两个区块显示；地块绘制与其他功能区不显示、不让位。ry-cad-vp 驱动
-     工栏显隐与 main 左让位（顶部让位已随视口切换条一并取消）。 */
-  var VPS=['pipePlanSection','tlPipePlanSection'];
-  /* 系统图视图排除（2026-09-14 用户要求）：三级管路切到「系统图」（data-ry-view="sys"）
-     时左栏已整体让位给满屏系统图，工具栏跟随隐藏；切回三级简图/轴测/设计自动恢复。
-     rySetTab 改 data-ry-view 后由 MutationObserver 触发 syncAll，显隐自动跟随。 */
-  function inVp(){
-    if(VPS.indexOf(curSec())<0) return false;
-    if(curSec()==='tlPipePlanSection'){
-      var el=$(curSec());
-      if(el&&el.getAttribute('data-ry-view')==='sys') return false;
-    }
-    return true;
-  }
-  function syncVp(){ document.body.classList.toggle('ry-cad-vp', inVp()); }
-  function syncAll(){ if(isTool()&&inVp()){ moveIn(); } else { moveBack(); } syncIso(); syncVp(); syncAutoExpand(); }
-
-  /* 切到某管路页 → 工具栏自动展开 + 对应分组互斥展开（2026-09-14 用户要求：
-     点二级管路展开二级分组、点三级管路展开三级分组、点轴测图展开轴测配件组，
-     **其余分组同时折叠**；轴测配件组只在轴测视口出现）。分组初始默认折叠
-     （verify 9e 把关），仅在视口变化那一次触发；用户随后收起不被反复顶开
-     （除非再切视口，那时按新目标重新互斥）。 */
-  var GRP_FOR={'pipePlanSection':'ryCadGrpPipe','tlPipePlanSection':'ryCadGrpTl'};
-  var ALL_GRPS=['ryCadGrpPipe','ryCadGrpTl','ryCadGrpIso'];
-  function ensureFor(spec){
-    try{
-      if(!inVp()) return;
-      var side=$('ryCadSide');
-      var sIso=(spec||'')==='tlPipePlanSection:iso';
-      /* 2026-09-24 用户要求：点轴测图 → 左侧工具栏自动展开（反转 v122 的自动折叠；
-         配套：经济对比面板改为自动折叠让位，见 rySetTab 轴测分支的 tlEconPanel.close()）。
-         同一口径：仅在切到轴测那一次触发，用户随后手动展开/收起不被反复顶动
-         （再切视口才按新目标重新联动）。 */
-      if(side&&sIso&&side.getAttribute('data-ry-open')!=='1'){
-        side.setAttribute('data-ry-open','1');
-        try{ localStorage.setItem('ryCadOpen','1'); }catch(err){}
-        applyWidth(); refit();
-      }
-      if(side&&!sIso&&side.getAttribute('data-ry-open')==='0'){
-        side.setAttribute('data-ry-open','1');
-        try{ localStorage.setItem('ryCadOpen','1'); }catch(err){}
-        applyWidth(); refit();
-      }
-      var s=spec||'';
-      var g=(s==='tlPipePlanSection:iso')?'ryCadGrpIso':GRP_FOR[s.split(':')[0]];
-      for(var i=0;i<ALL_GRPS.length;i++){
-        var d=$(ALL_GRPS[i]); if(!d) continue;
-        if(ALL_GRPS[i]===g){ if(!d.hasAttribute('open')) d.setAttribute('open','open'); }
-        else if(d.hasAttribute('open')) d.removeAttribute('open');
-      }
-    }catch(err){}
-  }
-
-  function toggleRail(){
-    var side=$('ryCadSide'); if(!side) return;
-    var open=side.getAttribute('data-ry-open')!=='0';
-    side.setAttribute('data-ry-open', open?'0':'1');
-    try{ localStorage.setItem('ryCadOpen', open?'0':'1'); }catch(err){}
-    applyWidth(); refit();
-  }
-
-  function bind(){
-    var side=$('ryCadSide');
-    if(side&&!side.getAttribute('data-ry-bound')){
-      side.setAttribute('data-ry-bound','1');
-      try{ side.setAttribute('data-ry-open', localStorage.getItem('ryCadOpen')==='1'?'1':'0'); }
-      catch(err){ side.setAttribute('data-ry-open','0'); }
-      side.addEventListener('click',function(e){
-        /* 分组内点击（勾选/输入/展开某组/编辑面板）不折叠整栏。
-           ★ 必须用 e.composedPath() 判断：编辑面板的按钮处理器会先重渲染面板
-           （innerHTML 替换），等 click 冒泡到本栏时 e.target 已脱离文档，
-           e.target.closest('.ry-cad-grp') 会返回 null 而误触发折叠。 */
-        var inGrp=false;
-        try{
-          var p=(e.composedPath&&e.composedPath())||[];
-          for(var i=0;i<p.length;i++){
-            var n=p[i];
-            if(n&&n.classList&&(n.classList.contains('ry-cad-grp')||n.classList.contains('iso-editor'))) { inGrp=true; break; }
-          }
-        }catch(err){}
-        if(inGrp) return;
-        if(e.target&&e.target.closest&&e.target.closest('.ry-cad-grp')) return;
-        toggleRail();
-      });
-    }
-    /* 宽度拖拽：右缘把手按住左右拖，实时改宽 + rAF 让画布重排；松手 localStorage 记忆。
-       拖动期间给把手打 .ry-wdrag 高亮；没拖过不写任何变量（默认视觉不变）。 */
-    var wg=$('ryCadWGrip');
-    if(wg&&!wg.getAttribute('data-ry-wbound')){
-      wg.setAttribute('data-ry-wbound','1');
-      var dragPid=null;
-      wg.addEventListener('pointerdown',function(e){
-        dragPid=e.pointerId;
-        try{ wg.setPointerCapture(e.pointerId); }catch(err){}
-        try{ wg.classList.add('ry-wdrag'); }catch(err){}
-        e.preventDefault();
-      });
-      wg.addEventListener('pointermove',function(e){
-        if(dragPid===null||e.pointerId!==dragPid) return;
-        var side2=$('ryCadSide'); if(!side2) return;
-        var max=Math.max(W_MIN,Math.floor((window.innerWidth||1600)*0.46)-16);
-        var lx=side2.getBoundingClientRect().left;
-        wOpen=Math.min(max,Math.max(W_MIN,Math.round(e.clientX-lx)));
-        applyWidth();
-        if(window.requestAnimationFrame) requestAnimationFrame(refit); else refit();
-      });
-      function endDrag(){
-        if(dragPid===null) return;
-        dragPid=null;
-        try{ wg.classList.remove('ry-wdrag'); }catch(err){}
-        try{ if(wOpen!=null) localStorage.setItem('ryCadWOpen',String(wOpen)); }catch(err){}
-        applyWidth(); refit();
-      }
-      wg.addEventListener('pointerup',endDrag);
-      wg.addEventListener('pointercancel',endDrag);
-    }
-    try{
-      var mo=new MutationObserver(function(){
-        var run=function(){ try{ syncAll(); }catch(err){} };
-        if(window.requestAnimationFrame) requestAnimationFrame(run); else setTimeout(run,16);
-      });
-      mo.observe(document.body,{attributes:true,attributeFilter:['class','data-ry-sec']});
-      HOSTS.forEach(function(h){
-        var el=$(h.sec); if(el) mo.observe(el,{attributes:true,attributeFilter:['data-ry-view','class']});
-      });
-    }catch(err){}
-    /* 打印：左栏交还区块内，保证纸质版式与原契约一致 */
-    try{
-      window.addEventListener('beforeprint',function(){
-        document.body.classList.remove('ry-cad-vp');   /* 打印不占顶部条 */
-        moveBack();
-      });
-      window.addEventListener('afterprint',function(){ syncAll(); });
-    }catch(err){}
-    syncAll();
-  }
-
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bind); else bind();
-})();
-</script>
+<script src="mod/ry-cad-toolbar.js?v=419-cad-toolbar-split"></script>
 
 <!-- ===== 设置（2026-09-27 用户要求）：顶栏齿轮打开，收纳「可调节的数据」=====
      参考 AutoCAD 的 Options：左侧分类 + 右侧参数 + 底部「恢复本页默认 / 取消 / 保存」。
@@ -2927,5 +2639,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
 <!-- [NEW MODULE: core 2026-10-11] 插件化主程序入口（ES Module）。
      删除本行即整体卸载插件体系，原有功能零影响；插件清单见 plugins.json。 -->
 <script type="module" src="core/bootstrap.js?v=2"></script>
+<script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.1/cdn/shoelace.js"></script>
+<script src="mod/ry-panel.js?v=431-panel-layout-cascade"></script>
 </body>
 </html>

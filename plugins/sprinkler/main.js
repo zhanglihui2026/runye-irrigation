@@ -143,6 +143,11 @@ function gate(ctx) {
   if (typeof E.ready === 'function' && !E.ready()) return true;
   return E.can(feat);
 }
+function pending(ctx) {
+  var feat = cfg(ctx).feat;
+  var E = (typeof window !== 'undefined') ? window.RyEntitle : null;
+  return !!(feat && E && typeof E.access === 'function' && E.access(feat) === 'pending');
+}
 function onLocked(ctx) {
   var lb = navCfg(ctx).label || ctx.id;
   var U = (typeof window !== 'undefined') ? window.RyMemberUI : null;
@@ -282,6 +287,7 @@ export function activate(ctx) {
       title: nc.title || '',
       order: nc.order,
       gate: function () { return gate(ctx); },
+      pending: function () { return pending(ctx); },
       onLocked: function () { onLocked(ctx); },
       onClick: function () {
         panel.style.display = panel.style.display === 'none' ? '' : 'none';

@@ -35,6 +35,11 @@ function gate(ctx) {
   if (typeof E.ready === 'function' && !E.ready()) return true;
   return E.can(feat);
 }
+function pending(ctx) {
+  var feat = cfg(ctx).feat;
+  var E = (typeof window !== 'undefined') ? window.RyEntitle : null;
+  return !!(feat && E && typeof E.access === 'function' && E.access(feat) === 'pending');
+}
 
 function onLocked(ctx) {
   var lb = navCfg(ctx).label || ctx.id;
@@ -154,6 +159,7 @@ function activate(ctx) {
         beforeLabel: c.beforeLabel || null,   /* [v390] 锚在稳定老项「滴灌带查询」之前 */
         before: c.insertBefore || null,
         gate: function () { return gate(ctx); },
+        pending: function () { return pending(ctx); },
         onLocked: function () { onLocked(ctx); },
         onClick: open
       });

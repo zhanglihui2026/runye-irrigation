@@ -47,6 +47,9 @@
     { label: '在线地图',     href: 'runye-map-measure.html',   pre: 1, feat: 'online-map' },
     /* [v250] 「二级管路」改名「地块分区」、「三级管路编辑」改名「管路规划」（hash/id 不变，仅显示名变） */
     { label: '地块分区',     hash: 'pipePlanSection',          pre: 1, feat: 'zone-split' },
+    /* [v438 2026-10-14 用户指令] 测试分区：侧边工具面板样板页（紧凑分组 + Shoelace + 深浅主题），
+       独立页走 RyFrameShell（iframe），按钮位置在「地块分区」之后；feat:'' 完全免费不参与门控 */
+    { label: '测试分区',     href: 'runye-test-panel.html',    pre: 1, feat: '', title: '测试分区：侧边工具面板样板（紧凑分组 · 深浅主题切换）' },
     { label: '管路规划',     hash: 'tlPipePlanSection',        pre: 1, feat: 'pipe-layout' },
     /* [v311 2026-10-08 用户要求] 水力校核 顶级导航项（独立模块：自动读 runye_network_layout，
        树状拓扑+全链路水损+滴灌带多孔出流+水泵选型+EPANET WASM 对照），原软件逻辑零改动 */
@@ -160,7 +163,7 @@
     a.setAttribute('data-ry-navitem', '1');
     if (it.href === 'runye-map-measure.html' || it.hash === 'pipePlanSection' || it.hash === 'tlPipePlanSection') a.setAttribute('data-ry-mobile-nav', '1');
     /* [v392] 页面级外挂：桌面端由 RyFrameShell 接管；href/feat 留作移动端和脚本故障兜底。 */
-    var framePage = it.href === 'runye-map-measure.html' ? 'online-map' : it.href === 'terrain/index.html' ? 'terrain' : it.href === 'runye-hydraulics.html' ? 'hydraulics' : '';
+    var framePage = it.href === 'runye-map-measure.html' ? 'online-map' : it.href === 'terrain/index.html' ? 'terrain' : it.href === 'runye-hydraulics.html' ? 'hydraulics' : it.href === 'runye-test-panel.html' ? 'test-panel' : '';
     if (framePage) { a.setAttribute('data-fr-page', framePage); a.setAttribute('data-fr-feature', it.feat || ''); }
     /* [v358] 锁定态：「·锁」标记 + 捕获阶段拦截（阻断 href 跳转 / data-target 处理器 /
        act 动作 / win 独立窗口 四条路径，与 v346 的线上锁同一手法） */

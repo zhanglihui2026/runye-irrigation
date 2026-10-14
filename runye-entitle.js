@@ -56,12 +56,29 @@
     'pro-others': '其余高级功能'
   };
   var PRO_ALL_KEY = 'pro-others';
+  var L1_FEATURE_KEYS = ['zone-split', 'ai-plan', 'pipe-layout', 'online-map'];
+  var L1_BLOCKED_FEATURES = ['drawing-export', 'bom-export', 'hydraulic-check', PRO_ALL_KEY];
   var PLAN_FEATURES = {
-    L1: ['zone-split', 'ai-plan', 'pipe-layout', 'online-map'],
+    L1: L1_FEATURE_KEYS.slice(),
     L2: ['zone-split', 'ai-plan', 'pipe-layout', 'online-map', 'drawing-export', 'bom-export', 'hydraulic-check', 'pro-others']
   };
   var PLAN_NAMES = { L1: '注册会员', L2: '高级会员' };
   var PLAN_DAYS = { L1: 30, L2: 365 };
+  var LOCAL_ADMIN_KEY = 'runyeLocalAdminSession';
+  var localAdminSession = false;
+
+  function isLocalTestHost() {
+    try {
+      var h = String(location.hostname || '').toLowerCase();
+      return location.protocol === 'file:' || h === 'localhost' || h === '127.0.0.1' || h === '::1';
+    } catch (e) { return false; }
+  }
+
+  function restoreLocalAdminSession() {
+    if (!isLocalTestHost()) return;
+    try { localAdminSession = localStorage.getItem(LOCAL_ADMIN_KEY) === '1'; } catch (e) {}
+  }
+  restoreLocalAdminSession();
 
   /* [2026-10-13] 启用 L1/L2 功能门控；具体权限由 PLAN_FEATURES 与 can() 判定。 */
   var ALL_FEATURES_OPEN = false;
@@ -82,7 +99,8 @@
       var dd = Number(p.days);
       if (isFinite(dd) && dd >= 1 && dd <= 3650 && Math.floor(dd) !== PLAN_DAYS[k]) { PLAN_DAYS[k] = Math.floor(dd); changed = true; }
       if (Array.isArray(p.features)) {
-        var fs = p.features.filter(function (x) { return !!FEATURES[x]; });
+        var allowed = k === 'L1' ? L1_FEATURE_KEYS : Object.keys(FEATURES);
+        var fs = p.features.filter(function (x) { return allowed.indexOf(x) >= 0; });
         if (fs.length && JSON.stringify(fs) !== JSON.stringify(PLAN_FEATURES[k])) { PLAN_FEATURES[k] = fs; changed = true; }
       }
     });
@@ -312,12 +330,61 @@
     },
 
     get state() { return state; },
-    onChange: function (fn) { if (typeof fn === 'function') listeners.push(fn); },
+    onChange: function (fn) {
+      if (typeof fn !== 'function') return function () {};
+      listeners.push(fn);
+      return function () { var i = listeners.indexOf(fn); if (i >= 0) listeners.splice(i, 1); };
+    },
+
+    /* 给直接操作按钮提供一致的权益状态提示；实际操作仍须在处理函数中二次校验。 */
+    bindControl: function (el, feature, label) {
+      if (!el || !feature) return;
+      var key = feature + ':' + label;
+      if (el.getAttribute('data-ry-entitle-bound') === key) return;
+      el.setAttribute('data-ry-entitle-bound', key);
+      var baseTitle = el.getAttribute('title') || '';
+      var baseLabel = el.getAttribute('aria-label') || (el.textContent || '').trim() || label || feature;
+      function sync() {
+        var status = RyEntitle.access(feature);
+        el.classList.add('ry-entitle-control');
+        el.classList.toggle('fn-pending', status === 'pending');
+        el.classList.toggle('fn-locked', status === 'denied');
+        el.setAttribute('data-ry-pending', status === 'pending' ? 'true' : 'false');
+        el.setAttribute('data-ry-locked', status === 'denied' ? 'true' : 'false');
+        el.setAttribute('aria-disabled', status === 'allowed' ? 'false' : 'true');
+        if (status === 'pending') {
+          el.setAttribute('title', (baseTitle ? baseTitle + ' · ' : '') + '正在同步会员权益');
+          el.setAttribute('aria-label', baseLabel + '，正在同步会员权益');
+        } else if (status === 'denied') {
+          el.setAttribute('title', (baseTitle ? baseTitle + ' · ' : '') + '高级会员功能');
+          el.setAttribute('aria-label', baseLabel + '，高级会员功能');
+        } else {
+          if (baseTitle) el.setAttribute('title', baseTitle); else el.removeAttribute('title');
+          el.setAttribute('aria-label', baseLabel);
+        }
+      }
+      sync();
+      return RyEntitle.onChange(sync);
+    },
 
     /* ---------- 身份与匿名策略 ---------- */
     DEFAULT_ANON_POLICY: 'trial',
-    isTrial: function () { return !!(state && state.trial); },
-    ready: function () { return !!state; },
+    isTrial: function () { return !this.localAdminActive() && !!(state && state.trial); },
+    ready: function () { return !!state || localAdminSession; },
+    localAdminAvailable: isLocalTestHost,
+    localAdminActive: function () { return isLocalTestHost() && localAdminSession; },
+    activateLocalAdmin: function () {
+      if (!isLocalTestHost()) return false;
+      localAdminSession = true;
+      try { localStorage.setItem(LOCAL_ADMIN_KEY, '1'); } catch (e) { localAdminSession = false; return false; }
+      emit();
+      return true;
+    },
+    logoutLocalAdmin: function () {
+      localAdminSession = false;
+      try { localStorage.removeItem(LOCAL_ADMIN_KEY); } catch (e) {}
+      emit();
+    },
     /* 权益门控三态：未取得服务端状态时必须等待，不能伪装成允许或无权。 */
     access: function (feature) {
       if (!feature) return 'allowed';
@@ -328,16 +395,16 @@
     anonPolicy: function () { return (state && state.anonPolicy) || this.DEFAULT_ANON_POLICY; },
 
     /* ---------- 判定（与云函数版语义一致，原样保留） ---------- */
-    plan: function () { return (state && state.entitle && state.entitle.plan) || 'L1'; },
-    planName: function () { return PLAN_NAMES[this.plan()] || '注册会员'; },
-    expireAt: function () { return (state && state.entitle && state.entitle.expireAt) || 0; },
-    expireText: function () { return this.isTrial() ? '未开通' : fmtDate(this.expireAt()); },
+    plan: function () { return this.localAdminActive() ? 'L2' : ((state && state.entitle && state.entitle.plan) || 'L1'); },
+    planName: function () { return this.localAdminActive() ? '本地管理员（高级会员）' : (PLAN_NAMES[this.plan()] || '注册会员'); },
+    expireAt: function () { return this.localAdminActive() ? Number.MAX_SAFE_INTEGER : ((state && state.entitle && state.entitle.expireAt) || 0); },
+    expireText: function () { return this.localAdminActive() ? '本地测试 · 不限期' : (this.isTrial() ? '未开通' : fmtDate(this.expireAt())); },
     daysLeft: function () {
       if (this.isTrial()) return 0;
       var e = this.expireAt(); if (!e) return 0;
       return Math.max(0, Math.ceil((e - Date.now()) / DAY));
     },
-    isActive: function () { return !this.isTrial() && this.expireAt() > Date.now(); },
+    isActive: function () { return this.localAdminActive() || (!this.isTrial() && this.expireAt() > Date.now()); },
     allFeaturesOpen: function () { return ALL_FEATURES_OPEN; },
     can: function (feature) {
       if (ALL_FEATURES_OPEN) return true;
@@ -348,11 +415,14 @@
     },
     canWith: function (plan, feature) {
       if (plan === 'locked') return false;
+      if (plan === 'L1' && L1_BLOCKED_FEATURES.indexOf(feature) >= 0) return false;
       if (plan === 'trial') return PLAN_FEATURES.L1.indexOf(feature) >= 0;
       var list = PLAN_FEATURES[plan] || PLAN_FEATURES.L1;
+      if (plan === 'L1' && list.indexOf(PRO_ALL_KEY) >= 0) return false;
       return list.indexOf(feature) >= 0 || list.indexOf(PRO_ALL_KEY) >= 0;
     },
     statusText: function () {
+      if (this.localAdminActive()) return '本地管理员 · 高级会员';
       if (!state) return '会员 · 未同步';
       if (this.isTrial()) return '未登录 · 试用中';
       if (!this.isActive()) return '会员已到期';
@@ -564,7 +634,7 @@
   /* [v408] 页面加载即同步一次云端会员规则（失败静默，沿内置默认） */
   try { syncMemberConfig(); } catch (_eCfg) {}
 
-  /* [v358] 本地联调钩子：?rymock=L1|L2|trial|locked
+  /* [v358] 本地联调钩子：?rymock=L1|trial|locked；L2 需通过本地测试账号登录
      只允许在 file:// / localhost / 127.0.0.1 生效 —— 线上域名一律忽略，
      避免「加个 URL 参数就绕过付费墙」。 */
   (function () {
@@ -574,6 +644,7 @@
       var h = String(location.hostname || '');
       var local = location.protocol === 'file:' || !h || h === 'localhost' || h === '127.0.0.1';
       if (!local) return;
+      if (m[1] === 'L2' && !localAdminSession) return;
       RyEntitle.mockPlan = m[1];
     } catch (e) { /* 无 location（Node 单测）时忽略 */ }
   })();

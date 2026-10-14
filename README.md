@@ -16,14 +16,14 @@
 | `二级系统图.html` | 二级管路系统图（接收主程序计算结果） |
 | `三级系统图.html` | 三级管路系统图（接收主程序计算结果） |
 | `耐特菲姆滴灌带长度查询器.html` | 滴灌带最大铺设长度查询（入口压力 × 坡度） |
-| `digital-agriculture/` | 数字农业模块（统一入口、花生决策工具、工作台、生育期数据源），见 [模块 README](digital-agriculture/README.md) 与 [开发规则](digital-agriculture/AGENTS.md）。**v382 起已与灌溉工具完全剥离**：导航入口与桥接层（irrigation-bridge.js）已移除，页面保留但两套系统无任何代码路径互通 |
+| `digital-agriculture/` | 数字农业模块（统一入口、花生决策工具、工作台、生育期数据源），见 [模块 README](digital-agriculture/README.md) 与 [开发规则](digital-agriculture/AGENTS.md）。**v382 移除了导航入口、`irrigation-bridge.js` 和绘制边界回写握手；共享地块库 `runye_plot_library` 仍由灌溉工具与工作台读写**，其数据契约见 `RYPLOT_SCHEMA.md` |
 | `peanut-tool.html` | （旧入口跳转壳 → digital-agriculture/peanut-tool.html） |
 | `数字农业.html` | （旧入口跳转壳 → digital-agriculture/index.html） |
 | `workbench.html` | （旧入口跳转壳 → digital-agriculture/workbench.html） |
 | `qicai-huasheng/schedule-core.js` | （旧路径兼容加载器 → digital-agriculture/qicai-huasheng/schedule-core.js） |
 | `hero-driptape.jpg` | 门户页 Hero 底图 |
 
-数字农业剥离的完整清单、依赖关系与验证记录见 [docs/digital-agriculture-extraction.md](docs/digital-agriculture-extraction.md)；灌溉侧 Step -1 剥离交付记录（v382）见 `AGENT_HANDOFF.md` 与方案文档 §12.1。
+数字农业拆分方案的历史记录见 [docs/digital-agriculture-extraction.md](docs/digital-agriculture-extraction.md)；v382 后的边界与遗留影响见 `AGENT_HANDOFF.md` 与方案文档 §12.1。
 
 ## 入口
 

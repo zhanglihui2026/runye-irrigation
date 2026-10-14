@@ -215,8 +215,9 @@
     var host=$(hostId);host.innerHTML='';
     Object.keys(FEATS).forEach(function(k){
       var l=document.createElement('label');
-      var c=document.createElement('input');c.type='checkbox';c.value=k;c.checked=features.indexOf(k)>=0;
-      l.appendChild(c);l.appendChild(document.createTextNode(FEATS[k]));
+      var l1Only=hostId==='cFeatL1'&&(k==='drawing-export'||k==='bom-export'||k==='hydraulic-check'||k==='pro-others');
+      var c=document.createElement('input');c.type='checkbox';c.value=k;c.disabled=l1Only;c.checked=!l1Only&&features.indexOf(k)>=0;
+      l.appendChild(c);l.appendChild(document.createTextNode(FEATS[k]+(l1Only?'（仅L2）':'')));
       host.appendChild(l);
     });
   }

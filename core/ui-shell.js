@@ -53,7 +53,7 @@ export function createUiShell(guard) {
         return;
       }
       if (isPending(item)) {
-        try { if (typeof item.onPending === 'function') item.onPending(ev); }
+        try { notifyPending(item, ev); }
         catch (e) { if (guard) guard.reportError(item.id, e, 'nav-pending'); }
         return;
       }
@@ -131,6 +131,23 @@ export function createUiShell(guard) {
      gate 与 pending 由插件提供（它知道 feat 键和权益状态），core 负责锁定、等待态及点击分发。 */
   function isPending(item) { return !!(item && typeof item.pending === 'function' && item.pending()); }
   function isLocked(item) { return !isPending(item) && !!(item && typeof item.gate === 'function' && !item.gate()); }
+
+  function notifyPending(item, ev) {
+    if (typeof item.onPending === 'function') {
+      item.onPending(ev);
+      return;
+    }
+    var tip = document.createElement('div');
+    tip.className = 'ry-nav-toast';
+    tip.setAttribute('role', 'status');
+    tip.textContent = '正在同步会员权益，请稍后重试。';
+    document.body.appendChild(tip);
+    setTimeout(function () { tip.classList.add('show'); }, 10);
+    setTimeout(function () {
+      tip.classList.remove('show');
+      setTimeout(function () { if (tip.parentNode) tip.parentNode.removeChild(tip); }, 300);
+    }, 2400);
+  }
 
   function applyLock(b, item) {
     var pending = isPending(item);
@@ -257,7 +274,9 @@ export function createUiShell(guard) {
       before: item.before || null,           /* [v377] 可选：插到该选择器命中的兄弟元素之前（保住原位置） */
       beforeLabel: item.beforeLabel || null, /* [v378] 可选：插到「可见文字为此值」的兄弟之前（跨重渲染稳定） */
       gate: typeof item.gate === 'function' ? item.gate : null,       /* [v378] 可选：返回 false = 锁定（会员门控） */
-      onLocked: typeof item.onLocked === 'function' ? item.onLocked : null
+      pending: typeof item.pending === 'function' ? item.pending : null,
+      onLocked: typeof item.onLocked === 'function' ? item.onLocked : null,
+      onPending: typeof item.onPending === 'function' ? item.onPending : null
     });
     navItems.sort(function (a, b) { return a.order - b.order; });
     mountNavs();

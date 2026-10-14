@@ -27,14 +27,27 @@ function extract(s, name) {
 let checks = 0;
 function check(fn) { fn(); checks++; }
 const state = { zoneRotated: false, cutSnap: null };
-const ctx = { MU_TO_SQM: 2000/3, window: {}, ppState: state, ppOwnDimOverride: true,
+const zoneGeometry = require('../mod/zone-geometry.js');
+const ctx = { MU_TO_SQM: 2000/3, MAX_MANUAL_ZONE_COUNT: 500, window: { RyZoneGeometry: zoneGeometry }, ppState: state, ppOwnDimOverride: true,
   document: { getElementById: id => ({ value: id === 'planTapeLaySide' ? '100' : id === 'planZoneMode' ? 'manual' : '90' }) },
-  ppZoneAutoOn: () => true };
+  ppZoneAutoOn: () => true,
+  // Plot editor's layout query also refreshes this UI warning; the geometry test
+  // deliberately stubs that side effect rather than booting a DOM.
+  ppSyncManualZoneWarning() {} };
 vm.createContext(ctx);
-const names = ['planZoneFixedSide','calcZoneLayout','splitZoneLength','calcManualZoneLayout','getManualPlanZoneMu',
+const names = ['planZoneFixedSide','calcZoneLayout','splitZoneLength','splitZoneLengthCount','calcManualZoneLayout','getManualPlanZoneMu',
   'calcPlanZoneLayout','ppGetPlanDims','ppGetZoneLayout','ppSplitLength','ppCutSig','ppResetCutSnap','ppApplyCutSnap',
   'ppGetZoneCuts','ppPolyArea','ppClipPolyToRect'];
 vm.runInContext(names.map(n => extract(html,n)).join('\n'), ctx);
+check(() => assert.equal(ctx.calcZoneLayout(600,300,Number.MAX_SAFE_INTEGER).N,zoneGeometry.MAX_AUTO_ZONE_COUNT,
+  '极大请求应限制在自动分区上限'));
+for (const [w,h] of [[1e9,1e9],[Number.MAX_VALUE,Number.MAX_VALUE],[Infinity,Infinity]]) {
+  const layout = zoneGeometry.autoZoneLayout(w,h,Number.MAX_SAFE_INTEGER,200);
+  check(() => assert.ok(layout && layout.cols > 0 && layout.rows > 0));
+  check(() => assert.ok(layout.N <= zoneGeometry.MAX_AUTO_ZONE_COUNT,
+    `极端尺寸 ${w}×${h} 不应产生无界网格`));
+  check(() => assert.ok(Number.isFinite(layout.zoneArea) && Number.isFinite(layout.drawZoneW) && Number.isFinite(layout.drawZoneH)));
+}
 for (const [w,h] of [[600,300],[300,600],[655,327],[300,300]]) {
   for (const mu of [18,45,90]) for (const rotated of [false,true]) {
     ctx.getManualPlanZoneMu = () => mu;

@@ -17,6 +17,7 @@
      position:fixed 定位），不再依赖 index.html 静态 #fnFileMenu 块。 */
   var curBtn = null;   /* 当前打开态关联的触发按钮 */
   var panel = null;    /* 懒创建的菜单面板 */
+  var memberChangeBound = false;
 
   /* ---------------- 菜单定义 ----------------
      type: 'fn' 主程序动作 / 'page' 独立页动作
@@ -62,15 +63,22 @@
       }, 2400);
     } catch (e) { }
   }
-  function canUseFeature(feature) {
-    if (!feature) return true;
+  function featureState(feature) {
+    if (!feature) return 'allowed';
     var ent = W.RyEntitle;
-    if (!ent || typeof ent.can !== 'function') return false;
-    if (typeof ent.ready === 'function' && !ent.ready()) return false;
-    return ent.can(feature);
+    if (ent && typeof ent.access === 'function') return ent.access(feature);
+    if (!ent || typeof ent.can !== 'function') return 'denied';
+    if (ent.mockPlan) return ent.can(feature) ? 'allowed' : 'denied';
+    if (typeof ent.ready === 'function' && !ent.ready()) return 'pending';
+    return ent.can(feature) ? 'allowed' : 'denied';
   }
   function requireFeature(feature, label) {
-    if (canUseFeature(feature)) return true;
+    var status = featureState(feature);
+    if (status === 'allowed') return true;
+    if (status === 'pending') {
+      toast('正在同步会员权益，请稍后重试。');
+      return false;
+    }
     var ui = W.RyMemberUI;
     if (ui && typeof ui.showUpgrade === 'function') ui.showUpgrade(label);
     else toast('「' + label + '」为高级会员功能 · 邀请好友即可开通');
@@ -212,13 +220,20 @@
         var a = D.createElement('button');
         a.type = 'button';
         a.className = 'fn-file-item';
-        var locked = !!it.feat && !canUseFeature(it.feat);
-        a.textContent = locked ? (it.label + ' ·锁') : it.label;
+        var status = featureState(it.feat);
+        var locked = status === 'denied';
+        var pending = status === 'pending';
+        a.textContent = locked ? (it.label + ' ·锁') : pending ? (it.label + ' ·同步中') : it.label;
         if (locked) {
           a.classList.add('fn-locked');
           a.setAttribute('data-ry-locked', '1');
           a.setAttribute('aria-disabled', 'true');
           a.title = '「' + it.label + '」为高级会员功能 · 点击查看开通方式';
+        } else if (pending) {
+          a.classList.add('fn-pending');
+          a.setAttribute('data-ry-pending', '1');
+          a.setAttribute('aria-disabled', 'true');
+          a.title = '正在同步会员权益，请稍后重试';
         } else if (it.title) a.title = it.title;
         a.setAttribute('data-ry-filemenu', '1');
         a.addEventListener('click', function (e) {
@@ -287,4 +302,12 @@
     close: close,
     isOpen: isOpen
   };
+  if (!memberChangeBound && W.RyEntitle && typeof W.RyEntitle.onChange === 'function') {
+    memberChangeBound = true;
+    W.RyEntitle.onChange(function () {
+      if (!isOpen()) return;
+      build();
+      place();
+    });
+  }
 })(window, document);

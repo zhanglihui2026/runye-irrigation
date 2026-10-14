@@ -1,6 +1,6 @@
 /*!
- * digital-agriculture.js — 数字农业模块侧的桥接数据读取与校验（协议 v1）
- * 配合根目录 irrigation-bridge.js 使用；本模块只读，禁止回写灌溉工具的任何数据。
+ * digital-agriculture.js — 历史地块快照读取与校验（协议 v1）
+ * v382 起无灌溉侧生产方；只读兼容可能残留的浏览器快照，不代表当前灌溉状态。
  * 存储约定见 AGENTS.md。
  */
 (function (global) {

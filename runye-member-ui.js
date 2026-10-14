@@ -143,6 +143,7 @@
     /* [v359] 手机号 + 短信验证码登录框 */
     '.ry-mbr-login{margin-top:10px;padding:10px;border:1px dashed #cbd5e1;border-radius:8px;background:#f8fafc}',
     '.ry-mbr-lrow{display:flex;gap:6px;margin-bottom:6px}',
+    '.ry-mbr-local-admin .ry-mbr-lrow{flex-direction:column}',
     '.ry-mbr-input{flex:1;min-width:0;border:1px solid #cbd5e1;border-radius:6px;',
     'padding:6px 8px;font-size:13px;font-family:inherit;color:#0f172a;background:#fff}',
     '.ry-mbr-codebtn{border:1px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:6px;',
@@ -255,6 +256,122 @@
     return box;
   }
 
+  /* 本地最高级会员仅用于 localhost/file:// 测试，不创建或修改云端账号。 */
+  function buildLocalAdminBox() {
+    var en = E();
+    if (!en || typeof en.localAdminAvailable !== 'function' || !en.localAdminAvailable()) return null;
+
+    var box = document.createElement('div');
+    box.className = 'ry-mbr-login ry-mbr-local-admin';
+    var title = document.createElement('b');
+    title.textContent = '本地管理员测试会员';
+    box.appendChild(title);
+
+    var msg = document.createElement('p');
+    msg.className = 'ry-mbr-tip';
+    msg.textContent = '仅本机启用全部高级会员功能；账号和密码不会发送到云端，登录状态保存在此浏览器。';
+    box.appendChild(msg);
+
+    if (en.localAdminActive()) {
+      var status = document.createElement('p');
+      status.className = 'ry-mbr-tip';
+      status.textContent = '当前已登录本地管理员测试会员。项目记录按现有本地保存方式存储。';
+      box.appendChild(status);
+      var logout = document.createElement('button');
+      logout.type = 'button';
+      logout.className = 'ry-mbr-codebtn';
+      logout.textContent = '退出本地测试会员';
+      logout.addEventListener('click', function () {
+        en.logoutLocalAdmin();
+        closePanel();
+        setTimeout(function () { try { RyMemberUI.openPanel(); } catch (e) {} }, 0);
+      });
+      box.appendChild(logout);
+      return box;
+    }
+
+    function makeInput(placeholder, type) {
+      var input = document.createElement('input');
+      input.className = 'ry-mbr-input';
+      input.placeholder = placeholder;
+      input.type = type;
+      input.autocomplete = type === 'password' ? 'current-password' : 'username';
+      return input;
+    }
+    var username = makeInput('本地测试账号（3–32 位）', 'text');
+    var password = makeInput('密码（8–32 位，含字母和数字）', 'password');
+    var submit = document.createElement('button');
+    submit.type = 'button';
+    submit.className = 'primary';
+    submit.textContent = '设置并登录';
+    var saved;
+    try { saved = JSON.parse(localStorage.getItem('runyeLocalAdminCredential') || 'null'); } catch (e) { saved = null; }
+    if (saved && saved.username) {
+      username.value = saved.username;
+      submit.textContent = '登录本地管理员';
+    }
+    var rowEl = document.createElement('div');
+    rowEl.className = 'ry-mbr-lrow';
+    rowEl.appendChild(username);
+    rowEl.appendChild(password);
+    box.appendChild(rowEl);
+    box.appendChild(submit);
+
+    function toHex(bytes) {
+      return Array.prototype.map.call(new Uint8Array(bytes), function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+    }
+    function derive(pass, salt) {
+      var cryptoApi = window.crypto;
+      if (!cryptoApi || !cryptoApi.subtle || !window.TextEncoder) return Promise.reject(new Error('浏览器不支持安全的本地密码存储，请使用最新版浏览器。'));
+      var bytes = new Uint8Array(salt.match(/.{2}/g).map(function (x) { return parseInt(x, 16); }));
+      return cryptoApi.subtle.importKey('raw', new window.TextEncoder().encode(pass), 'PBKDF2', false, ['deriveBits'])
+        .then(function (key) { return cryptoApi.subtle.deriveBits({ name: 'PBKDF2', salt: bytes, iterations: 120000, hash: 'SHA-256' }, key, 256); })
+        .then(toHex);
+    }
+    function randomSalt() {
+      var bytes = new Uint8Array(16);
+      window.crypto.getRandomValues(bytes);
+      return toHex(bytes);
+    }
+    function setMessage(text, warn) {
+      msg.textContent = text;
+      msg.className = 'ry-mbr-tip' + (warn ? ' warn' : '');
+    }
+
+    submit.addEventListener('click', function () {
+      var name = username.value.trim();
+      var pass = password.value;
+      if (!/^[\w.-]{3,32}$/.test(name)) { setMessage('账号需为 3–32 位字母、数字、下划线、点或短横线。', true); return; }
+      if (pass.length < 8 || pass.length > 32 || !/[A-Za-z]/.test(pass) || !/\d/.test(pass)) {
+        setMessage('密码需为 8–32 位，且同时包含字母和数字。', true); return;
+      }
+      submit.disabled = true;
+      setMessage('正在验证…');
+      var operation;
+      if (saved) {
+        if (saved.username !== name) operation = Promise.reject(new Error('本机已设置其他测试账号；请输入该账号，或清除此浏览器的本地测试数据后重新设置。'));
+        else operation = derive(pass, saved.salt).then(function (hash) {
+          if (hash !== saved.hash) throw new Error('账号或密码不正确。');
+        });
+      } else {
+        var salt;
+        try { salt = randomSalt(); }
+        catch (e) { submit.disabled = false; setMessage('浏览器无法生成安全凭据，请使用最新版浏览器。', true); return; }
+        operation = derive(pass, salt).then(function (hash) {
+          localStorage.setItem('runyeLocalAdminCredential', JSON.stringify({ username: name, salt: salt, hash: hash }));
+        });
+      }
+      operation.then(function () {
+        if (!en.activateLocalAdmin()) throw new Error('无法保存本地登录状态，请检查浏览器存储权限。');
+        closePanel();
+        setTimeout(function () { try { RyMemberUI.openPanel(); } catch (e) {} }, 0);
+      }).catch(function (e) {
+        setMessage(e && e.message ? e.message : '本地登录失败。', true);
+      }).then(function () { submit.disabled = false; });
+    });
+    return box;
+  }
+
   /* ---------- 面板 ---------- */
   var maskEl = null, panelEl = null;
 
@@ -322,6 +439,9 @@
 
     if (extraTopNode) p.appendChild(extraTopNode);
 
+    var localAdminBox = buildLocalAdminBox();
+    if (localAdminBox) p.appendChild(localAdminBox);
+
     if (!en) {
       p.appendChild(tip('权益层未加载，当前按「全部可用」运行。', true));
       return p;
@@ -335,7 +455,7 @@
     } else if (en.isTrial()) {
       p.appendChild(tip('未登录 · 试用中：四大功能可用，注册/登录后开始计时（30 天）。'));
     } else if (en.isActive()) {
-      p.appendChild(row('剩余天数', en.daysLeft() + ' 天'));
+      if (typeof en.localAdminActive !== 'function' || !en.localAdminActive()) p.appendChild(row('剩余天数', en.daysLeft() + ' 天'));
     } else {
       p.appendChild(tip('会员已到期，续费后恢复高级功能。', true));
     }

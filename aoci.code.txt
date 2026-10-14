@@ -2,82 +2,82 @@
 
 ===C:/Users/AHS/runye-irrigation/===
 .gitattributes[FV6T]: F:约束Git中文本与二进制文件的属性，文本检出统一为LF以稳定原始字节摘要 | R:code:aoci.txt,code:aoci.code.txt | A:仓库文件属性 | S:* text=auto eol=lf使受管文本在不同平台检出时保持LF，二进制仍由Git自动识别
-.gitignore[FV6T]: F:排除本地临时文件、验证产物与云端配置，并按否定规则保留tests目录和指定回归测试 | R:code:tests | A:Git忽略策略 | S:忽略规则顺序与否定条目共同决定测试文件能否重新纳入跟踪
-AGENTS.md[SR9L]: F:规定仓库Agent协作、AOCI认知建立与维护、证据绑定写入及恢复流程 | R:code:aoci.txt,code:aoci.meta.txt,code:aoci.code.txt | A:仓库代理与认知治理合同 | S:AOCI语义只能由模型依据机器Plan、Guide及真实证据创作，不能由扫描或模板推导
-AGENT_HANDOFF.md[SR9L]: F:记录润野灌溉的阶段交接、发布纪律、已知风险和待决事项，并指向后续主线步骤 | R:code:README.md,code:PLUGIN_DEV.md,code:RYPLOT_SCHEMA.md,code:HANDOVER_20261012.md | A:项目交接 | S:-
-AI_ONLINE.md[IN8S]: F:说明在线AI规划服务的部署、会员令牌校验与Redis额度管理 | R:code:runye-entitle.js,code:runye-member-ui.js | A:在线AI服务运维文档 | S:-
-ARCHITECTURE.html[SD6M]: F:以设计提案形式描述界面、业务服务和计算内核分层及灌溉水力公式 | R:code:AGENT_HANDOFF.md | A:架构设计资料 | S:文档中的目标架构与公式说明属于提案，不能单独证明当前实现
-HANDOFF_v359_REVIEW.md[SQ7M]: F:列出v359会员SDK自托管方案的复核范围、验证证据和待完成检查 | R:code:AGENT_HANDOFF.md,code:REVIEW_v359_RESULT.md | A:审核交接文档 | S:-
-HANDOVER_20261012.md[SV7S]: F:记录2026-10-12版本交接、导航与插件改动状态、验证和发布步骤 | R:code:runye-nav.js,code:AGENT_HANDOFF.md | A:阶段交接记录 | S:文档描述的是其日期对应的工作区快照，版本与发布状态需结合当前仓库核对
+.gitignore[FC7T]: F:控制本地临时产物、诊断文件和测试文件的 Git 可见性 | R:code:tests/partition_query.test.cjs,code:tests/entitle_flow.test.cjs,code:tests/group_planning.test.cjs,code:tests/terrain.test.cjs,code:tests/material_formulas.test.cjs,code:tests/zone_geometry.test.cjs,code:tests/flow_geometry.test.cjs | A:仓库忽略策略 | S:tests/目录先整体忽略，再通过否定规则逐项纳入回归文件；新增需要 Git 跟踪的测试必须加入白名单
+AGENTS.md[SR9S]: F:规定仓库Agent协作、AOCI认知建立与维护、证据绑定写入及恢复流程 | R:code:aoci.txt,code:aoci.meta.txt,code:aoci.code.txt | A:仓库代理与认知治理合同 | S:AOCI语义只能由模型依据机器Plan、Guide及真实证据创作，不能由扫描或模板推导
+AGENT_HANDOFF.md[SR9M]: F:记录润野灌溉的阶段交接、发布纪律、已知风险和待决事项，并指向后续主线步骤 | R:code:README.md,code:PLUGIN_DEV.md,code:RYPLOT_SCHEMA.md,code:HANDOVER_20261012.md | A:项目交接 | S:未经用户明确发布授权不得部署；会员云调用架构路线待用户决定；匿名云函数调用截至2026-10-10仍受EXCEED_AUTHORITY拦截
+AI_ONLINE.md[IN8T]: F:说明在线AI规划服务的部署、会员令牌校验与Redis额度管理 | R:code:runye-entitle.js,code:runye-member-ui.js | A:在线AI服务运维文档 | S:访问码、Redis或额度计数服务异常时禁止调用模型；结果不确定时保留额度预占，测试内存模式在Vercel强制禁用
+ARCHITECTURE.html[SG8T]: F:规定润野灌溉模块化单体的目标分层、依赖边界、新功能边界卡、团队分工与渐进交付流程 | R:code:AGENT_HANDOFF.md,code:AGENTS.md,code:.github/workflows/ci.yml | A:可持续演进架构约定 | S:该文档定义目标规则和阶段验收，不代表现状模块地图已核实，也不证明实现已符合目标
+HANDOFF_v359_REVIEW.md[SQ7S]: F:列出v359会员SDK自托管方案的复核范围、验证证据和待完成检查 | R:code:AGENT_HANDOFF.md,code:REVIEW_v359_RESULT.md | A:审核交接文档 | S:手机号短信真实链路仍待用户实测；测试未执行不得标为PASS；push和部署仍需用户明确发布指令
+HANDOVER_20261012.md[SV7T]: F:记录2026-10-12版本交接、导航与插件改动状态、验证和发布步骤 | R:code:runye-nav.js,code:AGENT_HANDOFF.md | A:阶段交接记录 | S:文档描述的是其日期对应的工作区快照，版本与发布状态需结合当前仓库核对
 PLUGIN_DEV.md[SE8M]: F:定义插件Manifest、最小权限、生命周期清理、数据访问和导航注册契约 | R:code:runye-nav.js,code:AGENT_HANDOFF.md | A:插件开发规范 | S:插件权限清单约束宿主API但不构成浏览器安全沙箱，插件仍可能访问页面可触达的数据
-PWA.md[FV7S]: F:说明应用安装、离线缓存范围、Service Worker更新策略及离线能力边界 | R:code:sw.js,code:index.html | A:PWA运维文档 | S:地图瓦片与云端服务不由静态核心缓存保证离线可用
-README.md[SV8M]: F:介绍项目页面、核心目录、插件系统和部署入口，并记录扩展信任边界 | R:code:PLUGIN_DEV.md,code:PWA.md,code:AGENT_HANDOFF.md | A:项目说明入口 | S:插件权限声明不隔离插件代码，社区插件发布前需要审查并配置资源完整性保护
-REVIEW_v359_RESULT.md[SQ7L]: F:记录v359审核的Git差异、验证结果、并发初始化回归及发布阻塞项 | R:code:HANDOFF_v359_REVIEW.md,code:AGENT_HANDOFF.md | A:审核结果报告 | S:-
-RYPLOT_SCHEMA.md[SD8S]: F:定义地块库分层数据结构、权威几何字段、跨页地块引用和只读物料快照契约 | R:code:core/data-service.js,code:TASK_ryplot-interface_20261012.md | A:地块数据模式 | S:跨页引用只保存地块ID，目标缺失或无效时必须报错并保留原引用
+PWA.md[FV7T]: F:说明应用安装、离线缓存范围、Service Worker更新策略及离线能力边界 | R:code:sw.js,code:index.html | A:PWA运维文档 | S:地图瓦片与云端服务不由静态核心缓存保证离线可用
+README.md[SV8T]: F:介绍项目页面与模块边界、核心目录、插件系统、部署入口及共享地块库契约 | R:code:PLUGIN_DEV.md,code:PWA.md,code:AGENT_HANDOFF.md,code:digital-agriculture/README.md,code:RYPLOT_SCHEMA.md | A:项目说明入口 | S:插件权限声明不隔离插件代码，社区插件发布前需要审查并配置资源完整性保护
+REVIEW_v359_RESULT.md[SQ7S]: F:记录v359审核的Git差异、验证结果、并发初始化回归及发布阻塞项 | R:code:HANDOFF_v359_REVIEW.md,code:AGENT_HANDOFF.md | A:审核结果报告 | S:Edge启动失败的页面验证没有结果，不能继承旧PASS或推断云端登录结果；报告基线含未提交工作区差异
+RYPLOT_SCHEMA.md[SD8T]: F:定义地块库分层数据结构、权威几何字段、跨页地块引用和只读物料快照契约 | R:code:core/data-service.js,code:TASK_ryplot-interface_20261012.md | A:地块数据模式 | S:跨页引用只保存地块ID，目标缺失或无效时必须报错并保留原引用
 TASK_bom-nav-merge_20261012.md[SU5T]: F:规定将BOM导出入口并入材料清单导航的任务范围与验收约束 | R:code:runye-nav.js | A:导航合并任务说明 | S:本文是任务规格，不能据此断言导航改造已实现
-TASK_contour-dxf_20261012.md[SD5T]: F:规定DXF等高线读取与高程点生成的任务边界、实现接口及验收条件 | R:code:runye-terrain.js | A:等高线导入任务说明 | S:文档明确限定为等高线转高程点，不包含DWG或TIN构建
-TASK_file-menu-complete_20261012.md[SU5T]: F:规定文件菜单导入、导出与工程分组的补全范围和会员门控验收项 | R:code:runye-nav.js | A:文件菜单任务说明 | S:文档是需求规格，不代表菜单功能当前已完成
+TASK_contour-dxf_20261012.md[SD5S]: F:规定DXF等高线读取与高程点生成的任务边界、实现接口及验收条件 | R:code:runye-terrain.js | A:等高线导入任务说明 | S:文档明确限定为等高线转高程点，不包含DWG或TIN构建
+TASK_file-menu-complete_20261012.md[SU5S]: F:规定文件菜单导入、导出与工程分组的补全范围和会员门控验收项 | R:code:runye-nav.js | A:文件菜单任务说明 | S:文档是需求规格，不代表菜单功能当前已完成
 TASK_hydraulics-compliance_20261012.md[SD5S]: F:规定水力校核标准符合性层和现场读数界面的设计范围 | R:code:runye-hydraulics.js | A:水力校核任务说明 | S:规格要求保持现有水力计算内核不变
 TASK_iframe-shell_20261012.md[SU5S]: F:规定地图、地形和水力页面iframe外壳的导航、存储与移动端衔接要求 | R:code:index.html | A:页面外壳任务说明 | S:规格要求同源页面通过localStorage共享状态并保留子页会员检查
-TASK_kmz-import_20261012.md[SI5T]: F:规定浏览器端解包KMZ并复用KML解析器的实现范围和失败处理 | R:code:runye-map-import.js | A:KMZ导入任务说明 | S:规格限定本地ZIP解包，不引入库且不改既有KML与非KMZ路径
-TASK_ryplot-interface_20261012.md[SD5T]: F:规定地块数据服务的上下文读取、图层变更和引用解析接口及验证要求 | R:code:core/data-service.js,code:RYPLOT_SCHEMA.md | A:地块接口任务说明 | S:规格禁止新增持久化键并要求引用字段保持默认空值语义
-TASK_sprinkler-pipeline_20261012.md[SD6S]: F:规定地形喷灌估算、布局和BOM流程的阶段目标、插件桥接与验收范围 | R:code:PLUGIN_DEV.md | A:喷灌流程任务说明 | S:规格要求复用既有计算公式并保持滴灌逻辑不变
+TASK_kmz-import_20261012.md[SI5S]: F:规定浏览器端解包KMZ并复用KML解析器的实现范围和失败处理 | R:code:runye-map-import.js | A:KMZ导入任务说明 | S:规格限定本地ZIP解包，不引入库且不改既有KML与非KMZ路径
+TASK_ryplot-interface_20261012.md[SD5S]: F:规定地块数据服务的上下文读取、图层变更和引用解析接口及验证要求 | R:code:core/data-service.js,code:RYPLOT_SCHEMA.md | A:地块接口任务说明 | S:规格禁止新增持久化键并要求引用字段保持默认空值语义
+TASK_sprinkler-pipeline_20261012.md[SD6M]: F:规定地形喷灌估算、布局和BOM流程的阶段目标、插件桥接与验收范围 | R:code:PLUGIN_DEV.md | A:喷灌流程任务说明 | S:规格要求复用既有计算公式并保持滴灌逻辑不变
 TASK_sw-cache-fix_20261012.md[SV5T]: F:规定Service Worker缓存修复和版本更新的任务范围及验证约束 | R:code:sw.js | A:缓存修复任务说明 | S:文档要求此任务不改业务逻辑且不执行发布
-_bak_v342_runye-ai-plan.css[ZU5M]: F:保存AI灌溉规划浮动面板、折叠竖条和独立工作台的版本化样式 | R:- | A:历史AI规划界面样式 | S:-
-_bak_v343_runye-ai-plan.css[ZU5M]: F:保存AI规划工作台标题栏、导航和聊天区的迭代样式 | R:code:_bak_v342_runye-ai-plan.css | A:历史AI规划界面样式 | S:-
-_bak_v345_runye-ai-plan.css[ZU5M]: F:记录AI工作台简化导航并隐藏地块绘制和更多功能入口的样式版本 | R:code:_bak_v343_runye-ai-plan.css | A:历史AI规划界面样式 | S:恢复隐藏入口需移除对应覆盖规则
-_bak_v346_runye-nav.css[ZU6M]: F:保存顶部功能导航和“更多”折叠面板样式，并包含AI规划工作台样式 | R:code:runye-nav.js,code:_bak_v345_runye-ai-plan.css | A:历史导航与规划样式 | S:“更多”面板使用fixed定位以避开横向滚动容器的纵向裁切
-_bak_v348_runye-ai-plan.css[ZU5M]: F:保存AI灌溉规划面板及独立工作台的后续样式版本 | R:code:_bak_v345_runye-ai-plan.css | A:历史AI规划界面样式 | S:-
+_bak_v342_runye-ai-plan.css[ZU5S]: F:保存AI灌溉规划浮动面板、折叠竖条和独立工作台的版本化样式 | R:- | A:历史AI规划界面样式 | S:-
+_bak_v343_runye-ai-plan.css[ZU5S]: F:保存AI规划工作台标题栏、导航和聊天区的迭代样式 | R:code:_bak_v342_runye-ai-plan.css | A:历史AI规划界面样式 | S:-
+_bak_v345_runye-ai-plan.css[ZU5S]: F:记录AI工作台简化导航并隐藏地块绘制和更多功能入口的样式版本 | R:code:_bak_v343_runye-ai-plan.css | A:历史AI规划界面样式 | S:恢复隐藏入口需移除对应覆盖规则
+_bak_v346_runye-nav.css[ZU6T]: F:保存顶部功能导航和“更多”折叠面板样式，并包含AI规划工作台样式 | R:code:runye-nav.js,code:_bak_v345_runye-ai-plan.css | A:历史导航与规划样式 | S:“更多”面板使用fixed定位以避开横向滚动容器的纵向裁切
+_bak_v348_runye-ai-plan.css[ZU5S]: F:保存AI灌溉规划面板及独立工作台的后续样式版本 | R:code:_bak_v345_runye-ai-plan.css | A:历史AI规划界面样式 | S:-
 _bak_v349_runye-ai-plan.css[ZU5S]: F:保存AI灌溉规划面板与独立工作台的样式，包含悬浮折叠交互和窄屏布局 | R:- | A:AI规划样式 | S:-
 _delcards.py[XZ3T]: F:按固定行号与HTML锚点删除peanut-tool.html中的历史建议卡片，并断言删除范围边界 | R:- | A:一次性卡片清理脚本 | S:-
 _pdbg_tmp.mjs[XE2T]: F:临时导入等高线DXF插件activate入口用于本地模块调试 | R:code:plugins/contour-dxf/main.js | A:插件调试导入脚本 | S:-
 build_sdk_bundle.cjs[XV8S]: F:核对CloudBase SDK构建依赖版本并生成浏览器自包含IIFE bundle与就绪事件 | R:code:pwa/vendor/cloudbase-js-sdk-3.8.2.bundle.js | A:CloudBase SDK构建脚本 | S:依赖版本固定且输出必须保持IIFE以暴露window.cloudbase并触发cloudbase-ready
-ci_check_static.cjs[TQ7T]: F:运行无第三方依赖静态闸门检查展开后的HTML脚本语法、重复ID和关键常量单一来源 | R:code:expand_index.cjs,code:.github/workflows/ci.yml | A:静态CI检查器 | S:内联脚本仅用vm.Script编译不执行
+ci_check_static.cjs[TQ7S]: F:检查展开HTML的内联脚本语法、重复ID、关键常量单一来源和主页面/插件入口的离线缓存登记 | R:code:expand_index.cjs,code:index.html,code:sw.js,code:plugins.json,code:.github/workflows/ci.yml | A:静态CI检查器 | S:内联脚本仅用vm.Script编译不执行；未纳入CORE的主页面脚本必须登记明确降级理由
 cloud-sms-test.html[TQ6M]: F:提供手机号验证码登录与CloudBase云函数调用的交互诊断页面，汇总SDK就绪、登录身份及调用结果 | R:code:cloud-sync.js,code:cloudfn/ryEntitle-v2/index.js | A:手机号登录云端诊断页 | S:验证码发送受60秒冷却限制，页面提示短信可能产生费用
 cloud-sync.js[IN8L]: F:封装CloudBase初始化、匿名与短信登录、云端档案同步、PG键值存储和云函数调用并提供稳定CloudSync接口 | R:code:build_sdk_bundle.cjs,code:core/data-service.js,code:cloudfn/ryEntitle-v2/index.js | A:CloudBase浏览器同步适配层 | S:云档案键值操作依赖已登录用户与可用RLS；未就绪时按接口路径回退本地存储并保留云错误状态
 expand_index.cjs[XV4T]: F:将根index.html引用的mod内联脚本和样式展开为内存中的虚拟HTML供静态检查及既有文本契约使用 | R:code:ci_check_static.cjs | A:主页面展开工具 | S:仅替换内存字符串，不写回展开结果
-index.html[EU9L]: F:润野灌溉设计主页面，整合地块绘制、地图、管路规划、水力校核、会员权益与插件入口 | R:code:mod/inline-09.js,code:mod/material-formulas.js,code:mod/zone-geometry.js,code:mod/inline-31.js,code:mod/inline-32.js,code:runye-nav.js,code:runye-entitle.js,code:sw.js | A:主程序页面入口 | S:入口脚本顺序影响行为：会员权益层须先于导航渲染加载，材料公式与分区几何工具须先于inline-09.js，离线核心资源清单由Service Worker维护
+index.html[EU9L]: F:润野灌溉主页面，装配设计、地图、管路、水力、会员与插件功能，并承载紧凑分组参数面板 | R:code:runye-entitle.js,code:runye-member-ui.js,code:mod/inline-09.js,code:mod/material-table.js,code:mod/plot-editor.js,code:mod/tl-header-layout.js,code:mod/plan-calc-render.js,code:mod/ry-panel.js | A:应用入口与页面装配 | S:设计参数的原生fld_*输入保留为计算数据源，Shoelace仅作可选代理且组件不可用时回退原生控件；新增核心静态资源须登记Service Worker CORE并更新VERSION
 invite.html[EU7L]: F:提供润野灌溉邀友注册、邀请码和会员权益操作页面 | R:code:lib/ai-quota.cjs,code:cloudfn/ryEntitle-v2/index.js | A:- | S:会员码及邀请状态由服务端流程确认，页面显示不能替代服务端授权
-irr_optim.js[KD8S]: F:提供独立的 Jaya 群智能管网多拓扑管径优化计算引擎 | R:code:pipe_optim_ui.js,code:hydraulic-calc/pipe-path-loss.js | A:- | S:只读调用方传入的 spec，不触碰站点原有数据；通过 window.IrrOptim 独立暴露
+irr_optim.js[KD8M]: F:提供独立的 Jaya 群智能管网多拓扑管径优化计算引擎 | R:code:pipe_optim_ui.js,code:hydraulic-calc/pipe-path-loss.js | A:- | S:只读调用方传入的 spec，不触碰站点原有数据；通过 window.IrrOptim 独立暴露
 manifest.webmanifest[FC5T]: F:声明润野灌溉 PWA 名称、启动地址、显示模式、图标与主题色 | R:code:index.html,code:pwa/offline.html | A:- | S:start_url 指向智能规划锚点，安装后以独立应用窗口启动
 peanut-tool.html[RU3T]: F:将历史七彩花生工具入口重定向到数字农业子目录页面 | R:code:digital-agriculture/peanut-tool.html | A:- | S:重定向保留原查询字符串和页面锚点
 pipe_optim.css[LU5T]: F:定义管网优化分析弹窗的隔离样式 | R:code:pipe_optim_ui.js | A:- | S:所有选择器使用 po- 前缀，运行时由 UI 模块注入样式
 pipe_optim_ui.js[AU8L]: F:实现独立管网优化分析弹窗并展示 Jaya 优化结果 | R:code:irr_optim.js,code:pipe_optim.css,code:index.html | A:- | S:输入设计数据先深拷贝到模块副本，优化器不读取或写回主程序对象
-plugin-admin.html[EU6T]: F:提供统一管理后台，管理插件开关、搜索和调整会员权益、查看邀请绑定关系及配置会员规则 | R:code:cloud-sync.js,code:cloudfn/ryEntitle-v2/index.js,code:runye-entitle.js | A:插件与会员管理后台 | S:管理写操作依赖服务端校验的登录JWT与管理员UID白名单，网页本身不授予管理员权限
+plugin-admin.html[EU6T]: F:提供管理后台，维护插件开关、会员权益和规则并查看邀请绑定关系 | R:code:cloud-sync.js,code:cloudfn/ryEntitle-v2/index.js,code:runye-entitle.js | A:插件与会员管理界面 | S:管理写操作依赖服务端验证的登录JWT和管理员UID白名单；L1配置界面禁用CAD、BOM、水力校验及其余高级功能
 plugins.json[FC6T]: F:声明插件核心版本、控制服务端点和已注册插件目录 | R:code:core/loader.js,code:cloudfn/ryEntitle-v2/index.js | A:- | S:加载器以此清单发现插件，单项目录由 id 与 path 配对
-runye-ai-chat-test.html[AU5S]: F:提供AI协同规划对话界面及其输入、消息和结果工作区 | R:code:runye-ai-plan.js,code:runye-ai-plan.css | A:AI规划聊天测试页 | S:文件名标明该入口为测试页面，不能据此视为生产服务契约
+runye-ai-chat-test.html[AU5M]: F:提供AI协同规划对话界面及其输入、消息和结果工作区 | R:code:runye-ai-plan.js,code:runye-ai-plan.css | A:AI规划聊天测试页 | S:文件名标明该入口为测试页面，不能据此视为生产服务契约
 runye-ai-plan.css[LU6M]: F:定义AI灌溉规划面板、输入表单、预览和状态提示的样式 | R:code:runye-ai-plan.js | A:AI规划面板样式 | S:页面样式与规划逻辑分离
 runye-ai-plan.js[AB8L]: F:解析并校验AI规划建议，展示候选方案，经版本和现场工况核对后调用既有引擎复算并支持撤销 | R:code:runye-ai-plan.css,code:runye-entitle.js,code:core/data-service.js | A:AI灌溉规划工作流 | S:AI输出先经过字段和风险校验；应用前核对地块版本并用原引擎重建复算，在线额度由服务端用户绑定
 runye-case-library.css[LU2T]: F:为匿名案例授权和保存对话框定义紧凑样式 | R:code:runye-case-library.js | A:匿名案例对话框样式 | S:样式只针对case-dialog及其子元素
-runye-case-library.js[AB6S]: F:提供方案本地保存及经用户明确授权后匿名提交公共案例库的流程 | R:code:runye-case-library.css,code:runye-entitle.js | A:匿名案例提交逻辑 | S:未授权时仅保存在本机且不会上传；上传案例经过隐私处理
-runye-dxf.js[AB8M]: F:把平面或轴测施工图转换为DXF 2004文本并触发下载 | R:code:runye-entitle.js,code:runye-nav.js | A:CAD图纸导出器 | S:导出前校验drawing-export高级会员权益；权益仍在同步时停止导出并提示重试
-runye-entitle.js[IS8L]: F:维护会员登录与试用权益状态，加载云端等级规则并按L1/L2功能清单判权，提供允许、拒绝、同步中三态访问接口 | R:code:runye-member-ui.js,code:runye-nav.js,code:plugins/bom/main.js,code:runye-dxf.js,code:cloudfn/ryEntitle-v2/index.js | A:会员权益控制层 | S:权益状态未就绪时access返回pending，调用方须阻止受限导航和导出动作；ALL_FEATURES_OPEN=false时由PLAN_FEATURES与can判权
+runye-case-library.js[AB6T]: F:提供方案本地保存及经用户明确授权后匿名提交公共案例库的流程 | R:code:runye-case-library.css,code:runye-entitle.js | A:匿名案例提交逻辑 | S:未授权时仅保存在本机且不会上传；上传案例经过隐私处理
+runye-dxf.js[AB8M]: F:将平面或轴测施工图转换为DXF 2004文本并触发下载 | R:code:runye-entitle.js,code:runye-nav.js,code:index.html | A:CAD图纸导出器 | S:导出前校验drawing-export高级会员权益；权益同步中的直接入口显示等待状态并停止导出
+runye-entitle.js[IS8L]: F:维护会员状态并按L1/L2权益表判断功能权限，另提供受本机来源限制的L2测试覆盖 | R:code:runye-member-ui.js,code:runye-nav.js,code:plugins/bom/main.js,code:runye-dxf.js,code:cloudfn/ryEntitle-v2/index.js | A:会员权益控制层 | S:L1不能通过云端规则配置获得CAD、BOM、水力校验或pro-others；本地管理员测试状态只在本机源有效，且不代表云端管理员身份
 runye-geo.js[CG7M]: F:提供统一经纬度与局部平面坐标换算、投影基准管理和距离计算接口 | R:code:runye-hydraulics-core.js,code:runye-terrain.js | A:共享地理计算库 | S:局部Mercator投影依赖保存的参考经纬度，调用方需保持坐标基准一致
 runye-hydraulics-core.js[DB9L]: F:构建灌溉管网水力模型并计算流量分配、沿程损失、节点压力和方案校核，提供EPANET对照数据 | R:code:hydraulic-calc/hc-core.js,code:hydraulic-calc/design-core.js,code:runye-hydraulics.html | A:水力校核计算核心 | S:流量链单位为m³/h并须与Hazen-Williams、泵和EPANET需求单位一致；参考解由EPANET对照，自研结果仍由润野内核负责
-runye-hydraulics.html[AU7L]: F:提供独立水力校核页面，加载润野计算核心并组织管网输入、计算结果和EPANET对照界面 | R:code:runye-hydraulics-core.js,code:hydraulic-calc/hc-core.js,code:hydraulic-calc/design-core.js | A:水力校核页面 | S:页面检测嵌入状态并使用同一套水力核心；EPANET用于对照而非替代润野主计算
+runye-hydraulics.html[AU7L]: F:提供独立水力校核页面，加载润野计算核心并组织管网输入、计算结果和EPANET对照界面；仅确认L2权益后才启动页面 | R:code:runye-hydraulics-core.js,code:hydraulic-calc/hc-core.js,code:hydraulic-calc/design-core.js,code:runye-entitle.js,code:plugins/hydraulics/main.js | A:水力校核页面 | S:页面检测嵌入状态并优先读取同源主站权益；无法确认权益时拒绝启动，权益待同步期间等待；EPANET用于对照而非替代润野主计算
 runye-inverse-design.css[LU4T]: F:定义逆向试算的输入项、试算结果和提示状态样式 | R:code:runye-inverse-design.js | A:逆向设计样式 | S:样式服务于逆向试算面板而不承载计算逻辑
 runye-inverse-design.js[AB6S]: F:基于当前正向水力模型提供管带摩阻或轮灌分组试算，并支持校核后应用和撤销 | R:code:runye-hydraulics-core.js,code:runye-nav.js | A:逆向水力设计流程 | S:应用前保存工程快照并要求安全撤销能力；水源条件变化时须重新校核
 runye-irrigation-illustrated-manual.html[AU6L]: F:提供润野灌溉设计工具的图文使用说明，按参数、地块、规划和图纸等章节讲解操作 | R:code:index.html,code:runye-landing.html | A:灌溉设计图文手册 | S:手册中的示意图和操作说明是辅助资料，实际功能以当前页面实现为准
 runye-landing.html[EU6M]: F:提供润野灌溉产品介绍和进入设计工具的公开落地页 | R:code:index.html,code:runye-theme.css,code:runye-typography.css | A:产品落地页 | S:该入口引用统一主题和PWA资源，承载产品介绍而非设计计算
 runye-map-enhance.js[IG8L]: F:封装地图覆盖层、地块几何导入导出与地图数据交互，并提供GeoJSON和KML解析构建能力 | R:code:runye-map-measure.html,code:runye-geo.js,code:terrain/terrain-core.js | A:地图增强与格式转换库 | S:页面坐标显示需经RunyeGeo转换；回传地形和水力数据依赖明确的宿主回调
-runye-map-measure.html[AU8L]: F:提供在线地图地块测量和边界编辑页面，集成导航、地图增强、分区、物料优化及PWA资源 | R:code:runye-map-enhance.js,code:runye-map-partition.js,code:runye-nav.js | A:地图面积测量页面 | S:该页面可被独立打开或嵌入；地图和远程底图能力仍依赖网络及外部图层服务
+runye-map-measure.html[AU8L]: F:提供在线地图地块测量和边界编辑页面，集成导航、地图增强、分区、物料优化及PWA资源 | R:code:runye-map-enhance.js,code:runye-map-partition.js,code:runye-nav.js,code:mod/ry-panel.js,code:mod/ry-panel.css | A:地图面积测量页面 | S:页面可独立打开或嵌入且地图依赖网络；角度工具的select、input、status和data-angle结构留在#mapPartitionTools内，旁侧动作按钮留在其外
 runye-map-partition.js[DB6T]: F:保存和恢复旋转分区方案，按地图坐标预览分区并回写地块档案与网络布局 | R:code:runye-map-measure.html,code:terrain/index.html | A:地图分区方案适配器 | S:应用新分区会清空关联旧管路和阀门并标记needsReplan；发送前必须先应用角度方案
 runye-material-audit.js[KB6T]: F:根据有效管段几何、管径和隐藏状态汇总前端主管支管长度，并解析表格公式引用 | R:code:plugins/bom/main.js,code:pipe_optim_ui.js | A:材料核算辅助库 | S:隐藏、无效或被路径分段裁切的管段不计入材料长度
-runye-member-ui.js[IU8L]: F:提供会员状态面板、注册登录与邀请绑定流程，并向导航锁定项展示升级引导 | R:code:runye-entitle.js,code:runye-nav.js | A:会员界面与邀请流程 | S:邀请绑定可从URL暂存并在登录或启动就绪后处理；升级弹窗通过RyMemberUI对外提供
+runye-member-ui.js[IU8L]: F:提供会员状态、注册登录、邀请绑定与升级引导，并提供本机最高级会员测试登录 | R:code:runye-entitle.js,code:cloud-sync.js,code:runye-nav.js | A:会员界面与本地测试账号交互 | S:本地测试密码以PBKDF2哈希保存且不发送云端；登录状态仅保存在本机浏览器，生产域名不展示本地提权入口
 runye-mobile-map-preview.css[LU5T]: F:定义移动地图预览页的地图、顶栏、工具抽屉、绘图提示和底部操作栏样式 | R:code:runye-mobile-map-preview.html,code:runye-mobile-map-preview.js | A:移动地图预览样式 | S:样式以独立预览页的组件类和地图控件为目标
-runye-mobile-map-preview.html[AU7L]: F:提供独立移动地图预览页，组合地图搜索、底图切换、地块绘制导入、分区示意和图层工具 | R:code:runye-mobile-map-preview.js,code:runye-mobile-map-preview.css,code:pwa/vendor/leaflet.js,code:runye-geo.js | A:移动地图预览页 | S:地块与二三级管路用于页面预览；地图瓦片依赖外部在线底图服务
+runye-mobile-map-preview.html[AU7S]: F:提供独立移动地图预览页，组合地图搜索、底图切换、地块绘制导入、分区示意和图层工具 | R:code:runye-mobile-map-preview.js,code:runye-mobile-map-preview.css,code:pwa/vendor/leaflet.js,code:runye-geo.js | A:移动地图预览页 | S:地块与二三级管路用于页面预览；地图瓦片依赖外部在线底图服务
 runye-mobile-map-preview.js[AB6S]: F:实现移动地图预览的地块绘制导入、面积估算、分区与管线示意、图层控制及本地初始设置 | R:code:runye-mobile-map-preview.html,code:runye-mobile-map-preview.css,code:runye-mobile-partition.js | A:移动地图预览交互 | S:设置保存在本机localStorage；页面绘制和预览地块不等同于主设计工程的持久化
 runye-mobile-partition.js[KB6T]: F:在局部平面坐标上按卷盘长度、目标分区面积和角度生成移动预览分区及管线示意 | R:code:runye-mobile-map-preview.js | A:移动分区几何计算 | S:仅供移动预览页绘制展示，不能作为主工程分区结果的写入接口
 runye-mobile.css[LU4T]: F:定义手机视口下导航、工具栏和面板的响应式布局样式 | R:code:runye-mobile.js,code:runye-landing.html | A:移动端公共样式 | S:移动页面类由运行时断点脚本管理，样式只在对应状态生效
 runye-mobile.js[EU6S]: F:检测触屏和窄视口并管理移动端允许页面区段、面板切换及绘图画布指针事件 | R:code:runye-mobile.css,code:runye-nav.js | A:移动端适配入口 | S:移动模式仅开放声明的地图与管路规划区段；桌面行为保持原页面路径
-runye-nav.css[LU7S]: F:定义全站顶部功能导航、更多菜单、锁定会员项和导航面板的视觉样式 | R:code:runye-nav.js,code:index.html | A:全站功能导航样式 | S:index和地图测量页面共享该导航样式
+runye-nav.css[LU7S]: F:定义全站顶部功能导航、更多菜单、文件面板及权益等待和高级锁定控件的视觉样式 | R:code:runye-nav.js,code:runye-entitle.js,code:index.html | A:全站导航与权益状态样式 | S:文件菜单和直接操作按钮区分权益同步中与高级会员锁定状态
 runye-nav.js[EU9L]: F:集中维护顶层和更多菜单项、会员能力门控、页面锚点跳转及动作注册 | R:code:runye-nav.css,code:runye-entitle.js,code:index.html,code:core/ui-shell.js | A:全站导航控制器 | S:权益状态分为允许、拒绝和同步中；等待时拦截点击、hash直达及iframe跳转，更多按钮自身仅展开菜单
 runye-terrain.css[LU6T]: F:定义地形模块入口按钮、侧栏控件和地形参数面板的专属样式 | R:code:terrain/index.html,code:terrain/terrain-ui.js | A:地形模块样式 | S:样式围绕地形页面和侧栏组件，不承担地形计算
 runye-terrain.js[DB6M]: F:管理主页地形高程导入、手工编辑和地形数据与主设计页面之间的桥接 | R:code:runye-terrain.css,code:terrain/terrain-core.js,code:index.html | A:主页地形数据桥接 | S:地形成果通过约定的存储与回传接口影响主页面；地形页面的预览模式成果不自动等同工程应用
-runye-theme.css[CG7M]: F:定义全站品牌颜色、间距、字号和共享界面组件的设计令牌 | R:code:runye-landing.html,code:runye-typography.css | A:全站主题令牌 | S:页面可通过局部变量覆盖主题默认值，公共组件需遵循该令牌层
+runye-theme.css[CG7M]: F:定义全站品牌颜色、间距、字号和共享界面组件的设计令牌 | R:code:runye-landing.html,code:runye-typography.css,code:mod/ry-panel.css | A:全站主题令牌 | S:页面可局部覆盖主题默认值；面板专用令牌由共享样式表补充
 runye-typography.css[CG7M]: F:集中定义工具页面常用文字层级与基础排版规则 | R:code:runye-theme.css,code:runye-landing.html | A:全站排版基线 | S:该层通过共享CSS变量与主题配合，页面级显式样式仍可覆盖
 runye-undo.js[CR7M]: F:为规划页面捕获工程快照并提供Ctrl+Z回退，清理快照中的临时与易变状态 | R:code:runye-nav.js,code:runye-inverse-design.js | A:规划页面撤销服务 | S:撤销依赖主程序保存和恢复项目接口；临时快照键用后删除以免污染用户档案
-sw.js[RP8M]: F:管理PWA核心预缓存与运行时缓存，执行资源更新、旧缓存清理、离线导航回退及静态资源请求策略 | R:code:pwa/offline.html,code:pwa/pwa.js,code:index.html,code:plugins.json,code:runye-entitle.js,code:mod/material-formulas.js,code:mod/zone-geometry.js | A:PWA Service Worker | S:新增离线核心资源须登记CORE并同步更新VERSION；缓存键移除?v查询串，查询参数不代替版本升级；不缓存用户上传、API、跟踪请求或地图瓦片
+sw.js[RP8M]: F:管理PWA核心预缓存、运行时缓存、资源更新、旧缓存清理及离线导航回退 | R:code:pwa/pwa.js,code:index.html,code:mod/ry-panel.js,code:mod/ry-panel.css,code:runye-case-library.js,code:cloud-sync.js,code:runye-undo.js | A:PWA Service Worker | S:核心资源变更须登记CORE并更新VERSION；URL查询参数不替代版本升级，离线核心清单须与页面实际依赖保持一致
 vercel.json[CV4T]: F:配置Vercel部署中AI灌溉API函数的最大执行时长 | R:code:api/ai-irrigation.js | A:Vercel部署配置 | S:当前仅为api/ai-irrigation.js声明300秒函数时长
 workbench.html[EU3T]: F:保留数字农业工作台旧路径并重定向到迁移后的digital-agriculture工作台 | R:code:digital-agriculture/workbench.html | A:工作台兼容入口 | S:重定向保留原查询参数与hash以兼容旧链接
 三级系统图.html[AU8L]: F:提供三级管网系统图和供水首部设计页面，呈现工作区、节点、手工管段与路径损失工具 | R:code:index.html,code:tl-workspace/tl-workspace.js,code:tl-workspace/tl-nodes.js | A:三级系统图页面 | S:页面模块共享index加载的tl-workspace编辑状态与数据接口
@@ -89,16 +89,21 @@ workbench.html[EU3T]: F:保留数字农业工作台旧路径并重定向到迁�
 插件化与数据资产化实施方案.md[SE7L]: F:定义插件Manifest与宿主协议、数据资产化阶段和旧模块迁移方案 | R:code:PLUGIN_DEV.md,code:RYPLOT_SCHEMA.md,code:AGENT_HANDOFF.md | A:插件与数据资产化方案 | S:文档内阶段完成状态和待决事项对应其记录时点，实施现况需以代码与运行证据复核
 数字农业.html[EU3T]: F:保留数字农业旧入口并重定向到digital-agriculture首页 | R:code:digital-agriculture/index.html | A:数字农业兼容入口 | S:浏览器跳转保留查询参数和hash，以兼容旧路径
 数据资产化推进方案.md[SD6S]: F:规划项目档案、BOM和实测反馈、案例检索与推荐构成的数据沉淀路线 | R:code:RYPLOT_SCHEMA.md,code:插件化与数据资产化实施方案.md | A:数据资产化路线图 | S:文档明确标记为方案立项快照，不代表路线图中的功能已经实现
-架构结构图.md[SD7S]: F:按2026-10-12代码盘点记录主程序、核心模块、插件和页面级模块的功能结构 | R:code:README.md,code:插件化与数据资产化实施方案.md,code:AGENT_HANDOFF.md | A:项目架构盘点 | S:该图文是日期标注的架构快照，代码结构变更后需重新核对
+架构结构图.md[SD7S]: F:按2026-10-12代码盘点记录主程序、核心模块、插件和页面模块，并追记核实后的面板试点与品牌状态 | R:code:README.md,code:插件化与数据资产化实施方案.md,code:AGENT_HANDOFF.md,code:mod/ry-panel.js,code:index.html,code:runye-map-measure.html,code:sw.js | A:项目架构盘点 | S:该图文是日期快照，变更记录需与源码核对；历史状态陈述可能过期
 管网优化模块说明.md[SE6S]: F:说明pipe_optim模块的Jaya管径优化目标、模块文件和与既有业务代码的隔离开发边界 | R:code:plugins/pipe-optim/main.js,code:irr_optim.js,code:pipe_optim_ui.js | A:管网优化开发说明 | S:文档表达模块设计约束，当前调用关系和隔离状态需以实现代码核实
 管路接驳拼装.html[AU7L]: F:提供管路接驳和拼装独立页面，承载管段、节点连接及装配交互 | R:code:runye-nav.js,code:runye-material-audit.js | A:管路接驳拼装页面 | S:该工具作为独立页面接入导航，工程量统计须结合共享材料核算逻辑
 耐特菲姆滴灌带长度查询器.html[KB7L]: F:依据滴头参数、入口压力和坡度查询滴灌带最大铺设长度，并展示压力与坡度矩阵 | R:code:runye-nav.js | A:滴灌带铺设长度查询器 | S:最大长度以首末端滴头流量偏差不超过10%为条件；薄壁带数据基于1.2bar，查询结果仍受单条建议800米上限约束
+runye-pipe3d.js[KU8L]: F:将三级管线图数据渲染为可交互三维示意，展示地块、总管、主管、支管、滴灌带、阀门和水源 | R:code:index.html,code:mod/inline-09.js,code:pwa/vendor/three.min.js,code:sw.js | A:管网三维预览交互层 | S:只读window.tlDiagramData，不进行水力计算、工程建模或图纸输出；Three.js在首次打开时本地懒加载，渲染管径按示意放大
+MAINTENANCE_BACKLOG_2026-10-14.md[SC4T]: F:记录架构改造待办、当前工作区验证基线及未决风险 | R:code:docs/architecture.md,code:tests/plot_merge.smoke.cjs,code:digital-agriculture/AGENTS.md | A:项目维护待办与阶段记录 | S:本地门禁不代表远端、浏览器或发布包已验证；并行改动先确认归属再提交
+UI面板设计规范.md[SU7L]: F:定义面板族、共享样式令牌、折叠拖动记忆交互和渐进迁移顺序，并记录两个试点状态 | R:code:mod/ry-panel.css,code:mod/ry-panel.js,code:index.html,code:runye-map-measure.html,code:runye-theme.css,code:架构结构图.md | A:UI面板设计规范 | S:当前仅主页面参数面板与地图角度面板启用共享折叠/拖动；侧栏宽度拖动及全站迁移尚未实施
+UI改造交接指令.md[SU5T]: F:交接深墨绿品牌与紧凑面板改造的决策、技术约束、试点顺序和发布纪律 | R:code:UI面板设计规范.md,code:index.html,code:runye-map-measure.html,code:runye-theme.css,code:sw.js | A:UI改造交接说明 | S:历史样板不代表真实页面已采用其控件库；待决事项按当前用户指令确认
+阶段二_Vite接入方案.md[SV5T]: F:记录Vite仅用于本地预览且保持静态发布链路不变的阶段二工程化方案 | R:code:index.html,code:sw.js,code:docs/architecture.md | A:Vite预览方案 | S:本文是未执行计划，环境中的Node路径和依赖需运行时复核
 
 ===C:/Users/AHS/runye-irrigation/.github/scripts/===
 fetch_daily.py[IV6S]: F:从Open-Meteo及可选RSS汇集每日天气和资讯，更新data/daily.json与生成脚本；单源失败保留有效旧值 | R:code:data/daily.json,code:data/daily-data.js,code:.github/workflows/daily-data.yml | A:每日数据采集 | S:-
 
 ===C:/Users/AHS/runye-irrigation/.github/workflows/===
-ci.yml[FV7S]: F:在推送、PR或手动触发时用Node 22执行语法检查、静态检查和指定Node测试 | R:code:ci_check_static.cjs | A:持续集成 | S:-
+ci.yml[EV7T]: F:在推送、PR与手动触发时用 Node 22 运行统一检查入口 | R:code:scripts/check.cjs | A:持续集成 | S:检查文件集合按 Git 可见 JS/CJS 枚举；浏览器渲染态探针不纳入 CI，纯 Node 的 plot_merge smoke 由统一入口显式运行
 daily-data.yml[FV5T]: F:按每日定时或手动触发运行天气资讯采集，并在data/daily.json变化时提交更新 | R:code:.github/scripts/fetch_daily.py,code:data/daily.json | A:每日数据工作流 | S:-
 
 ===C:/Users/AHS/runye-irrigation/_p1/===
@@ -139,7 +144,7 @@ _probe_zoneauto_render.cjs[TQ7L]: F:在Edge中测量地块自动划分控件的�
 _shot_merge_outline.cjs[TQ6M]: F:用真实地图渲染验证拼接地块保留各子块轮廓且不显示包围外框 | R:code:runye-map-enhance.js | A:拼接地块轮廓回归验证 | S:缺陷注入恢复旧外框行为时应触发断言失败
 _shot_v193_group_edit.cjs[TQ5S]: F:截取成组地块整组编辑和逐块编辑状态供人工目检 | R:code:index.html | A:v193成组编辑截图 | S:仅用于目检，不包含自动断言
 _shot_v202_zoneauto_btn.cjs[TQ6S]: F:验证自动划分复选框改为按钮后的状态切换、分区联动、持久化与重载行为 | R:code:index.html | A:v202自动划分按钮验证 | S:清除本地状态并重载建立默认值基线
-_shot_v203_pa_style.cjs[TQ6S]: F:验证管路拼装页导航高亮、跨页样式尺寸及示例水力材料状态功能 | R:code:管路接驳拼装.html,code:index.html | A:v203管路页样式验证 | S:-
+_shot_v203_pa_style.cjs[TQ6M]: F:验证管路拼装页导航高亮、跨页样式尺寸及示例水力材料状态功能 | R:code:管路接驳拼装.html,code:index.html | A:v203管路页样式验证 | S:-
 _shot_v207_pa_ctxmenu.cjs[TQ7M]: F:通过真实鼠标和菜单操作验证管件改径传播、配件替换吸附、长度拖动及平面轴测一致 | R:code:管路接驳拼装.html,code:_p1/_pptr.cjs | A:v207管件交互端到端验证 | S:断言读取使用只读组件与连接查询，不以合成状态替代用户操作
 _shot_v208_snap.cjs[TQ7S]: F:通过真实鼠标验证管件双向吸附、拖动反馈、连接组移动和素材库拖入 | R:code:管路接驳拼装.html,code:_p1/_pptr.cjs | A:v208吸附交互验证 | S:屏幕像素距离档覆盖缩放无关行为与远距离不误吸附
 _shot_v210_edit_move_view.cjs[TQ8L]: F:验证管件复制旋转移动键盘操作和四视图切换对连接与渲染几何的影响 | R:code:管路接驳拼装.html,code:_p1/_pptr.cjs | A:v210编辑移动视图验证 | S:视图切换不得改变设计数据；纯几何操作的水力结果应保持不变
@@ -161,7 +166,7 @@ case-library.js[IZ6T]: F:提供在线案例库提交API并把持久化交给案�
 
 ===C:/Users/AHS/runye-irrigation/cloudfn/ryEntitle-v2/===
 PLUGIN_CONTROL_SETUP.md[SV5T]: F:说明全站插件开关、会员管理与规则参数的云函数接口、管理员鉴权及静态站点和云函数部署步骤 | R:code:cloudfn/ryEntitle-v2/index.js,code:plugin-admin.html,code:runye-entitle.js | A:会员与插件管理部署说明 | S:管理员UID白名单只配置在云函数环境变量，不能放入网页
-index.js[II8M]: F:实现会员权益、邀请码、会员规则和管理员插件/会员管理服务端接口，验证登录令牌并处理权益、规则、邀请与管理操作 | R:code:runye-entitle.js,code:plugin-admin.html,code:cloudfn/ryEntitle-v2/PLUGIN_CONTROL_SETUP.md | A:会员权益与管理云函数 | S:服务端API Key只从环境变量读取；用户身份须由已验证JWT的签名声明确定
+index.js[II8L]: F:实现会员权益、邀请码、会员规则和管理员插件/会员管理服务端接口，验证登录令牌并限制L1云端规则仅授予基础功能 | R:code:runye-entitle.js,code:plugin-admin.html,code:cloudfn/ryEntitle-v2/PLUGIN_CONTROL_SETUP.md | A:会员权益与管理云函数 | S:服务端API Key只从环境变量读取；用户身份须由已验证JWT的签名声明确定；L1规则过滤排除CAD与BOM导出能力
 package.json[FV3T]: F:声明ryEntitle云函数包入口且不声明npm运行依赖 | R:code:cloudfn/ryEntitle-v2/index.js | A:ryEntitle函数包配置 | S:云函数通过Node内置https发起HTTP请求，部署包不需要node_modules
 
 ===C:/Users/AHS/runye-irrigation/core/===
@@ -181,13 +186,13 @@ lajiao.html[AD8L]: F:提供海南辣椒生产与价格决策页，汇总生产�
 lengdong-fenxi.html[SZ5S]: F:整理华南冷冬成因与秋冬季预判，作为辣椒价格和出货窗口分析的参考材料 | R:code:decision-engine/lajiao.html | A:冷冬分析参考页 | S:预测结论具有季节与年份时效，引用时需复核页面对应的信号期
 
 ===C:/Users/AHS/runye-irrigation/digital-agriculture/===
-AGENTS.md[SZ7T]: F:约束数字农业模块开发范围、数据桥接协议、目录边界、旧入口兼容和跨系统数据写回流程 | R:code:digital-agriculture/README.md,code:irrigation-bridge.js,code:digital-agriculture/qicai-huasheng/schedule-core.js | A:数字农业模块开发规则 | S:植保节点仅以schedule-core.js为唯一数据源；数字农业不得直接读取灌溉页面DOM或反写灌溉计算结果
-README.md[SZ5T]: F:说明数字农业子系统页面结构、桥接数据契约、兼容入口和本地启动方式 | R:code:digital-agriculture/AGENTS.md,code:digital-agriculture/index.html,code:digital-agriculture/digital-agriculture.js | A:数字农业模块说明 | S:桥接数据由灌溉侧写入，数字农业侧只读；旧runyePlotData仅供兼容读取
+AGENTS.md[SZ7T]: F:约束数字农业模块边界、独立数据管理、共享地块库契约、目录职责和开发流程 | R:code:digital-agriculture/README.md,code:digital-agriculture/workbench.html,code:digital-agriculture/index.html,code:RYPLOT_SCHEMA.md | A:数字农业模块开发规则 | S:runye_pending_land已无读写方；runye_plot_library仍由工作台与灌溉工具共享读写
+README.md[SZ5T]: F:说明数字农业页面结构、共享地块库、历史快照兼容和本地启动 | R:code:digital-agriculture/AGENTS.md,code:digital-agriculture/index.html,code:digital-agriculture/digital-agriculture.js,code:digital-agriculture/workbench.html,code:RYPLOT_SCHEMA.md | A:数字农业模块说明 | S:v382移除了自动回写握手，但runye_plot_library仍由工作台与灌溉工具读写
 digital-agriculture.css[FU4T]: F:定义数字农业统一入口页卡片、标题、地块摘要和响应式布局样式 | R:code:digital-agriculture/index.html | A:数字农业入口样式 | S:-
-digital-agriculture.js[IU6T]: F:读取并校验灌溉侧写入的版本化地块桥接payload并把状态交给入口页展示 | R:code:irrigation-bridge.js,code:digital-agriculture/AGENTS.md,code:digital-agriculture/index.html | A:数字农业桥接读取器 | S:只读runye_digital_bridge_v1且校验version、source和地块字段，不回写灌溉数据
-index.html[EU5T]: F:提供数字农业导航入口并按需展示由灌溉工具传入的当前地块摘要 | R:code:digital-agriculture.css,code:digital-agriculture.js,code:digital-agriculture/workbench.html,code:digital-agriculture/peanut-tool.html | A:数字农业统一入口页 | S:无有效桥接地块时隐藏地块摘要区
+digital-agriculture.js[IU6T]: F:读取并校验遗留地块快照、解析URL地块标识并向入口页提供只读接口 | R:code:digital-agriculture/AGENTS.md,code:digital-agriculture/index.html | A:数字农业历史地块快照读取器 | S:读取的runye_digital_bridge_v1可能是浏览器遗留数据，不能视为当前灌溉状态
+index.html[EU5T]: F:提供数字农业独立入口并在存在旧协议快照时展示历史地块摘要 | R:code:digital-agriculture.css,code:digital-agriculture.js,code:digital-agriculture/workbench.html,code:digital-agriculture/peanut-tool.html | A:数字农业统一入口页 | S:浏览器遗留快照可能陈旧；入口明确标注为历史数据，不代表当前灌溉工程
 peanut-tool.html[AD8L]: F:提供七彩花生生长参数、水肥与植保决策界面，并根据统一植保节点数据展示阶段方案 | R:code:digital-agriculture/qicai-huasheng/schedule-core.js,code:digital-agriculture/digital-agriculture.js | A:七彩花生水肥植保工具 | S:植保节点来自schedule-core.js统一数据源，不能在页面内维护平行方案
-workbench.html[AD9L]: F:提供地块全周期工作台，管理地块档案、农事记录、物资与用量、灌溉记录、任务、天气和报表 | R:code:digital-agriculture/AGENTS.md,code:digital-agriculture/qicai-huasheng/schedule-core.js,code:cloud-sync.js,code:irrigation-bridge.js | A:地块全周期工作台 | S:灌溉地块绘制使用runye_pending_land握手；runye_plot_library为只读，灌溉结果由桥接回写runye_db_v1
+workbench.html[AD9L]: F:提供地块全周期工作台，管理档案、农事、物资、任务、天气和报表，并同步共享地块库 | R:code:digital-agriculture/AGENTS.md,code:digital-agriculture/qicai-huasheng/schedule-core.js,code:cloud-sync.js,code:RYPLOT_SCHEMA.md | A:地块全周期工作台 | S:工作台仍读写runye_plot_library；旧runye_pending_land握手已移除，不承诺绘制后自动回写
 
 ===C:/Users/AHS/runye-irrigation/digital-agriculture/qicai-huasheng/===
 schedule-core.js[AD8L]: F:维护七彩花生植保与生育期节点并生成供页面消费的计划节点、时间表和详细说明 | R:code:digital-agriculture/peanut-tool.html,code:digital-agriculture/workbench.html | A:七彩花生植保节点数据源 | S:此文件是相关页面植保节点数据的唯一权威来源
@@ -203,9 +208,10 @@ filter-system.js[DB9L]: F:按过滤组数、管径、标高、阀门和流量参
 EDGE_AUDIT.md[SQ6S]: F:记录Graphify图边的误报移除、源代码核实项、自环审查和待复核推断调用 | R:code:graphify-out/GRAPH_REPORT.md,code:graphify-out/graph.json | A:Graphify边关系审计 | S:重新生成图谱可能恢复已移除的误报边，8条构造器推断调用仍待验证
 GRAPH_REPORT.md[SQ8L]: F:汇总Graphify语料覆盖、节点边数量、社区导航、强连接节点及建议查询 | R:code:graphify-out/EDGE_AUDIT.md,code:graphify-out/.graphify_labels.json,code:graphify-out/graph.html | A:Graphify知识图谱报告 | S:报告开头的11168条边与862条推断边早于EDGE_AUDIT.md所述后续审计计数11243和918；推断关系需回到源码核验
 cost.json[XR4T]: F:Graphify 运行成本记录文件，保存每次抽取运行及累计 token 统计 | R:- | A:- | S:成本统计只反映已记录的 Graphify 运行
-graph.html[XQ4T]: F:Graphify 生成的交互式知识图谱 HTML 视图 | R:- | A:- | S:可视化是图谱投影，不能替代来源文件
+graph.html[XQ4L]: F:Graphify 生成的交互式知识图谱 HTML 视图 | R:- | A:- | S:可视化是图谱投影，不能替代来源文件
 manifest.json[XR4T]: F:Graphify 语料清单缓存，按路径记录扫描时间及 AST、语义哈希 | R:- | A:- | S:清单哈希用于识别抽取缓存状态，不证明源文件语义正确
-.graphify_learning.json[XQ4T]: F:保存Graphify查询反馈汇总状态，供reflect生成跨会话经验 | R:code:graphify-out/memory,code:graphify-out/reflections/LESSONS.md | A:Graphify学习状态 | S:该文件是工具生成的反馈元数据，不是仓库业务事实来源
+.graphify_learning.json[XQ4T]: F:保存Graphify查询反馈、来源代码指纹及节点偏好，用于后续检索排序 | R:code:graphify-out/reflections/LESSONS.md,code:graphify-out/reflections,code:mod/inline-09.js | A:Graphify学习状态 | S:评分只影响检索排序；来源指纹过期时须重新核对源码
+.vocab.txt[XZ1T]: F:保存 Graphify 图谱处理生成的词汇集合，用于查询与节点匹配 | R:- | A:图谱辅助数据 | S:-
 
 ===C:/Users/AHS/runye-irrigation/graphify-out/cache/ast/v0.9.88-s12-g0fcafffe3c00/===
 100ca74067a5cde4b403e5bc91f257fc3d4c55f07ea0c6fe433ab55c7568ed81.json[XQ4T]: F:保存Graphify针对指定仓库源文件生成的节点、关系和调用结构缓存 | R:code:graphify-out/GRAPH_REPORT.md,code:cloudfn/ryEntitle-v2/package.json | A:Graphify源码结构缓存（cloudfn/ryEntitle-v2/package.json） | S:缓存结构关系属于图谱提取结果，解释源码行为须以原文件为准
@@ -237,7 +243,7 @@ e3d58c6087d8e567fbc1ac687718363956230ae2b10e94d677ea48590ca5c722.json[XQ4T]: F:�
 e8e6392225be8ef147f1db0d3fe3f7acd70a8be2b5493f47f9267b5bc767ba48.json[XQ4T]: F:解析 plugins/bom/manifest.json 的 Graphify AST 缓存 | R:code:plugins/bom/manifest.json | A:- | S:缓存是Graphify提取产物，源码才是实现依据
 
 ===C:/Users/AHS/runye-irrigation/graphify-out/cache/===
-last_query_stamp[XR2T]: F:记录Graphify缓存目录最近一次查询的时间戳 | R:- | A:Graphify缓存元数据 | S:该时间戳由Graphify查询命令写入，不代表业务数据
+last_query_stamp[XR2T]: F:记录Graphify最近一次查询时间以判断缓存是否需要刷新 | R:code:graphify-out/.graphify_learning.json | A:Graphify查询缓存标记 | S:该值仅是缓存时间元数据，不代表业务或源码状态
 stat-index.json[XR4T]: F:Graphify 文件扫描统计缓存，按源码路径保存文件大小、修改时间、索引时间、词数和哈希 | R:- | A:- | S:源码元数据是扫描时快照，可能随文件变化而过期
 
 ===C:/Users/AHS/runye-irrigation/graphify-out/cache/semantic/pd5fd89c46bb5/===
@@ -327,7 +333,7 @@ f109023bd79f5ca02fe10600b064572c6984bd92062d0d2c94761806a0594a15.json[XQ4T]: F:G
 f1504a4c7a73b061671bb35aa5306b386a274e6c611629d3611a03c25233bf59.json[XQ4T]: F:Graphify语义缓存记录喷灌规划图与 BOM 插件桥、sprinklerBom 和 runyeSprinklerResult 桥接快照；一条概念关联、一条 references | R:code:TASK_sprinkler-pipeline_20261012.md | A:- | S:缓存中的节点与边是抽取结果，须以来源文件核验
 
 ===C:/Users/AHS/runye-irrigation/hydraulic-calc/===
-compliance-check.js[KB6T]: F:水力合规检查模块，依据提供的设计或实测数据生成微灌、喷灌与分组检查结果和建议 | R:code:hydraulic-calc/compliance-check.js | A:- | S:缺少必要数据时标为未评估，不按虚构默认值判定，且结果不构成法定验收证书
+compliance-check.js[KB6S]: F:水力合规检查模块，依据提供的设计或实测数据生成微灌、喷灌与分组检查结果和建议 | R:code:hydraulic-calc/compliance-check.js | A:- | S:缺少必要数据时标为未评估，不按虚构默认值判定，且结果不构成法定验收证书
 compliance-check.test.cjs[TQ5T]: F:水力合规检查测试覆盖通过、失败、缺失数据与默认限值场景 | R:code:hydraulic-calc/compliance-check.js | A:- | S:GB/T 50485-2020 4.0.6 测试限值为20%，不是10%
 design-core.js[KB6T]: F:水力设计计算模块，按目标流速选择管径并计算内径、沿程损失、Christiansen 系数和电机规格 | R:code:hydraulic-calc/hc-core.js | A:- | S:有原生水力实现时优先调用，否则使用 JavaScript 公式回退
 hc-core.js[KB8M]: F:无 DOM 的水力计算核心，计算配置、流速、Hazen-Williams 损失、多分支路径与水头 | R:code:hydraulic-calc/hc-core.js | A:- | S:计算口径需与主页面保持一致：默认 C=150、PE OD 按 SDR13.6 折算内径，局部损失按分流后管流速计算
@@ -347,16 +353,16 @@ verify.cjs[TQ6T]: F:逐项对比 JavaScript 与 C++ WASM 水力原语并复用�
 ===C:/Users/AHS/runye-irrigation/iso-diagram/===
 NETWORK_EDITOR.md[SD7M]: F:记录施工管网编辑器下线决定、模型保留范围和交接约束 | R:code:iso-diagram/network-editor.js,code:iso-diagram/network-model.js | A:- | S:文档记录的当前决定是编辑 UI 关闭而模型引擎保留
 README.md[SD6T]: F:说明三级轴测图参数、编辑流程和 tlDiagramData 输入契约 | R:code:iso-diagram/iso-diagram.js,code:index.html | A:- | S:工程参数只改图纸标注，不改变管路拓扑、水力结果或材料统计；tlDiagramData 单位为米
-editor.js[EU5T]: F:管理轴测图左栏构件参数编辑面板、撤销与本地保存入口 | R:code:iso-diagram/iso-diagram.js,code:iso-diagram/NETWORK_EDITOR.md | A:- | S:ISO_PARAM_EDITOR_OFF 下整栏编辑面板保持关闭
+editor.js[EU5S]: F:管理轴测图左栏构件参数编辑面板、撤销与本地保存入口 | R:code:iso-diagram/iso-diagram.js,code:iso-diagram/NETWORK_EDITOR.md | A:- | S:ISO_PARAM_EDITOR_OFF 下整栏编辑面板保持关闭
 iso-diagram.css[LU4T]: F:定义三级轴测视口和手工配件层的作用域样式 | R:code:iso-diagram/iso-diagram.js | A:- | S:样式限定在 tlIso 区域，避免影响平面图和系统图
-iso-diagram.js[KB8L]: F:将 tlDiagramData 转换为三级管线等轴测投影并生成 SVG | R:code:index.html,code:iso-diagram/README.md | A:- | S:只读 tlDiagramData；不写回平面几何，也不参与水力、流量、管径、分区或材料清单计算
-network-editor.css[LU5S]: F:定义施工管网编辑器在平面与轴测视图中的面板、叠加层和就地菜单样式 | R:code:iso-diagram/network-editor.js | A:- | S:样式层随当前视图挂载到对应平面或轴测容器
+iso-diagram.js[KB8L]: F:将三级平面管网几何转换为等轴测模型和SVG，并提供下载、打印及编辑表达层 | R:code:index.html,code:iso-diagram/README.md,code:runye-entitle.js,code:mod/inline-14.js | A:轴测图渲染与导出 | S:只读tlDiagramData，不写回平面几何或参与水力、材料计算；下载和打印均校验drawing-export权益，按钮同步显示权益状态
+network-editor.css[LU5M]: F:定义施工管网编辑器在平面与轴测视图中的面板、叠加层和就地菜单样式 | R:code:iso-diagram/network-editor.js | A:- | S:样式层随当前视图挂载到对应平面或轴测容器
 network-editor.js[DU7L]: F:实现尺寸驱动施工管网编辑器的平面与轴测交互层 | R:code:iso-diagram/network-model.js,code:iso-diagram/iso-diagram.js,code:index.html | A:- | S:依赖独立施工模型并只读 tlDiagramData；当前编辑入口由 EDITOR_OFF 关闭
 network-model.js[DB8L]: F:建立独立版本化施工管网模型，管理管段、配件约束、撤销重做和本机恢复 | R:code:iso-diagram/network-editor.js,code:iso-diagram/product-catalog.js | A:- | S:模型不修改或回写 window.tlDiagramData，按地块保存施工模型状态
-product-catalog.js[DB5T]: F:提供版本化管材、三通和配件实体产品型号目录 | R:code:iso-diagram/network-model.js | A:- | S:目录条目同时记录材质、接口规格体系、连接方式、压力等级和来源版本
+product-catalog.js[DB5S]: F:提供版本化管材、三通和配件实体产品型号目录 | R:code:iso-diagram/network-model.js | A:- | S:目录条目同时记录材质、接口规格体系、连接方式、压力等级和来源版本
 
 ===C:/Users/AHS/runye-irrigation/lajiao-zhibao/===
-index.html[DB5M]: F:展示辣椒全程植保技术方案与操作历 | R:- | A:- | S:页面方案是农事参考内容，具体用药需以标签和当地要求为准
+index.html[DB5L]: F:展示辣椒全程植保技术方案与操作历 | R:- | A:- | S:页面方案是农事参考内容，具体用药需以标签和当地要求为准
 
 ===C:/Users/AHS/runye-irrigation/lib/===
 ai-quota.cjs[PI7T]: F:校验在线 AI 会员访问码并通过 Redis 预留、结算和释放调用额度 | R:code:api/ai-irrigation.js,code:cloudfn/ryEntitle-v2/index.js | A:- | S:会员名单配置后额度身份只从该名单解析；生产环境不启用测试内存模式
@@ -371,12 +377,12 @@ inline-05.js[AU3T]: F:为系统图和轴测图提供 RyFnNavActions 动作分发
 inline-06.js[AU5S]: F:从当前 planData 汇总管径、带径、流量、水头和功率并刷新方案对比 | R:code:index.html,code:irr_optim.js | A:- | S:比较值从当前设计状态读取
 inline-07.js[AB6M]: F:计算管路运行经济对比并管理电价、运行时长、折旧年限及管材单价假设 | R:code:index.html,code:iso-diagram/iso-diagram.js | A:- | S:二级页与轴测图共用 runye_tlEconAssum，持久化必须读改写以保留对方字段
 inline-08.js[RU3T]: F:绑定三级管路移动端导航按钮以展开或收起主导航 | R:code:index.html | A:- | S:仅在按钮和导航节点同时存在时绑定
-inline-09.js[AB8L]: F:主页面核心规划脚本，集中管理PE管径档位、水力计算和灌溉交互，并协调材料表、分区几何与三级图面 | R:code:index.html,code:hydraulic-calc/hc-core.js,code:hydraulic-calc/pipe-path-loss.js,code:mod/material-formulas.js,code:mod/zone-geometry.js | A:主规划交互与计算编排 | S:自动选管档位与手动改径、单价档位有意分开；公式和分区几何辅助由独立模块提供，表格DOM和存储仍由本脚本负责
+inline-09.js[AB8L]: F:主页面规划脚本，编排PE管径、水力计算、灌溉交互、分区布局与图面，并生成材料表骨架 | R:code:index.html,code:hydraulic-calc/hc-core.js,code:mod/flow-geometry.js,code:mod/material-formulas.js,code:mod/material-table.js,code:mod/zone-geometry.js,code:mod/tl-header-layout.js,code:mod/tl-polyline-geometry.js | A:主规划交互与计算编排 | S:自动与手动分区布局委托给无DOM几何模块；手动布局在分配数组前限制总格数为500，尺寸异常或超限时提示并回退自动布局；三级简图生成调用后置同步经典脚本的标题布局模块；节点图层将折线几何委托给先行加载的RyTlPolylineGeometry；分区面积计算不会在Shoelace代理输入获得焦点时覆写用户正在编辑的值
 inline-10.js[AU7L]: F:实现基于底图的地块绘制工具，管理图片缩放平移、距离标定、多边形顶点和网格计数 | R:code:index.html,code:runye-map-enhance.js | A:- | S:面积换算依赖标定距离与像素尺度，未标定时不能把像素当实地面积
-inline-11.js[AB8L]: F:根据测量地块面积更新灌溉方案参数、结果和分区规划显示 | R:code:index.html,code:irr_optim.js | A:- | S:面积为零时清除旧方案结果，避免把先前地块的结果保留为当前方案
+inline-11.js[AB8L]: F:根据测量地块重算灌溉方案参数、结果与分区规划显示，并反馈手动分区超限状态 | R:code:index.html,code:irr_optim.js,code:mod/inline-09.js,code:mod/plan-calc-render.js | A:面积驱动方案联动 | S:面积为零时清除旧方案数据；手动分区超限时统一采用自动布局并提示调整亩/区值；扬程公式与分解展示由RyPlanCalcRenderer实现，原全局入口保留为代理
 inline-12.js[PD7M]: F:保存、载入和恢复本地工程项目并生成地块边界签名 | R:code:index.html | A:- | S:边界签名以厘米粒度量化坐标，用于跨页恢复已生成图纸的几何锚
 inline-13.js[PD6M]: F:用 localStorage 数组保存和召回多个地块，并跟踪当前地块身份 | R:code:index.html,code:mod/inline-12.js | A:- | S:地块库以 runye_plot_library 独立键保存
-inline-14.js[AU6L]: F:编辑灌溉供水首部系统图的标题、泵、过滤器、阀门、施肥装置及图纸显示选项 | R:code:index.html,code:三级系统图.html | A:- | S:该块以 IIFE 隔离系统图编辑器状态
+inline-14.js[AU6L]: F:编辑灌溉供水首部系统图并提供SVG、PNG导出和打印 | R:code:index.html,code:三级系统图.html,code:runye-entitle.js,code:mod/head-system-svg.js | A:首部系统图编辑器与导出 | S:编辑状态由IIFE隔离；布局、尺寸和SVG生成经window.RyHeadSystemSvg调用，缺少先行加载模块时立即报错；导出和打印前检查drawing-export权益并显示同步或高级会员状态
 inline-15.js[RU3T]: F:绑定地块绘制页移动端导航按钮的展开与收起 | R:code:index.html | A:- | S:缺少按钮或导航容器时不绑定
 inline-16.js[PD6S]: F:将跨页传来的 ryPlotRef 解析为本地地块库中的地块对象 | R:code:mod/inline-13.js,code:runye-map-measure.html | A:- | S:引用必须包含 id 且能在地块库中找到，否则抛错，不会静默创建替代地块
 inline-17.js[RU4T]: F:为二级和三级工作区绑定 data-ry-view 标签按钮并复用 rySetTab 切换视图 | R:code:index.html,code:iso-diagram/iso-diagram.js | A:- | S:仅在全局 rySetTab 已初始化后执行绑定
@@ -394,14 +400,24 @@ inline-28.js[AU6M]: F:管理工程经济、尺寸标注和几何显示参数设�
 inline-29.js[AB8L]: F:提供成组管路总览、总管编辑和按块进入三级设计的规划工作区 | R:code:index.html,code:mod/inline-11.js,code:mod/inline-24.js | A:- | S:总管在组级页统一管理，分区明细与汇总清单分别保留
 inline-30.js[AU6S]: F:把驳接点、管径和水头损失控制卡移动到画布右侧可拖动浮动面板 | R:code:index.html | A:- | S:通过移动原 DOM 保留内部 id 和静态渲染契约，面板不重写计算卡内容
 inline-31.js[IR7S]: F:管理页面iframe壳的懒加载、页面显示切换和已加载文档状态保留，并在权益同步中阻止受限页面切换 | R:code:index.html,code:runye-entitle.js,code:runye-nav.js | A:页面iframe壳 | S:桌面端按需加载并复用iframe文档；权益pending时不打开目标页并提示等待
-inline-32.js[AU7M]: F:实现文件菜单的导入、导出与工程动作及其页面内动作分发 | R:code:index.html,code:mod/inline-31.js,code:runye-nav.js | A:文件菜单动作分发 | S:独立页动作先显示目标iframe并等待其load后调用页面函数；权益同步中不继续分发
-style-01.css[LU8L]: F:定义主应用全局重置、品牌色、页面布局与通用组件样式 | R:code:index.html,code:mod/style-02.css,code:mod/style-03.css | A:- | S:全局样式变量集中在根作用域，局部模块样式应保持组件前缀隔离
+inline-32.js[AU7M]: F:实现文件菜单导入、导出与工程动作，按主页面或独立页分发菜单操作 | R:code:index.html,code:mod/inline-31.js,code:runye-nav.js,code:runye-entitle.js | A:文件菜单动作分发 | S:独立页动作先显示目标iframe并等待其load后调用页面函数；会员权益同步中停止受限动作并提示等待
+style-01.css[LU8L]: F:定义主应用全局重置、品牌色、页面布局与通用组件样式 | R:code:index.html,code:mod/style-02.css,code:mod/style-03.css,code:mod/ry-panel.css | A:主页面基础样式 | S:参数区字段和恢复按钮位于.ryp-body内；全局样式变量集中于根作用域
 style-02.css[LU4T]: F:定义三级轴测经济面板位置、宽度拖拽和视图内布局样式 | R:code:iso-diagram/iso-diagram.css,code:mod/inline-07.js | A:- | S:面板宽度由 tlEconW 控制并挂在轴测容器内
 style-03.css[LU2T]: F:对齐成组管路面板标题与下方按钮的中心位置 | R:code:mod/inline-29.js | A:- | S:标题使用三列网格保持文字居中，箭头不参与文字居中计算
 style-04.css[LU4T]: F:定义管网方案对比卡片、表格和提示信息样式 | R:code:mod/inline-06.js | A:- | S:样式作用域限定在 irrCompareSection
 style-05.css[LU4T]: F:定义全局设置遮罩与设置弹窗的显示和布局样式 | R:code:mod/inline-28.js | A:- | S:遮罩与弹窗显示由 open 状态类控制
 material-formulas.js[KB6T]: F:提供材料表数值解析、单元格地址转换、公式引用提取、表达式求值和结果格式化 | R:code:mod/inline-09.js | A:材料表公式工具 | S:表达式字符白名单校验后才交给Function求值，公式单元格依赖与DOM更新由调用方负责
-zone-geometry.js[KB7T]: F:提供多边形面积、矩形裁剪、阶梯网格边界读取及灌溉分区和分组实际面积计算 | R:code:mod/inline-09.js | A:分区几何计算工具 | S:有效地块多边形按裁剪后的交叠面积统计；无有效多边形时回退到网格规划面积
+zone-geometry.js[KB7T]: F:提供多边形裁剪面积、自动与手动分区布局、分区分组面积计算及滴灌带轴向选择和分段估算 | R:code:mod/inline-09.js,code:tests/zone_geometry.test.cjs,code:tests/partition_query.test.cjs | A:分区与布管方向几何 | S:自动与手动分区最多生成500格，输入边长限制到1e9；几何与手动分区参数计算保持无DOM依赖
+flow-geometry.js[KB6T]: F:提供水流演示用SVG折线路径解析、点到折线最近投影及欧氏距离计算 | R:code:mod/inline-09.js,code:tests/flow_geometry.test.cjs | A:水流演示几何工具 | S:纯函数不依赖DOM；路径解析按数字顺序两两组成坐标，只适用于折线式M/L路径
+ry-cad-toolbar.js[EU7M]: F:在真实浏览器工具模式中接管CAD侧栏，按功能区将侧栏节点移入工具栏分组并在退出或打印时归还 | R:code:index.html,code:runye-nav.css | A:CAD侧栏搬运与响应式状态绑定 | S:须在侧栏DOM后以普通同步classic script加载以保持绑定时序；matchMedia非原生的测试或VM环境直接不动作
+plot-editor.js[AU8L]: F:承载管路规划与施工简图绘图编辑器，管理画布交互、管线绘制和图面状态 | R:code:index.html,code:mod/inline-09.js,code:mod/inline-11.js,code:mod/zone-geometry.js | A:管路规划绘图编辑器 | S:脚本必须紧跟inline-11.js以普通同步classic方式加载；编辑状态封装在IIFE内，对外通过window.pp接口与主页面协作
+material-table.js[DB8L]: F:实现灌溉设计材料清单与成本表，管理单价联动和覆盖、材料行列编辑与持久化、单元格公式及汇总 | R:code:index.html,code:mod/inline-09.js,code:mod/material-formulas.js,code:runye-material-audit.js | A:材料清单与成本表 | S:必须先于inline-09同步加载；其ready微任务可能在脚本间触发render，且render会立即调用本文件材料表函数
+head-system-svg.js[LB6S]: F:计算首部系统图布局与尺寸并生成供页面渲染和导出的SVG | R:code:mod/inline-14.js,code:index.html | A:首部系统图SVG几何与绘制模块 | S:脚本初始化时仅向window发布冻结的RyHeadSystemSvg命名空间；inline-14通过该API调用，必须先行同步加载
+tl-header-layout.js[AU5S]: F:为三级管线简图标题换行、拖动、调宽并持久化位置和宽度 | R:code:mod/inline-09.js,code:index.html | A:三级简图标题布局交互 | S:依赖inline-09提供的tlMeasureText和生成时写入的window标题状态；必须作为普通经典脚本置于inline-09之后，tlAutoGenerate调用发生在页面生成阶段
+plan-calc-render.js[AU7S]: F:渲染二级扬程计算式和三级扬程分解，并支持从公式输入写回主页面字段后重算 | R:code:mod/inline-11.js,code:mod/inline-09.js,code:index.html | A:扬程过程展示 | S:初始化仅发布冻结的RyPlanCalcRenderer命名空间；公式编辑写回fld_lift或fld_dh并调用calcPlan，扬程分解默认值由调用方传入
+tl-polyline-geometry.js[KB5T]: F:提供三级管线节点图层所需的折线长度、按弧长定位及弧长区间裁剪纯计算 | R:code:mod/inline-09.js | A:三级节点折线几何 | S:纯函数接收{x,y}点对象且不访问DOM或全局节点状态；pointAt将弧长限制在折线范围内，sliceArc对长度不大于1e-6的区间返回null
+ry-panel.css[LU6L]: F:定义共享面板令牌、标题栏、折叠按钮、浮动外壳和正文滚动布局，并为主参数侧栏提供紧凑分组与Shoelace控件样式 | R:code:mod/ry-panel.js,code:index.html,code:runye-map-measure.html,code:runye-theme.css | A:共享面板样式 | S:令牌有字面回退；折叠通过hidden隐藏内容，原生输入是Shoelace不可用时的回退
+ry-panel.js[CU7T]: F:提供共享面板初始化、折叠状态记忆、浮动面板拖动与侧边面板拖宽接口，并将Shoelace输入代理事件桥接到原生参数字段 | R:code:mod/ry-panel.css,code:index.html,code:runye-map-measure.html | A:共享面板交互库 | S:Shoelace代理注册后才显示，计算仍以原生fld_*为准并接收代理输入事件；地图角度面板保留原位置折叠存档键与地图边界限制；缺少data属性不绑定
 
 ===C:/Users/AHS/runye-irrigation/modeling/===
 AGENTS.md[SD6T]: F:限定 modeling 子树的开发范围、参数化建模定位和依赖边界 | R:code:modeling/README.md,code:modeling/parametric/index.html | A:- | S:参数化模块的局部三维预览不代表独立三维建模功能已上线；新增引擎或云服务需另行确认
@@ -428,7 +444,7 @@ vec3.js[KC4T]: F:提供参数化局部三维几何所需的三维向量基础运
 viewport2d.js[AU6M]: F:管理二维矢量视图的绘线、方形和圆形、缩放平移、选取与拖动 | R:code:modeling/parametric/js/app.js | A:- | S:图形数据由二维视图持有并通过回调交给上层应用
 
 ===C:/Users/AHS/runye-irrigation/plugins/ai-plan/===
-main.js[EU7M]: F:接管智能规划顶级导航入口并桥接既有 RyAiPlan 页面到独立窗口 | R:code:plugins/ai-plan/manifest.json,code:runye-ai-plan.js,code:runye-nav.js | A:- | S:弹窗动作保存当前工程并保留 query/hash 与一次性锚点，避免主窗口地块状态丢失
+main.js[EU7M]: F:接管智能规划顶级导航入口并桥接既有 RyAiPlan 页面到独立窗口 | R:code:plugins/ai-plan/manifest.json,code:runye-ai-plan.js,code:runye-nav.js | A:智能规划导航适配器 | S:弹窗动作保存当前工程并保留 query/hash 与一次性锚点，避免主窗口地块状态丢失；权益同步中由导航壳阻止动作
 manifest.json[FC6T]: F:声明智能规划插件入口、导航位置、弹窗模式和主模块配置 | R:code:plugins/ai-plan/main.js,code:runye-nav.js | A:- | S:mode 必须为 popup，href 保留 smart 查询和 pipePlanSection 锚点；文件入口插在地块绘制之前
 
 ===C:/Users/AHS/runye-irrigation/plugins/archive/===
@@ -437,7 +453,7 @@ manifest.json[FC5T]: F:声明项目档案插件入口、导航顺序和读写图
 style.css[LU5S]: F:定义项目档案浮动面板与表单样式 | R:code:plugins/archive/main.js | A:- | S:组件类名统一使用 archive- 前缀以隔离主站与其他插件样式
 
 ===C:/Users/AHS/runye-irrigation/plugins/bom/===
-main.js[AU7M]: F:通过Core readBom展示材料汇总、价格估算、CSV导出和档案保存入口，并对高级会员权益进行校验 | R:code:plugins/bom/manifest.json,code:runye-material-audit.js,code:core/data-service.js,code:runye-entitle.js | A:BOM材料清单插件 | S:权益尚未同步时导出操作停止并提示重试，不显示错误的升级拒绝信息
+main.js[AU7M]: F:通过Core readBom展示材料汇总、估价、CSV导出和档案保存，并对BOM高级权益进行校验与状态提示 | R:code:plugins/bom/manifest.json,code:runye-material-audit.js,code:core/data-service.js,code:runye-entitle.js | A:BOM材料清单插件 | S:权益未同步时受限操作停止并提示重试；插件卸载时解除权益监听
 manifest.json[FC5T]: F:声明材料清单插件入口及读取图纸、BOM和项目档案的权限 | R:code:plugins/bom/main.js,code:core/loader.js | A:- | S:权限表是插件可调用宿主数据接口的边界
 style.css[LU4S]: F:为BOM插件提供清单表格、筛选栏、工具栏及导出状态的样式 | R:code:plugins/bom/main.js,code:PLUGIN_DEV.md | A:BOM清单界面样式 | S:样式选择器以bom-前缀限定插件界面，避免覆盖宿主页面
 
@@ -457,7 +473,7 @@ manifest.json[FC6T]: F:声明DXF等高线插件入口及文件、地形读取写
 style.css[LU5S]: F:定义DXF等高线导入面板、解析状态和高程点结果的样式 | R:code:plugins/contour-dxf/main.js | A:等高线插件样式 | S:样式以插件专属前缀限定作用范围
 
 ===C:/Users/AHS/runye-irrigation/plugins/filter-system/===
-main.js[EU7S]: F:将现有过滤系统入口迁移到插件导航注册，并通过宿主分区跳转API定位原页面 | R:code:plugins/filter-system/manifest.json,code:runye-nav.js | A:过滤系统导航适配器 | S:只迁移顶层入口；导航重渲染期间抑制重复注册，业务模块保持原实现
+main.js[EU7S]: F:将现有过滤系统入口迁移到插件导航注册，并通过宿主分区跳转API定位原页面 | R:code:plugins/filter-system/manifest.json,code:runye-nav.js | A:过滤系统导航适配器 | S:只迁移顶层入口；导航重渲染期间抑制重复注册，权益同步期间由导航壳阻止动作，业务模块保持原实现
 manifest.json[FC4T]: F:声明过滤系统导航插件入口、资源与宿主导航能力 | R:code:plugins/filter-system/main.js,code:PLUGIN_DEV.md | A:插件Manifest | S:入口位置需在更多菜单之前注册以保持原顶层导航次序
 
 ===C:/Users/AHS/runye-irrigation/plugins/hello-world/===
@@ -465,19 +481,19 @@ main.js[EU2T]: F:挂载示例插件界面并注册用于验证插件加载的导
 manifest.json[FC2T]: F:声明hello-world示例插件的标识、入口和资源 | R:code:plugins/hello-world/main.js | A:示例插件Manifest | S:仅用于插件装载示例
 
 ===C:/Users/AHS/runye-irrigation/plugins/hydraulics/===
-main.js[EU5S]: F:把原水力校核独立页面接入插件导航，沿用原页面链接和功能实现 | R:code:plugins/hydraulics/manifest.json,code:runye-hydraulics.html | A:水力校核导航适配器 | S:导航壳不替代独立页面中的水力计算实现
+main.js[EU5M]: F:把原水力校核独立页面接入插件导航，沿用原页面链接和功能实现 | R:code:plugins/hydraulics/manifest.json,code:runye-hydraulics.html | A:水力校核导航适配器 | S:导航壳不替代独立页面中的水力计算实现；权益同步期间由导航壳阻止动作
 manifest.json[FC4T]: F:声明水力校核页面插件的资源、入口和导航项 | R:code:plugins/hydraulics/main.js,code:runye-hydraulics.html | A:插件Manifest | S:导航目标指向既有独立页面
 
 ===C:/Users/AHS/runye-irrigation/plugins/iso-view/===
-main.js[EU5S]: F:将轴测图导航动作映射到现有轴测图宿主动作 | R:code:plugins/iso-view/manifest.json,code:runye-nav.js | A:轴测图导航适配器 | S:通过既有宿主动作打开图表，不实现或修改图形渲染
+main.js[EU5S]: F:将轴测图导航动作映射到现有轴测图宿主动作 | R:code:plugins/iso-view/manifest.json,code:runye-nav.js | A:轴测图导航适配器 | S:通过既有宿主动作打开图表，不实现或修改图形渲染；权益同步期间由导航壳阻止动作
 manifest.json[FC4T]: F:声明轴测图导航插件入口及所需宿主资源 | R:code:plugins/iso-view/main.js,code:PLUGIN_DEV.md | A:插件Manifest | S:插件仅接入既有轴测图动作
 
 ===C:/Users/AHS/runye-irrigation/plugins/material-list/===
-main.js[EU5S]: F:把材料清单现有页面区块注册为宿主插件导航项并保留原页面功能 | R:code:plugins/material-list/manifest.json,code:runye-nav.js | A:材料清单导航适配器 | S:导航重渲染时防止重复插入，业务清单逻辑仍由原页面提供
+main.js[EU5S]: F:把材料清单现有页面区块注册为宿主插件导航项并保留原页面功能 | R:code:plugins/material-list/manifest.json,code:runye-nav.js | A:材料清单导航适配器 | S:导航重渲染时防止重复插入，权益同步时由导航壳阻止动作，业务清单逻辑仍由原页面提供
 manifest.json[FC4T]: F:声明材料清单导航插件入口及宿主导航能力 | R:code:plugins/material-list/main.js,code:PLUGIN_DEV.md | A:插件Manifest | S:注册目标为现有detailsSection页面区块
 
 ===C:/Users/AHS/runye-irrigation/plugins/pipe-assemble/===
-main.js[EU6S]: F:把管网装配入口注册到更多菜单面板，并沿用既有跳转目标 | R:code:plugins/pipe-assemble/manifest.json,code:runye-nav.js | A:管网装配导航适配器 | S:该入口位于折叠的更多面板，不属于顶层导航项
+main.js[EU6M]: F:把管网装配入口注册到更多菜单面板，并沿用既有跳转目标 | R:code:plugins/pipe-assemble/manifest.json,code:runye-nav.js | A:管网装配导航适配器 | S:该入口位于折叠的更多面板，不属于顶层导航项；权益同步期间由导航壳阻止动作
 manifest.json[FC4T]: F:声明管网装配入口插件的资源、导航位置和跳转配置 | R:code:plugins/pipe-assemble/main.js,code:PLUGIN_DEV.md | A:插件Manifest | S:入口保持在更多菜单内并链接现有装配功能
 
 ===C:/Users/AHS/runye-irrigation/plugins/pipe-optim/===
@@ -485,7 +501,7 @@ main.js[IE6S]: F:将管道优化旧功能接入插件壳，转发优化导出事
 manifest.json[FC4T]: F:声明管道优化适配器的导航、图表读取与事件发送能力 | R:code:plugins/pipe-optim/main.js,code:PLUGIN_DEV.md | A:插件Manifest | S:插件壳通过声明权限接入宿主已有优化业务
 
 ===C:/Users/AHS/runye-irrigation/plugins/sprinkler/===
-main.js[AB7M]: F:承载喷灌结果工作流并动态接入地形核心，读取地形数据后按配置键保存喷灌结果 | R:code:plugins/sprinkler/manifest.json,code:TASK_sprinkler-pipeline_20261012.md,code:runye-terrain.js | A:喷灌设计插件 | S:结果存储键由配置决定；依赖宿主RyTerrainData接口
+main.js[AB7M]: F:承载喷灌结果工作流并动态接入地形核心，读取地形数据后按配置键保存喷灌结果 | R:code:plugins/sprinkler/manifest.json,code:TASK_sprinkler-pipeline_20261012.md,code:runye-terrain.js | A:喷灌设计插件 | S:结果存储键由配置决定；依赖宿主RyTerrainData接口；权益同步期间由导航壳阻止动作
 manifest.json[FC4T]: F:声明喷灌设计插件入口、地形数据能力及结果工作流资源 | R:code:plugins/sprinkler/main.js,code:TASK_sprinkler-pipeline_20261012.md | A:插件Manifest | S:喷灌工作流与地形数据接口按插件声明绑定
 
 ===C:/Users/AHS/runye-irrigation/plugins/sys-view/===
@@ -512,7 +528,7 @@ index.mjs[LI8L]: F:提供epanet-js完整构建的EPANET WASM网络水力模拟�
 index.mjs[LI4T]: F:提供epanet-js精简构建入口 | R:code:pwa/vendor/epanet/index.mjs,code:pwa/vendor/epanet/LICENSE | A:EPANET精简构建 | S:这是独立的精简构建导出入口，许可沿用同目录LICENSE
 
 ===C:/Users/AHS/runye-irrigation/qicai-huasheng/===
-index.html[AB6S]: F:提供七彩花生种植日历与植保排期的网页入口和表格展示 | R:code:qicai-huasheng/qicai-plan-schedule.json,code:qicai-huasheng/schedule-core.js | A:花生种植日历页面 | S:页面内访问门控凭据属于前端内容，不能视作安全认证或保密边界
+index.html[AB6M]: F:提供七彩花生种植日历与植保排期的网页入口和表格展示 | R:code:qicai-huasheng/qicai-plan-schedule.json,code:qicai-huasheng/schedule-core.js | A:花生种植日历页面 | S:页面内访问门控凭据属于前端内容，不能视作安全认证或保密边界
 plan-config.json[DC3T]: F:保存七彩花生计划的地点、坐标、播种日期等历史默认配置 | R:code:qicai-huasheng/index.html | A:花生计划历史配置 | S:文件注明其历史配置不参与页面实时联动，当前植保节点取自地块或工具保存的播期
 qicai-plan-schedule.json[DB6M]: F:列出花生种植阶段对应的农事节点、相对播种日、操作和安排数据 | R:code:qicai-huasheng/index.html,code:qicai-huasheng/schedule-core.js | A:花生植保计划数据 | S:排期日期以播种日为相对基准，页面如何消费由计划加载器决定
 qicai_daily.html[EU5S]: F:提供七彩花生日常管理页面入口并复用仓库统一主题与文字样式 | R:code:runye-theme.css,code:runye-typography.css | A:花生日常页面 | S:本文件是独立页面入口，样式共享仓库主题资源
@@ -549,6 +565,16 @@ query_20261013_054327_82d1b086_aoci索引与graphify能否用于系统梳理代�
 query_20261013_071347_db36ee6b_identify_safe_optimization_opportunities_around_me.md[XQ4T]: F:保存会员权益、导航与BOM/DXF导出关系的Graphify查询结果及本次查询结论 | R:code:graphify-out/graph.json,code:runye-entitle.js,code:runye-member-ui.js,code:runye-dxf.js | A:Graphify查询反馈 | S:dead_end仅表示本次图查询未可靠连出权益与导出路径，不能据此断言源码无调用关系
 query_20261013_073836_fd9558f2_map_responsibilities_and_safest_extraction_boundar.md[XQ4T]: F:保存 inline-09.js 职责分区、现有模块边界和低风险拆分建议 | R:code:mod/inline-09.js,code:hydraulic-calc/design-core.js,code:runye-material-audit.js,code:tl-workspace/tl-workspace.js,code:iso-diagram/iso-diagram.js | A:Graphify架构梳理记录 | S:Graphify关系是调查线索，改造决策须回到来源代码核实
 query_20261013_084630_7ce83a62_which_low_risk_code_boundary_should_be_extracted_n.md[XQ4T]: F:记录inline-09职责与安全拆分边界的Graphify查询结果，并记载源码核实后抽出纯分区几何计算的决定 | R:code:graphify-out/graph.json,code:mod/inline-09.js,code:mod/zone-geometry.js | A:Graphify架构查询记录 | S:图关系仅作调查线索；拆分结论以来源代码核实为准
+query_20261013_102258_de74acf8_which_low_risk_helper_boundary_remains_in_inline_0.md[XQ4T]: F:记录inline-09水流演示辅助的Graphify查询及源码核实后抽取路径解析、最近点和距离计算的结论 | R:code:mod/inline-09.js,code:mod/flow-geometry.js | A:Graphify架构查询记录 | S:图关系仅用于定位候选；纯几何拆分边界由源码确认，DOM路线与动画仍在调用方
+query_20261013_141123_ecdd8c7b_which_inline_09_zone_layout_path_can_become_slow_f.md[XQ4T]: F:记录极端分区数布局性能问题的Graphify查询及其未定位目标源码的dead_end结论 | R:code:graphify-out/graph.json,code:mod/inline-09.js,code:tests/partition_query.test.cjs | A:Graphify查询记录 | S:本次dead_end只说明图遍历未定位目标；布局性能结论需回到源码与测试核实
+query_20261013_155453_128571be_review_entitlement_pending_feedback_and_calczonela.md[XQ3T]: F:保存权益等待反馈与calcZoneLayout安全审查的查询结论 | R:code:runye-entitle.js,code:mod/inline-09.js,code:mod/zone-geometry.js | A:Graphify查询记忆 | S:图谱遍历结果需回到源码验证；自动分区限制已实施为500格
+query_20261014_035317_44987d97_which_current_source_modules_and_test_harnesses_co.md[SZ1T]: F:记录一次 Graphify 查询未能建立测试与源码之间精确关系及后续源码核实结果 | R:code:tests/irrigation_bridge.test.cjs,code:tests/partition_query.test.cjs,code:tests/plot_merge.smoke.cjs | A:图谱调查记录 | S:记录将图边限定为导航线索，结论须以源码核实
 
 ===C:/Users/AHS/runye-irrigation/graphify-out/reflections/===
-LESSONS.md[XQ4T]: F:汇总Graphify查询记忆中标记为有用、无效或已纠正的经验，供后续检索时参考 | R:code:graphify-out/memory,code:graphify-out/.graphify_learning.json | A:Graphify查询经验摘要 | S:内容由reflect根据反馈记录确定性生成，仅作调查方向提示，结论仍须核对来源
+LESSONS.md[XQ4T]: F:汇总Graphify查询记忆的有效线索、误入方向和待验证边界 | R:code:graphify-out/memory,code:graphify-out/.graphify_learning.json | A:Graphify反思摘要 | S:内容由工具确定性生成，仅用于定位线索；实现结论须回到来源代码核实
+
+===C:/Users/AHS/runye-irrigation/docs/===
+architecture.md[SQ7S]: F:约定润野灌溉的目标分层、模块接口、数据与计算契约、测试发布流程，并记录当前混合式架构与迁移顺序 | R:code:index.html,code:core/bootstrap.js,code:core/data-service.js,code:core/loader.js,code:plugins.json,code:scripts/check.cjs,code:sw.js,code:.github/workflows/ci.yml | A:架构与协作约定 | S:五层是目标职责模型；当前主页面仍以经典脚本和全局状态为主，Core插件体系只是并行扩展路径；脚本加载顺序与Service Worker CORE必须同步
+
+===C:/Users/AHS/runye-irrigation/scripts/===
+check.cjs[XQ8T]: F:提供本地与 CI 共用的语法、静态契约、Node 单测和地块拼接契约检查入口 | R:code:ci_check_static.cjs,code:tests,code:tests/plot_merge.smoke.cjs,code:.github/workflows/ci.yml | A:工程检查门禁 | S:通过 Git 可见文件枚举检查目标，语法范围包含 JS、CJS、MJS；语法与静态契约失败即停止，测试文件按可见集合选取，避免将浏览器 smoke 通配进 Node 门禁

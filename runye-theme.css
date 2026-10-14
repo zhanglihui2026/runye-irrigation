@@ -7,10 +7,10 @@
 
 /* ===== 1. 设计 Token ===== */
 :root{
-  /* 品牌主色：绿（润野） */
+  /* 品牌主色：绿（润野）—— 深墨绿系，与顶部导航 #173e32 同源 */
   --ry-green-50:#f0fdf4; --ry-green-100:#dcfce7; --ry-green-200:#bbf7d0;
-  --ry-green-500:#22c55e; --ry-green-600:#16a34a; --ry-green-700:#15803d;
-  --ry-green-800:#166534; --ry-green-900:#14532d;
+  --ry-green-500:#1d4d3e; --ry-green-600:#173e32; --ry-green-700:#14532d;
+  --ry-green-800:#123026; --ry-green-900:#0f2a20;
   /* 辅色：teal（灌溉/水） */
   --ry-teal:#0d9488; --ry-teal-700:#0f766e;
   /* 中性灰阶（文本） */
@@ -32,9 +32,9 @@
      原 10px 过粗；拇指原带 1px 描边，4px 下描边会吃掉一半可抓面积，故去掉描边改纯色圆角丸。 */
   --ry-scroll-w:4px; --ry-scroll-track:transparent; --ry-scroll-thumb:rgba(100,116,139,.45); --ry-scroll-thumb-hover:rgba(100,116,139,.72);
   --ry-space-1:4px; --ry-space-2:8px; --ry-space-3:16px; --ry-space-4:24px;
-  --ry-success:#15803d; --ry-warn:#d97706; --ry-danger:#dc2626; --ry-info:#2563eb; --ry-white:#fff;
+  --ry-success:#14532d; --ry-warn:#d97706; --ry-danger:#dc2626; --ry-info:#173e32; --ry-white:#fff;
   --ry-btn-gap:6px; --ry-btn-pad-y:10px; --ry-btn-pad-x:20px; --ry-btn-fs:14px; --ry-btn-weight:700;
-  --ry-btn-shadow:0 4px 12px rgba(22,163,74,.25);
+  --ry-btn-shadow:0 4px 12px rgba(23,62,50,.25);
   --ry-table-margin-top:12px; --ry-table-fs:14px; --ry-table-head-pad-y:12px; --ry-table-cell-pad-y:11px; --ry-table-pad-x:14px;
 }
 

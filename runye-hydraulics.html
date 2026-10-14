@@ -807,15 +807,69 @@
     }
   };
 
-  /* ---------- 事件 ---------- */
-  $('btnRun').onclick = run;
-  $('btnReload').onclick = function () { renderSrc(); run(); };
-  $('btnMapHydraulic').onclick = function () { window.location.href = 'runye-map-measure.html#hydraulic'; };
-  document.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target && e.target.tagName === 'INPUT') run(); });
-
-  restoreCfg();
-  renderSrc();
-  run();
+  /* 水力校核属于 L2：同时保护独立 URL，不能只依赖主站导航入口门控。 */
+  function hydraulicAccess() {
+    var ent = window.RyEntitle;
+    try { if (!ent && window.parent !== window) ent = window.parent.RyEntitle; } catch (e) { }
+    if (ent && typeof ent.access === 'function') return ent.access('hydraulic-check');
+    if (ent && typeof ent.can === 'function') {
+      if (typeof ent.ready === 'function' && !ent.ready()) return 'pending';
+      return ent.can('hydraulic-check') ? 'allowed' : 'denied';
+    }
+    return 'denied';
+  }
+  function showHydraulicGate(status) {
+    var gate = document.getElementById('hydEntitlementGate');
+    if (!gate) {
+      gate = document.createElement('div');
+      gate.id = 'hydEntitlementGate';
+      gate.setAttribute('role', 'status');
+      gate.setAttribute('aria-live', 'polite');
+      gate.style.cssText = 'position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;background:rgba(247,245,240,.98);font:14px sans-serif;color:#243b33;text-align:center;padding:24px';
+      document.body.appendChild(gate);
+    }
+    gate.innerHTML = '';
+    var box = document.createElement('div');
+    box.style.cssText = 'max-width:420px;padding:28px;border:1px solid #d7e4dc;border-radius:12px;background:#fff;box-shadow:0 8px 30px rgba(0,0,0,.08)';
+    var title = document.createElement('h2');
+    title.textContent = status === 'pending' ? '正在同步会员权益' : '水力校核为高级会员功能';
+    var desc = document.createElement('p');
+    desc.textContent = status === 'pending' ? '请稍候，页面会在权益同步完成后自动打开。' : '请从润野主程序登录并开通高级会员后使用。';
+    box.appendChild(title); box.appendChild(desc);
+    if (status !== 'pending') {
+      var upgrade = document.createElement('button');
+      upgrade.type = 'button'; upgrade.textContent = '查看会员权益';
+      upgrade.onclick = function () {
+        var memberUI = null;
+        try { memberUI = window.RyMemberUI || (window.parent !== window ? window.parent.RyMemberUI : null); } catch (e) { }
+        if (memberUI && typeof memberUI.showUpgrade === 'function') memberUI.showUpgrade('水力校核');
+        else window.location.href = 'index.html';
+      };
+      box.appendChild(upgrade);
+    }
+    gate.appendChild(box);
+  }
+  function bootHydraulics() {
+    if (hydraulicAccess() !== 'allowed') return false;
+    var gate = document.getElementById('hydEntitlementGate');
+    if (gate && gate.parentNode) gate.parentNode.removeChild(gate);
+    /* ---------- 事件 ---------- */
+    $('btnRun').onclick = run;
+    $('btnReload').onclick = function () { renderSrc(); run(); };
+    $('btnMapHydraulic').onclick = function () { window.location.href = 'runye-map-measure.html#hydraulic'; };
+    document.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target && e.target.tagName === 'INPUT') run(); });
+    restoreCfg();
+    renderSrc();
+    run();
+    return true;
+  }
+  function checkHydraulicAccess() {
+    var status = hydraulicAccess();
+    if (status === 'allowed') { bootHydraulics(); return; }
+    showHydraulicGate(status);
+    if (status === 'pending') setTimeout(checkHydraulicAccess, 500);
+  }
+  checkHydraulicAccess();
 })();
 </script>
 </body>

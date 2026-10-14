@@ -66,6 +66,7 @@ const PLUGIN_ADMIN_UIDS = String(process.env.RY_PLUGIN_ADMIN_UIDS || '').split('
 /* [v2c] 会员规则配置（ry_kv）与功能清单（与 runye-entitle.js FEATURES 同构） */
 const MEMBER_CONFIG_ID = 'global:member-config';
 const FEATURE_KEYS = ['zone-split', 'ai-plan', 'pipe-layout', 'online-map', 'drawing-export', 'bom-export', 'hydraulic-check', 'pro-others'];
+const L1_FEATURE_KEYS = ['zone-split', 'ai-plan', 'pipe-layout', 'online-map'];
 const FEATURE_NAMES = {
   'zone-split': '地块分区', 'ai-plan': 'AI 智能规划', 'pipe-layout': '管路规划', 'online-map': '在线地图',
   'drawing-export': '出图', 'bom-export': '导出清单', 'hydraulic-check': '水利校验', 'pro-others': '其余高级功能'
@@ -95,7 +96,8 @@ function sanitizeMemberConfig(v) {
       const dd = Number(p.days);
       if (isFinite(dd) && dd >= 1 && dd <= 3650) o.days = Math.floor(dd);
       if (Array.isArray(p.features)) {
-        const fs = p.features.filter(function (x) { return FEATURE_KEYS.indexOf(x) >= 0; });
+        const allowed = k === 'L1' ? L1_FEATURE_KEYS : FEATURE_KEYS;
+        const fs = p.features.filter(function (x) { return allowed.indexOf(x) >= 0; });
         if (fs.length) o.features = fs;
       }
     }

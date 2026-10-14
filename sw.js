@@ -1,4 +1,5 @@
 /* Runye PWA v1. Increment VERSION when changing the offline shell. */
+/* v426-tl-polyline-geometry: extract node-layer polyline operations for reuse and isolated verification. */
 'use strict';
 /* VERSION 沿革：v380-cache-fix（另一会话的缓存修复）→ v381-plugin-aiplan（本次新增 ai-plan
    插件 + core/data-service.js、core/event-bus.js、core/ui-shell.js 均在 CORE 白名单内，必须抬版本，
@@ -91,8 +92,57 @@
    tapeAxis/pipeAxis/segs/代价报告，滴灌带 ∥ tapeAxis、主管∥支管 ⊥ tapeAxis 由构造保证；投票判据由
    「分区宽高比」改为「贴合单边铺设长度 S 的程度」，平票由更省支管一侧破平；带长超 S 自动分段。
    二级 ppBuildAutoPipes（原 v229 投票）与三级 tlAutoGenerate（原 v150b 逐区判向）改消费同一函数。
-   mod/zone-geometry.js / inline-09.js / inline-11.js 均在 CORE 白名单，必须抬版本）。 */
-const VERSION = 'v416-tape-axis';
+   mod/zone-geometry.js / inline-09.js / inline-11.js 均在 CORE 白名单，必须抬版本）→
+   v419-manual-zone-limit（手动分区超限保护 + CAD工具栏脚本拆分，新增 mod/ry-cad-toolbar.js 入 CORE，必须抬版本）→
+   v420-plot-editor-split（大文件拆分一：绘图编辑器 IIFE（07 管路规划与施工简图，402..4071 行逐字节）自
+   inline-11.js 迁出为 mod/plot-editor.js；inline-11 仅余二级扬程面板顶层段（24KB）。审计确认 head 与 IIFE
+   双向零符号依赖、IIFE 对外全部调用时守卫，加载顺序铁律=plot-editor 紧跟 inline-11 之后。新文件入 CORE，
+   必须抬版本）→
+   v421-mat-table（大文件拆分二：材料清单/材料表管理（TL_PIPE_PRICE_DEF 单价默认表 + tlPipePriceByOd +
+   updateMaterialTotals + mat* 可编辑表格，493..1491 行逐字节）自 inline-09.js 迁出为 mod/material-table.js；
+   边界审计：出带依赖仅 render/fmt/fmt0（call-time），带外引用 18 符号全 call-time，inline-09 本非 IIFE、
+   符号原就是全局 ⇒ 迁移零语义变化；表格 HTML 骨架仍由 inline-09 的 render() 生成。加载顺序=先于
+   inline-09（其尾部 IIFE 的 ready.then(render) 微任务在两脚本间触发首屏 render，须本文件先就位）。
+   新文件入 CORE，必须抬版本）→
+   v422-head-system-svg（提取首部系统图纯 SVG 布局/绘制模块，index.html 先行加载且新增 CORE 缓存项）→
+   v423-header-layout（将三级简图标题换行/拖动/调宽交互从 inline-09.js 拆出为 mod/tl-header-layout.js；
+   保留普通同步经典脚本，排在 inline-09 之后，复用 tlMeasureText 与生成器写入的 window 标题状态。新文件进 CORE）→
+   v424-plan-calc-render（将扬程计算式和扬程分解的 DOM 展示从 inline-11.js 抽为独立渲染器，保留原全局入口与行为，新增 CORE 缓存项，必须抬版本）→
+   v425-manual-zone-geometry（将手动分区尺寸与上限计算移入纯几何模块，inline-09 保留DOM参数适配与兼容入口）→
+   v426-tl-polyline-geometry（将节点图层折线长度、沿线定位和弧长裁剪提取为纯模块）→
+   v427-deepgreen-brand（全站品牌主色 token 深墨绿化：runye-theme.css 的 --ry-green-500/600/700/800/900、--ry-info、--ry-success、--ry-btn-shadow 改为深墨绿系 #173e32；同时 index.html 的 theme.css?v=1 升至 v=2。改 CSS 必须抬版本以重建 SW 缓存）→
+   v428-panel-pilot（新增共享折叠/拖动面板交互库，试点主页面参数面板与在线地图分区角度面板；两项新资产纳入 CORE，地图页主题缓存版本同步至 v=2）→
+   v429-local-admin（会员面板增加本机专用管理员测试会员，账号凭据仅保存PBKDF2哈希，登录状态可持久恢复；生产域名不启用）→
+   v430-shoelace-panel（主设计参数面板改为紧凑分组布局，使用 Shoelace 数字输入控件并保留原生离线回退；增加可记忆的侧栏拖宽与折叠轨；参数字段 ID 和计算监听保持兼容）→
+   v431-panel-layout-cascade（修正主页面既有布局规则覆盖拖宽变量的问题，并让窄屏折叠态收拢为紧凑横条）→
+   v432-pp-side-panel（04 地块分区页参数栏 #ppSide 套用共享面板规范：深墨绿标题头与折叠/收起轨
+   （mod/ry-panel.js rypCollapsible 驱动，记忆键 ryPpSideFolded）、灰条分组标题（水源与扬程/滴灌带铺设/
+   分区与水力/水力计算结果，含 sl-icon）、紧凑键值行、Shoelace 数字输入代理（data-ry-proxy-for 桥接，
+   原生 input 保留为数据源与离线回退）；字段 ID、计算监听与契约探针计数均不变；
+   旧 .pp-plan-bar 横向暗色样式与 ::before 伪元素分组标题由 ry-panel.css 全宽替代，其版本参数同步抬升）→
+   v433-core-script-audit（补齐主页面案例库、CloudSync 适配层和撤销模块的离线 CORE 预缓存；静态门禁校验
+   主页面本地脚本均已缓存或登记有明确降级理由的例外，避免新脚本遗漏离线清单）→
+   v434-pp-side-no-rail（按用户要求取消 04 分区参数面板的收起细条「参数」：折叠后标题头仍可见、
+   点击标题头即可重新展开（data-ry-toggle），细条属重复入口；删该按钮与对应 CSS，折叠行为不变）→
+   v435-skip-waiting（install 预缓存全部成功后调用 self.skipWaiting()，配合 activate 的
+   clients.claim()：新版本 SW 立即接管页面，消除旧 SW 控制期「新 HTML + 旧缓存 CSS」的
+   混合投递——这是用户反馈改样式后页面看不到效果的根因；预缓存失败仍保留旧 worker，原子性不变）→
+   v436-pp-normalize（04 地块分区页参数栏样式归一第②刀：删除 style-01.css 两段
+   #pipePlanSection 旧副本、index.html 内嵌 style 的参数栏段、body.ry-tool 统一层中
+   pp 版 .pp-side 容器与子项压缩规则（grid 定位保留）、inline-11.js updatePlan 的
+   内联 display:flex 写入；算式区浅色化规则搬家至 ry-panel.css 皮肤块并补齐容器布局；
+   皮肤块撤除全部对抗性 !important——04 页参数栏自此只有 ry-panel.css 一个样式来源；
+   tl/gr 页副本未动，属第③④刀）→
+   v437-remove-plan-entries（用户要求：04 地块分区页取消「滴灌带压差改善」与「地形高程」
+   两个动态注入入口——runye-inverse-design.js 移除 planTapeLaySide 行后的 ri-entry 按钮
+   注入；runye-terrain.js 移除 planDh 宿主与 v280 的 planBtnRow 按钮行机制（RyPlanBtnRow
+   导出一并删除）；   两脚本 01/土地流转/成组/设置页的入口不受影响；'plan' 作用域自此无入口））→
+   v438-test-panel（用户指令：侧边工具面板样板页并入主程序——根目录新增
+   runye-test-panel.html（样板复制 + 标题改「测试分区」），runye-nav.js ITEMS 在
+   「地块分区」后加「测试分区」项（pre:1、feat:'' 免门控、href 指向该页），
+   framePage 映射加 test-panel 分支，index.html #ryFrameShell 加
+   frTestPanel iframe（data-fr-page=test-panel，懒加载）；本页进 CORE 预缓存）。 */
+const VERSION = 'v438-test-panel';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
@@ -147,6 +197,10 @@ const CORE = [
   "plugins/contour-dxf/manifest.json",
   "plugins/contour-dxf/main.js",
   "plugins/contour-dxf/style.css",
+  /* Main page local scripts required for case library, local/cloud adapter and undo. */
+  "runye-case-library.js",
+  "cloud-sync.js",
+  "runye-undo.js",
   /* [v357] 单文件拆分产物 */
   "mod/inline-01.js",
   "mod/inline-02.js",
@@ -157,10 +211,15 @@ const CORE = [
   "mod/inline-07.js",
   "mod/inline-08.js",
   "mod/inline-09.js",
+  "mod/plan-calc-render.js",   /* [v424-plan-calc-render] 扬程计算式与分解展示 */
+  "mod/tl-header-layout.js",   /* [v423-header-layout] 三级简图标题换行与拖动布局 */
+  "mod/material-table.js",   /* [v421-mat-table] 材料清单/材料表管理预缓存 */
   "mod/inline-10.js",
   "mod/inline-11.js",
+  "mod/plot-editor.js",   /* [v420-split] 绘图编辑器 IIFE（自 inline-11 迁出，紧随其后加载） */
   "mod/inline-12.js",
   "mod/inline-13.js",
+  "mod/head-system-svg.js",   /* [v422-head-system-svg] inline-14 的纯 SVG 核心 */
   "mod/inline-14.js",
   "mod/inline-15.js",
   "mod/inline-16.js",
@@ -180,9 +239,13 @@ const CORE = [
   "mod/inline-30.js",
   "mod/inline-31.js",
   "mod/inline-32.js",
+  "mod/ry-cad-toolbar.js",
   "mod/material-formulas.js",
   "mod/zone-geometry.js",
   "mod/flow-geometry.js",
+  "mod/tl-polyline-geometry.js",
+  "mod/ry-panel.js",
+  "mod/ry-panel.css",
   "mod/style-01.css",
   "mod/style-02.css",
   "mod/style-03.css",
@@ -237,6 +300,7 @@ const CORE = [
   "pwa/vendor/three.min.js",   /* [v415] 管网 3D 预览（three r147 自托管懒加载） */
   "runye-dxf.js",
   "runye-entitle.js",
+  "runye-member-ui.js",
   "runye-material-audit.js",
   "runye-pipe3d.js",   /* [v415] 管网 3D 预览 */
   "runye-geo.js",
@@ -254,6 +318,7 @@ const CORE = [
   "runye-mobile.js",
   "runye-nav.css",
   "runye-nav.js",
+  "runye-test-panel.html",   /* [v438] 测试分区：侧边工具面板样板独立页（Shoelace 走 CDN，由 RUNTIME 缓存兜底） */
   "runye-theme.css",
   "runye-typography.css",
   "terrain/index.html",
@@ -273,7 +338,10 @@ const CORE_URLS = new Set(CORE.map(path => new URL(path, BASE).href));
 
 self.addEventListener('install', event => {
   // Atomic install: retain the previous working worker if any required file fails.
-  event.waitUntil(caches.open(CORE_CACHE).then(cache => cache.addAll(CORE.map(path => new Request(new URL(path, BASE), {cache:'reload'})))));
+  // [v435-skip-waiting] 预缓存全部成功后才 skipWaiting：新 SW 立即接管、配合 activate 的
+  // clients.claim() 让刷新后的页面不再被旧 SW 的旧缓存投递（根治「改了样式看不到」的
+  // 混合投递问题）；若预缓存失败则不接管，保留原子性。
+  event.waitUntil(caches.open(CORE_CACHE).then(cache => cache.addAll(CORE.map(path => new Request(new URL(path, BASE), {cache:'reload'})))).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {

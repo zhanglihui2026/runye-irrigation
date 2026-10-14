@@ -6,7 +6,7 @@
    本插件负责：展示、估价汇总、CSV 导出、把 BOM 存进指定项目档案。
    ============================================================ */
 
-var ctx = null, offBus = null, panel = null, linkEl = null;
+var ctx = null, offBus = null, offEntitle = [], panel = null, linkEl = null;
 var current = null;      /* 最近一次生成的 BOM */
 
 function el(tag, cls, text) {
@@ -229,6 +229,14 @@ export function activate(c) {
 
   panel = buildPanel();
   ctx.ui.mountPoint.appendChild(panel);
+  var ent = window.RyEntitle;
+  if (ent && typeof ent.bindControl === 'function') {
+    ['生成清单', '导出 CSV', '存入档案'].forEach(function (label, i) {
+      var btn = panel.querySelectorAll('.bom-btn')[i];
+      var off = ent.bindControl(btn, 'bom-export', label);
+      if (typeof off === 'function') offEntitle.push(off);
+    });
+  }
 
   if (ctx.events && typeof ctx.events.on === 'function') {
     offBus = ctx.events.on('bom-open-request', openPanel);
@@ -238,6 +246,8 @@ export function activate(c) {
 
 export function deactivate() {
   if (offBus) { try { offBus(); } catch (e) { } offBus = null; }
+  offEntitle.forEach(function (off) { try { off(); } catch (e) { } });
+  offEntitle = [];
   if (panel && panel.parentNode) panel.parentNode.removeChild(panel);
   panel = null;
   if (linkEl && linkEl.parentNode) linkEl.parentNode.removeChild(linkEl);

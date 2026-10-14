@@ -107,9 +107,9 @@
   /* ===== [v282] 分区角度悬浮面板：形态仿手机端 runye-mobile-map-preview.html 的
      .map-angle（↶＋1° / 角度输入 / ↷−1° 竖排）；默认靠地图区右侧，标题栏可拖动，位置记忆。 */
   .ry-angle-panel{position:absolute;right:12px;top:96px;z-index:1150;width:150px;
-    background:rgba(255,255,255,.97);border:1px solid var(--g-600);border-radius:6px;
+    background:var(--ry-panel-bg,#fff);border:1px solid var(--ry-panel-border,var(--ry-green-600));border-radius:6px;
     box-shadow:0 3px 12px rgba(15,23,42,.25);overflow:hidden;font-size:12px}
-  .ry-angle-head{display:flex;align-items:center;gap:6px;padding:5px 7px;background:var(--g-600);
+  .ry-angle-head{display:flex;align-items:center;gap:6px;padding:5px 7px;background:var(--ry-panel-head-bg,var(--ry-green-600));
     color:#fff;cursor:move;user-select:none;touch-action:none;font-size:12px;font-weight:700;line-height:1.2}
   .ry-angle-head .ah-t{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .ry-angle-head .ah-fold{flex:none;width:20px;height:20px;border:0;background:transparent;color:#fff;
@@ -123,12 +123,12 @@
   .map-angle-row .ang-btn{height:28px;display:flex;align-items:center;justify-content:center;gap:4px;
     padding:0 6px;font:inherit;font-size:13px;border:1px solid var(--s-300);background:#fff;
     color:var(--s-700);cursor:pointer}
-  .map-angle-row .ang-btn:hover{border-color:var(--g-600);color:var(--g-700);background:var(--g-50)}
+  .map-angle-row .ang-btn:hover{border-color:var(--ry-green-600);color:var(--ry-green-700);background:var(--ry-green-50)}
   .map-angle-row .ang-btn small{font-size:10px;font-weight:600}
   .map-angle-value{display:flex;align-items:center;gap:3px;justify-content:center}
   .map-angle-value input{width:100%;min-width:0;height:28px;text-align:center;font:inherit;font-size:13px;
-    font-weight:700;color:var(--g-700);border:1px solid var(--s-300);background:#fff}
-  .map-angle-value input:focus{outline:1px solid var(--g-600)}
+    font-weight:700;color:var(--ry-green-700);border:1px solid var(--s-300);background:#fff}
+  .map-angle-value input:focus{outline:1px solid var(--ry-green-600)}
   .map-angle-value span{font-size:12px;color:var(--s-500);font-weight:600}
   .ry-angle-panel .save-row{margin-top:0;display:flex;flex-direction:column;gap:5px;align-items:stretch}
   .ry-angle-panel .save-row .mbtn{height:28px;font-size:12px;font-weight:700;padding:0 4px;text-align:center;flex:none}
@@ -187,7 +187,8 @@
 <link rel="icon" type="image/png" sizes="192x192" href="pwa/icons/icon-192.png">
 <link rel="stylesheet" href="pwa/pwa.css?v=2">
 <script defer src="pwa/pwa.js?v=2"></script>
-    <link rel="stylesheet" href="runye-theme.css?v=1">
+    <link rel="stylesheet" href="runye-theme.css?v=2">
+    <link rel="stylesheet" href="mod/ry-panel.css?v=1">
   <link rel="stylesheet" href="runye-typography.css?v=1">
 </head>
 <body>
@@ -284,12 +285,12 @@
            原「分区角度」那一节（id=mapPartitionTools）整体迁入（runye-map-partition.js 只按 id 取 box，
            再用 querySelector 取内部 select / input / [role=status] / [data-angle-*]，
            故「搬容器不改结构」= JS 逻辑零改动）。默认靠地图区右侧，标题栏可拖动，位置记忆。 -->
-      <div class="ry-angle-panel" id="ryAnglePanel">
-        <div class="ry-angle-head" id="ryAngleHead" title="按住这里可拖动面板">
-          <span class="ah-t">分区角度</span>
-          <button class="ah-fold" id="ryAngleFold" type="button" aria-label="折叠或展开分区角度面板" title="折叠/展开">▾</button>
+      <div class="ry-angle-panel ryp-float" id="ryAnglePanel" data-ry-panel data-ry-drag-bounds data-ry-position-key="ryAnglePanelPos" data-ry-position-legacy-key="ryAnglePanelPos" data-ry-fold-key="ryAnglePanelFolded" data-ry-fold-legacy-key="ryAnglePanelFolded" data-ry-default-top="96">
+        <div class="ry-angle-head ryp-titlebar" id="ryAngleHead" data-ry-drag title="按住这里可拖动面板">
+          <span class="ah-t ryp-title">分区角度</span>
+          <button class="ah-fold ryp-fold" id="ryAngleFold" type="button" data-ry-fold aria-label="折叠或展开分区角度面板" aria-expanded="true" data-ry-fold-open="▾" data-ry-fold-closed="▸" title="折叠/展开">▾</button>
         </div>
-        <div class="ry-angle-body">
+        <div class="ry-angle-body ryp-body" data-ry-body>
           <!-- [v283 2026-10-06] 「↩ 回传地块绘制」「💾 保存地块」：用户截图指定放在**本面板内部顶端**、
                「当前设计地块」下拉之上（v282 曾浮在地图左上角）。button id 与 JS 绑定仍零改动。
                ★ 必须留在 section#mapPartitionTools **之外** —— 该 section 是分区角度模块
@@ -312,45 +313,6 @@
           </section>
         </div>
       </div>
-      <script>
-      /* [v282] 分区角度悬浮面板：拖动 + 折叠 + 位置记忆。
-         面板是 .map-wrap 的 absolute 子元素 ⇒ left/top 相对地图区定位，
-         clamp 在地图区内避免拖出视野；位置与折叠状态写 localStorage。 */
-      (function(){
-        var panel=document.getElementById('ryAnglePanel'),head=document.getElementById('ryAngleHead'),
-            fold=document.getElementById('ryAngleFold'),wrap=panel&&panel.parentNode;
-        if(!panel||!head||!fold||!wrap)return;
-        var KEY='ryAnglePanelPos',FOLD='ryAnglePanelFolded';
-        function place(l,t){
-          panel.style.right='auto';
-          var maxL=Math.max(0,wrap.clientWidth-panel.offsetWidth-4),
-              maxT=Math.max(0,wrap.clientHeight-panel.offsetHeight-4);
-          panel.style.left=Math.max(0,Math.min(l,maxL))+'px';
-          panel.style.top =Math.max(0,Math.min(t,maxT))+'px';
-        }
-        function save(){try{localStorage.setItem(KEY,JSON.stringify({l:panel.offsetLeft,t:panel.offsetTop}));}catch(e){}}
-        /* 默认位置：地图区右侧上部。仅无记忆时写入，绝不覆盖用户拖过的位置。 */
-        var saved=null;try{saved=JSON.parse(localStorage.getItem(KEY)||'null');}catch(e){}
-        if(saved&&typeof saved.l==='number'&&typeof saved.t==='number'){place(saved.l,saved.t);}
-        else{place(wrap.clientWidth-panel.offsetWidth-12,96);}
-        try{if(localStorage.getItem(FOLD)==='1'){panel.classList.add('folded');fold.textContent='▸';}}catch(e){}
-        var dragging=false,ox=0,oy=0;
-        head.addEventListener('pointerdown',function(e){
-          if(e.target===fold||fold.contains(e.target))return;
-          dragging=true;ox=e.clientX-panel.offsetLeft;oy=e.clientY-panel.offsetTop;
-          try{head.setPointerCapture(e.pointerId);}catch(err){}
-          e.preventDefault();
-        });
-        head.addEventListener('pointermove',function(e){if(dragging)place(e.clientX-ox,e.clientY-oy);});
-        function end(){if(!dragging)return;dragging=false;save();}
-        head.addEventListener('pointerup',end);head.addEventListener('pointercancel',end);
-        fold.addEventListener('click',function(){
-          var f=panel.classList.toggle('folded');fold.textContent=f?'▸':'▾';
-          try{localStorage.setItem(FOLD,f?'1':'0');}catch(e){}
-        });
-        window.addEventListener('resize',function(){place(panel.offsetLeft,panel.offsetTop);});
-      })();
-      </script>
       <div class="warn" id="warn">⚠️ 地图瓦片加载失败，请检查网络（本工具需要联网获取卫星影像）。</div>
       <div class="tip" id="tip">点击「✏️ 开始画框」后，在卫星图上依次点击地块边界顶点即可。</div>
     </div>
@@ -1751,5 +1713,6 @@
   refresh();
 })();
 </script>
+<script src="mod/ry-panel.js?v=1"></script>
 </body>
 </html>

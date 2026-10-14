@@ -2049,7 +2049,7 @@ function spacePanel(land){
       '</div>'+
     '</div>'+
     boundarySection(land)+
-    '<div class="wb-form-note">说明：工作台维护地块档案 / 农事 / 报表；点「绘制边界」会打开精准灌溉页面，画完保存后边界（geo_json）与实测面积自动回填本地块。灌溉设计计算仍在精准灌溉内完成。</div>';
+    '<div class="wb-form-note">工作台维护地块档案 / 农事 / 报表。边界在精准灌溉工具中独立维护；两侧共享地块库，但不再通过旧握手自动回填，关联结果需手动核对。</div>';
 }
 function boundarySection(land){
   var g=landGeo(land);
@@ -2057,8 +2057,7 @@ function boundarySection(land){
   if(hasGeo){
     var mu=parseFloat(g.mu)||(parseFloat(g.sqm)||0)/666.67;
     return '<div class="wb-panel" style="margin-top:16px">'+
-      '<div class="wb-list-head"><h3 style="margin:0;font-size:14px;font-weight:700;color:var(--g-800)">空间边界</h3>'+
-        '<button class="wb-btn wb-btn-light" onclick="openDrawBoundary(\''+esc(land.land_id)+'\')">重新绘制</button></div>'+
+      '<div class="wb-list-head"><h3 style="margin:0;font-size:14px;font-weight:700;color:var(--g-800)">空间边界</h3></div>'+
       landPlotSvgHtml(land)+
       '<div class="wb-rec" style="border:none;background:var(--g-50)">'+
         '<div class="wb-rec-meta">✓ 已绘制边界 ｜ 来源：'+(esc(g.source)||'runye-irrigation')+' ｜ 实测：'+(parseFloat(g.sqm)||0).toFixed(0)+' m²（'+mu.toFixed(2)+' 亩）</div>'+
@@ -2066,9 +2065,8 @@ function boundarySection(land){
       '</div></div>';
   }
   return '<div class="wb-panel" style="margin-top:16px;background:#fff7ed;border-color:#fed7aa">'+
-    '<div class="wb-list-head"><h3 style="margin:0;font-size:14px;font-weight:700;color:#c2410c">尚未绘制边界</h3>'+
-      '<button class="wb-btn wb-btn-primary" onclick="openDrawBoundary(\''+esc(land.land_id)+'\')">绘制边界</button></div>'+
-    '<div class="wb-rec-meta" style="color:#9a3412">在精准灌溉页面画图并保存后，边界与实测面积会回写此处，灌溉方案才能与地块关联。也可先不画，事后在此补绘。</div>'+
+    '<div class="wb-list-head"><h3 style="margin:0;font-size:14px;font-weight:700;color:#c2410c">尚未关联空间边界</h3></div>'+
+    '<div class="wb-rec-meta" style="color:#9a3412">边界需在精准灌溉工具中独立维护。共享地块库不会通过旧握手自动回填；请确认关联后再用于灌溉方案。</div>'+
   '</div>';
 }
 
@@ -2333,8 +2331,8 @@ function openNewLandModal(){
     field('土壤类型','<input id="new_soil" placeholder="如：砂壤土、pH 6.2、有机质偏低">')+
     field('底肥方案','<textarea id="new_base_fertilizer" rows="3" placeholder="如：熟石膏/钙肥、有机肥、复合肥用量；撒施或条施；整地时间"></textarea>')+
     field('备注','<textarea id="new_remark" rows="2" placeholder="如：水源、前茬、排水、病虫草风险"></textarea>')+
-    '<div class="wb-form-note" style="margin-bottom:10px">提示：点「先画边界」会跳转精准灌溉页面画图，保存后边界与实测面积自动回写本地块；也可先建档、事后在详情「空间信息」补绘。</div>'+
-    '<div class="wb-modal-actions"><button class="wb-btn" onclick="closeModal()">取消</button><button class="wb-btn wb-btn-light" onclick="submitNewLandAndDraw()">先画边界</button><button class="wb-btn wb-btn-primary" onclick="submitNewLand()">保存地块</button></div>';
+    '<div class="wb-form-note" style="margin-bottom:10px">边界需在精准灌溉工具中独立维护；工作台不再提供绘制后自动回写。使用共享地块库关联数据时，请核对地块名称、面积和边界。</div>'+
+    '<div class="wb-modal-actions"><button class="wb-btn" onclick="closeModal()">取消</button><button class="wb-btn wb-btn-primary" onclick="submitNewLand()">保存地块</button></div>';
   wbModal(html);
 }
 function collectLandForm(){
@@ -2364,24 +2362,6 @@ function submitNewLand(){
   closeModal();
   location.hash='#/land/'+land.land_id;
 }
-/* 单向打通：建档后跳转精准灌溉绘制边界，保存后由 index.html 回写 geo_json 与实测面积 */
-function setBridgePending(landId, name){
-  try{ localStorage.setItem('runye_pending_land', JSON.stringify({land_id:landId, name:name, ts:Date.now()})); }catch(e){}
-}
-function submitNewLandAndDraw(){
-  var data=collectLandForm();
-  if(!data){ alert('请填写地块名称'); return; }
-  var land=addLand(data);
-  setBridgePending(land.land_id, land.name);
-  closeModal();
-  window.location.href='../index.html?from=workbench#areaTool';
-}
-function openDrawBoundary(landId){
-  var l=getLand(landId); if(!l) return;
-  setBridgePending(landId, l.name);
-  window.location.href='../index.html?from=workbench#areaTool';
-}
-
 function openEditLandModal(id){
   var l=getLand(id); if(!l) return;
   var html='<h3>编辑地块</h3>'+
@@ -2954,7 +2934,7 @@ function goNewLand(){ openNewLandModal(); }
    ============================================================ */
 window.addEventListener('hashchange', router);
 window.addEventListener('storage', function(e){
-  // 跨标签页实时同步：精准灌溉页绘制边界写回 runye_db_v1 后，本页若停留在地块详情/地块中心则立即刷新
+  // 共享工作台档案在其他标签页更新时，刷新当前地块详情或列表。
   if(e && e.key==='runye_db_v1'){
     try{ DB=dbLoad()||DB; }catch(err){}
     var h=location.hash.replace(/^#\/?/,'');

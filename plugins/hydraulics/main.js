@@ -165,6 +165,11 @@ function gate(ctx) {
   if (typeof E.ready === 'function' && !E.ready()) return true;
   return E.can(feat);
 }
+function pending(ctx) {
+  var feat = cfg(ctx).feat;
+  var E = (typeof window !== 'undefined') ? window.RyEntitle : null;
+  return !!(feat && E && typeof E.access === 'function' && E.access(feat) === 'pending');
+}
 
 function onLocked(ctx) {
   var label = navCfg(ctx).label || ctx.id;
@@ -275,6 +280,7 @@ function activate(ctx) {
         order: nc.order,
         before: c.insertBefore || null,   /* 原位置：插回「更多 ▾」之前 */
         gate: function () { return gate(ctx); },
+        pending: function () { return pending(ctx); },
         onLocked: function () { onLocked(ctx); },
         onClick: open
       });
