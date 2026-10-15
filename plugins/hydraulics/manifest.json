@@ -1,6 +1,6 @@
 {
   "id": "hydraulics",
-  "name": "水力校核（老模块迁移 · 壳）",
+  "name": "水力校核（主页面功能区）",
   "version": "1.0.0",
   "entry": "main.js",
   "requires": { "core": ">=1.0.0", "plugins": [] },
@@ -16,10 +16,10 @@
   "config": {
     "takeOverNav": true,
     "matchLabel": "水力校核",
-    "href": "runye-hydraulics.html",
+    "href": "#hydraulicsSection",
     "insertBefore": ".fn-more",
     "feat": "hydraulic-check",
     "autoloadCore": true,
-    "_note": "壳迁移 + 真改造：runye-hydraulics.html 业务零改动，本插件做三件事 —— ① 接管导航入口（原位插回）+ 保住会员门控；② [v379] 作为**水力计算内核宿主**，把 hydraulic-calc/hc-core.js / design-core.js / runye-hydraulics-core.js 请进主页上下文（顺序敏感），并广播 hydraulics-core-ready，让 core/data-service.js 的 hazenLoss 与全站统一到同一个口径；③ 通过 ctx api 向其它插件暴露 hazen / christiansenF / compute。autoloadCore=false 可省掉这 65KB，但 hazenLoss 会退回内置兜底（口径回到两份）。takeOverNav 置 false = 完全不碰老入口（灰度用）。insertBefore 是「更多 ▾」折叠组的选择器 —— 老项原本就在它前面。"
+    "_note": "水力校核界面由主页面 #hydraulicsSection 承载；runye-hydraulics.html 保留为兼容独立入口。本插件负责导航会员门控、确认水力计算内核可用，并通过 ctx API 暴露 hazen / christiansenF / compute。主页面同步加载同一组内核，插件补载保持幂等。href 指向主页面锚点；insertBefore 控制其在更多菜单前的位置。"
   }
 }

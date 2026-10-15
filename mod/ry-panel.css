@@ -37,7 +37,10 @@
 .ryp-body[hidden] { display: none !important; }
 
 .ryp-float {
-  z-index: var(--ry-z-float);
+  /* [v439] z-index 行删除：层级是页面上下文相关值，由页面自己声明——
+     此前硬写 var(--ry-z-float)=200，把在线地图页「分区角度」面板从自带的
+     z-index:1150 压到 200，掉进 Leaflet 层区间（200~800）被地图盖住。
+     现状：地图页 .ry-angle-panel 自带 1150；测试分区页自带 200。 */
   border: 1px solid var(--ry-panel-border);
   background: var(--ry-panel-bg);
 }
@@ -351,24 +354,33 @@ body.ry-tool #designInput .ryp-body > .panel-foot { margin-top: auto; flex: 0 0 
   display:flex;flex-direction:column;align-self:start;max-height:100%;
   overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
   padding:0;gap:0;
-  background:var(--ry-s-50,#f8fafc);
-  border:1px solid var(--ry-s-200,#e2e8f0);
-  border-radius:10px;
   font-family:var(--ry-font,"Microsoft YaHei","PingFang SC","Segoe UI",system-ui,sans-serif);
 }
-/* —— 深墨绿标题头（同 01 面板 #173e32） —— */
+/* [试验层 2] 主程序地块分区侧栏去除卡片底色、边框和圆角；保留列布局与滚动。 */
+body.ry-tool #pipePlanSection .pp-side{
+  background:transparent;
+  border:0;
+  border-radius:0;
+}
+/* [试验层 3] 移除地块分区整个功能区外壳的底色与投影；保留原有尺寸和间距。
+   主程序模式的 body.ry-tool 规则特异性更高，故同时覆盖该实际作用域。 */
+#pipePlanSection,
+body.ry-tool #pipePlanSection{
+  background:transparent;
+  box-shadow:none;
+}
+/* [试验层 5] 去掉地块分区主工具栏的独立色带和底部分隔线。 */
+#pipePlanSection .pp-toolbar,
+body.ry-tool #pipePlanSection .pp-toolbar{
+  background:transparent;
+  border:0;
+  box-shadow:none;
+}
+/* [试验层 1] 暂时移除地块分区参数栏标题头的深色品牌皮肤，保留点击折叠和尺寸。 */
 #pipePlanSection .pp-side > .ryp-sidebar-head{
   cursor:pointer;
-  border:0;
-  border-radius:9px 9px 0 0;
-  background:#173e32;
-  color:#fff;
 }
-#pipePlanSection .pp-side .ryp-sidebar-head .ryp-title{ color:#fff; font-size:13px; }
-#pipePlanSection .pp-side .ryp-sidebar-head .ryp-fold{ width:36px; min-height:36px; color:#fff; }
-#pipePlanSection .pp-side .ryp-sidebar-head .ryp-fold:hover,
-#pipePlanSection .pp-side .ryp-sidebar-head .ryp-fold:focus-visible{ background:rgba(255,255,255,.16); }
-#pipePlanSection .pp-side .ryp-sidebar-head .ryp-fold:focus-visible{ outline:2px solid #fff; outline-offset:-2px; }
+#pipePlanSection .pp-side .ryp-sidebar-head .ryp-fold{ width:36px; min-height:36px; }
 /* —— 内容体：栏内滚动 —— */
 #pipePlanSection .pp-side > .ryp-body{
   flex:1 1 auto;
@@ -392,7 +404,16 @@ body.ry-tool #designInput .ryp-body > .panel-foot { margin-top: auto; flex: 0 0 
 /* 原 ::before 伪元素分组标题（「地块与灌溉参数」/「水力计算结果」）改由真实 DOM
    .ryp-group-head 承担（可带图标、可被契约测试检索），此处关闭伪元素。 */
 #pipePlanSection .pp-side .pp-plan-bar::before,
-#pipePlanSection .pp-side .pp-plan-bar-result::before{ content:none; }
+#pipePlanSection .pp-side .pp-plan-bar-result::before,
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-bar::before,
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-bar-result::before,
+#tlPipePlanSection .pp-side .pp-plan-bar::before,
+#tlPipePlanSection .pp-side .pp-plan-bar-result::before,
+#ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-bar::before,
+#ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-bar-result::before{
+  content:none!important;
+  display:none!important;
+}
 /* —— 分组标题条：对齐样板 .ryp-group-head（灰底 + 品牌绿图标 + 字距） —— */
 #pipePlanSection .pp-side .ryp-group-head{
   display:flex;align-items:center;gap:7px;
@@ -404,12 +425,32 @@ body.ry-tool #designInput .ryp-body > .panel-foot { margin-top: auto; flex: 0 0 
   font-size:11px;font-weight:700;letter-spacing:.04em;
 }
 #pipePlanSection .pp-side .ryp-group-head sl-icon{ color:#173e32; font-size:13px; }
+/* [试验层 6] 参数组不再各自呈卡片；必须放在基础皮肤之后才能生效。 */
+#pipePlanSection .pp-side .pp-plan-bar,
+body.ry-tool #pipePlanSection .pp-side .pp-plan-bar{
+  background:transparent;
+  border:0;
+  box-shadow:none;
+}
+/* [试验层 7] 参数组标题只保留文字和图标，去掉灰色标题条及上下分隔线。
+   CAD 栏会把 .pp-side 移出 #pipePlanSection，故为该宿主补同一覆盖。 */
+#pipePlanSection .pp-side .ryp-group-head,
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .ryp-group-head{
+  background:transparent;
+  border-top-color:transparent;
+  border-bottom-color:transparent;
+}
 /* —— 键值行：标签左、控件右，紧凑 27px 行距 —— */
 #pipePlanSection .pp-side .pp-plan-item{
   display:flex;align-items:center;gap:5px;
   width:100%;min-height:27px;padding:2px 12px;
   border-bottom:1px solid var(--ry-s-100,#f1f5f9);
   color:var(--ry-s-500,#64748b);font-size:11px;
+}
+/* [试验层 8] 移除参数行之间的细分隔线，观察纯间距分组效果。 */
+#pipePlanSection .pp-side .pp-plan-item,
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-item{
+  border-bottom-color:transparent;
 }
 #pipePlanSection .pp-side .pp-plan-item:last-of-type{ border-bottom:0; }
 #pipePlanSection .pp-side .pp-plan-item > .pp-plan-label:first-child{ margin-right:auto; }
@@ -446,6 +487,19 @@ body.ry-tool #designInput .ryp-body > .panel-foot { margin-top: auto; flex: 0 0 
   --sl-input-border-color-hover:var(--ry-s-400,#94a3b8);
   --sl-input-border-color-focus:#173e32;
   --sl-input-color:var(--ry-s-800,#1e293b);
+}
+/* [试验层 9] 控件取消独立白色输入框皮肤；保留尺寸，并保留聚焦时的可见提示。 */
+#pipePlanSection .pp-side .pp-plan-item input,
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-item input{
+  background:transparent;
+  border-color:transparent;
+}
+#pipePlanSection .pp-side sl-input[data-ry-proxy-for],
+#ryCadSide [data-pp="pipePlanSection"] .pp-side sl-input[data-ry-proxy-for]{
+  --sl-input-background-color:transparent;
+  --sl-input-border-color:transparent;
+  --sl-input-border-color-hover:transparent;
+  --sl-input-border-color-focus:#173e32;
 }
 #pipePlanSection .pp-side .pp-sep-vert{ display:none; }
 /* —— 扬程算式区（#ppCalcDetail.pp-calc-formula）：浅色栏内换行显示。

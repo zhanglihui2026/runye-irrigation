@@ -247,8 +247,7 @@ function writeToTerrain(points, fileName) {
       });
     }
     /* ① 地形页 iframe 活着 → 直接写它的活动状态（防它随后用旧内存覆盖 localStorage），并同步落盘 */
-    var fr = (typeof document !== 'undefined') ? document.getElementById('frTerrain') : null;
-    var live = (fr && fr.contentWindow && fr.contentWindow.RyTerrainUI && fr.contentWindow.RyTerrainData) ? fr.contentWindow : null;
+    var live = (typeof window !== 'undefined' && window.RyTerrainUI && window.RyTerrainData) ? window : null;
     if (live) {
       var ls = live.RyTerrainUI.state;
       ls.elevations = dropMine(ls.elevations);

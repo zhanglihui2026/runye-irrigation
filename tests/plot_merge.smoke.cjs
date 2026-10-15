@@ -23,7 +23,14 @@ const ENHANCE_SRC = fs.readFileSync(path.join(ROOT, 'runye-map-enhance.js'), 'ut
 // Expand the classic-script modules referenced by index.html so contract checks
 // continue to inspect the real assembled page after source extraction.
 const INDEX_SRC = require(path.join(ROOT, 'expand_index.cjs'))(path.join(ROOT, 'index.html'));
-const MAP_SRC = fs.readFileSync(path.join(ROOT, 'runye-map-measure.html'), 'utf8');
+// 在线地图现已作为主页面功能区运行；契约应检查实际装配的主页面片段与
+// 地图行为模块，不能再把迁移前的独立 HTML 当作唯一实现来源。
+const mapSectionStart = INDEX_SRC.indexOf('<section id="onlineMapSection"');
+const mapSectionEnd = INDEX_SRC.indexOf('<!-- ===== 04b 成组管路', mapSectionStart);
+assert.ok(mapSectionStart >= 0 && mapSectionEnd > mapSectionStart,
+  '主页面应装配完整的在线地图功能区');
+const MAP_SRC = fs.readFileSync(path.join(ROOT, 'mod', 'online-map.js'), 'utf8') + '\n' +
+  INDEX_SRC.slice(mapSectionStart, mapSectionEnd);
 
 /* ---- 静态判据公用工具（提到顶层，供 ③-h/③-i/③-j 共用）----
  * ★ 必须先剥注释再数：把调用写成 `/* [inject] *\/ ppXformSubRings(tf2);` 之后，

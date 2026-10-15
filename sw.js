@@ -141,8 +141,18 @@
    runye-test-panel.html（样板复制 + 标题改「测试分区」），runye-nav.js ITEMS 在
    「地块分区」后加「测试分区」项（pre:1、feat:'' 免门控、href 指向该页），
    framePage 映射加 test-panel 分支，index.html #ryFrameShell 加
-   frTestPanel iframe（data-fr-page=test-panel，懒加载）；本页进 CORE 预缓存）。 */
-const VERSION = 'v438-test-panel';
+   frTestPanel iframe（data-fr-page=test-panel，懒加载）；本页进 CORE 预缓存）→
+   v439-float-zindex（用户反馈：在线地图「分区角度」面板被地图盖住——共库 .ryp-float
+   硬写 z-index:var(--ry-z-float)=200，同特异性后加载压掉页面自带的 1150，跌进
+   Leaflet 层区间（200~800）。修法：共库删除 z-index 行（页面上下文相关值下放页面），
+   地图页恢复 1150，测试分区页自声明 200）→
+   v440-map-return-top（在线地图嵌入主程序时，回传地块改为导航顶层 index 页面，
+   避免只把 iframe 内部跳转到 index.html 后出现嵌套应用及重复导航/状态栏；独立打开地图仍跳转自身）→
+   v441-map-main-section（在线地图迁入主程序功能区，与地块分区/管路规划共用导航、状态栏和文档上下文，
+   移除地图 iframe；新增 scoped 样式与初始化脚本纳入 CORE）→
+   v442-native-terrain-hydraulics（地形与水力校核迁入主页面功能区，复用主导航、会员状态和页面上下文；
+   独立旧页面保留兼容，新增功能区样式与初始化脚本纳入 CORE）。 */
+const VERSION = 'v442-native-terrain-hydraulics';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
@@ -237,7 +247,6 @@ const CORE = [
   "mod/inline-28.js",
   "mod/inline-29.js",
   "mod/inline-30.js",
-  "mod/inline-31.js",
   "mod/inline-32.js",
   "mod/ry-cad-toolbar.js",
   "mod/material-formulas.js",
@@ -246,6 +255,8 @@ const CORE = [
   "mod/tl-polyline-geometry.js",
   "mod/ry-panel.js",
   "mod/ry-panel.css",
+  "mod/online-map.css",
+  "mod/online-map.js",
   "mod/style-01.css",
   "mod/style-02.css",
   "mod/style-03.css",
@@ -304,8 +315,10 @@ const CORE = [
   "runye-material-audit.js",
   "runye-pipe3d.js",   /* [v415] 管网 3D 预览 */
   "runye-geo.js",
-  "runye-hydraulics.html",
+  "runye-hydraulics.html",   /* 兼容独立入口 */
   "runye-hydraulics-core.js",
+  "runye-hydraulics-page.js",
+  "hydraulics-main.css",
   "runye-landing.html",
   "runye-map-enhance.js",
   "runye-map-partition.js",
@@ -323,6 +336,7 @@ const CORE = [
   "runye-typography.css",
   "terrain/index.html",
   "terrain/terrain-core.js",
+  "terrain/terrain-main.css",
   "terrain/terrain-ui.js",
   "terrain/terrain.css",
   "tl-workspace/tl-auto-edits.js",

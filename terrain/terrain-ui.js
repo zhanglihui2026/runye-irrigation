@@ -16,6 +16,7 @@
    ============================================================ */
 (function () {
   'use strict';
+  var root = document.getElementById('terrainSection') || document;
   var D = window.RyTerrainData;
   if (!D) { console.error('[terrain] terrain-core.js 未加载'); return; }
 
@@ -25,7 +26,7 @@
   var state = D.loadState();
   var areaUnit = state._unit === 'mu' ? 'mu' : 'sqm'; /* 单位偏好持久化，底层恒平方米 */
 
-  var $ = function (id) { return document.getElementById(id); };
+  var $ = function (id) { return root.querySelector('#' + (id === 'btnClear' && root.id === 'terrainSection' ? 'terrainBtnClear' : id)); };
 
   /* ---------------- 提示条 ---------------- */
 
@@ -57,7 +58,7 @@
   /* ---------------- 模式切换 ---------------- */
 
   function applyMode() {
-    document.body.classList.toggle('t-engineering', state.mode === 'engineering');
+    root.classList.toggle('t-engineering', state.mode === 'engineering');
     $('modePreview').classList.toggle('on', state.mode !== 'engineering');
     $('modeEng').classList.toggle('on', state.mode === 'engineering');
     if (state.mode !== 'engineering') {
@@ -729,7 +730,7 @@
     try {
       localStorage.setItem('runyeMeasuredArea', JSON.stringify(payload));
       banner('ok', '✓ 已回传主页（' + fmtArea(total) + '）。正在跳转 index.html#pipePlanSection …');
-      setTimeout(function () { window.location.href = '../index.html#pipePlanSection'; }, 900);
+      setTimeout(function () { if (document.getElementById('pipePlanSection')) window.location.hash = '#pipePlanSection'; else window.location.href = '../index.html#pipePlanSection'; }, 900);
     } catch (e) {
       banner('danger', '✕ 回传失败：' + esc(e.message));
     }
@@ -744,15 +745,15 @@
 
   function gripClamp(px, maxPx) { return Math.max(GRIP_MIN, Math.min(GRIP_MAX, px, maxPx)); }
   function gripMax() {
-    var body = document.querySelector('.t-body');
+    var body = root.querySelector('.t-body');
     return Math.max(GRIP_MIN, Math.min(GRIP_MAX, (body ? body.clientWidth : 1200) - 28 - 10 - CANVAS_MIN));
   }
   function gripApply(px) {
-    var body = document.querySelector('.t-body');
+    var body = root.querySelector('.t-body');
     if (body) body.style.setProperty('--t-side-w', px + 'px');
   }
   function initGrip() {
-    var grip = $('tGrip'), side = document.querySelector('.t-side');
+    var grip = $('tGrip'), side = root.querySelector('.t-side');
     if (!grip || !side) return;
     /* 恢复上次宽度（越界夹回） */
     try {
@@ -773,7 +774,7 @@
       if (e.button != null && e.button !== 0) return;
       drag = { x: e.clientX, w: side.getBoundingClientRect().width };
       grip.classList.add('dragging');
-      document.body.classList.add('t-col-resizing');
+      root.classList.add('t-col-resizing');
       if (e.preventDefault) e.preventDefault();
     });
     document.addEventListener(EV.move, function (e) {
@@ -785,7 +786,7 @@
       if (!drag) return;
       drag = null;
       grip.classList.remove('dragging');
-      document.body.classList.remove('t-col-resizing');
+      root.classList.remove('t-col-resizing');
       try {
         var px = side.getBoundingClientRect().width;
         localStorage.setItem(GRIP_KEY, String(Math.round(px)));
@@ -794,10 +795,10 @@
     document.addEventListener(EV.cancel, function () {
       if (!drag) return;
       drag = null; grip.classList.remove('dragging');
-      document.body.classList.remove('t-col-resizing');
+      root.classList.remove('t-col-resizing');
     });
     grip.addEventListener('dblclick', function () {
-      var body = document.querySelector('.t-body');
+      var body = root.querySelector('.t-body');
       if (body) body.style.removeProperty('--t-side-w');
       try { localStorage.removeItem(GRIP_KEY); } catch (e) {}
     });
@@ -1395,7 +1396,7 @@
     return removed;
   }
 
-  document.addEventListener('DOMContentLoaded', function () {
+  function initTerrainUI() {
     bind();
     initGrip();
     bindSprinkler();
@@ -1406,8 +1407,11 @@
     if (dedupRemoved > 0 && !incomingBannerShown) {
       banner('ok', '✓ 已自动清理 <b>' + dedupRemoved + '</b> 个重复导入的地块副本（同名同面积的在线地图地块只保留一个），总面积已修正。');
     }
-  });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initTerrainUI, { once: true });
+  else initTerrainUI();
+  window.addEventListener('hashchange', function () { if (window.location.hash === '#terrainSection') setTimeout(function () { consumeIncoming(); persistAndRender(); }, 80); });
 
   /* 供测试/自动化探针使用 */
-  window.RyTerrainUI = { state: state, sendHome: sendHome, setUnit: setUnit, setMode: setMode };
+  window.RyTerrainUI = { state: state, sendHome: sendHome, setUnit: setUnit, setMode: setMode, refresh: drawCanvas };
 })();

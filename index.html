@@ -20,10 +20,12 @@
 <link rel="stylesheet" href="runye-case-library.css?v=277">
 <script src="runye-case-library.js?v=277"></script>
 <script src="runye-geo.js"></script>
+<script src="runye-map-enhance.js?v=441-map-main-section"></script>
 <script src="hydraulic-calc/hydraulics-wasm.js"></script>
 <script src="hydraulic-calc/native-bridge.js"></script>
 <script src="hydraulic-calc/hc-core.js"></script>
 <script src="hydraulic-calc/design-core.js"></script>
+<script src="runye-hydraulics-core.js?v=442-native"></script>
 <script src="https://beacon.cdn.qq.com/sdk/4.5.9/beacon_web.min.js"></script>
 <script src="mod/inline-03.js?v=357"></script>
 <link rel="stylesheet" href="modeling/workspace.css">
@@ -33,6 +35,10 @@
 <link rel="stylesheet" href="runye-nav.css?v=404-tier-gates">
 <link rel="stylesheet" href="hydraulic-calc/hydraulic-calc.css">
 <link rel="stylesheet" href="filter-system/filter-system.css">
+<link rel="stylesheet" href="pwa/vendor/leaflet.css">
+<link rel="stylesheet" href="mod/online-map.css?v=441-map-main-section">
+<link rel="stylesheet" href="terrain/terrain-main.css?v=442-native">
+<link rel="stylesheet" href="hydraulics-main.css?v=442-native">
 <style id="ryCadTwinCss">
 /* --- 14c. CAD 全局工具栏 · 选择器孪生（2026-09-14 脚本生成，勿手改） ---
    原「#pipePlanSection …」「#tlPipePlanSection …」规则，在 .pp-side 被 ryCadJs
@@ -376,7 +382,7 @@
   border-bottom:1px solid #eaf1ec;
   font-size:11px;font-weight:700;letter-spacing:.05em;color:#2f6d43;
 }
-#ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-bar-result::before{content:"水力计算结果"}
+#ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-bar-result::before{content:none;display:none}
 #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-item{
   display:flex;align-items:center;gap:5px;
   width:100%;min-height:26px;padding:2px 0;
@@ -718,8 +724,8 @@ body.ry-tool.ry-cad-vp #ryCadSide{
   top:var(--fn-nav-h,36px);   /* 顶部紧贴导航栏（2026-09-14 用户要求，留白取消） */
   bottom:calc(var(--ry-status-h,30px) + 1px);
   width:var(--ry-cad-w-open,318px);max-width:46vw;
-  background:#fff;border:1px solid #cfdcd4;border-radius:8px;
-  box-shadow:0 12px 30px rgba(23,62,50,.14);
+  background:#fff;border:1px solid #cfdcd4;border-radius:0;
+  box-shadow:none;
   overflow:hidden;
 }
 body.ry-tool.ry-cad-vp #ryCadSide[data-ry-open="0"]{width:40px}
@@ -767,16 +773,17 @@ body.ry-tool.ry-cad-vp #ryCadSide[data-ry-open="0"]{width:40px}
 #ryCadSide .ry-cad-grps::-webkit-scrollbar-thumb, .pp-side::-webkit-scrollbar-thumb{background:rgba(188,211,198,.25);border-radius:2px}
 #ryCadSide .ry-cad-grps::-webkit-scrollbar-thumb:hover, .pp-side::-webkit-scrollbar-thumb:hover{background:#9db4a8}
 #ryCadSide[data-ry-open="0"] .ry-cad-grps{display:none}
-#ryCadSide .ry-cad-grp{border-bottom:1px solid #e4ede7}
-#ryCadSide .ry-cad-grp:last-child{border-bottom:0}
+#ryCadSide .ry-cad-grp:not(#ryCadGrpPipe){border-bottom:1px solid #e4ede7}
+#ryCadSide .ry-cad-grp:not(#ryCadGrpPipe):last-child{border-bottom:0}
 #ryCadSide .ry-cad-grp>summary{
   list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;
-  padding:9px 10px;font-size:12px;font-weight:600;color:#24443a;background:#f4f9f6;
+  padding:9px 10px;font-size:12px;font-weight:600;color:#24443a;
 }
 #ryCadSide .ry-cad-grp>summary::-webkit-details-marker{display:none}
 #ryCadSide .ry-cad-grp>summary::before{content:'▸';font-size:10px;color:#7d8f86}
 #ryCadSide .ry-cad-grp[open]>summary::before{content:'▾'}
-#ryCadSide .ry-cad-grp>summary:hover{background:#eaf3ed}
+#ryCadSide .ry-cad-grp:not(#ryCadGrpPipe)>summary{background:#f4f9f6}
+#ryCadSide .ry-cad-grp:not(#ryCadGrpPipe)>summary:hover{background:#eaf3ed}
 #ryCadSide .ry-cad-grp-body{padding:8px;min-width:0}
 /* 轴测配件分组只在轴测视口出现（ryCadJs 维护 body.ry-cad-iso） */
 #ryCadGrpIso{display:none}
@@ -870,13 +877,6 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     <!-- Shoelace 2.15.1（与紧凑分组样板一致）；Shoelace 不可用时保留原生输入控件。 -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.1/cdn/themes/light.css">
   <link rel="stylesheet" href="runye-typography.css?v=1">
-<style id="ryFrameShellCss">
-  #ryFrameShell{position:fixed;left:0;right:0;top:calc(var(--fn-nav-h,36px) + 1px);bottom:var(--ry-status-h,34px);z-index:20;background:#fff;overflow:hidden}
-  #ryFrameShell[hidden]{display:none!important}
-  #ryFrameShell iframe{display:block;width:100%;height:100%;border:0;background:#fff}
-  #ryFrameShell iframe[hidden]{display:none!important}
-  body.ry-frame-open>main>.ry-sec.ry-active{display:none!important}
-</style>
 </head>
 <body>
 
@@ -1101,7 +1101,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
         <input type="file" id="atFileInput" accept=".png,.jpg,.jpeg,.webp,.gif,.bmp" style="display:none">
         <div class="at-btn-group">
           <button class="at-btn-action" onclick="document.getElementById('atFileInput').click()">📁 上传图片</button>
-          <button class="at-btn-action" id="atBtnMapMeasure" onclick="window.open('runye-map-measure.html','_blank')">🗺️ 地图在线测量</button>
+          <button class="at-btn-action" id="atBtnMapMeasure" onclick="window.location.hash='onlineMapSection'">🗺️ 地图在线测量</button>
         </div>
       </div>
       <div class="at-section">
@@ -1215,6 +1215,121 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
 
 
 <!-- ===== 二级管路 · 管路规划与施工简图 ===== -->
+<section id="onlineMapSection" class="ry-sec" aria-label="在线地图">
+  <div id="onlineMapApp">
+<div class="main">
+    <!-- 左侧工具栏：原绿色顶部操作条（搜索/定位/底图/画框四键）+ 右侧浮动「测量结果」面板
+         的全部内容集中于此（2026-09-13）。全部元素 id 未变，JS 逻辑零改动 -->
+    <aside class="side">
+      <section>
+        <h4 class="sec-t">地图</h4>
+        <div class="tools">
+          <div class="search-row">
+            <input type="text" id="search" placeholder="搜索地点（如：三亚 崖州）" />
+            <button class="mbtn" id="btnSearch">搜索</button>
+          </div>
+          <div class="sr-list" id="searchRes" hidden></div>
+          <button class="mbtn" id="btnSavePlace">💾 保存地点</button>
+          <div class="pill-list" id="placeList" hidden></div>
+          <button class="mbtn" id="btnLocate">📍 定位三亚</button>
+          <button class="mbtn" id="btnBase">🗺️ 切换底图</button>
+          <div class="hint" id="placeHint">搜索定位后可「保存地点」；地图位置自动记住，下次打开回到上次位置。也可直接输入坐标（如 18.2528,109.5119）定位。</div>
+        </div>
+      </section>
+      <section>
+        <h4 class="sec-t">绘制</h4>
+        <div class="tools">
+          <button class="mbtn" id="btnDraw">✏️ 开始画框</button>
+          <!-- [v186] 「完成」的语义已升级为「定稿本块 + 清空 + 继续画下一块」，
+               按钮文案随之改，让用户一眼知道点完还能接着画（见 btnFinish 处理函数）。 -->
+          <button class="mbtn" id="btnFinish">✅ 完成并画下一块</button>
+          <button class="mbtn" id="btnAddPt">➕ 加点</button>
+          <button class="mbtn" id="btnUndo">↩ 撤销</button>
+          <button class="mbtn" id="btnMeasure">📏 测距</button>
+          <button class="mbtn" id="btnClear">🗑 清除</button>
+        </div>
+      </section>
+      <section class="results">
+        <h4 class="sec-t">测量结果</h4>
+        <div class="row"><span class="k">面积</span><span class="v"><span id="mu">0</span><small>亩</small></span></div>
+        <div class="row"><span class="k">折合</span><span class="v"><span id="ha">0</span><small>公顷</small></span></div>
+        <div class="row"><span class="k">平方</span><span class="v"><span id="sq">0</span><small>㎡</small></span></div>
+        <div class="row"><span class="k">周长</span><span class="v"><span id="peri">0</span><small>m</small></span></div>
+        <div class="row"><span class="k">顶点</span><span class="v"><span id="pts">0</span><small>个</small></span></div>
+        <div class="hint">点击地图添加顶点；拖动顶点可微调；「完成并画下一块」会自动保存本块、清空画布并让你**接着画下一块**（可连画多块小地块）。画完点「🔗 地块成组」把它们编成一组便于一起操作（**各块的轮廓与块间空隙原样保留**，不会并成一块）。画完点「➕ 加点」，拖动框线上的 ⊕ 手柄（或贴着框线单击）即可继续增加标点，把地块贴得更准。面积按真实球面经纬度计算。</div>
+        <div class="save-row">
+          <button class="mbtn" id="btnGeoJSON">⬇ GeoJSON</button>
+          <button class="mbtn" id="btnKML">⬇ KML</button>
+        </div>
+        <div class="save-row">
+          <button class="mbtn" id="btnImport">⬆ 导入地块(GeoJSON/KML/KMZ/奥维轨迹)</button>
+        </div>
+        <input type="file" id="fileImport" accept=".geojson,.json,.kml,.ovkml,.kmz" style="display:none" />
+        <div class="hint">保存后可累计多个地块；在「精准灌溉」页地块库「设为当前」，或在数字农业（水肥决策）页下拉选择。</div>
+      </section>
+      <section>
+        <h4 class="sec-t">我的地块</h4>
+        <div class="pill-list" id="myPlotList" hidden></div>
+        <div class="hint" id="myPlotHint">保存/导入后的地块列在这里；点击飞到该地块，×删除。</div>
+        <!-- [v185/v189 2026-10-03] 多地块成组：勾选若干相邻小地块 → 编为一组便于一起操作。
+             ★ 语义：只成组、不改几何；各块轮廓与块间道路/间隔/水渠/空地**原样保留**。
+             成组后可直接「回传地块绘制」把**各子地块**（而不是合并后的大块）
+             传给二级管路页面；各子地块可分别布管，再用总管互连。 -->
+        <div class="save-row">
+          <button class="mbtn" id="btnMerge">🔗 地块成组</button>
+          <button class="mbtn" id="btnMergeExit" hidden>✓ 完成成组</button>
+        </div>
+        <div class="hint" id="mergeHint" hidden></div>
+        <div class="save-row">
+          <button class="mbtn" id="btnExportProj">💾 导出工程</button>
+          <button class="mbtn" id="btnImportProj">📂 导入工程</button>
+        </div>
+        <input type="file" id="fileProj" accept=".json,.runye.json" style="display:none" />
+      </section>
+    </aside>
+    <!-- 左侧工具栏宽度拖拽条（2026-09-20）：拖动调宽、双击恢复默认 -->
+    <div class="side-grip" id="mapSideGrip" title="拖动调节工具栏宽度；双击恢复默认"></div>
+    <div class="map-wrap">
+      <div id="map"></div>
+      <!-- ===== [v282] 分区角度悬浮面板 =====
+           形态仿手机端 runye-mobile-map-preview.html 的 .map-angle：↶＋1° / 角度输入 / ↷−1° 竖排。
+           原「分区角度」那一节（id=mapPartitionTools）整体迁入（runye-map-partition.js 只按 id 取 box，
+           再用 querySelector 取内部 select / input / [role=status] / [data-angle-*]，
+           故「搬容器不改结构」= JS 逻辑零改动）。默认靠地图区右侧，标题栏可拖动，位置记忆。 -->
+      <div class="ry-angle-panel ryp-float" id="ryAnglePanel" data-ry-panel data-ry-drag-bounds data-ry-position-key="ryAnglePanelPos" data-ry-position-legacy-key="ryAnglePanelPos" data-ry-fold-key="ryAnglePanelFolded" data-ry-fold-legacy-key="ryAnglePanelFolded" data-ry-default-top="96">
+        <div class="ry-angle-head ryp-titlebar" id="ryAngleHead" data-ry-drag title="按住这里可拖动面板">
+          <span class="ah-t ryp-title">分区角度</span>
+          <button class="ah-fold ryp-fold" id="ryAngleFold" type="button" data-ry-fold aria-label="折叠或展开分区角度面板" aria-expanded="true" data-ry-fold-open="▾" data-ry-fold-closed="▸" title="折叠/展开">▾</button>
+        </div>
+        <div class="ry-angle-body ryp-body" data-ry-body>
+          <!-- [v283 2026-10-06] 「↩ 回传地块绘制」「💾 保存地块」：用户截图指定放在**本面板内部顶端**、
+               「当前设计地块」下拉之上（v282 曾浮在地图左上角）。button id 与 JS 绑定仍零改动。
+               ★ 必须留在 section#mapPartitionTools **之外** —— 该 section 是分区角度模块
+                 按 id 取的盒子，往里塞无关按钮会改变其 querySelector('input') 的落点语义。 -->
+          <div class="map-float-actions" id="mapFloatActions">
+            <button class="mbtn mbtn-primary" id="btnCopy">回传地块绘制</button>
+            <!-- [NEW MODULE: 地形模块 v286d] 回传地形模块：卸载=删除本行 + sendPlotToTerrain/btnCopyTerrain 那两段 JS -->
+            <button class="mbtn" id="btnCopyTerrain">回传地形模块</button>
+            <button class="mbtn mbtn-primary" id="btnSavePlot">💾 保存地块</button>
+          </div>
+          <section id="mapPartitionTools">
+            <select aria-label="选择分区地块"></select>
+            <div class="map-angle-row">
+              <button class="ang-btn" type="button" data-angle-plus title="增加1°">↶<small>＋1°</small></button>
+              <div class="map-angle-value"><input aria-label="地图分区角度" type="number" min="-180" max="180" step="1" value="0"><span>°</span></div>
+              <button class="ang-btn" type="button" data-angle-minus title="减少1°">↷<small>－1°</small></button>
+            </div>
+            <div class="save-row"><button class="mbtn mbtn-primary" data-angle-apply>应用并重新划分</button><button class="mbtn" data-angle-send>回二级继续规划</button></div>
+            <p class="hint" role="status">只调整分区方向，地块边界不动。正角度从东向北旋转。</p>
+          </section>
+        </div>
+      </div>
+      <div class="warn" id="warn">⚠️ 地图瓦片加载失败，请检查网络（本工具需要联网获取卫星影像）。</div>
+      <div class="tip" id="tip">点击「✏️ 开始画框」后，在卫星图上依次点击地块边界顶点即可。</div>
+    </div>
+  </div>
+  </div>
+</section>
 <section id="pipePlanSection" class="ry-sec" data-ry-view="edit">
   <!-- 标题栏「04 二级管路规划与施工简图 · 未测量」已按要求取消（原 .pp-title 整条删除）。
        如需恢复：从 git 历史取回该 .pp-title 整块即可（含 span.badge 04 与 span#planAreaTag）。
@@ -1251,7 +1366,6 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
          另一边 = 单区面积 ÷ 固定边，调节后分区宽度自动跟随。
          消费点：planZoneFixedSide() → calcZoneLayout / calcManualZoneLayout / ppGetZoneCuts。
          需要撤掉：删本 item，并把 planZoneFixedSide 三处消费点还原为 MAX_ZONE_SIDE。 -->
-    <div class="ryp-group-head"><sl-icon name="arrows-expand" aria-hidden="true"></sl-icon>滴灌带铺设</div>
     <span class="pp-plan-item"><span class="pp-plan-label">单边铺设长度</span><input class="ryp-native-fallback" type="number" id="planTapeLaySide" value="100" min="10" step="10" aria-label="单边铺设长度" title="滴灌带在分区内单边铺设长度；分区固定边 = 单边长度×2，调节后分区划分自动跟随"><sl-input data-ry-proxy-for="planTapeLaySide" type="number" value="100" min="10" step="10" size="small" aria-label="单边铺设长度" hidden></sl-input>m</span>
     <span class="pp-plan-item"><span class="pp-plan-label">滴灌带间距</span><input class="ryp-native-fallback" type="number" id="planTapeSpacing" value="0.4" min="0.1" step="0.1" aria-label="滴灌带间距"><sl-input data-ry-proxy-for="planTapeSpacing" type="number" value="0.4" min="0.1" step="0.1" size="small" aria-label="滴灌带间距" hidden></sl-input>m</span>
     <span class="pp-plan-item"><span class="pp-plan-label">滴孔间距</span><input class="ryp-native-fallback" type="number" id="planEmitterSpacing" value="0.3" min="0.05" step="0.05" aria-label="滴孔间距"><sl-input data-ry-proxy-for="planEmitterSpacing" type="number" value="0.3" min="0.05" step="0.05" size="small" aria-label="滴孔间距" hidden></sl-input>m</span>
@@ -1260,20 +1374,18 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
          单条滴灌带长度改由 planTapeLaySide（单边铺设长度）承担（calcPlan tapeLen / 摘要处均已重指向）。
          需要恢复：加回 <span class="pp-plan-item"><span class="pp-plan-label">单带长度</span><input type="number" id="planTapeLen" value="100" min="10" step="10">m</span> 并还原三处消费点。 -->
     <span class="pp-sep-vert"></span>
-    <div class="ryp-group-head"><sl-icon name="grid-3x3" aria-hidden="true"></sl-icon>分区与水力</div>
     <span class="pp-plan-item"><span class="pp-plan-label">分区划定</span><input class="ryp-native-fallback" type="number" id="planZoneMuManual" value="18" min="0.1" step="0.1" style="width:58px" aria-label="分区划定"><sl-input data-ry-proxy-for="planZoneMuManual" type="number" value="18" min="0.1" step="0.1" size="small" aria-label="分区划定" hidden></sl-input>亩/区</span>
-    <span class="pp-plan-item"><span class="pp-plan-label">目标流速</span><input class="ryp-native-fallback" type="number" id="planTargetV" value="1.5" min="0.3" max="5" step="0.1" aria-label="目标流速"><sl-input data-ry-proxy-for="planTargetV" type="number" value="1.5" min="0.3" max="5" step="0.1" size="small" aria-label="目标流速" hidden></sl-input>m/s</span>
     <!-- 2026-10-04 v199 用户要求：左栏增加「入口压力」输入 —— 与 01 一级表单「滴灌带入口工作压力
          fld_tapePressure」**同一个物理量**（扬程计算式条里的「入口压力」= bar×10.2m），
          双向镜像同 v91 机制（PP_LIFTDH_PAIRS）。调节后水泵扬程/计算式条实时跟随。
          需要撤掉：删本 item + PP_LIFTDH_PAIRS 里的镜像对 + 下方 calcPlan 触发循环里的一项。 -->
     <span class="pp-plan-item"><span class="pp-plan-label">入口压力</span><input class="ryp-native-fallback" type="number" id="planTapePressure" value="1" min="0" step="0.1" aria-label="入口压力" title="滴灌带入口工作压力（bar）：计入水泵扬程（×10.2 折算水头），与 01 一级表单同源联动"><sl-input data-ry-proxy-for="planTapePressure" type="number" value="1" min="0" step="0.1" size="small" aria-label="入口压力" hidden></sl-input>bar</span>
+    <span class="pp-plan-item"><span class="pp-plan-label">目标流速</span><input class="ryp-native-fallback" type="number" id="planTargetV" value="1.5" min="0.3" max="5" step="0.1" aria-label="目标流速"><sl-input data-ry-proxy-for="planTargetV" type="number" value="1.5" min="0.3" max="5" step="0.1" size="small" aria-label="目标流速" hidden></sl-input>m/s</span>
     <input type="hidden" id="planN" value="4">
     <input type="hidden" id="planZoneMode" value="manual">
   </div>
   <!-- 第2行：计算结果 -->
   <div class="pp-plan-bar pp-plan-bar-result" id="ppPlanBar2">
-    <div class="ryp-group-head"><sl-icon name="calculator" aria-hidden="true"></sl-icon>水力计算结果</div>
     <span class="pp-sep-vert"></span>
     <span class="pp-plan-item"><span class="pp-plan-label">每亩流量</span><span class="pp-plan-val" id="planIntensity">—</span>m³/h/亩</span>
     <span class="pp-sep-vert"></span>
@@ -2215,6 +2327,341 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     </div>
   </div>
 </section>
+<section id="terrainSection" class="ry-sec terrain-section" aria-label="地形模块">
+<header class="t-top">
+  <h1>⛰️ 地形模块</h1>
+  <span class="t-sub">阶段1 · 边界导入 / 坐标系校验 / 面积 / 高程数据登记</span>
+  <span class="t-spacer"></span>
+  <button class="t-modebtn on" id="modePreview" title="成果不用于工程放样与水力计算">预览模式</button>
+  <button class="t-modebtn" id="modeEng" title="成果用于工程：无高程数据时将给出风险提示">工程模式</button>
+</header>
+
+<div class="t-banner t-warn" id="tBanner" hidden></div>
+
+<main class="t-body">
+
+  <!-- 左：工具栏（[v287] 现有内容包进 <details> 默认全部折叠；底部新增山地喷灌设计参数区） -->
+  <aside class="t-side">
+    <details class="t-card t-fold">
+      <summary>地块边界 <small>多子多边形 · 梯田分层预留</small></summary>
+      <div class="t-cardbody">
+        <div class="t-btncol">
+          <button class="t-btn" onclick="document.getElementById('fileSHP').click()">📁 导入 shp 边界</button>
+          <button class="t-btn ghost" onclick="document.getElementById('filePRJ').click()">🧭 上传 .prj 校验坐标系</button>
+          <button class="t-btn ghost" onclick="document.getElementById('fileBoundaryCSV').click()">📋 导入 RTK 边界 CSV (X,Y)</button>
+          <button class="t-btn ghost" id="btnAddManual">✍ 手动粘贴顶点</button>
+        </div>
+        <input type="file" id="fileSHP" hidden>
+        <input type="file" id="filePRJ" hidden>
+        <input type="file" id="fileBoundaryCSV" hidden>
+        <div class="t-cs">坐标系：<b id="csResult">未校验</b><br><span style="font-size:var(--ry-fs-tiny)">导入 shp 后请一并上传同名 .prj；无 prj 时按坐标数值启发式判断</span></div>
+      </div>
+    </details>
+
+    <details class="t-card t-fold">
+      <summary>面积 <small>底层统一平方米</small></summary>
+      <div class="t-cardbody">
+        <div class="t-unit">
+          <button id="unitSqm" class="on">㎡</button>
+          <button id="unitMu">亩</button>
+        </div>
+        <div class="t-arearow">
+          <span>水平投影</span>
+          <span class="t-big" id="areaProj">—</span>
+        </div>
+        <div class="t-note" id="areaProjNote" style="margin:-4px 0 8px">鞋带公式 · 水平投影</div>
+        <div class="t-arearow t-locked" id="areaSurfCard" title="需要上传高程数据才可计算">
+          <span>地表斜面</span>
+          <span class="t-big" id="areaSurf">—</span>
+        </div>
+        <div class="t-note" id="areaSurfNote" style="margin:-4px 0 2px">需要上传高程数据才可计算</div>
+      </div>
+    </details>
+
+    <details class="t-card t-fold">
+      <summary>高程数据 <small>仅上传/登记 · 采集由外部设备完成</small></summary>
+      <div class="t-cardbody">
+        <div class="t-tabs">
+          <button id="tabRtk" class="on">RTK 点 (X,Y,Z)</button>
+          <button id="tabDtm">DTM (tif)</button>
+          <button id="tabDsm">DSM（仅预览）</button>
+        </div>
+        <div class="t-panel on" id="panelRtk">
+          <button class="t-btn" onclick="document.getElementById('fileElevCSV').click()">⬆ 上传 RTK 高程 CSV</button>
+          <input type="file" id="fileElevCSV" hidden>
+          <div class="t-hintbox">由 RTK 手簿导出的 X,Y,Z 点列（逗号/分号/Tab），软件不做现场采集与 RTK 驱动。</div>
+        </div>
+        <div class="t-panel" id="panelDtm">
+          <button class="t-btn" onclick="document.getElementById('fileDTM').click()">⬆ 上传 DTM 栅格 tif</button>
+          <input type="file" id="fileDTM" hidden>
+          <div class="t-hintbox">无人机航测 DTM（数字地形模型 = 纯地面）。tif 边界约束（shp）配套上传属阶段2；本阶段仅登记元信息。</div>
+        </div>
+        <div class="t-panel" id="panelDsm">
+          <button class="t-btn danger" onclick="document.getElementById('fileDSM').click()">⬆ 上传 DSM 栅格 tif（仅预览）</button>
+          <input type="file" id="fileDSM" hidden>
+          <div class="t-hintbox"><b style="color:#a31515">DSM 含树冠/建筑高程，仅可预览，禁止用于工程水力计算。</b>识别到 DSM 会自动标记低置信度并警示。</div>
+        </div>
+        <div id="elevList" style="margin-top:10px"></div>
+      </div>
+    </details>
+
+    <details class="t-card t-fold">
+      <summary>地块清单</summary>
+      <div class="t-cardbody">
+        <div id="plotList"></div>
+        <div class="t-btnrow" style="margin-top:8px">
+          <button class="t-btn" id="btnSendHome">↩ 回传主页参与计算</button>
+          <button class="t-btn danger" id="terrainBtnClear">🗑 清空</button>
+        </div>
+        <div class="t-hintbox">回传 = 写入与地图测量页相同的 localStorage 契约，主页「地块分区」自动接住面积与轮廓。</div>
+      </div>
+    </details>
+
+    <!-- [v287 NEW] 山地喷灌设计 · 参数输入区（调研依据见 terrain-core.js sprinklerEstimate 注释） -->
+    <details class="t-card t-fold" id="spCard" open>
+      <summary>山地喷灌设计 <small>参数输入 · 估算</small></summary>
+      <div class="t-cardbody">
+        <div class="t-spgroup">作物与需水</div>
+        <div class="t-sprow"><label>作物</label><input id="spCrop" type="text" placeholder="如果树/油茶/牧草"></div>
+        <div class="t-sprow"><label>设计日耗水 ETc</label><input id="spEtc" type="number" value="4.5" min="0" max="15" step="0.1"><span>mm/d</span></div>
+        <div class="t-sprow"><label>灌溉水利用系数 η</label><input id="spEta" type="number" value="0.7" min="0.4" max="1" step="0.05"></div>
+        <div class="t-spgroup">土壤与地形</div>
+        <div class="t-sprow"><label>土壤质地</label><select id="spSoil">
+          <option value="sand">沙土（允许 20 mm/h）</option>
+          <option value="sandyloam">沙壤土（15）</option>
+          <option value="loam" selected>壤土（12）</option>
+          <option value="clayloam">黏壤土（10）</option>
+          <option value="clay">黏土（8）</option>
+        </select></div>
+        <div class="t-sprow"><label>地块平均坡度</label><input id="spSlope" type="number" value="8" min="0" max="45" step="0.5"><span>°</span></div>
+        <div class="t-spgroup">喷头与布置</div>
+        <div class="t-sprow"><label>喷头射程 R（任务书 7–10）</label><input id="spRange" type="number" value="8.5" min="1" max="60" step="0.5"><span>m</span></div>
+        <div class="t-sprow"><label>喷头流量 q（任务书 350）</label><input id="spFlow" type="number" value="0.35" min="0.01" max="30" step="0.01"><span>m³/h</span></div>
+        <div class="t-sprow"><label>喷头工作压力（已确认 2–3 bar）</label><input id="spPressure" type="number" value="250" min="100" max="3000" step="10"><span>kPa</span></div>
+        <div class="t-hintbox">任务书压力范围 2–3 bar = 200–300 kPa；当前以 250 kPa 中值估算。喷头最终流量与工作压力请按具体型号厂家曲线复核。</div>
+        <div class="t-sprow"><label>喷嘴额定流量（可选）</label><input id="spRatedFlow" type="number" min="0.01" max="30" step="0.01" placeholder="按铭牌填写"><span>m³/h</span></div>
+        <div class="t-sprow"><label>喷嘴额定压力（可选）</label><input id="spRatedPressure" type="number" min="10" max="1000" step="1" placeholder="按铭牌填写"><span>kPa</span></div>
+        <div class="t-sprow"><label>布置方式</label><select id="spLayout">
+          <option value="tri">正三角形（坡地推荐）</option>
+          <option value="square" selected>正方形（任务书 12×12）</option>
+        </select></div>
+        <div class="t-sprow"><label>间距系数 k（×R）</label><input id="spK" type="number" value="1.1" min="0.4" max="1.6" step="0.05"></div>
+        <div class="t-sprow"><label>直接填间距（任务书 12×12）</label><input id="spSpacing" type="number" value="12" min="1" max="60" step="0.5" placeholder="如 12，留空用 k"><span>m</span></div>
+        <div class="t-sprow"><label>立管口径（任务书 25）</label><input id="spRiserOd" type="number" value="25" min="10" max="110" step="1"><span>mm</span></div>
+        <div class="t-sprow"><label>立管高度</label><input id="spRiserH" type="number" value="3" min="1" max="10" step="0.5"><span>m</span></div>
+        <div class="t-spgroup">地理分区与轮灌</div>
+        <div class="t-sprow"><label>单灌溉小区面积</label><input id="spZoneMin" type="number" value="50" min="1" max="10000" step="1"><span>–</span><input id="spZoneMax" type="number" value="60" min="1" max="10000" step="1"><span>亩</span></div>
+        <div class="t-sprow"><label>大灌溉区面积</label><input id="spMacroMin" type="number" value="200" min="1" max="100000" step="10"><span>–</span><input id="spMacroMax" type="number" value="250" min="1" max="100000" step="10"><span>亩</span></div>
+        <div class="t-sprow"><label>同时工作喷头数</label><input id="spHeads" type="number" value="255" min="1" max="4000" step="1"><span>个</span></div>
+        <div class="t-sprow"><label>水源可用流量（可选）</label><input id="spSourceFlow" type="number" min="0.1" max="10000" step="0.1" placeholder="实测或水泵铭牌"><span>m³/h</span></div>
+        <div class="t-spgroup">蓄水池与二次加压</div>
+        <div class="t-sprow"><label>蓄水池容积（m³）</label><input id="spTankV" type="number" min="0" max="100000" step="10" placeholder="手填或估算"><span><button class="t-btn ghost" id="spTankCalc" type="button">按参数估算</button></span></div>
+        <div class="t-sprow"><label>泵流量（可选）</label><input id="spBoostQ" type="number" min="0.1" max="10000" step="0.1" placeholder="默认轮灌组流量"><span>m³/h</span></div>
+        <div class="t-sprow"><label>泵总扬程</label><input id="spBoostH" type="number" min="1" max="500" step="1" placeholder="至最不利喷头"><span>m</span></div>
+        <div class="t-sprow"><label>二级起点扬程</label><input id="spBoostSplit" type="number" min="0.1" max="500" step="1" placeholder="如主管末端处"><span>m</span></div>
+        <div class="t-btnrow" style="margin-top:4px">
+          <button class="t-btn ghost" id="spBoostCalc" type="button">算两段泵</button>
+        </div>
+        <div id="spBoostResult" class="t-spresult" hidden></div>
+        <div class="t-spgroup">沟槽施工</div>
+        <div class="t-sprow"><label>沟深（固定）</label><input id="spTrenchD" type="number" value="0.5" min="0.2" max="2" step="0.1"><span>m</span></div>
+        <div class="t-sprow"><label>沟宽·主管（外线）</label><input id="spTwMain" type="number" value="0.5" min="0.2" max="2" step="0.1"><span>m</span></div>
+        <div class="t-sprow"><label>沟宽·干管</label><input id="spTwSub" type="number" value="0.4" min="0.2" max="2" step="0.1"><span>m</span></div>
+        <div class="t-sprow"><label>沟宽·支管</label><input id="spTwLat" type="number" value="0.3" min="0.2" max="2" step="0.1"><span>m</span></div>
+        <div class="t-spgroup">肥液与过滤</div>
+        <label class="t-sprow t-sp-overlay" style="cursor:pointer"><input type="checkbox" id="spFilterOn" checked> 板框过滤器（茶枯肥液防堵）</label>
+        <div class="t-sprow"><label>过滤器数量</label><input id="spFilterN" type="number" value="1" min="1" max="20" step="1"><span>套</span></div>
+        <label class="t-sprow t-sp-overlay" style="cursor:pointer"><input type="checkbox" id="spFertOn" checked> 溶肥容器 + 肥液中转池</label>
+        <div class="t-sprow"><label>溶肥设施数量</label><input id="spFertN" type="number" value="1" min="1" max="20" step="1"><span>套</span></div>
+        <div class="t-btnrow" style="margin-top:6px">
+          <button class="t-btn" id="spCalc">估算</button>
+          <button class="t-btn ghost" id="spReset">载入任务书参数</button>
+          <button class="t-btn ghost" id="spDemo" type="button">▶ 轮灌演示</button>
+        </div>
+        <label class="t-sprow t-sp-overlay" style="cursor:pointer"><input type="checkbox" id="spOverlay" checked> 图上显示喷灌布置</label>
+        <div id="spResult" class="t-spresult" hidden></div>
+        <div id="spWarn" hidden></div>
+        <!-- [v384 任务书 P0] 喷灌材料清单：估算后自动生成 BOM 并写入数据桥（localStorage.runyeSprinklerResult） -->
+        <details class="t-card t-fold" id="spBomCard" hidden>
+          <summary>喷灌材料清单（BOM）</summary>
+          <div class="t-cardbody" id="spBom"></div>
+        </details>
+        <div class="t-hintbox">参数依据：GB/T 50085《喷灌工程技术规范》+ 坡地喷灌实测研究（间距 0.8~1.2R、三角形布置、300kPa）+ IRRICAD/OpenCAD 输入范式。山地惯例：支管沿等高线布置、主管垂直等高线。详细水力计算属后续阶段。</div>
+      </div>
+    </details>
+  </aside>
+
+  <!-- 拖拽条（复刻 .pp-grip：拖动调左栏宽度，双击恢复默认；JS 在 terrain-ui.js） -->
+  <div class="t-grip" id="tGrip" role="separator" aria-orientation="vertical" title="拖动调整工具栏宽度 · 双击恢复默认"></div>
+
+  <!-- 右：制图区（SVG 画布，绘制已导入地块轮廓 / RTK 高程点；空态给引导提示） -->
+  <section class="t-stage">
+    <div class="t-canvas-head">
+      <b>制图区</b><span id="canvasMeta">暂无地块数据</span>
+      <span class="t-navhint">滚轮缩放 · 拖拽平移</span>
+      <span id="elevTools" hidden>
+        <label class="t-chk" id="elevDotWrap"><input type="checkbox" id="elevDots" checked> 显示高程点</label>
+        <label class="t-chk"><input type="checkbox" id="elevShade" checked> 高程着色</label>
+        <label class="t-chk"><input type="checkbox" id="elevContours"> 等高线</label>
+      </span>
+    </div>
+    <div class="t-canvas-wrap" id="canvasWrap">
+      <svg id="tCanvas" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" hidden></svg>
+      <!-- [v393 2026-10-12 用户指令] 做图区左上角快捷条：复刻「地块分区」的「地块角度」——
+           以（多地块联合）包围盒中心为轴旋转地块外轮廓（只影响显示、不重写数据；
+           多地块整组一起转，与地块分区 v193「旋转作用于整组」同口径）；
+           点「落定基准」把旋转后的地块轮廓与 RTK 高程点坐标写成新基准（栅格不转）。 -->
+      <div class="t-quick" id="tQuickBar">
+        <label class="t-angle-control" title="以地块包围盒中心为轴旋转地块外轮廓（多地块整组一起转，只影响显示、不重写数据）；点「落定基准」把旋转后的坐标写成新基准">
+          <span>地块角度</span>
+          <input id="tPlotAngle" type="number" value="0" min="-180" max="180" step="1">
+          <span>°</span>
+        </label>
+        <button class="t-btn ghost" id="tPlotBake" title="把当前旋转角度落定为新基准：地块轮廓与 RTK 高程点坐标一起刚性旋转改写（保持对位；栅格数据 DTM/DSM 不旋转，落定后请重新导入）">落定基准</button>
+      </div>
+      <div class="t-canvas-nav" id="tCanvasNav">
+        <button id="zoomIn" title="放大">＋</button>
+        <button id="zoomOut" title="缩小">－</button>
+        <button id="zoomReset" title="复位全览">⌂</button>
+      </div>
+      <div class="t-empty" id="canvasEmpty">暂无地块。请在左侧工具栏「导入 shp 边界」「导入 RTK 边界 CSV」或「手动粘贴顶点」。<br>导入后此处按 CGCS2000 平面坐标绘制地块轮廓。</div>
+    <!-- 喷灌布置图例（v289c）：浮动钉在制图区底部内侧，确保任何布局下可见 -->
+    <div class="t-sp-legend" id="spLegend" hidden></div>
+    <!-- [v410] 高程图例（高程着色/等高线） -->
+    <div class="t-elev-legend" id="elevLegend" hidden></div>
+    </div>
+  </section>
+
+</main>
+
+</section>
+<section id="hydraulicsSection" class="ry-sec" aria-label="水力校核">
+  <div class="main">
+    <aside class="side">
+      <section>
+        <div class="sec-t">数据源 · 已布置管网</div>
+        <div class="card" id="srcCard">读取中…</div>
+        <button class="mbtn" id="btnReload" style="margin-top:6px">↻ 重新读取管网</button>
+        <div class="hint">数据来自主页「生成管线图」反投卫星图的 <b>runye_network_layout</b>（只读）。
+          没有数据？先去 <a href="#onlineMapSection">在线地图</a> 布置管网或回主页生成管线图。</div>
+      </section>
+      <section>
+        <div class="sec-t">计算参数</div>
+        <div class="card">
+          <div class="frm" id="frmParams">
+            <label>海森系数 C（PE 150）</label><input id="pC" type="number" value="150" step="5" min="100" max="160">
+            <label>管径口径（SDR）</label><input id="pCaliber" type="text" value="sdr13.6" list="calList">
+            <datalist id="calList"><option value="sdr13.6"><option value="sdr17"><option value="sdr21"><option value="id"></datalist>
+            <label>局部损失比例（%）</label><input id="pLocal" type="number" value="10" step="1" min="0" max="50">
+            <label>滴头流量 q（L/h）</label><input id="pQdrip" type="number" value="1.38" step="0.01" min="0.1">
+            <label>滴头间距（m）</label><input id="pSpacing" type="number" value="0.3" step="0.05" min="0.1">
+            <label>滴灌带内径（mm）</label><input id="pTapeID" type="number" value="14.2" step="0.1" min="8">
+            <label>滴头额定压力（毛管模拟，m）</label><input id="pDripHead" type="number" value="10" step="0.5" min="0">
+            <label>流量指数 x（非补偿0.5/补偿0.15）</label><input id="pXExp" type="number" value="0.5" step="0.05" min="0.05" max="1">
+            <label>毛管坡度（上坡+/下坡− m/m）</label><input id="pSlope" type="number" value="0" step="0.001" min="-0.05" max="0.05">
+            <label>毛管长度（m，三级规划模式用）</label><input id="pTapeLen" type="number" value="80" step="5" min="10" max="200">
+            <label>水源→田间高差（m）</label><input id="pElev" type="number" value="0" step="0.5">
+            <label>首部损失（过滤施肥，m）</label><input id="pHeadLoss" type="number" value="3" step="0.5" min="0">
+            <label>泵组效率 η（0~1）</label><input id="pEff" type="number" value="0.6" step="0.05" min="0.2" max="0.9">
+            <label>流速上限（m/s）</label><input id="pVmax" type="number" value="2.0" step="0.1" min="0.5">
+            <label>端点吸附容差（m）</label><input id="pSnap" type="number" value="3" step="1" min="1" max="20">
+            <label>滴灌带挂接容差（m）</label><input id="pTapeSnap" type="number" value="8" step="1" min="2" max="30">
+            <div class="hint2">管径口径 sdr13.6/sdr17/sdr21=外径折算内径；id=输入即内径</div>
+          </div>
+        </div>
+        <button class="mbtn mbtn-primary" id="btnRun" style="margin-top:6px">▶ 读取并校核</button>
+        <div class="hint" id="paramHint">参数只在本页使用，不回写布置数据；口径与主页三级水力计算同源（hc-core/design-core）。</div>
+      </section>
+    </aside>
+    <div class="result" id="result">
+      <div class="result-head">
+        <div><h1>水力校核</h1><p id="resultIntro">读取已布置管网，重建拓扑，逐段递推水损。</p></div>
+        <div class="result-badge" id="resultBadge">未运行</div>
+      </div>
+      <div class="result-body" id="resultBody">
+      <div class="empty" id="emptyBox">
+        <b>水力校核</b><br>
+        自动读取在线地图/主页反投的已布置管网（总管→主管→支管→滴灌带），<br>
+        重建树状拓扑 → 逐段流量递推 → 全链路水损 → 最不利路径 → 需求扬程与水泵选型。<br>
+        点左侧 <b>「▶ 读取并校核」</b> 开始。
+      </div>
+      <div id="out" style="display:none">
+        <div class="overview">
+          <div><div class="warnbox" id="warnBox"></div><div class="sum-grid" id="sumGrid"></div></div>
+          <aside class="scope-card" id="checkScope"></aside>
+        </div>
+        <h3 class="rt">拓扑与诊断</h3>
+        <div class="pathline" id="treeLine"></div>
+        <div class="pathline" id="diagLine"></div>
+        <div class="row2" style="max-width:360px;margin:0 0 8px">
+          <button class="mbtn" id="btnMapHydraulic">🗺 在地图查看水力状态</button>
+        </div>
+        <h3 class="rt">最不利路径（逐段累计）</h3>
+        <div class="pathline" id="pathLine"></div>
+        <h3 class="rt">水力管线图</h3>
+        <div class="section-note">白色流线表示供水方向；点击管段可定位下方明细行。颜色用于识别管段类别和异常状态。</div>
+        <div class="hyd-map" id="hydDiagram" aria-label="水力管线图"></div>
+        <h3 class="rt">逐段水力校核</h3>
+        <div class="tblfreeze"><table id="segTable"></table></div>
+        <h3 class="rt">滴灌带多孔出流（Christiansen 修正）</h3>
+        <div class="tblfreeze"><table id="tapeTable"></table></div>
+        <h3 class="rt">代表毛管逐滴头模拟 · DU 估算</h3>
+        <div class="card" id="lateralCard">
+          <div class="du-grid">
+            <div>
+              <div style="font-size:var(--ry-fs-tiny);color:var(--s-500);line-height:1.6">
+                对最不利路径的<b>一条代表毛管</b>做逐滴头压力-流量耦合模拟：
+                每个滴头实际压力决定其出水量（q=k·P^x），迭代4轮收敛。
+                输出该毛管的 DU 估算与沿程压力曲线；它不替代全项目逐条毛管的均匀度校核。
+              </div>
+              <div class="sum-grid" id="latSum" style="margin-top:8px"></div>
+              <div id="latWarn" class="warnbox" style="margin-top:6px"></div>
+            </div>
+            <div id="latChart"></div>
+          </div>
+        </div>
+        <h3 class="rt">建议管径（流速上限内选最小 PE 外径，Guyri 口径）</h3>
+        <div class="tblfreeze"><table id="sugTable"></table></div>
+        <h3 class="rt">EPANET 对照（epanet-js WASM）</h3>
+        <div class="card">
+          <div class="epa-grid">
+            <div>
+              <div style="font-size:var(--ry-fs-tiny);color:var(--s-500);line-height:1.6">
+                由本页拓扑自动生成 .inp（JUNCTIONS/PIPES/COORDINATES）；末端灌水流量写入对应支管下游节点，
+                并把本页局部损失换算为 EPANET 管件损失系数。供水端使用需求扬程作为固定水头边界；泵曲线选型仍由润野主计算负责。
+              </div>
+              <div class="row2" style="margin-top:6px">
+                <button class="mbtn" id="btnCopyInp">复制 .inp 内容</button>
+                <button class="mbtn" id="btnDownInp">下载 .inp 文件</button>
+                <button class="mbtn" id="btnRunEpanet">▶ 运行 EPANET 对照</button>
+              </div>
+              <div id="epanetOut" style="font-size:var(--ry-fs-tiny);line-height:1.6;margin-top:6px"></div>
+            </div>
+            <pre class="inp" id="inpBox"></pre>
+          </div>
+        </div>
+      </div>
+      </div><!-- /result-body -->
+    </div>
+    <aside class="right-props" id="rightProps">
+      <div class="rp-tabs">
+        <div class="rp-tab active" data-rptab="asset">资产属性</div>
+        <div class="rp-tab" data-rptab="lateral">毛管模拟</div>
+      </div>
+      <div class="rp-body" id="rpBody">
+        <div class="rp-empty">点选图中任意管段<br>查看流量、流速、损失和压力</div>
+      </div>
+    </aside>
+  </div>
+  <div class="statusbar" id="statusbar">
+    <span>单位: m³/h</span>
+    <span>公式: Hazen-Williams</span>
+    <span id="stAssets">—</span>
+    <span class="sp"></span>
+    <span id="stStatus">就绪</span>
+    <span id="stWarn" style="display:none"></span>
+  </div>
+</section>
 <section id="filterSystemSection" class="ry-sec" aria-label="过滤系统">
   <!-- 2026-09-18 第七十一轮（用户要求）：顶部导航新增「过滤系统」→ 点击进入本页。
        用户下一步给了做法：本页由 filter-system/filter-system.js **懒挂载**
@@ -2227,13 +2674,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     </div>
   </div>
 </section>
-<div id="ryFrameShell" class="ry-frame-shell" hidden aria-label="独立工具页面">
-  <iframe id="frMap" data-fr-page="online-map" data-src="runye-map-measure.html" title="在线地图"></iframe>
-  <iframe id="frTerrain" data-fr-page="terrain" data-src="terrain/index.html" title="地形模块"></iframe>
-  <iframe id="frHyd" data-fr-page="hydraulics" data-src="runye-hydraulics.html" title="水力校核"></iframe>
-  <!-- [v438] 测试分区：侧边工具面板样板独立页（导航「地块分区」之后） -->
-  <iframe id="frTestPanel" data-fr-page="test-panel" data-src="runye-test-panel.html" title="测试分区"></iframe>
-</div></main>
+</main>
 
 <!-- ===== 底部状态栏（工具模式）：当前功能区 + 关键结果，常驻视口底部 ===== -->
 <div class="ry-statusbar" id="ryStatusBar">
@@ -2628,7 +3069,6 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
 <script src="mod/inline-29.js?v=357"></script>
 
 <script src="mod/inline-30.js?v=357"></script>
-<script src="mod/inline-31.js?v=401"></script>
 <script src="mod/inline-32.js?v=404-tier-gates"></script>
 
 <div class="mat-flash" id="matFlash"></div>
@@ -2641,5 +3081,10 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
 <script type="module" src="core/bootstrap.js?v=2"></script>
 <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.1/cdn/shoelace.js"></script>
 <script src="mod/ry-panel.js?v=431-panel-layout-cascade"></script>
+<script src="pwa/vendor/leaflet.js"></script>
+<script src="mod/online-map.js?v=441-map-main-section"></script>
+<script src="terrain/terrain-core.js?v=410-elev"></script>
+<script src="terrain/terrain-ui.js?v=442-native"></script>
+<script src="runye-hydraulics-page.js?v=442-native"></script>
 </body>
 </html>

@@ -1,10 +1,8 @@
 /* ============================================================
-   plugins/hydraulics —— 「水力校核」老模块迁移（壳，阶段五打样）
+   plugins/hydraulics —— 「水力校核」主页面导航与会员适配
    ------------------------------------------------------------
-   迁移对象与 pipe-optim 不同：水力校核是**独立页面**（runye-hydraulics.html），
-   入口是 runye-nav.js 渲染的**顶级导航项**。所以本插件只做一件事：
-     接管那个导航项 → 插件导航在**原位置**补上 → 点击跳同一页面。
-   业务零改动（连 href 都是 manifest 配置的）。
+   水力校核由主页面 #hydraulicsSection 承载，入口是 runye-nav.js 的顶级导航项。
+   本插件继续提供统一的权益门控和公共水力计算 API；导航目标仍指向主页面功能区。
 
    ★ 与 pipe-optim 的关键差异（为什么不能照抄）：
      pipe-optim 的老按钮由 pipe_optim_ui.js 注入一次，摘掉就没了；
@@ -12,10 +10,8 @@
      把老项原样再造出来 —— 只摘一次必然出现「老项 + 插件项」双入口。
      ⇒ 必须挂抑制器（MutationObserver）：重渲染造一次摘一次。
    [v379 真改造] 本插件从「只接管导航」升级为**水力计算内核的宿主**：
-     主页 index.html 并不加载 hydraulic-calc/hc-core.js 等（只有 runye-hydraulics.html
-     自己用 <script> 加载），所以**插件体系所在的主页上下文里根本没有这套内核**。
-     后果是 core/data-service.js 的 hazenLoss 只能走内置兜底 —— 口径出现两份记录。
-     本插件负责把内核请进来并广播就绪，让整个插件体系统一到一个口径上。
+     主页通过同步脚本装配水力内核；插件仍以幂等方式校验/补载并广播就绪，
+     让 core/data-service.js 与水力校核页共用同一套口径。
      ★ 内核之间有**加载顺序依赖**（design-core 取 root.RyHcCore、hydraulics-core
        缺了前一个会直接 throw），必须串行加载、逐个等就绪。
    ============================================================ */
@@ -128,8 +124,8 @@ function loadCore() {
     var missing = coreMissing();
     var out = { ok: r.ok && missing.length === 0, missing: missing, reason: r.reason || '' };
     if (!out.ok && ctxRef) {
-      /* 内核拿不到 ≠ 插件废了：导航入口照常可用（点进去 hydraulics 页面自己会加载），
-         只是「口径统一」这一层降级为内置兜底。上报后 fail-open，不许冒异常到主程序。 */
+      /* 内核拿不到 ≠ 插件废了：导航入口仍可到达功能区，页面会明确显示计算核心故障。
+         上报后 fail-open，不许冒异常到主程序。 */
       ctxRef.runtime.reportError(new Error('水力内核加载不完整：' + (out.reason || missing.join(','))));
     }
     if (out.ok && ctxRef && ctxRef.events && typeof ctxRef.events.emit === 'function') {
@@ -248,7 +244,7 @@ function activate(ctx) {
 
   /* 点击行为 = 老入口的同款跳转（href 由 manifest 配置，不写死） */
   function open() {
-    try { window.location.assign(c.href); }
+    try { window.location.hash = c.href || '#hydraulicsSection'; }
     catch (e) { ctx.runtime.reportError(e); }
   }
 

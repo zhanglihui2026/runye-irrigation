@@ -4,8 +4,7 @@
    把散在各处的导入/导出/工程操作收进导航右侧一个折叠菜单。
    分组：导入 / 导出 / 工程。动作分发两类：
      ① 主程序内动作：直接调全局函数（runyeDxf / RyIsoDiagram / runyeSaveProject 等）；
-     ② 独立页动作：先 RyFrameShell.show(page) 切到对应 iframe（懒加载），
-        等 iframe load 完成后调用 contentWindow 里暴露的按钮/函数触发。
+     ② 页面动作：先切换到对应主页面功能区，再调用该区内的控件。
    皮肤使用独立 .fn-file 面板（不复用 .fn-more-panel），
    定位逻辑与 buildMore 同款（position:fixed 防 .fn-inner overflow 裁切）。
    卸载：删 index.html 的 #fnFileMenu 块 + 本文件 + sw.js CORE 条目即可。
@@ -20,9 +19,9 @@
   var memberChangeBound = false;
 
   /* ---------------- 菜单定义 ----------------
-     type: 'fn' 主程序动作 / 'page' 独立页动作
+     type: 'fn' 主程序动作 / 'page' 主页面功能区动作
      action: 主程序内要调用的函数名（window 上）；page 动作的触发函数名
-     page:   iframe 页 id（online-map / terrain），须在 RyFrameShell._byId 中 */
+     page:   主页面功能区标识（online-map / terrain） */
   var GROUPS = [
     { title: '导入', items: [
       { label: '地块文件 (GeoJSON/KML/KMZ/奥维)', type: 'page', page: 'online-map', action: 'ryFileClickImport', title: '在线地图页打开「导入地块」文件选择器' },
@@ -84,15 +83,7 @@
     else toast('「' + label + '」为高级会员功能 · 邀请好友即可开通');
     return false;
   }
-  function clickInFrame(win, id) {
-    if (!win) return false;
-    try {
-      var el = win.document.getElementById(id);
-      if (!el) return false;
-      el.click();
-      return true;
-    } catch (e) { return false; }
-  }
+
   function focusPluginControl(navSelector, panelSelector, buttonSelector, label, readyMessage) {
     var nav = D.querySelector(navSelector);
     if (!nav) { toast(label + '插件未激活'); return; }
@@ -107,34 +98,18 @@
       toast(readyMessage);
     }, 80);
   }
-  /* 跨 iframe 触发：show 懒加载后等 load 完成再执行（首次进入才需要等） */
-  function runInFrame(page, fn, label) {
-    var shell = W.RyFrameShell;
-    if (!shell || typeof shell.show !== 'function') { toast('独立页容器不可用'); return; }
-    var ok = shell.show(page);
-    if (!ok) {
-      if (typeof shell.isPending === 'function' && shell.isPending(page)) return;
-      if (typeof shell.isLocked !== 'function' || !shell.isLocked(page)) {
-        toast('当前设备或页面容器无法打开「' + label + '」，请使用原页面入口操作');
-      }
-      return;
-    }
-    var fr = shell._byId ? shell._byId(page) : null;
-    if (!fr) { toast('未找到页面容器'); return; }
-    function exec() {
-      var cw = fr.contentWindow;
-      if (!fn(cw)) toast('「' + label + '」触发失败（页面可能未就绪，请在对应页面手动操作）');
-    }
-    if (fr.getAttribute('data-loaded') === '1') {
-      /* 已加载过：等 300ms 让页面空闲再触发（跨 iframe 同步时序保险） */
-      setTimeout(exec, 300);
-    } else {
-      fr.addEventListener('load', function onLoad() {
-        fr.removeEventListener('load', onLoad);
-        setTimeout(exec, 200);
-      });
-    }
+  /* 主页面功能区动作：先切换可见区，再触发区内控件。 */
+  function clickInSection(sectionId, id) {
+    var section = D.getElementById(sectionId);
+    if (!section) return false;
+    var target = section.querySelector('#' + id);
+    if (!target) return false;
+    if (typeof W.ryJumpToSection === 'function') W.ryJumpToSection(sectionId);
+    else W.location.hash = '#' + sectionId;
+    setTimeout(function () { target.click(); }, 80);
+    return true;
   }
+
 
   /* ---------------- 动作实现 ---------------- */
   var ACTIONS = {
@@ -187,16 +162,16 @@
       toast('载入功能未加载');
     },
 
-    /* —— 独立页（iframe） —— */
-    ryFileClickImport: function (cw) { return clickInFrame(cw, 'btnImport'); },
-    ryFileClickImportProj: function (cw) { return clickInFrame(cw, 'btnImportProj'); },
-    ryFileClickExportProj: function (cw) { return clickInFrame(cw, 'btnExportProj'); },
-    ryFileExportGeoJSON: function (cw) { return clickInFrame(cw, 'btnGeoJSON'); },
-    ryFileExportKML: function (cw) { return clickInFrame(cw, 'btnKML'); },
-    ryFileClickSHP: function (cw) { return clickInFrame(cw, 'fileSHP'); },
-    ryFileClickBoundaryCSV: function (cw) { return clickInFrame(cw, 'fileBoundaryCSV'); },
-    ryFileClickElevCSV: function (cw) { return clickInFrame(cw, 'fileElevCSV'); },
-    ryFileClickPRJ: function (cw) { return clickInFrame(cw, 'filePRJ'); }
+    /* —— 主页面功能区 —— */
+    ryFileClickImport: function () { return clickInSection('onlineMapSection', 'btnImport'); },
+    ryFileClickImportProj: function () { return clickInSection('onlineMapSection', 'btnImportProj'); },
+    ryFileClickExportProj: function () { return clickInSection('onlineMapSection', 'btnExportProj'); },
+    ryFileExportGeoJSON: function () { return clickInSection('onlineMapSection', 'btnGeoJSON'); },
+    ryFileExportKML: function () { return clickInSection('onlineMapSection', 'btnKML'); },
+    ryFileClickSHP: function () { return clickInSection('terrainSection', 'fileSHP'); },
+    ryFileClickBoundaryCSV: function () { return clickInSection('terrainSection', 'fileBoundaryCSV'); },
+    ryFileClickElevCSV: function () { return clickInSection('terrainSection', 'fileElevCSV'); },
+    ryFileClickPRJ: function () { return clickInSection('terrainSection', 'filePRJ'); }
   };
 
   /* ---------------- 面板构建 ---------------- */
@@ -242,7 +217,7 @@
           close();
           var act = ACTIONS[it.action];
           if (!act) { toast('该动作未实现'); return; }
-          if (it.type === 'page') runInFrame(it.page, act, it.label);
+          if (it.type === 'page') { if (act() === false) toast('「' + it.label + '」操作入口未就绪'); }
           else act();
         });
         panel.appendChild(a);
