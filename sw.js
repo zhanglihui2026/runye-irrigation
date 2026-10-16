@@ -304,8 +304,10 @@
    浮动面板（分区角度/地图浮动钮）在 .map-wrap 内不受影响。mod/online-map.css 尾部追加
    + index.html 引用 ?v= 抬为 497-map-side-font + runye-map-measure.html 页内
    <style> 追加 .side 作用域同款（v495 教训：两处副本同步改）。
-   三文件均在 CORE 白名单，必须抬版本）。 */
-const VERSION = 'v497-map-side-font';
+   三文件均在 CORE 白名单，必须抬版本）→
+   v498-pump-override-merge（统一合并面板分类选径与图面逐段改径，避免更新扬程时丢失任一覆盖；
+   inline-09 暴露图面口径快照给合并器；更新主页面两个脚本查询版本及核心缓存版本）。 */
+const VERSION = 'v498-pump-override-merge';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

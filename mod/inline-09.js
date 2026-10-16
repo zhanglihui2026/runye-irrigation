@@ -190,7 +190,7 @@ function tlBuildPipeOverride() {
   var mc = window.tlManualCals;
   var anyManual = (mc.front != null || mc.main != null || mc.branch != null);
   var AE = window.RyTlAutoEdits;
-  var base = (typeof pipeCaliberSnapshot === 'function') ? pipeCaliberSnapshot() : null;
+  var base = (typeof window.tlPipeCaliberSnapshot === 'function') ? window.tlPipeCaliberSnapshot() : null;
   var cals = (base && base.calibers) ? Object.assign({}, base.calibers) : {};
   var geoKey = (base && base.geoKey) ? base.geoKey : (AE && window.tlDiagramData ? AE.geometryKey(window.tlDiagramData) : null);
   if (AE && window.tlDiagramData && anyManual) {

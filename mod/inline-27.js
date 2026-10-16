@@ -251,12 +251,16 @@
     });
     return tlNormalizePipeOverride({ version: 1, geoKey: AE.geometryKey(window.tlDiagramData), calibers: live });
   }
+  /* inline-09 的分类选径需要在逐段快照上叠加分类覆盖；显式暴露窄接口，避免跨闭包隐式查找失败。 */
+  window.tlPipeCaliberSnapshot = pipeCaliberSnapshot;
   function pumpComparison() {
     var saved = tlPipeOdOverride;
     try {
       tlPipeOdOverride = null;
       var design = computeThreeLevel();
-      tlPipeOdOverride = pipeCaliberSnapshot();
+      /* 当前值必须与面板选径一致；快照单独读取图面改径，会漏掉 tlManualCals。 */
+      if (typeof tlBuildPipeOverride === 'function') tlBuildPipeOverride();
+      else tlPipeOdOverride = pipeCaliberSnapshot();
       return { design: design, current: computeThreeLevel() };
     } finally { tlPipeOdOverride = saved; }
   }
@@ -598,7 +602,9 @@
       var r0 = pumpComparison().design;
       before = { head: r0.pumpHead, shaftKW: r0.pumpPower, motorKW: r0.motorKW_rounded, loss: r0.totalPipeLoss };
     } catch (e) { }
-    tlPipeOdOverride = pipeCaliberSnapshot();
+    /* 合并图面逐段改径和面板总/主/支管选径，确保重算实际采用的管径与 UI 相同。 */
+    if (typeof tlBuildPipeOverride === 'function') tlBuildPipeOverride();
+    else tlPipeOdOverride = pipeCaliberSnapshot();
     try { tlUpdatePlanBar(); } catch (e) { console.error('[tlPumpUpdate] 重算失败：', e); }
     try { tlRefreshLossCard(); } catch (e) { }
     try { if (typeof window.tlSyncHydDesignSnapshot === 'function') window.tlSyncHydDesignSnapshot(); } catch (eHydSync) { }
