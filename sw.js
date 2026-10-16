@@ -291,8 +291,13 @@
    独立页完全一致，id 不变 → online-map.js 零改动）；mod/online-map.css 尾部追加
    #onlineMapSection .map-draw-tools 系列样式（含 .dt-grip/.mbtn/.btn-on），引用
    ?v=441-map-main-section 抬为 ?v=495-map-draw-toolbar。教训入档：改在线地图
-   必须同步两处副本。index.html / online-map.css 均在 CORE 白名单，必须抬版本）。 */
-const VERSION = 'v495-map-draw-toolbar';
+   必须同步两处副本。index.html / online-map.css 均在 CORE 白名单，必须抬版本）→
+   v496-map-hint-remove（用户要求：删掉测量结果栏下方那段绘制流程长提示
+   （「点击地图添加顶点；拖动顶点可微调……面积按真实球面经纬度计算。」）——没啥用。
+   index.html 与 runye-map-measure.html 各删一行 <div class="hint">（在线地图按
+   v495 教训两处副本同步改）；online-map.js 的状态提示（十字光标/成组等）不动。
+   两文件均在 CORE 白名单，必须抬版本）。 */
+const VERSION = 'v496-map-hint-remove';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
