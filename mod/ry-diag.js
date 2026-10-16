@@ -4,7 +4,9 @@
   function build() {
     function sl(p) { var a = 0, i, q; for (i = 0; i < p.length; i++) { q = p[(i + 1) % p.length]; a += p[i].x * q.y - q.x * p[i].y; } return Math.abs(a / 2); }
     function bb(p) { var a = 1e18, b = 1e18, c = -1e18, d = -1e18, i; for (i = 0; i < p.length; i++) { a = Math.min(a, p[i].x); c = Math.max(c, p[i].x); b = Math.min(b, p[i].y); d = Math.max(d, p[i].y); } return Math.round(c - a) + 'x' + Math.round(d - b); }
-    var lib = []; try { lib = JSON.parse(localStorage.getItem('runye_plot_library') || '[]'); } catch (e) { }
+    var store = window.RyPlotLibraryStore;
+    var librarySnapshot = store && typeof store.read === 'function' ? store.read() : null;
+    var lib = librarySnapshot && librarySnapshot.ok ? librarySnapshot.plots : [];
     var rows = lib.map(function (p) {
       var ll = p.polyLatLng || [], g = 0;
       try { g = Math.round(window.RunyeGeo.geodesicArea(ll)); } catch (e) { }
@@ -19,7 +21,9 @@
       'measuredPolygon 包围盒 = ' + bb(window.measuredPolygon || []),
       'measuredPolygonSource = ' + (window.measuredPolygonSource || ''),
       'runyePlanDims = ' + JSON.stringify(window.runyePlanDims || null),
-      '--- 地块库 ' + lib.length + ' 条 ---'
+      librarySnapshot && librarySnapshot.ok
+        ? '--- 地块库 ' + lib.length + ' 条 ---'
+        : '--- 地块库读取失败：' + (librarySnapshot && librarySnapshot.error || '存储适配器不可用') + ' ---'
     ].concat(rows).join('\n');
     var d = document.createElement('div');
     d.style.cssText = 'position:fixed;z-index:999999;top:12px;left:12px;right:12px;background:#fff;border:2px solid #16a34a;border-radius:8px;padding:10px;font:12px/1.5 monospace;color:#111;box-shadow:0 8px 30px rgba(0,0,0,.35)';

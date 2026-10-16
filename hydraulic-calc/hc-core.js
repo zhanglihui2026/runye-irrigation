@@ -4,13 +4,13 @@
  * 界面见 hydraulic-calc.js；宿主 index.html 的 #threeDModelingSection 懒挂载。
  *
  * ── 口径（务必与本站二级 / 三级水力计算保持一致）────────────────────────────
- *   沿程水头损失用 Hazen-Williams，与 index.html 的 hazenWilliams() 同一常数：
+ *   沿程水头损失用 Hazen-Williams；主页 hazenWilliams() 是调用本公式库的兼容包装：
  *       hf = 1.113e9 · L · Q^1.852 / (C^1.852 · D^4.87)      [L: m, Q: m³/h, D: mm, hf: m]
  *   默认 C = 150（PE 管常用值，可调）。
  *   管径默认按 PE100 / SDR13.6 由**外径 OD** 折算**内径**：D = OD · (1 − 2/SDR)，
- *   与 index.html 的 peInnerDiam() 同式；也可切到 SDR17 / SDR21 或「直接按内径」。
+ *   主页 peInnerDiam() 是本公式库的兼容包装；也可切到 SDR17 / SDR21 或「直接按内径」。
  *   ★ 单测 tests/hc_core.test.cjs 里有一条**交叉校验**：本模块的 hazen(L,Q,D,150)
- *     必须与 index.html 的 hazenWilliams(L,Q,D) 逐值相等 —— 两处口径不得漂移。
+ *     主页与水力计算器应通过共享核心保持逐值一致，避免维护两份公式。
  *
  * ── 拓扑模型（一棵树）───────────────────────────────────────────────────
  *   水源 ──[总管 trunk]── 分水三通 ──┬──[主管 main 1]── 沿程三通×M ──[支管 tap]×M
@@ -101,7 +101,7 @@
     return '';
   }
 
-  /* 内径（mm）。mode='id' 时输入值即内径；其余按 SDR 折算。与 index.html peInnerDiam 同式。 */
+  /* 内径（mm）。mode='id' 时输入值即内径；其余按 SDR 折算。主页包装函数委托此实现。 */
   function innerDiam(od, mode) {
     var sdr = sdrOf(mode);
     if (!sdr) return pos(od, 0);
@@ -116,7 +116,7 @@
     return d * (1 - 2 / ratio);
   }
 
-  /* Hazen-Williams 沿程损失（m）。与 index.html hazenWilliams 同式同常数。 */
+  /* Hazen-Williams 沿程损失（m）；主页兼容包装委托此实现。 */
   function hazen(L, Q, d, C) {
     var Li = pos(L, 0), Qi = nonNeg(Q), Di = pos(d, 0), Ci = pos(C, C_DEFAULT);
     if (Li <= 0 || Qi <= 0 || Di <= 0 || Ci <= 0) return 0;
@@ -155,7 +155,7 @@
    * 与 index.html computeThreeLevel 同式：H = (提升+地形+入口压力折米−已有压力折米
    *   + 主管损失+支管损失+过滤阀门损失 + 富余) × 安全系数(默认 1.10)。
    * staticM = 提升+地形+入口压力折米−已有压力折米；lossM = 主管+支管+过滤阀门损失合计。
-   * 与 index.html peInnerDiam/hazenWilliams 一致：输入清洗仍由本模块/宿主负责，C++ 不擅自替换。 */
+   * 与 JavaScript 共享核心一致：输入清洗仍由本模块/宿主负责，C++ 不擅自替换。 */
   function head(staticM, lossM, marginM, safety) {
     var s = num(staticM, 0), l = num(lossM, 0), m = num(marginM, 0), f = num(safety, 1);
     if (f <= 0) return 0;

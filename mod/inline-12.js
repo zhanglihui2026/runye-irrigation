@@ -2,6 +2,12 @@
 // ===== Project save/load =====
 (function(){
   var SAVE_KEY='runye_irrigation_saved_project_v1';
+  function readPlotLibrary(){
+    var store=window.RyPlotLibraryStore;
+    if(!store||typeof store.read!=='function') return [];
+    var snapshot=store.read();
+    return snapshot&&snapshot.ok&&Array.isArray(snapshot.plots)?snapshot.plots:[];
+  }
   /* [v355] 边界多边形几何签名（cm 粒度）：「已生成施工图」跨页恢复的几何锚。
      挂 window 上：ppGenerate 点击处所在脚本块先于本块执行，但点击发生在整页 load 之后，
      运行期取到即可。 */
@@ -125,7 +131,7 @@
        恢复后刷新地块库高亮，使「设为当前」标记与切页前一致。 */
     (function(){
       var cid=data.currentPlotId; if(!cid) return;
-      var lib=[]; try{ lib=JSON.parse(localStorage.getItem('runye_plot_library')||'[]'); }catch(e){}
+      var lib=readPlotLibrary();
       var hit=false; for(var i=0;i<lib.length;i++){ if(lib[i].id===cid){ hit=true; break; } }
       if(!hit) return;
       window.currentPlotId=cid;
@@ -233,7 +239,7 @@
       var raw=localStorage.getItem(SAVE_KEY); if(!raw) return;
       var snap=null; try{ snap=JSON.parse(raw); }catch(e){}
       if(!snap||snap.currentPlotId!==a.id) return;                       /* 存档与锚点不一致 → 不恢复 */
-      var lib=[]; try{ lib=JSON.parse(localStorage.getItem('runye_plot_library')||'[]'); }catch(e){}
+      var lib=readPlotLibrary();
       var hit=false; for(var i=0;i<lib.length;i++){ if(lib[i].id===a.id){ hit=true; break; } }
       if(!hit) return;                                                   /* 地块已删除 → 不恢复 */
       window.__runyeAutoRestored=true;

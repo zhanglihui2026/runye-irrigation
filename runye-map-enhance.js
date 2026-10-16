@@ -60,10 +60,7 @@
   /* 水力校核页生成的只读快照。时间戳不一致时宁可不画，避免把旧方案结果套到新管网。 */
   function readHydraulicOverlay(net) {
     try {
-      var o = JSON.parse(localStorage.getItem('runye_hydraulic_overlay_v1') || 'null');
-      if (!o || o.version !== 1 || !o.items) return null;
-      if (o.networkTs && net && net.ts && o.networkTs !== net.ts) return null;
-      return o;
+      return window.RyIrrigationDataStore.readHydraulicOverlayForNetwork(net);
     } catch (e) { return null; }
   }
   function hydraulicStyle(rec, fallback) {

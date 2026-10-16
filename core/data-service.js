@@ -628,7 +628,7 @@ export function createDataService(guard) {
      ★ 本组函数**全是纯计算**：只读、不写窗口、不碰主程序任何计算。
        反推出的 C 值只作为「本次工况的参考」，是否采纳由用户显式 opt-in，
        且采纳也只是写进档案的 design.optimization 字段 —— **现有水力计算一律不改**。
-     公式（hydraulic-calc/hc-core.js、index.html hazenWilliams 同式同常数）：
+     公式基准为 hydraulic-calc/hc-core.js；主页 hazenWilliams 是共享核心的兼容包装：
        hf = 1.113e9 · L · Q^1.852 / (C^1.852 · D^4.87)   [hf: m, L: m, Q: m³/h, D: mm]
 
      [v379 消除口径双份] 本组函数原本是**照抄**的一份实现（v375 引入）。

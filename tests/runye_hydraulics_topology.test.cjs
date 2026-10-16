@@ -20,6 +20,27 @@ const tTree = Core.buildTree(tJunction, { snapTol: 3 });
 assert.equal(tTree.orphans.length, 0, 'T 形搭接应将主管和支管连到同一棵树');
 assert.equal(tTree.segs.filter(s => s.sourceId === 'main-t').length, 2, '主管应在搭接处拆成两段');
 assert.equal(tTree.order.length, 3, '拆分后的两段主管和一段支管都应进入 BFS 树');
+const splitMain = tTree.segs.filter(s => s.sourceId === 'main-t');
+assert.deepEqual(splitMain.map(s => s.id), ['main-t_a', 'main-t_b'], '拆分段应有稳定且不同的派生 ID');
+assert.ok(splitMain.every(s => s.kind === 'main' && s.dn === 90), '拆分段应继承主管类型和管径');
+assert.equal(tTree.segs.find(s => s.id === 'branch-t').dn, 63, '支管管径映射应保留');
+
+/* 同一条折线主管的不同区间各接一条支管时，两处三通都必须保留。 */
+const multiT = {
+  sourcePos: { lat: 0, lng: 0 },
+  segments: [
+    { id: 'main-multi', kind: 'main', dn: 90,
+      latLng: [meterPoint(0, 0), meterPoint(50, 0), meterPoint(100, 0)] },
+    { id: 'branch-west', kind: 'branch', dn: 63, latLng: [meterPoint(25, 1), meterPoint(25, 30)] },
+    { id: 'branch-east', kind: 'branch', dn: 63, latLng: [meterPoint(75, 1), meterPoint(75, 30)] }
+  ],
+  dripTapes: []
+};
+const multiTree = Core.buildTree(multiT, { snapTol: 3 });
+assert.equal(multiTree.orphans.length, 0, '主管上的多个 T 形支管都应接入水源树');
+assert.equal(multiTree.segs.filter(s => s.sourceId === 'main-multi').length, 3,
+  '同一主管应按两个三通位置拆成三段');
+assert.equal(multiTree.order.length, 5, '拆出的三段主管与两条支管都应进入 BFS 树');
 
 /* 水源靠近管网末端时，BFS 应从末端向上游遍历，而不是固定从首段首点开始。 */
 const reversedRoot = {
@@ -64,5 +85,21 @@ assert.equal(Core.buildTree(gapNetwork(2.5), { snapTol: 3 }).orphans.length, 0,
   '端点间距小于吸附容差时应连通');
 assert.equal(Core.buildTree(gapNetwork(3.5), { snapTol: 3 }).orphans.length, 1,
   '端点间距超过吸附容差时应保留一个孤立段');
+
+/* 异常坐标段不能进入长度/流量计算；有效相邻管段仍可正常建树。 */
+const malformedCoordinates = Core.buildTree({
+  sourcePos: { lat: 0, lng: 0 },
+  segments: [
+    { id: 'bad-nan', kind: 'main', dn: 90, latLng: [[0, 0], [NaN, 0.001]] },
+    { id: 'bad-range', kind: 'branch', dn: 63, latLng: [[0, 181], [0, 182]] },
+    { id: 'valid', kind: 'main', dn: 90, latLng: [meterPoint(0, 0), meterPoint(10, 0)] }
+  ],
+  dripTapes: []
+}, { snapTol: 0.5 });
+assert.deepEqual(malformedCoordinates.segs.map(segment => segment.id), ['valid'],
+  'NaN 和超出经纬度范围的管段应被排除');
+assert.equal(malformedCoordinates.order.length, 1, '有效管段仍进入树');
+assert.equal(malformedCoordinates.warnings.filter(message => message.includes('无效经纬度')).length, 2,
+  '每条被排除的异常坐标段都应给出诊断');
 
 console.log('runye_hydraulics_topology.test.cjs: passed');

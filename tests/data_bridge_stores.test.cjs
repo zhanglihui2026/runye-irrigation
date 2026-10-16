@@ -37,12 +37,80 @@ function loadStore(file, options = {}) {
 
 function json(value) { return JSON.stringify(value); }
 
+function loadDataService(windowOverrides = {}) {
+  const source = fs.readFileSync(path.join(ROOT, 'core/data-service.js'), 'utf8')
+    .replace(/^export\s+/gm, '');
+  const window = Object.assign({ dispatchEvent() {} }, windowOverrides);
+  const context = {
+    window,
+    localStorage: { getItem() { return null; }, setItem() {} },
+    CustomEvent: function CustomEvent(type, init) { this.type = type; this.detail = init && init.detail; },
+    JSON, Date, Math, Number, String, Object, Array, isFinite, console
+  };
+  vm.createContext(context);
+  vm.runInContext(source + '\nglobalThis.__createDataService = createDataService;', context,
+    { filename: 'core/data-service.js' });
+  return { service: context.__createDataService(), window };
+}
+
+function builtinHazen(L, Q, d, C) {
+  return 1.113e9 * L * Math.pow(Q, 1.852) / (Math.pow(C, 1.852) * Math.pow(d, 4.87));
+}
+
 // These bridges intentionally have different exception and lifecycle contracts.
 // Keep each assertion against the real classic-script implementation.
 const irrigationKeys = {
   networkLayout: 'runye_network_layout',
-  hydraulicDesign: 'runye_hydraulic_design_v1'
+  hydraulicDesign: 'runye_hydraulic_design_v1',
+  hydraulicOverlay: 'runye_hydraulic_overlay_v1'
 };
+
+test('data service uses the built-in Hazen fallback and validates its inputs', () => {
+  const { service } = loadDataService({ C_HAZEN: 145 });
+  const input = { L: 120, Q: 18, d: 140, C: 145 };
+  const expected = Math.round(builtinHazen(input.L, input.Q, input.d, input.C) * 10000) / 10000;
+
+  assert.equal(service.hazenDefaults().engine, 'builtin');
+  assert.equal(service.hazenDefaults().C, 145);
+  assert.equal(service.hazenLoss(input), expected);
+  assert.equal(service.invertHazenC({ ...input, hf: builtinHazen(input.L, input.Q, input.d, input.C) }), 145);
+  for (const invalid of [
+    {}, { ...input, L: 0 }, { ...input, Q: -1 }, { ...input, d: 0 }, { ...input, C: 0 }
+  ]) assert.equal(service.hazenLoss(invalid), null);
+  assert.equal(service.invertHazenC({ ...input, hf: 0 }), null);
+});
+
+test('data service detects a dynamically loaded or removed hydraulic core on each call', () => {
+  const { service, window } = loadDataService();
+  const input = { L: 120, Q: 18, d: 140, C: 150 };
+  const fallback = Math.round(builtinHazen(input.L, input.Q, input.d, input.C) * 10000) / 10000;
+  assert.equal(service.hazenDefaults().engine, 'builtin');
+  assert.equal(service.hazenLoss(input), fallback);
+
+  let calls = 0;
+  window.RyHcCore = { hazen() { calls++; return 12.345678; } };
+  assert.equal(service.hazenDefaults().engine, 'hc-core');
+  assert.equal(service.hazenLoss(input), 12.3457);
+  assert.equal(calls, 1);
+
+  delete window.RyHcCore;
+  assert.equal(service.hazenDefaults().engine, 'builtin');
+  assert.equal(service.hazenLoss(input), fallback);
+});
+
+test('data service falls back when the hydraulic core accessor is incomplete or throws', () => {
+  const { service, window } = loadDataService();
+  const input = { L: 120, Q: 18, d: 140, C: 150 };
+  const fallback = Math.round(builtinHazen(input.L, input.Q, input.d, input.C) * 10000) / 10000;
+
+  window.RyHcCore = {};
+  assert.equal(service.hazenDefaults().engine, 'builtin');
+  assert.equal(service.hazenLoss(input), fallback);
+
+  Object.defineProperty(window, 'RyHcCore', { configurable: true, get() { throw new Error('not ready'); } });
+  assert.equal(service.hazenDefaults().engine, 'builtin');
+  assert.equal(service.hazenLoss(input), fallback);
+});
 
 test('Irrigation data store preserves fixed keys, JSON roundtrips, and nullish deletion', () => {
   const { store, values } = loadStore('core/irrigation-data-store.js', { exportName: 'RyIrrigationDataStore' });
@@ -50,17 +118,32 @@ test('Irrigation data store preserves fixed keys, JSON roundtrips, and nullish d
 
   const layout = { segments: [{ id: 'main-1', od: 200 }], plotId: 'plot-a' };
   const design = { version: 1, flow: 12.5, pump: { head: 30 } };
+  const overlay = { version: 1, networkTs: 123, items: { 'main-1': { status: 'ok' } } };
   assert.equal(store.writeNetworkLayout(layout), true);
   assert.equal(store.writeHydraulicDesign(design), true);
+  assert.equal(store.writeHydraulicOverlay(overlay), true);
   assert.equal(values.get(irrigationKeys.networkLayout), json(layout));
   assert.equal(values.get(irrigationKeys.hydraulicDesign), json(design));
+  assert.equal(values.get(irrigationKeys.hydraulicOverlay), json(overlay));
   assert.equal(json(store.readNetworkLayout()), json(layout));
+  assert.equal(store.readRawNetworkLayout(), json(layout));
   assert.equal(json(store.readHydraulicDesign()), json(design));
+  assert.equal(json(store.readHydraulicOverlayForNetwork({ ts: 123 })), json(overlay));
+  assert.equal(store.readHydraulicOverlayForNetwork({ ts: 124 }), null, 'an overlay from another network revision is rejected');
+  assert.equal(store.readHydraulicOverlayForNetwork({}), null, 'a network without a revision cannot accept an overlay');
 
   assert.equal(store.writeNetworkLayout(null), true);
   assert.equal(values.has(irrigationKeys.networkLayout), false);
+  assert.deepEqual(JSON.parse(JSON.stringify(store.restoreNetworkLayoutIfCurrent(null, json(layout)))), { ok: true });
+  assert.equal(values.get(irrigationKeys.networkLayout), json(layout), 'rollback restores the exact previous raw snapshot');
+  assert.deepEqual(JSON.parse(JSON.stringify(store.restoreNetworkLayoutIfCurrent(null, null))), { ok: false, error: 'network-layout-conflict' });
+  assert.deepEqual(JSON.parse(JSON.stringify(store.restoreNetworkLayoutIfCurrent(undefined, null))), { ok: false, error: 'invalid-network-layout-snapshot' });
+  assert.deepEqual(JSON.parse(JSON.stringify(store.restoreNetworkLayoutIfCurrent(json(layout), null))), { ok: true });
+  assert.equal(values.has(irrigationKeys.networkLayout), false);
   assert.equal(store.writeHydraulicDesign(undefined), true);
   assert.equal(values.has(irrigationKeys.hydraulicDesign), false);
+  assert.equal(store.writeHydraulicOverlay(null), true);
+  assert.equal(values.has(irrigationKeys.hydraulicOverlay), false);
 });
 
 test('Irrigation data store returns null for read/parse failures but lets write failures throw', () => {
@@ -69,11 +152,14 @@ test('Irrigation data store returns null for read/parse failures but lets write 
   assert.equal(brokenJson.store.readNetworkLayout(), null);
   assert.equal(loadStore('core/irrigation-data-store.js', { exportName: 'RyIrrigationDataStore', getError: true })
     .store.readHydraulicDesign(), null);
+  assert.equal(loadStore('core/irrigation-data-store.js', { exportName: 'RyIrrigationDataStore', getError: true })
+    .store.readHydraulicOverlayForNetwork({ ts: 123 }), null);
 
   const failedSet = loadStore('core/irrigation-data-store.js', { exportName: 'RyIrrigationDataStore', setError: true });
   assert.throws(() => failedSet.store.writeNetworkLayout({ segments: [] }), /set failed/);
   const failedRemove = loadStore('core/irrigation-data-store.js', { exportName: 'RyIrrigationDataStore', removeError: true });
   assert.throws(() => failedRemove.store.writeHydraulicDesign(null), /remove failed/);
+  assert.throws(() => failedSet.store.writeHydraulicOverlay({ version: 1 }), /set failed/);
 });
 
 test('Terrain bridge writes and consumes one fixed-key payload exactly once', () => {

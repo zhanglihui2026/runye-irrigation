@@ -88,7 +88,17 @@
   // K_VIEW   上次视图（自动记忆）——保证「下次打开回到上次位置」
   // K_PLACES 用户显式「保存地点」的书签列表（可点击回跳、可删除）
   var K_VIEW='runye_map_view', K_PLACES='runye_map_places', K_Q='runye_map_lastq';
-  function lsGet(k,d){ try{ var s=localStorage.getItem(k); return s?JSON.parse(s):d; }catch(e){ return d; } }
+  function lsGet(k,d){
+    try{
+      if(k==='runye_plot_library'){
+        var store=window.RyPlotLibraryStore;
+        if(!store||typeof store.read!=='function') return d;
+        var snapshot=store.read();
+        return snapshot&&snapshot.ok?snapshot.plots:d;
+      }
+      var s=localStorage.getItem(k); return s?JSON.parse(s):d;
+    }catch(e){ return d; }
+  }
   function lsSet(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); return true; }catch(e){ return false; } }
   function tip(s){ document.getElementById('tip').textContent=s; }
   function curView(){ var c=fromDisplay(map.getCenter()); return {lat:+c.lat.toFixed(6),lng:+c.lng.toFixed(6),zoom:map.getZoom()}; }
@@ -1157,7 +1167,8 @@
       arr.push({name:'当前画框', mu:parseFloat((geodesicArea(ll)/666.67).toFixed(2)), polyLatLng:ll});
     }
     try{
-      (JSON.parse(localStorage.getItem('runye_plot_library')||'[]')).forEach(function(p){
+      var librarySnapshot=window.RyPlotLibraryStore.read();
+      if(librarySnapshot.ok) librarySnapshot.plots.forEach(function(p){
         if(p && p.polyLatLng && p.polyLatLng.length>=3 && !(points.length>=3 && p.id===currentMapPlotId)) arr.push(p);
       });
     }catch(e){}
@@ -1404,8 +1415,10 @@
   // [map-enhance] 工程文件导出/导入：打包地块库+管网+视图为单文件，换设备不丢数据
   document.getElementById('btnExportProj').onclick=function(){
     try{
+      var librarySnapshot=window.RyPlotLibraryStore.read();
+      if(!librarySnapshot.ok) throw new Error('地块库读取失败，已停止导出');
       var data={ app:'runye-irrigation', version:1, ts:Date.now(),
-        plots: JSON.parse(localStorage.getItem('runye_plot_library')||'[]'),
+        plots: librarySnapshot.plots,
         network: window.RyIrrigationDataStore.readNetworkLayout(),
         view: JSON.parse(localStorage.getItem('runye_map_view')||'null') };
       var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
@@ -1446,14 +1459,18 @@
         var plotStore=window.RyPlotLibraryStore;
         if(!plotStore || typeof plotStore.read!=='function' || typeof plotStore.replace!=='function' || typeof plotStore.restoreSnapshot!=='function')
           throw new Error('地块库安全存储接口不可用');
+        var irrigationStore=window.RyIrrigationDataStore;
+        if(!irrigationStore || typeof irrigationStore.readNetworkLayoutRaw!=='function' || typeof irrigationStore.restoreNetworkLayoutIfCurrent!=='function')
+          throw new Error('管网快照安全存储接口不可用');
         var plotSnapshot=plotStore.read();
         if(!plotSnapshot.ok)throw new Error('地块库读取失败，未导入：'+plotSnapshot.error);
-        var keys=[window.RyIrrigationDataStore.keys.networkLayout,'runye_map_view'], old=keys.map(function(k){return localStorage.getItem(k);});
+        var keys=['runye_map_view'], old=[localStorage.getItem(keys[0])];
+        var oldNetworkRaw=irrigationStore.readRawNetworkLayout();
         var plotWrite=null,networkWritten=false,viewWritten=false;
         try{
           plotWrite=plotStore.replace(d.plots,plotSnapshot.revision);
           if(!plotWrite.ok)throw new Error('地块库写入失败：'+plotWrite.error);
-          window.RyIrrigationDataStore.writeNetworkLayout(d.network);
+          irrigationStore.writeNetworkLayout(d.network);
           networkWritten=true;
           if(d.view==null) localStorage.removeItem(keys[1]);else localStorage.setItem(keys[1],JSON.stringify(d.view));
           viewWritten=true;
@@ -1462,15 +1479,19 @@
             var plotRollback=plotStore.restoreSnapshot(plotSnapshot,plotWrite.revision);
             if(!plotRollback.ok)console.error('工程导入回滚失败',plotStore.key,plotRollback.error);
           }
-          var expectedRaw=[d.network==null?null:JSON.stringify(d.network),d.view==null?null:JSON.stringify(d.view)];
-          [networkWritten,viewWritten].forEach(function(written,i){
-            if(!written)return;
-            var key=keys[i];
+          if(networkWritten){
             try{
-              if(localStorage.getItem(key)!==expectedRaw[i])throw new Error('快照已被其他页面修改，拒绝覆盖');
-              if(old[i]==null)localStorage.removeItem(key);else localStorage.setItem(key,old[i]);
-            }catch(restoreError){console.error('工程导入回滚失败',key,restoreError);}
-          });
+              var networkRollback=irrigationStore.restoreNetworkLayoutIfCurrent(
+                d.network==null?null:JSON.stringify(d.network),oldNetworkRaw);
+              if(!networkRollback.ok)throw new Error(networkRollback.error==='network-layout-conflict'?'管网快照已被其他页面修改，拒绝覆盖':'管网快照恢复失败');
+            }catch(restoreError){console.error('工程导入回滚失败',irrigationStore.keys.networkLayout,restoreError);}
+          }
+          if(viewWritten){
+            try{
+              if(localStorage.getItem(keys[0])!==(d.view==null?null:JSON.stringify(d.view)))throw new Error('地图视图已被其他页面修改，拒绝覆盖');
+              if(old[0]==null)localStorage.removeItem(keys[0]);else localStorage.setItem(keys[0],old[0]);
+            }catch(restoreError){console.error('工程导入回滚失败',keys[0],restoreError);}
+          }
           throw writeError;
         }
         document.getElementById('btnClear').click();setDrawing(false);

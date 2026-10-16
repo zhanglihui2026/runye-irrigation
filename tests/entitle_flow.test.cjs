@@ -53,6 +53,7 @@ function mockRdb() {
 /* ---------- mock CloudSync ---------- */
 let currentUid = '10001';
 let currentPhone = '13800138000';
+let localAdminStored = false;
 const mockCloudSync = {
   ready: true,
   get uid() { return currentUid; },
@@ -67,13 +68,22 @@ global.window = {
   location: { search: '', hostname: 'localhost', protocol: 'file:', href: 'file:///invite.html' },
   fetch: null
 };
+global.location = global.window.location;
+global.localStorage = {
+  getItem(key) { return key === 'runyeLocalAdminSession' && localAdminStored ? '1' : null; },
+  setItem(key, value) { if (key === 'runyeLocalAdminSession') localAdminStored = value === '1'; },
+  removeItem(key) { if (key === 'runyeLocalAdminSession') localAdminStored = false; }
+};
 /* Node may provide global fetch; keep entitlement tests local and deterministic. */
 global.fetch = undefined;
 
 /* ---------- 加载被测文件 ---------- */
 const file = path.join(__dirname, '..', 'runye-entitle.js');
-eval(fs.readFileSync(file, 'utf8'));
-const E = global.window.RyEntitle;
+function loadEntitle() {
+  eval(fs.readFileSync(file, 'utf8'));
+  return global.window.RyEntitle;
+}
+let E = loadEntitle();
 
 /* ---------- 断言工具 ---------- */
 let pass = 0, fail = 0;
@@ -168,11 +178,15 @@ function reset() {
   E.PLAN_FEATURES.L1 = l1Features.concat(l2Features);
   ok('L1 即使规则误配也不能获得任何 L2 功能或高级通配权限', l2Features.every(f => !E.canWith('L1', f)), E.PLAN_FEATURES.L1);
   E.PLAN_FEATURES.L1 = l1Plan;
-  E.state.entitle.plan = 'L2';
-  E.state.entitle.expireAt = Date.now() + 86400000;
+  /* 通过产品提供的本地专用联调入口模拟 L2，不篡改被冻结的生产状态快照。 */
+  localAdminStored = true;
+  global.window.location.search = '?rymock=L2';
+  E = loadEntitle();
   ok('L2 featureKeys 覆盖全部功能', JSON.stringify(E.featureKeys()) === JSON.stringify(allFeatures), E.featureKeys());
   ok('L2 高级会员可访问基础和高级功能', allFeatures.every(f => E.can(f) && E.access(f) === 'allowed'), E.plan());
-  E.state.entitle.plan = 'L1';
+  localAdminStored = false;
+  global.window.location.search = '';
+  E = loadEntitle();
   E.reset();
   ok('权益未同步时所有受限功能均为 pending', allFeatures.every(f => E.access(f) === 'pending'), allFeatures.map(f => [f, E.access(f)]));
   const fileMenu = fs.readFileSync(path.join(__dirname, '..', 'mod', 'inline-32.js'), 'utf8');

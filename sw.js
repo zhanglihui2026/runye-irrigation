@@ -363,8 +363,10 @@
    v516-map-transfer-read-store：分区接收端从地块库按稳定引用解析时也统一经过该适配器；
    v517-tl-targetv-single-entry：三级水力项卡的「目标流速」输入取消（2026-10-17 用户要求，
    二级工具栏 #planTargetV 是唯一入口），三级改读二级值 + 二级输入实时联动；
-   mod/inline-09.js / mod/plot-editor.js / index.html 都在 CORE，必须抬版本重建离线缓存。 */
-const VERSION = 'v517-tl-targetv-single-entry';
+   mod/inline-09.js / mod/plot-editor.js / index.html 都在 CORE，必须抬版本重建离线缓存；
+   v518-irrigation-store-rollback-bridge：工程导入回滚的管网快照读写经RyIrrigationDataStore CAS接口执行，缓存包含修改后的存储接口；
+   v519-case-library-css-cache：补齐主页引用的 runye-case-library.css 离线缓存，并由CI静态检查本地样式缓存。 */
+const VERSION = 'v519-case-library-css-cache';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
@@ -423,6 +425,7 @@ const CORE = [
   "plugins/contour-dxf/style.css",
   /* Main page local scripts required for case library, local/cloud adapter and undo. */
   "runye-case-library.js",
+  "runye-case-library.css",
   "cloud-sync.js",
   "runye-undo.js",
   /* [v357] 单文件拆分产物 */

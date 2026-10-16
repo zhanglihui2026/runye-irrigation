@@ -4,8 +4,11 @@
     if(!d || !d.ryPlotRef) return d;
     var ref=d.ryPlotRef;
     if(!ref || !ref.id) throw new Error('地图回传地块引用缺少 id');
-    var lib=[];
-    try{ lib=JSON.parse(localStorage.getItem('runye_plot_library')||'[]'); }catch(e){ throw new Error('地块库数据无法读取'); }
+    var store=window.RyPlotLibraryStore;
+    if(!store||typeof store.read!=='function') throw new Error('地块库安全读取接口未加载');
+    var snapshot=store.read();
+    if(!snapshot||!snapshot.ok) throw new Error('地块库数据无法读取');
+    var lib=snapshot.plots;
     function geometryKey(x){
       function ringKey(r){
         if(!Array.isArray(r)||r.length<3)return null;

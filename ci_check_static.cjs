@@ -13,9 +13,9 @@
  *   ① 内联 <script> 语法（vm.Script 编译，不执行、无副作用）；
  *   ② HTML 内重复 id（**先剥 <script> 体与注释**，否则注释里引用的 id 会假红）；
  *   ③ 常量单一来源（管径 CAL_SERIES / PE_OD_SERIES、单价 TL_PIPE_PRICE_DEF 各只允许一处定义）；
- *   ④ 主页面关键同步脚本的依赖顺序正确；主页面本地脚本及插件清单声明的 manifest/入口
- *      与 Service Worker CORE 清单一致，未缓存项必须登记为有明确降级行为的可选项，
- *      且 CORE 资源必须存在且不重复。
+ *   ④ 主页面关键同步脚本的依赖顺序正确；主页面本地脚本、样式表、样式表本地 url()
+ *      资源及插件清单声明的 manifest/入口与 Service Worker CORE 清单一致，未缓存项必须
+ *      登记为有明确降级行为的可选项，且 CORE 资源必须存在且不重复。
  * 退出码：全过 0，任一不过 1（CI 靠退出码判定，别只 console.log 不设码）。
  *
  * 用法：node ci_check_static.cjs
@@ -96,6 +96,37 @@ for (const match of pageScriptTags) {
   localPageScripts.add(asset);
   if (!fs.existsSync(path.join(ROOT, asset))) missingPageScripts.push(asset);
 }
+const localPageStylesheets = new Set();
+const missingPageStylesheets = [];
+for (const match of indexSource.matchAll(/<link\b([^>]*)>/gi)) {
+  const attrs = match[1];
+  if (!/\brel\s*=\s*["']?stylesheet\b/i.test(attrs)) continue;
+  const hrefMatch = attrs.match(/\bhref\s*=\s*["']([^"']+)["']/i);
+  if (!hrefMatch) continue;
+  let url;
+  try { url = new URL(hrefMatch[1], 'https://runye.invalid/'); } catch (_) { continue; }
+  if (url.origin !== 'https://runye.invalid') continue;
+  const asset = decodeURIComponent(url.pathname.replace(/^\//, ''));
+  localPageStylesheets.add(asset);
+  if (!fs.existsSync(path.join(ROOT, asset))) missingPageStylesheets.push(asset);
+}
+const localStylesheetAssets = new Set();
+const missingStylesheetAssets = [];
+for (const stylesheet of localPageStylesheets) {
+  let source;
+  try { source = fs.readFileSync(path.join(ROOT, stylesheet), 'utf8'); }
+  catch (_) { continue; }
+  for (const match of source.matchAll(/url\(\s*["']?([^"')]+)["']?\s*\)/gi)) {
+    const reference = match[1].trim();
+    if (!reference || reference[0] === '#' || /^(?:data:|blob:|https?:)/i.test(reference)) continue;
+    let url;
+    try { url = new URL(reference, 'https://runye.invalid/' + stylesheet); } catch (_) { continue; }
+    if (url.origin !== 'https://runye.invalid') continue;
+    const asset = decodeURIComponent(url.pathname.replace(/^\//, ''));
+    localStylesheetAssets.add(asset);
+    if (!fs.existsSync(path.join(ROOT, asset))) missingStylesheetAssets.push(asset);
+  }
+}
 
 /* index.html 的经典脚本执行顺序是同步依赖契约。CORE 资源检查使用原始入口，
    因 expandIndex 会把 mod/ 外链替换成内联正文，不能从展开视图恢复真实资源列表或顺序。 */
@@ -134,10 +165,13 @@ const optionalPageScripts = new Map([
   ['pwa/vendor/cloudbase-js-sdk-3.8.2.bundle.js', '云端 SDK 可选；缺失时 cloud-sync.js 降级到本地模式']
 ]);
 const notCached = [...localPageScripts].filter((asset) => !coreSet.has(asset) && !optionalPageScripts.has(asset));
+const uncachedPageStylesheets = [...localPageStylesheets].filter((asset) => !coreSet.has(asset));
+const uncachedStylesheetAssets = [...localStylesheetAssets].filter((asset) => !coreSet.has(asset));
 const missingCoreFiles = coreEntries.filter((asset) => !fs.existsSync(path.join(ROOT, asset)));
 const duplicateCoreEntries = coreEntries.filter((asset, index) => coreEntries.indexOf(asset) !== index);
 const pluginAssets = ['plugins.json'];
 const pluginManifestErrors = [];
+const pluginStylesheets = new Set();
 try {
   const config = JSON.parse(fs.readFileSync(path.join(ROOT, 'plugins.json'), 'utf8'));
   for (const plugin of (Array.isArray(config.plugins) ? config.plugins : [])) {
@@ -146,7 +180,20 @@ try {
     pluginAssets.push(manifestPath);
     try {
       const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, manifestPath), 'utf8'));
-      pluginAssets.push(base + (manifest.entry || 'main.js'));
+      const entryAsset = base + (manifest.entry || 'main.js');
+      pluginAssets.push(entryAsset);
+      const entrySource = fs.readFileSync(path.join(ROOT, entryAsset), 'utf8');
+      /* 插件经 import.meta.url 拼出的本地脚本/样式也属于运行时资源契约。
+         例如 contour-dxf 懒加载 terrain-core.js，多个插件在 activate 时再挂 style.css。 */
+      for (const reference of entrySource.matchAll(/new\s+URL\(\s*["']([^"']+\.(?:css|js|mjs|json|wasm|svg|png|jpe?g|gif|woff2?))([?#][^"']*)?["']\s*,\s*import\.meta\.url\s*\)/gi)) {
+        const resource = path.posix.normalize(path.posix.join(path.posix.dirname(entryAsset), reference[1]));
+        pluginAssets.push(resource);
+        if (/\.css$/i.test(resource)) pluginStylesheets.add(resource);
+      }
+      /* 覆盖通过路径常量拼出 SITE_ROOT + file 的串行脚本注入（例如 CORE_CHAIN/CORE_FILE）。 */
+      for (const reference of entrySource.matchAll(/\b(?:file\s*:|CORE_FILE\s*=)\s*["']([^"']+\.(?:js|mjs))["']/gi)) {
+        pluginAssets.push(reference[1].replace(/\\/g, '/'));
+      }
     } catch (error) {
       pluginManifestErrors.push(manifestPath + '：' + error.message);
     }
@@ -156,16 +203,40 @@ try {
 }
 const missingPluginAssets = pluginAssets.filter((asset) => !fs.existsSync(path.join(ROOT, asset)));
 const uncachedPluginAssets = pluginAssets.filter((asset) => !coreSet.has(asset));
-check('④ 主页面本地脚本已纳入 Service Worker CORE（可选项须有明确降级理由）',
-  !!coreMatch && notCached.length === 0 && missingCoreFiles.length === 0 && missingPageScripts.length === 0 && duplicateCoreEntries.length === 0 &&
-    missingPluginAssets.length === 0 && uncachedPluginAssets.length === 0 && pluginManifestErrors.length === 0,
+const pluginStyleDependencies = new Set();
+const missingPluginStyleDependencies = [];
+for (const stylesheet of pluginStylesheets) {
+  let source;
+  try { source = fs.readFileSync(path.join(ROOT, stylesheet), 'utf8'); }
+  catch (_) { continue; }
+  for (const match of source.matchAll(/url\(\s*["']?([^"')]+)["']?\s*\)/gi)) {
+    const reference = match[1].trim();
+    if (!reference || reference[0] === '#' || /^(?:data:|blob:|https?:)/i.test(reference)) continue;
+    let url;
+    try { url = new URL(reference, 'https://runye.invalid/' + stylesheet); } catch (_) { continue; }
+    if (url.origin !== 'https://runye.invalid') continue;
+    const asset = decodeURIComponent(url.pathname.replace(/^\//, ''));
+    pluginStyleDependencies.add(asset);
+    if (!fs.existsSync(path.join(ROOT, asset))) missingPluginStyleDependencies.push(asset);
+  }
+}
+const uncachedPluginStyleDependencies = [...pluginStyleDependencies].filter((asset) => !coreSet.has(asset));
+check('④ 主页面本地脚本/样式表已纳入 Service Worker CORE（可选脚本须有明确降级理由）',
+  !!coreMatch && notCached.length === 0 && uncachedPageStylesheets.length === 0 && uncachedStylesheetAssets.length === 0 && missingCoreFiles.length === 0 && missingPageScripts.length === 0 && missingPageStylesheets.length === 0 && missingStylesheetAssets.length === 0 && duplicateCoreEntries.length === 0 &&
+    missingPluginAssets.length === 0 && uncachedPluginAssets.length === 0 && missingPluginStyleDependencies.length === 0 && uncachedPluginStyleDependencies.length === 0 && pluginManifestErrors.length === 0,
   [
     notCached.length ? '未缓存：' + notCached.join(', ') : '',
+    uncachedPageStylesheets.length ? '样式表未缓存：' + uncachedPageStylesheets.join(', ') : '',
+    uncachedStylesheetAssets.length ? '样式依赖未缓存：' + uncachedStylesheetAssets.join(', ') : '',
     missingCoreFiles.length ? 'CORE 文件缺失：' + missingCoreFiles.join(', ') : '',
     missingPageScripts.length ? '页面脚本文件缺失：' + missingPageScripts.join(', ') : '',
+    missingPageStylesheets.length ? '页面样式表文件缺失：' + missingPageStylesheets.join(', ') : '',
+    missingStylesheetAssets.length ? '样式依赖文件缺失：' + missingStylesheetAssets.join(', ') : '',
     duplicateCoreEntries.length ? 'CORE 重复：' + duplicateCoreEntries.join(', ') : '',
     missingPluginAssets.length ? '插件文件缺失：' + missingPluginAssets.join(', ') : '',
     uncachedPluginAssets.length ? '插件资源未缓存：' + uncachedPluginAssets.join(', ') : '',
+    missingPluginStyleDependencies.length ? '插件样式依赖缺失：' + missingPluginStyleDependencies.join(', ') : '',
+    uncachedPluginStyleDependencies.length ? '插件样式依赖未缓存：' + uncachedPluginStyleDependencies.join(', ') : '',
     pluginManifestErrors.length ? '插件清单错误：' + pluginManifestErrors.join('; ') : '',
     optionalPageScripts.size ? '显式可选：' + [...optionalPageScripts].map(([asset, reason]) => asset + '（' + reason + '）').join('; ') : ''
   ].filter(Boolean).join(' | '));

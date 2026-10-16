@@ -5,7 +5,6 @@
   var Core = window.RyHydCore;
   if (!Core) { root.querySelector('#srcCard').textContent = '计算核心加载失败（runye-hydraulics-core.js）'; return; }
   var CFG_KEY = 'runye_hydraulics_check_cfg_v1';   /* 只在用户点「校核」时写（站内约定） */
-  var MAP_OVERLAY_KEY = 'runye_hydraulic_overlay_v1';
   var lastFull = null, lastNet = null, lastDesign = null;
 
   function $(id) { return root.querySelector('#' + id); }
@@ -132,7 +131,7 @@
     }
     try {
       var overlay = Core.mapOverlay && Core.mapOverlay(full, net);
-      if (overlay) localStorage.setItem(MAP_OVERLAY_KEY, JSON.stringify(overlay));
+      if (overlay) window.RyIrrigationDataStore.writeHydraulicOverlay(overlay);
     } catch (e) { }
     renderAll(full);
   }

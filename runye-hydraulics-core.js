@@ -8,8 +8,8 @@
    单段水损/流速/内径折算复用 RyHcCore，Christiansen F / 电机功率档复用
    RyDesignCore，保证与 index.html 三级水力计算**同口径**，不另立公式）。
 
-   界面见 runye-hydraulics.html；数据源 localStorage['runye_network_layout']
-   （只读！写入方仍是 index.html 管网反投）。
+   界面见 runye-hydraulics.html；页面控制器通过 RyIrrigationDataStore 读取
+   localStorage['runye_network_layout']，本模块只接收快照并计算（写入方是 index.html 管网反投）。
 
    ── 数据契约（index.html:13013-13041 实测口径）────────────────────────
      { sourcePos:{lat,lng}|null,
@@ -83,6 +83,10 @@
   /* 地图回传的管线使用 [lat,lng]，滴灌带使用 {lat,lng}；两种格式必须同等处理。 */
   function latOf(p) { return Array.isArray(p) ? +p[0] : +(p && p.lat); }
   function lngOf(p) { return Array.isArray(p) ? +p[1] : +(p && p.lng); }
+  function validLatLng(p) {
+    var lat = latOf(p), lng = lngOf(p);
+    return isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+  }
   function toPlane(latLng, origin) {
     var m = 6378137 * Math.PI / 180;
     var co = Math.cos(origin.lat * Math.PI / 180);
@@ -200,6 +204,10 @@
     (net && net.segments || []).forEach(function (s, i) {
       if (!s || !Array.isArray(s.latLng) || s.latLng.length < 2) {
         res.warnings.push('段 #' + i + ' 缺坐标，已忽略');
+        return;
+      }
+      if (!s.latLng.every(validLatLng)) {
+        res.warnings.push('段 #' + i + ' 含无效经纬度，已忽略');
         return;
       }
       segs.push(s);
