@@ -61,6 +61,12 @@
     cursor:pointer;font-weight:600;text-align:left;font-family:inherit}
   .mbtn:hover{border-color:var(--g-600);color:var(--g-700);background:var(--g-50)}
   .mbtn.btn-on{background:var(--g-500);color:#fff;border-color:var(--g-500)}
+  /* [v497-map-side-font] 左栏文字缩小（与主程序内嵌版 mod/online-map.css 同步改，v495 教训）：
+     按钮/输入框 13px→11px、高度 34→28px；栏目标题 11→10px。
+     specificity(.side .mbtn=0,2,0) > typography.css 的 button:where(=0,0,1)，同载 !important 时前者胜。 */
+  .side .mbtn{font-size:11px !important;height:28px !important}
+  .side input[type=text]{font-size:11px !important;height:28px !important}
+  .side .sec-t{font-size:10px !important}
   .mbtn-primary{background:var(--g-600);color:#fff;border-color:var(--g-600);text-align:center}
   .mbtn-primary:hover{background:var(--g-700);color:#fff}
   .search-row{display:flex;gap:6px}

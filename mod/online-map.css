@@ -40,3 +40,10 @@
 #onlineMapSection .map-draw-tools .mbtn{height:28px;padding:0 8px;font-size:12px;border-width:1px;background:#fff;text-align:left}
 #onlineMapSection .map-draw-tools .mbtn:hover{border-color:var(--g-600);color:var(--g-700);background:var(--g-50)}
 #onlineMapSection .map-draw-tools .mbtn.btn-on{background:var(--g-500);color:#fff;border-color:var(--g-500)}
+
+/* [v497-map-side-font] 左栏文字缩小（用户要求 2026-10-16）：按钮/输入框 13px→11px、高度 34→28px；栏目标题 11→10px。
+   typography.css 对 button/input 全局 13px !important（v490），此处用 #onlineMapSection .side 前缀提高优先级同载 !important 压过。
+   独立页 runye-map-measure.html 无 #onlineMapSection 前缀，在页内 <style> 追加 .side 作用域同款（v495 教训：两处副本同步改）。 */
+#onlineMapSection .side .mbtn{font-size:11px !important;height:28px !important}
+#onlineMapSection .side input[type=text]{font-size:11px !important;height:28px !important}
+#onlineMapSection .side .sec-t{font-size:10px !important}

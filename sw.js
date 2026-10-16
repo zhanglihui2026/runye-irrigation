@@ -296,8 +296,16 @@
    （「点击地图添加顶点；拖动顶点可微调……面积按真实球面经纬度计算。」）——没啥用。
    index.html 与 runye-map-measure.html 各删一行 <div class="hint">（在线地图按
    v495 教训两处副本同步改）；online-map.js 的状态提示（十字光标/成组等）不动。
-   两文件均在 CORE 白名单，必须抬版本）。 */
-const VERSION = 'v496-map-hint-remove';
+   两文件均在 CORE 白名单，必须抬版本）→
+   v497-map-side-font（用户要求：在线地图左栏「定位三亚/切换底图/GeoJSON/KML/导入地块…」
+   等文字缩小。按钮/输入框 13px→11px、高度 34→28px；栏目标题 .sec-t 11→10px。
+   v490 起 typography.css 对 button/input 全局 13px !important，故用
+   #onlineMapSection .side（独立页 .side）作用域 + 同载 !important 靠 specificity 压过；
+   浮动面板（分区角度/地图浮动钮）在 .map-wrap 内不受影响。mod/online-map.css 尾部追加
+   + index.html 引用 ?v= 抬为 497-map-side-font + runye-map-measure.html 页内
+   <style> 追加 .side 作用域同款（v495 教训：两处副本同步改）。
+   三文件均在 CORE 白名单，必须抬版本）。 */
+const VERSION = 'v497-map-side-font';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
