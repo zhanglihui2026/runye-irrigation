@@ -98,6 +98,27 @@
 > 「保存地点」按钮去图标并移入搜索行右侧。
 > Vercel 副本未动，仍为老版本（仅承载大模型 API 代理，前端静态页走 Pages）；
 > 线上测试会员功能前先确认 Vercel 是否也需要同步。
+>
+> **✅ 2026-10-16 第二次发布：`commit ba95376`，`sw.js` = `v511-nav-rebind`（已实测线上
+> HTTP 200、`index.html` 引用 `mod/inline-18.js?v=511-nav-rebind`、线上 `mod/inline-18.js`
+> 17972 字节含修复）。本次内容：**
+> · **v511-nav-rebind 修「管路规划 → 底部切三级简图 → 再点顶部管路规划切不回工作区」**
+>   （用户实测报告）。根因＝runye-nav.js 的 `RyEntitle.onChange → RyFnNav.render()` 在会员
+>   权益异步就绪时**重建**全部导航项，而 `mod/inline-18.js` 在解析期就把 click 绑在旧元素上
+>   ⇒ 新元素无处理器，点击只剩原生锚点 → hashchange → `ryJumpToSection` → `ryShowSection`
+>   —— 这条路**不复位视图**（三级仍 `data-ry-view="pipe"`），用户在同一个功能区里就表现为
+>   「点了没反应」；同时导航高亮丢失（`activate()` 点亮的是脱离文档的旧节点）。
+>   修法：`collectItems()` 可重入 + 具名 `navItemClick()` + 按元素标记去重绑定 +
+>   `#fnNav` 上的 MutationObserver 重建后「重收/补绑/恢复高亮」。病史同 v376。
+>   回归脚本 `_repro_tabswitch.mjs`（gitignore，等权益就绪复现真实时序）：改前 4 过/8 红、
+>   改后 12/12。
+> · v510-remove-missing-pages（并行会话）：CORE 去掉已删页面的预缓存引用。
+> · 已确认的**既存红**（改前/改后逐条同值，不要再当回归查）：`verify_pp_tabs` 14/34
+>   （rySetTab 定位器只查 index.html，v376 已搬到 `mod/inline-09.js`）、`verify_nav_compact`
+>   10 项（权益「同步中」→ 点击被捕获拦截 + 旧项名契约）、`verify_construct_fit` 19/21
+>   （2 项 PP 二级可见尺寸）、`verify_sketchup` 3过/6红+FATAL（`.fn-link[data-target=
+>   "designInput"]` 选择器已过期）、`verify_ry_tool` 启动即崩（缺
+>   `iso-diagram/network-editor.css`）、`verify_cascade_pp` 1/38。
 
 ---
 
