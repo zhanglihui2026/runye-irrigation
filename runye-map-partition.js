@@ -29,7 +29,37 @@
   function library(){return JSON.parse(root.localStorage.getItem('runye_plot_library')||'[]');}
   function current(){return library().find(p=>p.id===select.value);}
   function geometry(p){return JSON.stringify([p.polyLatLng,p.polyLatLngSet,p.subPlots]);}
-  function draw(p){layer.clearLayers();(p&&p.partitions||[]).forEach(z=>root.L.polygon(z.latLng.map(q=>root.RyMapHost.toDisplay(q)),{color:'#f59e0b',weight:2,fillOpacity:0.04,interactive:false}).addTo(layer));}
+  /* [v499 2026-10-16 用户截图反馈] 分区格只画**内部分割线**，不再画整格外框。
+   * 问题：分区格外边沿与「地块」图层轮廓重复，且分区按旋转框重划后与地块环有数米
+   *   偏差，两圈线叠在一起被看成「我的地块 vs 当前地块两个重复地块」。
+   * 判据（零启发式、不受旋转偏差影响）：一条边同时属于两个分区格 = 内部分割线（画）；
+   *   只属于一个分区格 = 外边沿（跳过——地块图层已有权威轮廓）。端点按 1e-5（≈1.1m）
+   *   量化配对，容忍裁剪产生的浮点噪声；只有 1 个分区时没有共享边 ⇒ 全跳过（正确：
+   *   整块地即分区，地块图层轮廓已足够）。
+   * 保留 fillOpacity 0.04 的格底淡填充（描边置零），分区范围仍可感知。 */
+  function draw(p){
+    layer.clearLayers();
+    var parts=(p&&p.partitions||[]).filter(z=>z&&z.latLng&&z.latLng.length>=3);
+    if(!parts.length)return;
+    var style={color:'#f59e0b',weight:2,fillOpacity:0.04,interactive:false};
+    parts.forEach(z=>root.L.polygon(z.latLng.map(q=>root.RyMapHost.toDisplay(q)),Object.assign({},style,{weight:0,opacity:0})).addTo(layer));
+    function qkey(pt){return Math.round(pt[0]*1e5)+','+Math.round(pt[1]*1e5);}
+    var edges={};
+    parts.forEach(z=>{
+      var q=z.latLng.map(qkey);
+      for(var i=0;i<q.length;i++){
+        var k1=q[i],k2=q[(i+1)%q.length],key=k1<k2?k1+'|'+k2:k2+'|'+k1;
+        var e=edges[key];
+        if(!e)edges[key]={n:1,a:z.latLng[i],b:z.latLng[(i+1)%z.latLng.length]};
+        else e.n++;
+      }
+    });
+    Object.keys(edges).forEach(function(k){
+      var e=edges[k];
+      if(e.n<2)return; // 外边沿：只属于一个分区格，跳过（地块图层已有轮廓）
+      root.L.polyline([root.RyMapHost.toDisplay(e.a),root.RyMapHost.toDisplay(e.b)],{color:'#f59e0b',weight:2,interactive:false}).addTo(layer);
+    });
+  }
   /* [v481 2026-10-16 用户实测] 状态行着色：成功绿 / 失败红，错误不再淹没在小字里 */
   function setStatus(msg,kind){status.textContent=msg;status.style.color=kind==='err'?'#b91c1c':(kind==='ok'?'#166534':'');}
   /* [v482 2026-10-16 用户实测] 角度实时预览：未点「应用」前，把已划好的**分割线**旋转
