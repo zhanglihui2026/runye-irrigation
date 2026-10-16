@@ -88,6 +88,11 @@
 > `/runye-member-ui.js` 全部 **404**，会员相关 markers 全 0，`runye-ai-plan.js?v=355`（本地是 358）。
 > Vercel 上也有一份同代老前端副本（同样没有会员代码）。
 > ⇒ **任何"线上测试会员功能"的想法现在都不成立，必须先发布。**
+>
+> **✅ 2026-10-16 更新：GitHub Pages 已随本次发布同步为最新版本**（commit `edaf9da`，
+> 用户明确说「发布」后由 agent 推送）。实测线上 HTTP 200，`sw.js` = `v427-archive-3d-iso`，
+> 会员三件套（cloud-sync.js / runye-entitle.js / runye-member-ui.js）已在库并随发布上线。
+> Vercel 副本未动，仍为老版本；线上测试会员功能前先确认 Vercel 是否也需要同步。
 
 ---
 
