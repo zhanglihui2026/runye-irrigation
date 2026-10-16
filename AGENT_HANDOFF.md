@@ -411,3 +411,72 @@
 > **2026-10-12 补注（v382，主线已切换）**：插件化阶段五已完成 4 项（+ ai-plan v381：38 契约+39 变异、冒烟 29 项全绿）。
 > **当前主线 = 数据资产化主链路收口（方案文档 §12 六步计划）**：Step -1 数字农业完全剥离已交付（41 契约+40 变异全绿，含 C40/I40 与一个值得记住的假绿教训），**下一步 = Step 0 land-store 加壳**，从「▶ 当前任务」一节开工。
 > ⚠ 三条已向用户同步的剥离影响（花生工具手工填面积、工作台握手消失、页面目录保留无入口）**是拍板代价不是缺陷，勿"修复"**。
+
+---
+
+## 9. 🔐 会员门控链路安全审计报告（2026-10-16 · v513-sec-gate）
+
+> 用户原话：「检查一下 从主界面 切换到智能规划页面，智能规划页面又切换回完整工具，
+> 整个链路是否安全，有没有什么漏洞，可以破解会员系统的，查出来，能改就改掉，
+> 改不掉要重点记录。」
+> 授权范围＝用户本人项目自查。审计脚本 `_sec_audit.mjs`（gitignore，**生产态仿真**：
+> 起本地静态服务 + Edge `--host-resolver-rules=MAP runye-audit.local 127.0.0.1`，
+> 让 `location.hostname` 既非 localhost 又是 http ⇒ 走**线上分支**，否则
+> `isLocalTestHost()` 会把后门放行、测不出真结论）；线上只读探测 `_sec_live.mjs`。
+
+### 9.1 已修（实测转绿）
+
+| 编号 | 严重度 | 漏洞 | 修法 | 文件 |
+|---|---|---|---|---|
+| **B** | ★★★ | `RyEntitle.mockPlan` 是**普通可写属性** ⇒ 控制台一行 `RyEntitle.mockPlan='L2'` 让 `can()/access()` 全部放行 | 改闭包变量 `mockPlanVar` + `Object.defineProperty(..., {get, configurable:false})` 只读访问器；取值条件里再算 `isLocalTestHost()` ⇒ 线上恒 `null` | `runye-entitle.js` |
+| **C2** | ★★★ | `RyEntitle.state` 交出的是**活对象** ⇒ `E.state.entitle={plan:'L2'}; E.state.trial=false` 就地提权（等级直接显示「高级会员 · 26740 天」） | 交出前 `freezeState()` 深冻结（`entitle/progress/invites/claims/rewards` 各元素）；内部一律换新对象赋值，冻结无副作用 | `runye-entitle.js` |
+| **A2** | ★★★ | 绘图编辑器静态按钮 `#ppAiPlan`（「AI 规划」**第二入口**）此前**零权益校验**，`?rymock=locked` 下仍能打开 | 补 `aiPlanAccess()` **fail-closed**（取不到权益层即 denied，与导航的兼容放行刻意不同）+ `RyEntitle.bindControl` + 无权走 `RyMemberUI.showUpgrade` | `mod/plot-editor.js` |
+| **E** | ★★★ | `terrain/index.html`、`管路接驳拼装.html` 独立 URL 直达**零门控** | 地形门控加在 `terrain/terrain-ui.js`（该文件是独立页与主页 `#terrainSection` 的**唯一共用实现** ⇒ 一处覆盖两个入口）；管路拼装页注入同款门控脚本 | `terrain/terrain-ui.js`、`管路接驳拼装.html` |
+| **I** | ★★★ | 主页地址栏直接敲 `index.html#terrainSection` 可绕过导航点击门控（v401 起 hash 直达拦截已移除） | 同 E（`terrain-ui.js` 统一门控），并挂 `RyEntitle.onChange` + 20s 轮询兜底 | `terrain/terrain-ui.js` |
+| **G** | ★★ | 智能规划侧栏「地形模块 / 水力校核」是**独立页 href**（自带门控但不一致） | 改为走主站门控的 in-app 锚点 `index.html#terrainSection` / `#hydraulicsSection` | `runye-ai-plan.js` |
+
+**设计要点（本次过程中发现并当场纠正，避免了一次线上事故）**：主页内 `#terrainSection`
+的门控**必须**用**区块内 `absolute` 遮罩**，不能用全屏 `fixed` —— 否则任何无权用户
+一打开主页就被遮罩盖住**整个软件**。审计里加了回归护栏向量 **I0** 锁死这一点，并有
+正向对照 **I2**（本地管理员 L2 ⇒ 遮罩撤掉、估算按钮有输出）确认不误伤付费用户。
+
+### 9.2 ⛔ 未修 —— 纯前端门控的结构性上限（**重点记录**）
+
+| 编号 | 现象（实测） | 为什么修不掉 | 缓解 |
+|---|---|---|---|
+| **C3** | 控制台覆写判定函数本身：`RyEntitle.can=()=>true; RyEntitle.access=()=>'allowed'` ⇒ 全部 allowed（`writable:true`） | 只要判定逻辑跑在用户能改的 JS 里，就必然可被改；`Object.freeze` 拦不住给实例属性赋值/覆写，封成 `configurable:false` 也会被整体替换 `window.RyEntitle` 绕过 | **真正的付费墙是服务端 entitlement**：所有写操作走 `/entitle`（云函数持服务端身份直写 PG），前端门控只是 UI 层 |
+| **D** | 屏蔽 `runye-entitle.js` 后 `runye-nav.js` 走 **fail-open**（`!E → 'allowed'`）⇒ 21 个导航项全部解锁（`blockedCount:0`），**单个脚本即可绕过** | 是 v358 起的有意设计（老页面/未加载权益层时保留兼容放行），改成 fail-closed 会让「权益层加载失败」直接变成全站不可用 | 关键动作**都另有一层校验**（各插件 `gate()` + 服务端）；若要彻底，只能把 L2 能力的**数据**（而非入口）挪到需鉴权的服务端接口后面 |
+| — | `runye-map-measure.html`（在线地图＝L1）、`耐特菲姆滴灌带长度查询器.html`（`feat:''` 免费）无门控 | 非漏洞：L1 对匿名 trial 本就放行、查询器是公开小工具 | 无需处理 |
+
+> **一句话结论**：能改的 6 处都改了；剩下「覆写判定函数 / 屏蔽权益脚本」属于
+> **纯前端门控的物理上限**，只要业务数据仍在浏览器里就算"能算出来"。要把这两条
+> 真正闭合，方向只有一个——**把 L2 能力的计算与数据搬到需鉴权的服务端接口后面**
+> （对应 §2 Q1 架构迁移的同一个答案）。
+
+### 9.3 实测已安全（无需改，留作回归基线）
+
+* **D2** 线上域名下本地管理员不可用：`localAdminAvailable()=false`、`activateLocalAdmin()=false`、`plan` 仍 `L1`。
+* **H** `/entitle` 网关负向鉴权：`adminMemberGrant` / `pluginsSet` / `get` 无 token 与伪造 token **一律 code 401**；线上只读探测：`adminMembers` → **403「无会员管理权限」**，`pluginsGet` → code 0 但 `admin:false`。
+* **F** 匿名 trial 只拿 L1 四功能（`zone-split/ai-plan/pipe-layout/online-map`），L2（`drawing-export/bom-export/hydraulic-check/pro-others`）全 denied。
+* **服务端权威**：`sql/route_c_migration_v5_rls_tighten.sql` 已 revoke 浏览器身份对 `ry_entitle/ry_invite/ry_links/ry_bind` 的写权限（写只留 service_role）；`api/ai-irrigation.js` 校验 Bearer 访问码。
+* **J（全站普查）** 站内带门控页：`index.html`（插件级 + 地形区块）、`terrain/index.html`、`runye-hydraulics.html`、`管路接驳拼装.html`、`invite.html`。
+* `plugin-admin.html`（润野管理后台）页面本身公开可见，但**所有动作服务端鉴权**（实测 403），非漏洞。
+
+### 9.4 审计/回归脚本与结果
+
+| 脚本 | 用途 | 结果 |
+|---|---|---|
+| `_sec_audit.mjs` | 门控链路全向量（D/D2/A/A2/B/C/C2/C3/E/F/G/H/I0/I/I2/J） | **28 过 / 1 红**（唯一红＝C3 结构性上限，已在 9.2 记录） |
+| `_sec_live.mjs` | 线上**只读**探测（绝不写生产库） | **5 过 / 0 红** |
+| `verify_nav_switch.js` | 导航切换回归 | **30 过 / 0 红** |
+| `_smoke_publish.mjs` | 双页发布冒烟（期望版本已更新） | **ALL PASS** |
+
+### 9.5 发布
+
+* `commit 4d76c79`（`v513-sec-gate`），已 push；随后一次小提交统一 `?v=` 标签。
+* 线上核对（GitHub Pages）：`sw.js = v513-sec-gate-hydraulic-coord`、
+  `terrain/terrain-ui.js` 含 `terrainEntitlementGate`、`index.html` 4 处 `?v=513-sec-gate`、
+  `mod/plot-editor.js` 含 `aiPlanAccess`、`runye-entitle.js` 含 `mockPlanVar`。
+* ⚠ **版本名与并行会话合并**：抬版本时发现并行会话已把 `sw.js` 抬到
+  `v513-hydraulic-coordinate-guard`（未提交未发布），为免互相覆盖，两者并成同一个
+  版本名 `v513-sec-gate-hydraulic-coord`（都在 CORE 白名单内，必须抬版本重建离线缓存）。
