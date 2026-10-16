@@ -81,6 +81,7 @@ tests/
 !tests/
 tests/*
 !tests/partition_query.test.cjs
+!tests/plot_transfer.test.cjs
 !tests/entitle_flow.test.cjs
 
 # 成组管路真实面积与独立状态回归
@@ -96,6 +97,7 @@ tests/*
 !tests/material_formulas.test.cjs
 !tests/zone_geometry.test.cjs
 !tests/flow_geometry.test.cjs
+!tests/data_bridge_stores.test.cjs
 
 # AOCI agent host integration (machine-bound; do not commit)
 .codex/config.toml
@@ -106,3 +108,9 @@ graphify-out/
 
 # 一次性调试残留（mjs 未含于上方 _*.js 规则）
 _pdbg_tmp.mjs
+
+# Vite 构建缓存（可再生，不提交）
+.vite/
+
+# QA 地图侧对比临时产物（可再生，不提交）
+_mapside_*.json

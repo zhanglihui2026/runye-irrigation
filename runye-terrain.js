@@ -1,8 +1,9 @@
 (function (root) {
   'use strict';
-  /* [v245 2026-10-05] 用户要求：「手动地形高程」不要弹大窗口——放进左侧栏，平时折叠，点了展开。
-     实现：原 showModal() 大弹窗改为内联折叠面板 .rt-panel：点「地形高程」按钮就地展开
-     （面板插到按钮之后），再点该按钮或面板内「收起」即折叠；字段、校验、保存与应用逻辑不变。
+  /* [v454 2026-10-15] 地形高程由三级参数条中的按钮统一迁入 #ryCadGrpTerrain 折叠分组，
+     与二级、三级面板同级；面板内容在该分组内展开。字段、校验、保存与应用逻辑不变。
+     其余页面仍保留各自入口；三级旧按钮会在初始化时清除，以兼容已存在的旧 DOM。
+     [v245 2026-10-05] 手动地形高程原为内联折叠面板；字段、校验、保存与应用逻辑不变。
      [v247 2026-10-05] 触发按钮：三角常驻；字号 12→11px；平时也深绿块白字（与展开态一致），hover 加深。
      [v248 2026-10-05] 三角方向对调（v247 理解反了）：箭头表示面板当前状态——收起 ▴ 向上、展开 ▾ 向下。
      缓存 css?v=254、js?v=256，PWA v16。
@@ -121,11 +122,14 @@
     });
     if (panel && !panel.hidden) { var results = panel.querySelector('.rt-report'); if (results) results.innerHTML = report(); }
   }
-  /* [v245] 折叠 / 就地展开：面板是单例，展开时插到触发按钮之后（左侧栏内联，不再弹窗）。 */
+  /* 折叠 / 就地展开：面板是单例，地形分组存在时挂在该分组内；兼容其他页面的旧入口。 */
   function collapse() {
     if (!panel) return;
     panel.hidden = true;
-    if (openBtn) { openBtn.setAttribute('aria-expanded', 'false'); openBtn = null; }
+    var previous = openBtn;
+    if (previous) { previous.setAttribute('aria-expanded', 'false'); openBtn = null; }
+    var details = previous && previous.closest && previous.closest('#ryCadGrpTerrain');
+    if (details && details.open) details.open = false;
     refresh();
   }
   function toggle(btn) {
@@ -133,19 +137,25 @@
     if (openBtn === btn && !panel.hidden) { collapse(); return; }
     if (openBtn) openBtn.setAttribute('aria-expanded', 'false');
     openBtn = btn;
-    /* [v280] 按钮现在住在 .ri-btn-row 行容器里：面板必须插到**整行之后**，
-       否则会落进行容器（flex 横排），面板被压成半宽、挤在按钮旁边。 */
-    var rowHost = (btn.closest && btn.closest('.ri-btn-row')) || btn;
-    rowHost.insertAdjacentElement('afterend', panel);
+    var details = btn.closest && btn.closest('#ryCadGrpTerrain');
+    var terrainBody = details && details.querySelector('#ryCadTerrainBody');
+    if (terrainBody) terrainBody.appendChild(panel);
+    else {
+      /* [v280] 按钮现在住在 .ri-btn-row 行容器里：面板必须插到整行之后，
+         否则会落进行容器（flex 横排），面板被压成半宽。 */
+      var rowHost = (btn.closest && btn.closest('.ri-btn-row')) || btn;
+      rowHost.insertAdjacentElement('afterend', panel);
+    }
     var list = entries();
-    panel.innerHTML = '<form><header data-collapse title="点击收起面板"><h3>手动地形高程</h3></header><div class="rt-body">' +
+    panel.innerHTML = '<form>' + (terrainBody ? '' : '<header data-collapse title="点击收起面板"><h3>手动地形高程</h3></header>') + '<div class="rt-body">' +
       '<label class="rt-switch"><input type="checkbox" data-terrain="enabled" ' + (state.enabled ? 'checked' : '') + '>启用手动高程</label>' +
       '<p class="rt-note">所有高程使用同一基准；没有绝对高程时，可把水源设为0，填写相对高程。水源以泵站出水点为基准，井内水面至出水点的提升仍填写原“水泵提升高度”。启用且高程完整时，替代原“地形高差”，不重复叠加。</p>' +
       '<div class="rt-grid"><label>水源出水点高程（m）' + input('source', state.source) + '</label><label>实际供水泵扬程（m，可选）' + input('pumpHead', state.pumpHead, 'min="0"') + '</label><label>末端允许最大压力（bar，可选）' + input('maxPressure', state.maxPressure, 'min="0.01"') + '</label></div>' +
       '<p class="rt-note">允许最大压力请按实际滴灌带、阀门等设备填写。实际供水泵扬程用于剩余压力校核，不填写时只估算所需扬程。负高程和下坡高差均支持。</p>' +
       '<h4>地块 / 梯田层</h4>' + (list.length ? list.map(function (e, i) { var p = state.plots[e.key] || {}, imp = importedProfile(e, i); return '<fieldset data-row="' + i + '"><legend>' + escape(e.name) + '</legend>' + (imp ? '<p class="rt-note">已带入 RTK 建议范围：' + imp.minZ.toFixed(2) + '–' + imp.maxZ.toFixed(2) + ' m（' + imp.pointCount + ' 点，请复核后保存）</p>' : '') + '<div class="rt-grid"><label>最高点 / 平台高程（m）' + input('high', finite(p.high) ? p.high : (imp ? imp.maxZ : null)) + '</label><label>最低点高程（m，可选）' + input('low', finite(p.low) ? p.low : (imp ? imp.minZ : null)) + '</label></div></fieldset>'; }).join('') : '<p>请先绘制或选择地块。各层梯田分别成组后，可逐层填写。</p>') +
       '<p class="rt-note">最低点留空时按平台高程计算；有坡地请填写最低点，才能检查低处压力。每层高程不会改变原有布管走向。</p><p class="rt-status" role="status"></p><footer><button type="submit">保存并应用</button></footer><div class="rt-report">' + report() + '</div></div></form>';
-    panel.querySelector('[data-collapse]').onclick = collapse;
+    var collapseHeader = panel.querySelector('[data-collapse]');
+    if (collapseHeader) collapseHeader.onclick = collapse;
     panel.querySelector('form').onsubmit = function (event) {
       event.preventDefault();
       var currentKeys = entries().map(function (e) { return e.key; }).join('\n');
@@ -178,13 +188,23 @@
   }
   function init() {
     panel = doc.createElement('div'); panel.className = 'rt-panel'; panel.hidden = true; panel.setAttribute('role', 'region'); panel.setAttribute('aria-label', '手动地形高程');
-    ['fld_dh', 'tl_dh', 'tlPlanBar', 'grBlockCard', 'settingsForm'].forEach(function (id) {
+    var terrainDetails = doc.getElementById('ryCadGrpTerrain');
+    if (terrainDetails) {
+      terrainDetails.addEventListener('toggle', function () {
+        var summary = terrainDetails.querySelector('summary');
+        if (terrainDetails.open) toggle(summary);
+        else if (openBtn === summary) collapse();
+      });
+    }
+    /* 清除此前由缓存旧脚本插入的三级参数条入口，地形现在只从同级折叠分组打开。 */
+    var legacyTlBar = doc.getElementById('tlPlanBar');
+    if (legacyTlBar) legacyTlBar.querySelectorAll('[data-terrain-open]').forEach(function (button) { button.remove(); });
+    ['fld_dh', 'tl_dh', 'grBlockCard', 'settingsForm'].forEach(function (id) {
       var host = doc.getElementById(id); if (!host) return;
       var b = doc.createElement('button'); b.type = 'button'; b.className = 'rt-open'; b.dataset.terrainOpen = ''; b.setAttribute('aria-expanded', 'false'); b.onclick = function () { toggle(b); };
       if (id === 'grBlockCard') { var side = host.closest('.pp-side'); var top = doc.getElementById('grTrunkCard');
         /* [v245c] 用户要求：成组页「地形高程」放左栏最顶（成组地块条之后、总管卡之前） */
         if (side && top && top.parentElement === side) side.insertBefore(b, top); else host.prepend(b); }
-      else if (id === 'tlPlanBar') host.prepend(b);
       /* [v437] 原 planDh 分支（二级页按钮行）随 planBtnRow 机制一并移除 */
       else if (id === 'fld_dh' || id === 'tl_dh') host.closest('.field').insertAdjacentElement('afterend', b);
       else host.insertAdjacentElement('afterend', b);

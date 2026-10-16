@@ -12,9 +12,9 @@
  * 契约继续用夹具覆盖）。 */
 const FIXTURE = require('./catalog-full-fixture.cjs');
 globalThis.RyCatalog = FIXTURE;
-const NM = require('../iso-diagram/network-model.js');
+const NM = require('../feature-archive/三维与轴测图/source/iso-diagram/network-model.js');
 const CAT = FIXTURE;
-const REAL = require('../iso-diagram/product-catalog.js');
+const REAL = require('../feature-archive/三维与轴测图/source/iso-diagram/product-catalog.js');
 const ConstructionNetwork = NM.ConstructionNetwork;
 
 let pass = 0, fail = 0;

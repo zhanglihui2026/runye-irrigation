@@ -47,9 +47,6 @@
   *::-webkit-scrollbar-thumb:hover{background:rgba(100,116,139,.72)}
   *::-webkit-scrollbar-corner{background:transparent}
   /* [v322] 栏线融合：左右工具栏与中间区直接相接（分界靠底色差） */
-  body.ry-tool #pipePlanSection .pp-side, body.ry-tool #tlPipePlanSection .pp-side{border-right-color:transparent}
+  body.ry-tool #tlPipePlanSection .pp-side{border-right-color:transparent}
   body.ry-tool #areaTool .at-sidebar{border-right-color:transparent}
   body.ry-tool #designInput .mw-col-right{border-left-color:transparent;border-right-color:transparent}
-  body.ry-tool #pipePlanSection #ppToolbar{border-left-color:transparent;border-right-color:transparent}
-  body.ry-tool #ryCadSide [data-pp="pipePlanSection"] .pp-side, body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-side{border-right-color:transparent}
-  body.ry-tool #ryCadSide [data-pp="pipePlanSection"] #ppToolbar{border-left-color:transparent;border-right-color:transparent}

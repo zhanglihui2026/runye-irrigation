@@ -995,7 +995,8 @@
       warnBox.textContent = res.error;
       /* 输入已无效时清掉旧 BOM 与共享快照，避免下游插件继续展示上一轮的过期方案。 */
       var staleBom = $('spBomCard'); if (staleBom) staleBom.hidden = true;
-      try { localStorage.removeItem(SP_BRIDGE_KEY); } catch (e) {}
+      if (window.RySprinklerBridgeStore)
+        window.RySprinklerBridgeStore.removeSnapshot(SP_BRIDGE_KEY);
       return;
     }
     var rows = [
@@ -1065,8 +1066,8 @@
             },
             bom: bom, layout: lay
           };
-          localStorage.removeItem(SP_BRIDGE_KEY);
-          localStorage.setItem(SP_BRIDGE_KEY, JSON.stringify(payload));
+          if (window.RySprinklerBridgeStore)
+            window.RySprinklerBridgeStore.writeSnapshot(payload, SP_BRIDGE_KEY);
         }
       } else {
         var bomCard = $('spBomCard'); if (bomCard) bomCard.hidden = true;
@@ -1305,12 +1306,10 @@
      读到即清除 key，避免下次打开重复导入。 */
 
   function consumeIncoming() {
-    var raw = null;
-    try { raw = localStorage.getItem('runye_terrain_incoming'); } catch (e) { return; }
-    if (!raw) return;
     try {
-      var d = JSON.parse(raw);
-      localStorage.removeItem('runye_terrain_incoming');
+      var d = window.RyTerrainBridgeStore
+        ? window.RyTerrainBridgeStore.consumeIncoming()
+        : null;
       if (!d || typeof d !== 'object') return;
       var rings = [];
       if (Array.isArray(d.subPlots) && d.subPlots.length) {
@@ -1372,7 +1371,7 @@
           '注意：<b>非 CGCS2000 平面坐标</b>——工程放样/水力计算前请以 CGCS2000 成果文件导入为准。' +
           (bad ? '另有 ' + bad + ' 个无效环已跳过。' : ''));
       }
-    } catch (e) { /* 契约损坏：清除防卡死 */ try { localStorage.removeItem('runye_terrain_incoming'); } catch (e2) {} }
+    } catch (e) { /* 单次交接已消费；导入错误不应重复导入旧载荷。 */ }
   }
 
   /* v292b：清理历史版本积累的重复导入副本（同名+同源+面积差<1% 只留最早一份） */

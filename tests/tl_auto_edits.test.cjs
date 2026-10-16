@@ -197,7 +197,7 @@ const AE = require('../tl-workspace/tl-auto-edits.js');
   vm.createContext(sandbox);
   vm.runInContext('var window = globalThis;', sandbox);   // 关键：typeof window 必须在上下文内已定义
   vm.runInContext(fs.readFileSync('tl-workspace/tl-auto-edits.js', 'utf8'), sandbox, { filename: 'tl-auto-edits.js' });
-  vm.runInContext(fs.readFileSync('iso-diagram/iso-diagram.js', 'utf8'), sandbox, { filename: 'iso-diagram.js' });
+  vm.runInContext(fs.readFileSync('feature-archive/三维与轴测图/source/iso-diagram/iso-diagram.js', 'utf8'), sandbox, { filename: 'iso-diagram.js' });
   const A = sandbox.RyTlAutoEdits, ISO = sandbox.RyIsoDiagram;
   ok(!!A && !!ISO, 'vm 同仓加载：RyTlAutoEdits + RyIsoDiagram');
   const d = mkData();
@@ -293,7 +293,7 @@ const AE = require('../tl-workspace/tl-auto-edits.js');
   vm.createContext(sandbox);
   vm.runInContext('var window = globalThis;', sandbox);
   vm.runInContext(fs.readFileSync('tl-workspace/tl-auto-edits.js', 'utf8'), sandbox, { filename: 'tl-auto-edits.js' });
-  vm.runInContext(fs.readFileSync('iso-diagram/iso-diagram.js', 'utf8'), sandbox, { filename: 'iso-diagram.js' });
+  vm.runInContext(fs.readFileSync('feature-archive/三维与轴测图/source/iso-diagram/iso-diagram.js', 'utf8'), sandbox, { filename: 'iso-diagram.js' });
   const A = sandbox.RyTlAutoEdits, ISO2 = sandbox.RyIsoDiagram;
   const d = mkData();
   A.syncGeometry(d);

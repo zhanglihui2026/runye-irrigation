@@ -103,12 +103,17 @@
 
   /* 内径（mm）。mode='id' 时输入值即内径；其余按 SDR 折算。与 index.html peInnerDiam 同式。 */
   function innerDiam(od, mode) {
-    var d = pos(od, 0);
     var sdr = sdrOf(mode);
+    if (!sdr) return pos(od, 0);
+    return innerDiamForSdr(od, sdr);
+  }
+  /* 通用 SDR 折算，供设计层复用同一公式，同时保留其自定义 SDR 接口。 */
+  function innerDiamForSdr(od, sdr) {
+    var d = pos(od, 0), ratio = pos(sdr, 0);
+    if (d <= 0 || ratio <= 0) return 0;
     var native = nativeCore();
-    if (native && native.inner) return native.inner(d, sdr);
-    if (!sdr) return d;
-    return d * (1 - 2 / sdr);
+    if (native && native.inner) return native.inner(d, ratio);
+    return d * (1 - 2 / ratio);
   }
 
   /* Hazen-Williams 沿程损失（m）。与 index.html hazenWilliams 同式同常数。 */
@@ -355,6 +360,7 @@
     ECON_VMIN: ECON_VMIN, ECON_VMAX: ECON_VMAX,
     num: num, nonNeg: nonNeg, pos: pos, r2: r2, fmt: fmt,
     sdrOf: sdrOf, caliberLabel: caliberLabel, validCaliber: validCaliber, innerDiam: innerDiam,
+    innerDiamForSdr: innerDiamForSdr,
     hazen: hazen, velocity: velocity, statusOf: statusOf, localLoss: localLoss,
     head: head, power: power,
     defaultConfig: defaultConfig, normalize: normalize,

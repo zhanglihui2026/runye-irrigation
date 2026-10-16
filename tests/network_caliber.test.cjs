@@ -10,7 +10,7 @@
  *  4) serialize/deserialize 往返保留改径结果。
  * ===================================================================== */
 'use strict';
-const NM = require('../iso-diagram/network-model.js');
+const NM = require('../feature-archive/三维与轴测图/source/iso-diagram/network-model.js');
 const ConstructionNetwork = NM.ConstructionNetwork;
 
 let pass = 0, fail = 0;

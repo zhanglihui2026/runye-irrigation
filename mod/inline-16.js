@@ -6,7 +6,30 @@
     if(!ref || !ref.id) throw new Error('地图回传地块引用缺少 id');
     var lib=[];
     try{ lib=JSON.parse(localStorage.getItem('runye_plot_library')||'[]'); }catch(e){ throw new Error('地块库数据无法读取'); }
-    var p=Array.isArray(lib)?lib.find(function(x){return String(x.id)===String(ref.id);}):null;
+    function geometryKey(x){
+      function ringKey(r){
+        if(!Array.isArray(r)||r.length<3)return null;
+        return r.map(function(q){
+          var lat=Array.isArray(q)?Number(q[0]):Number(q&&q.lat);
+          var lng=Array.isArray(q)?Number(q[1]):Number(q&&q.lng);
+          return isFinite(lat)&&isFinite(lng)?[+lat.toFixed(7),+lng.toFixed(7)]:null;
+        });
+      }
+      var rings=[];
+      if(x&&x.merged){
+        var set=Array.isArray(x.polyLatLngSet)?x.polyLatLngSet:[];
+        var subs=Array.isArray(x.subPlots)?x.subPlots:[];
+        var n=Math.max(set.length,subs.length);
+        for(var i=0;i<n;i++)rings.push(ringKey(set[i]||subs[i]&&subs[i].polyLatLng));
+      }else rings.push(ringKey(x&&x.polyLatLng));
+      if(!rings.length||rings.some(function(r){return !r;}))return null;
+      return JSON.stringify(rings);
+    }
+    var candidates=Array.isArray(lib)?lib.filter(function(x){return x&&String(x.id)===String(ref.id);}):[];
+    if(candidates.length>1)throw new Error('地块库中存在重复编号，无法安全设为当前地块');
+    if(ref.geometryKey)candidates=candidates.filter(function(x){return geometryKey(x)===ref.geometryKey;});
+    else if(ref.savedAt!=null)candidates=candidates.filter(function(x){return Number(x.savedAt||x.ts)===Number(ref.savedAt);});
+    var p=candidates.length===1?candidates[0]:null;
     if(!p) throw new Error('地块库中找不到地块 '+ref.id+'，请回地图重新回传');
     var ring=Array.isArray(p.polyLatLng)?p.polyLatLng:null;
     if((!ring || ring.length<3) && p.geojson){
@@ -29,9 +52,11 @@
   function applyMapMeasuredArea(provided){
     try{
       var raw = provided ? JSON.stringify(provided) : (new URLSearchParams(location.search).has('partitionPreview') ? null : localStorage.getItem('runyeMeasuredArea'));
-      if(!raw) return;
-      var d = resolvePlotRef(JSON.parse(raw));
-      if(!d || !d.sqm){ localStorage.removeItem('runyeMeasuredArea'); return; }
+      if(!raw) return false;
+      var payload=JSON.parse(raw);
+      var d = resolvePlotRef(payload);
+      if(!d || !d.sqm){ localStorage.removeItem('runyeMeasuredArea'); return false; }
+      if(typeof window.runyePersistMeasuredPlot!=='function') throw new Error('地块库接收接口未加载');
 
       // 写入全局实测面积（㎡），驱动「二级管路」的计算
       window.measuredArea = d.sqm;
@@ -40,7 +65,7 @@
       /* terrain 页只回传已落在各地块内的 RTK 高低程摘要；不回传整片点云，
          由用户在「地形高程」面板确认后才写入正式水力计算。 */
       window.__runyeImportedTerrain = d.terrainProfile && d.terrainProfile.source === 'rtk_xyz' ? d.terrainProfile : null;
-      /* v161：先清跨页恢复锚点（本函数随后的 runyePersistMeasuredPlot 会按新地块写回） */
+      /* 先清跨页恢复锚点，随后由当前地块接收流程写入新的工程锚点。 */
       try{ if(window.runyeSetCurrentPlot) window.runyeSetCurrentPlot(null); }catch(e){}
 
       // 由真实经纬度换算成本地米坐标，供 A/B 边长估算
@@ -129,24 +154,22 @@
         (window.__runyeSubPlots||[]).forEach(function(p){p.poly=RyMapPartition.orient(p.poly,d.partitionPlan.angle,ctr);});
       }
       if(typeof updatePlan === 'function') updatePlan();
-      // 落库：地图实测回传的地块持久化到 runye_plot_library
-      // 管线绘图区由 runyePersistMeasuredPlot 一并刷新，避免回传后仅内存可见、刷新即丢
+      // 地块引用已在库中：只更新当前工程，不把旋转后的图面坐标写回地图原始边界。
+      // 旧版完整载荷仍走落库路径；两种路径都刷新管线绘图区并保存当前工程。
       // [2026-10-12 数字农业剥离] 原「持久化函数缺失时改走对端回写」的回落分支随桥接层
       //   一并删除；现在持久化函数缺失就是缺失，不再有第二套落库路径可绕。
-      try{
-        if(typeof window.runyePersistMeasuredPlot==='function'){
-          window.runyePersistMeasuredPlot({ plotId:d.plotId||null, name:d.name||null });
-        }
-      }catch(e){ console.error('map plot persist failed', e); }
+      window.runyePersistMeasuredPlot({ plotId:d.plotId||null, name:d.name||null, preserveSource:!!payload.ryPlotRef });
       if(window.RyMapPartition && d.partitionPlan){if(typeof ppLoadPolygon==='function')ppLoadPolygon();RyMapPartition.restore(d.partitionPlan);}
-      var sec = document.getElementById('areaTool');
-      if(sec) sec.scrollIntoView({behavior:'smooth', block:'start'});
+      if(d.partitionPlan && d.plotId && typeof window.runyeSetCurrentPlot==='function') window.runyeSetCurrentPlot(d.plotId);
       showMapBanner(d);
       localStorage.removeItem('runyeMeasuredArea');
+      if(typeof window.ryJumpToSection==='function') window.ryJumpToSection('pipePlanSection');
+      return true;
     }catch(e){
       console.error('applyMapMeasuredArea error', e);
       /* 引用失效时保留 runyeMeasuredArea 供恢复，并把原因明确反馈给用户。 */
       try{ alert('地块回传未完成：'+(e&&e.message?e.message:'数据读取失败')+'。回地图重新回传后再试。'); }catch(eAlert){}
+      return false;
     }
   }
 

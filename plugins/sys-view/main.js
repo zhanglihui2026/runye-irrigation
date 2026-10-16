@@ -107,7 +107,7 @@ function activate(ctx) {
       var act = c.act;
       var A = window.RyFnNavActions;
       if (A && typeof A[act] === 'function') { A[act](); return; }
-      var fn = act === 'sys' ? window.tlShowSysDiagram : window.tlShowIsoDiagram;
+      var fn = act === 'sys' ? window.tlShowSysDiagram : null;
       if (typeof fn === 'function') { fn(); return; }
       ctx.runtime.log('degrade', '动作未注册且页面全局函数不可用：' + act);
     } catch (e) { if (ctxRef) ctxRef.runtime.reportError(e); }

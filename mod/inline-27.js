@@ -1,5 +1,5 @@
 
-/* —— 图面改径菜单（2026-09-16 阶段2e）：三级设计工作区 / 轴测图 右键自动管线 →
+/* —— 图面改径菜单（2026-09-16 阶段2e）：三级设计工作区右键自动管线 →
    选 PE 外径一步改径（琥珀 Ø 标注），或恢复水力计算值。菜单 body 级懒创建
    （不进 SVG、不改静态 DOM）；数据走共享层 RyTlAutoEdits.cals，只作显示标注，
    不参与水力计算、不进材料清单（红线同阶段2）。220 为用户点名非标规格。 —— */
@@ -8,7 +8,7 @@
      本处不再自带一份字面量。 */
   var AE = window.RyTlAutoEdits;
   var menu = null;
-  var target = null;   /* {view:'ws'|'iso', pid} */
+  var target = null;   /* {view:'ws', pid} */
   function baseCal(pid) {
     var d = window.tlDiagramData;
     var m = d && d.meta && d.meta.pipes;
@@ -147,7 +147,7 @@
       + ' m</b>（已含安全系数，与右栏一致）';
   };
   function apply(view, pid, od) {
-    var mod = view === 'ws' ? window.RyTlWs : window.RyIsoDiagram;
+    var mod = window.RyTlWs;
     if (!mod) return;
     if (Array.isArray(pid)) {   /* 同类型多选整体改径（第三十九轮） */
       if (od == null) { if (mod.clearAutoCaliberMulti) mod.clearAutoCaliberMulti(pid); else pid.forEach(function (p) { if (mod.clearAutoCaliber) mod.clearAutoCaliber(p); }); }
@@ -169,18 +169,11 @@
       menu.addEventListener('click', function (e) {
         var b = e.target.closest ? e.target.closest('button') : null;
         if (!b || !target) return;
-        if (b.getAttribute('data-add')) {
-          var kind = b.getAttribute('data-add');
-          var added = window.RyIsoDiagram && window.RyIsoDiagram.addManualAtScreen ? window.RyIsoDiagram.addManualAtScreen(kind, target.x, target.y) : null;
-          if (added) { if (typeof tlIsoStatsRender === 'function') tlIsoStatsRender(); if (typeof setHint === 'function') setHint('已加' + (kind === 'tee' ? '三通' : kind === 'elbow' ? '弯头' : '阀门') + '：' + added.id + '（右键三通可旋转 X/Y/Z）'); }
-          else if (typeof setHint === 'function') setHint('未命中管线（请沿总管/主管/支管管段点击）');
-          hide(); return;
-        }
         if (b.getAttribute('data-od')) {
           apply(target.view, target.pid, b.getAttribute('data-od') === 'base' ? null : parseFloat(b.getAttribute('data-od')));
           hide(); return;
         }
-        /* v162：遮蔽/取消遮蔽（工作区与轴测图右键菜单共用） */
+        /* v162：遮蔽/取消遮蔽（工作区右键菜单） */
         if (b.getAttribute('data-mask') != null) {
           var maskOn = b.getAttribute('data-mask') === '1';
           if (typeof window.tlPipeHiddenChanged === 'function') {
@@ -200,15 +193,6 @@
     else { base = baseCal(pid); od = AE && AE.caliberOf ? AE.caliberOf(pid) : null; name = AE && AE.pipeName ? AE.pipeName(pid) : pid; }
     var btnCss = 'display:block;width:100%;text-align:left;border:0;background:none;padding:4px 10px;cursor:pointer;border-radius:4px;font:inherit;color:inherit';
     var h = '';
-    /* 轴测图「加配件」段（2026-10-01 v179 用户要求下线）：不再渲染；平面视图本无此段。
-       恢复方式：把页面级 ISO_FITTING_UI_OFF 改回 false。改径 / 遮蔽等原有项不受影响。 */
-    if (view === 'iso' && !window.ISO_FITTING_UI_OFF) {
-      h += '<div style="padding:4px 10px;font-weight:700;color:#0369a1">轴测图 · 加配件</div>'
-        + '<button type="button" data-add="tee" style="' + btnCss + '">＋ 加三通</button>'
-        + '<button type="button" data-add="elbow" style="' + btnCss + '">＋ 加弯头</button>'
-        + '<button type="button" data-add="valve" style="' + btnCss + '">＋ 加阀门</button>'
-        + '<div style="border-bottom:1px solid #e5e7eb;margin:2px 0"></div>';
-    }
     if (isMulti) h += '<div style="padding:4px 10px;font-weight:700;border-bottom:1px solid #e5e7eb;margin-bottom:2px">整体改径 · 共 ' + pid.length + ' 段（同类型）</div>';
     else h += '<div style="padding:4px 10px;font-weight:700;border-bottom:1px solid #e5e7eb;margin-bottom:2px">' + name + ' · 计算值 ' + (base ? 'Ø' + base : '—') + '</div>';
     CAL_SERIES.forEach(function (odv) {
@@ -247,7 +231,6 @@
     if (r.bottom > window.innerHeight - 8) menu.style.top = Math.max(4, window.innerHeight - r.height - 12) + 'px';
   }
   if (window.RyTlWs) window.RyTlWs.onAutoPipeContextMenu = function (pid, x, y) { openMenu('ws', pid, x, y); };
-  if (window.RyIsoDiagram) window.RyIsoDiagram.onAutoPipeContextMenu = function (pid, x, y) { openMenu('iso', pid, x, y); };
   /* ===== 更新水泵扬程（2026-09-17 第四十一轮，用户要求）=====
      背景：图面改径只作标注（红线），不进选型计算。但用户要"改不同管径 → 评估最经济的
      管径与水泵"，所以给一个显式确认动作：按管道编号保存已改外径，
@@ -311,7 +294,7 @@
   }
   /* ===== v137（2026-09-23 用户要求）：三级简图参数两行单一来源 =====
      「应用到图面」等改径重算后，简图/系统简图 SVG 里烤死的参数行也要跟着变——
-     生成（tlAutoGenerate）与实时重写（tlSyncIsoMeta）共用本构造，保证逐字同源。
+     生成（tlAutoGenerate）与当前页面的扬程分解共用本构造，保证逐字同源。
      ods = 图面实际代表径（图面改径按管长加权，无改径退回水力计算值，v116 口径）。
      v138（用户要求）：水泵参数=当前重算 r 的流量/扬程/功率，1 位小数——与经济面板
      「当前选择」同源同精度（原取结果条文本被 fmt0 取整，39 m ≠ 面板 38.9 m）；
@@ -447,8 +430,7 @@
     }
   };
   /* 遮蔽变化的统一收口（工具轨「遮蔽管道」点击 / Esc / 右键菜单 都走这里）：
-     先按新状态重刷简图样式 → 再写状态并广播（工作区重渲染时会克隆到新简图；轴测图走
-     AE.onChange → RyIsoDiagram.redraw）→ 最后重算材料清单。
+     先按新状态重刷简图样式 → 再写状态并广播（工作区重渲染时会克隆到新简图）→ 最后重算材料清单。
      opts: {pid,on} 单条 | {pids,on} 多条同值 | {pids,toggleEach:true} 逐条取反 | {clearAll:true} 全部恢复。 */
   window.tlPipeHiddenChanged = function (opts) {
     opts = opts || {};
@@ -508,7 +490,6 @@
     try { window.tlApplyHiddenPipeStyles(); } catch (eS) { }        /* 全量对齐一次（兜底） */
     try { if (window.RyTlWs && window.RyTlWs.rerenderKeepView) window.RyTlWs.rerenderKeepView(); } catch (eW) { }  /* 工作区底图=克隆简图 */
     try { if (typeof window.render === 'function') window.render(); } catch (eR) { }   /* 材料清单重算 */
-    try { if (window.RyIsoDiagram && window.RyIsoDiagram.redraw) window.RyIsoDiagram.redraw(); } catch (eI) { }
     return ok;
   };
   window.tlFigParamLines = function (r) {
@@ -542,7 +523,8 @@
     var pump = {
       flow: f1(r.combinedFlow) !== null ? f1(r.combinedFlow) + ' m³/h' : barTxt('tlPlanPumpFlow'),
       head: f1(r.pumpHead) !== null ? f1(r.pumpHead) + ' m' : barTxt('tlPlanPumpHead'),
-      power: f1(r.motorKW_rounded) !== null ? f1(r.motorKW_rounded) + ' kW' : barTxt('tlPlanPumpPower')
+      power: f1(r.pumpPower) !== null ? f1(r.pumpPower) + ' kW' : barTxt('tlPlanPumpPower'),
+      motor: f1(r.motorKW_rounded) !== null ? f1(r.motorKW_rounded) + ' kW' : barTxt('tlPlanMotorPower')
     };
     /* v140：全地块管长统计（与经济面板「全地块管长」同口径：有效几何逐段累加，含手工改动） */
     function plotLen(kind) {
@@ -582,46 +564,10 @@
     if (lM === null) lM = r.mainLenUsed;
     if (lB === null) lB = r.branchLenUsed;
     var l1 = '总管 Ø ' + ods.front + ' mm · ' + fmtLen(lF) + ' m · 主管 Ø ' + ods.main + ' mm · ' + fmtLen(lM) + ' m · 支管 Ø ' + ods.branch + ' mm · ' + fmtLen(lB) + ' m';
-    var l2 = '联合灌溉 ' + (typeof tlGetZoneCount === 'function' ? tlGetZoneCount() : (r.zoneCount || 1)) + '区 · 水泵 ' + pump.flow + ' · ' + pump.head + ' · ' + pump.power;
+    var l2 = '联合灌溉 ' + (typeof tlGetZoneCount === 'function' ? tlGetZoneCount() : (r.zoneCount || 1)) + '区 · 水泵 ' + pump.flow + ' · ' + pump.head + ' · 轴功率 ' + pump.power + ' · 建议电机 ' + pump.motor;
     /* v142：lens = 总/主/支管全地块实际长度（plotLen 统计，无图面退回 r.*LenUsed）——
        材料清单页从三级简图口径取数用；加法扩展，既有消费方（lines/ods/pump）零感知。 */
     return { lines: [l1, l2], ods: ods, pump: pump, lens: { front: lF, main: lM, branch: lB } };
-  };
-  /* ===== v136（2026-09-23 用户反馈）：轴测图图例/信息行实时更新 =====
-     「应用到图面」后管线与左栏结果都变了，但图例读的 tlDiagramData.meta.pipes/pump 是
-     生成管线图时刻的设计口径快照（网络模型/三通菜单/损失估算/e2e 消费红线，不能改写）。
-     故新增 meta.live 实时快照：pipes=按管长加权的图面实际管径（AE.calibersMap，无改径退回
-     水力计算值），pump=当前重算值（v138 起与面板「当前选择」同源同精度，不再取结果条取整文本）。
-     只写 live，设计口径原样保留。 */
-  window.tlSyncIsoMeta = function () {
-    var d = window.tlDiagramData;
-    if (!d || d.version !== 1) return false;
-    var r = null;
-    try { r = computeThreeLevel(); } catch (e) { return false; }
-    if (!r || !r.frontPipe) return false;
-    var fp = window.tlFigParamLines ? window.tlFigParamLines(r) : null;
-    if (!fp) return false;
-    var m = d.meta || (d.meta = {});
-    m.live = {
-      pipes: { front: 'Ø ' + fp.ods.front + ' mm',
-               main: 'Ø ' + fp.ods.main + ' mm',
-               branch: 'Ø ' + fp.ods.branch + ' mm' },
-      pump: fp.pump   /* v138：与面板「当前选择」同源同精度（1 位小数） */
-    };
-    /* v137：简图/系统简图内烤死的参数两行用同一构造实时重写
-       （#tlDiagramContent 原生 + #tlSysPipeBoxBody 克隆 sc_ 前缀，后缀匹配一并命中；
-         生成路径调用本函数时 SVG 尚未注入，查不到节点自然空转）。 */
-    var hosts = ['tlDiagramContent', 'tlSysPipeBoxBody'];
-    for (var hi = 0; hi < hosts.length; hi++) {
-      var host = document.getElementById(hosts[hi]);
-      if (!host || !host.querySelectorAll) continue;
-      var gs = host.querySelectorAll('[id$="tlParamsGroup"]');
-      for (var gi = 0; gi < gs.length; gi++) {
-        var ts = gs[gi].querySelectorAll('text');
-        if (ts.length >= 2) { ts[0].textContent = fp.lines[0]; ts[1].textContent = fp.lines[1]; }
-      }
-    }
-    return true;
   };
   /* [v307 2026-10-08 用户反馈「改径结果未传递给水力计算页」] 把管路规划页最新改径结果
      （管径三项+扬程）同步进 localStorage 快照 runye_hydraulic_design_v1——水力计算页
@@ -631,7 +577,7 @@
      ② tlPumpUpdateRun（更新水泵扬程/经济面板应用/图面改径 三路收口）。 */
   window.tlSyncHydDesignSnapshot = function () {
     try {
-      var raw = JSON.parse(localStorage.getItem('runye_hydraulic_design_v1') || 'null');
+      var raw = window.RyIrrigationDataStore.readHydraulicDesign();
       if (!raw || raw.version !== 1 || !raw.hydraulics) return false;
       var r = computeThreeLevel();
       if (!r || !r.frontPipe || !r.mainPipe || !r.branchPipe) return false;
@@ -640,7 +586,7 @@
       raw.hydraulics.mainPipe = { od: r.mainPipe.od };
       raw.hydraulics.branchPipe = { od: r.branchPipe.od };
       raw.caliberAppliedAt = Date.now();
-      localStorage.setItem('runye_hydraulic_design_v1', JSON.stringify(raw));
+      window.RyIrrigationDataStore.writeHydraulicDesign(raw);
       return true;
     } catch (eSync) { return false; }
   };
@@ -650,29 +596,27 @@
     var before = null;
     try {
       var r0 = pumpComparison().design;
-      before = { head: r0.pumpHead, kw: r0.motorKW_rounded, loss: r0.totalPipeLoss };
+      before = { head: r0.pumpHead, shaftKW: r0.pumpPower, motorKW: r0.motorKW_rounded, loss: r0.totalPipeLoss };
     } catch (e) { }
     tlPipeOdOverride = pipeCaliberSnapshot();
     try { tlUpdatePlanBar(); } catch (e) { console.error('[tlPumpUpdate] 重算失败：', e); }
     try { tlRefreshLossCard(); } catch (e) { }
-    /* v136：meta.live 实时快照 + 轴测图重渲染（若已挂载）——图例/信息行跟着实际值走。
-       redraw 内部无图面时自动空转；此收口覆盖 经济面板应用/图面改径/更新水泵扬程 三条路。 */
-    try { window.tlSyncIsoMeta && window.tlSyncIsoMeta(); } catch (e) { }
     try { if (typeof window.tlSyncHydDesignSnapshot === 'function') window.tlSyncHydDesignSnapshot(); } catch (eHydSync) { }
-    try { if (window.RyIsoDiagram && window.RyIsoDiagram.redraw) window.RyIsoDiagram.redraw(); } catch (e) { }
     try {
       var r1 = computeThreeLevel();
       var d = document.getElementById('tlPumpUpdateDelta');
       if (d && before) {
-        var dh = r1.pumpHead - before.head, dk = r1.motorKW_rounded - before.kw, dl = r1.totalPipeLoss - before.loss;
+        var dh = r1.pumpHead - before.head, dp = r1.pumpPower - before.shaftKW, dm = r1.motorKW_rounded - before.motorKW, dl = r1.totalPipeLoss - before.loss;
         function sgn(v, u, dec) { return (v >= 0 ? '+' : '\u2212') + Math.abs(v).toFixed(dec === undefined ? 2 : dec) + u; }
         function col(v) { return v < -0.005 ? '#15803d' : (v > 0.005 ? '#b91c1c' : '#64748b'); }
         d.style.display = '';
         d.innerHTML = '<div style="border-top:1px dashed #cbd5e1;padding-top:5px">'
           + '<div>设计 → 改径重算 · 水泵扬程 <b>' + before.head.toFixed(1) + ' → ' + r1.pumpHead.toFixed(1) + ' m</b>'
           + ' <b style="color:' + col(dh) + '">(' + sgn(dh, ' m', 1) + ')</b></div>'
-          + '<div>水泵功率 <b>' + before.kw + ' → ' + r1.motorKW_rounded + ' kW</b>'
-          + ' <b style="color:' + col(dk) + '">(' + sgn(dk, ' kW', 2) + ')</b></div>'
+          + '<div>计算轴功率 <b>' + before.shaftKW.toFixed(1) + ' → ' + r1.pumpPower.toFixed(1) + ' kW</b>'
+          + ' <b style="color:' + col(dp) + '">(' + sgn(dp, ' kW', 2) + ')</b></div>'
+          + '<div>建议电机功率 <b>' + before.motorKW + ' → ' + r1.motorKW_rounded + ' kW</b>'
+          + ' <b style="color:' + col(dm) + '">(' + sgn(dm, ' kW', 2) + ')</b></div>'
           + '<div>设计估算 → 最大路径损失 ' + before.loss.toFixed(2) + ' → ' + r1.totalPipeLoss.toFixed(2) + ' m'
           + ' <b style="color:' + col(dl) + '">(' + sgn(dl, ' m', 2) + ')</b></div></div>';
       }
@@ -690,7 +634,7 @@
      三级工作区绘图区右侧：按分区**逐段**列出总管 / 主管 / 支管
      （段名 + 长度 + 管径 + 改前 / 改后水头损失 + 差值）。
      管径下拉就地在表格里改 → 走 RyTlWs.setAutoCaliber（与右键改径同源 AE.cals）→ 图面同步 + 本表数值随动。
-     与轴测图「分区材料统计」的区别：那张表统计**数量**；本表统计**长度**并支持**改管径**。
+     本表按分区统计**长度**并支持**改管径**。
      损失口径与 hfFor 同源（总管=联合流量、主管=单区、支管=单区/支管数），
      改完管径后可再点左栏「⇧ 更新水泵扬程」把管径折算进正式选型计算。 */
   var WS_STATS_KEY = 'runye_tlWsStats_collapsed';
@@ -766,7 +710,7 @@
     return rows.length ? rows : null;
   }
   /* ===== 管径经济性对比面板（v120，2026-09-23 用户要求）=====
-     轴测图右侧列表：选不同 总管/主管/支管 管径组合 → 水泵扬程/功率/管材投入/年电费/年均总成本
+     管径经济分析：比较总管/主管/支管组合对应的水泵扬程、功率、管材投入和年均总成本
      一表对比（按年均总成本升序，最低行=平衡点参考），可一键应用到图面。口径约定（用户明确）：
      · 总/主/支管长度 = 三级管线编辑的【全地块】图面有效长度（wsSegRows 汇总，含手工改动），
        不是最远点路径 —— 改径是整个地块一起改，评估的是整体费用；
@@ -834,7 +778,7 @@
         var ov = tlNormalizePipeOverride({ version: 1, geoKey: geoKey, calibers: cal });
         var saved = tlPipeOdOverride, r;
         try { tlPipeOdOverride = ov; r = computeThreeLevel(); } finally { tlPipeOdOverride = saved; }
-        c.head = r.pumpHead; c.kw = r.motorKW_rounded;
+        c.head = r.pumpHead; c.kw = r.pumpPower; c.motorKw = r.motorKW_rounded;
         /* 流速 m/s: Q(m3/h)/3600 / 截面积(m2) */
         function vOf(Q, odMm) { var d = odMm/1000*0.94; return (Q/3600)/(Math.PI*d*d/4); }
         c.vF = r.combinedFlow ? vOf(r.combinedFlow, c.f) : (r.zoneFlow ? vOf(r.zoneFlow, c.f) : 0);
@@ -876,20 +820,20 @@
       rows.sort(function (x, y) { return x.annual - y.annual; });
       var selIdx = -1, minIdx = 0;
       rows.forEach(function (r, i) { if (r.c.f === st.selF && r.c.m === st.selM && r.c.b === st.selB) selIdx = i; });
-      var html = '<table><thead><tr><th>组合 总/主/支</th><th>管材投入(元)</th><th>扬程(m)</th><th>功率(kW)</th><th>年电费(元)</th><th>年均总(元/年)</th></tr></thead><tbody>';
+      var html = '<table><thead><tr><th>组合 总/主/支</th><th>管材投入(元)</th><th>扬程(m)</th><th>轴功率 / 建议电机(kW)</th><th>年电费估算(元)</th><th>年均总(元/年)</th></tr></thead><tbody>';
       rows.forEach(function (r, i) {
         var cls = (i === selIdx ? 'sel ' : '') + (i === minIdx ? 'min ' : '') + (r.c.f === D.dF && r.c.m === D.dM && r.c.b === D.dB ? 'des' : '');
         html += '<tr data-i="' + i + '" class="' + cls.trim() + '">'
           + '<td>Ø' + r.c.f + ' / Ø' + r.c.m + ' / Ø' + r.c.b + '</td>'
-          + '<td>' + fmtN(r.c.mat) + '</td><td>' + fmtN(r.c.head, 1) + '</td><td>' + fmtN(r.c.kw, 1) + '</td>'
+          + '<td>' + fmtN(r.c.mat) + '</td><td>' + fmtN(r.c.head, 1) + '</td><td>' + fmtN(r.c.kw, 1) + ' / ' + fmtN(r.c.motorKw, 1) + '</td>'
           + '<td>' + fmtN(r.elec) + '</td><td class="te-annual">' + fmtN(r.annual) + '</td></tr>';
       });
       html += '</tbody></table>';
       document.getElementById('teTbl').innerHTML = html;
-      document.getElementById('teNote').innerHTML = '扬程/功率 = 整地块统一改径后重算（最不利路径口径，与结果栏同源）；管材投入 = 各类总长 × 单价。绿字年均总 = 最低（平衡点参考）；「（设计）」= 水力计算选管组合。若已在「经济指标分析」左侧填了 总/主/支 管材单价，则该角色优先按角色单价、未填的角色才走上面的单价表。';
+      document.getElementById('teNote').innerHTML = '扬程与轴功率 = 整地块统一改径后按最不利路径重算；建议电机为标准额定档位。年电费估算按计算轴功率 × 运行小时 × 电价，不使用电机额定功率代替耗电功率。管材投入 = 各类总长 × 单价；绿字年均总为最低项参考。若已在「经济指标分析」左侧填了总/主/支管材单价，则该角色优先使用角色单价。';
       var selRow = selIdx >= 0 ? rows[selIdx] : null;
       document.getElementById('teSum').innerHTML = selRow
-        ? '当前选择：总 Ø' + selRow.c.f + ' · 主 Ø' + selRow.c.m + ' · 支 Ø' + selRow.c.b + ' → 扬程 <b>' + fmtN(selRow.c.head, 1) + ' m</b> · 功率 <b>' + fmtN(selRow.c.kw, 1) + ' kW</b> · 管材 <b>' + fmtN(selRow.c.mat) + ' 元</b> · 年均总 <b>' + fmtN(selRow.annual) + ' 元/年</b>'
+        ? '当前选择：总 Ø' + selRow.c.f + ' · 主 Ø' + selRow.c.m + ' · 支 Ø' + selRow.c.b + ' → 扬程 <b>' + fmtN(selRow.c.head, 1) + ' m</b> · 轴功率 <b>' + fmtN(selRow.c.kw, 1) + ' kW</b> · 建议电机 <b>' + fmtN(selRow.c.motorKw, 1) + ' kW</b> · 管材 <b>' + fmtN(selRow.c.mat) + ' 元</b> · 年均总 <b>' + fmtN(selRow.annual) + ' 元/年</b>'
         : '点击表中任一行选择组合。';
       var pr = prices();
       document.getElementById('tePrices').innerHTML = CAL_SERIES.map(function (od) {
@@ -925,7 +869,6 @@
       var p = document.getElementById('tlEconPanel'); if (p) p.style.display = '';
       var g = document.getElementById('tlEconGrip'); if (g) g.style.display = 'block';
       var r = document.getElementById('tlEconRail'); if (r) r.style.display = 'none';
-      var tb = document.getElementById('tlIsoToolbar'); if (tb) tb.classList.add('te-padded');
       render();
     }
     function closeP() {
@@ -933,7 +876,6 @@
       var p = document.getElementById('tlEconPanel'); if (p) p.style.display = 'none';
       var g = document.getElementById('tlEconGrip'); if (g) g.style.display = 'none';
       var r = document.getElementById('tlEconRail'); if (r) r.style.display = 'flex';
-      var tb = document.getElementById('tlIsoToolbar'); if (tb) tb.classList.remove('te-padded');
     }
     function toggleP() { st.open ? closeP() : openP(); }
     (function bind() {
@@ -977,46 +919,6 @@
       });
     })();
     return { open: openP, close: closeP, toggle: toggleP, render: render, build: build, applySel: applySel };
-  })();
-  /* v126（2026-09-23 用户要求）：经济对比面板宽度可拖 —— 镜像 #tlWsSegStatsGrip（第四十四轮）的约定：
-     没拖过不写任何变量（走 CSS 回退宽 clamp(400px,36vw,560px)），拖过即持久化 localStorage
-     'runye_tlEconPanel_w'，双击恢复默认。宽度范围 [360, min(820, 画布宽-280)] —— 至少给轴测图留 280px。 */
-  (function bindEconGrip(){
-    var grip=document.getElementById('tlEconGrip'),wrap=document.getElementById('tlIsoDiagramWrap');
-    if(!grip||!wrap)return;
-    var KEY='runye_tlEconPanel_w';
-    try{var w0=parseInt(localStorage.getItem(KEY),10)||0;if(w0>0)wrap.style.setProperty('--tlEconW',w0+'px');}catch(e){}
-    var drag=null;
-    grip.addEventListener('pointerdown',function(e){
-      var pr=wrap.getBoundingClientRect();
-      var maxW=Math.min(820,pr.width-280);
-      if(maxW<360)return;
-      drag={pr:pr,maxW:maxW};
-      grip.classList.add('on');
-      document.body.style.userSelect='none';
-      if(grip.setPointerCapture){try{grip.setPointerCapture(e.pointerId);}catch(err){}}
-      e.preventDefault();
-    });
-    grip.addEventListener('pointermove',function(e){
-      if(!drag)return;
-      var w=Math.round(Math.max(360,Math.min(drag.maxW,drag.pr.right-e.clientX)));
-      wrap.style.setProperty('--tlEconW',w+'px');
-      drag.w=w;
-    });
-    function endDrag(){drag=null;grip.classList.remove('on');document.body.style.userSelect='';}
-    grip.addEventListener('pointerup',function(){
-      var w=null;if(drag)w=drag.w;
-      endDrag();
-      if(w){try{localStorage.setItem(KEY,String(w));}catch(e){}}
-    });
-    grip.addEventListener('pointercancel',endDrag);
-    grip.addEventListener('dblclick',function(){
-      wrap.style.removeProperty('--tlEconW');
-      try{localStorage.removeItem(KEY);}catch(e){}
-    });
-    /* v127：右侧折叠细条点击 → 重新展开面板 */
-    var rail=document.getElementById('tlEconRail');
-    if(rail)rail.addEventListener('click',function(){ if(window.tlEconPanel&&window.tlEconPanel.open)window.tlEconPanel.open(); });
   })();
   /* v105（2026-09-22 用户要求）：「管段管径与损失」统计表目前没啥用 → 总开关隐藏。
      后续要调回这张表时：把 TL_WS_STATS_HIDDEN 改回 false 即可，其余逻辑一律不动。 */
@@ -1234,11 +1136,9 @@
         try { localStorage.setItem(WS_STATS_KEY, c ? '1' : '0'); } catch (e) {}
       });
     }
-    /* 工具轨宽度拖拽（第四十四轮：统计表移入工具轨后，拖拽条调节的是**整条工具轨**的宽度；
-       约定同轴测图：没拖过不写任何变量，走 CSS 回退值 --tlWsToolbarW）
-       ★ 元素 id 用 tlWsSegStatsGrip 而非 tlWsStatsGrip：后者被轴测图统计栏的拖拽条占用
-         （更早出现在文档里），同名会让 getElementById 取到轴测图那个 —— 本面板的拖拽条失联、
-         且拖轴测图统计栏会误改本面板宽度（第四十二轮实测踩到，已改名）。 */
+    /* 工具轨宽度拖拽：统计表移入工具轨后，拖拽条调节整条工具轨宽度；
+       没有用户自定义宽度时使用 CSS 回退值 --tlWsToolbarW。
+       grip 使用独立 id，避免与其他面板的历史命名冲突。 */
     var grip = document.getElementById('tlWsSegStatsGrip');
     var TOOLBAR_GAP = 8;   /* 与 .ry-pane-ws 的 column-gap 一致：拖拽条在轨左侧，量宽要扣掉这条缝 */
     if (grip && pane) {
@@ -1336,7 +1236,7 @@
    水头损失多大，这是一个信息卡片，可以自动隐藏的，卡片的位置可以拖动的」。
    · 只对三级管路编辑（ws 视图）的自动管线（总管/主管/支管）弹出；选中配件/点空白即隐藏。
    · #tlWsPipeCard 懒创建（首次点击才 appendChild 到 body）→ 页面加载零 DOM 增量，
-     eq 等价性基线不受影响（同 #tlPipeCalMenu / #tlIsoCtxMenu 的既有做法）。
+     eq 等价性基线不受影响（沿用既有管径菜单的处理方式）。
    · 默认贴鼠标（偏移 +16/+18，夹在视口内）；拖动过即「固定」，后续点击不再跟随鼠标，
      双击标题栏解除固定、回到跟随鼠标。固定位置与固定态一并存 localStorage。
    · 自动隐藏 8s：鼠标移入卡片暂停计时、移出重新计时；点「×」立即隐藏；取消选中立即隐藏。

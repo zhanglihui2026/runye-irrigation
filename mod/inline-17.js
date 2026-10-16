@@ -24,7 +24,7 @@
   var HINTS={
     designInput:'调整左侧参数，方案与管径选型结果实时更新',
     areaTool:'上传图片或在线地图描绘地块边界，闭合后自动回填面积',
-    pipePlanSection:'绘制主管 / 支管 → 生成施工图 → 切「二级简图」查看',
+    pipePlanSection:'绘制主管 / 支管 → 生成施工图；二级简图入口暂时停用',
     tlPipePlanSection:'设定联合灌溉分区 → 生成管线图 → 「三级制图」可缩放/插入管线',
     detailsSection:'材料清单与工程量汇总',
 threeDModelingSection:'经济指标分析 · 入口预留（方案确定后上线）',

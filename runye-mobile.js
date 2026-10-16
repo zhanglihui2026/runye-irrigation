@@ -46,7 +46,7 @@
       resizeDrawing();
     });
     bar.appendChild(toggle);
-    if (section) {
+    if (section && section.id === allowed[1]) {
       var view = document.createElement('button');
       view.type = 'button'; view.textContent = '查看简图';
       view.addEventListener('click', function () {
@@ -58,19 +58,17 @@
         resizeDrawing();
       });
       bar.appendChild(view);
-      if (section.id === allowed[1]) {
-        var generate = document.createElement('button');
-        generate.type = 'button'; generate.textContent = '生成图纸'; generate.setAttribute('data-mobile-generate', '1');
-        generate.addEventListener('click', function () { if (typeof window.tlAutoGenerate === 'function') window.tlAutoGenerate(); });
-        bar.appendChild(generate);
-        var zoom = document.createElement('div'); zoom.className = 'ry-mobile-zoom';
-        [['＋','zoomIn','放大图纸'],['－','zoomOut','缩小图纸'],['适配','zoomFit','图纸适应窗口']].forEach(function (item) {
-          var b = document.createElement('button'); b.type = 'button'; b.textContent = item[0]; b.setAttribute('aria-label',item[2]);
-          b.addEventListener('click',function () { if (window.RyTlWs) window.RyTlWs[item[1]](); });
-          zoom.appendChild(b);
-        });
-        section.appendChild(zoom);
-      }
+      var generate = document.createElement('button');
+      generate.type = 'button'; generate.textContent = '生成图纸'; generate.setAttribute('data-mobile-generate', '1');
+      generate.addEventListener('click', function () { if (typeof window.tlAutoGenerate === 'function') window.tlAutoGenerate(); });
+      bar.appendChild(generate);
+      var zoom = document.createElement('div'); zoom.className = 'ry-mobile-zoom';
+      [['＋','zoomIn','放大图纸'],['－','zoomOut','缩小图纸'],['适配','zoomFit','图纸适应窗口']].forEach(function (item) {
+        var b = document.createElement('button'); b.type = 'button'; b.textContent = item[0]; b.setAttribute('aria-label',item[2]);
+        b.addEventListener('click',function () { if (window.RyTlWs) window.RyTlWs[item[1]](); });
+        zoom.appendChild(b);
+      });
+      section.appendChild(zoom);
       // 顶部导航回到编辑状态时同步按钮文案。
       new MutationObserver(function () {
         view.textContent = /^(edit|ws)$/.test(section.getAttribute('data-ry-view')) ? '查看简图' : '返回编辑';

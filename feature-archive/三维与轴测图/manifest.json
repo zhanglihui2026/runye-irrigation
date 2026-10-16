@@ -1,0 +1,205 @@
+{
+  "schema": "runye-feature-archive/v1",
+  "feature": "3D preview and axonometric diagram",
+  "created_at": "2026-10-16",
+  "files": [
+    {
+      "archive_path": "integration-snapshot/index.html",
+      "source_path": "integration-snapshot/index.html",
+      "sha256": "93bd3476167cdb2a19d2d82552af6a16aa8f48b640c232e803a35ad73243677b",
+      "bytes": 250577
+    },
+    {
+      "archive_path": "integration-snapshot/mod/inline-05.js",
+      "source_path": "integration-snapshot/mod/inline-05.js",
+      "sha256": "1bfcd350ffcedd9c59e67223f5ae97f812f8d4241d9a031292461458584072a3",
+      "bytes": 228
+    },
+    {
+      "archive_path": "integration-snapshot/mod/inline-09.js",
+      "source_path": "integration-snapshot/mod/inline-09.js",
+      "sha256": "9ec9baa1a80eebeb8697e281e04e90f9312744b80b0d1ca7fc72336a41ab2c21",
+      "bytes": 314625
+    },
+    {
+      "archive_path": "integration-snapshot/mod/inline-12.js",
+      "source_path": "integration-snapshot/mod/inline-12.js",
+      "sha256": "9639aa1b352bf08342c3bc3907142c54e8c8f85938a51e3a5bafdd4af6e4c0bf",
+      "bytes": 22826
+    },
+    {
+      "archive_path": "integration-snapshot/mod/inline-17.js",
+      "source_path": "integration-snapshot/mod/inline-17.js",
+      "sha256": "0b5c219cb30002ca7b54befc40e35b0e5ed2e9286c88b82c6fae8d51ddc33f5f",
+      "bytes": 2655
+    },
+    {
+      "archive_path": "integration-snapshot/mod/inline-27.js",
+      "source_path": "integration-snapshot/mod/inline-27.js",
+      "sha256": "74dc775bb625c4261ded50d19cd452da5a67629628626bf1afde8ba428a3676c",
+      "bytes": 125361
+    },
+    {
+      "archive_path": "integration-snapshot/mod/inline-32.js",
+      "source_path": "integration-snapshot/mod/inline-32.js",
+      "sha256": "c09f260ec695ce880a18340a7bd7932c30eedc560569e98b8a94757111e5c3a2",
+      "bytes": 15548
+    },
+    {
+      "archive_path": "integration-snapshot/mod/ry-cad-toolbar.js",
+      "source_path": "integration-snapshot/mod/ry-cad-toolbar.js",
+      "sha256": "968fd7e05dfa57977b0e4ece1c6c8ddea104f9201f444baaaf1d53c6e84dfd37",
+      "bytes": 11973
+    },
+    {
+      "archive_path": "integration-snapshot/mod/style-01.css",
+      "source_path": "integration-snapshot/mod/style-01.css",
+      "sha256": "e930bad03e8d3a3875b17e44e57937776d80895abe32ad551877a3a38e0dc914",
+      "bytes": 251018
+    },
+    {
+      "archive_path": "integration-snapshot/plugins.json",
+      "source_path": "integration-snapshot/plugins.json",
+      "sha256": "18c41944ac9700c2495d4131772ac9aac424cd29c7941458671733541c30462c",
+      "bytes": 968
+    },
+    {
+      "archive_path": "integration-snapshot/plugins/sys-view/main.js",
+      "source_path": "integration-snapshot/plugins/sys-view/main.js",
+      "sha256": "4f829b971ad09293ee2c7833346d25c5c408ba52a0fc55c5390a7a72bec6aa54",
+      "bytes": 7253
+    },
+    {
+      "archive_path": "integration-snapshot/runye-dxf.js",
+      "source_path": "integration-snapshot/runye-dxf.js",
+      "sha256": "4f2969109e6f3b66f60ce23ab1e0a0161d7532d9c5254ee954e1bbff570b5ff8",
+      "bytes": 19906
+    },
+    {
+      "archive_path": "integration-snapshot/runye-nav.js",
+      "source_path": "integration-snapshot/runye-nav.js",
+      "sha256": "ec3fa62ca4bb2bb372e5a44609e6ea64eb2adc0cdd2e93063f863509ce9158f3",
+      "bytes": 28016
+    },
+    {
+      "archive_path": "integration-snapshot/sw.js",
+      "source_path": "integration-snapshot/sw.js",
+      "sha256": "c4a147e747af4a8912cfde5c139729fb628ca1c0283f61ef025397b27af85196",
+      "bytes": 37016
+    },
+    {
+      "archive_path": "integration-snapshot/tl-workspace/tl-workspace.js",
+      "source_path": "integration-snapshot/tl-workspace/tl-workspace.js",
+      "sha256": "3b4f0b1dc7de5b6ec2f731c44f2e6f35fd5fc73b57dfeb19fd9dceacb184563f",
+      "bytes": 212943
+    },
+    {
+      "archive_path": "source/iso-diagram/_shot_iso_pre.js",
+      "source_path": "iso-diagram/_shot_iso_pre.js",
+      "sha256": "44a5ab386b9ef889849c826868ad44c030dd2c41db6e6197f0ce49f4e04d7c25",
+      "bytes": 169629
+    },
+    {
+      "archive_path": "source/iso-diagram/_shot_neteditor_pre.js",
+      "source_path": "iso-diagram/_shot_neteditor_pre.js",
+      "sha256": "0348acb1d0cd30e38bc6ec511c0b43cd058b65f522e0745d9053c69fe61b4dd7",
+      "bytes": 100838
+    },
+    {
+      "archive_path": "source/iso-diagram/editor.js",
+      "source_path": "iso-diagram/editor.js",
+      "sha256": "103550eb9578a5dd5e4d5eb17d89a6bc776d3fe6cc0927175766e83ccaf78b12",
+      "bytes": 7885
+    },
+    {
+      "archive_path": "source/iso-diagram/iso-diagram.css",
+      "source_path": "iso-diagram/iso-diagram.css",
+      "sha256": "93b572eb903471f1641d01cecf59247d61ee5903fd1f3f9b52968a75e4f7c909",
+      "bytes": 2161
+    },
+    {
+      "archive_path": "source/iso-diagram/iso-diagram.js",
+      "source_path": "iso-diagram/iso-diagram.js",
+      "sha256": "e45cff959b0836d04fa17b430fcda1541f2dca0ab6dc4fd6589557e7b6f6c6d6",
+      "bytes": 188587
+    },
+    {
+      "archive_path": "source/iso-diagram/iso-diagram.js.pre-hitpad",
+      "source_path": "iso-diagram/iso-diagram.js.pre-hitpad",
+      "sha256": "8ac63f6d7287906cf8c7a5871fc896ca618961435e447c7998d4bb789b12a212",
+      "bytes": 107519
+    },
+    {
+      "archive_path": "source/iso-diagram/iso-diagram.js.rv_bak",
+      "source_path": "iso-diagram/iso-diagram.js.rv_bak",
+      "sha256": "8ac63f6d7287906cf8c7a5871fc896ca618961435e447c7998d4bb789b12a212",
+      "bytes": 107519
+    },
+    {
+      "archive_path": "source/iso-diagram/NETWORK_EDITOR.md",
+      "source_path": "iso-diagram/NETWORK_EDITOR.md",
+      "sha256": "f21eadbaba2c0beac6eecf652a0b04db38fb0f80b82de9ec45441afdae436585",
+      "bytes": 29049
+    },
+    {
+      "archive_path": "source/iso-diagram/network-editor.css",
+      "source_path": "iso-diagram/network-editor.css",
+      "sha256": "1da9aa0e133f0bedf70ecef1601fb8d72213e3f171cbb43ab32309df2e95d9d6",
+      "bytes": 9904
+    },
+    {
+      "archive_path": "source/iso-diagram/network-editor.js",
+      "source_path": "iso-diagram/network-editor.js",
+      "sha256": "ed9ffb86d81aa0236d68f0fd73d917587c4c0388437d1622e8827c2574a495d9",
+      "bytes": 102069
+    },
+    {
+      "archive_path": "source/iso-diagram/network-model.js",
+      "source_path": "iso-diagram/network-model.js",
+      "sha256": "1380ec7a7d14414843d16605d82f1df26830d18d787f5e1f6637045ecaee1706",
+      "bytes": 109503
+    },
+    {
+      "archive_path": "source/iso-diagram/product-catalog.js",
+      "source_path": "iso-diagram/product-catalog.js",
+      "sha256": "4a5aafd8340804c91fc538f788176fdd3dbd213d06885be3339dd30927b03411",
+      "bytes": 11155
+    },
+    {
+      "archive_path": "source/mod/inline-26.js",
+      "source_path": "mod/inline-26.js",
+      "sha256": "7757de8d9c0d9b1f5c826f0673dce02a89cc932d50bf819bfbbe501dab127503",
+      "bytes": 49133
+    },
+    {
+      "archive_path": "source/mod/style-01.css",
+      "source_path": "mod/style-01.css",
+      "sha256": "e0bbe3922c5fcf4e675e5ae9de30bdabbecc33f972deb94390771308469e7dfe",
+      "bytes": 266059
+    },
+    {
+      "archive_path": "source/mod/style-02.css",
+      "source_path": "mod/style-02.css",
+      "sha256": "62bfdc92bc272ffebc75e4cdbd20ca527ab80c536e488d7dc177d6e2b7c28b0b",
+      "bytes": 5255
+    },
+    {
+      "archive_path": "source/plugins/iso-view/main.js",
+      "source_path": "plugins/iso-view/main.js",
+      "sha256": "1001328507f80386b05291aba1dfa462ef4fc149ed84f60524e5b708a58460f3",
+      "bytes": 7008
+    },
+    {
+      "archive_path": "source/pwa/vendor/three.min.js",
+      "source_path": "pwa/vendor/three.min.js",
+      "sha256": "f34446bf875b5fb0dcd93819ffe1d9e182d46634ee855f5d904c6c4ac7cdbc95",
+      "bytes": 607784
+    },
+    {
+      "archive_path": "source/runye-pipe3d.js",
+      "source_path": "runye-pipe3d.js",
+      "sha256": "e5f0f2a32ad6fd419c71954db1c558cd7fbd74e5bee7050da361d70fdd4264ba",
+      "bytes": 22327
+    }
+  ]
+}

@@ -875,7 +875,7 @@
         var m2=(typeof s.sqm==='number'&&isFinite(s.sqm)&&s.sqm>0)?s.sqm:Math.round(geodesicArea(r));
         sum+=m2;
         out.push({ id:s.id||(pid+'-sub'+i), name:s.name||('子地块'+(out.length+1)),
-                   mu:+(m2/666.67).toFixed(2), sqm:Math.round(m2), crop:s.crop,
+                   mu:+(m2/666.67).toFixed(2), sqm:Math.round(m2),
                    polyLatLng:r, center:s.center||null });
       }
       if(out.length){
@@ -900,7 +900,8 @@
     var payload=buildPlotPayload(plot, currentMapPlotId||null);
     if(!payload){ alert('该地块没有有效的边界环，无法回传。'); return; }
     try{
-      localStorage.setItem('runye_terrain_incoming', JSON.stringify(payload));
+      if (!window.RyTerrainBridgeStore || !window.RyTerrainBridgeStore.writeIncoming(payload))
+        throw new Error('地形模块交接数据写入失败');
       if(btnEl){ var old=btnEl.textContent; btnEl.textContent='回传中…';
         setTimeout(function(){ btnEl.textContent=old; }, 1200); }
       setTimeout(function(){ if(document.getElementById('terrainSection')) window.location.hash='#terrainSection'; else window.location.href='terrain/index.html'; }, 350);
@@ -924,18 +925,51 @@
     function sendPlotToDesign(plot, btnEl){
     var id=plot && String(plot.id||'');
     var lib=lsGet('runye_plot_library',[]);
-    var saved=id && lib.find(function(p){return String(p.id)===id;});
-    if(!saved){ alert('地块尚未保存到地块库，请先保存后再回传。'); return; }
+    /* 弹窗绑定的是地图渲染时的地块快照。只按 id 重新取第一条会在重复 id
+       或地块库被其他页面改写后静默命中另一块地。几何指纹把“点中的环”绑定到引用。 */
+    function geometryKey(p){
+      function ringKey(r){
+        if(!Array.isArray(r)||r.length<3)return null;
+        return r.map(function(q){
+          var lat=Array.isArray(q)?Number(q[0]):Number(q&&q.lat);
+          var lng=Array.isArray(q)?Number(q[1]):Number(q&&q.lng);
+          return isFinite(lat)&&isFinite(lng)?[+lat.toFixed(7),+lng.toFixed(7)]:null;
+        });
+      }
+      var rings=[];
+      if(p&&p.merged){
+        var set=Array.isArray(p.polyLatLngSet)?p.polyLatLngSet:[];
+        var subs=Array.isArray(p.subPlots)?p.subPlots:[];
+        var n=Math.max(set.length,subs.length);
+        for(var i=0;i<n;i++)rings.push(ringKey(set[i]||subs[i]&&subs[i].polyLatLng));
+      }else rings.push(ringKey(p&&p.polyLatLng));
+      if(!rings.length||rings.some(function(r){return !r;}))return null;
+      return JSON.stringify(rings);
+    }
+    var clickedKey=geometryKey(plot);
+    if(!id||!clickedKey){ alert('当前弹窗地块边界无效，请刷新地图后重新回传。'); return; }
+    var matches=lib.filter(function(p){return p&&String(p.id)===id&&geometryKey(p)===clickedKey;});
+    if(lib.filter(function(p){return p&&String(p.id)===id;}).length!==1){
+      alert('地块库中存在重复编号，当前地块无法安全保存为唯一设计地块；请先检查重复记录。'); return;
+    }
+    if(matches.length!==1){
+      alert(matches.length?'地块库中存在相同编号和边界的多条记录，无法安全确定回传对象。':'弹窗中的地块已与地块库不同步，请刷新地图后重新回传。');
+      return;
+    }
+    var saved=matches[0];
     var areaM2=Number(saved.areaM2)||Number(saved.sqm)||0;
     var savedAt=Number(saved.savedAt)||Number(saved.ts)||Date.now();
     if(!areaM2 || !isFinite(areaM2)){ alert('地块面积无效，无法回传。'); return; }
     try{
       /* 主链路只传稳定引用；几何由二级页按 id 从共享地块库读取，避免跨页复制两套边界。 */
-      localStorage.setItem('runyeMeasuredArea', JSON.stringify({ryPlotRef:{id:id,savedAt:savedAt,areaM2:areaM2}}));
+      localStorage.setItem('runyeMeasuredArea', JSON.stringify({ryPlotRef:{id:id,savedAt:savedAt,areaM2:areaM2,geometryKey:clickedKey}}));
       if(btnEl){ var old=btnEl.textContent; btnEl.textContent='回传中…';
         setTimeout(function(){ btnEl.textContent=old; }, 1200); }
       setTimeout(function(){
-        if(document.getElementById('onlineMapSection')) window.location.hash='pipePlanSection';
+        if(document.getElementById('onlineMapSection')){
+          if(typeof window.runyeApplyMapPayload!=='function') alert('地块分区接收功能尚未加载，请刷新页面后重试。');
+          else if(window.runyeApplyMapPayload()) window.location.hash='pipePlanSection';
+        }
         else window.location.href='index.html#pipePlanSection';
       }, 350);
     }catch(e){ alert('写入失败：'+e.message); }
@@ -943,8 +977,23 @@
 
   // 回传地块绘制：写入 localStorage，并跳转到 index.html 的面积测量工具（03 面积测量工具）
   document.getElementById('btnCopy').onclick=function(){
-    /* 已保存的地块（含成组）：直接按库里那条记录回传，环/面积/子地块都以记录为准 */
+    /* [v475]（2026-10-16 用户实测踩坑）画布上有有效边界时**永远以画布为准**：
+       旧逻辑 currentMapPlotId 指着旧记录就优先传旧记录 ⇒ 用户改完边界/画了新地块
+       还没（重新）保存时，卡片显示的是画布实时测量、回传却发了旧地块——
+       实测案例：卡片 182.92 亩，传过去 274.62 亩（上一块）；卡片 397.29 亩，
+       传过去 145.73 亩（更早的小边界）。现改为：画布环与候选记录面积差 >0.5%
+       ⇒ 先把画布环落库（**另存新条目，不覆盖旧记录**）再回传；完全一致才直传记录。 */
     try{
+      var lib0=lsGet('runye_plot_library',[]);
+      var saved0=currentMapPlotId?lib0.filter(function(p){return p.id===currentMapPlotId;})[0]:null;
+      if(points.length>=3){
+        var liveSqm=Math.round(geodesicArea(points));
+        var savedSqm=saved0?(Number(saved0.areaM2)||Number(saved0.sqm)||0):0;
+        if(isFinite(liveSqm)&&liveSqm>0&&(!saved0||!savedSqm||Math.abs(liveSqm-savedSqm)>savedSqm*0.005)){
+          var fresh=saveCurrentDraftToLibrary({silent:false,newId:true});
+          if(fresh){ sendPlotToDesign(fresh, this); return; }
+        }
+      }
       var lib=lsGet('runye_plot_library',[]);
       var saved=currentMapPlotId?lib.filter(function(p){return p.id===currentMapPlotId;})[0]:null;
       if(saved){ sendPlotToDesign(saved, this); return; }
@@ -986,10 +1035,12 @@
       poly.forEach(function(p){ xs.push((p[1]-lngs[0])*mlat*cosLat); ys.push((p[0]-clat)*mlat); });
     }
     var previous=arr.filter(function(p){return p.id===currentMapPlotId;})[0];
-    if(previous) name=previous.name;
-    var plot={ id:currentMapPlotId || ('p'+Date.now()+Math.floor(Math.random()*1000)), name:name, mu:mu, sqm:sqm,
+    /* [v475] opts.newId=true：强制另存新条目（不占用 currentMapPlotId 的旧记录）
+       —— 回传以画布为准时，旧记录不能被新边界覆盖掉。 */
+    if(previous && !(opts&&opts.newId)) name=previous.name;
+    var plot={ id:((opts&&opts.newId)||!currentMapPlotId)?('p'+Date.now()+Math.floor(Math.random()*1000)):currentMapPlotId, name:name, mu:mu, sqm:sqm,
       poly:xs.map(function(x,i){return {x:Math.round(x*100)/100,y:Math.round(ys[i]*100)/100};}),
-      crop:'七彩花生', source:'map', ts:Date.now(), note:'' };
+      source:'map', ts:Date.now(), note:'' };
     // [map-enhance] 写入权威经纬度坐标，供卫星图实景叠加（旧字段 poly 保留不动，主程序画布照常消费）
     var rawLL=latlngs();
     if(rawLL && rawLL.length>=1){
@@ -1002,7 +1053,8 @@
       plot.geo={refLat:+sl.toFixed(6), refLng:+rawLL[0][1].toFixed(6), proj:'mercatorLocal', ts:Date.now()};
     }
     plot.crs='GCJ-02';
-    if(previous){plot.crop=previous.crop;plot.note=previous.note;arr=arr.map(function(p){return p.id===plot.id?plot:p;});}
+    /* [v475] newId 时旧 previous 与新条目无 id 关系，走 push，不覆盖旧记录 */
+    if(previous && !(opts&&opts.newId)){plot.note=previous.note;arr=arr.map(function(p){return p.id===plot.id?plot:p;});}
     else arr.push(plot);
     try{ localStorage.setItem('runye_plot_library', JSON.stringify(arr)); }
     catch(e){ if(!opts.silent) alert('保存失败：'+e.message); return null; }
@@ -1030,7 +1082,7 @@
   document.getElementById('btnSavePlot').onclick=function(){
     var plot=saveCurrentDraftToLibrary({silent:false});
     if(!plot) return;
-    alert('已保存到地块库：'+plot.name+'（'+plot.mu+' 亩）\n可在精准灌溉页「地块库」设为当前，或在数字农业页选择。');
+    alert('已保存到地块库：'+plot.name+'（'+plot.mu+' 亩）\n可在精准灌溉页「地块库」设为当前。');
   };
 
   // [map-enhance] 把地块库叠加到卫星图（隔离模块，失败不影响测量主流程）
@@ -1099,7 +1151,7 @@
     var arr=[];
     if(points && points.length>=3){
       var ll=latlngs();
-      arr.push({name:'当前画框', mu:parseFloat((geodesicArea(ll)/666.67).toFixed(2)), crop:'', polyLatLng:ll});
+      arr.push({name:'当前画框', mu:parseFloat((geodesicArea(ll)/666.67).toFixed(2)), polyLatLng:ll});
     }
     try{
       (JSON.parse(localStorage.getItem('runye_plot_library')||'[]')).forEach(function(p){
@@ -1146,7 +1198,7 @@
         poly:xs.map(function(x,i){return {x:Math.round(x*100)/100,y:Math.round(ys[i]*100)/100};}),
         polyLatLng:llGcj, center:{lat:+clat.toFixed(6),lng:+sn.toFixed(6)},
         geo:{refLat:+clat.toFixed(6), refLng:+llGcj[0][1].toFixed(6), proj:'mercatorLocal'},
-        crop:p.crop || '', source:'import', crs:'GCJ-02', ts:Date.now(), note:'' });
+        source:'import', crs:'GCJ-02', ts:Date.now(), note:'' });
       allLL=allLL.concat(llGcj);
     });
     localStorage.setItem('runye_plot_library', JSON.stringify(lib));
@@ -1339,7 +1391,7 @@
     try{
       var data={ app:'runye-irrigation', version:1, ts:Date.now(),
         plots: JSON.parse(localStorage.getItem('runye_plot_library')||'[]'),
-        network: JSON.parse(localStorage.getItem('runye_network_layout')||'null'),
+        network: window.RyIrrigationDataStore.readNetworkLayout(),
         view: JSON.parse(localStorage.getItem('runye_map_view')||'null') };
       var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
       var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
@@ -1376,10 +1428,10 @@
           (d.network.dripTapes||[]).forEach(function(line){if(!Array.isArray(line) || line.length<2) throw new Error('滴灌带坐标不足');line.forEach(RunyeGeo.coordPair);});
         }
         if(d.view!=null){RunyeGeo.coordPair(d.view);if(typeof d.view.zoom!=='number' || !isFinite(d.view.zoom) || d.view.zoom<3 || d.view.zoom>19) throw new Error('地图缩放级别无效');}
-        var keys=['runye_plot_library','runye_network_layout','runye_map_view'], old=keys.map(function(k){return localStorage.getItem(k);});
+        var keys=['runye_plot_library',window.RyIrrigationDataStore.keys.networkLayout,'runye_map_view'], old=keys.map(function(k){return localStorage.getItem(k);});
         try{
           localStorage.setItem(keys[0],JSON.stringify(d.plots));
-          if(d.network==null) localStorage.removeItem(keys[1]);else localStorage.setItem(keys[1],JSON.stringify(d.network));
+          window.RyIrrigationDataStore.writeNetworkLayout(d.network);
           if(d.view==null) localStorage.removeItem(keys[2]);else localStorage.setItem(keys[2],JSON.stringify(d.view));
         }catch(writeError){
           keys.forEach(function(k,i){try{if(old[i]==null)localStorage.removeItem(k);else localStorage.setItem(k,old[i]);}catch(restoreError){console.error('工程导入回滚失败',k,restoreError);}});

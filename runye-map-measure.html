@@ -8,8 +8,12 @@
 <link rel="stylesheet" href="pwa/vendor/leaflet.css" />
 <style>
   :root{
+    /* [v490 简化] 本页局部变量别名。--s-200/--s-600 全页零引用已删；
+       --radius 仅 .tip/.warn 共用，保留单一出处。
+       ★ 字号统一出处 = runye-typography.css（button/input/select 一律 13px !important），
+         页内自 v490 起不再给 button/input/select 写 font-size（写了也会被压死，白留死码）。 */
     --g-700:var(--ry-green-700); --g-600:var(--ry-green-600); --g-500:var(--ry-green-500); --g-50:var(--ry-green-50);
-    --g-100:var(--ry-green-100); --s-700:var(--ry-s-700); --s-600:var(--ry-s-600); --s-500:var(--ry-s-500); --s-300:var(--ry-s-300); --s-200:var(--ry-s-200); --s-100:var(--ry-s-100);
+    --g-100:var(--ry-green-100); --s-700:var(--ry-s-700); --s-500:var(--ry-s-500); --s-300:var(--ry-s-300); --s-100:var(--ry-s-100);
     --radius:0;
   }
   *{box-sizing:border-box}
@@ -27,9 +31,11 @@
     .fn-nav .fn-inner{padding:0 16px}
   }
   /* 主体：左侧工具栏 + 地图（2026-09-13 改版：原绿色顶部操作条与右侧浮动测量面板
-     的全部内容集中到左侧工具栏，地图占满其余空间） */
+     的全部内容集中到左侧工具栏，地图占满其余空间）
+     [v490 简化] 右边框原写两处（此处 s-300 + 块尾 v322 的 transparent 覆盖），
+     自冲突合并为一处：左边框实际渲染一直是透明（左栏与画布直接相接）。 */
   .main{flex:1;position:relative;display:flex;min-height:0}
-  .side{flex:none;width:var(--mapSideW,250px);background:#fff;border-right:1px solid var(--s-300);
+  .side{flex:none;width:var(--mapSideW,250px);background:#fff;border-right:1px solid transparent;
     overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:10px}
   /* 细滚动条（2026-09-20）：只写 ::-webkit-scrollbar，不写 scrollbar-width/color
      标准属性——两者并存会让 webkit 伪元素整条失效，实测回退 11px 标准条（第六十五轮） */
@@ -46,11 +52,13 @@
   .sec-t{margin:0 0 5px;font-size:11px;color:var(--s-500);font-weight:700;letter-spacing:1px;
     border-left:3px solid var(--g-600);padding-left:8px;line-height:1.4}
   .tools{display:flex;flex-direction:column;gap:5px}
+  /* [v490] input/button/select 字号统一由 runye-typography.css 出（13px !important），
+     页内 font-size 声明均被压死已删；font:inherit 保留（继承链同为 13px，等价） */
   .side input[type=text]{height:34px;padding:0 7px;border:1px solid var(--s-300);width:100%;
-    font-size:12px;background:#fff;color:var(--s-700)}
+    background:#fff;color:var(--s-700)}
   .side input[type=text]:focus{outline:1px solid var(--g-600)}
   .mbtn{height:34px;padding:0 9px;border:1px solid var(--s-300);background:#fff;color:var(--s-700);
-    cursor:pointer;font-size:12px;font-weight:600;text-align:left;font-family:inherit}
+    cursor:pointer;font-weight:600;text-align:left;font-family:inherit}
   .mbtn:hover{border-color:var(--g-600);color:var(--g-700);background:var(--g-50)}
   .mbtn.btn-on{background:var(--g-500);color:#fff;border-color:var(--g-500)}
   .mbtn-primary{background:var(--g-600);color:#fff;border-color:var(--g-600);text-align:center}
@@ -62,7 +70,7 @@
   .sr-list{margin-top:5px;border:1px solid var(--s-300);background:#fff;max-height:158px;overflow-y:auto}
   .sr-list[hidden]{display:none}
   .sr-item{display:block;width:100%;border:0;border-bottom:1px solid var(--s-100);background:#fff;
-    text-align:left;padding:5px 7px;font:inherit;font-size:11px;line-height:1.35;color:var(--s-700);cursor:pointer}
+    text-align:left;padding:5px 7px;font:inherit;line-height:1.35;color:var(--s-700);cursor:pointer}
   .sr-item:last-child{border-bottom:0}
   .sr-item:hover{background:var(--g-50);color:var(--g-700)}
   .sr-item b{display:block;font-weight:600;color:inherit}
@@ -72,15 +80,15 @@
   .pill-list[hidden]{display:none}
   .place-item{display:flex;gap:4px;align-items:center}
   .place-go{flex:1 1 auto;min-width:0;height:26px;padding:0 6px;border:1px solid var(--s-300);background:#fff;
-    color:var(--s-700);font:inherit;font-size:11px;text-align:left;cursor:pointer;
+    color:var(--s-700);font:inherit;text-align:left;cursor:pointer;
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .place-go:hover{border-color:var(--g-600);color:var(--g-700);background:var(--g-50)}
   .place-del{flex:none;width:26px;height:26px;border:1px solid var(--s-300);background:#fff;color:var(--s-500);
-    font:inherit;font-size:13px;line-height:1;cursor:pointer}
+    font:inherit;line-height:1;cursor:pointer}
   .place-del:hover{border-color:var(--ry-danger);color:var(--ry-danger);background:#fef2f2}
   /* [v191 2026-10-03] 「→ 回传二级管路」按钮：把**这条地块记录**（含成组地块）传给地块绘制 */
   .place-send{flex:none;width:30px;height:26px;border:1px solid var(--g-600);background:var(--g-50);color:var(--g-700);
-    font:inherit;font-size:13px;line-height:1;cursor:pointer;border-radius:3px}
+    font:inherit;line-height:1;cursor:pointer;border-radius:3px}
   .place-send:hover{background:var(--g-600);color:#fff}
   /* 测量结果 */
   .results .row{display:flex;justify-content:space-between;align-items:baseline;padding:2px 0;border-bottom:1px dashed var(--s-100)}
@@ -89,17 +97,29 @@
   .results .row .v small{font-size:10px;color:var(--s-500);font-weight:400;margin-left:2px}
   .hint{font-size:10px;color:var(--s-500);margin-top:5px;line-height:1.4}
   .results .mbtn-primary{margin-top:6px;width:100%}
-.save-row{margin-top:5px;display:flex;gap:6px;align-items:center;justify-content:stretch}
-.save-row .mbtn{flex:1 1 0;min-width:0;white-space:nowrap;padding-left:4px;padding-right:4px}
+  .save-row{margin-top:5px;display:flex;gap:6px;align-items:center;justify-content:stretch}
+  .save-row .mbtn{flex:1 1 0;min-width:0;white-space:nowrap;padding-left:4px;padding-right:4px}
   .ry-pin{background:transparent;border:none}
   /* 地图 */
   .map-wrap{flex:1;position:relative;min-width:0}
+  /* ===== [v494] 地图绘制工具条：左栏「绘制」区迁来，地图区顶端的可拖动横条 =====
+     形态：白底细描边横排、直角（全站扁平化）、按钮 28px 高；
+     拖动/位置记忆 = mod/ry-panel.js rypDraggable（bounds=.map-wrap，拖不出地图区）；
+     左栏已无「绘制」区。撤功能：删 #mapDrawTools + 本段样式 + 左栏注释即可。 */
+  .map-draw-tools{position:absolute;left:12px;top:12px;z-index:1050;display:flex;align-items:center;
+    gap:4px;flex-wrap:wrap;max-width:calc(100% - 24px);padding:4px 6px;
+    background:#fff;border:1px solid var(--s-300);box-shadow:0 2px 8px rgba(15,23,42,.14)}
+  .map-draw-tools .dt-grip{flex:none;padding:4px 7px;font-size:12px;font-weight:700;color:var(--g-700);
+    background:var(--g-50);border-right:1px solid var(--s-300);cursor:move;user-select:none;touch-action:none;letter-spacing:1px}
+  .map-draw-tools .mbtn{height:28px;padding:0 8px;font-size:12px;border-width:1px;background:#fff}
+  .map-draw-tools .mbtn:hover{border-color:var(--g-600);color:var(--g-700);background:var(--g-50)}
+  .map-draw-tools .mbtn.btn-on{background:var(--g-500);color:#fff;border-color:var(--g-500)}
   /* ===== [v283 2026-10-06] 「回传地块绘制 / 保存地块」并入右侧「分区角度」悬浮面板**内部顶端**
      （用户截图指定：放在这个面板里面、且在「当前设计地块」下拉之上）。
      v282 曾让它们浮在地图左上角，本轮撤掉那个绝对定位容器 ⇒ 恢复为面板内正常流
      （position:static），button 的 id 与 JS 绑定依然零改动。 */
   .map-float-actions{display:flex;flex-direction:column;gap:5px}
-  .map-float-actions .mbtn{height:28px;padding:0 8px;font-size:12px;text-align:center;font-weight:700;
+  .map-float-actions .mbtn{height:28px;padding:0 8px;text-align:center;font-weight:700;
     border:1px solid var(--g-600);background:#fff;color:var(--g-700);border-radius:4px}
   .map-float-actions .mbtn:hover{background:var(--g-50);color:var(--g-700)}
   .map-float-actions .mbtn-primary{background:var(--g-600);color:#fff}
@@ -113,25 +133,25 @@
     color:#fff;cursor:move;user-select:none;touch-action:none;font-size:12px;font-weight:700;line-height:1.2}
   .ry-angle-head .ah-t{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .ry-angle-head .ah-fold{flex:none;width:20px;height:20px;border:0;background:transparent;color:#fff;
-    font:inherit;font-size:13px;line-height:1;cursor:pointer;padding:0}
+    font:inherit;line-height:1;cursor:pointer;padding:0}
   .ry-angle-body{padding:7px;display:flex;flex-direction:column;gap:6px}
   .ry-angle-panel.folded .ry-angle-body{display:none}
-  #mapPartitionTools select{width:100%;height:28px;font-size:11px;font-family:inherit;
+  #mapPartitionTools select{width:100%;height:28px;font-family:inherit;
     border:1px solid var(--s-300);background:#fff;color:var(--s-700);padding:0 4px}
   /* 竖排角度组：↶＋1° 上 / 角度输入中 / ↷−1° 下（与手机端 .map-angle 同形态） */
   .map-angle-row{display:flex;flex-direction:column;gap:5px;align-items:stretch}
   .map-angle-row .ang-btn{height:28px;display:flex;align-items:center;justify-content:center;gap:4px;
-    padding:0 6px;font:inherit;font-size:13px;border:1px solid var(--s-300);background:#fff;
+    padding:0 6px;font:inherit;border:1px solid var(--s-300);background:#fff;
     color:var(--s-700);cursor:pointer}
   .map-angle-row .ang-btn:hover{border-color:var(--ry-green-600);color:var(--ry-green-700);background:var(--ry-green-50)}
   .map-angle-row .ang-btn small{font-size:10px;font-weight:600}
   .map-angle-value{display:flex;align-items:center;gap:3px;justify-content:center}
-  .map-angle-value input{width:100%;min-width:0;height:28px;text-align:center;font:inherit;font-size:13px;
+  .map-angle-value input{width:100%;min-width:0;height:28px;text-align:center;font:inherit;
     font-weight:700;color:var(--ry-green-700);border:1px solid var(--s-300);background:#fff}
   .map-angle-value input:focus{outline:1px solid var(--ry-green-600)}
   .map-angle-value span{font-size:12px;color:var(--s-500);font-weight:600}
   .ry-angle-panel .save-row{margin-top:0;display:flex;flex-direction:column;gap:5px;align-items:stretch}
-  .ry-angle-panel .save-row .mbtn{height:28px;font-size:12px;font-weight:700;padding:0 4px;text-align:center;flex:none}
+  .ry-angle-panel .save-row .mbtn{height:28px;font-weight:700;padding:0 4px;text-align:center;flex:none}
   .ry-angle-panel .hint{margin-top:2px;font-size:10px;line-height:1.35}
   #map{position:absolute;top:0;left:0;right:0;bottom:0;background:#dfe6e9}
   /* 操作提示条 */
@@ -164,13 +184,13 @@
    .mobile-menu-btn 及 @media(max-width:768px) 手机端规则）已一并删除。
    2026-09-13 起页面顶部改为「功能区导航 .fn-nav + 左侧工具栏 .side」结构。
    恢复原值：git show HEAD:runye-map-measure.html ===== */
-  /* [v322 2026-10-09 用户要求] 全站扁平化：滚动条隐形（轨道透明、滑块常态极淡、悬停显形；5px 基准不变） */
-  *::-webkit-scrollbar-track{background:transparent}
-  *::-webkit-scrollbar-thumb{background:rgba(188,211,198,.25)}
-  *::-webkit-scrollbar-thumb:hover{background:rgba(188,211,198,.8)}
-  *::-webkit-scrollbar-corner{background:transparent}
-  /* [v322] 左栏与画布直接相接 */
-  .side{border-right-color:transparent}
+  /* ===== [v490 简化] 原 v322 全局滚动条段（*::-webkit-scrollbar-track/thumb/hover/corner）
+     与「.side{border-right-color:transparent}」已删除，理由（单一出处）：
+     ① 全站滚动条唯一出处 = runye-theme.css v383（4px 圆角灰丸、轨道透明、藏箭头按钮），
+        本页 v322 同特异性规则加载在 theme 之前，四条声明全部被压死，属死码；
+     ② 左栏与 .sr-list 的局部 5px 绿拇指（本块上方 ::-webkit-scrollbar 专属规则，
+        特异性更高）不受影响，继续生效；
+     ③ .side 右边框透明已并入上方 .side 主规则（border-right:1px solid transparent）。 */
 </style>
 <link rel="stylesheet" href="runye-nav.css?v=346">
 <link rel="stylesheet" href="runye-mobile.css?v=242">
@@ -202,8 +222,9 @@
   <script src="runye-nav.js?v=385-global-open"></script>
   <!-- [NEW MODULE: map-enhance] 实景叠加图层（2026-09-26）：删除下两行即卸载，不影响其他逻辑 -->
   <script src="runye-geo.js"></script>
+  <script src="core/irrigation-data-store.js?v=1"></script>
   <script src="runye-map-enhance.js?v=352"></script>
-<script src="runye-map-partition.js?v=261"></script>
+<script src="runye-map-partition.js?v=486-angle-fix"></script>
   <!-- [NEW MODULE: pipe_optim] 导航按钮与主页同源（2026-09-23 用户要求：三页导航一致） -->
   <script src="pipe_optim_ui.js"></script>
   <div class="main">
@@ -225,19 +246,10 @@
           <div class="hint" id="placeHint">搜索定位后可「保存地点」；地图位置自动记住，下次打开回到上次位置。也可直接输入坐标（如 18.2528,109.5119）定位。</div>
         </div>
       </section>
-      <section>
-        <h4 class="sec-t">绘制</h4>
-        <div class="tools">
-          <button class="mbtn" id="btnDraw">✏️ 开始画框</button>
-          <!-- [v186] 「完成」的语义已升级为「定稿本块 + 清空 + 继续画下一块」，
-               按钮文案随之改，让用户一眼知道点完还能接着画（见 btnFinish 处理函数）。 -->
-          <button class="mbtn" id="btnFinish">✅ 完成并画下一块</button>
-          <button class="mbtn" id="btnAddPt">➕ 加点</button>
-          <button class="mbtn" id="btnUndo">↩ 撤销</button>
-          <button class="mbtn" id="btnMeasure">📏 测距</button>
-          <button class="mbtn" id="btnClear">🗑 清除</button>
-        </div>
-      </section>
+      <!-- [v494 用户要求] 原「绘制」区（开始画框/完成并画下一块/加点/撤销/测距/清除）
+           整体迁出左栏 → 地图区顶端的可拖动工具条 #mapDrawTools（位置记忆，
+           拖不出地图区 = 永不超过导航栏）。按钮 id 全部不变，online-map.js 零改动。
+           恢复：删 .map-wrap 内 #mapDrawTools，把下面注释里的 6 个按钮搬回此处。 -->
       <section class="results">
         <h4 class="sec-t">测量结果</h4>
         <div class="row"><span class="k">面积</span><span class="v"><span id="mu">0</span><small>亩</small></span></div>
@@ -254,7 +266,7 @@
           <button class="mbtn" id="btnImport">⬆ 导入地块(GeoJSON/KML/KMZ/奥维轨迹)</button>
         </div>
         <input type="file" id="fileImport" accept=".geojson,.json,.kml,.ovkml,.kmz" style="display:none" />
-        <div class="hint">保存后可累计多个地块；在「精准灌溉」页地块库「设为当前」，或在数字农业（水肥决策）页下拉选择。</div>
+        <div class="hint">保存后可累计多个地块；在「精准灌溉」页的地块库中可将任一地块设为当前。</div>
       </section>
       <section>
         <h4 class="sec-t">我的地块</h4>
@@ -280,6 +292,22 @@
     <div class="side-grip" id="mapSideGrip" title="拖动调节工具栏宽度；双击恢复默认"></div>
     <div class="map-wrap">
       <div id="map"></div>
+      <!-- ===== [v494 用户要求] 地图绘制工具条：左栏「绘制」区整体迁来，挂在地图区顶端；
+           按住左侧「⠿ 绘制」抓手可拖动（复用 mod/ry-panel.js rypDraggable：位置记忆
+           localStorage['mapDrawToolsPos']，clamp 在 .map-wrap 内 = 永不超出地图区、
+           不超过导航栏）。按钮 id 不变，online-map.js 绑定零改动。 ===== -->
+      <div class="map-draw-tools ryp-float" id="mapDrawTools" data-ry-panel
+           data-ry-position-key="mapDrawToolsPos" data-ry-default-top="12" data-ry-default-left="12">
+        <span class="dt-grip" data-ry-drag title="按住拖动工具条；位置自动记住">⠿ 绘制</span>
+        <button class="mbtn" id="btnDraw">✏️ 开始画框</button>
+        <!-- [v186] 「完成」的语义已升级为「定稿本块 + 清空 + 继续画下一块」，
+             按钮文案随之改，让用户一眼知道点完还能接着画（见 btnFinish 处理函数）。 -->
+        <button class="mbtn" id="btnFinish">✅ 完成并画下一块</button>
+        <button class="mbtn" id="btnAddPt">➕ 加点</button>
+        <button class="mbtn" id="btnUndo">↩ 撤销</button>
+        <button class="mbtn" id="btnMeasure">📏 测距</button>
+        <button class="mbtn" id="btnClear">🗑 清除</button>
+      </div>
       <!-- ===== [v282] 分区角度悬浮面板 =====
            形态仿手机端 runye-mobile-map-preview.html 的 .map-angle：↶＋1° / 角度输入 / ↷−1° 竖排。
            原「分区角度」那一节（id=mapPartitionTools）整体迁入（runye-map-partition.js 只按 id 取 box，
@@ -321,6 +349,6 @@
 
 <script src="pwa/vendor/leaflet.js"></script>
 <script src="mod/online-map.js?v=441-map-main-section"></script>
-<script src="mod/ry-panel.js?v=1"></script>
+<script src="mod/ry-panel.js?v=494-drag-default-left"></script>
 </body>
 </html>

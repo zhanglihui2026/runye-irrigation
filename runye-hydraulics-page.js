@@ -51,12 +51,10 @@
 
   /* ---------- 数据源 ---------- */
   function readNet() {
-    try { return JSON.parse(localStorage.getItem('runye_network_layout') || 'null'); }
-    catch (e) { return null; }
+    return window.RyIrrigationDataStore.readNetworkLayout();
   }
   function readDesign() {
-    try { return JSON.parse(localStorage.getItem('runye_hydraulic_design_v1') || 'null'); }
-    catch (e) { return null; }
+    return window.RyIrrigationDataStore.readHydraulicDesign();
   }
   function renderSrc() {
     var net = readNet(), design = readDesign(), el = $('srcCard');

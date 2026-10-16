@@ -93,8 +93,7 @@
   }
 
   /* 快照：借用主站工程序列化（静默、走临时 key、立即清理）。
-     __ryUndoQuiet 让主站跳过两个与"存档"无关的副作用（重算材料量 / 分享到数字农业），
-     否则每次点一下都要全量重算一遍材料清单。 */
+     __ryUndoQuiet 让主站跳过与"存档"无关的材料量重算副作用，避免每次快照都全量重算材料清单。 */
   function capture() {
     if (typeof global.runyeSaveProject !== 'function') return null;
     var prev = global.__ryUndoQuiet;

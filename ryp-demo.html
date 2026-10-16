@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>ryp 控制面板组件 · 测试样板</title>
+<!-- 引真实的共享组件库：交互逻辑来自这里 -->
+<link rel="stylesheet" href="mod/ry-panel.css">
+<style>
+  /* ========== 样板页最小皮肤（正式版应收敛进 mod/ry-panel.css） ========== */
+  :root{
+    --ry-green-800:#123026; --ry-green-700:#14532d; --ry-green-600:#173e32;
+    --ry-s-100:#f1f5f9; --ry-s-200:#e2e8f0; --ry-s-300:#cbd5e1;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:16px;font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:14px;color:#1f2937;background:#f8fafc}
+  h1{font-size:16px;margin:0 0 4px}
+  .sub{color:#6b7280;margin-bottom:12px;font-size:13px}
+  .sub code{background:#e2e8f0;padding:1px 5px;border-radius:3px}
+
+  /* .mw-shell 是 rypResize 硬依赖的容器：grid 第一列宽度由 --ryp-input-col-width 控制 */
+  .mw-shell{
+    display:grid;
+    grid-template-columns:var(--ryp-input-col-width,340px) minmax(0,1fr);
+    gap:12px;
+    height:560px;
+    border:1px dashed #94a3b8;
+    border-radius:10px;
+    padding:12px;
+    background:#fff;
+  }
+
+  /* --- 面板外壳（对应 ryPanel() 工厂生成的 .ryp-panel） --- */
+  .ryp-panel{
+    position:relative;
+    display:flex;flex-direction:column;
+    flex:1 1 auto;width:100%;
+    border:1px solid var(--ry-s-300);
+    border-radius:10px;
+    background:#fff;
+    box-shadow:0 1px 3px rgba(15,23,42,.06);
+    min-height:0;min-width:0;
+  }
+  .ryp-panel-head{
+    min-height:44px;display:flex;align-items:center;gap:8px;
+    padding:0 8px 0 12px;
+    background:var(--ry-green-600);color:#fff;
+    font-weight:700;font-size:14px;cursor:pointer;border-radius:9px 9px 0 0;
+  }
+  .ryp-panel-head .fold{
+    width:32px;min-height:32px;border:0;background:transparent;color:#fff;
+    font-size:14px;cursor:pointer;border-radius:4px;
+  }
+  .ryp-panel-head .fold:hover{background:rgba(255,255,255,.16)}
+  .ryp-panel-head .t{flex:1 1 auto;min-width:0}
+  .ryp-panel-head .sel{font-size:12px;opacity:.7;font-weight:400}
+  .ryp-panel-body{flex:1 1 auto;min-height:0;overflow:auto;padding:10px;display:flex;flex-direction:column;gap:10px}
+
+  .ryp-group{border:1px solid var(--ry-s-200);border-radius:8px;overflow:hidden}
+  .ryp-group-head{
+    background:var(--ry-s-100);padding:6px 10px;font-weight:700;font-size:12px;color:var(--ry-green-800);
+    border-bottom:1px solid var(--ry-s-200);
+  }
+  .ryp-group .fields{padding:6px 10px;display:flex;flex-direction:column;gap:8px}
+  .ryp-row{display:flex;align-items:center;gap:8px}
+  .ryp-row .k{flex:0 0 96px;color:#374151;font-size:13px}
+  .ryp-row .v{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:4px}
+  .ryp-row input[type=number],.ryp-row select{
+    width:100%;padding:5px 8px;border:1px solid var(--ry-s-300);border-radius:5px;font-size:13px;
+  }
+  .ryp-row .unit{color:#6b7280;font-size:12px}
+  .ryp-row.result .v{color:var(--ry-green-700);font-weight:600}
+
+  .ryp-panel-foot{display:flex;gap:8px;padding:10px;border-top:1px solid var(--ry-s-200)}
+  .ryp-panel-foot button{
+    flex:1;padding:7px 10px;border:1px solid var(--ry-s-300);background:#fff;border-radius:6px;cursor:pointer;font-size:13px;
+  }
+  .ryp-panel-foot button.primary{background:var(--ry-green-600);color:#fff;border-color:var(--ry-green-600)}
+  .ryp-panel-foot button:hover{filter:brightness(1.05)}
+
+  /* 收起后的细条（点它展开） */
+  .ryp-rail{display:none;writing-mode:vertical-rl;padding:8px 4px;background:var(--ry-green-600);color:#fff;cursor:pointer;font-size:12px}
+  .ryp-panel.folded .ryp-panel-head,
+  .ryp-panel.folded .ryp-panel-body,
+  .ryp-panel.folded .ryp-panel-foot{display:none}
+  .ryp-panel.folded .ryp-rail{display:block;position:absolute;left:0;top:0;bottom:0}
+
+  /* 拖宽手柄：贴面板右缘 */
+  .ryp-grip{
+    position:absolute;right:-3px;top:0;bottom:0;width:6px;cursor:col-resize;z-index:5;
+  }
+  .ryp-grip:hover,.ryp-grip.dragging{background:var(--ry-green-600)}
+
+  /* 右侧工作区占位 */
+  .workspace{
+    border:1px solid var(--ry-s-200);border-radius:10px;
+    background:repeating-linear-gradient(45deg,#f1f5f9 0 12px,#e2e8f0 12px 24px);
+    position:relative;overflow:auto;min-width:0;
+  }
+  .workspace .ph{
+    position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    color:#64748b;gap:6px;
+  }
+  .workspace .big{font-size:20px;font-weight:700}
+  .log{position:absolute;left:12px;right:12px;bottom:12px;background:#fff;border:1px solid var(--ry-s-300);border-radius:8px;padding:8px 10px;font-family:Consolas,monospace;font-size:12px;max-height:140px;overflow:auto}
+  .log div{padding:1px 0}
+
+  .toolbar{margin-bottom:10px;display:flex;gap:8px;align-items:center}
+  .toolbar button{padding:6px 12px;border:1px solid var(--ry-s-300);background:#fff;border-radius:6px;cursor:pointer}
+  .toolbar button.primary{background:var(--ry-green-600);color:#fff;border-color:var(--ry-green-600)}
+  .tag{font-size:12px;color:#6b7280;background:#e2e8f0;padding:2px 8px;border-radius:10px}
+</style>
+</head>
+<body>
+
+<h1>控制面板组件 · 测试样板</h1>
+<div class="sub">
+  外壳（折叠 / 拖宽 / 位置记忆）来自真实的 <code>mod/ry-panel.js</code>，本页只写了字段和回调。
+  试一下：①点标题栏折叠　②拖右缘灰条调宽度　③改数字看实时结果　④点"切换配置"看同一壳换内容　⑤刷新页面看状态保留。
+</div>
+
+<div class="toolbar">
+  <button class="primary" id="btnSwap">切换到「地形参数」配置</button>
+  <span class="tag" id="tagMode">当前配置：水力校核</span>
+  <span class="tag" id="tagState">—</span>
+</div>
+
+<div class="mw-shell">
+  <!-- 中间列容器：rypResize 用 parentElement 读当前面板宽 -->
+  <div class="mw-col-input" style="min-width:0;display:flex;">
+  <!-- 声明式面板：data-ry-panel 让 ry-panel.js 自动接管折叠/拖宽/记忆 -->
+  <aside class="ryp-panel" id="demoPanel" data-ry-panel
+         data-ry-panel-key="demoPanel"
+         data-ry-fold-key="demoPanel:folded"
+         data-ry-reset="340" data-ry-min="260" data-ry-max="520">
+    <div class="ryp-panel-head" data-ry-toggle>
+      <button class="fold" data-ry-fold data-ry-fold-open="▾" data-ry-fold-closed="▸">▾</button>
+      <span class="t">控制面板</span>
+      <span class="sel" id="selCfg">水力校核</span>
+    </div>
+
+    <div class="ryp-panel-body" data-ry-body id="panelBody">
+      <!-- 字段由 JS 按配置注入 -->
+    </div>
+
+    <div class="ryp-panel-foot">
+      <button id="btnReset">重置</button>
+      <button class="primary" id="btnRun">重新计算</button>
+    </div>
+
+    <div class="ryp-rail" data-ry-rail>展开 ▸</div>
+    <div class="ryp-grip" data-ry-grip title="拖动调宽度 · 双击复位"></div>
+  </aside>
+  </div><!-- /.mw-col-input -->
+
+  <div class="workspace">
+    <div class="ph">
+      <div class="big">工作区 / 画布占位</div>
+      <div>右侧面板的字段变化会实时打到下面日志里</div>
+    </div>
+    <div class="log" id="log"></div>
+  </div>
+</div>
+
+<!-- 真实组件库：含 rypCollapsible / rypResize / rypInitAll -->
+<script src="mod/ry-panel.js"></script>
+<script>
+(function(){
+  'use strict';
+  var body = document.getElementById('panelBody');
+  var logEl = document.getElementById('log');
+  var tagMode = document.getElementById('tagMode');
+  var selCfg = document.getElementById('selCfg');
+  var stateTag = document.getElementById('tagState');
+
+  /* ====================== 两份配置：同一壳、不同内容 ====================== */
+  var CFG = {
+    hydraulics: {
+      title: '水力校核',
+      groups: [
+        { name: '设计输入', fields: [
+          { id: 'length',  k: '干管长度',   type: 'number', value: 320, unit: 'm', min: 0, step: 10 },
+          { id: 'q',       k: '设计流量',   type: 'number', value: 12,  unit: 'L/s', min: 0, step: 0.5 },
+          { id: 'mat',     k: '管材',       type: 'select', value: 'PE100', options: [
+              {value:'PE100',label:'PE100'}, {value:'PVC',label:'PVC'}, {value:'镀锌钢管',label:'镀锌钢管'} ] }
+        ]},
+        { name: '计算结果', fields: [
+          { id: 'loss', k: '沿程损失', type: 'result', unit: 'm' },
+          { id: 'dn',    k: '推荐管径', type: 'result', unit: 'mm' }
+        ]}
+      ],
+      onInput: recompute,
+      onAction: function(id){ if(id==='run') recompute(); else if(id==='reset') this.reset(); }.bind({
+        reset: function(){ CFG.hydraulics.groups[0].fields.forEach(function(f){ if(f.type!=='select') f.value = f.default != null ? f.default : f.value; }); loadCfg('hydraulics'); }
+      })
+    },
+    terrain: {
+      title: '地形参数',
+      groups: [
+        { name: '地形', fields: [
+          { id: 'elev',  k: '地面高差', type: 'number', value: 12, unit: 'm', min: 0, step: 1 },
+          { id: 'slope', k: '平均坡度', type: 'number', value: 0.8, unit: '%', min: 0, step: 0.1 },
+          { id: 'soil',  k: '土壤类型', type: 'select', value: '壤土', options: [
+              {value:'砂土',label:'砂土'}, {value:'壤土',label:'壤土'}, {value:'黏土',label:'黏土'} ] }
+        ]},
+        { name: '系统建议', fields: [
+          { id: 'pump', k: '推荐扬程', type: 'result', unit: 'm' },
+          { id: 'zone', k: '建议分区', type: 'result', unit: '区' }
+        ]}
+      ],
+      onInput: recompute,
+      onAction: function(id){ if(id==='run') recompute(); else if(id==='reset') loadCfg('terrain'); }
+    }
+  };
+  var current = 'hydraulics';
+
+  /* ====================== 渲染一份配置到面板 body ====================== */
+  function el(tag, cls, text){
+    var e = document.createElement(tag);
+    if(cls) e.className = cls;
+    if(text != null) e.textContent = text;
+    return e;
+  }
+  function buildRow(field){
+    var row = el('div', 'ryp-row' + (field.type==='result'?' result':''));
+    row.appendChild(el('span','k', field.k));
+    var v = el('span','v');
+    var ctl;
+    if(field.type === 'select'){
+      ctl = document.createElement('select');
+      (field.options||[]).forEach(function(o){
+        var op = document.createElement('option'); op.value=o.value; op.textContent=o.label; ctl.appendChild(op);
+      });
+      ctl.value = field.value;
+      ctl.addEventListener('change', function(){ field.value = ctl.value; recompute(); });
+    } else if(field.type === 'result'){
+      ctl = el('span','val', field.value != null ? field.value : '—');
+      if(field.unit) v.appendChild(el('span','unit', field.unit));
+    } else {
+      ctl = document.createElement('input');
+      ctl.type = 'number'; ctl.value = field.value;
+      if(field.min!=null) ctl.min=field.min; if(field.step!=null) ctl.step=field.step;
+      ctl.addEventListener('input', function(){ field.value = Number(ctl.value); recompute(); });
+    }
+    v.insertBefore(ctl, v.firstChild);
+    row.querySelector('.v').dataset.fieldId = field.id;
+    row.querySelector('.v').dataset.ctlType = field.type;
+    return row;
+  }
+  function loadCfg(name){
+    current = name;
+    var cfg = CFG[name];
+    selCfg.textContent = cfg.title;
+    tagMode.textContent = '当前配置：' + cfg.title;
+    body.innerHTML = '';
+    cfg.groups.forEach(function(g){
+      var gdiv = el('div','ryp-group');
+      gdiv.appendChild(el('div','ryp-group-head', g.name));
+      var fwrap = el('div','fields');
+      g.fields.forEach(function(f){ fwrap.appendChild(buildRow(f)); });
+      gdiv.appendChild(fwrap);
+      body.appendChild(gdiv);
+    });
+    recompute();
+  }
+
+  /* ====================== 伪业务计算：读字段 → 写字段 ====================== */
+  function recompute(){
+    var cfg = CFG[current];
+    var get = function(id){
+      var f; cfg.groups.forEach(function(g){ g.fields.forEach(function(x){ if(x.id===id) f=x; }); });
+      return f ? f.value : null;
+    };
+    var set = function(id, val){
+      var rows = body.querySelectorAll('.ryp-row');
+      rows.forEach(function(r){
+        if(r.querySelector('.v').dataset.fieldId === id){
+          r.querySelector('.val').textContent = val;
+        }
+      });
+      cfg.groups.forEach(function(g){ g.fields.forEach(function(x){ if(x.id===id) x.value=val; }); });
+    };
+    if(current==='hydraulics'){
+      var L = Number(get('length'))||0, Q = Number(get('q'))||0;
+      var loss = (L * 0.012 * Q).toFixed(2);          // 假公式
+      var dn = Q>20 ? 90 : Q>10 ? 75 : Q>5 ? 63 : 50;
+      set('loss', loss); set('dn', dn);
+      log('水力：L='+L+'m Q='+Q+'L/s → 损失='+loss+'m 管径=DN'+dn);
+    } else {
+      var E = Number(get('elev'))||0, S = Number(get('slope'))||0;
+      var pump = (E + S*2 + 8).toFixed(1);
+      var zone = Math.max(1, Math.round(E/6));
+      set('pump', pump); set('zone', zone);
+      log('地形：高差='+E+'m 坡度='+S+'% → 扬程='+pump+'m 分区='+zone);
+    }
+  }
+  function log(msg){
+    var d = new Date();
+    var t = d.toLocaleTimeString('zh-CN',{hour12:false});
+    var line = el('div','','['+t+'] '+msg);
+    logEl.insertBefore(line, logEl.firstChild);
+  }
+
+  /* ====================== 页脚按钮 & 切换按钮 ====================== */
+  document.getElementById('btnRun').addEventListener('click', function(){
+    CFG[current].onAction('run');
+  });
+  document.getElementById('btnReset').addEventListener('click', function(){
+    CFG[current].onAction('reset');
+  });
+  document.getElementById('btnSwap').addEventListener('click', function(){
+    var next = current==='hydraulics' ? 'terrain' : 'hydraulics';
+    loadCfg(next);
+    this.textContent = next==='hydraulics' ? '切换到「地形参数」配置' : '切换到「水力校核」配置';
+  });
+
+  /* 折叠/宽度状态上屏（演示读面板状态） */
+  var panel = document.getElementById('demoPanel');
+  function refreshState(){
+    var folded = panel.classList.contains('folded');
+    var w = getComputedStyle(panel.closest('.mw-shell')).getPropertyValue('--ryp-input-col-width').trim() || '340px';
+    stateTag.textContent = (folded?'已折叠 · ':'展开 · ') + '面板宽 ' + w;
+  }
+  new MutationObserver(refreshState).observe(panel, {attributes:true, attributeFilter:['class']});
+  window.addEventListener('resize', refreshState);
+
+  /* 初始加载 */
+  loadCfg('hydraulics');
+  refreshState();
+  log('样板就绪：外壳来自 mod/ry-panel.js，本页只提供字段与回调。');
+})();
+</script>
+</body>
+</html>

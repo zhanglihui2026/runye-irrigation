@@ -125,12 +125,9 @@ function passthrough(name, args) {
 
 /* 深拷贝读桥数据（PLUGIN_DEV §5.2：数据只读），解析失败返回 null */
 function readBridged() {
-  try {
-    var raw = localStorage.getItem(storageKey(ctxRef));
-    if (!raw) return null;
-    var v = JSON.parse(raw);
-    return (v && typeof v === 'object') ? JSON.parse(JSON.stringify(v)) : null;
-  } catch (e) { return null; }
+  var store = (typeof window !== 'undefined') ? window.RySprinklerBridgeStore : null;
+  return store && typeof store.readSnapshot === 'function'
+    ? store.readSnapshot(storageKey(ctxRef)) : null;
 }
 
 /* ---------------- 会员门控（feat=pro-others，三态 fail-open，同 runye-nav.js gate()） ---------------- */

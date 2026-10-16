@@ -25,7 +25,7 @@ function clearPlanResults(){
   var a=document.getElementById('planA'), b=document.getElementById('planB');
   if(a) a.textContent = '—';
   if(b) b.textContent = '—';
-  var ids = ['planIntensity','planPumpFlow','planPumpHead','planPumpPower','planMainPipe','planMainVelocity','planBranchPipe','planBranchVelocity','planBranchSingleLen'];
+  var ids = ['planIntensity','planPumpFlow','planPumpHead','planPumpPower','planMotorPower','planMainPipe','planMainVelocity','planBranchPipe','planBranchVelocity','planBranchSingleLen'];
   ids.forEach(function(id){
     var el = document.getElementById(id);
     if(el) el.textContent = '—';
@@ -193,7 +193,8 @@ function calcPlan(){
   document.getElementById('planIntensity').textContent = intensity.toFixed(2);
   document.getElementById('planPumpFlow').textContent = zoneFlow.toFixed(1);
   document.getElementById('planPumpHead').textContent = pumpHead.toFixed(1);
-  document.getElementById('planPumpPower').textContent = motorKW.toFixed(1);
+  document.getElementById('planPumpPower').textContent = pumpPower.toFixed(1);
+  document.getElementById('planMotorPower').textContent = motorKW.toFixed(1);
   document.getElementById('planMainPipe').textContent = 'Ø '+mainPipe.od+' mm';
   document.getElementById('planMainVelocity').textContent = mainPipe.v.toFixed(2);
   document.getElementById('planBranchPipe').textContent = 'Ø '+branchPipe.od+' mm';

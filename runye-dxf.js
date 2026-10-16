@@ -2,7 +2,7 @@
    导出施工图为 CAD（DXF 2004，文本格式）
    ----------------------------------------------------------------------------
    平面图来源：window.tlDiagramSVG（App 自带的权威 SVG 字符串，导 PNG/打印同一份），
-   从它解析，绝不碰 DOM 里的轴测图/系统图克隆，避免互相叠加。
+   从它解析，不依赖重复生成的图面DOM，避免图层互相叠加。
    坐标反算：window.tlPlanView {s,ox,oy,minX,minY}。
    图层带颜色（AutoCAD 颜色号）：
      PLOT 地块边界(白) ZONE 分区(灰) PIPE_FRONT 总管(品红)
@@ -24,10 +24,10 @@
   ];
 
   function norm(c){ return (c||'').trim().toLowerCase(); }
-  /* 平面图/轴测图的管线一律带 data-tlpipe（或遮蔽分段 data-tlpipe-seg）。
+  /* 平面管线一律带 data-tlpipe（或遮蔽分段 data-tlpipe-seg）。
      2026-10-02 修复：旧 pipeKind 按 stroke 颜色猜、非蓝绿一律兜底「总管」——
      平面图里 line 全是辅助线/尺寸标注线/斜短线，几百条被塞进 PIPE_FRONT 层铺满图纸四周，
-     CAD 里看似「轴测图叠加在平面图上」。 */
+     CAD 中以叠加视图呈现。 */
   function tlPipeLayer(el){
     var p = el.getAttribute('data-tlpipe') || el.getAttribute('data-tlpipe-seg') || '';
     if(el.hasAttribute('data-tltape'))return 'PIPE_TAPE';
@@ -54,12 +54,8 @@
     return null;
   }
 
-  function sourceSvg(source){
-    if(source === 'iso'){
-      return document.querySelector('#tlIsoDiagramContent svg') ||
-             (window.RyIsoDiagram && window.RyIsoDiagram.svgString ? parseSvgString(window.RyIsoDiagram.svgString) : null);
-    }
-    // 平面：优先权威字符串
+  function sourceSvg(){
+    // 平面图：优先权威字符串
     return parseSvgString(window.tlDiagramSVG) ||
            document.querySelector('#tlDiagramContent svg');
   }
@@ -156,24 +152,14 @@
     table('LAYER',LAYERS.length);LAYERS.forEach(function(L){record('LAYER','AcDbLayerTableRecord');o.push('2',L.name,'70','0','62',String(L.color),'6','CONTINUOUS','370','-3');});o.push('0','ENDTAB','0','ENDSEC');return o.join('\n');
   }
 
-  function buildDxf(source, opts){
+  function buildDxf(opts){
     if (!requireDrawingExport()) return null;
-    var svg = sourceSvg(source);
-    if(!svg){ alert('未找到'+(source==='iso'?'轴测图':'平面布置图')+'。请先在三级页点「生成管线图」。'); return null; }
-    var inv, scale;
-    if(source === 'iso'){
-      /* 轴测图为等轴测示意（不按比例、投影不可逆）：按 SVG 画布 1:1 导出并翻转 y，
-         保持与屏幕一致的手性（2026-10-02 修复：旧版误用平面图视图参数反算，坐标完全错乱） */
-      var vb=(svg.getAttribute('viewBox')||'').trim().split(/[\s,]+/).map(parseFloat);
-      var sh=(vb.length===4 && isFinite(vb[3]) && vb[3]>0) ? vb[3] : 800;
-      inv=function(sx,sy){ return [sx, sh-sy]; };
-      scale=1;
-    }else{
-      var pv = window.tlPlanView;
-      if(!pv){ alert('未找到图纸坐标基准，请先重新「生成管线图」。'); return null; }
-      inv = makeInv(pv);
-      scale = pv.s;
-    }
+    var svg = sourceSvg();
+    if(!svg){ alert('未找到平面布置图。请先在三级页点「生成管线图」。'); return null; }
+    var pv = window.tlPlanView;
+    if(!pv){ alert('未找到图纸坐标基准，请先重新「生成管线图」。'); return null; }
+    var inv = makeInv(pv);
+    var scale = pv.s;
     if(!isFinite(scale)||scale<=0){alert('图纸比例无效，请重新生成管线图。');return null;}
     nextHandle=256;lineTypes={};var ents=[];
     svg.querySelectorAll('*').forEach(function(el){
@@ -202,7 +188,7 @@
     });
 
     if(!ents.length){ alert('按当前勾选没有可导出的内容。'); return null; }
-    var head=['0','SECTION','2','HEADER','9','$ACADVER','1','AC1018','9','$INSUNITS','70',source==='iso'?'0':'6','9','$DWGCODEPAGE','3','ANSI_1252','0','ENDSEC'];
+    var head=['0','SECTION','2','HEADER','9','$ACADVER','1','AC1018','9','$INSUNITS','70','6','9','$DWGCODEPAGE','3','ANSI_1252','0','ENDSEC'];
     /* 标准段序：HEADER → TABLES → ENTITIES → EOF（2026-10-02 修复：旧版 ENTITIES 排在 TABLES 前） */
     return head.join('\n')+'\n'
       + tablesSection()+'\n'
@@ -210,11 +196,11 @@
       + '0\nEOF\n';
   }
 
-  function doDownload(dxf, source){
+  function doDownload(dxf){
     var blob=new Blob([dxf],{type:'application/dxf'});
     var a=document.createElement('a');
     a.href=URL.createObjectURL(blob);
-    a.download='润野灌溉_'+(source==='iso'?'轴测图':'平面图')+'_'+new Date().toISOString().slice(0,10)+'.dxf';
+    a.download='润野灌溉_平面图_'+new Date().toISOString().slice(0,10)+'.dxf';
     document.body.appendChild(a); a.click();
     setTimeout(function(){a.remove();URL.revokeObjectURL(a.href);},100);
   }
@@ -223,7 +209,6 @@
     if (!requireDrawingExport()) return;
     var old=document.getElementById('ryDxfDlg'); if(old) old.remove();
     var hasPlan=!!(window.tlDiagramSVG && window.tlDiagramSVG.indexOf('<svg')>=0);
-    var hasIso=!!document.querySelector('#tlIsoDiagramContent svg');
     var box=document.createElement('div');
     box.id='ryDxfDlg';
     box.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:99999;display:flex;align-items:center;justify-content:center';
@@ -232,9 +217,7 @@
       +'<div style="font-size:15px;font-weight:700;margin-bottom:12px">导出 CAD (DXF)</div>'
       +'<div style="font-size:12.5px;color:#64748b;margin-bottom:6px">导出密码：</div>'
       +'<input type="password" id="ryDxfPwd" autocomplete="off" placeholder="请输入导出密码" style="width:100%;box-sizing:border-box;padding:7px 9px;font-size:13.5px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:10px">'
-      +'<div style="font-size:12.5px;color:#64748b;margin-bottom:6px">导出哪张图：</div>'
-      +'<label style="display:block;font-size:13.5px;margin:3px 0"><input type="radio" name="ryDxfSrc" value="plan" '+(hasPlan?'checked':'disabled')+'> 平面布置图</label>'
-      +'<label style="display:block;font-size:13.5px;margin:3px 0"><input type="radio" name="ryDxfSrc" value="iso" '+(hasIso?'':'disabled')+'> 轴测图'+(hasIso?'':'（未生成）')+'</label>'
+      +'<div style="font-size:12.5px;color:#64748b;margin-bottom:6px">导出当前平面布置图：</div>'
       +'<div style="font-size:12.5px;color:#64748b;margin:12px 0 6px">导出内容：</div>'
       +'<label style="display:block;font-size:13.5px;margin:3px 0"><input type="checkbox" class="ryDxfOpt" data-k="plot" checked> 地块边界</label>'
       +'<label style="display:block;font-size:13.5px;margin:3px 0"><input type="checkbox" class="ryDxfOpt" data-k="zone" checked> 分区</label>'
@@ -242,7 +225,7 @@
       +'<label style="display:block;font-size:13.5px;margin:3px 0"><input type="checkbox" class="ryDxfOpt" data-k="main" checked> 主管</label>'
       +'<label style="display:block;font-size:13.5px;margin:3px 0"><input type="checkbox" class="ryDxfOpt" data-k="branch" checked> 支管</label>'
       +'<label style="display:block;font-size:13.5px;margin:3px 0"><input type="checkbox" class="ryDxfOpt" data-k="tape" checked> 滴灌带</label>'
-      +'<div style="font-size:11px;color:#64748b;margin:8px 0">管线、边界导出为 PL，保留颜色与图示宽度（不是管径）；平面图单位为米。轴测图为示意图。</div>'
+      +'<div style="font-size:11px;color:#64748b;margin:8px 0">管线、边界导出为 PL，保留颜色与图示宽度（不是管径）；单位为米。</div>'
       +'<label style="display:block;font-size:13.5px;margin:3px 0"><input type="checkbox" class="ryDxfOpt" data-k="symbol" checked> 水泵/阀门符号</label>'
       +'<label style="display:block;font-size:13.5px;margin:3px 0"><input type="checkbox" class="ryDxfOpt" data-k="text" checked> 文字/标注</label>'
       +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">'
@@ -254,11 +237,10 @@
     box.onclick=function(e){ if(e.target===box) box.remove(); };
     function tryExport(){
       if(box.querySelector('#ryDxfPwd').value !== EXPORT_PWD){ alert('导出密码错误，请输入正确的导出密码。'); return; }
-      var src=(box.querySelector('input[name=ryDxfSrc]:checked')||{}).value||'plan';
       var opts={};
       box.querySelectorAll('.ryDxfOpt').forEach(function(cb){ opts[cb.getAttribute('data-k')]=cb.checked; });
-      var dxf=buildDxf(src,opts);
-      if(dxf){ doDownload(dxf,src); box.remove(); }
+      var dxf=buildDxf(opts);
+      if(dxf){ doDownload(dxf); box.remove(); }
     }
     box.querySelector('#ryDxfOk').onclick=tryExport;
     box.querySelector('#ryDxfPwd').addEventListener('keydown',function(e){ if(e.key==='Enter') tryExport(); });

@@ -169,6 +169,7 @@
     <div class="fn-inner" data-ry-fnnav data-base="index.html#"></div>
   </nav>
   <script src="runye-nav.js?v=385-global-open"></script>
+  <script src="core/irrigation-data-store.js?v=1"></script>
   <!-- [v299 水力校核] 计算核心（UMD）：hc-core/design-core 为全站口径唯一出处，必须先载 -->
   <script src="hydraulic-calc/hc-core.js"></script>
   <script src="hydraulic-calc/design-core.js"></script>
@@ -351,12 +352,10 @@
 
   /* ---------- 数据源 ---------- */
   function readNet() {
-    try { return JSON.parse(localStorage.getItem('runye_network_layout') || 'null'); }
-    catch (e) { return null; }
+    return window.RyIrrigationDataStore.readNetworkLayout();
   }
   function readDesign() {
-    try { return JSON.parse(localStorage.getItem('runye_hydraulic_design_v1') || 'null'); }
-    catch (e) { return null; }
+    return window.RyIrrigationDataStore.readHydraulicDesign();
   }
   function renderSrc() {
     var net = readNet(), design = readDesign(), el = $('srcCard');

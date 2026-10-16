@@ -3,7 +3,7 @@
    ------------------------------------------------------------
    把散在各处的导入/导出/工程操作收进导航右侧一个折叠菜单。
    分组：导入 / 导出 / 工程。动作分发两类：
-     ① 主程序内动作：直接调全局函数（runyeDxf / RyIsoDiagram / runyeSaveProject 等）；
+     ① 主程序内动作：直接调全局函数（runyeDxf / runyeSaveProject 等）；
      ② 页面动作：先切换到对应主页面功能区，再调用该区内的控件。
    皮肤使用独立 .fn-file 面板（不复用 .fn-more-panel），
    定位逻辑与 buildMore 同款（position:fixed 防 .fn-inner overflow 裁切）。
@@ -34,7 +34,6 @@
     ]},
     { title: '导出', items: [
       { label: 'CAD 图纸 (DXF)', type: 'fn', action: 'ryFileExportDxf', feat: 'drawing-export', title: '高级会员功能：导出当前管线图为 2004 DXF（CAD 直接打开）' },
-      { label: '轴测图 SVG', type: 'fn', action: 'ryFileExportIsoSvg', feat: 'drawing-export', title: '高级会员功能：下载三级管线轴测图 SVG' },
       { label: '系统图 SVG / PNG / 打印', type: 'fn', action: 'ryFileExportHead', feat: 'drawing-export', title: '高级会员功能：滴灌供水首部系统图导出 / 打印' },
       { label: '地块 GeoJSON', type: 'page', page: 'online-map', action: 'ryFileExportGeoJSON', title: '在线地图页导出全部地块为 GeoJSON' },
       { label: '地块 KML', type: 'page', page: 'online-map', action: 'ryFileExportKML', title: '在线地图页导出全部地块为 KML' },
@@ -117,10 +116,6 @@
     ryFileExportDxf: function () {
       if (W.runyeDxf && typeof W.runyeDxf.export === 'function') { W.runyeDxf.export(); return; }
       toast('DXF 导出模块未加载');
-    },
-    ryFileExportIsoSvg: function () {
-      if (W.RyIsoDiagram && typeof W.RyIsoDiagram.downloadSVG === 'function') { W.RyIsoDiagram.downloadSVG(); return; }
-      toast('轴测图未生成或模块未加载（请先生成管线图）');
     },
     ryFileExportHead: function () {
       var dlg = D.getElementById('headModal');

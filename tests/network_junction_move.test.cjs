@@ -14,7 +14,7 @@
  *  4) 返回值给出随动报告：affectedFittings（被带动的配件）、absorbedSegments（自动改长的管段）。
  * ===================================================================== */
 'use strict';
-const NM = require('../iso-diagram/network-model.js');
+const NM = require('../feature-archive/三维与轴测图/source/iso-diagram/network-model.js');
 const ConstructionNetwork = NM.ConstructionNetwork;
 
 let pass = 0, fail = 0;

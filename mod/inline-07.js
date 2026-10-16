@@ -4,8 +4,8 @@
   function fmtWan(v){ return (v/10000).toFixed(1)+'万'; }
   function fmtK(v){ return (v/1000).toFixed(0)+'k'; }
   function loadAssum(){ try{ return JSON.parse(localStorage.getItem('runye_tlEconAssum')||'{}')||{}; }catch(e){ return {}; } }
-  /* 假设持久化：与轴测图「管径经济性对比」共用 runye_tlEconAssum 键（电价/年运行小时/折旧年限/总·主·支管材单价 同处一个对象）。
-     必须「读-改-写」，否则两页互相覆盖 → 丢字段。 */
+  /* 假设持久化：与三级管径经济分析共用 runye_tlEconAssum 键（电价/年运行小时/折旧年限/总·主·支管材单价同处一个对象）。
+     必须「读-改-写」，避免其他分析字段被覆盖。 */
   function saveAssum(patch){ var o=loadAssum(); for(var k in patch){ if(typeof patch[k]==='number'&&isFinite(patch[k])&&patch[k]>0)o[k]=patch[k]; else delete o[k]; } try{ localStorage.setItem('runye_tlEconAssum', JSON.stringify(o)); }catch(e){} }
   var s0=loadAssum();
   if(s0.price)price=s0.price; if(s0.hours)hours=s0.hours; if(s0.years)years=s0.years;
@@ -195,7 +195,6 @@
         window.tlManualCals={front:r.c.f, main:r.c.m, branch:r.c.b};
         if(typeof tlBuildPipeOverride==='function') tlBuildPipeOverride();
         if(typeof tlUpdatePlanBar==='function') tlUpdatePlanBar();
-        if(typeof window.tlSyncIsoMeta==='function') window.tlSyncIsoMeta();
         alert('已应用 总管Ø'+r.c.f+' · 主管Ø'+r.c.m+' · 支管Ø'+r.c.b+'\n扬程/功率/材料清单已按此管径重算。');
       });
       box.querySelectorAll('tr[data-row]').forEach(function(tr){

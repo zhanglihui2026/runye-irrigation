@@ -7,14 +7,13 @@
  * 2026-09-15 用户要求：底图改为直接显示「三级简图」成图内容（仅去滴灌带示意，
  *       三级简图本身不变）；简图未生成时回退本模块原有自绘底图。
  * 2026-09-15 阶段1（用户批准）：手工管线迁入共享图面数据层 RyTlEditPipes
- *       （tl-edit-pipes.js）——三级工作区 ⇄ 轴测图 双向同步：任一视图插入/删除
- *       主管/支管，另一视图立即重渲染；支持拾取选中、改长（末段拉伸）、删除、
+ *       （tl-edit-pipes.js）供三级工作区管理；支持拾取选中、改长（末段拉伸）、删除、
  *       数量/长度自动汇总。
  * 2026-09-15 阶段2（用户批准）：接入自动管线图面编辑层 RyTlAutoEdits
  *       （tl-auto-edits.js）—— 二级传递的自动管线（简图底图内）可点选（高亮+信息）、
  *       就地改长（克隆底图隐藏原 path，覆盖层按简图原色重画有效几何）、
- *       在点击位置插三通/阀门；与轴测图双向同步。tlDiagramData 仍只读不写。
- * 红线：只读不写（与 iso-diagram 同一红线）。手工管线只存共享数据层自有状态，
+ *       在点击位置插三通/阀门。tlDiagramData 仍只读不写。
+ * 红线：手工管线只存共享数据层自有状态，
  *       不写回 tlDiagramData、不参与水力计算、不进材料清单；
  *       平面几何签名变更（重新生成平面图）→ 共享层自动清空（同几何保留）。
  * 交互：滚轮缩放（光标为中心）· 非插入模式拖拽平移 · 双击/按钮适应窗口；
@@ -25,7 +24,7 @@
   'use strict';
 
   /* ---------- 共享图面数据层（2026-09-15 阶段1）----------
-   * 手工管线单一数据源：三级工作区 ⇄ 轴测图共用。缺失时退化为只读空层
+   * 手工管线单一数据源：当前由三级工作区消费。缺失时退化为只读空层
    * （本模块仍可独立渲染/单测，插入操作不可用）。 */
   var EP = global.RyTlEditPipes || {
     list: function () { return []; },
@@ -70,7 +69,7 @@
     manValve: '#0891b2'                       /* 手工阀门（2026-09-18 第七十轮）：靛青，与玫红三通、紫弯头三色区分 */
   };
   /* ---------- v162：管道遮蔽的统一外观 ----------
-   * 遮蔽 = 该管在三级简图/工作区/轴测图改「灰色虚线」（与二级页「遮蔽管线」同色
+   * 遮蔽 = 该管在三级简图/工作区改「灰色虚线」（与二级页「遮蔽管线」同色
    * slate-500 @55%），且不计入材料清单。**管宽保持不变**：命中容差、几何、水力都不动，
    * 只换颜色与线型 —— 避免「遮一下就点不中/量不准」的连锁问题。 */
   var HID_STROKE = '#64748b';
@@ -335,8 +334,7 @@
     /* 手工配件锚点（MP-F## 三通/弯头，2026-09-16）：画线自动吸附到配件 */
     (EP.fitsList ? EP.fitsList() : []).forEach(function (f) { var p = EP.fitPos(f.id); if (p) add(p); });
     /* 三通锚点（2026-09-17 指令 C）：吸附到自动/手工三通，使手绘管端点精确落在三通上 →
-       三通旋转时该管被认作连接管跟随旋转（轴测图 teeSubtree.nearPt 判定）。 */
-    (global.RyIsoDiagram && global.RyIsoDiagram.teeSnapPts ? global.RyIsoDiagram.teeSnapPts() : []).forEach(function (t) { add(t); });
+       三通旋转时该管被认作连接管并跟随旋转。 */
     /* 去重（0.05m 内视为同一点） */
     var out = [];
     pts.forEach(function (p) {
@@ -1098,7 +1096,7 @@
       }
       if (lp.length) s.push('<g>' + lp.join('') + '</g>');
     }
-    /* 2) 滴灌带 —— 2026-09-15 按用户要求工作区不再绘制（数据仍由 tlDiagramData 导出，不影响轴测图） */
+    /* 2) 滴灌带 —— 工作区不绘制（数据仍由 tlDiagramData 导出）。 */
     /* 3) 支管 → 主管 → 总管（下位先画） */
     /* v162：底图兜底路径（克隆不到简图时自绘）—— 遮蔽管按同一口径画灰虚线 */
     (data.branchPipes || []).forEach(function (l, bi) { if (l && l.length >= 2) s.push('<path d="' + pl(l) + '" fill="none"' + hidAttr('branch-' + bi, COLORS.branch, 1.6) + ' stroke-linecap="round" stroke-linejoin="round"/>'); });
@@ -1255,7 +1253,7 @@
       if (!pos) return;
       var q = T(pos);
       var fSel = f.id === selFitId;
-      var col = '#202020';   /* 配件符号近黑（2026-09-16 用户要求）：与彩色管线区分，且与轴测图 tee/valve 色一致 */
+      var col = '#202020';   /* 配件符号近黑：与彩色管线区分。 */
       var sym;
       if (f.kind === 'valve') {
         sym = '<path d="M' + fmt(q.x - 4.5) + ' ' + fmt(q.y - 3.6) + ' L' + fmt(q.x + 4.5) + ' ' + fmt(q.y + 3.6) + ' L' + fmt(q.x + 4.5) + ' ' + fmt(q.y - 3.6) + ' L' + fmt(q.x - 4.5) + ' ' + fmt(q.y + 3.6) + ' Z" fill="' + col + '" stroke="#fff" stroke-width="1.3"/>';
@@ -1763,7 +1761,7 @@
   }
   /* 自动配件（A-F## 三通/阀门）接管道：从配件锚点沿管线切线垂直方向（屏幕朝上侧）引出 5m 手动支管
      （默认 5m，创建即选中 → 工具栏改长可直接输入，与手工配件 attachBranchPipe 同口径）；
-     走手工管层（EP），不写回 tlDiagramData → 轴测图/三级简图/材料清单数据不受影响；可继续右键延长/改长（链式） */
+     走手工管层（EP），不写回 tlDiagramData，不影响三级简图/材料清单数据；可继续右键延长/改长（链式）。 */
   function attachAutoBranchPipe(fitId) {
     var f = null;
     (AE.fitsList() || []).forEach(function (x) { if (x.id === fitId) f = x; });
@@ -1816,7 +1814,7 @@
     (AE.fitsList() || []).forEach(function (z) { if (z.id === fitId) f = z; });
     if (!f) return;
     var items = [];
-    if (f.kind === 'tee' && AE.setFitSpin) {   /* 图面三通第三口旋转（2026-09-16，与轴测图同源 AE.spin） */
+    if (f.kind === 'tee' && AE.setFitSpin) {   /* 图面三通第三口旋转。 */
       items.push({ label: '↻ 第三口 +15°（绕管道轴）', fn: function () { AE.setFitSpin(fitId, (AE.fitSpinOf(fitId) || 0) + 15, 'ws-menu'); } });
       items.push({ label: '↺ 第三口 -15°（绕管道轴）', fn: function () { AE.setFitSpin(fitId, (AE.fitSpinOf(fitId) || 0) - 15, 'ws-menu'); } });
       items.push({ label: '⌂ 复位第三口（垂直管道）', fn: function () { AE.setFitSpin(fitId, 0, 'ws-menu'); } });
@@ -2724,7 +2722,7 @@
         if (n >= 2 && Math.hypot(draft.pts[n - 1].x - draft.pts[n - 2].x, draft.pts[n - 1].y - draft.pts[n - 2].y) < 0.05) draft.pts.pop();
         commitDraft();
       } else if (!mode) {
-        /* 非插入模式双击 = 适应窗口（对齐轴测图交互）
+        /* 非插入模式双击 = 适应窗口
            [v242] 但「从成组页按块进来」时，双击在地块轮廓【外面】= 退回成组页（CAD 式）。 */
         if (!wsExitBlockEdit(currentEL(ctn), e)) zoomFit();
       }
@@ -2998,7 +2996,7 @@
   }
 
   /* ---------- 共享层订阅（双向同步核心，2026-09-15 阶段1）----------
-   * 轴测图/主方案存档发起的变更 → 本视图保持视口重渲染；
+   * 编辑状态/主方案存档发起的变更 → 本视图保持视口重渲染；
    * 本视图发起的变更（source='ws'）在 add/remove 等入口已触发同一订阅，
    * 统一走这里重渲染，避免双份。 */
   EP.onChange(function (d) {
@@ -3009,7 +3007,7 @@
     rerenderKeepView();
     notifyChange();
   });
-  /* 自动管线编辑层订阅（阶段2）：轴测图/存档发起的改长/配件变更 → 保持视口重渲染 */
+  /* 自动管线编辑层订阅：状态/存档发起的改长/配件变更 → 保持视口重渲染 */
   AE.onChange(function () {
     if (typeof document === 'undefined') return;
     var stillFit = selFitId && (AE.fitsList() || []).some(function (x) { return x.id === selFitId; });
@@ -3171,7 +3169,7 @@
   api.setMaskMode = setMaskMode;
   api.isMaskMode = function () { return maskMode; };
   api.onMaskMode = null;   /* 遮蔽模式变化 → 页面重画工具轨按钮（页面注入） */
-  /* 宿主（工具轨/右键菜单）直接切换某条管的遮蔽；AE 广播 → 工作区与轴测图一起重渲染 */
+  /* 宿主（工具轨/右键菜单）直接切换某条管的遮蔽；AE 广播后工作区重渲染。 */
   api.setAutoHidden = function (pid, on) {
     if (!lastDataRef || !pid) return false;
     return AE.setHidden(pid, on, lastDataRef, 'ws');

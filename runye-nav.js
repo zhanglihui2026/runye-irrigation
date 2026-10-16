@@ -25,7 +25,7 @@
   /* [v346 2026-10-09 用户指令] 导航收敛：顶层只留 智能规划/在线地图/地块分区/管路规划/过滤系统/水力校核，
      其余全部并入 MORE_ITEMS「更多 ▾」。
      [v387 2026-10-12 用户指令] 「更多」内容全部展开到顶栏——六项回到 ITEMS 顶层。
-     [v401 2026-10-12 用户指令] 顶栏二次收敛：过滤系统/轴测图/系统图/滴灌带查询 折叠回「更多 ▾」
+     [v401 2026-10-12 用户指令] 顶栏二次收敛：过滤系统/系统图/滴灌带查询 折叠回「更多 ▾」
      （协议自检/参数标定由插件侧 container='.fn-more-panel' 同步折叠）。
      ★ v346 的「更多内项目线上锁」随本次解除：折叠项按各自feat权益门控；权益未同步时显示等待态，
        不进行跳转或动作，线上整体拦截会把正式功能锁死 —— 面板委托拦截与
@@ -70,13 +70,12 @@
     /* { label: '数字化建模',   hash: 'parametricModelingSection', feat: 'pro-others', title: '数字化建模 · 参数化节点建模' }, */
     { label: '材料清单',     hash: 'detailsSection',           feat: 'bom-export' }
   ];
-  /* [v401 2026-10-12 用户指令] 「更多 ▾」折叠面板：过滤系统/轴测图/系统图/滴灌带查询 折叠于此；
+  /* [v401 2026-10-12 用户指令] 「更多 ▾」折叠面板：过滤系统/系统图/滴灌带查询 折叠于此；
      协议自检（hello-world）/ 参数标定（calib）由插件 nav 声明 container='.fn-more-panel' 同入面板；
      pipe_optim_ui.js 的「管网优化详细分析」注入项仍落这里。
      feat 说明：'pro-others' = 高级会员通配键；feat:'' = 完全免费（滴灌带查询是公开查询小工具）。 */
   var MORE_ITEMS = [
     { label: '过滤系统',     hash: 'filterSystemSection',      feat: 'pro-others', title: '过滤系统 · GREEN 型单体并联机组（初稿）' },
-    { label: '轴测图',       act: 'iso', page: 'index.html',   feat: 'drawing-export', title: '三级管线轴测图（先「生成管线图」再点）' },
     { label: '系统图',       act: 'sys', page: 'index.html',   feat: 'drawing-export', title: '三级系统图（供水首部系统图）' },
     { label: '滴灌带查询',   href: '耐特菲姆滴灌带长度查询器.html', feat: '' }
   ];
@@ -249,7 +248,7 @@
     btn.className = 'fn-link fn-more-btn';
     btn.setAttribute('aria-expanded', 'false');
     btn.setAttribute('aria-haspopup', 'true');
-    btn.title = '更多工具：过滤系统 / 轴测图 / 系统图 / 滴灌带查询 / 管网优化详细分析';
+    btn.title = '更多工具：过滤系统 / 系统图 / 滴灌带查询 / 管网优化详细分析';
     var caret = document.createElement('span');
     caret.className = 'fn-more-caret';
     caret.setAttribute('aria-hidden', 'true');

@@ -12,7 +12,7 @@
  * （network-model.js 的 CAT 解析链优先读 globalThis.RyCatalog）。
  * ===================================================================== */
 'use strict';
-const base = require('../iso-diagram/product-catalog.js');
+const base = require('../feature-archive/三维与轴测图/source/iso-diagram/product-catalog.js');
 
 const EXTRA = [
   { id: 'GEN-PIPE-90', type: 'pipe', brand: '通用示意', model: 'PE直管 Ø90',

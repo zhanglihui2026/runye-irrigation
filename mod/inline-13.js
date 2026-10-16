@@ -24,7 +24,7 @@
     arr.forEach(function(p){
       var item=document.createElement('div');
       item.className='at-lib-item'+(p.id===window.currentPlotId?' current':'');
-      item.innerHTML='<div class="pli-main"><div class="pli-name">'+esc(p.name)+' <span class="pli-crop">'+esc(p.crop||'七彩花生')+'</span></div><div class="pli-meta">'+((p.mu!=null)?p.mu.toFixed(2):'0')+' 亩 · '+srcLabel(p.source)+' · '+fmtDate(p.ts)+'</div></div><div class="pli-actions"><button class="at-btn-action pli-btn" data-act="current">设为当前</button><button class="at-btn-action pli-btn" data-act="rename">重命名</button><button class="at-btn-action danger pli-btn" data-act="del">删除</button></div>';
+      item.innerHTML='<div class="pli-main"><div class="pli-name">'+esc(p.name)+'</div><div class="pli-meta">'+((p.mu!=null)?p.mu.toFixed(2):'0')+' 亩 · '+srcLabel(p.source)+' · '+fmtDate(p.ts)+'</div></div><div class="pli-actions"><button class="at-btn-action pli-btn" data-act="current">设为当前</button><button class="at-btn-action pli-btn" data-act="rename">重命名</button><button class="at-btn-action danger pli-btn" data-act="del">删除</button></div>';
       item.querySelector('[data-act="current"]').addEventListener('click',function(){ setCurrent(p.id); });
       item.querySelector('[data-act="rename"]').addEventListener('click',function(){ renamePlot(p.id); });
       item.querySelector('[data-act="del"]').addEventListener('click',function(){ delPlot(p.id); });
@@ -42,11 +42,20 @@
     if(area<=0) return null;
     var arr=loadLib();
     var id=opts.plotId || ('pm'+Date.now());
+    if(opts.preserveSource){
+      var matches=arr.filter(function(x){return x&&String(x.id)===String(id);});
+      if(matches.length!==1) throw new Error('地块库编号重复或地块已删除，无法安全设为当前');
+      window.currentPlotId=id; renderLib();
+      if(window.measuredPolygon && window.measuredPolygon.length>=3 && typeof window.ppLoadPolygon==='function') window.ppLoadPolygon();
+      if(typeof window.ppGenerateDiagram==='function') window.ppGenerateDiagram({scroll:false});
+      if(typeof window.runyeSetCurrentPlot==='function') window.runyeSetCurrentPlot(id);
+      return matches[0];
+    }
     var exist=null; arr.forEach(function(x){ if(x.id===id) exist=x; });
     var name=opts.name || (exist&&exist.name) || ('地块 '+(arr.length+1));
     var plot={ id:id, name:name, mu:Math.round(area/666.67*100)/100, sqm:Math.round(area*100)/100,
       poly:(window.measuredPolygon||[]).map(function(pt){return {x:Math.round((pt.x||0)*100)/100,y:Math.round((pt.y||0)*100)/100};}),
-      crop:(exist&&exist.crop)||'七彩花生', source:'map', ts:Date.now(), note:(exist&&exist.note)||'' };
+      source:'map', ts:Date.now(), note:(exist&&exist.note)||'' };
     /* [map-enhance 补全 2026-09-28] 回传落库时补 polyLatLng + geo，否则地图页叠加地块
        框线因缺经纬度被 runye-map-enhance.js 跳过。基准 __runyeGeoBase 来自地图页画框
        的 GCJ-02 经纬度，反投结果与地图页 btnSavePlot 存的 polyLatLng 同坐标系。 */
@@ -77,7 +86,7 @@
       if(subs && subs.length){
         plot.merged=true; plot.grouped=true;
         plot.subPlots=subs.map(function(s){
-          return { id:s.id, name:s.name, mu:s.mu, sqm:s.sqm, crop:s.crop,
+          return { id:s.id, name:s.name, mu:s.mu, sqm:s.sqm,
                    poly:(s.poly||[]).map(function(q){return{x:Math.round((q.x||0)*100)/100,y:Math.round((q.y||0)*100)/100};}),
                    polyLatLng:s.polyLatLng||null };
         });
@@ -136,7 +145,7 @@
     var name=(nameInput&&nameInput.value||'').trim();
     if(!name) name='地块 '+(arr.length+1);
     var id='p'+Date.now()+Math.floor(Math.random()*1000);
-    var plot={ id:id, name:name, mu:Math.round(area/666.67*100)/100, sqm:Math.round(area*100)/100, poly:(window.measuredPolygon||[]).map(function(pt){return {x:Math.round((pt.x||0)*100)/100,y:Math.round((pt.y||0)*100)/100};}), crop:'七彩花生', source:(window.measuredPolygonSource||'area'), ts:Date.now(), note:'' };
+    var plot={ id:id, name:name, mu:Math.round(area/666.67*100)/100, sqm:Math.round(area*100)/100, poly:(window.measuredPolygon||[]).map(function(pt){return {x:Math.round((pt.x||0)*100)/100,y:Math.round((pt.y||0)*100)/100};}), source:(window.measuredPolygonSource||'area'), ts:Date.now(), note:'' };
     if(window.__runyeGeoBase && window.RunyeGeo){
       plot.geo=Object.assign({},window.__runyeGeoBase);
       var frame=window.__runyeMapFramePoly;
@@ -153,7 +162,9 @@
     try{ if(typeof window.runyeSetCurrentPlot==='function') window.runyeSetCurrentPlot(id); }catch(e){}
   }
   function setCurrent(id){
-    var arr=loadLib(); var p=arr.filter(function(x){return x.id===id;})[0];
+    var arr=loadLib(); var matches=arr.filter(function(x){return x&&x.id===id;});
+    if(matches.length>1){ toast('地块库中存在重复编号，无法确定当前地块；请先检查重复记录'); return; }
+    var p=matches[0];
     if(!p) return;
     if(p.polyLatLng && p.polyLatLng.length>=3 && window.RunyeGeo){
       if(!p.geo) p.geo=RunyeGeo.baseOfFeature(p);
@@ -193,7 +204,7 @@
         p.subPlots.forEach(function(s){
           if(s && Array.isArray(s.poly) && s.poly.length>=3){
             var _ring = s.poly.map(function(q){return{x:+q.x,y:_v219Flip?-(+q.y):+q.y};});
-            _rec.push({ id:s.id, name:s.name, mu:s.mu, sqm:s.sqm, crop:s.crop,
+            _rec.push({ id:s.id, name:s.name, mu:s.mu, sqm:s.sqm,
                         polyLatLng:s.polyLatLng||null,
                         poly:_ring });
           }

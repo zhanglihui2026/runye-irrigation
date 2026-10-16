@@ -1,0 +1,20 @@
+{
+  "core": "1.0.0",
+  "controlEndpoint": "https://runye-irrigation-d3e8xef4540bae5-1e50596164.ap-shanghai.app.tcloudbase.com/entitle",
+  "plugins": [
+    { "id": "hello-world", "path": "plugins/hello-world/" },
+    { "id": "archive", "path": "plugins/archive/" },
+    { "id": "bom", "path": "plugins/bom/" },
+    { "id": "case-lib", "path": "plugins/case-lib/" },
+    { "id": "pipe-optim", "path": "plugins/pipe-optim/" },
+    { "id": "calib", "path": "plugins/calib/" },
+    { "id": "hydraulics", "path": "plugins/hydraulics/" },
+    { "id": "ai-plan", "path": "plugins/ai-plan/" },
+    { "id": "sprinkler", "path": "plugins/sprinkler/" },
+    { "id": "filter-system", "path": "plugins/filter-system/" },
+    { "id": "material-list", "path": "plugins/material-list/" },
+    { "id": "iso-view", "path": "plugins/iso-view/" },
+    { "id": "sys-view", "path": "plugins/sys-view/" },
+    { "id": "contour-dxf", "path": "plugins/contour-dxf/" }
+  ]
+}

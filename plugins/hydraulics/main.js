@@ -304,17 +304,17 @@ function activate(ctx) {
       return isFinite(v) ? v : null;
     },
     /* Christiansen 多口系数（滴灌带多孔出流折减）—— RyHydCore 提供 */
-    christiansenF: function (n, x) {
+    christiansenF: function (n) {
       var W = coreGLobalFn();
       if (!W || !W.RyHydCore || typeof W.RyHydCore.christiansenF !== 'function') return null;
-      var v = Number(W.RyHydCore.christiansenF(n, x));
+      var v = Number(W.RyHydCore.christiansenF(n));
       return isFinite(v) ? v : null;
     },
     /* 全链路校核透传（读已布置管网 → 树 → 流量 → 逐段结果） */
-    compute: function (opts) {
+    compute: function (net, opts) {
       var W = coreGLobalFn();
       if (!W || !W.RyHydCore || typeof W.RyHydCore.compute !== 'function') return null;
-      try { return W.RyHydCore.compute(opts || {}); }
+      try { return W.RyHydCore.compute(net || {}, opts || {}); }
       catch (e) { if (ctxRef) ctxRef.runtime.reportError(e); return null; }
     },
     state: function () {

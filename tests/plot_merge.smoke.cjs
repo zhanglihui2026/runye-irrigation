@@ -412,18 +412,15 @@ test('③-f 地图页「成组」口径（v189）：不出现「拼接为大地�
 
 test('③-g 传递口径（v189）：回传二级页的是**各子地块本身**，不是合并后的大块', () => {
   /* 用户原话：「在在线地图中成组之后，不是拼接，我一说拼接你就把小地块之间的空地给我取消了，
-     传递到二级管路页面，」⇒ 回传 payload 必须逐子地块带各自的环（保留块间空隙）。 */
-  const k = MAP_SRC.indexOf("localStorage.setItem('runyeMeasuredArea'");
-  assert.ok(k > 0, '应能找到回传写入点');
-  /* ★ 窗口 3600（2026-10-08 实测）：buildPlotPayload 的 ringSet/polyLatLngSet 行距
-     「runyeMeasuredArea 写入点」已达 3099 字符（v286d 回传注释块 + v191 注释块加长所致），
-     旧窗口 2600 切不到 ⇒ ③-g 恒红（存量脆性，与功能无关）。留余量取 3600。 */
-  const seg = MAP_SRC.slice(Math.max(0, k - 3600), k);
-  assert.match(seg, /payload\.subPlots\s*=/, '成组地块回传时应带 subPlots（各子地块本身）');
-  assert.match(seg, /payload\.grouped\s*=\s*true/, 'v189 应显式打 grouped:true 标记');
-  /* 权威几何优先：先取 polyLatLngSet，缺失才退回 subPlots[].polyLatLng */
-  assert.match(seg, /polyLatLngSet/, '应优先用权威几何 polyLatLngSet（各成员环集合）');
-  assert.match(seg, /ringSet\s*&&\s*ringSet\[i\]/, '应逐环取 polyLatLngSet[i]，保证「各子地块本身」被传出');
+     传递到二级管路页面，」⇒ 现行链路只传稳定引用，目标页必须按引用读回各成员原环。 */
+  const sendStart = MAP_SRC.indexOf('function sendPlotToDesign(plot, btnEl){');
+  const sendEnd = MAP_SRC.indexOf('// 回传地块绘制', sendStart);
+  assert.ok(sendStart >= 0 && sendEnd > sendStart, '应能找到地图到设计页的回传函数');
+  const send = MAP_SRC.slice(sendStart, sendEnd);
+  assert.match(send, /polyLatLngSet/, '成组地块指纹应优先用权威成员环集合');
+  assert.match(send, /subs\[i\]&&subs\[i\]\.polyLatLng/, '缺少集合时应逐块使用子地块经纬度环');
+  assert.match(send, /ryPlotRef:\{id:id,[^}]*geometryKey:clickedKey/, '回传应携带可验证的地块引用');
+  assert.match(INDEX_SRC, /subPlots:p\.subPlots\|\|\[\]/, '目标页必须从匹配的库记录读取子地块');
 
   /* 二级页消费段：必须逐子地块换算成本地米坐标，而不是只留一个外轮廓。
      ★ 锚点不能用「首个 window.__runyeSubPlots」——v190 新增了 ppGetSubPlotRings 等 helper，

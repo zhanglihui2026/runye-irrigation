@@ -78,7 +78,6 @@
   function refresh() {
     try { var b = document.getElementById('btnPipeOpt'); if (b) b.click(); } catch (e) { }
     setTimeout(function () {
-      try { if (window.tlEconPanel && window.tlEconPanel.render) window.tlEconPanel.render(); } catch (e) { }
       var poly = window.measuredPolygon;
       var hasPoly = (poly && poly.length >= 3);
       try { if (hasPoly && typeof tlAutoGenerate === 'function') tlAutoGenerate({ scroll: false, stay: true }); } catch (e) { }

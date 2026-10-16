@@ -9,14 +9,10 @@
 })(typeof window !== 'undefined' ? window : globalThis, function (core, root) {
   'use strict';
   function inner(od, sdr) {
-    var native = root.RyHydraulicNative;
-    return native && native.inner ? native.inner(od, sdr) : od * (1 - 2 / sdr);
+    return core.innerDiamForSdr(od, sdr);
   }
   function hazen(L, Q, d, C) {
-    var native = root.RyHydraulicNative;
-    if (native && native.hazen) return native.hazen(L, Q, d, C);
-    if (d <= 0 || Q <= 0) return 0;
-    return 1.113e9 * L * Math.pow(Q, 1.852) / (Math.pow(C, 1.852) * Math.pow(d, 4.87));
+    return core.hazen(L, Q, d, C);
   }
   function christiansen(N) {
     var native = root.RyHydraulicNative;

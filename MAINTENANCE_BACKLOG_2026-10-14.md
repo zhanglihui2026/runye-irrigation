@@ -36,3 +36,9 @@
 - `node --check mod/inline-09.js`、`node --check mod/inline-11.js`：历史记录为通过；本轮未运行测试套件。
 - AOCI 本轮数字农业 4 条候选写入成功；Verify 无 stale/missing，Check `ok=true` 且无阻断项，Guide `complete=true` / `next_action=none`。仍有 10 条 E-scale 提示。
 - 未提交或部署；当前工作区包含本轮之前已有的多文件改动与未跟踪文件，不能直接把全部工作区内容作为一次发布范围。
+
+## 2026-10-15 阶段 0 续接记录
+
+- 变更仍按可观察主题归组，不按版本号或会话猜来源：在线地图主页面化（`index.html`、`mod/inline-31.js`、`runye-map-measure.html`、`runye-nav.js`、`mod/online-map.js`、`mod/online-map.css`、`sw.js`）；主参数面板样式调整（`index.html`、`mod/ry-panel.css`）；测试面板层级修正（`runye-test-panel.html`、`mod/ry-panel.css`、`sw.js`）；本地 Vite 预览相关（`vite.config.js`、`.vite/`）。后三个共享文件含跨主题差异，不能按整文件归属；Vite 文件来源和是否纳入项目仍待确认。
+- `tests/plot_merge.smoke.cjs` 的旧地图源码锚点已调整为检查主页面展开后的在线地图区段和 `mod/online-map.js`，没有跳过断言。2026-10-15 的本地统一门禁记录为：234 个 JS/CJS/MJS 语法通过，静态检查 8/8，25 个 Node 测试文件通过，拼接契约 23/23。该结果不替代远端 CI、真实浏览器渲染或线上冒烟。
+- 本轮未提交或发布。下一步应先确认 Vite 预览改动的留存范围，并为在线地图迁移补一次真实浏览器验收；这些事项不妨碍已通过的 Node 基线，但在确认前不应把整个工作区打包发布。

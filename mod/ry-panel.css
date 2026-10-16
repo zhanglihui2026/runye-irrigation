@@ -341,10 +341,8 @@ body.ry-tool #designInput .ryp-body > .panel-foot { margin-top: auto; flex: 0 0 
 }
 
 /* ======================================================================
-   [v432-pp-side-panel] 04 地块分区页（#pipePlanSection）参数栏套用面板规范。
-   与 01 设计参数面板同一套视觉与交互：深墨绿标题头 + 折叠/收起轨（mod/ry-panel.js
-   的 rypCollapsible 驱动，记忆键 ryPpSideFolded）+ 灰条分组标题 + 紧凑键值行 +
-   Shoelace 数字输入代理（原生 input 保留为数据源与离线回退）。
+   [v432-pp-side-panel] 04 地块分区页（#pipePlanSection）参数栏样式。
+   保留紧凑键值行与 Shoelace 数字输入代理（原生 input 保留为数据源与离线回退）。
    约束：字段 ID、计算监听、契约探针计数全部不动；本文件在 index.html 中晚于
    style-01.css 加载，同特异性规则以此处为准（含对 .pp-plan-bar 旧横向暗色
    样式与 ::before 伪元素分组标题的全宽替代）。
@@ -356,11 +354,12 @@ body.ry-tool #designInput .ryp-body > .panel-foot { margin-top: auto; flex: 0 0 
   padding:0;gap:0;
   font-family:var(--ry-font,"Microsoft YaHei","PingFang SC","Segoe UI",system-ui,sans-serif);
 }
-/* [试验层 2] 主程序地块分区侧栏去除卡片底色、边框和圆角；保留列布局与滚动。 */
+/* 主程序模式：沿用基础侧栏列布局与滚动，仅设置面板模式的间距和外观。 */
 body.ry-tool #pipePlanSection .pp-side{
   background:transparent;
   border:0;
   border-radius:0;
+  gap:8px;padding:10px;
 }
 /* [试验层 3] 移除地块分区整个功能区外壳的底色与投影；保留原有尺寸和间距。
    主程序模式的 body.ry-tool 规则特异性更高，故同时覆盖该实际作用域。 */
@@ -376,19 +375,6 @@ body.ry-tool #pipePlanSection .pp-toolbar{
   border:0;
   box-shadow:none;
 }
-/* [试验层 1] 暂时移除地块分区参数栏标题头的深色品牌皮肤，保留点击折叠和尺寸。 */
-#pipePlanSection .pp-side > .ryp-sidebar-head{
-  cursor:pointer;
-}
-#pipePlanSection .pp-side .ryp-sidebar-head .ryp-fold{ width:36px; min-height:36px; }
-/* —— 内容体：栏内滚动 —— */
-#pipePlanSection .pp-side > .ryp-body{
-  flex:1 1 auto;
-  min-height:0;min-width:0;
-  overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
-  padding:0 0 6px;
-  scrollbar-width:thin;
-}
 /* —— 旧横向参数条压平为纵向块。
    [v436-pp-normalize] 原 style-01.css 与 index.html 内嵌 style 的两组旧副本
    （暗色横条 + 旧浅色竖排卡片，含 input 64px!important 对抗源）已整体删除，
@@ -397,63 +383,32 @@ body.ry-tool #pipePlanSection .pp-toolbar{
 #pipePlanSection .pp-side .pp-plan-bar{
   display:block;margin:0;padding:0;
   min-height:0;
-  border:0;border-radius:0;
+  border:0;border-radius:0;box-shadow:none;
   background:transparent;
   font-size:11px;
 }
-/* 原 ::before 伪元素分组标题（「地块与灌溉参数」/「水力计算结果」）改由真实 DOM
-   .ryp-group-head 承担（可带图标、可被契约测试检索），此处关闭伪元素。 */
+/* 关闭旧横向参数条遗留的 ::before 伪标题，避免旧分组标题重新出现。 */
 #pipePlanSection .pp-side .pp-plan-bar::before,
 #pipePlanSection .pp-side .pp-plan-bar-result::before,
-#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-bar::before,
-#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-bar-result::before,
 #tlPipePlanSection .pp-side .pp-plan-bar::before,
-#tlPipePlanSection .pp-side .pp-plan-bar-result::before,
-#ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-bar::before,
-#ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-bar-result::before{
+#tlPipePlanSection .pp-side .pp-plan-bar-result::before{
   content:none!important;
   display:none!important;
 }
-/* —— 分组标题条：对齐样板 .ryp-group-head（灰底 + 品牌绿图标 + 字距） —— */
-#pipePlanSection .pp-side .ryp-group-head{
-  display:flex;align-items:center;gap:7px;
-  min-height:26px;padding:3px 12px;
-  border-top:1px solid var(--ry-s-200,#e2e8f0);
-  border-bottom:1px solid var(--ry-s-200,#e2e8f0);
-  background:var(--ry-s-100,#f1f5f9);
-  color:var(--ry-s-700,#334155);
-  font-size:11px;font-weight:700;letter-spacing:.04em;
-}
-#pipePlanSection .pp-side .ryp-group-head sl-icon{ color:#173e32; font-size:13px; }
 /* [试验层 6] 参数组不再各自呈卡片；必须放在基础皮肤之后才能生效。 */
-#pipePlanSection .pp-side .pp-plan-bar,
-body.ry-tool #pipePlanSection .pp-side .pp-plan-bar{
-  background:transparent;
-  border:0;
-  box-shadow:none;
-}
-/* [试验层 7] 参数组标题只保留文字和图标，去掉灰色标题条及上下分隔线。
-   CAD 栏会把 .pp-side 移出 #pipePlanSection，故为该宿主补同一覆盖。 */
-#pipePlanSection .pp-side .ryp-group-head,
-#ryCadSide [data-pp="pipePlanSection"] .pp-side .ryp-group-head{
-  background:transparent;
-  border-top-color:transparent;
-  border-bottom-color:transparent;
-}
 /* —— 键值行：标签左、控件右，紧凑 27px 行距 —— */
 #pipePlanSection .pp-side .pp-plan-item{
   display:flex;align-items:center;gap:5px;
   width:100%;min-height:27px;padding:2px 12px;
-  border-bottom:1px solid var(--ry-s-100,#f1f5f9);
+  border-bottom:1px solid transparent;
   color:var(--ry-s-500,#64748b);font-size:11px;
-}
-/* [试验层 8] 移除参数行之间的细分隔线，观察纯间距分组效果。 */
-#pipePlanSection .pp-side .pp-plan-item,
-#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-item{
-  border-bottom-color:transparent;
 }
 #pipePlanSection .pp-side .pp-plan-item:last-of-type{ border-bottom:0; }
 #pipePlanSection .pp-side .pp-plan-item > .pp-plan-label:first-child{ margin-right:auto; }
+#pipePlanSection .pp-side .pp-plan-item-fluid-input{
+  display:flex;align-items:center;gap:5px;
+}
+#pipePlanSection .pp-side .pp-plan-item-fluid-input > .pp-plan-label:first-child{flex:0 0 84px;margin-right:0;min-width:0}
 #pipePlanSection .pp-side .pp-plan-label{ font-size:12px;line-height:1.3;color:var(--ry-s-600,#475569); }
 #pipePlanSection .pp-side .pp-plan-val{
   font-size:12px;font-weight:600;color:var(--ry-s-800,#1e293b);
@@ -463,11 +418,11 @@ body.ry-tool #pipePlanSection .pp-side .pp-plan-bar{
    [v436] 撤除 !important：64px 对抗源已删；color 一项由 index.html :736 的
    统一 token 规则（--u-ink）接管，与本块深色文字同向，无视觉冲突。 */
 #pipePlanSection .pp-side .pp-plan-item input{
-  width:72px;height:24px;padding:2px 7px;box-sizing:border-box;
-  border:1px solid var(--ry-s-300,#cbd5e1);border-radius:6px;
-  background:#fff;color:var(--ry-s-800,#1e293b);
+  flex:0 0 64px;width:64px;height:24px;padding:2px 7px;box-sizing:border-box;
+  border:1px solid transparent;border-radius:6px;
+  background:transparent;color:var(--ry-s-800,#1e293b);
   font-family:inherit;font-size:12px;font-weight:400;
-  text-align:right;flex:0 0 auto;outline:none;
+  text-align:right;outline:none;
   -moz-appearance:textfield;
 }
 #pipePlanSection .pp-side .pp-plan-item input:focus{
@@ -476,44 +431,105 @@ body.ry-tool #pipePlanSection .pp-side .pp-plan-bar{
 }
 #pipePlanSection .pp-side .pp-plan-item input[hidden],
 #pipePlanSection .pp-side sl-input[data-ry-proxy-for][hidden]{ display:none!important; }
+/* ===== [v491 2026-10-16] 灌溉配方库行（#ppRecipeBar）：保存/调用第 1 行 10 项参数组。
+   皮肤对齐本面板基准：控件高 24px、圆角 6px、字号 11-12px、品牌绿 #173e32。
+   逻辑出处 = mod/plot-editor.js ppRecipeFlow；撤功能时同步删本段。 ===== */
+#pipePlanSection .pp-side .pp-recipe-bar{
+  display:flex;flex-direction:column;gap:2px;
+  padding:4px 0 6px;margin-bottom:8px;
+}
+#pipePlanSection .pp-side .pp-recipe-row{
+  display:flex;align-items:center;gap:5px;
+  min-height:27px;padding:2px 12px;
+}
+/* [v493 用户要求] 标签不再占 84px 基准列（「方案」两字紧凑排），
+   名称框 flex:1 1 auto 从标签右侧一直撑到保存按钮，最大化输入空间。 */
+#pipePlanSection .pp-side .pp-recipe-row > .pp-plan-label{ flex:none; }
+#pipePlanSection .pp-side .pp-recipe-row input[type=text],
+#pipePlanSection .pp-side .pp-recipe-row select{
+  flex:1 1 auto;min-width:0;width:auto;height:24px;padding:2px 7px;box-sizing:border-box;
+  border:1px solid var(--ry-s-200,#e2e8f0);border-radius:6px;
+  background:#fff;color:var(--ry-s-800,#1e293b);
+  font-family:inherit;font-size:12px;outline:none;
+}
+#pipePlanSection .pp-side .pp-recipe-row input[type=text]:focus,
+#pipePlanSection .pp-side .pp-recipe-row select:focus{
+  border-color:#173e32;box-shadow:0 0 0 2px rgba(23,62,50,.15);
+}
+#pipePlanSection .pp-side .pp-recipe-btn{
+  flex:none;height:24px;padding:0 8px;box-sizing:border-box;
+  border:1px solid var(--ry-s-200,#e2e8f0);border-radius:6px;
+  background:#fff;color:var(--ry-s-700,#334155);
+  font-family:inherit;font-size:11px;font-weight:600;line-height:1;
+  cursor:pointer;white-space:nowrap;
+}
+#pipePlanSection .pp-side .pp-recipe-btn:hover{
+  border-color:#173e32;color:#14532d;background:var(--ry-green-50,#f0fdf4);
+}
+#pipePlanSection .pp-side .pp-recipe-btn-primary{
+  border-color:#173e32;background:#173e32;color:#fff;
+}
+#pipePlanSection .pp-side .pp-recipe-btn-primary:hover{
+  background:#14532d;color:#fff;
+}
+#pipePlanSection .pp-side .pp-recipe-btn-danger:hover{
+  border-color:var(--ry-danger,#dc2626);color:#dc2626;background:#fef2f2;
+}
+#pipePlanSection .pp-side .pp-recipe-status{
+  display:block;min-height:14px;padding:0 12px;
+  font-size:10px;line-height:1.4;color:var(--ry-s-500,#64748b);
+}
+#pipePlanSection .pp-side .pp-recipe-status.pp-recipe-err{ color:#dc2626; }
 /* Shoelace 代理输入：与原生回退同尺寸，主色走品牌深墨绿 */
 #pipePlanSection .pp-side sl-input[data-ry-proxy-for]{
-  display:block;flex:0 1 auto;width:72px;min-width:0;
+  display:block;flex:0 0 64px;width:64px;min-width:64px;max-width:64px;
   --sl-input-height-small:24px;
   --sl-input-font-size-small:12px;
   --sl-input-border-radius-small:6px;
-  --sl-input-background-color:#fff;
-  --sl-input-border-color:var(--ry-s-300,#cbd5e1);
-  --sl-input-border-color-hover:var(--ry-s-400,#94a3b8);
-  --sl-input-border-color-focus:#173e32;
-  --sl-input-color:var(--ry-s-800,#1e293b);
-}
-/* [试验层 9] 控件取消独立白色输入框皮肤；保留尺寸，并保留聚焦时的可见提示。 */
-#pipePlanSection .pp-side .pp-plan-item input,
-#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-item input{
-  background:transparent;
-  border-color:transparent;
-}
-#pipePlanSection .pp-side sl-input[data-ry-proxy-for],
-#ryCadSide [data-pp="pipePlanSection"] .pp-side sl-input[data-ry-proxy-for]{
   --sl-input-background-color:transparent;
   --sl-input-border-color:transparent;
   --sl-input-border-color-hover:transparent;
   --sl-input-border-color-focus:#173e32;
+  --sl-input-color:var(--ry-s-800,#1e293b);
 }
+#pipePlanSection .pp-side .pp-plan-item-fluid-input > .pp-plan-unit{flex:0 0 auto;white-space:nowrap}
+/* 控件默认融入面板，聚焦时由上方 focus 规则显示边界。 */
 #pipePlanSection .pp-side .pp-sep-vert{ display:none; }
-/* —— 扬程算式区（#ppCalcDetail.pp-calc-formula）：浅色栏内换行显示。
-   [v436] 自 style-01 竖排段与 index.html 内嵌段搬家而来，配色仍由
-   style-01 全局 .pp-calc-formula（:2437 起）承担，后续统一再议。 —— */
+/* —— 扬程算式区（#ppCalcDetail.pp-calc-formula）：唯一由主参数面板管理。
+   配色沿用原深色算式条，只在本面板内应用，避免全局规则参与叠加。 —— */
 #pipePlanSection .pp-side .pp-calc-formula{
   margin:0;padding:6px 9px;
+  background:rgba(15,23,42,.90);border:1px solid var(--u-line-2);border-radius:6px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:11px;line-height:1.5;color:#e8eef7;
   white-space:normal;overflow:visible;
-  font-size:11px;line-height:1.5;
 }
+#pipePlanSection .pp-side .pp-calc-formula .pp-cf-name{color:#86efac;font-weight:700;margin-right:4px}
+#pipePlanSection .pp-side .pp-calc-formula .pp-cf-num{color:#fde68a;font-weight:600;padding:0 1px}
+#pipePlanSection .pp-side .pp-calc-formula .pp-cf-op{color:#cbd5e1;padding:0 1px}
+#pipePlanSection .pp-side .pp-calc-formula .pp-cf-eq{color:#e2e8f0;padding:0 1px;font-weight:600}
+#pipePlanSection .pp-side .pp-calc-formula .pp-cf-final{color:#a7f3d0;font-weight:700;background:rgba(134,239,172,.14);padding:1px 4px;border-radius:3px;margin-left:1px}
 #pipePlanSection .pp-side .pp-calc-formula .pp-cf-line,
-#pipePlanSection .pp-side .pp-calc-formula .pp-cf-line-h{ white-space:normal; }
-#pipePlanSection .pp-side .pp-calc-formula .pp-cf-input{ width:40px;height:16px;font-size:11px; }
+#pipePlanSection .pp-side .pp-calc-formula .pp-cf-line-h{display:block;white-space:normal;overflow:visible;padding-right:2px}
+#pipePlanSection .pp-side .pp-calc-formula .pp-cf-line{display:inline;white-space:normal}
+#pipePlanSection .pp-side .pp-calc-formula .pp-cf-input{
+  background:rgba(253,230,138,.10);color:#fde68a;font-weight:600;
+  border:0;border-bottom:1px dashed rgba(253,230,138,.5);padding:0 2px;margin:0;
+  width:40px;height:16px;font-family:inherit;font-size:11px;text-align:center;border-radius:2px;
+  -moz-appearance:textfield;
+}
+#pipePlanSection .pp-side .pp-calc-formula .pp-cf-input::-webkit-outer-spin-button,
+#pipePlanSection .pp-side .pp-calc-formula .pp-cf-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+#pipePlanSection .pp-side .pp-calc-formula .pp-cf-input:focus{outline:none;background:rgba(253,230,138,.22);border-bottom:1px solid #fde68a}
+#pipePlanSection .pp-side .pp-calc-formula .pp-cf-note{color:#f2d98c;font-size:11.5px;font-weight:500;margin:0 1px;letter-spacing:0}
+/* CAD 主面板中的扬程算式占满侧栏内容宽度，并在窄栏内自然换行。 */
+#ryCadSide [data-pp="pipePlanSection"] .pp-side #ppCalcDetail{
+  box-sizing:border-box;width:100%;max-width:100%;margin:8px 0 12px;
+  white-space:normal;overflow:visible;overflow-wrap:anywhere;
+}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side #ppCalcDetail .pp-cf-line,
+#ryCadSide [data-pp="pipePlanSection"] .pp-side #ppCalcDetail .pp-cf-line-h{
+  display:block;white-space:normal;overflow-wrap:anywhere;
+}
 /* —— 折叠态：只留标题头（[v433] 按用户要求取消收起细条「参数」：
    标题头自身可点击重新展开（data-ry-toggle），细条属重复入口 —— */
-#pipePlanSection .pp-side.folded > .ryp-sidebar-head{ border-radius:9px; }
-#pipePlanSection .pp-side.folded > .ryp-body{ display:none!important; }

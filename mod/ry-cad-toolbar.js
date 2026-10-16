@@ -1,7 +1,7 @@
 
 /* ═══ 14b. CAD 全局工具栏（2026-09-14；视口切换条已取消，切视口走旧入口） ═══
    仅真实浏览器（matchMedia 为原生函数）+ body.ry-tool 下接管；闸门 VM 桩 / Node
-   环境零动作。接管 = 把 #ppSide / #tlSide / #tlIsoSide 原节点移入 #ryCadSide
+   环境零动作。接管 = 把 #ppSide / #tlSide 原节点移入 #ryCadSide
    对应分组（节点携带全部 id 与事件，业务 JS 不感知）；退出工具模式原样搬回。
    搬回用 insertBefore 时必须校验参照节点仍在原父节点内 —— 否则先搬回的那个还
    挂在工具栏里，会抛 NotFoundError；故倒序搬回 + 参照节点失效则退化为 append。 */
@@ -12,8 +12,7 @@
 
   var HOSTS=[
     {sec:'pipePlanSection',   side:'ppSide',    grp:'ryCadGrpPipe'},
-    {sec:'tlPipePlanSection', side:'tlSide',    grp:'ryCadGrpTl'},
-    {sec:'tlPipePlanSection', side:'tlIsoSide', grp:'ryCadGrpIso'}
+    {sec:'tlPipePlanSection', side:'tlSide',    grp:'ryCadGrpTl'}
   ];
   var W_SHUT=40, W_DEF=318, W_MIN=220, GAP=1;
   /* 展开宽度：用户拖过 → localStorage 记忆（栏宽）；没拖过 wOpen=null，
@@ -83,8 +82,7 @@
   }
 
   /* 视口切换条已取消（2026-09-14 用户要求）：切视口由顶部导航 / 底部状态栏承担。
-     分组初始默认折叠；切到某管路页时随动展开对应分组（ensureFor(spec)，
-     2026-09-14 追加：点二级→二级组、点三级→三级组、点轴测→轴测配件组）。
+     分组初始默认折叠；切到某管路页时随动展开对应分组。
      仅在视口变化那一次触发；用户收起工具栏后不被反复顶开（除非再切视口）。 */
   var lastSpec=null;
   function syncAutoExpand(){
@@ -98,14 +96,6 @@
     ensureFor(spec);
   }
 
-  /* 轴测配件分组只在轴测视口出现 */
-  function syncIso(){
-    var tl=$('tlPipePlanSection');
-    var on=!!tl && curSec()==='tlPipePlanSection'
-           && tl.getAttribute('data-ry-view')==='iso';
-    document.body.classList.toggle('ry-cad-iso', on);
-  }
-
   /* 当前功能区 id：优先 body[data-ry-sec]，为空时回退读 .ry-active
      （首屏 ryShowSection 可能尚未写入，否则切换条会一开始不显示） */
   function curSec(){
@@ -114,12 +104,12 @@
     var a=document.querySelector('main > .ry-sec.ry-active');
     return a?a.id:'';
   }
-  /* 工具栏显示门控（2026-09-14 用户要求）：只在二级管路 / 三级管路（含轴测）
+  /* 工具栏显示门控（2026-09-14 用户要求）：只在二级管路 / 三级管路
      两个区块显示；地块绘制与其他功能区不显示、不让位。ry-cad-vp 驱动
      工栏显隐与 main 左让位（顶部让位已随视口切换条一并取消）。 */
   var VPS=['pipePlanSection','tlPipePlanSection'];
   /* 系统图视图排除（2026-09-14 用户要求）：三级管路切到「系统图」（data-ry-view="sys"）
-     时左栏已整体让位给满屏系统图，工具栏跟随隐藏；切回三级简图/轴测/设计自动恢复。
+     时左栏已整体让位给满屏系统图，工具栏跟随隐藏；切回三级简图/设计自动恢复。
      rySetTab 改 data-ry-view 后由 MutationObserver 触发 syncAll，显隐自动跟随。 */
   function inVp(){
     if(VPS.indexOf(curSec())<0) return false;
@@ -130,36 +120,26 @@
     return true;
   }
   function syncVp(){ document.body.classList.toggle('ry-cad-vp', inVp()); }
-  function syncAll(){ if(isTool()&&inVp()){ moveIn(); } else { moveBack(); } syncIso(); syncVp(); syncAutoExpand(); }
+  function syncAll(){ if(isTool()&&inVp()){ moveIn(); } else { moveBack(); } syncVp(); syncAutoExpand(); }
 
-  /* 切到某管路页 → 工具栏自动展开 + 对应分组互斥展开（2026-09-14 用户要求：
-     点二级管路展开二级分组、点三级管路展开三级分组、点轴测图展开轴测配件组，
-     **其余分组同时折叠**；轴测配件组只在轴测视口出现）。分组初始默认折叠
+  /* 切到某管路页 → 工具栏自动展开 + 对应分组互斥展开：
+     点二级管路展开二级分组、点三级管路展开三级分组，**其余分组同时折叠**。
+     分组初始默认折叠
      （verify 9e 把关），仅在视口变化那一次触发；用户随后收起不被反复顶开
      （除非再切视口，那时按新目标重新互斥）。 */
   var GRP_FOR={'pipePlanSection':'ryCadGrpPipe','tlPipePlanSection':'ryCadGrpTl'};
-  var ALL_GRPS=['ryCadGrpPipe','ryCadGrpTl','ryCadGrpIso'];
+  var ALL_GRPS=['ryCadGrpPipe','ryCadGrpTl','ryCadGrpTerrain'];
   function ensureFor(spec){
     try{
       if(!inVp()) return;
       var side=$('ryCadSide');
-      var sIso=(spec||'')==='tlPipePlanSection:iso';
-      /* 2026-09-24 用户要求：点轴测图 → 左侧工具栏自动展开（反转 v122 的自动折叠；
-         配套：经济对比面板改为自动折叠让位，见 rySetTab 轴测分支的 tlEconPanel.close()）。
-         同一口径：仅在切到轴测那一次触发，用户随后手动展开/收起不被反复顶动
-         （再切视口才按新目标重新联动）。 */
-      if(side&&sIso&&side.getAttribute('data-ry-open')!=='1'){
-        side.setAttribute('data-ry-open','1');
-        try{ localStorage.setItem('ryCadOpen','1'); }catch(err){}
-        applyWidth(); refit();
-      }
-      if(side&&!sIso&&side.getAttribute('data-ry-open')==='0'){
+      if(side&&side.getAttribute('data-ry-open')==='0'){
         side.setAttribute('data-ry-open','1');
         try{ localStorage.setItem('ryCadOpen','1'); }catch(err){}
         applyWidth(); refit();
       }
       var s=spec||'';
-      var g=(s==='tlPipePlanSection:iso')?'ryCadGrpIso':GRP_FOR[s.split(':')[0]];
+      var g=GRP_FOR[s.split(':')[0]];
       for(var i=0;i<ALL_GRPS.length;i++){
         var d=$(ALL_GRPS[i]); if(!d) continue;
         if(ALL_GRPS[i]===g){ if(!d.hasAttribute('open')) d.setAttribute('open','open'); }

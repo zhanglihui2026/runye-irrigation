@@ -50,8 +50,8 @@
    展开面板仍 insertAdjacentElement(afterend) 插在按钮之后：按钮脱流后面板成为
    首个在流子元素，紧贴标题下方，展开/收起逻辑零改动。
    max-width=内容宽-96px（标题约84px+缓冲）：窄栏防重叠，超长（·已启用 ▾）省略号兜底。 */
-#ppPlanBar,#tlPlanBar{position:relative}
-#ppPlanBar>.rt-open,#tlPlanBar>.rt-open{
+#ppPlanBar{position:relative}
+#ppPlanBar>.rt-open{
   position:absolute;top:4px;right:11px;z-index:2;
   margin:0;padding:2px 9px;
   max-width:calc(100% - 96px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

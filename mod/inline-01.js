@@ -1,1 +1,1 @@
-/* [v344] 默认打开智能规划：仅当无参数且无锚点时跳转；?full=1 或 #锚点 仍进完整工具 */if(!location.search&&!location.hash)location.replace('index.html?smart=1#pipePlanSection');
+/* [v446] 默认显示在线地图：初始活动区块由 index.html 标记；无参数无锚点时同步地图锚点，显式地址保持原行为。 */if(!location.search&&!location.hash)location.replace('index.html#onlineMapSection');

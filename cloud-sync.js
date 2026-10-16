@@ -1,5 +1,5 @@
 /* ============================================================
-   cloud-sync.js —— 数字农业工作台 · 云端同步适配层（CloudBase Web SDK v3）
+   cloud-sync.js —— 润野主程序 · 云端同步适配层（CloudBase Web SDK v3）
    ------------------------------------------------------------
    架构：浏览器 → CloudBase 2.0（PG 模式）
      1) 匿名登录拿 uid
@@ -16,7 +16,7 @@
    1) 最小侵入：业务层只调 dbSave/dbLoad，云端开关由本文件决定。
    2) 降级安全：USE_CLOUD=false / SDK 不可用 / accessKey 缺失
       → 退回 localStorage，并把真实错误码挂在 window._cloudLastError。
-   3) 接口稳定：暴露 window.CloudSync 名称/方法不变，workbench.html 无需改业务逻辑。
+   3) 接口稳定：暴露 window.CloudSync 名称/方法不变；数字农业工作台已归档，不再是运行消费者。
    ============================================================ */
 
 /* ====== CONFIG（部署前填写）====== */
@@ -518,25 +518,6 @@ function cloudRestore(){
   }).catch(function(){ return false; });
 }
 
-/* 云端计算：调用 calcStage 云函数（前端只发 plant_date/crop，只收结果） */
-function cloudCalcStage(payload){
-  if(!cloudReady || !cloudApp) return Promise.resolve(null);
-  return Promise.resolve(cloudApp.callFunction({ name:'calcStage', data: payload || {} })).then(function(res){
-    var r = res && res.result;
-    if(!r || r.code !== 0) return null;
-    return r.data;
-  }).catch(function(){ return null; });
-}
-/* 获取内置作物方案列表（前端只用于「方案库 / 导出」，算法与数据均来自云端） */
-function cloudGetPlans(){
-  if(!cloudReady || !cloudApp) return Promise.resolve(null);
-  return Promise.resolve(cloudApp.callFunction({ name:'calcStage', data:{ action:'plans' } })).then(function(res){
-    var r = res && res.result;
-    if(!r || r.code !== 0) return null;
-    return r.data;
-  }).catch(function(){ return null; });
-}
-
 function cloudLogout(){
   try{ if(cloudApp && cloudAuth() && cloudAuth().signOut) cloudAuth().signOut(); }catch(e){}
   cloudUid = null; cloudPhone = ''; cloudReady = false; cloudSyncing = false;
@@ -707,8 +688,6 @@ window.CloudSync = {
   setPassword: cloudSetPassword,
   signInPassword: cloudSignInPassword,
   restore: cloudRestore,
-  calcStage: cloudCalcStage,
-  getPlans: cloudGetPlans,
   logout: cloudLogout,
   kvSet: cloudKvSet,
   kvGet: cloudKvGet,

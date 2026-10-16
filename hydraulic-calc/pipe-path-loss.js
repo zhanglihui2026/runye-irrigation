@@ -9,6 +9,10 @@
         .filter(function (z) { return z && z.flow > 0; }).sort(function (a, b) { return a.run - b.run; });
       var frontLoss = 0, from = 0;
       var groupFlow = active.reduce(function (sum, z) { return sum + z.flow; }, 0);
+      var sourceDistance = Math.max(0, Number(input.sourceDistance) || 0);
+      if (sourceDistance > 0 && groupFlow > 0) {
+        frontLoss = input.hazen(sourceDistance, groupFlow, diameter('front', input.frontOd));
+      }
       active.forEach(function (z, i) {
         var flow = active.slice(i).reduce(function (sum, x) { return sum + x.flow; }, 0);
         frontLoss += input.hazen(Math.max(0, z.run - from), flow, diameter('front', input.frontOd));

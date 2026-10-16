@@ -5,8 +5,8 @@ const source=fs.readFileSync(require.resolve('./iso_diagram.test.cjs'),'utf8');
 const start=source.indexOf('function mkData'), fixture={};
 vm.runInNewContext(source.slice(start,source.indexOf('console.log',start)),fixture);
 function boot(){
-  delete require.cache[require.resolve('../iso-diagram/iso-diagram.js')];
-  const iso=require('../iso-diagram/iso-diagram.js'),data=fixture.mkData();
+  delete require.cache[require.resolve('../feature-archive/三维与轴测图/source/iso-diagram/iso-diagram.js')];
+  const iso=require('../feature-archive/三维与轴测图/source/iso-diagram/iso-diagram.js'),data=fixture.mkData();
   iso.attachData(data);iso.renderSVG(data);return {iso,data};
 }
 test('预览/取消/应用/撤销隔离，导出不包含未应用预览',()=>{

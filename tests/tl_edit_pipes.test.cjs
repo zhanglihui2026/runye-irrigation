@@ -28,7 +28,7 @@ function load(rel) {
 }
 load('tl-workspace/tl-edit-pipes.js');
 load('tl-workspace/tl-workspace.js');
-load('iso-diagram/iso-diagram.js');
+load('feature-archive/三维与轴测图/source/iso-diagram/iso-diagram.js');
 
 const EP = sandbox.globalThis.RyTlEditPipes;
 const W = sandbox.RyTlWs || sandbox.globalThis.RyTlWs;

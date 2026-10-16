@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">地块分区参数面板尺寸示意</title>
+  <desc id="desc">展示侧栏宽度、输入框尺寸、参数行高、分组间距和面板内容滚动范围。</desc>
+  <rect width="1600" height="900" fill="#f4f7f6"/>
+  <text id="title" x="64" y="68" fill="#173e32" font-family="Microsoft YaHei, sans-serif" font-size="34" font-weight="700">地块分区参数面板｜尺寸示意</text>
+  <text x="64" y="108" fill="#5f716a" font-family="Microsoft YaHei, sans-serif" font-size="20">已确认基准：输入框固定为 64px × 24px；本图是结构示意，不按屏幕像素比例绘制。</text>
+
+  <line x1="64" y1="150" x2="644" y2="150" stroke="#d44b4b" stroke-width="2" marker-start="url(#a)" marker-end="url(#a)"/>
+  <text x="354" y="140" fill="#b33333" font-family="Microsoft YaHei, sans-serif" font-size="18" text-anchor="middle">桌面侧栏参考：clamp(272px, 20vw, 318px)</text>
+  <rect x="64" y="170" width="580" height="650" rx="8" fill="#ffffff" stroke="#b7c8c1" stroke-width="2"/>
+  <path d="M72 170h564a8 8 0 0 1 8 8v54H64v-54a8 8 0 0 1 8-8" fill="#173e32"/>
+  <text x="92" y="216" fill="#ffffff" font-family="Microsoft YaHei, sans-serif" font-size="26" font-weight="700">工具栏</text>
+  <rect x="64" y="232" width="580" height="58" fill="#eaf2ee"/>
+  <text x="92" y="270" fill="#173e32" font-family="Microsoft YaHei, sans-serif" font-size="22" font-weight="700">二级 · 地块与灌溉参数 / 水力</text>
+
+  <g font-family="Microsoft YaHei, sans-serif" font-size="19" fill="#52675e">
+    <text x="92" y="330">水泵提升高度</text><text x="92" y="378">地形高差</text><text x="92" y="426">水源距离</text>
+    <text x="92" y="474">单边铺设长度</text><text x="92" y="522">滴灌带间距</text><text x="92" y="570">滴孔间距</text>
+    <text x="92" y="618">滴头流量</text><text x="92" y="714">分区划定</text><text x="92" y="762">入口压力</text><text x="92" y="810">目标流速</text>
+  </g>
+  <g fill="#ffffff" stroke="#c7d4cf" stroke-width="1.5">
+    <rect x="330" y="306" width="60" height="24"/><rect x="330" y="354" width="60" height="24"/><rect x="330" y="402" width="60" height="24"/>
+    <rect x="330" y="450" width="60" height="24"/><rect x="330" y="498" width="60" height="24"/><rect x="330" y="546" width="60" height="24"/>
+    <rect x="330" y="594" width="60" height="24"/><rect x="330" y="690" width="60" height="24"/><rect x="330" y="738" width="60" height="24"/><rect x="330" y="786" width="60" height="24"/>
+  </g>
+  <g fill="#263a32" font-family="Microsoft YaHei, sans-serif" font-size="16" text-anchor="end">
+    <text x="380" y="324">5</text><text x="380" y="372">5</text><text x="380" y="420">0</text><text x="380" y="468">100</text>
+    <text x="380" y="516">0.4</text><text x="380" y="564">0.3</text><text x="380" y="612">0.8</text><text x="380" y="708">30</text><text x="380" y="756">1</text><text x="380" y="804">1.5</text>
+  </g>
+  <g fill="#64766e" font-family="Microsoft YaHei, sans-serif" font-size="18">
+    <text x="420" y="326">m</text><text x="420" y="374">m</text><text x="420" y="422">m</text><text x="420" y="470">m</text><text x="420" y="518">m</text>
+    <text x="420" y="566">m</text><text x="420" y="614">L/h</text><text x="420" y="710">亩/区</text><text x="420" y="758">bar</text><text x="420" y="806">m/s</text>
+  </g>
+  <line x1="88" y1="642" x2="620" y2="642" stroke="#b8c8c2" stroke-width="1.5" stroke-dasharray="6 5"/>
+  <text x="354" y="670" fill="#64766e" font-family="Microsoft YaHei, sans-serif" font-size="17" text-anchor="middle">分组留白约 20px（不计入行高）</text>
+  <line x1="88" y1="680" x2="620" y2="680" stroke="#b8c8c2" stroke-width="1.5" stroke-dasharray="6 5"/>
+  <line x1="330" y1="298" x2="394" y2="298" stroke="#d44b4b" stroke-width="2" marker-start="url(#a)" marker-end="url(#a)"/>
+  <text x="362" y="286" fill="#b33333" font-family="Microsoft YaHei, sans-serif" font-size="16" text-anchor="middle">宽 64px</text>
+  <line x1="310" y1="306" x2="310" y2="330" stroke="#d44b4b" stroke-width="2" marker-start="url(#a)" marker-end="url(#a)"/>
+  <text x="298" y="324" fill="#b33333" font-family="Microsoft YaHei, sans-serif" font-size="15" text-anchor="end">高 24px</text>
+  <line x1="610" y1="306" x2="610" y2="333" stroke="#d44b4b" stroke-width="2" marker-start="url(#a)" marker-end="url(#a)"/>
+  <text x="600" y="348" fill="#b33333" font-family="Microsoft YaHei, sans-serif" font-size="15" text-anchor="end">行最小高 27px</text>
+
+  <g font-family="Microsoft YaHei, sans-serif">
+    <rect x="700" y="170" width="836" height="142" rx="8" fill="#ffffff" stroke="#d3dfda" stroke-width="2"/>
+    <rect x="700" y="170" width="8" height="142" rx="4" fill="#2464b8"/>
+    <text x="736" y="216" fill="#173e32" font-size="24" font-weight="700">输入框尺寸｜最终基准</text>
+    <text x="736" y="258" fill="#5f716a" font-size="20">固定宽 64px × 高 24px，包含边框。</text>
+    <text x="736" y="290" fill="#5f716a" font-size="20">原生输入与 Shoelace 代理共用尺寸，不随侧栏拖动拉伸。</text>
+
+    <rect x="700" y="338" width="836" height="142" rx="8" fill="#ffffff" stroke="#d3dfda" stroke-width="2"/>
+    <rect x="700" y="338" width="8" height="142" rx="4" fill="#2464b8"/>
+    <text x="736" y="384" fill="#173e32" font-size="24" font-weight="700">每项参数行</text>
+    <text x="736" y="426" fill="#5f716a" font-size="20">CSS 最小行高 27px；基础内边距上下各 2px。</text>
+    <text x="736" y="458" fill="#5f716a" font-size="20">标签列基准 84px；分组留白约 20px。</text>
+
+    <rect x="700" y="506" width="836" height="142" rx="8" fill="#ffffff" stroke="#d3dfda" stroke-width="2"/>
+    <rect x="700" y="506" width="8" height="142" rx="4" fill="#2464b8"/>
+    <text x="736" y="552" fill="#173e32" font-size="24" font-weight="700">内容区高度</text>
+    <text x="736" y="594" fill="#5f716a" font-size="20">桌面主体：calc(100vh − 导航栏高度)，最小 520px。</text>
+    <text x="736" y="626" fill="#5f716a" font-size="20">超出可视高度时，参数内容在面板内部纵向滚动。</text>
+
+    <rect x="700" y="674" width="836" height="146" rx="8" fill="#eaf2ee" stroke="#c6d7cf" stroke-width="2"/>
+    <text x="736" y="718" fill="#173e32" font-size="24" font-weight="700">职责定位</text>
+    <text x="736" y="760" fill="#40584e" font-size="19">index.html：字段结构｜ry-panel.css：面板皮肤与控件尺寸</text>
+    <text x="736" y="794" fill="#40584e" font-size="19">style-01.css + inline-19.js：网格宽度与拖拽行为</text>
+  </g>
+  <text x="64" y="866" fill="#75867f" font-family="Microsoft YaHei, sans-serif" font-size="16">源码基准已核对（2026-10-15）；CAD 宿主含生成式选择器镜像，实际渲染需在目标视图复核。</text>
+  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto-start-reverse"><path d="M0 0L8 4L0 8Z" fill="#d44b4b"/></marker></defs>
+</svg>

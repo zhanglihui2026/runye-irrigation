@@ -245,7 +245,6 @@ function tlBindCalSels() {
       window.tlManualCals[p[0]] = (val === design) ? null : val;
       tlBuildPipeOverride();
       if (typeof tlUpdatePlanBar === 'function') tlUpdatePlanBar();
-      if (typeof window.tlSyncIsoMeta === 'function') window.tlSyncIsoMeta();
       if (typeof window.tlSyncHydDesignSnapshot === 'function') window.tlSyncHydDesignSnapshot();
     });
   });
@@ -1249,10 +1248,8 @@ function computeThreeLevel() {
   // 支管沿用现有均分流量及 Christiansen 折减规则。
   var hydraulicPath = null;
   var appliedPipes = tlAppliedPipeOverride();
-  /* [v226]（2026-10-04 用户要求）逐组水头损失：工作区分组说明框切到某组时实时显示该组的
-     最不利路径损失。不再依赖「图面已改径」——只要有图面路径就按**当前管径**（改径值优先，
-     否则设计管径）逐组算一遍，与水泵扬程校核（RyPipePathLoss）同一套 长度/流量/Christiansen 口径；
-     hydraulicPath（扬程校核）的赋值仍严格限定 appliedPipes 存在 ⇒ 除新增 groupLoss 外零行为变化。 */
+  /* 有图面路径时，设计管径和手动改径都使用同一套逐路径损失模型；
+     否则“设计值”和“改径值”来自不同算法，不能直接比较。 */
   var groupLoss = null;
   if (wp.fromFigure && wp.zones && window.RyPipePathLoss) {
     var pathZones = wp.zones.map(function (z) {
@@ -1280,6 +1277,7 @@ function computeThreeLevel() {
     }
     var pathCheck = window.RyPipePathLoss.calculate({ zones: pathZones, groups: pathGroups,
       calibers: appliedPipes ? appliedPipes.calibers : null, frontOd: frontPipe.od, mainOd: mainPipe.od, branchOd: branchPipe.od,
+      sourceDistance: readNumber('planSrcDist', 0, { min: 0 }),
       branchCount: branchCount, branchF: branchF, innerDiam: peInnerDiam, hazen: hazenWilliams });
     /* [v226] 每组取本组 total 最大的一行 = 该组最不利分区路径；flow = 组内各分区流量和（m³/h） */
     groupLoss = pathGroups.map(function (ids, gi) {
@@ -1297,20 +1295,19 @@ function computeThreeLevel() {
         front: w.front, main: w.main, branch: w.branch,
         frontLoss: w.frontPipeLoss, mainLoss: w.mainLoss, branchLoss: w.branchLoss, total: w.total };
     });
+    hydraulicPath = pathCheck.worst;
+    if (hydraulicPath) {
+      frontPipeLoss = hydraulicPath.frontPipeLoss; mainLoss = hydraulicPath.mainLoss; branchLoss = hydraulicPath.branchLoss;
+      frontLenUsed = hydraulicPath.front + readNumber('planSrcDist', 0, { min: 0 }); mainLenUsed = hydraulicPath.main; branchLenUsed = hydraulicPath.branch;   /* 任务⑮：计入水源距离 */
+    }
     if (appliedPipes) {
-      hydraulicPath = pathCheck.worst;
-      if (hydraulicPath) {
-        frontPipeLoss = hydraulicPath.frontPipeLoss; mainLoss = hydraulicPath.mainLoss; branchLoss = hydraulicPath.branchLoss;
-        frontLenUsed = hydraulicPath.front + readNumber('planSrcDist', 0, { min: 0 }); mainLenUsed = hydraulicPath.main; branchLenUsed = hydraulicPath.branch;   /* 任务⑮：计入水源距离 */
-      }
-      /* 2026-09-24（用户要求）：面板管径选择按钮 —— 手动选管已并入 tlPipeOdOverride.calibers
-         （tlBuildPipeOverride），沿程损失在上方 hydraulicPath 校核中已按新管径计算；此处把
-         r.*Pipe.od 同步为手动选管值并据相同长度重算各段损失，供面板流速/返回对象/图例同源使用。 */
+      /* 手动选管已通过 tlBuildPipeOverride 写入逐管口径；损失以 hydraulicPath 为唯一事实源。
+         这里只同步面板代表管径，不能再用全局代表流量覆写最不利路径逐段损失。 */
       if (window.tlManualCals) {
         var _mc = window.tlManualCals;
-        if (_mc.front != null) { frontPipe.od = _mc.front; frontPipe.id = peInnerDiam(_mc.front); frontPipeLoss = hazenWilliams(frontLenUsed, combinedFlow, frontPipe.id); }
-        if (_mc.main != null) { mainPipe.od = _mc.main; mainPipe.id = peInnerDiam(_mc.main); mainLoss = hazenWilliams(mainLenUsed, zoneFlow, mainPipe.id); }
-        if (_mc.branch != null) { branchPipe.od = _mc.branch; branchPipe.id = peInnerDiam(_mc.branch); branchLoss = hazenWilliams(branchLenUsed, branchFlow, branchPipe.id) * branchF; }
+        if (_mc.front != null) { frontPipe.od = _mc.front; frontPipe.id = peInnerDiam(_mc.front); }
+        if (_mc.main != null) { mainPipe.od = _mc.main; mainPipe.id = peInnerDiam(_mc.main); }
+        if (_mc.branch != null) { branchPipe.od = _mc.branch; branchPipe.id = peInnerDiam(_mc.branch); }
       }
     }
   }
@@ -1621,7 +1618,7 @@ function selectTLLayout(sides) {
 function resetThreeLevelDefaults() {
   const defaults = {tl_zoneMu:30,tl_zoneFixedSide:300,tl_zoneCount:2,tl_frontPipeLen:200,tl_dh:5,tl_tapeLen:100,tl_tapeSpacing:0.8,tl_tapeDh:1,tl_emitterSpacing:0.3,tl_emitterFlow:0.8,tl_tapeOD:16,tl_tapePressure:1,tl_lift:5,tl_existPressure:0,tl_targetV:1.5,tl_filterLoss:5,tl_efficiency:65,tl_mainPipeLen:300,tl_tapeRollLen:2000};
   Object.entries(defaults).forEach(([id, val]) => { const el = document.getElementById(id); if(el) el.value = val; });
-  var pn=document.getElementById('tlPlotName'); if(pn) pn.value='七彩花生1号基地';
+  var pn=document.getElementById('tlPlotName'); if(pn && !pn.value) pn.value='1号灌溉地块';
   document.querySelectorAll('#tl_branchGroup button').forEach(b => b.classList.toggle('selected', +b.dataset.n === 2));
   document.querySelectorAll('#tl_layoutGroup button').forEach(b => b.classList.toggle('selected', +b.dataset.sides === 1));
   renderThreeLevel();
@@ -1834,7 +1831,12 @@ function tlFlowClear(svg) {
    （用户原话：「主管出来的水流进入支管那一段，要跟主管到支管的阀门对应」）：
    图面上每根支管的阀是挂在主管上的红⊗（斜连接管连接），旧版水流直接从主管
    斜切进支管起点 ⇒ 水流线与阀门位置对不上。现在水流沿「主管取水点 → 阀门中心
-   → 支管」走，与图面画法（三通→连接管→阀→支管）一一对应。 */
+   → 支管」走，与图面画法（三通→连接管→阀→支管）一一对应。
+   [v471]（2026-10-15 用户实测：大分区/合并组水流不走斜管）阀门识别升级：
+   首选「45° 连接管 <line stroke=#185FA5> 两端坐标」直接关联（末端=阀心/首端=主管锚点，
+   零阈值、随图面自动成立），v354 的固定像素阈值（8px/40px/6px）降级为兜底——
+   分区面积/合并方式/缩放变化会使阀与支管线的屏幕距离超出固定阈值 ⇒ 误判无阀、
+   水流退化成垂足直插。 */
 function tlFlowRoute(svg, fPts, zi) {
   var mEl = svg.querySelector('path[data-tlpipe="main-' + zi + '"]');
   if (!mEl) return null;
@@ -1861,43 +1863,70 @@ function tlFlowRoute(svg, fPts, zi) {
     if (bPts.length >= 2) {
       var s0 = tlFlowNear(bPts[0], mp), s1 = tlFlowNear(bPts[bPts.length - 1], mp);
       var bp = (s0 && (!s1 || s0.d <= s1.d)) ? bPts : bPts.slice().reverse();
-      /* [v354] 该支管的阀门 = 「挂在支管线上」的红⊗：阀心到支管折线的垂距 ≤ 8px。
-        旧判据「离支管起点 ≤60px」只在 18 亩小分区成立——阀画在支管中部
-        （离起点≈半个分区边长），联合灌溉大分区（75~83 亩）阀离支管起点上百米、
-        折算屏幕远超 60px ⇒ 永远找不到阀，水流退回「主管垂足直插支管」、与阀门错位
-        （用户实测 5 区错位）。改按垂距归属：阀本来就画在支管线上（与支管同 x/y），
-        垂距≈0；斜接管锚点/别区的阀垂距大，天然排除。
-        仍排除两类「不是支管阀」的红圈：① 总管×主管交接阀（<g data-junction-valve> 内）
-        ② 水源标记（紧贴总管起点）。 */
-      var vv = null;
+      /* [v471] 阀门识别改为「连接管线段直接关联」为主、v354 阈值判据为兜底。
+         根因（用户实测：大分区/合并组失效、小分区正常）：图面上每枚分区阀都画有 45° 连接管
+         <line stroke="#185FA5">（首端=主管上的三通锚点、末端=阀心，见本文件 3716 行绘制处），
+         但 v354 用固定像素阈值找阀（阀到支管垂距≤8px / 三通≤40px / 锚点≤6px）——分区面积、
+         合并方式、缩放比例一变，阀与支管线的屏幕距离就超出 8px ⇒ 找不到阀 ⇒ 水流退化成
+         「主管垂足直插支管」，看起来不再沿斜接管走。连接管两端坐标是画图时写死的确定性关联，
+         零阈值、天然随图面成立：线末端 ≤3px 命中阀心 ⇒ 另一端即主管锚点（≤6px 校验仍在主管上）。
+         同一主管上有多枚阀（合并组）时，取「离本区支管线最近」的那枚（相对排序，无硬阈值）。 */
+      var vv = null, anchorQ = null, bestScore = Infinity;
       var vs = svg.querySelectorAll('circle[fill="#ef4444"]');
+      var lns = svg.querySelectorAll('line[stroke="#185FA5"]');
       for (var w = 0; w < vs.length; w++) {
         if (vs[w].closest && vs[w].closest('[data-junction-valve]')) continue;
         var vx = +vs[w].getAttribute('cx'), vy = +vs[w].getAttribute('cy');
         if (tlFlowLen([vx, vy], fPts[0]) < 12) continue;      /* 水源标记排除 */
-        var nb = tlFlowNear([vx, vy], bPts);
-        if (!nb || nb.d > 8) continue;                        /* 不挂在本支管线上 ⇒ 不是本支管的阀 */
-        if (!vv || nb.d < vv.d) vv = { x: vx, y: vy, d: nb.d, r: +vs[w].getAttribute('r') || 6.5 };
+        var vr0 = +vs[w].getAttribute('r') || 6.5;
+        var anchor = null;
+        for (var L = 0; L < lns.length; L++) {
+          var lx1 = +lns[L].getAttribute('x1'), ly1 = +lns[L].getAttribute('y1');
+          var lx2 = +lns[L].getAttribute('x2'), ly2 = +lns[L].getAttribute('y2');
+          if (tlFlowLen([lx2, ly2], [vx, vy]) <= 3) { anchor = [lx1, ly1]; break; }
+          if (tlFlowLen([lx1, ly1], [vx, vy]) <= 3) { anchor = [lx2, ly2]; break; }
+        }
+        if (!anchor) continue;                                /* 无连接管的阀 ⇒ 走兜底 */
+        var pa = tlFlowNear(anchor, mp);
+        if (!pa || pa.d > 6) continue;                        /* 锚点必须真的在本区主管上 */
+        var nb0 = tlFlowNear([vx, vy], bPts);
+        if (!nb0) continue;
+        if (nb0.d < bestScore) { bestScore = nb0.d; vv = { x: vx, y: vy, d: nb0.d, r: vr0 }; anchorQ = pa.q; }
+      }
+      if (!vv) {
+        /* v354 兜底（无连接管或连接管未命中时沿用旧判据）：该支管的阀门 = 「挂在支管线上」的红⊗：
+          阀心到支管折线的垂距 ≤ 8px。仍排除两类「不是支管阀」的红圈：
+          ① 总管×主管交接阀（<g data-junction-valve> 内）② 水源标记（紧贴总管起点）。 */
+        vv = null;
+        for (var w2 = 0; w2 < vs.length; w2++) {
+          if (vs[w2].closest && vs[w2].closest('[data-junction-valve]')) continue;
+          var vx2 = +vs[w2].getAttribute('cx'), vy2 = +vs[w2].getAttribute('cy');
+          if (tlFlowLen([vx2, vy2], fPts[0]) < 12) continue;
+          var nb = tlFlowNear([vx2, vy2], bPts);
+          if (!nb || nb.d > 8) continue;
+          if (!vv || nb.d < vv.d) vv = { x: vx2, y: vy2, d: nb.d, r: +vs[w2].getAttribute('r') || 6.5 };
+        }
       }
       if (vv) {
-        /* [v354] 主管进入点优先取「主管×支管交接三通方块」（rect[data-junction-tee]）——
-          图面上阀→主管是 45° 斜接管、锚点处有三通方块；水流从同一锚点进入，
-          与图面画法逐段重合（旧版取垂足 ⇒ 接入段与斜接管/阀门错位）。
-          三通方块 rect 以左上角存坐标（9×9，中心 = x+4.5/y+4.5）。
-          约束：距阀 ≤40px（斜接管长度量级）且锚点必须落在主管上（≤6px）。 */
-        var jbest = null;
-        var tees = svg.querySelectorAll('rect[data-junction-tee]');
-        for (var t2 = 0; t2 < tees.length; t2++) {
-          if (tees[t2].getAttribute('data-junction-front')) continue;   /* 总管×主管交接阀不认 */
-          var tx2 = +tees[t2].getAttribute('x') + 4.5, ty2 = +tees[t2].getAttribute('y') + 4.5;
-          var dt2 = tlFlowLen([vv.x, vv.y], [tx2, ty2]);
-          if (dt2 > 40) continue;
-          var pr = tlFlowNear([tx2, ty2], mp);
-          if (!pr || pr.d > 6) continue;                    /* 锚点必须真的在本主管上 */
-          if (!jbest || dt2 < jbest.d) jbest = { q: pr.q, d: dt2 };
+        if (anchorQ) {
+          /* [v471] 主管进入点 = 连接管锚点（图面 45° 斜管的起点，与画法逐段重合） */
+          out.push(anchorQ);
+        } else {
+          /* [v354] 兜底时的主管进入点：优先三通方块锚点，无则垂足 */
+          var jbest = null;
+          var tees = svg.querySelectorAll('rect[data-junction-tee]');
+          for (var t2 = 0; t2 < tees.length; t2++) {
+            if (tees[t2].getAttribute('data-junction-front')) continue;   /* 总管×主管交接阀不认 */
+            var tx2 = +tees[t2].getAttribute('x') + 4.5, ty2 = +tees[t2].getAttribute('y') + 4.5;
+            var dt2 = tlFlowLen([vv.x, vv.y], [tx2, ty2]);
+            if (dt2 > 40) continue;
+            var pr = tlFlowNear([tx2, ty2], mp);
+            if (!pr || pr.d > 6) continue;                    /* 锚点必须真的在本主管上 */
+            if (!jbest || dt2 < jbest.d) jbest = { q: pr.q, d: dt2 };
+          }
+          if (!jbest) jbest = { q: tlFlowNear([vv.x, vv.y], mp).q };      /* 无三通标记 ⇒ 垂足兜底 */
+          out.push(jbest.q);
         }
-        if (!jbest) jbest = { q: tlFlowNear([vv.x, vv.y], mp).q };      /* 无三通标记 ⇒ 垂足兜底 */
-        out.push(jbest.q);
         out.push([vv.x, vv.y]);
         passed.push(vv);
       } else {
@@ -2040,10 +2069,12 @@ function tlDemoChipSync() {
   var bs = box.querySelectorAll('button[data-demo-g]');
   for (var i = 0; i < bs.length; i++) {
     var g = parseInt(bs[i].getAttribute('data-demo-g'), 10);
-    if (bs[i].classList) bs[i].className = (cur === g ? 'selected' : '');
+    /* [v461] 组 chips 已是圆形色点（class 由 tlRenderDemoChips 写入），
+       此处只翻转选中态——不能整串覆写 className，否则会把 tl-demo-dot 抹掉 */
+    if (bs[i].classList) bs[i].className = 'tl-demo-dot' + (cur === g ? ' selected' : '');
   }
   var pb = document.getElementById('tlDemoPlay');
-  if (pb) pb.innerHTML = tlDemoTimer ? '⏸ 暂停' : '▶ 轮播';
+  if (pb) pb.innerHTML = tlDemoTimer ? '⏸' : '▶';   /* [v465] 图标化：⏸=暂停中可接管 / ▶=轮播 */
   var eb = document.getElementById('tlDemoExit');
   if (eb) eb.disabled = (cur == null && !tlDemoTimer);
 }
@@ -2057,13 +2088,25 @@ function tlRenderDemoChips() {
   /* 越界守卫：重分组后组数变少 ⇒ 立刻退出演示，不指向不存在的组 */
   if (window.__tlDemoGroup != null && window.__tlDemoGroup >= M) { tlDemoStop(); return; }
   var manual = !!(window.tlManualGroups && window.tlManualGroups.length);
+  /* [v461]（2026-10-15 用户要求）组 chips 改为「圆形填充色 + 阿拉伯数字」，替代「组N」文字。
+     填充色与工作区分组色带同源（tl-workspace GROUP_FILLS 4 色循环：红/琥珀/绿/蓝）；
+     第 2 轮循环起用浅色底+深色字，对应色带「循环降透明度」的同一视觉语言。
+     手动分组时序号仍为 1..M（图面标注是 M{号}，tooltip 里说明对应关系）。 */
+  var DOT_FILLS = ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6'];
+  var DOT_FILLS_LT = ['#fca5a5', '#fcd34d', '#86efac', '#93c5fd'];
+  var DOT_INKS = ['#fff', '#fff', '#fff', '#fff'];
+  var DOT_INKS_LT = ['#7f1d1d', '#78350f', '#14532d', '#1e3a8a'];
   var h = '';
   for (var g = 0; g < M; g++) {
-    var lbl = manual ? ('M' + (g + 1)) : ('组' + (g + 1));
-    h += '<button type="button" data-demo-g="' + g + '" title="高亮第 ' + (g + 1) + ' 轮灌组（该组分区加深、其余淡化）">' + lbl + '</button>';
+    var ci = g % DOT_FILLS.length, lite = g >= DOT_FILLS.length;
+    h += '<button type="button" class="tl-demo-dot" data-demo-g="' + g + '"' +
+      ' style="background:' + (lite ? DOT_FILLS_LT[ci] : DOT_FILLS[ci]) + ';color:' + (lite ? DOT_INKS_LT[ci] : DOT_INKS[ci]) + '"' +
+      ' title="高亮第 ' + (g + 1) + ' 轮灌组（该组分区加深、其余淡化' + (manual ? '；对应图面 M' + (g + 1) : '') + '）">' + (g + 1) + '</button>';
   }
-  h += '<button type="button" id="tlDemoPlay" title="自动轮流高亮各组（2 秒一组），再点暂停">▶ 轮播</button>';
-  h += '<button type="button" id="tlDemoExit" title="退出演示，所有分区恢复原色">■ 退出</button>';
+  /* [v465]（2026-10-15 用户要求）轮播/退出取消文字、只用图标：▶=轮播 / ⏸=暂停（轮播中）/ ■=退出；
+     语义收进 title 与 aria-label。按钮尺寸收成图标方块（样式见 style-01.css .tl-demo-ctl）。 */
+  h += '<button type="button" id="tlDemoPlay" class="tl-demo-ctl" aria-label="轮播" title="自动轮流高亮各组（2 秒一组），再点暂停">▶</button>';
+  h += '<button type="button" id="tlDemoExit" class="tl-demo-ctl" aria-label="退出" title="退出演示，所有分区恢复原色">■</button>';
   box.innerHTML = h;
   tlDemoChipSync();
 }
@@ -2332,7 +2375,8 @@ window.tlGroupByArea = tlGroupByArea;
   var ai = document.getElementById('tlAreaGroupMu');
   if (ai) ai.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); tlGroupByArea(); } });
   var acb = document.getElementById('tlAreaGroupCalcBtn');
-  /* [v233] 成组成功（tlGroupByArea 返回 true）才点亮 .on；失败（无图/亩数非法）保持原样。 */
+  /* [v233] 成组成功（tlGroupByArea 返回 true）才点亮 .on；失败（无图/亩数非法）保持原样。
+     [v470]（2026-10-15 用户要求）撤销 v469：「按亩组合」是执行按钮，接线原样恢复。 */
   if (acb) acb.addEventListener('click', function () {
     if (tlGroupByArea() !== false) acb.classList.add('on');
   });
@@ -2566,7 +2610,8 @@ function tlUpdatePlanBar() {
      在橙列与下方黑条（水泵扬程 36.5 m）直接可见。 */
   if(el=document.getElementById('tlPlanPumpHead')) el.textContent=fmt(rDes.pumpHead,1)+' m';
 
-  if(el=document.getElementById('tlPlanPumpPower')) el.textContent=fmt(rDes.motorKW_rounded,1)+' kW';
+  if(el=document.getElementById('tlPlanPumpPower')) el.textContent=fmt(rDes.pumpPower,1)+' kW';
+  if(el=document.getElementById('tlPlanMotorPower')) el.textContent=fmt(rDes.motorKW_rounded,1)+' kW';
   if(el=document.getElementById('tlPlanFrontPipe')) el.textContent='Ø '+rDes.frontPipe.od+' mm';
   if(el=document.getElementById('tlPlanFrontVelocity')) el.textContent=fmt(rDes.frontPipe.v,2)+' m/s';
   if(el=document.getElementById('tlPlanMainPipe')) el.textContent='Ø '+rDes.mainPipe.od+' mm';
@@ -2582,7 +2627,8 @@ function tlUpdatePlanBar() {
   }
   /* v139：扬程/功率橙列（改径重算）= 应用管径重算后的值（与流速行同款 tlRealSet；未应用显示 —） */
   tlRealSet('tlPlanPumpHeadReal', r.pumpHead, 'm', 1);
-  tlRealSet('tlPlanPumpPowerReal', r.motorKW_rounded, 'kW', 1);
+  tlRealSet('tlPlanPumpPowerReal', r.pumpPower, 'kW', 1);
+  tlRealSet('tlPlanMotorPowerReal', r.motorKW_rounded, 'kW', 1);
   /* v109（2026-09-22 用户要求）：管径前后对比 —— 改径重算后实际参与计算的管径
      （computeThreeLevel 按覆盖管径算出的 r.*Pipe.od），与设计管径不同时显示「315 → 280 mm」，
      未改径或改径后没变显示 —（浅灰）。 */
@@ -3735,6 +3781,14 @@ function tlAutoGenerate(options) {
     });
   }
   // ===== 地块组结束：以下参数/图例/A3框固定不动 =====
+  /* v488：记录地块组闭合标签在 parts 中的下标 —— 最不利路径标注（tlWorstPathMarkSVG）
+     几何上属于地块组（须随 tlInitDrag 的图面拖动 translate 一起平移），但其几何取自
+     window.tlDiagramData 快照，而快照在此闭合**之后**才落地，不能当场画。
+     故先记下标，待快照落地后用 splice 插回本闭合标签之前（见下方 tlWorstPathMarkSVG 调用处）。
+     病史：v180 节点层曾因画在组外而错位（本文件 tlInitDrag 注释），紫线标注犯了同样的错 ——
+     图面拖动位移存 localStorage['tl-plot-pos'] 且每次重生成自动恢复，组内管线整体平移、
+     组外紫线原地不动 ⇒ 恒定偏移（用户实测「紫色水流动画线与管道路径偏位」）。 */
+  var tlPlotGCloseIdx = parts.length;
   parts.push('</g>');
 
   // Legend + params at bottom —— 整体下移、分块对齐、与图面拉开间距
@@ -3774,7 +3828,7 @@ function tlAutoGenerate(options) {
   /* 水力校核页唯一计算来源：保存三级规划的最终几何与已确定的设计流量。
      地图反投只承担显示，不再用滴灌带像素/坐标反推流量。 */
   try {
-    localStorage.setItem('runye_hydraulic_design_v1', JSON.stringify({ version: 1, ts: Date.now(),
+    window.RyIrrigationDataStore.writeHydraulicDesign({ version: 1, ts: Date.now(),
       generatedAt: window.tlDiagramData.generatedAt,
       geometry: { frontPipe: JSON.parse(JSON.stringify(window.tlDiagramData.frontPipe || [])),
         mainPipes: JSON.parse(JSON.stringify(window.tlDiagramData.mainPipes || [])),
@@ -3782,11 +3836,8 @@ function tlAutoGenerate(options) {
       hydraulics: { combinedFlow: r.combinedFlow, zoneFlow: r.zoneFlow, branchFlow: r.branchFlow,
         tapePressureM: r.tapePressureM, lift: r.lift, dh: r.dh, filterLoss: r.filterLoss,
         efficiency: r.efficiency, pumpHead: r.pumpHead,
-        frontPipe: { od: r.frontPipe.od }, mainPipe: { od: r.mainPipe.od }, branchPipe: { od: r.branchPipe.od } } }));
+        frontPipe: { od: r.frontPipe.od }, mainPipe: { od: r.mainPipe.od }, branchPipe: { od: r.branchPipe.od } } });
   } catch (eHydSnapshot) { }
-  /* v136：meta.live（图面实际值快照）随生成初始化——此刻实际==设计；此后每次改径重算
-     由 tlPumpUpdateRun 收口刷新（见 tlSyncIsoMeta）。meta.pipes 设计口径不动（消费红线）。 */
-  try { window.tlSyncIsoMeta && window.tlSyncIsoMeta(); } catch (eIsoMeta) { }
 
   var iy=footerTop+52; // 底部参数块起始 y（整体下移，与图例对齐）
   parts.push('<g id="tlParamsGroup" font-size="10.5" font-weight="600" fill="#334155">');
@@ -3796,7 +3847,7 @@ function tlAutoGenerate(options) {
      旧版只显示水力计算径且无长度，图面改径后点「生成管线图」数字不动（用户实测）。
      meta.pipes 保持设计径文本不动（iso/network-model 消费，多道 e2e 只读红线）。 */
   /* v137：两行文案抽到全局 tlFigParamLines 单一来源（逐字同格式）——
-     「应用到图面」改径重算后 tlSyncIsoMeta 用同一构造实时重写简图/系统简图内这两行。 */
+     「应用到图面」改径重算后以同一构造实时重写简图/系统简图内这两行。 */
   var tlPl = window.tlFigParamLines(r);
   parts.push('<text x="40" y="'+iy+'">'+tlPl.lines[0]+'</text>');
   /* v109b：结果条文本已自带单位（如「185.1 m³/h」），此处不再重复拼单位 */
@@ -3807,7 +3858,11 @@ function tlAutoGenerate(options) {
   // 2026-09-16：色块/圆点与文字垂直居中（dominant-baseline="central"）；
   // 2026-09-16 二次调整：各项横向等距 —— 统一槽位步进 60px（符号起点=槽位 s，
   // 文字起点 = 色块项 s+20 / 圆点·虚线项 s+16，符号与文字间隙统一 6px），整体在画布水平居中。
-  var lx=svgW/2-180, ly=iy+17;
+  /* v489（用户实测：图例与底部参数行重叠）—— 图例改靠 A3 右侧边框对齐：
+     原 lx=svgW/2-180 居中，参数行（总管/主管/支管 径+长）长了就压到图例。
+     图例 6 槽位总宽约 346px（末项「滴灌带」文字止于 lx+346），右缘贴 frameX 右边线
+     （svgW-8）内缩 4px ⇒ lx=svgW-358。与参数行同基线（ly=iy+17）不变。 */
+  var lx=svgW-358, ly=iy+17;
   parts.push('<g id="tlLegendGroup" font-size="10" font-weight="600">');
   parts.push('<rect x="'+lx+'" y="'+ly+'" width="14" height="4" fill="#111827" rx="2"/><text x="'+(lx+20)+'" y="'+(ly+2)+'" dominant-baseline="central" fill="#111827">总管</text>');
   parts.push('<rect x="'+(lx+60)+'" y="'+ly+'" width="14" height="4" fill="#185FA5" rx="2"/><text x="'+(lx+80)+'" y="'+(ly+2)+'" dominant-baseline="central" fill="#0C447C">主管</text>');
@@ -3831,8 +3886,15 @@ function tlAutoGenerate(options) {
   } catch (eAxisHint) { }
 
   /* 最不利路径标注（第四十七轮）：必须放在 window.tlDiagramData 落地**之后**（本函数 8632 行）才画 ——
-     标注几何由 tlWorstPathLen 读 tlDiagramData 得出；早于快照落地会标到上一幅图的旧几何。 */
-  try { parts.push(tlWorstPathMarkSVG(ts)); } catch (e) { }
+     标注几何由 tlWorstPathLen 读 tlDiagramData 得出；早于快照落地会标到上一幅图的旧几何。
+     v488：画在 tlPlotGCloseIdx（地块组 '</g>' 之前）——几何上归入 #tlPlotGroup，
+     随图面拖动 translate 一起平移，与管线/水源/节点层保持同组（修复恒定偏位）；
+     时序上仍在快照落地之后，满足上面的约束。splice 只移动字符串位置，SVG 嵌套
+     （data-tlworst 组内无嵌套 <g>）与工作区克隆剥离正则均不受影响。 */
+  try {
+    var tlWorstSvg = tlWorstPathMarkSVG(ts);
+    if (tlWorstSvg) parts.splice(tlPlotGCloseIdx, 0, tlWorstSvg);
+  } catch (e) { }
 
   parts.push('</svg>');
   /* v180b（2026-10-02）：缓存本次几何映射，供 tlRefreshTlNodesLayer 在 RyTlNodes 变更时
@@ -3853,7 +3915,7 @@ function tlAutoGenerate(options) {
     var dd = window.tlDiagramData; if(!dd || dd.world!=='meter') return;
     var base = window.__runyeGeoBase || null;
     if(!base || typeof base.refLat!=='number' || typeof base.refLng!=='number' || !isFinite(base.refLat) || !isFinite(base.refLng)){
-      localStorage.removeItem('runye_network_layout');
+      window.RyIrrigationDataStore.writeNetworkLayout(null);
       var lib=JSON.parse(localStorage.getItem('runye_plot_library')||'[]');
       localStorage.setItem('runye_plot_library',JSON.stringify(lib.filter(function(p){return p.id!=='auto-current';})));
       return;
@@ -3900,8 +3962,8 @@ function tlAutoGenerate(options) {
     pushSegs(dd.mainPipes, segDn.main, 'main');
     pushSegs(dd.branchPipes, segDn.branch, 'branch');
     var src = dd.sourcePos ? p2ll(dd.sourcePos) : null;
-    if(!segments.length && !src){localStorage.removeItem('runye_network_layout');return;}
-    localStorage.setItem('runye_network_layout', JSON.stringify({ sourcePos: src?{lat:src[0],lng:src[1]}:null, segments: segments, plotId:window.currentPlotId || null, crs:'GCJ-02', ts: Date.now() }));
+    if(!segments.length && !src){window.RyIrrigationDataStore.writeNetworkLayout(null);return;}
+    window.RyIrrigationDataStore.writeNetworkLayout({ sourcePos: src?{lat:src[0],lng:src[1]}:null, segments: segments, plotId:window.currentPlotId || null, crs:'GCJ-02', ts: Date.now() });
     /* [map-enhance] 阀门 + 滴灌带反投（2026-09-26 任务1，用户契约）：地图侧 enhancement 按
        runye_network_layout.valves（红圈）/ .dripTapes（青色虚线）渲染 —— 读出来补字段再写回，
        不重写整个 key（地图侧可能同帧写过其他字段）。 */
@@ -3919,11 +3981,11 @@ function tlAutoGenerate(options) {
           if(pts.length>=2) dripLL.push(pts);
         });
       }
-      var net = JSON.parse(localStorage.getItem('runye_network_layout')||'{}');
+      var net = window.RyIrrigationDataStore.readNetworkLayout() || {};
       net.valves = valvesLL;
       net.dripTapes = dripLL;
       if(window.RyMapPartition)RyMapPartition.capture(net);
-      localStorage.setItem('runye_network_layout', JSON.stringify(net));
+      window.RyIrrigationDataStore.writeNetworkLayout(net);
     }catch(eVT){}
     /* [map-enhance] 同步地块多边形到地块库（带 polyLatLng）：切到在线地图页自动叠加地块轮廓，
        与管网一起显示。固定 id=auto-current 幂等更新，不污染用户手动保存的其他地块。 */
@@ -3971,7 +4033,7 @@ function tlAutoGenerate(options) {
       +'<span style="display:inline-flex;align-items:center;vertical-align:middle;gap:5px;margin:0 9px"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ef4444"></i>阀门</span>';
     ov.style.display='block';
   })();
-  // ===== 轴测图数据导出（iso-diagram 模块只读）：平面图最终几何快照已在参数块之前写入并重算 =====
+  // 平面管网几何快照已在参数块之前写入并重算
   tlInitDrag();
   tlInitHeaderDrag();
   document.getElementById('tlDiagramWrap').style.display='block';
@@ -4000,15 +4062,10 @@ function tlAutoGenerate(options) {
   }
 }
 
-/* 导出图纸（下载 / 打印 / PNG）时的 SVG 序列化统一入口（2026-09-15）：
-   施工管网编辑器会在 svg 内叠加 g.cn-layer（编辑层 + 悬停高亮，带 data-ry-export-skip），
-   序列化前必须临时摘掉，否则图纸里会混进编辑器痕迹。轴测图侧由 iso-diagram.js 的
-   cleanExportSVG() 自行剔除同名标记元素。 */
+/* 导出平面图时的 SVG 序列化统一入口。 */
 function tlExportSvgString(ctn){
   var svgEl=ctn?ctn.querySelector('svg'):null;
   if(!svgEl)return tlDiagramSVG;
-  var E=window.RyNetEditor;
-  if(E&&E.exportClean)return E.exportClean(function(){return new XMLSerializer().serializeToString(svgEl);});
   return new XMLSerializer().serializeToString(svgEl);
 }
 function tlDownloadSVG() {
@@ -4426,7 +4483,8 @@ function tlOpenSystemDiagram() {
 })();
 
 /* ===== 主区 Tab 切换（替代原「整屏替换」）====================================
-   二级：#ppTabs → draw（二级简图）；三级：#tlTabs → pipe（三级简图）/ sys（系统简图）/ iso（轴测简图）
+   二级简图 draw 视图暂时停用，入口与程序切换均由下方保护拦截；视图实现保留。
+   三级：#tlTabs → pipe（三级简图）/ sys（系统简图）
    2026-09-15：底部「二级制图 / 三级制图」按钮已按用户指令取消 —— edit / ws 仍可由
    rySetTab 编程进入（顶部导航复位走这条路），只是不再有底部按钮；被删按钮的视图
    不会出现在高亮循环里（无匹配按钮 → 全部熄灭，属预期，勿"修复"）。
@@ -4466,7 +4524,10 @@ function grSyncSecondLevelToGroupPage(){
 }
 
 function rySetTab(sectionId, view) {
-  if(window.RyMobile && window.RyMobile.isActive() && sectionId==='tlPipePlanSection' && (view==='sys' || view==='iso')) view='ws';
+  /* 二级简图停用：避免旧入口、自动流程或外部调用把地块分区留在 draw 视图。
+     简图渲染、样式和数据仍保留；恢复步骤见 feature-archive/二级简图/README.md。 */
+  if (sectionId === 'pipePlanSection' && view === 'draw') return;
+  if(window.RyMobile && window.RyMobile.isActive() && sectionId==='tlPipePlanSection' && view==='sys') view='ws';
   /* [v193] 成组地块拦截三级页入口（三条路都要拦，见上方说明） */
   if(sectionId==='tlPipePlanSection' && typeof ryGroupThirdLevelGuard==='function' && ryGroupThirdLevelGuard())return;
   var sec = document.getElementById(sectionId);
@@ -4475,11 +4536,11 @@ function rySetTab(sectionId, view) {
   /* 输出模式标记（2026-09-13，见样式 12.2 段）：底部「简图」按钮 → 图纸独占、
      左属性栏让位；二级「管线编辑」回到工作区。值用 "1"/"0"（增删属性会破坏
      verify_pp_tabs / verify_nav_switch 的最小 DOM 桩 —— 桩没有 removeAttribute）。
-     三级的 pipe/sys/iso 全部是图纸输出（工作区=顶部导航入口，由导航处理器写 "0"）。 */
+     三级的 pipe/sys 是图纸输出（工作区=顶部导航入口，由导航处理器写 "0"）。 */
   if(sectionId==='pipePlanSection'){
     sec.setAttribute('data-ry-clean', view==='draw' ? '1' : '0');
   }else if(sectionId==='tlPipePlanSection'){
-    /* 2026-09-13：ws=「三级设计」工作区（左栏保留）；pipe/sys/iso 仍是图纸输出 */
+    /* 2026-09-13：ws=「三级设计」工作区（左栏保留）；pipe/sys 仍是图纸输出 */
     sec.setAttribute('data-ry-clean', view==='ws' ? '0' : '1');
   }
   var bar = sec.querySelector('.ry-tabs');
@@ -4505,28 +4566,8 @@ function rySetTab(sectionId, view) {
     var sysFrameAuto = document.getElementById('tlSysFrame');
     if (sysFrameAuto && !sysFrameAuto.getAttribute('src')) tlOpenSystemDiagram();
   }
-  /* 三级管路切到「轴测图」时根据平面图几何自动渲染（iso-diagram 模块，只读 window.tlDiagramData）；
-     无平面图数据时显示提示不崩溃；重复切换 innerHTML 整体替换，不叠加 SVG。 */
-  if (sectionId === 'tlPipePlanSection' && view === 'iso') {
-    var isoCtn = document.getElementById('tlIsoDiagramContent');
-    var isoBar = document.getElementById('tlIsoToolbar');
-    if (isoCtn && window.RyIsoDiagram) {
-      if (window.tlDiagramData) {
-        window.RyIsoDiagram.render(isoCtn, window.tlDiagramData);
-        if (isoBar) isoBar.style.display = 'flex';
-        if (typeof tlIsoStatsRender === 'function') tlIsoStatsRender();
-      } else {
-        isoCtn.innerHTML = '<div class="pp-diagram-empty">请先生成三级管线平面图（点「生成管线图」）</div>';
-        if (isoBar) isoBar.style.display = 'none';
-        if (typeof tlIsoStatsReset === 'function') tlIsoStatsReset();
-      }
-      /* 2026-09-24 用户要求：切入轴测图 → 管径经济对比面板默认折叠（反转 v127 的自动展开；
-         左侧工具栏同时自动展开，见 ensureFor）。重新展开走右侧折叠细条 #tlEconRail。 */
-      if (window.tlEconPanel && typeof window.tlEconPanel.close === 'function') window.tlEconPanel.close();
-    }
-  }
   /* 三级管路切到「三级设计」工作区：tl-workspace 模块按平面图几何渲染
-     （只读 window.tlDiagramData，与轴测图同一红线）；无数据时显示提示。
+     （只读 window.tlDiagramData）；无数据时显示提示。
      重复切换整幅重渲染（视口复位），手工管线层随数据引用保留。 */
   if (sectionId === 'tlPipePlanSection' && view === 'ws') {
     var wsCtn = document.getElementById('tlWsContent');
@@ -4586,8 +4627,9 @@ function openTlSystemDiagramFromNav() {
    替代入口：切到「三级系统图」视图时由 rySetTab 自动内嵌渲染（仅首次，
    已有 src 不重复加载）；（2026-09-14 晚 #tlSysBtn 按钮已取消，入口=rySetTab 视口切换自动渲染）。 */
 
-/* ===== 二级施工简图：切到「二级简图」Tab ===== */
+/* ===== 二级施工简图：历史视图入口（暂停切换，保留实现以便恢复） ===== */
 function ppShowConstructDiagram() {
+  // 二级简图视图已暂停；不再改变当前视图状态。
   rySetTab('pipePlanSection', 'draw');
 }
 /* 退回「管线编辑」Tab */
@@ -4598,12 +4640,6 @@ function tlShowWorkspace() {
   rySetTab('tlPipePlanSection', 'ws');
 }
 /* 兼容旧名（原整屏视图的返回入口） */
-
-/* ===== 三级轴测图：切到「轴测图」Tab（iso-diagram 模块渲染，只读平面图几何 window.tlDiagramData） ===== */
-function tlShowIsoDiagram() {
-  if (!window.tlDiagramData) { alert('请先生成三级管线平面图'); return; }
-  rySetTab('tlPipePlanSection', 'iso');
-}
 
 // Zone count selector
 document.querySelectorAll('#tlZoneCountGroup button').forEach(function(btn){

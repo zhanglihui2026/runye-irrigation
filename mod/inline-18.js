@@ -66,6 +66,11 @@
      仅工具模式使用；非工具模式由下面的滚动逻辑接管。 */
   function ryShowSection(sec, link){
     if(window.RyMobile && window.RyMobile.isActive() && sec && window.RyMobile.sections.indexOf(sec.id)<0) sec=document.getElementById('pipePlanSection');
+    /* 二级简图停用：无论由顶部导航、插件还是旧跳转入口进入，都统一回到编辑工作区。 */
+    if(sec && sec.id==='pipePlanSection' && sec.getAttribute('data-ry-view')!=='edit'){
+      sec.setAttribute('data-ry-view','edit');
+      sec.setAttribute('data-ry-clean','0');
+    }
     /* [v193] 成组地块拦截三级页入口（与 rySetTab 里的拦截互为兜底） */
     if(sec && sec.id==='tlPipePlanSection' && typeof ryGroupThirdLevelGuard==='function' && ryGroupThirdLevelGuard())return;
     /* [v242] 离开「从成组页进来的二级页逐块编辑」这条流（切到别的功能区）就撤掉标记 ——
@@ -180,7 +185,12 @@
       /* ★ 工具模式＝单视口切换：点导航直接换功能区，不做滚动定位。
          这里以前缺这条分支 —— 工具模式下其它功能区都是 display:none，
          锚点无处可跳，点击因此"完全没反应"。 */
-      if(isTool()){ ryShowSection(it.sec, it.link); return; }
+      if(isTool()){
+        /* rySetTab 会在目标未激活时自行切入；避免再激活一次并排队两次 resize。 */
+        if(!it.sec.classList.contains('ry-active')) ryShowSection(it.sec, it.link);
+        else activate(it.link);
+        return;
+      }
       /* 落点 = 区块顶 − 吸顶高度，**不再额外多减 14px**。
          吸顶区实际高 37px（.fn-nav 内容 36px + 1px 底边线），stickyOffset() 已按
          真实高度返回 37，减满 37 才能让功能区的上边正好贴上导航底边。

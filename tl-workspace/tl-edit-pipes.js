@@ -1,9 +1,7 @@
 /* =====================================================================
  * tl-edit-pipes.js — 三级图面共享编辑数据层（润野灌溉，2026-09-15）
  * ---------------------------------------------------------------------
- * 职责：三级设计工作区（RyTlWs）与轴测图（RyIsoDiagram）共用的
- *       「手工管线」单一数据源。任一视图 插入/删除 主管/支管折线，
- *       另一视图通过 onChange 订阅立即重渲染（双向同步）。
+ * 职责：三级设计工作区使用的「手工管线」单一数据源，管理主管/支管折线与配件状态。
  * 数据：条目 {id, kind:'main'|'branch', pts:[{x,y}(米)], len(米)}，
  *       数据坐标与 window.tlDiagramData 同系（米）。
  * 红线：只增本模块自有状态，不写回 tlDiagramData、不参与水力计算、
@@ -12,7 +10,7 @@
  * 持久：serialize/restore 供主方案存档（index.html runyeSaveProject）；
  *       浏览器端 localStorage 兜底（几何签名不符的旧存档不复活）。
  * 通知：notify 带 {action, source, count}；source 标记发起方
- *       （'ws'|'iso'|'project'|''），防重入（emitting 期间再入不广播）。
+ *       （'ws'|'project'|''），防重入（emitting 期间再入不广播）。
  * ===================================================================== */
 (function (global) {
   'use strict';
@@ -41,7 +39,7 @@
     for (var i = 0; i + 1 < pts.length; i++) L += Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].y - pts[i].y);
     return L;
   }
-  /* 几何签名：与 iso-diagram.geometryKey 同口径（总管/主管/支管/阀门/地块轮廓） */
+  /* 几何签名：以总管/主管/支管/阀门/地块轮廓作为当前管网几何口径。 */
   function geometryKey(data) {
     if (!data) return '';
     return JSON.stringify([data.frontPipe, data.mainPipes, data.branchPipes, data.valves, data.poly]);

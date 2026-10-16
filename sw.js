@@ -1,5 +1,5 @@
 /* Runye PWA v1. Increment VERSION when changing the offline shell. */
-/* v426-tl-polyline-geometry: extract node-layer polyline operations for reuse and isolated verification. */
+/* v427-archive-3d-iso: detach 3D preview and axonometric UI while retaining shared 2D pipe workspace and data. */
 'use strict';
 /* VERSION 沿革：v380-cache-fix（另一会话的缓存修复）→ v381-plugin-aiplan（本次新增 ai-plan
    插件 + core/data-service.js、core/event-bus.js、core/ui-shell.js 均在 CORE 白名单内，必须抬版本，
@@ -151,8 +151,148 @@
    v441-map-main-section（在线地图迁入主程序功能区，与地块分区/管路规划共用导航、状态栏和文档上下文，
    移除地图 iframe；新增 scoped 样式与初始化脚本纳入 CORE）→
    v442-native-terrain-hydraulics（地形与水力校核迁入主页面功能区，复用主导航、会员状态和页面上下文；
-   独立旧页面保留兼容，新增功能区样式与初始化脚本纳入 CORE）。 */
-const VERSION = 'v442-native-terrain-hydraulics';
+   独立旧页面保留兼容，新增功能区样式与初始化脚本纳入 CORE）→
+   v443-terrain-panel（把三级页面的手动地形高程提升为独立侧栏分组，放在三级管网参数下方，
+   默认折叠；三级工具栏切换时同步折叠状态）→
+   v444-pp-style-layer-10（移除主程序模式下地块分区参数条的第二层卡片背景与描边覆盖，
+   保留三级参数条样式）→
+   v445-default-online-map（首次打开无参数网址时默认进入在线地图）→
+   v446-default-online-map-active（页面初始活动区块设为在线地图，避免脚本启动前短暂或持续显示地块绘制）→
+   v447-remove-water-head-label（移除地块分区参数栏“水源与扬程”装饰标题及仅供该标题使用的样式，保留计算字段与旧伪标题屏蔽）→
+   v448-fluid-lift-input（泵提升高度输入填充侧栏行内剩余宽度，随可拖动CAD工具栏宽度伸缩）→
+   v449-aligned-parameter-inputs（十项分区参数共享标签、输入、单位网格列；输入框左边缘对齐并随工具栏宽度伸缩）→
+   v450-hide-relocated-separator（在移动到 CAD 侧栏的分区参数面板中同步隐藏已禁用的纵向分隔元素，消除参数行间空白）→
+   v451-inline-plot-parameters（取消“地块分区参数”内层折叠，让二级工具栏分组展开后直接显示所有参数）→
+   v452-inline-parameter-layout（恢复十项参数的标签、输入、单位横向排列；保留面板内 Shoelace 输入同步）→
+   v453-disable-l2-schematic（停用二级简图的底部与移动端入口，并拦截旧程序切换路径；保留原实现与样式）→
+   v454-terrain-sidebar-peer（地形高程统一作为CAD工具栏内与二级、三级同级的折叠分组；清理三级参数条旧入口并更新脚本缓存地址）→
+   v455-full-width-head-formula（扬程算式在CAD主面板内撑满侧栏内容宽度，并允许按宽度换行）→
+   v456-input-width-64-single-source →
+   v457-hydraulic-path-loss（修复三级改径后逐路径损失被全局代表值覆写；纳入水源距离；
+   将二级/三级计算轴功率与建议电机额定功率分开显示，经济电费估算改用计算轴功率）→
+   v458-unified-design-path-loss（设计管径与手动改径均使用同一套逐路径水头损失算法）→
+   v459-target-velocity-row（三级水力项目标流速移至表头下、联合流量上方）→
+   v460-planbar-uniform-fontsize（三级左栏「联合灌溉/面积成组/轮灌演示」按钮与输入框字号收回 11px，
+   与「联合灌溉」标签一致；对冲 runye-typography.css 对 input/button 的 13px 归一）→
+   v462-demo-dot-chips（轮灌演示组 chips 改为圆形填充色+阿拉伯数字，填充色与工作区分组色带
+   4 色循环同源；tlDemoChipSync 保留 .tl-demo-dot 只翻转选中态）→
+   v463-irrigation-data-store（集中管理水力校核与地图共用的管网/设计快照读写，沿用现有键名和v1格式）→
+   v464-laylen-relabel-move（二级左栏「单边铺设长度」改名「铺设长度」并挪到「滴头流量」之下、
+   「分区划定」之上；id=planTapeLaySide 不变，消费点零改动）→
+   v465-demo-icon-ctl（轮播/退出取消文字改图标 ▶/⏸/■；演示 chips 行改块级 flex，
+   与「轮灌演示」标题行距加大）→
+   v466-terrain-bridge-store（集中管理在线地图到地形模块的一次性载荷交接，保留 key/payload，
+   消费时先删除以维持单次导入语义；新增 core/terrain-bridge-store.js 纳入 CORE）→
+   v467-tape-spacing-relabel（二级左栏「滴灌带间距」改名「滴带间距」；id=planTapeSpacing 不变）→
+   v468-sprinkler-bridge-store（集中管理地形喷灌成果快照的 remove/set 写入与插件只读解析，
+   保留 runyeSprinklerResult、manifest 可配置 key 和既有载荷；新增 core/sprinkler-bridge-store.js 纳入 CORE）→
+   v469-areagroup-annotate（三级左栏「按亩组合」实体按钮取消，改「亩（按亩组合）」括弧注释；
+   执行入口收敛为「面积成组」点击+亩数框回车，acb 接线与死样式一并清理）→
+   v470-areagroup-btn-restore（撤销 v469：「按亩组合」是执行按钮不能取消——按钮 DOM、acb 接线、
+   样式三处原样恢复，括弧注释撤销）→
+   v471-flow-connector-link（轮灌演示水流找阀升级：首选 45° 连接管 line 两端坐标直接关联
+   阀门与主管锚点，零阈值、随图面自动成立；v354 的 8px/40px/6px 固定阈值降级为兜底——
+   修复大分区/合并组水流不走斜管、垂足直插支管的回归）→
+   v472-terrain-title-beta（地形模块页标题改「地形模块·测试中」：terrain/index.html 与
+   主页面内嵌 terrainSection 两处 h1 + 独立页 <title>，导航清单项名不变）→
+   v473-areagroup-right-align（三级左栏「按亩组合」按钮右缘与「4区」右缘对齐：
+   两参数行结构对齐撑满栏宽——行1 区按钮均分余量、行2 亩数输入框吃余量，
+   两行右缘天然重合，v227 左对齐保留；style-01.css ?v=473）→
+   v474-plot-diag（面积缩水排查诊断入口：mod/ry-diag.js，地址栏 index.html#rydiag
+   弹层展示 measuredArea/measuredPolygon/planDims 与地块库全部记录（含按环 geodesic
+   实测），一键复制；只读不改状态，纳入 CORE）→
+   v475-transfer-live-draft（回传地块绘制以画布为准：画布环与候选记录面积差>0.5% ⇒
+   先落库（另存新条目、不覆盖旧记录）再回传，修复「卡片显示 A 亩、传过去是旧记录
+   B 亩」（182.92→274.62、397.29→145.73 均为此因）；saveCurrentDraftToLibrary
+   支持 opts.newId。online-map.js ?v=475-transfer-live-draft）→
+   v476-pwa-reset（#ryresetpwa 一键清除安装面板关闭标记 runye_pwa_install_dismissed，
+   面板恢复出现；ry-diag.js ?v=476-pwa-reset）→
+   v477-del-confirm（删除/解散成组确认改页面内自绘弹窗 ryConfirm：原生 confirm() 被用户
+   勾选「阻止此页面显示更多对话框」屏蔽后恒返回 false ⇒ 「🗑 删除地块点了没反应」；
+   runye-map-enhance.js ?v=477-del-confirm）→
+   v478-plot-ref-geometry（在线地图弹窗回传增加几何指纹，接收端拒绝重复编号或陈旧弹窗
+   静默命中其他地块）；v479-plot-transfer（三条地块回传路径统一到分区页，同页立即消费引用，
+   原始地块记录只读，重复编号拒绝设为当前；更新主页面脚本查询版本与核心缓存）→
+   v481-angle-live（分区角度面板链路排查+交互修复：headless 实测证实「地图改角→应用→
+   回二级」链路完好，故障观感来自①±1°/输入角度不实时转线、必须点应用才有反馈，
+   ②「回二级继续规划」在角度未应用时静默拒绝（仅状态行小字）。修复：drawPreview 实时
+   预览（绕地块中心旋转已划分区线，仅显示不落数据，点应用才真正重划）；回二级前自动
+   应用；状态行成功绿/失败红着色。runye-map-partition.js ?v=481-angle-live）→
+   v483-angle-preview（用户实测指正：v481 预览把分区格整块刚性旋转，格外边缘跟着转出去，
+   看起来像「地块轮廓线也转动了」。改为只画分割线：从分区格边提取分割线（按方向+法向
+   偏移归并共线段），旋转后与真实地块环求交取弦、越界裁掉——轮廓永不旋转，与正式应用
+   的引擎行为（重划+按边界裁剪）一致。runye-map-partition.js ?v=483-angle-preview）→
+   v485-ai-panel-hide（用户要求取消二级页右缘「AI灌溉方案规划」悬浮面板（含折叠竖条），
+   但保留导航栏「智能规划」功能。关系澄清：导航「智能规划」= 新窗口打开 index.html?smart=1
+   （runye-ai-plan.js smartEntry 分支 → installSmartWorkbench 全屏工作台）；悬浮面板与它共用
+   同一脚本但互不依赖；工具栏「🤖 AI规划」按钮也走独立窗口。改法：syncSection 在非
+   smartEntry 页面恒 display:none（面板仍创建、绑定与导出/导入/回传逻辑零改动）。
+   runye-ai-plan.js ?v=484-ai-panel-hide）→
+   v486-angle-fix（用户实测：旋转角度时「分区混乱」——不规则地块的格子被边界裁剪后带有
+   沿边界走的跟随边，v483 提取分割线时把跟随边也当分割线并按边自身方向延伸，方向族实测
+   从理论 2 个暴增到 4+ 个（76/83/166/173/113°），边界被当成一堆旋转线画出。修复：只收
+   平行于分割方向 ±2.5° 内的边（点积 |投影|≥0.999），跟随边一律跳过；线延伸方向恒用
+   分割方向 dir。runye-map-partition.js ?v=486-angle-fix）→
+   v487-src-label-gap（用户要求：「水源/水泵」标注文字与水源点示意圆脱开距离——原间隙仅
+   约 6px 几乎贴着。施工图 SVG：标签基线 -16→-30、流量/扬程行 +22→+32；交互画布「水源」
+   基线 -13→-22。mod/plot-editor.js ?v=487-src-label-gap）→
+   v488-worst-in-plotgroup（用户实测：三级简图紫色最不利路径水流动画线与管道路径恒定偏位约 8px——
+   根因：紫线是唯一画在 #tlPlotGroup 地块组之外的几何图层，而 tlInitDrag 的图面拖动位移
+   存 localStorage['tl-plot-pos'] 且每次重生成自动恢复，组内管线整体平移、组外紫线不动。
+   修复：记 tlPlotGCloseIdx 后 splice 插到地块组闭合前（随拖动平移；时序仍在快照落地后）。
+   mod/inline-09.js ?v=488-worst-in-plotgroup）→
+   v489-legend-right（用户实测：三级简图底部图例与参数行重叠——参数行从左起排、长了
+   压到居中图例。图例 6 槽位（总宽约 346px）改靠 A3 右边框对齐：lx=svgW/2-180 →
+   svgW-358（右缘距 frame 右边线 4px），与参数行同基线不变。
+   mod/inline-09.js ?v=489-legend-right）→
+   v490-mapside-style-slim（用户要求：在线地图左栏样式逐层扒开简化、不影响整体效果。
+   按 ui-style-reference 单一出处方法论只删死码/并自冲突，不改任何活规则：
+   ① 删 v322 全局滚动条段（*::-webkit-scrollbar 四条，全被 runye-theme.css v383
+     同特异性后加载覆盖，实际生效一直是 theme 的 4px 灰丸）；左栏局部 5px 绿拇指
+     （.side/.sr-list 专属规则，特异性更高）保留不动。
+   ② .side 右边框两处自冲突（s-300 + 块尾 v322 transparent）合并为一处 transparent。
+   ③ 删 10 处被 runye-typography.css 13px !important 压死的 button/input/select
+     font-size 声明（.mbtn/.sr-item/.place-go/.place-del/.place-send/.map-float-actions
+     .mbtn/.ry-angle-panel .save-row .mbtn/#mapPartitionTools select/.ang-btn/
+     .map-angle-value input/.side input[type=text]/.ah-fold）——字号统一出处=typography 层。
+   ④ 删 :root 死变量别名 --s-200/--s-600（全页零引用）。
+   等价性：27 项 computed style 快照（_mapside_snap.js）before/after 全一致，
+   左栏截图目视一致。runye-map-measure.html）→
+   v491-recipe-lib（用户要求：红框 10 项输入参数可整组保存为命名方案、随时调用，
+   持续沉淀「地区 × 作物 × 铺设配置」配方库。二级左侧面板 #ppPlanBar 下新增
+   #ppRecipeBar（名称框+存/下拉+调用/✎改名/🗑删除，无弹窗，反馈走状态行）；
+   数据 = localStorage['runye_irrigation_recipes_v1']；逻辑 = plot-editor.js
+   ppRecipeFlow（复用 ppAiPlanFlow 的 snapshot/apply 模式：回填派发 change/input
+   触发实时重算 + tlPlanTargetV 联动 + 按新参数重划分区）；皮肤 = ry-panel.css
+   .pp-recipe-*（24px 控件/6px 圆角/品牌绿，对齐面板基准档案）。
+   mod/plot-editor.js ?v=491-recipe-lib、mod/ry-panel.css ?v=491-recipe-lib）→
+   v492-cad-recipe-skin（用户实测：CAD 工具栏宿主里配方行是浏览器默认样式——
+   根因 = 皮肤只写在 ry-panel.css 的 #pipePlanSection 前缀，宿主把面板节点移入
+   #ryCadSide 后选择器失配；按基准档案流程跑 scripts/refresh-cad-twin-css.cjs
+   重新生成 #ryCadTwinCss 镜像，.pp-recipe-* 以 #ryCadSide [data-pp=...] 前缀
+   同步入镜像（同时同步了 style-01.css 单选择器写法的 4 条过期镜像差异）。
+   index.html #ryCadTwinCss，随 SW 更新生效）→
+   v493-recipe-ui-tweak（用户要求：①「💾 存」去图标只留「保存」两字；
+   ②方案标签不再占 84px 基准列改紧凑排，名称框从标签右侧一直撑到保存按钮。
+   mod/ry-panel.css ?v=493-recipe-ui-tweak + 镜像重新同步）→
+   v494-map-draw-toolbar（用户要求：在线地图左栏「绘制」区整体迁出，做成地图区
+   顶端的可拖动工具条。runye-map-measure.html：左栏删「绘制」section（注释留恢复
+   说明），.map-wrap 内新增 #mapDrawTools（抓手 ⠿绘制 + 开始画框/完成并画下一块/
+   加点/撤销/测距/清除 六钮，id 全部不变 → online-map.js 零改动）；拖动/位置记忆
+   复用 mod/ry-panel.js rypDraggable（bounds=.map-wrap，clamp 在地图区内 = 永不
+   超出导航栏；位置存 localStorage['mapDrawToolsPos']）；ry-panel.js 新增
+   data-ry-default-left 默认水平位置钩子（未设置走原右缘逻辑，既有面板零影响）。
+   mod/ry-panel.js ?v=494-drag-default-left（index.html + runye-map-measure.html
+   两处引用同步抬）。 -->
+   v495-map-draw-toolbar（用户截图反馈「工具栏在哪里？没看到」——根因：在线地图在
+   独立页 runye-map-measure.html 与主程序 index.html #onlineMapSection 各有一份
+   副本，v494 只改了独立页。本次同步主程序内嵌版：index.html 删左栏「绘制」section
+   （注释留恢复说明）、.map-wrap 内 #map 后插入同款 #mapDrawTools（结构/属性与
+   独立页完全一致，id 不变 → online-map.js 零改动）；mod/online-map.css 尾部追加
+   #onlineMapSection .map-draw-tools 系列样式（含 .dt-grip/.mbtn/.btn-on），引用
+   ?v=441-map-main-section 抬为 ?v=495-map-draw-toolbar。教训入档：改在线地图
+   必须同步两处副本。index.html / online-map.css 均在 CORE 白名单，必须抬版本）。 */
+const VERSION = 'v495-map-draw-toolbar';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
@@ -166,6 +306,9 @@ const CORE = [
   "core/loader.js",
   "core/event-bus.js",
   "core/data-service.js",
+  "core/irrigation-data-store.js",
+  "core/terrain-bridge-store.js",
+  "core/sprinkler-bridge-store.js",
   "core/ui-shell.js",
   "core/runtime-guard.js",
   "plugins/hello-world/manifest.json",
@@ -199,8 +342,6 @@ const CORE = [
   "plugins/filter-system/main.js",
   "plugins/material-list/manifest.json",
   "plugins/material-list/main.js",
-  "plugins/iso-view/manifest.json",
-  "plugins/iso-view/main.js",
   "plugins/sys-view/manifest.json",
   "plugins/sys-view/main.js",
   /* [v397] 等高线解析插件（TASK_contour-dxf_20261012，DXF → 高程点 → 地形高差） */
@@ -233,6 +374,7 @@ const CORE = [
   "mod/inline-14.js",
   "mod/inline-15.js",
   "mod/inline-16.js",
+  "mod/ry-diag.js",
   "mod/inline-17.js",
   "mod/inline-18.js",
   "mod/inline-19.js",
@@ -242,7 +384,6 @@ const CORE = [
   "mod/inline-23.js",
   "mod/inline-24.js",
   "mod/inline-25.js",
-  "mod/inline-26.js",
   "mod/inline-27.js",
   "mod/inline-28.js",
   "mod/inline-29.js",
@@ -258,7 +399,6 @@ const CORE = [
   "mod/online-map.css",
   "mod/online-map.js",
   "mod/style-01.css",
-  "mod/style-02.css",
   "mod/style-03.css",
   "mod/style-04.css",
   "mod/style-05.css",
@@ -280,13 +420,6 @@ const CORE = [
   "runye-ai-plan.js",
   "runye-ai-plan.css",
   "runye-ai-chat-test.html",
-  "iso-diagram/editor.js",
-  "iso-diagram/iso-diagram.css",
-  "iso-diagram/iso-diagram.js",
-  "iso-diagram/network-editor.css",
-  "iso-diagram/network-editor.js",
-  "iso-diagram/network-model.js",
-  "iso-diagram/product-catalog.js",
   "manifest.webmanifest",
   "modeling/integration.js",
   "modeling/workspace.css",
@@ -308,12 +441,10 @@ const CORE = [
   "pwa/vendor/images/marker-shadow.png",
   "pwa/vendor/leaflet.css",
   "pwa/vendor/leaflet.js",
-  "pwa/vendor/three.min.js",   /* [v415] 管网 3D 预览（three r147 自托管懒加载） */
   "runye-dxf.js",
   "runye-entitle.js",
   "runye-member-ui.js",
   "runye-material-audit.js",
-  "runye-pipe3d.js",   /* [v415] 管网 3D 预览 */
   "runye-geo.js",
   "runye-hydraulics.html",   /* 兼容独立入口 */
   "runye-hydraulics-core.js",

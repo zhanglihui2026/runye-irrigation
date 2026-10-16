@@ -6,7 +6,7 @@
  * 每项测试在「已实现」的行为上做断言；若失败即暴露回归或实现缺口。
  * ===================================================================== */
 'use strict';
-const NM = require('../iso-diagram/network-model.js');
+const NM = require('../feature-archive/三维与轴测图/source/iso-diagram/network-model.js');
 const ConstructionNetwork = NM.ConstructionNetwork;
 
 let pass = 0, fail = 0;

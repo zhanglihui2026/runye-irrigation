@@ -46,18 +46,8 @@
     });
   }
 
-  /* 按作物名给地块配色：卫星图上一眼区分哪块种什么；无匹配回退绿色 */
-  function cropColor(crop) {
-    var c = String(crop || '').toLowerCase();
-    if (/火龙果/.test(c)) return '#dc2626';
-    if (/芒果|柑橘|橙|柠檬|黄皮/.test(c)) return '#f59e0b';
-    if (/荔枝|龙眼|葡萄|提子|蓝莓/.test(c)) return '#a855f7';
-    if (/槟榔|椰子|橡胶/.test(c)) return '#0f766e';
-    if (/西瓜|甜瓜|哈密瓜/.test(c)) return '#eab308';
-    if (/水稻|莲|藕/.test(c)) return '#0891b2';
-    if (/蔬菜|辣椒|番茄|茄子/.test(c)) return '#65a30d';
-    return '#16a34a';
-  }
+  /* 灌溉地图只按地块显示，不读取种植作物信息。 */
+  var PLOT_COLOR = '#16a34a';
 
   function injectCss() {
     if (document.getElementById('rym-layer-css')) return;
@@ -378,7 +368,7 @@
           if (on) {
             L2.setStyle(SEL_STYLE);
           } else if (all.length > 1 && L2._rySubStyle) {
-            L2.setStyle(L2._rySubStyle);       // 还原该子地块自己的作物色
+            L2.setStyle(L2._rySubStyle);       // 还原该子地块自己的地块色
           } else {
             L2.setStyle(rec.baseStyle);
           }
@@ -488,7 +478,7 @@
     rest.forEach(function (p) { have[p.id] = 1; });
     (big.subPlots || []).forEach(function (s) {
       if (!have[s.id]) rest.push({
-        id: s.id, name: s.name, mu: s.mu, sqm: s.sqm, crop: s.crop,
+        id: s.id, name: s.name, mu: s.mu, sqm: s.sqm,
         polyLatLng: s.polyLatLng, center: s.center, source: 'map', crs: 'GCJ-02', ts: Date.now(), note: ''
       });
     });
@@ -496,6 +486,26 @@
     catch (e) { return { ok: false, reason: '写入地块库失败：' + e.message }; }
     if (state && state.refresh) state.refresh();
     return { ok: true, restored: chk.count };
+  }
+
+  /* [v477] 页面内确认弹窗：原生 confirm() 在用户勾选过浏览器「阻止此页面显示更多对话框」后
+     会被静默吞掉（直接返回 false）⇒ 「🗑 删除地块」点了没反应。改为自绘弹窗，不再依赖原生对话框。 */
+  function ryConfirm(msg, onYes) {
+    var ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;left:0;top:0;right:0;bottom:0;z-index:100000;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center';
+    var box = document.createElement('div');
+    box.style.cssText = 'background:#fff;border-radius:10px;padding:18px 20px;max-width:340px;font:13px/1.6 system-ui,sans-serif;color:#111;box-shadow:0 12px 40px rgba(0,0,0,.35)';
+    var tip = document.createElement('div'); tip.style.whiteSpace = 'pre-line'; tip.textContent = msg;
+    var row = document.createElement('div'); row.style.cssText = 'margin-top:14px;display:flex;gap:10px;justify-content:flex-end';
+    var no = document.createElement('button'); no.textContent = '取消';
+    no.style.cssText = 'padding:6px 16px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;cursor:pointer;font-size:13px';
+    var yes = document.createElement('button'); yes.textContent = '确定';
+    yes.style.cssText = 'padding:6px 16px;border:0;background:#dc2626;color:#fff;border-radius:6px;cursor:pointer;font-size:13px';
+    no.onclick = function () { if (ov.parentNode) ov.parentNode.removeChild(ov); };
+    yes.onclick = function () { if (ov.parentNode) ov.parentNode.removeChild(ov); onYes(); };
+    row.appendChild(no); row.appendChild(yes);
+    box.appendChild(tip); box.appendChild(row); ov.appendChild(box);
+    document.body.appendChild(ov);
   }
 
   function renderPlots(state, opts) {
@@ -552,7 +562,7 @@
             healed++;
           }
         }
-        var color = p.color || cropColor(p.crop);
+        var color = p.color || PLOT_COLOR;
         /* ===== [v187/v189 2026-10-03] 成组地块：只画「各自轮廓线」，外面不加框，也不合并几何 =====
          * 用户原话（v187）：「地块拼接之后 是各自的轮廓线，外面不用再加一个框。」
          * 用户原话（v189）：「正确理解地块拼接，实际上不是拼接是地块成组，我可能一个大地块分开画
@@ -565,7 +575,7 @@
          *   ① 成组地块 ⇒ 优先按 `polyLatLngSet` 的**每一个环**各画一圈独立闭合轮廓；
          *      环缺失时退回 `subPlots[].polyLatLng`（老库兼容）；再退回凸包（不让地块消失）。
          *   ② 普通地块 ⇒ 画它自己的单环。
-         * 颜色用**各成员自己的作物色**（与未成组时观感一致，一眼区分不同子地块）。
+         * 颜色使用统一地块色，并允许通过显式 color 字段覆盖。
          * 注意：交互层（popup / 点击选中 / 解散成组）必须保留，否则去掉外框就点不到。
          *   做法：给每个成员环挂上同一套 popup 与 click 处理器，任一块都能唤起。
          * 另加一个「描边兜底」的不可见外轮廓（opacity 0）——不参与视觉，
@@ -586,7 +596,7 @@
               var sLL = validRingLL(ring);
               if (!sLL || sLL.length < 3) return;
               var meta = (p.subPlots && p.subPlots[si]) || {};
-              var sColor = meta.color || cropColor(meta.crop || p.crop);
+              var sColor = meta.color || PLOT_COLOR;
               var sStyle = { color: sColor, weight: 2.5, fillColor: sColor, fillOpacity: 0.22 };
               var sPoly = L.polygon(displayLL(sLL, opts), sStyle);
               sPoly._rySubIdx = si;
@@ -600,8 +610,8 @@
               if (!s.polyLatLng || s.polyLatLng.length < 3) return;
               var sLL = validRingLL(s.polyLatLng);
               if (!sLL) return;
-              /* 子地块自己的作物色：库里没写就退回成组地块的，再退回调色板 */
-              var sColor = s.color || cropColor(s.crop || p.crop);
+              /* 子地块显式颜色优先，否则使用统一地块色 */
+              var sColor = s.color || PLOT_COLOR;
               var sStyle = { color: sColor, weight: 2.5, fillColor: sColor, fillOpacity: 0.22 };
               var sPoly = L.polygon(displayLL(sLL, opts), sStyle);
               sPoly._rySubIdx = si;
@@ -646,7 +656,6 @@
           escapeHtml(p.name || '未命名地块') + (isMerged ? '（成组地块）' : '') + '</b><br>' +
           '面积：<b>' + (+mu).toFixed(2) + '</b> 亩　顶点：' + ll.length + ' 个' +
           subHtml +
-          '<label style="display:block;margin-top:5px">作物 <input id="rymCrop" style="width:88%;padding:2px 4px;border:1px solid #cbd5e1" value="' + escapeHtml(p.crop || '') + '" placeholder="如：七彩花生"></label>' +
           '<label style="display:block;margin-top:3px">备注 <textarea id="rymNote" rows="2" style="width:88%;padding:2px 4px;border:1px solid #cbd5e1" placeholder="地形/水源/备注">' + escapeHtml(p.note || '') + '</textarea></label>' +
           '<button id="rymSave" style="margin-top:5px;padding:3px 12px;background:#16a34a;color:#fff;border:0;cursor:pointer;font-size:12px">保存</button>' +
           /* [NEW MODULE: 地形模块 v286f] 弹窗回传按钮组：opts 回调跨作用域调页面局部函数， */
@@ -662,11 +671,10 @@
         var onPopupOpen = function () {
           var btn = document.getElementById('rymSave');
           if (btn) btn.onclick = function () {
-            var crop = (document.getElementById('rymCrop') || {}).value || '';
             var note = (document.getElementById('rymNote') || {}).value || '';
             try {
               var lib = JSON.parse(localStorage.getItem('runye_plot_library') || '[]');
-              for (var i = 0; i < lib.length; i++) { if (lib[i].id === p.id) { lib[i].crop = crop; lib[i].note = note; break; } }
+              for (var i = 0; i < lib.length; i++) { if (lib[i].id === p.id) { lib[i].note = note; break; } }
               localStorage.setItem('runye_plot_library', JSON.stringify(lib));
             } catch (e) { alert('保存失败：' + e.message); return; }
             try { state.refresh(); } catch (e) {}
@@ -680,26 +688,31 @@
           /* [NEW MODULE: 地块删除 v352] 删除：confirm 二次确认（成组地块连同子地块一起删）→
            * 移出 runye_plot_library → 关弹窗 → state.refresh() 重画叠加 → onPlotsChanged 通知宿主刷列表。 */
           var delBtn = document.getElementById('rymDel');
+          /* [v477] 删除确认改页面内自绘弹窗：原生 confirm() 一旦被用户勾选「阻止此页面
+           * 显示更多对话框」屏蔽后恒返回 false，删除按钮就「点了没反应」。ryConfirm
+           * 不经浏览器对话框，不受该屏蔽影响。 */
           if (delBtn) delBtn.onclick = function () {
             var subN = (p.merged && p.subPlots ? p.subPlots.length : 0);
             var msg = '确定删除地块「' + (p.name || '未命名地块') + '」？'
               + (subN ? '\n该地块是成组地块，将连同 ' + subN + ' 个子地块一起删除。' : '')
               + '\n删除后不可恢复。';
-            if (!confirm(msg)) return;
-            try {
-              var lib = JSON.parse(localStorage.getItem('runye_plot_library') || '[]');
-              var now = lib.filter(function (x) { return x && x.id !== p.id && x.mergedInto !== p.id; });
-              localStorage.setItem('runye_plot_library', JSON.stringify(now));
-            } catch (e) { alert('删除失败：' + e.message); return; }
-            layers.forEach(function (L2) { try { L2.closePopup(); } catch (e) {} });
-            try { state.refresh(); } catch (e) {}
-            if (typeof opts.onPlotsChanged === 'function') { try { opts.onPlotsChanged(p); } catch (e) {} }
+            ryConfirm(msg, function () {
+              try {
+                var lib = JSON.parse(localStorage.getItem('runye_plot_library') || '[]');
+                var now = lib.filter(function (x) { return x && x.id !== p.id && x.mergedInto !== p.id; });
+                localStorage.setItem('runye_plot_library', JSON.stringify(now));
+              } catch (e) { alert('删除失败：' + e.message); return; }
+              layers.forEach(function (L2) { try { L2.closePopup(); } catch (e) {} });
+              try { state.refresh(); } catch (e) {}
+              if (typeof opts.onPlotsChanged === 'function') { try { opts.onPlotsChanged(p); } catch (e) {} }
+            });
           };
           var ub = document.getElementById('rymUnmerge');
           if (ub) ub.onclick = function () {
-            if (!confirm('解散成组？\n将把「' + (p.name || '该地块') + '」拆回 ' + ((p.subPlots || []).length) + ' 个子地块（各自的轮廓与块间空隙本来就没动过）。')) return;
-            var r = doUnmerge(state, p.id);
-            if (!r.ok) alert('解散成组失败：' + r.reason);
+            ryConfirm('解散成组？\n将把「' + (p.name || '该地块') + '」拆回 ' + ((p.subPlots || []).length) + ' 个子地块（各自的轮廓与块间空隙本来就没动过）。', function () {
+              var r = doUnmerge(state, p.id);
+              if (!r.ok) alert('解散成组失败：' + r.reason);
+            });
           };
         };
         var onClickPick = function (e) { try { opts.onPick(p); } catch (err) {} };
@@ -755,8 +768,7 @@
 
   /* ---- 管网叠加：读 localStorage['runye_network_layout'] ---- */
   function readNetwork() {
-    try { return JSON.parse(localStorage.getItem('runye_network_layout') || 'null'); }
-    catch (e) { return null; }
+    return window.RyIrrigationDataStore.readNetworkLayout();
   }
   function dnStyle(dn) {
     dn = +dn || 0;
@@ -950,7 +962,7 @@
       var wgs = RunyeGeo.polyGcj2Wgs(RunyeGeo.normalizeRing(p.polyLatLng));
       var ring = wgs.map(function (ll) { return [ll[1], ll[0]]; });
       ring.push([wgs[0][1], wgs[0][0]]);
-      return { type: 'Feature', properties: { name: p.name || '', mu: p.mu || 0, crop: p.crop || '' },
+      return { type: 'Feature', properties: { name: p.name || '', mu: p.mu || 0 },
         geometry: { type: 'Polygon', coordinates: [ring] } };
     });
     return JSON.stringify({ type: 'FeatureCollection', features: feats }, null, 2);
@@ -961,8 +973,7 @@
       ring.push(ring[0].slice());
       var coords = ring.map(function (ll) { return ll[1] + ',' + ll[0] + ',0'; }).join(' ');
       return '<Placemark><name>' + escapeHtml(p.name || '地块') + '</name>' +
-        '<ExtendedData><Data name="mu"><value>' + escapeHtml(String(p.mu || '')) + '</value></Data>' +
-        '<Data name="crop"><value>' + escapeHtml(p.crop || '') + '</value></Data></ExtendedData>' +
+        '<ExtendedData><Data name="mu"><value>' + escapeHtml(String(p.mu || '')) + '</value></Data></ExtendedData>' +
         '<Polygon><outerBoundaryIs><LinearRing><coordinates>' + coords +
         '</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>';
     }
@@ -993,7 +1004,7 @@
       polys.forEach(function(rings){
         if(!Array.isArray(rings) || rings.length!==1) throw new Error('暂不支持带内孔的地块，请先拆分为无孔多边形');
         var ll=RunyeGeo.normalizeRing(rings[0].map(function(c){return [c[1],c[0]];}));
-        plots.push({name:props.name || props.Name || '', crop:props.crop || '', polyLatLng:ll});
+        plots.push({name:props.name || props.Name || '', polyLatLng:ll});
       });
     });
     return plots;
@@ -1012,8 +1023,7 @@
     }
     var plots=[], skipped=[];   /* skipped：无效轨迹/环线（自相交、退化等），跳过而非抛错毁掉整份导入（2026-10-02 审查修复） */
     descendants(doc,'Placemark').forEach(function(pm){
-      var name=firstText(pm,'name'), crop='';
-      descendants(pm,'Data').forEach(function(d){if(d.getAttribute('name')==='crop') crop=firstText(d,'value');});
+      var name=firstText(pm,'name');
       // 1) 标准多边形
       descendants(pm,'Polygon').forEach(function(poly){
         if(descendants(poly,'innerBoundaryIs').length) throw new Error('暂不支持带内孔的地块，请先拆分为无孔多边形');
@@ -1021,7 +1031,7 @@
         if(outer.length!==1) throw new Error('KML 地块缺少唯一外边界');
         var coords=firstText(outer[0],'coordinates');
         var ll=RunyeGeo.normalizeRing(ringFromCoordText(coords));
-        plots.push({name:name,crop:crop,polyLatLng:ll});
+        plots.push({name:name,polyLatLng:ll});
       });
       // 2) 奥维轨迹 <gx:Track>（.ovkml）：一串打点当作闭合地块边界
       descendants(pm,'Track').forEach(function(trk){
@@ -1033,7 +1043,7 @@
         // 单条轨迹无效（自相交/共线退化 → normalizeRing 抛错）只跳过它，不毁整份导入
         try{
           var ll=RunyeGeo.normalizeRing(pts);          // 自动去首尾重复点并校验
-          plots.push({name:name,crop:crop,polyLatLng:ll,source:'track'});
+          plots.push({name:name,polyLatLng:ll,source:'track'});
         }catch(e){ skipped.push(name||'未命名轨迹'); }
       });
       // 3) 普通 <LineString>：闭合环线当作地块边界（同样跳过无效环线）
@@ -1042,7 +1052,7 @@
         if(pts.length<3) return;
         try{
           var ll=RunyeGeo.normalizeRing(pts);
-          plots.push({name:name,crop:crop,polyLatLng:ll,source:'linestring'});
+          plots.push({name:name,polyLatLng:ll,source:'linestring'});
         }catch(e){ skipped.push(name||'未命名环线'); }
       });
     });
@@ -1108,7 +1118,7 @@
 
   /** 把若干地块**成组**（纯函数，不改动入参）。
    *  @param {Array} subPlots  子地块数组，每个至少要有 id + polyLatLng（或可重建）
-   *  @param {Object} opts     { name, crop, id, ts }
+   *  @param {Object} opts     { name, id, ts }
    *  @returns {Object|null}   组对象；子地块不足 2 个或有无效环时返回 null
    *
    *  ★★ 语义（v189 2026-10-03 用户纠正，务必守住）：
@@ -1125,7 +1135,7 @@
    *  返回对象字段：
    *    grouped:true           标记这是**成组**地块（保留 merged 字段名做向后兼容）
    *    merged:true            （同 grouped，老代码/老库仍认这个键）
-   *    subPlots:[...]         成员快照（各自完整几何/作物/面积）
+   *    subPlots:[...]         成员快照（各自完整几何与面积）
    *    polyLatLngSet:[[...]]  **成组后的权威几何 = 各成员环的集合**（多环，互不合并）
    *    polyLatLng             仅供包围盒/飞行的**参考外框**（凸包）—— 不是可见轮廓，
    *                           二级页**不得**把它当作地块边界参与布管/划分
@@ -1162,7 +1172,6 @@
         name: p.name || '',
         mu: sMu,
         sqm: sSqm,
-        crop: p.crop || '',
         polyLatLng: subRing,
         center: ctr
       };
@@ -1226,7 +1235,6 @@
       poly: poly,
       center: { lat: +clat.toFixed(6), lng: +sn.toFixed(6) },
       geo: { refLat: +clat.toFixed(6), refLng: +outer[0][1].toFixed(6), proj: 'mercatorLocal', ts: Date.now() },
-      crop: opts.crop || (list[0] && list[0].crop) || '',
       source: 'group',
       crs: 'GCJ-02',
       ts: opts.ts || Date.now(),

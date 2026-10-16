@@ -3,7 +3,7 @@
  * ID 唯一性、投影有限性/可逆性、退化输入、幂等渲染。
  * 运行：node tests/iso_diagram.test.cjs  （退出码非 0 即失败） */
 'use strict';
-const iso = require('../iso-diagram/iso-diagram.js');
+const iso = require('../feature-archive/三维与轴测图/source/iso-diagram/iso-diagram.js');
 const assert = require('assert');
 
 let pass = 0, fail = 0;

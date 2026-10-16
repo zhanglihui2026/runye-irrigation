@@ -177,8 +177,8 @@ function reset() {
   ok('权益未同步时所有受限功能均为 pending', allFeatures.every(f => E.access(f) === 'pending'), allFeatures.map(f => [f, E.access(f)]));
   const fileMenu = fs.readFileSync(path.join(__dirname, '..', 'mod', 'inline-32.js'), 'utf8');
   ok('文件菜单 pending 状态显示同步中并阻止动作', /status === 'pending'[\s\S]*?正在同步会员权益，请稍后重试。[\s\S]*?·同步中[\s\S]*?data-ry-pending/.test(fileMenu), '检查 pending 提示、标记和同步中标签');
-  const iso = fs.readFileSync(path.join(__dirname, '..', 'iso-diagram', 'iso-diagram.js'), 'utf8');
-  ok('轴测图 SVG 下载与打印入口均校验高级权益', /function downloadSVG\(\)\s*\{\s*if \(!requireDrawingExport\(\)\) return;/.test(iso) && /function printSVG\(\)\s*\{\s*if \(!requireDrawingExport\(\)\) return;/.test(iso));
+  const iso = fs.readFileSync(path.join(__dirname, '..', 'feature-archive', '三维与轴测图', 'source', 'iso-diagram', 'iso-diagram.js'), 'utf8');
+  ok('归档轴测图 SVG 下载与打印入口仍校验高级权益', /function downloadSVG\(\)\s*\{\s*if \(!requireDrawingExport\(\)\) return;/.test(iso) && /function printSVG\(\)\s*\{\s*if \(!requireDrawingExport\(\)\) return;/.test(iso));
   const headDiagram = fs.readFileSync(path.join(__dirname, '..', 'mod', 'inline-14.js'), 'utf8');
   ok('首部系统图 SVG、PNG 和打印入口均校验高级权益', /function exportSVG\(\)\s*\{\s*if \(!requireHeadExport\(\)\) return;/.test(headDiagram) && /function exportPNG\(\)\s*\{\s*if \(!requireHeadExport\(\)\) return;/.test(headDiagram) && /hmPrint'\)\.addEventListener\('click', function \(\) \{ if \(requireHeadExport\(\)\) window\.print\(\); \}/.test(headDiagram));
   const cloudFn = fs.readFileSync(path.join(__dirname, '..', 'cloudfn', 'ryEntitle-v2', 'index.js'), 'utf8');

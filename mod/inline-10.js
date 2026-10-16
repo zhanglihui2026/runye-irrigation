@@ -22,6 +22,7 @@ function atScreenToImage(sx,sy){return{x:(sx-atState.panX)/(atState.imgScale*atS
 function atImageToScreen(ix,iy){return{x:ix*atState.imgScale*atState.zoom+atState.panX,y:iy*atState.imgScale*atState.zoom+atState.panY};}
 
 function atResizeCanvas(){
+  if(document.body.classList.contains('ry-tool') && !document.getElementById('areaTool').classList.contains('ry-active')) return;
   atCanvas.width=atCanvasWrap.clientWidth;
   atCanvas.height=atCanvasWrap.clientHeight;
   if(atState.image) atFitImage();

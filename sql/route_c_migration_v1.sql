@@ -4,7 +4,7 @@
 --       「PG 直连 + RLS」。在 CloudBase 控制台
 --       「SQL 型数据库」的 SQL 编辑器里整段执行一次。
 -- 注意：
---  1. 本环境已有 plots / weather_logs（数字农业工作台），本脚本不碰。
+--  1. 本环境原有 plots / weather_logs 表（历史数字农业工作台数据），本脚本不碰；当前灌溉主程序不依赖这些表。
 --  2. auth.uid() 是 CloudBase PG 的 JWT sub 帮手函数（勿用 current_user）。
 --  3. _id 用 text 直接存 CloudBase uid，主键即 uid（一人一行）。
 -- ============================================================

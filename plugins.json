@@ -13,7 +13,6 @@
     { "id": "sprinkler", "path": "plugins/sprinkler/" },
     { "id": "filter-system", "path": "plugins/filter-system/" },
     { "id": "material-list", "path": "plugins/material-list/" },
-    { "id": "iso-view", "path": "plugins/iso-view/" },
     { "id": "sys-view", "path": "plugins/sys-view/" },
     { "id": "contour-dxf", "path": "plugins/contour-dxf/" }
   ]

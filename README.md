@@ -16,11 +16,11 @@
 | `二级系统图.html` | 二级管路系统图（接收主程序计算结果） |
 | `三级系统图.html` | 三级管路系统图（接收主程序计算结果） |
 | `耐特菲姆滴灌带长度查询器.html` | 滴灌带最大铺设长度查询（入口压力 × 坡度） |
-| `digital-agriculture/` | 数字农业模块（统一入口、花生决策工具、工作台、生育期数据源），见 [模块 README](digital-agriculture/README.md) 与 [开发规则](digital-agriculture/AGENTS.md）。**v382 移除了导航入口、`irrigation-bridge.js` 和绘制边界回写握手；共享地块库 `runye_plot_library` 仍由灌溉工具与工作台读写**，其数据契约见 `RYPLOT_SCHEMA.md` |
+| `digital-agriculture/` | 数字农业独立模块（花生、辣椒、气候决策及农艺资料），见 [模块 README](digital-agriculture/README.md) 与 [开发规则](digital-agriculture/AGENTS.md)。种植页面实现已集中在此目录；旧根路径只保留跳转壳。工作台源码在 [功能归档](feature-archive/数字农业工作台/README.md)，当前没有活动接收端 |
 | `peanut-tool.html` | （旧入口跳转壳 → digital-agriculture/peanut-tool.html） |
 | `数字农业.html` | （旧入口跳转壳 → digital-agriculture/index.html） |
-| `workbench.html` | （旧入口跳转壳 → digital-agriculture/workbench.html） |
 | `qicai-huasheng/schedule-core.js` | （旧路径兼容加载器 → digital-agriculture/qicai-huasheng/schedule-core.js） |
+| `qicai-huasheng/`、`lajiao-zhibao/`、`decision-engine/` | （历史页面 URL 兼容壳 → digital-agriculture/ 内的对应页面） |
 | `hero-driptape.jpg` | 门户页 Hero 底图 |
 
 数字农业拆分方案的历史记录见 [docs/digital-agriculture-extraction.md](docs/digital-agriculture-extraction.md)；v382 后的边界与遗留影响见 `AGENT_HANDOFF.md` 与方案文档 §12.1。

@@ -143,6 +143,7 @@
   }
 
   function ppResize(){
+    if(document.body.classList.contains('ry-tool') && !document.getElementById('pipePlanSection').classList.contains('ry-active')) return;
     ppCanvas.width=ppWrap.clientWidth;
     ppCanvas.height=ppWrap.clientHeight;
     ppUpdateTransform();ppRender();
@@ -1550,7 +1551,8 @@
       ppCtx.arc(sp.x,sp.y,8,0,Math.PI*2);ppCtx.fill();
       ppCtx.strokeStyle='#fff';ppCtx.lineWidth=2;ppCtx.stroke();
       ppCtx.fillStyle='#000';ppCtx.font='10px sans-serif';ppCtx.textAlign='center';
-      ppCtx.fillText('水源',sp.x,sp.y-13);
+      /* [v487] 「水源」标注与点脱开距离：基线 -13→-22（点圆半径 8，原间隙仅约 5px） */
+      ppCtx.fillText('水源',sp.x,sp.y-22);
     }
 
     // Valves
@@ -2344,6 +2346,85 @@
     window.addEventListener('storage',function(e){if(e.key==='runye_ai_plan_v1')checkPlan();});
   })();
 
+  /* ===== [v491 2026-10-16 用户要求] 灌溉配方库（二级左侧面板 #ppRecipeBar）：
+     把第 1 行 10 项输入参数整组保存为命名方案、随时调用回填，持续沉淀
+     灌溉参数组合方案库。DOM = index.html #ppRecipeBar；
+     皮肤 = mod/ry-panel.css .pp-recipe-*。
+     数据 = localStorage['runye_irrigation_recipes_v1']：
+       {version:1, recipes:[{id,name,at,params:{10 个参数 id:值}}]}
+     交互（全部无弹窗，反馈走 #ppRecipeStatus）：
+       💾 存  —— 按名称框保存（同名覆盖更新；空名自动「方案 N」）；
+       调用   —— 回填 10 值 + 派发 change/input 触发实时重算（含三级 tlPlanTargetV 联动、
+                 按新参数重划分区，与 ppAiPlanFlow.applyPlan 同一套联动）；
+       ✎ 改名 —— 用名称框内容改选中方案名（名称框为空则提示）；
+       🗑 删除 —— 删选中方案。
+     撤掉：删本 IIFE + index.html #ppRecipeBar + ry-panel.css .pp-recipe-* 即可。 ===== */
+  (function ppRecipeFlow(){
+    var KEY='runye_irrigation_recipes_v1';
+    /* 红框 10 项（2026-10-16 用户圈定）：水泵提升/地形高差/水源距离/滴带间距/滴孔间距/
+       滴头流量/铺设长度/分区划定/入口压力/目标流速 —— 均为 #ppPlanBar 内原生 input id */
+    var IDS=['planLift','planDh','planSrcDist','planTapeSpacing','planEmitterSpacing',
+      'planEmitterFlow','planTapeLaySide','planZoneMuManual','planTapePressure','planTargetV'];
+    var $=function(id){return document.getElementById(id);};
+    var nameEl=$('ppRecipeName'),selEl=$('ppRecipeSelect'),statusEl=$('ppRecipeStatus');
+    if(!nameEl||!selEl||!$('ppRecipeSave'))return;
+    function read(){try{var d=JSON.parse(localStorage.getItem(KEY)||'null');if(d&&d.version===1&&Array.isArray(d.recipes))return d.recipes;}catch(e){}return [];}
+    function write(list){try{localStorage.setItem(KEY,JSON.stringify({version:1,recipes:list}));return true;}catch(e){status('保存失败：浏览器不允许写入本地存储','err');return false;}}
+    function status(msg,cls){statusEl.textContent=msg;statusEl.className='pp-recipe-status'+(cls==='err'?' pp-recipe-err':'');if(status._t)clearTimeout(status._t);status._t=setTimeout(function(){if(statusEl.textContent===msg)statusEl.textContent='';},4000);}
+    function snapshot(){var p={};IDS.forEach(function(id){var el=$(id);p[id]=el?el.value:null;});return p;}
+    function applyParams(p){
+      function set(id,v){var el=$(id);
+        if(el&&v!==null&&v!==undefined&&isFinite(+v)&&String(v)!==''){el.value=v;
+          el.dispatchEvent(new Event('change',{bubbles:true}));el.dispatchEvent(new Event('input',{bubbles:true}));}}
+      IDS.forEach(function(id){set(id,p[id]);});
+      try{var t3=$('tlPlanTargetV');
+        if(t3&&p.planTargetV!==null&&p.planTargetV!==undefined&&isFinite(+p.planTargetV)){t3.value=p.planTargetV;t3.dispatchEvent(new Event('input',{bubbles:true}));}}catch(e){}
+      if(typeof ppRepartitionFromRotatedPlot==='function'){try{ppRepartitionFromRotatedPlot({aiApply:true});}catch(e){}}
+    }
+    function refreshSelect(keepId){
+      var list=read(),old=keepId||selEl.value;
+      selEl.innerHTML='<option value="">— 选择方案 —</option>';
+      list.forEach(function(r){
+        var o=document.createElement('option');o.value=r.id;
+        var d=new Date(r.at||0);
+        o.textContent=r.name+'（'+(d.getMonth()+1)+'/'+d.getDate()+' 存）';
+        selEl.appendChild(o);
+      });
+      if(old&&list.some(function(r){return r.id===old;}))selEl.value=old;
+    }
+    function selRecipeId(){return selEl.value||null;}
+    function selRecipe(){var list=read();return list.find(function(r){return r.id===selEl.value;})||null;}
+    $('ppRecipeSave').onclick=function(){
+      var list=read(),name=(nameEl.value||'').trim()||('方案'+(list.length+1));
+      var i=list.findIndex(function(r){return r.name===name;});
+      if(i>=0){list[i].params=snapshot();list[i].at=Date.now();if(write(list)){refreshSelect(list[i].id);status('已更新「'+name+'」的参数');}}
+      else{var r={id:'r_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),name:name,at:Date.now(),params:snapshot()};list.push(r);if(write(list)){refreshSelect(r.id);status('已保存「'+name+'」');}}
+    };
+    $('ppRecipeApply').onclick=function(){
+      var r=selRecipe();if(!r){status('请先在下拉里选择一个方案','err');return;}
+      applyParams(r.params||{});status('已调用「'+r.name+'」：参数已回填并重算');
+    };
+    $('ppRecipeRename').onclick=function(){
+      /* [v491b 修复] 必须在同一个 read() 数组里找再写回——之前 selRecipe() 与 list 是两次
+         独立 JSON.parse，改名改在游离对象上、write 把旧名写了回去（状态行还误报成功）。 */
+      var rid=selRecipeId();var list=read();
+      var r=list.find(function(x){return x.id===rid;});
+      if(!r){status('请先选择要改名的方案','err');return;}
+      var nn=(nameEl.value||'').trim();if(!nn){status('请先在「方案」框里输入新名称，再点 ✎','err');return;}
+      if(list.some(function(x){return x.id!==r.id&&x.name===nn;})){status('已有同名方案「'+nn+'」','err');return;}
+      r.name=nn;r.at=Date.now();
+      if(write(list)){refreshSelect(r.id);status('已改名为「'+nn+'」');}
+    };
+    $('ppRecipeDel').onclick=function(){
+      var rid=selRecipeId();
+      if(!rid||!read().some(function(x){return x.id===rid;})){status('请先选择要删除的方案','err');return;}
+      var list=read().filter(function(x){return x.id!==rid;});
+      if(write(list)){refreshSelect();status('已删除方案');}
+    };
+    window.addEventListener('storage',function(e){if(e.key===KEY)refreshSelect();});
+    refreshSelect();
+  })();
+
 
   /* ===== [v248 2026-10-06 用户要求] 快捷条(#ppQuickBar)整条可拖动：按住左侧抓手拖，
          位置存 localStorage('ppQuickBarPos')；恢复与拖动中都夹紧在画布范围内，
@@ -3078,8 +3159,10 @@
     if(ppState.source){
       var sp=ts(ppState.source.x,ppState.source.y);
       parts.push('<circle cx="'+sp.x.toFixed(1)+'" cy="'+sp.y.toFixed(1)+'" r="10" fill="#f59e0b" stroke="#fff" stroke-width="2"/>');
-      parts.push('<text x="'+sp.x.toFixed(1)+'" y="'+(sp.y-16).toFixed(1)+'" text-anchor="middle" font-size="11" font-weight="600" fill="#92400e">水源/水泵</text>');
-      parts.push('<text x="'+sp.x.toFixed(1)+'" y="'+(sp.y+22).toFixed(1)+'" text-anchor="middle" font-size="9" fill="#92400e">'+pFlow+' · '+pHead+'</text>');
+      /* [v487 2026-10-16 用户要求] 「水源/水泵」标注与水源点示意圆脱开距离：基线 -16→-30
+         （原间隙仅约 6px，文字几乎压着圆），下方流量/扬程行 +22→+32 同步拉开。 */
+      parts.push('<text x="'+sp.x.toFixed(1)+'" y="'+(sp.y-30).toFixed(1)+'" text-anchor="middle" font-size="11" font-weight="600" fill="#92400e">水源/水泵</text>');
+      parts.push('<text x="'+sp.x.toFixed(1)+'" y="'+(sp.y+32).toFixed(1)+'" text-anchor="middle" font-size="9" fill="#92400e">'+pFlow+' · '+pHead+'</text>');
     }
 
     // 阀门与主管的斜向连接管：每个阀门沿 45° 斜拉接到最近的主管线段（与三级页一致的斜向风格），画在红圈之下
@@ -3494,19 +3577,15 @@
     // 二级首部系统图（二级系统图.html）的自动弹出已按要求取消（用户 2026-09-12）：
     // 原为 try{ if(typeof openL2Head==='function') openL2Head(); }catch(e){...}
     // 取消原因：「⚙️ 生成系统图」按钮取消后，生成施工图时不应再自动弹新窗口。
-    // 进入施工图满屏视图（把二级切到「简图」）
-    try{ ppShowConstructDiagram(); }catch(e){}
+    // 二级简图切换已暂停；生成后直接进入三级设计工作区。
     /* v104（用户 2026-09-22 要求）：「生成施工图」点完**直接跳到「三级管路编辑」页**
        —— 即 tlPipePlanSection 的 ws 视图（三级设计工作区，与顶部导航「三级管路编辑」同一落点）。
        理由：二/三级施工图在这一句之前都已生成完毕，用户的下一步就是去三级编辑管路
        （插入主管/支管、联合灌溉分组、拖分界线），不该再把人留在二级「简图」上。
-       ⚠ **顺序不可颠倒**：ppShowConstructDiagram() 内部是 rySetTab('pipePlanSection','draw')，
-         它会把「二级」置为当前页；本次跳转必须排在它**之后**，否则会被它吃掉。
        ⚠ 用既有 helper tlShowWorkspace()（= rySetTab('tlPipePlanSection','ws')）而不是自己调
          ryJumpToSection：rySetTab 内部会在目标 section 未激活时自动补 ryShowSection，
          且会一并写好 data-ry-clean='0'（ws 是工作区，左属性栏保留），无需再手工补标记。
-       ⚠ 不要动 ppShowConstructDiagram() 这一句：状态栏提示与既有闸门都按
-         「生成后二级停在简图视图」建的契约，删掉会连带影响它们。 */
+       二级简图已停用，生成过程中不再切换到 draw 视图。 */
     try{ if(typeof tlShowWorkspace==='function') tlShowWorkspace(); }catch(e){ console.warn('[ppGenerate] 跳三级管路编辑失败', e); }
     /* [v355] 生成成功即记「已生成」边界签名：此后切页/整页重载（含手画、图片测量、AI 回带等
        没有地块库锚的路径）可按签名自动恢复。签名锚在边界多边形本身——几何没变设计就有效，

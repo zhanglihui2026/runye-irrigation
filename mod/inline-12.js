@@ -72,10 +72,9 @@
       pipePlan:typeof window.ppGetState==='function'?window.ppGetState():null,
       groupPlan:window.grExportState ? window.grExportState() : null,
       terrain:window.RyTerrain ? window.RyTerrain.exportState() : null,
-      isoDiagram:window.RyIsoDiagram && window.tlDiagramData ? {data:window.tlDiagramData, editor:window.RyIsoDiagram.exportState()} : null,
+      tlDiagramData:window.tlDiagramData||null,
       tlEditPipes:(window.RyTlEditPipes && window.tlDiagramData) ? window.RyTlEditPipes.serialize() : null,
       tlAutoEdits:(window.RyTlAutoEdits && window.tlDiagramData) ? window.RyTlAutoEdits.serialize() : null,
-      constructionNet:(window.RyNetEditor && window.RyNetEditor.exportForProject) ? window.RyNetEditor.exportForProject() : null,
       manualGroups:(typeof window.tlManualGroups!=='undefined' && window.tlManualGroups) ? window.tlManualGroups : [],
       zoneStep:(typeof tlZoneStepCount==='function' && tlZoneStepCount()>0) ? window.tlZoneStep : null,
       ppGenSig:(typeof window.__ryPpGenSig!=='undefined'&&window.__ryPpGenSig)?window.__ryPpGenSig:null
@@ -144,45 +143,32 @@
     // 施工简图管线恢复后重渲染，材料清单随之采用施工简图实际长度
     if(typeof render==='function') render();
     if(typeof updateMaterialTotals==='function') updateMaterialTotals();
-    if(window.RyIsoDiagram){
-      var isoSaved=data.isoDiagram;
-      window.RyIsoDiagram.cancelEdit();
-      // 先绑定目标方案几何，避免用上一方案的签名拒绝本方案改长、改径存档。
-      if (isoSaved && isoSaved.data) {
-        if (window.RyTlEditPipes) window.RyTlEditPipes.syncGeometry(isoSaved.data);
-        if (window.RyTlAutoEdits) window.RyTlAutoEdits.syncGeometry(isoSaved.data);
-      }
-      /* 共享图面数据层先恢复（2026-09-15 阶段1）：几何签名随存档校验，不符拒绝 */
-      if(window.RyTlEditPipes){
-        if(data.tlEditPipes && window.RyTlEditPipes.restore(data.tlEditPipes)){
-          toast('三级手工管线已随方案恢复 ' + window.RyTlEditPipes.count() + ' 条');
-        }else{
-          window.RyTlEditPipes.reset();     // 无存档或签名不符 → 清空，不复活旧几何上的管线
-          if(window.RyTlEditPipes.discardSaved) window.RyTlEditPipes.discardSaved();  // 兜底档一并作废（防同几何幽灵恢复）
-        }
-      }
-      /* 自动管线图面编辑随主方案恢复（几何签名校验，2026-09-15 阶段2） */
-      if(window.RyTlAutoEdits){
-        if(data.tlAutoEdits && window.RyTlAutoEdits.restore(data.tlAutoEdits)){
-          toast('三级自动管线编辑已随方案恢复（改长 ' + Object.keys(window.RyTlAutoEdits.lensMap()).length + ' 处 · 配件 ' + window.RyTlAutoEdits.fitCount() + ' 个）');
-        }else{
-          window.RyTlAutoEdits.reset();     // 无存档或签名不符 → 清空，不复活旧几何上的编辑
-          if(window.RyTlAutoEdits.discardSaved) window.RyTlAutoEdits.discardSaved();
-        }
-      }
-      if(isoSaved && isoSaved.data && isoSaved.data.version === 1){
-        // 尚未打开轴测页时 editor.geometry 可能为空；仍须恢复有效的原始图面。
-        window.RyIsoDiagram.importState(isoSaved.editor,isoSaved.data);
-        window.tlDiagramData=isoSaved.data;
-        window.RyIsoDiagram.render(document.getElementById('tlIsoDiagramContent'),isoSaved.data);
+    /* 管网几何由工作区共享；兼容旧存档的 isoDiagram.data 字段名。 */
+    var savedTlDiagram = (data.tlDiagramData && data.tlDiagramData.version === 1)
+      ? data.tlDiagramData
+      : (data.isoDiagram && data.isoDiagram.data && data.isoDiagram.data.version === 1 ? data.isoDiagram.data : null);
+    window.tlDiagramData = savedTlDiagram;
+    if (savedTlDiagram) {
+      if (window.RyTlEditPipes) window.RyTlEditPipes.syncGeometry(savedTlDiagram);
+      if (window.RyTlAutoEdits) window.RyTlAutoEdits.syncGeometry(savedTlDiagram);
+    }
+    /* 共享图面数据层恢复（2026-09-15 阶段1）：几何签名随存档校验，不符拒绝 */
+    if(window.RyTlEditPipes){
+      if(data.tlEditPipes && window.RyTlEditPipes.restore(data.tlEditPipes)){
+        toast('三级手工管线已随方案恢复 ' + window.RyTlEditPipes.count() + ' 条');
       }else{
-        window.tlDiagramData=null;
-        window.RyIsoDiagram.render(document.getElementById('tlIsoDiagramContent'),null);
+        window.RyTlEditPipes.reset();     // 无存档或签名不符 → 清空，不复活旧几何上的管线
+        if(window.RyTlEditPipes.discardSaved) window.RyTlEditPipes.discardSaved();  // 兜底档一并作废（防同几何幽灵恢复）
       }
     }
-    /* 施工管网模型随主方案恢复（几何签名校验，不符时在面板提供选择） */
-    if(window.RyNetEditor && window.RyNetEditor.importForProject){
-      window.RyNetEditor.importForProject(data.constructionNet||null);
+    /* 自动管线图面编辑随主方案恢复（几何签名校验，2026-09-15 阶段2） */
+    if(window.RyTlAutoEdits){
+      if(data.tlAutoEdits && window.RyTlAutoEdits.restore(data.tlAutoEdits)){
+        toast('三级自动管线编辑已随方案恢复（改长 ' + Object.keys(window.RyTlAutoEdits.lensMap()).length + ' 处 · 配件 ' + window.RyTlAutoEdits.fitCount() + ' 个）');
+      }else{
+        window.RyTlAutoEdits.reset();     // 无存档或签名不符 → 清空，不复活旧几何上的编辑
+        if(window.RyTlAutoEdits.discardSaved) window.RyTlAutoEdits.discardSaved();
+      }
     }
     if (typeof window !== 'undefined') {
       window.tlManualGroups = Array.isArray(data.manualGroups) ? data.manualGroups : [];
@@ -252,8 +238,7 @@
       if(!hit) return;                                                   /* 地块已删除 → 不恢复 */
       window.__runyeAutoRestored=true;
       window.runyeLoadProject({key:SAVE_KEY, silent:true});
-      /* load 只把三级数据渲染进轴测图容器（#tlIsoDiagramContent）；三级平面图
-         （#tlDiagramContent）与设计工作区（#tlWsContent）需按恢复的地块/参数重建，
+      /* load 恢复三级管网几何与设计状态；设计工作区按恢复的地块/参数延迟重建，
          否则用户回到三级页仍是一片空白。二级施工图同理重出一次。 */
       /* 重建期间临时静音弹窗：tlAutoGenerate / ppGenerateDiagram 在「无地块」或「生成出错」时会
          alert，自动恢复阶段弹窗既打断用户，也会阻塞页面（无头浏览器里更是把整页挂住）。

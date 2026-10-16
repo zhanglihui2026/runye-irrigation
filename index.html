@@ -2,25 +2,28 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<script src="mod/inline-01.js?v=357"></script>
+<script src="mod/inline-01.js?v=446-default-online-map-active"></script>
 <script src="mod/inline-02.js?v=357"></script>
+<script src="core/irrigation-data-store.js?v=1"></script>
+<script src="core/terrain-bridge-store.js?v=1"></script>
+<script src="core/sprinkler-bridge-store.js?v=1"></script>
 <script src="runye-material-audit.js?v=264"></script>
-<script src="runye-map-partition.js?v=261"></script>
+<script src="runye-map-partition.js?v=486-angle-fix"></script>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>润野灌溉设计优化版｜滴灌管径与水泵选型</title>
 <meta name="description" content="输入地块、滴灌带与水源参数，快速计算灌溉分区、主管支管管径和水泵工作点。"/>
-<link rel="stylesheet" href="mod/style-01.css?v=357">
+<link rel="stylesheet" href="mod/style-01.css?v=473-areagroup-right-align">
 <link rel="stylesheet" href="runye-inverse-design.css?v=277">
 <script defer src="runye-inverse-design.js?v=437"></script>
-<link rel="stylesheet" href="runye-terrain.css?v=255">
-<script src="runye-terrain.js?v=437"></script>
+<link rel="stylesheet" href="runye-terrain.css?v=454-terrain-sidebar-peer">
+<script src="runye-terrain.js?v=454-terrain-sidebar-peer"></script>
 <link rel="stylesheet" href="runye-ai-plan.css?v=366">
-<script src="runye-ai-plan.js?v=385"></script>
+<script src="runye-ai-plan.js?v=484-ai-panel-hide"></script>
 <link rel="stylesheet" href="runye-case-library.css?v=277">
 <script src="runye-case-library.js?v=277"></script>
 <script src="runye-geo.js"></script>
-<script src="runye-map-enhance.js?v=441-map-main-section"></script>
+<script src="runye-map-enhance.js?v=477-del-confirm"></script>
 <script src="hydraulic-calc/hydraulics-wasm.js"></script>
 <script src="hydraulic-calc/native-bridge.js"></script>
 <script src="hydraulic-calc/hc-core.js"></script>
@@ -29,22 +32,28 @@
 <script src="https://beacon.cdn.qq.com/sdk/4.5.9/beacon_web.min.js"></script>
 <script src="mod/inline-03.js?v=357"></script>
 <link rel="stylesheet" href="modeling/workspace.css">
-<link rel="stylesheet" href="iso-diagram/iso-diagram.css">
-<link rel="stylesheet" href="iso-diagram/network-editor.css">
+
 <link rel="stylesheet" href="tl-workspace/tl-workspace.css">
 <link rel="stylesheet" href="runye-nav.css?v=404-tier-gates">
 <link rel="stylesheet" href="hydraulic-calc/hydraulic-calc.css">
 <link rel="stylesheet" href="filter-system/filter-system.css">
 <link rel="stylesheet" href="pwa/vendor/leaflet.css">
-<link rel="stylesheet" href="mod/online-map.css?v=441-map-main-section">
+<link rel="stylesheet" href="mod/online-map.css?v=495-map-draw-toolbar">
 <link rel="stylesheet" href="terrain/terrain-main.css?v=442-native">
 <link rel="stylesheet" href="hydraulics-main.css?v=442-native">
 <style id="ryCadTwinCss">
-/* --- 14c. CAD 全局工具栏 · 选择器孪生（2026-09-14 脚本生成，勿手改） ---
-   原「#pipePlanSection …」「#tlPipePlanSection …」规则，在 .pp-side 被 ryCadJs
-   搬进 #ryCadSide 后不再命中；此处按同规则体生成孪生，前缀换成
-   「#ryCadSide [data-pp="区块"]」。区块自身规则（id 结尾）与 :has() 内引用不孪生。
-   共 219 条 —— 新增/修改区块内样式后请重跑 _p1/_cad_rail_install.py 重新生成。 */
+/* --- CAD global toolbar · generated selector twins ---
+   Source: local linked and inline styles; remote sheets and generated CAD styles are skipped.
+   Rebuild with scripts/refresh-cad-twin-css.cjs; preview by default, pass --apply to write.
+   Replaces only this style block. 259 generated rules.
+   Do not edit this block by hand. */
+#ryCadSide [data-pp="tlPipePlanSection"] .tl-group-btn{
+  font-size:11px;line-height:1;padding:5px 10px;white-space:nowrap;
+  border:1px solid #bfdbfe;background:#eff6ff;
+  cursor:pointer;color:#1d4ed8;transition:background .15s,border-color .15s;
+}
+#ryCadSide [data-pp="tlPipePlanSection"] .tl-group-btn:hover{background:#dbeafe;border-color:#93c5fd}
+#ryCadSide [data-pp="tlPipePlanSection"] .tl-group-btn:active{background:#bfdbfe}
 #ryCadSide [data-pp="pipePlanSection"] .pp-title{
   font-size:16px;font-weight:700;color:#fff;margin-bottom:12px;
   display:flex;align-items:center;gap:8px;padding-bottom:12px;
@@ -55,6 +64,7 @@
   width:30px;height:30px;display:flex;align-items:center;justify-content:center;
   font-size:14px;font-weight:800;
 }
+#ryCadSide [data-pp="pipePlanSection"] .pp-toolbar>.pp-btn-ghost#ppZoneAutoBtn{white-space:nowrap}
 #ryCadSide [data-pp="pipePlanSection"] .pp-title{
   padding-bottom:14px;
   margin-bottom:14px;
@@ -68,7 +78,6 @@
   background:#dcfce7;
   color:#14532d;
 }
-#ryCadSide [data-pp="pipePlanSection"] .pp-plan-bar,
 #ryCadSide [data-pp="pipePlanSection"] .pp-toolbar{
   min-height:38px;
   padding:5px 10px;
@@ -76,9 +85,6 @@
   gap:8px;
   align-items:center;
 }
-/* [v436-pp-normalize] 原 .pp-plan-item/.pp-plan-label/.pp-plan-val/input 的
-   紧凑行与配色规则已删除：04 页参数栏样式归一至 mod/ry-panel.css 皮肤块。
-   .pp-toolbar（工具条）与 .pp-sep（工具条分隔符）保留。 */
 #ryCadSide [data-pp="pipePlanSection"] .pp-sep,
 #ryCadSide [data-pp="pipePlanSection"] .pp-sep-vert{
   height:20px;
@@ -123,11 +129,7 @@
 }
 #ryCadSide [data-pp="pipePlanSection"] .pp-area-tag{color:rgba(255,255,255,.78)}
 #ryCadSide [data-pp="pipePlanSection"] .pp-area-tag b{color:#fff}
-/* [v436-pp-normalize] 原 .pp-plan-bar（白卡）/ .pp-plan-bar-result / .pp-plan-item
-   / .pp-plan-label / .pp-plan-val / input·select 配色与 focus 段已删除：
-   04 页参数栏样式归一至 mod/ry-panel.css 皮肤块。 */
-#ryCadSide [data-pp="pipePlanSection"] .pp-sep,
-#ryCadSide [data-pp="pipePlanSection"] .pp-sep-vert{background:#d9e4dd}
+#ryCadSide [data-pp="pipePlanSection"] .pp-sep{background:#d9e4dd}
 #ryCadSide [data-pp="pipePlanSection"] .pp-hint{color:#5a656a}
 #ryCadSide [data-pp="pipePlanSection"] .pp-toolbar{
   margin:0 20px 12px;
@@ -228,6 +230,23 @@
   box-shadow:0 2px 8px rgba(15,23,42,.06);
   font-size:11.5px;line-height:1.45;text-align:left;color:#5a656a;
 }
+#ryCadSide [data-pp="pipePlanSection"] .pp-canvas-wrap>.pp-quick{
+  position:absolute;top:8px;left:10px;z-index:3;
+  display:flex;align-items:center;gap:6px;flex-wrap:nowrap;
+  max-width:calc(100% - 20px);
+  padding:5px 7px;border-radius:9px;
+  background:rgba(251,253,251,.94);
+  border:1px solid #e2ebe5;
+  box-shadow:0 2px 8px rgba(15,23,42,.06);
+  pointer-events:auto;
+}
+#ryCadSide [data-pp="pipePlanSection"] .pp-canvas-wrap>.pp-quick>.pp-angle-control{height:26px;padding:0 7px;font-size:11.5px}
+#ryCadSide [data-pp="pipePlanSection"] .pp-canvas-wrap>.pp-quick>.pp-angle-control>input{width:46px;height:22px;padding:1px 4px;font-size:11.5px}
+#ryCadSide [data-pp="pipePlanSection"] .pp-canvas-wrap>.pp-quick>#ppRepartition{height:26px;padding:0 9px;font-size:11.5px;white-space:nowrap}
+#ryCadSide [data-pp="pipePlanSection"] .pp-canvas-wrap>.pp-quick>#ppGenerate{height:26px;padding:0 10px;font-size:11.5px;white-space:nowrap}
+#ryCadSide [data-pp="pipePlanSection"] .pp-canvas-wrap>.pp-quick .pp-quick-grip{cursor:grab;font-size:13px;line-height:1;color:#93a1a8;user-select:none;padding:0 3px;touch-action:none}
+#ryCadSide [data-pp="pipePlanSection"] .pp-canvas-wrap>.pp-quick.pp-quick-dragging{cursor:grabbing;box-shadow:0 6px 18px rgba(15,23,42,.14)}
+#ryCadSide [data-pp="pipePlanSection"] .pp-rail-toggle{display:none}
 #ryCadSide [data-pp="pipePlanSection"] .pp-grip{display:none}
 @media(min-width:1101px){
 #ryCadSide [data-pp="pipePlanSection"] > .pp-body{
@@ -249,10 +268,6 @@
 #ryCadSide [data-pp="pipePlanSection"] > .pp-body>.pp-stage{grid-column:3}
 #ryCadSide [data-pp="pipePlanSection"] .pp-side,
 #ryCadSide [data-pp="pipePlanSection"] .pp-stage{min-width:0;min-height:0}
-/* [v436-pp-normalize] 原「#pipePlanSection .pp-side 容器布局 + 旧竖排参数卡片
-   （.pp-plan-bar 白卡 / ::before 伪元素标题 / .pp-plan-item 竖排行 / input
-   64px!important / .pp-calc-formula 浅色化）」整段删除：
-   04 页参数栏样式归一至 mod/ry-panel.css 皮肤块（唯一来源）。 */
 #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-head-break{margin:0;padding:6px 9px;font-size:11px}
 #ryCadSide [data-pp="pipePlanSection"] .pp-stage{
     display:grid;
@@ -330,6 +345,42 @@
   }
 #ryCadSide [data-pp="pipePlanSection"] .pp-stage>.pp-legend{grid-column:1;grid-row:3;margin:0;padding:0 2px;flex:0 0 auto}
 #ryCadSide [data-pp="pipePlanSection"] .pp-diagram-wrap{margin:0 14px 14px;border-radius:10px}
+#ryCadSide [data-pp="pipePlanSection"] .pp-stage{transition:grid-template-columns .18s ease}
+#ryCadSide [data-pp="pipePlanSection"] .pp-stage.pp-rail-off{
+    grid-template-columns:minmax(0,1fr) 0px 0px;
+  }
+body.ry-tool #ryCadSide [data-pp="pipePlanSection"][data-ry-view="edit"] .ry-pane-edit.pp-rail-off{
+    grid-template-columns:minmax(0,1fr) 0px 0px;
+  }
+#ryCadSide [data-pp="pipePlanSection"] .pp-stage.pp-rail-off>.pp-grip-tool,
+body.ry-tool #ryCadSide [data-pp="pipePlanSection"][data-ry-view="edit"] .pp-rail-off>.pp-grip-tool{display:none}
+#ryCadSide [data-pp="pipePlanSection"] .pp-stage>.pp-toolbar,
+body.ry-tool #ryCadSide [data-pp="pipePlanSection"][data-ry-view="edit"] .ry-pane-edit>.pp-toolbar{
+    transition:opacity .16s ease,transform .18s ease,visibility .18s;
+  }
+#ryCadSide [data-pp="pipePlanSection"] .pp-stage.pp-rail-off>.pp-toolbar,
+body.ry-tool #ryCadSide [data-pp="pipePlanSection"][data-ry-view="edit"] .ry-pane-edit.pp-rail-off>.pp-toolbar{
+    opacity:0;visibility:hidden;pointer-events:none;
+    transform:translateX(24px);overflow:hidden;
+  }
+#ryCadSide [data-pp="pipePlanSection"] .pp-rail-toggle{
+    display:flex;position:absolute;top:50%;right:8px;z-index:4;transform:translateY(-50%);
+    width:24px;height:24px;padding:0;align-items:center;justify-content:center;
+    font-size:13px;line-height:1;font-family:inherit;
+    background:rgba(251,253,251,.94);color:#4b5a53;
+    border:1px solid #e2ebe5;border-radius:7px;
+    box-shadow:0 2px 8px rgba(15,23,42,.06);
+    cursor:pointer;
+  }
+#ryCadSide [data-pp="pipePlanSection"] .pp-rail-toggle:hover{color:#173e32;border-color:#b9d2c5}
+#ryCadSide [data-pp="pipePlanSection"] .pp-rail-toggle.pp-rail-tab{
+    right:0;width:auto;min-width:26px;height:auto;padding:14px 5px;
+    writing-mode:vertical-rl;letter-spacing:5px;
+    font-size:12px;font-weight:600;color:#2f6d43;
+    background:#fbfdfc;border:1px solid #b9d2c5;border-right:0;border-radius:8px 0 0 8px;
+    box-shadow:0 2px 10px rgba(15,23,42,.12);
+  }
+#ryCadSide [data-pp="pipePlanSection"] .pp-rail-toggle.pp-rail-tab:hover{color:#173e32;background:#f2f8f4}
 }
 #ryCadSide [data-pp="tlPipePlanSection"] > .pp-body{
   flex:0 0 auto;
@@ -375,14 +426,20 @@
   background:#fff;border:1px solid #e4ece7;
   font-size:11px;
 }
-#ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-bar-result{background:#fbfefc}
 #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-bar::before{
   content:"地块与灌溉参数";
   display:block;margin:0 0 4px;padding-bottom:5px;
   border-bottom:1px solid #eaf1ec;
   font-size:11px;font-weight:700;letter-spacing:.05em;color:#2f6d43;
 }
-#ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-bar-result::before{content:none;display:none}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-bar-result.pp-res-head::before,
+#ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-bar-result.pp-res-head::before{
+  content:"水力计算结果 ▾";
+}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-bar-result.pp-res-head.pp-res-off::before,
+#ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-bar-result.pp-res-head.pp-res-off::before{
+  content:"水力计算结果 ▸";
+}
 #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-item{
   display:flex;align-items:center;gap:5px;
   width:100%;min-height:26px;padding:2px 0;
@@ -408,19 +465,6 @@
   align-self:start;
   display:flex;flex-direction:column;gap:8px;min-height:0;overflow:hidden;
 }
-#ryCadSide [data-pp="tlPipePlanSection"].sys-view > .pp-body{display:none}
-#ryCadSide [data-pp="tlPipePlanSection"].sys-view > #tlSysDiagramWrap{
-  display:flex;flex-direction:column;
-  height:calc(100vh - var(--fn-nav-h));
-  margin:0;padding:0;border-radius:0;border:none;background:transparent;box-shadow:none;
-  overflow:hidden;
-}
-#ryCadSide [data-pp="tlPipePlanSection"].sys-view > #tlSysDiagramWrap > #tlSysDiagramContent{
-  flex:1 1 auto;min-height:0;display:flex;flex-direction:column;overflow:auto;padding:0;margin:0;background:transparent;
-}
-#ryCadSide [data-pp="tlPipePlanSection"].sys-view > #tlSysDiagramWrap #tlSysFrame{
-  width:100%;min-height:100%;border:0;flex:1 1 auto;border-radius:0;
-}
 #ryCadSide [data-pp="tlPipePlanSection"] .pp-stage>.pp-toolbar{margin:0}
 #ryCadSide [data-pp="tlPipePlanSection"] .pp-stage>.pp-diagram-wrap{margin:0;flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
 #ryCadSide [data-pp="tlPipePlanSection"] .pp-stage>.pp-diagram-wrap>#tlDiagramContent{flex:1 1 auto;min-height:0}
@@ -433,11 +477,6 @@
 #ryCadSide [data-pp="pipePlanSection"].sys-view > #ppDiagramWrap > #ppDiagramContent{
   flex:1 1 auto;min-height:0;display:flex;flex-direction:column;overflow:auto;
 }
-#ryCadSide [data-pp="tlPipePlanSection"].pipe-view > .pp-body{display:none}
-#ryCadSide [data-pp="tlPipePlanSection"].pipe-view > .pp-stage{display:flex!important;flex-direction:column;height:calc(100vh - var(--fn-nav-h));margin:0}
-#ryCadSide [data-pp="tlPipePlanSection"].pipe-view > .pp-stage > #tlDiagramWrap{
-  flex:1 1 auto;min-height:0;display:flex;flex-direction:column;margin:0;border-radius:0;border-left:0;border-right:0;border-bottom:0;
-}
 #ryCadSide [data-pp="tlPipePlanSection"] #tlSysDiagramWrap{margin:14px 0 0}
 #ryCadSide [data-pp="tlPipePlanSection"] #tlSysFrame{display:none;background:#fff}
 body.ry-tool #ryCadSide [data-pp="pipePlanSection"] > .pp-body,
@@ -448,36 +487,26 @@ body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] > .pp-body{
   grid-template-columns:var(--pp-side-w,var(--ry-side-w)) 10px minmax(0,1fr);
   column-gap:0;row-gap:0;padding:0;
 }
-/* [v436-pp-normalize] 04 页 .pp-side 容器只保留 grid 定位三件套：
-   底色/内边距/间距/滚动/子项伸缩全部归一至 mod/ry-panel.css 皮肤块。
-   原 pp/tl 共用规则拆分，tl 版保持原样（第③刀再处理）。 */
 body.ry-tool #ryCadSide [data-pp="pipePlanSection"] .pp-side{
-  grid-column:1;align-self:stretch;max-height:100%;
+  grid-column:1;align-self:stretch;
 }
 body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-side{
-  grid-column:1;align-self:stretch;max-height:100%;
-  display:flex;flex-direction:column;gap:8px;
-  padding:10px;overflow-y:auto;overscroll-behavior:contain;
+  grid-column:1;align-self:stretch;
+  padding:10px;overscroll-behavior:contain;
   background:var(--ry-panel);border:0;border-right:1px solid var(--ry-line);
 }
-body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-side>*{flex:0 0 auto}
+body.ry-tool #ryCadSide [data-pp="pipePlanSection"] .pp-side>*{flex:0 0 auto}
 body.ry-tool #ryCadSide [data-pp="pipePlanSection"] .pp-stage,
 body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-stage{
   grid-column:3;align-self:stretch;min-width:0;min-height:0;
   display:flex;flex-direction:column;gap:0;padding:0;
   background:var(--ry-canvas);border:0;overflow:hidden;
 }
-body.ry-tool #ryCadSide [data-pp="pipePlanSection"] .pp-plan-bar,
 body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-plan-bar{
   background:var(--ry-canvas);border:1px solid var(--ry-line);
   padding:8px 10px;font-size:11px;
 }
-body.ry-tool #ryCadSide [data-pp="pipePlanSection"] .pp-plan-bar-result,
 body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-plan-bar-result{background:#fafaf7}
-body.ry-tool #ryCadSide [data-pp="pipePlanSection"] .pp-plan-label,
-body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-plan-label{color:var(--ry-ink3)}
-body.ry-tool #ryCadSide [data-pp="pipePlanSection"] .pp-plan-val,
-body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-plan-val{color:var(--ry-ink)}
 body.ry-tool #ryCadSide [data-pp="pipePlanSection"] .pp-btn-ghost,
 body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-btn-ghost{
   color:var(--ry-ink2);border-color:var(--ry-line);background:var(--ry-canvas);
@@ -495,23 +524,20 @@ body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-toolbar{
 }
 #ryCadSide [data-pp="pipePlanSection"][data-ry-view="edit"] .ry-pane-draw{display:none}
 #ryCadSide [data-pp="pipePlanSection"][data-ry-view="draw"] .ry-pane-edit{display:none}
-#ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="pipe"] .ry-pane-sys,
-#ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="pipe"] .ry-pane-iso{display:none}
-#ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="sys"] .ry-pane-pipe,
-#ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="sys"] .ry-pane-iso{display:none}
-#ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="iso"] .ry-pane-pipe,
-#ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="iso"] .ry-pane-sys{display:none}
+#ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="pipe"] .ry-pane-sys{display:none}
+#ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="sys"] .ry-pane-pipe{display:none}
 #ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="ws"] .ry-pane-pipe,
-#ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="ws"] .ry-pane-sys,
-#ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="ws"] .ry-pane-iso{display:none}
+#ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="ws"] .ry-pane-sys{display:none}
 #ryCadSide [data-pp="tlPipePlanSection"]:not([data-ry-view="pipe"]) .ry-pane-pipe{display:none}
-#ryCadSide [data-pp="tlPipePlanSection"]:not([data-ry-view="iso"]) .ry-pane-iso{display:none}
 #ryCadSide [data-pp="tlPipePlanSection"]:not([data-ry-view="ws"]) .ry-pane-ws{display:none}
 #ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="pipe"] .ry-pane-ws,
-#ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="sys"] .ry-pane-ws,
-#ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="iso"] .ry-pane-ws{display:none}
+#ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="sys"] .ry-pane-ws{display:none}
 #ryCadSide [data-pp="tlPipePlanSection"] .ry-pane-ws{
-  /* 2026-09-13 晚：工具条改右侧竖向工具轨；2026-09-17 第四十四轮：统计表移入工具轨 → 三列（同主规则） */
+  /* 2026-09-13 晚：工具条改右侧竖向工具轨（参考二级管线 .pp-stage 三列做法）。
+     2026-09-17 第四十二轮：右侧增「管段管径与损失统计表」→ 四列。
+     2026-09-17 第四十四轮（用户要求）：统计表**移入工具轨内部顶端** → 回归三列
+     画布 ｜ 拖拽条 ｜ 工具轨（轨内顶端为可折叠统计表，其下为各工具按钮）
+     工具轨宽度走 --tlWsToolbarW：没拖过不写变量，走 CSS 回退值（默认＝旧统计表同宽，表格可直接读）。 */
   display:grid;
   grid-template-columns:minmax(0,1fr) 6px var(--tlWsToolbarW,clamp(210px,17vw,300px));
   grid-template-rows:minmax(0,1fr);column-gap:8px;
@@ -519,6 +545,11 @@ body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-toolbar{
   position:relative; /* 2026-09-16 固定文字层（#tlWsOverlays）定位基准 */
 }
 #ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="ws"] .ry-pane-ws{flex:1 1 auto}
+@media(max-width:900px){
+#ryCadSide [data-pp="tlPipePlanSection"] .ry-pane-ws{
+    grid-template-columns:minmax(0,1fr) 6px clamp(176px,30vw,236px);
+  }
+}
 body.ry-tool #ryCadSide [data-pp="pipePlanSection"][data-ry-view="edit"] .ry-pane-edit{
   display:grid;
   /* 画布列 ｜ 10px 拖拽列 ｜ 工具列（宽度由拖拽条写入 --pp-tool-w） */
@@ -562,6 +593,31 @@ body.ry-tool #ryCadSide [data-pp="pipePlanSection"] #ppToolbar>.pp-sep{
   width:100%;height:1px;margin:3px 0;flex:0 0 auto;background:var(--ry-line);
 }
 body.ry-tool #ryCadSide [data-pp="pipePlanSection"] #ppToolbar>.pp-sep:has(+ .pp-btn-generate){margin-top:auto}
+body.ry-tool #ryCadSide [data-pp="pipePlanSection"] #ppToolbar>.pp-group-edit{
+  display:flex;flex-direction:row;flex-wrap:wrap;justify-content:center;align-content:center;
+  width:100%;box-sizing:border-box;height:auto;gap:4px;padding:6px;
+  border:1px solid var(--ry-line);border-radius:8px;
+}
+body.ry-tool #ryCadSide [data-pp="pipePlanSection"] #ppToolbar>.pp-group-edit>.pp-ge-title{flex:1 1 100%;text-align:center;font-size:11.5px}
+body.ry-tool #ryCadSide [data-pp="pipePlanSection"] #ppToolbar>.pp-group-edit>.pp-ge-row{display:flex;gap:3px;flex:1 1 100%}
+body.ry-tool #ryCadSide [data-pp="pipePlanSection"] #ppToolbar>.pp-group-edit>.pp-ge-row>.pp-ge-mode{flex:1 1 0;min-width:0;height:26px;padding:0}
+body.ry-tool #ryCadSide [data-pp="pipePlanSection"] #ppToolbar>.pp-group-edit>.pp-ge-sel{
+  flex:1 1 100%;width:100%;max-width:none;height:26px;
+}
+body.ry-tool #ryCadSide [data-pp="pipePlanSection"] #ppToolbar>.pp-group-edit>.pp-ge-chips{
+  display:flex;flex-wrap:wrap;gap:3px;flex:1 1 100%;width:100%;
+}
+body.ry-tool #ryCadSide [data-pp="pipePlanSection"] #ppToolbar>.pp-group-edit>.pp-ge-chips>.pp-ge-chip{
+  flex:1 1 auto;min-width:46px;height:26px;padding:0 6px;
+  font:inherit;font-size:11.5px;line-height:1;white-space:nowrap;cursor:pointer;
+}
+body.ry-tool #ryCadSide [data-pp="pipePlanSection"] #ppToolbar>.pp-group-edit>.pp-back-group{
+  flex:1 1 100%;width:100%;height:26px;padding:0;
+  border-color:rgba(124,58,237,.45);color:#5b21b6;
+}
+body.ry-tool #ryCadSide [data-pp="pipePlanSection"] #ppToolbar>.pp-group-edit>.pp-back-group:hover{
+  background:#7c3aed;border-color:#7c3aed;color:#fff;
+}
 body.ry-tool #ryCadSide [data-pp="pipePlanSection"] #ppToolbar>.pp-cut-fine-group{gap:3px;margin:0}
 body.ry-tool #ryCadSide [data-pp="pipePlanSection"] #ppToolbar>.pp-cut-fine-group>.pp-fine-btn{
   flex:1 1 0;min-width:0!important;height:26px;padding:0!important;
@@ -626,24 +682,6 @@ body.ry-tool #ryCadSide [data-pp="pipePlanSection"][data-ry-clean="1"] > .pp-bod
 body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"][data-ry-clean="1"] > .pp-body{
   grid-template-columns:0 0 minmax(0,1fr);
 }
-#ryCadSide [data-pp="tlPipePlanSection"] > .pp-body>.tl-iso-side{display:none}
-#ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="iso"] > .pp-body>.tl-iso-side{display:flex}
-body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] > .pp-body>.tl-iso-side{display:none}
-body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="iso"] > .pp-body>.tl-iso-side{display:flex}
-#ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="iso"][data-ry-clean="1"] > .pp-body,
-body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="iso"][data-ry-clean="1"] > .pp-body{
-  grid-template-columns:var(--pp-side-w,clamp(272px,20vw,318px)) 10px minmax(0,1fr);
-}
-#ryCadSide [data-pp="tlPipePlanSection"] .ry-pane-iso{
-  display:grid;grid-template-columns:minmax(0,1fr);
-  grid-template-rows:minmax(0,1fr);column-gap:8px;
-  min-height:460px;margin:0;min-width:0;
-}
-#ryCadSide [data-pp="tlPipePlanSection"] .ry-pane-iso>#tlIsoDiagramWrap{margin:0;min-height:0;min-width:0}
-@media(max-width:900px){
-#ryCadSide [data-pp="tlPipePlanSection"] .ry-pane-iso{grid-template-columns:minmax(0,1fr)}
-#ryCadSide [data-pp="tlPipePlanSection"] .ry-pane-iso>.tl-iso-stats{grid-column:1/-1;max-height:260px}
-}
 #ryCadSide [data-pp="pipePlanSection"] .pp-btn{
   color:var(--u-ink-2)!important;background:var(--u-canvas)!important;
   border-color:var(--u-line)!important;
@@ -663,24 +701,14 @@ body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="iso"][data-r
 }
 #ryCadSide [data-pp="pipePlanSection"] .pp-btn-generate{background:var(--u-accent-2)!important;background-image:none!important;border-color:var(--u-accent-2)!important}
 #ryCadSide [data-pp="pipePlanSection"] .pp-btn-generate:hover{box-shadow:none!important;transform:none!important;background:var(--u-accent)!important}
-#ryCadSide [data-pp="pipePlanSection"] .pp-calc-formula,
 #ryCadSide [data-pp="pipePlanSection"] .pp-pick-result{border-color:var(--u-line-2)!important}
 #ryCadSide [data-pp="pipePlanSection"] #ppPickResult{background:var(--u-bg-2)!important}
-#ryCadSide [data-pp="pipePlanSection"] input:not(.pp-cf-input),
+#ryCadSide [data-pp="pipePlanSection"] input:not(.pp-cf-input):not(.ryp-native-fallback),
 #ryCadSide [data-pp="pipePlanSection"] select,
 #ryCadSide [data-pp="pipePlanSection"] textarea{color:var(--u-ink)!important}
 #ryCadSide [data-pp="tlPipePlanSection"] .tl-section-title .step{color:#eef0f1!important}
-body.ry-tool #ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-val,
-body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-val,
-#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-val,
 #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-val{color:var(--ry-ink,#2c2c2a)!important}
-body.ry-tool #ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-label,
-body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-label,
-#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-label,
 #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-label{color:var(--ry-ink2,#5a656a)!important}
-body.ry-tool #ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-item,
-body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-item,
-#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-item,
 #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-item{color:var(--ry-ink2,#5a656a)!important}
 #ryCadSide [data-pp="pipePlanSection"] .pp-cut-fine-group,
 #ryCadSide [data-pp="pipePlanSection"] .pp-angle-control{border-color:var(--u-line)!important}
@@ -691,12 +719,178 @@ body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-item,
 #ryCadSide [data-pp="pipePlanSection"] button:focus-visible,
 #ryCadSide [data-pp="tlPipePlanSection"] button:focus-visible{outline:2px solid var(--u-water);outline-offset:-3px}
 }
+@media (max-width:760px){
+body #ryCadSide [data-pp="tlPipePlanSection"] .ry-pane-ws{
+    display:flex;flex-direction:column;
+  }
+}
+html.ry-mobile #ryCadSide [data-pp="pipePlanSection"][data-ry-view="edit"] .ry-pane-edit,
+html.ry-mobile #ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="ws"] .ry-pane-ws{display:flex;flex-direction:column}
+html.ry-mobile #ryCadSide [data-pp="pipePlanSection"] #ppToolbar,
+html.ry-mobile #ryCadSide [data-pp="tlPipePlanSection"] #tlWsToolbar{flex:none;order:-1;display:flex;flex-direction:row;flex-wrap:nowrap;align-items:center;width:100%;max-width:100%;max-height:60px;min-width:0;gap:6px;margin:0;padding:6px;overflow-x:auto;overflow-y:hidden;grid-column:auto;grid-row:auto;background:#f4f7f5}
+html.ry-mobile #ryCadSide [data-pp="pipePlanSection"] #ppCanvasWrap,
+html.ry-mobile #ryCadSide [data-pp="tlPipePlanSection"] #tlWsContent{position:relative;flex:1;min-height:0;height:auto!important;width:100%;margin:0;overflow:hidden;border-radius:0}
+html.ry-mobile #ryCadSide [data-pp="pipePlanSection"] #ppLegend{flex:none;margin:0;padding:4px 8px;font-size:10px}
+html.ry-mobile #ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="ws"] > .ry-mobile-zoom{display:flex;position:absolute;right:8px;bottom:max(8px,env(safe-area-inset-bottom));gap:4px;z-index:45}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side{
+  position:relative;
+  display:flex;flex-direction:column;align-self:start;max-height:100%;
+  overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
+  padding:0;gap:0;
+  font-family:var(--ry-font,"Microsoft YaHei","PingFang SC","Segoe UI",system-ui,sans-serif);
+}
+body.ry-tool #ryCadSide [data-pp="pipePlanSection"] .pp-side{
+  background:transparent;
+  border:0;
+  border-radius:0;
+  gap:8px;padding:10px;
+}
+#ryCadSide [data-pp="pipePlanSection"] .pp-toolbar,
+body.ry-tool #ryCadSide [data-pp="pipePlanSection"] .pp-toolbar{
+  background:transparent;
+  border:0;
+  box-shadow:none;
+}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-bar{
+  display:block;margin:0;padding:0;
+  min-height:0;
+  border:0;border-radius:0;box-shadow:none;
+  background:transparent;
+  font-size:11px;
+}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-bar::before,
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-bar-result::before,
+#ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-bar::before,
+#ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-bar-result::before{
+  content:none!important;
+  display:none!important;
+}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-item{
+  display:flex;align-items:center;gap:5px;
+  width:100%;min-height:27px;padding:2px 12px;
+  border-bottom:1px solid transparent;
+  color:var(--ry-s-500,#64748b);font-size:11px;
+}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-item:last-of-type{ border-bottom:0; }
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-item > .pp-plan-label:first-child{ margin-right:auto; }
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-item-fluid-input{
+  display:flex;align-items:center;gap:5px;
+}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-item-fluid-input > .pp-plan-label:first-child{flex:0 0 84px;margin-right:0;min-width:0}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-label{ font-size:12px;line-height:1.3;color:var(--ry-s-600,#475569); }
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-val{
+  font-size:12px;font-weight:600;color:var(--ry-s-800,#1e293b);
+  font-variant-numeric:tabular-nums;
+}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-item input{
+  flex:0 0 64px;width:64px;height:24px;padding:2px 7px;box-sizing:border-box;
+  border:1px solid transparent;border-radius:6px;
+  background:transparent;color:var(--ry-s-800,#1e293b);
+  font-family:inherit;font-size:12px;font-weight:400;
+  text-align:right;outline:none;
+  -moz-appearance:textfield;
+}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-item input:focus{
+  border-color:#173e32;
+  box-shadow:0 0 0 2px rgba(23,62,50,.15);
+}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-item input[hidden],
+#ryCadSide [data-pp="pipePlanSection"] .pp-side sl-input[data-ry-proxy-for][hidden]{ display:none!important; }
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-recipe-bar{
+  display:flex;flex-direction:column;gap:2px;
+  padding:4px 0 6px;margin-bottom:8px;
+}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-recipe-row{
+  display:flex;align-items:center;gap:5px;
+  min-height:27px;padding:2px 12px;
+}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-recipe-row > .pp-plan-label{ flex:none; }
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-recipe-row input[type=text],
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-recipe-row select{
+  flex:1 1 auto;min-width:0;width:auto;height:24px;padding:2px 7px;box-sizing:border-box;
+  border:1px solid var(--ry-s-200,#e2e8f0);border-radius:6px;
+  background:#fff;color:var(--ry-s-800,#1e293b);
+  font-family:inherit;font-size:12px;outline:none;
+}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-recipe-row input[type=text]:focus,
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-recipe-row select:focus{
+  border-color:#173e32;box-shadow:0 0 0 2px rgba(23,62,50,.15);
+}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-recipe-btn{
+  flex:none;height:24px;padding:0 8px;box-sizing:border-box;
+  border:1px solid var(--ry-s-200,#e2e8f0);border-radius:6px;
+  background:#fff;color:var(--ry-s-700,#334155);
+  font-family:inherit;font-size:11px;font-weight:600;line-height:1;
+  cursor:pointer;white-space:nowrap;
+}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-recipe-btn:hover{
+  border-color:#173e32;color:#14532d;background:var(--ry-green-50,#f0fdf4);
+}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-recipe-btn-primary{
+  border-color:#173e32;background:#173e32;color:#fff;
+}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-recipe-btn-primary:hover{
+  background:#14532d;color:#fff;
+}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-recipe-btn-danger:hover{
+  border-color:var(--ry-danger,#dc2626);color:#dc2626;background:#fef2f2;
+}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-recipe-status{
+  display:block;min-height:14px;padding:0 12px;
+  font-size:10px;line-height:1.4;color:var(--ry-s-500,#64748b);
+}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-recipe-status.pp-recipe-err{ color:#dc2626; }
+#ryCadSide [data-pp="pipePlanSection"] .pp-side sl-input[data-ry-proxy-for]{
+  display:block;flex:0 0 64px;width:64px;min-width:64px;max-width:64px;
+  --sl-input-height-small:24px;
+  --sl-input-font-size-small:12px;
+  --sl-input-border-radius-small:6px;
+  --sl-input-background-color:transparent;
+  --sl-input-border-color:transparent;
+  --sl-input-border-color-hover:transparent;
+  --sl-input-border-color-focus:#173e32;
+  --sl-input-color:var(--ry-s-800,#1e293b);
+}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-item-fluid-input > .pp-plan-unit{flex:0 0 auto;white-space:nowrap}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-sep-vert{ display:none; }
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-calc-formula{
+  margin:0;padding:6px 9px;
+  background:rgba(15,23,42,.90);border:1px solid var(--u-line-2);border-radius:6px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:11px;line-height:1.5;color:#e8eef7;
+  white-space:normal;overflow:visible;
+}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-calc-formula .pp-cf-name{color:#86efac;font-weight:700;margin-right:4px}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-calc-formula .pp-cf-num{color:#fde68a;font-weight:600;padding:0 1px}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-calc-formula .pp-cf-op{color:#cbd5e1;padding:0 1px}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-calc-formula .pp-cf-eq{color:#e2e8f0;padding:0 1px;font-weight:600}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-calc-formula .pp-cf-final{color:#a7f3d0;font-weight:700;background:rgba(134,239,172,.14);padding:1px 4px;border-radius:3px;margin-left:1px}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-calc-formula .pp-cf-line,
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-calc-formula .pp-cf-line-h{display:block;white-space:normal;overflow:visible;padding-right:2px}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-calc-formula .pp-cf-line{display:inline;white-space:normal}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-calc-formula .pp-cf-input{
+  background:rgba(253,230,138,.10);color:#fde68a;font-weight:600;
+  border:0;border-bottom:1px dashed rgba(253,230,138,.5);padding:0 2px;margin:0;
+  width:40px;height:16px;font-family:inherit;font-size:11px;text-align:center;border-radius:2px;
+  -moz-appearance:textfield;
+}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-calc-formula .pp-cf-input::-webkit-outer-spin-button,
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-calc-formula .pp-cf-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-calc-formula .pp-cf-input:focus{outline:none;background:rgba(253,230,138,.22);border-bottom:1px solid #fde68a}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-calc-formula .pp-cf-note{color:#f2d98c;font-size:11.5px;font-weight:500;margin:0 1px;letter-spacing:0}
+@media screen{
+#ryCadSide [data-pp="pipePlanSection"] .pp-title:where(:not(.topbar *)){
+    font-size:var(--ry-fs-title) !important;
+    line-height:1.35;
+  }
+}
+body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-side{border-right-color:transparent}
 </style>
 <style id="ryCadCss">
 /* ═══ 14. CAD 单一操作区：全局左工具栏 + 右上角视口切换（2026-09-14） ══════
    需求：按 CAD 方式所有工作在一个操作区进行 —— 地块信息是基础底图，
-        二级制图 / 三级设计 / 管线图 / 系统图 / 轴测图 作为图层叠加切换；
-        原三块左属性栏（#ppSide / #tlSide / #tlIsoSide）折叠进一条全局工具栏。
+        二级制图 / 三级设计 / 管线图 / 系统图 作为图层叠加切换；
+        原两块左属性栏（#ppSide / #tlSide）折叠进一条全局工具栏。
    · #ryCadSide：固定左侧工具栏（仅二级/三级区块显示，body.ry-cad-vp 门控），
      默认折叠成 40px 细条，
      展开 318px；details 手风琴分组。ryCadJs 把三块 .pp-side 原节点搬进对应分组，
@@ -708,7 +902,7 @@ body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-item,
      双前缀 + 与 12 段同值，防特异性反压；全程零 !important（本段列定义除外）。 */
 #ryCadSide{display:none}
 
-/* 让位只在工具栏显示的区块（二级/三级/轴测，body.ry-cad-vp 由 ryCadJs 维护）
+/* 让位只在工具栏显示的区块（二级/三级，body.ry-cad-vp 由 ryCadJs 维护）
    生效；地块绘制与其他功能区不显示工具栏、也不让位，内容满幅。 */
 body.ry-tool.ry-cad-vp > main{padding-left:var(--ry-cad-w,46px)}
 
@@ -716,7 +910,7 @@ body.ry-tool.ry-cad-vp > main{padding-left:var(--ry-cad-w,46px)}
    切换条取消后即成纯留白。原「加在 section 自身、不得加在 main」的纪律保留备查 ——
    verify 9c 仍有 main 顶部内边距反向断言，别把让位加回 main 上。 */
 
-/* 工具栏只在二级管路 / 三级管路（含轴测）区块显示（body.ry-cad-vp），
+/* 工具栏只在二级管路 / 三级管路区块显示（body.ry-cad-vp），
    地块绘制与其他功能区不显示（2026-09-14 用户要求）。 */
 body.ry-tool.ry-cad-vp #ryCadSide{
   display:flex;flex-direction:column;
@@ -785,9 +979,6 @@ body.ry-tool.ry-cad-vp #ryCadSide[data-ry-open="0"]{width:40px}
 #ryCadSide .ry-cad-grp:not(#ryCadGrpPipe)>summary{background:#f4f9f6}
 #ryCadSide .ry-cad-grp:not(#ryCadGrpPipe)>summary:hover{background:#eaf3ed}
 #ryCadSide .ry-cad-grp-body{padding:8px;min-width:0}
-/* 轴测配件分组只在轴测视口出现（ryCadJs 维护 body.ry-cad-iso） */
-#ryCadGrpIso{display:none}
-body.ry-cad-iso #ryCadGrpIso{display:block}
 
 /* 最远水路（最不利路径）标注的显示开关（2026-09-17 第五十四轮，用户要求）：
    「在合适的位置增加一个按钮，点击显示，再点击关闭显示」。
@@ -840,12 +1031,6 @@ body.ry-tool #pipePlanSection[data-ry-rail="1"] > .pp-body>.pp-grip-side,
 #pipePlanSection[data-ry-rail="1"] > .pp-body>.pp-grip-side,
 body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.pp-grip-side,
 #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.pp-grip-side{display:none}
-/* 轴测视图 12.3 段会把左栏列还原（给 .tl-iso-side），接管态一并按住 */
-body.ry-tool #tlPipePlanSection[data-ry-rail="1"][data-ry-view="iso"] > .pp-body,
-body.ry-tool #tlPipePlanSection[data-ry-rail="1"][data-ry-view="iso"][data-ry-clean="1"] > .pp-body{
-  grid-template-columns:0 0 minmax(0,1fr);
-}
-body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{display:none}
 
 /* 打印：工具栏与切换条让位，左栏交还区块内（ryCadJs 在 beforeprint 搬回 + 摘 ry-cad-vp）。
    显隐/内边距一律带 body.ry-tool 前缀与同特异性，靠「打印块在后」取胜。 */
@@ -859,7 +1044,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
 
 </style>
 <link rel="stylesheet" href="runye-mobile.css?v=242">
-<script src="runye-mobile.js?v=242"></script>
+<script src="runye-mobile.js?v=453-disable-l2-schematic"></script>
 
 <!-- PWA: independent installation and offline support -->
 <link rel="manifest" href="manifest.webmanifest">
@@ -873,7 +1058,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
 <link rel="stylesheet" href="pwa/pwa.css?v=2">
 <script defer src="pwa/pwa.js?v=2"></script>
     <link rel="stylesheet" href="runye-theme.css?v=2">
-    <link rel="stylesheet" href="mod/ry-panel.css?v=436-pp-normalize">
+    <link rel="stylesheet" href="mod/ry-panel.css?v=493-recipe-ui-tweak">
     <!-- Shoelace 2.15.1（与紧凑分组样板一致）；Shoelace 不可用时保留原生输入控件。 -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.1/cdn/themes/light.css">
   <link rel="stylesheet" href="runye-typography.css?v=1">
@@ -944,13 +1129,11 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
   <script src="cloud-sync.js?v=371b"></script>
   <script src="runye-entitle.js?v=429-local-admin"></script>
   <script src="runye-member-ui.js?v=429-local-admin"></script>
-  <!-- 顶部导航动作按钮（系统图/轴测图，runye-nav.js act 项）：动作映射须先于 runye-nav.js 注册 -->
+  <!-- 顶部导航动作按钮（系统图，runye-nav.js act 项）：动作映射须先于 runye-nav.js 注册 -->
   <script src="mod/inline-05.js?v=357"></script>
   <script src="runye-nav.js?v=385-global-open"></script>
   <!-- [NEW MODULE: DXF 导出] 入口：删除本行即卸载（不改动任何原有逻辑） -->
   <script src="runye-dxf.js?v=404-tier-gates"></script>
-  <!-- [NEW MODULE: 管网 3D 预览] 入口：删除本行 + #tlTabs 里 #tlBtn3D 即卸载（three.min.js 懒加载） -->
-  <script src="runye-pipe3d.js?v=415-pipe3d"></script>
   <!-- [NEW MODULE: pipe_optim] 入口：删除本行即卸载本隔离模块（不改动任何原有逻辑） -->
   <script src="pipe_optim_ui.js"></script>
 </div>
@@ -1086,7 +1269,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
 </section>
 
 <!-- ===== 面积测量工具 + 实际地块规划 ===== -->
-<section id="areaTool" class="ry-sec ry-active">
+<section id="areaTool" class="ry-sec">
   <!-- 03 顶部绿条已取消：标题「03 面积测量工具 · 鞋带公式」与「💾 导出截图」按钮一并移除，
        「📁 上传图片」「🗺️ 地图在线测量」两个入口已移入左侧栏顶部（.at-entry-section）。
        导出截图的 JS 逻辑仍在（atBtnDownload 已加空值守卫）—— 将来需要恢复，
@@ -1169,7 +1352,6 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
         .at-lib-item.current{border-color:#16a34a;box-shadow:0 0 0 2px rgba(22,163,74,.18);}
         .pli-main{margin-bottom:6px;}
         .pli-name{font-weight:600;font-size:13px;color:#0f172a;}
-        .pli-crop{font-weight:400;font-size:11px;color:#16a34a;margin-left:4px;}
         .pli-meta{font-size:11px;color:#64748b;margin-top:2px;}
         .pli-actions{display:flex;gap:6px;flex-wrap:wrap;}
         .pli-btn{padding:4px 10px;font-size:11px;margin:0;}
@@ -1215,7 +1397,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
 
 
 <!-- ===== 二级管路 · 管路规划与施工简图 ===== -->
-<section id="onlineMapSection" class="ry-sec" aria-label="在线地图">
+<section id="onlineMapSection" class="ry-sec ry-active" aria-label="在线地图">
   <div id="onlineMapApp">
 <div class="main">
     <!-- 左侧工具栏：原绿色顶部操作条（搜索/定位/底图/画框四键）+ 右侧浮动「测量结果」面板
@@ -1236,19 +1418,9 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
           <div class="hint" id="placeHint">搜索定位后可「保存地点」；地图位置自动记住，下次打开回到上次位置。也可直接输入坐标（如 18.2528,109.5119）定位。</div>
         </div>
       </section>
-      <section>
-        <h4 class="sec-t">绘制</h4>
-        <div class="tools">
-          <button class="mbtn" id="btnDraw">✏️ 开始画框</button>
-          <!-- [v186] 「完成」的语义已升级为「定稿本块 + 清空 + 继续画下一块」，
-               按钮文案随之改，让用户一眼知道点完还能接着画（见 btnFinish 处理函数）。 -->
-          <button class="mbtn" id="btnFinish">✅ 完成并画下一块</button>
-          <button class="mbtn" id="btnAddPt">➕ 加点</button>
-          <button class="mbtn" id="btnUndo">↩ 撤销</button>
-          <button class="mbtn" id="btnMeasure">📏 测距</button>
-          <button class="mbtn" id="btnClear">🗑 清除</button>
-        </div>
-      </section>
+      <!-- [v495 用户要求] 主程序内嵌在线地图与独立页同步：原「绘制」区整体迁出左栏
+           → 地图区顶端的可拖动工具条 #mapDrawTools（位置记忆、拖不出地图区）。
+           恢复：删 .map-wrap 内 #mapDrawTools，把六钮搬回此处原 section。 -->
       <section class="results">
         <h4 class="sec-t">测量结果</h4>
         <div class="row"><span class="k">面积</span><span class="v"><span id="mu">0</span><small>亩</small></span></div>
@@ -1265,7 +1437,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
           <button class="mbtn" id="btnImport">⬆ 导入地块(GeoJSON/KML/KMZ/奥维轨迹)</button>
         </div>
         <input type="file" id="fileImport" accept=".geojson,.json,.kml,.ovkml,.kmz" style="display:none" />
-        <div class="hint">保存后可累计多个地块；在「精准灌溉」页地块库「设为当前」，或在数字农业（水肥决策）页下拉选择。</div>
+        <div class="hint">保存后可累计多个地块；可在地块库中选择「设为当前」。</div>
       </section>
       <section>
         <h4 class="sec-t">我的地块</h4>
@@ -1291,6 +1463,20 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     <div class="side-grip" id="mapSideGrip" title="拖动调节工具栏宽度；双击恢复默认"></div>
     <div class="map-wrap">
       <div id="map"></div>
+      <!-- ===== [v495] 主程序内嵌在线地图的绘制工具条（与独立页 runye-map-measure.html
+           v494 同款）：左栏「绘制」区迁来，挂在地图区顶端；按住「⠿ 绘制」抓手拖动
+           （mod/ry-panel.js rypDraggable：位置记忆 localStorage['mapDrawToolsPos']，
+           clamp 在 .map-wrap 内 = 不超过导航栏）。按钮 id 不变，online-map.js 零改动。 ===== -->
+      <div class="map-draw-tools ryp-float" id="mapDrawTools" data-ry-panel
+           data-ry-position-key="mapDrawToolsPos" data-ry-default-top="12" data-ry-default-left="12">
+        <span class="dt-grip" data-ry-drag title="按住拖动工具条；位置自动记住">⠿ 绘制</span>
+        <button class="mbtn" id="btnDraw">✏️ 开始画框</button>
+        <button class="mbtn" id="btnFinish">✅ 完成并画下一块</button>
+        <button class="mbtn" id="btnAddPt">➕ 加点</button>
+        <button class="mbtn" id="btnUndo">↩ 撤销</button>
+        <button class="mbtn" id="btnMeasure">📏 测距</button>
+        <button class="mbtn" id="btnClear">🗑 清除</button>
+      </div>
       <!-- ===== [v282] 分区角度悬浮面板 =====
            形态仿手机端 runye-mobile-map-preview.html 的 .map-angle：↶＋1° / 角度输入 / ↷−1° 竖排。
            原「分区角度」那一节（id=mapPartitionTools）整体迁入（runye-map-partition.js 只按 id 取 box，
@@ -1338,51 +1524,66 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
        （01 版面的面积条与 04 的施工简图），信息不丢失。 -->
   <!-- 版面：左侧参数栏 + 右侧图纸区。参数由顶部横排改为左栏竖排，把整屏高度让给图纸 -->
   <div class="pp-body">
-  <aside class="pp-side" id="ppSide" data-ry-panel data-ry-panel-key="ppSide" data-ry-fold-key="ryPpSideFolded">
-  <!-- [v432-pp-side-panel] 套用共享面板规范：深墨绿标题头 + 折叠（mod/ry-panel.js
-       的 rypCollapsible 驱动，记忆键 ryPpSideFolded；与 01 设计参数面板同一实现）。
-       [v433] 按用户要求取消收起细条「参数」——折叠后标题头仍可见、点击即可重新展开，
-       细条属于重复入口。参数与结果包进 [data-ry-body]，折叠时整体隐藏。
-       原字段 ID / 事件绑定一律未动。 -->
-  <div class="ryp-sidebar-head" data-ry-toggle title="点击折叠 / 展开分区参数面板">
-    <span class="ryp-title">地块分区参数</span>
-    <button class="ryp-fold" type="button" data-ry-fold aria-label="折叠或展开分区参数面板" aria-expanded="true" data-ry-fold-open="▾" data-ry-fold-closed="▸">▾</button>
-  </div>
-  <div class="ryp-body" data-ry-body>
+  <aside class="pp-side" id="ppSide" data-ry-panel>
   <!-- 地块规划参数 — 第1行：输入参数 -->
   <div class="pp-plan-bar" id="ppPlanBar" style="margin-bottom:8px">
     <!-- 2026-09-20 v91 用户要求：把「水泵提升高度 / 地形高差」做成可设定值，放进本面板、排在「滴灌带间距」之前。
          与 01 一级表单同源：planLift ⇄ fld_lift、planDh ⇄ fld_dh（双向镜像，见下方 JS 块），默认值仍为 5 / 5。
          需要撤掉：删掉本注释与下面两行 item 即可，另删本文件底部 ppPullLiftDh / ppLiftDhCapture 那一整块（含两个 document 监听）与 resetDefaults 里的回填调用。 -->
-    <div class="ryp-group-head"><sl-icon name="droplet" aria-hidden="true"></sl-icon>水源与扬程</div>
-    <span class="pp-plan-item"><span class="pp-plan-label">水泵提升高度</span><input class="ryp-native-fallback" type="number" id="planLift" value="5" min="0" step="1" aria-label="水泵提升高度"><sl-input data-ry-proxy-for="planLift" type="number" value="5" min="0" step="1" size="small" aria-label="水泵提升高度" hidden></sl-input>m</span>
-    <span class="pp-plan-item"><span class="pp-plan-label">地形高差</span><input class="ryp-native-fallback" type="number" id="planDh" value="5" min="0" step="1" aria-label="地形高差"><sl-input data-ry-proxy-for="planDh" type="number" value="5" min="0" step="1" size="small" aria-label="地形高差" hidden></sl-input>m</span>
+    <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">水泵提升高度</span><input class="ryp-native-fallback" type="number" id="planLift" value="5" min="0" step="1" aria-label="水泵提升高度"><sl-input data-ry-proxy-for="planLift" type="number" value="5" min="0" step="1" size="small" aria-label="水泵提升高度" hidden></sl-input><span class="pp-plan-unit">m</span></span>
+    <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">地形高差</span><input class="ryp-native-fallback" type="number" id="planDh" value="5" min="0" step="1" aria-label="地形高差"><sl-input data-ry-proxy-for="planDh" type="number" value="5" min="0" step="1" size="small" aria-label="地形高差" hidden></sl-input><span class="pp-plan-unit">m</span></span>
     <!-- 2026-09-24 任务⑮（用户要求）：新增「水源距离」——自动生成时水源贴着地块，实际水源可能在
          地块外一段距离。该距离计入三级总管长度（frontLenUsed）→ 总管沿程损失 → 水泵扬程，
          并计入总管长度统计（结果栏/损失卡/对比表）与材料清单。 -->
-    <span class="pp-plan-item"><span class="pp-plan-label">水源距离</span><input class="ryp-native-fallback" type="number" id="planSrcDist" value="0" min="0" step="1" aria-label="水源距离" title="水源到地块边界的距离（m）：计入总管长度 → 总管沿程损失 → 水泵扬程；同时计入总管长度统计与材料清单"><sl-input data-ry-proxy-for="planSrcDist" type="number" value="0" min="0" step="1" size="small" aria-label="水源距离" hidden></sl-input>m</span>
-    <!-- 2026-09-24 用户要求：新增「单边铺设长度」（默认100m，可调80/120等）。
+    <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">水源距离</span><input class="ryp-native-fallback" type="number" id="planSrcDist" value="0" min="0" step="1" aria-label="水源距离" title="水源到地块边界的距离（m）：计入总管长度 → 总管沿程损失 → 水泵扬程；同时计入总管长度统计与材料清单"><sl-input data-ry-proxy-for="planSrcDist" type="number" value="0" min="0" step="1" size="small" aria-label="水源距离" hidden></sl-input><span class="pp-plan-unit">m</span></span>
+    <!-- [v466]（2026-10-15 用户要求）「滴灌带间距」改名「滴带间距」（id=planTapeSpacing 不变，消费点零改动） -->
+    <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">滴带间距</span><input class="ryp-native-fallback" type="number" id="planTapeSpacing" value="0.4" min="0.1" step="0.1" aria-label="滴带间距"><sl-input data-ry-proxy-for="planTapeSpacing" type="number" value="0.4" min="0.1" step="0.1" size="small" aria-label="滴带间距" hidden></sl-input><span class="pp-plan-unit">m</span></span>
+    <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">滴孔间距</span><input class="ryp-native-fallback" type="number" id="planEmitterSpacing" value="0.3" min="0.05" step="0.05" aria-label="滴孔间距"><sl-input data-ry-proxy-for="planEmitterSpacing" type="number" value="0.3" min="0.05" step="0.05" size="small" aria-label="滴孔间距" hidden></sl-input><span class="pp-plan-unit">m</span></span>
+    <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">滴头流量</span><input class="ryp-native-fallback" type="number" id="planEmitterFlow" value="0.8" min="0.1" step="0.1" aria-label="滴头流量"><sl-input data-ry-proxy-for="planEmitterFlow" type="number" value="0.8" min="0.1" step="0.1" size="small" aria-label="滴头流量" hidden></sl-input><span class="pp-plan-unit">L/h</span></span>
+    <!-- [v463]（2026-10-15 用户要求）「单边铺设长度」改名「铺设长度」并挪到「滴头流量」之下、
+         「分区划定」之上（原位置在「水源距离」与「滴灌带间距」之间，见 git 历史）。
+         2026-09-24 用户要求：新增（默认100m，可调80/120等）。
          分区划分固定边 = 滴灌带铺设长度 = 此值（2026-09-28 取消双边×2；原默认 2×100=200m）；
          另一边 = 单区面积 ÷ 固定边，调节后分区宽度自动跟随。
          消费点：planZoneFixedSide() → calcZoneLayout / calcManualZoneLayout / ppGetZoneCuts。
+         id 保持 planTapeLaySide 不变（runye-ai-plan.js 的同义词表本就含「铺设长度」，解析不受影响）。
          需要撤掉：删本 item，并把 planZoneFixedSide 三处消费点还原为 MAX_ZONE_SIDE。 -->
-    <span class="pp-plan-item"><span class="pp-plan-label">单边铺设长度</span><input class="ryp-native-fallback" type="number" id="planTapeLaySide" value="100" min="10" step="10" aria-label="单边铺设长度" title="滴灌带在分区内单边铺设长度；分区固定边 = 单边长度×2，调节后分区划分自动跟随"><sl-input data-ry-proxy-for="planTapeLaySide" type="number" value="100" min="10" step="10" size="small" aria-label="单边铺设长度" hidden></sl-input>m</span>
-    <span class="pp-plan-item"><span class="pp-plan-label">滴灌带间距</span><input class="ryp-native-fallback" type="number" id="planTapeSpacing" value="0.4" min="0.1" step="0.1" aria-label="滴灌带间距"><sl-input data-ry-proxy-for="planTapeSpacing" type="number" value="0.4" min="0.1" step="0.1" size="small" aria-label="滴灌带间距" hidden></sl-input>m</span>
-    <span class="pp-plan-item"><span class="pp-plan-label">滴孔间距</span><input class="ryp-native-fallback" type="number" id="planEmitterSpacing" value="0.3" min="0.05" step="0.05" aria-label="滴孔间距"><sl-input data-ry-proxy-for="planEmitterSpacing" type="number" value="0.3" min="0.05" step="0.05" size="small" aria-label="滴孔间距" hidden></sl-input>m</span>
-    <span class="pp-plan-item"><span class="pp-plan-label">滴头流量</span><input class="ryp-native-fallback" type="number" id="planEmitterFlow" value="0.8" min="0.1" step="0.1" aria-label="滴头流量"><sl-input data-ry-proxy-for="planEmitterFlow" type="number" value="0.8" min="0.1" step="0.1" size="small" aria-label="滴头流量" hidden></sl-input>L/h</span>
+    <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">铺设长度</span><input class="ryp-native-fallback" type="number" id="planTapeLaySide" value="100" min="10" step="10" aria-label="铺设长度" title="滴灌带在分区内单边铺设的长度；分区固定边随之联动，调节后分区划分自动跟随"><sl-input data-ry-proxy-for="planTapeLaySide" type="number" value="100" min="10" step="10" size="small" aria-label="铺设长度" hidden></sl-input><span class="pp-plan-unit">m</span></span>
     <!-- 2026-09-28 用户要求：取消「单带长度」——与「单边铺设长度」语义重复。
          单条滴灌带长度改由 planTapeLaySide（单边铺设长度）承担（calcPlan tapeLen / 摘要处均已重指向）。
          需要恢复：加回 <span class="pp-plan-item"><span class="pp-plan-label">单带长度</span><input type="number" id="planTapeLen" value="100" min="10" step="10">m</span> 并还原三处消费点。 -->
     <span class="pp-sep-vert"></span>
-    <span class="pp-plan-item"><span class="pp-plan-label">分区划定</span><input class="ryp-native-fallback" type="number" id="planZoneMuManual" value="18" min="0.1" step="0.1" style="width:58px" aria-label="分区划定"><sl-input data-ry-proxy-for="planZoneMuManual" type="number" value="18" min="0.1" step="0.1" size="small" aria-label="分区划定" hidden></sl-input>亩/区</span>
+    <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">分区划定</span><input class="ryp-native-fallback" type="number" id="planZoneMuManual" value="18" min="0.1" step="0.1" aria-label="分区划定"><sl-input data-ry-proxy-for="planZoneMuManual" type="number" value="18" min="0.1" step="0.1" size="small" aria-label="分区划定" hidden></sl-input><span class="pp-plan-unit">亩/区</span></span>
     <!-- 2026-10-04 v199 用户要求：左栏增加「入口压力」输入 —— 与 01 一级表单「滴灌带入口工作压力
          fld_tapePressure」**同一个物理量**（扬程计算式条里的「入口压力」= bar×10.2m），
          双向镜像同 v91 机制（PP_LIFTDH_PAIRS）。调节后水泵扬程/计算式条实时跟随。
          需要撤掉：删本 item + PP_LIFTDH_PAIRS 里的镜像对 + 下方 calcPlan 触发循环里的一项。 -->
-    <span class="pp-plan-item"><span class="pp-plan-label">入口压力</span><input class="ryp-native-fallback" type="number" id="planTapePressure" value="1" min="0" step="0.1" aria-label="入口压力" title="滴灌带入口工作压力（bar）：计入水泵扬程（×10.2 折算水头），与 01 一级表单同源联动"><sl-input data-ry-proxy-for="planTapePressure" type="number" value="1" min="0" step="0.1" size="small" aria-label="入口压力" hidden></sl-input>bar</span>
-    <span class="pp-plan-item"><span class="pp-plan-label">目标流速</span><input class="ryp-native-fallback" type="number" id="planTargetV" value="1.5" min="0.3" max="5" step="0.1" aria-label="目标流速"><sl-input data-ry-proxy-for="planTargetV" type="number" value="1.5" min="0.3" max="5" step="0.1" size="small" aria-label="目标流速" hidden></sl-input>m/s</span>
+    <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">入口压力</span><input class="ryp-native-fallback" type="number" id="planTapePressure" value="1" min="0" step="0.1" aria-label="入口压力" title="滴灌带入口工作压力（bar）：计入水泵扬程（×10.2 折算水头），与 01 一级表单同源联动"><sl-input data-ry-proxy-for="planTapePressure" type="number" value="1" min="0" step="0.1" size="small" aria-label="入口压力" hidden></sl-input><span class="pp-plan-unit">bar</span></span>
+    <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">目标流速</span><input class="ryp-native-fallback" type="number" id="planTargetV" value="1.5" min="0.3" max="5" step="0.1" aria-label="目标流速"><sl-input data-ry-proxy-for="planTargetV" type="number" value="1.5" min="0.3" max="5" step="0.1" size="small" aria-label="目标流速" hidden></sl-input><span class="pp-plan-unit">m/s</span></span>
     <input type="hidden" id="planN" value="4">
     <input type="hidden" id="planZoneMode" value="manual">
+  </div>
+  <!-- ===== [v491 2026-10-16 用户要求] 灌溉配方库（二级左侧面板）：
+       把第 1 行的 10 项输入参数（提升/高差/水源距离/滴带间距/滴孔间距/滴头流量/
+       铺设长度/分区划定/入口压力/目标流速）整组保存为命名方案、随时调用回填。
+       用途：持续沉淀地区与滴灌参数组合方案，
+       将来直接下拉选用。数据 = localStorage['runye_irrigation_recipes_v1']；
+       逻辑 = mod/plot-editor.js 的 ppRecipeFlow（复用 ppAiPlanFlow 的 snapshot/apply
+       模式，回填后派发 change/input 触发实时重算）。
+       需要撤掉：删本块 + ppRecipeFlow IIFE + ry-panel.css 的 .pp-recipe-* 规则即可。 ===== -->
+  <div class="pp-plan-bar pp-recipe-bar" id="ppRecipeBar">
+    <span class="pp-plan-item pp-recipe-row">
+      <span class="pp-plan-label">方案</span>
+      <input type="text" id="ppRecipeName" maxlength="40" placeholder="如：东方基地·滴灌方案" aria-label="方案名称">
+      <button type="button" class="pp-recipe-btn pp-recipe-btn-primary" id="ppRecipeSave" title="把当前 10 项参数保存为方案">保存</button>
+    </span>
+    <span class="pp-plan-item pp-recipe-row">
+      <select id="ppRecipeSelect" aria-label="选择已存方案"><option value="">— 选择方案 —</option></select>
+      <button type="button" class="pp-recipe-btn" id="ppRecipeApply" title="把选中方案的参数回填到面板并重算">调用</button>
+      <button type="button" class="pp-recipe-btn" id="ppRecipeRename" title="重命名选中方案">✎</button>
+      <button type="button" class="pp-recipe-btn pp-recipe-btn-danger" id="ppRecipeDel" title="删除选中方案">🗑</button>
+    </span>
+    <span class="pp-recipe-status" id="ppRecipeStatus" role="status"></span>
   </div>
   <!-- 第2行：计算结果 -->
   <div class="pp-plan-bar pp-plan-bar-result" id="ppPlanBar2">
@@ -1391,7 +1592,8 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     <span class="pp-sep-vert"></span>
     <span class="pp-plan-item"><span class="pp-plan-label">水泵流量</span><span class="pp-plan-val" id="planPumpFlow">—</span>m³/h</span>
     <span class="pp-plan-item"><span class="pp-plan-label">水泵扬程</span><span class="pp-plan-val" id="planPumpHead">—</span>m</span>
-    <span class="pp-plan-item"><span class="pp-plan-label">水泵功率</span><span class="pp-plan-val" id="planPumpPower">—</span>kW</span>
+    <span class="pp-plan-item"><span class="pp-plan-label">计算轴功率</span><span class="pp-plan-val" id="planPumpPower">—</span>kW</span>
+    <span class="pp-plan-item"><span class="pp-plan-label">建议电机功率</span><span class="pp-plan-val" id="planMotorPower">—</span>kW</span>
     <span class="pp-sep-vert"></span>
     <span class="pp-plan-item"><span class="pp-plan-label">主管</span><span class="pp-plan-val" id="planMainPipe">—</span></span>
     <span class="pp-plan-item"><span class="pp-plan-label">主管流速</span><span class="pp-plan-val" id="planMainVelocity">—</span>m/s</span>
@@ -1401,10 +1603,8 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
   </div>
   <!-- 扬程计算式（紧贴结果栏下方，仅扬程一行，实时跟随输入更新，不换行） -->
   <div id="ppCalcDetail" class="pp-calc-formula pp-calc-h"></div>
-  </div><!-- /ryp-body [v432-pp-side-panel] -->
-  <!-- 视图切换（管线编辑 / 二级简图）：2026-09-12 再下移 —— 已搬出左栏，
-       落到页面底部状态栏 #ryStatusBar 内、位于「制图」标签之前（见该文件尾部注释）。
-       仍是同一个节点、同一个 id —— JS 用 getElementById('ppTabs') 绑定事件，与父节点无关。 -->
+  <!-- 二级简图视图本身保留在右侧 pane 中，入口暂时停用；恢复位置见
+       feature-archive/二级简图/README.md。 -->
   </aside>
   <!-- 图纸区：提示 + 工具条 + 拾取结果 + 画布（画布自适应吃掉剩余高度） + 图例 -->
   <div class="pp-stage">
@@ -1742,8 +1942,10 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
          「36」输入框左缘与「1区」按钮左缘精确对齐（结构对齐，不靠魔法数）。 -->
     <span class="pp-plan-item" style="gap:5px;min-height:22px">
       <button type="button" id="tlAreaGroupBtn" class="pp-plan-label" title="按目标面积把分区按顺序累加成联合灌溉组（每累计到目标亩数即断组开新组）" style="margin-right:0;background:none;border:none;padding:0;font:inherit;color:inherit;cursor:pointer">面积成组</button>
-      <input type="number" id="tlAreaGroupMu" value="36" min="0.1" step="1" title="每个联合灌溉区的目标面积（亩）：按分区顺序累加，累计不超过该值就并成一组" style="width:56px;font-size:11px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px;color:#334155">亩
+      <input type="number" id="tlAreaGroupMu" value="36" min="0.1" step="1" title="每个联合灌溉区的目标面积（亩）：按分区顺序累加，累计不超过该值就并成一组；改完直接回车即执行" style="width:56px;font-size:11px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px;color:#334155">亩
       <button type="button" id="tlAreaGroupCalcBtn" title="按目标亩数从第一个分区起累加：累计不超目标亩数就并入同组，超过阈值就断开开新组，依次递推自动组合联合灌溉区">按亩组合</button>
+      <!-- [v470]（2026-10-15 用户要求）撤销 v469：「按亩组合」是执行按钮，恢复原按钮（文字+外框）；
+           「亩（按亩组合）」括弧注释一并撤销。三处恢复：本 DOM、inline-09.js 接线、style-01.css 样式。 -->
     </span>
     <!-- [v216]（2026-10-04 用户要求）「保存分组 / 调出分组 / 恢复初始化」三钮原在左栏并一行，
          「手动分组 / 联合分区」标签与「分组：自动…」「⊕ 变更时自动」提示文字全部取消。
@@ -1761,20 +1963,14 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
          当前分组（自动 N 均分 / 手动 M 组）动态生成，无图时整行隐藏。 -->
     <div id="tlDemoBar" style="display:none;margin-top:6px;font-size:11px;line-height:1.7;color:#64748b">
       <span style="font-weight:700;color:#334155">轮灌演示</span>
-      <span id="tlDemoChips" style="display:inline-flex;gap:4px;flex-wrap:wrap;margin-left:4px;vertical-align:middle"></span>
+      <!-- [v465]（2026-10-15 用户要求）chips 改块级 flex 独占一行，与「轮灌演示」标题行距加大（margin-top:5px） -->
+      <span id="tlDemoChips" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:5px;align-items:center"></span>
     </div>
     <!-- 2026-09-16 用户要求：左栏面板「总管长度」输入取消（总管长度仍可在下方水力参数卡
          「联合灌溉 总管选型」里调整，tl_frontPipeLen 保留；tlUpdatePlanBar 不再覆盖它） -->
-    <!-- [v225]（2026-10-04 用户要求）「目标流速」已挪到下方结果栏标题「水力计算结果」右侧、
-         与标题同一行（见 #tlPlanBar2 内 .tl-target-v-row）。
-         id 不变 ⇒ tlUpdatePlanBar 的 readNumber('tlPlanTargetV') 与两个监听器零改动。 -->
+    <!-- 目标流速现位于三级水力项表头下、联合流量上方；保留原 id 和实时重算联动。 -->
   </div>
   <div class="pp-plan-bar pp-plan-bar-result tl-plan-result" id="tlPlanBar2">
-    <!-- [v225]（2026-10-04 用户要求）「目标流速」从上方参数栏挪到本栏标题「水力计算结果」右侧、
-         与标题文字同一行。★ 标题是 ::before 伪元素（不是真实 DOM），塞不进去 ⇒
-         本行改用绝对定位贴到标题行右端（样式见 .tl-target-v-row，规则一律挂 #tlPlanBar2 id 前缀，
-         与「#tlSide 被搬进 #ryCadGrpTl」的双宿主无关）。 -->
-    <span class="pp-plan-item tl-target-v-row"><span class="pp-plan-label">目标流速</span><input type="number" id="tlPlanTargetV" value="1.5" min="0.3" max="5" step="0.1" title="设计流速（m/s）：管径选型的基准，改动后会实时重算管径 / 扬程 / 流速"><span class="tl-tv-unit">m/s</span></span>
     <!-- ★ v109 关键发现（2026-09-22）：三级页切 tab 时本栏随 #tlSide 被**搬移**进 CAD 侧栏
          #ryCadGrpTl —— 失去 #tlPipePlanSection 祖先后，v107 挂该前缀的列布局规则全部失效
          （computed style 实证 flex=0 1 auto / margin-right:auto），用户看到的正是旧布局错位。
@@ -1785,13 +1981,16 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
          与表头错位达 50px —— 见 _p1/_v109_measure.cjs 实测）。v109b：单位并入设计值单元格文本
          （用户要求单位紧贴数值，删除独立单位槽 —— 改径重算列 "33.6 m" 同款）。 -->
     <span class="pp-plan-item pp-plan-cols-head"><span class="pp-plan-label">水力项</span><span class="pp-cols-h1">设计值</span><span class="pp-cols-h2">改径重算</span></span>
+    <!-- 目标流速置于“水力项”表头下、联合流量上方；保留原 id 与实时重算监听。 -->
+    <span class="pp-plan-item tl-target-v-row"><span class="pp-plan-label">目标流速</span><input type="number" id="tlPlanTargetV" value="1.5" min="0.3" max="5" step="0.1" title="设计流速（m/s）：管径选型的基准，改动后会实时重算管径 / 扬程 / 流速"><span class="tl-tv-unit">m/s</span></span>
     <span class="pp-plan-item"><span class="pp-plan-label">联合流量</span><span class="pp-plan-val" id="tlPlanCombinedFlow">— m³/h</span></span>
     <!-- v106（2026-09-22 用户要求）：联合流量底下、水泵流量上方注明依据 —— 按哪个联合分区、实际多少亩 -->
     <span class="pp-plan-item" id="tlPlanCombinedSrc" style="display:none;font-size:11px;color:#64748b"></span>
     <span class="pp-sep-vert"></span>
     <span class="pp-plan-item"><span class="pp-plan-label">水泵流量</span><span class="pp-plan-val" id="tlPlanPumpFlow">— m³/h</span></span>
     <span class="pp-plan-item"><span class="pp-plan-label">水泵扬程</span><span class="pp-plan-val" id="tlPlanPumpHead">— m</span><span class="pp-plan-val-real" id="tlPlanPumpHeadReal">—</span></span>
-    <span class="pp-plan-item"><span class="pp-plan-label">水泵功率</span><span class="pp-plan-val" id="tlPlanPumpPower">— kW</span><span class="pp-plan-val-real" id="tlPlanPumpPowerReal">—</span></span>
+    <span class="pp-plan-item"><span class="pp-plan-label">计算轴功率</span><span class="pp-plan-val" id="tlPlanPumpPower">— kW</span><span class="pp-plan-val-real" id="tlPlanPumpPowerReal">—</span></span>
+    <span class="pp-plan-item"><span class="pp-plan-label">建议电机功率</span><span class="pp-plan-val" id="tlPlanMotorPower">— kW</span><span class="pp-plan-val-real" id="tlPlanMotorPowerReal">—</span></span>
     <span class="pp-sep-vert"></span>
     <!-- v109：管径行补「改径重算」列 —— 管径前后对比（设计 Ø → 改径 Ø，未改径显示 —） -->
     <span class="pp-plan-item"><span class="pp-plan-label">总管</span><span class="pp-plan-val" id="tlPlanFrontPipe">—</span><span class="pp-plan-val-real"><select id="tlCalSelFront" class="pp-cal-sel" title="选择总管管径（设计值±3档），扬程/流速随之实时重算"></select></span></span>
@@ -1825,68 +2024,11 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     <div id="tlPumpUpdateDelta" style="display:none;font-size:10.5px;line-height:1.55;color:#475569;margin-top:6px"></div>
   </div>
   <div id="tlLossCard" style="display:none;position:relative;margin-top:12px;padding:9px 11px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);font:11.5px/1.6 system-ui,-apple-system,'Segoe UI',sans-serif;color:#1f2937;text-align:left"></div>
-  <!-- 主操作按钮（2026-09-13 三按钮横排；2026-09-14 晚「生成系统图/生成轴测图」已按用户要求取消，仅留生成管线图；系统图/轴测图走视口切换自动渲染）
+  <!-- 主操作按钮（2026-09-13 三按钮横排；2026-09-14 晚生成系统图按钮已取消，仅留生成管线图；系统图走视口切换自动渲染）
        2026-09-16 第三十七轮：按钮行下移到左栏最底部；
        2026-09-17 第四十三轮：按用户要求整体移到右侧工具栏最底部（#tlWsToolbar 内末尾），左栏不再保留该入口，避免与右栏顶部旧入口重复 -->
   </aside>
-  <!-- 轴测简图左侧工具栏（2026-09-13）：仅 data-ry-view="iso" 显示；插入管线（2026-09-15 阶段1）+ 配件布置 + 构件参数 -->
-  <aside class="pp-side tl-iso-side" id="tlIsoSide">
-    <!-- 插入管线入口已按用户要求取消（2026-09-16 第三十四轮）：轴测图页不再提供画线
-         （画线走「三级设计」工作区，双向同步保留）；卡片仅保留 #tlIsoPipeHint 反馈行
-         （右键旋转/阀门/接管等图面操作提示都写这里） -->
-    <div class="tl-iso-card tl-iso-pipe-card">
-      <div class="tl-iso-hint" id="tlIsoPipeHint">插入三通 / 弯头 / 阀门请在「三级管路编辑」的节点中完成；本图右键只作查看与已有配件调整 —— 右键三通可选分支口型号、快速转向（0/90/180/270°、±15° 微调）并「从分支口接管道」；右键弯头可调角 / 接管随转 / 删除；右键接管可「延长 1 m / 删除」；接管端点与图上白圈节点自动吸附；画线可用左栏「➕ 管道插入」（端点自动吸附节点/三通），与「三级设计」工作区数据互通</div>
-    </div>
-    <!-- 自动管线选中卡（2026-09-15 阶段2）：点选二级传递的自动管线后显示；ISO_FITTING_UI_OFF 下豁免隐藏 -->
-    <div class="tl-iso-card tl-iso-autocard" id="tlIsoAutoCard" style="display:none">
-      <div class="tl-iso-card-title">自动管线 · 选中</div>
-      <div class="tl-iso-note" id="tlIsoAutoInfo"></div>
-      <div id="tlIsoAutoDist" style="display:none;margin-top:6px">
-        <label style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#47555e;margin-top:3px">距起点 <span><input id="tlIsoFitA" type="number" step="0.1" min="0" style="width:64px;padding:1px 3px;font-size:11px;border:1px solid #cbd5e1;border-radius:4px"> m</span></label>
-        <label style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#47555e;margin-top:3px">距终点 <span><input id="tlIsoFitB" type="number" step="0.1" min="0" style="width:64px;padding:1px 3px;font-size:11px;border:1px solid #cbd5e1;border-radius:4px"> m</span></label>
-      </div>
-      <button class="pp-btn-generate" id="tlIsoAutoLenBtn" type="button" style="width:100%;margin-top:6px">📏 改长</button>
-      <button class="pp-btn-generate" id="tlIsoAutoTeeBtn" type="button" style="width:100%;margin-top:6px">⊞ 在点击位置插三通</button>
-      <button class="pp-btn-generate" id="tlIsoAutoValveBtn" type="button" style="width:100%;margin-top:6px">🔩 在点击位置插阀门</button>
-      <button class="pp-btn-ghost" id="tlIsoAutoFitDelBtn" type="button" style="display:none;width:100%;margin-top:6px">🗑 删除配件</button>
-    </div>
-    <div class="tl-iso-card">
-      <div class="tl-iso-card-title">配件布置</div>
-      <!-- 任务J（2026-09-25 用户要求）：管道插入入口复活。旧按钮 id tlIsoPipeMain/tlIsoPipeBranch
-           已删且被 verify_ry_tool.js mustNot 锁定禁用 —— 故用新 id tlIsoPipeKindSel/tlIsoPipeInsBtn。 -->
-      <label class="tl-iso-row" id="tlIsoPipeInsRow"><span>管线类型</span>
-        <select id="tlIsoPipeKindSel">
-          <option value="main">主管</option>
-          <option value="branch">支管</option>
-        </select>
-      </label>
-      <button class="pp-btn-generate" id="tlIsoPipeInsBtn" type="button" style="width:100%;margin-top:6px">➕ 管道插入</button>
-      <div class="tl-iso-kinds" id="tlIsoKinds">
-        <button type="button" data-kind="tee" class="active">三通</button>
-        <button type="button" data-kind="elbow">弯头</button>
-        <button type="button" data-kind="valve">阀门</button>
-      </div>
-      <label class="tl-iso-row" id="tlIsoSpecRow" style="display:none"><span>规格（弯头）</span>
-        <select id="tlIsoSpec">
-          <option value="">与管道同径</option>
-          <option>dn160</option>
-          <option>dn140</option>
-          <option>dn110</option>
-          <option>dn90</option>
-          <option>dn75</option>
-          <option>dn63</option>
-        </select>
-      </label>
-      <button class="pp-btn-generate" id="tlIsoPlaceBtn" type="button" style="width:100%;margin-top:8px">确定 · 放置</button>
-      <div class="tl-iso-hint" id="tlIsoPlaceHint">三通/阀门自动随所在管道管径；点「确定」后在图上沿管线点击放置。右键图上的三通可旋转第三口（每点 ±15°）、可选同径/异径；右键接管可延长/删除</div>
-    </div>
-    <div class="tl-iso-card" id="tlIsoInfoCard" style="display:none">
-      <div class="tl-iso-card-title">构件参数</div>
-      <div id="tlIsoInfoBody" class="tl-iso-info"></div>
-      <button class="pp-btn-ghost" id="tlIsoDelBtn" type="button" style="display:none;width:100%;margin-top:8px">🗑 删除该配件</button>
-    </div>
-  </aside>
-  <!-- 图纸区：工具条（生成 / 下载 / 打印）＋ 施工简图 -->
+  <!-- 图纸区：三级施工简图与系统简图 -->
   <div class="pp-stage">
   <!-- 视图切换（三级简图 / 三级系统图）：2026-09-12 下移到底部状态栏 #ryStatusBar，
        位于「制图」标签之前。同一个节点、同一个 id，JS 用 getElementById('tlTabs') 绑定事件。 -->
@@ -1922,48 +2064,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     </div>
   </div><!-- /.pp-diagram-wrap -->
   </div><!-- /.ry-pane-sys -->
-  <!-- 轴测图：与管线图/系统图同处右主区，由主区顶部 Tab 切换（iso-diagram 模块，只读平面图几何） -->
-  <div class="ry-pane ry-pane-iso">
-  <div class="pp-diagram-wrap" id="tlIsoDiagramWrap">
-    <div id="tlIsoToolbar" style="display:none">
-      <button class="pp-btn-ghost" id="tlIsoZoomIn" type="button" style="padding:5px 12px;font-size:12px" onclick="RyIsoDiagram.zoomIn()" title="放大（也可用鼠标滚轮）">🔍＋ 放大</button>
-      <button class="pp-btn-ghost" id="tlIsoZoomOut" type="button" style="padding:5px 12px;font-size:12px" onclick="RyIsoDiagram.zoomOut()" title="缩小（也可用鼠标滚轮）">🔍－ 缩小</button>
-      <button class="pp-btn-ghost" id="tlIsoZoomFit" type="button" style="padding:5px 12px;font-size:12px" onclick="RyIsoDiagram.zoomFit()" title="复位到适应窗口（也可双击图纸区）">⛶ 适应窗口</button>
-      <span id="tlIsoZoomPct">100%</span>
-      <button class="pp-btn-ghost" id="tlIsoDownload" type="button" style="padding:5px 14px;font-size:12px;margin-left:auto" onclick="RyIsoDiagram.downloadSVG()">📥 下载轴测图 SVG</button>
-      <button class="pp-btn-ghost" id="tlIsoPrint" type="button" style="padding:5px 14px;font-size:12px" onclick="RyIsoDiagram.printSVG()">🖨️ 打印轴测图</button>
-      <!-- 2026-09-27（用户指令）：工具栏上的「📊 管径综合优化」按钮点击无反应 —— 全仓库仅此一处出现该 id，
-           从未绑定任何 click 监听，属死按钮，故按用户要求删除（不只是 display:none）。管径经济对比面板的唯一
-           开启入口仍是右侧折叠细条 #tlEconRail（切入轴测图默认折叠、点细条展开）。
-           原 HTML 保留在下方 HTML 注释内（不影响渲染），便于日后恢复；其复活由 verify_ry_tool.js 的 2b mustNot 把关。
-      <button class="pp-btn-ghost" id="btnOptLaunch" type="button" style="padding:5px 14px;font-size:12px" title="管径综合优化：前期管材投入 vs 后期电费，找年均总成本最低的平衡点">📊 管径综合优化</button>
-      -->
-    </div>
-    <div id="tlIsoDiagramContent"><div class="pp-diagram-empty">完成面积测量并点击「生成管线图」后，切到「轴测简图」视图会根据平面图几何自动生成轴测示意图（含三通与阀门）。</div></div>
 
-    <!-- v120（2026-09-23 用户要求）：管径经济性对比面板 —— 选 总/主/支 管径组合看扬程/功率/管材投入/年电费/年均总成本 -->
-    <div id="tlEconPanel" style="display:none">
-      <link rel="stylesheet" href="mod/style-02.css?v=357">
-      <div class="te-head"><b>💰 管径经济性对比</b><button class="te-close" id="tlEconClose" title="关闭面板">×</button></div>
-      <div class="te-sub" id="teLens">生成管线图后，这里按<b>全地块</b>总/主/支管总长对比不同管径组合的水泵扬程、功率与费用。</div>
-      <div class="te-row" id="tePicks"></div>
-      <div class="te-row" id="teAssum"></div>
-      <div class="te-mid" id="teMid">
-      <div id="teTbl"></div>
-      <div class="te-note" id="teNote"></div>
-      <details id="tePriceDetails"><summary>管材单价表（元/m，占位价可改，自动记忆）</summary><div class="te-prices" id="tePrices"></div></details>
-      </div>
-      <div class="te-foot"><div class="te-sum" id="teSum">—</div><button class="te-apply" id="tlEconApply" title="把选中组合应用到整个地块（同类管道统一改径），水泵扬程/功率随之重算">✓ 应用到图面</button></div>
-    </div>
-    <!-- v126（2026-09-23 用户要求）：面板宽度拖拽条（贴面板左缘，随面板显隐；约定同工具轨拖拽条：
-         没拖过不写任何变量走 CSS 回退宽，拖过即持久化 localStorage，双击恢复默认） -->
-    <div id="tlEconGrip" title="拖拽调整面板宽度（双击恢复默认）"></div>
-    <!-- v127：面板收起后的右侧折叠细条 —— 点它重新展开面板（与左侧工具栏收起条同款交互） -->
-    <!-- 经济对比侧条已移除 -->
-  </div><!-- /.pp-diagram-wrap -->
-  <!-- v122（2026-09-23 用户要求）：轴测图右侧「分区材料统计」栏整体取消（拖拽条一并删除）。
-       渲染/折叠/拖宽函数保留但全部空值守卫（getElementById 落空即 return），历史探针作废。 -->
-  </div><!-- /.ry-pane-iso -->
   <!-- 三级设计工作区（2026-09-13）：可缩放/平移 + 手工插入管线层
        （tl-workspace 模块，只读 window.tlDiagramData；手工层不写回平面数据） -->
   <div class="ry-pane ry-pane-ws">
@@ -1995,7 +2096,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     <!-- 管段管径与损失统计表（2026-09-17 第四十二轮；第四十四轮按用户要求移入工具轨**内部顶端**）：
          按分区逐段列出总管 / 主管 / 支管（段名 + 长度 + 管径 + 改前改后水头损失），管径可就地改
          （同源 AE.cals，与右键改径等效）→ 图面同步 + 本表数值随动。
-         与轴测图「分区材料统计」区别：那张表统计**数量**，本表统计**长度并支持改管径**。
+         本表按分区统计**长度并支持改管径**。
          显隐由 tlWsStatsRender 接管（无图时 display:none）；轨道总宽由右侧 #tlWsSegStatsGrip 调节。 -->
     <aside id="tlWsStats" class="tl-ws-stats" style="display:none">
       <!-- v105（2026-09-22 用户要求）：本表由 JS 总开关 window.TL_WS_STATS_HIDDEN 整体隐藏（tlWsStatsRender 顶部短路）；调回时把该开关改回 false -->
@@ -2052,7 +2153,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
     <button class="tl-ws-btn" id="tlWsMultiBtn" type="button" aria-pressed="false" onclick="tlWsMultiToggle()" title="多选管道：开启后点管身逐段加选（同类型），再点已选段取消该段；点空白清空全部；Ctrl/⌘ + 点管身可直接加选（无需开启）">多选管道</button>
     <!-- v162（2026-09-29 用户要求「三级管线页面增加 管道遮蔽/隐藏功能，被遮蔽的管道不计入
          材料清单」）：点一下进入遮蔽模式 —— 之后点管身即切换该管「遮蔽/取消遮蔽」（不进入拖动）；
-         被遮蔽的管在简图/工作区/轴测图改灰色虚线（管宽不动），且不计入材料清单（管长/管径加权/
+         被遮蔽的管在简图/工作区改灰色虚线（管宽不动），且不计入材料清单（管长/管径加权/
          主管根数派生的三通与阀门件数/挂在该管上的节点配件）。再点本按钮或 Esc 退出。
          右键管身也有「遮蔽此管 / 取消遮蔽」一项（单段与多选都支持）。
          必须在 #tlAutoPipe 之前 —— A6 契约要求生成按钮贴底。 -->
@@ -2121,7 +2222,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
   </div>
   <!-- 工具轨宽度拖拽条（2026-09-17 第四十四轮，用户要求"工具栏宽度可调节"）：
        夹在画布与工具轨之间（网格第 2 列），拖动调节工具轨（含轨内统计表）的宽度；
-       约定同轴测图：没拖过不写任何变量（走 CSS var 回退值），双击恢复默认。 -->
+       约定：没拖过不写任何变量（走 CSS var 回退值），双击恢复默认。 -->
   <div id="tlWsSegStatsGrip" title="拖拽调整工具轨宽度（双击恢复默认）"></div>
   </div><!-- /.ry-pane-ws -->
   </div><!-- /.pp-stage -->
@@ -2329,7 +2430,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
 </section>
 <section id="terrainSection" class="ry-sec terrain-section" aria-label="地形模块">
 <header class="t-top">
-  <h1>⛰️ 地形模块</h1>
+  <h1>⛰️ 地形模块·测试中</h1>
   <span class="t-sub">阶段1 · 边界导入 / 坐标系校验 / 面积 / 高程数据登记</span>
   <span class="t-spacer"></span>
   <button class="t-modebtn on" id="modePreview" title="成果不用于工程放样与水力计算">预览模式</button>
@@ -2678,25 +2779,22 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
 
 <!-- ===== 底部状态栏（工具模式）：当前功能区 + 关键结果，常驻视口底部 ===== -->
 <div class="ry-statusbar" id="ryStatusBar">
-  <!-- 主区 Tab 条（下移到此）：只留「简图」类切换 —— 二级「二级简图」、
-       三级「三级简图 / 系统简图 / 轴测简图」。
+  <!-- 主区 Tab 条（下移到此）：保留三级「三级简图 / 系统简图」切换。
+       二级简图入口已按用户要求停用；实现仍保留在源码中，恢复说明见
+       feature-archive/二级简图/README.md。
        2026-09-15 用户指令：取消「二级制图」「三级制图」两个按钮（冗余入口）——
        回绘图工作区走顶部导航（导航处理器自动复位二级→edit、三级→ws），
        编程入口 rySetTab(sec,'edit'/'ws') 保留供导航处理器使用；无匹配按钮时高亮全灭属预期。
        2026-09-12 按需求从各功能区内部下移到页面左下角；仍是同一批节点、同一批 id ——
        JS 用 getElementById('ppTabs'/'tlTabs') 绑定事件；两组默认都收起，
        当前功能区对应的组显示（见样式区 13 段）。
-       回退方法：把删掉的两个 <button> 放回 #ppTabs / #tlTabs 首行即可。 -->
+       回退方法：按恢复说明重新加入二级入口，并解除 rySetTab 的 draw 视图保护。 -->
   <div class="ry-tabs ry-tabs-st" id="ppTabs" data-ry-sec="pipePlanSection">
-    <button type="button" data-ry-view="draw">二级简图</button>
+    <!-- 二级简图 Tab 暂停显示；保留空容器供旧代码安全查找。 -->
   </div>
   <div class="ry-tabs ry-tabs-st" id="tlTabs" data-ry-sec="tlPipePlanSection">
     <button type="button" data-ry-view="pipe">三级简图</button>
     <button type="button" data-ry-view="sys">系统简图</button>
-    <button type="button" data-ry-view="iso">轴测简图</button>
-    <!-- [v415] 管网 3D 预览入口：非 Tab（无 data-ry-view），不参与 rySetTab 高亮；
-       点击打开全屏 overlay（runye-pipe3d.js），只读 window.tlDiagramData，不回写数据 -->
-    <button type="button" id="tlBtn3D" title="管网 3D 预览（管道/弯头/阀门三维展示，只读）">🧊 3D 模型</button>
   </div>
   <span class="ry-st-tag" id="ryStTag">就绪</span>
   <b id="ryStSection">标准分区预设</b>
@@ -2852,7 +2950,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
           </div>
         </div>
         <div class="tl-plotname-row">
-          <label class="field"><span>地块名称</span><span class="input-shell"><input id="tlPlotName" type="text" placeholder="如：1号灌溉地块" value="七彩花生1号基地"></span></label>
+          <label class="field"><span>地块名称</span><span class="input-shell"><input id="tlPlotName" type="text" placeholder="如：1号灌溉地块" value="1号灌溉地块"></span></label>
         </div>
         <fieldset>
           <legend><span>单个分区</span> 试算</legend>
@@ -2945,19 +3043,19 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
 <script src="mod/material-table.js?v=421-mat-table"></script>
 <!-- [v424-plan-calc-render] 扬程公式与分解展示模块，先于计算控制器和三级调用方装载。 -->
 <script src="mod/plan-calc-render.js?v=424-plan-calc-render"></script>
-<script src="mod/inline-09.js?v=430-shoelace-panel"></script>
+<script src="mod/inline-09.js?v=489-legend-right"></script>
 <!-- [v423-header-layout] 三级简图标题布局依赖 inline-09 的 tlMeasureText 与生成时写入的标题状态。 -->
 <script src="mod/tl-header-layout.js?v=423-header-layout"></script>
 
 <!-- ===== 面积测量工具 JS ===== -->
-<script src="mod/inline-10.js?v=357"></script>
+<script src="mod/inline-10.js?v=482-nav-refit"></script>
 
 <!-- ===== 实际地块规划 JS ===== -->
-<script src="mod/inline-11.js?v=420-split"></script>
+<script src="mod/inline-11.js?v=457-pump-power-semantics"></script>
 <!-- [v420-split] 绘图编辑器 IIFE 自 inline-11 迁出：必须紧随 inline-11 之后同步执行 -->
-<script src="mod/plot-editor.js?v=420-split"></script>
+<script src="mod/plot-editor.js?v=491-recipe-lib"></script>
 <script src="mod/inline-12.js?v=357"></script>
-<script src="mod/inline-13.js?v=357"></script>
+<script src="mod/inline-13.js?v=479-plot-transfer"></script>
 <!-- [v422-head-system-svg] 纯 SVG 核心先于 inline-14 同步加载。 -->
 <script src="mod/head-system-svg.js?v=422-head-system-svg"></script>
 <script src="mod/inline-14.js?v=422-head-system-svg"></script>
@@ -2966,13 +3064,14 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
 <script src="mod/inline-15.js?v=357"></script>
 
 <!-- ===== 地图面积测量回传：消费 runye-map-measure.html 写入的数据 ===== -->
-<script src="mod/inline-16.js?v=357"></script>
+<script src="mod/inline-16.js?v=479-plot-transfer"></script>
+<script src="mod/ry-diag.js?v=476-pwa-reset"></script>
 
 <!-- ===== 主区 Tab 绑定 + 底部状态栏 + 视口自适应 ===== -->
-<script src="mod/inline-17.js?v=357"></script>
+<script src="mod/inline-17.js?v=453-disable-l2-schematic"></script>
 
 <!-- ===== 顶部功能区导航：平滑滚动 + 当前区块高亮 + 隐藏区块自动剔除 ===== -->
-<script src="mod/inline-18.js?v=380"></script>
+<script src="mod/inline-18.js?v=482-nav-refit"></script>
 
 <script src="mod/inline-19.js?v=357"></script>
 
@@ -2980,11 +3079,10 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
 
 <script src="mod/inline-21.js?v=357"></script>
 <script src="modeling/integration.js"></script>
-<!-- 共享图面数据层（2026-09-15 阶段1）：三级工作区 ⇄ 轴测图 手工管线双向同步。必须先于下面两个模块加载 -->
+<!-- 共享图面数据层（2026-09-15 阶段1）：三级工作区手工管线编辑状态。必须先于下面两个模块加载 -->
 <script src="tl-workspace/tl-edit-pipes.js"></script>
-<!-- 自动管线图面编辑层（2026-09-15 阶段2）：二级传递的自动管线 点选/改长/插配件，工作区⇄轴测图双向同步 -->
+<!-- 自动管线图面编辑层（2026-09-15 阶段2）：二级传递的自动管线点选、改长与插配件 -->
 <script src="tl-workspace/tl-auto-edits.js"></script>
-<script src="iso-diagram/iso-diagram.js?v=286"></script>
 
 <!-- ===== 三级设计工作区模块 + 页面接线（2026-09-13） ===== -->
 <script src="tl-workspace/tl-nodes.js"></script>
@@ -2997,19 +3095,14 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
      计算核心与 API 照常加载。将来恢复：改 false 或删除本行。
      注意 pipe-path-loss.js 是三级扬程校核（RyPipePathLoss.calculate）依赖，必须照常加载。 -->
 <script src="mod/inline-23.js?v=357"></script>
-<script src="hydraulic-calc/pipe-path-loss.js"></script>
+<script src="hydraulic-calc/pipe-path-loss.js?v=458-unified-design-path-loss"></script>
 <script src="hydraulic-calc/hydraulic-calc.js"></script>
 <!-- 过滤系统页（2026-09-18 第七十二轮）：GREEN 单体版管路模型 + 选型计算，
      懒挂载（首次可见时建 DOM），与二级/三级计算双向融合。 -->
 <script src="filter-system/filter-system.js"></script>
 <script src="mod/inline-24.js?v=357"></script>
 <script src="mod/inline-25.js?v=357"></script>
-<script src="mod/inline-26.js?v=357"></script>
-<script src="mod/inline-27.js?v=357"></script>
-<script src="iso-diagram/editor.js"></script>
-<script src="iso-diagram/product-catalog.js"></script>
-<script src="iso-diagram/network-model.js"></script>
-<script src="iso-diagram/network-editor.js"></script>
+<script src="mod/inline-27.js?v=457-pump-power-semantics"></script>
 <!-- ═══ CAD 单一操作区：全局左工具栏（2026-09-14；右上角视口切换条已取消） ═══════════
      需求：按 CAD 方式所有工作在一个操作区进行 —— 地块信息是基础底图，不同图纸作为
      图层叠加切换；原三块左属性栏折叠进本工具栏（details 分组，默认全部折叠，
@@ -3027,13 +3120,14 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
       <summary>三级 · 管网参数 / 生成与输出</summary>
       <div class="ry-cad-grp-body" data-pp="tlPipePlanSection" data-host="tlSide"></div>
     </details>
-    <details class="ry-cad-grp" id="ryCadGrpIso">
-      <summary>轴测 · 配件布置</summary>
-      <div class="ry-cad-grp-body" data-pp="tlPipePlanSection" data-host="tlIsoSide"></div>
+    <details class="ry-cad-grp" id="ryCadGrpTerrain">
+      <summary>地形高程</summary>
+      <div class="ry-cad-grp-body" id="ryCadTerrainBody"></div>
     </details>
+
   </div>
 </aside>
-<script src="mod/ry-cad-toolbar.js?v=419-cad-toolbar-split"></script>
+<script src="mod/ry-cad-toolbar.js?v=443-terrain-panel"></script>
 
 <!-- ===== 设置（2026-09-27 用户要求）：顶栏齿轮打开，收纳「可调节的数据」=====
      参考 AutoCAD 的 Options：左侧分类 + 右侧参数 + 底部「恢复本页默认 / 取消 / 保存」。
@@ -3080,9 +3174,9 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.tl-iso-side{displa
      删除本行即整体卸载插件体系，原有功能零影响；插件清单见 plugins.json。 -->
 <script type="module" src="core/bootstrap.js?v=2"></script>
 <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.1/cdn/shoelace.js"></script>
-<script src="mod/ry-panel.js?v=431-panel-layout-cascade"></script>
+<script src="mod/ry-panel.js?v=494-drag-default-left"></script>
 <script src="pwa/vendor/leaflet.js"></script>
-<script src="mod/online-map.js?v=441-map-main-section"></script>
+<script src="mod/online-map.js?v=479-plot-transfer"></script>
 <script src="terrain/terrain-core.js?v=410-elev"></script>
 <script src="terrain/terrain-ui.js?v=442-native"></script>
 <script src="runye-hydraulics-page.js?v=442-native"></script>

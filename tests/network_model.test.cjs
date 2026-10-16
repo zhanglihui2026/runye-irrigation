@@ -4,7 +4,7 @@
  * 覆盖需求验收场景 1-8 + 序列化/撤销/原数据保护。
  * ===================================================================== */
 'use strict';
-const NM = require('../iso-diagram/network-model.js');
+const NM = require('../feature-archive/三维与轴测图/source/iso-diagram/network-model.js');
 const ConstructionNetwork = NM.ConstructionNetwork;
 
 let pass = 0, fail = 0;

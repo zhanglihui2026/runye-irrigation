@@ -1,8 +1,8 @@
 # 数字农业模块（digital-agriculture/）
 
-润野数字农业子系统的统一目录：七彩花生水肥与植保决策、数字农业工作台、生育期与植保节点数据源。2026-09-13 自仓库根目录剥离而来。开发规则见 `AGENTS.md`。
+润野数字农业子系统集中在本目录，包含七彩花生水肥与植保、辣椒植保、气候与市场决策和农艺参考资料。数字农业工作台源码已从运行目录移至 `../feature-archive/数字农业工作台/`，不再从本模块提供入口。开发规则见 `AGENTS.md`。
 
-**系统边界（v382 起）**：灌溉导航入口、`irrigation-bridge.js` 和绘制边界后自动回写工作台的握手已移除。数字农业工作台仍与灌溉工具通过同源 localStorage 键 `runye_plot_library` 共享地块数据；该共享存储是当前遗留跨模块契约，字段约定见根目录 `RYPLOT_SCHEMA.md`。早期拆分方案 `../docs/digital-agriculture-extraction.md` 记录的是 v382 之前的设计，不代表当前握手仍可用。
+**系统边界：** 数字农业运行页面不依赖灌溉页面 DOM、账号、云服务或 `runye_plot_library`。花生决策页的面积、区域、播期、底肥与天气参数仅保存在本页本机状态中。旧快照 key 不再读取，也不自动删除浏览器残留数据。灌溉工具保留自身的作物需水设计输入和项目档案作物标签；这些数据不与数字农业页面共享。工作台源码当前归档且不执行；唯一允许的未来跨模块关系是灌溉工具把地块单向交给工作台，当前没有活动接收端。
 
 ## 站点结构
 
@@ -10,19 +10,22 @@
 | --- | --- |
 | `index.html` | 数字农业统一入口（导航卡片；可独立使用） |
 | `peanut-tool.html` | 七彩花生水肥与植保决策工具（原根目录 `peanut-tool.html`） |
-| `workbench.html` | 数字农业工作台：地块全周期管理（原根目录 `workbench.html`） |
-| `qicai-huasheng/schedule-core.js` | 生育期与植保节点**唯一数据源**（原根 `qicai-huasheng/schedule-core.js`） |
+| `qicai-huasheng/` | 七彩花生植保方案、每日建议、配置及素材；`schedule-core.js` 是生育期与植保节点**唯一数据源** |
+| `lajiao-zhibao/` | 辣椒全程植保方案 |
+| `decision-engine/` | 气候/市场通用决策与辣椒决策页面 |
+| `references/` | 花生农艺参考资料 |
 | `digital-agriculture.css` | 入口页样式 |
-| `digital-agriculture.js` | 读取并校验历史遗留的只读地块快照；当前无灌溉侧生产方 |
 
-旧地址兼容：根目录 `peanut-tool.html` / `workbench.html` / `数字农业.html` 为跳转壳（`location.replace` 到本目录）；根 `qicai-huasheng/schedule-core.js` 为同步兼容加载器。
+数字农业生育期计算云函数源码保存在 `cloud-functions/calcStage/`，但当前不属于润野灌溉的 CloudBase 部署清单，也没有活动调用方。部署配置只保留灌溉主程序使用的 `syncDb`。如需恢复作物计算服务，应在数字农业侧单独部署并核对调用关系，不要将其重新加入灌溉主程序的 `cloudbaserc.json`。
+
+旧地址兼容：根目录 `peanut-tool.html` / `数字农业.html` 及根 `qicai-huasheng/`、`lajiao-zhibao/`、`decision-engine/` 页面均为轻量跳转壳（`location.replace` 到本目录并保留 query/hash）；根 `qicai-huasheng/schedule-core.js`、`schedule-data.js`、`schedule-details.js` 为兼容加载器。根 `workbench.html` 跳转壳不存在且不再提供。
 
 ## 历史数据兼容
 
-`digital-agriculture.js` 暂时保留对 `runye_digital_bridge_v1` 的只读解析，以兼容浏览器中可能残留的旧快照。v382 已删除根目录 `irrigation-bridge.js` 及其加载入口，因此当前没有该快照的生产方，也不保证能从灌溉工具获得新数据。工作台对 `runye_plot_library` 的共享读写仍在运行；不要将旧 `runye_pending_land` 回写握手与该共享地块库混为一谈。
+浏览器中可能残留 `runye_digital_bridge_v1`、`runyePlotData` 等旧 key；当前代码不再读取或删除它们。`runye_plot_library` 归润野灌溉所有，数字农业页面不得访问。工作台归档期间，数字农业模块独立运行。
 
-- 如果浏览器仍有旧快照，入口页可能展示它；它不代表当前灌溉项目状态。
-- 不新增灌溉侧写入、回跳或边界回写逻辑。若未来确需跨系统交换数据，应先重新确定产品边界、数据所有者和经确认的接口契约。
+- 灌溉与种植页面之间不共享运行数据、账号、云服务或导航入口。
+- 若恢复工作台，唯一允许的接口是灌溉工具显式发送地块快照到工作台；工作台不得回写灌溉工程，种植页面不得直接读取该快照。
 
 ## 本地使用
 

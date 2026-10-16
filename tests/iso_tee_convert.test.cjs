@@ -4,7 +4,7 @@
  *       渲染含接管、fittingInfo 生效字段、统计接管长度计入、撤销、存档往返与非法档拒收。
  * 运行：node tests/iso_tee_convert.test.cjs （退出码非 0 即失败） */
 'use strict';
-const iso = require('../iso-diagram/iso-diagram.js');
+const iso = require('../feature-archive/三维与轴测图/source/iso-diagram/iso-diagram.js');
 const assert = require('assert');
 
 let pass = 0, fail = 0;

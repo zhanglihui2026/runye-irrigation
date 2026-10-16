@@ -17,7 +17,7 @@
        ⇒ 「按块进三级页」= 切到该块 → 把同一条环写进 measuredPolygon → 生成。
        三级页内部一行都不用改（全站 88 处引用 tlDiagramData 的地方也都不用改）。
 
-   ★ 本页只做**组级**的事。块级的重活（自动布管 / 管径 / 水力 / 系统图 / 轴测图）
+   ★ 本页只做**组级**的事。块级的重活（自动布管 / 管径 / 水力 / 系统图）
      全部仍走三级页，按块分别进 —— 这正是「各块完全独立」的结构保证。
    ============================================================================ */
 (function () {
@@ -1104,9 +1104,9 @@
     try { if (typeof tlAutoGenerate === 'function') { tlAutoGenerate({ scroll: false }); grRestoreBlockEdits(); } } catch (e) { console.warn('Group block L3:', e); }
     grRenderTlBar();
     /* [v242] 落点复核（用户反馈「我这边双击进去的不是三级页面」）：
-       「进哪一页」这件事在本工程里不止一处会写 —— 二级页出图那条路自带
-       ppShowConstructDiagram() → rySetTab('pipePlanSection',...)（v104 的注释就写着
-       「顺序不可颠倒」，那次事故的成因完全一样），而且还有 refit / scrollIntoView
+       「进哪一页」这件事在本工程里不止一处会写 —— 旧版二级页出图曾调用
+       ppShowConstructDiagram() → rySetTab('pipePlanSection',...)；二级简图入口现已停用，
+       但还要防 refit / scrollIntoView
        一类延后执行的动作。所以这里在下一帧与 150ms 后各复核一次：
        只要当前被激活的不是三级页，就再切回来。正常情况这两次都是空操作（幂等、零开销）。 */
     var tlWant = 'tlPipePlanSection';

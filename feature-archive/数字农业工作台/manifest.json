@@ -1,0 +1,40 @@
+{
+  "archiveId": "digital-agriculture-workbench",
+  "status": "detached",
+  "source": "digital-agriculture/workbench.html",
+  "files": [
+    {
+      "path": "source/digital-agriculture/workbench.html",
+      "sha256": "2ECD1C72C667D6D666A1F7A968B48156D76CE6929906349CF935090910C484F2",
+      "role": "完整原始工作台页面源码"
+    },
+    {
+      "path": "automation-snapshot/.github/workflows/daily-data.yml",
+      "sha256": "464D051B4AF79D04613C87301DFABF105326D5A7D875C49556CC70044311F8C1",
+      "role": "已停用的每日数据自动化工作流"
+    },
+    {
+      "path": "automation-snapshot/.github/scripts/fetch_daily.py",
+      "sha256": "84479AE3EF85CFB1D4FEDE0A6A71944E54DE6AB57EAEE2C7FC6A55E732774AA5",
+      "role": "每日天气/资讯抓取脚本原件"
+    },
+    {
+      "path": "automation-snapshot/data/daily.json",
+      "sha256": "2CB8CCC5EC56E2411E92CD6D18B26FA88FA89B20A674289ED3A69F6C61EE7CC0",
+      "role": "停用前最后一份数据快照"
+    },
+    {
+      "path": "README.md",
+      "role": "归档边界与恢复步骤"
+    },
+    {
+      "path": "integration-snapshot/routes-before.md",
+      "role": "剥离前运行入口记录"
+    }
+  ],
+  "runtimeLinksRemoved": [
+    "digital-agriculture/index.html -> workbench.html",
+    "qicai-huasheng/index.html -> ../workbench.html"
+  ],
+  "serviceWorkerCached": false
+}
