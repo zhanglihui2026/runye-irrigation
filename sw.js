@@ -357,8 +357,14 @@
       修法：runye-entitle.js 只读访问器 + 深冻结 state；plot-editor #ppAiPlan fail-closed；
       terrain-ui.js 统一门控（独立页 + 主页 #terrainSection 两入口）；管路接驳拼装.html 补门控。
    ② [并行会话] 水力拓扑拒绝 NaN/越界经纬度管段。
-   ①② 均改到 CORE 白名单内文件 → 必须抬版本重建离线缓存。 */
-const VERSION = 'v513-sec-gate-hydraulic-coord';
+   ①② 均改到 CORE 白名单内文件 → 必须抬版本重建离线缓存）→
+   v514-plot-library-read-store：项目恢复与诊断页的只读地块库消费改走 RyPlotLibraryStore；
+   v515-map-library-read-store：在线地图的当前/最近地块、列表与工程导出统一使用该适配器；
+   v516-map-transfer-read-store：分区接收端从地块库按稳定引用解析时也统一经过该适配器；
+   v517-tl-targetv-single-entry：三级水力项卡的「目标流速」输入取消（2026-10-17 用户要求，
+   二级工具栏 #planTargetV 是唯一入口），三级改读二级值 + 二级输入实时联动；
+   mod/inline-09.js / mod/plot-editor.js / index.html 都在 CORE，必须抬版本重建离线缓存。 */
+const VERSION = 'v517-tl-targetv-single-entry';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

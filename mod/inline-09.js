@@ -2580,7 +2580,8 @@ function tlUpdatePlanBar() {
   if(zoneCountInput) zoneCountInput.value = zc;
   /* 2026-09-16 面板「总管长度」输入已取消：tlUpdatePlanBar 不再读取/覆盖 tl_frontPipeLen，
      总管长度改由下方水力参数卡「联合灌溉 总管选型」独立控制（默认 200 不变，存档照常）。 */
-  var tv = readNumber('tlPlanTargetV', 1.5, { min: 0.01 });
+  /* [v517] 三级面板「目标流速」输入已取消：改读二级工具栏 #planTargetV（唯一入口）。 */
+  var tv = readNumber('planTargetV', 1.5, { min: 0.01 });
   var tvInput = document.getElementById('tl_targetV');
   if(tvInput) tvInput.value = tv;
 
@@ -4705,8 +4706,14 @@ document.querySelectorAll('#tlZoneCountGroup button').forEach(function(btn){
 // Plan bar inputs
 /* 2026-09-16 面板「总管长度」输入已取消：其 input/change 两个监听一并删除（元素不存在
    会 getElementById→null→TypeError 中断整段脚本，见删除控件的守卫纪律） */
-document.getElementById('tlPlanTargetV').addEventListener('input', tlUpdatePlanBar);
-document.getElementById('tlPlanTargetV').addEventListener('change', tlUpdatePlanBar);
+/* [v517] 三级「目标流速」输入已取消，实时联动迁到二级 #planTargetV（沿用原「改动即重算」体验）。
+   守卫纪律：元素可能不存在（接管页/测试沙箱），必须判空，不得裸 getElementById().addEventListener */
+(function () {
+  var tvSrc = document.getElementById('planTargetV');
+  if (!tvSrc) return;
+  tvSrc.addEventListener('input', tlUpdatePlanBar);
+  tvSrc.addEventListener('change', tlUpdatePlanBar);
+})();
 
 // ===== Scroll Reveal =====
 function initScrollReveal() {

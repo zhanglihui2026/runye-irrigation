@@ -2331,8 +2331,8 @@
       set('planZoneMuManual',p.zoneMu);set('planTargetV',p.targetV);set('planTapePressure',p.tapePressure);
       set('planTapeLaySide',p.tapeLaySide);set('planTapeSpacing',p.tapeSpacing);
       set('planEmitterSpacing',p.emitterSpacing);set('planEmitterFlow',p.emitterFlow);set('planLift',p.lift);
-      try{var t3=document.getElementById('tlPlanTargetV');
-        if(t3&&p.targetV!==null&&p.targetV!==undefined&&isFinite(+p.targetV)){t3.value=p.targetV;t3.dispatchEvent(new Event('input',{bubbles:true}));}}catch(e){}
+      /* [v517] 三级 tlPlanTargetV 输入已取消：planTargetV（上面已 set+派发事件）是唯一入口，
+         三级经 mod/inline-09.js 的联动监听自动跟随，无需再单独回填。 */
       if(typeof ppRepartitionFromRotatedPlot==='function'){try{ppRepartitionFromRotatedPlot({aiApply:true});}catch(e){}} /* [v326] */
     }
     function checkPlan(){
@@ -2374,7 +2374,7 @@
        {version:1, recipes:[{id,name,at,params:{10 个参数 id:值}}]}
      交互（全部无弹窗，反馈走 #ppRecipeStatus）：
        💾 存  —— 按名称框保存（同名覆盖更新；空名自动「方案 N」）；
-       调用   —— 回填 10 值 + 派发 change/input 触发实时重算（含三级 tlPlanTargetV 联动、
+       调用   —— 回填 10 值 + 派发 change/input 触发实时重算（v517 起三级无独立目标流速输入、
                  按新参数重划分区，与 ppAiPlanFlow.applyPlan 同一套联动）；
        ✎ 改名 —— 用名称框内容改选中方案名（名称框为空则提示）；
        🗑 删除 —— 删选中方案。
@@ -2397,8 +2397,7 @@
         if(el&&v!==null&&v!==undefined&&isFinite(+v)&&String(v)!==''){el.value=v;
           el.dispatchEvent(new Event('change',{bubbles:true}));el.dispatchEvent(new Event('input',{bubbles:true}));}}
       IDS.forEach(function(id){set(id,p[id]);});
-      try{var t3=$('tlPlanTargetV');
-        if(t3&&p.planTargetV!==null&&p.planTargetV!==undefined&&isFinite(+p.planTargetV)){t3.value=p.planTargetV;t3.dispatchEvent(new Event('input',{bubbles:true}));}}catch(e){}
+      /* [v517] 同上：三级输入已取消，IDS 里的 planTargetV 就是唯一入口。 */
       if(typeof ppRepartitionFromRotatedPlot==='function'){try{ppRepartitionFromRotatedPlot({aiApply:true});}catch(e){}}
     }
     function refreshSelect(keepId){

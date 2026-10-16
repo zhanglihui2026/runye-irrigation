@@ -1978,7 +1978,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.pp-grip-side,
     </div>
     <!-- 2026-09-16 用户要求：左栏面板「总管长度」输入取消（总管长度仍可在下方水力参数卡
          「联合灌溉 总管选型」里调整，tl_frontPipeLen 保留；tlUpdatePlanBar 不再覆盖它） -->
-    <!-- 目标流速现位于三级水力项表头下、联合流量上方；保留原 id 和实时重算联动。 -->
+    <!-- [v517] 「目标流速」输入已从三级取消（唯一入口在二级工具栏 #planTargetV）。 -->
   </div>
   <div class="pp-plan-bar pp-plan-bar-result tl-plan-result" id="tlPlanBar2">
     <!-- ★ v109 关键发现（2026-09-22）：三级页切 tab 时本栏随 #tlSide 被**搬移**进 CAD 侧栏
@@ -1991,8 +1991,10 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.pp-grip-side,
          与表头错位达 50px —— 见 _p1/_v109_measure.cjs 实测）。v109b：单位并入设计值单元格文本
          （用户要求单位紧贴数值，删除独立单位槽 —— 改径重算列 "33.6 m" 同款）。 -->
     <span class="pp-plan-item pp-plan-cols-head"><span class="pp-plan-label">水力项</span><span class="pp-cols-h1">设计值</span><span class="pp-cols-h2">改径重算</span></span>
-    <!-- 目标流速置于“水力项”表头下、联合流量上方；保留原 id 与实时重算监听。 -->
-    <span class="pp-plan-item tl-target-v-row"><span class="pp-plan-label">目标流速</span><input type="number" id="tlPlanTargetV" value="1.5" min="0.3" max="5" step="0.1" title="设计流速（m/s）：管径选型的基准，改动后会实时重算管径 / 扬程 / 流速"><span class="tl-tv-unit">m/s</span></span>
+    <!-- [v517] 目标流速输入已取消（2026-10-17 用户要求）：二级工具栏 #ppPlanBar 的
+         #planTargetV 是唯一入口，这里不再重复开命令入口。三级 tlUpdatePlanBar 改读二级值
+         （mod/inline-09.js），二级输入 input/change 实时联动三级重算；
+         水力参数卡的「目标经济流速」#tl_targetV 仍由 tlUpdatePlanBar 用同一值同步。 -->
     <span class="pp-plan-item"><span class="pp-plan-label">联合流量</span><span class="pp-plan-val" id="tlPlanCombinedFlow">— m³/h</span></span>
     <!-- v106（2026-09-22 用户要求）：联合流量底下、水泵流量上方注明依据 —— 按哪个联合分区、实际多少亩 -->
     <span class="pp-plan-item" id="tlPlanCombinedSrc" style="display:none;font-size:11px;color:#64748b"></span>
@@ -3053,7 +3055,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.pp-grip-side,
 <script src="mod/material-table.js?v=421-mat-table"></script>
 <!-- [v424-plan-calc-render] 扬程公式与分解展示模块，先于计算控制器和三级调用方装载。 -->
 <script src="mod/plan-calc-render.js?v=424-plan-calc-render"></script>
-<script src="mod/inline-09.js?v=509-flow-in-plotgroup"></script>
+<script src="mod/inline-09.js?v=517-tl-targetv"></script>
 <!-- [v423-header-layout] 三级简图标题布局依赖 inline-09 的 tlMeasureText 与生成时写入的标题状态。 -->
 <script src="mod/tl-header-layout.js?v=423-header-layout"></script>
 
@@ -3063,7 +3065,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.pp-grip-side,
 <!-- ===== 实际地块规划 JS ===== -->
 <script src="mod/inline-11.js?v=457-pump-power-semantics"></script>
 <!-- [v420-split] 绘图编辑器 IIFE 自 inline-11 迁出：必须紧随 inline-11 之后同步执行 -->
-<script src="mod/plot-editor.js?v=513-sec-gate"></script>
+<script src="mod/plot-editor.js?v=517-tl-targetv"></script>
 <script src="mod/inline-12.js?v=357"></script>
 <script src="mod/inline-13.js?v=499-plot-library-store"></script>
 <!-- [v422-head-system-svg] 纯 SVG 核心先于 inline-14 同步加载。 -->
