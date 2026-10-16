@@ -112,6 +112,8 @@ graphify-out/
 _pdbg_tmp.mjs
 _smoke_publish.mjs
 _verify_*.mjs
+# 导航点击绑定回归脚本（v511）：等权益就绪后走 导航→三级简图→再点导航 全流程
+_repro_*.mjs
 
 # Vite 构建缓存（可再生，不提交）
 .vite/

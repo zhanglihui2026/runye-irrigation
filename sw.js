@@ -327,6 +327,7 @@
 // 损坏/重复编号/并发冲突时停止写入，并更新主页面与独立地图页资源版本。
 // v507-auto-current-safe-write：主规划页自动地块清理/同步改走共享store，坏库、重复ID及revision冲突均拒绝覆盖。
 // v508-project-import-safe-rollback：在线地图工程导入走地块库store；多键失败回滚按revision/已写入快照保护。
+// v510-remove-missing-pages：移除已删除的AI协同跳转页与旧测试面板页面的CORE缓存引用，避免预缓存请求悬空。
 // v509-flow-in-plotgroup（2026-10-16 用户实测截屏「三级简图水流动画的路径偏离了，应该跟总管/主管/
 // 支管都重叠」）：轮灌演示的水流层原先 appendChild 到 svg 根，不随 #tlPlotGroup 的「图面整体拖动」
 // transform=translate(x,y) 平移 —— 病史同 v183 节点层、v488 紫线标注。图面只要被拖动过（哪怕手抖
@@ -338,7 +339,16 @@
    本次不动），这次改的是「多久换下一组」。间隔抽成具名常量 TL_DEMO_INTERVAL_MS（inline-09.js），
    ▶ 按钮 title 与三处注释同步改为「1 秒一组」；index.html 引用 inline-09.js ?v=500-dim-gap
    → ?v=504-demo-interval。mod/inline-09.js 在 CORE 白名单，必须抬版本。 */
-const VERSION = 'v509-flow-in-plotgroup';
+/* v511-nav-rebind（2026-10-16 用户实测「管路规划切换三级简图之后，再点击管路规划，无法切换到
+   管路规划页面」）：顶部导航的点击绑定失效。runye-nav.js 的 RyEntitle.onChange → RyFnNav.render()
+   会在会员权益异步就绪时**重建**全部 [data-ry-navitem]，而 mod/inline-18.js 在解析期就把 click
+   绑在那批旧元素上 ⇒ 新元素只剩浏览器原生锚点跳转 → hashchange → ryJumpToSection →
+   ryShowSection（这条路径不复位视图，三级仍停 data-ry-view="pipe"、data-ry-clean 仍 "1"），
+   同时 activate() 点亮的是脱离文档的旧节点 ⇒ 导航高亮一并丢失。
+   修法：收集抽成可重入 collectItems()；点击行为抽成具名 navItemClick()；绑定按元素标记去重；
+   在 #fnNav 上挂 MutationObserver（childList+subtree），重建后重收 + 补绑 + 按当前激活功能区
+   恢复高亮。病史同 v376 的「重建后 href 改写丢失」。mod/inline-18.js 在 CORE 白名单，必须抬版本。 */
+const VERSION = 'v511-nav-rebind';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
@@ -466,7 +476,6 @@ const CORE = [
   "runye-terrain.css",
   "runye-ai-plan.js",
   "runye-ai-plan.css",
-  "runye-ai-chat-test.html",
   "manifest.webmanifest",
   "modeling/integration.js",
   "modeling/workspace.css",
@@ -509,7 +518,6 @@ const CORE = [
   "runye-mobile.js",
   "runye-nav.css",
   "runye-nav.js",
-  "runye-test-panel.html",   /* [v438] 测试分区：侧边工具面板样板独立页（Shoelace 走 CDN，由 RUNTIME 缓存兜底） */
   "runye-theme.css",
   "runye-typography.css",
   "terrain/index.html",

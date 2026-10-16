@@ -27,7 +27,7 @@
 | --- | --- | --- | --- |
 | 地形模块 | `terrain/index.html` → `terrain/terrain-ui.js` | 同源 iframe；嵌入时隐藏副导航 | `plugins/contour-dxf/main.js` 会直接读写 `frTerrain.contentWindow.RyTerrainUI.state`；迁移时改成共享 `RyTerrainData`/明确的宿主 API。`terrain.css` 目前含 `:root`、`body`、通用控件选择器，会污染主页面，需先限定作用域。 |
 | 水力校核 | `runye-hydraulics.html` → 内联界面控制脚本 | 同源 iframe；嵌入时隐藏副导航 | 计算核心已在主页面入口加载；独立页另加载 `runye-hydraulics-core.js`，迁移时要统一脚本所有权并避免重复 ID。样式需限定在水力校核区域。 |
-| 测试分区 | 原为 `runye-test-panel.html` | 已从产品导航和 iframe 壳移除；样板文件保留 | 页面自述为“样板”、控件数据为示意，不是业务功能；暂留作 UI 设计参考，不再占用产品导航入口。 |
+| 测试分区 | 原为 `runye-test-panel.html`；样板现由 `ryp-demo.html` 承载 | 已从产品导航、iframe 壳和 Service Worker 核心缓存移除 | 原页面在 2026-10-16 的清理提交中删除；`ryp-demo.html` 直接引用共享面板组件作为样式与交互参考。 |
 
 建议迁移顺序：先处理地形页的状态 API 和 CSS 作用域，再将地形界面挂到主文档；随后迁移水力校核页面并归并重复的核心加载。全部导航路由切换到原生区域后，再移除 `#ryFrameShell` 与 `mod/inline-31.js` 的 iframe 切换逻辑。
 

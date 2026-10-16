@@ -18,32 +18,51 @@
      一旦功能区真的按 display:none 收起，锚点就无处可跳，表现为"点了没反应"。 */
   function isTool(){ return document.body.classList.contains('ry-tool') || (window.RyMobile && window.RyMobile.isActive()); }
 
-  var items=[];
-  Array.prototype.slice.call(nav.querySelectorAll('.fn-link')).forEach(function(a){
-    var id=a.getAttribute('data-target');
-    // 无 data-target 的是普通站内页链接（如「滴灌带查询」）：原样保留，不参与滚动高亮
-    if(!id) return;
-    var sec=document.getElementById(id);
-    if(!sec){ if(a.parentNode) a.parentNode.removeChild(a); return; }
-    // 目标区块被 display:none 隐藏时（页面已隐藏「管网布置」「数据对比」），同步从导航剔除。
-    // 例外：工具模式下所有非当前功能区都是 display:none，但它们是本模式管理的功能区
-    //       （带 .ry-sec），必须保留在导航里，否则切一次导航就被清空。
-    if(sec.offsetParent===null && !(isTool() && sec.classList.contains('ry-sec'))){
-      if(a.parentNode) a.parentNode.removeChild(a); return;
-    }
-    a.setAttribute('href','#'+id);
-    items.push({link:a, sec:sec});
-  });
+  /* ★ [v511 2026-10-16] 导航项收集改为「可重入」。
+     用户实测：管路规划 → 底部切「三级简图」→ 再点顶部「管路规划」，视图卡在 pipe
+     回不到工作区。根因＝runye-nav.js 的 RyEntitle.onChange → RyFnNav.render() 会在
+     「会员权益异步就绪」时**重建**全部 [data-ry-navitem]（先摘旧节点、再建新节点）。
+     本脚本在解析期就把 click 绑在**那批旧元素**上，重建一发生就两处同时坏掉：
+       · 新元素没有 click 处理器 ⇒ 点击只剩浏览器原生锚点跳转 → hashchange →
+         ryJumpToSection → ryShowSection —— 这条路**不复位视图**（三级仍停在 pipe），
+         也不清 data-ry-clean，正是用户看到的现象；
+       · activate() 点亮的是已脱离文档的旧节点 ⇒ 导航高亮一并丢失。
+     病史同 v376（runye-nav.js 里「重建后 href 改写丢失」那段注释记的是同一根因）。
+     ⇒ 收集抽成可重入的 collectItems()，并在文件下半部挂 MutationObserver，
+        导航一被重建就重收 + 补绑 + 恢复高亮。 */
+  function collectItems(prune){
+    var out=[];
+    Array.prototype.slice.call(nav.querySelectorAll('.fn-link')).forEach(function(a){
+      var id=a.getAttribute('data-target');
+      // 无 data-target 的是普通站内页链接（如「滴灌带查询」）：原样保留，不参与滚动高亮
+      if(!id) return;
+      var sec=document.getElementById(id);
+      if(!sec){ if(prune && a.parentNode) a.parentNode.removeChild(a); return; }
+      // 目标区块被 display:none 隐藏时（页面已隐藏「管网布置」「数据对比」），同步从导航剔除。
+      // 例外：工具模式下所有非当前功能区都是 display:none，但它们是本模式管理的功能区
+      //       （带 .ry-sec），必须保留在导航里，否则切一次导航就被清空。
+      if(sec.offsetParent===null && !(isTool() && sec.classList.contains('ry-sec'))){
+        if(prune && a.parentNode) a.parentNode.removeChild(a); return;
+      }
+      a.setAttribute('href','#'+id);
+      out.push({link:a, sec:sec});
+    });
+    return out;
+  }
+  /* prune 只在初始化这一次为 true：把页面自身隐藏的区块（管网布置/数据对比）从导航里摘掉。
+     重建后的重收用 false —— 那时 DOM 是渲染器刚产出的，不该再动它的节点。 */
+  var NAV_BOUND='_ryNavClickBound';
+  var items=collectItems(true);
   if(!items.length) return;
-
-  var links=items.map(function(it){ return it.link; });
 
   function stickyOffset(){
     var h=head?head.getBoundingClientRect().height:0;
     return h + nav.getBoundingClientRect().height;
   }
+  /* [v511] 不再预算 links 快照：导航重建后 items 整体换新，
+     高亮必须按**当前**元素列表算，否则点亮的是脱离文档的旧节点（表现为「高亮丢了」）。 */
   function activate(link){
-    links.forEach(function(a){ a.classList.toggle('active', a===link); });
+    items.forEach(function(it){ it.link.classList.toggle('active', it.link===link); });
   }
   function scrollYNow(){
     return window.pageYOffset || document.documentElement.scrollTop || 0;
@@ -157,52 +176,88 @@
     return true;
   };
 
-  items.forEach(function(it){
-    it.link.addEventListener('click', function(e){
-      e.preventDefault();
-      /* [v193] 成组地块拦截三级页入口：在导航这里就 return，
-         否则 rySetTab / ryShowSection 里的拦截会各弹一次窗（一次点击两声 alert）。 */
-      if(it.sec && it.sec.id==='tlPipePlanSection' && typeof ryGroupThirdLevelGuard==='function' && ryGroupThirdLevelGuard())return;
-      /* 若目标区块停在满屏视图（.sys-view 施工图 / .pipe-view 管线图），
-         点导航应回到绘图编辑区，而非停留在简图区 —— 先退出满屏态。 */
-      if(it.sec.classList.contains('sys-view')) it.sec.classList.remove('sys-view');
-      if(it.sec.classList.contains('pipe-view')) it.sec.classList.remove('pipe-view');
-      /* ★ 顶部导航＝绘图工作区（2026-09-13）：不管底部状态栏切到哪个简图，
-         点顶部一律回到该功能区的绘图工作区 —— 二级复位到「管线编辑」、
-         三级复位到「三级设计工作区」，并清除输出模式标记（左属性栏恢复）。
-         rySetTab 会把三级的标记写成 "1"，所以复位后必须再写 "0"（顺序不可倒）。
-         try/catch：此处任何异常都会中断整个 forEach，后续导航项将全部失绑。 */
-      try{
-        if(typeof rySetTab==='function'){
-          if(it.sec.id==='pipePlanSection' && it.sec.getAttribute('data-ry-view')!=='edit'){
-            rySetTab(it.sec.id,'edit');
-          }else if(it.sec.id==='tlPipePlanSection' && it.sec.getAttribute('data-ry-view')!=='ws'){
-            rySetTab(it.sec.id,'ws');
-          }
+  /* 单个导航项的点击行为。与「绑定」解耦成具名函数（[v511]）：
+     导航重建后新元素复用同一份逻辑，不用把整段处理器再抄一遍。 */
+  function navItemClick(it, e){
+    e.preventDefault();
+    /* [v193] 成组地块拦截三级页入口：在导航这里就 return，
+       否则 rySetTab / ryShowSection 里的拦截会各弹一次窗（一次点击两声 alert）。 */
+    if(it.sec && it.sec.id==='tlPipePlanSection' && typeof ryGroupThirdLevelGuard==='function' && ryGroupThirdLevelGuard())return;
+    /* 若目标区块停在满屏视图（.sys-view 施工图 / .pipe-view 管线图），
+       点导航应回到绘图编辑区，而非停留在简图区 —— 先退出满屏态。 */
+    if(it.sec.classList.contains('sys-view')) it.sec.classList.remove('sys-view');
+    if(it.sec.classList.contains('pipe-view')) it.sec.classList.remove('pipe-view');
+    /* ★ 顶部导航＝绘图工作区（2026-09-13）：不管底部状态栏切到哪个简图，
+       点顶部一律回到该功能区的绘图工作区 —— 二级复位到「管线编辑」、
+       三级复位到「三级设计工作区」，并清除输出模式标记（左属性栏恢复）。
+       rySetTab 会把三级的标记写成 "1"，所以复位后必须再写 "0"（顺序不可倒）。
+       try/catch：此处任何异常都只中断本次点击；[v511] 起各项各自持有处理器，
+       不再共用一个 forEach，因此不会像旧写法那样「一坏就整条导航全失绑」。 */
+    try{
+      if(typeof rySetTab==='function'){
+        if(it.sec.id==='pipePlanSection' && it.sec.getAttribute('data-ry-view')!=='edit'){
+          rySetTab(it.sec.id,'edit');
+        }else if(it.sec.id==='tlPipePlanSection' && it.sec.getAttribute('data-ry-view')!=='ws'){
+          rySetTab(it.sec.id,'ws');
         }
-        it.sec.setAttribute('data-ry-clean','0');
-      }catch(err){}
-      /* ★ 工具模式＝单视口切换：点导航直接换功能区，不做滚动定位。
-         这里以前缺这条分支 —— 工具模式下其它功能区都是 display:none，
-         锚点无处可跳，点击因此"完全没反应"。 */
-      if(isTool()){
-        /* rySetTab 会在目标未激活时自行切入；避免再激活一次并排队两次 resize。 */
-        if(!it.sec.classList.contains('ry-active')) ryShowSection(it.sec, it.link);
-        else activate(it.link);
-        return;
       }
-      /* 落点 = 区块顶 − 吸顶高度，**不再额外多减 14px**。
-         吸顶区实际高 37px（.fn-nav 内容 36px + 1px 底边线），stickyOffset() 已按
-         真实高度返回 37，减满 37 才能让功能区的上边正好贴上导航底边。
-         原写法 `- stickyOffset() - 14` 会让落点再低 14px —— 上一个功能区的最后
-         14px 就会从导航下方露出来，看起来像"上一个功能区串进了本功能区"。
-         此处与 CSS 的 scroll-margin-top:calc(var(--fn-nav-h) + 1px) 完全一致。 */
-      var top=it.sec.getBoundingClientRect().top + scrollYNow() - stickyOffset();
-      if(top<0) top=0;
-      jumpTo(top);
-      activate(it.link);
-    });
-  });
+      it.sec.setAttribute('data-ry-clean','0');
+    }catch(err){}
+    /* ★ 工具模式＝单视口切换：点导航直接换功能区，不做滚动定位。
+       这里以前缺这条分支 —— 工具模式下其它功能区都是 display:none，
+       锚点无处可跳，点击因此"完全没反应"。 */
+    if(isTool()){
+      /* rySetTab 会在目标未激活时自行切入；避免再激活一次并排队两次 resize。 */
+      if(!it.sec.classList.contains('ry-active')) ryShowSection(it.sec, it.link);
+      else activate(it.link);
+      return;
+    }
+    /* 落点 = 区块顶 − 吸顶高度，**不再额外多减 14px**。
+       吸顶区实际高 37px（.fn-nav 内容 36px + 1px 底边线），stickyOffset() 已按
+       真实高度返回 37，减满 37 才能让功能区的上边正好贴上导航底边。
+       原写法 `- stickyOffset() - 14` 会让落点再低 14px —— 上一个功能区的最后
+       14px 就会从导航下方露出来，看起来像"上一个功能区串进了本功能区"。
+       此处与 CSS 的 scroll-margin-top:calc(var(--fn-nav-h) + 1px) 完全一致。 */
+    var top=it.sec.getBoundingClientRect().top + scrollYNow() - stickyOffset();
+    if(top<0) top=0;
+    jumpTo(top);
+    activate(it.link);
+  }
+  /* [v511] 绑定去重：标记打在元素自身。RyFnNav.render() 重建会换掉元素，标记随旧元素
+     一起消失 ⇒ 新元素下次会被重新绑上；没被重建的元素不会被绑第二次（不会双触发）。 */
+  function bindNavItem(it){
+    if(!it.link || it.link[NAV_BOUND]) return;
+    it.link[NAV_BOUND]=true;
+    it.link.addEventListener('click', function(e){ navItemClick(it, e); });
+  }
+  function bindAllNavItems(){ for(var bi=0;bi<items.length;bi++) bindNavItem(items[bi]); }
+  bindAllNavItems();
+  /* ★ [v511] 重建兜底（本次修复的关键）：#fnNav 是页面静态节点、自身不会被重建，
+     只有它的 [data-ry-navitem] 后代被整体替换 ⇒ 盯住容器的 childList+subtree 即可覆盖
+     任何一次重建（权益同步 / 插件接管 / 会员徽标重挂都走这条路）。
+     回调只做「重收 + 补绑 + 恢复高亮」，用 setTimeout 合并同一轮 mount 的多次变更。 */
+  var navRebuildTimer=null;
+  function refreshNavItems(){
+    items=collectItems(false);
+    bindAllNavItems();
+    /* 重建把 .active 一起带走了（高亮由本脚本维护，runye-nav.js 只负责建节点）——
+       不补回来，权益同步一完成导航条就「全灭」，用户会以为坏了。 */
+    var cur=document.querySelector('main > .ry-sec.ry-active');
+    var lk=null;
+    for(var ri=0;ri<items.length;ri++){ if(items[ri].sec===cur){ lk=items[ri].link; break; } }
+    activate(lk);
+    /* 非工具模式的高亮由滚动 spy() 维护，items 换代后重算一次 */
+    if(!isTool() && typeof spy==='function') spy();
+  }
+  try{
+    if(typeof MutationObserver==='function' && nav && nav.nodeType===1){
+      var navObserver=new MutationObserver(function(){
+        if(navRebuildTimer) return;
+        navRebuildTimer=setTimeout(function(){ navRebuildTimer=null; try{ refreshNavItems(); }catch(err2){} },0);
+      });
+      navObserver.observe(nav,{childList:true,subtree:true});
+    }
+  }catch(err1){}
 
   var ticking=false;
   function spy(){
