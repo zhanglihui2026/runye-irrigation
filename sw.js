@@ -322,12 +322,23 @@
       index.html 与 runye-map-measure.html 两处副本同步改（v495 教训）。
    index.html / runye-map-measure.html / runye-map-partition.js / mod/inline-09.js 均在 CORE
    白名单，必须抬版本。 */
-   v504-demo-interval（2026-10-16 用户要求「两个地块切换的时长也要缩短」）：轮灌演示**切换节奏**
+// v506-map-list-delete-store：在线地图“我的地块”列表删除改为共享store读取+revision条件替换，失败时保留原数据。
+// v505-map-plot-store-cas：地图增强层的合并、解散、备注、删除和自愈改为共享地块库store的revision条件写入；
+// 损坏/重复编号/并发冲突时停止写入，并更新主页面与独立地图页资源版本。
+// v507-auto-current-safe-write：主规划页自动地块清理/同步改走共享store，坏库、重复ID及revision冲突均拒绝覆盖。
+// v508-project-import-safe-rollback：在线地图工程导入走地块库store；多键失败回滚按revision/已写入快照保护。
+// v509-flow-in-plotgroup（2026-10-16 用户实测截屏「三级简图水流动画的路径偏离了，应该跟总管/主管/
+// 支管都重叠」）：轮灌演示的水流层原先 appendChild 到 svg 根，不随 #tlPlotGroup 的「图面整体拖动」
+// transform=translate(x,y) 平移 —— 病史同 v183 节点层、v488 紫线标注。图面只要被拖动过（哪怕手抖
+// 微拖一下就会写进 localStorage 'tl-plot-pos'），水流就与管道平行错开（实测位移 (24,16) ⇒ 偏 29.1px）。
+// 修法：水流层改为挂进 #tlPlotGroup（无该组时退回 svg 根），并同步抬 index.html 的 inline-09.js ?v=。
+// mod/inline-09.js 在 CORE 白名单，必须抬版本。
+/* v504-demo-interval（2026-10-16 用户要求「两个地块切换的时长也要缩短」）：轮灌演示**切换节奏**
    2000→1000ms。注意与 v501/v503 区分——那两次改的是水流/阀门动画本身跑多快（.22/.25/.85/.75s，
    本次不动），这次改的是「多久换下一组」。间隔抽成具名常量 TL_DEMO_INTERVAL_MS（inline-09.js），
    ▶ 按钮 title 与三处注释同步改为「1 秒一组」；index.html 引用 inline-09.js ?v=500-dim-gap
    → ?v=504-demo-interval。mod/inline-09.js 在 CORE 白名单，必须抬版本。 */
-const VERSION = 'v504-demo-interval';
+const VERSION = 'v509-flow-in-plotgroup';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

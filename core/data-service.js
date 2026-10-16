@@ -336,17 +336,17 @@ export function createDataService(guard) {
         }
         if (!(Number(value.sqm) > 0)) return { ok: false, error: 'missing-field:sqm' };
         if (!Array.isArray(value.polyLatLng) || value.polyLatLng.length < 3) return { ok: false, error: 'missing-field:polyLatLng' };
-        var rows = JSON.parse(localStorage.getItem(PLOT_LIBRARY_KEY) || '[]');
-        if (!Array.isArray(rows)) return { ok: false, error: 'invalid-plot-library' };
-        var matchingRows = rows.filter(function (row) { return row && row.id === value.id; });
+        var plotStore = w.RyPlotLibraryStore;
+        if (!plotStore || typeof plotStore.read !== 'function' || typeof plotStore.upsertUnique !== 'function') {
+          return { ok: false, error: 'plot-library-store-unavailable' };
+        }
+        var snapshot = plotStore.read();
+        if (!snapshot.ok) return { ok: false, error: snapshot.error || 'plot-library-read-failed' };
+        var matchingRows = snapshot.plots.filter(function (row) { return row && row.id === value.id; });
         if (matchingRows.length > 1) return { ok: false, error: 'duplicate-plot-id' };
-        var found = false;
-        rows = rows.map(function (row) {
-          if (row && row.id === value.id) { found = true; return Object.assign({}, row, value); }
-          return row;
-        });
-        if (!found) rows.push(value);
-        localStorage.setItem(PLOT_LIBRARY_KEY, JSON.stringify(rows));
+        var next = matchingRows.length ? Object.assign({}, matchingRows[0], value) : value;
+        var write = plotStore.upsertUnique(value.id, next, snapshot.revision);
+        if (!write.ok) return { ok: false, error: write.error || 'plot-library-write-failed' };
       } else if (layer === 'geometry') {
         var geometryKeys = Object.keys(PLOT_GEOMETRY_KEYS);
         var supplied = geometryKeys.filter(function (k) { return own(value, k); });

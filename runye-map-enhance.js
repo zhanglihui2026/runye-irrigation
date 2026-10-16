@@ -17,9 +17,44 @@
 })(typeof self !== 'undefined' ? self : this, function (RunyeGeo) {
   'use strict';
 
+  function plotLibraryStore() {
+    var host = (typeof window !== 'undefined') ? window : (typeof globalThis !== 'undefined' ? globalThis : null);
+    return host && host.RyPlotLibraryStore;
+  }
+
+  function readPlotLibraryState() {
+    var store = plotLibraryStore();
+    if (store && typeof store.read === 'function') return store.read();
+    try {
+      var raw = localStorage.getItem('runye_plot_library');
+      if (raw === null) return { ok: true, plots: [], revision: null };
+      var plots = JSON.parse(raw);
+      return Array.isArray(plots) ? { ok: true, plots: plots, revision: raw } : { ok: false, error: 'invalid-plot-library' };
+    } catch (e) { return { ok: false, error: 'plot-library-read-failed', cause: e }; }
+  }
+
   function readPlotLibrary() {
-    try { return JSON.parse(localStorage.getItem('runye_plot_library') || '[]'); }
-    catch (e) { return []; }
+    var result = readPlotLibraryState();
+    if (result.ok) return result.plots;
+    if (typeof console !== 'undefined' && console.warn) console.warn('[map-enhance] 地块库读取失败，未按空库覆盖：', result.error);
+    return [];
+  }
+
+  function replacePlotLibrary(plots, revision) {
+    var store = plotLibraryStore();
+    if (!store || typeof store.replace !== 'function') return { ok: false, error: 'plot-library-store-unavailable' };
+    return store.replace(plots, revision);
+  }
+
+  function plotLibraryError(result) {
+    var messages = {
+      'invalid-plot-library': '地块库数据无效，已停止写入',
+      'plot-library-read-failed': '地块库读取失败，已停止写入',
+      'plot-library-conflict': '地块库已被其他操作更新，请刷新后重试',
+      'plot-library-write-failed': '地块库写入失败',
+      'plot-library-store-unavailable': '地块库安全存储未加载'
+    };
+    return (messages[result && result.error] || '地块库更新失败') + (result && result.cause && result.cause.message ? '：' + result.cause.message : '');
   }
 
   /* 水力校核页生成的只读快照。时间戳不一致时宁可不画，避免把旧方案结果套到新管网。 */
@@ -420,14 +455,13 @@
     o = o || {};
     var ids = Object.keys(state.selected || {});
     if (ids.length < 2) return { ok: false, reason: '至少选择 2 个地块' };
-    var lib;
-    try { lib = JSON.parse(localStorage.getItem('runye_plot_library') || '[]'); }
-    catch (e) { return { ok: false, reason: '地块库读取失败' }; }
-    if (!Array.isArray(lib)) lib = [];
+    var snapshot = readPlotLibraryState();
+    if (!snapshot.ok) return { ok: false, reason: plotLibraryError(snapshot) };
+    var lib = snapshot.plots;
 
     var picked = [];
     lib.forEach(function (p) { if (p && ids.indexOf(p.id) >= 0) picked.push(p); });
-    if (picked.length < 2) return { ok: false, reason: '选中的地块已不存在（可能刚被删除）' };
+    if (picked.length !== ids.length) return { ok: false, reason: '选中的地块已不存在或地块编号重复，请刷新后重试' };
     // 已成组的不能再重复成组（否则会丢失上一次的子地块归属）
     var nested = picked.filter(function (p) { return p.merged; });
     if (nested.length) {
@@ -445,8 +479,8 @@
       return c;
     });
     rest.push(big);
-    try { localStorage.setItem('runye_plot_library', JSON.stringify(rest)); }
-    catch (e) { return { ok: false, reason: '写入地块库失败：' + e.message }; }
+    var saved = replacePlotLibrary(rest, snapshot.revision);
+    if (!saved.ok) return { ok: false, reason: plotLibraryError(saved) };
 
     state.selected = {};
     if (state.refresh) state.refresh();
@@ -460,10 +494,12 @@
 
   /** 解散成组：把成组地块拆回子地块（子地块原本就在库里，只需解除归档与成组地块本身） */
   function doUnmerge(state, bigId) {
-    var lib;
-    try { lib = JSON.parse(localStorage.getItem('runye_plot_library') || '[]'); }
-    catch (e) { return { ok: false, reason: '地块库读取失败' }; }
-    var big = lib.filter(function (p) { return p && p.id === bigId; })[0];
+    var snapshot = readPlotLibraryState();
+    if (!snapshot.ok) return { ok: false, reason: plotLibraryError(snapshot) };
+    var lib = snapshot.plots;
+    var matches = lib.filter(function (p) { return p && p.id === bigId; });
+    if (matches.length !== 1) return { ok: false, reason: '成组地块不存在或编号重复，请刷新后重试' };
+    var big = matches[0];
     var chk = canUnmerge(big);
     if (!chk.ok) return { ok: false, reason: chk.reason };
     var rest = [];
@@ -482,8 +518,8 @@
         polyLatLng: s.polyLatLng, center: s.center, source: 'map', crs: 'GCJ-02', ts: Date.now(), note: ''
       });
     });
-    try { localStorage.setItem('runye_plot_library', JSON.stringify(rest)); }
-    catch (e) { return { ok: false, reason: '写入地块库失败：' + e.message }; }
+    var saved = replacePlotLibrary(rest, snapshot.revision);
+    if (!saved.ok) return { ok: false, reason: plotLibraryError(saved) };
     if (state && state.refresh) state.refresh();
     return { ok: true, restored: chk.count };
   }
@@ -512,8 +548,13 @@
     state.plotGroup.clearLayers();
     state.plotLayers = state.plotLayers || {};
     state.plotLayers = {};
-    var plots = (opts && opts.plots) ? opts.plots : readPlotLibrary();
-    var fromLib = !(opts && opts.plots);
+    var hasProvidedPlots = !!(opts && Array.isArray(opts.plots));
+    var librarySnapshot = hasProvidedPlots ? null : readPlotLibraryState();
+    var fromLib = !hasProvidedPlots && !!(librarySnapshot && librarySnapshot.ok);
+    var plots = hasProvidedPlots ? opts.plots : (fromLib ? librarySnapshot.plots : []);
+    if (!hasProvidedPlots && !fromLib && typeof console !== 'undefined' && console.warn) {
+      console.warn('[map-enhance] 地块库不可用，本次不绘制地块且不会将空列表写回：', librarySnapshot && librarySnapshot.error);
+    }
     var drawn = 0, skipped = 0, healed = 0, cleaned = 0;
     /* [v185] 已成组的原小地块不单独画（由成组地块代表），
        但仍留在库里（保留子地块）→ 只在 popup 里提示它属于哪个成组地块。 */
@@ -673,9 +714,13 @@
           if (btn) btn.onclick = function () {
             var note = (document.getElementById('rymNote') || {}).value || '';
             try {
-              var lib = JSON.parse(localStorage.getItem('runye_plot_library') || '[]');
-              for (var i = 0; i < lib.length; i++) { if (lib[i].id === p.id) { lib[i].note = note; break; } }
-              localStorage.setItem('runye_plot_library', JSON.stringify(lib));
+              var snapshot = readPlotLibraryState();
+              if (!snapshot.ok) { alert('保存失败：' + plotLibraryError(snapshot)); return; }
+              var matches = snapshot.plots.filter(function (item) { return item && item.id === p.id; });
+              if (matches.length !== 1) { alert('保存失败：地块已不存在或编号重复，请刷新后重试'); return; }
+              matches[0].note = note;
+              var saved = replacePlotLibrary(snapshot.plots, snapshot.revision);
+              if (!saved.ok) { alert('保存失败：' + plotLibraryError(saved)); return; }
             } catch (e) { alert('保存失败：' + e.message); return; }
             try { state.refresh(); } catch (e) {}
             layers.forEach(function (L2) { try { L2.closePopup(); } catch (e) {} });
@@ -698,9 +743,13 @@
               + '\n删除后不可恢复。';
             ryConfirm(msg, function () {
               try {
-                var lib = JSON.parse(localStorage.getItem('runye_plot_library') || '[]');
-                var now = lib.filter(function (x) { return x && x.id !== p.id && x.mergedInto !== p.id; });
-                localStorage.setItem('runye_plot_library', JSON.stringify(now));
+                var snapshot = readPlotLibraryState();
+                if (!snapshot.ok) { alert('删除失败：' + plotLibraryError(snapshot)); return; }
+                var matches = snapshot.plots.filter(function (item) { return item && item.id === p.id; });
+                if (matches.length !== 1) { alert('删除失败：地块已不存在或编号重复，请刷新后重试'); return; }
+                var now = snapshot.plots.filter(function (x) { return x && x.id !== p.id && x.mergedInto !== p.id; });
+                var saved = replacePlotLibrary(now, snapshot.revision);
+                if (!saved.ok) { alert('删除失败：' + plotLibraryError(saved)); return; }
               } catch (e) { alert('删除失败：' + e.message); return; }
               layers.forEach(function (L2) { try { L2.closePopup(); } catch (e) {} });
               try { state.refresh(); } catch (e) {}
@@ -757,8 +806,12 @@
       }
     });
     if ((healed || cleaned) && fromLib) {
-      try { localStorage.setItem('runye_plot_library', JSON.stringify(plots)); } catch (e) {}
-      if (console && console.info) console.info('[map-enhance] 地块库自愈并回写：' + healed + ' 个重建经纬度，' + cleaned + ' 个剔除非法顶点。');
+      var saved = replacePlotLibrary(plots, librarySnapshot.revision);
+      if (saved.ok) {
+        if (console && console.info) console.info('[map-enhance] 地块库自愈并回写：' + healed + ' 个重建经纬度，' + cleaned + ' 个剔除非法顶点。');
+      } else if (console && console.warn) {
+        console.warn('[map-enhance] 地块库自愈结果未回写：' + plotLibraryError(saved));
+      }
     }
     if (!drawn && skipped && console && console.warn) {
       console.warn('[map-enhance] ' + skipped + ' 个地块缺经纬度且无法重建，未叠加。');

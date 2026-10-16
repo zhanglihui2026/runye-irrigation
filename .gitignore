@@ -111,7 +111,7 @@ graphify-out/
 # 一次性调试残留（mjs 未含于上方 _*.js 规则）
 _pdbg_tmp.mjs
 _smoke_publish.mjs
-_verify_demo_interval.mjs
+_verify_*.mjs
 
 # Vite 构建缓存（可再生，不提交）
 .vite/

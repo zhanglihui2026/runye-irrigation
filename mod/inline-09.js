@@ -1820,6 +1820,12 @@ function tlApplyDemoHighlight(g) {
  *     path 的点与 world 数组同序同长 ⇒ 拿 nearest(sourcePos) 的下标即可，无需逆变换。
  *   · 阀门：落在**本组分**区矩形内的那些红⊗ = 本轮开启的阀门 ⇒ 加绿色张合环 + 手柄转 90°。
  *     不改动 ryValveSVG 一个字节（verify_valve_size.cjs 有 EQ1/EQ2 字节级基线），只叠加。
+ *   · [v505 2026-10-16 用户实测「水流动画的路径偏离了，应该跟总管/主管/支管都重叠」]
+ *     水流层必须挂进 #tlPlotGroup（地块组），不能挂 svg 根 —— 与 v183 节点层、v488 紫线
+ *     标注同一个病史：简图的地块/分区矩形/管线/内联节点层全在该组内，组上带「图面整体
+ *     拖动」transform=translate(x,y)（tlInitDrag，localStorage 'tl-plot-pos'，每次重生成
+ *     自动恢复）。挂在 svg 根 ⇒ 不随组平移，只要图面被拖动过（哪怕手抖微拖一下），
+ *     水流就整体偏移 (−tx,−ty)、与管道平行错开（实测位移 (24,16) ⇒ 偏 29.1px）。
  *   · 退出演示 / 切换组 ⇒ 整层 [data-tlflow] 删除重建（幂等）。 */
 /* 几何实现独立于页面；保留历史函数名供路径与演示渲染调用。 */
 function tlFlowParseD(d) { return window.RyFlowGeometry.parsePath(d); }
@@ -2061,7 +2067,13 @@ function tlDemoRenderFlow(svg, g) {
       gv.appendChild(ri); gv.appendChild(hb);
       layer.appendChild(gv);
     }
-    if (layer.childNodes.length) svg.appendChild(layer);
+    /* [v505] 必须挂进 #tlPlotGroup —— 否则不随「图面整体拖动」的 translate 平移，
+       水流会与管道平行错开（病史同 v183 节点层 / v488 紫线标注）。无该组时退回 svg 根
+       （老结构兼容；此时 svg 内也没有管线，属降级路径）。 */
+    if (layer.childNodes.length) {
+      var hostG = svg.querySelector('#tlPlotGroup') || svg;
+      hostG.appendChild(layer);
+    }
   } catch (eF) { }
 }
 window.tlDemoRenderFlow = tlDemoRenderFlow;
@@ -3922,8 +3934,11 @@ function tlAutoGenerate(options) {
     var base = window.__runyeGeoBase || null;
     if(!base || typeof base.refLat!=='number' || typeof base.refLng!=='number' || !isFinite(base.refLat) || !isFinite(base.refLng)){
       window.RyIrrigationDataStore.writeNetworkLayout(null);
-      var lib=JSON.parse(localStorage.getItem('runye_plot_library')||'[]');
-      localStorage.setItem('runye_plot_library',JSON.stringify(lib.filter(function(p){return p.id!=='auto-current';})));
+      var plotStore=window.RyPlotLibraryStore;
+      if(plotStore && typeof plotStore.removeUnique==='function'){
+        var removed=plotStore.removeUnique('auto-current');
+        if(!removed.ok)console.warn('[map-enhance] automatic plot cleanup skipped:',removed.error);
+      }else console.warn('[map-enhance] automatic plot cleanup skipped: plot library store unavailable');
       return;
     }
     var R=6378137, mlat=R*Math.PI/180, cosLat=Math.cos(base.refLat*Math.PI/180);
@@ -4007,10 +4022,11 @@ function tlAutoGenerate(options) {
             poly:dd.poly.map(function(p){var q=toFrame(p);return {x:q.x,y:q.y};}), polyLatLng:pll, center:{lat:+(sl/pll.length).toFixed(6), lng:+(sn/pll.length).toFixed(6)},
             geo:{refLat:base.refLat, refLng:base.refLng, proj:'mercatorLocal'}, source:'auto', ts:Date.now() };
           if(net){entry.partitionPlan=net.partitionPlan;entry.partitions=net.partitions;entry.designPlotId=net.plotId;}
-          var lib2=[]; try{ lib2=JSON.parse(localStorage.getItem('runye_plot_library')||'[]'); }catch(eL){ lib2=[]; }
-          var hit=false; for(var bi=0; bi<lib2.length; bi++){ if(lib2[bi].id==='auto-current'){ lib2[bi]=entry; hit=true; break; } }
-          if(!hit) lib2.push(entry);
-          localStorage.setItem('runye_plot_library', JSON.stringify(lib2));
+          var plotStore=window.RyPlotLibraryStore;
+          if(plotStore && typeof plotStore.upsertUnique==='function'){
+            var saved=plotStore.upsertUnique('auto-current',entry);
+            if(!saved.ok)console.warn('[map-enhance] automatic plot sync skipped:',saved.error);
+          }else console.warn('[map-enhance] automatic plot sync skipped: plot library store unavailable');
         }
       }
     }catch(ePlot){}

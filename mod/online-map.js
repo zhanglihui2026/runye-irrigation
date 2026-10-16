@@ -1296,8 +1296,11 @@
   function renderMyPlots(){
     var box=document.getElementById('myPlotList');
     if(!box) return;
-    var arr=[]; try{ arr=JSON.parse(localStorage.getItem('runye_plot_library')||'[]'); }catch(e){ arr=[]; }
+    var store=window.RyPlotLibraryStore;
+    var snapshot=store&&typeof store.read==='function'?store.read():{ok:false,error:'plot-library-store-unavailable'};
+    var arr=snapshot.ok?snapshot.plots:[];
     box.innerHTML='';
+    if(!snapshot.ok){box.textContent='地块库读取失败，未显示列表；请刷新后重试。';box.hidden=false;return;}
     arr.forEach(function(p){
       if(!p || !p.id) return;
       var row=document.createElement('div'); row.className='place-item';
@@ -1329,8 +1332,13 @@
       var del=document.createElement('button');
       del.type='button'; del.className='place-del'; del.textContent='×'; del.title='删除该地块';
       del.onclick=function(){
-        var now=(JSON.parse(localStorage.getItem('runye_plot_library')||'[]')).filter(function(x){return x.id!==p.id;});
-        localStorage.setItem('runye_plot_library', JSON.stringify(now));
+        var latest=store.read();
+        if(!latest.ok){alert('删除失败：地块库读取失败，数据没有更改。');return;}
+        var matches=latest.plots.filter(function(x){return x&&x.id===p.id;});
+        if(matches.length!==1){alert('删除失败：地块已不存在或编号重复，请刷新后重试。');return;}
+        var now=latest.plots.filter(function(x){return x&&x.id!==p.id;});
+        var saved=store.replace(now,latest.revision);
+        if(!saved.ok){alert(saved.error==='plot-library-conflict'?'删除失败：地块库已被其他操作更新，请刷新后重试。':'删除失败：地块库没有更改。');return;}
         renderMyPlots();
         if(typeof rymHandle!=='undefined' && rymHandle && rymHandle.refresh){ try{ rymHandle.refresh(); }catch(e){} }
       };
@@ -1435,13 +1443,34 @@
           (d.network.dripTapes||[]).forEach(function(line){if(!Array.isArray(line) || line.length<2) throw new Error('滴灌带坐标不足');line.forEach(RunyeGeo.coordPair);});
         }
         if(d.view!=null){RunyeGeo.coordPair(d.view);if(typeof d.view.zoom!=='number' || !isFinite(d.view.zoom) || d.view.zoom<3 || d.view.zoom>19) throw new Error('地图缩放级别无效');}
-        var keys=['runye_plot_library',window.RyIrrigationDataStore.keys.networkLayout,'runye_map_view'], old=keys.map(function(k){return localStorage.getItem(k);});
+        var plotStore=window.RyPlotLibraryStore;
+        if(!plotStore || typeof plotStore.read!=='function' || typeof plotStore.replace!=='function' || typeof plotStore.restoreSnapshot!=='function')
+          throw new Error('地块库安全存储接口不可用');
+        var plotSnapshot=plotStore.read();
+        if(!plotSnapshot.ok)throw new Error('地块库读取失败，未导入：'+plotSnapshot.error);
+        var keys=[window.RyIrrigationDataStore.keys.networkLayout,'runye_map_view'], old=keys.map(function(k){return localStorage.getItem(k);});
+        var plotWrite=null,networkWritten=false,viewWritten=false;
         try{
-          localStorage.setItem(keys[0],JSON.stringify(d.plots));
+          plotWrite=plotStore.replace(d.plots,plotSnapshot.revision);
+          if(!plotWrite.ok)throw new Error('地块库写入失败：'+plotWrite.error);
           window.RyIrrigationDataStore.writeNetworkLayout(d.network);
-          if(d.view==null) localStorage.removeItem(keys[2]);else localStorage.setItem(keys[2],JSON.stringify(d.view));
+          networkWritten=true;
+          if(d.view==null) localStorage.removeItem(keys[1]);else localStorage.setItem(keys[1],JSON.stringify(d.view));
+          viewWritten=true;
         }catch(writeError){
-          keys.forEach(function(k,i){try{if(old[i]==null)localStorage.removeItem(k);else localStorage.setItem(k,old[i]);}catch(restoreError){console.error('工程导入回滚失败',k,restoreError);}});
+          if(plotWrite && plotWrite.ok){
+            var plotRollback=plotStore.restoreSnapshot(plotSnapshot,plotWrite.revision);
+            if(!plotRollback.ok)console.error('工程导入回滚失败',plotStore.key,plotRollback.error);
+          }
+          var expectedRaw=[d.network==null?null:JSON.stringify(d.network),d.view==null?null:JSON.stringify(d.view)];
+          [networkWritten,viewWritten].forEach(function(written,i){
+            if(!written)return;
+            var key=keys[i];
+            try{
+              if(localStorage.getItem(key)!==expectedRaw[i])throw new Error('快照已被其他页面修改，拒绝覆盖');
+              if(old[i]==null)localStorage.removeItem(key);else localStorage.setItem(key,old[i]);
+            }catch(restoreError){console.error('工程导入回滚失败',key,restoreError);}
+          });
           throw writeError;
         }
         document.getElementById('btnClear').click();setDrawing(false);

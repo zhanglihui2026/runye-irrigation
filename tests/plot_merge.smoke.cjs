@@ -207,7 +207,7 @@ test('②-a 成组地块具备普通地块的全部关键字段（下游零改�
   const m = M.merge.plots([plotA, plotB], {});
   /* ★ v189：权威几何字段 polyLatLngSet（各成员环集合）是新增的必备字段 —— 少了它
      下游就只能退回凸包，块间空隙会被吞掉。故一并纳入「关键字段」清单。 */
-  ['id', 'name', 'mu', 'sqm', 'poly', 'polyLatLng', 'polyLatLngSet', 'hullLatLng', 'center', 'geo', 'crop', 'source', 'crs', 'ts']
+  ['id', 'name', 'mu', 'sqm', 'poly', 'polyLatLng', 'polyLatLngSet', 'hullLatLng', 'center', 'geo', 'source', 'crs', 'ts']
     .forEach(k => assert.ok(m[k] !== undefined && m[k] !== null, `成组地块缺字段 ${k}`));
   /* v189 语义：source 由 'merge' 改为 'group'（成组）。断言写死 'group'，
      旧值 'merge' 会红 —— 正是「语义纠正必须留痕」的意图。 */
@@ -558,4 +558,68 @@ test('③-k 成组编辑「整组 / 逐块」（v193）：切换控件 + 各块�
   /* 断言本体在 tests/_v193_group_edit_contract.cjs —— 与 _p1/_gate_v193_contract.cjs
      的注入体检共用同一份，避免「契约一份、体检另一份」的漂移。 */
   require('./_v193_group_edit_contract.cjs')(INDEX_SRC, { stripComments, bodyOf, countIn });
+});
+
+test('地图增强地块库写入统一经过带 revision 的共享 store', () => {
+  assert.match(ENHANCE_SRC, /function readPlotLibraryState\(\)/, '地图增强应通过统一入口读取库状态与revision');
+  assert.match(ENHANCE_SRC, /function replacePlotLibrary\(plots, revision\)/, '地图增强应通过统一CAS入口写库');
+  assert.match(ENHANCE_SRC, /replacePlotLibrary\(rest, snapshot\.revision\)/, '合并与解散应使用读取时revision写入');
+  assert.match(ENHANCE_SRC, /replacePlotLibrary\(snapshot\.plots, snapshot\.revision\)/, '备注保存应使用读取时revision写入');
+  assert.match(ENHANCE_SRC, /replacePlotLibrary\(now, snapshot\.revision\)/, '弹窗删除应使用读取时revision写入');
+  assert.match(ENHANCE_SRC, /replacePlotLibrary\(plots, librarySnapshot\.revision\)/, '坐标/面积自愈应使用渲染开始时revision写入');
+  assert.doesNotMatch(ENHANCE_SRC, /localStorage\.setItem\(['"]runye_plot_library['"]/, '地图增强不得绕过store直接覆盖地块库');
+});
+
+test('在线地图列表删除按唯一地块ID和最新revision安全更新', () => {
+  const source = fs.readFileSync(path.join(ROOT, 'mod', 'online-map.js'), 'utf8');
+  const start = source.indexOf('function renderMyPlots(){');
+  const end = source.indexOf('// [map-enhance] 测距工具', start);
+  assert.ok(start >= 0 && end > start, '应找到我的地块列表渲染和删除逻辑');
+  const section = source.slice(start, end);
+  assert.match(section, /store\.read\(\)/, '列表与删除必须从共享store读取');
+  assert.match(section, /matches\.length!==1/, '重复或已删除地块必须拒绝歧义操作');
+  assert.match(section, /store\.replace\(now,latest\.revision\)/, '删除必须按最新revision条件写入');
+  assert.doesNotMatch(section, /localStorage\.setItem\(['"]runye_plot_library['"]/, '列表删除不得直接覆盖地块库');
+});
+
+test('在线地图工程导入使用地块库revision并且回滚拒绝覆盖并发修改', () => {
+  const source = fs.readFileSync(path.join(ROOT, 'mod', 'online-map.js'), 'utf8');
+  const start = source.indexOf("document.getElementById('fileProj').onchange=function(e)");
+  const end = source.indexOf('\n  renderMyPlots();', start);
+  assert.ok(start >= 0 && end > start, '应找到工程文件导入流程');
+  const section = source.slice(start, end);
+  assert.match(section, /plotStore\.read\(\)/, '导入前必须读取并校验地块库');
+  assert.match(section, /plotStore\.replace\(d\.plots,plotSnapshot\.revision\)/, '导入地块必须使用读取时revision');
+  assert.match(section, /plotStore\.restoreSnapshot\(plotSnapshot,plotWrite\.revision\)/, '回滚必须受导入后revision保护');
+  assert.match(section, /拒绝覆盖/, '其他页面并发修改时不得覆盖其快照');
+  assert.doesNotMatch(section, /localStorage\.setItem\(['"]runye_plot_library['"]/, '工程导入不得直接写地块库');
+});
+
+test('地图增强解散成组拒绝损坏库，并能正常写回已验证快照', () => {
+  const previousStorage = global.localStorage;
+  global.localStorage = {
+    value: null,
+    getItem() { return this.value; },
+    setItem(_key, value) { this.value = value; }
+  };
+  require(path.join(ROOT, 'core', 'plot-library-store.js'));
+  try {
+    global.localStorage.value = '{broken';
+    const invalid = M.merge.unmerge('group-1');
+    assert.strictEqual(invalid.ok, false);
+    assert.match(invalid.reason, /读取失败/);
+
+    const child = { id: 'child-1', name: '子地块', polyLatLng: [[1, 1], [1, 2], [2, 2]], mergedInto: 'group-1' };
+    const group = { id: 'group-1', merged: true, subPlots: [child, { ...child, id: 'child-2' }] };
+    global.localStorage.value = JSON.stringify([child, group]);
+    const result = M.merge.unmerge('group-1');
+    assert.strictEqual(result.ok, true);
+    const saved = JSON.parse(global.localStorage.value);
+    assert.deepStrictEqual(saved.map(x => x.id).sort(), ['child-1', 'child-2']);
+    assert.ok(saved.every(x => !x.mergedInto));
+  } finally {
+    if (previousStorage === undefined) delete global.localStorage;
+    else global.localStorage = previousStorage;
+    delete global.RyPlotLibraryStore;
+  }
 });

@@ -177,11 +177,14 @@ test('data service refuses to update an ambiguous duplicate plot id', () => {
       getItem(key) { return values.has(key) ? values.get(key) : null; },
       setItem(key, value) { values.set(key, String(value)); }
     },
-    window: { dispatchEvent() {} },
+    window: { localStorage: null, dispatchEvent() {} },
     CustomEvent: function CustomEvent(type, init) { this.type = type; this.detail = init.detail; },
     JSON, Date, Math, Number, String, Object, Array, isFinite, console
   };
+  context.window.localStorage = context.localStorage;
   vm.createContext(context);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'core/plot-library-store.js'), 'utf8'), context,
+    { filename: 'core/plot-library-store.js' });
   vm.runInContext(source + '\nglobalThis.__createDataService = createDataService;', context,
     { filename: 'core/data-service.js' });
   const original = [
@@ -196,4 +199,32 @@ test('data service refuses to update an ambiguous duplicate plot id', () => {
   assert.deepEqual(JSON.parse(JSON.stringify(result)), { ok: false, error: 'duplicate-plot-id' });
   assert.deepEqual(JSON.parse(values.get('runye_plot_library')), original,
     'ambiguous source update must leave every library entry unchanged');
+});
+
+test('data service source upsert uses plot store and preserves existing non-source fields', () => {
+  const source = fs.readFileSync(path.join(ROOT, 'core/data-service.js'), 'utf8').replace(/^export\s+/gm, '');
+  const values = new Map([['runye_plot_library', JSON.stringify([
+    { id: 'plot-1', name: 'North', notes: 'retain', sqm: 1000, polyLatLng: [[1, 1], [1, 2], [2, 2]] }
+  ])]]);
+  const localStorage = {
+    getItem(key) { return values.has(key) ? values.get(key) : null; },
+    setItem(key, value) { values.set(key, String(value)); }
+  };
+  const context = {
+    localStorage, window: { localStorage, dispatchEvent() {} },
+    CustomEvent: function CustomEvent(type, init) { this.type = type; this.detail = init.detail; },
+    JSON, Date, Math, Number, String, Object, Array, isFinite, console
+  };
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'core/plot-library-store.js'), 'utf8'), context,
+    { filename: 'core/plot-library-store.js' });
+  vm.runInContext(source + '\nglobalThis.__createDataService = createDataService;', context,
+    { filename: 'core/data-service.js' });
+  const result = context.__createDataService().mutateLayer('source', {
+    id: 'plot-1', name: 'Updated', sqm: 1500, polyLatLng: [[3, 3], [3, 4], [4, 4]]
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(result)), { ok: true, schemaVersion: 1 });
+  assert.deepEqual(JSON.parse(values.get('runye_plot_library')), [
+    { id: 'plot-1', name: 'Updated', notes: 'retain', sqm: 1500, polyLatLng: [[3, 3], [3, 4], [4, 4]] }
+  ]);
 });
