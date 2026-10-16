@@ -89,10 +89,15 @@
 > Vercel 上也有一份同代老前端副本（同样没有会员代码）。
 > ⇒ **任何"线上测试会员功能"的想法现在都不成立，必须先发布。**
 >
-> **✅ 2026-10-16 更新：GitHub Pages 已随本次发布同步为最新版本**（commit `edaf9da`，
-> 用户明确说「发布」后由 agent 推送）。实测线上 HTTP 200，`sw.js` = `v427-archive-3d-iso`，
+> **✅ 2026-10-16 更新：GitHub Pages 已随本次发布同步为最新版本**（commit `a21b45b`，
+> 用户明确说「发布」后由 agent 推送）。实测线上 HTTP 200，`sw.js` = `v503-ui-batch-plot-store`，
+> `index.html` 上 `?v=` 与动画/CSS 实测一致，新增 `core/plot-library-store.js` 线上 200。
 > 会员三件套（cloud-sync.js / runye-entitle.js / runye-member-ui.js）已在库并随发布上线。
-> Vercel 副本未动，仍为老版本；线上测试会员功能前先确认 Vercel 是否也需要同步。
+> 本次批量上线内容：地块图库 store（并行会话）、分区格只画内部分割线（修重复轮廓）、
+> 三级图右缘标注间距 14→30px、轮灌演示水流动画 .85→.22s、地形模块标题去图标、
+> 「保存地点」按钮去图标并移入搜索行右侧。
+> Vercel 副本未动，仍为老版本（仅承载大模型 API 代理，前端静态页走 Pages）；
+> 线上测试会员功能前先确认 Vercel 是否也需要同步。
 
 ---
 
