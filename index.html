@@ -7,8 +7,9 @@
 <script src="core/irrigation-data-store.js?v=1"></script>
 <script src="core/terrain-bridge-store.js?v=1"></script>
 <script src="core/sprinkler-bridge-store.js?v=1"></script>
+<script src="core/plot-library-store.js?v=499-plot-library-store"></script>
 <script src="runye-material-audit.js?v=264"></script>
-<script src="runye-map-partition.js?v=486-angle-fix"></script>
+<script src="runye-map-partition.js?v=499-partition-inner"></script>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>润野灌溉设计优化版｜滴灌管径与水泵选型</title>
@@ -1001,14 +1002,20 @@ body.ry-worst-off [data-tlworst]{display:none}
      · 全部 pointer-events:none —— 否则 verify_v172_layers.cjs 的 elementFromPoint 会假红。
    水流方向 = 路径绘制方向（水源 → 该组各分区），dashoffset 递减 ⇒ 视觉上朝末端跑。
    阀门：0°→90° 一次转到位（闸阀「 quarter-turn 」语义）， forwards 保持开启态；
-         transform-box:view-box 让 transform-origin 走 viewBox 用户单位（避免各浏览器原点歧义）。 */
-.tl-demo-flow{stroke-dasharray:7 9;animation:tlDemoFlow .85s linear infinite;pointer-events:none}
+         transform-box:view-box 让 transform-origin 走 viewBox 用户单位（避免各浏览器原点歧义）。
+   [v501 2026-10-16 用户要求] 演示动画整体提速一半：flow .85→.425s、valve-open .5→.25s、
+         valve-ring 1.7→.85s、src-pulse 1.5→.75s（原时长逐一减半）。
+         注：轮播间隔（▶ 2 秒一组）是独立节奏，不在本次「动画时长」范围内。
+   [v503 2026-10-16 用户要求] 再缩短：只动**水流动画**（用户明确「演示轮罐组的水流动画」），
+         flow .425→.22s（≈再减半，dash 跑完一个周期 .22s ⇒ 视觉流速约 4.5 次/秒）。
+         valve-open/.25s、valve-ring/.85s、src-pulse/.75s、轮播间隔 2s 一律保持 v501 值不动。 */
+.tl-demo-flow{stroke-dasharray:7 9;animation:tlDemoFlow .22s linear infinite;pointer-events:none}
 @keyframes tlDemoFlow{to{stroke-dashoffset:-32}}
-.tl-demo-valve-open{pointer-events:none;transform-box:view-box;animation:tlValveOpen .5s cubic-bezier(.34,.9,.3,1) forwards}
+.tl-demo-valve-open{pointer-events:none;transform-box:view-box;animation:tlValveOpen .25s cubic-bezier(.34,.9,.3,1) forwards}
 @keyframes tlValveOpen{from{transform:rotate(0deg)}to{transform:rotate(90deg)}}
-.tl-demo-valve-ring{pointer-events:none;animation:tlValveRing 1.7s ease-in-out infinite}
+.tl-demo-valve-ring{pointer-events:none;animation:tlValveRing .85s ease-in-out infinite}
 @keyframes tlValveRing{0%,100%{opacity:.28}50%{opacity:.85}}
-.tl-demo-src{pointer-events:none;animation:tlSrcPulse 1.5s ease-in-out infinite}
+.tl-demo-src{pointer-events:none;animation:tlSrcPulse .75s ease-in-out infinite}
 @keyframes tlSrcPulse{0%,100%{opacity:.9;stroke-width:2.5}50%{opacity:.25;stroke-width:5}}
 
 /* 接管：搬进工具栏的 .pp-side 去掉「独立栏」外观，宽度撑满分组。
@@ -1409,9 +1416,9 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.pp-grip-side,
           <div class="search-row">
             <input type="text" id="search" placeholder="搜索地点（如：三亚 崖州）" />
             <button class="mbtn" id="btnSearch">搜索</button>
+            <button class="mbtn" id="btnSavePlace">保存地点</button>
           </div>
           <div class="sr-list" id="searchRes" hidden></div>
-          <button class="mbtn" id="btnSavePlace">💾 保存地点</button>
           <div class="pill-list" id="placeList" hidden></div>
           <button class="mbtn" id="btnLocate">📍 定位三亚</button>
           <button class="mbtn" id="btnBase">🗺️ 切换底图</button>
@@ -2429,7 +2436,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.pp-grip-side,
 </section>
 <section id="terrainSection" class="ry-sec terrain-section" aria-label="地形模块">
 <header class="t-top">
-  <h1>⛰️ 地形模块·测试中</h1>
+  <h1>地形模块·测试中</h1>
   <span class="t-sub">阶段1 · 边界导入 / 坐标系校验 / 面积 / 高程数据登记</span>
   <span class="t-spacer"></span>
   <button class="t-modebtn on" id="modePreview" title="成果不用于工程放样与水力计算">预览模式</button>
@@ -3042,7 +3049,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.pp-grip-side,
 <script src="mod/material-table.js?v=421-mat-table"></script>
 <!-- [v424-plan-calc-render] 扬程公式与分解展示模块，先于计算控制器和三级调用方装载。 -->
 <script src="mod/plan-calc-render.js?v=424-plan-calc-render"></script>
-<script src="mod/inline-09.js?v=498-pump-override-merge"></script>
+<script src="mod/inline-09.js?v=500-dim-gap"></script>
 <!-- [v423-header-layout] 三级简图标题布局依赖 inline-09 的 tlMeasureText 与生成时写入的标题状态。 -->
 <script src="mod/tl-header-layout.js?v=423-header-layout"></script>
 
@@ -3054,7 +3061,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.pp-grip-side,
 <!-- [v420-split] 绘图编辑器 IIFE 自 inline-11 迁出：必须紧随 inline-11 之后同步执行 -->
 <script src="mod/plot-editor.js?v=491-recipe-lib"></script>
 <script src="mod/inline-12.js?v=357"></script>
-<script src="mod/inline-13.js?v=479-plot-transfer"></script>
+<script src="mod/inline-13.js?v=499-plot-library-store"></script>
 <!-- [v422-head-system-svg] 纯 SVG 核心先于 inline-14 同步加载。 -->
 <script src="mod/head-system-svg.js?v=422-head-system-svg"></script>
 <script src="mod/inline-14.js?v=422-head-system-svg"></script>
@@ -3175,7 +3182,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.pp-grip-side,
 <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.1/cdn/shoelace.js"></script>
 <script src="mod/ry-panel.js?v=494-drag-default-left"></script>
 <script src="pwa/vendor/leaflet.js"></script>
-<script src="mod/online-map.js?v=479-plot-transfer"></script>
+<script src="mod/online-map.js?v=499-plot-library-store"></script>
 <script src="terrain/terrain-core.js?v=410-elev"></script>
 <script src="terrain/terrain-ui.js?v=442-native"></script>
 <script src="runye-hydraulics-page.js?v=442-native"></script>

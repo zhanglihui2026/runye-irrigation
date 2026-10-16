@@ -306,8 +306,23 @@
    <style> 追加 .side 作用域同款（v495 教训：两处副本同步改）。
    三文件均在 CORE 白名单，必须抬版本）→
    v498-pump-override-merge（统一合并面板分类选径与图面逐段改径，避免更新扬程时丢失任一覆盖；
-   inline-09 暴露图面口径快照给合并器；更新主页面两个脚本查询版本及核心缓存版本）。 */
-const VERSION = 'v498-pump-override-merge';
+   inline-09 暴露图面口径快照给合并器；更新主页面两个脚本查询版本及核心缓存版本）→
+   v499-plot-library-store（并行会话：新增 core/plot-library-store.js 地块图库 store 并登记 CORE；
+   inline-13.js（地块传输）与 online-map.js（在线地图）接入该 store，index.html / 地图独立页
+   两处引用抬版本）→
+   v503-ui-batch-plot-store【本次发布批量上线，含并行会话 v499 与以下用户需求改动】：
+   ① v499-partition-inner：分区格改为只画内部共享边，修复「我的地块 vs 当前地块」重复轮廓
+      （原来逐格画整框，分区重划后与地块环差数米 ⇒ 视觉双圈）；
+   ② v500-dim-gap：三级简图右缘竖向尺寸标注基准间距 14→30px（原太贴地块边线，版面挤）；
+   ③ v501 + v503：轮灌演示动画提速 —— 先整体减半（flow .85→.425s 等），再按用户要求只把
+      **水流动画** flow .425→.22s；valve-open .25s / valve-ring .85s / src-pulse .75s 与
+      轮播间隔 2s 保持不变；
+   ④ v502-terrain-title：地形模块标题去掉 ⛰️ 图标（terrain/index.html + index.html 内嵌版两处）；
+   ⑤ 在线地图「保存地点」按钮去 💾 图标并移入搜索行右侧（search → 搜索 → 保存地点），
+      index.html 与 runye-map-measure.html 两处副本同步改（v495 教训）。
+   index.html / runye-map-measure.html / runye-map-partition.js / mod/inline-09.js 均在 CORE
+   白名单，必须抬版本。 */
+const VERSION = 'v503-ui-batch-plot-store';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
@@ -321,6 +336,7 @@ const CORE = [
   "core/loader.js",
   "core/event-bus.js",
   "core/data-service.js",
+  "core/plot-library-store.js",
   "core/irrigation-data-store.js",
   "core/terrain-bridge-store.js",
   "core/sprinkler-bridge-store.js",

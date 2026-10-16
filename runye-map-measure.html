@@ -229,8 +229,9 @@
   <!-- [NEW MODULE: map-enhance] 实景叠加图层（2026-09-26）：删除下两行即卸载，不影响其他逻辑 -->
   <script src="runye-geo.js"></script>
   <script src="core/irrigation-data-store.js?v=1"></script>
+  <script src="core/plot-library-store.js?v=499-plot-library-store"></script>
   <script src="runye-map-enhance.js?v=352"></script>
-<script src="runye-map-partition.js?v=486-angle-fix"></script>
+<script src="runye-map-partition.js?v=499-partition-inner"></script>
   <!-- [NEW MODULE: pipe_optim] 导航按钮与主页同源（2026-09-23 用户要求：三页导航一致） -->
   <script src="pipe_optim_ui.js"></script>
   <div class="main">
@@ -243,9 +244,9 @@
           <div class="search-row">
             <input type="text" id="search" placeholder="搜索地点（如：三亚 崖州）" />
             <button class="mbtn" id="btnSearch">搜索</button>
+            <button class="mbtn" id="btnSavePlace">保存地点</button>
           </div>
           <div class="sr-list" id="searchRes" hidden></div>
-          <button class="mbtn" id="btnSavePlace">💾 保存地点</button>
           <div class="pill-list" id="placeList" hidden></div>
           <button class="mbtn" id="btnLocate">📍 定位三亚</button>
           <button class="mbtn" id="btnBase">🗺️ 切换底图</button>

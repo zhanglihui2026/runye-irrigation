@@ -2,6 +2,8 @@
  'use strict';
  var PARAMS=['planTapeSpacing','planEmitterSpacing','planEmitterFlow','planTapeLaySide','planZoneMuManual','planZoneMode','planTargetV','planN','planSrcDist','fld_lift','fld_dh','fld_tapePressure','fld_existPressure','fld_filterLoss','fld_efficiency'];
  function copy(v){return JSON.parse(JSON.stringify(v));}
+ function plotStore(){return root.RyPlotLibraryStore||null;}
+ function readLibrary(){var store=plotStore();return store?store.read():{ok:false,error:'plot-library-store-unavailable'};}
  function valid(p){return p&&p.version===1&&Number.isFinite(p.angle)&&p.angle>=-180&&p.angle<=180;}
  function rotate(p,deg,c){var r=deg*Math.PI/180,a=Math.cos(r),b=Math.sin(r),x=p.x-c.x,y=p.y-c.y;return{x:c.x+x*a-y*b,y:c.y+x*b+y*a};}
  function center(poly){return{x:(Math.min.apply(null,poly.map(p=>p.x))+Math.max.apply(null,poly.map(p=>p.x)))/2,y:(Math.min.apply(null,poly.map(p=>p.y))+Math.max.apply(null,poly.map(p=>p.y)))/2};}
@@ -17,7 +19,7 @@
   function ll(p){p=frame(p);return[base.refLat+p.y/m,base.refLng+p.x/(m*co)];}
   var plan={version:1,angle:angle,params:params(),cutSnap:copy(root.RunyeBridge.state.cutSnap),cutOverrides:copy(root.RunyeBridge.state.cutOverrides),zoneRotated:!!root.RunyeBridge.state.zoneRotated};
   net.partitionPlan=plan;net.partitions=polygons(ll);
-  var list=JSON.parse(root.localStorage.getItem('runye_plot_library')||'[]'),p=list.find(p=>p.id===net.plotId);if(p){p.partitionPlan=plan;p.partitions=net.partitions;root.localStorage.setItem('runye_plot_library',JSON.stringify(list));}
+  var state=readLibrary();if(!state.ok)return false;var matches=state.plots.filter(function(p){return p&&p.id===net.plotId;});if(matches.length!==1)return false;var p=matches[0];p.partitionPlan=plan;p.partitions=net.partitions;var saved=plotStore().replace(state.plots,state.revision);return !!saved.ok;
  }
  function preview(payload,angle){payload=copy(payload);payload.partitionPlan={version:1,angle:angle,params:(payload.partitionPlan||{}).params||{},zoneRotated:!!(payload.partitionPlan||{}).zoneRotated};root.runyeApplyMapPayload(payload);
   var b=root.RunyeBridge,F=root.__runyeMapFramePoly,c=center(F.map(p=>({x:p.x,y:-p.y}))),base=root.__runyeGeoBase,m=6378137*Math.PI/180,co=Math.cos(base.refLat*Math.PI/180);
@@ -26,7 +28,7 @@
  }
  function attach(map){
   var box=root.document.getElementById('mapPartitionTools');if(!box)return;var select=box.querySelector('select'),input=box.querySelector('input'),status=box.querySelector('[role=status]'),layer=root.L.layerGroup().addTo(map),iframe=null,busy=false;
-  function library(){return JSON.parse(root.localStorage.getItem('runye_plot_library')||'[]');}
+  function library(){var state=readLibrary();return state.ok?state.plots:[];}
   function current(){return library().find(p=>p.id===select.value);}
   function geometry(p){return JSON.stringify([p.polyLatLng,p.polyLatLngSet,p.subPlots]);}
   /* [v499 2026-10-16 用户截图反馈] 分区格只画**内部分割线**，不再画整格外框。
@@ -143,7 +145,7 @@
   async function engine(){if(!iframe){iframe=root.document.createElement('iframe');iframe.src='index.html?partitionPreview=1';iframe.title='分区计算';iframe.setAttribute('aria-hidden','true');iframe.style.cssText='position:fixed;left:-10000px;width:1280px;height:900px;border:0';root.document.body.appendChild(iframe);}var start=Date.now();while(!iframe.contentWindow.RyMapPartition||!iframe.contentWindow.RunyeBridge||!iframe.contentWindow.runyeApplyMapPayload){if(Date.now()-start>20000)throw new Error('二级分区引擎加载超时');await new Promise(r=>setTimeout(r,100));}return iframe.contentWindow;}
   /* [v481] 应用逻辑抽成具名函数：send 未应用时自动先走一遍，成功才回二级 */
   var applyBtn=box.querySelector('[data-angle-apply]');
-  async function applyNow(){if(busy)return false;var p=current(),angle=Number(input.value);if(!p||input.value.trim()===''||!Number.isFinite(angle)||angle<-180||angle>180){setStatus('请选择地块，角度范围为 −180° 至 180°。','err');return false;}busy=true;applyBtn.disabled=true;setStatus('正在按二级规则重新划分…');try{var payload=root.RyMapHost.payload(p),w=await engine(),result=w.RyMapPartition.preview(payload,angle);var list=library(),live=list.find(q=>q.id===p.id);if(!result.partitions.length)throw new Error('未生成有效分区，请检查地块和分区参数');if(!live||geometry(live)!==geometry(p)||select.value!==p.id)throw new Error('地块已切换，请重试');live.partitionPlan=result.plan;live.partitions=result.partitions;root.localStorage.setItem('runye_plot_library',JSON.stringify(list));var net=root.RyIrrigationDataStore.readNetworkLayout();if(net&&(net.plotId===p.id||p.id==='auto-current'&&p.designPlotId===net.plotId)){net.partitionPlan=result.plan;net.partitions=result.partitions;net.segments=[];net.dripTapes=[];net.valves=[];net.sourcePos=null;net.needsReplan=true;root.RyIrrigationDataStore.writeNetworkLayout(net);root.RyMapHost.refresh();}draw(live);setStatus('已重新划分 '+result.partitions.length+' 个区域；旧管路需回二级重新规划。','ok');return true;}catch(e){setStatus('未应用：'+e.message,'err');return false;}finally{busy=false;applyBtn.disabled=false;}}
+  async function applyNow(){if(busy)return false;var p=current(),angle=Number(input.value);if(!p||input.value.trim()===''||!Number.isFinite(angle)||angle<-180||angle>180){setStatus('请选择地块，角度范围为 −180° 至 180°。','err');return false;}busy=true;applyBtn.disabled=true;setStatus('正在按二级规则重新划分…');try{var payload=root.RyMapHost.payload(p),w=await engine(),result=w.RyMapPartition.preview(payload,angle);var state=readLibrary();if(!state.ok)throw new Error('地块库读取失败：'+state.error);var matches=state.plots.filter(function(q){return q&&q.id===p.id;});var live=matches.length===1?matches[0]:null;if(!result.partitions.length)throw new Error('未生成有效分区，请检查地块和分区参数');if(!live||geometry(live)!==geometry(p)||select.value!==p.id)throw new Error('地块已切换或编号重复，请重试');live.partitionPlan=result.plan;live.partitions=result.partitions;var saved=plotStore().replace(state.plots,state.revision);if(!saved.ok)throw new Error('地块库保存失败：'+saved.error);var net=root.RyIrrigationDataStore.readNetworkLayout();if(net&&(net.plotId===p.id||p.id==='auto-current'&&p.designPlotId===net.plotId)){net.partitionPlan=result.plan;net.partitions=result.partitions;net.segments=[];net.dripTapes=[];net.valves=[];net.sourcePos=null;net.needsReplan=true;root.RyIrrigationDataStore.writeNetworkLayout(net);root.RyMapHost.refresh();}draw(live);setStatus('已重新划分 '+result.partitions.length+' 个区域；旧管路需回二级重新规划。','ok');return true;}catch(e){setStatus('未应用：'+e.message,'err');return false;}finally{busy=false;applyBtn.disabled=false;}}
   applyBtn.onclick=applyNow;
   box.querySelector('[data-angle-send]').onclick=async function(){var p=current();if(!p||busy)return;var saved=valid(p.partitionPlan)?p.partitionPlan.angle:0;if(input.value.trim()===''||!Number.isFinite(Number(input.value))){setStatus('请先填写 −180° 至 180° 之间的角度。','err');return;}
    /* [v481] 旧版角度未应用时在这里**静默拒绝**（只有状态行小字，用户看不到 ⇒ 以为

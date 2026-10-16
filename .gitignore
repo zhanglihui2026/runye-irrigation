@@ -89,6 +89,7 @@ tests/*
 
 # 手动高程与压力校核回归
 !tests/terrain.test.cjs
+!tests/runye_hydraulics_topology.test.cjs
 
 # AI方案与原子额度回归
 !tests/ai_online_guard.test.cjs
@@ -98,6 +99,7 @@ tests/*
 !tests/zone_geometry.test.cjs
 !tests/flow_geometry.test.cjs
 !tests/data_bridge_stores.test.cjs
+!tests/plot_library_store.test.cjs
 
 # AOCI agent host integration (machine-bound; do not commit)
 .codex/config.toml
@@ -108,6 +110,7 @@ graphify-out/
 
 # 一次性调试残留（mjs 未含于上方 _*.js 规则）
 _pdbg_tmp.mjs
+_smoke_publish.mjs
 
 # Vite 构建缓存（可再生，不提交）
 .vite/

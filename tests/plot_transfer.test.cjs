@@ -22,7 +22,7 @@ function fixture(plots) {
     ryJumpToSection:id=>calls.jumps.push(id),runyeSetCurrentPlot:id=>{calls.saves++},
   };
   ctx.window=ctx;vm.createContext(ctx);
-  for(const f of ['mod/inline-13.js','mod/inline-16.js'])vm.runInContext(fs.readFileSync(path.join(root,f),'utf8'),ctx,{filename:f});
+  for(const f of ['core/plot-library-store.js','mod/inline-13.js','mod/inline-16.js'])vm.runInContext(fs.readFileSync(path.join(root,f),'utf8'),ctx,{filename:f});
   return {ctx,data,calls,list,document};
 }
 const a=plot('a',ringA), b=plot('b',ringB);
@@ -40,6 +40,11 @@ const selected=f.list.children[0];
 selected.querySelector('[data-act="current"]').click();
 assert.equal(f.ctx.currentPlotId,'a','drawing library selects clicked plot');
 assert.equal(f.calls.jumps.at(-1),'pipePlanSection');
+const corrupt=fixture([a]);
+corrupt.data.set('runye_plot_library','{bad json');
+corrupt.ctx.measuredArea=1000;
+assert.throws(()=>corrupt.ctx.runyePersistMeasuredPlot({plotId:'a'}),/地块库读取失败/);
+assert.equal(corrupt.data.get('runye_plot_library'),'{bad json','a failed read must not replace corrupt stored bytes');
 const dup=fixture([plot('same',ringA),plot('same',ringB)]);
 dup.list.children[1].querySelector('[data-act="current"]').click();
 assert.equal(dup.ctx.currentPlotId,null,'duplicate id must not pick first row');

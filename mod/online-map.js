@@ -1024,7 +1024,10 @@
     var mu=parseFloat((geodesicArea(points)/666.67).toFixed(2));
     if(!isFinite(mu) || mu<=0){ if(!opts.silent) alert('请先在地图上画框测量出有效面积再保存'); return null; }
     var sqm=Math.round(geodesicArea(points));
-    var arr=[]; try{ arr=JSON.parse(localStorage.getItem('runye_plot_library')||'[]'); }catch(e){ arr=[]; }
+    var plotStore=window.RyPlotLibraryStore;
+    var snapshot=plotStore&&plotStore.read();
+    if(!snapshot||!snapshot.ok){ if(!opts.silent) alert('地块库读取失败，未保存当前地块。'); return null; }
+    var arr=snapshot.plots;
     var name='地块 '+(arr.length+1);
     // 经纬度 → 本地米坐标（与精准灌溉页 applyMapMeasuredArea 一致），便于「设为当前」回填
     var poly=latlngs(), xs=[], ys=[];
@@ -1056,8 +1059,8 @@
     /* [v475] newId 时旧 previous 与新条目无 id 关系，走 push，不覆盖旧记录 */
     if(previous && !(opts&&opts.newId)){plot.note=previous.note;arr=arr.map(function(p){return p.id===plot.id?plot:p;});}
     else arr.push(plot);
-    try{ localStorage.setItem('runye_plot_library', JSON.stringify(arr)); }
-    catch(e){ if(!opts.silent) alert('保存失败：'+e.message); return null; }
+    var saveResult=plotStore.replace(arr,snapshot.revision);
+    if(!saveResult.ok){ if(!opts.silent) alert('保存失败，地块库未更改：'+saveResult.error); return null; }
     currentMapPlotId=plot.id;
     refreshPlotLibrary();
     return plot;
@@ -1178,7 +1181,10 @@
     if(isKml || /<kml[\s>]/i.test(text.slice(0,800))) arr=RunyeMapEnhance.parse.kml(text);
     else arr=RunyeMapEnhance.parse.geoJSON(text);
     if(!arr || !arr.length){ alert('未能从文件中解析出地块多边形（需要至少一个闭合多边形）。'+((arr&&arr.skipped&&arr.skipped.length)?'\\n其中跳过无效轨迹/环线：'+arr.skipped.join('、'):'')); return; }
-    var lib=[]; try{ lib=JSON.parse(localStorage.getItem('runye_plot_library')||'[]'); }catch(err){ lib=[]; }
+    var plotStore=window.RyPlotLibraryStore;
+    var snapshot=plotStore&&plotStore.read();
+    if(!snapshot||!snapshot.ok){ alert('地块库读取失败，导入已取消，原数据未更改。'); return; }
+    var lib=snapshot.plots;
     var allLL=[];
     arr.forEach(function(p){
       var ll=p.polyLatLng; if(!ll || ll.length<3) return;
@@ -1201,7 +1207,8 @@
         source:'import', crs:'GCJ-02', ts:Date.now(), note:'' });
       allLL=allLL.concat(llGcj);
     });
-    localStorage.setItem('runye_plot_library', JSON.stringify(lib));
+    var saveResult=plotStore.replace(lib,snapshot.revision);
+    if(!saveResult.ok){ alert('导入失败，地块库未更改：'+saveResult.error); return; }
     refreshPlotLibrary();
     if(allLL.length){ try{ map.fitBounds(L.latLngBounds(displayRing(allLL)),{padding:[30,30],maxZoom:17}); }catch(err){} }
     var skipMsg=(arr.skipped&&arr.skipped.length)?'\\n跳过 '+arr.skipped.length+' 条无效轨迹/环线（自相交或退化）：'+arr.skipped.join('、'):'';

@@ -338,6 +338,8 @@ export function createDataService(guard) {
         if (!Array.isArray(value.polyLatLng) || value.polyLatLng.length < 3) return { ok: false, error: 'missing-field:polyLatLng' };
         var rows = JSON.parse(localStorage.getItem(PLOT_LIBRARY_KEY) || '[]');
         if (!Array.isArray(rows)) return { ok: false, error: 'invalid-plot-library' };
+        var matchingRows = rows.filter(function (row) { return row && row.id === value.id; });
+        if (matchingRows.length > 1) return { ok: false, error: 'duplicate-plot-id' };
         var found = false;
         rows = rows.map(function (row) {
           if (row && row.id === value.id) { found = true; return Object.assign({}, row, value); }

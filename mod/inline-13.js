@@ -1,10 +1,16 @@
 
 // ===== 地块库：保存/召回多个实际地块（localStorage 数组，不覆盖） =====
 (function(){
-  var LIB_KEY='runye_plot_library';
   window.currentPlotId=null;
-  function loadLib(){ try{ var r=localStorage.getItem(LIB_KEY); return r?JSON.parse(r):[]; }catch(e){ return []; } }
-  function saveLib(a){ try{ localStorage.setItem(LIB_KEY, JSON.stringify(a)); }catch(e){} }
+  function readLibState(){
+    var store=window.RyPlotLibraryStore;
+    return store?store.read():{ok:false,error:'plot-library-store-unavailable'};
+  }
+  function loadLib(){ var state=readLibState(); return state.ok?state.plots:[]; }
+  function saveLib(a,state){
+    var store=window.RyPlotLibraryStore;
+    return store&&state?store.replace(a,state.revision):{ok:false,error:'plot-library-store-unavailable'};
+  }
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
   function fmtDate(ts){ var d=new Date(ts); if(isNaN(d)) return ''; var p=function(n){return (n<10?'0':'')+n;}; return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes()); }
   function srcLabel(s){ return s==='map'?'地图测量':(s==='area'?'图片测量':'手动'); }
@@ -13,6 +19,7 @@
   function toast(m){ try{ if(typeof atShowToast==='function'){ atShowToast(m); return; } }catch(e){} alert(m); }
 
   function renderLib(){
+    // 列表渲染只读展示：损坏存档时显示空列表，不得阻断页面启动；写入入口仍严格拒绝。
     var arr=loadLib();
     var list=document.getElementById('plotLibList');
     var sum=document.getElementById('plotLibSummary');
@@ -40,7 +47,9 @@
     opts=opts||{};
     var area=window.measuredArea||0;
     if(area<=0) return null;
-    var arr=loadLib();
+    var state=readLibState();
+    if(!state.ok) throw new Error('地块库读取失败，未保存地块：'+state.error);
+    var arr=state.plots;
     var id=opts.plotId || ('pm'+Date.now());
     if(opts.preserveSource){
       var matches=arr.filter(function(x){return x&&String(x.id)===String(id);});
@@ -51,7 +60,10 @@
       if(typeof window.runyeSetCurrentPlot==='function') window.runyeSetCurrentPlot(id);
       return matches[0];
     }
-    var exist=null; arr.forEach(function(x){ if(x.id===id) exist=x; });
+    var matches=arr.map(function(x,i){return x&&String(x.id)===String(id)?i:-1;}).filter(function(i){return i>=0;});
+    if(matches.length>1) throw new Error('地块库中存在重复编号，无法安全更新');
+    var existingIndex=matches.length?matches[0]:-1;
+    var exist=existingIndex>=0?arr[existingIndex]:null;
     var name=opts.name || (exist&&exist.name) || ('地块 '+(arr.length+1));
     var plot={ id:id, name:name, mu:Math.round(area/666.67*100)/100, sqm:Math.round(area*100)/100,
       poly:(window.measuredPolygon||[]).map(function(pt){return {x:Math.round((pt.x||0)*100)/100,y:Math.round((pt.y||0)*100)/100};}),
@@ -92,9 +104,11 @@
         });
       }
     }catch(eSub){}
-    if(exist){ arr=arr.map(function(x){ return x.id===id?plot:x; }); }
+    if(exist){ arr[existingIndex]=plot; }
     else { arr.push(plot); }
-    saveLib(arr); window.currentPlotId=id; renderLib();
+    var saved=saveLib(arr,state);
+    if(!saved.ok) throw new Error('地块库写入失败：'+saved.error);
+    window.currentPlotId=id; renderLib();
     // 同步本页「管线绘图区」（管道规划）
     try{ if(window.measuredPolygon && window.measuredPolygon.length>=3 && typeof window.ppLoadPolygon==='function') window.ppLoadPolygon(); }catch(e){}
     try{ if(typeof window.ppGenerateDiagram==='function') window.ppGenerateDiagram({scroll:false}); }catch(e){}
@@ -141,7 +155,9 @@
     var area=window.measuredArea||0;
     if(area<=0){ toast('请先测量/生成地块再保存'); return; }
     var nameInput=document.getElementById('plotNameInput');
-    var arr=loadLib();
+    var state=readLibState();
+    if(!state.ok){ toast('地块库读取失败，未保存：'+state.error); return; }
+    var arr=state.plots;
     var name=(nameInput&&nameInput.value||'').trim();
     if(!name) name='地块 '+(arr.length+1);
     var id='p'+Date.now()+Math.floor(Math.random()*1000);
@@ -152,7 +168,10 @@
       if(Array.isArray(frame) && frame.length===plot.poly.length) plot.mapFramePoly=frame.map(function(p){return {x:p.x,y:p.y};});
       plot.polyLatLng=RunyeGeo.polyM2ll(plot.mapFramePoly || plot.poly,plot.geo);plot.crs='GCJ-02';
     }
-    arr.push(plot); saveLib(arr); window.currentPlotId=id;
+    arr.push(plot);
+    var saved=saveLib(arr,state);
+    if(!saved.ok){ toast('保存失败，地块库未更改：'+saved.error); return; }
+    window.currentPlotId=id;
     if(nameInput) nameInput.value='';
     renderLib(); toast('已保存到地块库：'+name);
     // 同步到本页「管线绘图区」（管道规划）：即时把刚画好的边界载入管线画布
@@ -162,14 +181,16 @@
     try{ if(typeof window.runyeSetCurrentPlot==='function') window.runyeSetCurrentPlot(id); }catch(e){}
   }
   function setCurrent(id){
-    var arr=loadLib(); var matches=arr.filter(function(x){return x&&x.id===id;});
+    var state=readLibState();
+    if(!state.ok){ toast('地块库读取失败，无法设为当前：'+state.error); return; }
+    var arr=state.plots; var matches=arr.filter(function(x){return x&&String(x.id)===String(id);});
     if(matches.length>1){ toast('地块库中存在重复编号，无法确定当前地块；请先检查重复记录'); return; }
     var p=matches[0];
     if(!p) return;
     if(p.polyLatLng && p.polyLatLng.length>=3 && window.RunyeGeo){
       if(!p.geo) p.geo=RunyeGeo.baseOfFeature(p);
       if(!Array.isArray(p.poly) || p.poly.length<3) p.poly=RunyeGeo.toCanvasPoly(p);
-      if(typeof p.sqm!=='number' || !isFinite(p.sqm) || p.sqm<=0){p.sqm=Math.round(RunyeGeo.geodesicArea(p.polyLatLng));p.mu=+(p.sqm/666.67).toFixed(2);saveLib(arr);}
+      if(typeof p.sqm!=='number' || !isFinite(p.sqm) || p.sqm<=0){p.sqm=Math.round(RunyeGeo.geodesicArea(p.polyLatLng));p.mu=+(p.sqm/666.67).toFixed(2);var repaired=saveLib(arr,state);if(!repaired.ok){toast('地块信息修复未保存：'+repaired.error);return;}}
     }
     window.measuredArea=p.sqm||0;
     window.measuredPolygon=Array.isArray(p.poly)?p.poly:[];
@@ -225,15 +246,23 @@
     try{ if(typeof window.runyeSetCurrentPlot==='function') window.runyeSetCurrentPlot(id); }catch(e){}
   }
   function renamePlot(id){
-    var arr=loadLib(); var p=arr.filter(function(x){return x.id===id;})[0];
-    if(!p) return;
+    var state=readLibState();
+    if(!state.ok){ toast('地块库读取失败，未重命名：'+state.error); return; }
+    var arr=state.plots, matches=arr.filter(function(x){return x&&String(x.id)===String(id);});
+    if(matches.length>1){ toast('地块库中存在重复编号，无法安全重命名'); return; }
+    var p=matches[0]; if(!p) return;
     var n=prompt('重命名地块', p.name); if(n==null) return; n=n.trim(); if(!n) return;
-    p.name=n; saveLib(arr); renderLib();
+    p.name=n; var saved=saveLib(arr,state); if(!saved.ok){toast('重命名失败，地块库未更改：'+saved.error);return;} renderLib();
   }
   function delPlot(id){
     if(!confirm('确定删除该地块？此操作不可撤销。')) return;
-    var arr=loadLib().filter(function(x){return x.id!==id;});
-    saveLib(arr);
+    var state=readLibState();
+    if(!state.ok){ toast('地块库读取失败，未删除：'+state.error); return; }
+    var arr=state.plots, matches=arr.map(function(x,i){return x&&String(x.id)===String(id)?i:-1;}).filter(function(i){return i>=0;});
+    if(matches.length>1){ toast('地块库中存在重复编号，无法安全删除'); return; }
+    if(!matches.length) return;
+    arr.splice(matches[0],1);
+    var saved=saveLib(arr,state); if(!saved.ok){toast('删除失败，地块库未更改：'+saved.error);return;}
     if(window.currentPlotId===id){ window.currentPlotId=null; try{ if(window.runyeSetCurrentPlot) window.runyeSetCurrentPlot(null); }catch(e){} }
     renderLib();
   }

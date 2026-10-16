@@ -167,3 +167,33 @@ test('Sprinkler bridge rejects corrupt/non-object snapshots and reports failures
     'the old snapshot has already been removed when replacement set fails');
   assert.deepEqual(failedSet.calls.slice(-2).map(call => call[0]), ['remove', 'set']);
 });
+
+test('data service refuses to update an ambiguous duplicate plot id', () => {
+  const source = fs.readFileSync(path.join(ROOT, 'core/data-service.js'), 'utf8')
+    .replace(/^export\s+/gm, '');
+  const values = new Map();
+  const context = {
+    localStorage: {
+      getItem(key) { return values.has(key) ? values.get(key) : null; },
+      setItem(key, value) { values.set(key, String(value)); }
+    },
+    window: { dispatchEvent() {} },
+    CustomEvent: function CustomEvent(type, init) { this.type = type; this.detail = init.detail; },
+    JSON, Date, Math, Number, String, Object, Array, isFinite, console
+  };
+  vm.createContext(context);
+  vm.runInContext(source + '\nglobalThis.__createDataService = createDataService;', context,
+    { filename: 'core/data-service.js' });
+  const original = [
+    { id: 'duplicate', name: 'A', sqm: 1000, polyLatLng: [[1, 1], [1, 2], [2, 2]] },
+    { id: 'duplicate', name: 'B', sqm: 2000, polyLatLng: [[3, 3], [3, 4], [4, 4]] }
+  ];
+  values.set('runye_plot_library', JSON.stringify(original));
+  const result = context.__createDataService().mutateLayer('source', {
+    id: 'duplicate', name: 'changed', sqm: 3000,
+    polyLatLng: [[5, 5], [5, 6], [6, 6]]
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(result)), { ok: false, error: 'duplicate-plot-id' });
+  assert.deepEqual(JSON.parse(values.get('runye_plot_library')), original,
+    'ambiguous source update must leave every library entry unchanged');
+});
