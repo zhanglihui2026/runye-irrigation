@@ -1005,10 +1005,13 @@ body.ry-worst-off [data-tlworst]{display:none}
          transform-box:view-box 让 transform-origin 走 viewBox 用户单位（避免各浏览器原点歧义）。
    [v501 2026-10-16 用户要求] 演示动画整体提速一半：flow .85→.425s、valve-open .5→.25s、
          valve-ring 1.7→.85s、src-pulse 1.5→.75s（原时长逐一减半）。
-         注：轮播间隔（▶ 2 秒一组）是独立节奏，不在本次「动画时长」范围内。
+         注：轮播间隔（▶ 一组）是独立节奏，不在本次「动画时长」范围内（v504 另改，见下）。
    [v503 2026-10-16 用户要求] 再缩短：只动**水流动画**（用户明确「演示轮罐组的水流动画」），
          flow .425→.22s（≈再减半，dash 跑完一个周期 .22s ⇒ 视觉流速约 4.5 次/秒）。
-         valve-open/.25s、valve-ring/.85s、src-pulse/.75s、轮播间隔 2s 一律保持 v501 值不动。 */
+         valve-open/.25s、valve-ring/.85s、src-pulse/.75s、轮播间隔 2s 一律保持 v501 值不动。
+   [v504 2026-10-16 用户要求]「两个地块切换的时长也要缩短」——改的是**切换节奏**，不是动画本身：
+         轮播间隔 2000→1000ms，常量在 mod/inline-09.js 的 TL_DEMO_INTERVAL_MS。
+         上面四条动画时长（.22/.25/.85/.75s）不变。 */
 .tl-demo-flow{stroke-dasharray:7 9;animation:tlDemoFlow .22s linear infinite;pointer-events:none}
 @keyframes tlDemoFlow{to{stroke-dashoffset:-32}}
 .tl-demo-valve-open{pointer-events:none;transform-box:view-box;animation:tlValveOpen .25s cubic-bezier(.34,.9,.3,1) forwards}
@@ -1964,9 +1967,10 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.pp-grip-side,
     <!-- [v216] 「分组：自动（按 N=2 均分）/ 手动分组表格」文字行已按用户要求取消
          （手动分组明细看右侧「联合灌溉分组」面板）；tlRefreshGroupStatus 保留，
          现在只负责「分组一变 → 轮灌演示 chips 重建」这一件事。 -->
-    <!-- [v215] 轮灌演示（用户 2026-10-04）：点组号 → 该组分区高亮、其余淡化；▶轮播 2 秒一组自动切换
+    <!-- [v215] 轮灌演示（用户 2026-10-04）：点组号 → 该组分区高亮、其余淡化；▶轮播 一组自动切换
          （交互参照过滤系统反冲洗组态 chips）；■ 退出恢复。chips 由 tlRenderDemoChips() 按
-         当前分组（自动 N 均分 / 手动 M 组）动态生成，无图时整行隐藏。 -->
+         当前分组（自动 N 均分 / 手动 M 组）动态生成，无图时整行隐藏。
+         [v504 2026-10-16 用户要求] 轮播间隔 2000→1000ms，见 mod/inline-09.js TL_DEMO_INTERVAL_MS。 -->
     <div id="tlDemoBar" style="display:none;margin-top:6px;font-size:11px;line-height:1.7;color:#64748b">
       <span style="font-weight:700;color:#334155">轮灌演示</span>
       <!-- [v465]（2026-10-15 用户要求）chips 改块级 flex 独占一行，与「轮灌演示」标题行距加大（margin-top:5px） -->
@@ -3049,7 +3053,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.pp-grip-side,
 <script src="mod/material-table.js?v=421-mat-table"></script>
 <!-- [v424-plan-calc-render] 扬程公式与分解展示模块，先于计算控制器和三级调用方装载。 -->
 <script src="mod/plan-calc-render.js?v=424-plan-calc-render"></script>
-<script src="mod/inline-09.js?v=500-dim-gap"></script>
+<script src="mod/inline-09.js?v=504-demo-interval"></script>
 <!-- [v423-header-layout] 三级简图标题布局依赖 inline-09 的 tlMeasureText 与生成时写入的标题状态。 -->
 <script src="mod/tl-header-layout.js?v=423-header-layout"></script>
 

@@ -322,7 +322,12 @@
       index.html 与 runye-map-measure.html 两处副本同步改（v495 教训）。
    index.html / runye-map-measure.html / runye-map-partition.js / mod/inline-09.js 均在 CORE
    白名单，必须抬版本。 */
-const VERSION = 'v503-ui-batch-plot-store';
+   v504-demo-interval（2026-10-16 用户要求「两个地块切换的时长也要缩短」）：轮灌演示**切换节奏**
+   2000→1000ms。注意与 v501/v503 区分——那两次改的是水流/阀门动画本身跑多快（.22/.25/.85/.75s，
+   本次不动），这次改的是「多久换下一组」。间隔抽成具名常量 TL_DEMO_INTERVAL_MS（inline-09.js），
+   ▶ 按钮 title 与三处注释同步改为「1 秒一组」；index.html 引用 inline-09.js ?v=500-dim-gap
+   → ?v=504-demo-interval。mod/inline-09.js 在 CORE 白名单，必须抬版本。 */
+const VERSION = 'v504-demo-interval';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

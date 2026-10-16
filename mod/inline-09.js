@@ -1764,12 +1764,16 @@ window.tlSteppedZoneCuts = tlSteppedZoneCuts;
  *   · 点「组N / MN」→ 该组分区加深（groupFillHi）、其余淡化（灰 6%）——两视图同步：
  *       工作区走 RyTlWs.setSelGroup → applyGroupHighlight（selGroup 分支 v98 起就有、一直没入口）；
  *       三级简图走本文件 tlApplyDemoHighlight（rect 同带 data-zi/data-g/data-fill/data-stroke）。
- *   · ▶ 轮播 → setInterval 2 秒一组来回切换；再点 ⏸ 暂停；■ 退出恢复原色。
+ *   · ▶ 轮播 → setInterval TL_DEMO_INTERVAL_MS 一组来回切换；再点 ⏸ 暂停；■ 退出恢复原色。
  *   · 演示与「图上点分区成组」互斥：启动时清 tlPendingSel / tlGroupMode（applyGroupHighlight
  *     里待选蓝高亮优先级高于 selGroup，不清会盖住演示色）。
  *   · 演示态挂 window.__tlDemoGroup（单一份），render()/tlAutoGenerate 重渲染后各自恢复，
  *     不靠人记住同步（同一事实只存一份）。 */
 var tlDemoTimer = null, tlDemoIdx = 0;
+/* [v504 2026-10-16 用户要求] 轮灌演示「切换时长」缩短：每组停留/轮播间隔 2000→1000ms。
+   与 v501/v503 的动画时长是两件事——v501/v503 改的是「水流/阀门动画本身跑多快」，
+   这里改的是「多久换下一组」。抽成具名常量，后续再调只动这一处。 */
+var TL_DEMO_INTERVAL_MS = 1000;
 function tlDemoGroupCount() {
   var total = tlGroupZoneCount(); if (!total) return 0;
   var mg = (window.tlManualGroups && window.tlManualGroups.length) ? window.tlManualGroups : null;
@@ -2105,7 +2109,7 @@ function tlRenderDemoChips() {
   }
   /* [v465]（2026-10-15 用户要求）轮播/退出取消文字、只用图标：▶=轮播 / ⏸=暂停（轮播中）/ ■=退出；
      语义收进 title 与 aria-label。按钮尺寸收成图标方块（样式见 style-01.css .tl-demo-ctl）。 */
-  h += '<button type="button" id="tlDemoPlay" class="tl-demo-ctl" aria-label="轮播" title="自动轮流高亮各组（2 秒一组），再点暂停">▶</button>';
+  h += '<button type="button" id="tlDemoPlay" class="tl-demo-ctl" aria-label="轮播" title="自动轮流高亮各组（1 秒一组），再点暂停">▶</button>';
   h += '<button type="button" id="tlDemoExit" class="tl-demo-ctl" aria-label="退出" title="退出演示，所有分区恢复原色">■</button>';
   box.innerHTML = h;
   tlDemoChipSync();
@@ -2123,12 +2127,12 @@ function tlDemoPlayToggle() {
   var M = tlDemoGroupCount(); if (M <= 0) return;
   if (tlDemoTimer) { clearInterval(tlDemoTimer); tlDemoTimer = null; tlDemoChipSync(); return; }
   tlDemoIdx = (window.__tlDemoGroup != null) ? window.__tlDemoGroup : -1;
-  tlDemoIdx = (tlDemoIdx + 1) % M; tlDemoSet(tlDemoIdx);   /* 点下立即切组，不等 2 秒 */
+  tlDemoIdx = (tlDemoIdx + 1) % M; tlDemoSet(tlDemoIdx);   /* 点下立即切组，不等一个间隔 */
   tlDemoTimer = setInterval(function () {
     var Mc = tlDemoGroupCount(); if (Mc <= 0) { tlDemoStop(); return; }   /* 重分组后组数变化兜底 */
     tlDemoIdx = (tlDemoIdx + 1) % Mc;
     tlDemoSet(tlDemoIdx);
-  }, 2000);
+  }, TL_DEMO_INTERVAL_MS);
   tlDemoChipSync();
 }
 function tlDemoStop() {
