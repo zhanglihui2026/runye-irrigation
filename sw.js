@@ -348,7 +348,17 @@
    修法：收集抽成可重入 collectItems()；点击行为抽成具名 navItemClick()；绑定按元素标记去重；
    在 #fnNav 上挂 MutationObserver（childList+subtree），重建后重收 + 补绑 + 按当前激活功能区
    恢复高亮。病史同 v376 的「重建后 href 改写丢失」。mod/inline-18.js 在 CORE 白名单，必须抬版本。 */
-const VERSION = 'v511-nav-rebind';
+/* v513-sec-gate-hydraulic-coord：
+   ① [安全审计] L2 门控补齐 —— 会员门控链路自查发现
+      (a) runye-entitle.js 的 mockPlan 可被控制台一行改写（提权写入口）、
+      (b) RyEntitle.state 交出的活对象可就地篡改提权、
+      (c) 绘图编辑器静态按钮 #ppAiPlan 无任何权益校验、
+      (d) terrain/index.html 与 管路接驳拼装.html 独立 URL 直达零校验。
+      修法：runye-entitle.js 只读访问器 + 深冻结 state；plot-editor #ppAiPlan fail-closed；
+      terrain-ui.js 统一门控（独立页 + 主页 #terrainSection 两入口）；管路接驳拼装.html 补门控。
+   ② [并行会话] 水力拓扑拒绝 NaN/越界经纬度管段。
+   ①② 均改到 CORE 白名单内文件 → 必须抬版本重建离线缓存。 */
+const VERSION = 'v513-sec-gate-hydraulic-coord';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

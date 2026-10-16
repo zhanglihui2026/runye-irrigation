@@ -2138,5 +2138,75 @@
   });
 })();
 </script>
+<!-- ════════════════════════════════════════════════════════════════════
+     [v512 安全] L2 门控（feat=pro-others）
+     本页「管路拼装」在 v385 已随四功能剥离从导航下架（壳插件同步摘除），
+     但独立 URL 仍可直达，且此前**零权益校验** ⇒ 补齐 fail-closed 门控
+     （实测见 _sec_audit.mjs 向量 E）。
+     三态语义同 runye-nav.js / runye-hydraulics.html：pending 等待 / denied 拦截 / allowed 放行。
+     ════════════════════════════════════════════════════════════════════ -->
+<script>
+(function () {
+  'use strict';
+  function packingAccess() {
+    var E = window.RyEntitle;
+    try { if (!E && window.parent !== window) E = window.parent.RyEntitle; } catch (e) { }
+    if (E && typeof E.access === 'function') return E.access('pro-others');
+    if (E && typeof E.can === 'function') {
+      if (typeof E.ready === 'function' && !E.ready()) return 'pending';
+      return E.can('pro-others') ? 'allowed' : 'denied';
+    }
+    return 'denied';   /* fail-closed：取不到权益层就不放行 */
+  }
+  function showGate(status) {
+    var gate = document.getElementById('packingEntitlementGate');
+    if (!gate) {
+      gate = document.createElement('div');
+      gate.id = 'packingEntitlementGate';
+      gate.setAttribute('role', 'status');
+      gate.setAttribute('aria-live', 'polite');
+      /* 顶部导航留在遮罩之上：用户可以自己切走 */
+      gate.style.cssText = 'position:fixed;left:0;right:0;bottom:0;top:var(--fn-nav-h,48px);z-index:100000;' +
+        'display:flex;align-items:center;justify-content:center;background:rgba(247,245,240,.98);' +
+        'font:14px sans-serif;color:#243b33;text-align:center;padding:24px';
+      document.body.appendChild(gate);
+    }
+    gate.innerHTML = '';
+    var box = document.createElement('div');
+    box.style.cssText = 'max-width:420px;padding:28px;border:1px solid #d7e4dc;border-radius:12px;background:#fff;box-shadow:0 8px 30px rgba(0,0,0,.08)';
+    var title = document.createElement('h2');
+    title.textContent = status === 'pending' ? '正在同步会员权益' : '管路拼装为高级会员功能';
+    var desc = document.createElement('p');
+    desc.textContent = status === 'pending' ? '请稍候，页面会在权益同步完成后自动打开。' : '请从润野主程序登录并开通高级会员后使用。';
+    box.appendChild(title); box.appendChild(desc);
+    if (status !== 'pending') {
+      var up = document.createElement('button');
+      up.type = 'button'; up.textContent = '查看会员权益';
+      up.style.cssText = 'margin-top:8px;padding:8px 16px;border:1px solid #2f6f5e;border-radius:8px;background:#2f6f5e;color:#fff;cursor:pointer';
+      up.onclick = function () {
+        var ui = null;
+        try { ui = window.RyMemberUI || (window.parent !== window ? window.parent.RyMemberUI : null); } catch (e) { }
+        if (ui && typeof ui.showUpgrade === 'function') ui.showUpgrade('管路拼装');
+        else window.location.href = 'index.html';
+      };
+      box.appendChild(up);
+    }
+    gate.appendChild(box);
+  }
+  var booted = false;
+  function boot() {
+    if (booted) return;
+    if (packingAccess() === 'allowed') {
+      booted = true;
+      var g = document.getElementById('packingEntitlementGate');
+      if (g && g.parentNode) g.parentNode.removeChild(g);
+      return;
+    }
+    showGate(packingAccess());
+    setTimeout(boot, 500);
+  }
+  boot();
+})();
+</script>
 </body>
 </html>

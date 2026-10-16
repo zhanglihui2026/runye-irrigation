@@ -2293,7 +2293,27 @@
         zoneMu:g('planZoneMuManual'),targetV:g('planTargetV'),tapePressure:g('planTapePressure'),zones:g('planN')};
     }
     var btn=document.getElementById('ppAiPlan');
+    /* [v512 安全] #ppAiPlan 在主站导航之外，原先**完全没有权益校验**：
+       已确认无权的账号（甚至屏蔽了权益层的页面）点它就能开智能规划工作台 ——
+       绕开 `ai-plan` 门控的第二入口（实测见 _sec_audit.mjs 向量 A2）。
+       ⚠ 这里刻意用 **fail-closed** 口径：拿不到权益层即视为无权。
+         该层是同源静态文件，正常用户不会加载失败；而 runye-nav.js 主站导航
+         为避免网络抖动锁死老用户走的是 fail-open —— 新加的闸门从严，不跟它对齐。 */
+    function aiPlanAccess(){
+      var E = (typeof window!=='undefined') ? window.RyEntitle : null;
+      if(!E || typeof E.access!=='function') return 'denied';
+      return E.access('ai-plan');
+    }
+    if(btn && window.RyEntitle && typeof window.RyEntitle.bindControl==='function'){
+      try{ window.RyEntitle.bindControl(btn,'ai-plan','AI 规划'); }catch(e){}
+    }
     if(btn)btn.addEventListener('click',function(){
+      var _st=aiPlanAccess();
+      if(_st!=='allowed'){
+        if(_st==='pending'){ alert('正在同步会员权益，请稍后重试。'); return; }
+        try{ if(window.RyMemberUI&&typeof RyMemberUI.showUpgrade==='function'){ RyMemberUI.showUpgrade('智能规划'); return; } }catch(e){}
+        alert('「智能规划」为会员功能 · 邀请好友即可开通'); return;
+      }
       try{localStorage.setItem('runye_ai_plan_v1',JSON.stringify({mode:'request',at:Date.now(),params:snapshot()}));}catch(e){}
       /* [v327] 跳转前静默存档全量方案 + 写一次性锚：返回本页时恢复（页内手画/图片测量边界无地块库锚，v161 自动恢复不覆盖） */
       try{if(typeof window.runyeSaveProject==='function')window.runyeSaveProject(true);}catch(e){}

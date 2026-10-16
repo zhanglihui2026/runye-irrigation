@@ -127,6 +127,29 @@
   }
 
   var state = null;
+  /* [v512 安全] 联调开关改为「闭包变量 + 只读访问器」：
+     原先 RyEntitle.mockPlan 是个普通可写属性 —— 线上任意用户一行
+     `RyEntitle.mockPlan='L2'` 就能让 can()/access() 全部放行（实测见
+     _sec_audit.mjs 向量 B）。访问器另把 isLocalTestHost() 算进去 ⇒ 线上恒为 null。 */
+  var mockPlanVar = null;
+  /* [v512 安全] state 交出前先深冻结：
+     原先 getter 返回的是活对象，用户可 `RyEntitle.state.entitle={plan:'L2'};
+     RyEntitle.state.trial=false` 就地提权（实测向量 C2，等级直接变「高级会员」）。
+     内部一律「换新对象」赋值、从不就地改，故冻结对本模块无副作用。 */
+  function freezeState(o) {
+    if (!o || typeof o !== 'object') return o;
+    try {
+      if (o.entitle && typeof o.entitle === 'object') Object.freeze(o.entitle);
+      if (o.progress && typeof o.progress === 'object') Object.freeze(o.progress);
+      var arrs = [o.invites, o.claims, o.rewards];
+      for (var a = 0; a < arrs.length; a++) {
+        if (!Array.isArray(arrs[a])) continue;
+        for (var i = 0; i < arrs[a].length; i++) { if (arrs[a][i] && typeof arrs[a][i] === 'object') Object.freeze(arrs[a][i]); }
+      }
+      Object.freeze(o);
+    } catch (e) { }
+    return o;
+  }
   var lastHb = 0;
   var listeners = [];
   var loading = null;
@@ -209,7 +232,7 @@
   }
   /* 服务端状态包（packState）→ 前端 state（补 trial/anonPolicy 两个前端字段） */
   function applyServerState(pack) {
-    state = Object.assign({}, pack, { trial: false, anonPolicy: 'trial' });
+    state = freezeState(Object.assign({}, pack, { trial: false, anonPolicy: 'trial' }));
     emit();
     return state;
   }
@@ -288,7 +311,7 @@
         inv = a2[0]; ent = a2[1];
         return loadLinks(mySub).then(function (links) {
           var progress = computeProgress(links, now);
-          state = {
+          state = freezeState({
             code: (inv && inv.code) || '',
             entitle: ent ? { plan: ent.plan, expireAt: ms(ent.expires_at),
               memberDays: ent.member_days, activatedAt: ms(ent.activated_at) } : null,
@@ -297,7 +320,7 @@
             invites: links, claims: (inv && inv.claims) || [],
             rewards: (inv && inv.rewards) || [],
             rewardClaimed: !!(inv && inv.reward_claimed)
-          };
+          });
           emit();
           return state;
         });
@@ -318,14 +341,14 @@
     init: function (force) {
       if (force) this.reset();
       if (loading) return loading;
-      loading = (isAnon() ? Promise.resolve(anonState()).then(function (s) { state = s; emit(); return s; })
+      loading = (isAnon() ? Promise.resolve(anonState()).then(function (s) { state = freezeState(s); emit(); return s; })
                           : pullAuth(true))
         .then(function (s) { loading = null; return s; });
       return loading;
     },
     /* 刷新权益与进度 */
     refresh: function () {
-      return isAnon() ? Promise.resolve(anonState()).then(function (s) { state = s; emit(); return s; })
+      return isAnon() ? Promise.resolve(anonState()).then(function (s) { state = freezeState(s); emit(); return s; })
                       : pullAuth(false);
     },
 
@@ -500,6 +523,21 @@
     PLAN_NAMES: PLAN_NAMES
   };
 
+  /* [v512 安全] 把 mockPlan / state 钉死为**不可重定义**的只读访问器：
+     只在对象字面量里写 getter 还不够 —— 控制台仍可用 Object.defineProperty
+     把它覆盖成 {value:'L2'} 绕过去。这里以 configurable:false 重定义，
+     彻底关掉「提权写入口」；内部读写一律走闭包变量，不受影响。 */
+  try {
+    Object.defineProperty(RyEntitle, 'mockPlan', {
+      get: function () { return (mockPlanVar && isLocalTestHost()) ? mockPlanVar : null; },
+      enumerable: true, configurable: false
+    });
+    Object.defineProperty(RyEntitle, 'state', {
+      get: function () { return state; },
+      enumerable: true, configurable: false
+    });
+  } catch (e) { }
+
   /* ---------- [v371] rdb 降级路径（通道不可用时兜底，逻辑为 v370 原版） ---------- */
   function bindRefRdb(ref, viaGroup) {
     var self = RyEntitle;
@@ -645,7 +683,7 @@
       var local = location.protocol === 'file:' || !h || h === 'localhost' || h === '127.0.0.1';
       if (!local) return;
       if (m[1] === 'L2' && !localAdminSession) return;
-      RyEntitle.mockPlan = m[1];
+      mockPlanVar = m[1];   /* [v512] 改为写闭包变量，不再写公开属性 */
     } catch (e) { /* 无 location（Node 单测）时忽略 */ }
   })();
 })();

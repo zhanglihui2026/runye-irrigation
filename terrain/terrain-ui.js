@@ -1395,6 +1395,97 @@
     return removed;
   }
 
+  /* ============================================================
+     [v512 安全] L2 门控（feat=pro-others）
+     ------------------------------------------------------------
+     为什么加在这里：本文件是「独立入口 terrain/index.html」与「主页内
+     #terrainSection」唯一的共用实现 —— 一处补齐两个入口。
+     为什么必须补：地形模块在导航里是 feat:'pro-others'（L2 高级会员），
+     但在此之前 (a) 独立 URL 直接打开、 (b) 在主页地址栏敲 index.html#terrainSection
+     两条路径都是零校验（实测见 _sec_audit.mjs 向量 E / I）。
+     三态语义与 runye-nav.js / 各插件一致：pending 等待、denied 拦截、allowed 放行。
+     上限：与其它纯前端门控一样挡不住「控制台覆写判定函数」，但把上面两条
+     零校验旁路封死（真正付费墙仍是服务端 entitlement）。
+     ============================================================ */
+  function terrainAccess() {
+    var E = (typeof window !== 'undefined') ? window.RyEntitle : null;
+    if (!E) { try { if (window.parent !== window) E = window.parent.RyEntitle; } catch (e) { } }
+    if (E && typeof E.access === 'function') return E.access('pro-others');
+    if (E && typeof E.can === 'function') {
+      if (typeof E.ready === 'function' && !E.ready()) return 'pending';
+      return E.can('pro-others') ? 'allowed' : 'denied';
+    }
+    return 'denied';   /* fail-closed：取不到权益层就不放行（与导航的兼容放行刻意不同） */
+  }
+  var terrainGateEl = null;
+  function terrainGateRemove() {
+    if (terrainGateEl && terrainGateEl.parentNode) terrainGateEl.parentNode.removeChild(terrainGateEl);
+    terrainGateEl = null;
+  }
+  /* 遮罩范围必须与「本页是否就是地形模块」一致：
+       · 独立页 terrain/index.html（无 #terrainSection，root===document）
+         → 整页就是地形模块，用 fixed 全屏遮罩；
+       · 主页内 #terrainSection（root===该 section）
+         → 只能用 absolute 区块内遮罩！否则无权用户一打开主页就被全屏遮罩盖住，
+           整个软件不可用（这是本次修复过程中发现并纠正的设计缺陷）。
+         区块自身 display:none 时遮罩随之不可见，等价于「没进这个功能就不打扰」。 */
+  function terrainGateShow(status) {
+    var inApp = !!(root && root !== document);
+    if (!terrainGateEl) {
+      terrainGateEl = document.createElement('div');
+      terrainGateEl.id = 'terrainEntitlementGate';
+      terrainGateEl.setAttribute('role', 'status');
+      terrainGateEl.setAttribute('aria-live', 'polite');
+      terrainGateEl.style.cssText =
+        'position:' + (inApp ? 'absolute' : 'fixed') + ';left:0;right:0;top:0;bottom:0;z-index:100000;' +
+        'display:flex;align-items:center;justify-content:center;background:rgba(247,245,240,.98);' +
+        'font:14px sans-serif;color:#243b33;text-align:center;padding:24px';
+      if (inApp) {
+        try { if (getComputedStyle(root).position === 'static') root.style.position = 'relative'; } catch (e) { }
+        root.appendChild(terrainGateEl);
+      } else {
+        (document.body || document.documentElement).appendChild(terrainGateEl);
+      }
+    }
+    terrainGateEl.innerHTML = '';
+    var box = document.createElement('div');
+    box.style.cssText = 'max-width:420px;padding:28px;border:1px solid #d7e4dc;border-radius:12px;background:#fff;box-shadow:0 8px 30px rgba(0,0,0,.08)';
+    var title = document.createElement('h2');
+    title.textContent = status === 'pending' ? '正在同步会员权益' : '地形模块为高级会员功能';
+    var desc = document.createElement('p');
+    desc.textContent = status === 'pending' ? '请稍候，页面会在权益同步完成后自动打开。' : '请从润野主程序登录并开通高级会员后使用。';
+    box.appendChild(title); box.appendChild(desc);
+    if (status !== 'pending') {
+      var upgrade = document.createElement('button');
+      upgrade.type = 'button'; upgrade.textContent = '查看会员权益';
+      upgrade.style.cssText = 'margin-top:8px;padding:8px 16px;border:1px solid #2f6f5e;border-radius:8px;background:#2f6f5e;color:#fff;cursor:pointer';
+      upgrade.onclick = function () {
+        var ui = null;
+        try { ui = window.RyMemberUI || (window.parent !== window ? window.parent.RyMemberUI : null); } catch (e) { }
+        if (ui && typeof ui.showUpgrade === 'function') ui.showUpgrade('地形模块');
+        else window.location.href = (root && root !== document) ? 'index.html' : '../index.html';
+      };
+      box.appendChild(upgrade);
+    }
+    terrainGateEl.appendChild(box);
+  }
+  /* 权益是异步就绪的：pending 期间轮询（上限 20s），就绪后自动放行；
+     之后再变（升级/登录）由 RyEntitle.onChange 兜底（与 runye-hydraulics.html 同款三态）。 */
+  var terrainBooted = false, terrainGateTries = 0;
+  function terrainGateSync() {
+    if (terrainBooted) return;
+    var st = terrainAccess();
+    if (st === 'allowed') {
+      terrainBooted = true;
+      terrainGateRemove();
+      initTerrainUI();
+      return;
+    }
+    terrainGateShow(st);
+    terrainGateTries++;
+    if (terrainGateTries < 40) setTimeout(terrainGateSync, 500);
+  }
+
   function initTerrainUI() {
     bind();
     initGrip();
@@ -1407,9 +1498,19 @@
       banner('ok', '✓ 已自动清理 <b>' + dedupRemoved + '</b> 个重复导入的地块副本（同名同面积的在线地图地块只保留一个），总面积已修正。');
     }
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initTerrainUI, { once: true });
-  else initTerrainUI();
-  window.addEventListener('hashchange', function () { if (window.location.hash === '#terrainSection') setTimeout(function () { consumeIncoming(); persistAndRender(); }, 80); });
+  /* [v512 安全] 改为经门控启动；hash 变化时也先复查权益（防止绕开门控直达区块） */
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', terrainGateSync, { once: true });
+  else terrainGateSync();
+  /* 权益稍后才变化（登录/升级/管理态）→ 补一次复查；已启动则不再打扰 */
+  try {
+    if (window.RyEntitle && typeof window.RyEntitle.onChange === 'function') {
+      window.RyEntitle.onChange(function () { if (!terrainBooted) terrainGateSync(); });
+    }
+  } catch (e) { }
+  window.addEventListener('hashchange', function () {
+    if (terrainAccess() !== 'allowed') { terrainGateSync(); return; }
+    if (window.location.hash === '#terrainSection') setTimeout(function () { consumeIncoming(); persistAndRender(); }, 80);
+  });
 
   /* 供测试/自动化探针使用 */
   window.RyTerrainUI = { state: state, sendHome: sendHome, setUnit: setUnit, setMode: setMode, refresh: drawCanvas };
