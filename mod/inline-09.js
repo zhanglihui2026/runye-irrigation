@@ -3377,7 +3377,9 @@ function tlAutoGenerate(options) {
         var gdPAv=ts(zX(gdr2,cols),zY(gdCxV,gdr2)), gdPBv=ts(zX(gdr2,cols),zY(gdCxV,gdr2+1));
         if(gdPBv.y-gdPAv.y<=26)continue;
         var gdIdV='gd'+gdRcV.firstG+'-vr'+gdr2;
-        var gdVx=gdPAv.x+14+tlDimOffOf(gdIdV);      /* v114: off 正=向右 */
+        /* v500（2026-10-16 用户反馈）：基准间距 14px 太贴地块边线，版面挤 —— 加大到 30px
+           （与底部水平标注 dimBottomBase 的 38px 同一量级），配合 v114 拖动仍可微调。 */
+        var gdVx=gdPAv.x+30+tlDimOffOf(gdIdV);      /* v114: off 正=向右 */
         /* v176b：同横向 —— 端线并入该尺寸线组内 */
         var gdEvV=('<line data-dimext="'+gdIdV+'" data-dimextfix="x1" x1="'+(gdPAv.x+4).toFixed(1)+'" y1="'+gdPAv.y.toFixed(1)+'" x2="'+(gdVx+4).toFixed(1)+'" y2="'+gdPAv.y.toFixed(1)+'"/>')
           +('<line data-dimext="'+gdIdV+'" data-dimextfix="x1" x1="'+(gdPBv.x+4).toFixed(1)+'" y1="'+gdPBv.y.toFixed(1)+'" x2="'+(gdVx+4).toFixed(1)+'" y2="'+gdPBv.y.toFixed(1)+'"/>');
