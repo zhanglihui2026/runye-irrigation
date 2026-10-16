@@ -480,3 +480,36 @@
 * ⚠ **版本名与并行会话合并**：抬版本时发现并行会话已把 `sw.js` 抬到
   `v513-hydraulic-coordinate-guard`（未提交未发布），为免互相覆盖，两者并成同一个
   版本名 `v513-sec-gate-hydraulic-coord`（都在 CORE 白名单内，必须抬版本重建离线缓存）。
+
+## 10. v521-plan-params-store 灌溉参数集（2026-10-17 · 已发布上线）
+
+### 功能
+* 二级「地块与灌溉参数」10 项（planLift/planDh/planSrcDist/planTapeSpacing/planEmitterSpacing/
+  planEmitterFlow/planTapeLaySide/planZoneMuManual/planTapePressure/planTargetV）落
+  「当前参数集」`localStorage['runye_plan_params_v1']`：工具栏手动改 / AI 回填 / 命名方案调用
+  一律 write-through 自动落盘（防抖 350ms），刷新不丢。
+* 设置弹窗新增「灌溉参数」页签（`RENDER.irrig`），保存即同步回工具栏并重算；
+  工具栏组标题 `#ryCadGrpPipe` summary 加「⚙ 参数设置」按钮直达（`window.RyPlanParams.openSettings`）。
+* 涉及文件：`mod/inline-28.js`（参数集模块 + 页签 + save/pageDefault 分支）、
+  `index.html`（页签按钮 + ⚙按钮 + `?v=521-plan-params`）、`sw.js`。
+* commit `7bc6a6c`；验证：`_repro_v520_planparams.mjs` **20/20**、`_smoke_publish.mjs` ALL PASS、
+  `verify_nav_switch.js` 30/0、`verify_settings.js` 对照基线 8 既存红无新增、`ci_check_static` PASS=8。
+
+### 发布（git push 被阻断 → Git Data API）
+* 当日 `git push` 连续 18 次 `CONNECT tunnel failed, response 502`（代理对 github.com 持续阻断，
+  非间歇）→ 走 `github-publish-when-push-blocked` skill 的 Git Data API 路线。
+* 发布脚本 `_p1/_pub_api.py`（Python 移植版，--dry/--apply/--verify；node spawnSync 在沙箱 EBUSY 不可用）。
+* ⚠ **新坑：`git log --format=%B` 会多补一个尾换行** ⇒ 用它当 message 发 API，SHA 必不命中。
+  正确做法：读原始提交对象字节、取 `\n\n` 之后的消息（尾恰好 1 个 `\n`），四变体穷举定位。
+  author/committer 日期用 iso-strict（含 +0800），API 会忠实保留时区串，SHA 可精确命中本地。
+* 核验：远端 tip == 本地 HEAD（SHA 全等）、根树一致、385 文件 blob SHA 全等、提交信息一致；
+  Pages build `built`（commit=7bc6a6c）；线上冒烟 `_smoke_v521_live.mjs` **12/12**（线上 sw=v522、
+  ⚙按钮/页签在、参数集落盘、保存同步、无异常无 4xx）。
+
+### 探针新教训（写探针的必读）
+1. **`calcPlan` 首行守卫**：`window.measuredArea<=0` 直接 return（inline-11.js）——
+   造地块验证计算链必须同时造 `measuredPolygon`（≥3 点）**和** `measuredArea>0`，缺一整条链不跑。
+2. **设置弹窗 save()/pageDefault() 尾部都调 `refresh()`**（inline-28.js），有地块时会点
+   「综合分析」+ `tlAutoGenerate` 重生成三级管网图——无头+合成多边形下会卡死（>60s 无响应）。
+   无头探针验证保存/恢复默认时**先摘地块**（polygon=null, area=0），执行完再回填地块验证联动。
+3. 探针正则 `/\\d/` 匹配的是字面量 `\d` 不是数字——写完要盯实测值核对断言语义。
