@@ -86,6 +86,117 @@
     }, 360);
   }
 
+  /* ---- [v520] 灌溉参数集：二级「地块与灌溉参数」10 项的「当前生效参数集」 ----
+     三个入口（工具栏手动改 / 设置页保存 / AI·命名方案回填）最终都落在这里：
+     localStorage['runye_plan_params_v1'] = {version:1, params:{planLift:5, ...}, at:时间戳}
+     · 工具栏输入框仍是数据源（10 个 id 全部不动 ⇒ calcPlan 实时重算 / fld_* 镜像 /
+       planSrcDist→三级联动 / AI 回填 / 命名方案 全部零改动）；
+       任何 input/change 经 write-through 自动落盘（防抖 350ms）⇒ 刷新不再丢；
+     · 设置页「灌溉参数」页签读的就是当前值；保存后经 set() 同步回工具栏
+       （派发 change+input ⇒ 既有监听链原样触发重算）；
+     · planApply 与「命名方案回填 applyParams」同一手法：赋 .value + 派发事件，
+       不走 .value 直接赋值不触发事件的坑。 */
+  var PLAN_KEY = 'runye_plan_params_v1';
+  var PLAN_DEFS = [
+    { id: 'planLift',          label: '水泵提升高度', unit: 'm' },
+    { id: 'planDh',            label: '地形高差',     unit: 'm' },
+    { id: 'planSrcDist',       label: '水源距离',     unit: 'm',
+      tip: '水源到地块边界的距离（m）：计入总管长度 → 总管沿程损失 → 水泵扬程，同时计入总管长度统计与材料清单。' },
+    { id: 'planTapeSpacing',   label: '滴带间距',     unit: 'm' },
+    { id: 'planEmitterSpacing',label: '滴孔间距',     unit: 'm' },
+    { id: 'planEmitterFlow',   label: '滴头流量',     unit: 'L/h' },
+    { id: 'planTapeLaySide',   label: '铺设长度',     unit: 'm' },
+    { id: 'planZoneMuManual',  label: '分区划定',     unit: '亩/区' },
+    { id: 'planTapePressure',  label: '入口压力',     unit: 'bar' },
+    { id: 'planTargetV',       label: '目标流速',     unit: 'm/s' }
+  ];
+  var PLAN_DEF_VALUES = {};      /* 启动时从 DOM 捕获的 HTML 默认值（恢复默认用） */
+  var planPersistT = null;
+  function planInput(id) { return document.getElementById(id); }
+  function planDomValues() {
+    var o = {};
+    PLAN_DEFS.forEach(function (d) { var el = planInput(d.id); if (el) o[d.id] = el.value; });
+    return o;
+  }
+  function planStoreRead() {
+    var o = {};
+    try {
+      var s = JSON.parse(localStorage.getItem(PLAN_KEY) || 'null');
+      if (s && s.version === 1 && s.params) o = s.params;
+    } catch (e) { }
+    return o;
+  }
+  function planStoreWrite(vals) {
+    try { localStorage.setItem(PLAN_KEY, JSON.stringify({ version: 1, params: vals, at: Date.now() })); } catch (e) { }
+  }
+  function planPersistSoon() {
+    if (planPersistT) clearTimeout(planPersistT);
+    planPersistT = setTimeout(function () { planPersistT = null; planStoreWrite(planDomValues()); }, 350);
+  }
+  function planDispatch(el) {
+    try { el.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) { }
+    try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) { }
+  }
+  /* 把 patch 应用到工具栏输入框（值没变就不派发，避免无谓重算），并落盘 */
+  function planApply(patch) {
+    var fired = false;
+    PLAN_DEFS.forEach(function (d) {
+      var v = patch ? patch[d.id] : null;
+      if (v === null || v === undefined || !isFinite(Number(v))) return;
+      var el = planInput(d.id); if (!el) return;
+      v = Number(v);
+      if (String(el.value) === String(v)) return;
+      el.value = String(v); fired = true;
+      planDispatch(el);
+    });
+    planStoreWrite(planDomValues());
+    return fired;
+  }
+  function planReset() {
+    try { localStorage.removeItem(PLAN_KEY); } catch (e) { }
+    PLAN_DEFS.forEach(function (d) {
+      var el = planInput(d.id); if (!el) return;
+      var dv = PLAN_DEF_VALUES[d.id]; if (dv == null) return;
+      if (String(el.value) === String(dv)) return;
+      el.value = dv;
+      planDispatch(el);
+    });
+    planStoreWrite(planDomValues());
+  }
+  window.RyPlanParams = {
+    KEY: PLAN_KEY,
+    IDS: PLAN_DEFS.map(function (d) { return d.id; }),
+    get: planDomValues,
+    set: planApply,
+    reset: planReset,
+    openSettings: function () { open('irrig'); }
+  };
+  (function planInit() {
+    /* 先捕默认值（HTML 里的 value），再回填存储值，最后挂 write-through */
+    PLAN_DEFS.forEach(function (d) { var el = planInput(d.id); if (el) PLAN_DEF_VALUES[d.id] = el.value; });
+    var saved = planStoreRead();
+    PLAN_DEFS.forEach(function (d) {
+      var v = saved[d.id];
+      if (v === null || v === undefined || !isFinite(Number(v))) return;
+      var el = planInput(d.id); if (!el) return;
+      v = Number(v);
+      if (String(el.value) === String(v)) return;
+      el.value = String(v);
+      planDispatch(el);
+    });
+    PLAN_DEFS.forEach(function (d) {
+      var el = planInput(d.id); if (!el) return;
+      el.addEventListener('input', planPersistSoon);
+      el.addEventListener('change', planPersistSoon);
+    });
+    planStoreWrite(planDomValues());   /* 从第一天起就有参数集，消费方不用判空 */
+    var sb = document.getElementById('ryCadGrpPipeSet');
+    if (sb) sb.addEventListener('click', function (e) {
+      e.preventDefault(); e.stopPropagation();   /* 别触发分组折叠 */
+      open('irrig');
+    });
+  })();
+
   /* ---- 各页 HTML ---- */
   function rowNum(label, key, val, unit, attrs, tip) {
     var h = '<div class="rs-row"><label' + (tip ? ' title="' + tip + '"' : '') + '>' + label + '</label>'
@@ -147,7 +258,20 @@
     h += rowNum('管道埋深', 'bury', fmt(d), 'mm', 'min="0" step="50"', '总管/主管计划埋入地下的深度（暂定 600mm）。总管与主管同标高、水平连接；将来统计主管用量时，主管-支管连接处的竖直段按此值计入。');
     return h;
   }
-  var RENDER = { price: htmlPrice, assum: htmlAssum, scale: htmlScale, geo: htmlGeo, eng: htmlEng };
+  function htmlIrrig() {
+    var dom = planDomValues();
+    var h = '<h4>二级 · 地块与灌溉参数</h4>'
+      + '<p class="rs-note">与二级工具栏是<b>同一套参数</b>：这里改完点「保存」，工具栏同步更新并立即重算；'
+      + '在工具栏里手动改也一样会存进来（刷新不丢）。工具栏下方的「命名方案」照常可把整组参数存成方案随时调用。</p>';
+    PLAN_DEFS.forEach(function (d) {
+      var el = planInput(d.id);
+      var step = el ? (el.getAttribute('step') || 'any') : 'any';
+      var mn = el ? (el.getAttribute('min') || '0') : '0';
+      h += rowNum(d.label, d.id, el ? fmt(num(el.value)) : '', d.unit, 'min="' + mn + '" step="' + step + '"', d.tip);
+    });
+    return h;
+  }
+  var RENDER = { price: htmlPrice, assum: htmlAssum, scale: htmlScale, geo: htmlGeo, eng: htmlEng, irrig: htmlIrrig };
 
   /* ---- CSV ---- */
   function csvExport() {
@@ -280,6 +404,16 @@
       window.RyDimGeo.set(patch);
     } else if (tab === 'eng') {
       if (f.bury != null) window.RyBuryDepth.set(f.bury);
+    } else if (tab === 'irrig') {
+      /* [v520] 只收可解析的数值项；经 RyPlanParams.set 同步回工具栏（派发事件→重算）并落盘 */
+      var patch = {};
+      PLAN_DEFS.forEach(function (d) {
+        var inp = body.querySelector('input[data-f="' + d.id + '"]');
+        if (!inp) return;
+        var v = parseFloat(inp.value);
+        if (isFinite(v)) patch[d.id] = v;
+      });
+      window.RyPlanParams.set(patch);
     }
   }
   function pageDefault() {
@@ -295,6 +429,8 @@
       window.RyDimGeo.reset();
     } else if (tab === 'eng') {
       window.RyBuryDepth.set(window.RyBuryDepth.DEF);
+    } else if (tab === 'irrig') {
+      window.RyPlanParams.reset();
     }
     render(); refresh();
   }

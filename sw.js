@@ -365,8 +365,14 @@
    二级工具栏 #planTargetV 是唯一入口），三级改读二级值 + 二级输入实时联动；
    mod/inline-09.js / mod/plot-editor.js / index.html 都在 CORE，必须抬版本重建离线缓存；
    v518-irrigation-store-rollback-bridge：工程导入回滚的管网快照读写经RyIrrigationDataStore CAS接口执行，缓存包含修改后的存储接口；
-   v519-case-library-css-cache：补齐主页引用的 runye-case-library.css 离线缓存，并由CI静态检查本地样式缓存。 */
-const VERSION = 'v519-case-library-css-cache';
+   v519-case-library-css-cache：补齐主页引用的 runye-case-library.css 离线缓存，并由CI静态检查本地样式缓存 →
+   v520-shared-boost-power：独立地形页显式加载 hc-core，二次加压功率委托唯一公式库；
+   v521-plan-params-store：二级「地块与灌溉参数」10 项落「当前参数集」（localStorage 持久化，
+   工具栏手动改 / AI 回填 / 命名方案调用一律自动写入，刷新不丢）；设置弹窗新增「灌溉参数」页签
+   （保存即同步回工具栏并重算），工具栏组标题加「⚙ 参数设置」直达；
+   v522-map-partition-atomic-commit：分区应用先提交管网快照、再按revision写地块库；后者失败时对管网快照执行CAS回滚。
+   runye-map-partition.js 在 CORE，必须抬版本重建离线缓存。 */
+const VERSION = 'v522-map-partition-atomic-commit';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
