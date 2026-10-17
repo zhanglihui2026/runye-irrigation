@@ -712,3 +712,24 @@ function rypDraggable(rootEl){ /* 实现 */ }
   否则重试会把正在拖的条拽回存档点（表现为「拖了又弹回去」）。
 - 验收：`_probe_rect_live.mjs`（8 项，可直连线上）；`.ry-hbar` 类可加
   `data-ry-drag-dblclick-reset="1"` 提供「双击回默认位」逃生口。
+
+### 12.5 卡内节奏（v547 定论）
+
+> 外壳统一后，卡**内部**只认五个角色类（`mod/ry-panel.css`「卡内节奏」段），行高与间距不再各写一套：
+>
+> | 角色 | 类 | 规格 |
+> |---|---|---|
+> | 行（勾选/标签/子标题） | `.ry-float-row` / `.ry-float-label` | 行盒 19.2（12px×1.6），组内净距 0 |
+> | 分组标题 | `.ry-float-sec`（`.is-first` / `.is-divided`） | 12px/600，上 8 下 3，顶线 padding 6 |
+> | 说明 / 空态 | `.ry-float-note`（`.is-strong`） | 11px/1.5 = 16.5 |
+> | 图例 / 次要块 | `.ry-float-legend`（`.ry-float-sep`） | 10px/1.5 = 15，上方 6+1px 线 |
+> | 动作按钮 | `.ry-float-chip`（`.is-danger`） | 20px 高 / 11px（必须 `!important`） |
+> | 值行（键+值） | `.ry-float-value` | 键固定 52px、值可折行 |
+>
+> - 三档行高 **19.2 / 16.5 / 15**；两档间距 **组内 0、组间 8**。
+> - 卡内 `input/select/textarea` 一律 12px（`:not(.ai-panel)`），否则被全局 typography 的
+>   13px!important 顶掉（图层卡 chip 的 inline 11px 曾因此从未生效）。
+> - `.ai-panel` 已退役（v484 起主页常驻隐藏，智能规划走 `?smart=1` 工作台），**内部不归本口径**。
+> - 水力卡数据区 `.gr-hyd-sum` / `.gr-hyd-tbl`（10.5px 密集数值表）**有意不并入**——
+>   密度自成体系，并进 19.2 行节奏会让表格虚胖。
+> - 验收：`_probe_card_rhythm.mjs`（24 项，可直连线上）+ `_probe_float_cards.mjs` 基线树 A/B。

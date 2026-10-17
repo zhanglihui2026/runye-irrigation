@@ -1197,3 +1197,42 @@ modeling/ digital-agriculture/` 的 .css/.html，凡 `*::-webkit-scrollbar` 开�
 ### 一条判据（可复用）
 > **看到 `absolute` 浮层位置不对，先查 `offsetParent.id`；看到「拖动不跟手 / 拖了弹回」，先查两套坐标是否混用。**
 > 同一个组件里只要出现「`offsetLeft` 夹紧 + rect 存档」这种混搭，`offsetParent` 一变就整体崩 272px。
+
+---
+
+## 25c. v547-card-rhythm 卡内节奏统一（2026-10-17 · 已发布上线）
+
+提交号 `7cbfe48`。外壳统一（v544）后的第二层：三张**可见**卡内部原来仍各写一套。
+
+### 前置发现：四张卡其实只剩三张
+审计时发现 `.ai-panel` 自 **v484** 起在主页常驻 `display:none`（`runye-ai-plan.js` 的
+`syncSection()`：非 smartEntry 直接隐藏）——智能规划只走导航 `?smart=1` 全屏工作台。
+**它已不是可见卡片**，内部不纳入卡内口径；v547 的通用控件规则必须 `:not(.ai-panel)` 排除它，
+否则会把它的 13px 控件一起改掉。
+
+### 实测四类不一致（改前）
+1. 行距：图层卡 label `margin:2px 0`（相邻净距 2），地图卡 0；
+2. 分组标题：只有图层卡有，inline `margin:8px 0 3px;padding-top:6px`（行盒 26.19）；
+3. 说明行：图层卡 11px/1.6=17.6，水力卡 `.gr-empty` 11px/1.5=16.5；
+4. 卡内控件：被 style-01 全局 typography 顶成 **13px**（比卡正文 12 还大）；图层卡 chip 的
+   inline `font-size:11px` **不带 !important ⇒ 从未生效**（§四.1 的坑第二次实锤）。
+
+### 口径（唯一出处：mod/ry-panel.css「卡内节奏」段）
+五个角色类 + 四个辅助类：`.ry-float-row`（行 19.2 行盒，勾选框 12px）/ `.ry-float-sec`
+（分组标题 12/600，上 8 下 3，带顶线加 `.is-divided`）/ `.ry-float-note`（说明 11/16.5）/
+`.ry-float-legend`（图例 10/15）/ `.ry-float-chip`（动作按钮 20px/11）；
+`.ry-float-value`（值行，键 52px）/ `.ry-float-label` / `.ry-float-chips` / `.ry-float-sep`。
+卡内 `input/select/textarea` 统一 12px（`:not(.ai-panel)`）。
+**三档行高 19.2 / 16.5 / 15；两档间距：组内 0、组间 8。**
+水力卡数据区（`.gr-hyd-sum` / `.gr-hyd-tbl`）**不并入**（10.5px 密集数值表自成体系），
+只把 `.gr-hint` 归说明档、`.gr-btn` 归动作按钮档（11.5→11）。
+
+### 验收
+- `_probe_card_rhythm.mjs`：在真实页面建角色元素读 computed 值（不依赖选择状态），24/24，可 `RY_URL=` 直连线上。
+- 外壳 A/B（`_probe_float_cards.mjs` 基线树 A/B）153 处差异逐条核对全部属本改动，`.ai-panel` 0 差异。
+- 行为 31/31、工具栏 17/17、ci PASS=19、单测 123/123、线上冒烟 27/27。
+- 卡片特写：图层卡 244→237px、地图卡 257→260px、水力卡 134→139px。
+
+### 版本号
+并行会话已把 sw VERSION 抬到 `v546-terrain-transfer-tab-binding` ⇒ 本版取更高号 `v547-card-rhythm`
+（沿革段落追加在 v545 之后；sw.js 仍混编，只暂存自己的 hunk）。
