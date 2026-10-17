@@ -2566,12 +2566,20 @@ body > .ry-nav .main-header{display:none!important}
 .gr-tl-leg-hint{padding:4px 9px 2px;font-size:10.5px;color:#5f6b7a;line-height:1.5}
 #grPipeSection .gr-btn-on{background:#0f766e!important;border-color:#0f766e!important;color:#fff!important;font-weight:700}
 #grPipeSection .gr-btn-on:hover{background:#115e59!important;color:#fff!important}
-.gr-hyd-sum{display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;margin:2px 0 5px}
-.gr-hyd-sum>div{display:flex;flex-direction:column;gap:1px;padding:3px 6px;background:rgba(245,158,11,.1)}
-.gr-hyd-sum span{font-size:10px;color:#64748b}
-.gr-hyd-sum b{font-size:14px;color:#7c2d12}
-.gr-hyd-tbl{width:100%;border-collapse:collapse;font-size:10.5px}
-.gr-hyd-tbl th,.gr-hyd-tbl td{padding:2px 4px;text-align:right;border-bottom:1px solid rgba(31,41,55,.1)}
+/* [v548] 数据区并进卡内节奏（v547 口径）：说明档 11px/16.5、组间 6、单元内距 3px 6px、表头 600。
+   ⚠ 这里的 !important 不是乱加的：runye-typography.css 对 `p,li,table,input,select,button…`
+   与 `th,td` 打了 `font-size:var(--ry-fs-body)=13px !important`（第 131/136 行），
+   所以原写的 `10.5px` **从来没生效过**，实测渲染一直是 13px（与卡正文 12px 还大）。
+   与 §四.1 的 input 是同一个坑，表格这层是第三次实锤。
+   概要保持 14px 数值强调（与 12px 正文的对比是刻意的）。 */
+.gr-hyd-sum{display:grid;grid-template-columns:1fr 1fr;gap:6px 8px;margin:0 0 6px}
+.gr-hyd-sum>div{display:flex;flex-direction:column;gap:1px;padding:4px 6px;background:rgba(245,158,11,.1)}
+.gr-hyd-sum span{font-size:10px;line-height:15px;color:#64748b}
+.gr-hyd-sum b{font-size:14px;line-height:19.2px;color:#7c2d12}
+.gr-hyd-tbl{width:100%;border-collapse:collapse;font-size:11px!important;line-height:16.5px}
+.gr-hyd-tbl th{font-weight:600}
+.gr-hyd-tbl th,.gr-hyd-tbl td{padding:3px 6px;text-align:right;border-bottom:1px solid rgba(31,41,55,.1);
+  font-size:11px!important;line-height:16.5px}
 .gr-hyd-tbl th:first-child,.gr-hyd-tbl td:first-child{text-align:left}
 .gr-hyd-tbl th:nth-child(2),.gr-hyd-tbl td:nth-child(2){text-align:left}
 /* 三级页顶部的「按块编辑」返回条 */

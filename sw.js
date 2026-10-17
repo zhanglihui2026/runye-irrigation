@@ -575,8 +575,17 @@
     index.html / mod/ry-panel.css / mod/style-01.css / mod/inline-27.js / runye-map-enhance.js /
     runye-map-measure.html 均在 CORE，必须抬版本。
     注：并行会话已把 VERSION 抬到 v546-terrain-transfer-tab-binding ⇒ 本版取更高号 v547。
+  * v548-card-data-rhythm 水力卡数据区并进卡内节奏（v547 遗留的两个例外之一）。
+    改前先诊断出第四个实锤：runye-typography.css 对 `table` 与 `th,td` 也打了
+    `font-size:var(--ry-fs-body)=13px !important`（第 131/136 行）—— .gr-hyd-tbl 原写的
+    `10.5px` **从未生效**，表格实际一直渲染 13px（比卡正文 12 还大，§四.1 同款坑）。
+    改动（mod/style-01.css）：.gr-hyd-tbl 表体 11px/16.5（!important 压回全局 13）、
+    单元内距 2px 4px → 3px 6px、表头 600；.gr-hyd-sum 组间 4→6、单元内距 3px 6px → 4px 6px、
+    span 10px/15（图例档）、b 保持 14px/19.2 数值强调。
+    实测（_shot_hyd_table.mjs 样例注入，改前/改后）：表体行高 24.5→23.5、行字号 13→11、
+    面板 340→335；ci PASS=19。index.html 的 style-01 ?v= 抬 548-card-data-rhythm。
   */
-const VERSION = 'v547-card-rhythm';
+const VERSION = 'v548-card-data-rhythm';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
