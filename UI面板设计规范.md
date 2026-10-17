@@ -730,6 +730,9 @@ function rypDraggable(rootEl){ /* 实现 */ }
 > - 卡内 `input/select/textarea` 一律 12px（`:not(.ai-panel)`），否则被全局 typography 的
 >   13px!important 顶掉（图层卡 chip 的 inline 11px 曾因此从未生效）。
 > - `.ai-panel` 已退役（v484 起主页常驻隐藏，智能规划走 `?smart=1` 工作台），**内部不归本口径**。
-> - 水力卡数据区 `.gr-hyd-sum` / `.gr-hyd-tbl`（10.5px 密集数值表）**有意不并入**——
->   密度自成体系，并进 19.2 行节奏会让表格虚胖。
+> - 水力卡数据区 `.gr-hyd-sum` / `.gr-hyd-tbl`（v548 起已并入）：表体 11px/16.5（`!important`，
+>   见下条）、单元内距 3px 6px、表头 600；概要块组间 6、span 10px/15、b 14px 数值强调。
+> - **第五坑（v548 实锤）：`table` 与 `td/th` 也在全局 typography 的 `13px!important` 名单里**
+>   （runye-typography.css:131/136）——卡内表格想用别的字号必须带 `!important`，
+>   原写的 10.5px 从未生效过。
 > - 验收：`_probe_card_rhythm.mjs`（24 项，可直连线上）+ `_probe_float_cards.mjs` 基线树 A/B。
