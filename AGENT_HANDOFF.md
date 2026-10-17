@@ -1262,3 +1262,56 @@ modeling/ digital-agriculture/` 的 .css/.html，凡 `*::-webkit-scrollbar` 开�
 `inline-29.js` 同结构的样例（.gr-hyd-sum + .gr-hyd-tbl），改前/改后/线上三张特写 +
 行高断言（表体行高 24.5→23.5、行字号 13→11、面板 340→335）。ci PASS=19、单测 123/123、
 行为 31/31、线上冒烟 27/27。
+
+---
+
+## 25e. v550-front-in-plot 总管移进分区（2026-10-17 · 已发布上线）
+
+提交号 `56cbf5f`（+`9130d92` ?v= 对齐）。用户：「管路规划页面这个总管的生成逻辑改一下，
+现在水源位置不动，总管移动到分区内，移动到最近的第二个分区内……垂直与主管，偏离主管三通
+一定的距离。端头被主管直接裁剪掉。」三项几何经 AskUserQuestion 确认（会话记录可查）：
+① 距第 2 排顶边往下 **15 米**（=「偏离主管三通一定的距离」），且总管可沿主管走向拖动；
+② 两端**截止于第 2 排最左/最右主管**（不横贯全幅宽）；③ 第 1 排主管上端**裁到三通为止**
+（不再伸向地块外）。
+
+### 改动（mod/inline-09.js，front 唯一生成点，v517 起无第二副本）
+- **总管几何**：横向分支（主管竖置）`frontY = yPos[1] + min(15, ySrc[1]*0.5)`、
+  `x ∈ [第2排最左主管x, 最右主管x]`；纵向分支对称（第 2 列、左缘往右 15 米、截止于最上/最下
+  主管）。分区不足 2 列/行时退回旧几何。
+- **守卫别写反（A/B 抓到的真 bug）**：横向总管的 x 范围取自**列** ⇒ 守卫是 `cols>=2`；
+  纵向总管的 y 范围取自**行** ⇒ `rows>=2`。首版写反 ⇒ 单行地块 12 列时走纵向分支且
+  y 范围塌成一点 ⇒ **零长度总管**（图脚「总管 0.0 m」、水泵扬程掉 3.5 m）。基线对比
+  （`git archive HEAD` + RY_ROOT）实测抓到；已加退化兜底（front 长度 <0.5m ⇒ 退回旧几何）。
+- **水源连接段 `data-tlsrcpipe`**：水源留在旧总管起点（地块外沿），与总管脱开后用
+  「垂直优先」折线接到总管近端；与总管同色（#111827）同宽 6，仅示意（不进 frontPipe
+  数据/长度/水力/分段）。水源已在总管上（≤0.5m）不画。
+- **主管接入段改「物理线全跨度」判定**（tlStubs）：v143 的按 key 归并增加累计跨度
+  `tlMainSpan`；总管 y（x）落在该物理线跨度内 ⇒ **三通画在交点、不画接入段**（旧代码永远从
+  归并代表段顶端拉线，总管进分区后会画穿过整排的长接入线）；跨度外 ⇒ 接最近的跨度端点
+  （旧几何下=顶端，行为逐字节不变）。三通阀符号 `stubM>1` 门照旧（跨度内 stubM 记 2）。
+
+### 硬约束核对（§五/既有机制全不动）
+front 保持 2 点（tl-path-measure `fp.length!==2` 闸不触发）；`FRONT_JUNC_TOL=60` 下行 3+
+主管的「远距接入」在旧几何本就存在且按 t 合并，新几何距离更近不恶化；`moves['front']`
+(v167) 保留逻辑不动，拖动沿主管走向滑移（正交锁定既有）；快照仍落设计几何（tlFrontDesign）。
+
+### 验收
+`_probe_front_geom.mjs`（新探针，支持 RY_URL 直连线上 / RY_ROOT 换基线 / RY_SHOT 截图 /
+RY_FOOTER 读图脚）：三种地块形状（横 600×400、竖 400×600、扁 800×160）双朝向 **43/43**，
+本地与线上直连同分。单测 122/122（红 1 = 并行会话未入库的 runye_hydraulics_core.test.cjs，
+基线无此文件）；ci PASS=22 FAIL=0；双页冒烟 ALL PASS；线上冒烟 **27/27**。
+
+### 混编注记（§八 实战）
+并行会话在途把 VERSION 抬到 `v549`→`v552-project-network-owner` 且**保留了我的 v550 沿革
+段** ⇒ 按规则取更高号不回退，sw.js 整文件提交；inline-09.js / index.html 用「diff 按行号/
+内容滤 hunk → `git apply --cached`」只暂存自己的 hunk（对方的 designRevisionId 水力快照、
+?v=509/?v=2-project-owner 留在工作区）。`_smoke_v521_live` 的「style-01 ?v= 与 VERSION 同步」
+闸门因对方抬 VERSION 未带 style-01 而红 ⇒ v550b 一行把 style-01 ?v= 对齐到
+`552-project-network-owner`（style-01 内容未变）。
+
+### 探针坑位备查
+- `tlAutoGenerate()` 无边界会 `alert` 阻塞无头 evaluate ⇒ 探针先种
+  `window.measuredPolygon` 并挂 `Page.javascriptDialogOpening` 自动接受。
+- 截图：`#tlPipePlanSection` 整节 + `.ry-pane-pipe` 都要 `setProperty('display','block','important')`，
+  只强节不行；`Page.captureScreenshot` 的 clip 需取整 + scale:1，否则 Invalid parameters。
+- 页内 eval 里没有 `process` —— 环境开关要先 `ev()` 注入 `window.__flag`。
