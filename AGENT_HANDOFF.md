@@ -1096,3 +1096,62 @@ modeling/ digital-agriculture/` 的 .css/.html，凡 `*::-webkit-scrollbar` 开�
 
 ### 状态
 `ci_check_static` PASS=18 FAIL=0 ｜ `node --test tests/*.test.cjs` 122/122 ｜ `_smoke_publish` ALL PASS。
+
+## 25. v544-float-card-unify 悬浮卡片与横向工具栏统一（2026-10-17 · 已发布上线）
+
+### 用户诉求（原话）
+> 「查找这些面板的属性，分成两类，一类就是横向工具栏，另外一类就是悬浮面板…我像是先样式统一，
+> 然后细节再统一，比如说悬浮面板要去是位置可以移动的，可以折叠的，宽度可调的，变化位置之后要记录的。
+> 你先查，我们再商议怎么处理，我还是担心之前的问题，各种规则 样式 混在一起了，不统一，代码乱了。」
+
+批复：「图层卡补齐可拖/可折/可调宽（建议补齐）、确认删除旧卡、独立页统一改 —— 按 ①②③ 三步推进」。
+
+### 审计结论（改动前）
+| 物件 | 外壳 | 交互 | 按钮规格 |
+|---|---|---|---|
+| `#tlWsLayerPanel`（三级图层控制） | JS cssText 手写 | 手写 pointer 三件套 | `26px / 11.5px` |
+| `#grHydPanel`（驳接点） | JS cssText 手写 | 手写 pointer 三件套 | 借 `.gr-card` |
+| `.ai-panel`（AI 侧栏） | JS cssText 手写 | 手写 pointer 三件套 + 独立调宽 | 11px |
+| `.rym-layer-panel`（在线地图图层卡） | `runye-map-enhance.js` 注入 `<style>` | **无**（固定右上角） | 12px |
+| `#mapDrawTools`（地图绘制条） | `online-map.css` | `rypDraggable` | `.mbtn` 28px/12px，两条页各覆盖一次 |
+| `#ppQuickBar`（地块分区快捷条） | `style-01.css` `.pp-quick` | `plot-editor.js` 手写 45 行 | `26px / 11.5px` |
+
+四份外壳的 `background` 有 `#fff` 与 `rgba(255,255,255,.97)` 两种，圆角 8/10 两种，字号 12/11.5/11 三种。
+
+### 三步落地
+1. **外壳唯一出处** —— `mod/ry-panel.css` 末尾新增 `.ry-float-card / -head / -title / -grip / -caret / -body`。
+   四张卡的 `cssText` 只剩「定位 / 尺寸 / 层级 / 溢出 / 布局方向」。
+   语义配色例外（AI 面板的绿字白底）写在 `runye-ai-plan.css` 的 `.ai-panel.ry-float-card` ——
+   **必须双类**：`runye-ai-plan.css`（第 24 行）比 `mod/ry-panel.css`（第 247 行）先加载，单类会被后加载者压掉。
+2. **交互唯一实现** —— `mod/ry-panel.js` 的 `rypDraggable` 补齐 5 个声明式开关
+   （`keep-default` / `drag-threshold` / `drag-dblclick-reset` / `drag-clamp` / `fold-default`），
+   新增 `placeWhenVisible()`（容器隐藏时 rect 全 0 会把面板压到 0，改为轮询到有尺寸再落位）与
+   `rypResizePanel()`（不依赖 `.mw-shell` 的宽度手柄）。三张卡手写交互共约 260 行删除。
+3. **工具栏唯一规格** —— `.ry-hbar` / `.ry-hbar-btn`：高 26、字号 `11px!important`、内距 `0 8px`。
+   两条条 + 独立页同步换类；`plot-editor.js` 的 45 行手写拖动删除，存档键与 `{l,t}` 格式不变。
+
+### 三个坑（都会再踩）
+1. **`.ry-toolbar` 撞名**。初版类名叫 `.ry-toolbar`，而 `runye-theme.css:156` 早有一个同名 opt-in 类
+   （`min-height:var(--ry-toolbar-h)` = 56px + `background` + `color:var(--ry-s-800)`）。
+   结果 `#ppQuickBar` 被撑到 56px 高、文字变 `#334155`，A/B 直接抓到 `base.secPP 493x38 → 516x56`。
+   ⇒ 改名 `.ry-hbar`。**结论：新增全局类名前先 `grep -rn "\.类名" --include=*.css`。**
+2. **`classList.toggle('folded', undefined)` 会「加上」类**。旧写法
+   `safeRead(key)==='1' || (!safeRead(key) && legacyKey && safeRead(legacyKey)==='1')` 在 `legacyKey`
+   未声明时整条 `&&` 链返回 `undefined`，而 WebIDL 把 optional boolean 的 `undefined` 当「没给 force」
+   ⇒ 纯 toggle ⇒ `#designParametersPanel` 首次访问被折叠成 48px 竖条（线上实测是展开的，本地 HEAD 快照是折叠的）。
+   v544 把 `folded` 强制成严格 boolean。**凡是把变量当第二参数传给 `classList.toggle` 的地方都要防 undefined。**
+3. **探针的 `display:none` 假红**。离线无 CDN 时 `#pipePlanSection`/`#onlineMapSection` 常驻 `display:none`，
+   `style.display='block'` 无效，必须 `setProperty('display','block','important')` + 轮询容器 `clientWidth>0`；
+   否则按钮 `getBoundingClientRect().height` 与 `offsetLeft/offsetTop` 全 0，表现为「拖动不生效 + 按钮高 0」，
+   而 `fontSize` 仍然读得到 11px —— 极易误判成实现问题（本次先判成红，实为探针）。
+
+### 新增守卫
+`ci_check_static` 第 ⑧ 项：四张卡必须挂 `.ry-float-card`；挂类后紧跟的 `X.style.cssText`
+不得再出现 `background / box-shadow / border-radius / border: / font:`。只扫「className 行 + 其后 3 行」，
+不做全文模糊匹配（实测全文匹配有 25 处误报：注释、图例色块、`innerHTML` 里的图例背景色）。
+已做注入自测：往 `inline-27` 的 cssText 加 `background:#fff;border:1px solid #cbd5e1;` 立刻红灯。
+
+### 状态
+`ci_check_static` PASS=12 FAIL=0（本次提交版；工作区因并行会话另加 7 项共 19）｜
+`node --test tests/*.test.cjs` 122/122 ｜ 卡片外壳 A/B 61 元素 × 55 属性 0 差异 ｜
+行为探针 31/31 ｜ 工具栏探针 17/17 ｜ 线上冒烟 27/27。

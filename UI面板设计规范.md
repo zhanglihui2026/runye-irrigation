@@ -640,3 +640,56 @@ function rypDraggable(rootEl){ /* 实现 */ }
    每段各自保留特异性；**禁止 `:is()`**（会把低位分支抬到高位，v531 实测必回归）。
 3. **改完必须跑 `_ab_panel_dump.mjs` 的 8 个量测面**（`rail/base × #ppSide/#tlSide/两区块/main`），
    全 0 才算过。孤立的过渡属性差异（如 opacity 0.72）复跑一次再判断。
+
+## 12. 悬浮卡片与横向工具栏（v544 定论）
+
+### 12.1 两类物件的唯一规格
+
+**A. 悬浮卡片**（`.ry-float-card`，定义在 `mod/ry-panel.css` 末尾）
+
+| 部件 | 类名 | 规格 |
+|---|---|---|
+| 外壳 | `.ry-float-card` | `background:rgba(255,255,255,.97)` / `border:1px solid #cbd5e1` / `box-shadow:0 10px 28px rgba(15,23,42,.18)` / `font:12px/1.6 system-ui…` / `color:#1f2937` |
+| 标题行 | `.ry-float-head` | `padding:6px 9px` + `background:#f1f5f9` + 下边框 + `cursor:move` + `position:sticky;top:0` |
+| 标题字 | `.ry-float-title` | `flex:1;color:#334155` |
+| 调宽手柄 | `.ry-float-grip` | `cursor:ew-resize;color:#94a3b8` |
+| 折叠箭头 | `.ry-float-caret` | `color:#64748b` |
+| 内容区 | `.ry-float-body` | `padding:7px 9px 9px` |
+
+四张卡都挂这个类，`cssText` 里**只允许**写 `position / top / left / right / bottom / width / height / min-* / max-* / z-index / overflow / display / box-sizing / pointer-events`。
+场景语义配色只允许用**双类**写在场景自己的样式表里（如 `.ai-panel.ry-float-card{background:#fff;color:#4a6259}`）——
+单类会因为加载顺序被 `ry-panel.css` 压掉。
+
+**B. 横向工具栏**（`.ry-hbar` + `.ry-hbar-btn`，同样在 `mod/ry-panel.css`）
+
+- 容器：`display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:5px 7px; max-width:calc(100% - 24px)`
+- 按钮：`height:26px; padding:0 8px; border:1px solid #cbd5e1; background:#fff; color:#334155;`
+  `font-size:11px!important; font-weight:600; line-height:1; white-space:nowrap`
+- 底色与描边按场景各自保留（地图条纯白、画布条浅绿）—— 这是**背景差异不是规格差异**。
+
+⚠ 类名不许叫 `.ry-toolbar`：`runye-theme.css:156` 已有同名 opt-in 类
+（`min-height:56px` + `background`），撞上会把条撑高 18px。
+
+### 12.2 行为声明（全部由 `mod/ry-panel.js` 实现，禁止再手写 pointer 三件套）
+
+| 属性 | 作用 |
+|---|---|
+| `data-ry-panel` + `data-ry-panel-key` | 纳入 `rypInitAll` 扫描 |
+| `data-ry-position-key` | 拖动位置存档键（JSON `{l,t}`，兼容旧 `{x,y}`） |
+| `data-ry-keep-default="1"` | 没有存档时不重排默认位（由 CSS 的 `top/right` 决定） |
+| `data-ry-drag-threshold="4"` | 位移 >4px 才算拖动；同时抑制尾随 click（不会拖完就折叠） |
+| `data-ry-drag-dblclick-reset="1"` | 双击标题栏 = 清存档 + 回默认位 |
+| `data-ry-drag-clamp="viewport"` | 以视口为界并避让导航条 / 状态栏（fixed 时用） |
+| `data-ry-fold-key` / `-fold-default="1"` | 折叠记忆键 / 无存档时默认收起（且不写存档） |
+| `data-ry-resize` + `-resize-key` + `-min` / `-max` | 宽度手柄与记忆（折叠态 `offsetWidth<40` 不写存档，防写 0） |
+| `data-ry-drag` / `data-ry-toggle` / `data-ry-body` / `data-ry-fold` | 拖动区 / 折叠区 / 内容区 / 折叠按钮 |
+
+事件：拖完派发 `ry-panel-drag-end`（`detail.moved`），双击复位派发 `ry-panel-pos-reset`。
+
+### 12.3 验收口径
+
+1. **改外壳必须跑 A/B**：`_probe_float_cards.mjs` 抓 55 个 computed 属性（含导航/状态栏避让），四张卡逐元素 0 差异才算过。
+2. **改交互必须跑行为探针**：`_probe_float_behavior.mjs` 逐卡验证 拖动 / 写存档 / 折叠 / 折叠存档 / 展开 / 双击复位 / 调宽（当前 31/31）。
+3. **改工具栏必须跑**：`_probe_toolbars.mjs`（主页两条 + 独立页一条，17/17）。探针里必须先把区块
+   `setProperty('display','block','important')` 并轮询容器有尺寸 —— 否则 rect 全 0 会假红成「拖动不生效、按钮高 0」。
+4. 静态兜底：`ci_check_static` ⑧ 守「四张卡必须挂 `.ry-float-card`，且 cssText 不许再写外壳视觉」。
