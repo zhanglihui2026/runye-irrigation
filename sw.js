@@ -534,8 +534,27 @@
    index.html / mod/ry-panel.css / mod/ry-panel.js / mod/style-01.css / mod/inline-27.js /
    mod/inline-30.js / mod/plot-editor.js / mod/online-map.css / runye-ai-plan.js /
    runye-ai-plan.css / runye-map-enhance.js / runye-map-measure.html 均在 CORE，必须抬版本。
- */
-const VERSION = 'v544-float-card-unify';
+  * v544b-rect-clamp 修复：地块分区快捷条「藏在里面了，拖不出来了」（用户截图 + 线上实测）。
+   根因两层：
+   ① .pp-canvas-wrap 一直没有 position:relative —— #ppHint / #ppQuickBar 两个 absolute 浮层
+     实际相对 MAIN 定位（实测 offsetParent=MAIN，CSS left:10px 落在画布左外 272px）。
+     成组管路页 #grPipeSection #grCanvasWrap 一直有 position:relative，二级页漏了。
+     v248 旧拖动实现全程用「wrap 视口 rect」计算，掩盖了这一点；v544 换坐标系后暴露。
+     ⇒ style-01 补 #pipePlanSection .pp-canvas-wrap{position:relative}，
+       CSS 默认位 / offsetLeft / 拖动夹紧 / 存档 四者归一坐标系。
+   ② rypDraggable 改为全程 getBoundingClientRect：拖动 = 起始 rect + 指针位移；
+     夹紧 = bounds rect；存档 = rect 相对 bounds（与 v248 旧实现同格式，老存档免迁移）；
+     写 style.left 用 offsetLeft + 位移差，不依赖 offsetParent 是谁。
+     并给挂起的 placeWhenVisible 加取消守卫（用户按住抓手即作废，否则 10s 重试队列
+     会把拖动的条拽回存档点）；resize 重夹紧同样 rect 化。
+   ③ #ppQuickBar 补 data-ry-drag-dblclick-reset="1"：双击工具条 = 清存档回默认位（逃生口）。
+   实测（_probe_rect_fix.mjs 专项 8 项）：老存档 {l:30,t:16} 落在画布内 (30,16)、条完整在画布内、
+   抓手可命中、拖动跟手 (+120,+60)、存档=画布相对坐标、双击复位 (10,8)、双击清存档 —— 8/8。
+   回归：工具栏探针 17/17、行为探针 31/31、A/B 六面（pp/tl × rail/base + secTL）0 差异、
+   ci PASS=19 FAIL=0、单测 121/122（唯一红 Terrain bridge 属并行会话在途文件）。
+   index.html / mod/style-01.css / mod/ry-panel.js / runye-map-measure.html 均在 CORE，必须抬版本。
+  */
+const VERSION = 'v544b-rect-clamp';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

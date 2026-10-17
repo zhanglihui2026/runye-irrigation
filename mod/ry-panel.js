@@ -130,32 +130,54 @@
     /* 默认位的原始内联值：CSS 里 right:300px 这类是写在创建时的 cssText 上的，
        拖动会把 right 改成 auto，reset 必须能原样还回去。 */
     var preset = { l: rootEl.style.left, t: rootEl.style.top, r: rootEl.style.right, b: rootEl.style.bottom };
-    function limits() {
+    /* [v544b] 坐标系统一为「视口 rect + bounds 相对存档」。
+       v544 第一版用 offsetLeft + bounds.clientWidth 混算 —— 但 offsetParent 未必是 bounds：
+       #ppQuickBar 的 .pp-canvas-wrap 没有 position:relative，实测 offsetParent=MAIN，
+       两套坐标差 272px；老用户 v248 存的「画布相对坐标」被解释到画布外、夹紧范围也错位
+       ⇒ 条顶在区块左缘、抓手被切掉，怎么拖都回不到画布里（用户：「藏在里面了，拖不出来了」）。
+       现在全程 getBoundingClientRect：拖动 = 起始 rect + 指针位移；夹紧 = bounds rect；
+       存档 = rect 相对 bounds（与 v248 旧实现同格式，老存档无需迁移即可用）。
+       写 style.left 用 `offsetLeft + 视口位移差`，不依赖 offsetParent 是谁。 */
+    function clampRect(vl, vt) {
+      var r = rootEl.getBoundingClientRect(), b;
       if (clampToViewport) {
-        return { minL: 4, minT: safeTop(), maxL: (global.innerWidth || 1200) - rootEl.offsetWidth - 4, maxT: safeBottom() - rootEl.offsetHeight - 4 };
+        b = { left: 4, top: safeTop(), right: global.innerWidth || 1200, bottom: safeBottom() };
+      } else {
+        b = bounds.getBoundingClientRect();
       }
-      return { minL: 0, minT: 0, maxL: Math.max(0, bounds.clientWidth - rootEl.offsetWidth - 4), maxT: Math.max(0, bounds.clientHeight - rootEl.offsetHeight - 4) };
+      var maxL = Math.max(b.left, b.right - r.width);
+      var maxT = Math.max(b.top, b.bottom - r.height);
+      return { l: Math.max(b.left, Math.min(vl, maxL)), t: Math.max(b.top, Math.min(vt, maxT)) };
     }
-    function place(left, top) {
-      var q = limits();
+    function moveRectTo(vl, vt) {
+      var c = clampRect(vl, vt);
+      var r = rootEl.getBoundingClientRect();
+      var dl = c.l - r.left, dt = c.t - r.top;
+      if (!dl && !dt && rootEl.style.left) return;
+      rootEl.style.left = (rootEl.offsetLeft + dl) + 'px';
+      rootEl.style.top = (rootEl.offsetTop + dt) + 'px';
       rootEl.style.right = 'auto';
-      rootEl.style.left = Math.max(q.minL, Math.min(left, q.maxL)) + 'px';
-      rootEl.style.top = Math.max(q.minT, Math.min(top, q.maxT)) + 'px';
+      rootEl.style.bottom = 'auto';
     }
     var hasPos = false;
     var saved = null;
     try { saved = JSON.parse(safeRead(key) || (legacyKey && safeRead(legacyKey)) || 'null'); } catch (_) {}
     /* 存档位置要等容器真的可见才落位：区块默认 display:none 时 rect 全 0，
-       夹紧会把面板压到 (0,0) 并停在那儿（v248b 在快捷条上踩过）。 */
-    function placeWhenVisible(left, top, tries) {
+       夹紧会把面板压到 (0,0) 并停在那儿（v248b 在快捷条上踩过）。
+       [v544b] 用户一旦按住抓手，挂起的落位必须作废 —— 否则最长 10s 的重试队列
+       会在用户拖动中途把条拽回存档点（「拖了又弹回去」）。 */
+    var placeCancelled = false;
+    function placeWhenVisible(sl, st, tries) {
+      if (placeCancelled) return;
       if (bounds && (bounds.clientWidth < 50 || bounds.clientHeight < 50) && tries > 0) {
-        setTimeout(function () { placeWhenVisible(left, top, tries - 1); }, 200);
+        setTimeout(function () { placeWhenVisible(sl, st, tries - 1); }, 200);
         return;
       }
-      place(left, top);
+      var b = clampToViewport ? { left: 0, top: 0 } : bounds.getBoundingClientRect();
+      moveRectTo(b.left + sl, b.top + st);
     }
     if (saved) {
-      /* 旧存档两种格式：卡片家族存 {x,y}，框架面板存 {l,t} */
+      /* 旧存档格式：{l,t}（框架与 v248 旧实现均为 bounds 相对坐标）、{x,y}（更老的卡片家族） */
       var sl = typeof saved.l === 'number' ? saved.l : saved.x;
       var st = typeof saved.t === 'number' ? saved.t : saved.y;
       if (typeof sl === 'number' && typeof st === 'number') { placeWhenVisible(sl, st, 50); hasPos = true; }
@@ -164,17 +186,21 @@
       /* [v494] data-ry-default-left：默认水平位置钩子（地图绘制工具条默认贴地图区左侧顶端）；
          未设置时保持原逻辑=右缘内缩 12px，既有面板零影响。 */
       var dl = rootEl.dataset.ryDefaultLeft;
-      place(dl != null && dl !== '' ? Number(dl) : bounds.clientWidth - rootEl.offsetWidth - 12, Number(rootEl.dataset.ryDefaultTop) || 96);
+      var b0 = clampToViewport ? { left: 0, top: 0 } : bounds.getBoundingClientRect();
+      moveRectTo(
+        b0.left + (dl != null && dl !== '' ? Number(dl) : Math.max(0, bounds.clientWidth - rootEl.offsetWidth - 12)),
+        b0.top + (Number(rootEl.dataset.ryDefaultTop) || 96)
+      );
       hasPos = true;
     }
-    var dragging = false, moved = false, offsetX = 0, offsetY = 0, startX = 0, startY = 0;
+    var dragging = false, moved = false, startRect = null, startX = 0, startY = 0;
     handle.addEventListener('pointerdown', function (event) {
       if (event.target.closest('[data-ry-fold]')) return;
       if (event.button !== undefined && event.button !== 0) return;
       dragging = true; moved = false;
+      placeCancelled = true;                       /* 作废挂起的自动落位 */
       startX = event.clientX; startY = event.clientY;
-      offsetX = event.clientX - rootEl.offsetLeft;
-      offsetY = event.clientY - rootEl.offsetTop;
+      startRect = rootEl.getBoundingClientRect();
       try { handle.setPointerCapture(event.pointerId); } catch (_) {}
       if (!threshold) event.preventDefault();
     });
@@ -187,7 +213,7 @@
       } else {
         moved = true;
       }
-      place(event.clientX - offsetX, event.clientY - offsetY);
+      moveRectTo(startRect.left + (event.clientX - startX), startRect.top + (event.clientY - startY));
       hasPos = true;
     });
     function finish() {
@@ -195,7 +221,9 @@
       dragging = false;
       if (!moved) { rootEl.dispatchEvent(new CustomEvent('ry-panel-drag-end', { detail: { moved: false } })); return; }
       markDragged(rootEl);
-      var value = JSON.stringify({ l: rootEl.offsetLeft, t: rootEl.offsetTop });
+      var r = rootEl.getBoundingClientRect();
+      var b = clampToViewport ? { left: 0, top: 0 } : bounds.getBoundingClientRect();
+      var value = JSON.stringify({ l: Math.round(r.left - b.left), t: Math.round(r.top - b.top) });
       safeWrite(key, value);
       if (legacyKey) safeWrite(legacyKey, value);
       rootEl.dispatchEvent(new CustomEvent('ry-panel-drag-end', { detail: { moved: true } }));
@@ -215,7 +243,8 @@
     }
     global.addEventListener('resize', function () {
       if (!hasPos || dragging) return;
-      if (rootEl.style.left && rootEl.style.left !== 'auto') place(rootEl.offsetLeft, rootEl.offsetTop);
+      var r = rootEl.getBoundingClientRect();
+      moveRectTo(r.left, r.top);                   /* 视口/容器变了，重新夹紧回 bounds 内 */
     });
   }
 

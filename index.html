@@ -16,7 +16,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>润野灌溉设计优化版｜滴灌管径与水泵选型</title>
 <meta name="description" content="输入地块、滴灌带与水源参数，快速计算灌溉分区、主管支管管径和水泵工作点。"/>
-<link rel="stylesheet" href="mod/style-01.css?v=544-float-card-unify">
+<link rel="stylesheet" href="mod/style-01.css?v=544b-rect-clamp">
 <link rel="stylesheet" href="runye-inverse-design.css?v=277">
 <script defer src="runye-inverse-design.js?v=437"></script>
 <link rel="stylesheet" href="runye-terrain.css?v=454-terrain-sidebar-peer">
@@ -910,8 +910,9 @@ body.ry-worst-off [data-tlworst]{display:none}
          body.ry-zoneauto-off 的置灰规则照旧生效（那些选择器不带父级约束）。
          [v248] 「生成施工图」也整节点搬进本条（「重新分区」之后）；整条可通过左侧抓手拖动，位置存 localStorage(ppQuickBarPos)。 -->
     <div class="pp-quick ry-hbar" id="ppQuickBar" data-ry-panel
-         data-ry-panel-key="ppQuickBar" data-ry-position-key="ppQuickBarPos" data-ry-keep-default="1">
-      <span class="pp-quick-grip" id="ppQuickGrip" data-ry-drag title="按住拖动，可移动工具条位置">⠿</span>
+         data-ry-panel-key="ppQuickBar" data-ry-position-key="ppQuickBarPos" data-ry-keep-default="1"
+         data-ry-drag-threshold="4" data-ry-drag-dblclick-reset="1">
+      <span class="pp-quick-grip" id="ppQuickGrip" data-ry-drag title="按住拖动，可移动工具条位置；双击工具条 = 回到默认位置">⠿</span>
       <label class="pp-angle-control" title="以地块包围盒中心为轴旋转地块外轮廓（只影响显示、不重写数据）；输入角度后点「重新分区」把旋转落定为新基准">
         <span>地块角度</span>
         <input id="ppPlotAngle" type="number" value="0" min="-180" max="180" step="1">
@@ -2359,7 +2360,7 @@ body.ry-worst-off [data-tlworst]{display:none}
      删除本行即整体卸载插件体系，原有功能零影响；插件清单见 plugins.json。 -->
 <script type="module" src="core/bootstrap.js?v=2"></script>
 <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.1/cdn/shoelace.js"></script>
-<script src="mod/ry-panel.js?v=544-float-card-unify"></script>
+<script src="mod/ry-panel.js?v=544b-rect-clamp"></script>
 <script src="pwa/vendor/leaflet.js"></script>
 <script src="mod/online-map.js?v=508-project-import-safe-rollback"></script>
 <script src="terrain/terrain-core.js?v=410-elev"></script>
