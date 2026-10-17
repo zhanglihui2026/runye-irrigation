@@ -517,6 +517,32 @@ function rypDraggable(rootEl){ /* 实现 */ }
    `#threeLevelView`（`index.html:2773` 有 DOM，`mod/inline-09.js` 仍在切 `.active`）。
 
 
+### 9.2 v533 / v534 决策记录（2026-10-17，字号与滚动条的「唯一出处」）
+
+**滚动条（v533）：唯一出处 = `runye-theme.css`。**
+`*::-webkit-scrollbar` 是特异性 0 的全局规则，谁后加载谁赢。历史上 index.html 内联、
+`mod/style-05.css`、`terrain/terrain.css`、`runye-hydraulics.html`（两份）、`三级系统图.html`、
+`二级系统图.html`、`管路接驳拼装.html` 各复制了一份，取值还互不相同（5px 绿 / 4px 灰 / 5px 灰绿）。
+逐页实测（`getComputedStyle(el,'::-webkit-scrollbar').width` + 真实 `offsetWidth-clientWidth`）：
+**这些副本全部被 theme 压掉**，全站通用滚动条恒为 **4px / rgba(100,116,139,.45) / 圆角 999px**。
+⇒ 已删除 7 处副本，`ci_check_static` 第 ⑦ 项守「除 theme 外不许再出现 `*::-webkit-scrollbar`」。
+**例外（真在生效，不是副本）**：`.pp-side`、`#ryCadSide .ry-cad-grps` 的 5px 绿色细条
+（选择器更具体）；以及各页容器级细条（`.fs-side`、`.at-sidebar`、`.tl-iso-stats`、`.te-mid` 等）。
+
+**字号（v534）：正文口径 = `runye-typography.css`，面板密度口径 = 面板自己的声明（需 `!important`）。**
+`--ry-fs-body:13px` 的 `p/li/input/select/button{…!important}` 是**全站正文**口径；
+密集面板（在线地图左栏、地形模块）自带 10~15px 的一套尺度，`!important` 会把它整片压平
+（.hint 设计 10px 实测 13px、缩放键设计 15px 实测 13px）。
+规则：**面板要自己的生活尺度，就在自己那条声明上加 `!important`** —— 它的特异性
+（`.mbtn` 0,1,0、`#terrainSection .t-unit button` 1,1,1）本就高于裸元素选择器，加 `!important`
+即可反压全局；不要靠删 typography 的全局口径，也不要开容器级豁免（会波及未测量的元素）。
+
+落地值（实测生效）：地图左栏 `.mbtn` 12px / 分区下拉 11px / 角度面板 `.hint` 10px /
+结果行 `.v small` 10px；地形 `.t-sprow input,select` 12.5px / `.t-tabs`·`.t-unit`·`.t-modebtn` 12px /
+`.t-canvas-nav button` 15px / `summary small` 11px。
+⚠ **同一面板有多份副本必须同步加**（本次同步了 4 处：`mod/online-map.css`、`runye-map-measure.html` 内联、
+`terrain/terrain.css`、`terrain/terrain-main.css`）。
+
 
 ***
 

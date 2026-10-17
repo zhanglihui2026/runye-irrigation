@@ -726,3 +726,72 @@
 2. 滚动条 4 份同值规则收敛为一份。
 3. 地形双份 DOM 属于架构级（`terrain/index.html` vs 主页 `#terrainSection`），需要产品决策。
 
+## 18. v533-scrollbar-single-source 全局滚动条收敛（2026-10-17 · 已发布上线）
+
+用户答「各种覆盖都排查完了吗」后列出的遗留项之一：滚动条 4 份同值规则。
+
+### 事实
+`*::-webkit-scrollbar` 特异性 0，谁后加载谁赢。`runye-theme.css` 在 `:head` 里最后加载且用
+`width:var(--ry-scroll-w)` 定义 ⇒ 另外 **7 处副本全部被压掉**，但每处写的值不同
+（index 内联 5px 绿 / style-05 4px 灰 / terrain.css 5px #c9d6ce+3px 圆角 /
+runye-hydraulics 两份 5px 绿+2.5px 圆角 / 三级系统图·二级系统图·管路接驳拼装 各 5px 绿）。
+**读源码完全看不出真实渲染值**，这就是「多层覆盖」最典型的形态。
+
+### 实测（两个口径，`_probe_v533_fonts_scroll.mjs`）
+`getComputedStyle(el,'::-webkit-scrollbar').width` + 真实 `offsetWidth-clientWidth`，
+6 个页面改前改后逐项一致：**通用滚动条 4px / rgba(100,116,139,.45) / 圆角 999px**。
+保留的**生效例外**：`.pp-side`、`#ryCadSide .ry-cad-grps` = 5px + `rgba(188,211,198,.25)`（选择器更具体）。
+
+### 闸门 ⑦
+`ci_check_static.cjs` 扫描根目录 + `mod/ terrain/ hydraulic-calc/ filter-system/ tl-workspace/
+modeling/ digital-agriculture/` 的 .css/.html，凡 `*::-webkit-scrollbar` 开头且不在
+`runye-theme.css` 里的声明行一律报红，并确认 theme 里那条定义还在。
+负向测试：注入 `*::-webkit-scrollbar{width:9px}` → FAIL；还原 → PASS。
+
+---
+
+## 19. v534-panel-type-scale 密集面板字号按设计值生效（2026-10-17 · 已发布上线）
+
+用户决策：**给密集面板开豁免**（另一选项是「保持全站 13px 不动」）。
+
+### 根因
+`runye-typography.css` 的 `p,li,input,select,textarea,button,.btn…{font-size:var(--ry-fs-body)!important}`
+是全站正文口径（13px）。`:where()` 把特异性压到裸元素级，但 `!important` 压过一切普通声明 ⇒
+面板里「设计好 10/11/12/12.5/15px」的声明全部失效。`<p>`/`<small>` 也被同一条一起压掉。
+
+### 处置（不动全局口径、不开容器级豁免）
+给面板自己的声明补 `!important`（特异性本就更高，加 `!important` 即可反压）：
+* `mod/online-map.css`：`.mbtn` 12px ×3 处（draw-tools / float-actions / 角度保存行）、
+  分区下拉 11px、`.ry-angle-panel .hint` 10px、`.results .row .v small` 10px、`.ang-btn small` 10px
+* `terrain/terrain.css`：`.t-sprow input,select` 12.5px、`.t-tabs`/`.t-unit`/`.t-modebtn` 12px、
+  `.t-canvas-nav button` 15px、`details.t-fold>summary small` 11px
+* `terrain/terrain-main.css`：同上 7 条；并把 `.t-sprow select` 扩成 `input,select`
+  （原来只有 select 有规则 ⇒ 主页地形输入框一直吃 13px，与独立页 12.5px 不一致）
+* `runye-map-measure.html` 内联副本：7 条同步，其中 3 条**原本没写 font-size**（纯吃全局 13px），
+  按 index 侧设计值补齐 —— 两页自此同值
+
+### A/B 实测（`_dump_fonts.mjs`，容器内逐元素 fontSize+lineHeight 快照，逐 key 比对）
+| 目标 | 变化元素 | 分布（元素数×改前→改后） |
+|---|---|---|
+| 地形独立页 | 47 | 34×(13→12.5) 6×(13→12) 4×(12→11) 3×(13→15) |
+| 主页地形区块 | 49 | 34×(13→12.5) 8×(13→12) 4×(12→11) 3×(13→15) |
+| 在线地图独立页 | 20 | 11×(13→12) 7×(12→10) 1×(13→10) 1×(13→11) |
+| 主页在线地图区块 | 20 | 11×(13→12) 7×(12→10) 1×(13→10) 1×(13→11) |
+
+**容器外 0 处变化**（快照 key 数改前=改后：233/233、218/218、173/173、154/154）。
+⚠ 主页区块默认 `display:none`（离线无 CDN 时地图/地形不显示），探针需
+`el.style.setProperty('display','block','important')` 强制后测量；A/B 两次同样强制，可比。
+
+### 残余「仍被压死」（有意不动，均非密集面板）
+`.fn-nav .fn-link` 12.5→13（0.5px）、`.ry-mbr-btn` 12→13、`.pp-rail-tab-float` 12→13、
+`.ry-pwa-install` 14→13、`.ry-pwa-install small` 11→12；地形页只剩 `.fn-nav .fn-link` 与
+`.t-navhint`（11 vs 11.5）。
+被压死清单规模：index **46 组元素 → 26**，地形页 **52 → 3**。
+
+### 验证
+* ci_check_static PASS=14 FAIL=0；`node --test tests/*.test.cjs` 122/122；
+  `_repro_v520_planparams` 29/29；`_smoke_publish` ALL PASS；线上 `_smoke_v521_live` 26/26
+* 缓存键：`index.html` 的 `mod/online-map.css`、`terrain/terrain-main.css` 与
+  `terrain/index.html` 的 `terrain.css` 均抬到 `?v=534-panel-type-scale`；`sw.js` → v534
+* 线上核对：`terrain.css` 含 `font-size: 12.5px !important`；index 已引用 `?v=534-panel-type-scale`
+
