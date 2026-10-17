@@ -35,7 +35,7 @@ const hreq = (method, p) => new Promise((res, rej) => {
 for (let i = 0; i < 60; i++) { try { await hreq('GET', '/json/version'); break; } catch (e) { await sleep(300); } }
 let idc = 1, ws = null; const pend = {};
 const send = (m, p = {}) => new Promise((res, rej) => { const id = idc++; pend[id] = { res, rej }; ws.send(JSON.stringify({ id, method: m, params: p })); setTimeout(() => { if (pend[id]) { delete pend[id]; rej(new Error('timeout')); } }, 60000); });
-const url = 'http://127.0.0.1:' + PORT + '/index.html?full=1';
+const url = process.env.RY_URL || ('http://127.0.0.1:' + PORT + '/index.html?full=1');   /* RY_URL=线上地址则跳过本地服务 */
 const t = JSON.parse(await hreq('PUT', '/json/new?' + encodeURIComponent(url)));
 ws = new WS(t.webSocketDebuggerUrl);
 await new Promise(r => ws.addEventListener('open', r));
