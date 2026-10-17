@@ -8,11 +8,12 @@
  *   · `tests/` 目录整体被 .gitignore 排除（既有 13 个测试因「已跟踪」而保留在库中）；
  *   · 浏览器 smoke（tests/*.smoke.cjs）需要本机 Edge + puppeteer-core，CI 跑不了
  *     —— 它们仍由本机批跑 `_p1/_gates.cjs` 覆盖（P1/P5 的 5 条已纳入该批跑清单）。
- * 所以本文件只做「零依赖 + 纯文本」那一层，把三类最容易在改动中被静默改坏、
+ * 所以本文件只做「零依赖 + 纯文本」那一层，把四类最容易在改动中被静默改坏、
  * 而本地又没人跑的问题拦在推送/PR 上：
  *   ① 内联 <script> 语法（vm.Script 编译，不执行、无副作用）；
  *   ② HTML 内重复 id（**先剥 <script> 体与注释**，否则注释里引用的 id 会假红）；
  *   ③ 常量单一来源（管径 CAL_SERIES / PE_OD_SERIES、单价 TL_PIPE_PRICE_DEF 各只允许一处定义）；
+ *   ⑥ 面板皮肤「双副本」不许漂移（scripts/check_panel_drift.cjs，v532）；
  *   ④ 主页面关键同步脚本的依赖顺序正确；主页面本地脚本、样式表、样式表本地 url()
  *      资源及插件清单声明的 manifest/入口与 Service Worker CORE 清单一致，未缓存项必须
  *      登记为有明确降级行为的可选项，且 CORE 资源必须存在且不重复。
@@ -259,6 +260,20 @@ check('③c 单价表三个消费点均引用同一全局', priceRefs.length ===
 const calUse = countDef(/CAL_SERIES/g), peUse = countDef(/PE_OD_SERIES/g);
 check('③d 常量确有使用点（不是收敛成孤儿）', calUse > 1 && peUse > 1 && priceDef >= 1,
   'CAL 出现 ' + calUse + ' 次 / PE_OD 出现 ' + peUse + ' 次');
+
+/* ---------- ⑥ 面板双副本漂移（v532） ---------- */
+/* 地块分区/三级管路的左栏在 body.ry-tool 下被 ry-cad-toolbar.js 搬进 #ryCadSide，
+   搬走后 `#X .pp-yyy` 不再匹配 ⇒ index.html 内联 <style> 里长期存在一份换前缀的孪生规则
+   （`#ryCadSide [data-pp="X"] .pp-yyy`）。这两份**必须逐条同值**，且无法合并
+   （副本特异性 (1,1,0) 比原版高一级，是 rail 态赢过竞争者的依据；v531 试过合并，
+   A/B 实测 base 60~74 处、rail 113~120 处视觉变化，已回滚）。这里只守「不许漂移」：
+   v530 删 style-01 的 .pp-side{border-radius:12px} 时内联没跟上，正是该闸门要拦的形态。 */
+const driftRes = require('child_process').spawnSync(process.execPath,
+  [path.join(ROOT, 'scripts', 'check_panel_drift.cjs')], { encoding: 'utf8' });
+const driftLines = (driftRes.stdout || '').trim().split('\n');
+check('⑥ 面板双副本无新增漂移（index.html 的 rail 副本 vs mod/style-01.css / mod/ry-panel.css）',
+  driftRes.status === 0,
+  driftLines[driftLines.length - 1] || (driftRes.stderr || '').slice(0, 200));
 
 console.log('\n== ci_check_static：PASS=' + pass + ' FAIL=' + fail + ' ==');
 process.exit(fail ? 1 : 0);

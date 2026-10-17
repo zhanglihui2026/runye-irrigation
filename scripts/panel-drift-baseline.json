@@ -1,0 +1,30 @@
+[
+ {
+  "key": "@media(max-width:768px)||[data-pp=\"pipePlanSection\"] .pp-title",
+  "prop": "font-size",
+  "inline": "13px",
+  "base": "(基准无此声明)",
+  "reason": "窄屏（≤768px）下左栏搬进工具栏后只剩 ~200px 宽，标题要缩到 13px；style-01 的 .pp-title 是给原位整宽写的 16px，不该跟着缩。属「栏内适配」，不是漏同步。"
+ },
+ {
+  "key": "@media(max-width:768px)||[data-pp=\"pipePlanSection\"] .pp-title",
+  "prop": "font-weight",
+  "inline": "600",
+  "base": "(基准无此声明)",
+  "reason": "同上：窄栏标题降一档字重（700 → 600），避免 13px 下糊成一团。"
+ },
+ {
+  "key": "@media(max-width:768px)||[data-pp=\"pipePlanSection\"] .pp-title",
+  "prop": "line-height",
+  "inline": "1.3",
+  "base": "(基准无此声明)",
+  "reason": "同上：13px 配 1.3 行高；原位 16px 用的是继承行高。"
+ },
+ {
+  "key": "||body.ry-tool [data-pp=\"tlPipePlanSection\"] .pp-side",
+  "prop": "border-right-color",
+  "inline": "transparent",
+  "base": "(基准无此声明)",
+  "reason": "三级左栏搬进工具栏后，右侧分界线由工具栏自己的分隔线画；左栏那条 1px 右边框要透明掉，否则出现双线。"
+ }
+]

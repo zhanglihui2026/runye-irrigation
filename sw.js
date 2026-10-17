@@ -1,4 +1,5 @@
 /* Runye PWA v1. Increment VERSION when changing the offline shell. */
+/* v531-data-service-plot-store: resolve plugin plot references through the shared plot-library adapter. */
 /* v427-archive-3d-iso: detach 3D preview and axonometric UI while retaining shared 2D pipe workspace and data. */
 'use strict';
 /* VERSION 沿革：v380-cache-fix（另一会话的缓存修复）→ v381-plugin-aiplan（本次新增 ai-plan
@@ -381,7 +382,7 @@
    改动实时重划分区；微调只改当前地块并自动记住，不回写已存方案）；
    v528-recipe-bar-no-label：方案条去掉「方案」二字标签（用户截图圈注），只留下拉+调用；
    v529-panel-single-source：地块分区左栏样式收敛单一出处 —— 删掉 index.html 内联 style 里
-   与 mod/ry-panel.css 逐行重复的 44 条 .pp-side/.pp-plan-*/.pp-recipe-*/.pp-calc-formula 规则，
+   与 mod/ry-panel.css 逐行重复的 44 条 .pp-side、.pp-plan-*、.pp-recipe-*、.pp-calc-formula 规则，
    改指 :is(#pipePlanSection,#ryCadSide [data-pp="..."]) 双位置选择器（原位 + 搬入工具栏后）；
    「⚙ 参数设置」按钮行内 style 收成 .ry-cad-set-btn；设置弹窗方案名称/已存方案补 text/select
    规则（原为浏览器原生 2px 边框）、三个方案按钮改用既有 .rs-btn；三文件均在 CORE，必须抬版本；
@@ -394,8 +395,21 @@
    余下全是 50% 圆点语义 + enforcer 自身），圆角语言承认扁平；
    ④ mod/ry-panel.css 三处 token（bg/border/head-h）原在两份 :root 里重复声明，:root 非作用域
    导致「写 36px 实走 44px」，收敛为顶部唯一定义、取值等于收敛前实测值（视觉零变化）。
-   三样式文件均在 CORE，必须抬版本。 */
-const VERSION = 'v530-flat-skin-cleanup';
+   三样式文件均在 CORE，必须抬版本；
+   v531-data-service-plot-store：插件端地块引用改走共享 plot-library 适配器（并行会话提交）；
+   v532-rail-drift-gate：面板双副本不再强行合并，改为「防漂移」——
+   ① 新增 scripts/check_panel_drift.cjs：把 index.html 内联 style 里 158 条
+   `#ryCadSide [data-pp="pipePlanSection"] …` 副本与 mod/style-01.css / mod/ry-panel.css 的
+   基准规则按「归一化选择器 + 属性」逐条比对，值不同 / 只在副本有 / 只在基准有 三类全报；
+   ② 新增 scripts/panel-drift-baseline.json 登记 4 条**有意不同**（窄栏 @media 字号、
+   rail 态 border-right-color:transparent 避免与工具栏分隔线双线），其余未登记漂移一律报红；
+   ③ ci_check_static.cjs 接入为第 ⑥ 项；顺带清掉 index.html 内联 21 条被
+   border-radius:0!important 压平的死圆角（未登记漂移 17→4）。
+   说明：曾实测「用 :is() 把两份合成一份」，特异性从 (1,1,0) 掉到 (1,0,0) 后
+   base diff 60~74 / rail diff 113~120（噪声基线仅 0~1 条），原生 input display、
+   sl-input 显隐、#ppPlanBar2 宽度等成批回归 ⇒ 已全部回滚，双副本保留。
+   index.html 在 CORE，必须抬版本。 */
+const VERSION = 'v532-rail-drift-gate';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
