@@ -2386,11 +2386,21 @@
     var IDS=['planLift','planDh','planSrcDist','planTapeSpacing','planEmitterSpacing',
       'planEmitterFlow','planTapeLaySide','planZoneMuManual','planTapePressure','planTargetV'];
     var $=function(id){return document.getElementById(id);};
-    var nameEl=$('ppRecipeName'),selEl=$('ppRecipeSelect'),statusEl=$('ppRecipeStatus');
-    if(!nameEl||!selEl||!$('ppRecipeSave'))return;
+    /* [v526]（2026-10-17 用户要求）工具栏只留「调用端口」（选择方案+调用）；
+       方案命名/保存/改名/删除移入设置弹窗「灌溉参数」页签（#ryRecipe*，由 inline-28 渲染，
+       按钮走 #rySetBody 事件委托调 window.RyRecipes）。
+       ⚠ 设置页 DOM 会被 render() 重建 ⇒ ryRecipe* 一律每次现查、不缓存；
+       全部判空：设置页不在时对应功能退化为不可用，工具栏调用不受影响。 */
+    var selEl=$('ppRecipeSelect'),statusEl=$('ppRecipeStatus');
+    if(!selEl||!$('ppRecipeApply'))return;
     function read(){try{var d=JSON.parse(localStorage.getItem(KEY)||'null');if(d&&d.version===1&&Array.isArray(d.recipes))return d.recipes;}catch(e){}return [];}
     function write(list){try{localStorage.setItem(KEY,JSON.stringify({version:1,recipes:list}));return true;}catch(e){status('保存失败：浏览器不允许写入本地存储','err');return false;}}
-    function status(msg,cls){statusEl.textContent=msg;statusEl.className='pp-recipe-status'+(cls==='err'?' pp-recipe-err':'');if(status._t)clearTimeout(status._t);status._t=setTimeout(function(){if(statusEl.textContent===msg)statusEl.textContent='';},4000);}
+    function status(msg,cls){
+      [statusEl,$('ryRecipeStatus')].forEach(function(el){if(!el)return;
+        el.textContent=msg;el.className=el.className.replace(' pp-recipe-err','')+(cls==='err'?' pp-recipe-err':'');});
+      if(status._t)clearTimeout(status._t);
+      status._t=setTimeout(function(){[statusEl,$('ryRecipeStatus')].forEach(function(el){if(el&&el.textContent===msg)el.textContent='';});},4000);
+    }
     function snapshot(){var p={};IDS.forEach(function(id){var el=$(id);p[id]=el?el.value:null;});return p;}
     function applyParams(p){
       function set(id,v){var el=$(id);
@@ -2400,48 +2410,59 @@
       /* [v517] 同上：三级输入已取消，IDS 里的 planTargetV 就是唯一入口。 */
       if(typeof ppRepartitionFromRotatedPlot==='function'){try{ppRepartitionFromRotatedPlot({aiApply:true});}catch(e){}}
     }
-    function refreshSelect(keepId){
-      var list=read(),old=keepId||selEl.value;
-      selEl.innerHTML='<option value="">— 选择方案 —</option>';
+    function fillSelect(sel,list,keepId){
+      if(!sel)return;
+      var old=keepId||sel.value;
+      sel.innerHTML='<option value="">— 选择方案 —</option>';
       list.forEach(function(r){
         var o=document.createElement('option');o.value=r.id;
         var d=new Date(r.at||0);
         o.textContent=r.name+'（'+(d.getMonth()+1)+'/'+d.getDate()+' 存）';
-        selEl.appendChild(o);
+        sel.appendChild(o);
       });
-      if(old&&list.some(function(r){return r.id===old;}))selEl.value=old;
+      if(old&&list.some(function(r){return r.id===old;}))sel.value=old;
     }
-    function selRecipeId(){return selEl.value||null;}
-    function selRecipe(){var list=read();return list.find(function(r){return r.id===selEl.value;})||null;}
-    $('ppRecipeSave').onclick=function(){
-      var list=read(),name=(nameEl.value||'').trim()||('方案'+(list.length+1));
+    function refreshSelect(keepId){
+      var list=read();
+      fillSelect(selEl,list,keepId);
+      fillSelect($('ryRecipeSelect'),list,keepId);
+    }
+    function curSelId(){var s=$('ryRecipeSelect');return (s&&s.value)?s.value:(selEl.value||null);}
+    function curName(){var el=$('ryRecipeName');return el?(el.value||'').trim():'';}
+    function doSave(){
+      var list=read(),name=curName()||('方案'+(list.length+1));
       var i=list.findIndex(function(r){return r.name===name;});
       if(i>=0){list[i].params=snapshot();list[i].at=Date.now();if(write(list)){refreshSelect(list[i].id);status('已更新「'+name+'」的参数');}}
       else{var r={id:'r_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),name:name,at:Date.now(),params:snapshot()};list.push(r);if(write(list)){refreshSelect(r.id);status('已保存「'+name+'」');}}
-    };
-    $('ppRecipeApply').onclick=function(){
-      var r=selRecipe();if(!r){status('请先在下拉里选择一个方案','err');return;}
-      applyParams(r.params||{});status('已调用「'+r.name+'」：参数已回填并重算');
-    };
-    $('ppRecipeRename').onclick=function(){
-      /* [v491b 修复] 必须在同一个 read() 数组里找再写回——之前 selRecipe() 与 list 是两次
-         独立 JSON.parse，改名改在游离对象上、write 把旧名写了回去（状态行还误报成功）。 */
-      var rid=selRecipeId();var list=read();
+    }
+    function doRename(){
+      /* [v491b 修复沿用] 必须在同一个 read() 数组里找再写回——两次独立 JSON.parse 会把改名写在游离对象上。 */
+      var rid=curSelId();var list=read();
       var r=list.find(function(x){return x.id===rid;});
       if(!r){status('请先选择要改名的方案','err');return;}
-      var nn=(nameEl.value||'').trim();if(!nn){status('请先在「方案」框里输入新名称，再点 ✎','err');return;}
+      var nn=curName();if(!nn){status('请先在「方案名称」框里输入新名称','err');return;}
       if(list.some(function(x){return x.id!==r.id&&x.name===nn;})){status('已有同名方案「'+nn+'」','err');return;}
       r.name=nn;r.at=Date.now();
       if(write(list)){refreshSelect(r.id);status('已改名为「'+nn+'」');}
-    };
-    $('ppRecipeDel').onclick=function(){
-      var rid=selRecipeId();
+    }
+    function doDel(){
+      var rid=curSelId();
       if(!rid||!read().some(function(x){return x.id===rid;})){status('请先选择要删除的方案','err');return;}
       var list=read().filter(function(x){return x.id!==rid;});
       if(write(list)){refreshSelect();status('已删除方案');}
+    }
+    $('ppRecipeApply').onclick=function(){
+      var r=read().find(function(x){return x.id===selEl.value;})||null;
+      if(!r){status('请先在下拉里选择一个方案','err');return;}
+      applyParams(r.params||{});status('已调用「'+r.name+'」：参数已回填并重算');
     };
+    /* 旧工具栏 保存/✎/🗑 若 DOM 还在（回滚场景）也照常绑定；不在则跳过 */
+    var _old=[[$('ppRecipeSave'),doSave],[$('ppRecipeRename'),doRename],[$('ppRecipeDel'),doDel]];
+    _old.forEach(function(pr){if(pr[0])pr[0].onclick=pr[1];});
     window.addEventListener('storage',function(e){if(e.key===KEY)refreshSelect();});
     refreshSelect();
+    /* [v526] 设置页管理入口（inline-28 在 #rySetBody 上事件委托调用） */
+    window.RyRecipes={ read:read, save:doSave, rename:doRename, del:doDel, refresh:refreshSelect };
   })();
 
 

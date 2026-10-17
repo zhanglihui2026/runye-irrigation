@@ -374,9 +374,11 @@
    v524-economic-settings-store：管材单价/造价假设 localStorage 读写收编
    core/economic-settings-store.js（同批 measured-area-bridge-store 入 CORE）；
    v525-plan-readonly-port：左侧工具面板 10 项参数转只读「调用端口」（2026-10-17 用户要求），
-   修改/保存统一在设置弹窗「灌溉参数」页签（⚙ 参数设置直达）；index.html 在 CORE，
-   必须抬版本重建离线缓存。 */
-const VERSION = 'v525-plan-readonly-port';
+   修改/保存统一在设置弹窗「灌溉参数」页签（⚙ 参数设置直达）；index.html 在 CORE，必须抬版本；
+   v526-recipe-to-settings：灌溉方案管理移入设置弹窗「灌溉参数」页签（命名/保存/改名/删除），
+   工具栏方案条只留「选择方案+调用」（✎/🗑 图标取消），组标题去「/ 水力」；
+   index.html / mod/plot-editor.js / mod/inline-28.js 都在 CORE，必须抬版本重建离线缓存。 */
+const VERSION = 'v526-recipe-to-settings';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

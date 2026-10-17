@@ -2,7 +2,7 @@
 /* ===== 设置模块（自包含） ===== */
 (function () {
   'use strict';
-  var PRICE_KEY = 'runye_tlEconPrices', ASSUM_KEY = 'runye_tlEconAssum', SCALE_KEY = 'tl-dim-scale';
+  var SCALE_KEY = 'tl-dim-scale';
   var GEO_DEF = { ext: 4, gap: 4, tick: 4, tickW: 2.8, font: 12 };
   var GEO_LABEL = { ext: '界线超出量', gap: '数字离尺寸线净距', tick: '斜短线半长', tickW: '斜短线线宽', font: '尺寸数字字号' };
   var GEO_TIP = {
@@ -49,11 +49,10 @@
   };
 
   /* ---- 存储读写 ---- */
-  function readRaw(k) { try { return JSON.parse(localStorage.getItem(k) || '{}') || {}; } catch (e) { return {}; } }
   function loadPrices() {
     var p = {}, k;
     for (k in PDEF) p[k] = PDEF[k];
-    var s = readRaw(PRICE_KEY);
+    var s = window.RyEconomicSettingsStore.readPriceOverrides();
     for (k in s) { if (typeof s[k] === 'number' && isFinite(s[k]) && s[k] > 0) p[k] = s[k]; }
     return p;
   }
@@ -61,7 +60,7 @@
     var v = {}, k;
     for (k in ADEF) v[k] = ADEF[k];
     for (k in { pf: 1, pm: 1, pb: 1 }) v[k] = 0;
-    var s = readRaw(ASSUM_KEY);
+    var s = window.RyEconomicSettingsStore.readAssumptions();
     for (k in v) { if (typeof s[k] === 'number' && isFinite(s[k]) && s[k] > 0) v[k] = s[k]; }
     return v;
   }
@@ -69,9 +68,7 @@
   function num(v) { var n = parseFloat(v); return isFinite(n) ? n : 0; }
   function fmt(n) { return String(Math.round(n * 1000) / 1000); }
   function setAssumRaw(patch) {
-    var o = readRaw(ASSUM_KEY), k;
-    for (k in patch) { var v = patch[k]; if (typeof v === 'number' && isFinite(v) && v > 0) o[k] = v; else delete o[k]; }
-    try { localStorage.setItem(ASSUM_KEY, JSON.stringify(o)); } catch (e) { }
+    window.RyEconomicSettingsStore.patchAssumptions(patch);
   }
 
   /* ---- 刷新（保存/导入后让各视图跟上） ---- */
@@ -261,14 +258,25 @@
   function htmlIrrig() {
     var dom = planDomValues();
     var h = '<h4>二级 · 地块与灌溉参数</h4>'
-      + '<p class="rs-note">与二级工具栏是<b>同一套参数</b>：这里改完点「保存」，工具栏同步更新并立即重算；'
-      + '在工具栏里手动改也一样会存进来（刷新不丢）。工具栏下方的「命名方案」照常可把整组参数存成方案随时调用。</p>';
+      + '<p class="rs-note">与二级工具栏是<b>同一套参数</b>：这里改完点「保存」，工具栏同步更新并立即重算（工具栏只作展示与调用，[v525] 起不可直接编辑）。</p>';
     PLAN_DEFS.forEach(function (d) {
       var el = planInput(d.id);
       var step = el ? (el.getAttribute('step') || 'any') : 'any';
       var mn = el ? (el.getAttribute('min') || '0') : '0';
       h += rowNum(d.label, d.id, el ? fmt(num(el.value)) : '', d.unit, 'min="' + mn + '" step="' + step + '"', d.tip);
     });
+    /* [v526]（2026-10-17 用户要求）灌溉方案管理区：工具栏只留「选择+调用」，
+       命名/保存/改名/删除统一在这里。按钮 data-ry-recipe 走 #rySetBody 事件委托调 window.RyRecipes
+       （plot-editor ppRecipeFlow 暴露；#rySetBody 内容会被 render() 重建，故必须委托、不能直绑）。 */
+    h += '<hr class="rs-sep">'
+      + '<h4>灌溉方案</h4>'
+      + '<p class="rs-note">把上面 10 项的<b>当前值</b>存成命名方案；地块分区页的「方案」下拉只负责调用。</p>'
+      + '<div class="rs-row"><label>方案名称</label><input type="text" id="ryRecipeName" maxlength="40" placeholder="如：海南七彩花生-0.8L-300" style="flex:1;min-width:0"></div>'
+      + '<div class="rs-row"><label></label><button type="button" data-ry-recipe="save" style="padding:5px 10px;border:1px solid #c9d8d0;border-radius:6px;background:#fff;color:#33604f;font-size:12px;cursor:pointer">💾 保存为方案（同名覆盖）</button></div>'
+      + '<div class="rs-row"><label>已存方案</label><select id="ryRecipeSelect" style="flex:1;min-width:0"><option value="">— 选择方案 —</option></select></div>'
+      + '<div class="rs-row"><label></label><button type="button" data-ry-recipe="rename" style="padding:5px 10px;border:1px solid #c9d8d0;border-radius:6px;background:#fff;color:#33604f;font-size:12px;cursor:pointer">✎ 改名为名称框文字</button></div>'
+      + '<div class="rs-row"><label></label><button type="button" data-ry-recipe="del" style="padding:5px 10px;border:1px solid #c9d8d0;border-radius:6px;background:#fff;color:#33604f;font-size:12px;cursor:pointer">🗑 删除选中方案</button></div>'
+      + '<p class="rs-note" id="ryRecipeStatus" role="status" style="min-height:14px"></p>';
     return h;
   }
   var RENDER = { price: htmlPrice, assum: htmlAssum, scale: htmlScale, geo: htmlGeo, eng: htmlEng, irrig: htmlIrrig };
@@ -333,7 +341,7 @@
     if (!np && !nr && !na) { alert('没有读到可写入的项。\n\n' + (r.warns.slice(0, 5).join('\n') || '请确认表头是「类别,名称,数值」三列。')); return; }
     var priceObj = {};
     for (k in d.prices) { if (d.prices[k] > 0) priceObj[k] = d.prices[k]; }
-    if (np) { try { localStorage.setItem(PRICE_KEY, JSON.stringify(priceObj)); } catch (e) { } }
+    if (np) window.RyEconomicSettingsStore.writePriceOverrides(priceObj);
     if (nr) setAssumRaw(d.roles);
     if (na) setAssumRaw(d.assum);
     var msg = '已导入：按管径单价 ' + np + ' 档 / 角色单价 ' + nr + ' 项 / 假设 ' + na + ' 项。';
@@ -368,7 +376,7 @@
       b = document.getElementById('rySetExport'); if (b) b.onclick = csvExport;
       b = document.getElementById('rySetImport'); if (b) b.onclick = function () { document.getElementById('rySetCsvInput').click(); };
       b = document.getElementById('rySetResetPrice'); if (b) b.onclick = function () {
-        try { localStorage.removeItem(PRICE_KEY); } catch (e) { }
+        window.RyEconomicSettingsStore.clearPriceOverrides();
         setAssumRaw({ pf: 0, pm: 0, pb: 0 });
         render(); refresh();
       };
@@ -390,7 +398,7 @@
         var d = parseInt(inp.getAttribute('data-pd'), 10), v = num(inp.value);
         if (v > 0) pr[d] = v;
       });
-      try { localStorage.setItem(PRICE_KEY, JSON.stringify(pr)); } catch (e) { }
+      window.RyEconomicSettingsStore.writePriceOverrides(pr);
       setAssumRaw({ pf: f.pf || 0, pm: f.pm || 0, pb: f.pb || 0 });
     } else if (tab === 'assum') {
       setAssumRaw({ price: f.price || 0, hours: f.hours || 0, years: f.years || 0 });
@@ -419,7 +427,7 @@
   function pageDefault() {
     var o;
     if (tab === 'price') {
-      try { localStorage.removeItem(PRICE_KEY); } catch (e) { }
+      window.RyEconomicSettingsStore.clearPriceOverrides();
       setAssumRaw({ pf: 0, pm: 0, pb: 0 });
     } else if (tab === 'assum') {
       setAssumRaw({ price: 0, hours: 0, years: 0 });
@@ -455,6 +463,18 @@
   document.getElementById('rySetSave').onclick = function () { save(); close(); refresh(); };
   document.getElementById('rySetMask').onclick = close;
   document.getElementById('rySetPageDefault').onclick = pageDefault;
+  /* [v526] 灌溉方案管理（保存/改名/删除）——#rySetBody 内容会被 render() 重建，
+     用事件委托绑定：按钮 data-ry-recipe 调 plot-editor 暴露的 window.RyRecipes。 */
+  document.getElementById('rySetBody').addEventListener('click', function (ev) {
+    var b = ev.target && ev.target.closest ? ev.target.closest('[data-ry-recipe]') : null;
+    if (!b) return;
+    var api = window.RyRecipes;
+    if (!api) return;
+    var act = b.getAttribute('data-ry-recipe');
+    if (act === 'save') api.save();
+    else if (act === 'rename') api.rename();
+    else if (act === 'del') api.del();
+  });
   Array.prototype.slice.call(document.querySelectorAll('#rySetNav button')).forEach(function (b) {
     b.onclick = function () { tab = b.getAttribute('data-tab'); markNav(); render(); };
   });

@@ -1588,16 +1588,14 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.pp-grip-side,
        模式，回填后派发 change/input 触发实时重算）。
        需要撤掉：删本块 + ppRecipeFlow IIFE + ry-panel.css 的 .pp-recipe-* 规则即可。 ===== -->
   <div class="pp-plan-bar pp-recipe-bar" id="ppRecipeBar">
+    <!-- [v526]（2026-10-17 用户要求）工具栏只留「调用端口」：方案命名/保存/改名/删除移入
+         设置弹窗「灌溉参数」页签（#ryRecipe*，plot-editor ppRecipeFlow 暴露 window.RyRecipes，
+         inline-28 事件委托调用）。此处仅保留 选择方案 + 调用。
+         需要撤掉：把被删的名称框/保存/✎/🗑 加回来即可（ppRecipeFlow 对缺失 id 全部判空跳过）。 -->
     <span class="pp-plan-item pp-recipe-row">
       <span class="pp-plan-label">方案</span>
-      <input type="text" id="ppRecipeName" maxlength="40" placeholder="如：东方基地·滴灌方案" aria-label="方案名称">
-      <button type="button" class="pp-recipe-btn pp-recipe-btn-primary" id="ppRecipeSave" title="把当前 10 项参数保存为方案">保存</button>
-    </span>
-    <span class="pp-plan-item pp-recipe-row">
       <select id="ppRecipeSelect" aria-label="选择已存方案"><option value="">— 选择方案 —</option></select>
-      <button type="button" class="pp-recipe-btn" id="ppRecipeApply" title="把选中方案的参数回填到面板并重算">调用</button>
-      <button type="button" class="pp-recipe-btn" id="ppRecipeRename" title="重命名选中方案">✎</button>
-      <button type="button" class="pp-recipe-btn pp-recipe-btn-danger" id="ppRecipeDel" title="删除选中方案">🗑</button>
+      <button type="button" class="pp-recipe-btn pp-recipe-btn-primary" id="ppRecipeApply" title="把选中方案的参数回填到面板并重算">调用</button>
     </span>
     <span class="pp-recipe-status" id="ppRecipeStatus" role="status"></span>
   </div>
@@ -3072,7 +3070,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.pp-grip-side,
 <!-- ===== 实际地块规划 JS ===== -->
 <script src="mod/inline-11.js?v=457-pump-power-semantics"></script>
 <!-- [v420-split] 绘图编辑器 IIFE 自 inline-11 迁出：必须紧随 inline-11 之后同步执行 -->
-<script src="mod/plot-editor.js?v=517-tl-targetv"></script>
+<script src="mod/plot-editor.js?v=526-recipe-to-settings"></script>
 <script src="mod/inline-12.js?v=357"></script>
 <script src="mod/inline-13.js?v=499-plot-library-store"></script>
 <!-- [v422-head-system-svg] 纯 SVG 核心先于 inline-14 同步加载。 -->
@@ -3132,7 +3130,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.pp-grip-side,
   <span id="ryCadWGrip" title="⇔ 拖拽调整工具栏宽度"></span>
   <div class="ry-cad-grps">
     <details class="ry-cad-grp" id="ryCadGrpPipe">
-      <summary>二级 · 地块与灌溉参数 / 水力<button type="button" id="ryCadGrpPipeSet" title="工具栏参数仅显示与调用；修改/保存统一在「设置 · 灌溉参数」，保存后立即生效（存浏览器，刷新不丢）" style="margin-left:auto;font-size:11px;font-weight:500;padding:2px 8px;border:1px solid #c9d8d0;border-radius:6px;background:#fff;color:#33604f;cursor:pointer">⚙ 参数设置</button></summary>
+      <summary>二级 · 地块与灌溉参数<button type="button" id="ryCadGrpPipeSet" title="工具栏参数仅显示与调用；修改/保存统一在「设置 · 灌溉参数」，保存后立即生效（存浏览器，刷新不丢）" style="margin-left:auto;font-size:11px;font-weight:500;padding:2px 8px;border:1px solid #c9d8d0;border-radius:6px;background:#fff;color:#33604f;cursor:pointer">⚙ 参数设置</button></summary>
       <div class="ry-cad-grp-body" data-pp="pipePlanSection" data-host="ppSide"></div>
     </details>
     <details class="ry-cad-grp" id="ryCadGrpTl">
@@ -3178,7 +3176,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.pp-grip-side,
   </div>
 </div>
 <input type="file" id="rySetCsvInput" accept=".csv,text/csv" style="display:none">
-<script src="mod/inline-28.js?v=521-plan-params"></script>
+<script src="mod/inline-28.js?v=526-recipe-to-settings"></script>
 
 <script src="mod/inline-29.js?v=357"></script>
 
