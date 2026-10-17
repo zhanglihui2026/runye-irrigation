@@ -124,6 +124,9 @@ result.meta.rail = await ev(`(function(){ var a=document.getElementById('ppSide'
 result['rail.pp'] = await ev(DUMP + "('#ppSide')");
 result['rail.tl'] = await ev(DUMP + "('#tlSide')");
 await waitStable('#tlSide');
+result['rail.secPP'] = await ev(DUMP + "('#pipePlanSection')");
+result['rail.secTL'] = await ev(DUMP + "('#tlPipePlanSection')");
+result['rail.main'] = await ev(DUMP + "('main')");
 result['rail.page'] = await ev(DUMP + "('body')");
 
 /* ── 原位态 ── */
@@ -136,11 +139,14 @@ result.meta.base = await ev(`(function(){ var a=document.getElementById('ppSide'
 await waitStable('#ppSide');
 result['base.pp'] = await ev(DUMP + "('#ppSide')");
 result['base.tl'] = await ev(DUMP + "('#tlSide')");
+result['base.secPP'] = await ev(DUMP + "('#pipePlanSection')");
+result['base.secTL'] = await ev(DUMP + "('#tlPipePlanSection')");
+result['base.main'] = await ev(DUMP + "('main')");
 result['base.page'] = await ev(DUMP + "('body')");
 
 fs.writeFileSync(path.join(ROOT, OUT), JSON.stringify(result));
 console.log('rail=' + JSON.stringify(result.meta.rail) + '  base=' + JSON.stringify(result.meta.base));
-for (const k of ['rail.pp', 'rail.tl', 'rail.page', 'base.pp', 'base.tl', 'base.page']) {
+for (const k of ['rail.pp', 'rail.tl', 'rail.secPP', 'rail.secTL', 'rail.main', 'rail.page', 'base.pp', 'base.tl', 'base.secPP', 'base.secTL', 'base.main', 'base.page']) {
   console.log('  ' + k.padEnd(10) + Object.keys(result[k] || {}).length + ' 元素');
 }
 console.log('→ ' + OUT);

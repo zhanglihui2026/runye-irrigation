@@ -276,6 +276,31 @@ check('⑥ 面板双副本无新增漂移（index.html 的 rail 副本 vs mod/st
   driftRes.status === 0,
   driftLines[driftLines.length - 1] || (driftRes.stderr || '').slice(0, 200));
 
+/* ---------- ⑥b 面板样式单一归属（v543） ---------- */
+/* v542 的审计结论：面板相关规则 1673 条里只有 97 条真正命中，418 条从不命中——
+   根因是同一套皮肤被抄在 index.html 内联里（结构搬走后留下 252 条 #threeLevelView 死块、
+   125 条 .pp-title 死块）。v543 把内联里 179 条面板规则全部迁回 ry-panel.css / style-01.css，
+   内联从 45.8KB 降到 6.3KB。这条闸门守住「别再抄回去」：内联 <style> 里一旦再出现
+   面板选择器（去掉注释后判断），直接红灯。 */
+const inlineStyleCss = (() => {
+  const src = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  const blocks = [...src.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map(m => m[1]);
+  return blocks.map(c => c.replace(/\/\*[\s\S]*?\*\//g, '')).join('\n');
+})();
+const panelSelectorsInline = [];
+{
+  const re = /([^{}]+)\{[^{}]*\}/g;
+  let m;
+  while ((m = re.exec(inlineStyleCss))) {
+    const sel = m[1].trim();
+    if (!sel || sel.startsWith('@')) continue;
+    if (/(\.pp-|#ppSide|#tlSide|#pipePlanSection|#tlPipePlanSection|#ryCadSide|ry-cad-)/.test(sel)) panelSelectorsInline.push(sel.slice(0, 90));
+  }
+}
+check('⑥b 面板样式单一归属：index.html 内联不得再抄面板规则（v543）',
+  panelSelectorsInline.length === 0,
+  panelSelectorsInline.slice(0, 5).join(' | '));
+
 /* ---------- ⑦ 全局滚动条单一出处（v533） ---------- */
 /* `*::-webkit-scrollbar` 是纯特异性 0 的全局规则，谁后加载谁赢 ⇒ 历史上 index.html 内联、
    mod/style-05.css、terrain/terrain.css 各复制了一份（值还各不相同：5px 绿 / 4px 灰 / 5px 灰绿）。

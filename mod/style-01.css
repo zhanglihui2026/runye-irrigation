@@ -2342,9 +2342,9 @@ body > .ry-nav .main-header{display:none!important}
   /* 版心：高度 = 一屏 − 吸顶导航（不再扣标题条的 38px，省下的高度全部给图纸） */
 
   #pipePlanSection > .pp-body>.pp-side, #tlPipePlanSection > .pp-body>.pp-side{grid-column:1}
-  #pipePlanSection > .pp-body>.pp-grip-side, #tlPipePlanSection > .pp-body>.pp-grip-side{grid-column:2;grid-row:1}
-  #pipePlanSection > .pp-body>.pp-stage, #tlPipePlanSection > .pp-body>.pp-stage{grid-column:3}
-  #pipePlanSection .pp-side, #pipePlanSection .pp-stage, #tlPipePlanSection .pp-side, #tlPipePlanSection .pp-stage{min-width:0;min-height:0}
+  #pipePlanSection > .pp-body>.pp-grip-side, #tlPipePlanSection > .pp-body>.pp-grip-side, #ryCadSide [data-pp="pipePlanSection"] > .pp-body>.pp-grip-side, #ryCadSide [data-pp="tlPipePlanSection"] > .pp-body>.pp-grip-side{grid-column:2;grid-row:1}
+  #pipePlanSection > .pp-body>.pp-stage, #tlPipePlanSection > .pp-body>.pp-stage, #ryCadSide [data-pp="pipePlanSection"] > .pp-body>.pp-stage, #ryCadSide [data-pp="tlPipePlanSection"] > .pp-body>.pp-stage{grid-column:3}
+  #pipePlanSection .pp-side, #pipePlanSection .pp-stage, #tlPipePlanSection .pp-side, #tlPipePlanSection .pp-stage, #ryCadSide [data-pp="pipePlanSection"] .pp-side, #ryCadSide [data-pp="pipePlanSection"] .pp-stage, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side, #ryCadSide [data-pp="tlPipePlanSection"] .pp-stage{min-width:0;min-height:0}
 
   /* [v436-pp-normalize] 原「左：参数栏（竖排表单）」的皮肤规则已删除：
      #pipePlanSection .pp-side 的视觉样式、旧竖排参数卡片（.pp-plan-bar 白卡 /
@@ -2353,7 +2353,7 @@ body > .ry-nav .main-header{display:none!important}
      这里仍保留画布网格的结构定位；无需再对抗 JS 内联 display:flex——
      该内联写入已从 inline-11.js 移除）。
      #tlPipePlanSection .pp-head-break 保留（土地流转页仍依赖）。 */
-  #tlPipePlanSection .pp-side .pp-head-break{margin:0;padding:6px 9px;font-size:11px}
+  #tlPipePlanSection .pp-side .pp-head-break, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-head-break{margin:0;padding:6px 9px;font-size:11px}
 
   /* —— 右：图纸区 + 版心最右侧的竖排工具面板 ——
      工具条由「画布上方横排」改为「版心右缘竖排面板」：
@@ -2419,12 +2419,12 @@ body > .ry-nav .main-header{display:none!important}
   /* —— 拖拽条本体：整列都是热区，正中画一条 2px 竖线；悬停/拖动时加粗变绿 ——
      用完 .pp-grip 这个 10px 的网格列，不占额外宽度（原来这 10px 是列间距 gap）。 */
 
-  #pipePlanSection .pp-grip::before, #tlPipePlanSection .pp-grip::before{
+  #pipePlanSection .pp-grip::before, #tlPipePlanSection .pp-grip::before, #ryCadSide [data-pp="pipePlanSection"] .pp-grip::before, #ryCadSide [data-pp="tlPipePlanSection"] .pp-grip::before{
     content:"";position:absolute;top:0;bottom:0;left:50%;
     width:2px;margin-left:-1px;background:#dde8e1;
   }
   /* 拖动时不再给悬停过渡：跟手更利落 */
-  #pipePlanSection .pp-grip:hover::before, #pipePlanSection .pp-grip.dragging::before, #tlPipePlanSection .pp-grip:hover::before, #tlPipePlanSection .pp-grip.dragging::before{background:var(--g-600);width:4px;margin-left:-2px}
+  #pipePlanSection .pp-grip:hover::before, #pipePlanSection .pp-grip.dragging::before, #tlPipePlanSection .pp-grip:hover::before, #tlPipePlanSection .pp-grip.dragging::before, #ryCadSide [data-pp="pipePlanSection"] .pp-grip:hover::before, #ryCadSide [data-pp="pipePlanSection"] .pp-grip.dragging::before, #ryCadSide [data-pp="tlPipePlanSection"] .pp-grip:hover::before, #ryCadSide [data-pp="tlPipePlanSection"] .pp-grip.dragging::before{background:var(--g-600);width:4px;margin-left:-2px}
   /* 拖拽中锁定全局光标与选中，避免拖到画布上时选中文字/拖出画布选区 */
   body.pp-col-resizing,
   body.pp-col-resizing *{cursor:col-resize!important;user-select:none!important}
@@ -2622,7 +2622,7 @@ body > .ry-nav .main-header{display:none!important}
 
 
 
-#tlPipePlanSection .pp-side{
+#tlPipePlanSection .pp-side, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side{
   align-self:start;max-height:100%;
   display:flex;flex-direction:column;gap:8px;
   overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
@@ -2630,15 +2630,15 @@ body > .ry-nav .main-header{display:none!important}
   background:linear-gradient(180deg,#f8fbf9 0%,#f2f7f4 100%);
   border:1px solid #dde8e1;
 }
-#tlPipePlanSection .pp-side>*{flex:0 0 auto}
-#tlPipePlanSection .pp-side .pp-plan-bar{
+#tlPipePlanSection .pp-side>*, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side>*{flex:0 0 auto}
+#tlPipePlanSection .pp-side .pp-plan-bar, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-bar{
   display:block!important;margin:0!important;padding:8px 11px;
   min-height:0;
   background:#fff;border:1px solid #e4ece7;
   font-size:11px;
 }
 .tl-plan-result{background:#fbfefc}
-#tlPipePlanSection .pp-side .pp-plan-bar::before{
+#tlPipePlanSection .pp-side .pp-plan-bar::before, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-bar::before{
   content:"地块与灌溉参数";
   display:block;margin:0 0 4px;padding-bottom:5px;
   border-bottom:1px solid #eaf1ec;
@@ -2671,8 +2671,8 @@ body > .ry-nav .main-header{display:none!important}
   width:100%;min-height:26px;padding:2px 0;
   border-bottom:1px dashed #eef3f0;
 }
-#tlPipePlanSection .pp-side .pp-plan-item:last-of-type{border-bottom:0}
-#tlPipePlanSection .pp-side .pp-plan-item>.pp-plan-label:first-child{margin-right:auto}
+#tlPipePlanSection .pp-side .pp-plan-item:last-of-type, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-item:last-of-type{border-bottom:0}
+#tlPipePlanSection .pp-side .pp-plan-item>.pp-plan-label:first-child, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-item>.pp-plan-label:first-child{margin-right:auto}
 #tlPipePlanSection .pp-side .pp-plan-label{font-size:11px;line-height:1.25;white-space:nowrap}
 /* [v539] 字重拉齐（与二级地块工具栏同口径）：设计值 600、实际值 700、标签 400、列头 600。
    原来三级设计值是 400，同一语义（计算结果数值）在两级里粗细不同。
@@ -2731,7 +2731,7 @@ body > .ry-nav .main-header{display:none!important}
 .tl-grp-table td.tl-grp-z{color:#334155;word-break:break-word}
 .tl-grp-table th.tl-grp-a,.tl-grp-table td.tl-grp-a{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;color:#0f172a}
 .tl-grp-table tfoot td{background:#f8fbf9;font-weight:700;color:#0f172a}
-#tlPipePlanSection .pp-side .pp-plan-item input{
+#tlPipePlanSection .pp-side .pp-plan-item input, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-item input{
   width:64px!important;height:24px;padding:2px 6px;
   box-sizing:border-box;text-align:right;flex:0 0 auto;font-size:11px;font-weight:400;
   /* ★ 通用规则 .pp-plan-item input 是按「深绿底面板」写的
@@ -2740,13 +2740,13 @@ body > .ry-nav .main-header{display:none!important}
      两个数字框在浅色/白色卡片上完全看不见（值其实在）。这里补成同款浅色输入框。 */
   color:#1a1a1a;background:#fff;border:1px solid #dde8e1;
 }
-#tlPipePlanSection .pp-side .pp-plan-item input:focus{border-color:#16a34a}
-#tlPipePlanSection .pp-side .pp-sep-vert{display:none}
+#tlPipePlanSection .pp-side .pp-plan-item input:focus, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-item input:focus{border-color:#16a34a}
+#tlPipePlanSection .pp-side .pp-sep-vert, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-sep-vert{display:none}
 /* 右：图纸区单栏（放施工简图，无手绘画布 / 工具轨） */
 
 #tlPipePlanSection .pp-stage>.pp-toolbar{margin:0}
-#tlPipePlanSection .pp-stage>.pp-diagram-wrap{margin:0;flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
-#tlPipePlanSection .pp-stage>.pp-diagram-wrap>#tlDiagramContent{flex:1 1 auto;min-height:0}
+#tlPipePlanSection .pp-stage>.pp-diagram-wrap, #ryCadSide [data-pp="tlPipePlanSection"] .pp-stage>.pp-diagram-wrap{margin:0;flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+#tlPipePlanSection .pp-stage>.pp-diagram-wrap>#tlDiagramContent, #ryCadSide [data-pp="tlPipePlanSection"] .pp-stage>.pp-diagram-wrap>#tlDiagramContent{flex:1 1 auto;min-height:0}
 /* 二级施工图满屏视图：点「生成施工图」后，隐藏编辑两栏、施工图占满整屏 */
 
 #pipePlanSection.sys-view > #ppDiagramWrap{
@@ -2908,8 +2908,7 @@ body.ry-tool #irrCompareSection.details{background:var(--ry-canvas);overflow:aut
 body.ry-tool .details .container{max-width:none;margin:0;padding:14px}
 
 /* ── 6. 管路两区（二级 / 三级）：左属性栏 ＋ 右主区 ─────────────────────── */
-body.ry-tool #pipePlanSection > .pp-body,
-body.ry-tool #tlPipePlanSection > .pp-body{
+body.ry-tool #pipePlanSection > .pp-body, body.ry-tool #tlPipePlanSection > .pp-body, body.ry-tool #ryCadSide [data-pp="pipePlanSection"] > .pp-body, body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] > .pp-body{
   flex:1 1 auto;min-height:0;height:auto!important;margin:0;
   display:grid;
   /* 三列：属性栏 ｜ 拖拽条 ｜ 主工作区（沿用原有的左栏可拖宽能力） */
@@ -2927,34 +2926,29 @@ body.ry-tool #tlPipePlanSection .pp-side{
 body.ry-tool #pipePlanSection .pp-side>*{flex:0 0 auto}
 /* 面板拖拽条（JS 运行时注入）：保留天正式的「属性栏可拖宽」能力 */
 body.ry-tool .pp-grip-side{grid-column:2;grid-row:1;cursor:col-resize}
-body.ry-tool #pipePlanSection .pp-stage,
-body.ry-tool #tlPipePlanSection .pp-stage{
+body.ry-tool #pipePlanSection .pp-stage, body.ry-tool #tlPipePlanSection .pp-stage, body.ry-tool #ryCadSide [data-pp="pipePlanSection"] .pp-stage, body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-stage{
   grid-column:3;align-self:stretch;min-width:0;min-height:0;
   display:flex;flex-direction:column;gap:0;padding:0;
   background:var(--ry-canvas);border:0;overflow:hidden;
 }
 /* 左栏内的参数块 / 按钮：统一为浅色工程面板 */
-body.ry-tool #tlPipePlanSection .pp-plan-bar{
+body.ry-tool #tlPipePlanSection .pp-plan-bar, body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-plan-bar{
   background:var(--ry-canvas);border:1px solid var(--ry-line);
   padding:8px 10px;font-size:11px;
 }
-body.ry-tool #tlPipePlanSection .pp-plan-bar-result{background:#fafaf7}
-body.ry-tool #pipePlanSection .pp-btn-ghost,
-body.ry-tool #tlPipePlanSection .pp-btn-ghost{
+body.ry-tool #tlPipePlanSection .pp-plan-bar-result, body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-plan-bar-result{background:#fafaf7}
+body.ry-tool #pipePlanSection .pp-btn-ghost, body.ry-tool #tlPipePlanSection .pp-btn-ghost, body.ry-tool #ryCadSide [data-pp="pipePlanSection"] .pp-btn-ghost, body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-btn-ghost{
   color:var(--ry-ink2);border-color:var(--ry-line);background:var(--ry-canvas);
 }
-body.ry-tool #pipePlanSection .pp-btn-generate,
-body.ry-tool #tlPipePlanSection .pp-btn-generate{
+body.ry-tool #pipePlanSection .pp-btn-generate, body.ry-tool #tlPipePlanSection .pp-btn-generate, body.ry-tool #ryCadSide [data-pp="pipePlanSection"] .pp-btn-generate, body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-btn-generate{
   background:var(--ry-acc-hi);color:#fff;
 }
 /* 左属性栏内的两个主操作按钮（「一键生成管线图」「生成系统图」）：按要求取消加粗
    （用户 2026-09-12「文字都不用加粗」）。基础规则 .pp-btn-generate 是 600，
    这里以 (0,3,1) 特异性覆盖，仅作用于属性栏内，不影响工具轨按钮。 */
-#pipePlanSection .pp-side>.pp-btn-generate,
-#tlPipePlanSection .pp-side>.pp-btn-generate{font-weight:400}
+#pipePlanSection .pp-side>.pp-btn-generate, #tlPipePlanSection .pp-side>.pp-btn-generate, #ryCadSide [data-pp="pipePlanSection"] .pp-side>.pp-btn-generate, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side>.pp-btn-generate{font-weight:400}
 /* 主区内的工具条：贴主区顶部，不浮在画布上 */
-body.ry-tool #pipePlanSection .pp-toolbar,
-body.ry-tool #tlPipePlanSection .pp-toolbar{
+body.ry-tool #pipePlanSection .pp-toolbar, body.ry-tool #tlPipePlanSection .pp-toolbar, body.ry-tool #ryCadSide [data-pp="pipePlanSection"] .pp-toolbar, body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-toolbar{
   flex:0 0 auto;margin:0;padding:6px 8px;
   background:var(--ry-panel);border-bottom:1px solid var(--ry-line);
 }
@@ -3535,14 +3529,13 @@ body.ry-tool #pipePlanSection .ry-pane-edit>.pp-grip-tool.dragging::before{
    约束：只动版式。字段 id / 单位 / 按钮 / 事件绑定 / 计算逻辑一律不碰；
         左栏 DOM 一个字都没删 —— 切回「三级简图」立即原样恢复。
    ======================================================================== */
-#tlPipePlanSection[data-ry-view="sys"] > .pp-body{
+#tlPipePlanSection[data-ry-view="sys"] > .pp-body, #ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="sys"] > .pp-body{
   /* 属性栏 ｜ 拖拽条 ｜ 主工作区 —— 前两列收为 0，主区独占 */
   grid-template-columns:0 0 minmax(0,1fr);
 }
-#tlPipePlanSection[data-ry-view="sys"] > .pp-body>.pp-side,
-#tlPipePlanSection[data-ry-view="sys"] > .pp-body>.pp-grip-side{display:none}
+#tlPipePlanSection[data-ry-view="sys"] > .pp-body>.pp-side, #tlPipePlanSection[data-ry-view="sys"] > .pp-body>.pp-grip-side, #ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="sys"] > .pp-body>.pp-side, #ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="sys"] > .pp-body>.pp-grip-side{display:none}
 /* 工具模式：把上面那条同属性、更高优先级的列定义按住（RY-TOOL 段第 6 节） */
-body.ry-tool #tlPipePlanSection[data-ry-view="sys"] > .pp-body{
+body.ry-tool #tlPipePlanSection[data-ry-view="sys"] > .pp-body, body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="sys"] > .pp-body{
   grid-template-columns:0 0 minmax(0,1fr);
 }
 /* 系统图容器去掉左右内边距，iframe 与主区边缘齐平（空态提示文字仍由 .pp-diagram-empty 自带留白） */
@@ -3581,18 +3574,13 @@ body.ry-tool #tlPipePlanSection[data-ry-view="sys"] #tlSysDiagramContent{padding
         落到隐式列上），前两列收 0 + 隐藏左栏与拖拽条；带 body.ry-tool 前缀的
         同属性列定义压住 RY-TOOL 段第 6 节的 (var,10px,1fr)。全程零 !important。
    ======================================================================== */
-#pipePlanSection[data-ry-clean="1"] > .pp-body,
-#tlPipePlanSection[data-ry-clean="1"] > .pp-body{
+#pipePlanSection[data-ry-clean="1"] > .pp-body, #tlPipePlanSection[data-ry-clean="1"] > .pp-body, #ryCadSide [data-pp="pipePlanSection"][data-ry-clean="1"] > .pp-body, #ryCadSide [data-pp="tlPipePlanSection"][data-ry-clean="1"] > .pp-body{
   /* 属性栏 ｜ 拖拽条 ｜ 主工作区 —— 前两列收为 0，图纸独占 */
   grid-template-columns:0 0 minmax(0,1fr);
 }
-#pipePlanSection[data-ry-clean="1"] > .pp-body>.pp-side,
-#pipePlanSection[data-ry-clean="1"] > .pp-body>.pp-grip-side,
-#tlPipePlanSection[data-ry-clean="1"] > .pp-body>.pp-side,
-#tlPipePlanSection[data-ry-clean="1"] > .pp-body>.pp-grip-side{display:none}
+#pipePlanSection[data-ry-clean="1"] > .pp-body>.pp-side, #pipePlanSection[data-ry-clean="1"] > .pp-body>.pp-grip-side, #tlPipePlanSection[data-ry-clean="1"] > .pp-body>.pp-side, #tlPipePlanSection[data-ry-clean="1"] > .pp-body>.pp-grip-side, #ryCadSide [data-pp="pipePlanSection"][data-ry-clean="1"] > .pp-body>.pp-side, #ryCadSide [data-pp="pipePlanSection"][data-ry-clean="1"] > .pp-body>.pp-grip-side, #ryCadSide [data-pp="tlPipePlanSection"][data-ry-clean="1"] > .pp-body>.pp-side, #ryCadSide [data-pp="tlPipePlanSection"][data-ry-clean="1"] > .pp-body>.pp-grip-side{display:none}
 /* 工具模式：把 RY-TOOL 段第 6 节那条同属性、同特异性的列定义按住 */
-body.ry-tool #pipePlanSection[data-ry-clean="1"] > .pp-body,
-body.ry-tool #tlPipePlanSection[data-ry-clean="1"] > .pp-body{
+body.ry-tool #pipePlanSection[data-ry-clean="1"] > .pp-body, body.ry-tool #tlPipePlanSection[data-ry-clean="1"] > .pp-body, body.ry-tool #ryCadSide [data-pp="pipePlanSection"][data-ry-clean="1"] > .pp-body, body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"][data-ry-clean="1"] > .pp-body{
   grid-template-columns:0 0 minmax(0,1fr);
 }
 
@@ -4115,7 +4103,7 @@ body.ry-tool #designInput .mw-col-right{
   #areaTool .pli-btn[data-act="current"]{color:var(--u-accent-2)!important;background:var(--u-accent-bg)!important;border-color:var(--u-accent-line)!important}
   #pipePlanSection #ppToolbar>.pp-btn.active{background:var(--u-water-bg)!important;color:var(--u-water)!important;border-color:var(--u-water)!important}
   #pipePlanSection #ppAutoPipe{color:var(--u-accent-2)!important;background:var(--u-accent-bg)!important;border-color:var(--u-accent-line)!important}
-  #tlPipePlanSection .pp-btn-generate{background:var(--u-accent-2)!important;color:#fff!important;border-color:var(--u-accent-2)!important;background-image:none!important}
+  #tlPipePlanSection .pp-btn-generate, #ryCadSide [data-pp="tlPipePlanSection"] .pp-btn-generate{background:var(--u-accent-2)!important;color:#fff!important;border-color:var(--u-accent-2)!important;background-image:none!important}
   #areaTool .danger,#areaTool .danger:hover{color:var(--u-err)!important;border-color:var(--u-err-line)!important;background:var(--u-err-bg)!important}
   .materials-card .grand-total-val{color:var(--u-accent-2)!important}
   #fnNav .fn-link:focus-visible,#areaTool button:focus-visible,#pipePlanSection button:focus-visible,#tlPipePlanSection button:focus-visible{outline:2px solid var(--u-water);outline-offset:-3px}
@@ -4134,3 +4122,133 @@ body.ry-tool #designInput .mw-col-right{
 #tlPlanBar #tlZoneCountGroup{flex:1 1 auto}
 #tlPlanBar #tlZoneCountGroup button{flex:1 1 0;min-width:0}
 #tlPlanBar #tlAreaGroupMu{flex:1 1 56px;width:auto;min-width:0}
+
+
+/* ═══════════════════════════════════════════════════════════════
+三级 · 管网面板（#tlSide）
+   [v543] 从 index.html 内联 <style> 迁入 —— 面板样式单一归属。
+   迁移时选择器原样保留（不改写、不加 :is()），因此特异性与迁移前一致。
+   ═══════════════════════════════════════════════════════════════ */
+#ryCadSide [data-pp="tlPipePlanSection"] .tl-group-btn{
+  font-size:11px;line-height:1;padding:5px 10px;white-space:nowrap;
+  border:1px solid #bfdbfe;background:#eff6ff;
+  cursor:pointer;color:#1d4ed8;transition:background .15s,border-color .15s;
+}
+#ryCadSide [data-pp="tlPipePlanSection"] .tl-group-btn:hover{background:#dbeafe;border-color:#93c5fd}
+#ryCadSide [data-pp="tlPipePlanSection"] .tl-group-btn:active{background:#bfdbfe}
+
+
+
+
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-bar-result.pp-res-head::before,
+#ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-bar-result.pp-res-head::before{
+  content:"水力计算结果 ▾";
+}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side .pp-plan-bar-result.pp-res-head.pp-res-off::before,
+#ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-bar-result.pp-res-head.pp-res-off::before{
+  content:"水力计算结果 ▸";
+}
+#ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-item{
+  display:flex;align-items:center;gap:5px;
+  width:100%;min-height:26px;padding:2px 0;
+  border-bottom:1px dashed #eef3f0;
+}
+
+
+#ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-label{font-size:11px;line-height:1.25;white-space:nowrap}
+#ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-val{font-size:11px;font-weight:600;color:#1a1a1a}
+
+
+
+#ryCadSide [data-pp="tlPipePlanSection"] .pp-stage>.pp-toolbar{margin:0}
+
+
+#ryCadSide [data-pp="tlPipePlanSection"] #tlSysDiagramWrap{margin:14px 0 0}
+#ryCadSide [data-pp="tlPipePlanSection"] #tlSysFrame{display:none;background:#fff}
+
+body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-side{
+  grid-column:1;align-self:stretch;
+  padding:10px;overscroll-behavior:contain;
+  background:var(--ry-panel);border:0;border-right:1px solid var(--ry-line);
+}
+
+
+
+
+
+
+
+#ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="pipe"] .ry-pane-sys{display:none}
+#ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="sys"] .ry-pane-pipe{display:none}
+#ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="ws"] .ry-pane-pipe,
+#ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="ws"] .ry-pane-sys{display:none}
+#ryCadSide [data-pp="tlPipePlanSection"]:not([data-ry-view="pipe"]) .ry-pane-pipe{display:none}
+#ryCadSide [data-pp="tlPipePlanSection"]:not([data-ry-view="ws"]) .ry-pane-ws{display:none}
+#ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="pipe"] .ry-pane-ws,
+#ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="sys"] .ry-pane-ws{display:none}
+#ryCadSide [data-pp="tlPipePlanSection"] .ry-pane-ws{
+  /* 2026-09-13 晚：工具条改右侧竖向工具轨（参考二级管线 .pp-stage 三列做法）。
+     2026-09-17 第四十二轮：右侧增「管段管径与损失统计表」→ 四列。
+     2026-09-17 第四十四轮（用户要求）：统计表**移入工具轨内部顶端** → 回归三列
+     画布 ｜ 拖拽条 ｜ 工具轨（轨内顶端为可折叠统计表，其下为各工具按钮）
+     工具轨宽度走 --tlWsToolbarW：没拖过不写变量，走 CSS 回退值（默认＝旧统计表同宽，表格可直接读）。 */
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 6px var(--tlWsToolbarW,clamp(210px,17vw,300px));
+  grid-template-rows:minmax(0,1fr);column-gap:8px;
+  min-height:460px;margin:0;min-width:0;
+  position:relative; /* 2026-09-16 固定文字层（#tlWsOverlays）定位基准 */
+}
+#ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="ws"] .ry-pane-ws{flex:1 1 auto}
+
+
+
+body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="sys"] #tlSysDiagramContent{padding:0}
+#ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="sys"] #tlSysDiagramWrap > #tlSysDiagramContent{
+  flex:1 1 auto;min-height:0;overflow:hidden;
+}
+#ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="sys"] #tlSysFrame{
+  display:block;width:100%;height:100%;min-height:0;border:0;background:#fff;
+}
+
+
+
+#ryCadSide [data-pp="tlPipePlanSection"] .tl-section-title .step{color:#eef0f1!important}
+#ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-val{color:var(--ry-ink,#2c2c2a)!important}
+#ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-label{color:var(--ry-ink2,#5a656a)!important}
+#ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-item{color:var(--ry-ink2,#5a656a)!important}
+html.ry-mobile #ryCadSide [data-pp="pipePlanSection"][data-ry-view="edit"] .ry-pane-edit,
+html.ry-mobile #ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="ws"] .ry-pane-ws{display:flex;flex-direction:column}
+html.ry-mobile #ryCadSide [data-pp="pipePlanSection"] #ppToolbar,
+html.ry-mobile #ryCadSide [data-pp="tlPipePlanSection"] #tlWsToolbar{flex:none;order:-1;display:flex;flex-direction:row;flex-wrap:nowrap;align-items:center;width:100%;max-width:100%;max-height:60px;min-width:0;gap:6px;margin:0;padding:6px;overflow-x:auto;overflow-y:hidden;grid-column:auto;grid-row:auto;background:#f4f7f5}
+html.ry-mobile #ryCadSide [data-pp="pipePlanSection"] #ppCanvasWrap,
+html.ry-mobile #ryCadSide [data-pp="tlPipePlanSection"] #tlWsContent{position:relative;flex:1;min-height:0;height:auto!important;width:100%;margin:0;overflow:hidden;}
+html.ry-mobile #ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="ws"] > .ry-mobile-zoom{display:flex;position:absolute;right:8px;bottom:max(8px,env(safe-area-inset-bottom));gap:4px;z-index:45}
+body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-side{border-right-color:transparent}
+body.ry-tool #pipePlanSection[data-ry-rail="1"] > .pp-body,
+#pipePlanSection[data-ry-rail="1"] > .pp-body,
+body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body,
+#tlPipePlanSection[data-ry-rail="1"] > .pp-body{
+  grid-template-columns:0 0 minmax(0,1fr);
+}
+body.ry-tool #pipePlanSection[data-ry-rail="1"] > .pp-body>.pp-grip-side,
+#pipePlanSection[data-ry-rail="1"] > .pp-body>.pp-grip-side,
+body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.pp-grip-side,
+#tlPipePlanSection[data-ry-rail="1"] > .pp-body>.pp-grip-side{display:none}
+@media(min-width:1101px){
+  
+  
+  
+  
+  
+  
+}
+@media screen{
+  
+  #ryCadSide [data-pp="pipePlanSection"] button:focus-visible,
+#ryCadSide [data-pp="tlPipePlanSection"] button:focus-visible{outline:2px solid var(--u-water);outline-offset:-3px}
+}
+@media print{
+  body.ry-tool.ry-cad-vp > main > #areaTool,
+  body.ry-tool.ry-cad-vp > main > #pipePlanSection,
+  body.ry-tool.ry-cad-vp > main > #tlPipePlanSection{padding-top:0!important}
+}

@@ -625,3 +625,18 @@ function rypDraggable(rootEl){ /* 实现 */ }
 3. **合并重复块只能改写成逗号分组，不能用 `:is()`**（v531/v532 定论）：`:is()` 取参数里最高特异性，
    会把原位分支抬高一级 ⇒ 同特异性竞争改判 ⇒ 必回归。逗号分组让每个分支保留自己的特异性。
 4. 带 `:hover/:focus/:active/::/html.ry-mobile` 的规则**永远不要当成死规则删**——探针量不到状态与伪元素。
+
+## 11. 面板样式单一归属（v543 定论）
+
+**面板皮肤只允许存在于两个文件**：二级 → `mod/ry-panel.css`，三级 → `mod/style-01.css`。
+`index.html` 的 `<style>` 里**不许再出现**任何 `.pp-*` / `#ppSide` / `#tlSide` /
+`#pipePlanSection` / `#tlPipePlanSection` / `#ryCadSide` / `ry-cad-*` 规则（`ci_check_static` ⑥b 守着）。
+
+三条操作约定：
+1. **迁移/新增时落点放文件末尾**，不要插到开头——内联块原本在 `ry-panel.css` 之前，
+   放末尾才符合它原先的相对次序。
+2. **只能改位置，不许改选择器**。要合并「原位 + rail」两份同值规则就写成逗号分组
+   （`#pipePlanSection .x, #ryCadSide [data-pp="pipePlanSection"] .x { … }`），
+   每段各自保留特异性；**禁止 `:is()`**（会把低位分支抬到高位，v531 实测必回归）。
+3. **改完必须跑 `_ab_panel_dump.mjs` 的 8 个量测面**（`rail/base × #ppSide/#tlSide/两区块/main`），
+   全 0 才算过。孤立的过渡属性差异（如 opacity 0.72）复跑一次再判断。

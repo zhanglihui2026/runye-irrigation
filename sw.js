@@ -495,8 +495,17 @@
    合并重复块只用**逗号分组**，不用 :is()（:is 取最高特异性，原位分支被抬高一级 ⇒ 必回归）。
    结果：style-01.css 1374→1237 条规则、内联 CSS -16.1%，四态 A/B 0 差异。
    index.html / mod/style-01.css 均在 CORE，必须抬版本。
+ * v543 面板样式单一归属：内联 179 条面板规则全部迁回 mod/ry-panel.css（111 条）与
+   mod/style-01.css（68 条），index.html 内联 CSS 45.8KB → 6.3KB，面板皮肤不再有第二份。
+   迁移只搬位置、选择器原样保留（不加 :is()），特异性不变；再用**逗号分组**把「原位 + rail」
+   同值副本并成一条（style-01 合并 32 组），每个分支仍各自保留原特异性。
+   验收：四态 × 8 个量测面（#ppSide/#tlSide 两态 + #pipePlanSection/#tlPipePlanSection/#main）
+   × 40 个 computed 属性 = 0 差异；并证明 235 条迁移选择器「面板外命中 0 个」。
+   新增 ci ⑥b 守住「内联不得再抄面板规则」。
+   ⚠ 落地顺序有讲究：新块追加到目标文件**末尾**时 A/B 才 0 差异（放开头会改判平手）。
+   index.html / mod/ry-panel.css / mod/style-01.css 均在 CORE，必须抬版本。
  */
-const VERSION = 'v542-panel-css-prune';
+const VERSION = 'v543-panel-single-owner';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

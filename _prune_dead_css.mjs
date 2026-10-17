@@ -36,7 +36,12 @@ for (const key of ['rail', 'base']) {
     deadByState[key].add(sel.replace(/\s+/g, ' ').trim());
   }
 }
-const deadSet = new Set([...deadByState.rail].filter(x => deadByState.base.has(x)));
+/* 作用域收紧：整条选择器的每一段都必须落在面板作用域内。
+   否则会误删「面板 + 别的工具」混编组（如 #pipePlanSection .pp-title, #areaTool .at-topbar h1）——
+   那类规则在本轮两态里不命中，只是因为它所属的工具当时没显示。 */
+const PANEL_SCOPE = /#(?:pipePlanSection|tlPipePlanSection|ppSide|tlSide|ryCadSide)\b|\[data-pp=/;
+const inScope = sel => sel.split(',').every(p => PANEL_SCOPE.test(p));
+const deadSet = new Set([...deadByState.rail].filter(x => deadByState.base.has(x) && inScope(x)));
 const railOnly = [...deadByState.rail].filter(x => !deadByState.base.has(x));
 const baseOnly = [...deadByState.base].filter(x => !deadByState.rail.has(x));
 

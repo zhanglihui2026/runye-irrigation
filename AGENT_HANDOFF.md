@@ -1044,3 +1044,55 @@ modeling/ digital-agriculture/` 的 .css/.html，凡 `*::-webkit-scrollbar` 开�
 真正还能再降层的是**归属迁移**：把 `index.html` 内联那 22 条 rail 副本搬进 `mod/ry-panel.css` /
 `mod/style-01.css`，让同级部件只有一个 owner。风险点：内联块在文档序里位于 `ry-panel.css`
 **之前**，搬过去会变成之后 ⇒ 同特异性平手时改判。需专门一轮 A/B（本次未做，留作下一版）。
+
+---
+
+## 24. v543-panel-single-owner 面板样式单一归属（内联 179 条全部迁出）
+
+用户指令：「2，彻底清洗干净，不然我担心后面有隐患。」
+
+### 做了什么
+把 `index.html` 内联 `<style>` 里所有面板相关规则（正则 `pp-|ppSide|tlSide|pipePlanSection|ryCadSide|ry-cad|tl-plan|tlCal`）
+整块抽出，按归属迁回：
+- 二级 `.pp-*` / `#ppSide` / `#pipePlanSection` / `#ryCadSide` / `.ry-cad-*` → **`mod/ry-panel.css`**（111 条）
+- 三级 `#tlPipePlanSection` / `#tlSide` / `.tl-plan-*` / `#tlCal*` → **`mod/style-01.css`**（68 条）
+
+迁完再顺手把「原位 + rail」同值副本用**逗号分组**并成一条（`style-01.css` 合并 32 组），
+每个分支保留自己原来的特异性（不用 `:is()`，理由见 §17/v531）。
+
+结果：`index.html` 内联 CSS **45.8KB → 6.3KB**，面板皮肤不再有第二份。
+
+### 三条必须记住的
+1. **落点必须在目标文件「末尾」**。先试过 `--at=top`：内联块原本位于 `ry-panel.css` 之前，
+   放到开头等于让它们继续「输给」ry-panel 自己的同名规则；放末尾才是它们原本的相对次序语义。
+   实测末尾 0 差异（放开头未采纳）。
+2. **迁移只搬位置，选择器一个字都不改**。不改写、不加前缀、不用 `:is()` —— 一旦改选择器就是改特异性，
+   v531 的教训（base diff 60/74、rail 113/120）就是改选择器改出来的。
+3. **「面板外 0 命中」是可以证明的**：`_probe_moved_scope.mjs` 逐条 `querySelectorAll` 后判断
+   `el.closest('#ppSide|#tlSide|#ryCadSide')`。235 条迁移选择器里，面板外命中 12 条，
+   逐条核实全是**区块级布局**（`#pipePlanSection > .pp-body`、`body.ry-tool.ry-cad-vp > main`），
+   本来就是面板布局的一部分，不是外泄。
+
+### 验收（这次把量测面扩到 8 个）
+`_ab_panel_dump.mjs` 现在输出 12 份快照：`rail/base × {pp, tl, secPP, secTL, main, page}`。
+有效比对面 8 个（page 含大量动态节点，元素数每次不同，只作参考）：
+
+| 面 | rail | base |
+|---|---|---|
+| `#ppSide` 96 元素 | 0 差异 | 0 差异 |
+| `#tlSide` 77 元素 | 0 差异 | 0 差异 |
+| `#pipePlanSection` 82/178 元素 | 0 | 0 |
+| `#tlPipePlanSection` 125/202 元素 | 0 | 0 |
+| `main` 1725 元素 | 0（仅 4 个动态节点缺失） | 0 |
+
+每个元素 40 个 computed 属性 + 尺寸。合并后又跑了一次，仍 0 差异。
+中途出现过的 `opacity 1→0.72` 经复跑确认是 `.pp-quick` 的 `transition:opacity .16s` 被截在过渡中间，
+不是样式变化 —— **单次快照出现孤立的过渡属性差异时，必须复跑一次再下结论**。
+
+### 新增闸门 ⑥b（防回退）
+`ci_check_static` 增加第 ⑥b 项：读 index.html 所有 `<style>` 块、**去掉注释**后扫选择器，
+一旦再出现 `.pp-` / `#ppSide` / `#tlSide` / `#pipePlanSection` / `#tlPipePlanSection` / `#ryCadSide` / `ry-cad-`
+就红灯。这就是「以后不许再抄一份回去」的锁。
+
+### 状态
+`ci_check_static` PASS=18 FAIL=0 ｜ `node --test tests/*.test.cjs` 122/122 ｜ `_smoke_publish` ALL PASS。
