@@ -450,8 +450,26 @@
    实测（HEAD 基线树 vs 新版，37 属性逐元素）：主页 #terrainSection 218 元素 0 差异、
    独立地形页 233 元素 0 差异（仅路径编号 div:9→div:11 位移）、主页全页默认视图 186 元素 0 差异；
    112 个 .t-* 元素全在区块内、0 外泄。
-   index.html / terrain/index.html / terrain/terrain.css / sw.js 均在 CORE，必须抬版本。 */
-const VERSION = 'v537-terrain-single-source';
+   index.html / terrain/index.html / terrain/terrain.css / sw.js 均在 CORE，必须抬版本。
+ * v538 两个工具栏字号统一到 11px（二级地块 #ppSide ⇄ 三级管网 #tlSide）：
+   用户口径：「两个工具栏所有文字统一，一个文字高度；要区分就加粗」。
+   实测差：三级左栏控件全是 11px（32 个可见），二级是 label/val 12px、select/button 13px。
+   处置：mod/ry-panel.css —— 二级 label/val 12→11、native input 12→11、
+   sl-input 的 --sl-input-font-size-small 12→11、方案条 input/select 与 .pp-recipe-btn 补
+   `!important`（runye-typography 的 `input/select/button{13px!important}` 会压，v534 同款）；
+   mod/style-01.css —— 三级 .tl-plan-result .pp-cal-sel 的 11px 补 `!important`
+   （原声明被压成 13px，是三级自己的漏网）。
+   未动（不是工具栏条，是独立卡片/提示）：#tlPumpUpdateBox 内 11.5/10.5/13px、
+   #tlLossCard 11.5px、#tlPpHint 14px、黑底计算式条 #ppCalcDetail（用户确认保留层次）。
+   实测（_probe_toolbar_typo.mjs 逐元素 5 属性）：二级 43 个元素 12/13→11
+   （20 label + 10 val + 13 input + 2 select/button），三级 3 个下拉 13→11；
+   两级「可见」文字全部 11px（余下非 11px 的只有 type=hidden 隐藏域与上述卡片/提示）；
+   全页默认视图 186 元素 37 属性 0 差异 = 无外溢；元素高度仅 10 个 label 各矮 1.3px
+   （15.6→14.3），行高由 24px 输入框撑着，整体布局不变。
+   ⚠ 三级那条必须挂 .tl-plan-result（结果栏专属类）：rail 态 #tlSide 被搬进 #ryCadSide，
+   `#tlPipePlanSection .pp-side …` 祖先链断裂（v109 老坑）。
+   index.html / mod/ry-panel.css / mod/style-01.css 均在 CORE，必须抬版本。 */
+const VERSION = 'v538-toolbar-font-11';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

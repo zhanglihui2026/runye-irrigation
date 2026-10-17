@@ -423,9 +423,14 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-to
   display:flex;align-items:center;gap:5px;
 }
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-item-fluid-input > .pp-plan-label:first-child{flex:0 0 84px;margin-right:0;min-width:0}
-:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-label{ font-size:12px;line-height:1.3;color:var(--ry-s-600,#475569); }
+/* [v538] 工具栏字号统一：本面板与三级管网工具栏同口径 11px（用户要求「一个文字高度，
+   要区分只加粗」）。三级基准 = mod/style-01.css 的 #tlPipePlanSection .pp-side 一组（11px）。
+   控件（input/select/button）必须带 !important —— runye-typography.css 的
+   `input/select/button{font-size:var(--ry-fs-body)!important}`(13px) 会压过来（v534 同款处理）。
+   本例外的只有黑底计算式条 #ppCalcDetail（结果展示，保留 10~11.5px 层次）。 */
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-label{ font-size:11px;line-height:1.3;color:var(--ry-s-600,#475569); }
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-val{
-  font-size:12px;font-weight:600;color:var(--ry-s-800,#1e293b);
+  font-size:11px;font-weight:600;color:var(--ry-s-800,#1e293b);
   font-variant-numeric:tabular-nums;
 }
 /* 原生输入（Shoelace 不可用时的离线回退）：浅色紧凑 24px，右对齐数值。
@@ -435,7 +440,7 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-to
   flex:0 0 64px;width:64px;height:24px;padding:2px 7px;box-sizing:border-box;
   border:1px solid transparent;border-radius:6px;
   background:transparent;color:var(--ry-s-800,#1e293b);
-  font-family:inherit;font-size:12px;font-weight:400;
+  font-family:inherit;font-size:11px !important;font-weight:400;
   text-align:right;outline:none;
   -moz-appearance:textfield;
 }
@@ -464,7 +469,7 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-to
   flex:1 1 auto;min-width:0;width:auto;height:24px;padding:2px 7px;box-sizing:border-box;
   border:1px solid var(--ry-s-200,#e2e8f0);border-radius:6px;
   background:#fff;color:var(--ry-s-800,#1e293b);
-  font-family:inherit;font-size:12px;outline:none;
+  font-family:inherit;font-size:11px !important;outline:none;
 }
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-row input[type=text]:focus,
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-row select:focus{
@@ -474,7 +479,7 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-to
   flex:none;height:24px;padding:0 8px;box-sizing:border-box;
   border:1px solid var(--ry-s-200,#e2e8f0);border-radius:6px;
   background:#fff;color:var(--ry-s-700,#334155);
-  font-family:inherit;font-size:11px;font-weight:600;line-height:1;
+  font-family:inherit;font-size:11px !important;font-weight:600;line-height:1;
   cursor:pointer;white-space:nowrap;
 }
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-btn:hover{
@@ -498,7 +503,8 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-to
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side sl-input[data-ry-proxy-for]{
   display:block;flex:0 0 64px;width:64px;min-width:64px;max-width:64px;
   --sl-input-height-small:24px;
-  --sl-input-font-size-small:12px;
+  --sl-input-font-size-small:11px;   /* [v538] 与 .pp-plan-item input 的 11px 同口径 */
+
   --sl-input-border-radius-small:6px;
   --sl-input-background-color:transparent;
   --sl-input-border-color:transparent;

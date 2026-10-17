@@ -862,3 +862,62 @@ modeling/ digital-agriculture/` 的 .css/.html，凡 `*::-webkit-scrollbar` 开�
 * `RY_VP=宽,高` → 同时改 `--window-size` 与 `Emulation.setDeviceMetricsOverride`
   （**只改后者也够**，但只改 `--window-size` 无效 —— 探针里已经硬编码了 metrics override，
   窄屏测试会假绿：innerWidth 仍是 1520，`@media` 分支根本没走到）
+
+---
+
+## 21. v538-toolbar-font-11 二级/三级工具栏字号统一到 11px（2026-10-17 · 待发布）
+
+### 用户口径
+> 「二级地块工具栏跟三级管网工具栏的文字统一，都按照三级管网工具栏的文字大小执行，
+> 两个工具栏的所有文字都统一，不要出现不同大小的文字，一个文字高度就行了，
+> 如果要区分的话，那就个别文字加粗就行。」
+
+确认过的两个边界：**管径下拉也降到 11px**（用户选「全部 11px」）；
+**黑底扬程计算式条不动**（`#ppCalcDetail` 是结果展示，保留 10~11.5px 层次）。
+
+### 改前实测（`_probe_toolbar_typo.mjs`，逐元素 fontSize/fontWeight/lineHeight/高度）
+| 面板 | 分布 |
+|---|---|
+| 三级 `#tlSide`（基准） | 11px×32 可见（label/区按钮/亩数/列头）+ 11px/700×6（改径重算值）+ **13px×3**（管径下拉，被全局压） |
+| 二级 `#ppSide` | 11px×10（单位）+ **12px×20**（label）+ **12px/600×10**（计算值）+ **12px×10**（输入框数字）+ **13px/600×2**（方案下拉、调用按钮） |
+
+### 根因（两条，都属"被全站口径压"或"设计值不同"）
+1. **设计值不同**：`mod/ry-panel.css` 给二级 label/val/input 写了 12px，三级写的是 11px。
+2. **被 `runye-typography.css` 压**：`input/select/button{font-size:var(--ry-fs-body)!important}`(13px)
+   把二级的方案下拉、调用按钮，以及三级的 3 个管径下拉（CSS 明明写 11px）全顶成 13px。
+   ⇒ 与 v534 同一处置：**面板要自己的字号，就在自己那条声明上加 `!important`**（特异性本就够）。
+
+### 改动（5 处，全在 CORE 里）
+`mod/ry-panel.css`：label 12→11、val 12→11、native input 12→`11 !important`、
+`--sl-input-font-size-small` 12→11（这是 sl-input 内真实可见的数字）、
+方案条 `input/select` 与 `.pp-recipe-btn` → `11px !important`。
+`mod/style-01.css`：`.tl-plan-result .pp-cal-sel` 的 11px → `11px!important`。
+
+### ⚠ 两个坑
+1. **`.tl-plan-result` 前缀是承重的**：rail 态 `#tlSide` 被 `mod/ry-cad-toolbar.js` 搬进 `#ryCadSide`，
+   `#tlPipePlanSection .pp-side …` 祖先链断裂（v109 老坑）。改三级左栏样式一律挂类/ID，别挂 section 前缀。
+2. **`#tlPumpUpdateBtn` 一开始被我误改**：它在 `#tlPumpUpdateBox`（独立白底卡片，`font:11.5px/1.6`）里，
+   不是工具栏条。改成 11px 会让卡片内部 11.5/10.5/11 三档自相矛盾 ⇒ 已回退。
+
+### 未动清单（都不是「工具栏条」，是独立卡片/提示）
+| 元素 | 字号 | 性质 |
+|---|---|---|
+| `#tlPumpUpdateBox` 标题 | 11.5px/700 | 管径调整卡（白底卡片） |
+| `#tlPumpUpdateNote` / `#tlPumpUpdateDelta` | 10.5px | 同上，说明/对比行 |
+| `#tlPumpUpdateBtn` | 13px（设计 12，被全局压） | 同上，卡片内按钮 —— **既存"被压死"，本轮未处理** |
+| `#tlLossCard` | 11.5px | 管段长度/水头损失卡 |
+| `#tlPpHint` | 14px | 画布空态大提示 |
+| `#ppCalcDetail` | 10~11.5px 多档 | 黑底扬程计算式条（用户明确保留） |
+
+### 实测（改前→改后，逐元素 5 属性）
+* 二级：**43 个元素** 12/13→11（20 label + 10 val + 13 input + 2 select/button）
+* 三级：**3 个元素** 13/700→11/700（管径下拉）
+* 两级**可见**文字全部 11px；余下非 11px 的只有 `input[type=hidden]`×2 与上表卡片/提示
+* 外溢：主页全页默认视图 186 元素 × 37 属性 **0 差异**
+* 布局影响：仅 10 个 label 各矮 1.3px（line-height 15.6→14.3），行高由 24px 输入框撑着，
+  `#ppPlanBar` 行距不变
+
+### 验证
+`ci_check_static` PASS=15 FAIL=0（含 ⑥ 面板漂移闸门：本轮改的都是带 `:is(#pipePlanSection,…)` 前缀的
+规则或 `.tl-plan-result` 类规则，内联副本里没有同属性的 font-size，故无新增漂移）；
+`node --test` 122/122；`_repro_v520_planparams` 29/29；`_smoke_publish` ALL PASS。

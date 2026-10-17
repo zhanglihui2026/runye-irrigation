@@ -570,6 +570,31 @@ function rypDraggable(rootEl){ /* 实现 */ }
    主页 218 元素（1520px）/ 217（1050px 走单列分支）/ 独立页 233 / 主页全页 186，四张快照都要 0 差异。
 
 
+### 9.4 v538 决策记录（2026-10-17，两个工具栏「一个文字高度」）
+
+**二级地块工具栏（`#ppSide`）与三级管网工具栏（`#tlSide`）统一 11px，层级只用字重。**
+
+用户口径：不要出现不同大小的文字，一个文字高度；要区分只加粗。落地：
+
+| 角色 | 字号 | 字重 |
+|---|---|---|
+| 标签 / 单位 / 输入框数字 / 下拉 / 按钮 | **11px** | 400（按钮与下拉 600） |
+| 列头（设计值 / 改径重算） | 11px | 600 |
+| 结果数值（`.pp-plan-val` / `.pp-plan-val-real`） | 11px | 600 / 700 |
+| 黑底扬程计算式 `#ppCalcDetail` | 10~11.5px（例外，不统一） | 分色 |
+
+三条硬约束：
+1. **`input/select/button` 必须带 `!important`** —— `runye-typography.css` 的
+   `input/select/button{font-size:13px!important}` 会把它顶成 13px（本仓已有两处漏网就是它造成的：
+   二级「调用」按钮、三级三个管径下拉，CSS 里明明写着 11px）。
+2. **三级左栏样式一律挂 `.tl-plan-result` / ID，别挂 `#tlPipePlanSection .pp-side …`** ——
+   rail 态 `#tlSide` 被搬进 `#ryCadSide`，section 祖先链断裂（v109 老坑，改一次踩一次）。
+3. **区分「工具栏条」和「卡片/提示」**：`#tlPumpUpdateBox`、`#tlLossCard`（11.5px 白底卡片）、
+   `#tlPpHint`（14px 空态提示）、`#ppCalcDetail`（黑底公式条）**不属于**工具栏条，各自保留层次；
+   别一刀切成 11px，否则卡片内部（标题 11.5 / 说明 10.5 / 按钮 12）会自相矛盾。
+
+量测脚本：`_probe_toolbar_typo.mjs`（按 fontSize/fontWeight 分组的分布表，含隐藏元素与输入框自身字号）。
+
 ***
 
 *规范 v1・依据 runye-irrigation 真实结构归纳・2026-10-14 起按 `#ryAnglePanel` 与主页面参数面板试点落地；当前仅共用折叠和悬浮拖动，侧栏宽度拖拽未启用*
