@@ -34,12 +34,13 @@
 }#terrainSection details.t-fold > summary::-webkit-details-marker{ display: none; }#terrainSection details.t-fold > summary::after{
   content: "▾"; margin-left: auto; color: var(--u-ink-3); font-size: 11px;
   transition: transform .18s ease;
-}#terrainSection details.t-fold:not([open]) > summary::after{ transform: rotate(-90deg); }#terrainSection details.t-fold > summary small{ color: var(--u-ink-3); font-weight: 400; font-size: 11px; }#terrainSection details.t-fold > .t-cardbody{ padding: 10px 12px; }#terrainSection .t-spgroup{
+}#terrainSection details.t-fold:not([open]) > summary::after{ transform: rotate(-90deg); }#terrainSection details.t-fold > summary small{ color: var(--u-ink-3); font-weight: 400; font-size: 11px !important; }#terrainSection details.t-fold > .t-cardbody{ padding: 10px 12px; }#terrainSection .t-spgroup{
   font-size: 11px; color: var(--u-accent-2); font-weight: 700;
   border-left: 3px solid var(--g-500); padding-left: 6px; margin: 8px 0 6px;
 }#terrainSection .t-spgroup:first-child{ margin-top: 0; }#terrainSection .t-sprow{ display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }#terrainSection .t-sprow label{ flex: 0 0 auto; width: 108px; font-size: 12px; color: var(--u-ink-2); }#terrainSection .t-sprow input,
+#terrainSection .t-sprow input,
 #terrainSection .t-sprow select{
-  flex: 1 1 auto; min-width: 0; font-family: inherit; font-size: 12.5px;
+  flex: 1 1 auto; min-width: 0; font-family: inherit; font-size: 12.5px !important;
   padding: 4px 6px; border: 1px solid var(--u-line-2); border-radius: var(--radius-xs);
   background: var(--u-panel); color: var(--u-ink);
 }#terrainSection .t-sprow input:focus,
@@ -58,7 +59,7 @@
 }#terrainSection .t-top h1{ font-size: 14px; margin: 0; font-weight: 600; color: var(--u-ink); }#terrainSection .t-top .t-sub{ font-size: 11px; color: var(--u-ink-3); }#terrainSection .t-spacer{ flex: 1; }#terrainSection .t-modebtn{
   border: 1px solid var(--u-line); background: var(--u-panel); color: var(--u-ink-2);
   padding: 4px 12px; border-radius: var(--radius-xs); cursor: pointer;
-  font-size: 12px; transition: var(--transition);
+  font-size: 12px !important; transition: var(--transition);
 }#terrainSection .t-modebtn.on{ background: var(--g-600); border-color: var(--g-600); color: #fff; font-weight: 700; }#terrainSection .t-modebtn:hover:not(.on){ border-color: var(--g-500); color: var(--g-700); }#terrainSection .t-banner{ padding: 7px 16px; font-size: 12.5px; border-bottom: 1px solid var(--u-line-2); }#terrainSection .t-warn{ background: var(--u-warn-bg); color: var(--u-warn); border-left: 3px solid var(--u-warn-line); }#terrainSection .t-ok{ background: var(--u-accent-bg); color: var(--u-accent-2); border-left: 3px solid var(--u-accent-line); }#terrainSection .t-danger{ background: var(--u-err-bg); color: var(--u-err); border-left: 3px solid var(--u-err-line); }#terrainSection .t-side{
   align-self:stretch;max-height:100%;
   display:flex;flex-direction:column;gap:8px;
@@ -95,11 +96,11 @@
 }#terrainSection .t-angle-control{display:flex;align-items:center;gap:4px;user-select:none}#terrainSection .t-angle-control input{
   width:60px;height:24px;border:1px solid var(--u-line);
   background:#fff;color:var(--u-ink);padding:0 4px;
-  border-radius:var(--radius-xs);font-size:12px;
+  border-radius:var(--radius-xs);font-size:12px !important;
 }#terrainSection .t-angle-control input:focus{outline:none;border-color:var(--g-400)}#terrainSection .t-quick .t-btn{height:24px;padding:0 8px;font-size:12px}#terrainSection .t-canvas-nav button{
   width:30px;height:30px;border:1px solid var(--u-line);
   background:var(--u-panel);color:var(--u-ink-2);
-  border-radius:var(--radius-xs);cursor:pointer;font-size:15px;line-height:1;
+  border-radius:var(--radius-xs);cursor:pointer;font-size:15px !important;line-height:1;
   transition:var(--transition);
   box-shadow:none;
 }#terrainSection .t-canvas-nav button:hover{background:var(--g-50);color:var(--g-700);border-color:var(--g-400)}#terrainSection .t-navhint{margin-left:auto;font-size:11px;color:var(--u-ink-3);opacity:.8}#terrainSection .t-card{
@@ -116,13 +117,13 @@
 }#terrainSection .t-plot b{ flex-shrink: 0; }#terrainSection .t-lv{ background: var(--g-100); color: var(--g-800); font-size: 11px; padding: 1px 6px; border-radius: 0; }#terrainSection .t-src{ color: var(--u-ink-3); font-size: 11px; }#terrainSection .t-area{ margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 600; }#terrainSection .t-del{
   border: none; background: transparent; color: var(--u-err); cursor: pointer;
   font-size: 14px; padding: 2px 6px;
-}#terrainSection .t-empty{ color: var(--u-ink-3); font-size: 12px; padding: 12px 4px; }#terrainSection #canvasEmpty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;line-height:2;color:var(--u-ink-3)}#terrainSection .t-unit{ display: inline-flex; border: 1px solid var(--u-line-2); border-radius: var(--radius-xs); overflow: hidden; margin-bottom: 8px; }#terrainSection .t-unit button{ border: none; background: var(--u-panel); padding: 4px 12px; cursor: pointer; font-size: 12px; color: var(--u-ink-2); }#terrainSection .t-unit button.on{ background: var(--g-600); color: #fff; }#terrainSection .t-arearow{
+}#terrainSection .t-empty{ color: var(--u-ink-3); font-size: 12px; padding: 12px 4px; }#terrainSection #canvasEmpty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;line-height:2;color:var(--u-ink-3)}#terrainSection .t-unit{ display: inline-flex; border: 1px solid var(--u-line-2); border-radius: var(--radius-xs); overflow: hidden; margin-bottom: 8px; }#terrainSection .t-unit button{ border: none; background: var(--u-panel); padding: 4px 12px; cursor: pointer; font-size: 12px !important; color: var(--u-ink-2); }#terrainSection .t-unit button.on{ background: var(--g-600); color: #fff; }#terrainSection .t-arearow{
   display: flex; align-items: baseline; gap: 8px;
   padding: 8px 10px; border: 1px solid var(--u-line-2); border-radius: var(--radius-xs);
   background: var(--u-panel);
 }#terrainSection .t-arearow .t-big{ font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; margin-left: auto; color: var(--g-800); }#terrainSection .t-note{ font-size: 11px; color: var(--u-ink-3); }#terrainSection .t-arearow.t-locked{ background: var(--u-bg-2); color: #a8b3ad; }#terrainSection .t-arearow.t-locked .t-big{ color: #a8b3ad; }#terrainSection .t-arearow.t-locked::after{ content: "🔒"; margin-left: auto; }#terrainSection .t-tabs{ display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }#terrainSection .t-tabs button{
   border: 1px solid var(--u-line-2); background: var(--u-bg-2); border-radius: var(--radius-xs) var(--radius-xs) 0 0;
-  padding: 6px 10px; cursor: pointer; font-size: 12px; color: var(--u-ink-2);
+  padding: 6px 10px; cursor: pointer; font-size: 12px !important; color: var(--u-ink-2);
 }#terrainSection .t-tabs button.on{ background: var(--g-600); border-color: var(--g-600); color: #fff; }#terrainSection .t-elev{
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   border: 1px solid var(--u-line-2); border-radius: var(--radius-xs); padding: 6px 8px; margin-bottom: 6px; font-size: 12px;

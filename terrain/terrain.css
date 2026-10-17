@@ -71,7 +71,7 @@ details.t-fold > summary::after {
   transition: transform .18s ease;
 }
 details.t-fold:not([open]) > summary::after { transform: rotate(-90deg); }
-details.t-fold > summary small { color: var(--u-ink-3); font-weight: 400; font-size: 11px; }
+details.t-fold > summary small { color: var(--u-ink-3); font-weight: 400; font-size: 11px !important; }
 details.t-fold > .t-cardbody { padding: 10px 12px; }
 
 /* —— 山地喷灌参数表单 —— */
@@ -83,7 +83,7 @@ details.t-fold > .t-cardbody { padding: 10px 12px; }
 .t-sprow { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 .t-sprow label { flex: 0 0 auto; width: 108px; font-size: 12px; color: var(--u-ink-2); }
 .t-sprow input, .t-sprow select {
-  flex: 1 1 auto; min-width: 0; font-family: inherit; font-size: 12.5px;
+  flex: 1 1 auto; min-width: 0; font-family: inherit; font-size: 12.5px !important;
   padding: 4px 6px; border: 1px solid var(--u-line-2); border-radius: var(--radius-xs);
   background: var(--u-panel); color: var(--u-ink);
 }
@@ -119,7 +119,7 @@ label.t-sp-overlay input { flex: 0 0 auto; width: auto; }
 .t-modebtn {
   border: 1px solid var(--u-line); background: var(--u-panel); color: var(--u-ink-2);
   padding: 4px 12px; border-radius: var(--radius-xs); cursor: pointer;
-  font-size: 12px; transition: var(--transition);
+  font-size: 12px !important; transition: var(--transition);
 }
 .t-modebtn.on { background: var(--g-600); border-color: var(--g-600); color: #fff; font-weight: 700; }
 .t-modebtn:hover:not(.on) { border-color: var(--g-500); color: var(--g-700); }
@@ -198,14 +198,14 @@ body.t-col-resizing .t-stage{pointer-events:none}   /* 拖拽中不让画布吃�
 .t-angle-control input{
   width:60px;height:24px;border:1px solid var(--u-line);
   background:#fff;color:var(--u-ink);padding:0 4px;
-  border-radius:var(--radius-xs);font-size:12px;
+  border-radius:var(--radius-xs);font-size:12px !important;
 }
 .t-angle-control input:focus{outline:none;border-color:var(--g-400)}
 .t-quick .t-btn{height:24px;padding:0 8px;font-size:12px}
 .t-canvas-nav button{
   width:30px;height:30px;border:1px solid var(--u-line);
   background:var(--u-panel);color:var(--u-ink-2);
-  border-radius:var(--radius-xs);cursor:pointer;font-size:15px;line-height:1;
+  border-radius:var(--radius-xs);cursor:pointer;font-size:15px !important;line-height:1;
   transition:var(--transition);
   box-shadow:none;
 }
@@ -263,7 +263,7 @@ body.t-col-resizing .t-stage{pointer-events:none}   /* 拖拽中不让画布吃�
 
 /* 面积卡片 */
 .t-unit { display: inline-flex; border: 1px solid var(--u-line-2); border-radius: var(--radius-xs); overflow: hidden; margin-bottom: 8px; }
-.t-unit button { border: none; background: var(--u-panel); padding: 4px 12px; cursor: pointer; font-size: 12px; color: var(--u-ink-2); }
+.t-unit button { border: none; background: var(--u-panel); padding: 4px 12px; cursor: pointer; font-size: 12px !important; color: var(--u-ink-2); }
 .t-unit button.on { background: var(--g-600); color: #fff; }
 .t-arearow {
   display: flex; align-items: baseline; gap: 8px;
@@ -280,7 +280,7 @@ body.t-col-resizing .t-stage{pointer-events:none}   /* 拖拽中不让画布吃�
 .t-tabs { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
 .t-tabs button {
   border: 1px solid var(--u-line-2); background: var(--u-bg-2); border-radius: var(--radius-xs) var(--radius-xs) 0 0;
-  padding: 6px 10px; cursor: pointer; font-size: 12px; color: var(--u-ink-2);
+  padding: 6px 10px; cursor: pointer; font-size: 12px !important; color: var(--u-ink-2);
 }
 .t-tabs button.on { background: var(--g-600); border-color: var(--g-600); color: #fff; }
 .t-elev {

@@ -100,7 +100,7 @@
   .results .row{display:flex;justify-content:space-between;align-items:baseline;padding:2px 0;border-bottom:1px dashed var(--s-100)}
   .results .row .k{font-size:11px;color:var(--s-500)}
   .results .row .v{font-size:13px;font-weight:700;color:var(--g-700)}
-  .results .row .v small{font-size:10px;color:var(--s-500);font-weight:400;margin-left:2px}
+  .results .row .v small{font-size:10px !important;color:var(--s-500);font-weight:400;margin-left:2px}
   .hint{font-size:10px;color:var(--s-500);margin-top:5px;line-height:1.4}
   .results .mbtn-primary{margin-top:6px;width:100%}
   .save-row{margin-top:5px;display:flex;gap:6px;align-items:center;justify-content:stretch}
@@ -117,7 +117,7 @@
     background:#fff;border:1px solid var(--s-300);box-shadow:0 2px 8px rgba(15,23,42,.14)}
   .map-draw-tools .dt-grip{flex:none;padding:4px 7px;font-size:12px;font-weight:700;color:var(--g-700);
     background:var(--g-50);border-right:1px solid var(--s-300);cursor:move;user-select:none;touch-action:none;letter-spacing:1px}
-  .map-draw-tools .mbtn{height:28px;padding:0 8px;font-size:12px;border-width:1px;background:#fff}
+  .map-draw-tools .mbtn{height:28px;padding:0 8px;font-size:12px !important;border-width:1px;background:#fff}
   .map-draw-tools .mbtn:hover{border-color:var(--g-600);color:var(--g-700);background:var(--g-50)}
   .map-draw-tools .mbtn.btn-on{background:var(--g-500);color:#fff;border-color:var(--g-500)}
   /* ===== [v283 2026-10-06] 「回传地块绘制 / 保存地块」并入右侧「分区角度」悬浮面板**内部顶端**
@@ -125,7 +125,7 @@
      v282 曾让它们浮在地图左上角，本轮撤掉那个绝对定位容器 ⇒ 恢复为面板内正常流
      （position:static），button 的 id 与 JS 绑定依然零改动。 */
   .map-float-actions{display:flex;flex-direction:column;gap:5px}
-  .map-float-actions .mbtn{height:28px;padding:0 8px;text-align:center;font-weight:700;
+  .map-float-actions .mbtn{height:28px;padding:0 8px;font-size:12px !important;text-align:center;font-weight:700;
     border:1px solid var(--g-600);background:#fff;color:var(--g-700);border-radius:4px}
   .map-float-actions .mbtn:hover{background:var(--g-50);color:var(--g-700)}
   .map-float-actions .mbtn-primary{background:var(--g-600);color:#fff}
@@ -142,7 +142,7 @@
     font:inherit;line-height:1;cursor:pointer;padding:0}
   .ry-angle-body{padding:7px;display:flex;flex-direction:column;gap:6px}
   .ry-angle-panel.folded .ry-angle-body{display:none}
-  #mapPartitionTools select{width:100%;height:28px;font-family:inherit;
+  #mapPartitionTools select{width:100%;height:28px;font-size:11px !important;font-family:inherit;
     border:1px solid var(--s-300);background:#fff;color:var(--s-700);padding:0 4px}
   /* 竖排角度组：↶＋1° 上 / 角度输入中 / ↷−1° 下（与手机端 .map-angle 同形态） */
   .map-angle-row{display:flex;flex-direction:column;gap:5px;align-items:stretch}
@@ -150,15 +150,15 @@
     padding:0 6px;font:inherit;border:1px solid var(--s-300);background:#fff;
     color:var(--s-700);cursor:pointer}
   .map-angle-row .ang-btn:hover{border-color:var(--ry-green-600);color:var(--ry-green-700);background:var(--ry-green-50)}
-  .map-angle-row .ang-btn small{font-size:10px;font-weight:600}
+  .map-angle-row .ang-btn small{font-size:10px !important;font-weight:600}
   .map-angle-value{display:flex;align-items:center;gap:3px;justify-content:center}
   .map-angle-value input{width:100%;min-width:0;height:28px;text-align:center;font:inherit;
     font-weight:700;color:var(--ry-green-700);border:1px solid var(--s-300);background:#fff}
   .map-angle-value input:focus{outline:1px solid var(--ry-green-600)}
   .map-angle-value span{font-size:12px;color:var(--s-500);font-weight:600}
   .ry-angle-panel .save-row{margin-top:0;display:flex;flex-direction:column;gap:5px;align-items:stretch}
-  .ry-angle-panel .save-row .mbtn{height:28px;font-weight:700;padding:0 4px;text-align:center;flex:none}
-  .ry-angle-panel .hint{margin-top:2px;font-size:10px;line-height:1.35}
+  .ry-angle-panel .save-row .mbtn{height:28px;font-size:12px !important;font-weight:700;padding:0 4px;text-align:center;flex:none}
+  .ry-angle-panel .hint{margin-top:2px;font-size:10px !important;line-height:1.35}
   #map{position:absolute;top:0;left:0;right:0;bottom:0;background:#dfe6e9}
   /* 操作提示条 */
   .tip{position:absolute;left:14px;bottom:14px;background:rgba(15,23,42,.82);color:#fff;padding:8px 14px;font-size:12px;z-index:1000;border-radius:var(--radius);max-width:60%}

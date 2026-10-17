@@ -418,8 +418,25 @@
    全站通用滚动条恒为 4px / rgba(100,116,139,.45) / 圆角 999px ⇒ 删除零视觉变化；
    `.pp-side` 与 `#ryCadSide .ry-cad-grps` 的 5px 绿色细条是选择器更具体的**生效中例外**，保留。
    另加 ci_check_static 第 ⑦ 项守「不许再写 `*::` 版本」（负向测试：注入后报红，还原转绿）。
-   index.html / mod/style-05.css / terrain/terrain.css 均在 CORE，必须抬版本。 */
-const VERSION = 'v533-scrollbar-single-source';
+   index.html / mod/style-05.css / terrain/terrain.css 均在 CORE，必须抬版本；
+   v534-panel-type-scale：密集面板字号按设计值生效 ——
+   runye-typography.css 的 `p/li/input/select/button{font-size:13px !important}` 是全站正文口径，
+   落在两个「自成一套 10~15px 字号体系」的密集面板里会把设计密度顶掉。实测被压死的：
+   主页在线地图左栏 20 个元素、地形区块 49 个、独立地图页 20 个、独立地形页 47 个。
+   处置：给面板自己的声明补 `!important`（特异性已高于裸元素选择器，故能反压全局），
+   不动 typography 的全局口径、不开容器级豁免（避免波及未测量的元素）：
+   · mod/online-map.css：draw-tools/float-actions/角度保存行 .mbtn 12px、分区下拉 11px、
+     角度面板 .hint 10px、结果行 .v small 10px、角度行 .ang-btn small 10px；
+   · terrain/terrain.css 与 terrain/terrain-main.css：.t-sprow input/select 12.5px、
+     .t-tabs/.t-unit/.t-modebtn 12px、.t-canvas-nav button 15px、
+     details.t-fold>summary small 11px；terrain-main 原本缺 `.t-sprow input` 规则，补成与
+     terrain.css 同一条组合选择器；
+   · runye-map-measure.html 内联副本同步（float-actions / 分区下拉 / 角度保存行原本没写
+     font-size，按 index 侧设计值补齐）。
+   实测（改前→改后，四张快照逐元素比对，容器外 0 处变化）：
+   地形 34×(13→12.5) + 6×(13→12) + 4×(12→11) + 3×(13→15)；地图 11×(13→12) + 7×(12→10) + 1×(13→10) + 1×(13→11)。
+   index.html / terrain/index.html / 两个 css 均在 CORE，必须抬版本。 */
+const VERSION = 'v534-panel-type-scale';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
