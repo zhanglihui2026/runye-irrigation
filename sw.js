@@ -600,8 +600,27 @@
     会画穿过整排的长接入线）；分区不足 2 排/列退回旧几何。拖动沿主管走向滑移不变。
     index.html 的 inline-09 ?v= 抬 550-front-in-plot。并行会话在途：v549 段与两行头注释、
     CORE 摘 modeling/integration.js 留给对方。
+  * v556-front-row1-main-elbow：v550 的两处几何按用户新口径修订（示意图三轮确认后才动代码）——
+    ① 总管改贴**最外一排（123 区）顶边**：FRONT_IN_ROW=0、FRONT_IN_OFFSET=15→0
+       （旧「第 2 排 + 15 米」作废），两端仍截止于该排最左/最右主管、水源不动 + 连接段不变；
+    ② 最外一排（789 / 28/29/30 区）**主管不再向下延伸到底边**，截止于「分区中心往下 18% 分区高」
+       （MAIN_END_ELBOW_R=0.18，示意图确认的截止位置），末端接 **90°弯头**；之后照抄其他地块：
+       连接管 → 阀门 → 支管三通 → 支管（支管几何不变、仍贯通分区向上下两侧延伸）。
+       纵向分支对称（最外一**列**）。二级页传导几何（ppHasPipes 分支）不动。
+    ③ 图面：末端锚点方块仍带 data-junction-tee（水流路径取锚点/既有 verify 定位靠它），
+       另打 data-junction-elbow="1" + 白色直角折线以区分；阀门数据带 elbow/mi 标记。
+    ④ 材料清单同步（用户要求「相关的材料清单统计都要跟着变」）：
+       · 主管长度自动缩短（lens 取自图面几何，无需另改）；阀门数量不变；
+       · 分区三通 = zoneValveN − 末端弯头数（末端弯头处不再用三通）；
+       · 材料表新增一行「主管末端 90°弯头」（autoFitRows key=mainEndElbow，Ø 主管）；
+       · runye-material-audit.js autoFittings 新增 zoneElbow 分桶（末端弯头分区不再进 zoneTee）；
+       · core/data-service.js 管件清单 FIT 表补 ['zoneElbow','主管末端 90°弯头']；
+       · 弯头计数按所属主管段（v.mi）遮蔽态剔除，与 v162「遮蔽不计入材料」同口径；
+       · 修 autoFitRows 取不到新 key 时 list=undefined 抛错（会让整张材料表渲染失败）。
+    index.html 的 inline-09 ?v= / runye-material-audit.js ?v= 抬 556-front-row1-main-elbow。
+    注：并行会话在我改的过程中连续抬号（v553 → v555-plot-scoped-bridge）⇒ 取更高号 v556。
   */
-const VERSION = 'v552-project-network-owner';
+const VERSION = 'v556-front-row1-main-elbow';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

@@ -654,6 +654,23 @@ function render() {
   const specMainOd = useTl ? tlMat.ods.main : materialPipeSpecs.mainPipeOD;
   const specBranchOd = useTl ? tlMat.ods.branch : materialPipeSpecs.branchPipeOD;
   const zoneValveN = tlMainsAll > 0 ? tlMains : r.N;   /* v162：判据用图上总段数、取值用未遮蔽段数 */
+  /* [v556] 最外一排（789 / 28/29/30 区）主管末端改 90°弯头：
+     该处**不再用分区三通** ⇒ 分区三通 = zoneValveN − 末端弯头数；新增一行「主管末端 90°弯头」。
+     计数取自三级图面快照的阀门标记 v.elbow（生成时随阀门一起落地，见 v556 生成段），
+     并按所属主管段（v.mi）的遮蔽态剔除（与 v162「遮蔽不计入材料」同一口径）；
+     阀门数量不变（末端弯头后面照样接阀门）。 */
+  var zoneElbowN = 0;
+  try {
+    var tlVAll = (window.tlDiagramData && window.tlDiagramData.valves) ? window.tlDiagramData.valves : [];
+    for (var tlv = 0; tlv < tlVAll.length; tlv++) {
+      var tv = tlVAll[tlv];
+      if (!tv || !tv.elbow) continue;
+      if (tv.mi != null && typeof window.tlIsPipeHidden === 'function' && window.tlIsPipeHidden('main-' + tv.mi)) continue;
+      zoneElbowN++;
+    }
+  } catch (eElbN) { zoneElbowN = 0; }
+  const zoneTeeN = Math.max(0, zoneValveN - zoneElbowN);
+  const zoneElbowSpec = useTl ? ('\u00d8 ' + specMainOd + ' mm') : ('\u00d8 ' + materialPipeSpecs.mainPipeOD + ' mm');
   const zoneValveSpec = useTl ? ('\u00d8 ' + specMainOd + ' \u00d7 \u00d8 ' + specBranchOd + ' mm') : ('\u00d8 ' + materialPipeSpecs.mainPipeOD + ' mm');
   const teeSpec = useTl ? ('\u00d8 ' + specFrontOd + ' \u00d7 \u00d8 ' + specMainOd + ' mm') : '\u2014';
   /* v143（用户纠偏）：三通=总管×主管、每根物理主管 1 个（图上 2 根主管=2 套，不是 20）；
@@ -782,7 +799,12 @@ function render() {
     }).join('');
   }
   function autoFitRows(key,name,spec,n){
-    var list=autoFits?autoFits[key]:[{spec:spec,qty:n}];if(!list.length)list=[{spec:spec,qty:0}];
+    /* [v556 修 bug] 原写法 `autoFits?autoFits[key]:[...]`：存档里存在 autoFits 但没有
+       「新增管件」这个 key 时（v556 新加的 mainEndElbow 就属于这种情况）list 变 undefined，
+       下一行 `!list.length` 直接抛错 ⇒ **整张材料表渲染失败**（A/B 基线抓到：基线无异常、
+       新版 render() 抛 Cannot read properties of undefined）。改成「取不到就回退默认行」。 */
+    var list=(autoFits&&autoFits[key])?autoFits[key]:[{spec:spec,qty:n}];
+    if(!list||!list.length)list=[{spec:spec,qty:n}];
     return list.map(function(b){var dk=list.length===1?key:key+'-spec-'+encodeURIComponent(b.spec);return '<tr data-key="'+dk+'" data-qty="'+b.qty+'"><td>'+name+'</td><td>'+matEsc(b.spec)+'</td><td><span class="qty-text">'+b.qty+'</span><span class="unit-tag">套</span></td><td><input class="price-input" type="text" inputmode="decimal" value="'+matEsc(matPriceVal(dk))+'"><span class="unit-tag">元/套</span></td><td class="total-cell">—</td><td class="permu-cell">—</td>'+matRowTail(dk)+'</tr>';}).join('');
   }
   document.getElementById('detailsSection').innerHTML = `
@@ -828,7 +850,8 @@ function render() {
                 <td class="permu-cell">—</td>
                 ${matRowTail("tapeJoint")}
               </tr>
-              ${autoFitRows('zoneTee','分区三通',zoneValveSpec,zoneValveN)}
+              ${autoFitRows('zoneTee','分区三通',zoneValveSpec,zoneTeeN)}
+              ${autoFitRows('mainEndElbow','主管末端 90°弯头',zoneElbowSpec,zoneElbowN)}
               ${autoFitRows('zoneValve','分区电动阀','Ø '+specBranchOd+' mm · 电动',zoneValveN)}
               ${autoFitRows('teeJoint','主管接入三通',teeSpec,teeN)}
               ${autoFitRows('frontValve','主管接入阀','Ø '+specMainOd+' mm',teeN)}
@@ -3448,6 +3471,17 @@ function tlAutoGenerate(options) {
     // 复用二级页支管时端点若贴在分区边缘，同样向内缩进，保证相邻地块支管视觉上断开
     branchPipes=branchPipes.map(tlTrimBranchToZone);
   } else {
+    /* [v556 2026-10-18 用户要求] 最外一排（789 / 28/29/30 区）主管末端改 90°弯头：
+       「主管最边上的地块接到 90°弯头就可以了……90°弯头向上接一段……之后再接支管。」
+       经示意图三轮确认的画法：
+       · 最外一排的主管**不再向下延伸到底边**，截止于「分区中心往下 MAIN_END_ELBOW_R 比例」处
+         （示意图实测 ≈ 分区中心 +18% 分区高）；
+       · 截止点=90°弯头，之后**照抄其他地块**链路：连接管 → 阀门 → 支管三通 → 支管
+         （支管仍按原几何贯通全分区、向上下两侧延伸）；
+       · 唯一区别 = 主管末端由「三通」改「90°弯头」（材料清单同步：分区三通 −N、新增 90°弯头 +N）；
+       · 纵向分支（主管横置）对称：最外一**列**主管不再向右延伸，末端弯头后接阀门/支管；
+       · 二级页传导几何（ppHasPipes 分支）不在此列 —— 该分支几何来自二级页，保持原样。 */
+    var MAIN_END_ELBOW_R = 0.18;
     for(var zr2=0;zr2<rows;zr2++){
       for(var zc3=0;zc3<cols;zc3++){
         var zx2=xPos[zc3], zy2=yPos[zr2];
@@ -3463,23 +3497,46 @@ function tlAutoGenerate(options) {
           var mainX=zx2+zoneW2*0.5;
           var brOffX=Math.min(Math.max(zoneW2*0.09,2),zoneW2*0.22);
           var brX=mainX+brOffX;
-          mainPipes.push([{x:mainX,y:zy2},{x:mainX,y:zy2+zoneH2}]);
+          var tlEdgeZ=(zr2===rows-1);                 /* [v556] 最外一排 */
+          var tlMainEndY=zy2+zoneH2;
+          if(tlEdgeZ){
+            tlMainEndY=zy2+zoneH2*0.5+zoneH2*MAIN_END_ELBOW_R;
+            if(tlMainEndY>zy2+zoneH2-gapV)tlMainEndY=zy2+zoneH2-gapV;
+            if(tlMainEndY<zy2+gapV)tlMainEndY=zy2+gapV;
+          }
+          mainPipes.push([{x:mainX,y:zy2},{x:mainX,y:tlMainEndY}]);
           branchPipes.push([{x:brX,y:zy2+gapV},{x:brX,y:zy2+zoneH2-gapV}]);
-          if(window.atPointInPolygon&&window.atPointInPolygon({x:brX,y:centerY},poly)){
-            var tlDx=brX-mainX, tlAy=centerY-tlDx;
-            if(tlAy<zy2)tlAy=zy2; if(tlAy>zy2+zoneH2)tlAy=zy2+zoneH2;
-            valves.push({x:brX,y:centerY,ax:mainX,ay:tlAy});
+          if(window.atPointInPolygon&&window.atPointInPolygon({x:brX,y:tlEdgeZ?tlMainEndY:centerY},poly)){
+            if(tlEdgeZ){
+              /* [v556] 主管末端 90°弯头 → 水平连接管 → 阀门（落点仍在支管上）→ 支管三通 → 支管 */
+              valves.push({x:brX,y:tlMainEndY,ax:mainX,ay:tlMainEndY,elbow:true,mi:mainPipes.length-1});
+            }else{
+              var tlDx=brX-mainX, tlAy=centerY-tlDx;
+              if(tlAy<zy2)tlAy=zy2; if(tlAy>zy2+zoneH2)tlAy=zy2+zoneH2;
+              valves.push({x:brX,y:centerY,ax:mainX,ay:tlAy});
+            }
           }
         }else{
           var mainY=zy2+zoneH2*0.5;
           var brOffY=Math.min(Math.max(zoneH2*0.09,2),zoneH2*0.22);
           var brY=mainY+brOffY;
-          mainPipes.push([{x:zx2,y:mainY},{x:zx2+zoneW2,y:mainY}]);
+          var tlEdgeZ=(zc3===cols-1);                 /* [v556] 最外一列（纵向分支对称） */
+          var tlMainEndX=zx2+zoneW2;
+          if(tlEdgeZ){
+            tlMainEndX=zx2+zoneW2*0.5+zoneW2*MAIN_END_ELBOW_R;
+            if(tlMainEndX>zx2+zoneW2-gapH)tlMainEndX=zx2+zoneW2-gapH;
+            if(tlMainEndX<zx2+gapH)tlMainEndX=zx2+gapH;
+          }
+          mainPipes.push([{x:zx2,y:mainY},{x:tlMainEndX,y:mainY}]);
           branchPipes.push([{x:zx2+gapH,y:brY},{x:zx2+zoneW2-gapH,y:brY}]);
-          if(window.atPointInPolygon&&window.atPointInPolygon({x:centerX,y:brY},poly)){
-            var tlDy=brY-mainY, tlAx=centerX+tlDy;
-            if(tlAx<zx2)tlAx=zx2; if(tlAx>zx2+zoneW2)tlAx=zx2+zoneW2;
-            valves.push({x:centerX,y:brY,ax:tlAx,ay:mainY});
+          if(window.atPointInPolygon&&window.atPointInPolygon({x:tlEdgeZ?tlMainEndX:centerX,y:brY},poly)){
+            if(tlEdgeZ){
+              valves.push({x:tlMainEndX,y:brY,ax:tlMainEndX,ay:mainY,elbow:true,mi:mainPipes.length-1});
+            }else{
+              var tlDy=brY-mainY, tlAx=centerX+tlDy;
+              if(tlAx<zx2)tlAx=zx2; if(tlAx>zx2+zoneW2)tlAx=zx2+zoneW2;
+              valves.push({x:centerX,y:brY,ax:tlAx,ay:mainY});
+            }
           }
         }
       }
@@ -3535,23 +3592,24 @@ function tlAutoGenerate(options) {
      混合朝向地块上会与多数方向（majFixedH）相反 ⇒ 总管与主管不再垂直。现一律随 majFixedH。 */
   var firstFixedSideIsHorizontal = majFixedH;
   var frontPipe = null;
-  /* [v550 2026-10-17 用户要求] 总管移进分区：
-     「现在水源位置不动，总管移动到分区内，移动到最近的第二个分区内……垂直与主管，
-     偏离主管三通一定的距离。端头被主管直接裁剪掉。」（经选项确认）：
-     · 横向分支（主管竖置）：总管放进第 2 排分区内部，距该排顶边往下 FRONT_IN_OFFSET=15 米
-       （即「偏离主管三通一定的距离」，与该排主管顶端三通错开）；
-     · 两端截止于第 2 排最左/最右主管（端头被主管裁平，不再横贯全幅宽）；
+  /* [v556 2026-10-18 用户要求] 总管改贴最外一排（123 区）顶边：
+     「总管移动到分区内，就是这张图片的 123 区内……端头被主管直接裁剪掉。」
+     （v550 曾放进第 2 排、距排顶边 15 米，经示意图三轮确认改为第 1 排、偏移 0 米）：
+     · 横向分支（主管竖置）：总管放进第 1 排分区内部，FRONT_IN_ROW=0、FRONT_IN_OFFSET=0
+       ⇒ 正好压在该排顶边上（「贴着排顶边（0 米）」）；
+     · 两端截止于第 1 排最左/最右主管（端头被主管裁平，不再横贯全幅宽）；
      · 水源点留在原位（旧总管起点 = 地块外沿老位置），由「水源连接段」接到总管近端
        （见下方绘制段 data-tlsrcpipe）；
-     · 纵向分支（主管横置）对称：放进第 2 列、距该列左缘往右 15 米、两端截止于最上/最下主管；
+     · 纵向分支（主管横置）对称：放进第 1 列、贴该列左缘（偏移 0 米）、两端截止于最上/最下主管；
      · 拖动沿主管走向滑移不变（正交锁定，AE.moves['front'] 机制不动）；
      · 分区不足 2 排/列时退回旧几何（地块外沿全宽），保证小地块不空转。 */
-  var FRONT_IN_OFFSET = 15;   // 总管距第 2 排顶边（第 2 列左缘）往内偏移（米）
+  var FRONT_IN_ROW = 0;       // 总管所在排（列）序号：0 = 最外一排（123 区）
+  var FRONT_IN_OFFSET = 0;    // 距该排顶边（该列左缘）往内偏移（米）；0 = 紧贴顶边
   if (firstFixedSideIsHorizontal) {
     /* 横向总管的 x 范围取自**列**主管 ⇒ 至少 2 列才有意义（v550 首版误写成 rows>=2，
        单列地块会算出零长度总管——A/B 基线实测抓到）。 */
     if (cols >= 2) {
-      var tlfY = yPos[1] + Math.min(FRONT_IN_OFFSET, ySrc[1] * 0.5);   // 第 2 排顶边往内
+      var tlfY = yPos[FRONT_IN_ROW] + Math.min(FRONT_IN_OFFSET, ySrc[FRONT_IN_ROW] * 0.5);   // 第 1 排顶边（偏移 0）
       var tlfxA = Infinity, tlfxB = -Infinity;
       for (var tlfzc = 0; tlfzc < cols; tlfzc++) {
         var tlfmx = xPos[tlfzc] + xSrc[tlfzc] * 0.5;   // 该排主管 x（竖置主管）
@@ -3573,7 +3631,7 @@ function tlAutoGenerate(options) {
   } else {
     /* 纵向总管的 y 范围取自**行**主管 ⇒ 至少 2 行（对称修正）。 */
     if (rows >= 2) {
-      var tlfX = xPos[1] + Math.min(FRONT_IN_OFFSET, xSrc[1] * 0.5);   // 第 2 列左缘往内
+      var tlfX = xPos[FRONT_IN_ROW] + Math.min(FRONT_IN_OFFSET, xSrc[FRONT_IN_ROW] * 0.5);   // 第 1 列左缘（偏移 0）
       var tlfyA = Infinity, tlfyB = -Infinity;
       for (var tlfr2 = 0; tlfr2 < rows; tlfr2++) {
         var tfmy = yPos[tlfr2] + ySrc[tlfr2] * 0.5;   // 该列主管 y（横置主管）
@@ -3852,8 +3910,20 @@ function tlAutoGenerate(options) {
       var ap=ts(v.ax, v.ay);
       parts.push('<line x1="'+ap.x.toFixed(1)+'" y1="'+ap.y.toFixed(1)+'" x2="'+vp.x.toFixed(1)+'" y2="'+vp.y.toFixed(1)+'" stroke="#185FA5" stroke-width="3.5" stroke-linecap="round" opacity="0.92"/>');
       /* 任务⑧（2026-09-24 用户要求）：主管×支管交接处补三通方块 —— 与总管×主管交接
-         （data-junction-tee，深蓝白边 9×9）同款式，交接符号全覆盖。 */
-      parts.push('<rect data-junction-tee x="'+(ap.x-4.5).toFixed(1)+'" y="'+(ap.y-4.5).toFixed(1)+'" width="9" height="9" fill="#0C447C" stroke="#ffffff" stroke-width="1.5"/>');
+         （data-junction-tee，深蓝白边 9×9）同款式，交接符号全覆盖。
+         [v556] 最外一排分区的主管末端是**90°弯头**（不再向下延伸）：同一方块内叠一个白色
+         直角折线以区分；仍保留 data-junction-tee（水流路径取锚点、既有 verify 定位都靠它），
+         额外打 data-junction-elbow="1" 供按「弯头」口径识别。材料口径走数据层 v.elbow。 */
+      if(v.elbow){
+        var elH=Math.abs(v.ay-v.y)<=Math.abs(v.ax-v.x);   /* 连接管水平（主管竖置）为真 */
+        var elP=elH
+          ? 'M'+(ap.x-2.8).toFixed(1)+' '+(ap.y-2.8).toFixed(1)+'L'+(ap.x-2.8).toFixed(1)+' '+(ap.y+2.8).toFixed(1)+'L'+(ap.x+2.8).toFixed(1)+' '+(ap.y+2.8).toFixed(1)
+          : 'M'+(ap.x-2.8).toFixed(1)+' '+(ap.y-2.8).toFixed(1)+'L'+(ap.x+2.8).toFixed(1)+' '+(ap.y-2.8).toFixed(1)+'L'+(ap.x+2.8).toFixed(1)+' '+(ap.y+2.8).toFixed(1);
+        parts.push('<rect data-junction-tee data-junction-elbow="1" x="'+(ap.x-4.5).toFixed(1)+'" y="'+(ap.y-4.5).toFixed(1)+'" width="9" height="9" fill="#0C447C" stroke="#ffffff" stroke-width="1.5"/>');
+        parts.push('<path data-junction-elbow-mark="1" d="'+elP+'" fill="none" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>');
+      }else{
+        parts.push('<rect data-junction-tee x="'+(ap.x-4.5).toFixed(1)+'" y="'+(ap.y-4.5).toFixed(1)+'" width="9" height="9" fill="#0C447C" stroke="#ffffff" stroke-width="1.5"/>');
+      }
     }
     parts.push(window.ryValveSVG(vp.x, vp.y));   /* v159：与总管×主管交接阀同规格（尺寸取自 window.RY_VALVE） */
   });

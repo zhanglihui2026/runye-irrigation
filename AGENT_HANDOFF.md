@@ -1315,3 +1315,49 @@ RY_FOOTER 读图脚）：三种地块形状（横 600×400、竖 400×600、扁 
 - 截图：`#tlPipePlanSection` 整节 + `.ry-pane-pipe` 都要 `setProperty('display','block','important')`，
   只强节不行；`Page.captureScreenshot` 的 clip 需取整 + scale:1，否则 Invalid parameters。
 - 页内 eval 里没有 `process` —— 环境开关要先 `ev()` 注入 `window.__flag`。
+
+## §25f v556-front-row1-main-elbow：总管贴第 1 排顶边 ＋ 最外一排主管末端 90°弯头（2026-10-18）
+
+用户口径（示意图三轮确认后才动代码，用户原话：「不画对，不准改代码」）：
+- 「总管移动到 123 区内……端头被主管直接裁剪掉」⇒ v550 的「第 2 排 + 15 米」作废，
+  改 **第 1 排（123 区）、贴排顶边（偏移 0 米）**；水源不动、两端截止于最左/最右主管不变。
+- 「主管最边上的地块接到 90°弯头……弯头向上接一段……之后再接支管，支管向两侧延伸」
+  三轮澄清后的定论：**最外一排（789 / 28/29/30 区）主管不再向下延伸到底边**，截止于
+  「分区中心往下 18% 分区高」；截止点接 **90°弯头**，之后**照抄其他地块**链路：
+  连接管 → 阀门 → 支管三通 → 支管（支管几何不变、仍贯通分区向上下两侧延伸）。
+  唯一区别 = 主管末端由「三通」改「90°弯头」。
+  ⚠ 「向两侧延伸」= **支管三通之后支管向上、向下两侧延伸**，不是分两根叉管（第一版图误读）。
+
+### 改动（唯一生成点 mod/inline-09.js）
+1. 总管几何：`FRONT_IN_ROW = 1→0`、`FRONT_IN_OFFSET = 15→0`（`yPos[0] + min(0, …)`；
+   纵向对称 `xPos[0]`）。守卫 `cols>=2` / `rows>=2` 与退化兜底（<0.5m 退回旧几何）不动。
+2. 最外一排主管截止：`MAIN_END_ELBOW_R = 0.18` ⇒ 末端 y = 分区中心 + 18% 分区高，
+   并钳进支管范围（上下 gapV/gapH 内）；纵向分支对称（最外一**列**、末端 x）。
+   仅改**自布管**分支；二级页传导几何（`ppHasPipes`）不在本轮范围。
+3. 末端阀门：`valves.push({x:brX, y:末端y, ax:mainX, ay:末端y, elbow:true, mi:主管下标})`
+   ⇒ 连接管水平（纵向分支：竖直）、阀门仍落点支管，之后支管照旧。
+4. 图面符号：末端锚点方块**保留 `data-junction-tee`**（水流路径取锚点、既有 verify 定位靠它），
+   另打 `data-junction-elbow="1"` + 白色直角折线（水平连接管走 └、竖直走 ┐）以示区别。
+
+### 材料清单同步（用户明确要求「相关的材料清单统计都要跟着变」）
+- 主管长度自动缩短（lens 取自图面几何 `tlFigParamLines`，无需另改）；阀门数量不变（末端照样接阀）。
+- 材料表：`zoneTeeN = zoneValveN − zoneElbowN`；新增一行 `autoFitRows('mainEndElbow',
+  '主管末端 90°弯头', zoneElbowSpec(Ø 主管), zoneElbowN)`。
+- `zoneElbowN` 取自快照阀门的 `elbow` 标记，并按所属主管段 `v.mi` 的遮蔽态剔除
+  （与 v162「遮蔽不计入材料」同口径）。
+- `runye-material-audit.js`：autoFittings 新增 `zoneElbow` 分桶，末端弯头分区不再进 `zoneTee`。
+- `core/data-service.js`：管件清单 FIT 表补 `['zoneElbow','主管末端 90°弯头']`。
+- `verify_ry_tool.js`：两行锁定字面跟随（`zoneValveSpec,zoneTeeN` ＋ 新增 mainEndElbow 行）。
+
+### 验收
+`_probe_front_geom.mjs` 扩到 v554 口径：F1 改「第 1 排顶边+0」，新增
+E1 末排主管末端=中心+18%（不再到底边）/ E2 末端弯头阀数=末排分区数 /
+E3 弯头连接管与主管垂直（锚点=主管末端）/ E4 图面弯头符号数 / E5–E6 材料表两行数量。
+ci_check_static PASS=23 FAIL=0。
+
+### 坑位
+- 无头环境里 `window.render()` 抛 `Cannot read properties of undefined (reading 'length')`
+  （材料表 DOM 重渲染在探针上下文不可用）⇒ 材料口径断言改走数据层
+  （`RyMaterialAudit.autoFittings` + 快照阀门标记），不要靠 DOM 行。
+- 版本：并行会话在我改的过程中连续抬号（v553 → v555-plot-scoped-bridge）⇒ 按规则取更高号
+  **v556-front-row1-main-elbow**（不回退对方的号；我的 v554 沿革段保留在 sw.js）。

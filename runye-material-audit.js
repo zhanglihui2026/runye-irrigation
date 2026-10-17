@@ -20,7 +20,8 @@
   return seen;
  }
  function autoFittings(d,r,A){
-  var out={zoneTee:[],zoneValve:[],teeJoint:[],frontValve:[]},c=A&&A.calibersMap?A.calibersMap():{},lines={},front=A&&A.effPts?A.effPts('front',d):d.frontPipe;
+  /* [v553] 最外一排分区主管末端 = 90°弯头（不再向下延伸），该处不装分区三通 ⇒ 分桶新增 zoneElbow */
+  var out={zoneTee:[],zoneElbow:[],zoneValve:[],teeJoint:[],frontValve:[]},c=A&&A.calibersMap?A.calibersMap():{},lines={},front=A&&A.effPts?A.effPts('front',d):d.frontPipe;
   function od(pid,k){return Number(c[pid])||r[k+'Pipe'].od;}
   function add(key,spec){var b=out[key].find(q=>q.spec===spec);if(!b){b={spec:spec,qty:0};out[key].push(b);}b.qty++;}
   function nearest(p){var best={dist:Infinity,atM:0},sum=0;for(var j=1;j<(front||[]).length;j++){var a=front[j-1],b=front[j],dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy),t=L?Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/(L*L))):0,v=Math.hypot(p.x-a.x-t*dx,p.y-a.y-t*dy);if(v<best.dist)best={dist:v,atM:sum+t*L};sum+=L;}return best;}
@@ -33,7 +34,10 @@
     var id='branch-'+i;if(root.tlIsPipeHidden(id))return;var bp=A&&A.effPts?A.effPts(id,d):raw;if(!bp||bp.length<2)return;
     var v=(d.valves||[])[i],q=v&&Number.isFinite(v.ax)&&Number.isFinite(v.ay)?{x:v.ax,y:v.ay}:bp[Math.floor(bp.length/2)],best=Infinity,mi=-1;
     (d.mainPipes||[]).forEach(function(l,j){l=A&&A.effPts?A.effPts('main-'+j,d):l;for(var t=1;t<(l||[]).length;t++){var a=l[t-1],b=l[t],dx=b.x-a.x,dy=b.y-a.y,D=dx*dx+dy*dy,k=D?Math.max(0,Math.min(1,((q.x-a.x)*dx+(q.y-a.y)*dy)/D)):0,L=Math.hypot(q.x-a.x-k*dx,q.y-a.y-k*dy);if(L<best){best=L;mi=j;}}});
-    if(mi<0||root.tlIsPipeHidden('main-'+mi))return;var mo=od('main-'+mi,'main'),bo=od(id,'branch');add('zoneTee','Ø '+mo+' × Ø '+bo+' mm');add('zoneValve','Ø '+bo+' mm · 电动');
+    if(mi<0||root.tlIsPipeHidden('main-'+mi))return;var mo=od('main-'+mi,'main'),bo=od(id,'branch');
+    /* [v553] 末端弯头分区：主管末端 90°弯头（Ø 主管）+ 阀门，不再算分区三通 */
+    if(v&&v.elbow){add('zoneElbow','Ø '+mo+' mm');}else{add('zoneTee','Ø '+mo+' × Ø '+bo+' mm');}
+    add('zoneValve','Ø '+bo+' mm · 电动');
   });
   Object.keys(lines).forEach(function(k){var l=lines[k];if(nodeHidden({pid:'front',atM:l.near.atM}))return;add('teeJoint','Ø '+od('front','front')+' × Ø '+l.mo+' mm');add('frontValve','Ø '+l.mo+' mm');});return out;
  }

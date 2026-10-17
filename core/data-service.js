@@ -187,7 +187,8 @@ export function createDataService(guard) {
       }
 
       /* 管件：只有数量，无价目（unitPrice=0，UI 明示「未计价」，由用户手填） */
-      var FIT = [['zoneTee', '分区三通'], ['zoneValve', '分区阀门'], ['teeJoint', '主管三通'], ['frontValve', '首部阀门']];
+      /* [v556] 最外一排分区主管末端改 90°弯头（不再用分区三通），管件清单同步补一行 */
+      var FIT = [['zoneTee', '分区三通'], ['zoneElbow', '主管末端 90°弯头'], ['zoneValve', '分区阀门'], ['teeJoint', '主管三通'], ['frontValve', '首部阀门']];
       (FIT || []).forEach(function (f) {
         ((ft && ft[f[0]]) || []).forEach(function (x) {
           if (!(x.qty > 0)) return;
