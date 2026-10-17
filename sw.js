@@ -1,4 +1,7 @@
 /* Runye PWA v1. Increment VERSION when changing the offline shell. */
+/* v552-project-network-owner: reject project pipe snapshots not owned by an imported plot. */
+/* v546-terrain-transfer-tab-binding: reject terrain handoffs overwritten by another tab. */
+/* v541-hydraulic-snapshot-binding: bind hydraulic designs to their source network and reject stale snapshots. */
 /* v531-data-service-plot-store: resolve plugin plot references through the shared plot-library adapter. */
 /* v427-archive-3d-iso: detach 3D preview and axonometric UI while retaining shared 2D pipe workspace and data. */
 'use strict';
@@ -495,6 +498,8 @@
    合并重复块只用**逗号分组**，不用 :is()（:is 取最高特异性，原位分支被抬高一级 ⇒ 必回归）。
    结果：style-01.css 1374→1237 条规则、内联 CSS -16.1%，四态 A/B 0 差异。
    index.html / mod/style-01.css 均在 CORE，必须抬版本。
+ * v540 邀请码长度下限：FNV 转 base36 偶尔只有 5 位，生成时左补零至 6 位；
+   同步更新 runye-entitle.js 与 cloudfn/ryEntitle-v2/index.js，新增确定性短散列回归。
  * v543 面板样式单一归属：内联 179 条面板规则全部迁回 mod/ry-panel.css（111 条）与
    mod/style-01.css（68 条），index.html 内联 CSS 45.8KB → 6.3KB，面板皮肤不再有第二份。
    迁移只搬位置、选择器原样保留（不加 :is()），特异性不变；再用**逗号分组**把「原位 + rail」
@@ -584,8 +589,19 @@
     span 10px/15（图例档）、b 保持 14px/19.2 数值强调。
     实测（_shot_hyd_table.mjs 样例注入，改前/改后）：表体行高 24.5→23.5、行字号 13→11、
     面板 340→335；ci PASS=19。index.html 的 style-01 ?v= 抬 548-card-data-rhythm。
+  * v549-hydraulic-overlay-ownership：共享水力桥校验当前地块锚点；独立校核页拒绝失配管网/设计；
+    地图水力叠加升为 v2，按网络时间戳、地块 ID 与设计修订号匹配，防止旧状态套到别的地块。
+  * v550-front-in-plot：总管移进分区（用户要求「总管移动到分区内，移动到最近的第二个分区内，
+    垂直于主管，偏离主管三通一定的距离，端头被主管直接裁剪掉」，三项几何经选项确认）——
+    横向分支总管放进第 2 排分区内部、距该排顶边往下 15 米，两端截止于第 2 排最左/最右主管
+    （不横贯全幅宽）；纵向分支对称（第 2 列、左缘往右 15 米、截止于最上/最下主管）；
+    水源点留在旧总管起点不动，新增「水源连接段」(data-tlsrcpipe) 垂直优先折线接到总管近端；
+    主管接入段改「全跨度判定」：总管落在该物理线跨度内 ⇒ 三通在交点、不画接入段（旧行为
+    会画穿过整排的长接入线）；分区不足 2 排/列退回旧几何。拖动沿主管走向滑移不变。
+    index.html 的 inline-09 ?v= 抬 550-front-in-plot。并行会话在途：v549 段与两行头注释、
+    CORE 摘 modeling/integration.js 留给对方。
   */
-const VERSION = 'v548-card-data-rhythm';
+const VERSION = 'v552-project-network-owner';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
@@ -717,7 +733,6 @@ const CORE = [
   "runye-ai-plan.js",
   "runye-ai-plan.css",
   "manifest.webmanifest",
-  "modeling/integration.js",
   "modeling/workspace.css",
   "pipe_optim_ui.js",
   "pwa/icons/apple-touch-icon.png",
