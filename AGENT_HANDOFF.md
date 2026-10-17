@@ -601,3 +601,56 @@
 * ⚠ 探针/冒烟本轮又踩「加载未就绪」：并行会话把首屏拖到 >10s，`sleep(10000)` 不够 ⇒
   两个脚本都改成**轮询就绪闸门**（`window.RyPlanParams && #ppRecipeApply`），reload 后同样要等；
   否则前半段全红、后半段（页已加载完）却绿，极易误判成"代码坏了"。
+
+## 16. v530-flat-skin-cleanup UI 规范审计四项落地（2026-10-17 · 已发布上线）
+
+用户要求：「继续深挖是否还有多层覆盖，读 UI 设计要求，发现问题先商量再改」。四条决策经用户确认后落地。
+规范文件 = 仓库根 `UI面板设计规范.md`（490 行，六族面板 A~G）。
+
+### 审计结论（对照规范逐条查）
+1. **裸 `h1` 吃掉展示级 36px**：`runye-typography.css` 的 `h1:where(:not(.topbar *))` 本意是落地页大标题，
+   实测把地形「地形模块·测试中」（`terrain-main.css` 设计 14px）与水力校核（设计 15px）都顶成 36px。
+2. **圆角语言整体失真**：`style-01.css` 自身 `body,body *,…{border-radius:0!important}` 是唯一执行者，
+   同文件里却有 200+ 条 `border-radius`（含 28 条带 `!important` 的自相矛盾写法）。
+   ⚠ 但**不是全死**：带 `!important` 的（`.ry-nav .brand-logo{…var(--radius-xs)!important}` 一族）
+   特异性高于 `body *`，实测 33 个元素披 3px、17 个披 6px。
+3. **三代 `.pp-plan-*` 深绿玻璃皮肤**（白字 `#fff` / 深底 `rgba(255,255,255,.05)` / `#bbf7d0`）仍在，
+   早已被 `ry-panel.css`、`#grPipeSection`、`#tlPipePlanSection` 三处浅色皮肤顶掉。
+4. **44px 最小热区是纸面条款**：可见可点元素 44 个里 42 个 < 44px（导航 36 / 弹窗按钮 29 / 面板按钮 24）。
+5. **规范 token 纸面化**：`--ry-panel-radius` / `--ry-panel-sidebar-w` / `--ry-panel-result-w` 在 CSS 里从未定义。
+6. **`:root` 不是作用域**：`--ry-panel-bg/border/head-h` 在 `mod/ry-panel.css` 两处 `:root` 各写一遍，
+   同特异性后写者全域生效 ⇒ 顶部那份 `36px/#fff` 从未生效（实测 44px / #f8fafc）。
+
+### 处置
+* `runye-typography.css`：排除条件改为 **`:not(:where(.t-top *,.result-head *))`**（`：where()` 保持特异性 0,0,1）。
+  ⚠ **必须按容器类、不能按区块 id**：独立页 `terrain/index.html` 没有 `#terrainSection`，
+  第一版写 `:not(#terrainSection *)` 实测漏网、仍是 36px；`.t-top` / `.result-head` 两页通用。
+* `mod/style-01.css`：
+  ① GEN1 十行「深绿玻璃」**瘦身为中性骨架**（只留 flex / gap / padding / 字号 / select 26px 高），
+     深色值全删；GEN2 / GEN2B / GEN3 三块补丁整块删。
+     ⚠ 第一版整块 10 条全删，定向 A/B 立刻抓到 **21 处布局差异**（`#grBar` 的 `display:flex→block`、
+     `gap:12px→normal`、`#tlCalSel*` 的 `26px→auto`）——「死皮肤」里混着**活布局**，
+     `#grPipeSection` 的「成组地块/子地块/总面积」行完全靠 `.pp-plan-item{display:flex;gap:4px}` 排一行。
+  ② 圆角只删**不带 `!important`** 的（208 → 36，其余全是 `50%` 圆点语义 + enforcer 自身）。
+     ⚠ 第一版把带 `!important` 的一起删：实测 33 元素 3px→0px，另 2 元素 0→4px
+     （删掉一层 `border-radius:0!important` 反而让 `var(--radius)!important` 生效）。
+     判据只能靠实测：`body *{…!important}` 压得住**无** `!important` 的声明，压不住有 `!important` 且特异性更高的。
+* `mod/ry-panel.css`：三处 token 收敛到顶部 `:root` 唯一定义，取值 = 收敛前**实测值**（44px / #f8fafc），视觉零变化。
+* `UI面板设计规范.md`：原则 3 改双阈值（桌面 ≥28 / 触屏 ≥44）；`--ry-panel-radius` 改 `0px` 并注明
+  只保留 `50%` 圆点语义；新增 **§1.1 token 落地状态表**；新增 **§9.1 v530 决策记录**。
+* 版本：`sw.js` → `v530-flat-skin-cleanup`；`?v=` 抬 `index.html`（style-01 / ry-panel / typography）、
+  `runye-map-measure.html`、`runye-hydraulics.html`、`terrain/index.html`。
+
+### 两条「不是死代码」的更正（v529 曾误判）
+* `terrain/terrain.css`（359 行）→ 被 `terrain/index.html:15` 用**相对路径** `href="terrain.css"` 引用，不删。
+* `#threeLevelView`（`style-01.css` 里 `display:none !important`）→ `index.html:2773` 有 DOM、
+  `mod/inline-09.js:1689` 仍在切 `.active`，只是被永久隐藏，不删。
+
+### 验证
+* 定向 A/B（121 个 `.pp-plan-*` 元素 × 29 属性，base / 搬入工具栏两态）：
+  `plan diff = 0`、`brHist` 逐 key 相同，`fsHist` 仅 `36px×2 → 14px/15px`（即 h1 修复本身）。
+* 独立页实测：`terrain/index.html` h1 **14px/21px**、`runye-hydraulics.html` **15px/18px**；
+  未受影响的 `runye-landing.html`「投入更少」仍 36px、`digital-agriculture` 仍 36px。
+* `ci_check_static` PASS=11；`node --test tests/*.test.cjs` 121/121；`_repro_v520_planparams` 29/29；
+  `_smoke_publish` ALL PASS；线上 `_smoke_v521_live` 26/26（含 5 项 v530 新断言）。
+* commit `cba20eb`；未纳入 `terrain/index.html` 的另一会话在途改动（新增 `hc-core.js` 引用），只抬了它的 `?v=`。
