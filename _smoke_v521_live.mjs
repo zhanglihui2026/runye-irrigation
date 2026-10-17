@@ -69,8 +69,13 @@ const r0 = await ev(`(async function(){
            rpStatus: await fetch('mod/ry-panel.css?v=529-single-source&_=' + Date.now()).then(function(r){ return r.status; }),
            rpIs: await fetch('mod/ry-panel.css?v=529-single-source&_=' + Date.now()).then(function(r){ return r.text(); }).then(function(t){ return t.indexOf(':is(#pipePlanSection') > 0; }),
            gearCls: (function(){ var e=document.getElementById('ryCadGrpPipeSet'); return e ? (e.className + '|' + (e.getAttribute('style')||'')) : null; })(),
+           /* [v543] 内联副本数：v529 时要求「恰好 1 份」，v543 面板样式全部迁出后为 0 份 */
            idxDup: (function(){ var t=document.documentElement.innerHTML;
-             return t.split('#ryCadSide [data-pp="pipePlanSection"] .pp-side{').length - 1 === 1; })(),
+             return t.split('#ryCadSide [data-pp="pipePlanSection"] .pp-side{').length - 1; })(),
+           /* [v543] 迁出去的那份必须真的在 ry-panel.css 里，防止「删干净」=「删没了」 */
+           rpHasPpSide: await fetch('mod/ry-panel.css?_=' + Date.now()).then(function(r){ return r.text(); }).then(function(t){
+             return t.indexOf('#ryCadSide [data-pp="pipePlanSection"] .pp-side') > 0;
+           }),
            /* [v530] */
            s1Status: (function(){ var l=document.querySelector('link[href*="mod/style-01.css"]'); return l ? l.getAttribute('href') : null; })(),
            s1Dead: await fetch('mod/style-01.css?_=' + Date.now()).then(function(r){ return r.text(); }).then(function(t){
@@ -102,7 +107,8 @@ chk('线上 [v526] 组标题 = 二级 · 地块与灌溉参数', r0.sumText === 
 chk('线上 [v526] 工具栏方案条只留 选择+调用', r0.tbNameGone === true && r0.tbApplyAlive === true, r0);
 chk('线上 [v529] ry-panel.css 200 且已用 :is() 双位置选择器', r0.rpStatus === 200 && r0.rpIs === true, r0.rpStatus + '/' + r0.rpIs);
 chk('线上 [v529] ⚙ 按钮走 .ry-cad-set-btn 且无行内 style', r0.gearCls === 'ry-cad-set-btn|', r0.gearCls);
-chk('线上 [v529] 内联重复面板样式块已删干净', r0.idxDup === true, r0.idxDup);
+chk('线上 [v543] 内联面板样式已全部迁出（0 份副本）', r0.idxDup === 0, r0.idxDup);
+chk('线上 [v543] 面板皮肤在 ry-panel.css 有唯一归属', r0.rpHasPpSide === true, r0.rpHasPpSide);
 /* [v530] 四项落地的线上断言 */
 chk('线上 style-01.css 的 ?v= 与 sw VERSION 同步', String(r0.s1Status || '').indexOf('style-01.css?v=' + _ver.replace(/^v/, '')) >= 0, r0.s1Status);
 chk('线上 [v530] style-01 已无「无效圆角」声明（不带 !important 且非 50%）', r0.s1Dead === 0, r0.s1Dead);
