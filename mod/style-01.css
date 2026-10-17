@@ -78,12 +78,12 @@ a{color:inherit;text-decoration:none}
 .status{
   display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;
   color:var(--g-700);background:#fff;border:1px solid var(--g-200);
-  padding:6px 14px;border-radius:20px;
+  padding:6px 14px;
 }
 .status i{width:7px;height:7px;background:var(--g-500);border-radius:50%;display:inline-block;animation:pulse 2s infinite}
 .ghost-button{
   font-size:13px;font-weight:500;color:var(--s-600);background:#fff;
-  border:1px solid var(--s-200);border-radius:10px;padding:7px 16px;
+  border:1px solid var(--s-200);padding:7px 16px;
   transition:var(--transition);display:inline-flex;align-items:center;gap:5px;
   text-decoration:none;
 }
@@ -91,37 +91,11 @@ a{color:inherit;text-decoration:none}
 
 /* ===== Hero ===== */
 
-
-@media(max-width:900px){
-  
-}
-
-@media(max-width:900px){
-  
-}
-
 .eyebrow{
   display:inline-flex;align-items:center;gap:6px;font-size:10px;letter-spacing:.18em;color:var(--g-700);
   font-weight:700;margin-bottom:10px;text-transform:uppercase;
   padding:4px 10px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.15);
-  border-radius:20px;
 }
-
-
-
-
-
-@media(max-width:900px){
-  
-}
-
-
-
-
-
-
-
-
 
 /* ===== Workspace Layout ===== */
 .workspace{padding:0 0 64px}
@@ -139,7 +113,7 @@ a{color:inherit;text-decoration:none}
 
 /* ===== Panels ===== */
 .input-panel,.result-panel{
-  background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);
+  background:#fff;box-shadow:var(--shadow);
   overflow:hidden;transition:box-shadow .3s var(--ease-out-expo);
 }
 .input-panel:hover{box-shadow:0 12px 32px -8px rgba(15,23,42,.08),0 0 0 1px rgba(34,197,94,.12)}
@@ -150,23 +124,23 @@ a{color:inherit;text-decoration:none}
 .panel-heading>div{display:flex;align-items:center;gap:12px}
 .step{
   display:inline-flex;align-items:center;justify-content:center;
-  width:26px;height:26px;border-radius:8px;
+  width:26px;height:26px;
   background:var(--g-600);
   color:#fff;font-size:12px;font-weight:800;flex-shrink:0;
 }
 .step.light{background:var(--g-100);color:var(--g-700)}
 .panel-heading h2{font-size:16px;font-weight:700;color:var(--s-800)}
 .text-button{font-size:13px;color:var(--g-600);background:none;border:none;padding:6px 12px;font-weight:600;transition:var(--transition)}
-.text-button:hover{color:var(--g-700);background:var(--g-50);border-radius:var(--radius-xs)}
+.text-button:hover{color:var(--g-700);background:var(--g-50);}
 .live-pill{
   font-size:11px;color:var(--g-700);background:var(--g-100);
-  padding:5px 12px;border-radius:20px;font-weight:700;
+  padding:5px 12px;font-weight:700;
   display:flex;align-items:center;gap:6px;
 }
 .live-pill::before{content:'';width:6px;height:6px;background:var(--g-500);border-radius:50%;animation:pulse 2s infinite}
 .live-pill-btn{
   font-size:11px;font-weight:700;color:#fff;
-  padding:6px 14px;border-radius:20px;
+  padding:6px 14px;
   display:inline-flex;align-items:center;gap:6px;
   border:none;cursor:pointer;white-space:nowrap;text-decoration:none;
   transition:var(--transition);box-sizing:border-box;
@@ -192,8 +166,7 @@ legend span{color:var(--g-700);font-weight:700}
 .tl-plotname-row .field{max-width:380px}
 .field>span{font-size:12px;color:var(--s-500);font-weight:500}
 .input-shell{
-  display:flex;align-items:center;border:1.5px solid var(--s-200);
-  border-radius:10px;overflow:hidden;background:#fff;
+  display:flex;align-items:center;border:1.5px solid var(--s-200);overflow:hidden;background:#fff;
   transition:var(--transition);
 }
 .input-shell:hover{border-color:var(--s-300)}
@@ -207,7 +180,7 @@ legend span{color:var(--g-700);font-weight:700}
 .input-shell em{font-size:12px;color:var(--s-400);padding-right:12px;white-space:nowrap;font-style:normal;font-weight:500}
 .field-hint{
   font-size:12px;color:var(--s-400);margin-top:8px;line-height:1.6;
-  padding:8px 12px;background:var(--s-50);border-radius:10px;
+  padding:8px 12px;background:var(--s-50);
   border-left:3px solid var(--s-200);transition:border-color .3s ease
 }
 fieldset:focus-within .field-hint{border-left-color:var(--g-400)}
@@ -218,8 +191,7 @@ fieldset:focus-within .field-hint{border-left-color:var(--g-400)}
 .branch-selector>[role=group]{display:flex;gap:8px;flex-wrap:wrap}
 .branch-selector button,
 .branch-options button{
-  font-size:13px;font-weight:600;padding:7px 14px;border:1.5px solid var(--s-200);
-  border-radius:10px;background:#fff;color:var(--s-600);
+  font-size:13px;font-weight:600;padding:7px 14px;border:1.5px solid var(--s-200);background:#fff;color:var(--s-600);
   transition:var(--transition);position:relative;overflow:hidden
 }
 .branch-selector button:hover,
@@ -246,7 +218,6 @@ fieldset:focus-within .field-hint{border-left-color:var(--g-400)}
   padding:12px;
   background:linear-gradient(135deg,var(--g-50) 0%,#fff 100%);
   border:1.5px solid var(--g-200);
-  border-radius:var(--radius-sm);
 }
 .derivation-card h3{
   font-size:13px;font-weight:700;color:var(--g-700);margin-bottom:8px;
@@ -262,7 +233,7 @@ fieldset:focus-within .field-hint{border-left-color:var(--g-400)}
 .derivation-row .val{font-family:var(--mono);font-weight:700;color:var(--g-700)}
 .derivation-sum{
   margin-top:8px;padding:10px;
-  background:#fff;border:1.5px solid var(--g-300);border-radius:10px;
+  background:#fff;border:1.5px solid var(--g-300);
 }
 .derivation-sum .expr{
   font-family:var(--mono);font-size:12px;color:var(--s-600);line-height:1.7;
@@ -301,7 +272,7 @@ fieldset:focus-within .field-hint{border-left-color:var(--g-400)}
 .optimal-card{padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.08)}
 .optimal-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
 .optimal-top span{font-size:12px;color:rgba(255,255,255,.5);font-weight:500}
-.optimal-top b{font-size:11px;color:#14532d;background:#86efac;padding:4px 12px;border-radius:20px;font-weight:700}
+.optimal-top b{font-size:11px;color:#14532d;background:#86efac;padding:4px 12px;font-weight:700}
 .optimal-title{margin-bottom:8px}
 .optimal-title small{font-size:12px;color:rgba(255,255,255,.45);display:block;margin-bottom:4px}
 .optimal-title strong{font-family:var(--serif);font-size:22px;color:#fff;font-weight:600;line-height:1.4}
@@ -309,7 +280,7 @@ fieldset:focus-within .field-hint{border-left-color:var(--g-400)}
 @media(max-width:520px){.optimal-specs{grid-template-columns:repeat(2,1fr)}}
 .optimal-specs span{
   font-size:12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);
-  padding:8px 10px;border-radius:10px;color:rgba(255,255,255,.75);font-weight:500
+  padding:8px 10px;color:rgba(255,255,255,.75);font-weight:500
 }
 .optimal-specs b{display:block;color:#86efac;font-weight:700;margin-top:3px;font-size:13px}
 /* 流速格内第二行细节小字（2026-09-12：由已取消的 .diameter-grid 三卡块并入） */
@@ -324,7 +295,7 @@ fieldset:focus-within .field-hint{border-left-color:var(--g-400)}
 }
 .pump-topline{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
 .pump-topline>span{font-size:15px;font-weight:700;color:var(--dg-900)}
-.confidence{font-size:7px;color:var(--dg-700);background:rgba(255,255,255,.5);padding:2px 6px;border-radius:8px;font-weight:600}
+.confidence{font-size:7px;color:var(--dg-700);background:rgba(255,255,255,.5);padding:2px 6px;font-weight:600}
 .pump-metrics{display:flex;align-items:center;gap:14px;margin-bottom:10px;padding-left:12px}
 .pump-metrics div{display:flex;flex-direction:column;align-items:center}
 .pump-metrics strong{font-family:var(--serif);font-size:44px;color:var(--dg-900);font-weight:600;line-height:1}
@@ -335,7 +306,7 @@ fieldset:focus-within .field-hint{border-left-color:var(--g-400)}
 
 .rs-apply-btn{
   display:block;width:calc(100% - 4px);margin:0 auto;padding:10px 0;
-  border:none;border-radius:10px;
+  border:none;
   background:var(--g-700);color:#fff;
   font-size:14px;font-weight:700;cursor:pointer;
   transition:all .2s;
@@ -348,7 +319,7 @@ fieldset:focus-within .field-hint{border-left-color:var(--g-400)}
 .diameter-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:14px 20px;border-bottom:1px solid rgba(255,255,255,.08)}
 @media(max-width:640px){.diameter-grid{grid-template-columns:1fr}}
 .diameter-grid article{
-  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:12px;
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);
   padding:14px;display:flex;flex-direction:column;gap:4px;transition:var(--transition)
 }
 .diameter-grid article:hover{border-color:rgba(134,239,172,.35);background:rgba(255,255,255,.1)}
@@ -364,7 +335,7 @@ fieldset:focus-within .field-hint{border-left-color:var(--g-400)}
 .branch-compare-head{display:grid;grid-template-columns:1fr 1fr 1fr 1.2fr;gap:6px;font-size:11px;color:rgba(255,255,255,.4);padding:4px 10px;font-weight:600}
 .branch-option{
   display:grid;grid-template-columns:1fr 1fr 1fr 1.2fr;gap:6px;width:100%;
-  padding:10px 12px;border:1.5px solid rgba(255,255,255,.12);border-radius:10px;
+  padding:10px 12px;border:1.5px solid rgba(255,255,255,.12);
   background:rgba(255,255,255,.04);text-align:left;align-items:center;margin-bottom:6px;transition:var(--transition)
 }
 .branch-option:hover{border-color:rgba(134,239,172,.35);background:rgba(255,255,255,.08)}
@@ -397,7 +368,7 @@ fieldset:focus-within .field-hint{border-left-color:var(--g-400)}
 @media(max-width:1100px){.tl-pipe-table-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:720px){.tl-pipe-table-grid{grid-template-columns:1fr}}
 .pipe-table-card{
-  background:#fff;border-radius:var(--radius);overflow:hidden;
+  background:#fff;overflow:hidden;
   box-shadow:var(--shadow);
   transition:transform .22s var(--ease-out-expo),box-shadow .22s var(--ease-out-expo)
 }
@@ -405,7 +376,7 @@ fieldset:focus-within .field-hint{border-left-color:var(--g-400)}
 .pipe-table-title{padding:18px 22px;border-bottom:1px solid var(--s-100);display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px}
 .pipe-table-title h3{font-size:15px;color:var(--s-800);font-weight:700}
 .pipe-table-title p{font-size:11px;color:var(--s-400);margin-top:2px}
-.pipe-table-title>span{font-size:10px;color:var(--s-500);background:#fff;border:1px solid var(--s-200);padding:3px 10px;border-radius:12px;white-space:nowrap;font-weight:600}
+.pipe-table-title>span{font-size:10px;color:var(--s-500);background:#fff;border:1px solid var(--s-200);padding:3px 10px;white-space:nowrap;font-weight:600}
 .table-scroll{overflow-x:auto}
 .selection-table{width:100%;border-collapse:collapse;font-size:13px}
 .selection-table th{text-align:left;padding:12px 18px;font-size:11px;color:var(--s-400);border-bottom:2px solid var(--s-100);font-weight:600;white-space:nowrap;text-transform:uppercase;letter-spacing:.03em}
@@ -415,7 +386,7 @@ fieldset:focus-within .field-hint{border-left-color:var(--g-400)}
 .recommended-row{background:var(--g-700)!important}
 .recommended-row td{font-weight:700;color:#fff}
 .recommended-row:hover{background:var(--g-800)!important}
-.pipe-status{font-size:11px;padding:3px 10px;border-radius:12px;font-weight:700;display:inline-block}
+.pipe-status{font-size:11px;padding:3px 10px;font-weight:700;display:inline-block}
 .pipe-status.recommended{background:#fff;color:var(--g-700)}
 .pipe-status.suitable{background:var(--s-100);color:var(--s-600)}
 .pipe-status.outside{background:var(--red-100);color:var(--red)}
@@ -424,13 +395,13 @@ fieldset:focus-within .field-hint{border-left-color:var(--g-400)}
 /* ===== Network Diagram (linear horizontal layout) ===== */
 .network-heading{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;margin-bottom:20px}
 .network-legend{display:flex;gap:20px;font-size:12px;color:var(--s-500);flex-wrap:wrap}
-.legend-main,.legend-branch,.legend-tape{display:inline-block;width:18px;height:4px;border-radius:2px;vertical-align:middle;margin-right:5px}
+.legend-main,.legend-branch,.legend-tape{display:inline-block;width:18px;height:4px;vertical-align:middle;margin-right:5px}
 .legend-main{background:var(--g-700)}
 .legend-branch{background:var(--blue);height:3px}
 .legend-tape{background:var(--amber);height:2px}
 .legend-valve{display:inline-block;width:11px;height:11px;border-radius:50%;border:2px solid var(--s-400);background:#fff;vertical-align:middle;margin-right:5px}
 .network-card{
-  background:#fff;border-radius:var(--radius);overflow:hidden;
+  background:#fff;overflow:hidden;
   box-shadow:var(--shadow);
   transition:box-shadow .25s var(--ease-out-expo)
 }
@@ -453,7 +424,7 @@ fieldset:focus-within .field-hint{border-left-color:var(--g-400)}
 }
 .pump-node{
   display:flex;flex-direction:column;align-items:center;justify-content:center;
-  background:#fff;border:2px solid var(--g-700);border-radius:var(--radius-xs);
+  background:#fff;border:2px solid var(--g-700);
   padding:10px 18px;font-size:11px;white-space:nowrap;gap:2px;flex-shrink:0;
   min-width:120px;text-align:center;
 }
@@ -463,7 +434,7 @@ fieldset:focus-within .field-hint{border-left-color:var(--g-400)}
 .main-label{
   position:absolute;top:-22px;left:50%;transform:translateX(-50%);
   font-size:10px;color:var(--g-700);white-space:nowrap;background:#fff;
-  padding:2px 10px;border-radius:4px;border:1px solid var(--g-200);font-weight:600;
+  padding:2px 10px;border:1px solid var(--g-200);font-weight:600;
 }
 .field-plan-head{
   display:flex;justify-content:space-between;align-items:baseline;
@@ -479,12 +450,12 @@ fieldset:focus-within .field-hint{border-left-color:var(--g-400)}
   align-self:center;padding:0 4px;flex-shrink:0;letter-spacing:0.15em;
 }
 .main-pipe-vertical{
-  width:6px;flex-shrink:0;background:var(--g-700);border-radius:3px;
+  width:6px;flex-shrink:0;background:var(--g-700);
   margin:14px 0;
 }
 .zones-linear{flex:1;padding:20px 20px 20px 0;display:flex;flex-direction:column;gap:20px;overflow-x:auto;min-width:0}
 .valve-connector{
-  width:16px;height:3px;background:var(--g-700);flex-shrink:0;border-radius:2px;
+  width:16px;height:3px;background:var(--g-700);flex-shrink:0;
 }
 .zone-linear{
   display:flex;align-items:center;gap:16px;min-width:max-content;
@@ -500,7 +471,7 @@ fieldset:focus-within .field-hint{border-left-color:var(--g-400)}
   display:flex;align-items:center;gap:10px;flex:1;min-width:300px;
 }
 .zone-branch{
-  flex:1;height:3px;background:var(--blue);border-radius:2px;position:relative;
+  flex:1;height:3px;background:var(--blue);position:relative;
 }
 .zone-branch::after{
   content:'';position:absolute;left:10%;right:10%;top:8px;
@@ -522,19 +493,19 @@ fieldset:focus-within .field-hint{border-left-color:var(--g-400)}
 .detail-grid{display:grid;grid-template-columns:1.5fr 2.5fr;gap:20px;margin-top:24px}
 @media(max-width:820px){.detail-grid{grid-template-columns:1fr}}
 .check-card,.materials-card{
-  background:#fff;border-radius:var(--radius);padding:24px;
+  background:#fff;padding:24px;
   box-shadow:var(--shadow);
   transition:transform .22s var(--ease-out-expo),box-shadow .22s var(--ease-out-expo)
 }
 .check-card:hover,.materials-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-hover)}
 .card-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
 .card-title h3{font-size:17px;font-weight:700;color:var(--s-800)}
-.card-title>span{font-size:12px;padding:4px 12px;border-radius:12px;font-weight:700}
+.card-title>span{font-size:12px;padding:4px 12px;font-weight:700}
 .check-card .card-title>span{background:var(--amber-100);color:var(--amber)}
 .check-card .card-title>span.warn{background:var(--red-100);color:var(--red)}
 .materials-card .card-title>span{background:var(--g-100);color:var(--g-700)}
-.gauge{height:10px;background:var(--s-100);border-radius:5px;overflow:hidden;margin-bottom:12px}
-.gauge i{display:block;height:100%;border-radius:5px;transition:width .4s ease}
+.gauge{height:10px;background:var(--s-100);overflow:hidden;margin-bottom:12px}
+.gauge i{display:block;height:100%;transition:width .4s ease}
 .check-card>p{font-size:13px;color:var(--s-600);margin-bottom:12px;line-height:1.6}
 .check-card ul{padding-left:20px;font-size:12px;color:var(--s-500);line-height:1.8}
 .check-card ul li{margin-bottom:4px}
@@ -543,7 +514,7 @@ fieldset:focus-within .field-hint{border-left-color:var(--g-400)}
 .pipe-deriv{
   margin-top:16px;padding:14px;
   background:linear-gradient(135deg,var(--g-50) 0%,#fff 100%);
-  border:1.5px solid var(--g-200);border-radius:var(--radius-sm);
+  border:1.5px solid var(--g-200);
 }
 .pipe-deriv h4{
   font-size:13px;font-weight:700;color:var(--g-700);margin-bottom:10px;
@@ -551,7 +522,7 @@ fieldset:focus-within .field-hint{border-left-color:var(--g-400)}
 }
 .pipe-deriv .formula{
   font-family:var(--mono);font-size:11px;color:var(--s-500);
-  background:var(--s-50);padding:8px 10px;border-radius:8px;margin-bottom:10px;line-height:1.7;
+  background:var(--s-50);padding:8px 10px;margin-bottom:10px;line-height:1.7;
 }
 .pipe-deriv .formula b{color:var(--s-700);font-weight:600}
 .pipe-deriv-row{
@@ -563,7 +534,7 @@ fieldset:focus-within .field-hint{border-left-color:var(--g-400)}
 .pipe-deriv-row b{font-family:var(--mono);font-weight:700;color:var(--g-700)}
 .pipe-deriv-result{
   margin-top:10px;padding:10px 12px;background:#fff;
-  border:1.5px solid var(--g-300);border-radius:10px;
+  border:1.5px solid var(--g-300);
   display:flex;justify-content:space-between;align-items:center;
 }
 .pipe-deriv-result span{font-size:11px;color:var(--s-500)}
@@ -593,12 +564,12 @@ body.mat-resizing *{cursor:col-resize!important}
 .materials-card th{position:relative}
 .materials-card th,.materials-card td{width:auto}
 .materials-card .mat-toolbar{display:flex;gap:8px;align-items:center;margin:0 0 10px;flex-wrap:wrap}
-.materials-card .mat-toolbar button{border:1.5px solid var(--s-200);background:#fff;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;color:var(--s-700);cursor:pointer;transition:var(--transition)}
+.materials-card .mat-toolbar button{border:1.5px solid var(--s-200);background:#fff;padding:5px 12px;font-size:12px;font-weight:600;color:var(--s-700);cursor:pointer;transition:var(--transition)}
 .materials-card .mat-toolbar button:hover{border-color:var(--g-500);color:var(--g-600);background:var(--g-50)}
 .materials-card .mat-toolbar .mat-tip{font-size:11px;color:var(--s-400)}
 .materials-card .mat-colgrip{position:absolute;top:0;right:-3px;width:8px;height:100%;cursor:col-resize;z-index:2}
 .materials-card .mat-colgrip:hover{background:linear-gradient(90deg,transparent,var(--g-200))}
-.materials-card .mat-note,.materials-card .mat-extra{width:100%;border:1px dashed var(--s-200);border-radius:6px;padding:4px 6px;font-size:12px;color:var(--s-700);background:transparent;outline:none}
+.materials-card .mat-note,.materials-card .mat-extra{width:100%;border:1px dashed var(--s-200);padding:4px 6px;font-size:12px;color:var(--s-700);background:transparent;outline:none}
 .materials-card .mat-note:hover,.materials-card .mat-extra:hover,.materials-card .mat-note:focus,.materials-card .mat-extra:focus{border-color:var(--g-500);background:#fff}
 .materials-card td.mat-note-cell,.materials-card td.mat-extra-cell{white-space:normal;padding-right:10px}
 .materials-card .mat-col-del{position:absolute;top:2px;right:8px;width:14px;height:14px;line-height:12px;text-align:center;border-radius:50%;font-size:11px;color:var(--s-300);cursor:pointer;display:none}
@@ -609,7 +580,7 @@ body.mat-resizing *{cursor:col-resize!important}
 .materials-card .custom-row td:first-child{white-space:normal}
 .materials-card .price-cell{white-space:nowrap;display:flex;align-items:center;gap:2px}
 .materials-card .price-input{
-  width:56px;border:1.5px solid var(--s-200);border-radius:8px;
+  width:56px;border:1.5px solid var(--s-200);
   padding:5px 6px;font-size:13px;font-weight:600;color:var(--s-800);
   text-align:right;background:#fff;outline:none;transition:var(--transition);
   -moz-appearance:textfield;flex-shrink:0;
@@ -621,11 +592,11 @@ body.mat-resizing *{cursor:col-resize!important}
 .materials-card .mat-selfcheck.ok{color:#15803d}
 .materials-card .mat-selfcheck.bad{color:#dc2626;font-weight:600}
 .materials-card .mat-selfcheck .mat-price-resync{
-  border:1.5px solid currentColor;background:transparent;border-radius:8px;
+  border:1.5px solid currentColor;background:transparent;
   padding:3px 10px;font-size:12px;font-weight:600;color:inherit;cursor:pointer;transition:var(--transition)}
 .materials-card .mat-selfcheck .mat-price-resync:hover{background:#fee2e2}
 .materials-card .material-qty-input{
-  width:82px;border:1.5px solid var(--s-200);border-radius:8px;
+  width:82px;border:1.5px solid var(--s-200);
   padding:5px 6px;font-size:13px;font-weight:600;color:var(--s-800);
   text-align:right;background:#fff;outline:none;transition:var(--transition);
   -moz-appearance:textfield;
@@ -642,7 +613,7 @@ body.mat-resizing *{cursor:col-resize!important}
    几乎看不清；改用与全站次级文字同档的 #5a656a（约 6.0:1）。 */
 .materials-card .unit-tag{font-size:11px;color:#5a656a;font-weight:500;margin-left:2px}
 .materials-card .custom-input{
-  width:100%;min-width:60px;border:1.5px solid var(--s-200);border-radius:8px;
+  width:100%;min-width:60px;border:1.5px solid var(--s-200);
   padding:5px 8px;font-size:13px;font-weight:500;color:var(--s-800);
   background:#fff;outline:none;transition:var(--transition);
 }
@@ -650,25 +621,25 @@ body.mat-resizing *{cursor:col-resize!important}
 .materials-card .custom-qty{width:70px;text-align:right;-moz-appearance:textfield}
 .materials-card .custom-qty::-webkit-inner-spin-button{opacity:.4;height:20px}
 /* ===== v180 材料表电子表化（2026-10-02）===== */
-.materials-card .mat-namebox{display:inline-flex;align-items:center;justify-content:center;min-width:46px;height:24px;padding:0 7px;border:1.5px solid var(--s-200);border-radius:6px;background:#fff;font-size:12px;font-weight:700;color:var(--g-700);font-family:ui-monospace,Menlo,Consolas,monospace}
+.materials-card .mat-namebox{display:inline-flex;align-items:center;justify-content:center;min-width:46px;height:24px;padding:0 7px;border:1.5px solid var(--s-200);background:#fff;font-size:12px;font-weight:700;color:var(--g-700);font-family:ui-monospace,Menlo,Consolas,monospace}
 .materials-card .mat-rownum{width:46px;min-width:46px;padding:6px 4px!important;text-align:center!important;font-size:11px!important;font-weight:600;color:var(--s-400);background:var(--s-50);border-right:1px solid var(--s-100);user-select:none;white-space:nowrap}
 .materials-card th.mat-rownum{background:var(--s-50);color:var(--s-400);font-size:11px;text-align:center;letter-spacing:0}
-.materials-card .mat-col-letter{display:inline-block;min-width:15px;margin-right:5px;padding:1px 4px;border-radius:4px;background:var(--g-100);color:var(--g-700);font-size:10px;font-weight:700;font-family:ui-monospace,Menlo,Consolas,monospace;vertical-align:middle;letter-spacing:0}
+.materials-card .mat-col-letter{display:inline-block;min-width:15px;margin-right:5px;padding:1px 4px;background:var(--g-100);color:var(--g-700);font-size:10px;font-weight:700;font-family:ui-monospace,Menlo,Consolas,monospace;vertical-align:middle;letter-spacing:0}
 .materials-card tbody td{position:relative;cursor:cell}
 .materials-card tbody td.mat-inrange{background:#eef4ff}
 .materials-card tbody td.mat-sel{outline:2px solid var(--g-500);outline-offset:-2px;background:#e8f1ff;z-index:1}
 .materials-card tbody tr:hover td.mat-sel{background:#dfeaff}
 .materials-card td.mat-ref{background:#fff4d6!important;box-shadow:inset 0 0 0 1px #f6c344}
-.materials-card .mat-cell-editor{width:100%;height:100%;min-width:60px;border:0;padding:0 4px;margin:0;font:inherit;font-size:12.5px;color:var(--s-800);background:#fff;outline:none;box-shadow:inset 0 0 0 2px var(--g-500);border-radius:2px}
+.materials-card .mat-cell-editor{width:100%;height:100%;min-width:60px;border:0;padding:0 4px;margin:0;font:inherit;font-size:12.5px;color:var(--s-800);background:#fff;outline:none;box-shadow:inset 0 0 0 2px var(--g-500);}
 .materials-card .mat-cell-editor.mat-editing{position:absolute;inset:0;z-index:30}
-.mat-fill-handle{position:absolute;display:none;width:9px;height:9px;background:var(--g-500);border:2px solid #fff;border-radius:2px;cursor:crosshair;z-index:60;box-shadow:0 1px 3px rgba(0,0,0,.28)}
-.mat-menu{position:fixed;z-index:9998;min-width:152px;padding:5px;background:#fff;border:1px solid var(--s-200);border-radius:9px;box-shadow:0 8px 26px rgba(15,23,42,.18);font-size:12.5px}
-.mat-menu-item{padding:6px 11px;border-radius:6px;color:var(--s-700);font-weight:600;cursor:pointer;white-space:nowrap}
+.mat-fill-handle{position:absolute;display:none;width:9px;height:9px;background:var(--g-500);border:2px solid #fff;cursor:crosshair;z-index:60;box-shadow:0 1px 3px rgba(0,0,0,.28)}
+.mat-menu{position:fixed;z-index:9998;min-width:152px;padding:5px;background:#fff;border:1px solid var(--s-200);box-shadow:0 8px 26px rgba(15,23,42,.18);font-size:12.5px}
+.mat-menu-item{padding:6px 11px;color:var(--s-700);font-weight:600;cursor:pointer;white-space:nowrap}
 .mat-menu-item:hover{background:var(--g-50);color:var(--g-700)}
 .mat-menu-item.disabled{color:var(--s-300);cursor:not-allowed;font-weight:500}
 .mat-menu-item.disabled:hover{background:transparent;color:var(--s-300)}
 .mat-menu-sep{height:1px;margin:4px 6px;background:var(--s-100)}
-.mat-flash{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);padding:7px 16px;border-radius:8px;background:rgba(15,23,42,.9);color:#fff;font-size:12.5px;font-weight:600;z-index:9999;opacity:0;transition:opacity .22s;pointer-events:none}
+.mat-flash{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);padding:7px 16px;background:rgba(15,23,42,.9);color:#fff;font-size:12.5px;font-weight:600;z-index:9999;opacity:0;transition:opacity .22s;pointer-events:none}
 
 .materials-card tr.custom-row td{background:var(--g-50)}
 .materials-card tfoot tr{border-top:2px solid var(--s-200)}
@@ -677,7 +648,7 @@ body.mat-resizing *{cursor:col-resize!important}
 
 /* ===== Method Note ===== */
 .method-note>div{
-  background:#fff;border-radius:var(--radius);padding:28px;
+  background:#fff;padding:28px;
   box-shadow:var(--shadow)
 }
 .method-note>div>span{font-size:15px;font-weight:700;display:block;margin-bottom:12px;color:var(--s-800)}
@@ -695,335 +666,28 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
   .topbar,.ghost-button,.text-button,.status{display:none!important}
   .workspace .container{grid-template-columns:1fr;gap:16px}
   body{background:#fff;font-size:11px}
-  
-  
+
   *{box-shadow:none!important}
 }
 
 /* ===== 面积测量工具 ===== */
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /* ===== 05 三级管路规划与施工简图（移至主页面，二级简图下方） ===== */
-
-
 
 /* ===== 二级管路 · 管路规划与施工简图 ===== */
 
-
-
-
-
-
 /* 地块规划参数紧凑行 */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-@media(max-width:768px){
-  
-  
-  
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 /* Hidden by request: remove network demo and calculation basis blocks from the UI. */
 
-
-
 /* ===== Visual polish layer ===== */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-@media(max-width:768px){
-  
-  
-  
-  
-  
-  
-  
-  
-}
 
 /* ===== Clarity pass: solid colors + stronger contrast ===== */
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-@media(max-width:900px){
-  
-  
-  
-  
-  
-  
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /* Pipe planner uses the same light card shell as the area measurement tool. */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 /* ★ 2026-09-12 提亮：原 alpha .42 在白底对比度 2.71:1（空态提示「请在面积测量工具中
    完成边界描绘后使用」偏虚）；提到 .62 后约 4.9:1，达 AA。 */
-
-
-
-
-
-
-@media(max-width:768px){
-  
-}
 
 /* ===== Three-Level Pipeline View ===== */
 .tl-overlay{
@@ -1054,13 +718,13 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
 .tl-header h2 small{font-size:12px;font-weight:500;color:var(--s-400);margin-left:8px}
 .tl-back-btn{
   font-size:14px;font-weight:600;color:var(--s-600);background:#fff;
-  border:1.5px solid var(--s-200);border-radius:0;padding:8px 18px;
+  border:1.5px solid var(--s-200);padding:8px 18px;
   transition:var(--transition);display:inline-flex;align-items:center;gap:6px;
 }
 .tl-back-btn:hover{background:var(--s-50);border-color:var(--s-300);color:var(--s-800)}
 .tl-home-btn{
   font-size:14px;font-weight:700;color:#fff;background:var(--g-700);
-  border:0;border-radius:0;padding:9px 18px;cursor:pointer;
+  border:0;padding:9px 18px;cursor:pointer;
   transition:var(--transition);display:inline-flex;align-items:center;gap:6px;letter-spacing:.5px;
 }
 .tl-home-btn:hover{background:var(--g-800);}
@@ -1078,26 +742,23 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
 .tl-section-title h3{font-size:16px;font-weight:700;color:var(--s-800)}
 .tl-section-title p{font-size:12px;color:var(--s-400);margin-top:2px}
 .tl-result-panel{
-  background:linear-gradient(165deg,var(--dg-700) 0%,var(--dg-800) 100%);
-  border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);
+  background:linear-gradient(165deg,var(--dg-700) 0%,var(--dg-800) 100%);overflow:hidden;box-shadow:var(--shadow);
 }
 .tl-trigger-btn{
   font-size:12px;font-weight:700;color:#86efac;
-  background:rgba(255,255,255,.1);border:1px solid rgba(147,197,253,.3);
-  border-radius:20px;padding:5px 14px;transition:var(--transition);
+  background:rgba(255,255,255,.1);border:1px solid rgba(147,197,253,.3);padding:5px 14px;transition:var(--transition);
   cursor:pointer;white-space:nowrap;
 }
 .tl-trigger-btn:hover{background:rgba(147,197,253,.2);border-color:rgba(147,197,253,.5)}
 .tl-trigger-btn-inline{
   font-size:13px;font-weight:700;color:#fff;
-  background:#16a34a;border:1px solid #15803d;
-  border-radius:8px;padding:7px 16px;transition:var(--transition);
+  background:#16a34a;border:1px solid #15803d;padding:7px 16px;transition:var(--transition);
   cursor:pointer;white-space:nowrap;
 }
 .tl-trigger-btn-inline:hover{background:#15803d;border-color:#166534;transform:translateY(-1px);box-shadow:0 4px 12px rgba(37,99,235,.4)}
 /* [v215] 轮灌演示 chips 与「轮灌组数」按钮同款（同一视觉语言，左栏一栏到底） */
 #tlZoneCountGroup button, #tlDemoChips button{
-  font-size:11px;font-weight:400;padding:3px 10px;border-radius:6px;
+  font-size:11px;font-weight:400;padding:3px 10px;
   border:1px solid var(--s-200);background:#fff;color:var(--s-600);cursor:pointer;transition:var(--transition);
 }
 #tlZoneCountGroup button.selected, #tlDemoChips button.selected{background:var(--g-700);color:#fff;border-color:var(--g-700)}
@@ -1276,11 +937,11 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
 /* ===== 滴灌供水首部系统图编辑器（#headModal 作用域，合并自 滴灌供水图编辑器.html） ===== */
 #headModal{position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;padding:18px;font-family:var(--font)}
 #headModal *{box-sizing:border-box;margin:0;padding:0}
-.hm-panel{width:min(1460px,98vw);height:min(920px,94vh);background:#eef1f5;border-radius:14px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 64px -16px rgba(0,0,0,.45)}
+.hm-panel{width:min(1460px,98vw);height:min(920px,94vh);background:#eef1f5;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 64px -16px rgba(0,0,0,.45)}
 .hm-topbar{background:#16a34a;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;flex-shrink:0}
 .hm-title{font-size:15px;font-weight:700}
 .hm-actions{display:flex;gap:8px;flex-wrap:wrap}
-.hm-btn{padding:6px 14px;border:1px solid rgba(255,255,255,.55);background:rgba(255,255,255,.12);color:#fff;border-radius:6px;cursor:pointer;font-size:13px;font-family:inherit;transition:background .2s}
+.hm-btn{padding:6px 14px;border:1px solid rgba(255,255,255,.55);background:rgba(255,255,255,.12);color:#fff;cursor:pointer;font-size:13px;font-family:inherit;transition:background .2s}
 .hm-btn:hover{background:rgba(255,255,255,.28)}
 .hm-btn.hm-primary{background:#fff;color:#16a34a;border-color:#fff;font-weight:600}
 .hm-btn.hm-close{background:rgba(220,38,38,.75);border-color:rgba(255,255,255,.3)}
@@ -1291,17 +952,17 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
 .hm-aside h2:first-child{margin-top:0}
 .hm-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;font-size:13px;gap:8px}
 .hm-row label{color:#444;white-space:nowrap}
-.hm-row input[type=text],.hm-row input[type=number],.hm-row select{width:150px;padding:4px 6px;border:1px solid #c3ccd8;border-radius:5px;font-size:13px;background:#fff;color:#222}
+.hm-row input[type=text],.hm-row input[type=number],.hm-row select{width:150px;padding:4px 6px;border:1px solid #c3ccd8;font-size:13px;background:#fff;color:#222}
 .hm-row input:focus,.hm-row select:focus{outline:1.5px solid #16a34a;border-color:#16a34a}
 .hm-chk{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:13px;color:#444;margin-bottom:4px}
 .hm-chk label{display:flex;align-items:center;gap:4px;cursor:pointer}
 .hm-chk input{accent-color:#16a34a;width:14px;height:14px}
-.hm-fert-item{border:1px solid #e0e6ee;border-radius:6px;padding:6px 8px;margin-bottom:6px;background:#f8fafc}
+.hm-fert-item{border:1px solid #e0e6ee;padding:6px 8px;margin-bottom:6px;background:#f8fafc}
 .hm-fert-item .ft{font-size:12px;color:#16a34a;font-weight:600;margin-bottom:5px}
 .hm-fert-item .hm-row{margin-bottom:4px}
 .hm-fert-item select{width:132px}
 .hm-btn-line{display:flex;gap:8px;margin-top:10px}
-.hm-btn-line button{flex:1;padding:7px 0;border-radius:6px;cursor:pointer;font-size:13px;font-family:inherit}
+.hm-btn-line button{flex:1;padding:7px 0;cursor:pointer;font-size:13px;font-family:inherit}
 .hm-btn-line .ok{background:#16a34a;color:#fff;border:1px solid #16a34a}
 .hm-btn-line .ok:hover{background:#15803d}
 .hm-btn-line .ghost{background:#fff;color:#16a34a;border:1px solid #16a34a}
@@ -1343,7 +1004,6 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
   --at-accent-bg:var(--g-50);
   --at-accent-border:var(--g-300);
   background:var(--at-bg);
-  border-radius:0 0 24px 24px;
   overflow:hidden;
   margin:0 auto;
   max-width:1120px;
@@ -1361,12 +1021,11 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
 }
 #areaTool .at-topbar h1{font-size:16px;font-weight:700;letter-spacing:.5px;white-space:nowrap}
 #areaTool .at-section-badge{
-  display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;
-  border-radius:8px;background:rgba(255,255,255,.18);color:#bbf7d0;
+  display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;background:rgba(255,255,255,.18);color:#bbf7d0;
   font-size:14px;font-weight:800;margin-right:8px;vertical-align:middle;
 }
 #areaTool .at-topbar .spacer{flex:1}
-#areaTool .at-btn{padding:7px 14px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-family:inherit;transition:all .2s;display:inline-flex;align-items:center;gap:6px}
+#areaTool .at-btn{padding:7px 14px;border:none;cursor:pointer;font-size:13px;font-family:inherit;transition:all .2s;display:inline-flex;align-items:center;gap:6px}
 #areaTool .at-btn-light{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3)}
 #areaTool .at-btn-light:hover{background:rgba(255,255,255,.25)}
 #areaTool .at-main{flex:1;display:flex;overflow:hidden;align-items:stretch}
@@ -1376,17 +1035,17 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
 #areaTool .at-section h3 .num{background:var(--g-50);color:var(--g-700);border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px}
 #areaTool .at-field{display:block;margin-bottom:6px}
 #areaTool .at-field label{display:block;font-size:11px;color:#666;margin-bottom:2px}
-#areaTool .at-field input,#areaTool .at-field select{width:100%;padding:5px 8px;border:1px solid #ddd;border-radius:5px;font-size:13px;font-family:inherit;outline:none;transition:border-color .2s}
+#areaTool .at-field input,#areaTool .at-field select{width:100%;padding:5px 8px;border:1px solid #ddd;font-size:13px;font-family:inherit;outline:none;transition:border-color .2s}
 #areaTool .at-field input:focus,#areaTool .at-field select:focus{border-color:var(--g-500)}
 #areaTool .at-field-row{display:flex;gap:8px}
 #areaTool .at-field-row .at-field{flex:1;margin-bottom:0}
-#areaTool .at-btn-mode{width:100%;padding:7px;border:2px solid #e0e0e0;border-radius:8px;background:#fafafa;cursor:pointer;font-size:12px;font-family:inherit;transition:all .2s;margin-bottom:6px;text-align:left;display:flex;align-items:center;gap:8px}
+#areaTool .at-btn-mode{width:100%;padding:7px;border:2px solid #e0e0e0;background:#fafafa;cursor:pointer;font-size:12px;font-family:inherit;transition:all .2s;margin-bottom:6px;text-align:left;display:flex;align-items:center;gap:8px}
 #areaTool .at-btn-mode:hover{border-color:var(--g-300);background:var(--g-50)}
 #areaTool .at-btn-mode.active{border-color:var(--g-600);background:var(--g-50);color:var(--g-800);font-weight:600}
 #areaTool .at-btn-mode .icon{font-size:16px}
 #areaTool .at-mode-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:0}
 #areaTool .at-mode-row .at-btn-mode{width:100%;margin-bottom:0;justify-content:center;text-align:center;padding:6px}
-#areaTool .at-btn-action{width:100%;padding:6px;border:1px solid #ddd;border-radius:5px;background:#fff;cursor:pointer;font-size:12px;font-family:inherit;transition:all .2s}
+#areaTool .at-btn-action{width:100%;padding:6px;border:1px solid #ddd;background:#fff;cursor:pointer;font-size:12px;font-family:inherit;transition:all .2s}
 #areaTool .at-btn-action:hover{background:#f5f5f5}
 #areaTool .at-btn-action.danger{color:#c62828;border-color:#ef9a9a}
 #areaTool .at-btn-action.danger:hover{background:#ffebee}
@@ -1397,7 +1056,7 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
 #areaTool .at-slider-container .value{font-size:11px;color:#666;min-width:50px;text-align:right;font-weight:600}
 #areaTool .at-checkbox-row{display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;padding:5px 0}
 #areaTool .at-checkbox-row input{accent-color:var(--g-600);width:15px;height:15px}
-#areaTool .at-result-card{background:linear-gradient(135deg,var(--g-50) 0%,#f3e5f5 100%);border-radius:10px;padding:9px;margin-top:4px}
+#areaTool .at-result-card{background:linear-gradient(135deg,var(--g-50) 0%,#f3e5f5 100%);padding:9px;margin-top:4px}
 #areaTool .at-result-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;font-size:12px}
 #areaTool .at-result-row:last-child{margin-bottom:0}
 #areaTool .at-result-row .label{color:#555}
@@ -1417,26 +1076,23 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
 #areaTool .at-drop-zone{position:absolute;top:0;left:0;right:0;bottom:0;border:3px dashed transparent;transition:border-color .2s;pointer-events:none}
 #areaTool .at-canvas-wrap.dragover .at-drop-zone{border-color:#66bb6a;background:rgba(102,187,107,.1)}
 
-#areaTool .at-toast{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.8);color:#fff;padding:9px 22px;border-radius:8px;font-size:13px;z-index:9999;pointer-events:none;opacity:0;transition:opacity .3s}
+#areaTool .at-toast{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.8);color:#fff;padding:9px 22px;font-size:13px;z-index:9999;pointer-events:none;opacity:0;transition:opacity .3s}
 #areaTool .at-toast.show{opacity:1}
 /* [v383 2026-10-12 用户要求] 与全站统一最窄最短：5px→4px、拇指半透明灰圆角丸、轨道透明 */
 #areaTool .at-sidebar::-webkit-scrollbar{width:4px}
 #areaTool .at-sidebar::-webkit-scrollbar-track{background:transparent}
-#areaTool .at-sidebar::-webkit-scrollbar-thumb{background:rgba(100,116,139,.45);border-radius:999px}
+#areaTool .at-sidebar::-webkit-scrollbar-thumb{background:rgba(100,116,139,.45);}
 #areaTool .at-sidebar::-webkit-scrollbar-thumb:hover{background:rgba(100,116,139,.72)}
 
 /* ===== 05 三级管路规划与施工简图（移至主页面，二级简图下方） ===== */
 #tlPipePlanSection{
-  background:linear-gradient(165deg,var(--dg-700) 0%,var(--dg-800) 100%);
-  border-radius:var(--radius);padding:24px;margin:24px auto 0;max-width:1120px;
+  background:linear-gradient(165deg,var(--dg-700) 0%,var(--dg-800) 100%);padding:24px;margin:24px auto 0;max-width:1120px;
   color:#fff;box-shadow:var(--shadow);
 }
 
-
 /* ===== 二级管路 · 管路规划与施工简图 ===== */
 #pipePlanSection{
-  background:linear-gradient(165deg,var(--dg-700) 0%,var(--dg-800) 100%);
-  border-radius:var(--radius);padding:24px;margin:24px auto 0;max-width:1120px;
+  background:linear-gradient(165deg,var(--dg-700) 0%,var(--dg-800) 100%);padding:24px;margin:24px auto 0;max-width:1120px;
   color:#fff;box-shadow:var(--shadow);
 }
 #pipePlanSection .pp-title{
@@ -1445,32 +1101,35 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
   border-bottom:1px solid rgba(255,255,255,.08);
 }
 #pipePlanSection .pp-title .badge{
-  background:rgba(255,255,255,.18);color:#bbf7d0;border-radius:8px;
+  background:rgba(255,255,255,.18);color:#bbf7d0;
   width:30px;height:30px;display:flex;align-items:center;justify-content:center;
   font-size:14px;font-weight:800;
 }
 .pp-title-actions{margin-left:auto;display:flex;align-items:center;justify-content:flex-end;gap:12px;min-width:0}
 .pp-area-tag{font-size:13px;color:rgba(255,255,255,.7);font-weight:400;white-space:nowrap}
 .pp-area-tag b{color:#fff;font-weight:600}
-/* 地块规划参数紧凑行 */
+/* [v530] 旧「地块规划参数紧凑行」**深色皮肤瘦身为中性骨架**：删掉全部深色值
+   （color:#fff / rgba(255,255,255,.4) / #bbf7d0 / 半透明白底 / 深色描边 / 圆角），
+   保留仍被现役宿主依赖的**布局**——.pp-plan-bar 的 flex+12px 间距与内边距、
+   .pp-plan-item 的 flex+4px 间距（#grPipeSection 的「成组地块/子地块/总面积」行
+   完全依赖它，删了三个字段会粘连）、下拉框 26px 高与字重（三级 #tlCalSel* 依赖）。
+   不删布局的原因：这三条规则同时给 #grPipeSection / #tlPipePlanSection 兜底，
+   它们的专属皮肤只覆盖颜色，不覆盖 gap 与 select 高度。A/B 实测见 v530 提交说明。
+   仍在使用的 .pp-plan-bar-result / .pp-plan-spacer / .plan-apply-btn / .pp-select-sm 原样保留。 */
 .pp-plan-bar{
   display:flex;align-items:center;gap:12px;flex-wrap:wrap;
-  padding:10px 14px;margin-bottom:12px;
-  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);
-  border-radius:10px;font-size:13px;
+  padding:10px 14px;margin-bottom:12px;font-size:13px;
 }
-.pp-plan-item{display:flex;align-items:center;gap:4px;color:rgba(255,255,255,.75)}
-.pp-plan-label{font-size:11px;color:rgba(255,255,255,.4);font-weight:400}
-.pp-plan-val{font-weight:600;color:#bbf7d0;font-size:14px}
-.pp-plan-item input{width:50px;padding:3px 6px;border:1px solid rgba(255,255,255,.12);border-radius:5px;font-size:12px;font-weight:600;color:#fff;text-align:center;outline:none;background:rgba(255,255,255,.06);-moz-appearance:textfield}
-.pp-plan-item input:focus{border-color:rgba(187,247,208,.5)}
-.pp-plan-item select{height:26px;padding:3px 24px 3px 8px;border:1px solid rgba(255,255,255,.12);border-radius:5px;font-size:12px;font-weight:600;color:#fff;outline:none;background:rgba(255,255,255,.06)}
-.pp-plan-item select:focus{border-color:rgba(187,247,208,.5)}
+.pp-plan-item{display:flex;align-items:center;gap:4px}
+.pp-plan-label{font-size:11px;font-weight:400}
+.pp-plan-val{font-weight:600;font-size:14px}
+.pp-plan-item input{width:50px;padding:3px 6px;font-size:12px;font-weight:600;text-align:center;outline:none;-moz-appearance:textfield}
+.pp-plan-item select{height:26px;padding:3px 24px 3px 8px;font-size:12px;font-weight:600;outline:none}
 .pp-plan-item input:disabled,.pp-plan-item select:disabled{opacity:.45;cursor:not-allowed}
 .pp-plan-spacer{flex:1}
 .plan-apply-btn{
   min-height:28px;padding:5px 16px;background:rgba(255,255,255,.1);color:#fff;
-  border:1px solid rgba(255,255,255,.15);border-radius:8px;font-size:12px;font-weight:600;
+  border:1px solid rgba(255,255,255,.15);font-size:12px;font-weight:600;
   cursor:pointer;transition:all 0.2s;white-space:nowrap;
 }
 .plan-apply-btn:hover{background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.25)}
@@ -1487,14 +1146,14 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
 .pp-hint{text-align:center;padding:40px 20px;color:rgba(255,255,255,.4);font-size:14px}
 .pp-toolbar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:center}
 .pp-btn{
-  padding:7px 16px;border:1.5px solid rgba(255,255,255,.15);border-radius:8px;
+  padding:7px 16px;border:1.5px solid rgba(255,255,255,.15);
   background:rgba(255,255,255,.06);color:rgba(255,255,255,.7);font-size:13px;
   cursor:pointer;transition:all .2s;font-family:inherit;font-weight:500;
 }
 .pp-btn:hover{background:rgba(255,255,255,.1);color:#fff}
 .pp-btn.active{border-color:#86efac;background:rgba(134,239,172,.15);color:#bbf7d0;font-weight:600}
 .pp-btn-ghost{
-  padding:7px 14px;border:1px solid rgba(255,255,255,.1);border-radius:8px;
+  padding:7px 14px;border:1px solid rgba(255,255,255,.1);
   background:transparent;color:rgba(255,255,255,.5);font-size:12px;cursor:pointer;
   transition:all .2s;font-family:inherit;
 }
@@ -1508,30 +1167,28 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
 .pp-ge-title{font-size:11.5px;color:rgba(255,255,255,.6);margin-right:2px}
 .pp-ge-row{display:inline-flex;gap:3px}
 .pp-ge-sel{height:26px;max-width:132px;font:inherit;font-size:11.5px;padding:0 4px;
-  border:1px solid rgba(255,255,255,.18);border-radius:7px;background:rgba(0,0,0,.2);color:inherit}
+  border:1px solid rgba(255,255,255,.18);background:rgba(0,0,0,.2);color:inherit}
 /* [v193] 整组态下被禁用的块级编辑按钮：可看出是「暂时不能点」，而不是坏了 */
 #ppToolbar .pp-ge-disabled{opacity:.38;cursor:not-allowed;text-decoration:line-through}
 .pp-angle-control{
   display:inline-flex;align-items:center;gap:5px;height:30px;padding:0 8px;
-  border:1px solid rgba(255,255,255,.1);border-radius:8px;
+  border:1px solid rgba(255,255,255,.1);
   color:rgba(255,255,255,.68);font-size:12px;white-space:nowrap;
 }
 .pp-angle-control input{
-  width:54px;height:22px;padding:2px 5px;border:1px solid rgba(255,255,255,.12);
-  border-radius:6px;background:rgba(255,255,255,.06);color:#fff;
+  width:54px;height:22px;padding:2px 5px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;
   font:600 12px inherit;text-align:center;outline:none;-moz-appearance:textfield;
 }
 .pp-angle-control input:focus{border-color:rgba(187,247,208,.5)}
 .pp-pick-result{
   display:flex;align-items:center;gap:10px;flex-wrap:wrap;
-  margin:-4px 0 12px;padding:8px 12px;border:1px solid rgba(134,239,172,.22);
-  border-radius:8px;background:rgba(134,239,172,.08);color:#111827;
+  margin:-4px 0 12px;padding:8px 12px;border:1px solid rgba(134,239,172,.22);background:rgba(134,239,172,.08);color:#111827;
   font-size:12px;
 }
 .pp-pick-result strong{color:#111827;font-size:14px}
 .pp-pick-result .muted{color:#374151}
 .pp-btn-generate{
-  padding:7px 20px;border:none;border-radius:8px;
+  padding:7px 20px;border:none;
   background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;
   font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit;
 }
@@ -1573,10 +1230,10 @@ body.ry-zoneauto-off #ppRepartition,
 body.ry-zoneauto-off #ppRotateZones{
   opacity:.4;pointer-events:none;cursor:not-allowed;
 }
-.pp-select-sm{padding:5px 8px;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:rgba(0,0,0,.25);color:rgba(255,255,255,.8);font-size:12px;font-family:inherit;cursor:pointer;outline:none}
+.pp-select-sm{padding:5px 8px;border:1px solid rgba(255,255,255,.15);background:rgba(0,0,0,.25);color:rgba(255,255,255,.8);font-size:12px;font-family:inherit;cursor:pointer;outline:none}
 .pp-select-sm:focus{border-color:#16a34a}
 .pp-canvas-wrap{
-  position:relative;background:#f0f0f0;border-radius:12px;overflow:hidden;
+  position:relative;background:#f0f0f0;overflow:hidden;
   border:1px solid rgba(0,0,0,.1);height:750px;
 }
 #ppCanvas{display:block;cursor:grab}
@@ -1588,8 +1245,8 @@ body.ry-zoneauto-off #ppRotateZones{
 .pp-empty p{font-size:14px}
 .pp-legend{display:flex;gap:20px;padding:12px 4px 0;flex-wrap:wrap}
 .pp-legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:rgba(0,0,0,.5)}
-.pp-legend-item i{display:inline-block;width:20px;height:3px;border-radius:2px}
-.pp-diagram-wrap{margin-top:20px;background:#fff;border-radius:12px;padding:20px;position:relative}
+.pp-legend-item i{display:inline-block;width:20px;height:3px;}
+.pp-diagram-wrap{margin-top:20px;background:#fff;padding:20px;position:relative}
 .pp-diagram-title{
   font-size:16px;font-weight:700;color:#1a4731;margin-bottom:12px;
   display:flex;align-items:center;gap:8px;
@@ -1605,7 +1262,6 @@ body.ry-zoneauto-off #ppRotateZones{
   align-items:center;
   justify-content:center;
   border:1px dashed #cbd5e1;
-  border-radius:8px;
   background:#f8fafc;
   color:#64748b;
   font-size:13px;
@@ -1617,7 +1273,7 @@ body.ry-zoneauto-off #ppRotateZones{
 #filterSystemSection .fs-empty{
   flex:1;min-height:180px;margin:16px;
   display:flex;align-items:center;justify-content:center;
-  border:1px dashed #cbd5e1;border-radius:10px;background:#f8fafc;padding:24px;
+  border:1px dashed #cbd5e1;background:#f8fafc;padding:24px;
 }
 #filterSystemSection .fs-empty-inner{text-align:center}
 #filterSystemSection .fs-empty-title{font-size:17px;font-weight:700;color:#1f2937;margin-bottom:6px}
@@ -1657,7 +1313,6 @@ body{
 .brand{letter-spacing:0;color:#183828;font-size:15px;gap:8px}
 .brand-mark{
   width:28px;height:28px;font-size:13px;
-  border-radius:8px;
   background:linear-gradient(135deg,#166534,#0d9488);
   box-shadow:inset 0 0 0 1px rgba(255,255,255,.22),0 8px 18px rgba(20,83,45,.18);
 }
@@ -1670,29 +1325,20 @@ body{
 .ghost-button{
   font-size:12px;
   padding:5px 12px;
-  border-radius:8px;
   background:#fff;
   box-shadow:0 5px 14px rgba(15,23,42,.04);
 }
 
-
-
 .eyebrow{
-  border-radius:6px;
   background:rgba(13,148,136,.09);
   border-color:rgba(13,148,136,.18);
   color:#0f766e;
   letter-spacing:.12em;
 }
 
-
-
-
-
 .workspace{padding-bottom:54px}
 .workspace .container{gap:24px}
 .input-panel,.result-panel,.pipe-table-card,.network-card,.check-card,.materials-card,.method-note>div,#areaTool,#pipePlanSection{
-  border-radius:8px;
   border:1px solid rgba(15,23,42,.07);
 }
 .input-panel{
@@ -1704,14 +1350,12 @@ body{
   background:linear-gradient(180deg,#fff 0%,#f8fbf8 100%);
 }
 .step{
-  border-radius:7px;
   background:linear-gradient(135deg,#15803d,#0d9488);
   box-shadow:0 8px 16px rgba(22,101,52,.16);
 }
 fieldset{padding:18px 20px}
 legend{color:#53665b;letter-spacing:0}
 .input-shell{
-  border-radius:7px;
   border-color:#dbe5dd;
   background:#fbfdfb;
 }
@@ -1721,12 +1365,10 @@ legend{color:#53665b;letter-spacing:0}
   box-shadow:0 0 0 3px rgba(13,148,136,.12);
 }
 .field-hint{
-  border-radius:7px;
   background:#f7faf7;
   border-left-color:#7dd3c7;
 }
 .branch-selector button{
-  border-radius:7px;
   background:#fbfdfb;
 }
 .branch-selector button.selected{
@@ -1734,7 +1376,6 @@ legend{color:#53665b;letter-spacing:0}
   border-color:#0f766e;
 }
 .derivation-card,.pipe-deriv{
-  border-radius:8px;
   background:linear-gradient(135deg,#f1fbf4 0%,#ffffff 58%,#f0f9ff 100%);
   border-color:rgba(13,148,136,.18);
 }
@@ -1751,12 +1392,9 @@ legend{color:#53665b;letter-spacing:0}
   background:linear-gradient(135deg,#d9f99d 0%,#99f6e4 100%);
 }
 .optimal-specs span,.diameter-grid article,.branch-option{
-  border-radius:7px;
   background:rgba(255,255,255,.075);
 }
-.rs-apply-btn,.plan-apply-btn,.pp-btn,.pp-btn-ghost,.pp-btn-generate,#areaTool .at-btn,#areaTool .at-btn-mode,#areaTool .at-btn-action{
-  border-radius:7px;
-}
+
 .pipe-selection-section,.network-section,.details,.method-note{
   padding-bottom:42px;
 }
@@ -1776,11 +1414,9 @@ legend{color:#53665b;letter-spacing:0}
   background:#f5f8f6;
 }
 .water-source{
-  border-radius:8px;
   background:linear-gradient(135deg,#166534,#0d9488);
 }
 .pump-node{
-  border-radius:8px;
   box-shadow:0 8px 18px rgba(15,23,42,.08);
 }
 #areaTool{
@@ -1800,7 +1436,6 @@ legend{color:#53665b;letter-spacing:0}
 }
 #areaTool .at-section{border-bottom-color:#e7eee9}
 #areaTool .at-field input,#areaTool .at-field select{
-  border-radius:6px;
   border-color:#d6e1da;
   background:#fff;
 }
@@ -1820,12 +1455,12 @@ legend{color:#53665b;letter-spacing:0}
 }
 #areaTool .at-canvas-hint{
   position:absolute;left:50%;bottom:14px;transform:translateX(-50%);
-  max-width:86%;padding:6px 14px;border-radius:16px;
+  max-width:86%;padding:6px 14px;
   background:rgba(15,28,22,.72);color:#cfe6d8;font-size:11.5px;line-height:1.6;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;
   backdrop-filter:blur(2px);
 }
-@media(max-width:760px){#areaTool .at-canvas-hint{white-space:normal;text-align:center;border-radius:12px}}
+@media(max-width:760px){#areaTool .at-canvas-hint{white-space:normal;text-align:center;}}
 
 #pipePlanSection{
   background:
@@ -1838,26 +1473,15 @@ legend{color:#53665b;letter-spacing:0}
   margin-bottom:14px;
 }
 #pipePlanSection .pp-title .badge{
-  border-radius:7px;
   background:linear-gradient(135deg,rgba(134,239,172,.24),rgba(45,212,191,.18));
   color:#d9f99d;
-}
-.pp-plan-bar{
-  border-radius:8px;
-  background:rgba(255,255,255,.07);
-  border-color:rgba(255,255,255,.1);
 }
 .pp-plan-bar-result{
   background:rgba(134,239,172,.075);
   border-color:rgba(134,239,172,.18);
 }
-.pp-plan-item input,.pp-select-sm{
-  border-radius:6px;
-  background:rgba(255,255,255,.09);
-}
 .pp-toolbar{
   padding:8px;
-  border-radius:8px;
   background:rgba(0,0,0,.12);
   border:1px solid rgba(255,255,255,.08);
 }
@@ -1865,13 +1489,11 @@ legend{color:#53665b;letter-spacing:0}
   background:linear-gradient(135deg,#16a34a,#0d9488);
 }
 .pp-canvas-wrap{
-  border-radius:8px;
   background:#eef2ef;
   border:1px solid rgba(255,255,255,.18);
   box-shadow:0 16px 34px rgba(0,0,0,.16);
 }
 .pp-diagram-wrap{
-  border-radius:8px;
   border:1px solid rgba(15,23,42,.08);
   box-shadow:0 12px 28px rgba(15,23,42,.08);
 }
@@ -1887,8 +1509,7 @@ footer{
   .topbar{height:auto;padding:10px 0}
   .topbar .container{gap:10px;align-items:flex-start}
   .top-actions{flex-wrap:wrap;justify-content:flex-end}
-  
-  
+
   #areaTool{height:720px}
   #areaTool .at-main{flex-direction:column}
   #areaTool .at-sidebar{width:100%;max-height:300px;border-right:none;border-bottom:1px solid #d9e4dd}
@@ -1962,24 +1583,6 @@ main,footer{position:relative;z-index:1}
   color:#173F2D;
 }
 
-
-
-
-
-
-
-
-
-
-
-@media(max-width:900px){
-  
-  
-  
-  
-  
-  
-}
 .input-panel,.pipe-table-card,.network-card,.check-card,.materials-card,.method-note>div,#areaTool{
   background:#fff;
 }
@@ -2059,10 +1662,6 @@ main,footer{position:relative;z-index:1}
 #pipePlanSection .pp-title .badge{
   background:#dcfce7;
   color:#14532d;
-}
-.pp-plan-bar{
-  background:rgba(255,255,255,.08);
-  border-color:rgba(255,255,255,.14);
 }
 .pp-plan-bar-result{
   background:rgba(220,252,231,.09);
@@ -2145,7 +1744,6 @@ main,footer{position:relative;z-index:1}
 #pipePlanSection .pp-title .badge{
   background:rgba(255,255,255,.18);
   color:#dcfce7;
-  border-radius:9px;
 }
 #pipePlanSection .pp-area-tag{color:rgba(255,255,255,.78)}
 #pipePlanSection .pp-area-tag b{color:#fff}
@@ -2250,7 +1848,6 @@ input[type="reset"],
 }
 /* ===== /FLAT-BTN-OVERRIDE ===== */
 
-
 /* ===== RY-NAV: 主页导航嵌入（与 runye-landing 一致） ===== */
 .ry-nav{
   position:sticky;top:0;z-index:1500;
@@ -2288,8 +1885,8 @@ input[type="reset"],
 .ry-nav .search-btn{width:36px;height:36px;border:1px solid var(--s-200);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition);color:var(--s-600);}
 .ry-nav .search-btn:hover{background:var(--g-700);border-color:var(--g-700);color:#fff;}
 .ry-nav .mobile-menu-btn{display:none;flex-direction:column;gap:5px;padding:8px;cursor:pointer;}
-.ry-nav .mobile-menu-btn span{display:block;width:22px;height:2px;background:var(--s-700);border-radius:0;}
-.ry-nav .nav-home-btn{margin-left:8px;display:none;/* 隐藏「返回主页」：将来恢复改为 inline-flex */align-items:center;gap:6px;padding:9px 16px;background:var(--g-700);color:#fff;font-size:14px;font-weight:700;text-decoration:none;border:0;border-radius:0;cursor:pointer;transition:var(--transition);white-space:nowrap;letter-spacing:.5px;}
+.ry-nav .mobile-menu-btn span{display:block;width:22px;height:2px;background:var(--s-700);}
+.ry-nav .nav-home-btn{margin-left:8px;display:none;/* 隐藏「返回主页」：将来恢复改为 inline-flex */align-items:center;gap:6px;padding:9px 16px;background:var(--g-700);color:#fff;font-size:14px;font-weight:700;text-decoration:none;border:0;cursor:pointer;transition:var(--transition);white-space:nowrap;letter-spacing:.5px;}
 .ry-nav .nav-home-btn:hover{background:var(--g-800);}
 /* ===== /RY-NAV ===== */
 
@@ -2299,13 +1896,6 @@ input[type="reset"],
   .container{padding:0 16px}
 
   /* Hero 收紧 */
-  
-  
-  
-  
-  
-  
-  
 
   /* 触控放大：管线按钮 */
   .pp-btn,.pp-btn-ghost,.pp-btn-generate{min-height:42px;padding-top:9px;padding-bottom:9px;font-size:14px}
@@ -2412,8 +2002,7 @@ input[type="reset"],
 
 @media(max-width:480px){
   .container{padding:0 12px}
-  
-  
+
   .form-grid{grid-template-columns:1fr}
   .pp-plan-bar .pp-plan-item{flex:1 1 calc(50% - 8px)}
   .pp-plan-bar-result .pp-plan-item{flex:1 1 calc(50% - 8px)}
@@ -2423,13 +2012,12 @@ input[type="reset"],
   .ry-nav .nav-link{padding:10px 12px;font-size:12px}
 }
 
-
 /* ===== 扬程构成明细（#ppHeadBreak）：把结果栏的「水泵扬程」逐项拆开说明 =====
    与 .pp-calc-formula 同皮肤（深底 + 绿/黄高亮），放在它正下方；
    每项两行：第一行「名称 … 数值 … 占扬程比例」，第二行浅灰小字写清来源。 */
 .pp-head-break{
   margin:0 14px 12px;padding:7px 10px 8px;
-  background:rgba(15,23,42,.90);border:1px solid rgba(134,239,172,.18);border-radius:6px;
+  background:rgba(15,23,42,.90);border:1px solid rgba(134,239,172,.18);
   color:#e8eef7;font-size:12px;line-height:1.5;
 }
 .pp-head-break[hidden]{display:none!important}
@@ -2446,8 +2034,7 @@ input[type="reset"],
 .pp-head-break .pphb-v{margin-left:auto;color:#fde68a;font-weight:600;font-variant-numeric:tabular-nums}
 .pp-head-break .pphb-sum{border-top:1px solid rgba(134,239,172,.28);margin-top:5px;padding-top:4px}
 .pp-head-break .pphb-final .pphb-k{color:#a7f3d0;font-weight:700}
-.pp-head-break .pphb-final .pphb-v{color:#a7f3d0;background:rgba(134,239,172,.14);padding:0 4px;border-radius:3px}
-
+.pp-head-break .pphb-final .pphb-v{color:#a7f3d0;background:rgba(134,239,172,.14);padding:0 4px;}
 
 /* ===== FN-NAV: 顶部功能区导航（原品牌栏已隐藏，本栏为页面唯一吸顶栏） =====
    2026-09-13 去重：导航「皮肤」（底色/文字/高度/悬停/选中态）统一在 runye-nav.css，
@@ -2503,7 +2090,7 @@ body > .ry-nav .main-header{display:none!important}
 #detailsSection{justify-content:center;margin-top:0}
 /* 工具面板类区块：去掉居中收窄、圆角与两侧留白，工具本体铺满整个版面 */
 #areaTool,#pipePlanSection,#tlPipePlanSection{
-  max-width:none;margin:0;border-radius:0;border-left:0;border-right:0;
+  max-width:none;margin:0;border-left:0;border-right:0;
 }
 /* ===== 03 顶部绿条取消后的落位样式 =====
    原 .at-topbar（深绿条：标题 + 上传图片 / 导出截图 / 地图在线测量）整条移除，
@@ -2555,7 +2142,7 @@ body > .ry-nav .main-header{display:none!important}
   overflow:auto;overscroll-behavior:contain;
   padding:12px 14px 10px;margin:0;
   background:linear-gradient(180deg,#f8fbf9 0%,#f1f6f3 100%);
-  border:1px solid rgba(15,23,42,.07);border-radius:8px;
+  border:1px solid rgba(15,23,42,.07);
 }
 /* 注入的 .container 现在位于 .workspace 内部，需复位掉旧的 .workspace .container 网格规则 */
 #designInput #pipeTablesSection .container{
@@ -2592,7 +2179,6 @@ body > .ry-nav .main-header{display:none!important}
 #designInput .input-panel,
 #designInput .result-panel{
   border:1px solid rgba(21,128,61,.10);
-  border-radius:20px;
   box-shadow:0 10px 30px rgba(20,83,45,.07),0 1px 2px rgba(15,23,42,.04);
 }
 #designInput .input-panel{background:rgba(255,255,255,.96)}
@@ -2604,12 +2190,12 @@ body > .ry-nav .main-header{display:none!important}
 #designInput .panel-heading>div{gap:12px}
 #designInput .panel-heading h2{font-size:18px;letter-spacing:.01em;color:#143626}
 #designInput .panel-heading .step{
-  width:32px;height:32px;border-radius:10px;
+  width:32px;height:32px;
   background:linear-gradient(145deg,#22c55e,#15803d);
   box-shadow:0 5px 12px rgba(21,128,61,.22);
 }
 #designInput .text-button{
-  padding:7px 11px;border:1px solid #d8e9dc;border-radius:9px;
+  padding:7px 11px;border:1px solid #d8e9dc;
   background:#fff;color:#4b7257;font-size:12px;
 }
 #designInput .text-button:hover{background:#f0fdf4;border-color:#9ed1ab}
@@ -2617,7 +2203,6 @@ body > .ry-nav .main-header{display:none!important}
   margin:14px 16px 0;
   padding:15px 15px 16px;
   border:1px solid #e5eee7;
-  border-radius:14px;
   background:linear-gradient(180deg,#ffffff 0%,#fbfdfb 100%);
 }
 #designInput .input-panel fieldset:last-child{margin-bottom:16px;border-bottom:1px solid #e5eee7}
@@ -2630,22 +2215,21 @@ body > .ry-nav .main-header{display:none!important}
 #designInput .input-panel legend span{color:#166534}
 #designInput .form-grid{gap:11px 12px}
 #designInput .field>span:first-child{font-size:11px;color:#647b6b;letter-spacing:.01em}
-#designInput .input-shell{border-radius:9px;background:#fcfefc}
+#designInput .input-shell{background:#fcfefc}
 #designInput .input-shell input{padding:10px 11px;font-size:14px}
 #designInput .input-shell em{font-size:11px;color:#7c9a83;padding-right:10px}
 #designInput .branch-block{
-  margin-top:14px;padding:12px 12px 10px;
-  border-radius:11px;background:#f1faf3;border:1px solid #dceee0;
+  margin-top:14px;padding:12px 12px 10px;background:#f1faf3;border:1px solid #dceee0;
 }
 #designInput .branch-label{font-size:11px;color:#376547;font-weight:700}
 #designInput .branch-options{gap:10px;margin-top:8px}
 #designInput .branch-options>div{gap:6px}
-#designInput .branch-options button{padding:7px 10px;font-size:11px;border-radius:8px}
+#designInput .branch-options button{padding:7px 10px;font-size:11px;}
 #designInput .branch-block small{font-size:10px;line-height:1.5;color:#789080}
-#designInput .field-hint{margin-top:12px;padding:9px 11px;font-size:11px;border-radius:9px}
+#designInput .field-hint{margin-top:12px;padding:9px 11px;font-size:11px;}
 #designInput .mw-col-right{gap:18px}
 #designInput .mw-col-right>.result-panel{flex-basis:54%}
-#designInput #pipeTablesSection{flex-basis:46%;border-radius:16px;padding:14px 16px 12px}
+#designInput #pipeTablesSection{flex-basis:46%;padding:14px 16px 12px}
 @media(min-width:1101px) and (max-width:1240px){
   #designInput .mw-shell{grid-template-columns:420px minmax(0,1fr);padding-left:14px;padding-right:14px}
 }
@@ -2673,7 +2257,6 @@ body > .ry-nav .main-header{display:none!important}
   #designInput #pipeTablesSection .selection-table td,
   #designInput #pipeTablesSection .selection-table th{padding:10px 12px;font-size:12px}
 }
-
 
 /* ============================================================================
    2026 首屏「满屏版面」：01 标准分区预设
@@ -2705,24 +2288,24 @@ body > .ry-nav .main-header{display:none!important}
   #designInput .panel-heading{padding:12px 16px 10px}
   #designInput .panel-heading>div{gap:9px}
   #designInput .panel-heading h2{font-size:15px}
-  #designInput .panel-heading .step{width:25px;height:25px;border-radius:8px;font-size:11px}
-  #designInput .text-button{padding:5px 9px;font-size:11px;border-radius:8px}
-  #designInput .input-panel fieldset{margin:9px 10px 0;padding:9px 11px 11px;border-radius:11px}
+  #designInput .panel-heading .step{width:25px;height:25px;font-size:11px}
+  #designInput .text-button{padding:5px 9px;font-size:11px;}
+  #designInput .input-panel fieldset{margin:9px 10px 0;padding:9px 11px 11px;}
   #designInput .input-panel fieldset:last-child{margin-bottom:10px}
   #designInput .input-panel legend{margin-top:0;margin-bottom:6px;padding:0 6px;font-size:10.5px}
   #designInput .form-grid{gap:7px 9px}
   #designInput .field{gap:3px}
   #designInput .field>span:first-child{font-size:10.5px;line-height:1.3}
-  #designInput .input-shell{border-radius:8px;border-width:1px}
+  #designInput .input-shell{border-width:1px}
   #designInput .input-shell input{height:30px;padding:0 9px;font-size:12.5px;box-sizing:border-box}
   #designInput .input-shell em{font-size:10.5px;padding-right:8px}
-  #designInput .branch-block{margin-top:8px;padding:8px 9px 7px;border-radius:9px}
+  #designInput .branch-block{margin-top:8px;padding:8px 9px 7px;}
   #designInput .branch-label{font-size:10.5px;margin-bottom:5px}
   #designInput .branch-options{gap:8px}
   #designInput .branch-options>div{gap:5px}
-  #designInput .branch-options button{padding:5px 8px;font-size:10.5px;border-radius:7px}
+  #designInput .branch-options button{padding:5px 8px;font-size:10.5px;}
   #designInput .branch-block>small{margin-top:5px;font-size:9.5px;line-height:1.4}
-  #designInput .field-hint{margin-top:7px;padding:6px 9px;font-size:10px;line-height:1.45;border-radius:8px;border-left-width:2px}
+  #designInput .field-hint{margin-top:7px;padding:6px 9px;font-size:10px;line-height:1.45;border-left-width:2px}
 
   /* —— ② 方案区（中栏通高，内容超出时本栏内滚动） —— */
   #designInput .mw-col-right{gap:0;min-height:0}
@@ -2747,11 +2330,9 @@ body > .ry-nav .main-header{display:none!important}
   #designInput .pump-metrics span{font-size:11px;margin-top:2px}
   #designInput .pump-metrics b{font-size:18px}
   #designInput .motor-row{font-size:11.5px;padding:4px 0}
-  
+
   #designInput .metric-label{font-size:9.5px}
-  
-  
-  
+
   #designInput .branch-compare{padding:9px 16px}
   #designInput .branch-compare-title{margin-bottom:6px}
   #designInput .branch-compare-title span{font-size:12.5px}
@@ -2760,7 +2341,7 @@ body > .ry-nav .main-header{display:none!important}
   #designInput .branch-option strong{font-size:12.5px}
   #designInput .branch-option span{font-size:10.5px}
   #designInput .branch-option b{font-size:11.5px}
-  
+
   #designInput .result-list{padding:10px 16px}
   #designInput .result-list div{padding:3px 0}
   #designInput .result-list dt,#designInput .result-list dd{font-size:11px}
@@ -2779,7 +2360,7 @@ body > .ry-nav .main-header{display:none!important}
   #designInput .mw-col-query>#pipeTablesSection{flex:1 1 auto;min-height:0;overflow:auto}
   #designInput #pipeTablesSection{
     flex:1 1 auto;padding:0;margin:0;
-    border:1px solid rgba(21,128,61,.10);border-radius:0;
+    border:1px solid rgba(21,128,61,.10);
     background:#fff;
   }
   #designInput #pipeTablesSection .detail-heading{margin-bottom:7px;gap:8px}
@@ -2789,8 +2370,7 @@ body > .ry-nav .main-header{display:none!important}
   #designInput #pipeTablesSection .pipe-table-grid{grid-template-columns:1fr;gap:0}
   /* 右栏通高：两张表从卡片顶部起排，整栏铺满不留空 */
   #designInput #pipeTablesSection .container{display:flex;flex-direction:column;min-height:100%}
-  #designInput #pipeTablesSection .pipe-table-card{
-    border-radius:0;box-shadow:none;background:transparent;
+  #designInput #pipeTablesSection .pipe-table-card{box-shadow:none;background:transparent;
     border-bottom:1px solid rgba(21,128,61,.12);
   }
   #designInput #pipeTablesSection .pipe-table-card:last-child{border-bottom:0}
@@ -2802,7 +2382,7 @@ body > .ry-nav .main-header{display:none!important}
   #designInput #pipeTablesSection .selection-table th{padding:5px 10px;font-size:9.5px}
   #designInput #pipeTablesSection .selection-table td{padding:5px 10px;font-size:11.5px}
   #designInput #pipeTablesSection .selection-table tbody tr:last-child td{border-bottom:0}
-  
+
 }
 
 /* 矮窗口（笔记本 1366×768 等）再压一档；仍不足时由各面板内部滚动兜底 */
@@ -2823,8 +2403,7 @@ body > .ry-nav .main-header{display:none!important}
   #designInput .optimal-card,#designInput .pump-card{padding:8px 14px}
   #designInput .optimal-title strong{font-size:15.5px}
   #designInput .pump-metrics strong{font-size:26px}
-  
-  
+
   #designInput .branch-compare{padding:7px 14px}
   /* 管径查询区已改「无外层留白」的紧凑版式（见上），矮屏不再加回 padding，
      只把单元格行高再压一档（字号沿用上方规则，不放大） */
@@ -2873,7 +2452,7 @@ body > .ry-nav .main-header{display:none!important}
   max-width:min(520px,calc(100% - 24px));
   pointer-events:none;                 /* 不遮挡画布上的绘制/拾取操作 */
   background:rgba(251,253,251,.94);
-  border:1px solid #e2ebe5;border-radius:8px;
+  border:1px solid #e2ebe5;
   box-shadow:0 2px 8px rgba(15,23,42,.06);
   font-size:11.5px;line-height:1.45;text-align:left;color:#5a656a;
 }
@@ -2886,7 +2465,7 @@ body > .ry-nav .main-header{display:none!important}
   position:absolute;top:8px;left:10px;z-index:3;
   display:flex;align-items:center;gap:6px;flex-wrap:nowrap;
   max-width:calc(100% - 20px);
-  padding:5px 7px;border-radius:9px;
+  padding:5px 7px;
   background:rgba(251,253,251,.94);
   border:1px solid #e2ebe5;
   box-shadow:0 2px 8px rgba(15,23,42,.06);
@@ -2908,7 +2487,7 @@ body > .ry-nav .main-header{display:none!important}
    所以窄屏（≤1100px，上下自然流）与 JS 未执行时都不会有任何多余元素或间距。 */
 #pipePlanSection .pp-grip{display:none}
 @media(min-width:1101px){
-  
+
   /* 版心：高度 = 一屏 − 吸顶导航（不再扣标题条的 38px，省下的高度全部给图纸） */
   #pipePlanSection > .pp-body{
     flex:0 0 auto;
@@ -3032,11 +2611,11 @@ body > .ry-nav .main-header{display:none!important}
   #pipePlanSection .pp-stage>.pp-pick-result{grid-column:1;grid-row:1;margin:0;flex:0 0 auto}
   #pipePlanSection .pp-stage>.pp-canvas-wrap{
     grid-column:1;grid-row:2;
-    margin:0;height:auto;min-height:300px;border-radius:10px;
+    margin:0;height:auto;min-height:300px;
   }
   #pipePlanSection .pp-stage>.pp-legend{grid-column:1;grid-row:3;margin:0;padding:0 2px;flex:0 0 auto}
   /* 施工简图：与版心同宽 */
-  #pipePlanSection .pp-diagram-wrap{margin:0 14px 14px;border-radius:10px}
+  #pipePlanSection .pp-diagram-wrap{margin:0 14px 14px;}
   /* [v249 2026-10-06 用户要求] 工具轨「靠右折叠」：点画布右上角把手，工具列（网格第 3 列）
      宽度收到 0、整条右滑淡出，画布加宽；再点展开。是横向收合，不是上下手风琴。 */
   #pipePlanSection .pp-stage{transition:grid-template-columns .18s ease}
@@ -3066,7 +2645,7 @@ body > .ry-nav .main-header{display:none!important}
     width:24px;height:24px;padding:0;align-items:center;justify-content:center;
     font-size:13px;line-height:1;font-family:inherit;
     background:rgba(251,253,251,.94);color:#4b5a53;
-    border:1px solid #e2ebe5;border-radius:7px;
+    border:1px solid #e2ebe5;
     box-shadow:0 2px 8px rgba(15,23,42,.06);
     cursor:pointer;
   }
@@ -3077,7 +2656,7 @@ body > .ry-nav .main-header{display:none!important}
     right:0;width:auto;min-width:26px;height:auto;padding:14px 5px;
     writing-mode:vertical-rl;letter-spacing:5px;
     font-size:12px;font-weight:600;color:#2f6d43;
-    background:#fbfdfc;border:1px solid #b9d2c5;border-right:0;border-radius:8px 0 0 8px;
+    background:#fbfdfc;border:1px solid #b9d2c5;border-right:0;
     box-shadow:0 2px 10px rgba(15,23,42,.12);
   }
   #pipePlanSection .pp-rail-toggle.pp-rail-tab:hover{color:#173e32;background:#f2f8f4}
@@ -3091,7 +2670,7 @@ body > .ry-nav .main-header{display:none!important}
     min-width:26px;height:auto;padding:14px 5px;align-items:center;justify-content:center;
     writing-mode:vertical-rl;letter-spacing:5px;line-height:1.4;
     font-size:12px;font-weight:600;color:#2f6d43;font-family:inherit;
-    background:#fbfdfc;border:1px solid #b9d2c5;border-right:0;border-radius:8px 0 0 8px;
+    background:#fbfdfc;border:1px solid #b9d2c5;border-right:0;
     box-shadow:0 2px 10px rgba(15,23,42,.12);cursor:pointer;
   }
   .pp-rail-tab-float:hover{color:#173e32;background:#f2f8f4}
@@ -3151,7 +2730,7 @@ body > .ry-nav .main-header{display:none!important}
 #grPipeSection #grCanvas{display:block;width:100%;height:100%}
 /* [v234] 紧贴版式：画布容器沿用二级页 .pp-canvas-wrap 时带了深色舞台的圆角/投影/
    1px 描边（左右各多 1px、还显悬浮）——本页是浅色总览页，一律压平。 */
-#grPipeSection .pp-canvas-wrap{border:0;border-radius:0;box-shadow:none;background:#fff}
+#grPipeSection .pp-canvas-wrap{border:0;box-shadow:none;background:#fff}
 #grPipeSection #grCanvas{cursor:grab}              /* [v232] 可拖拽平移的暗示 */
 #grPipeSection #grCanvas.gr-panning{cursor:grabbing}
 #grPipeSection #grCanvas.gr-dragging{cursor:grabbing}
@@ -3161,28 +2740,28 @@ body > .ry-nav .main-header{display:none!important}
    **间距写了两遍**：容器 #grPipeSection .pp-side 的 gap:8px 与 .gr-card 自己的
    margin-bottom:8px 叠加。⇒ 间距单一来源：卡不再自带竖向外边距，全部交给容器的 gap。
    （.gr-card 只在本页左栏与 #grHydPanel 里用，面板那处本就写了 margin:0，互不影响。） */
-.gr-card{border:1px solid rgba(31,41,55,.14);border-radius:8px;padding:7px 8px;margin:0;background:rgba(255,255,255,.5)}
+.gr-card{border:1px solid rgba(31,41,55,.14);padding:7px 8px;margin:0;background:rgba(255,255,255,.5)}
 .gr-card-title{font-weight:700;font-size:12px;color:#1f2937;margin-bottom:5px}
 .gr-row{display:flex;align-items:center;gap:5px;margin:3px 0;font-size:11.5px}
 .gr-label{color:#64748b;white-space:nowrap}
 .gr-val{font-weight:700;color:#0f766e;min-width:36px;display:inline-block;text-align:right}
 /* #94a3b8 在浅底上只有 2.56:1（verify_text_contrast 实测不达标）⇒ 与 .gr-label 同色系调深 */
 .gr-unit{color:#5f6b7a;font-size:10.5px}
-.gr-sel{height:24px;font:inherit;font-size:11.5px;padding:0 4px;border:1px solid rgba(31,41,55,.18);border-radius:6px;background:#fff}
+.gr-sel{height:24px;font:inherit;font-size:11.5px;padding:0 4px;border:1px solid rgba(31,41,55,.18);background:#fff}
 .gr-btns{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
 .gr-btn{height:24px!important;padding:0 7px!important;font-size:11.5px!important}
 .gr-btn.active{background:rgba(124,58,237,.18);border-color:rgba(124,58,237,.5);color:#5b21b6;font-weight:600}
 .gr-hint{color:#5f6b7a;font-size:10.5px;line-height:1.45;margin-top:4px}
 .gr-empty{color:#5f6b7a;font-size:11px;line-height:1.5}
 /* 子地块列表 */
-.gr-block{margin:4px 0;padding:5px 6px;border:1px solid rgba(31,41,55,.12);border-radius:6px;background:rgba(255,255,255,.7)}
+.gr-block{margin:4px 0;padding:5px 6px;border:1px solid rgba(31,41,55,.12);background:rgba(255,255,255,.7)}
 .gr-block.cur{border-color:rgba(124,58,237,.55);background:rgba(124,58,237,.07)}
 .gr-block-hd{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:#1f2937}
 .gr-block-mu{color:#0f766e;font-weight:700}
 .gr-block-meta{color:#64748b;font-size:10.5px;margin:2px 0 4px}
 .gr-block-btns{display:flex;gap:4px}
 .gr-block-btns .gr-btn{flex:1 1 0}
-.gr-tag{font-size:10px;padding:1px 5px;border-radius:4px;background:rgba(22,163,74,.14);color:#166534}
+.gr-tag{font-size:10px;padding:1px 5px;background:rgba(22,163,74,.14);color:#166534}
 .gr-tag.no{background:rgba(100,116,139,.14);color:#64748b}
 /* 材料汇总表 */
 .gr-mat table{width:100%;border-collapse:collapse;font-size:11px}
@@ -3195,8 +2774,7 @@ body > .ry-nav .main-header{display:none!important}
 /* [v239] 「驳接点/管径/水头损失」从左侧栏搬到画布右侧的悬浮面板（同三级页图层控制面板款）：
    只浮在画布上、可拖动/调宽/折叠；把卡搬进来后去掉卡的边框与背景，避免双层框 */
 #grHydPanel{position:absolute;top:8px;right:8px;z-index:9994;width:420px;max-width:calc(100% - 16px);
-  max-height:calc(100% - 16px);overflow:auto;background:rgba(255,255,255,.97);border:1px solid #cbd5e1;
-  border-radius:10px;box-shadow:0 10px 28px rgba(15,23,42,.18);
+  max-height:calc(100% - 16px);overflow:auto;background:rgba(255,255,255,.97);border:1px solid #cbd5e1;box-shadow:0 10px 28px rgba(15,23,42,.18);
   font:12px/1.6 system-ui,-apple-system,"Microsoft YaHei",sans-serif;color:#1f2937}
 #grHydPanel.grp-hidden{display:none}
 #grHydPanel>.grp-head{display:flex;align-items:center;gap:6px;padding:6px 9px;background:#f1f5f9;
@@ -3205,14 +2783,14 @@ body > .ry-nav .main-header{display:none!important}
 #grHydPanel #grpGrip{cursor:ew-resize;color:#94a3b8;padding:0 3px;user-select:none;touch-action:none}
 #grHydPanel #grpCaret{color:#64748b}
 #grHydPanel>.grp-body{padding:7px 9px 9px}
-#grHydPanel .gr-card{border:0;border-radius:0;padding:0;margin:0;background:transparent}
+#grHydPanel .gr-card{border:0;padding:0;margin:0;background:transparent}
 #grHydPanel .gr-card-title{display:none}
 /* [v235] 三级管路导入层：图例提示 + 工具栏开关点亮态（!important 仅颜色/边框/字重，eng_skin 纪律） */
 .gr-tl-leg-hint{padding:4px 9px 2px;font-size:10.5px;color:#5f6b7a;line-height:1.5}
 #grPipeSection .gr-btn-on{background:#0f766e!important;border-color:#0f766e!important;color:#fff!important;font-weight:700}
 #grPipeSection .gr-btn-on:hover{background:#115e59!important;color:#fff!important}
 .gr-hyd-sum{display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;margin:2px 0 5px}
-.gr-hyd-sum>div{display:flex;flex-direction:column;gap:1px;padding:3px 6px;border-radius:6px;background:rgba(245,158,11,.1)}
+.gr-hyd-sum>div{display:flex;flex-direction:column;gap:1px;padding:3px 6px;background:rgba(245,158,11,.1)}
 .gr-hyd-sum span{font-size:10px;color:#64748b}
 .gr-hyd-sum b{font-size:14px;color:#7c2d12}
 .gr-hyd-tbl{width:100%;border-collapse:collapse;font-size:10.5px}
@@ -3221,12 +2799,12 @@ body > .ry-nav .main-header{display:none!important}
 .gr-hyd-tbl th:nth-child(2),.gr-hyd-tbl td:nth-child(2){text-align:left}
 /* 三级页顶部的「按块编辑」返回条 */
 .gr-tl-bar{display:flex;align-items:center;gap:8px;margin:0 0 8px;padding:6px 10px;
-  border:1px solid rgba(124,58,237,.35);border-radius:8px;background:rgba(124,58,237,.08);
+  border:1px solid rgba(124,58,237,.35);background:rgba(124,58,237,.08);
   font-size:12px;color:#5b21b6}
-.gr-tl-tag{font-weight:700;padding:2px 7px;border-radius:5px;background:#7c3aed;color:#fff;font-size:10.5px;white-space:nowrap}
+.gr-tl-tag{font-weight:700;padding:2px 7px;background:#7c3aed;color:#fff;font-size:10.5px;white-space:nowrap}
 .gr-tl-sep{color:#a78bfa}
 .gr-tl-btn{margin-left:auto;height:26px;padding:0 10px;font:inherit;font-size:11.5px;cursor:pointer;
-  border:1px solid rgba(124,58,237,.45);border-radius:6px;background:#fff;color:#5b21b6;white-space:nowrap}
+  border:1px solid rgba(124,58,237,.45);background:#fff;color:#5b21b6;white-space:nowrap}
 .gr-tl-btn:hover{background:#7c3aed;color:#fff}
 
 /* —— [v194] 新页复用二级页的 .pp-* 时，必须**整体改写成浅色卡片风** ——
@@ -3244,7 +2822,7 @@ body > .ry-nav .main-header{display:none!important}
 #grPipeSection .pp-side{
   align-self:start;max-height:100%;
   display:flex;flex-direction:column;gap:6px;
-  padding:7px 8px 6px;border-radius:0;border:0;
+  padding:7px 8px 6px;border:0;
   background:linear-gradient(180deg,#f8fbf9 0%,#f2f7f4 100%);
 }
 #grPipeSection .pp-side>*{flex:0 0 auto}
@@ -3252,10 +2830,10 @@ body > .ry-nav .main-header{display:none!important}
 #grPipeSection .pp-side>.gr-card,
 #grPipeSection .pp-side>.pp-plan-bar{margin-bottom:0}
 /* 制图区：内边距撤掉（画布直接顶到四边），圆角撤掉；它的左描边 = 与左栏的分界（单线，不双线） */
-#grPipeSection .pp-stage{background:#fff;border:1px solid #e4ece7;border-radius:0;padding:0}
+#grPipeSection .pp-stage{background:#fff;border:1px solid #e4ece7;padding:0}
 #grPipeSection .pp-plan-bar{
   display:flex;align-items:center;gap:8px;flex-wrap:wrap;
-  padding:6px 9px;margin:0;border-radius:8px;
+  padding:6px 9px;margin:0;
   background:#fff;border:1px solid #e4ece7;font-size:11px;
 }
 #grPipeSection .pp-plan-item{color:#4b5563}
@@ -3265,14 +2843,13 @@ body > .ry-nav .main-header{display:none!important}
    与画布之间的 1px 分隔线（原来 margin-bottom 6px + stage 内边距 9px 是「悬浮感」主因） */
 #grPipeSection .pp-toolbar{
   display:flex;align-items:center;gap:6px;flex-wrap:wrap;
-  padding:6px 9px;margin:0;border-radius:0;border:0;border-bottom:1px solid #e4ece7;
+  padding:6px 9px;margin:0;border:0;border-bottom:1px solid #e4ece7;
   background:#f4f8f6;
 }
 #grPipeSection .pp-tool-hint{color:#4b5563;font-size:11.5px}
 #grPipeSection .pp-sep{width:1px;height:20px;background:rgba(31,41,55,.18);margin:0 2px}
 #grPipeSection .pp-btn-ghost{
-  background:#fff;color:#1f2937;border:1px solid rgba(31,41,55,.22);
-  border-radius:8px;cursor:pointer;font-family:inherit;
+  background:#fff;color:#1f2937;border:1px solid rgba(31,41,55,.22);cursor:pointer;font-family:inherit;
 }
 #grPipeSection .pp-btn-ghost:hover{background:#eef4f1;color:#1f2937}
 /* 两段式「清空」的武装态：第一次点后按钮变红，3 秒内再点才真清
@@ -3291,14 +2868,14 @@ body > .ry-nav .main-header{display:none!important}
   align-self:start;max-height:100%;
   display:flex;flex-direction:column;gap:8px;
   overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
-  padding:9px;border-radius:12px;
+  padding:9px;
   background:linear-gradient(180deg,#f8fbf9 0%,#f2f7f4 100%);
   border:1px solid #dde8e1;
 }
 #tlPipePlanSection .pp-side>*{flex:0 0 auto}
 #tlPipePlanSection .pp-side .pp-plan-bar{
   display:block!important;margin:0!important;padding:8px 11px;
-  min-height:0;border-radius:10px;
+  min-height:0;
   background:#fff;border:1px solid #e4ece7;
   font-size:11px;
 }
@@ -3359,7 +2936,7 @@ body > .ry-nav .main-header{display:none!important}
 .tl-plan-result .pp-plan-cols-head{border-bottom:1px solid #e4ece7;min-height:18px;color:#94a3b8;font-size:11px;font-weight:600} /* 2026-09-24 用户要求：表头不小于正文(11px)并适当加粗(600) */
 .tl-plan-result .pp-cols-h1{flex:0 0 88px;text-align:center}
 .tl-plan-result .pp-cols-h2{flex:1 1 auto;text-align:center;color:#b45309}
-.tl-plan-result .pp-cal-sel{width:100%;max-width:100%;box-sizing:border-box;font:inherit;font-size:11px;font-weight:700;color:#b45309;text-align:center;text-align-last:center;background:#fff7ed;border:1px solid #fed7aa;border-radius:5px;padding:1px 2px;cursor:pointer}
+.tl-plan-result .pp-cal-sel{width:100%;max-width:100%;box-sizing:border-box;font:inherit;font-size:11px;font-weight:700;color:#b45309;text-align:center;text-align-last:center;background:#fff7ed;border:1px solid #fed7aa;padding:1px 2px;cursor:pointer}
 .tl-plan-result .pp-cal-sel:focus{outline:none;border-color:#f59e0b}
 .tl-plan-result .pp-cal-sel option{color:#1f2937;font-weight:400}
 /* 目标流速位于水力项表头下方、联合流量上方，按结果栏普通行参与布局。 */
@@ -3410,7 +2987,7 @@ body > .ry-nav .main-header{display:none!important}
 #pipePlanSection.sys-view > #ppDiagramWrap{
   display:flex;flex-direction:column;
   height:calc(100vh - var(--fn-nav-h));
-  margin:0;border-radius:0;border-left:0;border-right:0;border-bottom:0;
+  margin:0;border-left:0;border-right:0;border-bottom:0;
 }
 #pipePlanSection.sys-view > #ppDiagramWrap > #ppDiagramContent{
   flex:1 1 auto;min-height:0;display:flex;flex-direction:column;overflow:auto;
@@ -3851,16 +3428,8 @@ body{
 .ry-nav .main-header{background:#fff!important;border-bottom:1px solid var(--u-line)!important;box-shadow:none!important}
 .ry-nav .brand-logo{background:var(--u-accent)!important;box-shadow:none!important}
 
-
-
-
-
-
-
-
 /* ═══ 4. 01 输入设计参数 → 工程属性面板 ══════════════════════════════════ */
 /* 4.1 工作区底：撤掉径向绿光晕 + 绿白渐变（工具模式同样） */
-
 
 /* 4.2 面板外壳：白底 + 1px 描边 + 无投影；工具模式下与栏位齐平（去掉外框） */
 #designInput .input-panel,
@@ -3871,7 +3440,6 @@ body{
 }
 body.ry-tool #designInput .input-panel,
 body.ry-tool #designInput .result-panel{border:0!important}
-
 
 /* 4.3 分区标题条「01 输入设计参数」：已按要求取消（信息重复、白占一行高度）。
    三条 ::before 标题条（4.3 / 5.0 / 6.0）均已移除，分组靠 legend 条与分隔线区分。 */
@@ -3892,7 +3460,6 @@ body.ry-tool #designInput .result-panel{border:0!important}
   color:var(--u-ink-2)!important;font-weight:700!important;
   letter-spacing:.06em;text-transform:none!important;
 }
-
 
 /* 4.5 表单：标签 / 输入框 / 单位统一对齐；分组内容左右留 12px 内边距 */
 
@@ -3931,7 +3498,6 @@ body.ry-tool #designInput .result-panel{border:0!important}
   box-shadow:inset 2px 0 0 var(--u-accent)!important;
 }
 
-
 /* 4.7 「恢复示例」保留功能与位置，仅降低视觉权重 */
 #designInput .panel-foot{border-top:1px solid var(--u-line-2);padding:8px 12px 10px}
 #designInput .panel-foot .text-button{
@@ -3946,8 +3512,6 @@ body.ry-tool #designInput .result-panel{border:0!important}
 /* 5.0 结果区标题条「02 实际方案 · 实时计算」：已按要求取消。 */
 /* 5.1 面积条（原白字深绿底 → 浅灰底深字） */
 
-
-
 #designInput .area-strip small{color:var(--u-ink-3)!important}
 /* 5.2 推荐结果块：左 3px 标识线 + 浅底（不再使用高饱和绿色大面积填充） */
 #designInput .optimal-card{
@@ -3957,26 +3521,15 @@ body.ry-tool #designInput .result-panel{border:0!important}
 
 #designInput .optimal-top b{background:var(--u-accent-bg)!important;color:var(--u-accent)!important;border:1px solid var(--u-accent-line)}
 
-
 #designInput .optimal-specs span{background:var(--u-bg-2)!important;border:1px solid var(--u-line-2)!important;color:var(--u-ink-2)!important}
 #designInput .optimal-specs b{color:var(--u-accent)!important}
 
 /* 5.3 水泵工作点：浅灰底 + 左标识线（原亮绿渐变卡片取消） */
 
-
 #designInput .confidence{background:#fff!important;color:var(--u-ink-2)!important;border:1px solid var(--u-line-2)}
-
-
-
-
 
 #designInput .motor-row strong{color:var(--u-ink)!important}
 /* 5.4 规格卡片组 */
-
-
-
-
-
 
 /* 5.5 支管方案对比 */
 
@@ -3985,7 +3538,7 @@ body.ry-tool #designInput .result-panel{border:0!important}
 #designInput .branch-compare-title .layout-inline{display:flex;gap:4px;margin-left:auto}
 #designInput .branch-compare-title .layout-inline button{
   background:#fff!important;border:1px solid var(--u-line)!important;color:var(--u-ink-2)!important;
-  padding:3px 10px;font-size:11.5px;line-height:1.4;border-radius:6px;cursor:pointer;white-space:nowrap}
+  padding:3px 10px;font-size:11.5px;line-height:1.4;cursor:pointer;white-space:nowrap}
 #designInput .branch-compare-title .layout-inline button:hover{
   border-color:var(--u-ink-3)!important;color:var(--u-ink)!important;transform:none!important}
 #designInput .branch-compare-title .layout-inline button.selected{
@@ -3993,17 +3546,11 @@ body.ry-tool #designInput .result-panel{border:0!important}
   color:var(--u-accent)!important;font-weight:700!important;
   box-shadow:inset 2px 0 0 var(--u-accent)!important}
 
-
-
 #designInput .branch-compare-head{color:var(--u-ink-3)!important;background:var(--u-bg-2);border-bottom:1px solid var(--u-line-2)}
 #designInput .branch-option{background:#fff!important;border:1px solid var(--u-line)!important}
 
-
-
-
 #designInput .branch-option b{color:var(--u-accent)!important}
 /* 5.6 结果明细 */
-
 
 #designInput .result-list dd{color:var(--u-ink)!important}
 
@@ -4018,10 +3565,6 @@ body.ry-tool #designInput .result-panel{border:0!important}
   border-bottom:1px solid var(--u-line-2)!important;
 }
 
-
-
-
-
 /* 6.2 低对比度表头 + 浅灰边框 */
 #designInput #pipeTablesSection .selection-table th{
   background:var(--u-bg-2)!important;color:var(--u-ink-2)!important;
@@ -4029,15 +3572,11 @@ body.ry-tool #designInput .result-panel{border:0!important}
   text-transform:none!important;letter-spacing:0!important;
 }
 
-
 #designInput #pipeTablesSection .pipe-status.recommended{background:var(--u-accent)!important;color:#fff!important}
 #designInput #pipeTablesSection .pipe-status.suitable{background:var(--u-bg-2)!important;color:var(--u-ink-2)!important}
 #designInput #pipeTablesSection .pipe-status.outside{background:var(--u-err-bg)!important;color:var(--u-err)!important}
 
 /* ═══ 7. 推荐行（全站）：浅色底 + 左侧标识线，取消满行高饱和绿 ═══════════ */
-
-
-
 
 /* ═══ 8. 其余功能区：跟着降饱和 / 去投影 / 去上浮（只作轻量收口） ═══════ */
 .pipe-table-card,.network-card{background:#fff!important;border:1px solid var(--u-line)}
@@ -4073,7 +3612,7 @@ body:not(.ry-tool) .pp-btn-generate:hover{transform:none;box-shadow:0 0 0 1px va
   #designInput .pump-metrics b{font-size:18px}
   #designInput .optimal-title strong{font-size:17px}
   /* 选型表：窄屏给一个最小宽度，超宽由 .table-scroll 横向滚动 */
-  
+
 }
 /* 手机竖屏（≤520px）：支管方案对比原本 4 列并排，在两三百像素宽里会被压到溢出。
    表头行与方案行共用同一个 grid 模板、子元素顺序也一致，所以同时改成 2×2 仍然一一对齐。 */
@@ -4115,7 +3654,7 @@ body.ry-tool #pipePlanSection .ry-pane-edit>#ppPickResult{
 }
 body.ry-tool #pipePlanSection .ry-pane-edit>#ppCanvasWrap{
   grid-column:1;grid-row:2;margin:0;min-width:0;
-  height:auto;min-height:0;border-radius:0;
+  height:auto;min-height:0;
   background:var(--ry-canvas);border:1px solid var(--ry-line);
 }
 body.ry-tool #pipePlanSection .ry-pane-edit>#ppLegend{
@@ -4155,7 +3694,7 @@ body.ry-tool #pipePlanSection #ppToolbar>.pp-sep:has(+ .pp-btn-generate){margin-
 body.ry-tool #pipePlanSection #ppToolbar>.pp-group-edit{
   display:flex;flex-direction:row;flex-wrap:wrap;justify-content:center;align-content:center;
   width:100%;box-sizing:border-box;height:auto;gap:4px;padding:6px;
-  border:1px solid var(--ry-line);border-radius:8px;
+  border:1px solid var(--ry-line);
 }
 body.ry-tool #pipePlanSection #ppToolbar>.pp-group-edit>.pp-ge-title{flex:1 1 100%;text-align:center;font-size:11.5px}
 body.ry-tool #pipePlanSection #ppToolbar>.pp-group-edit>.pp-ge-row{display:flex;gap:3px;flex:1 1 100%}
@@ -4202,7 +3741,7 @@ body.ry-tool #pipePlanSection #ppToolbar>.pp-angle-control{
 body.ry-tool #pipePlanSection #ppToolbar>.pp-angle-control>span:first-child{flex:1 1 100%;text-align:center}
 body.ry-tool #pipePlanSection #ppToolbar>.pp-angle-control>span:not(:first-child){flex:0 0 auto}
 body.ry-tool #pipePlanSection #ppToolbar>.pp-angle-control>input{
-  width:auto;min-width:0;flex:1 1 40px;height:24px;text-align:center;border-radius:0;
+  width:auto;min-width:0;flex:1 1 40px;height:24px;text-align:center;
   border:1px solid var(--ry-line);background:var(--ry-canvas);color:var(--ry-ink);
 }
 body.ry-tool #pipePlanSection #ppToolbar>.pp-angle-control>.pp-mirror-btn{
@@ -4354,7 +3893,7 @@ body:has(#tlPipePlanSection.ry-active) .ry-statusbar .ry-tabs{
   height:22px;padding:0 10px;
   font-size:11.5px;font-weight:500;
   color:var(--u-ink-2,#5a656a);background:#fff;
-  border:1px solid var(--u-line,#d7dddf);border-radius:0;
+  border:1px solid var(--u-line,#d7dddf);
 }
 .ry-statusbar .ry-tabs-st button+button{border-left:0}
 /* 2026-09-13：两组 Tab（二级/三级）同时可见时贴合为一排（抵消状态栏 12px gap） */
@@ -4402,20 +3941,20 @@ body[data-ry-sec="tlPipePlanSection"] .ry-statusbar #ppTabs button.active{
 /* 润野工具配色：农业绿主操作、蓝色水力数据、浅色面板。 */
 :root{
 
-  --u-bg:#edf3f1;          
-  --u-toolbar:#e3efea;     
-  --u-panel:#f7faf9;       
-  --u-canvas:#ffffff;      
-  --u-bg-2:#eff6f3;        
-  --u-line:#c5d6cf;        
-  --u-line-2:#dce7e2;      
-  --u-ink:#243c35;         
-  --u-ink-2:#4a6259;       
-  --u-ink-3:#586e65;       
+  --u-bg:#edf3f1;
+  --u-toolbar:#e3efea;
+  --u-panel:#f7faf9;
+  --u-canvas:#ffffff;
+  --u-bg-2:#eff6f3;
+  --u-line:#c5d6cf;
+  --u-line-2:#dce7e2;
+  --u-ink:#243c35;
+  --u-ink-2:#4a6259;
+  --u-ink-3:#586e65;
 
   --u-accent:#18835e;
   --u-accent-2:#116447;
-  --u-accent-bg:#e0f2e9;   
+  --u-accent-bg:#e0f2e9;
   --u-accent-line:#9bcbb4;
   --u-blue-gray:#28688c;
   --u-nav:#173e32; --u-nav-hover:#244e40; --u-nav-active:#2d604b; --u-nav-ink:#d9e9df;
@@ -4425,12 +3964,10 @@ body[data-ry-sec="tlPipePlanSection"] .ry-statusbar #ppTabs button.active{
 
   --u-err:#a84339;  --u-err-bg:#fff0ed;  --u-err-line:#e9bcb5;
 
-
   --g-50:#f0f9f4; --g-100:#e1f2e8; --g-200:#bddfcb; --g-300:#91c5a9;
   --g-400:#5ea683; --g-500:#348e66; --g-600:#238056; --g-700:#196544;
   --g-800:#174f39; --g-900:#153e2f;
   --dg-700:#24543f; --dg-800:#1d4434; --dg-900:#17382c;
-
 
   --blue:#286f9e; --blue-50:#edf5fc; --blue-100:#dcecf8;
   --amber:#92601a; --amber-50:#fff7e9; --amber-100:#f7e7c1;
@@ -4439,7 +3976,6 @@ body[data-ry-sec="tlPipePlanSection"] .ry-statusbar #ppTabs button.active{
 
   --bg:#edf3f1;
 
-
   --radius:4px; --radius-sm:4px; --radius-xs:3px;
   --shadow:0 0 0 1px rgba(48,56,61,.06);
   --shadow-hover:0 0 0 1px rgba(48,56,61,.12);
@@ -4447,23 +3983,22 @@ body[data-ry-sec="tlPipePlanSection"] .ry-statusbar #ppTabs button.active{
   --mono:ui-monospace,"Cascadia Mono",Consolas,Menlo,"Courier New",monospace;
 }
 
-
 body.ry-tool{
-  --ry-bar:#e3efea;      
-  --ry-bar-hi:#d4e7de;   
-  --ry-bar-ink:#243c35;  
-  --ry-bar-ink2:#4a6259; 
+  --ry-bar:#e3efea;
+  --ry-bar-hi:#d4e7de;
+  --ry-bar-ink:#243c35;
+  --ry-bar-ink2:#4a6259;
   --ry-line:#c5d6cf;
   --ry-line2:#dce7e2;
   --ry-panel:#f7faf9;
   --ry-canvas:#ffffff;
   --ry-status:#e3efea;
   --ry-ink:#243c35;
-  --ry-ink2:#4a6259;   
-  --ry-ink3:#586e65;   
-  --ry-acc:#18835e;      
-  --ry-acc-hi:#116447;   
-  --ry-acc-bg:#e0f2e9;   
+  --ry-ink2:#4a6259;
+  --ry-ink3:#586e65;
+  --ry-acc:#18835e;
+  --ry-acc-hi:#116447;
+  --ry-acc-bg:#e0f2e9;
 }
 
 /* ── 2. 全局基底与顶部「品牌栏 + 功能工具栏」 ─────────────────────────────── */
@@ -4481,7 +4016,6 @@ body{background:var(--u-bg)!important;color:var(--u-ink)!important}
 .ry-nav .nav-home-btn:hover{background:var(--u-accent-bg)!important;color:var(--u-accent-2)!important;border-color:var(--u-accent-line)!important}
 .ry-nav .search-btn{border-color:var(--u-line)!important;color:var(--u-ink-2)!important}
 .ry-nav .search-btn:hover{background:var(--u-bg-2)!important;border-color:var(--u-line)!important;color:var(--u-accent)!important}
-
 
 /* 导航栏「⚙️ 生成系统图」入口已按要求取消（用户 2026-09-12）。
    仅隐藏导航入口：openTlSystemDiagramFromNav() 与 DOM 节点均保留，随时可恢复。
@@ -4521,7 +4055,7 @@ body.ry-tool #designInput .result-panel{border:0!important;border-radius:0!impor
   flex:0 0 auto;min-width:19px;height:15px;
   display:inline-flex;align-items:center;justify-content:center;
   background:var(--u-canvas);color:var(--u-accent-2)!important;
-  border:1px solid var(--u-accent-line);border-radius:2px;
+  border:1px solid var(--u-accent-line);
   font-size:10px;font-weight:700;letter-spacing:.02em;line-height:1;
 }
 #designInput .input-panel legend span{color:var(--u-ink)!important}
@@ -4635,10 +4169,7 @@ body.ry-tool #designInput .result-panel{border:0!important;border-radius:0!impor
 #designInput .motor-row strong{color:var(--u-ink)!important;font-family:var(--mono)}
 /* 4.4 规格卡片组 */
 
-
-
 #designInput .metric-label{color:var(--u-ink-3)!important;text-transform:none!important;letter-spacing:.02em}
-
 
 /* 4.5 支管方案对比 */
 #designInput .branch-compare{border-bottom:1px solid var(--u-line-2)!important}

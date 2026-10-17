@@ -1,7 +1,10 @@
 :root {
-  --ry-panel-bg: var(--ry-white, #fff);
+  /* [v530] 这三个 token 原先在下方「主设计参数面板」的 :root 里又声明了一遍
+     （:root 不是作用域选择器，同特异性后写者全域生效）⇒ 上面这份 36px/#fff 从来没生效过，
+     实测值是 44px/#f8fafc。两端数值在此收敛为唯一出处，取值 = 收敛前的实测值，视觉零变化。 */
+  --ry-panel-bg: var(--ry-s-50, #f8fafc);
   --ry-panel-border: var(--ry-s-300, #cbd5e1);
-  --ry-panel-head-h: 36px;
+  --ry-panel-head-h: 44px;              /* 面板标题栏高度 = 44px 最小热区（规范 §0 原则 3） */
   --ry-panel-head-bg: var(--ry-green-600, #173e32);
   --ry-panel-fold-w: 32px;
   --ry-panel-grip-hot: 14px;
@@ -74,9 +77,9 @@ body.ry-tool #designInput .ryp-body > .panel-foot { margin-top: auto; flex: 0 0 
 
 /* 主设计参数面板：紧凑分组 + Shoelace 控件。原生 input 保留为数据源与离线回退。 */
 :root {
-  --ry-panel-bg: var(--ry-s-50, #f8fafc);
-  --ry-panel-border: var(--ry-s-300, #cbd5e1);
-  --ry-panel-head-h: 44px;
+  /* [v530] 原先这里还重复声明了 --ry-panel-bg / --ry-panel-border / --ry-panel-head-h：
+     :root 无作用域，同特异性后写者全域生效，等于把文件顶部那份静默顶掉，
+     造成「写 36px 实走 44px」的双值假象。三行已删，唯一定义在文件顶部 :root。 */
   --sl-color-primary-50: #f0fdf4;
   --sl-color-primary-100: #dcfce7;
   --sl-color-primary-200: #bbf7d0;

@@ -42,7 +42,13 @@
 
 2. 视觉语言来自现有 `--ry-*` token，新增 `--ry-panel-*` 专属 token，不新造色板。
 
-3. 键盘可达 + 44px 最小热区 + 深浅色自动适配（沿用 `runye-theme.css` 的 data-theme 机制）。
+3. 键盘可达 + 热区分双阈值 + 深浅色自动适配（沿用 `runye-theme.css` 的 `data-theme` 机制）。
+   * **桌面（鼠标）≥ 28px**：`height` / `min-height` 不低于 28px，图标按钮不小于 24×24。
+   * **触屏（`@media (pointer:coarse)`）≥ 44px**：所有可点元素升到 44px。
+   * 例外：面板标题栏（`--ry-panel-head-h`）恒为 44px——它同时是拖拽/折叠把手。
+   * ⚠ 原「全站 44px 最小热区」在桌面是纸面条款：v530 实测可见可点元素 44 个里 42 个 < 44px
+     （导航 36、弹窗按钮 29、面板按钮 24）。硬拉 44 会让桌面版显著变松散，故改为双阈值，
+     与「同一件事只有一种做法」不冲突：**同一个元素不同输入方式不同尺寸**。
 
 
 
@@ -57,10 +63,12 @@
   /* 面板外壳 */
   --ry-panel-bg:var(--ry-s-100);          /* 面板底色，跟随主题 */
   --ry-panel-border:var(--ry-s-300);
-  --ry-panel-radius:var(--ry-radius);      /* 14px，与全局一致 */
+  --ry-panel-radius:0px;                   /* [v530] 全站扁平：style-01.css:3017
+                                              body,body *{border-radius:0!important} 是唯一执行者，
+                                              面板不声明圆角；仅圆点语义（border-radius:50%）豁免 */
   --ry-panel-shadow:var(--ry-shadow-md);
   /* 标题栏 */
-  --ry-panel-head-h:44px;                  /* 标题栏高 = 最小热区高 */
+  --ry-panel-head-h:44px;                  /* 标题栏高 = 最小热区高（唯一定义在 ry-panel.css 顶部 :root） */
   --ry-panel-head-bg:var(--ry-s-200);
   --ry-panel-head-fs:14px;
   --ry-panel-head-weight:600;
@@ -80,6 +88,16 @@
   --ry-z-rightclick:300; --ry-z-modal:400; --ry-z-toast:500;
 }
 ```
+
+### 1.1 落地状态（v530 实测，别再照抄未落地的行）
+
+| token | 实际落地 | 说明 |
+|---|---|---|
+| `--ry-panel-bg` / `--ry-panel-border` / `--ry-panel-head-h` | ✅ `mod/ry-panel.css` 顶部 `:root` | v530 收敛为唯一出处（下方「主设计参数面板」`:root` 里曾重复声明，`:root` 不是作用域，后写者全域生效 ⇒ 顶部 36px 从未生效，实测 44px） |
+| `--ry-panel-head-bg` / `--ry-panel-fold-w` / `--ry-panel-grip-hot` / `--ry-z-float` | ✅ `mod/ry-panel.css` | 值与上表略有出入，以文件为准 |
+| `--ry-panel-radius` | ❌ 全站圆角恒为 0 | 被扁平化 enforcer 压平；v530 已把 `style-01.css` 内 186 条无效 `border-radius` 声明删掉（209→23，余下全是 `50%` 圆点语义 + enforcer 自身） |
+| `--ry-panel-sidebar-w` / `--ry-panel-result-w` | ❌ 从未定义 | 实际宽度由 `--ryp-input-col-width:372px` 与各页自身 `minmax()` 控制 |
+| `--ry-panel-shadow` / `--ry-panel-grip-w` / `--ry-panel-head-fs` 等 | ❌ 未使用 | 需要时先落地再引用 |
 
 > 命名规范：所有面板类统一前缀
 > `ryp-`
@@ -481,6 +499,22 @@ function rypDraggable(rootEl){ /* 实现 */ }
 * [ ] 是否补 "命令面板 / 属性检查器"（现代工具面板，当前项目无）
 
 * [ ] AI 智能规划 `.smart-workbench` 大悬浮窗收编进 `ryp-float` 的边界（三栏拖宽特例）
+
+
+
+### 9.1 v530 决策记录（2026-10-17，四条已确认）
+
+1. **圆角 → 承认扁平**：不再追求 `--ry-panel-radius:14px`。唯一执行者是
+   `mod/style-01.css` 的 `body,body *{border-radius:0!important}`，本文件凡写圆角处一律改 0；
+   只保留 `border-radius:50%` 的圆点语义（图例/阀门/状态灯/水源图标）。
+2. **h1 字号**：`runye-typography.css` 的裸 `h1{font-size:36px!important}` 是给落地页大标题的，
+   把工具区标题（地形 14px、水力校核 15px）一并顶成 36px 属 bug，已用
+   `:not(:where(#terrainSection *,#hydraulicsSection *))` 排除，纯函数区标题回各自面板字号。
+3. **热区改双阈值**：见 §0 原则 3。
+4. **旧皮肤直接删**：`style-01.css` 里三代 `.pp-plan-*`「深绿玻璃」皮肤（白字/深底）已删，
+   保留仍在用的 `.pp-plan-bar-result` / `.pp-plan-spacer` / `.plan-apply-btn` / `.pp-select-sm`。
+   另核实两条**不是死代码、不可删**：`terrain/terrain.css`（被 `terrain/index.html:15` 引用）、
+   `#threeLevelView`（`index.html:2773` 有 DOM，`mod/inline-09.js` 仍在切 `.active`）。
 
 
 

@@ -221,9 +221,16 @@
     font-size:var(--ry-fs-display) !important;
     line-height:1.08;
   }
+  /* [v530] 裸 h1 原本把工具区标题也顶成 36px（地形「地形模块·测试中」设计 14px、
+     水力校核「水力校核」设计 15px，实测都是 36px）。这里按**容器类**排除，不用区块 id：
+     .t-top / .result-head 分别是地形页与水力页的模式条/结果头，
+     独立页（terrain/index.html、runye-hydraulics.html）与主页内嵌区块用的是同一套类，
+     一处排除即覆盖两条页面。:where() 让 :not() 不增特异性，规则仍是 (0,0,1)，
+     两处回落到各自面板标题字号（terrain.css / terrain-main.css / hydraulics-main.css）。
+     别写成 :not(#terrainSection *) —— 独立地形页没有这个 id，h1 会漏网仍是 36px。 */
   .hero h1:where(:not(.topbar *)),
   .hero-title:where(:not(.topbar *)),
-  h1:where(:not(.topbar *)){
+  h1:where(:not(.topbar *)):not(:where(.t-top *, .result-head *)){
     font-size:var(--ry-fs-hero) !important;
     line-height:1.16;
   }

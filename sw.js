@@ -385,8 +385,17 @@
    改指 :is(#pipePlanSection,#ryCadSide [data-pp="..."]) 双位置选择器（原位 + 搬入工具栏后）；
    「⚙ 参数设置」按钮行内 style 收成 .ry-cad-set-btn；设置弹窗方案名称/已存方案补 text/select
    规则（原为浏览器原生 2px 边框）、三个方案按钮改用既有 .rs-btn；三文件均在 CORE，必须抬版本；
-   index.html 在 CORE，必须抬版本重建离线缓存。 */
-const VERSION = 'v529-panel-single-source';
+   index.html 在 CORE，必须抬版本重建离线缓存；
+   v530-flat-skin-cleanup：UI 规范审计四项落地 ——
+   ① runye-typography.css 裸 h1 的 36px!important 按容器类排除 .t-top/.result-head，
+   地形（设计 14px）与水力校核（设计 15px）标题回落到设计值（独立页同修）；
+   ② mod/style-01.css 删三代 .pp-plan-*「深绿玻璃」旧皮肤（白字深底，早被三处浅色皮肤顶掉）；
+   ③ 同文件删 186 条被自带的 border-radius:0!important 压平的无效圆角声明（209→23，
+   余下全是 50% 圆点语义 + enforcer 自身），圆角语言承认扁平；
+   ④ mod/ry-panel.css 三处 token（bg/border/head-h）原在两份 :root 里重复声明，:root 非作用域
+   导致「写 36px 实走 44px」，收敛为顶部唯一定义、取值等于收敛前实测值（视觉零变化）。
+   三样式文件均在 CORE，必须抬版本。 */
+const VERSION = 'v530-flat-skin-cleanup';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
