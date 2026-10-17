@@ -12,8 +12,18 @@
      （全部功能按钮竖排）+ 右侧制图区（SVG 画布绘地块轮廓）。
      卸载：删除 terrain/ 目录 + runye-nav.js 清单中「地形模块」项 + sw.js 缓存条目。 -->
 <link rel="stylesheet" href="../runye-nav.css?v=346">
-<link rel="stylesheet" href="terrain.css?v=534-panel-type-scale">
+<link rel="stylesheet" href="terrain.css?v=535-terrain-single-source">
 <style>
+  /* [v535] 页面级样式（页面专用）：原先写在 terrain/terrain.css 里，而该文件现在也被主页加载
+     ⇒ 全局 body / * / button / input / a 规则会外泄到主页。移到本页内联后：
+     · 独立页照旧（同一特异性、同一先后顺序，视觉零变化）
+     · terrain.css 只留组件规则，可安全被主页复用 */
+  *{box-sizing:border-box}
+  body{margin:0;font-family:var(--font);color:var(--u-ink);line-height:1.6;
+    -webkit-font-smoothing:antialiased;background:var(--u-bg);font-size:14px}
+  button{cursor:pointer;font-family:inherit}
+  input{font-family:inherit;font-size:inherit}
+  a{color:inherit;text-decoration:none}
   /* 页面骨架（仅本页）：复刻「地块分区」pp-body 版式 ——
      三列 grid：左工具栏(var --t-side-w，可拖拽) ｜ 拖拽条 10px ｜ 右制图区 1fr；
      高度 = 视口减导航与模式条；拖拽条样式/行为见 terrain.css + terrain-ui.js */
@@ -43,7 +53,7 @@
     <link rel="stylesheet" href="../runye-theme.css?v=1">
   <link rel="stylesheet" href="../runye-typography.css?v=1">
 </head>
-<body>
+<body class="t-page">
 
 <!-- 顶部功能区导航（与主页/在线地图页同一份清单：runye-nav.js 唯一出处）
      data-root="../"：本页在 terrain/ 子目录 —— [v286g] 站内相对链接统一上跳一级，

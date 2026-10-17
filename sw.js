@@ -435,8 +435,23 @@
      font-size，按 index 侧设计值补齐）。
    实测（改前→改后，四张快照逐元素比对，容器外 0 处变化）：
    地形 34×(13→12.5) + 6×(13→12) + 4×(12→11) + 3×(13→15)；地图 11×(13→12) + 7×(12→10) + 1×(13→10) + 1×(13→11)。
-   index.html / terrain/index.html / 两个 css 均在 CORE，必须抬版本。 */
-const VERSION = 'v534-panel-type-scale';
+   index.html / terrain/index.html / 两个 css 均在 CORE，必须抬版本。
+ * v537 地形双份样式表合并（terrain-main.css 删除）：
+   （v535 / v536 号段已被并行会话占用：v536 = 移除 modeling 钩子，故本条实际版本号取 v537）
+   事实：terrain/terrain.css（独立页 143 条）与 terrain/terrain-main.css（主页，去前缀后 170 条）
+   重名 139 条**逐值完全相同、0 处值不同**，真正差异只有「独立页 4 条 + 嵌入态 20 条」。
+   处置：删 terrain/terrain-main.css；terrain.css 改为「裸 .t-* 通用段 + 令牌双命中
+   `body.t-page, #terrainSection` + 末尾嵌入差异段」；页面级 5 条（*{box-sizing} / body / button /
+   input / a）搬进 terrain/index.html 内联 <style>，避免本表被主页加载时外泄全局样式；
+   index.html 改引 terrain/terrain.css。
+   ⚠ 顺序承重：`#terrainSection>.t-body{flex:1;min-height:0;height:auto}` 与
+   `#terrainSection .t-body{height:calc(...)}` 特异性同为 (1,1,0)，必须让前者在**后面**
+   （合并时曾挪到前面，.t-body 从内容高 1850 被压成 886，侧栏连带出滚动条、整栏少 4px）。
+   实测（HEAD 基线树 vs 新版，37 属性逐元素）：主页 #terrainSection 218 元素 0 差异、
+   独立地形页 233 元素 0 差异（仅路径编号 div:9→div:11 位移）、主页全页默认视图 186 元素 0 差异；
+   112 个 .t-* 元素全在区块内、0 外泄。
+   index.html / terrain/index.html / terrain/terrain.css / sw.js 均在 CORE，必须抬版本。 */
+const VERSION = 'v537-terrain-single-source';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
@@ -613,7 +628,6 @@ const CORE = [
   "runye-typography.css",
   "terrain/index.html",
   "terrain/terrain-core.js",
-  "terrain/terrain-main.css",
   "terrain/terrain-ui.js",
   "terrain/terrain.css",
   "tl-workspace/tl-auto-edits.js",

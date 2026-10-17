@@ -15,7 +15,10 @@
        结构断言与拖拽记忆行为不受影响
    ============================================================ */
 
-:root{
+/* [v535] 令牌双命中：独立页挂在 body.t-page（页面级），嵌入主页挂在 #terrainSection。
+   这样 terrain.css 被主页加载时不会把 --g-* / --u-* / --radius 等全局令牌顶掉。 */
+body.t-page,
+#terrainSection{
   /* —— 与主页最终扁平层同名同值：品牌绿阶（低饱和灰绿） —— */
   --g-50:#f3f6f5; --g-100:#e4ece9; --g-200:#cddbd6; --g-300:#a9c1ba;
   --g-400:#7f9f96; --g-500:#5f8578; --g-600:#4b7264; --g-700:#3f6f60;
@@ -39,23 +42,12 @@
   --t-grip-w:10px;
 }
 
-*{box-sizing:border-box}
 /* [v533] 原 v144 在此复制了一份 `*::-webkit-scrollbar*` 五行（5px / #c9d6ce / 圆角 3px）。
    本文件在 terrain/index.html 里先于 ../runye-theme.css 加载，theme 的
    `*::-webkit-scrollbar{width:var(--ry-scroll-w)}` 把它整条压掉 —— 实测该页通用滚动条
    恒为 4px、滑块 rgba(100,116,139,.45)、圆角 999px，即这五行从未生效，已删。
    **唯一出处 = runye-theme.css，禁止再写 `*::` 版本。** */
 
-body{
-  margin:0;
-  font-family:var(--font);color:var(--u-ink);line-height:1.6;
-  -webkit-font-smoothing:antialiased;
-  background:var(--u-bg);   /* [v298b] 撤绿网格+渐变 → 主页扁平层纯浅灰底 */
-  font-size:14px;
-}
-button{cursor:pointer;font-family:inherit}
-input{font-family:inherit;font-size:inherit}
-a{color:inherit;text-decoration:none}
 
 /* —— 折叠卡（[v287] 原生 details：默认全部收起，点标题展开） —— */
 details.t-fold { padding: 0; }
@@ -158,8 +150,10 @@ label.t-sp-overlay input { flex: 0 0 auto; width: auto; }
   .t-grip:hover::before,
   .t-grip.dragging::before{background:var(--g-600);width:4px;margin-left:-2px}
 }
-body.t-col-resizing{-webkit-user-select:none;user-select:none;cursor:col-resize}
-body.t-col-resizing .t-stage{pointer-events:none}   /* 拖拽中不让画布吃指针 */
+body.t-page.t-col-resizing,
+#terrainSection.t-col-resizing{-webkit-user-select:none;user-select:none;cursor:col-resize}
+body.t-page.t-col-resizing .t-stage,
+#terrainSection.t-col-resizing .t-stage{pointer-events:none}   /* 拖拽中不让画布吃指针 */
 
 /* 右：制图区 */
 .t-stage{display:flex;flex-direction:column;min-width:0;min-height:0}
@@ -356,3 +350,56 @@ body.t-col-resizing .t-stage{pointer-events:none}   /* 拖拽中不让画布吃�
 .t-elev-contour{fill:none;stroke:#64748b;stroke-width:1px;opacity:.55;vector-effect:non-scaling-stroke}
 .t-elev-legend{position:absolute;right:10px;bottom:44px;background:rgba(255,255,255,.92);border:1px solid #d7e3dc;border-radius:6px;padding:5px 9px;font-size:11px;color:#334155;display:flex;align-items:center;gap:6px;pointer-events:none;z-index:5}
 .t-elev-legend i{display:inline-block;width:80px;height:8px;border-radius:4px;background:linear-gradient(90deg,#2563eb,#06b6d4,#22c55e,#eab308,#f97316,#dc2626)}
+
+/* ==========================================================================
+   [v535] 嵌入模式（主页 #terrainSection）差异 —— 这个 UI 唯一的第二形态。
+   由来：原 terrain/terrain-main.css = 「上面这批规则的整表 #terrainSection 前缀副本（约 160 条）
+   ＋下面这些布局差异」。实测两者重名的 139 条规则**逐值完全相同**（0 处值不同），却各自演化
+   （已出现 `.t-sprow input` 缺失、字号 `!important` 单边加过等漂移）。
+   合并后只保留真正的差异项，其余规则由上面的裸类选择器直接命中（`.t-*` 是地形模块的
+   专属命名空间，主页其他模块不会撞车）。
+   ⚠ 新增地形样式一律写在上面的通用段；只有「嵌入才有」的差异才写进本节。
+   ⚠ 页面级规则（body / * / button / input / a）不在这里 —— 它们归 terrain/index.html 的内联
+   <style>（独立页专用），本文件被主页加载时不会外泄全局样式。
+   ========================================================================== */
+#terrainSection{
+  margin:0; font-family:var(--font); color:var(--u-ink); line-height:1.6;
+  -webkit-font-smoothing:antialiased; background:var(--u-bg); font-size:14px;
+  height:calc(100vh - var(--fn-nav-h,48px) - var(--ry-status-h,34px));
+  min-height:480px; overflow:hidden; display:flex; flex-direction:column;
+}
+#terrainSection *{box-sizing:border-box}
+#terrainSection button{cursor:pointer;font-family:inherit}
+#terrainSection input{font-family:inherit;font-size:inherit}
+#terrainSection a{color:inherit;text-decoration:none}
+#terrainSection>.t-top,
+#terrainSection>.t-banner{flex:none}
+/* 三列骨架与独立页同构（工具栏 ｜ 拖拽条 ｜ 画布），高度改吃视口减导航与 42px 模式条 */
+#terrainSection .t-body{
+  height:calc(100vh - var(--fn-nav-h,48px) - 42px); /* 42px = 模式条 */
+  min-height:480px;box-sizing:border-box;display:grid;
+  grid-template-columns:var(--t-side-w,clamp(272px,20vw,318px)) var(--t-grip-w,10px) minmax(0,1fr);
+  column-gap:0;row-gap:0;padding:8px 10px 8px 8px;
+}
+#terrainSection .t-body>.t-side{grid-column:1;grid-row:1}
+#terrainSection .t-body>.t-grip{grid-column:2;grid-row:1}
+#terrainSection .t-body>.t-stage{grid-column:3;grid-row:1}
+#terrainSection.ry-embedded-page .fn-nav{display:none!important}
+#terrainSection.ry-embedded-page .t-body{height:calc(100vh - 42px)}
+/* ⚠ 顺序是承重的：本条与上一条特异性同为 (1,1,0)，靠文档序决胜 —— 高度必须由 flex:1 接管
+   （容器是 flex column，内容再高也不许撑破视口）。**必须写在上面的 height:calc 之后**，
+   v535 合并时曾挪到前面，直接把 .t-body 从「内容高 1850」压成 886，整栏连带少 4px。 */
+#terrainSection>.t-body{flex:1;min-height:0;height:auto}
+/* 只存在于主页标记里的两个节点 */
+#terrainSection .t-panel{display:none;border-top:1px dashed #ddd;padding-top:8px;margin-top:4px}
+#terrainSection .t-panel.on{display:block}
+#terrainSection .t-hintbox{font-size:11px;color:#888;background:#fafafa;border:1px dashed #ddd;border-radius:0;padding:8px 10px;margin-top:8px;line-height:1.7}
+/* 窄视口（≤1100px）改单列：工具栏在上、画布在下，拖拽条隐藏 */
+@media (max-width:1100px){
+  #terrainSection{height:auto;min-height:calc(100vh - var(--fn-nav-h,48px) - var(--ry-status-h,34px));overflow:visible}
+  #terrainSection>.t-body{height:auto;min-height:480px}
+  #terrainSection .t-body{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(320px,1fr);height:auto}
+  #terrainSection .t-body>.t-side{grid-column:1;grid-row:1;max-height:none!important}
+  #terrainSection .t-body>.t-grip{display:none}
+  #terrainSection .t-body>.t-stage{grid-column:1;grid-row:2}
+}

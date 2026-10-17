@@ -795,3 +795,70 @@ modeling/ digital-agriculture/` 的 .css/.html，凡 `*::-webkit-scrollbar` 开�
   `terrain/index.html` 的 `terrain.css` 均抬到 `?v=534-panel-type-scale`；`sw.js` → v534
 * 线上核对：`terrain.css` 含 `font-size: 12.5px !important`；index 已引用 `?v=534-panel-type-scale`
 
+
+---
+
+## 20. v535-terrain-single-source 地形双份样式表合并（2026-10-17 · 待发布）
+
+### 为什么动
+`terrain/index.html`（独立页）与主页 `#terrainSection`（嵌入）各挂一套完整样式表：
+`terrain/terrain.css`（143 条）与 `terrain/terrain-main.css`（159 条，去 `#terrainSection ` 前缀后 170 条）。
+两份从来不是「一份被覆盖」，而是**同一套规则的同构副本**，各自演化 —— 已经出现
+`.t-sprow input` 只在一侧、字号 `!important` 单边加过（v534 就要在两处同时改）。
+
+### 合并前先量，别猜
+逐规则归一化后比对（去 `#terrainSection ` 前缀 + 压缩空白）：
+* **重名 139 条，逐值完全相同 = 139，值不同 = 0**
+* 仅独立页 4 条：`:root` 令牌表、`body`、`body.t-col-resizing`×2
+* 仅嵌入 20 条：容器 `body` 等价项、三列栅格骨架、`@media(max-width:1100px)` 单列降级、
+  `.t-panel` / `.t-hintbox`、5 行滚动条副本
+
+⇒ 结论：**不是两套设计，是一套设计抄了两份**。合并只丢重复，不丢视觉。
+
+### 怎么合并
+1. `terrain/terrain.css` 变成唯一出处，三段结构：
+   * 裸 `.t-*` 通用组件规则（`.t-` 是地形模块专属命名空间）
+   * 令牌双命中：`body.t-page, #terrainSection{ --g-* / --u-* / --radius / --font … }`
+     —— 独立页命中 `body.t-page`，嵌入页命中 `#terrainSection`，**不会外泄全局令牌**
+   * 末尾「嵌入模式差异」段：只写嵌入才有的那 20 条
+2. 页面级 5 条（`*{box-sizing}` / `body{}` / `button` / `input` / `a`）**搬进 `terrain/index.html`
+   的内联 `<style>`** —— 理由：`terrain.css` 现在会被主页加载，这几条是全局选择器，
+   留在表里就会污染主页（`*{box-sizing:border-box}` 尤其致命）。
+3. `terrain/terrain-main.css` 删除；`sw.js` CORE 去掉该行；`index.html` 改引
+   `terrain/terrain.css?v=535-terrain-single-source`；`terrain/index.html` 同步抬 `?v=`。
+
+### ⚠ 顺序承重（这次踩到的唯一真坑）
+```css
+#terrainSection .t-body{ height:calc(100vh - var(--fn-nav-h,48px) - 42px); … }  /* (1,1,0) */
+#terrainSection>.t-body{ flex:1; min-height:0; height:auto }                      /* (1,1,0) ← 必须在其后 */
+```
+两者特异性**相同**，靠文档序决胜。第一版合并时我把 `flex:1` 那条挪到了前面 ⇒
+`height:calc` 反压，`.t-body` 从「内容高 1850」被压成 **886**，侧栏因出滚动条再少 4px，
+`width` 全线 `284→280`、`258→254`（114 个元素的差异，全是这一个根因的下游）。
+判据：**遇到「整片元素同时少 4px」先查滚动条，再看是谁把它挤出了滚动条。**
+
+### A/B 实测（HEAD 基线树 vs 新版，37 个 computed 属性逐元素）
+`git archive HEAD | tar -x -C $TEMP/rybase` + `RY_ROOT=$TEMP/rybase node _dump_style.mjs …`，
+同一探针跑两棵树，逐 key 比对：
+
+| 目标 | 元素 | 差异 |
+|---|---|---|
+| 主页 `#terrainSection`（1520px） | 218 | **0** |
+| 主页 `#terrainSection`（1050px，走 `@media ≤1100` 单列分支） | 217 | **0** |
+| 独立地形页 `terrain/index.html` | 233 | **0**（仅路径编号 `div:9→div:11` 位移，5 组属性逐字节相同） |
+| 主页全页默认视图（外泄面） | 186 | **0** |
+
+窄视口确认 media 真的生效：`.t-body` 栅格 `1028px` 单列、高度 `2093px`（宽屏是 `304px 10px 1fr` / `886`）。
+外泄检查：主页 112 个 `.t-*` 元素**全部**在 `#terrainSection` 内（`leakN=0`）；terrain.css 里
+裸 `.t-*` 规则 142 条、带 `#terrainSection`/`body.t-page` 前缀 21 条。
+
+### 验证
+* `ci_check_static` PASS=15 FAIL=0（④ 项确认 CORE 与页面引用一致，删除的文件没留悬空条目）
+* `node --test tests/*.test.cjs` 122/122；`_repro_v520_planparams` 29/29；`_smoke_publish` ALL PASS
+
+### 探针增强（可复用）
+`_dump_style.mjs` 现支持两个环境变量：
+* `RY_ROOT` → 换根目录（A/B 两棵树必用，比「备份-覆盖-还原」安全，不碰工作区）
+* `RY_VP=宽,高` → 同时改 `--window-size` 与 `Emulation.setDeviceMetricsOverride`
+  （**只改后者也够**，但只改 `--window-size` 无效 —— 探针里已经硬编码了 metrics override，
+  窄屏测试会假绿：innerWidth 仍是 1520，`@media` 分支根本没走到）

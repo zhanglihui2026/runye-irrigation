@@ -542,6 +542,32 @@ function rypDraggable(rootEl){ /* 实现 */ }
 `.t-canvas-nav button` 15px / `summary small` 11px。
 ⚠ **同一面板有多份副本必须同步加**（本次同步了 4 处：`mod/online-map.css`、`runye-map-measure.html` 内联、
 `terrain/terrain.css`、`terrain/terrain-main.css`）。
+（v535 起 `terrain-main.css` 已删除，地形只剩 `terrain/terrain.css` 一处 —— 见 §9.3。）
+
+### 9.3 v535 决策记录（2026-10-17，地形模块样式「唯一出处」）
+
+**地形模块样式唯一出处 = `terrain/terrain.css`。别再建 `#terrainSection` 前缀副本。**
+
+地形是唯一有**两套入口**的模块：独立页 `terrain/index.html` 与主页 `#terrainSection`。
+它俩历史上各挂一份样式表（`terrain.css` / `terrain-main.css`），实测**重名 139 条逐值完全相同、
+0 处值不同** —— 不是两套设计，是一套设计抄了两份，且已经开始漂移（`.t-sprow input` 只在一侧）。
+
+合并后的三段结构，**新增地形样式照这个放**：
+
+| 段落 | 选择器形态 | 归属 |
+|---|---|---|
+| 通用组件 | 裸 `.t-*`（`.t-side` / `.t-card` / `.t-btn` …） | 两种形态共用，改这里 |
+| 令牌 | `body.t-page, #terrainSection{ --g-* / --u-* … }` | 双命中，不写 `*`/`body` 的全局规则 |
+| 嵌入差异 | `#terrainSection …` | 只有嵌入态才有的（三列栅格、`.t-panel`、单列降级） |
+
+三条硬约束：
+1. **页面级规则（`*{box-sizing}` / `body{}` / `button` / `input` / `a`）不许写进 `terrain.css`**
+   —— 该表同时被主页加载，全局选择器会污染整个工具区。它们归 `terrain/index.html` 的内联 `<style>`。
+2. **特异性相同时，顺序承重。** `#terrainSection .t-body{height:calc(…)}` 与
+   `#terrainSection>.t-body{flex:1;min-height:0;height:auto}` 同为 (1,1,0)，后者必须在后，
+   否则 `.t-body` 会被压成固定高、侧栏出滚动条、整栏元素少 4px（v535 踩过）。
+3. **改完必须两形态 + 两视口都比对**（`_dump_style.mjs` 的 `RY_ROOT` / `RY_VP`）：
+   主页 218 元素（1520px）/ 217（1050px 走单列分支）/ 独立页 233 / 主页全页 186，四张快照都要 0 差异。
 
 
 ***
