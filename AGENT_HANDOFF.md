@@ -1236,3 +1236,29 @@ modeling/ digital-agriculture/` 的 .css/.html，凡 `*::-webkit-scrollbar` 开�
 ### 版本号
 并行会话已把 sw VERSION 抬到 `v546-terrain-transfer-tab-binding` ⇒ 本版取更高号 `v547-card-rhythm`
 （沿革段落追加在 v545 之后；sw.js 仍混编，只暂存自己的 hunk）。
+
+---
+
+## 25d. v548-card-data-rhythm 水力卡数据区并进卡内节奏（2026-10-17 · 已发布上线）
+
+提交号 `717bbb7`。用户对 v547 留下的两处「有意不并入」批复「没有就改吧，我同意」⇒
+把其一（水力卡数据区）并入口径；**另一处（.ai-panel 内部）保持不动** —— 它自 v484 起主页整卡
+`display:none`，只有 `?smart=1` 全屏工作台在用，改成卡节奏会打乱工作台的 14px 体系。
+
+### 第四个实锤：`table/td/th` 也被全局 typography 压成 13px
+改前先诊断（`_shot_hyd_table.mjs` 的规则枚举）：`runye-typography.css:131/136` 对
+`table:where(:not(.topbar *))` 与 `th,td:where(:not(.topbar *))` 打了
+`font-size:var(--ry-fs-body)=13px !important` —— `.gr-hyd-tbl` 原写的 `10.5px` **从未生效**，
+表格实际一直渲染 13px（比卡正文 12px 还大）。与 §四.1 的 input 是同一款坑：
+> **凡是会被全局 typography 点名的元素（p/li/table/input/select/button/td/th），卡内想改字号必须带 `!important`。**
+
+### 改动（mod/style-01.css）
+- `.gr-hyd-tbl` 表体 `11px!important`/16.5、单元内距 `2px 4px`→`3px 6px`、表头 600；
+- `.gr-hyd-sum` 组间 4→6（对齐 `.ry-float-sep`）、单元内距 3px 6px→4px 6px、span 10px/15（图例档）、
+  b 保持 14px/19.2（数值强调档，刻意与 12px 正文对比）。
+
+### 验收
+`_shot_hyd_table.mjs`：真实数据要靠「⚡ 生成各块管路」无头造不出 ⇒ 在真实卡片里注入与
+`inline-29.js` 同结构的样例（.gr-hyd-sum + .gr-hyd-tbl），改前/改后/线上三张特写 +
+行高断言（表体行高 24.5→23.5、行字号 13→11、面板 340→335）。ci PASS=19、单测 123/123、
+行为 31/31、线上冒烟 27/27。
