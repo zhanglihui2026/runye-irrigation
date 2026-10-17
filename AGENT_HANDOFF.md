@@ -975,3 +975,72 @@ modeling/ digital-agriculture/` 的 .css/.html，凡 `*::-webkit-scrollbar` 开�
 
 ### 验证
 `ci_check_static` PASS=16、面板漂移闸门 ✓、`node --test` 122/122、`_smoke_publish` ALL PASS。
+
+---
+
+## 23. v542-panel-css-prune 面板样式死规则清理 + 同值重复块合并（2026-10-17）
+
+用户诉求：「二级/三级工具栏样式堆了好几层，梳理一下重构，让整体统一」。
+
+### 先量化，别拍脑袋
+新增 `_audit_panel_css.mjs`：把两份左栏当作测量对象，在 **rail 态**（左栏被搬进 `#ryCadSide`）
+与 **原位态**（搬回 section）各量一遍，逐条判断每条 CSS 规则是否命中面板元素，并统计
+「同一元素同一属性被多少条规则竞争」。
+
+修前账本：
+
+| 项 | 数 |
+|---|---|
+| 参与计算的规则（含全部样式表） | 2862 |
+| 命中面板元素的规则 | 97 |
+| 面板相关但**从不命中**的规则 | 418 |
+| 命中文件分布 | `style-01.css` 42 ／ `index.html` 内联 23 ／ `ry-panel.css` 21 ／ 工具栏内联 10 ／ `typography` 1 |
+| 单属性竞争层数 | `background-color` 最多 7 层，`font-size` 6 层；187 个元素平均 2.2 层 |
+
+两个大头死块：
+1. **`#threeLevelView .pp-plan-*` 共 252 条**（`mod/style-01.css`）——`#threeLevelView` 这个 overlay
+   仍在 DOM 里（`<div class="tl-overlay" id="threeLevelView">`），但它内部的 `.pp-plan-*` 结构
+   早已随面板迁移消失（实测 `#threeLevelView .pp-plan-item` = 0）。整套旧皮肤留在原地。
+2. **`#ryCadSide [data-pp="pipePlanSection"] .pp-title…` 共 125 条**（`index.html` 内联）——
+   `.pp-title` 全局已无该元素（实测 `.pp-title` = 0）。
+
+### 工具链（已入库，可复用）
+- `_audit_panel_css.mjs` —— 规则命中 + 竞争层数 + 重复声明审计（`RY_ROOT` 换根）
+- `_prune_dead_css.mjs` —— 按审计结果删「两态皆不命中」的规则（`--write` 落盘）
+- `_merge_dup_rules.mjs` —— 同值重复规则合并成逗号分组（**不用 `:is()`**，见下）
+- `_diff_panel_copies.mjs` —— 两处副本按归一化选择器逐属性比对
+- `_ab_panel_dump.mjs` —— 四态快照（rail.pp / rail.tl / base.pp / base.tl），40 个 computed 属性
+- `_probe_pp_vs_tl.mjs` —— 二级 vs 三级同名部件对照
+
+### 两个必须记住的踩坑
+1. **死规则判据必须是「两态都不命中」的交集**。第一版取了 rail+base 的**并集**，
+   于是「rail 专用副本」被误判成死规则删掉 —— 二级面板当场掉皮肤（`#ryCadSide [data-pp=…] .pp-side`
+   这类规则在 rail 态是活的、原位态才死）。回归被 A/B 抓到，已回滚重做。
+2. **无头页面会被判后台 ⇒ `rAF` 不跑 ⇒ 工具栏搬移失效**。`MutationObserver` 里的 `syncAll` 走
+   `requestAnimationFrame`，不 `Page.bringToFront` 的话状态时有时无，探针会给出自相矛盾的数字。
+   另外 `sl-input` 走 CDN，偶发不认领 ⇒ 原生回退/组件互换，产生 20 处假差异；
+   用 `--host-resolver-rules=MAP cdn.jsdelivr.net 127.0.0.1` 固定成离线回退态才可比。
+
+### 改动
+- `mod/style-01.css`：删 140 条两态皆不命中的规则（`#threeLevelView .pp-plan-*` 一族），
+  合并 6 组同值重复块；文件 1374 → 1237 条规则
+- `index.html` 内联：删 104 条死规则（`.pp-title` / `.pp-hint` 旧块族），合并 6 组；
+  内联 CSS 45817 → 38456 字符（-16.1%）
+- 合计：死规则 418 → 229（剩下的全是带状态伪类/伪元素/移动端前缀的**探针假阴性**，一律不删）
+
+### 验证
+- A/B 四态快照（`rail.pp` 96 / `rail.tl` 77 / `base.pp` 96 / `base.tl` 77 个元素 × 40 属性）：
+  **0 处差异**，含同态两次基线复跑（0 差异，证明测量本身可重复）
+- `ci_check_static` PASS=17 FAIL=0（含 ⑥ 面板双副本无新增漂移）
+- `node --test tests/*.test.cjs` 122/122
+- `_smoke_publish` ALL PASS
+
+### 没做的那一半（结论 + 依据）
+两个工具栏**不是同一套部件**：`.pp-btn` / `.pp-cols-h1` / `.pp-plan-val-real` / `.pp-cal-sel`
+只在三级存在，`.pp-recipe-btn` 只在二级。共有部件的字号字重已一致，但颜色/内边距/背景/宽度
+仍不同（二级 `input` 64x24 透明底 vs 三级 136x24 白底；二级 `.pp-plan-bar` 无内边距 vs 三级 8/10px）——
+这是「参数列表」与「结果表」的业务差异，不是历史堆叠，不该强行抹平。
+
+真正还能再降层的是**归属迁移**：把 `index.html` 内联那 22 条 rail 副本搬进 `mod/ry-panel.css` /
+`mod/style-01.css`，让同级部件只有一个 owner。风险点：内联块在文档序里位于 `ry-panel.css`
+**之前**，搬过去会变成之后 ⇒ 同特异性平手时改判。需专门一轮 A/B（本次未做，留作下一版）。

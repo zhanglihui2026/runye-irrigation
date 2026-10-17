@@ -485,8 +485,18 @@
       .pp-side .pp-plan-val`，特异性 (1,3,0) 压过 `.tl-plan-result .pp-plan-val` (0,2,0)）——
       这就是 v532「双副本不许合并、只许防漂移」的原因，改字重时只改一处必然被内联副本压住。
    未动：`#tlPpHint`（14px 空态引导提示，非工具栏文字）、黑底计算式条 #ppCalcDetail。
-   index.html / mod/style-01.css / sw.js 均在 CORE，必须抬版本。 */
-const VERSION = 'v539-toolbar-font-unify';
+   index.html / mod/style-01.css / sw.js 均在 CORE，必须抬版本。
+ * v542 面板样式死规则清理 + 同值重复块合并（用户：「堆了好几层，重构让整体统一」）：
+   量出来的账：面板相关规则 1673 条里，真正命中左栏的只有 97 条，418 条从不命中。
+   两大死块：① `#threeLevelView .pp-plan-*` 252 条（该 overlay 仍在 DOM，但内部 .pp-plan-* 结构
+   已随面板迁移消失）；② 内联 `.pp-title` 族 125 条（全局 .pp-title = 0）。
+   ⚠ 判死必须「rail 态 + 原位态都不命中」取交集：只取并集会把 rail 专用副本判死，
+   删了二级面板直接掉皮肤（第一版踩到，A/B 抓到后回滚重做）。
+   合并重复块只用**逗号分组**，不用 :is()（:is 取最高特异性，原位分支被抬高一级 ⇒ 必回归）。
+   结果：style-01.css 1374→1237 条规则、内联 CSS -16.1%，四态 A/B 0 差异。
+   index.html / mod/style-01.css 均在 CORE，必须抬版本。
+ */
+const VERSION = 'v542-panel-css-prune';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

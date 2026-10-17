@@ -16,7 +16,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>润野灌溉设计优化版｜滴灌管径与水泵选型</title>
 <meta name="description" content="输入地块、滴灌带与水源参数，快速计算灌溉分区、主管支管管径和水泵工作点。"/>
-<link rel="stylesheet" href="mod/style-01.css?v=539-toolbar-font-unify">
+<link rel="stylesheet" href="mod/style-01.css?v=542-panel-css-prune">
 <link rel="stylesheet" href="runye-inverse-design.css?v=277">
 <script defer src="runye-inverse-design.js?v=437"></script>
 <link rel="stylesheet" href="runye-terrain.css?v=454-terrain-sidebar-peer">
@@ -57,41 +57,18 @@
 }
 #ryCadSide [data-pp="tlPipePlanSection"] .tl-group-btn:hover{background:#dbeafe;border-color:#93c5fd}
 #ryCadSide [data-pp="tlPipePlanSection"] .tl-group-btn:active{background:#bfdbfe}
-#ryCadSide [data-pp="pipePlanSection"] .pp-title{
-  font-size:16px;font-weight:700;color:#fff;margin-bottom:12px;
-  display:flex;align-items:center;gap:8px;padding-bottom:12px;
-  border-bottom:1px solid rgba(255,255,255,.08);
-}
-#ryCadSide [data-pp="pipePlanSection"] .pp-title .badge{
-  background:rgba(255,255,255,.18);color:#bbf7d0;
-  width:30px;height:30px;display:flex;align-items:center;justify-content:center;
-  font-size:14px;font-weight:800;
-}
+
+
 #ryCadSide [data-pp="pipePlanSection"] .pp-toolbar>.pp-btn-ghost#ppZoneAutoBtn{white-space:nowrap}
-#ryCadSide [data-pp="pipePlanSection"] .pp-title{
-  padding-bottom:14px;
-  margin-bottom:14px;
-}
-#ryCadSide [data-pp="pipePlanSection"] .pp-title .badge{
-  background:linear-gradient(135deg,rgba(134,239,172,.24),rgba(45,212,191,.18));
-  color:#d9f99d;
-}
-#ryCadSide [data-pp="pipePlanSection"] .pp-title .badge{
-  background:#dcfce7;
-  color:#14532d;
-}
-#ryCadSide [data-pp="pipePlanSection"] .pp-toolbar{
-  min-height:38px;
-  padding:5px 10px;
-  margin-bottom:8px;
-  gap:8px;
-  align-items:center;
-}
+
+
+
+
 #ryCadSide [data-pp="pipePlanSection"] .pp-sep,
 #ryCadSide [data-pp="pipePlanSection"] .pp-sep-vert{
   height:20px;
 }
-#ryCadSide [data-pp="pipePlanSection"] .pp-sep{margin:0 2px}
+
 #ryCadSide [data-pp="pipePlanSection"] .pp-btn,
 #ryCadSide [data-pp="pipePlanSection"] .pp-btn-ghost,
 #ryCadSide [data-pp="pipePlanSection"] .pp-btn-generate,
@@ -105,114 +82,51 @@
   justify-content:center;
   line-height:1;
 }
-#ryCadSide [data-pp="pipePlanSection"] .pp-btn{
-  padding-left:9px;
-  padding-right:9px;
-}
-#ryCadSide [data-pp="pipePlanSection"] .pp-btn-ghost{
-  padding-left:8px;
-  padding-right:8px;
-}
-#ryCadSide [data-pp="pipePlanSection"] .pp-btn-generate{
-  padding-left:12px;
-  padding-right:12px;
-}
-#ryCadSide [data-pp="pipePlanSection"] .pp-title{
-  background:#173F2D;
-  color:#fff;
-  margin:0;
-  padding:10px 20px;
-  border-bottom:1px solid rgba(255,255,255,.13);
-}
-#ryCadSide [data-pp="pipePlanSection"] .pp-title .badge{
-  background:rgba(255,255,255,.18);
-  color:#dcfce7;
-}
-#ryCadSide [data-pp="pipePlanSection"] .pp-area-tag{color:rgba(255,255,255,.78)}
-#ryCadSide [data-pp="pipePlanSection"] .pp-area-tag b{color:#fff}
-#ryCadSide [data-pp="pipePlanSection"] .pp-sep{background:#d9e4dd}
-#ryCadSide [data-pp="pipePlanSection"] .pp-hint{color:#5a656a}
-#ryCadSide [data-pp="pipePlanSection"] .pp-toolbar{
-  margin:0 20px 12px;
-  gap:5px;
-  background:#fbfdfb;
-  border:1px solid #d9e4dd;
-}
-#ryCadSide [data-pp="pipePlanSection"] .pp-btn,
-#ryCadSide [data-pp="pipePlanSection"] .pp-btn-ghost{
-  background:#fff;
-  border-color:#d6e1da;
-  color:#315c48;
-}
+
+
+
+
+
+
+
+
+
+
+
 #ryCadSide [data-pp="pipePlanSection"] .pp-btn:hover,
 #ryCadSide [data-pp="pipePlanSection"] .pp-btn-ghost:hover{
   background:#f6f8f7;
   color:#173f2d;
 }
-#ryCadSide [data-pp="pipePlanSection"] .pp-btn.active,
-#ryCadSide [data-pp="pipePlanSection"] .pp-btn-ghost.active{
-  border-color:#16a34a;
-  background:#ecfdf5;
-  color:#166534;
-}
-#ryCadSide [data-pp="pipePlanSection"] .pp-angle-control{
-  background:#fff;
-  border-color:#d6e1da;
-  color:#315c48;
-}
-#ryCadSide [data-pp="pipePlanSection"] .pp-angle-control input{
-  background:#fff;
-  color:#173f2d;
-  border-color:#d6e1da;
-}
+
+
+
 #ryCadSide [data-pp="pipePlanSection"] .pp-angle-control input:focus{
   border-color:#16a34a;
   box-shadow:0 0 0 3px rgba(22,163,74,.12);
 }
-#ryCadSide [data-pp="pipePlanSection"] .pp-btn-generate{
-  background:#173F2D;
-  color:#fff;
-}
-#ryCadSide [data-pp="pipePlanSection"] .pp-canvas-wrap{
-  margin:0 20px;
-  background:#dfe4e2;
-  border:1px solid #d9e4dd;
-  box-shadow:none;
-}
-#ryCadSide [data-pp="pipePlanSection"] .pp-empty{color:rgba(15,23,42,.62)}
-#ryCadSide [data-pp="pipePlanSection"] .pp-legend{
-  margin:0 20px;
-}
-#ryCadSide [data-pp="pipePlanSection"] .pp-legend-item{color:#5a656a}
-#ryCadSide [data-pp="pipePlanSection"] .pp-diagram-wrap{
-  margin:20px;
-  border:1px solid #d9e4dd;
-  box-shadow:none;
-}
-#ryCadSide [data-pp="tlPipePlanSection"] .pp-diagram-wrap{
-  margin:20px 0;
-  border:1px solid #d9e4dd;
-  box-shadow:none;
-}
+
+
+
+
+
+
+
 @media(max-width:768px){
 #ryCadSide [data-pp="pipePlanSection"] .pp-toolbar,
 #ryCadSide [data-pp="pipePlanSection"] .pp-plan-bar{margin-left:16px;margin-right:16px}
-#ryCadSide [data-pp="pipePlanSection"] .pp-sep{display:none}
-#ryCadSide [data-pp="pipePlanSection"] .pp-title{
-    font-size:13px;
-    font-weight:600;
-    line-height:1.3;
-  }
-#ryCadSide [data-pp="pipePlanSection"] .pp-title{white-space:nowrap;flex-wrap:wrap}
-#ryCadSide [data-pp="pipePlanSection"] .pp-title .badge{flex-shrink:0}
-#ryCadSide [data-pp="pipePlanSection"] .pp-title-actions{flex:0 0 100%;margin-left:0;margin-top:10px;justify-content:flex-start}
+
+
+
+
+
 }
 @media(max-width:480px){
 #ryCadSide [data-pp="pipePlanSection"] .pp-plan-bar,
 #ryCadSide [data-pp="pipePlanSection"] .pp-toolbar{margin-left:12px;margin-right:12px}
 }
 @media(min-width:1101px) and (max-height:860px){
-#ryCadSide [data-pp="pipePlanSection"] .pp-stage{--pp-tool-w-def:clamp(110px,8.5vw,130px)}
+
 #ryCadSide [data-pp="pipePlanSection"] .pp-stage>.pp-toolbar{gap:3px;padding:6px 5px}
 #ryCadSide [data-pp="pipePlanSection"] .pp-stage>.pp-toolbar>.pp-btn,
 #ryCadSide [data-pp="pipePlanSection"] .pp-stage>.pp-toolbar>.pp-btn-ghost{height:25px;font-size:11.5px;padding:0 4px}
@@ -247,38 +161,16 @@
 #ryCadSide [data-pp="pipePlanSection"] .pp-canvas-wrap>.pp-quick>#ppGenerate{height:26px;padding:0 10px;font-size:11.5px;white-space:nowrap}
 #ryCadSide [data-pp="pipePlanSection"] .pp-canvas-wrap>.pp-quick .pp-quick-grip{cursor:grab;font-size:13px;line-height:1;color:#93a1a8;user-select:none;padding:0 3px;touch-action:none}
 #ryCadSide [data-pp="pipePlanSection"] .pp-canvas-wrap>.pp-quick.pp-quick-dragging{cursor:grabbing;box-shadow:0 6px 18px rgba(15,23,42,.14)}
-#ryCadSide [data-pp="pipePlanSection"] .pp-rail-toggle{display:none}
-#ryCadSide [data-pp="pipePlanSection"] .pp-grip{display:none}
+
+
 @media(min-width:1101px){
-#ryCadSide [data-pp="pipePlanSection"] > .pp-body{
-    flex:0 0 auto;
-    height:calc(100vh - var(--fn-nav-h));
-    min-height:520px;
-    box-sizing:border-box;
-    display:grid;
-    /* 三列：参数栏 ｜ 拖拽条 ｜ 图纸区。
-       两列宽度由 CSS 变量接管，拖拽条（.pp-grip，JS 注入）实时改写变量即可改宽：
-       var() 未设值时回落到原来的响应式 clamp，未拖过的用户视觉与改动前完全一致。
-       gap 改为 0：原来那 10px 列间距现在由 10px 宽的拖拽条列承担，间距不变。 */
-    grid-template-columns:var(--pp-side-w,clamp(272px,20vw,318px)) 10px minmax(0,1fr);
-    column-gap:0;row-gap:0;
-    padding:10px 14px 8px;
-  }
-#ryCadSide [data-pp="pipePlanSection"] > .pp-body>.pp-side{grid-column:1}
-#ryCadSide [data-pp="pipePlanSection"] > .pp-body>.pp-grip-side{grid-column:2;grid-row:1}
-#ryCadSide [data-pp="pipePlanSection"] > .pp-body>.pp-stage{grid-column:3}
-#ryCadSide [data-pp="pipePlanSection"] .pp-side,
-#ryCadSide [data-pp="pipePlanSection"] .pp-stage{min-width:0;min-height:0}
+
+#ryCadSide [data-pp="pipePlanSection"] > .pp-body>.pp-side, #ryCadSide [data-pp="tlPipePlanSection"] > .pp-body>.pp-side{grid-column:1}
+#ryCadSide [data-pp="pipePlanSection"] > .pp-body>.pp-grip-side, #ryCadSide [data-pp="tlPipePlanSection"] > .pp-body>.pp-grip-side{grid-column:2;grid-row:1}
+#ryCadSide [data-pp="pipePlanSection"] > .pp-body>.pp-stage, #ryCadSide [data-pp="tlPipePlanSection"] > .pp-body>.pp-stage{grid-column:3}
+#ryCadSide [data-pp="pipePlanSection"] .pp-side, #ryCadSide [data-pp="pipePlanSection"] .pp-stage, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side, #ryCadSide [data-pp="tlPipePlanSection"] .pp-stage{min-width:0;min-height:0}
 #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-head-break{margin:0;padding:6px 9px;font-size:11px}
-#ryCadSide [data-pp="pipePlanSection"] .pp-stage{
-    display:grid;
-    /* 三列：画布列 ｜ 拖拽条 ｜ 工具轨。工具轨宽度由 --pp-tool-w 接管（用户拖出的固定宽度）；
-       未拖过时取 --pp-tool-w-def（矮屏媒体块里登记的 110–130px 窄档），再兜底到常规 clamp。
-       gap 改为 0：原 10px 列间距改由 10px 宽的拖拽条列承担，间距不变。 */
-    grid-template-columns:minmax(0,1fr) 10px var(--pp-tool-w,var(--pp-tool-w-def,clamp(118px,9vw,138px)));
-    grid-template-rows:auto minmax(0,1fr) auto;
-    column-gap:0;row-gap:8px;
-  }
+
 #ryCadSide [data-pp="pipePlanSection"] .pp-stage>.pp-grip-tool{grid-column:2;grid-row:1 / -1}
 #ryCadSide [data-pp="pipePlanSection"] .pp-stage>.pp-toolbar{
     grid-column:3;grid-row:1 / -1;
@@ -324,29 +216,20 @@
     display:flex;align-items:center;justify-content:center;
     font-size:11.5px;line-height:1;white-space:nowrap;
   }
-#ryCadSide [data-pp="pipePlanSection"] .pp-grip{
-    display:block;
-    position:relative;
-    align-self:stretch;
-    min-width:0;
-    cursor:col-resize;
-    touch-action:none;                 /* 触屏拖动不触发页面滚动 */
-    -webkit-user-select:none;user-select:none;
-  }
-#ryCadSide [data-pp="pipePlanSection"] .pp-grip::before{
+
+#ryCadSide [data-pp="pipePlanSection"] .pp-grip::before, #ryCadSide [data-pp="tlPipePlanSection"] .pp-grip::before{
     content:"";position:absolute;top:0;bottom:0;left:50%;
     width:2px;margin-left:-1px;background:#dde8e1;
   }
-#ryCadSide [data-pp="pipePlanSection"] .pp-grip:hover::before,
-#ryCadSide [data-pp="pipePlanSection"] .pp-grip.dragging::before{background:var(--g-600);width:4px;margin-left:-2px}
+#ryCadSide [data-pp="pipePlanSection"] .pp-grip:hover::before, #ryCadSide [data-pp="pipePlanSection"] .pp-grip.dragging::before, #ryCadSide [data-pp="tlPipePlanSection"] .pp-grip:hover::before, #ryCadSide [data-pp="tlPipePlanSection"] .pp-grip.dragging::before{background:var(--g-600);width:4px;margin-left:-2px}
 #ryCadSide [data-pp="pipePlanSection"] .pp-stage>.pp-pick-result{grid-column:1;grid-row:1;margin:0;flex:0 0 auto}
 #ryCadSide [data-pp="pipePlanSection"] .pp-stage>.pp-canvas-wrap{
     grid-column:1;grid-row:2;
     margin:0;height:auto;min-height:300px;
   }
 #ryCadSide [data-pp="pipePlanSection"] .pp-stage>.pp-legend{grid-column:1;grid-row:3;margin:0;padding:0 2px;flex:0 0 auto}
-#ryCadSide [data-pp="pipePlanSection"] .pp-diagram-wrap{margin:0 14px 14px}
-#ryCadSide [data-pp="pipePlanSection"] .pp-stage{transition:grid-template-columns .18s ease}
+
+
 #ryCadSide [data-pp="pipePlanSection"] .pp-stage.pp-rail-off{
     grid-template-columns:minmax(0,1fr) 0px 0px;
   }
@@ -364,54 +247,22 @@ body.ry-tool #ryCadSide [data-pp="pipePlanSection"][data-ry-view="edit"] .ry-pan
     opacity:0;visibility:hidden;pointer-events:none;
     transform:translateX(24px);overflow:hidden;
   }
-#ryCadSide [data-pp="pipePlanSection"] .pp-rail-toggle{
-    display:flex;position:absolute;top:50%;right:8px;z-index:4;transform:translateY(-50%);
-    width:24px;height:24px;padding:0;align-items:center;justify-content:center;
-    font-size:13px;line-height:1;font-family:inherit;
-    background:rgba(251,253,251,.94);color:#4b5a53;
-    border:1px solid #e2ebe5;
-    box-shadow:0 2px 8px rgba(15,23,42,.06);
-    cursor:pointer;
-  }
+
 #ryCadSide [data-pp="pipePlanSection"] .pp-rail-toggle:hover{color:#173e32;border-color:#b9d2c5}
-#ryCadSide [data-pp="pipePlanSection"] .pp-rail-toggle.pp-rail-tab{
-    right:0;width:auto;min-width:26px;height:auto;padding:14px 5px;
-    writing-mode:vertical-rl;letter-spacing:5px;
-    font-size:12px;font-weight:600;color:#2f6d43;
-    background:#fbfdfc;border:1px solid #b9d2c5;border-right:0;
-    box-shadow:0 2px 10px rgba(15,23,42,.12);
-  }
+
 #ryCadSide [data-pp="pipePlanSection"] .pp-rail-toggle.pp-rail-tab:hover{color:#173e32;background:#f2f8f4}
 }
-#ryCadSide [data-pp="tlPipePlanSection"] > .pp-body{
-  flex:0 0 auto;
-  height:calc(100vh - var(--fn-nav-h));
-  min-height:520px;
-  box-sizing:border-box;
-  display:grid;
-  grid-template-columns:var(--pp-side-w,clamp(272px,20vw,318px)) 10px minmax(0,1fr);
-  column-gap:0;row-gap:0;
-  padding:10px 14px 8px;
-}
-#ryCadSide [data-pp="tlPipePlanSection"] > .pp-body>.pp-side{grid-column:1}
-#ryCadSide [data-pp="tlPipePlanSection"] > .pp-body>.pp-stage{grid-column:3}
-#ryCadSide [data-pp="tlPipePlanSection"] .pp-grip{display:none}
+
+
+
+
 @media(min-width:1101px){
-#ryCadSide [data-pp="tlPipePlanSection"] > .pp-body>.pp-grip-side{grid-column:2;grid-row:1}
-#ryCadSide [data-pp="tlPipePlanSection"] .pp-grip{
-    display:block;position:relative;align-self:stretch;min-width:0;
-    cursor:col-resize;touch-action:none;
-    -webkit-user-select:none;user-select:none;
-  }
-#ryCadSide [data-pp="tlPipePlanSection"] .pp-grip::before{
-    content:"";position:absolute;top:0;bottom:0;left:50%;
-    width:2px;margin-left:-1px;background:#dde8e1;
-  }
-#ryCadSide [data-pp="tlPipePlanSection"] .pp-grip:hover::before,
-#ryCadSide [data-pp="tlPipePlanSection"] .pp-grip.dragging::before{background:var(--g-600);width:4px;margin-left:-2px}
+
+
+
+
 }
-#ryCadSide [data-pp="tlPipePlanSection"] .pp-side,
-#ryCadSide [data-pp="tlPipePlanSection"] .pp-stage{min-width:0;min-height:0}
+
 #ryCadSide [data-pp="tlPipePlanSection"] .pp-side{
   align-self:start;max-height:100%;
   display:flex;flex-direction:column;gap:8px;
@@ -450,7 +301,7 @@ body.ry-tool #ryCadSide [data-pp="pipePlanSection"][data-ry-view="edit"] .ry-pan
 #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-item>.pp-plan-label:first-child{margin-right:auto}
 #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-label{font-size:11px;line-height:1.25;white-space:nowrap}
 #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-val{font-size:11px;font-weight:600;color:#1a1a1a}
-#ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-btn-ghost{color:#333;border-color:#ccc;background:#f8f9fa}
+
 #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-item input{
   width:64px!important;height:24px;padding:2px 6px;
   box-sizing:border-box;text-align:right;flex:0 0 auto;font-size:11px;font-weight:400;
@@ -462,14 +313,11 @@ body.ry-tool #ryCadSide [data-pp="pipePlanSection"][data-ry-view="edit"] .ry-pan
 }
 #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-item input:focus{border-color:#16a34a}
 #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-sep-vert{display:none}
-#ryCadSide [data-pp="tlPipePlanSection"] .pp-stage{
-  align-self:start;
-  display:flex;flex-direction:column;gap:8px;min-height:0;overflow:hidden;
-}
+
 #ryCadSide [data-pp="tlPipePlanSection"] .pp-stage>.pp-toolbar{margin:0}
 #ryCadSide [data-pp="tlPipePlanSection"] .pp-stage>.pp-diagram-wrap{margin:0;flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
 #ryCadSide [data-pp="tlPipePlanSection"] .pp-stage>.pp-diagram-wrap>#tlDiagramContent{flex:1 1 auto;min-height:0}
-#ryCadSide [data-pp="pipePlanSection"].sys-view > .pp-body{display:none}
+
 #ryCadSide [data-pp="pipePlanSection"].sys-view > #ppDiagramWrap{
   display:flex;flex-direction:column;
   height:calc(100vh - var(--fn-nav-h));
@@ -683,24 +531,15 @@ body.ry-tool #ryCadSide [data-pp="pipePlanSection"][data-ry-clean="1"] > .pp-bod
 body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"][data-ry-clean="1"] > .pp-body{
   grid-template-columns:0 0 minmax(0,1fr);
 }
-#ryCadSide [data-pp="pipePlanSection"] .pp-btn{
-  color:var(--u-ink-2)!important;background:var(--u-canvas)!important;
-  border-color:var(--u-line)!important;
-}
+
 #ryCadSide [data-pp="pipePlanSection"] .pp-btn:hover{
   background:var(--u-bg-2)!important;color:var(--u-ink)!important;border-color:var(--u-ink-3)!important;
 }
-#ryCadSide [data-pp="pipePlanSection"] .pp-btn.active{
-  color:var(--u-accent-2)!important;border-color:var(--u-accent)!important;background:var(--u-accent-bg)!important;
-}
-#ryCadSide [data-pp="pipePlanSection"] .pp-btn-ghost{
-  color:var(--u-ink-2)!important;background:transparent!important;border-color:var(--u-line)!important;
-}
+
+
 #ryCadSide [data-pp="pipePlanSection"] .pp-btn-ghost:hover{color:var(--u-ink)!important;background:var(--u-bg-2)!important}
-#ryCadSide [data-pp="pipePlanSection"] .pp-btn-ghost.active{
-  color:var(--u-accent-2)!important;border-color:var(--u-accent-line)!important;background:var(--u-accent-bg)!important;
-}
-#ryCadSide [data-pp="pipePlanSection"] .pp-btn-generate{background:var(--u-accent-2)!important;background-image:none!important;border-color:var(--u-accent-2)!important}
+
+
 #ryCadSide [data-pp="pipePlanSection"] .pp-btn-generate:hover{box-shadow:none!important;transform:none!important;background:var(--u-accent)!important}
 #ryCadSide [data-pp="pipePlanSection"] .pp-pick-result{border-color:var(--u-line-2)!important}
 #ryCadSide [data-pp="pipePlanSection"] #ppPickResult{background:var(--u-bg-2)!important}
