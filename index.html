@@ -7,6 +7,8 @@
 <script src="core/irrigation-data-store.js?v=1"></script>
 <script src="core/terrain-bridge-store.js?v=1"></script>
 <script src="core/sprinkler-bridge-store.js?v=1"></script>
+<script src="core/measured-area-bridge-store.js?v=1"></script>
+<script src="core/economic-settings-store.js?v=1"></script>
 <script src="core/plot-library-store.js?v=508-project-import-safe-rollback"></script>
 <script src="runye-material-audit.js?v=264"></script>
 <script src="runye-map-partition.js?v=499-partition-inner"></script>
@@ -1052,6 +1054,11 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.pp-grip-side,
   body.ry-tool.ry-cad-vp > main > #tlPipePlanSection{padding-top:0!important}
 }
 
+  /* [v525]（2026-10-17 用户要求）左侧工具面板只留「调用端口」：上面 10 项参数输入已加 readonly 只读展示，
+     修改/保存统一在「设置 · 灌溉参数」（⚙ 参数设置按钮）。程序化回填（方案调用 / AI 回填 / 设置保存）
+     不受 readonly 影响：赋 .value + 派发事件照常触发重算与落盘。 */
+  #ppPlanBar input[readonly],#ppPlanBar sl-input[readonly]{cursor:default}
+
 </style>
 <link rel="stylesheet" href="runye-mobile.css?v=242">
 <script src="runye-mobile.js?v=453-disable-l2-schematic"></script>
@@ -1539,16 +1546,16 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.pp-grip-side,
     <!-- 2026-09-20 v91 用户要求：把「水泵提升高度 / 地形高差」做成可设定值，放进本面板、排在「滴灌带间距」之前。
          与 01 一级表单同源：planLift ⇄ fld_lift、planDh ⇄ fld_dh（双向镜像，见下方 JS 块），默认值仍为 5 / 5。
          需要撤掉：删掉本注释与下面两行 item 即可，另删本文件底部 ppPullLiftDh / ppLiftDhCapture 那一整块（含两个 document 监听）与 resetDefaults 里的回填调用。 -->
-    <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">水泵提升高度</span><input class="ryp-native-fallback" type="number" id="planLift" value="5" min="0" step="1" aria-label="水泵提升高度"><sl-input data-ry-proxy-for="planLift" type="number" value="5" min="0" step="1" size="small" aria-label="水泵提升高度" hidden></sl-input><span class="pp-plan-unit">m</span></span>
-    <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">地形高差</span><input class="ryp-native-fallback" type="number" id="planDh" value="5" min="0" step="1" aria-label="地形高差"><sl-input data-ry-proxy-for="planDh" type="number" value="5" min="0" step="1" size="small" aria-label="地形高差" hidden></sl-input><span class="pp-plan-unit">m</span></span>
+    <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">水泵提升高度</span><input readonly class="ryp-native-fallback" type="number" id="planLift" value="5" min="0" step="1" aria-label="水泵提升高度"><sl-input readonly data-ry-proxy-for="planLift" type="number" value="5" min="0" step="1" size="small" aria-label="水泵提升高度" hidden></sl-input><span class="pp-plan-unit">m</span></span>
+    <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">地形高差</span><input readonly class="ryp-native-fallback" type="number" id="planDh" value="5" min="0" step="1" aria-label="地形高差"><sl-input readonly data-ry-proxy-for="planDh" type="number" value="5" min="0" step="1" size="small" aria-label="地形高差" hidden></sl-input><span class="pp-plan-unit">m</span></span>
     <!-- 2026-09-24 任务⑮（用户要求）：新增「水源距离」——自动生成时水源贴着地块，实际水源可能在
          地块外一段距离。该距离计入三级总管长度（frontLenUsed）→ 总管沿程损失 → 水泵扬程，
          并计入总管长度统计（结果栏/损失卡/对比表）与材料清单。 -->
-    <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">水源距离</span><input class="ryp-native-fallback" type="number" id="planSrcDist" value="0" min="0" step="1" aria-label="水源距离" title="水源到地块边界的距离（m）：计入总管长度 → 总管沿程损失 → 水泵扬程；同时计入总管长度统计与材料清单"><sl-input data-ry-proxy-for="planSrcDist" type="number" value="0" min="0" step="1" size="small" aria-label="水源距离" hidden></sl-input><span class="pp-plan-unit">m</span></span>
+    <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">水源距离</span><input readonly class="ryp-native-fallback" type="number" id="planSrcDist" value="0" min="0" step="1" aria-label="水源距离" title="水源到地块边界的距离（m）：计入总管长度 → 总管沿程损失 → 水泵扬程；同时计入总管长度统计与材料清单"><sl-input readonly data-ry-proxy-for="planSrcDist" type="number" value="0" min="0" step="1" size="small" aria-label="水源距离" hidden></sl-input><span class="pp-plan-unit">m</span></span>
     <!-- [v466]（2026-10-15 用户要求）「滴灌带间距」改名「滴带间距」（id=planTapeSpacing 不变，消费点零改动） -->
-    <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">滴带间距</span><input class="ryp-native-fallback" type="number" id="planTapeSpacing" value="0.4" min="0.1" step="0.1" aria-label="滴带间距"><sl-input data-ry-proxy-for="planTapeSpacing" type="number" value="0.4" min="0.1" step="0.1" size="small" aria-label="滴带间距" hidden></sl-input><span class="pp-plan-unit">m</span></span>
-    <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">滴孔间距</span><input class="ryp-native-fallback" type="number" id="planEmitterSpacing" value="0.3" min="0.05" step="0.05" aria-label="滴孔间距"><sl-input data-ry-proxy-for="planEmitterSpacing" type="number" value="0.3" min="0.05" step="0.05" size="small" aria-label="滴孔间距" hidden></sl-input><span class="pp-plan-unit">m</span></span>
-    <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">滴头流量</span><input class="ryp-native-fallback" type="number" id="planEmitterFlow" value="0.8" min="0.1" step="0.1" aria-label="滴头流量"><sl-input data-ry-proxy-for="planEmitterFlow" type="number" value="0.8" min="0.1" step="0.1" size="small" aria-label="滴头流量" hidden></sl-input><span class="pp-plan-unit">L/h</span></span>
+    <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">滴带间距</span><input readonly class="ryp-native-fallback" type="number" id="planTapeSpacing" value="0.4" min="0.1" step="0.1" aria-label="滴带间距"><sl-input readonly data-ry-proxy-for="planTapeSpacing" type="number" value="0.4" min="0.1" step="0.1" size="small" aria-label="滴带间距" hidden></sl-input><span class="pp-plan-unit">m</span></span>
+    <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">滴孔间距</span><input readonly class="ryp-native-fallback" type="number" id="planEmitterSpacing" value="0.3" min="0.05" step="0.05" aria-label="滴孔间距"><sl-input readonly data-ry-proxy-for="planEmitterSpacing" type="number" value="0.3" min="0.05" step="0.05" size="small" aria-label="滴孔间距" hidden></sl-input><span class="pp-plan-unit">m</span></span>
+    <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">滴头流量</span><input readonly class="ryp-native-fallback" type="number" id="planEmitterFlow" value="0.8" min="0.1" step="0.1" aria-label="滴头流量"><sl-input readonly data-ry-proxy-for="planEmitterFlow" type="number" value="0.8" min="0.1" step="0.1" size="small" aria-label="滴头流量" hidden></sl-input><span class="pp-plan-unit">L/h</span></span>
     <!-- [v463]（2026-10-15 用户要求）「单边铺设长度」改名「铺设长度」并挪到「滴头流量」之下、
          「分区划定」之上（原位置在「水源距离」与「滴灌带间距」之间，见 git 历史）。
          2026-09-24 用户要求：新增（默认100m，可调80/120等）。
@@ -1557,18 +1564,18 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.pp-grip-side,
          消费点：planZoneFixedSide() → calcZoneLayout / calcManualZoneLayout / ppGetZoneCuts。
          id 保持 planTapeLaySide 不变（runye-ai-plan.js 的同义词表本就含「铺设长度」，解析不受影响）。
          需要撤掉：删本 item，并把 planZoneFixedSide 三处消费点还原为 MAX_ZONE_SIDE。 -->
-    <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">铺设长度</span><input class="ryp-native-fallback" type="number" id="planTapeLaySide" value="100" min="10" step="10" aria-label="铺设长度" title="滴灌带在分区内单边铺设的长度；分区固定边随之联动，调节后分区划分自动跟随"><sl-input data-ry-proxy-for="planTapeLaySide" type="number" value="100" min="10" step="10" size="small" aria-label="铺设长度" hidden></sl-input><span class="pp-plan-unit">m</span></span>
+    <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">铺设长度</span><input readonly class="ryp-native-fallback" type="number" id="planTapeLaySide" value="100" min="10" step="10" aria-label="铺设长度" title="滴灌带在分区内单边铺设的长度；分区固定边随之联动，调节后分区划分自动跟随"><sl-input readonly data-ry-proxy-for="planTapeLaySide" type="number" value="100" min="10" step="10" size="small" aria-label="铺设长度" hidden></sl-input><span class="pp-plan-unit">m</span></span>
     <!-- 2026-09-28 用户要求：取消「单带长度」——与「单边铺设长度」语义重复。
          单条滴灌带长度改由 planTapeLaySide（单边铺设长度）承担（calcPlan tapeLen / 摘要处均已重指向）。
          需要恢复：加回 <span class="pp-plan-item"><span class="pp-plan-label">单带长度</span><input type="number" id="planTapeLen" value="100" min="10" step="10">m</span> 并还原三处消费点。 -->
     <span class="pp-sep-vert"></span>
-    <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">分区划定</span><input class="ryp-native-fallback" type="number" id="planZoneMuManual" value="18" min="0.1" step="0.1" aria-label="分区划定"><sl-input data-ry-proxy-for="planZoneMuManual" type="number" value="18" min="0.1" step="0.1" size="small" aria-label="分区划定" hidden></sl-input><span class="pp-plan-unit">亩/区</span></span>
+    <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">分区划定</span><input readonly class="ryp-native-fallback" type="number" id="planZoneMuManual" value="18" min="0.1" step="0.1" aria-label="分区划定"><sl-input readonly data-ry-proxy-for="planZoneMuManual" type="number" value="18" min="0.1" step="0.1" size="small" aria-label="分区划定" hidden></sl-input><span class="pp-plan-unit">亩/区</span></span>
     <!-- 2026-10-04 v199 用户要求：左栏增加「入口压力」输入 —— 与 01 一级表单「滴灌带入口工作压力
          fld_tapePressure」**同一个物理量**（扬程计算式条里的「入口压力」= bar×10.2m），
          双向镜像同 v91 机制（PP_LIFTDH_PAIRS）。调节后水泵扬程/计算式条实时跟随。
          需要撤掉：删本 item + PP_LIFTDH_PAIRS 里的镜像对 + 下方 calcPlan 触发循环里的一项。 -->
-    <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">入口压力</span><input class="ryp-native-fallback" type="number" id="planTapePressure" value="1" min="0" step="0.1" aria-label="入口压力" title="滴灌带入口工作压力（bar）：计入水泵扬程（×10.2 折算水头），与 01 一级表单同源联动"><sl-input data-ry-proxy-for="planTapePressure" type="number" value="1" min="0" step="0.1" size="small" aria-label="入口压力" hidden></sl-input><span class="pp-plan-unit">bar</span></span>
-    <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">目标流速</span><input class="ryp-native-fallback" type="number" id="planTargetV" value="1.5" min="0.3" max="5" step="0.1" aria-label="目标流速"><sl-input data-ry-proxy-for="planTargetV" type="number" value="1.5" min="0.3" max="5" step="0.1" size="small" aria-label="目标流速" hidden></sl-input><span class="pp-plan-unit">m/s</span></span>
+    <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">入口压力</span><input readonly class="ryp-native-fallback" type="number" id="planTapePressure" value="1" min="0" step="0.1" aria-label="入口压力" title="滴灌带入口工作压力（bar）：计入水泵扬程（×10.2 折算水头），与 01 一级表单同源联动"><sl-input readonly data-ry-proxy-for="planTapePressure" type="number" value="1" min="0" step="0.1" size="small" aria-label="入口压力" hidden></sl-input><span class="pp-plan-unit">bar</span></span>
+    <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">目标流速</span><input readonly class="ryp-native-fallback" type="number" id="planTargetV" value="1.5" min="0.3" max="5" step="0.1" aria-label="目标流速"><sl-input readonly data-ry-proxy-for="planTargetV" type="number" value="1.5" min="0.3" max="5" step="0.1" size="small" aria-label="目标流速" hidden></sl-input><span class="pp-plan-unit">m/s</span></span>
     <input type="hidden" id="planN" value="4">
     <input type="hidden" id="planZoneMode" value="manual">
   </div>
@@ -3125,7 +3132,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.pp-grip-side,
   <span id="ryCadWGrip" title="⇔ 拖拽调整工具栏宽度"></span>
   <div class="ry-cad-grps">
     <details class="ry-cad-grp" id="ryCadGrpPipe">
-      <summary>二级 · 地块与灌溉参数 / 水力<button type="button" id="ryCadGrpPipeSet" title="打开「设置 · 灌溉参数」：这 10 项的正式编辑页，保存后立即生效（存浏览器，刷新不丢）" style="margin-left:auto;font-size:11px;font-weight:500;padding:2px 8px;border:1px solid #c9d8d0;border-radius:6px;background:#fff;color:#33604f;cursor:pointer">⚙ 参数设置</button></summary>
+      <summary>二级 · 地块与灌溉参数 / 水力<button type="button" id="ryCadGrpPipeSet" title="工具栏参数仅显示与调用；修改/保存统一在「设置 · 灌溉参数」，保存后立即生效（存浏览器，刷新不丢）" style="margin-left:auto;font-size:11px;font-weight:500;padding:2px 8px;border:1px solid #c9d8d0;border-radius:6px;background:#fff;color:#33604f;cursor:pointer">⚙ 参数设置</button></summary>
       <div class="ry-cad-grp-body" data-pp="pipePlanSection" data-host="ppSide"></div>
     </details>
     <details class="ry-cad-grp" id="ryCadGrpTl">

@@ -371,8 +371,12 @@
    工具栏手动改 / AI 回填 / 命名方案调用一律自动写入，刷新不丢）；设置弹窗新增「灌溉参数」页签
    （保存即同步回工具栏并重算），工具栏组标题加「⚙ 参数设置」直达；
    v522-map-partition-atomic-commit：分区应用先提交管网快照、再按revision写地块库；后者失败时对管网快照执行CAS回滚。
-   runye-map-partition.js 在 CORE，必须抬版本重建离线缓存。 */
-const VERSION = 'v522-map-partition-atomic-commit';
+   v524-economic-settings-store：管材单价/造价假设 localStorage 读写收编
+   core/economic-settings-store.js（同批 measured-area-bridge-store 入 CORE）；
+   v525-plan-readonly-port：左侧工具面板 10 项参数转只读「调用端口」（2026-10-17 用户要求），
+   修改/保存统一在设置弹窗「灌溉参数」页签（⚙ 参数设置直达）；index.html 在 CORE，
+   必须抬版本重建离线缓存。 */
+const VERSION = 'v525-plan-readonly-port';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
@@ -390,6 +394,8 @@ const CORE = [
   "core/irrigation-data-store.js",
   "core/terrain-bridge-store.js",
   "core/sprinkler-bridge-store.js",
+  "core/measured-area-bridge-store.js",
+  "core/economic-settings-store.js",
   "core/ui-shell.js",
   "core/runtime-guard.js",
   "plugins/hello-world/manifest.json",
