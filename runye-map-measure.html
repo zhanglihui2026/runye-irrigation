@@ -112,14 +112,12 @@
      形态：白底细描边横排、直角（全站扁平化）、按钮 28px 高；
      拖动/位置记忆 = mod/ry-panel.js rypDraggable（bounds=.map-wrap，拖不出地图区）；
      左栏已无「绘制」区。撤功能：删 #mapDrawTools + 本段样式 + 左栏注释即可。 */
-  .map-draw-tools{position:absolute;left:12px;top:12px;z-index:1050;display:flex;align-items:center;
-    gap:4px;flex-wrap:wrap;max-width:calc(100% - 24px);padding:4px 6px;
+  /* [v544] 几何与按钮规格统一到 .ry-hbar / .ry-hbar-btn（本页已加载 mod/ry-panel.css），
+     这里只留定位与「浮在卫星影像上要纯白」这条场景配色。 */
+  .map-draw-tools{position:absolute;left:12px;top:12px;z-index:1050;
     background:#fff;border:1px solid var(--s-300);box-shadow:0 2px 8px rgba(15,23,42,.14)}
   .map-draw-tools .dt-grip{flex:none;padding:4px 7px;font-size:12px;font-weight:700;color:var(--g-700);
     background:var(--g-50);border-right:1px solid var(--s-300);cursor:move;user-select:none;touch-action:none;letter-spacing:1px}
-  .map-draw-tools .mbtn{height:28px;padding:0 8px;font-size:12px !important;border-width:1px;background:#fff}
-  .map-draw-tools .mbtn:hover{border-color:var(--g-600);color:var(--g-700);background:var(--g-50)}
-  .map-draw-tools .mbtn.btn-on{background:var(--g-500);color:#fff;border-color:var(--g-500)}
   /* ===== [v283 2026-10-06] 「回传地块绘制 / 保存地块」并入右侧「分区角度」悬浮面板**内部顶端**
      （用户截图指定：放在这个面板里面、且在「当前设计地块」下拉之上）。
      v282 曾让它们浮在地图左上角，本轮撤掉那个绝对定位容器 ⇒ 恢复为面板内正常流
@@ -214,7 +212,7 @@
 <link rel="stylesheet" href="pwa/pwa.css?v=2">
 <script defer src="pwa/pwa.js?v=2"></script>
     <link rel="stylesheet" href="runye-theme.css?v=2">
-    <link rel="stylesheet" href="mod/ry-panel.css?v=530-token-single-source">
+    <link rel="stylesheet" href="mod/ry-panel.css?v=544-float-card-unify">
   <link rel="stylesheet" href="runye-typography.css?v=530-h1-scope">
 </head>
 <body>
@@ -231,7 +229,7 @@
   <script src="core/irrigation-data-store.js?v=1"></script>
   <script src="core/measured-area-bridge-store.js?v=1"></script>
   <script src="core/plot-library-store.js?v=508-project-import-safe-rollback"></script>
-  <script src="runye-map-enhance.js?v=505-map-plot-store-cas"></script>
+  <script src="runye-map-enhance.js?v=544-float-card-unify"></script>
 <script src="runye-map-partition.js?v=499-partition-inner"></script>
   <!-- [NEW MODULE: pipe_optim] 导航按钮与主页同源（2026-09-23 用户要求：三页导航一致） -->
   <script src="pipe_optim_ui.js"></script>
@@ -303,17 +301,17 @@
            按住左侧「⠿ 绘制」抓手可拖动（复用 mod/ry-panel.js rypDraggable：位置记忆
            localStorage['mapDrawToolsPos']，clamp 在 .map-wrap 内 = 永不超出地图区、
            不超过导航栏）。按钮 id 不变，online-map.js 绑定零改动。 ===== -->
-      <div class="map-draw-tools ryp-float" id="mapDrawTools" data-ry-panel
+      <div class="map-draw-tools ryp-float ry-hbar" id="mapDrawTools" data-ry-panel
            data-ry-position-key="mapDrawToolsPos" data-ry-default-top="12" data-ry-default-left="12">
         <span class="dt-grip" data-ry-drag title="按住拖动工具条；位置自动记住">⠿ 绘制</span>
-        <button class="mbtn" id="btnDraw">✏️ 开始画框</button>
+        <button class="ry-hbar-btn" id="btnDraw">✏️ 开始画框</button>
         <!-- [v186] 「完成」的语义已升级为「定稿本块 + 清空 + 继续画下一块」，
              按钮文案随之改，让用户一眼知道点完还能接着画（见 btnFinish 处理函数）。 -->
-        <button class="mbtn" id="btnFinish">✅ 完成并画下一块</button>
-        <button class="mbtn" id="btnAddPt">➕ 加点</button>
-        <button class="mbtn" id="btnUndo">↩ 撤销</button>
-        <button class="mbtn" id="btnMeasure">📏 测距</button>
-        <button class="mbtn" id="btnClear">🗑 清除</button>
+        <button class="ry-hbar-btn" id="btnFinish">✅ 完成并画下一块</button>
+        <button class="ry-hbar-btn" id="btnAddPt">➕ 加点</button>
+        <button class="ry-hbar-btn" id="btnUndo">↩ 撤销</button>
+        <button class="ry-hbar-btn" id="btnMeasure">📏 测距</button>
+        <button class="ry-hbar-btn" id="btnClear">🗑 清除</button>
       </div>
       <!-- ===== [v282] 分区角度悬浮面板 =====
            形态仿手机端 runye-mobile-map-preview.html 的 .map-angle：↶＋1° / 角度输入 / ↷−1° 竖排。
@@ -356,6 +354,6 @@
 
 <script src="pwa/vendor/leaflet.js"></script>
 <script src="mod/online-map.js?v=508-project-import-safe-rollback"></script>
-<script src="mod/ry-panel.js?v=494-drag-default-left"></script>
+<script src="mod/ry-panel.js?v=544-float-card-unify"></script>
 </body>
 </html>

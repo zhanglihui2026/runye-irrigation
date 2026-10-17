@@ -2466,54 +2466,11 @@
   })();
 
 
-  /* ===== [v248 2026-10-06 用户要求] 快捷条(#ppQuickBar)整条可拖动：按住左侧抓手拖，
-         位置存 localStorage('ppQuickBarPos')；恢复与拖动中都夹紧在画布范围内，
-         拖的是抓手（setPointerCapture），条内输入框/按钮交互不受影响。 ===== */
-  (function ppQuickBarDrag(){
-    var bar=document.getElementById('ppQuickBar'),wrap=document.getElementById('ppCanvasWrap'),grip=document.getElementById('ppQuickGrip');
-    if(!bar||!wrap||!grip)return;
-    var dragPx=0,dragPy=0,dragging=false;
-    function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
-    function applyPos(l,t){
-      var wr=wrap.getBoundingClientRect(),br=bar.getBoundingClientRect();
-      l=clamp(l,0,Math.max(0,wr.width-br.width));
-      t=clamp(t,0,Math.max(0,wr.height-br.height));
-      bar.style.left=Math.round(l)+'px';bar.style.top=Math.round(t)+'px';
-    }
-    (function restorePos(tries){
-      /* [v248b] 区块隐藏时 rect 全 0，夹紧会把位置压成 0 ⇒ 等区块可见再落位（最长约 10s） */
-      var wr=wrap.getBoundingClientRect();
-      if(wr.width<50&&tries>0){ setTimeout(function(){restorePos(tries-1);},200); return; }
-      try{
-        var sp=JSON.parse(localStorage.getItem('ppQuickBarPos')||'null');
-        if(sp&&typeof sp.l==='number'&&typeof sp.t==='number')applyPos(sp.l,sp.t);
-      }catch(err){}
-    })(50);
-    grip.addEventListener('pointerdown',function(e){
-      if(e.button!==undefined&&e.button!==0)return;
-      e.preventDefault();e.stopPropagation();
-      var br=bar.getBoundingClientRect();
-      dragging=true;dragPx=e.clientX-br.left;dragPy=e.clientY-br.top;
-      bar.classList.add('pp-quick-dragging');
-      try{grip.setPointerCapture(e.pointerId);}catch(err){}
-    });
-    grip.addEventListener('pointermove',function(e){
-      if(!dragging)return;
-      e.preventDefault();e.stopPropagation();
-      var wr=wrap.getBoundingClientRect();
-      applyPos(e.clientX-wr.left-dragPx,e.clientY-wr.top-dragPy);
-    });
-    function endDrag(e){
-      if(!dragging)return;
-      dragging=false;
-      bar.classList.remove('pp-quick-dragging');
-      try{if(e&&e.pointerId!==undefined)grip.releasePointerCapture(e.pointerId);}catch(err){}
-      var wr=wrap.getBoundingClientRect(),br=bar.getBoundingClientRect();
-      try{localStorage.setItem('ppQuickBarPos',JSON.stringify({l:Math.round(br.left-wr.left),t:Math.round(br.top-wr.top)}));}catch(err){}
-    }
-    grip.addEventListener('pointerup',endDrag);
-    grip.addEventListener('pointercancel',endDrag);
-  })();
+  /* ===== [v248 2026-10-06] 快捷条(#ppQuickBar)整条可拖动。
+         [v544] 手写拖动实现（pointer 三件套 + 夹紧 + 存档）已删除，改为在 index.html 上
+         声明 data-ry-panel / data-ry-position-key="ppQuickBarPos" + 抓手上 data-ry-drag，
+         由 mod/ry-panel.js 的 rypDraggable 统一接管（同一份实现，夹紧容器仍是 #ppCanvasWrap）。
+         存档键与格式（{l,t} 相对画布左上角）保持不变 ⇒ 老用户的位置记忆继续有效。 ===== */
 
   /* ===== [v249 2026-10-06 用户要求] 右侧竖排工具轨「靠右折叠」：点画布右上角把手，
          工具列整条向右缘收起（横向滑出、画布加宽），再点展开；

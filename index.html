@@ -16,17 +16,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>润野灌溉设计优化版｜滴灌管径与水泵选型</title>
 <meta name="description" content="输入地块、滴灌带与水源参数，快速计算灌溉分区、主管支管管径和水泵工作点。"/>
-<link rel="stylesheet" href="mod/style-01.css?v=543-panel-single-owner">
+<link rel="stylesheet" href="mod/style-01.css?v=544-float-card-unify">
 <link rel="stylesheet" href="runye-inverse-design.css?v=277">
 <script defer src="runye-inverse-design.js?v=437"></script>
 <link rel="stylesheet" href="runye-terrain.css?v=454-terrain-sidebar-peer">
 <script src="runye-terrain.js?v=454-terrain-sidebar-peer"></script>
-<link rel="stylesheet" href="runye-ai-plan.css?v=366">
-<script src="runye-ai-plan.js?v=513-sec-gate"></script>
+<link rel="stylesheet" href="runye-ai-plan.css?v=544-float-card-unify">
+<script src="runye-ai-plan.js?v=544-float-card-unify"></script>
 <link rel="stylesheet" href="runye-case-library.css?v=277">
 <script src="runye-case-library.js?v=277"></script>
 <script src="runye-geo.js"></script>
-<script src="runye-map-enhance.js?v=505-map-plot-store-cas"></script>
+<script src="runye-map-enhance.js?v=544-float-card-unify"></script>
 <script src="hydraulic-calc/hydraulics-wasm.js"></script>
 <script src="hydraulic-calc/native-bridge.js"></script>
 <script src="hydraulic-calc/hc-core.js"></script>
@@ -41,7 +41,7 @@
 <link rel="stylesheet" href="hydraulic-calc/hydraulic-calc.css">
 <link rel="stylesheet" href="filter-system/filter-system.css">
 <link rel="stylesheet" href="pwa/vendor/leaflet.css">
-<link rel="stylesheet" href="mod/online-map.css?v=534-panel-type-scale">
+<link rel="stylesheet" href="mod/online-map.css?v=544-float-card-unify">
 <link rel="stylesheet" href="terrain/terrain.css?v=535-terrain-single-source">
 <link rel="stylesheet" href="hydraulics-main.css?v=442-native">
 <style id="ryCadTwinCss">
@@ -244,7 +244,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <link rel="stylesheet" href="pwa/pwa.css?v=2">
 <script defer src="pwa/pwa.js?v=2"></script>
     <link rel="stylesheet" href="runye-theme.css?v=2">
-    <link rel="stylesheet" href="mod/ry-panel.css?v=543-panel-single-owner">
+    <link rel="stylesheet" href="mod/ry-panel.css?v=544-float-card-unify">
     <!-- Shoelace 2.15.1（与紧凑分组样板一致）；Shoelace 不可用时保留原生输入控件。 -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.1/cdn/themes/light.css">
   <link rel="stylesheet" href="runye-typography.css?v=530-h1-scope">
@@ -652,15 +652,15 @@ body.ry-worst-off [data-tlworst]{display:none}
            v494 同款）：左栏「绘制」区迁来，挂在地图区顶端；按住「⠿ 绘制」抓手拖动
            （mod/ry-panel.js rypDraggable：位置记忆 localStorage['mapDrawToolsPos']，
            clamp 在 .map-wrap 内 = 不超过导航栏）。按钮 id 不变，online-map.js 零改动。 ===== -->
-      <div class="map-draw-tools ryp-float" id="mapDrawTools" data-ry-panel
+      <div class="map-draw-tools ryp-float ry-hbar" id="mapDrawTools" data-ry-panel
            data-ry-position-key="mapDrawToolsPos" data-ry-default-top="12" data-ry-default-left="12">
         <span class="dt-grip" data-ry-drag title="按住拖动工具条；位置自动记住">⠿ 绘制</span>
-        <button class="mbtn" id="btnDraw">✏️ 开始画框</button>
-        <button class="mbtn" id="btnFinish">✅ 完成并画下一块</button>
-        <button class="mbtn" id="btnAddPt">➕ 加点</button>
-        <button class="mbtn" id="btnUndo">↩ 撤销</button>
-        <button class="mbtn" id="btnMeasure">📏 测距</button>
-        <button class="mbtn" id="btnClear">🗑 清除</button>
+        <button class="ry-hbar-btn" id="btnDraw">✏️ 开始画框</button>
+        <button class="ry-hbar-btn" id="btnFinish">✅ 完成并画下一块</button>
+        <button class="ry-hbar-btn" id="btnAddPt">➕ 加点</button>
+        <button class="ry-hbar-btn" id="btnUndo">↩ 撤销</button>
+        <button class="ry-hbar-btn" id="btnMeasure">📏 测距</button>
+        <button class="ry-hbar-btn" id="btnClear">🗑 清除</button>
       </div>
       <!-- ===== [v282] 分区角度悬浮面板 =====
            形态仿手机端 runye-mobile-map-preview.html 的 .map-angle：↶＋1° / 角度输入 / ↷−1° 竖排。
@@ -909,19 +909,20 @@ body.ry-worst-off [data-tlworst]{display:none}
          节点仍在 #pipePlanSection 内 ⇒ JS 事件绑定（ppPlotAngle 输入 / 重新分区）与
          body.ry-zoneauto-off 的置灰规则照旧生效（那些选择器不带父级约束）。
          [v248] 「生成施工图」也整节点搬进本条（「重新分区」之后）；整条可通过左侧抓手拖动，位置存 localStorage(ppQuickBarPos)。 -->
-    <div class="pp-quick" id="ppQuickBar">
-      <span class="pp-quick-grip" id="ppQuickGrip" title="按住拖动，可移动工具条位置">⠿</span>
+    <div class="pp-quick ry-hbar" id="ppQuickBar" data-ry-panel
+         data-ry-panel-key="ppQuickBar" data-ry-position-key="ppQuickBarPos" data-ry-keep-default="1">
+      <span class="pp-quick-grip" id="ppQuickGrip" data-ry-drag title="按住拖动，可移动工具条位置">⠿</span>
       <label class="pp-angle-control" title="以地块包围盒中心为轴旋转地块外轮廓（只影响显示、不重写数据）；输入角度后点「重新分区」把旋转落定为新基准">
         <span>地块角度</span>
         <input id="ppPlotAngle" type="number" value="0" min="-180" max="180" step="1">
         <span>°</span>
       </label>
       <!-- [v325] AI 规划入口按钮 -->
-      <button class="pp-btn-ghost" id="ppAiPlan" title="带当前地块参数跳转 AI 助手，通过对话完成规划；规划结果回传本页应用">🤖 AI规划</button>
-      <button class="pp-btn-ghost" id="ppRepartition" title="将当前旋转后的地块作为新基准重新切割分区">重新分区</button>
+      <button class="pp-btn-ghost ry-hbar-btn" id="ppAiPlan" title="带当前地块参数跳转 AI 助手，通过对话完成规划；规划结果回传本页应用">🤖 AI规划</button>
+      <button class="pp-btn-ghost ry-hbar-btn" id="ppRepartition" title="将当前旋转后的地块作为新基准重新切割分区">重新分区</button>
       <!-- [v328 2026-10-09 用户要求] 右侧工具栏「分区旋转90°」搬到此处（同一节点、同一 id，未复制第二份；v132/v246 同模式） -->
-      <button class="pp-btn-ghost" id="ppRotateZones">↻ 分区旋转90°</button>
-      <button class="pp-btn-generate" id="ppGenerate" title="汇总当前分区、管线与水力参数生成施工图（v248 起常驻本条）">生成施工图</button>
+      <button class="pp-btn-ghost ry-hbar-btn" id="ppRotateZones">↻ 分区旋转90°</button>
+      <button class="pp-btn-generate ry-hbar-btn" id="ppGenerate" title="汇总当前分区、管线与水力参数生成施工图（v248 起常驻本条）">生成施工图</button>
     </div>
 <button type="button" class="pp-rail-toggle pp-rail-tab" id="ppRailToggle" aria-expanded="false" title="展开工具栏">工具栏</button>
   </div>
@@ -1596,9 +1597,8 @@ body.ry-worst-off [data-tlworst]{display:none}
 </section>
 <script src="mod/inline-07.js?v=357"></script>
 <section id="parametricModelingSection" class="ry-sec ry-modeling-section" aria-label="数字化建模 · 参数化建模" data-modeling-state="idle">
-  <!-- 2026-09-19（用户指令）：数字化建模只预留导航入口，具体内容暂不展示——
-       原 iframe（modeling/parametric/embedded.html，由 modeling/integration.js 懒加载适配）暂停接入；
-       integration.js 顶部 if(!section||!frame) 判空自动空转，无残留报错。
+  <!-- 2026-09-19（用户指令）：数字化建模只保留占位说明，宿主 iframe 接线已移除；
+       参数化建模源码仍可从 modeling/parametric/index.html 独立运行。
        将来方案定了，把下面注释里的原文放回本节即可恢复：
        <div class="ry-modeling-load" role="status">
          <strong id="parametricLoadText">正在打开参数化建模工具…</strong>
@@ -2238,7 +2238,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <!-- ===== 实际地块规划 JS ===== -->
 <script src="mod/inline-11.js?v=457-pump-power-semantics"></script>
 <!-- [v420-split] 绘图编辑器 IIFE 自 inline-11 迁出：必须紧随 inline-11 之后同步执行 -->
-<script src="mod/plot-editor.js?v=526-recipe-to-settings"></script>
+<script src="mod/plot-editor.js?v=544-float-card-unify"></script>
 <script src="mod/inline-12.js?v=357"></script>
 <script src="mod/inline-13.js?v=499-plot-library-store"></script>
 <!-- [v422-head-system-svg] 纯 SVG 核心先于 inline-14 同步加载。 -->
@@ -2263,7 +2263,6 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script src="mod/inline-20.js?v=357"></script>
 
 <script src="mod/inline-21.js?v=357"></script>
-<script src="modeling/integration.js"></script>
 <!-- 共享图面数据层（2026-09-15 阶段1）：三级工作区手工管线编辑状态。必须先于下面两个模块加载 -->
 <script src="tl-workspace/tl-edit-pipes.js"></script>
 <!-- 自动管线图面编辑层（2026-09-15 阶段2）：二级传递的自动管线点选、改长与插配件 -->
@@ -2287,7 +2286,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script src="filter-system/filter-system.js"></script>
 <script src="mod/inline-24.js?v=357"></script>
 <script src="mod/inline-25.js?v=357"></script>
-<script src="mod/inline-27.js?v=498-pump-override-merge"></script>
+<script src="mod/inline-27.js?v=544-float-card-unify"></script>
 <!-- ═══ CAD 单一操作区：全局左工具栏（2026-09-14；右上角视口切换条已取消） ═══════════
      需求：按 CAD 方式所有工作在一个操作区进行 —— 地块信息是基础底图，不同图纸作为
      图层叠加切换；原三块左属性栏折叠进本工具栏（details 分组，默认全部折叠，
@@ -2348,7 +2347,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 
 <script src="mod/inline-29.js?v=357"></script>
 
-<script src="mod/inline-30.js?v=357"></script>
+<script src="mod/inline-30.js?v=544-float-card-unify"></script>
 <script src="mod/inline-32.js?v=404-tier-gates"></script>
 
 <div class="mat-flash" id="matFlash"></div>
@@ -2360,7 +2359,7 @@ body.ry-worst-off [data-tlworst]{display:none}
      删除本行即整体卸载插件体系，原有功能零影响；插件清单见 plugins.json。 -->
 <script type="module" src="core/bootstrap.js?v=2"></script>
 <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.1/cdn/shoelace.js"></script>
-<script src="mod/ry-panel.js?v=494-drag-default-left"></script>
+<script src="mod/ry-panel.js?v=544-float-card-unify"></script>
 <script src="pwa/vendor/leaflet.js"></script>
 <script src="mod/online-map.js?v=508-project-import-safe-rollback"></script>
 <script src="terrain/terrain-core.js?v=410-elev"></script>

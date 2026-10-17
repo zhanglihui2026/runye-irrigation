@@ -30,7 +30,7 @@
      估算展示（选中卡 + 管上就近标注 + 画布汇总条），不回写水力计算/材料清单/水泵选型
      （红线同阶段2）。流量口径与 computeThreeLevel 一致：总管=联合流量，主管=单区流量
      （每根主管经阀门一次过一区流量），支管=单区流量/支管数；管长取图面有效几何（含改长）。
-     公式自包含（与 hazenWilliams/peInnerDiam 同式：C=150、SDR13.6 内径）。 —— */
+     公式委托共享核心（C=150、SDR13.6 内径）；该估算仍只用于展示，不参与正式水泵选型。 —— */
   function flowModel() {
     var d = window.tlDiagramData;
     var fm = d && d.meta && d.meta.flowModel;
@@ -61,8 +61,10 @@
     var L = pipeLenM(pid); if (!(L > 0)) return null;
     var Q = pid === 'front' ? fm.combinedFlow : (pid.indexOf('main-') === 0 ? fm.zoneFlow : fm.branchFlow);
     if (!(Q > 0)) return null;
-    var di = od * (1 - 2 / 13.6);
-    return 1.113e9 * L * Math.pow(Q, 1.852) / (Math.pow(150, 1.852) * Math.pow(di, 4.87));
+    var core = window.RyHcCore;
+    if (!core || typeof core.innerDiamForSdr !== 'function' || typeof core.hazen !== 'function') return null;
+    var di = core.innerDiamForSdr(od, 13.6);
+    return core.hazen(L, Q, di, 150);
   }
   function pumpHeadNow() {
     var d = window.tlDiagramData;
@@ -728,17 +730,18 @@
   window.tlEconPanel = (function () {
     /* v184（P6）：默认单价表收敛为单一来源 TL_PIPE_PRICE_DEF（原此处另有第 2 份字面量副本） */
     var PRICES_DEFAULT = TL_PIPE_PRICE_DEF;
-    var ASSUM_KEY = 'runye_tlEconAssum', PRICE_KEY = 'runye_tlEconPrices';
     var st = { open: false, sel: -1, selF: null, selM: null, selB: null, cache: null, cacheKey: '' };
     function assum() {
       var v = { price: 0.65, hours: 1200, years: 8, pf: 0, pm: 0, pb: 0 };
-      try { var s = JSON.parse(localStorage.getItem(ASSUM_KEY) || '{}'); for (var k in v) { if (typeof s[k] === 'number' && isFinite(s[k]) && s[k] > 0) v[k] = s[k]; } } catch (e) { }
+      var s = window.RyEconomicSettingsStore.readAssumptions();
+      for (var k in v) { if (typeof s[k] === 'number' && isFinite(s[k]) && s[k] > 0) v[k] = s[k]; }
       return v;
     }
     function prices() {
       var p = {}, k;
       for (k in PRICES_DEFAULT) p[k] = PRICES_DEFAULT[k];
-      try { var s = JSON.parse(localStorage.getItem(PRICE_KEY) || '{}'); for (k in s) { if (typeof s[k] === 'number' && isFinite(s[k]) && s[k] > 0) p[k] = s[k]; } } catch (e) { }
+      var s = window.RyEconomicSettingsStore.readPriceOverrides();
+      for (k in s) { if (typeof s[k] === 'number' && isFinite(s[k]) && s[k] > 0) p[k] = s[k]; }
       return p;
     }
     /* 管材投入：优先「按角色单价」（经济指标分析左侧所填 总/主/支 元/m）；
@@ -913,13 +916,13 @@
           if (t.id === 'teAssumPrice') a.price = parseFloat(t.value) || a.price;
           if (t.id === 'teAssumHours') a.hours = parseFloat(t.value) || a.hours;
           if (t.id === 'teAssumYears') a.years = parseFloat(t.value) || a.years;
-          try { localStorage.setItem(ASSUM_KEY, JSON.stringify(a)); } catch (e2) { }
+          window.RyEconomicSettingsStore.patchAssumptions(a);
           render(); return;
         }
         if (t.getAttribute && t.getAttribute('data-teprice')) {
           var od = t.getAttribute('data-teprice'), pr = prices(), v = parseFloat(t.value);
           if (isFinite(v) && v > 0) pr[od] = v; else delete pr[od];
-          try { localStorage.setItem(PRICE_KEY, JSON.stringify(pr)); } catch (e3) { }
+          window.RyEconomicSettingsStore.writePriceOverrides(pr);
           render(); return;
         }
       });
@@ -1237,474 +1240,6 @@
     }
   });
   try { pumpUpdateNote(); } catch (e) { }
-/* ═══ 管段信息卡（2026-09-17 第五十七轮，用户要求）═══════════════════════════════
-   需求：「点击一下管道 应该在鼠标旁边就显示这个管道的基本信息，直径多少 多少米
-   水头损失多大，这是一个信息卡片，可以自动隐藏的，卡片的位置可以拖动的」。
-   · 只对三级管路编辑（ws 视图）的自动管线（总管/主管/支管）弹出；选中配件/点空白即隐藏。
-   · #tlWsPipeCard 懒创建（首次点击才 appendChild 到 body）→ 页面加载零 DOM 增量，
-     eq 等价性基线不受影响（沿用既有管径菜单的处理方式）。
-   · 默认贴鼠标（偏移 +16/+18，夹在视口内）；拖动过即「固定」，后续点击不再跟随鼠标，
-     双击标题栏解除固定、回到跟随鼠标。固定位置与固定态一并存 localStorage。
-   · 自动隐藏 8s：鼠标移入卡片暂停计时、移出重新计时；点「×」立即隐藏；取消选中立即隐藏。
-   · 纯展示层，不写任何水力数据（红线同阶段2）；数值取自 tlPipeCardInfo（同一套口径）。 */
-(function () {
-  'use strict';
-  if (typeof document === 'undefined') return;
-
-  var POS_KEY = 'runye_tlWsPipeCard_pos';
-  var AUTO_HIDE_MS = 8000;
-  var card = null, bodyEl = null, hdEl = null, pinEl = null;
-  var hideTimer = null, curPid = null, pinned = false;
-  var lastPt = { x: 200, y: 200 };
-
-  function savedPos() {
-    try {
-      var raw = localStorage.getItem(POS_KEY); if (!raw) return null;
-      var p = JSON.parse(raw);
-      return (p && isFinite(p.x) && isFinite(p.y)) ? { x: +p.x, y: +p.y } : null;
-    } catch (e) { return null; }
-  }
-  if (savedPos()) pinned = true;
-
-  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-  function f2(v) { return (Math.round(v * 100) / 100).toFixed(2); }
-  function disarm() { if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; } }
-  function arm() { disarm(); hideTimer = setTimeout(hide, AUTO_HIDE_MS); }
-  function visible() { return !!(card && card.style.display !== 'none'); }
-  function drawPin() { if (pinEl) pinEl.textContent = pinned ? '已固定' : '跟随鼠标'; }
-
-  function ensure() {
-    if (card) return card;
-    card = document.createElement('div');
-    card.id = 'tlWsPipeCard';
-    card.style.cssText = 'display:none;position:fixed;left:0;top:0;z-index:9997;background:#fff;'
-      + 'border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 10px 28px rgba(0,0,0,.18);'
-      + 'min-width:168px;max-width:262px;font:12px/1.65 system-ui,-apple-system,"Microsoft YaHei",sans-serif;color:#1f2937';
-    hdEl = document.createElement('div');
-    hdEl.style.cssText = 'display:flex;align-items:center;gap:6px;padding:4px 8px;border-bottom:1px solid #e2e8f0;'
-      + 'background:#f8fafc;border-radius:7px 7px 0 0;cursor:move;user-select:none';
-    var ttl = document.createElement('span');
-    ttl.textContent = '管段信息';
-    ttl.style.cssText = 'font-weight:600;flex:1';
-    pinEl = document.createElement('span');
-    pinEl.style.cssText = 'font-size:11px;color:#64748b';
-    var xb = document.createElement('span');
-    xb.textContent = '×';
-    xb.title = '关闭（卡片也会自动隐藏）';
-    xb.style.cssText = 'cursor:pointer;padding:0 3px;color:#64748b;font-size:14px;line-height:1';
-    hdEl.appendChild(ttl); hdEl.appendChild(pinEl); hdEl.appendChild(xb);
-    bodyEl = document.createElement('div');
-    bodyEl.style.cssText = 'padding:6px 9px 7px';
-    card.appendChild(hdEl); card.appendChild(bodyEl);
-    document.body.appendChild(card);
-
-    xb.addEventListener('click', function (e) { e.stopPropagation(); hide(); });
-    card.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
-    card.addEventListener('pointerenter', disarm);
-    card.addEventListener('pointerleave', function () { if (visible()) arm(); });
-
-    var dragPid = null, off = { x: 0, y: 0 };
-    hdEl.addEventListener('pointerdown', function (e) {
-      dragPid = e.pointerId;
-      var r = card.getBoundingClientRect();
-      off.x = e.clientX - r.left; off.y = e.clientY - r.top;
-      try { hdEl.setPointerCapture(e.pointerId); } catch (err) { }
-      e.preventDefault();
-    });
-    hdEl.addEventListener('pointermove', function (e) {
-      if (dragPid === null || e.pointerId !== dragPid) return;
-      place(e.clientX - off.x, e.clientY - off.y);
-    });
-    function endDrag() {
-      if (dragPid === null) return;
-      dragPid = null; pinned = true; drawPin();
-      try { var r = card.getBoundingClientRect(); localStorage.setItem(POS_KEY, JSON.stringify({ x: Math.round(r.left), y: Math.round(r.top) })); } catch (err) { }
-      arm();
-    }
-    hdEl.addEventListener('pointerup', endDrag);
-    hdEl.addEventListener('pointercancel', endDrag);
-    hdEl.addEventListener('dblclick', function () {      /* 双击标题栏 = 解除固定，回到跟随鼠标 */
-      pinned = false; drawPin();
-      try { localStorage.removeItem(POS_KEY); } catch (err) { }
-      place(lastPt.x + 16, lastPt.y + 18);
-    });
-    return card;
-  }
-
-  function place(x, y) {
-    if (!card) return;
-    var w = card.offsetWidth || 190, h = card.offsetHeight || 110;
-    var vw = window.innerWidth || 1200, vh = window.innerHeight || 800;
-    var L = Math.max(4, Math.min(Math.round(x), vw - w - 6));
-    var T = Math.max(4, Math.min(Math.round(y), vh - h - 6));
-    card.style.left = L + 'px';
-    card.style.top = T + 'px';
-  }
-
-  function row(k, v) {
-    return '<div style="display:flex;gap:8px;align-items:baseline;margin:1px 0">'
-      + '<span style="flex:none;width:56px;color:#64748b">' + k + '</span>'
-      + '<span style="flex:1;word-break:break-all">' + v + '</span></div>';
-  }
-  function render(info) {
-    /* 点取「总管第N段」等分段时，优先用段级数据（长度/管径/水头损失都按点取的线段算），
-       不再被整管 tlPipeCardInfo 的总长/整管值覆盖。整管无分段 / 段级数据缺失时回退整管口径。 */
-    var segPid = (info && info.segIndex != null) ? (info.id + '-' + info.segIndex) : null;
-    var sg = (segPid && window.RyTlPathMeasure && typeof window.RyTlPathMeasure.segInfo === 'function')
-      ? window.RyTlPathMeasure.segInfo(segPid) : null;
-    var ci = (typeof window.tlPipeCardInfo === 'function') ? window.tlPipeCardInfo(info.id) : null;
-
-    var name;
-    if (segPid && info.kindLabel) name = info.kindLabel;            /* 段标签「总管·第N段」优先 */
-    else if (sg && sg.name) name = sg.name;
-    else name = (ci && ci.name) ? ci.name : (info.kindLabel || info.id);
-
-    var odTxt = '—';
-    if (sg && sg.od != null) {
-      odTxt = 'Ø' + sg.od + ' mm';
-      if (sg.baseOd != null && sg.baseOd !== sg.od) odTxt += ' <span style="color:#64748b">（计算值 Ø' + sg.baseOd + '）</span>';
-    } else if (ci && ci.od != null) {
-      odTxt = 'Ø' + ci.od + ' mm';
-      if (ci.baseOd != null && ci.baseOd !== ci.od) odTxt += ' <span style="color:#64748b">（计算值 Ø' + ci.baseOd + '）</span>';
-    }
-
-    var lenTxt = (sg && sg.len != null) ? f2(sg.len) + ' m'
-      : ((ci && ci.len != null) ? f2(ci.len) + ' m' : ((info.len != null) ? f2(info.len) + ' m' : '—'));
-
-    var hfTxt = '—';
-    if (sg && sg.hf != null) {
-      hfTxt = f2(sg.hf) + ' m';
-      if (sg.baseHf != null && Math.abs(sg.hf - sg.baseHf) >= 0.005) {
-        hfTxt += ' <span style="color:' + (sg.hf <= sg.baseHf ? '#15803d' : '#b91c1c') + '">（'
-          + (sg.hf <= sg.baseHf ? '↓' : '↑') + f2(Math.abs(sg.hf - sg.baseHf)) + ' m）</span>';
-      }
-    } else if (ci && ci.hf != null) {
-      hfTxt = f2(ci.hf) + ' m';
-      if (ci.delta != null && Math.abs(ci.delta) >= 0.005) {
-        hfTxt += ' <span style="color:' + (ci.delta <= 0 ? '#15803d' : '#b91c1c') + '">（'
-          + (ci.delta <= 0 ? '↓' : '↑') + f2(Math.abs(ci.delta)) + ' m）</span>';
-      }
-    }
-
-    bodyEl.innerHTML = row('管段', esc(name)) + row('管径', odTxt) + row('长度', lenTxt) + row('水头损失', hfTxt)
-      + '<div style="margin-top:4px;padding-top:4px;border-top:1px dashed #e2e8f0;color:#94a3b8;font-size:11px">右键管身可改管径 · 拖动此卡可固定位置</div>';
-  }
-
-  function show(info, cx, cy) {
-    if (window.tlWsLayerPanelOn !== false) return;   /* v164：三面板合并 → 旧浮动卡让位，内容已并入「图层控制面板」（置 window.tlWsLayerPanelOn=false 可恢复） */
-    if (!info || !info.auto) { hide(); return; }
-    ensure();
-    var same = (curPid === info.id), wasHidden = !visible();
-    render(info);
-    card.style.display = '';
-    if (pinned) { var sp = savedPos(); if (sp) place(sp.x, sp.y); }
-    else if (!same || wasHidden) { place(cx + 16, cy + 18); }
-    curPid = info.id;
-    drawPin(); arm();
-  }
-  function hide() {
-    disarm();
-    if (card) card.style.display = 'none';
-    curPid = null;
-  }
-
-  /* 记最后一次指针位置：点击选中时用它把卡片放到鼠标旁（onPipeSelect 不带坐标） */
-  document.addEventListener('pointerdown', function (e) {
-    if (e && e.isPrimary === false) return;
-    lastPt = { x: e.clientX, y: e.clientY };
-  }, true);
-  window.addEventListener('resize', function () {
-    if (!visible()) return;
-    var r = card.getBoundingClientRect();
-    place(r.left, r.top);
-  });
-
-  /* 挂钩 onPipeSelect：tl-workspace.js 在选中/取消选中时触发（本脚本在所有页面脚本之后） */
-  function hook() {
-    var R = window.RyTlWs;
-    if (!R || R._pipeCardHooked) return;
-    var prev = R.onPipeSelect;
-    R.onPipeSelect = function (info) {
-      if (typeof prev === 'function') { try { prev(info); } catch (e) { } }
-      try { if (info && info.auto) { show(info, lastPt.x, lastPt.y); } else { hide(); } } catch (e) { }
-    };
-    R._pipeCardHooked = true;
-  }
-  hook();
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', hook); else hook();
-
-  window.tlWsPipeCard = {
-    hook: hook, hide: hide, show: show,
-    visible: visible,
-    pid: function () { return curPid; },
-    pinned: function () { return pinned; },
-    pos: function () { return card ? { x: card.offsetLeft, y: card.offsetTop } : null; },
-    rect: function () { return card ? card.getBoundingClientRect() : null; }
-  };
-})();
-
-/* ═══ 多选管段信息卡（2026-09-17 第五十八轮，用户要求）════════════════════════
-   用户原话：「箭头位置增加一个控制按钮，点击之后我就可以多选管道……多选管道之后
-   旁边同样弹出一个卡片，功能也是可以自动隐藏、拖动位置的，卡片显示我多选管道的信息，
-   要求可以切换管道直径，管道多选之后长度要累加，在卡片中也显示出来，比如说一根 60m
-   两根就是 120m 我选择了 5 根那就累加起来 300m 第六根是 43.2m 那累加起来就是 343.2m。」
-   · 触发：link 到 window.RyTlWs.onMultiSelect（多选开关开启后普通点管身 / Ctrl+点 /
-     工具轨「整体改直径」都会走到），只做链式挂钩，不覆盖工具轨那支处理函数。
-   · 「切换管道直径」= 卡片内下拉，选定即对**全部已选段**统一写管径
-     （RyTlWs.setAutoCaliberMulti）；选「恢复计算值」= clearAutoCaliberMulti。
-     与右键改径 / 工具轨「🔧 整体改直径」是同一条 AE 写入通道，不是新开一路。
-   · 「长度累加」逐段取 window.tlPipeCardInfo(pid).len（图面有效几何，含改长/平移）求和，
-     逐段明细写成 “60.00 + 60.00 + … + 43.20 m”，合计单独一行加粗。
-   · 懒创建（首次多选才 appendChild 到 body）→ 加载零 DOM 增量，eq 基线不受影响。
-   · 8s 自动隐藏（鼠标移入暂停、移出重新计时）；拖标题栏 = 固定位置
-     （localStorage runye_tlWsMultiCard_pos），双击标题栏解除固定、回到跟随鼠标。
-   · 纯展示层：除调用既有改径通道外不写任何水力数据。 */
-(function () {
-  'use strict';
-  if (typeof document === 'undefined') return;
-
-  var POS_KEY = 'runye_tlWsMultiCard_pos';
-  var AUTO_HIDE_MS = 8000;
-  var MAXDETAIL = 12;                 /* 逐段明细最多列几段，超出折叠中段 */
-  var TYPE_LABEL = { front: '总管', main: '主管', branch: '支管' };
-  var card = null, bodyEl = null, hdEl = null, pinEl = null;
-  var hideTimer = null, pinned = false, curKey = '';
-  var lastPt = { x: 200, y: 200 };
-
-  function savedPos() {
-    try {
-      var raw = localStorage.getItem(POS_KEY); if (!raw) return null;
-      var p = JSON.parse(raw);
-      return (p && isFinite(p.x) && isFinite(p.y)) ? { x: +p.x, y: +p.y } : null;
-    } catch (e) { return null; }
-  }
-  if (savedPos()) pinned = true;
-
-  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-  function f2(v) { return (Math.round(v * 100) / 100).toFixed(2); }
-  function disarm() { if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; } }
-  function arm() { disarm(); hideTimer = setTimeout(hide, AUTO_HIDE_MS); }
-  function visible() { return !!(card && card.style.display !== 'none'); }
-  function drawPin() { if (pinEl) pinEl.textContent = pinned ? '已固定' : '跟随鼠标'; }
-  /* v163：总管段沿用整管改径口径 */
-  function odOf(pid) { var A = window.RyTlAutoEdits; var p = /^front-\d+$/.test(String(pid)) ? 'front' : pid; return (A && A.caliberOf) ? A.caliberOf(p) : null; }
-
-  function ensure() {
-    if (card) return card;
-    card = document.createElement('div');
-    card.id = 'tlWsMultiCard';
-    card.style.cssText = 'display:none;position:fixed;left:0;top:0;z-index:9996;background:#fff;'
-      + 'border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 10px 28px rgba(0,0,0,.18);'
-      + 'min-width:212px;max-width:302px;font:12px/1.65 system-ui,-apple-system,"Microsoft YaHei",sans-serif;color:#1f2937';
-    hdEl = document.createElement('div');
-    hdEl.style.cssText = 'display:flex;align-items:center;gap:6px;padding:4px 8px;border-bottom:1px solid #e2e8f0;'
-      + 'background:#f0fdf4;border-radius:7px 7px 0 0;cursor:move;user-select:none';
-    var ttl = document.createElement('span');
-    ttl.textContent = '多选管段';
-    ttl.style.cssText = 'font-weight:600;flex:1';
-    pinEl = document.createElement('span');
-    pinEl.style.cssText = 'font-size:11px;color:#64748b';
-    var xb = document.createElement('span');
-    xb.textContent = '×';
-    xb.title = '关闭（卡片也会自动隐藏）';
-    xb.style.cssText = 'cursor:pointer;padding:0 3px;color:#64748b;font-size:14px;line-height:1';
-    hdEl.appendChild(ttl); hdEl.appendChild(pinEl); hdEl.appendChild(xb);
-    bodyEl = document.createElement('div');
-    bodyEl.style.cssText = 'padding:6px 9px 7px';
-    card.appendChild(hdEl); card.appendChild(bodyEl);
-    document.body.appendChild(card);
-
-    xb.addEventListener('click', function (e) { e.stopPropagation(); hide(); });
-    card.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
-    card.addEventListener('pointerenter', disarm);
-    card.addEventListener('pointerleave', function () { if (visible()) arm(); });
-    /* 下拉改径：bodyEl 每次 render 会换 innerHTML，故监听挂在 bodyEl 上做委托 */
-    bodyEl.addEventListener('change', function (e) {
-      var t = e.target;
-      if (t && t.id === 'tlWsMultiCalSel') applyOd(t.value);
-    });
-
-    var dragPid = null, off = { x: 0, y: 0 };
-    hdEl.addEventListener('pointerdown', function (e) {
-      dragPid = e.pointerId;
-      var r = card.getBoundingClientRect();
-      off.x = e.clientX - r.left; off.y = e.clientY - r.top;
-      try { hdEl.setPointerCapture(e.pointerId); } catch (err) { }
-      e.preventDefault();
-    });
-    hdEl.addEventListener('pointermove', function (e) {
-      if (dragPid === null || e.pointerId !== dragPid) return;
-      place(e.clientX - off.x, e.clientY - off.y);
-    });
-    function endDrag() {
-      if (dragPid === null) return;
-      dragPid = null; pinned = true; drawPin();
-      try { var r = card.getBoundingClientRect(); localStorage.setItem(POS_KEY, JSON.stringify({ x: Math.round(r.left), y: Math.round(r.top) })); } catch (err) { }
-      arm();
-    }
-    hdEl.addEventListener('pointerup', endDrag);
-    hdEl.addEventListener('pointercancel', endDrag);
-    hdEl.addEventListener('dblclick', function () {      /* 双击标题栏 = 解除固定，回到跟随鼠标 */
-      pinned = false; drawPin();
-      try { localStorage.removeItem(POS_KEY); } catch (err) { }
-      place(lastPt.x + 16, lastPt.y + 18);
-    });
-    return card;
-  }
-
-  function place(x, y) {
-    if (!card) return;
-    var w = card.offsetWidth || 220, h = card.offsetHeight || 132;
-    var vw = window.innerWidth || 1200, vh = window.innerHeight || 800;
-    var L = Math.max(4, Math.min(Math.round(x), vw - w - 6));
-    var T = Math.max(4, Math.min(Math.round(y), vh - h - 6));
-    card.style.left = L + 'px';
-    card.style.top = T + 'px';
-  }
-
-  function row(k, v, tip) {
-    var t = tip ? ' title="' + esc(tip).replace(/\n/g, '&#10;') + '"' : '';
-    return '<div style="display:flex;gap:8px;align-items:baseline;margin:1px 0">'
-      + '<span style="flex:none;width:56px;color:#64748b">' + k + '</span>'
-      + '<span style="flex:1;word-break:break-all"' + t + '>' + v + '</span></div>';
-  }
-
-  /* 逐段取数：与「管段信息卡」同一个 tlPipeCardInfo，口径完全一致 */
-  function collect(pids) {
-    return (pids || []).map(function (pid) {
-      var ci = (typeof window.tlPipeCardInfo === 'function') ? window.tlPipeCardInfo(pid) : null;
-      var hf = (ci && ci.hf != null) ? ci.hf : null;
-      var baseHf = hf;
-      if (hf != null && ci.delta != null) baseHf = hf - ci.delta;
-      return {
-        pid: pid,
-        name: (ci && ci.name) ? ci.name : pid,
-        baseOd: (ci && ci.baseOd != null) ? ci.baseOd : null,
-        len: (ci && ci.len != null) ? ci.len : 0,
-        hf: hf, baseHf: baseHf
-      };
-    });
-  }
-
-  /* 管径下拉：三态 —— 全部未改（= 计算值）/ 全部同一值 / 混合 */
-  function calSelect(rows) {
-    var cals = rows.map(function (r) { return odOf(r.pid); });
-    var anyCal = cals.some(function (v) { return v != null; });
-    var allSame = cals.every(function (v) { return v === cals[0]; });
-    var bases = rows.map(function (r) { return r.baseOd; });
-    var baseSame = bases.every(function (v) { return v === bases[0]; });
-    var curVal = anyCal ? (allSame ? String(cals[0]) : '__mix') : '';
-    var css = 'flex:1;min-width:80px;font:inherit;padding:1px 2px;border:1px solid #cbd5e1;border-radius:4px;background:#fff;color:inherit';
-    var h = '<select id="tlWsMultiCalSel" title="对全部已选管段统一改管径（与右键改径同一条通道）" style="' + css + '">';
-    if (anyCal) h += '<option value=""' + (curVal === '' ? ' selected' : '') + '>恢复计算值' + (baseSame && bases[0] != null ? '（Ø' + bases[0] + '）' : '') + '</option>';
-    else h += '<option value="" selected>计算值' + (baseSame && bases[0] != null ? ' Ø' + bases[0] : '') + '</option>';
-    if (curVal === '__mix') h += '<option value="__mix" selected>混合管径 · 选一个统一改</option>';
-    CAL_SERIES.forEach(function (odv) {
-      h += '<option value="' + odv + '"' + ((curVal !== '' && curVal !== '__mix' && +curVal === odv) ? ' selected' : '') + '>Ø' + odv + (odv === 220 ? '（非标）' : '') + '</option>';
-    });
-    h += '</select>';
-    return { html: h, anyCal: anyCal, od: anyCal ? cals[0] : null, allSame: allSame };
-  }
-
-  function render(pids) {
-    var rows = collect(pids);
-    var sumLen = 0, sumHf = 0, sumHf0 = 0, hasHf = false;
-    rows.forEach(function (r) {
-      sumLen += r.len;
-      if (r.hf != null) { sumHf += r.hf; hasHf = true; }
-      if (r.baseHf != null) sumHf0 += r.baseHf;
-    });
-    var type = (window.RyTlWs && RyTlWs.pipeType && pids.length) ? RyTlWs.pipeType(pids[0]) : null;
-    var cs = calSelect(rows);
-    /* 逐段长度明细（超 MAXDETAIL 段折叠中段）：'60.00 + 60.00 + ... + 43.20 m' */
-    var parts = rows.map(function (r) { return f2(r.len); });
-    var detail = (parts.length <= MAXDETAIL) ? parts.join(' + ') : (parts.slice(0, 6).join(' + ') + ' + … + ' + parts.slice(-1)[0]);
-    var tipLines = rows.map(function (r, i) { return (i + 1) + '. ' + r.name + '  ' + f2(r.len) + ' m'; }).join('\n');
-    var H = hdEl.firstElementChild; if (H) H.textContent = '多选管段 · ' + pids.length + ' 段';
-    var hfTxt = '—';
-    if (hasHf) {
-      if (Math.abs(sumHf - sumHf0) >= 0.005) {
-        hfTxt = '\u03a3 ' + f2(sumHf0) + ' \u2192 ' + f2(sumHf) + ' m <span style="color:' + (sumHf <= sumHf0 ? '#15803d' : '#b91c1c') + '">（' + (sumHf <= sumHf0 ? '\u2193' : '\u2191') + f2(Math.abs(sumHf - sumHf0)) + ' m）</span>';
-      } else { hfTxt = '\u03a3 ' + f2(sumHf) + ' m'; }
-    }
-    bodyEl.innerHTML = row('类型', esc(TYPE_LABEL[type] || '同类型'))
-      + row('段数', '<b>' + pids.length + '</b> 段')
-      + row('管径', cs.html)
-      + row('逐段长度', '<span style="color:#475569">' + detail + ' m</span>', tipLines)
-      + row('长度合计', '<b style="font-size:15px;color:#15803d">' + f2(sumLen) + ' m</b>')
-      + row('水头损失', hfTxt)
-      + '<div style="margin-top:4px;padding-top:4px;border-top:1px dashed #e2e8f0;color:#94a3b8;font-size:11px">'
-      + '改管径 = 对全部已选段统一改（与右键改径同源）· 拖动此卡可固定位置</div>';
-  }
-
-  /* 改径：v='' 恢复计算值；v='__mix' 不动；其余为外径 mm */
-  function applyOd(v) {
-    var R = window.RyTlWs;
-    if (!R || v === '__mix') return false;
-    var pids = (R.getSelSet ? R.getSelSet() : []);
-    if (!pids.length) return false;
-    if (v === '') return R.clearAutoCaliberMulti ? !!R.clearAutoCaliberMulti(pids) : false;
-    var od = parseFloat(v);
-    if (!isFinite(od) || od <= 0) return false;
-    return R.setAutoCaliberMulti ? !!R.setAutoCaliberMulti(pids, od) : false;
-  }
-
-  function show(setInfo, cx, cy) {
-    if (window.tlWsLayerPanelOn !== false) return;   /* v164：三面板合并 → 旧浮动卡让位，内容已并入「图层控制面板」（置 window.tlWsLayerPanelOn=false 可恢复） */
-    if (!setInfo || !(setInfo.count >= 1)) { hide(); return; }
-    var R = window.RyTlWs;
-    var pids = (setInfo.pids && setInfo.pids.length) ? setInfo.pids.slice() : ((R && R.getSelSet) ? R.getSelSet() : []);
-    if (!pids.length) { hide(); return; }
-    ensure();
-    var key = pids.join('|'), same = (curKey === key), wasHidden = !visible();
-    render(pids);
-    card.style.display = '';
-    if (pinned) { var sp = savedPos(); if (sp) place(sp.x, sp.y); }
-    else if (!same || wasHidden) { place(cx + 16, cy + 18); }
-    curKey = key;
-    drawPin(); arm();
-  }
-  function hide() {
-    disarm();
-    if (card) card.style.display = 'none';
-    curKey = '';
-  }
-
-  /* 记最后一次指针位置：点管身时用它把卡片放到鼠标旁（onMultiSelect 不带坐标） */
-  document.addEventListener('pointerdown', function (e) {
-    if (e && e.isPrimary === false) return;
-    lastPt = { x: e.clientX, y: e.clientY };
-  }, true);
-  window.addEventListener('resize', function () {
-    if (!visible()) return;
-    var r = card.getBoundingClientRect();
-    place(r.left, r.top);
-  });
-
-  /* 链式挂钩 onMultiSelect（工具轨那支处理函数先行，不覆盖） */
-  function hook() {
-    var R = window.RyTlWs;
-    if (!R || R._multiCardHooked) return;
-    var prev = R.onMultiSelect;
-    R.onMultiSelect = function (setInfo) {
-      if (typeof prev === 'function') { try { prev(setInfo); } catch (e) { } }
-      try { if (setInfo && setInfo.count >= 1) show(setInfo, lastPt.x, lastPt.y); else hide(); } catch (e) { }
-    };
-    R._multiCardHooked = true;
-  }
-  hook();
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', hook); else hook();
-
-  window.tlWsMultiCard = {
-    hook: hook, hide: hide, show: show,
-    visible: visible,
-    pids: function () { var R = window.RyTlWs; return (R && R.getSelSet) ? R.getSelSet() : []; },
-    pinned: function () { return pinned; },
-    pos: function () { return card ? { x: card.offsetLeft, y: card.offsetTop } : null; },
-    rect: function () { return card ? card.getBoundingClientRect() : null; },
-    setOd: applyOd
-  };
-})();
 })();
 /* ═══ v164（2026-09-30 用户要求）：图层控制面板（三面板合并）══════════════════════════
    把原本分散的三块：① 画布右上角三枚图层勾选（标注显示/地块文字/最远水路）
@@ -1714,13 +1249,18 @@
      原三枚 chip 用 CSS 隐藏（逻辑不动，可回退）。
    · 当前选中：挂钩 RyTlWs.onPipeSelect / onMultiSelect 渲染（口径仍取 tlPipeCardInfo）。
    · 批量操作：作用于当前选择集（getSelSet，空则退回单选中管）—— 改径 / 清除改径 / 遮蔽 / 取消遮蔽 / 清空选择。
-   · 旧两张浮动卡以 window.tlWsLayerPanelOn 门控让位（置 false 可恢复）。
+   · [v544] 旧两张浮动卡（管段信息卡 / 多选管段信息卡）已**整段删除**，不再是
+     「合并开关 + 置 false 可恢复」那套门控让位。理由：面板早已承接全部信息与批量操作，
+     两张卡自 v164 起只被挡在 false 分支里从未显示，却各留一套手写拖动 / 自动隐藏 /
+     位置存档，是「同一件事四套实现」的最大来源；真要恢复，从 git 历史取 v543 的这段即可，
+     恢复时必须改用 .ry-float-card + rypDraggable，不要再抄一套手写交互。
+     （本段故意不写那两个卡 id 与开关名：verify_ry_tool 的反向断言只在剥 HTML 注释后的
+      源码上匹配，JS 块注释里的同名串会被判成「复活」。）
    红线：纯展示/交互层；批量改径与遮蔽走既有 AE 写入通道，不新开数据路径。 */
 (function () {
   'use strict';
   if (typeof document === 'undefined') return;
-  window.tlWsLayerPanelOn = true;   /* 合并开关：旧浮动卡让位；置 false 可恢复 */
-  var panel = null, bodyEl = null, collapsed = false, lastSel = null;
+  var panel = null, bodyEl = null, lastSel = null;
   var POS_KEY = 'runye_tlWsLayerPanel_pos', W_KEY = 'runye_tlWsLayerPanel_w';
   var manualPos = false;   /* 用户拖动过后=手动定位（停用画布右上自动对齐）；双击标题栏恢复 */
 
@@ -1736,87 +1276,61 @@
     (document.head || document.documentElement).appendChild(st);
     panel = document.createElement('div');
     panel.id = 'tlWsLayerPanel';
-    panel.style.cssText = 'position:absolute;top:8px;right:300px;z-index:9994;width:238px;max-height:70vh;overflow:auto;background:rgba(255,255,255,.97);border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 10px 28px rgba(15,23,42,.18);font:12px/1.6 system-ui,-apple-system,"Microsoft YaHei",sans-serif;color:#1f2937';
+    /* [v544] 视觉交给 .ry-float-card（mod/ry-panel.css），这里只留定位与尺寸。
+       原先整套颜色/边框/阴影/字号写在本行 cssText 上，与 #grHydPanel、AI 面板各抄一份。 */
+    panel.className = 'ry-float-card';
+    panel.style.cssText = 'position:absolute;top:8px;right:300px;z-index:9994;width:238px;max-height:70vh;overflow:auto';
     var head = document.createElement('div');
-    head.style.cssText = 'display:flex;align-items:center;gap:6px;padding:6px 9px;background:#f1f5f9;border-bottom:1px solid #e2e8f0;cursor:move;user-select:none;position:sticky;top:0;touch-action:none';
+    head.className = 'ry-float-head';
     head.title = '拖动 = 移动面板 · 双击 = 回到画布右上默认位 · 单击 = 折叠/展开';
-    head.innerHTML = '<b style="flex:1;color:#334155">图层控制</b><span id="tlWsLayerPanelGrip" title="左右拖动调节面板宽度（200~480px，自动记忆）" style="cursor:ew-resize;color:#94a3b8;padding:0 3px;user-select:none;touch-action:none">↔</span><span id="tlWsLayerPanelCaret" style="color:#64748b">▾</span>';
+    head.innerHTML = '<b class="ry-float-title">图层控制</b><span id="tlWsLayerPanelGrip" class="ry-float-grip" title="左右拖动调节面板宽度（200~480px，自动记忆）">↔</span><span id="tlWsLayerPanelCaret" class="ry-float-caret">▾</span>';
     bodyEl = document.createElement('div');
-    bodyEl.style.cssText = 'padding:7px 9px 9px';
+    bodyEl.className = 'ry-float-body';
     panel.appendChild(head); panel.appendChild(bodyEl);
-    if(window.RyMobile && window.RyMobile.isActive()){ collapsed=true; bodyEl.style.display='none'; panel.querySelector('#tlWsLayerPanelCaret').textContent='▸'; }
+    /* [v544] 交互声明化：拖动 / 折叠 / 调宽全部交给 mod/ry-panel.js 的共用实现。
+       原先这里手写了 pointerdown/move/up + 4px 阈值 + suppressClick + 双击复位 + 存档
+       （与 #grHydPanel、AI 面板各抄一份，细节还各不相同）——现在只声明属性。 */
+    panel.setAttribute('data-ry-panel', '');
+    panel.setAttribute('data-ry-panel-key', 'tlWsLayerPanel');
+    panel.setAttribute('data-ry-position-key', POS_KEY);
+    panel.setAttribute('data-ry-keep-default', '1');        /* 默认位由 align() 算，初始化时不重排 */
+    panel.setAttribute('data-ry-drag-threshold', '4');
+    panel.setAttribute('data-ry-drag-dblclick-reset', '1');
+    panel.setAttribute('data-ry-fold-key', 'runye_tlWsLayerPanel_fold');
+    panel.setAttribute('data-ry-resize-key', W_KEY);
+    panel.setAttribute('data-ry-resize-min', '200');
+    panel.setAttribute('data-ry-resize-max', '480');
+    head.setAttribute('data-ry-drag', '');
+    head.setAttribute('data-ry-toggle', '');
+    bodyEl.setAttribute('data-ry-body', '');
+    var lpCaret = panel.querySelector('#tlWsLayerPanelCaret');
+    lpCaret.setAttribute('data-ry-fold', '');
+    lpCaret.setAttribute('data-ry-fold-open', '\u25be');
+    lpCaret.setAttribute('data-ry-fold-closed', '\u25b8');
+    var lpGrip = panel.querySelector('#tlWsLayerPanelGrip');
+    lpGrip.setAttribute('data-ry-resize', '');
+    /* 移动端默认收起：用 data-ry-fold-default 表达（不写 localStorage，桌面端仍展开） */
+    if (window.RyMobile && window.RyMobile.isActive()) panel.setAttribute('data-ry-fold-default', '1');
     var ctn = document.getElementById('tlWsContent');
     var host = (ctn && ctn.parentNode) ? ctn.parentNode : document.body;
     host.appendChild(panel);
-    /* v164b：恢复上次的宽度与位置（有位置存档=手动定位，停用自动对齐） */
-    try { var sw = parseInt(localStorage.getItem(W_KEY), 10); if (isFinite(sw) && sw >= 200 && sw <= 480) panel.style.width = sw + 'px'; } catch (e) { }
+    /* v164b：有位置存档=手动定位，停用自动对齐（位置恢复本身由 rypDraggable 统一处理，
+       这里只读一次存档来推断「用户拖过」）。 */
     try {
       var sp = JSON.parse(localStorage.getItem(POS_KEY) || 'null');
-      if (sp && isFinite(sp.x) && isFinite(sp.y)) { manualPos = true; panel.style.left = sp.x + 'px'; panel.style.top = sp.y + 'px'; panel.style.right = 'auto'; }
+      if (sp && (isFinite(sp.x) || isFinite(sp.l))) manualPos = true;
     } catch (e) { }
-    /* v164b：标题栏拖动 = 移动面板（>4px 判拖动，切 left/top 并停用自动对齐；存档）；
-       双击 = 回画布右上默认位；单击 = 折叠/展开（拖动后抑制误触） */
-    var dragPid = null, dragStart = null, moved = false, suppressClick = false;
-    head.addEventListener('pointerdown', function (e) {
-      if (e.button !== 0) return;
-      dragPid = e.pointerId; moved = false;
-      dragStart = { x: e.clientX, y: e.clientY, l: panel.offsetLeft, t: panel.offsetTop };
-      try { head.setPointerCapture(e.pointerId); } catch (err) { }
+    window.rypCollapsible(panel);
+    window.rypDraggable(panel);
+    window.rypResizePanel(panel);
+    /* 交互事件回灌本面板的专属布局语义：拖动过 ⇒ 停用自动对齐；双击复位 ⇒ 恢复自动对齐 */
+    panel.addEventListener('ry-panel-drag-end', function (e) {
+      if (e.detail && e.detail.moved) manualPos = true;
     });
-    head.addEventListener('pointermove', function (e) {
-      if (dragPid === null || e.pointerId !== dragPid || !dragStart) return;
-      var dx = e.clientX - dragStart.x, dy = e.clientY - dragStart.y;
-      if (!moved && Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
-      moved = true; suppressClick = true;
-      var op = panel.offsetParent || document.body;
-      var w = panel.offsetWidth || 238, h = panel.offsetHeight || 120;
-      var L = Math.max(4, Math.min(dragStart.l + dx, (op.clientWidth || 1200) - w - 4));
-      var T = Math.max(4, Math.min(dragStart.t + dy, (op.clientHeight || 800) - h - 4));
-      panel.style.left = L + 'px'; panel.style.top = T + 'px'; panel.style.right = 'auto';
-    });
-    function lpEndDrag(e) {
-      if (dragPid === null || (e && e.pointerId !== dragPid)) return;
-      dragPid = null;
-      if (moved) {
-        manualPos = true;
-        try { localStorage.setItem(POS_KEY, JSON.stringify({ x: panel.offsetLeft, y: panel.offsetTop })); } catch (err) { }
-      }
-    }
-    head.addEventListener('pointerup', lpEndDrag);
-    head.addEventListener('pointercancel', lpEndDrag);
-    head.addEventListener('click', function () {
-      if (suppressClick) { suppressClick = false; return; }
-      collapsed = !collapsed; bodyEl.style.display = collapsed ? 'none' : ''; var c = document.getElementById('tlWsLayerPanelCaret'); if (c) c.textContent = collapsed ? '▸' : '▾';
-    });
-    head.addEventListener('dblclick', function () {
-      manualPos = false; panel.style.left = 'auto';
-      try { localStorage.removeItem(POS_KEY); } catch (err) { }
+    panel.addEventListener('ry-panel-pos-reset', function () {
+      manualPos = false;
       try { align(); } catch (err) { }
     });
-    /* v164b：↔ 手柄左右拖动调宽（右锚定拖左加宽 / 左锚定拖右加宽），200~480px，localStorage 记忆 */
-    var rPid = null, rStart = null;
-    var lpGrip = document.getElementById('tlWsLayerPanelGrip');
-    if (lpGrip) {
-      lpGrip.addEventListener('pointerdown', function (e) {
-        if (e.button !== 0) return;
-        rPid = e.pointerId;
-        rStart = { x: e.clientX, w: panel.offsetWidth, ra: !(panel.style.left && panel.style.left !== 'auto') };
-        try { lpGrip.setPointerCapture(e.pointerId); } catch (err) { }
-        e.preventDefault(); e.stopPropagation();
-      });
-      lpGrip.addEventListener('pointermove', function (e) {
-        if (rPid === null || e.pointerId !== rPid || !rStart) return;
-        var nw = rStart.ra ? (rStart.w + (rStart.x - e.clientX)) : (rStart.w + (e.clientX - rStart.x));
-        panel.style.width = Math.max(200, Math.min(480, nw)) + 'px';
-      });
-      function lpEndR() {
-        if (rPid === null) return;
-        rPid = null;
-        try { localStorage.setItem(W_KEY, String(panel.offsetWidth)); } catch (err) { }
-      }
-      lpGrip.addEventListener('pointerup', lpEndR);
-      lpGrip.addEventListener('pointercancel', lpEndR);
-    }
     bodyEl.addEventListener('change', onBodyChange);
     bodyEl.addEventListener('click', onBodyClick);
     function align() {

@@ -671,17 +671,20 @@
   }
   function buildPanel() {
     panel = doc.createElement('div');
-    panel.className = 'ai-panel';
+    /* [v544] 外壳视觉统一到 .ry-float-card（mod/ry-panel.css）；
+       .ai-panel 只保留自己的配色（见 runye-ai-plan.css 的 .ai-panel.ry-float-card）。 */
+    panel.className = 'ai-panel ry-float-card';
     panel.setAttribute('role', 'region');
     panel.setAttribute('aria-label', 'AI灌溉方案规划');
-    /* [v253] 定位/尺寸/投影内联（同 #tlWsLayerPanel 款）：fixed 挂 body 跨页常驻，
-       默认视口右上（right:136px 避让二级页右侧固定工具列）；面板不再用 hidden（常驻可折叠）。 */
-    panel.style.cssText = 'position:fixed;top:calc(var(--fn-nav-h,36px) + 1px);right:136px;bottom:calc(var(--ry-status-h,30px) + 1px);z-index:9993;width:262px;background:rgba(255,255,255,.97);border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 10px 28px rgba(15,23,42,.18);display:flex;flex-direction:column;overflow:hidden';
+    /* [v253] 定位/尺寸内联（同 #tlWsLayerPanel 款）：fixed 挂 body 跨页常驻，
+       默认视口右上（right:136px 避让二级页右侧固定工具列）；面板不再用 hidden（常驻可折叠）。
+       [v544] 底色/边框/阴影/字体已交给 .ry-float-card，本行不再重复。 */
+    panel.style.cssText = 'position:fixed;top:calc(var(--fn-nav-h,36px) + 1px);right:136px;bottom:calc(var(--ry-status-h,30px) + 1px);z-index:9993;width:262px;display:flex;flex-direction:column;overflow:hidden';
     panel.innerHTML =
-      '<header data-head title="' + HEAD_TITLE + '">' +
+      '<header class="ry-float-head" data-head title="' + HEAD_TITLE + '">' +
       '<h3 class="ai-title">AI灌溉方案规划</h3><span class="ai-tag">云端版</span>' +
-      '<span class="ai-grip" data-grip title="左右拖动调节面板宽度（200~480px，自动记忆）">\u2194</span>' +
-      '<span class="ai-caret" data-caret>\u25be</span></header>' +
+      '<span class="ai-grip ry-float-grip" data-grip title="左右拖动调节面板宽度（200~480px，自动记忆）">\u2194</span>' +
+      '<span class="ai-caret ry-float-caret" data-caret>\u25be</span></header>' +
       '<div class="ai-body">' +
       '<div class="ai-conversation" data-ai="conversation" role="log" aria-live="polite"></div>' +
       '<label class="ai-label">告诉我怎么规划（可继续补充或修改）</label>' +
@@ -757,29 +760,17 @@
       syncMaxH();
       try { localStorage.removeItem(H_KEY); } catch (err) { }
     });
-    /* ↔ 手柄调宽（同 #tlWsLayerPanelGrip）：右锚定拖左加宽 / 左锚定拖右加宽，200~480px + 记忆 */
-    var grip = panel.querySelector('[data-grip]'), rPid = null, rStart = null;
-    if (grip) {
-      grip.addEventListener('pointerdown', function (e) {
-        if (e.button !== 0) return;
-        rPid = e.pointerId;
-        rStart = { x: e.clientX, w: panel.offsetWidth, ra: !(panel.style.left && panel.style.left !== 'auto') };
-        try { grip.setPointerCapture(e.pointerId); } catch (err) { }
-        e.preventDefault(); e.stopPropagation();
-      });
-      grip.addEventListener('pointermove', function (e) {
-        if (rPid === null || e.pointerId !== rPid || !rStart) return;
-        var nw = rStart.ra ? (rStart.w + (rStart.x - e.clientX)) : (rStart.w + (e.clientX - rStart.x));
-        panel.style.width = Math.max(200, Math.min(480, nw)) + 'px';
-      });
-      function aiEndR() {
-        if (rPid === null) return;
-        rPid = null;
-        try { localStorage.setItem(W_KEY, String(panel.offsetWidth)); } catch (err) { }
-      }
-      grip.addEventListener('pointerup', aiEndR);
-      grip.addEventListener('pointercancel', aiEndR);
-    }
+    /* ↔ 手柄调宽：[v544] 交给 mod/ry-panel.js 的 rypResizePanel（200~480px、右锚定拖左加宽、
+       双击复位、记忆键沿用 W_KEY ⇒ 旧存档继续有效）。这里只声明属性，不再手写指针逻辑。
+       ⚠ 拖动仍由本文件的 head 处理器负责——AI 面板的拖动带三重特殊约束
+       （折叠态禁用、贴导航/状态栏、拖后重算 max-height），暂不并入通用实现。 */
+    panel.setAttribute('data-ry-panel', '');
+    panel.setAttribute('data-ry-panel-key', 'aiPanel');
+    panel.setAttribute('data-ry-resize-key', W_KEY);
+    panel.setAttribute('data-ry-resize-min', '200');
+    panel.setAttribute('data-ry-resize-max', '480');
+    var grip = panel.querySelector('[data-grip]');
+    if (grip) grip.setAttribute('data-ry-resize', '');
     /* [v258 2026-10-06 用户要求] ↕ 底部手柄调高（对齐宽度手柄做法）：
        top 锚定 → 向下长高；上限 = 视口底留 40px（且不小于 200）；160px 起。
        注意：panel 已去掉 max-height:70vh，改由本手柄 + 恢复时的 clamp 控制，否则拖不高。
@@ -837,13 +828,13 @@
     panel.querySelector('[data-ai="req"]').value = store.req || '';
     panel.querySelector('[data-ai="req"]').addEventListener('change', function () { store.req = this.value; persist(); });
     doc.body.appendChild(panel);
-    /* 恢复宽度/位置记忆（有位置存档=手动定位，默认右上不再自动对齐）；[v303] 桌面端也默认折叠（原仅手机端），点右缘竖条即可展开 */
-    try { var sw = parseInt(localStorage.getItem(W_KEY), 10); if (isFinite(sw) && sw >= 200 && sw <= 480) panel.style.width = sw + 'px'; } catch (e) { }
-    /* [v258] 恢复高度记忆：按当前视口重新 clamp（换屏/缩窗后不越界） */
+    /* [v544] 宽度记忆由 rypResizePanel 从 W_KEY 恢复（原样保留旧键）。
+       [v258] 高度记忆仍在本文件：按当前视口重新 clamp（换屏/缩窗后不越界） */
     try {
       var sh = parseInt(localStorage.getItem(H_KEY), 10);
       if (isFinite(sh) && sh >= 160) panel.style.height = Math.max(HG_MIN, Math.min(sh, hgMax())) + 'px';
     } catch (e) { }
+    if (window.rypResizePanel) window.rypResizePanel(panel);
     /* 双击标题栏复位时高度一并回到自适应（下次拖动前不锁死） */
     try {
       var sp = JSON.parse(localStorage.getItem(POS_KEY) || 'null');

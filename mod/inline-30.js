@@ -14,8 +14,8 @@
   'use strict';
   if (typeof document === 'undefined') return;
   var W_KEY = 'runye_grHydPanel_w', POS_KEY = 'runye_grHydPanel_pos', ON_KEY = 'runye_grHydPanel_on';
-  var MINW = 260, MAXW = 760, DEFW = 420;
-  var panel = null, bodyEl = null, collapsed = false, manualPos = false;
+  var MINW = 260, MAXW = 760;          /* 调宽范围；DEFW 随 v544 的默认宽度交给 CSS 后已无引用 */
+  var panel = null, bodyEl = null;      /* collapsed / manualPos 已由 mod/ry-panel.js 接管 */
   function $(id) { return document.getElementById(id); }
 
   function syncBtn() {
@@ -28,96 +28,45 @@
     if (!host || !card) return null;          /* 不是这一页 / DOM 未就绪：静默跳过 */
     panel = document.createElement('div');
     panel.id = 'grHydPanel';
+    panel.className = 'ry-float-card';   /* [v544] 外壳视觉统一（mod/ry-panel.css） */
     var head = document.createElement('div');
-    head.className = 'grp-head';
+    head.className = 'grp-head ry-float-head';
     head.title = '拖动 = 移动面板 · 双击 = 回到画布右上默认位 · 单击 = 折叠/展开';
-    head.innerHTML = '<b>驳接点 / 管径 / 水头损失</b>'
-      + '<span id="grpGrip" title="左右拖动调节面板宽度（' + MINW + '~' + MAXW + 'px，自动记忆）">\u2194</span>'
-      + '<span id="grpCaret">\u25be</span>';
+    head.innerHTML = '<b class="ry-float-title">驳接点 / 管径 / 水头损失</b>'
+      + '<span id="grpGrip" class="ry-float-grip" title="左右拖动调节面板宽度（' + MINW + '~' + MAXW + 'px，自动记忆）">\u2194</span>'
+      + '<span id="grpCaret" class="ry-float-caret">\u25be</span>';
     bodyEl = document.createElement('div');
-    bodyEl.className = 'grp-body';
+    bodyEl.className = 'grp-body ry-float-body';
     bodyEl.appendChild(card);                 /* ★ 整张卡搬进来（搬家，不是复制） */
     panel.appendChild(head); panel.appendChild(bodyEl);
+    /* [v544] 交互声明化：拖动 / 折叠 / 调宽交给 mod/ry-panel.js（原手写指针逻辑已删）。
+       显隐开关（工具栏「▤ 水力面板」）是本面板专属语义，仍留在本文件。 */
+    panel.setAttribute('data-ry-panel', '');
+    panel.setAttribute('data-ry-panel-key', 'grHydPanel');
+    panel.setAttribute('data-ry-position-key', POS_KEY);
+    panel.setAttribute('data-ry-keep-default', '1');       /* 默认位由 #grHydPanel 的 CSS 给 */
+    panel.setAttribute('data-ry-drag-threshold', '4');
+    panel.setAttribute('data-ry-drag-dblclick-reset', '1');
+    panel.setAttribute('data-ry-fold-key', 'runye_grHydPanel_fold');
+    panel.setAttribute('data-ry-resize-key', W_KEY);
+    panel.setAttribute('data-ry-resize-min', String(MINW));
+    panel.setAttribute('data-ry-resize-max', String(MAXW));
+    head.setAttribute('data-ry-drag', '');
+    head.setAttribute('data-ry-toggle', '');
+    bodyEl.setAttribute('data-ry-body', '');
+    var grpCaret = panel.querySelector('#grpCaret');   /* 面板还没挂进文档，只能用子树查询 */
+    grpCaret.setAttribute('data-ry-fold', '');
+    grpCaret.setAttribute('data-ry-fold-open', '\u25be');
+    grpCaret.setAttribute('data-ry-fold-closed', '\u25b8');
+    var grpGrip = panel.querySelector('#grpGrip');
+    grpGrip.setAttribute('data-ry-resize', '');
     host.appendChild(panel);
 
-    /* 恢复上次的宽度 / 位置 / 显隐 */
-    try {
-      var sw = parseInt(localStorage.getItem(W_KEY), 10);
-      if (isFinite(sw) && sw >= MINW && sw <= MAXW) panel.style.width = sw + 'px';
-    } catch (e) { }
-    try {
-      var sp = JSON.parse(localStorage.getItem(POS_KEY) || 'null');
-      if (sp && isFinite(sp.x) && isFinite(sp.y)) {
-        manualPos = true;
-        panel.style.left = sp.x + 'px'; panel.style.top = sp.y + 'px'; panel.style.right = 'auto';
-      }
-    } catch (e) { }
+    /* 恢复上次的显隐；宽度与位置由框架按 data-ry-* 自己的存档恢复 */
     try { if (localStorage.getItem(ON_KEY) === '0') panel.classList.add('grp-hidden'); } catch (e) { }
-
-    /* 标题栏：拖动移动 / 单击折叠 / 双击复位 */
-    var pid = null, st = null, moved = false, suppress = false;
-    head.addEventListener('pointerdown', function (e) {
-      if (e.button !== 0) return;
-      pid = e.pointerId; moved = false;
-      st = { x: e.clientX, y: e.clientY, l: panel.offsetLeft, t: panel.offsetTop };
-      try { head.setPointerCapture(e.pointerId); } catch (err) { }
-    });
-    head.addEventListener('pointermove', function (e) {
-      if (pid === null || e.pointerId !== pid || !st) return;
-      var dx = e.clientX - st.x, dy = e.clientY - st.y;
-      if (!moved && Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
-      moved = true; suppress = true;
-      var op = panel.offsetParent || document.body;
-      var w = panel.offsetWidth || DEFW, h = panel.offsetHeight || 120;
-      var L = Math.max(4, Math.min(st.l + dx, (op.clientWidth || 1200) - w - 4));
-      var T = Math.max(4, Math.min(st.t + dy, (op.clientHeight || 800) - h - 4));
-      panel.style.left = L + 'px'; panel.style.top = T + 'px'; panel.style.right = 'auto';
-    });
-    function endDrag(e) {
-      if (pid === null || (e && e.pointerId !== pid)) return;
-      pid = null;
-      if (moved) {
-        manualPos = true;
-        try { localStorage.setItem(POS_KEY, JSON.stringify({ x: panel.offsetLeft, y: panel.offsetTop })); } catch (err) { }
-      }
-    }
-    head.addEventListener('pointerup', endDrag);
-    head.addEventListener('pointercancel', endDrag);
-    head.addEventListener('click', function () {
-      if (suppress) { suppress = false; return; }
-      collapsed = !collapsed;
-      bodyEl.style.display = collapsed ? 'none' : '';
-      var c = $('grpCaret'); if (c) c.textContent = collapsed ? '\u25b8' : '\u25be';
-    });
-    head.addEventListener('dblclick', function () {
-      manualPos = false;
-      panel.style.left = 'auto'; panel.style.top = '8px'; panel.style.right = '8px';
-      try { localStorage.removeItem(POS_KEY); } catch (err) { }
-    });
-
-    /* ↔ 手柄：右锚定拖左加宽 / 左锚定拖右加宽 */
-    var rPid = null, rs = null, grip = $('grpGrip');
-    if (grip) {
-      grip.addEventListener('pointerdown', function (e) {
-        if (e.button !== 0) return;
-        rPid = e.pointerId;
-        rs = { x: e.clientX, w: panel.offsetWidth, ra: !(panel.style.left && panel.style.left !== 'auto') };
-        try { grip.setPointerCapture(e.pointerId); } catch (err) { }
-        e.preventDefault(); e.stopPropagation();
-      });
-      grip.addEventListener('pointermove', function (e) {
-        if (rPid === null || e.pointerId !== rPid || !rs) return;
-        var nw = rs.ra ? (rs.w + (rs.x - e.clientX)) : (rs.w + (e.clientX - rs.x));
-        panel.style.width = Math.max(MINW, Math.min(MAXW, nw)) + 'px';
-      });
-      function endR() {
-        if (rPid === null) return;
-        rPid = null;
-        try { localStorage.setItem(W_KEY, String(panel.offsetWidth)); } catch (err) { }
-      }
-      grip.addEventListener('pointerup', endR);
-      grip.addEventListener('pointercancel', endR);
-    }
+    window.rypCollapsible(panel);
+    window.rypDraggable(panel);
+    window.rypResizePanel(panel);
     syncBtn();
     return panel;
   }

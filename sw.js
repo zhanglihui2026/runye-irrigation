@@ -504,8 +504,38 @@
    新增 ci ⑥b 守住「内联不得再抄面板规则」。
    ⚠ 落地顺序有讲究：新块追加到目标文件**末尾**时 A/B 才 0 差异（放开头会改判平手）。
    index.html / mod/ry-panel.css / mod/style-01.css 均在 CORE，必须抬版本。
+ * v544 悬浮面板与横向工具栏统一（用户：「先样式统一，然后细节再统一…我还是担心各种规则、
+   样式混在一起，不统一」）。三类东西、三条线一次收口：
+   ① 卡片外壳唯一出处 —— 新增 .ry-float-card / -head / -title / -grip / -caret / -body
+     （mod/ry-panel.css 末尾）。四张浮卡（三级 #tlWsLayerPanel、驳接点 #grHydPanel、
+     AI 侧栏 .ai-panel、在线地图图层卡 .rym-layer-panel）原来各自在 JS 里手写外壳，
+     值还不一样（#fff / rgba(255,255,255,.97)、圆角 8/10、字号 12/11.5/11）——
+     现全部改挂 .ry-float-card，cssText 只留定位/尺寸/层级。
+     语义配色例外保留在 runye-ai-plan.css 的 `.ai-panel.ry-float-card`（双类，靠顺序压过后加载者）。
+   ② 交互行为唯一实现 —— mod/ry-panel.js 的 rypDraggable / rypResizePanel 补齐声明式开关：
+     data-ry-keep-default（不重排默认位）、-drag-threshold（4px 阈值 + 抑制尾随 click）、
+     -drag-dblclick-reset（双击清存档回默认位）、-drag-clamp="viewport"（避让导航/状态栏）、
+     -fold-default（移动端默认收起且不写存档）；新增 placeWhenVisible（容器隐藏时 rect 全 0
+     会把位置压到 0，改为轮询到容器有尺寸再落位）与 `rypResizePanel`（不依赖 .mw-shell 的
+     宽度手柄，右锚定拖左加宽、双击还原）。三张卡的手写 pointer 三件套共约 260 行全部删除。
+     .rym-layer-panel 借此补齐「可拖 / 可折 / 可调宽」，与其余三张卡一致。
+   ③ 横向工具栏唯一规格 —— .ry-hbar + .ry-hbar-btn（高 26 / 字号 11!important / 内距 0 8px）；
+     两条条（#mapDrawTools 绘制条、#ppQuickBar 地块分区快捷条）与独立页 runye-map-measure.html
+     同步换类；#ppQuickBar 的手写拖动（mod/plot-editor.js 里 45 行）删除，改由 rypDraggable 接管，
+     存档键与 {l,t} 格式不变（老用户位置记忆不丢）。底色仍按场景各自保留（地图条纯白、画布条浅绿底）。
+   ④ 删除已让位三年的两张旧浮卡（用户确认）：#tlWsPipeCard / #tlWsMultiCard 自 v164 三面板合并起
+     一直被 window.tlWsLayerPanelOn 挡在 false 分支从未显示，却各留一套手写拖动/自动隐藏/存档。
+     整段删除 468 行，同时把 window.tlWsLayerPanelOn 一并摘掉；verify_ry_tool 的契约锚点从 must
+     移到 mustNot（复活即红）。
+   验收：① 三张卡 A/B 61 个元素 × 55 个 computed 属性 0 差异；② 行为探针 31/31（拖/存档/折叠/
+   展开/调宽/双击复位逐卡验证）；③ 工具栏探针 17/17（主页两条 + 独立页一条，含拖动与存档）。
+   新增 ci ⑧ 守住「四张卡必须挂 .ry-float-card，且 cssText 里不许再写外壳视觉」（已做注入自测：
+   往 inline-27 的 cssText 加 background 立刻报红）。
+   index.html / mod/ry-panel.css / mod/ry-panel.js / mod/style-01.css / mod/inline-27.js /
+   mod/inline-30.js / mod/plot-editor.js / mod/online-map.css / runye-ai-plan.js /
+   runye-ai-plan.css / runye-map-enhance.js / runye-map-measure.html 均在 CORE，必须抬版本。
  */
-const VERSION = 'v543-panel-single-owner';
+const VERSION = 'v544-float-card-unify';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

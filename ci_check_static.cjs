@@ -334,5 +334,55 @@ check('⑦ 全局滚动条只在 runye-theme.css 定义一次（容器级细条�
   (themeHasGlobal ? '' : 'runye-theme.css 缺少 *::-webkit-scrollbar 定义；') +
   (scrollbarViolations.length ? '重复定义：' + scrollbarViolations.join(', ') : ''));
 
+/* ---------- ⑧ 悬浮卡片外壳单一归属（v544） ---------- */
+/* v544 的审计结论：全站有 4 张「浮在地图/画布上的卡片」——三级图层控制、驳接点面板、
+   AI 侧栏面板、在线地图图层卡 —— 各自把外壳（背景/描边/圆角/阴影/字体）写在自己的
+   创建代码里（3 份 JS 字符串 + 1 份 CSS），值还不一样：#fff / rgba(255,255,255,.97)、
+   圆角 8 / 10 / 0、字号 12 / 11.5 / 11。v544 把外壳收敛成 mod/ry-panel.css 的
+   .ry-float-card / -head / -title / -grip / -caret / -body 一组。
+   本项守两件事：
+     正向 —— 四张卡的根节点必须挂 .ry-float-card（新增第 5 张卡时同样必须挂，
+             漏挂就会掉回「自己写一套壳」的老路）；
+     反向 —— 挂了这个类之后，紧跟其后的 `X.style.cssText` 里**不许**再写外壳视觉属性
+             （定位/尺寸/z-index/overflow 这些照旧写在 cssText 上，属正当差异）。
+   判定口径说明：只扫「className 赋值行 + 其后 3 行内的 style.cssText」，不做全文模糊匹配 ——
+   全文匹配会被注释、图例色块、`background` 出现在 `innerHTML` 里的图例等误伤（实测 25 处误报）。 */
+const FLOAT_CARD_ANCHORS = [
+  ['mod/inline-27.js', 'panel.className = \'ry-float-card\''],
+  ['mod/inline-30.js', 'panel.className = \'ry-float-card\'' ],
+  ['runye-ai-plan.js', 'ry-float-card' ],
+  ['runye-map-enhance.js', 'ry-float-card' ],
+];
+const SKIN_PROPS = /(background|box-shadow|border-radius|border\s*:|font\s*:)/;
+const floatCardProblems = [];
+/* ① owner 必须存在且真的定义了外壳 */
+const rpCss = fs.readFileSync(path.join(ROOT, 'mod/ry-panel.css'), 'utf8');
+const rpCardRule = (rpCss.match(/\.ry-float-card\s*\{([^}]*)\}/) || [])[1] || '';
+if (!/\bbackground\s*:/.test(rpCardRule) || !/\bbox-shadow\s*:/.test(rpCardRule)) {
+  floatCardProblems.push('mod/ry-panel.css 的 .ry-float-card 缺少 background / box-shadow（外壳唯一出处坏了）');
+}
+/* ② 四张卡必须挂类；挂类之后紧随的 cssText 不得写外壳 */
+for (const [rel, anchor] of FLOAT_CARD_ANCHORS) {
+  const abs = path.join(ROOT, rel);
+  if (!fs.existsSync(abs)) { floatCardProblems.push(rel + ' 不存在'); continue; }
+  const lines = fs.readFileSync(abs, 'utf8').split('\n');
+  const hitIdx = lines.findIndex(l => l.includes(anchor));
+  if (hitIdx < 0) { floatCardProblems.push(rel + ' 未挂 .ry-float-card（锚点：' + anchor + '）'); continue; }
+  const ownerVar = (lines[hitIdx].match(/([A-Za-z_$][\w$]*)\.className\s*=/) || [])[1];
+  if (!ownerVar) continue;                     /* 如 map-enhance 用字符串拼 innerHTML，跳过 */
+  for (let k = hitIdx + 1; k <= hitIdx + 3 && k < lines.length; k++) {
+    const m = lines[k].match(new RegExp(ownerVar.replace(/\$/g, '\\$') + '\\.style\\.cssText\\s*=\\s*(.+)$'));
+    if (!m) continue;
+    /* 卡根节点的 cssText 只该有「定位 / 尺寸 / 层级 / 溢出 / 布局方向」，
+       一旦出现背景、描边、圆角、阴影、字体，就是又抄了一套壳。 */
+    if (SKIN_PROPS.test(m[1])) {
+      floatCardProblems.push(rel + ':' + (k + 1) + ' 的 ' + ownerVar + '.style.cssText 里又写了外壳视觉（' +
+        m[1].trim().slice(0, 70) + '）—— 应挪进 .ry-float-card');
+    }
+  }
+}
+check('⑧ 悬浮卡片外壳单一归属：四张卡挂 .ry-float-card，且不再各自写一套壳（v544）',
+  floatCardProblems.length === 0,
+  floatCardProblems.slice(0, 4).join(' | '));
 console.log('\n== ci_check_static：PASS=' + pass + ' FAIL=' + fail + ' ==');
 process.exit(fail ? 1 : 0);

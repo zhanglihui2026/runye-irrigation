@@ -15,12 +15,17 @@
    [v279 2026-10-06 用户要求] 展开态「顶端紧贴导航栏、底端紧贴状态栏」（上下贴满、看起来更紧凑）：
    top/bottom 同时给死（各贴两条栏自己的 1px 边线）⇒ 面板自然拉伸成右侧整列，高度不再随内容；
    留白由 20px 收到 1px（= 可拉伸高度 100vh − 36 − 1 − 30 − 1）。 */
-.ai-panel{box-sizing:border-box;color:#4a6259;background:#fff;font-size:11px;line-height:1.6;overflow:hidden;display:flex;flex-direction:column;top:calc(var(--fn-nav-h,36px) + 1px);bottom:calc(var(--ry-status-h,30px) + 1px);max-height:calc(100vh - var(--fn-nav-h,36px) - 1px - var(--ry-status-h,30px) - 1px)}
-/* 标题栏：图层控制同款——灰底、move 光标、sticky 吸顶、触屏禁手势 */
-.ai-panel header{display:flex;align-items:center;gap:6px;padding:6px 9px;background:#f1f5f9;border-bottom:1px solid #e2e8f0;cursor:move;user-select:none;touch-action:none;position:sticky;top:0}
+/* [v544] 外壳（底色/边框/阴影/标题条）统一到 .ry-float-card（mod/ry-panel.css）；
+   这里只保留 AI 面板自己的语义配色（v251 绿色调色板）与字体口径。
+   ★ 必须用双类选择器 (0,2,0)：ry-panel.css 在本文件之后加载，
+     单类 .ai-panel (0,1,0) 会被 .ry-float-card 的 12px 字号与白底压掉。
+   ★ font-family:inherit 复现「原来不设字体、继承 body」的行为。 */
+.ai-panel{box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;top:calc(var(--fn-nav-h,36px) + 1px);bottom:calc(var(--ry-status-h,30px) + 1px);max-height:calc(100vh - var(--fn-nav-h,36px) - 1px - var(--ry-status-h,30px) - 1px)}
+.ai-panel.ry-float-card{background:#fff;color:#4a6259;font-size:11px;line-height:1.6;font-family:inherit}
+/* 标题栏：灰底/边框/内距由 .ry-float-head 提供，这里只留悬停反馈 */
 .ai-panel header:hover{background:#e8eef4}
-.ai-grip{cursor:ew-resize;color:#94a3b8;padding:0 3px;user-select:none;touch-action:none;font-size:12px}
-.ai-caret{color:#64748b;font-size:11px}
+.ai-grip{font-size:12px}
+.ai-caret{font-size:11px}
 /* [v258] 底部高度手柄：竖条状拖拽区，居中、hover 显绿，ew 语义换 ns */
 .ai-grip-v{display:block;height:9px;margin:0;cursor:ns-resize;user-select:none;touch-action:none;
   background:linear-gradient(to bottom,#f1f5f9,#e6ecf2);border-top:1px solid #e2e8f0;

@@ -86,11 +86,9 @@
     var css = document.createElement('style');
     css.id = 'rym-layer-css';
     css.textContent =
-      '.rym-layer-panel{position:absolute;top:12px;right:12px;z-index:1000;background:#fff;' +
-      'border:1px solid #cbd5e1;box-shadow:0 1px 4px rgba(0,0,0,.12);padding:8px 10px;' +
-      'font:12px/1.7 system-ui,-apple-system,"Segoe UI",sans-serif;color:#334155;min-width:120px}' +
-      '.rym-layer-panel .rym-lp-t{font-weight:700;color:#15803d;border-left:3px solid #16a34a;' +
-      'padding-left:6px;margin-bottom:4px;letter-spacing:1px}' +
+      /* [v544] 外壳（底色/边框/阴影/字体/标题条/内距）统一到 .ry-float-card 一族
+         （mod/ry-panel.css）；这里只留定位、min-width 与图层行自己的排版。 */
+      '.rym-layer-panel{position:absolute;top:12px;right:12px;z-index:1000;min-width:120px}' +
       '.rym-layer-panel label{display:block;cursor:pointer;user-select:none}' +
       '.rym-layer-panel input{margin-right:5px;vertical-align:-1px}' +
       '.rym-hyd-legend{margin-top:5px;padding-top:5px;border-top:1px solid #e2e8f0;font-size:10px;line-height:1.65;color:#475569}' +
@@ -193,7 +191,7 @@
 
   function buildPanel(state, opts) {
     var el = document.createElement('div');
-    el.className = 'rym-layer-panel';
+    el.className = 'rym-layer-panel ry-float-card';
     /* [v151 2026-09-29] 行调整：删掉「分区」（zoneGroup 从未被他处填入，是勾了没反应的死控件）；
      * 新增「滴灌带」（管网里的青色虚线很密，单独开关实用）。
      * 勾选状态持久化到 localStorage['runye_map_layers']，下次打开保持原样。 */
@@ -211,7 +209,12 @@
      * 只在宿主页显式传了 opts.onMergeMode 时才出现，避免其它引用页多出死控件。 */
     var hasMergeRow = !!(opts && typeof opts.onMergeMode === 'function');
     if (hasMergeRow) ROWS.push(['mergepick', '🔗 地块成组']);
-    el.innerHTML = '<div class="rym-lp-t">图层</div>' + ROWS.map(function (r) {
+    el.innerHTML = '<div class="rym-lp-t ry-float-head" data-ry-drag data-ry-toggle title="拖动 = 移动面板 · 双击 = 回到默认位 · 单击 = 折叠/展开">'
+      + '<b class="ry-float-title">图层</b>'
+      + '<span class="ry-float-grip" data-ry-resize title="左右拖动调节面板宽度（120~320px，自动记忆）">\u2194</span>'
+      + '<span class="ry-float-caret" data-ry-fold data-ry-fold-open="\u25be" data-ry-fold-closed="\u25b8">\u25be</span>'
+      + '</div>'
+      + '<div class="ry-float-body" data-ry-body>' + ROWS.map(function (r) {
       var on = (saved[r[0]] !== false);   // 默认全开；只有显式存过 false 才关
       return '<label><input type="checkbox" data-rym="' + r[0] + '"' + (on ? ' checked' : '') + '> ' + r[1] + '</label>';
     }).join('') +
@@ -219,10 +222,35 @@
       '<i style="background:#dc2626"></i>超流速<i style="background:#d97706"></i>未连通' +
       '<i style="background:#7c3aed"></i>环网<i style="background:#94a3b8"></i>无需求</div>' +
       '<label style="margin-top:4px;border-top:1px solid #e2e8f0;padding-top:4px">' +
-      '<input type="checkbox" data-rym="fieldmode"' + (saved.fieldmode ? ' checked' : '') + '> ☀️ 田间模式</label>';
+      '<input type="checkbox" data-rym="fieldmode"' + (saved.fieldmode ? ' checked' : '') + '> ☀️ 田间模式</label>'
+      + '</div>';
+    /* [v544] 补齐可拖/可折/可调宽：与「图层控制」等同款外壳（.ry-float-card）＋同一套共用交互
+       （mod/ry-panel.js）。此前这张卡是固定右上角、只有勾选状态有记忆。 */
+    el.setAttribute('data-ry-panel', '');
+    el.setAttribute('data-ry-panel-key', 'rymLayerPanel');
+    el.setAttribute('data-ry-position-key', 'runye_map_layers_pos');
+    el.setAttribute('data-ry-keep-default', '1');          /* 默认位由 CSS 的 top/right 给 */
+    el.setAttribute('data-ry-drag-threshold', '4');
+    el.setAttribute('data-ry-drag-dblclick-reset', '1');
+    el.setAttribute('data-ry-fold-key', 'runye_map_layers_folded');
+    el.setAttribute('data-ry-resize-key', 'runye_map_layers_w');
+    el.setAttribute('data-ry-resize-min', '120');
+    el.setAttribute('data-ry-resize-max', '320');
     state.map.getContainer().appendChild(el);
     L.DomEvent.disableClickPropagation(el);
     L.DomEvent.disableScrollPropagation(el);
+    /* 拖面板时别把地图一起平移：Leaflet 用 pointer 事件起拖，disableClickPropagation 不管 pointerdown */
+    el.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
+    /* mod/ry-panel.js 在本文件之后加载（index.html 第 2361 行），地图初始化可能早于它 ⇒ 轮询等一下就绪 */
+    (function initFloatCard(tries) {
+      if (window.rypCollapsible && window.rypDraggable && window.rypResizePanel) {
+        window.rypCollapsible(el);
+        window.rypDraggable(el);
+        window.rypResizePanel(el);
+        return;
+      }
+      if (tries > 0) setTimeout(function () { initFloatCard(tries - 1); }, 200);
+    })(25);
     state.panelEl = el;
     function apply(k, on) {
       if (k === 'measure') {                 // 页面级测量框：转交宿主页实现
@@ -361,7 +389,7 @@
       if (pll && pll.length >= 3) { p.polyLatLng = pll; return pll; }
     }
     try {
-      var ma = JSON.parse(localStorage.getItem('runyeMeasuredArea') || 'null');
+      var ma = window.RyMeasuredAreaBridgeStore.read();
       if (ma && ma.plotId === p.id && Array.isArray(ma.poly) && ma.poly.length >= 3) {
         p.polyLatLng = ma.poly; return p.polyLatLng;
       }

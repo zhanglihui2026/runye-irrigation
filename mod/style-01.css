@@ -2545,18 +2545,14 @@ body > .ry-nav .main-header{display:none!important}
 .gr-mat .gr-grp td{text-align:left;color:#64748b;font-weight:600;background:rgba(31,41,55,.04)}
 /* [v231] 驳接点 / 管径 / 水头损失 卡片 */
 .gr-hyd{margin-top:2px}
-/* [v239] 「驳接点/管径/水头损失」从左侧栏搬到画布右侧的悬浮面板（同三级页图层控制面板款）：
-   只浮在画布上、可拖动/调宽/折叠；把卡搬进来后去掉卡的边框与背景，避免双层框 */
+/* [v239] 「驳接点/管径/水头损失」从左侧栏搬到画布右侧的悬浮面板：
+   只浮在画布上、可拖动/调宽/折叠；把卡搬进来后去掉卡的边框与背景，避免双层框。
+   [v544] 视觉（底色/边框/阴影/字号/标题条/正文内距）统一到 .ry-float-card
+   + .ry-float-head + .ry-float-body（mod/ry-panel.css），这里只留定位/尺寸
+   与「搬进来的卡去框」这两条本面板专属规则。 */
 #grHydPanel{position:absolute;top:8px;right:8px;z-index:9994;width:420px;max-width:calc(100% - 16px);
-  max-height:calc(100% - 16px);overflow:auto;background:rgba(255,255,255,.97);border:1px solid #cbd5e1;box-shadow:0 10px 28px rgba(15,23,42,.18);
-  font:12px/1.6 system-ui,-apple-system,"Microsoft YaHei",sans-serif;color:#1f2937}
+  max-height:calc(100% - 16px);overflow:auto}
 #grHydPanel.grp-hidden{display:none}
-#grHydPanel>.grp-head{display:flex;align-items:center;gap:6px;padding:6px 9px;background:#f1f5f9;
-  border-bottom:1px solid #e2e8f0;cursor:move;user-select:none;position:sticky;top:0;touch-action:none}
-#grHydPanel>.grp-head>b{flex:1;color:#334155}
-#grHydPanel #grpGrip{cursor:ew-resize;color:#94a3b8;padding:0 3px;user-select:none;touch-action:none}
-#grHydPanel #grpCaret{color:#64748b}
-#grHydPanel>.grp-body{padding:7px 9px 9px}
 #grHydPanel .gr-card{border:0;padding:0;margin:0;background:transparent}
 #grHydPanel .gr-card-title{display:none}
 /* [v235] 三级管路导入层：图例提示 + 工具栏开关点亮态（!important 仅颜色/边框/字重，eng_skin 纪律） */

@@ -880,3 +880,59 @@ body.ry-tool #ryCadSide [data-pp="pipePlanSection"][data-ry-view="edit"] .ry-pan
 @media print{
   body.ry-tool #ryCadSide{display:none!important}
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   [v544] 悬浮卡片统一外壳 .ry-float-card
+   ───────────────────────────────────────────────────────────────────────────
+   来源：v164「图层控制」(#tlWsLayerPanel)、v239「驳接点/管径/水头损失」(#grHydPanel)、
+   v253「AI 灌溉方案规划」三张手写浮层——实测三者视觉规格**逐值相同**
+   （底色 rgba(255,255,255,.97) / 边框 #cbd5e1 / 阴影 0 10px 28px rgba(15,23,42,.18)
+    / 字体 12px/1.6 / 标题条 #f1f5f9 + #e2e8f0 下边线 / 正文 padding 7px 9px 9px），
+   却各写一份（两份在 JS 的 cssText 字符串里、一份在 style-01.css）。
+   自此视觉只在这里定义：JS 只留定位与尺寸，不再写颜色/边框/阴影/字号。
+
+   两条纪律：
+   1. **不写 border-radius**：全站扁平化规则 body,body *{border-radius:0!important}
+      （style-01.css:2792）有意压平，写了也是死声明（v530 教训）。
+   2. AI 面板保留自己的配色（.ai-panel.ry-float-card 覆盖，见 runye-ai-plan.css）：
+      v251 定的绿色调色板是内容语义，不是外壳，不随外壳统一而改。
+   ═══════════════════════════════════════════════════════════════════════════ */
+.ry-float-card{
+  background:rgba(255,255,255,.97);
+  border:1px solid #cbd5e1;
+  box-shadow:0 10px 28px rgba(15,23,42,.18);
+  font:12px/1.6 system-ui,-apple-system,"Microsoft YaHei",sans-serif;
+  color:#1f2937;
+}
+.ry-float-head{
+  display:flex;align-items:center;gap:6px;
+  padding:6px 9px;background:#f1f5f9;border-bottom:1px solid #e2e8f0;
+  cursor:move;user-select:none;position:sticky;top:0;touch-action:none;
+}
+.ry-float-title{flex:1;color:#334155}
+.ry-float-grip{cursor:ew-resize;color:#94a3b8;padding:0 3px;user-select:none;touch-action:none}
+.ry-float-caret{color:#64748b}
+.ry-float-body{padding:7px 9px 9px}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   [v544] 横向工具栏统一（.ry-hbar / .ry-hbar-btn）
+   ───────────────────────────────────────────────────────────────────────────
+   两条横向工具栏原来各写一套：
+     · #mapDrawTools（在线地图绘制条）：壳在 mod/online-map.css，按钮借侧栏的 .mbtn
+       再在两条页内各自覆盖高度/字号（28px/12px）；
+     · #ppQuickBar（地块分区快捷条）：壳与按钮全在 mod/style-01.css 的
+       #pipePlanSection .pp-canvas-wrap>.pp-quick 一族（26px/11.5px）。
+   现在几何与字号只在这里定义：高 26 / 字号 11（与 v538 工具栏口径一致）/ 内距 0 8px；
+   底色与描边仍按场景各自保留 —— 地图条浮在卫星影像上要纯白，画布条用面板的浅绿底，
+   这是背景差异不是规格差异（同 AI 面板保留语义配色的道理）。
+   ═══════════════════════════════════════════════════════════════════════════ */
+.ry-hbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:5px 7px;max-width:calc(100% - 24px)}
+.ry-hbar .ry-hbar-btn{
+  height:26px;padding:0 8px;border:1px solid #cbd5e1;background:#fff;color:#334155;
+  font-family:inherit;font-size:11px!important;font-weight:600;line-height:1;cursor:pointer;white-space:nowrap;
+}
+.ry-hbar .ry-hbar-btn:hover{border-color:#16a34a;color:#15803d;background:#f0fdf4}
+.ry-hbar .ry-hbar-btn.btn-on{background:#22c55e;border-color:#22c55e;color:#fff}
+.ry-hbar .ry-hbar-btn:disabled{opacity:.55;cursor:default}
+/* 地块分区快捷条沿用面板绿皮，只把按钮几何/字号并到同一档（原 26px 保留，字号 11.5→11） */
+#ppQuickBar .pp-btn-ghost,#ppQuickBar .pp-btn-generate{height:26px;padding:0 8px;font-size:11px!important;line-height:1}
