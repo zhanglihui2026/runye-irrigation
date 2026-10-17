@@ -555,8 +555,28 @@
    回归：工具栏探针 17/17、行为探针 31/31、A/B 六面（pp/tl × rail/base + secTL）0 差异、
    ci PASS=19 FAIL=0、单测 121/122（唯一红 Terrain bridge 属并行会话在途文件）。
    index.html / mod/style-01.css / mod/ry-panel.js / runye-map-measure.html 均在 CORE，必须抬版本。
+  * v547-card-rhythm 卡内节奏统一（外壳统一后的第二层）。三张可见卡内部原来仍各写一套，
+    实测四类不一致：① 行距 —— 图层卡 label `margin:2px 0`（相邻净距 2），地图卡 0；
+    ② 分组标题 —— 只有图层卡有，且是 inline 的 `margin:8px 0 3px;padding-top:6px`（行盒 26.19）；
+    ③ 说明行 —— 图层卡 11px/1.6=17.6，水力卡 .gr-empty 11px/1.5=16.5；
+    ④ 卡内控件 —— 被 style-01 的全局 typography 顶成 13px（比卡正文 12 还大），
+       图层卡 chip 的 inline `font-size:11px` 不带 !important ⇒ **从未生效过**（实测 13px）。
+    做法：mod/ry-panel.css 新增「卡内节奏」段，五个角色类成为唯一出处 ——
+    .ry-float-row（行，19.2 行盒）/ .ry-float-sec（分组标题 12/600，上 8 下 3，带顶线加 .is-divided）
+    / .ry-float-note（说明 11/16.5）/ .ry-float-legend（图例 10/15）/ .ry-float-chip（动作按钮 20px/11），
+    另配 .ry-float-value（值行，键 52px）/ .ry-float-label / .ry-float-chips / .ry-float-sep；
+    卡内 input/select/textarea 统一 12px（!important 压全局 13；排除已退役的 .ai-panel）。
+    落成三档行高 19.2 / 16.5 / 15、两档间距（组内 0、组间 8）。
+    水力卡数据区（.gr-hyd-sum / .gr-hyd-tbl）**不并入**：10.5px 密集数值表自成体系，
+    只把 .gr-hint 归到说明档（10.5/1.45 → 11/1.5）、.gr-btn 归到动作按钮档（11.5 → 11）。
+    实测：_probe_card_rhythm.mjs 口径断言 24/24；外壳 A/B 逐属性比对 153 处差异全部属本改动
+    （行 19.19→19.2、说明 17.6→16.5、图例 16.5→15、勾选框 13→12、卡内控件 13→12），
+    .ai-panel 0 差异；行为探针 31/31、工具栏 17/17、ci PASS=19、单测 123/123。
+    index.html / mod/ry-panel.css / mod/style-01.css / mod/inline-27.js / runye-map-enhance.js /
+    runye-map-measure.html 均在 CORE，必须抬版本。
+    注：并行会话已把 VERSION 抬到 v546-terrain-transfer-tab-binding ⇒ 本版取更高号 v547。
   */
-const VERSION = 'v545-rect-clamp';
+const VERSION = 'v547-card-rhythm';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

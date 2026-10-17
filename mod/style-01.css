@@ -2530,9 +2530,9 @@ body > .ry-nav .main-header{display:none!important}
 .gr-unit{color:#5f6b7a;font-size:10.5px}
 .gr-sel{height:24px;font:inherit;font-size:11.5px;padding:0 4px;border:1px solid rgba(31,41,55,.18);background:#fff}
 .gr-btns{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
-.gr-btn{height:24px!important;padding:0 7px!important;font-size:11.5px!important}
+.gr-btn{height:24px!important;padding:0 7px!important;font-size:11px!important}   /* [v547] 动作按钮 = 11px（与 .ry-float-chip 同档；高度仍跟 24px 下拉对齐） */
 .gr-btn.active{background:rgba(124,58,237,.18);border-color:rgba(124,58,237,.5);color:#5b21b6;font-weight:600}
-.gr-hint{color:#5f6b7a;font-size:10.5px;line-height:1.45;margin-top:4px}
+.gr-hint{color:#5f6b7a;font-size:11px;line-height:1.5;margin-top:4px}   /* [v547] 说明档 = 11px/1.5（与 .ry-float-note 同档） */
 .gr-empty{color:#5f6b7a;font-size:11px;line-height:1.5}
 /* 子地块列表 */
 .gr-block{margin:4px 0;padding:5px 6px;border:1px solid rgba(31,41,55,.12);background:rgba(255,255,255,.7)}

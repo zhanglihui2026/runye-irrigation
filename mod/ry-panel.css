@@ -914,6 +914,70 @@ body.ry-tool #ryCadSide [data-pp="pipePlanSection"][data-ry-view="edit"] .ry-pan
 .ry-float-caret{color:#64748b}
 .ry-float-body{padding:7px 9px 9px}
 
+/* ───────────────────────────────────────────────────────────────────────────
+   [v547] 卡内节奏（行 / 分组标题 / 说明 / 图例 / 控件字号）
+   ───────────────────────────────────────────────────────────────────────────
+   外壳统一后，三张可见卡（#tlWsLayerPanel 图层控制 / #grHydPanel 水力 / .rym-layer-panel
+   地图图层）的**内部**还是各写一套，实测四类不一致：
+     ① 行距：图层卡 label 带 margin:2px 0（相邻净距 2），地图卡 label 净距 0；
+     ② 分组标题：只有图层卡有，且是 inline 的 `margin:8px 0 3px;padding-top:6px`
+        （行盒 26.19，比正文行高 19.2 多 7px，全卡最高的一行）；
+     ③ 说明/空态：图层卡 11px/1.6=17.6，水力卡 .gr-empty 11px/1.5=16.5，两处不一；
+     ④ 卡内控件：`input/select/button` 被 style-01.css 的全局 typography
+        （`p,li,input,select,button{font-size:13px!important}`）顶成 **13px**，
+        比卡正文 12px 还大；图层卡的 chip 按钮 inline 写了 `font-size:11px`（不带
+        !important）**从来没生效过** —— 实测就是 13px。
+   自此卡内只认这五个角色类，几何与字号都在这里：
+     .ry-float-row    行（勾选行/标签行/值行）：行盒 = 正文行高 19.2，自身不加内外距
+     .ry-float-sec    分组标题：12px/600，上 8 下 3；带顶线的加 .is-divided（padding-top 6）
+     .ry-float-note   说明/空态：11px/1.5 = 16.5
+     .ry-float-legend 图例/次要把：10px/1.5 = 15，与上方隔 6 + 1px 分隔线
+     .ry-float-chip   卡内小按钮：20px 高 / 11px（字号与工具栏控件同档，必须 !important）
+   三档行高落成：19.2（正文行）/ 16.5（说明）/ 15（图例）；两档间距：组内 0、组间 8。
+   **水力卡的数据区（.gr-hyd-sum / .gr-hyd-tbl）不并入本节奏**：那是 10.5px 的密集数值表，
+   密度自成体系，改它会连带改变卡高与可读性，属另一件事。
+   ─────────────────────────────────────────────────────────────────────────── */
+.ry-float-row{
+  display:flex;align-items:center;gap:5px;
+  margin:0;line-height:19.2px;cursor:pointer;user-select:none;
+}
+.ry-float-row>input[type=checkbox],.ry-float-row>input[type=radio]{
+  margin:0;width:12px;height:12px;flex:0 0 auto;cursor:pointer;accent-color:#185FA5;
+}
+.ry-float-sec{font-weight:600;color:#475569;margin:8px 0 3px;line-height:19.2px}
+.ry-float-sec.is-first{margin-top:0}
+.ry-float-sec.is-divided{padding-top:6px;border-top:1px dashed #e2e8f0}
+.ry-float-note{font-size:11px!important;line-height:16.5px;color:#94a3b8;margin:0}
+.ry-float-note.is-strong{color:#64748b}
+/* 子标题（无勾选的分类行，如「管径」「遮蔽」）：与行同高，不抢眼 */
+.ry-float-label{color:#475569;line-height:19.2px;margin:0}
+/* 值行（键 + 值，如「管径 / Ø90」）：键固定 52px，值可折行 */
+.ry-float-value{display:flex;align-items:baseline;gap:6px;line-height:19.2px;margin:0}
+.ry-float-value>span:first-child{flex:none;width:52px;color:#64748b}
+.ry-float-value>span:last-child{flex:1;word-break:break-all}
+/* 按钮组容器 */
+.ry-float-chips{display:flex;flex-wrap:wrap;gap:3px;margin:0 0 5px}
+/* 分隔（图例、末行开关等与上方内容之间）：6 + 1px 线 + 6 */
+.ry-float-sep{margin-top:6px;padding-top:6px;border-top:1px solid #e2e8f0}
+.ry-float-legend{
+  margin-top:6px;padding-top:6px;border-top:1px solid #e2e8f0;
+  font-size:10px!important;line-height:15px;color:#475569;
+}
+.ry-float-legend b{font-weight:700}
+.ry-float-chip{
+  height:20px;padding:0 7px;border:1px solid #cbd5e1;background:#fff;color:#475569;
+  font-family:inherit;font-size:11px!important;font-weight:400;line-height:1;
+  cursor:pointer;white-space:nowrap;
+}
+.ry-float-chip:hover{border-color:#94a3b8;color:#334155}
+.ry-float-chip.is-danger{border-color:#fca5a5;color:#b91c1c}
+/* 卡内文本控件字号跟卡正文（全局 typography 的 13px!important 必须压回）。
+   **排除 .ai-panel**：那张卡自 v484 起在主页常驻 display:none（只 ?smart=1 走全屏工作台），
+   内部属智能规划工作台的字号体系，不归本口径管；不排除会把它的 13px 一起改掉。 */
+.ry-float-card:not(.ai-panel) input:not([type=checkbox]):not([type=radio]),
+.ry-float-card:not(.ai-panel) select,
+.ry-float-card:not(.ai-panel) textarea{font-size:12px!important;line-height:1.4}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    [v544] 横向工具栏统一（.ry-hbar / .ry-hbar-btn）
    ───────────────────────────────────────────────────────────────────────────

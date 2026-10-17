@@ -1267,7 +1267,8 @@
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function odSeries() { try { if (typeof PE_OD_SERIES !== 'undefined' && PE_OD_SERIES.length) return PE_OD_SERIES.slice(); } catch (e) { } return [63, 75, 90, 110, 140, 160, 200, 250, 315, 355, 400]; }
   function chipChecked(id) { var c = document.getElementById(id); return c ? !!c.checked : true; }
-  function row(k, v) { return '<div style="display:flex;gap:6px;align-items:baseline;margin:1px 0"><span style="flex:none;width:52px;color:#64748b">' + k + '</span><span style="flex:1;word-break:break-all">' + v + '</span></div>'; }
+  /* [v547] 值行的几何移到 mod/ry-panel.css 的 .ry-float-value（卡内节奏唯一出处） */
+  function row(k, v) { return '<div class="ry-float-value"><span>' + k + '</span><span>' + v + '</span></div>'; }
 
   function ensure() {
     if (panel) return panel;
@@ -1384,8 +1385,9 @@
     setTimeout(render, 0);
   }
   function cbRow(k, label, checked) {
-    return '<label style="display:flex;gap:6px;align-items:center;margin:2px 0;cursor:pointer;user-select:none">'
-      + '<input type="checkbox" data-lp="' + k + '"' + (checked ? ' checked' : '') + ' style="margin:0;width:12px;height:12px;cursor:pointer;accent-color:#185FA5">'
+    /* [v547] 行几何（flex / gap / 行高 19.2 / 勾选框 12px）统一在 .ry-float-row */
+    return '<label class="ry-float-row">'
+      + '<input type="checkbox" data-lp="' + k + '"' + (checked ? ' checked' : '') + '>'
       + '<span>' + esc(label) + '</span></label>';
   }
   function selHtml() {
@@ -1403,32 +1405,33 @@
           + row('水头损失', (ci.hf != null ? Number(ci.hf).toFixed(2) : '—') + ' m');
       }
     }
-    return '<div style="color:#94a3b8;font-size:11px">未选中（点管道查看信息）</div>';
+    return '<div class="ry-float-note">未选中（点管道查看信息）</div>';
   }
   function batchHtml() {
     var pids = targets();
-    if (!pids.length) return '<div style="color:#94a3b8;font-size:11px">先选中管段（多选可批量改径 / 遮蔽）</div>';
-    var btn = 'border:1px solid #cbd5e1;background:#fff;color:#475569;border-radius:4px;padding:1px 6px;cursor:pointer;font:inherit;font-size:11px';
-    var h = '<div style="color:#64748b;font-size:11px;margin:0 0 3px">作用对象：' + pids.length + ' 段</div>';
-    h += '<div style="color:#475569;margin:2px 0 2px">管径</div><div style="display:flex;flex-wrap:wrap;gap:3px;margin:0 0 5px">';
-    odSeries().forEach(function (od) { h += '<button type="button" data-lpact="od" data-od="' + od + '" style="' + btn + '">Ø' + od + '</button>'; });
-    h += '<button type="button" data-lpact="odclear" style="' + btn + ';border-color:#fca5a5;color:#b91c1c">清除</button></div>';
-    h += '<div style="color:#475569;margin:2px 0 2px">遮蔽</div><div style="display:flex;flex-wrap:wrap;gap:3px">';
-    h += '<button type="button" data-lpact="hide" style="' + btn + '">遮蔽</button>'
-      + '<button type="button" data-lpact="unhide" style="' + btn + '">取消遮蔽</button>'
-      + '<button type="button" data-lpact="clearSel" style="' + btn + '">清空选择</button></div>';
+    /* [v547] 说明 / 子标题 / 按钮组全部换角色类；chip 的 20px·11px 由 .ry-float-chip 定
+       （inline 写的 font-size:11px 不带 !important，一直被全局 typography 顶成 13px）。 */
+    if (!pids.length) return '<div class="ry-float-note">先选中管段（多选可批量改径 / 遮蔽）</div>';
+    var h = '<div class="ry-float-note is-strong">作用对象：' + pids.length + ' 段</div>';
+    h += '<div class="ry-float-label">管径</div><div class="ry-float-chips">';
+    odSeries().forEach(function (od) { h += '<button type="button" class="ry-float-chip" data-lpact="od" data-od="' + od + '">Ø' + od + '</button>'; });
+    h += '<button type="button" class="ry-float-chip is-danger" data-lpact="odclear">清除</button></div>';
+    h += '<div class="ry-float-label">遮蔽</div><div class="ry-float-chips">';
+    h += '<button type="button" class="ry-float-chip" data-lpact="hide">遮蔽</button>'
+      + '<button type="button" class="ry-float-chip" data-lpact="unhide">取消遮蔽</button>'
+      + '<button type="button" class="ry-float-chip" data-lpact="clearSel">清空选择</button></div>';
     return h;
   }
   function render() {
     if (!panel || !bodyEl) return;
     var h = '';
-    h += '<div style="font-weight:600;color:#475569;margin:0 0 3px">图层显隐</div>';
+    h += '<div class="ry-float-sec is-first">图层显隐</div>';
     h += cbRow('labels', '标注显示', chipChecked('tlWsLabelsChk'));
     h += cbRow('zone', '地块文字', chipChecked('tlWsZoneChk'));
     h += cbRow('worst', '最远水路', chipChecked('tlWsWorstChk'));
-    h += '<div style="font-weight:600;color:#475569;margin:8px 0 3px;border-top:1px dashed #e2e8f0;padding-top:6px">当前选中</div>';
+    h += '<div class="ry-float-sec is-divided">当前选中</div>';
     h += selHtml();
-    h += '<div style="font-weight:600;color:#475569;margin:8px 0 3px;border-top:1px dashed #e2e8f0;padding-top:6px">批量操作</div>';
+    h += '<div class="ry-float-sec is-divided">批量操作</div>';
     h += batchHtml();
     bodyEl.innerHTML = h;
   }

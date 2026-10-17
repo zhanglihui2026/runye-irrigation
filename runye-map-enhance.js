@@ -88,10 +88,10 @@
     css.textContent =
       /* [v544] 外壳（底色/边框/阴影/字体/标题条/内距）统一到 .ry-float-card 一族
          （mod/ry-panel.css）；这里只留定位、min-width 与图层行自己的排版。 */
+      /* [v547] 行距/图例字号已收进 mod/ry-panel.css 的 .ry-float-row / .ry-float-legend
+         （卡内节奏唯一出处）；这里只留定位与图例色点这种本卡专属的东西。 */
       '.rym-layer-panel{position:absolute;top:12px;right:12px;z-index:1000;min-width:120px}' +
-      '.rym-layer-panel label{display:block;cursor:pointer;user-select:none}' +
-      '.rym-layer-panel input{margin-right:5px;vertical-align:-1px}' +
-      '.rym-hyd-legend{margin-top:5px;padding-top:5px;border-top:1px solid #e2e8f0;font-size:10px;line-height:1.65;color:#475569}' +
+      '.rym-layer-panel label{display:flex;align-items:center}' +
       '.rym-hyd-legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin:0 3px 0 5px;vertical-align:0}' +
       '.ry-field-mode #map path{stroke-width:3.5px !important}' +
       '.ry-field-mode .leaflet-popup-content{font-size:14px;font-weight:600}' +
@@ -216,13 +216,13 @@
       + '</div>'
       + '<div class="ry-float-body" data-ry-body>' + ROWS.map(function (r) {
       var on = (saved[r[0]] !== false);   // 默认全开；只有显式存过 false 才关
-      return '<label><input type="checkbox" data-rym="' + r[0] + '"' + (on ? ' checked' : '') + '> ' + r[1] + '</label>';
+      return '<label class="ry-float-row"><input type="checkbox" data-rym="' + r[0] + '"' + (on ? ' checked' : '') + '><span>' + r[1] + '</span></label>';
     }).join('') +
-      '<div class="rym-hyd-legend"><b>水力图例</b><br><i style="background:#15803d"></i>正常' +
+      '<div class="rym-hyd-legend ry-float-legend"><b>水力图例</b><br><i style="background:#15803d"></i>正常' +
       '<i style="background:#dc2626"></i>超流速<i style="background:#d97706"></i>未连通' +
       '<i style="background:#7c3aed"></i>环网<i style="background:#94a3b8"></i>无需求</div>' +
-      '<label style="margin-top:4px;border-top:1px solid #e2e8f0;padding-top:4px">' +
-      '<input type="checkbox" data-rym="fieldmode"' + (saved.fieldmode ? ' checked' : '') + '> ☀️ 田间模式</label>'
+      '<label class="ry-float-row ry-float-sep">' +
+      '<input type="checkbox" data-rym="fieldmode"' + (saved.fieldmode ? ' checked' : '') + '><span>☀️ 田间模式</span></label>'
       + '</div>';
     /* [v544] 补齐可拖/可折/可调宽：与「图层控制」等同款外壳（.ry-float-card）＋同一套共用交互
        （mod/ry-panel.js）。此前这张卡是固定右上角、只有勾选状态有记忆。 */
