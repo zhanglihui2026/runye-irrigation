@@ -165,11 +165,11 @@ input[type="reset"],
 }
 /* ===== /RY-NAV ===== */
 
-  /* [v322 2026-10-09 用户要求] 全站扁平化：滚动条隐形（轨道透明、滑块常态极淡、悬停显形；5px 基准不变） */
-  *::-webkit-scrollbar-track{background:transparent}
-  *::-webkit-scrollbar-thumb{background:rgba(188,211,198,.25)}
-  *::-webkit-scrollbar-thumb:hover{background:rgba(188,211,198,.8)}
-  *::-webkit-scrollbar-corner{background:transparent}
+  /* [v322 2026-10-09 用户要求] 全站扁平化：滚动条隐形（轨道透明、滑块常态极淡、悬停显形）。
+     [v533] 此处原有一份 `*::-webkit-scrollbar*` 全局副本 —— 本页在 <style> 之后才加载
+     runye-theme.css，theme 的 `*::-webkit-scrollbar{width:var(--ry-scroll-w)}` 把它整条压掉；
+     实测本页通用滚动条恒为 4px + rgba(100,116,139,.45) + 圆角 999px，该块从未生效，已删。
+     **唯一出处 = runye-theme.css，禁止再写 `*::` 版本。** */
   /* [v322] 导航 tab 分隔线扁平化 */
   .ry-nav .nav-link{border-right-color:transparent}
 </style>

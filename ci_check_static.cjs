@@ -14,6 +14,7 @@
  *   ② HTML 内重复 id（**先剥 <script> 体与注释**，否则注释里引用的 id 会假红）；
  *   ③ 常量单一来源（管径 CAL_SERIES / PE_OD_SERIES、单价 TL_PIPE_PRICE_DEF 各只允许一处定义）；
  *   ⑥ 面板皮肤「双副本」不许漂移（scripts/check_panel_drift.cjs，v532）；
+ *   ⑦ 全局滚动条只允许在 runye-theme.css 定义一次（v533）；
  *   ④ 主页面关键同步脚本的依赖顺序正确；主页面本地脚本、样式表、样式表本地 url()
  *      资源及插件清单声明的 manifest/入口与 Service Worker CORE 清单一致，未缓存项必须
  *      登记为有明确降级行为的可选项，且 CORE 资源必须存在且不重复。
@@ -274,6 +275,39 @@ const driftLines = (driftRes.stdout || '').trim().split('\n');
 check('⑥ 面板双副本无新增漂移（index.html 的 rail 副本 vs mod/style-01.css / mod/ry-panel.css）',
   driftRes.status === 0,
   driftLines[driftLines.length - 1] || (driftRes.stderr || '').slice(0, 200));
+
+/* ---------- ⑦ 全局滚动条单一出处（v533） ---------- */
+/* `*::-webkit-scrollbar` 是纯特异性 0 的全局规则，谁后加载谁赢 ⇒ 历史上 index.html 内联、
+   mod/style-05.css、terrain/terrain.css 各复制了一份（值还各不相同：5px 绿 / 4px 灰 / 5px 灰绿）。
+   v533 实测三处副本从未生效（runye-theme.css 在 :head 里最后加载，通用滚动条恒为
+   4px + rgba(100,116,139,.45) + 圆角 999px），已全部删除，只留 runye-theme.css 一处。
+   本项守「不许再复制」：容器级细条（`.pp-side`、`#ryCadSide .ry-cad-grps` 等选择器更具体的）
+   不在此列，那是真在生效的例外。 */
+const SCROLLBAR_OWNER = 'runye-theme.css';
+const scrollbarScopeDirs = ['', 'mod', 'terrain', 'hydraulic-calc', 'filter-system', 'tl-workspace', 'modeling', 'digital-agriculture'];
+const scrollbarFiles = [];
+for (const dir of scrollbarScopeDirs) {
+  const abs = path.join(ROOT, dir);
+  if (!fs.existsSync(abs)) continue;
+  for (const name of fs.readdirSync(abs)) {
+    if (!/\.(css|html)$/i.test(name)) continue;
+    scrollbarFiles.push(path.posix.join(dir, name));
+  }
+}
+const scrollbarViolations = [];
+for (const rel of scrollbarFiles) {
+  if (rel === SCROLLBAR_OWNER) continue;
+  const src = fs.readFileSync(path.join(ROOT, rel), 'utf8');
+  src.split('\n').forEach((line, i) => {
+    if (/^\s*\*::-(webkit-)?scrollbar/.test(line)) scrollbarViolations.push(rel + ':' + (i + 1));
+  });
+}
+const themeSrc = fs.readFileSync(path.join(ROOT, SCROLLBAR_OWNER), 'utf8');
+const themeHasGlobal = /^\s*\*::-webkit-scrollbar\s*\{/m.test(themeSrc);
+check('⑦ 全局滚动条只在 runye-theme.css 定义一次（容器级细条例外）',
+  scrollbarViolations.length === 0 && themeHasGlobal,
+  (themeHasGlobal ? '' : 'runye-theme.css 缺少 *::-webkit-scrollbar 定义；') +
+  (scrollbarViolations.length ? '重复定义：' + scrollbarViolations.join(', ') : ''));
 
 console.log('\n== ci_check_static：PASS=' + pass + ' FAIL=' + fail + ' ==');
 process.exit(fail ? 1 : 0);

@@ -408,8 +408,18 @@
    说明：曾实测「用 :is() 把两份合成一份」，特异性从 (1,1,0) 掉到 (1,0,0) 后
    base diff 60~74 / rail diff 113~120（噪声基线仅 0~1 条），原生 input display、
    sl-input 显隐、#ppPlanBar2 宽度等成批回归 ⇒ 已全部回滚，双副本保留。
-   index.html 在 CORE，必须抬版本。 */
-const VERSION = 'v532-rail-drift-gate';
+   index.html 在 CORE，必须抬版本；
+   v533-scrollbar-single-source：全局滚动条收敛单一出处 ——
+   `*::-webkit-scrollbar` 是特异性 0 的全局规则，谁后加载谁赢，历史上 6 个文件各复制了一份
+   （index.html 内联 5px 绿 / mod/style-05.css 4px 灰 / terrain/terrain.css 5px 灰绿 /
+   runye-hydraulics.html 两份 5px 绿 / 三级系统图.html、二级系统图.html、管路接驳拼装.html
+   各一份 5px 绿）。逐页实测（getComputedStyle(el,'::-webkit-scrollbar').width + 真实
+   offsetWidth-clientWidth 双口径）确认：这些副本**全部被 runye-theme.css 压掉**，
+   全站通用滚动条恒为 4px / rgba(100,116,139,.45) / 圆角 999px ⇒ 删除零视觉变化；
+   `.pp-side` 与 `#ryCadSide .ry-cad-grps` 的 5px 绿色细条是选择器更具体的**生效中例外**，保留。
+   另加 ci_check_static 第 ⑦ 项守「不许再写 `*::` 版本」（负向测试：注入后报红，还原转绿）。
+   index.html / mod/style-05.css / terrain/terrain.css 均在 CORE，必须抬版本。 */
+const VERSION = 'v533-scrollbar-single-source';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

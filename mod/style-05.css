@@ -50,11 +50,10 @@
   #rySetModal .rs-nav{width:110px;flex:0 0 110px}
   #rySetModal .rs-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
-  /* [v383 2026-10-12 用户要求] 滚动条最窄最短，与 runye-theme.css 全局值保持一致（本文件后于 theme 加载，值须相同否则 index 页与全站不一致）：轨道透明、滑块半透明灰、悬停显形 */
-  *::-webkit-scrollbar-track{background:transparent}
-  *::-webkit-scrollbar-thumb{background:rgba(100,116,139,.45)}
-  *::-webkit-scrollbar-thumb:hover{background:rgba(100,116,139,.72)}
-  *::-webkit-scrollbar-corner{background:transparent}
+  /* [v533] 滚动条：原 v383 在此复制了一份 `*::-webkit-scrollbar*` 四行（与 runye-theme.css
+     的 :root 令牌逐值相同）。theme 先于本文件加载且值等价 ⇒ 这段是纯副本，
+     量测通用滚动条 4px / 滑块 rgba(100,116,139,.45) / 圆角 999px 前后一致。
+     **唯一出处 = runye-theme.css 的 §Native scrollbars + --ry-scroll-* 令牌，禁止再复制。** */
   /* [v322] 栏线融合：左右工具栏与中间区直接相接（分界靠底色差） */
   body.ry-tool #tlPipePlanSection .pp-side{border-right-color:transparent}
   body.ry-tool #areaTool .at-sidebar{border-right-color:transparent}

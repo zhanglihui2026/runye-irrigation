@@ -26,12 +26,11 @@
     padding:10px;display:flex;flex-direction:column;gap:10px}
   .side::-webkit-scrollbar{width:5px;height:5px}
   .side::-webkit-scrollbar-thumb{background:rgba(188,211,198,.25);border-radius:2px}
-  /* [v319 2026-10-09 用户要求] 全站滚动条最窄化：5px 与 .side 统一；webkit 前缀 + 标准属性双保险 */
-  *::-webkit-scrollbar{width:5px;height:5px}
-  *::-webkit-scrollbar-track{background:transparent}
-  *::-webkit-scrollbar-thumb{background:rgba(188,211,198,.25);border-radius:2.5px}
-  *::-webkit-scrollbar-thumb:hover{background:#9db8a8}
-  *::-webkit-scrollbar-corner{background:transparent}
+  /* [v319 2026-10-09 用户要求] 全站滚动条最窄化：5px 与 .side 统一。
+     [v533] 此处原有一份 `*::-webkit-scrollbar*` 全局块（5px / 绿滑块 / 2.5px 圆角）——
+     本页在 :163 才加载 runye-theme.css，theme 的 `*::-webkit-scrollbar{width:var(--ry-scroll-w)}`
+     把它整条压掉；实测本页通用滚动条恒为 4px + rgba(100,116,139,.45) + 圆角 999px，
+     即该块从未生效，已删。**唯一出处 = runye-theme.css，禁止再写 `*::` 版本。** */
   /* [v347 2026-10-09 用户反馈] 原此处写有 html 级标准滚动条属性——Chromium 121+ 会让全站
      ::-webkit-scrollbar 5px 细条失效落成 ~11px 粗条（同 index.html 全局口径注释），
      已删除，回到纯 webkit 5px 口径与其他页统一。 */
@@ -148,11 +147,8 @@
   .statusbar .st-warn{color:var(--a-600)}
   .statusbar .st-bad{color:var(--r-600)}
   .statusbar .sp{flex:1}
-  /* [v322 2026-10-09 用户要求] 全站扁平化：滚动条隐形（轨道透明、滑块常态极淡、悬停显形；5px 基准不变） */
-  *::-webkit-scrollbar-track{background:transparent}
-  *::-webkit-scrollbar-thumb{background:rgba(188,211,198,.25)}
-  *::-webkit-scrollbar-thumb:hover{background:rgba(188,211,198,.8)}
-  *::-webkit-scrollbar-corner{background:transparent}
+  /* [v322 2026-10-09 用户要求] 全站扁平化：滚动条隐形（轨道透明、滑块常态极淡、悬停显形）。
+     [v533] 同上的第二份全局副本（本页有两份），同样被 runye-theme.css 压掉，已删。 */
   /* [v322] 左右栏与中间区直接相接 + 卡片弱化 */
   .side{border-right-color:transparent}
   .right-props{border-left-color:transparent}

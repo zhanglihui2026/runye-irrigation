@@ -40,12 +40,11 @@
 }
 
 *{box-sizing:border-box}
-/* v144 全站滚动条统一：5px 细条（与主页同值；不写标准属性防失效） */
-*::-webkit-scrollbar{width:5px;height:5px}
-*::-webkit-scrollbar-track{background:transparent}
-*::-webkit-scrollbar-corner{background:transparent}
-*::-webkit-scrollbar-thumb{background:#c9d6ce;border-radius:3px}
-*::-webkit-scrollbar-thumb:hover{background:#9db4a8}
+/* [v533] 原 v144 在此复制了一份 `*::-webkit-scrollbar*` 五行（5px / #c9d6ce / 圆角 3px）。
+   本文件在 terrain/index.html 里先于 ../runye-theme.css 加载，theme 的
+   `*::-webkit-scrollbar{width:var(--ry-scroll-w)}` 把它整条压掉 —— 实测该页通用滚动条
+   恒为 4px、滑块 rgba(100,116,139,.45)、圆角 999px，即这五行从未生效，已删。
+   **唯一出处 = runye-theme.css，禁止再写 `*::` 版本。** */
 
 body{
   margin:0;

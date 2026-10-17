@@ -815,13 +815,13 @@ body.ry-tool.ry-cad-vp #ryCadSide[data-ry-open="0"]{width:40px}
 /* v144（2026-09-24 全站滚动条统一）：竖向/横向滚动条全站统一 5px。
    ★ 刻意不写 scrollbar-width / scrollbar-color 标准属性（原 .pp-side 写过 thin）——
    Chromium 121+ 下标准属性会让 ::-webkit-scrollbar 失效，落成约 11px 的 thin 条
-   （第六十五轮实测口径，同 hydraulic-calc.css 头注）；下面是全局兜底规则，
-   各容器自己的 webkit 细条规则（选择器更具体）不受影响。 */
-*::-webkit-scrollbar{width:5px;height:5px}
-*::-webkit-scrollbar-track{background:transparent}
-*::-webkit-scrollbar-corner{background:transparent}
-*::-webkit-scrollbar-thumb{background:rgba(188,211,198,.25);}
-*::-webkit-scrollbar-thumb:hover{background:#9db4a8}
+   （第六十五轮实测口径，同 hydraulic-calc.css 头注）。
+   [v533] 原此处还有一份 `*::-webkit-scrollbar{width:5px;…}` 全局兜底 —— 已删：
+   runye-theme.css（:head 内、本文件之后加载）用 `*::-webkit-scrollbar{width:var(--ry-scroll-w)}`
+   把它整条压掉，实测通用滚动条恒为 4px（不是 5px）+ 圆角 999px，即这四个声明从未生效。
+   **全站滚动条唯一出处 = runye-theme.css（--ry-scroll-* 令牌），禁止再写 `*::` 版本。**
+   下面这两个容器（.pp-side / .ry-cad-grps）保留本文件自己的 5px 绿色细条：
+   它们的选择器比 `*` 更具体，是**真在生效**的例外，不属于副本。 */
 #ryCadSide .ry-cad-grps::-webkit-scrollbar, .pp-side::-webkit-scrollbar{width:5px;height:5px}
 #ryCadSide .ry-cad-grps::-webkit-scrollbar-track, .pp-side::-webkit-scrollbar-track{background:transparent}
 #ryCadSide .ry-cad-grps::-webkit-scrollbar-thumb, .pp-side::-webkit-scrollbar-thumb{background:rgba(188,211,198,.25);}
@@ -3004,7 +3004,7 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.pp-grip-side,
 <!-- ===== 设置（2026-09-27 用户要求）：顶栏齿轮打开，收纳「可调节的数据」=====
      参考 AutoCAD 的 Options：左侧分类 + 右侧参数 + 底部「恢复本页默认 / 取消 / 保存」。
      模块自包含：只读写既有 localStorage 键；window.RyDimGeo 供三级/二级渲染读取标注几何细项。 -->
-<link rel="stylesheet" href="mod/style-05.css?v=529-single-source">
+<link rel="stylesheet" href="mod/style-05.css?v=533-scrollbar-single-source">
 <div id="rySetMask"></div>
 <div id="rySetModal" role="dialog" aria-modal="true" aria-label="设置">
   <div class="rs-head">
