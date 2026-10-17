@@ -550,3 +550,54 @@
 * ⚠ 探针等待从 6s 提到 10s：并行批次新增 core 脚本后页面加载变长，6s 时 inline-28 尚未执行 ⇒
   `RyPlanParams` 全红假象（诊断脚本 8s 正常才定位到）。另遇两次「并行会话正在写文件」的瞬态崩溃
   （探针/冒烟各一次），重跑即过——不是代码问题。
+
+## 14. v528-recipe-bar-no-label 方案条去掉「方案」二字（2026-10-17 · 已发布上线）
+
+* 用户截图圈注：方案条左侧「方案」二字标签取消（调用区只留 下拉 + 调用按钮）。
+* 落地：删 `#ppRecipeBar` 内 `<span class="pp-plan-label">方案</span>` 一行；CSS 不用改
+  （`.pp-recipe-row > .pp-plan-label{flex:none}` 无匹配即失效）。
+* commit `c578a23`；探针 29/29（新增 labelGone 断言）；线上冒烟 15/15。
+
+## 15. v529-panel-single-source 地块分区左栏样式收敛单一出处（2026-10-17 · 已发布上线）
+
+用户要求：「这个面板样式是否存在多层覆盖，要简化代码」。审计结论 + 处置：
+
+### 审计（无头 `getComputedStyle` + 遍历 `document.styleSheets` 枚举命中规则）
+1. **真·双副本（本轮删掉的那份）**：`index.html` 内联 `<style>` 里有一整块
+   `#ryCadSide [data-pp="pipePlanSection"] .pp-side …` 共 **42 条规则 / 146 行**，与
+   `mod/ry-panel.css` 的 `#pipePlanSection .pp-side …` **逐行相同（仅前缀不同）**。
+   成因：`mod/ry-cad-toolbar.js` 把 `#ppSide` **原节点搬进** `#ryCadSide`，搬走后
+   `#pipePlanSection .pp-side` 不再匹配 ⇒ 当时复制了一份换前缀顶上。两份各自维护，改一处必漏一处。
+2. **两条全局 `!important` 把所有控件字号/圆角锁死**：
+   `runye-typography.css:108` `input/select/button:where(:not(.topbar *)){font-size:13px!important}`、
+   `style-01.css:3450` `body,body *,body *::before,body *::after{border-radius:0!important}`。
+   ⇒ 面板里写的 `font-size:11/12px`、`border-radius:6px` 在 index 页**从来没生效过**
+   （实测 computed 13px / 0px）；行内 style 写 11px/6px 也一样死。只在没加载这两张表的
+   样板页（`ryp-demo.html`）里有效。
+3. **设置弹窗「灌溉方案」区裸奔**：`mod/style-05.css` 只覆盖了 `input[type=number]` 与 `.rs-cell input`，
+   方案名称框（text）与已存方案下拉（select）落到浏览器原生 `2px inset` 边框 + 0 padding；
+   三个方案按钮是 JS 里写的长串行内 style（字号同样被压成 13px）。
+4. 另有一层**必需、未动**：`index.html` 的 `body.ry-tool #ryCadSide [data-pp] .pp-side{…!important}`
+   （搬入工具栏后整宽/去内边距/去滚动）与 `#ryCadSide … !important` 主题层——它们是「栏内适配」，
+   不与面板皮肤重复。
+
+### 处置
+* `mod/ry-panel.css` 成为面板皮肤**唯一出处**：块内 51 处选择器改成
+  `:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) …` 双位置形式
+  （特异性 = `:is()` 内最高的 `#ryCadSide [data-pp=…]`，与原两份完全相同），
+  加载顺序仍在 index.html 内联之后 ⇒ 渲染等价。
+* `index.html` 删除那 42 条 / 146 行副本；⚙ 参数设置按钮的行内 style 收成 `.ry-cad-set-btn`
+  （只声明真正生效的属性，字号/圆角不再写）；`ry-panel.css` / `style-05.css` / `inline-28.js`
+  的 `?v=` 一并抬到 `529-single-source`。
+* `mod/style-05.css` 补 `#rySetModal .rs-row input[type=text] / select`（1px #cbd5e1 边框、
+  4px 7px padding、focus 描边）与 `#ryRecipeStatus{min-height:14px}`；`inline-28.js` 三个按钮
+  改用既有 `.rs-btn`、两个控件去掉行内 style。
+* commit 见下；**验证 A/B 等价**：同一无头量测脚本跑「改前 / 改后」两版，
+  ① 区块内原位 ② 手工搬进 `#ryCadSide` 之后，两态 285 行 computed 输出**逐字节相同**；
+  ⚙ 按钮 computed 也逐项相同（13px/0px/2px 8px/边框 #c9d8d0）。设置页为**有意变化**：
+  名称框/下拉由 `2px inset` → `1px solid #cbd5e1` + padding 4px 7px，按钮统一 `.rs-btn`。
+* 回归：探针 29/29、`_smoke_publish` ALL PASS（含独立地图页，它也用 ry-panel.css）、
+  `ci_check_static` PASS=11、`node --test tests/*.test.cjs` 121/121。
+* ⚠ 探针/冒烟本轮又踩「加载未就绪」：并行会话把首屏拖到 >10s，`sleep(10000)` 不够 ⇒
+  两个脚本都改成**轮询就绪闸门**（`window.RyPlanParams && #ppRecipeApply`），reload 后同样要等；
+  否则前半段全红、后半段（页已加载完）却绿，极易误判成"代码坏了"。

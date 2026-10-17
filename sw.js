@@ -380,8 +380,13 @@
    v527-plan-params-live-tweak：撤销 v525 的面板只读（用户澄清：调用方案后需可在面板微调，
    改动实时重划分区；微调只改当前地块并自动记住，不回写已存方案）；
    v528-recipe-bar-no-label：方案条去掉「方案」二字标签（用户截图圈注），只留下拉+调用；
+   v529-panel-single-source：地块分区左栏样式收敛单一出处 —— 删掉 index.html 内联 style 里
+   与 mod/ry-panel.css 逐行重复的 44 条 .pp-side/.pp-plan-*/.pp-recipe-*/.pp-calc-formula 规则，
+   改指 :is(#pipePlanSection,#ryCadSide [data-pp="..."]) 双位置选择器（原位 + 搬入工具栏后）；
+   「⚙ 参数设置」按钮行内 style 收成 .ry-cad-set-btn；设置弹窗方案名称/已存方案补 text/select
+   规则（原为浏览器原生 2px 边框）、三个方案按钮改用既有 .rs-btn；三文件均在 CORE，必须抬版本；
    index.html 在 CORE，必须抬版本重建离线缓存。 */
-const VERSION = 'v528-recipe-bar-no-label';
+const VERSION = 'v529-panel-single-source';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

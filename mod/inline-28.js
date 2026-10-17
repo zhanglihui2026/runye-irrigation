@@ -271,12 +271,12 @@
     h += '<hr class="rs-sep">'
       + '<h4>灌溉方案</h4>'
       + '<p class="rs-note">把上面 10 项的<b>当前值</b>存成命名方案；地块分区页的「方案」下拉只负责调用。</p>'
-      + '<div class="rs-row"><label>方案名称</label><input type="text" id="ryRecipeName" maxlength="40" placeholder="如：海南七彩花生-0.8L-300" style="flex:1;min-width:0"></div>'
-      + '<div class="rs-row"><label></label><button type="button" data-ry-recipe="save" style="padding:5px 10px;border:1px solid #c9d8d0;border-radius:6px;background:#fff;color:#33604f;font-size:12px;cursor:pointer">💾 保存为方案（同名覆盖）</button></div>'
-      + '<div class="rs-row"><label>已存方案</label><select id="ryRecipeSelect" style="flex:1;min-width:0"><option value="">— 选择方案 —</option></select></div>'
-      + '<div class="rs-row"><label></label><button type="button" data-ry-recipe="rename" style="padding:5px 10px;border:1px solid #c9d8d0;border-radius:6px;background:#fff;color:#33604f;font-size:12px;cursor:pointer">✎ 改名为名称框文字</button></div>'
-      + '<div class="rs-row"><label></label><button type="button" data-ry-recipe="del" style="padding:5px 10px;border:1px solid #c9d8d0;border-radius:6px;background:#fff;color:#33604f;font-size:12px;cursor:pointer">🗑 删除选中方案</button></div>'
-      + '<p class="rs-note" id="ryRecipeStatus" role="status" style="min-height:14px"></p>';
+      + '<div class="rs-row"><label>方案名称</label><input type="text" id="ryRecipeName" maxlength="40" placeholder="如：海南七彩花生-0.8L-300"></div>'
+      + '<div class="rs-row"><label></label><button class="rs-btn" type="button" data-ry-recipe="save">💾 保存为方案（同名覆盖）</button></div>'
+      + '<div class="rs-row"><label>已存方案</label><select id="ryRecipeSelect"><option value="">— 选择方案 —</option></select></div>'
+      + '<div class="rs-row"><label></label><button class="rs-btn" type="button" data-ry-recipe="rename">✎ 改名为名称框文字</button></div>'
+      + '<div class="rs-row"><label></label><button class="rs-btn" type="button" data-ry-recipe="del">🗑 删除选中方案</button></div>'
+      + '<p class="rs-note" id="ryRecipeStatus" role="status"></p>';
     return h;
   }
   var RENDER = { price: htmlPrice, assum: htmlAssum, scale: htmlScale, geo: htmlGeo, eng: htmlEng, irrig: htmlIrrig };

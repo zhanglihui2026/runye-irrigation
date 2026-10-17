@@ -25,6 +25,14 @@
 #rySetModal .rs-unit{font-size:12px;color:#64748b}
 #rySetModal input[type=number]{width:96px;padding:4px 7px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;font-family:inherit}
 #rySetModal input[type=range]{width:220px}
+/* [v529] 「灌溉方案」名称框与已存方案下拉：此前只有 input[type=number] 有规则，
+   这两个落到浏览器原生的 2px inset 边框与 0 padding，和弹窗里其余控件明显不同。
+   字号不写：由 runye-typography.css 统一 13px !important（写 12px 也不生效）。 */
+#rySetModal .rs-row input[type=text],
+#rySetModal .rs-row select{flex:1 1 auto;min-width:0;width:auto;padding:4px 7px;
+  border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#0f172a;font-family:inherit}
+#rySetModal .rs-row input[type=text]:focus,
+#rySetModal .rs-row select:focus{outline:none;border-color:#0e7490;box-shadow:0 0 0 2px rgba(14,116,144,.15)}
 #rySetModal .rs-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 10px;margin:6px 0 14px}
 #rySetModal .rs-cell{display:flex;align-items:center;gap:5px}
 #rySetModal .rs-phi{width:38px;flex:0 0 38px;font-size:11.5px;color:#64748b;text-align:right}
@@ -36,6 +44,7 @@
 #rySetModal button.rs-btn.primary{background:#0e7490;border-color:#0e7490;color:#fff}
 #rySetModal button.rs-btn.primary:hover{background:#155e75}
 #rySetModal button.rs-btn.ghost{border-color:#e2e8f0;color:#64748b}
+#rySetModal #ryRecipeStatus{min-height:14px}
 #rySetModal .rs-badge{font-size:12px;color:#0e7490;font-weight:700;min-width:46px;display:inline-block}
 @media(max-width:560px){
   #rySetModal .rs-nav{width:110px;flex:0 0 110px}

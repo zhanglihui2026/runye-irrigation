@@ -347,7 +347,18 @@ body.ry-tool #designInput .ryp-body > .panel-foot { margin-top: auto; flex: 0 0 
    style-01.css 加载，同特异性规则以此处为准（含对 .pp-plan-bar 旧横向暗色
    样式与 ::before 伪元素分组标题的全宽替代）。
    ====================================================================== */
-#pipePlanSection .pp-side{
+/* [v529 样式单一出处] 本块此前在 index.html 内联 <style> 里另有一份逐行相同的副本
+   （前缀 #ryCadSide [data-pp="pipePlanSection"]），两份各自维护、改一处必漏另一处
+   （同一 UI 双副本的老坑）。现收敛为一份：同一规则用
+   :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) 同时命中
+   「区块内原位」与「被 mod/ry-cad-toolbar.js 搬进 #ryCadSide 之后」两个位置，
+   特异性与原来两份完全相同（取 :is() 里最高的 #ryCadSide [data-pp=...]），
+   index.html 中的副本已整体删除 —— 以后改面板皮肤只改本文件。
+   ⚠ 两条全局 !important 会压掉本块部分声明，别再往本块加回去：
+     · runye-typography.css → input / select / button 字号一律 13px !important
+     · style-01.css        → body *{border-radius:0!important} 全站圆角压平
+   （本块 input 的 12px 与各 6px 圆角只在未加载上述两个样式表的样板页生效。） */
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side{
   position:relative;
   display:flex;flex-direction:column;align-self:start;max-height:100%;
   overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
@@ -355,7 +366,7 @@ body.ry-tool #designInput .ryp-body > .panel-foot { margin-top: auto; flex: 0 0 
   font-family:var(--ry-font,"Microsoft YaHei","PingFang SC","Segoe UI",system-ui,sans-serif);
 }
 /* 主程序模式：沿用基础侧栏列布局与滚动，仅设置面板模式的间距和外观。 */
-body.ry-tool #pipePlanSection .pp-side{
+body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side{
   background:transparent;
   border:0;
   border-radius:0;
@@ -369,8 +380,8 @@ body.ry-tool #pipePlanSection{
   box-shadow:none;
 }
 /* [试验层 5] 去掉地块分区主工具栏的独立色带和底部分隔线。 */
-#pipePlanSection .pp-toolbar,
-body.ry-tool #pipePlanSection .pp-toolbar{
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-toolbar,
+body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-toolbar{
   background:transparent;
   border:0;
   box-shadow:none;
@@ -380,7 +391,7 @@ body.ry-tool #pipePlanSection .pp-toolbar{
    （暗色横条 + 旧浅色竖排卡片，含 input 64px!important 对抗源）已整体删除，
    本块成为该页参数栏唯一样式来源，故撤除全部对抗性 !important；
    无前缀全局 .pp-plan-bar（成组页/土地流转页基础样式）特异性 (0,1,0) 低于本块，无竞争。 —— */
-#pipePlanSection .pp-side .pp-plan-bar{
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-bar{
   display:block;margin:0;padding:0;
   min-height:0;
   border:0;border-radius:0;box-shadow:none;
@@ -388,36 +399,36 @@ body.ry-tool #pipePlanSection .pp-toolbar{
   font-size:11px;
 }
 /* 关闭旧横向参数条遗留的 ::before 伪标题，避免旧分组标题重新出现。 */
-#pipePlanSection .pp-side .pp-plan-bar::before,
-#pipePlanSection .pp-side .pp-plan-bar-result::before,
-#tlPipePlanSection .pp-side .pp-plan-bar::before,
-#tlPipePlanSection .pp-side .pp-plan-bar-result::before{
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-bar::before,
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-bar-result::before,
+:is(#tlPipePlanSection,#ryCadSide [data-pp="tlPipePlanSection"]) .pp-side .pp-plan-bar::before,
+:is(#tlPipePlanSection,#ryCadSide [data-pp="tlPipePlanSection"]) .pp-side .pp-plan-bar-result::before{
   content:none!important;
   display:none!important;
 }
 /* [试验层 6] 参数组不再各自呈卡片；必须放在基础皮肤之后才能生效。 */
 /* —— 键值行：标签左、控件右，紧凑 27px 行距 —— */
-#pipePlanSection .pp-side .pp-plan-item{
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-item{
   display:flex;align-items:center;gap:5px;
   width:100%;min-height:27px;padding:2px 12px;
   border-bottom:1px solid transparent;
   color:var(--ry-s-500,#64748b);font-size:11px;
 }
-#pipePlanSection .pp-side .pp-plan-item:last-of-type{ border-bottom:0; }
-#pipePlanSection .pp-side .pp-plan-item > .pp-plan-label:first-child{ margin-right:auto; }
-#pipePlanSection .pp-side .pp-plan-item-fluid-input{
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-item:last-of-type{ border-bottom:0; }
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-item > .pp-plan-label:first-child{ margin-right:auto; }
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-item-fluid-input{
   display:flex;align-items:center;gap:5px;
 }
-#pipePlanSection .pp-side .pp-plan-item-fluid-input > .pp-plan-label:first-child{flex:0 0 84px;margin-right:0;min-width:0}
-#pipePlanSection .pp-side .pp-plan-label{ font-size:12px;line-height:1.3;color:var(--ry-s-600,#475569); }
-#pipePlanSection .pp-side .pp-plan-val{
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-item-fluid-input > .pp-plan-label:first-child{flex:0 0 84px;margin-right:0;min-width:0}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-label{ font-size:12px;line-height:1.3;color:var(--ry-s-600,#475569); }
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-val{
   font-size:12px;font-weight:600;color:var(--ry-s-800,#1e293b);
   font-variant-numeric:tabular-nums;
 }
 /* 原生输入（Shoelace 不可用时的离线回退）：浅色紧凑 24px，右对齐数值。
    [v436] 撤除 !important：64px 对抗源已删；color 一项由 index.html :736 的
    统一 token 规则（--u-ink）接管，与本块深色文字同向，无视觉冲突。 */
-#pipePlanSection .pp-side .pp-plan-item input{
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-item input{
   flex:0 0 64px;width:64px;height:24px;padding:2px 7px;box-sizing:border-box;
   border:1px solid transparent;border-radius:6px;
   background:transparent;color:var(--ry-s-800,#1e293b);
@@ -425,63 +436,63 @@ body.ry-tool #pipePlanSection .pp-toolbar{
   text-align:right;outline:none;
   -moz-appearance:textfield;
 }
-#pipePlanSection .pp-side .pp-plan-item input:focus{
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-item input:focus{
   border-color:#173e32;
   box-shadow:0 0 0 2px rgba(23,62,50,.15);
 }
-#pipePlanSection .pp-side .pp-plan-item input[hidden],
-#pipePlanSection .pp-side sl-input[data-ry-proxy-for][hidden]{ display:none!important; }
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-item input[hidden],
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side sl-input[data-ry-proxy-for][hidden]{ display:none!important; }
 /* ===== [v491 2026-10-16] 灌溉配方库行（#ppRecipeBar）：保存/调用第 1 行 10 项参数组。
    皮肤对齐本面板基准：控件高 24px、圆角 6px、字号 11-12px、品牌绿 #173e32。
    逻辑出处 = mod/plot-editor.js ppRecipeFlow；撤功能时同步删本段。 ===== */
-#pipePlanSection .pp-side .pp-recipe-bar{
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-bar{
   display:flex;flex-direction:column;gap:2px;
   padding:4px 0 6px;margin-bottom:8px;
 }
-#pipePlanSection .pp-side .pp-recipe-row{
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-row{
   display:flex;align-items:center;gap:5px;
   min-height:27px;padding:2px 12px;
 }
 /* [v493 用户要求] 标签不再占 84px 基准列（「方案」两字紧凑排），
    名称框 flex:1 1 auto 从标签右侧一直撑到保存按钮，最大化输入空间。 */
-#pipePlanSection .pp-side .pp-recipe-row > .pp-plan-label{ flex:none; }
-#pipePlanSection .pp-side .pp-recipe-row input[type=text],
-#pipePlanSection .pp-side .pp-recipe-row select{
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-row > .pp-plan-label{ flex:none; }
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-row input[type=text],
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-row select{
   flex:1 1 auto;min-width:0;width:auto;height:24px;padding:2px 7px;box-sizing:border-box;
   border:1px solid var(--ry-s-200,#e2e8f0);border-radius:6px;
   background:#fff;color:var(--ry-s-800,#1e293b);
   font-family:inherit;font-size:12px;outline:none;
 }
-#pipePlanSection .pp-side .pp-recipe-row input[type=text]:focus,
-#pipePlanSection .pp-side .pp-recipe-row select:focus{
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-row input[type=text]:focus,
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-row select:focus{
   border-color:#173e32;box-shadow:0 0 0 2px rgba(23,62,50,.15);
 }
-#pipePlanSection .pp-side .pp-recipe-btn{
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-btn{
   flex:none;height:24px;padding:0 8px;box-sizing:border-box;
   border:1px solid var(--ry-s-200,#e2e8f0);border-radius:6px;
   background:#fff;color:var(--ry-s-700,#334155);
   font-family:inherit;font-size:11px;font-weight:600;line-height:1;
   cursor:pointer;white-space:nowrap;
 }
-#pipePlanSection .pp-side .pp-recipe-btn:hover{
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-btn:hover{
   border-color:#173e32;color:#14532d;background:var(--ry-green-50,#f0fdf4);
 }
-#pipePlanSection .pp-side .pp-recipe-btn-primary{
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-btn-primary{
   border-color:#173e32;background:#173e32;color:#fff;
 }
-#pipePlanSection .pp-side .pp-recipe-btn-primary:hover{
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-btn-primary:hover{
   background:#14532d;color:#fff;
 }
-#pipePlanSection .pp-side .pp-recipe-btn-danger:hover{
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-btn-danger:hover{
   border-color:var(--ry-danger,#dc2626);color:#dc2626;background:#fef2f2;
 }
-#pipePlanSection .pp-side .pp-recipe-status{
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-status{
   display:block;min-height:14px;padding:0 12px;
   font-size:10px;line-height:1.4;color:var(--ry-s-500,#64748b);
 }
-#pipePlanSection .pp-side .pp-recipe-status.pp-recipe-err{ color:#dc2626; }
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-status.pp-recipe-err{ color:#dc2626; }
 /* Shoelace 代理输入：与原生回退同尺寸，主色走品牌深墨绿 */
-#pipePlanSection .pp-side sl-input[data-ry-proxy-for]{
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side sl-input[data-ry-proxy-for]{
   display:block;flex:0 0 64px;width:64px;min-width:64px;max-width:64px;
   --sl-input-height-small:24px;
   --sl-input-font-size-small:12px;
@@ -492,36 +503,36 @@ body.ry-tool #pipePlanSection .pp-toolbar{
   --sl-input-border-color-focus:#173e32;
   --sl-input-color:var(--ry-s-800,#1e293b);
 }
-#pipePlanSection .pp-side .pp-plan-item-fluid-input > .pp-plan-unit{flex:0 0 auto;white-space:nowrap}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-item-fluid-input > .pp-plan-unit{flex:0 0 auto;white-space:nowrap}
 /* 控件默认融入面板，聚焦时由上方 focus 规则显示边界。 */
-#pipePlanSection .pp-side .pp-sep-vert{ display:none; }
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-sep-vert{ display:none; }
 /* —— 扬程算式区（#ppCalcDetail.pp-calc-formula）：唯一由主参数面板管理。
    配色沿用原深色算式条，只在本面板内应用，避免全局规则参与叠加。 —— */
-#pipePlanSection .pp-side .pp-calc-formula{
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-calc-formula{
   margin:0;padding:6px 9px;
   background:rgba(15,23,42,.90);border:1px solid var(--u-line-2);border-radius:6px;
   font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   font-size:11px;line-height:1.5;color:#e8eef7;
   white-space:normal;overflow:visible;
 }
-#pipePlanSection .pp-side .pp-calc-formula .pp-cf-name{color:#86efac;font-weight:700;margin-right:4px}
-#pipePlanSection .pp-side .pp-calc-formula .pp-cf-num{color:#fde68a;font-weight:600;padding:0 1px}
-#pipePlanSection .pp-side .pp-calc-formula .pp-cf-op{color:#cbd5e1;padding:0 1px}
-#pipePlanSection .pp-side .pp-calc-formula .pp-cf-eq{color:#e2e8f0;padding:0 1px;font-weight:600}
-#pipePlanSection .pp-side .pp-calc-formula .pp-cf-final{color:#a7f3d0;font-weight:700;background:rgba(134,239,172,.14);padding:1px 4px;border-radius:3px;margin-left:1px}
-#pipePlanSection .pp-side .pp-calc-formula .pp-cf-line,
-#pipePlanSection .pp-side .pp-calc-formula .pp-cf-line-h{display:block;white-space:normal;overflow:visible;padding-right:2px}
-#pipePlanSection .pp-side .pp-calc-formula .pp-cf-line{display:inline;white-space:normal}
-#pipePlanSection .pp-side .pp-calc-formula .pp-cf-input{
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-calc-formula .pp-cf-name{color:#86efac;font-weight:700;margin-right:4px}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-calc-formula .pp-cf-num{color:#fde68a;font-weight:600;padding:0 1px}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-calc-formula .pp-cf-op{color:#cbd5e1;padding:0 1px}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-calc-formula .pp-cf-eq{color:#e2e8f0;padding:0 1px;font-weight:600}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-calc-formula .pp-cf-final{color:#a7f3d0;font-weight:700;background:rgba(134,239,172,.14);padding:1px 4px;border-radius:3px;margin-left:1px}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-calc-formula .pp-cf-line,
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-calc-formula .pp-cf-line-h{display:block;white-space:normal;overflow:visible;padding-right:2px}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-calc-formula .pp-cf-line{display:inline;white-space:normal}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-calc-formula .pp-cf-input{
   background:rgba(253,230,138,.10);color:#fde68a;font-weight:600;
   border:0;border-bottom:1px dashed rgba(253,230,138,.5);padding:0 2px;margin:0;
   width:40px;height:16px;font-family:inherit;font-size:11px;text-align:center;border-radius:2px;
   -moz-appearance:textfield;
 }
-#pipePlanSection .pp-side .pp-calc-formula .pp-cf-input::-webkit-outer-spin-button,
-#pipePlanSection .pp-side .pp-calc-formula .pp-cf-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
-#pipePlanSection .pp-side .pp-calc-formula .pp-cf-input:focus{outline:none;background:rgba(253,230,138,.22);border-bottom:1px solid #fde68a}
-#pipePlanSection .pp-side .pp-calc-formula .pp-cf-note{color:#f2d98c;font-size:11.5px;font-weight:500;margin:0 1px;letter-spacing:0}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-calc-formula .pp-cf-input::-webkit-outer-spin-button,
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-calc-formula .pp-cf-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-calc-formula .pp-cf-input:focus{outline:none;background:rgba(253,230,138,.22);border-bottom:1px solid #fde68a}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-calc-formula .pp-cf-note{color:#f2d98c;font-size:11.5px;font-weight:500;margin:0 1px;letter-spacing:0}
 /* CAD 主面板中的扬程算式占满侧栏内容宽度，并在窄栏内自然换行。 */
 #ryCadSide [data-pp="pipePlanSection"] .pp-side #ppCalcDetail{
   box-sizing:border-box;width:100%;max-width:100%;margin:8px 0 12px;
