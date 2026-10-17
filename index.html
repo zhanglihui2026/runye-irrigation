@@ -16,7 +16,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>润野灌溉设计优化版｜滴灌管径与水泵选型</title>
 <meta name="description" content="输入地块、滴灌带与水源参数，快速计算灌溉分区、主管支管管径和水泵工作点。"/>
-<link rel="stylesheet" href="mod/style-01.css?v=538-toolbar-font-11">
+<link rel="stylesheet" href="mod/style-01.css?v=539-toolbar-font-unify">
 <link rel="stylesheet" href="runye-inverse-design.css?v=277">
 <script defer src="runye-inverse-design.js?v=437"></script>
 <link rel="stylesheet" href="runye-terrain.css?v=454-terrain-sidebar-peer">
@@ -449,7 +449,7 @@ body.ry-tool #ryCadSide [data-pp="pipePlanSection"][data-ry-view="edit"] .ry-pan
 #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-item:last-of-type{border-bottom:0}
 #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-item>.pp-plan-label:first-child{margin-right:auto}
 #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-label{font-size:11px;line-height:1.25;white-space:nowrap}
-#ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-val{font-size:11px;font-weight:400;color:#1a1a1a}
+#ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-val{font-size:11px;font-weight:600;color:#1a1a1a}
 #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-btn-ghost{color:#333;border-color:#ccc;background:#f8f9fa}
 #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-item input{
   width:64px!important;height:24px;padding:2px 6px;
@@ -1889,13 +1889,13 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.pp-grip-side,
        用户把想要的管径都改好后，点这里「最终确认」，才把图面管径折算成三档覆盖值
        参与 computeThreeLevel 的沿程损失重算 → 水泵扬程/功率随之更新。
        这样"改不同管径 → 看扬程与功率 → 挑最经济组合"是可反复试算的闭环。 -->
-  <div id="tlPumpUpdateBox" style="display:none;margin-top:10px;padding:9px 11px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);font:11.5px/1.6 system-ui,-apple-system,'Segoe UI',sans-serif;color:#1f2937;text-align:left">
+  <div id="tlPumpUpdateBox" style="display:none;margin-top:10px;padding:9px 11px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);font:11px/1.6 system-ui,-apple-system,'Segoe UI',sans-serif;color:#1f2937;text-align:left">
     <div style="font-weight:700;color:#0f172a;margin-bottom:2px">管径调整 · 扬程确认</div>
-    <div style="font-size:10.5px;line-height:1.5;color:#64748b;margin-bottom:6px" id="tlPumpUpdateNote">图面改管径只作标注，点下方按钮按当前管径重算扬程</div>
-    <button type="button" id="tlPumpUpdateBtn" class="pp-btn-generate" style="width:100%;padding:5px 8px;font-size:12px" title="把图面上改过的管径折算成总管/主管/支管代表管径（按长度加权），参与沿程损失重算；反复改不同管径再点此按钮，即可比较水泵扬程与功率，挑出最经济合理的管径组合">⇧ 更新水泵扬程</button>
-    <div id="tlPumpUpdateDelta" style="display:none;font-size:10.5px;line-height:1.55;color:#475569;margin-top:6px"></div>
+    <div style="line-height:1.5;color:#64748b;margin-bottom:6px" id="tlPumpUpdateNote">图面改管径只作标注，点下方按钮按当前管径重算扬程</div>
+    <button type="button" id="tlPumpUpdateBtn" class="pp-btn-generate" style="width:100%;padding:5px 8px" title="把图面上改过的管径折算成总管/主管/支管代表管径（按长度加权），参与沿程损失重算；反复改不同管径再点此按钮，即可比较水泵扬程与功率，挑出最经济合理的管径组合">⇧ 更新水泵扬程</button>
+    <div id="tlPumpUpdateDelta" style="display:none;line-height:1.55;color:#475569;margin-top:6px"></div>
   </div>
-  <div id="tlLossCard" style="display:none;position:relative;margin-top:12px;padding:9px 11px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);font:11.5px/1.6 system-ui,-apple-system,'Segoe UI',sans-serif;color:#1f2937;text-align:left"></div>
+  <div id="tlLossCard" style="display:none;position:relative;margin-top:12px;padding:9px 11px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);font:11px/1.6 system-ui,-apple-system,'Segoe UI',sans-serif;color:#1f2937;text-align:left"></div>
   <!-- 主操作按钮（2026-09-13 三按钮横排；2026-09-14 晚生成系统图按钮已取消，仅留生成管线图；系统图走视口切换自动渲染）
        2026-09-16 第三十七轮：按钮行下移到左栏最底部；
        2026-09-17 第四十三轮：按用户要求整体移到右侧工具栏最底部（#tlWsToolbar 内末尾），左栏不再保留该入口，避免与右栏顶部旧入口重复 -->

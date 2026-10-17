@@ -92,7 +92,7 @@ const r0 = await ev(`(async function(){
              return t.indexOf('h1:where(:not(.topbar *)):not(:where(.t-top *, .result-head *))') > 0;
            }) };
 })()`);
-chk('线上 sw.js = v538（沿革含 v521~v537）', r0.swVer === 'v538-toolbar-font-11', r0.swVer);
+chk('线上 sw.js = v539（沿革含 v521~v538）', r0.swVer === 'v539-toolbar-font-unify', r0.swVer);
 chk('线上 inline-28.js?v=529 200', r0.i28Status === 200, r0.i28Status);
 chk('线上 DOM：组标题「⚙ 参数设置」按钮在', r0.grpSet === true, r0.grpSet);
 chk('线上 DOM：设置弹窗「灌溉参数」页签在', r0.navIrrig === true, r0.navIrrig);
@@ -103,7 +103,7 @@ chk('线上 [v529] ry-panel.css 200 且已用 :is() 双位置选择器', r0.rpSt
 chk('线上 [v529] ⚙ 按钮走 .ry-cad-set-btn 且无行内 style', r0.gearCls === 'ry-cad-set-btn|', r0.gearCls);
 chk('线上 [v529] 内联重复面板样式块已删干净', r0.idxDup === true, r0.idxDup);
 /* [v530] 四项落地的线上断言 */
-chk('线上 [v538] style-01.css 引用已抬到 ?v=538-toolbar-font-11', /style-01\.css\?v=538-toolbar-font-11/.test(r0.s1Status || ''), r0.s1Status);
+chk('线上 [v538] style-01.css 引用已抬到 ?v=539-toolbar-font-unify', /style-01\.css\?v=539-toolbar-font-unify/.test(r0.s1Status || ''), r0.s1Status);
 chk('线上 [v530] style-01 已无「无效圆角」声明（不带 !important 且非 50%）', r0.s1Dead === 0, r0.s1Dead);
 chk('线上 [v530] ry-panel.css --ry-panel-head-h 只剩一处定义', (r0.rpHeadH || '').split('|').length === 1, r0.rpHeadH);
 chk('线上 [v530] typography 的裸 h1 已排除 .t-top/.result-head', r0.typoLive === true, r0.typoLive);

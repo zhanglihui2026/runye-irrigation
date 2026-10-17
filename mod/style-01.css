@@ -2916,7 +2916,17 @@ body > .ry-nav .main-header{display:none!important}
 #tlPipePlanSection .pp-side .pp-plan-item:last-of-type{border-bottom:0}
 #tlPipePlanSection .pp-side .pp-plan-item>.pp-plan-label:first-child{margin-right:auto}
 #tlPipePlanSection .pp-side .pp-plan-label{font-size:11px;line-height:1.25;white-space:nowrap}
-#tlPipePlanSection .pp-side .pp-plan-val{font-size:11px;font-weight:400;color:#1a1a1a}
+/* [v539] 字重拉齐（与二级地块工具栏同口径）：设计值 600、实际值 700、标签 400、列头 600。
+   原来三级设计值是 400，同一语义（计算结果数值）在两级里粗细不同。
+   ⚠ 必须挂 .tl-plan-result（结果栏专属类）：rail 态 #tlSide 被 mod/ry-cad-toolbar.js 搬进
+   #ryCadSide，下面那条 `#tlPipePlanSection .pp-side .pp-plan-val` 的祖先链断裂 ——
+   实测它**从未生效过**（三级 .pp-plan-val 一直是继承来的 400）。两处都写，原位/搬移态一致。 */
+.tl-plan-result .pp-plan-val{font-weight:600}
+#tlPipePlanSection .pp-side .pp-plan-val{font-size:11px;font-weight:600;color:#1a1a1a}
+/* [v539] 「⇧ 更新水泵扬程」：inline 字号已删（改由本条统管）。必须 !important ——
+   runye-typography 的 `button{font-size:13px!important}` 会把 inline 值顶成 13px（实测）。
+   所在卡片 #tlPumpUpdateBox 的 font 简写也已从 11.5px 统一到 11px。 */
+#tlPumpUpdateBtn{font-size:11px!important}
 /* v107（2026-09-22 用户要求）：水力计算结果三列化 ——
    ① 原 .pp-plan-label{margin-right:auto} 把数值推到面板最右（标签与数值间大空白）；
       结果栏（#tlPlanBar2）内改为紧跟标签（数据左移），右侧留出固定的「实际」列。

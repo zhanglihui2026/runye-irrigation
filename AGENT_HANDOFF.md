@@ -921,3 +921,57 @@ modeling/ digital-agriculture/` 的 .css/.html，凡 `*::-webkit-scrollbar` 开�
 `ci_check_static` PASS=15 FAIL=0（含 ⑥ 面板漂移闸门：本轮改的都是带 `:is(#pipePlanSection,…)` 前缀的
 规则或 `.tl-plan-result` 类规则，内联副本里没有同属性的 font-size，故无新增漂移）；
 `node --test` 122/122；`_repro_v520_planparams` 29/29；`_smoke_publish` ALL PASS。
+
+---
+
+## 22. v539-toolbar-font-unify 工具栏统一收尾（卡片三档归一 + 字重拉齐）
+
+### 「三档自相矛盾」到底是什么
+上一轮我回退 `#tlPumpUpdateBtn` 的理由是「卡片内部会变成 11.5/10.5/11」。
+根因不是代码互相干扰，而是**逐处 inline 写死三个值**：
+
+| 位置 | 改前写法 | 实际渲染 |
+|---|---|---|
+| 卡片本体 `#tlPumpUpdateBox` | `font:11.5px/1.6 …`（简写，标题继承） | 标题 **11.5px** |
+| 说明 `#tlPumpUpdateNote` | inline `font-size:10.5px` | **10.5px** |
+| 按钮 `#tlPumpUpdateBtn` | inline `font-size:12px` | **13px**（被全站 `button{13px!important}` 顶掉） |
+
+所以只改按钮 ⇒ 11.5 / 10.5 / 11，比原来更乱。**正解是把三处一起改（用户说的「重写统一」）**。
+
+### 改动
+1. 两张白底卡片的 `font` 简写 **11.5px → 11px**（`#tlPumpUpdateBox` + `#tlLossCard`）
+2. 说明行 / delta 行**删掉 inline `font-size`**，改为继承卡片（11px）
+3. 按钮**删掉 inline `font-size:12px`**，字号归 CSS：`#tlPumpUpdateBtn{font-size:11px!important}`
+   —— 必须 `!important`，inline 不带 `!important` 反压不了全站的 `button{13px!important}`
+4. **字重拉齐**：设计值 600（二级原本就是 600，三级从 400 提上来）、实际值 `.pp-plan-val-real` 700、
+   列头 600、标签 400
+
+### ⚠ 又一个「双副本」实例（v532 定论再次应验）
+三级 `.pp-plan-val` 的 400 来自 **`index.html:452` 的 rail 内联副本**
+`#ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-val{font-weight:400}`，
+特异性 (1,3,0)，压过 style-01.css 里我新加的 `.tl-plan-result .pp-plan-val` (0,2,0)。
+**只改 CSS 那一处，字重不会变**。必须两处同步 —— 漂移闸门（ci ⑥）正是为此存在。
+
+顺带查明：`#tlPipePlanSection .pp-side .pp-plan-val{font-weight:400}` 这条**从未生效过**
+（rail 态 `#tlSide` 被搬进 `#ryCadSide`，`#tlPipePlanSection` 祖先不存在；三级 val 一直是继承来的 400）。
+所以三级左栏里凡是「以为在管、其实没管」的规则，都要按这个思路复查一遍：**挂 section 前缀的一律可疑**。
+
+### 实测（卡片可见态，`_probe_card_font.mjs` 先切视图再强制显示）
+| 元素 | 改前 | 改后 |
+|---|---|---|
+| 卡片本体 | 11.5/400 | **11/400** |
+| 标题「管径调整 · 扬程确认」 | 11.5/700 | **11/700** |
+| 说明「图面改管径只作标注…」 | 10.5/400 | **11/400** |
+| 按钮「⇧ 更新水泵扬程」 | 13/600 | **11/600** |
+
+全量分布（`_probe_toolbar_typo.mjs`，含隐藏元素）：
+* 二级：11px 全部，label/unit 400、val 600、select/button 600
+* 三级：11px 全部，label/区按钮 400、列头 600、设计值 600、实际值 700、按钮 600
+* 全页默认视图 186 元素 × 37 属性 **0 差异**
+
+### 未动
+`#tlPpHint`（14px「📋 请先在面积测量工具中描绘并闭合边界」，空态引导提示，非工具栏文字）、
+`#ppCalcDetail`（黑底扬程计算式条，用户已确认保留 10~11.5px 层次）。
+
+### 验证
+`ci_check_static` PASS=16、面板漂移闸门 ✓、`node --test` 122/122、`_smoke_publish` ALL PASS。

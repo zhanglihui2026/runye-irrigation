@@ -595,6 +595,21 @@ function rypDraggable(rootEl){ /* 实现 */ }
 
 量测脚本：`_probe_toolbar_typo.mjs`（按 fontSize/fontWeight 分组的分布表，含隐藏元素与输入框自身字号）。
 
+#### v539 补充（用户追认「要统一就重写」）
+
+1. **字号：11px 到底，含两张白底卡片。** `#tlPumpUpdateBox`（管径调整）/ `#tlLossCard`（水头损失）
+   原来是 `font:11.5px/1.6` 简写 + 内部逐处 inline（说明 10.5、按钮 12）。现统一：卡片简写 11px，
+   内部**删掉所有 inline font-size 改为继承**，按钮字号归 CSS `#tlPumpUpdateBtn{font-size:11px!important}`。
+   ⇒ **新增卡片一律在卡片本体设一次 `font:11px/1.6 …`，内部不要再写 font-size。**
+2. **字重口径（两级一致）**：标签 400 · 列头 600 · 设计值 600 · 实际值 700 · 按钮与下拉 600。
+3. **改三级左栏任何属性，先查 rail 内联副本。** `index.html` 里那批
+   `#ryCadSide [data-pp="tlPipePlanSection"] …` 特异性 (1,3,0)，会压过 `mod/style-01.css` 里的
+   `.tl-plan-result …` (0,2,0)。只改一处 = 白改（v539 第一次就栽在这里）。
+4. **`#tlPipePlanSection .pp-side …` 前缀的规则一律可疑**：rail 态祖先不存在，它从未生效过。
+   新增/修正规则请挂 `.tl-plan-result` 或 ID；`ci_check_static` ⑥ 只查"两处值是否一致"，
+   查不出"这条规则压根不匹配"。
+
+
 ***
 
 *规范 v1・依据 runye-irrigation 真实结构归纳・2026-10-14 起按 `#ryAnglePanel` 与主页面参数面板试点落地；当前仅共用折叠和悬浮拖动，侧栏宽度拖拽未启用*

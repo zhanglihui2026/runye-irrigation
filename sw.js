@@ -468,8 +468,25 @@
    （15.6→14.3），行高由 24px 输入框撑着，整体布局不变。
    ⚠ 三级那条必须挂 .tl-plan-result（结果栏专属类）：rail 态 #tlSide 被搬进 #ryCadSide，
    `#tlPipePlanSection .pp-side …` 祖先链断裂（v109 老坑）。
-   index.html / mod/ry-panel.css / mod/style-01.css 均在 CORE，必须抬版本。 */
-const VERSION = 'v538-toolbar-font-11';
+   index.html / mod/ry-panel.css / mod/style-01.css 均在 CORE，必须抬版本。
+ * v539 工具栏统一收尾：卡片三档 inline 字号归一 + 字重拉齐：
+   ① v537 那轮曾发现「#tlPumpUpdateBox 里 11.5/10.5/12 三档」——根因是**逐处 inline 写死**：
+      卡片本体 `font:11.5px/1.6 …`（简写，标题继承）、说明 inline 10.5px、按钮 inline 12px
+      （被 runye-typography 的 button 13px !important 顶成 13px）。只改按钮会让三档变
+      11.5/10.5/11，比原来更乱 ⇒ 当时回退。本次按用户要求「重写统一」：卡片 font 简写 11.5→11、
+      说明与 delta 行**删掉 inline font-size 继承卡片**、按钮 inline 字号也删掉改由 CSS 统管
+      `#tlPumpUpdateBtn{font-size:11px!important}`（inline 不带 !important 反压不了全站 13px）。
+      `#tlLossCard` 的 font 简写同样 11.5→11。实测卡片可见态：11 / 11 / 11 / 11（改前 11.5/11.5/10.5/13）。
+   ② 字重拉齐（用户要求）：同一语义在两级粗细不同 —— 三级设计值 `.pp-plan-val` 一直是 400
+      （它那条 `#tlPipePlanSection .pp-side .pp-plan-val{font-weight:400}` **从未生效过**：
+      rail 态 #tlSide 被搬进 #ryCadSide，祖先链断裂）。现改为：设计值 600（与二级一致）、
+      实际值 `.pp-plan-val-real` 700、列头 600、标签 400。
+      ⚠ 必须同步 index.html:452 的 rail 内联副本（`#ryCadSide [data-pp="tlPipePlanSection"]
+      .pp-side .pp-plan-val`，特异性 (1,3,0) 压过 `.tl-plan-result .pp-plan-val` (0,2,0)）——
+      这就是 v532「双副本不许合并、只许防漂移」的原因，改字重时只改一处必然被内联副本压住。
+   未动：`#tlPpHint`（14px 空态引导提示，非工具栏文字）、黑底计算式条 #ppCalcDetail。
+   index.html / mod/style-01.css / sw.js 均在 CORE，必须抬版本。 */
+const VERSION = 'v539-toolbar-font-unify';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
