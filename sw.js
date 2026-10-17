@@ -534,8 +534,10 @@
    index.html / mod/ry-panel.css / mod/ry-panel.js / mod/style-01.css / mod/inline-27.js /
    mod/inline-30.js / mod/plot-editor.js / mod/online-map.css / runye-ai-plan.js /
    runye-ai-plan.css / runye-map-enhance.js / runye-map-measure.html 均在 CORE，必须抬版本。
-  * v544b-rect-clamp 修复：地块分区快捷条「藏在里面了，拖不出来了」（用户截图 + 线上实测）。
-   根因两层：
+  * v545-rect-clamp 修复：地块分区快捷条「藏在里面了，拖不出来了」（用户截图 + 线上实测）。
+   注：本版首次提交（3131fdc）曾用串 v544b-rect-clamp，与 _smoke_v521_live.mjs 的
+   `/^v\d{3}-[a-z0-9-]+$/` 断言不兼容（字母后缀）⇒ 改回仓库一贯的 vNNN-kebab 形态。
+   根因三层：
    ① .pp-canvas-wrap 一直没有 position:relative —— #ppHint / #ppQuickBar 两个 absolute 浮层
      实际相对 MAIN 定位（实测 offsetParent=MAIN，CSS left:10px 落在画布左外 272px）。
      成组管路页 #grPipeSection #grCanvasWrap 一直有 position:relative，二级页漏了。
@@ -554,7 +556,7 @@
    ci PASS=19 FAIL=0、单测 121/122（唯一红 Terrain bridge 属并行会话在途文件）。
    index.html / mod/style-01.css / mod/ry-panel.js / runye-map-measure.html 均在 CORE，必须抬版本。
   */
-const VERSION = 'v544b-rect-clamp';
+const VERSION = 'v545-rect-clamp';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

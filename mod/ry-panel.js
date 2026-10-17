@@ -130,7 +130,7 @@
     /* 默认位的原始内联值：CSS 里 right:300px 这类是写在创建时的 cssText 上的，
        拖动会把 right 改成 auto，reset 必须能原样还回去。 */
     var preset = { l: rootEl.style.left, t: rootEl.style.top, r: rootEl.style.right, b: rootEl.style.bottom };
-    /* [v544b] 坐标系统一为「视口 rect + bounds 相对存档」。
+    /* [v545] 坐标系统一为「视口 rect + bounds 相对存档」。
        v544 第一版用 offsetLeft + bounds.clientWidth 混算 —— 但 offsetParent 未必是 bounds：
        #ppQuickBar 的 .pp-canvas-wrap 没有 position:relative，实测 offsetParent=MAIN，
        两套坐标差 272px；老用户 v248 存的「画布相对坐标」被解释到画布外、夹紧范围也错位
@@ -164,7 +164,7 @@
     try { saved = JSON.parse(safeRead(key) || (legacyKey && safeRead(legacyKey)) || 'null'); } catch (_) {}
     /* 存档位置要等容器真的可见才落位：区块默认 display:none 时 rect 全 0，
        夹紧会把面板压到 (0,0) 并停在那儿（v248b 在快捷条上踩过）。
-       [v544b] 用户一旦按住抓手，挂起的落位必须作废 —— 否则最长 10s 的重试队列
+       [v545] 用户一旦按住抓手，挂起的落位必须作废 —— 否则最长 10s 的重试队列
        会在用户拖动中途把条拽回存档点（「拖了又弹回去」）。 */
     var placeCancelled = false;
     function placeWhenVisible(sl, st, tries) {
