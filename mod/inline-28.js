@@ -258,7 +258,7 @@
   function htmlIrrig() {
     var dom = planDomValues();
     var h = '<h4>二级 · 地块与灌溉参数</h4>'
-      + '<p class="rs-note">与二级工具栏是<b>同一套参数</b>：这里改完点「保存」，工具栏同步更新并立即重算（工具栏只作展示与调用，[v525] 起不可直接编辑）。</p>';
+      + '<p class="rs-note">与二级工具栏是<b>同一套参数</b>：这里改完点「保存」，工具栏同步更新并立即重算；工具栏也可直接微调（实时重划分区、刷新不丢），微调只改当前地块，<b>不回写已存方案</b>。</p>';
     PLAN_DEFS.forEach(function (d) {
       var el = planInput(d.id);
       var step = el ? (el.getAttribute('step') || 'any') : 'any';

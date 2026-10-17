@@ -377,8 +377,10 @@
    修改/保存统一在设置弹窗「灌溉参数」页签（⚙ 参数设置直达）；index.html 在 CORE，必须抬版本；
    v526-recipe-to-settings：灌溉方案管理移入设置弹窗「灌溉参数」页签（命名/保存/改名/删除），
    工具栏方案条只留「选择方案+调用」（✎/🗑 图标取消），组标题去「/ 水力」；
-   index.html / mod/plot-editor.js / mod/inline-28.js 都在 CORE，必须抬版本重建离线缓存。 */
-const VERSION = 'v526-recipe-to-settings';
+   v527-plan-params-live-tweak：撤销 v525 的面板只读（用户澄清：调用方案后需可在面板微调，
+   改动实时重划分区；微调只改当前地块并自动记住，不回写已存方案）；
+   index.html / mod/inline-28.js 都在 CORE，必须抬版本重建离线缓存。 */
+const VERSION = 'v527-plan-params-live-tweak';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
