@@ -379,8 +379,9 @@
    工具栏方案条只留「选择方案+调用」（✎/🗑 图标取消），组标题去「/ 水力」；
    v527-plan-params-live-tweak：撤销 v525 的面板只读（用户澄清：调用方案后需可在面板微调，
    改动实时重划分区；微调只改当前地块并自动记住，不回写已存方案）；
-   index.html / mod/inline-28.js 都在 CORE，必须抬版本重建离线缓存。 */
-const VERSION = 'v527-plan-params-live-tweak';
+   v528-recipe-bar-no-label：方案条去掉「方案」二字标签（用户截图圈注），只留下拉+调用；
+   index.html 在 CORE，必须抬版本重建离线缓存。 */
+const VERSION = 'v528-recipe-bar-no-label';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
