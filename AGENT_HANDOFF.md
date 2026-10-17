@@ -654,3 +654,75 @@
 * `ci_check_static` PASS=11；`node --test tests/*.test.cjs` 121/121；`_repro_v520_planparams` 29/29；
   `_smoke_publish` ALL PASS；线上 `_smoke_v521_live` 26/26（含 5 项 v530 新断言）。
 * commit `cba20eb`；未纳入 `terrain/index.html` 的另一会话在途改动（新增 `hc-core.js` 引用），只抬了它的 `?v=`。
+
+## 17. v532-rail-drift-gate 面板双副本改为「防漂移闸门」（2026-10-17 · 已发布上线）
+
+用户问「各种覆盖都排查完了、都修改完毕了吗」。诚实答复：**没完**，并给出剩余量化的四类问题。
+用户两次决策：先选「做面板双副本合并」，实测失败回滚后改选「加防漂移闸门」。
+
+### 剩余覆盖的量化（跨文件归一化选择器 + 规则体复扫）
+| 面 | 现状 |
+|---|---|
+| 二级面板 | 内联 158 条 rail 副本：109 纯副本 / 14 值漂移 / 35 仅内联 |
+| 三级面板 | 内联 74 条：46 纯副本 / 3 漂移 / 25 仅内联 |
+| 控件字号 | `mod/*.css` 34 条 `font-size` 里 33 条不带 `!important`，全被 typography 13px 压死 |
+| 滚动条 | index 内联 / style-05 / runye-theme / terrain.css 各写一套同值规则 |
+| 地形 | `terrain/index.html` 与主页 `#terrainSection` 双份 DOM（架构级，不动） |
+
+### 一、合并方案：试过、量过、全部回滚
+`mod/ry-cad-toolbar.js` 的 `moveIn()` 把 `#ppSide`/`#tlSide` 原节点搬进 `#ryCadSide`，
+搬走后 `#pipePlanSection .pp-yy` 不再匹配 ⇒ 历史上有整批换前缀的孪生规则。v529 只把
+`.pp-side` 一支做成 `:is()` 双命中，其余 `.pp-title/.pp-toolbar/.pp-stage/.pp-legend` 仍是两份。
+
+用 v529 同款 `:is()` 合并的两版，A/B 定向快照（DOM 路径 key + 50 个 computed 属性，
+**同版本连跑两次噪声基线仅 0~1 条**）：
+
+| 版本 | 选择器 | 特异性 | base diff | rail diff |
+|---|---|---|---|---|
+| V1 | `:is(#X,[data-pp=X])` | (1,0,0) | 60 | 113 |
+| V2 | `:is(#X,#ryCadSide [data-pp=X])` | (1,1,0) | 74 | 120 |
+
+典型回归：`#planTapeSpacing` 等原生 `input` `display:block→none`、`sl-input display:none→block`、
+`#ppPlanBar2` 宽度 300→295、`.pp-plan-item` 278→273。
+
+**根因（记牢）**：副本 `#ryCadSide [data-pp="X"] .pp-side` = **(1,1,0)**，比原版
+`#X .pp-side` = **(1,0,0)** 高**一级**，rail 态正是靠这一级赢过一批 (1,0,1) 竞争者。
+⇒ **双副本无法用选择器合并消除**，强行合并必掉一级。已 `cp _backup_*/` 回滚，`git diff` 干净。
+
+### 二、改为「不许漂移」
+* `scripts/check_panel_drift.cjs`（新增，零依赖纯文本解析，处理 `@media` 嵌套）
+  * `canon()` 把 `:is(#X,#ryCadSide [data-pp="X"])` / `:is(#X,[data-pp="X"])` /
+    `#ryCadSide [data-pp="X"]` / `#X` 一律归一化到 `[data-pp="X"]`；
+  * 三类漂移全报：`value`（值不同）、`only-inline`（副本有基准无）、`only-base`（基准有副本无）；
+  * `--verbose` 打明细，`--update` 写回基线。
+* `scripts/panel-drift-baseline.json`（新增）登记 4 条**有意不同**并写明理由：
+  * `@media(max-width:768px) .pp-title` 的 `font-size:13px` / `font-weight:600` / `line-height:1.3`
+    —— 窄栏约 200px 宽，栏内适配；
+  * `body.ry-tool [data-pp="tlPipePlanSection"] .pp-side` 的 `border-right-color:transparent`
+    —— 避免与工具栏分隔线叠成双线。
+* `ci_check_static.cjs` 接入第 ⑥ 项（文件头「三类」→「四类」）。
+* 顺手清掉 `index.html` 内联 **21 条**被 `border-radius:0!important` 压平的死圆角：
+  **未登记漂移 17 → 4**。
+
+### 验证
+* `node scripts/check_panel_drift.cjs --verbose` → 内联 rail 规则 200 组 / 基准 1506 组 / 同键比对 187 组，✓ 已登记 4 条。
+* **负向测试**：注入 `#tlPipePlanSection .pp-side .pp-plan-bar{letter-spacing:9px}` → `exit=1`；还原 → `exit=0`。
+* `ci_check_static` **PASS=12 FAIL=0**；`node --test tests/*.test.cjs` **122/122**；
+  `_repro_v520_planparams` **29/29**；`_smoke_publish` ALL PASS；线上 `_smoke_v521_live` **26/26**。
+* commit `0b30c53`，线上 `sw.js` VERSION = `v532-rail-drift-gate`（6 次轮询后生效）。
+
+### 版本与混编处理（重要）
+* 并行会话先占了 `v531-data-service-plot-store`，本提交在其沿革上方追加并把 VERSION 抬到
+  `v532-rail-drift-gate`，两者共用一次缓存失效。
+* `ci_check_static.cjs` 是**混编文件**：本提交只 `git apply --cached` 了 ⑥ 相关 17 行 hunk，
+  并行会话的 ④b（独立地形页顺序）/ ④c（独立地图页顺序）/ ⑤（经济设置适配器）112 行
+  留在工作区由其自行提交。
+* 案例：`git add -p` 不可用时，用「`git diff` 导出 → 按 `@@` 切 hunk → 关键字筛 → `git apply --cached`」，
+  工作区文件保持不变，落盘仍是完整合并态。
+
+### 下一步（未做，均为独立决策项）
+1. 控件字号：`mod/*.css` 33 条不带 `!important` 的 `font-size` 被 `runye-typography.css` 的
+   13px 全压死 —— 要么给关键控件加 `!important` + 更高特异性，要么在 typography 里按容器排除。
+2. 滚动条 4 份同值规则收敛为一份。
+3. 地形双份 DOM 属于架构级（`terrain/index.html` vs 主页 `#terrainSection`），需要产品决策。
+
