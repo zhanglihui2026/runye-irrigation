@@ -693,3 +693,22 @@ function rypDraggable(rootEl){ /* 实现 */ }
 3. **改工具栏必须跑**：`_probe_toolbars.mjs`（主页两条 + 独立页一条，17/17）。探针里必须先把区块
    `setProperty('display','block','important')` 并轮询容器有尺寸 —— 否则 rect 全 0 会假红成「拖动不生效、按钮高 0」。
 4. 静态兜底：`ci_check_static` ⑧ 守「四张卡必须挂 `.ry-float-card`，且 cssText 不许再写外壳视觉」。
+
+### 12.4 坐标系（v545 定论，违反必错位 272px）
+
+> **`absolute` 浮层的容器必须是 `position:relative` 的定位祖先；拖动 / 夹紧 / 存档三件事必须同用
+> `getBoundingClientRect()`，禁止与 `offsetLeft` / `clientWidth` 混搭。**
+
+- 反例（v544 踩过）：`#ppQuickBar` 的 `.pp-canvas-wrap` 没有 `position` ⇒ `offsetParent=MAIN`，
+  CSS 的 `left:10px` 落在画布左外 **272px**；`offsetLeft` 夹紧 + rect 存档混用 ⇒ 老存档被解释到画布外，
+  条顶在区块左缘、抓手被裁掉（用户：「藏在里面了，拖不出来了」）。
+- 正解四条：
+  1. 容器补 `position:relative`（二级页 `#pipePlanSection .pp-canvas-wrap`，成组管路页 `#grCanvasWrap` 一直有）。
+  2. 拖动 = 「起始 rect + 指针位移」，**不要存 pointer 与元素的 offset**。
+  3. 夹紧 = `bounds.getBoundingClientRect()`；写回 `style.left` 用 `offsetLeft + 视口位移差`，
+     这样 `offsetParent` 是谁都不影响结果。
+  4. 存档 = rect 相对 bounds（`{l,t}`），与 v248 旧格式一致 ⇒ **老存档免迁移**。
+- 附带一条：`placeWhenVisible` 这类「等容器可见再落位」的重试队列必须带**用户已开拖即作废**的守卫，
+  否则重试会把正在拖的条拽回存档点（表现为「拖了又弹回去」）。
+- 验收：`_probe_rect_live.mjs`（8 项，可直连线上）；`.ry-hbar` 类可加
+  `data-ry-drag-dblclick-reset="1"` 提供「双击回默认位」逃生口。

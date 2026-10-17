@@ -1155,3 +1155,45 @@ modeling/ digital-agriculture/` 的 .css/.html，凡 `*::-webkit-scrollbar` 开�
 `ci_check_static` PASS=12 FAIL=0（本次提交版；工作区因并行会话另加 7 项共 19）｜
 `node --test tests/*.test.cjs` 122/122 ｜ 卡片外壳 A/B 61 元素 × 55 属性 0 差异 ｜
 行为探针 31/31 ｜ 工具栏探针 17/17 ｜ 线上冒烟 27/27。
+
+---
+
+## 25b. v545-rect-clamp 快捷条「藏在里面了，拖不出来了」（2026-10-17 · 已发布上线）
+
+首次提交号 `3131fdc`（版本串曾用 `v544b-rect-clamp`），随后 `d7ccaa4` 仅改版本串形态为
+`v545-rect-clamp` —— 线上冒烟的 `/^v\d{3}-[a-z0-9-]+$/` 不认字母后缀。**修复内容两笔相同。**
+
+### 用户原话
+「地块分区的顶部工具栏 藏在里面了，拖不出来了，」（附截图：`#ppQuickBar` 贴在区块左缘外、抓手看不见）
+
+### 根因三层（v544 换坐标系才暴露，v248 的实现把它遮住了）
+1. **`.pp-canvas-wrap` 从来没有 `position`** —— `#ppHint` / `#ppQuickBar` 两个 `absolute` 浮层都写在它里面，
+   实测 `offsetParent=MAIN`，CSS 的 `left:10px;top:8px` 落在画布左外侧 **272px**。
+   成组管路页 `#grPipeSection #grCanvasWrap` 一直有 `position:relative`（style-01 末尾），二级页漏了这一条；
+   v248 的旧拖动实现全程用「wrap 视口 rect」计算，把问题完全掩盖了。
+2. **`rypDraggable` 混用两套坐标**：`offsetLeft` + `bounds.clientWidth` 算夹紧，存档却是「相对 bounds」。
+   `offsetParent` 不是 bounds 时两者差 272px ⇒ 老用户 v248 存的「画布相对坐标」被解释到画布外、
+   夹紧范围也错位，条顶在区块左缘、抓手被裁掉，怎么拖都回不来。
+3. **`placeWhenVisible` 的 10s 重试队列没有「用户已开拖」守卫** ⇒ 拖动中途被拽回存档点（「拖了又弹回去」）。
+
+### 改法
+- `mod/style-01.css`：补 `#pipePlanSection .pp-canvas-wrap{position:relative}` ⇒
+  **CSS 默认位 / `offsetLeft` / 拖动夹紧 / 存档四者归一坐标系**（与 `#grCanvasWrap` 同级口径）。
+- `mod/ry-panel.js`：`rypDraggable` **全程 `getBoundingClientRect`** —— 新增 `clampRect` / `moveRectTo`，
+  删掉 `limits()` / `place()`；拖动 = 起始 rect + 指针位移；夹紧 = bounds rect；
+  存档 = rect 相对 bounds（**与 v248 旧格式一致，老存档免迁移**）；写 `style.left` 用
+  `offsetLeft + 视口位移差`，不再依赖 `offsetParent` 是谁；`placeCancelled` 守卫；
+  `resize` 重夹紧同样 rect 化。
+- `index.html`：`#ppQuickBar` 补 `data-ry-drag-threshold="4" data-ry-drag-dblclick-reset="1"`，
+  抓手 `title` 标出「双击工具条 = 回到默认位置」——**拖丢了的逃生口**。
+
+### 验收
+新增 `_probe_rect_live.mjs`（直连线上，同一套 8 项断言）：`wrap` 是定位祖先 / 老存档
+`{l:30,t:16}` 落回 (30,16) / 条完整在画布内 / 抓手可命中 / 拖动跟手 (+120,+60) /
+存档=画布相对坐标 / 双击复位 (10,8) / 双击清存档 —— **8/8**（本地与线上各跑一遍）。
+回归：工具栏探针 17/17 ｜ 行为探针 31/31 ｜ 外壳 A/B 六面（pp/tl × rail/base + secTL）0 差异 ｜
+`ci_check_static` PASS=19 FAIL=0 ｜ 单测 123/123 ｜ 线上冒烟 **27/27**。
+
+### 一条判据（可复用）
+> **看到 `absolute` 浮层位置不对，先查 `offsetParent.id`；看到「拖动不跟手 / 拖了弹回」，先查两套坐标是否混用。**
+> 同一个组件里只要出现「`offsetLeft` 夹紧 + rect 存档」这种混搭，`offsetParent` 一变就整体崩 272px。
