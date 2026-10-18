@@ -1561,3 +1561,18 @@ N4 只影响一根 / N5 图面三通跟随 / N6 clamp / N7 真实拖动（吸附
 **验收 _probe_chip_unify.mjs 8/8（含真实鼠标 hover）**：中性按钮 白/#cbd5e1；
 保存地块与应用并重新划分 默认 白/#173e32/#14532d，**hover 变 rgb(23,62,50) 底 + 白字**，移开恢复；
 五个按钮全部 24px/11px/130px 宽。ci PASS=28 FAIL=0。
+
+### §25n v577-settings-fixed-height —— 设置弹窗高度固定 + 文字统一 -1px
+用户：「这个设置，应该统一一个高度，按照必须得最高的高度统计，点击切换的时候即便不需要那么高，
+也要按照统一高度显示，不需要的区域留白就行了，这样才不会感觉页面跳来跳去的。再有，设置内的所有文字都缩小一级。」
+- 实测六页签内容高：管材单价 472 / 造价假设 208 / 标注与文字 202 / 标注几何 457 / 工程参数 202 /
+  灌溉参数 762 ⇒ 整窗高度 298~792 摆动 494px。
+- 改 `#rySetModal{height:min(88vh,800px)}`（保留 max-height:88vh）：按最高页签整窗高度定死，
+  内容少的页签留白，最高页超出部分照旧在 `.rs-body` 内滚动。实测 6 页签 modal 恒 = 792（差 0）。
+- 字号统一 -1px：基础 13→12、标题 15→14、页签 12.5→11.5、h4 13→12、说明 11.5→10.5、
+  标签/单位 12→11、input/select 12→11（!important）、按钮 12→11（!important）、角标 12→11、φ 11.5→10.5。
+  ⚠ `.rs-note` 是 `<p>`，被 typography `p{font-size:13px!important}` 顶回 13px ⇒ 必须 !important；
+    input/select/button 同理（typography 对控件打 13px!important）。
+- 验收 `_probe_set_height.mjs`：六页签 modal 792 恒定；字号实测 title 14 / nav 11.5 / h4 12 / note 10.5 /
+  label 11 / unit 11 / input 11 / btn 11。ci PASS=28 FAIL=0。
+- 版本：并行会话已抬到 v576 ⇒ 取更高号 v577。

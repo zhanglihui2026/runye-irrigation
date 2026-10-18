@@ -677,7 +677,17 @@
    同时删掉两处副本里 .map-float-actions/.save-row 的 .mbtn 绿色声明（含 border-radius:4px 那条死规则，
    它被 style-01.css `body *{border-radius:0!important}` 压平，实测 computed 一直是 0）。
    按钮尺寸统一 24px/11px/整行宽。 */
-const VERSION = 'v575-chip-neutral';
+/* v576-map-route-single-navigation: 地图回传接收器负责同页切换，pushState 只同步锚点；
+   新页面已带 #pipePlanSection 时由导航 load 路由负责切换，避免重复展示/重绘。 */
+/* v577-settings-fixed-height: 设置弹窗①高度固定、②所有文字缩小一级（用户要求）。
+   ① 六页签内容高差 494px（管材 472 / 造价 208 / 标注与文字 202 / 标注几何 457 / 工程参数 202 /
+      灌溉参数 762）⇒ 切换时弹窗忽高忽低。改 height:min(88vh,800px)：按最高页签（灌溉参数）的整窗
+      高度定死，内容少的页签留白，最高那页超出的部分照旧在 .rs-body 内滚动。实测 6 页签 modal 恒 792。
+   ② 文字统一 -1px：基础 13→12、标题 15→14、页签 12.5→11.5、h4 13→12、说明 11.5→10.5、
+      标签/单位 12→11、输入/select 12→11(!important，typography 对控件打 13!important)、
+      按钮 12→11!important、角标 12→11、φ 11.5→10.5。
+   注：并行会话已抬到 v576 ⇒ 按规则取更高号 v577（不回退对方）。 */
+const VERSION = 'v577-settings-fixed-height';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
