@@ -1663,3 +1663,24 @@ movePipe(main-0/branch-0) 仍 true；拖后 frontPipe 不变）+ 原 W1~W6 全�
 
 回归：_probe_front_node_ws 11 项 OK、_probe_source_straight 8/8、_probe_front_node 51/51、
 ci 28/0、单测 140/141（既存红灯）、双页冒烟 ALL PASS。
+
+### §25s v583-flow-host-group —— 动画层挂载组修正（+ 未复现的坦白记录）
+用户三度反馈「动画演示没按新管道路由」；v581（取点）、v582（底图重克隆）之后仍如此。
+
+本轮新查到并修正的一处（稳健性，非该现象主因）：
+- 工作区克隆底图时组内 id 全部加 `tlWsPipe_` 前缀 ⇒ `#tlPlotGroup` **查不到**，
+  `hostG = svg.querySelector('#tlPlotGroup') || svg` 会静默回退挂到 **svg 根**。
+  实测父链：总管 path → `tlWsPipe_tlPlotGroup`，而动画层曾是 `g →`（svg 根）。
+- 改为兜底顺序：#tlPlotGroup → #tlWsPipe_tlPlotGroup → #tlWsFrontBase → svg 根。
+- 对照实测：工作区 view 是改 **viewBox**（对 svg 根同样生效），所以缩放 1.33 倍后
+  管道与动画层的 CTM 仍相同、同点屏幕坐标差 0 px ⇒ 这处**不是**用户现象的原因，但分层始终不妥，已修。
+
+已排除的假设（均有实测数据）：
+1. 取点逻辑（v581 修：总管段弧长切片 + 接入段读图面 stub）—— 修后水流起点跟随新几何（136→194.1）。
+2. 工作区底图未重克隆（v582 修：补 rerenderKeepView + 重涂）—— 修后 path[data-tlpipe=front] 的 d 会更新。
+3. 坐标系/层级/缩放（v583 修）—— CTM 一致、缩放 0 px 偏差。
+4. 多三通/横向总管/逐组演示 —— 动画的取水点与主管起点一致，几何上吻合。
+
+⚠ 结论：在我能构造的场景里**复现不出**用户看到的现象。根因很可能在用户真实地块
+（不规则多边形/多块/合并组/阶梯分区）下才出现，需其现场取数。已准备控制台诊断片段（见本会话记录），
+待用户提供其场景下的输出再定位。

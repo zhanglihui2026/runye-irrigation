@@ -720,7 +720,14 @@
    并在演示组存在时 applyGroupHighlight() 重涂水流（否则重克隆后动画层被清空、直接消失）。
    实测（600x400，拖 H300 off=38）：工作区总管 d 由 M136.0 339.5… 变为 M194.1 339.5…，
    动画 d 同步跟随（起点 136 → 194.1）。 */
-const VERSION = 'v582-ws-rerender-after-regen';
+/* v583-flow-host-group: 水流动画层挂「管道所在的那个组」（稳健性修正，非 v582 现象的主因）。
+   工作区克隆底图时组内 id 全被加 tlWsPipe_ 前缀 ⇒ #tlPlotGroup 查不到，旧代码静默回退挂 svg 根。
+   实测：工作区 view 是改 viewBox（对 svg 根同样生效），所以缩放/平移都不会因此错位；
+   但动画层与管道分属不同组始终不稳妥，现按 简图#tlPlotGroup → 工作区#tlWsPipe_tlPlotGroup
+   → #tlWsFrontBase → svg 根 的顺序兜底，保证动画与管道同组、随同一套变换。
+   ⚠ 仍未复现用户报的「拖三通后动画不跟新路由」—— 需在用户真实场景下取数（见 _probe_ws_flow 系列），
+      已准备好控制台诊断片段，待用户提供其场景下的输出。 */
+const VERSION = 'v583-flow-host-group';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

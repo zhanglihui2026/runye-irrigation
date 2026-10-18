@@ -2144,11 +2144,20 @@ function tlDemoRenderFlow(svg, g) {
       gv.appendChild(ri); gv.appendChild(hb);
       layer.appendChild(gv);
     }
-    /* [v505] 必须挂进 #tlPlotGroup —— 否则不随「图面整体拖动」的 translate 平移，
-       水流会与管道平行错开（病史同 v183 节点层 / v488 紫线标注）。无该组时退回 svg 根
-       （老结构兼容；此时 svg 内也没有管线，属降级路径）。 */
+    /* [v583] 必须挂进「管道所在的那个组」—— 否则不随该组的变换（图面整体拖动 translate /
+       工作区缩放平移 view）平移，水流会与管道平行错开（病史同 v183 节点层 / v488 紫线标注）。
+       ★ 工作区里 #tlPlotGroup **查不到**：克隆底图时组内所有 id 都被加了 `tlWsPipe_` 前缀
+         （tl-workspace pipeBaseSVG：`ids[j].setAttribute('id','tlWsPipe_'+id)`），
+         于是旧代码 `svg.querySelector('#tlPlotGroup') || svg` 静默回退到 svg 根。
+         平时（未缩放）两者 CTM 相同看不出问题；用户一旦滚轮缩放/拖动画布（拖三通时几乎必做），
+         管道跟着 view 变换、动画层不跟 ⇒ 整条水流错开 —— 这就是「拖三通后动画对不上」的真因。
+         实测层级链：总管 path → tlWsPipe_tlPlotGroup，而动画层曾是 g →（svg 根）。
+       兜底顺序：简图 #tlPlotGroup → 工作区克隆组 → 工作区总管层 → svg 根（老结构降级）。 */
     if (layer.childNodes.length) {
-      var hostG = svg.querySelector('#tlPlotGroup') || svg;
+      var hostG = svg.querySelector('#tlPlotGroup')
+        || svg.querySelector('#tlWsPipe_tlPlotGroup')
+        || svg.querySelector('#tlWsFrontBase')
+        || svg;
       hostG.appendChild(layer);
     }
   } catch (eF) { }
