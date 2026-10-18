@@ -1532,3 +1532,32 @@ N4 只影响一根 / N5 图面三通跟随 / N6 clamp / N7 真实拖动（吸附
 - 验收 `_probe_float_unify.mjs` 5/5：两块卡的 bg/border/shadow/font/color 逐值相同
   （rgba(255,255,255,.97) / rgb(203,213,225) / 0 10px 28px / 12px）、标题条 bg #f1f5f9 + 字 #1f2937、
   标题条不再是 rgb(23,62,50)、类名含 ry-float-card、折叠 none→flex。ci PASS=28 FAIL=0。
+
+### §25m v575-chip-neutral —— 分区角度面板按钮改「默认中性、交互才变绿」
+用户质疑：「回传地块绘制/保存地块/应用并重新划分 那些按钮怎么是绿色的，应该是点击之后变色吧？
+这个绿色是怎么考虑的？参照了什么标准？查一下这个悬浮面板是不是有多层嵌套跟样式覆盖的情况。」
+
+**绿色溯源**：runye-theme.css:12 `--ry-green-600:#173e32`（v427-deepgreen-brand 全站品牌主色）
+→ online-map.css:2 `--g-600:var(--ry-green-600)` → `.mbtn-primary{background:var(--g-600);color:#fff}`。
+项目内两套口径并存：① `.mbtn-primary`/`.btn-primary` = **主操作常绿**；② `.mbtn.btn-on` = **切换按钮选中后变绿**
+（顶部绘制工具条那排）。这三个是动作型 ⇒ 沿用了①。
+⚠ 同一 token 有两套值：style-01.css:1705 的 `--g-600:#16a34a`（亮绿）vs online-map.css 重定向的 #173e32。
+
+**多层嵌套与覆盖（#btnSavePlot 实测 6 层）**
+1. `#onlineMapSection .mbtn`（白底/34px/12px/600）
+2. `#onlineMapSection .map-float-actions .mbtn`（28px/12px!/700/绿边/圆角4px）
+3. `#onlineMapSection .ry-angle-panel .save-row .mbtn`（保存行专属）
+4. `.mbtn-primary`（绿实心，盖掉 1、2 的白底）
+5. typography `button:where(:not(.topbar *)){font-size:13px!important}`（被 2 的 !important 压住）
+6. `style-01.css body *{border-radius:0!important}` ⇒ **2 里的 `border-radius:4px` 是死声明**（computed 0px）
+
+**改法（用户选「默认中性、交互才变绿」）**
+- 五个按钮全部改用卡内统一规格 `.ry-float-chip`；主操作加 `.is-primary`。
+- `.ry-float-chip.is-primary` = **白底 + 深绿边 + 绿字，hover/active 才绿底白字** —— 新增在
+  ry-panel.css「卡内节奏」区（卡内按钮唯一出处）。
+- 删掉两处副本里 `.map-float-actions .mbtn*` / `.save-row .mbtn` 的绿色声明（含那条死圆角）。
+- 尺寸统一 24px/11px/整行宽。
+
+**验收 _probe_chip_unify.mjs 8/8（含真实鼠标 hover）**：中性按钮 白/#cbd5e1；
+保存地块与应用并重新划分 默认 白/#173e32/#14532d，**hover 变 rgb(23,62,50) 底 + 白字**，移开恢复；
+五个按钮全部 24px/11px/130px 宽。ci PASS=28 FAIL=0。

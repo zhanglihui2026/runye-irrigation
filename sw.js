@@ -669,7 +669,15 @@
    #f1f5f9 标题条 + #e2e8f0 下边线 / 7px 9px 9px 内距）。原为绿边 + 深绿标题条白字（旧 .ryp-* 壳）。
    两处副本同步：index.html + mod/online-map.css（#onlineMapSection 版）、runye-map-measure.html（独立页版）。
    补 .ry-angle-body[hidden]{display:none!important}：body 改 display:flex 后会盖掉 UA 的 [hidden] 规则。 */
-const VERSION = 'v574-angle-float-unify';
+/* v575-chip-neutral: 分区角度面板按钮口径改「默认中性、交互才变绿」——
+   回传地块绘制/回传地形模块/回二级继续规划 → .ry-float-chip（白底 #cbd5e1 边）；
+   保存地块/应用并重新划分 → .ry-float-chip.is-primary（白底 + 深绿边 + 绿字，hover/active 才变绿底白字）。
+   旧口径是 .mbtn-primary 常绿实心（--g-600→--ry-green-600 #173e32），主次颠倒且抢地图注意力。
+   新增 .ry-float-chip.is-primary 是卡内按钮唯一出处（ry-panel.css 卡内节奏区）；
+   同时删掉两处副本里 .map-float-actions/.save-row 的 .mbtn 绿色声明（含 border-radius:4px 那条死规则，
+   它被 style-01.css `body *{border-radius:0!important}` 压平，实测 computed 一直是 0）。
+   按钮尺寸统一 24px/11px/整行宽。 */
+const VERSION = 'v575-chip-neutral';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

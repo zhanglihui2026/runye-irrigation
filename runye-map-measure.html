@@ -123,11 +123,8 @@
      v282 曾让它们浮在地图左上角，本轮撤掉那个绝对定位容器 ⇒ 恢复为面板内正常流
      （position:static），button 的 id 与 JS 绑定依然零改动。 */
   .map-float-actions{display:flex;flex-direction:column;gap:5px}
-  .map-float-actions .mbtn{height:28px;padding:0 8px;font-size:12px !important;text-align:center;font-weight:700;
-    border:1px solid var(--g-600);background:#fff;color:var(--g-700);border-radius:4px}
-  .map-float-actions .mbtn:hover{background:var(--g-50);color:var(--g-700)}
-  .map-float-actions .mbtn-primary{background:var(--g-600);color:#fff}
-  .map-float-actions .mbtn-primary:hover{background:var(--g-700);color:#fff}
+  /* [v575] 按钮外观/字号全部交给 .ry-float-chip（卡内统一规格）；这里只留「整行宽 + 24px 高」。 */
+  .map-float-actions .ry-float-chip{width:100%;height:24px}
   /* ===== [v282] 分区角度悬浮面板：形态仿手机端 runye-mobile-map-preview.html 的
      .map-angle（↶＋1° / 角度输入 / ↷−1° 竖排）；默认靠地图区右侧，标题栏可拖动，位置记忆。 */
   /* [v574] 外壳统一到 .ry-float-card（与「图层」面板逐值一致：白卡 / #cbd5e1 边框 /
@@ -159,7 +156,7 @@
   .map-angle-value input:focus{outline:1px solid var(--ry-green-600)}
   .map-angle-value span{font-size:12px;color:var(--s-500);font-weight:600}
   .ry-angle-panel .save-row{margin-top:0;display:flex;flex-direction:column;gap:5px;align-items:stretch}
-  .ry-angle-panel .save-row .mbtn{height:28px;font-size:12px !important;font-weight:700;padding:0 4px;text-align:center;flex:none}
+  .ry-angle-panel .save-row .ry-float-chip{width:100%;height:24px}
   .ry-angle-panel .hint{margin-top:2px;font-size:10px !important;line-height:1.35}
   #map{position:absolute;top:0;left:0;right:0;bottom:0;background:#dfe6e9}
   /* 操作提示条 */
@@ -333,10 +330,10 @@
                ★ 必须留在 section#mapPartitionTools **之外** —— 该 section 是分区角度模块
                  按 id 取的盒子，往里塞无关按钮会改变其 querySelector('input') 的落点语义。 -->
           <div class="map-float-actions" id="mapFloatActions">
-            <button class="mbtn mbtn-primary" id="btnCopy">回传地块绘制</button>
+            <button class="ry-float-chip" id="btnCopy">回传地块绘制</button>
             <!-- [NEW MODULE: 地形模块 v286d] 回传地形模块：卸载=删除本行 + sendPlotToTerrain/btnCopyTerrain 那两段 JS -->
-            <button class="mbtn" id="btnCopyTerrain">回传地形模块</button>
-            <button class="mbtn mbtn-primary" id="btnSavePlot">💾 保存地块</button>
+            <button class="ry-float-chip" id="btnCopyTerrain">回传地形模块</button>
+            <button class="ry-float-chip is-primary" id="btnSavePlot">💾 保存地块</button>
           </div>
           <section id="mapPartitionTools">
             <select aria-label="选择分区地块"></select>
@@ -345,7 +342,7 @@
               <div class="map-angle-value"><input aria-label="地图分区角度" type="number" min="-180" max="180" step="1" value="0"><span>°</span></div>
               <button class="ang-btn" type="button" data-angle-minus title="减少1°">↷<small>－1°</small></button>
             </div>
-            <div class="save-row"><button class="mbtn mbtn-primary" data-angle-apply>应用并重新划分</button><button class="mbtn" data-angle-send>回二级继续规划</button></div>
+            <div class="save-row"><button class="ry-float-chip is-primary" data-angle-apply>应用并重新划分</button><button class="ry-float-chip" data-angle-send>回二级继续规划</button></div>
             <p class="hint" role="status">只调整分区方向，地块边界不动。正角度从东向北旋转。</p>
           </section>
         </div>

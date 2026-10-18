@@ -973,6 +973,13 @@ body.ry-tool #ryCadSide [data-pp="pipePlanSection"][data-ry-view="edit"] .ry-pan
 }
 .ry-float-chip:hover{border-color:#94a3b8;color:#334155}
 .ry-float-chip.is-danger{border-color:#fca5a5;color:#b91c1c}
+/* [v575] 卡内主操作：默认**白底深绿边深绿字**（中性），hover/按下才变绿底白字。
+   ★ 与旧口径 .mbtn-primary（常绿实心）相反 —— 用户明确要「点击之后变色」：
+     整块浮层里若主操作常绿、次要按钮白底，视觉上主次颠倒且抢走地图注意力。
+     品牌绿取 --ry-green-600（v427-deepgreen-brand，#173e32）。 */
+.ry-float-chip.is-primary{border-color:var(--ry-green-600,#173e32);color:var(--ry-green-700,#14532d)}
+.ry-float-chip.is-primary:hover{background:var(--ry-green-600,#173e32);border-color:var(--ry-green-600,#173e32);color:#fff}
+.ry-float-chip.is-primary:active{background:var(--ry-green-700,#14532d);border-color:var(--ry-green-700,#14532d);color:#fff}
 /* 卡内文本控件字号跟卡正文（全局 typography 的 13px!important 必须压回）。
    **排除 .ai-panel**：那张卡自 v484 起在主页常驻 display:none（只 ?smart=1 走全屏工作台），
    内部属智能规划工作台的字号体系，不归本口径管；不排除会把它的 13px 一起改掉。 */

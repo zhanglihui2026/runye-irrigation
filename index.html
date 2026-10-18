@@ -41,7 +41,7 @@
 <link rel="stylesheet" href="hydraulic-calc/hydraulic-calc.css">
 <link rel="stylesheet" href="filter-system/filter-system.css">
 <link rel="stylesheet" href="pwa/vendor/leaflet.css">
-<link rel="stylesheet" href="mod/online-map.css?v=574-angle-float-unify">
+<link rel="stylesheet" href="mod/online-map.css?v=575-chip-neutral">
 <link rel="stylesheet" href="terrain/terrain.css?v=535-terrain-single-source">
 <link rel="stylesheet" href="hydraulics-main.css?v=442-native">
 <style id="ryCadTwinCss">
@@ -244,7 +244,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <link rel="stylesheet" href="pwa/pwa.css?v=2">
 <script defer src="pwa/pwa.js?v=2"></script>
     <link rel="stylesheet" href="runye-theme.css?v=2">
-    <link rel="stylesheet" href="mod/ry-panel.css?v=573-grp-bg-set-btn">
+    <link rel="stylesheet" href="mod/ry-panel.css?v=575-chip-neutral">
     <!-- Shoelace 2.15.1（与紧凑分组样板一致）；Shoelace 不可用时保留原生输入控件。 -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.1/cdn/themes/light.css">
   <link rel="stylesheet" href="runye-typography.css?v=530-h1-scope">
@@ -678,10 +678,10 @@ body.ry-worst-off [data-tlworst]{display:none}
                ★ 必须留在 section#mapPartitionTools **之外** —— 该 section 是分区角度模块
                  按 id 取的盒子，往里塞无关按钮会改变其 querySelector('input') 的落点语义。 -->
           <div class="map-float-actions" id="mapFloatActions">
-            <button class="mbtn mbtn-primary" id="btnCopy">回传地块绘制</button>
+            <button class="ry-float-chip" id="btnCopy">回传地块绘制</button>
             <!-- [NEW MODULE: 地形模块 v286d] 回传地形模块：卸载=删除本行 + sendPlotToTerrain/btnCopyTerrain 那两段 JS -->
-            <button class="mbtn" id="btnCopyTerrain">回传地形模块</button>
-            <button class="mbtn mbtn-primary" id="btnSavePlot">💾 保存地块</button>
+            <button class="ry-float-chip" id="btnCopyTerrain">回传地形模块</button>
+            <button class="ry-float-chip is-primary" id="btnSavePlot">💾 保存地块</button>
           </div>
           <section id="mapPartitionTools">
             <select aria-label="选择分区地块"></select>
@@ -690,7 +690,7 @@ body.ry-worst-off [data-tlworst]{display:none}
               <div class="map-angle-value"><input aria-label="地图分区角度" type="number" min="-180" max="180" step="1" value="0"><span>°</span></div>
               <button class="ang-btn" type="button" data-angle-minus title="减少1°">↷<small>－1°</small></button>
             </div>
-            <div class="save-row"><button class="mbtn mbtn-primary" data-angle-apply>应用并重新划分</button><button class="mbtn" data-angle-send>回二级继续规划</button></div>
+            <div class="save-row"><button class="ry-float-chip is-primary" data-angle-apply>应用并重新划分</button><button class="ry-float-chip" data-angle-send>回二级继续规划</button></div>
             <p class="hint" role="status">只调整分区方向，地块边界不动。正角度从东向北旋转。</p>
           </section>
         </div>
