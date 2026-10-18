@@ -1,5 +1,9 @@
 /* Runye PWA v1. Increment VERSION when changing the offline shell. */
-/* v552-project-network-owner: reject project pipe snapshots not owned by an imported plot. */
+/* v553-network-owner-required: reject network snapshots without an explicit active-plot binding. */
+/* v555-plot-scoped-bridge: keep network, hydraulic design, and overlay snapshots isolated by plot ID. */
+/* v557-legacy-owner-read-guard: reject legacy snapshot fallbacks whose plot ID does not match. */
+/* v558-map-projection-owner: bind main-page map projection reads/writes to the in-memory plot ID. */
+/* v559-tab-plot-anchor: keep the active plot identity scoped to each browser tab. */
 /* v546-terrain-transfer-tab-binding: reject terrain handoffs overwritten by another tab. */
 /* v541-hydraulic-snapshot-binding: bind hydraulic designs to their source network and reject stale snapshots. */
 /* v531-data-service-plot-store: resolve plugin plot references through the shared plot-library adapter. */
@@ -600,8 +604,8 @@
     会画穿过整排的长接入线）；分区不足 2 排/列退回旧几何。拖动沿主管走向滑移不变。
     index.html 的 inline-09 ?v= 抬 550-front-in-plot。并行会话在途：v549 段与两行头注释、
     CORE 摘 modeling/integration.js 留给对方。
-  * v556-front-row1-main-elbow：v550 的两处几何按用户新口径修订（示意图三轮确认后才动代码）——
-    ① 总管改贴**最外一排（123 区）顶边**：FRONT_IN_ROW=0、FRONT_IN_OFFSET=15→0
+  * v554-front-row1-main-elbow：v550 的两处几何按用户新口径修订（示意图三轮确认后才动代码）——
+    ① 总管改贴**最外一排（123 区）顶边**：FRONT_IN_ROW=1→0、FRONT_IN_OFFSET=15→0
        （旧「第 2 排 + 15 米」作废），两端仍截止于该排最左/最右主管、水源不动 + 连接段不变；
     ② 最外一排（789 / 28/29/30 区）**主管不再向下延伸到底边**，截止于「分区中心往下 18% 分区高」
        （MAIN_END_ELBOW_R=0.18，示意图确认的截止位置），末端接 **90°弯头**；之后照抄其他地块：
@@ -615,12 +619,28 @@
        · 材料表新增一行「主管末端 90°弯头」（autoFitRows key=mainEndElbow，Ø 主管）；
        · runye-material-audit.js autoFittings 新增 zoneElbow 分桶（末端弯头分区不再进 zoneTee）；
        · core/data-service.js 管件清单 FIT 表补 ['zoneElbow','主管末端 90°弯头']；
-       · 弯头计数按所属主管段（v.mi）遮蔽态剔除，与 v162「遮蔽不计入材料」同口径；
-       · 修 autoFitRows 取不到新 key 时 list=undefined 抛错（会让整张材料表渲染失败）。
+       · 弯头计数按所属主管段（v.mi）遮蔽态剔除，与 v162「遮蔽不计入材料」同口径。
     index.html 的 inline-09 ?v= / runye-material-audit.js ?v= 抬 556-front-row1-main-elbow。
-    注：并行会话在我改的过程中连续抬号（v553 → v555-plot-scoped-bridge）⇒ 取更高号 v556。
+    注：并行会话在我改的过程中又抬到 v555-plot-scoped-bridge ⇒ 按规则取更高号 v556（不回退对方）。
   */
-const VERSION = 'v556-front-row1-main-elbow';
+// v560-generated-plot-owner：自动地块以原设计 plotId 区分，地图分区按该归属读取对应管网；
+// v561-terrain-import-atomic：地图回传先校验全部有效环，再替换在线地图地块，不覆盖其他来源记录。
+// v563-project-restore-binding：工程恢复先校验地块归属，失效归属清除标签页锚点，写入失败则不恢复。
+/* v562-front-node-drag（2026-10-18 用户要求）：总管×主管交接三通 = 总管折线的「断点」，可沿主管向下拖动。
+   ① 语义（用户定论，经四轮示意图确认）：总管被这些三通切成若干总管段，三通是相邻两段公有的顶点；
+      某个三通沿主管下移 d ⇒ 两侧总管段斜接（总管由直线变折线、变长）+ 主管自三通起算（上方那段
+      去掉不通水 ⇒ 主管变短）。只能向下拖、吸附 1 m、上限 = min(主管末端上方 5 m, 分区阀锚点上方 2 m)。
+   ② 几何：前端唯一生成点 inline-09.js —— 主管物理线归并（mk='V<x>'/'H<y>'）**提前到总管几何之前**
+      （折线顶点由它派生）；frontPipe 由 2 点直线改 N 点折线；主管段起点随断点下移（截断）。
+      走向判定 frontHoriz 改用「分支设计朝向」——折线后端点 y 不等，按端点推断会误判成竖向。
+   ③ 拖动：三通方块输出 data-junction-key/sig/off/max/axis/mps；tlInitDrag 命中后沿主管轴拖动
+      （尺寸线之后、整图平移之前），松手写 localStorage['tlFrontNodeDrops_v1'] 并整图重生成。
+   ④ 联动：几何一改，材料清单（总管折线长↑ / 主管截断后长↓）与最不利路径/扬程自动跟着走。
+   ⑤ 配套修正：折线时 frontRatios 只认两点直线 ⇒ 改由顶点切段（tlFrontPolyCuts）+ 弧长取点
+      （tlFrontPolyAt，两点线性插值在折线上会错位）；水流动画改优先取整管引用 data-tlpipe-ref
+      （分段 path 只有 2 点，与 frontPipe 点数不等 ⇒ 水源端反序判断失效）。
+   注：并行会话在我改的过程中又抬到 v563-project-restore-binding ⇒ 按规则取更高号 v564（不回退对方）。 */
+const VERSION = 'v564-front-node-drag';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

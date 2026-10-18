@@ -1361,3 +1361,52 @@ ci_check_static PASS=23 FAIL=0。
   （`RyMaterialAudit.autoFittings` + 快照阀门标记），不要靠 DOM 行。
 - 版本：并行会话在我改的过程中连续抬号（v553 → v555-plot-scoped-bridge）⇒ 按规则取更高号
   **v556-front-row1-main-elbow**（不回退对方的号；我的 v554 沿革段保留在 sw.js）。
+
+
+## §25g v564（批次 F-3）：总管三通 = 总管折线的「断点」，可沿主管向下拖动
+
+### 用户口径（四轮示意图确认后才动代码）
+1. 对象 = 总管×主管交接的三通（图面深蓝方块 `data-junction-front`）。
+2. 方向 = **沿主管（竖向）上下移**，不是沿总管轴左右滑。
+3. **关键更正（用户原话）**：「总管不是不动 —— 总管被总管三通分成了若干总管段，三通相当于
+   若干总管段的断点，三通移动之后总管也随之变化，总管整体会变成折线」。
+4. ①= A 口径：三通下移后它上方那段主管去掉，主管从三通起算（末端不动）⇒ **主管变短**。
+5. 折线走**斜接**；**只能往下拖**；**吸附 1 米**；**拖动后记住**；**材料清单跟着变**。
+
+### 改动（前端唯一生成点 mod/inline-09.js）
+- 数据层：`localStorage['tlFrontNodeDrops_v1']`，键 = 物理主管线键（`V<x>`/`H<y>`）+ 地块指纹
+  `sig = round(base)|x1,x2,…`（换地块/重排分区自动失效）；`window.tlFrontNodeDropSet/Of/Drops` 导出。
+- 几何：主管物理线归并（`tlMainLines/tlMainIdx/tlMainSpan`）**提前到总管几何之前**（折线顶点由它派生）；
+  `frontPipe` 由 2 点直线改 N 点折线（顶点 = 各断点）；退回几何（分区不足 2 排/列）按
+  「首端 + 断点 + 尾端」拼折线（`tlFrontPolyLine`）；主管截断 `tlTruncateMainByNode`
+  （判据 = 断点坐标 > 主管起点，退回几何下断点没越过起点时不截断、只缩接入段）。
+- 限位：`上限 = min(主管末端上方 5 m, 该物理主管上分区阀锚点上方 2 m)`，< 0 视为不可拖。
+- 交互：三通方块输出 `data-junction-key/sig/off/max/axis/mps`（mps = 该主管 SVG 单位/米，供像素换算）；
+  `tlInitDrag` 命中后沿主管轴拖动（尺寸线之后、整图平移之前），松手落盘 + `tlAutoGenerate` 重生成；
+  光标 ns-resize / ew-resize + 琥珀 hover。
+- 走向判定：`frontHoriz` 改用「分支设计朝向」（折线后端点 y 不等，按端点推断会把横向总管误判成竖向）。
+
+### 联动（无需另改：几何一改自动跟着走）
+总管折线长↑ / 主管截断后长↓ ⇒ 材料清单 `tlFigParamLines` 与最不利路径、扬程全部重算。
+
+### 配套修正（不加就会回归）
+- `frontRatios` 只认两点直线 ⇒ 折线时改由顶点切段 `tlFrontPolyCuts` + **弧长**取点 `tlFrontPolyAt`
+  （两点线性插值在折线上会错位）；否则总管分段遮蔽会哑火。
+- 水流动画改优先取整管引用 `path[data-tlpipe="front"][data-tlpipe-ref]`（分段 path 只有 2 点，
+  与 `frontPipe` 点数不等 ⇒ 水源端「要不要反序」判断失效）。
+
+### 验收
+`_probe_front_node.mjs` 本地 **51/51**：B0 无偏移共线 / N1 断点下移 / N2 折线变长 / N3 主管截断 /
+N4 只影响一根 / N5 图面三通跟随 / N6 clamp / N7 真实拖动（吸附 21 m、落 localStorage）/ N8 复位。
+`_probe_front_geom.mjs`（v556）61/61 无回归；ci_check_static PASS=26 FAIL=0；`_smoke_publish.mjs` ALL PASS；
+单测 135/136（唯一红灯 `tests/runye_hydraulics_core.test.cjs` 属并行会话未入库新测试，非本次引入）。
+
+### 坑位
+- **探针地块延迟一拍**：`window.measuredPolygon` 经 store 传导，首次 `tlAutoGenerate()` 读到的仍是上一块
+  ⇒ 探针里必须连调两次，第二次才是本块几何（否则会看到「布局翻转」的假象）。
+- 断点定位不能靠 `frontPipe[idx]`：退回几何下 frontPipe 含固定的首/尾端点，断点不在同一位置
+  ⇒ 按 `axis` 取 x/y、用 `sig` 里的 pos 序号反查顶点下标。
+- 拖动位移方向要按 `axis` 施加（V→clientY，H→clientX），否则位移算成 0、松手不落盘。
+- 工具函数若定义在渲染函数内部，拖动回调（`tlInitDrag` 另一作用域）访问不到 ⇒ 导出到 window。
+- 版本：并行会话连续抬到 v561-terrain-import-atomic / v563-project-restore-binding
+  ⇒ 按规则取更高号 **v564-front-node-drag**（不回退对方）。
