@@ -664,7 +664,12 @@
    「二级 · 地块与灌溉参数」排除在外（用户截图对比：三级/地形高程都有浅绿底、就它没有），
    去掉排除后三组同底色 #f4f9f6（hover #eaf3ed）；②「⚙ 参数设置」按钮 → 「设置」二字、
    去图标、字号 13px→11px!important（typography 对 button 打 13px!important，必须跟 !important）。 */
-const VERSION = 'v573-grp-bg-set-btn';
+/* v574-angle-float-unify: 在线地图「分区角度」悬浮面板外壳统一到 .ry-float-card（与「图层」面板
+   逐值一致：白卡 rgba(255,255,255,.97) / #cbd5e1 边框 / 0 10px 28px 阴影 / 12px 正文 /
+   #f1f5f9 标题条 + #e2e8f0 下边线 / 7px 9px 9px 内距）。原为绿边 + 深绿标题条白字（旧 .ryp-* 壳）。
+   两处副本同步：index.html + mod/online-map.css（#onlineMapSection 版）、runye-map-measure.html（独立页版）。
+   补 .ry-angle-body[hidden]{display:none!important}：body 改 display:flex 后会盖掉 UA 的 [hidden] 规则。 */
+const VERSION = 'v574-angle-float-unify';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

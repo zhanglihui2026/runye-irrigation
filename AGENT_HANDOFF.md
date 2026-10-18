@@ -1516,3 +1516,19 @@ N4 只影响一根 / N5 图面三通跟随 / N6 clamp / N7 真实拖动（吸附
 - 注：截图脚本取不到坐标（#ryCadSide 默认 display:none，只在 body.ry-tool.ry-cad-vp 制图视图显示），
   故本次以 computed 值为准，未留截图。
 - ci PASS=28 FAIL=0；ry-panel.css 与 index.html 均在 CORE ⇒ sw VERSION v573 + `ry-panel.css?v=` 同步。
+
+### §25l v574-angle-float-unify —— 分区角度悬浮面板外壳统一到 .ry-float-card
+用户：「在线地图页面，分区角度这个悬浮面板跟图层那个悬浮面板不一样，要跟图层悬浮面板样式统一，
+我之前要求所有悬浮面板都统一的。」
+- 图层面板（runye-map-enhance.js 动态建）= v544 统一壳 `.ry-float-card`；
+  分区角度面板仍是旧壳 `.ryp-float/.ryp-titlebar`（绿边 + 深绿标题条白字）。
+- 改法：容器/标题条/正文/折叠按钮 全部换成统一壳类（ry-float-card / ry-float-head /
+  ry-float-title / ry-float-caret / ry-float-body），删掉 `.ry-angle-panel` 与 `.ry-angle-head` 里
+  的 background/border/box-shadow/font-size（颜色归 .ry-float-card），只留定位与内部排版。
+- **两处副本同步**：① index.html HTML + mod/online-map.css（#onlineMapSection 版，压缩单行）；
+  ② runye-map-measure.html（独立页，HTML + 内联 <style>）。
+- 关键坑：`.ry-angle-body` 从 `padding:7px` 改 `display:flex` 后是**作者样式**，会盖掉 UA 的
+  `[hidden]{display:none}` ⇒ 必须补 `.ry-angle-body[hidden]{display:none!important}`，否则折叠点了没反应。
+- 验收 `_probe_float_unify.mjs` 5/5：两块卡的 bg/border/shadow/font/color 逐值相同
+  （rgba(255,255,255,.97) / rgb(203,213,225) / 0 10px 28px / 12px）、标题条 bg #f1f5f9 + 字 #1f2937、
+  标题条不再是 rgb(23,62,50)、类名含 ry-float-card、折叠 none→flex。ci PASS=28 FAIL=0。

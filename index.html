@@ -41,7 +41,7 @@
 <link rel="stylesheet" href="hydraulic-calc/hydraulic-calc.css">
 <link rel="stylesheet" href="filter-system/filter-system.css">
 <link rel="stylesheet" href="pwa/vendor/leaflet.css">
-<link rel="stylesheet" href="mod/online-map.css?v=544-float-card-unify">
+<link rel="stylesheet" href="mod/online-map.css?v=574-angle-float-unify">
 <link rel="stylesheet" href="terrain/terrain.css?v=535-terrain-single-source">
 <link rel="stylesheet" href="hydraulics-main.css?v=442-native">
 <style id="ryCadTwinCss">
@@ -667,12 +667,12 @@ body.ry-worst-off [data-tlworst]{display:none}
            原「分区角度」那一节（id=mapPartitionTools）整体迁入（runye-map-partition.js 只按 id 取 box，
            再用 querySelector 取内部 select / input / [role=status] / [data-angle-*]，
            故「搬容器不改结构」= JS 逻辑零改动）。默认靠地图区右侧，标题栏可拖动，位置记忆。 -->
-      <div class="ry-angle-panel ryp-float" id="ryAnglePanel" data-ry-panel data-ry-drag-bounds data-ry-position-key="ryAnglePanelPos" data-ry-position-legacy-key="ryAnglePanelPos" data-ry-fold-key="ryAnglePanelFolded" data-ry-fold-legacy-key="ryAnglePanelFolded" data-ry-default-top="96">
-        <div class="ry-angle-head ryp-titlebar" id="ryAngleHead" data-ry-drag title="按住这里可拖动面板">
-          <span class="ah-t ryp-title">分区角度</span>
-          <button class="ah-fold ryp-fold" id="ryAngleFold" type="button" data-ry-fold aria-label="折叠或展开分区角度面板" aria-expanded="true" data-ry-fold-open="▾" data-ry-fold-closed="▸" title="折叠/展开">▾</button>
+      <div class="ry-angle-panel ry-float-card" id="ryAnglePanel" data-ry-panel data-ry-drag-bounds data-ry-position-key="ryAnglePanelPos" data-ry-position-legacy-key="ryAnglePanelPos" data-ry-fold-key="ryAnglePanelFolded" data-ry-fold-legacy-key="ryAnglePanelFolded" data-ry-default-top="96">
+        <div class="ry-angle-head ry-float-head" id="ryAngleHead" data-ry-drag title="按住这里可拖动面板">
+          <span class="ah-t ry-float-title">分区角度</span>
+          <button class="ah-fold ry-float-caret" id="ryAngleFold" type="button" data-ry-fold aria-label="折叠或展开分区角度面板" aria-expanded="true" data-ry-fold-open="▾" data-ry-fold-closed="▸" title="折叠/展开">▾</button>
         </div>
-        <div class="ry-angle-body ryp-body" data-ry-body>
+        <div class="ry-angle-body ry-float-body" data-ry-body>
           <!-- [v283 2026-10-06] 「↩ 回传地块绘制」「💾 保存地块」：用户截图指定放在**本面板内部顶端**、
                「当前设计地块」下拉之上（v282 曾浮在地图左上角）。button id 与 JS 绑定仍零改动。
                ★ 必须留在 section#mapPartitionTools **之外** —— 该 section 是分区角度模块

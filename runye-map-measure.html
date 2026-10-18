@@ -130,15 +130,19 @@
   .map-float-actions .mbtn-primary:hover{background:var(--g-700);color:#fff}
   /* ===== [v282] 分区角度悬浮面板：形态仿手机端 runye-mobile-map-preview.html 的
      .map-angle（↶＋1° / 角度输入 / ↷−1° 竖排）；默认靠地图区右侧，标题栏可拖动，位置记忆。 */
-  .ry-angle-panel{position:absolute;right:12px;top:96px;z-index:1150;width:150px;
-    background:var(--ry-panel-bg,#fff);border:1px solid var(--ry-panel-border,var(--ry-green-600));border-radius:6px;
-    box-shadow:0 3px 12px rgba(15,23,42,.25);overflow:hidden;font-size:12px}
-  .ry-angle-head{display:flex;align-items:center;gap:6px;padding:5px 7px;background:var(--ry-panel-head-bg,var(--ry-green-600));
-    color:#fff;cursor:move;user-select:none;touch-action:none;font-size:12px;font-weight:700;line-height:1.2}
+  /* [v574] 外壳统一到 .ry-float-card（与「图层」面板逐值一致：白卡 / #cbd5e1 边框 /
+     0 10px 28px 阴影 / 12px 正文 / #f1f5f9 标题条 + #e2e8f0 下边线 / 7px 9px 9px 内距）。
+     原先这里是绿边 + 深绿标题条白字（旧 .ryp-* 口径），与图层卡并排时明显两套。
+     ⚠ 只留定位与内部排版；颜色/边框/阴影/字号一律交给 .ry-float-card，
+       border-radius 写了也是死声明（全站扁平化规则会压平）。 */
+  .ry-angle-panel{position:absolute;right:12px;top:96px;z-index:1150;width:150px;overflow:hidden}
   .ry-angle-head .ah-t{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .ry-angle-head .ah-fold{flex:none;width:20px;height:20px;border:0;background:transparent;color:#fff;
+  .ry-angle-head .ah-fold{flex:none;width:18px;height:18px;border:0;background:transparent;color:#64748b;
     font:inherit;line-height:1;cursor:pointer;padding:0}
-  .ry-angle-body{padding:7px;display:flex;flex-direction:column;gap:6px}
+  .ry-angle-head .ah-fold:hover{color:#334155}
+  .ry-angle-body{display:flex;flex-direction:column;gap:6px}
+  /* 折叠靠 hidden 属性切换；display:flex 是作者样式，会盖掉 UA 的 [hidden]{display:none} ⇒ 必须显式补一条 */
+  .ry-angle-body[hidden]{display:none!important}
   .ry-angle-panel.folded .ry-angle-body{display:none}
   #mapPartitionTools select{width:100%;height:28px;font-size:11px !important;font-family:inherit;
     border:1px solid var(--s-300);background:#fff;color:var(--s-700);padding:0 4px}
@@ -318,12 +322,12 @@
            原「分区角度」那一节（id=mapPartitionTools）整体迁入（runye-map-partition.js 只按 id 取 box，
            再用 querySelector 取内部 select / input / [role=status] / [data-angle-*]，
            故「搬容器不改结构」= JS 逻辑零改动）。默认靠地图区右侧，标题栏可拖动，位置记忆。 -->
-      <div class="ry-angle-panel ryp-float" id="ryAnglePanel" data-ry-panel data-ry-drag-bounds data-ry-position-key="ryAnglePanelPos" data-ry-position-legacy-key="ryAnglePanelPos" data-ry-fold-key="ryAnglePanelFolded" data-ry-fold-legacy-key="ryAnglePanelFolded" data-ry-default-top="96">
-        <div class="ry-angle-head ryp-titlebar" id="ryAngleHead" data-ry-drag title="按住这里可拖动面板">
-          <span class="ah-t ryp-title">分区角度</span>
-          <button class="ah-fold ryp-fold" id="ryAngleFold" type="button" data-ry-fold aria-label="折叠或展开分区角度面板" aria-expanded="true" data-ry-fold-open="▾" data-ry-fold-closed="▸" title="折叠/展开">▾</button>
+      <div class="ry-angle-panel ry-float-card" id="ryAnglePanel" data-ry-panel data-ry-drag-bounds data-ry-position-key="ryAnglePanelPos" data-ry-position-legacy-key="ryAnglePanelPos" data-ry-fold-key="ryAnglePanelFolded" data-ry-fold-legacy-key="ryAnglePanelFolded" data-ry-default-top="96">
+        <div class="ry-angle-head ry-float-head" id="ryAngleHead" data-ry-drag title="按住这里可拖动面板">
+          <span class="ah-t ry-float-title">分区角度</span>
+          <button class="ah-fold ry-float-caret" id="ryAngleFold" type="button" data-ry-fold aria-label="折叠或展开分区角度面板" aria-expanded="true" data-ry-fold-open="▾" data-ry-fold-closed="▸" title="折叠/展开">▾</button>
         </div>
-        <div class="ry-angle-body ryp-body" data-ry-body>
+        <div class="ry-angle-body ry-float-body" data-ry-body>
           <!-- [v283 2026-10-06] 「↩ 回传地块绘制」「💾 保存地块」：用户截图指定放在**本面板内部顶端**、
                「当前设计地块」下拉之上（v282 曾浮在地图左上角）。button id 与 JS 绑定仍零改动。
                ★ 必须留在 section#mapPartitionTools **之外** —— 该 section 是分区角度模块
