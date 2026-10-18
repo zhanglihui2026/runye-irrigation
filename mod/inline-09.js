@@ -1872,6 +1872,49 @@ function tlFlowClear(svg) {
    零阈值、随图面自动成立），v354 的固定像素阈值（8px/40px/6px）降级为兜底——
    分区面积/合并方式/缩放变化会使阀与支管线的屏幕距离超出固定阈值 ⇒ 误判无阀、
    水流退化成垂足直插。 */
+/* [v581] 总管段按**弧长**切片：从水源端沿折线走到垂足 q，包含途中所有折点。
+   旧写法 `for (k=1; k<=tap.i; k++) sub.push(fPts[k])` 用的是「最近线段的起点下标」——
+   · 垂足落在第一段时 tap.i 恒为 0 ⇒ sub 只有起点、总管段整段消失（水流从总管起点直接横穿到主管）；
+   · 多顶点折线时只按顶点下标截断，垂足所在的那一小段被整段跳过 ⇒ 水流线跳过折点、与管路错开。
+   实测（三通下移 35m）：水流 path 第二点直接跳到主管起点，总管段长度 0。 */
+function tlFlowSliceTo(fPts, q) {
+  var out = [fPts[0]];
+  var bestSeg = 0, bestT = 0, bestD = Infinity;
+  for (var i = 0; i + 1 < fPts.length; i++) {
+    var a = fPts[i], b = fPts[i + 1];
+    var dx = b[0] - a[0], dy = b[1] - a[1], c = dx * dx + dy * dy;
+    var t = c === 0 ? 0 : ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / c;
+    t = Math.max(0, Math.min(1, t));
+    var dd = Math.hypot(q[0] - (a[0] + dx * t), q[1] - (a[1] + dy * t));
+    if (dd < bestD) { bestD = dd; bestSeg = i; bestT = t; }
+  }
+  for (var k = 1; k <= bestSeg; k++) out.push(fPts[k]);
+  var a2 = fPts[bestSeg], b2 = fPts[bestSeg + 1] || a2;
+  var hit = [a2[0] + (b2[0] - a2[0]) * bestT, a2[1] + (b2[1] - a2[1]) * bestT];
+  if (tlFlowLen(out[out.length - 1], hit) > 0.5) out.push(hit);
+  return out;
+}
+/* [v581] 接入段（总管→主管那一小段）：优先读图面上真实画出来的那条 path[data-tlstub]。
+   旧写法是 `sub.concat([mp[0]])` 直连 —— 而图面的接入段是沿主管走向画的另一条线（v550/v556），
+   拖三通后接入点位置变了、方向也变了，直连与图面就对不上（用户截图里的错位）。
+   匹配方式：两端点分别与 (总管垂足 a, 主管起点 b) 就近配对，两种顺序都试；阈值防错配。 */
+function tlFlowStubBetween(svg, a, b) {
+  var list = svg.querySelectorAll('path[data-tlstub]');
+  if (!list.length) return null;
+  var best = null, bestD = Infinity;
+  for (var i = 0; i < list.length; i++) {
+    var pts = tlFlowParseD(list[i].getAttribute('d'));
+    if (pts.length < 2) continue;
+    var p0 = pts[0], p1 = pts[pts.length - 1];
+    var dA = tlFlowLen(p0, a) + tlFlowLen(p1, b);
+    var dB = tlFlowLen(p1, a) + tlFlowLen(p0, b);
+    var d = Math.min(dA, dB);
+    if (d < bestD) { bestD = d; best = (dB < dA) ? pts.slice().reverse() : pts; }
+  }
+  if (!best) return null;
+  var straight = tlFlowLen(a, b);
+  return (bestD <= straight * 1.6 + 8) ? best : null;   /* 太远 ⇒ 判定不是这条，回退直连 */
+}
 function tlFlowRoute(svg, fPts, zi) {
   var mEl = svg.querySelector('path[data-tlpipe="main-' + zi + '"]');
   if (!mEl) return null;
@@ -1884,10 +1927,16 @@ function tlFlowRoute(svg, fPts, zi) {
   var tap = tlFlowNear(mp[0], fPts);
   if (!tap) return null;
   /* 总管：从水源端到取水点（只保留参与本路径的那一段） */
-  var sub = [fPts[0]];
-  for (var k = 1; k <= tap.i; k++) sub.push(fPts[k]);
-  if (tlFlowLen(sub[sub.length - 1], tap.q) > 0.5) sub.push(tap.q);
-  var out = sub.concat([mp[0]]);                 /* 接入短管（总监→该区主管，一般是一小段斜线） */
+  /* [v581] 总管段：按弧长走到垂足（含所有折点），不再按顶点下标截断 */
+  var sub = tlFlowSliceTo(fPts, tap.q);
+  /* [v581] 接入段：走图面真实那条线；匹配不到才退回直连 */
+  var out = sub.slice();
+  var stubPts = tlFlowStubBetween(svg, sub[sub.length - 1], mp[0]);
+  if (stubPts && stubPts.length >= 2) {
+    for (var sk = 0; sk < stubPts.length; sk++) out.push(stubPts[sk]);
+  } else {
+    out.push(mp[0]);
+  }
   for (var j = 0; j < mp.length; j++) out.push(mp[j]);
   /* 支管：从主管上最近的落点接进去（支管通常挂在主管中后段）
      [v223] 接入点取「该支管阀门」在主管上的垂足 —— 水流先到阀再到支管 */

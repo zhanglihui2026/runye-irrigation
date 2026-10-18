@@ -703,7 +703,15 @@
       实测会让 tlAutoGenerate 抛 ReferenceError、工作区整个渲染不出来（关键坑）。
    保留：moves 机制本身（主管/支管的整条让位拖动仍需要）、selectAuto 选中行为。
    注：并行会话已抬到 v579 ⇒ 按规则取更高号 v580（不回退对方）。 */
-const VERSION = 'v580-front-move-removed';
+/* v581-flow-route-polyline: 水流动画跟随「拖三通后重构的折线总管」。
+   ① 总管段改按**弧长**切片 tlFlowSliceTo(fPts, 垂足)：旧写法用「最近线段起点下标」截断，
+      垂足落在第一段时 sub 只有起点（总管段整段消失、水流从总管起点直接横穿到主管），
+      多顶点折线时又会跳过垂足所在那一小段。实测三通下移后第 2 点从「直接跳到主管」变为
+      落在总管斜线上的垂足（误差 0.02px）。
+   ② 接入段优先读图面真实那条 path[data-tlstub]（两端点就近配对、反向也认），
+      匹配不到才回退直连 —— 直连与图面画法不一致是用户看到错位的另一半原因。
+   回归：_probe_front_node_ws 全绿、_probe_front_node 51/51、ci 28/0。 */
+const VERSION = 'v581-flow-route-polyline';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
