@@ -687,7 +687,12 @@
       标签/单位 12→11、输入/select 12→11(!important，typography 对控件打 13!important)、
       按钮 12→11!important、角标 12→11、φ 11.5→10.5。
    注：并行会话已抬到 v576 ⇒ 按规则取更高号 v577（不回退对方）。 */
-const VERSION = 'v577-settings-fixed-height';
+/* v578-chip-hover-unify: 卡内按钮 hover 变色统一 + 规则精简。
+   原两套：中性 chip hover 只把边框 #cbd5e1→#94a3b8、字色变深（几乎看不出）；主操作 chip hover
+   变深绿底白字。五个按钮并排 hover 观感各异（用户：变色不统一，各是各的颜色）。
+   改：hover/active 只改底色且全 chip 同色（#eaf3ed / #d8e9df），主次只由默认态的边框+字色表达。
+   颜色相关规则 6 条 → 3 条且互不覆盖；另把两处同值的「整行宽 24px」尺寸规则合并成一条。 */
+const VERSION = 'v578-chip-hover-unify';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

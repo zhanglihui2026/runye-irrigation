@@ -971,15 +971,16 @@ body.ry-tool #ryCadSide [data-pp="pipePlanSection"][data-ry-view="edit"] .ry-pan
   font-family:inherit;font-size:11px!important;font-weight:400;line-height:1;
   cursor:pointer;white-space:nowrap;
 }
-.ry-float-chip:hover{border-color:#94a3b8;color:#334155}
+/* [v578] hover / active **只改底色，且所有 chip 同一个色**。
+   原先是两套：中性 chip 的 hover 只把边框 #cbd5e1→#94a3b8、字色变深（几乎看不出变化）；
+   主操作 chip 的 hover 直接变深绿底白字（强烈）。并排五个按钮 hover 起来观感各不相同。
+   现在统一：hover #eaf3ed / active #d8e9df；主次只由**默认态**的边框与字色表达，
+   不再各写一套 hover ⇒ 颜色相关规则由 6 条降到 3 条，且互不覆盖。 */
+.ry-float-chip:hover{background:#eaf3ed}
+.ry-float-chip:active{background:#d8e9df}
 .ry-float-chip.is-danger{border-color:#fca5a5;color:#b91c1c}
-/* [v575] 卡内主操作：默认**白底深绿边深绿字**（中性），hover/按下才变绿底白字。
-   ★ 与旧口径 .mbtn-primary（常绿实心）相反 —— 用户明确要「点击之后变色」：
-     整块浮层里若主操作常绿、次要按钮白底，视觉上主次颠倒且抢走地图注意力。
-     品牌绿取 --ry-green-600（v427-deepgreen-brand，#173e32）。 */
+/* 卡内主操作（v575 口径保持）：默认白底 + 深绿边 + 绿字，不做常绿实心。 */
 .ry-float-chip.is-primary{border-color:var(--ry-green-600,#173e32);color:var(--ry-green-700,#14532d)}
-.ry-float-chip.is-primary:hover{background:var(--ry-green-600,#173e32);border-color:var(--ry-green-600,#173e32);color:#fff}
-.ry-float-chip.is-primary:active{background:var(--ry-green-700,#14532d);border-color:var(--ry-green-700,#14532d);color:#fff}
 /* 卡内文本控件字号跟卡正文（全局 typography 的 13px!important 必须压回）。
    **排除 .ai-panel**：那张卡自 v484 起在主页常驻 display:none（只 ?smart=1 走全屏工作台），
    内部属智能规划工作台的字号体系，不归本口径管；不排除会把它的 13px 一起改掉。 */

@@ -1576,3 +1576,15 @@ N4 只影响一根 / N5 图面三通跟随 / N6 clamp / N7 真实拖动（吸附
 - 验收 `_probe_set_height.mjs`：六页签 modal 792 恒定；字号实测 title 14 / nav 11.5 / h4 12 / note 10.5 /
   label 11 / unit 11 / input 11 / btn 11。ci PASS=28 FAIL=0。
 - 版本：并行会话已抬到 v576 ⇒ 取更高号 v577。
+
+### §25o v578-chip-hover-unify —— 卡内按钮 hover 变色统一 + 规则精简
+用户：「这些按钮手放上就变色这个效果是对的，但是变色还不统一，各有各的颜色，统一一个颜色，
+这个按钮是不是有多层覆盖跟嵌套，如果有，样式代码简化下。」
+- 实测（真实鼠标逐个 hover）：中性 chip hover 只把边框 #cbd5e1→#94a3b8、字色 #475569→#334155
+  （几乎看不出）；主操作 chip hover 变深绿底 #173e32 + 白字 ⇒ 五个按钮观感各异。
+- 改：hover / active **只改底色且全 chip 同色**（#eaf3ed / #d8e9df）；主次只由默认态的
+  边框与字色表达（中性 #cbd5e1/#475569 vs 主操作 #173e32/#14532d）。
+- 规则精简：颜色相关 6 条（chip / chip:hover / danger / is-primary / is-primary:hover / is-primary:active）
+  → 3 条（chip:hover 只 1 个属性、chip:active、is-primary 只留默认态），互不覆盖；
+  另把 online-map.css 与 measure 页两处同值的「整行宽 24px」尺寸规则合并成一条逗号分组。
+- 实测 hover 后五个按钮 bg 全部 rgb(234,243,237)；边框/字色保持默认（主次可辨）。ci PASS=28 FAIL=0。
