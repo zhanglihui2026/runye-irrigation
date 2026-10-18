@@ -187,7 +187,7 @@ export function createDataService(guard) {
       }
 
       /* 管件：只有数量，无价目（unitPrice=0，UI 明示「未计价」，由用户手填） */
-      /* [v556] 最外一排分区主管末端改 90°弯头（不再用分区三通），管件清单同步补一行 */
+      /* [v553] 最外一排分区主管末端改 90°弯头（不再用分区三通），管件清单同步补一行 */
       var FIT = [['zoneTee', '分区三通'], ['zoneElbow', '主管末端 90°弯头'], ['zoneValve', '分区阀门'], ['teeJoint', '主管三通'], ['frontValve', '首部阀门']];
       (FIT || []).forEach(function (f) {
         ((ft && ft[f[0]]) || []).forEach(function (x) {
@@ -228,7 +228,6 @@ export function createDataService(guard) {
   }
 
   /* ---------- ryPlot 分层接口（v1，只挂载当前层，不触发重算） ---------- */
-  var PLOT_LIBRARY_KEY = 'runye_plot_library';
   var PLOT_GEOMETRY_KEYS = {
     measuredArea: 'measuredArea',
     measuredPolygon: 'measuredPolygon',
@@ -244,13 +243,23 @@ export function createDataService(guard) {
   function resolvePlotRef(plotId) {
     if (!plotId) return null;
     try {
-      var raw = localStorage.getItem(PLOT_LIBRARY_KEY);
-      var rows = raw ? JSON.parse(raw) : [];
-      if (!Array.isArray(rows)) return null;
-      for (var i = 0; i < rows.length; i++) {
-        if (rows[i] && rows[i].id === plotId) return deepCopy(rows[i]);
+      var w = (typeof window !== 'undefined') ? window : null;
+      var store = w && w.RyPlotLibraryStore;
+      if (!store || typeof store.read !== 'function') {
+        if (guard) guard.reportError('core', new Error('plot-library-store-unavailable'), 'resolvePlotRef');
+        return null;
       }
-      return null;
+      var snapshot = store.read();
+      if (!snapshot || !snapshot.ok || !Array.isArray(snapshot.plots)) {
+        if (guard) guard.reportError('core', new Error((snapshot && snapshot.error) || 'plot-library-read-failed'), 'resolvePlotRef');
+        return null;
+      }
+      var matches = snapshot.plots.filter(function (row) { return row && row.id === plotId; });
+      if (matches.length > 1) {
+        if (guard) guard.reportError('core', new Error('duplicate-plot-id'), 'resolvePlotRef');
+        return null;
+      }
+      return matches.length ? deepCopy(matches[0]) : null;
     } catch (e) {
       if (guard) guard.reportError('core', e, 'resolvePlotRef');
       return null;

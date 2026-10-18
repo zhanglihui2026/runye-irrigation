@@ -28,10 +28,13 @@
    ============================================================ */
 (function (root, factory) {
   'use strict';
-  var api = factory();
+  var hydraulicCore = (typeof module !== 'undefined' && module.exports)
+    ? require('../hydraulic-calc/hc-core.js')
+    : (root && root.RyHcCore);
+  var api = factory(hydraulicCore);
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.RyTerrainData = api;
-})(typeof self !== 'undefined' ? self : this, function () {
+})(typeof self !== 'undefined' ? self : this, function (hydraulicCore) {
   'use strict';
 
   var MU_SQM = 666.67;           /* 1 亩 = 666.67 ㎡（与主页 atFormatArea 一致） */
@@ -1038,9 +1041,11 @@
     var q = Number(input.q_m3h), th = Number(input.total_head_m), sp = Number(input.split_at_m);
     if (!(q > 0) || !(th > 0)) return { ok: false, error: '流量与总扬程必须为正数' };
     if (!(sp > 0) || sp >= th) return { ok: false, error: '二级加压起点扬程必须为正且小于总扬程' };
+    if (!hydraulicCore || typeof hydraulicCore.power !== 'function')
+      return { ok: false, error: '共享水力公式核心未加载' };
     var eta = (input.eta > 0 && input.eta <= 1) ? input.eta : 0.7;
     function stageOf(headM, label) {
-      var pkw = 2.725 * q * headM / eta / 1000;
+      var pkw = hydraulicCore.power(q, headM, eta);
       return {
         flow: q, head: Math.round(headM * 100) / 100,
         power_kw: Math.round(pkw * 100) / 100,

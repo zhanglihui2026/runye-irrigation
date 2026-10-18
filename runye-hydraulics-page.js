@@ -52,11 +52,41 @@
   function readNet() {
     return window.RyIrrigationDataStore.readNetworkLayout();
   }
-  function readDesign() {
-    return window.RyIrrigationDataStore.readHydraulicDesign();
+  function readDesignState(net) {
+    var state = window.RyIrrigationDataStore.readHydraulicDesignStateForNetwork(net);
+    if (!net) return state;
+    var networkState = window.RyIrrigationDataStore.readNetworkLayoutStateForCurrentPlot(net);
+    if (networkState.status === 'stale') {
+      return { status: 'stale', design: state && state.design || null, reason: networkState.reason };
+    }
+    return state;
   }
-  function renderSrc() {
-    var net = readNet(), design = readDesign(), el = $('srcCard');
+  function usableDesign(state) {
+    /* Only a design snapshot explicitly bound to this exact network revision may drive design mode.
+       Legacy or missing-network snapshots can belong to a different plot; calculate from the
+       current network layout instead, or show the empty state when no layout exists. */
+    return state && state.status === 'current' ? state.design : null;
+  }
+  function renderSrc(net, designState) {
+    net = net === undefined ? readNet() : net;
+    designState = designState || readDesignState(net);
+    var design = usableDesign(designState), el = $('srcCard');
+    if (designState.status === 'stale') {
+      var staleMessage = designState.reason === 'network-needs-replan'
+        ? '地块已重新划分，原三级设计快照已失效。'
+        : designState.reason === 'network-plot-unbound'
+          ? '保存的管网没有地块归属，已停止使用以避免串用。'
+        : designState.reason === 'active-plot-mismatch'
+          ? '当前选中的地块与保存的管网不匹配。'
+        : designState.reason === 'active-plot-unavailable'
+          ? '当前地块身份无法读取，已停止使用保存的管网。'
+        : designState.reason === 'plot-id-mismatch'
+          ? '设计快照与当前地块不匹配。'
+          : '设计快照与当前管网版本不匹配。';
+      el.innerHTML = '<span style="color:var(--a-600);font-weight:700">三级规划快照已失效</span><br>' +
+        '<span style="font-size:11px;color:var(--s-500)">' + staleMessage + '请回主页重新生成管线图后再校核。</span>';
+      return;
+    }
     if (design && design.version === 1 && design.geometry && design.hydraulics) {
       var g = design.geometry, h = design.hydraulics;
       el.innerHTML = '<div class="kv"><span class="k">来源</span><span class="v">三级规划最终数据</span></div>' +
@@ -69,7 +99,9 @@
       return;
     }
     if (!net) {
-      el.innerHTML = '<span style="color:var(--r-600);font-weight:700">未找到已布置管网</span><br>' +
+      var unverifiedWithoutNetwork = designState && designState.design
+        ? '<span style="color:var(--a-600);font-weight:700">三级设计快照未匹配到当前管网，未参与校核。</span><br>' : '';
+      el.innerHTML = unverifiedWithoutNetwork + '<span style="color:var(--r-600);font-weight:700">未找到已布置管网</span><br>' +
         '<span style="font-size:11px;color:var(--s-500)">去 <a href="runye-map-measure.html">在线地图</a> 布置管网，' +
         '或回主页「生成管线图」后回来校核。</span>';
       return;
@@ -80,7 +112,9 @@
       return;
     }
     var segs = (net.segments || []).length, tapes = (net.dripTapes || []).length;
-    el.innerHTML =
+    var unverifiedDesignNote = designState && designState.design
+      ? '<div style="font-size:11px;color:var(--a-600);font-weight:700;margin-bottom:6px">三级设计快照未与当前管网版本验证绑定，未参与计算；以下按当前管网独立校核。</div>' : '';
+    el.innerHTML = unverifiedDesignNote +
       '<div class="kv"><span class="k">管段</span><span class="v">' + segs + ' 段</span></div>' +
       '<div class="kv"><span class="k">滴灌带</span><span class="v">' + tapes + ' 条</span></div>' +
       '<div class="kv"><span class="k">水源</span><span class="v">' + (net.sourcePos ? '有' : '无（自动降级）') + '</span></div>' +
@@ -105,11 +139,19 @@
   /* ---------- 校核主流程 ---------- */
   function run() {
     var net = readNet();
-    var design = readDesign();
-    renderSrc();
+    var designState = readDesignState(net);
+    var design = usableDesign(designState);
+    renderSrc(net, designState);
     syncParameterMode(!!(design && design.version === 1));
     var opts = readOpts();
     saveCfg();
+    if (designState.status === 'stale') {
+      lastFull = lastNet = lastDesign = null;
+      $('out').style.display = 'none';
+      $('emptyBox').textContent = '当前地块、管网或三级设计快照不匹配。请切回对应地块或重新生成管线图后再校核。';
+      $('emptyBox').style.display = '';
+      return;
+    }
     if ((!design || design.version !== 1) && (!net || net.needsReplan || !(net.segments || []).length)) {
       $('emptyBox').style.display = '';
       $('out').style.display = 'none';

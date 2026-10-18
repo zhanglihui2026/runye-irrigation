@@ -54,11 +54,13 @@
 
   function applyMapMeasuredArea(provided){
     try{
-      var raw = provided ? JSON.stringify(provided) : (new URLSearchParams(location.search).has('partitionPreview') ? null : localStorage.getItem('runyeMeasuredArea'));
+      var transferStore = window.RyMeasuredAreaBridgeStore;
+      if(!transferStore) throw new Error('地块回传存储服务未加载');
+      var raw = provided ? JSON.stringify(provided) : (new URLSearchParams(location.search).has('partitionPreview') ? null : transferStore.readRaw());
       if(!raw) return false;
       var payload=JSON.parse(raw);
       var d = resolvePlotRef(payload);
-      if(!d || !d.sqm){ localStorage.removeItem('runyeMeasuredArea'); return false; }
+      if(!d || !d.sqm){ transferStore.remove(); return false; }
       if(typeof window.runyePersistMeasuredPlot!=='function') throw new Error('地块库接收接口未加载');
 
       // 写入全局实测面积（㎡），驱动「二级管路」的计算
@@ -165,7 +167,7 @@
       if(window.RyMapPartition && d.partitionPlan){if(typeof ppLoadPolygon==='function')ppLoadPolygon();RyMapPartition.restore(d.partitionPlan);}
       if(d.partitionPlan && d.plotId && typeof window.runyeSetCurrentPlot==='function') window.runyeSetCurrentPlot(d.plotId);
       showMapBanner(d);
-      localStorage.removeItem('runyeMeasuredArea');
+      transferStore.remove();
       if(typeof window.ryJumpToSection==='function') window.ryJumpToSection('pipePlanSection');
       return true;
     }catch(e){

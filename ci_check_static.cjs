@@ -82,6 +82,42 @@ const coreSource = coreMatch ? coreMatch[1] : '';
 const coreEntries = [...coreSource.matchAll(/^\s*"([^"\r\n]+)"\s*,?(?:\s*\/\*[^\r\n]*\*\/)?\s*$/gm)]
   .map((entry) => entry[1]);
 const coreSet = new Set(coreEntries);
+/* Detached 3D/axonometric code is retained only under feature-archive. Guard
+   the live entry, navigation, plugin registry, and offline CORE against
+   accidentally reconnecting its runtime assets. */
+const archived3dMarkers = ['runye-pipe3d.js', 'pwa/vendor/three.min.js', 'iso-diagram/', 'network-editor.js', 'plugins/iso-view/'];
+const archived3dSources = [
+  ['index.html', indexSource],
+  ['runye-nav.js', fs.readFileSync(path.join(ROOT, 'runye-nav.js'), 'utf8')],
+  ['plugins.json', fs.readFileSync(path.join(ROOT, 'plugins.json'), 'utf8')],
+  ['Service Worker CORE', coreEntries.join('\n')]
+];
+const archived3dReferences = [];
+for (const [sourceName, sourceText] of archived3dSources) {
+  for (const marker of archived3dMarkers) {
+    if (sourceText.includes(marker)) archived3dReferences.push(sourceName + ' → ' + marker);
+  }
+}
+check('④0 归档三维/轴测图不连接主程序、导航、插件清单或离线缓存', archived3dReferences.length === 0,
+  archived3dReferences.join(' | '));
+/* The old iframe navigation shell was retired after terrain and map tools were
+   integrated into the main page. Keep its script/API/container out of active
+   assembly and offline CORE so it cannot silently return as a parallel route. */
+const legacyFrameShellSources = [
+  ['index.html', indexSource],
+  ['runye-nav.js', fs.readFileSync(path.join(ROOT, 'runye-nav.js'), 'utf8')],
+  ['mod/inline-32.js', fs.readFileSync(path.join(ROOT, 'mod/inline-32.js'), 'utf8')],
+  ['Service Worker CORE', coreEntries.join('\n')]
+];
+const legacyFrameShellMarkers = ['mod/inline-31.js', 'RyFrameShell', '#ryFrameShell', 'data-fr-page'];
+const legacyFrameShellReferences = [];
+for (const [sourceName, sourceText] of legacyFrameShellSources) {
+  for (const marker of legacyFrameShellMarkers) {
+    if (sourceText.includes(marker)) legacyFrameShellReferences.push(sourceName + ' → ' + marker);
+  }
+}
+check('④0b 退役 iframe 导航壳不连接主页面、导航或离线缓存', legacyFrameShellReferences.length === 0,
+  legacyFrameShellReferences.join(' | '));
 const localPageScripts = new Set();
 const missingPageScripts = [];
 const pageScriptTags = [...indexSource.matchAll(/<script\b([^>]*)>/gi)];
@@ -133,6 +169,21 @@ for (const stylesheet of localPageStylesheets) {
 /* index.html 的经典脚本执行顺序是同步依赖契约。CORE 资源检查使用原始入口，
    因 expandIndex 会把 mod/ 外链替换成内联正文，不能从展开视图恢复真实资源列表或顺序。 */
 const scriptOrderRules = [
+  ['core/irrigation-data-store.js', 'mod/inline-09.js'],
+  ['core/plot-library-store.js', 'mod/inline-13.js'],
+  ['core/irrigation-data-store.js', 'runye-map-partition.js'],
+  ['core/plot-library-store.js', 'runye-map-partition.js'],
+  ['core/irrigation-data-store.js', 'mod/online-map.js'],
+  ['core/plot-library-store.js', 'mod/online-map.js'],
+  ['core/measured-area-bridge-store.js', 'mod/online-map.js'],
+  ['core/irrigation-data-store.js', 'runye-map-enhance.js'],
+  ['core/plot-library-store.js', 'runye-map-enhance.js'],
+  ['core/measured-area-bridge-store.js', 'runye-map-enhance.js'],
+  ['core/terrain-bridge-store.js', 'mod/online-map.js'],
+  ['core/sprinkler-bridge-store.js', 'terrain/terrain-ui.js'],
+  ['core/measured-area-bridge-store.js', 'terrain/terrain-ui.js'],
+  ['hydraulic-calc/hc-core.js', 'terrain/terrain-core.js'],
+  ['terrain/terrain-core.js', 'terrain/terrain-ui.js'],
   ['mod/material-formulas.js', 'mod/material-table.js'],
   ['mod/material-table.js', 'mod/inline-09.js'],
   ['mod/tl-polyline-geometry.js', 'mod/inline-09.js'],
@@ -161,6 +212,226 @@ for (const asset of synchronousScriptAssets) {
   }
 }
 check('④a 同步脚本依赖顺序', scriptOrderErrors.length === 0, scriptOrderErrors.join(' | '));
+
+/* A hydraulic design snapshot is valid for a network only when its explicit
+   binding matches. Partition changes mark layouts needsReplan; keep the page
+   from calculating against the retained, older design snapshot. */
+const irrigationStoreSource = fs.readFileSync(path.join(ROOT, 'core/irrigation-data-store.js'), 'utf8');
+const hydraulicsPageSource = fs.readFileSync(path.join(ROOT, 'runye-hydraulics-page.js'), 'utf8');
+const hydraulicsRunMatch = hydraulicsPageSource.match(/function run\(\)\s*\{([\s\S]*?)\n\s*\}\s*\n\s*function kindTag/);
+const hydraulicsRunSource = hydraulicsRunMatch ? hydraulicsRunMatch[1] : '';
+const staleGateIndex = hydraulicsRunSource.indexOf("designState.status === 'stale'");
+const hydraulicComputeIndex = hydraulicsRunSource.indexOf('Core.computeDesign');
+const hydraulicSnapshotProducer = fs.readFileSync(path.join(ROOT, 'mod/inline-09.js'), 'utf8');
+const hydraulicSnapshotBindingOk = irrigationStoreSource.includes('readHydraulicDesignStateForNetwork') &&
+  !!hydraulicsRunMatch && staleGateIndex >= 0 && hydraulicComputeIndex > staleGateIndex &&
+  hydraulicSnapshotProducer.includes('plotId: window.currentPlotId || null,') &&
+  hydraulicSnapshotProducer.includes('designTs=hydraulicDesignSaved?hydraulicDesignTs:null');
+check('④a2 水力校核拒绝重划/失配快照，三级新快照写入关联标识', hydraulicSnapshotBindingOk,
+  hydraulicSnapshotBindingOk ? '' : '桥接状态校验、先于计算的过期门禁或生产端关联字段缺失');
+
+const hydraulicCompatPage = fs.readFileSync(path.join(ROOT, 'runye-hydraulics.html'), 'utf8');
+const hydraulicCompatRunMatch = hydraulicCompatPage.match(/function run\(\)\s*\{([\s\S]*?)\n\s*\}\s*\n\s*function kindTag/);
+const hydraulicCompatRunSource = hydraulicCompatRunMatch ? hydraulicCompatRunMatch[1] : '';
+const compatStaleGateIndex = hydraulicCompatRunSource.indexOf("designState.status === 'stale'");
+const compatComputeIndex = hydraulicCompatRunSource.indexOf('Core.computeDesign');
+const hydraulicCoreSource = fs.readFileSync(path.join(ROOT, 'runye-hydraulics-core.js'), 'utf8');
+const hydraulicOverlayIdentityOk = irrigationStoreSource.includes('readNetworkLayoutStateForCurrentPlot') &&
+  irrigationStoreSource.includes("overlay.version !== 2") &&
+  irrigationStoreSource.includes("networkState.status !== 'current'") &&
+  irrigationStoreSource.includes("normalizedId(overlay.plotId) !== normalizedId(network.plotId)") &&
+  irrigationStoreSource.includes("normalizedId(overlay.designRevisionId) !== normalizedId(network.designRevisionId)") &&
+  hydraulicCoreSource.includes('version: 2, networkTs:') && hydraulicCoreSource.includes('designRevisionId: net') &&
+  hydraulicsPageSource.includes('readNetworkLayoutStateForCurrentPlot') &&
+  !!hydraulicCompatRunMatch && hydraulicCompatPage.includes('readNetworkLayoutStateForCurrentPlot') &&
+  compatStaleGateIndex >= 0 && compatComputeIndex > compatStaleGateIndex;
+check('④a3 水力快照按当前地块与修订号配对，兼容页先拒绝失配再计算', hydraulicOverlayIdentityOk,
+  hydraulicOverlayIdentityOk ? '' : '兼容页失配门禁、叠加层地块/修订身份校验或 v2 写入契约缺失');
+
+/* Map geometry comes from the same global network slot as hydraulic checks.
+   Require an explicit current-plot owner before drawing any pipe/device layer;
+   if the storage adapter is absent, keep the plot map usable and suppress only
+   the unavailable network overlay. */
+const mapOwnershipSource = fs.readFileSync(path.join(ROOT, 'runye-map-enhance.js'), 'utf8');
+const mapNetworkOwnerMatch = mapOwnershipSource.match(/function networkMatchesCurrentPlot\(network\)\s*\{([\s\S]*?)\n\s*\}\s*\n\s*function dnStyle/);
+const mapNetworkOwnerBody = mapNetworkOwnerMatch ? mapNetworkOwnerMatch[1] : '';
+const mapReadNetworkMatch = mapOwnershipSource.match(/function readNetwork\(\)\s*\{([\s\S]*?)\n\s*\}\s*\n\s*\/\* 地图只显示/);
+const mapReadNetworkBody = mapReadNetworkMatch ? mapReadNetworkMatch[1] : '';
+const mapRenderNetworkMatch = mapOwnershipSource.match(/function renderNetwork\(state, opts\)\s*\{([\s\S]*?)\n\s*\}\s*\n\s*\/\* ---- 导出：地块/);
+const mapRenderNetworkBody = mapRenderNetworkMatch ? mapRenderNetworkMatch[1] : '';
+const mapOwnerGateIndex = mapRenderNetworkBody.indexOf('networkMatchesCurrentPlot(net)');
+const mapHydraulicReadIndex = mapRenderNetworkBody.indexOf('readHydraulicOverlay(net)');
+const mapGeometryDrawIndex = mapRenderNetworkBody.indexOf('(net.segments || []).forEach');
+const mapSourceDrawIndex = mapRenderNetworkBody.indexOf('if (net.sourcePos &&');
+const mapValveDrawIndex = mapRenderNetworkBody.indexOf('if (net.valves &&');
+const mapDripDrawIndex = mapRenderNetworkBody.indexOf('if (net.dripTapes &&');
+const mapNetworkOwnershipOk = !!mapNetworkOwnerMatch &&
+  mapNetworkOwnerBody.includes("network.plotId == null || network.plotId === ''") &&
+  mapNetworkOwnerBody.includes('readNetworkLayoutStateForCurrentPlot') &&
+  mapNetworkOwnerBody.includes("ownership.status === 'current'") &&
+  !!mapReadNetworkMatch && mapReadNetworkBody.includes('readNetworkLayout') &&
+  mapReadNetworkBody.includes('return null') &&
+  !!mapRenderNetworkMatch && mapOwnerGateIndex >= 0 &&
+  mapRenderNetworkBody.includes("reason: 'network-plot-binding-mismatch'") &&
+  mapHydraulicReadIndex > mapOwnerGateIndex && mapGeometryDrawIndex > mapOwnerGateIndex &&
+  mapSourceDrawIndex > mapOwnerGateIndex && mapValveDrawIndex > mapOwnerGateIndex &&
+  mapDripDrawIndex > mapOwnerGateIndex;
+check('④a4 在线地图管网几何只绘制当前地块快照，存储桥缺失时只隐藏管网层', mapNetworkOwnershipOk,
+  mapNetworkOwnershipOk ? '' : '管网地块归属门禁、失配早退、存储桥缺失兜底或绘制前顺序契约缺失');
+
+const networkOwnerFailClosed = irrigationStoreSource.includes("reason: 'network-plot-unbound'") &&
+  irrigationStoreSource.includes('!anchor.ok || anchor.id == null') &&
+  hydraulicsPageSource.includes("designState.reason === 'network-plot-unbound'") &&
+  fs.readFileSync(path.join(ROOT, 'runye-hydraulics.html'), 'utf8').includes("designState.reason === 'network-plot-unbound'");
+check('④a4b 水力与地图共用归属门禁：无地块ID或无当前锚点一律失效关闭', networkOwnerFailClosed,
+  networkOwnerFailClosed ? '' : '归属身份缺失仍可能被判为 current，或页面未提示停止使用');
+
+const onlineMapProjectSource = fs.readFileSync(path.join(ROOT, 'mod/online-map.js'), 'utf8');
+const projectBindingValidationIndex = onlineMapProjectSource.indexOf('irrigationStore.validateNetworkPlotBinding(d.network,d.plots)');
+const projectPlotWriteIndex = onlineMapProjectSource.indexOf('plotWrite=plotStore.replace(d.plots,plotSnapshot.revision)');
+const projectNetworkOwnershipOk = irrigationStoreSource.includes('function validateNetworkPlotBinding(network, plots)') &&
+  irrigationStoreSource.includes("error: 'network-plot-not-in-project'") &&
+  irrigationStoreSource.includes("error: 'network-plot-ambiguous'") &&
+  projectBindingValidationIndex >= 0 && projectBindingValidationIndex < projectPlotWriteIndex &&
+  onlineMapProjectSource.includes('networkBinding.status===\'unbound\'') &&
+  onlineMapProjectSource.includes('当前地块不匹配，地图暂不显示');
+check('④a5 工程导入先验证管网归属，旧/失配快照明确提示并避免串图', projectNetworkOwnershipOk,
+  projectNetworkOwnershipOk ? '' : '工程管网owner校验未在写入前运行，或成功提示未解释安全隐藏状态');
+
+const mapPartitionSource = fs.readFileSync(path.join(ROOT, 'runye-map-partition.js'), 'utf8');
+const partitionGeneratedNetworkScopeOk = mapPartitionSource.includes("plotsStore.generatedCurrentOwner(p)") &&
+  mapPartitionSource.includes('var networkPlotId=designPlotId||p.id') &&
+  mapPartitionSource.includes('readRawNetworkLayout(networkPlotId)') &&
+  mapPartitionSource.includes('net.plotId===networkPlotId');
+const scopedStoreOwnershipOk = irrigationStoreSource.includes("networkLayoutByPlot: 'runye_network_layout_by_plot_v1:'") &&
+  irrigationStoreSource.includes("hydraulicDesignByPlot: 'runye_hydraulic_design_by_plot_v1:'") &&
+  irrigationStoreSource.includes("hydraulicOverlayByPlot: 'runye_hydraulic_overlay_by_plot_v1:'") &&
+  irrigationStoreSource.includes('function readScopedOrLegacy') &&
+  irrigationStoreSource.includes('normalizedId(legacy.plotId) !== normalizedId(plotId)') &&
+  irrigationStoreSource.includes('if (!anchor.ok || !anchor.id) return null;') &&
+  irrigationStoreSource.includes('function preserveBoundLegacySnapshot') &&
+  irrigationStoreSource.includes('readNetworkLayoutForPlot') &&
+  irrigationStoreSource.includes('readHydraulicDesignForPlot(network.plotId)') &&
+  irrigationStoreSource.includes('readHydraulicOverlayForPlot(network.plotId)') &&
+  partitionGeneratedNetworkScopeOk &&
+  mapPartitionSource.includes('restoreNetworkLayoutIfCurrent(expectedRaw,previousRaw,plotId)') &&
+  onlineMapProjectSource.includes('networkScopeId=d.network==null?undefined:(d.network.plotId||null)') &&
+  onlineMapProjectSource.includes('restoreNetworkLayoutIfCurrent(d.network==null?null:JSON.stringify(d.network),oldNetworkRaw,networkScopeId)');
+check('④a6 管网/设计/叠加按地块隔离，自动地块映射回原设计管网，导入与分区回滚使用同一地块作用域', scopedStoreOwnershipOk,
+  scopedStoreOwnershipOk ? '' : '地块作用域存储、旧槽兼容保全或按同一owner compare-and-restore 契约缺失');
+
+/* Main-page network projection must follow the page's in-memory plot identity,
+   not the cross-tab shared current-plot anchor used by convenience reads. */
+const projectionStart = hydraulicSnapshotProducer.indexOf('/* [map-enhance] 管网反投卫星图');
+const projectionEnd = hydraulicSnapshotProducer.indexOf('/* 系统简图图框同步', projectionStart);
+const projectionSource = projectionStart >= 0 && projectionEnd > projectionStart
+  ? hydraulicSnapshotProducer.slice(projectionStart, projectionEnd) : '';
+const projectionWrites = [...projectionSource.matchAll(/writeNetworkLayout\(([^;]+)\);/g)].map((match) => match[1]);
+const projectionPlotScopeOk = !!projectionSource &&
+  projectionSource.includes('var plotId=window.currentPlotId || null;') &&
+  projectionSource.includes('readNetworkLayoutForPlot(plotId)') &&
+  !projectionSource.includes('readNetworkLayout()') &&
+  projectionSource.includes('if(plotId){') &&
+  projectionWrites.length >= 3 && projectionWrites.every((args) => /,\s*plotId\s*$/.test(args));
+check('④a7 三级图面反投按页面地块读写，避免跨标签活动锚点串用', projectionPlotScopeOk,
+  projectionPlotScopeOk ? '' : '反投仍使用活动锚点读写，或网络快照写入未显式绑定本页地块');
+
+const projectSessionSource = fs.readFileSync(path.join(ROOT, 'mod/inline-12.js'), 'utf8');
+const projectAnchorWriterMatch = projectSessionSource.match(/function writeCurrentPlotAnchor\(id\)\s*\{([\s\S]*?)\n\s*\}/);
+const projectAutoRestoreMatch = projectSessionSource.match(/function ryAutoRestoreProject\(\)\s*\{([\s\S]*?)\n\s*\}\s*\n\s*\/\* \[v327\]/);
+const projectAnchorWriterBody = projectAnchorWriterMatch ? projectAnchorWriterMatch[1] : '';
+const projectAutoRestoreBody = projectAutoRestoreMatch ? projectAutoRestoreMatch[1] : '';
+const tabAnchorOwnershipOk = irrigationStoreSource.includes("currentPlotAnchorByTab: 'runye_current_plot_tab_v1'") &&
+  irrigationStoreSource.includes('root.sessionStorage.getItem(KEYS.currentPlotAnchorByTab)') &&
+  irrigationStoreSource.includes('root.sessionStorage.setItem(KEYS.currentPlotAnchorByTab, raw)') &&
+  irrigationStoreSource.includes('readCurrentPlotAnchor: readCurrentPlotAnchor') &&
+  projectAnchorWriterBody.includes("typeof store.writeCurrentPlotAnchor!=='function') return false") &&
+  projectAnchorWriterBody.includes('store.writeCurrentPlotAnchor(id)') &&
+  !projectAnchorWriterBody.includes('localStorage.') &&
+  projectAutoRestoreBody.includes("typeof store.readCurrentPlotAnchor!=='function') return") &&
+  projectAutoRestoreBody.includes('store.readCurrentPlotAnchor()') &&
+  !projectAutoRestoreBody.includes("getItem('runye_current_plot_v1'") &&
+  !projectAutoRestoreBody.includes('getItem(CUR_PLOT_KEY') &&
+  !projectAutoRestoreBody.includes('CUR_PLOT_KEY');
+check('④a8 当前标签页只经锚点适配器读写，适配器缺失时不回退共享锚点', tabAnchorOwnershipOk,
+  tabAnchorOwnershipOk ? '' : '工程存取未通过sessionStorage适配器，或适配器缺失时仍读写共享锚点');
+
+/* The standalone terrain page has its own classic-script assembly. Keep its
+   storage bridges and shared hydraulic core ahead of the terrain consumers,
+   and make sure these assets remain available to the offline CORE cache. */
+const terrainPage = path.join(ROOT, 'terrain', 'index.html');
+const terrainSource = fs.readFileSync(terrainPage, 'utf8');
+const terrainScripts = [];
+for (const match of terrainSource.matchAll(/<script\b([^>]*)>/gi)) {
+  const srcMatch = match[1].match(/\bsrc\s*=\s*["']([^"']+)["']/i);
+  if (!srcMatch) continue;
+  const asset = path.posix.normalize(path.posix.join('terrain', decodeURIComponent(srcMatch[1].split(/[?#]/, 1)[0])));
+  terrainScripts.push({ asset, attrs: match[1] });
+}
+const terrainOrderRules = [
+  ['core/terrain-bridge-store.js', 'terrain/terrain-core.js'],
+  ['core/sprinkler-bridge-store.js', 'terrain/terrain-core.js'],
+  ['core/measured-area-bridge-store.js', 'terrain/terrain-core.js'],
+  ['hydraulic-calc/hc-core.js', 'terrain/terrain-core.js'],
+  ['terrain/terrain-core.js', 'terrain/terrain-ui.js']
+];
+const terrainOrderErrors = [];
+const terrainRequiredAssets = [...new Set(terrainOrderRules.flat())];
+for (const asset of terrainRequiredAssets) {
+  const matches = terrainScripts.filter((item) => item.asset === asset);
+  if (matches.length !== 1) {
+    terrainOrderErrors.push(`${asset}：terrain/index.html 中必须且只出现一次`);
+    continue;
+  }
+  if (/\b(?:async|defer)(?=\s|=|$)/i.test(matches[0].attrs) || /\btype\s*=\s*["']module["']/i.test(matches[0].attrs)) {
+    terrainOrderErrors.push(`${asset} 必须保持同步经典脚本`);
+  }
+  if (!coreSet.has(asset)) terrainOrderErrors.push(`${asset} 未纳入 Service Worker CORE`);
+  if (!fs.existsSync(path.join(ROOT, asset))) terrainOrderErrors.push(`${asset} 文件缺失`);
+}
+for (const [before, after] of terrainOrderRules) {
+  const beforeIndex = terrainScripts.findIndex((item) => item.asset === before);
+  const afterIndex = terrainScripts.findIndex((item) => item.asset === after);
+  if (beforeIndex >= 0 && afterIndex >= 0 && beforeIndex >= afterIndex) terrainOrderErrors.push(`${before} 必须先于 ${after}`);
+}
+check('④b 独立地形页桥接、公式与计算脚本顺序及 CORE 缓存', terrainOrderErrors.length === 0,
+  terrainOrderErrors.join(' | '));
+
+/* The standalone map page also uses map-enhance for plot overlays and
+   hydraulic overlays. Keep both stores loaded before that adapter. */
+const mapPage = path.join(ROOT, 'runye-map-measure.html');
+const mapPageSource = fs.readFileSync(mapPage, 'utf8');
+const mapPageScripts = [];
+for (const match of mapPageSource.matchAll(/<script\b([^>]*)>/gi)) {
+  const srcMatch = match[1].match(/\bsrc\s*=\s*["']([^"']+)["']/i);
+  if (!srcMatch) continue;
+  const asset = path.posix.normalize(decodeURIComponent(srcMatch[1].split(/[?#]/, 1)[0]));
+  mapPageScripts.push({ asset, attrs: match[1] });
+}
+const mapPageOrderRules = [
+  ['core/irrigation-data-store.js', 'runye-map-enhance.js'],
+  ['core/plot-library-store.js', 'runye-map-enhance.js'],
+  ['core/measured-area-bridge-store.js', 'runye-map-enhance.js'],
+  ['core/irrigation-data-store.js', 'runye-map-partition.js'],
+  ['core/plot-library-store.js', 'runye-map-partition.js']
+];
+const mapPageOrderErrors = [];
+for (const asset of [...new Set(mapPageOrderRules.flat())]) {
+  const matches = mapPageScripts.filter((item) => item.asset === asset);
+  if (matches.length !== 1) {
+    mapPageOrderErrors.push(`${asset}：runye-map-measure.html 中必须且只出现一次`);
+    continue;
+  }
+  if (!coreSet.has(asset)) mapPageOrderErrors.push(`${asset} 未纳入 Service Worker CORE`);
+  if (!fs.existsSync(path.join(ROOT, asset))) mapPageOrderErrors.push(`${asset} 文件缺失`);
+}
+for (const [before, after] of mapPageOrderRules) {
+  const beforeIndex = mapPageScripts.findIndex((item) => item.asset === before);
+  const afterIndex = mapPageScripts.findIndex((item) => item.asset === after);
+  if (beforeIndex >= 0 && afterIndex >= 0 && beforeIndex >= afterIndex) mapPageOrderErrors.push(`${before} 必须先于 ${after}`);
+}
+check('④c 独立地图页存储桥先于地图适配器并纳入 CORE', mapPageOrderErrors.length === 0,
+  mapPageOrderErrors.join(' | '));
 
 /* CloudBase 仅提供云端能力；cloud-sync.js 在 SDK 缺失时保留本地模式。 */
 const optionalPageScripts = new Map([
@@ -242,6 +513,82 @@ check('④ 主页面本地脚本/样式表已纳入 Service Worker CORE（可选
     pluginManifestErrors.length ? '插件清单错误：' + pluginManifestErrors.join('; ') : '',
     optionalPageScripts.size ? '显式可选：' + [...optionalPageScripts].map(([asset, reason]) => asset + '（' + reason + '）').join('; ') : ''
   ].filter(Boolean).join(' | '));
+
+/* Economic settings are shared by several classic-script consumers. Keep their
+   localStorage ownership in the adapter and preserve synchronous load order. */
+const economicStoreAsset = 'core/economic-settings-store.js';
+const economicConsumers = [
+  'mod/inline-07.js', 'mod/inline-27.js', 'mod/inline-28.js', 'mod/material-table.js'
+];
+const economicKeys = ['runye_tlEconAssum', 'runye_tlEconPrices'];
+const economicBoundaryErrors = [];
+const economicStoreSource = fs.readFileSync(path.join(ROOT, economicStoreAsset), 'utf8');
+for (const key of economicKeys) {
+  if (!economicStoreSource.includes("'" + key + "'")) economicBoundaryErrors.push('适配器缺少键 ' + key);
+}
+for (const asset of economicConsumers) {
+  const item = orderedPageScripts.find((candidate) => candidate.asset === asset);
+  if (!item) { economicBoundaryErrors.push('消费者未在 index.html 装配：' + asset); continue; }
+  const source = fs.readFileSync(path.join(ROOT, asset), 'utf8');
+  if (!source.includes('RyEconomicSettingsStore.')) economicBoundaryErrors.push('消费者未调用适配器：' + asset);
+  for (const key of economicKeys) {
+    const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const directAccess = new RegExp("(?:window\\.)?localStorage\\.(?:getItem|setItem|removeItem)\\s*\\(\\s*['\"]" + escaped + "['\"]");
+    if (directAccess.test(source)) economicBoundaryErrors.push('消费者绕过适配器直接访问 ' + key + '：' + asset);
+  }
+  const storeIndex = orderedPageScripts.findIndex((candidate) => candidate.asset === economicStoreAsset);
+  const consumerIndex = orderedPageScripts.indexOf(item);
+  if (storeIndex < 0 || storeIndex >= consumerIndex) economicBoundaryErrors.push(economicStoreAsset + ' 必须先于 ' + asset + ' 加载');
+}
+check('⑤ 经济设置共享键由适配器统一读写并先行加载', economicBoundaryErrors.length === 0,
+  economicBoundaryErrors.join(' | '));
+
+/* runye-map-enhance supports standalone embedding when the shared plot store is
+   absent. Keep the raw-key read strictly as a last-resort compatibility path,
+   and require all writes to go through the revision-aware store. */
+const mapEnhanceSource = fs.readFileSync(path.join(ROOT, 'runye-map-enhance.js'), 'utf8');
+const plotReadBody = mapEnhanceSource.match(/function readPlotLibraryState\(\)\s*\{([\s\S]*?)\n\s*\}\s*\n\s*function readPlotLibrary\(\)/);
+const plotReadBodyText = plotReadBody ? plotReadBody[1] : '';
+const plotStoreProbeIndex = plotReadBodyText.indexOf("store && typeof store.read === 'function'");
+const plotFallbackIndex = plotReadBodyText.indexOf("localStorage.getItem('runye_plot_library')");
+const plotStoreWrite = /localStorage\.(?:setItem|removeItem)\s*\(\s*['"]runye_plot_library['"]/.test(mapEnhanceSource);
+const plotReplaceUsesStore = /function replacePlotLibrary\(plots, revision\)\s*\{[\s\S]*?store\.replace\(plots, revision\)/.test(mapEnhanceSource);
+const plotLibraryBoundaryOk = !!plotReadBody && plotStoreProbeIndex >= 0 && plotFallbackIndex > plotStoreProbeIndex &&
+  !plotStoreWrite && plotReplaceUsesStore;
+check('⑤b 地块库裸读仅为适配器缺席时的回退，写入必须经版本校验适配器', plotLibraryBoundaryOk,
+  [plotReadBody ? '' : '读取函数结构变化', plotStoreProbeIndex >= 0 && plotFallbackIndex > plotStoreProbeIndex ? '' : '裸读未处于适配器缺席回退后',
+    plotStoreWrite ? '发现适配器外直接写入' : '', plotReplaceUsesStore ? '' : '写入未委托适配器'].filter(Boolean).join(' | '));
+
+/* High-risk cross-page snapshots have one storage owner. Consumer pages must
+   call their bridge API instead of reaching into local/sessionStorage by key. */
+const bridgeConsumerSources = [
+  ['index.html', indexSource],
+  ['mod/inline-09.js', fs.readFileSync(path.join(ROOT, 'mod/inline-09.js'), 'utf8')],
+  ['mod/inline-12.js', fs.readFileSync(path.join(ROOT, 'mod/inline-12.js'), 'utf8')],
+  ['mod/inline-13.js', fs.readFileSync(path.join(ROOT, 'mod/inline-13.js'), 'utf8')],
+  ['mod/inline-16.js', fs.readFileSync(path.join(ROOT, 'mod/inline-16.js'), 'utf8')],
+  ['mod/online-map.js', onlineMapProjectSource],
+  ['runye-map-enhance.js', mapEnhanceSource],
+  ['runye-map-partition.js', fs.readFileSync(path.join(ROOT, 'runye-map-partition.js'), 'utf8')],
+  ['runye-hydraulics-page.js', hydraulicsPageSource],
+  ['runye-hydraulics.html', hydraulicCompatPage],
+  ['terrain/terrain-ui.js', fs.readFileSync(path.join(ROOT, 'terrain/terrain-ui.js'), 'utf8')],
+  ['plugins/sprinkler/main.js', fs.readFileSync(path.join(ROOT, 'plugins/sprinkler/main.js'), 'utf8')]
+];
+const bridgeOwnedKeys = [
+  'runye_network_layout', 'runye_hydraulic_design_v1', 'runye_hydraulic_overlay_v1',
+  'runye_terrain_incoming', 'runye_terrain_incoming_tab_token', 'runyeMeasuredArea', 'runyeSprinklerResult'
+];
+const bridgeRawAccess = [];
+for (const [sourceName, sourceText] of bridgeConsumerSources) {
+  for (const key of bridgeOwnedKeys) {
+    const keyLiteral = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const directStoreCall = new RegExp("(?:\\bwindow\\s*\\.\\s*|\\broot\\s*\\.\\s*|\\bglobal(?:This)?\\s*\\.\\s*)?(?:localStorage|sessionStorage)\\s*\\.\\s*(?:getItem|setItem|removeItem)\\s*\\(\\s*([\\\"'`])" + keyLiteral + "\\1");
+    if (directStoreCall.test(sourceText)) bridgeRawAccess.push(sourceName + ' → ' + key);
+  }
+}
+check('⑤c 跨页面地块/管网/地形/喷灌快照只通过存储桥访问', bridgeRawAccess.length === 0,
+  bridgeRawAccess.join(' | '));
 
 /* ---------- ③ 常量单一来源 ---------- */
 function countDef(re) { return (html.match(re) || []).length; }
@@ -384,5 +731,29 @@ for (const [rel, anchor] of FLOAT_CARD_ANCHORS) {
 check('⑧ 悬浮卡片外壳单一归属：四张卡挂 .ry-float-card，且不再各自写一套壳（v544）',
   floatCardProblems.length === 0,
   floatCardProblems.slice(0, 4).join(' | '));
+
+/* ---------- ⑨ 发布脚本只能推送本次确认的提交 ---------- */
+const publishScript = fs.readFileSync(path.join(ROOT, '推送更新.bat'), 'utf8');
+const publishRequired = [
+  'git fetch --quiet origin +refs/heads/master:refs/remotes/origin/master',
+  'if not "%START_HEAD%"=="%PUBLISH_BASE%"',
+  'if not "%PUSH_REMOTE%"=="%PUBLISH_BASE%"',
+  'if not "%PUSH_HEAD%"=="%COMMIT_SHA%"',
+  'if not "%PUSH_PARENT%"=="%PUBLISH_BASE%"',
+  'powershell -NoProfile -Command "$m=[Environment]::GetEnvironmentVariable(\'MSG\'); if (($m -match \'[&|<>^()!]\') -or $m.Contains([char]37) -or $m.Contains([char]34)) { exit 1 }"',
+  'for /f "delims=" %%T in (\'git write-tree 2^>nul\') do set "APPROVED_TREE=%%T"',
+  'for /f "delims=" %%T in (\'git rev-parse HEAD^{tree} 2^>nul\') do set "COMMIT_TREE=%%T"',
+  'if not "%COMMIT_TREE%"=="%APPROVED_TREE%"',
+  'git push origin "%COMMIT_SHA%:refs/heads/master"'
+];
+const publishMissing = publishRequired.filter((text) => !publishScript.includes(text));
+const publishUnsafePush = /^\s*git\s+push\s+origin\s+master\s*$/im.test(publishScript);
+const publishAutoStage = /^\s*git\s+add\b/im.test(publishScript);
+const publishBoundaryOk = publishMissing.length === 0 && !publishUnsafePush && !publishAutoStage;
+check('⑨ 发布脚本校验远端基线、提交快照与命令输入并只推本次确认提交', publishBoundaryOk,
+  [publishMissing.length ? '缺少校验：' + publishMissing.join(' | ') : '',
+    publishUnsafePush ? '发现无范围限制的 master 推送' : '',
+    publishAutoStage ? '发现自动暂存' : ''].filter(Boolean).join(' | '));
+
 console.log('\n== ci_check_static：PASS=' + pass + ' FAIL=' + fail + ' ==');
 process.exit(fail ? 1 : 0);

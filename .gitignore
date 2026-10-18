@@ -100,6 +100,8 @@ tests/*
 !tests/flow_geometry.test.cjs
 !tests/data_bridge_stores.test.cjs
 !tests/plot_library_store.test.cjs
+!tests/hydraulics_plugin_api.test.cjs
+!tests/project_restore_binding.test.cjs
 
 # AOCI agent host integration (machine-bound; do not commit)
 .codex/config.toml

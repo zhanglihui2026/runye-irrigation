@@ -846,7 +846,20 @@
 
   /* ---- 管网叠加：读 localStorage['runye_network_layout'] ---- */
   function readNetwork() {
-    return window.RyIrrigationDataStore.readNetworkLayout();
+    var store = window.RyIrrigationDataStore;
+    if (!store || typeof store.readNetworkLayout !== 'function') return null;
+    try { return store.readNetworkLayout(); } catch (e) { return null; }
+  }
+  /* 地图只显示与当前工程地块绑定的管网。该模块也可由独立地图页装配；
+     缺少共享存储校验、地块ID或活动锚点失配时，不把单槽旧快照画到当前地图。 */
+  function networkMatchesCurrentPlot(network) {
+    try {
+      if (!network || network.plotId == null || network.plotId === '') return false;
+      var store = window.RyIrrigationDataStore;
+      if (!store || typeof store.readNetworkLayoutStateForCurrentPlot !== 'function') return false;
+      var ownership = store.readNetworkLayoutStateForCurrentPlot(network);
+      return !!ownership && ownership.status === 'current';
+    } catch (e) { return false; }
   }
   function dnStyle(dn) {
     dn = +dn || 0;
@@ -937,6 +950,9 @@
     state.deviceGroup.clearLayers();
     var net = (opts && opts.network) ? opts.network : readNetwork();
     if (!net) return { drawn: 0 };
+    if (!networkMatchesCurrentPlot(net)) {
+      return { drawn: 0, suppressed: true, reason: 'network-plot-binding-mismatch' };
+    }
     var hydraulic = state.hydraulicOn ? readHydraulicOverlay(net) : null;
     var clipRings = clipPlotRings();   /* [v230] 有地块才裁剪 */
     (net.segments || []).forEach(function (s) {

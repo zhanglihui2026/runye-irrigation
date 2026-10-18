@@ -728,7 +728,8 @@
       terrainProfile: { source: 'rtk_xyz', plots: elevationProfiles() }
     };
     try {
-      localStorage.setItem('runyeMeasuredArea', JSON.stringify(payload));
+      var transferStore = window.RyMeasuredAreaBridgeStore;
+      if (!transferStore || !transferStore.write(payload)) throw new Error('地块回传存储服务未加载');
       banner('ok', '✓ 已回传主页（' + fmtArea(total) + '）。正在跳转 index.html#pipePlanSection …');
       setTimeout(function () { if (document.getElementById('pipePlanSection')) window.location.hash = '#pipePlanSection'; else window.location.href = '../index.html#pipePlanSection'; }, 900);
     } catch (e) {
@@ -982,6 +983,18 @@
     $('spFertN').value = v.fert_n || v.fertN || 1;
   }
   function spSave() { try { localStorage.setItem(SP_KEY, JSON.stringify(spRead())); } catch (e) {} }
+  function spBridgeWarning(message) {
+    var box = $('spWarn');
+    if (!box) return;
+    var line = document.createElement('div');
+    line.textContent = message;
+    box.appendChild(line);
+    box.hidden = false;
+  }
+  function spClearBridgeSnapshot() {
+    var bridge = window.RySprinklerBridgeStore;
+    return !!(bridge && typeof bridge.removeSnapshot === 'function' && bridge.removeSnapshot(SP_BRIDGE_KEY));
+  }
 
   function calcSprinkler() {
     var area = D.plotsTotalAreaM2(state.plots);
@@ -995,8 +1008,8 @@
       warnBox.textContent = res.error;
       /* 输入已无效时清掉旧 BOM 与共享快照，避免下游插件继续展示上一轮的过期方案。 */
       var staleBom = $('spBomCard'); if (staleBom) staleBom.hidden = true;
-      if (window.RySprinklerBridgeStore)
-        window.RySprinklerBridgeStore.removeSnapshot(SP_BRIDGE_KEY);
+      if (!spClearBridgeSnapshot())
+        spBridgeWarning('喷灌成果插件中的旧方案未能清除，请不要把它当作本次结果。');
       return;
     }
     var rows = [
@@ -1030,6 +1043,7 @@
     /* v384 任务书 P0：布置 → BOM → 写数据桥 localStorage['runyeSprinklerResult']。
        与地图回传同款套路：写前 removeItem 再 set，确保每次是全新快照。
        桥接失败不阻断估算展示（估算结果已在上面渲染完成）。 */
+    var bridgeWarning = '';
     try {
       var lay = D.sprinklerLayout(state.plots, input);
       if (lay && lay.ok) {
@@ -1066,13 +1080,21 @@
             },
             bom: bom, layout: lay
           };
-          if (window.RySprinklerBridgeStore)
-            window.RySprinklerBridgeStore.writeSnapshot(payload, SP_BRIDGE_KEY);
+          var bridge = window.RySprinklerBridgeStore;
+          if (!bridge || typeof bridge.writeSnapshot !== 'function' || !bridge.writeSnapshot(payload, SP_BRIDGE_KEY))
+            bridgeWarning = '本页估算已更新，但喷灌成果插件未同步；插件可能仍显示上次保存的方案。';
+        } else {
+          var staleBom = $('spBomCard'); if (staleBom) staleBom.hidden = true;
+          if (!spClearBridgeSnapshot()) bridgeWarning = '本次未生成有效材料清单，且喷灌成果插件中的旧方案未能清除。';
         }
       } else {
         var bomCard = $('spBomCard'); if (bomCard) bomCard.hidden = true;
+        if (!spClearBridgeSnapshot()) bridgeWarning = '本次未生成有效布置，且喷灌成果插件中的旧方案未能清除。';
       }
-    } catch (e) { /* 桥写失败只影响插件消费，页面估算结果不受影响 */ }
+    } catch (e) {
+      bridgeWarning = '本页估算结果已显示，但喷灌成果未能同步到插件；插件可能仍显示上次保存的方案。';
+    }
+    if (bridgeWarning) spBridgeWarning(bridgeWarning);
   }
 
   /* v384 任务书 P0：喷灌材料清单（BOM）纯展示，样式沿用估算结果区 */
@@ -1321,56 +1343,39 @@
         rings.push({ ring: d.poly, name: d.name || '', sqm: d.sqm });
       }
       if (!rings.length) return;
-      /* v298j（用户要求）：新回传**直接替换**之前回传的地块——
-         旧 source==='在线地图' 的全部移除后再导入（手绘/shp/CSV 等其他来源不动），
-         避免「几个地块同时传过来叠成一团」。地图页「点哪个传哪个」的选中行为不变。 */
-      var beforeCnt = state.plots.length;
-      state.plots = state.plots.filter(function (p) { return p.source !== '在线地图'; });
-      var replaced = beforeCnt - state.plots.length;
-      var added = 0, updated = 0, bad = 0;
+      /* 校验并投影全部有效环后再替换旧地图地块；无效载荷不能先清掉已有数据。 */
+      var imported = [], bad = 0;
       rings.forEach(function (r, i) {
         var c = D.lonlatToLocalMeters(r.ring);
         if (!c.ok) { bad++; return; }
         var base = r.name || d.name || '在线地图地块';
-        var name = base + (rings.length > 1 ? '#' + (added + updated + 1) : '');
+        var name = base + (rings.length > 1 ? '#' + (imported.length + 1) : '');
         var poly = c.points.map(function (pt) { return { x: Math.round(pt.x * 100) / 100, y: Math.round(pt.y * 100) / 100 }; });
-        var sqmNew = D.polygonAreaM2(poly);
-        /* 去重（v292）：已有同名在线地图地块且面积差 <1% → 原地更新几何，不重复新增。
-           否则同一块地每点一次「回传地形模块」就多一份副本，地块总数与总面积虚增。 */
-        var hit = -1;
-        for (var pi = 0; pi < state.plots.length; pi++) {
-          var p = state.plots[pi];
-          if (p.name !== name || !Array.isArray(p.poly) || p.poly.length < 3) continue;
-          var sqmOld = D.polygonAreaM2(p.poly);
-          if (sqmOld > 0 && sqmNew > 0 && Math.abs(sqmOld - sqmNew) / sqmNew < 0.01) { hit = pi; break; }
-        }
-        if (hit >= 0) {
-          state.plots[hit].poly = poly;
-          state.plots[hit]._mapSqm = isFinite(r.sqm) ? r.sqm : state.plots[hit]._mapSqm;
-          updated++;
-        } else {
-          state.plots.push({
-            id: 'map_' + Date.now() + '_' + i,
-            name: name,
-            /* 每一环以自身首点建局部投影，多个环并不天然共用一个工程坐标原点。 */
-            poly: poly, _cs: 'local-wgs84@' + c.origin.lat.toFixed(6) + ',' + c.origin.lng.toFixed(6),
-            level: null, source: '在线地图',
-            _mapSqm: isFinite(r.sqm) ? r.sqm : null
-          });
-          added++;
-        }
+        imported.push({
+          id: 'map_' + Date.now() + '_' + i,
+          name: name,
+          /* 每一环以自身首点建局部投影，多个环并不天然共用一个工程坐标原点。 */
+          poly: poly, _cs: 'local-wgs84@' + c.origin.lat.toFixed(6) + ',' + c.origin.lng.toFixed(6),
+          level: null, source: '在线地图',
+          _mapSqm: isFinite(r.sqm) ? r.sqm : null
+        });
       });
-      if (added || updated) {
-        setUnit('mu'); /* 回传导入成功：面积显示默认切为亩（内部恒为平方米） */
-        persistAndRender();
-        incomingBannerShown = true;
-        banner('warn',
-          '✓ 在线地图回传已导入 <b>' + added + '</b> 个地块（WGS-84 经纬度已按局部米制投影，面积已按<b>亩</b>显示）。' +
-          (replaced ? '本次为<b>替换导入</b>：已移除之前回传的 <b>' + replaced + '</b> 个在线地图地块（其他来源地块不受影响）。' : '') +
-          (updated ? '另有 <b>' + updated + '</b> 个同名地块已<b>原地更新</b>（未重复导入）。' : '') +
-          '注意：<b>非 CGCS2000 平面坐标</b>——工程放样/水力计算前请以 CGCS2000 成果文件导入为准。' +
-          (bad ? '另有 ' + bad + ' 个无效环已跳过。' : ''));
+      if (!imported.length) {
+        if (bad) banner('danger', '在线地图回传没有可用的地块边界；已有地块保持不变。');
+        return;
       }
+      var beforeCnt = state.plots.length;
+      var retained = state.plots.filter(function (p) { return p.source !== '在线地图'; });
+      var replaced = beforeCnt - retained.length;
+      state.plots = retained.concat(imported);
+      setUnit('mu'); /* 回传导入成功：面积显示默认切为亩（内部恒为平方米） */
+      persistAndRender();
+      incomingBannerShown = true;
+      banner('warn',
+        '✓ 在线地图回传已导入 <b>' + imported.length + '</b> 个地块（WGS-84 经纬度已按局部米制投影，面积已按<b>亩</b>显示）。' +
+        (replaced ? '本次为<b>替换导入</b>：已移除之前回传的 <b>' + replaced + '</b> 个在线地图地块（其他来源地块不受影响）。' : '') +
+        '注意：<b>非 CGCS2000 平面坐标</b>——工程放样/水力计算前请以 CGCS2000 成果文件导入为准。' +
+        (bad ? '另有 ' + bad + ' 个无效环已跳过。' : ''));
     } catch (e) { /* 单次交接已消费；导入错误不应重复导入旧载荷。 */ }
   }
 

@@ -53,6 +53,17 @@ test('plot library store commits only against the revision it read', () => {
   assert.deepEqual(JSON.parse(values.get('runye_plot_library')), [{ id: 'external' }]);
 });
 
+test('plot library replace refuses duplicate normalized IDs without changing stored data', () => {
+  const { store, values } = loadStore();
+  assert.equal(store.replace([{ id: 'same' }, { id: 'same' }], null).error, 'duplicate-plot-id');
+  assert.equal(values.has('runye_plot_library'), false);
+
+  values.set('runye_plot_library', JSON.stringify([{ id: 'before' }]));
+  const current = store.read();
+  assert.equal(store.replace([{ id: 7 }, { id: '7' }], current.revision).error, 'duplicate-plot-id');
+  assert.deepEqual(JSON.parse(values.get('runye_plot_library')), [{ id: 'before' }]);
+});
+
 test('plot library store updates a copy and preserves stored data on failures', () => {
   const { store, values } = loadStore();
   values.set('runye_plot_library', JSON.stringify([{ id: 'a', name: 'original' }]));
@@ -89,6 +100,70 @@ test('plot library unique removal rejects ambiguous records and leaves missing i
   const duplicate = values.get('runye_plot_library');
   assert.equal(store.removeUnique('auto-current').error, 'duplicate-plot-id');
   assert.equal(values.get('runye_plot_library'), duplicate);
+});
+
+test('generated current plot records are scoped to their design plot and cannot overwrite another owner', () => {
+  const { store, values } = loadStore();
+  const idA = store.generatedCurrentId('plot-a');
+  const idB = store.generatedCurrentId('plot-b');
+  assert.notEqual(idA, idB);
+  const entry = (id, owner, name) => ({ id, source: 'auto', designPlotId: owner, name });
+
+  assert.equal(store.upsertGeneratedCurrent('plot-a', entry(idA, 'plot-a', 'A')).ok, true);
+  assert.equal(store.upsertGeneratedCurrent('plot-b', entry(idB, 'plot-b', 'B')).ok, true);
+  assert.equal(store.upsertGeneratedCurrent('plot-a', entry(idA, 'plot-a', 'A updated')).ok, true);
+  assert.deepEqual(JSON.parse(values.get('runye_plot_library')), [
+    entry(idA, 'plot-a', 'A updated'), entry(idB, 'plot-b', 'B')
+  ]);
+  assert.equal(store.generatedCurrentOwner(entry(idB, 'plot-b', 'B')), 'plot-b');
+  assert.equal(store.removeGeneratedCurrent('plot-a').ok, true);
+  assert.deepEqual(JSON.parse(values.get('runye_plot_library')), [entry(idB, 'plot-b', 'B')]);
+});
+
+test('generated current plot migration removes only a legacy record with matching owner', () => {
+  const { store, values } = loadStore();
+  const oldB = { id: 'auto-current', source: 'auto', designPlotId: 'plot-b', name: 'old B' };
+  values.set('runye_plot_library', JSON.stringify([oldB]));
+  const idA = store.generatedCurrentId('plot-a');
+  assert.equal(store.upsertGeneratedCurrent('plot-a', {
+    id: idA, source: 'auto', designPlotId: 'plot-a', name: 'new A'
+  }).ok, true);
+  const entryA = {
+    id: idA, source: 'auto', designPlotId: 'plot-a', name: 'new A'
+  };
+  assert.deepEqual(JSON.parse(values.get('runye_plot_library')), [oldB, entryA],
+    'a legacy entry owned by another plot must be preserved');
+  const idB = store.generatedCurrentId('plot-b');
+  const entryB = { id: idB, source: 'auto', designPlotId: 'plot-b', name: 'new B' };
+  assert.equal(store.upsertGeneratedCurrent('plot-b', entryB).ok, true);
+  assert.deepEqual(JSON.parse(values.get('runye_plot_library')), [entryA, entryB],
+    'the matching legacy entry migrates to its scoped identity');
+});
+
+test('generated current plot identity refuses to replace an unrelated entry', () => {
+  const { store, values } = loadStore();
+  const id = store.generatedCurrentId('plot-a');
+  const manual = { id, source: 'map', name: 'user plot' };
+  values.set('runye_plot_library', JSON.stringify([manual]));
+  assert.equal(store.upsertGeneratedCurrent('plot-a', {
+    id, source: 'auto', designPlotId: 'plot-a', name: 'generated'
+  }).error, 'plot-id-owned-by-other-entry');
+  assert.deepEqual(JSON.parse(values.get('runye_plot_library')), [manual]);
+});
+
+test('generated current plot migration refuses ambiguous matching legacy owners and missing owners', () => {
+  const { store, values } = loadStore();
+  const old = { id: 'auto-current', source: 'auto', designPlotId: 'plot-a' };
+  values.set('runye_plot_library', JSON.stringify([old, { ...old }]));
+  const id = store.generatedCurrentId('plot-a');
+  assert.equal(store.upsertGeneratedCurrent('plot-a', {
+    id, source: 'auto', designPlotId: 'plot-a'
+  }).error, 'duplicate-plot-id');
+  assert.deepEqual(JSON.parse(values.get('runye_plot_library')), [old, old]);
+  assert.equal(store.upsertGeneratedCurrent(null, {
+    id: 'auto-current:undefined', source: 'auto', designPlotId: 'undefined'
+  }).error, 'invalid-generated-current-plot');
+  assert.equal(store.generatedCurrentOwner({ id: 'auto-current', source: 'auto' }), null);
 });
 
 test('plot library unique writes refuse malformed data and stale revisions', () => {

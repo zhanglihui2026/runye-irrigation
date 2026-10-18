@@ -23,8 +23,7 @@ var TL_PIPE_PRICE_DEF = { 50: 6, 63: 9, 75: 12, 90: 17, 110: 24, 125: 30, 140: 3
 function tlPipePriceByOd(od) {
   var k = Math.round(Number(od));
   if (!(k > 0)) return '';
-  var over = {};
-  try { over = JSON.parse(localStorage.getItem('runye_tlEconPrices') || '{}') || {}; } catch (e) { over = {}; }
+  var over = window.RyEconomicSettingsStore.readPriceOverrides();
   var v = (typeof over[k] === 'number' && over[k] > 0) ? over[k] : TL_PIPE_PRICE_DEF[k];
   return (typeof v === 'number' && v > 0) ? v : '';
 }

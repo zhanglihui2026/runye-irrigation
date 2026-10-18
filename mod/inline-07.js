@@ -3,10 +3,10 @@
   var price=0.65, hours=1200, years=8, priceF=0, priceM=0, priceB=0, curRows=null;
   function fmtWan(v){ return (v/10000).toFixed(1)+'万'; }
   function fmtK(v){ return (v/1000).toFixed(0)+'k'; }
-  function loadAssum(){ try{ return JSON.parse(localStorage.getItem('runye_tlEconAssum')||'{}')||{}; }catch(e){ return {}; } }
+  function loadAssum(){ return window.RyEconomicSettingsStore.readAssumptions(); }
   /* 假设持久化：与三级管径经济分析共用 runye_tlEconAssum 键（电价/年运行小时/折旧年限/总·主·支管材单价同处一个对象）。
      必须「读-改-写」，避免其他分析字段被覆盖。 */
-  function saveAssum(patch){ var o=loadAssum(); for(var k in patch){ if(typeof patch[k]==='number'&&isFinite(patch[k])&&patch[k]>0)o[k]=patch[k]; else delete o[k]; } try{ localStorage.setItem('runye_tlEconAssum', JSON.stringify(o)); }catch(e){} }
+  function saveAssum(patch){ window.RyEconomicSettingsStore.patchAssumptions(patch); }
   var s0=loadAssum();
   if(s0.price)price=s0.price; if(s0.hours)hours=s0.hours; if(s0.years)years=s0.years;
   if(s0.pf>0)priceF=s0.pf; if(s0.pm>0)priceM=s0.pm; if(s0.pb>0)priceB=s0.pb;
@@ -108,7 +108,7 @@
       if(localStorage.getItem('runye_econRolePrefill')) return;
       if(typeof computeThreeLevel!=='function') return;
       var r0=computeThreeLevel(); if(!r0||!r0.frontPipe||!r0.frontPipe.od) return;
-      var pd={}; try{ pd=JSON.parse(localStorage.getItem('runye_tlEconPrices')||'{}')||{}; }catch(e){}
+      var pd=window.RyEconomicSettingsStore.readPriceOverrides();
       /* v184（P6）：默认单价表收敛为单一来源 TL_PIPE_PRICE_DEF（原此处另有第 3 份字面量副本） */
       var DEF=TL_PIPE_PRICE_DEF;
       function pOf(od){ var k=Math.round(od); var v=(typeof pd[k]==='number'&&pd[k]>0)?pd[k]:DEF[k]; return (v>0?v:0); }

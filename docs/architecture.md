@@ -71,9 +71,10 @@
 | `core/event-bus.js` | 提供 `on/off/emit` 与登记事件名；监听器异常被隔离 | 事件传递不代替数据所有权，也不返回订阅者结果 |
 | `core/runtime-guard.js` | 捕获插件调用错误，记录错误并可禁用插件 | 保护范围是插件调用生命周期，不是通用业务错误处理 |
 | `core/data-service.js` | 向插件提供设计快照、工程快照、BOM、档案 CRUD 和 `ryPlot v1` 分层接口 | 设计图仍来自页面全局；档案本地先写，登录且云接口可用时再同步；`runye_plot_library` 与页面几何/管网状态仍存在跨模块共享 |
-| `core/irrigation-data-store.js` | 为经典页面提供管网布局与水力设计快照的同步读写接口 | 只集中 `runye_network_layout` 和 `runye_hydraulic_design_v1` 两个既有键，不改变其 v1 数据格式；它是过渡领域接口，不替代面向插件的 `core/data-service.js`，也不负责施工模型或地形数据 |
+| `core/irrigation-data-store.js` | 为经典页面提供管网布局、水力设计与校核叠加快照的同步读写接口 | 新的 owner-bound 快照分别按 `plotId` 写入独立 localStorage 键；旧单槽键只作匹配归属的迁移回退。设计快照匹配网络地块、时间戳与修订号，网络还要匹配当前地块锚点；水力叠加 v2 同时绑定网络时间戳、地块 ID 和设计修订号，旧/失配叠加不显示；它是过渡领域接口，不替代面向插件的 `core/data-service.js`，也不负责施工模型或地形数据 |
 | `core/terrain-bridge-store.js` | 管理在线地图向地形模块的一次性地块载荷交接 | 保留 `runye_terrain_incoming` 与原 payload；消费操作取出后立即删除，防止重复导入；不负责地块库或地形工作台状态 |
-| `core/sprinkler-bridge-store.js` | 管理地形喷灌估算到只读喷灌成果插件的快照桥 | 保留 `runyeSprinklerResult`、manifest 可配置存储键与 v1 快照；写入仍先删除再写入以维持跨标签页 `storage` 通知；读取返回隔离副本 |
+| `core/sprinkler-bridge-store.js` | 管理地形喷灌估算到只读喷灌成果插件的快照桥 | 保留 `runyeSprinklerResult`、manifest 可配置存储键与 v1 快照；写入仍先删除再写入以维持跨标签页 `storage` 通知，替换失败时尝试恢复先前原始快照；读取返回隔离副本 |
+| `core/economic-settings-store.js` | 集中管材价格覆盖与经济测算假设的经典脚本存储访问 | 保留 `runye_tlEconPrices`、`runye_tlEconAssum` 两个旧键及 JSON 形状；假设只按字段合并，防止设置页、经济分析和材料表互相覆盖；不拥有默认价格表或计算规则 |
 | `core/ui-shell.js` | 创建插件挂载点、注册导航、挂载/卸载插件 UI | 必须兼容 `runye-nav.js` 重绘；插件导航使用独立属性，不能依赖旧导航节点身份 |
 | `core/loader.js` | 读取注册清单、管理插件状态、按权限构造 `ctx`、激活和卸载插件 | 加载顺序表达插件依赖；控制端点不可用时当前逻辑会降级并继续加载 |
 | `cloud-sync.js` | 维护 CloudBase 初始化、登录、云端状态和 `window.CloudSync` 兼容接口 | 它是基础设施适配层，但当前通过全局对象被经典脚本和 Core 数据服务直接读取 |
@@ -85,10 +86,12 @@
 1. **页面启动**：`index.html` 的经典脚本先创建历史全局状态；随后 `core/bootstrap.js` 启动 Core；Core 加载插件清单并依序激活插件。插件通过最小化的 `ctx` 读取或修改数据、注册事件与导航。
 2. **设计图与插件**：主页面 `window.tlDiagramData` 等状态是当前设计图来源。`data-service` 对插件返回深拷贝快照；需要写入的能力经权限限定的 `applyProject` 或分层 `mutateLayer` 进入既有页面状态，并派发 `ryPlotChanged`。
 3. **档案与云同步**：档案服务先写浏览器 `localStorage`，再在 CloudSync 已登录且可用时通过其 KV 接口同步；远端读取失败时退回本地档案。因而“本地保存成功”和“云端同步成功”是两个不同结果，界面应分别反馈。
-4. **水力跨页快照**：三级规划通过 `RyIrrigationDataStore` 写出管网布局和水力设计快照；地图分区应用新边界时通过同一接口使旧管网失效；地图交换、地图叠加和水力校核页复用相同读取/写入契约。键名与快照形状保持兼容，当前仍是浏览器单例存储。
+4. **水力跨页快照**：三级规划通过 `RyIrrigationDataStore` 写出按地块归属隔离的管网布局和水力设计快照；地图分区应用新边界时只使该地块旧管网失效；地图交换、地图叠加和水力校核页复用相同读取/写入契约。旧单槽键保留为兼容回退，读取时只接受匹配 owner 的旧记录。当前地块锚点仍是全局 localStorage 值，浏览器多标签并发验证尚未完成。
 5. **地图到地形的一次性导入**：在线地图通过 `RyTerrainBridgeStore.writeIncoming` 写入既有 `runye_terrain_incoming` 载荷；地形模块通过 `consumeIncoming` 取出并删除，再将经纬度环投影为局部米制坐标。该桥只承载单次交接，不接管地形内部的地块状态。
-6. **地形到喷灌插件的成果快照**：地形估算将 BOM 与布置结果写入既有 `runyeSprinklerResult`；喷灌成果插件只读副本展示，并监听跨标签页 `storage` 事件。`RySprinklerBridgeStore` 集中负责快照序列化、替换写入和安全解析，不负责 BOM 计算或主设计图回写。
+6. **地形到喷灌插件的成果快照**：地形估算将 BOM 与布置结果写入既有 `runyeSprinklerResult`；喷灌成果插件只读副本展示，并监听跨标签页 `storage` 事件。`RySprinklerBridgeStore` 集中负责快照序列化、替换写入和安全解析；替换失败时尽力恢复删除前的原始快照，不负责 BOM 计算或主设计图回写。
 7. **导航与权益**：`runye-nav` 负责旧入口，插件通过 `ui-shell` 增加插件入口；`RyEntitle` 更新后旧导航会重绘，Core 壳负责维持插件项。每次点击重新检查锁定/等待状态。
+
+地形计算核心 `terrain/terrain-core.js` 在主页复用已加载的 `RyHcCore`；独立 `terrain/index.html` 必须先加载 `hydraulic-calc/hc-core.js`。二次加压功率由共享核心计算，地形仍保留自己的电机档位上限（315 kW）和超档提示语义。
 
 ### 当前偏差与迁移顺序
 

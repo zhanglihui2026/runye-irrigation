@@ -165,7 +165,7 @@
     <div class="fn-inner" data-ry-fnnav data-base="index.html#"></div>
   </nav>
   <script src="runye-nav.js?v=385-global-open"></script>
-  <script src="core/irrigation-data-store.js?v=1"></script>
+  <script src="core/irrigation-data-store.js?v=5-legacy-owner-read-guard"></script>
   <!-- [v299 水力校核] 计算核心（UMD）：hc-core/design-core 为全站口径唯一出处，必须先载 -->
   <script src="hydraulic-calc/hc-core.js"></script>
   <script src="hydraulic-calc/design-core.js"></script>
@@ -352,8 +352,36 @@
   function readDesign() {
     return window.RyIrrigationDataStore.readHydraulicDesign();
   }
-  function renderSrc() {
-    var net = readNet(), design = readDesign(), el = $('srcCard');
+  function readDesignState(net) {
+    var state = window.RyIrrigationDataStore.readHydraulicDesignStateForNetwork(net);
+    if (!net) return state;
+    var networkState = window.RyIrrigationDataStore.readNetworkLayoutStateForCurrentPlot(net);
+    if (networkState.status === 'stale') {
+      return { status: 'stale', design: state && state.design || readDesign(), reason: networkState.reason };
+    }
+    return state;
+  }
+  function usableDesign(state) {
+    return state && state.status === 'current' ? state.design : null;
+  }
+  function renderSrc(net, designState) {
+    net = net === undefined ? readNet() : net;
+    designState = designState || readDesignState(net);
+    var design = usableDesign(designState), el = $('srcCard');
+    if (designState.status === 'stale') {
+      var staleMessage = designState.reason === 'network-plot-unbound'
+        ? '保存的管网没有地块归属，已停止使用以避免串用。'
+        : designState.reason === 'active-plot-mismatch'
+          ? '当前选中的地块与保存的管网不匹配。'
+        : designState.reason === 'active-plot-unavailable'
+          ? '当前地块身份无法读取，已停止使用保存的管网。'
+          : designState.reason === 'network-needs-replan'
+            ? '地块已重新划分，原三级设计快照已失效。'
+            : '设计快照与当前管网版本不匹配。';
+      el.innerHTML = '<span style="color:var(--a-600);font-weight:700">三级规划快照已失效</span><br>' +
+        '<span style="font-size:11px;color:var(--s-500)">' + staleMessage + '请回主页重新生成管线图后再校核。</span>';
+      return;
+    }
     if (design && design.version === 1 && design.geometry && design.hydraulics) {
       var g = design.geometry, h = design.hydraulics;
       el.innerHTML = '<div class="kv"><span class="k">来源</span><span class="v">三级规划最终数据</span></div>' +
@@ -402,12 +430,20 @@
   /* ---------- 校核主流程 ---------- */
   function run() {
     var net = readNet();
-    var design = readDesign();
-    renderSrc();
+    var designState = readDesignState(net);
+    var design = usableDesign(designState);
+    renderSrc(net, designState);
     syncParameterMode(!!(design && design.version === 1));
     var opts = readOpts();
     saveCfg();
-    if ((!design || design.version !== 1) && (!net || net.needsReplan || !(net.segments || []).length)) {
+    if (designState.status === 'stale') {
+      lastFull = lastNet = lastDesign = null;
+      $('out').style.display = 'none';
+      $('emptyBox').textContent = '当前地块、管网或三级设计快照不匹配。请切回对应地块或重新生成管线图后再校核。';
+      $('emptyBox').style.display = '';
+      return;
+    }
+    if (!net || net.needsReplan || !(net.segments || []).length) {
       $('emptyBox').style.display = '';
       $('out').style.display = 'none';
       return;

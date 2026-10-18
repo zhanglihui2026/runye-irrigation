@@ -3,12 +3,12 @@
  * 覆盖三件事（对应用户三条诉求）：
  *   ① 拼接：mergePlots 真的产出「保留子地块 + 外层综合轮廓」的大地块（几何正确）
  *   ② 传递：拼接地块带齐 merged/subPlots/poly/geo/polyLatLng，能走既有 measuredPolygon 链路
- *   ③ 开关：二级页「地块划分」开关的存在、默认开、门控 CSS、以及「关闭不改计算结果」的口径
+ *   ③ 开关：二级页「地块划分」开关的存在、默认开启、关闭时的计算短路与 CSS 兜底
  *
  * 设计要点（吃过亏的地方）：
  *   · 每条断言都要有「能让它变红」的反例 —— 不做恒真断言。
- *   · 「开关关闭不影响计算」这条必须查**实现方式**（CSS 门控 + 计算路径不含开关条件），
- *     而不是只查「有个 checkbox」。否则改坏了（比如在 calcPlan 里 early-return）也照样绿。
+ *   · 关闭开关必须进入真正的单区计算路径；CSS 只是最后一道显示兜底。
+ *     样式规则由 mod/style-01.css 持有，不能只检查展开后的 index.html 脚本视图。
  */
 'use strict';
 const test = require('node:test');
@@ -23,6 +23,7 @@ const ENHANCE_SRC = fs.readFileSync(path.join(ROOT, 'runye-map-enhance.js'), 'ut
 // Expand the classic-script modules referenced by index.html so contract checks
 // continue to inspect the real assembled page after source extraction.
 const INDEX_SRC = require(path.join(ROOT, 'expand_index.cjs'))(path.join(ROOT, 'index.html'));
+const PANEL_CSS = fs.readFileSync(path.join(ROOT, 'mod', 'style-01.css'), 'utf8');
 // 在线地图现已作为主页面功能区运行；契约应检查实际装配的主页面片段与
 // 地图行为模块，不能再把迁移前的独立 HTML 当作唯一实现来源。
 const mapSectionStart = INDEX_SRC.indexOf('<section id="onlineMapSection"');
@@ -304,7 +305,7 @@ test('③-b 门控口径（v189）：关开关 = **真的不划分**，必须进
     '短路分支不得用 b.w/b.h（那是 SVG 像素包围盒，与下游 plan 米量纲不符 ⇒ 会多切一格）');
 
   // (3) 门控 CSS 仍保留（作为「万一某处没走短路」的最后兜底）
-  assert.match(INDEX_SRC, /body\.ry-zoneauto-off\s+#ppDiagramContent\s+\.pp-zone-layer\{display:none\}/,
+  assert.match(PANEL_CSS, /body\.ry-zoneauto-off\s+#ppDiagramContent\s+\.pp-zone-layer\{display:none\}/,
     '应保留 body.ry-zoneauto-off 门控 .pp-zone-layer 的 CSS（末级兜底）');
   // (4) SVG 里分区层真的挂了这两个类（否则 CSS 门控打不到东西）
   assert.match(INDEX_SRC, /class="pp-zone-layer"/, '分区底色层应挂 class="pp-zone-layer"');

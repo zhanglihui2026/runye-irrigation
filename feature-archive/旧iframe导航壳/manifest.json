@@ -1,0 +1,13 @@
+{
+  "schema": "runye-feature-archive/v1",
+  "feature": "legacy iframe navigation shell",
+  "created_at": "2026-10-17",
+  "files": [
+    {
+      "archive_path": "source/mod/inline-31.js",
+      "source_path": "mod/inline-31.js",
+      "sha256": "6053620dfcc3a77a793000b227f85e135c497b82aec2243d88d260a888c0e3b5",
+      "bytes": 6366
+    }
+  ]
+}

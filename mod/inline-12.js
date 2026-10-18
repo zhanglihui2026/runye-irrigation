@@ -8,6 +8,25 @@
     var snapshot=store.read();
     return snapshot&&snapshot.ok&&Array.isArray(snapshot.plots)?snapshot.plots:[];
   }
+  function resolveProjectPlotBinding(value){
+    if(value==null||value==='') return {id:null,reason:null};
+    var id=String(value), store=window.RyPlotLibraryStore, snapshot=null, matches=0;
+    if(!store||typeof store.read!=='function') return {id:null,reason:'unavailable'};
+    try{snapshot=store.read();}catch(e){return {id:null,reason:'unavailable'};}
+    if(!snapshot||!snapshot.ok||!Array.isArray(snapshot.plots)) return {id:null,reason:'unavailable'};
+    var plots=snapshot.plots;
+    for(var i=0;i<plots.length;i++){
+      if(plots[i]&&String(plots[i].id)===id) matches++;
+    }
+    if(matches===1) return {id:id,reason:null};
+    return {id:null,reason:matches>1?'duplicate':'missing'};
+  }
+  function writeCurrentPlotAnchor(id){
+    id=id==null||id===''?null:String(id);
+    var store=window.RyIrrigationDataStore;
+    if(!store||typeof store.writeCurrentPlotAnchor!=='function') return false;
+    return store.writeCurrentPlotAnchor(id)!==false;
+  }
   /* [v355] 边界多边形几何签名（cm 粒度）：「已生成施工图」跨页恢复的几何锚。
      挂 window 上：ppGenerate 点击处所在脚本块先于本块执行，但点击发生在整页 load 之后，
      运行期取到即可。 */
@@ -100,6 +119,22 @@
     if(!raw){toast('还没有保存过方案');return;}
     var data;
     try{data=JSON.parse(raw);}catch(e){toast('保存数据读取失败');return;}
+    if(!data||typeof data!=='object'||Array.isArray(data)){toast('保存数据格式无效');return;}
+    /* 恢复前先确定工程的地块归属。缺失/已删除/重复的地块ID按未绑定工程载入，
+       并清除当前标签页锚点，避免把存档中的图纸与页面原地块身份混用。 */
+    var plotBinding=resolveProjectPlotBinding(data.currentPlotId);
+    if(plotBinding.reason==='unavailable'){
+      toast('地块库当前不可用，无法核对存档归属，方案未恢复');
+      return;
+    }
+    if(!writeCurrentPlotAnchor(plotBinding.id)){
+      toast('当前地块状态无法安全更新，方案未恢复');
+      return;
+    }
+    window.currentPlotId=plotBinding.id;
+    var bindingNotice=plotBinding.reason
+      ? (plotBinding.reason==='duplicate'?'存档关联地块ID重复，已按未绑定工程恢复':'存档关联地块已不存在，已按未绑定工程恢复')
+      : null;
     // 先清除上一方案的计算覆盖；旧存档缺字段时使用明确默认值。
     tlPipeOdOverride = null;
     restoreInputValues(data.inputValues);
@@ -127,16 +162,8 @@
     window.measuredPolygon=Array.isArray(data.measuredPolygon)?data.measuredPolygon:[];
     window.__runyeSubPlots = data.groupPlan && Array.isArray(data.groupPlan.subPlots) ? data.groupPlan.subPlots : null;
     if (data.groupPlan && Array.isArray(data.groupPlan.frame)) window.measuredPolygon = data.groupPlan.frame;
-    /* v161：「当前地块」随方案恢复 —— 仅当地块仍在库中（防已删除地块复活）；
-       恢复后刷新地块库高亮，使「设为当前」标记与切页前一致。 */
-    (function(){
-      var cid=data.currentPlotId; if(!cid) return;
-      var lib=readPlotLibrary();
-      var hit=false; for(var i=0;i<lib.length;i++){ if(lib[i].id===cid){ hit=true; break; } }
-      if(!hit) return;
-      window.currentPlotId=cid;
-      try{ if(typeof window.runyeRenderPlotLib==='function') window.runyeRenderPlotLib(); }catch(e){}
-    })();
+    /* v161：刷新地块库高亮；归属和活动锚点已在任何工程状态写入前完成校验。 */
+    try{ if(typeof window.runyeRenderPlotLib==='function') window.runyeRenderPlotLib(); }catch(e){}
     window.__runyeGeoBase=(data.geoBase && typeof data.geoBase.refLat==='number' && typeof data.geoBase.refLng==='number' && isFinite(data.geoBase.refLat) && isFinite(data.geoBase.refLng))?data.geoBase:null;
     /* [map-enhance 2026-09-29] 存档一并恢复「地图口径」地块；旧存档无此字段 → null，
        反投退化为改动前行为，不会比原来更差。 */
@@ -198,7 +225,7 @@
     renderThreeLevel();
     if (typeof tlUpdatePlanBar === 'function') tlUpdatePlanBar();
     if (window.tlPumpUpdateNote) window.tlPumpUpdateNote();
-    toast('方案已打开');
+    toast(bindingNotice||'方案已打开');
   };
 
   ['saveProjectBtn','ppSaveProject'].forEach(function(id){
@@ -214,16 +241,14 @@
      背景：本页点「在线地图」是整页跳转，本页 JS 内存状态（measuredPolygon /
      __runyeGeoBase / __runyeMapFramePoly / currentPlotId）全部销毁；返回时既无
      存档也无锚点 ⇒ 地块与基于它生成的二级/三级划分全空。
-     做法：①「设为当前 / 保存地块 / 地图回传落库」时记锚点 runye_current_plot_v1
+     做法：①「设为当前 / 保存地块 / 地图回传落库」时写本标签页锚点；旧 localStorage 锚点仅作新标签页默认值
              并静默留存完整工作状态（复用既有 runyeSaveProject 快照）；
            ② 本页加载完成时，若锚点地块仍在库中、且存档记录的当前地块与锚点一致，
              则静默恢复（宁可不恢复，也不恢复成错方案）；
            ③ 地图回传（runyeMeasuredArea）与图片测量优先：前者由 applyMapMeasuredArea
              处理并会写新锚点，后者清锚点，两者都不会被自动恢复覆盖。 */
-  var CUR_PLOT_KEY='runye_current_plot_v1';
   window.runyeMarkCurrentPlot=function(id){
-    try{ if(id) localStorage.setItem(CUR_PLOT_KEY,JSON.stringify({id:String(id),ts:Date.now()}));
-         else localStorage.removeItem(CUR_PLOT_KEY); }catch(e){}
+    return writeCurrentPlotAnchor(id);
   };
   /* 「本页当前地块已变为 id」：记锚点 + 静默留存完整状态（id 为空 = 只清锚点，不动存档） */
   window.runyeSetCurrentPlot=function(id){
@@ -233,8 +258,12 @@
   function ryAutoRestoreProject(){
     try{
       if(window.__runyeAutoRestored) return;
-      if(localStorage.getItem('runyeMeasuredArea')) return;              /* 地图回传优先 */
-      var a=null; try{ a=JSON.parse(localStorage.getItem(CUR_PLOT_KEY)||'null'); }catch(e){}
+      if(window.RyMeasuredAreaBridgeStore.readRaw()) return;              /* 地图回传优先 */
+      var store=window.RyIrrigationDataStore;
+      if(!store||typeof store.readCurrentPlotAnchor!=='function') return;
+      var anchor=store.readCurrentPlotAnchor();
+      if(!anchor||!anchor.ok) return;
+      var a=anchor&&anchor.ok ? {id:anchor.id} : null;
       if(!a||!a.id) return;
       var raw=localStorage.getItem(SAVE_KEY); if(!raw) return;
       var snap=null; try{ snap=JSON.parse(raw); }catch(e){}
@@ -271,7 +300,7 @@
     try{localStorage.removeItem('runye_aiplot_anchor_v1');}catch(e){}
     try{
       if(window.__runyeAutoRestored)return;                 /* v161 已恢复 → 锚冗余 */
-      if(localStorage.getItem('runyeMeasuredArea'))return;  /* 地图回传优先 */
+      if(window.RyMeasuredAreaBridgeStore.readRaw())return;  /* 地图回传优先 */
       var raw=localStorage.getItem(SAVE_KEY);if(!raw)return;
       var snap=null;try{snap=JSON.parse(raw);}catch(e){return;}
       if(!snap||!Array.isArray(snap.measuredPolygon)||snap.measuredPolygon.length<3)return;
@@ -297,7 +326,7 @@
   function ryPpGenRestoreProject(){
     try{
       if(window.__runyeAutoRestored) return;
-      if(localStorage.getItem('runyeMeasuredArea')) return;              /* 地图回传优先 */
+      if(window.RyMeasuredAreaBridgeStore.readRaw()) return;              /* 地图回传优先 */
       var raw=localStorage.getItem(SAVE_KEY); if(!raw) return;
       var snap=null; try{ snap=JSON.parse(raw); }catch(e){ return; }
       if(!snap || !snap.ppGenSig) return;

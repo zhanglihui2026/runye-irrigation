@@ -102,4 +102,12 @@ assert.equal(malformedCoordinates.order.length, 1, '有效管段仍进入树');
 assert.equal(malformedCoordinates.warnings.filter(message => message.includes('无效经纬度')).length, 2,
   '每条被排除的异常坐标段都应给出诊断');
 
+const overlay = Core.mapOverlay({ valid: true, segRows: [], opts: { vmax: 2 }, qTotal: 8, tdh: 21 }, {
+  ts: 123, plotId: 'plot-a', designRevisionId: 'rev-a'
+});
+assert.deepEqual(overlay, {
+  version: 2, networkTs: 123, plotId: 'plot-a', designRevisionId: 'rev-a',
+  calculatedAt: overlay.calculatedAt, vmax: 2, qTotal: 8, tdh: 21, items: {}
+}, 'map status snapshots must bind to the plot and design revision as well as network timestamp');
+
 console.log('runye_hydraulics_topology.test.cjs: passed');

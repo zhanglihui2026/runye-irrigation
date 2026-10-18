@@ -972,7 +972,9 @@
     if(!areaM2 || !isFinite(areaM2)){ alert('地块面积无效，无法回传。'); return; }
     try{
       /* 主链路只传稳定引用；几何由二级页按 id 从共享地块库读取，避免跨页复制两套边界。 */
-      localStorage.setItem('runyeMeasuredArea', JSON.stringify({ryPlotRef:{id:id,savedAt:savedAt,areaM2:areaM2,geometryKey:clickedKey}}));
+      var transferStore=window.RyMeasuredAreaBridgeStore;
+      if(!transferStore || !transferStore.write({ryPlotRef:{id:id,savedAt:savedAt,areaM2:areaM2,geometryKey:clickedKey}}))
+        throw new Error('地块回传存储服务未加载');
       if(btnEl){ var old=btnEl.textContent; btnEl.textContent='回传中…';
         setTimeout(function(){ btnEl.textContent=old; }, 1200); }
       setTimeout(function(){
@@ -1460,20 +1462,33 @@
         if(!plotStore || typeof plotStore.read!=='function' || typeof plotStore.replace!=='function' || typeof plotStore.restoreSnapshot!=='function')
           throw new Error('地块库安全存储接口不可用');
         var irrigationStore=window.RyIrrigationDataStore;
-        if(!irrigationStore || typeof irrigationStore.readNetworkLayoutRaw!=='function' || typeof irrigationStore.restoreNetworkLayoutIfCurrent!=='function')
+        if(!irrigationStore || typeof irrigationStore.readRawNetworkLayout!=='function' || typeof irrigationStore.restoreNetworkLayoutIfCurrent!=='function' ||
+           typeof irrigationStore.validateNetworkPlotBinding!=='function' || typeof irrigationStore.readNetworkLayoutStateForCurrentPlot!=='function')
           throw new Error('管网快照安全存储接口不可用');
         var plotSnapshot=plotStore.read();
         if(!plotSnapshot.ok)throw new Error('地块库读取失败，未导入：'+plotSnapshot.error);
-        var keys=['runye_map_view'], old=[localStorage.getItem(keys[0])];
-        var oldNetworkRaw=irrigationStore.readRawNetworkLayout();
-        var plotWrite=null,networkWritten=false,viewWritten=false;
+        var networkBinding=irrigationStore.validateNetworkPlotBinding(d.network,d.plots);
+        if(!networkBinding || !networkBinding.ok){
+          var bindingError=networkBinding && networkBinding.error;
+          if(bindingError==='network-plot-not-in-project') throw new Error('工程管网绑定的地块不在本工程地块库中，已取消导入以避免串用');
+          if(bindingError==='network-plot-ambiguous') throw new Error('工程管网绑定的地块编号重复，已取消导入以避免串用');
+          throw new Error('工程管网与地块归属校验失败，已取消导入');
+        }
+        var viewKey='runye_map_view';
+        var networkScopeId=d.network==null?undefined:(d.network.plotId||null);
+        var oldNetworkRaw=typeof networkScopeId==='undefined'
+          ? irrigationStore.readRawNetworkLayout()
+          : irrigationStore.readRawNetworkLayout(networkScopeId);
+        var plotWrite=null,networkWritten=false;
         try{
           plotWrite=plotStore.replace(d.plots,plotSnapshot.revision);
           if(!plotWrite.ok)throw new Error('地块库写入失败：'+plotWrite.error);
-          irrigationStore.writeNetworkLayout(d.network);
+          var networkWriteResult=d.network==null
+            ? irrigationStore.writeNetworkLayout(null)
+            : irrigationStore.writeNetworkLayout(d.network,networkScopeId);
+          if(networkWriteResult!==true)throw new Error('无法确认要清除的管网地块归属，已停止导入');
           networkWritten=true;
-          if(d.view==null) localStorage.removeItem(keys[1]);else localStorage.setItem(keys[1],JSON.stringify(d.view));
-          viewWritten=true;
+          if(d.view==null) localStorage.removeItem(viewKey);else localStorage.setItem(viewKey,JSON.stringify(d.view));
         }catch(writeError){
           if(plotWrite && plotWrite.ok){
             var plotRollback=plotStore.restoreSnapshot(plotSnapshot,plotWrite.revision);
@@ -1481,23 +1496,28 @@
           }
           if(networkWritten){
             try{
-              var networkRollback=irrigationStore.restoreNetworkLayoutIfCurrent(
-                d.network==null?null:JSON.stringify(d.network),oldNetworkRaw);
+              var networkRollback=typeof networkScopeId==='undefined'
+                ? irrigationStore.restoreNetworkLayoutIfCurrent(d.network==null?null:JSON.stringify(d.network),oldNetworkRaw)
+                : irrigationStore.restoreNetworkLayoutIfCurrent(d.network==null?null:JSON.stringify(d.network),oldNetworkRaw,networkScopeId);
               if(!networkRollback.ok)throw new Error(networkRollback.error==='network-layout-conflict'?'管网快照已被其他页面修改，拒绝覆盖':'管网快照恢复失败');
             }catch(restoreError){console.error('工程导入回滚失败',irrigationStore.keys.networkLayout,restoreError);}
-          }
-          if(viewWritten){
-            try{
-              if(localStorage.getItem(keys[0])!==(d.view==null?null:JSON.stringify(d.view)))throw new Error('地图视图已被其他页面修改，拒绝覆盖');
-              if(old[0]==null)localStorage.removeItem(keys[0]);else localStorage.setItem(keys[0],old[0]);
-            }catch(restoreError){console.error('工程导入回滚失败',keys[0],restoreError);}
           }
           throw writeError;
         }
         document.getElementById('btnClear').click();setDrawing(false);
         refreshPlotLibrary();
         if(d.view) map.setView(toDisplay(d.view),d.view.zoom,{animate:false});
-        alert('工程已导入：'+d.plots.length+' 个地块'+(d.network?'、管网已恢复':'、无管网'));
+        var networkStatus='、无管网';
+        if(d.network){
+          if(networkBinding.status==='unbound') networkStatus='、管网已导入但缺少地块绑定，为避免串用暂不显示';
+          else {
+            var activeOwner=irrigationStore.readNetworkLayoutStateForCurrentPlot(d.network);
+            networkStatus=activeOwner && activeOwner.status==='current'
+              ? '、管网已恢复'
+              : '、管网已导入但与当前地块不匹配，地图暂不显示';
+          }
+        }
+        alert('工程已导入：'+d.plots.length+' 个地块'+networkStatus);
       }catch(err){ alert('导入失败：'+err.message); }
       e.target.value='';
     };

@@ -652,8 +652,10 @@
         old.velocity = Math.max(old.velocity, r.v);
       }
     });
-    return { version: 1, networkTs: net && net.ts || null, calculatedAt: Date.now(),
-      vmax: full.opts.vmax, qTotal: full.qTotal, tdh: full.tdh, items: items };
+    return { version: 2, networkTs: net && net.ts != null ? net.ts : null,
+      plotId: net && net.plotId != null && net.plotId !== '' ? String(net.plotId) : null,
+      designRevisionId: net && net.designRevisionId != null && net.designRevisionId !== '' ? String(net.designRevisionId) : null,
+      calculatedAt: Date.now(), vmax: full.opts.vmax, qTotal: full.qTotal, tdh: full.tdh, items: items };
   }
 
   function meterPolylineLen(points) {

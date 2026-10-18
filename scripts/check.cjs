@@ -3,6 +3,7 @@
 
 const { spawnSync } = require('node:child_process');
 const path = require('node:path');
+const fs = require('node:fs');
 
 const root = path.resolve(__dirname, '..');
 const node = process.execPath;
@@ -41,7 +42,12 @@ if (listed.error || listed.status !== 0) {
   process.exit(1);
 }
 
-const files = listed.stdout.toString('utf8').split('\0').filter(Boolean);
+// Git's cached path can retain the old name while a tracked file is moved into
+// an untracked archive directory. Syntax-check files that exist at their
+// current paths; ci_check_static separately verifies every runtime reference.
+const files = listed.stdout.toString('utf8').split('\0').filter(file =>
+  file && fs.existsSync(path.resolve(root, file))
+);
 if (files.length < 50) {
   console.error(`语法检查枚举到 ${files.length} 个 JS/CJS/MJS 文件，低于安全下限 50。`);
   process.exit(1);
@@ -74,6 +80,8 @@ if (!tests.length) {
   process.exit(1);
 }
 if (run(`Node 单测（${tests.length} 个文件）`, node, ['--test', ...tests], { summary: true }) !== 0) process.exit(1);
+
+if (run('水力计算核心与 WASM 等价验证', node, ['hydraulic-calc/native/verify.cjs']) !== 0) process.exit(1);
 
 const plotSmoke = path.join(root, 'tests', 'plot_merge.smoke.cjs');
 const listedSmoke = spawnSync('git', [

@@ -650,8 +650,8 @@
    ② 工作区：v564 只做在简图，工作区没有入口 ⇒ 新增三通断点拖动（世界坐标拾取、吸附 1 m、
    只能向下、落盘 + 重生成），优先级排在「自动管线整条拖动」之前、各模式分支之后。
    注：并行会话已抬到 v567 ⇒ 按规则取更高号 v568（不回退对方）。 */
-/* v569-plot-library-unique-ids: reject ambiguous duplicate plot IDs before replacing the shared library. */
-const VERSION = 'v569-plot-library-unique-ids';
+/* v570-irrigation-scope-guard: reject mismatched snapshot owners and protect bound legacy data from ownerless clears. */
+const VERSION = 'v570-irrigation-scope-guard';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

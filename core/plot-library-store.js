@@ -8,6 +8,36 @@
     return JSON.parse(JSON.stringify(value));
   }
 
+  function hasUniqueIds(plots) {
+    var seen = Object.create(null);
+    for (var i = 0; i < plots.length; i++) {
+      var plot = plots[i];
+      if (!plot || typeof plot !== 'object' || Array.isArray(plot) || plot.id == null || plot.id === '') continue;
+      var id = String(plot.id);
+      if (seen[id]) return false;
+      seen[id] = true;
+    }
+    return true;
+  }
+
+  function generatedCurrentId(plotId) {
+    if (plotId == null || plotId === '') return null;
+    try { return 'auto-current:' + encodeURIComponent(String(plotId)); }
+    catch (error) { return null; }
+  }
+
+  function generatedCurrentOwner(plot) {
+    if (!plot || plot.source !== 'auto' || plot.designPlotId == null || plot.designPlotId === '') return null;
+    var owner = String(plot.designPlotId);
+    /* The bare ID is recognized only as a legacy record, and only when its
+       explicit design owner is present. New records use a project-scoped ID. */
+    return plot.id === 'auto-current' || plot.id === generatedCurrentId(owner) ? owner : null;
+  }
+
+  function ownsGeneratedCurrent(plot, owner, id) {
+    return !!plot && plot.id === id && generatedCurrentOwner(plot) === owner;
+  }
+
   function read() {
     try {
       var raw = root.localStorage.getItem(KEY);
@@ -22,6 +52,7 @@
 
   function replace(plots, expectedRevision) {
     if (!Array.isArray(plots)) return { ok: false, error: 'invalid-plot-library' };
+    if (!hasUniqueIds(plots)) return { ok: false, error: 'duplicate-plot-id' };
     var current = read();
     if (!current.ok) return current;
     if (current.revision !== expectedRevision) return { ok: false, error: 'plot-library-conflict' };
@@ -83,6 +114,62 @@
     return replace(current.plots.filter(function (plot) { return !plot || plot.id !== id; }), current.revision);
   }
 
+  function upsertGeneratedCurrent(plotId, entry) {
+    var owner = plotId == null || plotId === '' ? null : String(plotId);
+    var id = generatedCurrentId(owner);
+    if (!owner || !id || !entry || typeof entry !== 'object' || Array.isArray(entry) ||
+        entry.id !== id || entry.source !== 'auto' || String(entry.designPlotId || '') !== owner) {
+      return { ok: false, error: 'invalid-generated-current-plot' };
+    }
+    var current = read();
+    if (!current.ok) return current;
+    var matches = current.plots.filter(function (plot) { return plot && plot.id === id; });
+    if (matches.length > 1) return { ok: false, error: 'duplicate-plot-id' };
+    if (matches.length === 1 && !ownsGeneratedCurrent(matches[0], owner, id)) {
+      return { ok: false, error: 'plot-id-owned-by-other-entry' };
+    }
+    var legacy = current.plots.filter(function (plot) { return plot && plot.id === 'auto-current'; });
+    if (legacy.length > 1 && legacy.some(function (plot) { return generatedCurrentOwner(plot) === owner; })) {
+      return { ok: false, error: 'duplicate-plot-id' };
+    }
+    var removableLegacy = legacy.length === 1 && generatedCurrentOwner(legacy[0]) === owner ? legacy[0] : null;
+    var next = [], replaced = false;
+    current.plots.forEach(function (plot) {
+      if (plot && plot.id === id) {
+        next.push(entry);
+        replaced = true;
+      } else if (removableLegacy && plot === removableLegacy) {
+        /* Migrate only a legacy record whose explicit owner matches. */
+      } else next.push(plot);
+    });
+    if (!replaced) next.push(entry);
+    return replace(next, current.revision);
+  }
+
+  function removeGeneratedCurrent(plotId) {
+    var owner = plotId == null || plotId === '' ? null : String(plotId);
+    var id = generatedCurrentId(owner);
+    if (!owner || !id) return { ok: false, error: 'invalid-generated-current-plot' };
+    var current = read();
+    if (!current.ok) return current;
+    var matches = current.plots.filter(function (plot) { return plot && plot.id === id; });
+    if (matches.length > 1) return { ok: false, error: 'duplicate-plot-id' };
+    if (matches.length === 1 && !ownsGeneratedCurrent(matches[0], owner, id)) {
+      return { ok: false, error: 'plot-id-owned-by-other-entry' };
+    }
+    var legacy = current.plots.filter(function (plot) { return plot && plot.id === 'auto-current'; });
+    if (legacy.length > 1 && legacy.some(function (plot) { return generatedCurrentOwner(plot) === owner; })) {
+      return { ok: false, error: 'duplicate-plot-id' };
+    }
+    var removableLegacy = legacy.length === 1 && generatedCurrentOwner(legacy[0]) === owner ? legacy[0] : null;
+    if (!matches.length && !removableLegacy) {
+      return { ok: true, plots: current.plots, revision: current.revision, unchanged: true };
+    }
+    return replace(current.plots.filter(function (plot) {
+      return !(plot && (plot.id === id && ownsGeneratedCurrent(plot, owner, id))) && plot !== removableLegacy;
+    }), current.revision);
+  }
+
   function restoreSnapshot(snapshot, expectedRevision) {
     if (!snapshot || snapshot.ok !== true || !Array.isArray(snapshot.plots) ||
         (snapshot.revision !== null && typeof snapshot.revision !== 'string')) {
@@ -107,6 +194,10 @@
 
   root.RyPlotLibraryStore = {
     key: KEY,
+    generatedCurrentId: generatedCurrentId,
+    generatedCurrentOwner: generatedCurrentOwner,
+    upsertGeneratedCurrent: upsertGeneratedCurrent,
+    removeGeneratedCurrent: removeGeneratedCurrent,
     read: read,
     replace: replace,
     update: update,
