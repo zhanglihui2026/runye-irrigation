@@ -2488,11 +2488,10 @@
             return;
           }
           selectAuto(apd.pid, apd.along);         // 拖哪条选哪条（信息卡/改长/右键菜单随之）
+          /* [v579] 原 v170 的 startW/curW/lockAxis/committed 四个字段专为「总管正交锁定」服务，
+             总管整体平移已取消 ⇒ 一并删除（selectAuto 选中行为保持不变）。 */
           autoDrag = { pid: apd.pid, pointerId: e.pointerId, last: rawAuto, acc: { x: 0, y: 0 }, moved: false,
-                       sx: e.clientX, sy: e.clientY,
-                       /* v170：总管拖动正交锁定用（其他管不用）—— startW/curW=手势起点/当前世界点，
-                          lockAxis=锁定轴（null=未锁），committed=已提交的目标投影位移 */
-                       startW: rawAuto, curW: rawAuto, lockAxis: null, committed: { x: 0, y: 0 } };
+                       sx: e.clientX, sy: e.clientY };
           if (ctn.setPointerCapture) { try { ctn.setPointerCapture(e.pointerId); } catch (err4) {} }
           e.preventDefault();
           return;
@@ -2644,27 +2643,15 @@
         if (!pdA) return;
         if (!autoDrag.moved && Math.hypot(e.clientX - autoDrag.sx, e.clientY - autoDrag.sy) < 3) return;  // 3px 启动阈值
         autoDrag.acc.x += pdA.x - autoDrag.last.x; autoDrag.acc.y += pdA.y - autoDrag.last.y;
-        autoDrag.last = pdA; autoDrag.curW = pdA; autoDrag.moved = true;   /* v170：curW 记当前世界点（正交锁定用） */
+        autoDrag.last = pdA; autoDrag.moved = true;
         if (!autoDragRaf) autoDragRaf = requestAnimationFrame(function () {
           autoDragRaf = 0;
           if (!autoDrag) return;
           var ax = autoDrag.acc.x, ay = autoDrag.acc.y;
           autoDrag.acc = { x: 0, y: 0 };
-          /* v170（用户 2026-10-01 要求「总管移动只能水平或者垂直移动」）：
-             总管拖动正交锁定 —— 以手势起点到当前的累计位移定轴（首次超过 0.3m 锁定，
-             整只手势不再换轴，避免接近 45° 时逐帧抖动换向）；锁轴后按「目标投影位移 − 已提交位移」
-             提交增量，松手前任何时刻的累计 moves 都严格落在单轴上。主管/支管拖动行为不变。 */
-          if (autoDrag.pid === 'front' && autoDrag.startW) {
-            var tF = { x: autoDrag.curW.x - autoDrag.startW.x, y: autoDrag.curW.y - autoDrag.startW.y };
-            if (!autoDrag.lockAxis && Math.hypot(tF.x, tF.y) > 0.3)
-              autoDrag.lockAxis = Math.abs(tF.x) >= Math.abs(tF.y) ? 'x' : 'y';
-            if (autoDrag.lockAxis) {
-              var tgtF = autoDrag.lockAxis === 'x' ? { x: tF.x, y: 0 } : { x: 0, y: tF.y };
-              ax = tgtF.x - autoDrag.committed.x; ay = tgtF.y - autoDrag.committed.y;
-              autoDrag.committed = { x: tgtF.x, y: tgtF.y };
-            } else { ax = 0; ay = 0; }
-          }
-          if ((ax || ay) && lastDataRef) AE.movePipe(autoDrag.pid, ax, ay, lastDataRef, 'ws');  // 广播 → ws/iso 重渲染
+          /* [v579] 总管不再整体平移：拖总管只选中、不写 moves（三通拖动才是改总管的正道，
+             v564/v568）。主管/支管的整条让位拖动行为不变。 */
+          if ((ax || ay) && lastDataRef && autoDrag.pid !== 'front') AE.movePipe(autoDrag.pid, ax, ay, lastDataRef, 'ws');  // 广播 → ws/iso 重渲染
         });
         return;
       }

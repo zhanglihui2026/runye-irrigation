@@ -3632,7 +3632,7 @@ function tlAutoGenerate(options) {
      口径：
      · 拖动值是**绝对世界坐标**（米），按地块指纹匹配；换地块自动失效。
      · 优先级：用户拖动值 > 二级页 ppShare.source > 自动推断（地块外沿/旧总管起点的近端）。
-     · 拖过的水源不再随「总管整体平移」(AE.moves['front']) 走 —— 用户放哪就是哪。
+     · 用户放哪就是哪（v579 起总管已不再整体平移，本条自然成立）。
      · 右键「水源换向」(plot-editor.js tlSrcFlip) 会清除本值，换向才生效。
      · 材料与水力：水源→总管近端三通那条直线**计入总管长度**（v570 起，原来只画不算）。 */
   var TL_SRC_LS='tlSourceMove_v1';
@@ -3689,7 +3689,7 @@ function tlAutoGenerate(options) {
      · 水源点留在原位（旧总管起点 = 地块外沿老位置），由「水源连接段」接到总管近端
        （见下方绘制段 data-tlsrcpipe）；
      · 纵向分支（主管横置）对称：放进第 1 列、贴该列左缘（偏移 0 米）、两端截止于最上/最下主管；
-     · 拖动沿主管走向滑移不变（正交锁定，AE.moves['front'] 机制不动）；
+     · 拖动沿主管走向滑移不变（v579 起「总管整体平移」已取消，改总管只走本机制）；
      · 分区不足 2 排/列时退回旧几何（地块外沿全宽），保证小地块不空转。 */
   var tlFrontMK=[];           /* [v557] 总管折线断点集（按总管走向排序）：{mk,idx,line,span,pos,off,max,sig} */
   /* [v557] 构建断点集：axis='V' → 竖主管接横向总管（断点沿 +y 下移，pos=主管 x）；
@@ -3878,20 +3878,15 @@ function tlAutoGenerate(options) {
   var tlSrcSig=Math.round(b.minX)+','+Math.round(b.minY)+'|'+Math.round(b.w)+'x'+Math.round(b.h)+'|'+poly.length;
   var tlSrcUser=tlSourceMoveOf(tlSrcSig);
   if(tlSrcUser){ sourcePos={x:tlSrcUser.x,y:tlSrcUser.y}; }
-  /* v170（2026-10-01 用户要求「总管移动之后，水源跟阀门自动跟着移动，地块外的主管就不用显示了」，
-     同日更正「不对，是主管」——地块外裁的是主管接入段，不是总管）：
-     总管图面平移（AE.moves['front']）在简图渲染层整体跟随 —— 水源点、总管→主管连接段、
-     交接三通/阀门全部随总管刚性平移（只动显示层；下方 tlDiagramData 快照仍落设计几何，
-     水力/材料/几何签名不变 —— moves 的红线原样保持）。
-     tlFrontDesign/tlSrcDesign 预存设计值供快照使用（否则 effPts 会再叠一次 moves）。 */
-  var tlFrontMv=(window.RyTlAutoEdits&&typeof window.RyTlAutoEdits.moveOf==='function')?window.RyTlAutoEdits.moveOf('front'):null;
+  /* [v579] 总管不再整体平移（用户拍板取消）：
+     三通拖动（v564 语义 + v568 工作区入口）已能**真改**总管几何 —— 断点下移后总管成折线、
+     主管自三通起算截断、材料与水力同步重算。而「总管整条平移」(AE.moves['front']) 只动显示层、
+     不进 tlDiagramData，两套并存会出现「同样都是拖、有的算钱有的不算」的矛盾。
+     ⇒ 这里不再叠加 moves['front']，frontPipe / sourcePos 直接用设计几何；
+       主管/支管的整条让位拖动保留（AE.moves 机制仍在用，见 tl-workspace autoDrag）。
+     tlFrontDesign / tlSrcDesign 仍预存：tlDiagramData 快照要用（否则 effPts 会二次叠加）。 */
   var tlFrontDesign=frontPipe?JSON.parse(JSON.stringify(frontPipe)):null;
   var tlSrcDesign=sourcePos?{x:sourcePos.x,y:sourcePos.y}:null;
-  if(tlFrontMv&&frontPipe){
-    frontPipe=frontPipe.map(function(fp){return{x:fp.x+tlFrontMv.dx,y:fp.y+tlFrontMv.dy};});
-    /* [v570] 用户拖过的水源是绝对位置 ⇒ 不再随总管整体平移叠加（否则会越拖越偏） */
-    if(sourcePos&&!tlSrcUser)sourcePos={x:sourcePos.x+tlFrontMv.dx,y:sourcePos.y+tlFrontMv.dy};
-  }
 
   // Draw front main pipe (总管) — orange, thick
   if(frontPipe){
@@ -4019,15 +4014,16 @@ function tlAutoGenerate(options) {
     }
     /* v170b（2026-10-01 用户更正「不对，是主管」）：总管被拖动过后，主管→总管接入段
        （主管色粗线，用户口中的「地块外的主管」）并入地块裁剪组 —— 总管尚在地块外/半进时，
-       伸出地块的那段接入线不再显示；未拖动时保持原样（接入段画在裁剪组之外是老场景：
-       总管在地块外沿，接入线必须可见）。data-tlstub 供工作区克隆/闸门选择器使用。 */
-    if(tlFrontMv)parts.push('<g clip-path="url(#tlPlotClip)" data-tlstubg="1">');
+       伸出地块的那段接入线不再显示。
+       [v579] 总管整体平移已取消（改总管靠拖三通）⇒ 该分支的唯一触发条件 tlFrontMv 恒为假，
+       整段连带 `if(tlFrontMv)` 的裁剪外壳一并删除（否则访问已删变量会抛 ReferenceError，
+       实测会让 tlAutoGenerate 整个挂掉、工作区渲染不出来）。接入段回到老场景：画在裁剪组之外，
+       地块外部分照常可见。data-tlstub 供工作区克隆/闸门选择器使用，保持不变。 */
     tlStubs.forEach(function(sl){
       var sd='';
       for(var si=0;si<sl.length;si++){var sp2=ts(sl[si].x,sl[si].y);sd+=(si===0?'M':'L')+sp2.x.toFixed(1)+' '+sp2.y.toFixed(1)+' ';}
       parts.push('<path data-tlstub="1" d="'+sd+'" fill="none" stroke="#185FA5" stroke-width="5" stroke-linecap="round"/>');
     });
-    if(tlFrontMv)parts.push('</g>');
   }
 
   // Draw main pipes (blue) — clipped to plot boundary

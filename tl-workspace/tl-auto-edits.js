@@ -413,13 +413,10 @@
     var k = geometryKey(data);
     if (!k) return 'kept';
     if (k === geoKey) return 'kept';
-    /* v167（2026-09-30 用户要求「总管的位置要移动到地块范围以内」→ 选「拖进去后不弹回」）：
-       几何签名变化时保留总管的整体平移 moves['front'] —— 它是用户显式拖动的图面位置，
-       与割缝/分区几何无关（此前任何引起 mainPipes 变化的操作都会把它清掉，总管弹回外侧）。
-       其余编辑（改长/配件/改径/遮蔽/其他管平移）照旧清空；reset()（换方案）语义不变。 */
-    var keepFrontMove = moves['front'] || null;
+    /* [v579] 原 v167 特例（几何变化时保留 moves['front']，让总管不弹回）已随「总管整体平移」
+       一并取消 —— 现在改总管靠拖三通（v564/v568，真改几何并落 frontNodes），没有需要跨
+       几何签名保留的图面位移。其余编辑（改长/配件/改径/遮蔽/其他管平移）照旧清空。 */
     lens = {}; fits = []; cals = {}; moves = {}; hidden = {}; seq = { n: 0 };
-    if (keepFrontMove) moves['front'] = keepFrontMove;
     geoKey = k;
     if (savedLS && savedLS.geoKey === k) {
       restore(savedLS, true);

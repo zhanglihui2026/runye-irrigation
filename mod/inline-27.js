@@ -1227,6 +1227,8 @@
     try { window.tlWsStatsRender(); } catch (e) { }
     try { tlPushToHydraulicCalc(); } catch (e) { }
     if (d && d.action === 'move') {
+      /* [v579] 总管整体平移已取消 ⇒ front 不再有 moves，_fm 恒为 null、_sig 恒为 ''，
+         与初始 tlFrontMvSig 相等 ⇒ 本分支对总管不再触发（主管/支管的 move 广播不受影响）。 */
       var _fm = (AE.moveOf ? AE.moveOf('front') : null) || null;
       var _sig = _fm ? (_fm.dx.toFixed(3) + ',' + _fm.dy.toFixed(3)) : '';
       if (_sig !== tlFrontMvSig) {

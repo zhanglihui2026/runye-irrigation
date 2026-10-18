@@ -1588,3 +1588,28 @@ N4 只影响一根 / N5 图面三通跟随 / N6 clamp / N7 真实拖动（吸附
   → 3 条（chip:hover 只 1 个属性、chip:active、is-primary 只留默认态），互不覆盖；
   另把 online-map.css 与 measure 页两处同值的「整行宽 24px」尺寸规则合并成一条逗号分组。
 - 实测 hover 后五个按钮 bg 全部 rgb(234,243,237)；边框/字色保持默认（主次可辨）。ci PASS=28 FAIL=0。
+
+### §25p v580-front-move-removed —— 取消「总管整体移动」
+用户：「管路编辑页面中之前应该有要求总管整体移动的代码，现在是移动总管三通自动重构管道了，
+那就不存在总管一起移动的情况了，所以那段代码要取消吧。」
+拍板：只删总管(front) 的；拖总管只选中、不移动。
+
+删除清单：
+  ① tl-workspace.js：v170 正交锁定 4 字段（startW/curW/lockAxis/committed）+ pointermove 里的
+     锁轴分支；autoDrag 提交 movePipe 时加 autoDrag.pid !== 'front'。
+  ② inline-09.js：渲染层不再叠加 AE.moves['front']（frontPipe/sourcePos 直接用设计几何）。
+  ③ tl-auto-edits.js：syncGeometry 里 v167「几何变化时保留 moves['front']」特例取消。
+  ④ inline-09.js：v170b 的接入段裁剪外壳 if(tlFrontMv) 连带删除。
+
+**关键坑**：④ 那段引用了已删变量 tlFrontMv ⇒ ReferenceError ⇒ tlAutoGenerate 整个挂掉、
+工作区渲染不出来（#tlWsCanvas 不挂载）。**删变量必须全局搜一遍引用**，不能只删定义处。
+
+保留：moves 机制本身（主管/支管整条让位拖动仍需要，实测 movePipe(main-0 / branch-0) 均返回
+true 并写入 dx）、selectAuto 选中行为、inline-24 复位按钮（判据是 moveOf(id)，front 恒 null
+⇒ 自动不显示）、inline-27 系统图的 _fm 分支（_fm 恒 null ⇒ 对总管自动不触发）。
+
+验收：_probe_front_node_ws 新增 G1/G2/G3 全绿（拖自动管线不写 moves[front]；
+movePipe(main-0/branch-0) 仍 true；拖后 frontPipe 不变）+ 原 W1~W6 全绿；
+回归 _probe_front_node 51/51、_probe_front_geom 61/61、_probe_source_straight 8/8、ci 28/0、
+单测 140/141（红灯 runye_hydraulics_core 既存）、双页冒烟 ALL PASS。
+版本：并行会话已抬到 v579 ⇒ 取更高号 v580。

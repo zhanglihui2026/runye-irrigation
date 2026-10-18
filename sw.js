@@ -692,7 +692,18 @@
    变深绿底白字。五个按钮并排 hover 观感各异（用户：变色不统一，各是各的颜色）。
    改：hover/active 只改底色且全 chip 同色（#eaf3ed / #d8e9df），主次只由默认态的边框+字色表达。
    颜色相关规则 6 条 → 3 条且互不覆盖；另把两处同值的「整行宽 24px」尺寸规则合并成一条。 */
-const VERSION = 'v578-chip-hover-unify';
+/* v579-map-route-single-navigation: 回传接收器先导航；跨页启动时导航 load 消费一次性标记，
+   同页由 pushState 更新锚点，均避免第二次页面切换。 */
+/* v580-front-move-removed: 取消「总管整体移动」（用户拍板：三通拖动已能真改总管几何，两者并存矛盾）。
+   删除范围只限 front：① tl-workspace.js v170 正交锁定 4 字段 + pointermove 里的锁轴分支，
+     autoDrag 提交 movePipe 时加 `pid !== 'front'`（拖总管只选中、不写位移）；
+   ② inline-09.js 渲染层不再叠加 AE.moves['front']（frontPipe/sourcePos 直接用设计几何）；
+   ③ tl-auto-edits.js syncGeometry 里「几何变化时保留 moves['front']」的 v167 特例一并取消；
+   ④ inline-09.js v170b 的接入段裁剪外壳 `if(tlFrontMv)` 连带删除 —— 它引用了已删变量 tlFrontMv，
+      实测会让 tlAutoGenerate 抛 ReferenceError、工作区整个渲染不出来（关键坑）。
+   保留：moves 机制本身（主管/支管的整条让位拖动仍需要）、selectAuto 选中行为。
+   注：并行会话已抬到 v579 ⇒ 按规则取更高号 v580（不回退对方）。 */
+const VERSION = 'v580-front-move-removed';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

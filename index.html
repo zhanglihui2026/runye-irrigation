@@ -317,7 +317,7 @@ body.ry-worst-off [data-tlworst]{display:none}
   <script src="runye-member-ui.js?v=429-local-admin"></script>
   <!-- 顶部导航动作按钮（系统图，runye-nav.js act 项）：动作映射须先于 runye-nav.js 注册 -->
   <script src="mod/inline-05.js?v=357"></script>
-  <script src="runye-nav.js?v=385-global-open"></script>
+  <script src="runye-nav.js?v=579-map-route-single-navigation"></script>
   <!-- [NEW MODULE: DXF 导出] 入口：删除本行即卸载（不改动任何原有逻辑） -->
   <script src="runye-dxf.js?v=404-tier-gates"></script>
   <!-- [NEW MODULE: pipe_optim] 入口：删除本行即卸载本隔离模块（不改动任何原有逻辑） -->
@@ -2229,7 +2229,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script src="mod/material-table.js?v=421-mat-table"></script>
 <!-- [v424-plan-calc-render] 扬程公式与分解展示模块，先于计算控制器和三级调用方装载。 -->
 <script src="mod/plan-calc-render.js?v=424-plan-calc-render"></script>
-<script src="mod/inline-09.js?v=571-source-straight-move"></script>
+<script src="mod/inline-09.js?v=580-front-move-removed"></script>
 <!-- [v423-header-layout] 三级简图标题布局依赖 inline-09 的 tlMeasureText 与生成时写入的标题状态。 -->
 <script src="mod/tl-header-layout.js?v=423-header-layout"></script>
 
@@ -2267,13 +2267,13 @@ body.ry-worst-off [data-tlworst]{display:none}
 <!-- 共享图面数据层（2026-09-15 阶段1）：三级工作区手工管线编辑状态。必须先于下面两个模块加载 -->
 <script src="tl-workspace/tl-edit-pipes.js"></script>
 <!-- 自动管线图面编辑层（2026-09-15 阶段2）：二级传递的自动管线点选、改长与插配件 -->
-<script src="tl-workspace/tl-auto-edits.js"></script>
+<script src="tl-workspace/tl-auto-edits.js?v=580-front-move-removed"></script>
 
 <!-- ===== 三级设计工作区模块 + 页面接线（2026-09-13） ===== -->
 <script src="tl-workspace/tl-nodes.js"></script>
 <!-- v180b（2026-10-02）：tl-nodes.js 就绪后再挂简图实时刷新订阅（见 tlHookTlNodesLiveSync 注释） -->
 <script src="mod/inline-22.js?v=357"></script>
-<script src="tl-workspace/tl-workspace.js?v=571-source-straight-move"></script>
+<script src="tl-workspace/tl-workspace.js?v=580-front-move-removed"></script>
 <script src="tl-workspace/tl-path-measure.js"></script>
 <!-- 2026-09-23（用户指令）v135：水力计算器「入口预留」总闸——置 true 时界面不挂载
      （hydraulic-calc.js 的 mount/setConfig/importThreeLevel 直接空转），导航入口与占位文案保留，
@@ -2287,7 +2287,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script src="filter-system/filter-system.js"></script>
 <script src="mod/inline-24.js?v=357"></script>
 <script src="mod/inline-25.js?v=357"></script>
-<script src="mod/inline-27.js?v=547-card-rhythm"></script>
+<script src="mod/inline-27.js?v=580-front-move-removed"></script>
 <!-- ═══ CAD 单一操作区：全局左工具栏（2026-09-14；右上角视口切换条已取消） ═══════════
      需求：按 CAD 方式所有工作在一个操作区进行 —— 地块信息是基础底图，不同图纸作为
      图层叠加切换；原三块左属性栏折叠进本工具栏（details 分组，默认全部折叠，
