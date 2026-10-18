@@ -2690,8 +2690,8 @@ body > .ry-nav .main-header{display:none!important}
    ⚠ 必须挂 .tl-plan-result（结果栏专属类）：rail 态 #tlSide 被 mod/ry-cad-toolbar.js 搬进
    #ryCadSide，下面那条 `#tlPipePlanSection .pp-side .pp-plan-val` 的祖先链断裂 ——
    实测它**从未生效过**（三级 .pp-plan-val 一直是继承来的 400）。两处都写，原位/搬移态一致。 */
-.tl-plan-result .pp-plan-val{font-weight:600}
-#tlPipePlanSection .pp-side .pp-plan-val{font-size:11px;font-weight:600;color:#1a1a1a}
+.tl-plan-result .pp-plan-val{font-weight:400}
+#tlPipePlanSection .pp-side .pp-plan-val{font-size:11px;font-weight:400;color:#1a1a1a}
 /* [v539] 「⇧ 更新水泵扬程」：inline 字号已删（改由本条统管）。必须 !important ——
    runye-typography 的 `button{font-size:13px!important}` 会把 inline 值顶成 13px（实测）。
    所在卡片 #tlPumpUpdateBox 的 font 简写也已从 11.5px 统一到 11px。 */
@@ -4167,7 +4167,7 @@ body.ry-tool #designInput .mw-col-right{
 
 
 #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-label{font-size:11px;line-height:1.25;white-space:nowrap}
-#ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-val{font-size:11px;font-weight:600;color:#1a1a1a}
+#ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-val{font-size:11px;font-weight:400;color:#1a1a1a}
 
 
 

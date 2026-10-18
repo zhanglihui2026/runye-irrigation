@@ -656,7 +656,11 @@
    绝对坐标按地块指纹落盘、整米吸附），优先级高于二级页 ppShare.source，右键换向前先清值；
    ③ 该直线长度计入总管长度（水力 + 材料），原来只画不算。
    注：并行会话已抬到 v570-irrigation-scope-guard ⇒ 按规则取更高号 v571（不回退对方）。 */
-const VERSION = 'v571-source-straight-move';
+/* v572-plan-val-regular: 三级「管网参数/生成与输出」左栏红框内数值改不加粗（用户要求）——
+   .pp-plan-val 的 font-weight 600 → 400，三处同改（通用 .pp-plan-val 600 由三级两条特异性
+   规则覆盖；rail 态 #ryCadSide 副本必须同步，否则工具栏搬移后又变粗：v539 踩过的双副本坑）。
+   只动三级专属三条，二级页（ry-panel.css:432 / style-01.css:1107 通用）不受影响。 */
+const VERSION = 'v572-plan-val-regular';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

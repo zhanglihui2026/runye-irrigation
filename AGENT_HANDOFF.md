@@ -1493,3 +1493,14 @@ N4 只影响一根 / N5 图面三通跟随 / N6 clamp / N7 真实拖动（吸附
   水源贴在地块外侧、与尺寸线邻近，放在其后会被抢走（实测：拖水源变成拖尺寸线，水源不动也不落盘）。
 - 拖动水源后「水源距离 planSrcDist」仍是手动输入项，不要把两者混为一谈（前者是图面连接段，后者是地块外实际距离）。
 - 版本：并行会话已提交到 v570-irrigation-scope-guard ⇒ 取更高号 **v571**（不回退对方）。
+
+### §25j v572-plan-val-regular —— 三级左栏数值改常规字重（用户要求）
+用户：截图红框（三级「管网参数/生成与输出」左栏，联合流量→支管流速）「加粗字体都变成不加粗的普通字体」。
+- `.pp-plan-val` 的 font-weight 600 → 400，**三处必须同改**（v539 双副本坑）：
+  · `mod/style-01.css:2693` `.tl-plan-result .pp-plan-val`（结果栏，原位/rail 两态都命中）
+  · `mod/style-01.css:2694` `#tlPipePlanSection .pp-side .pp-plan-val`（左栏原位态）
+  · `mod/style-01.css:4170` `#ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-val`（**rail 态副本**，漏改则工具栏搬移后又变粗）
+- 通用 `.pp-plan-val{font-weight:600;font-size:14px}`（style-01.css:1107）与二级页 `ry-panel.css:432` **不动** —— 只改三级专属三条。
+- 实测（getComputedStyle）：tlPlanCombinedFlow / PumpFlow / PumpHead / PumpPower / MotorPower / FrontPipe / MainPipe / BranchPipe 全部 `400/11px`。
+- 未动：列头 `.pp-plan-cols-head`（600）、改径后橙值 `.pp-plan-val-real`（700）—— 仍有强调语义，若用户要一起改需另说。
+- ci PASS=28 FAIL=0。版本 v572（CORE 含 style-01.css ⇒ 必须抬；index.html 的 style-01.css?v= 同步）。
