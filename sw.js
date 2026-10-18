@@ -711,7 +711,16 @@
    ② 接入段优先读图面真实那条 path[data-tlstub]（两端点就近配对、反向也认），
       匹配不到才回退直连 —— 直连与图面画法不一致是用户看到错位的另一半原因。
    回归：_probe_front_node_ws 全绿、_probe_front_node 51/51、ci 28/0。 */
-const VERSION = 'v581-flow-route-polyline';
+/* v582-ws-rerender-after-regen: 修「拖三通后水流动画仍按旧路由演示」的真正根因 ——
+   工作区底图克隆的是「简图重建前」的旧 SVG（inline-27 订阅里已记载这个差一帧问题）。
+   我给三通/水源拖动写的结算只调了 window.tlAutoGenerate()，没有补 rerenderKeepView()
+   ⇒ 工作区里 path[data-tlpipe="front"] 的 d 拖前拖后一模一样（实测 M38.8 313… 纹丝不动），
+   水流动画从 DOM 读 path（v218 设计），自然一直按旧几何走。
+   修：两处结算在 tlAutoGenerate 之后补一次 rerenderKeepView()（底图重克隆），
+   并在演示组存在时 applyGroupHighlight() 重涂水流（否则重克隆后动画层被清空、直接消失）。
+   实测（600x400，拖 H300 off=38）：工作区总管 d 由 M136.0 339.5… 变为 M194.1 339.5…，
+   动画 d 同步跟随（起点 136 → 194.1）。 */
+const VERSION = 'v582-ws-rerender-after-regen';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

@@ -1637,3 +1637,29 @@ movePipe(main-0/branch-0) 仍 true；拖后 frontPipe 不变）+ 原 W1~W6 全�
 
 回归：_probe_front_node_ws 全绿、_probe_front_node 51/51、ci 28/0、单测 140/141（既存红灯）、
 双页冒烟 ALL PASS。
+
+### §25r v582-ws-rerender-after-regen —— 拖三通后水流动画仍按旧路由的根因
+用户：「不行，动画演示没有按照新的管道路由演示，继续排查原因，解决掉。」
+
+前一轮（v581）误判：只修了 tlFlowRoute 的取点（总管段弧长切片 + 接入段读图面 stub），
+虽然正确但**不是**用户看到的现象的主因。
+
+真根因（实测抓到）：**工作区底图没有重新克隆**。
+- 工作区底图是 `cloneNode(#tlDiagramContent svg)`，克隆的是「简图重建前」的 SVG
+  （inline-27 的订阅注释里早就记载过这个「差一帧」问题）。
+- 我给三通/水源拖动的结算只写了 `window.tlAutoGenerate()` 就完事，**没有补 rerenderKeepView()**
+  ⇒ 拖完后工作区里 `path[data-tlpipe="front"]` 的 d 拖前拖后完全一致
+  （实测：M38.8 313.0 L38.8 416.0 L38.8 519.0 两次一模一样）。
+- 水流动画是「从已画好的 path 上取点」（v218 设计）⇒ 读到旧 path ⇒ 一直按旧路由演示。
+
+修（tl-workspace.js 两处结算）：
+- `tlAutoGenerate()` 之后再补一次 `rerenderKeepView()`（底图重克隆）。
+- 演示组存在时再 `applyGroupHighlight()` 重涂水流 —— 否则重克隆后动画层被清空、拖完动画直接消失。
+
+实测（600x400，真实鼠标拖 H300 → off=38）：
+- 工作区总管 d：`M136.0 339.5 L136.0 645.5` → `M194.1 339.5 L136.0 645.5`（新折线）
+- 覆盖层可见总管 d 同步（M194.14 339.5L136 645.5）
+- 动画 d 同步跟随：起点 136.0 → 194.1
+
+回归：_probe_front_node_ws 11 项 OK、_probe_source_straight 8/8、_probe_front_node 51/51、
+ci 28/0、单测 140/141（既存红灯）、双页冒烟 ALL PASS。

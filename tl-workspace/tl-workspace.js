@@ -2746,8 +2746,11 @@
           var vsSp = (api.getView && api.getView()) || null;
           if (typeof window !== 'undefined' && typeof window.tlAutoGenerate === 'function') { try { window.tlAutoGenerate(); } catch (errSp2) { } }
           else { rerenderKeepView(); }
+          /* [v582] 同三通：简图重建后补一次重渲染，否则工作区底图仍是旧简图的克隆（水源/接入阀差一帧） */
+          try { rerenderKeepView(); } catch (errSp2b) { }
           if (typeof window !== 'undefined' && typeof window.tlUpdatePlanBar === 'function') { try { window.tlUpdatePlanBar(); } catch (errSp3) { } }
           if (vsSp && api.setView) { try { api.setView(vsSp); } catch (errSp4) { } }
+          try { if (selGroup !== null) applyGroupHighlight(); } catch (errSp5) { }
         }
       }
       if (frontNodeDrag && (e.pointerId === undefined || e.pointerId === frontNodeDrag.pointerId)) {   // [v568] 三通断点结算
@@ -2760,8 +2763,15 @@
           var vsFn = (api.getView && api.getView()) || null;
           if (typeof window !== 'undefined' && typeof window.tlAutoGenerate === 'function') { try { window.tlAutoGenerate(); } catch (errFn2) { } }
           else { rerenderKeepView(); }
+          /* [v582] ★ 简图重建后**必须**再补一次 rerenderKeepView —— 工作区底图克隆的是「重建前」的
+             旧简图（inline-27 的订阅注释里已记载：不补就会水源/接入阀/水流停在上一帧、拖动结束后永久差一帧）。
+             实测：拖三通后工作区里 path[data-tlpipe="front"][data-tlpipe-ref] 的 d 纹丝不动（旧总管），
+             水流动画因此一直按旧路由演示。补这一行后底图重克隆，动画随之按新折线走。 */
+          try { rerenderKeepView(); } catch (errFn2b) { }
           if (typeof window !== 'undefined' && typeof window.tlUpdatePlanBar === 'function') { try { window.tlUpdatePlanBar(); } catch (errFn3) { } }
           if (vsFn && api.setView) { try { api.setView(vsFn); } catch (errFn4) { } }
+          /* 底图重克隆后演示层已被清空 ⇒ 按当前演示组重涂水流（否则拖完动画直接消失） */
+          try { if (selGroup !== null) applyGroupHighlight(); } catch (errFn5) { }
         }
       }
       if (autoDrag && (e.pointerId === undefined || e.pointerId === autoDrag.pointerId)) {
