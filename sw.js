@@ -660,7 +660,11 @@
    .pp-plan-val 的 font-weight 600 → 400，三处同改（通用 .pp-plan-val 600 由三级两条特异性
    规则覆盖；rail 态 #ryCadSide 副本必须同步，否则工具栏搬移后又变粗：v539 踩过的双副本坑）。
    只动三级专属三条，二级页（ry-panel.css:432 / style-01.css:1107 通用）不受影响。 */
-const VERSION = 'v572-plan-val-regular';
+/* v573-grp-bg-set-btn: ① 工具栏分组标题底色统一 —— 原 `:not(#ryCadGrpPipe)` 把
+   「二级 · 地块与灌溉参数」排除在外（用户截图对比：三级/地形高程都有浅绿底、就它没有），
+   去掉排除后三组同底色 #f4f9f6（hover #eaf3ed）；②「⚙ 参数设置」按钮 → 「设置」二字、
+   去图标、字号 13px→11px!important（typography 对 button 打 13px!important，必须跟 !important）。 */
+const VERSION = 'v573-grp-bg-set-btn';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

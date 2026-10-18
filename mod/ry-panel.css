@@ -768,7 +768,7 @@ body.ry-tool.ry-cad-vp #ryCadSide[data-ry-open="0"]{width:40px}
   flex:1 1 auto;flex-direction:column;justify-content:center;align-items:center;
   writing-mode:vertical-rl;padding:14px 0;letter-spacing:3px;
 }
-.ry-cad-set-btn{margin-left:auto;padding:2px 8px;border:1px solid #c9d8d0;background:#fff;color:#33604f;font-weight:500;cursor:pointer}
+.ry-cad-set-btn{margin-left:auto;padding:2px 8px;border:1px solid #c9d8d0;background:#fff;color:#33604f;font-weight:500;cursor:pointer;font-size:11px!important;line-height:1.5}
 .ry-cad-set-btn:hover{border-color:#173e32;color:#14532d}
 #ryCadSide .ry-cad-grps{flex:1 1 auto;overflow-y:auto;overflow-x:hidden}
 #ryCadSide .ry-cad-grps::-webkit-scrollbar, .pp-side::-webkit-scrollbar{width:5px;height:5px}
@@ -785,8 +785,10 @@ body.ry-tool.ry-cad-vp #ryCadSide[data-ry-open="0"]{width:40px}
 #ryCadSide .ry-cad-grp>summary::-webkit-details-marker{display:none}
 #ryCadSide .ry-cad-grp>summary::before{content:'▸';font-size:10px;color:#7d8f86}
 #ryCadSide .ry-cad-grp[open]>summary::before{content:'▾'}
-#ryCadSide .ry-cad-grp:not(#ryCadGrpPipe)>summary{background:#f4f9f6}
-#ryCadSide .ry-cad-grp:not(#ryCadGrpPipe)>summary:hover{background:#eaf3ed}
+/* [v573] 分组标题底色统一：原来 `:not(#ryCadGrpPipe)` 把「二级 · 地块与灌溉参数」排除在外，
+   用户截图对比「三级/地形高程都有浅绿底、就它没有」⇒ 去掉排除，三者同底色。 */
+#ryCadSide .ry-cad-grp>summary{background:#f4f9f6}
+#ryCadSide .ry-cad-grp>summary:hover{background:#eaf3ed}
 #ryCadSide .ry-cad-grp-body{padding:8px;min-width:0}
 body.ry-tool #ryCadSide [data-pp] .pp-side{
   width:100%!important;max-width:100%!important;min-width:0!important;

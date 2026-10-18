@@ -1504,3 +1504,15 @@ N4 只影响一根 / N5 图面三通跟随 / N6 clamp / N7 真实拖动（吸附
 - 实测（getComputedStyle）：tlPlanCombinedFlow / PumpFlow / PumpHead / PumpPower / MotorPower / FrontPipe / MainPipe / BranchPipe 全部 `400/11px`。
 - 未动：列头 `.pp-plan-cols-head`（600）、改径后橙值 `.pp-plan-val-real`（700）—— 仍有强调语义，若用户要一起改需另说。
 - ci PASS=28 FAIL=0。版本 v572（CORE 含 style-01.css ⇒ 必须抬；index.html 的 style-01.css?v= 同步）。
+
+### §25k v573-grp-bg-set-btn —— 分组标题底色统一 + 设置按钮瘦身
+用户：截图箭头指向工具栏第一组「二级 · 地块与灌溉参数」，要求「这里也应该有浅浅的绿色底色，
+三级管线 / 地形高程 都有」；另外「参数设置文字缩小，改为『设置』两个字，前面的图标也取消」。
+- 底色：`mod/ry-panel.css` 原本是 `#ryCadSide .ry-cad-grp:not(#ryCadGrpPipe)>summary{background:#f4f9f6}`
+  —— 显式把第一组排除在外（历史遗留）⇒ 去掉 `:not(...)`，三组同底色 `#f4f9f6`、hover `#eaf3ed`。
+- 按钮：index.html 里 `⚙ 参数设置` → `设置`；`.ry-cad-set-btn` 增 `font-size:11px!important`
+  （typography 对 `button` 打 13px !important，不带 !important 压不住）。
+- 实测：`#ryCadGrpPipe>summary` background-color = rgb(244,249,246)；`#ryCadGrpPipeSet` = 11px / 文案「设置」。
+- 注：截图脚本取不到坐标（#ryCadSide 默认 display:none，只在 body.ry-tool.ry-cad-vp 制图视图显示），
+  故本次以 computed 值为准，未留截图。
+- ci PASS=28 FAIL=0；ry-panel.css 与 index.html 均在 CORE ⇒ sw VERSION v573 + `ry-panel.css?v=` 同步。
