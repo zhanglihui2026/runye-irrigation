@@ -2587,6 +2587,9 @@
       if(!best||bd<1)return;   /* 水源总在端点上 ⇒ 最远端即另一端；退化情形不动 */
       var st=window.RunyeBridge&&window.RunyeBridge.state;
       if(!st)return;
+      /* [v570] 用户手动拖过水源时，拖动值是绝对位置且优先级更高 —— 换向前必须先清掉，
+         否则换向写进 state.source 也被拖动值盖住，看起来"右键没反应"。 */
+      if(typeof window.tlSourceMoveClear==='function')window.tlSourceMoveClear();
       st.source={x:best.x,y:best.y};
       try{ tlAutoGenerate({scroll:false,stay:true}); }catch(err){}
       if(typeof window.atShowToast==='function')window.atShowToast('水源已换到总管另一端（可再右键切换）');

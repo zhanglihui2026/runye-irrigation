@@ -651,7 +651,12 @@
    只能向下、落盘 + 重生成），优先级排在「自动管线整条拖动」之前、各模式分支之后。
    注：并行会话已抬到 v567 ⇒ 按规则取更高号 v568（不回退对方）。 */
 /* v570-irrigation-scope-guard: reject mismatched snapshot owners and protect bound legacy data from ownerless clears. */
-const VERSION = 'v570-irrigation-scope-guard';
+/* v571-source-straight-move: ① 水源→总管连接段由「垂直优先两段折线」改**一条直线**，
+   终点取总管上离水源最近的顶点（= 被拖动后的三通位置）；② 水源点可任意拖动（简图 + 工作区，
+   绝对坐标按地块指纹落盘、整米吸附），优先级高于二级页 ppShare.source，右键换向前先清值；
+   ③ 该直线长度计入总管长度（水力 + 材料），原来只画不算。
+   注：并行会话已抬到 v570-irrigation-scope-guard ⇒ 按规则取更高号 v571（不回退对方）。 */
+const VERSION = 'v571-source-straight-move';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

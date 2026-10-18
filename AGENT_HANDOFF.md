@@ -1453,3 +1453,43 @@ N4 只影响一根 / N5 图面三通跟随 / N6 clamp / N7 真实拖动（吸附
 - 新增同属性的辅助元素（命中圈）会让既有多处选择器计数翻倍 ⇒ 回归探针要收紧成
   rect[data-junction-tee][data-junction-front]（本次 D2/B0c 因此红过一轮）。
 - 版本：并行会话已抬到 v567-current-plot-anchor-fail-closed ⇒ 取更高号 **v568**（不回退对方）。
+
+### §25i v571-source-straight-move —— 水源连接段改直线 + 水源可任意拖动
+用户原话：「这里不要做成折线，就按照移动后的三通的位置 跟水源连起来，形成直线就行了。
+还有，水源位置要变成可任意移动的。」（附截图箭头指向水源右侧的直角折点）
+
+**① 连接段改直线**
+- 旧口径（v550）：水源→总管是「垂直优先」两段折线（先横后竖 / 先竖后横），水源一挪就多一个直角。
+- 新口径：`scPts=[sourcePos, scEnd]` 两点直连；scEnd = **总管上离水源最近的顶点**
+  —— 横向/纵向主分支下这些顶点就是各三通（含 v564 拖动后的位置），正好实现「按移动后的三通位置连」
+  （实测：拖三通 off=29 后，连接段终点与三通屏幕距离 0px）。
+
+**② 水源可任意拖动（简图 + 工作区）**
+- 数据层：`localStorage["tlSourceMove_v1"] = {sig,x,y}`，sig = 地块 bbox + 顶点数（换地块自动失效）；
+  导出 tlSourceMoveOf / Set / Clear、tlSourceLinkLen。
+- 优先级：用户拖动值 > 二级页 ppShare.source > 自动推断；拖过的水源**不再随**总管整体平移(AE.moves.front)叠加。
+- 简图：tlInitDrag 里新增 srcDrag（预览=水源 g 平移 + 连接段 d 起点跟随；松手整米吸附 + 落盘 + 重生成）。
+- 工作区：pickSource（世界坐标）+ srcPointDrag，排在三通之前、各模式分支之后；松手同样落盘+重生成（记视口）。
+  ⚠ 工作区不需要 DOM 层级命中，水源是克隆底图上的圆点，但拾取一律走世界坐标。
+- 右键换向（plot-editor.js tlSrcFlip）在写 state.source **之前**先调 tlSourceMoveClear()，
+  否则拖动值优先级更高会把换向结果盖掉（看起来"右键没反应"）。
+
+**③ 长度口径（用户选「自动计入」）**
+- `tlSourceLinkLen(d)` = 水源到总管最近顶点的直线长度（与绘图同一份几何）。
+- 计入三处：render() 的 matFrontLen（材料）、computeThreeLevel 的 frontLenUsed（水力，含 hydraulicPath 分支）。
+- 口径：总管长度 = 图面总管(wp.front) + 水源连接段直线 + 「水源距离」输入框(planSrcDist，地块外补充，默认 0)。
+
+**验收（_probe_source_straight.mjs，全 CDP 真实鼠标）8/8**
+- S1 连接段 2 点直线（d="M99.3 110.0 L136.0 339.5"）｜S2 终点=最近顶点(0,150)、长 151.91 m
+- S3 简图拖水源落盘 {sig:"0,0|600x400|4",x:5,y:22}、重生成后 sourcePos 跟随
+- S4 frontLenUsed 351.9 = wp.front 200 + 连接段 151.9 + 水源距离 0（连接段确已计入）
+- S5 拖三通 off=29 后，连接段终点与三通屏幕距离 0px（跟随生效）
+- S6 工作区拖水源落盘并生效
+- 回归：_probe_front_node_ws 8/8、_probe_front_node 51/51、_probe_front_geom 61/61、ci PASS=28 FAIL=0、
+  双页冒烟 ALL PASS、单测 140/141（唯一红灯 runye_hydraulics_core 属既存）。
+
+**坑位**
+- 水源拖动分支必须排在**尺寸线之前**：水源是精确 DOM 圆点（r=18 热区），尺寸线是坐标容差模糊命中；
+  水源贴在地块外侧、与尺寸线邻近，放在其后会被抢走（实测：拖水源变成拖尺寸线，水源不动也不落盘）。
+- 拖动水源后「水源距离 planSrcDist」仍是手动输入项，不要把两者混为一谈（前者是图面连接段，后者是地块外实际距离）。
+- 版本：并行会话已提交到 v570-irrigation-scope-guard ⇒ 取更高号 **v571**（不回退对方）。

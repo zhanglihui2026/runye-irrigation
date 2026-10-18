@@ -647,7 +647,9 @@ function render() {
     if (tlMc && tlMc.all > 0) tlMains = tlMc.visible;
   } catch (eTlMc) { }
   const useTl = !!(tlMat && tlMat.lens && window.tlDiagramData);
-  const matFrontLen = ((tlMat && tlMat.lens && isFinite(tlMat.lens.front)) ? tlMat.lens.front : (r.mainPipeLen || 0)) + readNumber('planSrcDist', 0, { min: 0 });   /* 任务⑮：计入水源距离 */
+  /* [v570] 水源→总管近端三通那条直线也计入总管长度（原来只画不算）：与图面所见一致 */
+  const srcLinkLen = (typeof window.tlSourceLinkLen === 'function') ? window.tlSourceLinkLen() : 0;
+  const matFrontLen = ((tlMat && tlMat.lens && isFinite(tlMat.lens.front)) ? tlMat.lens.front : (r.mainPipeLen || 0)) + srcLinkLen + readNumber('planSrcDist', 0, { min: 0 });   /* 任务⑮：水源连接段 + 水源距离 */
   const matMainLen = useTl ? tlMat.lens.main : (usePP ? ppStats.mainLen : r.mainPipeLen);
   const matBranchLen = useTl ? tlMat.lens.branch : (usePP ? ppStats.branchLen : r.branchLen * r.branchCount * r.N);
   const specFrontOd = tlMat ? tlMat.ods.front : materialPipeSpecs.mainPipeOD;
@@ -1159,7 +1161,7 @@ function computeThreeLevel() {
   /* 最远分区最不利路径（2026-09-16）：图面已生成时，总管/主管/支管长度改用图面到「最远分区」的
      实际折线长，损失只算这一条路径（不再按各地块累加）。无图面时退回试算输入值。 */
   const wp = (typeof tlWorstPathLen === 'function') ? tlWorstPathLen() : { fromFigure: false, zoneIndex: -1, front: 0, main: 0, branch: 0, taps: [] };
-  let frontLenUsed = ((wp.fromFigure && wp.front > 0) ? wp.front : frontPipeLen) + readNumber('planSrcDist', 0, { min: 0 });   /* 任务⑮：计入水源距离 */
+  let frontLenUsed = ((wp.fromFigure && wp.front > 0) ? wp.front : frontPipeLen) + ((typeof window.tlSourceLinkLen === 'function') ? window.tlSourceLinkLen() : 0) + readNumber('planSrcDist', 0, { min: 0 });   /* 任务⑮ + [v570]：水源连接段直线 + 水源距离 */
   let mainLenUsed = (wp.fromFigure && wp.main > 0) ? wp.main : mainPipeLen;
 
   /* 水泵流量按「最大分区的实际面积」计（2026-09-21，用户口径）：分区实际面积=裁剪到实测地块
@@ -1321,7 +1323,7 @@ function computeThreeLevel() {
     hydraulicPath = pathCheck.worst;
     if (hydraulicPath) {
       frontPipeLoss = hydraulicPath.frontPipeLoss; mainLoss = hydraulicPath.mainLoss; branchLoss = hydraulicPath.branchLoss;
-      frontLenUsed = hydraulicPath.front + readNumber('planSrcDist', 0, { min: 0 }); mainLenUsed = hydraulicPath.main; branchLenUsed = hydraulicPath.branch;   /* 任务⑮：计入水源距离 */
+      frontLenUsed = hydraulicPath.front + ((typeof window.tlSourceLinkLen === 'function') ? window.tlSourceLinkLen() : 0) + readNumber('planSrcDist', 0, { min: 0 }); mainLenUsed = hydraulicPath.main; branchLenUsed = hydraulicPath.branch;   /* 任务⑮ + [v570]：水源连接段直线计入 */
     }
     if (appliedPipes) {
       /* 手动选管已通过 tlBuildPipeOverride 写入逐管口径；损失以 hydraulicPath 为唯一事实源。
@@ -3626,6 +3628,42 @@ function tlAutoGenerate(options) {
     window.tlFrontNodeDropOf=tlFrontNodeDropOf;
     window.tlFrontNodeDropSet=tlFrontNodeDropSet;
   }
+  /* ===== [v570] 水源点可任意拖动（用户要求）=====
+     口径：
+     · 拖动值是**绝对世界坐标**（米），按地块指纹匹配；换地块自动失效。
+     · 优先级：用户拖动值 > 二级页 ppShare.source > 自动推断（地块外沿/旧总管起点的近端）。
+     · 拖过的水源不再随「总管整体平移」(AE.moves['front']) 走 —— 用户放哪就是哪。
+     · 右键「水源换向」(plot-editor.js tlSrcFlip) 会清除本值，换向才生效。
+     · 材料与水力：水源→总管近端三通那条直线**计入总管长度**（v570 起，原来只画不算）。 */
+  var TL_SRC_LS='tlSourceMove_v1';
+  function tlSourceMoveOf(sig){
+    if(!sig)return null;
+    try{var o=JSON.parse(localStorage.getItem(TL_SRC_LS)||'null');
+      if(!o||o.sig!==sig||!isFinite(o.x)||!isFinite(o.y))return null;
+      return {x:o.x,y:o.y};}catch(e){return null;}
+  }
+  function tlSourceMoveSet(sig,x,y){
+    if(!sig||!isFinite(x)||!isFinite(y))return;
+    try{localStorage.setItem(TL_SRC_LS,JSON.stringify({sig:sig,x:Math.round(x*10)/10,y:Math.round(y*10)/10}));}catch(e){}
+  }
+  function tlSourceMoveClear(){ try{localStorage.removeItem(TL_SRC_LS);}catch(e){} }
+  /* 水源→总管近端三通的直线长度（米）：绘图与水力/材料同一口径 */
+  function tlSourceLinkLen(d){
+    var dd=d||window.tlDiagramData;
+    if(!dd||!dd.sourcePos||!dd.frontPipe||dd.frontPipe.length<2)return 0;
+    var sp=dd.sourcePos, best=Infinity;
+    for(var i=0;i<dd.frontPipe.length;i++){
+      var p=dd.frontPipe[i], q=Math.hypot(p.x-sp.x,p.y-sp.y);
+      if(q<best)best=q;
+    }
+    return isFinite(best)?best:0;
+  }
+  if(typeof window!=='undefined'){
+    window.tlSourceMoveOf=tlSourceMoveOf;
+    window.tlSourceMoveSet=tlSourceMoveSet;
+    window.tlSourceMoveClear=tlSourceMoveClear;
+    window.tlSourceLinkLen=tlSourceLinkLen;
+  }
   /* 主管物理线归并（同排共线多段 = 一根）：[v557] 提前到总管几何之前 ——
      总管折线的顶点集由它派生（原在总管绘制之后，折线化必须先有顶点）。 */
   var tlMainLines={}, tlMainIdx={}, tlMainSpan={};
@@ -3835,6 +3873,11 @@ function tlAutoGenerate(options) {
   }
   // 若二级页已放置水源点，优先采用二级页的水源几何
   if(ppShare && ppShare.source){ sourcePos={x:ppShare.source.x,y:ppShare.source.y}; }
+  /* [v570] 用户拖动水源：优先级最高（绝对坐标，按地块指纹匹配）。
+     指纹 = 地块 bbox + 顶点数 —— 换地块 / 重新测绘自动失效，改参数重生成不会丢。 */
+  var tlSrcSig=Math.round(b.minX)+','+Math.round(b.minY)+'|'+Math.round(b.w)+'x'+Math.round(b.h)+'|'+poly.length;
+  var tlSrcUser=tlSourceMoveOf(tlSrcSig);
+  if(tlSrcUser){ sourcePos={x:tlSrcUser.x,y:tlSrcUser.y}; }
   /* v170（2026-10-01 用户要求「总管移动之后，水源跟阀门自动跟着移动，地块外的主管就不用显示了」，
      同日更正「不对，是主管」——地块外裁的是主管接入段，不是总管）：
      总管图面平移（AE.moves['front']）在简图渲染层整体跟随 —— 水源点、总管→主管连接段、
@@ -3846,7 +3889,8 @@ function tlAutoGenerate(options) {
   var tlSrcDesign=sourcePos?{x:sourcePos.x,y:sourcePos.y}:null;
   if(tlFrontMv&&frontPipe){
     frontPipe=frontPipe.map(function(fp){return{x:fp.x+tlFrontMv.dx,y:fp.y+tlFrontMv.dy};});
-    if(sourcePos)sourcePos={x:sourcePos.x+tlFrontMv.dx,y:sourcePos.y+tlFrontMv.dy};
+    /* [v570] 用户拖过的水源是绝对位置 ⇒ 不再随总管整体平移叠加（否则会越拖越偏） */
+    if(sourcePos&&!tlSrcUser)sourcePos={x:sourcePos.x+tlFrontMv.dx,y:sourcePos.y+tlFrontMv.dy};
   }
 
   // Draw front main pipe (总管) — orange, thick
@@ -3896,11 +3940,15 @@ function tlAutoGenerate(options) {
       return Math.hypot(sourcePos.x-stx,sourcePos.y-sty)<=0.5;
     })();
     if(!tlSrcOnFront){
-      var scA=frontPipe[0], scB=frontPipe[frontPipe.length-1];
-      var scHoriz=Math.abs(scA.y-scB.y)<1e-6;
-      var scEnd=(Math.hypot(sourcePos.x-scA.x,sourcePos.y-scA.y)<=Math.hypot(sourcePos.x-scB.x,sourcePos.y-scB.y))?scA:scB;
-      var scElbow=scHoriz?{x:sourcePos.x,y:scEnd.y}:{x:scEnd.x,y:sourcePos.y};
-      var scPts=[sourcePos,scElbow,scEnd], scd='';
+      /* [v570] 水源连接段改**一条直线**（用户要求「不要做成折线，按移动后的三通位置跟水源连起来」）：
+         终点取总管上离水源最近的顶点 —— 横向/纵向主分支下这些顶点就是各三通（含被拖动后的位置）。
+         旧口径是「垂直优先」两段折线（先横后竖 / 先竖后横），水源一挪就多一个直角，已废。 */
+      var scEnd=frontPipe[0], scBest=Infinity;
+      for(var sci1=0;sci1<frontPipe.length;sci1++){
+        var scq=Math.hypot(frontPipe[sci1].x-sourcePos.x,frontPipe[sci1].y-sourcePos.y);
+        if(scq<scBest){scBest=scq;scEnd=frontPipe[sci1];}
+      }
+      var scPts=[sourcePos,scEnd], scd='';
       for(var sci=0;sci<scPts.length;sci++){var scp=ts(scPts[sci].x,scPts[sci].y);scd+=(sci===0?'M':'L')+scp.x.toFixed(1)+' '+scp.y.toFixed(1)+' ';}
       parts.push('<path data-tlsrcpipe="1" d="'+scd+'" fill="none" stroke="#111827" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" opacity="0.95"/>');
     }
@@ -4036,7 +4084,9 @@ function tlAutoGenerate(options) {
     var sp=ts(sourcePos.x,sourcePos.y);
     /* [v255 2026-10-06 用户要求] 水源点可右键换向：外圈透明热区 r=18 承接 contextmenu
        （事件委托挂 document，见 tlSrcFlip）；<title> 给悬停提示。 */
-    parts.push('<g data-tl-src="1"><circle cx="'+sp.x.toFixed(1)+'" cy="'+sp.y.toFixed(1)+'" r="18" fill="rgba(0,0,0,0)"><title>右键：切换水源方向（换到总管另一端）</title></circle><circle cx="'+sp.x.toFixed(1)+'" cy="'+sp.y.toFixed(1)+'" r="10" fill="#f59e0b" stroke="#fff" stroke-width="2"/></g>');
+    parts.push('<g data-tl-src="1" data-tl-src-drag="1"><circle cx="'+sp.x.toFixed(1)+'" cy="'+sp.y.toFixed(1)+'" r="18" fill="rgba(0,0,0,0)"><title>拖动：移动水源位置（任意）　｜　右键：切换水源方向（换到总管另一端）</title></circle><circle cx="'+sp.x.toFixed(1)+'" cy="'+sp.y.toFixed(1)+'" r="10" fill="#f59e0b" stroke="#fff" stroke-width="2"/></g>');
+    /* [v570] 拖动水源要用到的两个量（tlInitDrag 在另一作用域）：SVG 单位/米比例、地块指纹 */
+    window.tlSrcScale=s; window.tlSrcSig=tlSrcSig;
     var tlSrcLabelY=tlHdrY0+tlHeaderLines.length*18+16; // 信息行下方
     /* v160（用户 2026-09-29：「水源/水泵 标注文字距离总管道近一些。」）
        原口径：标签钉在画布左边界 x=40，靠一条长虚线横跨空白拉到水源点
@@ -4647,6 +4697,31 @@ function tlInitDrag(){
   var dragStart=null;
   /* ===== [v557] 总管断点（三通）沿主管拖动 ===== */
   var nodeDrag=null;
+  /* ===== [v570] 水源点任意拖动 ===== */
+  var srcDrag=null;
+  function tlSrcDragMove(ev){
+    if(!srcDrag)return;
+    var dxSvg=(ev.clientX-srcDrag.x0)*srcDrag.scale;   /* 像素 → SVG 用户单位 */
+    var dySvg=(ev.clientY-srcDrag.y0)*srcDrag.scale;
+    srcDrag.curW={x:srcDrag.wx+dxSvg*srcDrag.k, y:srcDrag.wy+dySvg*srcDrag.k};  /* k = 1/每米SVG单位 */
+    if(srcDrag.g)srcDrag.g.setAttribute('transform','translate('+dxSvg.toFixed(1)+','+dySvg.toFixed(1)+')');
+    /* 连接段直线跟随：起点跟着水源走，终点（总管最近顶点）不动 */
+    if(srcDrag.pipeEl&&srcDrag.p0&&srcDrag.p1){
+      srcDrag.pipeEl.setAttribute('d','M'+(srcDrag.p0.x+dxSvg).toFixed(1)+' '+(srcDrag.p0.y+dySvg).toFixed(1)
+        +' L'+srcDrag.p1.x.toFixed(1)+' '+srcDrag.p1.y.toFixed(1));
+    }
+  }
+  function tlSrcDragUp(){
+    var sd=srcDrag; srcDrag=null;
+    document.body.style.userSelect='';
+    if(!sd)return;
+    if(sd.g)sd.g.removeAttribute('transform');
+    if(!sd.curW)return;
+    var nx=Math.round(sd.curW.x), ny=Math.round(sd.curW.y);   /* 吸附到整米（与三通同口径） */
+    if(Math.abs(nx-sd.wx)<0.5&&Math.abs(ny-sd.wy)<0.5)return;  /* 没动 ⇒ 不落盘不重生成 */
+    if(window.tlSourceMoveSet)window.tlSourceMoveSet(window.tlSrcSig,nx,ny);
+    try{ if(typeof tlAutoGenerate==='function') tlAutoGenerate({scroll:false}); }catch(e){}
+  }
   function tlNodeDragMove(ev){
     if(!nodeDrag)return;
     var dpx=(nodeDrag.axis==='V')?(ev.clientY-nodeDrag.y0):(ev.clientX-nodeDrag.x0);
@@ -4678,6 +4753,27 @@ function tlInitDrag(){
     if(e.button!==0)return;
     var target=e.target;
     if(!target||!target.closest||!target.closest('#tlPlotGroup'))return;
+    /* [v570] 水源点拖动（任意位置）：**排在尺寸线之前** —— 水源是精确的 DOM 圆点目标（r=18 热区），
+       而尺寸线是「按坐标容差」的模糊命中；水源本来就贴在地块外侧、与尺寸线邻近，
+       放在尺寸线之后会被抢走（实测：拖水源变成拖尺寸线，水源纹丝不动、也不落盘）。
+       也排在三通之前：水源拖到总管端点会与近端三通重叠，此时先抓水源（点哪个圆点拖哪个）。 */
+    var srcEl=target.closest('[data-tl-src]');
+    if(srcEl&&window.tlDiagramData&&window.tlDiagramData.sourcePos){
+      e.preventDefault();
+      var _sp0=window.tlDiagramData.sourcePos;
+      var _pipeEl=svgEl.querySelector('[data-tlsrcpipe]');
+      var _p0=null,_p1=null;
+      if(_pipeEl){
+        var _m=(_pipeEl.getAttribute('d')||'').match(/M\s*([-\d.]+)\s+([-\d.]+)\s*L\s*([-\d.]+)\s+([-\d.]+)/);
+        if(_m){ _p0={x:+_m[1],y:+_m[2]}; _p1={x:+_m[3],y:+_m[4]}; }
+      }
+      srcDrag={x0:e.clientX,y0:e.clientY,wx:_sp0.x,wy:_sp0.y,scale:getScale(),
+               k:(window.tlSrcScale>0?1/window.tlSrcScale:1),
+               g:srcEl,pipeEl:_pipeEl,p0:_p0,p1:_p1,curW:null};
+      document.body.style.userSelect='none';
+      svgEl.style.cursor='grabbing';
+      return;
+    }
     /* v114：尺寸标注线命中优先于整组平移（命中按坐标算，不依赖 pointer-events） */
     var _dimP=tlDimSvgPoint(svgEl,e);
     var _dimHit=_dimP?tlDimHitTest(_dimP):null;
@@ -4719,6 +4815,7 @@ function tlInitDrag(){
     svgEl.style.cursor='grabbing';
   });
   window._tlDragMove=function(ev){
+    if(srcDrag){tlSrcDragMove(ev);return;}
     if(nodeDrag){tlNodeDragMove(ev);return;}
     if(!dragStart)return;
     var s=dragStart.scale;
@@ -4728,6 +4825,7 @@ function tlInitDrag(){
     applyPos();
   };
   window._tlDragUp=function(){
+    if(srcDrag){tlSrcDragUp();return;}
     if(nodeDrag){tlNodeDragUp();return;}
     if(!dragStart)return;
     dragStart=null;

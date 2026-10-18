@@ -297,6 +297,28 @@
     }
     return (best && best.d <= tolM) ? best.n : null;
   }
+  /* [v570] 水源点任意拖动（与简图同口径：绝对坐标、整米吸附、落盘记住）。
+     ★ 工作区里水源是克隆底图上的圆点，但命中同样走世界坐标（不依赖 DOM 层级）。 */
+  var srcPointDrag = null;
+  var srcPointTip = null;
+  function srcPointTipShow(cx, cy, txt) {
+    if (!srcPointTip) {
+      srcPointTip = document.createElement('div');
+      srcPointTip.id = 'tlSrcPointTip';
+      srcPointTip.style.cssText = 'display:none;position:fixed;z-index:9991;background:#92400e;color:#fff;font:11px/1.6 system-ui,sans-serif;padding:2px 8px;border-radius:4px;pointer-events:none;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.25)';
+      document.body.appendChild(srcPointTip);
+    }
+    srcPointTip.textContent = txt;
+    srcPointTip.style.left = (cx + 14) + 'px';
+    srcPointTip.style.top = (cy - 10) + 'px';
+    srcPointTip.style.display = 'block';
+  }
+  function srcPointTipHide() { if (srcPointTip) srcPointTip.style.display = 'none'; }
+  function pickSource(p, tolM) {
+    var sp = (lastDataRef && lastDataRef.sourcePos) ? lastDataRef.sourcePos : null;
+    if (!p || !sp) return null;
+    return (Math.hypot(p.x - sp.x, p.y - sp.y) <= tolM) ? sp : null;
+  }
   var fitDrag = null;         // 配件沿管拖动态 {id, pointerId, atM}（阶段2b）
   var fitDragRaf = 0;         // 拖动提交 rAF 节流句柄
   var pipeDrag = null;        // 整条拖动手工管线（2026-09-16）{id, pointerId, last, acc, moved}
@@ -2412,6 +2434,21 @@
           return;
         }
       }
+      /* [v570] 水源点拖动（任意位置）：排在三通之前 —— 橙色圆点画在最上层，
+         水源拖到总管端点时会与近端三通重叠，此时先抓水源（点哪个圆点拖哪个）。 */
+      if (e.button === 0 && !mode && !fitMode && !maskMode && viewState && viewState.base && lastDataRef) {
+        var rawSp = rawDataPoint(el, e);
+        var spHit = rawSp ? pickSource(rawSp, snapTolUnits(el) / viewState.k * 1.5) : null;
+        if (spHit) {
+          srcPointDrag = { x0: rawSp.x, y0: rawSp.y, sx: spHit.x, sy: spHit.y,
+            cur: { x: spHit.x, y: spHit.y }, moved: false,
+            pointerId: e.pointerId, cx: e.clientX, cy: e.clientY };
+          suppressAutoPick = true;
+          if (ctn.setPointerCapture) { try { ctn.setPointerCapture(e.pointerId); } catch (errSp) {} }
+          e.preventDefault();
+          return;
+        }
+      }
       /* [v568] 总管三通（断点）沿主管拖动 —— 比「整条拖动总管」更具体的目标 ⇒ 必须排在它之前
          （技能 §2.143：越具体的目标越靠前）。排在各模式分支之后：配件/节点/划线模式与遮蔽开关
          打开时的既有行为一条不动。命中靠世界坐标（米），容差 = 12px 换算的米数 ×1.4。 */
@@ -2572,6 +2609,20 @@
         }
         return;
       }
+      if (srcPointDrag && (e.pointerId === undefined || e.pointerId === srcPointDrag.pointerId)) {   // [v570] 水源拖动
+        if (!srcPointDrag.moved && Math.hypot(e.clientX - srcPointDrag.cx, e.clientY - srcPointDrag.cy) < 3) return;
+        srcPointDrag.moved = true;
+        var elSp = currentEL(ctn);
+        var rawSpM = elSp ? rawDataPoint(elSp, e) : null;
+        if (rawSpM) {
+          var nxSp = Math.round(srcPointDrag.sx + (rawSpM.x - srcPointDrag.x0));   /* 吸附整米 */
+          var nySp = Math.round(srcPointDrag.sy + (rawSpM.y - srcPointDrag.y0));
+          srcPointDrag.cur = { x: nxSp, y: nySp };
+          srcPointTipShow(e.clientX, e.clientY, '水源 (' + nxSp + ', ' + nySp + ') m');
+        }
+        e.preventDefault();
+        return;
+      }
       if (frontNodeDrag && (e.pointerId === undefined || e.pointerId === frontNodeDrag.pointerId)) {   // [v568] 三通断点拖动
         if (!frontNodeDrag.moved && Math.hypot(e.clientX - frontNodeDrag.sx, e.clientY - frontNodeDrag.sy) < 3) return;  // 3px 启动阈值
         frontNodeDrag.moved = true;
@@ -2699,6 +2750,18 @@
       if (pipeDrag && (e.pointerId === undefined || e.pointerId === pipeDrag.pointerId)) {
         if (pipeDragRaf) { cancelAnimationFrame(pipeDragRaf); pipeDragRaf = 0; }
         pipeDrag = null;
+      }
+      if (srcPointDrag && (e.pointerId === undefined || e.pointerId === srcPointDrag.pointerId)) {   // [v570] 水源拖动结算
+        var spD = srcPointDrag; srcPointDrag = null;
+        srcPointTipHide();
+        if (spD.moved && (Math.abs(spD.cur.x - spD.sx) >= 0.5 || Math.abs(spD.cur.y - spD.sy) >= 0.5)) {
+          if (typeof window !== 'undefined' && typeof window.tlSourceMoveSet === 'function') window.tlSourceMoveSet(window.tlSrcSig, spD.cur.x, spD.cur.y);
+          var vsSp = (api.getView && api.getView()) || null;
+          if (typeof window !== 'undefined' && typeof window.tlAutoGenerate === 'function') { try { window.tlAutoGenerate(); } catch (errSp2) { } }
+          else { rerenderKeepView(); }
+          if (typeof window !== 'undefined' && typeof window.tlUpdatePlanBar === 'function') { try { window.tlUpdatePlanBar(); } catch (errSp3) { } }
+          if (vsSp && api.setView) { try { api.setView(vsSp); } catch (errSp4) { } }
+        }
       }
       if (frontNodeDrag && (e.pointerId === undefined || e.pointerId === frontNodeDrag.pointerId)) {   // [v568] 三通断点结算
         var fnD = frontNodeDrag; frontNodeDrag = null;
