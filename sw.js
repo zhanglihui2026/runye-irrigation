@@ -640,7 +640,18 @@
       （tlFrontPolyAt，两点线性插值在折线上会错位）；水流动画改优先取整管引用 data-tlpipe-ref
       （分段 path 只有 2 点，与 frontPipe 点数不等 ⇒ 水源端反序判断失效）。
    注：并行会话在我改的过程中又抬到 v563-project-restore-binding ⇒ 按规则取更高号 v564（不回退对方）。 */
-const VERSION = 'v564-front-node-drag';
+/* v565-map-project-import-store-api: use the actual scoped network snapshot API during map project restore. */
+/* v567-current-plot-anchor-fail-closed: project restore cannot bypass tab-scoped identity storage. */
+/* v568-front-node-drag-ws: 总管三通拖动「真实鼠标点不到」修复 —— ① 简图：三通 rect 被自己
+   的连接线（stroke 3.5，起点=三通中心）压住，真实命中是 line 而不是 rect，
+   closest('[data-junction-front]…') 永远失败 ⇒ 退化成整图平移（v564 验收是假绿：旧探针把
+   MouseEvent 直接派发到 rect 元素本身，绕过命中判定，v155 同款坑）⇒ 三通加 r=11 透明命中圈
+   置顶 + 阀门 r=9 命中圈 + 命中判定兜底到同组 [data-junction-key]；
+   ② 工作区：v564 只做在简图，工作区没有入口 ⇒ 新增三通断点拖动（世界坐标拾取、吸附 1 m、
+   只能向下、落盘 + 重生成），优先级排在「自动管线整条拖动」之前、各模式分支之后。
+   注：并行会话已抬到 v567 ⇒ 按规则取更高号 v568（不回退对方）。 */
+/* v569-plot-library-unique-ids: reject ambiguous duplicate plot IDs before replacing the shared library. */
+const VERSION = 'v569-plot-library-unique-ids';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

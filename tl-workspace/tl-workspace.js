@@ -266,6 +266,37 @@
     nodeDragTip.style.display = 'block';
   }
   function nodeDragTipHide() { if (nodeDragTip) nodeDragTip.style.display = 'none'; }
+  /* [v568] 总管三通（断点）沿主管拖动 —— 与简图 v564 同一口径：只能向下、吸附 1 m、落盘记住。
+     ★ 为什么在这里还要做一遍：v564 只做在简图（tlInitDrag 挂在简图 svg 上），工作区没有入口，
+       用户在工作区点总管走的是「自动管线整条拖动」（v170 正交锁定），三通根本选不上。
+     ★ 位移直接取世界坐标差（米），比简图的「像素→SVG→米」换算更可靠，也不依赖 mps。 */
+  var frontNodeDrag = null;   // {mk,sig,off,max,axis,startW,startOff,cur,moved,pointerId,sx,sy}
+  var frontNodeTip = null;
+  function frontNodeTipShow(cx, cy, off, max) {
+    if (!frontNodeTip) {
+      frontNodeTip = document.createElement('div');
+      frontNodeTip.id = 'tlFrontNodeTip';
+      frontNodeTip.style.cssText = 'display:none;position:fixed;z-index:9991;background:#0C447C;color:#fff;font:11px/1.6 system-ui,sans-serif;padding:2px 8px;border-radius:4px;pointer-events:none;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.25)';
+      document.body.appendChild(frontNodeTip);
+    }
+    frontNodeTip.textContent = '三通下移 ' + Math.max(0, off).toFixed(0) + ' m（上限 ' + Math.max(0, max).toFixed(0) + ' m）';
+    frontNodeTip.style.left = (cx + 14) + 'px';
+    frontNodeTip.style.top = (cy - 10) + 'px';
+    frontNodeTip.style.display = 'block';
+  }
+  function frontNodeTipHide() { if (frontNodeTip) frontNodeTip.style.display = 'none'; }
+  /* 三通拾取：世界坐标（米）最近断点，超出容差不算命中（避免抢走总管整条拖动） */
+  function pickFrontNode(p, tolM) {
+    var list = (lastDataRef && lastDataRef.frontNodes) ? lastDataRef.frontNodes : null;
+    if (!p || !list || !list.length) return null;
+    var best = null;
+    for (var i = 0; i < list.length; i++) {
+      var n = list[i];
+      var d = Math.hypot(p.x - n.x, p.y - n.y);
+      if (best === null || d < best.d) best = { d: d, n: n };
+    }
+    return (best && best.d <= tolM) ? best.n : null;
+  }
   var fitDrag = null;         // 配件沿管拖动态 {id, pointerId, atM}（阶段2b）
   var fitDragRaf = 0;         // 拖动提交 rAF 节流句柄
   var pipeDrag = null;        // 整条拖动手工管线（2026-09-16）{id, pointerId, last, acc, moved}
@@ -2381,6 +2412,22 @@
           return;
         }
       }
+      /* [v568] 总管三通（断点）沿主管拖动 —— 比「整条拖动总管」更具体的目标 ⇒ 必须排在它之前
+         （技能 §2.143：越具体的目标越靠前）。排在各模式分支之后：配件/节点/划线模式与遮蔽开关
+         打开时的既有行为一条不动。命中靠世界坐标（米），容差 = 12px 换算的米数 ×1.4。 */
+      if (e.button === 0 && !mode && !fitMode && !maskMode && viewState && viewState.base && lastDataRef) {
+        var rawFn = rawDataPoint(el, e);
+        var fnHit = rawFn ? pickFrontNode(rawFn, snapTolUnits(el) / viewState.k * 1.4) : null;
+        if (fnHit && (fnHit.max || 0) > 0) {
+          frontNodeDrag = { mk: fnHit.mk, sig: fnHit.sig, off: fnHit.off || 0, max: fnHit.max || 0,
+            axis: fnHit.axis || 'V', startW: rawFn, startOff: fnHit.off || 0, cur: fnHit.off || 0,
+            moved: false, pointerId: e.pointerId, sx: e.clientX, sy: e.clientY };
+          suppressAutoPick = true;
+          if (ctn.setPointerCapture) { try { ctn.setPointerCapture(e.pointerId); } catch (errFn) {} }
+          e.preventDefault();
+          return;
+        }
+      }
       /* 整条拖动自动管线（2026-09-16）：图面平移覆盖（AE.moves，不改 tlDiagramData/管长，红线安全） */
       if (e.button === 0 && !mode && viewState && viewState.base && lastDataRef) {
         var rawAuto = rawDataPoint(el, e);
@@ -2525,6 +2572,21 @@
         }
         return;
       }
+      if (frontNodeDrag && (e.pointerId === undefined || e.pointerId === frontNodeDrag.pointerId)) {   // [v568] 三通断点拖动
+        if (!frontNodeDrag.moved && Math.hypot(e.clientX - frontNodeDrag.sx, e.clientY - frontNodeDrag.sy) < 3) return;  // 3px 启动阈值
+        frontNodeDrag.moved = true;
+        var elFn = currentEL(ctn);
+        var rawFnM = elFn ? rawDataPoint(elFn, e) : null;
+        if (rawFnM) {
+          var dFn = (frontNodeDrag.axis === 'V') ? (rawFnM.y - frontNodeDrag.startW.y) : (rawFnM.x - frontNodeDrag.startW.x);
+          var offFn = Math.round(frontNodeDrag.startOff + dFn);   /* 吸附 1 m（与简图同口径） */
+          offFn = Math.max(0, Math.min(frontNodeDrag.max, offFn)); /* 只能向下 + 上限 */
+          frontNodeDrag.cur = offFn;
+          frontNodeTipShow(e.clientX, e.clientY, offFn, frontNodeDrag.max);
+        }
+        e.preventDefault();
+        return;
+      }
       if (autoDrag && e.pointerId === autoDrag.pointerId) {       // 整条拖动自动管线：图面平移（AE.moves 累加）
         var elA2 = currentEL(ctn); if (!elA2) return;
         var pdA = rawDataPoint(elA2, e);
@@ -2637,6 +2699,20 @@
       if (pipeDrag && (e.pointerId === undefined || e.pointerId === pipeDrag.pointerId)) {
         if (pipeDragRaf) { cancelAnimationFrame(pipeDragRaf); pipeDragRaf = 0; }
         pipeDrag = null;
+      }
+      if (frontNodeDrag && (e.pointerId === undefined || e.pointerId === frontNodeDrag.pointerId)) {   // [v568] 三通断点结算
+        var fnD = frontNodeDrag; frontNodeDrag = null;
+        frontNodeTipHide();
+        /* 几何真变了（总管折线 + 主管截断）⇒ 必须整幅重生成，材料/水力才会重算（与简图同口径）。
+           与 v98h 阶梯拖动同款：先记视口 → 重生成 → 还原视口（否则松手瞬间跳回适应窗口）。 */
+        if (fnD.moved && Math.abs(fnD.cur - fnD.off) >= 0.5) {
+          if (typeof window !== 'undefined' && typeof window.tlFrontNodeDropSet === 'function') window.tlFrontNodeDropSet(fnD.mk, fnD.sig, fnD.cur);
+          var vsFn = (api.getView && api.getView()) || null;
+          if (typeof window !== 'undefined' && typeof window.tlAutoGenerate === 'function') { try { window.tlAutoGenerate(); } catch (errFn2) { } }
+          else { rerenderKeepView(); }
+          if (typeof window !== 'undefined' && typeof window.tlUpdatePlanBar === 'function') { try { window.tlUpdatePlanBar(); } catch (errFn3) { } }
+          if (vsFn && api.setView) { try { api.setView(vsFn); } catch (errFn4) { } }
+        }
       }
       if (autoDrag && (e.pointerId === undefined || e.pointerId === autoDrag.pointerId)) {
         if (autoDragRaf) { cancelAnimationFrame(autoDragRaf); autoDragRaf = 0; }

@@ -4162,7 +4162,16 @@ function tlAutoGenerate(options) {
         parts.push('<g data-junction-valve'+jKeyAttr+'><circle cx="'+jv.x.toFixed(1)+'" cy="'+jv.y.toFixed(1)+'" r="6.5" fill="#ef4444" stroke="#ffffff" stroke-width="2"/>'
           +'<line x1="'+(jv.x-3.6).toFixed(1)+'" y1="'+(jv.y-3.6).toFixed(1)+'" x2="'+(jv.x+3.6).toFixed(1)+'" y2="'+(jv.y+3.6).toFixed(1)+'" stroke="#ffffff" stroke-width="1.4"/>'
           +'<line x1="'+(jv.x+3.6).toFixed(1)+'" y1="'+(jv.y-3.6).toFixed(1)+'" x2="'+(jv.x-3.6).toFixed(1)+'" y2="'+(jv.y+3.6).toFixed(1)+'" stroke="#ffffff" stroke-width="1.4"/></g>');
+        /* [v568] 阀门命中圈：阀门⊗同属这个三通组，点它等同点三通（拖动时整组一起走）。
+           否则点阀门中心命中的是 circle、closest 找不到 data-junction-front ⇒ 又退化成整图平移。 */
+        parts.push('<circle data-junction-front="1" data-junction-hit="1"'+jAttr+' cx="'+jv.x.toFixed(1)+'" cy="'+jv.y.toFixed(1)+'" r="9" fill="rgba(0,0,0,0)" stroke="none" pointer-events="all"/>');
       }
+      /* [v568] 三通透明命中圈（置顶）：三通方块只有 9×9（屏幕上约 10px），且中心被自己的连接线
+         （stroke 3.5，起点=三通中心）压住 ⇒ 真实鼠标命中的是 line 而不是 rect，
+         closest('[data-junction-front][data-junction-key]') 永远失败 —— v564 验收是假绿
+         （旧探针把 MouseEvent 直接派发到 rect 元素本身，绕过了命中判定，v155 同款坑）。
+         置顶加一层 r=11 透明圈 ⇒ 点三通必中；hover 时琥珀描边即「抓住了」的反馈。 */
+      parts.push('<circle data-junction-front="1" data-junction-hit="1"'+jAttr+' cx="'+jp.x.toFixed(1)+'" cy="'+jp.y.toFixed(1)+'" r="11" fill="rgba(0,0,0,0)" stroke="none" pointer-events="all"/>');
     });
   }
   // ===== 地块组结束：以下参数/图例/A3框固定不动 =====
@@ -4196,7 +4205,16 @@ function tlAutoGenerate(options) {
     /* v170：快照落「设计几何」—— 总管平移只动显示层（上面 frontPipe/sourcePos
        已是平移后的绘制副本）；AE.effPts 还会再叠一次 moves，写移动值会双重平移。 */
     frontPipe: tlFrontDesign,
-    sourcePos: tlSrcDesign };
+    sourcePos: tlSrcDesign,
+    /* [v568] 三通断点清单一并落快照：工作区（tl-workspace）没有 DOM 命中层，靠世界坐标拾取
+       三通，必须拿到「设计几何」的断点位置与限位（mk/x/y/axis/off/max/sig）。
+       坐标 = 主管物理线位置 pos × 总管断点坐标 base+off —— 与简图渲染同源（未含 tlFrontMv 平移）。 */
+    frontNodes: (tlFrontMK || []).map(function (v) {
+      var ax = frontHoriz ? 'V' : 'H';
+      return { mk: v.mk, axis: ax, pos: v.pos, base: v.base, at: v.at,
+        x: frontHoriz ? v.pos : v.at, y: frontHoriz ? v.at : v.pos,
+        off: v.off || 0, max: v.max || 0, sig: v.sig };
+    }) };
   r = computeThreeLevel();
   try { tlUpdatePlanBar(); } catch (e) { }
   var pumpFlowEl=document.getElementById('tlPlanPumpFlow');
@@ -4673,6 +4691,16 @@ function tlInitDrag(){
     /* [v557] 总管断点（三通）命中 → 沿主管方向拖动（尺寸线之后、整组平移之前）。
        max≤0（该断点无处可下移：主管太短 / 阀门太靠上）⇒ 不启动，退化成整图平移。 */
     var jEl=target.closest('[data-junction-front][data-junction-key]');
+    /* [v568] 命中兜底：连接线/阀门只带 data-junction-key（v564 为整组平移挂的），
+       点它们等同点这个三通 —— 反查同组带 data-junction-front 的元素取限位属性。
+       不做这层兜底的话，点连接线/阀门会 closest 失败 ⇒ 退化成整图平移。 */
+    if(!jEl){
+      var jAny=target.closest('[data-junction-key]');
+      if(jAny){
+        var jk=jAny.getAttribute('data-junction-key');
+        if(jk){ try{ jEl=svgEl.querySelector('[data-junction-front][data-junction-key="'+jk+'"]'); }catch(errJ){ jEl=null; } }
+      }
+    }
     if(jEl&&(parseFloat(jEl.getAttribute('data-junction-max'))||0)>0){
       e.preventDefault();
       nodeDrag={el:jEl,key:jEl.getAttribute('data-junction-key'),sig:jEl.getAttribute('data-junction-sig'),

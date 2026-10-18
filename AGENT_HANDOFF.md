@@ -1410,3 +1410,46 @@ N4 只影响一根 / N5 图面三通跟随 / N6 clamp / N7 真实拖动（吸附
 - 工具函数若定义在渲染函数内部，拖动回调（`tlInitDrag` 另一作用域）访问不到 ⇒ 导出到 window。
 - 版本：并行会话连续抬到 v561-terrain-import-atomic / v563-project-restore-binding
   ⇒ 按规则取更高号 **v564-front-node-drag**（不回退对方）。
+
+### §25h v568-front-node-drag-ws —— 三通拖动「真实鼠标点不到」修复（工作区补入口 + 简图命中）
+背景：v564 上线后用户反馈「拖动总管三通没看到实际效果；一选总管就选到整条，三通选不上」。
+
+**根因（实测，非推测）**
+- 简图：三通 rect（9×9）画完后紧接着画「三通自己的连接线」line，起点=三通中心、stroke 3.5、
+  后画所以在上层 ⇒ elementFromPoint 命中的是 line 而不是 rect；命中判定要求同时带
+  data-junction-front，而 line 只有 data-junction-key ⇒ closest 失败 ⇒ 退化成整图平移。
+  CDP 真实鼠标实测：点 (450,348) 顶层=line[H300]，拖动后地块组 translate(33.6,0)、三通没动、没落盘。
+- **v564 的 51/51 是假绿**：旧探针把 MouseEvent 直接派发到 rect 元素本身（target=rect），
+  绕过了命中判定。与 v155「节点不能拖动」同款坑 ⇒ **拖动类改动必须走 CDP 真实鼠标验证**。
+- 工作区：v564 只做在简图（tlInitDrag 挂在简图 svg 上），工作区根本没有三通拖动入口，
+  而用户正是在工作区操作 ⇒ 点总管走「自动管线整条拖动」（v170 正交锁定），三通选不上。
+
+**改动**
+1. mod/inline-09.js
+   - 三通加 r=11 透明命中圈（置顶）、阀门⊗加 r=9 命中圈：工作区 [data-tllinkhit] 同款做法；
+     hover 琥珀描边即「抓住了」的反馈（屏幕实测命中窗口 10.4px → 20.9px）。
+   - tlInitDrag 命中兜底：closest("[data-junction-front][data-junction-key]") 失败时，
+     退到 closest("[data-junction-key]") 再反查同组带 front 的元素取限位属性（点连接线/阀门也生效）。
+   - tlDiagramData 新增 frontNodes：[{mk,axis,pos,base,at,x,y,off,max,sig}]（设计几何，未含 tlFrontMv 平移）
+     —— 工作区没有 DOM 命中层，靠世界坐标拾取，必须拿到这份清单。
+2. tl-workspace/tl-workspace.js（新增三通断点拖动）
+   - pickFrontNode(p,tolM)：世界坐标最近断点（容差 = 12px 换算米数 ×1.4）。
+   - pointerdown 分支排在「自动管线整条拖动」之前、各模式分支之后（技能 §2.143：越具体越靠前；
+     maskMode/fitMode/lineMode 开启时行为一条不动）。
+   - 位移直接取世界坐标差（米）⇒ 吸附 1 m、clamp[0,max]；比简图的「像素→SVG→米」更可靠。
+   - 拖动中跟随 tip「三通下移 N m（上限 M m）」；松手 tlFrontNodeDropSet + tlAutoGenerate 重生成
+     （与 v98h 阶梯同款：先记视口 → 重生成 → 还原视口）。
+
+**验收（_probe_front_node_ws.mjs，全部走 CDP 真实鼠标）**
+- W1 工作区能查到三通（底图克隆带 key）｜W2 frontNodes 已落｜W3 落盘 off=38 ≤ max 58.33
+- W4 总管几何真变 200 m → 203.6 m｜W4b 未误写 moves.front｜W5 对照：点总管管身不写三通偏移
+- W6 简图三通中心顶层 = circle[data-junction-hit]（不再是 line）
+- 回归：_probe_front_node 51/51、_probe_front_geom 61/61、ci 26/0、双页冒烟 ALL PASS、单测 138/139
+  （唯一红灯 runye_hydraulics_core 属既存，非本次引入）。
+
+**坑位（可复用）**
+- 拖动/命中类改动，探针**禁止**用 dispatchEvent 派发到目标元素本身（会绕过命中判定、制造假绿），
+  必须用 Input.dispatchMouseEvent 走真实坐标。
+- 新增同属性的辅助元素（命中圈）会让既有多处选择器计数翻倍 ⇒ 回归探针要收紧成
+  rect[data-junction-tee][data-junction-front]（本次 D2/B0c 因此红过一轮）。
+- 版本：并行会话已抬到 v567-current-plot-anchor-fail-closed ⇒ 取更高号 **v568**（不回退对方）。
