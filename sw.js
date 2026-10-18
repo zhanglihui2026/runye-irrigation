@@ -736,7 +736,12 @@
    用途：三通下移后总管变折线，个别地块上水流动画与重构路径对不上；复位即回到直线总管这一稳定态。
    实测：拖三通 off=40（总管非直线）→ 点复位 → 偏移清空、三通全 0、总管回 [[0,150],[0,350]] 直线，
    演示水流首点与总管起点一致。 */
-const VERSION = 'v584-front-node-reset';
+/* v585-flow-source-seg: 水流动画补上「水源 → 总管起点」那一段。
+   总管 path 只覆盖各三通之间的折线；水源到第一个三通是另一条 path（data-tlsrcpipe，v571 起为直线），
+   而水流路线从 fPts[0]（第一个三通）起算 ⇒ 用户截图「水源到第一段主管之间没有动画路径」。
+   改：取离 fPts[0] 最近的 #f59e0b 水源圆，前插为每条路线起点（d≤1px 不插，避免零长段）。
+   实测：水源(38.8,121.7) → 总管起点(80,342.4) → 主管；与图面 data-tlsrcpipe 的 d 完全一致。 */
+const VERSION = 'v585-flow-source-seg';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

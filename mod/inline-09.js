@@ -2084,6 +2084,14 @@ function tlDemoRenderFlow(svg, g) {
       var d0 = tlFlowLen([cx, cy], fPts[0]);
       if (!best || d0 < best.d) best = { cx: cx, cy: cy, r: rr, d: d0 };
     }
+    /* [v585] 水源 → 总管起点那一段也要有水流。
+       总管 path 只覆盖「各三通之间」的折线，水源到第一个三通是**另一条** path
+       （data-tlsrcpipe，v571 起是一条直线）；而水流路线是从 fPts[0]（第一个三通）起算的
+       ⇒ 用户截图里「水源到第一段主管之间没有动画」。这里把水源圆点前插为每条路线的起点
+       （与图面那条直线同形；水源本就贴着总管起点时 d<1 不插，避免零长段）。 */
+    if (best && best.d > 1) {
+      routes = routes.map(function (route) { return [[best.cx, best.cy]].concat(route); });
+    }
     if (best) {
       var ring = document.createElementNS(NS, 'circle');
       ring.setAttribute('data-tlflow', 'src');

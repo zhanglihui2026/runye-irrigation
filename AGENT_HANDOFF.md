@@ -1705,3 +1705,21 @@ ci 28/0、单测 140/141（既存红灯）、双页冒烟 ALL PASS。
 
 回归：_probe_front_node 51/51、_probe_front_node_ws 全绿、_probe_source_straight 8/8、
 ci 28/0、单测 140/141（既存红灯）、双页冒烟 ALL PASS。
+
+### §25u v585-flow-source-seg —— 水流动画补上「水源 → 总管起点」
+用户：「水源到第一段主管有一段没有动画路径演示，这个要改过来。」
+
+根因：总管 path 只覆盖「各三通之间」的折线；水源到第一个三通是**另一条** path
+（`data-tlsrcpipe`，v571 起为直线）。而水流路线从 `fPts[0]`（第一个三通）起算
+⇒ 水源到第一段主管之间没有水流（截图红箭头处）。
+
+改：取离 `fPts[0]` 最近的 `circle[fill="#f59e0b"]`（水源圆），把它的圆心前插为每条路线的起点；
+距离 ≤1px 不插（水源已贴着总管起点时避免零长段）。
+
+实测（_probe_flow_srcseg.mjs 3/3）：
+- 水源圆点 (38.8,121.7)，总管起点 (80,342.4)，相距 224.5px；
+- 水流路径变为 [水源] → [总管起点] → [主管起点]；
+- 与图面 `data-tlsrcpipe` 的 d（`M38.8 121.7 L80.0 342.4`）**逐点一致**。
+
+回归：_probe_front_node 51/51、_probe_front_node_ws 11 项 OK、_probe_source_straight 8/8、
+_probe_front_reset 6/6（R3 断言改看第 2 点，因首点已是水源）、ci 28/0、单测 140/141、双页冒烟 PASS。
