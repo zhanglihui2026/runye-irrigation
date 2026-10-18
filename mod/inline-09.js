@@ -179,7 +179,7 @@ function tlAppliedPipeOverride() {
 }
 
 /* ===== 2026-09-24 用户要求：「水力计算结果」面板 总管/主管/支管 的「改径重算」列
-   改为管径选择按钮（设计值±3档）。选中后经 computeThreeLevel 实时重算扬程/流速/功率。 ===== */
+   改为管径选择按钮（设计值±3档）。选中后同步刷新扬程、流速、功率和改径确认摘要。 ===== */
 /* 手动选管状态：null = 用设计管径（不覆盖）；数字 = 覆盖该档管径 OD。 */
 window.tlManualCals = window.tlManualCals || { front: null, main: null, branch: null };
 /* 把手动选管并入 tlPipeOdOverride（与既有「图面改径 / 应用到图面」同源机制）：
@@ -244,8 +244,16 @@ function tlBindCalSels() {
       if (!window.tlManualCals) window.tlManualCals = { front: null, main: null, branch: null };
       window.tlManualCals[p[0]] = (val === design) ? null : val;
       tlBuildPipeOverride();
-      if (typeof tlUpdatePlanBar === 'function') tlUpdatePlanBar();
-      if (typeof window.tlSyncHydDesignSnapshot === 'function') window.tlSyncHydDesignSnapshot();
+      /* 管径选择与“更新水泵扬程”走同一刷新入口，避免主结果已更新而确认摘要仍显示旧损失。
+         兼容更新入口尚未装配或缺少图面路径的场景，保留原有即时显示与快照同步。 */
+      var updated = false;
+      if (typeof window.tlPumpUpdateRun === 'function') {
+        try { updated = window.tlPumpUpdateRun() === true; } catch (eUpdate) { updated = false; }
+      }
+      if (!updated) {
+        if (typeof tlUpdatePlanBar === 'function') tlUpdatePlanBar();
+        if (typeof window.tlSyncHydDesignSnapshot === 'function') window.tlSyncHydDesignSnapshot();
+      }
     });
   });
 }
@@ -3720,6 +3728,29 @@ function tlAutoGenerate(options) {
     window.tlSourceMoveOf=tlSourceMoveOf;
     window.tlSourceMoveSet=tlSourceMoveSet;
     window.tlSourceMoveClear=tlSourceMoveClear;
+    /* ===== [v584] 总管三通复位 =====
+       一键把所有被拖动过的三通恢复到初始位置（总管回到直线）。
+       由来：三通下移后总管变折线，部分地块上水流动画与重构后的路径对不上；
+       与其在动画侧逐个场景兜底，不如给用户一个明确的「退回稳定态」入口。
+       清 localStorage['tlFrontNodeDrops_v1']（按地块指纹存，换地块本身就会失效，这里只清当前档）
+       → 整幅重生成 → 工作区补一次重渲染（v582 教训：宿主重建后底图要重克隆）。
+       无偏移时给提示、不重绘。 */
+    window.tlFrontNodeReset=function(){
+      try{
+        var rec=(typeof tlFrontNodeDrops==='function')?tlFrontNodeDrops():{};
+        var ks=Object.keys(rec||{});
+        if(!ks.length){
+          try{ if(typeof window.atShowToast==='function') window.atShowToast('三通都在初始位置，无需复位'); }catch(eT){}
+          return false;
+        }
+        try{ localStorage.removeItem(TL_FNODE_LS); }catch(eR){}
+        try{ if(typeof tlAutoGenerate==='function') tlAutoGenerate({scroll:false}); }catch(eG){}
+        /* 宿主重建后工作区必须补一次重渲染：底图是克隆的，不补会停在重建前的旧图（v582） */
+        try{ if(window.RyTlWs&&typeof window.RyTlWs.rerenderKeepView==='function') window.RyTlWs.rerenderKeepView(); }catch(eW){}
+        try{ if(typeof window.atShowToast==='function') window.atShowToast('已复位 '+ks.length+' 个三通，总管回到直线'); }catch(eT2){}
+        return true;
+      }catch(e){ return false; }
+    };
     window.tlSourceLinkLen=tlSourceLinkLen;
   }
   /* 主管物理线归并（同排共线多段 = 一根）：[v557] 提前到总管几何之前 ——

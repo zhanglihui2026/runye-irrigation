@@ -1355,6 +1355,12 @@ body.ry-worst-off [data-tlworst]{display:none}
          点一下进入多选 —— 之后无位移地点尺寸线即逐条加选/取消；拖动任一已选尺寸线时全部已选一起平移；
          再点本按钮退出并清空选择。选择集与拖动全走 document 级（v123b 同口径），简图/ws 两份渲染同步。 -->
     <button class="tl-ws-btn" id="tlDimMultiBtn" type="button" aria-pressed="false" onclick="tlDimMultiToggle()" title="多选标注：开启后点尺寸线逐条加选（无位移点击），再点已选线取消；拖动任一已选尺寸线时全部已选一起平移">多选标注</button>
+    <!-- [v584] 总管三通复位（用户要求）：一键把所有被拖动过的三通恢复到初始位置（总管回到直线）。
+         背景：三通下移后总管变折线，水流动画在部分地块上会与重构后的路径对不上；
+         复位即可回到「直线总管」这一稳定态，动画表现正常。
+         与 tlDimScaleRow 的「⟲复位100%」同款语义，但作用域是三通偏移（localStorage tlFrontNodeDrops_v1）。
+         必须排在 #tlAutoPipe 之前 —— A6 契约要求生成按钮贴底。 -->
+    <button class="tl-ws-btn" id="tlFrontNodeResetBtn" type="button" onclick="tlFrontNodeReset()" title="总管三通复位：把所有拖动过的三通恢复到初始位置（总管回到直线），用于消除折线总管带来的动画/显示差异">三通复位</button>
     <!-- v125（同轮用户要求）：尺寸调整保存开关 —— 默认关 = 拖动仅本次有效，刷新页面即恢复初始位置；
          开 = 当前调整写入本地（localStorage），刷新后保留。关掉时自动清除已保存数据。
          2026-09-24（用户要求）：去掉💾图标；文字恒定，不再切换「已保存/不保存」（切换文字有歧义）；
@@ -2229,7 +2235,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script src="mod/material-table.js?v=421-mat-table"></script>
 <!-- [v424-plan-calc-render] 扬程公式与分解展示模块，先于计算控制器和三级调用方装载。 -->
 <script src="mod/plan-calc-render.js?v=424-plan-calc-render"></script>
-<script src="mod/inline-09.js?v=583-flow-host-group"></script>
+<script src="mod/inline-09.js?v=584-front-node-reset"></script>
 <!-- [v423-header-layout] 三级简图标题布局依赖 inline-09 的 tlMeasureText 与生成时写入的标题状态。 -->
 <script src="mod/tl-header-layout.js?v=423-header-layout"></script>
 

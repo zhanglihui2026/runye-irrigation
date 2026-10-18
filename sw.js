@@ -727,7 +727,16 @@
    → #tlWsFrontBase → svg 根 的顺序兜底，保证动画与管道同组、随同一套变换。
    ⚠ 仍未复现用户报的「拖三通后动画不跟新路由」—— 需在用户真实场景下取数（见 _probe_ws_flow 系列），
       已准备好控制台诊断片段，待用户提供其场景下的输出。 */
-const VERSION = 'v583-flow-host-group';
+/* v584-front-node-reset: 新增「总管三通复位」一键功能（用户要求）。
+   入口：三级左栏工具轨按钮 #tlFrontNodeResetBtn（tl-ws-btn 同款，会随 #tlSide 搬进 CAD 侧栏，
+   简图与工作区两处都可见），文案「三通复位」。
+   行为：window.tlFrontNodeReset() —— 读 tlFrontNodeDrops()，无偏移则提示「无需复位」并返回 false
+   （不重绘）；有偏移则清 localStorage['tlFrontNodeDrops_v1'] → 整幅重生成 → 工作区补一次
+   rerenderKeepView（v582 教训：宿主重建后底图要重克隆）→ 提示复位数量。
+   用途：三通下移后总管变折线，个别地块上水流动画与重构路径对不上；复位即回到直线总管这一稳定态。
+   实测：拖三通 off=40（总管非直线）→ 点复位 → 偏移清空、三通全 0、总管回 [[0,150],[0,350]] 直线，
+   演示水流首点与总管起点一致。 */
+const VERSION = 'v584-front-node-reset';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

@@ -1684,3 +1684,24 @@ ci 28/0、单测 140/141（既存红灯）、双页冒烟 ALL PASS。
 ⚠ 结论：在我能构造的场景里**复现不出**用户看到的现象。根因很可能在用户真实地块
 （不规则多边形/多块/合并组/阶梯分区）下才出现，需其现场取数。已准备控制台诊断片段（见本会话记录），
 待用户提供其场景下的输出再定位。
+
+### §25t v584-front-node-reset —— 新增「总管三通复位」一键功能
+用户：「感觉这个改起来比较麻烦，你给我增加一个总管三通复位功能吧，如果总管三通复位了，实际上它的动画演示就没问题了。」
+
+入口：三级左栏工具轨按钮 `#tlFrontNodeResetBtn`（class tl-ws-btn，与「多选管道/遮蔽管道/路径测算/多选标注」
+同排，排在 #tlAutoPipe 之前以满足 A6 契约），文案「三通复位」。该排随 #tlSide 会搬进 CAD 侧栏 ⇒ 简图与工作区两处都可见。
+
+实现：`window.tlFrontNodeReset()`（inline-09.js，与 tlSourceMove* 同一导出区）
+- 读 tlFrontNodeDrops()：无偏移 ⇒ toast「三通都在初始位置，无需复位」并返回 false（不重绘）；
+- 有偏移 ⇒ removeItem('tlFrontNodeDrops_v1') → tlAutoGenerate({scroll:false}) →
+  工作区补一次 rerenderKeepView()（v582 教训：宿主重建后底图要重克隆）→ toast「已复位 N 个三通，总管回到直线」。
+
+实测（_probe_front_reset.mjs 6/6，真实鼠标点按钮）：
+- 按钮文案「三通复位」可见；
+- 无偏移点击 ⇒ false（不重绘）；
+- 拖三通 off=40 ⇒ 总管非直线（[[40,150],[0,350]]）；
+- 点复位 ⇒ localStorage {}、三通 off 全 0、总管回 [[0,150],[0,350]]（直线）；
+- 复位后演示 ⇒ 水流首点与总管起点一致（[[136,339.5],…]）。
+
+回归：_probe_front_node 51/51、_probe_front_node_ws 全绿、_probe_source_straight 8/8、
+ci 28/0、单测 140/141（既存红灯）、双页冒烟 ALL PASS。
