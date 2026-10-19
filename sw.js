@@ -783,7 +783,16 @@
    修：补齐定位 —— fixed 贴视口右缘、竖排「工具栏」、z-index 9995（压过 AI 面板 9993）。
    实测 _probe_pp_rail 3/3：折叠态标签 x=1376/宽 24、中心命中自身；点击后 off=false、
    工具栏 w=126 回到可视区。 */
-const VERSION = 'v594-rail-tab-fixed';
+/* v595-rail-unified: 地块分区(二级) 与 管路规划(三级) 的右侧工具轨样式统一 + 去掉层层覆盖。
+   病根：两页 DOM 嵌套不同 —— 二级工具条在 .ry-pane-edit 下、三级在 .pp-stage 下，
+   旧代码按中间层写了 `.pp-stage>.pp-toolbar` 与 `.ry-pane-edit>.pp-toolbar` 两套，
+   其中 `.pp-stage>.pp-toolbar` 在二级**一条都没命中**（style-01.css 1163-1166 注释已实证），
+   为了压住它又补更具体的规则 ⇒ 层层叠加。
+   改：折叠动画 / 折叠态 / 把手隐藏 一律改为**不依赖中间层**的后代选择器，
+   二级 + 三级 + CAD 侧栏搬移态 四个作用域合成一条（逗号分组），不再嵌套依赖、不再重复覆盖。
+   实测：二级折叠 opacity 0/visibility hidden、展开 1/visible、transition 保留；三级纳入同一套（当前仍 display:none）。
+   回归：ci 28/0、_probe_pp_rail 3/3（折叠标签仍可见可点）。 */
+const VERSION = 'v595-rail-unified';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

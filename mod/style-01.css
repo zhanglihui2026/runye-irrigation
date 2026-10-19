@@ -2457,12 +2457,18 @@ body > .ry-nav .main-header{display:none!important}
   }
   #pipePlanSection .pp-stage.pp-rail-off>.pp-grip-tool,
   body.ry-tool #pipePlanSection[data-ry-view="edit"] .pp-rail-off>.pp-grip-tool{display:none}
-  #pipePlanSection .pp-stage>.pp-toolbar,
-  body.ry-tool #pipePlanSection[data-ry-view="edit"] .ry-pane-edit>.pp-toolbar{
+  /* [v595] 二级 / 三级工具轨折叠：统一成**不依赖中间层**的后代选择器。
+     旧写法依赖中间层（`.pp-stage>.pp-toolbar` 与 `.ry-pane-edit>.pp-toolbar` 各写一条）——
+     但两页 DOM 嵌套不同：二级工具条在 .ry-pane-edit 下、三级在 .pp-stage 下，
+     ⇒ 二级那条 `.pp-stage>.pp-toolbar` **一条都没命中**（1163-1166 注释已实证），
+      为了压住它又补了更具体的规则，形成层层覆盖。
+     现在两个作用域合成一条（含 CAD 侧栏搬移态），折叠类 pp-rail-off 加在 stage 或 pane 上都能命中。 */
+  #pipePlanSection .pp-toolbar, #tlPipePlanSection .pp-toolbar,
+  #ryCadSide [data-pp="pipePlanSection"] .pp-toolbar, #ryCadSide [data-pp="tlPipePlanSection"] .pp-toolbar{
     transition:opacity .16s ease,transform .18s ease,visibility .18s;
   }
-  #pipePlanSection .pp-stage.pp-rail-off>.pp-toolbar,
-  body.ry-tool #pipePlanSection[data-ry-view="edit"] .ry-pane-edit.pp-rail-off>.pp-toolbar{
+  #pipePlanSection .pp-rail-off .pp-toolbar, #tlPipePlanSection .pp-rail-off .pp-toolbar,
+  #ryCadSide [data-pp="pipePlanSection"] .pp-rail-off .pp-toolbar, #ryCadSide [data-pp="tlPipePlanSection"] .pp-rail-off .pp-toolbar{
     opacity:0;visibility:hidden;pointer-events:none;
     transform:translateX(24px);overflow:hidden;
   }

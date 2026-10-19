@@ -872,8 +872,11 @@ body.ry-tool #ryCadSide [data-pp] .pp-side{
   body.ry-tool #ryCadSide [data-pp="pipePlanSection"][data-ry-view="edit"] .ry-pane-edit.pp-rail-off{
     grid-template-columns:minmax(0,1fr) 0px 0px;
   }
-  #ryCadSide [data-pp="pipePlanSection"] .pp-stage.pp-rail-off>.pp-grip-tool,
-body.ry-tool #ryCadSide [data-pp="pipePlanSection"][data-ry-view="edit"] .pp-rail-off>.pp-grip-tool{display:none}
+  /* [v595] 同上：去掉对中间层的依赖。旧写法第一条 `.pp-stage.pp-rail-off>.pp-grip-tool`
+     在二级不命中（工具条/把手在 .ry-pane-edit 下），靠第二条补 ⇒ 两条叠一条。
+     现合并为后代选择器：祖先带 pp-rail-off 即隐藏把手，二级/三级与侧栏搬移态都覆盖。 */
+  #ryCadSide [data-pp="pipePlanSection"] .pp-rail-off .pp-grip-tool,
+  #ryCadSide [data-pp="tlPipePlanSection"] .pp-rail-off .pp-grip-tool{display:none}
   #ryCadSide [data-pp="pipePlanSection"] .pp-stage>.pp-toolbar,
 body.ry-tool #ryCadSide [data-pp="pipePlanSection"][data-ry-view="edit"] .ry-pane-edit>.pp-toolbar{
     transition:opacity .16s ease,transform .18s ease,visibility .18s;

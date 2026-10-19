@@ -1811,3 +1811,26 @@ _probe_front_reset 6/6（R3 断言改看第 2 点，因首点已是水源）、c
 实测 `_probe_pp_rail.mjs` 3/3（真实鼠标）：
 - 折叠态标签 rect x=1376 / w=24（视口 1400），中心 `elementFromPoint` 命中 `pp-rail-tab-float`；
 - 点击后 `pp-rail-off` 移除、`.pp-toolbar` w=126 回到可视区（x=1274）。
+
+### v595（主站）：二级 / 三级右侧工具轨样式统一 + 去层层覆盖
+用户：「检查地块分区跟管路规划页面的右侧面板是否统一，要求两个面板统一样式，不能层层覆盖层层嵌套，检查代码然后简化。」
+
+诊断（实测）：
+- 两页"右侧工具轨"都是 `.pp-toolbar`，但 **DOM 嵌套不同**：
+  二级 = `#pipePlanSection > .pp-body > .pp-stage > .ry-pane-edit > #ppToolbar`
+  三级 = `#tlPipePlanSection > .pp-stage > #tlToolbar`（直接子级）
+- 旧代码按中间层写两套：`.pp-stage>.pp-toolbar` 与 `.ry-pane-edit>.pp-toolbar`。
+  其中 `.pp-stage>.pp-toolbar` 在**二级一条都没命中**（style-01.css 1163-1166 注释已实证），
+  于是又补 `body.ry-tool ...` 更具体的规则去压 ⇒ 层层叠加；二级工具轨命中 9~11 条规则、跨 3 个文件。
+
+简化（v595）：
+- 折叠动画、折叠态、把手隐藏三条规则，一律改为**不依赖中间层**的后代选择器；
+- 二级 + 三级 + CAD 侧栏搬移态（`#ryCadSide [data-pp=...]`）四个作用域**合成一条**（逗号分组）；
+- 删掉已证伪的死选择器（`.pp-stage>.pp-toolbar` / `.pp-stage.pp-rail-off>.pp-grip-tool`）。
+
+验证：
+- 二级折叠态 opacity 0 / visibility hidden，展开态 1 / visible，transition(0.16s/0.18s) 保留；
+- 三级 #tlToolbar 已被同一条规则覆盖（当前仍 display:none，属功能决定，未改）；
+- ci 28/0、_probe_pp_rail 3/3（折叠标签仍可见可点）、_probe_cloud_import 3/3。
+- 提交方式：并行会话仍在改 inline-09/online-map/cloudfn 等 ⇒ 用 hash-object + update-index
+  构造只含自己改动的 index/sw blob，避免带上对方未完成代码。
