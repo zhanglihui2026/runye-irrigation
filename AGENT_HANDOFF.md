@@ -1723,3 +1723,25 @@ ci 28/0、单测 140/141（既存红灯）、双页冒烟 ALL PASS。
 
 回归：_probe_front_node 51/51、_probe_front_node_ws 11 项 OK、_probe_source_straight 8/8、
 _probe_front_reset 6/6（R3 断言改看第 2 点，因首点已是水源）、ci 28/0、单测 140/141、双页冒烟 PASS。
+
+### §25v v586-cad-grip-explicit —— 左侧工具栏收起/展开入口显性化
+用户：「地块分区的右侧工具栏关闭按钮不在工具栏附近，有时候关闭了，再想打开就找不到这个按钮了。」
+（注：截图里是左侧工具栏，用户口误说「右侧」。）
+
+查出两个问题：
+1. 收起入口就是顶部那行整宽的「⚙ 工具栏」按钮（深绿底），长得像标题不像按钮，也没有收起图标；
+2. **点工具栏内任意空白处都会整栏收起** —— `ry-cad-toolbar.js` 的 `side` click 处理器末尾
+   `if(inGrp) return; if(closest('.ry-cad-grp')) return; toggleRail();`，这是"有时候关闭了"的误关来源。
+
+改动：
+- HTML：`#ryCadSideGrip` 内拆两个 span —— 左「⚙ 工具栏」、右 `#ryCadSideGripIcon`（展开态 « / 收起态 »）。
+- CSS：展开态 `justify-content:space-between` + 图标 15px；收起态竖条加 `box-shadow:2px 0 10px`，
+  图标转横排 17px 置顶 —— 40px 竖条整条可点（实测 h=831），明显"点这里展开"。
+- JS：删掉「点空白折叠」；改为 `#ryCadSideGrip` 单独绑 click（`data-ry-gbound` 防重复绑定）；
+  `applyWidth()` 里同步 `aria-expanded` / `title`（收起工具栏 / 展开工具栏）/ 图标字符。
+
+实测 `_probe_cad_grip.mjs` 9/9（真实鼠标）：展开 318px、grip top=1px、icon «、title 收起工具栏；
+点后 40px、竖条 h=831 中心 elementFromPoint 命中自身（无遮挡）、icon »、title 展开工具栏；
+点工具栏空白后仍 open=1 / w=318（不再误关）。
+
+回归：_probe_front_node 51/51、_probe_front_reset 6/6、ci 28/0、单测 140/141（既存红灯）、双页冒烟 PASS。

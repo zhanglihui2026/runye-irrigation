@@ -757,16 +757,26 @@ body.ry-tool.ry-cad-vp #ryCadSide{
 }
 body.ry-tool.ry-cad-vp #ryCadSide[data-ry-open="0"]{width:40px}
 #ryCadSide[data-ry-open="0"] #ryCadWGrip{display:none}
+/* [v586] 收起入口显性化（用户：关闭按钮不在工具栏附近，关了就找不到再开的按钮）
+   ① 展开态：标题在左、「«」图标在右（两端对齐）—— 一眼看出这一行能收起；
+   ② 收起态：40px 竖条保留整条可点区域 + 投影 + 顶部横排的「»」箭头，明显"点这里展开"；
+   ③ 同时取消「点工具栏空白即收起」（ry-cad-toolbar.js），避免误关。 */
 #ryCadSideGrip{
-  flex:0 0 auto;display:flex;align-items:center;gap:6px;width:100%;
+  flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%;
   border:0;background:#173e32;color:#d9e9df;cursor:pointer;
   padding:9px 10px;font-size:12px;font-weight:600;letter-spacing:.5px;
   font-family:inherit;text-align:left;
 }
 #ryCadSideGrip:hover{background:#1d4c3d}
+#ryCadSideGrip .ry-cad-grip-i{flex:none;font-size:15px;line-height:1;opacity:.8;padding-left:6px}
+#ryCadSideGrip:hover .ry-cad-grip-i{opacity:1}
 #ryCadSide[data-ry-open="0"] #ryCadSideGrip{
   flex:1 1 auto;flex-direction:column;justify-content:center;align-items:center;
   writing-mode:vertical-rl;padding:14px 0;letter-spacing:3px;
+  box-shadow:2px 0 10px rgba(15,23,42,.22);
+}
+#ryCadSide[data-ry-open="0"] #ryCadSideGrip .ry-cad-grip-i{
+  writing-mode:horizontal-tb;margin-bottom:10px;font-size:17px;opacity:1;
 }
 .ry-cad-set-btn{margin-left:auto;padding:2px 8px;border:1px solid #c9d8d0;background:#fff;color:#33604f;font-weight:500;cursor:pointer;font-size:11px!important;line-height:1.5}
 .ry-cad-set-btn:hover{border-color:#173e32;color:#14532d}

@@ -38,7 +38,13 @@
       try{ var s=$('ryCadSide'); if(s) s.style.setProperty('--ry-cad-w-open', wOpen+'px'); }catch(err){}
     }
     var g=$('ryCadSideGrip');
-    if(g) g.setAttribute('aria-expanded', railOpen()?'true':'false');
+    if(g){
+      var op=railOpen();
+      g.setAttribute('aria-expanded', op?'true':'false');
+      g.title = op?'收起工具栏':'展开工具栏';
+      var ic=$('ryCadSideGripIcon');
+      if(ic) ic.textContent = op?'\u00ab':'\u00bb';   /* 展开态 « 收起；收起态 » 展开 */
+    }
   }
 
   function moveIn(){
@@ -177,8 +183,14 @@
         }catch(err){}
         if(inGrp) return;
         if(e.target&&e.target.closest&&e.target.closest('.ry-cad-grp')) return;
-        toggleRail();
+        /* [v586] 原此处 toggleRail() —— 点工具栏内任意空白就整栏收起，用户常"误关"且难找回。
+           改为只有顶部「⚙ 工具栏 / «」这一个按钮能收起（见下方 grip 的 click 绑定）。 */
       });
+      var gripBtn=$('ryCadSideGrip');
+      if(gripBtn&&!gripBtn.getAttribute('data-ry-gbound')){
+        gripBtn.setAttribute('data-ry-gbound','1');
+        gripBtn.addEventListener('click',function(e){ e.preventDefault(); e.stopPropagation(); toggleRail(); });
+      }
     }
     /* 宽度拖拽：右缘把手按住左右拖，实时改宽 + rAF 让画布重排；松手 localStorage 记忆。
        拖动期间给把手打 .ry-wdrag 高亮；没拖过不写任何变量（默认视觉不变）。 */

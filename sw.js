@@ -741,7 +741,15 @@
    而水流路线从 fPts[0]（第一个三通）起算 ⇒ 用户截图「水源到第一段主管之间没有动画路径」。
    改：取离 fPts[0] 最近的 #f59e0b 水源圆，前插为每条路线起点（d≤1px 不插，避免零长段）。
    实测：水源(38.8,121.7) → 总管起点(80,342.4) → 主管；与图面 data-tlsrcpipe 的 d 完全一致。 */
-const VERSION = 'v585-flow-source-seg';
+/* v586-cad-grip-explicit: 左侧工具栏的「收起/展开」入口显性化（用户：关闭按钮不在工具栏附近，
+   关了就找不到再打开的按钮）。
+   ① 展开态：顶部标题行两端对齐 —— 左「⚙ 工具栏」、右「«」图标，title「收起工具栏」；
+   ② 收起态：40px 竖条占满整栏高度（可点区域大）+ 投影 + 顶部横排「»」箭头，title「展开工具栏」；
+   ③ **取消「点工具栏内任意空白即整栏收起」**（原 side click 里的 toggleRail）—— 这是用户"有时候
+      关闭了"的误关来源；现在只有顶部那个按钮能收起。
+   实测 9/9：展开 318px / grip top=1 / icon « / title 收起；点后 40px / 竖条 h=831 中心命中自身 /
+   icon » / title 展开；点空白后仍 open=1、w=318（不再误关）。 */
+const VERSION = 'v586-cad-grip-explicit';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

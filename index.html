@@ -244,7 +244,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <link rel="stylesheet" href="pwa/pwa.css?v=2">
 <script defer src="pwa/pwa.js?v=2"></script>
     <link rel="stylesheet" href="runye-theme.css?v=2">
-    <link rel="stylesheet" href="mod/ry-panel.css?v=578-chip-hover-unify">
+    <link rel="stylesheet" href="mod/ry-panel.css?v=586-cad-grip-explicit">
     <!-- Shoelace 2.15.1（与紧凑分组样板一致）；Shoelace 不可用时保留原生输入控件。 -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.1/cdn/themes/light.css">
   <link rel="stylesheet" href="runye-typography.css?v=530-h1-scope">
@@ -2300,7 +2300,9 @@ body.ry-worst-off [data-tlworst]{display:none}
      由用户点 summary 展开）；展开 318px，右缘把手可拖拽调宽（localStorage 记忆）。
      样式见样式区 14 / 14c 段，搬运与切换逻辑见下方 ryCadJs。 -->
 <aside id="ryCadSide" data-ry-open="0" aria-label="全局工具栏">
-  <button type="button" id="ryCadSideGrip" title="展开 / 收起工具栏" aria-expanded="false">⚙ 工具栏</button>
+  <button type="button" id="ryCadSideGrip" title="收起工具栏" aria-expanded="false" aria-label="收起或展开左侧工具栏">
+    <span class="ry-cad-grip-t">⚙ 工具栏</span><span class="ry-cad-grip-i" id="ryCadSideGripIcon" aria-hidden="true">«</span>
+  </button>
   <span id="ryCadWGrip" title="⇔ 拖拽调整工具栏宽度"></span>
   <div class="ry-cad-grps">
     <details class="ry-cad-grp" id="ryCadGrpPipe">
@@ -2318,7 +2320,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 
   </div>
 </aside>
-<script src="mod/ry-cad-toolbar.js?v=443-terrain-panel"></script>
+<script src="mod/ry-cad-toolbar.js?v=586-cad-grip-explicit"></script>
 
 <!-- ===== 设置（2026-09-27 用户要求）：顶栏齿轮打开，收纳「可调节的数据」=====
      参考 AutoCAD 的 Options：左侧分类 + 右侧参数 + 底部「恢复本页默认 / 取消 / 保存」。
