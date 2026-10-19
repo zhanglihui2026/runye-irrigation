@@ -2463,12 +2463,12 @@ body > .ry-nav .main-header{display:none!important}
      ⇒ 二级那条 `.pp-stage>.pp-toolbar` **一条都没命中**（1163-1166 注释已实证），
       为了压住它又补了更具体的规则，形成层层覆盖。
      现在两个作用域合成一条（含 CAD 侧栏搬移态），折叠类 pp-rail-off 加在 stage 或 pane 上都能命中。 */
-  #pipePlanSection .pp-toolbar, #tlPipePlanSection .pp-toolbar,
-  #ryCadSide [data-pp="pipePlanSection"] .pp-toolbar, #ryCadSide [data-pp="tlPipePlanSection"] .pp-toolbar{
+  #pipePlanSection .pp-toolbar,
+  #ryCadSide [data-pp="pipePlanSection"] .pp-toolbar{
     transition:opacity .16s ease,transform .18s ease,visibility .18s;
   }
-  #pipePlanSection .pp-rail-off .pp-toolbar, #tlPipePlanSection .pp-rail-off .pp-toolbar,
-  #ryCadSide [data-pp="pipePlanSection"] .pp-rail-off .pp-toolbar, #ryCadSide [data-pp="tlPipePlanSection"] .pp-rail-off .pp-toolbar{
+  #pipePlanSection .pp-rail-off .pp-toolbar,
+  #ryCadSide [data-pp="pipePlanSection"] .pp-rail-off .pp-toolbar{
     opacity:0;visibility:hidden;pointer-events:none;
     transform:translateX(24px);overflow:hidden;
   }
@@ -2983,7 +2983,7 @@ body.ry-tool #pipePlanSection .pp-btn-generate, body.ry-tool #tlPipePlanSection 
    这里以 (0,3,1) 特异性覆盖，仅作用于属性栏内，不影响工具轨按钮。 */
 #pipePlanSection .pp-side>.pp-btn-generate, #tlPipePlanSection .pp-side>.pp-btn-generate, #ryCadSide [data-pp="pipePlanSection"] .pp-side>.pp-btn-generate, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side>.pp-btn-generate{font-weight:400}
 /* 主区内的工具条：贴主区顶部，不浮在画布上 */
-body.ry-tool #pipePlanSection .pp-toolbar, body.ry-tool #tlPipePlanSection .pp-toolbar, body.ry-tool #ryCadSide [data-pp="pipePlanSection"] .pp-toolbar, body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-toolbar{
+body.ry-tool #pipePlanSection .pp-toolbar, body.ry-tool #ryCadSide [data-pp="pipePlanSection"] .pp-toolbar{
   flex:0 0 auto;margin:0;padding:6px 8px;
   background:var(--ry-panel);border-bottom:1px solid var(--ry-line);
 }

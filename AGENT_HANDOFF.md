@@ -1834,3 +1834,12 @@ _probe_front_reset 6/6（R3 断言改看第 2 点，因首点已是水源）、c
 - ci 28/0、_probe_pp_rail 3/3（折叠标签仍可见可点）、_probe_cloud_import 3/3。
 - 提交方式：并行会话仍在改 inline-09/online-map/cloudfn 等 ⇒ 用 hash-object + update-index
   构造只含自己改动的 index/sw blob，避免带上对方未完成代码。
+
+### v596（主站）：删掉三级页的空壳工具轨 #tlToolbar（用户要求"调出来看看"）
+- 真相：`<div class="pp-toolbar" id="tlToolbar" style="display:none"></div>` —— **内部为空**、
+  无任何 JS 引用；内容早在历史版本搬走（系统图工具条 2026-09-12 整条取消）。
+  "调出来"只会是一条空白竖条 ⇒ 正确处理是删除，而不是显示。
+- 连带清理三级的 .pp-toolbar 作用域（不留死代码）：
+  style-01.css v595 统一规则与 2980 共享规则里的 `#tlPipePlanSection .pp-toolbar` 部分、
+  ry-panel.css 的三级把手规则；二级工具轨不受影响（v595 实测口径保持）。
+- 暂存区核验：index 无 tlToolbar、style-01 无三级作用域。

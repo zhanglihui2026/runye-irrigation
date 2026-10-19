@@ -792,7 +792,13 @@
    二级 + 三级 + CAD 侧栏搬移态 四个作用域合成一条（逗号分组），不再嵌套依赖、不再重复覆盖。
    实测：二级折叠 opacity 0/visibility hidden、展开 1/visible、transition 保留；三级纳入同一套（当前仍 display:none）。
    回归：ci 28/0、_probe_pp_rail 3/3（折叠标签仍可见可点）。 */
-const VERSION = 'v595-rail-unified';
+/* v596-toolbar-shell-removed: 删掉三级页的空壳工具轨 #tlToolbar。
+   真相：它 style="display:none" 且内部为空、无任何 JS 引用 —— 内容早在历史版本搬走
+   （系统图工具条 2026-09-12 整条取消），是个废弃空壳，"调出来"只会是一条空白竖条。
+   连带清理三级的 .pp-toolbar 作用域（v595 统一规则与 2980 共享规则里的三级部分、
+   ry-panel.css 的三级把手规则）⇒ 不留死代码；二级工具轨不受影响。
+   注：并行会话的 592 引用未纳入本次提交（仍在其工作区）。 */
+const VERSION = 'v596-toolbar-shell-removed';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
