@@ -32,8 +32,12 @@
 
   var KEY='runye_pp_panel_w';
   /* 拖拽边界：下限保证字段/按钮不被压瘪，上限保证画布不被挤没；
-     MAX_SIDE / MAX_TOOL 是硬上限，实际可用上限还会按当前版心宽度动态收紧。 */
-  var MIN_SIDE=200,MAX_SIDE=560,MIN_TOOL=92,MAX_TOOL=280;
+     MAX_SIDE / MAX_TOOL 是硬上限，实际可用上限还会按当前版心宽度动态收紧。
+     [v608] MIN_TOOL 92 → 132：工具轨里最长的一项是「🔓 锁定面积」（文字 + 锁图标约 96px，
+     加左右内边距与边框约需 118px），「地块镜像 无 / 水平 / 垂直」三键并排还需更宽。
+     实测 96–104px 时按钮文字被裁、镜像键被压成细条（用户截图：「右侧工具栏显示不全」）。
+     存量存档的旧窄宽度会在启动时被这里夹回 132，不再需要用户手拖。 */
+  var MIN_SIDE=200,MAX_SIDE=560,MIN_TOOL=132,MAX_TOOL=280;
   var CANVAS_MIN=320;                 /* 给画布+另一侧留的最小宽度 */
 
   function clampNum(v,lo,hi){

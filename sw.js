@@ -804,7 +804,12 @@
 /* v605-announce-modal: 新增 runye-announce.js（首页公告弹窗，文档在 CORE）；每次访问弹出，提醒注册与邀请规则。 */
 /* v604-branch-span-all-paths: 满跨口径覆盖到材料表 buckets 行 / 逐段表 / 管道卡 / 经济分析 / 二级材料统计，
    并修 v602 遗留的「二级传导」满跨仍取 52m 的错（满跨改按分区几何净跨）。 */
-const VERSION = 'v605-announce-modal';
+/* v608-rail-min-width: 二级「地块分区」右侧工具轨显示不全（用户截图：文字被裁、镜像键压成细条）。
+   根因：inline-19.js 的 MIN_TOOL=92 允许轨宽小于内容需求（「🔓 锁定面积」约需 118px），
+   且宽度存 localStorage 拖窄后每次启动原样恢复 ⇒ 切页回来永远是窄的。
+   修：MIN_TOOL 92 → 132，并在 style-01.css / ry-panel.css 的 grid-template-columns 各加一道
+   max(var(--pp-tool-w,…),132px)；三处同值，任何写死窄值的路径都压不进来。 */
+const VERSION = 'v608-rail-min-width';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

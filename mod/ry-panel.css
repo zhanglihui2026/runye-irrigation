@@ -629,8 +629,9 @@ body.ry-tool #ryCadSide [data-pp="pipePlanSection"] .pp-side>*{flex:0 0 auto}
 #ryCadSide [data-pp="pipePlanSection"][data-ry-view="draw"] .ry-pane-edit{display:none}
 body.ry-tool #ryCadSide [data-pp="pipePlanSection"][data-ry-view="edit"] .ry-pane-edit{
   display:grid;
-  /* 画布列 ｜ 10px 拖拽列 ｜ 工具列（宽度由拖拽条写入 --pp-tool-w） */
-  grid-template-columns:minmax(0,1fr) 10px var(--pp-tool-w,clamp(118px,9vw,138px));
+  /* 画布列 ｜ 10px 拖拽列 ｜ 工具列（宽度由拖拽条写入 --pp-tool-w）
+     [v608] 下限 132px 与 mod/style-01.css 主站规则、inline-19.js 的 MIN_TOOL 三处同值。 */
+  grid-template-columns:minmax(0,1fr) 10px max(var(--pp-tool-w,clamp(118px,9vw,138px)),132px);
   grid-template-rows:auto minmax(0,1fr) auto;
   column-gap:0;row-gap:0;
   min-height:0;overflow:hidden;

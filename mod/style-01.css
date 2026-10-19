@@ -3426,8 +3426,11 @@ body:not(.ry-tool) .pp-btn-generate:hover{transform:none;box-shadow:0 0 0 1px va
    ======================================================================== */
 body.ry-tool #pipePlanSection[data-ry-view="edit"] .ry-pane-edit{
   display:grid;
-  /* 画布列 ｜ 10px 拖拽列 ｜ 工具列（宽度由拖拽条写入 --pp-tool-w） */
-  grid-template-columns:minmax(0,1fr) 10px var(--pp-tool-w,clamp(118px,9vw,138px));
+  /* 画布列 ｜ 10px 拖拽列 ｜ 工具列（宽度由拖拽条写入 --pp-tool-w）
+     [v608] 工具列下限锁 132px：低于这个宽度时「🔓 锁定面积」的文字和「地块镜像
+     无/水平/垂直」三键会被裁/压瘪（用户反馈「右侧工具栏总是显示不全」）。
+     JS 侧 MIN_TOOL 同为 132 —— 这里再加一道，任何写死更窄值的路径都压不进来。 */
+  grid-template-columns:minmax(0,1fr) 10px max(var(--pp-tool-w,clamp(118px,9vw,138px)),132px);
   grid-template-rows:auto minmax(0,1fr) auto;
   column-gap:0;row-gap:0;
   min-height:0;overflow:hidden;
