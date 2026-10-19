@@ -757,7 +757,13 @@
    主站侧只做跳转，不含任何云凭据；与「💾 保存地块」（本机）互不影响。
    云端配套（独立应用 wbapp_FxUShyeJ60dvzoe0Xbxe5e，域 https://plot-library.app.workbuddy.host/）：
    plots 表（RLS：本人可读写自己的行，管理员可读全部）+ plot_admins + claim_plot_admin(口令) 函数。 */
-const VERSION = 'v587-cloud-submit';
+/* v588-cloud-load-map: 云端地块库「载入地图」一键回填主站。
+   主站 mod/online-map.js 新增 importCloudRingFromUrl()：URL 带 cloudring（[[lat,lng],…]）时
+   → 先 rySetTab 切到在线地图区块 → 把环设为当前绘制 points → refresh() 重画并更新面积
+   → fitBounds 缩放到该地块 → 提示「已载入云端地块（X 亩）」→ 立刻清掉 URL 参数防重复导入。
+   之后「💾 保存地块」「↩ 回传地块绘制」等既有按钮照常可用（都读 points / latlngs()）。
+   云端管理页同步：每行改为「载入地图」（跳主站带参）+「下载」（GeoJSON）两个操作。 */
+const VERSION = 'v588-cloud-load-map';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

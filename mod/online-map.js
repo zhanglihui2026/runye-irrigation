@@ -1566,4 +1566,36 @@
   renderMyPlots();
 
   refresh();
+
+  /* ===== [v588] 从 URL 参数回填地块（云端地块库「载入地图」用） =====
+     管理员在云端地块库点「载入地图」→ 带着 cloudring（[[lat,lng],…]）与 cloudname 回到主站；
+     这里把它直接设成当前绘制，并自动切到在线地图页 + 缩放到该地块范围。
+     之后「💾 保存地块」「↩ 回传地块绘制」等既有按钮照常可用（它们都读 points / latlngs()）。
+     用完立刻把 URL 参数清掉，避免刷新时重复导入。 */
+  function importCloudRingFromUrl(){
+    try{
+      var q=new URLSearchParams(location.search);
+      var raw=q.get('cloudring');
+      if(!raw) return;
+      var ring=JSON.parse(raw);
+      if(!Array.isArray(ring)||ring.length<3) return;
+      var name=q.get('cloudname')||'云端地块';
+      try{ history.replaceState(null,'',location.pathname+location.hash); }catch(errH){}
+      var go=function(){
+        try{
+          points=ring.map(function(p){ return {lat:Number(p[0]), lng:Number(p[1])}; });
+          if(!measureOn) setMeasureOn(true);
+          refresh();
+          if(map&&poly&&map.fitBounds) map.fitBounds(poly.getBounds(),{padding:[30,30]});
+          var mu=(geodesicArea(points)/666.67).toFixed(2);
+          try{ if(typeof window.atShowToast==='function') window.atShowToast('已载入云端地块：'+name+'（'+mu+' 亩）'); }
+          catch(errT){ alert('已载入云端地块：'+name+'（'+mu+' 亩）'); }
+        }catch(err){ try{ alert('云端地块载入失败：'+err.message); }catch(errA){} }
+      };
+      /* 主站需先切到在线地图区块，否则容器尺寸无效、fitBounds 会偏 */
+      try{ if(typeof window.rySetTab==='function') window.rySetTab('onlineMapSection','map'); }catch(errTab){}
+      setTimeout(go, 350);
+    }catch(e){ }
+  }
+  importCloudRingFromUrl();
 })();

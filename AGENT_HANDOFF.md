@@ -1745,3 +1745,10 @@ _probe_front_reset 6/6（R3 断言改看第 2 点，因首点已是水源）、c
 点工具栏空白后仍 open=1 / w=318（不再误关）。
 
 回归：_probe_front_node 51/51、_probe_front_reset 6/6、ci 28/0、单测 140/141（既存红灯）、双页冒烟 PASS。
+
+### v588（已上线）：云端地块库「载入地图」一键回填主站
+- 主站 mod/online-map.js 新增 importCloudRingFromUrl()：URL 带 cloudring（[[lat,lng],…]）时
+  ① rySetTab('onlineMapSection','map') 切到在线地图 ② points = ring → refresh() 重画并更新面积
+  ③ fitBounds 缩放到该地块 ④ toast「已载入云端地块（X 亩）」⑤ history.replaceState 清掉参数防重复导入。
+- 云端 admin.html 每行操作改为「载入地图」（跳主站带参）+「下载」（GeoJSON）两个按钮。
+- 实测 _probe_cloud_import.mjs 3/3：区块 ry-active、多边形 1 个、亩数 1225.45、URL 参数已清。
