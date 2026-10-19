@@ -776,7 +776,14 @@
    看着比旁边两列小一号。只给表头那一格放行：.tl-plan-result .pp-plan-cols-head > .pp-plan-label{600/11px}；
    字段行（联合流量/水泵流量/扬程…）仍 400/11px，实测未被带跑。
    注：并行会话已抬到 v592 ⇒ 取更高号 v593。 */
-const VERSION = 'v593-hyd-head-bold';
+/* v594-rail-tab-fixed: 地块分区页「右侧工具栏」折叠后没有任何入口（用户：右侧控制面板不见了）。
+   根因：折叠态入口是 body 级代理 .pp-rail-tab-float，但 style-01.css 只写了它的 :hover，
+   **没有 position 等基础定位** ⇒ 实测落在 x=0，被左侧工具栏整块盖住；
+   同一份 syncProxy 又把真把手设成 visibility:hidden（因为"代理可见"）⇒ 两边都看不到。
+   修：补齐定位 —— fixed 贴视口右缘、竖排「工具栏」、z-index 9995（压过 AI 面板 9993）。
+   实测 _probe_pp_rail 3/3：折叠态标签 x=1376/宽 24、中心命中自身；点击后 off=false、
+   工具栏 w=126 回到可视区。 */
+const VERSION = 'v594-rail-tab-fixed';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

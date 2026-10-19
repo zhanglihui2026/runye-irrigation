@@ -1795,3 +1795,19 @@ _probe_front_reset 6/6（R3 断言改看第 2 点，因首点已是水源）、c
 - 混编注意：并行会话的 v592（cloud-design-binding）尚未提交且改了 sw CORE 列表 ⇒
   本次用 git hash-object + update-index --cacheinfo 构造只含自己改动的 index/sw blob 提交，
   避免把对方未完成代码带上线。
+
+### v594（主站）：地块分区页「右侧工具栏」折叠后无法找回 —— 补回标签定位
+用户：「地块分区右侧控制面板不见了，这个怎么回事。」
+
+根因（实测）：
+- 右侧工具轨默认折叠（v254 设计要求），折叠态唯一的入口是 body 级代理 `.pp-rail-tab-float`；
+- `mod/style-01.css` 里**只写了它的 `:hover`**，没有 `position` 等基础定位 ⇒ 代理是普通文档流按钮，
+  实测落在 **x=0**，被左侧工具栏（#ryCadSide，宽 318）整块盖住；
+- 同一份 `syncProxy()` 又因为"代理可见"把真把手 `#ppRailToggle` 设成 `visibility:hidden`
+  ⇒ **两边都看不见**，右侧就成了空白。
+修：补齐代理定位 —— `position:fixed; right:0; top:50%`、竖排写「工具栏」、`z-index:9995`
+（按 v254/v270 注释原意：贴右缘、压在 AI 面板 9993 之上）。
+
+实测 `_probe_pp_rail.mjs` 3/3（真实鼠标）：
+- 折叠态标签 rect x=1376 / w=24（视口 1400），中心 `elementFromPoint` 命中 `pp-rail-tab-float`；
+- 点击后 `pp-rail-off` 移除、`.pp-toolbar` w=126 回到可视区（x=1274）。

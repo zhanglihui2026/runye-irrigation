@@ -2479,6 +2479,19 @@ body > .ry-nav .main-header{display:none!important}
      类内抬 z 无效 ⇒ 代理挂 body、z-index:9995 压过面板；外观复制 .pp-rail-tab，
      显隐由 ppRailCollapse.syncProxy 控制（折叠中 && 真按钮 display≠none），点击转发真按钮。 */
 
+  /* [v594] 折叠「工具栏」标签的**基础定位**（此前只有 :hover，没写 position ⇒ body 下的普通按钮，
+     实测落在 x=0，被左侧工具栏整块盖住；而 syncProxy 又因"代理可见"把真把手设成 visibility:hidden
+     ⇒ 右侧工具栏折叠后**彻底没有入口**，用户看到的就是"右侧控制面板不见了"）。
+     按 v254/v270 的原意补回：贴视口右缘、竖排写「工具栏」、z9995 压在 AI 面板之上。 */
+  .pp-rail-tab-float{
+    position:fixed;right:0;top:50%;transform:translateY(-50%);
+    z-index:9995;display:flex;align-items:center;justify-content:center;
+    writing-mode:vertical-rl;letter-spacing:2px;
+    width:24px;padding:12px 4px;
+    background:#fff;color:#173e32;border:1px solid #b9d2c5;border-right:0;
+    border-radius:6px 0 0 6px;box-shadow:-2px 0 8px rgba(15,23,42,.14);
+    font:12px/1.2 system-ui,-apple-system,"Microsoft YaHei",sans-serif;cursor:pointer;
+  }
   .pp-rail-tab-float:hover{color:#173e32;background:#f2f8f4}
 }
 
