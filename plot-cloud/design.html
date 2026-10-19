@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>回传设计方案</title>
+<style>
+  :root{ --g:#173e32; --g2:#1d4c3d; --line:#cfdcd4; --bg:#f7faf8; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:#1f2937;font:14px/1.6 system-ui,"Microsoft YaHei",sans-serif;padding:16px}
+  .wrap{max-width:560px;margin:0 auto}
+  h1{font-size:17px;margin:0 0 4px;color:var(--g)}
+  .sub{font-size:13px;color:#64748b;margin:0 0 16px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
+  label{display:block;font-size:13px;color:#475569;margin-bottom:4px}
+  input{width:100%;height:38px;padding:0 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;font-family:inherit;background:#fff}
+  .btn{border:0;background:var(--g);color:#d9e9df;border-radius:6px;padding:9px 14px;font-size:14px;font-family:inherit;cursor:pointer}
+  .btn:hover{background:var(--g2)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn.ghost{background:#fff;color:var(--g);border:1px solid var(--g)}
+  .err{font-size:13px;color:#b91c1c;min-height:18px;margin-top:4px}
+  .ok{font-size:13px;color:#14532d;min-height:18px;margin-top:4px}
+  .hidden{display:none}
+  .kv{display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px dashed #eef2f0}
+  .kv b{font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>回传设计方案</h1>
+  <p class="sub">把当前三级设计结果存到云端，与该地块配对存档（仅管理员可回传）。</p>
+
+  <div class="card" id="infoCard">
+    <div class="kv"><span>关联地块编号</span><b id="vPlot">—</b></div>
+    <div class="kv"><span>分区数</span><b id="vZone">—</b></div>
+    <div class="kv"><span>总管 / 主管 / 支管</span><b id="vOd">—</b></div>
+    <div class="kv"><span>水泵扬程 / 功率</span><b id="vPump">—</b></div>
+  </div>
+
+  <div class="card" id="loginCard">
+    <div style="margin-bottom:10px">
+      <label for="phone">手机号（管理员）</label>
+      <input id="phone" type="tel" inputmode="numeric" maxlength="11" placeholder="11 位手机号" autocomplete="tel">
+      <div class="err" id="phoneErr"></div>
+    </div>
+    <div style="margin-bottom:10px">
+      <button class="btn ghost" id="btnCode" type="button">获取验证码</button>
+      <span style="font-size:12px;color:#64748b" id="codeHint"></span>
+    </div>
+    <div style="margin-bottom:10px">
+      <label for="code">验证码</label>
+      <input id="code" type="text" inputmode="numeric" maxlength="6" placeholder="6 位验证码" autocomplete="one-time-code">
+    </div>
+    <button class="btn" id="btnLogin" type="button">登录</button>
+    <div class="err" id="loginErr"></div>
+    <div class="ok" id="loginOk"></div>
+  </div>
+
+  <div class="card hidden" id="upCard">
+    <button class="btn" id="btnUp" type="button">确认回传</button>
+    <div class="err" id="upErr"></div>
+    <div class="ok" id="upOk"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@tencent-ai/workbuddy-cloud-sdk@dev/lib/index.global.js"></script>
+<script>
+(function(){
+  'use strict';
+  var PUBLIC = {
+    endpoint: 'https://plot-library.app.workbuddy.host',
+    oauthRelayBaseUrl: 'https://www.workbuddy.cn/v2/as/genie-baas/oauth',
+    publishableKey: 'wbpk_FxUShyeJ60dvzoe0Xbxe5e_PoNN5FVW5opkhQh3nwVIKQ3KcS9ib52O'
+  };
+
+  var cloud = null;
+  try { cloud = WorkBuddyCloud.createWorkBuddyCloud(PUBLIC); }
+  catch (e) { document.getElementById('loginErr').textContent = '云服务初始化失败：' + e.message; return; }
+
+  var $ = function(id){ return document.getElementById(id); };
+  var q = new URLSearchParams(location.search);
+  var plotId = q.get('plotid') || '';
+  var data = null;
+  try { data = JSON.parse(q.get('data') || 'null'); } catch (e) { data = null; }
+
+  if (!plotId || !data) {
+    $('loginErr').textContent = '缺少地块编号或设计数据，请在主站点「☁ 回传设计」重新进入。';
+    $('btnCode').disabled = true; $('btnLogin').disabled = true;
+    return;
+  }
+
+  $('vPlot').textContent = plotId;
+  $('vZone').textContent = data.zoneCount || '—';
+  $('vOd').textContent = [data.frontOd, data.mainOd, data.branchOd].filter(Boolean).join(' / ') || '—';
+  $('vPump').textContent = [data.pumpHead, data.motorPower || data.pumpPower].filter(Boolean).join(' / ') || '—';
+
+  var pending = null;
+  $('phone').addEventListener('input', function(){ $('phoneErr').textContent = ''; });
+
+  $('btnCode').addEventListener('click', async function(){
+    var phone = ($('phone').value || '').trim();
+    if (!/^1\d{10}$/.test(phone)) { $('phoneErr').textContent = '请输入正确的 11 位手机号'; return; }
+    $('phoneErr').textContent = ''; $('loginErr').textContent = '';
+    $('btnCode').disabled = true;
+    try {
+      var sent = await cloud.auth.sendOtp({ phone: phone });
+      if (sent.error) { $('loginErr').textContent = sent.error.message || '验证码发送失败'; $('btnCode').disabled = false; return; }
+      pending = { phone: phone, verificationId: sent.data.verificationId, isExistingUser: sent.data.isExistingUser };
+      $('codeHint').textContent = '已发送';
+      var cool = 60, btn = $('btnCode');
+      var timer = setInterval(function(){
+        cool--; btn.textContent = cool > 0 ? ('重新获取(' + cool + ')') : '获取验证码';
+        if (cool <= 0) { clearInterval(timer); btn.disabled = false; btn.textContent = '获取验证码'; }
+      }, 1000);
+    } catch (e) { $('loginErr').textContent = '网络异常，请重试'; $('btnCode').disabled = false; }
+  });
+
+  $('btnLogin').addEventListener('click', async function(){
+    var phone = ($('phone').value || '').trim();
+    var token = ($('code').value || '').trim();
+    if (!pending || pending.phone !== phone) { $('loginErr').textContent = '请先为当前手机号获取验证码'; return; }
+    if (!token) { $('loginErr').textContent = '请输入验证码'; return; }
+    $('loginErr').textContent = ''; $('btnLogin').disabled = true;
+    try {
+      var done = await cloud.auth.verifyOtp({ phone: pending.phone, verificationId: pending.verificationId, isExistingUser: pending.isExistingUser, token: token });
+      if (done.error) { $('loginErr').textContent = done.error.message || '验证码不正确'; $('btnLogin').disabled = false; return; }
+      pending = null;
+      $('loginOk').textContent = '已登录';
+      $('loginCard').classList.add('hidden');
+      $('upCard').classList.remove('hidden');
+    } catch (e) { $('loginErr').textContent = '网络异常，请重试'; $('btnLogin').disabled = false; }
+  });
+
+  $('btnUp').addEventListener('click', async function(){
+    $('upErr').textContent = ''; $('btnUp').disabled = true;
+    try {
+      var row = { plot_id: Number(plotId), design: data };
+      var zc = parseInt(data.zoneCount, 10); if (!isNaN(zc)) row.zone_count = zc;
+      var muN = parseFloat(data.mu); if (isFinite(muN)) row.mu = muN;
+      var res = await cloud.database.from('plot_designs').insert(row).select();
+      if (res.error) { $('upErr').textContent = '回传失败：' + (res.error.message || ''); $('btnUp').disabled = false; return; }
+      var created = (res.data && res.data[0]) || null;
+      $('upOk').textContent = '已回传，设计编号 ' + (created ? created.id : '-') + '，已与该地块配对存档。';
+      $('btnUp').disabled = true;
+    } catch (e) { $('upErr').textContent = '回传失败：' + (e && e.message ? e.message : e); $('btnUp').disabled = false; }
+  });
+})();
+</script>
+</body>
+</html>

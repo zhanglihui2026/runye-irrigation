@@ -89,7 +89,7 @@
   function loadLink(p){
     var ring = encodeURIComponent(JSON.stringify(p.ring || []));
     var name = encodeURIComponent(p.name || '云端地块');
-    return MAIN_SITE + '?cloudring=' + ring + '&cloudname=' + name;
+    return MAIN_SITE + '?cloudring=' + ring + '&cloudname=' + name + '&cloudid=' + encodeURIComponent(p.id);
   }
 
   var cloud = null;
@@ -185,9 +185,21 @@
       if (res.error) { $('listBody').innerHTML = '<div class="empty">读取失败：' + esc(res.error.message) + '</div>'; return; }
       var rows = res.data || [];
       if (!rows.length) { $('listBody').innerHTML = '<div class="empty">还没有地块提交</div>'; return; }
+      /* [v590] 已回传的设计（地块 ↔ 设计 配对）：管理员可读全部 */
+      var dmap = {};
+      try {
+        var dres = await cloud.database.from('plot_designs')
+          .select('id, plot_id, zone_count, mu, created_at')
+          .order('created_at', { ascending: false })
+          .limit(500);
+        (dres.data || []).forEach(function(d){ if (!dmap[d.plot_id]) dmap[d.plot_id] = d; });
+      } catch (errD) { }
+
       var ST = [['new','新提交'],['doing','处理中'],['done','已完成']];
-      var html = '<table><thead><tr><th>编号</th><th>名称</th><th>亩数</th><th>状态</th><th>用户备注</th><th>内部备注</th><th>提交时间</th><th>操作</th></tr></thead><tbody>';
+      var html = '<table><thead><tr><th>编号</th><th>名称</th><th>亩数</th><th>状态</th><th>用户备注</th><th>内部备注</th><th>设计</th><th>提交时间</th><th>操作</th></tr></thead><tbody>';
       rows.forEach(function(p){
+        var dsg = dmap[p.id];
+        var dsgTxt = dsg ? ('#' + dsg.id + (dsg.zone_count ? '（' + dsg.zone_count + ' 区）' : '')) : '—';
         var t = new Date(p.created_at);
         var ts = isNaN(t.getTime()) ? '' : (t.getFullYear() + '-' + String(t.getMonth()+1).padStart(2,'0') + '-' + String(t.getDate()).padStart(2,'0') + ' ' + String(t.getHours()).padStart(2,'0') + ':' + String(t.getMinutes()).padStart(2,'0'));
         var sel = '<select data-st="' + esc(p.id) + '" style="height:30px;padding:0 4px;border:1px solid #cfdcd4;border-radius:5px;font-size:13px">';
@@ -202,6 +214,7 @@
           '<td>' + sel + '</td>' +
           '<td>' + esc(p.note || '') + '</td>' +
           '<td><input data-nt="' + esc(p.id) + '" value="' + esc(p.admin_note || '') + '" placeholder="仅自己可见" style="height:30px"></td>' +
+          '<td>' + (dsg ? '<span class="tag" style="background:#dcfce7;color:#166534">' + esc(dsgTxt) + '</span>' : '—') + '</td>' +
           '<td>' + esc(ts) + '</td>' +
           '<td style="white-space:nowrap">' +
             '<button class="btn mini" data-save="' + esc(p.id) + '">保存</button> ' +

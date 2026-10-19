@@ -763,7 +763,15 @@
    → fitBounds 缩放到该地块 → 提示「已载入云端地块（X 亩）」→ 立刻清掉 URL 参数防重复导入。
    之后「💾 保存地块」「↩ 回传地块绘制」等既有按钮照常可用（都读 points / latlngs()）。
    云端管理页同步：每行改为「载入地图」（跳主站带参）+「下载」（GeoJSON）两个操作。 */
-const VERSION = 'v588-cloud-load-map';
+/* v590-cloud-design-back: 设计方案回传云端，形成「地块 ↔ 设计」样本库。
+   主站：① 云端「载入地图」跳回时记住 cloudid（localStorage ry_cloud_plot_id）；
+        ② 三级工具轨新增「☁ 回传设计」按钮 —— 读当前管径/流速/水泵/分区数/亩数，
+           带参跳云端 design.html（主站不含云凭据）。
+   云端：新增 plot_designs 表（plot_id + zone_count + mu + design JSONB），RLS：
+        管理员可 INSERT/SELECT 全部；普通用户可读「自己地块」的设计。
+        新增 design.html（管理员登录 → 确认回传）；admin.html 列表加「设计」列显示已回传编号。
+   用途：地块与其设计方案配对存档，将来用于统计、比对、回测与学习。 */
+const VERSION = 'v590-cloud-design-back';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

@@ -1761,3 +1761,16 @@ _probe_front_reset 6/6（R3 断言改看第 2 点，因首点已是水源）、c
   进度用中文徽标（new=新提交 amber、doing=处理中 blue、done=已完成 green）。
   RLS 保证用户只能读到自己的行 ⇒ 无需额外“查询码”，登录即可自查。
 - 后续（三期）：把设计方案回传云端，形成「地块↔设计」配对样本库（用于统计/回测/学习）。
+
+### v590（主站已推送；云端已部署）：设计方案回传 → 「地块 ↔ 设计」样本库
+- 云端新表 `plot_designs`（plot_id / zone_count / mu / design JSONB / owner_id / created_at），
+  RLS：管理员可 INSERT 与 SELECT 全部；普通用户可读「自己地块」的设计。
+- 云端新页 `design.html`：管理员登录 → 显示设计摘要 → 确认回传 → 返回设计编号。
+- 管理页 admin.html：列表新增「设计」列，显示已回传的设计编号与分区数（绿色标记）；
+  「载入地图」链接额外带 cloudid，主站据此记住当前地块号。
+- 主站：① online-map.js 导入地块时把 cloudid 存 localStorage('ry_cloud_plot_id')；
+        ② 三级工具轨新增「☁ 回传设计」按钮 → window.tlUploadDesign() 读
+           管径/流速/水泵扬程/功率/流量/分区数/亩数 → 带参跳云端 design.html。
+- 用途：每块地形成「原始地块 ↔ 设计方案」配对，供统计、比对、回测、学习。
+- 回归：ci 28/0、单测 140/141（既存红灯）、front_node 51/51、front_reset 6/6（偶发一次已复跑通过）、
+  cloud_import 3/3、双页冒烟 PASS。

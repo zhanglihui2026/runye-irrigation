@@ -3743,6 +3743,31 @@ function tlAutoGenerate(options) {
        清 localStorage['tlFrontNodeDrops_v1']（按地块指纹存，换地块本身就会失效，这里只清当前档）
        → 整幅重生成 → 工作区补一次重渲染（v582 教训：宿主重建后底图要重克隆）。
        无偏移时给提示、不重绘。 */
+    /* ===== [v590] 回传设计方案到云端地块库 =====
+       把当前三级设计结果（管径 / 流速 / 水泵参数 / 分区数 / 亩数）回传到云端，与该地块配对存档，
+       形成「地块 ↔ 设计」样本 —— 将来做统计、比对、回测、学习都靠这份配对数据。
+       关联哪个地块 = 本地存的 ry_cloud_plot_id（管理员从云端「载入地图」跳进来时带过来的）。
+       主站只负责跳转，写库在云端页完成（需管理员登录）。 */
+    window.tlUploadDesign=function(){
+      try{
+        var plotId=localStorage.getItem('ry_cloud_plot_id')||'';
+        if(!plotId){ alert('请先在云端地块库点「载入地图」打开该地块，再回传设计方案'); return; }
+        var T=function(id){ var e=document.getElementById(id); return e?(e.textContent||'').trim():''; };
+        var V=function(id){ var e=document.getElementById(id); return e?(e.value||'').trim():''; };
+        var d={
+          frontOd:T('tlPlanFrontPipe'), frontVel:T('tlPlanFrontVelocity'),
+          mainOd:T('tlPlanMainPipe'), mainVel:T('tlPlanMainVelocity'),
+          branchOd:T('tlPlanBranchPipe'), branchVel:T('tlPlanBranchVelocity'),
+          combinedFlow:T('tlPlanCombinedFlow'), pumpFlow:T('tlPlanPumpFlow'),
+          pumpHead:T('tlPlanPumpHead'), pumpPower:T('tlPlanPumpPower'), motorPower:T('tlPlanMotorPower'),
+          zoneCount:V('tl_zoneCount'), mu:V('tl_zoneMu'), ts:Date.now(), src:'tl'
+        };
+        var url='https://plot-library.app.workbuddy.host/design.html?plotid='+encodeURIComponent(plotId)
+          +'&data='+encodeURIComponent(JSON.stringify(d));
+        if(url.length>8000){ alert('设计数据过大，暂不能回传'); return; }
+        window.open(url,'_blank','noopener');
+      }catch(e){ alert('回传失败：'+(e&&e.message?e.message:e)); }
+    };
     window.tlFrontNodeReset=function(){
       try{
         var rec=(typeof tlFrontNodeDrops==='function')?tlFrontNodeDrops():{};

@@ -1580,6 +1580,9 @@
       var ring=JSON.parse(raw);
       if(!Array.isArray(ring)||ring.length<3) return;
       var name=q.get('cloudname')||'云端地块';
+      /* [v590] 记住云端地块编号：之后「☁ 回传设计」才知道该把方案挂到哪块地上 */
+      var pid=q.get('cloudid');
+      if(pid){ try{ localStorage.setItem('ry_cloud_plot_id', String(pid)); }catch(errS){} }
       try{ history.replaceState(null,'',location.pathname+location.hash); }catch(errH){}
       var go=function(){
         try{
