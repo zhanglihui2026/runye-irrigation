@@ -538,6 +538,13 @@
         var AE = window.RyTlAutoEdits;
         if (!AE || !AE.allPids || !d) return null;
         var pids = AE.allPids(d), total = 0, i, seen = false, hidSeen = false;
+        /* [v601 2026-10-19 用户口径] 支管总长按「设计满跨」计，不按图面折线：
+           图面两端各缩进 gapV/gapH（4m 级）只是显示约定，不进材料；
+           用户手动改长的增量（effLen − 原始图面长）照常叠加。
+           每区支管总用量 = 该区满跨 ÷ 敷设边数（= 根数 × 单根，单边时即整区贯通长度）。 */
+        var brSpans = d.branchFullSpans || [], brDrawn = d.branchDrawnLens || [];
+        var lsEl = document.querySelector('#tl_layoutGroup .selected');
+        var brSides = (lsEl && lsEl.dataset && parseInt(lsEl.dataset.sides, 10) > 0) ? parseInt(lsEl.dataset.sides, 10) : 1;
         for (i = 0; i < pids.length; i++) {
           var k = pids[i] === 'front' ? 'front' : (pids[i].indexOf('main-') === 0 ? 'main' : 'branch');
           if (k !== kind) continue;
@@ -553,6 +560,14 @@
             if (vr != null) {
               if (!(vr > 0)) { hidSeen = true; continue; }
               total += AE.polylineLen(pts) * vr;
+              continue;
+            }
+          }
+          if (kind === 'branch') {
+            var bi2 = parseInt(String(pids[i]).replace('branch-', ''), 10);
+            if (isFinite(bi2) && brSpans[bi2] > 0) {
+              var base2 = (brDrawn[bi2] > 0) ? brDrawn[bi2] : brSpans[bi2];
+              total += (brSpans[bi2] + Math.max(0, AE.polylineLen(pts) - base2)) / brSides;
               continue;
             }
           }

@@ -970,6 +970,21 @@ function tlWorstPathLen(needGeom) {
     }
     var mainPipes = d.mainPipes || [], branchPipes = d.branchPipes || [];
     var branchLens = branchPipes.map(function (bp, bi) { return polyLen(eff('branch-' + bi, bp)); });
+    /* [v601 2026-10-19 用户口径] 支管**计算**长度取「设计满跨 ÷（根数×敷设边数）」：
+       · 图面两端各缩进 gapV/gapH 只是显示约定（不压分区边线），不能进长度与水损；
+       · 用户手动改长时，只把图面拉伸增量（effLen − 原始图面长）叠加到满跨上，
+         不把留边算回来，也不因留边而少算。 */
+    var brCalcSpans = d.branchFullSpans || [], brCalcDrawn = d.branchDrawnLens || [];
+    var brCalcCount = readSelectedInt('#tl_branchGroup .selected', 2);
+    var brCalcSides = readSelectedInt('#tl_layoutGroup .selected', 1);
+    function branchSingleCalcLen(zi) {
+      var full = (brCalcSpans[zi] > 0) ? brCalcSpans[zi] : 0;
+      if (!(full > 0)) return 0;                       /* 无满跨记录（如二级传导的额外支管）→ 由调用方退回图面长 */
+      var base = (brCalcDrawn[zi] > 0) ? brCalcDrawn[zi] : full;
+      var now = (branchLens[zi] > 0) ? branchLens[zi] : base;
+      var delta = Math.max(0, now - base);             /* 手动改长增量 */
+      return (full + delta) / (brCalcCount * brCalcSides);
+    }
     var taps = [], zones = [], worst = null;
     for (var zi = 0; zi < mainPipes.length; zi++) {
       var mp = eff('main-' + zi, mainPipes[zi]);
@@ -982,7 +997,7 @@ function tlWorstPathLen(needGeom) {
       /* 接入段 = 该区主管靠总管的一端到总管折线的距离（简图上是以 tlStubs 画出的连接管）：
          计入「最远分区」判定与主管长度，否则同一总管引出点上的各区会并列为同长。 */
       var link = r.d || 0;
-      var bl = (zi < branchLens.length) ? branchLens[zi] : 0;        /* 简图按分区顺序 1:1 生成；无对应则回退计算式 */
+      var bl = (zi < branchLens.length) ? (branchSingleCalcLen(zi) || branchLens[zi]) : 0;   /* [v601] 满跨口径优先；无记录退回图面长 */
       taps.push({ zi: zi, run: r.run });
       var mainTot = ml + link;
       zones.push({ zi: zi, main: mainTot, branch: bl, run: r.run });
@@ -3520,6 +3535,14 @@ function tlAutoGenerate(options) {
 
   // ===== 管线：优先采用二级页已生成几何（数据传导），否则三级页自动布管 =====
   var mainPipes=[], branchPipes=[], valves=[];
+  /* [v601 2026-10-19 用户口径] 支管计算长度的两个基准，随图面快照一起落 tlDiagramData：
+     · branchFullSpans —— 该支管所在分区的「设计满跨」（贯通整个分区的净尺寸），
+       与图面两端 gapV/gapH 留边无关；
+     · branchDrawnLens —— 图面实际画出来的长度（= 满跨 − 2×留边），
+       仅用于识别「用户手动改长」的增量（effLen − drawn）后再叠加到满跨上。
+     长度/水损一律按满跨计，图面留边只影响显示（用户 2026-10-19 明确口径）。 */
+  var branchFullSpans=[], branchDrawnLens=[];
+  function tlPolyLen(pts){ if(!pts||pts.length<2)return 0; var L=0; for(var i=1;i<pts.length;i++){var dx=pts[i].x-pts[i-1].x,dy=pts[i].y-pts[i-1].y;L+=Math.sqrt(dx*dx+dy*dy);} return L; }
   var ppShare=window.RunyeBridge?window.RunyeBridge.state:null;
   var ppHasPipes=ppShare && (ppShare.mainPipes.length||ppShare.branchPipes.length||ppShare.valves.length);
   /* v150b（2026-09-28 用户要求「管道布置方向按多数分区的方向自动校正；这些地方没有必要换方向」）：
@@ -3547,8 +3570,12 @@ function tlAutoGenerate(options) {
     branchPipes=ppShare.branchPipes.map(function(l){return l.map(function(p){return{x:p.x,y:p.y};});});
     if(ppShare.subBranchPipes&&ppShare.subBranchPipes.length){ppShare.subBranchPipes.forEach(function(l){branchPipes.push(l.map(function(p){return{x:p.x,y:p.y};}));});}
     valves=ppShare.valves.map(function(v){return{x:v.x,y:v.y};});
+    /* [v601] 二级传导几何：缩进**前**的支管长度 = 设计满跨（二级按分区贯通画的），
+       缩进后的长度只作为显示长，供识别用户改长增量。 */
+    branchFullSpans=branchPipes.map(function(l){return tlPolyLen(l);});
     // 复用二级页支管时端点若贴在分区边缘，同样向内缩进，保证相邻地块支管视觉上断开
     branchPipes=branchPipes.map(tlTrimBranchToZone);
+    branchDrawnLens=branchPipes.map(function(l){return tlPolyLen(l);});
   } else {
     /* [v553 2026-10-18 用户要求] 最外一排（789 / 28/29/30 区）主管末端改 90°弯头：
        「主管最边上的地块接到 90°弯头就可以了……90°弯头向上接一段……之后再接支管。」
@@ -3585,6 +3612,8 @@ function tlAutoGenerate(options) {
           }
           mainPipes.push([{x:mainX,y:zy2},{x:mainX,y:tlMainEndY}]);
           branchPipes.push([{x:brX,y:zy2+gapV},{x:brX,y:zy2+zoneH2-gapV}]);
+          /* [v601] 设计满跨 = 分区在该方向的净跨（竖向支管 = 分区高），图面两端留边不计入计算 */
+          branchFullSpans.push(zoneH2); branchDrawnLens.push(zoneH2-2*gapV);
           if(window.atPointInPolygon&&window.atPointInPolygon({x:brX,y:tlEdgeZ?tlMainEndY:centerY},poly)){
             if(tlEdgeZ){
               /* [v553] 主管末端 90°弯头 → 水平连接管 → 阀门（落点仍在支管上）→ 支管三通 → 支管 */
@@ -3608,6 +3637,8 @@ function tlAutoGenerate(options) {
           }
           mainPipes.push([{x:zx2,y:mainY},{x:tlMainEndX,y:mainY}]);
           branchPipes.push([{x:zx2+gapH,y:brY},{x:zx2+zoneW2-gapH,y:brY}]);
+          /* [v601] 横向支管：设计满跨 = 分区宽 */
+          branchFullSpans.push(zoneW2); branchDrawnLens.push(zoneW2-2*gapH);
           if(window.atPointInPolygon&&window.atPointInPolygon({x:tlEdgeZ?tlMainEndX:centerX,y:brY},poly)){
             if(tlEdgeZ){
               valves.push({x:tlMainEndX,y:brY,ax:tlMainEndX,ay:mainY,elbow:true,mi:mainPipes.length-1});
@@ -4368,6 +4399,9 @@ function tlAutoGenerate(options) {
                 空表时为 null ⇒ 工作区与面积计算都退回基础网格，与改动前一致。 */
              cutOffX: (tlZoneStepRef ? tlZoneStepRef.x : null), cutOffY: (tlZoneStepRef ? tlZoneStepRef.y : null) },
     mainPipes: JSON.parse(JSON.stringify(mainPipes)), branchPipes: JSON.parse(JSON.stringify(branchPipes)),
+    /* [v601] 支管「设计满跨 / 图面长」两个基准（索引与 branchPipes 一一对应）：
+       计算（材料清单、最不利路径水损）一律按满跨；图面两端 gapV/gapH 留边只影响显示。 */
+    branchFullSpans: branchFullSpans.slice(), branchDrawnLens: branchDrawnLens.slice(),
     valves: JSON.parse(JSON.stringify(valves)), dripTapes: JSON.parse(JSON.stringify(dripTapes)),
     partialFlags: tlPartialFlags.slice(), zoneActMu: tlZoneActMu.slice(),
     /* v170：快照落「设计几何」—— 总管平移只动显示层（上面 frontPipe/sourcePos
