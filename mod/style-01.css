@@ -2495,7 +2495,10 @@ body > .ry-nav .main-header{display:none!important}
     writing-mode:vertical-rl;letter-spacing:2px;
     width:24px;padding:12px 4px;
     background:#fff;color:#173e32;border:1px solid #b9d2c5;border-right:0;
-    border-radius:6px 0 0 6px;box-shadow:-2px 0 8px rgba(15,23,42,.14);
+    /* [v600] 原 border-radius:6px 0 0 6px 删除：全站扁平化规则
+       body,body *{border-radius:0!important}（本文件 2827 行）有意压平，
+       不带 !important 的圆角声明是死声明（v530 闸门会报红）。 */
+    box-shadow:-2px 0 8px rgba(15,23,42,.14);
     font:12px/1.2 system-ui,-apple-system,"Microsoft YaHei",sans-serif;cursor:pointer;
   }
   .pp-rail-tab-float:hover{color:#173e32;background:#f2f8f4}

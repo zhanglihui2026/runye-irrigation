@@ -799,7 +799,8 @@
    ry-panel.css 的三级把手规则）⇒ 不留死代码；二级工具轨不受影响。
    注：并行会话的 592 引用未纳入本次提交（仍在其工作区）。 */
 /* v599-wsbtn-skin: 二级工具轨按钮皮肤统一到三级 .tl-ws-btn 口径（mod/style-01.css 在 CORE）。 */
-const VERSION = 'v599-wsbtn-skin';
+/* v600-wsbtn-skin: 同上样式文件再改（删 .pp-rail-tab-float 死圆角声明），抬版本刷缓存。 */
+const VERSION = 'v600-wsbtn-skin';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
