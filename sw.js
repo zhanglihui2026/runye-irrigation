@@ -801,7 +801,9 @@
 /* v599-wsbtn-skin: 二级工具轨按钮皮肤统一到三级 .tl-ws-btn 口径（mod/style-01.css 在 CORE）。 */
 /* v600-wsbtn-skin: 同上样式文件再改（删 .pp-rail-tab-float 死圆角声明），抬版本刷缓存。 */
 /* v602-branch-full-span: 支管计算长度改「设计满跨」口径（材料/水损不吃图面留边；inline-09/27 在 CORE）。 */
-const VERSION = 'v602-branch-full-span';
+/* v604-branch-span-all-paths: 满跨口径覆盖到材料表 buckets 行 / 逐段表 / 管道卡 / 经济分析 / 二级材料统计，
+   并修 v602 遗留的「二级传导」满跨仍取 52m 的错（满跨改按分区几何净跨）。 */
+const VERSION = 'v604-branch-span-all-paths';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

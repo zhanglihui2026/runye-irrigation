@@ -5,7 +5,25 @@
  function buckets(d,r,A,hidden,ratio,manual){
   var out={front:[],main:[],branch:[]},c=A&&A.calibersMap?A.calibersMap():{},defaults={front:r.frontPipe.od,main:r.mainPipe.od,branch:r.branchPipe.od};
   function add(k,od,len){if(!(len>0))return;od=Number(od)||defaults[k];var b=out[k].find(function(q){return q.od===od;});if(!b){b={od:od,len:0};out[k].push(b);}b.len+=len;}
-  ['front','main','branch'].forEach(function(k){var arr=k==='front'?[d.frontPipe]:(d[k+'Pipes']||[]);arr.forEach(function(p,i){var id=k==='front'?'front':k+'-'+i;if(hidden(id))return;var q=A&&A.effPts?A.effPts(id,d):p;if(!q)return;add(k,c[id]||defaults[k],length(q)*(k==='front'&&ratio!=null?ratio:1));});});
+  /* [v604 2026-10-19 用户口径] 支管用量按「设计满跨」计，不按图面折线 —— 图面两端各缩 gapV/gapH
+     只是显示约定，材料表这行的数量 = 满跨 ÷ 敷设边数（含支管根数），手动改长按增量叠加。
+     这是材料表「支管 Øxx」那一行 qty 的唯一来源（pipeMaterialRows ← buckets），必须与
+     tlFigParamLines().lens.branch、最不利路径水损同口径。 */
+  function sidesNow(){
+    var el=(root.document&&root.document.querySelector)?root.document.querySelector('#tl_layoutGroup .selected'):null;
+    var v=el&&el.dataset?parseInt(el.dataset.sides,10):0;
+    return v>0?v:1;
+  }
+  function branchCalcLen(i,q){
+    var info=(typeof root.tlBranchSpanInfo==='function')?root.tlBranchSpanInfo(i):null;
+    if(!info||!(info.full>0))return 0;
+    var now=length(q);
+    return (info.full+Math.max(0,now-info.base))/sidesNow();
+  }
+  ['front','main','branch'].forEach(function(k){var arr=k==='front'?[d.frontPipe]:(d[k+'Pipes']||[]);arr.forEach(function(p,i){var id=k==='front'?'front':k+'-'+i;if(hidden(id))return;var q=A&&A.effPts?A.effPts(id,d):p;if(!q)return;
+    var len=(k==='branch')?branchCalcLen(i,q):0;
+    if(!(len>0))len=length(q)*(k==='front'&&ratio!=null?ratio:1);
+    add(k,c[id]||defaults[k],len);});});
   (manual||[]).forEach(function(p){if(p.kind==='main'||p.kind==='branch')add(p.kind,p.od||defaults[p.kind],length(p.pts));});
   return out;
  }

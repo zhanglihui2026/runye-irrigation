@@ -3645,15 +3645,48 @@
   };
   // 材料清单数据传导：统计施工简图实际绘制（未遮蔽）的主管/支管总长；hasPipes=false 时调用方回退理论值。
   // 滴灌带不在施工简图布置，由调用方按总面积 ÷ 滴灌带间距直接传导。
+  /* [v604 2026-10-19 用户口径] 二级施工简图的支管同样在两端缩进 gap（分区边长 6%，4~14m），
+     那只是显示约定 —— 材料清单按**设计满跨**计（留边不进长度）。满跨按支管中点所在分区、
+     沿支管方向取该分区净跨；几何拿不到（如整组多块叠加态）时退回图面线长。 */
+  function ppBranchFullSpan(line) {
+    try {
+      if (typeof ppIsGroupWhole === 'function' && ppIsGroupWhole()) return 0;
+      if (!line || line.length < 2) return 0;
+      var b = ppGetBounds();
+      var nEl = document.getElementById('planN') || document.getElementById('fld_N');
+      var planN = (nEl && parseInt(nEl.value, 10)) || 4;
+      var cuts = ppGetZoneCuts(b, ppGetZoneLayout(b, planN));
+      if (!cuts || !cuts.xPos || !cuts.yPos) return 0;
+      var a = line[0], z = line[line.length - 1];
+      var mid = { x: (a.x + z.x) / 2, y: (a.y + z.y) / 2 };
+      var vert = Math.abs(a.x - z.x) < Math.abs(a.y - z.y);
+      var E = 1e-6, i;
+      if (vert) {
+        for (i = 0; i + 1 < cuts.yPos.length; i++) {
+          if (mid.y >= cuts.yPos[i] - E && mid.y <= cuts.yPos[i + 1] + E) return cuts.ySrc[i] || 0;
+        }
+      } else {
+        for (i = 0; i + 1 < cuts.xPos.length; i++) {
+          if (mid.x >= cuts.xPos[i] - E && mid.x <= cuts.xPos[i + 1] + E) return cuts.xSrc[i] || 0;
+        }
+      }
+    } catch (e) { }
+    return 0;
+  }
   window.ppGetMaterialStats=function(){
     var stats={mainLen:0,branchLen:0,hasPipes:false};
     (ppState.mainPipes||[]).forEach(function(line,i){
       if(ppIsPipeHidden('main',i))return;
       stats.mainLen+=ppLineLen(line);
     });
+    var lsEl=document.querySelector('#layoutGroup .selected');
+    var sides=(lsEl&&lsEl.dataset&&parseInt(lsEl.dataset.sides,10)>0)?parseInt(lsEl.dataset.sides,10):1;
     (ppState.branchPipes||[]).forEach(function(line,i){
       if(ppIsPipeHidden('branch',i))return;
-      stats.branchLen+=ppLineLen(line);
+      var drawn=ppLineLen(line);
+      var span=ppBranchFullSpan(line);
+      /* 满跨 ÷ 敷设边数 = 该区支管用量（与三级材料清单同一口径）；用户把线拉长时按图面长走 */
+      stats.branchLen+=(span>0)?(Math.max(span,drawn)/sides):drawn;
     });
     stats.hasPipes=stats.mainLen>0||stats.branchLen>0;
     return stats;

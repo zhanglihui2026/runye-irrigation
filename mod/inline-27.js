@@ -48,6 +48,28 @@
   }
   function pipeLenM(pid) {
     if (!AE || !AE.effPts) return 0;
+    /* [v604 2026-10-19 用户口径] 支管长度不再取图面折线：图面两端各缩进 gapV/gapH 只是显示约定，
+       计算长度 = 设计满跨 ÷（支管根数 × 敷设边数），与最不利路径水损、材料清单同源。
+       手动改长仍按「图面长度 − 图面基准」的增量叠加到满跨上（留边永远不算回来）。
+       其余管道（总管/主管）继续取图面有效几何（含改长/平移）。 */
+    var mBr = /^branch-(\d+)$/.exec(String(pid || ''));
+    if (mBr) {
+      var ziB = parseInt(mBr[1], 10);
+      var infoB = (typeof window.tlBranchSpanInfo === 'function') ? window.tlBranchSpanInfo(ziB) : null;
+      if (infoB && infoB.full > 0) {
+        var fmB = flowModel() || {};
+        var bcB = (fmB.branchCount > 0) ? fmB.branchCount : 2;
+        var lsB = document.querySelector('#tl_layoutGroup .selected');
+        var sdB = (lsB && lsB.dataset && parseInt(lsB.dataset.sides, 10) > 0) ? parseInt(lsB.dataset.sides, 10) : 1;
+        var nowB = 0;
+        try {
+          var ptB = AE.effPts(pid, window.tlDiagramData);
+          nowB = (ptB && AE.polylineLen) ? AE.polylineLen(ptB) : 0;
+        } catch (eB) { nowB = 0; }
+        var deltaB = Math.max(0, nowB - infoB.base);
+        return (infoB.full + deltaB) / (bcB * sdB);
+      }
+    }
     var pts = AE.effPts(pid, window.tlDiagramData);
     if (!pts || pts.length < 2) return 0;
     if (AE.polylineLen) return AE.polylineLen(pts);
@@ -542,7 +564,6 @@
            图面两端各缩进 gapV/gapH（4m 级）只是显示约定，不进材料；
            用户手动改长的增量（effLen − 原始图面长）照常叠加。
            每区支管总用量 = 该区满跨 ÷ 敷设边数（= 根数 × 单根，单边时即整区贯通长度）。 */
-        var brSpans = d.branchFullSpans || [], brDrawn = d.branchDrawnLens || [];
         var lsEl = document.querySelector('#tl_layoutGroup .selected');
         var brSides = (lsEl && lsEl.dataset && parseInt(lsEl.dataset.sides, 10) > 0) ? parseInt(lsEl.dataset.sides, 10) : 1;
         for (i = 0; i < pids.length; i++) {
@@ -564,10 +585,12 @@
             }
           }
           if (kind === 'branch') {
+            /* [v604] 满跨与图面基准统一走 tlBranchSpanInfo（旧存档按分区几何反推） */
             var bi2 = parseInt(String(pids[i]).replace('branch-', ''), 10);
-            if (isFinite(bi2) && brSpans[bi2] > 0) {
-              var base2 = (brDrawn[bi2] > 0) ? brDrawn[bi2] : brSpans[bi2];
-              total += (brSpans[bi2] + Math.max(0, AE.polylineLen(pts) - base2)) / brSides;
+            var info3 = isFinite(bi2) && (typeof window.tlBranchSpanInfo === 'function') ? window.tlBranchSpanInfo(bi2) : null;
+            if (info3 && info3.full > 0) {
+              var base2 = info3.base;
+              total += (info3.full + Math.max(0, AE.polylineLen(pts) - base2)) / brSides;
               continue;
             }
           }
@@ -718,7 +741,9 @@
     AE.allPids(d).forEach(function (pid) {
       var epts = AE.effPts(pid, d);
       if (!epts || epts.length < 2) return;
-      var len = AE.polylineLen(epts);
+      /* [v604] 长度一律走 pipeLenM：支管 = 设计满跨 ÷ 根数 ÷ 边数（不吃图面留边），
+         其余 = 图面有效几何。逐段表与改前/改后损失（hfFor 同源）因此必然自洽。 */
+      var len = pipeLenM(pid); if (!(len > 0)) len = AE.polylineLen(epts);
       var base = baseCal(pid);
       var cur = AE.caliberOf(pid);
       var h0 = base ? hfFor(pid, base) : null;
@@ -790,6 +815,15 @@
       rows.forEach(function (r) { len[r.kind] += r.len; });
       var savedOv = tlPipeOdOverride, rDes;
       try { tlPipeOdOverride = null; rDes = computeThreeLevel(); } finally { tlPipeOdOverride = savedOv; }
+      /* [v604] 支管的「成本长度」必须用材料清单口径（整区贯通 = 满跨 ÷ 敷设边数，含支管根数），
+         而逐段表的支管行是「单根设计长」—— 两者差一个根数倍数。若沿用逐段表汇总，
+         管材投入会比材料清单少算一倍（2 根/区时）。 */
+      try {
+        var tlLens3 = window.tlFigParamLines ? window.tlFigParamLines(rDes) : null;
+        if (tlLens3 && tlLens3.lens && isFinite(tlLens3.lens.branch) && tlLens3.lens.branch > 0) {
+          len.branch = tlLens3.lens.branch;
+        }
+      } catch (eLen3) { }
       var dF = Math.round(rDes.frontPipe.od), dM = Math.round(rDes.mainPipe.od), dB = Math.round(rDes.branchPipe.od);
       var oF = odOpts(dF, dM, null), oM = odOpts(dM, dB, null), oB = odOpts(dB, null, dM);
       var pids = AE.allPids(d), kinds = pids.map(function (pid) { return kindOf(pid); });
@@ -825,7 +859,7 @@
         document.getElementById('tePicks').innerHTML = ''; document.getElementById('teTbl').innerHTML = '';
         document.getElementById('teSum').textContent = '—'; return;
       }
-      if (lensEl) lensEl.innerHTML = '全地块管长（取自三级管线编辑，含手工改动）：总管 <b>' + fmtN(D.len.front) + '</b> m · 主管 <b>' + fmtN(D.len.main) + '</b> m · 支管 <b>' + fmtN(D.len.branch) + '</b> m（共 ' + D.nPids + ' 段）。改径按整地块同类管道统一生效。';
+      if (lensEl) lensEl.innerHTML = '全地块管长（总管/主管取图面几何、支管取设计满跨，均含手工改动）：总管 <b>' + fmtN(D.len.front) + '</b> m · 主管 <b>' + fmtN(D.len.main) + '</b> m · 支管 <b>' + fmtN(D.len.branch) + '</b> m（共 ' + D.nPids + ' 段）。改径按整地块同类管道统一生效。';
       var a = assum();
       /* 单价可在面板内改：材料投入必须在渲染时按当前单价重算（不能烤在 build 缓存里，否则改价无效） */
       D.combos.forEach(function (c) { c.mat = matOf(D.len, c); });
@@ -1037,7 +1071,8 @@
     html += '<tr class="grand"><td>合计</td><td>' + f1(tL) + '</td><td>' + chN + '/' + rows.length + '</td>'
       + '<td>' + f2(tH0) + '</td><td>' + f2(tH1) + '</td></tr>';
     html += '</tbody></table>';
-    html += '<div class="tl-ws-stats-note">长度取图面实际几何（含改长 / 平移）；损失按 Hazen-Williams 估算；管径 ＊ 为非标 PE 外径；'
+    html += '<div class="tl-ws-stats-note">总管/主管长度取图面实际几何（含改长 / 平移）；支管行按「设计满跨 ÷ 支管根数 ÷ 敷设边数」计（图面两端留边只影响显示）；'
+      + '损失按 Hazen-Williams 估算；管径 ＊ 为非标 PE 外径；'
       + '流量口径与扬程计算一致（总管=联合流量、主管=单区流量、支管=单区流量/支管数）。'
       + '改完管径点左栏「⇧ 更新水泵扬程」即可折算进正式选型。</div>';
     body.innerHTML = html;

@@ -922,6 +922,43 @@ document.querySelectorAll('#branchGroup button').forEach(btn => {
 });
 
 // ===== THREE-LEVEL PIPELINE VIEW =====
+/* [v604] 支管「设计满跨 / 图面基准」的唯一取数口（满跨口径的兜底层）。
+   为什么需要兜底：v602 之前生成的 tlDiagramData（旧存档、旧 localStorage 快照）没有
+   branchFullSpans / branchDrawnLens 两个基准，若直接退回图面折线长度，旧项目一打开
+   支管又变回 52m（吃掉两端 gapV/gapH）—— 用户口径是「留边只影响显示，永远不进计算」。
+   兜底推法（纯几何、不依赖存档字段）：支管中点落在哪个分区 → 该分区在该方向上的净跨 = 满跨；
+   图面基准 = 满跨 − 2×gap，gap 与生成时同一条公式 min(max(span*0.06,4),14,span*0.22)。
+   返回 { full: 设计满跨, base: 图面基准长 }；几何不全时返回 null，调用方自行回退。 */
+window.tlBranchSpanInfo = function (zi) {
+  try {
+    var d = window.tlDiagramData || {};
+    var spans = d.branchFullSpans || [], drawn = d.branchDrawnLens || [];
+    if (spans[zi] === -1) return null;   /* [v604] 显式标记「非满跨贯通支管」（二级分叉短管）→ 走图面长 */
+    var full = (spans[zi] > 0) ? spans[zi] : 0;
+    var base = (drawn[zi] > 0) ? drawn[zi] : 0;
+    if (full > 0 && base > 0) return { full: full, base: base };
+    var bp = (d.branchPipes || [])[zi], zs = d.zones;
+    if (!bp || bp.length < 2 || !zs || !zs.xPos || !zs.yPos) {
+      return (full > 0) ? { full: full, base: base || full } : null;
+    }
+    var a = bp[0], b = bp[bp.length - 1];
+    var mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    var vert = Math.abs(a.x - b.x) < Math.abs(a.y - b.y);   /* 竖向支管 ⇒ 跨分区高 */
+    var span = 0, E = 1e-6, i;
+    if (vert) {
+      for (i = 0; i + 1 < zs.yPos.length; i++) {
+        if (mid.y >= zs.yPos[i] - E && mid.y <= zs.yPos[i + 1] + E) { span = zs.yPos[i + 1] - zs.yPos[i]; break; }
+      }
+    } else {
+      for (i = 0; i + 1 < zs.xPos.length; i++) {
+        if (mid.x >= zs.xPos[i] - E && mid.x <= zs.xPos[i + 1] + E) { span = zs.xPos[i + 1] - zs.xPos[i]; break; }
+      }
+    }
+    if (!(span > 0)) return (full > 0) ? { full: full, base: base || full } : null;
+    var gap = Math.min(Math.max(span * 0.06, 4), 14, span * 0.22);
+    return { full: (full > 0 ? full : span), base: (base > 0 ? base : Math.max(0, span - 2 * gap)) };
+  } catch (e) { return null; }
+};
 /* 最远分区最不利路径（2026-09-16 用户要求）：
    水头损失只按「水源 → 最远分区」一条路径计：总管（水源→该区接水点）+ 该区主管 + 该区支管；
    不把各地块的支管/主管全部相加。图面已生成时，长度取图面真实折线（含图面改长/平移，走 AE.effPts）；
@@ -978,12 +1015,13 @@ function tlWorstPathLen(needGeom) {
     var brCalcCount = readSelectedInt('#tl_branchGroup .selected', 2);
     var brCalcSides = readSelectedInt('#tl_layoutGroup .selected', 1);
     function branchSingleCalcLen(zi) {
-      var full = (brCalcSpans[zi] > 0) ? brCalcSpans[zi] : 0;
-      if (!(full > 0)) return 0;                       /* 无满跨记录（如二级传导的额外支管）→ 由调用方退回图面长 */
-      var base = (brCalcDrawn[zi] > 0) ? brCalcDrawn[zi] : full;
-      var now = (branchLens[zi] > 0) ? branchLens[zi] : base;
-      var delta = Math.max(0, now - base);             /* 手动改长增量 */
-      return (full + delta) / (brCalcCount * brCalcSides);
+      /* [v604] 满跨与图面基准统一走 window.tlBranchSpanInfo：有快照字段用字段，
+         旧存档（无字段）按分区几何反推 —— 两条路的结论都是「留边不进计算」。 */
+      var info = (typeof window.tlBranchSpanInfo === 'function') ? window.tlBranchSpanInfo(zi) : null;
+      if (!info || !(info.full > 0)) return 0;          /* 真拿不到几何 → 由调用方退回图面长 */
+      var now = (branchLens[zi] > 0) ? branchLens[zi] : info.base;
+      var delta = Math.max(0, now - info.base);         /* 手动改长增量 */
+      return (info.full + delta) / (brCalcCount * brCalcSides);
     }
     var taps = [], zones = [], worst = null;
     for (var zi = 0; zi < mainPipes.length; zi++) {
@@ -3543,6 +3581,22 @@ function tlAutoGenerate(options) {
      长度/水损一律按满跨计，图面留边只影响显示（用户 2026-10-19 明确口径）。 */
   var branchFullSpans=[], branchDrawnLens=[];
   function tlPolyLen(pts){ if(!pts||pts.length<2)return 0; var L=0; for(var i=1;i<pts.length;i++){var dx=pts[i].x-pts[i-1].x,dy=pts[i].y-pts[i-1].y;L+=Math.sqrt(dx*dx+dy*dy);} return L; }
+  /* [v604] 支管所在分区的**净跨**（= 设计满跨）：竖向支管取该行 ySrc、横向取该列 xSrc。
+     分区判定用支管中点（与 tlBranchSpanInfo、wsZoneOf 同一套行主序几何）。
+     为什么不能用折线长：二级传过来的支管已缩过 gap，三级还会再缩一次，折线永远比满跨短。 */
+  function tlZoneSpanAt(pts){
+    if(!pts||pts.length<2||!xPos||!yPos||!xSrc||!ySrc)return 0;
+    var a=pts[0], b=pts[pts.length-1];
+    var mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
+    var vert=Math.abs(a.x-b.x)<Math.abs(a.y-b.y);
+    var E=1e-6,i;
+    if(vert){
+      for(i=0;i+1<yPos.length;i++){ if(mid.y>=yPos[i]-E&&mid.y<=yPos[i+1]+E) return ySrc[i]||0; }
+    }else{
+      for(i=0;i+1<xPos.length;i++){ if(mid.x>=xPos[i]-E&&mid.x<=xPos[i+1]+E) return xSrc[i]||0; }
+    }
+    return 0;
+  }
   var ppShare=window.RunyeBridge?window.RunyeBridge.state:null;
   var ppHasPipes=ppShare && (ppShare.mainPipes.length||ppShare.branchPipes.length||ppShare.valves.length);
   /* v150b（2026-09-28 用户要求「管道布置方向按多数分区的方向自动校正；这些地方没有必要换方向」）：
@@ -3568,11 +3622,20 @@ function tlAutoGenerate(options) {
   if(ppHasPipes){
     mainPipes=ppShare.mainPipes.map(function(l){return l.map(function(p){return{x:p.x,y:p.y};});});
     branchPipes=ppShare.branchPipes.map(function(l){return l.map(function(p){return{x:p.x,y:p.y};});});
-    if(ppShare.subBranchPipes&&ppShare.subBranchPipes.length){ppShare.subBranchPipes.forEach(function(l){branchPipes.push(l.map(function(p){return{x:p.x,y:p.y};}));});}
+    /* [v604 2026-10-19 用户口径修正] 二级传导来的支管**自己已经缩进过**（二级 ppBuildAutoPipes
+       两端各缩 gap = min(max(边长*0.06,4),14,边长*0.22)），所以它的折线长是 52m 而不是 60m。
+       v601 曾把这条「缩进前长度」当满跨，实测仍是 52 ⇒ 水损单根会算成 26m（更小，更错）。
+       正解：满跨只能用**分区几何净跨**（支管中点落在哪个分区，竖向取 ySrc[行]、横向取 xSrc[列]）。 */
+    branchFullSpans=branchPipes.map(function(l){ return tlZoneSpanAt(l) || tlPolyLen(l); });
+    /* 二级「三级模式」的 subBranch 是**垂直支管的分叉短管**，本身不是满跨贯通支管：
+       用 -1 明确标记「不适用满跨口径」，避免它被按整区净跨放大（材料会凭空多出几十米）。 */
+    if(ppShare.subBranchPipes&&ppShare.subBranchPipes.length){
+      ppShare.subBranchPipes.forEach(function(l){
+        branchPipes.push(l.map(function(p){return{x:p.x,y:p.y};}));
+        branchFullSpans.push(-1);
+      });
+    }
     valves=ppShare.valves.map(function(v){return{x:v.x,y:v.y};});
-    /* [v601] 二级传导几何：缩进**前**的支管长度 = 设计满跨（二级按分区贯通画的），
-       缩进后的长度只作为显示长，供识别用户改长增量。 */
-    branchFullSpans=branchPipes.map(function(l){return tlPolyLen(l);});
     // 复用二级页支管时端点若贴在分区边缘，同样向内缩进，保证相邻地块支管视觉上断开
     branchPipes=branchPipes.map(tlTrimBranchToZone);
     branchDrawnLens=branchPipes.map(function(l){return tlPolyLen(l);});
