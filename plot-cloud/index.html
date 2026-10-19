@@ -26,6 +26,14 @@
   .kv b{font-weight:600}
   .hidden{display:none}
   .privacy{font-size:12px;color:#64748b;background:#f1f5f9;border-radius:6px;padding:8px 10px;margin-top:6px}
+  .mine{font-size:13px}
+  .mine table{width:100%;border-collapse:collapse}
+  .mine th,.mine td{text-align:left;padding:6px 4px;border-bottom:1px dashed #eef2f0}
+  .mine th{color:#475569;font-weight:600;font-size:12px}
+  .st{display:inline-block;font-size:12px;padding:1px 8px;border-radius:10px;background:#eef2f0;color:#475569}
+  .st.new{background:#fef3c7;color:#92400e}
+  .st.doing{background:#e0f2fe;color:#075985}
+  .st.done{background:#dcfce7;color:#166534}
 </style>
 </head>
 <body>
@@ -69,6 +77,12 @@
     <div class="privacy">
       提交内容仅为地块边界坐标、面积与你填写的备注，用于灌溉设计；手机号仅用于登录与必要回访，不会对外展示。
     </div>
+  </div>
+
+  <div class="card hidden mine" id="mineCard">
+    <b style="font-size:14px">我提交的地块</b>
+    <div style="font-size:12px;color:#64748b;margin:2px 0 8px">这里可以看到处理进度</div>
+    <div id="mineBody">加载中…</div>
   </div>
 </div>
 
@@ -142,8 +156,36 @@
       $('loginOk').textContent = '已登录';
       $('loginCard').classList.add('hidden');
       $('submitCard').classList.remove('hidden');
+      $('mineCard').classList.remove('hidden');
+      loadMine();
     } catch (e) { $('loginErr').textContent = '网络异常，请重试'; $('btnLogin').disabled = false; }
   });
+
+  /* --- [v589] 我提交的地块（进度自查）：RLS 保证只能读到自己的 --- */
+  var ST_TXT = { 'new': '新提交', 'doing': '处理中', 'done': '已完成' };
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]; }); }
+  async function loadMine(){
+    $('mineBody').textContent = '加载中…';
+    try {
+      var res = await cloud.database.from('plots')
+        .select('id, name, mu, status, created_at')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (res.error) { $('mineBody').textContent = '读取失败：' + (res.error.message || ''); return; }
+      var rows = res.data || [];
+      if (!rows.length) { $('mineBody').textContent = '还没有提交记录'; return; }
+      var h = '<table><thead><tr><th>编号</th><th>名称</th><th>亩数</th><th>进度</th><th>时间</th></tr></thead><tbody>';
+      rows.forEach(function(p){
+        var t = new Date(p.created_at);
+        var ts = isNaN(t.getTime()) ? '' : (String(t.getMonth()+1) + '/' + String(t.getDate()) + ' ' + String(t.getHours()).padStart(2,'0') + ':' + String(t.getMinutes()).padStart(2,'0'));
+        var st = p.status || 'new';
+        h += '<tr><td>' + esc(p.id) + '</td><td>' + esc(p.name) + '</td><td>' + (p.mu != null ? Number(p.mu).toFixed(2) : '-') + '</td>' +
+          '<td><span class="st ' + esc(st) + '">' + esc(ST_TXT[st] || st) + '</span></td><td>' + esc(ts) + '</td></tr>';
+      });
+      h += '</tbody></table>';
+      $('mineBody').innerHTML = h;
+    } catch (e) { $('mineBody').textContent = '读取失败：' + (e && e.message ? e.message : e); }
+  }
 
   /* --- 提交地块 --- */
   $('btnSubmit').addEventListener('click', async function(){
@@ -158,6 +200,7 @@
       var created = (res.data && res.data[0]) || null;
       $('submitOk').textContent = '提交成功，编号 ' + (created ? created.id : '-') + '。请把编号发给设计方。';
       $('btnSubmit').disabled = true;
+      loadMine();
     } catch (e) { $('submitErr').textContent = '提交失败：' + (e && e.message ? e.message : e); $('btnSubmit').disabled = false; }
   });
 })();

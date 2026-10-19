@@ -1752,3 +1752,12 @@ _probe_front_reset 6/6（R3 断言改看第 2 点，因首点已是水源）、c
   ③ fitBounds 缩放到该地块 ④ toast「已载入云端地块（X 亩）」⑤ history.replaceState 清掉参数防重复导入。
 - 云端 admin.html 每行操作改为「载入地图」（跳主站带参）+「下载」（GeoJSON）两个按钮。
 - 实测 _probe_cloud_import.mjs 3/3：区块 ry-active、多边形 1 个、亩数 1225.45、URL 参数已清。
+
+### v589（云端，已重新部署）：状态流转 + 内部备注 + 用户进度自查
+- 数据库：GRANT UPDATE ON plots；新增策略 plots_update_admin（仅管理员可 UPDATE）。
+- 管理页 admin.html：每行「状态下拉（新提交/处理中/已完成）+ 内部备注输入 + 保存」，
+  保存走 update(...).eq('id').select()；空数组按“无权限/没改动”提示（RLS 语义）。
+- 提交页 index.html：登录后多出「我提交的地块」列表（编号/名称/亩数/进度/时间），
+  进度用中文徽标（new=新提交 amber、doing=处理中 blue、done=已完成 green）。
+  RLS 保证用户只能读到自己的行 ⇒ 无需额外“查询码”，登录即可自查。
+- 后续（三期）：把设计方案回传云端，形成「地块↔设计」配对样本库（用于统计/回测/学习）。

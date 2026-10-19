@@ -84,7 +84,13 @@
     oauthRelayBaseUrl: 'https://www.workbuddy.cn/v2/as/genie-baas/oauth',
     publishableKey: 'wbpk_FxUShyeJ60dvzoe0Xbxe5e_PoNN5FVW5opkhQh3nwVIKQ3KcS9ib52O'
   };
-  /* 一期：管理员先下载 GeoJSON 再自行导入；二期改为跳主站一键回填（需主站支持 ?cloudring= 参数） */
+  /* [v588] 主站已支持 ?cloudring= 回填 ⇒ 「载入地图」直接跳主站并自动画上该地块 */
+  var MAIN_SITE = 'https://zhanglihui2026.github.io/runye-irrigation/index.html';
+  function loadLink(p){
+    var ring = encodeURIComponent(JSON.stringify(p.ring || []));
+    var name = encodeURIComponent(p.name || '云端地块');
+    return MAIN_SITE + '?cloudring=' + ring + '&cloudname=' + name;
+  }
 
   var cloud = null;
   try { cloud = WorkBuddyCloud.createWorkBuddyCloud(PUBLIC); }
@@ -173,28 +179,41 @@
     $('listBody').innerHTML = '<div class="empty">加载中…</div>';
     try {
       var res = await cloud.database.from('plots')
-        .select('id, name, mu, area_m2, status, note, created_at, ring')
+        .select('id, name, mu, area_m2, status, note, admin_note, created_at, ring')
         .order('created_at', { ascending: false })
         .limit(200);
       if (res.error) { $('listBody').innerHTML = '<div class="empty">读取失败：' + esc(res.error.message) + '</div>'; return; }
       var rows = res.data || [];
       if (!rows.length) { $('listBody').innerHTML = '<div class="empty">还没有地块提交</div>'; return; }
-      var html = '<table><thead><tr><th>编号</th><th>名称</th><th>亩数</th><th>状态</th><th>提交时间</th><th>备注</th><th>操作</th></tr></thead><tbody>';
+      var ST = [['new','新提交'],['doing','处理中'],['done','已完成']];
+      var html = '<table><thead><tr><th>编号</th><th>名称</th><th>亩数</th><th>状态</th><th>用户备注</th><th>内部备注</th><th>提交时间</th><th>操作</th></tr></thead><tbody>';
       rows.forEach(function(p){
         var t = new Date(p.created_at);
         var ts = isNaN(t.getTime()) ? '' : (t.getFullYear() + '-' + String(t.getMonth()+1).padStart(2,'0') + '-' + String(t.getDate()).padStart(2,'0') + ' ' + String(t.getHours()).padStart(2,'0') + ':' + String(t.getMinutes()).padStart(2,'0'));
+        var sel = '<select data-st="' + esc(p.id) + '" style="height:30px;padding:0 4px;border:1px solid #cfdcd4;border-radius:5px;font-size:13px">';
+        ST.forEach(function(s){
+          sel += '<option value="' + s[0] + '"' + ((p.status || 'new') === s[0] ? ' selected' : '') + '>' + s[1] + '</option>';
+        });
+        sel += '</select>';
         html += '<tr>' +
           '<td>' + esc(p.id) + '</td>' +
           '<td>' + esc(p.name) + '</td>' +
           '<td>' + (p.mu != null ? Number(p.mu).toFixed(2) : '-') + '</td>' +
-          '<td><span class="tag' + (p.status === 'new' ? ' new' : '') + '">' + esc(p.status || '') + '</span></td>' +
-          '<td>' + esc(ts) + '</td>' +
+          '<td>' + sel + '</td>' +
           '<td>' + esc(p.note || '') + '</td>' +
-          '<td><button class="btn mini" data-dl="' + esc(p.id) + '">下载 GeoJSON</button></td>' +
+          '<td><input data-nt="' + esc(p.id) + '" value="' + esc(p.admin_note || '') + '" placeholder="仅自己可见" style="height:30px"></td>' +
+          '<td>' + esc(ts) + '</td>' +
+          '<td style="white-space:nowrap">' +
+            '<button class="btn mini" data-save="' + esc(p.id) + '">保存</button> ' +
+            '<a class="btn mini" target="_blank" rel="noopener" href="' + loadLink(p) + '">载入地图</a> ' +
+            '<button class="btn mini" data-dl="' + esc(p.id) + '">下载</button>' +
+          '</td>' +
         '</tr>';
       });
       html += '</tbody></table>';
       $('listBody').innerHTML = html;
+
+      /* 下载 GeoJSON */
       var btns = $('listBody').querySelectorAll('[data-dl]');
       for (var i = 0; i < btns.length; i++) {
         (function(btn){
@@ -204,6 +223,32 @@
             if (hit) downloadJson(hit);
           });
         })(btns[i]);
+      }
+
+      /* [v589] 状态流转 + 内部备注：管理员改状态/备注后写回（RLS 只允许管理员更新） */
+      var sbs = $('listBody').querySelectorAll('[data-save]');
+      for (var j = 0; j < sbs.length; j++) {
+        (function(btn){
+          btn.addEventListener('click', async function(){
+            var id = Number(btn.getAttribute('data-save'));
+            var selEl = $('listBody').querySelector('[data-st="' + id + '"]');
+            var ntEl = $('listBody').querySelector('[data-nt="' + id + '"]');
+            if (!selEl) return;
+            var old = btn.textContent;
+            btn.disabled = true; btn.textContent = '保存中';
+            try {
+              var r = await cloud.database.from('plots')
+                .update({ status: selEl.value, admin_note: ntEl ? ntEl.value : '' })
+                .eq('id', id)
+                .select();
+              if (r.error) { alert('保存失败：' + (r.error.message || '')); }
+              else if (!r.data || !r.data.length) { alert('没有改动 —— 只有管理员可以修改状态'); }
+              else { btn.textContent = '已保存'; }
+            } catch (e) { alert('保存失败：' + (e && e.message ? e.message : e)); }
+            btn.disabled = false;
+            setTimeout(function(){ btn.textContent = old; }, 1500);
+          });
+        })(sbs[j]);
       }
     } catch (e) { $('listBody').innerHTML = '<div class="empty">读取失败：' + esc(e && e.message ? e.message : e) + '</div>'; }
   }
