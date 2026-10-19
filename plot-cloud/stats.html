@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>地块库 · 统计看板</title>
+<style>
+  :root{ --g:#173e32; --g2:#1d4c3d; --line:#cfdcd4; --bg:#f7faf8; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:#1f2937;font:14px/1.6 system-ui,"Microsoft YaHei",sans-serif;padding:16px}
+  .wrap{max-width:960px;margin:0 auto}
+  h1{font-size:17px;margin:0 0 4px;color:var(--g)}
+  .sub{font-size:13px;color:#64748b;margin:0 0 16px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
+  .card h2{font-size:14px;margin:0 0 10px;color:var(--g);font-weight:600}
+  label{display:block;font-size:13px;color:#475569;margin-bottom:4px}
+  input{width:100%;height:38px;padding:0 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;font-family:inherit;background:#fff}
+  .btn{border:0;background:var(--g);color:#d9e9df;border-radius:6px;padding:9px 14px;font-size:14px;font-family:inherit;cursor:pointer}
+  .btn:hover{background:var(--g2)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn.ghost{background:#fff;color:var(--g);border:1px solid var(--g)}
+  .btn.mini{padding:5px 10px;font-size:13px}
+  .err{font-size:13px;color:#b91c1c;min-height:18px;margin-top:4px}
+  .ok{font-size:13px;color:#14532d;min-height:18px;margin-top:4px}
+  .hidden{display:none}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  .kpi{background:#f1f5f9;border-radius:8px;padding:10px 12px}
+  .kpi b{display:block;font-size:20px;color:var(--g);line-height:1.3}
+  .kpi span{font-size:12px;color:#64748b}
+  .bar{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:13px}
+  .bar .lb{flex:0 0 82px;color:#475569}
+  .bar .tr{flex:1;background:#eef2f0;border-radius:4px;height:16px;overflow:hidden}
+  .bar .fl{height:16px;background:var(--g2);border-radius:4px}
+  .bar .vl{flex:0 0 84px;text-align:right;color:#64748b;font-size:12px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:7px 6px;border-bottom:1px solid #eef2f0}
+  th{color:#475569;font-weight:600}
+  .empty{padding:20px;text-align:center;color:#94a3b8;font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>地块库 · 统计看板</h1>
+  <p class="sub">地块与设计配对后的统计：面积分布、进度、以及设计侧的管径 / 分区 / 扬程规律。</p>
+
+  <div class="card" id="loginCard">
+    <div style="margin-bottom:10px">
+      <label for="phone">手机号（管理员）</label>
+      <input id="phone" type="tel" inputmode="numeric" maxlength="11" placeholder="11 位手机号" autocomplete="tel">
+      <div class="err" id="phoneErr"></div>
+    </div>
+    <div style="margin-bottom:10px">
+      <button class="btn ghost" id="btnCode" type="button">获取验证码</button>
+      <span style="font-size:12px;color:#64748b" id="codeHint"></span>
+    </div>
+    <div style="margin-bottom:10px">
+      <label for="code">验证码</label>
+      <input id="code" type="text" inputmode="numeric" maxlength="6" placeholder="6 位验证码" autocomplete="one-time-code">
+    </div>
+    <button class="btn" id="btnLogin" type="button">登录并查看</button>
+    <div class="err" id="loginErr"></div>
+    <div class="ok" id="loginOk"></div>
+  </div>
+
+  <div class="card hidden" id="claimCard">
+    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+      <div style="flex:1 1 200px">
+        <label for="pwd">管理员口令（只需激活一次）</label>
+        <input id="pwd" type="password" maxlength="40" placeholder="请输入管理员口令">
+      </div>
+      <button class="btn" id="btnClaim" type="button">激活管理员</button>
+    </div>
+    <div class="err" id="claimErr"></div>
+    <div class="ok" id="claimOk"></div>
+  </div>
+
+  <div class="card hidden" id="bodyCard">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <b style="font-size:14px">统计</b>
+      <button class="btn mini" id="btnReload" type="button">刷新</button>
+    </div>
+    <div id="body"><div class="empty">加载中…</div></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@tencent-ai/workbuddy-cloud-sdk@dev/lib/index.global.js"></script>
+<script>
+(function(){
+  'use strict';
+  var PUBLIC = {
+    endpoint: 'https://plot-library.app.workbuddy.host',
+    oauthRelayBaseUrl: 'https://www.workbuddy.cn/v2/as/genie-baas/oauth',
+    publishableKey: 'wbpk_FxUShyeJ60dvzoe0Xbxe5e_PoNN5FVW5opkhQh3nwVIKQ3KcS9ib52O'
+  };
+  var cloud = null;
+  try { cloud = WorkBuddyCloud.createWorkBuddyCloud(PUBLIC); }
+  catch (e) { document.getElementById('loginErr').textContent = '云服务初始化失败：' + e.message; return; }
+
+  var $ = function(id){ return document.getElementById(id); };
+  var pending = null;
+
+  $('phone').addEventListener('input', function(){ $('phoneErr').textContent = ''; });
+
+  $('btnCode').addEventListener('click', async function(){
+    var phone = ($('phone').value || '').trim();
+    if (!/^1\d{10}$/.test(phone)) { $('phoneErr').textContent = '请输入正确的 11 位手机号'; return; }
+    $('phoneErr').textContent = ''; $('loginErr').textContent = '';
+    $('btnCode').disabled = true;
+    try {
+      var sent = await cloud.auth.sendOtp({ phone: phone });
+      if (sent.error) { $('loginErr').textContent = sent.error.message || '验证码发送失败'; $('btnCode').disabled = false; return; }
+      pending = { phone: phone, verificationId: sent.data.verificationId, isExistingUser: sent.data.isExistingUser };
+      $('codeHint').textContent = '已发送';
+      var cool = 60, btn = $('btnCode');
+      var timer = setInterval(function(){
+        cool--; btn.textContent = cool > 0 ? ('重新获取(' + cool + ')') : '获取验证码';
+        if (cool <= 0) { clearInterval(timer); btn.disabled = false; btn.textContent = '获取验证码'; }
+      }, 1000);
+    } catch (e) { $('loginErr').textContent = '网络异常，请重试'; $('btnCode').disabled = false; }
+  });
+
+  $('btnLogin').addEventListener('click', async function(){
+    var phone = ($('phone').value || '').trim();
+    var token = ($('code').value || '').trim();
+    if (!pending || pending.phone !== phone) { $('loginErr').textContent = '请先为当前手机号获取验证码'; return; }
+    if (!token) { $('loginErr').textContent = '请输入验证码'; return; }
+    $('loginErr').textContent = ''; $('btnLogin').disabled = true;
+    try {
+      var done = await cloud.auth.verifyOtp({ phone: pending.phone, verificationId: pending.verificationId, isExistingUser: pending.isExistingUser, token: token });
+      if (done.error) { $('loginErr').textContent = done.error.message || '验证码不正确'; $('btnLogin').disabled = false; return; }
+      pending = null;
+      $('loginOk').textContent = '已登录';
+      $('loginCard').classList.add('hidden');
+      $('claimCard').classList.remove('hidden');
+      $('bodyCard').classList.remove('hidden');
+      loadStats();
+    } catch (e) { $('loginErr').textContent = '网络异常，请重试'; $('btnLogin').disabled = false; }
+  });
+
+  $('btnClaim').addEventListener('click', async function(){
+    var pwd = ($('pwd').value || '').trim();
+    if (!pwd) { $('claimErr').textContent = '请输入口令'; return; }
+    $('claimErr').textContent = ''; $('btnClaim').disabled = true;
+    try {
+      var r = await cloud.database.rpc('claim_plot_admin', { pwd: pwd });
+      if (r.error) { $('claimErr').textContent = '激活失败：' + (r.error.message || ''); }
+      else { $('claimOk').textContent = (r.data === true) ? '已激活管理员' : '口令不正确'; }
+      $('btnClaim').disabled = false;
+      loadStats();
+    } catch (e) { $('claimErr').textContent = '激活失败：' + (e && e.message ? e.message : e); $('btnClaim').disabled = false; }
+  });
+
+  $('btnReload').addEventListener('click', loadStats);
+
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]; }); }
+  function num(v){ var m = String(v == null ? '' : v).match(/-?\d+(\.\d+)?/); return m ? parseFloat(m[0]) : null; }
+  function fmt(v, d){ return (v == null || !isFinite(v)) ? '—' : Number(v).toFixed(d == null ? 2 : d); }
+
+  function barChart(title, buckets){
+    var max = 0;
+    buckets.forEach(function(b){ if (b[1] > max) max = b[1]; });
+    var h = '';
+    buckets.forEach(function(b){
+      var w = max ? Math.round(b[1] / max * 100) : 0;
+      h += '<div class="bar"><span class="lb">' + esc(b[0]) + '</span>' +
+        '<span class="tr"><span class="fl" style="width:' + w + '%"></span></span>' +
+        '<span class="vl">' + b[1] + (b[2] ? ' ' + esc(b[2]) : '') + '</span></div>';
+    });
+    return '<div class="card"><h2>' + esc(title) + '</h2>' + h + '</div>';
+  }
+
+  async function loadStats(){
+    $('body').innerHTML = '<div class="empty">加载中…</div>';
+    var P = [], D = [];
+    try {
+      var rp = await cloud.database.from('plots').select('id,name,mu,status,created_at').limit(1000);
+      if (rp.error) { $('body').innerHTML = '<div class="empty">读取地块失败：' + esc(rp.error.message) + '</div>'; return; }
+      P = rp.data || [];
+      var rd = await cloud.database.from('plot_designs').select('id,plot_id,zone_count,mu,design,created_at').limit(1000);
+      D = (rd.data) || [];
+    } catch (e) { $('body').innerHTML = '<div class="empty">读取失败：' + esc(e && e.message ? e.message : e) + '</div>'; return; }
+
+    if (!P.length) { $('body').innerHTML = '<div class="empty">还没有地块数据</div>'; return; }
+
+    /* --- 概览 --- */
+    var mus = P.map(function(p){ return Number(p.mu) || 0; });
+    var total = mus.reduce(function(a, b){ return a + b; }, 0);
+    var avg = total / P.length;
+    var byStatus = {};
+    P.forEach(function(p){ var k = p.status || 'new'; byStatus[k] = (byStatus[k] || 0) + 1; });
+    var designedIds = {}; D.forEach(function(d){ designedIds[d.plot_id] = d; });
+
+    var h = '<div class="card"><h2>概览</h2><div class="grid">' +
+      '<div class="kpi"><b>' + P.length + '</b><span>地块总数</span></div>' +
+      '<div class="kpi"><b>' + fmt(total, 1) + '</b><span>累计亩数</span></div>' +
+      '<div class="kpi"><b>' + fmt(avg, 2) + '</b><span>平均亩数</span></div>' +
+      '<div class="kpi"><b>' + Object.keys(designedIds).length + '</b><span>已出设计</span></div>' +
+      '<div class="kpi"><b>' + (byStatus.done || 0) + '</b><span>已完成</span></div>' +
+      '</div></div>';
+
+    /* --- 亩数分布 --- */
+    var buckets = [['0-5 亩', 0], ['5-10 亩', 0], ['10-20 亩', 0], ['20-50 亩', 0], ['50-100 亩', 0], ['100+ 亩', 0]];
+    P.forEach(function(p){
+      var m = Number(p.mu) || 0;
+      var i = m < 5 ? 0 : (m < 10 ? 1 : (m < 20 ? 2 : (m < 50 ? 3 : (m < 100 ? 4 : 5))));
+      buckets[i][1]++;
+    });
+    h += barChart('地块面积分布（' + P.length + ' 块）', buckets);
+
+    /* --- 状态 --- */
+    var stName = { 'new': '新提交', 'doing': '处理中', 'done': '已完成' };
+    var stBars = Object.keys(byStatus).map(function(k){ return [stName[k] || k, byStatus[k], '块']; });
+    h += barChart('处理进度', stBars);
+
+    /* --- 设计侧 --- */
+    if (D.length) {
+      var zones = [], fronts = [], mains = [], branchs = [], heads = [];
+      D.forEach(function(d){
+        var zc = Number(d.zone_count);
+        if (isFinite(zc) && zc > 0) zones.push(zc);
+        var g = d.design || {};
+        var f = num(g.frontOd), m = num(g.mainOd), b = num(g.branchOd), hd = num(g.pumpHead);
+        if (f) fronts.push(f); if (m) mains.push(m); if (b) branchs.push(b); if (hd) heads.push(hd);
+      });
+      function avgArr(a){ return a.length ? (a.reduce(function(x, y){ return x + y; }, 0) / a.length) : null; }
+      function modeOf(a){
+        var c = {}, best = null, bn = 0;
+        a.forEach(function(v){ c[v] = (c[v] || 0) + 1; if (c[v] > bn) { bn = c[v]; best = v; } });
+        return best;
+      }
+      h += '<div class="card"><h2>设计侧（' + D.length + ' 份方案）</h2><div class="grid">' +
+        '<div class="kpi"><b>' + fmt(avgArr(zones), 1) + '</b><span>平均分区数</span></div>' +
+        '<div class="kpi"><b>' + (modeOf(fronts) || '—') + '</b><span>总管常用管径 mm</span></div>' +
+        '<div class="kpi"><b>' + (modeOf(mains) || '—') + '</b><span>主管常用管径 mm</span></div>' +
+        '<div class="kpi"><b>' + (modeOf(branchs) || '—') + '</b><span>支管常用管径 mm</span></div>' +
+        '<div class="kpi"><b>' + fmt(avgArr(heads), 1) + '</b><span>平均扬程 m</span></div>' +
+        '</div></div>';
+
+      /* 分区数 vs 亩数 */
+      h += '<div class="card"><h2>面积 → 分区数（配对样本）</h2><table><thead><tr><th>地块编号</th><th>亩数</th><th>分区数</th><th>总管 mm</th><th>主管 mm</th><th>支管 mm</th><th>扬程 m</th></tr></thead><tbody>';
+      D.slice(0, 30).forEach(function(d){
+        var g = d.design || {};
+        h += '<tr><td>' + esc(d.plot_id) + '</td><td>' + fmt(d.mu != null ? d.mu : num(g.mu), 2) + '</td><td>' + (d.zone_count || '—') + '</td>' +
+          '<td>' + (num(g.frontOd) || '—') + '</td><td>' + (num(g.mainOd) || '—') + '</td><td>' + (num(g.branchOd) || '—') + '</td>' +
+          '<td>' + (num(g.pumpHead) || '—') + '</td></tr>';
+      });
+      h += '</tbody></table>' + (D.length > 30 ? '<div style="font-size:12px;color:#64748b;margin-top:6px">仅显示最近 30 份</div>' : '') + '</div>';
+    } else {
+      h += '<div class="card"><h2>设计侧</h2><div class="empty">还没有回传设计方案。在主站做完设计后点「☁ 回传设计」即可生成配对样本。</div></div>';
+    }
+
+    $('body').innerHTML = h;
+  }
+})();
+</script>
+</body>
+</html>
