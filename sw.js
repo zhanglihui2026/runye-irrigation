@@ -771,7 +771,12 @@
         管理员可 INSERT/SELECT 全部；普通用户可读「自己地块」的设计。
         新增 design.html（管理员登录 → 确认回传）；admin.html 列表加「设计」列显示已回传编号。
    用途：地块与其设计方案配对存档，将来用于统计、比对、回测与学习。 */
-const VERSION = 'v590-cloud-design-back';
+/* v593-hyd-head-bold: 三级左栏表头「水力项」与「设计值 / 改径重算」同字重同字号（用户：加粗，别改乱）。
+   根因：表头行本身 600/11px，但通用规则 .pp-plan-label{font-weight:400} 更具体，把「水力项」压回常规字重，
+   看着比旁边两列小一号。只给表头那一格放行：.tl-plan-result .pp-plan-cols-head > .pp-plan-label{600/11px}；
+   字段行（联合流量/水泵流量/扬程…）仍 400/11px，实测未被带跑。
+   注：并行会话已抬到 v592 ⇒ 取更高号 v593。 */
+const VERSION = 'v593-hyd-head-bold';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

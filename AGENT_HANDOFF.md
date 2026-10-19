@@ -1785,3 +1785,13 @@ _probe_front_reset 6/6（R3 断言改看第 2 点，因首点已是水源）、c
   ④ 设计侧：平均分区数、总管/主管/支管**众数管径**、平均扬程
   ⑤ 「面积 → 分区数」配对明细表（最近 30 份：亩数/分区数/三级管径/扬程）
 - 说明：目前库里还没有真实地块数据，看板会显示「还没有地块数据」；等地块与设计攒起来自动出图。
+
+### v593（主站）：三级左栏表头「水力项」加粗，与「设计值」同字重同字号
+- 根因：`.tl-plan-result .pp-plan-cols-head` 整行 600/11px，但通用规则 `.pp-plan-label{font-weight:400}`
+  特异性更高，把表头里的「水力项」压回常规字重，视觉上比旁边两列小一号。
+- 改：只给表头那一格放行 —— `.tl-plan-result .pp-plan-cols-head > .pp-plan-label{font-weight:600;font-size:11px}`。
+- 实测 _probe_hyd_head 3/3：水力项 600/11px = 设计值 600/11px = 改径重算 600/11px；
+  字段行（联合流量/水泵流量/水泵扬程/计算轴功率）仍 400/11px 未被带跑。
+- 混编注意：并行会话的 v592（cloud-design-binding）尚未提交且改了 sw CORE 列表 ⇒
+  本次用 git hash-object + update-index --cacheinfo 构造只含自己改动的 index/sw blob 提交，
+  避免把对方未完成代码带上线。

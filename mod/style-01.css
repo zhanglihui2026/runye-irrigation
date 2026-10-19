@@ -2715,6 +2715,11 @@ body > .ry-nav .main-header{display:none!important}
 .tl-plan-result .pp-plan-cols-head{border-bottom:1px solid #e4ece7;min-height:18px;color:#94a3b8;font-size:11px;font-weight:600} /* 2026-09-24 用户要求：表头不小于正文(11px)并适当加粗(600) */
 .tl-plan-result .pp-cols-h1{flex:0 0 88px;text-align:center}
 .tl-plan-result .pp-cols-h2{flex:1 1 auto;text-align:center;color:#b45309}
+/* [v592] 表头「水力项」与「设计值 / 改径重算」同字重同字号（用户：水力项这几个字加粗，跟设计值的大小一样）。
+   ★ 只作用于表头那一格（.pp-plan-cols-head > .pp-plan-label）：表头行本身是 600/11px，
+     但通用规则 .pp-plan-label{font-weight:400} 更具体、把「水力项」压回了常规字重，
+     看起来就比旁边两列小一号。这里把这一格放行到 600/11px，其余字段行仍是 400/11px 不变。 */
+.tl-plan-result .pp-plan-cols-head > .pp-plan-label{font-weight:600;font-size:11px}
 .tl-plan-result .pp-cal-sel{width:100%;max-width:100%;box-sizing:border-box;font:inherit;font-size:11px!important;font-weight:700;color:#b45309;text-align:center;text-align-last:center;background:#fff7ed;border:1px solid #fed7aa;padding:1px 2px;cursor:pointer}
 .tl-plan-result .pp-cal-sel:focus{outline:none;border-color:#f59e0b}
 
