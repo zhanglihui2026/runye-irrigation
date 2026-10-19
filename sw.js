@@ -798,7 +798,8 @@
    连带清理三级的 .pp-toolbar 作用域（v595 统一规则与 2980 共享规则里的三级部分、
    ry-panel.css 的三级把手规则）⇒ 不留死代码；二级工具轨不受影响。
    注：并行会话的 592 引用未纳入本次提交（仍在其工作区）。 */
-const VERSION = 'v596-toolbar-shell-removed';
+/* v599-wsbtn-skin: 二级工具轨按钮皮肤统一到三级 .tl-ws-btn 口径（mod/style-01.css 在 CORE）。 */
+const VERSION = 'v599-wsbtn-skin';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

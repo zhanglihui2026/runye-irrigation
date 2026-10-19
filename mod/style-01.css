@@ -4287,3 +4287,53 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.pp-grip-side,
   body.ry-tool.ry-cad-vp > main > #pipePlanSection,
   body.ry-tool.ry-cad-vp > main > #tlPipePlanSection{padding-top:0!important}
 }
+
+/* ===== [v597] 二级工具轨（#ppToolbar）按钮皮肤统一到三级 .tl-ws-btn 口径 =====
+   用户对比截图：「地块分区 vs 管路规划 右侧控制面板显然不一样」。
+   根因（探针 _probe_pp_right_v2.mjs 实测）：v357 时代的全局 .pp-btn / .pp-btn-ghost
+   基础皮肤（border+radius+背景）在历次清理中被删（现仅剩 hover 与 #ryCadSide
+   搬移态的 scoped 规则 —— 而工具轨从不搬进 #ryCadSide）⇒ 主区 #ppToolbar 的
+   按钮退化成 UA 默认 2px outset 立体边框、方角、灰底，与三级 .tl-ws-btn
+   （1px solid #c5d6cc 扁平浅绿）完全两样。
+   本段按三级实际渲染值（_probe_tl_ref.mjs 实测：border #c5d6cc / bg #f8fbf9 /
+   字色 #2c4a3d / 高 28px / 字号 13px 由 .runye-typography 统一）对齐；
+   轨体背景同步三级 .tl-ws-toolbar 的渐变。
+   双 ID 前缀 + !important：压过上方「去绿收口」的 u-* hover/active（4041/4046/
+   4139/4140）与 #ppAutoPipe 常亮强调（4140）—— 工具轨内一律以三级口径为准。
+   hover 口径同三级：只变边框色（#2d604b），底色/字色不动；
+   active 口径同三级 .tl-ws-btn.active：实心 #2d604b 白字。 */
+body.ry-tool #pipePlanSection #ppToolbar{
+  background:linear-gradient(180deg,#f8fbf9 0%,#f2f7f4 100%);
+  border:0;border-left:1px solid #dde8e1;
+}
+body.ry-tool #pipePlanSection #ppToolbar>button.pp-btn,
+body.ry-tool #pipePlanSection #ppToolbar>button.pp-btn-ghost,
+body.ry-tool #pipePlanSection #ppToolbar button.pp-mirror-btn,
+body.ry-tool #pipePlanSection #ppToolbar button.pp-fine-btn,
+body.ry-tool #pipePlanSection #ppToolbar button.pp-ge-mode,
+body.ry-tool #pipePlanSection #ppToolbar button.pp-ge-chip,
+body.ry-tool #pipePlanSection #ppToolbar button.pp-back-group{
+  border:1px solid #c5d6cc;background:#f8fbf9;color:#2c4a3d;
+}
+body.ry-tool #pipePlanSection #ppToolbar>button.pp-btn:hover,
+body.ry-tool #pipePlanSection #ppToolbar>button.pp-btn-ghost:hover,
+body.ry-tool #pipePlanSection #ppToolbar button.pp-mirror-btn:hover,
+body.ry-tool #pipePlanSection #ppToolbar button.pp-fine-btn:hover,
+body.ry-tool #pipePlanSection #ppToolbar button.pp-ge-mode:hover,
+body.ry-tool #pipePlanSection #ppToolbar button.pp-ge-chip:hover{
+  border-color:#2d604b!important;background:#f8fbf9!important;color:#2c4a3d!important;
+}
+body.ry-tool #pipePlanSection #ppToolbar>button.pp-btn.active,
+body.ry-tool #pipePlanSection #ppToolbar>button.pp-btn-ghost.active,
+body.ry-tool #pipePlanSection #ppToolbar button.pp-mirror-btn.active,
+body.ry-tool #pipePlanSection #ppToolbar button.pp-ge-mode.active,
+body.ry-tool #pipePlanSection #ppToolbar button.pp-ge-chip.active{
+  background:#2d604b!important;border-color:#2d604b!important;color:#fff!important;font-weight:600;
+}
+/* 「自动管路」原 u-accent 常亮强调取消：与其它键同皮肤，开启态走 .active 实心绿 */
+body.ry-tool #pipePlanSection #ppToolbar>#ppAutoPipe{
+  color:#2c4a3d!important;background:#f8fbf9!important;border-color:#c5d6cc!important;
+}
+body.ry-tool #pipePlanSection #ppToolbar>#ppAutoPipe.active{
+  background:#2d604b!important;border-color:#2d604b!important;color:#fff!important;
+}
