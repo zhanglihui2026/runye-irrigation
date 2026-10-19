@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>提交地块到云端</title>
+<style>
+  :root{ --g:#173e32; --g2:#1d4c3d; --line:#cfdcd4; --bg:#f7faf8; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:#1f2937;font:14px/1.6 system-ui,"Microsoft YaHei",sans-serif;padding:16px}
+  .wrap{max-width:520px;margin:0 auto}
+  h1{font-size:17px;margin:0 0 4px;color:var(--g)}
+  .sub{font-size:13px;color:#64748b;margin:0 0 16px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
+  .row{margin-bottom:10px}
+  label{display:block;font-size:13px;color:#475569;margin-bottom:4px}
+  input{width:100%;height:38px;padding:0 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;font-family:inherit;background:#fff}
+  .btn{display:inline-block;border:0;background:var(--g);color:#d9e9df;border-radius:6px;padding:9px 14px;font-size:14px;font-family:inherit;cursor:pointer}
+  .btn:hover{background:var(--g2)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn.ghost{background:#fff;color:var(--g);border:1px solid var(--g)}
+  .hint{font-size:12px;color:#64748b;margin-top:4px}
+  .err{font-size:13px;color:#b91c1c;min-height:18px;margin-top:4px}
+  .ok{font-size:13px;color:#14532d;min-height:18px;margin-top:4px}
+  .kv{display:flex;justify-content:space-between;font-size:13px;padding:3px 0;border-bottom:1px dashed #eef2f0}
+  .kv b{font-weight:600}
+  .hidden{display:none}
+  .privacy{font-size:12px;color:#64748b;background:#f1f5f9;border-radius:6px;padding:8px 10px;margin-top:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>提交地块到云端</h1>
+  <p class="sub">登录后即可把当前绘制的地块发送给设计方，设计方会据此做分区与配管。</p>
+
+  <div class="card" id="plotCard">
+    <div class="kv"><span>地块名称</span><b id="vName">—</b></div>
+    <div class="kv"><span>面积</span><b id="vMu">—</b></div>
+    <div class="kv"><span>边界顶点</span><b id="vPts">—</b></div>
+  </div>
+
+  <div class="card" id="loginCard">
+    <div class="row">
+      <label for="phone">手机号</label>
+      <input id="phone" type="tel" inputmode="numeric" maxlength="11" placeholder="11 位手机号" autocomplete="tel">
+      <div class="err" id="phoneErr"></div>
+    </div>
+    <div class="row">
+      <button class="btn ghost" id="btnCode" type="button">获取验证码</button>
+      <span class="hint" id="codeHint"></span>
+    </div>
+    <div class="row">
+      <label for="code">验证码</label>
+      <input id="code" type="text" inputmode="numeric" maxlength="6" placeholder="6 位验证码" autocomplete="one-time-code">
+    </div>
+    <button class="btn" id="btnLogin" type="button">登录</button>
+    <div class="err" id="loginErr"></div>
+    <div class="ok" id="loginOk"></div>
+  </div>
+
+  <div class="card hidden" id="submitCard">
+    <div class="row">
+      <label for="note">备注（选填）</label>
+      <input id="note" type="text" maxlength="100" placeholder="如：水源在东侧、种玉米、希望分 4 区">
+    </div>
+    <button class="btn" id="btnSubmit" type="button">提交到云端</button>
+    <div class="err" id="submitErr"></div>
+    <div class="ok" id="submitOk"></div>
+    <div class="privacy">
+      提交内容仅为地块边界坐标、面积与你填写的备注，用于灌溉设计；手机号仅用于登录与必要回访，不会对外展示。
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@tencent-ai/workbuddy-cloud-sdk@dev/lib/index.global.js"></script>
+<script>
+(function(){
+  'use strict';
+  /* 仅使用云服务 publicConfig 中允许下发到前端的三个值 */
+  var PUBLIC = {
+    endpoint: 'https://plot-library.app.workbuddy.host',
+    oauthRelayBaseUrl: 'https://www.workbuddy.cn/v2/as/genie-baas/oauth',
+    publishableKey: 'wbpk_FxUShyeJ60dvzoe0Xbxe5e_PoNN5FVW5opkhQh3nwVIKQ3KcS9ib52O'
+  };
+  var MAIN_SITE = 'https://zhanglihui2026.github.io/runye-irrigation/runye-map-measure.html';
+
+  var cloud = null;
+  try { cloud = WorkBuddyCloud.createWorkBuddyCloud(PUBLIC); }
+  catch (e) { document.getElementById('loginErr').textContent = '云服务初始化失败：' + e.message; return; }
+
+  /* --- 从主站带来的地块数据（URL 参数） --- */
+  var q = new URLSearchParams(location.search);
+  var plot = { name: q.get('name') || '未命名地块', mu: parseFloat(q.get('mu') || '0'), area: parseFloat(q.get('area') || '0'), ring: null, center: null };
+  try { plot.ring = JSON.parse(q.get('ring') || 'null'); } catch (e) { plot.ring = null; }
+  try { plot.center = JSON.parse(q.get('center') || 'null'); } catch (e) { plot.center = null; }
+
+  var $ = function(id){ return document.getElementById(id); };
+  $('vName').textContent = plot.name;
+  $('vMu').textContent = plot.mu ? (plot.mu.toFixed(2) + ' 亩') : '—';
+  $('vPts').textContent = (plot.ring && plot.ring.length) ? (plot.ring.length + ' 个点') : '—';
+
+  if (!plot.ring || plot.ring.length < 3) {
+    $('loginErr').textContent = '没有收到地块数据，请回到在线地图页重新点击「提交到云端」。';
+    $('btnCode').disabled = true; $('btnLogin').disabled = true;
+    return;
+  }
+
+  /* --- 手机号验证码登录 --- */
+  var pending = null;   /* { phone, verificationId, isExistingUser } */
+  var cool = 0;
+
+  $('phone').addEventListener('input', function(){ $('phoneErr').textContent = ''; });
+
+  $('btnCode').addEventListener('click', async function(){
+    var phone = ($('phone').value || '').trim();
+    if (!/^1\d{10}$/.test(phone)) { $('phoneErr').textContent = '请输入正确的 11 位手机号'; return; }
+    $('phoneErr').textContent = ''; $('loginErr').textContent = '';
+    $('btnCode').disabled = true;
+    try {
+      var sent = await cloud.auth.sendOtp({ phone: phone });
+      if (sent.error) { $('loginErr').textContent = sent.error.message || '验证码发送失败'; $('btnCode').disabled = false; return; }
+      pending = { phone: phone, verificationId: sent.data.verificationId, isExistingUser: sent.data.isExistingUser };
+      $('codeHint').textContent = '验证码已发送';
+      cool = 60; var btn = $('btnCode');
+      var timer = setInterval(function(){
+        cool--; btn.textContent = cool > 0 ? ('重新获取(' + cool + ')') : '获取验证码';
+        if (cool <= 0) { clearInterval(timer); btn.disabled = false; btn.textContent = '获取验证码'; }
+      }, 1000);
+    } catch (e) { $('loginErr').textContent = '网络异常，请重试'; $('btnCode').disabled = false; }
+  });
+
+  $('btnLogin').addEventListener('click', async function(){
+    var phone = ($('phone').value || '').trim();
+    var token = ($('code').value || '').trim();
+    if (!pending || pending.phone !== phone) { $('loginErr').textContent = '请先为当前手机号获取验证码'; return; }
+    if (!token) { $('loginErr').textContent = '请输入验证码'; return; }
+    $('loginErr').textContent = ''; $('btnLogin').disabled = true;
+    try {
+      var done = await cloud.auth.verifyOtp({ phone: pending.phone, verificationId: pending.verificationId, isExistingUser: pending.isExistingUser, token: token });
+      if (done.error) { $('loginErr').textContent = done.error.message || '验证码不正确'; $('btnLogin').disabled = false; return; }
+      pending = null;
+      $('loginOk').textContent = '已登录';
+      $('loginCard').classList.add('hidden');
+      $('submitCard').classList.remove('hidden');
+    } catch (e) { $('loginErr').textContent = '网络异常，请重试'; $('btnLogin').disabled = false; }
+  });
+
+  /* --- 提交地块 --- */
+  $('btnSubmit').addEventListener('click', async function(){
+    $('submitErr').textContent = ''; $('btnSubmit').disabled = true;
+    try {
+      var session = await cloud.auth.getSession();
+      if (!session || session.error || !session.data) { $('submitErr').textContent = '登录已失效，请重新登录'; $('btnSubmit').disabled = false; return; }
+      var row = { name: plot.name, mu: plot.mu || null, area_m2: plot.area || null, ring: plot.ring, center: plot.center };
+      var note = ($('note').value || '').trim(); if (note) row.note = note;
+      var res = await cloud.database.from('plots').insert(row).select();
+      if (res.error) { $('submitErr').textContent = '提交失败：' + (res.error.message || ''); $('btnSubmit').disabled = false; return; }
+      var created = (res.data && res.data[0]) || null;
+      $('submitOk').textContent = '提交成功，编号 ' + (created ? created.id : '-') + '。请把编号发给设计方。';
+      $('btnSubmit').disabled = true;
+    } catch (e) { $('submitErr').textContent = '提交失败：' + (e && e.message ? e.message : e); $('btnSubmit').disabled = false; }
+  });
+})();
+</script>
+</body>
+</html>

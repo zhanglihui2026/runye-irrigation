@@ -682,6 +682,9 @@ body.ry-worst-off [data-tlworst]{display:none}
             <!-- [NEW MODULE: 地形模块 v286d] 回传地形模块：卸载=删除本行 + sendPlotToTerrain/btnCopyTerrain 那两段 JS -->
             <button class="ry-float-chip" id="btnCopyTerrain">回传地形模块</button>
             <button class="ry-float-chip is-primary" id="btnSavePlot">💾 保存地块</button>
+            <!-- [v587] 提交到云端（地块库）：把当前绘制的地块边界带参数跳到云端提交页（应用域），
+                 用户登录后提交，管理员在地块库可见。与「保存地块」（存本机 localStorage）互不影响。 -->
+            <button class="ry-float-chip" id="btnCloudSubmit">☁ 提交到云端</button>
           </div>
           <section id="mapPartitionTools">
             <select aria-label="选择分区地块"></select>
@@ -2370,7 +2373,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.1/cdn/shoelace.js"></script>
 <script src="mod/ry-panel.js?v=545-rect-clamp"></script>
 <script src="pwa/vendor/leaflet.js"></script>
-<script src="mod/online-map.js?v=576-map-route-single-navigation"></script>
+<script src="mod/online-map.js?v=587-cloud-submit"></script>
 <script src="terrain/terrain-core.js?v=410-elev"></script>
 <script src="terrain/terrain-ui.js?v=513-sec-gate"></script>
 <script src="runye-hydraulics-page.js?v=442-native"></script>

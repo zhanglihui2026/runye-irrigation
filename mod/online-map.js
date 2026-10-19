@@ -980,7 +980,14 @@
       setTimeout(function(){
         if(document.getElementById('onlineMapSection')){
           if(typeof window.runyeApplyMapPayload!=='function') alert('地块分区接收功能尚未加载，请刷新页面后重试。');
-          else if(window.runyeApplyMapPayload()) window.location.hash='pipePlanSection';
+          else if(window.runyeApplyMapPayload()){
+            /* 接收器已经同步切到地块分区；pushState 只更新可恢复的地址锚点，
+               避免 hashchange 再由导航模块重复切一次。 */
+            if(window.location.hash!=='#pipePlanSection' && window.history && typeof window.history.pushState==='function'){
+              try{ window.history.pushState(window.history.state,'','#pipePlanSection'); }
+              catch(eHash){ window.location.hash='pipePlanSection'; }
+            }else if(window.location.hash!=='#pipePlanSection') window.location.hash='pipePlanSection';
+          }
         }
         else window.location.href='index.html#pipePlanSection';
       }, 350);
@@ -1099,6 +1106,38 @@
     if(!plot) return;
     alert('已保存到地块库：'+plot.name+'（'+plot.mu+' 亩）\n可在精准灌溉页「地块库」设为当前。');
   };
+
+  /* ===== [v587] 提交到云端（地块库） =====
+     目的：别人在地图上画好地块后一键提交，管理员在云端地块库能直接看到（省掉来回沟通）；
+     与「保存地块」不同 —— 保存只写本机 localStorage，换设备就没了，管理员也看不到。
+     做法：把当前边界（GCJ-02 经纬度）+ 亩数 + 中心点拼成 URL 参数，跳到云端提交页（应用域
+     https://plot-library.app.workbuddy.host/）。提交页负责登录与写库，主站不接触任何凭据。 */
+  var CLOUD_SUBMIT_URL='https://plot-library.app.workbuddy.host/';
+  function submitCurrentPlotToCloud(){
+    var mu=parseFloat((geodesicArea(points)/666.67).toFixed(2));
+    if(!isFinite(mu)||mu<=0){ alert('请先在地图上画框测量出有效面积，再提交到云端'); return; }
+    var ring=latlngs();
+    if(!ring||ring.length<3){ alert('请先在地图上绘制地块边界'); return; }
+    var sqm=Math.round(geodesicArea(points));
+    var name='地块';
+    try{
+      var snap=window.RyPlotLibraryStore&&window.RyPlotLibraryStore.read();
+      if(snap&&snap.ok){
+        var prev=(snap.plots||[]).filter(function(p){return p.id===currentMapPlotId;})[0];
+        if(prev&&prev.name) name=prev.name;
+      }
+    }catch(errName){}
+    var sl=0, sn=0;
+    ring.forEach(function(p){ sl+=p[0]; sn+=p[1]; });
+    sl=+(sl/ring.length).toFixed(6); sn=+(sn/ring.length).toFixed(6);
+    var url=CLOUD_SUBMIT_URL+'?name='+encodeURIComponent(name)+'&mu='+mu+'&area='+sqm
+      +'&ring='+encodeURIComponent(JSON.stringify(ring))
+      +'&center='+encodeURIComponent(JSON.stringify({lat:sl,lng:sn}));
+    if(url.length>8000){ alert('地块顶点太多（'+ring.length+' 个），请先精简边界再提交'); return; }
+    window.open(url,'_blank','noopener');
+  }
+  var _cloudBtn=document.getElementById('btnCloudSubmit');
+  if(_cloudBtn) _cloudBtn.onclick=submitCurrentPlotToCloud;
 
   // [map-enhance] 把地块库叠加到卫星图（隔离模块，失败不影响测量主流程）
   var rymHandle=null;

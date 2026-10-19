@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>地块库 · 管理</title>
+<style>
+  :root{ --g:#173e32; --g2:#1d4c3d; --line:#cfdcd4; --bg:#f7faf8; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:#1f2937;font:14px/1.6 system-ui,"Microsoft YaHei",sans-serif;padding:16px}
+  .wrap{max-width:900px;margin:0 auto}
+  h1{font-size:17px;margin:0 0 4px;color:var(--g)}
+  .sub{font-size:13px;color:#64748b;margin:0 0 16px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
+  label{display:block;font-size:13px;color:#475569;margin-bottom:4px}
+  input{width:100%;height:38px;padding:0 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;font-family:inherit;background:#fff}
+  .btn{border:0;background:var(--g);color:#d9e9df;border-radius:6px;padding:9px 14px;font-size:14px;font-family:inherit;cursor:pointer}
+  .btn:hover{background:var(--g2)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn.ghost{background:#fff;color:var(--g);border:1px solid var(--g)}
+  .btn.mini{padding:5px 10px;font-size:13px}
+  .err{font-size:13px;color:#b91c1c;min-height:18px;margin-top:4px}
+  .ok{font-size:13px;color:#14532d;min-height:18px;margin-top:4px}
+  .hidden{display:none}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:8px 6px;border-bottom:1px solid #eef2f0;vertical-align:middle}
+  th{color:#475569;font-weight:600}
+  .tag{display:inline-block;font-size:12px;padding:1px 7px;border-radius:10px;background:#eef2f0;color:#475569}
+  .tag.new{background:#fef3c7;color:#92400e}
+  .empty{padding:24px;text-align:center;color:#94a3b8;font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>地块库 · 管理</h1>
+  <p class="sub">登录后用管理员口令激活一次，即可查看所有人提交的地块，并载入到在线地图做分区。</p>
+
+  <div class="card" id="loginCard">
+    <div class="row" style="margin-bottom:10px">
+      <label for="phone">手机号</label>
+      <input id="phone" type="tel" inputmode="numeric" maxlength="11" placeholder="11 位手机号" autocomplete="tel">
+      <div class="err" id="phoneErr"></div>
+    </div>
+    <div class="row" style="margin-bottom:10px">
+      <button class="btn ghost" id="btnCode" type="button">获取验证码</button>
+      <span style="font-size:12px;color:#64748b" id="codeHint"></span>
+    </div>
+    <div class="row" style="margin-bottom:10px">
+      <label for="code">验证码</label>
+      <input id="code" type="text" inputmode="numeric" maxlength="6" placeholder="6 位验证码" autocomplete="one-time-code">
+    </div>
+    <button class="btn" id="btnLogin" type="button">登录</button>
+    <div class="err" id="loginErr"></div>
+    <div class="ok" id="loginOk"></div>
+  </div>
+
+  <div class="card hidden" id="adminCard">
+    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+      <div style="flex:1 1 200px">
+        <label for="pwd">管理员口令（只需激活一次）</label>
+        <input id="pwd" type="password" maxlength="40" placeholder="请输入管理员口令">
+      </div>
+      <button class="btn" id="btnClaim" type="button">激活管理员</button>
+    </div>
+    <div class="err" id="claimErr"></div>
+    <div class="ok" id="claimOk"></div>
+  </div>
+
+  <div class="card hidden" id="listCard">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <b style="font-size:14px">地块列表</b>
+      <button class="btn mini" id="btnReload" type="button">刷新</button>
+    </div>
+    <div id="listBody"><div class="empty">加载中…</div></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@tencent-ai/workbuddy-cloud-sdk@dev/lib/index.global.js"></script>
+<script>
+(function(){
+  'use strict';
+  var PUBLIC = {
+    endpoint: 'https://plot-library.app.workbuddy.host',
+    oauthRelayBaseUrl: 'https://www.workbuddy.cn/v2/as/genie-baas/oauth',
+    publishableKey: 'wbpk_FxUShyeJ60dvzoe0Xbxe5e_PoNN5FVW5opkhQh3nwVIKQ3KcS9ib52O'
+  };
+  /* 一期：管理员先下载 GeoJSON 再自行导入；二期改为跳主站一键回填（需主站支持 ?cloudring= 参数） */
+
+  var cloud = null;
+  try { cloud = WorkBuddyCloud.createWorkBuddyCloud(PUBLIC); }
+  catch (e) { document.getElementById('loginErr').textContent = '云服务初始化失败：' + e.message; return; }
+
+  var $ = function(id){ return document.getElementById(id); };
+  var pending = null;
+
+  $('phone').addEventListener('input', function(){ $('phoneErr').textContent = ''; });
+
+  $('btnCode').addEventListener('click', async function(){
+    var phone = ($('phone').value || '').trim();
+    if (!/^1\d{10}$/.test(phone)) { $('phoneErr').textContent = '请输入正确的 11 位手机号'; return; }
+    $('phoneErr').textContent = ''; $('loginErr').textContent = '';
+    $('btnCode').disabled = true;
+    try {
+      var sent = await cloud.auth.sendOtp({ phone: phone });
+      if (sent.error) { $('loginErr').textContent = sent.error.message || '验证码发送失败'; $('btnCode').disabled = false; return; }
+      pending = { phone: phone, verificationId: sent.data.verificationId, isExistingUser: sent.data.isExistingUser };
+      $('codeHint').textContent = '已发送';
+      var cool = 60, btn = $('btnCode');
+      var timer = setInterval(function(){
+        cool--; btn.textContent = cool > 0 ? ('重新获取(' + cool + ')') : '获取验证码';
+        if (cool <= 0) { clearInterval(timer); btn.disabled = false; btn.textContent = '获取验证码'; }
+      }, 1000);
+    } catch (e) { $('loginErr').textContent = '网络异常，请重试'; $('btnCode').disabled = false; }
+  });
+
+  $('btnLogin').addEventListener('click', async function(){
+    var phone = ($('phone').value || '').trim();
+    var token = ($('code').value || '').trim();
+    if (!pending || pending.phone !== phone) { $('loginErr').textContent = '请先为当前手机号获取验证码'; return; }
+    if (!token) { $('loginErr').textContent = '请输入验证码'; return; }
+    $('loginErr').textContent = ''; $('btnLogin').disabled = true;
+    try {
+      var done = await cloud.auth.verifyOtp({ phone: pending.phone, verificationId: pending.verificationId, isExistingUser: pending.isExistingUser, token: token });
+      if (done.error) { $('loginErr').textContent = done.error.message || '验证码不正确'; $('btnLogin').disabled = false; return; }
+      pending = null;
+      $('loginOk').textContent = '已登录';
+      $('loginCard').classList.add('hidden');
+      $('adminCard').classList.remove('hidden');
+      $('listCard').classList.remove('hidden');
+      loadList();
+    } catch (e) { $('loginErr').textContent = '网络异常，请重试'; $('btnLogin').disabled = false; }
+  });
+
+  $('btnClaim').addEventListener('click', async function(){
+    var pwd = ($('pwd').value || '').trim();
+    if (!pwd) { $('claimErr').textContent = '请输入口令'; return; }
+    $('claimErr').textContent = ''; $('btnClaim').disabled = true;
+    try {
+      var r = await cloud.database.rpc('claim_plot_admin', { pwd: pwd });
+      if (r.error) { $('claimErr').textContent = '激活失败：' + (r.error.message || ''); $('btnClaim').disabled = false; return; }
+      $('claimOk').textContent = (r.data === true) ? '已激活管理员，现在可查看全部地块' : '口令不正确';
+      $('btnClaim').disabled = false;
+      loadList();
+    } catch (e) { $('claimErr').textContent = '激活失败：' + (e && e.message ? e.message : e); $('btnClaim').disabled = false; }
+  });
+
+  $('btnReload').addEventListener('click', loadList);
+
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]; }); }
+
+  /* ring 存的是 [[lat,lng],…]；GeoJSON 要求 [lng,lat] */
+  function toFeature(p){
+    var ring = (p.ring || []).map(function(pt){ return [Number(pt[1]), Number(pt[0])]; });
+    if (ring.length) ring.push(ring[0]);
+    return {
+      type: 'Feature',
+      properties: { id: p.id, name: p.name, mu: p.mu, area_m2: p.area_m2, status: p.status, note: p.note, created_at: p.created_at },
+      geometry: { type: 'Polygon', coordinates: [ring] }
+    };
+  }
+  function downloadJson(p){
+    try {
+      var blob = new Blob([JSON.stringify(toFeature(p), null, 2)], { type: 'application/json' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = '地块' + p.id + '.geojson';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
+    } catch (e) { alert('下载失败：' + (e && e.message ? e.message : e)); }
+  }
+
+  async function loadList(){
+    $('listBody').innerHTML = '<div class="empty">加载中…</div>';
+    try {
+      var res = await cloud.database.from('plots')
+        .select('id, name, mu, area_m2, status, note, created_at, ring')
+        .order('created_at', { ascending: false })
+        .limit(200);
+      if (res.error) { $('listBody').innerHTML = '<div class="empty">读取失败：' + esc(res.error.message) + '</div>'; return; }
+      var rows = res.data || [];
+      if (!rows.length) { $('listBody').innerHTML = '<div class="empty">还没有地块提交</div>'; return; }
+      var html = '<table><thead><tr><th>编号</th><th>名称</th><th>亩数</th><th>状态</th><th>提交时间</th><th>备注</th><th>操作</th></tr></thead><tbody>';
+      rows.forEach(function(p){
+        var t = new Date(p.created_at);
+        var ts = isNaN(t.getTime()) ? '' : (t.getFullYear() + '-' + String(t.getMonth()+1).padStart(2,'0') + '-' + String(t.getDate()).padStart(2,'0') + ' ' + String(t.getHours()).padStart(2,'0') + ':' + String(t.getMinutes()).padStart(2,'0'));
+        html += '<tr>' +
+          '<td>' + esc(p.id) + '</td>' +
+          '<td>' + esc(p.name) + '</td>' +
+          '<td>' + (p.mu != null ? Number(p.mu).toFixed(2) : '-') + '</td>' +
+          '<td><span class="tag' + (p.status === 'new' ? ' new' : '') + '">' + esc(p.status || '') + '</span></td>' +
+          '<td>' + esc(ts) + '</td>' +
+          '<td>' + esc(p.note || '') + '</td>' +
+          '<td><button class="btn mini" data-dl="' + esc(p.id) + '">下载 GeoJSON</button></td>' +
+        '</tr>';
+      });
+      html += '</tbody></table>';
+      $('listBody').innerHTML = html;
+      var btns = $('listBody').querySelectorAll('[data-dl]');
+      for (var i = 0; i < btns.length; i++) {
+        (function(btn){
+          btn.addEventListener('click', function(){
+            var id = Number(btn.getAttribute('data-dl'));
+            var hit = rows.filter(function(x){ return Number(x.id) === id; })[0];
+            if (hit) downloadJson(hit);
+          });
+        })(btns[i]);
+      }
+    } catch (e) { $('listBody').innerHTML = '<div class="empty">读取失败：' + esc(e && e.message ? e.message : e) + '</div>'; }
+  }
+})();
+</script>
+</body>
+</html>

@@ -749,7 +749,15 @@
       关闭了"的误关来源；现在只有顶部那个按钮能收起。
    实测 9/9：展开 318px / grip top=1 / icon « / title 收起；点后 40px / 竖条 h=831 中心命中自身 /
    icon » / title 展开；点空白后仍 open=1、w=318（不再误关）。 */
-const VERSION = 'v586-cad-grip-explicit';
+/* v587-cloud-submit: 在线地图页新增「☁ 提交到云端」（地块库一期）。
+   背景：别人让管理员帮画地块，来回沟通繁琐；地块画好后存本机 localStorage 管理员看不到。
+   现在：在线地图「分区角度」面板里多一枚「☁ 提交到云端」按钮 —— 把当前边界（GCJ-02 经纬度）
+   + 亩数 + 中心点拼成 URL 参数，跳到云端提交页（应用域 plot-library），用户登录（手机号验证码）
+   后写入云数据库 plots 表；管理员在云端地块库可见列表，一期先支持下载 GeoJSON。
+   主站侧只做跳转，不含任何云凭据；与「💾 保存地块」（本机）互不影响。
+   云端配套（独立应用 wbapp_FxUShyeJ60dvzoe0Xbxe5e，域 https://plot-library.app.workbuddy.host/）：
+   plots 表（RLS：本人可读写自己的行，管理员可读全部）+ plot_admins + claim_plot_admin(口令) 函数。 */
+const VERSION = 'v587-cloud-submit';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
