@@ -2610,3 +2610,37 @@ CloudBase 控制台那张表读的是**身份认证（auth）用户表**，云�
   后台显示「服务已连接 · 管理员权限已验证 ✓」。**当前云函数已是 `v2c-4-member-stats`**（`configGet` 回显实证）。
 - 仍缺最后一步：**`sql/route_c_migration_v6_member_stats.sql` 未执行** ⇒ 现在打开后台能看到
   「累计注册 / L1 / L2 / 已过期 / 邀请关系」（这些不依赖新列），但「今日新增 / 近 7 日 / 注册时间 / 最后活跃」会是 0 或「—」。
+
+### 26.22 v625-phone-backfill：后台手机号一列显示「—」的成因与修复（2026-10-20）
+
+**用户提问**（两张后台截图，多行手机号显示「—」）：「这些没有显示手机号的怎么回事？」
+
+**根因（两条，都不是「没注册」）**
+1. **只在建行那一刻写 `phone`**：`ry_entitle.phone` 只在 `ensureRows()` 首次 INSERT 时从请求体取一次。
+   早期版本前端 `pullAuth()` 传的是 `entPhone()` → `CloudSync.phone`，若那次调用发生在登录态还没恢复完
+   （或该行是管理员用 UID 直接开通建的），`phone` 就永久是 `null` —— 之后既不重试也不补写。
+2. **格式不统一**：H5 注册页传的是 `+86 199xxxxxxxx` 这种带国家码带空格的形式。`maskPhone()` 原本按
+   `s.length === 11` 判断，13 位带前缀的直接判 false ⇒ **整串明文**（既没脱敏也没显示成号码），
+   后台按手机号搜索（`like`）也对不上。
+
+**改动**
+1. 云函数 `normPhone()`：去掉所有非数字，`86` + 11 位的截成 11 位。建行、回填、搜索、脱敏统一走它。
+2. `maskPhone()` 重写：11 位出 `199****1296`；其它长度（>7）出首 3 + `****` + 末 4；**任何长度都不再整串明文**；
+   空值返回空串（前端渲染成「—」）。
+3. **老行回填**：`ensureRows()` 里每次带 `phone` 的请求都比对一次，不一致就 `PATCH { phone }` 补写。
+   ⇒ 用户**下次打开软件即自动补录**，不用跑 SQL、不用手工改库。
+4. `runye-entitle.js` 同步加 `normPhone()`，`newEntRow()` 补 `phone: normPhone(entPhone()) || null`
+   （rdb 直连降级路径也写对格式）。
+5. `plugin-admin.html`：版本标识 v624 → **v625**；检索说明补一句「手机号显示「—」表示该账号建档时没带上号码
+   （早期版本只在建行那一刻记录），该用户下次打开软件会自动补录」——把「—」从疑似 bug 变成可解释状态。
+
+**为什么不能直接搬 CloudBase 用户管理那张表的手机号**：那是 auth 用户表，云函数要读得配 SecretId/SecretKey
+（权限过大且与现有 `TCB_API_KEY` 是两套凭据）。所以走「让用户下次登录自己补」这条路，零额外凭据。
+
+**验证**：单测 **51/51**（新增 4 条：`normPhone` 三种格式归一 / `maskPhone` 不整串明文 + 空值 / 服务端建行与回填
+都写归一值 / 前端降级路径同样写）；`ci_check_static` **PASS=29**；`--test tests/*.test.cjs` **154/154**；
+`check_publish_refs` PASS；`node --check cloudfn/ryEntitle-v2/index.js` OK。
+实测：`normPhone('+86 19979431296') = '19979431296'`、`maskPhone('+86 19979431296') = '199****1296'`、`maskPhone('') = ''`。
+
+**部署**：`cloudfn/ryEntitle-v2c5-phone-backfill.zip`（扁平，index.js 35048B + package.json），
+上传后 `configGet` 的 `fn` 字段应回显 **`v2c-5-phone-backfill`**。**回填逻辑在云函数里，只发静态站点不生效。**

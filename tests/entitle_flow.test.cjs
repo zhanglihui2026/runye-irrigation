@@ -248,6 +248,28 @@ function reset() {
     /add column if not exists created_at/.test(sqlV6) && /add column if not exists last_seen_at/.test(sqlV6));
   ok('管理后台会员页含统计卡与分页（走 adminMemberStats）',
     /id="mKpis"/.test(admin) && /id="mTrend"/.test(admin) && /adminMemberStats/.test(admin));
+  /* [v625] 手机号归一化：H5 注册页传的是「+86 199xxxxxxxx」，若原样入库，
+     脱敏函数按 s.length===11 判断失败 ⇒ 后台整串明文，按手机号搜索也 like 不上。 */
+  const phoneFn = require(path.join(__dirname, '..', 'cloudfn', 'ryEntitle-v2', 'index.js'));
+  const P = phoneFn.__internals || {};
+  ok('手机号归一：+86 / 空格 / 连字符统一成 11 位纯数字',
+    typeof P.normPhone === 'function' &&
+    P.normPhone('+86 19979431296') === '19979431296' &&
+    P.normPhone('199-7943-1296') === '19979431296' &&
+    P.normPhone('19979431296') === '19979431296' &&
+    P.normPhone('') === '' && P.normPhone(null) === '',
+    [P.normPhone && P.normPhone('+86 19979431296'), P.normPhone && P.normPhone('199-7943-1296')]);
+  ok('脱敏：任何长度都不整串明文，空值返回空串（后台显示「—」）',
+    typeof P.maskPhone === 'function' &&
+    P.maskPhone('+86 19979431296') === '199****1296' &&
+    P.maskPhone('19979431296') === '199****1296' &&
+    P.maskPhone('') === '' && P.maskPhone(null) === '',
+    [P.maskPhone && P.maskPhone('+86 19979431296'), P.maskPhone && P.maskPhone('19979431296')]);
+  ok('服务端建行与老行回填都写归一后的手机号',
+    /phone: normPhone\(phone\) \|\| null/.test(cloudFn) &&
+    /const np = normPhone\(phone\);[\s\S]{0,220}?phone: np/.test(cloudFn));
+  ok('前端 rdb 降级路径同样写归一后的手机号',
+    /function normPhone/.test(selfSrc) && /phone: normPhone\(entPhone\(\)\) \|\| null/.test(selfSrc));
   setUser('anon-x', '');
   await E.init(true);
   ok('匿名 trial 仅可访问 L1 基础功能', E.isTrial() && l1Features.every(f => E.can(f)) && l2Features.every(f => !E.can(f)), E.plan());

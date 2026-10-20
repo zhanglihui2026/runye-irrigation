@@ -67,7 +67,7 @@ const PLANS = {
 };
 const PLUGIN_IDS = ['hello-world', 'archive', 'bom', 'case-lib', 'pipe-optim', 'calib', 'hydraulics', 'ai-plan', 'sprinkler'];
 const PLUGIN_CONFIG_ID = 'global:plugin-control';
-const FN_VERSION = 'v2c-4-member-stats';  /* [v2c-4] configGet 回显，用于确认部署版本 */
+const FN_VERSION = 'v2c-5-phone-backfill';  /* [v2c-5] configGet 回显，用于确认部署版本 */
 const PLUGIN_ADMIN_UIDS = String(process.env.RY_PLUGIN_ADMIN_UIDS || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean);
 /* [v2c] 会员规则配置（ry_kv）与功能清单（与 runye-entitle.js FEATURES 同构） */
 const MEMBER_CONFIG_ID = 'global:member-config';
@@ -235,9 +235,23 @@ function makeCode(seed) {
   while (body.length < 6) body = '0' + body;
   return 'RY' + body.slice(0, 8);
 }
+/* [v2c-5] 手机号规范：客户端有的传 '19979431296'，有的传 '+86 19979431296'
+   （H5 注册页就是带 +86 空格的形式）。统一存 11 位纯数字，否则
+   1) 后台脱敏函数认不出（s.length===11 判false）⇒ 整串明文显示；
+   2) 按手机号搜索 `like` 对不上。 */
+function normPhone(p) {
+  const d = String(p == null ? '' : p).replace(/[^0-9]/g, '');
+  if (d.length === 13 && d.slice(0, 2) === '86') return d.slice(2);
+  return d;
+}
+/* 脱敏：任何长度都不整串明文；只有确实不是号码（太短）才原样返回 */
 function maskPhone(p) {
-  const s = String(p == null ? '' : p);
-  return s.length === 11 ? s.slice(0, 3) + '****' + s.slice(7) : s;
+  const raw = String(p == null ? '' : p).trim();
+  if (!raw) return '';
+  const d = normPhone(raw);
+  if (d.length === 11) return d.slice(0, 3) + '****' + d.slice(7);
+  if (d.length > 7) return d.slice(0, 3) + '****' + d.slice(-4);
+  return raw;
 }
 function iso(ms) { return new Date(ms).toISOString(); }
 function ok(data, message) { return { code: 0, data: data || null, message: message || '' }; }
@@ -285,7 +299,7 @@ async function ensureRows(uid, phone) {
     const baseRow = {
       _id: uid, plan: 'L1', expires_at: iso(Date.now() + TRIAL_DAYS * DAY),
       member_days: TRIAL_DAYS, activated_at: iso(now.getTime()),
-      phone: phone || null, history: hist
+      phone: normPhone(phone) || null, history: hist
     };
     try {
       /* [v2c-4] 注册/活跃时刻：供管理后台统计「今日新增 / 近 7 日活跃」
@@ -298,6 +312,16 @@ async function ensureRows(uid, phone) {
       await rdbInsert('ry_entitle', baseRow);
     }
     ent = await getEntitle(uid);
+  }
+  /* [v2c-5] 老行回填手机号：早期只在「建行那一刻」写 phone，若当时客户端还没拿到号码
+     （或该行是管理员开通时用 uid 建的），phone 就永远是 null，后台一直显示「—」。
+     这里在每次带 phone 的鉴权请求里补写；顺带把带 +86 的旧格式归一成 11 位。 */
+  const np = normPhone(phone);
+  if (ent && np && String(ent.phone || '') !== np) {
+    try {
+      await rdbUpdate('ry_entitle', { _id: 'eq.' + uid }, { phone: np });
+      ent.phone = np;
+    } catch (e) { /* 回填失败不影响主流程 */ }
   }
   let inv = await getInvite(uid);
   if (!inv) {
@@ -643,6 +667,9 @@ async function actAdminMemberBind(uid, body) {
 }
 
 /* ---------- 入口 ---------- */
+/* 供单测直接检验脱敏/归一（不影响云函数运行） */
+exports.__internals = { maskPhone: maskPhone, normPhone: normPhone, cstDayKey: cstDayKey, cstTodayStart: cstTodayStart };
+
 exports.main = async function (event) {
   try {
     /* HTTP 集成请求：body 可能是 JSON 字符串（集成）或对象（SDK 调用） */

@@ -40,7 +40,7 @@
 </head>
 <body><header>润野灌溉 · 管理后台</header>
 <main>
-  <div class="head"><div><h1>统一管理后台</h1><div class="muted">插件开关 · 会员管理 · 会员规则参数。写操作需要管理员账号（云函数环境变量 RY_PLUGIN_ADMIN_UIDS）。 · <b id="admVer" style="color:#2E7D4F">界面 v624</b></div></div><a class="btn" href="index.html">返回主程序</a></div>
+  <div class="head"><div><h1>统一管理后台</h1><div class="muted">插件开关 · 会员管理 · 会员规则参数。写操作需要管理员账号（云函数环境变量 RY_PLUGIN_ADMIN_UIDS）。 · <b id="admVer" style="color:#2E7D4F">界面 v625</b></div></div><a class="btn" href="index.html">返回主程序</a></div>
 
   <div class="tabs">
     <button class="tab on" data-tab="plugins">外挂插件</button>
@@ -71,7 +71,8 @@
         <label class="bar" style="gap:4px">每页
           <select id="mSize"><option value="30">30</option><option value="50">50</option><option value="100">100</option></select> 条</label>
       </div>
-      <p class="foot">列出全部注册用户（按注册时间倒序，分页浏览；也可搜手机号/UID）。点「管理」展开操作面板。</p>
+      <p class="foot">列出全部注册用户（按注册时间倒序，分页浏览；也可搜手机号/UID）。点「管理」展开操作面板。<br>
+        手机号显示「—」表示该账号建档时没带上号码（早期版本只在建行那一刻记录），该用户下次打开软件会自动补录。</p>
       <div id="mList" style="margin-top:6px">尚未查询。</div>
     </section>
     <section class="card" id="mDetailCard" hidden>

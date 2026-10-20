@@ -199,9 +199,19 @@
     while (body.length < 6) body = '0' + body;
     return 'RY' + body.slice(0, 8);
   }
+  /* [v621+] 与云函数同口径：客户端可能拿到 '+86 19979431296'，
+     统一成 11 位再脱敏，避免整串明文或空值 */
+  function normPhone(p) {
+    var d = String(p == null ? '' : p).replace(/[^0-9]/g, '');
+    return (d.length === 13 && d.slice(0, 2) === '86') ? d.slice(2) : d;
+  }
   function maskPhone(p) {
-    var s = String(p == null ? '' : p);
-    return s.length === 11 ? s.slice(0, 3) + '****' + s.slice(7) : s;
+    var raw = String(p == null ? '' : p).trim();
+    if (!raw) return '';
+    var d = normPhone(raw);
+    if (d.length === 11) return d.slice(0, 3) + '****' + d.slice(7);
+    if (d.length > 7) return d.slice(0, 3) + '****' + d.slice(-4);
+    return raw;
   }
 
   function readOne(table, id) {
@@ -255,6 +265,7 @@
   /* 默认权益行：L1 注册会员，从现在起 30 天 */
   function newEntRow(now) {
     return { _id: sub(), plan: 'L1', expires_at: iso(now + TRIAL_DAYS * DAY),
+      phone: normPhone(entPhone()) || null,
       member_days: TRIAL_DAYS, activated_at: null,
       history: [{ at: now, days: TRIAL_DAYS, plan: 'L1', planName: '注册会员', from: now, to: now + TRIAL_DAYS * DAY, src: 'register' }] };
   }
