@@ -2815,6 +2815,19 @@ $('mDetailCard').scrollIntoView({behavior:'smooth',block:'nearest'});
   install 用「没有才下载」/ 不用 addAll / 大件缓存优先且排在 local 之前 / deadline ≥ 20s / 后台有重试按钮）。
 - 闸门：`--test` **156/156**、`ci_check_static` **PASS=29**、`check_publish_refs` PASS。
 
+**发布（2026-10-20 16:08）**
+- 提交 `443dc5e`（7 文件：`sw.js` / `cloud-sync.js` / `plugin-admin.html` / `index.html` / `invite.html` /
+  `tests/sw_vendor_cache.test.cjs` / 本文档），推送 `1d3a2c9..443dc5e`。
+- 版本口径：`sw.js` = `v628-cloud-sdk-precache`，`index.html` 的 `style-01.css?v=` 同步；
+  `cloud-sync.js?v=371b → 371c`（三个页面 index / invite / plugin-admin 都改了）。
+- 线上核对：`sw.js` 含 `VENDOR_CACHE`(5 处) 与 `name !== VENDOR_CACHE`(1 处)；
+  `cloud-sync.js?v=371c` 含 `Date.now() + 20000`；`plugin-admin.html` 有 `id="retryBtn"` 且「界面 v628」；
+  线上冒烟 **27/27**。
+- **用户侧要发生一次「一次性下载」**：新的 SW 装好后才会把 787KB 放进 `-vendor` 缓存。
+  建议顺序：先打开主程序（index.html）让 SW 装好 → 再开后台。之后每次发版都不再重复下载。
+  若首屏仍报错，点后台新增的「重新连接」；仍不行再 Ctrl+F5。
+
+
 
 
 
