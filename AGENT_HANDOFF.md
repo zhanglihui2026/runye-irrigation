@@ -2935,3 +2935,34 @@ canvas 里的线被切与 CSS 的 `overflow` / `min-height` **无关**，是**�
 
 **用户侧还要做一步**：回主程序用**手机号登录一次**（把会员会话重新建立起来）。
 登录后后台会显示 19 位 UID（`2089…`）—— 那个才是白名单里登记过的身份，管理权限随即恢复。
+
+### 26.28 v632-login-deeplink：把「匿名态 → 登录 → 回后台」接成一条路（2026-10-20）
+
+**v631 上线后用户仍然反馈同一张截图**（刷新后还是同一个匿名 uid）。说明问题不在代码判身份，
+在**路走不通**：v631 的提示写的是「请先回主程序用手机号登录」，但主程序的登录框**藏在右上角会员胶囊
+的弹层里**——用户点进主程序，看到的是一个能用的工具页，找不到登录入口，就退回来了。
+
+**修法（深链闭环）**
+1. `runye-member-ui.js` 新增两个小函数：
+   - `qsVal(name)`：读查询串（`?login=1` / `?back=...`）；
+   - `backTarget()`：只放行**站内相对 `.html`**（`/^[A-Za-z0-9._\-\/]+\.html(\?[^#]*)?$/` 且不含 `//`），
+     挡掉 `//evil.com`、`http(s)://`、`javascript:` 这类开放重定向。
+2. boot 末尾（权益拉完、胶囊渲染完之后）：`if (qsVal('login') === '1') RyMemberUI.openPanel();`
+   ⇒ 从后台点过来，**落地就是手机号输入框**，不用先找胶囊。
+3. `doLogin` 成功回调里：`var back = backTarget(); if (back) setTimeout(… location.replace(back), 900);`
+   ⇒ 登录完成自动回 `plugin-admin.html`，后台按新会话重新判权限。
+4. `plugin-admin.html` 匿名态那句话从「回主程序」改成按钮直链
+   `index.html?login=1&back=plugin-admin.html`（「去主程序用手机号登录 →」+「登录成功后会自动回到本页」）。
+
+**为什么用 `location.replace` 而不是 `location.href`**：登录页是一次性中转，不该留在历史里，
+否则用户按返回又回到登录框（而那时已经登录成功，看起来像"没生效"）。
+
+**契约测试**：`tests/cred_pick.test.cjs` 追加 **7 项**——`qsVal/backTarget` 存在、`backTarget` 有白名单正则、
+放行 `plugin-admin.html` / 拦掉 `//evil.com` 与 `http://`、boot 里 `?login=1` 必须调 `openPanel`、
+`doLogin` 成功路径必须 `location.replace(backTarget())`、后台匿名态链接必须带 `login=1` 和 `back=`。
+
+**版本口径**：`sw.js` = `v632-login-deeplink`；`style-01.css?v=` 同步（同值契约）；
+`runye-member-ui.js?v=632-login-deeplink`（在 CORE 缓存里，必须抬版本才刷得动）。
+
+**这一条之后用户的操作**：后台点一次按钮 → 输入手机号 + 验证码 → 自动回后台，
+账号行显示 19 位 UID 且带「（会员账号）」字样，管理权限恢复。**只需要做这一次**。

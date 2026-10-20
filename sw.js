@@ -871,7 +871,15 @@
    ensureAnon 先 cloudRestore()，有会话就复用、绝不匿名登录；
    新增 CloudSync.authInfo() 身份快照；后台在匿名态直接写明「请先用手机号登录」+ 回主程序链接。
    改 cloud-sync.js（必须抬版本刷缓存）+ plugin-admin.html（界面 v631）。 */
-const VERSION = 'v631-cred-pick';
+/* v632-login-deeplink: 把「匿名态 → 登录 → 回后台」接成一条路。
+   背景：v631 已能让后台正确显示「当前是匿名身份」，但文案只说「回主程序登录」——
+   登录框其实藏在右上角会员胶囊的弹层里，用户找不到就卡住了（本轮实测：刷新后仍是同一个匿名 uid）。
+   做法：主程序支持 ?login=1（直接弹会员中心，登录框就在里面）与 ?back=<站内相对 .html>
+   （登录成功后 location.replace 跳回，带白名单正则挡开放重定向）；
+   后台匿名态的提示改成按钮「去主程序用手机号登录 →」直链
+   index.html?login=1&back=plugin-admin.html。
+   改 runye-member-ui.js（在 CORE，必须抬版本）+ plugin-admin.html。 */
+const VERSION = 'v632-login-deeplink';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

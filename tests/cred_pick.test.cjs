@@ -122,7 +122,34 @@ assert.ok(/authInfo/.test(admin) && /function applyAdminState\(/.test(admin),
 assert.ok(/当前是匿名身份/.test(admin), '匿名态必须明说「当前是匿名身份」');
 assert.ok(/RY_PLUGIN_ADMIN_UIDS[\s\S]{0,80}也不会生效/.test(admin),
   '必须写明「把匿名 UID 加进 RY_PLUGIN_ADMIN_UIDS 也不会生效」，否则用户会继续去加白名单');
-assert.ok(/href="index\.html"[^>]*>主程序</.test(admin), '匿名态要给「回主程序登录」的入口');
+assert.ok(/href="index\.html[^"]*"[^>]*>[^<]*(去主程序用手机号登录|主程序)/.test(admin),
+  '匿名态要给「回主程序登录」的入口（v632 起是带 ?login=1&back= 的深链按钮）');
 assert.ok(/identTag\(\)/.test(admin), '账号行要标出（会员账号 / 匿名会话）');
 
 console.log('cred_pick：身份择取契约 17 项通过');
+
+/* ---------- 8. 深链闭环（v632）：后台点一下 → 主程序弹登录框 → 登录成功自动跳回 ----------
+   起因：匿名态提示「回主程序用手机号登录」，但登录框藏在右上角会员胶囊的弹层里，
+   用户找不到入口就放弃了。深链把这一步接上。 */
+const memberUi = fs.readFileSync(path.join(root, 'runye-member-ui.js'), 'utf8');
+assert.ok(/function qsVal\(name\)/.test(memberUi) && /function backTarget\(\)/.test(memberUi),
+  'runye-member-ui.js 需要 qsVal/backTarget 支撑 ?login=1 与 ?back= 深链');
+assert.ok(/if \(qsVal\('login'\) === '1'\)[\s\S]{0,120}RyMemberUI\.openPanel\(\)/.test(memberUi),
+  '?login=1 必须直接弹会员中心（登录框在里面），否则用户还是找不到登录入口');
+assert.ok(/var back = backTarget\(\);[\s\S]{0,160}location\.replace\(back\)/.test(memberUi),
+  '登录成功后必须按 ?back= 跳回（后台闭环），否则用户要自己再找一遍后台入口');
+
+/* backTarget 必须只放行站内相对 .html —— 否则 ?back=//evil.com 就是开放重定向 */
+const btStart = memberUi.indexOf('function backTarget()');
+const btEnd = memberUi.indexOf('/* ---------- 胶囊 ---------- */', btStart);
+const bt = memberUi.slice(btStart, btEnd);
+assert.ok(/\^\[A-Za-z0-9\._\\-\\\/\]\+\\\.html/.test(bt) || /\.html\(/.test(bt),
+  'backTarget 必须用白名单正则限定为「站内相对 .html」，挡住 //evil.com 之类开放重定向');
+assert.ok(bt.indexOf("indexOf('//') < 0") >= 0, 'backTarget 必须显式排除 //host 形式');
+
+/* 后台的匿名态要给出这条深链，而不是只写「回主程序」 */
+assert.ok(/index\.html\?login=1&amp;back=plugin-admin\.html/.test(admin),
+  'plugin-admin.html 的匿名提示必须给「登录并自动回到后台」的深链');
+assert.ok(/去主程序用手机号登录/.test(admin), '深链要有明确按钮文案（不能只是一行小字链接）');
+
+console.log('cred_pick：深链闭环契约 7 项通过');

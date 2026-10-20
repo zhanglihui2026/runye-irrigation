@@ -59,6 +59,25 @@ const state = await ev(`(function(){
 })()`);
 console.log('后台状态:', JSON.stringify(state, null, 1));
 
+/* ③ 深链闭环：index.html?login=1&back=plugin-admin.html 必须直接弹出登录框（v632） */
+await send('Page.navigate', { url: BASE + 'index.html?login=1&back=plugin-admin.html&_=' + Date.now() });
+await sleep(2500);
+for (let i = 0; i < 60; i++) { if (await ev('!!document.querySelector(".ry-mbr-panel")') === true) break; await sleep(500); }
+const link = await ev(`(function(){
+  var p=document.querySelector('.ry-mbr-panel');
+  var box=p?p.querySelector('.ry-mbr-login'):null;
+  var ph=box?[].map.call(box.querySelectorAll('input'),function(i){return i.placeholder}).join(' | '):null;
+  return {panelOpen:!!p, hasLoginBox:!!box, placeholders:ph, href:location.pathname+location.search};
+})()`);
+console.log('深链 ?login=1:', JSON.stringify(link));
+if (process.env.SHOT2) {
+  await send('Page.captureScreenshot', { format: 'png' });
+  await sleep(400);
+  const s2 = await send('Page.captureScreenshot', { format: 'png', clip: { x: 0, y: 0, width: 1400, height: 520, scale: 1 } });
+  fs.writeFileSync(process.env.SHOT2, Buffer.from(s2.data, 'base64'));
+  console.log('深链截图已存:', process.env.SHOT2);
+}
+
 if (process.env.SHOT) {
   await sleep(600);
   await send('Page.captureScreenshot', { format: 'png' });

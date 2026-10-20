@@ -243,6 +243,10 @@
               return maybeGrantReward();
             }).then(function () {
               try { closePanel(); RyMemberUI.openPanel(); } catch (e) { }
+              /* [v632] 从后台深链过来的（?back=plugin-admin.html）：登录成功后自动跳回去，
+                 不用用户自己再找一遍后台入口。 */
+              var back = backTarget();
+              if (back) setTimeout(function () { location.replace(back); }, 900);
             });
           }, 600);
         } else {
@@ -578,6 +582,24 @@
     place(anchor);
   }
 
+  /* ---------- [v632 2026-10-20] 深链：?login=1 直接弹会员中心（登录框就在里面）、
+     ?back=<站内相对 .html> 登录成功后自动跳回。
+     起因：管理后台在「匿名身份」下会提示「先回主程序用手机号登录」，但用户找不到入口
+     （登录框藏在右上角会员胶囊的弹层里），来回两趟就放弃了。现在后台给一个按钮，
+     点过去直接看到手机号输入框，登录完自动回到后台，闭环。 */
+  function qsVal(name) {
+    try {
+      var m = new RegExp('[?&]' + name + '=([^&#]*)').exec(String(location.search || ''));
+      return m ? decodeURIComponent(m[1].replace(/\+/g, ' ')) : '';
+    } catch (e) { return ''; }
+  }
+  function backTarget() {
+    var b = qsVal('back');
+    if (!b) return '';
+    /* 只放行站内相对 .html（含可选查询串）：挡掉 //evil.com、http(s)://、javascript: 之类。 */
+    return /^[A-Za-z0-9._\-\/]+\.html(\?[^#]*)?$/.test(b) && b.indexOf('//') < 0 ? b : '';
+  }
+
   /* ---------- 胶囊 ---------- */
   var pills = [];
 
@@ -745,7 +767,11 @@
         refreshPills();
         /* 通知导航：权益已就绪，可以重渲染上锁了 */
         try { document.dispatchEvent(new Event('ryentitle-ready')); } catch (e) { }
-      }, function () { /* 静默失败：门控保持放行 */ });
+      }, function () { /* 静默失败：门控保持放行 */ }).then(function () {
+        /* [v632] ?login=1：直接把会员中心（含手机号登录框）弹出来。
+           放在最后一步，确保权益已拉完、胶囊已渲染，弹层里的状态是准的。 */
+        if (qsVal('login') === '1') { try { RyMemberUI.openPanel(); } catch (e) { } }
+      });
     });
   }
 

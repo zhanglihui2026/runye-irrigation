@@ -134,7 +134,9 @@
       setService('服务已连接 · 当前是匿名身份，不是会员账号（无管理权限）',true);
       if(hb)hb.innerHTML='这台浏览器现在用的是<b>匿名会话</b>'+(ident.sub?'（UID <code>'+esc(ident.sub)+'</code>）':'')+
         '，而后台按<b>手机号登录的会员账号</b>判权限 ⇒ 把这个 UID 加进 <code>RY_PLUGIN_ADMIN_UIDS</code> '+
-        '也不会生效（匿名 uid 每次/每设备都不一样）。请先回<a href="index.html">主程序</a>用手机号登录，再重新打开本页。'+
+        '也不会生效（匿名 uid 每次/每设备都不一样）。'+
+        '<br><a href="index.html?login=1&amp;back=plugin-admin.html" style="display:inline-block;margin-top:6px;padding:5px 12px;border:1px solid #173e32;border-radius:0;background:#173e32;color:#fff;text-decoration:none;font-weight:600">去主程序用手机号登录 →</a>'+
+        '　登录成功后会自动回到本页。'+
         (ident.members?'<br>本机另外还有 '+ident.members+' 条会员凭据，已优先使用会员身份；若仍无权限，才需要把会员 UID 登记进白名单。':'');
       if(sv)sv.title='请先回主程序用手机号登录：匿名身份拿不到管理权限';
       return;
