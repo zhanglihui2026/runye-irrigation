@@ -2558,3 +2558,45 @@ var days = (ent && ent.member_days > 0) ? ent.member_days : …;   // 30
 - `invite.html` 内嵌的 `C.grantReward / coolUntil / computeProgress` 是一整套**未被调用**的本地模型
   （只在 2926 行导出），本轮只对齐了口径没有删除。它和真链路重复，属于潜在漂移源，后续可整块删。
 - `cloud-functions/ryEntitle/index.js`（v1 老函数）仍是旧逻辑，未部署也未改动；确认不用后可归档。
+
+### 26.21 v623-member-stats：管理后台加「注册人员概览」（2026-10-20）
+
+**用户需求**（附 CloudBase 用户管理截图）：「我的管理后台能把注册人员情况统计出来吗？就是这些内容
+（UID / 昵称 / 注册时间 / 最后登录 / 手机号），我想在我自己的管理后台能看到。」
+
+**先说清两个数据源的区别**（避免以后又绕回去）
+CloudBase 控制台那张表读的是**身份认证（auth）用户表**，云函数拿不到（需要腾讯云 SecretId/SecretKey，
+权限过大且与现有 API_KEY 是两套凭据）。所以这里**不搬 auth 表**，而是用自己库里已有的
+`ry_entitle`（每个注册用户必有一行）+ `ry_links`（邀请关系）来还原同一份信息。
+
+| 截图里的列 | 我们怎么给 | 说明 |
+|---|---|---|
+| 用户 ID | `ry_entitle._id` | 就是 `auth.uid()`，同一串数字 |
+| 手机号 | `ry_entitle.phone`（脱敏） | 注册时写入 |
+| 注册时间 | **新增 `created_at`** | 老数据回填 `updated_at`（≈ 行首次写入时间，不是精确注册时刻） |
+| 最后登录 | **新增 `last_seen_at`** | 从本次部署起记录，历史为空；`actGet` 里 30 分钟节流写 |
+| 用户昵称 / 邮箱 | 不给 | 我们只用手机号注册，库里没有昵称与邮箱，「—」比假数据好 |
+
+**改动**
+1. `sql/route_c_migration_v6_member_stats.sql`（新增）：`created_at` / `last_seen_at` 两列 + 存量回填 + 两个索引。
+   **不动 RLS**，新列是用户自己行的字段，原有策略自动覆盖。
+2. 云函数 `actGet` 里调 `touchSeen()`：同一用户 30 分钟内只写一次，避免每次刷新都写库。
+3. 新增 `adminMemberStats`（限管理员）：一次返回 `totals`（累计/今日/近7日/近7日活跃/L1/L2/已过期/邀请关系数）+
+   `daily`（近 30 天每日新增，按**北京时间**切日 —— 云函数默认 UTC，直接 `getDate()` 会把早 8 点前算到前一天）+
+   分页列表（含每人邀请人数、注册时间、最后活跃）。
+4. `plugin-admin.html`：会员管理页顶部加 9 个 KPI 卡 + 近 30 天迷你柱状图（纯 div，不引图表库），
+   列表加「注册时间 / 最后活跃 / 邀请」三列与分页，详情面板补三行。
+
+**两处容错（很要紧）**
+- 建行时先试「带 created_at/last_seen_at 插入」，失败则退回旧字段集 —— **SQL 没跑就先部署，注册流程不会被拖垮**。
+- 统计接口先试带 `order=created_at` 的查询，400 则退回无序读取 —— **后台不会整块报错**，只是注册时间显示「—」。
+
+**前置条件（少一步都出不来数）**
+1. 在 CloudBase「数据库 → SQL 执行」跑 `sql/route_c_migration_v6_member_stats.sql`；
+2. 上传 `cloudfn/ryEntitle-v2c4-member-stats.zip` 覆盖 `ryEntitle`，`configGet` 回显应变成 `v2c-4-member-stats`；
+3. 把管理员 UID 加进云函数环境变量 `RY_PLUGIN_ADMIN_UIDS`（否则页面只读、统计接口直接 403）。
+   2026-10-20 实测本机账号 UID = `2089630534341758976`，当时仍是「无管理权限」。
+
+**验证**：单测 `tests/entitle_flow.test.cjs` **47/47**（新增 3 条：接口存在且限管理员 / v6 迁移含两列 / 后台有统计卡）；
+`ci_check_static` **PASS=29**；`plugin-admin.html` 内联脚本语法 0 错误；无 token 调 `adminMemberStats` 返回 401（鉴权前置生效）。
+统计数字的真值要等 SQL 跑完后在页面上核对一次：**累计注册应等于 `select count(*) from ry_entitle`**。

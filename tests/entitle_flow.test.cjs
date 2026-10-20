@@ -240,6 +240,14 @@ function reset() {
     /function maybeGrantReward/.test(memberUi) && /en\.grant\(\)/.test(memberUi));
   const admin = fs.readFileSync(path.join(__dirname, '..', 'plugin-admin.html'), 'utf8');
   ok('会员规则后台把全部 L2 功能固定为仅 L2', /l1Only=hostId==='cFeatL1'&&\(k==='drawing-export'\|\|k==='bom-export'\|\|k==='hydraulic-check'\|\|k==='pro-others'\)/.test(admin));
+  /* [v623] 注册人员统计：接口必须存在、必须限管理员、必须由 SQL 迁移提供两个时间列 */
+  ok('服务端提供注册人员统计接口且限管理员',
+    /case 'adminMemberStats'/.test(cloudFn) && /async function actAdminMemberStats[\s\S]{0,160}?isAdminUid\(uid\)/.test(cloudFn));
+  const sqlV6 = fs.readFileSync(path.join(__dirname, '..', 'sql', 'route_c_migration_v6_member_stats.sql'), 'utf8');
+  ok('v6 迁移为统计补齐 created_at / last_seen_at',
+    /add column if not exists created_at/.test(sqlV6) && /add column if not exists last_seen_at/.test(sqlV6));
+  ok('管理后台会员页含统计卡与分页（走 adminMemberStats）',
+    /id="mKpis"/.test(admin) && /id="mTrend"/.test(admin) && /adminMemberStats/.test(admin));
   setUser('anon-x', '');
   await E.init(true);
   ok('匿名 trial 仅可访问 L1 基础功能', E.isTrial() && l1Features.every(f => E.can(f)) && l2Features.every(f => !E.can(f)), E.plan());

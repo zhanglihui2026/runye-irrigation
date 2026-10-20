@@ -67,7 +67,7 @@ const PLANS = {
 };
 const PLUGIN_IDS = ['hello-world', 'archive', 'bom', 'case-lib', 'pipe-optim', 'calib', 'hydraulics', 'ai-plan', 'sprinkler'];
 const PLUGIN_CONFIG_ID = 'global:plugin-control';
-const FN_VERSION = 'v2c-3-invite-l2';  /* [v2c-3] configGet 回显，用于确认部署版本 */
+const FN_VERSION = 'v2c-4-member-stats';  /* [v2c-4] configGet 回显，用于确认部署版本 */
 const PLUGIN_ADMIN_UIDS = String(process.env.RY_PLUGIN_ADMIN_UIDS || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean);
 /* [v2c] 会员规则配置（ry_kv）与功能清单（与 runye-entitle.js FEATURES 同构） */
 const MEMBER_CONFIG_ID = 'global:member-config';
@@ -255,16 +255,48 @@ async function getInvite(uid) {
 async function getLinksByInviter(uid) {
   return await rdbSelect('ry_links', { inviter_uid: 'eq.' + uid, order: 'id.desc' });
 }
+/* ---------- [v2c-4] 活跃时间与统计工具 ---------- */
+const SEEN_GAP_MS = 30 * 60 * 1000;   /* last_seen 写入节流：同一用户 30 分钟内只写一次 */
+async function touchSeen(ent, uid) {
+  try {
+    const now = Date.now();
+    const last = ent && ent.last_seen_at ? Date.parse(ent.last_seen_at) : 0;
+    if (now - last < SEEN_GAP_MS) return;
+    await rdbUpdate('ry_entitle', { _id: 'eq.' + uid }, { last_seen_at: iso(now) });
+  } catch (e) { /* 统计字段写失败不影响权益主流程（列未建时就是这条路） */ }
+}
+/* 统计一律按北京时间切日：云函数默认 UTC，直接 getDate() 会把早 8 点前算到前一天 */
+const CST_MS = 8 * 3600 * 1000;
+function cstDayKey(ts) {
+  const t = new Date(ts + CST_MS);
+  const p = function (x) { return x < 10 ? '0' + x : '' + x; };
+  return t.getUTCFullYear() + '-' + p(t.getUTCMonth() + 1) + '-' + p(t.getUTCDate());
+}
+function cstTodayStart(now) {
+  const t = new Date(now + CST_MS);
+  return Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()) - CST_MS;
+}
+
 async function ensureRows(uid, phone) {
   let ent = await getEntitle(uid);
   if (!ent) {
     const now = new Date();
     const hist = [{ at: Date.now(), days: TRIAL_DAYS, plan: 'L1', planName: '注册会员', from: Date.now(), to: Date.now() + TRIAL_DAYS * DAY, src: 'register' }];
-    await rdbInsert('ry_entitle', {
+    const baseRow = {
       _id: uid, plan: 'L1', expires_at: iso(Date.now() + TRIAL_DAYS * DAY),
       member_days: TRIAL_DAYS, activated_at: iso(now.getTime()),
       phone: phone || null, history: hist
-    });
+    };
+    try {
+      /* [v2c-4] 注册/活跃时刻：供管理后台统计「今日新增 / 近 7 日活跃」
+         列由 sql/route_c_migration_v6_member_stats.sql 建；没跑迁移时 PATCH/POST 会报
+         未知列，这里退回旧字段集，保证「统计功能没上线」不会把注册流程一起拖垮。 */
+      await rdbInsert('ry_entitle', Object.assign({
+        created_at: iso(now.getTime()), last_seen_at: iso(now.getTime())
+      }, baseRow));
+    } catch (e) {
+      await rdbInsert('ry_entitle', baseRow);
+    }
     ent = await getEntitle(uid);
   }
   let inv = await getInvite(uid);
@@ -315,6 +347,7 @@ function packState(ent, inv, links) {
 async function actGet(uid, params) {
   const phone = params && params.phone;
   const { ent, inv } = await ensureRows(uid, phone);
+  await touchSeen(ent, uid);
   const links = await getLinksByInviter(uid);
   return ok(packState(ent, inv, links));
 }
@@ -455,6 +488,72 @@ async function actConfigSet(uid, body) {
   return ok({ config: cfg, updatedAt: value.updatedAt });
 }
 
+/* ---------- [v2c-4] 注册人员统计（管理员） ----------
+   为什么不用 SQL 聚合：数据网关只暴露 REST（PostgREST），没有 group by；
+   当前量级（千级）一次全量拉回在函数里算，比分页聚合更简单也够快。
+   规模上万后再改成「按日预聚合表 + 定时任务」。 */
+async function actAdminMemberStats(uid, body) {
+  if (!isAdminUid(uid)) return fail(403, '无会员管理权限');
+  const page = Math.max(1, parseInt(body && body.page, 10) || 1);
+  const size = Math.min(100, Math.max(10, parseInt(body && body.size, 10) || 30));
+  const q = String((body && body.q) || '').trim();
+  if (q && !/^[0-9]{4,20}$/.test(q)) return fail(-1, '搜索词需为手机号或 UID 数字串（≥4 位）');
+
+  const LIMIT = 2000;
+  let rows;
+  try {
+    rows = await rdbSelect('ry_entitle', { order: 'created_at.desc.nullslast', limit: LIMIT });
+  } catch (e) {
+    /* v6 迁移还没执行（没有 created_at 列）时，排序会 400；
+       退回不带排序的读取，统计照常出数（注册时间列显示 —），不让后台整块报错 */
+    rows = await rdbSelect('ry_entitle', { limit: LIMIT });
+  }
+  const links = await rdbSelect('ry_links', { select: 'inviter_uid', limit: LIMIT });
+
+  const invited = Object.create(null);
+  links.forEach(function (l) { const k = l && l.inviter_uid; if (k) invited[k] = (invited[k] || 0) + 1; });
+
+  const now = Date.now(), t0 = cstTodayStart(now), d7 = now - 7 * DAY;
+  const totals = { total: rows.length, today: 0, last7: 0, l1: 0, l2: 0, expired: 0,
+    active7: 0, links: links.length, inviters: Object.keys(invited).length };
+  const daily = {};
+  for (let i = 29; i >= 0; i--) daily[cstDayKey(t0 - i * DAY)] = 0;
+
+  rows.forEach(function (r) {
+    const created = r.created_at ? Date.parse(r.created_at) : 0;
+    if (created) {
+      if (created >= t0) totals.today++;
+      if (created >= d7) totals.last7++;
+      const k = cstDayKey(created);
+      if (daily[k] != null) daily[k]++;
+    }
+    const exp = r.expires_at ? Date.parse(r.expires_at) : 0;
+    if (exp && exp > now) { if (r.plan === 'L2') totals.l2++; else totals.l1++; }
+    else if (exp) totals.expired++;
+    const seen = r.last_seen_at ? Date.parse(r.last_seen_at) : 0;
+    if (seen >= d7) totals.active7++;
+  });
+
+  let list = rows;
+  if (q) {
+    list = rows.filter(function (r) {
+      return String(r._id).indexOf(q) >= 0 || String(r.phone || '').indexOf(q) >= 0;
+    });
+  }
+  const start = (page - 1) * size;
+  return ok({
+    totals: totals,
+    daily: Object.keys(daily).sort().map(function (k) { return { d: k, n: daily[k] }; }),
+    page: page, size: size, matched: list.length, truncated: rows.length >= LIMIT,
+    members: list.slice(start, start + size).map(function (r) {
+      return { uid: r._id, phone: maskPhone(r.phone), plan: r.plan || 'L1',
+        expires_at: r.expires_at || null, created_at: r.created_at || null,
+        last_seen_at: r.last_seen_at || null, activated_at: r.activated_at || null,
+        member_days: r.member_days || 0, invited: invited[r._id] || 0 };
+    })
+  });
+}
+
 /* ---------- [v2c] 会员搜索 / 开通续期（管理员） ---------- */
 async function actAdminMembers(uid, body) {
   if (!isAdminUid(uid)) return fail(403, '无会员管理权限');
@@ -471,6 +570,7 @@ async function actAdminMembers(uid, body) {
     members: rows.map(function (m) {
       return { uid: m._id, plan: m.plan, expires_at: m.expires_at || null,
         member_days: m.member_days || 0, activated_at: m.activated_at || null,
+        created_at: m.created_at || null, last_seen_at: m.last_seen_at || null,
         phone: maskPhone(m.phone), history: (m.history || []).slice(0, 10) };
     })
   });
@@ -569,6 +669,7 @@ exports.main = async function (event) {
       case 'adminMembers': return await actAdminMembers(uid, body);
       case 'adminMemberGrant': return await actAdminMemberGrant(uid, body);
       case 'adminMemberBind': return await actAdminMemberBind(uid, body);
+      case 'adminMemberStats': return await actAdminMemberStats(uid, body);
       case 'get':
       case 'init':    return await actGet(uid, body);
       case 'bindRef': return await actBindRef(uid, body);

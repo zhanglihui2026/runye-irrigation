@@ -22,6 +22,18 @@
     .planbox h3{margin:0 0 8px;font-size:15px}
     .ok{color:#187648}.err{color:#b42318}
     [hidden]{display:none!important}
+    /* [v623] 注册人员统计：KPI 卡 + 30 天迷你柱状图（纯 div，不引图表库） */
+    .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:10px;margin-top:12px}
+    .kpi{background:#f6faf8;border:1px solid #e3ede7;border-radius:10px;padding:10px 12px}
+    .kpi b{display:block;font-size:20px;line-height:1.25;color:#1f3a2e;font-variant-numeric:tabular-nums}
+    .kpi span{font-size:12px;color:#5b6f65}
+    .trendwrap{margin-top:16px}
+    .trendwrap .ttl{font-size:12px;color:#5b6f65;margin-bottom:6px}
+    .trend{display:flex;align-items:flex-end;gap:3px;height:58px}
+    .trend i{flex:1;background:#cfe6d8;border-radius:2px 2px 0 0;min-height:2px}
+    .trend i.hot{background:#2E7D4F}
+    .trend i.zero{background:#eef4f0}
+    .pager{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
   </style>
   <script defer src="pwa/vendor/cloudbase-js-sdk-3.8.2.bundle.js?v=359"></script>
   <script defer src="cloud-sync.js?v=371b"></script>
@@ -45,6 +57,11 @@
 
   <!-- ============ 页签2：会员管理 [v408] ============ -->
   <section id="sec-members" hidden>
+    <section class="card">
+      <div class="bar" style="justify-content:space-between"><strong>注册人员概览</strong><span id="mStatMeta" class="muted">读取中…</span></div>
+      <div class="kpis" id="mKpis"></div>
+      <div class="trendwrap"><div class="ttl">近 30 天每日新增注册（柱高 = 当日人数，深色为最近 7 天）</div><div class="trend" id="mTrend"></div></div>
+    </section>
     <section class="card">
       <div class="bar" style="justify-content:space-between"><strong>会员检索</strong><span id="mPerm" class="muted"></span></div>
       <div class="bar" style="margin-top:10px">
@@ -100,6 +117,8 @@
   function setService(msg,error){$('service').textContent=msg;$('service').className='status'+(error?' err':'')}
   function api(action,extra){var token=window.CloudSync&&CloudSync.authToken();var h={'Content-Type':'application/json'};if(token)h.Authorization='Bearer '+token;return fetch(ENDPOINT,{method:'POST',headers:h,body:JSON.stringify(Object.assign({action:action},extra||{})),cache:'no-store'}).then(function(r){return r.json()})}
   function fmtDay(v){if(!v)return '—';var d=new Date(v);if(isNaN(d.getTime()))return '—';return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2)}
+  function fmtDT(v){if(!v)return '—';var d=new Date(v);if(isNaN(d.getTime()))return '—';var p=function(x){return ('0'+x).slice(-2)};
+    return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())}
   function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 
   /* ---------- 页签切换 ---------- */
@@ -121,18 +140,65 @@
   var curMember=null;
   function permText(){$('mPerm').textContent=state.admin?'管理员权限已验证 ✓':(state.plugins.length?'当前账号没有管理权限（只读）':'')}
   function planPill(plan,exp){var active=exp&&new Date(exp).getTime()>Date.now();return '<span class="pill'+(active?'':' off')+'">'+esc(plan||'L1')+(active?' · 有效':' · 已到期')+'</span>'}
-  function renderMembers(ms){var host=$('mList');if(!ms||!ms.length){host.textContent='无匹配记录。';return}
+  /* ---------- [v623] 注册人员统计 ---------- */
+  var statsPage=1,statsQ='';
+  function renderStats(d){
+    var t=d.totals||{};
+    $('mStatMeta').textContent='统计于 '+fmtDT(Date.now())+(d.truncated?' · 仅统计最近 2000 行':'');
+    var items=[['累计注册',t.total||0],['今日新增',t.today||0],['近 7 日新增',t.last7||0],
+      ['近 7 日活跃',t.active7||0],['高级会员 L2',t.l2||0],['注册会员 L1',t.l1||0],
+      ['已过期',t.expired||0],['邀请关系',t.links||0],['有邀请记录的人',t.inviters||0]];
+    $('mKpis').innerHTML=items.map(function(x){return '<div class="kpi"><b>'+x[1]+'</b><span>'+x[0]+'</span></div>'}).join('');
+    var max=1;(d.daily||[]).forEach(function(x){if(x.n>max)max=x.n});
+    var cut=Date.now()-7*86400000;
+    $('mTrend').innerHTML=(d.daily||[]).map(function(x){
+      var h=Math.max(2,Math.round(x.n/max*56));
+      var hot=new Date(x.d+'T00:00:00+08:00').getTime()>=cut;
+      return '<i class="'+(x.n?(hot?'hot':''):'zero')+'" style="height:'+h+'px" title="'+x.d+'：'+x.n+' 人"></i>';
+    }).join('');
+  }
+  function renderMembers(ms,d){var host=$('mList');host.innerHTML='';
+    if(!ms||!ms.length){host.textContent='无匹配记录。';return}
+    d=d||{size:ms.length,page:1,matched:ms.length};
     var t=document.createElement('table');t.className='mt';
-    t.innerHTML='<thead><tr><th>UID</th><th>手机号</th><th>等级</th><th>到期日</th><th>状态</th><th>操作</th></tr></thead>';
+    t.innerHTML='<thead><tr><th>UID</th><th>手机号</th><th>注册时间</th><th>最后活跃</th><th>等级</th><th>到期日</th><th>邀请</th><th>状态</th><th>操作</th></tr></thead>';
     var tb=document.createElement('tbody');
     ms.forEach(function(m){
       var tr=document.createElement('tr');
       var active=m.expires_at&&new Date(m.expires_at).getTime()>Date.now();
-      tr.innerHTML='<td style="font-family:monospace">'+esc(m.uid)+'</td><td>'+esc(m.phone||'—')+'</td><td>'+esc(m.plan||'L1')+'</td><td>'+fmtDay(m.expires_at)+'</td><td>'+(active?'<span class="pill">有效</span>':'<span class="pill off">已到期</span>')+'</td>';
+      tr.innerHTML='<td style="font-family:monospace">'+esc(m.uid)+'</td><td>'+esc(m.phone||'—')+'</td>'+
+        '<td>'+fmtDT(m.created_at)+'</td><td>'+fmtDT(m.last_seen_at)+'</td>'+
+        '<td>'+esc(m.plan||'L1')+'</td><td>'+fmtDay(m.expires_at)+'</td>'+
+        '<td>'+(m.invited||0)+' 人</td>'+
+        '<td>'+(active?'<span class="pill">有效</span>':'<span class="pill off">已到期</span>')+'</td>';
       var td=document.createElement('td');var b=document.createElement('button');b.className='mbtn';b.textContent='管理';
       b.onclick=function(){openDetail(m)};td.appendChild(b);tr.appendChild(td);tb.appendChild(tr);
     });
-    t.appendChild(tb);host.innerHTML='';host.appendChild(t);
+    t.appendChild(tb);host.appendChild(t);
+    var pages=Math.max(1,Math.ceil((d.matched||ms.length)/(d.size||ms.length)));
+    var pager=document.createElement('div');pager.className='pager';
+    var info=document.createElement('span');info.className='foot';
+    info.textContent='共 '+(d.matched||ms.length)+' 人 · 第 '+(d.page||1)+' / '+pages+' 页';
+    var sp=document.createElement('span');
+    var b1=document.createElement('button');b1.className='btn';b1.textContent='上一页';b1.disabled=(d.page||1)<=1;
+    b1.onclick=function(){loadStats((d.page||1)-1)};
+    var b2=document.createElement('button');b2.className='btn';b2.textContent='下一页';b2.disabled=(d.page||1)>=pages;
+    b2.onclick=function(){loadStats((d.page||1)+1)};
+    sp.appendChild(b1);sp.appendChild(document.createTextNode(' '));sp.appendChild(b2);
+    pager.appendChild(info);pager.appendChild(sp);host.appendChild(pager);
+  }
+  function loadStats(page){
+    if(page)statsPage=page;
+    var body={page:statsPage,size:30};if(statsQ)body.q=statsQ;
+    $('mList').textContent='读取中…';
+    return api('adminMemberStats',body).then(function(r){
+      if(!r||r.code!==0)throw new Error((r&&r.message)||'查询失败');
+      renderStats(r.data);renderMembers(r.data.members,r.data);
+      if(state.admin===false)$('mPerm').textContent='当前账号没有管理权限（服务端只读）';
+    }).catch(function(e){
+      $('mList').innerHTML='<span class="err">'+esc(e.message||e)+'</span>'+(String(e.message||'').indexOf('未知 action')>=0?
+        '<div class="foot">⚠ 云函数尚未部署 v2c-4 新版 —— 请先在 CloudBase 控制台上传新部署包（见 cloudfn/ryEntitle-v2/）。</div>':'');
+    }).finally(function(){permText()});
   }
   function openDetail(m){
     curMember=m;$('mDetailCard').hidden=false;$('gResult').textContent='';$('gResult').className='foot';
@@ -142,7 +208,10 @@
       '<div class="kv"><b>当前等级</b>'+esc(m.plan||'L1')+'</div>'+
       '<div class="kv"><b>到期时间</b>'+fmtDay(m.expires_at)+'</div>'+
       '<div class="kv"><b>单次奖励天数</b>'+(m.member_days||0)+'</div>'+
-      '<div class="kv"><b>注册激活</b>'+fmtDay(m.activated_at)+'</div>';
+      '<div class="kv"><b>注册激活</b>'+fmtDay(m.activated_at)+'</div>'+
+      '<div class="kv"><b>注册时间</b>'+fmtDT(m.created_at)+'</div>'+
+      '<div class="kv"><b>最后活跃</b>'+fmtDT(m.last_seen_at)+'</div>'+
+      '<div class="kv"><b>名下邀请</b>'+(m.invited||0)+' 人</div>';
     var h=$('mHist');h.innerHTML='';
     var hist=m.history||[];
     if(!hist.length){h.textContent='（无记录）';return}
@@ -181,12 +250,8 @@
     }).catch(function(e){host.innerHTML='<span class="err">'+esc(e.message||e)+'</span>'+(String(e.message||'').indexOf('未知 action')>=0?'<div class="foot">⚠ 云函数版本过旧（缺 adminMemberBind），请上传最新部署包。</div>':'')});
   };
 
-  function search(q){var btn=$('mSearch');btn.disabled=true;$('mList').textContent='查询中…';return api('adminMembers',q!=null?{q:q}:{}).then(function(r){
-      if(!r||r.code!==0)throw new Error((r&&r.message)||'查询失败');
-      renderMembers(r.data.members);
-      if(state.admin===false)$('mPerm').textContent='当前账号没有管理权限（服务端只读）';
-    }).catch(function(e){$('mList').innerHTML='<span class="err">'+esc(e.message||e)+'</span>'+(String(e.message||'').indexOf('未知 action')>=0?'<div class="foot">⚠ 云函数尚未部署 v2c 新版 —— 请先在 CloudBase 控制台上传新部署包（见 cloudfn/ryEntitle-v2/）。</div>':'')})
-    .finally(function(){btn.disabled=false;permText()})}
+  function search(q){statsQ=q==null?'':String(q);statsPage=1;var btn=$('mSearch');btn.disabled=true;
+    return loadStats(1).finally(function(){btn.disabled=false})}
   $('mSearch').onclick=function(){var q=String($('mQ').value||'').trim();if(q)search(q)};
   $('mAll').onclick=function(){search(null)};
   $('mQ').addEventListener('keydown',function(e){if(e.key==='Enter'){var q=String($('mQ').value||'').trim();if(q)search(q)}});
@@ -261,7 +326,7 @@
   };
 
   /* ---------- 启动（插件读取成功后再做会员权限回显） ---------- */
-  function boot(){if(!window.CloudSync){setService('CloudBase 登录组件未加载',true);return}CloudSync.init().then(function(ok){if(!ok)throw new Error('CloudBase 初始化失败');return CloudSync.restore()}).then(function(signed){var uid=CloudSync.authSub();$('account').textContent=signed?'当前账号 UID：'+(uid||'已登录'):'未检测到登录态，请先在主程序登录后再打开后台';return fetch('plugins.json?v='+Date.now(),{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('插件清单 HTTP '+r.status);return r.json()})}).then(function(cfg){state.plugins=cfg.plugins||[];return api('pluginsGet')}).then(function(r){if(!r||r.code!==0)throw new Error((r&&r.message)||'无法读取插件控制配置');state.enabled=r.data.enabled||{};state.admin=!!r.data.admin;setService(state.admin?'服务已连接 · 管理员权限已验证':'服务已连接 · 当前账号没有管理权限',!state.admin);if(!state.admin){$('save').title='请让管理员在云函数环境变量 RY_PLUGIN_ADMIN_UIDS 中登记此 UID';}render();permText();return probe()}).catch(function(e){setService('后台连接失败：'+(e.message||e),true);$('list').textContent='无法读取插件状态；主程序不会受此后台故障影响。'})}
+  function boot(){if(!window.CloudSync){setService('CloudBase 登录组件未加载',true);return}CloudSync.init().then(function(ok){if(!ok)throw new Error('CloudBase 初始化失败');return CloudSync.restore()}).then(function(signed){var uid=CloudSync.authSub();$('account').textContent=signed?'当前账号 UID：'+(uid||'已登录'):'未检测到登录态，请先在主程序登录后再打开后台';return fetch('plugins.json?v='+Date.now(),{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('插件清单 HTTP '+r.status);return r.json()})}).then(function(cfg){state.plugins=cfg.plugins||[];return api('pluginsGet')}).then(function(r){if(!r||r.code!==0)throw new Error((r&&r.message)||'无法读取插件控制配置');state.enabled=r.data.enabled||{};state.admin=!!r.data.admin;setService(state.admin?'服务已连接 · 管理员权限已验证':'服务已连接 · 当前账号没有管理权限',!state.admin);if(!state.admin){$('save').title='请让管理员在云函数环境变量 RY_PLUGIN_ADMIN_UIDS 中登记此 UID';}render();permText();loadStats(1);return probe()}).catch(function(e){setService('后台连接失败：'+(e.message||e),true);$('list').textContent='无法读取插件状态；主程序不会受此后台故障影响。'})}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
 </script></body></html>
