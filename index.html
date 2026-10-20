@@ -17,7 +17,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>润野灌溉设计优化版｜滴灌管径与水泵选型</title>
 <meta name="description" content="输入地块、滴灌带与水源参数，快速计算灌溉分区、主管支管管径和水泵工作点。"/>
-<link rel="stylesheet" href="mod/style-01.css?v=637-search-row-wrap">
+<link rel="stylesheet" href="mod/style-01.css?v=644-pump-btn-align">
 <link rel="stylesheet" href="runye-inverse-design.css?v=277">
 <script defer src="runye-inverse-design.js?v=438-branch-flow-conservation"></script>
 <link rel="stylesheet" href="runye-terrain.css?v=454-terrain-sidebar-peer">
@@ -245,7 +245,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <link rel="stylesheet" href="pwa/pwa.css?v=2">
 <script defer src="pwa/pwa.js?v=2"></script>
     <link rel="stylesheet" href="runye-theme.css?v=2">
-    <link rel="stylesheet" href="mod/ry-panel.css?v=620-sticky-grp">
+    <link rel="stylesheet" href="mod/ry-panel.css?v=640-formula-fold">
     <!-- Shoelace 2.15.1（与紧凑分组样板一致）；Shoelace 不可用时保留原生输入控件。 -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.1/cdn/themes/light.css">
   <link rel="stylesheet" href="runye-typography.css?v=530-h1-scope">
@@ -722,6 +722,31 @@ body.ry-worst-off [data-tlworst]{display:none}
        样式唯一出处 = mod/ry-panel.css 的 [v609] 段；行仍是 .pp-plan-item 原类名，探针契约不受影响。
        需要撤掉：删下面两个 .ry-props-head 与 ry-panel.css 的 [v609] 段，并去掉 #ppSide 的 ry-props 类即可。 -->
   <div class="ry-props-head">灌溉参数</div>
+  <!-- ===== [v491 2026-10-16 用户要求] 灌溉配方库（二级左侧面板）：
+       把第 1 行的 10 项输入参数（提升/高差/水源距离/滴带间距/滴孔间距/滴头流量/
+       铺设长度/分区划定/入口压力/目标流速）整组保存为命名方案、随时调用回填。
+       用途：持续沉淀地区与滴灌参数组合方案，
+       将来直接下拉选用。数据 = localStorage['runye_irrigation_recipes_v1']；
+       逻辑 = mod/plot-editor.js 的 ppRecipeFlow（复用 ppAiPlanFlow 的 snapshot/apply
+       模式，回填后派发 change/input 触发实时重算）。
+       [v639 2026-10-21 用户要求] 本块整体上移到「灌溉参数」分组条正下方、水泵提升高度之上
+       —— 用户原话：「调用方案整体移动到水泵提升高度上面，灌溉参数 下面」。
+       理由：配方行是先选方案再填参数的动作入口，原来压在 10 行输入下面，要先滚过整组才看得见。
+       只改 DOM 顺序，未改 class / id / 样式（.pp-recipe-bar 本就无上边距、行高 22px，
+       与相邻的 .pp-plan-item 行同底边线 ⇒ 插到组首不会多出一条缝）。
+       需要撤掉本块（功能层）：删本块 + ppRecipeFlow IIFE + ry-panel.css 的 .pp-recipe-* 规则即可。
+       需要还原位置：把本块整体挪回 #ppPlanBar 之后（紧邻「第2行：计算结果」注释之前）。 ===== -->
+  <div class="pp-plan-bar pp-recipe-bar" id="ppRecipeBar">
+    <!-- [v526]（2026-10-17 用户要求）工具栏只留「调用端口」：方案命名/保存/改名/删除移入
+         设置弹窗「灌溉参数」页签（#ryRecipe*，plot-editor ppRecipeFlow 暴露 window.RyRecipes，
+         inline-28 事件委托调用）。此处仅保留 选择方案 + 调用。
+         需要撤掉：把被删的名称框/保存/✎/🗑 加回来即可（ppRecipeFlow 对缺失 id 全部判空跳过）。 -->
+    <span class="pp-plan-item pp-recipe-row">
+      <select id="ppRecipeSelect" aria-label="选择已存方案"><option value="">— 选择方案 —</option></select>
+      <button type="button" class="pp-recipe-btn pp-recipe-btn-primary" id="ppRecipeApply" title="把选中方案的参数回填到面板并重算">调用</button>
+    </span>
+    <span class="pp-recipe-status" id="ppRecipeStatus" role="status"></span>
+  </div>
   <!-- 地块规划参数 — 第1行：输入参数 -->
   <div class="pp-plan-bar" id="ppPlanBar">
     <!-- 2026-09-20 v91 用户要求：把「水泵提升高度 / 地形高差」做成可设定值，放进本面板、排在「滴灌带间距」之前。
@@ -759,25 +784,6 @@ body.ry-worst-off [data-tlworst]{display:none}
     <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">目标流速</span><input class="ryp-native-fallback" type="number" id="planTargetV" value="1.5" min="0.3" max="5" step="0.1" aria-label="目标流速"><sl-input data-ry-proxy-for="planTargetV" type="number" value="1.5" min="0.3" max="5" step="0.1" size="small" aria-label="目标流速" hidden></sl-input><span class="pp-plan-unit">m/s</span></span>
     <input type="hidden" id="planN" value="4">
     <input type="hidden" id="planZoneMode" value="manual">
-  </div>
-  <!-- ===== [v491 2026-10-16 用户要求] 灌溉配方库（二级左侧面板）：
-       把第 1 行的 10 项输入参数（提升/高差/水源距离/滴带间距/滴孔间距/滴头流量/
-       铺设长度/分区划定/入口压力/目标流速）整组保存为命名方案、随时调用回填。
-       用途：持续沉淀地区与滴灌参数组合方案，
-       将来直接下拉选用。数据 = localStorage['runye_irrigation_recipes_v1']；
-       逻辑 = mod/plot-editor.js 的 ppRecipeFlow（复用 ppAiPlanFlow 的 snapshot/apply
-       模式，回填后派发 change/input 触发实时重算）。
-       需要撤掉：删本块 + ppRecipeFlow IIFE + ry-panel.css 的 .pp-recipe-* 规则即可。 ===== -->
-  <div class="pp-plan-bar pp-recipe-bar" id="ppRecipeBar">
-    <!-- [v526]（2026-10-17 用户要求）工具栏只留「调用端口」：方案命名/保存/改名/删除移入
-         设置弹窗「灌溉参数」页签（#ryRecipe*，plot-editor ppRecipeFlow 暴露 window.RyRecipes，
-         inline-28 事件委托调用）。此处仅保留 选择方案 + 调用。
-         需要撤掉：把被删的名称框/保存/✎/🗑 加回来即可（ppRecipeFlow 对缺失 id 全部判空跳过）。 -->
-    <span class="pp-plan-item pp-recipe-row">
-      <select id="ppRecipeSelect" aria-label="选择已存方案"><option value="">— 选择方案 —</option></select>
-      <button type="button" class="pp-recipe-btn pp-recipe-btn-primary" id="ppRecipeApply" title="把选中方案的参数回填到面板并重算">调用</button>
-    </span>
-    <span class="pp-recipe-status" id="ppRecipeStatus" role="status"></span>
   </div>
   <!-- 第2行：计算结果 -->
   <div class="pp-plan-bar pp-plan-bar-result" id="ppPlanBar2">
@@ -1402,15 +1408,13 @@ body.ry-worst-off [data-tlworst]{display:none}
     <!-- 标注显隐：2026-09-28 晚改勾选框（用户：工具栏按钮取消，只留做图区右上角勾选一处）——
          见 #tlWsLabelsChkWrap（#tlWsContent 兄弟位，render 重建不抹）。隐藏范围=文字（区号/尺寸/亩数）
          +标注线（尺寸线/改径套壳/最不利路径），节点连线与命中带常显；text 层 pointer-events 常驻禁用。 -->
-    <!-- 任务M（2026-09-26 用户：「标注线的文字跟箭头尺寸有点大，做一个控制按钮，可以适当的调整他们比例」）：
-         标注比例四键组 —— Aa−/Aa±10%（60%~180%）、⟲复位100%；写 localStorage('tl-dim-scale')，
-         简图/系统简图克隆/下载/打印同源渲染自然生效。必须在 #tlAutoPipe 之前 —— A6 契约要求生成按钮贴底。 -->
-    <div id="tlDimScaleRow" style="display:flex;align-items:center;gap:4px;margin:4px 0 2px">
-      <button class="tl-ws-btn" id="tlDimScaleMinus" type="button" style="flex:0 0 auto;width:auto;padding:4px 7px" onclick="tlDimScaleStep(-1)" title="标注文字/箭头缩小 10%（下限 60%）">Aa－</button>
-      <span id="tlDimScaleVal" style="font-size:11px;font-weight:700;color:#47555e;min-width:36px;text-align:center">100%</span>
-      <button class="tl-ws-btn" id="tlDimScalePlus" type="button" style="flex:0 0 auto;width:auto;padding:4px 7px" onclick="tlDimScaleStep(1)" title="标注文字/箭头放大 10%（上限 180%）">Aa＋</button>
-      <button class="tl-ws-btn" id="tlDimScaleReset" type="button" style="flex:0 0 auto;width:auto;padding:4px 7px" onclick="tlDimScaleReset()" title="恢复默认 100%">⟲</button>
-    </div>
+    <!-- [v645 2026-10-21 用户要求] 标注比例「Aa」四键组（#tlDimScaleRow）**已取消**。
+         用户原话：「标注尺寸大小调节，不放在这里，放在设置页面就行了，如果这里的跟设置页面的重复，那这里就取消。」
+         核对结论：确实是重复 —— 设置页「标注与文字」页签（#rySetScaleRange 滑块 0.6~1.8）
+         与这里写的是**同一个 key** localStorage['tl-dim-scale']，v520 的页签文案自己就写着
+         「与顶栏工具栏上的「Aa」四键组是同一个值，两边随时同步」。既然两处等价，就只留设置页一处。
+         要恢复：把四键 div 放回 #tlAutoPipe **之前**（A6 契约要求「生成管线图」贴底），
+         并还原 mod/inline-09.js 里的 window.tlDimScaleStep / window.tlDimScaleReset。 -->
 
     <button class="tl-ws-btn" id="tlAutoPipe" type="button" onclick="tlAutoGenerate()" title="按当前参数生成 / 重新生成三级管线平面图（生成后右侧「管段管径与损失」表逐段列出管长与管径）">🔄 生成管线图</button>
     <button class="tl-ws-btn" id="tlDxfExport" type="button" style="margin-top:6px" title="把地块边界/管道/管径标注/地块名/水泵位置导出为 2004 DXF，CAD 直接打开" onclick="if(window.runyeDxf)runyeDxf.export()">📐 导出 CAD(DXF)</button>
@@ -1443,7 +1447,15 @@ body.ry-worst-off [data-tlworst]{display:none}
        克隆底图已在 tl-workspace.pipeBaseSVG 中剥离这三组。普通简图 SVG 内仍保留（供下载/打印）。 -->
   <div id="tlWsOverlays" style="display:none;position:absolute;inset:0;pointer-events:none;z-index:5">
     <div id="tlWsOvHeader" style="position:absolute;top:10px;left:12px;max-width:62%;font-size:12px;font-weight:700;color:#334155;line-height:1.6;background:rgba(255,255,255,.88);padding:2px 6px;border-radius:4px"></div>
-    <div id="tlWsOvLegend" style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);font-size:11.5px;font-weight:600;color:#334155;background:rgba(255,255,255,.88);padding:2px 8px;border-radius:4px;white-space:nowrap"></div>
+    <!-- [v641 2026-10-21 用户要求] 工作区图例（总管/主管/支管/水源/阀门）挪到画布**右下角**：
+         原为「bottom:8px + left:50% + translateX(-50%)」居中，用户截图圈的就是它，要求「放在右下角」。
+         ⚠ 关键坑：本 div 是 #tlWsOverlays 的子元素，而 #tlWsOverlays 是 inset:0 —— 相对的是
+         整个 .ry-pane-ws（三列栅格「画布 1fr ｜ 拖拽条 6px ｜ 工具轨」），**不是画布**。
+         只写 right:8px 会贴到窗口右缘、压在工具轨按钮与轨内提示文字上（第一版就是这么翻的车）。
+         故 right/bottom 由 JS 按「画布右缘」实时换算并写在行内（mod/inline-24.js 的
+         window.tlAlignWsOvLegend，与右上角三枚勾选框同一套 ResizeObserver 对齐）；
+         下面写的 right:8px/left:auto/transform:none 只是首帧兜底与清掉旧居中基准。 -->
+    <div id="tlWsOvLegend" style="position:absolute;bottom:8px;right:8px;left:auto;transform:none;font-size:11.5px;font-weight:600;color:#334155;background:rgba(255,255,255,.88);padding:2px 8px;border-radius:4px;white-space:nowrap"></div>
   </div>
   <!-- 工具轨宽度拖拽条（2026-09-17 第四十四轮，用户要求"工具栏宽度可调节"）：
        夹在画布与工具轨之间（网格第 2 列），拖动调节工具轨（含轨内统计表）的宽度；
@@ -2267,7 +2279,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script src="mod/material-table.js?v=421-mat-table"></script>
 <!-- [v424-plan-calc-render] 扬程公式与分解展示模块，先于计算控制器和三级调用方装载。 -->
 <script src="mod/plan-calc-render.js?v=614-head-formula"></script>
-<script src="mod/inline-09.js?v=636-north-arrow"></script>
+<script src="mod/inline-09.js?v=646-north-cross"></script>
 <!-- [v423-header-layout] 三级简图标题布局依赖 inline-09 的 tlMeasureText 与生成时写入的标题状态。 -->
 <script src="mod/tl-header-layout.js?v=423-header-layout"></script>
 
@@ -2277,7 +2289,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <!-- ===== 实际地块规划 JS ===== -->
 <script src="mod/inline-11.js?v=607-branch-material-span"></script>
 <!-- [v420-split] 绘图编辑器 IIFE 自 inline-11 迁出：必须紧随 inline-11 之后同步执行 -->
-<script src="mod/plot-editor.js?v=629-pp-view-fit"></script>
+<script src="mod/plot-editor.js?v=640-formula-fold"></script>
 <script src="mod/inline-12.js?v=619-undo-cover"></script>
 <script src="mod/inline-13.js?v=499-plot-library-store"></script>
 <!-- [v422-head-system-svg] 纯 SVG 核心先于 inline-14 同步加载。 -->
@@ -2323,7 +2335,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <!-- 过滤系统页（2026-09-18 第七十二轮）：GREEN 单体版管路模型 + 选型计算，
      懒挂载（首次可见时建 DOM），与二级/三级计算双向融合。 -->
 <script src="filter-system/filter-system.js"></script>
-<script src="mod/inline-24.js?v=357"></script>
+<script src="mod/inline-24.js?v=641-tl-legend-corner"></script>
 <script src="mod/inline-25.js?v=357"></script>
 <script src="mod/inline-27.js?v=622-punct-clean"></script>
 <!-- ═══ CAD 单一操作区：全局左工具栏（2026-09-14；右上角视口切换条已取消） ═══════════
@@ -2384,7 +2396,7 @@ body.ry-worst-off [data-tlworst]{display:none}
   </div>
 </div>
 <input type="file" id="rySetCsvInput" accept=".csv,text/csv" style="display:none">
-<script src="mod/inline-28.js?v=529-single-source"></script>
+<script src="mod/inline-28.js?v=645-dim-scale-entry"></script>
 
 <script src="mod/inline-29.js?v=358-branch-flow-conservation"></script>
 

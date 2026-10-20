@@ -573,6 +573,13 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-to
   font-size:10px;line-height:1.4;color:var(--ry-s-500,#64748b);
 }
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-status.pp-recipe-err{ color:#dc2626; }
+/* [v639 2026-10-21 用户要求把配方行整块上移到「灌溉参数」组首之后补的一条：
+   空状态行原本靠 min-height:14px 占位，位置在 10 行输入下方时看不见问题；
+   移到组首后它正好夹在「选择方案 / 调用」与「水泵提升高度」之间，
+   变成一条看不出用途、也点不到的空档（实测 14px + flex gap 2px）。
+   ⇒ 空时不给盒子（:empty 对「只有空白文本」也命中），有反馈文字时照常展开，
+     .pp-recipe-err 的红字规则在上面，不受影响。 */
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-status:empty{ display:none; }
 /* Shoelace 代理输入：与原生回退同尺寸，主色走品牌深墨绿 */
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side sl-input[data-ry-proxy-for]{
   display:block;flex:0 0 64px;width:64px;min-width:64px;max-width:64px;
@@ -645,6 +652,17 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-to
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-calc-formula .pp-cf-final{color:#a7f3d0;font-weight:700;background:rgba(134,239,172,.14);padding:1px 4px;border-radius:3px;margin-left:1px}
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-calc-formula .pp-cf-line,
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-calc-formula .pp-cf-line-h{display:block;white-space:normal;overflow:visible;padding-right:2px}
+/* ===== [v640 2026-10-21 用户要求] 二级「扬程计算式」可折叠，默认折叠 =====
+   用户原话：「二级 三级控制面板中的扬程计算式 默认都是可以折叠起来的，改下。」
+   箭头口径与「水力计算结果」一致（▾ 展开 / ▸ 收起），但那条是拼进 ::before 的 content、
+   本条的标题文字在 DOM 里 ⇒ 用 ::after 追加，不动既有文字。
+   折叠态隐藏 #ppCalcDetail 整条算式带，只留灰条标题；标题高度 22px 不变 ⇒ 收起来不塌版面。
+   ★ 逻辑出处 = mod/plot-editor.js 的 ppFormulaFold IIFE（默认折叠也在那里置位）。 */
+.ry-props .ry-props-head.pp-fold-head{ cursor:pointer; user-select:none; }
+.ry-props .ry-props-head.pp-fold-head:hover{ background:#d3d7d4; }
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .ry-props-head.pp-fold-head::after{ content:" ▾"; }
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .ry-props-head.pp-fold-head.pp-fold-off::after{ content:" ▸"; }
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side #ppCalcDetail.pp-fold-body-off{ display:none; }
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-calc-formula .pp-cf-line{display:inline;white-space:normal}
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-calc-formula .pp-cf-input{
   background:rgba(253,230,138,.10);color:#fde68a;font-weight:600;

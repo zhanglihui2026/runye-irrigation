@@ -2097,6 +2097,42 @@
            ⇒ 一根都没进 ge.slots[i] ⇒ 成组管路页永远画不出来、jimmy尺寸标注也无从标。
         拆出来之后整组态 =「对每一块各调一次本函数」，与 v193 铁律一致
         （成组 = 多次单块，一行布管规则都不改写）。 */
+  /* [v638 2026-10-20 用户口径] 主管与支管在平面上其实是**同一位置的上下两层**
+     （主管埋地下、支管在地面），图上把它们错开只是为了两根都看得见。
+     所以错开量必须**固定**，不能被地块压缩或拉伸 ——
+     用户原话：「主管跟支管在图中显示的距离，不应该被地块压缩，不管地块大小，应该都保持一致」。
+
+     为什么用「固定的实地距离」而不是「分区块的百分比」，也不是「地块跨度比例」：
+       本画布是**固定比例**的（见 ppUpdateTransform：s = 0.5×zoom，注释写明「1px=2m」），
+       不随地块大小变化 ⇒ 一个固定的实地距离，在任意缩放下就是固定的像素数，
+       地块大小、分区数目都不再影响它。三级图框同样是固定比例（s 被上限 2 夹住，
+       常规地块恒为 2 单位/m），且取的是同一个数 ⇒ 两个视图的视觉间距天生一致。
+     旧口径是「主管落分区块宽/高的 40%、支管落中线」⇒ 错开量 = 分区块尺寸的 10%，
+     实测同一套代码：520×237m/16 区 → 20m；200×120m/8 区 → 12m；60×40m/4 区 → 6m。
+     这就是用户说的「被地块压缩」。
+     zoneDim 是错开方向上的分区尺寸。两根线改成「对称夹住真实位置」（各让一半）后，
+     只有窄于间距的极窄小分区才会触发硬边界，正常地块一律拿到那个固定米数。 */
+  var PP_MAIN_BRANCH_GAP_M = 20;    /* 唯一一处数值，三级简图经 window.RyMainBranchGap 取同一个值 */
+  function ppGapM() {
+    /* 探针/比对用：window.__ryMainBranchGapM 可临时改值，不影响正常使用（不设就一直用 PP_MAIN_BRANCH_GAP_M） */
+    var o = (typeof window !== 'undefined') ? window.__ryMainBranchGapM : null;
+    return (typeof o === 'number' && isFinite(o) && o > 0) ? o : PP_MAIN_BRANCH_GAP_M;
+  }
+  function ppVisGap(zoneDim) {
+    var g = ppGapM();
+    /* 硬边界：两根线是「对称夹住真实位置」的（各让一半），
+       所以间距只要不超过分区尺寸的 90%，两根就都还留在本分区里。
+       —— 这个边界只在极窄分区（< 22m）才会咬到 20m，正常地块一律拿到全量。 */
+    if (zoneDim > 0) g = Math.min(g, zoneDim * 0.9);
+    return g;
+  }
+  /* 三级简图（mod/inline-09.js）取同一个数 —— 两个视图都是定比例的，同值即同「实地间距」。
+     数值只有一份，改这里就够；inline-09 里有 20 的兜底字面量（plot-editor 未加载时用）。
+     ★ 为什么是 20 米：v637 在用户当时那块 520×237m 地块上错开量正好约 20 米（45% 缩放下
+       约 4~5 物理像素，蓝绿两根一眼分得开），用户就是对着那张图提的要求 ⇒ 以这个观感为基准，
+       把它从「那块地块恰好算出来的值」提升成「所有地块都用这个值」。 */
+  if (typeof window !== 'undefined') window.RyMainBranchGap = { m: ppGapM };
+
   function ppBuildAutoPipes(polyPts, planN, isThree, useOwnDims, forceDir) {
     var out = { main: [], branch: [], subbranch: [], valves: [] };
     var keepPoly = ppState.polyPts, keepOwn = ppOwnDimOverride;
@@ -2150,12 +2186,16 @@
             : (forceDir === 'h') ? false
             : (cuts.xPlan[zc] >= cuts.yPlan[zr]);
           if (fixedSideIsHorizontal) {
-            var mainX = zx + zoneW * 0.40;
+            /* [v638] 主管/支管「对称夹住真实位置」：错开量固定（见 ppVisGap），
+               两根各让一半 ⇒ 无论间距多大，只要分区装得下就都留在分区内。
+               （旧口径：主管落分区块 40%、支管落中线 ⇒ 间距 = 10% 块宽，随分区尺寸缩放） */
+            var gapV1 = ppVisGap(zoneW);
+            var mainX = centerX - gapV1 / 2, branchX = centerX + gapV1 / 2;
             out.main.push([{ x: mainX, y: zy }, { x: mainX, y: zy + zoneH }]);
             // 支管两端各缩进一段距离（分区边长 6%，4~14m），不与分区边缘相接，使各地块支管视觉上独立断开
             var gapV2 = Math.min(Math.max(zoneH * 0.06, 4), 14, zoneH * 0.22);
-            out.branch.push([{ x: centerX, y: zy + gapV2 }, { x: centerX, y: zy + zoneH - gapV2 }]);
-            if (ppPointInPlot({ x: centerX, y: centerY })) out.valves.push({ x: centerX, y: centerY });
+            out.branch.push([{ x: branchX, y: zy + gapV2 }, { x: branchX, y: zy + zoneH - gapV2 }]);
+            if (ppPointInPlot({ x: branchX, y: centerY })) out.valves.push({ x: branchX, y: centerY });
             // Three-level: sub-branch pipes perpendicular to branch (horizontal)
             if (isThree) {
               var nSub = Math.max(2, Math.floor(zoneH / 15));
@@ -2165,12 +2205,14 @@
               }
             }
           } else {
-            var mainY = zy + zoneH * 0.40;
+            /* [v638] 同竖向分支：对称夹住真实位置，错开量固定 */
+            var gapH1 = ppVisGap(zoneH);
+            var mainY = centerY - gapH1 / 2, branchY = centerY + gapH1 / 2;
             out.main.push([{ x: zx, y: mainY }, { x: zx + zoneW, y: mainY }]);
             // 支管两端缩进，与分区边缘留出空隙
             var gapH2 = Math.min(Math.max(zoneW * 0.06, 4), 14, zoneW * 0.22);
-            out.branch.push([{ x: zx + gapH2, y: centerY }, { x: zx + zoneW - gapH2, y: centerY }]);
-            if (ppPointInPlot({ x: centerX, y: centerY })) out.valves.push({ x: centerX, y: centerY });
+            out.branch.push([{ x: zx + gapH2, y: branchY }, { x: zx + zoneW - gapH2, y: branchY }]);
+            if (ppPointInPlot({ x: centerX, y: branchY })) out.valves.push({ x: centerX, y: branchY });
             // Three-level: sub-branch pipes perpendicular to branch (vertical)
             if (isThree) {
               var nSub2 = Math.max(2, Math.floor(zoneW / 15));
@@ -2787,6 +2829,82 @@
   })();
   })();
 
+
+  /* ===== [v640 2026-10-21 用户要求]「扬程计算式」二级 / 三级都改成可折叠，且**默认折叠**。
+     用户原话：「二级 三级控制面板中的扬程计算式 默认都是可以折叠起来的，改下。」
+     两个宿主的 DOM 形态不一样，所以不能照搬 ppResCollapse（那条是给「水力计算结果」整条 .pp-plan-bar
+     挂 pp-res-head、用 ::before 拼箭头）：
+       · 二级：灰条标题是静态的 <div class="ry-props-head">扬程计算式</div>，
+               内容容器是紧跟其后的 #ppCalcDetail ⇒ 折叠态直接挂在这两个元素上。
+       · 三级：#ppHeadBreak 的 innerHTML 由 mod/plan-calc-render.js 的 renderHeadBreakdown
+               每次重绘（标题 .tl-flat-head + 算式带 .pphb-formula 都是生成的）⇒
+               折叠态必须挂在**容器** #ppHeadBreak 上，否则下一次重绘/重算就把状态冲掉；
+               点击用容器委托，命中 .tl-flat-head 才算。
+     不记忆状态：与「水力计算结果」同口径 —— 每次进入都是默认折叠（用户要的就是这个默认）。
+     可点区域排除 input/select/button/a：二级算式带里「提升 / 地形」是可编辑输入，
+     万一展开时点它们不能被折叠抢走。
+     需要撤掉：删本 IIFE + ry-panel.css / style-01.css 里带 [v640] 的两段 CSS，
+     并把 index.html 的两个 ?v= 与 sw.js 版本按前一个版本回退即可。 ===== */
+  (function ppFormulaFold(){
+    function paint(head, detail, off){
+      if (head) {
+        head.classList.toggle('pp-fold-off', off);
+        head.setAttribute('aria-expanded', off ? 'false' : 'true');
+        head.title = off ? '点击展开扬程计算式' : '点击收起扬程计算式';
+      }
+      if (detail) detail.classList.toggle('pp-fold-body-off', off);
+    }
+    /* —— 二级 —— */
+    var d2 = document.getElementById('ppCalcDetail');
+    var h2 = d2 && d2.previousElementSibling;
+    if (h2 && h2.classList && h2.classList.contains('ry-props-head')) {
+      h2.classList.add('pp-fold-head');
+      h2.setAttribute('role', 'button');
+      h2.setAttribute('tabindex', '0');
+      paint(h2, d2, true);
+      var toggle2 = function(){
+        paint(h2, d2, !h2.classList.contains('pp-fold-off'));
+      };
+      h2.addEventListener('click', function(e){
+        if (e.target && e.target.closest && e.target.closest('input,select,button,a,textarea')) return;
+        toggle2();
+      });
+      h2.addEventListener('keydown', function(e){
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle2(); }
+      });
+    }
+    /* —— 三级 —— */
+    var host = document.getElementById('ppHeadBreak');
+    if (host) {
+      host.classList.add('pp-fold-off');
+      var paint3 = function(off){
+        host.classList.toggle('pp-fold-off', off);
+        var hd = host.querySelector('.tl-flat-head');
+        if (hd) {
+          hd.setAttribute('aria-expanded', off ? 'false' : 'true');
+          hd.title = off ? '点击展开扬程计算式' : '点击收起扬程计算式';
+          hd.style.cursor = 'pointer';
+        }
+      };
+      paint3(true);
+      host.addEventListener('click', function(e){
+        if (!e.target || !e.target.closest) return;
+        if (e.target.closest('input,select,button,a')) return;
+        if (!e.target.closest('.tl-flat-head')) return;
+        paint3(!host.classList.contains('pp-fold-off'));
+      });
+      /* 重绘后把 aria/title 补到新生成的标题上（折叠 class 在容器上，不受重绘影响） */
+      try {
+        new MutationObserver(function(){
+          var hd = host.querySelector('.tl-flat-head');
+          if (hd && !hd.dataset.ppFoldBound) {
+            hd.dataset.ppFoldBound = '1';
+            paint3(host.classList.contains('pp-fold-off'));
+          }
+        }).observe(host, { childList: true });
+      } catch (e) { }
+    }
+  })();
 
   /* ===== [v193] 成组编辑切换：整组 / 逐块 + 选择子地块 + 总管 ===== */
   (function bindGroupEditUI(){

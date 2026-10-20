@@ -2826,6 +2826,18 @@ body > .ry-nav .main-header{display:none!important}
    预期按钮 98.3 → ~80px，窄面板下说明文字回到 2 行；22px 行高与左右 10px 缩进不变。 */
 #tlPipePlanSection .pp-side #tlPumpUpdateRow, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side #tlPumpUpdateRow{
   gap:4px;
+  /* [v644 2026-10-21 用户要求]「更新扬程这个按钮跟上面的标题灰色色块右侧对齐」。
+     实测（_p1/_probe_pump_btn_align.cjs，面板 300px）：
+       灰条 .tl-flat-head 盒子通栏 10..310（文字内缩 10px）；
+       行 #tlPumpUpdateRow 复用 .pp-plan-item（v611 起 padding:0 10px）10..310；
+       按钮右缘 300 ⇒ **比灰条右缘内缩 10px**，就是用户看到的那道缺口。
+     一行处理：把这一行的**右**内边距归零，按钮右缘落到 310 与灰条齐平（实测 0px）；
+     左内边距保持 10px 不动 —— 说明文字左缘仍在 10px，与灰条标题文字同一条竖线。
+     ⚠ 只改本行：`.pp-plan-item` 的 padding 是面板所有行的公共节奏（#ppHeadBreak / 损失卡等都用它），
+       动全局会让所有行正文都顶到面板边缘。
+     ⚠ 选择器优先级够高（2 个 id > 2934 行那条 `#tlPipePlanSection .pp-side .pp-plan-item` 的 1 个 id），
+       不需要 !important，也不写 !important —— 免得以后要按断点改宽度时压不动。 */
+  padding-right:0;
 }
 #tlPipePlanSection .pp-side #tlPumpUpdateRow>.tl-flat-note, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side #tlPumpUpdateRow>.tl-flat-note{
   flex:1 1 auto;min-width:0;
@@ -2891,6 +2903,20 @@ body > .ry-nav .main-header{display:none!important}
 #tlPipePlanSection .pp-side .pphb-formula .pphb-op, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pphb-formula .pphb-op{color:#cbd5e1;padding:0 1px}
 #tlPipePlanSection .pp-side .pphb-formula .pphb-eq, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pphb-formula .pphb-eq{color:#e2e8f0;padding:0 1px;font-weight:600}
 #tlPipePlanSection .pp-side .pphb-formula .pphb-final, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pphb-formula .pphb-final{color:#a7f3d0;font-weight:700;background:rgba(134,239,172,.14);padding:1px 4px;margin-left:2px}
+/* ===== [v640 2026-10-21 用户要求] 三级「扬程计算式」可折叠，默认折叠 =====
+   与二级同一条口径（见 mod/ry-panel.css 同版本号那段）：箭头 ▾ 展开 / ▸ 收起，折叠态只留灰条。
+   ★ 折叠 class 挂在容器 #ppHeadBreak 上（不是标题）：标题与算式带都是 renderHeadBreakdown
+     每次重绘生成的，挂在子节点会被下一次重绘抹掉。逻辑 = mod/plot-editor.js 的 ppFormulaFold。
+   ★ 只挂 #ppHeadBreak 下的 .tl-flat-head —— 同一套 .tl-flat-head 还被「管径调整 · 扬程确认」
+     与「管段长度与水头损失」两块用，不能跟着变成可折叠。 */
+#tlPipePlanSection .pp-side #ppHeadBreak .tl-flat-head,
+#ryCadSide [data-pp="tlPipePlanSection"] .pp-side #ppHeadBreak .tl-flat-head{ cursor:pointer; user-select:none; }
+#tlPipePlanSection .pp-side #ppHeadBreak .tl-flat-head::after,
+#ryCadSide [data-pp="tlPipePlanSection"] .pp-side #ppHeadBreak .tl-flat-head::after{ content:" ▾"; }
+#tlPipePlanSection .pp-side #ppHeadBreak.pp-fold-off .tl-flat-head::after,
+#ryCadSide [data-pp="tlPipePlanSection"] .pp-side #ppHeadBreak.pp-fold-off .tl-flat-head::after{ content:" ▸"; }
+#tlPipePlanSection .pp-side #ppHeadBreak.pp-fold-off .pphb-formula,
+#ryCadSide [data-pp="tlPipePlanSection"] .pp-side #ppHeadBreak.pp-fold-off .pphb-formula{ display:none; }
 /* ===== [v252 2026-10-06 用户要求]「水力计算结果」面板默认折叠 =====
    #ppPlanBar2（二级）/ #tlPlanBar2（三级）载入即加 pp-res-head + pp-res-off：
    只露标题一行（水力计算结果 ▸），点标题行展开（▾）、再点收起；不记忆状态，每次进入默认折叠。

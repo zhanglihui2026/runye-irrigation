@@ -3275,3 +3275,551 @@ Pages 构建 `built` / commit `0d2eb78`；线上 `index.html`、`online-map.css`
 四份 sha256 与仓库 blob 逐字节相同。线上真跑一遍（`_p1/_live_smoke_v637.cjs`）：
 搜索框 **181px**、保存地点第二行满宽、加载的就是 `online-map.css?v=637`、本站资源零 404、零未捕获异常。
 截图 `_probe_out/05-live-searchrow.jpg`。
+
+### 26.36 v638-main-branch-gap：主管/支管图面错开量改成固定值，不再被地块压缩（2026-10-20）
+
+**用户口径（原话）**：「主管跟支管的在图中显示的距离，**不应该被地块压缩**，不管地块大小，**应该都保持一致**。
+另外检查一下，主管跟支管在平面图上为了看起来方便，做了一个**虚假显示**，实际上主管跟支管应该是**重合的**，
+只是主管**埋在地底下**。原来是这么设定的吧？如果是，那就按照我的要求执行吧。」
+
+**先答「原来是这么设定的吧」——是的，代码里有出处**：`mod/inline-09.js` 三级简图 `v110（2026-09-22）`
+注释写明「主管改到分区横向中间；**支管在主管旁平移一小段**（原主管 32% 偏置、支管落中 → 主支相距 18% 边长，
+用户反馈偏移过大，缩到 9%）」；二级 `ppBuildAutoPipes` 是「主管落分区块 40%、支管落中线」= 10% 块宽。
+⇒ 错开纯粹是显示约定，但一直是**分区块尺寸的百分比**，这正是「被地块压缩」的根源。
+
+**改前实测（同一套代码，三块地）**：错开量 = 分区尺寸 × 10%，实测 **20m（520×237/16 区）/ 12m（200×120/8 区）/
+6m（60×40/4 区）**，同一缩放下像素间距 2px / 6px / 18px —— 地块越小反而越宽、越大越窄，用户看到的正是这个。
+
+**改法（两处几何 + 一个数值）**
+1. **固定实地米数**：`plot-editor.js` 新增 `PP_MAIN_BRANCH_GAP_M = 20`，`ppVisGap()` 出值；
+   `window.RyMainBranchGap` 暴露给三级（`inline-09.js` 的 `tlGapM()` 取同一个数，兜底字面量 20）。
+   —— 为什么固定米数在两个视图里都成立：二级 `ppUpdateTransform` 是 `s = 0.5×zoom` 的**固定比例**（注释「1px=2m」），
+   三级图框 `s = min(drawW/b.w, drawH/b.h)` 且**上限被夹在 2**（常规地块恒 2 单位/m）⇒ 两边只差一个整图缩放。
+   —— 为什么是 20：v637 在用户截图那块地上正好约 20m（45% 缩放下蓝绿两根一眼分得开），以这个观感为基准推广。
+2. **对称夹住真实位置**（关键，否则固定值守不住）：原来「支管落中线、主管单侧偏」⇒ 20m 在 60m 宽的区里会把主管
+   推到邻居分区，只能靠「不超过分区尺寸 1/4」的边界压回去 ⇒ 小地块又被压回窄间距（等于没改）。
+   改成 `主管 = 中线 − 间距/2、支管 = 中线 + 间距/2`，两根**各让一半**，边界放宽到 **分区尺寸的 90%**，
+   只有窄于 22m 的极窄分区才会咬到。阀门落点跟着支管走（`x: branchX` / `y: branchY`）。
+3. 三级自动布管路径同口径（`mainX = centerX − g/2、brX = centerX + g/2`；横置同理）。
+   ★ 注意三级有两条路径：**二级已布管时（`ppHasPipes`）直接复用二级几何**，`tlVisGap` 只在自动布管路径生效 ——
+   所以三级的一致性主要来自二级，两条路径现在同口径。
+
+**改后实测（`_p1/_probe_main_branch_gap.cjs` / `_p1/_probe_tl_gap.cjs`）**
+
+| 地块 | 二级世界间距（v637 → v638） | 二级像素（同 s） | 三级 SVG 分离量（v637 → v638） |
+|---|---|---|---|
+| 520×237m / 16 区 | 20,20,20（另有一对 3.7 被 1/4 边界压掉） → **20,20,20** | 11px @s=0.5 | 7.4（p50 20.3，配对 [20/3.7]） → **39.6**（=20×1.98） |
+| 200×120m / 8 区 | 12 → **20** | 10px @s=0.5 | 3.8（配对 [10.13/1.87]） → **40**（=20×2） |
+| 60×40m / 4 区 | 6 → **20** | 60px @s=3（=20m×3px/m） | 8（配对 [4]） → **40** |
+
+⇒ 世界间距三块地**完全一致**；三级 39.6 vs 40 的 0.4 差额只是 520m 地块的图框比例是 1.98 而不是 2（整图缩放，非间距差异）。
+反向核对：把 v637 的两个文件换回去跑同一探针，逐项回到 20/12/6，改完再换回 ⇒ 探针确认测的就是本次改动。
+
+**探针本身修的三处（都是实测踩到才发现的）**
+- **只扫列量不到竖置线**：列扫时竖管整条是「簇高 200px」的大色块，被「簇高 ≤10px 才算线」的过滤掉 ⇒ 小地块量出 `null`。
+  补一遍**行扫**（沿 x 聚簇）后三块地都有读数。
+- **`ppGetPlanDims` 优先读 `window.runyePlanDims`**：探针只设 `measuredPolygon` 时，分区线按上一轮遗留的
+  600×400 画、多边形却是 520×237，截图看着「管子在分区边上」。探针里一并设 `window.runyePlanDims={A,B}` 后对齐。
+- **三块地可比必须同一比例**：`ppFitView` 的比例随地块大小变（还夹了 zoom≤10），fit 下量出来的 px 不可比 ⇒
+  统一 `ppGetState()→改 zoom→ppSetState()` 回到 **zoom=1（s=0.5px/m）** 再量；小地块 100% 下只有 30px 宽，退到 zoom=6（s=3px/m）并在输出里标 `放大后量`。
+
+**版本三件同抬**：`sw.js VERSION = 'v638-main-branch-gap'`（含变更注释）、
+`index.html` 的 `mod/plot-editor.js?v=` / `mod/inline-09.js?v=` / `mod/style-01.css?v=`、`plugin-admin.html` 角标 `界面 v638`。
+
+**闸门**：`node scripts/gate.cjs` → 核心门禁 PASS（113.3s），等价性/Playwright/Puppeteer 四项仍 SKIPPED
+（本机 Node 解析不到 playwright/puppeteer、`_p1/baseline.reviewed.txt` 未审核），与 v637 发布时同状态，无新增 FAIL。
+本次改动确实会动三级 SVG 的几何 hash（间距变了），等价性基线要在补齐审核流程时一并重建，已在 v637 记录里挂账。
+
+**备份**：`_backup_20261020_gap/`（plot-editor.js / inline-09.js / index.html / sw.js / plugin-admin.html，v637 版）。
+截图：`_probe_out/gap_520x237_fit.jpg`、`gap_60x40_fit.jpg`、`gap_60x40_s3.jpg`、`tl_gap_520.jpg` 等。
+
+### 26.37 v639-recipe-row-top：二级左栏「调用方案」整行上移到「灌溉参数」组首（2026-10-21）
+
+**用户口径（原话）**：「二级面板中，灌溉参数这个区域，调用方案整体移动到水泵提升高度上面，灌溉参数 下面。」
+
+**改前结构**（`#ppSide` 内，自上而下）：灌溉参数灰条 → `#ppPlanBar`（10 行输入，首行水泵提升高度）
+→ `#ppRecipeBar`（选择方案 + 调用）→ `#ppPlanBar2`（水力计算结果）→ 扬程计算式灰条 → `#ppCalcDetail`。
+配方行压在整组输入之下 ⇒ 想先选方案得先滚过 10 行。
+
+**改后**：灌溉参数灰条 → `#ppRecipeBar` → `#ppPlanBar` → 结果 → 计算式。
+
+**三处改动（都不动逻辑）**
+1. `index.html`：`#ppRecipeBar` 整块（连同 v491/v526 两段说明注释）从 `#ppPlanBar` 之后挪到
+   `<div class="ry-props-head">灌溉参数</div>` 之后；id / class / 内部控件一个没改。
+   ⚠ 中途踩过一次：先用 Edit 在「第2行：计算结果」前插入，结果配方块**重复了一份**（原块还在），
+   靠 `grep -c 'id="ppRecipeBar"'` 立刻发现（应该 =1），改用脚本按行号删两份再插一份解决。
+   ⇒ 教训：这种「移动」不能靠「先插后删」，插入点若在原块之后必然短暂出现重复 id。
+2. `mod/ry-panel.css`：补 `.pp-recipe-status:empty{ display:none }`。
+   空状态行原本靠 `min-height:14px` 占位，位置在 10 行下方时看不出问题；挪到组首后它正好夹在
+   「调用」与「水泵提升高度」之间，成了一条 16px 的无用空档（实测：行 22px + gap 2px + 状态 14px = 38px）。
+   有反馈文字（「请先在下拉里选择一个方案」/保存成功/错误红字）时照常展开，`.pp-recipe-err` 不受影响。
+3. `mod/ry-panel.css?v=620-sticky-grp` → `?v=639-recipe-row-top`（文件真的改了，参数必须抬）。
+
+**实测（`_p1/_probe_recipe_row_top.cjs`，9 条全 PASS）**
+- 屏幕坐标（top）：灌溉参数 121 → 调用方案 143 → 水泵提升高度 165 → 地形高差 187 → 水源距离 209
+  ⇒ DOM 顺序 = 屏幕顺序，且上下间隙都是 **0px**（无多出来的缝）。
+- 行高：配方行 22px，与相邻参数行 22px 同基准；选择方案 235×20、调用按钮 40×20，均 visible / 未 disabled。
+- 状态行回归：点「调用」（未选方案）→ 文本「请先在下拉里选择一个方案」、行高 22→38px、
+  行底 181 = 水泵提升高度 top 181（不重叠）；清空后回到 22px。
+- 零未捕获异常。截图 `_probe_out/v639_recipe_row.jpg`。
+
+**版本三件**：`sw.js VERSION = 'v639-recipe-row-top'`（含变更注释）、`index.html` 的 `ry-panel.css?v=`、
+`plugin-admin.html` 角标 `界面 v639`。v638 的 `plot-editor.js?v=638-main-branch-gap` 等保持不动（那些文件本次未改）。
+
+**闸门**：`node scripts/gate.cjs` → 核心门禁 PASS、面板漂移检查 PASS（4 条已登记，无新增），
+等价性 / Playwright / Puppeteer 四项 SKIPPED（与 v637/v638 同状态）。
+
+### 26.38 v640-formula-fold：二级 / 三级「扬程计算式」可折叠，默认折叠（2026-10-21）
+
+**用户口径（原话）**：「二级 三级控制面板中的扬程计算式 默认都是可以折叠起来的，改下。」
+
+**为什么不能照抄现有折叠机制**：`ppResCollapse`（v252）是给「水力计算结果」**整条 `.pp-plan-bar`** 用的
+—— 它挂 `pp-res-head`、箭头拼进 `::before` 的 `content`。而「扬程计算式」在两个宿主里形态完全不同：
+
+| 宿主 | 标题 DOM | 内容 DOM | 折叠态挂哪 |
+|---|---|---|---|
+| 二级 | 静态 `<div class="ry-props-head">扬程计算式</div>`（index.html:805） | 紧跟其后的 `#ppCalcDetail`（`renderPlanCalcDetail` 填 innerHTML） | 标题 + 内容各自加类 |
+| 三级 | `#ppHeadBreak` 里由 `renderHeadBreakdown` **每次重绘生成**的 `.tl-flat-head` | 同一次重绘生成的 `.pphb-formula` | **只能挂容器 `#ppHeadBreak`** |
+
+★ 三级那条是本次的关键坑：如果把 `pp-fold-off` 挂在标题或算式带上，下一次 `calcPlan → renderHeadBreakdown`
+一重绘就整个 innerHTML 换掉、折叠状态**无声消失**（用户看到的就是「点了没反应/自己又弹回来」）。
+挂在容器上才稳；再补一个 `MutationObserver`，重绘后把 `aria-expanded` / `title` 补到新标题上。
+
+**实现（三处）**
+1. `mod/plot-editor.js` 新增 `ppFormulaFold` IIFE（紧跟 `ppResCollapse` 之后，文件顶层）：
+   - 二级：`#ppCalcDetail` 的 `previousElementSibling` 就是它那条灰条（做了 `ry-props-head` 校验，
+     万一结构变了不会误绑），点击/回车切换；可点区域排除 `input,select,button,a,textarea`
+     （算式带里「提升 / 地形」是可编辑输入，展开时点它们不能被折叠抢走）。
+   - 三级：容器 `#ppHeadBreak` 加 `pp-fold-off`，点击委托命中 `.tl-flat-head` 才算。
+   - 两个宿主都是**默认折叠**（`paint(..., true)`）；不记忆状态，每次进入都折叠（与「水力计算结果」同口径）。
+2. `mod/ry-panel.css`：`[v640]` 段 —— 标题 `cursor:pointer` + hover 微变、`::after` 拼 ` ▾ / ▸`、
+   `#ppCalcDetail.pp-fold-body-off{display:none}`。
+3. `mod/style-01.css`：`[v640]` 段 —— 同上，但选择器**限定 `#ppHeadBreak` 下的 `.tl-flat-head`**：
+   同一套 `.tl-flat-head` 还被「管径调整 · 扬程确认」「管段长度与水头损失」两块用，
+   不限定就会把这两块也带成可折叠（实测确认它们仍是 `cursor:auto`、无箭头）。
+
+**实测（`_p1/_probe_formula_fold.cjs`，18 条全 PASS）**
+- 二级默认态：`#ppCalcDetail display:none`、标题 `::after=" ▸"`、`aria-expanded=false`、灰条仍 22px（不塌版面）；
+  点一下 → `display:block`、`" ▾"`、`aria=true`、算式带高 83px；再点回到 `none`。
+- 折叠不清空内容：收起态 `#ppCalcDetail.innerHTML` 仍有 **1081 字符**（渲染照常，只是不显示）。
+- 三级默认态：`.pphb-formula display:none`、`::after=" ▸"`、`cursor:pointer`；点一下 → `block`、块高 102px；再点回 `none`。
+- 同页其它 `.tl-flat-head`：「管径调整 · 扬程确认」「管段长度与水头损失」|`cursor=auto`|`after=none` ⇒ 未被带折叠。
+- 零未捕获异常。截图：`_probe_out/v640_pp_fold_closed.jpg`（二级默认折叠）、`v640_pp_fold_open.jpg`（展开）、
+  `v640_tl_fold_panel.jpg`（三级默认折叠）。
+
+**探针踩到的两个坑（记下来）**
+- `Page.captureScreenshot` 的 `clip` 字段是 `width/height`，不是 `w/h` —— 写错直接 `Invalid parameters`。
+- 三级左栏**不能**用 `#tlPipePlanSection .pp-side` 定位：`#tlSide` 会被搬进 `#ryCadSide` 的 rail，
+  祖先选择器找不到；要用 `#tlSide` 这个 id。
+
+**版本三件**：`sw.js VERSION = 'v640-formula-fold'`（含变更注释）、
+`index.html` 的 `style-01.css?v=` / `plot-editor.js?v=` / `ry-panel.css?v=` 三个都抬到 `640-formula-fold`、
+`plugin-admin.html` 角标 `界面 v640`。`inline-09.js?v=638-main-branch-gap` 不动（本次未改该文件）。
+
+**闸门**：`node scripts/gate.cjs` → 核心门禁 PASS（96.9s）、面板漂移检查 PASS（4 条已登记，无新增），
+其余四项 SKIPPED（与 v637～v639 同状态）。
+
+---
+
+### 26.39 v641-tl-legend-corner：三级工作区图例挪到画布右下角（2026-10-21）
+
+**用户原话**：「红框中的图例放在右下角吧。」（附截图，红框圈的是三级设计工作区画布底部那条
+「总管 / 主管 / 支管 / 水源 / 阀门」五色图例，原来是**底部居中**）
+
+**这版真正的工作量不在改 right 值，而在「别把定位基准认错」**
+- 图例 `#tlWsOvLegend` 是 `#tlWsOverlays` 的子元素（2026-09-16 的「固定文字层」，不随图纸缩放/平移）。
+- `#tlWsOverlays` 是 `inset:0` —— 它相对的 `.ry-pane-ws` 是**三列栅格**：
+  `minmax(0,1fr) | 6px 拖拽条 | var(--tlWsToolbarW, clamp(210px,17vw,300px)) 工具轨`，`column-gap:8px`。
+  ⇒ **覆盖层铺满三列，不等于画布**。
+- 第一版只改了 `bottom:8px;right:8px;left:auto;transform:none`，探针一看就翻车：
+  图例右缘 **1592**、工具轨左缘 **1328** ⇒ 相交 **264px**，图例跑到窗口右缘、压在工具轨按钮
+  （🖍/Aa−/生成管线图/导出 CAD）和最底那条轨内提示文字上。
+  ——教训：**绝对定位元素的 `right/bottom` 是相对定位祖先（这里是整块栅格）算的，不是相对它「看上去所在」的画布**。
+
+**最终做法：沿用仓库里已有的对齐术（不新造轮子）**
+- 右上角那三枚勾选框（`#tlWsLabelsChkWrap` / `#tlWsZoneChkWrap` / `#tlWsWorstChkWrap`，2026-09-28 加的）
+  早就解决过同一个问题：`r = Math.max(8, (pane.right - canvas.right) + 8)`，由 `ResizeObserver(#tlWsContent)` 驱动。
+- 本轮把图例并进同一条路：`mod/inline-24.js` 里新增 `window.tlAlignWsOvLegend()`，
+  ```
+  right  = (pane.right   - #tlWsContent.right)  + 8
+  bottom = (pane.bottom  - #tlWsContent.bottom) + 8
+  left   = 'auto'; transform = 'none';   /* 清掉旧的居中基准 */
+  ```
+  挂在原来的 `tlAlignLabelsChk()` 尾部 ⇒ **一处驱动、四处跟随**：拖拽条改工具轨宽度、窗口缩放、
+  切视图（rail 开合）、手机端 `.ry-pane-ws` 改纵向 flex，全部自动重算（公式对纵向布局同样成立：
+  此时 `pane.bottom - canvas.bottom` 恰好等于工具轨高，图例仍落在画布下缘 8px）。
+- `mod/inline-09.js` 在每次生成图、重写图例 `innerHTML` 之后补调一次（`ov.style.display='block'` 之后），
+  因为图例宽度会随内容变（项数固定 5 项，但管径文字可能变化）。
+- `index.html` 行内保留 `bottom:8px;right:8px;left:auto;transform:none` 作**首帧兜底**
+  （JS 未跑/图例重绘瞬间不会闪回居中）。
+
+**实测（`_p1/_probe_legend_corner.cjs`，12 条全 PASS）**
+| 项 | 实测 |
+|---|---|
+| 画布 `#tlWsContent` | l=319 r=1306 t=37 b=970（w=987） |
+| 覆盖层 `#tlWsOverlays` | l=319 r=1600 → 与面板同尺寸（w=1281），证实「覆盖层 ≠ 画布」 |
+| 工具轨 | l=1328 r=1600 w=272 |
+| 图例 | l=990 r=1298 t=939 b=962（308×23） |
+| 距画布右缘 / 下缘 | **8px / 8px** |
+| 与工具轨相交 | **0×23**（贴边不算相交） |
+| 与轨内提示文字 `#tlWsHint` 相交 | **0** |
+| 图例完全落在画布内 | 308×23 全部命中画布 |
+| 4 点 `elementFromPoint` | 全部 `in:true`（命中 `#tlWsOvLegend` 自身） |
+| 图例项 | 5：总管/主管/支管/水源/阀门 |
+| 未捕获异常 | 0 |
+
+截图：`_probe_out/v641_tl_legend_corner.jpg`（画布右下角 620×210 局部，五色图例完整、右边工具轨整条露出来）、
+`_probe_out/v641_tl_legend_full.jpg`（整幅工作区）。
+
+**探针踩到的三个坑（都是「测错了」而不是「改错了」，记下来别再犯）**
+1. **命中检测必须临时打开 `pointer-events`**：图例继承 `#tlWsOverlays` 的 `pointer-events:none`
+   （刻意不挡画布框选/点击），`elementFromPoint` 会**跳过**它、直接返回下面的 `tl-ws-svg`，
+   看上去像「被 SVG 盖住了」。改成「存原值 → 置 auto → 测 4 点 → 还原」后才是有效证据。
+2. **公告遮罩会异步再弹一次**：`runye-announce.js` 的 `.ry-ann-mask` 在开头删掉后，生成图时又出现，
+   4 点命中全是 `ry-ann-mask`。命中检测前再摘一次。
+3. **右下角还蹲着「添加到主屏幕」浮层**（`#ryPwaInstall`，`position:fixed`，`pwa/pwa.js`）：
+   它会盖住右下角截图。先量它与图例的相交（改完后应为 0），再 `visibility:hidden` 后截图 ——
+   这样报告里既证明「不与它相交」，又拿到干净截图。
+
+**副产物**：`_probe_legend_corner.cjs` 顺带复核了二级 `#ppLegend`（画布下方那条整行图例），
+仍是 `l=319 r=1600 w=1281`、与画布列同宽、未被裁 —— 二级没动过，确认无回退。
+
+**版本三件（含两个脚本缓存参数）**
+- `sw.js` → `const VERSION = 'v641-tl-legend-corner';`（含上方变更注释块）
+- `index.html` → `inline-09.js?v=641-tl-legend-corner`、`inline-24.js?v=641-tl-legend-corner`
+  （`inline-24.js` 原参数还是古老的 `?v=357`，顺手对齐；`style-01.css` / `ry-panel.css` /
+  `plot-editor.js` 本次未改，保持 `640-formula-fold`）
+- `plugin-admin.html` → 角标 `界面 v641`
+
+**闸门**：`node scripts/gate.cjs` → 核心门禁 PASS（103.5s）、面板漂移检查 PASS（4 条已登记，无新增）、
+其余四项 SKIPPED（与 v637～v640 同状态）。
+
+**状态**：v638 / v639 / v640 / v641 四版**全部本地、未提交未推送**，等用户说「发布」再一起走 Git Data API。
+
+---
+
+### 26.40 v642-tl-legend-frame：三级**简图**底部图例整体左移，末项「滴灌带」不再压外框（2026-10-21）
+
+**用户原话**：「三级简图的图例位置调整下，现在滴灌带跟外框重叠了，图例整体向左移动一些。」
+（截图是**三级简图**那张 A3 施工图，不是设计工作区）
+
+**先分清两处「图例」——这是本轮最容易混淆的地方**
+| | v641 改的 | v642 改的（本条） |
+|---|---|---|
+| 位置 | 三级**设计工作区**画布右下角 | 三级**简图**（A3 施工图）底部 |
+| 载体 | HTML 覆盖层 `#tlWsOvLegend`（DOM，JS 定位） | SVG 内固定坐标 `#tlLegendGroup`（`mod/inline-09.js` 拼字符串） |
+| 定位 | `right/bottom` 相对定位祖先 | `lx = svgW-378` 硬编码用户坐标 |
+| 影响面 | 只工作区（克隆底图剥离图例组） | 简图 / 下载 SVG / 下载 PNG / 打印（同一份 `parts` 共用） |
+
+**根因：v489 的估算口径本身就偏了 4 单位**
+- `#tlFrameGroup` 是**双线**图框（2026-10-06 v272）：外粗线 `x=8 w=svgW-16`（右缘 **1182**）、
+  内细线 `x=16 w=svgW-32`（右缘 **1174**）。
+- v489 的注释写「末项文字止于 `lx+346` = `svgW-12`」并「右缘贴 frameX 右边线内缩 4px」⇒
+  这个 `svgW-12` 比**内细线 `svgW-16` 大 4**，估算一开始就注定压内线。
+- 再叠加字体实测误差：字号 10 / 字重 600 的三个汉字 **31.8** 单位（估的是 30）。
+- 两项合起来 ⇒ 整组右缘 `1178.8`，越过内细线 **4.8** 单位。（没到外粗线 1182，所以看上去是「字压在框线上」而不是「跑出画外」）
+
+**改法：只动 `lx` 一个数**
+```
+lx = svgW - 358   →   svgW - 378      /* 左移 20 单位 */
+```
+各项相对步进（60/60/65/60/55 + 文字偏移 20/20/20/11/11/16）与字号字重全部不动 ⇒ 图例内部节奏原样。
+
+**实测（`_p1/_probe_tl_legend_frame.cjs`，量 `getBBox()` 的 SVG 用户坐标，与屏幕缩放无关）**
+
+| 项 | 改前 | 改后 |
+|---|---|---|
+| 图例 bbox | x=832 w=346.8 ⇒ 右缘 **1178.8** | x=812 w=346.8 ⇒ 右缘 **1158.8** |
+| 末项「滴灌带」文字 bbox | 1147 → 1178.8 (w=31.8) | 1127 → 1158.8 |
+| 内细线 1174 / 外粗线 1182 | 压内细线 **+4.8** | 距内细线 **−15.2**（留 15.2） |
+| 与底部参数行（右端 465.1）间隙 | 366.9 | **346.9**（仍极宽裕） |
+
+6 条断言全 PASS：不压外粗线、不压内细线（≤ 内细线−8）、右缘余量 ≥10、不撞参数行、6 项齐全、零未捕获异常。
+截图：`_probe_out/v642_tl_legend_frame.jpg`（图例+右边框局部 3× 放大，能看清「滴灌带」与双线框的间隙）、
+`v642_tl_diagram_full.jpg`（整幅简图）。
+
+**为什么选 20 而不是「刚好不压」的 13**
+刚好不压只需左移 12.8；取 20 后右侧留 15.2 单位，与图框「内框内缩 16」是同一视觉口径，
+看起来是「刻意留白」而不是「差一点压上」。参数行离得远（346.9 间隙），左移毫无副作用。
+
+**回归**：`_p1/_probe_legend_corner.cjs`（v641 工作区图例）复跑 12 条仍全 PASS —— inline-09 同文件改动未影响工作区定位。
+
+**版本三件**：`sw.js VERSION = 'v642-tl-legend-frame'`（含变更注释）、`index.html` 的
+`inline-09.js?v=642-tl-legend-frame`、`plugin-admin.html` 角标 `界面 v642`。
+（`inline-24.js` / `style-01.css` / `ry-panel.css` / `plot-editor.js` 本次未改，参数保持 v641/v640。）
+
+**闸门**：`node scripts/gate.cjs` → 核心门禁 PASS（95.1s）、面板漂移 PASS（4 条已登记，无新增）、4 项 SKIPPED。
+
+**状态**：v638 / v639 / v640 / v641 / v642 **五版全部本地、未提交未推送**，等用户说「发布」再一起走 Git Data API。
+
+---
+
+### 26.41 v643-north-arrow：三级简图指北针换造型（圈径与位置不动，纯图形重画）（2026-10-21）
+
+**用户原话**：「指北针的图例换下。」（截图红箭头指向 A3 图框右上角那个小罗盘）
+
+**旧造型为什么该换**
+2026-10-20「出图加指北针」时画的是「单圈 + 两片**透镜形**对顶箭头 + 圈外小 N」：
+箭头两头尖、没有底边，缩到 A3 上约 17mm（屏上约 26px）时是两片小白绿瓜子，**看不出「指北」的方向感**；
+单圈也撑不起「罗盘」的识别度。
+
+**新造型（建筑制图惯例）**
+1. **双圈盘面**：外圆 1.4 细实线 + 内圆 0.6 细线（内圆 = R×0.8125）；
+2. **指北针两瓣改三角**（共底边于圆心线）：北瓣实心深绿 `#14532d`（与标题/图例同色系）、
+   南瓣白底深绿描边 ⇒ 方向感明确，缩到 26px 也一眼看得出朝北；
+3. **N 仍在圈外上方**（不挤占盘面），字号 11 → 12.5、加 0.4 字距。
+
+**几何全部由 `tlNr` 推导** —— `tip = R×0.69`、`半底宽 = R×0.27`、`内圈 = R×0.8125`。
+以后调大小只动 `tlNr` 一个数即整体等比缩放，不会再出现「圈变大了箭头没跟上」的错位。
+
+**实测（`_p1/_probe_north_arrow.cjs`，SVG 用户坐标 getBBox，8 条全 PASS）**
+
+| 项 | 实测 |
+|---|---|
+| 外圆 r | **24**（与旧版一致，版面零位移） |
+| 内圆 r | 19.5 = 24×0.8125，线宽 0.6 |
+| 两瓣 | 北 `fill=#14532d` 无描边 / 南 `fill=#ffffff stroke=#14532d` |
+| 整组 bbox | 1070..1118 × 39.2..106（内细框 16..1174，右侧余量 56） |
+| N 文字 | 1088.5..1099.5，字号 12.5 |
+| 与标题相交 | 无（标题右缘 725.3） |
+| 与信息行相交 | 无（信息行右缘 1002） |
+
+截图：`_probe_out/v643_north_arrow_5x.jpg`（5 倍特写）、`v643_tl_diagram_full.jpg`（整幅简图）。
+
+**同时给了两个备选**（聊天气泡里并排画了三版，等用户拍）：
+- **B 国标单针**：单圈 + 实心针 + 细尾线（不要内圈，最接近 GB 的「细圆 + 指针」）；
+- **C 全黑工程版**：双圈 + 指针与 N 全用 `#111827`（CAD 味，与图框线条同色）。
+用户如说「用 B/C」，只需改本段的两处 `fill/stroke` 与是否画内圈，坐标一个都不用动。
+
+**版本三件**：`sw.js VERSION = 'v643-north-arrow'`、`index.html` 的 `inline-09.js?v=643-north-arrow`、
+`plugin-admin.html` 角标 `界面 v643`。
+**闸门**：核心门禁 PASS（108.8s）、面板漂移 PASS（4 条已登记，无新增）、4 项 SKIPPED。
+
+**状态**：v638～v643 **六版全部本地、未提交未推送**，等用户说「发布」再一起走 Git Data API。
+
+---
+
+### 26.42 根目录调试探针清账（B 方案「保留证据」· 2026-10-21 · 提交 025356c）
+
+**用户原话**：「B 保留证据（我倾向这个）：先把这 26 个已入库，其余 45 个再加忽略。
+文档可追溯，?? 也基本不再出现在 git status 里，代价是多 308KB。」
+
+**背景（`_p1/_audit_root_probes.md` 的结论）**
+根目录堆了 **106 个** `_probe_*` / `_shot_*`（1.9MB），构成是：
+24 个早已被忽略（`_*.cjs` / `_*.png` / `_*.txt`）+ 11 个历史上故意入库 +
+**71 个 `.mjs` 悬空**（就是 `git status` 里一直挂着的几十条 `??`）。
+其中 **26 个被 `AGENT_HANDOFF.md` 点名**、当作某次修复的「实测依据」，
+但文件只活在本机 —— 换机器后文档里的引证就指向空文件。**零个被产品代码加载**
+（`sw.js` / `cloud-sync.js` 里的出现全是注释引证）。
+
+**执行（三步，顺序不能反）**
+1. `git ls-files --others --exclude-standard | grep -E '^_(probe|shot)_.*\.mjs$'` → 71 个；
+   逐个查名字是否出现在 `AGENT_HANDOFF.md` → **26 个**（实测 308KB）；
+2. **先 `git add` 这 26 个**；
+3. **再**在 `.gitignore` 尾部加 `_probe_*.mjs` / `_shot_*.mjs`（连处置原则注释一起写进去）。
+   ⚠️ 顺序反了会被新规则挡住 —— 那时只能 `git add -f`，等于自己给自己设卡。
+
+**结果**
+
+| 项 | 改前 | 改后 |
+| --- | --- | --- |
+| 已跟踪探针 `git ls-files` | 11 | **37** |
+| 悬空探针 | 71 | **0** |
+| 根目录 `??` 条数 | 74 | **3** |
+| 仓库体积 | — | +308KB |
+
+**两条要记住的性质**
+- `.gitignore` **对已跟踪文件无效** ⇒ 新规则不会把已入库的 37 个「反忽略」掉，
+  以后改这些探针照常 `git add` 即可，不会出现「改了却没被 git 看见」。
+- `_p1/` 整个目录被 `.gitignore` 第 17 行 `_*/` 忽略 ⇒ 我新建的探针（`_p1/_probe_*.cjs`）
+  和清点报告 `_p1/_audit_root_probes.md` **都不入库**，只作本机验证工具；
+  决策与结论以本节（跟踪文件）为准。
+
+**剩下的 3 条 `??`（非探针，未动）**
+`2026-10-19.md`（散落的当日笔记）、`_float_behavior.json`（浮层行为探针输出）、
+`v599_二级右栏皮肤对比.png`（皮肤对比截图）。
+如要一并清净，建议：截图与 json 归到 `_probe_out/`（已被 `_*/` 覆盖），md 并入文档或删掉 —— 等用户定。
+
+**⚠️ 发布流程影响**：提交 `025356c` 是**本地**提交，`master` 现比 `origin/master` 领先 **1 个**。
+`推送更新.bat` 第一道闸就要求「本地 master == origin/master」，否则直接停
+（原话：「为避免顺带推送之前的本地提交」）。所以**下次发布前需要先把这 1 个 chore 提交推上去**：
+GitHub Desktop 点一下推送即可（页面内容零变化，只是把探针入库），或不推、等发布时一并处理。
+
+**状态**：v638～v643 六版仍未提交；本条 chore 已提交未推送。
+
+---
+
+### 26.43 v644-pump-btn-align：「更新扬程」按钮右缘与灰条右缘对齐（2026-10-21）
+
+**用户原话**：「更新扬程这个按钮跟上面的标题灰色色块 右侧对齐。」（红箭头指向三级左栏「管径调整 · 扬程确认」块）
+**改动面**：只动一条声明 —— `mod/style-01.css` 里 `#tlPumpUpdateRow{padding-right:0}`（双祖先同写）。
+
+**实测位置（`_p1/_probe_pump_btn_align.cjs`，面板 300px）**
+
+| 元素 | 左 .. 右 | 说明 |
+|---|---|---|
+| 面板 `#tlSide` | 10 .. **310** | 宽 300 |
+| 灰条 `.tl-flat-head` | 10 .. **310** | 盒子通栏，文字内缩 10px |
+| 行 `#tlPumpUpdateRow` | 10 .. 310 | 复用 `.pp-plan-item`，v611 起 `padding:0 10px` |
+| 按钮 `#tlPumpUpdateBtn` | 242 .. **300** | ← 比灰条右缘内缩 **10px** |
+
+⇒ 缺口就是行的右内边距。改后按钮右缘 **310**，与灰条、面板右缘三者重合（实测差值 0px）。
+
+**为什么只改这一行、不加 !important**
+- `.pp-plan-item` 的 `padding:0 10px` 是**整个面板所有行的公共节奏**（扬程块、损失卡、联合灌溉行都用它），
+  改全局会让所有行正文顶到面板边缘 —— 用户要的是这一行。
+- 选择器 `#tlPipePlanSection .pp-side #tlPumpUpdateRow` 有 **2 个 id**，
+  页面后面那条 `#tlPipePlanSection .pp-side .pp-plan-item` 只有 1 个 id ⇒ 优先级天然更高，
+  不需要 !important（也刻意不写，免得以后按断点改宽度时压不动）。
+
+**实测 8 条全 PASS**
+
+| 断言 | 实测 |
+|---|---|
+| 灰条通栏（灰条宽 = 面板宽） | 300 = 300 |
+| 按钮右缘与灰条右缘齐平 | **0px** |
+| 按钮右缘与面板右缘齐平 | **0px** |
+| 说明文字左缘仍内缩 10px | 10px（左内边距未被牵连） |
+| 按钮宽度未被压 | 58px |
+| 说明文字与按钮不重叠 | note.r=248 ≤ btn.l−4=248 |
+| 行右内边距实测 0px | 真 CSS 生效（**不是** inline 试算） |
+| 未捕获异常 | 0 |
+
+截图：`_probe_out/v644_pump_btn_after.jpg`（改后，3× 特写）、
+`v644_pump_btn_sim10.jpg`（用 `--sim` 把右内边距强行加回 10px 的**对照图**，一眼看出缺口）。
+
+**探针踩的坑（三条，都是截图口径）**
+1. `Page.captureScreenshot` 的 `clip` 必须有 `width/height` 且**四缘都要量到** ——
+   我起初的 `R()` 只返回 l/r，`y`/`height` 变 undefined（JSON 里是 null）⇒ `Invalid parameters`。
+2. **`captureBeyondViewport` 会把 clip 当作文档坐标**，而面板是内部滚动容器、
+   `getBoundingClientRect` 给的是视口坐标 ⇒ 截出来是一整片背景色。优先用视口口径（不带该参数）。
+3. 这块在左栏靠下，默认在视口外，得先 `scrollIntoView({block:'center'})` 再量/截。
+
+**版本三件**：`sw.js VERSION = 'v644-pump-btn-align'`、`index.html` 的 `style-01.css?v=644-pump-btn-align`、
+`plugin-admin.html` 角标 `界面 v644`。
+**闸门**：核心门禁 PASS（92.2s）、面板漂移 PASS（4 条已登记，无新增）、4 项 SKIPPED。
+
+**状态**：v638～v644 **七版全部本地、未提交未推送**（另有 chore 提交 `025356c` 也未推送）。
+
+---
+
+### 26.44 v645-dim-scale-entry：「标注尺寸大小调节」入口收敛到设置页（2026-10-21）
+
+**用户原话**：「标注尺寸大小调节，不放在这里，放在设置页面就行了，如果这里的跟设置页面的重复，那这里就取消。」
+（红箭头指向三级工具轨里那组 `Aa－ / 100% / Aa＋ / ⟲`）
+
+**核对结论：确实是重复，而且是同一个 localStorage key**
+
+| | 设置页「标注与文字」 | 工具栏四键组 |
+|---|---|---|
+| 控件 | `#rySetScaleRange` 滑块 0.6~1.8 step 0.1 | `#tlDimScaleRow` 四键 |
+| 写入 | `localStorage['tl-dim-scale']` | **同一个 key** |
+| 证据 | v520 的页签文案自己写着「与顶栏工具栏上的「Aa」四键组是同一个值，两边随时同步」 | — |
+
+⇒ 按用户要求取消工具栏那处，只留设置页。
+
+**四处一起改（少一处就会留下死代码或谎话）**
+1. `index.html`：删掉 `#tlDimScaleRow` 整块，**注释留档**写明怎么恢复 ——
+   四键必须放回 `#tlAutoPipe` **之前**（A6 契约：生成按钮贴底）。
+2. `mod/inline-09.js`：删 `window.tlDimScaleStep` / `window.tlDimScaleReset` + 那句 `#tlDimScaleVal` 同步；
+   **保留 `tlDimScaleOf()` 与 `tlDS`** —— 渲染仍把它乘进 `DG.font/gap/tick/tickW`，出图逻辑一个字节没动。
+3. `mod/inline-28.js`：去掉 `refresh()` 里对已删元素的同步；页签文案改成「**这里是唯一入口**（v645 起工具栏那组四键已取消）」——
+   不改就是界面在说谎（用户会照着去工具栏找）。
+4. `verify_ry_tool.js`（历史审计，不在 gate 里）：任务M 契约从 `id="tlDimScaleMinus"` 改成
+   `id="rySetScaleRange"`。锁的目标从「四键别删」变成「别两处都没了、比例再也调不了」。
+
+**实测（`_p1/_probe_dim_scale_entry.cjs`，11 条全 PASS）**
+
+| 断言 | 实测 |
+|---|---|
+| 工具栏已无 `#tlDimScaleRow` | 查无 |
+| 四键/数值节点全消失 | Minus/Plus/Reset/Val 全部 false |
+| 两个函数不再挂在 window 上 | `undefined / undefined` |
+| A6：生成管线图仍是轨内最后主按钮 | gen idx=24，导出 CAD idx=25 |
+| 设置页滑块范围 | 0.6~1.8 / step 0.1 |
+| 文案已改「唯一入口」 | 命中 |
+| 拖到 70% 即时反映 | 标签 `70%` |
+| 保存后落盘 | `localStorage = 0.7` |
+| **图面字号真按 12×0.7 缩放** | 字号档位由 `[…,12,…]` 变为 `[**8.4**, 9.5, 10, …]` |
+| 只改标注档、不是整图缩放 | 其余档位不变（9.5/10/10.5/11/12/12.5/15/20 仍在） |
+| 未捕获异常 | 0（没有 `tlDimScaleStep is not defined`） |
+
+截图：`_probe_out/v645_rail_no_aa.jpg`（工具轨，四键已消失，顺序变成「标注保存 → 生成管线图 → 导出 CAD」）、
+`v645_settings_scale.jpg`（设置页「标注与文字」，滑块 + 100% + 复位 100%）。
+
+**版本三件**：`sw.js VERSION = 'v645-dim-scale-entry'`、`index.html` 的 `inline-09.js?v=` / `inline-28.js?v=`
+都抬到 `645-dim-scale-entry`、`plugin-admin.html` 角标 `界面 v645`。
+（`style-01.css` 保持 v644 —— 本次没动它。）
+**闸门**：核心门禁 PASS（93.5s）、面板漂移 PASS（4 条已登记，无新增）、4 项 SKIPPED。
+
+**状态**：v638～v645 **八版全部本地、未提交未推送**（另有 chore 提交 `025356c` 也未推送）。
+
+---
+
+### 26.45 v646-north-cross：三级简图指北针换成「十字刻度」版（候选 4）（2026-10-21）
+
+**用户原话**：「三级简图的指北针有没有更好的图例，你先列几个，我看看，我同意你在修改。」→
+我列了六版并排样张（都按 r=24 同尺寸渲）→ 用户回「**用4吧**」。
+
+**候选 4 的取舍（当时写在样张旁边，事后核对属实）**
+
+| | 内容 |
+|---|---|
+| 好处 | 「工程感」最强，四个方位（N/E/S/W）一眼可读 |
+| 代价 | 刻度**突破圆外 4px** ⇒ 整组宽度从 48 变 56，得重算与图框右缘的距离 |
+
+**改动只有一处：`mod/inline-09.js` 的 `#tlNorthGroup` 绘制段**
+
+| 部件 | v643（旧） | v646（现在） |
+|---|---|---|
+| 圈 | 双圈（外 r=24 + 内圈） | **单圈** r=24，`fill #ffffff` / `stroke #111827` / `stroke-width 1.1` |
+| 方位 | 无 | **四向十字刻度**：一条 path 四段 `M-L`，从 `R-4` 伸到 `R+4`，`fill=none` / `stroke #111827` / 宽 1 |
+| 针 | 双三角 | 双三角（**没动**）：北瓣实心 `#14532d`，南瓣白底 + `#14532d` 描边 |
+| N | 圈内 | **圈外**：`y = cy-R-10`，字号 12.5 / 字重 700 / 字距 0.4 / 色 `#14532d` |
+
+几何全部由 R 推导，**R 仍是 24 —— 版面占位一个字节没变**（当初用户问过「要不要顺便放大到 r=30（约 21mm）」，未答，
+所以保持原尺寸）：
+`tlNtip = R×0.71`、`tlNbw = R×0.229`、`tlNtk = 4`。
+
+```js
+var tlNcx = svgW - 96, tlNcy = 82, tlNr = 24;
+var tlNtick = 'M'+tlNcx+' '+(tlNcy-tlNr-tlNtk)+' L'+tlNcx+' '+(tlNcy-tlNr+tlNtk)  // 上（北）
+  +' M'+tlNcx+' '+(tlNcy+tlNr-tlNtk)+' L'+tlNcx+' '+(tlNcy+tlNr+tlNtk)            // 下
+  +' M'+(tlNcx-tlNr-tlNtk)+' '+tlNcy+' L'+(tlNcx-tlNr+tlNtk)+' '+tlNcy            // 左
+  +' M'+(tlNcx+tlNr-tlNtk)+' '+tlNcy+' L'+(tlNcx+tlNr+tlNtk)+' '+tlNcy;           // 右
+```
+
+**关键约束：刻度底端正好落在图面顶边**
+`cy=82`、`R=24`、刻度伸到 `R+4` ⇒ 底端 `y = 82+28 = 110`，而图面顶边**就是 y=110**。
+即「刚好贴住、不越界」—— 这是这一版最容易被下一次微调踩坏的一条，探针专门锁死。
+
+**实测（`_p1/_probe_north_arrow.cjs` 改用 4 号口径，11 条全 PASS）**
+
+| 断言 | 实测 |
+|---|---|
+| 外圆 r 仍 24 | `r=24`（版面尺寸未变） |
+| 单圈（v646 取消内圈） | `circles=1` |
+| 外圆线宽 1.1 | `1.1` |
+| 四向十字刻度（`fill=none` / `stroke #111827` / 4 段 M-L） | `M1094 54 L1094 62 M1094 102 L1094 110 M1066 82 L…` |
+| 北瓣实心深绿、南瓣白底绿描边 | `none/#111827 · #14532d/null · #ffffff/#14532d` |
+| 整组在内细框内 | `1066..1122` vs 内框 `16..1174`（右余 52） |
+| **刻度底端不压图面顶边** | `bbox.b = 110` ≤ 110 |
+| 整组宽度 56（R+4 两侧） | `56` |
+| N 不撞标题 | N 右缘 1099.5 vs 标题右缘 725.3 |
+| N 不撞信息行 | N 右缘 1099.5 vs 信息右缘 1002 |
+| 未捕获异常 | 0 |
+
+整组 bbox：`{l:1066, r:1122, t:35.2, b:110, w:56, h:74.8}`。
+
+截图：`_probe_out/v646_north_cross_5x.jpg`（5 倍特写 —— 刻度与三角针放大后依然干净，没有糊成一团）、
+`v646_tl_diagram_full.jpg`（整幅 A3 实图 —— 在真实出图尺寸下仍认得出，且没压到图面顶边）。
+
+**版本三件**：`sw.js VERSION = 'v646-north-cross'`（变更注释已写在 VERSION 上方）、
+`index.html` 的 `inline-09.js?v=646-north-cross`、`plugin-admin.html` 角标 `界面 v646`。
+（`inline-24.js` 保持 v641、`inline-28.js` 保持 v645、`style-01.css` 保持 v644 —— 本次都没动。）
+
+**闸门**：核心门禁 PASS（98.8s）、面板漂移 PASS（4 条已登记，无新增）、4 项 SKIPPED（与 v637 同状态）。
+
+**状态**：v638～v646 **九版全部本地、未提交未推送**（另有 chore 提交 `025356c` 也未推送）。
+⇒ 发布前必须先处理 `025356c`：它让本地 master 领先 origin 一个提交，`推送更新.bat` 第一道闸（本地 == 远端）会**直接停**。
+

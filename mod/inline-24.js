@@ -240,6 +240,27 @@
     if(!pane) return;
     var zoneWrap=document.getElementById('tlWsZoneChkWrap');
     var worstWrap=document.getElementById('tlWsWorstChkWrap');
+    /* [v641 2026-10-21 用户要求「图例放在右下角」] 工作区图例（#tlWsOvLegend）同款对齐。
+       坑：图例是 #tlWsOverlays 的子元素，而 #tlWsOverlays 是 inset:0 —— 相对的是整个
+       .ry-pane-ws（三列栅格：画布 1fr ｜ 拖拽条 6px ｜ 工具轨），**不是画布**。
+       所以纯 CSS 写 right:8px 会贴到窗口右缘、压在工具轨按钮和轨内提示文字上（右侧面板
+       宽度还会被拖拽条改）。这里沿用上方勾选框的办法：按「画布右缘」换算 ——
+       right = (pane.right - canvas.right) + 8；工具轨宽度变化 → 画布宽度变化 →
+       ResizeObserver(#tlWsContent) 触发重算，无需另挂观察器。
+       生成图时 inline-09 会重写图例 innerHTML 并 ov.display=block，那边也会调一次本函数。 */
+    function tlAlignWsOvLegend(){
+      try{
+        var lg=document.getElementById('tlWsOvLegend');
+        if(!lg) return;
+        var pr=pane.getBoundingClientRect(), cr=ctn.getBoundingClientRect();
+        if(cr.width<40) return;
+        lg.style.right=Math.max(8,(pr.right-cr.right)+8)+'px';
+        lg.style.bottom=Math.max(8,(pr.bottom-cr.bottom)+8)+'px';
+        lg.style.left='auto';          /* 清掉历史居中基准 */
+        lg.style.transform='none';     /* 清掉 translateX(-50%) 回拉 */
+      }catch(e){}
+    }
+    window.tlAlignWsOvLegend=tlAlignWsOvLegend;
     function tlAlignLabelsChk(){
       try{
         var pr=pane.getBoundingClientRect(), cr=ctn.getBoundingClientRect();
@@ -249,6 +270,7 @@
         if(zoneWrap){ zoneWrap.style.right=r+'px'; zoneWrap.style.top=(t+28)+'px'; }
         if(worstWrap){ worstWrap.style.right=r+'px'; worstWrap.style.top=(t+56)+'px'; }
       }catch(e){}
+      tlAlignWsOvLegend();
     }
     if(window.ResizeObserver){ try{ new ResizeObserver(tlAlignLabelsChk).observe(ctn); }catch(e){} }
     tlAlignLabelsChk();

@@ -79,7 +79,6 @@
       var hasPoly = (poly && poly.length >= 3);
       try { if (hasPoly && typeof tlAutoGenerate === 'function') tlAutoGenerate({ scroll: false, stay: true }); } catch (e) { }
       try { if (hasPoly && typeof ppGenerateDiagram === 'function') ppGenerateDiagram({ scroll: false }); } catch (e) { }
-      try { var v = document.getElementById('tlDimScaleVal'); if (v) v.textContent = Math.round(loadScale() * 100) + '%'; } catch (e) { }
     }, 360);
   }
 
@@ -233,7 +232,7 @@
   function htmlScale() {
     var s = loadScale();
     return '<h4>标注比例</h4>'
-      + '<p class="rs-note">统一缩放尺寸标注的<b>数字字号</b>与<b>建筑斜短线</b>的长短/粗细。与顶栏工具栏上的「Aa」四键组是同一个值，两边随时同步。</p>'
+      + '<p class="rs-note">统一缩放尺寸标注的<b>数字字号</b>与<b>建筑斜短线</b>的长短/粗细。<b>这里是唯一入口</b>（v645 起工具栏那组「Aa−/Aa＋」四键已取消，两处原本是同一个值，留一处）。</p>'
       + '<div class="rs-row"><label>比例</label><input type="range" min="0.6" max="1.8" step="0.1" id="rySetScaleRange" value="' + s + '">'
       + '<span class="rs-badge" id="rySetScaleVal">' + Math.round(s * 100) + '%</span></div>'
       + '<div style="margin-top:12px"><button class="rs-btn" type="button" id="rySetScaleReset">复位 100%</button></div>';

@@ -3103,15 +3103,29 @@ function tlAutoGenerate(options) {
        「地图口径」未旋转顶点（见下方 [map-enhance] 注释），北方位恒定。
      显示范围：简图 / 下载 SVG / 下载 PNG / 打印 全部同源（都出自本 parts）；
        工作区克隆底图与 DXF 导出按「图框装饰」剥离（见 tl-workspace.js、runye-dxf.js）。
-     造型：双半式 —— 北半实心深绿、南半空心描边，顶部 N 字，与图例同色系（#14532d/#111827）。 */
+     造型：v643 起为「双圈 + 两瓣三角指北针（北实心/南描边）+ 圈外 N」，见下方造型注释。 */
   var tlNcx = svgW - 96, tlNcy = 82, tlNr = 24;
-  var tlNarrowN = 'M'+tlNcx+' '+(tlNcy-17)+' L'+(tlNcx+6)+' '+(tlNcy-2)+' L'+tlNcx+' '+(tlNcy+4)+' L'+(tlNcx-6)+' '+(tlNcy-2)+' Z';
-  var tlNarrowS = 'M'+tlNcx+' '+(tlNcy+17)+' L'+(tlNcx+6)+' '+(tlNcy+2)+' L'+tlNcx+' '+(tlNcy-4)+' L'+(tlNcx-6)+' '+(tlNcy+2)+' Z';
+  /* [v646 2026-10-21 用户从六个候选里选定「4 十字刻度」] 造型再换一次，cx/cy/r 依旧不动（版面零位移）。
+     前情：v643 换成「双圈 + 双三角针」（备选 A）；用户看过并排的六版样张后回「用4吧」——
+     4 号 = **单圈 + 四向十字刻度（伸出/收进各 4 单位）+ 双三角针 + 圈外 N**，
+     比 v643 多的是那四条刻度：它们把「这是一张工程图的方位标」说清楚了，而单圈又比双圈干净
+     （双圈在 A3 约 17mm 时两条圆线会糊成一根粗圈）。
+     几何仍全部由 tlNr 推导（针尖 = R×0.71、半底宽 = R×0.229、刻度长 = R×固定 4），改大小只动 tlNr。
+     ⚠ 刻度伸到 R+4 = 28 ⇒ 整组 bbox 从 48×~67 长到 56×~72（底端到 y=110，正好是图面顶边线，
+       不越界也不压图；右缘 1122 距内细框 1174 还有 52 余量）。 */
+  var tlNtip = tlNr * 0.71, tlNbw = tlNr * 0.229, tlNtk = 4;
+  var tlNarrowN = 'M'+tlNcx+' '+(tlNcy-tlNtip)+' L'+(tlNcx+tlNbw)+' '+tlNcy+' L'+(tlNcx-tlNbw)+' '+tlNcy+' Z';
+  var tlNarrowS = 'M'+tlNcx+' '+(tlNcy+tlNtip)+' L'+(tlNcx+tlNbw)+' '+tlNcy+' L'+(tlNcx-tlNbw)+' '+tlNcy+' Z';
+  var tlNtick = 'M'+tlNcx+' '+(tlNcy-tlNr-tlNtk)+' L'+tlNcx+' '+(tlNcy-tlNr+tlNtk)
+    +' M'+tlNcx+' '+(tlNcy+tlNr-tlNtk)+' L'+tlNcx+' '+(tlNcy+tlNr+tlNtk)
+    +' M'+(tlNcx-tlNr-tlNtk)+' '+tlNcy+' L'+(tlNcx-tlNr+tlNtk)+' '+tlNcy
+    +' M'+(tlNcx+tlNr-tlNtk)+' '+tlNcy+' L'+(tlNcx+tlNr+tlNtk)+' '+tlNcy;
   parts.push('<g id="tlNorthGroup">'
-    +'<circle cx="'+tlNcx+'" cy="'+tlNcy+'" r="'+tlNr+'" fill="#ffffff" stroke="#111827" stroke-width="1.2"/>'
+    +'<circle cx="'+tlNcx+'" cy="'+tlNcy+'" r="'+tlNr+'" fill="#ffffff" stroke="#111827" stroke-width="1.1"/>'
+    +'<path d="'+tlNtick+'" stroke="#111827" stroke-width="1" fill="none"/>'
     +'<path d="'+tlNarrowN+'" fill="#14532d"/>'
-    +'<path d="'+tlNarrowS+'" fill="#ffffff" stroke="#111827" stroke-width="1"/>'
-    +'<text x="'+tlNcx+'" y="'+(tlNcy-30)+'" text-anchor="middle" font-size="11" font-weight="700" fill="#14532d">N</text>'
+    +'<path d="'+tlNarrowS+'" fill="#ffffff" stroke="#14532d" stroke-width="1" stroke-linejoin="round"/>'
+    +'<text x="'+tlNcx+'" y="'+(tlNcy-tlNr-10)+'" text-anchor="middle" font-size="12.5" font-weight="700" letter-spacing="0.4" fill="#14532d">N</text>'
     +'</g>');
   // info —— 与图面拉开间距，不再压到地块
   // 信息行：与标题分行；过长时按 " | " 边界自动换行
@@ -3376,19 +3390,11 @@ function tlAutoGenerate(options) {
   var GAP=DG.gap*tlDS;
   var INK=(window.__ryInkM?window.__ryInkM(DG.font*tlDS):{a:DG.font*tlDS*0.75,d:0});
   var ASC=INK.a, DESC=INK.d;
-  (function(){ var dsv=document.getElementById('tlDimScaleVal'); if(dsv)dsv.textContent=Math.round(tlDS*100)+'%'; })();
-  window.tlDimScaleStep=function(dir){
-    var n=Math.round((tlDimScaleOf()+dir*0.1)*10)/10;
-    n=Math.max(0.6,Math.min(1.8,n));
-    try{localStorage.setItem('tl-dim-scale',String(n));}catch(e){}
-    var el=document.getElementById('tlDimScaleVal'); if(el)el.textContent=Math.round(n*100)+'%';
-    try{tlAutoGenerate({scroll:false});}catch(e){}   /* 任务M：重渲染宿主是 tlAutoGenerate（整段简图 SVG 渲染在其函数体内），tlUpdatePlanBar 只是状态栏小函数 */
-  };
-  window.tlDimScaleReset=function(){
-    try{localStorage.removeItem('tl-dim-scale');}catch(e){}
-    var el=document.getElementById('tlDimScaleVal'); if(el)el.textContent='100%';
-    try{tlAutoGenerate({scroll:false});}catch(e){}
-  };
+  /* [v645 2026-10-21 用户要求] 比例的唯一入口改到「设置 → 标注与文字」。
+     原来工具栏还有一组「Aa−/100%/Aa＋/⟲」四键（index.html #tlDimScaleRow），
+     与设置页滑块写的是同一个 key，属重复入口 ⇒ 四键连同 window.tlDimScaleStep /
+     window.tlDimScaleReset 一并删除（用户：「如果这里的跟设置页面的重复，那这里就取消」）。
+     本文件只读不改：tlDimScaleOf() 读 localStorage，渲染时乘进 DG 各项（v124 口径不变）。 */
 
   // 地块尺寸标注（建筑制图风格）：图下水平尺寸线 + 图左垂直尺寸线；尺寸值取二级页传导(有桥)或实测，与二级页施工简图一致
   (function(){
@@ -3682,6 +3688,33 @@ function tlAutoGenerate(options) {
        · 纵向分支（主管横置）对称：最外一**列**主管不再向右延伸，末端弯头后接阀门/支管；
        · 二级页传导几何（ppHasPipes 分支）不在此列 —— 该分支几何来自二级页，保持原样。 */
     var MAIN_END_ELBOW_R = 0.18;
+    /* [v638 2026-10-20 用户口径] 主管/支管是「同一位置的上下两层」（主管埋地下、支管在地面），
+       图面错开只是为了让两根都看得见，错开量必须固定、不被地块压缩 ——
+       用户原话：「主管跟支管在图中显示的距离，不应该被地块压缩，不管地块大小，应该都保持一致」。
+       改法：错开量从「支管所在分区块的 9%」换成「固定的实地米数」，与二级画布同值
+       （数值唯一来源 = mod/plot-editor.js 的 PP_MAIN_BRANCH_GAP_M，经 window.RyMainBranchGap 取）。
+       为什么固定米数在两个视图里都成立：二级 ppUpdateTransform 是 s=0.5×zoom 的固定比例，
+       本图框 s=min(drawW/b.w, drawH/b.h) 并被上限 2 夹住 ⇒ 常规地块（宽 ≤515m、高 ≤306m）
+         实际就是 s=2 的固定比例；两边都只差一个整图缩放，米数固定则视觉间距固定。
+       超过上述尺寸的超大地块，s 会整体降到 2 以下 —— 那时图里所有东西（含分区宽度、标注）
+         都同比例缩小，间距跟着一起缩，比例关系不坏。
+       旧口径的历史：v110 之前主管落 32%、支管落中（相距 18% 块宽），用户反馈「偏移过大」→ 缩到 9%；
+       9% 仍随分区尺寸变化（实测 520m 地块 20m、60m 地块 6m），故再改成本口径。 */
+    function tlGapM() {
+      var RG = (typeof window !== 'undefined') ? window.RyMainBranchGap : null;
+      if (RG && typeof RG.m === 'function') {
+        var v = RG.m();
+        if (typeof v === 'number' && isFinite(v) && v > 0) return v;
+      }
+      return 20;   /* 兜底：与 PP_MAIN_BRANCH_GAP_M 同值（plot-editor 未加载时走到这里） */
+    }
+    function tlVisGap(zoneDim) {
+      var g = tlGapM();
+      /* 硬边界：两根线对称夹住真实位置（各让一半）⇒ 间距 ≤ 分区尺寸 90% 时都还在本分区内。
+         只有极窄分区才会咬到，正常地块一律拿到那个固定米数（与二级同一条边界口径）。 */
+      if (zoneDim > 0) g = Math.min(g, zoneDim * 0.9);
+      return g > 0 ? g : 0.001;
+    }
     for(var zr2=0;zr2<rows;zr2++){
       for(var zc3=0;zc3<cols;zc3++){
         var zx2=xPos[zc3], zy2=yPos[zr2];
@@ -3693,10 +3726,12 @@ function tlAutoGenerate(options) {
         var gapH=Math.min(Math.max(zoneW2*0.06,4),14,zoneW2*0.22);
         if(fixedSideIsHorizontal){
           /* v110（2026-09-22 用户要求）：主管改到分区横向中间；支管在主管旁平移一小段
-             （原主管 32% 偏置、支管落中 → 主支相距 18% 边长，用户反馈偏移过大，缩到 9%） */
-          var mainX=zx2+zoneW2*0.5;
-          var brOffX=Math.min(Math.max(zoneW2*0.09,2),zoneW2*0.22);
-          var brX=mainX+brOffX;
+             （原主管 32% 偏置、支管落中 → 主支相距 18% 边长，用户反馈偏移过大，缩到 9%）
+             [v638 2026-10-20] 平移量改为固定显示间距 tlVisGap（固定米数，与二级同值），不再按分区块宽 9%；
+             并且改成「两根对称夹住真实位置」—— 与二级 ppBuildAutoPipes 同一套摆法 */
+          var gapX1=tlVisGap(zoneW2);
+          var mainX=centerX-gapX1/2;
+          var brX=centerX+gapX1/2;
           var tlEdgeZ=(zr2===rows-1);                 /* [v553] 最外一排 */
           var tlMainEndY=zy2+zoneH2;
           if(tlEdgeZ){
@@ -3719,9 +3754,10 @@ function tlAutoGenerate(options) {
             }
           }
         }else{
-          var mainY=zy2+zoneH2*0.5;
-          var brOffY=Math.min(Math.max(zoneH2*0.09,2),zoneH2*0.22);
-          var brY=mainY+brOffY;
+          /* [v638] 同竖向分支：固定显示间距 + 对称夹住真实位置，不按分区高 9% */
+          var gapY1=tlVisGap(zoneH2);
+          var mainY=centerY-gapY1/2;
+          var brY=centerY+gapY1/2;
           var tlEdgeZ=(zc3===cols-1);                 /* [v553] 最外一列（纵向分支对称） */
           var tlMainEndX=zx2+zoneW2;
           if(tlEdgeZ){
@@ -4573,9 +4609,19 @@ function tlAutoGenerate(options) {
   // 文字起点 = 色块项 s+20 / 圆点·虚线项 s+16，符号与文字间隙统一 6px），整体在画布水平居中。
   /* v489（用户实测：图例与底部参数行重叠）—— 图例改靠 A3 右侧边框对齐：
      原 lx=svgW/2-180 居中，参数行（总管/主管/支管 径+长）长了就压到图例。
-     图例 6 槽位总宽约 346px（末项「滴灌带」文字止于 lx+346），右缘贴 frameX 右边线
-     （svgW-8）内缩 4px ⇒ lx=svgW-358。与参数行同基线（ly=iy+17）不变。 */
-  var lx=svgW-358, ly=iy+17;
+     v642（2026-10-21 用户实测：末项「滴灌带」与外框重叠，要求「图例整体向左移动一些」）——
+     上一版的估算口径错了：注释按「末项文字止于 lx+346 = svgW-12」留 4 单位余量，
+     但 A3 内细框线在 **svgW-16**（见上方 #tlFrameGroup：内细线 x=16 w=svgW-32），
+     估算值本身就比内框线大 4 单位；字号 10 / 字重 600 的三个汉字实测 31.8 单位
+     （不是 30），于是整组右缘落在 svgW-11.2 = 1178.8，越过内细线 4.8 单位 ⇒ 压线。
+     实测（_p1/_probe_tl_legend_frame.cjs）：图例 bbox x=832 w=346.8 ⇒ 右缘 1178.8，
+     内细线 1174、外粗线 1182 —— 不压外粗线但压内细线，正是用户看到的现象。
+     改法：lx 由 svgW-358 左移 **20** 单位 → svgW-378，整组右缘 1158.8，
+     距内细线留 15.2 单位（与「内框内缩 16」同一视觉口径），末项文字完整落在内框内。
+     只动 lx 一个数，各项相对步进（60/60/65/60/55/16）与字号全不变，图例内部节奏原样。
+     注：同一条 lx 也被「下载 SVG / 下载 PNG / 打印」共用（都出自本 parts），一处改全局一致；
+     工作区克隆底图与 DXF 导出整组剥离 tlLegendGroup，不受影响。 */
+  var lx=svgW-378, ly=iy+17;
   parts.push('<g id="tlLegendGroup" font-size="10" font-weight="600">');
   parts.push('<rect x="'+lx+'" y="'+ly+'" width="14" height="4" fill="#111827" rx="2"/><text x="'+(lx+20)+'" y="'+(ly+2)+'" dominant-baseline="central" fill="#111827">总管</text>');
   parts.push('<rect x="'+(lx+60)+'" y="'+ly+'" width="14" height="4" fill="#185FA5" rx="2"/><text x="'+(lx+80)+'" y="'+(ly+2)+'" dominant-baseline="central" fill="#0C447C">主管</text>');
@@ -4765,6 +4811,9 @@ function tlAutoGenerate(options) {
       +'<span style="display:inline-flex;align-items:center;vertical-align:middle;gap:5px;margin:0 9px"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f59e0b"></i>水源</span>'
       +'<span style="display:inline-flex;align-items:center;vertical-align:middle;gap:5px;margin:0 9px"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ef4444"></i>阀门</span>';
     ov.style.display='block';
+    /* [v641] 图例贴「画布右缘」而非「整个 .ry-pane-ws 右缘」（后者含工具轨，会压住轨内按钮/提示）。
+       每次生成都会重写图例 innerHTML → 宽度可能变（管径文字变化不影响项数，但保险起见重算一次）。 */
+    if(typeof window.tlAlignWsOvLegend==='function'){ try{ window.tlAlignWsOvLegend(); }catch(eAlign){} }
   })();
   // 平面管网几何快照已在参数块之前写入并重算
   tlInitDrag();
