@@ -2644,3 +2644,17 @@ CloudBase 控制台那张表读的是**身份认证（auth）用户表**，云�
 
 **部署**：`cloudfn/ryEntitle-v2c5-phone-backfill.zip`（扁平，index.js 35048B + package.json），
 上传后 `configGet` 的 `fn` 字段应回显 **`v2c-5-phone-backfill`**。**回填逻辑在云函数里，只发静态站点不生效。**
+
+**发布与现状（2026-10-20）**
+- 提交 `07edc41`（8 文件 +105/−10），推送 `4b8996f..07edc41`；Pages 约 20 秒翻新到 `v625-phone-backfill`。
+- 线上冒烟 `_smoke_v521_live.mjs` **27/27**；逐文件核对：`plugin-admin.html` 含「界面 v625」(1)、
+  `index.html` 含 `style-01.css?v=625-phone-backfill`(1)、`sw.js` 含 `v625-phone-backfill`(1)、
+  `runye-entitle.js` 含 `function normPhone`(1)。
+- 实测线上 `POST /entitle {action:'configGet'}` 回显仍是 **`v2c-4-member-stats`** ⇒
+  **云函数还没换包，老行的手机号回填尚未生效**。需要做的只有一件事：
+  把 `cloudfn/ryEntitle-v2c5-phone-backfill.zip` 传上去覆盖 `ryEntitle`（云函数 → 函数代码 → 上传 zip），
+  传完再打一次 `configGet` 看到 `v2c-5-phone-backfill` 即完成。
+- 传完后的验证方式：让任意一个手机号显示「—」的账号**重新登录一次软件**（PC 或 H5 均可），
+  再刷新管理后台，该行应显示 `199****1296` 形态的脱敏号码。
+  仍显示「—」则说明该账号登录态里确实没有手机号（`CloudSync.phone` 为空，常见于只用密码/微信登录且
+  auth 用户记录里没有 `phone_number` 的账号），这类只能手工补或让用户补绑手机号。
