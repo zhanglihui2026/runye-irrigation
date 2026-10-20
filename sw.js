@@ -855,7 +855,23 @@
 /* v630-fitview-radius: v629 的 .pp-fitview 写了 border-radius:12px（不带 !important）——
    全站 body *{border-radius:0!important} 会把它压成 0，属死声明，撞 v530 检查（冒烟判红 1 项）。
    删掉该行，纯删声明、视觉零变化（这个按钮本来就是方角），抬版本只为刷掉带死声明的 CSS。 */
-const VERSION = 'v630-fitview-radius';
+/* v631-cred-pick: 「后台没有管理权限」根治 —— 后台读到的 UID 是**匿名会话**的 uid。
+   用户截图：「服务已连接 · 当前账号没有管理权限，当前账号 UID：ROg2duHzXTK-5LmGCdsww」。
+   本机实测（_probe_cred.mjs）：CloudBase 匿名会话的 JWT sub 形如 wbZ7_O-4FTzLdBQL920TVQ
+   （21 位随机串），而会员（手机号登录）的 sub 是 19 位数字 2089630534341758976 ——
+   正是 RY_PLUGIN_ADMIN_UIDS 里登记的那个。两者完全不同的身份空间。
+   两个代码缺陷：
+     ① cloudAuthSub/cloudAuthToken 只按 localStorage 顺序取「第一颗 sub !== 'anon'」的凭据，
+        不看 is_anonymous ⇒ 匿名与会员凭据并存时可能挑到匿名那颗（实测：先插匿名 key 就返回匿名
+        sub，尽管会员凭据就在旁边）⇒ 后台无权限，连 /entitle 的写操作都会被记到匿名 uid 名下；
+     ② cloudEnsureAnon() 不看有没有已持久化的会话，直接 signInAnonymously()。主程序每次启动
+        都先走这一步（runye-member-ui boot：ensureAnon → en.init）⇒ 手机号登录得到的会员会话
+        会被一次匿名登录顶掉。
+   修法：cloudPickCred() 统一择取（会员优先、匿名兜底），authSub/authToken 共用同一颗；
+   ensureAnon 先 cloudRestore()，有会话就复用、绝不匿名登录；
+   新增 CloudSync.authInfo() 身份快照；后台在匿名态直接写明「请先用手机号登录」+ 回主程序链接。
+   改 cloud-sync.js（必须抬版本刷缓存）+ plugin-admin.html（界面 v631）。 */
+const VERSION = 'v631-cred-pick';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

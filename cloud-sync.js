@@ -202,22 +202,30 @@ function cloudEnsureAnon(){
   if(cloudReady) return Promise.resolve(true);
   return cloudInit().then(function(ok){
     if(!ok) return false;
-    var a = cloudAuth();
-    if(!a) return false;
-    var p = (typeof a.signInAnonymously === 'function') ? a.signInAnonymously()
-          : (typeof a.signIn === 'function') ? a.signIn({ type: 'anonymous' })
-          : null;
-    if(!p) return false;
-    return Promise.resolve(p).then(function(res){
-      var u = res && res.data && res.data.user;
-      cloudUid = (u && (u.id || u.uid || u._id)) || cloudUid;
-      if(!cloudUid) return false;
-      cloudReady = true; cloudEmitStatus();
-      return true;
-    }).catch(function(e){
-      window._cloudLastError = { code:(e && e.code) || 'anon_signin_failed',
-        msg:(e && (e.message || e.errMsg)) || String(e), raw:e };
-      return false;
+    /* [v631 2026-10-20] 已有持久化会话就**直接复用，绝不再匿名登录**。
+       老实现不看有没有会话，直接 signInAnonymously()；主程序每次启动都先走这一步
+       （runye-member-ui.js 的 boot：ensureAnon → en.init），于是手机号登录得到的会员会话
+       会被一次匿名登录顶掉 —— 表现就是「主程序看着还是会员，但后台/写接口拿到的是
+       匿名 uid，管理白名单永远匹配不上」。会话只在**确实没有**的时候才建。 */
+    return cloudRestore().then(function(restored){
+      if(restored) return true;
+      var a = cloudAuth();
+      if(!a) return false;
+      var p = (typeof a.signInAnonymously === 'function') ? a.signInAnonymously()
+            : (typeof a.signIn === 'function') ? a.signIn({ type: 'anonymous' })
+            : null;
+      if(!p) return false;
+      return Promise.resolve(p).then(function(res){
+        var u = res && res.data && res.data.user;
+        cloudUid = (u && (u.id || u.uid || u._id)) || cloudUid;
+        if(!cloudUid) return false;
+        cloudReady = true; cloudEmitStatus();
+        return true;
+      }).catch(function(e){
+        window._cloudLastError = { code:(e && e.code) || 'anon_signin_failed',
+          msg:(e && (e.message || e.errMsg)) || String(e), raw:e };
+        return false;
+      });
     });
   });
 }
@@ -605,54 +613,83 @@ function cloudKvList(prefix){
 /* ===== [v360c] DB 身份助手：JWT sub（= DB 侧 auth.uid()）=====
    42501 实测教训：登录后 auth.uid() 是 JWT 的 sub（数字串），与 SDK uid（kzcRk 串）不同。
    凡要落库的 _id / 归属判定一律用 sub；SDK uid 仅作展示与 _id 前缀命名空间。 */
-function cloudAuthSub(){
+/* ===== [v631 2026-10-20] 凭据择取：会员优先，匿名只作兜底 =====
+   真实故障（用户：「后台好像还是不行，当前账号没有管理权限」，截图显示
+   「当前账号 UID：ROg2duHzXTK-5LmGCdsww」）：那个 UID 是**匿名会话**的 uid
+   （本机实测匿名 sub 形如 wbZ7_O-4FTzLdBQL920TVQ；会员 sub 是 19 位数字
+   2089630534341758976 —— 也就是环境变量 RY_PLUGIN_ADMIN_UIDS 里登记的那个）。
+   ⇒ 后台读到匿名 uid，白名单永远匹配不上，看起来就是「没有管理权限」。
+
+   为什么读到的是匿名那颗：老实现只是「遍历 localStorage，取第一颗 sub !== 'anon'」，
+   **不区分匿名与会员**。浏览器里同时存在两颗 `credentials_*`（匿名会话 + 手机号登录）
+   时，谁排在前面就用谁；凭据元数据里的 `is_anonymous` 完全没被看。
+   本机复现（_probe_cred.mjs）：先插匿名 key、再插会员 key ⇒ authSub 返回匿名 sub，
+   尽管会员凭据就在旁边 ⇒ 连 /entitle 的写操作都会被记到匿名 uid 名下。
+
+   现在统一走 cloudPickCred()：先滤掉没有 sub 的，再**优先 is_anonymous !== true 的**，
+   同类才按 localStorage 顺序；authSub / authToken 都从**同一颗**凭据取
+   （老 v371b 靠「payload.sub === authSub() 再回找」，一旦 authSub 本身挑错就整组错）。 */
+function cloudDecodeJwt(jwt){
+  try{
+    var seg = String(jwt).split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(decodeURIComponent(escape(atob(seg + '==='.slice((seg.length + 3) % 4)))));
+  }catch(e){ return null; }
+}
+function cloudReadCreds(){
+  var list = [];
   try{
     for(var i = 0; i < localStorage.length; i++){
       var k = localStorage.key(i);
-      if(k && k.indexOf('credentials_') === 0){
-        var v = localStorage.getItem(k);
-        var m = /eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/.exec(String(v || ''));
-        if(!m) continue;
-        var seg = m[0].split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-        var payload = JSON.parse(decodeURIComponent(escape(atob(seg + '==='.slice((seg.length + 3) % 4)))));
-        if(payload && payload.sub && payload.sub !== 'anon') return String(payload.sub);
-      }
+      if(!k || k.indexOf('credentials_') !== 0) continue;
+      var v = String(localStorage.getItem(k) || '');
+      var m = /eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/.exec(v);
+      if(!m) continue;
+      var p = cloudDecodeJwt(m[0]);
+      var sub = (p && p.sub) ? String(p.sub) : null;
+      if(!sub || sub === 'anon') continue;
+      list.push({key:k, jwt:m[0], payload:p, sub:sub, anon: !!(p && p.is_anonymous === true)});
     }
   }catch(e){}
-  return null;
+  return list;
+}
+function cloudPickCred(){
+  var list = cloudReadCreds();
+  if(!list.length) return null;
+  for(var i = 0; i < list.length; i++){ if(!list[i].anon) return list[i]; }   /* 会员优先 */
+  return list[0];                                                            /* 只有匿名就用它 */
+}
+function cloudAuthSub(){
+  var c = cloudPickCred();
+  return c ? c.sub : null;
 }
 
 function cloudOnStatus(fn){ if(typeof fn === 'function') cloudStatusListeners.push(fn); }
 
 /* ===== [v371] 原始 JWT（Bearer）=====
    HTTP 访问服务通道（/entitle）用：云函数拿同一 token 调 auth 网关验签，
-   前端无法伪造身份。与 cloudAuthSub 同源（credentials_<envId> 里的 JWT）。
-   [v371b] 与 authSub 同源匹配：多颗 token 时优先取 payload.sub === authSub()
-   的那颗，避免登录态切换瞬间把旧的匿名 token 发给服务端。 */
+   前端无法伪造身份。与 cloudAuthSub **同一颗凭据**（v631 起直接共用 cloudPickCred，
+   不再靠 sub 回找）。
+   [v371b] 多颗 token 时要与 authSub 同源，避免登录态切换瞬间把旧的匿名 token 发给服务端。
+   [v631] 同源问题从根上解决：authSub 与 authToken 出自同一次择取。 */
 function cloudAuthToken(){
-  try{
-    var want = null;
-    try { want = cloudAuthSub(); } catch(_e){ if(want === undefined) want = null; }
-    var first = null;
-    for(var i = 0; i < localStorage.length; i++){
-      var k = localStorage.key(i);
-      if(k && k.indexOf('credentials_') === 0){
-        var v = localStorage.getItem(k);
-        var m = /eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/.exec(String(v || ''));
-        if(!m) continue;
-        var sub = null;
-        try {
-          var seg = m[0].split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
-          var payload = JSON.parse(decodeURIComponent(escape(atob(seg + '==='.slice((seg.length + 3) % 4)))));
-          sub = (payload && payload.sub) ? String(payload.sub) : null;
-        } catch(_e){}
-        if(!first) first = m[0];
-        if(sub && want && sub === want) return m[0];
-      }
-    }
-    return first;
-  }catch(e){}
-  return null;
+  var c = cloudPickCred();
+  return c ? c.jwt : null;
+}
+
+/* [v631] 身份快照：给后台/诊断用，一眼看出「现在用的是会员身份还是匿名身份」。 */
+function cloudAuthInfo(){
+  var list = cloudReadCreds();
+  var picked = cloudPickCred();
+  var member = null;
+  for(var i = 0; i < list.length; i++){ if(!list[i].anon){ member = list[i]; break; } }
+  return {
+    sub: picked ? picked.sub : null,
+    anon: picked ? picked.anon : null,          /* true=当前是匿名身份（做写操作会被判无权限） */
+    key: picked ? picked.key : null,
+    creds: list.length,                          /* 本机 credentials_* 凭据条数 */
+    members: list.filter(function(c){ return !c.anon; }).length,
+    memberSub: member ? member.sub : null        /* 若同时存在会员凭据，把它报出来 */
+  };
 }
 function cloudEmitStatus(){
   var s = cloudReady ? (cloudSyncing ? 'syncing' : 'online') : 'offline';
@@ -681,6 +718,7 @@ window.CloudSync = {
   rdb: cloudRdb,                 /* [v360c] rdb 句柄（未登录/SDK 不支持时 null） */
   authSub: cloudAuthSub,         /* [v360c] DB 侧身份 = JWT sub（登录后可能与 uid 不同） */
   authToken: cloudAuthToken,     /* [v371] 原始 JWT（Bearer），HTTP 访问服务通道用 */
+  authInfo: cloudAuthInfo,       /* [v631] 身份快照：会员/匿名、凭据条数、会员 sub（后台诊断用） */
   load: cloudLoad,
   save: cloudSave,
   /* [v359] 账号体系统一为手机号：邮箱三件套与 loginAndPull 已移除（全项目无调用点） */

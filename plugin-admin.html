@@ -36,11 +36,11 @@
     .pager{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
   </style>
   <script defer src="pwa/vendor/cloudbase-js-sdk-3.8.2.bundle.js?v=359"></script>
-  <script defer src="cloud-sync.js?v=371c"></script>
+  <script defer src="cloud-sync.js?v=631-cred-pick"></script>
 </head>
 <body><header>润野灌溉 · 管理后台</header>
 <main>
-  <div class="head"><div><h1>统一管理后台</h1><div class="muted">插件开关 · 会员管理 · 会员规则参数。写操作需要管理员账号（云函数环境变量 RY_PLUGIN_ADMIN_UIDS）。 · <b id="admVer" style="color:#2E7D4F">界面 v628</b></div></div><a class="btn" href="index.html">返回主程序</a></div>
+  <div class="head"><div><h1>统一管理后台</h1><div class="muted">插件开关 · 会员管理 · 会员规则参数。写操作需要管理员账号（云函数环境变量 RY_PLUGIN_ADMIN_UIDS）。 · <b id="admVer" style="color:#2E7D4F">界面 v631</b></div></div><a class="btn" href="index.html">返回主程序</a></div>
 
   <div class="tabs">
     <button class="tab on" data-tab="plugins">外挂插件</button>
@@ -118,6 +118,31 @@
   var FEATS={'zone-split':'地块分区','ai-plan':'AI 智能规划','pipe-layout':'管路规划','online-map':'在线地图','drawing-export':'出图','bom-export':'导出清单','hydraulic-check':'水利校验','pro-others':'其余高级功能'};
   var $=function(id){return document.getElementById(id)};
   function setService(msg,error){$('service').textContent=msg;$('service').className='status'+(error?' err':'')}
+  /* [v631 2026-10-20] 身份/权限落 UI。真实故障现场：用户截图「服务已连接 · 当前账号没有管理权限，
+     当前账号 UID：ROg2duHzXTK-5LmGCdsww」—— 那个 UID 是**匿名会话**的 uid（本机实测匿名 sub 形如
+     wbZ7_O-4FTzLdBQL920TVQ；会员 sub 是 19 位数字，即 RY_PLUGIN_ADMIN_UIDS 里登记的那个）。
+     匿名 uid 每次/每设备都不同，加进白名单毫无意义 ⇒ 必须把这句话直接写给用户看，
+     否则永远表现为「莫名其妙没有权限」。 */
+  var ident={sub:null,anon:null,creds:0,members:0,memberSub:null};
+  function readIdent(){try{ident=(window.CloudSync&&CloudSync.authInfo)?CloudSync.authInfo():{sub:null};}catch(e){ident={sub:null};}return ident}
+  function identTag(){return ident.anon===true?'匿名会话':(ident.anon===false?'会员账号':'身份未知')}
+  function applyAdminState(admin){
+    var hb=$('serviceHint'),sv=$('save');
+    if(admin){setService('服务已连接 · 管理员权限已验证',false);
+      if(hb)hb.textContent='开关保存到 CloudBase 的 ry_kv，由主程序启动时读取；关闭后对之后打开或刷新页面的用户生效。';return}
+    if(ident.anon===true){
+      setService('服务已连接 · 当前是匿名身份，不是会员账号（无管理权限）',true);
+      if(hb)hb.innerHTML='这台浏览器现在用的是<b>匿名会话</b>'+(ident.sub?'（UID <code>'+esc(ident.sub)+'</code>）':'')+
+        '，而后台按<b>手机号登录的会员账号</b>判权限 ⇒ 把这个 UID 加进 <code>RY_PLUGIN_ADMIN_UIDS</code> '+
+        '也不会生效（匿名 uid 每次/每设备都不一样）。请先回<a href="index.html">主程序</a>用手机号登录，再重新打开本页。'+
+        (ident.members?'<br>本机另外还有 '+ident.members+' 条会员凭据，已优先使用会员身份；若仍无权限，才需要把会员 UID 登记进白名单。':'');
+      if(sv)sv.title='请先回主程序用手机号登录：匿名身份拿不到管理权限';
+      return;
+    }
+    setService('服务已连接 · 当前账号没有管理权限',true);
+    if(hb)hb.textContent='请把上面的 UID 登记到云函数环境变量 RY_PLUGIN_ADMIN_UIDS（改完需要重启/重建云函数实例才生效）。';
+    if(sv)sv.title='请让管理员在云函数环境变量 RY_PLUGIN_ADMIN_UIDS 中登记此 UID';
+  }
   function api(action,extra){var token=window.CloudSync&&CloudSync.authToken();var h={'Content-Type':'application/json'};if(token)h.Authorization='Bearer '+token;return fetch(ENDPOINT,{method:'POST',headers:h,body:JSON.stringify(Object.assign({action:action},extra||{})),cache:'no-store'}).then(function(r){return r.json()})}
   function fmtDay(v){if(!v)return '—';var d=new Date(v);if(isNaN(d.getTime()))return '—';return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2)}
   function fmtDT(v){if(!v)return '—';var d=new Date(v);if(isNaN(d.getTime()))return '—';var p=function(x){return ('0'+x).slice(-2)};
@@ -141,7 +166,7 @@
 
   /* ---------- 页签2：会员管理 ---------- */
   var curMember=null;
-  function permText(){$('mPerm').textContent=state.admin?'管理员权限已验证 ✓':(state.plugins.length?'当前账号没有管理权限（只读）':'')}
+  function permText(){$('mPerm').textContent=state.admin?'管理员权限已验证 ✓':(state.plugins.length?(ident.anon===true?'当前是匿名身份：请先用手机号登录（只读）':'当前账号没有管理权限（只读）'):'')}
   function planPill(plan,exp){var active=exp&&new Date(exp).getTime()>Date.now();return '<span class="pill'+(active?'':' off')+'">'+esc(plan||'L1')+(active?' · 有效':' · 已到期')+'</span>'}
   /* ---------- [v623] 注册人员统计 ---------- */
   var statsPage=1,statsQ='',statsSize=30;
@@ -376,7 +401,7 @@
     setService('重新连接中…',false);
     boot();
   }
-  function boot(){if(!window.CloudSync){setService('CloudBase 登录组件未加载',true);return}CloudSync.init().then(function(ok){if(!ok)throw new Error('CloudBase 初始化失败');return CloudSync.restore()}).then(function(signed){var uid=CloudSync.authSub();$('account').textContent=signed?'当前账号 UID：'+(uid||'已登录'):'未检测到登录态，请先在主程序登录后再打开后台';return fetch('plugins.json?v='+Date.now(),{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('插件清单 HTTP '+r.status);return r.json()})}).then(function(cfg){state.plugins=cfg.plugins||[];return api('pluginsGet')}).then(function(r){if(!r||r.code!==0)throw new Error((r&&r.message)||'无法读取插件控制配置');state.enabled=r.data.enabled||{};state.admin=!!r.data.admin;setService(state.admin?'服务已连接 · 管理员权限已验证':'服务已连接 · 当前账号没有管理权限',!state.admin);var rb=$('retryBtn');if(rb)rb.style.display='none';var hb=$('serviceHint');if(hb)hb.textContent='开关保存到 CloudBase 的 ry_kv，由主程序启动时读取；关闭后对之后打开或刷新页面的用户生效。';if(!state.admin){$('save').title='请让管理员在云函数环境变量 RY_PLUGIN_ADMIN_UIDS 中登记此 UID';}render();permText();loadStats(1);return probe()}).catch(function(e){bootFail(e);$('list').textContent='无法读取插件状态；主程序不会受此后台故障影响。'})}
+  function boot(){if(!window.CloudSync){setService('CloudBase 登录组件未加载',true);return}CloudSync.init().then(function(ok){if(!ok)throw new Error('CloudBase 初始化失败');return CloudSync.restore()}).then(function(signed){var uid=CloudSync.authSub();readIdent();$('account').textContent=signed?('当前账号 UID：'+(uid||'已登录')+'（'+identTag()+'）'):'未检测到登录态，请先在主程序登录后再打开后台';return fetch('plugins.json?v='+Date.now(),{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('插件清单 HTTP '+r.status);return r.json()})}).then(function(cfg){state.plugins=cfg.plugins||[];return api('pluginsGet')}).then(function(r){if(!r||r.code!==0)throw new Error((r&&r.message)||'无法读取插件控制配置');state.enabled=r.data.enabled||{};state.admin=!!r.data.admin;readIdent();applyAdminState(state.admin);var rb=$('retryBtn');if(rb)rb.style.display='none';render();permText();loadStats(1);return probe()}).catch(function(e){bootFail(e);$('list').textContent='无法读取插件状态；主程序不会受此后台故障影响。'})}
   $('retryBtn').onclick=retryBoot;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();

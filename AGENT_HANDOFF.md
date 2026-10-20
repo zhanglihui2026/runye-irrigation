@@ -2887,3 +2887,51 @@ canvas 里的线被切与 CSS 的 `overflow` / `min-height` **无关**，是**�
 **闸门**：`node --test tests/*.test.cjs` **157/157**、`ci_check_static` PASS=29、`check_publish_refs` PASS。
 **版本口径**：`sw.js` = `v630-fitview-radius`（v629 首次发布后冒烟发现 `border-radius:12px` 撞 v530 检查，删死声明并抬版本），`style-01.css?v=` / `plot-editor.js?v=` 同步（后者原停在
 `612-flat-radius`，这次一并抬）。
+
+### 26.27 v631-cred-pick：后台「没有管理权限」＝读到了匿名会话的 UID（2026-10-20）
+
+**用户口径**：「似乎还是不行，当前账号没有管理权限」（截图：服务已连接 ·
+当前账号没有管理权限 · 当前账号 UID：`ROg2duHzXTK-5LmGCdsww`）。
+
+**先认身份**：那个 UID 不是会员账号。本机实测（`_probe_cred.mjs` 在线上环境真跑一次匿名登录）：
+
+| 身份 | JWT `sub` 形态 | 例 |
+|---|---|---|
+| CloudBase **匿名会话** | 21 位随机串，`is_anonymous: true`，`name: "Anonymous"` | `wbZ7_O-4FTzLdBQL920TVQ` |
+| 会员（手机号登录） | 19 位数字 | `2089630534341758976`（= `RY_PLUGIN_ADMIN_UIDS` 里登记的那个） |
+
+⇒ 后台把匿名 uid 拿去和白名单比，永远不匹配。**匿名 uid 每次/每设备都不同，加进白名单也没用。**
+
+**两处代码缺陷（都实测坐实）**
+1. `cloudAuthSub()` / `cloudAuthToken()` 只按 localStorage 顺序取「第一颗 `sub !== 'anon'`」的凭据，
+   **从不看 `payload.is_anonymous`**。本机注入两颗凭据（先匿名、后会员）实测：
+   `authSub()` 返回匿名 sub，会员凭据就在旁边却没用上 ⇒ 后台无权限，
+   而且 `/entitle` 的写操作（领奖/绑定/权益）会被记到匿名 uid 名下。
+2. `cloudEnsureAnon()` 不看有没有已持久化的会话，直接 `signInAnonymously()`；
+   而主程序每次启动都先走这一步（`runye-member-ui.js` boot：`ensureAnon()` → `en.init()`）
+   ⇒ 手机号登录得到的会员会话会被一次匿名登录顶掉（这正是「以前能管、现在突然不能管」的成因）。
+
+**修法**（`cloud-sync.js`）
+- 新增 `cloudDecodeJwt` / `cloudReadCreds` / `cloudPickCred`：**会员优先、匿名兜底**；
+  `authSub` 与 `authToken` 共用同一次择取（不再靠 `payload.sub === authSub()` 回找，
+  authSub 一旦挑错就整组错）；
+- `cloudEnsureAnon()`：先 `cloudRestore()`，**有会话就 return true，绝不匿名登录**；没有才建匿名会话；
+- 新增 `CloudSync.authInfo()`：`{sub, anon, key, creds, members, memberSub}`，供后台/诊断一眼看穿身份。
+
+**后台（`plugin-admin.html`，界面 v631）**：新增 `readIdent()/identTag()/applyAdminState()`。
+- 账号行变成 `当前账号 UID：xxx（会员账号 / 匿名会话）`；
+- 匿名态的服务状态直接写「**当前是匿名身份，不是会员账号（无管理权限）**」，并在说明里写明
+  「把这个 UID 加进 `RY_PLUGIN_ADMIN_UIDS` 也不会生效」，同时给「回主程序」链接让用户去登录；
+- 非匿名但仍无权限时，才提示「把上面的 UID 登记到环境变量（改完需重启/重建云函数实例）」。
+
+**契约测试**：`tests/cred_pick.test.cjs`（17 项，**行为级**）——把 `cloudPickCred/authSub/authToken/authInfo`
+抠出来塞进 vm + 假 localStorage 真跑：匿名在前→必须挑会员、authToken 与 authSub 同源、
+只剩匿名→退回匿名但 `authInfo().anon=true`、坏凭据不抛、`ensureAnon` 里 `signInAnonymously` 必须排在
+`cloudRestore()` 之后（**先剥注释再比顺序**，第一版就是被说明文字骗了）。
+闸门：`--test` **158/158**、`ci_check_static` PASS=29、`check_publish_refs` PASS。
+
+**版本口径**：`sw.js` = `v631-cred-pick`；`style-01.css?v=` 同步（未改样式，但契约要求与 SW 同值）；
+`cloud-sync.js?v=371c → 631-cred-pick`（index / invite / plugin-admin 三处）。
+
+**用户侧还要做一步**：回主程序用**手机号登录一次**（把会员会话重新建立起来）。
+登录后后台会显示 19 位 UID（`2089…`）—— 那个才是白名单里登记过的身份，管理权限随即恢复。
