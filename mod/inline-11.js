@@ -71,6 +71,7 @@ function calcPlan(){
   const targetV = readNumber('planTargetV', 1.5, { min: 0.01 });
   const branchCount = readSelectedInt('#branchGroup .selected', 2);
   const layoutSides = readSelectedInt('#layoutGroup .selected', 1);
+  const branchParallelCount = branchCount * layoutSides;
   const lift = readNumber('fld_lift', 5);
   const dh = window.RyTerrain ? window.RyTerrain.resolveDh(readNumber('fld_dh', 5), false) : readNumber('fld_dh', 5);
   const tapePressure = readNumber('fld_tapePressure', 1, { min: 0 });
@@ -167,11 +168,11 @@ function calcPlan(){
   // Pump estimation (same head model as the main calculator)
   const mainPipe = selectPipe(zoneFlow, targetV, MAIN_PIPE_MIN_OD);
   const mainLoss = hazenWilliams(mainPipeLen, zoneFlow, mainPipe.id);
-  const branchFlow = zoneFlow / branchCount;
+  const branchFlow = zoneFlow / branchParallelCount;
   const branchPipe = selectPipe(branchFlow, targetV, 0, BRANCH_PIPE_MAX_OD);
   const branchSpan = Math.max(0, zoneHEff);
   const branchLen = branchSpan / (branchCount * layoutSides);
-  const tapsPerBranch = Math.ceil(tapesPerZone / branchCount);
+  const tapsPerBranch = Math.ceil(tapesPerZone / branchParallelCount);
   const branchF = christiansenF(tapsPerBranch);
   const branchLoss = hazenWilliams(branchLen, branchFlow, branchPipe.id) * branchF;
   const tapePressureM = tapePressure * 10.2;
@@ -221,7 +222,7 @@ function calcPlan(){
   // Store all data for apply
   window.planData = { A, B, N, zoneCols: zoneLayout.cols, zoneRows: zoneLayout.rows, zoneW: zoneLayout.zoneW, zoneH: zoneLayout.zoneH, mainPipeLen, tapeLen, tapeSpacing, emitterSpacing, emitterFlow, tapeRollLen, tapeTotalLen, totalTapes, tapesPerZone, zoneTapeLen, lift, dh, totalMu, zoneFlow, pumpHead, pumpPower, motorKW, intensity, manualZoneMu, targetV, flowAreaM2, flowAreaSrc, mainPipeOD:'Ø '+mainPipe.od+' mm', branchPipeOD:'Ø '+branchPipe.od+' mm', mainPipeODValue:mainPipe.od, branchPipeODValue:branchPipe.od, mainVelocity:mainPipe.v, branchVelocity:branchPipe.v,
     // 水泵扬程计算中间量，用于施工简图展示
-    tapePressure, tapePressureM, existPressure, mainLoss, branchLoss, filterLoss, headBeforeSafety, headBeforeSafetyRaw, safetyFactor: SAFETY_FACTOR, marginHead: MARGIN_HEAD, efficiency, branchCount, layoutSides
+    tapePressure, tapePressureM, existPressure, mainLoss, branchLoss, filterLoss, headBeforeSafety, headBeforeSafetyRaw, safetyFactor: SAFETY_FACTOR, marginHead: MARGIN_HEAD, efficiency, branchCount, branchParallelCount, layoutSides
   };
   // 二级→三级 联动：二级计算完成后，自动把单区参数带入三级系统（若开启"与二级联动"）
   if (window.__tlLinkEnabled !== false && typeof syncThreeLevelFromPlan === 'function') {

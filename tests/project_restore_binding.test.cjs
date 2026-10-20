@@ -42,6 +42,7 @@ function createContext(plots, options = {}) {
     },
     localStorage,
     sessionStorage,
+    location: { search: options.smart ? '?smart=1' : '' },
     RyPlotLibraryStore: { read() { return { ok: true, plots }; } },
     RyMeasuredAreaBridgeStore: { readRaw() { return null; } },
     tlNormalizePipeOverride() { return null; },
@@ -160,6 +161,112 @@ test('automatic project restore does not use the shared anchor when the per-tab 
   assert.equal(fixture.context.currentPlotId, 'plot-b');
   assert.deepEqual(JSON.parse(JSON.stringify(fixture.context.measuredPolygon)), [{ x: 9, y: 9 }]);
   assert.equal(fixture.context.__runyeAutoRestored, undefined);
+});
+
+test('automatic generated-diagram restore does not replace a different tab-scoped plot project', () => {
+  const fixture = createContext([{ id: 'plot-a' }, { id: 'plot-b' }]);
+  seedNetworks(fixture);
+  setAnchor(fixture, 'plot-b');
+  fixture.context.currentPlotId = 'plot-b';
+  fixture.context.measuredPolygon = [{ x: 9, y: 9 }];
+  const savedPolygon = [{ x: 1, y: 2 }, { x: 3, y: 4 }, { x: 5, y: 6 }];
+  fixture.localValues.set(PROJECT_KEY, JSON.stringify({
+    currentPlotId: 'plot-a',
+    measuredArea: 1200,
+    measuredPolygon: savedPolygon,
+    ppGenSig: fixture.context.ryPolySig(savedPolygon)
+  }));
+
+  fireLoad(fixture);
+
+  assert.equal(fixture.context.currentPlotId, 'plot-b');
+  assert.equal(fixture.context.RyIrrigationDataStore.readCurrentPlotAnchor().id, 'plot-b');
+  assert.deepEqual(JSON.parse(JSON.stringify(fixture.context.measuredPolygon)), [{ x: 9, y: 9 }]);
+  assert.equal(fixture.context.__runyeAutoRestored, undefined);
+  assert.deepEqual(JSON.parse(JSON.stringify(fixture.context.RyIrrigationDataStore.readNetworkLayout())), {
+    plotId: 'plot-b', marker: 'B'
+  });
+});
+
+test('automatic generated-diagram restore still restores an unbound saved project when no plot is active', () => {
+  const fixture = createContext([]);
+  const savedPolygon = [{ x: 1, y: 2 }, { x: 3, y: 4 }, { x: 5, y: 6 }];
+  fixture.localValues.set(PROJECT_KEY, JSON.stringify({
+    currentPlotId: null,
+    measuredArea: 1200,
+    measuredPolygon: savedPolygon,
+    ppGenSig: fixture.context.ryPolySig(savedPolygon)
+  }));
+
+  fireLoad(fixture);
+
+  assert.equal(fixture.context.currentPlotId, null);
+  assert.equal(fixture.context.RyIrrigationDataStore.readCurrentPlotAnchor().id, null);
+  assert.deepEqual(JSON.parse(JSON.stringify(fixture.context.measuredPolygon)), savedPolygon);
+  assert.equal(fixture.context.__runyeAutoRestored, true);
+});
+
+test('ordinary tabs leave the shared AI restore marker for the smart window', () => {
+  const fixture = createContext([{ id: 'plot-a' }, { id: 'plot-b' }]);
+  seedNetworks(fixture);
+  setAnchor(fixture, 'plot-b');
+  fixture.context.currentPlotId = 'plot-b';
+  fixture.context.measuredPolygon = [{ x: 9, y: 9 }];
+  fixture.localValues.set('runye_aiplot_anchor_v1', JSON.stringify({ at: 123, src: 'smart-popup' }));
+  fixture.localValues.set(PROJECT_KEY, JSON.stringify({
+    currentPlotId: 'plot-a',
+    measuredArea: 1200,
+    measuredPolygon: [{ x: 1, y: 2 }, { x: 3, y: 4 }, { x: 5, y: 6 }]
+  }));
+
+  fireLoad(fixture);
+
+  assert.equal(fixture.context.currentPlotId, 'plot-b');
+  assert.deepEqual(JSON.parse(JSON.stringify(fixture.context.measuredPolygon)), [{ x: 9, y: 9 }]);
+  assert.equal(fixture.localValues.has('runye_aiplot_anchor_v1'), true);
+  assert.deepEqual(JSON.parse(JSON.stringify(fixture.context.RyIrrigationDataStore.readNetworkLayout())), {
+    plotId: 'plot-b', marker: 'B'
+  });
+});
+
+test('smart page consumes and restores the AI handoff snapshot when its plot anchor matches', () => {
+  const fixture = createContext([], { smart: true });
+  fixture.localValues.set('runye_aiplot_anchor_v1', JSON.stringify({ at: 123, src: 'smart-popup' }));
+  const polygon = [{ x: 1, y: 2 }, { x: 3, y: 4 }, { x: 5, y: 6 }];
+  fixture.localValues.set(PROJECT_KEY, JSON.stringify({
+    currentPlotId: null,
+    measuredArea: 1200,
+    measuredPolygon: polygon
+  }));
+
+  fireLoad(fixture);
+
+  assert.equal(fixture.context.currentPlotId, null);
+  assert.deepEqual(JSON.parse(JSON.stringify(fixture.context.measuredPolygon)), polygon);
+  assert.equal(fixture.localValues.has('runye_aiplot_anchor_v1'), false);
+});
+
+test('smart page refuses an AI handoff snapshot bound to another tab plot', () => {
+  const fixture = createContext([{ id: 'plot-a' }, { id: 'plot-b' }], { smart: true });
+  seedNetworks(fixture);
+  setAnchor(fixture, 'plot-b');
+  fixture.context.currentPlotId = 'plot-b';
+  fixture.context.measuredPolygon = [{ x: 9, y: 9 }];
+  fixture.localValues.set('runye_aiplot_anchor_v1', JSON.stringify({ at: 123, src: 'smart-popup' }));
+  fixture.localValues.set(PROJECT_KEY, JSON.stringify({
+    currentPlotId: 'plot-a',
+    measuredArea: 1200,
+    measuredPolygon: [{ x: 1, y: 2 }, { x: 3, y: 4 }, { x: 5, y: 6 }]
+  }));
+
+  fireLoad(fixture);
+
+  assert.equal(fixture.context.currentPlotId, 'plot-b');
+  assert.deepEqual(JSON.parse(JSON.stringify(fixture.context.measuredPolygon)), [{ x: 9, y: 9 }]);
+  assert.equal(fixture.localValues.has('runye_aiplot_anchor_v1'), true);
+  assert.deepEqual(JSON.parse(JSON.stringify(fixture.context.RyIrrigationDataStore.readNetworkLayout())), {
+    plotId: 'plot-b', marker: 'B'
+  });
 });
 
 test('project restore stops before changing project state when the plot library cannot verify ownership', () => {

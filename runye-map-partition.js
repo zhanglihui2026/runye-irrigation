@@ -21,7 +21,12 @@
    if(network){
     expectedNetworkRaw=JSON.stringify(network);
     if(typeof expectedNetworkRaw!=='string')return {ok:false,error:'network-layout-serialize-failed'};
-    irrigation.writeNetworkLayout(network);
+    if(network.plotId==null||String(network.plotId).trim()==='')return {ok:false,error:'network-layout-owner-missing'};
+    var written=irrigation.writeNetworkLayout(network,network.plotId);
+    if(written===false){
+     var rejectedRollback=rollbackNetworkLayout(irrigation,expectedNetworkRaw,previousNetworkRaw,network.plotId);
+     return {ok:false,error:'network-layout-write-failed',rollbackError:rejectedRollback};
+    }
    }
   }catch(e){
    var writeRollback=rollbackNetworkLayout(irrigation,expectedNetworkRaw,previousNetworkRaw,network&&network.plotId);
@@ -43,13 +48,22 @@
  function polygons(toLL){var b=root.RunyeBridge,cuts=b.getZoneCuts(),rings=root.__runyeSubPlots&&root.__runyeSubPlots.length?root.__runyeSubPlots.map(s=>s.poly):[b.state.polyPts],out=[];
   if(!cuts)return out;for(var y=0;y<cuts.yPos.length-1;y++)for(var x=0;x<cuts.xPos.length-1;x++)rings.forEach(function(r){var p=b.clipPolyToRect(r,cuts.xPos[x],cuts.yPos[y],cuts.xPos[x+1],cuts.yPos[y+1]);if(p&&p.length>=3&&b.polyArea(p)>0.01)out.push({latLng:p.map(toLL),area:b.polyArea(p)});});return out;
  }
- function capture(net){if(!net||!root.__runyeMapFrameInv||!root.RunyeBridge)return;var inv=root.__runyeMapFrameInv;
+ function capture(net,previousNetworkRaw){
+  if(!net)return {ok:false,error:'network-layout-missing'};
+  if(!root.__runyeMapFrameInv||!root.RunyeBridge)return {ok:true,skipped:true,reason:'partition-context-unavailable'};
+  if(arguments.length<2||(previousNetworkRaw!==null&&typeof previousNetworkRaw!=='string'))return {ok:false,error:'network-layout-snapshot-missing'};
+  var inv=root.__runyeMapFrameInv;
   function frame(p){var x=p.x-inv.tx,y=p.y-inv.ty;return{x:inv.ax*x+inv.bx*y,y:inv.ay*x+inv.by*y};}
   var angle=Math.atan2(inv.ay,inv.ax)*180/Math.PI,base=root.__runyeGeoBase,m=6378137*Math.PI/180,co=Math.cos(base.refLat*Math.PI/180);
   function ll(p){p=frame(p);return[base.refLat+p.y/m,base.refLng+p.x/(m*co)];}
   var plan={version:1,angle:angle,params:params(),cutSnap:copy(root.RunyeBridge.state.cutSnap),cutOverrides:copy(root.RunyeBridge.state.cutOverrides),zoneRotated:!!root.RunyeBridge.state.zoneRotated};
-  net.partitionPlan=plan;net.partitions=polygons(ll);
-  var state=readLibrary();if(!state.ok)return false;var matches=state.plots.filter(function(p){return p&&p.id===net.plotId;});if(matches.length!==1)return false;var p=matches[0];p.partitionPlan=plan;p.partitions=net.partitions;var saved=plotStore().replace(state.plots,state.revision);return !!saved.ok;
+  var partitions=polygons(ll),state=readLibrary();
+  if(!state.ok)return {ok:true,skipped:true,reason:state.error||'plot-library-unavailable'};
+  var matches=state.plots.filter(function(p){return p&&p.id===net.plotId;});
+  if(matches.length!==1)return {ok:true,skipped:true,reason:'plot-library-identity-not-unique'};
+  net.partitionPlan=plan;net.partitions=partitions;
+  var p=matches[0];p.partitionPlan=plan;p.partitions=partitions;
+  return commitPartitionResult(state,net,previousNetworkRaw);
  }
  function preview(payload,angle){payload=copy(payload);payload.partitionPlan={version:1,angle:angle,params:(payload.partitionPlan||{}).params||{},zoneRotated:!!(payload.partitionPlan||{}).zoneRotated};root.runyeApplyMapPayload(payload);
   var b=root.RunyeBridge,F=root.__runyeMapFramePoly,c=center(F.map(p=>({x:p.x,y:-p.y}))),base=root.__runyeGeoBase,m=6378137*Math.PI/180,co=Math.cos(base.refLat*Math.PI/180);

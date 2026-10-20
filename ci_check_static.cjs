@@ -329,12 +329,16 @@ const projectionSource = projectionStart >= 0 && projectionEnd > projectionStart
 const projectionWrites = [...projectionSource.matchAll(/writeNetworkLayout\(([^;]+)\);/g)].map((match) => match[1]);
 const projectionPlotScopeOk = !!projectionSource &&
   projectionSource.includes('var plotId=window.currentPlotId || null;') &&
-  projectionSource.includes('readNetworkLayoutForPlot(plotId)') &&
+  projectionSource.includes('readRawNetworkLayout(plotId)') &&
   !projectionSource.includes('readNetworkLayout()') &&
   projectionSource.includes('if(plotId){') &&
-  projectionWrites.length >= 3 && projectionWrites.every((args) => /,\s*plotId\s*$/.test(args));
+  projectionSource.includes('capture(candidateNet,previousNetworkRaw)') &&
+  projectionSource.includes('if(net && dd.poly && dd.poly.length>=3)') &&
+  projectionWrites.length >= 2 && projectionWrites.every((args) => /,\s*plotId\s*$/.test(args)) &&
+  mapPartitionSource.includes('writeNetworkLayout(network,network.plotId)') &&
+  mapPartitionSource.includes('return commitPartitionResult(state,net,previousNetworkRaw)');
 check('④a7 三级图面反投按页面地块读写，避免跨标签活动锚点串用', projectionPlotScopeOk,
-  projectionPlotScopeOk ? '' : '反投仍使用活动锚点读写，或网络快照写入未显式绑定本页地块');
+  projectionPlotScopeOk ? '' : '反投必须读取页面地块原始快照、显式限定管网owner，并让分区库与管网事务一致');
 
 const projectSessionSource = fs.readFileSync(path.join(ROOT, 'mod/inline-12.js'), 'utf8');
 const projectAnchorWriterMatch = projectSessionSource.match(/function writeCurrentPlotAnchor\(id\)\s*\{([\s\S]*?)\n\s*\}/);

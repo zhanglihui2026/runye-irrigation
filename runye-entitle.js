@@ -185,7 +185,9 @@
     var s = String(seed || '') + '|' + Date.now() + '|' + Math.random();
     var h = 2166136261;
     for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = (h * 16777619) >>> 0; }
-    return 'RY' + h.toString(36).toUpperCase().slice(0, 8);
+    var body = h.toString(36).toUpperCase();
+    while (body.length < 6) body = '0' + body;
+    return 'RY' + body.slice(0, 8);
   }
   function maskPhone(p) {
     var s = String(p == null ? '' : p);

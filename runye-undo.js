@@ -110,6 +110,24 @@
         try { s = JSON.stringify(stripVolatile(JSON.parse(s))); }
         catch (e5) { /* 解析不动就原样用 */ }
       }
+      /* ★ [v619] 图面改径（RyTlAutoEdits.cals）补进快照。
+         v145 有明确用户约定：「改径不进任何存档，每次打开网页都清空」——
+         所以它**不能**进工程 payload（否则导出工程/跨会话都会带上）。
+         但撤销是会话内的行为，改错管径按 Ctrl+Z 必须能退回，这一层只能补。
+         做法：只在**快照字符串**上挂一个 `__undoCals` 字段（runyeSaveProject 写盘的那份没有它，
+         盘上/导出文件逐字节不变）；没有改径时不挂 ⇒ 快照字符串保持原样，去重不受影响。 */
+      try {
+        var ae = global.RyTlAutoEdits;
+        if (s && ae && typeof ae.calibersMap === 'function') {
+          var cm = ae.calibersMap(), ks = cm ? Object.keys(cm) : [];
+          if (ks.length) {
+            var o = JSON.parse(s), bag = {};
+            for (var i2 = 0; i2 < ks.length; i2++) bag[ks[i2]] = cm[ks[i2]];
+            o.__undoCals = bag;
+            s = JSON.stringify(o);
+          }
+        }
+      } catch (e6) { }
       return s || null;
     } catch (e) {
       return null;
@@ -139,23 +157,59 @@
     /* ★ 该页已有基线 ⇒ 原样保留历史（这就是“往返不清空”的关键），只清掉待拍的基线定时器。 */
     if (S.top >= 0) { clearTimeout(resetT); return true; }
     clearTimeout(resetT);
-    if (immediate) { var s = capture(); if (s) pushTo(S, s); return true; }
-    resetT = setTimeout(function () { var s = capture(); if (s) pushTo(S, s); }, 400);
+    if (immediate) { var s = capture(); if (s) pushTo(S, s, 'base'); return true; }
+    resetT = setTimeout(function () { var s = capture(); if (s) pushTo(S, s, 'base'); }, 400);
     return true;
   }
   setInterval(function () { syncSection(false); }, 1000);
 
-  function pushTo(S, snap) {
+  /* 入栈追踪环（诊断用）：一次手势到底入了几档、每档是谁拍的 —— 排查「按一次 Ctrl+Z 退两步」时第一手要看的东西。
+     只在内存里留最近 60 条，不落盘；正常使用零开销（就是一次 push 数组）。 */
+  var TRACE = [];
+  function sig(s) {
+    if (!s) return 'null';
+    var h = 5381;
+    for (var i = 0; i < s.length; i += 7) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+    return s.length + '#' + h.toString(36);
+  }
+  function trace(src, added, snap) {
+    var S = curSlot();
+    TRACE.push({ src: src, added: added, top: S ? S.top : -1, len: S ? S.stack.length : 0, sig: sig(snap), t: Date.now() % 100000 });
+    if (TRACE.length > 60) TRACE.shift();
+  }
+
+  function pushTo(S, snap, src) {
     if (!S || !snap) return false;
-    if (S.top >= 0 && S.stack[S.top] === snap) return false;   // 没变化 → 不入栈
+    if (S.top >= 0 && S.stack[S.top] === snap) { trace(src || '?', 0, snap); return false; }   // 没变化 → 不入栈
     S.stack = S.stack.slice(0, S.top + 1);
     S.stack.push(snap);
     if (S.stack.length > MAX) S.stack.shift();
     S.top = S.stack.length - 1;
+    trace(src || '?', 1, snap);
     refreshTitle();
     return true;
   }
-  function push(snap) { return pushTo(curSlot(), snap); }
+  function push(snap, src) { return pushTo(curSlot(), snap, src); }
+
+  /* 「操作前」入栈：栈里还没有历史时，它是**基线**，不是新的一步。
+     ★ 为什么单独一条路径（v619 探针 run3 抓到）：stack[0] 是进入本页时由 syncSection
+       拍的，三级页的简图生成是异步的（切页 400ms 后才拍，生成往往还没完），
+       基线可能停在「简图还没画」的状态。此时直接 push 出手前状态，就会在
+       "基线 → 操作后" 之间**凭空多出一档**（实测栈深 0→2）⇒ 用户按一次 Ctrl+Z
+       只退回"还没重算完"的样子、图反而空掉，再按一次才到他要的上一步。
+       还没有历史时，「出手前的状态」才是真正的上一步 ⇒ 直接覆盖 stack[0]，并把
+       它之后的 redo 尾巴丢掉（语义等同"从这里重新开始记"）。 */
+  function pushPre(snap) {
+    var S = curSlot();
+    if (!S || !snap) return false;
+    if (S.top === 0) {
+      if (S.stack[0] === snap) { trace('mark.pre', 0, snap); return false; }
+      S.stack = [snap]; S.top = 0;
+      trace('mark.pre=base', 1, snap); refreshTitle();
+      return true;
+    }
+    return pushTo(S, snap, 'mark.pre');
+  }
 
   /* 手势结束 → 下一轮事件循环取快照（此刻本轮处理器的写入已全部落地）。
      pending 保证同一次手势里的 pointerup + click 只跑一次。 */
@@ -172,8 +226,8 @@
     var pre = capture();
     setTimeout(function () {
       pending = false;
-      if (pre) push(pre);
-      push(capture());
+      if (pre) pushPre(pre);
+      push(capture(), 'mark.post');
     }, 0);
   }
 
@@ -190,6 +244,27 @@
       global.__ryUndoQuiet = false;
       try { global.localStorage.removeItem(KEY); } catch (e2) { }
     }
+    /* ★ [v619] 图面改径回写 —— 与 capture 里的 `__undoCals` 成对。
+       v145 让改径「不进存档」，因此 runyeLoadProject 恢复后 cals 必然为空；
+       撤销要回到上一步，就得把快照里那份改径重新落回去（多退的删掉、少的补上）。
+       条数通常只有个位数（用户手动改过几根），逐条 setCaliber 的通知开销可忽略。 */
+    try {
+      var ae3 = global.RyTlAutoEdits;
+      if (ae3 && typeof ae3.calibersMap === 'function') {
+        var want = null;
+        try { var oo = JSON.parse(snap); want = (oo && oo.__undoCals) || null; } catch (e7) { }
+        var w = want || {}, curMap = ae3.calibersMap() || {}, pk = Object.keys(curMap);
+        for (var a = 0; a < pk.length; a++) {
+          if (!(pk[a] in w) && typeof ae3.clearCaliber === 'function') ae3.clearCaliber(pk[a], 'undo');
+        }
+        var wk = Object.keys(w);
+        for (var b = 0; b < wk.length; b++) {
+          if (Math.abs((curMap[wk[b]] || 0) - w[wk[b]]) > 1e-6 && typeof ae3.setCaliber === 'function') {
+            ae3.setCaliber(wk[b], w[wk[b]], null, 'undo');
+          }
+        }
+      }
+    } catch (e8) { }
     /* ★ 三级页「联合灌溉 1/2/3/4 区」按钮组的高亮是**纯 DOM 状态**，不在工程快照里（快照只有 tlDiagramData.combinedN）。
        撤销后数据回到上一步、按钮却仍停在旧选项，界面与数据不一致
        （实测：点「4 区」→ Ctrl+Z，combinedN 已回 2，按钮仍高亮「4 区」）。
@@ -213,6 +288,22 @@
         global.grRefreshGroupPage();
       }
     } catch (e3) { }
+    /* ★ [v619 2026-10-20] 三级图面重绘 —— 「数据回去了、画面没回去」的根因。
+       runyeLoadProject 的恢复尾段只重算结果条（renderThreeLevel / tlUpdatePlanBar），
+       而简图 SVG（管道、三通、阀门、节点圆点、尺寸标注线、整图平移）是**渲染时按状态画**的，
+       不重绘就会出现：数据已回到上一步，图上还是拖动后的样子。
+       优先用工作区的轻量重绘（只按现有几何重画，不重新生成管网）；
+       工作区没起来（例如只在化简图态）才退回 tlAutoGenerate。 */
+    try {
+      if (activeSec() === 'tlPipePlanSection') {
+        var ws = global.RyTlWs;
+        if (ws && typeof ws.render === 'function') ws.render();
+        else if (typeof global.tlAutoGenerate === 'function' && global.tlDiagramData) {
+          global.tlAutoGenerate({ scroll: false });
+        }
+        if (typeof global.tlUpdatePlanBar === 'function') global.tlUpdatePlanBar();
+      }
+    } catch (e6) { }
   }
 
   function undo() {
@@ -266,8 +357,29 @@
   document.addEventListener('input', function () {
     if (!isTarget()) return;
     clearTimeout(timer);
-    timer = setTimeout(function () { push(capture()); }, INPUT_MERGE_MS);
+    timer = setTimeout(function () { push(capture(), 'input'); }, INPUT_MERGE_MS);
   }, true);
+
+  /* ★ [v619 2026-10-20] 拖动也要产生「操作后」快照 —— 这是「误操作拖了标识/管道却退不回去」的根因。
+     原来只在 pointerdown/click/change 上拍快照：pointerdown 拍的是「操作前」，拖动过程在
+     pointermove/up 里写数据，而 pointerdown 之后那个 setTimeout(0) 早已执行完
+     ⇒ 这次拖动永远没有「操作后」快照入栈。而拖动结束后 click 常常**根本不到**
+     （工作区命中管线后会 setPointerCapture + preventDefault，工程注释里有实测：3 次 pointerdown / 0 次 click）
+     ⇒ 后果一：栈顶停在拖动前，再按 Ctrl+Z 退的是"上一步再上一步"；后果二：拖完第一次按 Ctrl+Z 直接
+     提示「没有可回退的步骤」。
+     修法：抬手时（pointerup / mouseup / touchend / pointercancel）延后 120ms 补拍一次。
+     延后是必须的 —— 本工程不少拖动把落盘写在 **mouseup**（如简图的 _tlDragUp / _tlNodeDragUp），
+     而 pointerup 早于 mouseup 派发，立刻拍会拍到"还没落盘"的中间态。
+     120ms 内的多次抬手由 clearTimeout 合并，pushTo 自身还会按字符串去重。 */
+  var postT = 0;
+  function schedulePost() {
+    if (!isTarget()) return;
+    clearTimeout(postT);
+    postT = setTimeout(function () { postT = 0; push(capture(), 'post'); }, 120);
+  }
+  ['pointerup', 'mouseup', 'touchend', 'pointercancel'].forEach(function (t) {
+    document.addEventListener(t, schedulePost, true);
+  });
 
   document.addEventListener('keydown', function (e) {
     if (global.__ryUndoInjectDisable) return;   /* 仅注入体检用：关掉拦截以证明本探针不是恒绿 */
@@ -314,6 +426,9 @@
     push: push,
     depth: function () { var S = curSlot(); return S ? S.top : -1; },
     debug: function () { var S = curSlot(); return { top: S ? S.top : -1, len: S ? S.stack.length : 0, target: isTarget(), sec: activeSec(), pages: Object.keys(ALL) }; },
+    /* 诊断用：最近 60 次入栈尝试（谁拍的 / 有没有真入栈 / 入栈前后的栈深与内容指纹） */
+    trace: function (n) { return TRACE.slice(-(n || 20)); },
+    traceClear: function () { TRACE.length = 0; },
     /* 诊断用：把栈里每一份快照的关键字段摊开（"按了没反应"时第一手要看的东西） */
     dump: function () {
       var S = curSlot(); if (!S) return [];

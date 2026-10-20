@@ -1843,3 +1843,528 @@ _probe_front_reset 6/6（R3 断言改看第 2 点，因首点已是水源）、c
   style-01.css v595 统一规则与 2980 共享规则里的 `#tlPipePlanSection .pp-toolbar` 部分、
   ry-panel.css 的三级把手规则；二级工具轨不受影响（v595 实测口径保持）。
 - 暂存区核验：index 无 tlToolbar、style-01 无三级作用域。
+
+## 26. v613 ~ v615 三级左栏样式收口（2026-10-20 · 三批全部未提交、未推送）
+
+> **这一节是"进行中状态"，不是历史沿革。** HEAD 仍是 `f5ed5a2 v612-flat-radius`；
+> v613 / v614 / v615 三批改动**只在工作区**。用户已看过对照图并逐版调整过口径，
+> 但**从未说"推送"** —— 动手发布前必须再问一次。
+
+### 26.0 接手第一件事：看清工作区是混编的
+
+`git status --porcelain` 有 **30+ 个已修改文件**，来自多个并行会话，跟本次工作无关的有：
+`core/terrain-bridge-store.js`、`core/measured-area-bridge-store.js`、`runye-material-audit.js`、
+`mod/inline-11.js`、`mod/inline-12.js`、`mod/inline-16.js`、`mod/inline-29.js`、`mod/online-map.js`、
+`mod/plot-editor.js`、`runye-entitle.js`、`runye-inverse-design.js`、`runye-map-partition.js`、
+`runye-nav.js`、`runye-map-measure.html`、`terrain/index.html`、`cloudfn/*`、`tests/*`、`docs/*`、`ci_check_static.cjs`…
+
+⇒ **禁止 `git add -A` / `git commit -a`**。提交走 §26.7 的 hash-object 混编法。
+
+**本次工作涉及的文件（6 个）**：
+`index.html`、`sw.js`、`mod/style-01.css`、`mod/plan-calc-render.js`、`mod/inline-09.js`、`mod/inline-27.js`。
+其中 `index.html` 与 `sw.js` **同时含并行会话的改动**（版本串、bridge-store 引用、sw 注释精简），
+提交时必须"HEAD 为底 + 只替换自己那几段"。
+
+### 26.1 这三批在解决什么
+
+用户连提四个递进要求（原文留在 style-01.css 各段注释里）：
+1. 「三级水力计算结果，左侧面板样式有多层嵌套/覆盖的情况，底色还有那个框应该取消」
+2. 「轮灌演示那组内容文字左侧要与联合灌溉/面积成组那些文字左侧对齐」
+3. 「你看扬程这个很明显看不清楚，我建议你按照二级工具栏那个扬程样式来」
+4. 「红框内的文字跟按钮用一个样式来要求它呢，现在按钮太长了…不要新建样式，就用二级面板的样式」
+
+→ 目标态：**三级左栏 = 二级 CAD 特性面板的同一套语言**（v609 定的口径）：
+灰条分组 + 22px 行网格 + 标签左/值右 + 实线分隔，全站只有一处深色块（扬程算式带，与二级同款）。
+
+### 26.2 三级左栏现在的结构（从上到下 5 个灰条分组）
+
+| # | 分组标题（灰条） | 载体 | 说明 |
+|---|---|---|---|
+| 1 | 地块与灌溉参数 | `#tlPlanBar` 的 `.pp-plan-bar::before` | v611 定的灰条 |
+| 2 | 水力计算结果 | `#tlPlanBar2` 的 `.pp-res-head` 伪标题 | 可点折叠（默认展开） |
+| 3 | 扬程计算式 | `#ppHeadBreak` 内 `<div class="tl-flat-head">` | [v614] 下面接一条深色算式带 |
+| 4 | 管径调整 · 扬程确认 | `#tlPumpUpdateBox` 内 `.tl-flat-head` | [v615] 说明+按钮同一行 |
+| 5 | 管段长度与水头损失 | `#tlLossCard` 内 `.tl-flat-head` | [v613] 三行数据 + 合计 |
+
+### 26.3 统一网格的五个角色类（唯一出处 = `mod/style-01.css`）
+
+| 类 | 作用 | 关键值 | 输出方 |
+|---|---|---|---|
+| `.tl-flat-head` | 灰条标题 | 22px / `#dcdfdd` / `#2c2c2a` / 600 / 上下 1px `#cfd4d1` | index.html 静态 + JS |
+| `.tl-flat-row` | 22px 数据行（标签左、值右） | flex / `min-height:22px` / `padding:0 10px` / 底线 `#e8ecea` | `inline-09.js` `tlRefreshLossCard` |
+| `.tl-flat-line` | 22px 单行长文本 | 同上但不分两栏 | `inline-27.js` `tlPumpUpdateRun` |
+| `.tl-flat-note` | 多行小字说明 | 10.5px / `#64748b` / `padding:5px 10px` | 同上 + index.html |
+| `.pphb-formula` + `.pphb-{name,num,op,eq,final}` | 扬程算式带词法 | 深底 `rgba(15,23,42,.90)`、绿名/黄值/近白括号/淡绿结论 | `plan-calc-render.js` `renderHeadBreakdown` |
+
+**纪律**：新增任何"左栏信息块"一律复用这五类，**结构由 JS 输出类名、不写 inline 样式**。
+样式只在 style-01.css 里定义一次，选择器一律**双祖先**（见 §26.5 坑 1）。
+
+### 26.4 逐版改动（文件级，便于 review）
+
+**v613 `v613-flat-cards`（两块信息卡并入网格）**
+- `index.html`：`#tlPumpUpdateBox` 的标题/说明两个 div 换成 `.tl-flat-head` / `.tl-flat-note`；
+  四处 `?v=` 抬到 `613-flat-cards`（style-01 / ry-panel / inline-09 / inline-27）。
+- `mod/inline-09.js`：`tlRefreshLossCard` 改为输出 `.tl-flat-head/.tl-flat-note/.tl-flat-row`，**不写 inline 样式**。
+- `mod/inline-27.js`：`tlPumpUpdateRun` 的四行结果改输出 `.tl-flat-line`。
+- `mod/style-01.css`：v613 段（约 2734 行起）定义四类 + 更新按钮 22px；
+  三块拍平规则里 `margin:0` 改 `margin:0!important`（见坑 2）。
+- `sw.js`：`VERSION='v613-flat-cards'`。
+
+**v614 `v614-head-formula`（扬程看不清的根治）**
+- 根因（实测，不是猜）：v611 把 `.pp-head-break` 的深色底拍成 `transparent`，**但没清它自带的
+  `color:#e8eef7`** ⇒ 容器与 11 行明细 computed color 全是 `rgb(232,238,247)`、bg 全透明，
+  浅色字落白面板对比度 **1.16:1**；行高只有 16.5px、标签与数值无间距（读成「提升5.00」）。
+  另：`plan-calc-render.js` 输出的 `.pphb-row/.pphb-k/.pphb-v` **全站一条 CSS 都没写过**。
+- `index.html`：`<details id="ppHeadBreak">` → `<div>`（details 会藏内容，div 才能直接铺算式带）。
+- `mod/plan-calc-render.js`：`renderHeadBreakdown` 改为输出
+  `.tl-flat-head`「扬程计算式」+ 一条 `.pphb-formula`；
+  **9 项全保留**（含三级独有的「总管损失 / 已有压力」），数值与加减口径**一字未改**。
+- `mod/style-01.css`：v614 段（约 2812 行起）删掉 `#ppHeadBreak>summary` 那 4 条（含 `>summary~*`），
+  换成 `.pphb-formula` + 五类词法配色，**与 `ry-panel.css` 的 `.pp-calc-formula/.pp-cf-*` 逐项同值**。
+- `sw.js`：`VERSION='v614-head-formula'`；`plan-calc-render.js` 在 CORE 里，故必须抬版本。
+
+**v615 `v615-btn-row`（说明 + 按钮并成一行）**
+- `index.html`：`#tlPumpUpdateBox` 内改成
+  `<div class="pp-plan-item" id="tlPumpUpdateRow"><span class="tl-flat-note" id="tlPumpUpdateNote">…</span><button id="tlPumpUpdateBtn">…</button></div>`；
+  按钮 inline 的 `width:100%;padding:5px 8px` 删掉。
+- `mod/style-01.css`：v615 段（约 2774 行起）把**原有那条** `#tlPumpUpdateBtn` 改成二级 `.pp-recipe-btn` 规格
+  （20px / `padding:0 8px` / 白底 / 1px `#e2e8f0` / `#334155` / 11px 600 / nowrap）+ `:disabled` 态；
+  行容器直接用**已有的** `.pp-plan-item`，不新增行样式。
+- 实测：按钮 280px → **98.3px**，右缘距行右 10px，`sameRow:true`，`btnIsFullWidth:false`。
+- `sw.js`：`VERSION='v615-btn-row'`；`style-01.css?v=615-btn-row`。
+
+**当前版本串（工作区现状，别改错）**
+```
+sw.js                      VERSION = 'v619-undo-cover'
+index.html:20              mod/style-01.css?v=619-undo-cover
+index.html:248             mod/ry-panel.css?v=619-undo-cover
+index.html:2261            mod/plan-calc-render.js?v=614-head-formula
+index.html:2262            mod/inline-09.js?v=619-undo-cover
+index.html:2273            mod/inline-12.js?v=619-undo-cover
+index.html:2303            tl-workspace/tl-nodes.js?v=619-undo-cover
+index.html:2320            mod/inline-27.js?v=619-undo-cover
+index.html:2390            runye-undo.js?v=619-undo-cover
+```
+
+### 26.5 五个坑（踩过，别重踩）
+
+1. **两态选择器**：三级 `#tlSide` 切 tab 时被搬进 `#ryCadSide`，祖先链断裂 ⇒
+   每条规则都要**同时**挂 `#tlPipePlanSection .pp-side …` 与 `#ryCadSide [data-pp="tlPipePlanSection"] .pp-side …`。
+   只写一条在另一态完全不生效（v613 行规则就这么翻过车）。
+2. **`!important` 只准用在三类**：颜色 / 边框 / 阴影。用途是压 index.html 上的 inline
+   （`#tlPumpUpdateBox` 有 inline `margin-top:10px`、`#tlLossCard` 有 `margin-top:12px`，
+   不带 `!important` 压不住 ⇒ 灰条之间留 10/12px 白缝、网格断成三截）。
+3. **style-01.css 里禁止任何不带 `!important` 的 `border-radius`**（连 `border-radius:0` 都不行）：
+   全站 `body *{border-radius:0!important}` 已压平，写它就是死声明，线上冒烟专门查这条（v611 判红过）。
+4. **inline `opacity` 在扮 disabled**：`inline-27.js` 在未改管径时给按钮写 `opacity:.5`。
+   把"灰底大按钮"换成"白底小按钮"后 0.5 会把描边和字吃没（白底半透明 = 与面板同色）。
+   现用 `opacity:1!important` 收回 + `:disabled` 显式表态。**改任何"缩小/变透明"的控件都要查这个。**
+5. **改 `index.html` 的 CRLF**：工作区里 `index.html` / `mod/style-01.css` 是 **CRLF**，
+   `sw.js` / `mod/plan-calc-render.js` 是 **LF**。用 Python 改必须
+   `io.open(p, encoding='utf-8', newline='')` 读、`newline=''` 写、自己拼 `\r\n`；
+   图省事用默认文本模式会整文件换行被改（v613 踩过，断言 0 命中）。
+
+### 26.6 怎么验（本地无头，Edge CDP）
+
+```bash
+cd C:/Users/AHS/runye-irrigation
+node ci_check_static.cjs                      # 期望 PASS=28 FAIL=0
+node --test tests/*.test.cjs                  # 期望 153 pass / 1 fail（见 §26.8）
+```
+
+`_probe_tl_skin.mjs`（本次主力探针，环境变量组合）：
+
+| 变量 | 作用 |
+|---|---|
+| `GEN=1` | 先跑 `tlAutoGenerate()` 让生成图后才现身的块现身（需种 `measuredPolygon`） |
+| `HB=1` | 展开并逐行量 `#ppHeadBreak`（容器/每行 color、bg、行高） |
+| `PUMP=1` | 量 `#tlPumpUpdateRow`（行高、按钮宽高、说明换行数、左右内边距对称性） |
+| `PUMPON=1` | 把「更新水泵扬程」置为可用态（截图对照禁用/可用两副样子） |
+| `DELTA=1` | 跑 `tlPumpUpdateRun()` 让四行 `.tl-flat-line` 现身 |
+| `DEMO18=1` | 走真实渲染路径铺 18 个轮灌 chips（别用 cloneNode，会全红误导） |
+| `MODE=orig` | 把 `#tlSide` 搬回 `#tlPipePlanSection > .pp-body` 验"原位态"选择器 |
+| `SHOT=…png` | 视口截图 + 落 `_box.json`（本站 `captureScreenshot` 的 clip 常算出 0 宽，只能外部按坐标裁） |
+
+```bash
+GEN=1 HB=1 PUMP=1 SHOT=C:/tmp/x.png node _probe_tl_skin.mjs
+# 再用 python + PIL 按 _box.json 的 x/y/width/height × dpr 裁
+```
+
+二级对照：`SHOT=…png node _shot_panel_sl.mjs`。
+⚠ 该脚本按 `#ppSide` 可见矩形裁切，**二级「扬程计算式」那条算式带在裁切线以下，本次没截到**；
+要对照得先把它滚进可视区再截。
+
+### 26.7 发布口径（混编提交 + 推送 + 线上校验）
+
+1. **只提交自己的 hunk**（`index.html` / `sw.js` 混有并行改动）：
+   ```bash
+   git show HEAD:<path> > /tmp/base/<path>          # 以 HEAD 为底
+   # 在副本上只替换自己那几段（断言命中数 == 1），再
+   git hash-object -w --path=<path> /tmp/base/<path>
+   git update-index --cacheinfo 100644,<sha>,<path>
+   git diff --cached --stat                          # 核对行数，确认无夹带
+   ```
+2. `git commit -F -`（写清 v613+v614+v615 三段），推送要带代理：
+   `git -c http.proxy=http://127.0.0.1:7897 -c https.proxy=http://127.0.0.1:7897 push`
+   （端口会变，先用 `netstat -ano | grep LISTENING` 找，别死磕 7897）。
+3. 判断"代码上去没有"用 **GitHub API**，别用 `raw.githubusercontent.com`（v610 实测不实时）：
+   `curl -H 'Accept: application/vnd.github.raw' https://api.github.com/repos/<o>/<r>/contents/<path>?ref=master`
+4. Pages 翻新可能很慢（v608 实测 35 分钟），期间别反复推。
+5. 线上跑 `node _smoke_v521_live.mjs`（期望 27/27），它逐字比对
+   `style-01.css?v=` 与 sw VERSION，且查"style-01 无无效圆角声明"。
+   curl 校验大 CSS 先比字节数再比 sha256（会截断在 245760 字节，造成假 DIFF）。
+
+### 26.8 已知红灯 / 待办
+
+- **单测 1 条既存红**：`tests/runye_hydraulics_core.test.cjs:27` 断言 `overlay.version === 1`，
+  而 `runye-hydraulics-core.js:655` 已返回 `version: 2`（早前提交 `74bf67e` 没同步测试）。
+  与本次工作无关，**修不修看用户**。
+- **既存红（历史登记）**：`verify_pp_tabs` 14/34、`verify_sketchup` 3/6、`verify_cascade_pp` 1/38、
+  `verify_nav_compact` 10 项；本机无头权益拉不通 ⇒ 导航/表单类大面积假红。
+- **§26.9 待用户拍板的口径**（不是本次工作，但同页相关）：
+  地块裁剪后管道长度仍按设计几何计（多算约 33%，`_probe_clip_len.mjs` 可复现）；
+  三级简图 28 区底部双「20 m」叠字（批次 F-1）。
+- **三级「扬程计算式」现在的形态是 details 改 div 后的常显块**（与二级一致，不可折叠）。
+  若用户回头要折叠，需给 `.pphb-formula` 加一层显隐，**不要再改回 `<details>`**
+  （details 会把 `.tl-flat-head` 一起藏起来）。
+
+### 26.9 一句话交接
+
+三级左栏的"多层嵌套/看不清"已经收口成二级同一套语言（灰条 + 22px 网格 + 一条深色算式带），
+**三批改动全部躺在工作区没提交**；下一步只差用户点头 → 按 §26.7 混编提交并发布。
+
+### 26.10 v615 本地复验记录（2026-10-20 接手会话，仍未提交、未推送）
+
+**门禁 / 单测**
+
+| 项 | 结果 |
+|---|---|
+| `node ci_check_static.cjs` | **PASS=28 FAIL=0** |
+| `node --test tests/*.test.cjs` | **154 pass / 0 fail**（接手时 153/1，见下方修复 ①） |
+| `_probe_tl_skin.mjs`（GEN/HB/PUMP/PUMPON/DELTA/DEMO18/MODE=orig） | 全项符合 §26.4 预期 |
+| `verify_text_contrast.js` | ⛔ 本机**跑不起来**：`Cannot find module 'puppeteer-core'`（环境既存，非本次改动引入） |
+| `verify_ry_tool.js` | ⛔ **启动即崩**：缺 `iso-diagram/network-editor.css`（§1 已登记既存红，崩在 952 行模块载入期，`must` 清单根本没跑到） |
+
+**实测数字（工作区 v615，1400×1400 视口、dpr2、GEN=1 生成过管线图）**
+
+- 行网格：`#tlSide` 内 16 个可见 `.pp-plan-item`，**14 行 = 22.0px**；两处 34px / 31px 是**多行说明**
+  （「联合流量依据…」「当前使用设计管径…」）自然换行，不是网格失效。
+- 按钮行：`#tlPumpUpdateBtn` **98.3 × 20px**，`sameRow:true`、`btnIsFullWidth:false`，
+  左内边距 10 / 右内边距（行右缘 − 按钮右缘）**10**，对称；禁用态 `#94a3b8` on `#f1f5f9` 仍可读
+  —— 坑 4 那条 inline `opacity:.5` 已被 `opacity:1!important` 收回。
+- 轮灌演示：`titleX=20` 与 `.pp-plan-label` 的 `rowLabelX=20` 对齐；18 组 chips 折 2 行、`chipsW=280`。
+- 扬程算式带：容器 bg `rgba(15,23,42,.90)`（合成到白底 ≈ #272e3f）、文字 `#e8eef7` ⇒ 对比度 **≈11.6:1**
+  （v611 事故态 1.16:1）；`.tl-flat-head` `#2c2c2a` on `#dcdfdd` ≈ 11:1。**「看不清」已根治。**
+- 三块拍平：`ppHeadBreak / tlPumpUpdateBox / tlLossCard` computed 圆角全 `0px`、bg `transparent`、`box-shadow:none`。
+- `style-01.css` 的「无效圆角」（`_smoke_v521_live.mjs` §114 同口径：不带 `!important` 且非 `50%`）= **0**。
+- 版本串与 §26.4 表逐字一致；`style-01.css?v=615-btn-row` 与 `sw VERSION` 去 `v` 后相等 ⇒ 冒烟 §113 会过。
+- 原位态选择器：`MODE=orig` 下 `#tlSide` 搬回 `.pp-body` 后侧栏宽度为 0（父容器未激活，无头环境量不到布局），
+  但 `#tlPlanBar2::before` 灰条仍 `22px / #dcdfdd / 上下 1px #cfd4d9`、三块圆角仍 0 ⇒ 双祖先两态都生效；
+  v613–v615 新增的规则**逐条**都写了 `#tlPipePlanSection …` + `#ryCadSide [data-pp=…] …` 两套（静态核过）。
+
+**已修（本地改动，仍未提交）**
+
+1. `tests/runye_hydraulics_core.test.cjs:27`：`overlay.version` 断言 1 → **2**，并加「v2 必须带
+   `networkTs` / `plotId` / `designRevisionId` 三键」；根因是 `74bf67e` 抬契约时没同步测试。→ 单测 154/154。
+2. `verify_ry_tool.js:64` 契约串：`<details id="ppHeadBreak" class="pp-head-break" hidden`
+   → `<div id="ppHeadBreak" class="pp-head-break" hidden`（v614 把 details 改 div，契约没跟，会假红）。
+3. `verify_text_contrast.js` D2 段：旧类名 `.pphb-row / .pphb-v / summary` **全站已无产出**，
+   样本口径换成 `.pphb-formula / .pphb-name / .pphb-num / .pphb-op / .pphb-eq / .pphb-final / .tl-flat-head`；
+   `need` 改为 `{formula:1, head:1, name:1, num:10, op:9, eq:3, final:1}`
+   （按 `renderHeadBreakdown` 实产个数核算：9 项名称/数值 + 安全系数 1 个数值 = 10 num，
+   8 个项间符号 + 1 个 × = 9 op，括号/等号 3）；`natural / injected` 判据与「结论取数」
+   （`.pphb-final .pphb-v` → `.pphb-final`）同步改。
+   ⚠ **这处只做了静态核对，本机缺 `puppeteer-core` 没跑通** —— 换台装了 puppeteer 的机器要先跑一次 D2。
+
+**⇒ 提交清单仍是 6 个文件，不变。** 上面三处修复所在文件**全是 gitignore 的本地脚本**：
+`.gitignore:28` 的 `verify_*.js`（`verify_ry_tool.js` / `verify_text_contrast.js`）与
+`.gitignore:82` 的 `tests/*`（`runye_hydraulics_core.test.cjs` 不在白名单里）——`git status` 完全不显示，
+**永远不会进提交**。两条推论：
+① 那条「既存红」只存在于本机，远端仓库没有这个测试文件，别去线上找；
+② `verify_*` / `tests/*` 的修复只对下一次本地复验有效，**不要指望随发布一起上线**。
+`index.html` / `sw.js` 依旧混有并行会话改动，§26.7 的混编法不变。
+
+**两条口径提醒（不是本次改动引入，但会误导读代码的人）**
+
+- §26.5 坑 2 写「`!important` 只准用在颜色/边框/阴影」，实际 v613–v615 段里有 32 处，还用在
+  `margin/padding/font-size`：压 `index.html` 上的 inline `margin-top` 与
+  `runye-typography` 的 `button{font-size:13px!important}`（见 `style-01.css` 2880 行注释）。
+  规则的真实边界是「**只准用来压必须压掉的外部声明**」，不是按属性类别禁。
+- `style-01.css` 2872 / 2879 两条旧规则（`.pp-plan-label` / `.pp-plan-val`）至今**只挂**
+  `#tlPipePlanSection` 一个祖先，即 §26.5 坑 1 说的两态断裂在它们身上仍存在（rail 态下这两条不生效，
+  标签字重/颜色靠别处兜住，实测行高不受影响）。属 legacy，动它有回归风险，**本轮未改，等用户点头再说**。
+
+### 26.11 v616-btn-narrow「更新水泵扬程」按钮去图标 + 收窄（2026-10-20 · 仍未提交）
+
+用户原话（附截图，红框圈住该行）：
+> 「更新水泵扬程前面的图标取消，这个按钮的左右宽度压缩一点，这样前面的文字就可以变为两行了。」
+
+**实机诊断（截图量出来的，不是猜）**：用户面板比 `SIDEW=300` 的默认态窄（≈235px 外宽 / 217px 内容宽），
+按钮「⇧ 更新水泵扬程」占 **98.3px**、间距 6px ⇒ 说明文字只剩 **~111px**，
+23 字文案在 11px 字号下要 253px ⇒ 被挤成 **3 行**（截图上「当前使用设计管径；调整 / 图面管径后自动重算扬 / 程。」），
+按钮同时贴到右缘（截图上只露出一角）。
+
+**三处联动改动**
+
+| # | 文件 | 改了什么 |
+|---|---|---|
+| ① | `index.html:1231`、`mod/inline-27.js:328/334/337` | 按钮文案去掉行首符号：`⇧ 更新水泵扬程` / `⇧ 恢复设计水泵扬程` / `↻ 重新校核水泵扬程` → 全去掉符号（**同一按钮三个状态一起改**，否则状态切换时按钮宽度跳变） |
+| ② | `mod/style-01.css` `#tlPumpUpdateBtn` | 左右内边距 `0 8px` → `0 6px`；同时本行 `#tlPumpUpdateRow` 的 `gap` 由 `.pp-plan-item` 继承的 6px 收到 **4px**（只这一行，不影响其它行节奏） |
+| ③ | `index.html:1230`、`mod/inline-27.js:327` | 说明文案 23 字 → **16 字**：`当前使用设计管径；改径自动重算。`（原「…调整图面管径后自动重算扬程。」）。**②只把文字区从 111 加到 129，仍卡在 2 行门槛（需 ≥127）的边缘，③ 才是真正让它稳在 2 行的那一步** —— 两处文案必须同改，否则 JS 刷新一次就回退 |
+
+顺带修：`inline-27.js:336` 的「点**下方**按钮…」→「点**右侧**按钮…」（v615 已把按钮挪到同一行，措辞过期）。
+
+**实测（SIDEW 三档，`_probe_tl_skin.mjs`，本次给探针加了 `SIDEW=<px>` 环境变量钉侧栏宽度）**
+
+| 内容宽度 | 按钮 | 文字区 | 说明行数 |
+|---|---|---|---|
+| 300（默认） | 80px | 196px | **1 行**（宽屏不啰嗦） |
+| 247 | 80px | 143px | **2 行** |
+| **217（≈用户实机）** | **80px** | **113px** | **2 行**（改前 3 行） |
+
+- 按钮 98.3 → **80px**（−18.3），`sameRow:true`、右缘距行右 **10px**、左内边距 10px，左右对称未破。
+- 行高 30.7（两行说明自然撑高），22px 网格与灰条不受影响；三块拍平圆角仍全 0。
+- 禁用态 `#94a3b8` on `#f1f5f9` / 可用态 `#334155` on `#fff` 两副样子都实测截图过。
+- 门禁：`ci_check_static` **PASS=28 FAIL=0**；单测 **154/154**。
+- 版本串：`sw VERSION` / `style-01.css?v=` / `inline-27.js?v=` 全部 → **`616-btn-narrow`**（三者必须同步，
+  冒烟 §113 只比 style-01 与 sw；但 inline-27 变了不抬版本会让 PWA 缓存吃到旧 JS）。
+
+**⇒ 本次提交范围仍是 §26.10 那 6 个文件**，只是版本串换成 v616。**仍未提交、未推送。**
+
+### 26.12 v617-btn-flat：按钮去掉旧皮肤 + hover 回到全站口径（2026-10-20 · 仍未提交）
+
+用户原话（附三级左栏截图，红框圈住「更新水泵扬程」按钮）：
+> 「更新水泵扬程改为更新扬程，然后这个按钮的特效跟其他的统一，手放在上面变色就好了，
+>   你现在样式看起来挺复杂的。还有没有类似情况也统一改了，你这个特效是遵循的哪里的样式，
+>   我印象中整个程序中没有这个样式，不要新造样式，面板样式要简化，代码简洁，
+>   不要多层覆盖/嵌套，后面改起来也麻烦。」
+
+**「复杂」的真正来源（不是 v615 那段写多了）**
+
+那颗按钮同时挂着 `class="pp-btn-generate"` —— 那是「生成施工图 / 生成系统图」的**主操作大按钮皮肤**
+（`style-01.css:1155` 绿渐变 `linear-gradient(135deg,#16a34a,#15803d)` +
+`hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(22,163,74,.4)}`）。
+v615 又给它写了白底小按钮规格，于是只能靠 5 个 `!important` 去压那层旧皮肤 ⇒ **两层规则互相打架**，
+改一处要同时看两处 —— 用户说的「多层覆盖/嵌套」就是这个。
+
+**改法（做减法）**
+
+| # | 文件 | 改了什么 | 净效果 |
+|---|---|---|---|
+| ① | `index.html:1231` | 删掉 `class="pp-btn-generate"`；文案 `更新水泵扬程` → **`更新扬程`** | 旧皮肤整层消失，`!important` 从 5 处降到 2 处 |
+| ② | `inline-27.js` | 三个状态文案同缩：`更新扬程` / `恢复设计扬程` / `重新校核`（去掉「水泵」；同一按钮宽度才稳定） | 按钮 80 → **58px** |
+| ③ | `style-01.css` `#tlPumpUpdateBtn` | 一条规则只留几何 + 白底 + 11px 字；删掉 `width:auto!important`、`display:inline-block`、`margin:0!important`、`font-family`、3 个颜色 `!important` | 只剩 `font-size!important`（压全局 typography 的 `button{13px!important}`）与 `opacity!important`（压 inline-27 写的 inline `.5`） |
+| ④ | `style-01.css` | hover 由「边绿 + 字绿 + 底绿」三连变 → **只改底色** `#eaf3ed`；新增 `:active` `#d8e9df` | 与 v578 全站口径一致 |
+| ⑤ | `ry-panel.css` `.pp-recipe-btn:hover` | 同一条三连变（v609 抄的就是它）→ 只改底色 `#eaf3ed` + 补 `:active` `#d8e9df` | **这是唯一「类似情况」**（面板里另一条同款 hover） |
+| ⑥ | `style-01.css` `.tl-flat-note`（本行） | 加 `text-wrap:balance` | 窄面板折 2 行时折在「；」后，不再出现「改径自 / 动重算」切词 |
+
+**「hover 只改底色」的出处（回答用户那句「遵循哪里的样式」）**
+`mod/ry-panel.css` 的 `[v578]` 注释，是全站唯一写死的口径：
+> 「hover / active **只改底色，且所有 chip 同一个色** … hover #eaf3ed / active #d8e9df；
+>   主次只由**默认态**的边框与字色表达，不再各写一套 hover」
+
+三级这颗按钮原来那条三连变不是基础口径，是 v615 抄 `.pp-recipe-btn` 时带进来的（那份自己也是 v609 新写的），
+所以用户「整个程序中没有这个样式」的印象是对的 —— 现在两处都收回到 v578。
+
+**实测（`_probe_tl_skin.mjs`，本次新增 `HOVER=1`：真派发 `Input.dispatchMouseEvent` 到按钮中心，
+逐态读 computed —— `getComputedStyle` 不支持 `:hover` 伪类，只有真触发才验得到）**
+
+| 态 | 宽度 | bg | color | border | shadow / transform |
+|---|---|---|---|---|---|
+| 默认 | 58px | `#fff` | `rgb(51,65,85)` | `#e2e8f0` | none / none |
+| hover | 58px | **`#eaf3ed`** | 不变 | 不变 | none / none |
+| active | 58px | **`#d8e9df`** | 不变 | 不变 | none / none |
+| disabled | 58px | `#f1f5f9` | `#94a3b8` | 不变 | none / none |
+
+- 说明文字：217px 内容宽 → **2 行**（折在「；」后）；282px → **1 行**。行内左右内边距仍各 10px。
+- 门禁：`ci_check_static` **PASS=28 FAIL=0**；单测 **154/154**；`node --check inline-27.js` 通过。
+- 版本串 → **`617-btn-flat`**（sw / style-01 / ry-panel / inline-27 四处同步；ry-panel 这轮也改了，必须抬）。
+
+**同族但**没动**的 hover（留着等用户点名，别自作主张）**
+
+| 选择器 | 现状 | 为什么没动 |
+|---|---|---|
+| `.ry-hbar .ry-hbar-btn:hover` | 边 `#16a34a` + 字 `#15803d` + 底 `#f0fdf4` | 浮在做图区/卫星图上的横向工具条，`ry-panel.css:1128` 有独立规格；改它要连 `.btn-on` 态一起看 |
+| `.ry-cad-set-btn:hover` | 只变边 + 字（无底色） | ⚙ 设置按钮，无底色变化，不属于「三连变」 |
+| `.pp-rail-toggle:hover` | 只变字 + 边 | 轨道切换页签，同上 |
+| `.pp-btn-generate:hover` | 位移 + 投影（主操作皮肤） | 「生成施工图 / 生成系统图 / 综合分析」三家还在用，属**主操作**语义，单独决定 |
+
+**⇒ 提交范围：6 个文件不变**（`index.html` / `sw.js` / `style-01.css` / `ry-panel.css` / `plan-calc-render.js` / `inline-09.js` / `inline-27.js`
+—— 严格说是 7 个，`ry-panel.css` 本轮新进）。**仍未提交、未推送。**
+
+**同轮补丁（v618，用户口述）**：说明文案
+`当前使用设计管径；改径自动重算。` → **`当前为设计管径，改径后重算。`**（16 → 15 字，
+两处同改：`index.html:1230` 静态 + `mod/inline-27.js:327` 刷新态）。
+实测：217px 内容宽折成 `当前为设计管径，` / `改径后重算。`（`text-wrap:balance` 让折点正好落在逗号后，
+不再切词）；282px 仍是 1 行。
+
+### 26.13 v618-src-brief：「联合流量依据」文案简化（2026-10-20 · 仍未提交）
+
+用户原话（附水力计算结果截图，指向联合流量下面那行小字）：
+> 「联合流量依据：联合分区M13（25区、26区）…… 文字改下、简化，改为：依据：分区M13……」
+
+**改动（只动文案，不动数据口径）**
+
+`mod/inline-09.js` `tlUpdatePlanBar` 里 `#tlPlanCombinedSrc` 的两处输出：
+- `联合流量依据：联合分区 M13（25区、26区）· 实际面积和 36.0 亩`
+  → **`依据：分区 M13（25区、26区）· 实际面积和 36.0 亩`**
+- 兜底句 `联合流量依据：暂无图面分组数据（按单区流量 × N 估算）`
+  → **`依据：暂无图面分组数据（按单区流量 × N 估算）`**
+
+理由：前四个字「联合流量」与该行上方的行标题完全重复，窄面板下还要多折一行。
+**数值口径一字未改**（仍取 `worstGroup.sum/666.67`、仍按同一 `computeThreeLevel` 结果）。
+
+`verify_ry_tool.js:137` 的契约串 `'联合流量依据：'` → `'依据：分区 M'`（否则这条契约下次跑必假红）。
+
+**实测**：`SIDEW=300` 下 16 个可见行**全部 22.0px**（`notH22` 为空 —— 这轮之前那一行是 34px 两行）；
+兜底句「依据：暂无图面分组数据（按单区流量 × 2 估算）」正好 1 行。有 `worstGroup` 的真实数据
+（用户现场 M13 那条）在 217px 内容宽下仍是 2 行，第一行即「依据：分区 M13（25区、26区）」。
+
+**同轮第二次（用户第二轮口述）**：「依据:分区M13(25区、26区)·实际面积和」→
+**「依据：分区 M13（25区、26区）*实际面积= 36.0 亩」**（分隔符 `·`→`*`、「和」→`=`）。
+含义未变（值仍是最大联合分区的面积和，单位亩），只改字面。拼接结果已用 node 复算核对。
+
+⚠ **窄面板（217px 内容宽）这一行会折在「实 / 际」之间**（第一行放得下到「*实际」为止）。
+两行形态：`依据：分区 M13（25区、26区）*实际` / `面积= 36.0 亩`。
+用户若觉得切词难看，有两条现成办法（都未做，等点名）：
+① 给 `#tlPlanCombinedSrc` 加一句 `text-wrap:balance`（新增 1 条规则，折点会落到「）」后）；
+② 文案再短一截（如去掉「实际」二字 → `*面积=`）。
+
+门禁：`ci_check_static` **PASS=28 FAIL=0**；单测 **154/154**；`node --check inline-09.js` 通过。
+版本串保持 **`618-src-brief`**（这轮改动与上一轮同属 v618，且 618 从未部署过 —— 无缓存残留问题）。
+
+### 26.14 v618 文案批量（用户逐条口述，2026-10-20 · 仍未提交）
+
+同一天用户连着口述了四条文案，都只改字面、不动任何数值口径。**汇总在这里，避免以后翻三节**：
+
+| # | 位置 | 原 | 现 |
+|---|---|---|---|
+| ① | `inline-27.js:327` + `index.html:1230`（管径调整说明） | 当前使用设计管径；改径自动重算。 | **当前为设计管径，改径后重算。** |
+| ② | `inline-09.js` `#tlPlanCombinedSrc`（联合流量依据行） | 联合流量依据：联合分区 M13（25区、26区）· 实际面积和 36.0 亩 | **依据：分区 M13（25区、26区）*实际面积= 36.0 亩** |
+| ③ | 同上，兜底句 | 联合流量依据：暂无图面分组数据（…） | **依据：暂无图面分组数据（…）** |
+| ④ | `inline-09.js:2676` `tlRefreshLossCard`（管段长度卡说明） | 按「最远分区最不利路径」计（图面实际 · 最远 30 区），不叠加各地块管道 | **按「最远分区最不利路径」计（图面实际 * 最远 30 区），不叠加各地块管道** |
+
+纪律提醒（这轮反复踩到）：**静态文案与 JS 刷新文案必须同改**（②③④ 的静态骨架都在 `index.html`，
+但 ① 的初值同时写在两处：`index.html:1230` 与 `inline-27.js:327`，只改一处会被下一次刷新覆盖）。
+凡是用户口述的字面，`verify_ry_tool.js` 里可能有对应契约串（本轮 `'联合流量依据：'` → `'依据：分区 M'`），
+**改文案必须同步契约，否则下次跑闸门必假红**。
+
+**同类但未改的一处**（等用户点名）：`inline-09.js:1531` 的
+`（图面实际几何 · 最远 N 区）`（三级结果栏旁注）仍用 `·`，与④刚改的 `*` 不一致。
+
+### 26.15 v619-undo-cover：Ctrl+Z 覆盖面扩到「位置层 / 编辑层」（2026-10-20 · 仍未提交）
+
+用户原话（附三级页截图，框住图面三通）：
+> 「这个页面 ctrl+z 的回退快捷键，要能驱动更多的功能，比如说我不小心误操作了 标识的位置，
+>   要能退回去，类似的还可以驱动什么你整体排查下，反正就是我误操作了之后，我发 ctrl+z 就应该能回退才行。」
+
+**排查结论（先弄清「够不着」的是哪几层，再动手）**
+
+| 状态层 | 存放处 | 改前能否撤销 | 本轮处置 |
+|---|---|---|---|
+| 总管三通下移 | `localStorage tlFrontNodeDrops_v1` | ✗ 不在快照 | 收进 `tlAux.drops` |
+| 水源点位置 | `localStorage tlSourceMove_v1` | ✗ | `tlAux.src` |
+| 手工节点/连线 | `localStorage runye_tlNodes_v1`（**有内存副本**） | ✗ | `tlAux.nodes` + `RyTlNodes.restore()` |
+| 尺寸标注线偏移 | **内存 `window._tlDimState.offs`** | ✗ | `tlAux.dims`（读内存，不是读盘） |
+| 整图平移 | `localStorage tl-plot-pos`（**有内存闭包 `pos`**） | ✗ | `tlAux.plotPos` |
+| 管道遮蔽 | `RyTlAutoEdits.hidden`（本来就在 `tlAutoEdits` 快照里） | 数据能回、**样式不回** | 靠 restore 尾段重绘 |
+| 图面改径 | `RyTlAutoEdits.cals`（v145 约定**不进任何存档**） | ✗ | 快照专用字段 `__undoCals` |
+| 改长 / 配件 / 管平移 | `tlAutoEdits.lens/fits/moves` | ✓ 一直可以 | 未改 |
+| 视图偏好（tab / 缩放 / 面板宽 / 标注比例 / 多选） | 各处 | 故意不进 | **明确不做**（撤销不该把视角也翻回去） |
+
+**六处代码改动**
+
+| # | 文件 | 改了什么 |
+|---|---|---|
+| ① | `runye-undo.js` | **抬手补拍**：拖动没有「操作后」快照（`pointerdown` 拍的是"前"，`setTimeout(0)` 早于拖动结束，而拖动后 `click` 常常根本不到）⇒ 在 `pointerup/mouseup/touchend/pointercancel` 上 `schedulePost()` 延后 **120ms** 补拍一次。延后是必须的：工程里不少拖动把落盘写在 **mouseup**，而 `pointerup` 早于 `mouseup` |
+| ② | `runye-undo.js` | **`pushPre()` 基线覆盖**：栈里还没有历史时，「出手前状态」就是真基线，直接覆盖 `stack[0]`，不再追加（详见下面「竞态」） |
+| ③ | `runye-undo.js` | **`restore()` 尾段补三级页重绘**：`RyTlWs.render()` → 退回 `tlAutoGenerate({scroll:false})` → `tlUpdatePlanBar()` |
+| ④ | `runye-undo.js` | **`trace()` 入栈追踪环**（最近 60 条：谁拍的 / 有没有真入栈 / 内容指纹）。`RyUndo.trace(n)` / `.traceClear()`。排查「按一次退两步」全靠它 |
+| ⑤ | `mod/inline-12.js` | `readTlAux()` / `writeTlAux()`：五个位置键收进 payload 的 `tlAux`；`runyeSaveProject` 加 `tlAux:readTlAux()`；`runyeLoadProject` 在 `window.tlDiagramData = savedTlDiagram` **之后、几何恢复之前**写回（位置要先就位，否则画面仍按旧位置画） |
+| ⑥ | `tl-workspace/tl-nodes.js` | 新增 `restoreRaw(raw)`（校验 `geoSig` → 整体替换 nodes/links → 重算 `seq` → `persist()` + `notify({action:'restore'})`）并导出为 `restore` |
+
+**三个坑（都是实测抓到的，别重犯）**
+
+1. **基线 × 异步渲染的竞态**（`pushPre` 的由来）。三级页简图生成是异步的，而 `syncSection` 的基线定时器 400ms 后就拍。
+   生成没完时基线停在"空图"，之后拖一次就会入**两档**（0→2），用户按第一次 Ctrl+Z 只回到"还没重算完"的样子、图反而空掉。
+   `_probe_undo_drag.mjs` 连跑三次抓到：run1/2 走 `mark.pre added:0`，run3 走 `mark.pre added:1`，三次内容指纹完全相同
+   ⇒ 差别只在"基线是否过期"。修法：`top===0` 时覆盖 `stack[0]`（并丢掉 redo 尾巴）。修后 4/4 稳定。
+2. **`_tlDimState.offs` 不在盘上**。`tl-dim-offs` 只在「保存开关」为开时写（默认关，且关时还会主动 `removeItem`）
+   ⇒ 按盘上读永远是 `null`，拖过标注线也退不回去。必须读/写内存 `window._tlDimState`（`{sig,offs}`）。
+   写回时**不能用旧 `sig` 盖当前 `sig`**，否则后续 `tlDimOffOf` 全部读不到偏移。
+3. **`restore(null)` ≠ "跳过"**。`restoreRaw(null)` 返回 false（几何不符时的拒绝语义），
+   而"那一刻确实一个手工节点都没有"是**合法状态** ⇒ 必须区分 `undefined`（旧存档无此字段，跳过）与 `null`（要清空）。
+   这是 `_probe_undo_more.mjs` D2 抓到的（加节点撤不掉）。
+
+**v145 红线的处理（图面改径）**
+
+v145 有用户明确约定：改径 `cals` **不进任何存档**（"调整管径之后才跳出，每次打开网页都应清空"）。
+所以它不能进工程 payload。做法：`capture()` 只在**快照字符串**上挂 `__undoCals`（`runyeSaveProject` 写盘的那份没有它
+⇒ 盘上文件 / 导出工程逐字节不变），`restore()` 里按它逐条 `setCaliber` / `clearCaliber` 补回。
+**没有改径时完全不挂** ⇒ 快照字符串保持原样，去重不受影响。这条红线有守卫断言（见 G1–G3）。
+
+**实测**
+
+| 探针 | 断言 | 结果 |
+|---|---|---|
+| `_probe_undo_drag.mjs` 拖三通 → Ctrl+Z | 4 | **全过**（连跑 3 次稳定） |
+| `_probe_undo_more.mjs` A 水源拖动（真实鼠标） | A1–A3 | 全过，且**手势自己入栈**（不是靠显式 push） |
+| 同上 B 标注偏移 / C 遮蔽 / D 节点 / E 平移 / F 改径 | B1–F2 | 全过 |
+| 同上 G 改径不进存档（v145 红线） | G1–G3 | 全过（`calInPayload:0` `hasUndoCals:false` `inMem:1`） |
+| 水力单测 | 154 | **154/154** |
+| `_probe_tl_skin.mjs` 视觉回归 | — | 行高 22、`flatRadius` 全 0、侧栏 300，与 §26.13 记录一致 |
+
+`_probe_undo_more.mjs` 里 B/C/D/E/F 用的是「状态直改 + 显式 `RyUndo.push()`」而非真实手势 ——
+这几项的界面入口是右键菜单 / 面板按钮，无头下点不全；**手势→入栈**这条链由 A 与 `_probe_undo_drag.mjs` 独立验证，
+两边合起来才算覆盖完整。跑法：`node _probe_undo_more.mjs`（`SHOT=x.png` 落图）。
+
+**版本串 → `619-undo-cover`**（`sw VERSION` / `style-01` / `ry-panel` / `inline-09` / `inline-12` / `inline-27` /
+`tl-nodes` / `runye-undo` 八处同步；`style-01?v=` 必须等于 `sw VERSION` 去 `v`，否则冒烟 §113 红）。
+`inline-12.js?v=` 原先是 `567-current-plot-anchor-fail-closed`、`runye-undo.js?v=3`、`tl-nodes.js` 无版本，
+这轮一并抬到 `619-undo-cover` —— 这三个都改了内容，不抬会让 PWA 缓存吃到旧 JS。
+
+**仍未做（等点名）**：① 掩蔽管道恢复后是否要额外走一次 `tlPipeHiddenChanged`（目前靠 restore 尾段整体重绘已够，未加）；
+② §26.14 末尾那条 `（图面实际几何 · 最远 N 区）` 的 `·` 与 `*` 不一致。
+
+**§26.15 补记（同日）**
+
+- **二级页没被弄坏**：`restore()` / `tlAux` 是三个页面共用的，改动后专门加了 `_probe_undo_l2.mjs`：
+  在 `#pipePlanSection` 派发真实 click 切「分支数」→ `branchCount` 2→3、栈深 +1 → Ctrl+Z → 回到 2、栈深 −1。**3/3 通过**。
+  （`#branchGroup` 视觉上是 `hidden` 的遗留控件，但 handler 与快照读取都只看 `.selected`，派发 click 即可改状态、不依赖地块是否已布管。）
+- **`verify_ry_tool.js` 从"启动即崩"救回到能跑**（该文件 gitignore，**不进提交**）：
+  病根不是一行，而是整套 `iso-diagram/` 已归档到 `feature-archive/`，脚本里多处硬编码那批路径。
+  逐个改路径是漏斗，改成在入口给 `fs.readFileSync` 兜一层：**归档目录（`iso-diagram/` / `feature-archive/`）下的文件缺了返回空串**，
+  其它路径照旧抛错（不能把真正的缺失也吞掉）。现在能从第 14 项一路跑到第 43 项。
+  仍崩在 `_bak_v362_index.html` —— 这类"注入体检"依赖的备份快照文件本身已被清理，属另一件事，**未继续修**。
+  顺带暴露两条**既存红**（与 v619 无关，改动前就在）：v254 工具轨折叠契约缺 2/7、v255 水源右键换向契约缺 2/6
+  （`<g data-tl-src="1">` 与 `<title>右键…</title>` 已随工作区接管图面而移走）。
+
+### 26.16 「恢复设计扬程」→「恢复扬程」（2026-10-20 · 仍未提交）
+
+用户原话（附三级左栏「管径调整 · 扬程确认」行截图，框住按钮）：
+> 「恢复设计扬程，改为恢复扬程。」
+
+**只改一处**：`mod/inline-27.js:328` `pumpUpdateNote()` 里那句三态赋值
+`st.applied ? '恢复设计扬程' : '更新扬程'` → **`st.applied ? '恢复扬程' : '更新扬程'`**。
+`index.html:1231` 的静态初值是「更新扬程」，不受影响；`title` 提示语未动。
+`verify_*` / 探针里**没有**这条文案的契约串（全库 grep 过），不存在需要同步的断言。
+
+**顺带解决一个隐患：按钮不再跳宽**
+原来三态字数不一致 —— 「更新扬程」4 字 / **「恢复设计扬程」6 字** / 「重新校核」4 字 ⇒
+状态切换时按钮宽度会在 58px ↔ 74px 之间跳，同一行说明文字的可用宽度跟着抖。
+现在三态都是 4 字，实测 **三态按钮宽度恒为 58px**（`_probe_pump_btn.mjs`）。
+
+**实测（`_probe_pump_btn.mjs`，侧栏 300px 展开态）**
+
+| 状态 | 触发条件 | 按钮文案 | 按钮宽 | 说明行数 |
+|---|---|---|---|---|
+| A | 未应用（`applied:false`） | 更新扬程（禁用、`opacity .5`） | 58 | 1 |
+| B | 已应用 + 图面无改径（`n:0 applied:true`） | **恢复扬程** | 58 | 1 |
+| C | 已应用 + 有图面改径（`n:1`） | 重新校核 | 58 | 3 |
+
+B 态说明仍是「当前为设计管径，改径后重算。」**1 行**（`noteW 218`）。
+C 态说明「已应用 N 根管道的管径…调整管径后自动更新。」在 300px 下是 **3 行** —— 这是既有文案长度（v140 起就在），
+本轮**未动**；用户若要压到 2 行，得改文案本身（不是本次诉求）。
+
+**版本串保持 `619-undo-cover`**：本轮与 v619 同属一次未提交改动，且 619 从未部署过 ⇒ 无缓存残留问题
+（沿用 §26.13 「同批未部署不重复抬版本」的口径）。

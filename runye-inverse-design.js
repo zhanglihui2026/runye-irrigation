@@ -47,7 +47,7 @@
         current=calc();persist();if(!current.inversePath||!current.inversePath.zones.length)throw Error('请先从二级规划生成三级图面，取得真实分区面积与路径。');
         if(w.RyTlEditPipes&&w.RyTlEditPipes.list().length)throw Error('图面含手工新增管线，当前路径模型不能完整识别其供水拓扑，暂不自动推荐轮灌。');
         if(w.RyTlAutoEdits&&Object.values(w.RyTlAutoEdits.serialize().hidden||{}).some(Boolean))throw Error('图面存在隐藏或停用管段，当前校核未识别断水关系，请恢复管段后校核。');
-        var input=Object.assign({},current.inversePath,{frontOd:current.frontPipe.od,mainOd:current.mainPipe.od,branchOd:current.branchPipe.od,branchCount:current.branchCount,branchF:current.branchF,baseHead:current.lift+current.dh+current.tapePressureM-current.existPressure*10.2+current.filterLoss+2,sourceDistance:Number(el('planSrcDist').value)||0});
+        var input=Object.assign({},current.inversePath,{frontOd:current.frontPipe.od,mainOd:current.mainPipe.od,branchOd:current.branchPipe.od,branchCount:current.branchParallelCount||current.branchCount,branchF:current.branchF,baseHead:current.lift+current.dh+current.tapePressureM-current.existPressure*10.2+current.filterLoss+2,sourceDistance:Number(el('planSrcDist').value)||0});
         var res=api.sourceGroups(input,num('riHead'),num('riFlow'));
         trial={kind:'source',fingerprint:fingerprint(),result:res,input:input,prefs:sourcePrefs()};
         var html='<p>当前分组：'+res.current.map(function(g,i){return '第'+(i+1)+'组 '+g.flow.toFixed(2)+' m³/h、'+g.head.toFixed(2)+' m '+(g.ok?'通过':'不足');}).join('；')+'</p>';

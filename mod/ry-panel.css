@@ -549,8 +549,15 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-to
   font-family:inherit;font-size:11px !important;font-weight:600;line-height:1;
   cursor:pointer;white-space:nowrap;
 }
+/* [v617 2026-10-20] 与 v578 的 .ry-float-chip 口径统一：hover / active **只改底色**，
+   不换边框色、不换字色（原来这条是「边绿 + 字绿 + 底绿」三连变，是面板里唯一这么做的按钮，
+   用户点名「样式看起来挺复杂…整个程序中没有这个样式」）。
+   主次仍只由默认态表达：.pp-recipe-btn-primary 实心深绿、.pp-recipe-btn-danger 危态红。 */
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-btn:hover{
-  border-color:#173e32;color:#14532d;background:var(--ry-green-50,#f0fdf4);
+  background:#eaf3ed;
+}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-btn:active{
+  background:#d8e9df;
 }
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-btn-primary{
   border-color:#173e32;background:#173e32;color:#fff;

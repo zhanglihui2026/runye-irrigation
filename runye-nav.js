@@ -426,6 +426,10 @@
     var all = ITEMS.concat(MORE_ITEMS);   /* [v247] 折叠项也要能被 #hash 直达 */
     var item = all.filter(function (it) { return it.hash === hash || (it.act && 'nav-' + it.act === hash); })[0];
     if (!item) return;
+    if (global.__rySkipNextLinkedSectionRoute === hash) {
+      global.__rySkipNextLinkedSectionRoute = null;
+      return;
+    }
     /* [v401] v346 折叠项 hash 直达拦截已解除（同面板拦截：功能已上线，feat 门控兜底） */
     /* [v358] 会员门控：#hash 直达走与点击相同的权益状态判断，避免绕过功能权限 */
     var access = accessState(item.feat);

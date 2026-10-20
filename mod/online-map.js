@@ -973,14 +973,29 @@
     try{
       /* 主链路只传稳定引用；几何由二级页按 id 从共享地块库读取，避免跨页复制两套边界。 */
       var transferStore=window.RyMeasuredAreaBridgeStore;
-      if(!transferStore || !transferStore.write({ryPlotRef:{id:id,savedAt:savedAt,areaM2:areaM2,geometryKey:clickedKey}}))
+      var transferId=transferStore && typeof transferStore.write==='function'
+        ? transferStore.write({ryPlotRef:{id:id,savedAt:savedAt,areaM2:areaM2,geometryKey:clickedKey}}) : null;
+      if(!transferId)
         throw new Error('地块回传存储服务未加载');
+      /* 云端样本仅在这次回传的本地地块边界与刚载入的云端环完全一致时建立关联。 */
+      try{
+        var cloudBinding=window.RyCloudDesignBindingStore;
+        if(cloudBinding && typeof cloudBinding.bindTransferredPlot==='function') cloudBinding.bindTransferredPlot(saved);
+      }catch(errCloudBinding){}
       if(btnEl){ var old=btnEl.textContent; btnEl.textContent='回传中…';
         setTimeout(function(){ btnEl.textContent=old; }, 1200); }
       setTimeout(function(){
         if(document.getElementById('onlineMapSection')){
           if(typeof window.runyeApplyMapPayload!=='function') alert('地块分区接收功能尚未加载，请刷新页面后重试。');
-          else if(window.runyeApplyMapPayload()){
+          else {
+            /* 同页接收也把载荷编号放在地址上，接收失败后刷新仍能恢复这一次交接。 */
+            try{
+              var transferParams=new URLSearchParams(window.location.search||'');
+              transferParams.set(transferStore.urlParam||'ryPlotTransfer',transferId);
+              var transferSearch=transferParams.toString();
+              window.history.replaceState(window.history.state,'',window.location.pathname+(transferSearch?'?'+transferSearch:'')+window.location.hash);
+            }catch(errTransferUrl){}
+            if(!window.runyeApplyMapPayload(transferId)) return;
             /* 接收器已经同步切到地块分区；pushState 只更新可恢复的地址锚点，
                避免 hashchange 再由导航模块重复切一次。 */
             if(window.location.hash!=='#pipePlanSection' && window.history && typeof window.history.pushState==='function'){
@@ -989,12 +1004,12 @@
             }else if(window.location.hash!=='#pipePlanSection') window.location.hash='pipePlanSection';
           }
         }
-        else window.location.href='index.html#pipePlanSection';
+        else window.location.href='index.html?'+encodeURIComponent(transferStore.urlParam||'ryPlotTransfer')+'='+encodeURIComponent(transferId)+'#pipePlanSection';
       }, 350);
     }catch(e){ alert('写入失败：'+e.message); }
   }
 
-  // 回传地块绘制：写入 localStorage，并跳转到 index.html 的面积测量工具（03 面积测量工具）
+  // 回传地块绘制：写入按编号隔离的载荷，并跳转到 index.html 的地块分区页
   document.getElementById('btnCopy').onclick=function(){
     /* [v475]（2026-10-16 用户实测踩坑）画布上有有效边界时**永远以画布为准**：
        旧逻辑 currentMapPlotId 指着旧记录就优先传旧记录 ⇒ 用户改完边界/画了新地块
@@ -1577,12 +1592,15 @@
       var q=new URLSearchParams(location.search);
       var raw=q.get('cloudring');
       if(!raw) return;
+      var cloudBinding=window.RyCloudDesignBindingStore;
+      /* 新云端导入先清旧关联；即使新载荷损坏或缺少 cloudid，也不能继承上一块云端地块编号。 */
+      try{ if(cloudBinding && typeof cloudBinding.clear==='function') cloudBinding.clear(); }catch(errClearCloudBinding){}
       var ring=JSON.parse(raw);
       if(!Array.isArray(ring)||ring.length<3) return;
       var name=q.get('cloudname')||'云端地块';
-      /* [v590] 记住云端地块编号：之后「☁ 回传设计」才知道该把方案挂到哪块地上 */
       var pid=q.get('cloudid');
-      if(pid){ try{ localStorage.setItem('ry_cloud_plot_id', String(pid)); }catch(errS){} }
+      /* 仅暂存本标签页中的云端编号与原始边界签名，等待同一地块写入本地库并回传。 */
+      if(cloudBinding && typeof cloudBinding.beginCloudImport==='function') cloudBinding.beginCloudImport(pid,ring);
       try{ history.replaceState(null,'',location.pathname+location.hash); }catch(errH){}
       var go=function(){
         try{

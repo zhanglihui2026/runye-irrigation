@@ -15,7 +15,9 @@ function fixture(plots) {
     getElementById(id){return id==='plotLibList'?list:null},
     createElement(){const buttons={};return {className:'',querySelector(sel){return buttons[sel]||(buttons[sel]={addEventListener(type,fn){this.click=fn}})}}}
   };
-  const ctx={document,location:{search:''},URLSearchParams,console,Date,Math,JSON,
+  const location={search:'',hash:'',pathname:'/index.html'};
+  const ctx={document,location,URLSearchParams,URL,console,Date,Math,JSON,
+    history:{state:null,replaceState(state,title,url){const next=new URL(url,'https://local.test/');location.search=next.search;location.hash=next.hash;location.pathname=next.pathname;}},
     localStorage:{getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k)},
     alert:m=>calls.alerts.push(m),updatePlan(){},
     ppLoadPolygon(){calls.loads++},ppGenerateDiagram(){calls.diagrams++},
@@ -29,18 +31,36 @@ const a=plot('a',ringA), b=plot('b',ringB);
 const f=fixture([a,b]);
 const original=f.data.get('runye_plot_library');
 const geometryKey=JSON.stringify([ringB]);
-f.data.set('runyeMeasuredArea',JSON.stringify({ryPlotRef:{id:'b',geometryKey,areaM2:1000}}));
+const transferId=f.ctx.RyMeasuredAreaBridgeStore.write({ryPlotRef:{id:'b',geometryKey,areaM2:1000}});
+f.ctx.location.search='?ryPlotTransfer='+encodeURIComponent(transferId);
 assert.equal(f.ctx.runyeApplyMapPayload(),true);
 assert.equal(f.ctx.currentPlotId,'b');
 assert.equal(f.data.get('runye_plot_library'),original,'map source must not be overwritten');
-assert.equal(f.data.get('runyeMeasuredArea'),undefined,'consumed reference');
+assert.equal(f.data.has(f.ctx.RyMeasuredAreaBridgeStore.keyPrefix+transferId),false,'consumed reference');
+assert.equal(f.ctx.location.search,'','successful receive removes its URL token');
 assert.equal(f.calls.jumps.at(-1),'pipePlanSection');
 assert.equal(f.calls.loads>0 && f.calls.diagrams>0,true);
 const missingRef=fixture([a]);
 const stalePayload=JSON.stringify({ryPlotRef:{id:'missing',geometryKey:JSON.stringify([ringB]),areaM2:1000}});
-missingRef.data.set('runyeMeasuredArea',stalePayload);
+const staleId=missingRef.ctx.RyMeasuredAreaBridgeStore.write(JSON.parse(stalePayload));
+missingRef.ctx.location.search='?ryPlotTransfer='+encodeURIComponent(staleId);
 assert.equal(missingRef.ctx.runyeApplyMapPayload(),false,'stale map references fail without importing');
-assert.equal(missingRef.data.get('runyeMeasuredArea'),stalePayload,'failed reference remains available for recovery');
+assert.equal(missingRef.ctx.RyMeasuredAreaBridgeStore.readRaw(staleId),stalePayload,'failed reference remains available for recovery');
+assert.equal(missingRef.ctx.location.search,'?ryPlotTransfer='+encodeURIComponent(staleId),'failed receive keeps its recovery token');
+const startupHash=fixture([a]);
+startupHash.ctx.location.hash='#pipePlanSection';
+const startupId=startupHash.ctx.RyMeasuredAreaBridgeStore.write({ryPlotRef:{id:'a',geometryKey:JSON.stringify([ringA]),areaM2:1000}});
+startupHash.ctx.location.search='?ryPlotTransfer='+encodeURIComponent(startupId);
+startupHash.document.onready();
+assert.equal(startupHash.ctx.currentPlotId,'a','startup hash still consumes the map reference');
+assert.equal(startupHash.calls.jumps.length,1,'receiver performs the initial page switch once');
+assert.equal(startupHash.ctx.__rySkipNextLinkedSectionRoute,'pipePlanSection','load hash route is suppressed after receiver navigation');
+assert.match(fs.readFileSync(path.join(root,'runye-nav.js'),'utf8'),/__rySkipNextLinkedSectionRoute\s*===\s*hash[\s\S]*?__rySkipNextLinkedSectionRoute\s*=\s*null[\s\S]*?return;/,'navigation consumes the one-shot initial hash marker');
+const previewTransfer=fixture([a]);
+const previewId=previewTransfer.ctx.RyMeasuredAreaBridgeStore.write({ryPlotRef:{id:'a',geometryKey:JSON.stringify([ringA]),areaM2:1000}});
+previewTransfer.ctx.location.search='?partitionPreview=1&ryPlotTransfer='+encodeURIComponent(previewId);
+assert.equal(previewTransfer.ctx.runyeApplyMapPayload(),true,'a targeted handoff takes priority over partition preview mode');
+assert.equal(previewTransfer.ctx.location.search,'?partitionPreview=1','successful receive removes only its own query token');
 const selected=f.list.children[0];
 selected.querySelector('[data-act="current"]').click();
 assert.equal(f.ctx.currentPlotId,'a','drawing library selects clicked plot');
@@ -66,20 +86,33 @@ const end=mapSrc.indexOf('// 回传地块绘制',start);
 assert.equal(start>=0 && end>start,true);
 assert.match(fs.readFileSync(path.join(root,'runye-map-enhance.js'),'utf8'),/opts\.onSendDesign\(p\)/);
 const sent=new Map([['runye_plot_library',original]]);
-const sentCalls={applied:0,alerts:[]};
+const sentCalls={applied:0,alerts:[],jumps:[],payloads:[],transferIds:[]};
 const sender={window:null,document:{getElementById:id=>id==='onlineMapSection'?{}:null},
-  location:{hash:''},localStorage:{getItem:k=>sent.get(k)||null,setItem:(k,v)=>sent.set(k,v)},
+  location:{search:'',hash:'',pathname:'/index.html'},history:{state:null,
+    replaceState(state,title,url){const next=new URL(url,'https://local.test/');sender.location.search=next.search;sender.location.hash=next.hash;sender.location.pathname=next.pathname;},
+    pushState(state,title,url){const next=new URL(url,'https://local.test/');sender.location.search=next.search;sender.location.hash=next.hash;sender.location.pathname=next.pathname;}},
+  localStorage:{getItem:k=>sent.get(k)||null,setItem:(k,v)=>sent.set(k,v)},
   lsGet:k=>JSON.parse(sent.get(k)||'[]'),setTimeout:fn=>{fn();return 1},
-  alert:m=>sentCalls.alerts.push(m),console,JSON,Math,Number,String,Date,isFinite};
+  alert:m=>sentCalls.alerts.push(m),console,JSON,URL,URLSearchParams,Math,Number,String,Date,isFinite};
 sender.window=sender;
+sender.ryJumpToSection=id=>sentCalls.jumps.push(id);
 vm.createContext(sender);
 vm.runInContext(fs.readFileSync(path.join(root,'core/measured-area-bridge-store.js'),'utf8'),sender,{filename:'core/measured-area-bridge-store.js'});
-sender.runyeApplyMapPayload=()=>{sentCalls.applied++;return true};
+sender.runyeApplyMapPayload=id=>{
+  sentCalls.applied++; sentCalls.transferIds.push(id);
+  const raw=sender.RyMeasuredAreaBridgeStore.readRaw(id);
+  sentCalls.payloads.push(JSON.parse(raw));
+  sender.RyMeasuredAreaBridgeStore.remove(id);
+  sender.ryJumpToSection('pipePlanSection'); return true;
+};
 vm.runInContext(mapSrc.slice(start,end)+'\nwindow.__send=sendPlotToDesign;',sender);
 sender.__send(b,null);
-assert.equal(JSON.parse(sent.get('runyeMeasuredArea')).ryPlotRef.id,'b');
+assert.equal(sentCalls.payloads[0].ryPlotRef.id,'b');
+assert.ok(sentCalls.transferIds[0]);
 assert.equal(sentCalls.applied,1,'same-page transfer must invoke receiver');
-assert.equal(sender.location.hash,'pipePlanSection');
+assert.equal(sender.location.hash,'#pipePlanSection');
+assert.equal(sender.location.search,'','successful same-page transfer clears its URL token');
+assert.equal(sentCalls.jumps.length,1,'receiver performs the only same-page navigation');
 
 // Execute the actual per-row arrow handler used by the map's "我的地块" list.
 const rowSendStart=mapSrc.indexOf('sd.onclick=function(){',mapSrc.indexOf('function renderMyPlots(){'));
@@ -88,25 +121,61 @@ assert.equal(rowSendStart>=0 && rowSendEnd>rowSendStart,true,'map plot-list arro
 sender.p=b; sender.sd={};
 vm.runInContext(mapSrc.slice(rowSendStart,rowSendEnd),sender);
 sender.sd.onclick.call(sender.sd);
-assert.equal(JSON.parse(sent.get('runyeMeasuredArea')).ryPlotRef.id,'b','plot-list arrow sends its own clicked plot');
+assert.equal(sentCalls.payloads[1].ryPlotRef.id,'b','plot-list arrow sends its own clicked plot');
+assert.notEqual(sentCalls.transferIds[1],sentCalls.transferIds[0],'each transfer gets a distinct payload id');
 assert.equal(sentCalls.applied,2,'plot-list arrow reaches the map payload receiver');
+assert.equal(sentCalls.jumps.length,2,'plot-list arrow navigates only once');
 
 // Execute the callback passed to the right-click popup integration.
 const popupCallback=mapSrc.match(/onSendDesign:function\(p\)\{ sendPlotToDesign\(p, document\.getElementById\('btnCopy'\)\); \}/);
 assert.ok(popupCallback,'right-click popup callback must route to the shared sender');
 sender.popupSend=vm.runInContext('('+popupCallback[0].replace(/^onSendDesign:/,'')+')',sender);
 sender.popupSend(b);
-assert.equal(JSON.parse(sent.get('runyeMeasuredArea')).ryPlotRef.id,'b','popup sends its own clicked plot');
+assert.equal(sentCalls.payloads[2].ryPlotRef.id,'b','popup sends its own clicked plot');
+assert.notEqual(sentCalls.transferIds[2],sentCalls.transferIds[1],'popup transfer gets its own payload id');
 assert.equal(sentCalls.applied,3,'right-click popup reaches the map payload receiver');
+assert.equal(sentCalls.jumps.length,3,'right-click popup navigates only once');
 
-const oldPayload=sent.get('runyeMeasuredArea');
+// The standalone map navigates with its own token; another tab cannot replace that payload.
+const externalData=new Map([['runye_plot_library',original]]);
+const external={window:null,document:{getElementById:()=>null},location:{search:'',hash:'',pathname:'/runye-map-measure.html',href:''},
+  history:{state:null},localStorage:{getItem:k=>externalData.get(k)||null,setItem:(k,v)=>externalData.set(k,v),removeItem:k=>externalData.delete(k)},
+  lsGet:k=>JSON.parse(externalData.get(k)||'[]'),setTimeout:fn=>{fn();return 1},alert(){},console,JSON,URL,URLSearchParams,
+  Math,Number,String,Date,isFinite};
+external.window=external;vm.createContext(external);
+vm.runInContext(fs.readFileSync(path.join(root,'core/measured-area-bridge-store.js'),'utf8'),external);
+vm.runInContext(mapSrc.slice(start,end)+'\nwindow.__send=sendPlotToDesign;',external);
+external.__send(b,null);
+const externalUrl=new URL(external.location.href,'https://local.test/');
+const externalTransferId=externalUrl.searchParams.get('ryPlotTransfer');
+assert.equal(externalUrl.pathname,'/index.html');
+assert.ok(externalTransferId,'standalone map URL carries its transfer token');
+assert.equal(JSON.parse(external.RyMeasuredAreaBridgeStore.readRaw(externalTransferId)).ryPlotRef.id,'b');
+assert.equal(externalData.has('runyeMeasuredArea'),false,'transfer payload is never stored in a shared singleton slot');
+
+const oldTransfers=[...sent.keys()].filter(key=>key.startsWith(sender.RyMeasuredAreaBridgeStore.keyPrefix));
 sender.__send({...b,polyLatLng:ringA},null);
-assert.equal(sent.get('runyeMeasuredArea'),oldPayload,'stale map popup must not change transfer');
+assert.deepEqual([...sent.keys()].filter(key=>key.startsWith(sender.RyMeasuredAreaBridgeStore.keyPrefix)),oldTransfers,'stale map popup must not create a transfer');
 assert.equal(sentCalls.alerts.length,1);
 sent.set('runye_plot_library',JSON.stringify([b,plot('b',ringA)]));
 sender.__send(b,null);
-assert.equal(sent.get('runyeMeasuredArea'),oldPayload,'duplicate id must not choose another plot');
+assert.deepEqual([...sent.keys()].filter(key=>key.startsWith(sender.RyMeasuredAreaBridgeStore.keyPrefix)),oldTransfers,'duplicate id must not create a transfer');
 assert.equal(sentCalls.alerts.length,2);
+
+// Two tabs sharing localStorage read only the transfer addressed by their own URL token.
+const sharedTransfers=new Map();
+function transferTab(id){
+  const tab={window:null,location:{search:'?ryPlotTransfer='+id},localStorage:{getItem:k=>sharedTransfers.get(k)||null,
+    setItem:(k,v)=>sharedTransfers.set(k,v),removeItem:k=>sharedTransfers.delete(k)},URLSearchParams,Date,Math,JSON};
+  tab.window=tab;vm.createContext(tab);
+  vm.runInContext(fs.readFileSync(path.join(root,'core/measured-area-bridge-store.js'),'utf8'),tab);
+  return tab;
+}
+const transferA='transfer-tab-a-1234', transferB='transfer-tab-b-5678';
+sharedTransfers.set('runyeMeasuredArea:'+transferA,JSON.stringify({ryPlotRef:{id:'plot-a'}}));
+sharedTransfers.set('runyeMeasuredArea:'+transferB,JSON.stringify({ryPlotRef:{id:'plot-b'}}));
+assert.equal(transferTab(transferA).RyMeasuredAreaBridgeStore.read().ryPlotRef.id,'plot-a');
+assert.equal(transferTab(transferB).RyMeasuredAreaBridgeStore.read().ryPlotRef.id,'plot-b');
 
 // Execute the actual project-import handler and verify its map-view storage key.
 function importFixture(initialView) {

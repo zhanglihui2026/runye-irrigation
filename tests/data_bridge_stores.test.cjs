@@ -48,11 +48,18 @@ function loadStore(file, options = {}) {
       sessionValues.delete(key);
     }
   };
-  const context = { localStorage: storage, sessionStorage, JSON, console };
+  const location = options.location || { search: '', pathname: '/index.html', hash: '' };
+  const context = { localStorage: storage, sessionStorage, JSON, console, location, URLSearchParams };
+  context.history = { state: null, replaceState(state, title, url) {
+    const next = new URL(url, 'https://local.test/');
+    location.search = next.search;
+    location.pathname = next.pathname;
+    location.hash = next.hash;
+  } };
   context.window = context;
   vm.createContext(context);
   vm.runInContext(fs.readFileSync(path.join(ROOT, file), 'utf8'), context, { filename: file });
-  return { store: context[options.exportName], values, calls, sessionValues, sessionCalls };
+  return { store: context[options.exportName], values, calls, sessionValues, sessionCalls, location };
 }
 
 function json(value) { return JSON.stringify(value); }
@@ -427,16 +434,20 @@ test('Terrain bridge preserves its payload API and consumes a tab-bound handoff 
   const { store, values, sessionValues } = loadStore('core/terrain-bridge-store.js', { exportName: 'RyTerrainBridgeStore' });
   const key = 'runye_terrain_incoming';
   assert.equal(store.key, key);
+  assert.equal(store.keyPrefix, key + ':');
 
   const payload = { polygon: [[1, 2], [3, 4]], source: 'online-map' };
   assert.equal(store.writeIncoming(payload), true);
-  const storedPayload = JSON.parse(values.get(key));
-  assert.equal(storedPayload.__runyeTerrainTransferId, sessionValues.get('runye_terrain_incoming_tab_token'));
-  delete storedPayload.__runyeTerrainTransferId;
-  assert.deepEqual(storedPayload, payload, 'the stored object keeps the legacy payload fields at top level');
+  const transferId = sessionValues.get('runye_terrain_incoming_tab_token');
+  const transferKey = key + ':' + transferId;
+  const storedPayload = JSON.parse(values.get(transferKey));
+  assert.equal(storedPayload.bridge, 'runye-terrain-transfer/v1');
+  assert.equal(storedPayload.transferId, transferId);
+  assert.deepEqual(storedPayload.payload, payload, 'the envelope keeps the public payload fields unchanged');
+  assert.equal(values.has(key), false, 'new handoffs do not write the shared legacy slot');
   assert.ok(sessionValues.has('runye_terrain_incoming_tab_token'));
   assert.equal(json(store.consumeIncoming()), json(payload));
-  assert.equal(values.has(key), false, 'consume removes the payload before returning it');
+  assert.equal(values.has(transferKey), false, 'consume removes the addressed payload before returning it');
   assert.equal(sessionValues.has('runye_terrain_incoming_tab_token'), false);
   assert.equal(store.consumeIncoming(), null, 'the same handoff cannot be consumed twice');
 
@@ -454,15 +465,26 @@ test('Terrain bridge rejects another tab handoff without deleting or importing i
   const plotB = { plotId: 'plot-b', poly: [[7, 8], [9, 10], [11, 12]] };
 
   assert.equal(tabA.store.writeIncoming(plotA), true);
+  const idA = tabA.sessionValues.get(tabA.store.tabTokenKey);
+  const keyA = tabA.store.keyPrefix + idA;
   assert.equal(tabB.store.consumeIncoming(), null);
-  assert.ok(tabA.values.has(key), 'a non-owning tab leaves the pending payload intact');
+  assert.ok(tabA.values.has(keyA), 'a non-owning tab leaves the pending payload intact');
   assert.equal(json(tabA.store.consumeIncoming()), json(plotA));
 
   assert.equal(tabA.store.writeIncoming(plotA), true);
+  const nextIdA = tabA.sessionValues.get(tabA.store.tabTokenKey);
+  const nextKeyA = tabA.store.keyPrefix + nextIdA;
   assert.equal(tabB.store.writeIncoming(plotB), true);
-  assert.equal(tabA.store.consumeIncoming(), null, 'a payload overwritten by another tab is not misattributed');
+  const idB = tabB.sessionValues.get(tabB.store.tabTokenKey);
+  const keyB = tabB.store.keyPrefix + idB;
+  assert.notEqual(nextKeyA, keyB);
+  assert.ok(tabA.values.has(nextKeyA), 'a concurrent write from another tab does not overwrite tab A payload');
+  assert.ok(tabA.values.has(keyB), 'tab B payload is stored independently');
+  assert.equal(json(tabA.store.consumeIncoming()), json(plotA), 'tab A receives its own payload after tab B writes');
   assert.equal(json(tabB.store.consumeIncoming()), json(plotB));
-  assert.equal(tabA.values.has(key), false);
+  assert.equal(tabA.values.has(nextKeyA), false);
+  assert.equal(tabA.values.has(keyB), false);
+  assert.equal(tabA.values.has(key), false, 'concurrent handoffs never use the shared legacy slot');
 });
 
 test('Terrain bridge deletes corrupt payloads before returning null and fails closed on storage errors', () => {
@@ -486,6 +508,22 @@ test('Terrain bridge deletes corrupt payloads before returning null and fails cl
   const failedRemove = loadStore('core/terrain-bridge-store.js', { exportName: 'RyTerrainBridgeStore', removeError: true });
   failedRemove.values.set(failedRemove.store.key, '{"polygon":[]}');
   assert.equal(failedRemove.store.consumeIncoming(), null);
+});
+
+test('Terrain bridge reads old single-slot handoffs without allowing a different tab token to consume them', () => {
+  const tabA = loadStore('core/terrain-bridge-store.js', { exportName: 'RyTerrainBridgeStore' });
+  const tabB = loadStore('core/terrain-bridge-store.js', { exportName: 'RyTerrainBridgeStore', values: tabA.values });
+  const oldPayload = { polygon: [[1, 1], [2, 2], [3, 3]], source: 'legacy-map' };
+  tabA.sessionValues.set(tabA.store.tabTokenKey, 'legacy-transfer-1234');
+  tabA.values.set(tabA.store.key, JSON.stringify({
+    ...oldPayload,
+    __runyeTerrainTransferId: 'legacy-transfer-1234'
+  }));
+
+  assert.equal(tabB.store.consumeIncoming(), null);
+  assert.equal(tabA.values.has(tabA.store.key), true, 'a non-owning tab leaves the old handoff untouched');
+  assert.equal(json(tabA.store.consumeIncoming()), json(oldPayload));
+  assert.equal(tabA.values.has(tabA.store.key), false);
 });
 
 test('Sprinkler bridge uses default/custom keys, notifies by remove/set, and isolates returned snapshots', () => {
@@ -547,28 +585,41 @@ test('Sprinkler bridge rejects corrupt/non-object snapshots and reports failures
   assert.deepEqual(transientSetFailure.calls.slice(-4).map(call => call[0]), ['get', 'remove', 'set', 'set']);
 });
 
-test('Measured-area bridge preserves the fixed key, both payload shapes, and deferred one-shot removal', () => {
-  const { store, values, calls } = loadStore('core/measured-area-bridge-store.js', { exportName: 'RyMeasuredAreaBridgeStore' });
+test('Measured-area bridge addresses per-transfer payloads through URL tokens and removes only the consumed item', () => {
+  const { store, values, calls, location } = loadStore('core/measured-area-bridge-store.js', { exportName: 'RyMeasuredAreaBridgeStore' });
   const reference = { ryPlotRef: { id: 'plot-a', savedAt: 10, areaM2: 1200 } };
   const terrain = { plotId: 'plot-b', isXY: true, poly: [{ x: 1, y: 2 }], terrainProfile: { source: 'rtk_xyz' } };
   assert.equal(store.key, 'runyeMeasuredArea');
-  assert.equal(store.write(reference), true);
-  assert.equal(values.get(store.key), json(reference));
+  const referenceId = store.write(reference);
+  assert.ok(referenceId);
+  assert.equal(values.get(store.keyPrefix + referenceId), json(reference));
+  location.search = '?ryPlotTransfer=' + encodeURIComponent(referenceId);
   assert.equal(store.readRaw(), json(reference));
   assert.equal(json(store.read()), json(reference));
   assert.deepEqual(calls.slice(-3).map(call => call[0]), ['set', 'get', 'get']);
 
-  assert.equal(store.write(terrain), true);
+  const terrainId = store.write(terrain);
+  assert.ok(terrainId);
+  assert.notEqual(terrainId, referenceId, 'every handoff gets a unique address');
+  location.search = '?ryPlotTransfer=' + encodeURIComponent(terrainId);
   assert.equal(json(store.read()), json(terrain), 'terrain XY payload remains unchanged');
   assert.equal(store.readRaw(), json(terrain));
-  assert.equal(values.has(store.key), true, 'reading does not consume a payload before receiver validation');
+  assert.equal(values.has(store.keyPrefix + referenceId), true, 'reading a different transfer does not consume this payload');
+  assert.equal(values.has(store.keyPrefix + terrainId), true, 'reading does not consume a payload before receiver validation');
   assert.equal(store.remove(), true);
-  assert.equal(values.has(store.key), false);
+  assert.equal(values.has(store.keyPrefix + terrainId), false);
+  assert.equal(values.has(store.keyPrefix + referenceId), true, 'removal is scoped to the URL token');
+  assert.equal(location.search, '', 'consuming a payload removes its URL token');
   assert.equal(store.readRaw(), null);
 
-  values.set(store.key, '{bad json');
+  const corruptId = 'corrupt-transfer-1234';
+  values.set(store.keyPrefix + corruptId, '{bad json');
+  location.search = '?ryPlotTransfer=' + corruptId;
   assert.equal(store.read(), null, 'map enhance fallback safely ignores corrupt data');
-  assert.equal(values.has(store.key), true, 'corrupt payload stays available for explicit recovery');
+  assert.equal(values.has(store.keyPrefix + corruptId), true, 'corrupt payload stays available for explicit recovery');
+
+  const failedWrite = loadStore('core/measured-area-bridge-store.js', { exportName: 'RyMeasuredAreaBridgeStore', setError: true });
+  assert.equal(failedWrite.store.write(reference), null, 'storage write errors do not return a usable transfer token');
 });
 
 test('data service refuses to update an ambiguous duplicate plot id', () => {
@@ -665,4 +716,144 @@ test('map partition commit rolls back its network write when plot-library persis
   assert.equal(networkRaw, previousNetwork, 'network layout must return to its exact previous raw snapshot');
   assert.deepEqual(scopedOwners, [['read', 'plot-1'], ['restore', 'plot-1']],
     'partition rollback must compare and restore only the network slot belonging to the selected plot');
+});
+
+test('map partition capture rolls the network snapshot back when the plot-library revision is stale', () => {
+  const previousNetwork = JSON.stringify({ plotId: 'plot-1', ts: 10, segments: [{ id: 'main-1' }] });
+  let networkRaw = previousNetwork;
+  let writtenPlotId = null;
+  const irrigation = {
+    readRawNetworkLayout(plotId) { assert.equal(plotId, 'plot-1'); return networkRaw; },
+    writeNetworkLayout(value, plotId) {
+      writtenPlotId = plotId;
+      assert.equal(plotId, value.plotId, 'network writes must target their embedded plot owner');
+      networkRaw = JSON.stringify(value);
+      return true;
+    },
+    restoreNetworkLayoutIfCurrent(expectedRaw, previousRaw, plotId) {
+      assert.equal(plotId, 'plot-1');
+      if (networkRaw !== expectedRaw) return { ok: false, error: 'network-layout-conflict' };
+      networkRaw = previousRaw;
+      return { ok: true };
+    }
+  };
+  const plotStore = {
+    read() { return { ok: true, plots: [{ id: 'plot-1' }], revision: 'plot-library-before' }; },
+    replace() { return { ok: false, error: 'plot-library-write-failed' }; }
+  };
+  const context = {
+    RyIrrigationDataStore: irrigation,
+    RyPlotLibraryStore: plotStore,
+    __runyeMapFrameInv: { tx: 0, ty: 0, ax: 1, ay: 0, bx: 0, by: 1 },
+    __runyeGeoBase: { refLat: 0, refLng: 0 },
+    RunyeBridge: {
+      state: { cutSnap: { sig: '' }, cutOverrides: { x: {}, y: {} }, zoneRotated: false },
+      getZoneCuts() { return null; }
+    },
+    document: { getElementById() { return null; } }
+  };
+  context.window = context;
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'runye-map-partition.js'), 'utf8'), context,
+    { filename: 'runye-map-partition.js' });
+
+  const result = context.RyMapPartition.capture(
+    { plotId: 'plot-1', segments: [{ id: 'main-new' }] }, previousNetwork
+  );
+  assert.deepEqual(JSON.parse(JSON.stringify(result)), {
+    ok: false, error: 'plot-library-write-failed', rollbackError: null
+  });
+  assert.equal(writtenPlotId, 'plot-1');
+  assert.equal(networkRaw, previousNetwork, 'capture must restore its exact prior network snapshot');
+});
+
+test('map partition commit does not persist plot changes when scoped network persistence rejects', () => {
+  const previousNetwork = JSON.stringify({ plotId: 'plot-1', ts: 10, segments: [] });
+  let networkRaw = previousNetwork;
+  let replaceCalls = 0;
+  let writtenPlotId = null;
+  const irrigation = {
+    readRawNetworkLayout(plotId) { assert.equal(plotId, 'plot-1'); return networkRaw; },
+    writeNetworkLayout(value, plotId) {
+      writtenPlotId = plotId;
+      assert.equal(plotId, value.plotId);
+      return false;
+    },
+    restoreNetworkLayoutIfCurrent(expectedRaw, previousRaw, plotId) {
+      if (networkRaw !== expectedRaw) return { ok: false, error: 'network-layout-conflict' };
+      networkRaw = previousRaw;
+      return { ok: true };
+    }
+  };
+  const plotStore = { replace() { replaceCalls += 1; return { ok: true }; } };
+  const context = { RyIrrigationDataStore: irrigation, RyPlotLibraryStore: plotStore };
+  context.window = context;
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'runye-map-partition.js'), 'utf8'), context,
+    { filename: 'runye-map-partition.js' });
+
+  const result = context.RyMapPartition.commitPartitionResult(
+    { plots: [{ id: 'plot-1' }], revision: 'plot-library-before' },
+    { plotId: 'plot-1', ts: 11, segments: [] }, previousNetwork
+  );
+  assert.deepEqual(JSON.parse(JSON.stringify(result)), {
+    ok: false, error: 'network-layout-write-failed', rollbackError: null
+  });
+  assert.equal(writtenPlotId, 'plot-1');
+  assert.equal(replaceCalls, 0, 'a rejected network write must stop the plot-library write');
+  assert.equal(networkRaw, previousNetwork);
+});
+
+test('map partition rollback preserves a newer network snapshot from another writer', () => {
+  const previousNetwork = JSON.stringify({ plotId: 'plot-1', ts: 10, segments: [{ id: 'main-old' }] });
+  const concurrentNetwork = JSON.stringify({ plotId: 'plot-1', ts: 12, segments: [{ id: 'main-concurrent' }] });
+  let networkRaw = previousNetwork;
+  let restoreCalls = 0;
+  const irrigation = {
+    readRawNetworkLayout(plotId) { assert.equal(plotId, 'plot-1'); return networkRaw; },
+    writeNetworkLayout(value, plotId) {
+      assert.equal(plotId, 'plot-1');
+      assert.equal(plotId, value.plotId);
+      networkRaw = JSON.stringify(value);
+      return true;
+    },
+    restoreNetworkLayoutIfCurrent(expectedRaw, previousRaw, plotId) {
+      restoreCalls += 1;
+      assert.equal(plotId, 'plot-1');
+      if (networkRaw !== expectedRaw) return { ok: false, error: 'network-layout-conflict' };
+      networkRaw = previousRaw;
+      return { ok: true };
+    }
+  };
+  const plotStore = {
+    read() { return { ok: true, plots: [{ id: 'plot-1' }], revision: 'plot-library-before' }; },
+    replace() {
+      networkRaw = concurrentNetwork;
+      return { ok: false, error: 'plot-library-write-failed' };
+    }
+  };
+  const context = {
+    RyIrrigationDataStore: irrigation,
+    RyPlotLibraryStore: plotStore,
+    __runyeMapFrameInv: { tx: 0, ty: 0, ax: 1, ay: 0, bx: 0, by: 1 },
+    __runyeGeoBase: { refLat: 0, refLng: 0 },
+    RunyeBridge: {
+      state: { cutSnap: { sig: '' }, cutOverrides: { x: {}, y: {} }, zoneRotated: false },
+      getZoneCuts() { return null; }
+    },
+    document: { getElementById() { return null; } }
+  };
+  context.window = context;
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'runye-map-partition.js'), 'utf8'), context,
+    { filename: 'runye-map-partition.js' });
+
+  const result = context.RyMapPartition.capture(
+    { plotId: 'plot-1', segments: [{ id: 'main-new' }] }, previousNetwork
+  );
+  assert.deepEqual(JSON.parse(JSON.stringify(result)), {
+    ok: false, error: 'plot-library-write-failed', rollbackError: 'network-layout-conflict'
+  });
+  assert.equal(restoreCalls, 0, 'a detected concurrent write must skip the restore API');
+  assert.equal(networkRaw, concurrentNetwork, 'rollback must not overwrite a newer network snapshot');
 });

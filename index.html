@@ -5,20 +5,21 @@
 <script src="mod/inline-01.js?v=446-default-online-map-active"></script>
 <script src="mod/inline-02.js?v=357"></script>
 <script src="core/irrigation-data-store.js?v=570-irrigation-scope-guard"></script>
-<script src="core/terrain-bridge-store.js?v=1"></script>
+<script src="core/terrain-bridge-store.js?v=601-terrain-bridge-isolation"></script>
 <script src="core/sprinkler-bridge-store.js?v=1"></script>
-<script src="core/measured-area-bridge-store.js?v=1"></script>
+<script src="core/measured-area-bridge-store.js?v=598-tab-scoped-plot-transfer"></script>
+<script src="core/cloud-design-binding-store.js?v=592-cloud-design-binding"></script>
 <script src="core/economic-settings-store.js?v=1"></script>
 <script src="core/plot-library-store.js?v=569-plot-library-unique-ids"></script>
-<script src="runye-material-audit.js?v=604-branch-span-all-paths"></script>
-<script src="runye-map-partition.js?v=560-generated-plot-owner"></script>
+<script src="runye-material-audit.js?v=607-branch-material-span"></script>
+<script src="runye-map-partition.js?v=561-partition-capture-transaction"></script>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>润野灌溉设计优化版｜滴灌管径与水泵选型</title>
 <meta name="description" content="输入地块、滴灌带与水源参数，快速计算灌溉分区、主管支管管径和水泵工作点。"/>
-<link rel="stylesheet" href="mod/style-01.css?v=612-flat-radius">
+<link rel="stylesheet" href="mod/style-01.css?v=619-undo-cover">
 <link rel="stylesheet" href="runye-inverse-design.css?v=277">
-<script defer src="runye-inverse-design.js?v=437"></script>
+<script defer src="runye-inverse-design.js?v=438-branch-flow-conservation"></script>
 <link rel="stylesheet" href="runye-terrain.css?v=454-terrain-sidebar-peer">
 <script src="runye-terrain.js?v=454-terrain-sidebar-peer"></script>
 <link rel="stylesheet" href="runye-ai-plan.css?v=544-float-card-unify">
@@ -244,7 +245,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <link rel="stylesheet" href="pwa/pwa.css?v=2">
 <script defer src="pwa/pwa.js?v=2"></script>
     <link rel="stylesheet" href="runye-theme.css?v=2">
-    <link rel="stylesheet" href="mod/ry-panel.css?v=612-flat-radius">
+    <link rel="stylesheet" href="mod/ry-panel.css?v=619-undo-cover">
     <!-- Shoelace 2.15.1（与紧凑分组样板一致）；Shoelace 不可用时保留原生输入控件。 -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.1/cdn/themes/light.css">
   <link rel="stylesheet" href="runye-typography.css?v=530-h1-scope">
@@ -1199,13 +1200,15 @@ body.ry-worst-off [data-tlworst]{display:none}
     <span class="pp-plan-item"><span class="pp-plan-label">支管</span><span class="pp-plan-val" id="tlPlanBranchPipe">—</span><span class="pp-plan-val-real"><select id="tlCalSelBranch" class="pp-cal-sel" title="选择支管管径（设计值±3档），扬程/流速随之实时重算"></select></span></span>
     <span class="pp-plan-item"><span class="pp-plan-label">支管流速</span><span class="pp-plan-val" id="tlPlanBranchVelocity">— m/s</span><span class="pp-plan-val-real" id="tlPlanBranchVelocityReal">—</span></span>
   </div>
-  <!-- 扬程计算过程（2026-09-16 第三十五轮建，第三十六轮按要求移入三级左栏并简化，
-       第三十七轮起默认收起：只露「水泵扬程 ×× m（×× × 1.10）」一行，点标题展开全过程）：
-       逐项列出 提升/地形/入口压力/已有压力/总管损失/主管损失/支管损失/过滤阀门/富余
-         → 小计 → × 安全系数 = 水泵扬程，只列数值不做文字解释。
+  <!-- 扬程计算式（2026-09-16 第三十五轮建，第三十六轮按要求移入三级左栏并简化）：
+       逐项列出 提升/地形/入口压力/已有压力/总管损失/主管损失/支管损失/过滤阀门/富余，
+       由「( … )」括号汇总小计，× 安全系数后给出最终水泵扬程；只列数值不做文字解释。
        数据与三级结果栏同源（computeThreeLevel，扬程按最远分区最不利路径），
-       由 tlUpdatePlanBar 末尾刷新；纯展示、不参与也不改动任何计算。 -->
-  <details id="ppHeadBreak" class="pp-head-break" hidden></details>
+       由 tlUpdatePlanBar 末尾刷新；纯展示、不参与也不改动任何计算。
+       [v614 2026-10-20 用户要求] 形态改为照抄二级「扬程计算式」：灰条标题 + 一条深色算式带，
+         原来是 details 折叠 + 9 行两栏明细（深色底被 v611 拍平后残留浅色字，白底上几乎看不见）；
+         details 换成普通 div 才能直接铺开算式带，内容仍由 plan-calc-render.js 的 renderHeadBreakdown 输出。 -->
+  <div id="ppHeadBreak" class="pp-head-break" hidden></div>
   <div class="pp-hint" id="tlPpHint" style="display:none">📋 请先在面积测量工具中描绘并闭合边界</div>
   <!-- 下载 / 打印图纸按钮已按用户要求取消（2026-09-16 第三十三轮）；
        tlDownloadSVG / tlPrintDiagram 函数保留但已无入口（与 tlSavePng 先例一致） -->
@@ -1217,9 +1220,16 @@ body.ry-worst-off [data-tlworst]{display:none}
        参与 computeThreeLevel 的沿程损失重算 → 水泵扬程/功率随之更新。
        这样"改不同管径 → 看扬程与功率 → 挑最经济组合"是可反复试算的闭环。 -->
   <div id="tlPumpUpdateBox" style="display:none;margin-top:10px;padding:9px 11px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);font:11px/1.6 system-ui,-apple-system,'Segoe UI',sans-serif;color:#1f2937;text-align:left">
-    <div style="font-weight:700;color:#0f172a;margin-bottom:2px">管径调整 · 扬程确认</div>
-    <div style="line-height:1.5;color:#64748b;margin-bottom:6px" id="tlPumpUpdateNote">图面改管径只作标注，点下方按钮按当前管径重算扬程</div>
-    <button type="button" id="tlPumpUpdateBtn" class="pp-btn-generate" style="width:100%;padding:5px 8px" title="把图面上改过的管径折算成总管/主管/支管代表管径（按长度加权），参与沿程损失重算；反复改不同管径再点此按钮，即可比较水泵扬程与功率，挑出最经济合理的管径组合">⇧ 更新水泵扬程</button>
+    <!-- [v613] 标题改用面板统一的 .tl-flat-head（灰条 22px），样式唯一出处 = mod/style-01.css 的 .tl-flat-* 段。
+         [v615 2026-10-20 用户要求] 说明文字与按钮并成同一行（用户：红框内的文字跟按钮用一个样式来要求它，
+           现在按钮太长了）——口径照抄二级 .pp-recipe-row / .pp-recipe-btn：
+           左槽说明文字（可换行）+ 右侧紧凑按钮，同一 22px 行节奏，按钮不再通栏。
+           按钮原来的 inline width:100%;padding:5px 8px 已删，尺寸/外观统一由 style-01.css 的 #tlPumpUpdateBtn 一条管。 -->
+    <div class="tl-flat-head">管径调整 · 扬程确认</div>
+    <div class="pp-plan-item" id="tlPumpUpdateRow">
+      <span class="tl-flat-note" id="tlPumpUpdateNote">当前为设计管径，改径后重算。</span>
+      <button type="button" id="tlPumpUpdateBtn" title="把图面上改过的管径折算成总管/主管/支管代表管径（按长度加权），参与沿程损失重算；反复改不同管径再点此按钮，即可比较扬程与功率，挑出最经济合理的管径组合">更新扬程</button>
+    </div>
     <div id="tlPumpUpdateDelta" style="display:none;line-height:1.55;color:#475569;margin-top:6px"></div>
   </div>
   <div id="tlLossCard" style="display:none;position:relative;margin-top:12px;padding:9px 11px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);font:11px/1.6 system-ui,-apple-system,'Segoe UI',sans-serif;color:#1f2937;text-align:left"></div>
@@ -2248,8 +2258,8 @@ body.ry-worst-off [data-tlworst]{display:none}
      IIFE 的 ready.then(render) 是微任务，会在两脚本之间触发首屏 render，需要本文件函数已就位 -->
 <script src="mod/material-table.js?v=421-mat-table"></script>
 <!-- [v424-plan-calc-render] 扬程公式与分解展示模块，先于计算控制器和三级调用方装载。 -->
-<script src="mod/plan-calc-render.js?v=424-plan-calc-render"></script>
-<script src="mod/inline-09.js?v=604-branch-span-all-paths"></script>
+<script src="mod/plan-calc-render.js?v=614-head-formula"></script>
+<script src="mod/inline-09.js?v=619-undo-cover"></script>
 <!-- [v423-header-layout] 三级简图标题布局依赖 inline-09 的 tlMeasureText 与生成时写入的标题状态。 -->
 <script src="mod/tl-header-layout.js?v=423-header-layout"></script>
 
@@ -2257,10 +2267,10 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script src="mod/inline-10.js?v=482-nav-refit"></script>
 
 <!-- ===== 实际地块规划 JS ===== -->
-<script src="mod/inline-11.js?v=457-pump-power-semantics"></script>
+<script src="mod/inline-11.js?v=607-branch-material-span"></script>
 <!-- [v420-split] 绘图编辑器 IIFE 自 inline-11 迁出：必须紧随 inline-11 之后同步执行 -->
 <script src="mod/plot-editor.js?v=612-flat-radius"></script>
-<script src="mod/inline-12.js?v=567-current-plot-anchor-fail-closed"></script>
+<script src="mod/inline-12.js?v=619-undo-cover"></script>
 <script src="mod/inline-13.js?v=499-plot-library-store"></script>
 <!-- [v422-head-system-svg] 纯 SVG 核心先于 inline-14 同步加载。 -->
 <script src="mod/head-system-svg.js?v=422-head-system-svg"></script>
@@ -2270,7 +2280,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script src="mod/inline-15.js?v=357"></script>
 
 <!-- ===== 地图面积测量回传：消费 runye-map-measure.html 写入的数据 ===== -->
-<script src="mod/inline-16.js?v=479-plot-transfer"></script>
+<script src="mod/inline-16.js?v=598-tab-scoped-plot-transfer"></script>
 <script src="mod/ry-diag.js?v=476-pwa-reset"></script>
 
 <!-- ===== 主区 Tab 绑定 + 底部状态栏 + 视口自适应 ===== -->
@@ -2290,7 +2300,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script src="tl-workspace/tl-auto-edits.js?v=580-front-move-removed"></script>
 
 <!-- ===== 三级设计工作区模块 + 页面接线（2026-09-13） ===== -->
-<script src="tl-workspace/tl-nodes.js"></script>
+<script src="tl-workspace/tl-nodes.js?v=619-undo-cover"></script>
 <!-- v180b（2026-10-02）：tl-nodes.js 就绪后再挂简图实时刷新订阅（见 tlHookTlNodesLiveSync 注释） -->
 <script src="mod/inline-22.js?v=357"></script>
 <script src="tl-workspace/tl-workspace.js?v=582-ws-rerender-after-regen"></script>
@@ -2300,14 +2310,14 @@ body.ry-worst-off [data-tlworst]{display:none}
      计算核心与 API 照常加载。将来恢复：改 false 或删除本行。
      注意 pipe-path-loss.js 是三级扬程校核（RyPipePathLoss.calculate）依赖，必须照常加载。 -->
 <script src="mod/inline-23.js?v=357"></script>
-<script src="hydraulic-calc/pipe-path-loss.js?v=458-unified-design-path-loss"></script>
+<script src="hydraulic-calc/pipe-path-loss.js?v=607-branch-material-span"></script>
 <script src="hydraulic-calc/hydraulic-calc.js"></script>
 <!-- 过滤系统页（2026-09-18 第七十二轮）：GREEN 单体版管路模型 + 选型计算，
      懒挂载（首次可见时建 DOM），与二级/三级计算双向融合。 -->
 <script src="filter-system/filter-system.js"></script>
 <script src="mod/inline-24.js?v=357"></script>
 <script src="mod/inline-25.js?v=357"></script>
-<script src="mod/inline-27.js?v=604-branch-span-all-paths"></script>
+<script src="mod/inline-27.js?v=619-undo-cover"></script>
 <!-- ═══ CAD 单一操作区：全局左工具栏（2026-09-14；右上角视口切换条已取消） ═══════════
      需求：按 CAD 方式所有工作在一个操作区进行 —— 地块信息是基础底图，不同图纸作为
      图层叠加切换；原三块左属性栏折叠进本工具栏（details 分组，默认全部折叠，
@@ -2368,7 +2378,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <input type="file" id="rySetCsvInput" accept=".csv,text/csv" style="display:none">
 <script src="mod/inline-28.js?v=529-single-source"></script>
 
-<script src="mod/inline-29.js?v=357"></script>
+<script src="mod/inline-29.js?v=358-branch-flow-conservation"></script>
 
 <script src="mod/inline-30.js?v=544-float-card-unify"></script>
 <script src="mod/inline-32.js?v=404-tier-gates"></script>
@@ -2377,14 +2387,14 @@ body.ry-worst-off [data-tlworst]{display:none}
 <!-- [v284 2026-10-06] 地块分区 / 管路规划 / 多地块规划 三页的 Ctrl+Z 回退。
      必须排在所有主站脚本之后（它复用 window.runyeSaveProject / runyeLoadProject 做快照）。
      ★ 删除本行即完全卸载该功能（其余文件零改动）。 -->
-<script src="runye-undo.js?v=3"></script>
+<script src="runye-undo.js?v=619-undo-cover"></script>
 <!-- [NEW MODULE: core 2026-10-11] 插件化主程序入口（ES Module）。
      删除本行即整体卸载插件体系，原有功能零影响；插件清单见 plugins.json。 -->
 <script type="module" src="core/bootstrap.js?v=2"></script>
 <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.1/cdn/shoelace.js"></script>
 <script src="mod/ry-panel.js?v=545-rect-clamp"></script>
 <script src="pwa/vendor/leaflet.js"></script>
-<script src="mod/online-map.js?v=590-cloud-design-back"></script>
+<script src="mod/online-map.js?v=598-tab-scoped-plot-transfer"></script>
 <script src="terrain/terrain-core.js?v=410-elev"></script>
 <script src="terrain/terrain-ui.js?v=513-sec-gate"></script>
 <script src="runye-hydraulics-page.js?v=442-native"></script>

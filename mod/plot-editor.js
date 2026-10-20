@@ -2561,6 +2561,7 @@
     init(document.getElementById('ppPlanBar2'), false);
     init(document.getElementById('tlPlanBar2'), false);
 
+
   /* ===== [v255 2026-10-06 用户要求] 水源方向可调：三级管线简图右键水源点，
          水源换到总管另一端（左右端/上下端互换）。事件委托挂 document 的 contextmenu，
          命中 [data-tl-src] 热区后：① 取 tlDiagramData 设计几何 frontPipe 两端中
@@ -3683,14 +3684,13 @@
       if(ppIsPipeHidden('main',i))return;
       stats.mainLen+=ppLineLen(line);
     });
-    var lsEl=document.querySelector('#layoutGroup .selected');
-    var sides=(lsEl&&lsEl.dataset&&parseInt(lsEl.dataset.sides,10)>0)?parseInt(lsEl.dataset.sides,10):1;
     (ppState.branchPipes||[]).forEach(function(line,i){
       if(ppIsPipeHidden('branch',i))return;
       var drawn=ppLineLen(line);
       var span=ppBranchFullSpan(line);
-      /* 满跨 ÷ 敷设边数 = 该区支管用量（与三级材料清单同一口径）；用户把线拉长时按图面长走 */
-      stats.branchLen+=(span>0)?(Math.max(span,drawn)/sides):drawn;
+      /* 每区图面只画一条代表支管；支管总材料量按设计满跨统计，
+         边数/根数只拆分单根设计长度，不能再折减汇总用量。手动拉长增量计入。 */
+      stats.branchLen+=(span>0)?Math.max(span,drawn):drawn;
     });
     stats.hasPipes=stats.mainLen>0||stats.branchLen>0;
     return stats;

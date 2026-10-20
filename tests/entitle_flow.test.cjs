@@ -102,6 +102,24 @@ function reset() {
 (async function main() {
   console.log('== 会员裂变 · 逻辑层跑通验证 ==\n');
 
+  /* FNV output can be only five base36 digits; keep the documented 6–8-char
+     invite suffix even for a deterministic short-hash input. */
+  const realNow = Date.now;
+  const realRandom = Math.random;
+  let shortHashCode = '';
+  try {
+    Date.now = () => 0;
+    Math.random = () => 0;
+    reset(); setUser('98', '13800138098');
+    await E.init(true);
+    shortHashCode = E.myCode();
+  } finally {
+    Date.now = realNow;
+    Math.random = realRandom;
+    reset();
+  }
+  ok('短散列邀请码补齐为至少6位后缀', /^RY[0-9A-Z]{6,8}$/.test(shortHashCode), shortHashCode);
+
   /* ---- 场景 1：A 注册初始化 ---- */
   console.log('[场景1] A 注册初始化 → 分配邀请码');
   reset(); setUser('10001', '13800138000');

@@ -29,27 +29,44 @@
   /* —— 水头损失变化估算（2026-09-16 阶段2f）：改径前后 Hazen-Williams 对比，只作图面
      估算展示（选中卡 + 管上就近标注 + 画布汇总条），不回写水力计算/材料清单/水泵选型
      （红线同阶段2）。流量口径与 computeThreeLevel 一致：总管=联合流量，主管=单区流量
-     （每根主管经阀门一次过一区流量），支管=单区流量/支管数；管长取图面有效几何（含改长）。
+     （每根主管经阀门一次过一区流量），支管=单区流量/物理并联支管总数；管长取图面有效几何（含改长）。
      公式委托共享核心（C=150、SDR13.6 内径）；该估算仍只用于展示，不参与正式水泵选型。 —— */
   function flowModel() {
     var d = window.tlDiagramData;
     var fm = d && d.meta && d.meta.flowModel;
-    if (fm && fm.zoneFlow > 0) return fm;
     function rd(id, def) { var el = document.getElementById(id); var v = el ? parseFloat(el.value) : NaN; return isFinite(v) && v > 0 ? v : def; }
+    var nb = document.querySelector('#tl_branchGroup .selected');
+    var selectedBranchCount = nb ? parseInt(nb.dataset.n, 10) : 2;
+    var ls = document.querySelector('#tl_layoutGroup .selected');
+    var selectedSides = ls ? parseInt(ls.dataset.sides, 10) : 1;
+    if (fm && fm.zoneFlow > 0) {
+      /* [v606] 根数/边数一律**以当前选择为准**，快照只作兜底：
+         computeThreeLevel 读的就是 #tl_branchGroup / #tl_layoutGroup 的实时选择，
+         若这里优先用 meta 快照，用户切了「双边」但没重生成管线图时，逐段表 / 管道卡 /
+         损失估算仍按旧边数算（实测：双边单根仍显示 30 m，扬程那边已是 15 m）。
+         快照只在该控件不存在（无图面 / 控件未挂载）时兜底。 */
+      var branchCount = selectedBranchCount > 0 ? selectedBranchCount : (Number(fm.branchCount) > 0 ? Number(fm.branchCount) : 2);
+      var layoutSides = selectedSides > 0 ? selectedSides : (Number(fm.layoutSides) > 0 ? Number(fm.layoutSides) : 1);
+      var branchParallelCount = branchCount * layoutSides;
+      return Object.assign({}, fm, { branchCount: branchCount, layoutSides: layoutSides,
+        branchParallelCount: branchParallelCount, branchFlow: fm.zoneFlow / branchParallelCount });
+    }
     var areaM2 = rd('tl_zoneMu', 30) * (2000 / 3);
     var zoneTapeLen = areaM2 / rd('tl_tapeSpacing', 1.2);
     var zoneFlow = zoneTapeLen / rd('tl_emitterSpacing', 0.3) * rd('tl_emitterFlow', 2) / 1000;
     var zcEl = document.getElementById('tl_zoneCount');
     var zcV = zcEl ? parseFloat(zcEl.value) : NaN;
     var zoneCount = isFinite(zcV) && zcV > 0 ? zcV : 2;
-    var nb = document.querySelector('#tl_branchGroup .selected');
-    var branchCount = nb ? parseInt(nb.dataset.n) : 2;
-    return { zoneFlow: zoneFlow, branchFlow: zoneFlow / branchCount, combinedFlow: zoneFlow * zoneCount, zoneCount: zoneCount, branchCount: branchCount };
+    var branchCount = selectedBranchCount;
+    var layoutSides = selectedSides;
+    var branchParallelCount = branchCount * layoutSides;
+    return { zoneFlow: zoneFlow, branchFlow: zoneFlow / branchParallelCount, combinedFlow: zoneFlow * zoneCount,
+      zoneCount: zoneCount, branchCount: branchCount, layoutSides: layoutSides, branchParallelCount: branchParallelCount };
   }
   function pipeLenM(pid) {
     if (!AE || !AE.effPts) return 0;
     /* [v604 2026-10-19 用户口径] 支管长度不再取图面折线：图面两端各缩进 gapV/gapH 只是显示约定，
-       计算长度 = 设计满跨 ÷（支管根数 × 敷设边数），与最不利路径水损、材料清单同源。
+       计算长度 = 设计满跨 ÷（每侧根数 × 敷设边数），与最不利路径水损同源；此 pid 代表每区同组支管。
        手动改长仍按「图面长度 − 图面基准」的增量叠加到满跨上（留边永远不算回来）。
        其余管道（总管/主管）继续取图面有效几何（含改长/平移）。 */
     var mBr = /^branch-(\d+)$/.exec(String(pid || ''));
@@ -59,15 +76,15 @@
       if (infoB && infoB.full > 0) {
         var fmB = flowModel() || {};
         var bcB = (fmB.branchCount > 0) ? fmB.branchCount : 2;
-        var lsB = document.querySelector('#tl_layoutGroup .selected');
-        var sdB = (lsB && lsB.dataset && parseInt(lsB.dataset.sides, 10) > 0) ? parseInt(lsB.dataset.sides, 10) : 1;
+        var sdB = fmB.layoutSides > 0 ? fmB.layoutSides : 1;
+        var physicalBranchCount = fmB.branchParallelCount > 0 ? fmB.branchParallelCount : bcB * sdB;
         var nowB = 0;
         try {
           var ptB = AE.effPts(pid, window.tlDiagramData);
           nowB = (ptB && AE.polylineLen) ? AE.polylineLen(ptB) : 0;
         } catch (eB) { nowB = 0; }
         var deltaB = Math.max(0, nowB - infoB.base);
-        return (infoB.full + deltaB) / (bcB * sdB);
+        return (infoB.full + deltaB) / physicalBranchCount;
       }
     }
     var pts = AE.effPts(pid, window.tlDiagramData);
@@ -307,17 +324,17 @@
     box.style.display = hasFig ? '' : 'none';
     if (!hasFig) return;
     if (st.n <= 0) {
-      if (note) note.textContent = '当前使用设计管径；调整图面管径后自动重算扬程。';
-      if (btn) { btn.textContent = st.applied ? '⇧ 恢复设计水泵扬程' : '⇧ 更新水泵扬程'; btn.disabled = !st.applied; btn.style.opacity = st.applied ? '1' : '0.5'; }
+      if (note) note.textContent = '当前为设计管径，改径后重算。';
+      if (btn) { btn.textContent = st.applied ? '恢复扬程' : '更新扬程'; btn.disabled = !st.applied; btn.style.opacity = st.applied ? '1' : '0.5'; }
     } else if (st.applied) {
       var count = Object.keys(tlAppliedPipeOverride().calibers).length;
       var result = computeThreeLevel();
       if (note) note.textContent = '已应用 ' + count + ' 根管道的管径，按轮灌组逐段校核。' +
         (result.hydraulicPath ? '最大损失路径：第 ' + (result.hydraulicPath.zoneIndex + 1) + ' 区。' : '') + '调整管径后自动更新。';
-      if (btn) { btn.textContent = '↻ 重新校核水泵扬程'; btn.disabled = false; btn.style.opacity = '1'; }
+      if (btn) { btn.textContent = '重新校核'; btn.disabled = false; btn.style.opacity = '1'; }
     } else {
-      if (note) note.innerHTML = '图面已改径 <b>' + st.n + '</b> 段，点下方按钮按这些管径重算扬程';
-      if (btn) { btn.textContent = '⇧ 更新水泵扬程'; btn.disabled = false; btn.style.opacity = '1'; }
+      if (note) note.innerHTML = '图面已改径 <b>' + st.n + '</b> 段，点右侧按钮按这些管径重算扬程';
+      if (btn) { btn.textContent = '更新扬程'; btn.disabled = false; btn.style.opacity = '1'; }
     }
   }
   /* ===== v137（2026-09-23 用户要求）：三级简图参数两行单一来源 =====
@@ -560,12 +577,9 @@
         var AE = window.RyTlAutoEdits;
         if (!AE || !AE.allPids || !d) return null;
         var pids = AE.allPids(d), total = 0, i, seen = false, hidSeen = false;
-        /* [v601 2026-10-19 用户口径] 支管总长按「设计满跨」计，不按图面折线：
+        /* [v605] branch-* 是每区代表线，支管材料总长计全部物理并联管，等于「设计满跨」：
            图面两端各缩进 gapV/gapH（4m 级）只是显示约定，不进材料；
-           用户手动改长的增量（effLen − 原始图面长）照常叠加。
-           每区支管总用量 = 该区满跨 ÷ 敷设边数（= 根数 × 单根，单边时即整区贯通长度）。 */
-        var lsEl = document.querySelector('#tl_layoutGroup .selected');
-        var brSides = (lsEl && lsEl.dataset && parseInt(lsEl.dataset.sides, 10) > 0) ? parseInt(lsEl.dataset.sides, 10) : 1;
+           用户手动改长的增量（effLen − 原始图面长）只叠加一次。 */
         for (i = 0; i < pids.length; i++) {
           var k = pids[i] === 'front' ? 'front' : (pids[i].indexOf('main-') === 0 ? 'main' : 'branch');
           if (k !== kind) continue;
@@ -590,7 +604,7 @@
             var info3 = isFinite(bi2) && (typeof window.tlBranchSpanInfo === 'function') ? window.tlBranchSpanInfo(bi2) : null;
             if (info3 && info3.full > 0) {
               var base2 = info3.base;
-              total += (info3.full + Math.max(0, AE.polylineLen(pts) - base2)) / brSides;
+              total += info3.full + Math.max(0, AE.polylineLen(pts) - base2);
               continue;
             }
           }
@@ -656,15 +670,16 @@
         function sgn(v, u, dec) { return (v >= 0 ? '+' : '\u2212') + Math.abs(v).toFixed(dec === undefined ? 2 : dec) + u; }
         function col(v) { return v < -0.005 ? '#15803d' : (v > 0.005 ? '#b91c1c' : '#64748b'); }
         d.style.display = '';
-        d.innerHTML = '<div style="border-top:1px dashed #cbd5e1;padding-top:5px">'
-          + '<div>设计 → 改径重算 · 水泵扬程 <b>' + before.head.toFixed(1) + ' → ' + r1.pumpHead.toFixed(1) + ' m</b>'
+        /* [v613] 四行改为 .tl-flat-line（22px 行 + 实线分隔），与三级面板其余行同一套网格；
+           去掉原来那层「dashed 上边框 + padding-top」的自造分隔 —— 行分隔线现在由网格统一提供。 */
+        d.innerHTML = '<div class="tl-flat-line">设计 → 改径重算 · 水泵扬程 <b>' + before.head.toFixed(1) + ' → ' + r1.pumpHead.toFixed(1) + ' m</b>'
           + ' <b style="color:' + col(dh) + '">(' + sgn(dh, ' m', 1) + ')</b></div>'
-          + '<div>计算轴功率 <b>' + before.shaftKW.toFixed(1) + ' → ' + r1.pumpPower.toFixed(1) + ' kW</b>'
+          + '<div class="tl-flat-line">计算轴功率 <b>' + before.shaftKW.toFixed(1) + ' → ' + r1.pumpPower.toFixed(1) + ' kW</b>'
           + ' <b style="color:' + col(dp) + '">(' + sgn(dp, ' kW', 2) + ')</b></div>'
-          + '<div>建议电机功率 <b>' + before.motorKW + ' → ' + r1.motorKW_rounded + ' kW</b>'
+          + '<div class="tl-flat-line">建议电机功率 <b>' + before.motorKW + ' → ' + r1.motorKW_rounded + ' kW</b>'
           + ' <b style="color:' + col(dm) + '">(' + sgn(dm, ' kW', 2) + ')</b></div>'
-          + '<div>设计估算 → 最大路径损失 ' + before.loss.toFixed(2) + ' → ' + r1.totalPipeLoss.toFixed(2) + ' m'
-          + ' <b style="color:' + col(dl) + '">(' + sgn(dl, ' m', 2) + ')</b></div></div>';
+          + '<div class="tl-flat-line">设计估算 → 最大路径损失 ' + before.loss.toFixed(2) + ' → ' + r1.totalPipeLoss.toFixed(2) + ' m'
+          + ' <b style="color:' + col(dl) + '">(' + sgn(dl, ' m', 2) + ')</b></div>';
       }
     } catch (e) { }
     pumpUpdateNote();
@@ -681,8 +696,8 @@
      （段名 + 长度 + 管径 + 改前 / 改后水头损失 + 差值）。
      管径下拉就地在表格里改 → 走 RyTlWs.setAutoCaliber（与右键改径同源 AE.cals）→ 图面同步 + 本表数值随动。
      本表按分区统计**长度**并支持**改管径**。
-     损失口径与 hfFor 同源（总管=联合流量、主管=单区、支管=单区/支管数），
-     改完管径后可再点左栏「⇧ 更新水泵扬程」把管径折算进正式选型计算。 */
+     损失口径与 hfFor 同源（总管=联合流量、主管=单区、支管=单区/物理并联支管总数），
+     改完管径后可再点左栏「更新水泵扬程」把管径折算进正式选型计算。 */
   var WS_STATS_KEY = 'runye_tlWsStats_collapsed';
   var WS_STATS_WKEY = 'runye_tlWsToolbar_w';   /* 第四十四轮：宽度改为工具轨宽度（旧 key 作废） */
   /* 点是否落在折线上（tol 米） */
@@ -815,9 +830,8 @@
       rows.forEach(function (r) { len[r.kind] += r.len; });
       var savedOv = tlPipeOdOverride, rDes;
       try { tlPipeOdOverride = null; rDes = computeThreeLevel(); } finally { tlPipeOdOverride = savedOv; }
-      /* [v604] 支管的「成本长度」必须用材料清单口径（整区贯通 = 满跨 ÷ 敷设边数，含支管根数），
-         而逐段表的支管行是「单根设计长」—— 两者差一个根数倍数。若沿用逐段表汇总，
-         管材投入会比材料清单少算一倍（2 根/区时）。 */
+      /* [v605] 支管的「成本长度」用每区全部物理并联管的材料总长（各单根求和后等于满跨），
+         而逐段表的支管行是单根设计长。若沿用逐段表汇总，会漏掉其余并联支管。 */
       try {
         var tlLens3 = window.tlFigParamLines ? window.tlFigParamLines(rDes) : null;
         if (tlLens3 && tlLens3.lens && isFinite(tlLens3.lens.branch) && tlLens3.lens.branch > 0) {
@@ -1071,10 +1085,10 @@
     html += '<tr class="grand"><td>合计</td><td>' + f1(tL) + '</td><td>' + chN + '/' + rows.length + '</td>'
       + '<td>' + f2(tH0) + '</td><td>' + f2(tH1) + '</td></tr>';
     html += '</tbody></table>';
-    html += '<div class="tl-ws-stats-note">总管/主管长度取图面实际几何（含改长 / 平移）；支管行按「设计满跨 ÷ 支管根数 ÷ 敷设边数」计（图面两端留边只影响显示）；'
+    html += '<div class="tl-ws-stats-note">总管/主管长度取图面实际几何（含改长 / 平移）；支管行显示单根长度，材料总长按「设计满跨」计（物理根数 = 每侧根数 × 敷设边数；图面两端留边只影响显示）；'
       + '损失按 Hazen-Williams 估算；管径 ＊ 为非标 PE 外径；'
-      + '流量口径与扬程计算一致（总管=联合流量、主管=单区流量、支管=单区流量/支管数）。'
-      + '改完管径点左栏「⇧ 更新水泵扬程」即可折算进正式选型。</div>';
+      + '流量口径与扬程计算一致（总管=联合流量、主管=单区流量、单根支管=单区流量/物理并联支管总数）。'
+      + '改完管径点左栏「更新扬程」即可折算进正式选型。</div>';
     body.innerHTML = html;
   };
   /* 第五十二轮（2026-09-17，用户要求）：「在图上选中某分区的管线，右侧统计表要直接跳到该分区」。

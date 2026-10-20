@@ -18,6 +18,7 @@
         frontLoss += input.hazen(Math.max(0, z.run - from), flow, diameter('front', input.frontOd));
         from = z.run;
         var mainLoss = input.hazen(z.main, z.flow, diameter('main-' + z.zi, input.mainOd));
+        /* branchCount is the physical parallel branch count (selected roots × layout sides). */
         var branchLoss = input.hazen(z.branch, z.flow / input.branchCount,
           diameter('branch-' + z.zi, input.branchOd)) * input.branchF;
         var row = { zoneIndex: z.zi, groupIndex: gi, front: z.run, main: z.main, branch: z.branch,

@@ -471,6 +471,26 @@
     notify({ action: 'reset' });
   }
 
+  /* [v619 2026-10-20] 从外部快照恢复（给「方案恢复 / Ctrl+Z 撤销」用）。
+     本模块原来只有「启动时读一次 localStorage」的单向路径（ensureRestored 一次性），
+     所以在撤销时即使把 runye_tlNodes_v1 写回去，内存里的 nodes 也不会变 ⇒ 节点位置退不回去。
+     这里补一个显式入口：校验几何签名一致 → 整体替换 nodes/links（并重算序号）→ 落盘 + 通知重绘。 */
+  function restoreRaw(raw) {
+    if (!raw || raw.version !== VERSION) return false;
+    var sig = currentGeoSig();
+    if (raw.geoSig && sig && raw.geoSig !== sig) return false;   /* 几何不符不套旧节点 */
+    nodes = Array.isArray(raw.nodes) ? copy(raw.nodes) : [];
+    links = Array.isArray(raw.links) ? copy(raw.links) : [];
+    var maxN = 0, maxL = 0;
+    nodes.forEach(function (nd) { var m = /^N-(\d+)$/.exec(String(nd && nd.id)); if (m) maxN = Math.max(maxN, +m[1]); });
+    links.forEach(function (lk) { var m = /^L-(\d+)$/.exec(String(lk && lk.id)); if (m) maxL = Math.max(maxL, +m[1]); });
+    seq = { n: maxN, l: maxL };
+    linkFrom = null; restored = true;
+    persist();
+    notify({ action: 'restore' });
+    return true;
+  }
+
   global.RyTlNodes = {
     list: list, links: linksList, nodeById: nodeById,
     addAt: addAt, removeNode: removeNode, setFittings: setFittings, fitTotal: fitTotal,
@@ -481,6 +501,7 @@
     subscribe: function (fn) { if (typeof fn === 'function') subs.push(fn); },
     FITS: FITS, pipeName: pipeNameOf,
     reset: reset,
+    restore: restoreRaw,
     _internals: { serialize: function () { ensureRestored(); return { version: VERSION, geoSig: currentGeoSig(), nodes: copy(nodes), links: copy(links) }; } }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

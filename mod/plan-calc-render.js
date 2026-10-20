@@ -74,16 +74,25 @@
       var sum = rows.reduce(function (a, x) { return a + (Number.isFinite(x.v) ? x.v : 0); }, 0);
       var sub = Number.isFinite(r.headBeforeSafety) ? r.headBeforeSafety : Math.max(0, sum);
       var total = Number.isFinite(r.pumpHead) ? r.pumpHead : sub * sf;
-      var rowHtml = rows.map(function (x) {
+      /* [v614 2026-10-20 用户要求] 形态照抄二级 #ppCalcDetail（.ry-props-head 灰条 + .pp-calc-formula 算式带）：
+         灰条标题「扬程计算式」+ 一条深色算式带，逐项仍全部列出（含三级独有的总管损失 / 已有压力），
+         小计由「( … )」这一层括号表达，× 安全系数后给出最终扬程。
+         原来是 details + 9 行两栏明细，深色底被 v611 拍平后残留 #e8eef7 浅色字落在白底上
+         （实测对比度 1.16:1）⇒ 用户说的「扬程这个很明显看不清楚」。
+         这里只改展示：数值来源、加减口径、安全系数取值与原来逐项一致，不参与任何计算。 */
+      var items = rows.map(function (x, i) {
         var v = Number.isFinite(x.v) ? x.v : 0;
-        return '<div class="pphb-row"><span class="pphb-k">' + x.k + '</span>' +
-          '<span class="pphb-v">' + (v < 0 ? '\u2212' : '') + num(Math.abs(v)) + '</span></div>';
-      }).join('');
-      el.innerHTML = '<summary>水泵扬程 ' + num(total, 1) + ' m（' + num(sub, 1) + ' \u00d7 ' + num(sf, 2) + '）</summary>' +
-        rowHtml + '<div class="pphb-row pphb-sum"><span class="pphb-k">小计</span>' +
-        '<span class="pphb-v">' + num(sub) + '</span></div>' +
-        '<div class="pphb-row pphb-sum pphb-final"><span class="pphb-k">扬程（\u00d7' + num(sf, 2) + '）</span>' +
-        '<span class="pphb-v">' + num(total) + '</span></div>';
+        var sign = v < 0 ? '\u2212' : (i === 0 ? '' : '+');
+        return (i > 0 ? '<span class="pphb-op">' + sign + '</span> ' : '') + x.k +
+          ' <span class="pphb-num">' + num(Math.abs(v)) + '</span>';
+      }).join(' ');
+      el.innerHTML = '<div class="tl-flat-head">扬程计算式</div>' +
+        '<div class="pphb-formula">' +
+        '<span class="pphb-name">扬程 H</span>' +
+        '<span class="pphb-eq">= (</span>' + items + '<span class="pphb-eq">)</span> ' +
+        '<span class="pphb-op">\u00d7</span> <span class="pphb-num">' + num(sf, 2) + '</span> ' +
+        '<span class="pphb-eq">=</span> <span class="pphb-final">' + num(total, 1) + ' m</span>' +
+        '</div>';
       el.hidden = false;
     } catch (e) { root.console.error('[ppHeadBreak] 渲染失败：', e); }
   }

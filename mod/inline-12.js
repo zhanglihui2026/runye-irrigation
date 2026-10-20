@@ -71,6 +71,60 @@
 
   // [2026-10-12 数字农业剥离] 原「存档后广播地块给对端模块」的耦合已按用户决定整体切除，
   // 桥接层文件与调用点一并删除；此处只做纯本地存档，不再往外广播。
+  /* ===== [v619 2026-10-20] 「用户拖出来的位置」纳入工程快照 =====
+     用户诉求：「我不小心误操作了标识的位置，要能退回去；只要是误操作，Ctrl+Z 就应该能回退」。
+     这几个位置原先各自躺在自己的 localStorage 键里（三通下移 / 水源点 / 手工节点 / 尺寸标注线 /
+     整图平移），工程存档和撤销快照都够不着 ⇒ 拖错了既没法撤销、导出工程也带不走。
+     现在统一收进 payload 的 `tlAux` 一栏（架构上仍是「只有一份序列化」，不新增第二套状态模型）。
+     读/写全部 try-catch 兜底：旧存档没有 tlAux ⇒ 原样跳过，行为与改动前完全一致。 */
+  function readTlAux(){
+    function rd(k){ try{ var s=localStorage.getItem(k); return s?JSON.parse(s):null; }catch(e){ return null; } }
+    /* 标注线偏移例外：它的真实状态在内存 window._tlDimState（{sig,offs}），
+       而 localStorage 'tl-dim-offs' 只在这个「保存开关」为开时才写（默认关，且关时还会主动清档）。
+       按盘上的值拍快照 ⇒ 默认情况下永远是 null，拖过标注线也退不回去 ⇒ 这里直接读内存。
+       sig 是布局签名，尺寸随分区/组变化而变，恢复时按它校验（不符就不套用旧偏移）。 */
+    var dims=null;
+    try{
+      var ds=window._tlDimState;
+      if(ds && ds.sig && ds.offs && Object.keys(ds.offs).length) dims={ sig:ds.sig, offs:ds.offs };
+    }catch(e){}
+    return {
+      drops:rd('tlFrontNodeDrops_v1'),   // 总管三通下移量 {mk:{sig,off}}
+      src:rd('tlSourceMove_v1'),         // 水源点绝对坐标 {sig,x,y}
+      nodes:rd('runye_tlNodes_v1'),      // 手工节点/连线
+      dims:dims,                         // 尺寸标注线偏移 {sig,offs}（内存态）
+      plotPos:rd('tl-plot-pos')          // 整图平移 {x,y}
+    };
+  }
+  function writeTlAux(aux){
+    if(!aux||typeof aux!=='object') return;
+    function wr(k,v){ try{ if(v==null) localStorage.removeItem(k); else localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+    wr('tlFrontNodeDrops_v1',aux.drops);
+    wr('tlSourceMove_v1',aux.src);
+    wr('tl-plot-pos',aux.plotPos);
+    /* 标注线：写回内存态。布局签名不符 → 只清偏移、保留当前 sig（偏移本就是按当前布局的坐标），
+       不能把整份旧 sig 盖上去，否则旧的 sig 会让后续 tlDimOffOf 全部读不到。 */
+    try{
+      var ds=window._tlDimState;
+      if(ds){
+        if(aux.dims && aux.dims.sig===ds.sig && aux.dims.offs) ds.offs=JSON.parse(JSON.stringify(aux.dims.offs));
+        else ds.offs={};
+        try{ if(window._tlDimSaveOn) localStorage.setItem('tl-dim-offs',JSON.stringify({sig:ds.sig,offs:ds.offs})); }catch(e2){}
+      }
+    }catch(e){}
+    /* 节点有内存副本（RyTlNodes 只在启动时读一次盘），必须走它的 restore 才会重绘。
+       ★ null 与 undefined 必须区分开：undefined = 旧存档/旧快照压根没有这一栏（跳过，保持现状）；
+         null = 那一刻确实一个手工节点都没有（要清空）—— 否则「加节点」这一步永远撤不掉，
+         因为撤到"没有节点"的那份快照时会被当成"跳过"（v619 探针 D2 抓到）。 */
+    try{
+      if(window.RyTlNodes){
+        if(aux.nodes===undefined) { /* 旧快照无此字段：不动 */ }
+        else if(aux.nodes && typeof aux.nodes==='object') window.RyTlNodes.restore(aux.nodes);
+        else if(window.RyTlNodes.reset) window.RyTlNodes.reset();
+      }
+    }catch(e){}
+  }
+
   window.runyeSaveProject=function(silent,key){
     /* v161：可选第二参 key —— 静默自动留存与「手动保存」共用同一套快照构造，
        不传 key 时写原有 SAVE_KEY，行为与改动前一致。 */
@@ -102,7 +156,8 @@
       tlAutoEdits:(window.RyTlAutoEdits && window.tlDiagramData) ? window.RyTlAutoEdits.serialize() : null,
       manualGroups:(typeof window.tlManualGroups!=='undefined' && window.tlManualGroups) ? window.tlManualGroups : [],
       zoneStep:(typeof tlZoneStepCount==='function' && tlZoneStepCount()>0) ? window.tlZoneStep : null,
-      ppGenSig:(typeof window.__ryPpGenSig!=='undefined'&&window.__ryPpGenSig)?window.__ryPpGenSig:null
+      ppGenSig:(typeof window.__ryPpGenSig!=='undefined'&&window.__ryPpGenSig)?window.__ryPpGenSig:null,
+      tlAux:readTlAux()
     };
     localStorage.setItem(key||SAVE_KEY,JSON.stringify(data));
     if(silent!==true)projectToast('方案已保存到本机');
@@ -181,6 +236,9 @@
       ? data.tlDiagramData
       : (data.isoDiagram && data.isoDiagram.data && data.isoDiagram.data.version === 1 ? data.isoDiagram.data : null);
     window.tlDiagramData = savedTlDiagram;
+    /* [v619] 位置层先于下面的几何/编辑恢复写回：三通下移、水源、标注线偏移都要在
+       渲染（renderThreeLevel / 工作区重绘）之前就位，否则画面仍按旧位置画。 */
+    writeTlAux(data.tlAux);
     if (savedTlDiagram) {
       if (window.RyTlEditPipes) window.RyTlEditPipes.syncGeometry(savedTlDiagram);
       if (window.RyTlAutoEdits) window.RyTlAutoEdits.syncGeometry(savedTlDiagram);
@@ -294,17 +352,31 @@
      （runye_aiplot_anchor_v1）。返回本页时消费锚，静默恢复快照——页内手画/图片测量的边界
      没有 runye_current_plot_v1 锚，v161 自动恢复不覆盖，来回一趟就丢地块、无法重新划分。 */
   function ryAiRestoreProject(){
+    /* AI 规划由独立的 ?smart=1 页面接收回程快照。普通标签不能消费共享的一次性标记，
+       否则会抢先删除标记并把另一标签的共享快照载入当前地块。 */
+    var search=window.location&&typeof window.location.search==='string'?window.location.search:'';
+    if(!/(?:^|[?&])smart=1(?:&|$)/.test(search))return;
     var had=false;
     try{had=!!localStorage.getItem('runye_aiplot_anchor_v1');}catch(e){}
     if(!had)return;
-    try{localStorage.removeItem('runye_aiplot_anchor_v1');}catch(e){}
     try{
-      if(window.__runyeAutoRestored)return;                 /* v161 已恢复 → 锚冗余 */
+      if(window.__runyeAutoRestored){localStorage.removeItem('runye_aiplot_anchor_v1');return;} /* v161 已恢复 → 锚冗余 */
       if(window.RyMeasuredAreaBridgeStore.readRaw())return;  /* 地图回传优先 */
       var raw=localStorage.getItem(SAVE_KEY);if(!raw)return;
       var snap=null;try{snap=JSON.parse(raw);}catch(e){return;}
       if(!snap||!Array.isArray(snap.measuredPolygon)||snap.measuredPolygon.length<3)return;
+      var savedPlotId=snap.currentPlotId==null||snap.currentPlotId===''?null:String(snap.currentPlotId);
+      var pagePlotId=window.currentPlotId==null||window.currentPlotId===''?null:String(window.currentPlotId);
+      if(pagePlotId&&pagePlotId!==savedPlotId)return;
+      var plotStore=window.RyIrrigationDataStore;
+      if(plotStore&&typeof plotStore.readCurrentPlotAnchor==='function'){
+        var anchor=plotStore.readCurrentPlotAnchor();
+        if(!anchor||anchor.ok!==true)return;
+        var anchorPlotId=anchor.id==null||anchor.id===''?null:String(anchor.id);
+        if(anchorPlotId!==savedPlotId)return;
+      }else if(savedPlotId&&pagePlotId!==savedPlotId)return;
       window.runyeLoadProject({key:SAVE_KEY,silent:true});
+      try{localStorage.removeItem('runye_aiplot_anchor_v1');}catch(e){}
       var _ryAlert0=window.alert;
       try{
         window.alert=function(){};
@@ -332,6 +404,18 @@
       if(!snap || !snap.ppGenSig) return;
       if(!Array.isArray(snap.measuredPolygon) || snap.measuredPolygon.length<3) return;
       if(window.ryPolySig(snap.measuredPolygon)!==snap.ppGenSig) return; /* 边界已改 → 不恢复 */
+      /* 自动恢复不能像手动「载入方案」那样切换当前地块。共享快照若属于另一标签页，
+         v161 会因锚点不匹配让位；这里也必须核对当前标签页锚点，避免随后把它改回存档地块。 */
+      var savedPlotId=snap.currentPlotId==null||snap.currentPlotId===''?null:String(snap.currentPlotId);
+      var pagePlotId=window.currentPlotId==null||window.currentPlotId===''?null:String(window.currentPlotId);
+      if(pagePlotId&&pagePlotId!==savedPlotId) return;
+      var plotStore=window.RyIrrigationDataStore;
+      if(plotStore&&typeof plotStore.readCurrentPlotAnchor==='function'){
+        var anchor=plotStore.readCurrentPlotAnchor();
+        if(!anchor||anchor.ok!==true) return;
+        var anchorPlotId=anchor.id==null||anchor.id===''?null:String(anchor.id);
+        if(anchorPlotId!==savedPlotId) return;
+      }else if(savedPlotId&&pagePlotId!==savedPlotId) return;
       window.__runyeAutoRestored=true;
       window.__ryPpGenSig=snap.ppGenSig;   /* 记回内存：后续 pagehide 继续留存 */
       window.runyeLoadProject({key:SAVE_KEY, silent:true});

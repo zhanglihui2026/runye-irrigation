@@ -524,7 +524,7 @@
        v231 自写的 pickDn/hfHW 已删，直接调全局 selectPipe() / hazenWilliams() /
        christiansenF()（RyDesignCore 单一来源）：
        · 主管/块总管：selectPipe(流量, 目标流速, minOd=MAIN_PIPE_MIN_OD)（主管最小 Ø90）；
-       · 支管：流量 = 分区流量 ÷ 每区支管根数（#branchGroup，默认 2），
+       · 支管：流量 = 分区流量 ÷ 物理并联支管总数（每侧根数 × 敷设边数），
          selectPipe(..., maxOd=BRANCH_PIPE_MAX_OD)（支管最大 Ø160），
          沿程损失 × christiansenF(每根支管的滴头/接头数) —— 与二级页扬程模型同款；
        · 每亩流量 I：优先读二级页算好的 #planIntensity；没算过就按同一组输入现算
@@ -544,6 +544,11 @@
     var el = document.querySelector('#branchGroup .selected');
     var n = el ? parseInt(el.getAttribute('data-n'), 10) : NaN;
     return (isFinite(n) && n > 0) ? n : 2;
+  }
+  function grLayoutSides() {
+    var el = document.querySelector('#tl_layoutGroup .selected') || document.querySelector('#layoutGroup .selected');
+    var n = el && el.dataset ? parseInt(el.dataset.sides, 10) : NaN;
+    return n === 2 ? 2 : 1;
   }
   function grId(dn) {   /* 手选总管 dn → 内径(mm)：与 selectPipe 同一 SDR 口径 */
     var k = (typeof SDR !== 'undefined' && SDR > 0) ? (1 - 2 / SDR) : 0.853;
@@ -746,6 +751,8 @@
     var I = grIntensity(); if (!(I > 0)) return;
     var tv = grNum('planTargetV', 1.5);
     var bc = grBranchCount();
+    var layoutSides = grLayoutSides();
+    var branchParallelCount = bc * layoutSides;
     var tsp = grNum('planTapeSpacing', 0.4), tapeLen = grNum('planTapeLaySide', 100);
     if (!(tsp > 0)) tsp = 0.4;
     if (!(tapeLen > 0)) tapeLen = 100;
@@ -781,9 +788,9 @@
         var tpDef = grProjectOnLine(d1 <= d2 ? mPts[0] : mPts[1], zLine);
         var tpOv = (b.tpOver && b.tpOver[z]) ? b.tpOver[z] : null;
         var tp = tpOv ? (grProjectOnLine(tpOv, zLine) || tpDef) : tpDef;
-        /* [v233] 与二级页同款选型：主管 minOd=90；支管流量=分区流量÷支管根数、maxOd=160 */
+        /* [v233] 与二级页同款选型：主管 minOd=90；支管流量按物理并联根数分摊，maxOd=160 */
         var mp = selectPipe(Math.max(flow, 0.01), tv, MAIN_PIPE_MIN_OD, Infinity);
-        var bFlow = flow / bc;
+        var bFlow = flow / branchParallelCount;
         var bp = selectPipe(Math.max(bFlow, 0.01), tv, 0, BRANCH_PIPE_MAX_OD);
         var mL = (mains[z] && mains.length === nz && mains[z].length >= 2) ? sumLen([mains[z]]) : (fs ? zH : zW);
         var branchSpan = fs ? zH : zW;
@@ -792,7 +799,7 @@
         /* 每根支管带的滴灌带段数 → christiansenF 折减（二级页扬程模型同款） */
         var zoneTapeLen = mu * 666.67 / tsp;
         var tapesPerZone = Math.max(1, Math.ceil(zoneTapeLen / tapeLen));
-        var taps = Math.max(1, Math.ceil(tapesPerZone / bc));
+        var taps = Math.max(1, Math.ceil(tapesPerZone / branchParallelCount));
         var hm = hazenWilliams(mL, flow, mp.id);
         var hb = hazenWilliams(bL, bFlow, bp.id) * christiansenF(taps);
         var zl = hm + hb;
@@ -834,7 +841,8 @@
     var tk = handDrawn ? sumLen(W.trunk.lines) : trunkAutoLen;
     var trunkLoss = hazenWilliams(tk, totalFlow, handDrawn ? grId(W.trunk.dn) : trunkAutoP.id);
     W.hyd = {
-      blocks: blocks, I: I, tv: tv, bc: bc, totalFlow: totalFlow,
+      blocks: blocks, I: I, tv: tv, bc: bc, layoutSides: layoutSides,
+      branchParallelCount: branchParallelCount, totalFlow: totalFlow,
       trunkAuto: trunkAuto, trunkAutoLen: trunkAutoLen, trunkAutoDn: trunkAutoP.od,
       trunkLen: tk, trunkLoss: trunkLoss, maxBlkLoss: maxBlkLoss, sysLoss: trunkLoss + maxBlkLoss,
       trunkMode: handDrawn ? '手画' : '自动', trunkDn: handDrawn ? W.trunk.dn : trunkAutoP.od,

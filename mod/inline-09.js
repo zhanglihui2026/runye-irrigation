@@ -343,6 +343,7 @@ function compute() {
   const efficiency = readNumber('fld_efficiency', 65, { min: 1, max: 100 }) / 100;
   const branchCount = readSelectedInt('#branchGroup .selected', 2);
   const layoutSides = readSelectedInt('#layoutGroup .selected', 1);
+  const branchParallelCount = branchCount * layoutSides;
   const mainPipeLen = readNumber('fld_mainPipeLen', A, { min: 0 });
   const tapeRollLen = readNumber('fld_tapeRollLen', 2000, { min: 0 });
 
@@ -363,11 +364,11 @@ function compute() {
   const mainPipe = selectPipe(zoneFlow, targetV, MAIN_PIPE_MIN_OD);
   const mainLoss = hazenWilliams(mainPipeLen, zoneFlow, mainPipe.id);
 
-  const branchFlow = zoneFlow / branchCount;
+  const branchFlow = zoneFlow / branchParallelCount;
   // 支管长度按垂直于滴灌带的分区跨度折算；滴灌带分段只影响接头数量，不应放大支管长度。
   const branchSpan = B;
   const branchLen = branchSpan / (branchCount * layoutSides);
-  const tapsPerBranch = Math.ceil(tapesPerZone / branchCount);
+  const tapsPerBranch = Math.ceil(tapesPerZone / branchParallelCount);
   const branchF = christiansenF(tapsPerBranch);
   const branchPipe = selectPipe(branchFlow, targetV, 0, BRANCH_PIPE_MAX_OD);
   const branchLossRaw = hazenWilliams(branchLen, branchFlow, branchPipe.id);
@@ -394,9 +395,9 @@ function compute() {
   const branchAll = evaluateAllPipes(branchFlow, 0, BRANCH_PIPE_MAX_OD);
 
   const branchAlternatives = [2, 3, 4].map(n => {
-    const bf = zoneFlow / n;
+    const bf = zoneFlow / (n * layoutSides);
     const bl = branchSpan / (n * layoutSides);
-    const bt = Math.ceil(tapesPerZone / n);
+    const bt = Math.ceil(tapesPerZone / (n * layoutSides));
     const bfVal = christiansenF(bt);
     const bp = selectPipe(bf, targetV, 0, BRANCH_PIPE_MAX_OD);
     const blRaw = hazenWilliams(bl, bf, bp.id);
@@ -407,7 +408,7 @@ function compute() {
   return {
     A, B, dh, N, zoneCols: zoneLayout.cols, zoneRows: zoneLayout.rows, zoneW: zoneLayout.zoneW, zoneH: zoneLayout.zoneH,
     tapeLen, tapeSpacing, tapeDh, emitterSpacing, emitterFlow, tapeOD, tapePressure,
-    lift, existPressure, targetV, filterLoss, efficiency, branchCount, mainPipeLen,
+    lift, existPressure, targetV, filterLoss, efficiency, branchCount, branchParallelCount, mainPipeLen,
     totalArea, totalMu, zoneMu,
     tapeRows, segmentsPerRow, totalTapes, tapesPerZone, tapeRollLen, tapeTotalLen, tapeRolls, zoneTapeLen,
     emittersPerTape, tapeFlow, zoneFlow,
@@ -422,6 +423,9 @@ function compute() {
 // ===== RENDER =====
 function fmt(n, d=2) { return n.toFixed(d); }
 function fmt0(n) { return Math.round(n).toLocaleString(); }
+function branchCountLabel(perSide, sides) {
+  return sides > 1 ? `${perSide} 根/侧（每区合计 ${perSide * sides} 根）` : `${perSide} 根/区`;
+}
 
 // material prices persist across re-renders
 
@@ -446,12 +450,12 @@ function render() {
     <div class="optimal-card">
       <div class="optimal-top"><span>单区流量选型结果 · 推荐管径</span><b>经济流速法</b></div>
       <div class="optimal-title">
-        <strong>主管 Ø ${r.mainPipe.od} mm · 每区 ${r.branchCount} 根支管 Ø ${r.branchPipe.od} mm</strong>
+        <strong>主管 Ø ${r.mainPipe.od} mm · 支管 ${branchCountLabel(r.branchCount, r.layoutSides)} · Ø ${r.branchPipe.od} mm</strong>
       </div>
       <div class="optimal-specs">
         <span>目标流速<b>${fmt(r.targetV,2)} m/s</b><small class="spec-note">主管按单区流量选型；阀门后的支管按 2、3 或 4 根并联分流。</small></span>
         <span>主管实际流速<b>${fmt(r.mainPipe.v,2)} m/s</b><small class="spec-note">理论内径 ${fmt(r.mainPipe.id,1)} mm · 主管长 ${fmt(r.mainPipeLen,1)} m · 损失 ${fmt(r.mainLoss,2)} m</small></span>
-        <span>支管实际流速<b>${fmt(r.branchPipe.v,2)} m/s</b><small class="spec-note">每区 ${r.branchCount} 根 · 单根 ${fmt(r.branchLen,1)} m · ${fmt(r.branchFlow,2)} m³/h · 损失 ${fmt(r.branchLoss,2)} m</small></span>
+        <span>支管实际流速<b>${fmt(r.branchPipe.v,2)} m/s</b><small class="spec-note">${branchCountLabel(r.branchCount, r.layoutSides)} · 单根 ${fmt(r.branchLen,1)} m · ${fmt(r.branchFlow,2)} m³/h · 损失 ${fmt(r.branchLoss,2)} m</small></span>
       </div>
     </div>
     <div class="pump-card">
@@ -481,7 +485,7 @@ function render() {
           <article>
             <span class="metric-label">单根支管推荐规格</span>
             <strong>Ø ${r.branchPipe.od} mm</strong>
-            <small>每区 ${r.branchCount} 根 · 单根 ${fmt(r.branchLen,1)} m · ${fmt(r.branchFlow,2)} m³/h · 损失 ${fmt(r.branchLoss,2)} m</small>
+            <small>${branchCountLabel(r.branchCount, r.layoutSides)} · 单根 ${fmt(r.branchLen,1)} m · ${fmt(r.branchFlow,2)} m³/h · 损失 ${fmt(r.branchLoss,2)} m</small>
           </article>
           <article>
             <span class="metric-label">轮灌流量依据</span>
@@ -500,7 +504,7 @@ function render() {
       <div class="branch-compare-head"><span>方案</span><span>单根长度</span><span>单根流量</span><span>推荐规格</span></div>
       ${r.branchAlternatives.map(alt => `
         <button type="button" class="branch-option ${alt.n === r.branchCount ? 'selected' : ''}" onclick="selectBranch(${alt.n})">
-          <strong>${alt.n} 根</strong>
+          <strong>${branchCountLabel(alt.n, r.layoutSides)}</strong>
           <span>${fmt(alt.len,1)} m</span>
           <span>${fmt(alt.flow,2)} m³/h</span>
           <b>Ø ${alt.pipe.od} mm</b>
@@ -557,7 +561,7 @@ function render() {
     <div class="container">
       <div class="pipe-table-grid">
         ${renderTable('主管管径选型对比', `主管长 ${fmt(r.mainPipeLen,1)} m · 单区流量 ${fmt(r.zoneFlow,2)} m³/h · 不折减`, 'main', r.mainAll, r.mainPipe.od, r.mainPipeLen)}
-        ${renderTable('支管管径选型对比', `当前 ${r.branchCount} 根/区 · 单根长 ${fmt(r.branchLen,1)} m · 单根流量 ${fmt(r.branchFlow,2)} m³/h · F=${fmt(r.branchF,4)}`, 'branch', r.branchAll, r.branchPipe.od, r.branchLen)}
+        ${renderTable('支管管径选型对比', `当前 ${branchCountLabel(r.branchCount, r.layoutSides)} · 单根长 ${fmt(r.branchLen,1)} m · 单根流量 ${fmt(r.branchFlow,2)} m³/h · F=${fmt(r.branchF,4)}`, 'branch', r.branchAll, r.branchPipe.od, r.branchLen)}
       </div>
     </div>
   `;
@@ -570,7 +574,7 @@ function render() {
         <div class="valve-connector"></div>
         <div class="zone-tap"><i></i><span>阀 ${z}</span></div>
         <div class="zone-branch-line">
-          ${Array.from({length: r.branchCount}, () => `<div class="zone-branch"></div>`).join('')}
+          ${Array.from({length: r.branchParallelCount}, () => `<div class="zone-branch"></div>`).join('')}
         </div>
         <div class="zone-info">
           <strong>第 ${z} 区</strong>
@@ -615,7 +619,7 @@ function render() {
         </div>
         <div class="network-summary">
           <div><span>主管</span><strong>Ø ${r.mainPipe.od} mm</strong><small>主管长 ${fmt(r.mainPipeLen,1)} m</small></div>
-          <div><span>支管</span><strong>${r.branchCount * r.N} 根</strong><small>每区 ${r.branchCount} 根 · 单根 ${fmt(r.branchLen,1)} m</small></div>
+          <div><span>支管</span><strong>${r.branchParallelCount * r.N} 根</strong><small>${branchCountLabel(r.branchCount, r.layoutSides)} · 单根 ${fmt(r.branchLen,1)} m</small></div>
           <div><span>滴灌带</span><strong>${fmt0(r.totalTapes)} 条</strong><small>单条 ${fmt(r.tapeLen,1)} m · ${r.tapeRolls} 卷</small></div>
           <div><span>分区阀门</span><strong>${r.N} 套</strong><small>每区独立控制</small></div>
         </div>
@@ -659,7 +663,7 @@ function render() {
   const srcLinkLen = (typeof window.tlSourceLinkLen === 'function') ? window.tlSourceLinkLen() : 0;
   const matFrontLen = ((tlMat && tlMat.lens && isFinite(tlMat.lens.front)) ? tlMat.lens.front : (r.mainPipeLen || 0)) + srcLinkLen + readNumber('planSrcDist', 0, { min: 0 });   /* 任务⑮：水源连接段 + 水源距离 */
   const matMainLen = useTl ? tlMat.lens.main : (usePP ? ppStats.mainLen : r.mainPipeLen);
-  const matBranchLen = useTl ? tlMat.lens.branch : (usePP ? ppStats.branchLen : r.branchLen * r.branchCount * r.N);
+  const matBranchLen = useTl ? tlMat.lens.branch : (usePP ? ppStats.branchLen : r.branchLen * r.branchParallelCount * r.N);
   const specFrontOd = tlMat ? tlMat.ods.front : materialPipeSpecs.mainPipeOD;
   const specMainOd = useTl ? tlMat.ods.main : materialPipeSpecs.mainPipeOD;
   const specBranchOd = useTl ? tlMat.ods.branch : materialPipeSpecs.branchPipeOD;
@@ -922,7 +926,7 @@ document.querySelectorAll('#branchGroup button').forEach(btn => {
 });
 
 // ===== THREE-LEVEL PIPELINE VIEW =====
-/* [v604] 支管「设计满跨 / 图面基准」的唯一取数口（满跨口径的兜底层）。
+/* [v603] 支管「设计满跨 / 图面基准」的唯一取数口（满跨口径的兜底层）。
    为什么需要兜底：v602 之前生成的 tlDiagramData（旧存档、旧 localStorage 快照）没有
    branchFullSpans / branchDrawnLens 两个基准，若直接退回图面折线长度，旧项目一打开
    支管又变回 52m（吃掉两端 gapV/gapH）—— 用户口径是「留边只影响显示，永远不进计算」。
@@ -933,7 +937,7 @@ window.tlBranchSpanInfo = function (zi) {
   try {
     var d = window.tlDiagramData || {};
     var spans = d.branchFullSpans || [], drawn = d.branchDrawnLens || [];
-    if (spans[zi] === -1) return null;   /* [v604] 显式标记「非满跨贯通支管」（二级分叉短管）→ 走图面长 */
+    if (spans[zi] === -1) return null;   /* [v603] 显式标记「非满跨贯通支管」（二级分叉短管）→ 走图面长 */
     var full = (spans[zi] > 0) ? spans[zi] : 0;
     var base = (drawn[zi] > 0) ? drawn[zi] : 0;
     if (full > 0 && base > 0) return { full: full, base: base };
@@ -1015,7 +1019,7 @@ function tlWorstPathLen(needGeom) {
     var brCalcCount = readSelectedInt('#tl_branchGroup .selected', 2);
     var brCalcSides = readSelectedInt('#tl_layoutGroup .selected', 1);
     function branchSingleCalcLen(zi) {
-      /* [v604] 满跨与图面基准统一走 window.tlBranchSpanInfo：有快照字段用字段，
+      /* [v603] 满跨与图面基准统一走 window.tlBranchSpanInfo：有快照字段用字段，
          旧存档（无字段）按分区几何反推 —— 两条路的结论都是「留边不进计算」。 */
       var info = (typeof window.tlBranchSpanInfo === 'function') ? window.tlBranchSpanInfo(zi) : null;
       if (!info || !(info.full > 0)) return 0;          /* 真拿不到几何 → 由调用方退回图面长 */
@@ -1076,7 +1080,7 @@ function tlWorstPathLen(needGeom) {
    地块绘制划分分区、生成三级管线图后，把管线计算相关数值（推荐管径、图面实长、
    每根支管设计流量）直接导入水力计算器，用户零输入。
    口径 v2（2026-09-19 用户核对流量后确认）：全分区联合 —— trunk=总管段(水源→最远区接点)、
-   mains=每个分区一根主管（各区图面实长）+ 各 branchCount 根支管；
+   mains=每个分区一根主管（各区图面实长）+ 各 branchCount × layoutSides 根物理支管；
    计算器总管流量=联合流量（N 区 × zoneFlow），最不利路径由计算器自动标出。 */
 function tlPushToHydraulicCalc() {
   try {
@@ -1087,12 +1091,12 @@ function tlPushToHydraulicCalc() {
     var wp = tlWorstPathLen();
     if (!wp || !wp.fromFigure) return false;
     var r = computeThreeLevel();
-    var bc = Math.max(1, r.branchCount | 0);
+    var bc = Math.max(1, r.branchParallelCount | 0);
     /* v2.1（2026-09-19 用户核对流量）+ v95（2026-09-21 用户口径）：联合灌溉 = 全图轮灌中同时只开 tl_zoneCount 区
        （面板「联合灌溉分区数」）；总管流量 = 该 N 下「最大联合组的实际面积和」换算的 combinedFlow
        （v95 起不再按「单区流量 × N」估算；组号 = floor(分区序号 / N)，尾组按实际区数参与比较）。
        故计算器只导入 zoneCount 根主管：
-       按距水源弧长取最远的 zoneCount 区（最不利组合，与图面最不利路径标注同源），每根挂 branchCount 根支管。 */
+       按距水源弧长取最远的 zoneCount 区（最不利组合，与图面最不利路径标注同源），每根主管挂 branchCount × layoutSides 根物理支管。 */
     var allZones = wp.zones || [];
     if (!allZones.length) return false;
     var nImp = Math.max(1, Math.min(r.zoneCount | 0 || 1, allZones.length));
@@ -1212,6 +1216,7 @@ function computeThreeLevel() {
   const efficiency = readNumber('tl_efficiency', 65, { min: 1, max: 100 }) / 100;
   const branchCount = readSelectedInt('#tl_branchGroup .selected', 2);
   const layoutSides = readSelectedInt('#tl_layoutGroup .selected', 1);
+  const branchParallelCount = branchCount * layoutSides;
   const mainPipeLen = readNumber('tl_mainPipeLen', A, { min: 0 });
   const tapeRollLen = readNumber('tl_tapeRollLen', 2000, { min: 0 });
 
@@ -1320,11 +1325,11 @@ function computeThreeLevel() {
   const frontPipe = selectPipe(combinedFlow, targetV, MAIN_PIPE_MIN_OD);
   let frontPipeLoss = hazenWilliams(frontLenUsed, combinedFlow, frontPipe.id);
 
-  const branchFlow = zoneFlow / branchCount;
+  const branchFlow = zoneFlow / branchParallelCount;
   const branchSpan = B;
   const branchLen = branchSpan / (branchCount * layoutSides);
   let branchLenUsed = (wp.fromFigure && wp.branch > 0) ? wp.branch : branchLen;
-  const tapsPerBranch = Math.ceil(tapesPerZone / branchCount);
+  const tapsPerBranch = Math.ceil(tapesPerZone / branchParallelCount);
   const branchF = christiansenF(tapsPerBranch);
   const branchPipe = selectPipe(branchFlow, targetV, 0, BRANCH_PIPE_MAX_OD);
   const branchLossRaw = hazenWilliams(branchLenUsed, branchFlow, branchPipe.id);
@@ -1364,7 +1369,7 @@ function computeThreeLevel() {
     var pathCheck = window.RyPipePathLoss.calculate({ zones: pathZones, groups: pathGroups,
       calibers: appliedPipes ? appliedPipes.calibers : null, frontOd: frontPipe.od, mainOd: mainPipe.od, branchOd: branchPipe.od,
       sourceDistance: readNumber('planSrcDist', 0, { min: 0 }),
-      branchCount: branchCount, branchF: branchF, innerDiam: peInnerDiam, hazen: hazenWilliams });
+      branchCount: branchParallelCount, branchF: branchF, innerDiam: peInnerDiam, hazen: hazenWilliams });
     /* [v226] 每组取本组 total 最大的一行 = 该组最不利分区路径；flow = 组内各分区流量和（m³/h） */
     groupLoss = pathGroups.map(function (ids, gi) {
       var rows = pathCheck.paths.filter(function (p) { return p.groupIndex === gi; });
@@ -1432,9 +1437,9 @@ function computeThreeLevel() {
   });
 
   const branchAlternatives = [2, 3, 4].map(n => {
-    const bf = zoneFlow / n;
+    const bf = zoneFlow / (n * layoutSides);
     const bl = branchSpan / (n * layoutSides);
-    const bt = Math.ceil(tapesPerZone / n);
+    const bt = Math.ceil(tapesPerZone / (n * layoutSides));
     const bfVal = christiansenF(bt);
     const bp = selectPipe(bf, targetV, 0, BRANCH_PIPE_MAX_OD);
     const blRaw = hazenWilliams(bl, bf, bp.id);
@@ -1445,7 +1450,7 @@ function computeThreeLevel() {
   return {
     A, B, dh, N, zoneCols: zoneLayout.cols, zoneRows: zoneLayout.rows, zoneW: zoneLayout.zoneW, zoneH: zoneLayout.zoneH,
     tapeLen, tapeSpacing, tapeDh, emitterSpacing, emitterFlow, tapeOD, tapePressure,
-    lift, existPressure, targetV, filterLoss, efficiency, branchCount, mainPipeLen: mainLenUsed,
+    lift, existPressure, targetV, filterLoss, efficiency, branchCount, branchParallelCount, mainPipeLen: mainLenUsed,
     totalArea, totalMu, zoneMu,
     tapeRows, segmentsPerRow, totalTapes, tapesPerZone, tapeRollLen, tapeTotalLen, tapeRolls, zoneTapeLen,
     emittersPerTape, tapeFlow, zoneFlow,
@@ -1601,7 +1606,7 @@ function renderThreeLevel() {
       <article>
         <span class="metric-label">单根支管推荐规格</span>
         <strong>Ø ${r.branchPipe.od} mm</strong>
-        <small>每区 ${r.branchCount} 根 · 单根 ${fmt(r.branchLen,1)} m · ${fmt(r.branchFlow,2)} m³/h · 损失 ${fmt(r.branchLoss,2)} m</small>
+        <small>${branchCountLabel(r.branchCount, r.layoutSides)} · 单根 ${fmt(r.branchLen,1)} m · ${fmt(r.branchFlow,2)} m³/h · 损失 ${fmt(r.branchLoss,2)} m</small>
       </article>
     </div>
 
@@ -1625,7 +1630,7 @@ function renderThreeLevel() {
       <div class="branch-compare-head"><span>方案</span><span>单根长度</span><span>单根流量</span><span>推荐规格</span></div>
       ${r.branchAlternatives.map(alt => `
         <button type="button" class="branch-option ${alt.n === r.branchCount ? 'selected' : ''}" onclick="selectTLBranch(${alt.n})">
-          <strong>${alt.n} 根</strong>
+          <strong>${branchCountLabel(alt.n, r.layoutSides)}</strong>
           <span>${fmt(alt.len,1)} m</span>
           <span>${fmt(alt.flow,2)} m³/h</span>
           <b>Ø ${alt.pipe.od} mm</b>
@@ -1642,7 +1647,7 @@ function renderThreeLevel() {
       <div><dt>总管推荐</dt><dd>Ø ${r.frontPipe.od} mm · 流速 ${fmt(r.frontPipe.v,2)} m/s</dd></div>
       <div><dt>总管损失</dt><dd>${fmt(r.frontPipeLoss,2)} m（长 ${fmt(r.frontPipeLen,0)} m）</dd></div>
       <div><dt>单区主管</dt><dd>Ø ${r.mainPipe.od} mm · 损失 ${fmt(r.mainLoss,2)} m</dd></div>
-      <div><dt>支管方案</dt><dd>${r.branchCount} 根/区 · Ø ${r.branchPipe.od} mm · 损失 ${fmt(r.branchLoss,2)} m</dd></div>
+      <div><dt>支管方案</dt><dd>${branchCountLabel(r.branchCount, r.layoutSides)} · Ø ${r.branchPipe.od} mm · 损失 ${fmt(r.branchLoss,2)} m</dd></div>
       <div><dt>管路总损失</dt><dd>${fmt(r.totalPipeLoss,2)} m</dd></div>
       <div><dt>扬程（安全系数前）</dt><dd>${fmt(r.headBeforeSafety,2)} m</dd></div>
       <div><dt>水泵工作点</dt><dd>${fmt(r.combinedFlow,1)} m³/h × ${fmt0(r.pumpHead)} m</dd></div>
@@ -1686,7 +1691,7 @@ function renderThreeLevel() {
     <div class="tl-pipe-table-grid">
       ${renderTLTable('总管管径选型对比', `${fmt0(r.zoneCount)} 区联合 · 联合流量 ${fmt(r.combinedFlow,2)} m³/h · 总管长 ${fmt(r.frontPipeLen,0)} m`, r.combinedFlow, r.frontAll, r.frontPipe.od, r.frontPipeLen)}
       ${renderTLTable('单区主管管径选型对比', `单区流量 ${fmt(r.zoneFlow,2)} m³/h · 主管长 ${fmt(r.mainPipeLen,0)} m`, r.zoneFlow, r.mainAll, r.mainPipe.od, r.mainPipeLen)}
-      ${renderTLTable('支管管径选型对比', `${r.branchCount} 根/区 · 单根流量 ${fmt(r.branchFlow,2)} m³/h · F=${fmt(r.branchF,4)}`, r.branchFlow, r.branchAll, r.branchPipe.od, r.branchLen)}
+      ${renderTLTable('支管管径选型对比', `${branchCountLabel(r.branchCount, r.layoutSides)} · 单根流量 ${fmt(r.branchFlow,2)} m³/h · F=${fmt(r.branchF,4)}`, r.branchFlow, r.branchAll, r.branchPipe.od, r.branchLen)}
     </div>
     <p class="pipe-table-note" style="margin-top:12px">理论内径按 d = 外径 × (1 − 2/13.6) 估算。实际产品壁厚、内径及耐压等级以厂家资料为准，采购前应复核。</p>
   `;
@@ -2668,24 +2673,27 @@ function tlRefreshLossCard(r) {
     function f1(v) { return (isFinite(v) ? v : 0).toFixed(1); }
     function f2(v) { return (isFinite(v) ? v : 0).toFixed(2); }
     var fromFig = !!(r.wp && r.wp.fromFigure);
-    var ziTxt = fromFig ? ('图面实际 · 最远 ' + (r.wp.zoneIndex + 1) + ' 区') : '试算输入值';
+    /* [v618 2026-10-20 用户要求] 括号内分隔符 `·` → `*`：
+       「（图面实际 · 最远 30 区）」→「（图面实际 * 最远 30 区）」，其余字面一字未改。 */
+    var ziTxt = fromFig ? ('图面实际 * 最远 ' + (r.wp.zoneIndex + 1) + ' 区') : '试算输入值';
+    /* [v613] 外观全部交给 style-01.css 的 .tl-flat-*（灰条标题 / 22px 行 / 小字说明），
+       本函数只负责结构 + 数值，不再往 DOM 上写 inline 样式 —— 与三级面板其余几条走同一套网格。
+       原来这里是「加粗黑标题 + 虚线分隔 + 卡片内边距」，与上面的灰条行完全不是一个语言。 */
     function row(name, len, loss) {
-      return '<div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0">'
-        + '<span style="color:#475569">' + name + '</span>'
-        + '<span><b style="font-weight:700">' + f1(len) + ' m</b>'
-        + ' · 损失 <b style="font-weight:700;color:#b45309">' + f2(loss) + ' m</b></span></div>';
+      return '<div class="tl-flat-row">'
+        + '<span>' + name + '</span>'
+        + '<span>' + f1(len) + ' m · 损失 <b style="color:#b45309">' + f2(loss) + ' m</b></span></div>';
     }
-    el.innerHTML = '<div style="font-weight:700;color:#0f172a;margin-bottom:2px">管段长度与水头损失</div>'
-      + '<div style="font-size:10.5px;line-height:1.5;color:#64748b;margin-bottom:4px">按「最远分区最不利路径」计（' + ziTxt + '），不叠加各地块管道</div>'
+    el.innerHTML = '<div class="tl-flat-head">管段长度与水头损失</div>'
+      + '<div class="tl-flat-note">按「最远分区最不利路径」计（' + ziTxt + '），不叠加各地块管道</div>'
       + row('总管', r.frontLenUsed, r.frontPipeLoss)
       + row('主管', r.mainLenUsed, r.mainLoss)
       + row('支管', r.branchLenUsed, r.branchLoss)
-      + '<div style="display:flex;justify-content:space-between;gap:8px;border-top:1px dashed #cbd5e1;margin-top:4px;padding-top:4px">'
-      + '<span style="color:#475569">合计</span>'
-      + '<span><b style="font-weight:700">' + f1((r.frontLenUsed || 0) + (r.mainLenUsed || 0) + (r.branchLenUsed || 0)) + ' m</b>'
-      + ' · 损失 <b style="font-weight:700;color:#b45309">' + f2(r.totalPipeLoss) + ' m</b></span></div>'
-      + (fromFig ? '<div style="font-size:10.5px;color:#94a3b8;margin-top:3px">主管含由总管接入该区的连接段</div>'
-        : '<div style="font-size:10.5px;color:#94a3b8;margin-top:3px">生成管线图后改用图面实际几何</div>');
+      + '<div class="tl-flat-row"><span>合计</span>'
+      + '<span>' + f1((r.frontLenUsed || 0) + (r.mainLenUsed || 0) + (r.branchLenUsed || 0)) + ' m'
+      + ' · 损失 <b style="color:#b45309">' + f2(r.totalPipeLoss) + ' m</b></span></div>'
+      + '<div class="tl-flat-note">'
+      + (fromFig ? '主管含由总管接入该区的连接段' : '生成管线图后改用图面实际几何') + '</div>';
     el.style.display = 'block';
   } catch (e) { }
 }
@@ -2763,14 +2771,18 @@ function tlUpdatePlanBar() {
   var el;
   if(el=document.getElementById('tlPlanCombinedFlow')) el.textContent=fmt(r.combinedFlow,1)+' m³/h';
   /* v106（2026-09-22 用户要求）：「联合流量」底下注明依据 —— 按哪个联合分区、实际多少亩换算。
-     数据与 computeThreeLevel 同源（worstGroup={g,zones,sum}，sum=最大组实际面积和 m²）。 */
+     数据与 computeThreeLevel 同源（worstGroup={g,zones,sum}，sum=最大组实际面积和 m²）。
+     [v618 2026-10-20 用户要求] 文案简化：「联合流量依据：联合分区 M13…」→「依据：分区 M13…」
+     （前四个字与行标题「联合流量」重复，窄面板下还要多折一行）。
+     同轮第二次：「· 实际面积和 36.0 亩」→「*实际面积= 36.0 亩」（分隔符与措辞按用户原话，
+     含义不变：该值仍是最大联合分区的面积和，单位亩）。 */
   if (el = document.getElementById('tlPlanCombinedSrc')) {
     if (r.worstGroup) {
-      el.textContent = '联合流量依据：联合分区 M' + (r.worstGroup.g + 1) + '（'
+      el.textContent = '依据：分区 M' + (r.worstGroup.g + 1) + '（'
         + r.worstGroup.zones.map(function (z) { return (z + 1) + '区'; }).join('、')
-        + '）· 实际面积和 ' + fmt(r.worstGroup.sum / 666.67, 1) + ' 亩';
+        + '）*实际面积= ' + fmt(r.worstGroup.sum / 666.67, 1) + ' 亩';
     } else {
-      el.textContent = '联合流量依据：暂无图面分组数据（按单区流量 × ' + fmt0(r.zoneCount || 1) + ' 估算）';
+      el.textContent = '依据：暂无图面分组数据（按单区流量 × ' + fmt0(r.zoneCount || 1) + ' 估算）';
     }
     el.style.display = '';
   }
@@ -3581,7 +3593,7 @@ function tlAutoGenerate(options) {
      长度/水损一律按满跨计，图面留边只影响显示（用户 2026-10-19 明确口径）。 */
   var branchFullSpans=[], branchDrawnLens=[];
   function tlPolyLen(pts){ if(!pts||pts.length<2)return 0; var L=0; for(var i=1;i<pts.length;i++){var dx=pts[i].x-pts[i-1].x,dy=pts[i].y-pts[i-1].y;L+=Math.sqrt(dx*dx+dy*dy);} return L; }
-  /* [v604] 支管所在分区的**净跨**（= 设计满跨）：竖向支管取该行 ySrc、横向取该列 xSrc。
+  /* [v603] 支管所在分区的**净跨**（= 设计满跨）：竖向支管取该行 ySrc、横向取该列 xSrc。
      分区判定用支管中点（与 tlBranchSpanInfo、wsZoneOf 同一套行主序几何）。
      为什么不能用折线长：二级传过来的支管已缩过 gap，三级还会再缩一次，折线永远比满跨短。 */
   function tlZoneSpanAt(pts){
@@ -3622,7 +3634,7 @@ function tlAutoGenerate(options) {
   if(ppHasPipes){
     mainPipes=ppShare.mainPipes.map(function(l){return l.map(function(p){return{x:p.x,y:p.y};});});
     branchPipes=ppShare.branchPipes.map(function(l){return l.map(function(p){return{x:p.x,y:p.y};});});
-    /* [v604 2026-10-19 用户口径修正] 二级传导来的支管**自己已经缩进过**（二级 ppBuildAutoPipes
+    /* [v603 2026-10-19 用户口径修正] 二级传导来的支管**自己已经缩进过**（二级 ppBuildAutoPipes
        两端各缩 gap = min(max(边长*0.06,4),14,边长*0.22)），所以它的折线长是 52m 而不是 60m。
        v601 曾把这条「缩进前长度」当满跨，实测仍是 52 ⇒ 水损单根会算成 26m（更小，更错）。
        正解：满跨只能用**分区几何净跨**（支管中点落在哪个分区，竖向取 ySrc[行]、横向取 xSrc[列]）。 */
@@ -3837,15 +3849,25 @@ function tlAutoGenerate(options) {
        清 localStorage['tlFrontNodeDrops_v1']（按地块指纹存，换地块本身就会失效，这里只清当前档）
        → 整幅重生成 → 工作区补一次重渲染（v582 教训：宿主重建后底图要重克隆）。
        无偏移时给提示、不重绘。 */
-    /* ===== [v590] 回传设计方案到云端地块库 =====
+    /* ===== [v592] 回传设计方案到云端地块库 =====
        把当前三级设计结果（管径 / 流速 / 水泵参数 / 分区数 / 亩数）回传到云端，与该地块配对存档，
        形成「地块 ↔ 设计」样本 —— 将来做统计、比对、回测、学习都靠这份配对数据。
-       关联哪个地块 = 本地存的 ry_cloud_plot_id（管理员从云端「载入地图」跳进来时带过来的）。
+       云端地块编号必须绑定到本标签页中实际载入并回传的本地地块，且当前地块锚点和边界仍一致。
        主站只负责跳转，写库在云端页完成（需管理员登录）。 */
     window.tlUploadDesign=function(){
       try{
-        var plotId=localStorage.getItem('ry_cloud_plot_id')||'';
-        if(!plotId){ alert('请先在云端地块库点「载入地图」打开该地块，再回传设计方案'); return; }
+        var bindingStore=window.RyCloudDesignBindingStore;
+        if(!bindingStore || typeof bindingStore.resolveForCurrentPlot!=='function'){
+          alert('云端地块关联服务未加载，请刷新页面后重试'); return;
+        }
+        var binding=bindingStore.resolveForCurrentPlot();
+        if(!binding || !binding.ok){
+          var message=binding&&binding.error==='cloud-plot-not-bound'
+            ? '请先从云端地块库「载入地图」，再把同一地块从在线地图回传到地块分区后重试。'
+            : '当前设计地块与云端来源不一致或地块边界已变化，请回到在线地图重新载入并回传该云端地块。';
+          alert(message); return;
+        }
+        var plotId=binding.cloudPlotId;
         var T=function(id){ var e=document.getElementById(id); return e?(e.textContent||'').trim():''; };
         var V=function(id){ var e=document.getElementById(id); return e?(e.value||'').trim():''; };
         var d={
@@ -4490,7 +4512,7 @@ function tlAutoGenerate(options) {
   var branchPipeEl=document.getElementById('tlPlanBranchPipe');
   /* meta 按刷新后的结果条文本补齐（iso/工作区只读；不参与计算） */
   window.tlDiagramData.meta = { zoneCount: totalZones,
-    flowModel: { zoneFlow: r.zoneFlow, branchFlow: r.branchFlow, combinedFlow: r.combinedFlow, zoneCount: r.zoneCount, branchCount: r.branchCount },
+    flowModel: { zoneFlow: r.zoneFlow, branchFlow: r.branchFlow, combinedFlow: r.combinedFlow, zoneCount: r.zoneCount, branchCount: r.branchCount, layoutSides: r.layoutSides, branchParallelCount: r.branchParallelCount },
     pump: { flow: (pumpFlowEl ? pumpFlowEl.textContent : ''), head: (pumpHeadEl ? pumpHeadEl.textContent : ''), power: (pumpPowerEl ? pumpPowerEl.textContent : '') },
     pipes: { front: (frontPipeEl ? frontPipeEl.textContent : ''), main: (mainPipeEl ? mainPipeEl.textContent : ''), branch: (branchPipeEl ? branchPipeEl.textContent : '') } };
   /* 水力校核页唯一计算来源：保存三级规划的最终几何与已确定的设计流量。
@@ -4505,7 +4527,7 @@ function tlAutoGenerate(options) {
       geometry: { frontPipe: JSON.parse(JSON.stringify(window.tlDiagramData.frontPipe || [])),
         mainPipes: JSON.parse(JSON.stringify(window.tlDiagramData.mainPipes || [])),
         branchPipes: JSON.parse(JSON.stringify(window.tlDiagramData.branchPipes || [])) },
-      hydraulics: { combinedFlow: r.combinedFlow, zoneFlow: r.zoneFlow, branchFlow: r.branchFlow,
+      hydraulics: { combinedFlow: r.combinedFlow, zoneFlow: r.zoneFlow, branchFlow: r.branchFlow, branchParallelCount: r.branchParallelCount, layoutSides: r.layoutSides,
         tapePressureM: r.tapePressureM, lift: r.lift, dh: r.dh, filterLoss: r.filterLoss,
         efficiency: r.efficiency, pumpHead: r.pumpHead,
         frontPipe: { od: r.frontPipe.od }, mainPipe: { od: r.mainPipe.od }, branchPipe: { od: r.branchPipe.od } } }) === true;
@@ -4643,10 +4665,10 @@ function tlAutoGenerate(options) {
     if(plotId){
       var designTs=hydraulicDesignSaved?hydraulicDesignTs:null;
       var designRevisionId=hydraulicDesignSaved?hydraulicDesignRevisionId:null;
-      window.RyIrrigationDataStore.writeNetworkLayout({ sourcePos: src?{lat:src[0],lng:src[1]}:null, segments: segments, plotId:plotId, designTs:designTs, designRevisionId:designRevisionId, crs:'GCJ-02', ts: Date.now() },plotId);
-      /* [map-enhance] 阀门 + 滴灌带反投（2026-09-26 任务1，用户契约）：地图侧 enhancement 按
-         runye_network_layout.valves（红圈）/ .dripTapes（青色虚线）渲染 —— 通过数据桥读取原快照后补字段再写回，
-         保留其余字段，并始终显式限定本页地块，避免跨标签共享活动锚点串用。 */
+      var previousNetworkRaw=window.RyIrrigationDataStore.readRawNetworkLayout(plotId);
+      var candidateNet={ sourcePos: src?{lat:src[0],lng:src[1]}:null, segments: segments, plotId:plotId, designTs:designTs, designRevisionId:designRevisionId, crs:'GCJ-02', ts: Date.now(), valves:[], dripTapes:[] };
+      /* [map-enhance] 阀门 + 滴灌带反投：在内存中组装完整管网快照，显式限定本页地块；
+         若分区方案也适用，则由 RyMapPartition 将地块库与管网快照作为一项事务提交。 */
       try{
         var valvesLL=[];
         if(dd.valves && dd.valves.length){
@@ -4661,18 +4683,26 @@ function tlAutoGenerate(options) {
             if(pts.length>=2) dripLL.push(pts);
           });
         }
-        net = window.RyIrrigationDataStore.readNetworkLayoutForPlot(plotId) || {};
-        net.valves = valvesLL;
-        net.dripTapes = dripLL;
-        if(window.RyMapPartition)RyMapPartition.capture(net);
-        window.RyIrrigationDataStore.writeNetworkLayout(net,plotId);
-      }catch(eVT){}
+        candidateNet.valves = valvesLL;
+        candidateNet.dripTapes = dripLL;
+        var captureResult=window.RyMapPartition&&typeof window.RyMapPartition.capture==='function'
+          ? window.RyMapPartition.capture(candidateNet,previousNetworkRaw) : null;
+        if(captureResult&&captureResult.ok===false){
+          console.warn('[map-enhance] partition/network sync skipped:',captureResult.error||'partition-commit-failed',captureResult.rollbackError||'');
+        }else if(!captureResult||captureResult.skipped){
+          var networkWritten=window.RyIrrigationDataStore.writeNetworkLayout(candidateNet,plotId);
+          if(networkWritten===false)throw new Error('network-layout-write-failed');
+          net=candidateNet;
+        }else{
+          net=candidateNet;
+        }
+      }catch(eVT){try{console.warn('[map-enhance] network projection skipped:',eVT&&eVT.message||eVT);}catch(_){}}
     }
     /* [map-enhance] 同步当前设计地块到共享地块库，与管网一起供地图叠加。
        自动记录使用所属项目ID，避免不同地块在固定 auto-current 槽位互相覆盖；
        无明确项目ID时不写入共享库，避免把临时几何误认成其他项目的地块。 */
     try{
-      if(dd.poly && dd.poly.length>=3){
+      if(net && dd.poly && dd.poly.length>=3){
         var pll = []; for(var pi=0; pi<dd.poly.length; pi++){ var llpt=p2ll(dd.poly[pi]); if(llpt) pll.push(llpt); }
         if(pll.length>=3){
           var area=0; for(var ai=0; ai<pll.length; ai++){ var a=pll[ai], b=pll[(ai+1)%pll.length];

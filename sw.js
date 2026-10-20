@@ -764,13 +764,14 @@
    之后「💾 保存地块」「↩ 回传地块绘制」等既有按钮照常可用（都读 points / latlngs()）。
    云端管理页同步：每行改为「载入地图」（跳主站带参）+「下载」（GeoJSON）两个操作。 */
 /* v590-cloud-design-back: 设计方案回传云端，形成「地块 ↔ 设计」样本库。
-   主站：① 云端「载入地图」跳回时记住 cloudid（localStorage ry_cloud_plot_id）；
+   主站旧实现：① 云端「载入地图」跳回时记住 cloudid（localStorage ry_cloud_plot_id）；
         ② 三级工具轨新增「☁ 回传设计」按钮 —— 读当前管径/流速/水泵/分区数/亩数，
            带参跳云端 design.html（主站不含云凭据）。
    云端：新增 plot_designs 表（plot_id + zone_count + mu + design JSONB），RLS：
         管理员可 INSERT/SELECT 全部；普通用户可读「自己地块」的设计。
         新增 design.html（管理员登录 → 确认回传）；admin.html 列表加「设计」列显示已回传编号。
-   用途：地块与其设计方案配对存档，将来用于统计、比对、回测与学习。 */
+   用途：地块与其设计方案配对存档，将来用于统计、比对、回测与学习。
+   v592 起以标签页会话内的边界签名 + 当前本地地块锚点校验 cloudid，旧全局 localStorage 键不再参与关联。 */
 /* v593-hyd-head-bold: 三级左栏表头「水力项」与「设计值 / 改径重算」同字重同字号（用户：加粗，别改乱）。
    根因：表头行本身 600/11px，但通用规则 .pp-plan-label{font-weight:400} 更具体，把「水力项」压回常规字重，
    看着比旁边两列小一号。只给表头那一格放行：.tl-plan-result .pp-plan-cols-head > .pp-plan-label{600/11px}；
@@ -778,42 +779,26 @@
    注：并行会话已抬到 v592 ⇒ 取更高号 v593。 */
 /* v594-rail-tab-fixed: 地块分区页「右侧工具栏」折叠后没有任何入口（用户：右侧控制面板不见了）。
    根因：折叠态入口是 body 级代理 .pp-rail-tab-float，但 style-01.css 只写了它的 :hover，
-   **没有 position 等基础定位** ⇒ 实测落在 x=0，被左侧工具栏整块盖住；
-   同一份 syncProxy 又把真把手设成 visibility:hidden（因为"代理可见"）⇒ 两边都看不到。
-   修：补齐定位 —— fixed 贴视口右缘、竖排「工具栏」、z-index 9995（压过 AI 面板 9993）。
-   实测 _probe_pp_rail 3/3：折叠态标签 x=1376/宽 24、中心命中自身；点击后 off=false、
-   工具栏 w=126 回到可视区。 */
-/* v595-rail-unified: 地块分区(二级) 与 管路规划(三级) 的右侧工具轨样式统一 + 去掉层层覆盖。
-   病根：两页 DOM 嵌套不同 —— 二级工具条在 .ry-pane-edit 下、三级在 .pp-stage 下，
-   旧代码按中间层写了 `.pp-stage>.pp-toolbar` 与 `.ry-pane-edit>.pp-toolbar` 两套，
-   其中 `.pp-stage>.pp-toolbar` 在二级**一条都没命中**（style-01.css 1163-1166 注释已实证），
-   为了压住它又补更具体的规则 ⇒ 层层叠加。
-   改：折叠动画 / 折叠态 / 把手隐藏 一律改为**不依赖中间层**的后代选择器，
-   二级 + 三级 + CAD 侧栏搬移态 四个作用域合成一条（逗号分组），不再嵌套依赖、不再重复覆盖。
-   实测：二级折叠 opacity 0/visibility hidden、展开 1/visible、transition 保留；三级纳入同一套（当前仍 display:none）。
-   回归：ci 28/0、_probe_pp_rail 3/3（折叠标签仍可见可点）。 */
-/* v596-toolbar-shell-removed: 删掉三级页的空壳工具轨 #tlToolbar。
-   真相：它 style="display:none" 且内部为空、无任何 JS 引用 —— 内容早在历史版本搬走
-   （系统图工具条 2026-09-12 整条取消），是个废弃空壳，"调出来"只会是一条空白竖条。
-   连带清理三级的 .pp-toolbar 作用域（v595 统一规则与 2980 共享规则里的三级部分、
-   ry-panel.css 的三级把手规则）⇒ 不留死代码；二级工具轨不受影响。
-   注：并行会话的 592 引用未纳入本次提交（仍在其工作区）。 */
+   没有 position 等基础定位，实测落在 x=0，被左侧工具栏盖住；同一份 syncProxy 又把真把手设成 hidden。
+   修复为 fixed 贴视口右缘、竖排「工具栏」、z-index 9995；探针验证标签可见可点并能恢复工具栏。 */
+/* v595-rail-unified: 地块分区（二级）与管路规划（三级）的右侧工具轨样式统一。
+   两页 DOM 嵌套不同；折叠动画、折叠态和把手隐藏改用不依赖中间层的后代选择器，
+   二级、三级和 CAD 搬移态共用分组规则，减少重复覆盖。 */
+/* v596-toolbar-shell-removed: 移除三级页无内容且无 JS 引用的空壳 #tlToolbar 与对应死样式；二级工具轨不受影响。 */
+/* v597-cloud-design-binding: 缓存云端设计绑定适配器，避免复用缺少该 CORE 资源的旧缓存版本。 */
+/* v598-tab-scoped-plot-transfer: 每次地块交接使用唯一载荷键，目标 URL 携带编号，避免另一标签页覆盖或消费。 */
 /* v599-wsbtn-skin: 二级工具轨按钮皮肤统一到三级 .tl-ws-btn 口径（mod/style-01.css 在 CORE）。 */
 /* v600-wsbtn-skin: 同上样式文件再改（删 .pp-rail-tab-float 死圆角声明），抬版本刷缓存。 */
-/* v602-branch-full-span: 支管计算长度改「设计满跨」口径（材料/水损不吃图面留边；inline-09/27 在 CORE）。 */
-/* v605-announce-modal: 新增 runye-announce.js（首页公告弹窗，文档在 CORE）；每次访问弹出，提醒注册与邀请规则。 */
-/* v604-branch-span-all-paths: 满跨口径覆盖到材料表 buckets 行 / 逐段表 / 管道卡 / 经济分析 / 二级材料统计，
-   并修 v602 遗留的「二级传导」满跨仍取 52m 的错（满跨改按分区几何净跨）。 */
-/* v608-rail-min-width: 二级「地块分区」右侧工具轨显示不全（用户截图：文字被裁、镜像键压成细条）。
-   根因：inline-19.js 的 MIN_TOOL=92 允许轨宽小于内容需求（「🔓 锁定面积」约需 118px），
-   且宽度存 localStorage 拖窄后每次启动原样恢复 ⇒ 切页回来永远是窄的。
-   修：MIN_TOOL 92 → 132，并在 style-01.css / ry-panel.css 的 grid-template-columns 各加一道
-   max(var(--pp-tool-w,…),132px)；三处同值，任何写死窄值的路径都压不进来。 */
+/* v601-terrain-bridge-isolation: 地图到地形交接改用每次唯一载荷键，避免跨标签页写入覆盖。 */
+/* v606-branch-flow-conservation: 单根支管流量/物理根数、并联材料总量与接入短管材料口径统一。 */
+/* v607-branch-material-span: 二级代表支管材料量不再按敷设边数重复折减。 */
+/* v608-rail-min-width: 右侧工具轨最小宽度 92 → 132（inline-19 MIN_TOOL + style-01/ry-panel 的
+   grid-template-columns 三处同值）。窄轨会把「🔓 锁定面积」文字裁掉、「地块镜像 无/水平/垂直」
+   压成细条，即用户反馈的「地块分区页右侧工具栏显示不全」；旧存档宽度启动时自动夹回 132。 */
 /* v609-props-panel: 二级「地块与灌溉参数」面板改为 CAD「特性」面板式（灰底分组条 + 标签｜值
    两列 + 细网格，行高 27→22px）。样式改在 mod/ry-panel.css（面板皮肤唯一出处），不动 JS 计算。
    同一改动修掉一桩既存缺陷：#ppPlanBar2「水力计算结果」的伪元素标题被 v529 的
-   content:none!important 误杀，标题不可见而该栏默认 pp-res-off ⇒ 二级结果栏整块消失。
-   v609j 追加：三级 #tlPlanBar2 同一条规则漏了 :not(.pp-res-head)，标题同样被误杀，一并修好。 */
+   content:none!important 误杀，标题不可见而该栏默认 pp-res-off ⇒ 二级结果栏整块消失。 */
 /* v611-tl-flat: 三级「管网参数」左栏整栏扁平化 —— 原来同一块左栏叠了 4 层底色/边框：
    ① #tlSide 浅绿渐变底 + 外框 + 9px 内边距；② body.ry-tool 那层再铺 --ry-panel 底 + 10px
    内边距 + 右分隔线（原位态与 rail 态各一条）；③ 外层 #ryCadSide 白底 + 外框；
@@ -821,14 +806,40 @@
    现全部清成透明无框，层次只靠「灰分组标题条 + 22px 行网格」表达，与二级 v609 特性面板同口径；
    生成图后才现身的三块（扬程计算式深色卡 / 管径调整卡 / 水头损失卡）一并拍平。
    顺带把撑破网格的三类控件收到 20px（分区按钮 padding 3→1、输入框 24→20、管径下拉 27→20）。
-   v611b 追加：轮灌演示组 #tlDemoBar 补 padding:0 10px 12px —— 它不是 .pp-plan-item，
-   扁平化后左缘比参数行少 10px、底部与「水力计算结果」灰条 gap=0（用户截图指出）。
    改动文件：mod/style-01.css（三级样式唯一出处）、mod/ry-panel.css（撤出三级两条 ::before 抑制）。 */
 /** v612-flat-radius: 删掉 v611 拍平那三块时顺手写的 `border-radius:0`（不带 !important）。
    全站已有 body *{border-radius:0!important}，inline 的 8px 也压得过 ⇒ 这条是死声明，
    且正好撞上 v530「style-01.css 不得出现无效圆角声明」的检查（线上冒烟判红 1 项）。
    纯删声明，视觉零变化（实测三块 computed 圆角仍 0px）；抬版本只为刷掉缓存里带死声明的 CSS。 */
-const VERSION = 'v612-flat-radius';
+/** v613-flat-cards: 「管径调整 · 扬程确认」「管段长度与水头损失」两块并入三级面板统一网格
+   （用户：这部分内容的样式也要跟着二级工具栏跟三级工具栏统一）。原来两块是自成一体的小卡片：
+   加粗黑标题 + 说明 + 虚线分隔 + inline 内外边距。现改用 .tl-flat-head（灰条 22px）/
+   .tl-flat-row（22px 行，标签左值右）/ .tl-flat-line（单行长文本）/ .tl-flat-note（10.5px 小字说明），
+   与「地块与灌溉参数」「水力计算结果」「水泵扬程」三条灰条连成一套。
+   结构改在 inline-09.js（tlRefreshLossCard）与 inline-27.js（tlPumpUpdateRun 的四行结果），
+   只输出类名不写 inline 样式；index.html 里那两个标题/说明 div 也换成同类。
+   样式唯一出处仍是 style-01.css 的 v613 段（两态祖先都挂）。
+   ⚠ margin 用的是 !important：index.html 上该两块有 inline margin-top:10/12px，
+     不压会把灰条网格撑出白缝（实测踩过）。 */
+/** v614-head-formula: 三级「扬程」「看不清」根治（用户：应该是有多层覆盖嵌套，你看扬程这个
+   很明显看不清楚，我建议你按照二级工具栏那个扬程样式来 / 这种就挺好）。
+   实测根因：v611 把 #ppHeadBreak(.pp-head-break) 的深色底拍成 transparent，但没动它自带的
+   color:#e8eef7 ⇒ 容器与 11 行明细 computed color 全是 rgb(232,238,247)、bg 全透明，
+   浅色字落白底对比度 1.16:1，肉眼看不见；且每行仅 16.5px、标签与数值间无间距（「提升5.00」）。
+   修法不是再叠一层覆盖，而是把结构换成二级 #ppCalcDetail 同款：灰条标题「扬程计算式」+
+   一条深色算式带（绿名/黄值/近白括号、等宽字体），只有一层。details → div（index.html），
+   内容仍由 plan-calc-render.js 的 renderHeadBreakdown 输出（数据与加减口径一字未改）；
+   样式唯一出处 = style-01.css v614 段（.pphb-* 两态祖先都挂，配色与 ry-panel.css 的
+   .pp-calc-formula 同值）。plan-calc-render.js 在 CORE 里 ⇒ 必须抬版本。 */
+/** v615-btn-row: 三级「管径调整 · 扬程确认」块的说明文字与按钮并成同一行
+   （用户：红框内的文字跟按钮用一个样式来要求它，现在按钮太长了，让这个区域排版更好看一些，
+     跟大的样式不能冲突，不要新建样式，就用二级面板的样式）。
+   原来说明独占一行、按钮 width:calc(100% - 20px) 通栏 ⇒ 两套规格，按钮成一条横杠。
+   现改为 .pp-plan-item 同一行（22px / 左右10px / 底部分隔线）+ 右侧紧凑按钮，
+   规格逐项照抄二级 .pp-recipe-row / .pp-recipe-btn（20px 高、0 8px 内边距、白底 1px #e2e8f0、
+   #334155 字、11px 600、nowrap）；按钮 inline 的 width:100%;padding 已删。
+   改 index.html（DOM）+ style-01.css（#tlPumpUpdateBtn 那条，唯一出处）⇒ 抬版本刷缓存。 */
+const VERSION = 'v619-undo-cover';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
@@ -847,6 +858,7 @@ const CORE = [
   "core/terrain-bridge-store.js",
   "core/sprinkler-bridge-store.js",
   "core/measured-area-bridge-store.js",
+  "core/cloud-design-binding-store.js",
   "core/economic-settings-store.js",
   "core/ui-shell.js",
   "core/runtime-guard.js",

@@ -54,13 +54,22 @@
 
   function applyMapMeasuredArea(provided){
     try{
+      /* 独立地图页跳到 index.html#pipePlanSection 时，本接收器会在 DOMContentLoaded
+         先切换区块；通知导航模块跳过随后同一初始 hash，避免重复重绘。 */
+      var suppressInitialHashRoute = !provided && window.location && window.location.hash === '#pipePlanSection' && document.readyState !== 'complete';
       var transferStore = window.RyMeasuredAreaBridgeStore;
       if(!transferStore) throw new Error('地块回传存储服务未加载');
-      var raw = provided ? JSON.stringify(provided) : (new URLSearchParams(location.search).has('partitionPreview') ? null : transferStore.readRaw());
+      var transferId = typeof provided === 'string' ? provided : null;
+      var suppliedPayload = provided && typeof provided === 'object';
+      var urlTransferId = !provided && typeof transferStore.currentTransferId==='function' ? transferStore.currentTransferId() : null;
+      var isPartitionPreview = new URLSearchParams(location.search).has('partitionPreview');
+      var raw = transferId ? transferStore.readRaw(transferId)
+        : suppliedPayload ? JSON.stringify(provided)
+        : (isPartitionPreview && !urlTransferId ? null : transferStore.readRaw());
       if(!raw) return false;
       var payload=JSON.parse(raw);
       var d = resolvePlotRef(payload);
-      if(!d || !d.sqm){ transferStore.remove(); return false; }
+      if(!d || !d.sqm){ transferStore.remove(transferId); return false; }
       if(typeof window.runyePersistMeasuredPlot!=='function') throw new Error('地块库接收接口未加载');
 
       // 写入全局实测面积（㎡），驱动「二级管路」的计算
@@ -99,7 +108,7 @@
            ⇒ 供图面用的 measuredPolygon 取 −y（北 → 屏幕上方），与在线地图大体方向对应。
             ★ 只翻「供图面」的这一份：__runyeMapFramePoly 仍是地图口径（北 = +y，不翻），
               反投段 fInv 是仿射逆（det 取 abs）⇒ 反射同样成立，地图侧方位自动不变。
-            ★ 幂等：本函数只在 localStorage['runyeMeasuredArea'] 存在时动作，且末尾 removeItem
+           ★ 幂等：本函数只消费当前 URL 所指的回传载荷，且成功后删除该编号对应的存储项
               （每次「回传」恰好消费一次）；刷新/读存档走 setCurrent / ryAutoRestoreProject，
               读的都是已定向好的数据 ⇒ 不会叠加第二次。 */
         window.measuredPolygon = xs.map(function(x,i){return {x:x, y:-ys[i]};});
@@ -167,12 +176,15 @@
       if(window.RyMapPartition && d.partitionPlan){if(typeof ppLoadPolygon==='function')ppLoadPolygon();RyMapPartition.restore(d.partitionPlan);}
       if(d.partitionPlan && d.plotId && typeof window.runyeSetCurrentPlot==='function') window.runyeSetCurrentPlot(d.plotId);
       showMapBanner(d);
-      transferStore.remove();
-      if(typeof window.ryJumpToSection==='function') window.ryJumpToSection('pipePlanSection');
+      transferStore.remove(transferId);
+      if(typeof window.ryJumpToSection==='function'){
+        if(suppressInitialHashRoute) window.__rySkipNextLinkedSectionRoute='pipePlanSection';
+        window.ryJumpToSection('pipePlanSection');
+      }
       return true;
     }catch(e){
       console.error('applyMapMeasuredArea error', e);
-      /* 引用失效时保留 runyeMeasuredArea 供恢复，并把原因明确反馈给用户。 */
+      /* 引用失效时保留当前编号的载荷和 URL 参数供恢复，并把原因明确反馈给用户。 */
       try{ alert('地块回传未完成：'+(e&&e.message?e.message:'数据读取失败')+'。回地图重新回传后再试。'); }catch(eAlert){}
       return false;
     }

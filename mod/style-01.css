@@ -2714,7 +2714,10 @@ body > .ry-nav .main-header{display:none!important}
 #tlPipePlanSection .pp-side #ppHeadBreak, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side #ppHeadBreak,
 #tlPipePlanSection .pp-side #tlPumpUpdateBox, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side #tlPumpUpdateBox,
 #tlPipePlanSection .pp-side #tlLossCard, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side #tlLossCard{
-  margin:0;
+  /* [v613] margin 必须 !important：index.html 上 #tlPumpUpdateBox 有 inline `margin-top:10px`、
+     #tlLossCard 有 `margin-top:12px`，不带 !important 压不住 ⇒ 灰条之间会多出 10/12px 白缝，
+     网格就断了（实测截图里三条灰条各自孤立，读不成一套）。 */
+  margin:0!important;
   background:transparent!important;
   border:0!important;
   box-shadow:none!important;
@@ -2724,21 +2727,134 @@ body > .ry-nav .main-header{display:none!important}
 }
 #tlPipePlanSection .pp-side #tlPumpUpdateBox, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side #tlPumpUpdateBox,
 #tlPipePlanSection .pp-side #tlLossCard, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side #tlLossCard{
-  padding:8px 10px!important;
+  /* [v613] 内边距归零：这两块改用「灰条标题 + 22px 行」后，缩进必须由各行自己带
+     （否则灰条与 #ppHeadBreak 的 22px 标题条贴不到边、左右各缩 10px，跟面板差一截）。 */
+  padding:0!important;
 }
-#tlPipePlanSection .pp-side #ppHeadBreak, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side #ppHeadBreak{padding:0}
-#tlPipePlanSection .pp-side #ppHeadBreak>summary, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side #ppHeadBreak>summary{
+/* ===== [v613 2026-10-20 用户要求] 两块信息卡纳入三级面板统一网格 =====
+   用户原话：「这部分内容的样式，也要跟着二级工具栏跟三级工具栏统一」
+   （截图红框圈住「管径调整 · 扬程确认」与「管段长度与水头损失」）。
+   原来它们是两块自成一体的小卡片：加粗黑标题 + 说明文字 + 虚线分隔 + 独立内边距，
+   和上面三条灰条、22px 行网格完全不是一个语言。
+   现在改用与面板同一套的三个类，行/说明/标题各司其职：
+     .tl-flat-head = 灰条标题（与 .pp-plan-bar::before / #ppHeadBreak>summary 同值）
+     .tl-flat-row  = 22px 数据行（标签左、值右，实线分隔）
+     .tl-flat-note = 多行小字说明（10.5px 灰）
+   ★ 这三个类由 JS 输出（tlRefreshLossCard / tlPumpUpdateRun），样式只在此处定义一次，
+     选择器一律挂两态祖先 —— 结构决定样式，不用 nth-child 去猜第几个 div。 */
+#tlPipePlanSection .pp-side .tl-flat-head, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .tl-flat-head{
   display:block;height:22px;line-height:22px;
-  padding:0 10px;box-sizing:border-box;
-  background:#dcdfdd;color:#2c2c2a;
-  font-family:inherit;font-size:11px;font-weight:600;
+  margin:0!important;padding:0 10px!important;box-sizing:border-box;
+  background:#dcdfdd!important;color:#2c2c2a!important;
+  font-size:11px!important;font-weight:600!important;
   border-top:1px solid #cfd4d1;border-bottom:1px solid #cfd4d1;
 }
-#tlPipePlanSection .pp-side #ppHeadBreak>summary::before, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side #ppHeadBreak>summary::before{color:#2c2c2a}
-/* 展开后的明细行：与 summary 同一条左边缘（否则文字比灰条标题缩进差 10px） */
-#tlPipePlanSection .pp-side #ppHeadBreak>summary~*, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side #ppHeadBreak>summary~*{
-  padding-left:10px;padding-right:10px;
+#tlPipePlanSection .pp-side .tl-flat-row, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .tl-flat-row{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  width:100%;min-height:22px;margin:0!important;padding:0 10px!important;box-sizing:border-box;
+  border-bottom:1px solid #e8ecea;
+  font-size:11px;color:#475569;
 }
+#tlPipePlanSection .pp-side .tl-flat-row>span:last-child, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .tl-flat-row>span:last-child{
+  color:#1a1a1a;font-variant-numeric:tabular-nums;white-space:nowrap;
+}
+#tlPipePlanSection .pp-side .tl-flat-note, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .tl-flat-note{
+  display:block;
+  margin:0!important;padding:5px 10px!important;
+  font-size:10.5px;line-height:1.5;color:#64748b;
+}
+/* 单行长文本（「设计 → 改径重算 · 水泵扬程 39.3 → 39.3 m (+0.0 m)」这类）：
+   不是「标签左 / 值右」两栏，故单独一个类，只保证 22px 行网格与左右缩进一致。 */
+#tlPipePlanSection .pp-side .tl-flat-line, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .tl-flat-line{
+  display:block;min-height:22px;line-height:22px;
+  margin:0!important;padding:0 10px!important;box-sizing:border-box;
+  border-bottom:1px solid #e8ecea;
+  font-size:11px;color:#475569;
+}
+/* ===== [v615 2026-10-20 用户要求] 「管径调整」块的说明文字 + 按钮并成同一行 =====
+   用户原话：「红框内的文字，跟按钮用一个样式来要求它呢，现在按钮太长了，看看调整一下，
+              让这个区域排版更好看一些，注意要跟大的样式不能冲突，不要新建样式，就用二级面板的样式执行。」
+   原来：说明独占一行（.tl-flat-note，10.5px 小字 + 左右 padding），按钮另起一行且
+        width:calc(100% - 20px) 通栏 ⇒ 两个元素两套规格，按钮长得像一条横杠（用户：太长）。
+   现在：两者并进 .pp-plan-item 同一行 —— 22px 行高 + 左右 10px + 底部分隔线，
+        与上面「联合流量 / 水泵扬程」这些行同一节奏；左侧说明 flex:1 可换行，右侧按钮按内容收窄靠右。
+   规格逐项照抄二级面板（mod/ry-panel.css 的 .pp-recipe-row / .pp-recipe-btn，即「选择方案 + 调用」那行）：
+     行 = min-height 22px / padding 0 10px / align-items center（.pp-plan-item 已提供，不重复写）；
+     钮 = height 20px / padding 0 6px（v616 由 8 收到 6）/ 白底 #fff / 1px var(--ry-s-200,#e2e8f0) / 字 var(--ry-s-700,#334155) / 11px 600 / nowrap。
+   ★ 本段不写圆角：全站 body *{圆角 0 !important} 已压平，二级那条 6px 同样是死值。 */
+/* [v616 2026-10-20 用户要求]「更新水泵扬程前面的图标取消，按钮左右宽度压缩一点，
+   这样前面的文字就可以变为两行了」——用户实机面板更窄（约 235px），原来按钮
+   「⇧ 更新水泵扬程」占 98.3px，说明文字只剩 ~111px ⇒ 被挤成 3 行且按钮贴到右缘。
+   三处一起收：① index.html / inline-27.js 去掉文案前的 ⇧ / ↻（同一按钮三个状态都去，宽度才稳定）；
+              ② 按钮左右内边距 8 → 6px；③ 本行 gap 6 → 4px（只这一行，不影响其它行节奏）。
+   预期按钮 98.3 → ~80px，窄面板下说明文字回到 2 行；22px 行高与左右 10px 缩进不变。 */
+#tlPipePlanSection .pp-side #tlPumpUpdateRow, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side #tlPumpUpdateRow{
+  gap:4px;
+}
+#tlPipePlanSection .pp-side #tlPumpUpdateRow>.tl-flat-note, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side #tlPumpUpdateRow>.tl-flat-note{
+  flex:1 1 auto;min-width:0;
+  margin:0!important;padding:0!important;
+  font-size:11px;line-height:1.35;color:#475569;
+  /* 窄面板下必须折成 2 行时，让两行长度接近（折在「；」后面），
+     否则会只差一个字的宽度就折成「改径自 / 动重算」这种把词切开的形态。 */
+  text-wrap:balance;
+}
+/* [v617 2026-10-20 用户要求] 「更新扬程」按钮只留一层样式，hover 只改底色
+   用户原话：「这个按钮的特效跟其他的统一，手放在上面变色就好了，你现在样式看起来挺复杂的。
+              还有没有类似情况也统一改了，你这个特效是遵循的哪里的样式，我印象中整个程序中没有
+              这个样式，不要新造样式，面板样式要简化，代码简洁，不要多层覆盖/嵌套。」
+   ★ 复杂不是这一段写多了，而是这颗按钮同时挂着 `<button class="pp-btn-generate">` 的旧大按钮皮肤
+     （绿渐变 + hover 位移 + 投影），本段只能拿 5 个 !important 去压它 ⇒ 两层规则互相打架，
+     改一次要同时看两处。v617 把 index.html 上那个 class 去掉（本按钮不该复用「生成施工图」的主操作皮肤），
+     本段于是只剩一层：几何 + 白底 + 11px 字。
+   ★ hover / active 回到全站既有口径（mod/ry-panel.css 的 v578 注释：只改底色、所有小按钮同一个色）：
+     hover #eaf3ed / active #d8e9df，**不换边框色、不换字色**。原来那条「边绿+字绿+底绿」的三连变
+     是 v609 抄 .pp-recipe-btn 时带进来的，不是本程序的基础口径，已一并统一（见 ry-panel.css 同名注释）。 */
+#tlPipePlanSection .pp-side #tlPumpUpdateBtn, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side #tlPumpUpdateBtn{
+  flex:none;height:20px;padding:0 6px;box-sizing:border-box;
+  border:1px solid var(--ry-s-200,#e2e8f0);
+  background:#fff;color:var(--ry-s-700,#334155);
+  font-size:11px!important;font-weight:600;line-height:1;white-space:nowrap;
+  /* 只剩两处必须 !important：全局 typography 的 `button{13px!important}`、
+     inline-27.js 给「还没改径」态写的 inline opacity:.5。其余一律不加。 */
+  opacity:1!important;
+}
+#tlPipePlanSection .pp-side #tlPumpUpdateBtn:hover:not(:disabled),
+#ryCadSide [data-pp="tlPipePlanSection"] .pp-side #tlPumpUpdateBtn:hover:not(:disabled){background:#eaf3ed}
+#tlPipePlanSection .pp-side #tlPumpUpdateBtn:active:not(:disabled),
+#ryCadSide [data-pp="tlPipePlanSection"] .pp-side #tlPumpUpdateBtn:active:not(:disabled){background:#d8e9df}
+#tlPipePlanSection .pp-side #tlPumpUpdateBtn:disabled, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side #tlPumpUpdateBtn:disabled{
+  background:#f1f5f9;color:#94a3b8;cursor:not-allowed;
+}
+/* [v613] #tlPumpUpdateDelta 的四行由 inline-27.js 输出 .tl-flat-line 类，
+   这里不再按 `>div>div` 猜结构（旧规则已删）。 */
+/* ===== [v614 2026-10-20 用户要求] 三级「扬程计算式」改为照抄二级同款 =====
+   用户原话：「你仔细排查一下，应该是有多层覆盖 嵌套，你看扬程这个很明显看不清楚，
+              我建议你按照二级工具栏那个扬程样式来」「这种就挺好」。
+   实测根因（量测数据，不是猜）：v611 把这个块的深色底拍成了 transparent，
+   但 .pp-head-break 自带的 color:#e8eef7 没跟着改 —— 实测容器与 11 行明细的
+   computed color 全是 rgb(232,238,247)、background 全是 rgba(0,0,0,0)，
+   浅色字落在白面板上，对比度只有 1.16:1，肉眼就是「看不见」；
+   顺带每行只有 16.5px、标签与数值之间无间距（读成「提升5.00」），也顶破了 22px 网格。
+   改法不是再加一层覆盖去压，而是把结构换成二级 #ppCalcDetail 那一套：
+     灰条标题「扬程计算式」 + 一条深色算式带（绿/黄高亮、等宽字体），只有一层、无嵌套。
+   配色与 mod/ry-panel.css 的 .pp-calc-formula / .pp-cf-* 同值，两级读起来是同一个东西。
+   ★ 本段是三级该块的唯一出处；DOM 由 mod/plan-calc-render.js 的 renderHeadBreakdown 输出。 */
+#tlPipePlanSection .pp-side #ppHeadBreak, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side #ppHeadBreak{padding:0}
+#tlPipePlanSection .pp-side .pphb-formula, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pphb-formula{
+  margin:0!important;padding:6px 10px;box-sizing:border-box;
+  background:rgba(15,23,42,.90);border:0;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:11px;line-height:1.55;color:#e8eef7;
+  white-space:normal;overflow-wrap:break-word;
+}
+/* 算式内四类词法配色（与二级 .pp-cf-name/num/op/eq/final 逐项同值）：
+   项名绿、数值黄、运算符浅灰、括号与等号近白、最终结果淡绿底 */
+#tlPipePlanSection .pp-side .pphb-formula .pphb-name, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pphb-formula .pphb-name{color:#86efac;font-weight:700;margin-right:4px}
+#tlPipePlanSection .pp-side .pphb-formula .pphb-num, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pphb-formula .pphb-num{color:#fde68a;font-weight:600;padding:0 1px}
+#tlPipePlanSection .pp-side .pphb-formula .pphb-op, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pphb-formula .pphb-op{color:#cbd5e1;padding:0 1px}
+#tlPipePlanSection .pp-side .pphb-formula .pphb-eq, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pphb-formula .pphb-eq{color:#e2e8f0;padding:0 1px;font-weight:600}
+#tlPipePlanSection .pp-side .pphb-formula .pphb-final, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pphb-formula .pphb-final{color:#a7f3d0;font-weight:700;background:rgba(134,239,172,.14);padding:1px 4px;margin-left:2px}
 /* ===== [v252 2026-10-06 用户要求]「水力计算结果」面板默认折叠 =====
    #ppPlanBar2（二级）/ #tlPlanBar2（三级）载入即加 pp-res-head + pp-res-off：
    只露标题一行（水力计算结果 ▸），点标题行展开（▾）、再点收起；不记忆状态，每次进入默认折叠。
