@@ -852,7 +852,10 @@
    都保证整幅可见；滚轮放大不受影响（wheel 走 ppUpdateTransform，不过 ppResize）。
    另加画布内浮层胶囊「⤢ 适应窗口」（#ppFitViewBtn，仅在真被裁切时亮起）作为显式出口。
    改 mod/plot-editor.js + mod/style-01.css + index.html ⇒ 抬版本刷缓存。 */
-const VERSION = 'v629-pp-view-fit';
+/* v630-fitview-radius: v629 的 .pp-fitview 写了 border-radius:12px（不带 !important）——
+   全站 body *{border-radius:0!important} 会把它压成 0，属死声明，撞 v530 检查（冒烟判红 1 项）。
+   删掉该行，纯删声明、视觉零变化（这个按钮本来就是方角），抬版本只为刷掉带死声明的 CSS。 */
+const VERSION = 'v630-fitview-radius';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

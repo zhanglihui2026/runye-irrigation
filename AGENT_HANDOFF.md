@@ -2885,5 +2885,5 @@ canvas 里的线被切与 CSS 的 `overflow` / `min-height` **无关**，是**�
 点击走 `ppFitView()`。
 
 **闸门**：`node --test tests/*.test.cjs` **157/157**、`ci_check_static` PASS=29、`check_publish_refs` PASS。
-**版本口径**：`sw.js` = `v629-pp-view-fit`，`style-01.css?v=` / `plot-editor.js?v=` 同步（后者原停在
+**版本口径**：`sw.js` = `v630-fitview-radius`（v629 首次发布后冒烟发现 `border-radius:12px` 撞 v530 检查，删死声明并抬版本），`style-01.css?v=` / `plot-editor.js?v=` 同步（后者原停在
 `612-flat-radius`，这次一并抬）。

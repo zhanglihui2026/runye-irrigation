@@ -1221,13 +1221,16 @@ body.ry-zoneauto-off #ppRotateZones{
    只在 ppIsViewClipped() 为真时由 JS 加 .is-on 显示；默认 display:none，
    因此不占版面、不影响 #ppCanvasWrap 的滚动尺寸。
    位置：右下角、抬到 canvas 自己画的「缩放 xx%」文字（右 8 / 下 18）上方，
-   两者不重叠；左上角让给 #ppQuickBar + #ppHint。 */
+   两者不重叠；左上角让给 #ppQuickBar + #ppHint。
+   ⚠ 不写 border-radius：全站 `body *{border-radius:0!important}` 会把它压成 0，
+     留着就是一条死声明，且正好撞上 v530「style-01.css 不得出现无效圆角声明」的检查
+     （线上冒烟判红 1 项 —— v612 踩过一次，这次又踩了，已删）。 */
 .pp-fitview{
   display:none;position:absolute;right:10px;bottom:34px;z-index:4;
   align-items:center;gap:4px;
   height:24px;padding:0 9px;
   background:rgba(255,251,235,.97);
-  border:1px solid #e6c98a;border-radius:12px;
+  border:1px solid #e6c98a;
   color:#8a5a08;font-size:11.5px;line-height:1;white-space:nowrap;
   cursor:pointer;box-shadow:0 2px 6px rgba(15,23,42,.10);
   font-family:inherit;
