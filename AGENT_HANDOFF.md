@@ -2987,3 +2987,26 @@ v632 上线后线上实测：功能是新的（后台按钮直链 `?login=1&back
 **长期口径**：凡是改 CORE 白名单里的页面（含 `index.html`、`plugin-admin.html`、`invite.html`、
 `cloud-sync.js`、`runye-member-ui.js`），**同时抬 `sw VERSION` + 页面角标 + `style-01.css?v=`**，
 三者一起动，别再出现「代码新、角标旧」。
+
+### 26.30 已知未修（2026-10-20 用户明确「暂时不折腾，细节后面再细化」）
+
+用户看过状态语义解释后决定：**功能都通了，先不修**。以下两处是查证过、但本轮**故意没动**的，
+留给后续细化时直接接上（不用重新查）：
+
+1. **后台状态列的口径与 C 端矛盾**
+   - `plugin-admin.html:294` 把 `x.status` 原文打印（`valid` / `registered`），且灰绿判定是 `==='valid'`；
+   - 但后端 `computeProgress()`（`cloudfn/ryEntitle-v2/index.js:351`）把
+     `['valid','cooling','registered']` **一律计入**名额 ⇒ **灰标 ≠ 不算名额**，
+     「进度 3/3 + 只有 2 个绿标」是能同时成立的，看的人容易误判；
+   - C 端 `invite.html:3116` 对 `registered` 显示「已注册 · 已生效」，与后台灰标说法冲突。
+   - 建议改法：状态中文化（已生效/待生效）、灰绿按「是否计入名额」判定、「绑定时间」列改用
+     `registered_at`（现在取的是 `activated_at`，`registered` 行因此显示「—」）。
+2. **`registered` / `cooling` 是懒迁移残留**
+   - 迁移只在被邀请人**自己**心跳时发生（`actHeartbeat`，`:417` 按 `invited_uid = 自己` 推进）；
+     绑定后不再打开主程序的用户会永远停在 `registered`。
+   - 想一次性收干净就是一条 SQL（v4 触发器只禁 `valid → 其他` 回退，正向推进允许）：
+     `update public.ry_links set status='valid', activated_at=coalesce(activated_at, now()) where status in ('registered','cooling');`
+   - **未执行**，等用户决定。
+
+另：`sql/route_c_migration_v6_member_stats.sql` 仍未执行 ⇒ 后台「今日新增 / 近 7 日 / 注册时间 /
+最后活跃」显示为空，与本次两处无关，别忘了。
