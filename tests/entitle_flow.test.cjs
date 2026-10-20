@@ -270,6 +270,19 @@ function reset() {
     /const np = normPhone\(phone\);[\s\S]{0,220}?phone: np/.test(cloudFn));
   ok('前端 rdb 降级路径同样写归一后的手机号',
     /function normPhone/.test(selfSrc) && /phone: normPhone\(entPhone\(\)\) \|\| null/.test(selfSrc));
+  /* [v626] 「管理」按钮点了没反应：openDetail 里曾用
+     `if(!hist.length){h.textContent='（无记录）';return}` 早退，把后面的 scrollIntoView 一起跳过。
+     adminMemberStats 返回的列表项本来就不带 history ⇒ 每次都早退 ⇒ 面板在 30 行表格下方打开、
+     视口不动，用户看到的就是「没反应」。这里锁死三件事。 */
+  const odStart = admin.indexOf('function openDetail(m){');
+  const odScroll = odStart >= 0 ? admin.indexOf('scrollIntoView', odStart) : -1;
+  const odBody = (odStart >= 0 && odScroll > odStart) ? admin.slice(odStart + 'function openDetail(m){'.length, odScroll) : '';
+  ok('openDetail 不再因「无历史」早退，面板一定会滚进视口',
+    odBody.length > 100 && odBody.length < 1200 && !/\breturn\b/.test(odBody), { len: odBody.length });
+  ok('操作记录改为按需拉取（复用已部署的 adminMembers，不必再传云函数包）',
+    /function loadHist\(m\)\{[\s\S]{0,700}?api\('adminMembers'/.test(admin));
+  ok('打开面板会重置「邀请绑定关系」占位，不残留上一个人的数据',
+    /function openDetail\(m\)\{[\s\S]{0,1500}?mBind'\)\.innerHTML='（点上方按钮加载/.test(admin));
   setUser('anon-x', '');
   await E.init(true);
   ok('匿名 trial 仅可访问 L1 基础功能', E.isTrial() && l1Features.every(f => E.can(f)) && l2Features.every(f => !E.can(f)), E.plan());

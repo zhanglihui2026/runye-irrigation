@@ -2667,3 +2667,44 @@ CloudBase 控制台那张表读的是**身份认证（auth）用户表**，云�
 - 结论：**「—」的账号下次打开软件就会自愈**，无需人工介入。`ry_entitle.phone` 全库只有这一处来源
   （`sql/route_c_migration_v1.sql` 注释「绑定手机号（登录后回填）」本来就写的是这个设计），没有第二处可拿来批量回填。
 - 复跑闸门：`entitle_flow` **51/51**、`--test` **154/154**、`ci_check_static` **PASS=29**、线上冒烟 **27/27**。
+
+### 26.23 v626-admin-detail-fix：后台「管理」按钮点了没反应（2026-10-20）
+
+**用户提问**（截图，红箭头指向列表最右的「管理」按钮）：「这个管理入口点击没有效果，怎么回事？」
+
+**复现手法**（`_probe_admin_detail.mjs`，Edge headless + CDP，见 skill `edge-cdp-verify`）
+页面要登录态，用 `Page.addScriptToEvaluateOnNewDocument` 在页面脚本之前注入
+① 假 `CloudSync`（`Object.defineProperty(window,'CloudSync',{get})` 挡掉真云同步）
+② 假 `fetch`（喂 30 行会员数据给 `adminMemberStats`）。
+**踩坑**：第一版探针没先点「会员管理」页签，`#sec-members` 是 `hidden`，所有 `rect` 都是 0，
+    差点误判成「面板高度塌了」；第二版点是点了但**点太早**——内联脚本还没执行完，`.tab.onclick` 还是 null，
+    合成 `.click()` 什么也没做。正确姿势：先轮询 `typeof document.querySelector('.tab').onclick === 'function'` 再点。
+
+**根因**：`openDetail()` 里这段早退
+```js
+var hist=m.history||[];
+if(!hist.length){ h.textContent='（无记录）'; return }   // ← 把后面的 scrollIntoView 一起跳过了
+...
+$('mDetailCard').scrollIntoView({behavior:'smooth',block:'nearest'});
+```
+而 `adminMemberStats` 返回的列表项**根本不含 `history`**（那是分页用的瘦对象，只有 `adminMembers` 才带）⇒
+`hist` 永远为空 ⇒ **每次都早退** ⇒ 面板其实已经 `hidden=false` 打开了，但它位于 30 行表格 + 分页条**下方约 2300px**，
+视口一动不动。用户看到的就是「点了没反应」。顺带 `mBind` 那行占位也被跳过，会残留上一个人的绑定关系文本。
+
+**改动（纯前端，不需要重传云函数）**
+1. 把历史表格渲染拆成 `renderHist()`；新增 `loadHist(m)` 按需拉：
+   走**已部署的** `adminMembers {q: uid}`（它的返回里带 `history`，且支持按 uid 精确匹配），
+   不必为这一行去改云函数再让用户传一次包。
+2. `openDetail()` 去掉早退：无论有没有历史，都先 `scrollIntoView`，再异步填历史；
+   `mBind` 占位无条件重置。
+3. `plugin-admin.html` 版本标识 v625 → **v626**；`sw.js` → `v626-admin-detail-fix`；`index.html` 的
+   `style-01.css?v=` 同步（发布纪律 §26.7）。
+
+**验证**
+- 探针（修复后）：点击 → `hidden:false / top:53 / h:702 / scrollY:2295 / inViewport:true`，
+  历史懒加载出 **2 行**，`mBind` 占位已重置，**JS 异常 0**。
+- 单测 **54/54**（新增 3 条：`openDetail` 到 `scrollIntoView` 之间不得出现 `return` /
+  `loadHist` 必须走 `adminMembers` / `mBind` 占位必须重置）；`--test` **154/154**；`ci_check_static` **PASS=29**；`check_publish_refs` PASS。
+- 断言写法教训：一开始用正则查旧代码字符串，结果**被我自己写在注释里的同一段代码**命中 —— 改成
+  切片取 `openDetail` 函数体再查 `\breturn\b`，才对得上「行为」而不是「文本」。
+

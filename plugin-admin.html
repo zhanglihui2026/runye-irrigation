@@ -40,7 +40,7 @@
 </head>
 <body><header>润野灌溉 · 管理后台</header>
 <main>
-  <div class="head"><div><h1>统一管理后台</h1><div class="muted">插件开关 · 会员管理 · 会员规则参数。写操作需要管理员账号（云函数环境变量 RY_PLUGIN_ADMIN_UIDS）。 · <b id="admVer" style="color:#2E7D4F">界面 v625</b></div></div><a class="btn" href="index.html">返回主程序</a></div>
+  <div class="head"><div><h1>统一管理后台</h1><div class="muted">插件开关 · 会员管理 · 会员规则参数。写操作需要管理员账号（云函数环境变量 RY_PLUGIN_ADMIN_UIDS）。 · <b id="admVer" style="color:#2E7D4F">界面 v626</b></div></div><a class="btn" href="index.html">返回主程序</a></div>
 
   <div class="tabs">
     <button class="tab on" data-tab="plugins">外挂插件</button>
@@ -203,6 +203,36 @@
         '<div class="foot">⚠ 云函数尚未部署 v2c-4 新版 —— 请先在 CloudBase 控制台上传新部署包（见 cloudfn/ryEntitle-v2/）。</div>':'');
     }).finally(function(){permText()});
   }
+  /* 操作记录表格（拆出来给「懒加载」复用） */
+  function renderHist(h,hist){
+    h.innerHTML='';
+    if(!hist||!hist.length){h.textContent='（该用户暂无操作记录）';return}
+    var t=document.createElement('table');t.className='mt';
+    t.innerHTML='<thead><tr><th>时间</th><th>来源</th><th>天数</th><th>等级</th><th>从</th><th>到</th><th>备注</th></tr></thead>';
+    var tb=document.createElement('tbody');
+    hist.forEach(function(x){
+      var tr=document.createElement('tr');
+      var src={'register':'注册','invite':'邀请奖励','admin':'管理员'}[x.src]||x.src||'—';
+      tr.innerHTML='<td>'+fmtDay(x.at)+'</td><td>'+esc(src)+'</td><td>'+(x.days||0)+'</td><td>'+esc(x.planName||x.plan||'')+'</td><td>'+fmtDay(x.from)+'</td><td>'+fmtDay(x.to)+'</td><td>'+esc(x.note||'')+'</td>';
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb);h.appendChild(t);
+  }
+  /* [v626] adminMemberStats 的列表项**不含 history**（那是分页用的瘦对象）。
+     旧代码在这里 `if(!hist.length){h.textContent='（无记录）';return}` 直接 return，
+     把下面的 scrollIntoView 一起跳过了 ⇒ 点「管理」确实打开了面板，但面板在 30 行表格
+     下方几千像素处、视口没动，用户看到的就是「点了没反应」。
+     现在：① 无论有没有记录都滚过去；② 记录改成按需拉（复用已部署的 adminMembers）。 */
+  function loadHist(m){
+    var h=$('mHist');
+    if(m.history&&m.history.length){renderHist(h,m.history);return}
+    h.textContent='读取中…';
+    api('adminMembers',{q:String(m.uid)}).then(function(r){
+      if(!r||r.code!==0)throw new Error((r&&r.message)||'读取失败');
+      var row=(r.data.members||[]).filter(function(x){return x.uid===m.uid})[0];
+      renderHist(h,(row&&row.history)||[]);
+    }).catch(function(e){h.innerHTML='<span class="err">'+esc(e.message||e)+'</span>';});
+  }
   function openDetail(m){
     curMember=m;$('mDetailCard').hidden=false;$('gResult').textContent='';$('gResult').className='foot';
     $('mInfo').innerHTML=
@@ -215,21 +245,9 @@
       '<div class="kv"><b>注册时间</b>'+fmtDT(m.created_at)+'</div>'+
       '<div class="kv"><b>最后活跃</b>'+fmtDT(m.last_seen_at)+'</div>'+
       '<div class="kv"><b>名下邀请</b>'+(m.invited||0)+' 人</div>';
-    var h=$('mHist');h.innerHTML='';
-    var hist=m.history||[];
-    if(!hist.length){h.textContent='（无记录）';return}
-    var t=document.createElement('table');t.className='mt';
-    t.innerHTML='<thead><tr><th>时间</th><th>来源</th><th>天数</th><th>等级</th><th>从</th><th>到</th><th>备注</th></tr></thead>';
-    var tb=document.createElement('tbody');
-    hist.forEach(function(x){
-      var tr=document.createElement('tr');
-      var src={'register':'注册','invite':'邀请奖励','admin':'管理员'}[x.src]||x.src||'—';
-      tr.innerHTML='<td>'+fmtDay(x.at)+'</td><td>'+esc(src)+'</td><td>'+(x.days||0)+'</td><td>'+esc(x.planName||x.plan||'')+'</td><td>'+fmtDay(x.from)+'</td><td>'+fmtDay(x.to)+'</td><td>'+esc(x.note||'')+'</td>';
-      tb.appendChild(tr);
-    });
-    t.appendChild(tb);h.appendChild(t);
     $('mBind').innerHTML='（点上方按钮加载：邀请码 / 邀请进度 / 名下被邀请人）';
     $('mDetailCard').scrollIntoView({behavior:'smooth',block:'nearest'});
+    loadHist(m);
   }
   $('mBindBtn').onclick=function(){
     if(!curMember){return}
