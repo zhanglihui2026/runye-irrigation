@@ -879,7 +879,11 @@
    后台匿名态的提示改成按钮「去主程序用手机号登录 →」直链
    index.html?login=1&back=plugin-admin.html。
    改 runye-member-ui.js（在 CORE，必须抬版本）+ plugin-admin.html。 */
-const VERSION = 'v632-login-deeplink';
+/* v633-admin-badge: 只为了「让用户能自证刷新到了新版」。
+   v632 上线后实测后台角标还写着「界面 v631」——功能已经是新的，但角标没跟着抬；
+   后台在 CORE 白名单里，改了正文必须抬版本才刷得动，所以单独发一版把角标对齐成 v633。
+   改 plugin-admin.html（角标）+ index.html（style-01.css?v= 同值契约）。 */
+const VERSION = 'v633-admin-badge';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
