@@ -814,7 +814,7 @@
    同一改动修掉一桩既存缺陷：#ppPlanBar2「水力计算结果」的伪元素标题被 v529 的
    content:none!important 误杀，标题不可见而该栏默认 pp-res-off ⇒ 二级结果栏整块消失。
    v609j 追加：三级 #tlPlanBar2 同一条规则漏了 :not(.pp-res-head)，标题同样被误杀，一并修好。 */
-const VERSION = 'v609j-props-panel';
+const VERSION = 'v610-props-panel';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
