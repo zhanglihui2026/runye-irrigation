@@ -814,7 +814,17 @@
    同一改动修掉一桩既存缺陷：#ppPlanBar2「水力计算结果」的伪元素标题被 v529 的
    content:none!important 误杀，标题不可见而该栏默认 pp-res-off ⇒ 二级结果栏整块消失。
    v609j 追加：三级 #tlPlanBar2 同一条规则漏了 :not(.pp-res-head)，标题同样被误杀，一并修好。 */
-const VERSION = 'v610-props-panel';
+/* v611-tl-flat: 三级「管网参数」左栏整栏扁平化 —— 原来同一块左栏叠了 4 层底色/边框：
+   ① #tlSide 浅绿渐变底 + 外框 + 9px 内边距；② body.ry-tool 那层再铺 --ry-panel 底 + 10px
+   内边距 + 右分隔线（原位态与 rail 态各一条）；③ 外层 #ryCadSide 白底 + 外框；
+   ④ 里面每块 .pp-plan-bar 又各画白底/米白底 + 1px 框 ⇒ 用户看到「框中框套框中框」。
+   现全部清成透明无框，层次只靠「灰分组标题条 + 22px 行网格」表达，与二级 v609 特性面板同口径；
+   生成图后才现身的三块（扬程计算式深色卡 / 管径调整卡 / 水头损失卡）一并拍平。
+   顺带把撑破网格的三类控件收到 20px（分区按钮 padding 3→1、输入框 24→20、管径下拉 27→20）。
+   v611b 追加：轮灌演示组 #tlDemoBar 补 padding:0 10px 12px —— 它不是 .pp-plan-item，
+   扁平化后左缘比参数行少 10px、底部与「水力计算结果」灰条 gap=0（用户截图指出）。
+   改动文件：mod/style-01.css（三级样式唯一出处）、mod/ry-panel.css（撤出三级两条 ::before 抑制）。 */
+const VERSION = 'v611-tl-flat';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

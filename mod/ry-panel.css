@@ -441,12 +441,12 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-to
    两条选择器都会命中它，只改下面一条不够。
    [v609j 2026-10-20] 三级两条选择器也补上 :not(.pp-res-head) —— 之前只修了二级，
    #tlPlanBar2 的「水力计算结果 ▾」同样被误杀，三级结果栏只露数据行、没有标题（用户要求一起修）。
-   三级标题的皮肤来自 style-01.css 的 `#tlPipePlanSection .pp-side .pp-plan-bar::before`
-   （小号绿色 700、下边框），与三级白卡风格一致，这里不另加灰条。 */
+   [v611 2026-10-20] 三级两条选择器**整条撤出**：三级左栏已整栏扁平化（见 style-01.css v611 段），
+   层次改由「灰分组标题条 + 行分隔线」表达，#tlPlanBar 的「地块与灌溉参数」标题必须显示出来，
+   否则上半块（联合灌溉/面积成组）与下半块（水力计算结果）之间没有任何分界。
+   二级仍保留本条 —— 二级的参数行是 v609 统一网格，不需要旧 ::before 标题。 */
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-bar:not(.pp-res-head)::before,
-:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-bar-result:not(.pp-res-head)::before,
-:is(#tlPipePlanSection,#ryCadSide [data-pp="tlPipePlanSection"]) .pp-side .pp-plan-bar:not(.pp-res-head)::before,
-:is(#tlPipePlanSection,#ryCadSide [data-pp="tlPipePlanSection"]) .pp-side .pp-plan-bar-result:not(.pp-res-head)::before{
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-bar-result:not(.pp-res-head)::before{
   content:none!important;
   display:none!important;
 }

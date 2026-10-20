@@ -758,7 +758,9 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
 .tl-trigger-btn-inline:hover{background:#15803d;border-color:#166534;transform:translateY(-1px);box-shadow:0 4px 12px rgba(37,99,235,.4)}
 /* [v215] 轮灌演示 chips 与「轮灌组数」按钮同款（同一视觉语言，左栏一栏到底） */
 #tlZoneCountGroup button, #tlDemoChips button{
-  font-size:11px;font-weight:400;padding:3px 10px;
+  /* [v611] padding 3px→1px：三级行高已从 26 收到 22（与二级特性面板同网格），
+     按钮原高 24 会把行撑到 24，网格就参差了。 */
+  font-size:11px;font-weight:400;padding:1px 10px;
   border:1px solid var(--s-200);background:#fff;color:var(--s-600);cursor:pointer;transition:var(--transition);
 }
 #tlZoneCountGroup button.selected, #tlDemoChips button.selected{background:var(--g-700);color:#fff;border-color:var(--g-700)}
@@ -767,7 +769,8 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
    （绿底白字 = .selected 同一视觉语言）。全站扁平化，不写 border-radius。
    [v470]（2026-10-15 用户要求）撤销 v469：按钮是执行入口，样式原样恢复。 */
 #tlAreaGroupCalcBtn{
-  font-size:11px;font-weight:400;padding:3px 10px;
+  font-size:11px;font-weight:400;padding:1px 10px;   /* [v611] 同分区按钮，20px 高 */
+
   border:1px solid var(--s-200);background:#fff;color:var(--s-600);cursor:pointer;transition:var(--transition);
   margin-left:6px;vertical-align:middle;
 }
@@ -2655,27 +2658,84 @@ body > .ry-nav .main-header{display:none!important}
 
 
 
+/* [v611 2026-10-20 用户要求] 三级左栏「整栏扁平化」—— 原来这里是三层嵌套的底色+边框：
+   ① #tlSide 自身 = 浅绿渐变底 + 1px 外框 + 9px 内边距；
+   ② 外层还有 #ryCadSide 白底 + 1px 外框（搬移态）；
+   ③ 里面每块 .pp-plan-bar 再各画一次白底/米白底 + 1px 框 ⇒ 用户看到「框中框套框中框」。
+   现在全部拆掉，与二级 v609 的 CAD 特性面板同口径：
+     侧栏无底色无外框、内边距归零；.pp-plan-bar 无底色无边框无内边距；
+     层次只靠「灰分组标题条 + 行分隔线」表达（标题条见下方 ::before 段）。
+   ⚠ 两条规则必须同时挂原位态与 rail 态：三级切 tab 时 #tlSide 会被搬进 #ryCadSide，
+     祖先链断裂后只挂 #tlPipePlanSection 的规则在用户真正看到的界面里不会生效
+     （v109/v539 各踩过一次）。 */
 #tlPipePlanSection .pp-side, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side{
   align-self:start;max-height:100%;
-  display:flex;flex-direction:column;gap:8px;
+  display:flex;flex-direction:column;gap:0;
   overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
-  padding:9px;
-  background:linear-gradient(180deg,#f8fbf9 0%,#f2f7f4 100%);
-  border:1px solid #dde8e1;
+  padding:0;
+  background:transparent;
+  border:0;
 }
 #tlPipePlanSection .pp-side>*, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side>*{flex:0 0 auto}
 #tlPipePlanSection .pp-side .pp-plan-bar, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-bar{
-  display:block!important;margin:0!important;padding:8px 11px;
+  display:block!important;margin:0!important;padding:0;
   min-height:0;
-  background:#fff;border:1px solid #e4ece7;
+  background:transparent;border:0;box-shadow:none;
   font-size:11px;
 }
-.tl-plan-result{background:#fbfefc}
+.tl-plan-result{background:transparent}
 #tlPipePlanSection .pp-side .pp-plan-bar::before, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-bar::before{
   content:"地块与灌溉参数";
-  display:block;margin:0 0 4px;padding-bottom:5px;
-  border-bottom:1px solid #eaf1ec;
-  font-size:11px;font-weight:700;letter-spacing:.05em;color:#2f6d43;
+  /* [v611] 标题条改二级同款灰条（原为绿色小字 + 下划线）：扁平化后层次全靠这条灰条表达，
+     绿色细字压不住两块内容的分界。数值与 .ry-props-head 逐项对齐，两级观感一致。 */
+  display:block;height:22px;line-height:22px;
+  margin:0;padding:0 10px;box-sizing:border-box;
+  background:#dcdfdd;color:#2c2c2a;
+  font-size:11px;font-weight:600;letter-spacing:0;
+  border-top:1px solid #cfd4d1;border-bottom:1px solid #cfd4d1;
+}
+/* [v611b] 轮灌演示块（#tlDemoBar）：
+   ① 它不是 .pp-plan-item（没有行那套 padding:0 10px），文字左缘落在 10px，
+      而「联合灌溉」「面积成组」等标签落在 20px ⇒ 左缘差 10px（实测 titleX=10 vs rowLabelX=20）；
+   ② 它底部直接顶着「水力计算结果」灰条，gapToResultBar 实测 0，肉眼就是"贴死"。
+   补 padding:0 10px 10px 一次解决两桩；inline 上的 margin-top:6px 保持不动（文字与上一行的距离）。
+   ★ #tlDemoBar 是 #tlPlanBar 的最后一个子元素，padding-bottom 落在它对内，所以不会把灰条推歪。 */
+#tlPipePlanSection .pp-side #tlDemoBar, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side #tlDemoBar{
+  padding:0 10px 12px;
+}
+/* —— [v611] 左栏内剩余三块「卡片」一并拍平 ——
+   生成管线图后才现身，不加这段就会在扁平底上突然冒出三个白框/黑框（实测就是用户说的
+   「各种嵌套、各种覆盖」）。三块各有出处：
+     · #ppHeadBreak（扬程计算式 details）基础皮肤是**深蓝黑卡**（.pp-head-break，为土地流转页写的）；
+     · #tlPumpUpdateBox / #tlLossCard 是 index.html 上的 inline style（白底 + 1px #cbd5e1 + 8px 圆角 + 阴影），
+       inline 优先级最高 ⇒ 只能用 !important（颜色/边框/阴影属允许带 !important 的三类，不动布局属性）。
+   统一口径：无底色、无边框、无阴影、无圆角，左右 10px 与关键行内边距对齐；
+   「扬程计算式」的折叠标题改成与另两条同款灰条，三条灰条并排读成一套分组。 */
+#tlPipePlanSection .pp-side #ppHeadBreak, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side #ppHeadBreak,
+#tlPipePlanSection .pp-side #tlPumpUpdateBox, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side #tlPumpUpdateBox,
+#tlPipePlanSection .pp-side #tlLossCard, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side #tlLossCard{
+  margin:0;
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+  border-radius:0;
+}
+#tlPipePlanSection .pp-side #tlPumpUpdateBox, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side #tlPumpUpdateBox,
+#tlPipePlanSection .pp-side #tlLossCard, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side #tlLossCard{
+  padding:8px 10px!important;
+}
+#tlPipePlanSection .pp-side #ppHeadBreak, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side #ppHeadBreak{padding:0}
+#tlPipePlanSection .pp-side #ppHeadBreak>summary, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side #ppHeadBreak>summary{
+  display:block;height:22px;line-height:22px;
+  padding:0 10px;box-sizing:border-box;
+  background:#dcdfdd;color:#2c2c2a;
+  font-family:inherit;font-size:11px;font-weight:600;
+  border-top:1px solid #cfd4d1;border-bottom:1px solid #cfd4d1;
+}
+#tlPipePlanSection .pp-side #ppHeadBreak>summary::before, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side #ppHeadBreak>summary::before{color:#2c2c2a}
+/* 展开后的明细行：与 summary 同一条左边缘（否则文字比灰条标题缩进差 10px） */
+#tlPipePlanSection .pp-side #ppHeadBreak>summary~*, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side #ppHeadBreak>summary~*{
+  padding-left:10px;padding-right:10px;
 }
 /* ===== [v252 2026-10-06 用户要求]「水力计算结果」面板默认折叠 =====
    #ppPlanBar2（二级）/ #tlPlanBar2（三级）载入即加 pp-res-head + pp-res-off：
@@ -2699,10 +2759,14 @@ body > .ry-nav .main-header{display:none!important}
 }
 .pp-plan-bar.pp-res-off>.pp-plan-item:not(.tl-target-v-row),
 .pp-plan-bar.pp-res-off>.pp-sep-vert{display:none!important}
-#tlPipePlanSection .pp-side .pp-plan-item{
-  display:flex;align-items:center;gap:5px;
-  width:100%;min-height:26px;padding:2px 0;
-  border-bottom:1px dashed #eef3f0;
+/* [v611] 行规则与二级特性面板对齐：22px 行高、左右 10px 内边距（原为卡内 padding 8/11 + 行 padding 2/0，
+   卡片内边距归零后必须由行自己承担，否则文字贴到侧栏边缘）、实线分隔（原虚线在新扁平底上显得发毛）。
+   ★ 补上 rail 态选择器：本条原来只挂 #tlPipePlanSection，三级切 tab 后 #tlSide 被搬进 #ryCadSide
+     ⇒ 这条从未在用户实际看到的界面里生效（行高/内边距一直是别处的基础值）。 */
+#tlPipePlanSection .pp-side .pp-plan-item, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-item{
+  display:flex;align-items:center;gap:6px;
+  width:100%;min-height:22px;padding:0 10px;box-sizing:border-box;
+  border-bottom:1px solid #e8ecea;
 }
 #tlPipePlanSection .pp-side .pp-plan-item:last-of-type, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-item:last-of-type{border-bottom:0}
 #tlPipePlanSection .pp-side .pp-plan-item>.pp-plan-label:first-child, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-item>.pp-plan-label:first-child{margin-right:auto}
@@ -2742,7 +2806,7 @@ body > .ry-nav .main-header{display:none!important}
      但通用规则 .pp-plan-label{font-weight:400} 更具体、把「水力项」压回了常规字重，
      看起来就比旁边两列小一号。这里把这一格放行到 600/11px，其余字段行仍是 400/11px 不变。 */
 .tl-plan-result .pp-plan-cols-head > .pp-plan-label{font-weight:600;font-size:11px}
-.tl-plan-result .pp-cal-sel{width:100%;max-width:100%;box-sizing:border-box;font:inherit;font-size:11px!important;font-weight:700;color:#b45309;text-align:center;text-align-last:center;background:#fff7ed;border:1px solid #fed7aa;padding:1px 2px;cursor:pointer}
+.tl-plan-result .pp-cal-sel{width:100%;max-width:100%;box-sizing:border-box;font:inherit;font-size:11px!important;font-weight:700;color:#b45309;text-align:center;text-align-last:center;background:#fff7ed;border:1px solid #fed7aa;padding:0 2px;height:20px;cursor:pointer}   /* [v611] height:20 + padding 0 2 ⇒ 原实测 27px 撑破 22px 行网格 */
 .tl-plan-result .pp-cal-sel:focus{outline:none;border-color:#f59e0b}
 
 /* 目标流速位于水力项表头下方、联合流量上方，按结果栏普通行参与布局。 */
@@ -2770,7 +2834,8 @@ body > .ry-nav .main-header{display:none!important}
 .tl-grp-table th.tl-grp-a,.tl-grp-table td.tl-grp-a{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;color:#0f172a}
 .tl-grp-table tfoot td{background:#f8fbf9;font-weight:700;color:#0f172a}
 #tlPipePlanSection .pp-side .pp-plan-item input, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-item input{
-  width:64px!important;height:24px;padding:2px 6px;
+  /* [v611] height 24→20：与 22px 行网格对齐（原 24 会把所在行撑高 2px） */
+  width:64px!important;height:20px;padding:2px 6px;
   box-sizing:border-box;text-align:right;flex:0 0 auto;font-size:11px;font-weight:400;
   /* ★ 通用规则 .pp-plan-item input 是按「深绿底面板」写的
      （color:#fff + background:rgba(255,255,255,.06) + 近乎看不见的白边框），
@@ -2958,8 +3023,11 @@ body.ry-tool #pipePlanSection .pp-side{
 }
 body.ry-tool #tlPipePlanSection .pp-side{
   grid-column:1;align-self:stretch;
-  padding:10px;overscroll-behavior:contain;
-  background:var(--ry-panel);border:0;border-right:1px solid var(--ry-line);
+  /* [v611] 与原位态第 2671 条同样扁平化：这里曾给侧栏再铺一层 --ry-panel 底 + 10px 内边距
+     + 右分隔线（第 4 处叠加，且特异性高于 2671 ⇒ 只改那边不生效，实测原位态仍是 #f7faf9 底）。
+     与二级 body.ry-tool #pipePlanSection .pp-side 对齐：只留网格定位，不画皮肤。 */
+  padding:0;overscroll-behavior:contain;
+  background:transparent;border:0;
 }
 body.ry-tool #pipePlanSection .pp-side>*{flex:0 0 auto}
 /* 面板拖拽条（JS 运行时注入）：保留天正式的「属性栏可拖宽」能力 */
@@ -2969,12 +3037,14 @@ body.ry-tool #pipePlanSection .pp-stage, body.ry-tool #tlPipePlanSection .pp-sta
   display:flex;flex-direction:column;gap:0;padding:0;
   background:var(--ry-canvas);border:0;overflow:hidden;
 }
-/* 左栏内的参数块 / 按钮：统一为浅色工程面板 */
+/* 左栏内的参数块 / 按钮：统一为浅色工程面板
+   [v611] 三级两块的底色与边框在此处被二次加了回来（--ry-canvas 底 + --ry-line 框 + 8/10 内边距），
+   是「多层覆盖」的第二层来源 —— 主程序模式下这条特异性高于上面的扁平化规则，故一并清成透明。 */
 body.ry-tool #tlPipePlanSection .pp-plan-bar, body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-plan-bar{
-  background:var(--ry-canvas);border:1px solid var(--ry-line);
-  padding:8px 10px;font-size:11px;
+  background:transparent;border:0;box-shadow:none;
+  padding:0;font-size:11px;
 }
-body.ry-tool #tlPipePlanSection .pp-plan-bar-result, body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-plan-bar-result{background:#fafaf7}
+body.ry-tool #tlPipePlanSection .pp-plan-bar-result, body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-plan-bar-result{background:transparent}
 body.ry-tool #pipePlanSection .pp-btn-ghost, body.ry-tool #tlPipePlanSection .pp-btn-ghost, body.ry-tool #ryCadSide [data-pp="pipePlanSection"] .pp-btn-ghost, body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-btn-ghost{
   color:var(--ry-ink2);border-color:var(--ry-line);background:var(--ry-canvas);
 }
@@ -4189,10 +4259,13 @@ body.ry-tool #designInput .mw-col-right{
 #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-bar-result.pp-res-head.pp-res-off::before{
   content:"水力计算结果 ▸";
 }
+/* [v611] 行规则的 rail 态副本（与 2720 主规则同源，历史上是两份手抄）：
+   扁平化时两处必须一起改，否则用户实际看到的界面仍是旧观感（实测：主规则改了、这处没改
+   ⇒ 行高 26/虚线/padding 2 0 原样，量测直接抓到）。 */
 #ryCadSide [data-pp="tlPipePlanSection"] .pp-side .pp-plan-item{
-  display:flex;align-items:center;gap:5px;
-  width:100%;min-height:26px;padding:2px 0;
-  border-bottom:1px dashed #eef3f0;
+  display:flex;align-items:center;gap:6px;
+  width:100%;min-height:22px;padding:0 10px;box-sizing:border-box;
+  border-bottom:1px solid #e8ecea;
 }
 
 
@@ -4209,8 +4282,11 @@ body.ry-tool #designInput .mw-col-right{
 
 body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-side{
   grid-column:1;align-self:stretch;
-  padding:10px;overscroll-behavior:contain;
-  background:var(--ry-panel);border:0;border-right:1px solid var(--ry-line);
+  /* [v611] 扁平化第三层：此处曾给 rail 态侧栏再铺一次 --ry-panel 底色 + 10px 内边距 + 右分隔线，
+     与 style-01 上部那条（2668）以及 #ryCadSide 自身的白底叠成三层。三者全清，
+     底色交给 #ryCadSide 的白底，内边距交给行自己（行已带 0 10）。 */
+  padding:0;overscroll-behavior:contain;
+  background:transparent;border:0;
 }
 
 
