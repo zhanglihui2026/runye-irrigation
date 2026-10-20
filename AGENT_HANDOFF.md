@@ -2658,3 +2658,12 @@ CloudBase 控制台那张表读的是**身份认证（auth）用户表**，云�
   再刷新管理后台，该行应显示 `199****1296` 形态的脱敏号码。
   仍显示「—」则说明该账号登录态里确实没有手机号（`CloudSync.phone` 为空，常见于只用密码/微信登录且
   auth 用户记录里没有 `phone_number` 的账号），这类只能手工补或让用户补绑手机号。
+
+**2026-10-20 15:10 云函数已换包（回填正式生效）**
+- 用户上传 `ryEntitle-v2c5-phone-backfill.zip` 后复查：`configGet` 的 `fn` 回显 **`v2c-5-phone-backfill`**（实证新代码已在线）；
+  `ping` 返回 `{ok:true, gw:true, rows:1}`（网关联通、能读到库）；无 token 调 `adminMemberStats` 返回 **401**（鉴权前置仍生效）。
+- 复核客户端传参链路：`cloudSignInSms` 的 `done()` 与 `cloudSignInPassword()` 都写 `cloudPhone = pn`，
+  会话恢复 `cloudRestore()` 也从 `st.user.phone_number` 取 ⇒ 登录后 `entPhone()` 一定有值，`pullAuth` 必然带 phone 调 `get`。
+- 结论：**「—」的账号下次打开软件就会自愈**，无需人工介入。`ry_entitle.phone` 全库只有这一处来源
+  （`sql/route_c_migration_v1.sql` 注释「绑定手机号（登录后回填）」本来就写的是这个设计），没有第二处可拿来批量回填。
+- 复跑闸门：`entitle_flow` **51/51**、`--test` **154/154**、`ci_check_static` **PASS=29**、线上冒烟 **27/27**。
