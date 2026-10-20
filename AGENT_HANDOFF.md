@@ -2485,7 +2485,7 @@ C 态说明「已应用 N 根管道的管径…调整管径后自动更新。」
 - 线上冒烟 `_smoke_v521_live.mjs` **27/27**。首跑只过 3/27，是因为 Pages 还在传播（`sw.js` 先翻新、其余资源未就位），复跑即满 —— 遇到这种"第一轮大面积红"先看是不是传播未完成，不是真故障。
 - 线上实页面复测：把吸顶探针加 `LIVE=1`（`PAGE_URL` 指向线上、不起本地服务，`if (!LIVE) srv.close()`）直接打开线上站点跑，**11/11 全过** —— 结论不只在本地产物上成立。
 
-### 26.20 v621-invite-l2：裂变奖励从「续期」改为「升级高级会员 + 30 天」（2026-10-20 · 未发布）
+### 26.20 v621-invite-l2：裂变奖励从「续期」改为「升级高级会员 + 30 天」（2026-10-20 · 已发布 170ce96）
 
 **用户指令**：「下面开始优化会员系统，检查邀请三个送高级会员的功能是否可用。」→ 检查后确认**不可用**，
 用户拍板规则为「升级 L2，但只送 30 天」。
@@ -2540,13 +2540,17 @@ var days = (ent && ent.member_days > 0) ? ent.member_days : …;   // 30
 必须把 `cloudfn/ryEntitle-v2c3-invite-l2.zip` 上传到 CloudBase 控制台覆盖 `ryEntitle` 云函数，
 再用 `configGet` 确认回显已是 `v2c-3-invite-l2`。
 
-**进度（2026-10-20 14:12 核对）**
+**进度（2026-10-20 14:20 全部完成）**
 - ✅ **云函数已上传生效**：`configGet` 回显 `"fn":"v2c-3-invite-l2"`（该字符串只存在于新代码，可确证）。
   自检一行：`curl -s -X POST <ENT_URL> -H 'Content-Type: application/json' -d '{"action":"configGet"}'`。
-- ❌ **静态站仍是 `v620-sticky-grp`**：线上 `runye-entitle.js` 里还能 grep 到旧句
-  `var plan = (ent && ent.plan) || 'L1'` ⇒ 前端 9 个改动文件尚未推送。
-  当前线上是「新服务端 + 旧前端」：发奖会真的升 L2（服务端权威），但页面文案仍自相矛盾、
-  PC 端仍不触发发奖、旧前端的 rdb 降级路径仍会写 L1。
+- ✅ **静态站已发布**：提交 `170ce96`（10 files, +207/−49），推送 `78a6d76..170ce96`，远端 SHA == 本地；
+  Pages 约 45 秒翻新到 `v621-invite-l2`。线上冒烟 `_smoke_v521_live.mjs` **27/27**。
+- 线上逐项核对：`runye-entitle.js` 含 `INVITE_REWARD_PLAN = 'L2'`(1)、旧句
+  `var plan = (ent && ent.plan) || 'L1'` 已为 0 次；`runye-member-ui.js` 含 `maybeGrantReward`(3)；
+  `runye-announce.js` 含「赠送 30 天」(1)；`invite.html` 含「自动升级为高级会员（L2）」(1) 且
+  「等级不变」已为 0 次；`index.html` 的 `style-01.css?v=621-invite-l2`。
+- 发布时 `git push` 连续两次 `schannel: server closed abruptly`，加 `-c http.version=HTTP/1.1` 后成功
+  —— Windows 下 schannel 偶发，不必换代理，先降低到 HTTP/1.1 重试。
 - 下次传云函数优先用控制台「**上传代码**」标签传 zip（保留 `package.json`），
   在线开发编辑器里粘贴 index.js 也能用，但容易漏文件、也无法带 package.json。
 
