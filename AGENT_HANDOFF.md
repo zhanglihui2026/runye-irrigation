@@ -2405,3 +2405,35 @@ C 态说明「已应用 N 根管道的管径…调整管径后自动更新。」
 
 **教训**：`git status --porcelain` 里 `??` 与 ` M` 要分开看 —— 只 `git add -u` 会漏掉新模块（本次差点踩）。
 另：轮询线上版本时 `grep -o "v[0-9a-zA-Z-]*'"` 会先命中注释里的 `v1`，**必须 `grep "const VERSION"`**。
+
+### 26.18 新增闸门：页面引用必须都已入库（防线上 404）（2026-10-20）
+
+**由来**：v619 发布时差点踩到 —— `index.html:11` 引用 `core/cloud-design-binding-store.js`，
+而该文件是新建的、**从未入库**。当时的提交用的是 `git add -u`，它只暂存「已跟踪文件的修改」，
+**新文件会被静默跳过且不报错** ⇒ 首页照常提交、被引用的脚本没上传 ⇒ 线上 404，
+依赖它的功能整块哑掉，而页面看起来一切正常。
+
+**判据（`check_publish_refs.cjs`，新增文件）**
+扫所有已入库的 `*.html`（**跳过 `feature-archive/`**：归档快照本身故意不完整），
+剥掉 HTML 注释后抽 `<script src>` / `<link href>`，只留本地引用（剔 http(s)/协议相对/data:/#），
+去 `?v=` 与 `#` 后按所在目录归一化路径，然后逐条判两件事：
+1. **磁盘上存在**（否则链接本身就是坏的）；
+2. **在 git 索引里**（`git ls-files`；索引 = 这次提交要记录的内容）。
+两件都过才算 PASS。`--quiet` 只在失败时输出。
+
+**接入两处（同一份判据，避免两处漂移）**
+- `ci_check_static.cjs` 新增 **第⑩项**（spawn 上面那个脚本，`--quiet`）。
+- `推送更新.bat` 在「本次将提交的已暂存文件」之后、`COMMIT` 确认之前插入核对块：
+  有 node 就 `node check_publish_refs.cjs`，非 0 ⇒ 打印并 `goto :end`（不提交不推送）；
+  没有 node 则打印提醒后跳过（不硬卡死发布）。块内无括号型 `echo`、无 `git add` 字样，
+  不破坏 §⑨ 的 `publishAutoStage` / `publishRequired` 契约。
+
+**反向验证（证明不是恒绿，两次都做了）**
+- 直接跑脚本：`git rm --cached core/cloud-design-binding-store.js` → 打印
+  `[未入库] index.html → core/cloud-design-binding-store.js`、退出码 1；`git reset` 后退出码 0。
+- 走闸门：同样摘掉索引后 `ci_check_static` → **PASS=28 FAIL=1**（第⑩项红，带文件名）；
+  恢复后 **PASS=29 FAIL=0**。
+- 正常态：**扫描 39 个页面 / 241 条引用 / PASS**。
+
+**为什么不能只靠「记得」**：这类漏文件不报错、不缺页面、本地一切正常，只有线上那一个 404；
+而 404 后的表现是"某功能没反应"，很难联想到是发布漏了文件。所以必须机器拦。

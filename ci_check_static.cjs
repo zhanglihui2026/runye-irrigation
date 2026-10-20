@@ -759,5 +759,17 @@ check('⑨ 发布脚本校验远端基线、提交快照与命令输入并只推
     publishUnsafePush ? '发现无范围限制的 master 推送' : '',
     publishAutoStage ? '发现自动暂存' : ''].filter(Boolean).join(' | '));
 
+/* ---------- ⑩ 页面引用必须都已入库（防线上 404） ----------
+   由来（v619 发布时差点踩到）：index.html 引用 core/cloud-design-binding-store.js，
+   但那是新建文件、没进过仓库；`git add -u` 只暂存「已跟踪文件的修改」会静默跳过新文件
+   ⇒ 首页照常提交、被引用的脚本没上传 ⇒ 线上 404、功能整块哑掉，而页面看起来一切正常。
+   实现放在独立脚本里（推送更新.bat 也用同一份，避免两处判据漂移）。 */
+const refCheck = require('child_process').spawnSync(process.execPath,
+  [path.join(ROOT, 'check_publish_refs.cjs'), '--quiet'], { encoding: 'utf8' });
+const refOut = ((refCheck.stdout || '') + (refCheck.stderr || '')).trim();
+check('⑩ 页面引用的本地脚本/样式都已入库（防「引用了但没上传 ⇒ 线上 404」）',
+  refCheck.status === 0,
+  refCheck.status === 0 ? '' : refOut.split('\n').slice(0, 6).join(' | '));
+
 console.log('\n== ci_check_static：PASS=' + pass + ' FAIL=' + fail + ' ==');
 process.exit(fail ? 1 : 0);

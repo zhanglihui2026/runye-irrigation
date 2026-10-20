@@ -80,6 +80,24 @@ if errorlevel 1 (
   goto :end
 )
 echo.
+REM ===========================================================
+REM  引用核对：页面里引用的本地脚本/样式，必须都已入库。
+REM  由来：新建的文件不会被「只暂存已跟踪文件」的操作带进来，若首页引用了它却没提交，
+REM        线上就是 404、那块功能哑掉，而页面看起来一切正常。
+REM  判据在 check_publish_refs.cjs 里（与 ci_check_static 第⑩项同一份）。
+REM ===========================================================
+node --version >nul 2>&1
+if errorlevel 1 (
+  echo [提醒] 本机没有 node，跳过引用核对。
+  echo        无法确认是否存在「引用了但没入库」的文件；若线上出现 404，先查这一点。
+) else (
+  node check_publish_refs.cjs
+  if errorlevel 1 (
+    echo [已停止] 上面列出的文件没入库或磁盘上不存在；没有提交或推送。
+    goto :end
+  )
+)
+echo.
 set /p "CONFIRM=确认只提交上面列出的已暂存文件？输入 COMMIT 继续："
 if /I not "%CONFIRM%"=="COMMIT" (
   echo [已取消] 没有提交或推送。
