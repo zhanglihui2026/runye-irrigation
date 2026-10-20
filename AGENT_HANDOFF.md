@@ -2755,4 +2755,16 @@ $('mDetailCard').scrollIntoView({behavior:'smooth',block:'nearest'});
   **这类 bug 的共性就是「DOM 多一层、选择器没跟上」，所以把结构 × 样式锁在一起，改层级不配套就立刻红。**
 - 闸门：`--test` **155/155**、`ci_check_static` **PASS=29**、`check_publish_refs` PASS、`entitle_flow` 54/54。
 
+**发布（2026-10-20 15:52）**
+- 提交 `e3c3b44`（5 文件：`mod/style-01.css` / `index.html` / `sw.js` / `tests/diagram_fit.test.cjs` / 本文档），
+  推送 `eaadf61..e3c3b44`。**`tests/*` 在 .gitignore 里（第 82 行），新测试要用 `git add -f`** ——
+  已入库的 42 个测试文件都是这么来的。
+- 推送时又遇上 `CONNECT tunnel failed, response 502`（第一次），第二次 `HTTP/1.1` 成功。**重试即可，不要改远端**。
+- 线上核对：`sw.js` → `v627-diagram-fit`；`index.html` → `style-01.css?v=627-diagram-fit`；
+  线上 `mod/style-01.css` 含 `pp-stage>.ry-pane>.pp-diagram-wrap`（2 处：本页 + #ryCadSide）与
+  `max-height:100%}`（SVG 规则）；线上冒烟 **27/27**。
+- 探针 `_probe_tl_fit.mjs` **不随仓库提交**（本仓库 60+ 个 `_probe_*.mjs` 都是本地工具）；
+  需要复跑就 `node _probe_tl_fit.mjs`，可加 `VW/VH/INJECT/SHOT/SHOT2` 环境变量。
+
+
 
