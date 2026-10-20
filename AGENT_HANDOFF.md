@@ -2708,3 +2708,51 @@ $('mDetailCard').scrollIntoView({behavior:'smooth',block:'nearest'});
 - 断言写法教训：一开始用正则查旧代码字符串，结果**被我自己写在注释里的同一段代码**命中 —— 改成
   切片取 `openDetail` 函数体再查 `\breturn\b`，才对得上「行为」而不是「文本」。
 
+### 26.24 v627-diagram-fit：三级管线简图 / 系统图「不能全部显示」（2026-10-20）
+
+**用户提问**（截图，红箭头指向图纸右下角）：线上版本「三级管线简图不能全部显示出来，系统图同样也是」。
+
+**复现与定位**（`_probe_tl_fit.mjs`，Edge headless + CDP + 本地静态服务，沿用 `_probe_tl_skin.mjs` 骨架）
+量 `#tlDiagramContent` 及其祖先链的 rect / computed style，喂一幅 528×237 地块后生成图。实测 1400×620 窗口：
+
+| 节点 | 高度 | 结论 |
+|---|---|---|
+| `#tlPipePlanSection` | 553 | ✅ 正好 = 620 − 导航 − 1 − 状态栏 |
+| `.pp-stage` | 553 | ✅ |
+| `#tlDiagramWrap`（`.pp-diagram-wrap`） | **818** | ❌ 溢出父级 265px |
+| `#tlDiagramContent` | **818** | ❌ 跟着内容走 |
+| 内部 `svg` | 802 | 被 `main{overflow:hidden}` 裁掉底部 |
+
+**根因（两个叠加）**
+1. **高度链断了**：视图切换在 `.pp-stage` 与 `.pp-diagram-wrap` 之间插了一层 `.ry-pane`
+   （`index.html` 现结构是 `.pp-stage > .ry-pane-pipe > #tlDiagramWrap`），而 style-01.css 里那条
+   `#tlPipePlanSection .pp-stage>.pp-diagram-wrap{...min-height:0}` 写的还是**直接子节点**路径 ⇒ 匹配不到。
+   图纸卡于是退回 `min-height:auto`，作为 flex 列的子项**不能缩到内容以下** ⇒ 被内容撑高。
+2. **SVG 只受宽度约束**：`#tlDiagramContent svg{width:100%;height:auto}`，宽扁窗口下按宽度算出的高度
+   必然超过可用高度 ⇒ 溢出。
+
+**修法**
+1. `mod/style-01.css` 补 `.pp-stage>.ry-pane>.pp-diagram-wrap` 路径（含 `#ryCadSide` 克隆那一路），
+   `margin:0;flex:1 1 auto;min-height:0;display:flex;flex-direction:column;overflow:hidden`。
+   多一个 class ⇒ 特异性 (1,2,0) 压过 `#tlPipePlanSection .pp-diagram-wrap{margin:20px 0;border:...}` 的 (1,1,0)。
+2. `body.ry-tool #tlDiagramContent > svg`（含 `#ppDiagramContent`）加 `height:100%;max-height:100%` ——
+   宽高都取容器尺寸，配合 viewBox 默认 `preserveAspectRatio="xMidYMid meet"` 自动等比缩放居中。
+   容器高度仍为 auto 时 `height:100%` 解析成 auto，**退化为原行为**，不会把图压扁。
+3. 系统图视图容器 `#tlSysDiagramContent` 由 `overflow:hidden` 改 **`auto`**：该视图里除 iframe（首部系统图）
+   之外下方还叠着「三级管线施工简图」图框 `#tlSysPipeBox`（约 1000px 高），hidden 会把它整块裁掉
+   **且没有滚动条**，用户完全够不到。改 auto 后系统图仍按容器等比适配，往下滚可见图框。
+4. `#tlSysPipeBoxBody svg{max-width:100%;height:auto;display:block}` 防止克隆 SVG 横向撑破。
+
+**验证（实机量测，不是目测）**
+- 1400×620：`#tlDiagramContent` 553、`scrollH==clientH`、`svg 537`、`svgClippedV=false`、`gapBottom=8`。
+- 1920×1080 / 1280×800 / 1600×700 / 1400×620 四档窗口：一律 `vOver=0`、`svgClippedV=false`。
+- 系统图：`#tlSysDiagramContent` 539（`overflowY:auto`、`scrollH 1637` 可滚到图框）；
+  **iframe 内部** `docScrollH == docClientH == 539`、`vOver=0` ⇒ A3 图幅整张可见（`ryFitEmbedSheet` 生效）。
+- 截图肉眼复核：`C:/tmp/tl_fit_pipe2.png`（A3 图框上下边框、1区~9区、528m/217m 标注、底部参数行与图例全在）、
+  `C:/tmp/tl_fit_sys.png`（系统图整张：标题栏、流程图、图例、设备表、设计说明、图签全在）。
+- 新增 `tests/diagram_fit.test.cjs`（5 项：三张图纸卡的父节点必须是 `.ry-pane` / 高度链规则按真实路径存在 /
+  SVG 需 `height:100%` / 系统图容器不得 hidden / 克隆 SVG 不得撑破）。
+  **这类 bug 的共性就是「DOM 多一层、选择器没跟上」，所以把结构 × 样式锁在一起，改层级不配套就立刻红。**
+- 闸门：`--test` **155/155**、`ci_check_static` **PASS=29**、`check_publish_refs` PASS、`entitle_flow` 54/54。
+
+

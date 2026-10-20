@@ -886,6 +886,21 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
 
 #tlDiagramContent{position:relative;overflow:visible;padding-top:2px}
 #tlDiagramContent svg{display:block;user-select:none;max-width:100%;width:100%;height:auto}
+/* [v627 2026-10-20 用户反馈「三级管线简图不能全部显示出来，系统图同样」]
+   根因两层：
+   ① 图纸卡的高度链断了。`.pp-stage > .ry-pane > .pp-diagram-wrap` 多插了一层 `.ry-pane`
+      （视图切换用），而 2969 行那条给图纸卡设 `min-height:0` 的规则还写着
+      `.pp-stage>.pp-diagram-wrap`（直接子节点）⇒ 匹配不到 ⇒ 图纸卡退回 `min-height:auto`，
+      作为 flex 列的子项**不能缩到内容以下**，于是被内容（SVG 按 width:100% 算出的高度）撑高。
+      实测 1400×620 窗口：section 553px，图纸卡却 818px —— 溢出 265px，
+      被 `main{overflow:hidden}` 裁掉，用户看到的就是「下半截没了」。
+   ② SVG 只受宽度约束（width:100%;height:auto），宽扁窗口下算出的高度必然超过可用高度。
+   修法：① 把图纸卡的高度链补回（见 2969 行那组选择器加 `.ry-pane` 路径）；
+        ② 这里让 SVG 宽高都取容器尺寸，配合 viewBox 默认的 preserveAspectRatio="xMidYMid meet"
+           自动等比缩放居中 ⇒ 任何窗口比例下都**整幅可见、不裁切、不出滚动条**。
+   注：`height:100%` 在容器高度仍为 auto 时解析成 auto，退化为原行为（不会把图压扁）。 */
+body.ry-tool #tlDiagramContent > svg,
+body.ry-tool #ppDiagramContent > svg{height:100%;max-height:100%}
 #tlDiagramContent svg #tlPlotGroup{cursor:move}
 #tlDiagramContent svg #tlHeaderGroup{cursor:move}
 #tlDiagramContent svg #tlHeaderGroup:hover #tlHeaderBg{fill:rgba(59,130,246,.04);stroke:rgba(59,130,246,.2);stroke-dasharray:3,3}
@@ -2967,6 +2982,14 @@ body > .ry-nav .main-header{display:none!important}
 
 #tlPipePlanSection .pp-stage>.pp-toolbar{margin:0}
 #tlPipePlanSection .pp-stage>.pp-diagram-wrap, #ryCadSide [data-pp="tlPipePlanSection"] .pp-stage>.pp-diagram-wrap{margin:0;flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+/* [v627] 上面这条是「图纸卡直接挂在 .pp-stage 下」的老结构 —— 视图切换（三级简图/系统图/工作区）
+   插入了一层 `.ry-pane` 之后它就再也匹配不到了（见 style 顶部 v627 注释）。
+   这里补上带 .ry-pane 的路径，多一个 class ⇒ 特异性 (1,2,0) 压过
+   `#tlPipePlanSection .pp-diagram-wrap{margin:20px 0;border:1px solid #d9e4dd}` 的 (1,1,0)，
+   margin 归零与去边框也一并生效。overflow:hidden 兜住 SVG 的瞬时溢出。 */
+#tlPipePlanSection .pp-stage>.ry-pane>.pp-diagram-wrap,
+#ryCadSide [data-pp="tlPipePlanSection"] .pp-stage>.ry-pane>.pp-diagram-wrap{
+  margin:0;flex:1 1 auto;min-height:0;display:flex;flex-direction:column;overflow:hidden}
 #tlPipePlanSection .pp-stage>.pp-diagram-wrap>#tlDiagramContent, #ryCadSide [data-pp="tlPipePlanSection"] .pp-stage>.pp-diagram-wrap>#tlDiagramContent{flex:1 1 auto;min-height:0}
 /* 二级施工图满屏视图：点「生成施工图」后，隐藏编辑两栏、施工图占满整屏 */
 
@@ -3783,8 +3806,13 @@ body.ry-tool #tlPipePlanSection[data-ry-view="sys"] #tlSysDiagramContent{padding
    约束：只动版式与容器高度，不改 iframe 的 id、src 拼装与显隐逻辑。
    ========================================================================== */
 #tlPipePlanSection[data-ry-view="sys"] #tlSysDiagramWrap > #tlSysDiagramContent{
-  flex:1 1 auto;min-height:0;overflow:hidden;
+  flex:1 1 auto;min-height:0;overflow:auto;
 }
+/* [v627] 原为 overflow:hidden —— 系统图视图里除 iframe（首部系统图）之外，
+   下方还叠了「三级管线施工简图」图框（#tlSysPipeBox，高约 1000px）。
+   容器高度只有一屏（实测 539px），hidden 会把图框整块裁掉，而且**连滚动条都没有**，
+   用户完全够不到。改 auto 后：系统图本身仍按容器高度等比适配（iframe height:100%），
+   往下滚即可看图框。 */
 #tlPipePlanSection[data-ry-view="sys"] #tlSysFrame{
   display:block;width:100%;height:100%;min-height:0;border:0;background:#fff;
 }
@@ -4439,8 +4467,10 @@ body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-side{
 
 body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="sys"] #tlSysDiagramContent{padding:0}
 #ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="sys"] #tlSysDiagramWrap > #tlSysDiagramContent{
-  flex:1 1 auto;min-height:0;overflow:hidden;
+  flex:1 1 auto;min-height:0;overflow:auto;
 }
+/* [v627] 同上：hidden → auto，让下方「三级管线施工简图」图框可滚动到 */
+#tlSysPipeBoxBody svg{max-width:100%;height:auto;display:block}
 #ryCadSide [data-pp="tlPipePlanSection"][data-ry-view="sys"] #tlSysFrame{
   display:block;width:100%;height:100%;min-height:0;border:0;background:#fff;
 }
