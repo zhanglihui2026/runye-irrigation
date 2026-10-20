@@ -58,6 +58,13 @@ await sleep(1200);
 console.log('--- 匿名登录后 ---');
 console.log(JSON.stringify(await ev(PEEK), null, 1));
 
+/* 幂等性：已有匿名会话时再调一次 ensureAnon，**不能**再建一个新匿名用户（v631：先 restore） */
+const sub1 = await ev('window.CloudSync.authSub()');
+console.log('二次 ensureAnon:', JSON.stringify(await ev('window.CloudSync.ensureAnon()')));
+await sleep(800);
+const sub2 = await ev('window.CloudSync.authSub()');
+console.log('会话是否被顶掉:', sub1 === sub2 ? '否（正确）' : ('是（错误）' + sub1 + ' → ' + sub2));
+
 /* 关键实验：注入一颗「会员凭据」与一颗「匿名凭据」，看 cloudAuthSub 挑哪一颗。
    用真实匿名 JWT 的 payload 结构（sub 保留）复制一份改成 19 位数字 sub、去掉 is_anonymous。 */
 const PICK = `(function(){
