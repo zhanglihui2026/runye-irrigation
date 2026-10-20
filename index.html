@@ -17,7 +17,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>润野灌溉设计优化版｜滴灌管径与水泵选型</title>
 <meta name="description" content="输入地块、滴灌带与水源参数，快速计算灌溉分区、主管支管管径和水泵工作点。"/>
-<link rel="stylesheet" href="mod/style-01.css?v=633-admin-badge">
+<link rel="stylesheet" href="mod/style-01.css?v=637-search-row-wrap">
 <link rel="stylesheet" href="runye-inverse-design.css?v=277">
 <script defer src="runye-inverse-design.js?v=438-branch-flow-conservation"></script>
 <link rel="stylesheet" href="runye-terrain.css?v=454-terrain-sidebar-peer">
@@ -42,7 +42,7 @@
 <link rel="stylesheet" href="hydraulic-calc/hydraulic-calc.css">
 <link rel="stylesheet" href="filter-system/filter-system.css">
 <link rel="stylesheet" href="pwa/vendor/leaflet.css">
-<link rel="stylesheet" href="mod/online-map.css?v=578-chip-hover-unify">
+<link rel="stylesheet" href="mod/online-map.css?v=637-search-row-wrap">
 <link rel="stylesheet" href="terrain/terrain.css?v=535-terrain-single-source">
 <link rel="stylesheet" href="hydraulics-main.css?v=442-native">
 <style id="ryCadTwinCss">
@@ -322,7 +322,7 @@ body.ry-worst-off [data-tlworst]{display:none}
   <script src="mod/inline-05.js?v=357"></script>
   <script src="runye-nav.js?v=579-map-route-single-navigation"></script>
   <!-- [NEW MODULE: DXF 导出] 入口：删除本行即卸载（不改动任何原有逻辑） -->
-  <script src="runye-dxf.js?v=404-tier-gates"></script>
+  <script src="runye-dxf.js?v=636-north-arrow"></script>
   <!-- [NEW MODULE: pipe_optim] 入口：删除本行即卸载本隔离模块（不改动任何原有逻辑） -->
   <script src="pipe_optim_ui.js"></script>
 </div>
@@ -596,7 +596,7 @@ body.ry-worst-off [data-tlworst]{display:none}
         <h4 class="sec-t">地图</h4>
         <div class="tools">
           <div class="search-row">
-            <input type="text" id="search" placeholder="搜索地点（如：三亚 崖州）" />
+            <input type="text" id="search" placeholder="搜索地点，或输入坐标（18.25,109.51）" />
             <button class="mbtn" id="btnSearch">搜索</button>
             <button class="mbtn" id="btnSavePlace">保存地点</button>
           </div>
@@ -604,7 +604,7 @@ body.ry-worst-off [data-tlworst]{display:none}
           <div class="pill-list" id="placeList" hidden></div>
           <button class="mbtn" id="btnLocate">📍 定位三亚</button>
           <button class="mbtn" id="btnBase">🗺️ 切换底图</button>
-          <div class="hint" id="placeHint">搜索定位后可「保存地点」；地图位置自动记住，下次打开回到上次位置。也可直接输入坐标（如 18.2528,109.5119）定位。</div>
+          <div class="hint" id="placeHint">搜索定位后可「保存地点」；地图位置自动记住，下次打开回到上次位置。坐标搜索支持：18.2528,109.5119 ｜ N18.2528 E109.5119 ｜ 18°15'10"N 109°30'43"E ｜ 北纬18.2528 东经109.5119（首值大于 90 时自动按「经度,纬度」理解），定位后会反查该处地名。</div>
         </div>
       </section>
       <!-- [v495 用户要求] 主程序内嵌在线地图与独立页同步：原「绘制」区整体迁出左栏
@@ -2267,7 +2267,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script src="mod/material-table.js?v=421-mat-table"></script>
 <!-- [v424-plan-calc-render] 扬程公式与分解展示模块，先于计算控制器和三级调用方装载。 -->
 <script src="mod/plan-calc-render.js?v=614-head-formula"></script>
-<script src="mod/inline-09.js?v=619-undo-cover"></script>
+<script src="mod/inline-09.js?v=636-north-arrow"></script>
 <!-- [v423-header-layout] 三级简图标题布局依赖 inline-09 的 tlMeasureText 与生成时写入的标题状态。 -->
 <script src="mod/tl-header-layout.js?v=423-header-layout"></script>
 
@@ -2311,7 +2311,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script src="tl-workspace/tl-nodes.js?v=619-undo-cover"></script>
 <!-- v180b（2026-10-02）：tl-nodes.js 就绪后再挂简图实时刷新订阅（见 tlHookTlNodesLiveSync 注释） -->
 <script src="mod/inline-22.js?v=357"></script>
-<script src="tl-workspace/tl-workspace.js?v=582-ws-rerender-after-regen"></script>
+<script src="tl-workspace/tl-workspace.js?v=636-north-arrow"></script>
 <script src="tl-workspace/tl-path-measure.js"></script>
 <!-- 2026-09-23（用户指令）v135：水力计算器「入口预留」总闸——置 true 时界面不挂载
      （hydraulic-calc.js 的 mount/setConfig/importThreeLevel 直接空转），导航入口与占位文案保留，
@@ -2402,7 +2402,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.1/cdn/shoelace.js"></script>
 <script src="mod/ry-panel.js?v=545-rect-clamp"></script>
 <script src="pwa/vendor/leaflet.js"></script>
-<script src="mod/online-map.js?v=598-tab-scoped-plot-transfer"></script>
+<script src="mod/online-map.js?v=637-search-row-wrap"></script>
 <script src="terrain/terrain-core.js?v=410-elev"></script>
 <script src="terrain/terrain-ui.js?v=513-sec-gate"></script>
 <script src="runye-hydraulics-page.js?v=442-native"></script>

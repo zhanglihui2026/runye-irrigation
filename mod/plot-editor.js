@@ -2518,13 +2518,59 @@
       status._t=setTimeout(function(){[statusEl,$('ryRecipeStatus')].forEach(function(el){if(el&&el.textContent===msg)el.textContent='';});},4000);
     }
     function snapshot(){var p={};IDS.forEach(function(id){var el=$(id);p[id]=el?el.value:null;});return p;}
+    /* [v634 2026-10-20 用户要求]「调用」之后面板与结果必须一起跟着变。原实现三处缺陷：
+       ① 自己写一套 set()，绕开 v520 的单一入口 RyPlanParams.set（落盘/派发口径分家）；
+       ② 只写原生 input，不碰 sl-input 代理 —— 代理 setter 是靠 try{}catch(_){} 静默劫持的，
+          劫持失败时屏幕上显示的还是旧值（"值变了但看着没变"）；
+       ③ 不管有没有地块、有没有管线都直冲 ppRepartitionFromRotatedPlot
+          —— 无地块 alert、有管线 confirm 并清空，用户一取消就只剩"值变了、什么都没重算"。
+       现改为：单一入口写入 → 强制同步代理 → 轻量重算链必跑 → 重分区按条件守卫。 */
     function applyParams(p){
-      function set(id,v){var el=$(id);
-        if(el&&v!==null&&v!==undefined&&isFinite(+v)&&String(v)!==''){el.value=v;
-          el.dispatchEvent(new Event('change',{bubbles:true}));el.dispatchEvent(new Event('input',{bubbles:true}));}}
+      var wrote=[],skipped=[],viaPlan=false;
+      /* ① 单一入口优先（v520 起三个入口都应落到这里：同源派发 + 自动落盘） */
+      try{
+        if(window.RyPlanParams&&typeof window.RyPlanParams.set==='function'){
+          var patch={};
+          IDS.forEach(function(id){
+            if(p[id]!==null&&p[id]!==undefined&&String(p[id])!=='')patch[id]=p[id];
+          });
+          window.RyPlanParams.set(patch);viaPlan=true;
+        }
+      }catch(e){viaPlan=false;}
+      /* ② 兜底写入 + 强制同步 sl-input 代理（劫持成功时本步幂等） */
+      function set(id,v){
+        var el=$(id);
+        if(!(el&&v!==null&&v!==undefined&&isFinite(+v)&&String(v)!=='')){skipped.push(id);return;}
+        if(String(el.value)!==String(v)||!viaPlan){
+          el.value=v;
+          el.dispatchEvent(new Event('change',{bubbles:true}));
+          el.dispatchEvent(new Event('input',{bubbles:true}));
+        }
+        var px=document.querySelector('sl-input[data-ry-proxy-for="'+id+'"]');
+        if(px&&String(px.value)!==String(el.value)){try{px.value=el.value;}catch(e){}}
+        wrote.push(id);
+      }
       IDS.forEach(function(id){set(id,p[id]);});
-      /* [v517] 同上：三级输入已取消，IDS 里的 planTargetV 就是唯一入口。 */
-      if(typeof ppRepartitionFromRotatedPlot==='function'){try{ppRepartitionFromRotatedPlot({aiApply:true});}catch(e){}}
+      /* ③ 轻量重算链：一定执行，不依赖 ppRepartitionFromRotatedPlot 是否走得下去 */
+      try{if(typeof ppPullLiftDh==='function')ppPullLiftDh();}catch(e){}
+      try{if(typeof calcPlan==='function')calcPlan();}catch(e){}
+      try{if(typeof ppRender==='function')ppRender();}catch(e){}
+      try{if(typeof ppRefreshDiagramOrReset==='function')ppRefreshDiagramOrReset();}catch(e){}
+      try{if(typeof renderThreeLevel==='function')renderThreeLevel();}catch(e){}
+      try{if(typeof tlUpdatePlanBar==='function')tlUpdatePlanBar();}catch(e){}
+      /* ④ 重分区：只在「有地块 + 没有已画管线」时做，避免 alert / confirm 清图 */
+      var repart='skip',note='';
+      try{
+        var _st=(window.RunyeBridge&&window.RunyeBridge.state)||window.ppState||null;
+        var hasPlot=!!(_st&&_st.polyPts&&_st.polyPts.length);
+        var hasPipe=(typeof ppHasPipeContent==='function')?!!ppHasPipeContent():false;
+        if(!hasPlot){note='未画地块，仅回填参数';}
+        else if(hasPipe){note='已有管线保留、未重排';}
+        else if(typeof ppRepartitionFromRotatedPlot==='function'){
+          ppRepartitionFromRotatedPlot({aiApply:true});repart='done';
+        }
+      }catch(e){repart='err';}
+      return {wrote:wrote,skipped:skipped,repart:repart,note:note};
     }
     function fillSelect(sel,list,keepId){
       if(!sel)return;
@@ -2544,6 +2590,23 @@
       fillSelect($('ryRecipeSelect'),list,keepId);
     }
     function curSelId(){var s=$('ryRecipeSelect');return (s&&s.value)?s.value:(selEl.value||null);}
+    /* [v634] 「调用」取方案的目标：**以工具栏下拉为准**（那是用户眼前选中的），
+       工具栏没选时才回退设置页下拉。curSelId 的语义（设置页优先）留给改名/删除，不动。 */
+    function applyTargetId(){
+      if(selEl&&selEl.value)return selEl.value;
+      var g=$('ryRecipeSelect');
+      if(g&&g.value)return g.value;
+      /* [v634b] 两处都没选：回退到「最近保存的方案」并把它选上。
+         用户点「调用」的本意就是用方案，不该被一句 4 秒就消失的「请先选择方案」挡回来
+         （工具栏宽度不足时下拉框本身就可能看不见，等于让按钮空转）。 */
+      var list=read();
+      if(!list.length)return null;
+      list.sort(function(a,b){return (b.at||0)-(a.at||0);});
+      var id=list[0].id;
+      if(selEl){try{selEl.value=id;}catch(e){}}
+      if(g){try{g.value=id;}catch(e){}}
+      return id;
+    }
     function curName(){var el=$('ryRecipeName');return el?(el.value||'').trim():'';}
     function doSave(){
       var list=read(),name=curName()||('方案'+(list.length+1));
@@ -2568,9 +2631,15 @@
       if(write(list)){refreshSelect();status('已删除方案');}
     }
     $('ppRecipeApply').onclick=function(){
-      var r=read().find(function(x){return x.id===selEl.value;})||null;
+      var rid=applyTargetId();
+      var r=read().find(function(x){return x.id===rid;})||null;
       if(!r){status('请先在下拉里选择一个方案','err');return;}
-      applyParams(r.params||{});status('已调用「'+r.name+'」：参数已回填并重算');
+      var got=applyParams(r.params||{})||{};
+      var miss=(got.skipped&&got.skipped.length)||0;
+      var tip='已调用「'+r.name+'」：'+(got.wrote?got.wrote.length:0)+' 项已回填并重算';
+      if(miss)tip+='；'+miss+' 项无有效值未回填（'+got.skipped.join('、')+'）';
+      if(got.note)tip+='；'+got.note;
+      status(tip,miss?'err':undefined);
     };
     /* 旧工具栏 保存/✎/🗑 若 DOM 还在（回滚场景）也照常绑定；不在则跳过 */
     var _old=[[$('ppRecipeSave'),doSave],[$('ppRecipeRename'),doRename],[$('ppRecipeDel'),doDel]];

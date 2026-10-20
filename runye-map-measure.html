@@ -69,9 +69,12 @@
   .side .sec-t{font-size:10px !important}
   .mbtn-primary{background:var(--g-600);color:#fff;border-color:var(--g-600);text-align:center}
   .mbtn-primary:hover{background:var(--g-700);color:#fff}
-  .search-row{display:flex;gap:6px}
+  .search-row{display:flex;flex-wrap:wrap;gap:6px}
   .search-row input{flex:1;min-width:0}
   .search-row .mbtn{flex:none;text-align:center}
+  /* [v637] 「保存地点」独占第二行（flex-basis:100% 强制换行），第一行只留「搜索框 + 搜索」，
+     让搜索框宽度多出原「保存地点」按钮那份（约 68px）。两页同改：主程序内嵌版见 mod/online-map.css。 */
+  .search-row #btnSavePlace{flex:1 0 100%;text-align:center}
   /* 搜索结果候选 + 已保存地点（2026-09-19 v60：地点搜索 / 保存地点 / 位置记忆） */
   .sr-list{margin-top:5px;border:1px solid var(--s-300);background:#fff;max-height:158px;overflow-y:auto}
   .sr-list[hidden]{display:none}
@@ -242,7 +245,7 @@
         <h4 class="sec-t">地图</h4>
         <div class="tools">
           <div class="search-row">
-            <input type="text" id="search" placeholder="搜索地点（如：三亚 崖州）" />
+            <input type="text" id="search" placeholder="搜索地点，或输入坐标（18.25,109.51）" />
             <button class="mbtn" id="btnSearch">搜索</button>
             <button class="mbtn" id="btnSavePlace">保存地点</button>
           </div>
@@ -250,7 +253,7 @@
           <div class="pill-list" id="placeList" hidden></div>
           <button class="mbtn" id="btnLocate">📍 定位三亚</button>
           <button class="mbtn" id="btnBase">🗺️ 切换底图</button>
-          <div class="hint" id="placeHint">搜索定位后可「保存地点」；地图位置自动记住，下次打开回到上次位置。也可直接输入坐标（如 18.2528,109.5119）定位。</div>
+          <div class="hint" id="placeHint">搜索定位后可「保存地点」；地图位置自动记住，下次打开回到上次位置。坐标搜索支持：18.2528,109.5119 ｜ N18.2528 E109.5119 ｜ 18°15'10"N 109°30'43"E ｜ 北纬18.2528 东经109.5119（首值大于 90 时自动按「经度,纬度」理解），定位后会反查该处地名。</div>
         </div>
       </section>
       <!-- [v494 用户要求] 原「绘制」区（开始画框/完成并画下一块/加点/撤销/测距/清除）
@@ -354,7 +357,7 @@
 </div>
 
 <script src="pwa/vendor/leaflet.js"></script>
-<script src="mod/online-map.js?v=598-tab-scoped-plot-transfer"></script>
+<script src="mod/online-map.js?v=637-search-row-wrap"></script>
 <script src="mod/ry-panel.js?v=545-rect-clamp"></script>
 </body>
 </html>

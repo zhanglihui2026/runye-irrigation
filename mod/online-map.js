@@ -746,18 +746,117 @@
     renderRes([]);
     tip('已定位：'+r.name+(r.detail?'（'+r.detail+'）':'')+'。点「💾 保存地点」可记住此处。');
   }
-  // 坐标直入（免网络兜底）：支持「18.2528,109.5119」；首值 >90 时按「经度,纬度」理解
+  /* ===== [v634 2026-10-20 用户要求]「根据坐标搜索位置」 =====
+     旧 parseLatLng 只认「18.2528,109.5119」，且只落一个红点、不告诉你这是哪。
+     现支持四类写法（全部按 **WGS-84** 理解，定位前统一转 GCJ-02，与搜索候选同口径）：
+       ① 十进制度     18.2528,109.5119 ｜ 109.5119,18.2528（首值 >90 自动判为经度）
+       ② 方向字母     N18.2528 E109.5119 ｜ 18.2528N,109.5119E
+       ③ 度分秒       18°15'10"N, 109°30'43"E
+       ④ 中文经纬     北纬18.2528 东经109.5119
+     定位完成后由 reverseName() 异步反查地名（网络失败只少一个地名，不影响定位）。 */
+  var COORD_AXIS={N:'lat',S:'lat',E:'lng',W:'lng','北':'lat','南':'lat','东':'lng','西':'lng'};
+  function coordAxis(h){
+    if(!h)return null;
+    var k=String(h).toUpperCase();
+    if(COORD_AXIS[k])return COORD_AXIS[k];
+    return COORD_AXIS[String(h).charAt(0)]||null;
+  }
+  function coordSign(h){
+    var k=String(h||'').toUpperCase();
+    return (k==='S'||k==='W'||k==='南'||k==='西')?-1:1;
+  }
+  /* 单段 → 十进制：18 ｜ 18.5 ｜ 18°15′ ｜ 18°15′10.5″，可带前/后方向标记 */
+  function coordPiece(seg){
+    var s=String(seg).trim();
+    if(!s)return null;
+    var hemi=null,m;
+    if((m=/^([NSEWnsew]|北纬|南纬|东经|西经|北|南|东|西)\s*(.+)$/.exec(s))){ hemi=m[1]; s=m[2]; }
+    else if((m=/^(.+?)\s*([NSEWnsew]|北纬|南纬|东经|西经|北|南|东|西)$/.exec(s))){ s=m[1]; hemi=m[2]; }
+    s=String(s).replace(/[°度]/g,'°').replace(/['′分]/g,'′').replace(/["″秒]/g,'″').trim();
+    if(!/^-?\d/.test(s))return null;
+    var d=s.split('°'),deg=parseFloat(d[0]);
+    if(!isFinite(deg))return null;
+    var min=0,sec=0;
+    if(d[1]!=null){
+      var q=d[1].split('′');
+      min=parseFloat(q[0])||0;
+      if(q[1]!=null)sec=parseFloat(String(q[1]).replace(/″/g,''))||0;
+    }
+    if(min>=60||sec>=60)return null;
+    var v=Math.abs(deg)+min/60+sec/3600;
+    if(/^-/.test(String(d[0]).trim()))v=-v;      /* 显式负号优先于方向字母 */
+    else v=v*coordSign(hemi);
+    return {v:v,axis:coordAxis(hemi)};
+  }
   function parseLatLng(q){
-    var m=/^\s*(-?\d+(?:\.\d+)?)\s*[,，\s]\s*(-?\d+(?:\.\d+)?)\s*$/.exec(q);
-    if(!m) return null;
-    var a=parseFloat(m[1]), b=parseFloat(m[2]), lat, lng;
-    if(Math.abs(a)>90 && Math.abs(b)<=90){ lng=a; lat=b; } else { lat=a; lng=b; }
-    if(Math.abs(lat)>90 || Math.abs(lng)>180) return null;
-    return {lat:lat, lng:lng};
+    if(!q)return null;
+    var s=String(q).trim();
+    /* ① 纯数字对（最常见，保持旧行为） */
+    var m=/^\s*(-?\d+(?:\.\d+)?)\s*[,，\s]\s*(-?\d+(?:\.\d+)?)\s*$/.exec(s);
+    if(m){
+      var a=parseFloat(m[1]),b=parseFloat(m[2]),lat,lng;
+      if(Math.abs(a)>90&&Math.abs(b)<=90){lng=a;lat=b;}else{lat=a;lng=b;}
+      if(Math.abs(lat)>90||Math.abs(lng)>180)return null;
+      return {lat:lat,lng:lng,raw:s};
+    }
+    /* ② 多格式：先把「10″ N」这类**秒/分符号与方向之间**的空格并掉（不能按「数字+空格+方向」合并，
+          否则 「18.2528 E109.5119」会被粘成一段、整条判定失败），再按分隔符切 */
+    var t=s.replace(/(["″秒'′分])\s+([NSEWnsew])/g,'$1$2').replace(/[，,；;/]+/g,' , ');
+    var segs=t.split(/\s+/).filter(function(x){return x&&x!==',';});
+    if(segs.length<2)return null;
+    var lat=null,lng=null,free=[];
+    segs.forEach(function(sg){
+      var p=coordPiece(sg);
+      if(!p)return;
+      if(p.axis==='lat'){ if(lat===null)lat=p.v; }
+      else if(p.axis==='lng'){ if(lng===null)lng=p.v; }
+      else free.push(p.v);
+    });
+    if(lat===null&&lng===null){
+      if(free.length<2)return null;
+      if(Math.abs(free[0])>90&&Math.abs(free[1])<=90){lng=free[0];lat=free[1];}
+      else{lat=free[0];lng=free[1];}
+    }else if(lat===null){ if(!free.length)return null; lat=free[0]; }
+    else if(lng===null){ if(!free.length)return null; lng=free[0]; }
+    if(Math.abs(lat)>90||Math.abs(lng)>180)return null;
+    return {lat:lat,lng:lng,raw:s};
+  }
+  /* 坐标 → 「这是哪」。主源 Nominatim（中文地址），备源 Photon；
+     两源都失败只影响地名，定位本身已完成（不阻塞、不报错）。 */
+  function reverseName(lat,lng){
+    var la=(+lat).toFixed(6),lo=(+lng).toFixed(6);
+    function pickNm(j){
+      var a=(j&&j.address)||{};
+      var nm=j.name||a.road||a.neighbourhood||a.village||a.town||a.city_district||a.city||a.county||a.state||'';
+      var det=[];
+      [a.state,a.city,a.county||a.city_district,a.town||a.village||a.suburb,a.road].forEach(function(x){
+        if(x&&x!==nm&&det.indexOf(x)<0)det.push(x);
+      });
+      if(!nm&&!det.length)throw new Error('empty');
+      return {name:nm||det[0],detail:det.join(' · ')};
+    }
+    /* [v634] 源顺序按 2026-10-20 实测调换：国内 Nominatim reverse 常在 12s 内无返回，
+       而 Photon reverse 秒回且带中文地名（实测 18.2528,109.5119 → 阳光雅园·吉阳区·三亚市·海南省）。
+       主源 Photon、备源 Nominatim —— 与关键词搜索的源顺序一致。 */
+    function pickPhoton(j){
+      var f=(j&&j.features&&j.features[0]);
+      if(!f)throw new Error('empty');
+      var p=f.properties||{};
+      var det=[p.district,p.city,p.state].filter(Boolean);
+      var nm=p.name||'';
+      if(!nm&&!det.length)throw new Error('empty');
+      return {name:nm||det[0],detail:det.join(' · ')};
+    }
+    return fetchJson('https://photon.komoot.io/reverse?limit=1&lat='+la+'&lon='+lo,8000)
+      .then(pickPhoton)
+      .catch(function(){
+        return fetchJson('https://nominatim.openstreetmap.org/reverse?format=jsonv2&accept-language=zh&zoom=18&lat='+la+'&lon='+lo,8000)
+          .then(pickNm);
+      });
   }
   function doSearch(){
     var q=document.getElementById('search').value.trim();
-    if(!q){ tip('请输入要搜索的地点名称，例如「三亚 崖州」。'); return; }
+    if(!q){ tip('请输入地点名称，或直接粘贴坐标（18.2528,109.5119 ｜ 18°15\'10"N 109°30\'43"E）。'); return; }
     lsSet(K_Q,q);
     var seq=++searchSeq;
     // 坐标直入优先：不触网即可定位
@@ -765,10 +864,23 @@
     if(ll){
       // [GCJ-02 修复 2026-09-28] 用户输入的坐标是真实 WGS-84，转成 GCJ-02 网格值再定位
       var gl=toGcjLL(ll.lat, ll.lng);
-      lastPick={name:q, detail:'坐标定位', lat:gl.lat, lng:gl.lng, zoom:16};
+      var cs=(+ll.lat).toFixed(6)+', '+(+ll.lng).toFixed(6);
+      lastPick={name:q, detail:'坐标 '+cs, lat:gl.lat, lng:gl.lng, zoom:16};
       goTo(lastPick);
       renderRes([]);
-      tip('已按坐标定位：'+gl.lat.toFixed(6)+', '+gl.lng.toFixed(6)+'。点「💾 保存地点」可记住此处。');
+      /* [v634] 定位先落地（不等网络），地名回来后再补提示与图钉 tooltip */
+      tip('已按坐标定位：'+cs+'，正在查询该处地名…');
+      reverseName(ll.lat, ll.lng).then(function(r){
+        if(seq!==searchSeq) return;
+        if(!r||!r.name){ tip('已按坐标定位：'+cs+'（未取到地名，可直接「💾 保存地点」）。'); return; }
+        lastPick.name=r.name;
+        lastPick.detail=(r.detail?r.detail+' · ':'')+'坐标 '+cs;
+        if(searchMark&&searchMark.setTooltipContent)searchMark.setTooltipContent(r.name);
+        tip('已按坐标定位：'+r.name+(r.detail?'（'+r.detail+'）':'')+' · '+cs+'。点「💾 保存地点」可记住此处。');
+      }).catch(function(){
+        if(seq!==searchSeq) return;
+        tip('已按坐标定位：'+cs+'（未取到地名，可直接「💾 保存地点」）。');
+      });
       return;
     }
     lastPick=null;

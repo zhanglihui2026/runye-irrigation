@@ -113,7 +113,9 @@
   }
   function entText(p,h,str,layer,sty){ return baseEntity('TEXT',layer,sty).concat(['100','AcDbText','10',f(p[0]),'20',f(p[1]),'30','0','40',f(h),'1',escText(str),'7','STANDARD','100','AcDbText']).join('\n'); }
 
-  var SKIP_IDS = { tlFrameGroup:1, tlTitleGroup:1, tlHeaderGroup:1, tlCalcBookGroup:1, tlLegendGroup:1 };
+  /* tlNorthGroup = 指北针（2026-10-20 加）：图框装饰，与图框/标题/图例同属「出图页眉页脚」，
+     DXF 里没有对应实体（且北方位对 DXF 使用方无意义）⇒ 整组跳过。 */
+  var SKIP_IDS = { tlFrameGroup:1, tlTitleGroup:1, tlHeaderGroup:1, tlCalcBookGroup:1, tlLegendGroup:1, tlNorthGroup:1 };
   /* 导出密码（2026-10-02 用户要求）：DXF 导出前须在对话框输入。前端口令门，防误用而非加密。 */
   var EXPORT_PWD = '230230';
 

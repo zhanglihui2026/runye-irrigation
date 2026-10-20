@@ -21,7 +21,7 @@ var clearTap = null;     /* 高亮联动：document 捕获监听（deactivate �
 
 function cfg(ctx) { return (ctx.manifest && ctx.manifest.config) || {}; }
 function navCfg(ctx) { return (ctx.manifest && ctx.manifest.ui && ctx.manifest.ui.nav) || {}; }
-function norm(t) { return String(t || '').replace(/\s*·\s*锁\s*$/, '').trim(); }
+function norm(t) { return String(t || '').replace(/\s*·\s*(?:锁|同步中)\s*$/, '').trim(); }
 
 /* 会员门控：语义与 runye-nav.js gate() 完全一致（三态 fail-open）——
    否则网络抖动会把老用户当场锁死。feat 取 manifest.config.feat。 */

@@ -31,7 +31,7 @@ function cfg(ctx) { return (ctx.manifest && ctx.manifest.config) || {}; }
 function navCfg(ctx) { return (ctx.manifest && ctx.manifest.ui && ctx.manifest.ui.nav) || {}; }
 
 /* 归一化：线上锁会给导航项加「 ·锁」后缀，比较前去掉（是装饰不是名字） */
-function norm(t) { return String(t || '').replace(/\s*·\s*锁\s*$/, '').trim(); }
+function norm(t) { return String(t || '').replace(/\s*·\s*(?:锁|同步中)\s*$/, '').trim(); }
 
 /* 找老入口：按标签匹配（data-ry-navitem 由 runye-nav.js 渲染） */
 function findLegacy(ctx) {

@@ -3094,6 +3094,25 @@ function tlAutoGenerate(options) {
   var tlPlotNameVal=(document.getElementById('tlPlotName')&&document.getElementById('tlPlotName').value.trim())||'未命名地块';
   // 标题（2026-09-16 恢复）：简图/下载/打印显示；工作区克隆剥离 tlTitleGroup
   parts.push('<g id="tlTitleGroup"><text x="'+svgW/2+'" y="40" text-anchor="middle" font-size="20" font-weight="700" fill="#14532d">润野灌溉 · 三级管线施工简图</text></g>');
+  /* ── 指北针（2026-10-20 用户要求「三级简图出图要增加指北针」）────────────────
+     位置：A3 图框右上角空白区。信息行从 x=34 起、宽 960 ⇒ 最长到 994；内细框右边线在
+       1174；中间 1000..1170 是结构上永不被占用的空白（两行折行也只是往下长，不往右长）。
+     方位：简图顶点取 window.measuredPolygon = 面积测量的**图像坐标**（y 向下），
+       绘制时 y 直接映射成 SVG y ⇒ 图上方即真北，指北针恒朝上。
+       不跟地块变换旋转是对的：二级页的「地块旋转/镜像」只是作图便利变换，简图走的是
+       「地图口径」未旋转顶点（见下方 [map-enhance] 注释），北方位恒定。
+     显示范围：简图 / 下载 SVG / 下载 PNG / 打印 全部同源（都出自本 parts）；
+       工作区克隆底图与 DXF 导出按「图框装饰」剥离（见 tl-workspace.js、runye-dxf.js）。
+     造型：双半式 —— 北半实心深绿、南半空心描边，顶部 N 字，与图例同色系（#14532d/#111827）。 */
+  var tlNcx = svgW - 96, tlNcy = 82, tlNr = 24;
+  var tlNarrowN = 'M'+tlNcx+' '+(tlNcy-17)+' L'+(tlNcx+6)+' '+(tlNcy-2)+' L'+tlNcx+' '+(tlNcy+4)+' L'+(tlNcx-6)+' '+(tlNcy-2)+' Z';
+  var tlNarrowS = 'M'+tlNcx+' '+(tlNcy+17)+' L'+(tlNcx+6)+' '+(tlNcy+2)+' L'+tlNcx+' '+(tlNcy-4)+' L'+(tlNcx-6)+' '+(tlNcy+2)+' Z';
+  parts.push('<g id="tlNorthGroup">'
+    +'<circle cx="'+tlNcx+'" cy="'+tlNcy+'" r="'+tlNr+'" fill="#ffffff" stroke="#111827" stroke-width="1.2"/>'
+    +'<path d="'+tlNarrowN+'" fill="#14532d"/>'
+    +'<path d="'+tlNarrowS+'" fill="#ffffff" stroke="#111827" stroke-width="1"/>'
+    +'<text x="'+tlNcx+'" y="'+(tlNcy-30)+'" text-anchor="middle" font-size="11" font-weight="700" fill="#14532d">N</text>'
+    +'</g>');
   // info —— 与图面拉开间距，不再压到地块
   // 信息行：与标题分行；过长时按 " | " 边界自动换行
   var tlHeaderExtra=tlPartialCount>0?(' | 非标准 '+tlPartialCount+' 区'):'';
@@ -4780,7 +4799,14 @@ function tlAutoGenerate(options) {
 function tlExportSvgString(ctn){
   var svgEl=ctn?ctn.querySelector('svg'):null;
   if(!svgEl)return tlDiagramSVG;
-  return new XMLSerializer().serializeToString(svgEl);
+  /* 出图口径（2026-10-20，随指北针一并收口）：编辑态的拖拽手柄不进图纸。
+     #tlHeaderHandle 是信息行右下角 8×8 的淡紫色方块（cursor:nwse-resize），只用于拖宽信息行；
+     直接序列化会把它写进 SVG / PNG / 打印，印在 A3 上就是一个说不出用途的紫方块
+     （加了指北针后它正好落在指北针左侧，更显眼）。clone 后摘掉，不动页面上真实 DOM。 */
+  var clone=svgEl.cloneNode(true);
+  var hh=clone.querySelector('#tlHeaderHandle');
+  if(hh&&hh.parentNode)hh.parentNode.removeChild(hh);
+  return new XMLSerializer().serializeToString(clone);
 }
 function tlDownloadSVG() {
   if(!tlDiagramSVG)return;

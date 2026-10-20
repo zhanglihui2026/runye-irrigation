@@ -450,8 +450,9 @@
         lgTexts[k].parentNode.removeChild(lgTexts[k]);
       }
       /* 2026-09-16：页眉信息/底部参数/图例三组在工作区改由固定 HTML 覆盖层呈现（不随缩放平移），
-         克隆底图剥离；标题/图框恢复于简图源头（2026-09-16），工作区同样剥离（做图区不显示）。 */
-      ['tlHeaderGroup', 'tlParamsGroup', 'tlLegendGroup', 'tlTitleGroup', 'tlFrameGroup'].forEach(function (gid) {
+         克隆底图剥离；标题/图框恢复于简图源头（2026-09-16），工作区同样剥离（做图区不显示）。
+         2026-10-20：tlNorthGroup（指北针）同属图框装饰，做图区不显示，一并剥离。 */
+      ['tlHeaderGroup', 'tlParamsGroup', 'tlLegendGroup', 'tlTitleGroup', 'tlFrameGroup', 'tlNorthGroup'].forEach(function (gid) {
         var g = clone.querySelector('#' + gid);
         if (g && g.parentNode) g.parentNode.removeChild(g);
       });

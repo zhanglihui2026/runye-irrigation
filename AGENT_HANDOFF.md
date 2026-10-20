@@ -3010,3 +3010,260 @@ v632 上线后线上实测：功能是新的（后台按钮直链 `?login=1&back
 
 另：`sql/route_c_migration_v6_member_stats.sql` 仍未执行 ⇒ 后台「今日新增 / 近 7 日 / 注册时间 /
 最后活跃」显示为空，与本次两处无关，别忘了。
+
+### 26.31 v634-recipe-apply：点「调用」不再只回填、还会重算，且不再毁图（2026-10-20）
+
+**用户原话**：「调用参数之后，现有的面板参数没有跟着调用参数变化，这个不对，改过来。」
+
+**探针定位**（`project-planning/验收记录/recipe-apply.mjs`，Edge headless + 自建静态服务）：
+DOM 层 10 项其实是被回填的，所以问题不在 `set()` 的赋值，而在下面三处：
+
+1. `ppRecipeFlow.applyParams`（`mod/plot-editor.js`）**自己写了一套 `set()`**，绕开 v520 立的单一入口
+   `RyPlanParams.set`（`mod/inline-28.js`）——注释里写明「三个入口最终都落在这里」，配方调用是漏网的那一个
+   ⇒ 落盘与派发口径分家。
+2. **只写原生 input，不碰 `sl-input[data-ry-proxy-for]` 代理**。`rypShoelaceInputs` 是靠
+   `Object.defineProperty` 劫持 `nativeInput.value` 的 setter 来同步代理的，外面套着 `try{}catch(_){}`；
+   劫持一旦失败（Shoelace 未就绪/元素被搬动重建），原生 input 又被 `hidden=true`，屏幕上就是永远旧值。
+3. **无条件调 `ppRepartitionFromRotatedPlot`**：它内部 `if(!polyPts.length) alert(...) return;`
+   （无地块就弹框）、`if(ppHasPipeContent() && !confirm(...)) return;` 且确认后清空
+   `mainPipes/branchPipes/subBranchPipes/source/valves`。而状态栏只写「参数已回填并重算」——
+   **用户画好的管线被静默清空**。
+
+**反向验证（硬数字）**：同一探针、同一地块与管线
+- 改前：管线 **8 → 0**（全清），状态「参数已回填并重算」
+- 改后：管线 **8 → 8**（保留），状态「10 项已回填并重算；已有管线保留、未重排」
+
+**改法**（`mod/plot-editor.js`，+76/−7）
+- `applyParams` 五段式：`RyPlanParams.set()` 单一入口 → 兜底写入并强制同步 `sl-input` 代理 →
+  轻量重算链（`ppPullLiftDh`→`calcPlan`→`ppRender`→`ppRefreshDiagramOrReset`→`renderThreeLevel`→`tlUpdatePlanBar`）
+  → 重分区守卫（无地块跳过 / 有管线保留 / 都没有才重排）→ 返回 `{wrote,skipped,repart,note}`。
+- 状态栏：`N 项已回填并重算` + 未回填项点名（红字）+ 未重排原因，不再是笼统一句。
+- 新增 `applyTargetId()`：工具栏下拉优先 → 设置页下拉兜底 → **回退到最近保存的方案**并选上。
+  （`curSelId()` 的「设置页优先」语义留给改名/删除，不动。）
+- ⚠ 状态源头坑：真实地块/管线在 **`window.RunyeBridge.state`**，不是 `window.ppState`；
+  第一版写成 `window.ppState` ⇒ `hasPlot` 恒 false、守卫永远走「未画地块」分支（已修）。
+
+**验收**：`node scripts/check.cjs` 全绿（静态契约 PASS=29 / 36 个单测 / 水力核心 2500 组比对 / 地块拼接）；
+探针 `recipe-apply.mjs` 10 项回填 + 结果区 4.44→2.67、33.5→60.5、Ø160→Ø90 + 零 pageerror。
+截图 `_verify_out/recipe-apply-after.png`，备份 `_backup_20261020_recipe_apply/plot-editor.js`。**未发布**。
+
+### 26.32 v634-coord-search：在线地图「按坐标搜索位置」（2026-10-20）
+
+**用户原话**：「在线地图搜索要增加一个功能，要能根据坐标搜索位置。」
+
+**现状**：`mod/online-map.js` 的 `parseLatLng` 只认 `18.25,109.51` 一种写法，且只落一个红点、
+tip 里只报坐标本身 —— 不告诉你「这是哪」，界面上也没有任何地方提示可以输坐标
+（placeholder 一直写「搜索地点（如：三亚 崖州）」）。
+
+**改动**（`mod/online-map.js` +4.7KB；`index.html`、`runye-map-measure.html` 各 +107B）
+1. **解析器扩到四类写法**（全部按 WGS-84 理解，定位前统一转 GCJ-02，与搜索候选同口径）：
+   ① 十进制度 `18.2528,109.5119`（首值 >90 自动判为经度）
+   ② 方向字母 `N18.2528 E109.5119` / `18.2528N,109.5119E`
+   ③ 度分秒 `18°15'10"N, 109°30'43"E`（含中文「度分秒」符号）
+   ④ 中文经纬 `北纬18.2528 东经109.5119`
+2. **新增 `reverseName()`**：坐标 → 地名。**源顺序实测定为 Photon 主 + Nominatim 备**：
+   本机实测 Nominatim reverse 12s 内无返回，Photon 秒回且带中文
+   （`阳光雅园 · 吉阳区 · 三亚市 · 海南省`）。与关键词搜索的源顺序一致。
+3. 定位**先落地不等网络**，地名回来后再回填 `lastPick.name`、图钉 tooltip 与状态条；
+   两源都失败 → 「未取到地名，可直接保存」，不阻塞、不报错。
+4. 两页 placeholder → 「搜索地点，或输入坐标（18.25,109.51）」，hint 列出四种写法 + 「定位后反查地名」。
+5. 版本三件同抬（CORE 铁律）：`sw VERSION = v634-coord-search`、`style-01.css?v=`、
+   两处 `mod/online-map.js?v=`、`plugin-admin.html` 角标 `界面 v634`。
+
+**验收**
+- 解析器 **16/16**（`project-planning/验收记录/coord-search.mjs`，支持 `--file=` 对任意版本跑；
+  改前备份跑同一脚本 ⇒ **9/16**，7 种新格式全红 ⇒ 反向验证成立）。
+- E2E **7/7**（`coord-search-e2e.mjs`，Edge headless + CDP）：5 种写法全部识别定位、
+  地名输入「三亚 崖州」不被误判为坐标、零 pageerror。
+- `node scripts/check.cjs` 全绿；截图 `_verify_out/coord-search-after.png`。
+
+**两个坑**
+- **Photon 不支持 `lang=zh`**（只 default/de/en/fr，传 zh 直接报错），中文地名靠浏览器
+  `Accept-Language` 自动协商 ⇒ headless（默认 en）里显示拼音、真实中文浏览器显示中文，不是 bug。
+- 合并「数字 + 空格 + 方向」的正则会**误伤** `18.2528 E109.5119`（粘成一段 ⇒ 整条失败），
+  只能合并「秒/分符号 + 空格 + 方向」（`(["″秒'′分])\s+([NSEW])`）。第一版就是这么挂的。
+
+备份 `_backup_20261020_coord_search/`（三个文件）。**未发布**。
+
+---
+
+### 26.33 v635-nav-dedupe：顶栏出现两份「智能规划」，是插件没认出「·同步中」（2026-10-20）
+
+**这一节同时是「A → B → C」三项闸门工程的收尾记录。**
+
+#### 现象与定性（C 段）
+
+`verify_nav_compact.js` 长期 12 PASS / 11 FAIL。先按「是抖动还是真红」定性，结论是**两条互相独立的真红**：
+
+| 项 | 表面现象 | 真因 | 性质 |
+| --- | --- | --- | --- |
+| Z/G/H/I/D/E/D2/F/F2 | 区块高 0、点「地块分区」状态栏不变 | 权益接口 3~10s 才返回，脚本只等 1.6s。`RyEntitle.access()` 在 `state===null` 时**恒返回 'pending'**（三态设计），于是 19 项里 11 项带「·同步中」+ `aria-disabled` + **捕获阶段拦截点击** | 闸门等得不够久，非布局问题 |
+| M3 | 面板项 9 个采样点全被挡 | 公告弹窗「每次访问都弹」，遮罩 `z-index:11990` 挂在 body 根层叠上下文；而 `body.ry-tool > .ry-nav{z-index:60}` **创建了层叠上下文**，把面板自己的 `z-index:99999` 关在里面 ⇒ 对外只有 60 层 | 模态盖下层是**正确语义**，不修布局 |
+
+**M3 的反向验证**（证明不是抖动、不是 v634 引入）：连跑 3 次全为 0/9；探针在 350/700/1400ms 三个时点都 0/9（不自愈）；历史存档 `_verify_out/nav_compact_gate.txt`（改动前）同样是 0/9；`ry-ann-mask` 与 `body.ry-tool > .ry-nav{z-index:60}` 自 v344 起就在。
+
+**修法（两处前置，断言一条没放宽）**：
+1. 轮询到「`.fn-pending` 归零 **且** 导航项签名连续 3 次不变」再量。只等 pending 归零不够：`pending` 一清零，插件抑制器（MutationObserver）还没把老项摘完，会量到「老项 + 插件项」并存态。
+2. `RyAnnounce.close()` → 兜底点 `.ry-ann-x` / 「开始使用」→ 轮询到 `.ry-ann-mask` 消失。
+3. `legacyTexts` / `pluginNavTexts` 比较前归一化掉 `·锁` 与 `·同步中` 后缀（`runye-nav.js` 自己的注释就写着「是装饰不是名字」；不归一化则 11 项顺序全对也判不合格）。
+
+#### 真红背后还藏着一个用户可见缺陷
+
+修完前置后仍剩 D/D2/J2 三条红，`Z0` 报 **25 项**。逐层挖下去：
+
+- `plugins/ai-plan/main.js` 与 `plugins/hydraulics/main.js` 的 `norm()` 只剥 `·锁`：`replace(/\s*·\s*锁\s*$/, '')`；
+- 权益未就绪时老项文字是「智能规划 **·同步中**」→ `findLegacy()` 匹配失败 → `probe` 等 40×50ms=2s 超时 → **降级「不接管」→ `startSuppressor()` 根本不启动**；
+- 之后权益就绪、文字变回「智能规划」时 `runye-nav.render()` 造出的老项**再没人摘** ⇒ 顶栏出现两份「智能规划」、两份「水力校核」。
+
+**6 个插件共用这份复制粘贴的 `norm()`**（ai-plan / filter-system / hydraulics / material-list / pipe-assemble / sys-view），一并改为
+`replace(/\s*·\s*(?:锁|同步中)\s*$/, '')`。
+
+反向验证硬数字：改前连跑 5 次 **5/5 都是 25 项**（稳定复现，不是抖动）；改后连跑 3 次 **3/3 都是 23 项全绿**。
+
+#### 顺带修掉的既有过期期望
+
+- `WANT_PLUGINS` 去掉 `iso-view`（13→12）、`MORE_WANT` 去掉「轴测图」（8→7）：`plugins/iso-view/` 目录已不存在，产品代码零引用，只剩 `.aoci` 历史索引快照里有路径 ⇒ 该功能确已下线，期望里留着只会恒红。
+
+**结果：12 PASS / 11 FAIL → 25 PASS / 0 FAIL，连跑 3 次 EXIT=0。**
+
+#### A-4：`scripts/gate.cjs` 全量闸门三态入口
+
+`scripts/check.cjs` 是 FAIL-fast 的（任一红就 exit，后面全不跑），浏览器回归又散在根目录。新增 `node scripts/gate.cjs` 一条命令跑完 8 个阶段，**一项失败不打断后续**，只报 PASS / FAIL / SKIPPED 三态：
+
+```
+✔ PASS syntax / static / unit / hydraulic / plot / nav / panel-drift
+```
+
+关键纪律：SKIPPED **必须带理由**，且汇总里明写「它们没有被验证过，不算通过」；`--strict` 让 SKIPPED 也算失败。环境不满足（缺基线 / 缺 puppeteer-core / 脚本被删）只能是 SKIPPED，绝不当成通过 —— 历史上 `_p1/baseline.json` 丢过一次，等价性验证空转还报绿。
+常用：`--filter=nav`、`--list`、`--json`、`--timeout=900000`。
+
+#### 等价性基线（`equiv`）本身不可信，已修口径
+
+`gate` 首跑唯一红项是 `equiv`，而且报的不是改过的地方：**17 个功能区、每个 208 个元素「计算样式不同」**。重建基线后**间隔 2 分钟立即重跑**仍然同样 208 个差异 ⇒ 与本次改动无关，是快照口径问题。两层噪声：
+
+1. **序号错位**：`STYLES` 给 `body *` 按**文档顺序**编号。插件注册顺序抖一次（`ry-plugin-root` 里插件面板创建时机不同 → 导航项「项目档案/案例推荐」与 `fn-more` 位置互换），后面所有序号跟着平移。证据：`base` 的 40 号是 80px 项、`now` 的 40 号是 63.53px 的 `fn-more`，而 base 43 = now 40。
+   → 改为「`tag#id.class` 稳定签名 + 排序」作键。吸收顺序抖动，元素增删仍会暴露（行数变或某签名行消失），比较的属性集合一个没少（48 个 × 3522 元素）。
+2. **会话态徽标**：`span#ryUndoBadge` 宽 76.17px vs 0px，`span.ry-st-spacer` 1203.11px vs 1279.28px —— 正好差 76px，同一个原因（spacer 是 flex 占位，徽标有字就窄 76px）。徽标文字取决于撤销栈深度，`window.RyUndo` 也没有清空接口。
+   → 采样前统一设成固定文本「撤销」（**不置空**，保留非零宽度，徽标自身的 padding/字号被改仍量得出来）。
+3. 页面错误改为「URL/数字归一化 + 排序」再比：被阻断的外网请求谁先失败是随机的（这次 `entitle`、下次 `signin/anonymously`）。
+
+效果：208 个差异 → 只剩 2 个 → 0（重建基线后连跑两次，见 `_verify_out/_eq_c4a.log` / `_eq_c4b.log`）。
+
+#### B 段：N02 三入口验收从 playwright 换成 CDP
+
+`project-planning/验收记录/n02-three-entry.cjs` 从落地起**一次都没跑过**（本机只装了 `puppeteer-core`，`require('playwright')` → MODULE_NOT_FOUND），等于没有验收。改为 Edge headless + 原生 `globalThis.WebSocket`（零第三方依赖），映射关系写在文件头。
+
+跑通后抓出两个原脚本自带的笔误（因为从未执行过，一直没暴露）：
+
+- **区块激活类是 `ry-active` 不是 `active`**：原脚本 `classList.contains('active')`，实测 `pipePlanSection[ry-sec ry-active]`，永远等不到。
+- **`context.route(/^https?:/, abort)` 不能直译成 `Network.setBlockedURLs(['http://*'])`**：原脚本页面走 `file://`，我改成 `http://127.0.0.1` 后，那条规则会**把页面自己的 html/js/css/plugins 全挡掉**（实测 40s 都等不到 `RyMapHost`）。改用 `Fetch.enable` + 逐请求判定，只放行 127.0.0.1/localhost。
+
+**结果：3/3 通过**（`_verify_out/_n02_cdp5.log`）——地图右键弹窗 / 地图列表箭头 / 地块库设为当前，A(23500㎡) 与 B(36000㎡) 不串用，刷新后面积、边界 4 顶点、`network.plotId`、`#pipePlanSection` 全部还原，零 pageerror、零意外弹窗。
+
+#### 版本与备份
+
+版本三件同抬（6 个插件 `main.js` 在 CORE 白名单）：`sw VERSION = v635-nav-dedupe`、
+`index.html` 的 `style-01.css?v=` 与 `mod/online-map.js?v=`、`runye-map-measure.html` 的 `mod/online-map.js?v=`、`plugin-admin.html` 角标 `界面 v635`。
+
+备份 `_backup_20261020_AtoC/`：6 个插件 `main.js`、`verify_nav_compact.js`、`runye-nav.js`、`runye-entitle.js`、`runye-announce.js`、playwright 版 n02、v634 基线。**未发布。**
+
+#### 遗留（未做，需要用户拍板）
+
+- `verify_ry_tool.js` 修了崩溃（缺 `_bak_v362_index.html` 时降级 SKIPPED）但仍 EXIT=1，红项是 v311 契约 `must 0 命中` 与多处导航条目 `[MISS]`，属既有红，需逐项判定是「契约过期」还是「真缺」。
+- `_p1/_gates.cjs` 批跑器未重建；`scripts/gate.cjs` 暂未纳入 `verify_ry_tool.js`（纳入会让闸门常红，掩盖真正的新红）。
+
+---
+
+### 26.34 v636-north-arrow：三级简图右上角加指北针（2026-10-20）
+
+**需求**：用户「三级简图出图，要增加指北针图例」。
+
+**实现**（`mod/inline-09.js`，在 `tlTitleGroup` 之后插一组 `tlNorthGroup`）：
+
+- **位置**：A3 图框右上角。信息行从 `x=34` 起、宽 960 ⇒ 最长到 994；内细框右边线在 1174 ⇒ `1000..1170` 是结构上永不被占用的空白（信息行折行只往下长，不往右长）。
+- **几何**：中心 `(svgW-96, 82)` = `(1094, 82)`，半径 24 ⇒ 实测 bbox `x 1070..1118 / y 40.2..106`，完全落在内框 `16..1174 / 16..884` 之内。
+- **方位**：`window.measuredPolygon` 是面积测量的**图像坐标**（y 增大向下），绘制时 y 直接映射成 SVG y ⇒ 图上方即真北，指北针恒朝上。**不跟地块变换旋转是对的**：二级页的「地块旋转/镜像」只是作图便利变换，简图走「地图口径」未旋转顶点（`tlAutoGenerate` 内 `[map-enhance]` 注释已写明）。
+- **造型**：双半式（北半实心 `#14532d`、南半空心描边 `#111827`）+ 顶部 `N`，与图例同色系；字号 11、外圆描边 1.2，和现有图例（font-size 10/12、`#111827`）同一视觉语言。
+
+**排版校验**（`_p1/_tmp_probe_north.mjs`，真实生成一张简图后量 `getBBox`）：
+与标题、信息行、地块、参数块、图例 **五处相交全部为 false**。其中最需要交代的一处：地块 `plot` 的 y 从 `drawTop=110` 起，指北针底在 `106` ⇒ 即使宽扁地块把 plot 横向撑到 `x=1110`（与指北针 x 重叠 40px），**y 上也永不重叠**，结构上安全；信息行折两行时 `drawTop` 更大，余量只增不减。
+
+**顺带修掉一个既有的出图瑕疵**：`tlExportSvgString` 原来直接序列化 DOM，把信息行右下角那个 8×8 的编辑态拖拽手柄 `#tlHeaderHandle`（淡紫、`cursor:nwse-resize`）一起写进 SVG/PNG/打印，印在 A3 上是个说不出用途的紫方块 —— 加了指北针后它正好落在指北针左侧，更显眼。改为 clone 后摘掉该元素再序列化（不动页面真实 DOM，拖拽照常可用）。
+
+**剥离清单同步**（指北针属「图框装饰」，只给纸面看，不给做图区/DXF）：
+- `tl-workspace/tl-workspace.js` 克隆底图剥离数组加 `'tlNorthGroup'`；
+- `runye-dxf.js` 的 `SKIP_IDS` 加 `tlNorthGroup:1`。
+
+**反向验证**（改前备份换回去跑同一个探针）：
+
+| | 改前 | 改后 |
+| --- | --- | --- |
+| `northChildCount` | **0** | **4** |
+| 导出 `hasNorth` | **false** | **true** |
+| 导出 `hasHeaderHandle` | **true** | **false** |
+
+**版本三件同抬**：`sw VERSION = v636-north-arrow`、`style-01.css?v=`、`online-map.js?v=`（两页）、
+`inline-09.js?v=`（619 → 636）、`runye-dxf.js?v=`（404 → 636）、`tl-workspace.js?v=`（582 → 636）、`plugin-admin.html` 角标 `界面 v636`。
+
+**基线**：出图 SVG 内容真的变了 ⇒ 等价性基线必须重建（重建后 gate 全绿）。
+
+截图 `_verify_out/north-arrow-full.png`（整图）、`north-arrow-zoom.png`（右上角局部，3× 放大）。
+备份 `_backup_20261020_north/`（7 个文件 + v635 基线）。**未发布。**
+
+### 26.35 v637-search-row-wrap：地图左栏「保存地点」移到第二行，搜索框变宽（2026-10-20）
+
+**需求**：用户截图 +「保存地点移动到下一行，让搜索框宽一些」。
+
+**改前事实**（`?v=` 旧样式下同页实测）：左栏 229px 里塞三件 —— 输入框 `flex:1` + 「搜索」42px + 「保存地点」64px，
+输入框只剩 **111px**，坐标示例 `18.25,109.51` 都被截断。
+
+**改法**（两页同改，DOM 与 JS 零改动，id 全不变）：
+
+| 文件 | 改动 |
+| --- | --- |
+| `mod/online-map.css` | `.search-row` 加 `flex-wrap:wrap`；新增 `.search-row #btnSavePlace{flex:1 0 100%;text-align:center}` |
+| `runye-map-measure.html`（内联样式 72-74 行区） | 同上三条 |
+
+`flex-basis:100%` 是**结构性换行**而不是「碰巧挤不下」：该项的假设主轴尺寸就等于容器宽度，
+第一行永远放不下它，所以不依赖栏宽、不依赖按钮文案长度，缩到 229px 还是 800px 视口都成立。
+它是 `.mbtn` 的后代规则、有 id 加权（主程序 `(2,1,0)` > `(1,2,0)`、独立页 `(1,1,0)` > `(0,2,0)`），
+能压掉原来的 `flex:none`，不需要 `!important`。
+
+**实测几何**（`_probe_searchrow.cjs`，Edge headless 1400×900，两页各量一次）：
+
+| | 改前 | 改后 |
+| --- | --- | --- |
+| `input#search` 宽 | **111px** | **181px**（+70px / +63%） |
+| `.search-row` 高 | 28px | 62px（两行） |
+| `.tools` 高 | 188px | 222px |
+| 「保存地点」宽 | 64px（第三件） | 229px（独占第二行，满栏） |
+| 「保存地点」与「搜索」同排 | **true** | **false** |
+
+「保存地点」满宽后与下方「📍 定位三亚 / 🗺️ 切换底图」两键左对齐同宽，视觉上归成一列，不像孤零零的小按钮。
+
+**反向验证**（同一页面注入 `flex-wrap:nowrap` + `flex:none` 覆盖回旧布局再量）：
+输入框回到 111px、两按钮同排 = true ⇒ 变宽确实是这次改动带来的，不是环境差异。
+
+**探针三条真结论**：主程序 6 条 PASS（换行、满宽、≥150px、无横向溢出、反向两条）、
+独立页 5 条 PASS（含「两页几何一致，宽度差 ≤2px」）、断点边缘 800px 2 条 PASS。
+
+**探针踩到的坑（写下来免得下次再踩）**：`Page.captureScreenshot` 带 `captureBeyondViewport:true` 时，
+Chrome 会把视口临时撑到整页尺寸 ⇒ `runye-mobile.js` 的 `matchMedia('(max-width:768px),(pointer:coarse) and (max-width:1024px)')`
+翻成 true ⇒ 立刻 `location.replace('runye-mobile-map-preview.html')`，截出来的是手机版首页。
+另外**视口从宽调到宽不会自动跳回来**：一旦进过手机版，必须在宽视口下重新 `Page.navigate` 才量得到本页。
+
+**未覆盖（明说，不算通过）**：手机端 360px 由 `runye-mobile.js` 按设计整页跳 `runye-mobile-map-preview.html`，
+`runye-map-measure.html` 的这三件元素在手机端根本不渲染，本次**没有验证手机端搜索行**。
+手机端 `runye-mobile.css:49` 的 `grid-column:1/-1` 作用在 `.search-row` 这个网格项上，与本次的行内 flex 换行不冲突。
+
+**版本三件同抬**：`sw VERSION = v637-search-row-wrap`（含变更注释）、
+`index.html` 的 `style-01.css?v=` 与 `online-map.css?v=`（后者原停在 `578-chip-hover-unify`，一并抬齐）、
+两页的 `online-map.js?v=`、`plugin-admin.html` 角标 `界面 v637`。
+
+**基线**：5 个元素的计算尺寸真的变了（`btnSavePlace` 64→229、`search-row` 高 28→62、`tools` 188→222、
+`input#search` 111→181、外层 `section` 207→241，**只有尺寸、无颜色/字体差异**）⇒ 重建 `_p1/baseline.json`。
+gate 复跑 **PASS 8 / FAIL 0 / SKIPPED 0**。
+
+截图 `_probe_out/01-main-searchrow.jpg`（主程序左栏）、`02-main-full.jpg`（整页）、
+`03-measure-searchrow.jpg`（独立页左栏）、`04-measure-narrow.jpg`（800px 断点边缘）。
+备份 `_backup_20261020_searchrow/`（5 个文件 + v636 基线）。**未发布。**

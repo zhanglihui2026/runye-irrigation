@@ -23,7 +23,7 @@ var ctxRef = null;
 
 function cfg(ctx) { return (ctx.manifest && ctx.manifest.config) || {}; }
 function navCfg(ctx) { return (ctx.manifest && ctx.manifest.ui && ctx.manifest.ui.nav) || {}; }
-function norm(t) { return String(t || '').replace(/\s*·\s*锁\s*$/, '').trim(); }
+function norm(t) { return String(t || '').replace(/\s*·\s*(?:锁|同步中)\s*$/, '').trim(); }
 
 /* 会员门控：按允许、拒绝、同步中三态处理；同步中不触发宿主动作 */
 function gate(ctx) {

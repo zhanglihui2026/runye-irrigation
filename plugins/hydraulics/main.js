@@ -27,7 +27,7 @@ function cfg(ctx) { return (ctx.manifest && ctx.manifest.config) || {}; }
 function navCfg(ctx) { return (ctx.manifest && ctx.manifest.ui && ctx.manifest.ui.nav) || {}; }
 
 /* 归一化：线上锁会给面板项加「 ·锁」后缀，比较前去掉（是装饰不是名字） */
-function norm(t) { return String(t || '').replace(/\s*·\s*锁\s*$/, '').trim(); }
+function norm(t) { return String(t || '').replace(/\s*·\s*(?:锁|同步中)\s*$/, '').trim(); }
 
 /* ============================================================
    水力计算内核加载（v379 真改造）

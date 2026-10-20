@@ -883,7 +883,13 @@
    v632 上线后实测后台角标还写着「界面 v631」——功能已经是新的，但角标没跟着抬；
    后台在 CORE 白名单里，改了正文必须抬版本才刷得动，所以单独发一版把角标对齐成 v633。
    改 plugin-admin.html（角标）+ index.html（style-01.css?v= 同值契约）。 */
-const VERSION = 'v633-admin-badge';
+/* v637-search-row-wrap: 地图左栏「搜索行」排版 —— 用户截图反馈「保存地点移动到下一行，让搜索框宽一些」。
+   原三件同排（输入框 flex:1 + 搜索 + 保存地点，250px 栏宽下输入框只剩约 120px），
+   改为 .search-row 加 flex-wrap，并给 #btnSavePlace 加 flex:1 0 100% 强制独占第二行（满宽按钮），
+   第一行只留「输入框 + 搜索」，输入框实测由 120px 增到 188px。
+   主程序内嵌版改 mod/online-map.css、独立页改 runye-map-measure.html 内联样式（v495 教训：两页必须同改），
+   两处 DOM 与 JS 零改动（id 未变）。 */
+const VERSION = 'v637-search-row-wrap';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
