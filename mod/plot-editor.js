@@ -142,11 +142,116 @@
     };
   }
 
+  /* ============================================================================
+     [v629 2026-10-20] 「地块分区只显示一半」的**真正根因**（此前三次都改错了地方）
+     ----------------------------------------------------------------------------
+     现象：用户反复反馈「地块分区怎么就显示一半」，并猜是「多层覆盖/嵌套」。
+     但 v627 修的 .ry-pane 高度链是三级简图的事，与二级画布无关 —— 二级画布是
+     <canvas>，它的内容由 ppUpdateTransform 的变换决定，不是 CSS 裁的。
+
+     根因（无 CSS 参与）：
+       ① 比例是写死的：`s = 0.5 * zoom`（1px=2m × zoom），代码里**没有任何**
+          「内容是否装得下画布」的判断；
+       ② zoom / panX / panY 又被 ppGetState/ppSetState 持久化进云端地块存档
+          （plot-editor.js 3645 / 3731）⇒ 用户在做图区**滚一次滚轮**（wheel zoom
+          1.1/0.9 一次一跳，很容易滚出 347%）或拖一次平移，这个状态就被永久记住，
+          此后每次打开这个地块都是同一张「只看到一角」的图；
+       ③ ppResize 只按容器尺寸重设画布，重算变换时**仍然沿用那个 zoom**。
+
+     实测（_probe_pp_ink.mjs，读 canvas 像素算墨迹包围盒）：
+       VW=1086 VH=581 ZOOM=3.47 → ink 触到画布上/下沿（gapTop=0、gapBottom=0），
+       期望内容高 411px > 画布可用高 → 上下各切一刀，正是用户截图的样子。
+
+     修法（只收口视图状态，不动任何绘制/分区/水力逻辑）：
+       · ppContentSize() 算「scale=1 时内容多大」；
+       · ppFitScale()   算「装进画布需要的 scale」；
+       · ppClampViewToFit()  ★只缩不放★：装不下就退到装得下的比例并清平移。
+         ppResize 里调用 ⇒ 每次进场 / 改窗口 / 切页回来都保证整幅可见；
+         滚轮放大不受影响（wheel 走 ppUpdateTransform，不经过 ppResize）。
+       · ppFitView() 一键「适应窗口」（可放大也可缩小），只给下面的小按钮用。
+     ============================================================================ */
+  var PP_VIEW_PAD=50;                 /* 与 ppUpdateTransform 里的 pad 同值 */
+  /* ★ 画布是否已按容器**真量过**一次。
+     坑（v629 自己踩到并修）：<canvas> 出厂默认 300×150。初始化顺序是
+     `setTimeout(function(){ppResize();ppLoadPolygon();})`，而工具模式下 ppResize 在
+     「本页还没激活」时会直接 return ⇒ ppLoadPolygon 拿到的仍是 300×150，
+     按它算「装得下」会得出 zoom≈42% 并把用户存档里的正常比例**永久压小**。
+     所以：只有真量过（宽高都 >60px）才允许收口。 */
+  var ppSized=false;
+
+  function ppContentSize(){
+    if(!ppState.polyPts||!ppState.polyPts.length) return null;
+    var b=ppGetBounds(),db=ppGetDisplayBounds();
+    if(!b||!db) return null;
+    var dims=ppGetPlanDims(b);
+    var sx=b.w>0?dims.w/b.w:1, sy=b.h>0?dims.h/b.h:1;
+    var w=db.w*sx, h=db.h*sy;
+    if(!(w>0)||!(h>0)) return null;
+    return {w:w,h:h};
+  }
+  function ppFitScale(){
+    if(!ppSized) return null;                  /* 还没真量过容器 → 不给比例（见 ppSized 注释） */
+    var m=ppContentSize(); if(!m) return null;
+    var aw=ppCanvas.width-2*PP_VIEW_PAD, ah=ppCanvas.height-2*PP_VIEW_PAD;
+    if(!(aw>8)||!(ah>8)) return null;          /* 画布还没量到尺寸（隐藏/首帧）→ 先不动 */
+    return Math.min(aw/m.w, ah/m.h);
+  }
+  function ppClampViewToFit(){
+    var sfit=ppFitScale(); if(sfit==null) return false;
+    var changed=false;
+    var s=0.5*(ppState.zoom||1);
+    if(s>sfit*1.001){                         /* 装不下 → 才退到装得下的比例（只缩不放） */
+      ppState.zoom=Math.max(0.1,Math.min(10,sfit/0.5));
+      s=0.5*ppState.zoom;
+      changed=true;
+    }
+    /* 内容整幅都装得下时，平移没有意义 —— 它只会把图推出画布，而平移量同样被存进
+       地块存档（ppGetState/ppSetState）⇒ 用户拖歪一次就会永久偏出去。这里一并归零。
+       放大态（内容比画布大）下的平移是合理操作，不动。 */
+    var m=ppContentSize();
+    if(m&&m.w*s<=ppCanvas.width+1&&m.h*s<=ppCanvas.height+1&&(ppState.panX||ppState.panY)){
+      ppState.panX=0;ppState.panY=0;changed=true;
+    }
+    return changed;
+  }
+  function ppFitView(){
+    var sfit=ppFitScale(); if(sfit==null) return false;
+    ppState.zoom=Math.max(0.1,Math.min(10,sfit/0.5));
+    ppState.panX=0;ppState.panY=0;
+    ppUpdateTransform();ppRender();ppSyncFitBtn();
+    return true;
+  }
+  /* 内容现在是否比画布大（= 图上一定有线被切）。只用于决定要不要亮出「适应窗口」按钮。 */
+  function ppIsViewClipped(){
+    if(!ppSized) return false;
+    var m=ppContentSize(); if(!m) return false;
+    var s=0.5*(ppState.zoom||1);
+    return m.w*s>ppCanvas.width+1 || m.h*s>ppCanvas.height+1;
+  }
+  function ppSyncFitBtn(){
+    var btn=document.getElementById('ppFitViewBtn');
+    if(!btn) return;
+    var on=!!ppState.polyPts.length && ppIsViewClipped();
+    btn.classList.toggle('is-on',on);
+  }
+  window.ppFitView=ppFitView;
+  window.__ppViewDebug=function(){
+    var m=ppContentSize(),s=0.5*(ppState.zoom||1);
+    return {zoom:ppState.zoom,scale:s,panX:ppState.panX,panY:ppState.panY,
+      content:m?{w:+m.w.toFixed(1),h:+m.h.toFixed(1)}:null,
+      contentPx:m?{w:+(m.w*s).toFixed(1),h:+(m.h*s).toFixed(1)}:null,
+      canvas:{w:ppCanvas.width,h:ppCanvas.height},
+      fitScale:ppFitScale(),clipped:ppIsViewClipped()};
+  };
+
   function ppResize(){
     if(document.body.classList.contains('ry-tool') && !document.getElementById('pipePlanSection').classList.contains('ry-active')) return;
     ppCanvas.width=ppWrap.clientWidth;
     ppCanvas.height=ppWrap.clientHeight;
-    ppUpdateTransform();ppRender();
+    if(ppCanvas.width>60&&ppCanvas.height>60) ppSized=true;
+    /* [v629] 关键一行：画布尺寸一旦变化，先保证「整幅装得下」，再算变换。 */
+    ppClampViewToFit();
+    ppUpdateTransform();ppRender();ppSyncFitBtn();
   }
 
   function ppLoadPolygon(){
@@ -162,7 +267,10 @@
        必须在 ppUpdateTransform 之前，因为整组/逐块会决定 bounds 用的是外框还是某一块。 */
     ppInitGroupEdit();
     ppResetCutSnap('');
-    ppUpdateTransform();ppRender();
+    /* [v629] 存档恢复 / 首次进场也走本函数 ⇒ 在这里同样收口一次，
+       否则「云端存着 zoom=347%」的地块一打开仍是裁切态（ppResize 那时还没量到内容）。 */
+    ppClampViewToFit();
+    ppUpdateTransform();ppRender();ppSyncFitBtn();
   }
   window.ppLoadPolygon=ppLoadPolygon;
   window.ppGetPolyPts=function(){ return ppState.polyPts.map(function(p){return{x:p.x,y:p.y};}); };
@@ -1593,6 +1701,12 @@
       ppCtx.fillText(txtTotal,tx+12,ty+36);
     }
   }
+  /* [v629] 「适应窗口」胶囊的显隐收口在这里，而不是在每个调用点撒一遍：
+     分区旋转 / 重新分区 / 回退 / 加管都会改内容尺寸或平移量，只有这里能保证不漏。
+     做法：把局部 ppRender 换成一个转发器（函数声明可重新赋值），
+     内部所有 ppRender() 调用立刻跟着生效，绘制逻辑一行没动。 */
+  var ppRenderBase=ppRender;
+  ppRender=function(){ ppRenderBase.apply(null,arguments); ppSyncFitBtn(); };
   window.ppRender=ppRender;
 
   var ppSpacePressed=false;
@@ -1621,6 +1735,8 @@
     var np=ppToCanvas(mw.x,mw.y);
     ppState.panX+=pos.x-np.x;ppState.panY+=pos.y-np.y;
     ppRender();
+    /* [v629] 滚轮放大后线条会被画布切掉 ⇒ 亮出「适应窗口」小按钮（缩回去后自动收起）。 */
+    ppSyncFitBtn();
   },{passive:false});
 
   // Keyboard — space for pan, arrows for fine-tune
@@ -3758,4 +3874,14 @@
   // Resize + init
   window.addEventListener('resize',ppResize);
   setTimeout(function(){ppResize();ppLoadPolygon();ppUpdateAutoPipeButton();},200);
+  /* [v629] 「适应窗口」小按钮：只在图被裁掉时显示（见 ppSyncFitBtn），点一下整幅回来。
+     放在画布内的绝对定位浮层里 ⇒ 不占版面高度、不参与 .ry-pane-edit 网格，引不出新的嵌套问题。 */
+  (function(){
+    var btn=document.getElementById('ppFitViewBtn');
+    if(!btn) return;
+    btn.addEventListener('click',function(e){
+      e.preventDefault();e.stopPropagation();
+      ppFitView();
+    });
+  })();
 })();

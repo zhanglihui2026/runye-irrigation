@@ -17,7 +17,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>润野灌溉设计优化版｜滴灌管径与水泵选型</title>
 <meta name="description" content="输入地块、滴灌带与水源参数，快速计算灌溉分区、主管支管管径和水泵工作点。"/>
-<link rel="stylesheet" href="mod/style-01.css?v=628-cloud-sdk-precache">
+<link rel="stylesheet" href="mod/style-01.css?v=629-pp-view-fit">
 <link rel="stylesheet" href="runye-inverse-design.css?v=277">
 <script defer src="runye-inverse-design.js?v=438-branch-flow-conservation"></script>
 <link rel="stylesheet" href="runye-terrain.css?v=454-terrain-sidebar-peer">
@@ -911,6 +911,14 @@ body.ry-worst-off [data-tlworst]{display:none}
   <div class="pp-canvas-wrap" id="ppCanvasWrap">
     <div class="pp-hint" id="ppHint">📋 请先在面积测量工具中描绘并闭合边界，完成后此处自动显示地块形状</div>
     <canvas id="ppCanvas"></canvas>
+    <!-- [v629 2026-10-20] 视图收起胶囊：只在「图上内容比画布大、一定有线条被切掉」时显示，
+         点一下把整块地＋分区缩放到刚好铺满画布（= ppFitView()）。
+         背景：用户反复反馈「地块分区只显示一半」——根因是画布比例写死 1px=2m×zoom，
+         zoom/平移又被存进地块存档（滚一次滚轮就永久 347%）⇒ 整幅再也回不来。
+         v629 已让进场/改窗口自动收口；本按钮是那种状态下的显式出口（也覆盖用户自己放大后迷路）。
+         放在画布内的绝对定位浮层里：不占版面高度、不进 .ry-pane-edit 网格。 -->
+    <button type="button" class="pp-fitview" id="ppFitViewBtn"
+            title="适应窗口：把整块地与分区缩放到刚好铺满画布（滚轮放大 / 拖动平移后看不全时点这里）">⤢ 适应窗口</button>
     <div class="pp-empty" id="ppEmpty">
       <div class="big-icon">🗺️</div>
       <p>请在面积测量工具中完成边界描绘后使用</p>
@@ -2269,7 +2277,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <!-- ===== 实际地块规划 JS ===== -->
 <script src="mod/inline-11.js?v=607-branch-material-span"></script>
 <!-- [v420-split] 绘图编辑器 IIFE 自 inline-11 迁出：必须紧随 inline-11 之后同步执行 -->
-<script src="mod/plot-editor.js?v=612-flat-radius"></script>
+<script src="mod/plot-editor.js?v=629-pp-view-fit"></script>
 <script src="mod/inline-12.js?v=619-undo-cover"></script>
 <script src="mod/inline-13.js?v=499-plot-library-store"></script>
 <!-- [v422-head-system-svg] 纯 SVG 核心先于 inline-14 同步加载。 -->

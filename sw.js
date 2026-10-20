@@ -839,7 +839,20 @@
    规格逐项照抄二级 .pp-recipe-row / .pp-recipe-btn（20px 高、0 8px 内边距、白底 1px #e2e8f0、
    #334155 字、11px 600、nowrap）；按钮 inline 的 width:100%;padding 已删。
    改 index.html（DOM）+ style-01.css（#tlPumpUpdateBtn 那条，唯一出处）⇒ 抬版本刷缓存。 */
-const VERSION = 'v628-cloud-sdk-precache';
+/* v629-pp-view-fit: 「地块分区只显示一半」根治。此前三次都当成 CSS 嵌套去改（v627 修的是三级
+   SVG 图纸卡高度链，与二级画布无关）—— 二级画布是 <canvas>，线被切是**视图变换**造成的：
+   ① ppUpdateTransform 的比例写死 `s=0.5*zoom`（1px=2m），代码里没有「装不装得下画布」的判断；
+   ② zoom/panX/panY 又被 ppGetState/ppSetState 存进地块存档 ⇒ 在做图区滚一次滚轮
+      （一次 ±10%，很容易滚到 347%）就被永久记住，此后每次打开都只看到一角；
+   ③ ppResize 只重设画布尺寸，变换仍沿用那个 zoom。
+   实测（_probe_pp_ink.mjs 读 canvas 像素算墨迹包围盒）：VW=1086/VH=581/zoom=3.47 时
+   ink 触到画布上下沿、期望内容高 411px > 画布可用高 → 上下各切一刀，与用户截图一致。
+   修法（只收口视图状态，绘制/分区/水力一行未动）：ppContentSize / ppFitScale /
+   ppClampViewToFit（只缩不放）在 ppResize 与 ppLoadPolygon 里调用 ⇒ 进场/改窗口/切页回来
+   都保证整幅可见；滚轮放大不受影响（wheel 走 ppUpdateTransform，不过 ppResize）。
+   另加画布内浮层胶囊「⤢ 适应窗口」（#ppFitViewBtn，仅在真被裁切时亮起）作为显式出口。
+   改 mod/plot-editor.js + mod/style-01.css + index.html ⇒ 抬版本刷缓存。 */
+const VERSION = 'v629-pp-view-fit';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

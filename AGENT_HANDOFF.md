@@ -2831,3 +2831,59 @@ $('mDetailCard').scrollIntoView({behavior:'smooth',block:'nearest'});
 
 
 
+
+### 26.26 v629-pp-view-fit：「地块分区只显示一半」的真正原因（不是 CSS 嵌套）（2026-10-20）
+
+**用户口径**：「这个面板的问题 一直没解决，让你改了好几次都没解决，地块分区怎么就显示一半呢？
+是不是又出现了多层覆盖/嵌套的情况」。
+
+**先纠正自己的方向**：用户猜「多层覆盖/嵌套」，我前几轮也顺着这条线查，但
+**v627 修的是三级 SVG 图纸卡的高度链**（`.pp-stage>.ry-pane>.pp-diagram-wrap`），
+跟二级画布根本不是一回事 —— 二级「地块分区」的图是 `<canvas id="ppCanvas">`，
+canvas 里的线被切与 CSS 的 `overflow` / `min-height` **无关**，是**视图变换**把图挪出了画布。
+
+**根因（三件叠加，全是纯 JS 状态问题）**
+1. `ppUpdateTransform()` 的比例是写死的：`var s = 0.5 * ppState.zoom;`（1px=2m × zoom），
+   全文**没有一句**「内容是否装得下画布」的判断；
+2. `zoom / panX / panY` 被 `ppGetState()` / `ppSetState()` **存进地块存档**（云端 per-plot）⇒
+   在做图区滚一次滚轮（`deltaY` 一次 ±10%，`ppState.zoom` 上不封顶到 10）就被**永久记住**；
+   用户截图右下角那个「缩放 347%」就是它 —— 之后每次打开这个地块都只看到一角；
+3. `ppResize()` 只按容器重设画布像素尺寸，重算变换时**仍然沿用那个 zoom**。
+
+**怎么证实的（`_probe_pp_ink.mjs`，新写，读 canvas 像素算墨迹包围盒）**
+- 手法：`getImageData` 扫非底色像素求 bbox，与 `canvas.width/height`、`transform` 期望内容矩形对照；
+  `ink.touchesBottom/touchesTop` 为真 = 内容被 canvas 自己裁掉。
+- 修复前 `VW=1086 VH=581 ZOOM=3.47`：期望内容高 **411px** > 画布可用高，`gapTop=0`、`gapBottom=0`，
+  上下各切一刀 —— 与用户截图完全一致。
+- 同一窗口修复后：zoom 被夹到 **2.68**，内容 `708×318` 装进 `1082×418`，`gapTop=50`、无一条边被切。
+
+**修法（只收口「视图状态」，绘制 / 分区 / 水力 / 材料一行未动）** — `mod/plot-editor.js`
+- 新增 `ppContentSize()`（scale=1 时内容多大）/ `ppFitScale()`（装进画布需要的比例）/
+  `ppClampViewToFit()` / `ppFitView()` / `ppIsViewClipped()` / `ppSyncFitBtn()`；
+- `ppResize()`：量完画布尺寸 → **先 `ppClampViewToFit()` 再 `ppUpdateTransform()`**（顺序不能反：
+  变换是按 `ppCanvas.width/height` 算的）；
+- `ppLoadPolygon()` 也收口一次 ⇒ 存档里存着 347% 的地块一打开就是整幅，不用等下一次 resize；
+- **只缩不放**：只在 `s > sfit*1.001` 时才退比例，用户主动放大不会被无条件改掉；
+- **平移一并收口**：内容整幅装得下时 `panX/panY` 归零（平移量同样进存档，拖歪一次会永久偏出去）；
+  放大态下的平移是合理操作，不清；
+- `ppSized` 闸门（自己踩的坑）：`<canvas>` 出厂默认 `300×150`，初始化时 `ppResize` 在「本页未激活」会
+  return，`ppLoadPolygon` 拿到的是 300×150 ⇒ 按它算「装得下」会把正常比例**永久压到 42%**。
+  故只有量到 >60px 才允许收口；
+- 滚轮处理器**故意不调用**收口（`wheel` 走 `ppUpdateTransform`），否则滚轮永远放不大；
+- 重绘出口包了一层：`var ppRenderBase=ppRender; ppRender=function(){ ppRenderBase.apply(...); ppSyncFitBtn(); }`，
+  保证分区旋转 / 重新分区 / 回退之后胶囊状态跟着变。
+
+**新增出口按钮**：`#ppFitViewBtn`（画布内绝对定位胶囊「⤢ 适应窗口」，`mod/style-01.css` 的 `.pp-fitview`）。
+默认 `display:none`，只有 `ppIsViewClipped()` 为真（图上一定有线条被切）才加 `.is-on`；
+放在 `#ppCanvasWrap` 里 ⇒ 不占版面高度、不进 `.ry-pane-edit` 网格，不会引出新的「多一层」问题。
+实测：滚轮 25 次 → zoom 10、`clipped:true`、胶囊亮起且在画布内（1400×620：x=1303,y=499,86×24）→
+点一下 → `zoom 3.527`、`clipped:false`、胶囊自动收起。
+
+**契约测试**：`tests/pp_view_fit.test.cjs`（15 项）——收口函数齐全 / `ppResize` 里 clamp 必须在
+`ppUpdateTransform` 之前 / `ppLoadPolygon` 也收口 / 只缩不放的区间顺序 / `ppSized` 闸门 /
+**wheel 里不许出现 clamp** / 胶囊 DOM 在画布容器内 + 默认隐藏 + `is-on` 才显示 / 重绘出口包了一层 /
+点击走 `ppFitView()`。
+
+**闸门**：`node --test tests/*.test.cjs` **157/157**、`ci_check_static` PASS=29、`check_publish_refs` PASS。
+**版本口径**：`sw.js` = `v629-pp-view-fit`，`style-01.css?v=` / `plot-editor.js?v=` 同步（后者原停在
+`612-flat-radius`，这次一并抬）。
