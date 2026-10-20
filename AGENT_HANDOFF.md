@@ -3266,4 +3266,12 @@ gate 复跑 **PASS 8 / FAIL 0 / SKIPPED 0**。
 
 截图 `_probe_out/01-main-searchrow.jpg`（主程序左栏）、`02-main-full.jpg`（整页）、
 `03-measure-searchrow.jpg`（独立页左栏）、`04-measure-narrow.jpg`（800px 断点边缘）。
-备份 `_backup_20261020_searchrow/`（5 个文件 + v636 基线）。**未发布。**
+备份 `_backup_20261020_searchrow/`（5 个文件 + v636 基线）。
+
+**已发布（2026-10-20 23:2x）**：`git push` 打不通 github.com（代理 `CONNECT tunnel failed, response 502`、
+直连 15s 超时），按 `github-publish-when-push-blocked` 走 Git Data API：提交 `0d2eb78`
+（连带本日未发布的 v634/v635/v636 一起，共 24 个文件），远端 tip 与本地 SHA 精确命中，437 文件树/blob 全等。
+Pages 构建 `built` / commit `0d2eb78`；线上 `index.html`、`online-map.css`、`runye-map-measure.html`、`sw.js`
+四份 sha256 与仓库 blob 逐字节相同。线上真跑一遍（`_p1/_live_smoke_v637.cjs`）：
+搜索框 **181px**、保存地点第二行满宽、加载的就是 `online-map.css?v=637`、本站资源零 404、零未捕获异常。
+截图 `_probe_out/05-live-searchrow.jpg`。
