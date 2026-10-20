@@ -36,11 +36,11 @@
     .pager{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
   </style>
   <script defer src="pwa/vendor/cloudbase-js-sdk-3.8.2.bundle.js?v=359"></script>
-  <script defer src="cloud-sync.js?v=371b"></script>
+  <script defer src="cloud-sync.js?v=371c"></script>
 </head>
 <body><header>润野灌溉 · 管理后台</header>
 <main>
-  <div class="head"><div><h1>统一管理后台</h1><div class="muted">插件开关 · 会员管理 · 会员规则参数。写操作需要管理员账号（云函数环境变量 RY_PLUGIN_ADMIN_UIDS）。 · <b id="admVer" style="color:#2E7D4F">界面 v626</b></div></div><a class="btn" href="index.html">返回主程序</a></div>
+  <div class="head"><div><h1>统一管理后台</h1><div class="muted">插件开关 · 会员管理 · 会员规则参数。写操作需要管理员账号（云函数环境变量 RY_PLUGIN_ADMIN_UIDS）。 · <b id="admVer" style="color:#2E7D4F">界面 v628</b></div></div><a class="btn" href="index.html">返回主程序</a></div>
 
   <div class="tabs">
     <button class="tab on" data-tab="plugins">外挂插件</button>
@@ -50,7 +50,7 @@
 
   <!-- ============ 页签1：外挂插件（原控制台原样保留） ============ -->
   <section id="sec-plugins">
-    <section class="card"><div class="bar"><strong>服务状态：</strong><span id="service" class="status">检查中…</span><span id="account" class="muted"></span></div><p class="foot">开关保存到 CloudBase 的 ry_kv，由主程序启动时读取；关闭后对之后打开或刷新页面的用户生效。</p></section>
+    <section class="card"><div class="bar"><strong>服务状态：</strong><span id="service" class="status">检查中…</span><span id="account" class="muted"></span><button class="btn" id="retryBtn" style="display:none;margin-left:8px">重新连接</button></div><p class="foot" id="serviceHint">开关保存到 CloudBase 的 ry_kv，由主程序启动时读取；关闭后对之后打开或刷新页面的用户生效。</p></section>
     <section class="card"><div class="bar" style="justify-content:space-between"><strong>插件列表</strong><div class="bar"><button class="btn" id="probe">重新检测接通状态</button><button class="btn primary" id="save" disabled>保存全站设置</button></div></div><div id="list" style="margin-top:10px">正在读取插件清单…</div></section>
     <section class="card"><strong>权限说明</strong><p class="foot">只有云函数环境变量 <code>RY_PLUGIN_ADMIN_UIDS</code> 中列出的账号 UID 可以保存开关。配置或读取服务暂时不可用时，主程序会继续加载插件，并在这里显示服务异常；这样不会因为后台故障而影响原有工具。</p></section>
   </section>
@@ -348,7 +348,36 @@
   };
 
   /* ---------- 启动（插件读取成功后再做会员权限回显） ---------- */
-  function boot(){if(!window.CloudSync){setService('CloudBase 登录组件未加载',true);return}CloudSync.init().then(function(ok){if(!ok)throw new Error('CloudBase 初始化失败');return CloudSync.restore()}).then(function(signed){var uid=CloudSync.authSub();$('account').textContent=signed?'当前账号 UID：'+(uid||'已登录'):'未检测到登录态，请先在主程序登录后再打开后台';return fetch('plugins.json?v='+Date.now(),{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('插件清单 HTTP '+r.status);return r.json()})}).then(function(cfg){state.plugins=cfg.plugins||[];return api('pluginsGet')}).then(function(r){if(!r||r.code!==0)throw new Error((r&&r.message)||'无法读取插件控制配置');state.enabled=r.data.enabled||{};state.admin=!!r.data.admin;setService(state.admin?'服务已连接 · 管理员权限已验证':'服务已连接 · 当前账号没有管理权限',!state.admin);if(!state.admin){$('save').title='请让管理员在云函数环境变量 RY_PLUGIN_ADMIN_UIDS 中登记此 UID';}render();permText();loadStats(1);return probe()}).catch(function(e){setService('后台连接失败：'+(e.message||e),true);$('list').textContent='无法读取插件状态；主程序不会受此后台故障影响。'})}
+  /* [v628 2026-10-20] 用户反馈「后台连接失败」。原来只显示一句「CloudBase 初始化失败」，
+     看不出是网络慢、SDK 没加载还是配置问题。这里把 cloud-sync.js 记在
+     window._cloudLastError 里的真实原因摊开，并给「重新连接」按钮（不必整页刷新）。 */
+  function bootFail(e){
+    var le=window._cloudLastError||null,hint='';
+    if(le&&le.code==='sdk_not_loaded'){
+      hint='原因：CloudBase SDK 没能加载（网络慢或本地缓存过期）。点「重新连接」再试；仍不行就按 Ctrl+F5 强刷，或在浏览器「设置 → 站点数据」里清除本站数据后重开。';
+    }else if(le&&(le.code==='init_failed'||le.code==='no_access_key')){
+      hint='原因：'+(le.msg||le.code);
+    }else{
+      hint='主程序不受此后台故障影响；可点「重新连接」重试。';
+    }
+    setService('后台连接失败：'+((e&&e.message)||e),true);
+    var hb=$('serviceHint'); if(hb)hb.textContent=hint;
+    var rb=$('retryBtn'); if(rb){rb.style.display='';rb.disabled=false;rb.textContent='重新连接';}
+  }
+  function retryBoot(){
+    var rb=$('retryBtn'); if(rb){rb.disabled=true;rb.textContent='连接中…';}
+    if(window._cloudLastError&&window._cloudLastError.code==='sdk_not_loaded')window._cloudLastError=null;
+    /* SDK 根本没到的情形（上一次是它没加载成功）：重新挂一次 script。
+       v628 起 SW 对这份 bundle 是「缓存优先」，所以重挂通常立刻命中本地缓存；
+       query 只是破一次 HTTP 缓存，SW 的 key() 会抹掉查询串，不影响命中。 */
+    if(typeof window.cloudbase==='undefined'){
+      try{var s=document.createElement('script');s.src='pwa/vendor/cloudbase-js-sdk-3.8.2.bundle.js?v='+Date.now();document.head.appendChild(s);}catch(e){}
+    }
+    setService('重新连接中…',false);
+    boot();
+  }
+  function boot(){if(!window.CloudSync){setService('CloudBase 登录组件未加载',true);return}CloudSync.init().then(function(ok){if(!ok)throw new Error('CloudBase 初始化失败');return CloudSync.restore()}).then(function(signed){var uid=CloudSync.authSub();$('account').textContent=signed?'当前账号 UID：'+(uid||'已登录'):'未检测到登录态，请先在主程序登录后再打开后台';return fetch('plugins.json?v='+Date.now(),{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('插件清单 HTTP '+r.status);return r.json()})}).then(function(cfg){state.plugins=cfg.plugins||[];return api('pluginsGet')}).then(function(r){if(!r||r.code!==0)throw new Error((r&&r.message)||'无法读取插件控制配置');state.enabled=r.data.enabled||{};state.admin=!!r.data.admin;setService(state.admin?'服务已连接 · 管理员权限已验证':'服务已连接 · 当前账号没有管理权限',!state.admin);var rb=$('retryBtn');if(rb)rb.style.display='none';var hb=$('serviceHint');if(hb)hb.textContent='开关保存到 CloudBase 的 ry_kv，由主程序启动时读取；关闭后对之后打开或刷新页面的用户生效。';if(!state.admin){$('save').title='请让管理员在云函数环境变量 RY_PLUGIN_ADMIN_UIDS 中登记此 UID';}render();permText();loadStats(1);return probe()}).catch(function(e){bootFail(e);$('list').textContent='无法读取插件状态；主程序不会受此后台故障影响。'})}
+  $('retryBtn').onclick=retryBoot;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
 </script></body></html>

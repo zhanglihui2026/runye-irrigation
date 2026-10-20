@@ -2766,5 +2766,55 @@ $('mDetailCard').scrollIntoView({behavior:'smooth',block:'nearest'});
 - 探针 `_probe_tl_fit.mjs` **不随仓库提交**（本仓库 60+ 个 `_probe_*.mjs` 都是本地工具）；
   需要复跑就 `node _probe_tl_fit.mjs`，可加 `VW/VH/INJECT/SHOT/SHOT2` 环境变量。
 
+### 26.25 v628-cloud-sdk-precache：后台「CloudBase 初始化失败」的真正原因（2026-10-20）
+
+**用户提问**（截图）：「后台链接失败，应该是哪里有了问题」——服务状态显示
+「后台连接失败：CloudBase 初始化失败」，页面本身能打开（界面 v626）。
+
+**先排除误判**
+- 线上 `pwa/vendor/cloudbase-js-sdk-3.8.2.bundle.js` → HTTP 200、787218 字节；`cloud-sync.js` 也 200。
+- 本机起静态服务打开 `plugin-admin.html`：`typeof cloudbase === 'object'`、`CloudSync.init()` → **`{ok:true}`**
+  ⇒ **代码路径没问题，是浏览器那一侧没拿到 SDK**。
+- 时间线也对得上：15:26（v625）后台还正常（截图有统计），15:40 发 v626、15:52 发 v627，15:54 就报错。
+
+**根因（三段串起来才致命）**
+1. `pwa/vendor/cloudbase-js-sdk-3.8.2.bundle.js`（787KB）**不在 CORE 白名单**里
+   （CORE 只有 leaflet / epanet / images），所以它只会走「被请求时才落盘」的 RUNTIME 缓存。
+2. `RUNTIME_CACHE = PREFIX + VERSION + '-runtime'` 是**版本作用域**，而 `activate` 会把
+   `PREFIX*` 里除当前 CORE/RUNTIME 之外的缓存全删 ⇒ **每发一个版本，这 787KB 就被清空**，
+   下次打开必须重新从 GitHub Pages 拉一遍。
+3. `cloud-sync.js` 的 `cloudInit()` **只等 10 秒**就判 `sdk_not_loaded`。
+   ⇒ 网络稍慢（国内访问 Pages 很常见）必然失败，而且**发版越勤越容易踩**——我今天 30 分钟内发了 3 版。
+
+**为什么没把 SDK 塞进 CORE**：CORE 的 install 是原子 `addAll`，塞一个 787KB 进去会明显抬高
+「一次失败就整包不更新」的概率——那会让以后所有修复都发不出去，代价太大。
+
+**改动**
+1. `sw.js`
+   - 新增**版本无关**的 `VENDOR_CACHE = PREFIX + 'vendor'`，`VENDOR = ['pwa/vendor/cloudbase-js-sdk-3.8.2.bundle.js']`；
+   - `activate` 删除旧缓存时**排除 VENDOR_CACHE**（这是「跨版本保留」的关键一行）；
+   - `install` 在 `skipWaiting()` **之后**补大件，且**缓存已有就跳过**（第一版写成 `addAll` +
+     `cache:'reload'`，等于每版照旧重下 787KB，等于没优化——已改掉），整体 try/catch 不影响 SW 更新；
+   - `fetch` 对 VENDOR 走**缓存优先**，且分支排在通用 `local()`（网络优先）之前。
+2. `cloud-sync.js`：SDK 就绪 deadline **10 秒 → 20 秒**（兜底冷启动；正常情况已是毫秒级命中缓存）。
+3. `plugin-admin.html`：失败时摊开 `window._cloudLastError` 的真实原因（`sdk_not_loaded` /
+   `init_failed` / `no_access_key` 各给一句可操作的话）+ **「重新连接」按钮**；
+   重试时若 `typeof cloudbase === 'undefined'` 会**重新挂一次 script**（SW 缓存优先 ⇒ 一般立刻命中）。
+
+**验证（实机，`_probe_sw_vendor.mjs`）**
+- 装 SW 后 `caches.keys()` = `["runye-pwa-/-v628-cloud-sdk-precache-core","runye-pwa-/-vendor"]`，
+  vendor 里有 `cloudbase-js-sdk-3.8.2.bundle.js`；
+- 页面侧该资源 `transferSize: 0`（来自缓存），**把本地服务器关掉再重载，`typeof cloudbase` 仍是 object**
+  ⇒ 确实由 SW 缓存供给。
+- **跨版本保留实测**：同一浏览器 profile 先把版本从 v628 改成 v629 再跑 →
+  `caches` 变成 `["runye-pwa-/-vendor","runye-pwa-/-v629-bump-sim-core"]`（旧 core 被删、**vendor 留住**），
+  SDK 仍 `transferSize: 0`、断网仍可加载。**这正是旧版做不到的事**。
+- 失败 UX：用 `FAKE_FAIL=1` 注入「init 永远失败」的假 CloudSync →
+  服务状态「后台连接失败：CloudBase 初始化失败」+ 原因提示 + 「重新连接」按钮可见。
+- 新增 `tests/sw_vendor_cache.test.cjs`（7 组契约：VENDOR 名字不含 VERSION / activate 不删 /
+  install 用「没有才下载」/ 不用 addAll / 大件缓存优先且排在 local 之前 / deadline ≥ 20s / 后台有重试按钮）。
+- 闸门：`--test` **156/156**、`ci_check_static` **PASS=29**、`check_publish_refs` PASS。
+
+
 
 

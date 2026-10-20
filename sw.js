@@ -839,7 +839,7 @@
    规格逐项照抄二级 .pp-recipe-row / .pp-recipe-btn（20px 高、0 8px 内边距、白底 1px #e2e8f0、
    #334155 字、11px 600、nowrap）；按钮 inline 的 width:100%;padding 已删。
    改 index.html（DOM）+ style-01.css（#tlPumpUpdateBtn 那条，唯一出处）⇒ 抬版本刷缓存。 */
-const VERSION = 'v627-diagram-fit';
+const VERSION = 'v628-cloud-sdk-precache';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
@@ -1029,18 +1029,49 @@ const CORE = [
 const LEAFLET_CDN = 'https://unpkg.com/leaflet@1.9.4/dist/';
 const LEAFLET_FILES = ['leaflet.js','leaflet.css','images/layers.png','images/layers-2x.png','images/marker-icon.png','images/marker-icon-2x.png','images/marker-shadow.png'];
 const CORE_URLS = new Set(CORE.map(path => new URL(path, BASE).href));
+/* ===== [v628 2026-10-20] 版本无关的「静态大件」缓存 =========================
+   现象（用户反馈）：后台打开就报「后台连接失败：CloudBase 初始化失败」。
+   根因（完整链路）：
+     ① `pwa/vendor/cloudbase-js-sdk-3.8.2.bundle.js`（787KB）**不在 CORE 白名单**，
+        只会在被请求时落进 RUNTIME 缓存；
+     ② `RUNTIME_CACHE = PREFIX + VERSION + '-runtime'` 是**版本作用域**，
+        而 activate 会把 `PREFIX*` 里除当前 CORE/RUNTIME 之外的缓存全删掉
+        ⇒ **每发一个版本，这份 787KB 就被清掉**，下次打开必须重新从 GitHub Pages 拉；
+     ③ `cloud-sync.js` 的 `cloudInit()` 只等 SDK **10 秒**就判定 `sdk_not_loaded`。
+     ⇒ 网络稍慢（国内访问 Pages 很常见）就必然失败，而且**发版越勤越容易复现**。
+   处理：给这类「内容不变的大件」单独一个**跨版本保留**的缓存，并**缓存优先**。
+     · 不放进 CORE：CORE 的 install 是原子 `addAll`，塞一个 787KB 进去会明显抬高
+       「一次失败就整包不更新」的概率，得不偿失；
+     · 放这里：第一次下载后可跨版本长期复用，发版不再重复拉。
+   ========================================================================== */
+const VENDOR_CACHE = PREFIX + 'vendor';
+const VENDOR = ['pwa/vendor/cloudbase-js-sdk-3.8.2.bundle.js'];
+const VENDOR_URLS = new Set(VENDOR.map(path => new URL(path, BASE).href));
 
 self.addEventListener('install', event => {
   // Atomic install: retain the previous working worker if any required file fails.
   // [v435-skip-waiting] 预缓存全部成功后才 skipWaiting：新 SW 立即接管、配合 activate 的
   // clients.claim() 让刷新后的页面不再被旧 SW 的旧缓存投递（根治「改了样式看不到」的
   // 混合投递问题）；若预缓存失败则不接管，保留原子性。
-  event.waitUntil(caches.open(CORE_CACHE).then(cache => cache.addAll(CORE.map(path => new Request(new URL(path, BASE), {cache:'reload'})))).then(() => self.skipWaiting()));
+  event.waitUntil((async () => {
+    const cache = await caches.open(CORE_CACHE);
+    await cache.addAll(CORE.map(path => new Request(new URL(path, BASE), {cache:'reload'})));
+    await self.skipWaiting();
+    /* [v628] 大件放在接管之后再补，且失败不抛出（不能因为它一个大文件把整次更新废掉）。
+       关键：**缓存里已有就不再下载** —— 用 addAll 会每版重拉 787KB，等于没优化。 */
+    try {
+      const vc = await caches.open(VENDOR_CACHE);
+      for (const path of VENDOR) {
+        const u = new URL(path, BASE).href;
+        if (!(await vc.match(u))) await vc.add(new Request(u, {cache:'reload'}));
+      }
+    } catch (e) { /* 下次页面加载时按需补进 VENDOR_CACHE */ }
+  })());
 });
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
     for (const name of await caches.keys()) {
-      if (name.startsWith(PREFIX) && name !== CORE_CACHE && name !== RUNTIME_CACHE) await caches.delete(name);
+      if (name.startsWith(PREFIX) && name !== CORE_CACHE && name !== RUNTIME_CACHE && name !== VENDOR_CACHE) await caches.delete(name);
     }
     await self.clients.claim();
   })());
@@ -1092,6 +1123,20 @@ self.addEventListener('fetch', event => {
     return;
   }
   if (url.origin !== BASE.origin || !url.pathname.startsWith(BASE.pathname) || url.pathname.endsWith('/sw.js')) return;
+  /* [v628] 静态大件缓存优先：命中即回，不再先等网络。否则网络一慢，
+     787KB 的 CloudBase SDK 迟迟不到，cloud-sync.js 等 10 秒就判「初始化失败」。 */
+  if (VENDOR_URLS.has(key(request.url))) {
+    event.respondWith((async () => {
+      const cached = await caches.match(key(request.url));
+      if (cached) return cached;
+      const res = await fetch(request);
+      if (res && res.ok) {
+        try { const vc = await caches.open(VENDOR_CACHE); await vc.put(key(request.url), res.clone()); } catch (e) {}
+      }
+      return res;
+    })());
+    return;
+  }
   if (request.mode === 'navigate' || /\.(?:js|css|png|svg|ico|woff2?|webmanifest)$/i.test(url.pathname)) {
     // Online always uses the server so subsequent releases cannot get stuck on old UI.
     event.respondWith(local(request, event));

@@ -133,7 +133,11 @@ function cloudInit(){
     wait = Promise.resolve(true);
   }else{
     wait = new Promise(function(resolve){
-      var deadline = Date.now() + 10000;          /* 墙钟 10 秒：后台节流也能准时到期 */
+      /* [v371c 2026-10-20] 10 秒 → 20 秒。SDK bundle 有 787KB，国内访问 GitHub Pages
+         偶尔十几秒才到；原来 10 秒就判失败，管理后台直接显示「CloudBase 初始化失败」。
+         v628 起 SW 把该 bundle 放进跨版本保留的 VENDOR 缓存（缓存优先），正常情况是
+         毫秒级命中，这里的放宽只是兜底冷启动。 */
+      var deadline = Date.now() + 20000;          /* 墙钟 20 秒：后台节流也能准时到期 */
       (function poll(){
         if(typeof cloudbase !== 'undefined'){ resolve(true); return; }
         if(Date.now() >= deadline){ resolve(false); return; }
@@ -143,7 +147,7 @@ function cloudInit(){
   }
   cloudInitPending = wait.then(function(sdkOk){
     if(!sdkOk){
-      window._cloudLastError = {code:'sdk_not_loaded', msg:'CloudBase SDK 未加载（已等 10 秒）。请检查 pwa/vendor/cloudbase-js-sdk-3.8.2.bundle.js 是否存在/可达。'};
+      window._cloudLastError = {code:'sdk_not_loaded', msg:'CloudBase SDK 未加载（已等 20 秒）。请按 Ctrl+F5 强刷；仍不行就在「设置 → 站点数据」清除本站数据后重开。'};
       return false;
     }
     if(cloudApp) return true;                     /* 双重检查：等待期间别处已完成初始化 */
