@@ -29,7 +29,8 @@ const hreq = (m, p) => new Promise((res, rej) => { const q = http.request({ host
 for (let i = 0; i < 60; i++) { try { await hreq('GET', '/json/version'); break; } catch (e) { await sleep(300); } }
 let idc = 1, ws; const pend = {};
 const send = (m, p = {}) => new Promise((res, rej) => { const id = idc++; pend[id] = { res, rej }; ws.send(JSON.stringify({ id, method: m, params: p })); setTimeout(() => { if (pend[id]) { delete pend[id]; rej(new Error('timeout ' + m)); } }, 60000); });
-const t = JSON.parse(await hreq('PUT', '/json/new?' + encodeURIComponent('http://127.0.0.1:' + PORT + '/index.html')));
+const TARGET = process.env.URL || ('http://127.0.0.1:' + PORT + '/index.html');
+const t = JSON.parse(await hreq('PUT', '/json/new?' + encodeURIComponent(TARGET)));
 ws = new WS(t.webSocketDebuggerUrl); await new Promise(r => ws.addEventListener('open', r));
 ws.addEventListener('message', e => { const o = JSON.parse(e.data); if (o.id && pend[o.id]) { const { res, rej } = pend[o.id]; delete pend[o.id]; o.error ? rej(new Error(o.error.message)) : res(o.result); return; } if (o.method === 'Page.javascriptDialogOpening') { ws.send(JSON.stringify({ id: idc++, method: 'Page.handleJavaScriptDialog', params: { accept: true } })); } });
 await send('Runtime.enable'); await send('Page.enable');
