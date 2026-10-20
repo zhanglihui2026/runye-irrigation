@@ -2600,3 +2600,13 @@ CloudBase 控制台那张表读的是**身份认证（auth）用户表**，云�
 **验证**：单测 `tests/entitle_flow.test.cjs` **47/47**（新增 3 条：接口存在且限管理员 / v6 迁移含两列 / 后台有统计卡）；
 `ci_check_static` **PASS=29**；`plugin-admin.html` 内联脚本语法 0 错误；无 token 调 `adminMemberStats` 返回 401（鉴权前置生效）。
 统计数字的真值要等 SQL 跑完后在页面上核对一次：**累计注册应等于 `select count(*) from ry_entitle`**。
+
+**发布与现状（2026-10-20 14:38）**
+- 提交 `edb4541`（v622 标点）+ `3a52528`（v623 统计），推送 `addcdc3..3a52528`；Pages 约 45 秒翻新到 `v623-member-stats`。
+- 线上冒烟 `_smoke_v521_live.mjs` **27/27**；逐项核对：`plugin-admin.html` 含 `id="mKpis"`(1) 与 `adminMemberStats`(1)、
+  `index.html` 旧句「改径后重算。</span>」为 0、`inline-27.js` 旧间隔号「改径重算 · 水泵扬程」为 0、
+  `style-01.css?v=623-member-stats`。
+- **管理员权限已解决**：用户把 `2089630534341758976` 加进 `RY_PLUGIN_ADMIN_UIDS` 并重建实例后，
+  后台显示「服务已连接 · 管理员权限已验证 ✓」。**当前云函数已是 `v2c-4-member-stats`**（`configGet` 回显实证）。
+- 仍缺最后一步：**`sql/route_c_migration_v6_member_stats.sql` 未执行** ⇒ 现在打开后台能看到
+  「累计注册 / L1 / L2 / 已过期 / 邀请关系」（这些不依赖新列），但「今日新增 / 近 7 日 / 注册时间 / 最后活跃」会是 0 或「—」。
