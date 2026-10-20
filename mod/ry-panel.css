@@ -906,6 +906,15 @@ body.ry-tool.ry-cad-vp #ryCadSide[data-ry-open="0"]{width:40px}
 #ryCadSide .ry-cad-grp>summary{
   list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;
   padding:9px 10px;font-size:12px;font-weight:600;color:#24443a;
+  /* [v620 2026-10-20 用户要求] 分组标题吸顶。
+     用户原话：「三级管线工具栏向下点开下拉菜单后，具体显示内容超过屏幕时，需要滚动之后查看里面的内容，
+     滚动时，三级管网参数/生成与输出这个大标题应该是不动的；二级 地块与灌溉参数、地形高程应该同样的道理。」
+     实现：三个分组标题都在这一个滚动容器（#ryCadSide .ry-cad-grps，overflow-y:auto）里，
+     给 summary 本身上吸顶即可，不用改 DOM。
+     · 各自的 <details> 就是它的约束盒 ⇒ 滚到下一组时上一组标题被自然顶走，不会几层叠在一起；
+     · 底色必须不透明（下一行 background:#f4f9f6 已满足），否则正文会从标题底下透出来；
+     · z-index 要盖住 .ry-cad-grp-body 里的行/表，否则滚动时正文压在标题上。 */
+  position:sticky;top:0;z-index:3;
 }
 #ryCadSide .ry-cad-grp>summary::-webkit-details-marker{display:none}
 #ryCadSide .ry-cad-grp>summary::before{content:'▸';font-size:10px;color:#7d8f86}

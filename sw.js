@@ -839,7 +839,7 @@
    规格逐项照抄二级 .pp-recipe-row / .pp-recipe-btn（20px 高、0 8px 内边距、白底 1px #e2e8f0、
    #334155 字、11px 600、nowrap）；按钮 inline 的 width:100%;padding 已删。
    改 index.html（DOM）+ style-01.css（#tlPumpUpdateBtn 那条，唯一出处）⇒ 抬版本刷缓存。 */
-const VERSION = 'v619-undo-cover';
+const VERSION = 'v620-sticky-grp';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
