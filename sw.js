@@ -809,7 +809,12 @@
    且宽度存 localStorage 拖窄后每次启动原样恢复 ⇒ 切页回来永远是窄的。
    修：MIN_TOOL 92 → 132，并在 style-01.css / ry-panel.css 的 grid-template-columns 各加一道
    max(var(--pp-tool-w,…),132px)；三处同值，任何写死窄值的路径都压不进来。 */
-const VERSION = 'v608-rail-min-width';
+/* v609-props-panel: 二级「地块与灌溉参数」面板改为 CAD「特性」面板式（灰底分组条 + 标签｜值
+   两列 + 细网格，行高 27→22px）。样式改在 mod/ry-panel.css（面板皮肤唯一出处），不动 JS 计算。
+   同一改动修掉一桩既存缺陷：#ppPlanBar2「水力计算结果」的伪元素标题被 v529 的
+   content:none!important 误杀，标题不可见而该栏默认 pp-res-off ⇒ 二级结果栏整块消失。
+   v609j 追加：三级 #tlPlanBar2 同一条规则漏了 :not(.pp-res-head)，标题同样被误杀，一并修好。 */
+const VERSION = 'v609j-props-panel';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

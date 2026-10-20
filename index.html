@@ -244,7 +244,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <link rel="stylesheet" href="pwa/pwa.css?v=2">
 <script defer src="pwa/pwa.js?v=2"></script>
     <link rel="stylesheet" href="runye-theme.css?v=2">
-    <link rel="stylesheet" href="mod/ry-panel.css?v=608-rail-min-width">
+    <link rel="stylesheet" href="mod/ry-panel.css?v=609j-props-panel">
     <!-- Shoelace 2.15.1（与紧凑分组样板一致）；Shoelace 不可用时保留原生输入控件。 -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.1/cdn/themes/light.css">
   <link rel="stylesheet" href="runye-typography.css?v=530-h1-scope">
@@ -714,9 +714,15 @@ body.ry-worst-off [data-tlworst]{display:none}
        （01 版面的面积条与 04 的施工简图），信息不丢失。 -->
   <!-- 版面：左侧参数栏 + 右侧图纸区。参数由顶部横排改为左栏竖排，把整屏高度让给图纸 -->
   <div class="pp-body">
-  <aside class="pp-side" id="ppSide" data-ry-panel>
+  <aside class="pp-side ry-props" id="ppSide" data-ry-panel>
+  <!-- [v609 2026-10-20 用户要求] 面板改为 CAD「特性」面板式：灰底分组条 + 标签｜值 两列 + 细网格。
+       三组固定为「灌溉参数 / 计算结果 / 扬程计算式」，灰条只做视觉分组、不加折叠（用户明确「暂时不用收起」）。
+       分组条是本面板**唯一新增的 DOM**（.ry-props-head，与行同级，不包 wrapper ⇒ 层级不增）。
+       样式唯一出处 = mod/ry-panel.css 的 [v609] 段；行仍是 .pp-plan-item 原类名，探针契约不受影响。
+       需要撤掉：删下面两个 .ry-props-head 与 ry-panel.css 的 [v609] 段，并去掉 #ppSide 的 ry-props 类即可。 -->
+  <div class="ry-props-head">灌溉参数</div>
   <!-- 地块规划参数 — 第1行：输入参数 -->
-  <div class="pp-plan-bar" id="ppPlanBar" style="margin-bottom:8px">
+  <div class="pp-plan-bar" id="ppPlanBar">
     <!-- 2026-09-20 v91 用户要求：把「水泵提升高度 / 地形高差」做成可设定值，放进本面板、排在「滴灌带间距」之前。
          与 01 一级表单同源：planLift ⇄ fld_lift、planDh ⇄ fld_dh（双向镜像，见下方 JS 块），默认值仍为 5 / 5。
          需要撤掉：删掉本注释与下面两行 item 即可，另删本文件底部 ppPullLiftDh / ppLiftDhCapture 那一整块（含两个 document 监听）与 resetDefaults 里的回填调用。 -->
@@ -775,20 +781,21 @@ body.ry-worst-off [data-tlworst]{display:none}
   <!-- 第2行：计算结果 -->
   <div class="pp-plan-bar pp-plan-bar-result" id="ppPlanBar2">
     <span class="pp-sep-vert"></span>
-    <span class="pp-plan-item"><span class="pp-plan-label">每亩流量</span><span class="pp-plan-val" id="planIntensity">—</span>m³/h/亩</span>
+    <span class="pp-plan-item"><span class="pp-plan-label">每亩流量</span><span class="pp-plan-val" id="planIntensity">—</span><span class="pp-plan-unit">m³/h</span></span>
     <span class="pp-sep-vert"></span>
-    <span class="pp-plan-item"><span class="pp-plan-label">水泵流量</span><span class="pp-plan-val" id="planPumpFlow">—</span>m³/h</span>
-    <span class="pp-plan-item"><span class="pp-plan-label">水泵扬程</span><span class="pp-plan-val" id="planPumpHead">—</span>m</span>
-    <span class="pp-plan-item"><span class="pp-plan-label">计算轴功率</span><span class="pp-plan-val" id="planPumpPower">—</span>kW</span>
-    <span class="pp-plan-item"><span class="pp-plan-label">建议电机功率</span><span class="pp-plan-val" id="planMotorPower">—</span>kW</span>
+    <span class="pp-plan-item"><span class="pp-plan-label">水泵流量</span><span class="pp-plan-val" id="planPumpFlow">—</span><span class="pp-plan-unit">m³/h</span></span>
+    <span class="pp-plan-item"><span class="pp-plan-label">水泵扬程</span><span class="pp-plan-val" id="planPumpHead">—</span><span class="pp-plan-unit">m</span></span>
+    <span class="pp-plan-item"><span class="pp-plan-label">计算轴功率</span><span class="pp-plan-val" id="planPumpPower">—</span><span class="pp-plan-unit">kW</span></span>
+    <span class="pp-plan-item"><span class="pp-plan-label">建议电机功率</span><span class="pp-plan-val" id="planMotorPower">—</span><span class="pp-plan-unit">kW</span></span>
     <span class="pp-sep-vert"></span>
-    <span class="pp-plan-item"><span class="pp-plan-label">主管</span><span class="pp-plan-val" id="planMainPipe">—</span></span>
-    <span class="pp-plan-item"><span class="pp-plan-label">主管流速</span><span class="pp-plan-val" id="planMainVelocity">—</span>m/s</span>
-    <span class="pp-plan-item"><span class="pp-plan-label">支管</span><span class="pp-plan-val" id="planBranchPipe">—</span></span>
-    <span class="pp-plan-item"><span class="pp-plan-label">支管流速</span><span class="pp-plan-val" id="planBranchVelocity">—</span>m/s</span>
-    <span class="pp-plan-item" style="display:none"><span class="pp-plan-label">支管总长度</span><span class="pp-plan-val" id="planBranchSingleLen">—</span>m</span>
+    <span class="pp-plan-item"><span class="pp-plan-label">主管</span><span class="pp-plan-val" id="planMainPipe">—</span><span class="pp-plan-unit"></span></span>
+    <span class="pp-plan-item"><span class="pp-plan-label">主管流速</span><span class="pp-plan-val" id="planMainVelocity">—</span><span class="pp-plan-unit">m/s</span></span>
+    <span class="pp-plan-item"><span class="pp-plan-label">支管</span><span class="pp-plan-val" id="planBranchPipe">—</span><span class="pp-plan-unit"></span></span>
+    <span class="pp-plan-item"><span class="pp-plan-label">支管流速</span><span class="pp-plan-val" id="planBranchVelocity">—</span><span class="pp-plan-unit">m/s</span></span>
+    <span class="pp-plan-item" style="display:none"><span class="pp-plan-label">支管总长度</span><span class="pp-plan-val" id="planBranchSingleLen">—</span><span class="pp-plan-unit">m</span></span>
   </div>
   <!-- 扬程计算式（紧贴结果栏下方，仅扬程一行，实时跟随输入更新，不换行） -->
+  <div class="ry-props-head">扬程计算式</div>
   <div id="ppCalcDetail" class="pp-calc-formula pp-calc-h"></div>
   <!-- 二级简图视图本身保留在右侧 pane 中，入口暂时停用；恢复位置见
        feature-archive/二级简图/README.md。 -->
@@ -2252,7 +2259,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <!-- ===== 实际地块规划 JS ===== -->
 <script src="mod/inline-11.js?v=457-pump-power-semantics"></script>
 <!-- [v420-split] 绘图编辑器 IIFE 自 inline-11 迁出：必须紧随 inline-11 之后同步执行 -->
-<script src="mod/plot-editor.js?v=604-branch-span-all-paths"></script>
+<script src="mod/plot-editor.js?v=609j-props-panel"></script>
 <script src="mod/inline-12.js?v=567-current-plot-anchor-fail-closed"></script>
 <script src="mod/inline-13.js?v=499-plot-library-store"></script>
 <!-- [v422-head-system-svg] 纯 SVG 核心先于 inline-14 同步加载。 -->

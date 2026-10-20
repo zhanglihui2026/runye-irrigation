@@ -373,8 +373,40 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-si
   background:transparent;
   border:0;
   border-radius:0;
-  gap:8px;padding:10px;
+  gap:0;padding:0;   /* [v609] 特性面板：分组条与行都通栏，容器不再留 10px 边距 + 8px 组间距 */
 }
+
+/* ===== [v609 2026-10-20 用户要求] 二级面板改为 CAD「特性」面板式 ==========
+   用户原话：「截图是cad的控制面板，我让你把二级页面也改成这个样式的控制面板，
+             注意不能各种嵌套 各种覆盖。你先画个示意图我看看。」
+   拍板参数：三组灰条（灌溉参数 / 计算结果 / 扬程计算式）、灰条不做收起交互、行高 22px。
+   归属纪律（防重演 v595 的「两套规则叠同一个元素」）：
+     · 本段是该面板皮肤的唯一出处，行/标签/值/输入四类元素的尺寸与外观全部在这里；
+     · 一律以 .ry-props（挂在 #ppSide 上）为根的单类前缀，不写 ID 提权、不写 !important；
+     · 放在 DOM 上的新元素只有一个 .ry-props-head，与行同级不包 wrapper ⇒ 层级不增；
+     · 「计算结果」不新建元素，复用 #ppPlanBar2 既有的 pp-res-head 伪标题机制。
+   ⚠ 全站两条全局 !important 仍会压本段，别在段内加回去：
+     runye-typography.css → input/select/button 字号 13px !important（故 input 字号仍写 !important）
+     style-01.css → body *{border-radius:0!important} 全站圆角压平。 */
+.ry-props .ry-props-head{
+  display:block;height:22px;line-height:22px;
+  padding:0 10px;box-sizing:border-box;
+  background:#dcdfdd;color:#2c2c2a;
+  font-size:11px;font-weight:600;
+  border-top:1px solid #cfd4d1;border-bottom:1px solid #cfd4d1;
+  user-select:none;
+}
+.ry-props .ry-props-head:first-child{border-top:0}
+/* 计算结果那条：伪元素标题（content 由 style-01.css 的 pp-res-head 段给，这里只管皮肤） */
+.ry-props .pp-plan-bar-result.pp-res-head::before{
+  display:block;height:22px;line-height:22px;
+  padding:0 10px;box-sizing:border-box;
+  background:#dcdfdd;color:#2c2c2a;
+  font-size:11px;font-weight:600;
+  border-top:1px solid #cfd4d1;border-bottom:1px solid #cfd4d1;
+}
+/* 结果栏原来那层淡绿底（style-01.css 的 rgba(134,239,172,.06)）在灰条网格里发脏：
+   由上面 .pp-plan-bar 的 background:#fff 统一压白，本处不再重复声明。 */
 /* [试验层 3] 移除地块分区整个功能区外壳的底色与投影；保留原有尺寸和间距。
    主程序模式的 body.ry-tool 规则特异性更高，故同时覆盖该实际作用域。 */
 #pipePlanSection,
@@ -398,31 +430,44 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-to
   display:block;margin:0;padding:0;
   min-height:0;
   border:0;border-radius:0;box-shadow:none;
-  background:transparent;
+  background:#fff;   /* [v609] 行底改白：灰分组条要有对比才能读成「条」，透明底会跟侧栏底色糊成一片 */
   font-size:11px;
 }
-/* 关闭旧横向参数条遗留的 ::before 伪标题，避免旧分组标题重新出现。 */
-:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-bar::before,
-:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-bar-result::before,
-:is(#tlPipePlanSection,#ryCadSide [data-pp="tlPipePlanSection"]) .pp-side .pp-plan-bar::before,
-:is(#tlPipePlanSection,#ryCadSide [data-pp="tlPipePlanSection"]) .pp-side .pp-plan-bar-result::before{
+/* 关闭旧横向参数条遗留的 ::before 伪标题，避免旧分组标题重新出现。
+   [v609] 必须放行 .pp-res-head：那是 plot-editor.js ppResCollapse 给「水力计算结果」挂的
+   可折叠标题（v252 功能）。v529 这条 content:none!important 把标题一并杀了且没带 :not()，
+   导致二级结果栏「眼看不见标题 + 默认 pp-res-off 把行也藏了」= 整块消失。
+   ⚠ .pp-plan-bar::before 也要带 :not()： #ppPlanBar2 的 class 是「pp-plan-bar pp-plan-bar-result」，
+   两条选择器都会命中它，只改下面一条不够。
+   [v609j 2026-10-20] 三级两条选择器也补上 :not(.pp-res-head) —— 之前只修了二级，
+   #tlPlanBar2 的「水力计算结果 ▾」同样被误杀，三级结果栏只露数据行、没有标题（用户要求一起修）。
+   三级标题的皮肤来自 style-01.css 的 `#tlPipePlanSection .pp-side .pp-plan-bar::before`
+   （小号绿色 700、下边框），与三级白卡风格一致，这里不另加灰条。 */
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-bar:not(.pp-res-head)::before,
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-bar-result:not(.pp-res-head)::before,
+:is(#tlPipePlanSection,#ryCadSide [data-pp="tlPipePlanSection"]) .pp-side .pp-plan-bar:not(.pp-res-head)::before,
+:is(#tlPipePlanSection,#ryCadSide [data-pp="tlPipePlanSection"]) .pp-side .pp-plan-bar-result:not(.pp-res-head)::before{
   content:none!important;
   display:none!important;
 }
 /* [试验层 6] 参数组不再各自呈卡片；必须放在基础皮肤之后才能生效。 */
-/* —— 键值行：标签左、控件右，紧凑 27px 行距 —— */
+/* —— 键值行：[v609] CAD 特性面板式 —— 标签左（固定 46% 列 + 右缘竖线）、值右对齐、22px 行距 —— */
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-item{
-  display:flex;align-items:center;gap:5px;
-  width:100%;min-height:27px;padding:2px 12px;
-  border-bottom:1px solid transparent;
+  display:flex;align-items:center;gap:6px;
+  width:100%;min-height:22px;padding:0 10px;box-sizing:border-box;
+  border-bottom:1px solid #e8ecea;
   color:var(--ry-s-500,#64748b);font-size:11px;
 }
-:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-item:last-of-type{ border-bottom:0; }
-:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-item > .pp-plan-label:first-child{ margin-right:auto; }
-:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-item-fluid-input{
-  display:flex;align-items:center;gap:5px;
+/* [v609] 原「最后一行去底边」已删：特性面板每行都要网格线，末行由分组条收口。 */
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-item > .pp-plan-label:first-child{
+  flex:0 0 46%;margin-right:0;min-width:0;padding-right:6px;
+  border-right:1px solid #e8ecea;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
-:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-item-fluid-input > .pp-plan-label:first-child{flex:0 0 84px;margin-right:0;min-width:0}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-item-fluid-input{
+  display:flex;align-items:center;gap:6px;
+}
+/* [v609] 原「标签固定 84px」已删：与上面 46% 列合并为同一条，避免两套列宽规则互相覆盖。 */
 /* [v538] 工具栏字号统一：本面板与三级管网工具栏同口径 11px（用户要求「一个文字高度，
    要区分只加粗」）。三级基准 = mod/style-01.css 的 #tlPipePlanSection .pp-side 一组（11px）。
    控件（input/select/button）必须带 !important —— runye-typography.css 的
@@ -430,23 +475,42 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-to
    本例外的只有黑底计算式条 #ppCalcDetail（结果展示，保留 10~11.5px 层次）。 */
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-label{ font-size:11px;line-height:1.3;color:var(--ry-s-600,#475569); }
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-val{
-  font-size:11px;font-weight:600;color:var(--ry-s-800,#1e293b);
+  font-size:11px;font-weight:400;color:var(--ry-s-800,#1e293b);   /* [v609] 600→400：用户 2026-10-20「4.44 那个数值不用加粗」，层级改由字色承担 */
   font-variant-numeric:tabular-nums;
+  /* [v609h] margin-right 6：与输入行同步左移，两列才不会错开。 */
+  margin-left:auto;margin-right:6px;padding-left:6px;white-space:nowrap;   /* [v609] 值列贴右，与输入行的右对齐一致 */
 }
 /* 原生输入（Shoelace 不可用时的离线回退）：浅色紧凑 24px，右对齐数值。
    [v436] 撤除 !important：64px 对抗源已删；color 一项由 index.html :736 的
-   统一 token 规则（--u-ink）接管，与本块深色文字同向，无视觉冲突。 */
+   统一 token 规则（--u-ink）接管，与本块深色文字同向，无视觉冲突。
+   [v609h] 内边距保持 7px 不动，改由下面 margin-right:6px 整体左移
+   （原因见那条规则的注释：加内边距会裁掉三位数末位）。 */
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-item input{
-  flex:0 0 64px;width:64px;height:24px;padding:2px 7px;box-sizing:border-box;
-  border:1px solid transparent;border-radius:6px;
+  flex:0 0 64px;width:64px;height:20px;padding:1px 7px;box-sizing:border-box;
+  /* [v609h] margin-left:auto 贴右 + margin-right:6 整体左移 6px ⇒ 数字/原生箭头离右侧小竖线更远。
+     ★ 不能靠加 padding-right 实现：输入框内容区会先被 Chrome 给原生 ▲▼ 预留的那一截吃掉，
+       padding 一加大就把 3 位数的最后一位裁掉（实测 100 显示成 10）。挪控件不动内部留白。 */
+  margin-left:auto;margin-right:6px;
+  border:1px solid transparent;border-radius:0;   /* [v609d] 用户：不要那个圆角外框 */
   background:transparent;color:var(--ry-s-800,#1e293b);
   font-family:inherit;font-size:11px !important;font-weight:400;
   text-align:right;outline:none;
   -moz-appearance:textfield;
 }
+/* [v609d] 原生回退 input 的上下微调箭头关掉（只影响这条离线路径：Shoelace 的箭头在 shadow DOM 里，
+   这条规则够不着，那是另一套机制 —— 见下面 ::part(input) 那段注释）。
+   [v609h] 保留本规则：关掉后回退路径不再被 Chrome 预留箭头位，数字落在 234 附近（只读值 242，差 8px）；
+   若放开，回退路径的数字会被压到 213，与只读值差 29px，更难看。 */
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-item input::-webkit-outer-spin-button,
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-item input::-webkit-inner-spin-button{
+  -webkit-appearance:none;display:none;margin:0;
+}
+/* [v609d] 聚焦不再画框（用户要求「外面的框取消」）：只给一层极淡底纹表示「这一格在编辑中」，
+   不画边框、不加外阴影 —— 圆角框会跟整块面板的扁平网格打架。 */
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-item input:focus{
-  border-color:#173e32;
-  box-shadow:0 0 0 2px rgba(23,62,50,.15);
+  border-color:transparent;
+  box-shadow:none;
+  background:#eef4f1;
 }
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-item input[hidden],
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side sl-input[data-ry-proxy-for][hidden]{ display:none!important; }
@@ -455,28 +519,31 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-to
    逻辑出处 = mod/plot-editor.js ppRecipeFlow；撤功能时同步删本段。 ===== */
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-bar{
   display:flex;flex-direction:column;gap:2px;
-  padding:4px 0 6px;margin-bottom:8px;
+  padding:0;margin-bottom:0;   /* [v609] 特性面板下配方行并入「灌溉参数」组，不再自带上下留白 */
 }
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-row{
   display:flex;align-items:center;gap:5px;
-  min-height:27px;padding:2px 12px;
+  min-height:22px;padding:0 10px;   /* [v609] 与其它行同高同边距 */
 }
 /* [v493 用户要求] 标签不再占 84px 基准列（「方案」两字紧凑排），
    名称框 flex:1 1 auto 从标签右侧一直撑到保存按钮，最大化输入空间。 */
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-row > .pp-plan-label{ flex:none; }
+/* [v609f 2026-10-20 用户要求]「选择方案」外框取消：下拉框不再画白底+边框+圆角，
+   与上面 10 行一样读成一条扁平单元格（右侧保留原生下拉箭头作为可点击提示）。
+   聚焦同样只给淡底纹，不画框 —— 与 .pp-plan-item input 的口径一致。 */
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-row input[type=text],
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-row select{
-  flex:1 1 auto;min-width:0;width:auto;height:24px;padding:2px 7px;box-sizing:border-box;
-  border:1px solid var(--ry-s-200,#e2e8f0);border-radius:6px;
-  background:#fff;color:var(--ry-s-800,#1e293b);
+  flex:1 1 auto;min-width:0;width:auto;height:20px;padding:1px 4px;box-sizing:border-box;
+  border:1px solid transparent;border-radius:0;
+  background:transparent;color:var(--ry-s-800,#1e293b);
   font-family:inherit;font-size:11px !important;outline:none;
 }
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-row input[type=text]:focus,
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-row select:focus{
-  border-color:#173e32;box-shadow:0 0 0 2px rgba(23,62,50,.15);
+  border-color:transparent;box-shadow:none;background:#eef4f1;
 }
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-btn{
-  flex:none;height:24px;padding:0 8px;box-sizing:border-box;
+  flex:none;height:20px;padding:0 8px;box-sizing:border-box;
   border:1px solid var(--ry-s-200,#e2e8f0);border-radius:6px;
   background:#fff;color:var(--ry-s-700,#334155);
   font-family:inherit;font-size:11px !important;font-weight:600;line-height:1;
@@ -502,17 +569,57 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-to
 /* Shoelace 代理输入：与原生回退同尺寸，主色走品牌深墨绿 */
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side sl-input[data-ry-proxy-for]{
   display:block;flex:0 0 64px;width:64px;min-width:64px;max-width:64px;
-  --sl-input-height-small:24px;
+  margin-left:auto;margin-right:6px;   /* [v609h] 同原生回退 input：整体左移 6px，数字离竖线更远 */
+  --sl-input-height-small:20px;
   --sl-input-font-size-small:11px;   /* [v538] 与 .pp-plan-item input 的 11px 同口径 */
 
-  --sl-input-border-radius-small:6px;
+  /* [v609d] 用户要求「外面的框取消」：Shoelace 的圆角来自 --sl-input-border-radius-small，
+     它作用在 shadow DOM 里，全局 body *{border-radius:0!important} 够不着 ⇒ 只能在这里改 0；
+     聚焦态的外圈是 focus ring，宽度归零后与原生回退一致（只有一层淡底纹）。 */
+  --sl-input-border-radius-small:0;
+  --sl-focus-ring-width:0;
+  --sl-focus-ring-color:transparent;
   --sl-input-background-color:transparent;
   --sl-input-border-color:transparent;
   --sl-input-border-color-hover:transparent;
-  --sl-input-border-color-focus:#173e32;
+  --sl-input-border-color-focus:transparent;
   --sl-input-color:var(--ry-s-800,#1e293b);
 }
-:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-item-fluid-input > .pp-plan-unit{flex:0 0 auto;white-space:nowrap}
+/* [v609d] 穿透 shadow DOM 收拾内部那个 <input part="input">：
+   圆角外框来自 Shoelace 的 --sl-input-border-radius-small（只能在宿主上用变量压），
+   内层的边框/阴影/对齐则必须用 ::part(input)。CSS 变量管不到 shadow 里，这是唯一入口。
+   ⚠ [v609h 更正] v609d 曾以为 `appearance:textfield` 能关掉原生 ▲▼ —— **实测关不掉**：
+     Chrome 143 下 computed appearance 已是 none，鼠标一悬停照样画箭头（只是它非悬停时不画，
+     所以静态截图里永远看不到，别再拿静态图判断箭头有没有）。
+     真要关：给 <sl-input> 加 `no-spin-buttons` 属性（Shoelace 2.15.1 源码确有该开关）。 */
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side sl-input[data-ry-proxy-for]::part(input){
+  appearance:textfield;-webkit-appearance:none;
+  border:0;box-shadow:none;background:transparent;outline:none;
+  /* [v609j] 撤回 v609i 的 padding:28px：原生箭头留在原位，数字仍靠 margin-right:6px 左移。
+     ★ 别再试图用 padding-right 拉开「数字 ↔ 原生 ▲▼」那道空隙 —— 实测 padding 12 与 18 时
+       文字右缘都恰好 = 内容右缘 − 16，两者恒为 0 间距，CSS 撬不动（用户 2026-10-20 已同意作罢）。 */
+  text-align:right;font-size:11px;color:var(--ry-s-800,#1e293b);
+}
+/* [v609] 单位列：固定宽度 + 右对齐 ⇒ 所有行的数值右边缘落在同一条线上（特性面板的观感就靠这条）。
+   原来单位是裸文本节点、宽度随内容变（m / L/h / 亩/区 / m³/h/亩），数值会随单位宽度左右漂。
+   index.html 里计算结果那 10 行已把单位包进 .pp-plan-unit（无单位的「主管/支管」留空 span 占位）。 */
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-item-fluid-input > .pp-plan-unit,
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-item > .pp-plan-unit{
+  flex:0 0 46px;width:46px;text-align:right;padding-left:2px;box-sizing:border-box;white-space:nowrap;
+}
+/* [v609b 2026-10-20 用户要求] 可调数值右侧加一道小竖线（用户给参考图：短竖线，非满行高），
+   把「数值｜单位」读成两个单元格；二次要求「再往左，尽量靠近文字」，故不挂在单位格左缘
+   （那里离数字 13px），改成挂在本行上的绝对定位伪元素，直接拉到数字右侧 6px。
+   只挂可编辑行（.pp-plan-item-fluid-input）—— 计算结果那些只读行不加，避免把展示值也画成输入框。
+   ★ 为什么不用 input 的 border/背景：可见的输入框可能是原生回退 input，也可能是
+     Shoelace 的 sl-input 代理（现代浏览器走后者），挂在任一控件上都只在一种情况下生效；
+     挂在行上则两态一致。数值统一右对齐 ⇒ 各行竖线落在同一 x，纵向连成一列。 */
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-item-fluid-input{position:relative}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-item-fluid-input::after{
+  content:"";position:absolute;top:50%;margin-top:-5px;
+  right:calc(10px + 46px + 5px);   /* 行右内边距10 + 单位列46 + 5 ⇒ 落在输入框右缘外 0.5px，离数字约 8px */
+  width:1px;height:10px;background:#cbd5e1;pointer-events:none;
+}
 /* 控件默认融入面板，聚焦时由上方 focus 规则显示边界。 */
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-sep-vert{ display:none; }
 /* —— 扬程算式区（#ppCalcDetail.pp-calc-formula）：唯一由主参数面板管理。
@@ -544,7 +651,7 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-to
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-calc-formula .pp-cf-note{color:#f2d98c;font-size:11.5px;font-weight:500;margin:0 1px;letter-spacing:0}
 /* CAD 主面板中的扬程算式占满侧栏内容宽度，并在窄栏内自然换行。 */
 #ryCadSide [data-pp="pipePlanSection"] .pp-side #ppCalcDetail{
-  box-sizing:border-box;width:100%;max-width:100%;margin:8px 0 12px;
+  box-sizing:border-box;width:100%;max-width:100%;margin:0;   /* [v609] 灰条已提供分隔，算式块不再自带上下外边距 */
   white-space:normal;overflow:visible;overflow-wrap:anywhere;
 }
 #ryCadSide [data-pp="pipePlanSection"] .pp-side #ppCalcDetail .pp-cf-line,

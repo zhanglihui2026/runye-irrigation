@@ -2554,7 +2554,11 @@
         bar.classList.toggle('pp-res-off');
       });
     }
-    init(document.getElementById('ppPlanBar2'), true);
+    /* [v609] 二级「水力计算结果」默认改为展开（原 v252 是 true=默认折叠）。
+       用户 2026-10-20：「默认三组 暂时不用收起 22吧」—— 特性面板三组要一眼看全，
+       折叠能力保留（点灰条仍可收起/展开），只是初始不再收起。
+       要退回 v252 行为：把下面第一个参数 true 即可。 */
+    init(document.getElementById('ppPlanBar2'), false);
     init(document.getElementById('tlPlanBar2'), false);
 
   /* ===== [v255 2026-10-06 用户要求] 水源方向可调：三级管线简图右键水源点，
