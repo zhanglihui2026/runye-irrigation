@@ -324,7 +324,7 @@
     box.style.display = hasFig ? '' : 'none';
     if (!hasFig) return;
     if (st.n <= 0) {
-      if (note) note.textContent = '当前为设计管径，改径后重算。';
+      if (note) note.textContent = '当前为设计管径，改径后重算';
       if (btn) { btn.textContent = st.applied ? '恢复扬程' : '更新扬程'; btn.disabled = !st.applied; btn.style.opacity = st.applied ? '1' : '0.5'; }
     } else if (st.applied) {
       var count = Object.keys(tlAppliedPipeOverride().calibers).length;
@@ -672,7 +672,7 @@
         d.style.display = '';
         /* [v613] 四行改为 .tl-flat-line（22px 行 + 实线分隔），与三级面板其余行同一套网格；
            去掉原来那层「dashed 上边框 + padding-top」的自造分隔 —— 行分隔线现在由网格统一提供。 */
-        d.innerHTML = '<div class="tl-flat-line">设计 → 改径重算 · 水泵扬程 <b>' + before.head.toFixed(1) + ' → ' + r1.pumpHead.toFixed(1) + ' m</b>'
+        d.innerHTML = '<div class="tl-flat-line">设计 → 改径重算 水泵扬程 <b>' + before.head.toFixed(1) + ' → ' + r1.pumpHead.toFixed(1) + ' m</b>'
           + ' <b style="color:' + col(dh) + '">(' + sgn(dh, ' m', 1) + ')</b></div>'
           + '<div class="tl-flat-line">计算轴功率 <b>' + before.shaftKW.toFixed(1) + ' → ' + r1.pumpPower.toFixed(1) + ' kW</b>'
           + ' <b style="color:' + col(dp) + '">(' + sgn(dp, ' kW', 2) + ')</b></div>'

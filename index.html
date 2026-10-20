@@ -17,7 +17,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>润野灌溉设计优化版｜滴灌管径与水泵选型</title>
 <meta name="description" content="输入地块、滴灌带与水源参数，快速计算灌溉分区、主管支管管径和水泵工作点。"/>
-<link rel="stylesheet" href="mod/style-01.css?v=621-invite-l2">
+<link rel="stylesheet" href="mod/style-01.css?v=622-punct-clean">
 <link rel="stylesheet" href="runye-inverse-design.css?v=277">
 <script defer src="runye-inverse-design.js?v=438-branch-flow-conservation"></script>
 <link rel="stylesheet" href="runye-terrain.css?v=454-terrain-sidebar-peer">
@@ -1227,7 +1227,7 @@ body.ry-worst-off [data-tlworst]{display:none}
            按钮原来的 inline width:100%;padding:5px 8px 已删，尺寸/外观统一由 style-01.css 的 #tlPumpUpdateBtn 一条管。 -->
     <div class="tl-flat-head">管径调整 · 扬程确认</div>
     <div class="pp-plan-item" id="tlPumpUpdateRow">
-      <span class="tl-flat-note" id="tlPumpUpdateNote">当前为设计管径，改径后重算。</span>
+      <span class="tl-flat-note" id="tlPumpUpdateNote">当前为设计管径，改径后重算</span>
       <button type="button" id="tlPumpUpdateBtn" title="把图面上改过的管径折算成总管/主管/支管代表管径（按长度加权），参与沿程损失重算；反复改不同管径再点此按钮，即可比较扬程与功率，挑出最经济合理的管径组合">更新扬程</button>
     </div>
     <div id="tlPumpUpdateDelta" style="display:none;line-height:1.55;color:#475569;margin-top:6px"></div>
@@ -2317,7 +2317,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script src="filter-system/filter-system.js"></script>
 <script src="mod/inline-24.js?v=357"></script>
 <script src="mod/inline-25.js?v=357"></script>
-<script src="mod/inline-27.js?v=619-undo-cover"></script>
+<script src="mod/inline-27.js?v=622-punct-clean"></script>
 <!-- ═══ CAD 单一操作区：全局左工具栏（2026-09-14；右上角视口切换条已取消） ═══════════
      需求：按 CAD 方式所有工作在一个操作区进行 —— 地块信息是基础底图，不同图纸作为
      图层叠加切换；原三块左属性栏折叠进本工具栏（details 分组，默认全部折叠，
