@@ -2966,3 +2966,24 @@ canvas 里的线被切与 CSS 的 `overflow` / `min-height` **无关**，是**�
 
 **这一条之后用户的操作**：后台点一次按钮 → 输入手机号 + 验证码 → 自动回后台，
 账号行显示 19 位 UID 且带「（会员账号）」字样，管理权限恢复。**只需要做这一次**。
+
+### 26.29 v633-admin-badge：角标必须跟着版本走（2026-10-20 · 已发布 32dc067）
+
+v632 上线后线上实测：功能是新的（后台按钮直链 `?login=1&back=` 已在），
+但左上角角标仍写 **「界面 v631」**。后台的角标是用户截图里唯一的「我刷到新版了吗」判据，
+角标不跟着抬 = 用户永远觉得「没生效」——v631 那次「似乎还是不行」就吃过这个亏的一部分。
+
+**坑在哪**：`plugin-admin.html` 在 `sw.js` 的 CORE 白名单（第 1007 行），
+改了正文**必须抬 VERSION** 才会重装缓存；v632 只改了该页正文没抬角标字符串，于是两者对不上。
+
+**修**：单独发 v633 —— 角标 → `界面 v633`、`sw VERSION = 'v633-admin-badge'`、
+`style-01.css?v=633-admin-badge`（同值契约）。功能零改动。
+
+**复核（线上 CDP，`_probe_admin_ident.mjs`）**：
+`ver:"界面 v633"` / `service:"…当前是匿名身份…"` / `hasBackLink:true` /
+深链 `?login=1` → `{panelOpen:true, hasLoginBox:true, placeholders:"11 位手机号 | 6 位验证码"}`；
+线上冒烟 **27/27**。
+
+**长期口径**：凡是改 CORE 白名单里的页面（含 `index.html`、`plugin-admin.html`、`invite.html`、
+`cloud-sync.js`、`runye-member-ui.js`），**同时抬 `sw VERSION` + 页面角标 + `style-01.css?v=`**，
+三者一起动，别再出现「代码新、角标旧」。
