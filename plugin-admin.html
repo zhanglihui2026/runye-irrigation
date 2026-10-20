@@ -40,7 +40,7 @@
 </head>
 <body><header>润野灌溉 · 管理后台</header>
 <main>
-  <div class="head"><div><h1>统一管理后台</h1><div class="muted">插件开关 · 会员管理 · 会员规则参数。写操作需要管理员账号（云函数环境变量 RY_PLUGIN_ADMIN_UIDS）。</div></div><a class="btn" href="index.html">返回主程序</a></div>
+  <div class="head"><div><h1>统一管理后台</h1><div class="muted">插件开关 · 会员管理 · 会员规则参数。写操作需要管理员账号（云函数环境变量 RY_PLUGIN_ADMIN_UIDS）。 · <b id="admVer" style="color:#2E7D4F">界面 v624</b></div></div><a class="btn" href="index.html">返回主程序</a></div>
 
   <div class="tabs">
     <button class="tab on" data-tab="plugins">外挂插件</button>
@@ -67,9 +67,11 @@
       <div class="bar" style="margin-top:10px">
         <input id="mQ" placeholder="手机号或 UID（数字串，≥4 位）" style="min-width:260px" inputmode="numeric">
         <button class="btn primary" id="mSearch">查询</button>
-        <button class="btn" id="mAll">列出最近到期（前 50）</button>
+        <button class="btn" id="mAll">列出全部注册用户</button>
+        <label class="bar" style="gap:4px">每页
+          <select id="mSize"><option value="30">30</option><option value="50">50</option><option value="100">100</option></select> 条</label>
       </div>
-      <p class="foot">检索当前账号（含未注册权益行的用户也可通过 UID 直接开通）。点「管理」展开操作面板。</p>
+      <p class="foot">列出全部注册用户（按注册时间倒序，分页浏览；也可搜手机号/UID）。点「管理」展开操作面板。</p>
       <div id="mList" style="margin-top:6px">尚未查询。</div>
     </section>
     <section class="card" id="mDetailCard" hidden>
@@ -141,7 +143,7 @@
   function permText(){$('mPerm').textContent=state.admin?'管理员权限已验证 ✓':(state.plugins.length?'当前账号没有管理权限（只读）':'')}
   function planPill(plan,exp){var active=exp&&new Date(exp).getTime()>Date.now();return '<span class="pill'+(active?'':' off')+'">'+esc(plan||'L1')+(active?' · 有效':' · 已到期')+'</span>'}
   /* ---------- [v623] 注册人员统计 ---------- */
-  var statsPage=1,statsQ='';
+  var statsPage=1,statsQ='',statsSize=30;
   function renderStats(d){
     var t=d.totals||{};
     $('mStatMeta').textContent='统计于 '+fmtDT(Date.now())+(d.truncated?' · 仅统计最近 2000 行':'');
@@ -189,7 +191,7 @@
   }
   function loadStats(page){
     if(page)statsPage=page;
-    var body={page:statsPage,size:30};if(statsQ)body.q=statsQ;
+    var body={page:statsPage,size:statsSize};if(statsQ)body.q=statsQ;
     $('mList').textContent='读取中…';
     return api('adminMemberStats',body).then(function(r){
       if(!r||r.code!==0)throw new Error((r&&r.message)||'查询失败');
@@ -254,6 +256,7 @@
     return loadStats(1).finally(function(){btn.disabled=false})}
   $('mSearch').onclick=function(){var q=String($('mQ').value||'').trim();if(q)search(q)};
   $('mAll').onclick=function(){search(null)};
+  $('mSize').onchange=function(){statsSize=Number(this.value)||30;loadStats(1)};
   $('mQ').addEventListener('keydown',function(e){if(e.key==='Enter'){var q=String($('mQ').value||'').trim();if(q)search(q)}});
   $('gRun').onclick=function(){
     if(!curMember){return}
