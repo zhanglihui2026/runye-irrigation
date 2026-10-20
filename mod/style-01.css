@@ -2718,7 +2718,9 @@ body > .ry-nav .main-header{display:none!important}
   background:transparent!important;
   border:0!important;
   box-shadow:none!important;
-  border-radius:0;
+  /* [v612] 不写 border-radius —— index.html inline 的 8px 圆角由全站 body *{border-radius:0!important}
+     压平（!important 压得过 inline 非 important）。这里若再写一条不带 !important 的 0，
+     就是 v530 明令禁止的「无效圆角声明」（线上冒烟专门查这条，会判红）。 */
 }
 #tlPipePlanSection .pp-side #tlPumpUpdateBox, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side #tlPumpUpdateBox,
 #tlPipePlanSection .pp-side #tlLossCard, #ryCadSide [data-pp="tlPipePlanSection"] .pp-side #tlLossCard{

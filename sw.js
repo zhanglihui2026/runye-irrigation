@@ -824,7 +824,11 @@
    v611b 追加：轮灌演示组 #tlDemoBar 补 padding:0 10px 12px —— 它不是 .pp-plan-item，
    扁平化后左缘比参数行少 10px、底部与「水力计算结果」灰条 gap=0（用户截图指出）。
    改动文件：mod/style-01.css（三级样式唯一出处）、mod/ry-panel.css（撤出三级两条 ::before 抑制）。 */
-const VERSION = 'v611-tl-flat';
+/** v612-flat-radius: 删掉 v611 拍平那三块时顺手写的 `border-radius:0`（不带 !important）。
+   全站已有 body *{border-radius:0!important}，inline 的 8px 也压得过 ⇒ 这条是死声明，
+   且正好撞上 v530「style-01.css 不得出现无效圆角声明」的检查（线上冒烟判红 1 项）。
+   纯删声明，视觉零变化（实测三块 computed 圆角仍 0px）；抬版本只为刷掉缓存里带死声明的 CSS。 */
+const VERSION = 'v612-flat-radius';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
