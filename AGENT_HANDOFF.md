@@ -2368,3 +2368,40 @@ C 态说明「已应用 N 根管道的管径…调整管径后自动更新。」
 
 **版本串保持 `619-undo-cover`**：本轮与 v619 同属一次未提交改动，且 619 从未部署过 ⇒ 无缓存残留问题
 （沿用 §26.13 「同批未部署不重复抬版本」的口径）。
+
+### 26.17 发布记录：v619-undo-cover 已上线（2026-10-20）
+
+**提交 `83ed7dc`**（40 files, +3167/−729），推送 `f5ed5a2..83ed7dc master -> master`，**无需代理**（本次 `git push` 直接成功，
+§26.7 里那个 7897 代理端口这轮没用上）。
+
+**发布范围由用户当面拍板**：工作区当时有 **111 个未提交文件**，远多于本次三级页工作。
+问「发布范围」时用户选择「全部修改都发布」⇒ 一次全量提交，**没有走 §26.7 的混编法**
+（那是「只发自己的 hunk」用的；用户要全量时混编反而会漏发）。
+仍遵守了 `git add -A` 的红线，改用 `git add -u` + 显式列出 3 个新文件，实际清单 `git diff --cached --name-status` 逐行核过：
+40 个文件、**0 删除、0 二进制**。未跟踪的 73 个 `_probe_* / _shot_* / _repro_* / *.png / *.json / 2026-10-19.md / project-planning/` 全部留在本地未入库。
+
+**入库前抓到的坑（这条要紧）**
+`index.html:11` 引用 `core/cloud-design-binding-store.js`，而该文件当时**未入库** ⇒ 若只提交已跟踪文件，线上必然 404。
+写了个一次性核对脚本，把 `index.html` 里 109 个本地 `<script src>` / `<link href>` 逐个比对 `git ls-files`：
+唯一「存在但未入库」就是它。**以后发布前先跑这个核对**（三类结果：磁盘不存在 / 存在但未入库 / 正常）。
+
+**门禁（发布前，全绿）**
+
+| 项 | 结果 |
+|---|---|
+| `ci_check_static.cjs` | **PASS=28 FAIL=0** |
+| `node --test tests/*.test.cjs` | **154 pass / 0 fail** |
+| `_smoke_publish.mjs`（本地起服务） | **ALL PASS**（含 `sw.js VERSION 已是新值 v619-undo-cover`、无 JS 异常、本地资源无 4xx/5xx） |
+
+**线上校验（`zhanglihui2026.github.io/runye-irrigation/`）**
+
+- Pages 翻新耗时 **约 4 分钟**（12:26 推送 → 12:35 线上 `sw.js` 已是 `v619-undo-cover`；这次不是 §26.7 记的 35 分钟极端值）。
+- `_smoke_v521_live.mjs` **27/27 通过**，0 失败，无 JS 异常、无 4xx。
+- 逐项确认本次改动真的在线上：`runye-undo.js` 含 `schedulePost`(2) 与 `mark.pre=base`(1)、
+  `mod/inline-27.js` 含「恢复扬程」(1)、`core/cloud-design-binding-store.js` **HTTP 200**、`index.html` 版本串 7 处全等。
+
+**随批上线的非本会话工作**（用户知情后选择全量）：支管并联根数口径（每侧根数 × 敷设边数，会改变水力结果）、
+云端设计绑定 store、地图测量/分区、导航、材料清单、权益等。这批不是本会话改的，**上线后若有问题要回到各自会话查**。
+
+**教训**：`git status --porcelain` 里 `??` 与 ` M` 要分开看 —— 只 `git add -u` 会漏掉新模块（本次差点踩）。
+另：轮询线上版本时 `grep -o "v[0-9a-zA-Z-]*'"` 会先命中注释里的 `v1`，**必须 `grep "const VERSION"`**。
