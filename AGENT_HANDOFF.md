@@ -2484,3 +2484,73 @@ C 态说明「已应用 N 根管道的管径…调整管径后自动更新。」
 - 线上核对：`sw.js` = `v620-sticky-grp`；`curl` 线上 `mod/ry-panel.css` 命中 `position:sticky;top:0;z-index:3`（1 处）、`index.html` 版本串 2 处。
 - 线上冒烟 `_smoke_v521_live.mjs` **27/27**。首跑只过 3/27，是因为 Pages 还在传播（`sw.js` 先翻新、其余资源未就位），复跑即满 —— 遇到这种"第一轮大面积红"先看是不是传播未完成，不是真故障。
 - 线上实页面复测：把吸顶探针加 `LIVE=1`（`PAGE_URL` 指向线上、不起本地服务，`if (!LIVE) srv.close()`）直接打开线上站点跑，**11/11 全过** —— 结论不只在本地产物上成立。
+
+### 26.20 v621-invite-l2：裂变奖励从「续期」改为「升级高级会员 + 30 天」（2026-10-20 · 未发布）
+
+**用户指令**：「下面开始优化会员系统，检查邀请三个送高级会员的功能是否可用。」→ 检查后确认**不可用**，
+用户拍板规则为「升级 L2，但只送 30 天」。
+
+**体检结论（改前）**
+`runye-entitle.js:604` 与 `cloudfn/ryEntitle-v2/index.js:365` 都取**当前等级**再按 `member_days` 续期：
+
+```js
+var plan = (ent && ent.plan) || 'L1';            // L1 进来 → L1 出去
+var days = (ent && ent.member_days > 0) ? ent.member_days : …;   // 30
+```
+
+全库没有任何一处把 `plan` 写成 `L2` ⇒ 邀满 3 人只是「注册会员再续 30 天」，出图/清单/水利校验仍锁着。
+`_probe_invite_reward.cjs` 实测：`granted:30 / planName:'注册会员' / plan L1→L1 / can(drawing-export)=false`。
+
+**为什么一直没被发现**：文案两边各说一套 —— 公告 `runye-announce.js:133` 与会员面板
+`runye-member-ui.js:548/637` 承诺「即可升级高级会员」，而 `invite.html` 规则第 7 条写的是
+「赠**同等时长**、等级不变」，**代码与后者一致、与前者矛盾**；且旧测试断言的是「续期」，把错的行为固化成了绿。
+
+**另外两个缺口**
+1. `en.grant()` 全库只有 `invite.html:3212` 一个调用点 ⇒ 用户只在 PC 上攒够 3 人时奖励永不发放。
+2. `invite.html` 规则第 6 条仍写「3 天冷静期」，v367 就已取消，属没删的旧条款。
+
+**改动（一套口径，四处同步）**
+
+| 文件 | 改动 |
+|---|---|
+| `runye-entitle.js` | 新增 `INVITE_REWARD_PLAN='L2'` / `INVITE_REWARD_DAYS=30`；`grantRdb()` 固定升级口径，写库 patch 补 `plan`；暴露 `RyEntitle.INVITE_REWARD` 供文案取用 |
+| `cloudfn/ryEntitle-v2/index.js` | 同名常量 + `actGrant()` 同口径，`rdbUpdate` 补 `plan`；`FN_VERSION` → `v2c-3-invite-l2`（`configGet` 回显，用于确认线上是否已重新部署） |
+| `runye-member-ui.js` | 新增 `maybeGrantReward()`（boot 与登录后各触发一次，in-flight 锁 + 服务端 `reward_claimed` 双保险）；面板新增「裂变奖励」行（已升级 / 待发放）；两处文案补「赠送 30 天」 |
+| `invite.html` | 规则 6 删冷静期、规则 7 改「自动升级 L2 并顺延 30 天」；落地页标题、分享文案、海报文字、发放弹窗、内嵌 `grantReward()`（导出但未被调用的死代码，一并改成同口径）全部对齐 |
+
+**关键设计点：只改到期时间是不够的**
+`expires_at` 顺延而 `plan` 不变，会出现「流水写着高级会员、`can()` 仍按 L1 判」的假升级。
+所以两处写库都必须同时写 `plan`，这也是新测试专门盯的一条（正则断言 `plan: plan, expires_at: iso(to)`）。
+
+**验证**
+- `_probe_invite_reward.cjs`：**12/12** —— 改后 `plan L1→L2`、`granted:30`、`planName:'高级会员'`、
+  三个高级功能同时放行，第二次 grant 幂等 `granted:0`。
+- `tests/entitle_flow.test.cjs`：**44/44**（新增 10 条：升级 L2、30 天、高级功能放行、
+  前后端常量同源、服务端写 `plan`、邀请页不再宣称「等级不变」、PC 端有发奖触发点）；
+  场景 5 改用干净用户 `10009` 验 L1 门控 —— 因为场景 3 之后 A 已是 L2。
+- `ci_check_static` **PASS=29 FAIL=0**；`node --test tests/*.test.cjs` **154/154**。
+
+**版本串 → `v621-invite-l2`**：`sw VERSION` + `mod/style-01.css?v=`（必须等值，冒烟 §113 检查）
++ `index.html` 里 `runye-entitle / runye-member-ui / runye-announce` 三个 `?v=`
++ `invite.html` 里 `runye-entitle.js?v=`。
+
+**⚠️ 上线必须两步，只发前端不生效**
+前端写操作走 `/entitle` HTTP 网关（§v371 方案二），服务端是权威写；只更新静态站点时，
+`actGrant` 仍按旧逻辑返回 `planName:'注册会员'`，页面会继续显示 L1。
+必须把 `cloudfn/ryEntitle-v2c3-invite-l2.zip` 上传到 CloudBase 控制台覆盖 `ryEntitle` 云函数，
+再用 `configGet` 确认回显已是 `v2c-3-invite-l2`。
+
+**进度（2026-10-20 14:12 核对）**
+- ✅ **云函数已上传生效**：`configGet` 回显 `"fn":"v2c-3-invite-l2"`（该字符串只存在于新代码，可确证）。
+  自检一行：`curl -s -X POST <ENT_URL> -H 'Content-Type: application/json' -d '{"action":"configGet"}'`。
+- ❌ **静态站仍是 `v620-sticky-grp`**：线上 `runye-entitle.js` 里还能 grep 到旧句
+  `var plan = (ent && ent.plan) || 'L1'` ⇒ 前端 9 个改动文件尚未推送。
+  当前线上是「新服务端 + 旧前端」：发奖会真的升 L2（服务端权威），但页面文案仍自相矛盾、
+  PC 端仍不触发发奖、旧前端的 rdb 降级路径仍会写 L1。
+- 下次传云函数优先用控制台「**上传代码**」标签传 zip（保留 `package.json`），
+  在线开发编辑器里粘贴 index.js 也能用，但容易漏文件、也无法带 package.json。
+
+**遗留**
+- `invite.html` 内嵌的 `C.grantReward / coolUntil / computeProgress` 是一整套**未被调用**的本地模型
+  （只在 2926 行导出），本轮只对齐了口径没有删除。它和真链路重复，属于潜在漂移源，后续可整块删。
+- `cloud-functions/ryEntitle/index.js`（v1 老函数）仍是旧逻辑，未部署也未改动；确认不用后可归档。

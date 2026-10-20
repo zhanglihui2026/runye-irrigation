@@ -34,6 +34,12 @@
    等级（本期两级）：
      L1 注册会员（限时 30 天）：地块分区 / AI 智能规划 / 管路规划 / 在线地图
      L2 高级会员：L1 + 出图、导出清单、水利校验
+
+   [v621 2026-10-20] 裂变奖励改为「升级 L2 + 顺延 30 天」。
+   原实现取 `ent.plan`（当前等级）再按 `member_days` 续期 ⇒ 邀满 3 人只是
+   L1 再续 30 天、等级不变，与公告/面板「即可升级高级会员」的承诺不符
+   （实测见 _probe_invite_reward.cjs）。现固定：等级 → L2，天数 → 30，
+   有效期在当前到期日基础上顺延；服务端 actGrant 同口径（两处必须同步改）。
    ============================================================ */
 (function () {
   'use strict';
@@ -41,8 +47,12 @@
   var DAY = 86400000;
   var HB_INTERVAL = 10 * 60 * 1000;   // heartbeat 节流：10 分钟
   var CAP = 3;                        // 邀请注册 + 群裂变 共享上限
-  var COOL_MS = 3 * DAY;              // 冷静期 3 天
+  var COOL_MS = 3 * DAY;              // 冷静期 3 天（v367 起废弃，仅保留常量兼容旧引用）
   var TRIAL_DAYS = 30;                // L1 注册会员初始天数
+  /* [v621] 裂变奖励口径：邀满 CAP 人 → 直接升到 L2，并顺延 30 天。
+     与 cloudfn/ryEntitle-v2/index.js 的 INVITE_REWARD_* 必须一致。 */
+  var INVITE_REWARD_PLAN = 'L2';
+  var INVITE_REWARD_DAYS = 30;
 
   /* 功能 key → 显示名 */
   var FEATURES = {
@@ -460,6 +470,9 @@
     featureKeys: function () { return (ALL_FEATURES_OPEN ? Object.keys(FEATURES) : (PLAN_FEATURES[this.plan()] || PLAN_FEATURES.L1)).slice(); },
 
     /* ---------- 邀请 ---------- */
+    /* [v621] 奖励口径单一来源：UI 文案与判定都读这里，避免「面板说升级、规则页说续期」 */
+    INVITE_REWARD: { plan: INVITE_REWARD_PLAN, planName: PLAN_NAMES[INVITE_REWARD_PLAN] || '高级会员',
+      days: INVITE_REWARD_DAYS, cap: CAP },
     myCode: function () { return (state && state.code) || ''; },
     progress: function () {
       return (state && state.progress) || { capped: 0, fromInvite: 0, fromGroup: 0, cooling: 0, pending: 0, remain: 3, reached: false };
@@ -477,7 +490,7 @@
           return { ok: true, repaired: /修复半程态/.test(r.message || ''), existed: /修复半程态/.test(r.message || '') };
         });
     },
-    /* [v371] 满 3 人发奖：服务端算进度 + reward_claimed 幂等 + 服务端续期。 */
+    /* [v371] 满 3 人发奖：服务端算进度 + reward_claimed 幂等 + 服务端写等级/到期。 */
     grant: function () {
       var self = this;
       return callServer('grant', { phone: entPhone() }).then(function (r) {
@@ -601,21 +614,24 @@
         if (!p.reached || inv.reward_claimed)
           return self.refresh().then(function () { return { ok: true, granted: 0, planName: '' }; });
         return readOne(T_ENT, mySub).then(function (ent) {
-          var plan = (ent && ent.plan) || 'L1';
-          var days = (ent && ent.member_days > 0) ? ent.member_days : (PLAN_DAYS[plan] || 30);
+          /* [v621] 固定升级口径，不再沿用当前等级续期 */
+          var plan = INVITE_REWARD_PLAN;
+          var days = INVITE_REWARD_DAYS;
+          var planName = PLAN_NAMES[plan] || '高级会员';
           var from = (ent && ms(ent.expires_at) > now) ? ms(ent.expires_at) : now;
           var to = from + days * DAY;
           var hist = (ent && ent.history) || [];
-          hist.unshift({ at: now, days: days, plan: plan, planName: PLAN_NAMES[plan] || '注册会员', from: from, to: to, src: 'invite' });
-          return d.from(T_ENT).update({ expires_at: iso(to), member_days: days, history: hist }).eq('_id', mySub)
+          hist.unshift({ at: now, days: days, plan: plan, planName: planName, from: from, to: to, src: 'invite' });
+          /* plan 必须一起写回：只改到期时间就会出现「页面说升级、判定仍 L1」 */
+          return d.from(T_ENT).update({ plan: plan, expires_at: iso(to), member_days: days, history: hist }).eq('_id', mySub)
             .then(function (r1) {
               if (r1 && r1.error) { setErr('grant_ent', r1.error); return { ok: false, message: '发放失败' }; }
               var rewards = (inv.rewards) || [];
-              rewards.unshift({ at: now, days: days, plan: plan, planName: PLAN_NAMES[plan] || '注册会员', from: from, to: to, src: 'invite' });
+              rewards.unshift({ at: now, days: days, plan: plan, planName: planName, from: from, to: to, src: 'invite' });
               return d.from(T_INV).update({ reward_claimed: true, rewards: rewards }).eq('_id', mySub)
                 .then(function (r2) {
                   if (r2 && r2.error) setErr('grant_inv', r2.error);
-                  return self.refresh().then(function () { return { ok: true, granted: days, planName: PLAN_NAMES[plan] || '注册会员' }; });
+                  return self.refresh().then(function () { return { ok: true, granted: days, planName: planName }; });
                 });
             });
         });

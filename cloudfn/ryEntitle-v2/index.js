@@ -55,13 +55,19 @@ const AUTH_USER_URL = 'https://' + ENV_ID + '.' + REGION + '.tcb-api.tencentclou
 const CAP = 3;                    // 邀请注册 + 群裂变 共享上限
 const TRIAL_DAYS = 30;            // L1 注册会员初始天数
 const DAY = 86400000;
+/* [v2c-3 2026-10-20] 裂变奖励口径改为「升级 L2 + 顺延 30 天」。
+   原实现取 ent.plan 再按 member_days 续期 ⇒ 邀满 3 人只是 L1 续 30 天、等级不变，
+   与公告/会员面板「即可升级高级会员」的承诺不符。必须与 runye-entitle.js
+   的 INVITE_REWARD_PLAN / INVITE_REWARD_DAYS 保持同值。 */
+const INVITE_REWARD_PLAN = 'L2';
+const INVITE_REWARD_DAYS = 30;
 const PLANS = {
   L1: { key: 'L1', name: '注册会员', days: 30 },
   L2: { key: 'L2', name: '高级会员', days: 365 }
 };
 const PLUGIN_IDS = ['hello-world', 'archive', 'bom', 'case-lib', 'pipe-optim', 'calib', 'hydraulics', 'ai-plan', 'sprinkler'];
 const PLUGIN_CONFIG_ID = 'global:plugin-control';
-const FN_VERSION = 'v2c-2-fix-setexpire';  /* [v2c-2] configGet 回显，用于确认部署版本 */
+const FN_VERSION = 'v2c-3-invite-l2';  /* [v2c-3] configGet 回显，用于确认部署版本 */
 const PLUGIN_ADMIN_UIDS = String(process.env.RY_PLUGIN_ADMIN_UIDS || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean);
 /* [v2c] 会员规则配置（ry_kv）与功能清单（与 runye-entitle.js FEATURES 同构） */
 const MEMBER_CONFIG_ID = 'global:member-config';
@@ -362,21 +368,23 @@ async function actGrant(uid, params) {
   const links = await getLinksByInviter(uid);
   const p = computeProgress(links);
   if (!p.reached || inv.reward_claimed) return ok({ granted: 0 });
-  const plan = ent.plan || 'L1';
-  const days = (ent.member_days > 0) ? ent.member_days : (PLANS[plan] ? PLANS[plan].days : 30);
+  const plan = INVITE_REWARD_PLAN;
+  const days = INVITE_REWARD_DAYS;
+  const planName = PLANS[plan] ? PLANS[plan].name : '高级会员';
   const now = Date.now();
   const from = (ent.expires_at && new Date(ent.expires_at).getTime() > now) ? new Date(ent.expires_at).getTime() : now;
   const to = from + days * DAY;
   const hist = (ent.history || []);
-  hist.unshift({ at: now, days: days, plan: plan, planName: PLANS[plan] ? PLANS[plan].name : '注册会员', from: from, to: to, src: 'invite' });
+  hist.unshift({ at: now, days: days, plan: plan, planName: planName, from: from, to: to, src: 'invite' });
+  /* plan 必须一起写：只改 expires_at 会出现「流水写着高级会员、判定仍是 L1」 */
   await rdbUpdate('ry_entitle', { _id: 'eq.' + uid },
-    { expires_at: iso(to), member_days: days, history: hist });
+    { plan: plan, expires_at: iso(to), member_days: days, history: hist });
   const rewards = (inv.rewards || []);
-  rewards.unshift({ at: now, days: days, plan: plan, planName: PLANS[plan] ? PLANS[plan].name : '注册会员', from: from, to: to, src: 'invite' });
+  rewards.unshift({ at: now, days: days, plan: plan, planName: planName, from: from, to: to, src: 'invite' });
   await rdbUpdate('ry_invite', { _id: 'eq.' + uid }, { reward_claimed: true, rewards: rewards });
   const ent2 = await getEntitle(uid);
   const inv2 = await getInvite(uid);
-  return ok({ granted: days, planName: PLANS[plan] ? PLANS[plan].name : '注册会员', state: packState(ent2, inv2, links) });
+  return ok({ granted: days, planName: planName, plan: plan, state: packState(ent2, inv2, links) });
 }
 async function actClaim(uid, params) {
   const n = Number(params && params.count);

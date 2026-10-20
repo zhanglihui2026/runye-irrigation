@@ -240,6 +240,8 @@
              [v361] 若此前通过邀请链接暂存/带来了 ?ref= 码，登录即自动绑定 */
           setTimeout(function () {
             autoBind().then(function () {
+              return maybeGrantReward();
+            }).then(function () {
               try { closePanel(); RyMemberUI.openPanel(); } catch (e) { }
             });
           }, 600);
@@ -483,6 +485,10 @@
       var activated = Math.min(3, pr.capped || 0);
       var remainActive = Math.max(0, 3 - activated);
       p.appendChild(row('邀请进度', activated + ' / 3' + (remainActive ? '（还差 ' + remainActive + ' 人注册）' : '')));
+      /* [v621] 达标后的发奖状态：原先满 3 人只显示 3/3，用户不知道奖励去哪了 */
+      var notice = rewardNoticeText();
+      if (notice) p.appendChild(row('裂变奖励', notice));
+      else if (pr.reached && !(en.state && en.state.rewardClaimed)) p.appendChild(row('裂变奖励', '已达标，奖励待发放（下次打开自动重试）'));
     } else {
       p.appendChild(tip('尚未获取到邀请码（云端未就绪），稍后重试或刷新页面。', true));
     }
@@ -545,7 +551,7 @@
     acts.appendChild(bClose);
 
     p.appendChild(acts);
-    p.appendChild(tip('邀请 3 位好友注册成功，即可升级高级会员（出图 / 导出清单 / 水利校验等全部功能）。注册即刻计入，无需好友再做其他操作。'));
+    p.appendChild(tip('邀请 3 位好友注册成功，即可升级高级会员并赠送 30 天（出图 / 导出清单 / 水利校验等全部功能）。注册即刻计入，无需好友再做其他操作。'));
     return p;
   }
 
@@ -598,6 +604,37 @@
     }
   }
 
+  /* ---------- [v621] 满 3 人自动发奖（PC 端补齐） ----------
+     原先 en.grant() 全项目只有 invite.html 一个调用点：用户只在电脑上攒够 3 人、
+     从不打开手机邀请页时，奖励永远挂着不发，面板只显示 3 / 3 却什么也没到账。
+     幂等由服务端 reward_claimed 兜底，这里再加 in-flight 锁防并发重复调用。 */
+  var grantBusy = false, grantNotice = null;
+
+  function maybeGrantReward() {
+    var en = E();
+    if (!en || typeof en.grant !== 'function' || !loggedIn() || grantBusy) return Promise.resolve(null);
+    var pr = en.progress();
+    var st = en.state || {};
+    if (!pr || !pr.reached || st.rewardClaimed) return Promise.resolve(null);
+    grantBusy = true;
+    return en.grant().then(function (r) {
+      grantBusy = false;
+      if (r && r.ok && r.granted > 0) {
+        grantNotice = { days: r.granted, planName: r.planName || '高级会员' };
+        refreshPills();
+        /* 面板正开着就原地重绘，让「已升级」立刻可见 */
+        if (panelEl && panelEl.parentNode) {
+          try { openAt(pills[0] || document.body, '会员中心', null); } catch (e) { }
+        }
+      }
+      return r;
+    }, function () { grantBusy = false; return null; });
+  }
+  function rewardNoticeText() {
+    if (grantNotice) return '已升级' + grantNotice.planName + ' · 顺延 ' + grantNotice.days + ' 天';
+    return '';
+  }
+
   function mountPills() {
     var hosts = document.querySelectorAll('[data-ry-fnnav]');
     for (var i = 0; i < hosts.length; i++) {
@@ -634,7 +671,7 @@
       box.appendChild(p1);
       var p2 = document.createElement('p');
       p2.className = 'ry-mbr-tip';
-      p2.textContent = '邀请 3 位好友注册成功，即可升级高级会员（含出图 / 导出清单 / 水利校验等全部功能）。注册即刻计入。';
+      p2.textContent = '邀请 3 位好友注册成功，即可升级高级会员并赠送 30 天（含出图 / 导出清单 / 水利校验等全部功能）。注册即刻计入。';
       box.appendChild(p2);
       /* 未登录时把登录框直接放进引导里：用户在这里第一次意识到「要开通」，
          必须当场能注册，而不是先关弹窗再去找入口。 */
@@ -701,6 +738,9 @@
         refreshPills();
         /* [v361] 登录态访客直接带 ?ref= 打开 ⇒ 启动即自动绑定 */
         return autoBind();
+      }).then(function () {
+        /* [v621] 绑定完再看是否够 3 人该发奖（PC 端原先完全没有这一步） */
+        return maybeGrantReward();
       }).then(function () {
         refreshPills();
         /* 通知导航：权益已就绪，可以重渲染上锁了 */

@@ -145,16 +145,25 @@ function reset() {
   ok('A 剩余 remain=0', p2.remain === 0, p2.remain);
   ok('邀请明细 3 条且均为 valid', E.state.invites.length === 3 && E.state.invites.every(i => i.status === 'valid'), E.state.invites);
 
-  /* ---- 场景 3：grant 发奖 + 幂等 ---- */
-  console.log('\n[场景3] A 满 3 人触发 grant（续期）');
+  /* ---- 场景 3：grant 发奖（v621 口径：升级 L2 + 顺延 30 天）+ 幂等 ---- */
+  console.log('\n[场景3] A 满 3 人触发 grant（升级高级会员 + 30 天）');
   const expireBefore = E.expireAt();
   const g1 = await E.grant();
   ok('grant 返回成功且 granted>0', g1 && g1.ok === true && g1.granted > 0, g1);
-  ok('权益已续期（到期时间延后）', E.expireAt() > expireBefore, { before: expireBefore, after: E.expireAt() });
+  ok('奖励天数为 30 天', g1 && g1.granted === 30, g1);
+  ok('奖励等级为高级会员（L2）', g1 && g1.planName === '高级会员', g1);
+  ok('权益等级已升级为 L2', E.plan() === 'L2', E.plan());
+  ok('高级功能全部解锁（出图/清单/水利校验）',
+    ['drawing-export', 'bom-export', 'hydraulic-check'].every(f => E.can(f) && E.access(f) === 'allowed'),
+    ['drawing-export', 'bom-export', 'hydraulic-check'].map(f => [f, E.can(f)]));
+  ok('有效期在原到期日基础上顺延 30 天',
+    Math.round((E.expireAt() - expireBefore) / 86400000) === 30,
+    { before: expireBefore, after: E.expireAt(), days: (E.expireAt() - expireBefore) / 86400000 });
   const g2 = await E.grant();
   ok('再次 grant 幂等（granted=0）', g2 && g2.ok === true && g2.granted === 0, g2);
   ok('rewardClaimed 已置位', E.state.rewardClaimed === true, E.state.rewardClaimed);
-  ok('奖励记录含续期条目', (E.state.rewards || []).length >= 1, E.state.rewards);
+  const rw = (E.state.rewards || [])[0] || {};
+  ok('奖励记录为「高级会员 30 天」', rw.plan === 'L2' && rw.days === 30 && rw.src === 'invite', rw);
 
   /* ---- 场景 4：防刷规则 ---- */
   console.log('\n[场景4] 防刷：自邀 / 重复绑定 / 非法码');
@@ -184,8 +193,10 @@ function reset() {
 
   /* ---- 场景 5：功能门控判定 ---- */
   console.log('\n[场景5] 功能门控判定');
-  setUser('10001', '13800138000');
-  await E.refresh();
+  /* 场景 3 之后 A 已被升级为 L2，这里另起一个干净用户验证 L1 门控 */
+  setUser('10009', '13800138008');
+  await E.init(true);
+  ok('新注册用户初始等级仍是 L1', E.plan() === 'L1' && !E.can('drawing-export'), E.plan());
   const l1Features = ['zone-split', 'ai-plan', 'pipe-layout', 'online-map'];
   const l2Features = ['drawing-export', 'bom-export', 'hydraulic-check', 'pro-others'];
   const allFeatures = l1Features.concat(l2Features);
@@ -215,6 +226,18 @@ function reset() {
   ok('首部系统图 SVG、PNG 和打印入口均校验高级权益', /function exportSVG\(\)\s*\{\s*if \(!requireHeadExport\(\)\) return;/.test(headDiagram) && /function exportPNG\(\)\s*\{\s*if \(!requireHeadExport\(\)\) return;/.test(headDiagram) && /hmPrint'\)\.addEventListener\('click', function \(\) \{ if \(requireHeadExport\(\)\) window\.print\(\); \}/.test(headDiagram));
   const cloudFn = fs.readFileSync(path.join(__dirname, '..', 'cloudfn', 'ryEntitle-v2', 'index.js'), 'utf8');
   ok('服务端规则清洗会从 L1 移除 CAD、BOM 和高级通配权限', /const allowed = k === 'L1' \? L1_FEATURE_KEYS : FEATURE_KEYS/.test(cloudFn));
+  /* [v621] 裂变奖励口径三处必须同源：前端常量 / 服务端常量 / 服务端写库字段 */
+  const selfSrc = fs.readFileSync(path.join(__dirname, '..', 'runye-entitle.js'), 'utf8');
+  ok('前端裂变奖励口径为 L2 + 30 天',
+    /INVITE_REWARD_PLAN = 'L2'/.test(selfSrc) && /INVITE_REWARD_DAYS = 30/.test(selfSrc));
+  ok('服务端 actGrant 同时写 plan 与到期时间（只写到期会出现「说升级、判 L1」）',
+    /INVITE_REWARD_PLAN = 'L2'/.test(cloudFn) && /plan: plan, expires_at: iso\(to\)/.test(cloudFn));
+  const inviteH5 = fs.readFileSync(path.join(__dirname, '..', 'invite.html'), 'utf8');
+  ok('邀请页规则与实现一致：升级高级会员 + 顺延 30 天，且不再宣称「等级不变」',
+    /自动升级为高级会员（L2）/.test(inviteH5) && /顺延 30 天/.test(inviteH5) && !/等级不变/.test(inviteH5));
+  const memberUi = fs.readFileSync(path.join(__dirname, '..', 'runye-member-ui.js'), 'utf8');
+  ok('PC 会员面板也会触发发奖（原先只有 H5 一个调用点）',
+    /function maybeGrantReward/.test(memberUi) && /en\.grant\(\)/.test(memberUi));
   const admin = fs.readFileSync(path.join(__dirname, '..', 'plugin-admin.html'), 'utf8');
   ok('会员规则后台把全部 L2 功能固定为仅 L2', /l1Only=hostId==='cFeatL1'&&\(k==='drawing-export'\|\|k==='bom-export'\|\|k==='hydraulic-check'\|\|k==='pro-others'\)/.test(admin));
   setUser('anon-x', '');
