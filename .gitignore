@@ -127,3 +127,12 @@ _dbg_*.mjs
 
 # QA 地图侧对比临时产物（可再生，不提交）
 _mapside_*.json
+
+# 一次性调试探针（2026-10-21 用户定 B 方案「保留证据」）
+# 处置原则：被 AGENT_HANDOFF.md 点名引用、作为某次修复「实测依据」的探针 → 入库（可追溯）；
+# 其余一次性探针一律忽略，免得 git status 永远挂着几十条 ?? 把真正的新文件埋掉。
+# 已入库的 26 个（_probe_front_node / _probe_undo_drag / _shot_hyd_table 等）不受本规则影响 ——
+# gitignore 对已跟踪文件无效，它们照常可以用 git add 更新。
+# 判据与清单见 _p1/_audit_root_probes.md；新增探针若被文档引用，记得 git add 而不是让它落到规则里。
+_probe_*.mjs
+_shot_*.mjs
