@@ -52,18 +52,18 @@ const stages = [
    * 避免把旧预期冒充当前产品回归。 */
   { id: 'core', name: '核心门禁（scripts/check.cjs，含语法、静态契约、单测、水力与拼接）', script: 'scripts/check.cjs' },
   {
-    id: 'equiv', name: '简化等价性回归（Puppeteer + 已审核基线）', script: 'verify_simplify_equivalence.js',
+    id: 'equiv', name: '简化等价性证据比较（Puppeteer + 现存基线）', script: 'scripts/simplify-equivalence.cjs',
     browser: 'puppeteer-core',
-    requires: ['_p1/baseline.json', '_p1/baseline.reviewed.txt'],
-    skip: '等价性基线尚未完成负向校验并审核；需先确认基准场景，再运行 --baseline 和破坏性反向验证',
+    requires: ['_p1/baseline.json'],
+    skip: '缺少等价性基线；采集当前快照不能证明此前改动等价',
   },
   {
     id: 'n02', name: 'N02 三入口地块回传（Playwright + Edge）',
     script: 'project-planning/验收记录/n02-three-entry.cjs', browser: 'playwright',
   },
   {
-    id: 'pump', name: '管径/水泵恢复冒烟验收（Puppeteer + Edge）',
-    script: 'tests/pipe_pump_restore.smoke.cjs', browser: 'puppeteer',
+    id: 'pump', name: '管径/水泵恢复冒烟验收（Playwright + Edge）',
+    script: 'tests/pipe_pump_restore.smoke.cjs', browser: 'playwright',
   },
   {
     id: 'nav', name: '导航紧凑与遮挡回归（Playwright + Edge）',

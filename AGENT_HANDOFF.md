@@ -3857,3 +3857,338 @@ var tlNtick = 'M'+tlNcx+' '+(tlNcy-tlNr-tlNtk)+' L'+tlNcx+' '+(tlNcy-tlNr+tlNtk)
 
 截图：`_probe_out/v646_live_north_5x.jpg`（线上 5 倍特写，与本地渲染逐像素一致）、`v646_live_full.jpg`。
 
+
+---
+
+### 26.46 v647-north-bearing：指北针跟着地块实际方位转（2026-10-21）
+
+**用户原话（两段，第二段是补充）**
+> 「指北针的方向要从地图上采集方向，采集之后，随着地块信息传递给地块分区页面，地块分区页面可能
+> 对地块进行了旋转，那么指北针也要随着旋转，这样三级简图出图页面的指北针才能指向实际位置。」
+>
+> 「地块分区之后可以传回地图的，在地图上可以微调分区角度的，这个微调之后，再回传给地块分区页面，
+> 也会导致指北针微调，这个别忘记修改了。」
+
+**根因：v646 及以前写死「图上方即真北」**
+
+那只对「刚从地图回传、二级一动没动」的地块成立 —— 回传时
+`measuredPolygon.y = −(lat−lat₀)·m`，北被编成 −y（`inline-16.js:100-117`）。
+但下面三类操作**只改图面顶点、不动经纬度基准**，一发生「上方」就不是真北：
+
+| # | 操作 | 代码位置 | 对顶点的作用 |
+|---|---|---|---|
+| ① | 二级「重新分区」落定地块角度 | `plot-editor.js ppRepartitionFromRotatedPlot()` | 旋转写进 `ppState.polyPts` + `window.measuredPolygon` |
+| ② | 二级「地块镜像」水平/垂直 | `ppApplyMirror()` | 直接改数据（对合可撤） |
+| ③ | 地图上微调「分区角度」再回传 | `runye-map-partition.js` → `runyeApplyMapPayload`（`inline-16.js:165-169`） | `measuredPolygon = RyMapPartition.orient(..., angle, ctr)` 再转一次 |
+
+**做法：不记角度，每次出图现场反算**
+
+累加器（`rot += θ`）看着简单，但撤销/镜像/整组/地图往返每一处都能把它记歪。改成几何反算：
+
+`tlNorthAngleDeg()`（`mod/inline-09.js`，与 `tlAutoGenerate` 同级，已挂 `window`）：
+
+1. 参考环 = `window.__runyeMapFramePoly`（地图口径，**北 = +y**，与图面顶点同序同点数）；
+2. 用**相邻点差**（边向量）做样本，最小二乘解 2×2 线性映射 `M`：地图口径 → 图面
+   （位移不影响方向，所以只解线性部分，不解平移）；
+3. 北在图面里的方向 = `M·(0,1) = (m12, m22)`；
+4. 返回「相对正上方的顺时针角」：`rot = atan2(m22, m12) + 90°`（正上方 = 屏幕角 −90°）。
+
+为什么 ①②③ 全都自动覆盖：三者都是对**整块地**做的相似变换 ⇒ 顶点变了、参考环没变，`M` 自己就带上了那个角度。
+
+**绘制**（`#tlNorthGroup`）
+
+- 整组 `transform="rotate(rot 圆心)"`；rot = 0 时不写 transform ⇒ 与 v646 **逐字节一致**；
+- N 字与角度数值**仍留在组内**（`runye-dxf.js` / `tl-workspace.js` 的「整组剥离」规则一行都不用改），
+  但各自 `rotate(−rot)` 反向转回 ⇒ 任何角度下都正立可读（用户确认：盘转、字不倒）；
+- `|rot| ≥ 0.5°` 时在 N 右侧标数值，如「N +30.0°」；0° 时不出，版面干净。
+
+**退化**：图片测量 / 手画矩形 / 地形模块米坐标 ⇒ 无 `__runyeMapFramePoly`；或点数不等、矩阵奇异
+⇒ 返回 0，完全退回 v646 行为（老地块不变样、不报错）。
+
+**实测（`_p1/_probe_north_bearing.cjs`，18 条全 PASS）**
+
+| 场景 | 期望 | 实测 |
+|---|---|---|
+| S0 刚回传（未旋转） | 0，且**不写 transform** | `tf=null` ✔ |
+| S1 二级落定 +30° | 30 | `rotate(30 1094 82)` ✔ |
+| S2 二级落定 −45° | −45 | `rotate(-45 …)` ✔ |
+| S3 垂直镜像 | 180（北被翻到下方） | `rotate(180 …)` ✔ |
+| S4 水平镜像 | 0（北仍朝上） | `tf=null` ✔ |
+| S5 无地图基准（图片测量） | 0 且无角度数字 | ✔ |
+| **S6 真链路**：`runyeApplyMapPayload` + `partitionPlan.angle=15` | 15 | `rotate(15 …)`、`+15.0°` ✔ |
+| 针尖实际指向（`getCTM` 投到图面复算） | 0 / 30 / −45 / 180 | 0 / 30 / −45 / 180 ✔ |
+| N 字反向转 | `rotate(-30 1094 47)` | ✔ |
+| 下载 SVG 同源 | 带同一 rotate | ✔ |
+| 未捕获异常 | 0 | ✔ |
+
+截图：`_probe_out/v647_north_rot30_4x.jpg`（30° 4 倍特写：针尖朝右上、N 正立、右侧 `+30.0°`）、
+`v647_full_rot30.jpg`（整幅 A3）。
+
+**两个量测坑（都白跑了一轮，记下来）**
+
+1. `tlAutoGenerate()` 生成完会把视图**自动切回 `ws`（设计工作区）**，此时 `#tlDiagramContent` 尺寸为 0，
+   `getBBox()` 全 0、截图报 `Cannot take screenshot with 0 width` ⇒ 量之前必须
+   `window.rySetTab('tlPipePlanSection','pipe')` 再等 `#tlDiagramContent` 宽度 > 40。
+2. `getBBox()` 是**局部坐标**，元素被 `rotate` 了它也不变 ⇒ 想验证「针真的指那儿」必须用
+   `getCTM()` 把针尖点投到图面坐标系复算角度；截图裁剪要用 `getBoundingClientRect()`（已含变换）。
+
+**版本三件**：`sw.js VERSION = 'v647-north-bearing'`、`index.html` 的 `inline-09.js?v=647-north-bearing`、
+`plugin-admin.html` 角标 `界面 v647`。（其余文件保持 v641~v646 不动。）
+**闸门**：核心门禁 PASS、面板漂移 PASS、4 项 SKIPPED（同 v637 状态）。
+
+**状态**：本地已提交前先跑 gate；发布仍需用户明确指令。
+
+---
+
+### 26.47 v648-lock-text：二级右栏「锁定面积」按钮去掉锁图标（2026-10-21）
+
+**用户原话**：「锁定网格按钮前面的图标取消吧。」（红箭头指向右栏那枚 `🔓 锁定面积`）
+
+**三处一起改**（少一处就会出现「点一下图标又回来了」）
+
+| 位置 | 改前 | 改后 |
+|---|---|---|
+| `index.html:837` 初始文案 | `🔓 锁定面积` | `锁定面积` |
+| `plot-editor.js` `ppSyncAreaLockUI` 锁定态 | `🔒 已锁定面积` | `已锁定面积` |
+| 同上 解锁态 | `🔓 锁定面积` | `锁定面积` |
+
+`id`、`title` 提示、`active` 高亮、解锁逻辑（合并/重置/重新分区/旋转时自动解锁）**一律未动**。
+
+**顺带更正一处会过期的注释**：`mod/inline-19.js` 里 v608 那条「MIN_TOOL 92→132」的宽度依据写着
+「最长的一句是『🔓 锁定面积』（文字+锁图标约 96px）」—— 去图标后约 82px，补一句说明，
+避免下次有人照 96px 复核时对不上。
+
+**实测（`_p1/_probe_lock_btn_text.cjs`，10 条全 PASS）**
+
+| 断言 | 实测 |
+|---|---|
+| 初始文案就是「锁定面积」 | ✔ |
+| 初始/锁定态都不含 emoji | ✔ |
+| 点一下 →「已锁定面积」+ `active` | ✔ |
+| 再点一下 →「锁定面积」、`active` 去掉 | ✔ |
+| 两次点击按钮宽度一致 | 123 × 2 |
+| 按钮右缘不越过工具轨右缘 | 1593 vs 1600 |
+| 未捕获异常 | 0 |
+
+截图：`_probe_out/v648_lock_btn.jpg`（右栏 2 倍：调网格 / 重置网格 / **锁定面积** / ↩ 回退 / 清除管路 / 地块镜像 / 地块划分）。
+
+**量测坑（又白跑一轮）**：二级右栏**默认是折叠的**（`plot-editor.js` ppRailCollapse，v254：无存档即
+`off=true`），折叠态下 `#ppLockArea` 只有 **14px 宽**、位于 1632 之外，量到的根本不是真按钮 ⇒
+断言「按钮右缘 ≤ 轨道右缘」会假 FAIL、截图也是一片空白。探针必须先
+`document.getElementById('ppRailToggle').click()` 展开（或预置 `localStorage.ppRailOff='0'`），
+再等 `#ppToolbar` 宽度 > 60。
+
+**版本三件**：`sw.js VERSION = 'v648-lock-text'`、`index.html` 的 `plot-editor.js?v=648-lock-text`、
+`plugin-admin.html` 角标 `界面 v648`。（`inline-09.js` 保持 v647 —— 本次没动它。）
+**闸门**：核心门禁 PASS、面板漂移 PASS、4 项 SKIPPED。
+
+**状态**：本地未提交未发布（v647 也仍未提交）。
+
+### 26.48 v649-gr-toolbar：多地块规划页接入与二级/三级同一套左侧工具栏（2026-10-21）
+
+**用户原话**：「多地块规划页面的布局乱了，左侧应该跟二级 三级一样，是工具栏。」
+（截图：`#grPipeSection` 左侧是一列灰卡横贯整版、画布上方还横着一条工具按钮）
+
+**病灶（探针实测，改版前留档 `_probe_out/gr_layout_before.jpg`）**
+
+| 项 | 改版前 | 依据 |
+|---|---|---|
+| `#grPipeSection > .pp-body` | `display:block`（没有任何 `display:grid`） | 第 2566/2567 行只写了 `grid-column` 定位，落在 block 容器上等于没写 |
+| `#grSide` | 1600px 宽、5 张卡上下铺满整版 | 左栏卡片一张张横贯全屏 |
+| `#grCanvasWrap` | 1600×1226，被顶到第二屏 | `.pp-body` 总高 1618 > 一屏 933 ⇒ 整页纵向滚动 |
+| `#grToolbar` | `display:block`、条高 23px | `.pp-toolbar` 全站没有基础规则，按钮按 inline 排，看着像「没有工具条」 |
+| `#grLegend` | 塌成一段 inline 文字、高 20px | `.pp-legend/.pp-legend-item` 基础规则在历史清理中被删；第二行 `#grTlLeg` 被 `.pp-stage` 的 `overflow:hidden` 裁掉 |
+| 右缘「工具栏」竖标签 | 在多地块页也显示 | `plot-editor.js syncProxy` 只判 `getComputedStyle(btn).display`，而 display 不会从 `display:none` 祖先继承 |
+
+**四处改动**
+
+1. `mod/ry-cad-toolbar.js`：`HOSTS` 加 `{sec:'grPipeSection', side:'grSide', grp:'ryCadGrpGr'}`；
+   `VPS` 加 `'grPipeSection'`（显示门控 + main 左让位）；`GRP_FOR` / `ALL_GRPS` 同步 ——
+   左栏由「页面内一列卡」变成「⚙ 工具栏」里的第三个分组（展开/收起/拖宽与二级/三级同一套机制）。
+2. `index.html`：`#ryCadSide` 里新增 `<details id="ryCadGrpGr">` + `data-pp="grPipeSection" data-host="grSide"`。
+3. `mod/style-01.css` 新增 §6b / §6b-2：
+   - `body.ry-tool #grPipeSection > .pp-body` 三列网格（与二级 3202 行同值同序）+ `.pp-stage` 改 flex 列
+     （`#grCanvasWrap` 第 2571 行那句早写了的 `flex:1 1 auto` 这次真生效）；
+   - `[data-ry-rail="1"]` 搬移态前两列归零（与 4539 行同口径）；
+   - `#grToolbar` 复位成顶部横条（flex row、高 39px、5 键一行）；
+   - `#grSide` 栏内竖排 + gap 6px；`.gr-card-title` 改成二级同款灰分组条（22px / #dcdfdd / 11px）；
+   - `#grLegend` / `.pp-legend-item` / `#grTlLeg` 布局补回（只挂 gr 作用域，不动全局）；
+   - `#grPipeSection .pp-side` 原位态也补 `flex 列 + gap`（v241「间距单一来源」的欠账）。
+4. `mod/plot-editor.js` `syncProxy`：追加「本页是当前功能区（`#pipePlanSection.ry-active`）」判定 ——
+   竖标签不再跨页残留。
+
+**刻意不做**：孪生样式**没有**交给 `scripts/refresh-cad-twin-css.cjs` 重跑 —— 那个块历史上有过手工剔除
+（现块里成片空行即遗迹），重跑会把被剔的规则全部复活、牵动二级/三级现有观感。gr 只需一小撮孪生，
+手写在 §6b-2（`#ryCadSide [data-pp="grPipeSection"] …`）；脚本 `sections` 处留了注释说明原因。
+
+**实测（`_p1/_probe_gr_layout.cjs`，29 条全 PASS）**
+
+| 断言组 | 实测 |
+|---|---|
+| 外壳接管：ry-tool + ry-cad-vp、栏宽 318 | ✔ |
+| `#grSide` 进 `#ryCadGrpGr`、`data-ry-rail="1"` | ✔ |
+| `.pp-body` 是 grid、搬移态 `0px 0px 1281px` | ✔ |
+| 一屏装下：section 底 970 ≤ 1000 | ✔ |
+| 画布 1281×847（原来 1600×1226 + 整页滚动） | ✔ |
+| 工具条 flex/row、高 39、5 键同行在条内 | ✔ |
+| 图例 flex、8 条目同行、11px、`#grTlLeg` 未被裁 | ✔ |
+| 右缘竖标签本页隐藏 / 切回二级恢复 | ✔ / ✔ |
+| 切页后 `#grSide` 留在栏内（与 `#ppSide` 同行为）、分组互斥折叠 | ✔ |
+| 未捕获异常 0 | ✔ |
+
+回归：v648 `_probe_lock_btn_text.cjs` 10 条全 PASS、v647 `_probe_north_bearing.cjs` 全 PASS。
+**闸门**：核心 PASS（46.0s）、面板漂移 PASS（4 条已登记）、4 项 SKIPPED。
+
+截图：`_probe_out/v649_gr_layout.jpg`（整页）/ `v649_gr_rail.jpg`（左栏 2 倍）。
+
+**版本三件**：`sw.js VERSION = 'v649-gr-toolbar'`、`index.html` 的 `style-01.css / plot-editor.js /
+ry-cad-toolbar.js` 三个 `?v=649-gr-toolbar`、`plugin-admin.html` 角标 `界面 v649`。
+**状态**：本地未提交未发布（v647 / v648 也仍未提交，等用户说「发布」一并推）。
+
+### 26.49 v650-gr-terrain-btn-gone：多地块页左栏撤掉「地形高程」快捷按钮（2026-10-21）
+
+**用户原话**：「地形高程控制按钮，在上一层工具栏有了，这里就没有必要再出现了。」
+（截图红箭头指向 `#grSide` 顶部那枚绿色大按钮）
+
+**背景**：v245c 当年把这枚按钮插在「成组地块条之后、总管卡之前」，是因为那时多地块页
+左栏是独立面板、没有别的地形入口。v649 起左栏已并入全局工具栏，`#ryCadGrpTerrain`
+分组就在**同一个栏**里（截图下方可见），按钮成了重复入口。
+
+**改动**：`runye-terrain.js` 注入数组去掉 `'grBlockCard'`（`closest('.pp-side')` 插入分支一并删）；
+`init` 时按 `data-terrain-open` 把页内旧残留按钮一律拔掉（防 SW 旧缓存把按钮带回来）。
+其余宿主（`fld_dh` / `tl_dh` / `settingsForm`）不动。
+
+**版本**：`sw.js VERSION = 'v650-gr-terrain-btn-gone'`（含 v649 未发布增量）、
+`index.html` 的 `runye-terrain.js?v=650-gr-terrain-btn-gone`、角标 `界面 v650`。
+**验证**：`_probe_gr_layout.cjs` 扩到 30 条全 PASS（新增：`#grSide` 内 `data-terrain-open` /
+`.rt-open` 计数均为 0）；gate 核心 PASS、面板漂移 PASS。
+**状态**：本地未提交未发布（v647/v648/v649/v650 攒着，等用户说「发布」一并推）。
+
+### 26.50 v651-gr-side-flat：多地块面板「拍平」并进二级/三级共享皮肤链（2026-10-21）
+
+**用户两轮拍板**：
+1. 「样式不能多层嵌套/覆盖」（Grasshopper Flatten 作比：层级是搬运过程的副产品，拍掉）；
+2. 「多地块面板要遵从二级 三级总体的规则，将来一句话，二级/三级/多地块/地形高程一起变」——
+   即皮肤必须**单源**，不允许各面板私抄一份同值副本。
+
+**拍平动作（只动多地块面板 + 一处三级收编）**
+
+| 改动 | 文件 | 内容 |
+|---|---|---|
+| 孪生层删除 | `mod/style-01.css` | v649 的 `#ryCadSide [data-pp="grPipeSection"]` 11 条补丁整层删除；规则键在稳定锚点上——`#grSide`（id 跟元素走）与 `.gr-*` 专属类；页内 `#grPipeSection .pp-side` 前缀副本同批删除 |
+| 皮肤根类 | `index.html` | `#grSide` 挂上 `ry-props`，与二级 `#ppSide` 同根 |
+| 灰条单源 | `mod/ry-panel.css` | `.ry-props .ry-props-head` 扩为四面板灰条唯一出处：`+ .ry-props .gr-card-title`（多地块卡标题）`+ #tlPipePlanSection/.#ryCadSide [data-pp] .pp-side .tl-flat-head`（三级信息卡标题，原是同值拷贝带 !important，改一句变不了它——本轮排查抓出并收编） |
+| 卡盒定稿 | `mod/style-01.css` | 通用 `.gr-card/.gr-block` 直接写定稿值（白底 + #e4ede7 细框 + padding 0），#grSide 不再打补丁；`.gr-card` 全站只有 gr 页与 #grHydPanel（本来整体清零）使用，已核实 |
+| 细节对齐 | `mod/style-01.css` | 卡内正文缩进 8→10px（与共享灰条 padding 对齐）；`.gr-btn:hover` #eef4f1/#1f2937 → #f6f8f7/#173f2d（二级 ghost 共享基准） |
+
+**四面板排查结论（实测计算样式）**
+
+| 面板 | 灰条来源 | bg | 字号/字重 | 结论 |
+|---|---|---|---|---|
+| 二级 `.ry-props-head` | `.ry-props` 共享规则 | #dcdfdd | 11/600 | ✔ 已是单源 |
+| 三级 `.tl-flat-head` | ~~同值拷贝~~ → 本轮收编进共享规则 | #dcdfdd | 11/600 | ✔ 本轮并入 |
+| 多地块 `.gr-card-title` | ~~gr 私有副本~~ → 本轮收编 | #dcdfdd | 11/600 | ✔ 本轮并入 |
+| 地形 `.rt-panel`（header/按钮） | 自成一套（深绿按钮 #116447、绿头 #f4f9f6，runye-terrain.css） | — | — | ⚠ **未并入**：改动会波及二级/三级/设置页里的地形入口按钮外观，等用户点头再做 |
+
+**将来改风格只动 `mod/ry-panel.css` 一条规则**（灰条 22px/#dcdfdd/#cfd4d1/11px/600），二级、三级、多地块同时变；地形高程待并入。
+
+**验证**：`_p1/_probe_gr_layout.cjs` 30 条全 PASS；v648 回归 10 条全 PASS；gate 核心 PASS、面板漂移 PASS。四面板灰条计算样式对照脚本 `_p1/_diag_panel_audit.cjs`（一次排查即弃）。
+**版本**：`sw.js VERSION = 'v651-gr-side-flat'`（含 v649/v650 未发布增量）；`style-01.css` 与 `ry-panel.css` → `?v=651-gr-side-flat`；角标 `界面 v651`。
+**状态**：本地未提交未发布（v647~v651 攒着，等「发布」一并推）。
+
+### 26.50b v651b：多地块卡去外框（同日用户反馈，随 v651 未发布增量）
+
+**用户原话**：「感觉这里有点问题，怎么还套了一个框？」（三箭头指向 总管 / 子地块 / 材料汇总 三张卡的外框）
+
+二级特性面板的灰条是**直接贴在白底上**的；v651 拍平时给卡留了 1px #e4ede7 细框（本意与工具栏分组分隔线同族），渲染出来就是「白底 → 卡框 → 灰条」三层。拍平的好处兑现：改 `.gr-card` 定稿值一处即可——`border:1px solid #e4ede7` → `border:0`；子地块列表项 `.gr-block` 同步拍平（四周框 → 底部分隔线 #e8ecea，与三级 22px 行同语言）。
+
+验证：`_probe_gr_layout.cjs` 30 条全 PASS、gate PASS。样式只动 `mod/style-01.css` 两行。
+
+**版本**：`sw.js VERSION = 'v651b-gr-card-unboxed'`；仅 `style-01.css` → `?v=651b-gr-card-unboxed`（ry-panel.css 无改动，保持 651）；角标 `界面 v651b`。全套 `scripts/check.cjs` 复核：静态 29 项 PASS、36 个单测文件、水力/WASM 等价、地块拼接契约全过。
+**状态**：本地未提交未发布（v647~v651b 攒着，等「发布」一并推）。
+
+### 26.52 v652-gr-skin-unify：多地块面板文字/控件彻底对齐共享基准（同日深挖）
+
+**用户原话**：「多地块这个工具栏 很多样式跟三级二级都不一样，深挖一下，彻底解决掉，拍平，把那种多层嵌套 多个样式的都消除掉，都升级到这个工具栏总的样式下面，文字都要统一大小。」
+
+**排查出的差异（实测计算样式，不是猜）**：
+
+| 元素 | 改前（gr 自用档） | 改后（共享基准） | 出处 |
+|---|---|---|---|
+| `#grBar` 数值行 | **14px/600 大字**（吃到 style-01 基础 `.pp-plan-val`） | 11px/400 #1e293b tabular + 22px 行 + #e8ecea 底线 | ry-panel.css 共享规则**作用域扩进多地块**（6 条 :is() 加 `#grPipeSection` + `#ryCadSide [data-pp="grPipeSection"]`，与三级 v611 同手法，非值拷贝） |
+| `.gr-row/.gr-label/.gr-val` | 11.5px / #64748b / **700 青绿 #0f766e** | 11px / 22px / #475569 / 400 #1e293b tabular | v609「数值不用加粗」同源 |
+| `.gr-sel` | 24px 白底灰框 11.5px | 20px 无框透明底 11px，聚焦淡绿底纹 | 二级 v609f 口径 |
+| `.gr-btn` | 24px / 0 7px | 20px / 0 6px / 11px 600 | 三级 v615/v616 + `.pp-recipe-btn` 同款 |
+| `.gr-btn.active` | **紫色** rgba(124,58,237) | 实心深绿 #2d604b 白字 | 二级工具栏 button.active 同款 |
+| `.gr-btn-on` | 青绿 #0f766e | 实心深绿 #2d604b 白字 | 同上（teal 也是 gr 自用档） |
+| `.gr-block.cur` | 紫底线+紫底 | 深绿底线 #2d604b + 淡绿底 #f0f7f2 | 同上 |
+| `.gr-hint/.gr-empty` | 11px #5f6b7a | 10.5px #64748b | 三级 `.tl-flat-note` 注释档 |
+| `.gr-mat` 表格线 | rgba(31,41,55,.1/.25) | #e8ecea / 合计顶线 #cfd4d1 | 行皮肤同一条线 |
+| `.gr-card-title` 旧词条 | style-01 残留 12px/700 死拷贝 | **删除**（灰条唯一出处 = ry-panel.css） | v651 收编后遗留 |
+| index.html 内联 | `style="font-size:10px"`（gr-tag 重复）、`style="margin-left:10px"`（根数标签） | 收进 CSS（`.gr-row>.gr-label:not(:first-child){margin-left:6px}`） | 单源 |
+| `#grSide .pp-plan-bar` 私有词条 | margin/padding/gap/font-size 一份 | **整条删除**（共享规则已覆盖） | — |
+
+有意保留：`.gr-tl-*` 紫色系（三级管路导入层的画布语义色，与图例/图面 #7c3aed 同源，不是皮肤）。
+
+**验证**：新一次性探针 `_p1/_diag_gr_skin_v652.cjs` 26 条计算样式全 PASS（含与二级 #ppSide 逐项对照同值）；`_probe_gr_layout.cjs` 23 条全 PASS（布局零回归）；全套 `scripts/check.cjs` 通过（静态 29 项、36 单测文件、水力/WASM 等价、地块拼接契约）。
+**版本**：`sw.js VERSION = 'v652-gr-skin-unify'`；`style-01.css` 与 `ry-panel.css` → `?v=652-gr-skin-unify`；角标 `界面 v652`。
+**状态**：本地未提交未发布（v647~v652 攒着，等「发布」一并推）。
+
+### 26.52b v652b-label-collision：画布标签防重叠 + 面板两处折行（同日用户截图反馈）
+
+**用户原话**：「有文字重叠的情况」（两箭头指画布「Ø… 驳接点」白底牌）。
+
+**画布（mod/inline-29.js drawTakeoffs）**：
+- 琥珀「Ø主径」标签原是裸 `fillText`（9px 棕字直接叠在管线上）→ 改白底小牌（`grLabelDraw`），位置不变（点右上）。
+- 「Ø总管径 驳接点」白底牌原固定上移 14px（v238）——块驳接点常与某分区驳接点**重合**（链端=该分区主管端），牌子正好盖住对方的 Ø 标签，用户截图两处即此。→ 改 **上→下→右→左 四候选位**，挑第一个不与已放标签相交的；全占退回上方兜底。
+- 机制：`grLabelW / grLabelDraw / grHits` 三件套——先画先登记屏幕占位盒，后画避让；旧 `grLabel(text,wp,color)` 接口保留（三级导入层管径标签、水源标签三处调用方不动）。
+
+**面板（mod/style-01.css）**：
+- `.gr-block-meta` 11px → **10.5px 回注释档**：v652 提到 11px 后「未布置 / 三级未布置」在 235px 窄面板折行断词（「三级未 / 布置」）。meta 与 .gr-hint 同属注释档（三级 .tl-flat-note 同款），11px 口径只适用数据行。
+- `.gr-mat th,td` 加 `white-space:nowrap`：表头「主管 m / 支管 m / 一级管 m」在窄列折行（「一级 / 管 m」断成两行，v651b 截图已见的旧病）；列宽交给表格自动布局。
+
+**验证**：`node --check inline-29` 过；`_probe_gr_layout.cjs` 23 条全 PASS（未捕获异常 0）；全套 `scripts/check.cjs` 通过。画布标签实际避让效果待用户环境截图复核（探针环境无成组数据，drawTakeoffs 不走）。
+**版本**：`sw.js VERSION = 'v652b-label-collision'`；`inline-29.js` 与 `style-01.css` → `?v=652b-label-collision`（ry-panel.css 无改动，保持 652）；角标 `界面 v652b`。
+**状态**：本地未提交未发布（v647~v652b 攒着，等「发布」一并推）。
+
+### 26.52c v652c-group-frozen：二级页成组逐块编辑「冻结邻块」（同日用户反馈）
+
+**用户原话**：「这个多地块编辑某一块的时候，其他块冻结就好了，不要编辑某一块的时候，其他块都不显示了，这样不够直观，我要看这块在整体中是什么关系，这样好判断总管怎么连接好。」
+
+**原行为**：逐块态 `ppGroupActiveSubs()` 只返回当前块 ⇒ 画布上其他成员块直接消失。
+
+**改法（mod/plot-editor.js，三处）**：
+1. `ppGetFrozenSubRings()`：逐块态返回其余成员环（带块名；显示坐标与 `ppGetRotatedSubRings` 同口径——同 rotation、同旋转中心，模式切换不跳位）。
+2. `ppRender` 在当前块**之下**画冻结底图：`rgba(100,116,139,.10)` 灰填充 + 灰虚线框（[6,4] 1.5px）+ 外接框中心块名（11px 屏幕字号）。**只读**——不进分区/面积/水力/材料，不参与点位判定与命中（那些仍走 `ppGetSubPlotRings`=仅当前块），「成组退化成多次单块、一行规则不改」的结构原封不动。
+3. 取景：`ppGetDisplayBounds(includeFrozen)` 加参；仅**交互画布**路径并框冻结邻块（`ppUpdateTransform` 取景居中整组、`ppContentSize`→「适应窗口」框整组）；**施工简图出图**那个调用点保持当前块口径（v193 拍板：各块结果独立，邻块不许进图纸）。
+
+**验证**：`node --check plot-editor` 过；全套 `scripts/check.cjs` 通过（静态 29 项、36 单测文件、水力/WASM 等价、地块拼接契约）。冻结显示实际观感待用户环境复核（探针环境无成组数据）。
+**版本**：`sw.js VERSION = 'v652c-group-frozen'`；`plot-editor.js` → `?v=652c-group-frozen`（style-01/ry-panel 无改动，保持 652b）；角标 `界面 v652c`。
+**状态**：本地未提交未发布（v647~v652c 攒着，等「发布」一并推）。
+
+### 26.53 v653-zone-calibers：二级页管径细化——「实切面积」口径（用户拍板：标注+材料+水力联动）
+
+**用户原话**：「如果是小分区可以优化管径，那我们地块分区页面，也就是单个地块分区有小分区的，是不是可以把管道变细？」
+
+**现状病根**：二级结果栏只给一档主管管径，选径基准是 v97 设计值口径（标准分区 A×B/N 或划定亩数，2026-09-21 用户拍板：图面实测裁剪只作用于三级）⇒ 全区一档，小分区吃大管的浪费看不见。
+
+**新增三件（mod/inline-09 + inline-11 + plot-editor + index.html）**：
+1. **口径切换按钮**（结果栏输入行「管径口径」，localStorage `runye_caliber_mode`，默认设计值）：实切模式 = 最大实切分区（分区网格∩实测多边形）为单区基准，与三级 `figureMaxZone` 同口径；主管/支管/水泵流量/扬程/功率全套随实切流量重选。
+2. **画布逐区标注**：实切模式下每区右上角追加「主管 Ø… · 支管 Ø…」（#7c2d12，与多地块页琥珀点同色系）；数据源 `window.ryZonePipePick`（inline-09 新增单源：流量公式与 selectPipe 约束 = grComputeHydraulics 同一条，v193 铁律不写第二份算法）。
+3. **「分区管径明细（实切）」灰条块**（扬程计算式下方）：逐区 实切亩数 / 流量 / 主管Ø / 支管Ø，小分区自动变细 1~3 档；设计值模式整块隐藏。
+
+**数据流**：ppDrawZones 逐区算实切面积（复用 `ppZoneActualAreaM2`）→ 发布 `window.__ppZoneActuals`（JSON 签名去重后回调 calcPlan，render→calc→render 无死循环）→ calcPlan 实切模式取 maxCell 重算 + 渲染明细。
+
+**验证**：新探针 `_p1/_probe_zone_calibers_v653.cjs`（合成 L 形地块 5 分区）10 条全 PASS——实切后自动分出 Ø160/Ø125 两档（18 亩区 Ø160、10.8 亩区 Ø125），结果栏=最大实切分区选径一致，切回设计值明细隐藏；全套 `scripts/check.cjs` 通过。截图 `_probe_out/v653_design.jpg` / `v653_actual.jpg`。
+**版本**：`sw.js VERSION = 'v653-zone-calibers'`；`inline-09` / `inline-11` / `plot-editor` → `?v=653-zone-calibers`；角标 `界面 v653`。
+**状态**：本地未提交未发布（v647~v653 攒着，等「发布」一并推）。
+
+### 26.53b v653b-caliber-btn：「管径口径」按钮皮肤归位面板共享档（同日用户反馈）
+
+**用户原话**：「用按钮控制是好的，但是这个按钮的样式要服从于整个面板的样式，改下。」
+
+- 病根：v653 的按钮误用了工具栏的 `.pp-btn-ghost`（26px 工具轨皮），混在参数输入行里突兀。
+- 改法：HTML 只换类 → `.pp-recipe-btn`（面板共享按钮档：20px / 白底 / 1px var(--ry-s-200,#e2e8f0) / 11px 600 / hover 只变底色——与「保存/调用」「更新水泵扬程」同款）；ry-panel.css 补三条 **id 规则**（这颗钮全站仅一枚，键在 id 无歧义）：`margin-left:auto` 贴右（与输入行同列）、`.active` 实心深绿白字（全站 button.active 口径）、`.active:hover` 深绿加深。
+- 验证：`_probe_zone_calibers_v653.cjs` 10 条全 PASS（截图确认按钮与面板行同语言）；全套 `scripts/check.cjs` 通过。
+**版本**：`sw.js VERSION = 'v653b-caliber-btn'`；仅 `ry-panel.css` → `?v=653b-caliber-btn`；角标 `界面 v653b`。
+**状态**：本地未提交未发布（v647~v653b 攒着，等「发布」一并推）。

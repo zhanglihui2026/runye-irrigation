@@ -17,11 +17,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>润野灌溉设计优化版｜滴灌管径与水泵选型</title>
 <meta name="description" content="输入地块、滴灌带与水源参数，快速计算灌溉分区、主管支管管径和水泵工作点。"/>
-<link rel="stylesheet" href="mod/style-01.css?v=644-pump-btn-align">
+<link rel="stylesheet" href="mod/style-01.css?v=652b-label-collision">
 <link rel="stylesheet" href="runye-inverse-design.css?v=277">
 <script defer src="runye-inverse-design.js?v=438-branch-flow-conservation"></script>
 <link rel="stylesheet" href="runye-terrain.css?v=454-terrain-sidebar-peer">
-<script src="runye-terrain.js?v=454-terrain-sidebar-peer"></script>
+<script src="runye-terrain.js?v=650-gr-terrain-btn-gone"></script>
 <link rel="stylesheet" href="runye-ai-plan.css?v=544-float-card-unify">
 <script src="runye-ai-plan.js?v=544-float-card-unify"></script>
 <link rel="stylesheet" href="runye-case-library.css?v=277">
@@ -245,7 +245,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <link rel="stylesheet" href="pwa/pwa.css?v=2">
 <script defer src="pwa/pwa.js?v=2"></script>
     <link rel="stylesheet" href="runye-theme.css?v=2">
-    <link rel="stylesheet" href="mod/ry-panel.css?v=640-formula-fold">
+    <link rel="stylesheet" href="mod/ry-panel.css?v=653b-caliber-btn">
     <!-- Shoelace 2.15.1（与紧凑分组样板一致）；Shoelace 不可用时保留原生输入控件。 -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.1/cdn/themes/light.css">
   <link rel="stylesheet" href="runye-typography.css?v=530-h1-scope">
@@ -782,6 +782,10 @@ body.ry-worst-off [data-tlworst]{display:none}
          需要撤掉：删本 item + PP_LIFTDH_PAIRS 里的镜像对 + 下方 calcPlan 触发循环里的一项。 -->
     <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">入口压力</span><input class="ryp-native-fallback" type="number" id="planTapePressure" value="1" min="0" step="0.1" aria-label="入口压力" title="滴灌带入口工作压力（bar）：计入水泵扬程（×10.2 折算水头），与 01 一级表单同源联动"><sl-input data-ry-proxy-for="planTapePressure" type="number" value="1" min="0" step="0.1" size="small" aria-label="入口压力" hidden></sl-input><span class="pp-plan-unit">bar</span></span>
     <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">目标流速</span><input class="ryp-native-fallback" type="number" id="planTargetV" value="1.5" min="0.3" max="5" step="0.1" aria-label="目标流速"><sl-input data-ry-proxy-for="planTargetV" type="number" value="1.5" min="0.3" max="5" step="0.1" size="small" aria-label="目标流速" hidden></sl-input><span class="pp-plan-unit">m/s</span></span>
+    <!-- [v653] 管径口径切换：设计值（v97 默认）/ 实切面积（小分区建议管径自动变细 + 逐区明细）
+         [v653b] 按钮皮肤 = 面板共享档 .pp-recipe-btn（与「保存/调用」「更新水泵扬程」同款），
+         选中态规则在 ry-panel.css —— 不再用工具栏的 .pp-btn-ghost（那是工具轨的皮）。 -->
+    <span class="pp-plan-item"><span class="pp-plan-label">管径口径</span><button type="button" class="pp-recipe-btn" id="ppCaliberModeBtn">口径：设计值</button></span>
     <input type="hidden" id="planN" value="4">
     <input type="hidden" id="planZoneMode" value="manual">
   </div>
@@ -804,6 +808,9 @@ body.ry-worst-off [data-tlworst]{display:none}
   <!-- 扬程计算式（紧贴结果栏下方，仅扬程一行，实时跟随输入更新，不换行） -->
   <div class="ry-props-head">扬程计算式</div>
   <div id="ppCalcDetail" class="pp-calc-formula pp-calc-h"></div>
+  <!-- [v653] 分区管径明细（仅实切口径下显示）：逐区实切亩数 → 流量 / 主管Ø / 支管Ø -->
+  <div class="ry-props-head" id="ppZoneCalHead" style="display:none">分区管径明细（实切）</div>
+  <div id="ppZoneCalDetail" style="display:none"></div>
   <!-- 二级简图视图本身保留在右侧 pane 中，入口暂时停用；恢复位置见
        feature-archive/二级简图/README.md。 -->
   </aside>
@@ -834,7 +841,7 @@ body.ry-worst-off [data-tlworst]{display:none}
     <button class="pp-btn" data-mode="adjustCut" title="拖动分区线调整分区；把一条线拖到相邻线上松手即可合并分区（分区数随之减少），误操作可用「回退」撤销">调网格</button>
     <button class="pp-btn-ghost" id="ppResetCuts" title="恢复系统默认分区线位置（撤销所有拖动与合并）">重置网格</button>
     <!-- 任务K（2026-09-26）：分区面积锁定按钮。开启后拖动/微调网格线只整体平移分区，各区面积不变；合并/重置/重新分区/旋转会先自动解锁 -->
-    <button class="pp-btn-ghost" id="ppLockArea" title="锁定分区面积：开启后拖动网格线只整体平移分区，不改变各区面积（如 18 亩保持 18 亩）；例外：最外侧分区线拖到地块边线可直接合并减区；合并/重置/重新分区/旋转等操作会先自动解锁">🔓 锁定面积</button>
+    <button class="pp-btn-ghost" id="ppLockArea" title="锁定分区面积：开启后拖动网格线只整体平移分区，不改变各区面积（如 18 亩保持 18 亩）；例外：最外侧分区线拖到地块边线可直接合并减区；合并/重置/重新分区/旋转等操作会先自动解锁">锁定面积</button>
     <span class="pp-cut-fine-group" id="ppCutFineGroup" style="display:none">
       <button class="pp-btn-ghost pp-fine-btn" id="ppFineUp" title="向上微调 0.3m">↑</button>
       <button class="pp-btn-ghost pp-fine-btn" id="ppFineDown" title="向下微调 0.3m">↓</button>
@@ -985,7 +992,9 @@ body.ry-worst-off [data-tlworst]{display:none}
        少一套机制就少一处要 verify_ry_tool 纳管的 DOM。 -->
 <section id="grPipeSection" class="ry-sec" data-ry-view="overview">
   <div class="pp-body">
-  <aside class="pp-side" id="grSide">
+  <!-- [v651 拍平] 加 ry-props：与二级 #ppSide 同一个皮肤根类 —— 卡标题灰条、行底白、
+       字号等全部走 mod/ry-panel.css 的 .ry-props 单源规则，改一处四处（二级/三级/多地块/地形）同变。 -->
+  <aside class="pp-side ry-props" id="grSide">
     <!-- [v241] 原来这里带内联 style="margin-bottom:8px"：内联样式优先级高于下面的
          CSS 规则，光改 CSS 会把这条 8px 漏掉（实测首条净间距仍是 14px）。
          间距统一交给 .pp-side 的 gap，内联外边距去掉。 -->
@@ -1006,7 +1015,7 @@ body.ry-worst-off [data-tlworst]{display:none}
       </div>
       <div class="gr-row">
         <span class="gr-label">长度</span><span class="gr-val" id="grTrunkLen">0.0</span><span class="gr-unit">m</span>
-        <span class="gr-label" style="margin-left:10px">根数</span><span class="gr-val" id="grTrunkN">0</span>
+        <span class="gr-label">根数</span><span class="gr-val" id="grTrunkN">0</span>
       </div>
       <div class="gr-btns">
         <button type="button" class="pp-btn-ghost gr-btn" id="grTrunkDraw" title="进入画总管：在图上点击加点，双击结束，右键退回上一点">✎ 画总管</button>
@@ -1025,7 +1034,7 @@ body.ry-worst-off [data-tlworst]{display:none}
          = 本块驳接点 —— 用户回头用一根大总管把各块驳接点连起来（大总管仍在本页手画）。
          整体损失 = 大总管(满载) + max(各块: 块总管损失 + 块内最大分区损失)。 -->
     <div class="gr-card" id="grTakeoffCard">
-      <div class="gr-card-title">驳接点 / 管径 / 水头损失 <span class="gr-tag" style="font-size:10px">v233</span></div>
+      <div class="gr-card-title">驳接点 / 管径 / 水头损失 <span class="gr-tag">v233</span></div>
       <div id="grHyd" class="gr-hyd">
         <div class="gr-empty">请先点「⚡ 生成各块管路」，并确保左侧「每亩流量」已计算。</div>
       </div>
@@ -2279,7 +2288,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script src="mod/material-table.js?v=421-mat-table"></script>
 <!-- [v424-plan-calc-render] 扬程公式与分解展示模块，先于计算控制器和三级调用方装载。 -->
 <script src="mod/plan-calc-render.js?v=614-head-formula"></script>
-<script src="mod/inline-09.js?v=646-north-cross"></script>
+<script src="mod/inline-09.js?v=653-zone-calibers"></script>
 <!-- [v423-header-layout] 三级简图标题布局依赖 inline-09 的 tlMeasureText 与生成时写入的标题状态。 -->
 <script src="mod/tl-header-layout.js?v=423-header-layout"></script>
 
@@ -2287,9 +2296,9 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script src="mod/inline-10.js?v=482-nav-refit"></script>
 
 <!-- ===== 实际地块规划 JS ===== -->
-<script src="mod/inline-11.js?v=607-branch-material-span"></script>
+<script src="mod/inline-11.js?v=653-zone-calibers"></script>
 <!-- [v420-split] 绘图编辑器 IIFE 自 inline-11 迁出：必须紧随 inline-11 之后同步执行 -->
-<script src="mod/plot-editor.js?v=640-formula-fold"></script>
+<script src="mod/plot-editor.js?v=653-zone-calibers"></script>
 <script src="mod/inline-12.js?v=619-undo-cover"></script>
 <script src="mod/inline-13.js?v=499-plot-library-store"></script>
 <!-- [v422-head-system-svg] 纯 SVG 核心先于 inline-14 同步加载。 -->
@@ -2357,6 +2366,16 @@ body.ry-worst-off [data-tlworst]{display:none}
       <summary>三级 · 管网参数 / 生成与输出</summary>
       <div class="ry-cad-grp-body" data-pp="tlPipePlanSection" data-host="tlSide"></div>
     </details>
+    <!-- [v649 2026-10-21 用户要求] 多地块规划页纳入同一套左工具栏。
+         用户原话：「多地块规划页面的布局乱了，左侧应该跟二级 三级一样，是工具栏」。
+         此前 #grSide 原样躺在 .pp-body 第一列，但该页的 .pp-body 只有 grid-column
+         定位、没有 display:grid ⇒ 定位全部失效，左栏卡片铺满整版 1600px、画布被
+         顶到第二屏。现按二级/三级的同一机制接管：ry-cad-toolbar.js 把 #grSide
+         搬进本组（data-host="grSide"），退出工具模式原样搬回。 -->
+    <details class="ry-cad-grp" id="ryCadGrpGr">
+      <summary>多地块 · 成组总览 / 总管与材料</summary>
+      <div class="ry-cad-grp-body" data-pp="grPipeSection" data-host="grSide"></div>
+    </details>
     <details class="ry-cad-grp" id="ryCadGrpTerrain">
       <summary>地形高程</summary>
       <div class="ry-cad-grp-body" id="ryCadTerrainBody"></div>
@@ -2364,7 +2383,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 
   </div>
 </aside>
-<script src="mod/ry-cad-toolbar.js?v=586-cad-grip-explicit"></script>
+<script src="mod/ry-cad-toolbar.js?v=649-gr-toolbar"></script>
 
 <!-- ===== 设置（2026-09-27 用户要求）：顶栏齿轮打开，收纳「可调节的数据」=====
      参考 AutoCAD 的 Options：左侧分类 + 右侧参数 + 底部「恢复本页默认 / 取消 / 保存」。
@@ -2398,7 +2417,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <input type="file" id="rySetCsvInput" accept=".csv,text/csv" style="display:none">
 <script src="mod/inline-28.js?v=645-dim-scale-entry"></script>
 
-<script src="mod/inline-29.js?v=358-branch-flow-conservation"></script>
+<script src="mod/inline-29.js?v=652b-label-collision"></script>
 
 <script src="mod/inline-30.js?v=544-float-card-unify"></script>
 <script src="mod/inline-32.js?v=404-tier-gates"></script>

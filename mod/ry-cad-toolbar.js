@@ -12,7 +12,10 @@
 
   var HOSTS=[
     {sec:'pipePlanSection',   side:'ppSide',    grp:'ryCadGrpPipe'},
-    {sec:'tlPipePlanSection', side:'tlSide',    grp:'ryCadGrpTl'}
+    {sec:'tlPipePlanSection', side:'tlSide',    grp:'ryCadGrpTl'},
+    /* [v649 2026-10-21] 多地块规划页（#grPipeSection）纳入同一套左工具栏：
+       用户原话「多地块规划页面的布局乱了，左侧应该跟二级 三级一样，是工具栏」。 */
+    {sec:'grPipeSection',     side:'grSide',    grp:'ryCadGrpGr'}
   ];
   var W_SHUT=40, W_DEF=318, W_MIN=220, GAP=1;
   /* 展开宽度：用户拖过 → localStorage 记忆（栏宽）；没拖过 wOpen=null，
@@ -110,10 +113,11 @@
     var a=document.querySelector('main > .ry-sec.ry-active');
     return a?a.id:'';
   }
-  /* 工具栏显示门控（2026-09-14 用户要求）：只在二级管路 / 三级管路
-     两个区块显示；地块绘制与其他功能区不显示、不让位。ry-cad-vp 驱动
-     工栏显隐与 main 左让位（顶部让位已随视口切换条一并取消）。 */
-  var VPS=['pipePlanSection','tlPipePlanSection'];
+  /* 工具栏显示门控（2026-09-14 用户要求）：只在二级管路 / 三级管路 / 多地块规划
+     三个区块显示；地块绘制与其他功能区不显示、不让位。ry-cad-vp 驱动
+     工栏显隐与 main 左让位（顶部让位已随视口切换条一并取消）。
+     [v649] 加入 grPipeSection：该页左栏已改为本工具栏内的分组。 */
+  var VPS=['pipePlanSection','tlPipePlanSection','grPipeSection'];
   /* 系统图视图排除（2026-09-14 用户要求）：三级管路切到「系统图」（data-ry-view="sys"）
      时左栏已整体让位给满屏系统图，工具栏跟随隐藏；切回三级简图/设计自动恢复。
      rySetTab 改 data-ry-view 后由 MutationObserver 触发 syncAll，显隐自动跟随。 */
@@ -133,8 +137,8 @@
      分组初始默认折叠
      （verify 9e 把关），仅在视口变化那一次触发；用户随后收起不被反复顶开
      （除非再切视口，那时按新目标重新互斥）。 */
-  var GRP_FOR={'pipePlanSection':'ryCadGrpPipe','tlPipePlanSection':'ryCadGrpTl'};
-  var ALL_GRPS=['ryCadGrpPipe','ryCadGrpTl','ryCadGrpTerrain'];
+  var GRP_FOR={'pipePlanSection':'ryCadGrpPipe','tlPipePlanSection':'ryCadGrpTl','grPipeSection':'ryCadGrpGr'};
+  var ALL_GRPS=['ryCadGrpPipe','ryCadGrpTl','ryCadGrpGr','ryCadGrpTerrain'];
   function ensureFor(spec){
     try{
       if(!inVp()) return;

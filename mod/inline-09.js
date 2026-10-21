@@ -270,6 +270,22 @@ function selectPipe(Q, targetV, minOd = 0, maxOd = Infinity) {
   return RyDesignCore.selectPipe(Q, targetV, PE_OD_SERIES, SDR, minOd, maxOd);
 }
 
+/* [v653] 分区管径细化（实切口径）—— 单一出处：给定分区实际面积(m²)与滴灌参数，
+   返回该区流量与主/支管建议档。流量口径与 calcPlan / grComputeHydraulics 同一条
+   （面积 ÷ 滴带间距 ÷ 滴孔间距 × 滴头流量 / 1000）；管径就是本文件的 selectPipe
+   （主管 ≥Ø90 / 支管 ≤Ø160，四级约束一致）。二级画布逐区标注与「分区管径明细」
+   共用本函数 —— 不写第二份算法（v193 铁律）。 */
+function ryZonePipePick(areaM2, tapeSpacing, emitterSpacing, emitterFlow, targetV, branchParallelCount) {
+  const flow = areaM2 / tapeSpacing / emitterSpacing * emitterFlow / 1000;
+  const par = Math.max(1, branchParallelCount || 1);
+  return {
+    flow: flow,
+    main: selectPipe(Math.max(flow, 0.01), targetV, MAIN_PIPE_MIN_OD, Infinity),
+    branch: selectPipe(Math.max(flow / par, 0.01), targetV, 0, BRANCH_PIPE_MAX_OD)
+  };
+}
+window.ryZonePipePick = ryZonePipePick;
+
 function evaluateAllPipes(Q, minOd = 0, maxOd = Infinity) {
   return RyDesignCore.pipes(Q, PE_OD_SERIES, SDR, minOd, maxOd).map(function (p) { return { od: p.od, id: p.id, v: p.v }; });
 }
@@ -2943,6 +2959,58 @@ function tlHookTlNodesLiveSync() {
   return true;
 }
 
+/* ── 真北方位角（v647 2026-10-21 用户要求「指北针要指向实际位置」）─────────────
+   旧口径（v646 及以前）：指北针恒朝上，理由是「回传时 measuredPolygon.y = −(lat−lat₀)·m，
+   北被编成 −y ⇒ 图上方即真北」。这对「刚从地图回传、二级页一动没动」的地块成立。
+   但下面三类操作**只改图面顶点、不动经纬度基准**，一发生，「上方」就不再是真北：
+     ① 二级「重新分区」把地块角度落定（plot-editor.js ppRepartitionFromRotatedPlot）
+        —— 旋转写进 ppState.polyPts 与 window.measuredPolygon；
+     ② 二级「地块镜像」水平/垂直（ppApplyMirror 直接改数据）；
+     ③ 地图上微调「分区角度」再回传（runye-map-partition → runyeApplyMapPayload，
+        inline-16.js 用 RyMapPartition.orient(measuredPolygon, angle) 再转一次）。
+   ⇒ 印出来的 A3 方位是错的。
+
+   做法：**不记角度**（撤销/镜像/整组/往返都会把累加记歪），每次出图现场反算：
+     · 参考环 = window.__runyeMapFramePoly（地图口径，北 = +y，与图面顶点同序同点数）；
+     · 用相邻点差做样本，最小二乘解 2×2 线性映射 M：地图口径向量 → 图面向量
+       （位移不影响方向，故只用边向量，不需要解平移）；
+     · 北在图面里的方向 = M·(0,1) = (m12, m22)；
+     · 返回「相对正上方的顺时针角」（度）：正上方 = 屏幕角 −90°，故 rot = atan2 + 90°。
+   为什么这样能自动覆盖 ①②③：三者都是对**整块地**做的相似变换（旋转/镜像），
+   顶点变了、参考环没变 ⇒ M 自己就带上了那个角度，不用相信任何一个计数器。
+
+   退化：无地图基准（图片测量 / 手画矩形 / 地形模块米坐标）、点数不等、矩阵奇异
+   ⇒ 返回 0（朝上，与 v646 完全一致，老地块不报错也不变样）。 */
+function tlNorthAngleDeg() {
+  try {
+    var poly = window.measuredPolygon || [];
+    var ref = window.__runyeMapFramePoly || null;
+    if (!ref || poly.length < 3 || ref.length !== poly.length) return 0;
+    var A00 = 0, A01 = 0, A11 = 0, r1x = 0, r1y = 0, r2x = 0, r2y = 0;
+    for (var i = 0; i < poly.length; i++) {
+      var j = (i + 1) % poly.length;
+      var ax = +ref[j].x - +ref[i].x, ay = +ref[j].y - +ref[i].y;      /* 地图口径边（北=+y） */
+      var bx = +poly[j].x - +poly[i].x, by = +poly[j].y - +poly[i].y;  /* 图面边（y 向下） */
+      if (!isFinite(ax) || !isFinite(ay) || !isFinite(bx) || !isFinite(by)) return 0;
+      A00 += ax * ax; A01 += ax * ay; A11 += ay * ay;
+      r1x += ax * bx; r1y += ay * bx;
+      r2x += ax * by; r2y += ay * by;
+    }
+    var det = A00 * A11 - A01 * A01;
+    if (!isFinite(det) || Math.abs(det) < 1e-9) return 0;   /* 参考环退化（共线/退化三角形） */
+    /* 2×2 正规方程解：M = [[m11,m12],[m21,m22]]，bx = m11·ax + m12·ay，by = m21·ax + m22·ay。
+       北向只用到第二列 ⇒ 只解 m12 / m22（第一列不参与，省一半算力）。 */
+    var m12 = (A00 * r1y - A01 * r1x) / det;
+    var m22 = (A00 * r2y - A01 * r2x) / det;
+    var deg = Math.atan2(m22, m12) * 180 / Math.PI + 90;
+    if (!isFinite(deg)) return 0;
+    while (deg > 180) deg -= 360;
+    while (deg < -180) deg += 360;
+    return Math.abs(deg) < 0.05 ? 0 : Math.round(deg * 10) / 10;
+  } catch (e) { return 0; }
+}
+window.tlNorthAngleDeg = tlNorthAngleDeg;
+
 function tlAutoGenerate(options) {
   options = options || {};
   var doScroll = options.scroll !== false;
@@ -3097,13 +3165,14 @@ function tlAutoGenerate(options) {
   /* ── 指北针（2026-10-20 用户要求「三级简图出图要增加指北针」）────────────────
      位置：A3 图框右上角空白区。信息行从 x=34 起、宽 960 ⇒ 最长到 994；内细框右边线在
        1174；中间 1000..1170 是结构上永不被占用的空白（两行折行也只是往下长，不往右长）。
-     方位：简图顶点取 window.measuredPolygon = 面积测量的**图像坐标**（y 向下），
-       绘制时 y 直接映射成 SVG y ⇒ 图上方即真北，指北针恒朝上。
-       不跟地块变换旋转是对的：二级页的「地块旋转/镜像」只是作图便利变换，简图走的是
-       「地图口径」未旋转顶点（见下方 [map-enhance] 注释），北方位恒定。
+     方位（v647 改）：**跟着地块的实际方位转**，角度由 tlNorthAngleDeg() 现场反算，
+       见函数上方注释。v646 及以前这里写的是「图上方即真北、指北针恒朝上」——
+       那只对「刚回传、二级一动没动」的地块成立；一旦二级落定旋转 / 镜像，或地图上
+       微调分区角度再回传，图面就转过了，恒朝上会指错。旋转量 0 时与 v646 逐字节一致。
      显示范围：简图 / 下载 SVG / 下载 PNG / 打印 全部同源（都出自本 parts）；
-       工作区克隆底图与 DXF 导出按「图框装饰」剥离（见 tl-workspace.js、runye-dxf.js）。
-     造型：v643 起为「双圈 + 两瓣三角指北针（北实心/南描边）+ 圈外 N」，见下方造型注释。 */
+       工作区克隆底图与 DXF 导出按「图框装饰」剥离（见 tl-workspace.js、runye-dxf.js）
+       —— N 字与角度数值刻意仍放在 #tlNorthGroup 内，就是为了不改那两处剥离规则。
+     造型：v643 双圈/双三角 → v646 单圈 + 四向十字刻度（用户选「候选 4」）→ v647 加旋转。 */
   var tlNcx = svgW - 96, tlNcy = 82, tlNr = 24;
   /* [v646 2026-10-21 用户从六个候选里选定「4 十字刻度」] 造型再换一次，cx/cy/r 依旧不动（版面零位移）。
      前情：v643 换成「双圈 + 双三角针」（备选 A）；用户看过并排的六版样张后回「用4吧」——
@@ -3114,18 +3183,31 @@ function tlAutoGenerate(options) {
      ⚠ 刻度伸到 R+4 = 28 ⇒ 整组 bbox 从 48×~67 长到 56×~72（底端到 y=110，正好是图面顶边线，
        不越界也不压图；右缘 1122 距内细框 1174 还有 52 余量）。 */
   var tlNtip = tlNr * 0.71, tlNbw = tlNr * 0.229, tlNtk = 4;
+  /* [v647] 真北：整组绕圆心转 tlNrot（0 = 朝上，与 v646 逐字节一致） */
+  var tlNrot = tlNorthAngleDeg();
+  var tlNTf = tlNrot ? ' transform="rotate(' + tlNrot + ' ' + tlNcx + ' ' + tlNcy + ')"' : '';
   var tlNarrowN = 'M'+tlNcx+' '+(tlNcy-tlNtip)+' L'+(tlNcx+tlNbw)+' '+tlNcy+' L'+(tlNcx-tlNbw)+' '+tlNcy+' Z';
   var tlNarrowS = 'M'+tlNcx+' '+(tlNcy+tlNtip)+' L'+(tlNcx+tlNbw)+' '+tlNcy+' L'+(tlNcx-tlNbw)+' '+tlNcy+' Z';
   var tlNtick = 'M'+tlNcx+' '+(tlNcy-tlNr-tlNtk)+' L'+tlNcx+' '+(tlNcy-tlNr+tlNtk)
     +' M'+tlNcx+' '+(tlNcy+tlNr-tlNtk)+' L'+tlNcx+' '+(tlNcy+tlNr+tlNtk)
     +' M'+(tlNcx-tlNr-tlNtk)+' '+tlNcy+' L'+(tlNcx-tlNr+tlNtk)+' '+tlNcy
     +' M'+(tlNcx+tlNr-tlNtk)+' '+tlNcy+' L'+(tlNcx+tlNr+tlNtk)+' '+tlNcy;
-  parts.push('<g id="tlNorthGroup">'
+  /* N 字与角度数值：**仍在 #tlNorthGroup 内**（这样 DXF/工作区克隆的「整组剥离」规则不用改），
+     但各自反向转回 −tlNrot，保证任何角度下都正立可读（工程图惯例：盘转、字不倒）。 */
+  var tlNlx = tlNcx, tlNly = tlNcy - tlNr - 11;
+  var tlNcf = tlNrot ? ' transform="rotate(' + (-tlNrot) + ' ' + tlNlx + ' ' + tlNly + ')"' : '';
+  /* 角度数字紧贴 N 右侧（同一条基线上），这样「N +30.0°」读成一组，而不是飘在圆外面 */
+  var tlNdegX = tlNlx + 10, tlNdegY = tlNly;
+  var tlNdf = tlNrot ? ' transform="rotate(' + (-tlNrot) + ' ' + tlNdegX + ' ' + tlNdegY + ')"' : '';
+  parts.push('<g id="tlNorthGroup"'+tlNTf+'>'
     +'<circle cx="'+tlNcx+'" cy="'+tlNcy+'" r="'+tlNr+'" fill="#ffffff" stroke="#111827" stroke-width="1.1"/>'
     +'<path d="'+tlNtick+'" stroke="#111827" stroke-width="1" fill="none"/>'
     +'<path d="'+tlNarrowN+'" fill="#14532d"/>'
     +'<path d="'+tlNarrowS+'" fill="#ffffff" stroke="#14532d" stroke-width="1" stroke-linejoin="round"/>'
-    +'<text x="'+tlNcx+'" y="'+(tlNcy-tlNr-10)+'" text-anchor="middle" font-size="12.5" font-weight="700" letter-spacing="0.4" fill="#14532d">N</text>'
+    +'<text id="tlNorthN" x="'+tlNlx+'" y="'+tlNly+'"'+tlNcf+' text-anchor="middle" dominant-baseline="middle" font-size="12.5" font-weight="700" letter-spacing="0.4" fill="#14532d">N</text>'
+    +(Math.abs(tlNrot) >= 0.5
+      ? '<text id="tlNorthDeg" x="'+tlNdegX+'" y="'+tlNdegY+'"'+tlNdf+' text-anchor="start" font-size="9" font-weight="600" fill="#14532d">'+(tlNrot>0?'+':'')+tlNrot.toFixed(1)+'°</text>'
+      : '')
     +'</g>');
   // info —— 与图面拉开间距，不再压到地块
   // 信息行：与标题分行；过长时按 " | " 边界自动换行

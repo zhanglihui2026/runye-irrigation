@@ -155,6 +155,17 @@ function calcPlan(){
      flowAreaM2 = 手动亩/区→亩×MU_TO_SQM；否则方正标准分区 A×B/N。flowAreaSrc='design'。 */
   var flowAreaM2 = manualZoneMu > 0 ? manualZoneMu * MU_TO_SQM : (A * B / N);
   var flowAreaSrc = 'design';
+  /* [v653] 实切口径：逐区实切面积（网格∩实测多边形）由画布层 ppDrawZones 发布到
+     window.__ppZoneActuals，本页取「最大实切分区」为单区基准 —— 与三级
+     figureMaxZone 同一口径。设计值（v97：标准分区/划定亩数）仍是默认；
+     切换入口 = 结果栏「管径口径」按钮（localStorage 持久化）。 */
+  var __ppActuals = (window.__ppZoneActuals && window.__ppZoneActuals.length) ? window.__ppZoneActuals : null;
+  var __ppCaliberActual = (function(){ try { return localStorage.getItem('runye_caliber_mode') === 'actual'; } catch(e){ return false; } })();
+  if (__ppCaliberActual && __ppActuals) {
+    var __maxActM2 = 0;
+    for (var zaI = 0; zaI < __ppActuals.length; zaI++) { if (__ppActuals[zaI].m2 > __maxActM2) __maxActM2 = __ppActuals[zaI].m2; }
+    if (__maxActM2 > 1) { flowAreaM2 = __maxActM2; flowAreaSrc = 'figureMaxZone'; }
+  }
   const flowZoneMu = flowAreaM2 / MU_TO_SQM;
   const zoneTapeLen = flowAreaM2 / tapeSpacing;
   const zoneRows = Math.max(1, Math.ceil(zoneHEff / tapeSpacing));
@@ -224,6 +235,29 @@ function calcPlan(){
     // 水泵扬程计算中间量，用于施工简图展示
     tapePressure, tapePressureM, existPressure, mainLoss, branchLoss, filterLoss, headBeforeSafety, headBeforeSafetyRaw, safetyFactor: SAFETY_FACTOR, marginHead: MARGIN_HEAD, efficiency, branchCount, branchParallelCount, layoutSides
   };
+  /* [v653] 分区管径明细：逐区实切面积 → 各区自己的主/支管建议档（ryZonePipePick 单源，
+     与画布逐区标注同一条）。设计值模式下整块隐藏 —— 那时全区一档，明细只会重复同一个数。 */
+  (function(){
+    var box = document.getElementById('ppZoneCalDetail');
+    var head = document.getElementById('ppZoneCalHead');
+    if (!box) return;
+    if (!__ppCaliberActual || !__ppActuals || !__ppActuals.length) {
+      box.style.display = 'none'; box.innerHTML = '';
+      if (head) head.style.display = 'none';
+      return;
+    }
+    var rows = '';
+    __ppActuals.forEach(function(z){
+      var p = window.ryZonePipePick(z.m2, tapeSpacing, emitterSpacing, emitterFlow, targetV, branchParallelCount);
+      rows += '<span class="pp-plan-item"><span class="pp-plan-label">' + (z.zi + 1) + '区 · ' + z.mu.toFixed(1) + ' 亩</span>'
+        + '<span class="pp-plan-val">' + p.flow.toFixed(1) + '</span><span class="pp-plan-unit">m³/h</span>'
+        + '<span class="pp-plan-val">Ø' + p.main.od + '</span><span class="pp-plan-unit">主管</span>'
+        + '<span class="pp-plan-val">Ø' + p.branch.od + '</span><span class="pp-plan-unit">支管</span></span>';
+    });
+    box.innerHTML = rows;
+    box.style.display = '';
+    if (head) head.style.display = '';
+  })();
   // 二级→三级 联动：二级计算完成后，自动把单区参数带入三级系统（若开启"与二级联动"）
   if (window.__tlLinkEnabled !== false && typeof syncThreeLevelFromPlan === 'function') {
     syncThreeLevelFromPlan();
@@ -304,3 +338,34 @@ document.addEventListener('change', ppLiftDhCapture, true);
 });
 ppPullLiftDh();                                              // 首屏对齐一次
 // （ppToggleCalc 的 click 已在 ppToggleCalcDetail 定义处立即绑定，无需再注册 DOMContentLoaded）
+
+/* ===== [v653] 管径口径切换：设计值（v97 默认，标准分区/划定亩数口径）/
+   实切面积（最大实切分区为单区基准，与三级 figureMaxZone 同口径）。=====
+   实切模式下：结果栏主管/支管/水泵三件套按实切流量重选，画布逐区标注建议管径，
+   「分区管径明细」显示每区的实切亩数 / 流量 / 主管Ø / 支管Ø（小分区自动变细）。 */
+function ppCaliberMode(){
+  try { return localStorage.getItem('runye_caliber_mode') === 'actual' ? 'actual' : 'design'; }
+  catch(e){ return 'design'; }
+}
+function ppApplyCaliberModeUI(){
+  var btn = document.getElementById('ppCaliberModeBtn');
+  if (!btn) return;
+  var actual = ppCaliberMode() === 'actual';
+  btn.classList.toggle('active', actual);
+  btn.textContent = actual ? '口径：实切面积' : '口径：设计值';
+  btn.title = actual
+    ? '当前按「分区实切面积」口径：取最大实切分区为单区基准，主管/支管/水泵随实切流量选型，画布逐区标注建议管径。点击切回设计值。'
+    : '当前按 v97 设计值口径（标准分区/划定亩数，全区一档）。点击切换「实切面积」：小分区的建议管径自动变细，并可看逐区明细。';
+}
+function ppSetCaliberMode(m){
+  try { localStorage.setItem('runye_caliber_mode', m === 'actual' ? 'actual' : 'design'); } catch(e){}
+  ppApplyCaliberModeUI();
+  calcPlan();
+}
+window.ppCaliberMode = ppCaliberMode;
+window.ppSetCaliberMode = ppSetCaliberMode;
+(function(){
+  var b = document.getElementById('ppCaliberModeBtn');
+  if (b) b.addEventListener('click', function(){ ppSetCaliberMode(ppCaliberMode() === 'actual' ? 'design' : 'actual'); });
+  ppApplyCaliberModeUI();
+})();

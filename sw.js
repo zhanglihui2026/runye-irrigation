@@ -1027,7 +1027,150 @@
    四段刻度正则命中 / 北实心南描边 / 整组 1066..1122 在内细框 16..1174 内 / bbox.b=110 不压图面顶边 /
    整组宽 56 / N 字右缘 1099.5 不撞标题（右缘 725.3）与信息行（右缘 1002）/ 零未捕获异常。
    截图：_probe_out/v646_north_cross_5x.jpg（5 倍特写）、v646_tl_diagram_full.jpg（整幅）。 */
-const VERSION = 'v646-north-cross';
+/* v647-north-bearing: 三级简图指北针**跟着地块实际方位转**（不再恒朝上）。
+   用户原话：「指北针的方向要从地图上采集方向，采集之后，随着地块信息传递给地块分区页面，
+     地块分区页面可能对地块进行了旋转，那么指北针也要随着旋转，这样三级简图出图页面的指北针
+     才能指向实际位置」＋「地块分区之后可以传回地图的，在地图上可以微调分区角度的，这个微调之后，
+     再回传给地块分区页面，也会导致指北针微调，这个别忘记修改了。」
+   根因：v646 及以前写死「图上方即真北」。这只对「刚回传、二级一动没动」的地块成立 ——
+     回传时 measuredPolygon.y = −(lat−lat₀)·m，北被编成 −y。但下面三类操作**只改图面顶点、
+     不动经纬度基准**，一发生「上方」就不是真北了：
+       ① 二级「重新分区」把地块角度落定（plot-editor.js ppRepartitionFromRotatedPlot）；
+       ② 二级「地块镜像」水平/垂直（ppApplyMirror 直接改数据）；
+       ③ 地图上微调「分区角度」再回传（runye-map-partition → runyeApplyMapPayload，
+          inline-16.js 用 RyMapPartition.orient(measuredPolygon, angle) 再转一次）。
+   做法（**不记角度**，每次出图现场反算 —— 撤销/镜像/整组/往返都会把累加器记歪）：
+     · 新函数 tlNorthAngleDeg()：拿「地图口径顶点」__runyeMapFramePoly（北=+y）与「图面顶点」
+       measuredPolygon（同序同点数），用相邻点差做最小二乘，解 2×2 线性映射 M；
+       北在图面里的方向 = M·(0,1) = (m12, m22)；相对正上方的顺时针角 = atan2 + 90°。
+     · #tlNorthGroup 整组 rotate(角度 圆心)；N 字与角度数值仍**留在组内**（DXF/工作区
+       「整组剥离」规则不用改），但各自反向转 −角度 ⇒ 任何角度下都正立可读。
+     · 角度 ≥0.5° 时在 N 右侧标出数值（如「N +30.0°」），0° 时不出现，版面与 v646 逐字节一致。
+     · 退化（图片测量/手画/地形米坐标：无 __runyeMapFramePoly；或点数不等、矩阵奇异）⇒ 0，
+       完全退回 v646 行为，老地块不变样也不报错。
+   探针 _p1/_probe_north_bearing.cjs 18 条全 PASS：S0 回传未旋转=0（无 transform）、
+     S1 落定 +30°、S2 −45°、S3 垂直镜像=180、S4 水平镜像=0、S5 无基准=0 且无角度数字、
+     **S6 真链路**（runyeApplyMapPayload + partitionPlan.angle=15 走完回传接收器）=15；
+     另用 getCTM 把针尖投到图面复算指向（0/30/−45/180 全中，证明不是只有 transform 写了数）、
+     N 字反向转、下载 SVG 同源带同一 rotate、零未捕获异常。 */
+/* v648-lock-text: 二级右栏「锁定面积」按钮去掉前面的锁图标（🔓 / 🔒）。
+   用户原话：「锁定网格按钮前面的图标取消吧。」（红箭头指向右栏那枚 🔓 锁定面积）
+   三处文案一起改，少一处就会「点一下图标又回来了」：
+     · index.html 的初始文案 🔓 锁定面积 → 锁定面积；
+     · plot-editor.js ppSyncAreaLockUI：锁定态 🔒 已锁定面积 → 已锁定面积、
+       解锁态 🔓 锁定面积 → 锁定面积。
+   title 提示、id、active 高亮与解锁逻辑一概不动；按钮变窄 ~14px，工具轨 min-width 132 仍有富余。 */
+/* v649-gr-toolbar: 多地块规划页（#grPipeSection）接入与二级/三级同一套左侧工具栏。
+   用户原话：「多地块规划页面的布局乱了，左侧应该跟二级 三级一样，是工具栏」。
+   ---------------------------------------------------------------------------
+   病灶（探针实测，非推测）：该页 .pp-body 只有 grid-column 定位、**没有 display:grid**
+   ⇒ 定位全废，左栏 5 张卡铺满整版 1600px、画布被顶到第二屏（.pp-body 高 1618 > 一屏 933）。
+   四处改动：
+     ① mod/ry-cad-toolbar.js：HOSTS 加 {grPipeSection, grSide, ryCadGrpGr}，
+        VPS 加 grPipeSection，GRP_FOR / ALL_GRPS 同步 —— 左栏由「页面内一列卡」
+        变成「⚙ 工具栏」里的第三个分组（展开/收起/拖宽与二级/三级同一套机制）；
+     ② index.html：新增 #ryCadGrpGr 分组 + data-host="grSide"；
+     ③ mod/style-01.css §6b：三列网格（与二级 3202 行同值）+ 主区改 flex 列
+        （#grToolbar 复位成顶部横条、#grCanvasWrap 的 flex:1 真正生效）+
+        [data-ry-rail="1"] 前两列归零 + 卡标题改成灰分组条（对齐二级特性面板）+
+        补回 .pp-legend / .pp-legend-item 布局（基础规则在历史清理中被删，
+        图例原本塌成一段 inline 文字、第二行被 overflow:hidden 裁掉）；
+     ④ mod/plot-editor.js syncProxy：折叠「工具栏」竖标签追加 ry-active 判定 ——
+        原来只判 getComputedStyle(btn).display，display 不从 display:none 祖先继承，
+        于是切到三级/多地块页时那枚竖标签仍赖在视口右缘。
+   纪律：只动版式与接线，字段 id / 事件绑定 / 计算逻辑一律不碰；verify_ry_tool 的
+   9c / 9f 两条契约同步更新（VPS 字面量、gr 网格与归零规则）。 */
+/* v650-gr-terrain-btn-gone: 多地块页左栏撤掉「地形高程」快捷按钮（含 v649 未发布增量）。
+   用户原话：「地形高程控制按钮，在上一层工具栏有了，这里就没有必要再出现了。」
+   v649 起多地块页左栏已并入全局工具栏，#ryCadGrpTerrain 分组就在同一栏里，
+   runye-terrain.js 再往 #grSide 顶部插一枚绿色大按钮（v245c 的落位）就是重复入口：
+     · runye-terrain.js：注入数组去掉 'grBlockCard'（分支一并删），
+       init 时按 data-terrain-open 把旧残留按钮一律拔掉（防 SW 旧缓存复活）；
+     · index.html：runye-terrain.js?v=650-gr-terrain-btn-gone。
+   其余宿主（fld_dh / tl_dh / settingsForm）不动。 */
+/* v651-gr-side-flat: 多地块面板「拍平」并进二级/三级共享皮肤链（含 v649/v650 未发布增量）。
+   用户以 Grasshopper 的 Flatten 作比，两轮拍板：
+     ① 「不能让样式多层嵌套/覆盖」——v649 第一版的 #ryCadSide [data-pp="grPipeSection"]
+        孪生层（11 条补丁）整层删除，规则键在跟位置无关的锚点上：
+        面板根 #grSide（稳定 id）、.gr-* 全站专属类；
+     ② 「多地块面板要遵从二级 三级总体的规则，将来一句话二级/三级/多地块/地形一起变」——
+        · #grSide 挂上二级同款皮肤根类 ry-props（index.html）；
+        · 卡标题灰条收编进 mod/ry-panel.css 的 .ry-props 单源规则
+          （.ry-props .ry-props-head 与 .ry-props .gr-card-title 同一条）；
+        · 卡盒定稿回通用 .gr-card / .gr-block（白底 + #e4ede7 细框，无补丁）；
+        · 卡内正文缩进 8→10px、按钮悬停 #eef4f1→#f6f8f7，对齐共享基准；
+        · 页内 #grPipeSection .pp-side 前缀副本删除（#grSide 单源覆盖两种位置）。
+   版本参数：style-01.css / ry-panel.css → ?v=651-gr-side-flat，角标 界面 v651。 */
+/* v651b-gr-card-unboxed: 多地块三卡去外框（v651 的后续微调）。
+   用户截图三箭头指「总管 / 子地块 / 材料汇总」卡：怎么还套了一个框？
+   二级特性面板的灰条本来就是直接贴在白底上的，卡自带 1px #e4ede7 细框
+   渲染出来就是「白底 → 卡框 → 灰条」三层。拍平的好处当场兑现：
+     · .gr-card：border:1px solid #e4ede7 → border:0（一处定稿值，无需搬家）；
+     · .gr-block（子地块列表项）同步拍平：四周框 → 底部分隔线 #e8ecea，
+       与三级 22px 行同语言；.cur 选中态改由底线变色 + 浅紫底承担。
+   版本参数：仅 style-01.css → ?v=651b-gr-card-unboxed（ry-panel.css 无改动），
+   角标 界面 v651b。 */
+/* v652-gr-skin-unify: 多地块面板文字/控件彻底对齐共享基准（v651b 后深挖）。
+   用户：「很多样式跟三级二级都不一样……拍平，多层嵌套 多个样式的都消除掉，
+   都升级到这个工具栏总的样式下面，文字都要统一大小。」排查出的差异与处理：
+     · #grBar 数值行：基础 .pp-plan-val 是 14px/600 大字 —— 根因是 ry-panel.css
+       共享行皮肤作用域写死 pipePlanSection。把 #grPipeSection 与
+       #ryCadSide [data-pp="grPipeSection"] 加进同一批 :is() 列表（6 条规则），
+       二级/多地块同一条规则，#grSide .pp-plan-bar 私有词条整条删除；
+     · .gr-* 私有档清零：行 11.5px→11px/22px 网格；数值 700 青绿→400 #1e293b
+       tabular（v609 同源）；下拉 24px 白框→20px 无框（二级 v609f 口径）；
+       按钮 24px/0 7px→20px/0 6px/11px 600（三级 v615/v616 与 .pp-recipe-btn 同款）；
+     · 开关态统一实心深绿 #2d604b 白字（二级工具栏 .active 同款）：
+       .gr-btn.active 紫 → 绿、.gr-btn-on 青绿 → 绿；.gr-block.cur 紫 → 深绿底线+淡绿底；
+     · 注释档 10.5px #64748b（三级 .tl-flat-note 同款）；.gr-card-title 死拷贝词条删除；
+     · index.html 两处内联样式收进 CSS（gr-tag 重复 font-size、根数标签 margin-left）。
+   版本参数：style-01.css / ry-panel.css → ?v=652-gr-skin-unify，角标 界面 v652。 */
+/* v652b-label-collision: 多地块画布标签防重叠 + 面板两处折行（v652 后用户截图反馈）。
+   用户：「有文字重叠的情况」（两箭头指画布「Ø… 驳接点」白底牌）。
+     · 画布：琥珀 Ø 主径标签原是裸 fillText（字叠在管线上）→ 改白底小牌；
+       驳接点白底牌原固定上移 14px，块驳接点常与分区驳接点重合（链端=该分区
+       主管端），牌子正好盖住对方 Ø 标签 → 改 上→下→右→左 四候选位挑第一个
+       不相交的；先画先登记占位盒、后画避让（grLabelW/grLabelDraw/grHits 三件套，
+       旧 grLabel 接口保留给三级导入层/水源标签）。
+     · 面板：.gr-block-meta 回注释档 10.5px（v652 提到 11px 后「三级未布置」
+       窄面板折行断词）；.gr-mat th/td nowrap（表头「一级管 m」折行断词，旧病）。
+   版本参数：inline-29.js / style-01.css → ?v=652b-label-collision（ry-panel.css 无改动），
+   角标 界面 v652b。 */
+/* v652c-group-frozen: 二级页成组逐块编辑「冻结邻块」（用户截图反馈）。
+   用户：「编辑某一块的时候，其他块冻结就好了，不要其他块都不显示了，这样不够直观，
+   我要看这块在整体中是什么关系，这样好判断总管怎么连接好。」
+   原行为：逐块态 ppGroupActiveSubs 只返回当前块 ⇒ 画布上其他块直接消失。
+   现在（mod/plot-editor.js）：
+     · ppGetFrozenSubRings()：逐块态返回其余成员环（显示坐标，随旋转同口径）；
+     · ppRender 在当前块之下画灰显底图（rgba(100,116,139,.10) 填充 + 灰虚线框
+       + 块名 11px 标注）——看得见、摸不着：不进分区/面积/水力/材料，不参与
+       点位判定与命中，「成组退化成多次单块、一行规则不改」的结构原封不动；
+     · 取景：ppGetDisplayBounds 加 includeFrozen 参数，仅交互画布路径
+       （ppUpdateTransform / ppContentSize→适应窗口）并框冻结邻块；
+       施工简图出图的取景保持当前块口径，邻块不进图纸。
+   版本参数：plot-editor.js → ?v=652c-group-frozen，角标 界面 v652c。 */
+/* v653-zone-calibers: 二级页管径细化——「实切面积」口径（用户拍板：标注+材料+水力联动）。
+   用户：「单个地块分区有小分区的，是不是可以把管道变细？」
+   现状：二级结果栏只给一档主管管径（v97 设计值=标准分区/划定亩数，全区一档）。
+   新增（三件）：
+     ① 口径切换：结果栏「管径口径」按钮（localStorage runye_caliber_mode，默认设计值）。
+        实切模式 = 最大实切分区（网格∩实测多边形）为单区基准 —— 与三级 figureMaxZone
+        同口径；主管/支管/水泵三件套随实切流量重选。
+     ② 画布逐区标注：实切模式下每个分区右上角标「主管 Ø… · 支管 Ø…」
+        （ryZonePipePick 单源，与多地块页琥珀点同色 #7c2d12）。
+     ③ 「分区管径明细」灰条块：逐区 实切亩数 / 流量 / 主管Ø / 支管Ø
+        （小分区自动变细 1~3 档，材料订购按区分档直接照单）。
+   单源：新增 window.ryZonePipePick（inline-09，流量公式与 selectPipe 约束同 grComputeHydraulics）；
+   逐区实切面积由 ppDrawZones 发布 window.__ppZoneActuals（签名去重回调 calcPlan，无死循环）。
+   版本参数：inline-09 / inline-11 / plot-editor → ?v=653-zone-calibers，角标 界面 v653。 */
+/* v653b-caliber-btn: 「管径口径」按钮皮肤归位面板共享档（v653 同日用户反馈）。
+   用户：「按钮的样式要服从于整个面板的样式。」
+   原来 HTML 用的是工具栏的 .pp-btn-ghost（26px 工具轨皮），混在参数输入行里突兀。
+   改为 .pp-recipe-btn（面板共享按钮档：20px / 白底 / 1px var(--ry-s-200) / 11px 600 /
+   hover 只变底色 —— 与「保存/调用」「更新水泵扬程」同款）；ry-panel.css 补两条
+   id 规则：margin-left:auto 贴右（与输入行同列）、.active 实心深绿白字（全站开关态口径）。
+   版本参数：ry-panel.css → ?v=653b-caliber-btn（其余无改动），角标 界面 v653b。 */
+const VERSION = 'v653b-caliber-btn';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

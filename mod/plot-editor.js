@@ -181,7 +181,7 @@
 
   function ppContentSize(){
     if(!ppState.polyPts||!ppState.polyPts.length) return null;
-    var b=ppGetBounds(),db=ppGetDisplayBounds();
+    var b=ppGetBounds(),db=ppGetDisplayBounds(true);   /* [v652c] 适应窗口在逐块态框整组 */
     if(!b||!db) return null;
     var dims=ppGetPlanDims(b);
     var sx=b.w>0?dims.w/b.w:1, sy=b.h>0?dims.h/b.h:1;
@@ -494,6 +494,33 @@
     var b=ppGetBounds();
     var center={x:b.minX+b.w/2,y:b.minY+b.h/2};
     return rings.map(function(r){return r.map(function(p){return ppRotatePoint(p,deg,center);});});
+  }
+  /* ===== [v652c 2026-10-21 用户要求] 逐块态「冻结邻块」 =====
+   * 用户原话：「这个多地块编辑某一块的时候，其他块冻结就好了，不要编辑某一块的时候，
+   *   其他块都不显示了，这样不够直观，我要看这块在整体中是什么关系，这样好判断总管怎么连接好。」
+   * ⇒ 逐块模式下其余成员环照常画出来（灰显 + 虚线框 + 块名），但**只读**：
+   *   不进分区/面积/水力/材料，不参与点位判定与命中（那些仍走 ppGetSubPlotRings=仅当前块，
+   *   「成组退化成多次单块、一行规则不改」的结构原封不动）——邻块只是看得见、摸不着。
+   * 显示坐标与 ppGetRotatedSubRings 同口径（同 rotation、同旋转中心），两种模式切换不跳。 */
+  function ppGetFrozenSubRings(){
+    var ge=window.__runyeGroupEdit;
+    var subs=window.__runyeSubPlots;
+    if(!ge||!ge.active||ge.mode!=='perPlot'||!subs||subs.length<2)return null;
+    var rings=[];
+    subs.forEach(function(s,i){
+      if(i===ge.current)return;
+      if(s&&Array.isArray(s.poly)&&s.poly.length>=3){
+        rings.push({name:s.name||('子地块'+(i+1)),poly:s.poly.map(function(q){return{x:+q.x,y:+q.y};})});
+      }
+    });
+    if(!rings.length)return null;
+    var deg=parseFloat(ppState.plotRotationDeg)||0;
+    if(!deg)return rings;
+    var b=ppGetBounds();
+    var center={x:b.minX+b.w/2,y:b.minY+b.h/2};
+    return rings.map(function(r){
+      return {name:r.name,poly:r.poly.map(function(p){return ppRotatePoint(p,deg,center);})};
+    });
   }
   /* 对 window.__runyeSubPlots 里的环就地应用变换（旋转落定 / 镜像时随主轮廓一起变） */
   function ppXformSubRings(fn){
@@ -848,7 +875,10 @@
     return true;
   }
 
-  function ppGetDisplayBounds(){
+  /* [v652c] includeFrozen=true：逐块态把冻结邻块的显示外框并入取景框 ——
+     只给**交互画布**的取景/适配用（ppUpdateTransform / ppContentSize），
+     施工简图出图（另一个调用点）必须保持当前块口径，不许把邻块框进图纸。 */
+  function ppGetDisplayBounds(includeFrozen){
     if(!ppState.polyPts.length)return{minX:0,minY:0,w:1,h:1};
     var base=ppGetBounds();
     var rotated=ppBoundsFromPoints(ppGetRotatedPlotPoints());
@@ -856,6 +886,14 @@
     var minY=Math.min(base.minY,rotated.minY);
     var maxX=Math.max(base.minX+base.w,rotated.minX+rotated.w);
     var maxY=Math.max(base.minY+base.h,rotated.minY+rotated.h);
+    if(includeFrozen){
+      var fr=ppGetFrozenSubRings();
+      if(fr)fr.forEach(function(r){
+        var fb=ppBoundsFromPoints(r.poly);
+        minX=Math.min(minX,fb.minX);minY=Math.min(minY,fb.minY);
+        maxX=Math.max(maxX,fb.minX+fb.w);maxY=Math.max(maxY,fb.minY+fb.h);
+      });
+    }
     return{minX:minX,minY:minY,w:maxX-minX,h:maxY-minY};
   }
 
@@ -1104,7 +1142,7 @@
 
   function ppUpdateTransform(){
     if(!ppState.polyPts.length)return;
-    var b=ppGetBounds();var displayB=ppGetDisplayBounds();var pad=50;
+    var b=ppGetBounds();var displayB=ppGetDisplayBounds(true);var pad=50;   /* [v652c] 逐块态取景含冻结邻块 */
     var dims=ppGetPlanDims(b);
     var planScaleX=b.w>0?dims.w/b.w:1;
     var planScaleY=b.h>0?dims.h/b.h:1;
@@ -1449,6 +1487,18 @@
     }
     ppCtx.restore(); // 结束地块裁剪
     // 第二遍：文字标注层（不再裁剪，避免被地块边界切掉）
+    /* [v653] 实切口径下逐区标注建议主管管径（ryZonePipePick 单源，与 gr 琥珀点同色），
+       并把逐区实切面积发布到 window.__ppZoneActuals —— calcPlan 的实切模式与
+       「分区管径明细」吃这份。签名不变不回调 calcPlan（render 本就由 calcPlan 触发，
+       最多多走一轮，无死循环）。 */
+    var __calActual = (function(){ try { return localStorage.getItem('runye_caliber_mode') === 'actual'; } catch(e){ return false; } })();
+    var __tsp = parseFloat((document.getElementById('planTapeSpacing')||{}).value) || 0.4;
+    var __esp = parseFloat((document.getElementById('planEmitterSpacing')||{}).value) || 0.3;
+    var __ef  = parseFloat((document.getElementById('planEmitterFlow')||{}).value) || 0.8;
+    var __tv  = parseFloat((document.getElementById('planTargetV')||{}).value) || 1.5;
+    var __par = (typeof readSelectedInt === 'function')
+      ? (readSelectedInt('#branchGroup .selected', 2) * readSelectedInt('#layoutGroup .selected', 1)) : 2;
+    var __act = [];
     ppCtx.setLineDash([]);
     ppCtx.textBaseline='top';
     for(var zr=0;zr<cuts.rows;zr++){
@@ -1462,6 +1512,8 @@
         var _mu=_m2/666.67;
         var _std=cuts.xPlan[zc]*cuts.yPlan[zr]/666.67;
         var _partial=_std>0 && _mu<_std*0.97 && _mu>0.05;
+        if(_mu>0.05)__act.push({zi:zi,m2:_m2,mu:_mu});
+        var __pick=(__calActual&&_mu>0.05&&window.ryZonePipePick)?window.ryZonePipePick(_m2,__tsp,__esp,__ef,__tv,__par):null;
         if(aw>34&&ah>26 && _mu>0.05){
           if(_partial){
             // 非标准分区：与标准分区一致，文字置于分区右上角（已在裁剪层之外绘制，可超出地块显示）
@@ -1473,6 +1525,8 @@
               ppCtx.fillText((zi+1)+'区',pLabelX,pLabelY);
               ppCtx.font='11px sans-serif';
               ppCtx.fillText('实际 '+_mu.toFixed(1)+' 亩',pLabelX,pLabelY+16);
+              /* [v653] 实切口径：该区按实切面积的建议主管档（与多地块页琥珀点同色） */
+              if(__pick){ ppCtx.fillStyle='#7c2d12'; ppCtx.font='11px sans-serif'; ppCtx.fillText('主管 Ø'+__pick.main.od,pLabelX,pLabelY+31); }
             }else{
               ppCtx.font='8px sans-serif';
               ppCtx.fillText((zi+1)+'区 实际'+_mu.toFixed(1)+'亩',pLabelX,pLabelY);
@@ -1490,6 +1544,8 @@
               ppCtx.fillText(zoneSizeText,labelX,labelY+16);
               ppCtx.font='10px sans-serif';
               ppCtx.fillText(zoneAreaText,labelX,labelY+31);
+              /* [v653] 实切口径：该区按实切面积的建议主管/支管档 */
+              if(__pick&&ah>64){ ppCtx.fillStyle='#7c2d12'; ppCtx.font='11px sans-serif'; ppCtx.fillText('主管 Ø'+__pick.main.od+' · 支管 Ø'+__pick.branch.od,labelX,labelY+46); }
             }else if(ah>70){
               ppCtx.save();
               ppCtx.translate(x+w/2,y+h/2);
@@ -1507,6 +1563,15 @@
         }
       }
     }
+    /* [v653] 发布逐区实切面积：签名去重后再回调 calcPlan（实切模式的结果栏/明细吃这份） */
+    try{
+      var __sig=JSON.stringify(__act);
+      if(__sig!==window.__ppZoneActualsSig){
+        window.__ppZoneActualsSig=__sig;
+        window.__ppZoneActuals=__act;
+        if(__calActual&&typeof window.calcPlan==='function')window.calcPlan();
+      }
+    }catch(ePub){}
     ppCtx.textBaseline='alphabetic';
     ppCtx.save();
     ppCtx.strokeStyle='rgba(15,23,42,.38)';
@@ -1578,6 +1643,33 @@
     }
 
     var b=ppGetBounds();
+
+    /* [v652c] 逐块态冻结邻块：灰显底图画在当前块之下——看得见、摸不着，
+       编辑时也能看到本块在整组里的位置关系（用户原话见 ppGetFrozenSubRings 注）。 */
+    var frozen=ppGetFrozenSubRings();
+    if(frozen){
+      frozen.forEach(function(r){
+        ppCtx.beginPath();
+        r.poly.forEach(function(p,i2){
+          var c=ppToCanvas(p.x,p.y);
+          if(i2===0)ppCtx.moveTo(c.x,c.y);else ppCtx.lineTo(c.x,c.y);
+        });
+        ppCtx.closePath();
+        ppCtx.fillStyle='rgba(100,116,139,.10)';ppCtx.fill();
+        ppCtx.strokeStyle='rgba(71,85,105,.42)';ppCtx.lineWidth=1.5;
+        ppCtx.setLineDash([6,4]);ppCtx.stroke();ppCtx.setLineDash([]);
+        /* 块名标在环的外接框中心，屏幕字号固定 11px（不随缩放变大变小） */
+        var nX=Infinity,nY=Infinity,xX=-Infinity,xY=-Infinity;
+        r.poly.forEach(function(p){
+          if(p.x<nX)nX=p.x;if(p.x>xX)xX=p.x;if(p.y<nY)nY=p.y;if(p.y>xY)xY=p.y;
+        });
+        var cp=ppToCanvas((nX+xX)/2,(nY+xY)/2);
+        ppCtx.fillStyle='rgba(71,85,105,.78)';ppCtx.font='11px sans-serif';
+        ppCtx.textAlign='center';ppCtx.textBaseline='middle';
+        ppCtx.fillText(r.name,cp.x,cp.y);
+        ppCtx.textAlign='start';ppCtx.textBaseline='alphabetic';
+      });
+    }
 
     // Polygon fill
     ppCtx.fillStyle='rgba(26,71,49,.06)';
@@ -2721,7 +2813,15 @@
     }
     function syncProxy(offNow){
       ensureProxy();
-      var vis=(offNow && getComputedStyle(btn).display!=='none');
+      /* [v649 2026-10-21] 必须同时满足「本页是当前功能区」。
+         原来只判 getComputedStyle(btn).display!=='none' —— display 不会从
+         display:none 的祖先继承，所以切到三级 / 多地块页时，二级那个把手
+         在计算样式里仍是 flex，代理「工具栏」竖标签就跟着留在**别的页面**的
+         视口右缘（用户看到多地块页右边凭空多出一条竖排「工具栏」）。
+         ⇒ 追加 ry-active 判定，切页即隐藏。 */
+      var ownSec=document.getElementById('pipePlanSection');
+      var onOwn=!!(ownSec && ownSec.classList.contains('ry-active'));
+      var vis=(offNow && onOwn && getComputedStyle(btn).display!=='none');
       proxy.style.display=vis?'flex':'none';
       proxy.setAttribute('title',offNow?'展开工具栏':'收起工具栏（靠右折叠）');
       btn.style.visibility=vis?'hidden':'';
@@ -2933,8 +3033,8 @@
   function ppUpdateLockAreaBtn(){
     var btn=document.getElementById('ppLockArea');
     if(!btn)return;
-    if(ppState.areaLocked){ btn.textContent='🔒 已锁定面积'; btn.classList.add('active'); }
-    else { btn.textContent='🔓 锁定面积'; btn.classList.remove('active'); }
+    if(ppState.areaLocked){ btn.textContent='已锁定面积'; btn.classList.add('active'); }
+    else { btn.textContent='锁定面积'; btn.classList.remove('active'); }
   }
   function ppUnlockArea(){
     if(ppState.areaLocked){ ppState.areaLocked=false; ppUpdateLockAreaBtn(); }

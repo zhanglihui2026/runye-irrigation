@@ -388,7 +388,18 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-si
    ⚠ 全站两条全局 !important 仍会压本段，别在段内加回去：
      runye-typography.css → input/select/button 字号 13px !important（故 input 字号仍写 !important）
      style-01.css → body *{border-radius:0!important} 全站圆角压平。 */
-.ry-props .ry-props-head{
+/* [v651 拍平] .gr-card-title 并入同一条规则：多地块面板的卡标题就是「灰分组条」，
+   与二级 .ry-props-head 同源 —— 将来改风格只动这一条，二级/三级/多地块一起变。
+   （多地块卡标题是 .gr-card 的首子元素，:first-child 去顶线的规则同样适用，
+    卡自身有 1px 外框，不会出现双线。）
+   [v651 排查补收] .tl-flat-head（三级「管径调整·扬程确认 / 管段长度与水头损失」
+   两块信息卡的灰条标题，style-01 旧词条是同值拷贝）一并收编 —— 此前改一句灰条
+   只能变二级+多地块、变不了三级，正是要拍平的「树」。本条成为四个面板灰条的
+   唯一出处。 */
+.ry-props .ry-props-head,
+.ry-props .gr-card-title,
+#tlPipePlanSection .pp-side .tl-flat-head,
+#ryCadSide [data-pp="tlPipePlanSection"] .pp-side .tl-flat-head{
   display:block;height:22px;line-height:22px;
   padding:0 10px;box-sizing:border-box;
   background:#dcdfdd;color:#2c2c2a;
@@ -396,7 +407,8 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-si
   border-top:1px solid #cfd4d1;border-bottom:1px solid #cfd4d1;
   user-select:none;
 }
-.ry-props .ry-props-head:first-child{border-top:0}
+.ry-props .ry-props-head:first-child,
+.ry-props .gr-card-title:first-child{border-top:0}
 /* 计算结果那条：伪元素标题（content 由 style-01.css 的 pp-res-head 段给，这里只管皮肤） */
 .ry-props .pp-plan-bar-result.pp-res-head::before{
   display:block;height:22px;line-height:22px;
@@ -426,7 +438,14 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-to
    （暗色横条 + 旧浅色竖排卡片，含 input 64px!important 对抗源）已整体删除，
    本块成为该页参数栏唯一样式来源，故撤除全部对抗性 !important；
    无前缀全局 .pp-plan-bar（成组页/土地流转页基础样式）特异性 (0,1,0) 低于本块，无竞争。 —— */
-:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-bar{
+/* [v652 拍平] 作用域扩进多地块：#grBar（成组地块/子地块/总面积）用的就是
+   .pp-plan-bar/.pp-plan-item/.pp-plan-label/.pp-plan-val 这几个类名，
+   但本段原来只写 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"])，
+   多地块吃不到 ⇒ 数值行按 style-01 基础规则渲染成 14px/600 大字、无网格线。
+   现把 #grPipeSection 与 #ryCadSide [data-pp="grPipeSection"]（搬移态）加进
+   同一批 :is() 列表 —— 与三级 v611 同一手法，仍是「一条规则、多个面板」，非值拷贝。 */
+:is(#pipePlanSection,#grPipeSection,
+    #ryCadSide [data-pp="pipePlanSection"],#ryCadSide [data-pp="grPipeSection"]) .pp-side .pp-plan-bar{
   display:block;margin:0;padding:0;
   min-height:0;
   border:0;border-radius:0;box-shadow:none;
@@ -445,21 +464,25 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-to
    层次改由「灰分组标题条 + 行分隔线」表达，#tlPlanBar 的「地块与灌溉参数」标题必须显示出来，
    否则上半块（联合灌溉/面积成组）与下半块（水力计算结果）之间没有任何分界。
    二级仍保留本条 —— 二级的参数行是 v609 统一网格，不需要旧 ::before 标题。 */
-:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-bar:not(.pp-res-head)::before,
-:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-bar-result:not(.pp-res-head)::before{
+:is(#pipePlanSection,#grPipeSection,
+    #ryCadSide [data-pp="pipePlanSection"],#ryCadSide [data-pp="grPipeSection"]) .pp-side .pp-plan-bar:not(.pp-res-head)::before,
+:is(#pipePlanSection,#grPipeSection,
+    #ryCadSide [data-pp="pipePlanSection"],#ryCadSide [data-pp="grPipeSection"]) .pp-side .pp-plan-bar-result:not(.pp-res-head)::before{
   content:none!important;
   display:none!important;
 }
 /* [试验层 6] 参数组不再各自呈卡片；必须放在基础皮肤之后才能生效。 */
 /* —— 键值行：[v609] CAD 特性面板式 —— 标签左（固定 46% 列 + 右缘竖线）、值右对齐、22px 行距 —— */
-:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-item{
+:is(#pipePlanSection,#grPipeSection,
+    #ryCadSide [data-pp="pipePlanSection"],#ryCadSide [data-pp="grPipeSection"]) .pp-side .pp-plan-item{
   display:flex;align-items:center;gap:6px;
   width:100%;min-height:22px;padding:0 10px;box-sizing:border-box;
   border-bottom:1px solid #e8ecea;
   color:var(--ry-s-500,#64748b);font-size:11px;
 }
 /* [v609] 原「最后一行去底边」已删：特性面板每行都要网格线，末行由分组条收口。 */
-:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-item > .pp-plan-label:first-child{
+:is(#pipePlanSection,#grPipeSection,
+    #ryCadSide [data-pp="pipePlanSection"],#ryCadSide [data-pp="grPipeSection"]) .pp-side .pp-plan-item > .pp-plan-label:first-child{
   flex:0 0 46%;margin-right:0;min-width:0;padding-right:6px;
   border-right:1px solid #e8ecea;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
@@ -473,8 +496,10 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-to
    控件（input/select/button）必须带 !important —— runye-typography.css 的
    `input/select/button{font-size:var(--ry-fs-body)!important}`(13px) 会压过来（v534 同款处理）。
    本例外的只有黑底计算式条 #ppCalcDetail（结果展示，保留 10~11.5px 层次）。 */
-:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-label{ font-size:11px;line-height:1.3;color:var(--ry-s-600,#475569); }
-:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-val{
+:is(#pipePlanSection,#grPipeSection,
+    #ryCadSide [data-pp="pipePlanSection"],#ryCadSide [data-pp="grPipeSection"]) .pp-side .pp-plan-label{ font-size:11px;line-height:1.3;color:var(--ry-s-600,#475569); }
+:is(#pipePlanSection,#grPipeSection,
+    #ryCadSide [data-pp="pipePlanSection"],#ryCadSide [data-pp="grPipeSection"]) .pp-side .pp-plan-val{
   font-size:11px;font-weight:400;color:var(--ry-s-800,#1e293b);   /* [v609] 600→400：用户 2026-10-20「4.44 那个数值不用加粗」，层级改由字色承担 */
   font-variant-numeric:tabular-nums;
   /* [v609h] margin-right 6：与输入行同步左移，两列才不会错开。 */
@@ -567,6 +592,21 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-to
 }
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-btn-danger:hover{
   border-color:var(--ry-danger,#dc2626);color:#dc2626;background:#fef2f2;
+}
+/* [v653b] 「管径口径」切换钮（#ppCaliberModeBtn）：皮肤 = .pp-recipe-btn 同款（HTML 只换类），
+   这里只补两件它没有的——贴右对齐（与输入行的 margin-left:auto 同列）+ 选中态
+   （实心深绿白字 = 全站 button.active 口径，hover 只变底色）。键在 id：这颗钮全站仅一枚。 */
+:is(#pipePlanSection,
+    #ryCadSide [data-pp="pipePlanSection"]) .pp-side #ppCaliberModeBtn{
+  margin-left:auto;
+}
+:is(#pipePlanSection,
+    #ryCadSide [data-pp="pipePlanSection"]) .pp-side #ppCaliberModeBtn.active{
+  border-color:#2d604b;background:#2d604b;color:#fff;
+}
+:is(#pipePlanSection,
+    #ryCadSide [data-pp="pipePlanSection"]) .pp-side #ppCaliberModeBtn.active:hover{
+  background:#244f3e;
 }
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-status{
   display:block;min-height:14px;padding:0 12px;

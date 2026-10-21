@@ -199,14 +199,21 @@
     /* 清除此前由缓存旧脚本插入的三级参数条入口，地形现在只从同级折叠分组打开。 */
     var legacyTlBar = doc.getElementById('tlPlanBar');
     if (legacyTlBar) legacyTlBar.querySelectorAll('[data-terrain-open]').forEach(function (button) { button.remove(); });
-    ['fld_dh', 'tl_dh', 'grBlockCard', 'settingsForm'].forEach(function (id) {
+    /* [v650 2026-10-21 用户指令] 成组页（#grPipeSection）的「地形高程」快捷按钮撤掉：
+       用户原话「地形高程控制按钮，在上一层工具栏有了，这里就没有必要再出现了」——
+       v649 起多地块页左栏已并入全局工具栏，#ryCadGrpTerrain 分组就在同一个栏里，
+       再插一枚绿色大按钮就是重复入口。
+       兼容：老用户页面上可能还残留这枚按钮（旧脚本注入后存档在 localStorage 场景，
+       或 SW 缓存了旧 js），init 时按 data-terrain-open 标记一律拔掉。 */
+    (function purgeGrTerrainBtn() {
+      var side = doc.getElementById('grSide');
+      if (side) side.querySelectorAll('[data-terrain-open]').forEach(function (button) { button.remove(); });
+    })();
+    ['fld_dh', 'tl_dh', 'settingsForm'].forEach(function (id) {
       var host = doc.getElementById(id); if (!host) return;
       var b = doc.createElement('button'); b.type = 'button'; b.className = 'rt-open'; b.dataset.terrainOpen = ''; b.setAttribute('aria-expanded', 'false'); b.onclick = function () { toggle(b); };
-      if (id === 'grBlockCard') { var side = host.closest('.pp-side'); var top = doc.getElementById('grTrunkCard');
-        /* [v245c] 用户要求：成组页「地形高程」放左栏最顶（成组地块条之后、总管卡之前） */
-        if (side && top && top.parentElement === side) side.insertBefore(b, top); else host.prepend(b); }
       /* [v437] 原 planDh 分支（二级页按钮行）随 planBtnRow 机制一并移除 */
-      else if (id === 'fld_dh' || id === 'tl_dh') host.closest('.field').insertAdjacentElement('afterend', b);
+      if (id === 'fld_dh' || id === 'tl_dh') host.closest('.field').insertAdjacentElement('afterend', b);
       else host.insertAdjacentElement('afterend', b);
     });
     doc.addEventListener('change', function (e) { if (!panel.contains(e.target)) refresh(); });

@@ -13,6 +13,11 @@ const pagePath = path.join(root, 'index.html');
 const targetId = 'ryCadTwinCss';
 const excludedStyleIds = new Set(['ryCadTwinCss', 'ryCadCss', 'plotLibStyle']);
 const sections = ['pipePlanSection', 'tlPipePlanSection'];
+/* [v649] grPipeSection（多地块规划页）的孪生样式**没有**交给本脚本生成：
+   本块当年被手工剔除过一批规则（现存块里成片空行即为其遗迹），直接重跑会把
+   那批被剔掉的规则全部复活。多地块页只需一小撮孪生，写在 mod/style-01.css 的
+   §6b 尾部（#ryCadSide [data-pp="grPipeSection"] …），按需增删、不牵动本块。
+   将来若要把本块整体重建成「纯生成物」，再把 'grPipeSection' 加回本数组。 */
 const replacements = Object.fromEntries(sections.map((id) => [
   `#${id}`, `#ryCadSide [data-pp="${id}"]`,
 ]));

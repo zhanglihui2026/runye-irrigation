@@ -158,17 +158,35 @@
     }
     return l[Math.floor(l.length / 2)] || null;
   }
+  /* [v652b] 画布标签防重叠三件套：量宽 / 画白底牌（返回占位盒）/ 盒相交判定。
+     原先只有 grLabel 一个函数、位置写死；琥珀 Ø 主径标签是裸 fillText
+     （字直接叠在管线上），驳接点白底牌固定上移 14px 不讲余地 —— 块驳接点
+     常与某分区驳接点重合（链端=该分区主管端），牌子正好盖住对方的 Ø 标签，
+     用户截图两处箭头即此。现：先画的标签登记占位盒，后画的在候选位里
+     挑第一个不相交的。 */
+  function grLabelW(text) { ctx.font = '10px sans-serif'; return ctx.measureText(text).width + 6; }
+  function grLabelDraw(text, cx, cy, color) {
+    var w = grLabelW(text);
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    ctx.fillRect(cx - w / 2, cy - 7, w, 14);
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, cx, cy);
+    ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+    return { x: cx - w / 2, y: cy - 7, w: w, h: 14 };
+  }
+  function grHits(boxes, b) {
+    for (var i = 0; i < boxes.length; i++) {
+      var o = boxes[i];
+      if (b.x < o.x + o.w && b.x + b.w > o.x && b.y < o.y + o.h && b.y + b.h > o.y) return true;
+    }
+    return false;
+  }
+  /* 旧接口保留（三级导入层管径标签 / 水源标签仍在用）：世界坐标 → 白底牌居中画 */
   function grLabel(text, wp, color) {
     if (!wp) return;
     var q = toC(wp.x, wp.y);
-    ctx.font = '10px sans-serif';
-    var w = ctx.measureText(text).width + 6;
-    ctx.fillStyle = 'rgba(255,255,255,.85)';
-    ctx.fillRect(q.x - w / 2, q.y - 7, w, 14);
-    ctx.fillStyle = color;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(text, q.x, q.y);
-    ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+    grLabelDraw(text, q.x, q.y, color);
   }
 
   function curBlock() {
@@ -930,7 +948,10 @@
   }
   function drawTakeoffs() {
     if (!W.hyd) return;
-    /* 各分区主管端：小琥珀点 + Ø主径 标签（管径见左侧明细表） */
+    var boxes = [];   /* [v652b] 已放标签的屏幕占位盒，后来的标签避让 */
+    /* 各分区主管端：小琥珀点 + Ø主径 标签（管径见左侧明细表）
+       [v652b] 标签改白底小牌：原裸 fillText 的管径字直接叠在管线上；
+       位置不变（点右上），并登记占位盒供驳接点牌避让。 */
     W.hyd.blocks.forEach(function (b) {
       b.zones.forEach(function (z) {
         if (!z.tp) return;
@@ -938,8 +959,9 @@
         ctx.beginPath(); ctx.arc(q.x, q.y, 4.5, 0, Math.PI * 2);
         ctx.fillStyle = '#f59e0b'; ctx.fill();
         ctx.lineWidth = 1.5; ctx.strokeStyle = '#7c2d12'; ctx.stroke();
-        ctx.font = '9px sans-serif'; ctx.fillStyle = '#7c2d12'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
-        ctx.fillText('Ø' + z.mainDn, q.x + 6, q.y - 4);
+        var txt = 'Ø' + z.mainDn;
+        var w = grLabelW(txt);
+        boxes.push(grLabelDraw(txt, q.x + 6 + w / 2, q.y - 9, '#7c2d12'));
       });
     });
     /* [v233] 各块总管：示意链（深红虚线）+ 水源点（大红点 = 本块驳接点） */
@@ -954,8 +976,24 @@
       ctx.beginPath(); ctx.arc(q.x, q.y, 6.5, 0, Math.PI * 2);
       ctx.fillStyle = '#dc2626'; ctx.fill();
       ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
-      /* v238：标签上移 14px（屏幕像素）—— 原来的白底牌正压在红点上，点看不见也抓不准 */
-      grLabel('\u00d8' + b.trunkDn + ' 驳接点', { x: b.src.x, y: b.src.y - 14 / (view.scale || 1) }, '#b91c1c');
+      /* [v238] 原来固定上移 14px——白底牌不再正压红点，但块驳接点常与分区
+         驳接点重合，牌子会盖住对方的 Ø 主径标签（v652b 用户截图两处箭头）。
+         [v652b] 改四候选位 上→下→右→左，挑第一个不与已放标签相交的；
+         全占时退回上方（v238 原位兜底）。 */
+      var txt = 'Ø' + b.trunkDn + ' 驳接点';
+      var hw = grLabelW(txt) / 2;
+      var cands = [
+        { x: q.x, y: q.y - 16 },
+        { x: q.x, y: q.y + 16 },
+        { x: q.x + hw + 12, y: q.y },
+        { x: q.x - hw - 12, y: q.y }
+      ];
+      var pick = cands[0];
+      for (var ci = 0; ci < cands.length; ci++) {
+        var box = { x: cands[ci].x - hw - 1, y: cands[ci].y - 8, w: hw * 2 + 2, h: 16 };
+        if (!grHits(boxes, box)) { pick = cands[ci]; break; }
+      }
+      boxes.push(grLabelDraw(txt, pick.x, pick.y, '#b91c1c'));
     });
   }
 
