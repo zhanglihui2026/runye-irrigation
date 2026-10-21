@@ -4192,3 +4192,20 @@ ry-cad-toolbar.js` 三个 `?v=649-gr-toolbar`、`plugin-admin.html` 角标 `界�
 - 验证：`_probe_zone_calibers_v653.cjs` 10 条全 PASS（截图确认按钮与面板行同语言）；全套 `scripts/check.cjs` 通过。
 **版本**：`sw.js VERSION = 'v653b-caliber-btn'`；仅 `ry-panel.css` → `?v=653b-caliber-btn`；角标 `界面 v653b`。
 **状态**：本地未提交未发布（v647~v653b 攒着，等「发布」一并推）。
+
+### 26.54 v653b 发布结果：v647~v653b 十版合并上线（2026-10-21）
+
+**提交**：`e033191`（v653b-caliber-btn: v647~v653b 十版合并）——17 个文件、+1613/−109，`43aa2e9..e033191 master -> master` 直推成功（未走 _pub_api.py 备选）。
+
+**入库范围**：13 个产品文件（index.html / sw.js / plugin-admin.html / ry-panel.css / style-01.css / inline-09 / inline-11 / inline-19 / inline-29 / plot-editor / ry-cad-toolbar / runye-terrain / AGENT_HANDOFF）+ 3 个脚本（gate.cjs / refresh-cad-twin-css.cjs）+ 2 个新工具入库（scripts/simplify-equivalence.cjs、scripts/equivalence-compare.cjs——被 gate.cjs equiv 阶段引用，此前一直是未跟踪状态，这次随 gate 引用一并入库）。未跟踪杂物 4 件（2026-10-19.md、_float_behavior.json、v599_二级右栏皮肤对比.png、设备块库_实施方案.md）未入库，待用户处置。
+
+**发布前门禁**：全套 `scripts/check.cjs` 通过（静态 29 项、36 单测文件、水力/WASM 等价、地块拼接契约）。
+
+**线上核验（新脚本 `_p1/_live_smoke_v653b.cjs`，18 条全 PASS）**：
+- A 版本口径：线上 performance 资源条目五件套全部带本次 ?v=（style-01/inline-29=652b-label-collision、ry-panel=653b-caliber-btn、inline-09/inline-11/plot-editor=653-zone-calibers）；`sw.js VERSION='v653b-caliber-btn'`、角标「界面 v653b」。
+- B 二级页口径按钮：存在、皮肤 `.pp-recipe-btn`（无 pp-btn-ghost 残留）、默认文案「口径：设计值」。
+- C/D/E 合成 L 形地块（5 分区）：设计值出 Ø160 → 切实切后 `__ppZoneActuals` 发布 5 区、明细表 5 行含 Ø（18 亩区 Ø160/Ø110、10.8 亩区 Ø125/Ø90 自动变细）、按钮文案翻转「口径：实切面积」→ 切回明细隐藏。
+- F 单源函数 `window.ryZonePipePick` 可用（合成输入返回 200/140）；#grPipeSection 多地块页区块在线上存在。
+- 线上截图 `_probe_out/v653b_live.jpg`。
+
+**状态**：v647~v653b 已全部上线闭环。下一版从 v654 起算。
