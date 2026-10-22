@@ -558,6 +558,28 @@
   function ppCaptureSlot(){
     var s={};
     PP_SLOT_KEYS.forEach(function(k){ s[k]=ppCloneJSON(ppState[k]); });
+    /* [v660 用户实测「主管支管应该被地块裁切，现在还不行」] 成组态下任何 ppState→slot
+       的存档路径（切块 / 返回成组 / grSync 实时快照）都按本块环裁剪管线——保证块档案
+       里的管不出环。跨块段的「分配到邻块」走「生成施工图」的全量裁剪分发；这里只负责
+       「本块不收出环管」。非成组（单地块自由画）不受限。 */
+    try{
+      var geC=window.__runyeGroupEdit;
+      if(geC&&geC.active&&window.__runyeSubPlots&&window.__runyeSubPlots.length>=2){
+        var ringC=(s.polyPts&&s.polyPts.length>=3)?s.polyPts:null;
+        if(!ringC&&geC.slots&&geC.slots[geC.current]&&geC.slots[geC.current].polyPts&&geC.slots[geC.current].polyPts.length>=3){
+          ringC=geC.slots[geC.current].polyPts;
+        }
+        if(ringC){
+          ['mainPipes','branchPipes','subBranchPipes'].forEach(function(k){
+            var out=[];
+            (s[k]||[]).forEach(function(line){
+              ppClipPolylineToRing(line,ringC).forEach(function(seg){ out.push(seg); });
+            });
+            s[k]=out;
+          });
+        }
+      }
+    }catch(eCap){ }
     return s;
   }
   function ppApplySlot(s){
@@ -574,6 +596,14 @@
     ['polyPts','mainPipes','branchPipes','subBranchPipes','valves'].forEach(function(k){
       if(ppState[k]==null) ppState[k]=[];
     });
+    /* [v657] 对象/标量型字段同样兜底 —— v657 探针实测：最小 slot（{}）经上面数组兜底后
+       hiddenPipes 仍是 null，ppPushHistory→ppCloneState 读 .main 直接 TypeError
+       （「Cannot read properties of null (reading 'main')」）。真实流程字段齐全不触发，
+       但老存档/外部合成 slot 走到就会崩，这里按 ppBlankSlot 语义一次补齐。 */
+    if(ppState.hiddenPipes==null) ppState.hiddenPipes={main:{},branch:{},subbranch:{}};
+    if(ppState.pipeIds==null) ppState.pipeIds={main:[],branch:[],subbranch:[]};
+    if(!ppState.nextPipeId) ppState.nextPipeId=1;
+    if(ppState.cutOverrides==null) ppState.cutOverrides={x:{},y:{}};
   }
   function ppBlankSlot(polyPts){
     return {
@@ -2565,13 +2595,21 @@
         alert('「智能规划」为会员功能 · 邀请好友即可开通'); return;
       }
       try{localStorage.setItem('runye_ai_plan_v1',JSON.stringify({mode:'request',at:Date.now(),params:snapshot()}));}catch(e){}
-      /* [v327] 跳转前静默存档全量方案 + 写一次性锚：返回本页时恢复（页内手画/图片测量边界无地块库锚，v161 自动恢复不覆盖） */
-      try{if(typeof window.runyeSaveProject==='function')window.runyeSaveProject(true);}catch(e){}
-      try{localStorage.setItem('runye_aiplot_anchor_v1',JSON.stringify({at:Date.now()}));}catch(e){}
+      /* [v327 / N03] 全量方案写入一次性交接槽，并把不可猜的 ID 放进智能规划页 URL。
+         SAVE_KEY 是跨标签共享的最近存档；AI 往返必须绑定发起它的这一份快照，不能让
+         另一个标签页先写入的地块覆盖当前请求。旧 runye_aiplot_anchor_v1 仅供旧链接恢复。 */
+      var handoffId=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,14);
+      var handoffKey='runye_ai_plot_handoff_v1:'+handoffId;
+      try{
+        if(typeof window.runyeSaveProject!=='function')throw new Error('save unavailable');
+        window.runyeSaveProject(true,handoffKey);
+        if(!localStorage.getItem(handoffKey))throw new Error('handoff snapshot missing');
+      }catch(eSave){alert('当前方案未能安全保存，AI 规划暂未打开，请检查本地存储空间后重试。');return;}
       /* [v331b 2026-10-09 用户要求] AI规划同样走独立窗口（旧对话页已被智能规划工作台替代重定向）：
          主窗口原地不动、地块分区手动规划不受影响；弹窗内 v327 锚自动恢复当前边界。 */
-      var _smartWin=window.open('index.html?smart=1#pipePlanSection','runye_smart','width=1180,height=860');
-      if(!_smartWin)location.href='index.html?smart=1#pipePlanSection';
+      var smartUrl='index.html?smart=1&handoffId='+encodeURIComponent(handoffId)+'#pipePlanSection';
+      var _smartWin=window.open(smartUrl,'runye_smart','width=1180,height=860');
+      if(!_smartWin)location.href=smartUrl;
     });
     function applyPlan(plan){
       function set(id,v){var el=document.getElementById(id);
@@ -3974,7 +4012,109 @@
      且便于验收脚本拦截计数。 */
   window.ppRefreshTLAfterCuts=ppRefreshTLAfterCuts;
 
+  /* ===== [v659 2026-10-21 用户拍板] 管线按地块边界裁剪 =====
+     用户原话：「总管跟支管应该是被地块裁切过的，这个要改过来」——v657 分发是整段
+     分配（中点归块/当前块全收），横跨两块的管会整根塞进一个块，图上压过邻块与空隙。
+     ⇒ 分发改「裁剪口径」：每根管线与各块环求交，在边界处断开成子段，
+       环内子段归该块、环外（空隙/越界）部分丢弃。块内生成的管裁剪后原样保留。
+     ppClipPolylineToRing：折线 × 环 → 环内子段数组。逐线段收集与环边的交点参数 t，
+     排序切成子段，子段中点用 atPointInPolygon 判内；连续环内子段首尾拼接成一根。
+     挂 window 供探针与组页复用。 */
+  function ppSegXt(a,b,c,d){
+    var den=(b.x-a.x)*(d.y-c.y)-(b.y-a.y)*(d.x-c.x);
+    if(Math.abs(den)<1e-12)return null;
+    var t=((c.x-a.x)*(d.y-c.y)-(c.y-a.y)*(d.x-c.x))/den;
+    var u=((c.x-a.x)*(b.y-a.y)-(c.y-a.y)*(b.x-a.x))/den;
+    if(t<0||t>1||u<0||u>1)return null;
+    return t;
+  }
+  function ppClipPolylineToRing(line,ring){
+    var out=[];
+    if(!line||line.length<2||!ring||ring.length<3)return out;
+    var fnIn=window.atPointInPolygon||atPointInPolygon;
+    var cur=null;   /* 正在拼接的环内折线 */
+    var lastPt=null;
+    function lerp(p,q,t){ return {x:p.x+(q.x-p.x)*t, y:p.y+(q.y-p.y)*t}; }
+    for(var i=0;i+1<line.length;i++){
+      var a=line[i], b=line[i+1];
+      var ts=[0,1];
+      for(var j=0;j<ring.length;j++){
+        var t=ppSegXt(a,b,ring[j],ring[(j+1)%ring.length]);
+        if(t!=null&&t>1e-9&&t<1-1e-9)ts.push(t);
+      }
+      ts.sort(function(x,y){return x-y;});
+      for(var k=0;k+1<ts.length;k++){
+        if(ts[k+1]-ts[k]<1e-9)continue;
+        var p0=lerp(a,b,ts[k]), p1=lerp(a,b,ts[k+1]);
+        var mid=lerp(a,b,(ts[k]+ts[k+1])/2);
+        if(!fnIn(mid,ring)){ if(cur&&cur.length>=2)out.push(cur); cur=null; lastPt=null; continue; }
+        if(cur&&lastPt&&Math.abs(lastPt.x-p0.x)<1e-6&&Math.abs(lastPt.y-p0.y)<1e-6){
+          cur.push(p1);
+        }else{
+          if(cur&&cur.length>=2)out.push(cur);
+          cur=[p0,p1];
+        }
+        lastPt=p1;
+      }
+    }
+    if(cur&&cur.length>=2)out.push(cur);
+    return out;
+  }
+  window.ppClipPolylineToRing=ppClipPolylineToRing;
+
   document.getElementById('ppGenerate').addEventListener('click',function(){
+    /* [v656 2026-10-21 用户拍板] 成组态智能分流：多地块点「生成施工图」不进三级，
+       直接回「多地块规划页」——用户流程是「在二级逐块把管路生成好、检查没问题，
+       再传递给多地块规划页手绘总管」。出口复用 grBackFromPlotEdit（与「◀ 返回成组
+       管路」同一正规路径：存档当前块 → 清标记 → 切页 → grSync 重算组态），零新数据
+       通道；整组态（只读合并视图，无可存档）直接 grShowGroupPage 切页。
+       单地块（未成组）不进此分支，行为与 v104 完全一致。 */
+    var geJump=window.__runyeGroupEdit;
+    if(geJump&&geJump.active&&window.__runyeSubPlots&&window.__runyeSubPlots.length>=2){
+      /* [v657 2026-10-21 用户实测反馈] 跳转前把二级成果「按块分发」进各块 slot：
+         用户在二级（可能整组外框口径）生成好主管/支管，跳组页后各块档案还是空的
+         （材料 0.0m、图上无管）——因为块级管路的真身在 slots，ppState 不自动分发。
+         分发规则：管段中点落在哪块环内就归哪块（管段生成时本就按分区裁剪在块内，
+         不会跨块）；都不在时归质心最近的块。只在本组所有块都还没有管路时分发，
+         防重复点击管段翻倍。分发后若处于逐块态，把当前块实时快照同步成分发结果
+         ——否则 grSync 的 groupLiveSlot 覆盖会让当前块拿到未分发的整组管。
+         分区线仍由组页按块口径显示（方案一，用户拍板「按块分发」）。 */
+      try{
+        if((ppState.mainPipes&&ppState.mainPipes.length)||(ppState.branchPipes&&ppState.branchPipes.length)){
+          /* [v660 用户实测修正] 分发=「全量裁剪分配 + 分配非空才覆盖」：
+             - v659 的「slots 全空才分发」在真实会话里失效——用户反复测试后 slots 已有
+               旧横跨管（v657 整段分配遗留），重传被跳过、旧错数据永不修正（用户截图复现）。
+             - 现口径：只要二级 ppState 有管，就对每块环做全量裁剪；某块**裁剪结果非空**
+               才覆盖该块（修正旧数据），裁剪为空则保留该块原管（不毁三级页逐块精修）。
+             - 裁剪分配天然幂等：重复点击「生成施工图」不会翻倍（每次都是替换式重算）。 */
+          var subRings=window.__runyeSubPlots.map(function(sp){return sp.poly;});
+          var clipTo=function(list,si){
+            var s=geJump.slots[si];
+            var ring=(s&&s.polyPts&&s.polyPts.length>=3)?s.polyPts:subRings[si];
+            var out=[];
+            (list||[]).forEach(function(line){
+              ppClipPolylineToRing(line,ring).forEach(function(seg){ out.push(ppCloneJSON(seg)); });
+            });
+            return out;
+          };
+          geJump.slots.forEach(function(s,si){
+            if(!s)return;
+            var mC=clipTo(ppState.mainPipes,si);
+            var bC=clipTo(ppState.branchPipes,si);
+            var sbC=clipTo(ppState.subBranchPipes,si);
+            if(mC.length||bC.length||sbC.length){
+              s.mainPipes=mC; s.branchPipes=bC; s.subBranchPipes=sbC;
+              if(typeof ppSlotRebuildIds==='function')ppSlotRebuildIds(s);
+            }
+          });
+          if(geJump.mode==='perPlot'&&geJump.slots[geJump.current])ppApplySlot(geJump.slots[geJump.current]);
+        }
+      }catch(eDist){ }
+      var back=false;
+      try{ if(window.__runyeGroupPlotEdit!=null&&typeof window.grBackFromPlotEdit==='function') back=!!window.grBackFromPlotEdit(); }catch(eGr){ }
+      if(!back&&typeof window.grShowGroupPage==='function'){ try{ window.grShowGroupPage(); }catch(eGr2){ } }
+      return;   /* 不跑单地块口径的 tlAutoGenerate / tlShowWorkspace */
+    }
     ppGenerateDiagram({scroll:false});
     // 同步生成三级管线施工简图：默认按当前选择的分区数（首次为2区一总管），调整4/6/8区后再次点击即按新选择重算
     try{

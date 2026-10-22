@@ -35,7 +35,7 @@
     } catch (e) { return { ok: false, id: null }; }
   }
 
-  function writeCurrentPlotAnchor(plotId) {
+  function writeCurrentPlotAnchor(plotId, options) {
     var id = normalizedId(plotId);
     var raw = JSON.stringify({ id: id, ts: Date.now() });
     try {
@@ -43,10 +43,12 @@
     } catch (e) { return false; }
     /* Keep the old shared key as a default for a newly opened tab. Existing
        tabs use their session-scoped anchor, so this write cannot switch them. */
-    try {
-      if (id) root.localStorage.setItem(KEYS.currentPlotAnchor, raw);
-      else root.localStorage.removeItem(KEYS.currentPlotAnchor);
-    } catch (e) { }
+    if (!options || options.sharedDefault !== false) {
+      try {
+        if (id) root.localStorage.setItem(KEYS.currentPlotAnchor, raw);
+        else root.localStorage.removeItem(KEYS.currentPlotAnchor);
+      } catch (e) { }
+    }
     return true;
   }
 

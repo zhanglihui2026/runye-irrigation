@@ -341,7 +341,10 @@ check('④a7 三级图面反投按页面地块读写，避免跨标签活动锚�
   projectionPlotScopeOk ? '' : '反投必须读取页面地块原始快照、显式限定管网owner，并让分区库与管网事务一致');
 
 const projectSessionSource = fs.readFileSync(path.join(ROOT, 'mod/inline-12.js'), 'utf8');
-const projectAnchorWriterMatch = projectSessionSource.match(/function writeCurrentPlotAnchor\(id\)\s*\{([\s\S]*?)\n\s*\}/);
+/* [v662 门禁维护] writeCurrentPlotAnchor 签名扩为 (id, options)（AI 跨标签 handoff 隔离：
+   isolated 恢复时带 {sharedDefault:false}，不再写共享 localStorage 默认槽）——
+   提取正则与调用断言放宽为兼容新旧签名，契约语义不变：标签页锚点只走 sessionStorage 适配器。 */
+const projectAnchorWriterMatch = projectSessionSource.match(/function writeCurrentPlotAnchor\(id(?:,\s*options)?\)\s*\{([\s\S]*?)\n\s*\}/);
 const projectAutoRestoreMatch = projectSessionSource.match(/function ryAutoRestoreProject\(\)\s*\{([\s\S]*?)\n\s*\}\s*\n\s*\/\* \[v327\]/);
 const projectAnchorWriterBody = projectAnchorWriterMatch ? projectAnchorWriterMatch[1] : '';
 const projectAutoRestoreBody = projectAutoRestoreMatch ? projectAutoRestoreMatch[1] : '';
@@ -350,7 +353,7 @@ const tabAnchorOwnershipOk = irrigationStoreSource.includes("currentPlotAnchorBy
   irrigationStoreSource.includes('root.sessionStorage.setItem(KEYS.currentPlotAnchorByTab, raw)') &&
   irrigationStoreSource.includes('readCurrentPlotAnchor: readCurrentPlotAnchor') &&
   projectAnchorWriterBody.includes("typeof store.writeCurrentPlotAnchor!=='function') return false") &&
-  projectAnchorWriterBody.includes('store.writeCurrentPlotAnchor(id)') &&
+  /store\.writeCurrentPlotAnchor\(id[),]/.test(projectAnchorWriterBody) &&
   !projectAnchorWriterBody.includes('localStorage.') &&
   projectAutoRestoreBody.includes("typeof store.readCurrentPlotAnchor!=='function') return") &&
   projectAutoRestoreBody.includes('store.readCurrentPlotAnchor()') &&

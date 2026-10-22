@@ -4,7 +4,7 @@
 <head>
 <script src="mod/inline-01.js?v=446-default-online-map-active"></script>
 <script src="mod/inline-02.js?v=357"></script>
-<script src="core/irrigation-data-store.js?v=570-irrigation-scope-guard"></script>
+<script src="core/irrigation-data-store.js?v=663-ai-handoff"></script>
 <script src="core/terrain-bridge-store.js?v=601-terrain-bridge-isolation"></script>
 <script src="core/sprinkler-bridge-store.js?v=1"></script>
 <script src="core/measured-area-bridge-store.js?v=598-tab-scoped-plot-transfer"></script>
@@ -17,7 +17,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>润野灌溉设计优化版｜滴灌管径与水泵选型</title>
 <meta name="description" content="输入地块、滴灌带与水源参数，快速计算灌溉分区、主管支管管径和水泵工作点。"/>
-<link rel="stylesheet" href="mod/style-01.css?v=652b-label-collision">
+<link rel="stylesheet" href="mod/style-01.css?v=668-const-dn">
 <link rel="stylesheet" href="runye-inverse-design.css?v=277">
 <script defer src="runye-inverse-design.js?v=438-branch-flow-conservation"></script>
 <link rel="stylesheet" href="runye-terrain.css?v=454-terrain-sidebar-peer">
@@ -1013,12 +1013,19 @@ body.ry-worst-off [data-tlworst]{display:none}
         <select id="grTrunkDn" class="gr-sel" title="总管管径（外径 mm）"></select>
         <span class="gr-unit" id="grTrunkMat">—</span>
       </div>
+      <!-- [v654] 大总管流速体检：有水力结果才显示；超出 0.8~2.0 m/s 经济区间给一键建议档 -->
+      <div class="gr-row" id="grTrunkVelRow" style="display:none">
+        <span class="gr-label">流速</span><span class="gr-val" id="grTrunkVel">—</span><span class="gr-unit">m/s</span>
+        <button type="button" class="gr-btn" id="grTrunkVelFix" style="display:none" title="一键切到建议档位">建议</button>
+      </div>
       <div class="gr-row">
         <span class="gr-label">长度</span><span class="gr-val" id="grTrunkLen">0.0</span><span class="gr-unit">m</span>
         <span class="gr-label">根数</span><span class="gr-val" id="grTrunkN">0</span>
       </div>
       <div class="gr-btns">
         <button type="button" class="pp-btn-ghost gr-btn" id="grTrunkDraw" title="进入画总管：在图上点击加点，双击结束，右键退回上一点">✎ 画总管</button>
+        <!-- [v655] 参考线：临时显示系统建议走向（虚线幽灵，仅视觉，不参与计算不出料） -->
+        <button type="button" class="pp-btn-ghost gr-btn" id="grTrunkGhost" title="临时显示系统建议走向（虚线，仅参考，不参与计算与材料）">参考线</button>
         <!-- [v196] 「⚡ 自动生成」撤掉：用户原话「总管我会根据实际情况，手动画」——
              自动连线猜不出水源和走向，生成一版还要删，反而碍事。只留手画。 -->
         <button type="button" class="pp-btn-ghost gr-btn" id="grTrunkDel" title="删除选中的总管（先在图上点选一根）">🗑 删除选中</button>
@@ -1086,6 +1093,16 @@ body.ry-worst-off [data-tlworst]{display:none}
     </div>
     <div class="pp-canvas-wrap" id="grCanvasWrap">
       <canvas id="grCanvas"></canvas>
+      <!-- [v658 2026-10-21 用户要求] 组页「标注显示」勾选框 —— 参考三级页 #tlWsLabelsChk 同款：
+           做图区右上角胶囊勾选框，勾=显示标注（v236 各块尺寸标注线+文字 / v198·v237 管径白底牌），
+           取消=隐藏（图面只剩管线/分区线/驳接点等功能图层，选管道更清爽）。
+           [v667 用户拍板] 默认改为【不勾】（标注没啥用后面需要）：只有存过 '0'（明确勾过显示）才显示。
+           驳接点（琥珀/红点）是功能图层不受此开关影响；状态存 localStorage['gr-labels-off']。 -->
+      <label id="grLabelsChkWrap" for="grLabelsChk" title="勾选=显示图面标注（尺寸标注+管径数字）；取消勾选=隐藏标注，图面更清爽"
+        style="position:absolute;top:8px;right:8px;z-index:40;display:inline-flex;align-items:center;gap:4px;padding:2px 7px;background:rgba(255,255,255,.94);border:1px solid #cbd5e1;border-radius:999px;font-size:11px;font-weight:400;color:#0f172a;cursor:pointer;user-select:none;box-shadow:0 1px 4px rgba(15,23,42,.14)">
+        <input type="checkbox" id="grLabelsChk" style="margin:0;width:12px;height:12px;cursor:pointer;accent-color:#185FA5">
+        <span id="grLabelsChkTxt">标注显示</span>
+      </label>
       <div class="pp-empty" id="grEmpty">
         <div class="big-icon">🧩</div>
         <p>成组地块回传后，这里显示全组总览与总管</p>
@@ -2298,8 +2315,8 @@ body.ry-worst-off [data-tlworst]{display:none}
 <!-- ===== 实际地块规划 JS ===== -->
 <script src="mod/inline-11.js?v=653-zone-calibers"></script>
 <!-- [v420-split] 绘图编辑器 IIFE 自 inline-11 迁出：必须紧随 inline-11 之后同步执行 -->
-<script src="mod/plot-editor.js?v=653-zone-calibers"></script>
-<script src="mod/inline-12.js?v=619-undo-cover"></script>
+<script src="mod/plot-editor.js?v=663-ai-handoff"></script>
+<script src="mod/inline-12.js?v=663-ai-handoff"></script>
 <script src="mod/inline-13.js?v=499-plot-library-store"></script>
 <!-- [v422-head-system-svg] 纯 SVG 核心先于 inline-14 同步加载。 -->
 <script src="mod/head-system-svg.js?v=422-head-system-svg"></script>
@@ -2417,7 +2434,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <input type="file" id="rySetCsvInput" accept=".csv,text/csv" style="display:none">
 <script src="mod/inline-28.js?v=645-dim-scale-entry"></script>
 
-<script src="mod/inline-29.js?v=652b-label-collision"></script>
+<script src="mod/inline-29.js?v=668-const-dn"></script>
 
 <script src="mod/inline-30.js?v=544-float-card-unify"></script>
 <script src="mod/inline-32.js?v=404-tier-gates"></script>

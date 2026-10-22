@@ -2621,8 +2621,16 @@ body > .ry-nav .main-header{display:none!important}
 .gr-sel{height:20px;font:inherit;font-size:11px!important;padding:1px 4px;box-sizing:border-box;border:1px solid transparent;border-radius:0;background:transparent;color:var(--ry-s-800,#1e293b);outline:none}
 .gr-sel:focus{border-color:transparent;box-shadow:none;background:#eef4f1}
 .gr-btns{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
-/* [v652] 20px/0 6px/11px 600 = 三级 v615/v616 与 .pp-recipe-btn 的共享档（原 24px/0 7px） */
-.gr-btn{height:20px!important;padding:0 6px!important;font-size:11px!important;font-weight:600}
+/* [v652] 20px/0 6px/11px 600 = 三级 v615/v616 与 .pp-recipe-btn 的共享档（原 24px/0 7px）
+   [v663] 皮肤补齐：v652 只抄了 .pp-recipe-btn 的尺寸/字重，漏了皮肤（边框/底色/圆角）
+   ⇒ UA 默认 2px outset 立体框漏出（用户「按钮外面还是很粗的线」）。
+   本版补齐为 .pp-recipe-btn（ry-panel.css 570 行）同款：
+   1px #e2e8f0 / 白底 / #334155 / line-height 1；hover 只变底色 #eaf3ed（v617 口径）。
+   圆角不抄——FLAT-BTN-OVERRIDE（1714 段）对全站 button 打 radius:0!important，
+   二级 recipe 按钮实际渲染也是直角，抄了只是死代码。 */
+.gr-btn{height:20px!important;padding:0 6px!important;font-size:11px!important;font-weight:600;
+  border:1px solid var(--ry-s-200,#e2e8f0);background:#fff;color:var(--ry-s-700,#334155);line-height:1;white-space:nowrap;cursor:pointer}
+.gr-btn:hover{background:#eaf3ed}
 /* [v652] 开关态统一实心深绿 #2d604b 白字 —— 二级工具栏 button.active 同款
    （原 rgba(124,58,237) 紫是 gr 自用，全站独一份）。 */
 .gr-btn.active{background:#2d604b!important;border-color:#2d604b!important;color:#fff!important;font-weight:600}
@@ -2645,14 +2653,30 @@ body > .ry-nav .main-header{display:none!important}
 .gr-tag.no{background:rgba(100,116,139,.14);color:#64748b}
 /* 材料汇总表：分隔线统一 #e8ecea（行皮肤同一条线），合计顶线用灰条描边色 #cfd4d1。
    [v652b] 表头「主管 m / 支管 m / 一级管 m」在窄列里折行（「一级 / 管 m」断成两行）：
-   单元格一律 nowrap，列宽交给表格自动布局（压缩「分项」列），不再断词。 */
-.gr-mat table{width:100%;border-collapse:collapse;font-size:11px}
+   单元格一律 nowrap，列宽交给表格自动布局（压缩「分项」列），不再断词。
+   [v666 用户红框] 自动布局会把面板拖宽后的多余宽度按比例分给第一列，
+   「地块名 ↔ 数值」之间的空隙随面板宽度拉伸 —— 表格改 fixed 布局、第一列
+   限定 80px：拖动面板宽度时该间隙恒定，多余宽度全部由四个数值列均摊。
+   列宽由首行（表头）决定，colspan 组行/提示行不影响。 */
+.gr-mat table{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed}
 .gr-mat th,.gr-mat td{padding:2px 4px;text-align:right;border-bottom:1px solid #e8ecea;white-space:nowrap}
+.gr-mat th:first-child,.gr-mat td:first-child{width:80px}
+/* [v661 用户截图「左侧工具栏面板文字大小不一」] 材料表 th/td 被 runye-typography.css
+   全局 `th,td{font-size:var(--ry-fs-body)=13px !important}` 抬高（.gr-hyd-tbl 已对抗、
+   这里漏了）——表内文字比周围 11px 行体系大一圈，面板观感割裂。压回 11px 同一基准；
+   合计 700 / 组行 600 / 表头 600 的字重层级保留（那是刻意的信息层级，不是不统一）。 */
+.gr-mat th,.gr-mat td{font-size:11px!important;line-height:16.5px}
+.gr-mat th{font-weight:600}
 .gr-mat th:first-child,.gr-mat td:first-child{text-align:left}
 .gr-mat .gr-sum td{font-weight:700;border-top:2px solid #cfd4d1;border-bottom:0}
 .gr-mat .gr-grp td{text-align:left;color:#64748b;font-weight:600;background:rgba(31,41,55,.04)}
 /* [v231] 驳接点 / 管径 / 水头损失 卡片 */
 .gr-hyd{margin-top:2px}
+/* [v668] 主管/支管手动调档行（水力面板顶部）：两颗 select 与三级页 tlCalSel 同款交互，
+   设计值±3 档、选回设计值=清覆盖；恒定口径下全组就这两颗档，改档损失/扬程实时重算。 */
+.gr-cal-row{display:flex;gap:12px;align-items:center;padding:3px 0;font-size:11px;color:var(--ry-s-600,#475569)}
+.gr-cal-row label{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.gr-cal-row .gr-sel{width:auto;min-width:64px;background:#fff;border-color:var(--ry-s-200,#e2e8f0)}
 /* [v239] 「驳接点/管径/水头损失」从左侧栏搬到画布右侧的悬浮面板：
    只浮在画布上、可拖动/调宽/折叠；把卡搬进来后去掉卡的边框与背景，避免双层框。
    [v544] 视觉（底色/边框/阴影/字号/标题条/正文内距）统一到 .ry-float-card
@@ -2671,6 +2695,10 @@ body > .ry-nav .main-header{display:none!important}
    button.active、面板 .gr-btn.active 同一个开关态口径（原来 teal 又是 gr 自用档） */
 .gr-btn-on{background:#2d604b!important;border-color:#2d604b!important;color:#fff!important;font-weight:600}
 .gr-btn-on:hover{background:#244f3e!important;color:#fff!important}
+/* [v654] 大总管流速体检色档：经济区间(0.8~2.0 m/s)内绿、超出琥珀警示（与多地块画布
+   琥珀点 #b45309 同色系）。用在两处：#grTrunkVel 流速值 + #grHyd 汇总行状态词。 */
+.gr-vel-ok{color:#2d604b}
+.gr-vel-warn{color:#b45309}
 /* [v548] 数据区并进卡内节奏（v547 口径）：说明档 11px/16.5、组间 6、单元内距 3px 6px、表头 600。
    ⚠ 这里的 !important 不是乱加的：runye-typography.css 对 `p,li,table,input,select,button…`
    与 `th,td` 打了 `font-size:var(--ry-fs-body)=13px !important`（第 131/136 行），
@@ -2724,7 +2752,9 @@ body > .ry-nav .main-header{display:none!important}
 
 
 
-#grPipeSection .pp-btn-ghost:hover{background:#eef4f1;color:#1f2937}
+/* [v663] 原 #grPipeSection .pp-btn-ghost:hover{background:#eef4f1;color:#1f2937} 删除：
+   它无 body.ry-tool 前缀、命中面板内 .gr-btn（.gr-btn 也带 pp-btn-ghost），把面板按钮的
+   hover 拉回旧三连变口径 —— 工具条 hover 移到 3370 段随皮肤统一（只变边框色）。 */
 /* 两段式「清空」的武装态：第一次点后按钮变红，3 秒内再点才真清
    （颜色/边框/字重是允许带 !important 的三类；布局属性不带 —— eng_skin 纪律）
    [v651 拍平] 前缀已去掉，与 .gr-btn-on 同批（键在专属类 = 单源）。 */
@@ -3274,7 +3304,10 @@ body.ry-tool #tlPipePlanSection .pp-plan-bar, body.ry-tool #ryCadSide [data-pp="
   padding:0;font-size:11px;
 }
 body.ry-tool #tlPipePlanSection .pp-plan-bar-result, body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-plan-bar-result{background:transparent}
-body.ry-tool #pipePlanSection .pp-btn-ghost, body.ry-tool #tlPipePlanSection .pp-btn-ghost, body.ry-tool #grPipeSection .pp-btn-ghost, body.ry-tool #ryCadSide [data-pp="pipePlanSection"] .pp-btn-ghost, body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-btn-ghost, body.ry-tool #ryCadSide [data-pp="grPipeSection"] .pp-btn-ghost{
+/* [v663] grPipeSection 两项（原位 + 搬移）从本列表摘除：这条只设 color/border-color/bg
+   三个分量、不设 border-width/style，组页按钮的 UA 2px outset 粗框正是从这里漏出。
+   组页皮肤现在单源：面板 .gr-btn（2625 段，.pp-recipe-btn 全同款）+ 工具条（3370 段）。 */
+body.ry-tool #pipePlanSection .pp-btn-ghost, body.ry-tool #tlPipePlanSection .pp-btn-ghost, body.ry-tool #ryCadSide [data-pp="pipePlanSection"] .pp-btn-ghost, body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-btn-ghost{
   color:var(--ry-ink2);border-color:var(--ry-line);background:var(--ry-canvas);
 }
 body.ry-tool #pipePlanSection .pp-btn-generate, body.ry-tool #tlPipePlanSection .pp-btn-generate, body.ry-tool #ryCadSide [data-pp="pipePlanSection"] .pp-btn-generate, body.ry-tool #ryCadSide [data-pp="tlPipePlanSection"] .pp-btn-generate{
@@ -3362,6 +3395,14 @@ body.ry-tool #grPipeSection .pp-stage>.pp-toolbar>.pp-btn-ghost{
   height:26px;min-height:0;padding:0 9px;
   display:inline-flex;align-items:center;justify-content:center;
   font-size:12px;line-height:1;white-space:nowrap;
+  /* [v663] 皮肤补齐（二级工具轨 v597 口径：1px #c5d6cc 扁平浅绿）——此前只设
+     尺寸分量，边框/底色走 3287 半截皮肤 ⇒ UA 2px outset 粗框漏出。 */
+  border:1px solid #c5d6cc;background:#f8fbf9;color:#2c4a3d;border-radius:0;
+}
+/* [v663] 工具条 hover 对齐二级工具轨 v597 口径：只变边框色 #2d604b，底色/字色不动。 */
+body.ry-tool #grPipeSection .pp-stage>.pp-toolbar>.pp-btn:hover,
+body.ry-tool #grPipeSection .pp-stage>.pp-toolbar>.pp-btn-ghost:hover{
+  border-color:#2d604b;background:#f8fbf9;color:#2c4a3d;
 }
 /* 提示文字吃掉剩余宽度、按钮靠右成组；窄屏时提示先换行 */
 body.ry-tool #grPipeSection .pp-stage>.pp-toolbar>.pp-tool-hint{
@@ -3387,12 +3428,32 @@ body.ry-tool #grPipeSection .pp-stage>.pp-toolbar>.pp-sep{
    （块里成片空行即遗迹），重跑会复活被剔规则、牵动二级/三级的现有观感。 */
 
 /* —— 布局层（#grSide 这个 id 在原位态与搬移态都有效）—— */
-#grSide{display:flex;flex-direction:column;gap:6px;min-width:0}
+/* [v662 用户「多地块面板继续深挖，与二级三级统一」] gap 6px→0：卡与卡之间不再留空隙，
+   灰条成为唯一分节（与二级 #ppSide「单盒+灰条+行网格」同构）；卡尾自身保留 padding-bottom。 */
+#grSide{display:flex;flex-direction:column;gap:0;min-width:0}
 #grSide>*{flex:0 0 auto}
 /* 参数行（成组地块 / 子地块 / 总面积）：
    [v652 拍平] 原 #grSide .pp-plan-bar 私有词条（margin/padding/gap/font-size）
    整条删除 —— ry-panel.css 的共享 .pp-plan-bar 行皮肤作用域已扩进 #grPipeSection
    与 #ryCadSide [data-pp="grPipeSection"]，二级/多地块同一条规则，不再各写一份。 */
+
+/* —— [v662] gr-row 并入二级 pp-plan-item 键值行皮肤 ——
+   组页此前 gr-row 是流式 flex（标签贴左、值跟排、无底线），与同页面顶部的
+   pp-plan-bar（46% 标签列 + 右缘竖线 + 行底线网格）自相两套。对齐二级：
+   ① 首组标签占 46% 列 + 右缘竖线（#e8ecea，与行网格同线）；
+   ② 行加底线，卡内行连成网格 —— 每行都保留网格线，末行由卡尾按钮区/下一张卡的
+     灰条收口（ry-panel.css v609 口径：「原最后一行去底边已删」）；
+   ③ 行内第二元素贴右（值/控件右对齐，同二级 margin-left:auto 口径）；
+   ④ 行内距归 0（上 4px 补偿撤除），行高 22px 网格不变。
+   gr-btns / gr-hint / gr-mat / gr-blocks 不是键值行，不参与网格。 */
+#grSide .gr-card>.gr-row{border-bottom:1px solid #e8ecea;padding-top:0;padding-bottom:0}
+#grSide .gr-row>.gr-label:first-child{flex:0 0 46%;box-sizing:border-box;border-right:1px solid #e8ecea;padding-right:6px}
+#grSide .gr-row>:nth-child(2){margin-left:auto}
+#grSide .gr-row .gr-val{text-align:right}
+/* [v662] 行内单位不折行：值贴右后单位跟排，窄卡里「Ø110 mm PE」曾断成两行——
+   单位恒单行且不收缩，压缩量交给 select 消化（select 解除 min-width 可缩）。 */
+#grSide .gr-row .gr-sel{min-width:0;flex:0 1 auto}
+#grSide .gr-row .gr-unit{white-space:nowrap;flex-shrink:0}
 
 /* —— 皮肤层：卡标题灰条与盒子已上收 ——
    · 灰条 → mod/ry-panel.css 的 .ry-props .gr-card-title（与二级 .ry-props-head 同一条规则）；
@@ -3406,7 +3467,6 @@ body.ry-tool #grPipeSection .pp-stage>.pp-toolbar>.pp-sep{
 #grSide .gr-card>.gr-blocks,
 #grSide .gr-card>.gr-mat,
 #grSide .gr-card>.gr-empty{padding-left:10px;padding-right:10px}
-#grSide .gr-card>.gr-row:first-of-type{padding-top:4px}
 #grSide .gr-card>.gr-empty{padding-top:6px;padding-bottom:6px}
 #grSide .gr-card>.gr-row:last-child,
 #grSide .gr-card>.gr-hint:last-child,
@@ -3415,8 +3475,8 @@ body.ry-tool #grPipeSection .pp-stage>.pp-toolbar>.pp-sep{
 #grSide .gr-card>.gr-mat:last-child{padding-bottom:6px}
 
 /* —— 状态层：键在专属类上（卡片搬进工具栏后 .gr-btn 类跟着走，无需孪生）。
-   悬停色对齐二级 ghost 的共享基准 #f6f8f7/#173f2d（原来 gr 自用 #eef4f1/#1f2937）。 */
-.gr-btn:hover{background:#f6f8f7;color:#173f2d}
+   [v663] .gr-btn:hover / .active / .gr-btn-on / .gr-btn-arm 全部随 .gr-btn 基础皮肤
+   走（2625 段）——这里原来的 hover 旧词条删除（hover 改只变底色，与二级 v617 口径一致）。 */
 
 
 /* ── 7. 主区 Tab 条（替代原「整屏替换」） ───────────────────────────────── */

@@ -6,7 +6,7 @@
  * without reimplementing or duplicating the core checks.
  *
  * Usage:
- *   node scripts/gate.cjs [--filter=core|equiv|n02|pump|nav|panel]
+ *   node scripts/gate.cjs [--filter=core|equiv|n02|n03|pump|nav|panel]
  *   node scripts/gate.cjs --strict   # a skipped stage also fails the command
  *   node scripts/gate.cjs --list
  *   node scripts/gate.cjs --json
@@ -60,6 +60,10 @@ const stages = [
   {
     id: 'n02', name: 'N02 三入口地块回传（Playwright + Edge）',
     script: 'project-planning/验收记录/n02-three-entry.cjs', browser: 'playwright',
+  },
+  {
+    id: 'n03', name: 'N03 多标签 AI 地块交接（Playwright + Edge）',
+    script: 'tests/n03_ai_plot_handoff.multitab.smoke.cjs', browser: 'playwright',
   },
   {
     id: 'pump', name: '管径/水泵恢复冒烟验收（Playwright + Edge）',

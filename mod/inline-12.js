@@ -21,11 +21,24 @@
     if(matches===1) return {id:id,reason:null};
     return {id:null,reason:matches>1?'duplicate':'missing'};
   }
-  function writeCurrentPlotAnchor(id){
+  function writeCurrentPlotAnchor(id,options){
     id=id==null||id===''?null:String(id);
     var store=window.RyIrrigationDataStore;
     if(!store||typeof store.writeCurrentPlotAnchor!=='function') return false;
-    return store.writeCurrentPlotAnchor(id)!==false;
+    return store.writeCurrentPlotAnchor(id,options)!==false;
+  }
+  function aiHandoffId(){
+    try{
+      var search=window.location&&typeof window.location.search==='string'?window.location.search:'';
+      var match=/(?:^|[?&])handoffId=([A-Za-z0-9_-]{8,80})(?:&|$)/.exec(search);
+      return match?match[1]:null;
+    }catch(e){return null;}
+  }
+  function aiHandoffKey(id){return id?'runye_ai_plot_handoff_v1:'+id:null;}
+  function aiSessionKey(id){return id?'runye_ai_plot_session_v1:'+id:null;}
+  function projectSaveKey(){
+    var id=aiHandoffId();
+    return aiSessionKey(id)||SAVE_KEY;
   }
   /* [v355] 边界多边形几何签名（cm 粒度）：「已生成施工图」跨页恢复的几何锚。
      挂 window 上：ppGenerate 点击处所在脚本块先于本块执行，但点击发生在整页 load 之后，
@@ -159,16 +172,16 @@
       ppGenSig:(typeof window.__ryPpGenSig!=='undefined'&&window.__ryPpGenSig)?window.__ryPpGenSig:null,
       tlAux:readTlAux()
     };
-    localStorage.setItem(key||SAVE_KEY,JSON.stringify(data));
+    localStorage.setItem(key||projectSaveKey(),JSON.stringify(data));
     if(silent!==true)projectToast('方案已保存到本机');
   };
 
   window.runyeLoadProject=function(keyOrOpts,silentOpt){
     /* v161：支持指定存档 key 与静默恢复（自动恢复走静默、不弹提示）。
        点按钮调用时第一个实参是 Event 对象 → 落回默认 key + 非静默，行为同改动前。 */
-    var _key=SAVE_KEY, _silent=(silentOpt===true);
+    var _key=projectSaveKey(), _silent=(silentOpt===true), _anchorOptions=null;
     if(typeof keyOrOpts==='string'){ _key=keyOrOpts; }
-    else if(keyOrOpts && typeof keyOrOpts==='object'){ if(keyOrOpts.key) _key=String(keyOrOpts.key); if(keyOrOpts.silent===true) _silent=true; }
+    else if(keyOrOpts && typeof keyOrOpts==='object'){ if(keyOrOpts.key) _key=String(keyOrOpts.key); if(keyOrOpts.silent===true) _silent=true; if(keyOrOpts.isolated===true)_anchorOptions={sharedDefault:false}; }
     var toast=function(m){ if(!_silent) projectToast(m); };
     var raw=localStorage.getItem(_key);
     if(!raw){toast('还没有保存过方案');return;}
@@ -182,7 +195,7 @@
       toast('地块库当前不可用，无法核对存档归属，方案未恢复');
       return;
     }
-    if(!writeCurrentPlotAnchor(plotBinding.id)){
+    if(!writeCurrentPlotAnchor(plotBinding.id,_anchorOptions)){
       toast('当前地块状态无法安全更新，方案未恢复');
       return;
     }
@@ -272,7 +285,8 @@
       window.tlPendingSel = [];
       window.tlGroupMode = false;
       try { if (typeof window.tlRefreshGroupPanel === 'function') window.tlRefreshGroupPanel(); } catch (e) { }
-      try { if (window.tlPersistManualGroups) window.tlPersistManualGroups(); } catch(e){}
+      /* Loading a complete project already carries manualGroups. Persisting here
+         would save a partially restored state over the project being loaded. */
     }
     // 二级重算会同步三级输入；以存档中的三级参数为准恢复最终计算条件。
     restoreInputValues(data.inputValues);
@@ -306,7 +320,7 @@
            ③ 地图回传（runyeMeasuredArea）与图片测量优先：前者由 applyMapMeasuredArea
              处理并会写新锚点，后者清锚点，两者都不会被自动恢复覆盖。 */
   window.runyeMarkCurrentPlot=function(id){
-    return writeCurrentPlotAnchor(id);
+    return writeCurrentPlotAnchor(id,aiHandoffId()?{sharedDefault:false}:null);
   };
   /* 「本页当前地块已变为 id」：记锚点 + 静默留存完整状态（id 为空 = 只清锚点，不动存档） */
   window.runyeSetCurrentPlot=function(id){
@@ -316,6 +330,8 @@
   function ryAutoRestoreProject(){
     try{
       if(window.__runyeAutoRestored) return;
+      /* AI 新窗口必须先消费 URL 指定的源标签快照，不能先恢复共享默认槽。 */
+      if(aiHandoffId()) return;
       if(window.RyMeasuredAreaBridgeStore.readRaw()) return;              /* 地图回传优先 */
       var store=window.RyIrrigationDataStore;
       if(!store||typeof store.readCurrentPlotAnchor!=='function') return;
@@ -356,6 +372,35 @@
        否则会抢先删除标记并把另一标签的共享快照载入当前地块。 */
     var search=window.location&&typeof window.location.search==='string'?window.location.search:'';
     if(!/(?:^|[?&])smart=1(?:&|$)/.test(search))return;
+    var handoffId=aiHandoffId();
+    if(handoffId){
+      try{
+        if(window.RyMeasuredAreaBridgeStore.readRaw())return;  /* 保留地图回传优先级 */
+        var handoffKey=aiHandoffKey(handoffId), sessionKey=aiSessionKey(handoffId);
+        var restoreKey=localStorage.getItem(handoffKey)?handoffKey:sessionKey;
+        var handoffRaw=localStorage.getItem(restoreKey);
+        if(!handoffRaw)return;
+        var handoffSnap=JSON.parse(handoffRaw);
+        if(!handoffSnap||!Array.isArray(handoffSnap.measuredPolygon)||handoffSnap.measuredPolygon.length<3)return;
+        var expectedPlotId=handoffSnap.currentPlotId==null||handoffSnap.currentPlotId===''?null:String(handoffSnap.currentPlotId);
+        var expectedPoly=(handoffSnap.groupPlan&&Array.isArray(handoffSnap.groupPlan.frame))?handoffSnap.groupPlan.frame:handoffSnap.measuredPolygon;
+        window.runyeLoadProject({key:restoreKey,silent:true,isolated:true});
+        var actualPlotId=window.currentPlotId==null||window.currentPlotId===''?null:String(window.currentPlotId);
+        var actualPoly=(typeof window.ppGetPolyPts==='function')?window.ppGetPolyPts():(window.measuredPolygon||[]);
+        var samePoly=typeof window.ryPolySig==='function'&&window.ryPolySig(actualPoly)===window.ryPolySig(expectedPoly);
+        if(actualPlotId!==expectedPlotId||!samePoly){
+          try{if(typeof atShowToast==='function')atShowToast('AI 规划地块交接未通过校验，请返回原页面重试');}catch(eToast){}
+          return;
+        }
+        window.__runyeAutoRestored=true;
+        if(restoreKey===handoffKey){try{localStorage.removeItem(handoffKey);}catch(eRemove){}}
+        var _ryAlertH=window.alert;
+        try{window.alert=function(){};if(actualPoly&&actualPoly.length>=3)window.__ryLazyReplay=true;}catch(eReplay){}finally{window.alert=_ryAlertH;}
+        try{if(typeof tlUpdatePlanBar==='function')tlUpdatePlanBar();}catch(ePlan){}
+        try{if(typeof atShowToast==='function')atShowToast('已恢复发起 AI 规划的地块与划分');}catch(eToast2){}
+        return;
+      }catch(eHandoff){try{console.warn('[ai-handoff] restore skipped:',eHandoff&&eHandoff.message);}catch(_){}return;}
+    }
     var had=false;
     try{had=!!localStorage.getItem('runye_aiplot_anchor_v1');}catch(e){}
     if(!had)return;

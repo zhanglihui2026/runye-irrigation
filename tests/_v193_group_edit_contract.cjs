@@ -166,8 +166,12 @@ module.exports = function v193GroupEditContracts(INDEX_SRC, helpers) {
   assert.match(INDEX_SRC, /id="grTlBackBtn"/, '返回条上要有「返回成组管路」按钮');
 
   /* --- ⑫ 汇总口径：各块明细 + 总管单独一行 + 合计（拍板 ④） --- */
+  /* [v666 用户拍板] 「各块明细（互不串味…）」组行取消 —— 原断言 /各块明细/ 删除，
+     明细行本身仍在（rows.forEach 直接跟表头）；「整组总管」组行保留。 */
   const gmat = bodyOf(INDEX_SRC, 'grRenderMat', 2400);
-  assert.match(gmat, /各块明细/, '汇总必须分「各块明细」组');
+  assert.ok(!/class="gr-grp"><td colspan="5">各块明细/.test(gmat),
+    '「各块明细」组行必须已删除（v666 用户拍板取消该行）');
+  assert.match(gmat, /rows\.forEach/, '各块明细行必须仍逐块渲染');
   assert.match(gmat, /整组总管/, '汇总必须有「整组总管」单独一组');
   /* ★ 不能只写 /合计/ —— 空态提示文案里也有「分块明细与合计」四字，会把断言顶住
      （v16 注入「把合计行改名」时契约仍全绿，就是这个原因）。必须钉到 gr-sum 那一行。 */
@@ -175,7 +179,11 @@ module.exports = function v193GroupEditContracts(INDEX_SRC, helpers) {
   /* ★ 反向断言：总管长度绝不能并进任何一块的明细 —— 那正是「串味」 */
   assert.ok(!/tMain\s*\+=\s*tk/.test(gmat),
     '总管长度不得并进各块的主管合计（各块口径必须独立）');
-  assert.match(gmat, /tMain\s*\+\s*tk/, '合计行应把总管长度加进去（总价才拿得出来）');
+  /* ★ [v655 口径更新] 总管改「纯手绘」后，未手绘时不出料、不计入合计
+     （材料行显示「总管未手绘（不出料，画好后自动计入）」）——
+     合计只在 handTrunk 时把 tk 加进去。原 /tMain\s*\+\s*tk/ 断言随之收紧。 */
+  assert.match(gmat, /tMain\s*\+\s*\(\s*handTrunk\s*\?\s*tk\s*:\s*0\s*\)/,
+    '合计行应把手绘总管长度加进去（v655：未手绘不计，总价才拿得出来）');
 
   /* =========================================================================
      --- ⑬ [v194] 二级页「正在编辑的那一块」必须能被组页实时读到 ---

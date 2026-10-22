@@ -36,7 +36,7 @@
   }
 
   /* ---------------- 数据层 ---------------- */
-  var W = { blocks: [], trunk: { lines: [], dn: 110 }, frame: null, sel: -1, draw: null, mode: 'pick', tlShow: true, drag: null, hovBlock: -1 };
+  var W = { blocks: [], trunk: { lines: [], dn: 110 }, dnOver: { main: null, branch: null }, frame: null, sel: -1, draw: null, mode: 'pick', tlShow: true, drag: null, hovBlock: -1 };
   window.__runyeGroupWork = W;
 
   /* 从二级页接管：各块环 / 各块的编辑结果 / 外框；并把 v193 在二级页画的总管迁过来 */
@@ -85,8 +85,13 @@
     });
     /* v193 的总管存在 __runyeGroupEdit.trunkPipes；v194 起归本页管，旧数据一次性迁过来 */
     if (ge && Array.isArray(ge.trunkPipes)) W.trunk.lines = ge.trunkPipes;
-    if (ge && ge.trunkDn > 0) W.trunk.dn = ge.trunkDn;
-    if ($('grTrunkDn')) $('grTrunkDn').value = String(W.trunk.dn);
+    /* [v654] ★ ge.trunkDn → W.trunk.dn / sel.value 的反写已删除（修撤销系统捕获快照踩踏）：
+       runye-undo 在 change **捕获阶段**同步 runyeSaveProject → grExportState → grSync，
+       此时用户刚选的新管径还在下拉框里、change 处理器尚未读走 ⇒ grSync 用滞后的
+       ge.trunkDn（上一次 grRenderTrunk 的镜像）把 W.trunk.dn 和 sel.value 弹回旧值 ⇒
+       **大总管管径下拉从来改不动**（用户截图 Ø110 流速超标改不掉的元凶）。
+       恢复路径的落值改由 grRestoreState 显式完成（见下）；平时 ge.trunkDn 只是
+       grRenderTrunk 维护的镜像，与 W 恒等，去掉反写无副作用。 */
     if (W.sel >= W.trunk.lines.length) W.sel = -1;
     return true;
   }
@@ -367,8 +372,9 @@
       }
       ctx.restore();
     });
-    /* [v236] 各块尺寸标注（建筑制图风，同三级页样式）：底边总宽 + 右侧总高 */
-    grRenderBlockDims();
+    /* [v236] 各块尺寸标注（建筑制图风，同三级页样式）：底边总宽 + 右侧总高
+       [v658] 受「标注显示」勾选框控制（隐藏范围=尺寸标注线+尺寸文字） */
+    if (!grLabelsOff) grRenderBlockDims();
     /* 各块已布的管线：只读（块级的编辑一律回二级页逐块模式 / 三级页，不在本页改） */
     W.blocks.forEach(function (b) {
       var s = b.slot || {};
@@ -387,7 +393,9 @@
           不写第二份选型算法（v193 铁律）。
        · hyd 块与 W.blocks 同序生成但会跳过无分区的块 ⇒ 用同一跳过条件做双指针对齐；
        · 仅当「该块管线条数 = 分区数」时按序号取径（与 v233 的 mains[z]↔zones[z] 同一假设），
-         对不上或 hyd 未算时【不标】，绝不回退成管长（用户明确不要管长）。 */
+         对不上或 hyd 未算时【不标】，绝不回退成管长（用户明确不要管长）。
+       [v658] 整段受「标注显示」勾选框控制（隐藏范围=管径白底牌）。 */
+    if (!grLabelsOff) {
     var hydI = 0;
     W.blocks.forEach(function (b) {
       var s = b.slot || {};
@@ -407,15 +415,23 @@
         if (l && l.length >= 2 && zBr && zBr[z]) grLabel('\u00d8' + zBr[z].branchDn, grMidOf(l), '#15803d');
       });
     });
+    } /* end [v658] if(!grLabelsOff) 管径白底牌段 */
     /* [v235] 三级管路导入层（只读，独立通道）：画在 ⚡ 管线之上、总管与 v233 驳接点之下 */
     grTlRender();
     /* 总管：本页唯一可编辑的图层 */
     (W.trunk.lines || []).forEach(function (l, i) {
       strokeLines([l], (i === W.sel) ? '#f59e0b' : '#7c3aed', (i === W.sel) ? 7 : 5);
     });
-    /* [v244] 跨块大总管自动最短链路：无手画总管时，画出连各块红点的最短路径（紫色） */
-    if (!(W.trunk.lines && W.trunk.lines.length) && W.hyd && W.hyd.trunkAuto && W.hyd.trunkAuto.length >= 2) {
-      strokeLines([W.hyd.trunkAuto], '#7c3aed', 5);
+    /* [v655] 自动总管不再画上画布（用户：总管按实际情况手绘；v196 同一诉求，v244 的
+       自动链撤掉）。无手画时总管位留白；「参考线」按钮打开时才临时画幽灵虚线
+       （仅视觉参考，不参与水力、不出材料）。 */
+    if (!(W.trunk.lines && W.trunk.lines.length) && trunkGhost && W.hyd && W.hyd.trunkAuto && W.hyd.trunkAuto.length >= 2) {
+      ctx.save();
+      ctx.strokeStyle = '#7c3aed'; ctx.lineWidth = 2; ctx.setLineDash([8, 6]);
+      ctx.beginPath();
+      W.hyd.trunkAuto.forEach(function (p, i) { var q = toC(p.x, p.y); i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y); });
+      ctx.stroke();
+      ctx.restore();
     }
     /* [v231] 驳接点（每块每分区边缘的主管端点）：琥珀点 + 主管dn 标签，供总管穿越连接 */
     drawTakeoffs();
@@ -468,6 +484,25 @@
     if ($('grTrunkN')) $('grTrunkN').textContent = String(n);
     if ($('grTrunkMat')) $('grTrunkMat').textContent = 'Ø' + W.trunk.dn + ' mm PE';
     if ($('grTrunkDraw')) $('grTrunkDraw').classList.toggle('active', W.mode === 'draw');
+    grUpdateTrunkVel();   /* [v654] 管径下拉/一键建议档改后，流速行同步刷新 */
+  }
+  /* [v654] 大总管流速体检行：有水力结果且总流量>0 才显示；超出经济区间给「一键建议档」。
+     用 .gr-row/.gr-label/.gr-val/.gr-btn 共享皮肤档（v652 拍平纪律），色档 .gr-vel-* 在 style-01。 */
+  function grUpdateTrunkVel() {
+    var row = $('grTrunkVelRow'), val = $('grTrunkVel'), fix = $('grTrunkVelFix');
+    if (!row || !val || !fix) return;
+    var H = W.hyd;
+    if (!H || !H.hasPipe || !(H.trunkVel > 0)) { row.style.display = 'none'; return; }
+    row.style.display = '';
+    val.textContent = fmt(H.trunkVel, 1);
+    val.classList.toggle('gr-vel-ok', H.trunkVelState === 'ok');
+    val.classList.toggle('gr-vel-warn', H.trunkVelState !== 'ok');
+    if (H.trunkVelState !== 'ok' && H.trunkVelSugOd > 0) {
+      fix.style.display = '';
+      fix.dataset.od = String(H.trunkVelSugOd);
+      fix.textContent = '建议 Ø' + H.trunkVelSugOd;
+      fix.title = '满载流速 ' + fmt(H.trunkVel, 1) + ' m/s 超出经济区间 0.8~2.0 m/s，一键切到建议档';
+    } else { fix.style.display = 'none'; fix.dataset.od = ''; }
   }
   function grRenderBlocks() {
     var box = $('grBlocks'); if (!box) return;
@@ -521,15 +556,24 @@
       rows.push({ name: b.name, mu: num(b.mu, 0), m: ml, b: bl, s: sl });
     });
     var tk = sumLen(W.trunk.lines);
+    var handTrunk = !!(W.trunk.lines && W.trunk.lines.length);
     var h = '<table><thead><tr><th>分项</th><th>亩</th><th>主管 m</th><th>支管 m</th><th>一级管 m</th></tr></thead><tbody>';
-    h += '<tr class="gr-grp"><td colspan="5">各块明细（互不串味，各块独立口径）</td></tr>';
+    /* [v666 用户拍板] 「各块明细（互不串味，各块独立口径）」组行取消 —— 明细行紧跟表头即可，
+       语义已由行内容自明；「整组总管」组行保留（它隔开的是「不出料」的总管段，有信息量）。 */
     rows.forEach(function (r) {
       h += '<tr><td>' + esc(r.name) + '</td><td>' + fmt(r.mu, 2) + '</td><td>' + fmt(r.m, 1) + '</td><td>' + fmt(r.b, 1) + '</td><td>' + fmt(r.s, 1) + '</td></tr>';
     });
     h += '<tr class="gr-grp"><td colspan="5">整组总管</td></tr>';
-    h += '<tr><td>总管 Ø' + W.trunk.dn + '</td><td>—</td><td>' + fmt(tk, 1) + '</td><td>—</td><td>—</td></tr>';
+    /* [v655] 总管改纯手绘口径：没手绘走向就不出料（自动链长度是猜的，出料不诚实） */
+    if (handTrunk) {
+      h += '<tr><td>总管 Ø' + W.trunk.dn + '</td><td>—</td><td>' + fmt(tk, 1) + '</td><td>—</td><td>—</td></tr>';
+    } else {
+      /* [v666] colspan 整行提示：第一列定宽 80px 后，五列版会在窄列里折成四行——
+         它本来就是整行消息而非五列数据，colspan 后恒单行、不占列宽（fixed 布局下列宽由表头行决定）。 */
+      h += '<tr><td class="gr-vel-warn" colspan="5">总管未手绘（不出料，画好后自动计入）</td></tr>';
+    }
     h += '<tr class="gr-sum"><td>合计</td><td>' + fmt(rows.reduce(function (a, r) { return a + r.mu; }, 0), 2) + '</td><td>' +
-      fmt(tMain + tk, 1) + '</td><td>' + fmt(tBr, 1) + '</td><td>' + fmt(tSb, 1) + '</td></tr>';
+      fmt(tMain + (handTrunk ? tk : 0), 1) + '</td><td>' + fmt(tBr, 1) + '</td><td>' + fmt(tSb, 1) + '</td></tr>';
     h += '</tbody></table>';
     box.innerHTML = h;
   }
@@ -774,6 +818,33 @@
     var tsp = grNum('planTapeSpacing', 0.4), tapeLen = grNum('planTapeLaySide', 100);
     if (!(tsp > 0)) tsp = 0.4;
     if (!(tapeLen > 0)) tapeLen = 100;
+    /* [v668 用户拍板「主管支管恒定」] 主管/支管管径**不随分区面积变化**：
+       预扫描全组所有分区流量，取最大值定档（baseMainFlow/baseBranchFlow），
+       全组所有分区共用同一档主管/支管 —— 将来把小分区并入大分区，管道大概率仍够用；
+       要改细由用户在水力面板手动调档（W.dnOver，与三级页 tlManualCals 同款语义），
+       对比损失/扬程后再决策。块总管仍按块流量选（块级对象，未在本次拍板范围）。 */
+    var baseMainFlow = 0, baseBranchFlow = 0;
+    W.blocks.forEach(function (b) {
+      var cuts0 = grZonesFor(b);
+      if (!cuts0 || !cuts0.zoneCount) return;
+      for (var z0 = 0; z0 < cuts0.zoneCount; z0++) {
+        var zr0 = Math.floor(z0 / cuts0.cols), zc0 = z0 % cuts0.cols;
+        var cell0 = window.RunyeBridge.clipPolyToRect(b.ring, cuts0.xPos[zc0], cuts0.yPos[zr0], cuts0.xPos[zc0 + 1], cuts0.yPos[zr0 + 1]);
+        var mu0 = window.RunyeBridge.polyArea(cell0 || []) / 666.67;
+        if (!(mu0 > 1e-9)) continue;
+        var f0 = mu0 * I;
+        if (f0 > baseMainFlow) baseMainFlow = f0;
+        var bf0 = f0 / branchParallelCount;
+        if (bf0 > baseBranchFlow) baseBranchFlow = bf0;
+      }
+    });
+    var constMp = selectPipe(Math.max(baseMainFlow, 0.01), tv, MAIN_PIPE_MIN_OD, Infinity);
+    var constBp = selectPipe(Math.max(baseBranchFlow, 0.01), tv, 0, BRANCH_PIPE_MAX_OD);
+    /* 手动覆盖（v668）：有覆盖用覆盖（内径走 grId，与 selectPipe 同一 SDR 口径），无覆盖用恒定自动档 */
+    var ovMainOd = (W.dnOver && W.dnOver.main) ? W.dnOver.main : constMp.od;
+    var ovBranchOd = (W.dnOver && W.dnOver.branch) ? W.dnOver.branch : constBp.od;
+    var ovMainId = (W.dnOver && W.dnOver.main) ? grId(W.dnOver.main) : constMp.id;
+    var ovBranchId = (W.dnOver && W.dnOver.branch) ? grId(W.dnOver.branch) : constBp.id;
     var blocks = [], totalFlow = 0, maxBlkLoss = 0, anyPipe = false;
     W.blocks.forEach(function (b, bi) {
       var cuts = grZonesFor(b);
@@ -806,10 +877,11 @@
         var tpDef = grProjectOnLine(d1 <= d2 ? mPts[0] : mPts[1], zLine);
         var tpOv = (b.tpOver && b.tpOver[z]) ? b.tpOver[z] : null;
         var tp = tpOv ? (grProjectOnLine(tpOv, zLine) || tpDef) : tpDef;
-        /* [v233] 与二级页同款选型：主管 minOd=90；支管流量按物理并联根数分摊，maxOd=160 */
-        var mp = selectPipe(Math.max(flow, 0.01), tv, MAIN_PIPE_MIN_OD, Infinity);
+        /* [v233] 与二级页同款选型口径；[v668] 主管/支管改**恒定档**（预扫描最大分区流量定档，
+           不随本分区面积变），手动覆盖走 W.dnOver（水力面板两颗 select，三级页 tlCalSel 同款）。 */
+        var mp = { od: ovMainOd, id: ovMainId };
         var bFlow = flow / branchParallelCount;
-        var bp = selectPipe(Math.max(bFlow, 0.01), tv, 0, BRANCH_PIPE_MAX_OD);
+        var bp = { od: ovBranchOd, id: ovBranchId };
         var mL = (mains[z] && mains.length === nz && mains[z].length >= 2) ? sumLen([mains[z]]) : (fs ? zH : zW);
         var branchSpan = fs ? zH : zW;
         var branchGap = Math.min(Math.max(branchSpan * 0.06, 4), 14, branchSpan * 0.22);
@@ -856,14 +928,36 @@
     var trunkAutoLen = sumLen(grChainLines(trunkAuto));
     var trunkAutoP = selectPipe(Math.max(totalFlow, 0.01), tv, MAIN_PIPE_MIN_OD, Infinity);
     var handDrawn = !!(W.trunk.lines && W.trunk.lines.length);
-    var tk = handDrawn ? sumLen(W.trunk.lines) : trunkAutoLen;
-    var trunkLoss = hazenWilliams(tk, totalFlow, handDrawn ? grId(W.trunk.dn) : trunkAutoP.id);
+    /* [v655] 总管改纯手绘口径：没手画就不算总管损失、不算流速、不出料 ——
+       trunkAuto 只保留几何给「参考线」幽灵虚线（视觉参考，不进任何数字）。
+       trunkAutoDn（按满载流量推算的建议档）仍在汇总提示里给用户参考。 */
+    var tk = handDrawn ? sumLen(W.trunk.lines) : 0;
+    var trunkLoss = handDrawn ? hazenWilliams(tk, totalFlow, grId(W.trunk.dn)) : 0;
+    /* [v654 2026-10-21 用户拍板「大总管流速体检」] 手选档位（手画模式）按满载流量算实际流速：
+       内径走 grId（与 selectPipe 同一 SDR 口径），超出经济区间给建议档（单源 selectPipe）。
+       常量按本页惯例带 typeof 兜底（inline-09 顶层 const 跨脚本可见，但防加载顺序意外）。 */
+    var vMin = (typeof ECON_VMIN !== 'undefined') ? ECON_VMIN : 0.8;
+    var vMax = (typeof ECON_VMAX !== 'undefined') ? ECON_VMAX : 2.0;
+    var trunkVel = 0, trunkVelState = 'none', trunkVelSugOd = 0;
+    if (handDrawn && totalFlow > 0) {
+      var velId = grId(W.trunk.dn);
+      trunkVel = totalFlow / 3600 / (Math.PI * Math.pow(velId / 2000, 2));
+      trunkVelState = trunkVel > vMax ? 'high' : (trunkVel < vMin ? 'low' : 'ok');
+      if (trunkVelState !== 'ok') {
+        trunkVelSugOd = selectPipe(Math.max(totalFlow, 0.01), tv, MAIN_PIPE_MIN_OD, Infinity).od;
+      }
+    }
     W.hyd = {
       blocks: blocks, I: I, tv: tv, bc: bc, layoutSides: layoutSides,
       branchParallelCount: branchParallelCount, totalFlow: totalFlow,
+      /* [v668] 恒定档设计值（供手动调档 select 的 ±3 档中心）与覆盖生效标志 */
+      constMainOd: constMp.od, constBranchOd: constBp.od,
+      dnOverridden: !!(W.dnOver && (W.dnOver.main || W.dnOver.branch)),
       trunkAuto: trunkAuto, trunkAutoLen: trunkAutoLen, trunkAutoDn: trunkAutoP.od,
-      trunkLen: tk, trunkLoss: trunkLoss, maxBlkLoss: maxBlkLoss, sysLoss: trunkLoss + maxBlkLoss,
-      trunkMode: handDrawn ? '手画' : '自动', trunkDn: handDrawn ? W.trunk.dn : trunkAutoP.od,
+      trunkLen: tk, trunkLoss: trunkLoss, maxBlkLoss: maxBlkLoss,
+      sysLoss: handDrawn ? (trunkLoss + maxBlkLoss) : maxBlkLoss,
+      trunkMode: handDrawn ? '手画' : '未手绘', trunkDn: handDrawn ? W.trunk.dn : 0,
+      trunkVel: trunkVel, trunkVelState: trunkVelState, trunkVelSugOd: trunkVelSugOd,
       hasPipe: anyPipe
     };
   }
@@ -874,11 +968,27 @@
       box.innerHTML = '<div class="gr-empty">请先点「⚡ 生成各块管路」，并确保左侧「每亩流量」已计算。</div>';
       return;
     }
-    var h = '<div class="gr-hyd-sum">'
-      + '<div><span>系统总水头损失</span><b>' + fmt(H.sysLoss, 2) + '</b> m</div>'
-      + '<div><span>大总管损失(' + H.trunkMode + '·满载)</span><b>' + fmt(H.trunkLoss, 2) + '</b> m</div>'
+    /* [v655] 未手绘态：损失只含各块，总管行明确标「未计」并提示选泵风险 */
+    var hand = H.trunkMode === '手画';
+    /* [v668] 主管/支管手动调档（三级页 tlCalSel 同款）：设计值±3 档，选回设计值=清除覆盖；
+       改档即全量重算（损失/扬程实时跟随），供用户对比决策。 */
+    var h = '<div class="gr-cal-row">'
+      + '<label>主管 <select id="grCalSelMain" class="gr-sel" title="选择主管管径（设计值±3档），各块损失/系统扬程随之实时重算；选回设计值即恢复自动档"></select></label>'
+      + '<label>支管 <select id="grCalSelBranch" class="gr-sel" title="选择支管管径（设计值±3档），各块损失/系统扬程随之实时重算；选回设计值即恢复自动档"></select></label>'
+      + '</div>'
+      + '<div class="gr-hyd-sum">'
+      + '<div><span>系统总水头损失' + (hand ? '' : '(不含总管)') + '</span><b>' + fmt(H.sysLoss, 2) + '</b> m</div>'
+      + '<div><span>大总管损失(' + H.trunkMode + (hand ? '·满载' : '') + ')</span><b class="' + (hand ? '' : 'gr-vel-warn') + '">'
+      + (hand ? fmt(H.trunkLoss, 2) + ' m' : '未计') + '</b></div>'
+      /* [v654] 大总管流速体检：经济区间内绿、超出琥珀（色档 .gr-vel-ok / .gr-vel-warn） */
+      + '<div><span>大总管流速(' + (hand ? fmt(H.trunkVel, 1) : '—') + ' m/s)</span><b class="' + (H.trunkVelState === 'ok' || H.trunkVelState === 'none' ? 'gr-vel-ok' : 'gr-vel-warn') + '">'
+      + (H.trunkVelState === 'high' ? '偏高' : H.trunkVelState === 'low' ? '偏低' : H.trunkVelState === 'ok' ? '正常' : '待手绘') + '</b></div>'
       + '<div><span>控制块损失(块总管+分区)</span><b>' + fmt(H.maxBlkLoss, 2) + '</b> m</div>'
       + '<div><span>总流量</span><b>' + fmt(H.totalFlow, 1) + '</b> m³/h</div></div>';
+    if (!hand) {
+      h += '<div class="gr-hint">⚠ 总管未手绘：以上损失不含总管，选泵扬程会偏小。按满载流量推算建议总管 ≥ Ø'
+        + fmt(H.trunkAutoDn, 0) + '；点「✎ 画总管」手绘后自动恢复计算，可先点「参考线」临时看系统建议走向（虚线，不算料）。</div>';
+    }
     /* [v233] 各块总管（示意链）一览：驳接点 = 块总管水源点，用户的大总管接这里 */
     h += '<table class="gr-hyd-tbl"><thead><tr><th>块</th><th>块流量</th><th>总管dn</th><th>总管长</th><th>总管损失</th></tr></thead><tbody>';
     H.blocks.forEach(function (b) {
@@ -896,7 +1006,47 @@
     });
     h += '</tbody></table>';
     box.innerHTML = h;
+    grRefreshCalSels();
     if (window.RyTerrain) window.RyTerrain.refresh();
+  }
+  /* [v668] 主管/支管手动调档 select：填充（设计值±3 档，当前有效值选中态）+ 一次性绑定。
+     语义与三级页 tlRefreshCalSels/tlBindCalSels 同款（inline-09 215/237 行）：选回设计值=清除覆盖。
+     改档 → W.dnOver → grComputeHydraulics 全量重算 → 损失/扬程实时跟随 → 图面管径牌同步。 */
+  function grRefreshCalSels() {
+    var H = W.hyd; if (!H) return;
+    var sels = [
+      { sel: 'grCalSelMain', des: H.constMainOd, key: 'main' },
+      { sel: 'grCalSelBranch', des: H.constBranchOd, key: 'branch' }
+    ];
+    grBindCalSels();
+    sels.forEach(function (s) {
+      var el = document.getElementById(s.sel); if (!el) return;
+      var centerIdx = PE_OD_SERIES.indexOf(s.des);
+      if (centerIdx < 0) { var best = 0, bd = Infinity; for (var i = 0; i < PE_OD_SERIES.length; i++) { var d = Math.abs(PE_OD_SERIES[i] - s.des); if (d < bd) { bd = d; best = i; } } centerIdx = best; }
+      var lo = Math.max(0, centerIdx - 3), hi = Math.min(PE_OD_SERIES.length - 1, centerIdx + 3);
+      var opts = PE_OD_SERIES.slice(lo, hi + 1);
+      var cur = (W.dnOver && W.dnOver[s.key]) ? W.dnOver[s.key] : s.des;
+      if (isFinite(cur) && opts.indexOf(cur) < 0 && PE_OD_SERIES.indexOf(cur) >= 0) { opts = opts.concat([cur]); opts.sort(function (a, b) { return a - b; }); }
+      el.innerHTML = opts.map(function (od) { return '<option value="' + od + '">Ø ' + od + '</option>'; }).join('');
+      el.setAttribute('data-design', s.des);
+      el.value = (opts.indexOf(cur) >= 0) ? cur : s.des;
+    });
+  }
+  function grBindCalSels() {
+    if (window._grCalSelBound) return; window._grCalSelBound = true;
+    /* [v668] 委托到 #grHyd 容器：grRenderHyd 每次 innerHTML 重建 select，直接绑元素会
+       随重画丢失（三级页 tlCalSel 是静态元素才可以用一次绑定）。容器不换，委托恒有效。 */
+    var box = $('grHyd'); if (!box) return;
+    box.addEventListener('change', function (e) {
+      var el = e.target;
+      var key = (el.id === 'grCalSelMain') ? 'main' : (el.id === 'grCalSelBranch') ? 'branch' : null;
+      if (!key) return;
+      var design = Number(el.getAttribute('data-design'));
+      var val = Number(el.value);
+      if (!W.dnOver) W.dnOver = { main: null, branch: null };
+      W.dnOver[key] = (val === design) ? null : val;
+      grComputeHydraulics(); grRenderHyd(); grRender(); grRenderMat();
+    });
   }
   /* ---------------- [v238] 驳接点拖动：命中 / 拖动 ----------------
      用户原话：「各个地块的驳接点的位置要能自由拖动，在管道上自由拖动。」
@@ -964,9 +1114,12 @@
         boxes.push(grLabelDraw(txt, q.x + 6 + w / 2, q.y - 9, '#7c2d12'));
       });
     });
-    /* [v233] 各块总管：示意链（深红虚线）+ 水源点（大红点 = 本块驳接点） */
+    /* [v233] 各块总管：示意链（深红虚线）+ 水源点（大红点 = 本块驳接点）
+       [v658 用户拍板方案A] 深红示意链并入「标注显示」勾选框——取消勾选时一起藏
+       （它不进材料表、只是水力试算示意，图面留给真实管线）；红点驳接点是
+       功能点，永远显示。 */
     W.hyd.blocks.forEach(function (b) {
-      if (b.chain && b.chain.length > 1) {
+      if (!grLabelsOff && b.chain && b.chain.length > 1) {
         ctx.setLineDash([6, 4]);
         strokeLines(grChainLines(b.chain), '#b91c1c', 2.5);
         ctx.setLineDash([]);
@@ -1228,6 +1381,16 @@
      ★ grClearArm 必须声明在 **IIFE 作用域**（本文件是 'use strict'）——
        若在 grBind() 里 var，grDisarmClear 里对它赋值就是对未声明变量赋值 ⇒ ReferenceError。 */
   var grClearArm = 0;
+  var trunkGhost = false;   /* [v655] 参考线开关：临时显示系统建议走向幽灵虚线（默认关） */
+  /* [v658] 组页「标注显示」开关（参考三级页 #tlWsLabelsChk 同款）：
+     false=显示，true=隐藏 v236 各块尺寸标注线+文字 与 v198/v237 管径白底牌。
+     驳接点（琥珀/红点）与红链是功能图层，不受此开关影响。
+     状态持久化 localStorage['gr-labels-off']（'0'=明确显示），切页/刷新后保持。
+     [v667 用户拍板] 默认改为【隐藏】——「标注现在没啥用，后面需要」：
+     只有历史上明确勾过「显示」（存了 '0'）才显示，其余（含从未操作过）一律隐藏。
+     勾选框保留，后面需要时勾上即恢复。 */
+  var grLabelsOff = true;
+  try { grLabelsOff = localStorage.getItem('gr-labels-off') !== '0'; } catch (eGrLbl) { }
   function grDisarmClear() {
     grClearArm = 0;
     var btn = $('grTrunkClear');
@@ -1247,6 +1410,34 @@
       sel.value = String(W.trunk.dn);
       sel.addEventListener('change', function () { W.trunk.dn = parseInt(this.value, 10) || W.trunk.dn; grRenderTrunk(); grRenderMat(); grComputeHydraulics(); grRenderHyd(); });
     }
+    /* [v655] 参考线开关：临时显示系统建议走向的幽灵虚线（不参与计算、不出材料） */
+    var ghostBtn = $('grTrunkGhost');
+    if (ghostBtn) ghostBtn.addEventListener('click', function () {
+      trunkGhost = !trunkGhost;
+      this.classList.toggle('active', trunkGhost);
+      grRender();
+    });
+    /* [v658] 组页「标注显示」勾选框：勾=显示标注（尺寸标注+管径牌），取消=隐藏。
+       与三级页同一交互（文字恒为「标注显示」，状态走 localStorage）。 */
+    var lblChk = $('grLabelsChk');
+    if (lblChk) {
+      lblChk.checked = !grLabelsOff;
+      lblChk.addEventListener('change', function () {
+        grLabelsOff = !this.checked;
+        try { localStorage.setItem('gr-labels-off', grLabelsOff ? '1' : '0'); } catch (eGrLbl2) { }
+        grRender();
+      });
+    }
+    /* [v654] 流速体检「一键建议档」：切到手选建议外径 → 同步下拉显示 → 走 grRenderTrunk
+       全链（内含 grComputeHydraulics + grRenderHyd + grUpdateTrunkVel），告警自然消掉。 */
+    var velFix = $('grTrunkVelFix');
+    if (velFix) velFix.addEventListener('click', function () {
+      var od = parseInt(this.dataset.od, 10);
+      if (!(od > 0)) return;
+      W.trunk.dn = od;
+      var sel2 = $('grTrunkDn'); if (sel2) sel2.value = String(od);
+      grRenderTrunk(); grRenderMat();
+    });
     var click = function (id, fn) { var e = $(id); if (e) e.addEventListener('click', fn); };
     /* [v201] 「⚡ 生成各块管路」：把二级页的整个状态机先切到**整组态**，
        再调用二级页那一套 ppAutoGeneratePipes()（内部已按整组态逐块生成、
@@ -1566,7 +1757,8 @@
     var blocks = clone(W.blocks);
     blocks.forEach(function(b){if(b.tlState){b.tlState.calibers=null;b.tlState.override=null;}});
     return {version:1, subPlots:clone(window.__runyeSubPlots), frame:clone(W.frame), edit:edit,
-      blocks:blocks, defaults:clone(W.tlDefaults), trunk:clone(W.trunk)};
+      blocks:blocks, defaults:clone(W.tlDefaults), trunk:clone(W.trunk),
+      dnOver:clone(W.dnOver || { main: null, branch: null })};
   };
   window.grRestoreState = function (saved) {
     if (!saved) { window.__runyeGroupEdit=null; window.__runyeSubPlots=null; grSync(); grRefreshUI(); return false; }
@@ -1583,6 +1775,15 @@
     if(mode!=='perPlot') window.RunyeBridge.setGroupMode('whole');
     W.groupRef=edit; W.groupKey=JSON.stringify(saved.subPlots.map(function(s){return s.id || s.name;}));
     W.blocks=clone(saved.blocks || []); W.tlDefaults=clone(saved.defaults);
+    /* [v654] trunk dn 恢复不再经 grSync 反写（见 grSync 内注释），这里显式落值并同步下拉显示；
+       必须在 grSync/grRefreshUI 之前 —— 后续渲染链（grRenderTrunk）会把 ge.trunkDn 镜像成它。 */
+    W.trunk.dn = edit.trunkDn;
+    var selDn = document.getElementById('grTrunkDn'); if (selDn) selDn.value = String(W.trunk.dn);
+    /* [v668] 主管/支管手动调档覆盖值恢复（缺档兜底，v657 最小存档纪律同款） */
+    W.dnOver = clone(saved.dnOver) || { main: null, branch: null };
+    if (!W.dnOver || typeof W.dnOver !== 'object') W.dnOver = { main: null, branch: null };
+    if (!('main' in W.dnOver)) W.dnOver.main = null;
+    if (!('branch' in W.dnOver)) W.dnOver.branch = null;
     grSync(); grFit(); grRefreshUI(); return true;
   };
   /* [v242] 「按块进二级页」也开一个外部入口 —— 与 grEnterTlForBlock 同样理由：

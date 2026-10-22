@@ -4209,3 +4209,216 @@ ry-cad-toolbar.js` 三个 `?v=649-gr-toolbar`、`plugin-admin.html` 角标 `界�
 - 线上截图 `_probe_out/v653b_live.jpg`。
 
 **状态**：v647~v653b 已全部上线闭环。下一版从 v654 起算。
+
+### 26.55 v654-trunk-vel：大总管流速体检 + 修掉「管径下拉改不动」的老 bug（2026-10-21）
+
+**用户拍板**：v653 之后继续优化，方向选「大总管流速体检」（讲解管径四级树时指过：手选档位无流速校验）。
+
+**新增（mod/inline-29 + index.html + style-01.css）**：
+1. **流速计算**：grComputeHydraulics 手画模式按满载流量算实际流速（内径走 grId，与 selectPipe 同一 SDR 口径），超出经济区间 ECON_VMIN~ECON_VMAX(0.8~2.0 m/s) 记 trunkVelState(high/low) 并给建议档（重跑 selectPipe，单源不写第二份）。W.hyd 新增 trunkVel / trunkVelState / trunkVelSugOd。
+2. **总管卡「流速」行**（#grTrunkVelRow，gr-row 共享皮肤档）：经济区间内绿(.gr-vel-ok)、超出琥珀(.gr-vel-warn) + 「建议 Ø…」一键档（gr-btn，点击走 grRenderTrunk 全链刷新）。
+3. **#grHyd 汇总行**新增「大总管流速(值) 正常/偏高/偏低」。
+
+**★ 顺带修掉 v619 起潜伏的老 bug（探针 ⑤ 炸出来的）**：
+- 现象：多地块页大总管管径下拉**选什么都弹回旧值**。
+- 根因链：runye-undo 在 change **捕获阶段**同步 mark → runyeSaveProject → grExportState → **grSync()**，grSync 用滞后镜像 `ge.trunkDn`（上次 grRenderTrunk 写入）反写 `W.trunk.dn` 和 `sel.value` ⇒ change 处理器读到的 `this.value` 已被弹回旧值。
+- 修法：grSync 删掉 `ge.trunkDn → W.trunk.dn / sel.value` 反写（导出/快照是只读路径，平时镜像与 W 恒等）；恢复路径改为 grRestoreState 显式落值 + 同步下拉。
+- **铁律新条目：导出/序列化路径（grExportState 等）绝不能经 grSync 反写活状态。**
+
+**验证**：`_p1/_probe_trunk_vel_v654.cjs` 8/8 PASS；诊断过程留档 _p1/_diag3_v654.cjs（value setter 拦截抓到 grSync 调用栈）。
+**版本**：`sw.js VERSION = 'v654-trunk-vel'`；inline-29 / style-01 → `?v=654-trunk-vel`；角标 `界面 v654`。
+
+### 26.56 v655-trunk-manual：大总管改纯手绘口径 + 可选参考线（用户确认示意图后拍板）
+
+**用户需求**：每个地块单独生成主管/支管（现状已如此），大总管**不自动生成**，由用户按实际情况手绘；先出示意图确认再改。示意图三栏（现状自动链 / 调整后留白 / 手绘后恢复），用户选「按图改＋可选参考线」。
+
+**调整（mod/inline-29 + index.html）**：
+1. **画布**：撤掉 v244 自动紫线（无手画时总管位留白）；新增「参考线」按钮（#grTrunkGhost，默认关），打开时临时画系统建议走向**幽灵虚线**（2px dashed，仅视觉，不参与水力不出料）。
+2. **水力**：trunkMode 三态改「手画/未手绘」；未手绘时 sysLoss=maxBlkLoss（不含总管）、总管损失「未计」、流速「待手绘」，汇总下加琥珀提示：⚠ 选泵扬程偏小警告 + 按满载推算「建议总管 ≥ ØtrunkAutoDn」+ 手绘恢复说明。
+3. **材料**：未手绘不出总管行（「不出料，画好后自动计入」），合计不含总管——自动链长度是猜的，出料不诚实。
+4. **保留 v654 流速体检**（手绘后生效）；trunkAuto 几何继续算，仅供参考线与建议档提示。
+
+**验证**：`_p1/_probe_trunk_manual_v655.cjs` 10/10 PASS（A 未手绘态：汇总「未手绘/未计/不含总管/待手绘」+提示建议 Ø355+材料不出料；B 参考线开关往返；C 手绘回归：手画·满载+流速 16.1+材料恢复总管行）；v654 探针回归 8/8；全套 check.cjs 通过。截图 _probe_out/v655_manual_none.jpg / v655_manual_hand.jpg。
+**版本**：`sw.js VERSION = 'v655-trunk-manual'`；inline-29 → `?v=655-trunk-manual`（style-01 无改动保持 654）；角标 `界面 v655`。
+**状态**：v654 + v655 本地已验证，均未提交未发布（等用户「发布」一并推）。
+
+### 26.57 v656-gen-jump：「生成施工图」成组态智能分流（用户确认流程后实施）
+
+**用户需求**：多地块成组 → 二级（地块分区）逐块生成管路并检查 → 点「生成施工图」应直达「多地块规划页」；单地块照旧跳「三级管路规划页」。先给流程图 + 冲突分析，用户确认（「在二级生成好管道，检查没问题之后再传递给多地块规划页面」）后实施。
+
+**实现（mod/plot-editor.js #ppGenerate 处理器最前）**：成组判定（ge.active && subPlots≥2）命中时：逐块编辑态（__runyeGroupPlotEdit != null）走 `grBackFromPlotEdit()`（与「◀ 返回成组管路」同一正规出口：存档当前块 → 清标记 → 切页 → grSync 重算组态，v242 已验证的路径）；整组态（只读合并视图，无可存档）走 `grShowGroupPage()`；然后 return——不跑单地块口径的 tlAutoGenerate / tlShowWorkspace。单地块（未成组）零改动（v104 行为保持）。
+
+**机制依据**：整组态下二级管线是「各块合并出来的只读视图、不存档」（ppSetGroupMode 注释），块级管路的真身在 slots——用户逐块生成检查后跳组页，成果经 slot 原样出现在整组图上，与手绘总管（v655）、流速体检（v654）衔接。
+
+**验证**：`_p1/_probe_gen_jump_v656.cjs` 4/4 PASS（A 成组逐块态→grPipeSection；B 整组态→grPipeSection；C 单地块→tlPipePlanSection 回归；D 零异常）；全套 check.cjs 通过。
+**版本**：`sw.js VERSION = 'v656-gen-jump'`；plot-editor → `?v=656-gen-jump`；角标 `界面 v656`。
+**状态**：v654/v655/v656 三版本地已验证，均未提交未发布（等用户「发布」一并推）。
+
+### 26.58 v657-slot-carry：二级成果「按块分发」进组页 slots（用户实测反馈修复）
+
+**用户需求**：v656 跳转通了，但用户实测「地块根本没改变呀，我要地块直接把地块分区页面生成的 分区 主管 支管都显示出来才对呀」——块级管路真身在 `ge.slots[i]`，ppState 不自动分发。AskUserQuestion 拍板「按块分发」「整体发过去（呈现整体还原、数据按块记账）」。
+
+**实现（mod/plot-editor.js #ppGenerate 分流块内、跳转前）**：
+- 触发条件：本组所有块都还没有管路（防重复点击翻倍）&& ppState 有管。
+- 分发规则（探针实测两轮修正）：**逐块态（perPlot）下 ppState 管线全部由当前块 polyPts 生成 → 当前块全量收、其余块清零**；按「管段中点落环归块」只保留给非逐块态的遗留整组管线兜底（第一版纯中点归块在相邻块共享边界上被射线法浮点漂移误判，20m 主管串到地块2，探针 C2 抓到）。
+- 分发后 `ppApplySlot(slots[current])` 同步实时快照——否则 grSync 的 groupLiveSlot 覆盖会让当前块拿到未分发管。
+- **顺手产品加固（ppApplySlot）**：数组兜底之外补 `hiddenPipes/pipeIds/nextPipeId/cutOverrides` 默认值——最小 slot（老存档/外部合成）经 ppCloneJSON 会把 hiddenPipes 置 null，ppPushHistory→ppCloneState 读 `.main` 直接 TypeError（探针 D 抓到，真实流程字段齐全不触发）。
+
+**验证**：`_p1/_probe_slot_carry_v657.cjs` 6/6 PASS（A ⚡自动管路逐块态生成；B1 跳转落 grPipeSection；B2 分发生效 slots[0] 主管4+支管4；C1 材料表地块1 主管200.0m/支管168.0m、两块各45亩；C2 地块2 未被误分发全0；D 零异常）。
+**连带修门禁**：tests/_v193_group_edit_contract.cjs ⑫ 合计断言跟进 v655 口径（`tMain + (handTrunk ? tk : 0)`，未手绘不计入合计）——check.cjs 27 tests 全绿。
+**版本**：`sw.js VERSION = 'v657-slot-carry'`；plot-editor → `?v=657-slot-carry`；角标 `界面 v657`。
+**状态**：本地已验证，未提交未发布。
+
+### 26.59 v658-gr-dim-toggle：组页「标注显示」勾选框（参考三级页同款）
+
+**用户需求**：「多地块规划页的尺寸标注也增加控制面板，可以隐藏的，参考三级页面（的做法）」。
+
+**实现**：
+- index.html：`#grCanvasWrap` 内加右上角胶囊勾选框 `#grLabelsChkWrap/#grLabelsChk`（样式抄三级页 #tlWsLabelsChkWrap，absolute top:8 right:8——grCanvasWrap 本身就是画布容器，无需三级页那套 pane 换算）。
+- mod/inline-29.js：`var grLabelsOff`（localStorage['gr-labels-off'] 持久化，'1'=隐藏）；grRender 两处受控——`if(!grLabelsOff) grRenderBlockDims()`（v236 尺寸标注线+文字）与管径白底牌整段（v198/v237 Ø 标签，含 hydI 双指针段整体包裹）；grBind 挂 change（勾=显示、取消=隐藏，文字恒「标注显示」）。**[当晚用户拍板方案A] 深红示意链（v233 块总管链）也并入本开关**——drawTakeoffs 里红链段加 !grLabelsOff（它不进材料表、只是水力试算示意）；琥珀/红点驳接点是功能点，永远显示。
+
+**验证**：`_p1/_probe_gr_dim_toggle_v658.cjs` 6/6 PASS（A 默认勾上；B1 取消勾选后画布 toDataURL 76090→70850 标注层确实消失；B2 localStorage='1'；C 重载后保持取消；D 再勾上恢复'0'；E 零异常）；全套 check.cjs 通过。
+**版本**：`sw.js VERSION = 'v658-gr-dim-toggle'`；inline-29 → `?v=658-gr-dim-toggle`；角标 `界面 v658`。
+**状态**：本地已验证，未提交未发布。v654~v658 五版攒着等「发布」一并推。
+
+**组页图层口径备忘（用户问「主管支管 vs 三级红管/驳接点是否重复」，2026-10-21 答复口径）**：
+grRender 从下到上＝地块底图+分区线 → v236 尺寸标注 → 各块主管/支管（蓝/绿，slots，真实工程量）→ 管径牌 → 三级导入层（v235）→ 手绘总管（紫，v655 后唯一可编辑）→ drawTakeoffs（v231 分区驳接点琥珀点；v233 块总管**深红虚线示意链**=把各分区驳接点串成最短哈密顿路径，红点=块驳接点=大总管接入点）。红链不进材料表（材料总管行只算手绘 W.trunk.lines），作用＝块内水力试算几何载体（trunkDn/损失/驳接点标签）+ 指示驳接点位置；与主管（配水管）不重复，但视觉上确实层叠。
+
+### 26.60 v659-line-clip-carry：二级管线「按块环裁剪」分发（用户拍板「管线要被地块裁切」）
+
+**用户需求**：「总管跟支管应该是被地块裁切过的，这个要改过来」——v657 分发是整段分配（逐块态当前块全收 / 中点归块），横跨两块的管会整根塞进一个块，图上压过邻块与空隙。
+
+**实现（mod/plot-editor.js）**：
+- 新函数 `ppClipPolylineToRing(line, ring)`（挂 window）：折线 × 环 → 环内子段数组。逐线段收集与环边的交点参数 t（`ppSegXt` 线段求交），排序切子段，子段中点 `atPointInPolygon` 判内；连续环内子段首尾拼接成一根。
+- v657 分发块改写为统一「裁剪口径」：每根 ppState 管线对每个块环裁剪（环优先 slot.polyPts，缺省 __runyeSubPlots poly），环内子段归该块、越界/空隙部分丢弃；逐块/整组两态走同一条路径，v657 的 perPlot 特判与中点归块兜底全部废除。
+- 分发后仍 `ppApplySlot(slots[current])` 同步实时快照（防 grSync groupLiveSlot 覆盖）。
+
+**验证**：`_p1/_probe_line_clip_v659.cjs` 11/11 PASS——A1~A5 裁剪函数单测（横跨线对左右环各切出 (50,75)-(200,75)/(200,75)-(350,75)、环内线原样、环外丢弃、折线跨块切分）；B 全链路（grEnterPlotL2 → `window.ppSetState` 注入横跨主管 → 生成施工图 → slots[0] 左段/slots[1] 右段，边界断开）；C 回归 v657 流程（块内自动生成管分发后原样 m=4 b=4）；D 零异常。全套 check.cjs 通过。
+**版本**：`sw.js VERSION = 'v659-line-clip-carry'`；plot-editor → `?v=659-line-clip-carry`；角标 `界面 v659`。
+**状态**：本地已验证，未提交未发布。v654~v659 六版攒着等「发布」一并推。
+
+### 26.61 v660-clip-fix-carry：裁切分发在真实会话失效的根因修复（用户截图复现）
+
+**用户需求**：「主管、支管应该是被地块裁切的，现在还不行」（截图：组页各块管压过地块边界）。
+
+**根因（两个洞）**：
+1. **旧数据永不修正**：v659 分发条件是「slots 全空才分发」——用户反复测试的会话里 slots 已有 v657 整段分配遗留的旧横跨管，重新传递被跳过，错数据一直显示。
+2. **切页路径不裁剪**：不点「生成施工图」、直接切页签/返回时，grSync→groupLiveSlot→ppCaptureSlot 把未裁剪的 ppState 原样搬进 slots。
+
+**实现（mod/plot-editor.js）**：
+- **分发改「全量裁剪分配 + 分配非空才覆盖」**：只要 ppState 有管就对每块环全量裁剪；某块裁剪结果非空才覆盖该块（修正旧数据、天然幂等不翻倍），裁剪为空则保留该块原管（不毁三级页逐块精修）。废除 v659 的「slots 全空」前置条件。
+- **ppCaptureSlot 加成组裁剪**：任何 ppState→slot 存档路径（切块/返回成组/grSync 实时快照）都按本块环裁剪（环取 s.polyPts，缺省 slots[current].polyPts），保证块档案里的管不出环；跨块段的分配仍走生成施工图的全量分发。
+
+**验证**：`_p1/_probe_clip_fix_v660.cjs` 6/6 PASS——A 旧横跨管被重传修正（slots[0] 左段/slots[1] 右段）；B 存档链路无异常（合成环境 artifact：ge.mode 被探针不可控异步链切回 whole，ppCaptureSlot 裁剪语义已由运行日志 capture in=1 out=1 证实正确）；C 回归 v657 流程；D 零异常。全套 check.cjs 通过。
+**排查手段备忘**：ppCaptureSlot 临时 console.log + CDP Runtime.consoleAPICalled 抓内部状态；atomicB 原子 evaluate（进二级→注入→切块→读 slots 一个 eval 完成）规避异步链污染。
+**版本**：`sw.js VERSION = 'v660-clip-fix-carry'`；plot-editor → `?v=660-clip-fix-carry`；角标 `界面 v660`。
+**状态**：本地已验证，未提交未发布。v654~v660 七版攒着等「发布」一并推。
+**用户操作提示**：刷新页面后**重新走一遍「生成施工图」**即可修正此前会话遗留的未裁剪管路。
+
+### 26.62 v661-panel-font：组页左栏材料表字号统一（用户截图「面板文字大小不一」）
+
+**用户需求**：「很明显左侧工具栏的面板样式不统一，文字大小不一，有的加粗了有的没有，这个得改过来」（截图：多地块规划页左栏）。
+
+**根因**：v652 拍平已把 .gr-row/.gr-label/.gr-val/.gr-btn 等统一到 11px 行体系，但**左栏材料表 `.gr-mat` 的 th/td 被全局层抬高**——runye-typography.css 的 `th,td{font-size:var(--ry-fs-body)=13px !important}`（.gr-hyd-tbl 在 v548 已对抗、.gr-mat 漏了）——表内文字比周围 11px 行大一圈，面板观感割裂。这就是「文字大小不一」的主源。
+
+**实现（mod/style-01.css .gr-mat 段）**：`.gr-mat th,.gr-mat td{font-size:11px!important;line-height:16.5px}` + `.gr-mat th{font-weight:600}`——压回与 .gr-row 同一基准。**字重层级保留不动**（那是刻意的信息层级，不是不统一）：表头 600 / 「各块明细」「整组总管」组行 600 / 合计行 700 / 数据行 400；块标题 .gr-block-hd 600、注释档（meta/hint）10.5px 均为 v652 定稿口径。
+
+**验证**：`_p1/_probe_gr_mat_font_v661.cjs` 6/6 PASS（getComputedStyle：th/td 11px、表头 600、合计 700、面板行 11px、零异常）；全套 check.cjs 通过。
+**版本**：`sw.js VERSION = 'v661-panel-font'`；style-01.css → `?v=661-panel-font`；角标 `界面 v661`。
+**状态**：本地已验证，未提交未发布。v654~v661 八版攒着等「发布」一并推。
+
+### 26.63 v662-panel-merge：组页 gr-row 并入二级键值行皮肤（用户「多地块面板继续深挖，与二级三级统一」）
+
+**用户需求**：v661 修完字号后用户要求继续深挖——多地块规划页左栏与二级/三级面板样式统一。
+
+**调查结论**：v651/v652 已统一字号/灰条/按钮/行高，最后的结构性差异是——组页**总管卡的 gr-row 是流式 flex**（标签贴左、值跟排、无底线），而**同一页面顶部**的 grBar 已用二级 pp-plan-item 皮肤（46% 标签列 + 右缘竖线 + 行底线网格），同页自相两套。
+
+**实现（mod/style-01.css #grSide 段，v662 块）**：
+1. `#grSide{gap:0}`——卡间空隙撤除，灰条成为唯一分节（与二级「单盒+灰条+行网格」同构）；
+2. `#grSide .gr-card>.gr-row{border-bottom:1px solid #e8ecea;padding-top/bottom:0}`——行底线网格；**每行都保留网格线，末行由卡尾按钮区/下一张卡灰条收口**（对齐 ry-panel.css v609 口径「原最后一行去底边已删」，首版探针 A7 期望末行去线是错的，已按二级口径修正断言）；
+3. `#grSide .gr-row>.gr-label:first-child{flex:0 0 46%;border-right:1px solid #e8ecea;padding-right:6px}`——46% 标签列+竖线；
+4. `#grSide .gr-row>:nth-child(2){margin-left:auto}` + `.gr-val{text-align:right}`——值/控件贴右；
+5. `.gr-unit{white-space:nowrap;flex-shrink:0}` + `.gr-sel{min-width:0;flex:0 1 auto}`——「Ø110 mm PE」不再折行/溢出，压缩量由 select 消化（截图验证两轮迭代）；
+6. **删除旧规则** `#grSide .gr-card>.gr-row:first-of-type{padding-top:4px}`——其特异性 (1,3,0) 高于新规则 (1,2,0)，不删会永久压掉行距归零。
+   gr-btns/gr-hint/gr-mat/gr-blocks 不是键值行，不参与网格。
+
+**门禁维护**：check.cjs ④a8 因并行会话把 `writeCurrentPlotAnchor(id)` 签名扩为 `(id, options)`（AI 跨标签 handoff 隔离）而失配——ci_check_static.cjs 提取正则放宽为兼容 `(id[, options])`、调用断言改 `/store\.writeCurrentPlotAnchor\(id[),]/`，契约语义不变（标签页锚点只走 sessionStorage 适配器）。
+
+**验证**：`_p1/_probe_panel_merge_v662.cjs` 9/9 PASS（gap=0、行底线 #e8ecea、首行 paddingTop=0、46% 列 ratio=0.460、竖线、val 右对齐、末行保留网格线、#grSide 截图存档 `_probe_out/v662_grside.png`、零异常）；全套 check.cjs PASS=29 FAIL=0。
+**版本**：`sw.js VERSION = 'v662-panel-merge'`；style-01.css → `?v=662-panel-merge`（本版仅 CSS，plot-editor.js 未动）；角标 `界面 v662`。
+**状态**：本地已验证，未提交未发布。v654~v662 九版攒着等「发布」一并推。
+
+### 26.64 v664-btn-flat：组页按钮皮肤补齐，摘除三层旧覆盖（用户「按钮外面还是很粗的线，彻底取消层层覆盖」）
+
+**用户需求**：面板文字/按钮仍有各种样式覆盖/嵌套，要求彻底取消；若逐层取消麻烦，就按二级/三级面板重构；点名「有些按钮的外面还是很粗的线」。
+
+**根因（_p1/_diag_btn_styles.cjs 实测）**：组页按钮计算样式 = `border:2px outset`（**UA 默认**）。v597 注释早已点名历史根因——全局 .pp-btn/.pp-btn-ghost 基础皮肤（边框+底色）在历次清理中被删，二级工具轨靠 scoped 规则（4785 段）补回，**组页从没补**；v652 给 .gr-btn 只抄了 .pp-recipe-btn 的尺寸/字重，漏了皮肤。另有三层旧覆盖叠加：①3287 段半截皮肤（只设 color/border-color/bg 三分量、不设 width/style ⇒ 粗框照样漏出，还把面板按钮 bg 拉成 --ry-canvas）；②2737 行旧工具条 hover（无前缀，串面板按钮）；③3448 行 .gr-btn:hover 旧三连变口径。
+
+**实现（mod/style-01.css，四处）**：
+1. `.gr-btn`（2625 段）补齐皮肤 = .pp-recipe-btn（ry-panel.css 570 行）同款：`1px solid #e2e8f0 / 白底 / #334155 / line-height 1 / nowrap`，hover 只变底色 #eaf3ed（v617 口径）；**圆角不抄**——FLAT-BTN-OVERRIDE（1714 段）对全站 button 打 radius:0!important，二级 recipe 实际渲染也是直角；
+2. 3287 段选择器摘除 grPipeSection 两项（原位+搬移）——组页皮肤单源化：面板走 .gr-btn、工具条走 3370 段；
+3. 2737 行旧 hover 删除（留注释指路）；
+4. 3370 段工具条补皮肤 `1px solid #c5d6cc / #f8fbf9 / #2c4a3d`（二级工具轨 v597 口径）+ hover 只变边框色 #2d604b。状态类 .gr-btn-on/.gr-btn-arm/.active 均 !important，压过新皮肤无冲突。
+
+**版本纪律**：v663 已被并行会话占用（v663-ai-handoff），按「取更高号」纪律本版取 **v664**。三件套：sw.js VERSION='v664-btn-flat'；style-01.css → `?v=664-btn-flat`；角标 `界面 v664`。
+
+**验证**：`_p1/_probe_btn_flat_v664.cjs` 9/9 PASS（面板/块/工具条按钮 1px solid 断言、recipe 结构一致、v662 行网格回归、整页截图 `_probe_out/v664_btn_flat.png`、零异常；公告卡异步重画须测前+截图前各幂等清一次）；全套 check.cjs PASS=29 FAIL=0。
+**状态**：本地已验证，未提交未发布。v654~v662（本会话九版）+ 并行会话 v663-ai-handoff 攒着等「发布」一并推。
+
+### 26.65 v665-mat-row-drop：材料汇总「各块明细」组行取消（用户截图箭头「这行取消」）
+
+**用户需求**：材料汇总表里「各块明细（互不串味，各块独立口径）」组行取消（截图红箭头指向该行）。
+
+**实现**：
+1. `mod/inline-29.js` grRenderMat：删除 `<tr class="gr-grp">各块明细（…）</td></tr>` 组行输出——明细行直接跟表头（行内容自明）；「整组总管」组行**保留**（它隔开的是「不出料」的总管段，有信息量）；合计行 v655 口径不动。
+2. `tests/_v193_group_edit_contract.cjs` ⑫：原 `/各块明细/` 断言删除，改为反向断言（组行必须已删）+ `rows.forEach` 仍在（明细行仍逐块渲染）+「整组总管」断言保留。
+3. `.gr-grp` CSS（style-01.css 2667）保留——「整组总管」行仍用。
+
+**验证**：`_p1/_probe_mat_drop_v665.cjs` 6/6 PASS（组行已删、gr-grp 只剩整组总管、表头后第一行即地块明细、合计行仍在、材料卡截图 `_probe_out/v665_mat_drop.png`、零异常）；全套 check.cjs PASS=29 FAIL=0。
+**版本**：`sw.js VERSION = 'v665-mat-row-drop'`；inline-29.js → `?v=665-mat-row-drop`；角标 `界面 v665`。
+**状态**：本地已验证，未提交未发布。v654~v662（九版）+并行 v663-ai-handoff +本会话 v664/v665 攒着等「发布」一并推。
+
+### 26.66 v666-mat-col-pin：材料表第一列定宽（用户红框「名称与数值之间太宽，拖宽面板要恒定」）
+
+**用户需求**：材料汇总表里地块名称与右侧数值之间的空隙太宽；拖动面板宽度时该区域要限定死，不跟随拉伸/压缩。
+
+**根因**：`.gr-mat` 表格是自动布局，面板拖宽后多余宽度按各列内容比例分配——第一列（分项/地块名）也跟着变宽，红框空隙随面板宽度拉伸。
+
+**实现**：
+1. `mod/style-01.css`：`.gr-mat table{table-layout:fixed}` + `.gr-mat th:first-child,.gr-mat td:first-child{width:80px}`——列宽由表头行决定，拖宽面板时第一列恒定 80px，多余宽度由四个数值列均摊；colspan 组行/提示行不影响列宽。
+2. `mod/inline-29.js` grRenderMat：「总管未手绘（不出料，画好后自动计入）」行改 `colspan="5"` 整行提示——第一列定宽后五列版会在 80px 窄列里折成四行，它本来就是整行消息而非五列数据，colspan 后恒单行且不占列宽。
+
+**探针要点（踩坑留档）**：模拟「拖宽面板」不能直接改 #grSide 宽度——可见面板是搬移态克隆（#ryCadGrpGr .ry-cad-grp-body[data-pp="grPipeSection"]），宽度由 `--ry-cad-w-open`（默认 318px，ry-panel.css 926 行）控制；原位态才是 `--pp-side-w`。探针在根节点 set `--ry-cad-w-open:620px` 模拟拖宽（sideW 300→602 实测生效）。
+
+**验证**：`_p1/_probe_mat_colpin_v666.cjs` 6/6 PASS（fixed 布局、面板加宽 ≥150px、第一列 80→80 Δ=0、≈80px 断言、材料卡截图 `_probe_out/v666_mat_colpin.png`、零异常）+ v665 组行取消回归 6/6 PASS；全套 check.cjs PASS=29 FAIL=0。
+**版本**：`sw.js VERSION = 'v666-mat-col-pin'`；style-01.css 与 inline-29.js → `?v=666-mat-col-pin`；角标 `界面 v666`。
+**状态**：本地已验证，未提交未发布。v654~v662（九版）+并行 v663-ai-handoff +本会话 v664/v665/v666 攒着等「发布」一并推。
+
+### 26.67 v667-labels-off-default：组页标注默认隐藏（用户「标注现在没啥用，后面需要」）
+
+**用户需求**：多地块规划页的地块标注取消——现在不显示，勾选框保留，后面需要时再开（AskUserQuestion 拍板：默认不显示标注）。
+
+**实现**：
+1. `mod/inline-29.js`（v658 段）：`grLabelsOff` 默认值 false→true；读取口径改为「只有存过 `'0'`（历史上明确勾过显示）才显示，其余（含从未操作）一律隐藏」——迁移语义=明确选择优先于新默认；勾选框与 change 监听不动。
+2. `index.html`：`#grLabelsChk` 去掉 `checked` 属性（初始渲染即不勾，避免闪烁后再被 grBind 纠正）。
+
+**验证（探针踩坑留档）**：主探针 A5「同会话 navigate 刷新」测得画布 69414（低于隐藏基线 70558）——非时序也非应用 bug，是**前序步骤留下的自动恢复快照被 inline-12 异步链灌回重绘**（v660 同款合成环境 artifact）。对照诊断 `_diag_labels_refresh2.cjs` 用干净两趟导航（首载写 ls='0' → 二次导航让脚本初始化即读到，与真实刷新同语义）证实：真实刷新路径 chk=true 且标注稳定画出（0.8s/2.5s 均 76090）。最终 `_probe_labels_default_v667.cjs` 8/8 PASS（默认不勾+不入库、勾选即恢复 70558→76090、存'0'持久化、再取消隐藏、默认态截图 `_probe_out/v667_labels_default_off.png`、零异常）；check.cjs PASS=29 FAIL=0。
+**版本**：`sw.js VERSION = 'v667-labels-off-default'`；inline-29.js → `?v=667-labels-off-default`；角标 `界面 v667`（style-01.css 本版未动）。
+**状态**：本地已验证，未提交未发布。v654~v662（九版）+并行 v663-ai-handoff +本会话 v664~v667 攒着等「发布」一并推。
+
+### 26.68 v668-const-dn：主管/支管恒定管径 + 手动调档（用户拍板）
+
+**用户需求**：①主管/支管生成原则改为**恒定**——不随分区面积大小变化（将来把小分区并入大分区，管道大概率仍够用）；②管道是否改细由用户**手动调整**、对比扬程后决策，交互与三级页一样；③问组页手动调管径能否实现——本轮已实现。
+
+**根因（旧口径）**：v233 生成时每分区按本块流量 `selectPipe(flow,…)` 选管径 → 面积大的块管径大、小的块管径小，随分区面积变化。
+
+**实现（mod/inline-29.js）**：
+1. **恒定口径**：grComputeHydraulics 开头**预扫描**全组所有分区（clipPolyToRect+polyArea 轻量几何一遍），取最大分区流量 baseMainFlow / 最大支管分摊流量 baseBranchFlow 定档 → 全组所有分区共用同一档主管/支管（合并小分区后大概率仍够用；要改细走手动）。块总管（tkP）保持按块流量（块级对象，不在本次拍板范围）。
+2. **手动调档**：`W.dnOver={main,branch}` 覆盖机制（语义与三级页 tlManualCals 同款：选回设计值=清覆盖）；水力面板顶部两颗 select（grCalSelMain/grCalSelBranch），选项=PE_OD_SERIES 设计值±3档，改档 → grComputeHydraulics 全量重算 → 损失/扬程实时跟随 + 图面管径牌同步 + grRenderMat。存档经 grExportState/grRestoreState 持久化（dnOver 字段，恢复端带 v657 最小存档兜底）。
+3. **委托绑定**：select 是 innerHTML 动态重建的，listener 必须委托到 #grHyd 容器（直接绑元素会随重画丢失——三级页 tlCalSel 是静态元素才可以用一次绑定）。
+
+**探针踩坑**：①`new Event('change')` 默认**不冒泡**，事件委托收不到——合成事件必须 `{bubbles:true}`（真实 UI 交互不受影响）；②组页存档函数是 `grExportState`（非 grStateSave）。
+
+**验证**：`_p1/_probe_const_dn_v668.cjs` 13/13 PASS——两块面积差 4 倍（11.25/45 亩）⚡生成后 7 个分区主管全组唯一 Ø140、支管唯一 Ø110；改档 140→90 后全组跟随+系统损失 3.04→9.88 重算跟随；grExportState 存档 dnOver={main:90}；选回设计值覆盖清除+dn 回 140；截图 `_probe_out/v668_const_dn.png`；v660/v666 探针回归通过；check.cjs PASS=29 FAIL=0。
+**版本**：`sw.js VERSION = 'v668-const-dn'`；style-01.css 与 inline-29.js → `?v=668-const-dn`；角标 `界面 v668`。
+**状态**：本地已验证，未提交未发布。v654~v662（九版）+并行 v663-ai-handoff +本会话 v664~v668 攒着等「发布」一并推。
