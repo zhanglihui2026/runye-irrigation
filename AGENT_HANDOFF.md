@@ -4421,4 +4421,4 @@ grRender 从下到上＝地块底图+分区线 → v236 尺寸标注 → 各块�
 
 **验证**：`_p1/_probe_const_dn_v668.cjs` 13/13 PASS——两块面积差 4 倍（11.25/45 亩）⚡生成后 7 个分区主管全组唯一 Ø140、支管唯一 Ø110；改档 140→90 后全组跟随+系统损失 3.04→9.88 重算跟随；grExportState 存档 dnOver={main:90}；选回设计值覆盖清除+dn 回 140；截图 `_probe_out/v668_const_dn.png`；v660/v666 探针回归通过；check.cjs PASS=29 FAIL=0。
 **版本**：`sw.js VERSION = 'v668-const-dn'`；style-01.css 与 inline-29.js → `?v=668-const-dn`；角标 `界面 v668`。
-**状态**：本地已验证，未提交未发布。v654~v662（九版）+并行 v663-ai-handoff +本会话 v664~v668 攒着等「发布」一并推。
+**状态**：**已发布** —— 合并式提交 `2552c74`（v654~v668 十五版，含并行会话 v663-ai-handoff），2026-10-22 推送 origin/master 成功（0c899dd..2552c74）；线上冒烟：index.html 引用 `?v=668-const-dn`、sw.js VERSION='v668-const-dn'、style-01/inline-29/plot-editor 资源 200。下版从 v669 起编。
