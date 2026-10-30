@@ -1231,7 +1231,10 @@
      + v656 回归 + 全套 check.cjs。
    - 版本：plot-editor.js → ?v=657-slot-carry；角标 界面 v657。
    ========================================================================== */
-const VERSION = 'v668-const-dn';
+/* v691: 分区角度同步外圈尺寸线与内部尺寸标注；旋转不改变地块坐标。
+   v706: 联合灌溉分组手动合并整链取消（面板/右键合并/快照）；分区只按 预设N区+面积亩组合。
+         轮灌演示水流动画修复：分区格子 rect→polygon 后演示链选择器失效，改 [data-zi]。 */
+const VERSION = 'v815-icon-unify';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
@@ -1252,6 +1255,10 @@ const CORE = [
   "core/measured-area-bridge-store.js",
   "core/cloud-design-binding-store.js",
   "core/economic-settings-store.js",
+  "core/drawing-design-model.js",
+  "core/drawing-design-legacy-adapter.js",
+  "core/drawing-design-level3-adapter.js",
+  "core/drawing-design-group-adapter.js",
   "core/ui-shell.js",
   "core/runtime-guard.js",
   "plugins/hello-world/manifest.json",

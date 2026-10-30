@@ -1252,32 +1252,9 @@
         wsStatsRefit();          // 恢复默认宽 → 图纸重新铺满
       });
     }
-    /* v98f：右侧「🧩 联合灌溉分组」面板也折叠（**默认收起**，与上方统计表同一套交互 + 持久化约定）。
-       折叠只收面板内容，工具轨宽度不变；显隐会改轨内高度分布 → 同样兜底 resize 一次。 */
-    (function bindTlGroupPanel() {
-      var gp = document.getElementById('tlGroupPanel');
-      var gpBody = document.getElementById('tlGroupPanelBody');
-      var gpTg = document.getElementById('tlGroupPanelToggle');
-      var gpArrow = document.getElementById('tlGroupPanelArrow');
-      if (!gp || !gpBody || !gpTg) return;
-      var GP_KEY = 'runye_tlGroupPanel_collapsed';
-      function applyGpCollapsed(c) {
-        gpBody.style.display = c ? 'none' : '';
-        gp.classList.toggle('collapsed', c);
-        if (gpArrow) gpArrow.style.transform = c ? 'rotate(180deg)' : 'rotate(90deg)';
-        gpTg.title = c ? '点击展开联合灌溉分组' : '点击折叠联合灌溉分组';
-        wsStatsRefit();
-      }
-      var gSaved = null;
-      try { gSaved = localStorage.getItem(GP_KEY); } catch (e) {}
-      /* 默认收起（2026-09-21 用户要求「联合灌溉分组折叠起来」）；用户手动展开后记住选择 */
-      applyGpCollapsed(gSaved === null ? true : gSaved === '1');
-      gpTg.addEventListener('click', function () {
-        var c = !gp.classList.contains('collapsed');
-        applyGpCollapsed(c);
-        try { localStorage.setItem(GP_KEY, c ? '1' : '0'); } catch (e) {}
-      });
-    })();
+    /* [2026-10-27 用户指令取消] v98f 右侧「🧩 联合灌溉分组」面板折叠逻辑整块删除
+       （#tlGroupPanel 已从 index.html 删除，守卫 getElementById→null→return 自动失效；
+        localStorage 键 runye_tlGroupPanel_collapsed 成孤儿无碍，不再读写）。 */
   })();
   /* 图面改长 / 改径 / 整条平移（AE 编辑层）→ 左下角「管段长度与水头损失」同步刷新：
      最远分区路径长度走 AE.effPts（图面有效几何），几何一变数值就得跟着变；
@@ -1327,8 +1304,6 @@
   'use strict';
   if (typeof document === 'undefined') return;
   var panel = null, bodyEl = null, lastSel = null;
-  var POS_KEY = 'runye_tlWsLayerPanel_pos', W_KEY = 'runye_tlWsLayerPanel_w';
-  var manualPos = false;   /* 用户拖动过后=手动定位（停用画布右上自动对齐）；双击标题栏恢复 */
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function odSeries() { try { if (typeof PE_OD_SERIES !== 'undefined' && PE_OD_SERIES.length) return PE_OD_SERIES.slice(); } catch (e) { } return [63, 75, 90, 110, 140, 160, 200, 250, 315, 355, 400]; }
@@ -1343,78 +1318,55 @@
     (document.head || document.documentElement).appendChild(st);
     panel = document.createElement('div');
     panel.id = 'tlWsLayerPanel';
-    /* [v544] 视觉交给 .ry-float-card（mod/ry-panel.css），这里只留定位与尺寸。
-       原先整套颜色/边框/阴影/字号写在本行 cssText 上，与 #grHydPanel、AI 面板各抄一份。 */
+    /* [v803 纯抽屉统一] 与「多地块编辑」同一套抽屉语义：面板由右缘抽屉标签
+       （#tlWsLayerDrawerTab，inline-18 创建）唯一驱动——创建即 hidden（平时折叠），
+       点击弹出（对齐画布右上、弹出即全展开）、再点收回。拖拽/定位/折叠/调宽
+       属性整组移除（原 data-ry-panel/position-key/keep-default/drag-threshold/
+       dblclick-reset/fold-key/resize-*、head 的 data-ry-drag/data-ry-toggle、
+       grip 的 data-ry-resize 全删），rypCollapsible/rypDraggable/rypResizePanel
+       不再调用，manualPos/位置存档机制整体退役——无多层覆盖/嵌套。
+       视觉仍走 .ry-float-card（与多地块面板同族）。 */
     panel.className = 'ry-float-card';
     panel.style.cssText = 'position:absolute;top:8px;right:300px;z-index:9994;width:238px;max-height:70vh;overflow:auto';
+    panel.hidden = true;
     var head = document.createElement('div');
     head.className = 'ry-float-head';
-    head.title = '拖动 = 移动面板 · 双击 = 回到画布右上默认位 · 单击 = 折叠/展开';
-    head.innerHTML = '<b class="ry-float-title">图层控制</b><span id="tlWsLayerPanelGrip" class="ry-float-grip" title="左右拖动调节面板宽度（200~480px，自动记忆）">↔</span><span id="tlWsLayerPanelCaret" class="ry-float-caret">▾</span>';
+    head.innerHTML = '<b class="ry-float-title">图层控制</b>';
     bodyEl = document.createElement('div');
     bodyEl.className = 'ry-float-body';
     panel.appendChild(head); panel.appendChild(bodyEl);
-    /* [v544] 交互声明化：拖动 / 折叠 / 调宽全部交给 mod/ry-panel.js 的共用实现。
-       原先这里手写了 pointerdown/move/up + 4px 阈值 + suppressClick + 双击复位 + 存档
-       （与 #grHydPanel、AI 面板各抄一份，细节还各不相同）——现在只声明属性。 */
-    panel.setAttribute('data-ry-panel', '');
-    panel.setAttribute('data-ry-panel-key', 'tlWsLayerPanel');
-    panel.setAttribute('data-ry-position-key', POS_KEY);
-    panel.setAttribute('data-ry-keep-default', '1');        /* 默认位由 align() 算，初始化时不重排 */
-    panel.setAttribute('data-ry-drag-threshold', '4');
-    panel.setAttribute('data-ry-drag-dblclick-reset', '1');
-    panel.setAttribute('data-ry-fold-key', 'runye_tlWsLayerPanel_fold');
-    panel.setAttribute('data-ry-resize-key', W_KEY);
-    panel.setAttribute('data-ry-resize-min', '200');
-    panel.setAttribute('data-ry-resize-max', '480');
-    head.setAttribute('data-ry-drag', '');
-    head.setAttribute('data-ry-toggle', '');
-    bodyEl.setAttribute('data-ry-body', '');
-    var lpCaret = panel.querySelector('#tlWsLayerPanelCaret');
-    lpCaret.setAttribute('data-ry-fold', '');
-    lpCaret.setAttribute('data-ry-fold-open', '\u25be');
-    lpCaret.setAttribute('data-ry-fold-closed', '\u25b8');
-    var lpGrip = panel.querySelector('#tlWsLayerPanelGrip');
-    lpGrip.setAttribute('data-ry-resize', '');
-    /* 移动端默认收起：用 data-ry-fold-default 表达（不写 localStorage，桌面端仍展开） */
-    if (window.RyMobile && window.RyMobile.isActive()) panel.setAttribute('data-ry-fold-default', '1');
     var ctn = document.getElementById('tlWsContent');
     var host = (ctn && ctn.parentNode) ? ctn.parentNode : document.body;
     host.appendChild(panel);
-    /* v164b：有位置存档=手动定位，停用自动对齐（位置恢复本身由 rypDraggable 统一处理，
-       这里只读一次存档来推断「用户拖过」）。 */
-    try {
-      var sp = JSON.parse(localStorage.getItem(POS_KEY) || 'null');
-      if (sp && (isFinite(sp.x) || isFinite(sp.l))) manualPos = true;
-    } catch (e) { }
-    window.rypCollapsible(panel);
-    window.rypDraggable(panel);
-    window.rypResizePanel(panel);
-    /* 交互事件回灌本面板的专属布局语义：拖动过 ⇒ 停用自动对齐；双击复位 ⇒ 恢复自动对齐 */
-    panel.addEventListener('ry-panel-drag-end', function (e) {
-      if (e.detail && e.detail.moved) manualPos = true;
-    });
-    panel.addEventListener('ry-panel-pos-reset', function () {
-      manualPos = false;
-      try { align(); } catch (err) { }
-    });
     bodyEl.addEventListener('change', onBodyChange);
     bodyEl.addEventListener('click', onBodyClick);
     function align() {
-      if (manualPos) return;   /* v164b：用户拖动定位后不再自动对齐（双击标题栏恢复） */
       try {
-        var c = document.getElementById('tlWsContent'), pane = panel.parentNode;
+        /* In the shared drawing host the pipeline layer itself is camera-transformed.
+           Anchor the floating controls to the stable viewport instead. */
+        var pane = panel.parentNode;
+        var c = pane && pane.id === 'ryDrawingHost'
+          ? document.getElementById('ppCanvasWrap') : document.getElementById('tlWsContent');
         if (!c || !pane) return;
         var pr = pane.getBoundingClientRect(), cr = c.getBoundingClientRect();
         if (cr.width < 40) return;
-        var r = Math.max(8, (pr.right - cr.right) + 8), t = Math.max(8, (cr.top - pr.top) + 8);
+        /* [v803] 右缘让出抽屉标签宽度（~24px）：面板弹出不遮住右缘标签，
+           用户才能再点标签收回。 */
+        var r = Math.max(26, (pr.right - cr.right) + 8), t = Math.max(8, (cr.top - pr.top) + 8);
         panel.style.right = r + 'px'; panel.style.top = t + 'px';
       } catch (e) { }
     }
-    if (window.ResizeObserver) { try { new ResizeObserver(align).observe(document.getElementById('tlWsContent')); } catch (e) { } }
+    if (window.ResizeObserver) { try {
+      var observer = new ResizeObserver(align);
+      observer.observe(document.getElementById('tlWsContent'));
+      var sharedViewport = document.getElementById('ppCanvasWrap');
+      if (sharedViewport) observer.observe(sharedViewport);
+    } catch (e) { } }
     window.addEventListener('resize', align);
     setTimeout(align, 400); align();
     render();
+    /* [v803] 对齐函数挂到面板实例上，供抽屉标签（inline-18）弹开时主动触发。 */
+    panel.__ryAlign = align;
     return panel;
   }
 
@@ -1510,6 +1462,17 @@
     R._layerPanelHooked = true;
   }
   function boot() { ensure(); hookSel(); }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
-  window.tlWsLayerPanel = { refresh: render, el: function () { return panel; } };
+  /* [v792c] boot 不再单押 DOMContentLoaded。用户实测（file:// 直开 + 慢 CDN）：
+     head 里同步加载的 beacon.cdn.qq.com 脚本阻塞解析、尾部 jsdelivr 的 shoelace
+     module（defer 语义）推迟 DOMContentLoaded —— CDN 一慢，DOMContentLoaded 几十秒
+     都不触发，面板就从未创建（「图层控制面板不见了」；此前 v164~v780s 面板一直在，
+     纯属当时 CDN 可达）。三路兜底：DOMContentLoaded / 1.2s 定时器 / 宿主挂载时的
+     主动 ensure（window.tlWsLayerPanel.ensure，inline-18 homeLayerPanel 调用）。
+     boot 幂等：ensure 有 panel guard、hookSel 有 _layerPanelHooked guard。
+     readyState 仍为 loading 时 ensure() 里 getElementById('tlWsContent') 可能为
+     null ⇒ 面板暂挂 body（observe(null) 被 try-catch 吞掉），后续宿主挂载的
+     homeLayerPanel 会把它搬进宿主并触发对齐，无害。 */
+  if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', boot); setTimeout(boot, 1200); } else boot();
+  /* [v803] align 也暴露出去：抽屉标签弹开面板后立即调用一次，确保不遮住右缘标签。 */
+  window.tlWsLayerPanel = { refresh: render, el: function () { return panel; }, ensure: boot, align: function () { try { if (panel && panel.__ryAlign) panel.__ryAlign(); } catch (e) { } } };
 })();

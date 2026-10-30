@@ -546,6 +546,38 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-to
   display:flex;flex-direction:column;gap:2px;
   padding:0;margin-bottom:0;   /* [v609] 特性面板下配方行并入「灌溉参数」组，不再自带上下留白 */
 }
+/* [多地块逐块规划] 清单作为右侧原生工具轨的末尾分区；只用工具轨自身滚动，不嵌套第二个滚动面板。 */
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) #ppToolbar>.pp-plot-workflow{
+  display:flex;flex:0 0 auto;flex-direction:column;gap:3px;width:100%;box-sizing:border-box;
+  margin-top:auto;padding:8px 2px 2px;border-top:1px solid var(--ry-line);background:transparent;
+}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-plot-workflow-title{
+  color:var(--ry-ink);font-size:11px;font-weight:700;line-height:17px;text-align:center;
+}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-plot-workflow-hint,
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-plot-workflow-status{
+  color:var(--ry-ink2);font-size:9px;line-height:13px;overflow-wrap:anywhere;
+}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-plot-workflow-list{
+  display:flex;flex:0 0 auto;flex-direction:column;gap:0;width:100%;margin:2px 0;
+}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-plot-workflow-row{
+  display:flex;align-items:center;gap:4px;min-height:34px;padding:3px 1px;border-bottom:1px solid var(--ry-line);background:transparent;
+}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-plot-workflow-row.is-current{background:var(--u-accent-bg);}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-plot-workflow-check{display:flex;align-items:center;flex:0 0 16px;justify-content:center;}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-plot-workflow-check input{width:13px;height:13px;margin:0;accent-color:var(--u-accent);}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-plot-workflow-main{flex:1;min-width:0;}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-plot-workflow-name{overflow:hidden;color:var(--ry-ink);font-size:10px;font-weight:600;text-overflow:ellipsis;white-space:nowrap;}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-plot-workflow-meta{color:var(--ry-ink2);font-size:8.5px;line-height:12px;overflow-wrap:anywhere;}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-plot-workflow-edit,
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-plot-workflow-group{
+  min-height:24px;padding:2px 5px;border:1px solid var(--ry-line);background:var(--ry-panel);color:var(--ry-ink);font-family:inherit;font-size:10px;font-weight:600;line-height:1.2;cursor:pointer;
+}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-plot-workflow-edit{flex:0 0 auto;}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-plot-workflow-group{width:100%;margin:2px 0;background:var(--u-accent);border-color:var(--u-accent);color:#fff;white-space:normal;}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-plot-workflow-group:disabled{border-color:var(--ry-line);background:#e7ece9;color:var(--ry-ink2);cursor:not-allowed;}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-plot-workflow-empty{padding:4px 1px;color:var(--ry-ink2);font-size:9px;line-height:13px;}
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-row{
   display:flex;align-items:center;gap:5px;
   min-height:22px;padding:0 10px;   /* [v609] 与其它行同高同边距 */

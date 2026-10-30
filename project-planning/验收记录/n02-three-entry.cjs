@@ -55,9 +55,11 @@ async function main() {
   const page = await context.newPage();
   const errors = [];
   const consoleErrors = [];
+  const consoleWarnings = [];
   const dialogs = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()); });
+  page.on('console', (message) => { if (message.type() === 'warning') consoleWarnings.push(message.text()); });
   page.on('requestfailed', (request) => consoleErrors.push(`${request.url()} :: ${request.failure()?.errorText || 'failed'}`));
   page.on('dialog', async (dialog) => {
     dialogs.push(dialog.message());
@@ -100,6 +102,19 @@ async function main() {
     network: window.RyIrrigationDataStore?.readNetworkLayout?.() || null,
     hash: location.hash,
   }));
+  const alignmentError = () => page.evaluate(() => {
+    window.RyDrawingWorkspace?.syncCamera?.();
+    const data=window.tlDiagramData, svg=document.querySelector('#tlWsContent svg.tl-ws-svg');
+    const canvas=document.getElementById('ppCanvas'), wrap=document.getElementById('ppCanvasWrap');
+    const world=window.RyTlWs?.getWorldTransform?.();
+    if(!data?.poly?.length||!svg||!canvas||!wrap||!world)return null;
+    const p=data.poly[0], q=window.ppMapToCanvas?.(p.x,p.y), rect=wrap.getBoundingClientRect();
+    const m=svg.getScreenCTM(), x=(p.x+world.ox)*world.k, y=(p.y+world.oy)*world.k;
+    if(!q||!m)return null;
+    const target={x:rect.left+q.x*rect.width/canvas.width,y:rect.top+q.y*rect.height/canvas.height};
+    const actual={x:m.a*x+m.c*y+m.e,y:m.b*x+m.d*y+m.f};
+    return Math.hypot(actual.x-target.x,actual.y-target.y);
+  });
   const clickMapListButton = async (name, selector) => {
     const item = page.locator('#myPlotList .place-item').filter({ hasText: name }).first();
     await item.waitFor({ state: 'visible' });
@@ -109,13 +124,26 @@ async function main() {
     await waitFor((wanted) => window.currentPlotId === wanted &&
       (document.getElementById('pipePlanSection')?.classList.contains('ry-active') ||
        document.getElementById('pipePlanSection')?.classList.contains('active')),
-      `${entry} 回传地块 ${id}`, 15000, id);
+      `${entry} 回传地块 ${id}`, 15000, id).catch(async (error) => {
+        const state = await page.evaluate(() => ({ id: window.currentPlotId, hash: location.hash,
+          section: document.getElementById('pipePlanSection')?.className,
+          transfer: location.search, anchor: window.RyIrrigationDataStore?.readCurrentPlotAnchor?.() || null,
+          canonical: window.__runyeSingleCanonicalDesign ? {revision: window.__runyeSingleCanonicalDesign.revision,
+            plot: window.__runyeSingleCanonicalDesign.plots?.[0]?.plotId,
+            valid: window.RyDrawingDesignModel?.validate?.(window.__runyeSingleCanonicalDesign)} : null,
+          generatedSig: window.tlDiagramData?.sourceSignature,
+          liveSig: window.ryDrawingDesignGenerationInputSignature?.(),
+          pipeCount: window.ppGetState?.()?.mainPipes?.length }));
+        throw new Error(`${error.message}\n回传现场：${JSON.stringify(state)}\n弹窗：${JSON.stringify(dialogs)}\n页面异常：${JSON.stringify(errors)}\n控制台警告：${JSON.stringify(consoleWarnings.slice(-12))}`);
+      });
     const before = await readState();
     assert.equal(before.anchor?.id, id, `${entry}：当前锚点应为 ${id}`);
     assert.ok(Array.isArray(before.poly) && before.poly.length >= 3, `${entry}：边界顶点应不少于 3`);
     assert.ok(Number(before.area) > 0, `${entry}：面积应大于 0`);
 
-    await nav('管路规划', 'tlPipePlanSection');
+    // 分区与管路现共用同一绘图区；顶部不再提供独立的管路规划导航入口。
+    await nav('分区与管路', 'pipePlanSection');
+    await page.evaluate(() => window.RyDrawingWorkspace?.setToolMode?.('pipeline'));
     await page.evaluate(() => {
       window.tlAutoGenerate?.({ scroll: false });
       window.runyeSaveProject?.(true);
@@ -124,8 +152,44 @@ async function main() {
       `${entry} 管网归属 ${id}`, 15000, id);
     const generated = await readState();
     assert.equal(generated.network?.plotId, id, `${entry}：生成管网归属应为 ${id}`);
+    let editedPid=null;
+    if(entry==='地图右键弹窗'){
+      const initial=await alignmentError();
+      assert.ok(initial!==null&&initial<2, `叠加层初始对齐误差 ${initial}px`);
+      await page.evaluate(() => { window.ppZoomView?.(1.25); window.ppPanView?.(40,25); });
+      const moved=await alignmentError();
+      assert.ok(moved!==null&&moved<2, `缩放平移后叠加层对齐误差 ${moved}px`);
+      editedPid=await page.evaluate(() => {
+        const edits=window.RyTlAutoEdits, data=window.tlDiagramData;
+        const pid=edits?.allPids?.(data)?.[0];
+        return pid&&edits.setHidden(pid,true,data,'ws')?pid:null;
+      });
+      assert.ok(editedPid, '三级管线应存在可编辑管段');
+      await waitFor((pid) => window.__runyeSingleCanonicalDesign?.plots?.[0]?.network?.level3Edits?.automatic?.hidden?.[pid]===true,
+        '三级遮蔽写入规范模型', 15000, editedPid);
+      await page.evaluate((pid) => {
+        const edits=window.RyTlAutoEdits;
+        edits.beginBatch(); edits.setHidden(pid,false,window.tlDiagramData,'host-expand'); edits.endBatch();
+      },editedPid);
+      await waitFor((pid) => !window.__runyeSingleCanonicalDesign?.plots?.[0]?.network?.level3Edits?.automatic?.hidden?.[pid],
+        '宿主工具遮蔽撤销写入规范模型', 15000, editedPid);
+      await page.evaluate((pid) => window.RyTlAutoEdits.setHidden(pid,true,window.tlDiagramData,'host'),editedPid);
+      await waitFor((pid) => window.__runyeSingleCanonicalDesign?.plots?.[0]?.network?.level3Edits?.automatic?.hidden?.[pid]===true,
+        '宿主工具遮蔽写入规范模型', 15000, editedPid);
+      const revisionBeforeCaliber=await page.evaluate(() => window.__runyeSingleCanonicalDesign?.revision);
+      await page.evaluate((pid) => {
+        const edits=window.RyTlAutoEdits;
+        edits.beginBatch(); edits.setCaliber(pid,200,window.tlDiagramData,'econ'); edits.endBatch();
+      },editedPid);
+      await sleep(250);
+      assert.equal(await page.evaluate(() => window.__runyeSingleCanonicalDesign?.revision),revisionBeforeCaliber,
+        '仅会话态的批量改径不推进规范设计修订');
+      assert.equal(await page.evaluate(() => window.runyeSaveProject?.(true)),true,'三级编辑后工程保存成功');
+    }
+    const beforeReloadSignatures = await page.evaluate(() => ({ generated: window.tlDiagramData?.sourceSignature,
+      live: window.ryDrawingDesignGenerationInputSignature?.() }));
 
-    await nav('地块分区', 'pipePlanSection');
+    await nav('分区与管路', 'pipePlanSection');
     await page.reload({ waitUntil: 'load' });
     await closeNotice();
     try { await waitFor((wanted) => window.currentPlotId === wanted, `${entry} 刷新恢复地块 ${id}`, 30000, id); }
@@ -142,12 +206,21 @@ async function main() {
       throw new Error(`${error.message}\n刷新恢复现场：${JSON.stringify(diagnostic)}`);
     }
     const after = await readState();
+    const afterReloadSignatures = await page.evaluate(() => ({ generated: window.tlDiagramData?.sourceSignature,
+      live: window.ryDrawingDesignGenerationInputSignature?.() }));
     assert.equal(after.anchor?.id, id, `${entry}：刷新后锚点应为 ${id}`);
     assert.equal(after.network?.plotId, id, `${entry}：刷新后管网仍应归属 ${id}`);
     assert.equal(after.area, before.area, `${entry}：刷新后面积应一致`);
     assert.deepEqual(after.poly, before.poly, `${entry}：刷新后边界应一致`);
     assert.equal(after.hash, '#pipePlanSection', `${entry}：刷新后应停留在地块分区`);
+    assert.equal(beforeReloadSignatures.generated, beforeReloadSignatures.live, `${entry}：生成签名应匹配当前输入`);
+    assert.equal(afterReloadSignatures.generated, afterReloadSignatures.live, `${entry}：刷新后生成签名应保持稳定`);
+    if(editedPid){
+      assert.equal(await page.evaluate((pid) => window.RyTlAutoEdits?.isHidden?.(pid),editedPid),true,
+        '三级遮蔽状态刷新后恢复');
+    }
     console.log(`PASS: ${entry} → ${id} → 管网归属 → 刷新恢复`);
+    return editedPid;
   };
 
   try {
@@ -178,12 +251,14 @@ async function main() {
     const send = page.locator('#rymSendDesign');
     await send.waitFor({ state: 'visible', timeout: 10000 });
     await send.click();
-    await checkEntry('n02-a', '地图右键弹窗');
+    const priorHiddenPid=await checkEntry('n02-a', '地图右键弹窗');
 
     // 入口二：地图列表箭头。
     await nav('在线地图', 'onlineMapSection');
     await clickMapListButton('N02-B', '.place-send');
     await checkEntry('n02-b', '地图列表箭头');
+    assert.equal(await page.evaluate((pid) => window.RyTlAutoEdits?.isHidden?.(pid),priorHiddenPid),false,
+      '切到另一地块后不得继承上一块的三级遮蔽编辑');
 
     // 入口三：地块绘制页的地块库“设为当前”。
     await nav('地块绘制', 'areaTool');

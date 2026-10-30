@@ -4,6 +4,10 @@ const fs = require('fs'), vm = require('vm');
 const repo = require('path').join(__dirname, '..');
 function setup() {
   const root = { measuredPolygon: [{x:0,y:0},{x:120,y:0},{x:120,y:100},{x:0,y:100}], measuredArea:12000 };
+  const saved=new Map();
+  root.localStorage={getItem:key=>saved.get(key)||null,setItem:(key,value)=>saved.set(key,String(value)),removeItem:key=>saved.delete(key)};
+  root.runyeSaveProject=(silent,key)=>{root.localStorage.setItem(key,JSON.stringify({measuredPolygon:root.measuredPolygon,measuredArea:root.measuredArea}));return true;};
+  root.runyeLoadProject=()=>true;
   const context=vm.createContext(root);
   vm.runInContext(fs.readFileSync(repo+'/runye-ai-plan.js','utf8'), context);
   return root;

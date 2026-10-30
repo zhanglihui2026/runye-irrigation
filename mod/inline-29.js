@@ -36,7 +36,7 @@
   }
 
   /* ---------------- 数据层 ---------------- */
-  var W = { blocks: [], trunk: { lines: [], dn: 110 }, dnOver: { main: null, branch: null }, frame: null, sel: -1, draw: null, mode: 'pick', tlShow: true, drag: null, hovBlock: -1 };
+  var W = { blocks: [], trunk: { lines: [], dn: 110 }, dnOver: { main: null, branch: null }, frame: null, sel: -1, draw: null, mode: 'pick', drag: null, hovBlock: -1 };
   window.__runyeGroupWork = W;
 
   /* 从二级页接管：各块环 / 各块的编辑结果 / 外框；并把 v193 在二级页画的总管迁过来 */
@@ -62,9 +62,28 @@
     var B = window.RunyeBridge;
     var live = (B && B.groupLiveSlot) ? B.groupLiveSlot() : null;
     var liveIdx = live && ge ? ge.current : -1;
+    var memberIds = subs.map(function (s) { return String(s && s.id || ''); });
+    var canonicalGroupId = 'legacy-group:' + JSON.stringify(memberIds);
+    var canonicalRead = !!(W.canonicalDesign);
+    var canonicalAdapter = window.RyDrawingDesignGroupAdapter;
+    var projectionError = null;
     W.blocks = subs.map(function (s, i) {
       var prev = old.filter(function(b){return s.id != null ? b.id === s.id : b.name === (s.name || ('子地块' + (i + 1)));})[0] || {};
-      var slot = (i === liveIdx) ? live : ((ge && ge.slots[i]) ? clone(ge.slots[i]) : null);
+      var slot = null;
+      if (i === liveIdx) slot = live;
+      else if (canonicalRead) {
+        if (W.canonicalGroupId !== canonicalGroupId || !memberIds[i] || !canonicalAdapter ||
+          typeof canonicalAdapter.toLegacyMemberSlot !== 'function') {
+          projectionError = { error: 'canonical-member-projection-binding-mismatch', index: i };
+        } else {
+          var projected = canonicalAdapter.toLegacyMemberSlot(W.canonicalDesign, canonicalGroupId, memberIds[i],
+            ge && ge.slots && ge.slots[i] || {});
+          if (!projected || !projected.ok) projectionError = {
+            error: projected && projected.error || 'canonical-member-projection-failed', index: i
+          };
+          else slot = projected.slot;
+        }
+      } else slot = (ge && ge.slots && ge.slots[i]) ? clone(ge.slots[i]) : null;
       var ring = (s.poly || []).map(function(q){return {x:+q.x,y:+q.y};});
       if (prev.tlData && grSlotSignature(prev.ring, prev.slot) !== grSlotSignature(ring, slot)) {
         prev = {};   // L2 geometry changed: old L3 results no longer describe this block.
@@ -83,6 +102,11 @@
         srcOver: prev.srcOver || null
       };
     });
+    if (projectionError) {
+      W.blocks = []; W.frame = null;
+      window.__runyeDrawingDesignShadow = { ok: false, stage: 'group-read', error: projectionError.error, index: projectionError.index };
+      return false;
+    }
     /* v193 的总管存在 __runyeGroupEdit.trunkPipes；v194 起归本页管，旧数据一次性迁过来 */
     if (ge && Array.isArray(ge.trunkPipes)) W.trunk.lines = ge.trunkPipes;
     /* [v654] ★ ge.trunkDn → W.trunk.dn / sel.value 的反写已删除（修撤销系统捕获快照踩踏）：
@@ -220,7 +244,8 @@
     /* 分区数与二级页同源：读同一个输入框（planN / fld_N），整组共用一个口径 */
     var elN = document.getElementById('planN'), elF = document.getElementById('fld_N');
     var planN = parseInt(elN && elN.value) || parseInt(elF && elF.value) || 4;
-    return B.zoneCutsFor(bb, planN, b.slot && b.slot.cutSnap, b.slot && b.slot.cutOverrides);
+    return B.zoneCutsFor(bb, planN, b.slot && b.slot.cutSnap, b.slot && b.slot.cutOverrides,
+      b.slot && isFinite(Number(b.slot.zoneAngleDeg)) ? Number(b.slot.zoneAngleDeg) : (b.slot && b.slot.zoneRotated ? 90 : 0),b.ring);
   }
   /* ===== [v236] 地块尺寸标注 —— 样式与三级管路页同一套（建筑制图风） =====
      用户原话：「地块的尺寸标注样式跟三级管路一样，改下。」
@@ -342,12 +367,15 @@
       ctx.strokeStyle = 'rgba(51,65,85,.45)';
       ctx.lineWidth = 1.2;
       ctx.setLineDash([6, 4]);
+      var B=window.RunyeBridge,localRing=B.polyToGrid(cuts,b.ring);
       cuts.xPos.forEach(function (x) {
-        var p1 = toC(x, cuts.yPos[0]), p2 = toC(x, cuts.yPos[cuts.yPos.length - 1]);
+        var ends=B.polyToWorld(cuts,[{x:x,y:cuts.yPos[0]},{x:x,y:cuts.yPos[cuts.yPos.length - 1]}]);
+        var p1 = toC(ends[0].x,ends[0].y), p2 = toC(ends[1].x,ends[1].y);
         ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
       });
       cuts.yPos.forEach(function (y) {
-        var p1 = toC(cuts.xPos[0], y), p2 = toC(cuts.xPos[cuts.xPos.length - 1], y);
+        var ends=B.polyToWorld(cuts,[{x:cuts.xPos[0],y:y},{x:cuts.xPos[cuts.xPos.length - 1],y:y}]);
+        var p1 = toC(ends[0].x,ends[0].y), p2 = toC(ends[1].x,ends[1].y);
         ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
       });
       /* 非标分区（实际面积 < 标准 97%）：琥珀描边 —— 判断口径与二级页 ppDrawZones 相同；
@@ -359,14 +387,25 @@
       for (var zr = 0; zr < cuts.rows; zr++) {
         for (var zc = 0; zc < cuts.cols; zc++) {
           var cell = XB && XB.clipPolyToRect
-            ? XB.clipPolyToRect(b.ring, cuts.xPos[zc], cuts.yPos[zr], cuts.xPos[zc + 1], cuts.yPos[zr + 1])
+            ? XB.clipPolyToRect(localRing, cuts.xPos[zc], cuts.yPos[zr], cuts.xPos[zc + 1], cuts.yPos[zr + 1])
             : null;
           var mu = (cell && XB.polyArea ? XB.polyArea(cell) : 0) / 666.67;
           var stdMu = (cuts.xPlan[zc] || 0) * (cuts.yPlan[zr] || 0) / 666.67;
           if (stdMu > 0 && mu < stdMu * 0.97 && mu > 0.05) {
-            var q1 = toC(cuts.xPos[zc], cuts.yPos[zr]), q2 = toC(cuts.xPos[zc + 1], cuts.yPos[zr + 1]);
+            var cs = [
+              { x: cuts.xPos[zc], y: cuts.yPos[zr] },
+              { x: cuts.xPos[zc + 1], y: cuts.yPos[zr] },
+              { x: cuts.xPos[zc + 1], y: cuts.yPos[zr + 1] },
+              { x: cuts.xPos[zc], y: cuts.yPos[zr + 1] }
+            ];
             ctx.strokeStyle = 'rgba(217,119,6,.9)';
-            ctx.strokeRect(q1.x, q1.y, q2.x - q1.x, q2.y - q1.y);
+            ctx.beginPath();
+            cs.forEach(function (w, ci) {
+              var world=XB.cutToWorld(cuts,w.x,w.y),q = toC(world.x, world.y);
+              ci ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y);
+            });
+            ctx.closePath();
+            ctx.stroke();
           }
         }
       }
@@ -375,7 +414,9 @@
     /* [v236] 各块尺寸标注（建筑制图风，同三级页样式）：底边总宽 + 右侧总高
        [v658] 受「标注显示」勾选框控制（隐藏范围=尺寸标注线+尺寸文字） */
     if (!grLabelsOff) grRenderBlockDims();
-    /* 各块已布的管线：只读（块级的编辑一律回二级页逐块模式 / 三级页，不在本页改） */
+    /* 各块已布的管线：只读（块级的编辑一律回二级页逐块模式 / 三级页，不在本页改）
+       [v671 用户要求] 管线画法对齐三级页：补画 45°斜向连接管 + 阀门红⊗ + 主管上
+       的三通小方块（见 grRenderFittings）；本页仍不画总管，其余与三级页一致。 */
     W.blocks.forEach(function (b) {
       var s = b.slot || {};
       strokeLines(s.mainPipes, 'rgba(24,95,165,.85)', 3);
@@ -385,6 +426,7 @@
         var q = toC(s.source.x, s.source.y);
         ctx.fillStyle = '#f59e0b'; ctx.beginPath(); ctx.arc(q.x, q.y, 6, 0, Math.PI * 2); ctx.fill();
       }
+      grRenderFittings(s.mainPipes, s.branchPipes, s.valves);
     });
     /* [v198] 主管/支管尺寸标注：画完所有线再统一标（标注层在最上，不被线压住）。
        [v237] 用户原话：「60跟52是管道长度吗？这里不用显示管道长度，显示管道直径。」
@@ -394,8 +436,10 @@
        · hyd 块与 W.blocks 同序生成但会跳过无分区的块 ⇒ 用同一跳过条件做双指针对齐；
        · 仅当「该块管线条数 = 分区数」时按序号取径（与 v233 的 mains[z]↔zones[z] 同一假设），
          对不上或 hyd 未算时【不标】，绝不回退成管长（用户明确不要管长）。
-       [v658] 整段受「标注显示」勾选框控制（隐藏范围=管径白底牌）。 */
-    if (!grLabelsOff) {
+       [v658] 整段受「标注显示」勾选框控制（隐藏范围=管径白底牌）。
+       [v669b] 管径白底牌改由 grDnLabelsOff 单独控制（用户要求主管/支管管径要显示），
+       不再跟随「标注」总开关。 */
+    if (!grDnLabelsOff) {
     var hydI = 0;
     W.blocks.forEach(function (b) {
       var s = b.slot || {};
@@ -416,8 +460,8 @@
       });
     });
     } /* end [v658] if(!grLabelsOff) 管径白底牌段 */
-    /* [v235] 三级管路导入层（只读，独立通道）：画在 ⚡ 管线之上、总管与 v233 驳接点之下 */
-    grTlRender();
+    /* [v678 用户拍板] 「▣ 三级管路」导入层随页面瘦身移除（grTlRender/grTlToggle/grTlSyncBtn 删除）；
+       各块三级结果存档（tlData）数据层仍保留在 grSync/grExportState，恢复显示只需重接渲染调用。 */
     /* 总管：本页唯一可编辑的图层 */
     (W.trunk.lines || []).forEach(function (l, i) {
       strokeLines([l], (i === W.sel) ? '#f59e0b' : '#7c3aed', (i === W.sel) ? 7 : 5);
@@ -442,6 +486,61 @@
       W.draw.forEach(function (p) {
         var q = toC(p.x, p.y); ctx.beginPath(); ctx.arc(q.x, q.y, 3, 0, Math.PI * 2); ctx.fill();
       });
+    }
+  }
+
+  /* ============== [v671 2026-10-23 用户要求] 三通方块 / 45°斜向连接管 / 阀门 ==============
+     用户原话：「主管的三通小方块 三通，主管跟支管连接的斜向的管都没有，这个要改过来，
+       按照三级页面那个方式绘制管道，多地块规划比三级页面只是不显示总管，其他都按照三级页面来。」
+     数据源：slot.mainPipes / slot.branchPipes / slot.valves（⚡生成各块管路写回，
+       plot-editor.js ppBuildAutoPipes，与三级页 tlAutoGenerate 同一套公式）。
+     · 阀心 = valves[z] 的 (x,y)（=支管中点）；缺失时按支管首尾中点现算。
+     · 斜向连接管：主管上的 45° 锚点 → 阀心。锚点按三级页同款公式现算
+       （对照 inline-09.js:3833-3860 生成式 与 4479-4511 tlValveConnPt 补算式）：
+         竖主管：ax = 主管x，ay = 阀心y − |阀心x − 主管x|，钳位到主管段范围；
+         横主管：ay = 主管y，ax = 阀心x − |阀心y − 主管y|，钳位到主管段范围。
+       valves[z] 自带 ax/ay（tlData 快照里的三级阀门）时直接用，不重算。
+     · 三通小方块：中心 = 主管上的锚点，9×9 #0C447C 白描边 1.5（三级页 4529-4533 同款）。
+     · 阀门符号：window.ryValveCanvas（RY_VALVE 单一来源，红⊗ r6.5，与二级/三级同规格）。
+     层序照三级页：主管→支管→斜管→阀门→三通方块（方块最后画，白框不被线压）。
+     坐标：世界米 → toC 转屏幕；方块/阀门固定像素尺寸，不随缩放（与管径白底牌同口径）。 */
+  function grRenderFittings(mains, branches, valves) {
+    if (!mains || !mains.length || !branches || !branches.length) return;
+    var n = Math.min(mains.length, branches.length);
+    for (var i = 0; i < n; i++) {
+      var mp = mains[i], bp = branches[i];
+      if (!mp || mp.length < 2 || !bp || bp.length < 2) continue;
+      var v = (valves && valves[i]) || null;
+      if (!v || v.x == null) {
+        v = { x: (bp[0].x + bp[bp.length - 1].x) / 2, y: (bp[0].y + bp[bp.length - 1].y) / 2 };
+      }
+      var vert = Math.abs(mp[0].x - mp[mp.length - 1].x) < 1e-6;
+      var ax = v.ax, ay = v.ay;
+      if (ax == null || ay == null) {
+        if (vert) {
+          ax = mp[0].x;
+          ay = v.y - Math.abs(v.x - ax);
+          var yLo = Math.min(mp[0].y, mp[mp.length - 1].y), yHi = Math.max(mp[0].y, mp[mp.length - 1].y);
+          if (ay < yLo) ay = yLo; if (ay > yHi) ay = yHi;
+        } else {
+          ay = mp[0].y;
+          ax = v.x - Math.abs(v.y - ay);
+          var xLo = Math.min(mp[0].x, mp[mp.length - 1].x), xHi = Math.max(mp[0].x, mp[mp.length - 1].x);
+          if (ax < xLo) ax = xLo; if (ax > xHi) ax = xHi;
+        }
+      }
+      var a = toC(ax, ay), vp = toC(v.x, v.y);
+      /* 斜向连接管（三级页 4518 行同规格：#185FA5，透明度 0.92） */
+      ctx.strokeStyle = '#185FA5'; ctx.lineWidth = 2.5; ctx.globalAlpha = 0.92;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(vp.x, vp.y); ctx.stroke();
+      ctx.globalAlpha = 1;
+      /* 阀门红⊗ */
+      if (window.ryValveCanvas) window.ryValveCanvas(ctx, vp.x, vp.y);
+      /* 主管上的三通小方块 */
+      ctx.fillStyle = '#0C447C';
+      ctx.fillRect(a.x - 4.5, a.y - 4.5, 9, 9);
+      ctx.lineWidth = 1.5; ctx.strokeStyle = '#fff';
+      ctx.strokeRect(a.x - 4.5, a.y - 4.5, 9, 9);
     }
   }
 
@@ -478,7 +577,7 @@
   function grRenderTrunk() {
     var ge = window.__runyeGroupEdit;
     if (ge && W.groupRef === ge) { ge.trunkPipes = W.trunk.lines; ge.trunkDn = W.trunk.dn; }
-    grComputeHydraulics(); grRenderHyd();
+    grComputeHydraulics();   /* [v678] 只喂 DN 管径牌 / 总管流速体检 / 参考线；水力面板已随页面瘦身移除 */
     var len = sumLen(W.trunk.lines), n = (W.trunk.lines || []).length;
     if ($('grTrunkLen')) $('grTrunkLen').textContent = fmt(len, 1);
     if ($('grTrunkN')) $('grTrunkN').textContent = String(n);
@@ -511,30 +610,22 @@
       return;
     }
     box.innerHTML = '';
-    W.blocks.forEach(function (b, i) {
+    W.blocks.forEach(function (b) {
       var s = b.slot || {};
       var ml = sumLen(s.mainPipes), bl = sumLen(s.branchPipes);
       var d = document.createElement('div');
-      /* [v242] 「当前块」高亮对两条路都成立：三级页(__runyeTlBlock) / 二级页(__runyeGroupPlotEdit)。
-         三级优先 —— 它 != null 时一定是从「▶ 进入三级页」进来的，此刻没有二级编辑在途。 */
-      var curI = (window.__runyeTlBlock != null) ? window.__runyeTlBlock : window.__runyeGroupPlotEdit;
-      d.className = 'gr-block' + (curI === i ? ' cur' : '');
+      d.className = 'gr-block';
       var hasPipe = ((s.mainPipes || []).length + (s.branchPipes || []).length + (s.subBranchPipes || []).length) > 0;
       /* [v201] 「这块还没布管」必须在列表里说清楚 —— 用户原话：「主管跟支管未显示，
-         要显示出来」。若只是画布空白，用户无法分辨是「页面坏了」还是「这块本来就没管」；
-         补一枚状态标签，一眼就知道该去点「⚡ 生成各块管路」还是等着看结果。 */
+         要显示出来」。若只是画布空白，用户无法分辨是「页面坏了」还是「这块本来就没管」。 */
       var pipeTag = hasPipe
         ? '<span class="gr-tag">主管 ' + (s.mainPipes || []).length + ' ／ 支管 ' + (s.branchPipes || []).length + '</span>'
         : '<span class="gr-tag no">未布管</span>';
+      /* [v678] 只读展示：不再有「▶ 进入三级页 / ✎ 二级改这块的管」按钮与「三级已生成」标签 */
       d.innerHTML =
         '<div class="gr-block-hd"><span>' + esc(b.name) + '</span>' +
         '<span class="gr-block-mu">' + fmt(num(b.mu, 0), 2) + ' 亩</span></div>' +
-        '<div class="gr-block-meta">主管 ' + fmt(ml, 1) + ' m ／ 支管 ' + fmt(bl, 1) + ' m ／ ' + pipeTag +
-        (b.tlData ? ' ／ <span class="gr-tag">三级已生成</span>' : ' ／ <span class="gr-tag no">三级未生成</span>') + '</div>' +
-        '<div class="gr-block-btns">' +
-        '<button type="button" class="pp-btn-ghost gr-btn" data-act="tl" data-i="' + i + '">▶ 进入三级页</button>' +
-        '<button type="button" class="pp-btn-ghost gr-btn" data-act="l2" data-i="' + i + '">✎ 二级改这块的管</button>' +
-        '</div>';
+        '<div class="gr-block-meta">主管 ' + fmt(ml, 1) + ' m ／ 支管 ' + fmt(bl, 1) + ' m ／ ' + pipeTag + '</div>';
       box.appendChild(d);
     });
   }
@@ -731,83 +822,9 @@
     });
     return best;
   }
-  /* ---------------- [v242] 双击地块 ⇒ 进入该块二级编辑（CAD 式） ----------------
-     用户原话：「我想点双击地块边线，直接进入地块内部编辑，拖动分区线的位置。
-               类似CAD那种，双击进入块编辑，或者是在布局的窗口内双击进入图纸编辑，
-               在视口外面 双击就退出了。」
-               「我这里双击进入的是二级页面，不是三级页面，更正一下。」
-     ⇒ 本页（= 布局/图纸总览）：双击地块 = 进入该块的**二级页逐块编辑**；双击地块【之外】的
-       空白 = 适应窗口（v240 取消「⤢ 适应」按钮后唯一的复位入口，不能被这层含义吃掉）。
-       ★ 为什么是二级页：用户要「拖动分区线」，而分区线只在二级页可拖 —— 三级页的分区是
-         从二级页 getZoneCuts() 读来的只读网格。
-       对称的那一半：
-         · 二级页里双击地块轮廓外面 = 退回本页（ppExitToGroupPage，在 pp IIFE 里）；
-         · 三级页里双击地块轮廓外面 = 退回本页（wsExitBlockEdit，供「▶ 进入三级页」那条路）。
-     ★ 命中口径分两级：先按【边线垂距 ≤ 10 屏幕像素】取最近的一块（用户明确说的是
-       「边线」），不中才退化为【点落在块内】—— 这样"瞄着边线"和"随手点块里"都能进，
-       而块外的空白仍然留给适应窗口。容差按屏幕像素折算（10 / view.scale），
-       缩放后手感一致。 */
-  function grDistToRing(p, ring) {
-    var best = Infinity;
-    for (var i = 0; i < ring.length; i++) {
-      var d = dist(p, grProjectOnSeg(p, ring[i], ring[(i + 1) % ring.length]));
-      if (d < best) best = d;
-    }
-    return best;
-  }
-  function grPointInRing(p, ring) {
-    var inside = false;
-    for (var i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-      var a = ring[i], b = ring[j];
-      if ((a.y > p.y) !== (b.y > p.y) &&
-        p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) inside = !inside;
-    }
-    return inside;
-  }
-  function grHitBlockForEnter(wp) {
-    if (!W.blocks.length) return -1;
-    var tol = 10 / (view.scale || 1), best = -1, bd = tol, i, b;
-    for (i = 0; i < W.blocks.length; i++) {
-      b = W.blocks[i];
-      if (!b.ring || b.ring.length < 3) continue;
-      var d = grDistToRing(wp, b.ring);
-      if (d <= bd) { bd = d; best = i; }
-    }
-    if (best >= 0) return best;
-    for (i = 0; i < W.blocks.length; i++) {
-      b = W.blocks[i];
-      if (b.ring && b.ring.length >= 3 && grPointInRing(wp, b.ring)) return i;
-    }
-    return -1;
-  }
-  /* ---------------- 按块进入二级页（逐块编辑） ----------------
-     ★ [v242 更正] 双击地块进的是【二级页】，不是三级页 —— 用户原话：
-       「我这里双击进入的是二级页面，不是三级页面，更正一下。」
-       落点逻辑也印证了这一点：用户最初那句「直接进入地块内部编辑，**拖动分区线的位置**」——
-       分区线（ppState.cutOverrides / 分区网格）**只在二级页可拖**；三级页的分区是从二级页
-       RunyeBridge.getZoneCuts() 读来的只读网格，在那边拖分区线是无效操作。
-     ★ 与「✎ 二级改这块的管」按钮（data-act="l2"，见 grBind 里的委托）走**同一条路** ——
-       原来那四行内联逻辑搬到这里，避免「按钮一条、双击一条」改一处漏一处。
-     ★ 标记 window.__runyeGroupPlotEdit 是这条路径的身份证：二级页据此显示「◀ 返回成组管路」，
-       并允许「在地块轮廓外面双击」退回。手动切「逐块」不设它 ⇒ 那些行为不会误触发。 */
-  function grEnterPlotL2(i) {
-    var b = W.blocks[i]; if (!b) return;
-    var B = window.RunyeBridge;
-    if (B && B.setGroupMode) { try { B.setGroupMode('perPlot'); } catch (e) { } }
-    if (B && B.selectGroupPlot) { try { B.selectGroupPlot(i); } catch (e) { } }
-    window.__runyeGroupPlotEdit = i;
-    try { if (window.ryShowSection) window.ryShowSection($('pipePlanSection'), null); } catch (e) { }
-    /* 必须落在「管线编辑」视图：二级简图（view=draw）里没有画布，分区线无从拖起。
-       放在 ryShowSection 之后 —— rySetTab 自带「目标未激活则先 ryShowSection」，无需再补。 */
-    try { if (typeof rySetTab === 'function') rySetTab('pipePlanSection', 'edit'); } catch (e) { }
-    if (B && B.syncGroupEditUI) { try { B.syncGroupEditUI(); } catch (e) { } }
-  }
-  function grEnterBlockByDbl(bi) {
-    if (bi < 0 || !W.blocks[bi]) return;
-    grHint2('进入第 ' + (bi + 1) + ' 块「' + W.blocks[bi].name + '」的二级编辑：在那边拖分区线调划分；' +
-      '在地块轮廓外面双击即可退回本页。');
-    grEnterPlotL2(bi);
-  }
+  /* [v678 用户拍板] 「双击地块进入二级编辑」整链路删除（grDistToRing / grPointInRing /
+     grHitBlockForEnter / grEnterPlotL2 / grEnterBlockByDbl，连同块列表按钮与外部导出）——
+     页面瘦身后本页纯展示，逐块编辑回到二级页自身的成组控件。双击空白 = 适应窗口保留。 */
   function grComputeHydraulics() {
     W.hyd = null;
     var I = grIntensity(); if (!(I > 0)) return;
@@ -818,18 +835,16 @@
     var tsp = grNum('planTapeSpacing', 0.4), tapeLen = grNum('planTapeLaySide', 100);
     if (!(tsp > 0)) tsp = 0.4;
     if (!(tapeLen > 0)) tapeLen = 100;
-    /* [v668 用户拍板「主管支管恒定」] 主管/支管管径**不随分区面积变化**：
-       预扫描全组所有分区流量，取最大值定档（baseMainFlow/baseBranchFlow），
-       全组所有分区共用同一档主管/支管 —— 将来把小分区并入大分区，管道大概率仍够用；
-       要改细由用户在水力面板手动调档（W.dnOver，与三级页 tlManualCals 同款语义），
-       对比损失/扬程后再决策。块总管仍按块流量选（块级对象，未在本次拍板范围）。 */
+    /* 主管/支管按全组最大分区流量选取固定档位。当前组页只保留展示、总管绘制和材料清单，
+       旧版 dnOver 快照字段仍保留读写兼容，但不能再覆盖当前自动选档结果。 */
     var baseMainFlow = 0, baseBranchFlow = 0;
     W.blocks.forEach(function (b) {
       var cuts0 = grZonesFor(b);
       if (!cuts0 || !cuts0.zoneCount) return;
       for (var z0 = 0; z0 < cuts0.zoneCount; z0++) {
         var zr0 = Math.floor(z0 / cuts0.cols), zc0 = z0 % cuts0.cols;
-        var cell0 = window.RunyeBridge.clipPolyToRect(b.ring, cuts0.xPos[zc0], cuts0.yPos[zr0], cuts0.xPos[zc0 + 1], cuts0.yPos[zr0 + 1]);
+        var localRing0=window.RunyeBridge.polyToGrid(cuts0,b.ring);
+        var cell0 = window.RunyeBridge.clipPolyToRect(localRing0, cuts0.xPos[zc0], cuts0.yPos[zr0], cuts0.xPos[zc0 + 1], cuts0.yPos[zr0 + 1]);
         var mu0 = window.RunyeBridge.polyArea(cell0 || []) / 666.67;
         if (!(mu0 > 1e-9)) continue;
         var f0 = mu0 * I;
@@ -840,11 +855,8 @@
     });
     var constMp = selectPipe(Math.max(baseMainFlow, 0.01), tv, MAIN_PIPE_MIN_OD, Infinity);
     var constBp = selectPipe(Math.max(baseBranchFlow, 0.01), tv, 0, BRANCH_PIPE_MAX_OD);
-    /* 手动覆盖（v668）：有覆盖用覆盖（内径走 grId，与 selectPipe 同一 SDR 口径），无覆盖用恒定自动档 */
-    var ovMainOd = (W.dnOver && W.dnOver.main) ? W.dnOver.main : constMp.od;
-    var ovBranchOd = (W.dnOver && W.dnOver.branch) ? W.dnOver.branch : constBp.od;
-    var ovMainId = (W.dnOver && W.dnOver.main) ? grId(W.dnOver.main) : constMp.id;
-    var ovBranchId = (W.dnOver && W.dnOver.branch) ? grId(W.dnOver.branch) : constBp.id;
+    var ovMainOd = constMp.od, ovBranchOd = constBp.od;
+    var ovMainId = constMp.id, ovBranchId = constBp.id;
     var blocks = [], totalFlow = 0, maxBlkLoss = 0, anyPipe = false;
     W.blocks.forEach(function (b, bi) {
       var cuts = grZonesFor(b);
@@ -862,7 +874,8 @@
         var zr = Math.floor(z / cuts.cols), zc = z % cuts.cols;
         var zx = cuts.xPos[zc], zy = cuts.yPos[zr], zW = cuts.xSrc[zc], zH = cuts.ySrc[zr];
         var B = window.RunyeBridge;
-        var cell = B.clipPolyToRect(b.ring, cuts.xPos[zc], cuts.yPos[zr], cuts.xPos[zc + 1], cuts.yPos[zr + 1]);
+        var localRing=B.polyToGrid(cuts,b.ring);
+        var cell = B.clipPolyToRect(localRing, cuts.xPos[zc], cuts.yPos[zr], cuts.xPos[zc + 1], cuts.yPos[zr + 1]);
         var mu = B.polyArea(cell || []) / 666.67;
         if (!(mu > 1e-9)) continue;   // No crop outside the actual block boundary.
         var flow = mu * I;
@@ -870,6 +883,7 @@
         var mPts;
         if (fs) { var mx = zx + 0.40 * zW; mPts = [{ x: mx, y: zy }, { x: mx, y: zy + zH }]; }
         else { var my = zy + 0.40 * zH; mPts = [{ x: zx, y: my }, { x: zx + zW, y: my }]; }
+        mPts=B.polyToWorld(cuts,mPts);
         var d1 = dist(mPts[0], { x: cx, y: cy }), d2 = dist(mPts[1], { x: cx, y: cy });
         /* [v238] 拖动轨道：优先该分区**真实布的主管**（与图上所见一致），没布管就用合成的 mPts。
            有用户拖过的覆盖值时，把它再投影一次 —— 保证即使分区/管线变了也仍落在管上。 */
@@ -877,8 +891,7 @@
         var tpDef = grProjectOnLine(d1 <= d2 ? mPts[0] : mPts[1], zLine);
         var tpOv = (b.tpOver && b.tpOver[z]) ? b.tpOver[z] : null;
         var tp = tpOv ? (grProjectOnLine(tpOv, zLine) || tpDef) : tpDef;
-        /* [v233] 与二级页同款选型口径；[v668] 主管/支管改**恒定档**（预扫描最大分区流量定档，
-           不随本分区面积变），手动覆盖走 W.dnOver（水力面板两颗 select，三级页 tlCalSel 同款）。 */
+      /* [v233] 与二级页同款选型口径；主管/支管共用全组最大分区流量选出的自动档。 */
         var mp = { od: ovMainOd, id: ovMainId };
         var bFlow = flow / branchParallelCount;
         var bp = { od: ovBranchOd, id: ovBranchId };
@@ -952,7 +965,7 @@
       branchParallelCount: branchParallelCount, totalFlow: totalFlow,
       /* [v668] 恒定档设计值（供手动调档 select 的 ±3 档中心）与覆盖生效标志 */
       constMainOd: constMp.od, constBranchOd: constBp.od,
-      dnOverridden: !!(W.dnOver && (W.dnOver.main || W.dnOver.branch)),
+      dnOverridden: false,
       trunkAuto: trunkAuto, trunkAutoLen: trunkAutoLen, trunkAutoDn: trunkAutoP.od,
       trunkLen: tk, trunkLoss: trunkLoss, maxBlkLoss: maxBlkLoss,
       sysLoss: handDrawn ? (trunkLoss + maxBlkLoss) : maxBlkLoss,
@@ -961,148 +974,22 @@
       hasPipe: anyPipe
     };
   }
-  function grRenderHyd() {
-    var box = $('grHyd'); if (!box) return;
-    var H = W.hyd;
-    if (!H || !H.hasPipe) {
-      box.innerHTML = '<div class="gr-empty">请先点「⚡ 生成各块管路」，并确保左侧「每亩流量」已计算。</div>';
-      return;
-    }
-    /* [v655] 未手绘态：损失只含各块，总管行明确标「未计」并提示选泵风险 */
-    var hand = H.trunkMode === '手画';
-    /* [v668] 主管/支管手动调档（三级页 tlCalSel 同款）：设计值±3 档，选回设计值=清除覆盖；
-       改档即全量重算（损失/扬程实时跟随），供用户对比决策。 */
-    var h = '<div class="gr-cal-row">'
-      + '<label>主管 <select id="grCalSelMain" class="gr-sel" title="选择主管管径（设计值±3档），各块损失/系统扬程随之实时重算；选回设计值即恢复自动档"></select></label>'
-      + '<label>支管 <select id="grCalSelBranch" class="gr-sel" title="选择支管管径（设计值±3档），各块损失/系统扬程随之实时重算；选回设计值即恢复自动档"></select></label>'
-      + '</div>'
-      + '<div class="gr-hyd-sum">'
-      + '<div><span>系统总水头损失' + (hand ? '' : '(不含总管)') + '</span><b>' + fmt(H.sysLoss, 2) + '</b> m</div>'
-      + '<div><span>大总管损失(' + H.trunkMode + (hand ? '·满载' : '') + ')</span><b class="' + (hand ? '' : 'gr-vel-warn') + '">'
-      + (hand ? fmt(H.trunkLoss, 2) + ' m' : '未计') + '</b></div>'
-      /* [v654] 大总管流速体检：经济区间内绿、超出琥珀（色档 .gr-vel-ok / .gr-vel-warn） */
-      + '<div><span>大总管流速(' + (hand ? fmt(H.trunkVel, 1) : '—') + ' m/s)</span><b class="' + (H.trunkVelState === 'ok' || H.trunkVelState === 'none' ? 'gr-vel-ok' : 'gr-vel-warn') + '">'
-      + (H.trunkVelState === 'high' ? '偏高' : H.trunkVelState === 'low' ? '偏低' : H.trunkVelState === 'ok' ? '正常' : '待手绘') + '</b></div>'
-      + '<div><span>控制块损失(块总管+分区)</span><b>' + fmt(H.maxBlkLoss, 2) + '</b> m</div>'
-      + '<div><span>总流量</span><b>' + fmt(H.totalFlow, 1) + '</b> m³/h</div></div>';
-    if (!hand) {
-      h += '<div class="gr-hint">⚠ 总管未手绘：以上损失不含总管，选泵扬程会偏小。按满载流量推算建议总管 ≥ Ø'
-        + fmt(H.trunkAutoDn, 0) + '；点「✎ 画总管」手绘后自动恢复计算，可先点「参考线」临时看系统建议走向（虚线，不算料）。</div>';
-    }
-    /* [v233] 各块总管（示意链）一览：驳接点 = 块总管水源点，用户的大总管接这里 */
-    h += '<table class="gr-hyd-tbl"><thead><tr><th>块</th><th>块流量</th><th>总管dn</th><th>总管长</th><th>总管损失</th></tr></thead><tbody>';
-    H.blocks.forEach(function (b) {
-      h += '<tr><td>' + esc(b.name) + '</td><td>' + fmt(b.flow, 1) + '</td><td>Ø' + b.trunkDn
-        + '</td><td>' + fmt(b.trunkLen, 1) + '</td><td>' + fmt(b.trunkLoss, 2) + '</td></tr>';
-    });
-    h += '</tbody></table>';
-    h += '<table class="gr-hyd-tbl"><thead><tr><th>块</th><th>区</th><th>亩</th><th>流量</th><th>主管dn</th><th>支管dn</th><th>主管长</th><th>支管长</th><th>损失</th></tr></thead><tbody>';
-    H.blocks.forEach(function (b) {
-      b.zones.forEach(function (z) {
-        h += '<tr><td>' + esc(b.name) + '</td><td>' + z.z + '</td><td>' + fmt(z.mu, 2)
-          + '</td><td>' + fmt(z.flow, 2) + '</td><td>Ø' + z.mainDn + '</td><td>Ø' + z.branchDn
-          + '</td><td>' + fmt(z.mL, 1) + '</td><td>' + fmt(z.bL, 1) + '</td><td>' + fmt(z.zl, 2) + '</td></tr>';
-      });
-    });
-    h += '</tbody></table>';
-    box.innerHTML = h;
-    grRefreshCalSels();
-    if (window.RyTerrain) window.RyTerrain.refresh();
-  }
-  /* [v668] 主管/支管手动调档 select：填充（设计值±3 档，当前有效值选中态）+ 一次性绑定。
-     语义与三级页 tlRefreshCalSels/tlBindCalSels 同款（inline-09 215/237 行）：选回设计值=清除覆盖。
-     改档 → W.dnOver → grComputeHydraulics 全量重算 → 损失/扬程实时跟随 → 图面管径牌同步。 */
-  function grRefreshCalSels() {
-    var H = W.hyd; if (!H) return;
-    var sels = [
-      { sel: 'grCalSelMain', des: H.constMainOd, key: 'main' },
-      { sel: 'grCalSelBranch', des: H.constBranchOd, key: 'branch' }
-    ];
-    grBindCalSels();
-    sels.forEach(function (s) {
-      var el = document.getElementById(s.sel); if (!el) return;
-      var centerIdx = PE_OD_SERIES.indexOf(s.des);
-      if (centerIdx < 0) { var best = 0, bd = Infinity; for (var i = 0; i < PE_OD_SERIES.length; i++) { var d = Math.abs(PE_OD_SERIES[i] - s.des); if (d < bd) { bd = d; best = i; } } centerIdx = best; }
-      var lo = Math.max(0, centerIdx - 3), hi = Math.min(PE_OD_SERIES.length - 1, centerIdx + 3);
-      var opts = PE_OD_SERIES.slice(lo, hi + 1);
-      var cur = (W.dnOver && W.dnOver[s.key]) ? W.dnOver[s.key] : s.des;
-      if (isFinite(cur) && opts.indexOf(cur) < 0 && PE_OD_SERIES.indexOf(cur) >= 0) { opts = opts.concat([cur]); opts.sort(function (a, b) { return a - b; }); }
-      el.innerHTML = opts.map(function (od) { return '<option value="' + od + '">Ø ' + od + '</option>'; }).join('');
-      el.setAttribute('data-design', s.des);
-      el.value = (opts.indexOf(cur) >= 0) ? cur : s.des;
-    });
-  }
-  function grBindCalSels() {
-    if (window._grCalSelBound) return; window._grCalSelBound = true;
-    /* [v668] 委托到 #grHyd 容器：grRenderHyd 每次 innerHTML 重建 select，直接绑元素会
-       随重画丢失（三级页 tlCalSel 是静态元素才可以用一次绑定）。容器不换，委托恒有效。 */
-    var box = $('grHyd'); if (!box) return;
-    box.addEventListener('change', function (e) {
-      var el = e.target;
-      var key = (el.id === 'grCalSelMain') ? 'main' : (el.id === 'grCalSelBranch') ? 'branch' : null;
-      if (!key) return;
-      var design = Number(el.getAttribute('data-design'));
-      var val = Number(el.value);
-      if (!W.dnOver) W.dnOver = { main: null, branch: null };
-      W.dnOver[key] = (val === design) ? null : val;
-      grComputeHydraulics(); grRenderHyd(); grRender(); grRenderMat();
-    });
-  }
-  /* ---------------- [v238] 驳接点拖动：命中 / 拖动 ----------------
-     用户原话：「各个地块的驳接点的位置要能自由拖动，在管道上自由拖动。」
-     ⇒ 两种驳接点都能拖，且**只沿管走**（鼠标投影到管线上，不会拖到田里）：
-       · 分区驳接点（琥珀点 z.tp）—— 沿该分区主管拖，轨道 = hyd 里存档的 zone.line；
-       · 块驳接点（红点 b.src，= 大总管接入点）—— 沿该块总管链拖，轨道 = grChainLines(chain)。
-     ★ 只改「位置覆盖值」+ 立刻重算；v233 的选型/损失算法一行不动。
-     ★ src 先命中：它在链端，常常正好压在某个分区驳接点上，先判它才拖得动。 */
-  function grNodeRadius() { return 9 / (view.scale || 1); }
-  function grHitNode(wp) {
-    var H = W.hyd; if (!H || !H.blocks) return null;
-    var r = grNodeRadius(), i, z;
-    for (i = 0; i < H.blocks.length; i++) {
-      var hb = H.blocks[i];
-      if (hb.src && dist(wp, hb.src) <= r) {
-        return { kind: 'src', bi: (hb.bi == null ? i : hb.bi), hi: i, zi: -1 };
-      }
-    }
-    for (i = 0; i < H.blocks.length; i++) {
-      var hb2 = H.blocks[i];
-      for (z = 0; z < hb2.zones.length; z++) {
-        if (hb2.zones[z].tp && dist(wp, hb2.zones[z].tp) <= r) {
-          return { kind: 'tp', bi: (hb2.bi == null ? i : hb2.bi), hi: i, zi: z };
-        }
-      }
-    }
-    return null;
-  }
-  function grDragTrack(hit) {
-    var H = W.hyd; if (!H || !hit) return null;
-    var hb = H.blocks[hit.hi]; if (!hb) return null;
-    if (hit.kind === 'src') return grChainLines(hb.chain || []);
-    var zone = hb.zones[hit.zi];
-    return (zone && zone.line && zone.line.length >= 2) ? [zone.line] : null;
-  }
-  function grDragTo(wp) {
-    if (!W.drag) return;
-    var b = W.blocks[W.drag.bi]; if (!b) return;
-    var lines = grDragTrack(W.drag);
-    if (!lines || !lines.length) return;
-    var q = grProjectOnLines(wp, lines); if (!q) return;
-    if (W.drag.kind === 'src') b.srcOver = q;
-    else { b.tpOver = b.tpOver || {}; b.tpOver[W.drag.zi] = q; }
-    grComputeHydraulics(); grRenderHyd(); grRender();
-  }
-  function grClearNodeOverrides() {
-    W.blocks.forEach(function (b) { b.tpOver = null; b.srcOver = null; });
-    grComputeHydraulics(); grRenderHyd(); grRender();
-  }
+  /* [v678 用户拍板「只保留 展示 + 画总管 + 材料清单」] grRenderHyd / grRefreshCalSels /
+     grBindCalSels（水力面板：驳接点/管径覆盖/水头损失表 + 主管支管手动调档 select）整段删除。
+     grComputeHydraulics 保留 —— 它是画布 DN 管径牌、总管流速体检行、「参考线」幽灵的数据源；
+     W.dnOver 仅保留旧存档读写兼容；组页无调档入口，当前计算始终使用自动选档。 */
+  /* [v678 用户拍板] grNodeRadius / grHitNode / grDragTrack / grDragTo / grClearNodeOverrides
+     （驳接点拖动交互）整段删除 —— 驳接点 v669/v672 起已不显示、不参与命中，
+     水力面板与「↺ 驳接点复位」也随本次瘦身移除，交互链路已无消费方。
+     drawTakeoffs 保留（grTakeoffsOff 门控，代码可恢复）。 */
   function drawTakeoffs() {
     if (!W.hyd) return;
     var boxes = [];   /* [v652b] 已放标签的屏幕占位盒，后来的标签避让 */
     /* 各分区主管端：小琥珀点 + Ø主径 标签（管径见左侧明细表）
        [v652b] 标签改白底小牌：原裸 fillText 的管径字直接叠在管线上；
-       位置不变（点右上），并登记占位盒供驳接点牌避让。 */
-    W.hyd.blocks.forEach(function (b) {
+       位置不变（点右上），并登记占位盒供驳接点牌避让。
+       [v672 用户要求] 分区驳接点先取消显示（grTakeoffsOff），代码保留可恢复。 */
+    if (!grTakeoffsOff) W.hyd.blocks.forEach(function (b) {
       b.zones.forEach(function (z) {
         if (!z.tp) return;
         var q = toC(z.tp.x, z.tp.y);
@@ -1117,9 +1004,12 @@
     /* [v233] 各块总管：示意链（深红虚线）+ 水源点（大红点 = 本块驳接点）
        [v658 用户拍板方案A] 深红示意链并入「标注显示」勾选框——取消勾选时一起藏
        （它不进材料表、只是水力试算示意，图面留给真实管线）；红点驳接点是
-       功能点，永远显示。 */
+       功能点，永远显示。
+       [v669 用户要求] 红色驳接点相关整体取消：红链 / 红点 / 「Ø… 驳接点」红字牌
+       全部不再画（grRedNodesOff 恒为 true），本段只保留代码不再执行。 */
     W.hyd.blocks.forEach(function (b) {
-      if (!grLabelsOff && b.chain && b.chain.length > 1) {
+      if (grRedNodesOff) return;
+      if (b.chain && b.chain.length > 1) {
         ctx.setLineDash([6, 4]);
         strokeLines(grChainLines(b.chain), '#b91c1c', 2.5);
         ctx.setLineDash([]);
@@ -1150,65 +1040,14 @@
     });
   }
 
-  /* ============== [v235 2026-10-05] 三级管路数据传导（独立通道） ==============
-     用户原话：「成组管路中，点击进入三级管路不是每个地块都单独有总管 主管 跟支管的
-       路由嘛……你要把各个地块的主管 支管 总管 数据传导到成组管路页面中。然后对每个
-       地块自动生成的管路 通过手动连接总管的方式把所有地块驳接起来。」
-     ★★ 与上面 [v233] 驳接点/水头损失那套**刻意隔离**（用户 2026-10-05 拍板：
-       「这套东西别删除，留着相关代码，后面我想好了再研究怎么改，但是要跟这段指令
-       隔开，各自数据独立，不要互相影响，将来他们两个之间怎么接通，再说」）：
-       · 数据源：只读各块 W.blocks[i].tlData（grBackFromTl 存档的三级 tlDiagramData
-         快照：frontPipe=块总管折线 / mainPipes / branchPipes / sourcePos=水源点，
-         世界坐标与块环同系）—— 本通道**只读，不写**它的任何字段；
-       · 显示开关：W.tlShow（独立状态，与 W.hyd 无任何读写关系）；
-       · 不调用、不改动 v233 的 grComputeHydraulics / drawTakeoffs / grRenderHyd，
-         也不把三级管径/长度喂给水力估算 —— 两套数据将来怎么接通，等用户想好。 */
-  function grTlRender() {
-    if (!W.tlShow) return;
-    W.blocks.forEach(function (b) {
-      var d = b.tlData; if (!d) return;
-      /* ★ 不裁剪：三级页的块总管本来就走在地块边缘外侧（frontY = minY − max(15, h·4%)），
-           裁到环内会把总管整个裁没；tlData 是三级页权威设计几何，原样画。 */
-      /* 线序与三级页图例一致：支管(绿) → 主管(蓝) → 块总管(黑，最上) */
-      strokeLines(d.branchPipes, 'rgba(22,163,74,.9)', 2);
-      strokeLines(d.mainPipes, 'rgba(24,95,165,.95)', 3);
-      strokeLines(d.frontPipe ? [d.frontPipe] : [], '#1f2937', 5);
-      /* 水源点：黑芯白圈 + 块名 —— 用户手画大总管从各块这个点驳接进去。 */
-      if (d.sourcePos) {
-        var q = toC(d.sourcePos.x, d.sourcePos.y);
-        ctx.beginPath(); ctx.arc(q.x, q.y, 5.5, 0, Math.PI * 2);
-        ctx.fillStyle = '#111827'; ctx.fill();
-        ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
-        grLabel((b.name || '地块') + ' 水源', d.sourcePos, '#1f2937');
-      }
-    });
-  }
-  function grTlSyncBtn() {
-    var btn = $('grTlLayer'); if (btn) btn.classList.toggle('gr-btn-on', !!W.tlShow);
-    var leg = $('grTlLeg'); if (leg) leg.style.display = W.tlShow ? '' : 'none';
-  }
-  function grTlToggle() {
-    W.tlShow = !W.tlShow;
-    grTlSyncBtn();
-    grRender();
-    /* ★ 刻意不写工具栏提示条（grHint2）：提示文字变行数 → 画布高度变 → 视图
-       重适配跳一帧，且会让「开关前后快照对比」失真。状态反馈 = 按钮点亮/熄灭
-       + 图例行显隐 + 图层本身消失，三处已足够直白。 */
-  }
+  /* [v678 用户拍板] 三级管路导入层（grTlRender / grTlSyncBtn / grTlToggle）删除 ——
+     页面瘦身后只保留 展示 + 画总管 + 材料清单，本层整体退场。
+     tlData/tlState 数据层仍在 grSync / grExportState / grBackFromTl 保留（旧存档兼容）。 */
   /* 本页工具栏的操作反馈（总管区已有 grHint，别混用两条 —— 否则用户分不清
-     这句是「说总管的」还是「说各块管路的」）。用完 6 秒还原默认说明。
-     ★ 默认说明随状态变：没布管时告诉用户去点生成按钮，布好之后回到「只读」说明
-       —— 静态一句两面不讨好：空画布时它像在搪塞，画满管子时又显得多此一举。 */
+     这句是「说总管的」还是「说各块管路的」）。用完 6 秒还原默认说明。 */
   function grDefaultHint() {
-    var n = 0;
-    W.blocks.forEach(function (b) { if (b.slot) n += (b.slot.mainPipes || []).length; });
-    /* ★ [v242] 文案**不许再写长**：本句就是 #grToolbar 里最宽的那个子元素，
-       加长十几字（「（逐块，可拖分区线）」）会把「▣ 三级管路」挤到第二行 ——
-       v240 的「工具栏不再换行」回归立刻变红（实测 660px 时换行、545px 时单行）。
-       「二级编辑里能拖分区线」这条信息放在图例的 title 里说（tooltip 不限长）。 */
-    return n
-      ? '整组总览：分区线与各块主管/支管为只读，总管在本页手动画；双击某块进入它的二级编辑'
-      : '各块还没布管：点「⚡ 生成各块管路」逐块布管，总管在本页手动画；双击某块进入它的二级编辑';
+    /* [v678] 瘦身后只有一句话：展示只读、总管手画。不再提「生成按钮 / 双击进编辑」。 */
+    return '整组总览：各块分区线与管线为只读展示；总管在左侧「✎ 画总管」手绘，画好自动计入材料汇总';
   }
   var grHintT = 0;
   function grHint2(msg) {
@@ -1222,11 +1061,14 @@
   }
   function grRefreshUI() {
     grRenderBar(); grRenderTrunk(); grRenderBlocks(); grRenderMat();
-    grComputeHydraulics(); grRenderHyd(); grRender();
+    grComputeHydraulics(); grRender();   /* [v678] 水力面板已移除，grRenderHyd 不再调用 */
     var h = $('grHint'); if (h && !grHintT) h.textContent = grDefaultHint();
   }
 
-  /* ---------------- 按块进入三级页 ---------------- */
+  /* ---------------- 三级页按块链路（v678 瘦身） ----------------
+     入口（块列表按钮 / 双击地块 / grEnterTlForBlock、grEnterPlotL2 外部导出）已随瘦身移除；
+     保留 grSaveBlockTl（grExportState 存档要用）、grRenderTlBar / grBackFromTl
+     （tl-workspace 返回按钮仍会调用，bar 无入口时恒隐藏）。 */
   function grSaveBlockTl() {
     var b = curBlock(); if (!b) return;
     var values = {};
@@ -1236,90 +1078,22 @@
       var selected = document.querySelector('#' + id + ' .selected');
       buttons[id] = selected ? selected.dataset.n || selected.dataset.sides : null;
     });
+    var priorState = b.tlState && typeof b.tlState === 'object' && !Array.isArray(b.tlState)
+      ? clone(b.tlState) : {};
+    var nodeState = window.RyTlNodes && window.RyTlNodes._internals &&
+      typeof window.RyTlNodes._internals.serialize === 'function'
+      ? clone(window.RyTlNodes._internals.serialize()) : priorState.nodes;
     b.tlData = clone(window.tlDiagramData); b.tlAt = new Date().toISOString();
-    b.tlState = {values: values, buttons: buttons, groups: clone(window.tlManualGroups || []),
+    b.tlState = Object.assign(priorState, {values: values, buttons: buttons, groups: clone(window.tlManualGroups || []),
       snapshot: clone(window._tlManualGroupsSnapshot),
       step: clone(window.tlZoneStep), override: clone(tlPipeOdOverride),
       edits: window.RyTlEditPipes ? clone(window.RyTlEditPipes.serialize()) : null,
       auto: window.RyTlAutoEdits ? clone(window.RyTlAutoEdits.serialize()) : null,
-      calibers: window.RyTlAutoEdits ? clone(window.RyTlAutoEdits.calibersMap()) : null};
+      nodes: nodeState == null ? null : nodeState,
+      calibers: window.RyTlAutoEdits ? clone(window.RyTlAutoEdits.calibersMap()) : null});
   }
-  function grLoadBlockTl(b) {
-    var saved = b.tlState;
-    if (!W.tlDefaults) {
-      W.tlDefaults = {};
-      document.querySelectorAll('input[id^="tl_"]').forEach(function(el){W.tlDefaults[el.id] = el.value;});
-    }
-    window.tlManualGroups = saved ? clone(saved.groups) : [];
-    window._tlManualGroupsSnapshot = saved ? clone(saved.snapshot) : null;
-    window.tlZoneStep = saved ? clone(saved.step) : null;
-    window.tlPendingSel = []; window.tlGroupMode = false;
-    tlPipeOdOverride = saved ? clone(saved.override) : null;
-    if (saved) {
-      Object.keys(saved.values).forEach(function(id){if ($(id)) $(id).value = saved.values[id];});
-      Object.keys(saved.buttons).forEach(function(id){
-        document.querySelectorAll('#' + id + ' button').forEach(function(el){
-          el.classList.toggle('selected', String(el.dataset.n || el.dataset.sides) === String(saved.buttons[id]));
-        });
-      });
-    } else {
-      Object.keys(W.tlDefaults).forEach(function(id){if($(id)) $(id).value = W.tlDefaults[id];});
-    }
-    [window.RyTlEditPipes, window.RyTlAutoEdits].forEach(function(api){if(api){api.reset();api.discardSaved();}});
-    window.tlDiagramData = null;   // Do not calculate the next block using the previous block's paths.
-  }
-  function grRestoreBlockEdits() {
-    var b = curBlock(), saved = b && b.tlState, d = window.tlDiagramData;
-    if (!saved || !d) return;
-    var ep = window.RyTlEditPipes, ae = window.RyTlAutoEdits;
-    if (ep) { ep.syncGeometry(d); if(saved.edits) ep.restore(saved.edits, true); }
-    if (ae) {
-      ae.syncGeometry(d); if(saved.auto) ae.restore(saved.auto, true);
-      ae.beginBatch();
-      try {Object.keys(saved.calibers || {}).forEach(function(pid){ae.setCaliber(pid, saved.calibers[pid]);});}
-      finally {ae.endBatch();}
-    }
-    tlAutoGenerate({scroll:false});
-  }
-  function grEnterBlock(i) {
-    var b = W.blocks[i]; if (!b || !b.ring || b.ring.length < 3) return;
-    grSaveBlockTl();
-    grLoadBlockTl(b);
-    var B = window.RunyeBridge;
-    /* ① 先让二级页切到这一块 —— 三级页的分区网格走 RunyeBridge.getZoneCuts()，
-          它内部读二级页的 ppState.polyPts；不切就拿到别的块的分区。 */
-    if (B && B.setGroupMode) { try { B.setGroupMode('perPlot'); } catch (e) { } }
-    if (B && B.selectGroupPlot) { try { B.selectGroupPlot(i); } catch (e) { } }
-    /* ② measuredPolygon 换成这一块的环 —— tlAutoGenerate 把它当**单个地块**用 */
-    window.__runyeGroupFrame = clone(W.frame);
-    window.measuredPolygon = b.ring.map(function (p) { return { x: p.x, y: p.y }; });
-    /* ③ 放行三级页的成组拦截：此刻口径确实就是单地块 */
-    window.__runyeTlBlock = i;
-    grShowTl();
-  }
-  function grShowTl() {
-    try { if (typeof rySetTab === 'function') rySetTab('tlPipePlanSection', 'ws'); } catch (e) { }
-    try { if (window.ryShowSection) window.ryShowSection($('tlPipePlanSection'), null); } catch (e) { }
-    try { if (typeof tlAutoGenerate === 'function') { tlAutoGenerate({ scroll: false }); grRestoreBlockEdits(); } } catch (e) { console.warn('Group block L3:', e); }
-    grRenderTlBar();
-    /* [v242] 落点复核（用户反馈「我这边双击进去的不是三级页面」）：
-       「进哪一页」这件事在本工程里不止一处会写 —— 旧版二级页出图曾调用
-       ppShowConstructDiagram() → rySetTab('pipePlanSection',...)；二级简图入口现已停用，
-       但还要防 refit / scrollIntoView
-       一类延后执行的动作。所以这里在下一帧与 150ms 后各复核一次：
-       只要当前被激活的不是三级页，就再切回来。正常情况这两次都是空操作（幂等、零开销）。 */
-    var tlWant = 'tlPipePlanSection';
-    function grTlReassert() {
-      var act = document.querySelector('main > .ry-sec.ry-active');
-      if (window.__runyeTlBlock != null && act && act.id !== tlWant) {
-        try { if (typeof rySetTab === 'function') rySetTab(tlWant, 'ws'); } catch (e) { }
-        try { if (window.ryShowSection) window.ryShowSection($('tlPipePlanSection'), null); } catch (e) { }
-        grRenderTlBar();
-      }
-    }
-    try { if (window.requestAnimationFrame) requestAnimationFrame(grTlReassert); } catch (e) { }
-    setTimeout(grTlReassert, 150);
-  }
+  /* [v678 用户拍板] grEnterBlock / grShowTl（含 grLoadBlockTl / grRestoreBlockEdits）删除 ——
+     「▶ 进入三级页」入口已随瘦身移除，本页不再承担逐块三级设计的中转。 */
   function grRenderTlBar() {
     var bar = $('grTlBackBar'); if (!bar) return;
     var i = window.__runyeTlBlock;
@@ -1389,8 +1163,22 @@
      [v667 用户拍板] 默认改为【隐藏】——「标注现在没啥用，后面需要」：
      只有历史上明确勾过「显示」（存了 '0'）才显示，其余（含从未操作过）一律隐藏。
      勾选框保留，后面需要时勾上即恢复。 */
+  /* [v669b 2026-10-23 用户要求] 主管/支管管径白底牌要显示——从「标注」总开关里拆出来
+     单独控制：尺寸标注（grRenderBlockDims）仍隐藏，管径牌（v198/v237）恒显示。 */
+  var grDnLabelsOff = false;
+  /* [v669 用户要求] 标注整体取消——grLabelsOff 恒为 true，不再读 localStorage['gr-labels-off']
+     （用户此前勾过「显示」存的 '0' 也一律忽略）。隐藏范围不变：v236 各块尺寸标注线+文字、
+     v198/v237 管径白底牌。渲染代码全部保留，后面需要时把这个开关改回 false 即可整体恢复。 */
   var grLabelsOff = true;
-  try { grLabelsOff = localStorage.getItem('gr-labels-off') !== '0'; } catch (eGrLbl) { }
+  /* [v669 用户要求] 红色驳接点相关整体取消显示：深红块总管虚线链（#b91c1c）、
+     大红点（#dc2626 = 块驳接点/水源点）、「Ø… 驳接点」红字牌都不再画到图面。
+     ★ 只是**不画**——grComputeHydraulics 照常算、水力面板照常显示、拖动覆盖值照常存；
+       红点也不再参与命中拖动（见 grHitNode）。代码保留，后面需要时改回 false 恢复。 */
+  var grRedNodesOff = true;
+  /* [v672 2026-10-23 用户要求] 分区驳接点（小琥珀点 + Ø主径 白底牌）也先取消显示，
+     将来需要再改回 false 恢复。数据层完全不动——tp / 拖动覆盖值 / 水力链路
+     （最短哈密顿路径、水头损失）照常计算，只是不画、也不参与鼠标命中（见 grHitNode）。 */
+  var grTakeoffsOff = true;
   function grDisarmClear() {
     grClearArm = 0;
     var btn = $('grTrunkClear');
@@ -1408,7 +1196,15 @@
         sel.appendChild(o);
       });
       sel.value = String(W.trunk.dn);
-      sel.addEventListener('change', function () { W.trunk.dn = parseInt(this.value, 10) || W.trunk.dn; grRenderTrunk(); grRenderMat(); grComputeHydraulics(); grRenderHyd(); });
+      sel.addEventListener('change', function () {
+        var dn = parseInt(this.value, 10) || W.trunk.dn;
+        if (!grCommitTrunk(function (trunk) { trunk.dn = dn; })) {
+          this.value = String(W.trunk.dn);
+          grHint('总管管径未写入：规范组状态无法安全提交。');
+          return;
+        }
+        grRenderTrunk(); grRenderMat();
+      });
     }
     /* [v655] 参考线开关：临时显示系统建议走向的幽灵虚线（不参与计算、不出材料） */
     var ghostBtn = $('grTrunkGhost');
@@ -1429,121 +1225,25 @@
       });
     }
     /* [v654] 流速体检「一键建议档」：切到手选建议外径 → 同步下拉显示 → 走 grRenderTrunk
-       全链（内含 grComputeHydraulics + grRenderHyd + grUpdateTrunkVel），告警自然消掉。 */
+       全链（内含 grComputeHydraulics + grUpdateTrunkVel），告警自然消掉。 */
     var velFix = $('grTrunkVelFix');
     if (velFix) velFix.addEventListener('click', function () {
       var od = parseInt(this.dataset.od, 10);
       if (!(od > 0)) return;
-      W.trunk.dn = od;
+      if (!grCommitTrunk(function (trunk) { trunk.dn = od; })) {
+        grHint('建议管径未写入：规范组状态无法安全提交。');
+        return;
+      }
       var sel2 = $('grTrunkDn'); if (sel2) sel2.value = String(od);
       grRenderTrunk(); grRenderMat();
     });
     var click = function (id, fn) { var e = $(id); if (e) e.addEventListener('click', fn); };
-    /* [v201] 「⚡ 生成各块管路」：把二级页的整个状态机先切到**整组态**，
-       再调用二级页那一套 ppAutoGeneratePipes()（内部已按整组态逐块生成、
-       逐块写回 ge.slots[i]），最后把二级页恢复回原来的块/模式。
-       ★ 为什么必须绕这一圈而不是在本页算：布管规则（0.40 定主管、支管缩进 6%、
-         哪边做固定边）全都在二级页 IIFE 里，且要与二级页的分区严格同源 ——
-         v193 铁律：不写第二份算法。
-       ★ 先切整组态的原因：当时若在「逐块」态，setGroupMode('whole') 会先把
-         当前块 ppCaptureSlot() 存盘 ⇒ 用户在二级页刚画的管不会因为本页操作丢掉。 */
-    function grKeepMode() {
-      var ge = window.__runyeGroupEdit;
-      return ge && ge.active ? { mode: ge.mode, current: ge.current } : null;
-    }
-    /* [v195 教训] 覆盖确认**不能**用 window.confirm —— iframe / 部分 WebView 会静默
-       返回 false ⇒ 用户点了「⚡ 生成」却毫无反应（正是用户报过一次的「点了不能弄」）。
-       改用与「清空」同款的两段式：已有管时才先变红「⚠ 覆盖已有管路？」，3 秒内再点执行。 */
-    var grPipeAutoArm = 0;
-    function grDisarmPipeAuto() {
-      grPipeAutoArm = 0;
-      var b2 = $('grPipeAuto');
-      if (b2) { b2.textContent = '⚡ 生成各块管路'; b2.classList.remove('gr-btn-arm'); }
-    }
-    var grPipeClearArm = 0;
-    function grDisarmPipeClear() {
-      grPipeClearArm = 0;
-      var b3 = $('grPipeClear');
-      if (b3) { b3.textContent = '🗑 清除各块管路'; b3.classList.remove('gr-btn-arm'); }
-    }
-    function grGenerateAllPipes(armed) {
-      var B = window.RunyeBridge;
-      if (!W.blocks.length) { grHint2('当前不是成组地块。请先在在线地图把两个及以上地块成组后回传。'); return; }
-      if (!B || !B.setGroupMode || !B.autoPipesWhole) { grHint2('自动布管接口未就绪，请刷新页面重试。'); return; }
-      var had = 0;
-      W.blocks.forEach(function (b) {
-        if (!b.slot) return;
-        had += (b.slot.mainPipes || []).length + (b.slot.branchPipes || []).length + (b.slot.subBranchPipes || []).length;
-      });
-      if (had && !armed) {
-        var btn = $('grPipeAuto');
-        var again = (grPipeAutoArm > 0) && (Date.now() - grPipeAutoArm < 3000);
-        if (!again) {
-          grPipeAutoArm = Date.now();
-          if (btn) { btn.textContent = '⚠ 覆盖已有 ' + had + ' 根管？'; btn.classList.add('gr-btn-arm'); }
-          grHint2('各块已有管路：3 秒内再点一次即覆盖全部重生成，超时自动取消。');
-          setTimeout(grDisarmPipeAuto, 3000);
-          return;
-        }
-      }
-      grDisarmPipeAuto();
-      var keep = grKeepMode();
-      try {
-        B.setGroupMode('whole');
-        if (!B.autoPipesWhole()) { grHint2('生成失败，请先在二级管路页确认地块边界与分区数。'); return; }
-      } finally {
-        if (keep && keep.mode === 'perPlot') {
-          try { B.setGroupMode('perPlot'); } catch (e) { }
-          try { B.selectGroupPlot(keep.current || 0); } catch (e) { }
-        }
-      }
-      grSync(); grFit(); grRefreshUI();
-      var has = 0;
-      W.blocks.forEach(function (b) { if (b.slot) has += (b.slot.mainPipes || []).length; });
-      grHint2(has ? ('已按各块分区生成主管/支管（共 ' + has + ' 根主管），线上数字为管径（Ø）。') : '未生成任何管线，请检查各块边界是否有效。');
-    }
-    function grClearAllPipes(armed) {
-      var B = window.RunyeBridge;
-      if (!W.blocks.length) { grHint2('当前不是成组地块。'); return; }
-      if (!B || !B.clearPipesWhole) { grHint2('清除接口未就绪，请刷新页面重试。'); return; }
-      var n = 0;
-      W.blocks.forEach(function (b) {
-        if (!b.slot) return;
-        n += (b.slot.mainPipes || []).length + (b.slot.branchPipes || []).length + (b.slot.subBranchPipes || []).length;
-      });
-      if (!n) { grHint2('各块当前没有管线可清除。'); return; }
-      /* 与「清空总管」同款的两段式：清管局不可逆，一次误点不能就把整套布管抹了 */
-      if (!armed) {
-        var btn = $('grPipeClear');
-        var again = (grPipeClearArm > 0) && (Date.now() - grPipeClearArm < 3000);
-        if (!again) {
-          grPipeClearArm = Date.now();
-          if (btn) { btn.textContent = '⚠ 确认清除 ' + n + ' 根管？'; btn.classList.add('gr-btn-arm'); }
-          grHint2('3 秒内再点一次即清除全组各块管路，超时自动取消。');
-          setTimeout(grDisarmPipeClear, 3000);
-          return;
-        }
-      }
-      grDisarmPipeClear();
-      var keep = grKeepMode();
-      try {
-        B.setGroupMode('whole');
-        B.clearPipesWhole();
-      } finally {
-        if (keep && keep.mode === 'perPlot') {
-          try { B.setGroupMode('perPlot'); } catch (e) { }
-          try { B.selectGroupPlot(keep.current || 0); } catch (e) { }
-        }
-      }
-      grSync(); grFit(); grRefreshUI();
-      grHint2('已清除全组各块的管路（共 ' + n + ' 根），本页手画的总管不受影响。');
-    }
-    click('grPipeAuto', function () { grExitDraw(); grGenerateAllPipes(); });
-    click('grPipeClear', function () { grExitDraw(); grClearAllPipes(); });
-    /* [v235] 三级管路导入层开关（独立通道，见 grTlRender 处注释） */
-    click('grTlLayer', function () { grExitDraw(); grTlToggle(); });
-    click('grNodeReset', function () { grClearNodeOverrides(); grHint2('已把各块驳接点复位到自动位置。'); });
-    grTlSyncBtn();
+    /* [v677 用户拍板] 「⚡ 生成各块管路」移除 —— 新方向：所有地块都先在二级页
+       单地块完成划分与布管，最后才拼成一组（成组时继承各块已有设计）。
+       [v678 用户拍板] 页面进一步瘦身：只保留 展示 + 画总管 + 材料清单 ——
+       「🗑 清除各块管路」（grPipeClear/grClearAllPipes/grKeepMode）、「▤ 水力面板」、
+       「↺ 驳接点复位」、「▣ 三级管路」四组绑定全部移除。各块管线改错了
+       回二级页单地块改（成组继承会带过来），本页只画总管。 */
     click('grTrunkDraw', function () {
       W.mode = (W.mode === 'draw') ? 'pick' : 'draw';
       W.draw = W.draw || [];
@@ -1557,8 +1257,12 @@
       /* ★ 想删除就不是想画线 —— 先退出画线模式，否则用户点图想「选中」、实际还在加点 */
       grExitDraw();
       if (W.sel < 0) { grHint('先在图上点一根总管（点线上任意位置），再点删除。'); return; }
-      var n = W.trunk.lines.length;
-      W.trunk.lines.splice(W.sel, 1); W.sel = -1;
+      var n = W.trunk.lines.length, selected = W.sel;
+      if (!grCommitTrunk(function (trunk) { trunk.pipes.splice(selected, 1); })) {
+        grHint('总管未删除：规范组状态无法安全提交。');
+        return;
+      }
+      W.sel = -1;
       grRender(); grRenderTrunk(); grRenderMat();
       grHint('已删除 1 根（剩 ' + (n - 1) + ' 根）。');
     });
@@ -1579,7 +1283,11 @@
         return;
       }
       var n = W.trunk.lines.length;
-      W.trunk.lines = []; W.sel = -1; W.draw = null; grClearArm = 0;
+      if (!grCommitTrunk(function (trunk) { trunk.pipes = []; })) {
+        grHint('总管未清空：规范组状态无法安全提交。');
+        return;
+      }
+      W.sel = -1; W.draw = null; grClearArm = 0;
       grDisarmClear();
       grRender(); grRenderTrunk(); grRenderMat();
       grHint('已清空 ' + n + ' 根总管。');
@@ -1588,17 +1296,8 @@
        （缩放改由滚轮、平移改由拖拽 —— 见 cvs 的 wheel / mousedown 处理）。 */
     click('grTlBackBtn', function () { grBackFromTl(); });
 
-    /* 子地块列表：两个入口（三级页 / 二级页）走事件委托 */
-    var box = $('grBlocks');
-    if (box) box.addEventListener('click', function (e) {
-      var b = e.target.closest ? e.target.closest('button[data-act]') : null;
-      if (!b) return;
-      var i = parseInt(b.getAttribute('data-i'), 10);
-      if (b.getAttribute('data-act') === 'tl') { grEnterBlock(i); return; }
-      /* 「二级改这块的管」：切到二级页并停在这一块，让用户在逐块模式下直接改
-         [v242] 与「双击地块」共用 grEnterPlotL2（原先这四行内联逻辑就是双击那条路的雏形） */
-      grEnterPlotL2(i);
-    });
+    /* [v678] 子地块列表按钮委托（▶ 进入三级页 / ✎ 二级改这块的管）已随瘦身移除 ——
+       列表改为纯只读展示（名称/亩数/管长/未布管状态），无任何跳转入口。 */
 
     /* 画布：画总管 / 点选 */
     /* [v232] 拖拽平移状态（用户反馈：能放大缩小但不能拖动）。
@@ -1623,8 +1322,11 @@
       cvs.addEventListener('dblclick', function (e) {
         if (W.mode !== 'draw' || !W.draw) return;
         e.__runyeTrunkFinished = true;
-        var got = W.draw.length >= 2;
-        if (got) W.trunk.lines.push(W.draw.slice());
+        var got = W.draw.length >= 2, completedLine = W.draw.slice();
+        if (got && !grCommitTrunk(function (trunk) { trunk.pipes.push(completedLine); })) {
+          grHint('总管未收线：规范组状态无法安全提交，当前草稿已保留。');
+          return;
+        }
         W.draw = null;
         /* ★ [v195] 收线即退出画线模式：总管通常只画一根，停在画线模式会让用户
              以为「点图 = 选中」，实际还在加点（本轮反馈「删除选中不能用」的根因）。
@@ -1635,39 +1337,24 @@
           ? '已收线（共 ' + W.trunk.lines.length + ' 根）。点图可选中一根；再点「✎ 画总管」继续画下一根。'
           : '不足两点未收线。再点「✎ 画总管」重新画。';
       });
-      /* [v240] 非画线态双击：先判「有没有双击到地块」——[v242] 命中就进该块二级编辑
-         （用户要的 CAD 式「双击视口进入图纸」；用户更正过落点 = 二级页，不是三级页），
-         没命中才做适应窗口。
-         ★ 顺序不能反：适应窗口是 v240 取消「⤢ 适应」按钮后唯一的复位入口，
-           但它排在后面，绝不会抢走「双击地块」这个主用法。 */
+      /* [v678] 非画线态双击 = 适应窗口（v240 取消「⤢ 适应」按钮后唯一的复位入口）。
+         「双击地块进入二级编辑」已随瘦身移除，这里不再做块命中。 */
       cvs.addEventListener('dblclick', function (e) {
-        if (e.__runyeTrunkFinished || W.mode === 'draw') return;      /* 收线不能继续触发块编辑 */
+        if (e.__runyeTrunkFinished || W.mode === 'draw') return;      /* 收线不能继续触发适应 */
         if (!W.blocks.length) return;
-        var r = cvs.getBoundingClientRect();
-        var bi = grHitBlockForEnter(toW(e.clientX - r.left, e.clientY - r.top));
-        if (bi >= 0) { grEnterBlockByDbl(bi); return; }
         grFit(); grRender();
-        grHint2('已适应窗口。双击地块可进入该块的二级编辑（逐块，可拖分区线）；滚轮缩放（以鼠标位置为中心）、按住左键拖动平移。');
+        grHint2('已适应窗口。滚轮缩放（以鼠标位置为中心）、按住左键拖动平移。');
       });
       cvs.addEventListener('contextmenu', function (e) {
         e.preventDefault();
         if (W.mode === 'draw' && W.draw && W.draw.length) { W.draw.pop(); grRender(); }
       });
       /* [v232] 按下 → 准备平移。记录起点与当时的 ox/oy，真正挪不挪看 move 位移过阈值。
-         [v238] 按下先判驳接点：命中就进入「拖驳接点」，不再平移（同一手势不干两件事）。 */
+         [v678] 驳接点命中拖动已随瘦身移除，按下只做平移准备。 */
       cvs.addEventListener('mousedown', function (e) {
         if (e.button !== 0 || !W.blocks.length) return;
         e.preventDefault();
         var r = cvs.getBoundingClientRect();
-        var wp = toW(e.clientX - r.left, e.clientY - r.top);
-        if (W.mode !== 'draw') {
-          var hit = grHitNode(wp);
-          if (hit) {
-            W.drag = hit;
-            cvs.classList.add('gr-dragging');
-            return;
-          }
-        }
         grPan = { sx: e.clientX - r.left, sy: e.clientY - r.top, ox: view.ox, oy: view.oy, moved: false };
         cvs.classList.add('gr-panning');
       });
@@ -1684,27 +1371,10 @@
       }, { passive: false });
     }
     /* [v232] 拖拽平移（mousemove/mouseup 挂 window：拖出画布也不中断；松手才结束）。
-       平移就是改 view.ox/oy —— 与 wheel 缩放同一套坐标参数，grRender 一次即生效。 */
+       平移就是改 view.ox/oy —— 与 wheel 缩放同一套坐标参数，grRender 一次即生效。
+       [v678] 驳接点拖动分支与「悬停块高亮暗示可进编辑」分支已随瘦身移除。 */
     window.addEventListener('mousemove', function (e) {
-      /* [v238] 拖驳接点：优先于平移；沿管吸附 + 实时重算 */
-      if (W.drag) {
-        if (!cvs) return;
-        var rb = cvs.getBoundingClientRect();
-        grDragTo(toW(e.clientX - rb.left, e.clientY - rb.top));
-        return;
-      }
       if (!cvs) return;
-      if (!grPan && e.target === cvs) {
-        var rh = cvs.getBoundingClientRect();
-        var hwp = toW(e.clientX - rh.left, e.clientY - rh.top);
-        if (grHitNode(hwp)) { cvs.style.cursor = 'grab'; }
-        else {
-          /* [v242] 悬停在某块上 ⇒ pointer 光标 + 该块描边高亮，暗示「可双击进入」 */
-          var hb = (W.mode === 'draw') ? -1 : grHitBlockForEnter(hwp);
-          if (hb !== W.hovBlock) { W.hovBlock = hb; grRender(); }
-          cvs.style.cursor = (hb >= 0) ? 'pointer' : '';
-        }
-      }
       if (!grPan) return;
       var r = cvs.getBoundingClientRect();
       var dx = (e.clientX - r.left) - grPan.sx, dy = (e.clientY - r.top) - grPan.sy;
@@ -1712,14 +1382,6 @@
       if (grPan.moved) { view.ox = grPan.ox + dx; view.oy = grPan.oy + dy; grRender(); }
     });
     window.addEventListener('mouseup', function () {
-      /* [v238] 拖驳接点收尾：吃掉随后的 click（否则会被当成「点图选总管」） */
-      if (W.drag) {
-        W.drag = null;
-        grPanEat = true;
-        cvs.classList.remove('gr-dragging');
-        setTimeout(function () { grPanEat = false; }, 0);
-        return;
-      }
       if (!grPan) return;
       grPanEat = grPan.moved;                          /* 拖过 ⇒ 吃掉随后的 click */
       grPan = null;
@@ -1729,7 +1391,12 @@
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && W.mode === 'draw') { W.draw = null; W.mode = 'pick'; grRenderTrunk(); grRender(); }
       if ((e.key === 'Delete' || e.key === 'Backspace') && W.sel >= 0 && $('grPipeSection').classList.contains('ry-active') && document.activeElement === document.body) {
-        W.trunk.lines.splice(W.sel, 1); W.sel = -1; grRender(); grRenderTrunk(); grRenderMat();
+        var selected = W.sel;
+        if (!grCommitTrunk(function (trunk) { trunk.pipes.splice(selected, 1); })) {
+          grHint('总管未删除：规范组状态无法安全提交。');
+          return;
+        }
+        W.sel = -1; grRender(); grRenderTrunk(); grRenderMat();
       }
     });
   }
@@ -1747,34 +1414,436 @@
     try { if (window.ryShowSection) window.ryShowSection($('grPipeSection'), null); } catch (e) { }
     window.grRefreshGroupPage();
   };
-  window.grEnterTlForBlock = grEnterBlock;
-  window.grExportState = function () {
+  function grObserveDrawingDesignSnapshot(snapshot, stage, roundTrip) {
+    try {
+      var adapter = window.RyDrawingDesignGroupAdapter;
+      var memberIds = snapshot && Array.isArray(snapshot.subPlots)
+        ? snapshot.subPlots.map(function (plot) { return String(plot && plot.id || ''); }) : [];
+      if (!adapter || typeof adapter.fromGroupSnapshot !== 'function' || memberIds.length < 2 ||
+          !memberIds.every(function (id) { return !!id; })) {
+        window.__runyeDrawingDesignShadow = { ok: false, stage: stage, error: 'group-shadow-identity-unavailable' };
+        return;
+      }
+      var groupKey = JSON.stringify(memberIds), groupId = 'legacy-group:' + groupKey;
+      var shadow = adapter.fromGroupSnapshot(snapshot, {
+        projectId: 'legacy-group-project:' + groupKey,
+        groupId: groupId,
+        frameId: 'legacy-frame:' + groupKey
+      });
+      if (!shadow || !shadow.ok) {
+        window.__runyeDrawingDesignShadow = {
+          ok: false, stage: stage, error: shadow && shadow.error || 'group-shadow-unavailable'
+        };
+        return;
+      }
+      var result = { ok: true, stage: stage, plotCount: shadow.design.plots.length, groupCount: shadow.design.groups.length };
+      if (roundTrip) {
+        var exported = adapter.toLegacyPatch(shadow.design, groupId, snapshot);
+        result.roundTripOk = !!(exported && exported.ok);
+        if (!result.roundTripOk) result.roundTripError = exported && exported.error || 'group-shadow-round-trip-unavailable';
+      }
+      window.__runyeDrawingDesignShadow = result;
+    } catch (shadowError) {
+      window.__runyeDrawingDesignShadow = { ok: false, stage: stage, error: 'group-shadow-conversion-error' };
+    }
+  }
+  function grCanonicalComparable(design) {
+    var value = clone(design);
+    if (!value) return null;
+    delete value.revision;
+    (value.plots || []).forEach(function (plot) {
+      delete plot.revision;
+      if (plot.generated) plot.generated.sourceRevision = 0;
+    });
+    (value.groups || []).forEach(function (group) { delete group.revision; });
+    return JSON.stringify(value);
+  }
+  function grCanonicalComparableExceptPlotLevel3(design, plotIds) {
+    var value = clone(design);
+    if (!value) return null;
+    var ignored = Object.create(null);
+    (Array.isArray(plotIds) ? plotIds : [plotIds]).forEach(function (id) { ignored[id] = true; });
+    delete value.revision;
+    (value.plots || []).forEach(function (plot) {
+      delete plot.revision;
+      if (ignored[plot.plotId]) {
+        delete plot.generated;
+        if (plot.network) delete plot.network.level3Edits;
+      } else if (plot.generated) {
+        /* sourceRevision is binding metadata, like plot.revision. Legacy group import
+           reconstructs it from the imported plot revision, so compare content after
+           normalizing both sides instead of dropping a valid canonical history. */
+        plot.generated.sourceRevision = 0;
+      }
+    });
+    (value.groups || []).forEach(function (group) { delete group.revision; });
+    return JSON.stringify(value);
+  }
+  function grPlotDesignComparable(plot) {
+    var value = clone(plot);
+    if (!value) return null;
+    delete value.revision;
+    delete value.generated;
+    if (value.network) delete value.network.level3Edits;
+    return JSON.stringify(value);
+  }
+  /* Group trunk writes now commit through the canonical group revision first. The legacy
+     snapshot remains the compatibility projection used by existing save/undo consumers. */
+  function grCommitTrunk(operation) {
+    var model = window.RyDrawingDesignModel, adapter = window.RyDrawingDesignGroupAdapter;
+    var ge = window.__runyeGroupEdit;
+    if (!model || !adapter || !ge || W.groupRef !== ge || !window.grExportState) return false;
+    var memberIds = (window.__runyeSubPlots || []).map(function (plot) { return String(plot && plot.id || ''); });
+    if (memberIds.length < 2 || !memberIds.every(function (id) { return !!id; })) return false;
+    var memberKey = JSON.stringify(memberIds), groupId = 'legacy-group:' + memberKey;
+    var snapshot = window.grExportState();
+    if (!snapshot) return false;
+    var imported = adapter.fromGroupSnapshot(snapshot, {
+      projectId: 'legacy-group-project:' + memberKey,
+      groupId: groupId,
+      frameId: 'legacy-frame:' + memberKey
+    });
+    if (!imported || !imported.ok) {
+      window.__runyeDrawingDesignShadow = { ok: false, stage: 'group-write', error: imported && imported.error || 'group-import-failed' };
+      return false;
+    }
+    var base = imported.design;
+    if (W.canonicalGroupId === groupId && W.canonicalDesign &&
+        grCanonicalComparable(W.canonicalDesign) === grCanonicalComparable(imported.design)) {
+      base = W.canonicalDesign;
+    }
+    var group = base.groups.filter(function (item) { return item.groupId === groupId; })[0];
+    if (!group) return false;
+    var next = model.updateGroup(base, groupId, base.revision, function (target) {
+      operation(target.trunkNetwork);
+    });
+    if (!next || !next.ok) {
+      window.__runyeDrawingDesignShadow = { ok: false, stage: 'group-write', error: next && next.error || 'group-update-failed' };
+      return false;
+    }
+    var projected = adapter.toLegacyPatch(next.design, groupId, snapshot);
+    if (!projected || !projected.ok || !projected.snapshot || !projected.snapshot.trunk) {
+      window.__runyeDrawingDesignShadow = { ok: false, stage: 'group-write', error: projected && projected.error || 'group-projection-failed' };
+      return false;
+    }
+    W.canonicalDesign = next.design;
+    W.canonicalGroupId = groupId;
+    W.trunk = clone(projected.snapshot.trunk);
+    ge.trunkPipes = clone(W.trunk.lines);
+    ge.trunkDn = W.trunk.dn;
+    window.__runyeDrawingDesignShadow = {
+      ok: true, stage: 'group-write', groupId: groupId,
+      designRevision: next.design.revision,
+      groupRevision: next.design.groups.filter(function (item) { return item.groupId === groupId; })[0].revision
+    };
+    return true;
+  }
+  window.grCommitGroupMemberSlots = function (changes) {
+    var model = window.RyDrawingDesignModel, adapter = window.RyDrawingDesignGroupAdapter;
+    var ge = window.__runyeGroupEdit, subs = window.__runyeSubPlots || [];
+    if (!model || !adapter || !ge || !ge.active || !Array.isArray(changes) || !changes.length ||
+        W.groupRef !== ge || !window.grExportState) return false;
+    var memberIds = subs.map(function (plot) { return String(plot && plot.id || ''); });
+    if (memberIds.length < 2 || !memberIds.every(function (id) { return !!id; })) return false;
+    var seen = Object.create(null);
+    for (var c = 0; c < changes.length; c++) {
+      if (!changes[c] || !Number.isInteger(changes[c].index) || changes[c].index < 0 ||
+          changes[c].index >= memberIds.length || !changes[c].slot || seen[changes[c].index]) return false;
+      if (Object.prototype.hasOwnProperty.call(changes[c], 'stepOverrides')) {
+        var nextStep = changes[c].stepOverrides;
+        var oldStep = changes[c].stepPreimage;
+        function validStep(value) {
+          return value == null || (value && typeof value === 'object' && !Array.isArray(value) &&
+            typeof value.sig === 'string' && value.x && typeof value.x === 'object' && !Array.isArray(value.x) &&
+            value.y && typeof value.y === 'object' && !Array.isArray(value.y));
+        }
+        if (!validStep(nextStep) || !validStep(oldStep)) return false;
+      }
+      seen[changes[c].index] = true;
+    }
+    var memberKey = JSON.stringify(memberIds), groupId = 'legacy-group:' + memberKey;
+    /* Keep the saved slot as the transaction preimage; grSync may still use the live
+       ppState for its read-only block view, so the live slot is explicitly excluded here. */
+    var baseline = window.grExportState({ includeLiveSlot: false });
+    if (!baseline || !baseline.blocks || changes.some(function (change) { return !baseline.blocks[change.index]; })) return false;
+    baseline = clone(baseline);
+    changes.forEach(function (change) {
+      var savedStep = change.stepPreimage;
+      if (!Object.prototype.hasOwnProperty.call(change, 'stepOverrides')) {
+        var priorState = baseline.blocks[change.index].tlState;
+        savedStep = priorState && priorState.step;
+      }
+      baseline.blocks[change.index].tlData = null;
+      baseline.blocks[change.index].tlState = savedStep ? { step: clone(savedStep) } : null;
+    });
+    var candidate = clone(baseline);
+    changes.forEach(function (change) {
+      candidate.edit.slots[change.index] = clone(change.slot);
+      if (Object.prototype.hasOwnProperty.call(change, 'stepOverrides')) {
+        var step = change.stepOverrides;
+        candidate.blocks[change.index].tlState = step
+          ? { step: clone(step) } : null;
+      }
+    });
+    var options = {
+      projectId: 'legacy-group-project:' + memberKey,
+      groupId: groupId,
+      frameId: 'legacy-frame:' + memberKey
+    };
+    var imported = adapter.fromGroupSnapshot(baseline, options);
+    var desired = adapter.fromGroupSnapshot(candidate, options);
+    if (!imported || !imported.ok || !desired || !desired.ok) {
+      var conversionError = !imported || !imported.ok ? imported : desired;
+      window.__runyeDrawingDesignShadow = {
+        ok: false, stage: 'member-write', error: conversionError && conversionError.error || 'group-member-import-failed'
+      };
+      return false;
+    }
+    var changed = [];
+    changes.forEach(function (change) {
+      var plotId = memberIds[change.index];
+      var currentPlot = imported.design.plots.filter(function (plot) { return plot.plotId === plotId; })[0];
+      var desiredPlot = desired.design.plots.filter(function (plot) { return plot.plotId === plotId; })[0];
+      if (currentPlot && desiredPlot && grPlotDesignComparable(currentPlot) !== grPlotDesignComparable(desiredPlot)) {
+        changed.push({ index: change.index, plotId: plotId, desiredPlot: desiredPlot });
+      }
+    });
+    if (changed.length !== changes.length) {
+      var invalidMember = changes.filter(function (change) {
+        var id = memberIds[change.index];
+        return !imported.design.plots.some(function (plot) { return plot.plotId === id; }) ||
+          !desired.design.plots.some(function (plot) { return plot.plotId === id; });
+      })[0];
+      if (invalidMember) return false;
+    }
+    if (!changed.length) {
+      /* A compatibility-only difference is not a canonical design transaction. Keep the
+         authoritative slot untouched instead of admitting fields the adapter did not model. */
+      window.__runyeDrawingDesignShadow = {
+        ok: true, stage: 'member-write', noChange: true, plotIds: []
+      };
+      return true;
+    }
+    /* Only changed members lose old L3 state. Reimport with those blocks sanitized while
+       preserving untouched members' generated geometry and edits. */
+    var projectionBaseline = window.grExportState({ includeLiveSlot: false });
+    if (!projectionBaseline || !projectionBaseline.blocks) return false;
+    projectionBaseline = clone(projectionBaseline);
+    changed.forEach(function (item) {
+      var stepChange = changes.filter(function (change) { return change.index === item.index; })[0];
+      var savedStep = stepChange && Object.prototype.hasOwnProperty.call(stepChange, 'stepOverrides')
+        ? stepChange.stepPreimage : (projectionBaseline.blocks[item.index].tlState && projectionBaseline.blocks[item.index].tlState.step);
+      projectionBaseline.blocks[item.index].tlData = null;
+      projectionBaseline.blocks[item.index].tlState = savedStep ? { step: clone(savedStep) } : null;
+    });
+    var fullBase = adapter.fromGroupSnapshot(projectionBaseline, options);
+    if (!fullBase || !fullBase.ok) {
+      window.__runyeDrawingDesignShadow = { ok: false, stage: 'member-write', error: fullBase && fullBase.error || 'group-member-preimage-failed' };
+      return false;
+    }
+    var base = imported.design;
+    if (W.canonicalGroupId === groupId && W.canonicalDesign &&
+        grCanonicalComparableExceptPlotLevel3(W.canonicalDesign, changed.map(function (item) { return item.plotId; })) ===
+          grCanonicalComparableExceptPlotLevel3(fullBase.design, changed.map(function (item) { return item.plotId; }))) {
+      base = W.canonicalDesign;
+    } else {
+      base = fullBase.design;
+    }
+    var updatedDesign = base;
+    for (var u = 0; u < changed.length; u++) {
+      var item = changed[u], updated = model.updatePlot(updatedDesign, item.plotId, updatedDesign.revision, function (target) {
+        target.geometry = clone(item.desiredPlot.geometry);
+        target.partition = clone(item.desiredPlot.partition);
+        target.network = clone(item.desiredPlot.network);
+        delete target.network.level3Edits;
+        delete target.generated;
+      });
+      if (!updated || !updated.ok) {
+        window.__runyeDrawingDesignShadow = { ok: false, stage: 'member-write', error: updated && updated.error || 'group-member-update-failed' };
+        return false;
+      }
+      updatedDesign = updated.design;
+    }
+    var projected = adapter.toLegacyPatch(updatedDesign, groupId, projectionBaseline);
+    if (!projected || !projected.ok || !projected.snapshot || !projected.snapshot.edit ||
+        !projected.snapshot.edit.slots || !projected.snapshot.blocks) {
+      window.__runyeDrawingDesignShadow = { ok: false, stage: 'member-write', error: projected && projected.error || 'group-member-projection-failed' };
+      return false;
+    }
+    var changedByIndex = Object.create(null);
+    changed.forEach(function (item) { changedByIndex[item.index] = true; });
+    changes.forEach(function (change) {
+      if (changedByIndex[change.index]) {
+        ge.slots[change.index] = clone(projected.snapshot.edit.slots[change.index]);
+      }
+    });
+    W.blocks = clone(projected.snapshot.blocks);
+    W.canonicalDesign = updatedDesign;
+    W.canonicalGroupId = groupId;
+    window.__runyeDrawingDesignShadow = {
+      ok: true, stage: 'member-write', plotIds: changed.map(function (item) { return item.plotId; }),
+      designRevision: updatedDesign.revision,
+      plotRevisions: changed.map(function (item) {
+        var plot = updatedDesign.plots.filter(function (entry) { return entry.plotId === item.plotId; })[0];
+        return { plotId: item.plotId, revision: plot && plot.revision };
+      }),
+      groupRevision: updatedDesign.groups.filter(function (group) { return group.groupId === groupId; })[0].revision
+    };
+    return true;
+  };
+  window.grCommitGroupMemberSlot = function (index, slot) {
+    return window.grCommitGroupMemberSlots([{ index: index, slot: slot }]);
+  };
+  /* [v678] grEnterTlForBlock / grEnterPlotL2 外部导出已随入口一起移除。 */
+  window.grExportState = function (options) {
+    options = options || {};
     var ge = window.__runyeGroupEdit;
     if (!ge || !ge.active || !window.__runyeSubPlots || window.__runyeSubPlots.length < 2) return null;
     grSaveBlockTl(); grSync();
     var edit = clone(ge), live = window.RunyeBridge.groupLiveSlot();
-    if (live) edit.slots[ge.current] = live;
+    /* Canonical member edits are committed at the editor action boundary. Rendering
+       can lazily fill cutSnap/partitionCuts in the live canvas without a user edit;
+       exporting that live view would turn a read into a design write and make a
+       restored per-plot snapshot diverge from its canonical source. */
+    if (live && options.includeLiveSlot !== false && !W.canonicalDesign) edit.slots[ge.current] = live;
     var blocks = clone(W.blocks);
     blocks.forEach(function(b){if(b.tlState){b.tlState.calibers=null;b.tlState.override=null;}});
-    return {version:1, subPlots:clone(window.__runyeSubPlots), frame:clone(W.frame), edit:edit,
+    var snapshot = {version:1, subPlots:clone(window.__runyeSubPlots), frame:clone(W.frame), edit:edit,
       blocks:blocks, defaults:clone(W.tlDefaults), trunk:clone(W.trunk),
       dnOver:clone(W.dnOver || { main: null, branch: null })};
+    /* Persist the canonical model as the group design authority; legacy fields below are
+       a checked projection for the editors and older consumers. */
+    try {
+      var adapter = window.RyDrawingDesignGroupAdapter;
+      var model = window.RyDrawingDesignModel;
+      var memberIds = snapshot.subPlots.map(function (plot) { return String(plot && plot.id || ''); });
+      var groupKey = JSON.stringify(memberIds), groupId = 'legacy-group:' + groupKey;
+      var imported = adapter && adapter.fromGroupSnapshot(snapshot, {
+        projectId: 'legacy-group-project:' + groupKey,
+        groupId: groupId,
+        frameId: 'legacy-frame:' + groupKey
+      });
+      if (!imported || !imported.ok || !model || !model.validate(imported.design).ok) {
+        window.__runyeDrawingDesignShadow = {
+          ok: false, stage: 'group-export',
+          error: imported && imported.error || 'group-canonical-export-unavailable'
+        };
+        return null;
+      }
+      var hasCanonical = W.canonicalGroupId === groupId && W.canonicalDesign;
+      if (hasCanonical && grCanonicalComparable(W.canonicalDesign) !== grCanonicalComparable(imported.design)) {
+        window.__runyeDrawingDesignShadow = { ok: false, stage: 'group-export', error: 'canonical-legacy-group-divergence' };
+        return null;
+      }
+      var canonical = hasCanonical ? W.canonicalDesign : imported.design;
+      snapshot.canonicalDrawingDesign = clone(canonical);
+      W.canonicalDesign = clone(canonical);
+      W.canonicalGroupId = groupId;
+    } catch (canonicalExportError) {
+      window.__runyeDrawingDesignShadow = { ok: false, stage: 'group-export', error: 'group-canonical-export-error' };
+      return null;
+    }
+    /* Migration shadow records the canonical/compatibility round trip after export. */
+    grObserveDrawingDesignSnapshot(snapshot, 'export', false);
+    return snapshot;
   };
-  window.grRestoreState = function (saved) {
-    if (!saved) { window.__runyeGroupEdit=null; window.__runyeSubPlots=null; grSync(); grRefreshUI(); return false; }
+  var grPreparedRestoreSource=null,grPreparedRestoreResult=null;
+  function grPrepareRestoreState(saved) {
+    if (!saved) return {ok:false,error:'group-snapshot-missing'};
     function ringOK(r){return Array.isArray(r) && r.length>=3 && r.every(function(p){return p && Number.isFinite(p.x) && Number.isFinite(p.y);});}
     if (saved.version!==1 || !ringOK(saved.frame) || !Array.isArray(saved.subPlots) || saved.subPlots.length<2 ||
       !saved.subPlots.every(function(s){return s && ringOK(s.poly);}) || !saved.edit ||
-      !Array.isArray(saved.edit.slots) || saved.edit.slots.length!==saved.subPlots.length) return false;
+      !Array.isArray(saved.edit.slots) || saved.edit.slots.length!==saved.subPlots.length) return {ok:false,error:'group-snapshot-shape-invalid'};
+    var prepared=saved, preparedCanonical=null;
+    /* New snapshots restore from the canonical design, then project into the legacy
+       fields still consumed by the group editor. Snapshots without this field remain
+       on the legacy import path; a present but invalid/unprojectable model fails closed. */
+    if (Object.prototype.hasOwnProperty.call(saved, 'canonicalDrawingDesign')) {
+      try {
+        var restoreAdapter = window.RyDrawingDesignGroupAdapter;
+        var restoreModel = window.RyDrawingDesignModel;
+        var restoreIds = saved.subPlots.map(function (plot) { return String(plot && plot.id || ''); });
+        var restoreKey = JSON.stringify(restoreIds);
+        var restoreGroupId = 'legacy-group:' + restoreKey;
+        var canonical = saved.canonicalDrawingDesign;
+        var canonicalGroup = canonical && Array.isArray(canonical.groups)
+          ? canonical.groups.filter(function (group) { return group.groupId === restoreGroupId; })[0] : null;
+        if (!restoreAdapter || !restoreModel || !restoreModel.validate(canonical).ok ||
+            canonical.projectId !== 'legacy-group-project:' + restoreKey || !canonicalGroup ||
+            JSON.stringify(canonicalGroup.memberPlotIds) !== JSON.stringify(restoreIds)) return {ok:false,error:'canonical-group-binding-invalid'};
+        var canonicalProjection = restoreAdapter.toLegacyPatch(canonical, restoreGroupId, saved);
+        if (!canonicalProjection || !canonicalProjection.ok || !canonicalProjection.snapshot) return {ok:false,error:'canonical-group-projection-failed'};
+        prepared = Object.assign({}, canonicalProjection.snapshot, { canonicalDrawingDesign: clone(canonical) });
+        var imported = restoreAdapter.fromGroupSnapshot(prepared, {
+          projectId:'legacy-group-project:'+restoreKey,
+          groupId:restoreGroupId,
+          frameId:'legacy-frame:'+restoreKey
+        });
+        if (!imported || !imported.ok || !restoreModel.validate(imported.design).ok) return {ok:false,error:'canonical-group-import-failed'};
+        if (grCanonicalComparable(canonical) !== grCanonicalComparable(imported.design)) {
+          return {ok:false,error:'canonical-group-roundtrip-mismatch'};
+        }
+        preparedCanonical=clone(canonical);
+      } catch (canonicalProjectionError) {
+        return {ok:false,error:'canonical-group-projection-error'};
+      }
+    } else {
+      try {
+        var legacyAdapter = window.RyDrawingDesignGroupAdapter;
+        var legacyModel = window.RyDrawingDesignModel;
+        var legacyIds = saved.subPlots.map(function (plot) { return String(plot && plot.id || ''); });
+        var legacyKey = JSON.stringify(legacyIds);
+        var legacyGroupId = 'legacy-group:' + legacyKey;
+        var legacyImport = legacyAdapter && legacyAdapter.fromGroupSnapshot(saved, {
+          projectId:'legacy-group-project:'+legacyKey,
+          groupId:legacyGroupId,
+          frameId:'legacy-frame:'+legacyKey
+        });
+        if (!legacyImport || !legacyImport.ok || !legacyModel || !legacyModel.validate(legacyImport.design).ok) {
+          return {ok:false,error:legacyImport && legacyImport.error || 'legacy-group-import-failed'};
+        }
+        preparedCanonical=clone(legacyImport.design);
+      } catch (legacyProjectionError) {
+        return {ok:false,error:'legacy-group-import-error'};
+      }
+    }
+    return {ok:true,snapshot:prepared,canonicalDesign:preparedCanonical};
+  }
+  window.grValidateRestoreState = function(saved){
+    grPreparedRestoreSource=null;grPreparedRestoreResult=null;
+    var prepared=grPrepareRestoreState(saved);
+    if(prepared.ok){grPreparedRestoreSource=saved;grPreparedRestoreResult=prepared;}
+    return prepared.ok;
+  };
+  window.grRestoreState = function (saved) {
+    if (!saved) { grPreparedRestoreSource=null;grPreparedRestoreResult=null;window.__runyeGroupEdit=null; window.__runyeSubPlots=null; grSync(); grRefreshUI(); return false; }
+    var preparedRestore=grPreparedRestoreSource===saved&&grPreparedRestoreResult?grPreparedRestoreResult:null;
+    grPreparedRestoreSource=null;grPreparedRestoreResult=null;
+    if(!preparedRestore)preparedRestore=grPrepareRestoreState(saved);
+    if(!preparedRestore.ok) return false;
+    saved=preparedRestore.snapshot;
+    /* Inspect legacy input through the canonical adapters before applying it. The projected
+       result validates the canonical projection before the legacy-compatible editor state is applied. */
+    grObserveDrawingDesignSnapshot(saved, 'restore', true);
     window.__runyeSubPlots=clone(saved.subPlots); window.measuredPolygon=clone(saved.frame);
     var edit=clone(saved.edit), mode=edit.mode, current=edit.current;
     edit.active=true; edit.mode='whole'; edit.current=Math.max(0,Math.min(edit.slots.length-1,Math.floor(num(current,0))));
     edit.trunkPipes=clone(saved.trunk && saved.trunk.lines || []); edit.trunkDn=num(saved.trunk && saved.trunk.dn,110);
     window.__runyeGroupEdit=edit; window.__runyeTlBlock=null; window.__runyeGroupPlotEdit=null;
-    window.RunyeBridge.setGroupMode('perPlot');
-    if(mode!=='perPlot') window.RunyeBridge.setGroupMode('whole');
+    /* The mode bridge may save the current member through grExportState. Install the
+       restored group and canonical source first, so that bridge reads this group rather
+       than the previous W.groupRef (or an empty initial W). */
     W.groupRef=edit; W.groupKey=JSON.stringify(saved.subPlots.map(function(s){return s.id || s.name;}));
     W.blocks=clone(saved.blocks || []); W.tlDefaults=clone(saved.defaults);
+    W.trunk={lines:edit.trunkPipes,dn:edit.trunkDn};
+    W.canonicalDesign=preparedRestore.canonicalDesign;
+    W.canonicalGroupId='legacy-group:' + JSON.stringify(saved.subPlots.map(function (plot) { return String(plot && plot.id || ''); }));
+    window.RunyeBridge.setGroupMode('perPlot');
+    if(mode!=='perPlot') window.RunyeBridge.setGroupMode('whole');
+    /* Project/undo snapshots persist canonical design and its checked legacy projection,
+       but intentionally omit in-progress canvas gestures. Reset transient interaction
+       state even when restoring the same group identity (grSync only does this on key change). */
+    W.mode='pick'; W.draw=null; W.drag=null; W.sel=-1; W.hovBlock=-1; W.hyd=null;
     /* [v654] trunk dn 恢复不再经 grSync 反写（见 grSync 内注释），这里显式落值并同步下拉显示；
        必须在 grSync/grRefreshUI 之前 —— 后续渲染链（grRenderTrunk）会把 ge.trunkDn 镜像成它。 */
     W.trunk.dn = edit.trunkDn;
@@ -1784,11 +1853,10 @@
     if (!W.dnOver || typeof W.dnOver !== 'object') W.dnOver = { main: null, branch: null };
     if (!('main' in W.dnOver)) W.dnOver.main = null;
     if (!('branch' in W.dnOver)) W.dnOver.branch = null;
-    grSync(); grFit(); grRefreshUI(); return true;
+    grSync();
+    grFit(); grRefreshUI(); return true;
   };
-  /* [v242] 「按块进二级页」也开一个外部入口 —— 与 grEnterTlForBlock 同样理由：
-     跨 IIFE / 冒烟脚本要能直接触发这条路径，不必去模拟一次真实双击（取点受浮层遮挡影响）。 */
-  window.grEnterPlotL2 = grEnterPlotL2;
+  /* [v242→v678] window.grEnterPlotL2 外部导出已随「双击/按钮进二级编辑」入口一起移除。 */
   /* 主区切换 / 窗口尺寸变化时，若本页正显示就重排一次（隐藏期间量到的宽高是 0） */
   window.addEventListener('resize', function () {
     var sec = $('grPipeSection');

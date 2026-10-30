@@ -24,8 +24,7 @@
     pipeIds:{main:[],branch:[],subbranch:[]},
     nextPipeId:1,
     zoneRotated:false,
-    plotRotationDeg:0,
-    plotMirror:'none',
+    zoneAngleDeg:0,
     zoom:1, panX:0, panY:0, isPanning:false, panStartX:0, panStartY:0,
     cutOverrides:{x:{},y:{}},
     // 手动调整后的内部切割线位置快照（世界坐标，升序）；sig 用于识别基础划分是否变化
@@ -48,6 +47,166 @@
            bb 就是那一块的 bbox ⇒ 同样必须按本块尺寸算。
        单地块 / 二级页整组视图不受影响（那条路径不置此标志）。 */
   var ppOwnDimOverride=false;
+  var ppCutDragPreimage=null;
+  var ppCutSinglePreimage=null;
+  var ppCutStepPreimage=null;
+
+  function ppGroupMemberPreimage(){
+    var ge=window.__runyeGroupEdit;
+    if(!ge||!ge.active||ge.mode!=='perPlot')return null;
+    if(!Array.isArray(ge.slots)||!ge.slots[ge.current])return {index:ge.current,slot:null,invalid:true};
+    var slot=ppCloneJSON(ge.slots[ge.current]);
+    return slot?{index:ge.current,slot:slot,invalid:false}:{index:ge.current,slot:null,invalid:true};
+  }
+  function ppReadGroupMemberSlot(ge,index){
+    if(!ge||!Array.isArray(ge.slots)||!Number.isInteger(index)||index<0||index>=ge.slots.length)return {ok:false};
+    var work=window.__runyeGroupWork,adapter=window.RyDrawingDesignGroupAdapter;
+    if(!work||!work.canonicalDesign)return {ok:true,canonical:false,slot:ge.slots[index]};
+    var subs=window.__runyeSubPlots||[],memberIds=subs.map(function(plot){return String(plot&&plot.id||'');});
+    if(memberIds.length!==ge.slots.length||!memberIds.every(function(id){return !!id;}))return {ok:false,canonical:true};
+    var groupId='legacy-group:'+JSON.stringify(memberIds);
+    if(work.canonicalGroupId!==groupId||!adapter||typeof adapter.toLegacyMemberSlot!=='function')return {ok:false,canonical:true};
+    var projected=adapter.toLegacyMemberSlot(work.canonicalDesign,groupId,memberIds[index],ge.slots[index]);
+    return projected&&projected.ok?{ok:true,canonical:true,slot:projected.slot}:{ok:false,canonical:true,error:projected&&projected.error};
+  }
+  function ppReadGroupMemberSlots(ge){
+    if(!ge||!Array.isArray(ge.slots))return {ok:false,error:'group-slots-unavailable'};
+    var slots=[];
+    for(var i=0;i<ge.slots.length;i++){
+      var read=ppReadGroupMemberSlot(ge,i);
+      if(!read.ok){
+        var error=read.error||'canonical-member-projection-failed';
+        window.__runyeDrawingDesignShadow={ok:false,stage:'group-read',error:error,index:i};
+        return {ok:false,error:error,index:i};
+      }
+      slots.push(read.slot);
+    }
+    return {ok:true,slots:slots};
+  }
+  function ppDiscardLatestHistoryEntry(){
+    if(Array.isArray(ppState.history)&&ppState.history.length)ppState.history.pop();
+  }
+  function ppCommitGroupMemberEdit(preimage,reason){
+    if(!preimage)return true;
+    if(preimage.invalid||!preimage.slot)return false;
+    if(ppSaveGroupMemberSlot(preimage.index,ppCaptureSlot()))return true;
+    ppApplySlot(preimage.slot);
+    if(reason!=='undo')ppDiscardLatestHistoryEntry();
+    ppUpdateLockAreaBtn();
+    if(typeof updatePlan==='function')updatePlan();
+    ppUpdateTransform();ppRender();
+    if(typeof window.ppRefreshTLAfterCuts==='function')window.ppRefreshTLAfterCuts();
+    else if(typeof window.ppRefreshDiagramIfVisible==='function')window.ppRefreshDiagramIfVisible();
+    console.warn('[plot-editor] group member transaction rejected');
+    return false;
+  }
+  function ppCommitSinglePlotEdit(preimage,reason,refreshMaterials,refreshPlan){
+    if(!preimage||typeof window.ryCommitSinglePlotL2Snapshot!=='function')return true;
+    var after=window.ppGetState();
+    var designKeys=['polyPts','mainPipes','branchPipes','subBranchPipes','source','valves','hiddenPipes','pipeIds','nextPipeId',
+      'cutSnap','partitionCuts','cutOverrides','areaLocked','zoneAngleDeg','zoneRotated','zoneAuto'];
+    if(!designKeys.some(function(key){return JSON.stringify(preimage[key])!==JSON.stringify(after[key]);}))return true;
+    var result=window.ryCommitSinglePlotL2Snapshot(preimage,after);
+    if(result!==false){
+      if(result===true){ppRefreshDiagramOrReset();if(refreshMaterials&&typeof ppRefreshMaterials==='function')ppRefreshMaterials();}
+      return true;
+    }
+    if(reason!=='undo')ppDiscardLatestHistoryEntry();
+    ppApplySlot(preimage);
+    ppUpdateLockAreaBtn();
+    if(refreshPlan&&typeof updatePlan==='function')updatePlan();
+    ppUpdateTransform();ppRender();ppUpdateAutoPipeButton();ppRefreshDiagramOrReset();
+    if(refreshMaterials&&typeof ppRefreshMaterials==='function')ppRefreshMaterials();
+    console.warn('[plot-editor] single-plot '+reason+' transaction rejected');
+    return false;
+  }
+  function ppCommitCutDragSnapshots(groupPreimage,singlePreimage,reason){
+    if(groupPreimage&&!ppCommitGroupMemberEdit(groupPreimage))return false;
+    return !singlePreimage||ppCommitSinglePlotEdit(singlePreimage,reason,true,true);
+  }
+  function ppCommitGroupMemberStep(preimage, nextStep, previousStep, discardHistoryOnReject){
+    if(!preimage)return true;
+    if(preimage.invalid||!preimage.slot)return false;
+    var change={index:preimage.index,slot:ppCaptureSlot(),stepOverrides:nextStep,stepPreimage:previousStep};
+    if(ppSaveGroupMemberSlots([change]))return true;
+    if(discardHistoryOnReject)ppDiscardLatestHistoryEntry();
+    ppApplySlot(preimage.slot);
+    window.tlZoneStep=ppCloneJSON(previousStep)||{sig:'',x:{},y:{}};
+    if(window.tlDiagramData&&window.tlDiagramData.zones){
+      var old=window.tlZoneStep;
+      window.tlDiagramData.zones.cutOffX=old&&Object.keys(old.x||{}).length?old.x:null;
+      window.tlDiagramData.zones.cutOffY=old&&Object.keys(old.y||{}).length?old.y:null;
+    }
+    ppUpdateLockAreaBtn();
+    if(typeof updatePlan==='function')updatePlan();
+    ppUpdateTransform();ppRender();
+    if(typeof window.ppRefreshTLAfterCuts==='function')window.ppRefreshTLAfterCuts();
+    else if(typeof window.ppRefreshDiagramIfVisible==='function')window.ppRefreshDiagramIfVisible();
+    console.warn('[plot-editor] group member step transaction rejected');
+    return false;
+  }
+
+  function ppZoneAngle(){
+    var a=Number(ppState.zoneAngleDeg);
+    if(!isFinite(a)||Math.abs(a)<0.001)a=ppState.zoneRotated?90:0;
+    a=((a+180)%360+360)%360-180;
+    return Math.abs(a)<0.05?0:Math.round(a*10)/10;
+  }
+  function ppSyncZoneAngleUI(preserveInput){
+    var a=ppZoneAngle(),input=document.getElementById('ppZoneAngleInput'),btn=document.getElementById('ppRotateZones');
+    if(input&&!preserveInput)input.value=String(a);
+    if(btn)btn.classList.toggle('active',Math.abs(a)>0.001);
+  }
+  function ppApplyZoneAngle(value,refreshPlan,preserveInput,preimageOverride){
+    var a=Number(value);if(!isFinite(a))return false;
+    a=((a+180)%360+360)%360-180;
+    if(Math.abs(a)<0.05)a=0;
+    a=Math.round(a*10)/10;
+    var groupPreimage=refreshPlan?ppGroupMemberPreimage():null;
+    if(groupPreimage&&groupPreimage.invalid)return false;
+    var singlePreimage=refreshPlan&&!groupPreimage&&typeof window.ppGetState==='function'
+      ?(preimageOverride||window.ppGetState()):null;
+    ppUnlockArea();
+    ppState.zoneAngleDeg=a;
+    ppState.zoneRotated=Math.abs(Math.abs(a)-90)<0.001;
+    if(groupPreimage&&!ppCommitGroupMemberEdit(groupPreimage)){
+      ppSyncZoneAngleUI(preserveInput);
+      return false;
+    }
+    if(singlePreimage&&typeof window.ryCommitSinglePlotL2Snapshot==='function'){
+      var singleCommit=window.ryCommitSinglePlotL2Snapshot(singlePreimage,window.ppGetState());
+      if(singleCommit===false){
+        ppDiscardLatestHistoryEntry();
+        ppApplySlot(singlePreimage);
+        ppUpdateLockAreaBtn();
+        ppSyncZoneAngleUI(preserveInput);
+        if(typeof updatePlan==='function')updatePlan();
+        ppUpdateTransform();ppRender();ppRefreshDiagramOrReset();
+        console.warn('[plot-editor] single-plot canonical partition transaction rejected');
+        return false;
+      }
+    }
+    ppSyncZoneAngleUI(preserveInput);
+    ppRender();
+    if(refreshPlan&&typeof updatePlan==='function')updatePlan();
+    if(refreshPlan)ppRefreshDiagramOrReset();
+    return true;
+  }
+  function ppGridFrame(poly,b,dims,angleDeg){
+    var pts=poly||ppState.polyPts||[];if(!pts.length)return null;
+    b=b||ppGetBounds();dims=dims||ppGetPlanDims(b);
+    var sx=b.w>0?dims.w/b.w:1,sy=b.h>0?dims.h/b.h:1;
+    var angle=(isFinite(Number(angleDeg))?Number(angleDeg):ppZoneAngle())*Math.PI/180,cs=Math.cos(angle),sn=Math.sin(angle);
+    var c={x:dims.w/2,y:dims.h/2};
+    function toGrid(p){var x=(p.x-b.minX)*sx-c.x,y=(p.y-b.minY)*sy-c.y;return{x:c.x+x*cs+y*sn,y:c.y-x*sn+y*cs};}
+    function toWorld(p){var x=p.x-c.x,y=p.y-c.y,gx=c.x+x*cs-y*sn,gy=c.y+x*sn+y*cs;return{x:b.minX+gx/sx,y:b.minY+gy/sy};}
+    var gp=pts.map(toGrid),gb={minX:Infinity,minY:Infinity,maxX:-Infinity,maxY:-Infinity};
+    gp.forEach(function(p){gb.minX=Math.min(gb.minX,p.x);gb.minY=Math.min(gb.minY,p.y);gb.maxX=Math.max(gb.maxX,p.x);gb.maxY=Math.max(gb.maxY,p.y);});
+    gb.w=gb.maxX-gb.minX;gb.h=gb.maxY-gb.minY;
+    return{angle:(isFinite(Number(angleDeg))?Number(angleDeg):ppZoneAngle()),center:c,origin:{x:b.minX,y:b.minY},toGrid:toGrid,toWorld:toWorld,poly:gp,bounds:gb,scaleX:sx,scaleY:sy};
+  }
+  function ppCutPoint(cuts,x,y){return cuts&&cuts.frame?cuts.frame.toWorld({x:x,y:y}):{x:x,y:y};}
+  function ppCutCanvas(cuts,x,y){var p=ppCutPoint(cuts,x,y);return ppToCanvas(p.x,p.y);}
 
   function ppGetPlanDims(b){
     /* [v197] 成组**逐块**模式：分区以「本块真实尺寸」为准（sx=sy=1）。
@@ -109,34 +268,32 @@
       /* 取「根本不切」的等价布局：设计边长给「比整块任何边都大」的值，
          `ppSplitLength(total,total)` 的 `while(total-used > step+0.05)` 立即为假 ⇒ 返回 [total]（1 段）。
          ⇒ 1 × 1 = 1 个区，全链路一致。 */
-      var _d0=ppGetPlanDims(b);
-      var _big=Math.hypot(_d0.w||1,_d0.h||1);   // ≥ max(planW,planH)，长短边互换后仍 ≥ 任何边
+      var _d0=ppGetPlanDims(b),_f0=ppGridFrame(ppState.polyPts,b,_d0),_gd0=_f0?_f0.bounds:_d0;
+      var _big=Math.hypot(_gd0.w||1,_gd0.h||1);   // ≥ max(gridW,gridH)，不会残留自动切分
       return {
         cols:1, rows:1, N:1,
         zoneW:_big, zoneH:_big,
         drawZoneW:_big, drawZoneH:_big,
-        zoneArea:(_d0.w||1)*(_d0.h||1), rotated:false,
+        zoneArea:(_gd0.w||1)*(_gd0.h||1), rotated:false,
         autoOff:true
       };
     }
-    var dims=ppGetPlanDims(b);
-    var manualZoneMu=getManualPlanZoneMu(dims.w,dims.h);
+    var dims=ppGetPlanDims(b),frame=ppGridFrame(ppState.polyPts,b,dims),gd=frame?frame.bounds:dims;
+    var manualZoneMu=getManualPlanZoneMu(gd.w,gd.h);
     ppSyncManualZoneWarning(document.getElementById('planZoneMuManual'));
-    var base=calcPlanZoneLayout(dims.w,dims.h,planN,manualZoneMu);
-    // 计算与图面共用轴向切分尺寸；旋转后按地块实际边长重新计数。
-    var xDesign=ppState.zoneRotated?base.designH:base.designW;
-    var yDesign=ppState.zoneRotated?base.designW:base.designH;
-    var cols=splitZoneLength(dims.w,xDesign).length;
-    var rows=splitZoneLength(dims.h,yDesign).length;
+    var base=calcPlanZoneLayout(gd.w,gd.h,planN,manualZoneMu);
+    var xDesign=base.designW,yDesign=base.designH;
+    var cols=splitZoneLength(gd.w,xDesign).length;
+    var rows=splitZoneLength(gd.h,yDesign).length;
     return {
       cols:cols,
       rows:rows,
       N:cols*rows,
       designW:xDesign, designH:yDesign,
-      zoneW:ppState.zoneRotated?base.zoneH:base.zoneW,
-      zoneH:ppState.zoneRotated?base.zoneW:base.zoneH,
-      drawZoneW:ppState.zoneRotated?base.drawZoneH:base.drawZoneW,
-      drawZoneH:ppState.zoneRotated?base.drawZoneW:base.drawZoneH,
+      zoneW:base.zoneW,
+      zoneH:base.zoneH,
+      drawZoneW:base.drawZoneW,
+      drawZoneH:base.drawZoneH,
       zoneArea:base.zoneArea,
       rotated:ppState.zoneRotated
     };
@@ -194,7 +351,16 @@
     var m=ppContentSize(); if(!m) return null;
     var aw=ppCanvas.width-2*PP_VIEW_PAD, ah=ppCanvas.height-2*PP_VIEW_PAD;
     if(!(aw>8)||!(ah>8)) return null;          /* 画布还没量到尺寸（隐藏/首帧）→ 先不动 */
-    return Math.min(aw/m.w, ah/m.h);
+    var s=Math.min(aw/m.w, ah/m.h);
+    /* [v784] 管线图层（三级施工图）存在时预留标注余量：syncCamera 相机锁定只保证「地块多边形」
+       与底图重合，而施工图幅在地块外沿还有尺寸标注（下方 42 / 左侧 66 图幅px，旋转后左端更低），
+       紧边 fit 会把它们推出画布被裁（用户实测：分区旋转后底部尺寸线左半段消失）。
+       0.8 ≈ 两侧各留 10% 画布 —— 覆盖 42~66 图幅px × 锁定比例的常见区间。 */
+    try{
+      var _tld=window.tlDiagramData;
+      if(_tld&&_tld.poly&&_tld.poly.length>2) s*=0.8;
+    }catch(e){}
+    return s;
   }
   function ppClampViewToFit(){
     var sfit=ppFitScale(); if(sfit==null) return false;
@@ -246,6 +412,9 @@
 
   function ppResize(){
     if(document.body.classList.contains('ry-tool') && !document.getElementById('pipePlanSection').classList.contains('ry-active')) return;
+    /* Entering a tool group dispatches resize even when the shared viewport has not
+       changed. Do not clamp a deliberately zoomed or panned camera on that event. */
+    if(ppCanvas.width===ppWrap.clientWidth&&ppCanvas.height===ppWrap.clientHeight&&ppSized)return;
     ppCanvas.width=ppWrap.clientWidth;
     ppCanvas.height=ppWrap.clientHeight;
     if(ppCanvas.width>60&&ppCanvas.height>60) ppSized=true;
@@ -254,19 +423,78 @@
     ppUpdateTransform();ppRender();ppSyncFitBtn();
   }
 
+  /* CAD 单一制图区迁移：导航切换会触发宿主尺寸重排，读写该视口不触碰地块或分区设计数据。 */
+  window.ppGetView=function(){return{zoom:ppState.zoom,panX:ppState.panX,panY:ppState.panY};};
+  /* Shared CAD canvas bridge: callers project the authoritative map coordinates
+     through the exact same camera used by the partition renderer. */
+  window.ppMapToCanvas=function(x,y){
+    if(!isFinite(Number(x))||!isFinite(Number(y)))return null;
+    if(!ppState.transform)ppUpdateTransform();
+    var p=ppToCanvas(Number(x),Number(y));
+    return{x:p.x,y:p.y,width:ppCanvas.width,height:ppCanvas.height};
+  };
+  window.ppSetView=function(view){
+    if(!view||!isFinite(Number(view.zoom))||!isFinite(Number(view.panX))||!isFinite(Number(view.panY)))return false;
+    ppState.zoom=Math.max(0.1,Math.min(10,Number(view.zoom)));
+    ppState.panX=Number(view.panX);ppState.panY=Number(view.panY);
+    ppUpdateTransform();ppRender();ppSyncFitBtn();
+    return true;
+  };
+  window.ppPanView=function(dx,dy){
+    if(!isFinite(dx)||!isFinite(dy))return false;
+    ppState.panX+=dx;ppState.panY+=dy;
+    ppUpdateTransform();ppRender();ppSyncFitBtn();
+    return true;
+  };
+  /* Shared CAD camera zoom: all input sources update the partition camera, then
+     reproject the pipeline overlay onto that exact view. */
+  window.ppZoomView=function(factor,x,y){
+    factor=Number(factor);if(!isFinite(factor)||factor<=0)return false;
+    var pos={x:isFinite(Number(x))?Number(x):ppCanvas.width/2,y:isFinite(Number(y))?Number(y):ppCanvas.height/2};
+    var nz=Math.max(0.1,Math.min(10,ppState.zoom*factor));
+    if(nz===ppState.zoom)return false;
+    var mw=ppToMeters(pos.x,pos.y);
+    ppState.zoom=nz;ppUpdateTransform();
+    var np=ppToCanvas(mw.x,mw.y);
+    ppState.panX+=pos.x-np.x;ppState.panY+=pos.y-np.y;
+    ppRender();ppSyncFitBtn();
+    return true;
+  };
+
+  function ppApplySavedPartitionCuts(){
+    var saved=ppState.partitionCuts;
+    if(!saved||!Array.isArray(saved.x)||!Array.isArray(saved.y)||ppState.polyPts.length<3)return false;
+    try{
+      var b=ppGetBounds();
+      var n=parseInt(document.getElementById('planN')&&document.getElementById('planN').value)||parseInt(document.getElementById('fld_N')&&document.getElementById('fld_N').value)||4;
+      var layout=ppGetZoneLayout(b,n);
+      ppState.cutSnap={sig:ppGetZoneCutSignature(b,layout),x:saved.x.slice(),y:saved.y.slice()};
+      return true;
+    }catch(e){return false;}
+  }
+
   function ppLoadPolygon(){
     if(!window.measuredPolygon||window.measuredPolygon.length<3){
       ppHintEl.style.display='block';ppToolbar.style.display='flex';
       ppEmpty.style.display='block';ppLegend.style.display='none';
-      ppState.polyPts=[];ppState.transform=null;ppRender();return;
+      ppState.polyPts=[];ppState.transform=null;
+      /* Replacing a grouped plot with an empty/invalid boundary must also detach
+         the prior group's editor state and controls from the now-empty canvas. */
+      window.__runyeGroupEdit=null;
+      ppResetCutSnap('');
+      ppSyncGroupEditUI();
+      ppRender();return;
     }
     ppHintEl.style.display='none';ppToolbar.style.display='flex';
     ppEmpty.style.display='none';ppLegend.style.display='flex';
     ppState.polyPts=window.measuredPolygon.map(function(p){return{x:p.x,y:p.y};});
     /* [v193] 成组地块：初始化「整组 / 逐块」编辑状态（非成组 → 置 null，UI 自动隐藏）。
        必须在 ppUpdateTransform 之前，因为整组/逐块会决定 bounds 用的是外框还是某一块。 */
-    ppInitGroupEdit();
-    ppResetCutSnap('');
+    var ppHasGroup=ppInitGroupEdit();
+    /* 成组成员的分区线快照属于各自 slot。新地块才清除旧快照；成组初始化若再清一次，
+       会把当前成员刚恢复的手动分区位置抹掉。 */
+    if(!ppHasGroup)ppResetCutSnap('');
+    ppApplySavedPartitionCuts();
     /* [v629] 存档恢复 / 首次进场也走本函数 ⇒ 在这里同样收口一次，
        否则「云端存着 zoom=347%」的地块一打开仍是裁切态（ppResize 那时还没量到内容）。 */
     ppClampViewToFit();
@@ -274,6 +502,9 @@
   }
   window.ppLoadPolygon=ppLoadPolygon;
   window.ppGetPolyPts=function(){ return ppState.polyPts.map(function(p){return{x:p.x,y:p.y};}); };
+  window.ppSetZoneAngleDeg=function(value){
+    return ppApplyZoneAngle(value,false);
+  };
 
   // ===== 数据传导桥：供三级页读取二级页的分区网格与管线几何（二级页状态 ppState 为 IIFE 私有，三级页顶层函数访问不到，故在此暴露）=====
   window.RunyeBridge = {
@@ -290,6 +521,56 @@
        成组管路页要「按块进入三级页」，必须先让二级页切到那一块 —— 因为三级页的
        分区网格走 getZoneCuts()（读 ppState.polyPts），不切就会拿错那一块的分区。 */
     groupEdit: function(){ return window.__runyeGroupEdit||null; },
+    setSourcePosition: function(point){
+      if(!point||!Number.isFinite(Number(point.x))||!Number.isFinite(Number(point.y)))return false;
+      var ge=window.__runyeGroupEdit;
+      if(ge&&ge.active&&ge.mode==='whole')return false;
+      var groupPreimage=ppGroupMemberPreimage();
+      if(groupPreimage&&groupPreimage.invalid)return false;
+      var singlePreimage=!groupPreimage&&!ppIsGroupWhole()&&typeof window.ppGetState==='function'
+        ?window.ppGetState():null;
+      ppPushHistory();
+      ppState.source={x:Number(point.x),y:Number(point.y)};
+      if(groupPreimage)return ppCommitGroupMemberEdit(groupPreimage,'source-flip');
+      return !singlePreimage||ppCommitSinglePlotEdit(singlePreimage,'source-flip',false,false);
+    },
+    getPartitionState: function(){
+      return {cutSnap:ppCloneJSON(ppState.cutSnap),cutOverrides:ppCloneJSON(ppState.cutOverrides),
+        zoneAngleDeg:ppState.zoneAngleDeg,zoneRotated:!!ppState.zoneRotated};
+    },
+    getPlotPolygon: function(){
+      return ppState.polyPts.map(function(point){return{x:Number(point.x),y:Number(point.y)};});
+    },
+    getPartitionSnapshot: function(){
+      return ppCloneJSON({polyPts:ppState.polyPts,zoneAngleDeg:ppState.zoneAngleDeg,partitionCuts:ppState.partitionCuts,
+        cutSnap:ppState.cutSnap,cutOverrides:ppState.cutOverrides,mainPipes:ppState.mainPipes,
+        branchPipes:ppState.branchPipes,subBranchPipes:ppState.subBranchPipes,source:ppState.source,
+        valves:ppState.valves,zoom:ppState.zoom,panX:ppState.panX,panY:ppState.panY});
+    },
+    hasPlot: function(){return Array.isArray(ppState.polyPts)&&ppState.polyPts.length>=3;},
+    restorePartitionState: function(next){
+      if(!next||typeof next!=='object')return false;
+      var ge=window.__runyeGroupEdit;
+      if(ge&&ge.active&&ge.mode==='whole')return false;
+      var groupPreimage=ppGroupMemberPreimage();
+      if(groupPreimage&&groupPreimage.invalid)return false;
+      var singlePreimage=!groupPreimage&&!ppIsGroupWhole()&&typeof window.ppGetState==='function'
+        ?window.ppGetState():null;
+      var angle=Number(next.zoneAngleDeg);
+      if(!isFinite(angle))angle=0;
+      angle=((angle+180)%360+360)%360-180;
+      if(Math.abs(angle)<0.05)angle=0;
+      angle=Math.round(angle*10)/10;
+      ppPushHistory();
+      ppState.cutSnap=next.cutSnap?ppCloneJSON(next.cutSnap):{sig:'',x:null,y:null};
+      ppState.cutOverrides=next.cutOverrides?ppCloneJSON(next.cutOverrides):{x:{},y:{}};
+      ppState.zoneAngleDeg=angle;
+      ppState.zoneRotated=Math.abs(Math.abs(angle)-90)<0.001;
+      if(groupPreimage&&!ppCommitGroupMemberEdit(groupPreimage,'partition-restore'))return false;
+      if(singlePreimage&&!ppCommitSinglePlotEdit(singlePreimage,'partition-restore',false,true))return false;
+      ppSyncZoneAngleUI();
+      return true;
+    },
     setGroupMode: function(m){ if(typeof ppSetGroupMode==='function') ppSetGroupMode(m); },
     selectGroupPlot: function(i){ if(typeof ppSelectGroupPlot==='function') ppSelectGroupPlot(i); },
     /* [v242] 成组编辑区的 UI 同步（含「◀ 返回成组管路」的显隐，它读 window.__runyeGroupPlotEdit）。
@@ -318,18 +599,24 @@
        cutSnap 和 mergePreview，两个都要还原）。
        ★ 成组页 IIFE 里没有 ppState / ppGetZoneCuts（跨 IIFE 够不着）——
          v196 第一版直接引用直接 ReferenceError（group_work 探针 FATAL 抓到）。 */
-    zoneCutsFor: function(bb, planN, cutSnap, cutOverrides){
+    zoneCutsFor: function(bb, planN, cutSnap, cutOverrides, zoneAngleDeg, polyPts){
       if(!bb||!(bb.w>0.5)||!(bb.h>0.5))return null;
-      var keepSnap=ppState.cutSnap, keepOv=ppState.cutOverrides, keepMp=ppState.mergePreview, keepOwn=ppOwnDimOverride;
+      var keepSnap=ppState.cutSnap, keepOv=ppState.cutOverrides, keepMp=ppState.mergePreview, keepOwn=ppOwnDimOverride, keepAngle=ppState.zoneAngleDeg, keepRot=ppState.zoneRotated, keepPoly=ppState.polyPts;
       try{
+        if(Array.isArray(polyPts)&&polyPts.length>=3)ppState.polyPts=polyPts.map(function(p){return{x:+p.x,y:+p.y};});
         ppState.cutSnap=cutSnap||{sig:'',x:null,y:null};
         ppState.cutOverrides=cutOverrides||{x:{},y:{}};
+        ppState.zoneAngleDeg=isFinite(Number(zoneAngleDeg))?Number(zoneAngleDeg):0;
+        ppState.zoneRotated=Math.abs(ppState.zoneAngleDeg%180)===90;
         ppOwnDimOverride=true;   /* [v201] 传进来的 bb 就是某一块的 bbox ⇒ 按本块尺寸分区 */
         var zl=ppGetZoneLayout(bb,planN);
         return ppGetZoneCuts(bb,zl);
       }catch(e){ return null; }
-      finally{ ppState.cutSnap=keepSnap; ppState.cutOverrides=keepOv; ppState.mergePreview=keepMp; ppOwnDimOverride=keepOwn; }
+      finally{ ppState.cutSnap=keepSnap; ppState.cutOverrides=keepOv; ppState.mergePreview=keepMp; ppOwnDimOverride=keepOwn; ppState.zoneAngleDeg=keepAngle; ppState.zoneRotated=keepRot; ppState.polyPts=keepPoly; }
     },
+    cutToWorld: function(cuts,x,y){return ppCutPoint(cuts,x,y);},
+    polyToGrid: function(cuts,poly){return cuts&&cuts.frame?(poly||[]).map(cuts.frame.toGrid):(poly||[]).map(function(p){return{x:p.x,y:p.y};});},
+    polyToWorld: function(cuts,poly){return cuts&&cuts.frame?(poly||[]).map(cuts.frame.toWorld):(poly||[]).map(function(p){return{x:p.x,y:p.y};});},
     /* 非标分区判断用的两个纯函数桥（成组页只算本块自己的环，不能走
        ppZoneActualAreaM2 —— 那个在成组时会经 ppGetSubPlotRings() 把全部
        成员环都裁剪进来，本块 cell 会被别的块污染）。 */
@@ -337,8 +624,16 @@
     polyArea: function(poly){ try{ return ppPolyArea(poly); }catch(e){ return 0; } },
     /* v98d：三级画布拖动「组边界线」→ 复用二级的分区线位置（写回共享 cutSnap），二级/三级同步。
        allowMerge=false 时不触发「拖到邻线即合并」，以保护手动分组的区号不失效。 */
-    cutDragBegin: function(){ try{ ppPushHistory(); }catch(e){} },
+    cutDragBegin: function(){
+      try{
+        ppCutDragPreimage=ppGroupMemberPreimage();
+        if(ppCutDragPreimage&&ppCutDragPreimage.invalid)return;
+        ppCutSinglePreimage=!ppCutDragPreimage&&!ppIsGroupWhole()&&typeof window.ppGetState==='function'?window.ppGetState():null;
+        ppPushHistory();
+      }catch(e){ppCutDragPreimage=null;ppCutSinglePreimage=null;}
+    },
     cutDragTo: function(axis,index,worldVal,allowMerge){
+      if(ppCutDragPreimage&&ppCutDragPreimage.invalid)return null;
       var r=null;
       try{ r = allowMerge ? ppDragCutTo(axis,index,worldVal) : ppDragCutPosOnly(axis,index,worldVal); }catch(e){}
       try{ ppRender(); }catch(e){}
@@ -348,6 +643,9 @@
       var merged=false;
       if(allowMerge){ try{ merged=ppCommitMerge(); }catch(e){} }
       else { try{ ppState.mergePreview=null; }catch(e){} }
+      var preimage=ppCutDragPreimage,singlePreimage=ppCutSinglePreimage;
+      ppCutDragPreimage=null;ppCutSinglePreimage=null;
+      if(!ppCommitCutDragSnapshots(preimage,singlePreimage,'cut-drag'))return false;
       try{ ppRender(); }catch(e){}
       ppRefreshTLAfterCuts();
       return merged;
@@ -357,9 +655,23 @@
        lane = 行号（axis='x' 时）/ 列号（axis='y' 时），由工作区命中时给出。
        写入 window.tlZoneStep（稀疏覆盖表）并同步当前快照 zones.cutOffX/cutOffY
        （画布克隆底图 / 逐格面积 / 流量都读它）；返回值把两张表回给工作区做防御性同步。 */
-    cutStepDragBegin: function(){ try{ ppPushHistory(); }catch(e){} },
+    cutStepDragBegin: function(){
+      try{
+        ppCutStepPreimage=ppGroupMemberPreimage();
+        if(ppCutStepPreimage&&ppCutStepPreimage.invalid)return;
+        if(ppCutStepPreimage){
+          ppCutStepPreimage=Object.assign({},ppCutStepPreimage,{step:ppCloneJSON(window.tlZoneStep)});
+        }else if(!ppIsGroupWhole()&&window.__runyeSingleCanonicalDesign){
+          ppCutStepPreimage={single:true,step:ppCloneJSON(window.tlZoneStep),diagram:ppCloneJSON(window.tlDiagramData)};
+        }else{
+          ppCutStepPreimage=null;
+        }
+        ppPushHistory();
+      }catch(e){ppCutStepPreimage=null;}
+    },
     cutStepDragTo: function(axis,index,lane,worldVal){
       try{
+        if(ppCutStepPreimage&&ppCutStepPreimage.invalid)return null;
         if(lane==null) return null;
         var base=ppCurrentCuts(); if(!base) return null;
         var arr=(axis==='x')?base.xPos:base.yPos;
@@ -388,6 +700,20 @@
         window.tlDiagramData.zones.cutOffX=st.x;
         window.tlDiagramData.zones.cutOffY=st.y;
       }
+      var preimage=ppCutStepPreimage;ppCutStepPreimage=null;
+      if(preimage&&preimage.single){
+        var changed=JSON.stringify(preimage.step)!==JSON.stringify(st)||
+          JSON.stringify(preimage.diagram)!==JSON.stringify(window.tlDiagramData);
+        if(changed&&typeof window.ryCommitSingleLevel3CanonicalFromRuntime==='function'&&
+            !window.ryCommitSingleLevel3CanonicalFromRuntime()){
+          ppDiscardLatestHistoryEntry();
+          window.tlZoneStep=ppCloneJSON(preimage.step)||{sig:'',x:{},y:{}};
+          window.tlDiagramData=ppCloneJSON(preimage.diagram);
+          if(typeof window.ppRefreshTLAfterCuts==='function')window.ppRefreshTLAfterCuts();
+          console.warn('[plot-editor] single-plot level3 cut-step transaction rejected');
+          return false;
+        }
+      }else if(preimage&&!ppCommitGroupMemberStep(preimage,ppCloneJSON(st),preimage.step,true))return false;
       /* ⚠ 这里**故意不**调 runyeSaveProject()：它内部会 projectToast('方案已保存到本机')，
          等于每松一次手就弹一次提示（v98d 真渲染闸门的「生成图过程中无 alert 弹窗」会因此变红）。
          旧路径 cutDragEnd 同样不落盘 —— 拖动只改内存，落盘交给用户点「保存」。
@@ -396,10 +722,14 @@
       return tlZoneStepCount();
     },
     cutStepReset: function(){
+      var preimage=ppGroupMemberPreimage();
+      if(preimage&&preimage.invalid)return false;
+      var previousStep=ppCloneJSON(window.tlZoneStep);
       tlZoneStepClear();
       if(window.tlDiagramData&&window.tlDiagramData.zones){
         window.tlDiagramData.zones.cutOffX=null; window.tlDiagramData.zones.cutOffY=null;
       }
+      if(preimage&&!ppCommitGroupMemberStep(Object.assign({},preimage,{step:previousStep}),null,previousStep))return false;
       return true;
     },
     zoneStepCount: function(){ return tlZoneStepCount(); }
@@ -425,14 +755,6 @@
     return{minX:minX,minY:minY,w:maxX-minX,h:maxY-minY};
   }
 
-  function ppRotatePoint(pt,deg,center){
-    if(!deg)return{x:pt.x,y:pt.y};
-    var rad=deg*Math.PI/180;
-    var c=Math.cos(rad),s=Math.sin(rad);
-    var dx=pt.x-center.x,dy=pt.y-center.y;
-    return{x:center.x+dx*c-dy*s,y:center.y+dx*s+dy*c};
-  }
-
   function ppPointInPlot(point){
     if(!ppState.polyPts||ppState.polyPts.length<3)return true;
     var fn=window.atPointInPolygon||atPointInPolygon;
@@ -451,28 +773,11 @@
 
   function ppGetRotatedPlotPoints(){
     if(!ppState.polyPts.length)return [];
-    var deg=parseFloat(ppState.plotRotationDeg)||0;
-    if(!deg)return ppState.polyPts.map(function(p){return{x:p.x,y:p.y};});
-    var b=ppGetBounds();
-    var center={x:b.minX+b.w/2,y:b.minY+b.h/2};
-    return ppState.polyPts.map(function(p){return ppRotatePoint(p,deg,center);});
+    /* 规划坐标是地块的固定真实坐标；只有分区网格可以改变方向。 */
+    return ppState.polyPts.map(function(p){return{x:p.x,y:p.y};});
   }
 
-  /* ===== [v190 2026-10-03] 成组地块的「各子地块环」（本地米坐标） =====
-   * 用户原话：「在线地图中两个地块之间明显是有空隙的，你怎么就给吃掉了。」
-   * 地图侧回传的 payload.subPlots（各子地块自己的环）由 applyMapMeasuredArea 存到
-   * window.__runyeSubPlots。v189 只存不用 ⇒ 二级页仍画 ppState.polyPts（凸包），空隙被吞。
-   * v190 起绘制/算面积优先按这些环：
-   *   · 画布（ppTracePlotPath）与施工图（ppGenerateDiagram 的 d）按每个环各画一圈，
-   *     块间空隙自然留空；
-   *   · 分区实际面积（ppZoneActualAreaM2）= Σ 各环裁剪到分区内的面积（空隙不计入）；
-   *   · 点位判定（ppPointInPlot）= 落在任一成员环内（落在空隙里不算地块内）。
-   * ★ 坐标同步：这些环与 ppState.polyPts 同一世界坐标系，但**必须跟随旋转/镜像同步变换**
-   *   （同步点：ppRepartitionFromRotatedPlot 旋转落定、ppApplyMirror 两次镜像），
-   *   否则主轮廓转了、子地块环没转，两者错位。
-   * 「地块角度」输入框（ppState.plotRotationDeg）只影响显示、不重写数据 —— 所以显示层的
-   * 环用 ppGetRotatedSubRings()（与 ppGetRotatedPlotPoints 同口径临时旋转），
-   * 数据/面积层用 ppGetSubPlotRings()（数据坐标，与 polyPts/zoneCuts 同空间）。 */
+  /* 成组地块保留每个成员的原始局部米坐标；边界位置和朝向不可变。 */
   function ppGetSubPlotRings(){
     /* [v193] 按编辑模式取环：整组=全部成员环；逐块=只有当前那一块。
        ⇒ 下游（画布 / 施工图 / 面积 / 点位判定）不用改一行就自动跟着模式走。 */
@@ -489,11 +794,7 @@
   function ppGetRotatedSubRings(){
     var rings=ppGetSubPlotRings();
     if(!rings)return null;
-    var deg=parseFloat(ppState.plotRotationDeg)||0;
-    if(!deg)return rings;
-    var b=ppGetBounds();
-    var center={x:b.minX+b.w/2,y:b.minY+b.h/2};
-    return rings.map(function(r){return r.map(function(p){return ppRotatePoint(p,deg,center);});});
+    return rings;
   }
   /* ===== [v652c 2026-10-21 用户要求] 逐块态「冻结邻块」 =====
    * 用户原话：「这个多地块编辑某一块的时候，其他块冻结就好了，不要编辑某一块的时候，
@@ -501,7 +802,7 @@
    * ⇒ 逐块模式下其余成员环照常画出来（灰显 + 虚线框 + 块名），但**只读**：
    *   不进分区/面积/水力/材料，不参与点位判定与命中（那些仍走 ppGetSubPlotRings=仅当前块，
    *   「成组退化成多次单块、一行规则不改」的结构原封不动）——邻块只是看得见、摸不着。
-   * 显示坐标与 ppGetRotatedSubRings 同口径（同 rotation、同旋转中心），两种模式切换不跳。 */
+   * 显示用真实坐标；分区旋转只改变分区网格，不变换地块边界。 */
   function ppGetFrozenSubRings(){
     var ge=window.__runyeGroupEdit;
     var subs=window.__runyeSubPlots;
@@ -514,28 +815,13 @@
       }
     });
     if(!rings.length)return null;
-    var deg=parseFloat(ppState.plotRotationDeg)||0;
-    if(!deg)return rings;
-    var b=ppGetBounds();
-    var center={x:b.minX+b.w/2,y:b.minY+b.h/2};
-    return rings.map(function(r){
-      return {name:r.name,poly:r.poly.map(function(p){return ppRotatePoint(p,deg,center);})};
-    });
+    return rings;
   }
-  /* 对 window.__runyeSubPlots 里的环就地应用变换（旋转落定 / 镜像时随主轮廓一起变） */
-  function ppXformSubRings(fn){
-    var subs=window.__runyeSubPlots;
-    if(!subs||!subs.length)return;
-    subs.forEach(function(s){
-      if(s&&Array.isArray(s.poly)&&s.poly.length>=3)s.poly=s.poly.map(fn);
-    });
-  }
-
   /* ================= [v193 2026-10-03] 成组地块「整组 / 逐块」编辑 =================
    * 用户原话：「成组地块传到二级管路之后，进一步编辑的话，再给我一个切换按钮，这个
    *   单独编辑，跟三级管路编辑页面分开，否则我担心跟原来的一些计算规则跟逻辑搞混了。」
-   * 用户拍板：① 逐块单独编辑 ② 先不让成组地块进三级页 ③ 各块结果完全独立
-   *          ④ 旋转/镜像作用于整组 ⑤ 施工图出一张总图
+   * 用户拍板：① 逐块单独编辑 ② 各块结果完全独立 ③ 地块坐标和朝向固定
+   *          ④ 旋转分区网格而非地块 ⑤ 施工图出一张总图
    *
    * ★★ 设计原则：**不写成组的“新算法”，而是让成组退化成“多次单块”**。
    *   逐块模式下 ppState.polyPts 就是那一块自己的环 ⇒ 分区 / 布管 / 面积 / 材料 / 水力
@@ -547,13 +833,54 @@
    *                    **不可编辑管线**（编辑必须切到逐块，否则分不清画的是哪块）
    *   · perPlot 逐块：一次只编辑一块，ppState 整份换成本块的 slot
    *
-   * 每块一份 slot 的字段（PP_SLOT_KEYS）—— 视图类（zoom/pan/transform）与
-   * 整组类（plotRotationDeg / plotMirror / zoneAuto / mode）**不进 slot**，切块时保持不变。
+    * 每块一份 slot 的字段（PP_SLOT_KEYS）—— 每块的边界、分区方向、角度与管线跟随成员；
+    * 视图类（zoom/pan/transform）和交互模式（mode）不进 slot，切块时保持一致。
    */
   var PP_SLOT_KEYS=['polyPts','mainPipes','branchPipes','subBranchPipes','source','valves',
-    'pipeIds','nextPipeId','hiddenPipes','cutOverrides','cutSnap','mergePreview','areaLocked'];
+    'pipeIds','nextPipeId','hiddenPipes','cutOverrides','cutSnap','partitionCuts','mergePreview','areaLocked',
+    'zoneRotated','zoneAngleDeg','zoneAuto'];
 
   function ppCloneJSON(v){ try{ return JSON.parse(JSON.stringify(v===undefined?null:v)); }catch(e){ return null; } }
+
+  function ppClipSlotPipesToRing(slot, ring){
+    if(!slot||!ring||ring.length<3)return slot;
+    var sets=[
+      {key:'mainPipes',idKey:'main',prefix:'m'},
+      {key:'branchPipes',idKey:'branch',prefix:'b'},
+      {key:'subBranchPipes',idKey:'subbranch',prefix:'s'}
+    ];
+    var usedIds=Object.create(null);
+    ['main','branch','subbranch'].forEach(function(idKey){
+      (slot.pipeIds&&slot.pipeIds[idKey]||[]).forEach(function(id){if(id)usedIds[String(id)]=true;});
+    });
+    var nextId=Number.isSafeInteger(slot.nextPipeId)&&slot.nextPipeId>0?slot.nextPipeId:1;
+    function freshId(prefix){
+      var id;
+      do{id=prefix+nextId++;}while(usedIds[id]);
+      usedIds[id]=true;
+      return id;
+    }
+    sets.forEach(function(set){
+      var lines=slot[set.key]||[],oldIds=slot.pipeIds&&slot.pipeIds[set.idKey]||[];
+      var hidden=slot.hiddenPipes&&slot.hiddenPipes[set.idKey]||{},out=[],ids=[],nextHidden={};
+      lines.forEach(function(line,index){
+        var originalId=oldIds[index]&&String(oldIds[index]);
+        var isHidden=!!(hidden[String(index)]||originalId&&hidden[originalId]);
+        ppClipPolylineToRing(line,ring).forEach(function(seg,segmentIndex){
+          var id=segmentIndex===0&&originalId&&ids.indexOf(originalId)<0?originalId:freshId(set.prefix);
+          ids.push(id);out.push(seg);
+          if(isHidden)nextHidden[id]=true;
+        });
+      });
+      slot[set.key]=out;
+      slot.pipeIds=slot.pipeIds||{main:[],branch:[],subbranch:[]};
+      slot.pipeIds[set.idKey]=ids;
+      slot.hiddenPipes=slot.hiddenPipes||{main:{},branch:{},subbranch:{}};
+      slot.hiddenPipes[set.idKey]=nextHidden;
+    });
+    slot.nextPipeId=nextId;
+    return slot;
+  }
 
   function ppCaptureSlot(){
     var s={};
@@ -569,17 +896,13 @@
         if(!ringC&&geC.slots&&geC.slots[geC.current]&&geC.slots[geC.current].polyPts&&geC.slots[geC.current].polyPts.length>=3){
           ringC=geC.slots[geC.current].polyPts;
         }
-        if(ringC){
-          ['mainPipes','branchPipes','subBranchPipes'].forEach(function(k){
-            var out=[];
-            (s[k]||[]).forEach(function(line){
-              ppClipPolylineToRing(line,ringC).forEach(function(seg){ out.push(seg); });
-            });
-            s[k]=out;
-          });
-        }
+        if(ringC)ppClipSlotPipesToRing(s,ringC);
       }
     }catch(eCap){ }
+    try{
+      var cutsNow=ppCurrentCuts();
+      if(cutsNow)s.partitionCuts={x:cutsNow.xPos.slice(1,-1),y:cutsNow.yPos.slice(1,-1)};
+    }catch(eCuts){ }
     return s;
   }
   function ppApplySlot(s){
@@ -604,6 +927,15 @@
     if(ppState.pipeIds==null) ppState.pipeIds={main:[],branch:[],subbranch:[]};
     if(!ppState.nextPipeId) ppState.nextPipeId=1;
     if(ppState.cutOverrides==null) ppState.cutOverrides={x:{},y:{}};
+    if(ppState.partitionCuts==null)ppState.partitionCuts=null;
+    if(ppState.zoneRotated==null)ppState.zoneRotated=false;
+    if(!isFinite(Number(ppState.zoneAngleDeg)))ppState.zoneAngleDeg=ppState.zoneRotated?90:0;
+    if(ppState.zoneAuto==null)ppState.zoneAuto=true;
+    ppSyncZoneAngleUI();
+    if(typeof ppApplyZoneAutoUI==='function')ppApplyZoneAutoUI();
+    /* 自动分区位置也作为成员设计快照保存。重新成组后按当前成员尺寸重建签名，
+       让原有的内部切割线位置优先于组级外框重新计算出来的默认网格。 */
+    ppApplySavedPartitionCuts();
   }
   function ppBlankSlot(polyPts){
     return {
@@ -611,9 +943,142 @@
       mainPipes:[],branchPipes:[],subBranchPipes:[],source:null,valves:[],
       pipeIds:{main:[],branch:[],subbranch:[]},nextPipeId:1,
       hiddenPipes:{main:{},branch:{},subbranch:{}},
-      cutOverrides:{x:{},y:{}},cutSnap:{sig:'',x:null,y:null},mergePreview:null,areaLocked:false
+      cutOverrides:{x:{},y:{}},cutSnap:{sig:'',x:null,y:null},partitionCuts:null,mergePreview:null,areaLocked:false,
+      zoneRotated:false,zoneAngleDeg:0,zoneAuto:true
     };
   }
+
+  /* ===== [v677 成组继承] 单地块设计 → 组内子地块 =====
+     用户原话（2026-10-23）：「所有地块都是单地块进行划分，最后才拼成一组，
+     如果先成组，注定很多细节无法无法完善」；「成组时继承各块已有设计」（确认「2 是的」）。
+     数据来源（按优先级）：
+       ① runye_plot_design_v1:<sub.id> —— 用户在该地块单地块态下保存工程时按块留档
+         （runyeSaveProject 写入，见 inline-12.js）；
+       ② 主存档 SAVE_KEY.pipePlan —— 旧流程兜底（最后一次单地块态的 pipePlan），
+         仅接受**顶点逐点匹配**（防把 A 块的设计错配到形状相近的 B 块上）。
+     几何换算：单地块与成组的投影原点不同（inline-16.js applyMapMeasuredArea），
+     用「质心对齐」算平移量 Δ，管线/阀门/水源/分区线快照全部平移；
+     cutSnap.sig 只含 bbox 尺寸（ppCutSig，平移不变）⇒ 手动线位原样继承。
+     校验不过（形状对不上）⇒ 返回 null，回退空白槽（与旧行为一致）。 */
+  function ppCentroidOf(poly){
+    var cx=0,cy=0,n=(poly||[]).length||1;
+    (poly||[]).forEach(function(p){cx+=(+p.x)||0;cy+=(+p.y)||0;});
+    return {x:cx/n,y:cy/n};
+  }
+  function ppDesignCandidates(sub,archiveOnly){
+    var list=[];
+    try{
+      if(sub&&sub.id!=null&&String(sub.id).length){
+        var raw=localStorage.getItem('runye_plot_design_v1:'+encodeURIComponent(String(sub.id)));
+        if(raw){
+          var d=JSON.parse(raw);
+          if(d&&d.design&&d.design.polyPts&&d.design.polyPts.length>=3){
+            if(Object.prototype.hasOwnProperty.call(d,'canonicalDrawingDesign')&&d.canonicalDrawingDesign){
+              var model=window.RyDrawingDesignModel,adapter=window.RyDrawingDesignLegacyAdapter;
+              var canonical=d.canonicalDrawingDesign,check=model&&model.validate(canonical);
+              var plotId=String(sub.id),projected=null;
+              if(check&&check.ok&&canonical.projectId==='legacy-project:'+plotId&&canonical.plots.length===1&&
+                  canonical.groups.length===0&&canonical.plots[0].plotId===plotId&&adapter&&
+                  typeof adapter.toLegacyPatch==='function'){
+                var baseline={currentPlotId:plotId,measuredPolygon:ppCloneJSON(d.design.polyPts),pipePlan:ppCloneJSON(d.design)};
+                projected=adapter.toLegacyPatch(canonical,plotId,baseline);
+              }
+              if(!projected||!projected.ok||!projected.snapshot||!projected.snapshot.pipePlan){
+                list.push({invalidCanonical:true,strict:false});
+              }else list.push({design:projected.snapshot.pipePlan,strict:false,canonical:true});
+            }else list.push({design:d.design,strict:false,canonical:false});
+          }
+        }
+      }
+    }catch(e){}
+    if(!archiveOnly) try{
+      var raw2=localStorage.getItem('runye_irrigation_saved_project_v1');
+      if(raw2){ var p2=JSON.parse(raw2); if(p2&&p2.pipePlan&&p2.pipePlan.polyPts&&p2.pipePlan.polyPts.length>=3) list.push({design:p2.pipePlan,strict:true}); }
+    }catch(e2){}
+    return list;
+  }
+  function ppInheritSlot(sub,archiveOnly){
+    if(!sub||!sub.poly||sub.poly.length<3)return null;
+    var ring=sub.poly.map(function(q){return{x:+q.x,y:+q.y};});
+    var cands=ppDesignCandidates(sub,archiveOnly);
+    for(var ci=0;ci<cands.length;ci++){
+      if(cands[ci].invalidCanonical)return null;
+      var d=cands[ci].design;
+      var src=(d.polyPts||[]).map(function(q){return{x:+q.x,y:+q.y};});
+      if(src.length<3)continue;
+      var cS=ppCentroidOf(ring),cD=ppCentroidOf(src);
+      var dx=cS.x-cD.x,dy=cS.y-cD.y;
+      /* 形状校验：顶点数相等 → 逐点平均偏差 <1m；
+         点数不等 → 仅非严格来源（按块留档）允许，面积差 <1% 兜底（管线随后裁回环内）。
+         严格来源（SAVE_KEY 兜底）点数不等一律拒绝 —— 防同形不同位错配。 */
+      var ok=false;
+      if(ring.length===src.length){
+        var sum=0;
+        for(var i=0;i<ring.length;i++){
+          var ax=src[i].x+dx-ring[i].x,ay=src[i].y+dy-ring[i].y;
+          sum+=Math.sqrt(ax*ax+ay*ay);
+        }
+        ok=(sum/ring.length)<1.0;
+      }else if(!cands[ci].strict){
+        var a1=Math.abs(ppPolyArea(ring)),a2=Math.abs(ppPolyArea(src));
+        ok=a2>1&&(Math.abs(a1-a2)/a2)<0.01;
+      }
+      if(!ok)continue;
+      /* 仅继承非平凡设计：有管线或手动分区线快照 */
+      var hasPipes=((d.mainPipes||[]).length+(d.branchPipes||[]).length+(d.subBranchPipes||[]).length)>0;
+      var hasCut=!!(d.cutSnap&&((Array.isArray(d.cutSnap.x)&&d.cutSnap.x.length)||(Array.isArray(d.cutSnap.y)&&d.cutSnap.y.length)));
+      var hasPartition=!!(d.partitionCuts&&((Array.isArray(d.partitionCuts.x)&&d.partitionCuts.x.length)||(Array.isArray(d.partitionCuts.y)&&d.partitionCuts.y.length)));
+      if(!hasPipes&&!hasCut&&!hasPartition)continue;
+      var mv=function(lines){return (lines||[]).map(function(l){return (l||[]).map(function(p){return{x:(+p.x)+dx,y:(+p.y)+dy};});});};
+      var slot=ppBlankSlot(ring);
+      var cutsAreLocal=Math.abs(isFinite(Number(d.zoneAngleDeg))?Number(d.zoneAngleDeg):(d.zoneRotated?90:0))>0.001;
+      slot.mainPipes=mv(d.mainPipes);
+      slot.branchPipes=mv(d.branchPipes);
+      slot.subBranchPipes=mv(d.subBranchPipes);
+      slot.valves=(d.valves||[]).map(function(p){return{x:(+p.x)+dx,y:(+p.y)+dy};});
+      slot.source=d.source?{x:(+d.source.x)+dx,y:(+d.source.y)+dy}:null;
+      /* 轴对齐旧快照保存世界坐标，随地块平移；旋转网格快照保存网格局部坐标，不能平移。 */
+      if(d.cutSnap){
+        slot.cutSnap={sig:d.cutSnap.sig||'',
+          x:Array.isArray(d.cutSnap.x)?d.cutSnap.x.map(function(v){return (+v)+(cutsAreLocal?0:dx);}):null,
+          y:Array.isArray(d.cutSnap.y)?d.cutSnap.y.map(function(v){return (+v)+(cutsAreLocal?0:dy);}):null};
+      }
+      if(d.cutOverrides){
+        var ov={x:{},y:{}};
+        Object.keys(d.cutOverrides.x||{}).forEach(function(k){ov.x[k]=(+d.cutOverrides.x[k])+(cutsAreLocal?0:dx);});
+        Object.keys(d.cutOverrides.y||{}).forEach(function(k){ov.y[k]=(+d.cutOverrides.y[k])+(cutsAreLocal?0:dy);});
+        slot.cutOverrides=ov;
+      }
+      if(d.partitionCuts){
+        slot.partitionCuts={
+          x:Array.isArray(d.partitionCuts.x)?d.partitionCuts.x.map(function(v){return (+v)+(cutsAreLocal?0:dx);}):[],
+          y:Array.isArray(d.partitionCuts.y)?d.partitionCuts.y.map(function(v){return (+v)+(cutsAreLocal?0:dy);}):[]
+        };
+      }
+      if(d.hiddenPipes)slot.hiddenPipes=ppCloneJSON(d.hiddenPipes)||slot.hiddenPipes;
+      if(d.pipeIds)slot.pipeIds=ppCloneJSON(d.pipeIds)||slot.pipeIds;
+      if(+d.nextPipeId>1)slot.nextPipeId=+d.nextPipeId;
+      slot.areaLocked=!!d.areaLocked;
+      slot.zoneRotated=!!d.zoneRotated;
+      slot.zoneAngleDeg=isFinite(Number(d.zoneAngleDeg))?Number(d.zoneAngleDeg):(slot.zoneRotated?90:0);
+      slot.zoneAuto=d.zoneAuto!==false;
+      /* 保底裁回环内，并同步重建ID/隐藏映射，避免裁剪改变管线数量后错配。 */
+      try{ppClipSlotPipesToRing(slot,ring);}catch(eClip){ }
+      return slot;
+    }
+    return null;
+  }
+
+  /* 单地块切换时只从该 ID 的 L2 档案恢复，绝不拿共享快照兜底，以免把另一块的管线
+     套到当前边界。形状校验、质心平移和环内裁剪复用组内继承的同一实现。 */
+  window.ppRestorePlotDesign=function(plotId){
+    if(window.__runyeGroupEdit&&window.__runyeGroupEdit.active)return false;
+    var slot=ppInheritSlot({id:plotId,poly:ppState.polyPts},true);
+    if(!slot)return false;
+    ppApplySlot(slot);
+    ppUpdateTransform();ppRender();ppUpdateAutoPipeButton();
+    return true;
+  };
 
   /* 载入成组地块时初始化（非成组 → 置 null，UI 自动隐藏） */
   function ppInitGroupEdit(){
@@ -621,11 +1086,16 @@
     if(!subs||subs.length<2){ window.__runyeGroupEdit=null; ppSyncGroupEditUI(); return false; }
     var frame=(window.measuredPolygon||[]).map(function(p){return{x:+p.x,y:+p.y};});
     window.__runyeGroupEdit={
-      active:true, mode:'whole', current:0,
+      /* 新组默认逐块显示：成组只汇总成员，不把成员重新当成一个大地块分区。
+         用户仍可显式切到整组只读总览。 */
+      active:true, mode:'perPlot', current:0,
       framePts:frame,                                   // 整组模式用的参考外框（不参与面积）
-      slots:subs.map(function(s){ return ppBlankSlot(s.poly); }),
+      /* [v677 成组继承] 逐块尝试从「按块设计留档 / 主存档」继承该块在单地块态的
+         设计（管线+分区线位，质心平移对位）；没命中给空白槽（与旧行为一致）。 */
+      slots:subs.map(function(s){ return ppInheritSlot(s)||ppBlankSlot(s.poly); }),
       trunkPipes:[], trunkHidden:{}                     // 总管：跨块手动画，不进各块统计
     };
+    ppApplySlot(window.__runyeGroupEdit.slots[0]);
     ppSyncGroupEditUI();
     return true;
   }
@@ -642,6 +1112,18 @@
     return subs;
   }
 
+  function ppSaveGroupMemberSlots(changes){
+    var ge=window.__runyeGroupEdit;
+    if(!ge||!ge.slots||!Array.isArray(changes)||!changes.length)return false;
+    if(typeof window.grCommitGroupMemberSlots==='function'){
+      return window.grCommitGroupMemberSlots(changes)===true;
+    }
+    return false;
+  }
+  function ppSaveGroupMemberSlot(index, slot){
+    return ppSaveGroupMemberSlots([{index:index,slot:slot}]);
+  }
+
   function ppSetGroupMode(mode){
     var ge=window.__runyeGroupEdit;
     if(!ge||!ge.active)return;
@@ -650,15 +1132,18 @@
     if(mode==='perPlot'){
       /* 整组 → 逐块：整组态的管线是「各块合并出来的只读视图」，不存档；
          直接载入当前块的 slot（坐标都是同一世界坐标系，无需换算） */
+      var memberRead=ppReadGroupMemberSlot(ge,ge.current);
+      if(!memberRead.ok)return;
       ge.mode='perPlot';
-      ppApplySlot(ge.slots[ge.current]);
+      ppApplySlot(memberRead.slot);
       ppState.history=[];                 // 撤销栈不跨块
     }else{
       /* 逐块 → 整组：先把当前块存回 slot，再切成外框 + 合并视图 */
-      ge.slots[ge.current]=ppCaptureSlot();
+      if(!ppSaveGroupMemberSlot(ge.current,ppCaptureSlot()))return;
+      var merged=ppCollectGroupAllPipes();
+      if(!merged)return;
       ge.mode='whole';
       ppState.polyPts=ge.framePts.map(function(p){return{x:p.x,y:p.y};});
-      var merged=ppCollectGroupAllPipes();
       ppState.mainPipes=merged.main; ppState.branchPipes=merged.branch;
       ppState.subBranchPipes=merged.subbranch;
       ppState.source=null; ppState.valves=[];
@@ -684,12 +1169,14 @@
     if(!ge||!ge.active)return;
     i=parseInt(i,10)||0;
     if(i<0||i>=ge.slots.length||i===ge.current)return;
-    if(ge.mode==='perPlot') ge.slots[ge.current]=ppCaptureSlot();   // 存档旧块
+    if(ge.mode==='perPlot'&&!ppSaveGroupMemberSlot(ge.current,ppCaptureSlot()))return;   // 提交旧块后再切换
+    var memberRead=ge.mode==='perPlot'?ppReadGroupMemberSlot(ge,i):null;
+    if(memberRead&&!memberRead.ok)return;
     ge.current=i;
     /* [v242] 「从成组页进来」时换块 ⇒ 返回落点跟着换（退回成组页要停在用户最后看的那一块，
        否则按块高亮会指回原来那块，用户会以为没生效）。非该路径进来的不置标记。 */
     if(window.__runyeGroupPlotEdit!=null)window.__runyeGroupPlotEdit=i;
-    if(ge.mode==='perPlot') ppApplySlot(ge.slots[i]);               // 载入新块
+    if(ge.mode==='perPlot') ppApplySlot(memberRead.slot);            // canonical优先投影成员槽
     ppState.currentLine=[]; ppState.hoverPt=null;
     ppState.dragCut=null; ppState.hoverCut=null; ppState.history=[];
     // Keep the selected block's saved cuts; getZoneCuts validates the geometry signature.
@@ -704,41 +1191,14 @@
     var ge=window.__runyeGroupEdit;
     var out={main:[],branch:[],subbranch:[]};
     if(!ge||!ge.active)return out;
-    ge.slots.forEach(function(s){
+    var memberRead=ppReadGroupMemberSlots(ge);
+    if(!memberRead.ok)return null;
+    memberRead.slots.forEach(function(s){
       (s.mainPipes||[]).forEach(function(l){out.main.push(l.map(function(p){return{x:p.x,y:p.y};}));});
       (s.branchPipes||[]).forEach(function(l){out.branch.push(l.map(function(p){return{x:p.x,y:p.y};}));});
       (s.subBranchPipes||[]).forEach(function(l){out.subbranch.push(l.map(function(p){return{x:p.x,y:p.y};}));});
     });
     return out;
-  }
-
-  /* [v193] 旋转落定 / 镜像后：把变换作用到**整组的全部对象** ——
-     各块的环与管线、参考外框、总管（用户拍板 ④：旋转/镜像作用于整组）。
-     opt.clearPipes=true（重新分区会清空管线）时只转几何、顺带清空各块管线与总管。
-     结束后把当前块 slot 回灌 ppState —— 这样调用方里对 ppState 的那一份变换会被
-     正确结果覆盖，不会「转两次」。 */
-  function ppXformGroupAll(fn,opt){
-    var ge=window.__runyeGroupEdit;
-    if(!ge||!ge.active)return false;
-    opt=opt||{};
-    if(Array.isArray(ge.framePts))ge.framePts=ge.framePts.map(fn);
-    ge.slots.forEach(function(s){
-      if(Array.isArray(s.polyPts))s.polyPts=s.polyPts.map(fn);
-      if(opt.clearPipes){
-        s.mainPipes=[];s.branchPipes=[];s.subBranchPipes=[];s.source=null;s.valves=[];
-      }else{
-        ['mainPipes','branchPipes','subBranchPipes'].forEach(function(k){
-          if(Array.isArray(s[k]))s[k]=s[k].map(function(l){return l.map(fn);});
-        });
-        if(s.source)s.source=fn(s.source);
-        if(Array.isArray(s.valves))s.valves=s.valves.map(fn);
-      }
-    });
-    if(opt.clearPipes)ge.trunkPipes=[];
-    else if(Array.isArray(ge.trunkPipes))ge.trunkPipes=ge.trunkPipes.map(function(l){return l.map(fn);});
-    if(ge.mode==='perPlot'&&ge.slots[ge.current])ppApplySlot(ge.slots[ge.current]);
-    else if(ge.mode==='whole')ppState.polyPts=ge.framePts.map(function(p){return{x:p.x,y:p.y};});
-    return true;
   }
 
   /* 整组态：块级编辑一律拦掉，只留「管线拾取」（只读量长度）。
@@ -862,13 +1322,29 @@
         sig:(ppState.cutSnap&&ppState.cutSnap.sig)||'',
         x:(ppState.cutSnap&&ppState.cutSnap.x)?ppState.cutSnap.x.slice():null,
         y:(ppState.cutSnap&&ppState.cutSnap.y)?ppState.cutSnap.y.slice():null
-      }
+      },
+      zoneAngleDeg:ppZoneAngle(),zoneRotated:!!ppState.zoneRotated,areaLocked:!!ppState.areaLocked,
+      zoneAuto:ppState.zoneAuto!==false
     };
   }
 
   function ppPushHistory(){
     if(!ppState.history)ppState.history=[];
-    ppState.history.push(ppCloneState());
+    var snapshot=ppCloneState();
+    /* Group operations such as clear-all mutate every member slot while the canvas
+       shows only a merged, read-only view. Keep the member source data with the undo
+       frame; the merged ppState alone cannot reconstruct which member owned a pipe. */
+    var ge=window.__runyeGroupEdit;
+    if(ge&&ge.active){
+      var members=ppReadGroupMemberSlots(ge);
+      if(members.ok){
+        snapshot.groupSlots=members.slots.map(function(slot){return ppCloneJSON(slot);});
+        if(ge.mode==='perPlot'&&ge.current>=0&&ge.current<snapshot.groupSlots.length){
+          snapshot.groupSlots[ge.current]=ppCaptureSlot();
+        }
+      }
+    }
+    ppState.history.push(snapshot);
     if(ppState.history.length>50)ppState.history.shift();
   }
 
@@ -892,16 +1368,48 @@
       x:(snap.cutSnap&&snap.cutSnap.x)?snap.cutSnap.x.slice():null,
       y:(snap.cutSnap&&snap.cutSnap.y)?snap.cutSnap.y.slice():null
     };
+    ppState.zoneAngleDeg=isFinite(Number(snap.zoneAngleDeg))?Number(snap.zoneAngleDeg):(snap.zoneRotated?90:0);
+    ppState.zoneRotated=!!snap.zoneRotated;
+    ppState.areaLocked=!!snap.areaLocked;
+    if(typeof snap.zoneAuto==='boolean'){
+      ppState.zoneAuto=snap.zoneAuto;
+      try{localStorage.setItem('runye_zone_auto',snap.zoneAuto?'1':'0');}catch(e){}
+      ppApplyZoneAutoUI();
+    }
+    ppUpdateLockAreaBtn();
+    ppSyncZoneAngleUI();
     ppState.mergePreview=null;
     if(typeof ppSyncPipeLevelUI==='function')ppSyncPipeLevelUI(); // 该函数未定义时跳过，避免回退中断
-    ppState.plotMirror='none';
-    ppSyncMirrorUI();
   }
 
   function ppUndoStep(){
     if(!ppState.history||ppState.history.length===0)return false;
-    var snap=ppState.history.pop();
+    var snap=ppState.history[ppState.history.length-1];
+    if(ppIsGroupWhole()){
+      if(!Array.isArray(snap.groupSlots)||snap.groupSlots.length!==(window.__runyeSubPlots||[]).length)return false;
+      var current=ppCloneState(), changes=snap.groupSlots.map(function(slot,index){
+        return {index:index,slot:ppCloneJSON(slot)};
+      });
+      if(changes.some(function(change){return !change.slot;})||!ppSaveGroupMemberSlots(changes)){
+        ppRestoreState(current);
+        return false;
+      }
+      ppRestoreState(snap);
+      ppState.history.pop();
+      return true;
+    }
+    var groupPreimage=ppGroupMemberPreimage();
+    if(groupPreimage&&groupPreimage.invalid)return false;
+    var singlePreimage=!groupPreimage&&typeof window.ppGetState==='function'?window.ppGetState():null;
+    var current=ppCloneState();
     ppRestoreState(snap);
+    if(groupPreimage&&!ppCommitGroupMemberEdit(groupPreimage,'undo')){
+      ppRestoreState(current);return false;
+    }
+    if(singlePreimage&&!ppCommitSinglePlotEdit(singlePreimage,'undo',false,true)){
+      ppRestoreState(current);return false;
+    }
+    ppState.history.pop();
     return true;
   }
 
@@ -1103,22 +1611,25 @@
     return {merge:false,count:arr.length-1,axis:axis,delta:delta};
   }
 
+  function ppGetZoneCutSignature(b,layout){
+    var dims=ppGetPlanDims(b);
+    var frame=ppGridFrame(ppState.polyPts,b,dims),gd=frame?frame.bounds:dims;
+    var xDesign=layout.designW || layout.zoneW,yDesign=layout.designH || layout.zoneH;
+    var xPlan=ppSplitLength(gd.w,xDesign),yPlan=ppSplitLength(gd.h,yDesign);
+    return ppCutSig(gd,xPlan.length,yPlan.length,xDesign,yDesign)+'|a'+ppZoneAngle().toFixed(3);
+  }
   function ppGetZoneCuts(b,layout){
     var dims=ppGetPlanDims(b);
-    // 不再按长短边重排；手动/自动布局给出的轴向尺寸是唯一来源。
-    var longIsX=dims.w>=dims.h;
-    var xDesign=layout.designW || (longIsX?layout.zoneH:layout.zoneW);
-    var yDesign=layout.designH || (longIsX?layout.zoneW:layout.zoneH);
-    var xPlan=ppSplitLength(dims.w,xDesign);
-    var yPlan=ppSplitLength(dims.h,yDesign);
-    var sx=b.w/dims.w,sy=b.h/dims.h;
-    var xSrc=[],ySrc=[],xPos=[b.minX],yPos=[b.minY];
-    for(var xi=0;xi<xPlan.length;xi++){xSrc.push(xPlan[xi]*sx);xPos.push(xPos[xPos.length-1]+xSrc[xi]);}
-    for(var yi=0;yi<yPlan.length;yi++){ySrc.push(yPlan[yi]*sy);yPos.push(yPos[yPos.length-1]+ySrc[yi]);}
-    xPos[xPos.length-1]=b.minX+b.w;
-    yPos[yPos.length-1]=b.minY+b.h;
+    var frame=ppGridFrame(ppState.polyPts,b,dims),gd=frame?frame.bounds:{minX:0,minY:0,maxX:dims.w,maxY:dims.h,w:dims.w,h:dims.h};
+    var xDesign=layout.designW || layout.zoneW,yDesign=layout.designH || layout.zoneH;
+    var xPlan=ppSplitLength(gd.w,xDesign),yPlan=ppSplitLength(gd.h,yDesign);
+    var xSrc=[],ySrc=[],xPos=[gd.minX],yPos=[gd.minY];
+    for(var xi=0;xi<xPlan.length;xi++){xSrc.push(xPlan[xi]);xPos.push(xPos[xPos.length-1]+xSrc[xi]);}
+    for(var yi=0;yi<yPlan.length;yi++){ySrc.push(yPlan[yi]);yPos.push(yPos[yPos.length-1]+ySrc[yi]);}
+    xPos[xPos.length-1]=gd.maxX;
+    yPos[yPos.length-1]=gd.maxY;
     // 应用手动拖动/合并后的内部切割线快照（线数量可变 → 分区数随之变化）
-    var sig=ppCutSig(dims,xPlan.length,yPlan.length,xDesign,yDesign);
+    var sig=ppGetZoneCutSignature(b,layout);
     var snap=ppState.cutSnap;
     if(!snap||snap.sig!==sig)snap=ppResetCutSnap(sig);
     xPos=ppApplyCutSnap(xPos,snap.x);
@@ -1127,15 +1638,15 @@
     for(var xa=0;xa<xPos.length-1;xa++){
       var wSrc=xPos[xa+1]-xPos[xa];
       xSrc.push(wSrc);
-      xPlan.push(sx>0?wSrc/sx:0);
+      xPlan.push(wSrc);
     }
     ySrc=[];yPlan=[];
     for(var ya=0;ya<yPos.length-1;ya++){
       var hSrc=yPos[ya+1]-yPos[ya];
       ySrc.push(hSrc);
-      yPlan.push(sy>0?hSrc/sy:0);
+      yPlan.push(hSrc);
     }
-    return {xPlan:xPlan,yPlan:yPlan,xSrc:xSrc,ySrc:ySrc,xPos:xPos,yPos:yPos,cols:xPlan.length,rows:yPlan.length,designW:xDesign,designH:yDesign,sig:sig,zoneCount:xPlan.length*yPlan.length};
+    return {xPlan:xPlan,yPlan:yPlan,xSrc:xSrc,ySrc:ySrc,xPos:xPos,yPos:yPos,cols:xPlan.length,rows:yPlan.length,designW:xDesign,designH:yDesign,sig:sig,zoneCount:xPlan.length*yPlan.length,frame:frame,bounds:gd};
   }
 
   // ===== 分区真实面积（裁剪到地块多边形）=====
@@ -1161,12 +1672,14 @@
     if(rings){
       var sum=0;
       for(var ri=0;ri<rings.length;ri++){
-        sum+=ppPolyArea(ppClipPolyToRect(rings[ri],x0,y0,x1,y1));
+        var local=zoneCuts.frame?rings[ri].map(zoneCuts.frame.toGrid):rings[ri];
+        sum+=ppPolyArea(ppClipPolyToRect(local,x0,y0,x1,y1));
       }
       return sum;
     }
     if(!plotPoly||plotPoly.length<3)return nom;
-    var clipped=ppClipPolyToRect(plotPoly,x0,y0,x1,y1);
+    var plotLocal=zoneCuts.frame?plotPoly.map(zoneCuts.frame.toGrid):plotPoly;
+    var clipped=ppClipPolyToRect(plotLocal,x0,y0,x1,y1);
     return ppPolyArea(clipped);
   }
 
@@ -1401,21 +1914,22 @@
     var planN=parseInt(document.getElementById('planN')?.value)||parseInt(document.getElementById('fld_N')?.value)||4;
     var layout=ppGetZoneLayout(b,planN);
     var cuts=ppGetZoneCuts(b,layout);
+    var gridPt=cuts.frame?cuts.frame.toGrid(worldPt):worldPt, gb=cuts.bounds||b;
     // threshold in world (image-pixel) units — convert 9 canvas px
     var t=ppState.transform;
     var thr=t?9/(t.scale*(Math.abs(t.scaleX)+Math.abs(t.scaleY))/2):5;
     var best=null;
     // vertical lines (xPos interior 1..len-2)
     for(var xi=1;xi<cuts.xPos.length-1;xi++){
-      var dx=Math.abs(worldPt.x-cuts.xPos[xi]);
-      if(dx<thr&&worldPt.y>=b.minY-5&&worldPt.y<=b.minY+b.h+5){
+      var dx=Math.abs(gridPt.x-cuts.xPos[xi]);
+      if(dx<thr&&gridPt.y>=gb.minY-5&&gridPt.y<=gb.maxY+5){
         if(!best||dx<best.dist){best={axis:'x',index:xi,dist:dx,pos:cuts.xPos[xi]};}
       }
     }
     // horizontal lines (yPos interior 1..len-2)
     for(var yi=1;yi<cuts.yPos.length-1;yi++){
-      var dy=Math.abs(worldPt.y-cuts.yPos[yi]);
-      if(dy<thr&&worldPt.x>=b.minX-5&&worldPt.x<=b.minX+b.w+5){
+      var dy=Math.abs(gridPt.y-cuts.yPos[yi]);
+      if(dy<thr&&gridPt.x>=gb.minX-5&&gridPt.x<=gb.maxX+5){
         if(!best||dy<best.dist){best={axis:'y',index:yi,dist:dy,pos:cuts.yPos[yi]};}
       }
     }
@@ -1439,8 +1953,8 @@
       var isDrag=ppState.dragCut&&ppState.dragCut.axis==='x'&&ppState.dragCut.index===xi;
       var isSel=ppState.lastSelectedCut&&ppState.lastSelectedCut.axis==='x'&&ppState.lastSelectedCut.index===xi;
       var isMerge=!!(mp&&mp.axis==='x'&&(mp.index===xi||mp.target===xi));
-      var midY=b.minY+b.h/2;
-      var hp=ppToCanvas(cuts.xPos[xi],midY);
+      var gb=cuts.bounds||b,midY=(gb.minY+gb.maxY)/2;
+      var hp=ppCutCanvas(cuts,cuts.xPos[xi],midY);
       ppCtx.fillStyle=isMerge?'#f97316':isDrag?'#f59e0b':(isHover||isSel)?'#22c55e':'rgba(59,130,246,.6)';
       ppCtx.strokeStyle='#fff';ppCtx.lineWidth=isMerge?3:2;
       ppCtx.beginPath();ppCtx.arc(hp.x,hp.y,isMerge?9:((isHover||isDrag||isSel)?7:5),0,Math.PI*2);ppCtx.fill();ppCtx.stroke();
@@ -1450,8 +1964,8 @@
       var isDrag2=ppState.dragCut&&ppState.dragCut.axis==='y'&&ppState.dragCut.index===yi;
       var isSel2=ppState.lastSelectedCut&&ppState.lastSelectedCut.axis==='y'&&ppState.lastSelectedCut.index===yi;
       var isMerge2=!!(mp&&mp.axis==='y'&&(mp.index===yi||mp.target===yi));
-      var midX=b.minX+b.w/2;
-      var hp2=ppToCanvas(midX,cuts.yPos[yi]);
+      var gb2=cuts.bounds||b,midX=(gb2.minX+gb2.maxX)/2;
+      var hp2=ppCutCanvas(cuts,midX,cuts.yPos[yi]);
       ppCtx.fillStyle=isMerge2?'#f97316':isDrag2?'#f59e0b':(isHover2||isSel2)?'#22c55e':'rgba(59,130,246,.6)';
       ppCtx.strokeStyle='#fff';ppCtx.lineWidth=isMerge2?3:2;
       ppCtx.beginPath();ppCtx.arc(hp2.x,hp2.y,isMerge2?9:((isHover2||isDrag2||isSel2)?7:5),0,Math.PI*2);ppCtx.fill();ppCtx.stroke();
@@ -1501,9 +2015,12 @@
     for(var zr=0;zr<cuts.rows;zr++){
       for(var zc=0;zc<cuts.cols;zc++){
         var zi=zr*cuts.cols+zc;
-        var p1=ppToCanvas(cuts.xPos[zc],cuts.yPos[zr]);
-        var p2=ppToCanvas(cuts.xPos[zc+1],cuts.yPos[zr+1]);
-        var x=p1.x,y=p1.y,w=p2.x-p1.x,h=p2.y-p1.y;
+        var q1=ppCutCanvas(cuts,cuts.xPos[zc],cuts.yPos[zr]);
+        var q2=ppCutCanvas(cuts,cuts.xPos[zc+1],cuts.yPos[zr]);
+        var q3=ppCutCanvas(cuts,cuts.xPos[zc+1],cuts.yPos[zr+1]);
+        var q4=ppCutCanvas(cuts,cuts.xPos[zc],cuts.yPos[zr+1]);
+        var x=Math.min(q1.x,q2.x,q3.x,q4.x),y=Math.min(q1.y,q2.y,q3.y,q4.y);
+        var w=Math.max(q1.x,q2.x,q3.x,q4.x)-x,h=Math.max(q1.y,q2.y,q3.y,q4.y)-y;
         var _m2=ppZoneActualAreaM2(zc,zr,cuts,ppState.polyPts);
         var _mu=_m2/666.67;
         var _std=cuts.xPlan[zc]*cuts.yPlan[zr]/666.67;
@@ -1511,8 +2028,7 @@
         /* 2026-09-27：非标区不再整块涂琥珀 —— 与三级工作区同规则（保留本区底色，仅琥珀描边区分） */
         ppCtx.fillStyle=fills[zi%fills.length];
         ppCtx.strokeStyle=_partial?'rgba(217,119,6,.9)':strokes[zi%strokes.length];
-        ppCtx.fillRect(x,y,w,h);
-        ppCtx.strokeRect(x,y,w,h);
+        ppCtx.beginPath();ppCtx.moveTo(q1.x,q1.y);ppCtx.lineTo(q2.x,q2.y);ppCtx.lineTo(q3.x,q3.y);ppCtx.lineTo(q4.x,q4.y);ppCtx.closePath();ppCtx.fill();ppCtx.stroke();
       }
     }
     ppCtx.restore(); // 结束地块裁剪
@@ -1534,62 +2050,39 @@
     for(var zr=0;zr<cuts.rows;zr++){
       for(var zc=0;zc<cuts.cols;zc++){
         var zi=zr*cuts.cols+zc;
-        var p1=ppToCanvas(cuts.xPos[zc],cuts.yPos[zr]);
-        var p2=ppToCanvas(cuts.xPos[zc+1],cuts.yPos[zr+1]);
-        var x=p1.x,y=p1.y,w=p2.x-p1.x,h=p2.y-p1.y;
-        var aw=Math.abs(w),ah=Math.abs(h);
+        var q1=ppCutCanvas(cuts,cuts.xPos[zc],cuts.yPos[zr]);
+        var q2=ppCutCanvas(cuts,cuts.xPos[zc+1],cuts.yPos[zr]);
+        var q3=ppCutCanvas(cuts,cuts.xPos[zc+1],cuts.yPos[zr+1]);
+        var q4=ppCutCanvas(cuts,cuts.xPos[zc],cuts.yPos[zr+1]);
+        var x=Math.min(q1.x,q2.x,q3.x,q4.x),y=Math.min(q1.y,q2.y,q3.y,q4.y);
+        var w=Math.max(q1.x,q2.x,q3.x,q4.x)-x,h=Math.max(q1.y,q2.y,q3.y,q4.y)-y;
+        var zoneScreenW=Math.hypot(q2.x-q1.x,q2.y-q1.y),zoneScreenH=Math.hypot(q3.x-q2.x,q3.y-q2.y);
+        var labelCenter={x:(q1.x+q2.x+q3.x+q4.x)/4,y:(q1.y+q2.y+q3.y+q4.y)/4};
+        var labelAngle=Math.atan2(q2.y-q1.y,q2.x-q1.x);
+        if(labelAngle>Math.PI/2)labelAngle-=Math.PI;else if(labelAngle<-Math.PI/2)labelAngle+=Math.PI;
         var _m2=ppZoneActualAreaM2(zc,zr,cuts,ppState.polyPts);
         var _mu=_m2/666.67;
         var _std=cuts.xPlan[zc]*cuts.yPlan[zr]/666.67;
         var _partial=_std>0 && _mu<_std*0.97 && _mu>0.05;
         if(_mu>0.05)__act.push({zi:zi,m2:_m2,mu:_mu});
         var __pick=(__calActual&&_mu>0.05&&window.ryZonePipePick)?window.ryZonePipePick(_m2,__tsp,__esp,__ef,__tv,__par):null;
-        if(aw>34&&ah>26 && _mu>0.05){
-          if(_partial){
-            // 非标准分区：与标准分区一致，文字置于分区右上角（已在裁剪层之外绘制，可超出地块显示）
-            ppCtx.fillStyle='#000';
-            var pLabelX=x+w-8, pLabelY=y+8;
-            ppCtx.textAlign='right';
-            if(aw>78&&ah>44){
-              ppCtx.font='13px sans-serif';
-              ppCtx.fillText((zi+1)+'区',pLabelX,pLabelY);
-              ppCtx.font='11px sans-serif';
-              ppCtx.fillText('实际 '+_mu.toFixed(1)+' 亩',pLabelX,pLabelY+16);
-              /* [v653] 实切口径：该区按实切面积的建议主管档（与多地块页琥珀点同色） */
-              if(__pick){ ppCtx.fillStyle='#7c2d12'; ppCtx.font='11px sans-serif'; ppCtx.fillText('主管 Ø'+__pick.main.od,pLabelX,pLabelY+31); }
-            }else{
-              ppCtx.font='8px sans-serif';
-              ppCtx.fillText((zi+1)+'区 实际'+_mu.toFixed(1)+'亩',pLabelX,pLabelY);
-            }
+        if(_mu>0.05&&zoneScreenW>16&&zoneScreenH>11){
+          var zoneSizeText=ppZoneSizeLabel(cuts.xPlan[zc],cuts.yPlan[zr]);
+          var zoneAreaText=(_partial?_mu:(cuts.xPlan[zc]*cuts.yPlan[zr]/666.67)).toFixed(1)+'亩';
+          var baseFont=Math.max(6,Math.min(10,Math.min(zoneScreenW/12,zoneScreenH/4.5)));
+          ppCtx.save();ppCtx.translate(labelCenter.x,labelCenter.y);ppCtx.rotate(labelAngle);
+          ppCtx.fillStyle=_partial?'#9a4d05':'#111827';ppCtx.textAlign='center';ppCtx.textBaseline='middle';
+          if(zoneScreenH>=31){
+            ppCtx.font=baseFont+'px sans-serif';ppCtx.fillText((zi+1)+'区',0,-baseFont*.95);
+            ppCtx.font=baseFont+'px sans-serif';ppCtx.fillText(zoneSizeText,0,baseFont*.1);
+            if(zoneScreenH>=43)ppCtx.fillText(zoneAreaText,0,baseFont*1.15);
           }else{
-            var zoneSizeText=ppZoneSizeLabel(Math.max(cuts.xPlan[zc],cuts.yPlan[zr]),Math.min(cuts.xPlan[zc],cuts.yPlan[zr]));
-            var zoneAreaText=(cuts.xPlan[zc]*cuts.yPlan[zr]/666.67).toFixed(1)+'亩';
-            var labelX=x+w-8, labelY=y+8;
-            ppCtx.fillStyle='#000';
-            if(aw>88&&ah>48){
-              ppCtx.textAlign='right';
-              ppCtx.font='13px sans-serif';
-              ppCtx.fillText((zi+1)+'区',labelX,labelY);
-              ppCtx.font='10px sans-serif';
-              ppCtx.fillText(zoneSizeText,labelX,labelY+16);
-              ppCtx.font='10px sans-serif';
-              ppCtx.fillText(zoneAreaText,labelX,labelY+31);
-              /* [v653] 实切口径：该区按实切面积的建议主管/支管档 */
-              if(__pick&&ah>64){ ppCtx.fillStyle='#7c2d12'; ppCtx.font='11px sans-serif'; ppCtx.fillText('主管 Ø'+__pick.main.od+' · 支管 Ø'+__pick.branch.od,labelX,labelY+46); }
-            }else if(ah>70){
-              ppCtx.save();
-              ppCtx.translate(x+w/2,y+h/2);
-              ppCtx.rotate(-Math.PI/2);
-              ppCtx.textAlign='center';
-              ppCtx.font='10px sans-serif';
-              ppCtx.fillText((zi+1)+'区 '+zoneSizeText+' '+zoneAreaText,0,-4);
-              ppCtx.restore();
-            }else{
-              ppCtx.textAlign='center';
-              ppCtx.font='8px sans-serif';
-              ppCtx.fillText((zi+1)+'区 '+zoneSizeText+' '+zoneAreaText,x+w/2,y+h/2-5);
-            }
+            ppCtx.font=Math.max(5.5,baseFont*.82)+'px sans-serif';
+            ppCtx.fillText((zi+1)+'区 '+zoneSizeText,0,0);
           }
+          /* [v653] 实切口径：该区按实切面积的建议主管/支管档 */
+          if(__pick&&zoneScreenH>=57){ppCtx.fillStyle='#7c2d12';ppCtx.font=Math.max(6,baseFont*.9)+'px sans-serif';ppCtx.fillText('主 Ø'+__pick.main.od+' / 支 Ø'+__pick.branch.od,0,baseFont*2.2);}
+          ppCtx.restore();
         }
       }
     }
@@ -1608,13 +2101,15 @@
     ppCtx.lineWidth=1.1;
     ppCtx.setLineDash([7,5]);
     for(var bx=0;bx<cuts.xPos.length;bx++){
-      var vx1=ppToCanvas(cuts.xPos[bx],b.minY);
-      var vx2=ppToCanvas(cuts.xPos[bx],b.minY+b.h);
+      var gb=cuts.bounds||b;
+      var vx1=ppCutCanvas(cuts,cuts.xPos[bx],gb.minY);
+      var vx2=ppCutCanvas(cuts,cuts.xPos[bx],gb.maxY);
       ppCtx.beginPath();ppCtx.moveTo(vx1.x,vx1.y);ppCtx.lineTo(vx2.x,vx2.y);ppCtx.stroke();
     }
     for(var by=0;by<cuts.yPos.length;by++){
-      var hy1=ppToCanvas(b.minX,cuts.yPos[by]);
-      var hy2=ppToCanvas(b.minX+b.w,cuts.yPos[by]);
+      var gb2=cuts.bounds||b;
+      var hy1=ppCutCanvas(cuts,gb2.minX,cuts.yPos[by]);
+      var hy2=ppCutCanvas(cuts,gb2.maxX,cuts.yPos[by]);
       ppCtx.beginPath();ppCtx.moveTo(hy1.x,hy1.y);ppCtx.lineTo(hy2.x,hy2.y);ppCtx.stroke();
     }
     ppCtx.restore();
@@ -1668,7 +2163,7 @@
       ppCtx.fillStyle='rgba(15,23,42,.42)';ppCtx.font='10px sans-serif';ppCtx.textAlign='right';
       ppCtx.fillText('缩放 '+((ppState.zoom*100).toFixed(0))+'%',ppCanvas.width-8,ppCanvas.height-18);
       ppCtx.fillStyle='rgba(15,23,42,.46)';ppCtx.font='14px sans-serif';ppCtx.textAlign='center';
-      ppCtx.fillText('请在面积测量工具中加载多边形',ppCanvas.width/2,ppCanvas.height/2);
+      ppCtx.fillText('请先到「在线地图」画框并回传地块',ppCanvas.width/2,ppCanvas.height/2);
       return;
     }
 
@@ -1828,7 +2323,7 @@
      做法：把局部 ppRender 换成一个转发器（函数声明可重新赋值），
      内部所有 ppRender() 调用立刻跟着生效，绘制逻辑一行没动。 */
   var ppRenderBase=ppRender;
-  ppRender=function(){ ppRenderBase.apply(null,arguments); ppSyncFitBtn(); };
+  ppRender=function(){ ppRenderBase.apply(null,arguments); ppSyncFitBtn();try{if(window.RyDrawingWorkspace)window.RyDrawingWorkspace.syncCamera();}catch(e){} };
   window.ppRender=ppRender;
 
   var ppSpacePressed=false;
@@ -1848,17 +2343,7 @@
     e.preventDefault();
     var pos=ppClientPos(e);
     var delta=e.deltaY>0?0.9:1.1;
-    var nz=Math.max(0.1,Math.min(10,ppState.zoom*delta));
-    if(nz===ppState.zoom)return;
-    // Zoom towards mouse point
-    var mw=ppToMeters(pos.x,pos.y);
-    ppState.zoom=nz;
-    ppUpdateTransform();
-    var np=ppToCanvas(mw.x,mw.y);
-    ppState.panX+=pos.x-np.x;ppState.panY+=pos.y-np.y;
-    ppRender();
-    /* [v629] 滚轮放大后线条会被画布切掉 ⇒ 亮出「适应窗口」小按钮（缩回去后自动收起）。 */
-    ppSyncFitBtn();
+    window.ppZoomView(delta,pos.x,pos.y);
   },{passive:false});
 
   // Keyboard — space for pan, arrows for fine-tune
@@ -1900,7 +2385,13 @@
         var world=ppToMeters(pos.x,pos.y);
         var hit=ppHitTestCutLine(world);
         if(hit){
+          var cutPreimage=ppGroupMemberPreimage();
+          if(cutPreimage&&cutPreimage.invalid)return;
+          var cutSinglePreimage=!cutPreimage&&!ppIsGroupWhole()&&typeof window.ppGetState==='function'
+            ?window.ppGetState():null;
           ppPushHistory();
+          ppCutDragPreimage=cutPreimage;
+          ppCutSinglePreimage=cutSinglePreimage;
           ppState.dragCut={axis:hit.axis,index:hit.index};
           ppState.lastSelectedCut={axis:hit.axis,index:hit.index};
           ppState.mergePreview=null;
@@ -1922,7 +2413,8 @@
     if(ppState.dragCut){
       var world2=ppToMeters(pos.x,pos.y);
       var dcK=ppState.dragCut;
-      var dcCoord=world2[dcK.axis==='x'?'x':'y'];
+      var dcCuts=ppCurrentCuts(),dcLocal=dcCuts&&dcCuts.frame?dcCuts.frame.toGrid(world2):world2;
+      var dcCoord=dcLocal[dcK.axis==='x'?'x':'y'];
       // 面积锁定：整轴刚性平移（面积不变）；否则单线拖动（可合并）
       if(ppState.areaLocked&&!ppBmFreeOk(dcK.axis,dcK.index))ppDragCutAxis(dcK.axis,dcK.index,dcCoord);
       else ppDragCutTo(dcK.axis,dcK.index,dcCoord);
@@ -1966,6 +2458,9 @@
       ppState.hoverCut=null;
       ppCanvas.style.cursor=ppState.mode==='adjustCut'?'default':'grab';
       ppMouseDownPos=null;
+      var cutPreimage=ppCutDragPreimage,cutSinglePreimage=ppCutSinglePreimage;
+      ppCutDragPreimage=null;ppCutSinglePreimage=null;
+      if(!ppCommitCutDragSnapshots(cutPreimage,cutSinglePreimage,'cut-drag'))return;
       /* v166：调网格松手后同步重建三级简图（60m/545m/224m 标注线与分区色块随新界线）——
          原来只刷二级简图，三级简图停留旧网格，工作区克隆的也是旧图（与 cutDragEnd 链路对齐）。 */
       if(typeof window.ppRefreshTLAfterCuts==='function')window.ppRefreshTLAfterCuts();
@@ -1994,25 +2489,48 @@
           if(!pick)alert('未拾取到管线，请点击靠近主管、支管或一级管的位置');
           ppRender();ppMouseDownPos=null;return;
         }
+        /* In group-wide view only read-only pipe picking is allowed. Keep this
+           guard ahead of source/valve handlers as well as the pipe drawing guard. */
+        if(ppGroupEditBlocks(ppState.mode)){ppMouseDownPos=null;return;}
         if(ppState.mode==='maskPipe'){
           var maskPick=ppFindNearestPipe(ppToMeters(pos.x,pos.y));
           if(!maskPick){alert('未拾取到管线，请点击靠近主管、支管或一级管的位置');ppMouseDownPos=null;return;}
+          var maskPreimage=ppGroupMemberPreimage();
+          if(maskPreimage&&maskPreimage.invalid){ppMouseDownPos=null;return;}
+          var maskSinglePreimage=!maskPreimage&&!ppIsGroupWhole()&&typeof window.ppGetState==='function'
+            ?window.ppGetState():null;
           ppPushHistory();
           ppTogglePipeHidden(maskPick);
+          if(maskPreimage&&!ppCommitGroupMemberEdit(maskPreimage)){ppMouseDownPos=null;return;}
+          if(maskSinglePreimage&&!ppCommitSinglePlotEdit(maskSinglePreimage,'pipe-visibility',true,true)){ppMouseDownPos=null;return;}
           ppUpdatePickResult(maskPick);
           if(typeof window.ppRefreshDiagramIfVisible==='function')window.ppRefreshDiagramIfVisible();
           ppRefreshMaterials();
           ppRender();ppMouseDownPos=null;return;
         }
         if(ppState.mode==='source'){
+          var sourcePreimage=ppGroupMemberPreimage();
+          if(sourcePreimage&&sourcePreimage.invalid){ppMouseDownPos=null;return;}
+          var sourceSinglePreimage=!sourcePreimage&&!ppIsGroupWhole()&&typeof window.ppGetState==='function'
+            ?window.ppGetState():null;
           ppPushHistory();
-          ppState.source=ppToMeters(pos.x,pos.y);ppRender();ppMouseDownPos=null;return;
+          ppState.source=ppToMeters(pos.x,pos.y);
+          if(sourcePreimage&&!ppCommitGroupMemberEdit(sourcePreimage)){ppMouseDownPos=null;return;}
+          if(sourceSinglePreimage&&!ppCommitSinglePlotEdit(sourceSinglePreimage,'source-placement',false)){ppMouseDownPos=null;return;}
+          ppRender();ppMouseDownPos=null;return;
         }
         if(ppState.mode==='valve'){
           var valvePt=ppToMeters(pos.x,pos.y);
           if(!ppPointInPlot(valvePt)){ppMouseDownPos=null;return;}
+          var valvePreimage=ppGroupMemberPreimage();
+          if(valvePreimage&&valvePreimage.invalid){ppMouseDownPos=null;return;}
+          var valveSinglePreimage=!valvePreimage&&!ppIsGroupWhole()&&typeof window.ppGetState==='function'
+            ?window.ppGetState():null;
           ppPushHistory();
-          ppState.valves.push(valvePt);ppRender();ppMouseDownPos=null;return;
+          ppState.valves.push(valvePt);
+          if(valvePreimage&&!ppCommitGroupMemberEdit(valvePreimage)){ppMouseDownPos=null;return;}
+          if(valveSinglePreimage&&!ppCommitSinglePlotEdit(valveSinglePreimage,'valve-placement',true)){ppMouseDownPos=null;return;}
+          ppRender();ppMouseDownPos=null;return;
         }
         if(ppState.mode==='adjustCut'){ppMouseDownPos=null;return;}
         /* [v193] 整组态不允许落块级管线的点 —— 按钮已置灰，这里是兜底
@@ -2037,6 +2555,9 @@
     if(ppState.dragCut){
       var ppMergedLeave=ppCommitMerge(); // 移出画布时按当前预览结算合并
       ppState.dragCut=null;
+      var cutPreimageLeave=ppCutDragPreimage,cutSinglePreimageLeave=ppCutSinglePreimage;
+      ppCutDragPreimage=null;ppCutSinglePreimage=null;
+      if(!ppCommitCutDragSnapshots(cutPreimageLeave,cutSinglePreimageLeave,'cut-drag')){ppMouseDownPos=null;return;}
       /* v166：同 mouseup —— 移出画布结算的合并也要同步三级简图（原路径完全不刷） */
       if(typeof window.ppRefreshTLAfterCuts==='function')window.ppRefreshTLAfterCuts();
       if(ppMergedLeave&&typeof ppRefreshMaterials==='function')ppRefreshMaterials();
@@ -2187,21 +2708,49 @@
   }
 
   function ppClearPipes(){
+    var groupPreimage=ppGroupMemberPreimage();
+    if(groupPreimage&&groupPreimage.invalid)return;
+    var singlePreimage=!groupPreimage&&!ppIsGroupWhole()&&typeof window.ppGetState==='function'
+      ?window.ppGetState():null;
     ppPushHistory();
     /* [v201] 整组态的「清除管路」必须落到各块 slot —— 与整组态的生成互为逆操作。
        否则只有二级页的合并视图清了、各块 slot 还在 ⇒ 成组管路页照样把管画出来，
        用户点「清除管路」却看着管子还在（第二份「两页不一致」的坑）。 */
     if(ppIsGroupWhole()){
-      window.__runyeGroupEdit.slots.forEach(function(s){
+      var memberRead=ppReadGroupMemberSlots(window.__runyeGroupEdit);
+      if(!memberRead.ok){ppDiscardLatestHistoryEntry();return;}
+      var changes=[];
+      memberRead.slots.forEach(function(s,index){
         if(!s)return;
-        s.mainPipes=[];s.branchPipes=[];s.subBranchPipes=[];s.source=null;s.valves=[];
-        ppSlotRebuildIds(s);
+        var next=ppCloneJSON(s);
+        if(!next){changes.push({index:index,slot:null});return;}
+        next.mainPipes=[];next.branchPipes=[];next.subBranchPipes=[];next.source=null;next.valves=[];
+        ppSlotRebuildIds(next);
+        changes.push({index:index,slot:next});
       });
+      if(changes.length&&!ppSaveGroupMemberSlots(changes)){
+        ppDiscardLatestHistoryEntry();
+        console.warn('[plot-editor] group pipe-clear transaction rejected');
+        return;
+      }
       /* 同步推给「成组管路」页，避免它停在旧画面 */
       setTimeout(function(){ try{ ppSyncGroupEditUI(); }catch(e){} },0);
     }
     ppState.mainPipes=[];ppState.branchPipes=[];ppState.subBranchPipes=[];
-    ppState.source=null;ppState.valves=[];ppState.currentLine=[];ppState.hiddenPipes={main:{},branch:{},subbranch:{}};ppState.pipeIds={main:[],branch:[],subbranch:[]};ppState.nextPipeId=1;ppState.cutOverrides={x:{},y:{}};ppResetCutSnap('');ppUpdatePickResult(null);ppRender();
+    ppState.source=null;ppState.valves=[];ppState.currentLine=[];ppState.hiddenPipes={main:{},branch:{},subbranch:{}};ppState.pipeIds={main:[],branch:[],subbranch:[]};ppState.nextPipeId=1;ppState.cutOverrides={x:{},y:{}};ppResetCutSnap('');
+    if(groupPreimage&&!ppCommitGroupMemberEdit(groupPreimage))return;
+    if(singlePreimage&&typeof window.ryCommitSinglePlotL2Snapshot==='function'){
+      var singleCommit=window.ryCommitSinglePlotL2Snapshot(singlePreimage,window.ppGetState());
+      if(singleCommit===false){
+        ppDiscardLatestHistoryEntry();
+        ppApplySlot(singlePreimage);
+        ppUpdateLockAreaBtn();
+        ppUpdatePickResult(null);ppRender();ppUpdateAutoPipeButton();ppRefreshDiagramOrReset();ppRefreshMaterials();
+        console.warn('[plot-editor] single-plot pipe-clear transaction rejected');
+        return;
+      }
+    }
+    ppUpdatePickResult(null);ppRender();
     ppUpdateAutoPipeButton();
     if(typeof window.ppRefreshDiagramIfVisible==='function') window.ppRefreshDiagramIfVisible();
     ppRefreshMaterials();
@@ -2255,15 +2804,27 @@
        把它从「那块地块恰好算出来的值」提升成「所有地块都用这个值」。 */
   if (typeof window !== 'undefined') window.RyMainBranchGap = { m: ppGapM };
 
-  function ppBuildAutoPipes(polyPts, planN, isThree, useOwnDims, forceDir) {
+  function ppBuildAutoPipes(polyPts, planN, isThree, useOwnDims, forceDir, gridAngle) {
     var out = { main: [], branch: [], subbranch: [], valves: [] };
-    var keepPoly = ppState.polyPts, keepOwn = ppOwnDimOverride;
+    var keepPoly = ppState.polyPts, keepOwn = ppOwnDimOverride, keepAngle=ppState.zoneAngleDeg, keepRot=ppState.zoneRotated, keepSnap=ppState.cutSnap, keepOverrides=ppState.cutOverrides;
+    var frame=null;
     try {
       ppState.polyPts = (polyPts || []).map(function (p) { return { x: p.x, y: p.y }; });
       if (useOwnDims) ppOwnDimOverride = true;   /* 见 ppGetPlanDims 处 [v201] 说明 */
       if (ppState.polyPts.length < 3) return out;
-      var b = ppGetBounds();
-      var cuts = ppGetZoneCuts(b, ppGetZoneLayout(b, planN));
+      var sourceBounds=ppGetBounds(),sourceDims=ppGetPlanDims(sourceBounds);
+      var effectiveAngle=isFinite(Number(gridAngle))?Number(gridAngle):ppZoneAngle();
+      frame=ppGridFrame(ppState.polyPts,sourceBounds,sourceDims,effectiveAngle);
+      if(frame&&Math.abs(effectiveAngle)>0.001){
+        ppState.polyPts=frame.poly.map(function(p){return{x:p.x,y:p.y};});
+        ppState.zoneAngleDeg=0;ppState.zoneRotated=false;
+        ppState.cutSnap={sig:'',x:null,y:null};ppState.cutOverrides={x:{},y:{}};
+      }
+      var b = ppGetBounds(),layout=ppGetZoneLayout(b,planN);
+      if(frame&&Math.abs(frame.angle)>0.001&&keepSnap&&keepSnap.x&&keepSnap.y){
+        ppState.cutSnap={sig:ppGetZoneCutSignature(b,layout),x:keepSnap.x.slice(),y:keepSnap.y.slice()};
+      }
+      var cuts = ppGetZoneCuts(b, layout);
 
       /* [v229 2026-10-05 用户要求] 主管/支管走向「少数服从多数」，全块统一：
          用户原话：「分了 20 个分区，其中有 11 个以上的分区是横向走主管、支管，
@@ -2346,7 +2907,13 @@
           }
         }
       }
-    } finally { ppState.polyPts = keepPoly; ppOwnDimOverride = keepOwn; }
+    } finally {
+      if(frame&&Math.abs(frame.angle)>0.001){
+        ['main','branch','subbranch'].forEach(function(k){out[k]=out[k].map(function(line){return line.map(frame.toWorld);});});
+        out.valves=out.valves.map(frame.toWorld);
+      }
+      ppState.polyPts = keepPoly; ppOwnDimOverride = keepOwn; ppState.zoneAngleDeg=keepAngle; ppState.zoneRotated=keepRot; ppState.cutSnap=keepSnap; ppState.cutOverrides=keepOverrides;
+    }
     return out;
   }
 
@@ -2371,7 +2938,11 @@
   }
 
   function ppAutoGeneratePipes() {
-    if (!ppState.polyPts.length) { alert('请先在面积测量工具中描绘边界'); return; }
+    if (!ppState.polyPts.length) { alert('请先到「在线地图」画框并回传地块'); return; }
+    var groupPreimage=ppGroupMemberPreimage();
+    if(groupPreimage&&groupPreimage.invalid)return;
+    var singlePreimage=!groupPreimage&&!ppIsGroupWhole()&&typeof window.ppGetState==='function'
+      ?window.ppGetState():null;
     ppPushHistory();
 
     var planN = parseInt(document.getElementById('planN')?.value) || parseInt(document.getElementById('fld_N')?.value) || 4;
@@ -2383,15 +2954,27 @@
          与 ppSetGroupMode 里「逐块 → 整组」的合并口径严格同一套。 */
     if (ppIsGroupWhole()) {
       var geW = window.__runyeGroupEdit;
-      geW.slots.forEach(function (s) {
+      var memberRead=ppReadGroupMemberSlots(geW);
+      if(!memberRead.ok){ppDiscardLatestHistoryEntry();return;}
+      var memberChanges=[];
+      memberRead.slots.forEach(function (s,slotIndex) {
         if (!s || !s.polyPts || s.polyPts.length < 3) return;
-        var r = ppBuildAutoPipes(s.polyPts, planN, isThree, true);
+        s = ppCloneJSON(s);
+        if(!s){memberChanges.push({index:slotIndex,slot:null});return;}
+        var r = ppBuildAutoPipes(s.polyPts, planN, isThree, true, null, s.zoneAngleDeg);
         s.mainPipes = r.main; s.branchPipes = r.branch; s.subBranchPipes = r.subbranch;
         s.valves = r.valves; s.source = null;
         s.cutOverrides = { x: {}, y: {} }; s.mergePreview = null;
         ppSlotRebuildIds(s);
+        memberChanges.push({index:slotIndex,slot:s});
       });
+      if(memberChanges.length&&!ppSaveGroupMemberSlots(memberChanges)){
+        ppDiscardLatestHistoryEntry();
+        console.warn('[plot-editor] group auto-pipe transaction rejected');
+        return;
+      }
       var mg = ppCollectGroupAllPipes();
+      if(!mg)return;
       ppState.mainPipes = mg.main; ppState.branchPipes = mg.branch; ppState.subBranchPipes = mg.subbranch;
       ppState.source = null; ppState.valves = [];
       ppState.pipeIds = { main: [], branch: [], subbranch: [] }; ppState.nextPipeId = 1;
@@ -2421,35 +3004,35 @@
     ppUpdatePickResult(null);
     ppEnsurePipeIds('main'); ppEnsurePipeIds('branch'); ppEnsurePipeIds('subbranch');
 
+    if(groupPreimage&&!ppCommitGroupMemberEdit(groupPreimage))return;
+    if(singlePreimage&&typeof window.ryCommitSinglePlotL2Snapshot==='function'){
+      var singleCommit=window.ryCommitSinglePlotL2Snapshot(singlePreimage,window.ppGetState());
+      if(singleCommit===false){
+        ppDiscardLatestHistoryEntry();
+        ppApplySlot(singlePreimage);
+        ppUpdateLockAreaBtn();
+        if(typeof updatePlan==='function')updatePlan();
+        ppUpdateTransform();ppRender();ppUpdateAutoPipeButton();ppRefreshDiagramOrReset();ppRefreshMaterials();
+        console.warn('[plot-editor] single-plot auto-pipe transaction rejected');
+        return;
+      }
+    }
     ppRender();
     ppUpdateAutoPipeButton();
     if (typeof window.ppRefreshDiagramIfVisible === 'function') window.ppRefreshDiagramIfVisible();
     ppRefreshMaterials();
   }
 
-  function ppRepartitionFromRotatedPlot(opts){ /* [v326] opts.aiApply=AI规划回传应用：跳过旋转角度校验（deg=0 旋转为恒等变换，重切流程复用；手动点击不受影响） */
-    ppUnlockArea(); // 重新分区会改变各区面积，锁定态自动解除（任务K 2026-09-26）
-    if(!ppState.polyPts.length){alert('请先在面积测量工具中描绘边界');return;}
-    var deg=parseFloat(ppState.plotRotationDeg)||0;
-    if(!deg&&!(opts&&opts.aiApply)){alert('请先输入地块旋转角度，再点击重新分区');return;} /* [v326] AI规划应用无需旋转角度 */
+  function ppRepartitionDesign(opts){
+    if(!ppState.polyPts.length){alert('请先到「在线地图」画框并回传地块');return;}
     if(ppHasPipeContent()&&!confirm('重新分区会清除当前绘制的管线、阀门和水源，是否继续？'))return;
+    var groupPreimage=ppGroupMemberPreimage();
+    if(groupPreimage&&groupPreimage.invalid)return false;
+    var singlePreimage=!groupPreimage&&!ppIsGroupWhole()&&typeof window.ppGetState==='function'
+      ?window.ppGetState():null;
     ppPushHistory();
-    var _rotB=ppGetBounds();
-    var _rotC={x:_rotB.minX+_rotB.w/2,y:_rotB.minY+_rotB.h/2};
-    var rotatedPts=ppGetRotatedPlotPoints();
-    ppState.polyPts=rotatedPts.map(function(p){return{x:p.x,y:p.y};});
-    window.measuredPolygon=ppState.polyPts.map(function(p){return{x:p.x,y:p.y};});
-    /* [v190] 子地块环随主轮廓一起旋转落定（同一 center/deg），否则两者错位、空隙位置错乱 */
-    ppXformSubRings(function(pt){return ppRotatePoint(pt,deg,_rotC);});
-    /* [v193] 旋转作用于整组：各块的环/管线/外框/总管一起转（用户拍板 ④）。
-       重新分区本来就会清空管线 ⇒ clearPipes:true，避免各块留下旋转前的旧坐标。 */
-    ppXformGroupAll(function(pt){return ppRotatePoint(pt,deg,_rotC);},{clearPipes:true});
-    /* measuredPolygon 始终代表「整个成组地块」的外框，不能停在某一块的环上 */
-    var geRot=window.__runyeGroupEdit;
-    if(geRot&&geRot.active)window.measuredPolygon=geRot.framePts.map(function(p){return{x:p.x,y:p.y};});
-    ppState.plotRotationDeg=0;
-    var angleInput=document.getElementById('ppPlotAngle');
-    if(angleInput)angleInput.value=0;
+    ppUnlockArea(); // 重新分区会改变各区面积，锁定态自动解除（任务K 2026-09-26）
+    /* 重分区只重建分区与清理管路；地块、多地块成员环和世界坐标均保持不变。 */
     ppState.mainPipes=[];
     ppState.branchPipes=[];
     ppState.subBranchPipes=[];
@@ -2462,7 +3045,20 @@
     ppState.cutOverrides={x:{},y:{}};ppResetCutSnap('');
     ppState.dragCut=null;ppState.hoverCut=null;
     ppUpdatePickResult(null);
-    // Recalculate plan dimensions from the rotated polygon
+    if(groupPreimage&&!ppCommitGroupMemberEdit(groupPreimage))return;
+    if(singlePreimage&&typeof window.ryCommitSinglePlotL2Snapshot==='function'){
+      var singleCommit=window.ryCommitSinglePlotL2Snapshot(singlePreimage,window.ppGetState());
+      if(singleCommit===false){
+        ppDiscardLatestHistoryEntry();
+        ppApplySlot(singlePreimage);
+        ppUpdateLockAreaBtn();
+        if(typeof updatePlan==='function')updatePlan();
+        ppUpdateTransform();ppRender();ppUpdateAutoPipeButton();ppRefreshDiagramOrReset();ppRefreshMaterials();
+        console.warn('[plot-editor] single-plot repartition transaction rejected');
+        return false;
+      }
+    }
+    // Recalculate the plan against the unchanged plot geometry.
     if(typeof updatePlan==='function') updatePlan();
     ppUpdateTransform();
     ppRender();
@@ -2476,94 +3072,36 @@
   });
 
   document.getElementById('ppRotateZones').addEventListener('click',function(){
-    ppUnlockArea(); // 分区旋转会改变各区面积，锁定态自动解除（任务K 2026-09-26）
     ppPushHistory();
-    ppState.zoneRotated=!ppState.zoneRotated;
-    this.classList.toggle('active',ppState.zoneRotated);
-    this.textContent=ppState.zoneRotated?'↻ 分区已旋转90°':'↻ 分区旋转90°';
-    ppRender();
-    ppRefreshDiagramOrReset();
+    ppApplyZoneAngle(ppZoneAngle()+90,true);
   });
+  /* [v804 取消「重新分区」按钮] 分区角度输入/↻+90° 均实时自动重算（ppApplyZoneAngle），
+     手动驱动按钮冗余，按钮已删（index.html）。此处原 click 绑定无判空，必须随按钮
+     一起移除，否则脚本加载即抛 TypeError 断掉整个编辑器初始化。
+     ppRepartitionDesign 函数本体保留：AI 应用链 ppRepartitionDesign({aiApply:true})
+     （3160/3277 行）仍在调用。 */
 
-  var ppPlotAngleInput=document.getElementById('ppPlotAngle');
-  if(ppPlotAngleInput){
-    ppPlotAngleInput.addEventListener('input',function(){
-      var v=parseFloat(this.value);
-      if(!isFinite(v))v=0;
-      v=Math.max(-180,Math.min(180,v));
-      ppState.plotRotationDeg=v;
-      ppUpdateTransform();
-      ppRender();
-      ppRefreshDiagramOrReset();
+  (function bindZoneAngleInput(){
+    var input=document.getElementById('ppZoneAngleInput');if(!input)return;
+    var pushed=false,startAngle=0,designPreimage=null;
+    input.addEventListener('focus',function(){
+      pushed=false;startAngle=ppZoneAngle();
+      designPreimage=typeof window.ppGetState==='function'?window.ppGetState():null;
     });
-  }
-
-  // ===== 地块镜像：以地块包围盒中心为轴，翻转整张图（含管线/水源/阀门）=====
-  // mode: 'none' | 'h'(水平/左右) | 'v'(垂直/上下)
-  function ppSyncMirrorUI(){
-    var btns=document.querySelectorAll('.pp-mirror-btn');
-    btns.forEach(function(btn){ btn.classList.toggle('active', btn.getAttribute('data-mirror')===(ppState.plotMirror||'none')); });
-  }
-  function ppMirrorPoint(p,mode,cx,cy){
-    if(mode==='h')return{x:2*cx-p.x,y:p.y};
-    if(mode==='v')return{x:p.x,y:2*cy-p.y};
-    return{x:p.x,y:p.y};
-  }
-  function ppApplyMirror(mode){
-    if(!ppState.polyPts.length){alert('请先在面积测量工具中加载地块多边形');return;}
-    if(!ppState.plotMirror)ppState.plotMirror='none';
-    // 先撤销上一次镜像（镜像是对合运算，再镜像一次即回到基准），再应用新镜像
-    if(ppState.plotMirror!=='none'){
-      var b=ppGetBounds();var cx=b.minX+b.w/2,cy=b.minY+b.h/2;
-      var tf=function(pt){return ppMirrorPoint(pt,ppState.plotMirror,cx,cy);};
-      ppState.polyPts=ppState.polyPts.map(tf);
-      ppState.mainPipes=ppState.mainPipes.map(function(l){return l.map(tf);});
-      ppState.branchPipes=ppState.branchPipes.map(function(l){return l.map(tf);});
-      if(ppState.subBranchPipes)ppState.subBranchPipes=ppState.subBranchPipes.map(function(l){return l.map(tf);});
-      if(ppState.source)ppState.source=tf(ppState.source);
-      ppState.valves=ppState.valves.map(tf);
-      ppXformSubRings(tf); // [v190] 子地块环随主轮廓一起撤销镜像
-      ppXformGroupAll(tf); // [v193] 各块 slot / 外框 / 总管同步撤销
-    }
-    // 再应用新镜像（以当前几何中心为轴）
-    if(mode!=='none'){
-      var b2=ppGetBounds();var cx2=b2.minX+b2.w/2,cy2=b2.minY+b2.h/2;
-      var tf2=function(pt){return ppMirrorPoint(pt,mode,cx2,cy2);};
-      ppState.polyPts=ppState.polyPts.map(tf2);
-      ppState.mainPipes=ppState.mainPipes.map(function(l){return l.map(tf2);});
-      ppState.branchPipes=ppState.branchPipes.map(function(l){return l.map(tf2);});
-      if(ppState.subBranchPipes)ppState.subBranchPipes=ppState.subBranchPipes.map(function(l){return l.map(tf2);});
-      if(ppState.source)ppState.source=tf2(ppState.source);
-      ppState.valves=ppState.valves.map(tf2);
-      ppXformSubRings(tf2); // [v190] 子地块环随主轮廓一起应用新镜像
-      ppXformGroupAll(tf2); // [v193] 各块 slot / 外框 / 总管同步应用
-    }
-    ppState.plotMirror=mode;
-    // 镜像后世界坐标翻转，手动分区线位置失效，恢复默认划分（可用「回退」撤销）
-    ppResetCutSnap('');
-    // 同步全局多边形（面积标签 / 三级传导保持一致）
-    // [v193] 成组时 measuredPolygon 恒为整组外框（逐块态 ppState.polyPts 只是其中一块）
-    var geMir=window.__runyeGroupEdit;
-    window.measuredPolygon=(geMir&&geMir.active?geMir.framePts:ppState.polyPts).map(function(p){return{x:p.x,y:p.y};});
-    ppSyncMirrorUI();
-    ppUpdateTransform();ppRender();
-    if(typeof ppRefreshDiagramOrReset==='function')ppRefreshDiagramOrReset();
-  }
-  // 镜像按钮（事件委托到按钮组）
-  var ppMirrorWrap=document.querySelector('.pp-mirror-btn');
-  if(ppMirrorWrap){
-    ppMirrorWrap.parentNode.addEventListener('click',function(e){
-      var btn=e.target.closest?e.target.closest('.pp-mirror-btn'):null;
-      if(!btn||!btn.classList.contains('pp-mirror-btn'))return;
-      ppPushHistory();
-      ppApplyMirror(btn.getAttribute('data-mirror'));
+    input.addEventListener('input',function(){
+      var raw=Number(input.value);if(input.value.trim()===''||!isFinite(raw))return;
+      raw=Math.max(-180,Math.min(180,raw));
+      if(!pushed&&Math.abs(raw-startAngle)>0.001){ppPushHistory();pushed=true;}
+      ppApplyZoneAngle(raw,false,true);
     });
-  }
+    input.addEventListener('change',function(){
+      var raw=Number(input.value);if(input.value.trim()===''||!isFinite(raw)){ppSyncZoneAngleUI();return;}
+      raw=Math.max(-180,Math.min(180,raw));
+      if(!pushed&&Math.abs(raw-startAngle)>0.001)ppPushHistory();
+      ppApplyZoneAngle(raw,true,false,designPreimage);ppSyncZoneAngleUI();pushed=false;designPreimage=null;
+    });
+  })();
 
-  var ppRepartitionBtn=document.getElementById('ppRepartition');
-  if(ppRepartitionBtn){
-    ppRepartitionBtn.addEventListener('click',ppRepartitionFromRotatedPlot);
-  }
   /* ===== [v325 2026-10-09 用户要求] AI 规划闭环：带地块信息跳 AI 助手；回传结果提示应用 ===== */
   (function ppAiPlanFlow(){
     function snapshot(){
@@ -2621,7 +3159,7 @@
       set('planEmitterSpacing',p.emitterSpacing);set('planEmitterFlow',p.emitterFlow);set('planLift',p.lift);
       /* [v517] 三级 tlPlanTargetV 输入已取消：planTargetV（上面已 set+派发事件）是唯一入口，
          三级经 mod/inline-09.js 的联动监听自动跟随，无需再单独回填。 */
-      if(typeof ppRepartitionFromRotatedPlot==='function'){try{ppRepartitionFromRotatedPlot({aiApply:true});}catch(e){}} /* [v326] */
+      if(typeof ppRepartitionDesign==='function'){try{ppRepartitionDesign({aiApply:true});}catch(e){}}
     }
     function checkPlan(){
       var w=null;try{w=JSON.parse(localStorage.getItem('runye_ai_plan_v1')||'null');}catch(e){}
@@ -2694,7 +3232,7 @@
        ① 自己写一套 set()，绕开 v520 的单一入口 RyPlanParams.set（落盘/派发口径分家）；
        ② 只写原生 input，不碰 sl-input 代理 —— 代理 setter 是靠 try{}catch(_){} 静默劫持的，
           劫持失败时屏幕上显示的还是旧值（"值变了但看着没变"）；
-       ③ 不管有没有地块、有没有管线都直冲 ppRepartitionFromRotatedPlot
+       ③ 不管有没有地块、有没有管线都直冲 ppRepartitionDesign
           —— 无地块 alert、有管线 confirm 并清空，用户一取消就只剩"值变了、什么都没重算"。
        现改为：单一入口写入 → 强制同步代理 → 轻量重算链必跑 → 重分区按条件守卫。 */
     function applyParams(p){
@@ -2723,7 +3261,7 @@
         wrote.push(id);
       }
       IDS.forEach(function(id){set(id,p[id]);});
-      /* ③ 轻量重算链：一定执行，不依赖 ppRepartitionFromRotatedPlot 是否走得下去 */
+      /* ③ 轻量重算链：一定执行，不依赖 ppRepartitionDesign 是否走得下去 */
       try{if(typeof ppPullLiftDh==='function')ppPullLiftDh();}catch(e){}
       try{if(typeof calcPlan==='function')calcPlan();}catch(e){}
       try{if(typeof ppRender==='function')ppRender();}catch(e){}
@@ -2733,13 +3271,12 @@
       /* ④ 重分区：只在「有地块 + 没有已画管线」时做，避免 alert / confirm 清图 */
       var repart='skip',note='';
       try{
-        var _st=(window.RunyeBridge&&window.RunyeBridge.state)||window.ppState||null;
-        var hasPlot=!!(_st&&_st.polyPts&&_st.polyPts.length);
+        var hasPlot=!!(window.RunyeBridge&&typeof window.RunyeBridge.hasPlot==='function'&&window.RunyeBridge.hasPlot());
         var hasPipe=(typeof ppHasPipeContent==='function')?!!ppHasPipeContent():false;
         if(!hasPlot){note='未画地块，仅回填参数';}
         else if(hasPipe){note='已有管线保留、未重排';}
-        else if(typeof ppRepartitionFromRotatedPlot==='function'){
-          ppRepartitionFromRotatedPlot({aiApply:true});repart='done';
+        else if(typeof ppRepartitionDesign==='function'){
+          ppRepartitionDesign({aiApply:true});repart='done';
         }
       }catch(e){repart='err';}
       return {wrote:wrote,skipped:skipped,repart:repart,note:note};
@@ -2930,8 +3467,8 @@
   /* ===== [v255 2026-10-06 用户要求] 水源方向可调：三级管线简图右键水源点，
          水源换到总管另一端（左右端/上下端互换）。事件委托挂 document 的 contextmenu，
          命中 [data-tl-src] 热区后：① 取 tlDiagramData 设计几何 frontPipe 两端中
-         「距当前水源更远」的一端；② 写回 RunyeBridge.state.source（=二级页 ppState.source，
-         随二级快照持久化，二级/三级两页水源一致）；③ tlAutoGenerate({scroll:false,stay:true})
+         「距当前水源更远」的一端；② 经 RunyeBridge.setSourcePosition 提交二级规范源坐标
+         （随二级快照持久化，二级/三级两页水源一致）；③ tlAutoGenerate({scroll:false,stay:true})
          重画 —— 管路几何不变，水力/材料不受影响，只水流方向动画与水源标注位置变。
          没生成管线图时右键给提示不动作。 ===== */
   (function tlSrcFlip(){
@@ -2955,12 +3492,12 @@
         if(d2>bd){bd=d2;best=fp[i];}
       }
       if(!best||bd<1)return;   /* 水源总在端点上 ⇒ 最远端即另一端；退化情形不动 */
-      var st=window.RunyeBridge&&window.RunyeBridge.state;
-      if(!st)return;
+      var bridge=window.RunyeBridge;
+      if(!bridge||typeof bridge.setSourcePosition!=='function')return;
       /* [v570] 用户手动拖过水源时，拖动值是绝对位置且优先级更高 —— 换向前必须先清掉，
          否则换向写进 state.source 也被拖动值盖住，看起来"右键没反应"。 */
+      if(bridge.setSourcePosition({x:best.x,y:best.y})!==true)return;
       if(typeof window.tlSourceMoveClear==='function')window.tlSourceMoveClear();
-      st.source={x:best.x,y:best.y};
       try{ tlAutoGenerate({scroll:false,stay:true}); }catch(err){}
       if(typeof window.atShowToast==='function')window.atShowToast('水源已换到总管另一端（可再右键切换）');
     });
@@ -3080,9 +3617,16 @@
   var ppResetCutsBtn=document.getElementById('ppResetCuts');
   if(ppResetCutsBtn){
     ppResetCutsBtn.addEventListener('click',function(){
+      if(ppIsGroupWhole())return;
+      var groupPreimage=ppGroupMemberPreimage();
+      if(groupPreimage&&groupPreimage.invalid)return;
+      var singlePreimage=!groupPreimage&&typeof window.ppGetState==='function'?window.ppGetState():null;
+      ppPushHistory();
       ppUnlockArea(); // 重置网格会改变各区面积，锁定态自动解除（任务K 2026-09-26）
       ppState.cutOverrides={x:{},y:{}};ppResetCutSnap('');
       ppState.dragCut=null;ppState.hoverCut=null;ppState.lastSelectedCut=null;
+      if(groupPreimage&&!ppCommitGroupMemberEdit(groupPreimage))return;
+      if(singlePreimage&&!ppCommitSinglePlotEdit(singlePreimage,'cut-reset',false,true))return;
       ppRender();
       if(typeof window.ppRefreshDiagramIfVisible==='function')window.ppRefreshDiagramIfVisible();
     });
@@ -3130,7 +3674,28 @@
   }
   function ppSetZoneAuto(on){
     on = !!on;
+    var changed=on!==!!ppState.zoneAuto;
+    var groupPreimage=changed?ppGroupMemberPreimage():null;
+    if(groupPreimage&&groupPreimage.invalid)return false;
+    var singlePreimage=changed&&!groupPreimage&&!ppIsGroupWhole()&&typeof window.ppGetState==='function'
+      ?window.ppGetState():null;
+    if(changed)ppPushHistory();
     ppState.zoneAuto = on;
+    if(groupPreimage&&!ppCommitGroupMemberEdit(groupPreimage))return false;
+    if(singlePreimage&&typeof window.ryCommitSinglePlotL2Snapshot==='function'){
+      var singleCommit=window.ryCommitSinglePlotL2Snapshot(singlePreimage,window.ppGetState());
+      if(singleCommit===false){
+        ppDiscardLatestHistoryEntry();
+        ppApplySlot(singlePreimage);
+        ppApplyZoneAutoUI();
+        if(typeof updatePlan==='function')updatePlan();
+        ppRender();
+        if(typeof window.ppRefreshDiagramIfVisible==='function')window.ppRefreshDiagramIfVisible();
+        if(typeof window.tlRefreshFromPlan==='function'){try{window.tlRefreshFromPlan();}catch(e){}}
+        console.warn('[plot-editor] single-plot zone-auto transaction rejected');
+        return false;
+      }
+    }
     try{ localStorage.setItem('runye_zone_auto', on ? '1' : '0'); }catch(e){}
     ppApplyZoneAutoUI();
     /* 开关改变的是「分区怎么算」⇒ 必须重算 + 重绘下游，而不只是切个 CSS 类。
@@ -3149,6 +3714,7 @@
       /* 三级页若在跑，也要跟着变（它读同一份分区网格）。 */
       if(typeof window.tlRefreshFromPlan==='function'){ try{ window.tlRefreshFromPlan(); }catch(e){} }
     }catch(e){}
+    return true;
   }
   // 初始态：读存档；首次（无存档）默认开 = 自动划分，与现状一致（向后兼容，老流程零变化）
   (function ppInitZoneAuto(){
@@ -3169,7 +3735,14 @@
   var ppLockAreaBtn=document.getElementById('ppLockArea');
   if(ppLockAreaBtn){
     ppLockAreaBtn.addEventListener('click',function(){
+      var groupPreimage=ppGroupMemberPreimage();
+      if(groupPreimage&&groupPreimage.invalid)return;
+      var singlePreimage=!groupPreimage&&!ppIsGroupWhole()&&typeof window.ppGetState==='function'
+        ?window.ppGetState():null;
+      ppPushHistory();
       ppState.areaLocked=!ppState.areaLocked;
+      if(groupPreimage&&!ppCommitGroupMemberEdit(groupPreimage))return;
+      if(singlePreimage&&!ppCommitSinglePlotEdit(singlePreimage,'area-lock',false,false))return;
       ppUpdateLockAreaBtn();
     });
     ppUpdateLockAreaBtn(); // 同步初始文案（默认未锁定）
@@ -3199,6 +3772,10 @@
     var sel=ppState.lastSelectedCut;
     if(!sel){ sel=ppState.hoverCut; }
     if(!sel){return;}
+    var groupPreimage=ppGroupMemberPreimage();
+    if(groupPreimage&&groupPreimage.invalid)return;
+    var singlePreimage=!groupPreimage&&!ppIsGroupWhole()&&typeof window.ppGetState==='function'
+      ?window.ppGetState():null;
     // 面积锁定：微调改为整轴刚性平移，各区面积不变（任务K 2026-09-26）
     if(ppState.areaLocked){
       ppPushHistory();
@@ -3220,6 +3797,8 @@
       var o2=arr2.slice();
       for(var i2=1;i2<arr2.length-1;i2++){ ppSetCutPos(ax,i2,o2[i2]+delta); }
       ppState.mergePreview=null;
+      if(groupPreimage&&!ppCommitGroupMemberEdit(groupPreimage))return;
+      if(singlePreimage&&!ppCommitSinglePlotEdit(singlePreimage,'cut-nudge-locked',false,true))return;
       ppRender();
       /* v166：整轴刚性平移后同步三级简图 */
       if(typeof window.ppRefreshTLAfterCuts==='function')window.ppRefreshTLAfterCuts();
@@ -3260,6 +3839,8 @@
     if(newPos>maxBound)newPos=maxBound;
     ppSetCutPos(axis,idx,newPos);
     ppState.lastSelectedCut={axis:axis,index:idx};
+    if(groupPreimage&&!ppCommitGroupMemberEdit(groupPreimage))return;
+    if(singlePreimage&&!ppCommitSinglePlotEdit(singlePreimage,'cut-nudge',false,true))return;
     ppRender();
     /* v166：微调后同步三级简图（键盘方向键与微调按钮都走这里） */
     if(typeof window.ppRefreshTLAfterCuts==='function')window.ppRefreshTLAfterCuts();
@@ -3287,13 +3868,14 @@
   function ppGenerateDiagram(options){
     var ge=window.__runyeGroupEdit;
     if(!(ge&&ge.active&&ge.mode==='perPlot'))return ppGenerateDiagramCore(options);
-    ge.slots[ge.current]=ppCaptureSlot();          // 先存档当前块，合并视图才拿得到最新
+    if(!ppSaveGroupMemberSlot(ge.current,ppCaptureSlot()))return null; // canonical提交成功后再生成组图
     var back=ppCaptureSlot();                      // 出图后原样还原
     var mode0=ge.mode;                             // ★ 连 mode 一起临时切成 whole：
     try{                                           //   否则 ppGroupActiveSubs() 仍只返回当前块，
       ge.mode='whole';                             //   画的就不是「一张总图」而是「当前块的图」。
       ppState.polyPts=ge.framePts.map(function(p){return{x:p.x,y:p.y};});
       var m=ppCollectGroupAllPipes();
+      if(!m)return null;
       ppState.mainPipes=m.main; ppState.branchPipes=m.branch; ppState.subBranchPipes=m.subbranch;
       ppState.source=null; ppState.valves=[];
       ppState.hiddenPipes={main:{},branch:{},subbranch:{}};
@@ -3307,7 +3889,7 @@
   function ppGenerateDiagramCore(options){
     options=options||{};
     var doScroll=options.scroll!==false;
-    if(!ppState.polyPts.length){alert('请先在面积测量工具中描绘边界');return;}
+    if(!ppState.polyPts.length){alert('请先到「在线地图」画框并回传地块');return;}
     var r=window._r||{};
     var pd=window.planData||{};
     // 直接引用计算器结果
@@ -3345,6 +3927,10 @@
     s=Math.min(s,2);
     var ox=pad+(drawW-plotDisplayW*s)/2,oy=pad+(drawH-plotDisplayH*s)/2;
     function ts(mx,my){return{x:(mx-displayB.minX)*plotScaleX*s+ox,y:(my-displayB.minY)*plotScaleY*s+oy};}
+    function gridWorld(gx,gy){return zoneCuts&&zoneCuts.frame?zoneCuts.frame.toWorld({x:gx,y:gy}):{x:gx,y:gy};}
+    function tsGrid(gx,gy){var p=gridWorld(gx,gy);return ts(p.x,p.y);}
+    function gridCellPoints(x0,y0,x1,y1){return[tsGrid(x0,y0),tsGrid(x1,y0),tsGrid(x1,y1),tsGrid(x0,y1)];}
+    function svgPoints(points){return points.map(function(p){return p.x.toFixed(1)+','+p.y.toFixed(1);}).join(' ');}
 
     /* [v190] 成组地块：施工图里**每个成员环各写一条子路径**（M…L…Z 循环），
        块间空隙不写进 d ⇒ 底色填充 / 分区裁剪 / 描边都自然留出空隙，
@@ -3410,8 +3996,7 @@
         var zi=zr*zoneCuts.cols+zc;
         var zx=zoneCuts.xPos[zc], zy=zoneCuts.yPos[zr];
         var zoneW=zoneCuts.xSrc[zc], zoneH=zoneCuts.ySrc[zr];
-        var r1=ts(zx,zy), r2=ts(zx+zoneW,zy+zoneH);
-        var rx=r1.x, ry=r1.y, rw=r2.x-r1.x, rh=r2.y-r1.y;
+        var cellPts=gridCellPoints(zx,zy,zx+zoneW,zy+zoneH);
         var ci=zi%zoneCols.length;
         // 实际落在线段多边形内的面积（m²）与标准区比较，判定是否"非完整分区"
         var actualM2=ppZoneActualAreaM2(zc,zr,zoneCuts,plotPoly);
@@ -3420,7 +4005,7 @@
         var isPartial=_stdMu>0 && actualMu<_stdMu*0.97;
         var cellFill=zoneCols[ci];   /* 2026-09-27：非标区保留本色（三级同规则），仅描边用琥珀区分 */
         var cellStroke=isPartial?'rgba(217,119,6,.85)':zoneStrokes[ci];
-        parts.push('<rect x="'+rx.toFixed(1)+'" y="'+ry.toFixed(1)+'" width="'+rw.toFixed(1)+'" height="'+rh.toFixed(1)+'" fill="'+cellFill+'" stroke="'+cellStroke+'" stroke-width="1" stroke-dasharray="6,3"/>');
+        parts.push('<polygon points="'+svgPoints(cellPts)+'" fill="'+cellFill+'" stroke="'+cellStroke+'" stroke-width="1" stroke-dasharray="6,3"/>');
       }
     }
     parts.push('</g>');
@@ -3430,39 +4015,42 @@
         var zi=zr*zoneCuts.cols+zc;
         var zx=zoneCuts.xPos[zc], zy=zoneCuts.yPos[zr];
         var zoneW=zoneCuts.xSrc[zc], zoneH=zoneCuts.ySrc[zr];
-        var r1=ts(zx,zy), r2=ts(zx+zoneW,zy+zoneH);
-        var rx=r1.x, ry=r1.y, rw=r2.x-r1.x, rh=r2.y-r1.y;
-        var aw=Math.abs(rw),ah=Math.abs(rh);
+        var cellPts=gridCellPoints(zx,zy,zx+zoneW,zy+zoneH);
+        var cellXs=cellPts.map(function(p){return p.x;}),cellYs=cellPts.map(function(p){return p.y;});
+        var rx=Math.min.apply(null,cellXs),ry=Math.min.apply(null,cellYs),rw=Math.max.apply(null,cellXs)-rx,rh=Math.max.apply(null,cellYs)-ry;
+        // Screen-space lengths along the partition grid axes (the axis-aligned bbox
+        // shrinks as the grid rotates and must not decide whether dimensions exist).
+        var zoneScreenW=Math.hypot(cellPts[1].x-cellPts[0].x,cellPts[1].y-cellPts[0].y);
+        var zoneScreenH=Math.hypot(cellPts[2].x-cellPts[1].x,cellPts[2].y-cellPts[1].y);
+        var labelCenter={x:(cellPts[0].x+cellPts[1].x+cellPts[2].x+cellPts[3].x)/4,y:(cellPts[0].y+cellPts[1].y+cellPts[2].y+cellPts[3].y)/4};
+        var labelAngle=Math.atan2(cellPts[1].y-cellPts[0].y,cellPts[1].x-cellPts[0].x)*180/Math.PI;
+        if(labelAngle>90)labelAngle-=180;else if(labelAngle<-90)labelAngle+=180;
         var actualM2=ppZoneActualAreaM2(zc,zr,zoneCuts,plotPoly);
         var actualMu=actualM2/666.67;
         var _stdMu=zoneCuts.xPlan[zc]*zoneCuts.yPlan[zr]/666.67;
         var isPartial=_stdMu>0 && actualMu<_stdMu*0.97;
-        if(aw>36&&ah>26 && actualMu>0.05){
-          if(isPartial){
-            // 非标准分区：与标准分区一致，文字置于分区右上角（已在裁剪层之外绘制，可超出地块显示）
-            var pLabelX=rx+rw-8, pLabelY=ry+14;
-            if(aw>78&&ah>44){
-              labelParts.push('<text x="'+pLabelX.toFixed(1)+'" y="'+pLabelY.toFixed(1)+'" text-anchor="end" font-size="14" font-weight="700" fill="#b45309">'+(zi+1)+'区</text>');
-              labelParts.push('<text x="'+pLabelX.toFixed(1)+'" y="'+(pLabelY+16).toFixed(1)+'" text-anchor="end" font-size="10.5" font-weight="700" fill="#b45309">实际 '+actualMu.toFixed(1)+' 亩</text>');
+        if(actualMu>0.05){
+          // Dimensions are reported in grid-axis order (x × y), including partial cells.
+          // Use a readable rotation of the text with the grid and choose detail by the
+          // cell's true along-axis space, not its shrinking screen-aligned bounding box.
+          var zoneSizeText=ppZoneSizeLabel(zoneCuts.xPlan[zc],zoneCuts.yPlan[zr]);
+          var zoneAreaText=(isPartial?actualMu:(zoneCuts.xPlan[zc]*zoneCuts.yPlan[zr]/666.67)).toFixed(1)+'亩';
+          var detailFont=Math.max(6.5,Math.min(10.5,Math.min(zoneScreenW/12,zoneScreenH/4.8)));
+          var compactFont=Math.max(6,Math.min(8.5,Math.min(zoneScreenW/18,zoneScreenH/2.8)));
+          labelParts.push('<g transform="translate('+labelCenter.x.toFixed(1)+' '+labelCenter.y.toFixed(1)+') rotate('+labelAngle.toFixed(2)+')" text-anchor="middle" fill="'+(isPartial?'#b45309':'#111827')+'">');
+          if(zoneScreenW>=42&&zoneScreenH>=20){
+            var titleY=zoneScreenH>=38?-detailFont*1.05:0;
+            labelParts.push('<text x="0" y="'+titleY.toFixed(1)+'" font-size="'+detailFont.toFixed(1)+'">'+(zi+1)+'区</text>');
+            if(zoneScreenH>=34){
+              labelParts.push('<text x="0" y="'+(titleY+detailFont*1.15).toFixed(1)+'" font-size="'+detailFont.toFixed(1)+'">'+zoneSizeText+'</text>');
+              if(zoneScreenH>=48)labelParts.push('<text x="0" y="'+(titleY+detailFont*2.25).toFixed(1)+'" font-size="'+compactFont.toFixed(1)+'">'+zoneAreaText+'</text>');
             }else{
-              labelParts.push('<text x="'+pLabelX.toFixed(1)+'" y="'+pLabelY.toFixed(1)+'" text-anchor="end" font-size="8" font-weight="700" fill="#b45309">'+(zi+1)+'区 实际'+actualMu.toFixed(1)+'亩</text>');
+              labelParts.push('<text x="0" y="'+(detailFont*1.05).toFixed(1)+'" font-size="'+compactFont.toFixed(1)+'">'+zoneSizeText+'</text>');
             }
-          }else{
-            var zoneSizeText=ppZoneSizeLabel(Math.max(zoneCuts.xPlan[zc],zoneCuts.yPlan[zr]),Math.min(zoneCuts.xPlan[zc],zoneCuts.yPlan[zr]));
-            var zoneAreaText=(zoneCuts.xPlan[zc]*zoneCuts.yPlan[zr]/666.67).toFixed(1)+'亩';
-            var zoneLabelX=rx+rw-8, zoneLabelY=ry+14;
-            if(aw>92&&ah>52){
-              labelParts.push('<text x="'+zoneLabelX.toFixed(1)+'" y="'+zoneLabelY.toFixed(1)+'" text-anchor="end" font-size="15" font-weight="700" fill="#111827">'+(zi+1)+'区</text>');
-              labelParts.push('<text x="'+zoneLabelX.toFixed(1)+'" y="'+(zoneLabelY+16).toFixed(1)+'" text-anchor="end" font-size="10.5" font-weight="600" fill="#111827">'+zoneSizeText+'</text>');
-              labelParts.push('<text x="'+zoneLabelX.toFixed(1)+'" y="'+(zoneLabelY+31).toFixed(1)+'" text-anchor="end" font-size="10" fill="#111827">'+zoneAreaText+'</text>');
-            }else if(ah>70){
-              labelParts.push('<g transform="translate('+((rx+rw/2).toFixed(1))+' '+((ry+rh/2).toFixed(1))+') rotate(-90)">');
-              labelParts.push('<text x="0" y="3" text-anchor="middle" font-size="8.5" font-weight="700" fill="#111827">'+(zi+1)+'区 '+zoneSizeText+' '+zoneAreaText+'</text>');
-              labelParts.push('</g>');
-            }else{
-              labelParts.push('<text x="'+(rx+rw/2).toFixed(1)+'" y="'+(ry+rh/2).toFixed(1)+'" text-anchor="middle" font-size="7.5" font-weight="700" fill="#111827">'+(zi+1)+'区 '+zoneSizeText+' '+zoneAreaText+'</text>');
-            }
+          }else if(zoneScreenW>=28&&zoneScreenH>=12){
+            labelParts.push('<text x="0" y="0" font-size="'+compactFont.toFixed(1)+'">'+(zi+1)+'区 '+zoneSizeText+'</text>');
           }
+          labelParts.push('</g>');
         }
       }
     }
@@ -3470,76 +4058,58 @@
 
     parts.push('<g class="pp-zone-label" fill="none" stroke="#334155" stroke-width="1" stroke-dasharray="7,5" opacity="0.48">');
     for(var bz=0;bz<zoneCuts.xPos.length;bz++){
-      var bv1=ts(zoneCuts.xPos[bz],b.minY),bv2=ts(zoneCuts.xPos[bz],b.minY+b.h);
+      var bv1=tsGrid(zoneCuts.xPos[bz],zoneCuts.bounds.minY),bv2=tsGrid(zoneCuts.xPos[bz],zoneCuts.bounds.maxY);
       parts.push('<line x1="'+bv1.x.toFixed(1)+'" y1="'+bv1.y.toFixed(1)+'" x2="'+bv2.x.toFixed(1)+'" y2="'+bv2.y.toFixed(1)+'"/>');
     }
     for(var br=0;br<zoneCuts.yPos.length;br++){
-      var bh1=ts(b.minX,zoneCuts.yPos[br]),bh2=ts(b.minX+b.w,zoneCuts.yPos[br]);
+      var bh1=tsGrid(zoneCuts.bounds.minX,zoneCuts.yPos[br]),bh2=tsGrid(zoneCuts.bounds.maxX,zoneCuts.yPos[br]);
       parts.push('<line x1="'+bh1.x.toFixed(1)+'" y1="'+bh1.y.toFixed(1)+'" x2="'+bh2.x.toFixed(1)+'" y2="'+bh2.y.toFixed(1)+'"/>');
     }
     parts.push('</g>');
 
-    // Plot size dimensions in an architectural drafting style.
-    var plotLeft=ts(b.minX,b.minY).x;
-    var plotRight=ts(b.minX+b.w,b.minY).x;
-    var plotTop=ts(b.minX,b.minY).y;
-    var plotBottom=ts(b.minX,b.minY+b.h).y;
+    // Overall dimensions follow the rotated partition frame while land geometry stays fixed.
     /* v124：二级页与三级页共用同一组标注几何细项（二级页不乘 tlDS，保持既有语义） */
     var DG=(window.RyDimGeo?window.RyDimGeo.get():{ext:4,gap:4,tick:4,tickW:2.8,font:12});
     /* v148：二级页同口径 —— GAP 不乘 tlDS（二级保持既有语义），ASC = 运行时 canvas 实测的墨水高度（见 __ryInkAscent） */
     var GAP=DG.gap;
     var INK=(window.__ryInkM?window.__ryInkM(DG.font):{a:DG.font*0.75,d:0});
     var ASC=INK.a, DESC=INK.d;
-    var dimBottomY=Math.min(drawY2+38,plotBottom+38);
-    var dimLeftX=Math.max(58,plotLeft-48);
     function ppDimLabel(value){
       if(!isFinite(value))return '— m';
       var rounded=Math.round(value);
       return Math.abs(value-rounded)<0.05?rounded+' m':value.toFixed(1)+' m';
     }
-    /* v148：y 一律是【基线】（原 +DG.font/6 已去掉）；rotate 时第 6 参 off = 基线相对锚点 x 的垂直偏移 */
-    function ppTextBox(x,y,text,anchor,rotate,off){
-      if(rotate){
-        var offv=(off==null?-GAP:off);
-        parts.push('<g transform="translate('+x.toFixed(1)+' '+y.toFixed(1)+') rotate(-90)">');
-        parts.push('<text x="0" y="'+offv.toFixed(2)+'" text-anchor="middle">'+text+'</text></g>');
-        return;
-      }
-      parts.push('<text x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" text-anchor="'+anchor+'">'+text+'</text>');
-    }
-    function ppArchTick(x,y,dir){
-      /* v113（2026-09-22 用户要求）：建筑斜短线加粗、缩短 —— k 5.5→4（长 11px→8px）、线宽 1.8→2.8（与三级 tlArchTick 同步） */
-      var k=DG.tick;
-      if(dir==='h')parts.push('<line x1="'+(x-k).toFixed(1)+'" y1="'+(y+k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y-k).toFixed(1)+'" stroke-width="'+DG.tickW+'"/>');
-      else parts.push('<line x1="'+(x-k).toFixed(1)+'" y1="'+(y-k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y+k).toFixed(1)+'" stroke-width="'+DG.tickW+'"/>');
-    }
+    var dimB=zoneCuts.bounds, dimTL=tsGrid(dimB.minX,dimB.minY), dimTR=tsGrid(dimB.maxX,dimB.minY);
+    var dimBL=tsGrid(dimB.minX,dimB.maxY), dimBR=tsGrid(dimB.maxX,dimB.maxY);
+    function unitVec(a,b){var dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1;return{x:dx/len,y:dy/len};}
+    function addVec(p,v,n){return{x:p.x+v.x*n,y:p.y+v.y*n};}
+    function dimTick(p,u){var k=DG.tick;parts.push('<line x1="'+(p.x-u.x*k-u.y*k).toFixed(1)+'" y1="'+(p.y-u.y*k+u.x*k).toFixed(1)+'" x2="'+(p.x+u.x*k+u.y*k).toFixed(1)+'" y2="'+(p.y+u.y*k-u.x*k).toFixed(1)+'" stroke-width="'+DG.tickW+'"/>');}
+    var ux=unitVec(dimBL,dimBR), uy=unitVec(dimTL,dimBL), nx={x:-ux.y,y:ux.x}, ny={x:-uy.y,y:uy.x};
+    var h1=addVec(dimBL,nx,38),h2=addVec(dimBR,nx,38),v1=addVec(dimTL,ny,48),v2=addVec(dimBL,ny,48);
     parts.push('<g stroke="#111111" stroke-width="0.95" fill="none" opacity="0.98" stroke-linecap="square">');
-    parts.push('<line x1="'+plotLeft.toFixed(1)+'" y1="'+(plotBottom+4).toFixed(1)+'" x2="'+plotLeft.toFixed(1)+'" y2="'+(dimBottomY+DG.ext).toFixed(1)+'"/>');
-    parts.push('<line x1="'+plotRight.toFixed(1)+'" y1="'+(plotBottom+4).toFixed(1)+'" x2="'+plotRight.toFixed(1)+'" y2="'+(dimBottomY+DG.ext).toFixed(1)+'"/>');
-    parts.push('<line x1="'+plotLeft.toFixed(1)+'" y1="'+dimBottomY.toFixed(1)+'" x2="'+plotRight.toFixed(1)+'" y2="'+dimBottomY.toFixed(1)+'"/>');
-    ppArchTick(plotLeft,dimBottomY,'h');
-    ppArchTick(plotRight,dimBottomY,'h');
-    parts.push('<line x1="'+(plotLeft-4).toFixed(1)+'" y1="'+plotTop.toFixed(1)+'" x2="'+(dimLeftX-4).toFixed(1)+'" y2="'+plotTop.toFixed(1)+'"/>');
-    parts.push('<line x1="'+(plotLeft-4).toFixed(1)+'" y1="'+plotBottom.toFixed(1)+'" x2="'+(dimLeftX-4).toFixed(1)+'" y2="'+plotBottom.toFixed(1)+'"/>');
-    parts.push('<line x1="'+dimLeftX.toFixed(1)+'" y1="'+plotTop.toFixed(1)+'" x2="'+dimLeftX.toFixed(1)+'" y2="'+plotBottom.toFixed(1)+'"/>');
-    ppArchTick(dimLeftX,plotTop,'v');
-    ppArchTick(dimLeftX,plotBottom,'v');
+    [[addVec(dimBL,nx,4),addVec(dimBL,nx,38+DG.ext)],[addVec(dimBR,nx,4),addVec(dimBR,nx,38+DG.ext)],
+      [addVec(dimTL,ny,4),addVec(dimTL,ny,48+DG.ext)],[addVec(dimBL,ny,4),addVec(dimBL,ny,48+DG.ext)]].forEach(function(pair){
+      parts.push('<line x1="'+pair[0].x.toFixed(1)+'" y1="'+pair[0].y.toFixed(1)+'" x2="'+pair[1].x.toFixed(1)+'" y2="'+pair[1].y.toFixed(1)+'"/>');
+    });
+    parts.push('<line x1="'+h1.x.toFixed(1)+'" y1="'+h1.y.toFixed(1)+'" x2="'+h2.x.toFixed(1)+'" y2="'+h2.y.toFixed(1)+'"/>');dimTick(h1,ux);dimTick(h2,ux);
+    parts.push('<line x1="'+v1.x.toFixed(1)+'" y1="'+v1.y.toFixed(1)+'" x2="'+v2.x.toFixed(1)+'" y2="'+v2.y.toFixed(1)+'"/>');dimTick(v1,uy);dimTick(v2,uy);
     parts.push('</g>');
+    var hAngle=Math.atan2(ux.y,ux.x)*180/Math.PI, vAngle=Math.atan2(uy.y,uy.x)*180/Math.PI;
+    if(hAngle>90)hAngle-=180;else if(hAngle<-90)hAngle+=180;
+    if(vAngle>90)vAngle-=180;else if(vAngle<-90)vAngle+=180;
+    var hMid={x:(h1.x+h2.x)/2,y:(h1.y+h2.y)/2},vMid={x:(v1.x+v2.x)/2,y:(v1.y+v2.y)/2};
     parts.push('<g font-size="'+DG.font+'" font-weight="700" fill="#111111">');
-    /* 2026-09-27（用户指令 D）：与三级页同一条「地块长宽标注」，横向数字同样改到线上方（贴边时兜底放下方）。
-       界线活动端 = dimBottomY+4（跨过尺寸线超出 4px），与三级页及分区标注一致。
-       v148：两种位置可见净距都 = GAP（下方再加墨水 ASC）；竖向锚点落在线上、off = −GAP。 */
-    var ppDimHAbove=(dimBottomY-plotBottom)>=18;
-    ppTextBox((plotLeft+plotRight)/2,ppDimHAbove?(dimBottomY-GAP-DESC):(dimBottomY+GAP+ASC),ppDimLabel(plotW),'middle',false);
-    ppTextBox(dimLeftX,(plotTop+plotBottom)/2,ppDimLabel(plotH),'middle',true,-GAP-DESC);
+    parts.push('<text transform="translate('+hMid.x.toFixed(1)+' '+hMid.y.toFixed(1)+') rotate('+hAngle.toFixed(2)+')" x="0" y="'+(-GAP-DESC).toFixed(2)+'" text-anchor="middle">'+ppDimLabel(dimB.w)+'</text>');
+    parts.push('<text transform="translate('+vMid.x.toFixed(1)+' '+vMid.y.toFixed(1)+') rotate('+vAngle.toFixed(2)+')" x="0" y="'+(-GAP-DESC).toFixed(2)+'" text-anchor="middle">'+ppDimLabel(dimB.h)+'</text>');
     parts.push('</g>');
 
     // Pipe length note uses the same top-left cut grid as the zones.
     var noteCol=0;
     var noteRow=0;
-    var zoneDimX1=ts(zoneCuts.xPos[noteCol],zoneCuts.yPos[noteRow]).x;
-    var zoneDimY1=ts(zoneCuts.xPos[noteCol],zoneCuts.yPos[noteRow]).y;
-    var zoneDimY2=ts(zoneCuts.xPos[noteCol+1],zoneCuts.yPos[noteRow+1]).y;
+    var noteCell=gridCellPoints(zoneCuts.xPos[noteCol],zoneCuts.yPos[noteRow],zoneCuts.xPos[noteCol+1],zoneCuts.yPos[noteRow+1]);
+    var zoneDimX1=Math.min.apply(null,noteCell.map(function(p){return p.x;}));
+    var zoneDimY1=Math.min.apply(null,noteCell.map(function(p){return p.y;}));
+    var zoneDimY2=Math.max.apply(null,noteCell.map(function(p){return p.y;}));
     var showPipeNoteMain=ppHasVisiblePipe('main');
     var showPipeNoteBranch=ppHasVisiblePipe('branch');
     parts.push('<path d="'+d+'" fill="none" stroke="#1a4731" stroke-width="2.2"/>');
@@ -4002,7 +4572,6 @@
        此处补一次独立重算：computeThreeLevel 直接读 RunyeBridge.getZoneCuts + measuredPolygon + tlManualGroups，
        不依赖 tlDiagramData，故即使上方 tlAutoGenerate 失败，绿栏也一定随新界线更新。 */
     try{ if(typeof tlUpdatePlanBar==='function') tlUpdatePlanBar(); }catch(e){}
-    try{ if(typeof window.tlRefreshGroupPanel==='function') window.tlRefreshGroupPanel(); }catch(e){}
     try{ if(typeof window.tlRefreshGroupStatus==='function') window.tlRefreshGroupStatus(); }catch(e){}
   }
   window.ppRefreshDiagramIfVisible=ppRefreshDiagramIfVisible;
@@ -4080,7 +4649,7 @@
          ——否则 grSync 的 groupLiveSlot 覆盖会让当前块拿到未分发的整组管。
          分区线仍由组页按块口径显示（方案一，用户拍板「按块分发」）。 */
       try{
-        if((ppState.mainPipes&&ppState.mainPipes.length)||(ppState.branchPipes&&ppState.branchPipes.length)){
+        if((ppState.mainPipes&&ppState.mainPipes.length)||(ppState.branchPipes&&ppState.branchPipes.length)||(ppState.subBranchPipes&&ppState.subBranchPipes.length)){
           /* [v660 用户实测修正] 分发=「全量裁剪分配 + 分配非空才覆盖」：
              - v659 的「slots 全空才分发」在真实会话里失效——用户反复测试后 slots 已有
                旧横跨管（v657 整段分配遗留），重传被跳过、旧错数据永不修正（用户截图复现）。
@@ -4088,8 +4657,11 @@
                才覆盖该块（修正旧数据），裁剪为空则保留该块原管（不毁三级页逐块精修）。
              - 裁剪分配天然幂等：重复点击「生成施工图」不会翻倍（每次都是替换式重算）。 */
           var subRings=window.__runyeSubPlots.map(function(sp){return sp.poly;});
+          var memberRead=ppReadGroupMemberSlots(geJump);
+          if(!memberRead.ok)return;
+          var memberChanges=[];
           var clipTo=function(list,si){
-            var s=geJump.slots[si];
+            var s=memberRead.slots[si];
             var ring=(s&&s.polyPts&&s.polyPts.length>=3)?s.polyPts:subRings[si];
             var out=[];
             (list||[]).forEach(function(line){
@@ -4097,19 +4669,23 @@
             });
             return out;
           };
-          geJump.slots.forEach(function(s,si){
+          memberRead.slots.forEach(function(s,si){
             if(!s)return;
+            s=ppCloneJSON(s);
+            if(!s)throw new Error('group-member-clone-failed');
             var mC=clipTo(ppState.mainPipes,si);
             var bC=clipTo(ppState.branchPipes,si);
             var sbC=clipTo(ppState.subBranchPipes,si);
             if(mC.length||bC.length||sbC.length){
               s.mainPipes=mC; s.branchPipes=bC; s.subBranchPipes=sbC;
               if(typeof ppSlotRebuildIds==='function')ppSlotRebuildIds(s);
+              memberChanges.push({index:si,slot:s});
             }
           });
+          if(memberChanges.length&&!ppSaveGroupMemberSlots(memberChanges))return;
           if(geJump.mode==='perPlot'&&geJump.slots[geJump.current])ppApplySlot(geJump.slots[geJump.current]);
         }
-      }catch(eDist){ }
+      }catch(eDist){console.warn('[plot-editor] group distribution rejected',eDist);return;}
       var back=false;
       try{ if(window.__runyeGroupPlotEdit!=null&&typeof window.grBackFromPlotEdit==='function') back=!!window.grBackFromPlotEdit(); }catch(eGr){ }
       if(!back&&typeof window.grShowGroupPage==='function'){ try{ window.grShowGroupPage(); }catch(eGr2){ } }
@@ -4173,6 +4749,10 @@
 
   window.ppGetState=function(){
     return {
+      /* [v677 成组继承] polyPts / cutSnap / cutOverrides / areaLocked 进导出：
+         runyeSaveProject 据此写「按地块设计留档」，成组时逐块平移继承。
+         ppSetState 不读这几个字段（polyPts 仍由量测边界重建），旧消费方零影响。 */
+      polyPts:(ppState.polyPts||[]).map(function(p){return{x:p.x,y:p.y};}),
       mainPipes:JSON.parse(JSON.stringify(ppState.mainPipes||[])),
       branchPipes:JSON.parse(JSON.stringify(ppState.branchPipes||[])),
       subBranchPipes:JSON.parse(JSON.stringify(ppState.subBranchPipes||[])),
@@ -4183,8 +4763,21 @@
       hiddenPipes:JSON.parse(JSON.stringify(ppState.hiddenPipes||{main:{},branch:{},subbranch:{}})),
       pipeIds:JSON.parse(JSON.stringify(ppState.pipeIds||{main:[],branch:[],subbranch:[]})),
       nextPipeId:ppState.nextPipeId||1,
+      cutSnap:JSON.parse(JSON.stringify(ppState.cutSnap||{sig:'',x:null,y:null})),
+      partitionCuts:(function(){
+        try{
+          if(!ppState.polyPts||ppState.polyPts.length<3)return null;
+          var b=ppGetBounds();
+          var n=parseInt(document.getElementById('planN')&&document.getElementById('planN').value)||parseInt(document.getElementById('fld_N')&&document.getElementById('fld_N').value)||4;
+          var cuts=ppGetZoneCuts(b,ppGetZoneLayout(b,n));
+          return {x:cuts.xPos.slice(1,-1),y:cuts.yPos.slice(1,-1)};
+        }catch(e){return null;}
+      })(),
+      cutOverrides:JSON.parse(JSON.stringify(ppState.cutOverrides||{x:{},y:{}})),
+      areaLocked:!!ppState.areaLocked,
       zoneRotated:!!ppState.zoneRotated,
-      plotRotationDeg:ppState.plotRotationDeg||0,
+      zoneAngleDeg:ppZoneAngle(),
+      zoneAuto:ppState.zoneAuto!==false,
       zoom:ppState.zoom||1,
       panX:ppState.panX||0,
       panY:ppState.panY||0,
@@ -4258,6 +4851,8 @@
     if(!Array.isArray(ppState.pipeIds.branch))ppState.pipeIds.branch=[];
     if(!Array.isArray(ppState.pipeIds.subbranch))ppState.pipeIds.subbranch=[];
     ppState.nextPipeId=saved.nextPipeId||1;
+    ppState.partitionCuts=(saved.partitionCuts&&Array.isArray(saved.partitionCuts.x)&&Array.isArray(saved.partitionCuts.y))
+      ?ppCloneJSON(saved.partitionCuts):null;
     ppState.hiddenPipes=JSON.parse(JSON.stringify(saved.hiddenPipes||{main:{},branch:{},subbranch:{}}));
     if(!ppState.hiddenPipes.main)ppState.hiddenPipes.main={};
     if(!ppState.hiddenPipes.branch)ppState.hiddenPipes.branch={};
@@ -4270,18 +4865,15 @@
     ppUpdateLegend(false);
     ppState.lineDrawMode=saved.lineDrawMode==='ortho'?'ortho':'free';
     ppState.zoneRotated=!!saved.zoneRotated;
-    ppState.plotRotationDeg=parseFloat(saved.plotRotationDeg)||0;
+    ppState.zoneAngleDeg=isFinite(Number(saved.zoneAngleDeg))?Number(saved.zoneAngleDeg):(ppState.zoneRotated?90:0);
+    /* 旧存档里的地块旋转值不再应用；设计几何始终使用原始地块坐标。 */
+    if(typeof saved.zoneAuto==='boolean')ppState.zoneAuto=saved.zoneAuto;
     ppState.zoom=saved.zoom||1;
     ppState.panX=saved.panX||0;
     ppState.panY=saved.panY||0;
     ppState.lastSVG=saved.lastSVG||'';
-    var rotateBtn=document.getElementById('ppRotateZones');
-    if(rotateBtn){
-      rotateBtn.classList.toggle('active',ppState.zoneRotated);
-      rotateBtn.textContent=ppState.zoneRotated?'↻ 分区已旋转90°':'↻ 分区旋转90°';
-    }
-    var angleInput=document.getElementById('ppPlotAngle');
-    if(angleInput)angleInput.value=ppState.plotRotationDeg;
+    ppSyncZoneAngleUI();
+    ppApplyZoneAutoUI();
     if(ppState.lastSVG){
       document.getElementById('ppDiagramContent').innerHTML=ppState.lastSVG;
       document.getElementById('ppDiagramWrap').style.display='block';
@@ -4300,6 +4892,19 @@
 
   // Resize + init
   window.addEventListener('resize',ppResize);
+  /* 共享制图区会在二级/三级功能区之间换宿主父级；侧栏宽度或布局变化不保证伴随
+     window.resize。直接观察画布容器，避免 canvas backing store 沿用旧尺寸而模糊/裁切。 */
+  if(typeof ResizeObserver==='function'&&ppWrap){
+    var ppContainerResizeFrame=0;
+    var ppContainerResizeObserver=new ResizeObserver(function(entries){
+      var entry=entries&&entries[entries.length-1],rect=entry&&entry.contentRect;
+      if(!rect||Math.round(rect.width)===ppCanvas.width&&Math.round(rect.height)===ppCanvas.height)return;
+      if(ppContainerResizeFrame)return;
+      var schedule=window.requestAnimationFrame||function(fn){return setTimeout(fn,16);};
+      ppContainerResizeFrame=schedule(function(){ppContainerResizeFrame=0;ppResize();});
+    });
+    ppContainerResizeObserver.observe(ppWrap);
+  }
   setTimeout(function(){ppResize();ppLoadPolygon();ppUpdateAutoPipeButton();},200);
   /* [v629] 「适应窗口」小按钮：只在图被裁掉时显示（见 ppSyncFitBtn），点一下整幅回来。
      放在画布内的绝对定位浮层里 ⇒ 不占版面高度、不参与 .ry-pane-edit 网格，引不出新的嵌套问题。 */

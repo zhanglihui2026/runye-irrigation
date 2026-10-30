@@ -129,23 +129,18 @@ module.exports = function v193GroupEditContracts(INDEX_SRC, helpers) {
   assert.match(ENHANCE_NAV_SRC, /hash:\s*'grPipeSection'/,
     'runye-nav.js 的 ITEMS 里应有「成组管路」入口（跨页导航的唯一出处）');
 
-  /* --- ⑩ 按块进入三级页：三件事缺一不可 ---
-     tlAutoGenerate() 的输入只有两个：measuredPolygon（当单地块用）与
-     RunyeBridge.getZoneCuts()（内部读二级页的 ppState.polyPts）。⇒ 必须**同时**摆对：
-       a) measuredPolygon = 这一块的环
-       b) ppState.polyPts  = 这一块的环（靠 setGroupMode + selectGroupPlot）
-     ★★ 曾经这里写的是「selectGroupPlot 必须早于 measuredPolygon」—— 那是**恒真断言**：
-        ppSelectGroupPlot() 内部自己就会 ppApplySlot()，两条语句谁先谁后结果完全一样，
-        注入「交换顺序」只会让**源码文本**变红，行为一点没变（断言测的不是它声称的东西）。
-        ⇒ 改成下面三条各自独立可失效的断言，行为侧由 _p1/_probe_group_work.cjs 的 G6 实测。 */
-  const geb = bodyOf(INDEX_SRC, 'grEnterBlock', 1600);
-  assert.match(geb, /selectGroupPlot/, 'grEnterBlock 必须把二级页切到那一块');
-  /* ★ setGroupMode('perPlot') 不是装饰：ppSelectGroupPlot 只在 ge.mode==='perPlot'
-       时才 ppApplySlot()。若二级页停在**整组态**，光调 selectGroupPlot 只会改 ge.current，
-       ppState.polyPts 仍是外框 ⇒ getZoneCuts() 返回外框的分区网格，三级页分区全错。 */
-  assert.match(geb, /setGroupMode\(/, 'grEnterBlock 必须确保二级页处于逐块模式（否则 polyPts 还是外框）');
-  assert.match(geb, /measuredPolygon\s*=\s*b\.ring/, 'grEnterBlock 必须把 measuredPolygon 换成该块的环');
-  assert.match(geb, /__runyeTlBlock\s*=\s*i/, 'grEnterBlock 必须记下当前块号（供返回条与拦截放行用）');
+  /* --- ⑩ 按块进入三级页（v678 瘦身反转） ---
+     [v678 用户拍板] 组页瘦身为「展示 + 画总管 + 材料清单」，「▶ 进入三级页 / 双击地块 /
+     ✎ 二级改这块的管」等入口与 grEnterBlock / grShowTl / grEnterPlotL2 实现整体删除。
+     grBackFromTl / grRenderTlBar / grSaveBlockTl 保留（tl-workspace 返回按钮兼容 +
+     grExportState 存档要用）。原行为断言随之反转为「不得再出现」。 */
+  assert.ok(!/function\s+grEnterBlock\b/.test(NC), 'v678 起组页不得再有 grEnterBlock()（按块进三级页入口已移除）');
+  assert.ok(!/function\s+grShowTl\b/.test(NC), 'v678 起组页不得再有 grShowTl()');
+  assert.ok(!/grEnterTlForBlock|window\.grEnterPlotL2\s*=/.test(NC), 'v678 起不得再有按块编辑的外部导出');
+  assert.match(bodyOf(INDEX_SRC, 'grBackFromTl', 1400), /grSaveBlockTl\(\)/, 'grBackFromTl（tl-workspace 兼容）必须保留存档逻辑');
+  assert.match(bodyOf(INDEX_SRC,'grSaveBlockTl'), /tlData\s*=\s*clone\(window\.tlDiagramData\)/, '存档须来自本块三级结果');
+  assert.match(bodyOf(INDEX_SRC, 'grBackFromTl', 1400), /measuredPolygon\s*=\s*clone\(window\.__runyeGroupFrame\)/, 'grBackFromTl 必须恢复整组外框');
+  assert.match(bodyOf(INDEX_SRC, 'grBackFromTl', 1400), /__runyeTlBlock\s*=\s*null/, 'grBackFromTl 必须清掉「按块编辑」标记');
   /* ★ 隐藏的地雷：grSync() 会用 window.measuredPolygon 当整组外框的兜底。
        若在「按块编辑中」刷新（此时 measuredPolygon 已是**某一块**的环），
        W.frame 就被污染成那一块 ⇒ 返回成组页时外框丢失。
@@ -328,7 +323,9 @@ module.exports = function v193GroupEditContracts(INDEX_SRC, helpers) {
   const agW = NC.indexOf('function ppAutoGeneratePipes(');
   const ag = NC.slice(agW, agW + 4200);
   assert.match(ag, /ppIsGroupWhole\(\)/, '整组态必须走「逐块生成」分支');
-  assert.match(ag, /ppBuildAutoPipes\(s\.polyPts,\s*planN,\s*isThree,\s*true\)/,
+  /* [v673] 第 5/6 参为追加的 forceDir / rot（分区角度局部坐标系布管），断言放宽为前缀匹配
+     —— 契约本意是「必须按本块尺寸 useOwnDims=true」，保持不变。 */
+  assert.match(ag, /ppBuildAutoPipes\(s\.polyPts,\s*planN,\s*isThree,\s*true\b/,
     '整组态逐块生成必须按本块尺寸（useOwnDims=true，否则主管根数与逐块态对不上）');
   assert.match(ag, /ppCollectGroupAllPipes\(\)/,
     '整组视图必须用既有合并函数（与 ppSetGroupMode 同一套口径，不写第二份）');
@@ -339,10 +336,20 @@ module.exports = function v193GroupEditContracts(INDEX_SRC, helpers) {
   const cpW = NC.indexOf('function ppClearPipes(');
   const cp = NC.slice(cpW, cpW + 1400);
   assert.match(cp, /ppIsGroupWhole\(\)/, '整组态「清除管路」必须落回各块 slot（与生成对称）');
-  /* 组页侧：按钮存在（HTML 属性断言一律钉原始 INDEX_SRC，v196 stripComments 陷阱） */
-  assert.ok(INDEX_SRC.indexOf('id="grPipeAuto"') > 0, '成组管路页应有「⚡ 生成各块管路」按钮');
-  assert.ok(INDEX_SRC.indexOf('id="grPipeClear"') > 0, '成组管路页应有「🗑 清除各块管路」按钮');
+  /* 组页侧（HTML 属性断言一律钉原始 INDEX_SRC，v196 stripComments 陷阱）
+     [v677 用户拍板] 「⚡ 生成各块管路」按钮移除 —— 新方向：所有地块先单地块划分布管，
+     最后拼组（成组时继承各块已有设计）。契约反转为「不得再出现」。
+     [v678 用户拍板] 组页进一步瘦身：只保留 展示 + 画总管 + 材料清单 ——
+     「🗑 清除各块管路」「↺ 驳接点复位」「▤ 水力面板」「▣ 三级管路」按钮不得再出现。 */
+  assert.ok(INDEX_SRC.indexOf('id="grPipeAuto"') < 0, 'v677 起成组管路页不得再有一键布管按钮（grPipeAuto 已移除）');
+  assert.ok(INDEX_SRC.indexOf('id="grPipeClear"') < 0, 'v678 起成组管路页不得再有「清除各块管路」按钮');
+  ['grNodeReset', 'grHydPanelBtn', 'grTlLayer', 'grTakeoffCard', 'grTlLeg'].forEach(function (id) {
+    assert.ok(INDEX_SRC.indexOf('id="' + id + '"') < 0, 'v678 瘦身后不得再有 #' + id);
+  });
   const grIife = NC.slice(NC.indexOf('window.__runyeGroupWork = W'));
-  assert.match(grIife, /autoPipesWhole\(\)/, '组页生成必须走桥（不得在本页重写布管算法）');
+  assert.doesNotMatch(grIife, /grGenerateAllPipes|grPipeAuto|grClearAllPipes|grRenderHyd\b|grTlRender|grEnterBlock\b|grEnterPlotL2|grHitNode/,
+    '组页 IIFE 不得残留已瘦身功能的实现函数（v677/v678 移除）');
   assert.match(grIife, /未布管/, '子地块列表应标出「未布管」状态（让用户分辨「没数据」与「页面坏了」）');
+  assert.match(grIife, /grRenderMat\s*\(\)/, '材料汇总 grRenderMat 必须保留（本页仅存的三大数据功能之一）');
+  assert.match(grIife, /grComputeHydraulics\s*\(\)/, 'grComputeHydraulics 保留（画布 DN 管径牌/流速体检/参考线的唯一数据源）');
 };

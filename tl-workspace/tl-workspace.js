@@ -179,7 +179,7 @@
     var tlSel = (typeof window !== 'undefined' && window.tlPendingSel) ? window.tlPendingSel : [];
     /* v98b：有待选区（图上点分区多选）即蓝高亮，不再要求先进入成组模式 */
     var tlHi = tlGM || !!(tlSel && tlSel.length);
-    var rects = cv.querySelectorAll('rect[data-zi]');
+    var rects = cv.querySelectorAll('[data-zi]');
     for (var i = 0; i < rects.length; i++) {
       var r = rects[i], g = parseInt(r.getAttribute('data-g'), 10);
       var zi = parseInt(r.getAttribute('data-zi'), 10);
@@ -457,7 +457,13 @@
         if (g && g.parentNode) g.parentNode.removeChild(g);
       });
       var pg = clone.querySelector('#tlPlotGroup');
-      if (pg) pg.removeAttribute('transform');
+      if (pg) {
+        pg.removeAttribute('transform');
+        /* The first two direct paths are the parcel fill and outline. Keep their
+           geometry for export, but let the shared partition canvas own the base. */
+        Array.prototype.filter.call(pg.children,function(n){return n.tagName.toLowerCase()==='path';}).slice(0,2)
+          .forEach(function(n){n.setAttribute('data-ry-partition-base','1');});
+      }
       /* 阶段2：已改长的自动管线在克隆底图中隐藏原 path —— 有效几何由 tlWsAuto 覆盖层重画 */
       var lensMap = AE.lensMap();
       Object.keys(lensMap).forEach(function (pid) {
@@ -509,6 +515,20 @@
     var o = z && z.cutOffY, v = o ? o[ci + ',' + ri] : null;
     return (v != null && isFinite(v)) ? v : z.yPos[ri];
   }
+  /* 分区坐标存于网格局部平面；地块轮廓、管线和拾取点仍使用固定世界坐标。 */
+  function tlGridToWorld(z, p) {
+    var f=z&&z.frame;if(!f||!f.origin||!f.center)return{x:p.x,y:p.y};
+    var a=(Number(f.angle)||0)*Math.PI/180,c=Math.cos(a),s=Math.sin(a),cx=f.center.x,cy=f.center.y;
+    var sx=Number(f.scaleX)||1,sy=Number(f.scaleY)||1,dx=p.x-cx,dy=p.y-cy;
+    return{x:f.origin.x+(cx+dx*c-dy*s)/sx,y:f.origin.y+(cy+dx*s+dy*c)/sy};
+  }
+  function tlWorldToGrid(z, p) {
+    var f=z&&z.frame;if(!f||!f.origin||!f.center)return{x:p.x,y:p.y};
+    var a=(Number(f.angle)||0)*Math.PI/180,c=Math.cos(a),s=Math.sin(a),cx=f.center.x,cy=f.center.y;
+    var sx=Number(f.scaleX)||1,sy=Number(f.scaleY)||1,dx=(p.x-f.origin.x)*sx-cx,dy=(p.y-f.origin.y)*sy-cy;
+    return{x:cx+dx*c+dy*s,y:cy-dx*s+dy*c};
+  }
+  function tlGridToScreen(T,z,p){return T(tlGridToWorld(z,p));}
   /* 行 r 上「列 cA 与列 cB 之间的公共 y 边带」——阶梯后相邻列的行边界可能错开，取交集才是那条公共边。
      无覆盖时 = [yPos[r], yPos[r+1]]（逐位相同）。 */
   function tlZyb(z, r, cA, cB) {
@@ -600,6 +620,7 @@
     var mg = (typeof window !== 'undefined') ? window.tlManualGroups : null;
     if (!mg || !mg.length) return '';
     var z = d.zones, zcN = z.cols || (z.xPos.length - 1), zrN = z.rows || (z.yPos.length - 1);
+    function gridT(p){return tlGridToScreen(T,z,p);}
     function grp(zi) { for (var g = 0; g < mg.length; g++) { if (mg[g] && mg[g].indexOf(zi) >= 0) return g; } return -1; }
     function seg(ax, ix, lane, x1, y1, x2, y2) {
       /* v106：两轴都可拖（v100 的「平行轴锁定」作废）。锁定态渲染分支保留但不再触发
@@ -620,7 +641,7 @@
       for (var ri = 0; ri < zrN; ri++) {
         if (grp(ri * zcN + cx - 1) === grp(ri * zcN + cx)) continue;
         var yb = tlZyb(z, ri, cx - 1, cx);
-        var a = T({ x: tlZx(z, ri, cx), y: yb[0] }), b2 = T({ x: tlZx(z, ri, cx), y: yb[1] });
+        var a = gridT({ x: tlZx(z, ri, cx), y: yb[0] }), b2 = gridT({ x: tlZx(z, ri, cx), y: yb[1] });
         out += seg('x', cx, ri, a.x, a.y, b2.x, b2.y);
       }
     }
@@ -628,7 +649,7 @@
       for (var ci = 0; ci < zcN; ci++) {
         if (grp((cy - 1) * zcN + ci) === grp(cy * zcN + ci)) continue;
         var xb = tlZxb(z, ci, cy - 1, cy);
-        var c = T({ x: xb[0], y: tlZy(z, ci, cy) }), e2 = T({ x: xb[1], y: tlZy(z, ci, cy) });
+        var c = gridT({ x: xb[0], y: tlZy(z, ci, cy) }), e2 = gridT({ x: xb[1], y: tlZy(z, ci, cy) });
         out += seg('y', cy, ci, c.x, c.y, e2.x, e2.y);
       }
     }
@@ -640,9 +661,11 @@
     var mg = (typeof window !== 'undefined') ? window.tlManualGroups : null;
     if (!mg || !mg.length) return null;
     var z = lastDataRef.zones;
+    worldPt=tlWorldToGrid(z,worldPt);
     var zcN = z.cols || (z.xPos.length - 1), zrN = z.rows || (z.yPos.length - 1);
     function grp(zi) { for (var g = 0; g < mg.length; g++) { if (mg[g] && mg[g].indexOf(zi) >= 0) return g; } return -1; }
-    var best = null, bd = tolWorld;
+    var frameScale=z.frame?Math.max(Number(z.frame.scaleX)||1,Number(z.frame.scaleY)||1):1;
+    var best = null, bd = tolWorld*frameScale;
     /* v106：两轴都参与命中 —— 判据仍走与 manualGbLines 的 seg() 同一个 tlGbDraggable（恒可拖），
        保持「画得出就拖得动」的一致性。 */
     var okAxisX = tlGbDraggable('x', lastDataRef);
@@ -686,13 +709,14 @@
     var mg = (typeof window !== 'undefined') ? window.tlManualGroups : null;
     if (!mg || !mg.length) return '';   /* 无手动分组时简图自带的分区线还在，不重复画 */
     var z = d.zones, zcN = z.cols || (z.xPos.length - 1), zrN = z.rows || (z.yPos.length - 1);
+    function gridT(p){return tlGridToScreen(T,z,p);}
     function grp(zi) { for (var g = 0; g < mg.length; g++) { if (mg[g] && mg[g].indexOf(zi) >= 0) return g; } return -1; }
     var out = '';
     for (var cx = 1; cx < zcN; cx++) {
       for (var ri = 0; ri < zrN; ri++) {
         if (grp(ri * zcN + cx - 1) >= 0 || grp(ri * zcN + cx) >= 0) continue;
         var ybU = tlZyb(z, ri, cx - 1, cx);
-        var aU = T({ x: tlZx(z, ri, cx), y: ybU[0] }), bU = T({ x: tlZx(z, ri, cx), y: ybU[1] });
+        var aU = gridT({ x: tlZx(z, ri, cx), y: ybU[0] }), bU = gridT({ x: tlZx(z, ri, cx), y: ybU[1] });
         out += '<line x1="' + fmt(aU.x) + '" y1="' + fmt(aU.y) + '" x2="' + fmt(bU.x) + '" y2="' + fmt(bU.y) + '" stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="5,4" opacity="0.85" data-ugb="1"/>';
       }
     }
@@ -700,7 +724,7 @@
       for (var ci = 0; ci < zcN; ci++) {
         if (grp((cy - 1) * zcN + ci) >= 0 || grp(cy * zcN + ci) >= 0) continue;
         var xbU = tlZxb(z, ci, cy - 1, cy);
-        var cU = T({ x: xbU[0], y: tlZy(z, ci, cy) }), eU = T({ x: xbU[1], y: tlZy(z, ci, cy) });
+        var cU = gridT({ x: xbU[0], y: tlZy(z, ci, cy) }), eU = gridT({ x: xbU[1], y: tlZy(z, ci, cy) });
         out += '<line x1="' + fmt(cU.x) + '" y1="' + fmt(cU.y) + '" x2="' + fmt(eU.x) + '" y2="' + fmt(eU.y) + '" stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="5,4" opacity="0.85" data-ugb="1"/>';
       }
     }
@@ -749,7 +773,8 @@
     if (!poly || poly.length < 3) return null;
     if (typeof global.ryZoneAreaGroups !== 'function') return null;
     try {
-      var r = global.ryZoneAreaGroups(z, poly, (z.cols || 1) * (z.rows || 1));
+      var areaPoly=z.frame?poly.map(function(p){return tlWorldToGrid(z,p);}):poly;
+      var r = global.ryZoneAreaGroups(z, areaPoly, (z.cols || 1) * (z.rows || 1));
       return (r && r.ok && r.cells && r.cells.length) ? r.cells : null;
     } catch (e) { return null; }
   }
@@ -771,8 +796,16 @@
     for (var i = 0; i < (zones || []).length; i++) {
       var r = cellRect[zones[i]];
       if (!r || typeof r.getAttribute !== 'function') continue;
-      var x = parseFloat(r.getAttribute('x')), y = parseFloat(r.getAttribute('y'));
-      var w = parseFloat(r.getAttribute('width')), h = parseFloat(r.getAttribute('height'));
+      var x,y,w,h;
+      if(r.hasAttribute('points')){
+        var ps=(r.getAttribute('points')||'').trim().split(/\s+/).map(function(pair){return pair.split(',').map(Number);}).filter(function(p){return p.length===2&&isFinite(p[0])&&isFinite(p[1]);});
+        if(ps.length<3)continue;
+        var xs=ps.map(function(p){return p[0];}),ys=ps.map(function(p){return p[1];});
+        x=Math.min.apply(null,xs);y=Math.min.apply(null,ys);w=Math.max.apply(null,xs)-x;h=Math.max.apply(null,ys)-y;
+      }else{
+        x=parseFloat(r.getAttribute('x'));y=parseFloat(r.getAttribute('y'));
+        w=parseFloat(r.getAttribute('width'));h=parseFloat(r.getAttribute('height'));
+      }
       if (!isFinite(x) || !isFinite(y) || !isFinite(w) || !isFinite(h)) continue;
       var a = (cells && isFinite(cells[zones[i]]) && cells[zones[i]] > 0) ? cells[zones[i]] : (w * h);
       sx += (x + w / 2) * a; sy += (y + h / 2) * a; sw += a;
@@ -792,13 +825,14 @@
       if (!(ri >= 0 && ri < zrN && ci >= 0 && ci < zcN)) continue;
       var x0 = z.xPos[ci], x1 = z.xPos[ci + 1], y0 = z.yPos[ri], y1 = z.yPos[ri + 1];
       if (!isFinite(x0) || !isFinite(x1) || !isFinite(y0) || !isFinite(y1)) continue;
-      var w = Math.abs(x1 - x0), h = Math.abs(y1 - y0);
+      var w = Math.abs(x1 - x0), h = Math.abs(y1 - y0), pts=[[tlZx(z,ri,ci),tlZy(z,ci,ri)],[tlZx(z,ri,ci+1),tlZy(z,ci+1,ri)],[tlZx(z,ri+1,ci+1),tlZy(z,ci+1,ri+1)],[tlZx(z,ri+1,ci),tlZy(z,ci,ri+1)]].map(function(p){return tlGridToWorld(z,{x:p[0],y:p[1]});});
+      var xs=pts.map(function(p){return p.x;}),ys=pts.map(function(p){return p.y;}),cx=pts.reduce(function(a,p){return a+p.x;},0)/pts.length,cy=pts.reduce(function(a,p){return a+p.y;},0)/pts.length;
       var a = (cells && isFinite(cells[zi]) && cells[zi] > 0) ? cells[zi] : (w * h);
-      sx += (x0 + x1) / 2 * a; sy += (y0 + y1) / 2 * a; sw += a;
-      if (Math.min(x0, x1) < minX) minX = Math.min(x0, x1);
-      if (Math.min(y0, y1) < minY) minY = Math.min(y0, y1);
-      if (Math.max(x0, x1) > maxX) maxX = Math.max(x0, x1);
-      if (Math.max(y0, y1) > maxY) maxY = Math.max(y0, y1);
+      sx += cx * a; sy += cy * a; sw += a;
+      if (Math.min.apply(null,xs) < minX) minX = Math.min(minX,Math.min.apply(null,xs));
+      if (Math.min.apply(null,ys) < minY) minY = Math.min(minY,Math.min.apply(null,ys));
+      if (Math.max.apply(null,xs) > maxX) maxX = Math.max(maxX,Math.max.apply(null,xs));
+      if (Math.max.apply(null,ys) > maxY) maxY = Math.max(maxY,Math.max.apply(null,ys));
       n++;
     }
     if (!n) return null;
@@ -837,7 +871,7 @@
       }
     }
     /* ② 组内小分区的格边框去掉 ⇒ 同组连成一片 */
-    var rects = clone.querySelectorAll('rect[data-zi]');
+    var rects = clone.querySelectorAll('[data-zi]');
     var cellRect = {};
     for (i = 0; i < rects.length; i++) {
       rEl = rects[i];
@@ -1033,6 +1067,8 @@
       var flags = data.partialFlags || [];
       var zcN = z.cols || (z.xPos.length - 1);
       var zrN = z.rows || (z.yPos.length - 1);
+      function gridT(x,y){return tlGridToScreen(T,z,{x:x,y:y});}
+      function cellPts(ci,ri){return[[tlZx(z,ri,ci),tlZy(z,ci,ri)],[tlZx(z,ri,ci+1),tlZy(z,ci+1,ri)],[tlZx(z,ri+1,ci+1),tlZy(z,ci+1,ri+1)],[tlZx(z,ri+1,ci),tlZy(z,ci,ri+1)]].map(function(p){var q=gridT(p[0],p[1]);return fmt(q.x)+','+fmt(q.y);}).join(' ');}
       var tlN = (typeof data.combinedN === 'number' && data.combinedN >= 1) ? data.combinedN : 2;
       var tlTotal = zcN * zrN;
       var tlManualActive = !!(typeof window !== 'undefined' && window.tlManualGroups && window.tlManualGroups.length);
@@ -1048,10 +1084,11 @@
           var zi = ri * zcN + ci;
           var g = tlManualActive ? tlGrpOf(zi) : Math.floor(zi / tlN);
           var cellFill = (tlManualActive && g < 0) ? 'rgba(148,163,184,0.14)' : groupFill(g);
-          zf.push('<rect x="' + fmt((z.xPos[ci] + ox) * K) + '" y="' + fmt((z.yPos[ri] + oy) * K) + '" width="' + fmt((z.xPos[ci + 1] - z.xPos[ci]) * K) + '" height="' + fmt((z.yPos[ri + 1] - z.yPos[ri]) * K) + '" fill="' + cellFill + '" data-zi="' + zi + '" data-g="' + g + '" data-fill="' + cellFill + '"/>');
+          var cp=cellPts(ci,ri);
+          zf.push('<polygon points="' + cp + '" fill="' + cellFill + '" data-zi="' + zi + '" data-g="' + g + '" data-fill="' + cellFill + '"/>');
           /* 非标区：组色底 + 琥珀描边（2026-09-15 二色区分的延续，仍归入其序号所在组） */
           if (flags[zi]) {
-            zp.push('<rect x="' + fmt((z.xPos[ci] + ox) * K) + '" y="' + fmt((z.yPos[ri] + oy) * K) + '" width="' + fmt((z.xPos[ci + 1] - z.xPos[ci]) * K) + '" height="' + fmt((z.yPos[ri + 1] - z.yPos[ri]) * K) + '" fill="none" stroke="#d97706" stroke-width="2" stroke-dasharray="6,3"/>');
+            zp.push('<polygon points="' + cp + '" fill="none" stroke="#d97706" stroke-width="2" stroke-dasharray="6,3"/>');
           }
         }
       }
@@ -1062,11 +1099,13 @@
       var tlMgL = tlManualGroupsRef();
       (z.xPos || []).forEach(function (x, xi) {
         if (tlMgL && xi > 0 && xi < zcN && tlCutInsideGroup(tlMgL, 'x', xi, zcN, zrN)) return;
-        zg.push('<line x1="' + fmt((x + ox) * K) + '" y1="' + fmt((b.minY + oy) * K) + '" x2="' + fmt((x + ox) * K) + '" y2="' + fmt((b.maxY + oy) * K) + '" stroke="' + COLORS.zone + '" stroke-width="2" stroke-dasharray="' + COLORS.zoneDash + '"/>');
+        var ca=gridT(tlZx(z,0,xi),z.yPos[0]),cb=gridT(tlZx(z,zrN-1,xi),z.yPos[zrN]);
+        zg.push('<line x1="' + fmt(ca.x) + '" y1="' + fmt(ca.y) + '" x2="' + fmt(cb.x) + '" y2="' + fmt(cb.y) + '" stroke="' + COLORS.zone + '" stroke-width="2" stroke-dasharray="' + COLORS.zoneDash + '"/>');
       });
       (z.yPos || []).forEach(function (y, yi) {
         if (tlMgL && yi > 0 && yi < zrN && tlCutInsideGroup(tlMgL, 'y', yi, zcN, zrN)) return;
-        zg.push('<line x1="' + fmt((b.minX + ox) * K) + '" y1="' + fmt((y + oy) * K) + '" x2="' + fmt((b.maxX + ox) * K) + '" y2="' + fmt((y + oy) * K) + '" stroke="' + COLORS.zone + '" stroke-width="2" stroke-dasharray="' + COLORS.zoneDash + '"/>');
+        var da=gridT(z.xPos[0],tlZy(z,0,yi)),db=gridT(z.xPos[zcN],tlZy(z,zcN-1,yi));
+        zg.push('<line x1="' + fmt(da.x) + '" y1="' + fmt(da.y) + '" x2="' + fmt(db.x) + '" y2="' + fmt(db.y) + '" stroke="' + COLORS.zone + '" stroke-width="2" stroke-dasharray="' + COLORS.zoneDash + '"/>');
       });
       /* 联合灌溉组边界（粗深色实线，强调「哪些区是一组」）：
          竖向：每行内 (ri*zcN + ci + 1) % N == 0 处；横向：行首序号 (ri+1)*zcN % N == 0 处（仅内部线，不画地块外框）。 */
@@ -1075,13 +1114,13 @@
         for (var bri = 0; bri < zrN; bri++) {
           for (var bci = 0; bci + 1 < zcN; bci++) {
             if ((bri * zcN + bci + 1) % tlN === 0) {
-              var gx = (z.xPos[bci + 1] + ox) * K;
-              gb.push('<line x1="' + fmt(gx) + '" y1="' + fmt((z.yPos[bri] + oy) * K) + '" x2="' + fmt(gx) + '" y2="' + fmt((z.yPos[bri + 1] + oy) * K) + '" stroke="#1f2937" stroke-width="3.4" opacity="0.78" data-gb="' + Math.floor((bri * zcN + bci) / tlN) + '"/>');
+              var ga=gridT(tlZx(z,bri,bci+1),tlZy(z,bci,bri)),gbp=gridT(tlZx(z,bri+1,bci+1),tlZy(z,bci+1,bri+1));
+              gb.push('<line x1="' + fmt(ga.x) + '" y1="' + fmt(ga.y) + '" x2="' + fmt(gbp.x) + '" y2="' + fmt(gbp.y) + '" stroke="#1f2937" stroke-width="3.4" opacity="0.78" data-gb="' + Math.floor((bri * zcN + bci) / tlN) + '"/>');
             }
           }
           if ((bri + 1) < zrN && (bri + 1) * zcN % tlN === 0) {
-            var gy = (z.yPos[bri + 1] + oy) * K;
-            gb.push('<line x1="' + fmt((z.xPos[0] + ox) * K) + '" y1="' + fmt(gy) + '" x2="' + fmt((z.xPos[zcN] + ox) * K) + '" y2="' + fmt(gy) + '" stroke="#1f2937" stroke-width="3.4" opacity="0.78" data-gb="' + Math.floor(((bri + 1) * zcN - 1) / tlN) + '"/>');
+            var ha=gridT(tlZx(z,bri+1,0),tlZy(z,0,bri+1)),hb=gridT(tlZx(z,bri+1,zcN),tlZy(z,zcN-1,bri+1));
+            gb.push('<line x1="' + fmt(ha.x) + '" y1="' + fmt(ha.y) + '" x2="' + fmt(hb.x) + '" y2="' + fmt(hb.y) + '" stroke="#1f2937" stroke-width="3.4" opacity="0.78" data-gb="' + Math.floor(((bri + 1) * zcN - 1) / tlN) + '"/>');
           }
         }
       } else {
@@ -1102,8 +1141,8 @@
           var stdMu2 = (z.xPlan && z.yPlan) ? z.xPlan[ci2] * z.yPlan[ri2] / 666.67 : 0;
           var actMu2 = isFinite(actMus[zi2]) ? actMus[zi2] : stdMu2;
           if (!(actMu2 > 0.05)) continue;
-          var rx = (z.xPos[ci2] + ox) * K, ry = (z.yPos[ri2] + oy) * K;
-          var rw = (z.xPos[ci2 + 1] - z.xPos[ci2]) * K, rh = (z.yPos[ri2 + 1] - z.yPos[ri2]) * K;
+          var l0=gridT(tlZx(z,ri2,ci2),tlZy(z,ci2,ri2)),l1=gridT(tlZx(z,ri2,ci2+1),tlZy(z,ci2+1,ri2)),l2=gridT(tlZx(z,ri2+1,ci2+1),tlZy(z,ci2+1,ri2+1)),l3=gridT(tlZx(z,ri2+1,ci2),tlZy(z,ci2,ri2+1));
+          var rx=Math.min(l0.x,l1.x,l2.x,l3.x),ry=Math.min(l0.y,l1.y,l2.y,l3.y),rw=Math.max(l0.x,l1.x,l2.x,l3.x)-rx,rh=Math.max(l0.y,l1.y,l2.y,l3.y)-ry;
           var aw = Math.abs(rw), ah = Math.abs(rh);
           var lx = rx + rw - 5, ly = ry + 13;
           var FF = ' font-family="system-ui"';
@@ -1483,6 +1522,7 @@
   function applyView(ctn, el) {
     el.style.transformOrigin = '0 0';
     el.style.transform = 'translate(' + fmt(view.x) + 'px,' + fmt(view.y) + 'px) scale(' + fmt(view.z) + ')';
+    try { if (window.RyDrawingWorkspace) window.RyDrawingWorkspace.syncCamera(); } catch (e) { }
   }
   function baseFit(ctn, el) {
     var w = (ctn.clientWidth || 900) - 8;
@@ -1770,36 +1810,9 @@
     var r = ctxMenuEl.getBoundingClientRect();
     if (r.bottom > window.innerHeight - 8) ctxMenuEl.style.top = Math.max(4, window.innerHeight - r.height - 12) + 'px';
   }
-  /* 分区右键菜单（v98b）：先给所选分区的面积汇总（便于判断是否值得合并），再提供「合并为一组」。
-     合并动作交 index.html 的 window.tlMergeIndices（与右侧面板共用同一 window.tlManualGroups）。 */
-  function openZoneMergeMenu(selZis, x, y) {
-    if (typeof document === 'undefined') return;
-    var d = lastDataRef;
-    var muArr = (d && d.zoneActMu) ? d.zoneActMu : null;
-    var n = selZis.length, sumMu = 0, per = [];
-    for (var i = 0; i < n; i++) {
-      var zi = selZis[i];
-      var m = muArr ? (muArr[zi] || 0) : 0;
-      sumMu += m; per.push('区' + (zi + 1) + ' ' + m.toFixed(1) + '亩');
-    }
-    var sumM2 = Math.round(sumMu * 666.67);
-    var header = '<b>已选 ' + n + ' 个分区</b>'
-      + '<div style="margin-top:2px">合计 <b style="color:#b45309">' + sumMu.toFixed(1) + ' 亩</b>（' + sumM2 + ' m²）</div>'
-      + (n <= 10 ? '<div style="margin-top:3px;color:#64748b">' + per.join('、') + '</div>' : '')
-      + '<div style="margin-top:2px;color:#94a3b8;font-size:11px">提示：点击图上其它分区可继续加选/取消</div>';
-    var items = [];
-    if (n >= 2) items.push({ label: '⊕ 合并为一组（' + n + ' 个分区）', fn: function () {
-      if (typeof window !== 'undefined' && typeof window.tlMergeIndices === 'function') window.tlMergeIndices(selZis.slice());
-      if (typeof window !== 'undefined') window.tlPendingSel = [];
-      applyGroupHighlight();
-    } });
-    else items.push({ label: '⊕ 合并为一组（需 ≥2 个分区）', disabled: true, fn: function () { } });
-    items.push({ label: '✕ 清除选择', fn: function () {
-      if (typeof window !== 'undefined') window.tlPendingSel = [];
-      applyGroupHighlight();
-    } });
-    openCtxMenu(x, y, items, header);
-  }
+  /* [2026-10-27 用户指令取消] v98b 分区右键合并菜单 openZoneMergeMenu 整函数删除：
+     「⊕ 合并为一组」项走 window.tlMergeIndices（inline-09 侧已同步删除），
+     手动合并入口取消后本函数无调用方。恢复方式：git 历史恢复本函数 + 上方右键接线块。 */
   /* 接管道：从配件锚点引出新管段（宿主管 kind，默认 5m，创建即选中 → 工具栏改长可直接输入）。
      挂 branchId 链到配件：配件（沿管弧长/换向）或宿主管移动时，syncBranchPipes 把支管起点对齐锚点整体平移。 */
   var BRANCH_SPAWN_LEN = 5;   /* 接管道引出长度（米）：菜单文案与几何共用同一处，防再次漂移 */
@@ -2458,7 +2471,8 @@
         var fnHit = rawFn ? pickFrontNode(rawFn, snapTolUnits(el) / viewState.k * 1.4) : null;
         if (fnHit && (fnHit.max || 0) > 0) {
           frontNodeDrag = { mk: fnHit.mk, sig: fnHit.sig, off: fnHit.off || 0, max: fnHit.max || 0,
-            axis: fnHit.axis || 'V', startW: rawFn, startOff: fnHit.off || 0, cur: fnHit.off || 0,
+            axis: fnHit.axis || 'V', axisV: (isFinite(fnHit.axisX)&&isFinite(fnHit.axisY)) ? {x:fnHit.axisX,y:fnHit.axisY} : null,
+            startW: rawFn, startOff: fnHit.off || 0, cur: fnHit.off || 0,
             moved: false, pointerId: e.pointerId, sx: e.clientX, sy: e.clientY };
           suppressAutoPick = true;
           if (ctn.setPointerCapture) { try { ctn.setPointerCapture(e.pointerId); } catch (errFn) {} }
@@ -2516,7 +2530,7 @@
         }
       }
       if (e.button === 1 || (e.button === 0 && !mode)) {          // 非插入模式左键 / 任意中键 = 平移
-        drag = { x: e.clientX - view.x, y: e.clientY - view.y, id: e.pointerId };
+        drag = { x: e.clientX - view.x, y: e.clientY - view.y, lastX:e.clientX,lastY:e.clientY,id: e.pointerId };
         el.classList.add('tl-ws-dragging');
         if (el.setPointerCapture) { try { el.setPointerCapture(e.pointerId); } catch (err) {} }
         e.preventDefault();
@@ -2543,6 +2557,7 @@
         if (elCd && typeof window !== 'undefined' && window.RunyeBridge && typeof window.RunyeBridge.cutDragTo === 'function') {
           var wcd = rawDataPoint(elCd, e);
           if (wcd) {
+            wcd=tlWorldToGrid(lastDataRef.zones,wcd);
             var axCd = cutDrag.axis, ixCd = cutDrag.index, lnCd = cutDrag.lane, stCd = cutDrag.step, vCd = wcd[axCd];
             if (!cutDragRaf) cutDragRaf = requestAnimationFrame(function () {
               cutDragRaf = 0;
@@ -2629,7 +2644,9 @@
         var elFn = currentEL(ctn);
         var rawFnM = elFn ? rawDataPoint(elFn, e) : null;
         if (rawFnM) {
-          var dFn = (frontNodeDrag.axis === 'V') ? (rawFnM.y - frontNodeDrag.startW.y) : (rawFnM.x - frontNodeDrag.startW.x);
+          var vFn = frontNodeDrag.axisV || (frontNodeDrag.axis === 'V' ? {x:0,y:1} : {x:1,y:0});
+          var vFn2 = vFn.x*vFn.x+vFn.y*vFn.y || 1;
+          var dFn = ((rawFnM.x-frontNodeDrag.startW.x)*vFn.x + (rawFnM.y-frontNodeDrag.startW.y)*vFn.y)/vFn2;
           var offFn = Math.round(frontNodeDrag.startOff + dFn);   /* 吸附 1 m（与简图同口径） */
           offFn = Math.max(0, Math.min(frontNodeDrag.max, offFn)); /* 只能向下 + 上限 */
           frontNodeDrag.cur = offFn;
@@ -2676,6 +2693,9 @@
       }
       if (drag && e.pointerId === drag.id) {
         var el = currentEL(ctn); if (!el) return;
+        if(window.RyDrawingWorkspace&&typeof window.RyDrawingWorkspace.panBy==='function'&&window.RyDrawingWorkspace.panBy(e.clientX-drag.lastX,e.clientY-drag.lastY)){
+          drag.lastX=e.clientX;drag.lastY=e.clientY;return;
+        }
         view.x = e.clientX - drag.x; view.y = e.clientY - drag.y;
         applyView(ctn, el);
         return;
@@ -2724,15 +2744,13 @@
           if (typeof window !== 'undefined' && window.RunyeBridge && typeof window.RunyeBridge.cutDragEnd === 'function') window.RunyeBridge.cutDragEnd(false);
           rerenderKeepView();
         }
-        /* v100：组面积会随阶梯拖动变化 ⇒ **两个**展示组面积的地方都要刷。
-           只刷右侧面板会让左栏状态块留着拖动前的数字（v100 实测：画布 60.0 亩 / 左栏 54.0 亩，
-           用户一眼就会说「面积没跟着调」）。 */
-        if (typeof window.tlRefreshGroupPanel === 'function') window.tlRefreshGroupPanel();
+        /* v100：组面积会随阶梯拖动变化 ⇒ 展示组面积的地方都要刷。
+           [2026-10-27] tlRefreshGroupPanel 调用已删（面板取消），tlRefreshGroupStatus 保留
+           （触发轮灌演示 chips 重建 —— 组面积变了 chips 上的亩数也要跟着变）。 */
         if (typeof window.tlRefreshGroupStatus === 'function') window.tlRefreshGroupStatus();
       }
       if (cutStepFellBack) {
         cutStepFellBack = false;
-        if (typeof window.tlRefreshGroupPanel === 'function') window.tlRefreshGroupPanel();
         if (typeof window.tlRefreshGroupStatus === 'function') window.tlRefreshGroupStatus();
       }
       if (pipeDrag && (e.pointerId === undefined || e.pointerId === pipeDrag.pointerId)) {
@@ -2783,9 +2801,14 @@
       if (nodeDrag && (e.pointerId === undefined || e.pointerId === nodeDrag.pointerId)) {
         var wasMovedNd = nodeDrag.moved, dragNdId = nodeDrag.id, upX = e.clientX, upY = e.clientY;
         if (nodeDragRaf) { cancelAnimationFrame(nodeDragRaf); nodeDragRaf = 0; }
+        if (wasMovedNd && window.RyTlNodes && typeof window.RyTlNodes.moveNode === 'function') {
+          window.RyTlNodes.moveNode(dragNdId, nodeDrag.atM);
+        }
         nodeDrag = null;
         nodeDragTipHide();
         if (!wasMovedNd) selectNode(dragNdId, upX, upY);   /* 未移动抬起 = 点击 → 弹节点面板（v150 行为保持） */
+        /* moveNode emits the same subscribed change as precise stake entry below; that
+           shared path commits the final runtime snapshot once and avoids a duplicate write. */
       }
       if (drag && (e.pointerId === undefined || e.pointerId === drag.id)) {
         drag = null;
@@ -2822,23 +2845,9 @@
             }
           }
         }
-        /* 联合灌溉分组交互（v98b）：点分区 = 加入/移出待选区（普通模式即可多选，用于右键合并）；点空白清选区 */
-        var zt = e.target;
-        if (zt && zt.getAttribute && zt.getAttribute('data-zi') != null) {
-          var ziHit = parseInt(zt.getAttribute('data-zi'), 10);
-          var tlSel = (typeof window !== 'undefined' && window.tlPendingSel && window.tlPendingSel.slice) ? window.tlPendingSel.slice() : [];
-          var idx = tlSel.indexOf(ziHit);
-          if (idx >= 0) tlSel.splice(idx, 1); else tlSel.push(ziHit);
-          if (typeof window !== 'undefined') window.tlPendingSel = tlSel;
-          applyGroupHighlight();
-          if (typeof window.tlManualBtnSync === 'function') window.tlManualBtnSync();
-          return;
-        }
-        if (typeof window !== 'undefined' && window.tlPendingSel && window.tlPendingSel.length) {
-          window.tlPendingSel = []; applyGroupHighlight();
-          if (typeof window.tlManualBtnSync === 'function') window.tlManualBtnSync();
-          return;
-        }
+        /* [2026-10-27 用户指令取消] v98b 分区点击加入待选区 + 点空白清选区整块删除
+           （待选区唯一用途是右键「合并为一组」，合并入口已随 #tlGroupPanel 取消；
+            保留会变成「点了变蓝但什么都不发生」的僵尸交互）。 */
         if (selGroup !== null) { selGroup = null; applyGroupHighlight(); }
         clearSel();
         return;
@@ -2911,27 +2920,26 @@
         if (typeof api.onAutoPipeContextMenu === 'function') api.onAutoPipeContextMenu(hit.pid, e.clientX, e.clientY);
         return;
       }
-      /* v98b：分区右键 → 面积汇总 + 合并为一组（图纸上的交互入口；管线右键已在上面优先处理） */
-      var zgSel = (typeof window !== 'undefined' && window.tlPendingSel) ? window.tlPendingSel : [];
-      var ztgt = e.target;
-      var ziCtx = (ztgt && ztgt.getAttribute && ztgt.getAttribute('data-zi') != null) ? parseInt(ztgt.getAttribute('data-zi'), 10) : null;
-      if (ziCtx != null && zgSel.indexOf(ziCtx) < 0) {   /* 右键点未选中分区 → 先补选它 */
-        zgSel = zgSel.concat([ziCtx]);
-        if (typeof window !== 'undefined') window.tlPendingSel = zgSel;
-        applyGroupHighlight();
-      }
-      if (!zgSel.length) return;                          /* 无选区 → 交回浏览器默认菜单 */
-      e.preventDefault();
-      openZoneMergeMenu(zgSel.slice(), e.clientX, e.clientY);
+      /* [2026-10-27 用户指令取消] v98b 分区右键合并菜单（openZoneMergeMenu → tlMergeIndices）
+         整块删除 —— 联合灌溉分组手动合并入口取消，分区右键交回浏览器默认菜单。 */
     });
     /* 容器尺寸变化（左栏拖宽/窗口缩放）→ 未缩放时保持整幅适配 */
     if (!ctn._tlwsResize) {
       ctn._tlwsResize = true;
-      window.addEventListener('resize', function () {
+      var refitBaseView = function () {
+        var section = document.getElementById('tlPipePlanSection');
+        if (document.body && document.body.classList.contains('ry-tool') && section && !section.classList.contains('ry-active')) return;
         var el = currentEL(ctn);
         if (!el || view.z !== 1 || view.x !== 0 || view.y !== 0) return;
         baseFit(ctn, el); applyView(ctn, el);
-      });
+      };
+      window.addEventListener('resize', refitBaseView);
+      /* 共享绘图宿主可改变容器父级，且侧栏/工具轨重排不一定派发 window.resize；
+         观察三级工作区本身，确保初始适配视图随可用画布尺寸更新。 */
+      if (typeof ResizeObserver === 'function') {
+        ctn._tlwsResizeObserver = new ResizeObserver(refitBaseView);
+        ctn._tlwsResizeObserver.observe(ctn);
+      }
     }
   }
 
@@ -3341,6 +3349,10 @@
   api.commitDraft = commitDraft;      // 测试/外部结束当前折线
   api.cancelDraft = cancelDraft;
   api.getViewState = function () { return viewState; };   // 只读钩子：E2E 数据坐标→屏幕换算
+  api.getWorldTransform = function () {
+    return viewState && isFinite(viewState.k) && isFinite(viewState.ox) && isFinite(viewState.oy)
+      ? { k:viewState.k, ox:viewState.ox, oy:viewState.oy } : null;
+  };
   /* v98h：视口读写钩子。三级拖「组边界线」松手后要整幅重生成（阶梯要重算面积/标注/流量），
      而重生成会走 render() 把画布重置为「适应窗口」⇒ 松手瞬间整幅图跳位。
      这两个钩子让上层「先存后还原」，用户的缩放/平移到拖完为止一直保持。 */
@@ -3400,13 +3412,17 @@
   }
   function tlAutoResetGroups() {
     if (typeof window === 'undefined') return;
+    if (window.RunyeBridge && typeof window.RunyeBridge.cutStepReset === 'function') {
+      try { if (window.RunyeBridge.cutStepReset() === false) return; } catch (eReset) { return; }
+    } else {
+      try { if (typeof window.tlZoneStepClear === 'function') window.tlZoneStepClear(); } catch(e){}
+      try { if (window.tlDiagramData && window.tlDiagramData.zones) { window.tlDiagramData.zones.cutOffX = null; window.tlDiagramData.zones.cutOffY = null; } } catch(e){}
+    }
     window.tlManualGroups = [];
     window.tlPendingSel = [];
     selGroup = null;
     /* v115（2026-09-22 用户要求）：回自动时同样清空手动拖过的分界线（阶梯覆盖表），
        与左栏 2/3/4/5 区按钮行为一致（见 index.html N 区按钮处理器）。 */
-    try { if (typeof window.tlZoneStepClear === 'function') window.tlZoneStepClear(); } catch(e){}
-    try { if (window.tlDiagramData && window.tlDiagramData.zones) { window.tlDiagramData.zones.cutOffX = null; window.tlDiagramData.zones.cutOffY = null; } } catch(e){}
     if (typeof rerenderKeepView === 'function') rerenderKeepView();
     applyGroupHighlight();
     if (typeof window.tlManualBtnSync === 'function') window.tlManualBtnSync();
@@ -3452,10 +3468,41 @@
   }
 
   /* ===== v150 节点层联动：节点增删/改配件 → 重渲染（角标/连线随数据更新）；删除的是选中节点 → 清选中态 ===== */
+  var drawingDesignLevel3CommitTimer = 0;
+  function queueDrawingDesignLevel3Commit() {
+    if (drawingDesignLevel3CommitTimer) clearTimeout(drawingDesignLevel3CommitTimer);
+    drawingDesignLevel3CommitTimer = setTimeout(function () {
+      drawingDesignLevel3CommitTimer = 0;
+      if (typeof window.ryCommitSingleLevel3CanonicalFromRuntime === 'function') {
+        var committed=window.ryCommitSingleLevel3CanonicalFromRuntime();
+        if(committed!==true&&!(window.__runyeGroupEdit&&window.__runyeGroupEdit.active)&&
+            typeof window.ryRestoreSingleLevel3CanonicalRuntime==='function'){
+          window.ryRestoreSingleLevel3CanonicalRuntime();
+        }
+      }
+    }, 120);
+  }
   if (typeof window !== 'undefined' && window.RyTlNodes && typeof window.RyTlNodes.subscribe === 'function') {
     window.RyTlNodes.subscribe(function (det) {
       if (det && det.action === 'removeNode' && selNodeId === det.id) selNodeId = null;
       rerenderKeepView();
+      if (det && ['addNode','removeNode','moveNode','fittings','addLink','removeLink','linkOd'].indexOf(det.action) !== -1 &&
+          typeof window.ryCommitSingleLevel3CanonicalFromRuntime === 'function') {
+        queueDrawingDesignLevel3Commit();
+      }
+    });
+  }
+  if (typeof window !== 'undefined' && EP && typeof EP.onChange === 'function') {
+    EP.onChange(function (det) {
+      if (!det || det.source !== 'ws' || det.action === 'restore') return;
+      queueDrawingDesignLevel3Commit();
+    });
+  }
+  if (typeof window !== 'undefined' && AE && typeof AE.onChange === 'function') {
+    AE.onChange(function (det) {
+      if (!det || det.action === 'restore' || det.action === 'caliber') return;
+      if (det.action === 'batch' && !(det.actions || []).some(function (action) { return action !== 'caliber'; })) return;
+      queueDrawingDesignLevel3Commit();
     });
   }
   api._v150 = { selNodeId: function () { return selNodeId; }, selAutoSeg: function () { return selAutoSeg; } };   // 诊断/E2E 钩子

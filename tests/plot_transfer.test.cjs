@@ -8,7 +8,7 @@ const ringB = [[18.4,109.7],[18.4,109.701],[18.401,109.701]];
 const plot = (id,ring) => ({id,name:id,polyLatLng:ring,sqm:1000,mu:1.5,source:'map',ts:10,poly:ring.map((_,i)=>({x:i,y:i}))});
 function fixture(plots) {
   const data = new Map([['runye_plot_library',JSON.stringify(plots)]]);
-  const calls = {jumps:[],alerts:[],saves:0,loads:0,diagrams:0};
+  const calls = {jumps:[],alerts:[],saves:0,loads:0,diagrams:0,refreshes:0};
   const list = {children:[],set innerHTML(v){this.children=[]},appendChild(x){this.children.push(x)}};
   const document = {
     readyState:'loading',addEventListener(type,fn){this.onready=fn},
@@ -22,6 +22,8 @@ function fixture(plots) {
     alert:m=>calls.alerts.push(m),updatePlan(){},
     ppLoadPolygon(){calls.loads++},ppGenerateDiagram(){calls.diagrams++},
     ryJumpToSection:id=>calls.jumps.push(id),runyeSetCurrentPlot:id=>{calls.saves++},
+    runyeSaveCurrentPlotBeforeSwitch(){return true},
+    RyDrawingWorkspace:{refreshPlot(){calls.refreshes++;assert.equal(calls.jumps.at(-1),'pipePlanSection','refresh happens after the viewport is visible')}},
   };
   ctx.window=ctx;vm.createContext(ctx);
   for(const f of ['core/plot-library-store.js','core/measured-area-bridge-store.js','mod/inline-13.js','mod/inline-16.js'])vm.runInContext(fs.readFileSync(path.join(root,f),'utf8'),ctx,{filename:f});
@@ -30,6 +32,7 @@ function fixture(plots) {
 const a=plot('a',ringA), b=plot('b',ringB);
 const f=fixture([a,b]);
 const original=f.data.get('runye_plot_library');
+f.ctx.__ryLazyReplay=true;
 const geometryKey=JSON.stringify([ringB]);
 const transferId=f.ctx.RyMeasuredAreaBridgeStore.write({ryPlotRef:{id:'b',geometryKey,areaM2:1000}});
 f.ctx.location.search='?ryPlotTransfer='+encodeURIComponent(transferId);
@@ -40,6 +43,8 @@ assert.equal(f.data.has(f.ctx.RyMeasuredAreaBridgeStore.keyPrefix+transferId),fa
 assert.equal(f.ctx.location.search,'','successful receive removes its URL token');
 assert.equal(f.calls.jumps.at(-1),'pipePlanSection');
 assert.equal(f.calls.loads>0 && f.calls.diagrams>0,true);
+assert.equal(f.ctx.__ryLazyReplay,false,'incoming map geometry cancels outgoing deferred generation');
+assert.equal(f.calls.refreshes,1,'map handoff refreshes and fits the single drawing viewport');
 const missingRef=fixture([a]);
 const stalePayload=JSON.stringify({ryPlotRef:{id:'missing',geometryKey:JSON.stringify([ringB]),areaM2:1000}});
 const staleId=missingRef.ctx.RyMeasuredAreaBridgeStore.write(JSON.parse(stalePayload));
@@ -224,3 +229,107 @@ assert.equal(importFailure.data.get('runye_map_view'),JSON.stringify({lat:10,lng
 assert.deepEqual(JSON.parse(importFailure.data.get('runye_plot_library')).map(p=>p.id),['before-import'],'a failed project import restores the previous plot library');
 assert.equal(importFailure.data.has('undefined'),false);
 console.log('three plot transfer routes, source preservation and duplicate guard: OK');
+
+// Exercise the real workspace controller with a minimal DOM, without opening a user browser.
+function workspaceFixture(){
+  const nodes=new Map(),frames=[],events={};
+  class Element{
+    constructor(id){this.id=id||'';this.children=[];this.attrs={};this.style={};this.textContent='';this.hidden=false;this.className='';this.handlers={};if(id)nodes.set(id,this);}
+    setAttribute(k,v){this.attrs[k]=String(v);if(k==='id'){this.id=String(v);nodes.set(this.id,this);}}
+    getAttribute(k){return Object.hasOwn(this.attrs,k)?this.attrs[k]:null;}
+    hasAttribute(k){return Object.hasOwn(this.attrs,k);}
+    removeAttribute(k){delete this.attrs[k];}
+    appendChild(n){if(n.parentNode)n.parentNode.removeChild(n);this.children.push(n);n.parentNode=this;return n;}
+    removeChild(n){this.children.splice(this.children.indexOf(n),1);n.parentNode=null;}
+    insertBefore(n,ref){if(!ref)return this.appendChild(n);if(n.parentNode)n.parentNode.removeChild(n);this.children.splice(this.children.indexOf(ref),0,n);n.parentNode=this;return n;}
+    get nextSibling(){return this.parentNode&&this.parentNode.children[this.parentNode.children.indexOf(this)+1]||null;}
+    get classList(){return {contains:c=>this.className.split(' ').includes(c),toggle:(c,on)=>{const s=new Set(this.className.split(' ').filter(Boolean));if(on===undefined)on=!s.has(c);on?s.add(c):s.delete(c);this.className=[...s].join(' ');return on;}};}
+    addEventListener(k,fn){this.handlers[k]=fn;}
+    querySelectorAll(selector){
+      const matches=n=>selector==='button'?n.tagName==='button':selector==='svg.tl-ws-svg'?n.tagName==='svg'&&n.classList.contains('tl-ws-svg'):
+        selector[0]==='['?n.hasAttribute(selector.slice(1,-1)):selector[0]==='#'?n.id===selector.slice(1):n.classList.contains(selector.slice(1));
+      const found=[];for(const n of this.children){if(matches(n))found.push(n);found.push(...n.querySelectorAll(selector));}return found;
+    }
+    querySelector(s){return this.querySelectorAll(s)[0]||null;}
+  }
+  const body=new Element('body'),main=new Element('main');body.appendChild(main);
+  const pp=new Element('pipePlanSection'),tl=new Element('tlPipePlanSection'),pb=new Element('ppBody'),tb=new Element('tlBody');
+  main.appendChild(pp);main.appendChild(tl);pp.appendChild(pb);tl.appendChild(tb);
+  const ps=new Element('ppStage'),ts=new Element('tlStage');pb.appendChild(ps);tb.appendChild(ts);
+  const ppSide=new Element('ppSide'),tlSide=new Element('tlSide');pb.appendChild(ppSide);tb.appendChild(tlSide);
+  for(const id of ['ppCanvasWrap','ppCanvas','ppToolbar','ppQuickBar','ppPlotPanel'])ps.appendChild(new Element(id));
+  const panel=nodes.get('ppPlotPanel');panel.appendChild(new Element('ppPlotWorkflow'));panel.appendChild(new Element('ppGroupEditWrap'));
+  const panelToggle=new Element('ppPlotPanelToggle');panelToggle.tagName='button';panelToggle.textContent='多地块编辑';nodes.get('ppToolbar').appendChild(panelToggle);
+  for(const id of ['tlWsContent','tlWsToolbar'])ts.appendChild(new Element(id));
+  for(const id of ['tlWsZoomIn','tlWsZoomOut','tlWsZoomFit']){const b=new Element(id);b.tagName='button';nodes.get('tlWsToolbar').appendChild(b);}
+  const button=new Element('ppLockArea');button.tagName='button';button.textContent='锁定面积';button.setAttribute('title','拖动网格时保持面积');nodes.get('ppToolbar').appendChild(button);
+  const selectors={'body > main':main,'#pipePlanSection > .pp-body > .pp-stage':ps,'#tlPipePlanSection > .pp-body > .pp-stage':ts};
+  pp.querySelector=s=>s===':scope > .pp-body'?pb:null;
+  const document={body,getElementById:id=>nodes.get(id)||null,querySelector:s=>selectors[s]||null,createElement(tag){const e=new Element();e.tagName=tag;return e;}};
+  const calls={renders:0,fit:0,pan:[],zoom:[],panelInit:0};
+  const ctx={document,console,Event:function(type){this.type=type},requestAnimationFrame:fn=>frames.push(fn),
+    addEventListener:(type,fn)=>{events[type]=fn},dispatchEvent(){},ppFitView(){calls.fit++},ppZoomView(factor){calls.zoom.push(factor);return true},ppPanView(x,y){calls.pan.push([x,y]);return true},rypInitAll(){calls.panelInit++},
+    RyTlWs:{render(ctn){calls.renders++;const svg=new Element();svg.tagName='svg';svg.className='tl-ws-svg';ctn.appendChild(svg);}}};
+  ctx.window=ctx;vm.createContext(ctx);
+  const source=fs.readFileSync(path.join(root,'mod/inline-18.js'),'utf8');
+  const start=source.indexOf('(function initDrawingWorkspace(){'),end=source.indexOf('\n  })();',start)+'\n  })();'.length;
+  vm.runInContext('function isTool(){return true;}\n'+source.slice(start,end),ctx);
+  return {ctx,nodes,calls,ps,button,flush(){let n=0;while(frames.length&&n++<50)frames.shift()();assert(n<50,'animation frame queue settles');}};
+}
+const workspace=workspaceFixture(),ws=workspace.ctx.RyDrawingWorkspace;
+ws.activateSection('onlineMapSection');
+assert.equal(workspace.nodes.get('ppCanvasWrap').parentNode,workspace.ps,'visiting the map must not mount or move a hidden drawing viewport');
+workspace.ctx.document.body.setAttribute('data-ry-sec','pipePlanSection');
+ws.activateSection('pipePlanSection');
+assert.equal(workspace.nodes.get('ppPlotPanel').parentNode.id,'ryDrawingHost','plot editor floats outside the horizontal tool groups');
+assert.equal(workspace.nodes.get('ppQuickBar').parentNode.id,'ryDrawingHost','[v788] 分区角度/AI规划/生成施工图组 floats as an independent draggable panel (user: 单独拎出来), not a toolbar child');
+assert.equal(workspace.nodes.get('ppQuickBar').getAttribute('data-ry-tool-group'),null,'[v788] quick panel is NOT a toolbar group anymore');
+assert.equal(workspace.nodes.get('ppPlotWorkflow').parentNode,workspace.nodes.get('ppPlotPanel'),'the original checklist node moves with its panel');
+assert.equal(workspace.calls.panelInit,1,'floating editor is registered with the shared drag/fold controller');
+assert.equal(workspace.nodes.get('ppPlotPanel').hidden,true,'[v789] 多地块编辑 panel starts collapsed as a right-edge drawer');
+assert.equal(workspace.nodes.get('ppPlotPanel').style.left,'','[v790] mount clears stale drag inline position so the drawer opens at the CSS default (right edge)');
+const panelToggle=workspace.nodes.get('ppPlotPanelToggle');
+panelToggle.handlers.click();assert.equal(workspace.nodes.get('ppPlotPanel').hidden,false,'toolbar icon opens the drawer');
+panelToggle.handlers.click();assert.equal(workspace.nodes.get('ppPlotPanel').hidden,true,'click again collapses the drawer');
+const drawerTab=workspace.nodes.get('ppPlotDrawerTab');
+assert.equal(drawerTab.getAttribute('aria-expanded'),'false','[v789] drawer tab starts collapsed');
+drawerTab.handlers.click();assert.equal(workspace.nodes.get('ppPlotPanel').hidden,false,'drawer tab opens the panel');
+assert.equal(drawerTab.classList.contains('open'),true,'[v789] drawer tab highlights when open');
+drawerTab.handlers.click();assert.equal(workspace.nodes.get('ppPlotPanel').hidden,true,'drawer tab collapses the panel');
+assert.equal(drawerTab.classList.contains('open'),false,'[v789] drawer tab highlight clears when closed');
+const canvasParent=workspace.nodes.get('ppCanvasWrap').parentNode;
+ws.setToolMode('pipeline');
+assert.equal(workspace.nodes.get('ppCanvasWrap').parentNode,canvasParent,'tool selection preserves the same viewport node');
+/* [v777 合并工具栏] 用户要求：两套功能按钮全部常驻同一顶部工具栏，不再档位切换。
+   setToolMode 只更新内部上下文，不改变任何工具组可见性。 */
+assert.equal(workspace.nodes.get('ppToolbar').hidden,false,'partition tools stay visible in the merged toolbar');
+assert.equal(workspace.nodes.get('tlWsToolbar').hidden,false,'pipeline tools stay visible in the merged toolbar');
+ws.setToolMode('partition');
+assert.equal(workspace.nodes.get('ppToolbar').hidden,false,'merged toolbar keeps partition tools visible');
+assert.equal(workspace.nodes.get('tlWsToolbar').hidden,false,'merged toolbar keeps pipeline tools visible');
+ws.setToolMode('pipeline');
+assert.equal(workspace.button.getAttribute('aria-label'),'锁定面积');
+assert(workspace.button.getAttribute('data-ry-icon'),'an icon is assigned even when a long description exists');
+assert.equal(workspace.nodes.get('tlWsContent').style.visibility,'hidden','an old SVG cannot show without current pipeline data');
+workspace.ctx.tlDiagramData={poly:[{x:0,y:0},{x:20,y:0},{x:0,y:20}]};
+ws.setToolMode('pipeline');
+assert.equal(workspace.calls.renders,1,'current pipeline geometry is rendered into the existing overlay');
+assert.equal(workspace.nodes.get('tlWsContent').style.pointerEvents,'auto');
+ws.setToolMode('partition');
+/* [v777 合并工具栏] 混合模式下管线层 ready 即可交互，不再按档位切 none；
+   分区编辑不被拦截由 SVG visiblePainted 默认行为保证（空白穿透、
+   全幅背景 rect 已被 pointer-events:none 禁用），此处断言交互保持开启。 */
+assert.equal(workspace.nodes.get('tlWsContent').style.pointerEvents,'auto','merged mode keeps the ready pipe layer interactive; blank areas pass through to the base canvas');
+assert.equal(workspace.calls.renders,1,'changing tools does not regenerate pipeline geometry');
+const zoomIn=workspace.nodes.get('tlWsZoomIn');
+workspace.nodes.get('tlWsToolbar').handlers.click({target:{closest(){return zoomIn;}},preventDefault(){},stopPropagation(){},stopImmediatePropagation(){}});
+assert.deepEqual(workspace.calls.zoom,[1.25],'pipeline zoom-in toolbar updates the shared base camera');
+assert.equal(workspace.calls.fit,1,'[v784] rendering new pipeline data refits the base camera once (ppFitScale dim-margin refit); zoom-in adds none');
+const zoomFit=workspace.nodes.get('tlWsZoomFit');
+workspace.nodes.get('tlWsToolbar').handlers.click({target:{closest(){return zoomFit;}},preventDefault(){},stopPropagation(){},stopImmediatePropagation(){}});
+assert.equal(workspace.calls.fit,2,'pipeline fit toolbar fits the shared drawing camera');
+assert.equal(ws.panBy(10,20),true);assert.deepEqual(workspace.calls.pan,[[10,20]],'pipe panning uses the shared base camera');
+workspace.ctx.tlDiagramData=null;ws.refreshPlot();workspace.flush();
+assert.equal(workspace.nodes.get('tlWsContent').style.visibility,'hidden','incoming map plot detaches the previous network overlay');
+assert.equal(workspace.calls.fit,3,'shared fit plus a newly received plot request the base camera fit');
+console.log('shared viewport, combined toolbar, incoming plot and overlay interaction: OK');

@@ -19,7 +19,7 @@ const css = fs.readFileSync(path.join(root, 'mod', 'style-01.css'), 'utf8');
 
 /* ---------- 1. 结构：三张图纸卡的父节点都是 .ry-pane ---------- */
 ['tlDiagramWrap', 'tlSysDiagramWrap', 'ppDiagramWrap'].forEach(function (id) {
-  const re = new RegExp('<div class="ry-pane[^"]*">\\s*<div class="pp-diagram-wrap" id="' + id + '">');
+  const re = new RegExp('<div class="ry-pane[^"]*">\\s*<div class="pp-diagram-wrap" id="' + id + '"(?:\\s+[^>]*)?>');
   assert.ok(re.test(html),
     '#' + id + ' 的父节点应是 .ry-pane —— 若 DOM 层级变了，style-01.css 里那条 ' +
     '`.pp-stage > .ry-pane > .pp-diagram-wrap{min-height:0}` 就要同步改，否则图纸会被裁');

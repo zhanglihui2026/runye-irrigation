@@ -1204,12 +1204,12 @@ body.ry-zoneauto-off #ppDiagramContent .pp-zone-label{display:none}
    分区层（例如某处没走到 ppGetZoneLayout），也不至于让用户看到不该有的线。 */
 
 
-/* 关闭划分后「调网格 / 重置网格 / 锁定面积 / 重新分区 / 分区旋转」均无意义（没有内部线可操作）
-   ⇒ 置灰不可点，避免用户点了没反应或产生困惑。开启时自动恢复。 */
+/* 关闭划分后「调网格 / 重置网格 / 锁定面积 / 分区旋转」均无意义（没有内部线可操作）
+   ⇒ 置灰不可点，避免用户点了没反应或产生困惑。开启时自动恢复。
+   （v804：「重新分区」按钮已取消——角度调整即自动重算，无需手动驱动。 */
 body.ry-zoneauto-off #ppToolbar>.pp-btn[data-mode="adjustCut"],
 body.ry-zoneauto-off #ppResetCuts,
 body.ry-zoneauto-off #ppLockArea,
-body.ry-zoneauto-off #ppRepartition,
 body.ry-zoneauto-off #ppRotateZones{
   opacity:.4;pointer-events:none;cursor:not-allowed;
 }
@@ -2368,12 +2368,20 @@ body > .ry-nav .main-header{display:none!important}
   box-shadow:0 2px 8px rgba(15,23,42,.06);
   pointer-events:auto;
 }
-#pipePlanSection .pp-canvas-wrap>.pp-quick>.pp-angle-control{height:26px;padding:0 7px;font-size:11.5px}
-#pipePlanSection .pp-canvas-wrap>.pp-quick>.pp-angle-control>input{width:46px;height:22px;padding:1px 4px;font-size:11.5px}
-#pipePlanSection .pp-canvas-wrap>.pp-quick>#ppRepartition{height:26px;padding:0 9px;font-size:11.5px;white-space:nowrap}
+#pipePlanSection .pp-canvas-wrap>.pp-quick>.pp-zone-angle-control{
+  display:flex;align-items:center;gap:4px;height:26px;padding:0 7px;
+  border:1px solid #d8e4dc;background:#fff;color:#315b47;font-size:11.5px;white-space:nowrap;
+}
+#pipePlanSection .pp-canvas-wrap>.pp-quick>.pp-zone-angle-control>input{
+  width:58px;height:22px;box-sizing:border-box;padding:1px 4px;border:1px solid #cbd8d0;
+  background:#fff;color:#24342d;font:inherit;text-align:center;
+}
+#pipePlanSection .pp-canvas-wrap>.pp-quick>.pp-zone-angle-control>input:focus{outline:2px solid rgba(22,163,74,.22);border-color:#16a34a}
+#pipePlanSection .pp-canvas-wrap>.pp-quick>#ppRotateZones{height:26px;padding:0 8px;font-size:11.5px;white-space:nowrap}
 #pipePlanSection .pp-canvas-wrap>.pp-quick>#ppGenerate{height:26px;padding:0 10px;font-size:11.5px;white-space:nowrap}
 #pipePlanSection .pp-canvas-wrap>.pp-quick .pp-quick-grip{cursor:grab;font-size:13px;line-height:1;color:#93a1a8;user-select:none;padding:0 3px;touch-action:none}
 #pipePlanSection .pp-canvas-wrap>.pp-quick.pp-quick-dragging{cursor:grabbing;box-shadow:0 6px 18px rgba(15,23,42,.14)}
+@media(max-width:680px){#pipePlanSection .pp-canvas-wrap>.pp-quick{flex-wrap:wrap;max-width:calc(100% - 16px)}}
 /* [v249] 折叠把手：仅宽屏三列布局显示（下方 @media 内定义），窄屏上下流布局无右轨可折 */
 
 /* [v246b] 提示条（#ppHint）与本条同在画布左上角，会正面相撞 ⇒ 提示条退到快捷条下方
@@ -4843,4 +4851,459 @@ body.ry-tool #pipePlanSection #ppToolbar>#ppAutoPipe{
 }
 body.ry-tool #pipePlanSection #ppToolbar>#ppAutoPipe.active{
   background:#2d604b!important;border-color:#2d604b!important;color:#fff!important;
+}
+
+/* CAD 单一制图区迁移阶段 2：同一宿主随二级/三级功能区移动，内部保留各自渲染层。 */
+#ryDrawingHost{
+  grid-column:3;grid-row:1;display:flex;flex:1 1 auto;flex-direction:column;
+  min-width:0;min-height:0;width:100%;height:100%;padding:0;margin:0;
+  overflow:hidden;background:var(--ry-canvas);border:0;
+}
+#ryDrawingHost>[data-ry-drawing-layer]{
+  flex:1 1 auto;min-width:0;min-height:0;width:100%;height:100%;margin:0;
+  overflow:hidden;background:var(--ry-canvas);border:0;
+}
+#ryDrawingHost>.ry-drawing-modes{
+  display:flex;flex:0 0 auto;gap:4px;align-items:center;min-height:34px;padding:4px 10px;
+  background:var(--ry-panel-bg,#fff);border-bottom:1px solid var(--ry-border,#d4dfd8);
+}
+#ryDrawingHost>.ry-drawing-modes>button{
+  min-height:26px;padding:3px 12px;border:1px solid #c6d6cc;background:#fff;color:#173e32;
+  font-family:inherit;font-weight:600;font-size:12px;line-height:18px;cursor:pointer;
+}
+#ryDrawingHost>.ry-drawing-modes>button[aria-pressed="true"]{background:#173e32;border-color:#173e32;color:#fff}
+#ryDrawingHost>.ry-drawing-modes>button:focus-visible{outline:2px solid #39795b;outline-offset:2px}
+
+/* Unified CAD canvas: both legacy renderers share one persistent viewport.
+   Tool mode changes the visible control group; layer toggles never replace the canvas. */
+#ryDrawingHost.ry-drawing-host{
+  position:relative;grid-column:3;grid-row:1;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:46px minmax(0,1fr);
+  min-width:0;min-height:0;width:100%;max-width:100%;height:100%;overflow:hidden;background:#e8eeeb;
+}
+#ryDrawingHost>.ry-drawing-toolbar{
+  grid-row:1;display:flex;align-items:center;gap:5px;min-width:0;width:100%;max-width:100%;min-height:42px;
+  padding:5px 8px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;background:#f8fbf9;box-sizing:border-box;
+  border-bottom:1px solid #c9d8cf;z-index:50;
+}
+#ryDrawingHost .ry-drawing-tool-mode,#ryDrawingHost .ry-drawing-layer-toggle{
+  flex:0 0 32px;width:32px;height:32px;padding:0;border:1px solid #c7d7ce;background:#fff;
+  color:#244b39;font:600 17px/1 system-ui,sans-serif;cursor:pointer;
+}
+#ryDrawingHost [data-ry-drawing-mode-button][aria-pressed="true"],
+#ryDrawingHost [data-ry-layer-toggle][aria-pressed="true"]{background:#1c5a42;border-color:#1c5a42;color:#fff}
+#ryDrawingHost .ry-drawing-toolbar-label{flex:0 0 auto;padding:0 5px;color:#456354;font-size:11px;font-weight:700}
+#ryDrawingHost #ppToolbar,#ryDrawingHost #tlWsToolbar{
+  display:flex!important;flex:0 0 auto!important;flex-direction:row!important;align-items:center;gap:5px;min-width:max-content;
+  width:auto!important;max-width:none;max-height:none;margin:0!important;padding:0!important;background:transparent;overflow:visible!important;
+}
+#ryDrawingHost #ppToolbar[hidden],#ryDrawingHost #tlWsToolbar[hidden],#ryDrawingHost #ppQuickBar[hidden]{display:none!important}
+body.ry-tool #pipePlanSection #ryDrawingHost #ppToolbar{grid-column:auto;grid-row:auto;flex-direction:row!important;flex-wrap:nowrap!important;align-items:center!important;min-width:max-content;max-height:none;overflow:visible!important;border:0!important}
+body.ry-tool #pipePlanSection #ryDrawingHost #ppToolbar>.pp-sep{width:1px;height:24px;flex:0 0 1px;margin:0;background:#d7e2dc}
+#ryDrawingHost #tlWsToolbar .tl-ws-btn{width:auto;min-width:32px;max-width:150px;padding:0 8px}
+#ryDrawingHost #tlWsToolbar .tl-ws-sep{width:1px;height:24px;flex:0 0 1px;margin:0;background:#d7e2dc}
+#ryDrawingHost #tlWsToolbar .tl-ws-hint{display:none}
+body.ry-tool #pipePlanSection #ryDrawingHost [data-ry-tool-group] button[data-ry-icon]{
+  position:relative;flex:0 0 32px!important;width:32px!important;min-width:32px!important;max-width:32px!important;
+  height:32px!important;min-height:32px!important;padding:0!important;font-size:0!important;line-height:32px!important;
+  overflow:hidden;white-space:nowrap;box-sizing:border-box;vertical-align:middle;
+}
+#ryDrawingHost [data-ry-tool-group] button[data-ry-icon]::before{
+  content:attr(data-ry-icon);display:inline-block;margin:0;font-size:18px;line-height:30px;vertical-align:top;
+}
+/* [v788 单层工具栏 + 角度组悬浮] 用户截图（箭头指组分隔线断口）指令：「我要把所有功能
+   都放在一个工具栏……只有一层关系，就是面板里面执行按钮，另外，分区旋转角度那一套，
+   还是要单独拎出来」。
+   ① 工具栏 = 分区组 + 管路组，组间分隔线（pp-sep / tl-ws-sep / ry-drawing-tsep）
+      一律隐藏 —— 按钮连成一条，消除"两个工具栏拼接"的断口感（v782 的浅色 1px 线
+      在图标化观感下就是断口）。
+   ② #ppQuickBar（🤖AI规划/分区角度/±90°/重新分区/生成施工图）恢复 v783 悬浮卡片：
+      画布左上可拖动（默认 top:52px/left:16px，避开工具栏与多地块编辑面板），
+      白底、描边、投影、圆角、抓手可拖、双击抓手回默认位、位置存档 ppQuickBarPos。
+   要改回"角度组进工具栏"：删 ② 还原 v787 内联规则（git 历史），并把 inline-18.js
+   的 quick 组重新挂 toolbarStack。 */
+#ryDrawingHost>.ry-drawing-toolbar .pp-sep,
+#ryDrawingHost>.ry-drawing-toolbar .tl-ws-sep,
+#ryDrawingHost>.ry-drawing-toolbar .ry-drawing-tsep{display:none!important}
+#ryDrawingHost #ppQuickBar{
+  position:absolute!important;top:52px;left:16px;bottom:auto;right:auto;
+  display:flex!important;flex:0 0 auto!important;flex-direction:row!important;align-items:center!important;gap:4px!important;
+  width:auto;max-width:none;min-height:36px;box-shadow:0 4px 14px rgba(15,23,42,.12);
+  border:1px solid #e0e7ea;border-radius:8px;background:#fff;padding:5px 8px;margin:0;
+  overflow:visible;z-index:60;white-space:nowrap;
+}
+#ryDrawingHost #ppQuickBar[hidden]{display:none!important}
+/* 抓手：v246 的 cursor:grab 规则带 `.pp-canvas-wrap>` 前缀，宿主内不命中 —— 按原手感补回
+   （全站方角规则会压掉 v783 的 8px 圆角，属有意扁平化，不写 radius）。 */
+#ryDrawingHost #ppQuickBar .pp-quick-grip{cursor:grab;font-size:13px;line-height:1;color:#93a1a8;user-select:none;padding:0 3px;touch-action:none}
+#ryDrawingHost #ppQuickBar.pp-quick-dragging .pp-quick-grip{cursor:grabbing}
+
+/* [v789 右缘抽屉 → v803 双抽屉统一] 「多地块编辑」与「图层控制」两面板同一套抽屉
+   语义：默认收起，右缘各留一枚竖排标签，点击弹出（全展开）/再点收起。
+   标签 absolute 贴 host 右缘（不出流、不占宿主网格行）；全站方角规则下不写圆角。
+   图层标签在多地块标签正下方（96px 高 + 8px 间距 → top:202px）。 */
+#ryDrawingHost #ppPlotDrawerTab,
+#ryDrawingHost #tlWsLayerDrawerTab{
+  position:absolute;top:98px;right:0;z-index:70;
+  writing-mode:vertical-rl;letter-spacing:3px;text-align:center;
+  min-height:96px;padding:10px 6px;border:1px solid #c8d7ce;border-right:0;
+  background:#fff;color:#244b39;font:600 12px/1 system-ui,sans-serif;cursor:pointer;
+}
+#ryDrawingHost #tlWsLayerDrawerTab{top:202px}
+#ryDrawingHost #ppPlotDrawerTab:hover,
+#ryDrawingHost #tlWsLayerDrawerTab:hover{background:#f2f8f4}
+#ryDrawingHost #ppPlotDrawerTab.open,
+#ryDrawingHost #tlWsLayerDrawerTab.open{background:#2d604b;border-color:#2d604b;color:#fff}
+#ryDrawingHost #ppPlotDrawerTab:focus-visible,
+#ryDrawingHost #tlWsLayerDrawerTab:focus-visible{outline:2px solid #39795b;outline-offset:-2px}
+#ryDrawingHost #ppPlotPanel{right:44px}
+#ryDrawingHost .ry-drawing-canvas{position:relative;grid-row:2;min-width:0;min-height:0;width:100%;height:100%;overflow:hidden;background:#e8eeeb}
+#ryDrawingHost #ppCanvasWrap,#ryDrawingHost #tlWsContent{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;min-width:0;min-height:0;margin:0!important;border:0!important;border-radius:0!important;}
+#ryDrawingHost #ppCanvasWrap{z-index:1;background:transparent!important}
+#ryDrawingHost #ppCanvas{display:block;width:100%;height:100%}
+/* [v784] overflow hidden→visible：图层盒被 syncCamera 仿射变换（transform-origin:0 0），
+   pp 缩放较小（affine scale<1）时变换盒内缩，hidden 会把图幅底部条带（尺寸标注区）
+   按内缩盒错误裁掉；可视边界统一交给 .ry-drawing-canvas（overflow:hidden）。 */
+#ryDrawingHost #tlWsContent{z-index:2;overflow:visible;background:transparent!important;transform-origin:0 0}
+#ryDrawingHost #tlWsContent .tl-ws-canvas{position:absolute;inset:0;overflow:visible;background:transparent}
+#ryDrawingHost #tlWsContent svg.tl-ws-svg{overflow:visible}
+#ryDrawingHost #tlWsContent svg.tl-ws-svg>rect:first-child{visibility:hidden;pointer-events:none}
+#ryDrawingHost #tlWsBase{visibility:hidden;pointer-events:none}
+#ryDrawingHost #tlWsContent [data-ry-partition-base],
+#ryDrawingHost #tlWsContent [data-zi],
+#ryDrawingHost #tlWsContent [data-tlzone]{visibility:hidden;pointer-events:none}
+#ppPlotPanel{
+  position:fixed;z-index:80;top:calc(var(--fn-nav-h,40px) + 58px);right:12px;
+  display:flex;flex-direction:column;width:300px;max-width:calc(100vw - 24px);
+  max-height:min(64vh,calc(100vh - var(--fn-nav-h,40px) - 90px));
+  overflow:hidden;background:rgba(250,252,251,.98);border:1px solid #c8d7ce;
+  box-shadow:0 5px 18px rgba(24,50,38,.16);box-sizing:border-box;white-space:normal;
+}
+#ppPlotPanel[hidden],#ppPlotPanel [data-ry-body][hidden]{display:none!important}
+/* [v803] 面板头不再承载拖拽（data-ry-drag 属性已随抽屉统一整组移除），
+   cursor:move/touch-action 一并清掉；折叠按钮已删，对应规则不再保留。 */
+#ppPlotPanel .ry-plot-panel-head{display:flex;align-items:center;justify-content:space-between;flex:0 0 32px;padding:0 8px;user-select:none;background:#eaf2ed;border-bottom:1px solid #c8d7ce;color:#244b39}
+#ppPlotPanel .ry-plot-panel-body{min-height:0;overflow:auto;padding:8px;overscroll-behavior:contain}
+#ppPlotPanel #ppPlotWorkflow{position:static!important;display:block!important;width:100%;min-width:0;max-height:none;margin:0;padding:0;border:0;box-shadow:none}
+#ppPlotPanel #ppGroupEditWrap{flex-direction:column;align-items:stretch;gap:6px;width:100%;margin:0 0 8px;padding:0 0 8px;border-bottom:1px solid #d7e2dc}
+#ppPlotPanel .pp-ge-row,#ppPlotPanel .pp-ge-chips{display:flex;flex-wrap:wrap;gap:4px}
+#ppPlotPanel button.pp-ge-mode,#ppPlotPanel button.pp-ge-chip,#ppPlotPanel .pp-back-group{min-height:28px;width:auto;padding:3px 9px;border:1px solid #c5d6cc;background:#f8fbf9;color:#2c4a3d;font-size:12px}
+#ppPlotPanel button.active{background:#2d604b;color:#fff}
+#ryDrawingHost #ppSide,#ryDrawingHost #tlSide{display:none}
+/* [v775 工具化] 模式切换器：地块分区 / 管路规划 = 画布顶部工具档位（不再是页面切换入口）。
+   选中态沿用 [data-ry-drawing-mode-button][aria-pressed="true"] 既有规则。 */
+#ryDrawingHost .ry-drawing-mode-switch{flex:0 0 auto;display:inline-flex}
+#ryDrawingHost .ry-drawing-mode-switch>button{
+  min-height:28px;padding:3px 10px;border:1px solid #c7d7ce;background:#fff;color:#244b39;
+  font-family:inherit;font-weight:600;font-size:12px;line-height:18px;cursor:pointer;white-space:nowrap;
+}
+#ryDrawingHost .ry-drawing-mode-switch>button:first-child{border-right:0;border-radius:4px 0 0 4px}
+#ryDrawingHost .ry-drawing-mode-switch>button:last-child{border-radius:0 4px 4px 0}
+#ryDrawingHost .ry-drawing-mode-switch>button:focus-visible{outline:2px solid #39795b;outline-offset:1px}
+/* 工具栏内组分隔线 */
+#ryDrawingHost .ry-drawing-tsep{flex:0 0 1px;width:1px;height:24px;margin:0 2px;background:#d7e2dc}
+/* [v779 取消] 通用「地块规划清单」入口 ▤ 已删除（与工具组内「多地块编辑」重复，用户拍板保留后者）；
+   .ry-drawing-plot-toggle 规则随之作废，恢复时连同 inline-18.js 的 plotToggle 创建块一起还原 */
+/* [v778 取消] 通用缩放三键（＋ − ⛶）已按用户要求从工具栏移除（缩放走滚轮/双击），
+   .ry-drawing-zoom-btn 规则随之作废；恢复时连同 inline-18.js 的创建块一起还原 */
+/* [v781 取消] 「▦ 调网格」（button[data-mode=adjustCut]）与「⟲ 重置网格」（#ppResetCuts）
+   在统一绘图工作区内隐藏 —— 用户截图标注「调网格跟重置网格按钮都取消吧」。
+   注意：调网格是分区编辑的默认档位（adjustCut），只隐藏按钮不改默认模式 ——
+   画布上拖分区线的能力原样保留；重置网格仅去宿主内入口，DOM 与绑定保留
+   （verify_sketchup 计数契约不破坏；宿主卸载回退原二级页面时两者仍可用）。
+   恢复方式：删除本行即可。 */
+#ryDrawingHost #ppToolbar button[data-mode="adjustCut"],#ryDrawingHost #ppResetCuts{display:none!important}
+/* [v780 取消] 「⇢ 自动管路」（#ppAutoPipe，ppToolbar 组内、回退与地块划分之间）
+   在统一绘图工作区内隐藏 —— 用户截图标注「没什么意义了，取消吧」（管路生成已由
+   管路组「🔄 生成管线图」承担）。按 v96/v778 惯例只隐藏宿主内入口：DOM 与点击
+   绑定、verify_sketchup 按钮计数契约均保留；宿主卸载回退原二级页面时仍可用。
+   恢复方式：删除本行即可。 */
+#ryDrawingHost #ppAutoPipe{display:none!important}
+/* [v778 取消] 分区线微调四键（↑↓←→，#ppCutFineGroup，调网格模式下出现）
+   在统一绘图工作区内隐藏 —— 用户截图红箭头标注取消。
+   只隐藏宿主内的入口：DOM 与 ppNudgeCut 绑定原样保留（不破坏 verify_sketchup
+   的按钮计数契约；宿主卸载回退到原二/三级页面时微调能力仍在）。
+   恢复方式：删除本行即可。 */
+#ryDrawingHost #ppCutFineGroup{display:none!important}
+/* [v775] 管路组内旧缩放键在宿主内隐藏（与通用键重复）；宿主外（窄屏原始位置）不受影响 */
+#ryDrawingHost #tlWsToolbar #tlWsZoomIn,#ryDrawingHost #tlWsToolbar #tlWsZoomOut,#ryDrawingHost #tlWsToolbar #tlWsZoomFit{display:none!important}
+
+/* ================= [v782 视觉重构] 顶部工具栏 → WPS/Office 扁平风格 =================
+   用户参考截图（WPS 工具栏）：无边框图标钮、浅灰 hover 高亮、组间细分隔线、
+   紧凑单行、彩色图标、主操作带浅色底。仅 #ryDrawingHost 作用域 —— 不改 DOM、
+   绑定与 verify 计数契约；要回旧观感：删除本段（至文件尾）即可。 */
+#ryDrawingHost.ry-drawing-host{grid-template-rows:40px minmax(0,1fr)}
+#ryDrawingHost>.ry-drawing-toolbar{
+  gap:2px;min-height:40px;padding:4px 10px;background:#fff;border-bottom:1px solid #e4ebee;
+}
+#ryDrawingHost>.ry-drawing-toolbar::-webkit-scrollbar{height:4px}
+#ryDrawingHost>.ry-drawing-toolbar::-webkit-scrollbar-thumb{background:#d4dde2;border-radius:2px}
+/* 扁平图标钮：无边框、透明底、28×28、hover 浅灰圆角 */
+#ryDrawingHost .ry-drawing-layer-toggle,
+#ryDrawingHost [data-ry-tool-group] button[data-ry-icon]{
+  flex:0 0 28px!important;width:28px!important;min-width:28px!important;max-width:28px!important;
+  height:28px!important;min-height:28px!important;max-height:28px!important;padding:0!important;
+  border:0!important;border-radius:4px;background:transparent!important;color:#47555e;cursor:pointer;
+}
+#ryDrawingHost .ry-drawing-layer-toggle{font-size:16px;line-height:28px}
+#ryDrawingHost [data-ry-tool-group] button[data-ry-icon]::before{font-size:17px;line-height:28px}
+#ryDrawingHost .ry-drawing-layer-toggle:hover,
+#ryDrawingHost [data-ry-tool-group] button[data-ry-icon]:hover{background:#eef2f6!important}
+/* [v815 退役] 此处原有「彩色图标（WPS 式按功能配色）」一组规则：
+     ppPlotPanelToggle 蓝 / ppLockArea 紫 / ppZoneAutoBtn 绿 / ppGenerate 蓝底 /
+     tlWsFitValve 橙 / tlWsFitTee 青 / tlWsFitElbow 粉 / tlWsFitNode 蓝 /
+     tlLineBtn 黄 / tlDesignUploadBtn 天蓝 / tlAutoPipe 绿底 / tlDxfExport 紫。
+   用户实测：「整体颜色也乱，一会儿是黄色 一会儿是绿色 一会儿是红色的。」
+   这组还越界命中了快捷条的 #ppGenerate / #ppRotateZones，把「生成施工图 /
+   ↺+90°」染成蓝色（上一轮「文字颜色普通黑色就行」的真因）。
+   ⇒ 整组删除，配色改由下方 v815 段单点定义（一种墨色，激活态一种绿）。 */
+/* 按下 / 激活态：浅色高亮底 + 深图标（替代旧深绿实心块） */
+#ryDrawingHost [data-ry-drawing-mode-button][aria-pressed="true"],
+#ryDrawingHost [data-ry-layer-toggle][aria-pressed="true"]{background:#e6f2ec!important;border:0!important;color:#1c6b4f!important}
+#ryDrawingHost [data-ry-tool-group] button[data-ry-icon][aria-pressed="true"]{background:#e3edf8!important;color:#2f6fd9!important}
+body.ry-tool #pipePlanSection #ryDrawingHost #ppZoneAutoBtn.active,
+#ryDrawingHost #ppZoneAutoBtn.active{background:#e6f2ec!important;border-color:transparent!important;color:#1c6b4f!important}
+/* 组间细分隔线（各组之间一条淡线，代替按钮自带边框） */
+#ryDrawingHost .ry-drawing-tsep,
+#ryDrawingHost #ppToolbar>.pp-sep,
+#ryDrawingHost #tlWsToolbar .tl-ws-sep{height:20px;margin:0 4px;background:#e3e9ec}
+/* 快捷条：grip 淡化、分区角度输入轻边框 */
+#ryDrawingHost .pp-quick-grip{color:#b6c2c9;font-size:14px;padding:0 2px}
+#ryDrawingHost .pp-zone-angle-control{gap:3px;font-size:11px;color:#47555e}
+#ryDrawingHost .pp-zone-angle-control input{width:52px;height:24px;padding:1px 4px;border:1px solid #dfe6ea;border-radius:4px;font-size:11px}
+/* 焦点可见性 */
+#ryDrawingHost .ry-drawing-layer-toggle:focus-visible,
+#ryDrawingHost [data-ry-tool-group] button[data-ry-icon]:focus-visible{outline:2px solid #39795b;outline-offset:1px}
+/* ================= [v782 视觉重构结束] ================= */
+
+/* ═══ [v802 工具栏按钮统一] 用户指令：「整体梳理一遍，细化按钮样式，注意各个按钮
+   的比例关系……注意原则，还是一个大的工具栏样式，内部放了执行按钮，各种嵌套/覆盖
+   的样式都不能有。」═══════════════════════════════════════════════════════════
+   实测三处不齐：① 图层开关 28×28 vs 装饰按钮 32×32（两套尺寸并存）；
+   ② 彩色 emoji（🔒💾☁📐🔄🔧）字形满格 ≈18px、单色符号（⋈⊤∟⊕╱↶⌖）字形 ≈0.6em，
+     同一 font-size 视觉一大一小（「弯头看起来比较大」同源：⌐/∟ 字形比例差异）；
+   ③ 原 .pp-btn-ghost/.tl-ws-btn 各自的 border-color/padding 残留（嵌套覆盖）。
+   ⇒ 一套盒子规则压平所有来源：32×32、无边框（active 用背景反馈）、图标单通道
+   ::before 渲染；emoji 按钮 ::before 缩小补偿满格字形。 */
+#ryDrawingHost .ry-drawing-toolbar button[data-ry-icon],
+#ryDrawingHost .ry-drawing-toolbar .ry-drawing-layer-toggle{
+  flex:0 0 32px!important;width:32px!important;min-width:32px!important;max-width:32px!important;
+  height:32px!important;min-height:32px!important;max-height:32px!important;
+  padding:0!important;margin:0!important;border:1px solid transparent!important;border-radius:0!important;
+  font-size:0!important;line-height:30px!important;
+}
+#ryDrawingHost .ry-drawing-toolbar button[data-ry-icon]::before{
+  content:attr(data-ry-icon);display:inline-block;margin:0;font-size:18px;line-height:30px;vertical-align:top;
+}
+#ryDrawingHost .ry-drawing-toolbar button[data-ry-icon][data-ry-icon-emoji]::before{
+  font-size:14px;
+}
+/* 图层开关走同一渲染通道后（v802 inline-18 改 data-ry-icon），旧 span 已不存在；
+   兜底清掉其残留内边距/边框表达。 */
+#ryDrawingHost .ry-drawing-toolbar .ry-drawing-layer-toggle::before{
+  content:attr(data-ry-icon);font-size:18px;
+}
+
+/* ===== [v807 在线地图左栏扒平：对齐分区与管路 .ry-props 特性面板] =====
+   用户指令：「左侧这个工具栏面板，文字样式大小不一，风格也是各种嵌套/覆盖，不统一，
+   扒一扒，翻到底层，让它就是一个面板内部嵌上各种功能就行了，
+   具体样式与分区与管路左侧面板样式统一。」
+   目标皮肤 = ry-panel.css v609 灰条体系：22px 灰分组条（#dcdfdd/#2c2c2a/11px/600）+
+   白底通栏行 + 1px 网格线 + 26px 方角控件，全段不新造色。
+   纪律：本段是在线地图左栏皮肤的唯一出处，一律 #onlineMapSection .side 前缀；
+   online-map.css 在本表之后加载且 .sec-t/.mbtn/input 带 !important（v490 字号对抗），
+   对抗属性同载 !important——除对抗外不写 !important。
+   要回退：删本段即可，online-map.css 原样仍完整可用。 */
+#onlineMapSection .side{gap:0;padding:0;background:#fff}
+#onlineMapSection .side section{margin:0;padding:0;background:transparent}
+/* 灰分组条：值 = ry-panel.css v609 .ry-props-head 同款（全站灰条唯一形制） */
+#onlineMapSection .side .sec-t{
+  display:block;height:22px;line-height:22px;margin:0;
+  padding:0 10px;box-sizing:border-box;
+  background:#dcdfdd;color:#2c2c2a;
+  font-size:11px !important;font-weight:600;letter-spacing:0;
+  border-left:0;border-top:1px solid #cfd4d1;border-bottom:1px solid #cfd4d1;
+}
+#onlineMapSection .side section:first-child .sec-t{border-top:0}
+/* 「地图」组：内容块统一左右 10px、上下 8px；组内 hint 不再加横向内边距（免双层） */
+#onlineMapSection .side .tools{display:flex;flex-direction:column;gap:6px;padding:8px 10px}
+#onlineMapSection .side .tools .hint{padding:0;margin:0}
+#onlineMapSection .side .hint{font-size:11px;line-height:1.5;color:#888780}
+/* 「测量结果 / 我的地块」组：直插组内的行/列/提示自带左右 10px */
+#onlineMapSection .side .results .row{
+  display:flex;justify-content:space-between;align-items:baseline;
+  height:22px;line-height:22px;padding:0 10px;margin:0;
+  border-bottom:1px solid #eceeed;
+}
+#onlineMapSection .side .results .row .k{font-size:11px !important;color:#5f5e5a;font-weight:400}
+/* [v812 字号统一] 用户实测：「东方市 定位三亚 面积 折合 平方 显然不一样大小，都按面积折合平方那一档统一」
+   —— 面积/折合/平方 = 11px 标签档。此前左栏三档混用（按钮 12 / 标签 11 / 单位 10），
+   现全部收敛到 11px：数值、单位、按钮、输入框无一例外；仅数值保留 600 字重做强调。 */
+#onlineMapSection .side .results .row .v{font-size:11px !important;color:#2c2c2a;font-weight:600}
+#onlineMapSection .side .results .row .v small{font-size:11px !important;color:#888780;font-weight:400}
+#onlineMapSection .side .results .hint,
+#onlineMapSection .side > section > .hint{padding:6px 10px 8px;margin:0}
+#onlineMapSection .side > section > .pill-list{padding:8px 10px 2px;margin:0}
+#onlineMapSection .side .save-row{margin:0;padding:6px 10px;display:flex;gap:6px}
+#onlineMapSection .side .save-row .mbtn{flex:1 1 0;min-width:0;white-space:nowrap}
+#onlineMapSection .side .results .mbtn-primary{margin:0;width:auto}
+/* 控件统一：26px 高、11px 字（v812 与标签档同值）、#cbd8d0 边、方角白底 */
+#onlineMapSection .side .mbtn{
+  height:26px !important;padding:0 10px;
+  border:1px solid #cbd8d0;background:#fff;color:#2c4a3d;
+  font-size:11px !important;font-weight:400;line-height:1;
+}
+#onlineMapSection .side .mbtn:hover{border-color:#39795b;background:#f2f8f4;color:#085041}
+#onlineMapSection .side .mbtn.btn-on{background:#2d604b;border-color:#2d604b;color:#fff}
+#onlineMapSection .side .mbtn-primary{background:#2d604b;border-color:#2d604b;color:#fff;text-align:center}
+#onlineMapSection .side .mbtn-primary:hover{background:#085041;border-color:#085041;color:#fff}
+#onlineMapSection .side input[type=text]{
+  height:26px !important;padding:0 8px;
+  font-size:11px !important;border:1px solid #cbd8d0;background:#fff;
+}
+#onlineMapSection .side input[type=text]:focus{outline:1px solid #39795b}
+/* 列表层：搜索结果 / 我的地块行，同一边框色、同字号、零圆角 */
+#onlineMapSection .side .sr-list{margin:0;border:1px solid #cbd8d0}
+/* [v812] 搜索结果行第二行（地址详情）原 10px，是左栏最后一个 10px 档，同步归到 11px；
+   仅用更浅的 #888780 表示次级，不再靠字号差拉层级。online-map.css 后加载，故需 !important。 */
+#onlineMapSection .side .sr-item i{font-size:11px !important;color:#888780}
+#onlineMapSection .side .place-go{
+  height:26px;border:1px solid #cbd8d0;border-radius:0;
+  color:#2c4a3d;font-size:11px !important;line-height:1;
+}
+#onlineMapSection .side .place-go:hover{border-color:#39795b;background:#f2f8f4;color:#085041}
+/* [v812] 行内两个图标位按钮同步到 11px，与左侧文字同一档（此前 12px 混入） */
+#onlineMapSection .side .place-del,
+#onlineMapSection .side .place-send{font-size:11px !important;line-height:1}
+/* [v812 行压平] 此前一行 = 名称框 + → 框 + × 框 三个各自带边框的按钮并排，读起来像三层嵌套。
+   现改为一整行一条边框，右端两个操作位用竖分隔线切格（CAD 面板列表行惯例）：
+   保存地点列表与我的地块列表共用同一形态（两处 DOM 都是 .place-item）。 */
+#onlineMapSection .side .pill-list .place-item{
+  display:flex;align-items:stretch;
+  border:1px solid #cbd8d0;background:#fff;gap:0;
+}
+#onlineMapSection .side .pill-list .place-go{
+  border:0;height:24px;flex:1 1 auto;background:transparent;padding:0 8px;
+}
+#onlineMapSection .side .pill-list .place-go:hover{background:#f2f8f4;color:#085041}
+#onlineMapSection .side .pill-list .place-send,
+#onlineMapSection .side .pill-list .place-del{
+  border:0;border-left:1px solid #dfe6e2;height:24px;width:26px;
+  background:transparent;color:#5f5e5a;
+}
+#onlineMapSection .side .pill-list .place-send{color:#085041;font-weight:600}
+#onlineMapSection .side .pill-list .place-send:hover{background:#eaf2ed;color:#085041}
+#onlineMapSection .side .pill-list .place-del:hover{background:#fdf0f0;color:#a32d2d}
+/* [v812 退役] 此处原有 .place-del/.place-send 的「26px 带框 + 12px 字 !important」两组规则，
+   正是它把字号从 11px 反压回 12px（同特异性、后到先赢），也是「三格嵌套」观感的来源。
+   上方 .pill-list 压平段（一路一框 + 竖分隔线）已完全覆盖它的职责，故整组删除而不是叠加对抗。 */
+
+/* ===== [v808 搜索提示改悬浮弹窗 → v809 改为右侧浮出] =====   用户要求：原本常驻在「地图」组底部的长段坐标格式说明，改为鼠标放到搜索框时弹出的提示框；
+   v809 追加：「弹窗放在右侧吧，如果放在底部，容易把下面的内容遮挡了」。
+   DOM：节点在 .search-row 内部（index.html v808 注释），本段是其外观唯一样式出处。
+   定位：.side 是 overflow:auto 滚动容器，absolute 会被横向裁切 ⇒ 必须 position:fixed
+   跳出去（坐标由 mod/online-map.js v809 段按搜索行实时计算；本段只负责外观）。
+   显示条件：JS 打 data-show="1"（mouseenter/focusin）；:hover 规则作无 JS 兜底。
+   pointer-events:none ⇒ 弹窗不吃鼠标、不挡地图拖拽与下方按钮。 */
+#onlineMapSection .side .search-row{position:relative}
+#onlineMapSection .side #placeHint{
+  display:none;
+  position:fixed;z-index:1500;
+  pointer-events:none;
+  max-width:320px;
+  padding:8px 10px;
+  background:#fff;border:1px solid #cbd8d0;
+  box-shadow:0 4px 14px rgba(24,50,38,.16);
+  font-size:11px;line-height:1.6;color:#5f5e5a;text-align:left;white-space:normal;
+}
+#onlineMapSection .side #placeHint[data-show="1"],
+#onlineMapSection .side .search-row:hover #placeHint,
+#onlineMapSection .side .search-row:focus-within #placeHint{display:block}
+
+/* ===== [v815 工具栏图标统一：单色线性 SVG + 一种墨色] =====
+   用户指令：「图标还是不好看，整体颜色也乱，要统一，图标大小要统一，样式要一种
+   风格，三通阀门 弯头节点 直线这些，用个更形象的图标。遮蔽也用更形象的图标。
+   整体颜色也乱，一会儿是黄色 一会儿是绿色 一会儿是红色的。」
+
+   落点（三处一起才成立）：
+     ① 图标本身 → mod/ry-icons.js 的单色线性 SVG（24×24 网格、1.7px 圆头描边、
+        currentColor）。字形大小不再靠 font-size 猜，同一网格下视觉重量天然一致；
+     ② 颜色 → 本段单点定义：默认一种墨色 #3f4a45，hover 加深，激活态一种绿
+        #1c6b4f / #e6f2ec。「按功能配色」整组已删（见上方退役注释）；
+     ③ 通道 → 有 SVG 的按钮停用 ::before 字形通道，避免字符与 SVG 双份图标。
+   纪律：本段是绘图工具栏图标配色的唯一出处，一律 #ryDrawingHost 前缀；
+   只在此处写 !important（对抗 v782/v802 两代历史规则）。 */
+#ryDrawingHost .ry-drawing-toolbar button[data-ry-ico-svg]::before,
+#ryDrawingHost .ry-drawing-toolbar .ry-drawing-layer-toggle[data-ry-ico-svg]::before{
+  content:none !important;display:none !important;
+}
+#ryDrawingHost .ry-drawing-toolbar button[data-ry-ico-svg],
+#ryDrawingHost .ry-drawing-toolbar .ry-drawing-layer-toggle[data-ry-ico-svg]{
+  display:flex !important;align-items:center !important;justify-content:center !important;
+  font-size:0 !important;
+}
+/* 图标尺寸唯一出处：18×18 in 32×32 按钮；描边参数写在这里，
+   保证 35 个图标是同一支笔画的（「样式要一种风格」）。
+   前一条不带前缀，是兜底：万一有按钮不在 .ry-drawing-toolbar 下被挂了 SVG，
+   也保持 18px，不会撑满容器。 */
+.ry-ico{
+  width:18px;height:18px;flex:0 0 18px;display:block;
+  fill:none;stroke:currentColor;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round;
+  pointer-events:none;
+}
+#ryDrawingHost .ry-drawing-toolbar .ry-ico{
+  width:18px;height:18px;flex:0 0 18px;display:block;
+  fill:none;stroke:currentColor;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round;
+  pointer-events:none;
+}
+/* 一种墨色：不再按功能区分颜色。
+   选择器带三层 id（#pipePlanSection #ryDrawingHost .ry-drawing-toolbar）：历史上
+   `body.ry-tool #pipePlanSection #ppToolbar>.pp-btn-ghost` 这类 2 id + 2 class 的
+   旧皮肤规则还在（v386/v663 遗产），特异性压过 1~2 id 的写法，实测把
+   #ppAutoPipe 改成 #2c4a3d、把 .pp-btn.active（主管）改成深绿白字。三层 id 才能赢。 */
+#pipePlanSection #ryDrawingHost #ppToolbar button[data-ry-icon],
+#pipePlanSection #ryDrawingHost #tlWsToolbar button[data-ry-icon],
+#pipePlanSection #ryDrawingHost .ry-drawing-toolbar button[data-ry-icon],
+#pipePlanSection #ryDrawingHost .ry-drawing-toolbar .ry-drawing-layer-toggle,
+#ryDrawingHost .ry-drawing-toolbar button[data-ry-icon],
+#ryDrawingHost .ry-drawing-toolbar .ry-drawing-layer-toggle{
+  color:#3f4a45 !important;background:transparent !important;border-color:transparent !important;
+}
+#pipePlanSection #ryDrawingHost #ppToolbar button[data-ry-icon]:hover,
+#pipePlanSection #ryDrawingHost #tlWsToolbar button[data-ry-icon]:hover,
+#pipePlanSection #ryDrawingHost .ry-drawing-toolbar button[data-ry-icon]:hover,
+#pipePlanSection #ryDrawingHost .ry-drawing-toolbar .ry-drawing-layer-toggle:hover,
+#ryDrawingHost .ry-drawing-toolbar button[data-ry-icon]:hover{
+  color:#1f2a24 !important;background:#eef2f6 !important;
+}
+/* 激活态：一种绿（状态色只有这一对，不再是每个按钮一种颜色）。
+   覆盖 .pp-btn.active（主管/支管档位）、[aria-pressed=true]（图层开关）、
+   以及 .pp-btn.btn-on 系旧皮肤。 */
+#pipePlanSection #ryDrawingHost #ppToolbar button[data-ry-icon][aria-pressed="true"],
+#pipePlanSection #ryDrawingHost #ppToolbar button[data-ry-icon].active,
+#pipePlanSection #ryDrawingHost #ppToolbar button[data-ry-icon].btn-on,
+#pipePlanSection #ryDrawingHost #tlWsToolbar button[data-ry-icon][aria-pressed="true"],
+#pipePlanSection #ryDrawingHost #tlWsToolbar button[data-ry-icon].active,
+#pipePlanSection #ryDrawingHost .ry-drawing-toolbar button[data-ry-icon][aria-pressed="true"],
+#pipePlanSection #ryDrawingHost .ry-drawing-toolbar button[data-ry-icon].active,
+#pipePlanSection #ryDrawingHost .ry-drawing-toolbar button[data-ry-icon].btn-on,
+#pipePlanSection #ryDrawingHost .ry-drawing-toolbar .ry-drawing-layer-toggle[aria-pressed="true"],
+#ryDrawingHost .ry-drawing-toolbar button[data-ry-icon][aria-pressed="true"],
+#ryDrawingHost .ry-drawing-toolbar button[data-ry-icon].active,
+#ryDrawingHost .ry-drawing-toolbar .ry-drawing-layer-toggle[aria-pressed="true"]{
+  color:#1c6b4f !important;background:#e6f2ec !important;border-color:transparent !important;
+}
+/* 快捷条（分区角度 / ↺+90° / 生成施工图）：同一套白底墨字方角按钮。
+   此前 生成施工图 被上面那组按功能配色染成蓝底蓝字、↺+90° 染成蓝字
+   —— 用户上一轮「文字颜色 普通的黑色就行了」即指此。 */
+#ryDrawingHost #ppQuickBar .pp-btn-ghost,
+#ryDrawingHost #ppQuickBar .pp-btn-generate{
+  color:#3f4a45 !important;background:#fff !important;
+  border:1px solid #dfe6ea !important;box-shadow:none !important;transform:none !important;
+}
+#ryDrawingHost #ppQuickBar .pp-btn-ghost:hover,
+#ryDrawingHost #ppQuickBar .pp-btn-generate:hover{
+  color:#1f2a24 !important;background:#eef2f6 !important;border-color:#cbd8d0 !important;
+  box-shadow:none !important;transform:none !important;
 }

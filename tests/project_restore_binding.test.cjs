@@ -31,6 +31,7 @@ function createContext(plots, options = {}) {
     readyState: 'loading',
     addEventListener() {},
     getElementById() { return null; },
+    querySelector() { return null; },
     querySelectorAll() { return []; }
   };
   const context = {
@@ -47,6 +48,10 @@ function createContext(plots, options = {}) {
     RyMeasuredAreaBridgeStore: { readRaw() { return null; } },
     tlNormalizePipeOverride() { return null; },
     tlAppliedPipeOverride() { return false; },
+    readSelectedInt(selector, fallback) { return fallback; },
+    materialPrices: {},
+    materialQtyOverrides: {},
+    customMaterials: {},
     renderThreeLevel() {},
     console,
     Date,

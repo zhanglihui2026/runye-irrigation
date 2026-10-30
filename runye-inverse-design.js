@@ -80,7 +80,7 @@
             w.tlPipeOdOverride={version:1,geoKey:w.RyTlAutoEdits.geometryKey(w.tlDiagramData),calibers:fixed};
             Object.keys(fixed).forEach(function(pid){if(w.RyTlAutoEdits.allPids(w.tlDiagramData).includes(pid))w.RyTlAutoEdits.setCaliber(pid,fixed[pid],w.tlDiagramData);});
             w.render();w.renderThreeLevel();
-            if(w.tlRefreshGroupPanel)w.tlRefreshGroupPanel();if(w.tlRefreshGroupStatus)w.tlRefreshGroupStatus();
+            if(w.tlRefreshGroupStatus)w.tlRefreshGroupStatus();
             var after=w.computeThreeLevel(),verify=api.sourceGroups(Object.assign({},trial.input,after.inversePath),num('riHead'),num('riFlow'));
             if(verify.current.some(function(g){return !g.ok;}))throw Error('重新生成后的图面未通过水源校核，已恢复原方案。');
           }

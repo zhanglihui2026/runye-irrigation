@@ -919,7 +919,7 @@
       row.setAttribute('data-place-id', p.id);
       var go=document.createElement("button");
       go.type='button'; go.className='place-go'; go.setAttribute('data-place-go','1');
-      go.textContent='📍 '+p.name; go.title=p.name;
+      go.textContent=p.name; go.title=p.name;
       go.onclick=function(){
         lastPick={name:p.name,detail:'',lat:p.lat,lng:p.lng,zoom:p.zoom};
         goTo(lastPick);
@@ -1079,6 +1079,8 @@
       return;
     }
     var saved=matches[0];
+    var destinationSection=(saved.merged||saved.grouped)&&Array.isArray(saved.subPlots)&&saved.subPlots.length>=2
+      ? 'grPipeSection' : 'pipePlanSection';
     var areaM2=Number(saved.areaM2)||Number(saved.sqm)||0;
     var savedAt=Number(saved.savedAt)||Number(saved.ts)||Date.now();
     if(!areaM2 || !isFinite(areaM2)){ alert('地块面积无效，无法回传。'); return; }
@@ -1110,13 +1112,13 @@
             if(!window.runyeApplyMapPayload(transferId)) return;
             /* 接收器已经同步切到地块分区；pushState 只更新可恢复的地址锚点，
                避免 hashchange 再由导航模块重复切一次。 */
-            if(window.location.hash!=='#pipePlanSection' && window.history && typeof window.history.pushState==='function'){
-              try{ window.history.pushState(window.history.state,'','#pipePlanSection'); }
-              catch(eHash){ window.location.hash='pipePlanSection'; }
-            }else if(window.location.hash!=='#pipePlanSection') window.location.hash='pipePlanSection';
+            if(window.location.hash!=='#'+destinationSection && window.history && typeof window.history.pushState==='function'){
+              try{ window.history.pushState(window.history.state,'','#'+destinationSection); }
+              catch(eHash){ window.location.hash=destinationSection; }
+            }else if(window.location.hash!=='#'+destinationSection) window.location.hash=destinationSection;
           }
         }
-        else window.location.href='index.html?'+encodeURIComponent(transferStore.urlParam||'ryPlotTransfer')+'='+encodeURIComponent(transferId)+'#pipePlanSection';
+        else window.location.href='index.html?'+encodeURIComponent(transferStore.urlParam||'ryPlotTransfer')+'='+encodeURIComponent(transferId)+'#'+destinationSection;
       }, 350);
     }catch(e){ alert('写入失败：'+e.message); }
   }
@@ -1486,9 +1488,10 @@
       var go=document.createElement('button');
       go.type='button'; go.className='place-go';
       // [v185/v189] 成组地块：前缀「🔗」并在名称后显示子地块数；归档中的子地块加「⊂」前缀
-      var prefix = p.merged ? '🔗' : (p.mergedInto ? '⊂' : '📍');
+      // [v810 去图标] 普通地块不再加 📍 前缀（用户：左栏图标一律取消）；🔗/⊂ 是状态标记（成组/已归档）保留。
+      var prefix = p.merged ? '🔗' : (p.mergedInto ? '⊂' : '');
       var suffix = p.merged ? '（'+(p.subPlots?p.subPlots.length:0)+'块成组）' : '';
-      go.textContent=prefix+' '+(p.name||'地块')+suffix+'（'+(p.mu!=null?p.mu:'?')+'亩）';
+      go.textContent=(prefix?prefix+' ':'')+(p.name||'地块')+suffix+'（'+(p.mu!=null?p.mu:'?')+'亩）';
       go.title = p.merged ? ('由 '+(p.subPlots||[]).length+' 个子地块成组（轮廓与块间空隙保留）：'+(p.subPlots||[]).map(function(s){return s.name||s.id;}).join('、'))
                           : (p.name||'');
       go.onclick=function(){
@@ -1731,4 +1734,41 @@
     }catch(e){ }
   }
   importCloudRingFromUrl();
+})();
+
+/* ===== [v809 搜索提示弹窗改为右侧浮出] =====
+   用户反馈：「弹窗放在右侧吧，如果放在底部，容易把下面的内容遮挡了」。
+   左栏 .side 是 overflow:auto 的滚动容器，绝对定位子元素会被横向裁掉 —— 要弹到卫星图上
+   必须跳出裁切，故用 position:fixed + 本例程按搜索行实时算坐标（CSS 侧只留外观）。
+   触发：搜索行 mouseenter / 行内 focusin；隐藏：mouseleave / 行内失焦。
+   坐标：left = 搜索行右缘 + 8px；top = 搜索行顶（与输入框齐平）；宽度自适应到
+   视口右缘留 24px，夹在 220~320px。
+   与 v808 关系：v808 的 #placeHint 样式段保留作外观与无 JS 兜底（display 条件含 :hover），
+   本段只补坐标与 data-show 开关。撤掉本段即回退为「底部弹出」形态。 */
+(function(){
+  'use strict';
+  var row=document.querySelector('#onlineMapSection .search-row');
+  var hint=document.getElementById('placeHint');
+  if(!row||!hint) return;
+  var side=row.closest ? row.closest('.side') : null;
+  function place(){
+    try{
+      var r=row.getBoundingClientRect();
+      /* 基准取「左栏右缘」而不是「搜索行右缘」：行内有 10px 内边距，按行算会压掉面板边缘
+         十来像素，看起来弹窗贴在栏上而不是浮在图上。 */
+      var sr=side?side.getBoundingClientRect():null;
+      var baseRight=Math.max(r.right,sr?sr.right:0);
+      var vw=window.innerWidth||document.documentElement.clientWidth;
+      hint.style.left=Math.round(baseRight+8)+'px';
+      hint.style.top=Math.round(r.top)+'px';
+      hint.style.maxWidth=Math.max(220,Math.min(320,vw-baseRight-24))+'px';
+    }catch(e){}
+  }
+  function show(){ place(); hint.setAttribute('data-show','1'); }
+  function hide(){ hint.removeAttribute('data-show'); }
+  row.addEventListener('mouseenter',show);
+  row.addEventListener('mouseleave',hide);
+  row.addEventListener('focusin',show);
+  row.addEventListener('focusout',function(){ setTimeout(function(){ try{ if(!row.contains(document.activeElement)) hide(); }catch(e){} },0); });
+  window.addEventListener('resize',function(){ try{ if(hint.getAttribute('data-show')==='1') place(); }catch(e){} });
 })();

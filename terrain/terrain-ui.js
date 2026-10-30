@@ -313,97 +313,17 @@
     return b;
   }
 
-  /* ===== [v393 2026-10-12 用户指令] 地块角度：复刻「地块分区」的地块旋转 =====
-   * 语义与主页 mod/inline-11.js 的 ppGetRotatedPlotPoints / ppRepartition 完全同口径：
-   *   · 输入框（tPlotAngle → state._plotRot，[v407] 随状态持久化、刷新保留—— pp 实际就是持久化的（inline-11 3944/3998/4008），原注释「刷新归零与 pp 一致」有误，已纠正）
-   *     只影响**显示**、不重写数据；
-   *   · 旋转轴 = 全部地块的**联合包围盒中心**（单地块即该地块包围盒中心）；
-   *     多地块整组一起转 —— 与地块分区 v193「旋转作用于整组」一致；
-   *   · 喷灌布置叠加由地块多边形推导，drawCanvas 传旋转后的多边形即自动跟随；
-   *   · 「落定基准」（tPlotBake）= ppRepartition 的落定：把旋转后的坐标写成新基准 ——
-   *     地块 poly 与 rtk_xyz 高程点**一起刚性旋转**（保持对位，采样/坡度不失真）；
-   *     栅格（DTM/DSM）不支持旋转，落定前 confirm 提示重新导入。
-   * 回传主页始终发送数据坐标：想回传旋转后的轮廓，先落定再回传（快捷条 title 已注明）。 */
-  function tRotDeg() {
-    var v = parseFloat(state._plotRot);
-    if (!isFinite(v)) v = 0;
-    return Math.max(-180, Math.min(180, v));
-  }
-  function tRotatePoint(pt, deg, center) {
-    if (!deg) return { x: pt.x, y: pt.y };
-    var rad = deg * Math.PI / 180;
-    var c = Math.cos(rad), s = Math.sin(rad);
-    var dx = pt.x - center.x, dy = pt.y - center.y;
-    return { x: center.x + dx * c - dy * s, y: center.y + dx * s + dy * c };
-  }
-  /* 联合包围盒中心（drawCanvas 的 B 同口径；这里只看有效地块） */
-  function tRotCenter(polys) {
-    var B = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
-    polys.forEach(function (p) {
-      var b = bboxOfPoly(p.poly);
-      B.minX = Math.min(B.minX, b.minX); B.minY = Math.min(B.minY, b.minY);
-      B.maxX = Math.max(B.maxX, b.maxX); B.maxY = Math.max(B.maxY, b.maxY);
-    });
-    return { x: B.minX + (B.maxX - B.minX) / 2, y: B.minY + (B.maxY - B.minY) / 2 };
-  }
-  function tRotPoly(poly, deg, center) {
-    return poly.map(function (pt) { return tRotatePoint(pt, deg, center); });
-  }
-  /* 当前显示层用的地块集合（deg=0 时原样返回，避免无谓拷贝） */
+  /* 地形模块只读、显示真实地块坐标；旧存档的角度值不再参与绘制。 */
   function tViewPolys() {
     var polys = state.plots.filter(function (p) { return Array.isArray(p.poly) && p.poly.length >= 3; });
-    var deg = tRotDeg();
-    if (!deg || !polys.length) return { polys: polys, deg: 0, center: null };
-    return { polys: polys, deg: deg, center: tRotCenter(polys) };
-  }
-  /* 「落定基准」：把当前旋转角度写成数据新基准（复刻地块分区 ppRepartition 的落定语义）。
-     地块轮廓与 rtk_xyz 高程点一起刚性旋转（同一 center/deg，保持对位，采样/坡度不失真）；
-     栅格（DTM/DSM）网格结构不适用刚性旋转 → confirm 里明示需重新导入。 */
-  function bakeRotation() {
-    var polys = state.plots.filter(function (p) { return Array.isArray(p.poly) && p.poly.length >= 3; });
-    if (!polys.length) { banner('warn', '尚未导入地块，无可落定的轮廓。'); return; }
-    var deg = tRotDeg();
-    if (!deg) { banner('warn', '地块角度为 0°，无需落定。'); return; }
-    var hasRaster = state.elevations.some(function (r) { return r && r.data_type && r.data_type !== 'rtk_xyz'; });
-    var msg = '把当前角度（' + deg + '°）落定为新基准？\n' +
-      '· 地块轮廓坐标将改写为旋转后坐标（不可撤销）\n' +
-      '· RTK 高程点坐标同步旋转（保持与地块对位）' +
-      (hasRaster ? '\n· ⚠ 栅格数据（DTM/DSM）不支持旋转，落定后请重新导入' : '');
-    if (!window.confirm(msg)) return;
-    var rc = tRotCenter(polys);
-    var rnd = function (v) { return Math.round(v * 100) / 100; }; /* 与导入口径一致：保留两位小数 */
-    state.plots.forEach(function (p) {
-      if (Array.isArray(p.poly) && p.poly.length >= 3) {
-        p.poly = tRotPoly(p.poly, deg, rc).map(function (pt) { return { x: rnd(pt.x), y: rnd(pt.y) }; });
-      }
-    });
-    state.elevations.forEach(function (r) {
-      if (r && r.data_type === 'rtk_xyz' && Array.isArray(r.point_list)) {
-        r.point_list = r.point_list.map(function (pt) {
-          var q = tRotatePoint(pt, deg, rc);
-          return { x: rnd(q.x), y: rnd(q.y), z: pt.z };
-        });
-      }
-    });
     state._plotRot = 0;
-    var inp = $('tPlotAngle'); if (inp) inp.value = 0;
-    persistAndRender();
-    banner('ok', '✓ 已落定：地块轮廓与 RTK 高程点已按 <b>' + deg + '°</b> 刚性旋转并写入新基准。');
+    return polys;
   }
 
   function drawCanvas() {
     var svg = $('tCanvas'), emptyBox = $('canvasEmpty'), meta = $('canvasMeta');
-    /* [v407] 角度输入框 ← 状态回填（对齐地块分区 pp 4008 行口径；输入中不抢焦点） */
-    var tAi = $('tPlotAngle');
-    if (tAi && document.activeElement !== tAi && parseFloat(tAi.value) !== tRotDeg()) tAi.value = tRotDeg();
-    /* [v393] 显示层 = 旋转后的地块集合（deg=0 时即原数据）；
-       视野 bbox 也按旋转后算，保证任意角度都在全览视野内 */
-    var vp = tViewPolys();
-    var rotDeg = vp.deg, rotC = vp.center;
-    var drawPolys = rotDeg
-      ? vp.polys.map(function (p) { return Object.assign({}, p, { poly: tRotPoly(p.poly, rotDeg, rotC) }); })
-      : vp.polys;
-    var polys = drawPolys;
+    /* 地块真实坐标固定；图面只展示原始几何。 */
+    var polys = tViewPolys();
     /* [v410] 高程数据收集（rtk_xyz 抽稀 ≤3000）+ 可视化开关 + 地块坡度缓存（数据坐标，旋转不改变坡度） */
     var rtkPts = [];
     state.elevations.forEach(function (r) {
@@ -457,7 +377,7 @@
     var fs = (vh * 0.035).toFixed(2); /* 标签字号随视野缩放 */
 
     var out = [];
-    /* 地块多边形（[v393] 显示层 = drawPolys，已按地块角度旋转） */
+    /* 地块多边形保持真实坐标方向。 */
     polys.forEach(function (p, i) {
       var rp = p.poly;
       var pts = rp.map(function (pt) {
@@ -476,10 +396,10 @@
       out.push('<text class="t-poly-label" x="' + (lp.x + vw * 0.008).toFixed(1) + '" y="' + (flip - lp.y - vh * 0.008).toFixed(1) +
                '" font-size="' + fs + '">' + lbl + '</text>');
     });
-    /* [v410] 等高线：数据坐标网格场 → marching squares → 端点随地块角度刚性旋转 */
+    /* [v410] 等高线使用数据坐标网格场，不随地块方向变换。 */
     if (showContour && rtkPts.length >= 5) {
       var B0 = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
-      vp.polys.forEach(function (p) {
+      polys.forEach(function (p) {
         var b0 = bboxOfPoly(p.poly);
         B0.minX = Math.min(B0.minX, b0.minX); B0.minY = Math.min(B0.minY, b0.minY);
         B0.maxX = Math.max(B0.maxX, b0.maxX); B0.maxY = Math.max(B0.maxY, b0.maxY);
@@ -495,8 +415,8 @@
       if (elevContourData) {
         elevContourData.forEach(function (cl) {
           for (var si = 0; si < cl.segs.length; si += 4) {
-            var q1 = rotDeg ? tRotatePoint({ x: cl.segs[si], y: cl.segs[si + 1] }, rotDeg, rotC) : { x: cl.segs[si], y: cl.segs[si + 1] };
-            var q2 = rotDeg ? tRotatePoint({ x: cl.segs[si + 2], y: cl.segs[si + 3] }, rotDeg, rotC) : { x: cl.segs[si + 2], y: cl.segs[si + 3] };
+            var q1 = { x: cl.segs[si], y: cl.segs[si + 1] };
+            var q2 = { x: cl.segs[si + 2], y: cl.segs[si + 3] };
             out.push('<polyline class="t-elev-contour" points="' + q1.x.toFixed(1) + ',' + (flip - q1.y).toFixed(1) + ' ' + q2.x.toFixed(1) + ',' + (flip - q2.y).toFixed(1) + '"/>');
           }
         });
@@ -511,9 +431,8 @@
         var step = Math.ceil(r.point_list.length / 3000);
         r.point_list.forEach(function (pt, i) {
           if (i % step) return;
-          /* [v393] 高程点显示坐标跟随地块角度刚性旋转（保持与旋转后地块对位）；
-             title 恒显原始数据坐标（数据未被改写） */
-          var dp = rotDeg ? tRotatePoint(pt, rotDeg, rotC) : pt;
+          /* RTK 点始终按原始真实坐标显示，与地块边界保持同一坐标系。 */
+          var dp = pt;
           if (dp.x < B.minX || dp.x > B.maxX || dp.y < B.minY || dp.y > B.maxY) return;
           var shadeAttr = '';
           if (showShade && isFinite(zminE)) {
@@ -842,34 +761,6 @@
     /* [v410-fix] 着色/等高线开关同样触发重绘（v410 遗漏监听，勾选后画面不刷新） */
     $('elevShade').addEventListener('change', drawCanvas);
     $('elevContours').addEventListener('change', drawCanvas);
-    /* [v393] 地块角度：输入即重绘（只影响显示、不重写数据）；「落定基准」改写数据为新基准。
-       [v407] 稳健化：input 即时重绘 + change 兜底回显 + 绘制异常可见化（不再静默失败） */
-    var tAngle = $('tPlotAngle');
-    function tApplyAngle(echo) {
-      var v = parseFloat(tAngle.value);
-      if (!isFinite(v)) {
-        if (tAngle.validity && tAngle.validity.badInput) { banner('warn', '地块角度请输入 -180 ~ 180 的数字。'); return; }
-        v = 0;
-      }
-      v = Math.max(-180, Math.min(180, v));
-      state._plotRot = v;
-      D.saveState(state);  /* [v407] 角度即时落盘（对齐 pp：设完角度刷新/重进不丢） */
-      if (echo) tAngle.value = v;
-      try { drawCanvas(); } catch (err) {
-        banner('danger', '✕ 旋转绘制失败：' + esc(err && err.message || String(err)) + ' —— 请截图反馈。');
-      }
-    }
-    if (tAngle) {
-      tAngle.addEventListener('input', function () { tApplyAngle(false); });
-      tAngle.addEventListener('change', function () {
-        var before = tRotDeg();
-        tApplyAngle(true);
-        var after = tRotDeg();
-        if (after) banner('ok', '✓ 已按 <b>' + after + '°</b> 旋转显示（仅显示、不改数据）；确认无误后点「落定基准」写入新基准。');
-        else if (before) banner('ok', '已恢复 0°（原始朝向）。');
-      });
-    }
-    $('tPlotBake').addEventListener('click', bakeRotation);
     initCanvasNav();
     $('btnClear').addEventListener('click', function () {
       if (!state.plots.length && !state.elevations.length) return;

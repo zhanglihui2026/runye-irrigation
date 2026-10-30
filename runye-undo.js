@@ -99,7 +99,10 @@
     var prev = global.__ryUndoQuiet;
     global.__ryUndoQuiet = true;
     try {
-      global.runyeSaveProject(true, KEY);           // ★ (silent, key)
+      /* A prior interrupted run may leave the temporary key behind. Never treat it as
+         this capture when canonical group export or project serialization now fails. */
+      try { global.localStorage.removeItem(KEY); } catch (e0) { }
+      if (global.runyeSaveProject(true, KEY) !== true) return null; // ★ (silent, key)
       var s = global.localStorage.getItem(KEY);
       /* ★ 归一化 savedAt 后才能当快照用：runyeSaveProject 每次都写
          `savedAt:new Date().toISOString()`，两次相隔 1ms 的快照字符串也永不相等
@@ -233,16 +236,21 @@
 
   /* 恢复：把快照塞回临时 key，走主站标准恢复路径（静默）。 */
   function restore(snap) {
+    var restored = false;
     global.__ryUndoQuiet = true;
     try {
       global.localStorage.setItem(KEY, snap);
-      if (typeof global.runyeLoadProject === 'function') global.runyeLoadProject(KEY, true);  // ★ (key, silent)
+      if (typeof global.runyeLoadProject === 'function') restored = global.runyeLoadProject(KEY, true) === true;  // ★ (key, silent)
     } catch (e) {
       /* 恢复失败不抛给用户，保持界面可用；但要留下现场，否则"按了没反应"无从查起 */
       try { global.__ryUndoLastError = String((e && e.message) || e); } catch (e4) { }
     } finally {
       global.__ryUndoQuiet = false;
       try { global.localStorage.removeItem(KEY); } catch (e2) { }
+    }
+    if (!restored) {
+      try { global.__ryUndoLastError = '工程快照恢复未确认'; } catch (e4) { }
+      return false;
     }
     /* ★ [v619] 图面改径回写 —— 与 capture 里的 `__undoCals` 成对。
        v145 让改径「不进存档」，因此 runyeLoadProject 恢复后 cals 必然为空；
@@ -304,6 +312,7 @@
         if (typeof global.tlUpdatePlanBar === 'function') global.tlUpdatePlanBar();
       }
     } catch (e6) { }
+    return true;
   }
 
   function undo() {
@@ -318,8 +327,11 @@
     var i = S.top - 1;
     while (i >= 0 && S.stack[i] === cur) i--;
     if (i < 0) { S.top = 0; tip('没有可回退的步骤'); return false; }
+    if (!restore(S.stack[i])) {
+      tip('撤销恢复失败，历史位置已保留');
+      return false;
+    }
     S.top = i;
-    restore(S.stack[i]);
     tip('已回退上一步（还可回退 ' + S.top + ' 步）');
     return true;
   }

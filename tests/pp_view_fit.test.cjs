@@ -99,7 +99,7 @@ assert.ok(sync.indexOf('ppCanvas') >= 0 || sync.indexOf('ppIsViewClipped') >= 0,
 assert.ok(sync.indexOf("classList.toggle('is-on'") >= 0, 'ppSyncFitBtn 要 toggle is-on');
 
 /* ---------- 8. 重绘出口挂一次同步，避免「分区旋转/重新分区」后胶囊状态不跟 ---------- */
-assert.ok(/var ppRenderBase=ppRender;[\s\S]{0,200}?ppRender=function\(\)\{ ppRenderBase\.apply\(null,arguments\); ppSyncFitBtn\(\); \};/.test(js),
+assert.ok(/var ppRenderBase=ppRender;[\s\S]{0,260}?ppRender=function\(\)\{ ppRenderBase\.apply\(null,arguments\); ppSyncFitBtn\(\);try\{if\(window\.RyDrawingWorkspace\)window\.RyDrawingWorkspace\.syncCamera\(\);\}catch\(e\)\{\} \};/.test(js),
   'ppRender 出口必须包一层 ppSyncFitBtn()：分区旋转 / 重新分区 / 回退都会改内容尺寸');
 
 /* ---------- 9. 胶囊点击 = ppFitView ---------- */

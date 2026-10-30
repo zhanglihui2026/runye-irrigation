@@ -54,9 +54,8 @@
 
   function applyMapMeasuredArea(provided){
     try{
-      /* 独立地图页跳到 index.html#pipePlanSection 时，本接收器会在 DOMContentLoaded
-         先切换区块；通知导航模块跳过随后同一初始 hash，避免重复重绘。 */
-      var suppressInitialHashRoute = !provided && window.location && window.location.hash === '#pipePlanSection' && document.readyState !== 'complete';
+      /* 跨页初始 hash 的导航回调稍后触发；接收器先手动落页，再按实际目标抑制重复路由。 */
+      var suppressInitialHashRoute = false;
       var transferStore = window.RyMeasuredAreaBridgeStore;
       if(!transferStore) throw new Error('地块回传存储服务未加载');
       var transferId = typeof provided === 'string' ? provided : null;
@@ -71,6 +70,18 @@
       var d = resolvePlotRef(payload);
       if(!d || !d.sqm){ transferStore.remove(transferId); return false; }
       if(typeof window.runyePersistMeasuredPlot!=='function') throw new Error('地块库接收接口未加载');
+      /* 在线地图回传会在同一 SPA 内替换当前地块；hash 切换不触发 pagehide，先把旧地块
+         的 L2 主管/支管和分区状态按旧 ID 留档，避免随后将其误存到本次回传地块。 */
+      try{
+        if(typeof window.runyeSaveCurrentPlotBeforeSwitch==='function') window.runyeSaveCurrentPlotBeforeSwitch();
+        else if(window.currentPlotId) throw new Error('旧地块安全保存接口未加载');
+      }catch(eSave){ throw new Error('当前地块未能先行保存：'+(eSave&&eSave.message?eSave.message:'本地存储失败')); }
+      if(typeof window.runyeResetPlotScopedNetworkState==='function') window.runyeResetPlotScopedNetworkState();
+      /* A previous project's deferred replay must not regenerate over the incoming plot. */
+      window.__ryLazyReplay=false;
+      var destinationSection = (d.merged||d.grouped) && Array.isArray(d.subPlots) && d.subPlots.length>=2
+        ? 'grPipeSection' : 'pipePlanSection';
+      suppressInitialHashRoute = !provided && window.location && window.location.hash === '#'+destinationSection && document.readyState !== 'complete';
 
       // 写入全局实测面积（㎡），驱动「二级管路」的计算
       window.measuredArea = d.sqm;
@@ -162,30 +173,37 @@
         }
       }catch(eSub){ window.__runyeSubPlots=null; }
 
-      if(window.RyMapPartition && RyMapPartition.valid(d.partitionPlan)){
-        var ctr=RyMapPartition.center(window.measuredPolygon);
-        window.measuredPolygon=RyMapPartition.orient(window.measuredPolygon,d.partitionPlan.angle,ctr);
-        (window.__runyeSubPlots||[]).forEach(function(p){p.poly=RyMapPartition.orient(p.poly,d.partitionPlan.angle,ctr);});
-      }
+      /* 分区角度属于网格方向，不是地块坐标变换；回传不得旋转 measuredPolygon 或成员地块环。 */
+      /* 当前边界已换成新地块：清掉内存中的上一块管线；持久化步骤按新 ID 恢复该块自己的
+         L2 档案，成组地块则由 ppLoadPolygon 从各成员档案初始化 slots。 */
+      if(typeof window.ppSetState==='function') window.ppSetState({});
       if(typeof updatePlan === 'function') updatePlan();
       // 地块引用已在库中：只更新当前工程，不把旋转后的图面坐标写回地图原始边界。
       // 旧版完整载荷仍走落库路径；两种路径都刷新管线绘图区并保存当前工程。
       // [2026-10-12 数字农业剥离] 原「持久化函数缺失时改走对端回写」的回落分支随桥接层
       //   一并删除；现在持久化函数缺失就是缺失，不再有第二套落库路径可绕。
       window.runyePersistMeasuredPlot({ plotId:d.plotId||null, name:d.name||null, preserveSource:!!payload.ryPlotRef });
-      if(window.RyMapPartition && d.partitionPlan){if(typeof ppLoadPolygon==='function')ppLoadPolygon();RyMapPartition.restore(d.partitionPlan);}
       if(d.partitionPlan && d.plotId && typeof window.runyeSetCurrentPlot==='function') window.runyeSetCurrentPlot(d.plotId);
-      showMapBanner(d);
-      transferStore.remove(transferId);
-      if(typeof window.ryJumpToSection==='function'){
-        if(suppressInitialHashRoute) window.__rySkipNextLinkedSectionRoute='pipePlanSection';
-        window.ryJumpToSection('pipePlanSection');
+      if(window.RyMapPartition && d.partitionPlan){
+        if(typeof ppLoadPolygon==='function')ppLoadPolygon();
+        RyMapPartition.restore(d.partitionPlan);
+        /* 分区计划恢复会重建编辑器状态，随后从该组自己的档案恢复组级总管。 */
+        if(typeof window.runyeRestoreGroupDesign==='function') window.runyeRestoreGroupDesign(window.currentPlotId||d.plotId);
       }
+      showMapBanner(d);
+      if(typeof window.ryJumpToSection==='function'){
+        if(suppressInitialHashRoute) window.__rySkipNextLinkedSectionRoute=destinationSection;
+        window.ryJumpToSection(destinationSection);
+      }
+      if(destinationSection==='pipePlanSection'&&window.RyDrawingWorkspace&&typeof window.RyDrawingWorkspace.refreshPlot==='function'){
+        window.RyDrawingWorkspace.refreshPlot();
+      }
+      transferStore.remove(transferId);
       return true;
     }catch(e){
       console.error('applyMapMeasuredArea error', e);
-      /* 引用失效时保留当前编号的载荷和 URL 参数供恢复，并把原因明确反馈给用户。 */
-      try{ alert('地块回传未完成：'+(e&&e.message?e.message:'数据读取失败')+'。回地图重新回传后再试。'); }catch(eAlert){}
+      /* 保留当前编号的载荷和 URL 参数供刷新重试；刷新仍失败时再回地图重新回传。 */
+      try{ alert('地块回传未完成：'+(e&&e.message?e.message:'数据读取失败')+'。本次数据已保留，可刷新页面重试；若仍失败，再回地图重新回传。'); }catch(eAlert){}
       return false;
     }
   }

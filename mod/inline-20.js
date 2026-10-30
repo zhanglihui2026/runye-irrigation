@@ -15,8 +15,10 @@
   var body=sec.querySelector('.pp-body');
   if(!body) return;
   var side=document.getElementById('tlSide');
-  var stage=body.querySelector('.pp-stage');
-  if(!side||!stage) return;
+  /* 初始活动页可能是二级：共享宿主此时挂在二级 body，三级 body 暂时没有
+     .pp-stage。拖拽条仍须在三级 body 内先注册，宿主切入时按第 3 列显示。 */
+  var stage=body.querySelector(':scope > .pp-stage');
+  if(!side) return;
   if(body.querySelector('.pp-grip-side')) return;   /* 防重复注入 */
 
   var KEY='runye_tl_panel_w';
@@ -45,7 +47,8 @@
   g.title='拖动调整参数栏宽度 · 双击恢复默认';
   g.setAttribute('role','separator');
   g.setAttribute('aria-orientation','vertical');
-  body.insertBefore(g,stage);
+  if(stage) body.insertBefore(g,stage);
+  else body.appendChild(g);
 
   var EV=window.PointerEvent?{down:'pointerdown',move:'pointermove',up:'pointerup',cancel:'pointercancel'}:{down:'mousedown',move:'mousemove',up:'mouseup',cancel:'blur'};
   var drag=null;

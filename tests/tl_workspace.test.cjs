@@ -200,7 +200,8 @@ console.log('== tl-workspace 纯逻辑回归 ==');
   /* 分区可视化契约：分区填充 + 加粗分区线 + 总管可见 */
   const svg = ctn.innerHTML;
   ok(svg.indexOf('tlWsPlotClip') > 0, '含地块轮廓 clipPath（分区填充裁剪到轮廓内）');
-  ok((svg.match(/<rect /g) || []).length >= 2, '分区底色 ≥2 格');
+  // 分区按真实地块轮廓裁剪为多边形；只统计带分区标记且有填充的区域。
+  ok((svg.match(/<polygon\b(?=[^>]*\bdata-zi="\d+")(?=[^>]*\bfill="(?!none)[^"]+")[^>]*>/g) || []).length >= 2, '分区底色 ≥2 格');
   ok(svg.indexOf('stroke-width="2" stroke-dasharray="5,5"') > 0, '分区线已加粗（width=2）');
   ok(svg.indexOf('stroke="#111827"') > 0, '总管路径在位（v162 总管改深灰 #111827，原橙色 #f97316）');
   /* 2026-09-16 契约更新：分区底色由「标准浅绿/非标琥珀」改为「联合灌溉分组色带」

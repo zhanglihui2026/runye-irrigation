@@ -36,9 +36,8 @@
 #onlineMapSection .map-draw-tools .dt-grip{flex:none;padding:4px 7px;font-size:12px;font-weight:700;color:var(--g-700);
   background:var(--g-50);border-right:1px solid var(--s-300);cursor:move;user-select:none;touch-action:none;letter-spacing:1px}
 
-/* [v497-map-side-font] 左栏文字缩小（用户要求 2026-10-16）：按钮/输入框 13px→11px、高度 34→28px；栏目标题 11→10px。
-   typography.css 对 button/input 全局 13px !important（v490），此处用 #onlineMapSection .side 前缀提高优先级同载 !important 压过。
-   独立页 runye-map-measure.html 无 #onlineMapSection 前缀，在页内 <style> 追加 .side 作用域同款（v495 教训：两处副本同步改）。 */
-#onlineMapSection .side .mbtn{font-size:11px !important;height:28px !important}
-#onlineMapSection .side input[type=text]{font-size:11px !important;height:28px !important}
-#onlineMapSection .side .sec-t{font-size:10px !important}
+/* [v497-map-side-font → v807 退役] 左栏字号/高度统一改由 style-01.css 的 v807 段管理
+   （对齐分区与管路 .ry-props 灰条体系：控件 26px/12px、灰分组条 22px/11px、hint 11px）。
+   本组 v490 对抗与 v807 同特异性（#onlineMapSection .side 前缀 + !important），
+   但本表在 style-01.css 之后加载会反压 v807 ⇒ 整组删除，不再留值拷贝。
+   独立页 runye-map-measure.html 不加载 style-01.css，其页内 <style> 副本保持原值不受影响。 */

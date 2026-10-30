@@ -1,0 +1,10 @@
+{
+  "projectMu": 50000,
+  "zoneMu": 20,
+  "waterPerMu": 4.5,
+  "densityPerMu": 44,
+  "pumpFlow": 100,
+  "reachM": 1500,
+  "pumpHoursPerDay": 10,
+  "cycleDays": 7
+}

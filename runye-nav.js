@@ -42,12 +42,18 @@
        由本渲染器产出 DOM，顺序=数组顺序（彻底消除静态块 relocate 与插件锚定的位置竞态）；
        去掉 📂 图标。面板本体由 mod/inline-32.js 动态创建（RyFileMenu.toggle(btn)）。 */
     { label: '文件',         fileMenu: 1, pre: 1, feat: '', title: '文件：导入 / 导出 / 工程 统一入口' },
+    /* [v805 地块绘制退役] 用户决定：画地块统一走在线地图（真实地理面积、免比例尺标定）。
+       「地块绘制」（areaTool，图片描绘 + 比例尺标定）导航项摘除，areaTool section 整体
+       display:none（DOM/JS 全保留，v385「入口摘除、业务保留」惯例）；其地块库管理
+       #plotLibSection 已整节点搬进在线地图左栏。
+       要恢复：加回下行 + index.html 的 #areaTool 去掉 display:none。
     { label: '地块绘制',     hash: 'areaTool',                 pre: 1, feat: 'pro-others', title: '地块绘制工具（比例尺 / 绘制边界 / 地块库）' },
+    */
     /* [v250] 在线地图 移到 地块绘制 之前（v346 起地块绘制折叠进「更多」；v391 按用户指令对调回来） */
     { label: '在线地图',     hash: 'onlineMapSection',        pre: 1, feat: 'online-map' },
     /* [v250] 「二级管路」改名「地块分区」、「三级管路编辑」改名「管路规划」（hash/id 不变，仅显示名变） */
-    { label: '地块分区',     hash: 'pipePlanSection',          pre: 1, feat: 'zone-split' },
-    { label: '管路规划',     hash: 'tlPipePlanSection',        pre: 1, feat: 'pipe-layout' },
+    { label: '分区与管路',   hash: 'pipePlanSection',          pre: 1, feat: 'zone-split', drawingEntry: 1 },
+    { label: '管路规划',     hash: 'tlPipePlanSection',        pre: 1, feat: 'pipe-layout', routeOnly: 1 },
     /* [v311 2026-10-08 用户要求] 水力校核顶级导航项：主页面功能区自动读 runye_network_layout，
        展示树状拓扑、全链路水损、滴灌带多孔出流、水泵选型和 EPANET WASM 对照。 */
     { label: '水力校核',     hash: 'hydraulicsSection',             feat: 'hydraulic-check', title: '水力校核：自动读已布置管网，逐段流量/流速/水损 + 最不利路径 + 需求扬程与水泵选型' },
@@ -60,7 +66,7 @@
     { label: '地形模块',     hash: 'terrainSection',                feat: 'pro-others', title: '地形模块：shp/RTK边界导入、CGCS2000校验、面积、高程数据源登记' },
     /* [v391 2026-10-12 用户指令] 多地块规划 恢复上线（v386 剥离时业务全保留，此处按原条目加回，
        位置：地形模块 之后） */
-    { label: '多地块规划',   hash: 'grPipeSection',            feat: 'pro-others', title: '成组地块：全组总览 + 总管编辑 + 按块进入管路规划' },
+    { label: '多地块规划',   hash: 'grPipeSection',            feat: 'pro-others', title: '成组地块：展示各块二级主管/支管 + 手动画组级总管' },
     /* [v385 2026-10-12 用户指令] 四项功能剥离下线（入口摘除，业务代码/页面全部保留，将来需要时
        把对应行加回 MORE_ITEMS 或 ITEMS 即可恢复）：多地块规划(已于 v391 恢复)、管路拼装(独立页+
        pipe-assemble 壳插件同步摘除)、经济指标分析(#threeDModelingSection)、数字化建模
@@ -156,6 +162,7 @@
     var a = document.createElement(localAction ? 'button' : 'a');
     if (localAction) a.type = 'button';
     a.className = 'fn-link';
+    if (it.drawingEntry) a.setAttribute('data-ry-drawing-entry', '1');
     a.setAttribute('data-ry-navitem', '1');
     if (it.href === 'runye-map-measure.html' || it.hash === 'pipePlanSection' || it.hash === 'tlPipePlanSection') a.setAttribute('data-ry-mobile-nav', '1');
     /* [v358] 锁定态：「·锁」标记 + 捕获阶段拦截（阻断 href 跳转 / data-target 处理器 /
@@ -353,6 +360,7 @@
     });
     var marker = el.firstElementChild;
     ITEMS.forEach(function (it) {
+      if (it.routeOnly) return;
       var a = makeItem(it, base, root);
       if (it.pre && marker) el.insertBefore(a, marker);
       else el.appendChild(a);
@@ -403,6 +411,28 @@
   global.RyFnNav = {
     items: ITEMS,
     moreItems: MORE_ITEMS,
+    openDrawingMode: function (mode) {
+      if (mode !== 'partition' && mode !== 'pipeline') return false;
+      var id = mode === 'partition' ? 'pipePlanSection' : 'tlPipePlanSection';
+      var item = ITEMS.filter(function (it) { return it.hash === id; })[0];
+      var access = accessState(item.feat);
+      if (access === 'pending') { showToast('正在同步会员权益，请稍后重试。'); return false; }
+      if (access === 'denied') { showUpgrade(item.label); return false; }
+      /* Both tool contexts now use the same active section, host and camera. */
+      var hostSection = document.getElementById('pipePlanSection');
+      var alreadyActive=!!(hostSection&&hostSection.classList.contains('ry-active')&&hostSection.getAttribute('data-ry-view')==='edit');
+      if(!alreadyActive){
+        if (typeof global.rySetTab === 'function') global.rySetTab('pipePlanSection', 'edit');
+        else if (typeof global.ryJumpToSection === 'function') global.ryJumpToSection('pipePlanSection');
+        else return false;
+      }
+      if(global.RyDrawingWorkspace&&typeof global.RyDrawingWorkspace.setToolMode==='function')global.RyDrawingWorkspace.setToolMode(mode);
+      var activated = !!(hostSection && hostSection.classList.contains('ry-active'));
+      if (activated && global.history && typeof global.history.replaceState === 'function') {
+        global.history.replaceState(null, '', global.location.pathname + global.location.search + '#pipePlanSection');
+      }
+      return activated;
+    },
     /* [v247] 「更多」面板元素 —— pipe_optim_ui.js 把「管网优化详细分析」追加到这里 */
     getMorePanel: function () { return morePanelEl; },
     render: function () {

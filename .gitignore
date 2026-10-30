@@ -104,6 +104,7 @@ tests/*
 !tests/cloud_design_binding.test.cjs
 !tests/hydraulics_plugin_api.test.cjs
 !tests/project_restore_binding.test.cjs
+!tests/drawing_design_model.test.cjs
 
 # AOCI agent host integration (machine-bound; do not commit)
 .codex/config.toml

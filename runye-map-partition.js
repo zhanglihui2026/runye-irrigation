@@ -40,13 +40,11 @@
   return {ok:true,plots:saved.plots,revision:saved.revision};
  }
  function valid(p){return p&&p.version===1&&Number.isFinite(p.angle)&&p.angle>=-180&&p.angle<=180;}
- function rotate(p,deg,c){var r=deg*Math.PI/180,a=Math.cos(r),b=Math.sin(r),x=p.x-c.x,y=p.y-c.y;return{x:c.x+x*a-y*b,y:c.y+x*b+y*a};}
  function center(poly){return{x:(Math.min.apply(null,poly.map(p=>p.x))+Math.max.apply(null,poly.map(p=>p.x)))/2,y:(Math.min.apply(null,poly.map(p=>p.y))+Math.max.apply(null,poly.map(p=>p.y)))/2};}
- function orient(poly,angle,c){c=c||center(poly);return poly.map(p=>rotate(p,angle,c));}
  function params(){var p={};PARAMS.forEach(function(id){var e=root.document.getElementById(id);if(e)p[id]=e.value;});return p;}
- function restore(plan){if(!valid(plan))return;Object.keys(plan.params||{}).forEach(function(id){if(PARAMS.indexOf(id)<0)return;var e=root.document.getElementById(id);if(e)e.value=plan.params[id];});var b=root.RunyeBridge;if(b){b.state.cutSnap=plan.cutSnap?copy(plan.cutSnap):{sig:'',x:null,y:null};b.state.cutOverrides=plan.cutOverrides?copy(plan.cutOverrides):{x:{},y:{}};b.state.zoneRotated=!!plan.zoneRotated;}if(typeof root.calcPlan==='function')root.calcPlan();if(typeof root.ppRender==='function')root.ppRender();}
- function polygons(toLL){var b=root.RunyeBridge,cuts=b.getZoneCuts(),rings=root.__runyeSubPlots&&root.__runyeSubPlots.length?root.__runyeSubPlots.map(s=>s.poly):[b.state.polyPts],out=[];
-  if(!cuts)return out;for(var y=0;y<cuts.yPos.length-1;y++)for(var x=0;x<cuts.xPos.length-1;x++)rings.forEach(function(r){var p=b.clipPolyToRect(r,cuts.xPos[x],cuts.yPos[y],cuts.xPos[x+1],cuts.yPos[y+1]);if(p&&p.length>=3&&b.polyArea(p)>0.01)out.push({latLng:p.map(toLL),area:b.polyArea(p)});});return out;
+ function restore(plan){if(!valid(plan))return false;var b=root.RunyeBridge;if(!b||typeof b.restorePartitionState!=='function'||b.restorePartitionState({cutSnap:plan.cutSnap,cutOverrides:plan.cutOverrides,zoneAngleDeg:-plan.angle})!==true)return false;Object.keys(plan.params||{}).forEach(function(id){if(PARAMS.indexOf(id)<0)return;var e=root.document.getElementById(id);if(e)e.value=plan.params[id];});if(typeof root.calcPlan==='function')root.calcPlan();if(typeof root.ppRender==='function')root.ppRender();return true;}
+ function polygons(toLL){var b=root.RunyeBridge,cuts=b.getZoneCuts(),rings=root.__runyeSubPlots&&root.__runyeSubPlots.length?root.__runyeSubPlots.map(s=>s.poly):[b.getPlotPolygon()],out=[];
+  if(!cuts)return out;var localRings=rings.map(function(r){return b.polyToGrid(cuts,r);});for(var y=0;y<cuts.yPos.length-1;y++)for(var x=0;x<cuts.xPos.length-1;x++)localRings.forEach(function(r){var local=b.clipPolyToRect(r,cuts.xPos[x],cuts.yPos[y],cuts.xPos[x+1],cuts.yPos[y+1]);if(local&&local.length>=3){var p=b.polyToWorld(cuts,local),area=b.polyArea(p);if(area>0.01)out.push({latLng:p.map(toLL),area:area});}});return out;
  }
  function capture(net,previousNetworkRaw){
   if(!net)return {ok:false,error:'network-layout-missing'};
@@ -56,7 +54,8 @@
   function frame(p){var x=p.x-inv.tx,y=p.y-inv.ty;return{x:inv.ax*x+inv.bx*y,y:inv.ay*x+inv.by*y};}
   var angle=Math.atan2(inv.ay,inv.ax)*180/Math.PI,base=root.__runyeGeoBase,m=6378137*Math.PI/180,co=Math.cos(base.refLat*Math.PI/180);
   function ll(p){p=frame(p);return[base.refLat+p.y/m,base.refLng+p.x/(m*co)];}
-  var plan={version:1,angle:angle,params:params(),cutSnap:copy(root.RunyeBridge.state.cutSnap),cutOverrides:copy(root.RunyeBridge.state.cutOverrides),zoneRotated:!!root.RunyeBridge.state.zoneRotated};
+  var partitionState=root.RunyeBridge.getPartitionState();
+  var plan={version:1,angle:angle,params:params(),cutSnap:copy(partitionState.cutSnap),cutOverrides:copy(partitionState.cutOverrides),zoneRotated:!!partitionState.zoneRotated};
   var partitions=polygons(ll),state=readLibrary();
   if(!state.ok)return {ok:true,skipped:true,reason:state.error||'plot-library-unavailable'};
   var matches=state.plots.filter(function(p){return p&&p.id===net.plotId;});
@@ -65,13 +64,25 @@
   var p=matches[0];p.partitionPlan=plan;p.partitions=partitions;
   return commitPartitionResult(state,net,previousNetworkRaw);
  }
- function preview(payload,angle){payload=copy(payload);payload.partitionPlan={version:1,angle:angle,params:(payload.partitionPlan||{}).params||{},zoneRotated:!!(payload.partitionPlan||{}).zoneRotated};root.runyeApplyMapPayload(payload);
+ function preview(payload,angle){payload=copy(payload);payload.partitionPlan={version:1,angle:angle,params:(payload.partitionPlan||{}).params||{},zoneRotated:!!(payload.partitionPlan||{}).zoneRotated};root.runyeApplyMapPayload(payload);if(typeof root.ppSetZoneAngleDeg==='function')root.ppSetZoneAngleDeg(-angle);
   var b=root.RunyeBridge,F=root.__runyeMapFramePoly,c=center(F.map(p=>({x:p.x,y:-p.y}))),base=root.__runyeGeoBase,m=6378137*Math.PI/180,co=Math.cos(base.refLat*Math.PI/180);
-  function ll(p){p=rotate(p,-angle,c);return[base.refLat-p.y/m,base.refLng+p.x/(m*co)];}
-  return{plan:{version:1,angle:angle,params:params(),cutSnap:copy(b.state.cutSnap),cutOverrides:copy(b.state.cutOverrides),zoneRotated:!!b.state.zoneRotated},partitions:polygons(ll)};
+  function ll(p){return[base.refLat-p.y/m,base.refLng+p.x/(m*co)];}
+  var partitionState=b.getPartitionState();
+  return{plan:{version:1,angle:angle,params:params(),cutSnap:copy(partitionState.cutSnap),cutOverrides:copy(partitionState.cutOverrides),zoneRotated:!!partitionState.zoneRotated},partitions:polygons(ll)};
  }
  function attach(map){
   var box=root.document.getElementById('mapPartitionTools');if(!box)return;var select=box.querySelector('select'),input=box.querySelector('input'),status=box.querySelector('[role=status]'),layer=root.L.layerGroup().addTo(map),iframe=null,busy=false;
+  var plusBtn=box.querySelector('[data-angle-plus]'),minusBtn=box.querySelector('[data-angle-minus]'),sendBtn=box.querySelector('[data-angle-send]');
+  /* [v673 2026-10-23 隔离] 成组地块（merged）的分区角度只在「多地块规划」页按块调整，
+     在线地图端**只读**：角度输入/±1°/应用/回传全部禁用 —— 地图整组一把转会与组页
+     逐块角度打架（用户原话：「在线地图不能对这些分区角度调整，不然容易乱」）。
+     单地块记录不受影响，原有交互一分不改。 */
+  function isGrouped(p){return !!(p&&p.merged);}
+  function gate(p){
+    var g=isGrouped(p);
+    [input,plusBtn,minusBtn,applyBtn,sendBtn].forEach(function(el){if(el)el.disabled=g;});
+    if(g){input.value='';setStatus('成组地块：分区角度请在「多地块规划」页按块调整，地图端只读。');}
+  }
   function library(){var state=readLibrary();return state.ok?state.plots:[];}
   function current(){return library().find(p=>p.id===select.value);}
   function geometry(p){return JSON.stringify([p.polyLatLng,p.polyLatLngSet,p.subPlots]);}
@@ -114,7 +125,7 @@
        转动了」（用户指正：轮廓不应动）。现改为只画分割线：从分区格边里提取分割线
        （共享边/共线段按「方向+偏移」归并），旋转后与地块环求交取弦，越界部分裁掉。
        正式「应用并重新划分」由二级引擎重划并按边界裁剪，本来就是轮廓不动的 ✓。
-     数学口径与 rotate() 一致：本地米制投影（x=Δlng·m·cos、y=Δlat·m），正角度从东向北
+     数学口径采用本地米制投影（x=Δlng·m·cos、y=Δlat·m），正角度从东向北
      （CCW），画前经 RyMapHost.toDisplay 做 GCJ 纠偏。 */
   function drawPreview(p,angle){
     var saved=valid(p&&p.partitionPlan)?p.partitionPlan.angle:0,d=(Number(angle)||0)-saved;
@@ -180,8 +191,8 @@
       });
     });
   }
-  function refresh(){var old=select.value,list=library().filter(p=>!p.mergedInto&&p.polyLatLng&&p.polyLatLng.length>=3);select.innerHTML='';list.forEach(p=>{var o=root.document.createElement('option');o.value=p.id;o.textContent=p.name||p.id;select.appendChild(o);});if(list.some(p=>p.id===old))select.value=old;var p=current();input.value=p&&valid(p.partitionPlan)?p.partitionPlan.angle.toFixed(2):'0';draw(p);}
-  select.onchange=function(){var p=current();input.value=p&&valid(p.partitionPlan)?p.partitionPlan.angle.toFixed(2):'0';draw(p);setStatus('正角度为从东向北旋转；真实地块边界不变。');};
+  function refresh(){var old=select.value,list=library().filter(p=>!p.mergedInto&&p.polyLatLng&&p.polyLatLng.length>=3);select.innerHTML='';list.forEach(p=>{var o=root.document.createElement('option');o.value=p.id;o.textContent=p.name||p.id;select.appendChild(o);});if(list.some(p=>p.id===old))select.value=old;var p=current();gate(p);input.value=(p&&!p.merged&&valid(p.partitionPlan))?p.partitionPlan.angle.toFixed(2):'0';draw(p);}
+  select.onchange=function(){var p=current();gate(p);input.value=(p&&!p.merged&&valid(p.partitionPlan))?p.partitionPlan.angle.toFixed(2):'0';draw(p);setStatus('正角度为从东向北旋转；真实地块边界不变。');};
   /* [v481] ±1° 与手动输入都实时转动分区线（预览），点「应用并重新划分」才真正重划 */
   box.querySelector('[data-angle-minus]').onclick=()=>{input.value=Math.max(-180,Number(input.value)-1);drawPreview(current(),Number(input.value));};
   box.querySelector('[data-angle-plus]').onclick=()=>{input.value=Math.min(180,Number(input.value)+1);drawPreview(current(),Number(input.value));};
@@ -192,6 +203,8 @@
   async function applyNow(){
    if(busy)return false;
    var p=current(),angle=Number(input.value);
+   /* [v673] 双保险：成组地块一律拒绝在地图端应用角度（控件已禁用，这里兜 API 直调） */
+   if(isGrouped(p)){setStatus('成组地块的分区角度请在「多地块规划」页按块调整，地图端不能改。','err');return false;}
    if(!p||input.value.trim()===''||!Number.isFinite(angle)||angle<-180||angle>180){setStatus('请选择地块，角度范围为 −180° 至 180°。','err');return false;}
    busy=true;applyBtn.disabled=true;setStatus('正在按二级规则重新划分…');
    try{
@@ -221,7 +234,7 @@
    finally{busy=false;applyBtn.disabled=false;}
   }
   applyBtn.onclick=applyNow;
-  box.querySelector('[data-angle-send]').onclick=async function(){var p=current();if(!p||busy)return;var saved=valid(p.partitionPlan)?p.partitionPlan.angle:0;if(input.value.trim()===''||!Number.isFinite(Number(input.value))){setStatus('请先填写 −180° 至 180° 之间的角度。','err');return;}
+  box.querySelector('[data-angle-send]').onclick=async function(){var p=current();if(!p||busy)return;if(isGrouped(p)){setStatus('成组地块的分区角度请在「多地块规划」页按块调整，地图端不能改。','err');return;}var saved=valid(p.partitionPlan)?p.partitionPlan.angle:0;if(input.value.trim()===''||!Number.isFinite(Number(input.value))){setStatus('请先填写 −180° 至 180° 之间的角度。','err');return;}
    /* [v481] 旧版角度未应用时在这里**静默拒绝**（只有状态行小字，用户看不到 ⇒ 以为
       「调整角度后回传不了地块分区页」）。现改为：自动先「应用并重新划分」，
       成功后才回二级；失败则停在地图页并显示红色错误。 */
@@ -229,5 +242,5 @@
    root.RyMapHost.send(p,this);};
   root.addEventListener('storage',refresh);root.addEventListener('runye-plots-updated',refresh);refresh();return{refresh:refresh};
  }
- root.RyMapPartition={orient:orient,center:center,valid:valid,restore:restore,capture:capture,preview:preview,attach:attach,commitPartitionResult:commitPartitionResult};
+ root.RyMapPartition={center:center,valid:valid,restore:restore,capture:capture,preview:preview,attach:attach,commitPartitionResult:commitPartitionResult};
 })(typeof window!=='undefined'?window:globalThis);

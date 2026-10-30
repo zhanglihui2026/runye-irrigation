@@ -480,32 +480,8 @@
     o = o || {};
     var ids = Object.keys(state.selected || {});
     if (ids.length < 2) return { ok: false, reason: '至少选择 2 个地块' };
-    var snapshot = readPlotLibraryState();
-    if (!snapshot.ok) return { ok: false, reason: plotLibraryError(snapshot) };
-    var lib = snapshot.plots;
-
-    var picked = [];
-    lib.forEach(function (p) { if (p && ids.indexOf(p.id) >= 0) picked.push(p); });
-    if (picked.length !== ids.length) return { ok: false, reason: '选中的地块已不存在或地块编号重复，请刷新后重试' };
-    // 已成组的不能再重复成组（否则会丢失上一次的子地块归属）
-    var nested = picked.filter(function (p) { return p.merged; });
-    if (nested.length) {
-      return { ok: false, reason: '「' + (nested[0].name || nested[0].id) + '」本身已是成组地块，请先「解散成组」后再成组' };
-    }
-
-    var big = mergePlots(picked, { name: o.name });
-    if (!big) return { ok: false, reason: '成组失败：子地块缺少有效环' };
-
-    // 原小地块保留在库里但标记归属：体现「保留子地块」，且它们可再被还原
-    var rest = lib.map(function (p) {
-      if (ids.indexOf(p.id) < 0) return p;
-      var c = JSON.parse(JSON.stringify(p));
-      c.mergedInto = big.id;
-      return c;
-    });
-    rest.push(big);
-    var saved = replacePlotLibrary(rest, snapshot.revision);
-    if (!saved.ok) return { ok: false, reason: plotLibraryError(saved) };
+    var result = groupPlotsFromLibrary(ids, o);
+    if (!result.ok) return result;
 
     state.selected = {};
     if (state.refresh) state.refresh();
@@ -513,7 +489,45 @@
     state.mergePick = false;
     renderMergeBar(state, []);
     // 通知宿主页（地图页左栏「我的地块」列表需要跟着重列）
-    if (state.onMergeDone) { try { state.onMergeDone(big); } catch (e) {} }
+    if (state.onMergeDone) { try { state.onMergeDone(result.merged); } catch (e) {} }
+    return result;
+  }
+
+  /** 由库内地块 ID 安全成组，供地图页和地块分区页共用。 */
+  function groupPlotsFromLibrary(ids, o) {
+    o = o || {};
+    ids = Array.isArray(ids) ? ids.map(String) : [];
+    ids = ids.filter(function (id, i) { return id && ids.indexOf(id) === i; });
+    if (ids.length < 2) return { ok: false, reason: '至少选择 2 个地块' };
+    var snapshot = readPlotLibraryState();
+    if (!snapshot.ok) return { ok: false, reason: plotLibraryError(snapshot) };
+    var lib = snapshot.plots;
+
+    var picked = [];
+    lib.forEach(function (p) { if (p && ids.indexOf(String(p.id)) >= 0) picked.push(p); });
+    if (picked.length !== ids.length) return { ok: false, reason: '选中的地块已不存在或地块编号重复，请刷新后重试' };
+    // 已成组的不能再重复成组（否则会丢失上一次的子地块归属）
+    var nested = picked.filter(function (p) { return p.merged || p.grouped || p.mergedInto; });
+    if (nested.length) {
+      return { ok: false, reason: '「' + (nested[0].name || nested[0].id) + '」本身已是成组地块，请先「解散成组」后再成组' };
+    }
+
+    var big = mergePlots(picked, { name: o.name });
+    if (!big) return { ok: false, reason: '成组失败：子地块缺少有效环' };
+    if (lib.some(function (p) { return p && String(p.id) === String(big.id); })) {
+      return { ok: false, reason: '生成的组编号与现有地块冲突，请重试' };
+    }
+
+    // 原小地块保留在库里但标记归属：体现「保留子地块」，且它们可再被还原
+    var rest = lib.map(function (p) {
+      if (!p || ids.indexOf(String(p.id)) < 0) return p;
+      var c = JSON.parse(JSON.stringify(p));
+      c.mergedInto = big.id;
+      return c;
+    });
+    rest.push(big);
+    var saved = replacePlotLibrary(rest, snapshot.revision);
+    if (!saved.ok) return { ok: false, reason: plotLibraryError(saved) };
     return { ok: true, merged: big };
   }
 
@@ -1358,6 +1372,7 @@
       plots: mergePlots,
       hull: convexHull,
       canUnmerge: canUnmerge,
+      groupFromLibrary: groupPlotsFromLibrary,
       /* [v185] 宿主页离线用法：直接操作地块库，不需要地图实例 */
       unmerge: function (bigId) { return doUnmerge(null, bigId); }
     }

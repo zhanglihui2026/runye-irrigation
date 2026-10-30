@@ -10,6 +10,10 @@
   window._tlDimSel=[];
   try{window._tlDimSaveOn=localStorage.getItem('tl-dim-save')==='1';}catch(e){window._tlDimSaveOn=false;}
   function drawM(){
+    /* [v797 合并多选] 独立按钮已删（index.html）→ mBtn 为 null；状态变化仍需回灌
+       合并按钮（#tlWsMultiBtn，inline-24 drawMultiBtn 联合渲染），故回灌放在
+       mBtn 空值返回**之前**。 */
+    if(window.tlMultiSyncUI){ try{ window.tlMultiSyncUI(); }catch(e){} }
     if(!mBtn)return;
     var on=!!window._tlDimMulti;
     mBtn.classList.toggle('active',on);

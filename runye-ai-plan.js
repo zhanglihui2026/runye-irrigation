@@ -233,21 +233,56 @@
   var lastUndo=null;
   function fingerprint() {
     var c=collect(),ge=root.__runyeGroupEdit, b=root.RunyeBridge;
-    return JSON.stringify({plot:root.currentPlotId,poly:c.poly,groups:c.groups,area:c.area_m2,terrain:c.terrain,conditions:c.conditions,cur:c.cur,lift:c.pump_lift,source:c.src_distance,pressure:c.tape_pressure,mode:ge&&ge.mode,current:ge&&ge.current,pipes:b&&b.state&&[b.state.mainPipes,b.state.branchPipes,b.state.subBranchPipes],slots:ge&&ge.slots,trunk:ge&&ge.trunkPipes,cuts:b&&b.state&&b.state.cutSnap,rotated:b&&b.state&&b.state.zoneRotated});
+    var design=b&&typeof b.getPartitionSnapshot==='function'?b.getPartitionSnapshot():null;
+    return JSON.stringify({plot:root.currentPlotId,poly:c.poly,groups:c.groups,area:c.area_m2,terrain:c.terrain,conditions:c.conditions,cur:c.cur,lift:c.pump_lift,source:c.src_distance,pressure:c.tape_pressure,mode:ge&&ge.mode,current:ge&&ge.current,pipes:design&&[design.mainPipes,design.branchPipes,design.subBranchPipes],slots:ge&&ge.slots,trunk:ge&&ge.trunkPipes,cuts:design&&design.cutSnap,rotated:design&&design.zoneAngleDeg});
   }
-  function clone(v){return v == null?v:JSON.parse(JSON.stringify(v));}
+  var AI_UNDO_KEY='runye_ai_plan_rollback_v1';
   function capture(){
-    var nodes=root.document.querySelectorAll?Array.from(root.document.querySelectorAll('input[id],select[id]')):FIELDS.reduce(function(a,f){return a.concat(f.ids.map(el).filter(Boolean));},[]);
-    return {nodes:nodes.map(function(n){return {node:n,value:n.value,checked:n.checked};}),state:clone(root.RunyeBridge&&root.RunyeBridge.state),group:clone(root.__runyeGroupEdit),groupRef:root.__runyeGroupEdit,blocks:clone(root.__runyeGroupWork&&root.__runyeGroupWork.blocks),data:clone(root.planData)};
+    if(typeof root.runyeSaveProject!=='function'||typeof root.runyeLoadProject!=='function'||!root.localStorage)return null;
+    var previousQuiet=root.__ryUndoQuiet,raw=null;
+    try{
+      root.__ryUndoQuiet=true;
+      try{root.localStorage.removeItem(AI_UNDO_KEY);}catch(e0){}
+      if(root.runyeSaveProject(true,AI_UNDO_KEY)!==true)return null;
+      raw=root.localStorage.getItem(AI_UNDO_KEY);
+      if(!raw)return null;
+      var snapshot=JSON.parse(raw),edits=root.RyTlAutoEdits;
+      if(edits&&typeof edits.calibersMap==='function'){
+        var calibers=edits.calibersMap(),keys=calibers?Object.keys(calibers):[];
+        if(keys.length){snapshot.__undoCals={};keys.forEach(function(k){snapshot.__undoCals[k]=calibers[k];});}
+      }
+      return JSON.stringify(snapshot);
+    }catch(e){return null;}
+    finally{
+      root.__ryUndoQuiet=previousQuiet;
+      try{root.localStorage.removeItem(AI_UNDO_KEY);}catch(e1){}
+    }
   }
   function restore(s){
-    s.nodes.forEach(function(p){p.node.value=p.value;if(p.checked!==undefined)p.node.checked=p.checked;});
-    if(s.state&&root.RunyeBridge&&root.RunyeBridge.state){var target=root.RunyeBridge.state;Object.keys(target).forEach(function(k){delete target[k];});Object.assign(target,clone(s.state));}
-    if(s.group){var g=s.groupRef;Object.keys(g).forEach(function(k){delete g[k];});Object.assign(g,clone(s.group));root.__runyeGroupEdit=g;}if(s.blocks&&root.__runyeGroupWork)root.__runyeGroupWork.blocks=clone(s.blocks);root.planData=clone(s.data);
-    if(typeof root.calcPlan==='function')try{root.calcPlan();}catch(e){}
-    if(typeof root.grRefreshGroupPage==='function'&&s.group&&s.group.active)root.grRefreshGroupPage();
+    if(typeof s!=='string'||!s||typeof root.runyeLoadProject!=='function'||!root.localStorage)return false;
+    var previousQuiet=root.__ryUndoQuiet,restored=false,snapshot=null;
+    try{
+      snapshot=JSON.parse(s);
+      root.__ryUndoQuiet=true;
+      root.localStorage.setItem(AI_UNDO_KEY,s);
+      restored=root.runyeLoadProject(AI_UNDO_KEY,true)===true;
+    }catch(e){restored=false;}
+    finally{
+      root.__ryUndoQuiet=previousQuiet;
+      try{root.localStorage.removeItem(AI_UNDO_KEY);}catch(e1){}
+    }
+    if(!restored)return false;
+    try{
+      var edits=root.RyTlAutoEdits,want=snapshot&&snapshot.__undoCals||{},current=edits&&typeof edits.calibersMap==='function'?edits.calibersMap()||{}:{};
+      if(edits){
+        Object.keys(current).forEach(function(k){if(!(k in want)&&typeof edits.clearCaliber==='function')edits.clearCaliber(k,'undo');});
+        Object.keys(want).forEach(function(k){if(Math.abs((current[k]||0)-want[k])>1e-6&&typeof edits.setCaliber==='function')edits.setCaliber(k,want[k],null,'undo');});
+      }
+    }catch(e2){}
+    if(typeof root.grRefreshGroupPage==='function'&&root.__runyeGroupEdit&&root.__runyeGroupEdit.active)try{root.grRefreshGroupPage();}catch(e3){}
+    return true;
   }
-  function undoApply(){if(!lastUndo)return false;restore(lastUndo);lastUndo=null;return true;}
+  function undoApply(){if(!lastUndo||!restore(lastUndo))return false;lastUndo=null;return true;}
   /* ---------- 4. 应用（写现有输入框 + 调现有 calcPlan） ---------- */
   function apply(plan, options) {
     options = options || {};
@@ -262,11 +297,14 @@
     ['pump_lift','terrain_dh','src_distance','tape_pressure'].forEach(function(k) { if(isNum(d[k])) { delete d[k]; lockedWarnings.push(k==='terrain_dh'?'已保留手动高程或原地形高差；AI建议未覆盖。':'已保留实测工况：'+FIELDS.filter(function(f){return f.key===k;})[0].name); } });
     var written = [], terrainOverride = root.RyTerrain && root.RyTerrain.exportState().enabled && isNum(d.terrain_dh);
     if (terrainOverride) delete d.terrain_dh;
-    var bridge=root.RunyeBridge, hasPipes=!!(bridge && bridge.state && ['mainPipes','branchPipes','subBranchPipes'].some(function(k){return (bridge.state[k]||[]).length;}));
+    var bridge=root.RunyeBridge, partition=bridge&&typeof bridge.getPartitionSnapshot==='function'?bridge.getPartitionSnapshot():null;
+    var hasPipes=!!(partition&&['mainPipes','branchPipes','subBranchPipes'].some(function(k){return (partition[k]||[]).length;}));
     var layoutChanged=FIELDS.some(function(f){return ['tape_lay_side','zone_mu','tape_spacing'].indexOf(f.key)>=0 && isNum(d[f.key]) && f.ids.some(function(id){var n=el(id);return n&&Number(n.value)!==d[f.key];});});
     if(hasPipes && layoutChanged && !options.rebuild) return {ok:false,kind:'rebuild',msg:'分区参数会改变现有管路，请在预览中确认按原规则重建；尚未修改参数。'};
     if(options.rebuild && (!bridge || typeof bridge.autoPipesWhole!=='function')) return {ok:false,msg:'当前页面尚未加载布管入口，未写入参数。'};
     var undo=capture();
+    if(!undo)return {ok:false,kind:'snapshot',msg:'无法安全捕获当前工程快照，方案未应用。'};
+    lastUndo=undo;
     try {
     FIELDS.forEach(function (f) {
       var v = d[f.key];
@@ -300,12 +338,11 @@
     if (isNum(plan.plot && plan.plot.area_m2) && Math.abs(plan.plot.area_m2 - c.area_m2) / Math.max(c.area_m2, 1) > 0.5) {
       warnings.push('方案里的地块面积 ' + plan.plot.area_m2.toFixed(1) + ' m² 与当前实测 ' + c.area_m2.toFixed(1) + ' m² 相差较大，请核对是否为同一地块');
     }
-    lastUndo=undo;
     return {
       ok: true, rebuilt:!!options.rebuild, written: written, warnings: warnings,
       summary: pd ? { pumpFlow: pd.zoneFlow, pumpHead: pd.pumpHead, mainOD: pd.mainPipeODValue, branchOD: pd.branchPipeODValue, zones: pd.zoneCols + '×' + pd.zoneRows } : null
     };
-      } catch(e) { restore(undo); return {ok:false,msg:'应用失败，原参数与管路已恢复：'+e.message}; }
+      } catch(e) { var recovered=restore(undo); if(recovered)lastUndo=null;else lastUndo=undo; return {ok:false,msg:recovered?'应用失败，已通过工程快照恢复：'+e.message:'应用失败，且工程快照恢复未确认；请检查当前设计状态。'}; }
   }
 
   /* ---------- 4.5 云端接口（v255）：user_id / 接口地址 / POST ---------- */
@@ -545,7 +582,7 @@
       store.remark='模型建议（未作工程复算）：'+(plan.remark||'');store.risks=(plan.risks||[]).concat(ap.warnings||[]);persist();renderRemark();
       var r=ap.summary;addConversation('assistant','方案已应用并完成复算。'+(r?'分区 '+r.zones+' 个，泵扬程 '+r.pumpHead.toFixed(1)+' m。':'')+'可以继续告诉我需要调整的地方。');setStatus('已按原规则生成并复算。'+(r?'主管 Ø'+r.mainOD+' mm；支管 Ø'+r.branchOD+' mm；分区 '+r.zones+'；泵扬程 '+r.pumpHead.toFixed(1)+' m。':''));
       var applied=fingerprint();slot.innerHTML='<button type="button" data-ai="undo">撤销本次应用</button>';
-      slot.querySelector('[data-ai="undo"]').onclick=function(){if(fingerprint()!==applied){setStatus('应用后规划已有修改，为避免覆盖，请使用原页面的撤销操作。',true);return;}undoApply();slot.innerHTML='';setStatus('已恢复应用前的参数与管路。');};
+      slot.querySelector('[data-ai="undo"]').onclick=function(){if(fingerprint()!==applied){setStatus('应用后规划已有修改，为避免覆盖，请使用原页面的撤销操作。',true);return;}if(!undoApply()){setStatus('工程快照恢复未确认，撤销记录已保留；请检查当前设计状态后重试。',true);return;}slot.innerHTML='';setStatus('已恢复应用前的参数与管路。');};
     };
     setStatus('已取得候选方案，尚未修改规划；请检查参数后应用。');
   }
@@ -907,7 +944,7 @@
     var actions=panel.querySelector('.ai-actions'), status=panel.querySelector('[data-ai=status]'), slot=panel.querySelector('[data-ai=slot]'), remark=panel.querySelector('[data-ai=remark]');
     var oldSettings=Array.prototype.slice.call(panel.querySelectorAll('.ai-api,.ai-note'));
     var grid=doc.createElement('div');grid.className='smart-workbench';
-    grid.innerHTML='<header class="smart-titlebar" role="banner"><span class="smart-tb-dot"></span><span>润野灌溉 · 智能规划</span><span class="smart-tb-sub">专业滴灌设计 · AI 方案规划</span><span class="smart-tb-spacer"></span><a class="smart-tb-link" href="index.html?full=1">返回完整工具 ↗</a></header><aside class="smart-history"><div class="smart-brand">润野 · 智能规划</div><button class="smart-new" type="button">＋ 新建对话</button><nav class="smart-nav"><a href="index.html#areaTool"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11.3 2.3l2.4 2.4L5.2 13l-3.2.7.7-3.2z"/></svg><span>地块绘制</span></a><a href="runye-map-measure.html"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4l4.5-2 4.5 2 4-2v10l-4 2-4.5-2-4.5 2z"/><path d="M6 2v10M10.5 4v10"/></svg><span>在线地图</span></a><a href="index.html#pipePlanSection"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="0.5"/><rect x="9" y="2" width="5" height="5" rx="0.5"/><rect x="2" y="9" width="5" height="5" rx="0.5"/><rect x="9" y="9" width="5" height="5" rx="0.5"/></svg><span>地块分区</span></a><a href="index.html#tlPipePlanSection"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h5.5a3 3 0 013 3v5"/><circle cx="2.5" cy="4" r="1.2"/><circle cx="11" cy="12.5" r="1.2"/></svg><span>管路规划</span></a><details class="smart-nav-more"><summary><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="4" cy="4" r="1.3"/><circle cx="12" cy="4" r="1.3"/><circle cx="4" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/></svg><span>更多功能</span></summary><div class="smart-nav-sub"><a href="index.html#designInput"><span>标准分区预设</span></a><a href="index.html#terrainSection"><span>地形模块</span></a><a href="index.html#hydraulicsSection"><span>水力校核</span></a><a href="index.html#detailsSection"><span>材料清单</span></a><a href="index.html#filterSystemSection"><span>过滤系统</span></a><a href="index.html#nav-sys"><span>系统图</span></a><a href="耐特菲姆滴灌带长度查询器.html"><span>滴灌带查询</span></a></div></details></nav><div class="smart-label">历史对话 · 本机保存</div><div class="smart-thread-list"></div></aside><section class="smart-center"><header class="smart-chat-head"><h2>把需求说出来，让规划更简单</h2><p>描述作物、滴灌参数和分区要求，生成方案后在右侧确认应用。</p><details class="smart-howto" open><summary>第一次用？三步生成规划方案</summary><ol class="smart-steps"><li><i>1</i><div><b>在线地图 · 绘制地块</b><span>在「在线地图」绘制地块边界，点击「绘制完成」。</span><a href="runye-map-measure.html">去绘制地块 ↗</a></div></li><li><i>2</i><div><b>地块分区 · 旋转地块</b><span>在「地块分区」页把地块旋转到合适的铺设角度。</span><a href="index.html#pipePlanSection">去旋转地块 ↗</a></div></li><li><i>3</i><div><b>智能规划 · 输入参数发送</b><span>在下方输入滴灌参数（滴头流量、滴孔间距、带间距、每区流量…），发送后自动规划；方案在右侧确认应用。</span></div></li></ol></details></header><div class="smart-welcome"><b>今天想怎样规划地块？</b><p>例如：滴头流量 1.38 L/h，滴孔间距 0.3 m，带间距 0.8 m，单边长 60 m，每区流量不超过 80 m³/h。</p><button type="button" class="smart-example">填入这个示例</button><ol class="smart-steps"><li><i>1</i><div><b>在线地图 · 绘制地块</b><span>在「在线地图」绘制地块边界，点击「绘制完成」。</span><a href="runye-map-measure.html">去绘制地块 ↗</a></div></li><li><i>2</i><div><b>地块分区 · 旋转地块</b><span>在「地块分区」页把地块旋转到合适的铺设角度。</span><a href="index.html#pipePlanSection">去旋转地块 ↗</a></div></li><li><i>3</i><div><b>智能规划 · 输入参数发送</b><span>在下方输入滴灌参数（滴头流量、滴孔间距、带间距、每区流量…），发送后自动规划；方案在右侧确认应用。</span></div></li></ol></div><div class="smart-composer"><label>继续补充你的要求</label><div class="smart-compose-bottom"></div><details class="smart-settings"><summary>会员与连接设置</summary></details></div></section><aside class="smart-results"><header><h2>规划成果</h2><p>当前地块与待应用方案</p></header><div class="smart-result-scroll"><div class="smart-plot"></div><div class="smart-result-empty">还没有候选方案。发送需求后，参数变化及应用按钮会显示在这里。</div></div></aside><div class="smart-statusbar" role="status"><span class="smart-sb-dot"></span><span>润野 · 智能规划</span><span class="smart-sb-sep"></span><span>v356</span><span class="smart-sb-spacer"></span><span>当前地块 <b data-sb="mu">—</b></span><span class="smart-sb-sep"></span><span>历史 <b data-sb="threads">0</b> 条</span><span class="smart-sb-sep"></span><span>对话仅保存在本机</span></div>';
+    grid.innerHTML='<header class="smart-titlebar" role="banner"><span class="smart-tb-dot"></span><span>润野灌溉 · 智能规划</span><span class="smart-tb-sub">专业滴灌设计 · AI 方案规划</span><span class="smart-tb-spacer"></span><a class="smart-tb-link" href="index.html?full=1">返回完整工具 ↗</a></header><aside class="smart-history"><div class="smart-brand">润野 · 智能规划</div><button class="smart-new" type="button">＋ 新建对话</button><nav class="smart-nav"><a href="index.html#areaTool"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11.3 2.3l2.4 2.4L5.2 13l-3.2.7.7-3.2z"/></svg><span>地块绘制</span></a><a href="runye-map-measure.html"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4l4.5-2 4.5 2 4-2v10l-4 2-4.5-2-4.5 2z"/><path d="M6 2v10M10.5 4v10"/></svg><span>在线地图</span></a><a href="index.html#pipePlanSection"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="0.5"/><rect x="9" y="2" width="5" height="5" rx="0.5"/><rect x="2" y="9" width="5" height="5" rx="0.5"/><rect x="9" y="9" width="5" height="5" rx="0.5"/></svg><span>地块分区</span></a><a href="index.html#tlPipePlanSection"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h5.5a3 3 0 013 3v5"/><circle cx="2.5" cy="4" r="1.2"/><circle cx="11" cy="12.5" r="1.2"/></svg><span>管路规划</span></a><details class="smart-nav-more"><summary><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="4" cy="4" r="1.3"/><circle cx="12" cy="4" r="1.3"/><circle cx="4" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/></svg><span>更多功能</span></summary><div class="smart-nav-sub"><a href="index.html#designInput"><span>标准分区预设</span></a><a href="index.html#terrainSection"><span>地形模块</span></a><a href="index.html#hydraulicsSection"><span>水力校核</span></a><a href="index.html#detailsSection"><span>材料清单</span></a><a href="index.html#filterSystemSection"><span>过滤系统</span></a><a href="index.html#nav-sys"><span>系统图</span></a><a href="耐特菲姆滴灌带长度查询器.html"><span>滴灌带查询</span></a></div></details></nav><div class="smart-label">历史对话 · 本机保存</div><div class="smart-thread-list"></div></aside><section class="smart-center"><header class="smart-chat-head"><h2>把需求说出来，让规划更简单</h2><p>描述作物、滴灌参数和分区要求，生成方案后在右侧确认应用。</p><details class="smart-howto" open><summary>第一次用？三步生成规划方案</summary><ol class="smart-steps"><li><i>1</i><div><b>在线地图 · 绘制地块</b><span>在「在线地图」绘制地块边界，点击「绘制完成」。</span><a href="runye-map-measure.html">去绘制地块 ↗</a></div></li><li><i>2</i><div><b>地块分区 · 调整分区方向</b><span>在「地块分区」页调整分区网格方向；地块边界和朝向保持不变。</span><a href="index.html#pipePlanSection">去调整分区方向 ↗</a></div></li><li><i>3</i><div><b>智能规划 · 输入参数发送</b><span>在下方输入滴灌参数（滴头流量、滴孔间距、带间距、每区流量…），发送后自动规划；方案在右侧确认应用。</span></div></li></ol></details></header><div class="smart-welcome"><b>今天想怎样规划地块？</b><p>例如：滴头流量 1.38 L/h，滴孔间距 0.3 m，带间距 0.8 m，单边长 60 m，每区流量不超过 80 m³/h。</p><button type="button" class="smart-example">填入这个示例</button><ol class="smart-steps"><li><i>1</i><div><b>在线地图 · 绘制地块</b><span>在「在线地图」绘制地块边界，点击「绘制完成」。</span><a href="runye-map-measure.html">去绘制地块 ↗</a></div></li><li><i>2</i><div><b>地块分区 · 调整分区方向</b><span>在「地块分区」页调整分区网格方向；地块边界和朝向保持不变。</span><a href="index.html#pipePlanSection">去调整分区方向 ↗</a></div></li><li><i>3</i><div><b>智能规划 · 输入参数发送</b><span>在下方输入滴灌参数（滴头流量、滴孔间距、带间距、每区流量…），发送后自动规划；方案在右侧确认应用。</span></div></li></ol></div><div class="smart-composer"><label>继续补充你的要求</label><div class="smart-compose-bottom"></div><details class="smart-settings"><summary>会员与连接设置</summary></details></div></section><aside class="smart-results"><header><h2>规划成果</h2><p>当前地块与待应用方案</p></header><div class="smart-result-scroll"><div class="smart-plot"></div><div class="smart-result-empty">还没有候选方案。发送需求后，参数变化及应用按钮会显示在这里。</div></div></aside><div class="smart-statusbar" role="status"><span class="smart-sb-dot"></span><span>润野 · 智能规划</span><span class="smart-sb-sep"></span><span>v356</span><span class="smart-sb-spacer"></span><span>当前地块 <b data-sb="mu">—</b></span><span class="smart-sb-sep"></span><span>历史 <b data-sb="threads">0</b> 条</span><span class="smart-sb-sep"></span><span>对话仅保存在本机</span></div>';
     body.innerHTML='';body.appendChild(grid);
     var center=grid.querySelector('.smart-center'), composer=grid.querySelector('.smart-composer');
     center.insertBefore(log,composer);composer.insertBefore(req,composer.querySelector('.smart-compose-bottom'));

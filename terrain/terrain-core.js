@@ -1080,8 +1080,8 @@
           elevations: Array.isArray(s.elevations) ? s.elevations : [],
           mode: s.mode === 'engineering' ? 'engineering' : 'preview',
           _unit: s._unit === 'mu' ? 'mu' : 'sqm',
-          /* [v407] 地块角度随状态持久化（对齐地块分区 pp 口径，刷新不再归零） */
-          _plotRot: (typeof s._plotRot === 'number' && isFinite(s._plotRot)) ? Math.max(-180, Math.min(180, s._plotRot)) : 0
+          /* 旧版本地块旋转值已弃用；地形/喷灌数据始终使用真实坐标。 */
+          _plotRot: 0
         };
       }
     } catch (e) { /* 损坏则重置 */ }
@@ -1100,7 +1100,7 @@
         }),
         mode: state.mode || 'preview',
         _unit: state._unit === 'mu' ? 'mu' : 'sqm',  /* 单位偏好随状态持久化（不可白名单遗漏） */
-        _plotRot: (typeof state._plotRot === 'number' && isFinite(state._plotRot)) ? state._plotRot : 0  /* [v407] 地块角度持久化 */
+        _plotRot: 0
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(out));
       return { ok: true };

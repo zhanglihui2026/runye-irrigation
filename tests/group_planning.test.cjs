@@ -12,7 +12,7 @@ function fixture(){
  const box={window:win,document:doc,console,setTimeout,clearTimeout,MAIN_PIPE_MIN_OD:90,BRANCH_PIPE_MAX_OD:160,SDR:13.6,
   selectPipe:(q,v,min,max)=>({od:Math.max(min || 50,50),id:45}),hazenWilliams:(length,q,id)=>length*q/id,christiansenF:()=>1};
  vm.createContext(box);vm.runInContext(functionSource('ppPolyArea')+'\n'+functionSource('ppClipPolyToRect'),box);
- win.RunyeBridge={polyArea:box.ppPolyArea,clipPolyToRect:box.ppClipPolyToRect,groupLiveSlot:()=>null,
+ win.RunyeBridge={polyArea:box.ppPolyArea,clipPolyToRect:box.ppClipPolyToRect,polyToGrid:(cuts,poly)=>cuts&&cuts.frame?(poly||[]).map(cuts.frame.toGrid):(poly||[]).map(p=>({x:p.x,y:p.y})),polyToWorld:(cuts,poly)=>cuts&&cuts.frame?(poly||[]).map(cuts.frame.toWorld):(poly||[]).map(p=>({x:p.x,y:p.y})),groupLiveSlot:()=>null,
   zoneCutsFor:bb=>({zoneCount:1,cols:1,rows:1,xPlan:[bb.w],yPlan:[bb.h],xSrc:[bb.w],ySrc:[bb.h],xPos:[bb.minX,bb.minX+bb.w],yPos:[bb.minY,bb.minY+bb.h]})};
  const marker=html.indexOf('window.__runyeGroupWork = W');const start=html.lastIndexOf('(function () {',marker),end=html.indexOf('\n})();',marker)+'\n})();'.length;
  vm.runInContext(html.slice(start,end),box);

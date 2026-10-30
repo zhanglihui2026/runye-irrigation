@@ -272,24 +272,22 @@
     if (state.geoKey && geoKey && state.geoKey !== geoKey) return false;
     if (!state.seq || !Number.isInteger(state.seq.n) || state.seq.n < 0) return false;
     if (state.pipes.length > 2000) return false;
-    var seen = {}, maxN = 0;
+    var seen = {}, maxN = 0, nextPipes, nextSeq, nextFits = [], nextFseq = fseq;
     for (var i = 0; i < state.pipes.length; i++) {
       var m = state.pipes[i];
-      if (!ID_RE.test(m.id) || !KINDS[m.kind] || !validPts(m.pts) || !isFinite(m.len)) return false;
+      if (!m || !ID_RE.test(m.id) || !KINDS[m.kind] || !validPts(m.pts) || !isFinite(m.len)) return false;
       if (seen[m.id]) return false;
       seen[m.id] = 1;
       maxN = Math.max(maxN, parseInt(m.id.slice(3), 10) || 0);
     }
-    pipes = copy(state.pipes);
-    seq = { n: Math.max(state.seq.n, maxN) };
+    nextSeq = { n: Math.max(state.seq.n, maxN) };
     /* 配件（2026-09-16）：旧存档无 fits 字段视为空；有则逐条校验（宿主必须存在） */
-    var nf = [];
     if (state.fits != null) {
       if (!Array.isArray(state.fits) || state.fits.length > 2000) return false;
       var seenF = {}, fmax = 0;
       for (var k = 0; k < state.fits.length; k++) {
         var ft = state.fits[k];
-        if (!FIT_ID_RE.test(ft.id) || !FIT_KINDS[ft.kind] || !pipeById(ft.pid)) return false;
+        if (!ft || !FIT_ID_RE.test(ft.id) || !FIT_KINDS[ft.kind] || !seen[ft.pid]) return false;
         if (ft.kind === 'elbow') {
           if (Number.isInteger(ft.vi) && ft.vi >= 0) { /* 内部拐点弯头（2026-09-18）*/ }
           else if (ft.end !== 0 && ft.end !== 1) return false;
@@ -303,10 +301,17 @@
         seenF[ft.id] = 1;
         fmax = Math.max(fmax, parseInt(ft.id.slice(4), 10) || 0);
       }
-      nf = copy(state.fits);
-      fseq = { n: Math.max(state.fseq && Number.isInteger(state.fseq.n) ? state.fseq.n : 0, fmax) };
+      nextFseq = { n: Math.max(state.fseq && Number.isInteger(state.fseq.n) ? state.fseq.n : 0, fmax) };
     }
-    fits = nf;
+    try {
+      nextPipes = copy(state.pipes);
+      nextFits = state.fits == null ? [] : copy(state.fits);
+    } catch (eCopy) { return false; }
+    /* Keep rejection atomic: no live layer state changes until the full snapshot is valid and cloned. */
+    pipes = nextPipes;
+    seq = nextSeq;
+    fits = nextFits;
+    fseq = nextFseq;
     if (state.geoKey) geoKey = state.geoKey;
     if (!silent) notify('restore', 'project');
     return true;

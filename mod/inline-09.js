@@ -961,7 +961,19 @@ window.tlBranchSpanInfo = function (zi) {
     if (!bp || bp.length < 2 || !zs || !zs.xPos || !zs.yPos) {
       return (full > 0) ? { full: full, base: base || full } : null;
     }
-    var a = bp[0], b = bp[bp.length - 1];
+    var a = bp[0], b = bp[bp.length - 1], frame = zs.frame;
+    /* 新快照的管线使用固定世界坐标，网格线仍是局部设计坐标。
+       旧快照缺少 branchFullSpans 时必须先把管线端点映回网格坐标再判区，
+       否则旋转分区会让支管方向/所在区判断错位。 */
+    function toGrid(p) {
+      if (!frame || !frame.origin || !frame.center) return { x: p.x, y: p.y };
+      var ang = (Number(frame.angle) || 0) * Math.PI / 180, c = Math.cos(ang), s = Math.sin(ang);
+      var sx = Number(frame.scaleX) || 1, sy = Number(frame.scaleY) || 1;
+      var dx = (p.x - frame.origin.x) * sx - frame.center.x;
+      var dy = (p.y - frame.origin.y) * sy - frame.center.y;
+      return { x: frame.center.x + dx * c + dy * s, y: frame.center.y - dx * s + dy * c };
+    }
+    a = toGrid(a); b = toGrid(b);
     var mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
     var vert = Math.abs(a.x - b.x) < Math.abs(a.y - b.y);   /* 竖向支管 ⇒ 跨分区高 */
     var span = 0, E = 1e-6, i;
@@ -1891,7 +1903,10 @@ function tlDemoGroupCount() {
 function tlApplyDemoHighlight(g) {
   var svg = document.querySelector('#tlDiagramContent svg'); if (!svg) return;
   var hi = (window.RyTlWs && window.RyTlWs.groupFillHiCss) ? window.RyTlWs.groupFillHiCss : null;
-  var rects = svg.querySelectorAll('rect[data-zi]');
+  /* [2026-10-27 修复] 分区格子已从 <rect> 改为 <polygon data-zi>（旋转分区线角度改造），
+     旧选择器 rect[data-zi] 查不到任何元素 ⇒ 演示高亮与水流动画整链静默失效；
+     与 tl-workspace 侧 applyGroupHighlight 的 '[data-zi]' 同口径（元素无关）。 */
+  var rects = svg.querySelectorAll('[data-zi]');
   for (var i = 0; i < rects.length; i++) {
     var r = rects[i];
     if (!r.getAttribute('data-stroke')) r.setAttribute('data-stroke', r.getAttribute('stroke') || '');
@@ -2109,7 +2124,8 @@ function tlDemoRenderFlow(svg, g) {
   if (!svg || g == null || !svg.querySelectorAll) return;
   try {
     var zis = [];
-    var rects = svg.querySelectorAll('rect[data-zi]');
+    /* [2026-10-27 修复] 同 tlApplyDemoHighlight：分区格子已是 <polygon data-zi>，rect 选择器失效 */
+    var rects = svg.querySelectorAll('[data-zi]');
     for (var i = 0; i < rects.length; i++) {
       if (parseInt(rects[i].getAttribute('data-g'), 10) === g) zis.push(parseInt(rects[i].getAttribute('data-zi'), 10));
     }
@@ -2349,8 +2365,18 @@ window.tlRefreshGroupStatus = function () {
      之前就返回，演示行永远不出现（删 DOM 必须连带重审函数内所有提前返回）。 */
   if (typeof tlRenderDemoChips === 'function') { try { tlRenderDemoChips(); } catch (e) { } }
 };
-/* v98 手动分区成组（面板入口）：右侧「联合灌溉分组」面板列出全部分区，勾选 → 合并为一组。
-   状态仍挂在 window.tlManualGroups（与画布着色 / 流量重算共用）。 */
+/* [2026-10-27 用户指令取消] 联合灌溉分组「手动合并」机制整链删除：
+   原 v98 面板（勾选合并为一组 / 清空勾选 / 已建联合组列表 ✕ 删除 / 全部清除回自动均分）、
+   v229 保存分组 / 调出分组 / 恢复初始化三钮、v112 本地快照（tlManualGroupsSnapshotKey /
+   tlSaveManualGroups / tlRestoreManualGroups）、v98b 右键合并入口（window.tlMergeIndices，
+   tl-workspace 侧菜单项同步删除）全部移除；index.html 的 #tlGroupPanel aside 已删。
+   分区此后只按两条原则执行：
+     ① 预设 1 / 2 / 3 / 4 区按钮（均分，点按即清空 tlManualGroups）；
+     ② 面积亩组合 tlGroupByArea（v220，下方原样保留，写同一 window.tlManualGroups ——
+        画布组色带 / M 组标注 / 联合流量 / 演示 chips / 工程量全链路照常消费）。
+   保留的公共依赖：tlGroupZoneCount（演示 chips）、tlApplyGroups（面积成组后重生成图面）、
+   window.tlRefreshGroupStatus（触发演示 chips 重建）。
+   恢复方式：git 历史恢复本段函数块与 index.html 的 #tlGroupPanel。 */
 function tlGroupZoneCount() {
   var d = (typeof window !== 'undefined') ? window.tlDiagramData : null;
   var z = d && d.zones; if (!z) return 0;
@@ -2358,53 +2384,6 @@ function tlGroupZoneCount() {
   var zr = z.rows || (z.yPos ? z.yPos.length - 1 : 0);
   return zc * zr;
 }
-window.tlRefreshGroupPanel = function () {
-  var list = document.getElementById('tlGroupZoneList'); if (!list) return;
-  var total = tlGroupZoneCount();
-  var mg = (typeof window !== 'undefined') ? (window.tlManualGroups || []) : [];
-  function grpOf(zi) { for (var g = 0; g < mg.length; g++) { if (mg[g] && mg[g].indexOf(zi) >= 0) return g; } return -1; }
-  var zhtml = '';
-  for (var zi = 0; zi < total; zi++) {
-    var g = grpOf(zi); var inG = g >= 0;
-    zhtml += '<label class="tl-gp-zone' + (inG ? ' in-group' : '') + '">' + '<input type="checkbox" data-zi="' + zi + '"' + (inG ? ' disabled' : '') + '>' + '<span>区 ' + (zi + 1) + (inG ? '（组' + (g + 1) + '）' : '') + '</span></label>';
-  }
-  list.innerHTML = zhtml || '<div class="tl-gp-empty">请先生成三级管线平面图</div>';
-  var n = 0; var cbs = list.querySelectorAll('input[type=checkbox]'); for (var i = 0; i < cbs.length; i++) if (cbs[i].checked) n++;
-  var mb = document.getElementById('tlGroupMergeBtn'); if (mb) mb.disabled = n < 2;
-  var gl = document.getElementById('tlGroupList');
-  if (gl) {
-    if (!mg.length) { gl.innerHTML = '<div class="tl-gp-empty">尚无手动组（按 N 自动均分）</div>'; }
-    else {
-      /* v100：组列表直接给出该组的实际面积（亩）—— 与图上「M2 · 区3/4 / 32.4 亩」组级标注同源 */
-      var glCells = null;
-      try {
-        var glShare = tlSteppedZoneCuts();   /* v100：与左栏/画布同源（并上阶梯覆盖表） */
-        var glPoly = (typeof window !== 'undefined') ? window.measuredPolygon : null;
-        if (glShare && glPoly && glPoly.length >= 3 && typeof ryZoneAreaGroups === 'function') {
-          glCells = ryZoneAreaGroups(glShare, glPoly, glShare.cols * glShare.rows).cells;
-        }
-      } catch (e) { glCells = null; }
-      var gh = '';
-      for (var j = 0; j < mg.length; j++) {
-        var gmu = '';
-        if (glCells) { var gs2 = 0; for (var gk = 0; gk < mg[j].length; gk++) gs2 += (glCells[mg[j][gk]] || 0); gmu = ' <span class="tl-gp-mu">' + (gs2 / 666.67).toFixed(1) + ' 亩</span>'; }
-        gh += '<div class="tl-gp-group"><span>M' + (j + 1) + '：区 ' + mg[j].map(function (z) { return z + 1; }).join('/') + gmu + '</span><button class="tl-gp-del" data-g="' + j + '" type="button" title="删除该组">✕</button></div>';
-      }
-      gl.innerHTML = gh;
-    }
-  }
-  /* v106：分界线口径提示 —— 平行于主管的整条拖动、垂直于主管的分段拖（2026-09-22 用户口径，
-     v100 的「平行轴锁定」作废；管向仍由图面主管/支管实测） */
-  var dh = document.getElementById('tlGroupDragHint');
-  if (dh) {
-    var dhAx = (typeof window !== 'undefined' && window.RyTlWs && window.RyTlWs._v100) ? window.RyTlWs._v100.pipeAxis() : '';
-    dh.textContent = '分界线：平行于主管的整条拖动、垂直于主管的分段拖 —— ' + (dhAx === 'v'
-      ? '本图管向为「竖向」⇒ 竖分界线整条移动；横分界线可分段拖'
-      : (dhAx === 'h'
-        ? '本图管向为「水平」⇒ 横分界线整条移动；竖分界线可分段拖'
-        : '未取到管向信息 ⇒ 当前不限制；生成图面后按管向自动区分'));
-  }
-};
 function tlApplyGroups() {
   try { if (typeof window.runyeSaveProject === 'function') window.runyeSaveProject(true); } catch (e) { }   /* v105：静默保存（不弹「方案已保存到本机」） */
   /* v105：合并/删组后立即重生成图面（等效点「生成管线图」）—— 组色带、组标注、联合流量即时生效，
@@ -2414,84 +2393,15 @@ function tlApplyGroups() {
   try { if (typeof render === 'function') render(); } catch (e) { }
   var wsCtn = document.getElementById('tlWsContent');
   if (wsCtn && window.RyTlWs && window.tlDiagramData) { try { window.RyTlWs.render(wsCtn, window.tlDiagramData); } catch (e) { } }
-  if (typeof window.tlRefreshGroupPanel === 'function') window.tlRefreshGroupPanel();
   if (typeof window.tlRefreshGroupStatus === 'function') window.tlRefreshGroupStatus();
 }
-function tlMergeChecked() {
-  var list = document.getElementById('tlGroupZoneList'); if (!list) return;
-  var sel = []; var cbs = list.querySelectorAll('input[type=checkbox]');
-  for (var i = 0; i < cbs.length; i++) { if (cbs[i].checked) sel.push(parseInt(cbs[i].getAttribute('data-zi'), 10)); }
-  if (sel.length < 2) return;
-  var mg = (typeof window !== 'undefined' && window.tlManualGroups && window.tlManualGroups.length) ? window.tlManualGroups : [];
-  mg.push(sel); window.tlManualGroups = mg;
-  tlApplyGroups();
-}
-function tlDeleteGroup(g) {
-  var mg = (typeof window !== 'undefined' && window.tlManualGroups) ? window.tlManualGroups : [];
-  if (g < 0 || g >= mg.length) return;
-  mg.splice(g, 1); window.tlManualGroups = mg;
-  tlApplyGroups();
-}
-function tlResetAllGroups() { window.tlManualGroups = []; tlApplyGroups(); }
-/* v112（2026-09-22 用户要求）：手动分组「保存 / 调出」快照 ——
-   点上方 2/3/4/5 区自动按钮会清空 window.tlManualGroups（既有行为）；
-   保存 = 深拷贝快照存 window._tlManualGroupsSnapshot + localStorage（按地块名分槽，刷新页面也在）；
-   调出 = 恢复快照并走 tlApplyGroups 重生成（组色带 / 联合流量 / 左栏状态表即时回填）。
-   校验：恢复前过滤非分区序号，分区总数以当前 tlDiagramData 为准，越界成员剔除，防止旧快照套在新网格上。 */
-function tlManualGroupsSnapshotKey() {
-  var nameEl = document.getElementById('tlPlotName');
-  var name = (nameEl && nameEl.value.trim()) || 'default';
-  var block = window.__runyeTlBlock;
-  if (block != null && window.__runyeSubPlots && window.__runyeSubPlots[block]) {
-    name += '::' + (window.currentPlotId || '') + '::block:' + (window.__runyeSubPlots[block].id || block);
-  }
-  return 'ry_tl_manual_groups_snapshot::' + name;
-}
-function tlSnapHint(msg) {
-  var h = document.getElementById('tlGroupSnapHint'); if (h) h.textContent = msg || '';
-}
-window.tlSaveManualGroups = function () {
-  var mg = (typeof window !== 'undefined' && window.tlManualGroups && window.tlManualGroups.length) ? window.tlManualGroups : null;
-  if (!mg) { tlSnapHint('当前没有手动分组可保存'); return false; }
-  var snap = mg.map(function (g) { return (g || []).slice(); }).filter(function (g) { return g.length > 0; });
-  if (!snap.length) { tlSnapHint('当前没有手动分组可保存'); return false; }
-  window._tlManualGroupsSnapshot = snap;
-  try { localStorage.setItem(tlManualGroupsSnapshotKey(), JSON.stringify(snap)); } catch (e) { }
-  tlSnapHint('已保存 ' + snap.length + ' 组（点「调出分组」可恢复）');
-  return true;
-};
-window.tlRestoreManualGroups = function () {
-  var snap = window._tlManualGroupsSnapshot;
-  if (!snap || !snap.length) {
-    try { var raw = localStorage.getItem(tlManualGroupsSnapshotKey()); if (raw) snap = JSON.parse(raw); } catch (e) { snap = null; }
-  }
-  if (!snap || !snap.length) { tlSnapHint('没有已保存的手动分组'); return false; }
-  var d = (typeof window !== 'undefined') ? window.tlDiagramData : null;
-  var z = d && d.zones;
-  var maxZi = z ? ((z.cols || (z.xPos ? z.xPos.length - 1 : 0)) * (z.rows || (z.yPos ? z.yPos.length - 1 : 0))) : Infinity;
-  var cleaned = [];
-  for (var gi = 0; gi < snap.length; gi++) {
-    var g2 = [];
-    for (var ki = 0; ki < snap[gi].length; ki++) {
-      var zi2 = parseInt(snap[gi][ki], 10);
-      if (isFinite(zi2) && zi2 >= 0 && zi2 < maxZi && g2.indexOf(zi2) < 0) g2.push(zi2);
-    }
-    if (g2.length) cleaned.push(g2);
-  }
-  if (!cleaned.length) { tlSnapHint('快照与当前分区网格不匹配，未恢复'); return false; }
-  window.tlManualGroups = cleaned;
-  tlApplyGroups();
-  tlSnapHint('已调出 ' + cleaned.length + ' 组');
-  return true;
-};
-/* v98b：把「应用分组 / 合并给定分区」暴露到 window，供图纸右键菜单调用（与面板共用同一状态） */
-window.tlApplyGroups = tlApplyGroups;
-window.tlMergeIndices = function (sel) {
-  if (!sel || sel.length < 2) return;
-  var mg = (typeof window !== 'undefined' && window.tlManualGroups && window.tlManualGroups.length) ? window.tlManualGroups : [];
-  mg.push(sel.slice()); window.tlManualGroups = mg;
-  tlApplyGroups();
-};
+/* [2026-10-27] tlMergeChecked / tlDeleteGroup / tlResetAllGroups（v98 手动合并三件套）
+   随面板删除 —— 手动勾选合并入口不存在了；唯一写 window.tlManualGroups 的活跃入口
+   只剩下方 tlGroupByArea（面积亩组合）。 */
+/* [2026-10-27] v112 手动分组快照（tlManualGroupsSnapshotKey / tlSnapHint / tlSaveManualGroups /
+   tlRestoreManualGroups）与 v98b 右键合并入口（window.tlMergeIndices / window.tlApplyGroups 导出）
+   随面板与右键菜单项删除。window.tlManualGroups 的持久化仍走 runyeSaveProject（inline-12 存档
+   manualGroups 字段原样兼容 —— 面积亩组合的结果照常随方案保存/载入）。 */
 /* ---------- [v220 2026-10-04 用户要求] 按目标面积把分区顺序累加成联合灌溉组 ----------
  * 用户原话：「设定联合灌溉区为 36 亩，自动按顺序累加二级管路传递过来的分区面积，
  *            累计到 36 亩范围内作为一个联合灌溉区，这样我可以把 3/4/5 个小灌溉区合成一个联合灌溉区。」
@@ -2545,23 +2455,10 @@ function tlGroupByArea() {
   return true;
 }
 window.tlGroupByArea = tlGroupByArea;
-/* 面板按钮接线（v98） */
+/* 面积成组按钮接线（v220/v233/v470）。
+   [2026-10-27] 原 v98 面板按钮接线（合并/清空勾选/全部清除/保存/调出/恢复初始化/组列表✕）
+   随 #tlGroupPanel 删除 —— 元素不存在，接线整体移除；仅保留面积成组一族。 */
 (function () {
-  var mb = document.getElementById('tlGroupMergeBtn');
-  if (mb) mb.addEventListener('click', tlMergeChecked);
-  var cs = document.getElementById('tlGroupClearSel');
-  if (cs) cs.addEventListener('click', function () { var l = document.getElementById('tlGroupZoneList'); if (l) { var cbs = l.querySelectorAll('input[type=checkbox]'); for (var i = 0; i < cbs.length; i++) cbs[i].checked = false; if (mb) mb.disabled = true; } });
-  var ra = document.getElementById('tlGroupResetAll');
-  if (ra) ra.addEventListener('click', tlResetAllGroups);
-  /* v112：手动分组「保存 / 调出」按钮接线 */
-  var gsb = document.getElementById('tlGroupSaveBtn');
-  if (gsb) gsb.addEventListener('click', window.tlSaveManualGroups);
-  var grb = document.getElementById('tlGroupRestoreBtn');
-  if (grb) grb.addEventListener('click', window.tlRestoreManualGroups);
-  /* [v233] 调出分组后当前分组未必来自按亩计算 ⇒ 熄灭「按亩自动组合」高亮防误导。 */
-  if (grb) grb.addEventListener('click', function () { if (acb) acb.classList.remove('on'); });
-  /* [v220]「按面积成组」按钮接线：点击即执行（与页面其它按钮同一范式，不勾选）。
-     Enter 键在输入框里也触发（改完目标亩数直接回车，少一次移动鼠标）。 */
   var ab = document.getElementById('tlAreaGroupBtn');
   if (ab) ab.addEventListener('click', tlGroupByArea);
   var ai = document.getElementById('tlAreaGroupMu');
@@ -2572,36 +2469,9 @@ window.tlGroupByArea = tlGroupByArea;
   if (acb) acb.addEventListener('click', function () {
     if (tlGroupByArea() !== false) acb.classList.add('on');
   });
-  /* 点 1/2/3/4 区（均分）= 既有路径清空按亩分组 ⇒ 高亮同步熄灭（程序化 .click() 也会冒泡到这里，覆盖「恢复初始化」）。 */
+  /* 点 1/2/3/4 区（均分）= 既有路径清空按亩分组 ⇒ 高亮同步熄灭（程序化 .click() 也会冒泡到这里）。 */
   var zcg = document.getElementById('tlZoneCountGroup');
   if (zcg) zcg.addEventListener('click', function () { if (acb) acb.classList.remove('on'); });
-  /* v177（2026-10-01 用户请求⑲）：「↺ 恢复初始化」= 回到初始化设计。
-     刻意【不重写一套复位逻辑】，而是程序化点击「2 区」按钮 —— 那条路径（上方 #tlZoneCountGroup
-     的 click 处理器）已经在做全套：清 tlManualGroups、tlZoneStepClear()、清 cutOffX/Y、
-     tlPersistManualGroups() 落盘、tlUpdatePlanBar + tlRefreshGroupPanel、重生成图面。
-     两套实现必然慢慢漂移，故只保留一条。
-     初始分区数取 #tlZoneCountGroup 的 data-init-n（HTML 单一事实来源，避免这里再硬编码一个 2）。
-     刻意【不动「保存分组」存档】：误点后仍可点「调出分组」找回（用户确认：不加二次确认）。 */
-  var gib = document.getElementById('tlGroupInitBtn');
-  if (gib) gib.addEventListener('click', function () {
-    var grp = document.getElementById('tlZoneCountGroup');
-    var initN = grp ? parseInt(grp.getAttribute('data-init-n'), 10) : NaN;
-    if (!isFinite(initN)) initN = 2;
-    var b = grp ? grp.querySelector('button[data-n="' + initN + '"]') : null;
-    if (!b) { tlSnapHint('初始化失败：未找到「' + initN + ' 区」按钮'); return; }
-    b.click();
-    /* v177b：提示基于【复位后的实际状态】校验，不无条件报成功 ——
-       否则一旦复位路径失效（注入体检实测：把 click 掏空），会谎报「已恢复初始化」。 */
-    var okN = (typeof tlGetZoneCount === 'function') && (tlGetZoneCount() === initN);
-    var okG = !(window.tlManualGroups && window.tlManualGroups.length);
-    tlSnapHint((okN && okG)
-      ? ('已恢复初始化：' + initN + ' 区联合灌溉 · 手动分组与分界线已清空')
-      : '初始化未完全生效，请再点一次或刷新页面');
-  });
-  var gl = document.getElementById('tlGroupList');
-  if (gl) gl.addEventListener('click', function (e) { var t = e.target; if (t && t.getAttribute && t.getAttribute('data-g') != null) { tlDeleteGroup(parseInt(t.getAttribute('data-g'), 10)); } });
-  var listEl = document.getElementById('tlGroupZoneList');
-  if (listEl) listEl.addEventListener('change', function () { if (!mb) return; var n = 0; var cbs = listEl.querySelectorAll('input[type=checkbox]'); for (var i = 0; i < cbs.length; i++) if (cbs[i].checked) n++; mb.disabled = n < 2; });
 })();
 /* 联合灌溉分组图例（2026-09-16 补全）：在三级简图 #tlDiagramContent 叠加 HTML 图例，
    不进简图 SVG（不破坏下载/打印成图）；驱动 tlDiagramData.combinedN；N 改变即时刷新。
@@ -2959,28 +2829,17 @@ function tlHookTlNodesLiveSync() {
   return true;
 }
 
-/* ── 真北方位角（v647 2026-10-21 用户要求「指北针要指向实际位置」）─────────────
-   旧口径（v646 及以前）：指北针恒朝上，理由是「回传时 measuredPolygon.y = −(lat−lat₀)·m，
-   北被编成 −y ⇒ 图上方即真北」。这对「刚从地图回传、二级页一动没动」的地块成立。
-   但下面三类操作**只改图面顶点、不动经纬度基准**，一发生，「上方」就不再是真北：
-     ① 二级「重新分区」把地块角度落定（plot-editor.js ppRepartitionFromRotatedPlot）
-        —— 旋转写进 ppState.polyPts 与 window.measuredPolygon；
-     ② 二级「地块镜像」水平/垂直（ppApplyMirror 直接改数据）；
-     ③ 地图上微调「分区角度」再回传（runye-map-partition → runyeApplyMapPayload，
-        inline-16.js 用 RyMapPartition.orient(measuredPolygon, angle) 再转一次）。
-   ⇒ 印出来的 A3 方位是错的。
-
-   做法：**不记角度**（撤销/镜像/整组/往返都会把累加记歪），每次出图现场反算：
+/* ── 真北方位角（三级简图出图）──────────────────────────────────────────────
+   地块坐标与朝向保持真实且固定，分区网格方向不会旋转地块。在线地图与二级设计页
+   都不得对地块几何做旋转或镜像；仅三级简图的最终展示旋转整个 SVG，不改变北向计算。
+   这里根据地图基准与当前固定地块坐标的映射现场反算真北方向：
      · 参考环 = window.__runyeMapFramePoly（地图口径，北 = +y，与图面顶点同序同点数）；
      · 用相邻点差做样本，最小二乘解 2×2 线性映射 M：地图口径向量 → 图面向量
        （位移不影响方向，故只用边向量，不需要解平移）；
      · 北在图面里的方向 = M·(0,1) = (m12, m22)；
      · 返回「相对正上方的顺时针角」（度）：正上方 = 屏幕角 −90°，故 rot = atan2 + 90°。
-   为什么这样能自动覆盖 ①②③：三者都是对**整块地**做的相似变换（旋转/镜像），
-   顶点变了、参考环没变 ⇒ M 自己就带上了那个角度，不用相信任何一个计数器。
-
    退化：无地图基准（图片测量 / 手画矩形 / 地形模块米坐标）、点数不等、矩阵奇异
-   ⇒ 返回 0（朝上，与 v646 完全一致，老地块不报错也不变样）。 */
+   ⇒ 返回 0（朝上）。 */
 function tlNorthAngleDeg() {
   try {
     var poly = window.measuredPolygon || [];
@@ -3020,6 +2879,7 @@ function tlAutoGenerate(options) {
     if(!plotPoly||plotPoly.length<3)return zoneCuts.xPlan[zc]*zoneCuts.yPlan[zr];
     var x0=tlZoneGx(zoneCuts,zr,zc), y0=tlZoneGy(zoneCuts,zc,zr);
     var x1=tlZoneGx(zoneCuts,zr,zc+1), y1=tlZoneGy(zoneCuts,zc,zr+1);
+    /* tlPlotPolyForZone 已经是局部网格坐标；不要在这里再次套 frame。 */
     var clipped=clipPolyToRect(plotPoly,x0,y0,x1,y1);
     return polyAreaM2(clipped);
   }
@@ -3056,7 +2916,7 @@ function tlAutoGenerate(options) {
   console.log('[tlAutoGenerate] called, measuredPolygon:', window.measuredPolygon);
   var poly = window.measuredPolygon || [];
   if (!poly || poly.length < 3) {
-    alert('请先在面积测量工具中描绘边界（当前测量点数：' + (poly?poly.length:0) + '）');
+    alert('请先到「在线地图」画框并回传地块（当前测量点数：' + (poly?poly.length:0) + '）');
     return;
   }
 
@@ -3112,8 +2972,30 @@ function tlAutoGenerate(options) {
   function zXb(c, rA, rB) { var a = zX(rA, c), b2 = zX(rA, c + 1), c1 = zX(rB, c), d = zX(rB, c + 1); var lo = Math.max(a, c1), hi = Math.min(b2, d); if (!(hi > lo)) { lo = a; hi = b2; } return [lo, hi]; }
 
   // 预统计：每个分区的实际面积（裁剪到地块多边形）与名义标准区比较，判定"非标分区"
-  var tlZoneCuts={xPos:xPos,yPos:yPos,xPlan:xPlan,yPlan:yPlan,cutOffX:(tlZoneStepRef?tlZoneStepRef.x:null),cutOffY:(tlZoneStepRef?tlZoneStepRef.y:null)};
-  var tlPlotPolyForZone=(poly&&poly.length>=3)?poly.map(function(p){return{x:p.x,y:p.y};}):null;
+  var tlZoneCuts={xPos:xPos,yPos:yPos,xPlan:xPlan,yPlan:yPlan,frame:tlShare&&tlShare.frame||null,cutOffX:(tlZoneStepRef?tlZoneStepRef.x:null),cutOffY:(tlZoneStepRef?tlZoneStepRef.y:null)};
+  function tlFrameToWorld(frame,p){
+    if(!frame)return{x:p.x,y:p.y};
+    if(typeof frame.toWorld==='function')return frame.toWorld(p);
+    var c=frame.center||{x:0,y:0},o=frame.origin||{x:0,y:0},a=(Number(frame.angle)||0)*Math.PI/180,cs=Math.cos(a),sn=Math.sin(a);
+    var sx=Number(frame.scaleX)||1,sy=Number(frame.scaleY)||1,dx=p.x-c.x,dy=p.y-c.y;
+    return{x:o.x+(c.x+dx*cs-dy*sn)/sx,y:o.y+(c.y+dx*sn+dy*cs)/sy};
+  }
+  function tlFrameToGrid(frame,p){
+    if(!frame)return{x:p.x,y:p.y};
+    if(typeof frame.toGrid==='function')return frame.toGrid(p);
+    var c=frame.center||{x:0,y:0},o=frame.origin||{x:0,y:0},a=(Number(frame.angle)||0)*Math.PI/180,cs=Math.cos(a),sn=Math.sin(a);
+    var sx=Number(frame.scaleX)||1,sy=Number(frame.scaleY)||1,dx=(p.x-o.x)*sx-c.x,dy=(p.y-o.y)*sy-c.y;
+    return{x:c.x+dx*cs+dy*sn,y:c.y-dx*sn+dy*cs};
+  }
+  function tlGridWorld(x,y){return tlFrameToWorld(tlZoneCuts.frame,{x:x,y:y});}
+  var tlGridPlotPoly=(poly||[]).map(function(p){return tlFrameToGrid(tlZoneCuts.frame,p);});
+  var tlGeoBounds=(function(){
+    if(!tlZoneCuts.frame)return b;
+    var q={minX:Infinity,minY:Infinity,maxX:-Infinity,maxY:-Infinity};
+    tlGridPlotPoly.forEach(function(p){q.minX=Math.min(q.minX,p.x);q.minY=Math.min(q.minY,p.y);q.maxX=Math.max(q.maxX,p.x);q.maxY=Math.max(q.maxY,p.y);});
+    q.w=q.maxX-q.minX;q.h=q.maxY-q.minY;return q;
+  })();
+  var tlPlotPolyForZone=(tlGridPlotPoly&&tlGridPlotPoly.length>=3)?tlGridPlotPoly:null;
   var tlPartialFlags=[], tlPartialCount=0, tlZoneActMu=[];
   for(var _zr=0;_zr<rows;_zr++){for(var _zc=0;_zc<cols;_zc++){
     var _zi=_zr*cols+_zc;
@@ -3138,9 +3020,12 @@ function tlAutoGenerate(options) {
      宽扁地块（宽度受限）不受影响；仅偏高地块整体约缩小 9%。 */
   var drawTop=headerBottom, drawBottom=footerTop-68;
   var drawW=svgW-2*padX, drawH=drawBottom-drawTop;
-  var s=Math.min(drawW/b.w, drawH/b.h); s=Math.min(s,2);
+  var s=Math.min(drawW/b.w,drawH/b.h); s=Math.min(s,2);
   var ox=padX+(drawW-b.w*s)/2, oy=drawTop+(drawH-b.h*s)/2;
   function ts(mx,my){return{x:(mx-b.minX)*s+ox,y:(my-b.minY)*s+oy};}
+  function tsGrid(gx,gy){var p=tlGridWorld(gx,gy);return ts(p.x,p.y);}
+  function tsGridCell(x0,y0,x1,y1){return[tsGrid(x0,y0),tsGrid(x1,y0),tsGrid(x1,y1),tsGrid(x0,y1)];}
+  function tlSvgPoints(points){return points.map(function(p){return p.x.toFixed(1)+','+p.y.toFixed(1);}).join(' ');}
 
   // Plot path
   var d='';
@@ -3165,10 +3050,7 @@ function tlAutoGenerate(options) {
   /* ── 指北针（2026-10-20 用户要求「三级简图出图要增加指北针」）────────────────
      位置：A3 图框右上角空白区。信息行从 x=34 起、宽 960 ⇒ 最长到 994；内细框右边线在
        1174；中间 1000..1170 是结构上永不被占用的空白（两行折行也只是往下长，不往右长）。
-     方位（v647 改）：**跟着地块的实际方位转**，角度由 tlNorthAngleDeg() 现场反算，
-       见函数上方注释。v646 及以前这里写的是「图上方即真北、指北针恒朝上」——
-       那只对「刚回传、二级一动没动」的地块成立；一旦二级落定旋转 / 镜像，或地图上
-       微调分区角度再回传，图面就转过了，恒朝上会指错。旋转量 0 时与 v646 逐字节一致。
+     方位：按固定地块真实坐标与地图基准计算，分区网格旋转和最终图面旋转都不改真北方位。
      显示范围：简图 / 下载 SVG / 下载 PNG / 打印 全部同源（都出自本 parts）；
        工作区克隆底图与 DXF 导出按「图框装饰」剥离（见 tl-workspace.js、runye-dxf.js）
        —— N 字与角度数值刻意仍放在 #tlNorthGroup 内，就是为了不改那两处剥离规则。
@@ -3278,12 +3160,12 @@ function tlAutoGenerate(options) {
          等于让这一格整体平移：拖过阶梯后一侧留白、另一侧压到邻格上（用户 2026-09-22 报「填充空白、重叠」）。
          ⚠ 无阶梯覆盖时两个修正项都恰好是 0.0 ⇒ 与旧输出**逐字节相同**（eq 基线不受影响）。 */
       var zoneW=xSrc[zc2]+(zX(zr,zc2+1)-xPos[zc2+1])+(xPos[zc2]-zX(zr,zc2)), zoneH=ySrc[zr]+(zY(zc2,zr+1)-yPos[zr+1])+(yPos[zr]-zY(zc2,zr));
-      var r1=ts(zx,zy), r2=ts(zx+zoneW,zy+zoneH);
+      var cellPts=tsGridCell(zx,zy,zx+zoneW,zy+zoneH), r1=cellPts[0], r2=cellPts[2];
       var grp = tlManualActive ? ((typeof window!=='undefined'&&window.tlZoneManualGroupOf) ? window.tlZoneManualGroupOf(zi) : -1) : Math.floor(zi/tlGN);
       var isPartial=tlPartialFlags[zi];
       var cellFill = (tlManualActive && grp < 0) ? tlUngroupedFill : ((typeof window!=='undefined'&&window.RyTlWs&&window.RyTlWs.groupFillCss)?window.RyTlWs.groupFillCss(grp):zoneCols[zi%zoneCols.length]);
       var cellStroke=isPartial?'rgba(217,119,6,.85)':'rgba(51,65,85,.28)';
-      gzSvg.push('<rect x="'+r1.x.toFixed(1)+'" y="'+r1.y.toFixed(1)+'" width="'+(r2.x-r1.x).toFixed(1)+'" height="'+(r2.y-r1.y).toFixed(1)+'" fill="'+cellFill+'" stroke="'+cellStroke+'" stroke-width="1" stroke-dasharray="6,3" data-zi="'+zi+'" data-g="'+grp+'" data-fill="'+cellFill+'" data-stroke="'+cellStroke+'"/>');
+      gzSvg.push('<polygon points="'+tlSvgPoints(cellPts)+'" fill="'+cellFill+'" stroke="'+cellStroke+'" stroke-width="1" stroke-dasharray="6,3" data-zi="'+zi+'" data-g="'+grp+'" data-fill="'+cellFill+'" data-stroke="'+cellStroke+'"/>');
     }
   }
   /* 组边界深线：同行内组号变化处画竖向；行与行之间组号变化画横向（仅自动分组模式；手动分组靠色带区分） */
@@ -3291,7 +3173,7 @@ function tlAutoGenerate(options) {
   for(var glr=0;glr<rows;glr++){
     for(var glc=0;glc+1<cols;glc++){
       if(Math.floor((glr*cols+glc)/tlGN)!==Math.floor((glr*cols+glc+1)/tlGN)){
-        var _gyb=zYb(glr,glc,glc+1); var tgA=ts(zX(glr,glc+1),_gyb[0]), tgB=ts(zX(glr,glc+1),_gyb[1]);
+        var _gyb=zYb(glr,glc,glc+1); var tgA=tsGrid(zX(glr,glc+1),_gyb[0]), tgB=tsGrid(zX(glr,glc+1),_gyb[1]);
         gzLines.push('<line x1="'+tgA.x.toFixed(1)+'" y1="'+tgA.y.toFixed(1)+'" x2="'+tgB.x.toFixed(1)+'" y2="'+tgB.y.toFixed(1)+'" stroke="#1f2937" stroke-width="2.2" opacity="0.62" data-gb="'+Math.floor((glr*cols+glc)/tlGN)+'"/>');
       }
     }
@@ -3301,11 +3183,11 @@ function tlAutoGenerate(options) {
         /* v98h 阶梯：行边界成了折线 ⇒ 逐列分段（zStepOn=false 时走 else 原路径，保持单条直线、旧输出不变） */
         for(var gcc=0;gcc<cols;gcc++){
           var _gxb=zXb(gcc,glr,glr+1); if(!(_gxb[1]>_gxb[0]))continue;
-          var gC=ts(_gxb[0],zY(gcc,glr+1)), gD=ts(_gxb[1],zY(gcc,glr+1));
+          var gC=tsGrid(_gxb[0],zY(gcc,glr+1)), gD=tsGrid(_gxb[1],zY(gcc,glr+1));
           gzLines.push('<line x1="'+gC.x.toFixed(1)+'" y1="'+gC.y.toFixed(1)+'" x2="'+gD.x.toFixed(1)+'" y2="'+gD.y.toFixed(1)+'" stroke="#1f2937" stroke-width="2.2" opacity="0.62" data-gb="'+_ghs+'"/>');
         }
       }else{
-        var tgC=ts(b.minX,yPos[glr+1]), tgD=ts(b.minX+b.w,yPos[glr+1]);
+        var tgC=tsGrid(xPos[0],yPos[glr+1]), tgD=tsGrid(xPos[xPos.length-1],yPos[glr+1]);
         gzLines.push('<line x1="'+tgC.x.toFixed(1)+'" y1="'+tgC.y.toFixed(1)+'" x2="'+tgD.x.toFixed(1)+'" y2="'+tgD.y.toFixed(1)+'" stroke="#1f2937" stroke-width="2.2" opacity="0.62" data-gb="'+_ghs+'"/>');
       }
     }
@@ -3320,13 +3202,13 @@ function tlAutoGenerate(options) {
     for(var mlr=0;mlr<rows;mlr++){
       for(var mlc=0;mlc+1<cols;mlc++){
         if(window.tlZoneManualGroupOf(mlr*cols+mlc)===window.tlZoneManualGroupOf(mlr*cols+mlc+1))continue;
-        var _myb=zYb(mlr,mlc,mlc+1); var mgA=ts(zX(mlr,mlc+1),_myb[0]), mgB=ts(zX(mlr,mlc+1),_myb[1]);
+        var _myb=zYb(mlr,mlc,mlc+1); var mgA=tsGrid(zX(mlr,mlc+1),_myb[0]), mgB=tsGrid(zX(mlr,mlc+1),_myb[1]);
         gzLines.push('<line x1="'+mgA.x.toFixed(1)+'" y1="'+mgA.y.toFixed(1)+'" x2="'+mgB.x.toFixed(1)+'" y2="'+mgB.y.toFixed(1)+'" stroke="#1f2937" stroke-width="3" opacity="0.9" stroke-linecap="round" data-mgb="1" data-cutaxis="x" data-cutindex="'+(mlc+1)+'"/>');
       }
       if(mlr+1<rows){
         for(var mlc2=0;mlc2<cols;mlc2++){
           if(window.tlZoneManualGroupOf(mlr*cols+mlc2)===window.tlZoneManualGroupOf((mlr+1)*cols+mlc2))continue;
-          var _mxb=zXb(mlc2,mlr,mlr+1); var mgC=ts(_mxb[0],zY(mlc2,mlr+1)), mgD=ts(_mxb[1],zY(mlc2,mlr+1));
+          var _mxb=zXb(mlc2,mlr,mlr+1); var mgC=tsGrid(_mxb[0],zY(mlc2,mlr+1)), mgD=tsGrid(_mxb[1],zY(mlc2,mlr+1));
           gzLines.push('<line x1="'+mgC.x.toFixed(1)+'" y1="'+mgC.y.toFixed(1)+'" x2="'+mgD.x.toFixed(1)+'" y2="'+mgD.y.toFixed(1)+'" stroke="#1f2937" stroke-width="3" opacity="0.9" stroke-linecap="round" data-mgb="1" data-cutaxis="y" data-cutindex="'+(mlr+1)+'"/>');
         }
       }
@@ -3346,39 +3228,37 @@ function tlAutoGenerate(options) {
          等于让这一格整体平移：拖过阶梯后一侧留白、另一侧压到邻格上（用户 2026-09-22 报「填充空白、重叠」）。
          ⚠ 无阶梯覆盖时两个修正项都恰好是 0.0 ⇒ 与旧输出**逐字节相同**（eq 基线不受影响）。 */
       var zoneW=xSrc[zc2]+(zX(zr,zc2+1)-xPos[zc2+1])+(xPos[zc2]-zX(zr,zc2)), zoneH=ySrc[zr]+(zY(zc2,zr+1)-yPos[zr+1])+(yPos[zr]-zY(zc2,zr));
-      var r1=ts(zx,zy), r2=ts(zx+zoneW,zy+zoneH);
-      var rx=r1.x, ry=r1.y, rw=r2.x-r1.x, rh=r2.y-r1.y;
-      var aw=Math.abs(rw), ah=Math.abs(rh);
+       var cellPts=tsGridCell(zx,zy,zx+zoneW,zy+zoneH), r1=cellPts[0], r2=cellPts[2];
+       var cellCx=(cellPts[0].x+cellPts[1].x+cellPts[2].x+cellPts[3].x)/4;
+       var cellCy=(cellPts[0].y+cellPts[1].y+cellPts[2].y+cellPts[3].y)/4;
+       var cellWpx=Math.hypot(cellPts[1].x-cellPts[0].x,cellPts[1].y-cellPts[0].y);
+       var cellHpx=Math.hypot(cellPts[3].x-cellPts[0].x,cellPts[3].y-cellPts[0].y);
+       var cellTextAngle=Math.atan2(cellPts[1].y-cellPts[0].y,cellPts[1].x-cellPts[0].x)*180/Math.PI;
+       while(cellTextAngle>90)cellTextAngle-=180;
+       while(cellTextAngle<-90)cellTextAngle+=180;
       var actM2=tlZoneActualAreaM2(zc2,zr,tlZoneCuts,tlPlotPolyForZone);
       var actMu=actM2/MU_TO_SQM;
       var isPartial=tlPartialFlags[zi];
-      if(aw>36&&ah>26 && actMu>0.05){
-        if(isPartial){
-          // 非标准分区：分区名 + 实际亩数（不显示尺寸），置于右上角
-          var pLabelX=rx+rw-8, pLabelY=ry+14;
-          if(aw>78&&ah>44){
-            tlLabelParts.push('<text data-tlzone="1" x="'+pLabelX.toFixed(1)+'" y="'+pLabelY.toFixed(1)+'" text-anchor="end" font-size="14" font-weight="700" fill="#b45309">'+(zi+1)+'区</text>');
-            tlLabelParts.push('<text data-tlzone="1" x="'+pLabelX.toFixed(1)+'" y="'+(pLabelY+16).toFixed(1)+'" text-anchor="end" font-size="10.5" font-weight="700" fill="#b45309">实际 '+actMu.toFixed(1)+' 亩</text>');
-          }else{
-            tlLabelParts.push('<text data-tlzone="1" x="'+pLabelX.toFixed(1)+'" y="'+pLabelY.toFixed(1)+'" text-anchor="end" font-size="8" font-weight="700" fill="#b45309">'+(zi+1)+'区 实际'+actMu.toFixed(1)+'亩</text>');
-          }
-        }else{
-          // 标准分区：分区名 + 尺寸 + 亩数，置于右上角
-          var zoneSizeText=tlZoneSizeLabel(Math.max(xPlan[zc2],yPlan[zr]),Math.min(xPlan[zc2],yPlan[zr]));
-          var zoneAreaText=(xPlan[zc2]*yPlan[zr]/MU_TO_SQM).toFixed(1)+'亩';
-          var zoneLabelX=rx+rw-8, zoneLabelY=ry+14;
-          if(aw>92&&ah>52){
-            tlLabelParts.push('<text data-tlzone="1" x="'+zoneLabelX.toFixed(1)+'" y="'+zoneLabelY.toFixed(1)+'" text-anchor="end" font-size="15" font-weight="700" fill="#111827">'+(zi+1)+'区</text>');
-            tlLabelParts.push('<text data-tlzone="1" x="'+zoneLabelX.toFixed(1)+'" y="'+(zoneLabelY+16).toFixed(1)+'" text-anchor="end" font-size="10.5" font-weight="600" fill="#111827">'+zoneSizeText+'</text>');
-            tlLabelParts.push('<text data-tlzone="1" x="'+zoneLabelX.toFixed(1)+'" y="'+(zoneLabelY+31).toFixed(1)+'" text-anchor="end" font-size="10" fill="#111827">'+zoneAreaText+'</text>');
-          }else if(ah>70){
-            tlLabelParts.push('<g transform="translate('+((rx+rw/2).toFixed(1))+' '+((ry+rh/2).toFixed(1))+') rotate(-90)">');
-            tlLabelParts.push('<text data-tlzone="1" x="0" y="3" text-anchor="middle" font-size="8.5" font-weight="700" fill="#111827">'+(zi+1)+'区 '+zoneSizeText+' '+zoneAreaText+'</text>');
-            tlLabelParts.push('</g>');
-          }else{
-            tlLabelParts.push('<text data-tlzone="1" x="'+(rx+rw/2).toFixed(1)+'" y="'+(ry+rh/2).toFixed(1)+'" text-anchor="middle" font-size="7.5" font-weight="700" fill="#111827">'+(zi+1)+'区 '+zoneSizeText+' '+zoneAreaText+'</text>');
-          }
-        }
+       if(cellWpx>10&&cellHpx>10 && actMu>0.05){
+         var zoneLabelParts=[];
+         if(isPartial){
+           // 非标准分区显示区名与裁剪后的实际亩数，位置和文字方向都以当前网格为准。
+           zoneLabelParts.push('<text data-tlzone="1" x="0" y="-3" text-anchor="middle" font-size="12" font-weight="700" fill="#b45309">'+(zi+1)+'区</text>');
+           zoneLabelParts.push('<text data-tlzone="1" x="0" y="11" text-anchor="middle" font-size="9.5" font-weight="700" fill="#b45309">实际 '+actMu.toFixed(1)+' 亩</text>');
+         }else{
+           // 标准区尺寸始终按网格 X×Y 次序输出，避免旋转后标注内容也被交换。
+           var zoneSizeText=tlZoneSizeLabel(xPlan[zc2],yPlan[zr]);
+           var zoneAreaText=(xPlan[zc2]*yPlan[zr]/MU_TO_SQM).toFixed(1)+'亩';
+           var enoughForThreeLines=cellWpx>=78&&cellHpx>=42;
+           if(enoughForThreeLines){
+             zoneLabelParts.push('<text data-tlzone="1" x="0" y="-14" text-anchor="middle" font-size="13" font-weight="700" fill="#111827">'+(zi+1)+'区</text>');
+             zoneLabelParts.push('<text data-tlzone="1" x="0" y="1" text-anchor="middle" font-size="9.5" font-weight="600" fill="#111827">'+zoneSizeText+'</text>');
+             zoneLabelParts.push('<text data-tlzone="1" x="0" y="15" text-anchor="middle" font-size="9" fill="#111827">'+zoneAreaText+'</text>');
+           }else{
+             zoneLabelParts.push('<text data-tlzone="1" x="0" y="3" text-anchor="middle" font-size="8" font-weight="700" fill="#111827">'+(zi+1)+'区 '+zoneSizeText+'</text>');
+           }
+         }
+         tlLabelParts.push('<g transform="translate('+cellCx.toFixed(1)+' '+cellCy.toFixed(1)+') rotate('+cellTextAngle.toFixed(2)+')">'+zoneLabelParts.join('')+'</g>');
       }
     }
   }
@@ -3388,11 +3268,11 @@ function tlAutoGenerate(options) {
   parts.push('<g fill="none" stroke="#334155" stroke-width="1" stroke-dasharray="7,5" opacity="0.48">');
   if(!zStepOn){
     for(var bx=0;bx<xPos.length;bx++){
-      var bv1=ts(xPos[bx],b.minY),bv2=ts(xPos[bx],b.minY+b.h);
+      var bv1=tsGrid(xPos[bx],yPos[0]),bv2=tsGrid(xPos[bx],yPos[yPos.length-1]);
       parts.push('<line x1="'+bv1.x.toFixed(1)+'" y1="'+bv1.y.toFixed(1)+'" x2="'+bv2.x.toFixed(1)+'" y2="'+bv2.y.toFixed(1)+'"/>');
     }
     for(var by=0;by<yPos.length;by++){
-      var bh1=ts(b.minX,yPos[by]),bh2=ts(b.minX+b.w,yPos[by]);
+      var bh1=tsGrid(xPos[0],yPos[by]),bh2=tsGrid(xPos[xPos.length-1],yPos[by]);
       parts.push('<line x1="'+bh1.x.toFixed(1)+'" y1="'+bh1.y.toFixed(1)+'" x2="'+bh2.x.toFixed(1)+'" y2="'+bh2.y.toFixed(1)+'"/>');
     }
   }else{
@@ -3400,7 +3280,7 @@ function tlAutoGenerate(options) {
     for(var bx2=0;bx2<xPos.length;bx2++){
       for(var bri=0;bri<rows;bri++){
         var _byb=zYb(bri,bx2-1<0?0:bx2-1,bx2>cols-1?cols:bx2); if(!(_byb[1]>_byb[0]))continue;
-        var bv3=ts(zX(bri,bx2),_byb[0]), bv4=ts(zX(bri,bx2),_byb[1]);
+        var bv3=tsGrid(zX(bri,bx2),_byb[0]), bv4=tsGrid(zX(bri,bx2),_byb[1]);
         if(Math.abs(bv4.y-bv3.y)<0.05)continue;
         parts.push('<line x1="'+bv3.x.toFixed(1)+'" y1="'+bv3.y.toFixed(1)+'" x2="'+bv4.x.toFixed(1)+'" y2="'+bv4.y.toFixed(1)+'"/>');
       }
@@ -3408,7 +3288,7 @@ function tlAutoGenerate(options) {
     for(var by2=0;by2<yPos.length;by2++){
       for(var bci=0;bci<cols;bci++){
         var _bxb=zXb(bci,(by2-1<0?0:by2-1),(by2>rows-1?rows:by2)); if(!(_bxb[1]>_bxb[0]))continue;
-        var bh3=ts(_bxb[0],zY(bci,by2)), bh4=ts(_bxb[1],zY(bci,by2));
+        var bh3=tsGrid(_bxb[0],zY(bci,by2)), bh4=tsGrid(_bxb[1],zY(bci,by2));
         if(Math.abs(bh4.x-bh3.x)<0.05)continue;
         parts.push('<line x1="'+bh3.x.toFixed(1)+'" y1="'+bh3.y.toFixed(1)+'" x2="'+bh4.x.toFixed(1)+'" y2="'+bh4.y.toFixed(1)+'"/>');
       }
@@ -3480,6 +3360,28 @@ function tlAutoGenerate(options) {
 
   // 地块尺寸标注（建筑制图风格）：图下水平尺寸线 + 图左垂直尺寸线；尺寸值取二级页传导(有桥)或实测，与二级页施工简图一致
   (function(){
+     var gridAngle=tlZoneCuts&&tlZoneCuts.frame?Number(tlZoneCuts.frame.angle)||0:0;
+     var gridAngleNorm=((gridAngle%360)+360)%360;
+     if(Math.min(gridAngleNorm,360-gridAngleNorm)>=0.001){
+       /* 分区旋转时，真实地块边界保持不动，外框尺寸改按网格局部坐标标注。
+          该分支是静态展示标注；轴对齐时继续使用下面原有可拖动尺寸线。 */
+       var db=tlGeoBounds, q00=tsGrid(db.minX,db.minY), q10=tsGrid(db.maxX,db.minY),
+           q11=tsGrid(db.maxX,db.maxY), q01=tsGrid(db.minX,db.maxY);
+       var dcx=(q00.x+q10.x+q11.x+q01.x)/4, dcy=(q00.y+q10.y+q11.y+q01.y)/4;
+       function dUnit(a,b){var dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy)||1;return{x:dx/L,y:dy/L};}
+       function dOut(a,b){var m={x:(a.x+b.x)/2,y:(a.y+b.y)/2},n={x:-(b.y-a.y),y:b.x-a.x},L=Math.hypot(n.x,n.y)||1;n.x/=L;n.y/=L;if((m.x-dcx)*n.x+(m.y-dcy)*n.y<0){n.x=-n.x;n.y=-n.y;}return n;}
+       function dAdd(p,n,k){return{x:p.x+n.x*k,y:p.y+n.y*k};}
+       function dLine(a,b,attrs){parts.push('<line x1="'+a.x.toFixed(1)+'" y1="'+a.y.toFixed(1)+'" x2="'+b.x.toFixed(1)+'" y2="'+b.y.toFixed(1)+'" '+(attrs||'')+'/>');}
+       function dText(a,b,label){var m={x:(a.x+b.x)/2,y:(a.y+b.y)/2},u=dUnit(a,b),ang=Math.atan2(u.y,u.x)*180/Math.PI;while(ang>90)ang-=180;while(ang<-90)ang+=180;parts.push('<text data-tl-dim="1" transform="translate('+m.x.toFixed(1)+' '+m.y.toFixed(1)+') rotate('+ang.toFixed(2)+')" x="0" y="-'+(GAP+DESC).toFixed(2)+'" text-anchor="middle" font-size="'+(DG.font*tlDS).toFixed(2)+'" font-weight="700" fill="#111111" stroke="none">'+label+'</text>');}
+       function dTick(p,u){var n={x:-u.y,y:u.x},k=DG.tick*tlDS;dLine(dAdd(dAdd(p,n,-k),u,-k),dAdd(dAdd(p,n,k),u,k),'stroke-width="'+(DG.tickW*tlDS).toFixed(2)+'"');}
+       parts.push('<g stroke="#111111" stroke-width="0.95" fill="none" opacity="0.98" stroke-linecap="square">');
+       var ux=dUnit(q01,q11), nx=dOut(q01,q11), hOff=38+tlDimOffOf('gplot-h'), hA=dAdd(q01,nx,hOff),hB=dAdd(q11,nx,hOff);
+       dLine(dAdd(q01,nx,4),dAdd(q01,nx,hOff+DG.ext));dLine(dAdd(q11,nx,4),dAdd(q11,nx,hOff+DG.ext));dLine(hA,hB);dTick(hA,ux);dTick(hB,ux);dText(hA,hB,tlDimLabel(plotW));
+       var uy=dUnit(q00,q01), ny=dOut(q00,q01), vOff=48+tlDimOffOf('gplot-v'), vA=dAdd(q00,ny,vOff),vB=dAdd(q01,ny,vOff);
+       dLine(dAdd(q00,ny,4),dAdd(q00,ny,vOff+DG.ext));dLine(dAdd(q01,ny,4),dAdd(q01,ny,vOff+DG.ext));dLine(vA,vB);dTick(vA,uy);dTick(vB,uy);dText(vA,vB,tlDimLabel(plotH));
+       parts.push('</g>');
+       return;
+     }
     var plotLeft=ts(b.minX,b.minY).x;
     var plotRight=ts(b.minX+b.w,b.minY).x;
     var plotTop=ts(b.minX,b.minY).y;
@@ -3499,10 +3401,10 @@ function tlAutoGenerate(options) {
       if(rotate){
         var offv=(off==null?-GAP:off);
         parts.push('<g transform="translate('+x.toFixed(1)+' '+y.toFixed(1)+') rotate(-90)">');
-        parts.push('<text x="0" y="'+offv.toFixed(2)+'" text-anchor="middle" font-size="'+(DG.font*tlDS).toFixed(2)+'" font-weight="700" fill="#111111" stroke="none">'+text+'</text></g>');
+        parts.push('<text data-tl-dim="1" x="0" y="'+offv.toFixed(2)+'" text-anchor="middle" font-size="'+(DG.font*tlDS).toFixed(2)+'" font-weight="700" fill="#111111" stroke="none">'+text+'</text></g>');
         return;
       }
-      parts.push('<text x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" text-anchor="'+anchor+'" font-size="'+(DG.font*tlDS).toFixed(2)+'" font-weight="700" fill="#111111" stroke="none">'+text+'</text>');
+      parts.push('<text data-tl-dim="1" x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" text-anchor="'+anchor+'" font-size="'+(DG.font*tlDS).toFixed(2)+'" font-weight="700" fill="#111111" stroke="none">'+text+'</text>');
     }
     function tlArchTick(x,y,dir){
       /* v113（2026-09-22 用户要求）：建筑斜短线加粗、缩短 —— k 5.5→4（长 11px→8px）、线宽 1.8→2.8；
@@ -3588,6 +3490,11 @@ function tlAutoGenerate(options) {
        任务M：k 与线宽再乘标注比例 tlDS */
     function gdTickH(x,y){ var k=DG.tick*tlDS; return '<line x1="'+(x-k).toFixed(1)+'" y1="'+(y+k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y-k).toFixed(1)+'" stroke-width="'+(DG.tickW*tlDS).toFixed(2)+'"/>'; }
     function gdTickV(x,y){ var k=DG.tick*tlDS; return '<line x1="'+(x-k).toFixed(1)+'" y1="'+(y-k).toFixed(1)+'" x2="'+(x+k).toFixed(1)+'" y2="'+(y+k).toFixed(1)+'" stroke-width="'+(DG.tickW*tlDS).toFixed(2)+'"/>'; }
+    /* A rotated partition grid has diagonal screen-space cuts. The legacy group dimension
+       chains are axis-aligned, so do not publish geometrically false dimensions for it. */
+    var tlGridFrameAngle=tlZoneCuts&&tlZoneCuts.frame?Number(tlZoneCuts.frame.angle)||0:0;
+    var tlNormalizedGridAngle=((tlGridFrameAngle%360)+360)%360;
+    if(Math.min(tlNormalizedGridAngle,360-tlNormalizedGridAngle)<0.001){
     Object.keys(gdBox).forEach(function(gdK){
       var gdB=gdBox[gdK];
       /* v115fix：gdG 此前在 forEach 里未定义（泄漏自上一循环=最后一个单元格的组号），
@@ -3604,7 +3511,7 @@ function tlAutoGenerate(options) {
          （原上端取 minC 列：阶梯/合并后两列边界不同 ⇒ 端点越界进邻带，用户截图右缘 255 线跨过紫色分界线）。
          gdTR/gdBR 只服务于右缘竖向标注与其加选命中 ⇒ 直接改用右缘列端点。 */
       var gdY0v=zY(gdB.maxC,gdB.minR), gdY1v=zY(gdB.maxC,gdB.maxR+1);
-      var gdTL=ts(gdX0,gdY0), gdTR=ts(gdX1,gdY0v), gdBR=ts(gdX1,gdY1v);
+      var gdTL=tsGrid(gdX0,gdY0), gdTR=tsGrid(gdX1,gdY0v), gdBR=tsGrid(gdX1,gdY1v);
       /* 横向尺寸线（v111d 锚点沿用：组底边上方 14px——单行组=地块底缘上方，多行=分界线上方；
          与总尺寸线间距恒 ≥52px（v111c 预留）。
          v115（2026-09-23 用户截图：横向实际被主管分成三块，旧「组包络」一段标注把其中两块并到一起——不对）：
@@ -3638,9 +3545,9 @@ function tlAutoGenerate(options) {
     Object.keys(gdBands).forEach(function(gdBK){
       var gdRc=gdBands[gdBK];
       var gdY1b=zY(gdRc.maxC,gdRc.maxR+1);
-      var gdBRb=ts(zX(gdRc.minR,gdRc.maxC+1),gdY1b);
+      var gdBRb=tsGrid(zX(gdRc.minR,gdRc.maxC+1),gdY1b);
       for(var gdc2=gdRc.minC;gdc2<=gdRc.maxC;gdc2++){
-        var gdPA=ts(zX(gdRc.maxR,gdc2),gdY1b), gdPB=ts(zX(gdRc.maxR,gdc2+1),gdY1b);
+        var gdPA=tsGrid(zX(gdRc.maxR,gdc2),gdY1b), gdPB=tsGrid(zX(gdRc.maxR,gdc2+1),gdY1b);
         if(gdPB.x-gdPA.x<=26)continue;
         var gdIdH='gd'+gdRc.firstG+'-hc'+gdc2;
         var gdHy=gdBRb.y-14+tlDimOffOf(gdIdH);   /* v114: off 正=向下 */
@@ -3652,7 +3559,7 @@ function tlAutoGenerate(options) {
         gdParts.push('<g data-dim="'+gdIdH+'" data-axis="y">'+gdEvH
           +'<line x1="'+gdPA.x.toFixed(1)+'" y1="'+gdHy.toFixed(1)+'" x2="'+gdPB.x.toFixed(1)+'" y2="'+gdHy.toFixed(1)+'"/>'
           +gdTickH(gdPA.x,gdHy)+gdTickH(gdPB.x,gdHy)
-          +'<text x="'+((gdPA.x+gdPB.x)/2).toFixed(1)+'" y="'+(gdHy-GAP-DESC).toFixed(1)+'" text-anchor="middle" font-size="'+(DG.font*tlDS).toFixed(2)+'" font-weight="700" fill="#111111" stroke="none">'
+          +'<text data-tl-dim="1" x="'+((gdPA.x+gdPB.x)/2).toFixed(1)+'" y="'+(gdHy-GAP-DESC).toFixed(1)+'" text-anchor="middle" font-size="'+(DG.font*tlDS).toFixed(2)+'" font-weight="700" fill="#111111" stroke="none">'
           +gdVal((zX(gdRc.maxR,gdc2+1)-zX(gdRc.maxR,gdc2))/gdSx)+'</text></g>');  /* v174：值=该段端点实际跨距 ÷ gdSx（换算回 plan 米；2026-09-24 起用实际跨距，v174 补上单位换算） */
         window._tlDimHits.push({id:gdIdH,axis:'y',x1:gdPA.x,y1:gdHy,x2:gdPB.x,y2:gdHy,minOff:-8});
       }
@@ -3665,7 +3572,7 @@ function tlAutoGenerate(options) {
       var gdRcV=gdBandsV[gdVK];
       var gdCxV=gdRcV.maxC;                         /* = cols-1（右缘列） */
       for(var gdr2=gdRcV.minR;gdr2<=gdRcV.maxR;gdr2++){
-        var gdPAv=ts(zX(gdr2,cols),zY(gdCxV,gdr2)), gdPBv=ts(zX(gdr2,cols),zY(gdCxV,gdr2+1));
+        var gdPAv=tsGrid(zX(gdr2,cols),zY(gdCxV,gdr2)), gdPBv=tsGrid(zX(gdr2,cols),zY(gdCxV,gdr2+1));
         if(gdPBv.y-gdPAv.y<=26)continue;
         var gdIdV='gd'+gdRcV.firstG+'-vr'+gdr2;
         /* v500（2026-10-16 用户反馈）：基准间距 14px 太贴地块边线，版面挤 —— 加大到 30px
@@ -3679,7 +3586,7 @@ function tlAutoGenerate(options) {
           +gdTickV(gdVx,gdPAv.y)+gdTickV(gdVx,gdPBv.y)
           /* v174：值 ÷ gdSy 换算回 plan 米（防分区链与总尺寸不同口径）；v175：改为逐行取值 */
           /* v148：锚点落在尺寸线上，off = GAP+ASC（数字在线的【右侧】，朝线的一侧是墨迹左缘 = 基线−ASC） */
-          +'<g transform="translate('+gdVx.toFixed(1)+' '+((gdPAv.y+gdPBv.y)/2).toFixed(1)+') rotate(-90)"><text x="0" y="'+(GAP+ASC).toFixed(2)+'" text-anchor="middle" font-size="'+(DG.font*tlDS).toFixed(2)+'" font-weight="700" fill="#111111" stroke="none">'+gdVal((zY(gdCxV,gdr2+1)-zY(gdCxV,gdr2))/gdSy)+'</text></g></g>');
+          +'<g transform="translate('+gdVx.toFixed(1)+' '+((gdPAv.y+gdPBv.y)/2).toFixed(1)+') rotate(-90)"><text data-tl-dim="1" x="0" y="'+(GAP+ASC).toFixed(2)+'" text-anchor="middle" font-size="'+(DG.font*tlDS).toFixed(2)+'" font-weight="700" fill="#111111" stroke="none">'+gdVal((zY(gdCxV,gdr2+1)-zY(gdCxV,gdr2))/gdSy)+'</text></g></g>');
         window._tlDimHits.push({id:gdIdV,axis:'x',x1:gdVx,y1:gdPAv.y,x2:gdVx,y2:gdPBv.y,minOff:-8});
       }
     });
@@ -3687,6 +3594,7 @@ function tlAutoGenerate(options) {
       parts.push('<g pointer-events="none" stroke="#111111" stroke-width="0.95" fill="none" opacity="0.95" stroke-linecap="square">');
       parts.push(gdParts.join(''));
       parts.push('</g>');
+    }
     }
   })();
 
@@ -3705,7 +3613,8 @@ function tlAutoGenerate(options) {
      为什么不能用折线长：二级传过来的支管已缩过 gap，三级还会再缩一次，折线永远比满跨短。 */
   function tlZoneSpanAt(pts){
     if(!pts||pts.length<2||!xPos||!yPos||!xSrc||!ySrc)return 0;
-    var a=pts[0], b=pts[pts.length-1];
+    var pLocal=tlZoneCuts.frame?pts.map(function(p){return tlFrameToGrid(tlZoneCuts.frame,p);}):pts;
+    var a=pLocal[0], b=pLocal[pLocal.length-1];
     var mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
     var vert=Math.abs(a.x-b.x)<Math.abs(a.y-b.y);
     var E=1e-6,i;
@@ -3716,7 +3625,8 @@ function tlAutoGenerate(options) {
     }
     return 0;
   }
-  var ppShare=window.RunyeBridge?window.RunyeBridge.state:null;
+  var ppShare=window.RunyeBridge&&typeof window.RunyeBridge.getPartitionSnapshot==='function'
+    ?window.RunyeBridge.getPartitionSnapshot():null;
   var ppHasPipes=ppShare && (ppShare.mainPipes.length||ppShare.branchPipes.length||ppShare.valves.length);
   /* v150b（2026-09-28 用户要求「管道布置方向按多数分区的方向自动校正；这些地方没有必要换方向」）：
      原每分区独立判向（xPlan[zc]>=yPlan[zr]）→ 窄长分区会单独翻转向，同一张图上主管/支管方向不一。
@@ -3755,6 +3665,11 @@ function tlAutoGenerate(options) {
       });
     }
     valves=ppShare.valves.map(function(v){return{x:v.x,y:v.y};});
+    if(tlZoneCuts.frame){
+      mainPipes=mainPipes.map(function(l){return l.map(function(p){return tlFrameToGrid(tlZoneCuts.frame,p);});});
+      branchPipes=branchPipes.map(function(l){return l.map(function(p){return tlFrameToGrid(tlZoneCuts.frame,p);});});
+      valves=valves.map(function(v){return tlFrameToGrid(tlZoneCuts.frame,v);});
+    }
     // 复用二级页支管时端点若贴在分区边缘，同样向内缩进，保证相邻地块支管视觉上断开
     branchPipes=branchPipes.map(tlTrimBranchToZone);
     branchDrawnLens=branchPipes.map(function(l){return tlPolyLen(l);});
@@ -3825,7 +3740,7 @@ function tlAutoGenerate(options) {
           branchPipes.push([{x:brX,y:zy2+gapV},{x:brX,y:zy2+zoneH2-gapV}]);
           /* [v601] 设计满跨 = 分区在该方向的净跨（竖向支管 = 分区高），图面两端留边不计入计算 */
           branchFullSpans.push(zoneH2); branchDrawnLens.push(zoneH2-2*gapV);
-          if(window.atPointInPolygon&&window.atPointInPolygon({x:brX,y:tlEdgeZ?tlMainEndY:centerY},poly)){
+          if(window.atPointInPolygon&&window.atPointInPolygon({x:brX,y:tlEdgeZ?tlMainEndY:centerY},tlGridPlotPoly)){
             if(tlEdgeZ){
               /* [v553] 主管末端 90°弯头 → 水平连接管 → 阀门（落点仍在支管上）→ 支管三通 → 支管 */
               valves.push({x:brX,y:tlMainEndY,ax:mainX,ay:tlMainEndY,elbow:true,mi:mainPipes.length-1});
@@ -3851,7 +3766,7 @@ function tlAutoGenerate(options) {
           branchPipes.push([{x:zx2+gapH,y:brY},{x:zx2+zoneW2-gapH,y:brY}]);
           /* [v601] 横向支管：设计满跨 = 分区宽 */
           branchFullSpans.push(zoneW2); branchDrawnLens.push(zoneW2-2*gapH);
-          if(window.atPointInPolygon&&window.atPointInPolygon({x:tlEdgeZ?tlMainEndX:centerX,y:brY},poly)){
+          if(window.atPointInPolygon&&window.atPointInPolygon({x:tlEdgeZ?tlMainEndX:centerX,y:brY},tlGridPlotPoly)){
             if(tlEdgeZ){
               valves.push({x:tlMainEndX,y:brY,ax:tlMainEndX,ay:mainY,elbow:true,mi:mainPipes.length-1});
             }else{
@@ -4186,12 +4101,12 @@ function tlAutoGenerate(options) {
         : [{x:tlfxA, y:tlfY}, {x:tlfxB, y:tlfY}];
       tlTruncateMainByNode('V', tlfY);
       // 水源不动：留在旧总管起点（地块上沿外），不再随总管进分区
-      var sourcePos = {x:b.minX, y:b.minY - Math.max(15, b.h * 0.04)};
+      var sourcePos = {x:tlGeoBounds.minX, y:tlGeoBounds.minY - Math.max(15, tlGeoBounds.h * 0.04)};
     } else {
       // Main pipes are vertical → front pipe is horizontal, along the top edge
-      var frontY = b.minY - Math.max(15, b.h * 0.04);
-      var frontX1 = b.minX;
-      var frontX2 = b.minX + b.w;
+      var frontY = tlGeoBounds.minY - Math.max(15, tlGeoBounds.h * 0.04);
+      var frontX1 = tlGeoBounds.minX;
+      var frontX2 = tlGeoBounds.minX + tlGeoBounds.w;
       /* [v557] 单列退回几何（总管在地块外沿）：端点在地块外沿、断点夹在中间 ⇒ 拼成折线 */
       tlFrontMK = tlBuildFrontNodes('V', frontY);
       frontPipe = tlFrontMK.length
@@ -4218,12 +4133,12 @@ function tlAutoGenerate(options) {
         : [{x:tlfX, y:tlfyA}, {x:tlfX, y:tlfyB}];
       tlTruncateMainByNode('H', tlfX);
       // 水源不动：留在旧总管起点（地块左沿外）
-      var sourcePos = {x:b.minX - Math.max(15, b.w * 0.04), y:b.minY};
+      var sourcePos = {x:tlGeoBounds.minX - Math.max(15, tlGeoBounds.w * 0.04), y:tlGeoBounds.minY};
     } else {
       // Main pipes are horizontal → front pipe is vertical, along the left edge
-      var frontX = b.minX - Math.max(15, b.w * 0.04);
-      var frontY1 = b.minY;
-      var frontY2 = b.minY + b.h;
+      var frontX = tlGeoBounds.minX - Math.max(15, tlGeoBounds.w * 0.04);
+      var frontY1 = tlGeoBounds.minY;
+      var frontY2 = tlGeoBounds.minY + tlGeoBounds.h;
       /* [v557] 单行退回几何（对称） */
       tlFrontMK = tlBuildFrontNodes('H', frontX);
       frontPipe = tlFrontMK.length
@@ -4237,22 +4152,22 @@ function tlAutoGenerate(options) {
   if (frontPipe && Math.hypot(frontPipe[1].x - frontPipe[0].x, frontPipe[1].y - frontPipe[0].y) < 0.5) {
     tlFrontMK=[];   /* [v557] 退回旧几何 ⇒ 断点集作废（否则后续按断点重建会把零长总管又拼回去） */
     if (firstFixedSideIsHorizontal) {
-      var tlfFbY = b.minY - Math.max(15, b.h * 0.04);
-      frontPipe = [{x:b.minX, y:tlfFbY}, {x:b.minX + b.w, y:tlfFbY}];
-      sourcePos = {x:b.minX, y:tlfFbY};
+      var tlfFbY = tlGeoBounds.minY - Math.max(15, tlGeoBounds.h * 0.04);
+      frontPipe = [{x:tlGeoBounds.minX, y:tlfFbY}, {x:tlGeoBounds.minX + tlGeoBounds.w, y:tlfFbY}];
+      sourcePos = {x:tlGeoBounds.minX, y:tlfFbY};
     } else {
-      var tlfFbX = b.minX - Math.max(15, b.w * 0.04);
-      frontPipe = [{x:tlfFbX, y:b.minY}, {x:tlfFbX, y:b.minY + b.h}];
-      sourcePos = {x:tlfFbX, y:b.minY};
+      var tlfFbX = tlGeoBounds.minX - Math.max(15, tlGeoBounds.w * 0.04);
+      frontPipe = [{x:tlfFbX, y:tlGeoBounds.minY}, {x:tlfFbX, y:tlGeoBounds.minY + tlGeoBounds.h}];
+      sourcePos = {x:tlfFbX, y:tlGeoBounds.minY};
     }
   }
   // 若二级页已放置水源点，优先采用二级页的水源几何
-  if(ppShare && ppShare.source){ sourcePos={x:ppShare.source.x,y:ppShare.source.y}; }
+  if(ppShare && ppShare.source){ sourcePos=tlFrameToGrid(tlZoneCuts.frame,ppShare.source); }
   /* [v570] 用户拖动水源：优先级最高（绝对坐标，按地块指纹匹配）。
      指纹 = 地块 bbox + 顶点数 —— 换地块 / 重新测绘自动失效，改参数重生成不会丢。 */
   var tlSrcSig=Math.round(b.minX)+','+Math.round(b.minY)+'|'+Math.round(b.w)+'x'+Math.round(b.h)+'|'+poly.length;
   var tlSrcUser=tlSourceMoveOf(tlSrcSig);
-  if(tlSrcUser){ sourcePos={x:tlSrcUser.x,y:tlSrcUser.y}; }
+  if(tlSrcUser){ sourcePos=tlFrameToGrid(tlZoneCuts.frame,tlSrcUser); }
   /* [v579] 总管不再整体平移（用户拍板取消）：
      三通拖动（v564 语义 + v568 工作区入口）已能**真改**总管几何 —— 断点下移后总管成折线、
      主管自三通起算截断、材料与水力同步重算。而「总管整条平移」(AE.moves['front']) 只动显示层、
@@ -4266,7 +4181,7 @@ function tlAutoGenerate(options) {
   // Draw front main pipe (总管) — orange, thick
   if(frontPipe){
     var fd='';
-    for(var fi=0;fi<frontPipe.length;fi++){var fp=ts(frontPipe[fi].x,frontPipe[fi].y);fd+=(fi===0?'M':'L')+fp.x.toFixed(1)+' '+fp.y.toFixed(1)+' ';}
+    for(var fi=0;fi<frontPipe.length;fi++){var fp=tsGrid(frontPipe[fi].x,frontPipe[fi].y);fd+=(fi===0?'M':'L')+fp.x.toFixed(1)+' '+fp.y.toFixed(1)+' ';}
     /* v162：被遮蔽的管在三级简图改「灰色虚线」（管宽不动 ⇒ 命中/几何/水力全不受影响）。
        v165（2026-09-30 用户要求「这个遮蔽功能遇到总管，不能分段遮蔽，要改下，可以分段遮蔽」）：
        总管按「主管接入点」拆成 N 段渲染，每段各自带遮蔽态（半遮蔽 = 一段灰虚线、其余实线）；
@@ -4286,7 +4201,7 @@ function tlAutoGenerate(options) {
       for(var fsi=0;fsi+1<tlFR.length;fsi++){
         var ft0=tlFR[fsi],ft1=tlFR[fsi+1];
         var fp0=tlFrontPolyAt(frontPipe,ft0), fp1=tlFrontPolyAt(frontPipe,ft1);
-        var fq0=ts(fp0.x,fp0.y), fq1=ts(fp1.x,fp1.y);
+        var fq0=tsGrid(fp0.x,fp0.y), fq1=tsGrid(fp1.x,fp1.y);
         var fH=window.tlIsPipeSegHidden?window.tlIsPipeSegHidden('front-'+fsi):false;
         var fP='<path data-tlpipe-seg="front-'+fsi+'" d="M'+fq0.x.toFixed(1)+' '+fq0.y.toFixed(1)+' L'+fq1.x.toFixed(1)+' '+fq1.y.toFixed(1)+'" fill="none" stroke="'+(fH?'#64748b':'#111827')+'" stroke-width="6"'+(fH?' stroke-dasharray="8,5" opacity="0.55"':'')+' stroke-linecap="round" stroke-linejoin="round"/>';
         if(fH)tlFS.push(fP);else tlFN.push(fP);   /* 遮蔽段先画：灰色圆头不会压在实线端点 */
@@ -4319,7 +4234,7 @@ function tlAutoGenerate(options) {
         if(scq<scBest){scBest=scq;scEnd=frontPipe[sci1];}
       }
       var scPts=[sourcePos,scEnd], scd='';
-      for(var sci=0;sci<scPts.length;sci++){var scp=ts(scPts[sci].x,scPts[sci].y);scd+=(sci===0?'M':'L')+scp.x.toFixed(1)+' '+scp.y.toFixed(1)+' ';}
+      for(var sci=0;sci<scPts.length;sci++){var scp=tsGrid(scPts[sci].x,scPts[sci].y);scd+=(sci===0?'M':'L')+scp.x.toFixed(1)+' '+scp.y.toFixed(1)+' ';}
       parts.push('<path data-tlsrcpipe="1" d="'+scd+'" fill="none" stroke="#111827" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" opacity="0.95"/>');
     }
   }
@@ -4396,7 +4311,7 @@ function tlAutoGenerate(options) {
        地块外部分照常可见。data-tlstub 供工作区克隆/闸门选择器使用，保持不变。 */
     tlStubs.forEach(function(sl){
       var sd='';
-      for(var si=0;si<sl.length;si++){var sp2=ts(sl[si].x,sl[si].y);sd+=(si===0?'M':'L')+sp2.x.toFixed(1)+' '+sp2.y.toFixed(1)+' ';}
+      for(var si=0;si<sl.length;si++){var sp2=tsGrid(sl[si].x,sl[si].y);sd+=(si===0?'M':'L')+sp2.x.toFixed(1)+' '+sp2.y.toFixed(1)+' ';}
       parts.push('<path data-tlstub="1" d="'+sd+'" fill="none" stroke="#185FA5" stroke-width="5" stroke-linecap="round"/>');
     });
   }
@@ -4405,7 +4320,7 @@ function tlAutoGenerate(options) {
   parts.push('<g clip-path="url(#tlPlotClip)">');
   mainPipes.forEach(function(l,mi){
     var md='';
-    for(var i=0;i<l.length;i++){var p=ts(l[i].x,l[i].y);md+=(i===0?'M':'L')+p.x.toFixed(1)+' '+p.y.toFixed(1)+' ';}
+    for(var i=0;i<l.length;i++){var p=tsGrid(l[i].x,l[i].y);md+=(i===0?'M':'L')+p.x.toFixed(1)+' '+p.y.toFixed(1)+' ';}
     var tlHidM=window.tlIsPipeHidden('main-'+mi);
     parts.push('<path data-tlpipe="main-'+mi+'" d="'+md+'" fill="none" stroke="'+(tlHidM?'#64748b':'#185FA5')+'" stroke-width="5"'+(tlHidM?' stroke-dasharray="8,5" opacity="0.55"':'')+' stroke-linecap="round" stroke-linejoin="round"/>');
   });
@@ -4413,7 +4328,7 @@ function tlAutoGenerate(options) {
   // Draw branch pipes (green) — clipped to plot boundary
   branchPipes.forEach(function(l,bi){
     var bd='';
-    for(var i=0;i<l.length;i++){var p=ts(l[i].x,l[i].y);bd+=(i===0?'M':'L')+p.x.toFixed(1)+' '+p.y.toFixed(1)+' ';}
+    for(var i=0;i<l.length;i++){var p=tsGrid(l[i].x,l[i].y);bd+=(i===0?'M':'L')+p.x.toFixed(1)+' '+p.y.toFixed(1)+' ';}
     var tlHidB=window.tlIsPipeHidden('branch-'+bi);
     parts.push('<path data-tlpipe="branch-'+bi+'" d="'+bd+'" fill="none" stroke="'+(tlHidB?'#64748b':'#16a34a')+'" stroke-width="3"'+(tlHidB?' stroke-dasharray="8,5" opacity="0.55"':'')+' stroke-linecap="round" stroke-linejoin="round"/>');
   });
@@ -4427,7 +4342,7 @@ function tlAutoGenerate(options) {
      data-tltape：稳定标识，供图层契约闸门按「文档顺序」断言叠放层级（勿删）。 */
   dripTapes.forEach(function(l){
     var td='';
-    for(var i=0;i<l.length;i++){var p=ts(l[i].x,l[i].y);td+=(i===0?'M':'L')+p.x.toFixed(1)+' '+p.y.toFixed(1)+' ';}
+    for(var i=0;i<l.length;i++){var p=tsGrid(l[i].x,l[i].y);td+=(i===0?'M':'L')+p.x.toFixed(1)+' '+p.y.toFixed(1)+' ';}
     parts.push('<path data-tltape="1" d="'+td+'" fill="none" stroke="#67e8f9" stroke-width="1.4" stroke-dasharray="3,3" stroke-linecap="round"/>');
   });
   parts.push('</g>');
@@ -4447,12 +4362,12 @@ function tlAutoGenerate(options) {
        v183（2026-10-02）：无节点/连线时也落一个**空锚点组** —— 实时刷新靠「旧层 nextSibling」
        定位插入点（保持与整图重生成的叠放次序一致：滴灌带之后、水源/阀门/交接符号之前）；
        无锚点时只能 append 到地块组末尾，层序与重生成不一致（节点圆点会压在阀门符号之上）。 */
-    var tlNodeLayerSvg = tlBuildTlNodesLayer({ frontPipe: frontPipe, mainPipes: mainPipes, branchPipes: branchPipes, ts: ts });
+    var tlNodeLayerSvg = tlBuildTlNodesLayer({ frontPipe: frontPipe, mainPipes: mainPipes, branchPipes: branchPipes, ts: function(x,y){return tsGrid(x,y);} });
     parts.push(tlNodeLayerSvg || '<g data-tlnode-layer="1"></g>');
   } catch (eNdLink) { parts.push('<g data-tlnode-layer="1"></g>'); }
 
   if(sourcePos){
-    var sp=ts(sourcePos.x,sourcePos.y);
+    var sp=tsGrid(sourcePos.x,sourcePos.y);
     /* [v255 2026-10-06 用户要求] 水源点可右键换向：外圈透明热区 r=18 承接 contextmenu
        （事件委托挂 document，见 tlSrcFlip）；<title> 给悬停提示。 */
     parts.push('<g data-tl-src="1" data-tl-src-drag="1"><circle cx="'+sp.x.toFixed(1)+'" cy="'+sp.y.toFixed(1)+'" r="18" fill="rgba(0,0,0,0)"><title>拖动：移动水源位置（任意）　｜　右键：切换水源方向（换到总管另一端）</title></circle><circle cx="'+sp.x.toFixed(1)+'" cy="'+sp.y.toFixed(1)+'" r="10" fill="#f59e0b" stroke="#fff" stroke-width="2"/></g>');
@@ -4511,10 +4426,10 @@ function tlAutoGenerate(options) {
   valves.forEach(function(v){ if(v.ax===undefined||v.ay===undefined){ var cp=tlValveConnPt(v); if(cp){v.ax=cp.x;v.ay=cp.y;} } });
 
   // Valves —— 斜向连接管把阀门与主管接通，更直观（连接管与主管同色，画在红圈之下）
-  valves.filter(function(v){return window.atPointInPolygon?window.atPointInPolygon(v,poly):true;}).forEach(function(v,idx){
-    var vp=ts(v.x,v.y);
+  valves.filter(function(v){return window.atPointInPolygon?window.atPointInPolygon(v,tlGridPlotPoly):true;}).forEach(function(v,idx){
+    var vp=tsGrid(v.x,v.y);
     if(v.ax!==undefined && v.ay!==undefined){
-      var ap=ts(v.ax, v.ay);
+      var ap=tsGrid(v.ax, v.ay);
       parts.push('<line x1="'+ap.x.toFixed(1)+'" y1="'+ap.y.toFixed(1)+'" x2="'+vp.x.toFixed(1)+'" y2="'+vp.y.toFixed(1)+'" stroke="#185FA5" stroke-width="3.5" stroke-linecap="round" opacity="0.92"/>');
       /* 任务⑧（2026-09-24 用户要求）：主管×支管交接处补三通方块 —— 与总管×主管交接
          （data-junction-tee，深蓝白边 9×9）同款式，交接符号全覆盖。
@@ -4545,20 +4460,19 @@ function tlAutoGenerate(options) {
      用短直连线（主管蓝）接通；随总管平移（jc 已由 tlFrontMv 刚性平移）。 */
   if(tlJunctions && tlJunctions.length){
     tlJunctions.forEach(function(jc){
-      var jp=ts(jc.x,jc.y);
+      var jp=tsGrid(jc.x,jc.y);
       /* [v557] 三通 = 总管折线的断点，可沿主管拖动：输出定位/限位/比例供 tlInitDrag 命中与像素→米换算
          · key/sig：物理主管线键 + 地块指纹（持久化匹配）；off：当前下移量；max：可下移上限（米）
          · axis：拖动轴（V=沿 y 上下 / H=沿 x）；mps：该主管「SVG 单位 / 米」比例（像素位移换算用） */
       var jAttr='', jKeyAttr='';
       if(jc.mk){
-        var jmps=0, jl=(jc.mi!=null&&mainPipes[jc.mi])?mainPipes[jc.mi]:null;
+        var jmps=0, jux=0, juy=0, jl=(jc.mi!=null&&mainPipes[jc.mi])?mainPipes[jc.mi]:null;
         if(jl&&jl.length>=2){
-          var ja0=ts(jl[0].x,jl[0].y), ja1=ts(jl[1].x,jl[1].y);
-          if(jc.axis==='V'){
-            var jdm=Math.abs(jl[1].y-jl[0].y); if(jdm>0.01)jmps=Math.abs(ja1.y-ja0.y)/jdm;
-          }else{
-            var jdm2=Math.abs(jl[1].x-jl[0].x); if(jdm2>0.01)jmps=Math.abs(ja1.x-ja0.x)/jdm2;
-          }
+          var ja0=tsGrid(jl[0].x,jl[0].y), ja1=tsGrid(jl[1].x,jl[1].y);
+          var jdm=(jc.axis==='V')?Math.abs(jl[1].y-jl[0].y):Math.abs(jl[1].x-jl[0].x);
+          var jlen=Math.hypot(ja1.x-ja0.x,ja1.y-ja0.y);
+          if(jlen>0){jux=(ja1.x-ja0.x)/jlen;juy=(ja1.y-ja0.y)/jlen;}
+          if(jdm>0.01)jmps=jlen/jdm;
         }
         jKeyAttr=' data-junction-key="'+jc.mk+'"';
         jAttr=jKeyAttr
@@ -4567,6 +4481,7 @@ function tlAutoGenerate(options) {
           +' data-junction-max="'+Number(jc.max||0).toFixed(2)+'"'
           +' data-junction-maxa="'+Number(jc.maxA||0).toFixed(2)+'" data-junction-maxb="'+Number(isFinite(jc.maxB)?jc.maxB:-1).toFixed(2)+'"'
           +' data-junction-axis="'+(jc.axis||'V')+'"'
+          +' data-junction-ux="'+Number(jux).toFixed(5)+'" data-junction-uy="'+Number(juy).toFixed(5)+'"'
           +' data-junction-mps="'+Number(jmps||0).toFixed(4)+'"';
       }
       parts.push('<rect data-junction-tee data-junction-front="1"'+jAttr+' x="'+(jp.x-4.5).toFixed(1)+'" y="'+(jp.y-4.5).toFixed(1)+'" width="9" height="9" fill="#0C447C" stroke="#ffffff" stroke-width="1.5"/>');
@@ -4574,11 +4489,11 @@ function tlAutoGenerate(options) {
         /* v171d（用户 2026-10-01 更正：以「总管」为基准，不是主管/接入段）——
            总管横向(jc.dy≠0) → 阀恒在总管下侧(+y)；总管竖向(jc.dx≠0) → 阀恒在总管右侧(+x)。
            基准点取「总管×主管交点」jm（落在总管上），阀距总管固定垂直距离 JC_VALVE_OFF（米）。*/
-        var jm=ts(jc.x,jc.y);
+        var jm=tsGrid(jc.x,jc.y);
         var JC_VALVE_OFF=10.0; // 固定距离（米）：阀距总管（交点）的垂直距离（2026-10-01 用户要求「适当放大一点」：6.0→10.0）
         var jox=(jc.dx===0)?0:JC_VALVE_OFF; // 总管竖向 → 右侧(+x)
         var joy=(jc.dy===0)?0:JC_VALVE_OFF; // 总管横向 → 下侧(+y)
-        var jv=ts(jc.x+jox, jc.y+joy);
+        var jv=tsGrid(jc.x+jox, jc.y+joy);
         parts.push('<line'+jKeyAttr+' x1="'+jm.x.toFixed(1)+'" y1="'+jm.y.toFixed(1)+'" x2="'+jv.x.toFixed(1)+'" y2="'+jv.y.toFixed(1)+'" stroke="#185FA5" stroke-width="3.5" stroke-linecap="round" opacity="0.92"/>');
         parts.push('<g data-junction-valve'+jKeyAttr+'><circle cx="'+jv.x.toFixed(1)+'" cy="'+jv.y.toFixed(1)+'" r="6.5" fill="#ef4444" stroke="#ffffff" stroke-width="2"/>'
           +'<line x1="'+(jv.x-3.6).toFixed(1)+'" y1="'+(jv.y-3.6).toFixed(1)+'" x2="'+(jv.x+3.6).toFixed(1)+'" y2="'+(jv.y+3.6).toFixed(1)+'" stroke="#ffffff" stroke-width="1.4"/>'
@@ -4616,27 +4531,36 @@ function tlAutoGenerate(options) {
     poly: JSON.parse(JSON.stringify(poly)),
     combinedN: tlGetZoneCount(),   /* 2026-09-16 联合灌溉区数 N，供工作区分组着色读取（简图不变） */
     zones: { cols: cols, rows: rows, xPos: xPos.slice(), yPos: yPos.slice(), xPlan: xPlan.slice(), yPlan: yPlan.slice(), xSrc: xSrc.slice(), ySrc: ySrc.slice(),
+             /* Grid cuts stay in local design coordinates; this serializable frame maps them back to immutable plot coordinates. */
+             frame: tlZoneCuts.frame ? {angle:tlZoneCuts.frame.angle,center:tlZoneCuts.frame.center,origin:tlZoneCuts.frame.origin,scaleX:tlZoneCuts.frame.scaleX,scaleY:tlZoneCuts.frame.scaleY} : null,
              /* v98h 阶梯覆盖表必须随图面数据走：tlAutoGenerate 每次重建 tlDiagramData，
                 漏掉这两项就会在「松手 / 改参数 / 切页重生成」时把阶梯抹平（线弹回直的一条）。
                 空表时为 null ⇒ 工作区与面积计算都退回基础网格，与改动前一致。 */
              cutOffX: (tlZoneStepRef ? tlZoneStepRef.x : null), cutOffY: (tlZoneStepRef ? tlZoneStepRef.y : null) },
-    mainPipes: JSON.parse(JSON.stringify(mainPipes)), branchPipes: JSON.parse(JSON.stringify(branchPipes)),
+    /* SVG/设计阶段使用旋转网格局部坐标；tlDiagramData 是跨模块的真实地块坐标契约。 */
+    mainPipes: mainPipes.map(function(line){return line.map(function(p){return tlGridWorld(p.x,p.y);});}),
+    branchPipes: branchPipes.map(function(line){return line.map(function(p){return tlGridWorld(p.x,p.y);});}),
     /* [v601] 支管「设计满跨 / 图面长」两个基准（索引与 branchPipes 一一对应）：
        计算（材料清单、最不利路径水损）一律按满跨；图面两端 gapV/gapH 留边只影响显示。 */
     branchFullSpans: branchFullSpans.slice(), branchDrawnLens: branchDrawnLens.slice(),
-    valves: JSON.parse(JSON.stringify(valves)), dripTapes: JSON.parse(JSON.stringify(dripTapes)),
+    valves: valves.map(function(v){var p=tlGridWorld(v.x,v.y),a=(v.ax!=null&&v.ay!=null)?tlGridWorld(v.ax,v.ay):null;return Object.assign({},v,p,a?{ax:a.x,ay:a.y}:{});}),
+    dripTapes: dripTapes.map(function(line){return line.map(function(p){return tlGridWorld(p.x,p.y);});}),
     partialFlags: tlPartialFlags.slice(), zoneActMu: tlZoneActMu.slice(),
     /* v170：快照落「设计几何」—— 总管平移只动显示层（上面 frontPipe/sourcePos
        已是平移后的绘制副本）；AE.effPts 还会再叠一次 moves，写移动值会双重平移。 */
-    frontPipe: tlFrontDesign,
-    sourcePos: tlSrcDesign,
+    frontPipe: tlFrontDesign ? tlFrontDesign.map(function(p){return tlGridWorld(p.x,p.y);}) : null,
+    sourcePos: tlSrcDesign ? tlGridWorld(tlSrcDesign.x,tlSrcDesign.y) : null,
     /* [v568] 三通断点清单一并落快照：工作区（tl-workspace）没有 DOM 命中层，靠世界坐标拾取
        三通，必须拿到「设计几何」的断点位置与限位（mk/x/y/axis/off/max/sig）。
        坐标 = 主管物理线位置 pos × 总管断点坐标 base+off —— 与简图渲染同源（未含 tlFrontMv 平移）。 */
     frontNodes: (tlFrontMK || []).map(function (v) {
       var ax = frontHoriz ? 'V' : 'H';
+      var gridPos={x:frontHoriz?v.pos:v.at,y:frontHoriz?v.at:v.pos};
+      var worldPos=tlGridWorld(gridPos.x,gridPos.y);
       return { mk: v.mk, axis: ax, pos: v.pos, base: v.base, at: v.at,
-        x: frontHoriz ? v.pos : v.at, y: frontHoriz ? v.at : v.pos,
+        x: worldPos.x, y: worldPos.y,
+        axisX: (tlGridWorld(gridPos.x+(frontHoriz?0:1),gridPos.y+(frontHoriz?1:0)).x-worldPos.x),
+        axisY: (tlGridWorld(gridPos.x+(frontHoriz?0:1),gridPos.y+(frontHoriz?1:0)).y-worldPos.y),
         off: v.off || 0, max: v.max || 0, sig: v.sig };
     }) };
   r = computeThreeLevel();
@@ -4740,10 +4664,18 @@ function tlAutoGenerate(options) {
   parts.push('</svg>');
   /* v180b（2026-10-02）：缓存本次几何映射，供 tlRefreshTlNodesLayer 在 RyTlNodes 变更时
      实时刷新三级简图的节点/连线图层（无需重新「生成管线图」）。 */
-  window.__tlPlanGeo = { frontPipe: frontPipe, mainPipes: mainPipes, branchPipes: branchPipes, ts: ts };
+  /* tl-nodes 的 atM 沿用 tlDiagramData 的真实地块米坐标；实时刷新也必须用同一几何口径。 */
+  window.__tlPlanGeo = {
+    frontPipe: (frontPipe||[]).map(function(p){return tlGridWorld(p.x,p.y);}),
+    mainPipes: mainPipes.map(function(line){return line.map(function(p){return tlGridWorld(p.x,p.y);});}),
+    branchPipes: branchPipes.map(function(line){return line.map(function(p){return tlGridWorld(p.x,p.y);});}),
+    ts: ts
+  };
   var svgStr=parts.join('');
   tlDiagramSVG=svgStr;
   document.getElementById('tlDiagramContent').innerHTML=svgStr;
+  var _tlOutputDeg=0;try{_tlOutputDeg=Number(localStorage.getItem('tlOutputRotationDeg'))||0;}catch(eTlOutputStore){}
+  tlApplyOutputRotation(_tlOutputDeg,false);
   /* [v215] 轮灌演示跨重渲染：简图整棵重建后立刻按当前演示组重涂 + 演示 chips 重建
      （组数随 N/手动分组变化；chips 内部自带越界退出守卫。工作区侧由 RyTlWs.render 内恢复）。 */
   try { if (window.__tlDemoGroup != null) tlApplyDemoHighlight(window.__tlDemoGroup); } catch (e) { }
@@ -4766,10 +4698,9 @@ function tlAutoGenerate(options) {
       return;
     }
     var R=6378137, mlat=R*Math.PI/180, cosLat=Math.cos(base.refLat*Math.PI/180);
-    /* [map-enhance 2026-09-29] 地图框线方位恒定：二级页的「地块旋转 / 镜像」只是作图便利变换
-       （把地块摆正便于分区与布管），不得回传到在线地图。window.__runyeMapFramePoly 保存
-       「地图口径」（未旋转 / 未镜像）的地块顶点（只在 地图回传 / 设为当前 / 读存档 三处写入）；
-       这里按顶点对应关系反解出「当前世界坐标 → 地图口径」的仿射逆变换，并施加到整段反投几何
+    /* 地图框线与实际坐标保持固定。window.__runyeMapFramePoly 保存
+       地图坐标口径的地块顶点（只在地图回传 / 设为当前 / 读存档处写入）；
+       这里按顶点对应关系反解「当前设计坐标 → 地图坐标」的仿射逆变换，并施加到整段反投几何
        （地块框线 + 总管/主管/支管 + 水源 + 阀门 + 滴灌带），使管线与框线始终同坐标系。
        无基准（旧存档 / 手画矩形 / 图片测量）时 fInv=null，完全退化为改动前行为。 */
     var fInv=(function(){
@@ -4913,6 +4844,25 @@ function tlAutoGenerate(options) {
   /* v170c：options.stay 为真时不跳视图 —— AE 订阅（front 平移→重建简图）每帧触发本函数，
      若每次都 tlShowWorkspace 会把用户从简图视图强行切走（且拖动中每帤 rySetTab）。其余调用方不传 stay，行为不变。 */
   if(!options.stay){ try{ tlShowWorkspace(); }catch(e){} }
+  try{
+    var generationInputSignature=window.ryDrawingDesignGenerationInputSignature;
+    var groupEdit=window.__runyeGroupEdit;
+    if(typeof generationInputSignature==='function'&&!(groupEdit&&groupEdit.active)){
+      window.tlDiagramData.sourceSignature=generationInputSignature();
+      if(typeof window.ryCommitSingleLevel3CanonicalFromRuntime==='function'){
+        var committed=window.ryCommitSingleLevel3CanonicalFromRuntime();
+        if(committed!==true&&window.__runyeSingleCanonicalDesign){
+          var restored=typeof window.ryRestoreSingleLevel3CanonicalRuntime==='function'&&
+            window.ryRestoreSingleLevel3CanonicalRuntime()===true;
+          var commitError=new Error(restored
+            ?'规范绘图模型拒绝三级生成结果，已恢复最后有效状态'
+            :'规范绘图模型拒绝三级生成结果，且无法恢复最后有效状态');
+          commitError.canonicalCommitRejected=true;
+          throw commitError;
+        }
+      }
+    }
+  }catch(eSignature){if(eSignature&&eSignature.canonicalCommitRejected)throw eSignature;}
   console.log('[tlAutoGenerate] SVG generated successfully');
   } catch(err) {
     console.error('[tlAutoGenerate] Error:', err);
@@ -4927,6 +4877,279 @@ function tlAutoGenerate(options) {
 }
 
 /* 导出平面图时的 SVG 序列化统一入口。 */
+/* 最终出图旋转：只对三级简图的 SVG 展示/导出做变换，不改设计坐标或业务几何。
+   [2026-10-27 第二轮·按用户反馈收窄] 旋转范围 = 地块内容 + 指北针，其余（标题/
+   信息行/备注/图例/图框）不转 —— 详见 tlApplyOutputRotation 头注释。 */
+/* ── 文字反向补偿（2026-10-27 用户确认「文字反向补偿、始终保持水平可读」）────────
+   旋转 θ 后，受转文字绕自身锚点反向转回，任何角度下正立可读。
+   ⚠ 不用 getCTM()：实测 #tlDiagramContent 处于 display:none 时 Chrome 返回的矩阵
+   不含祖先变换（测出 deg≈0 → 全部误跳过，文字跟着图斜）。改为纯解析式计算：
+   从 text 节点沿祖先链一路复合到 svg 根（θ 已直接落在 #tlPlotGroup/#tlNorthGroup
+   的 transform 上，链内自然含 θ），总朝向归零、锚点不动。
+   [第四轮·用户确认] 带 data-tl-dim 的尺寸标注文字跳过补偿——按自身尺寸线定位，
+   随地块旋转、不做水平调整。
+   原始 transform 存 data-tl-otf；复位/重调先整体还原再重算，天然幂等。 */
+function tlParseTfStr(str){
+  if(!str)return {a:1,b:0,c:0,d:1,e:0,f:0};
+  var m={a:1,b:0,c:0,d:1,e:0,f:0};
+  var re=/(matrix|translate|rotate|scale)\s*\(([^)]*)\)/g,t;
+  while((t=re.exec(str))){
+    var s=t[2].trim().split(/[\s,]+/),n={a:1,b:0,c:0,d:1,e:0,f:0};
+    if(t[1]==='matrix'){n={a:+s[0],b:+s[1],c:+s[2],d:+s[3],e:+s[4]||0,f:+s[5]||0};}
+    else if(t[1]==='translate'){n={a:1,b:0,c:0,d:1,e:+s[0]||0,f:s.length>1?+s[1]:0};}
+    else if(t[1]==='scale'){n={a:+s[0]||1,b:0,c:0,d:s.length>1?+s[1]:(+s[0]||1),e:0,f:0};}
+    else if(t[1]==='rotate'){
+      var r=(+s[0]||0)*Math.PI/180,co=Math.cos(r),si=Math.sin(r);
+      if(s.length>2){var cx=+s[1],cy=+s[2];n={a:co,b:si,c:-si,d:co,e:cx-cx*co+cy*si,f:cy-cx*si-cy*co};}
+      else n={a:co,b:si,c:-si,d:co,e:0,f:0};
+    }
+    m={a:m.a*n.a+m.c*n.b,b:m.b*n.a+m.d*n.b,c:m.a*n.c+m.c*n.d,d:m.b*n.c+m.d*n.d,
+       e:m.a*n.e+m.c*n.f+m.e,f:m.b*n.e+m.d*n.f+m.f};
+  }
+  return m;
+}
+function tlTextCompRestore(svg){
+  var list=svg.querySelectorAll('text[data-tl-otf]');
+  for(var i=0;i<list.length;i++){
+    var el=list[i],o=el.getAttribute('data-tl-otf');
+    if(o)el.setAttribute('transform',o);else el.removeAttribute('transform');
+    el.removeAttribute('data-tl-otf');
+  }
+}
+function tlTextCompensate(svg,angle){
+  tlTextCompRestore(svg);
+  /* θ=0 只还原不补偿：沿线尺寸文字的固有倾角是原始出图习惯，无旋转时必须原样保留 */
+  if(!angle)return;
+  /* θ 已直接落在 #tlPlotGroup / #tlNorthGroup 的 transform 上（无 wrapper 组），
+     故沿祖先链一路复合到 svg 根（含 θ），总朝向归零即可：
+     地外文字（标题/信息/备注/图例/图框）链上无旋转 → c=0 自动跳过，零开销。 */
+  var texts=svg.querySelectorAll('text');
+  for(var i=0;i<texts.length;i++){
+    var el=texts[i],old=el.getAttribute('transform');
+    /* [第四轮·用户确认] 尺寸标注文字（data-tl-dim）不做水平补偿：
+       按自身尺寸线定位、随地块一起转，与尺寸线相对关系不变。 */
+    if(el.hasAttribute&&el.hasAttribute('data-tl-dim'))continue;
+    var A={a:1,b:0,c:0,d:1,e:0,f:0},p=el.parentNode;
+    while(p&&p.nodeType===1&&p.tagName.toLowerCase()!=='svg'){
+      var pa=tlParseTfStr(p.getAttribute&&p.getAttribute('transform'));
+      if(pa)A={a:A.a*pa.a+A.c*pa.b,b:A.b*pa.a+A.d*pa.b,c:A.a*pa.c+A.c*pa.d,d:A.b*pa.c+A.d*pa.d,
+               e:A.a*pa.e+A.c*pa.f+A.e,f:A.b*pa.e+A.d*pa.f+A.f};
+      p=p.parentNode;
+    }
+    var O=tlParseTfStr(old);
+    var ax=parseFloat(el.getAttribute('x'))||0,ay=parseFloat(el.getAttribute('y'))||0;
+    /* 锚点在父系坐标（own transform 作用域）：p = O·(x,y) */
+    var px=O.a*ax+O.c*ay+O.e,py=O.b*ax+O.d*ay+O.f;
+    /* 文字当前总朝向：祖先链 × own 的线性部分 */
+    var L={a:A.a*O.a+A.c*O.b,b:A.b*O.a+A.d*O.b,c:A.a*O.c+A.c*O.d,d:A.b*O.c+A.d*O.d,e:0,f:0};
+    var c=-Math.atan2(L.b,L.a)*180/Math.PI;
+    if(!isFinite(px)||!isFinite(py)||!isFinite(c))continue;
+    if(Math.abs(c)<0.05)continue;                /* 本来就水平 → 不动 */
+    el.setAttribute('data-tl-otf',old||'');
+    el.setAttribute('transform','rotate('+c.toFixed(2)+' '+px.toFixed(2)+' '+py.toFixed(2)+')'+(old?' '+old:''));
+  }
+}
+/* [2026-10-27 第二轮·按用户反馈收窄] 只转「地块内容 + 指北针」：
+   · #tlPlotGroup 绕图面中心转 θ（地块/分区/管线/阀门/水源/尺寸标注/最不利路径 随转）；
+   · #tlNorthGroup 绕自身圆心叠转 θ（停在右上角原位，针向跟随地块旋转，真北不丢）；
+   · 标题 tlTitleGroup / 信息行 tlHeaderGroup / 底部备注 tlParamsGroup / 图例 tlLegendGroup /
+     图框 tlFrameGroup —— 一律不转。
+   实现不包 wrapper 组、不改 z 序：直接在两组 transform 前置旋转（data-tl-rotf 存原值），
+   文字反向补偿改为「祖先链一路复合到 svg 根、总朝向归零」的通用式。 */
+function tlApplyOutputRotation(angle, persist){
+  var host=document.getElementById('tlDiagramContent');
+  var svg=host&&host.querySelector('svg');
+  if(!svg)return false;
+  var plot=svg.querySelector('#tlPlotGroup');
+  var north=svg.querySelector('#tlNorthGroup');
+  if(!plot&&!north)return false;
+  var original=svg.getAttribute('data-tl-original-viewbox')||svg.getAttribute('viewBox');
+  if(!original)return false;
+  svg.setAttribute('data-tl-original-viewbox',original);
+  var vb=original.trim().split(/[\s,]+/).map(Number);
+  if(vb.length!==4||vb.some(function(n){return !isFinite(n);})||vb[2]<=0||vb[3]<=0)return false;
+  angle=((Number(angle)||0)%360+360)%360;
+  if(angle>180)angle-=360;
+  /* 先整体还原（文字 + 两组 transform），再按新角度重算 —— 幂等 */
+  tlTextCompRestore(svg);
+  [plot,north].forEach(function(g){
+    if(!g)return;
+    if(g.hasAttribute('data-tl-rotf')){
+      var o=g.getAttribute('data-tl-rotf');
+      if(o)g.setAttribute('transform',o);else g.removeAttribute('transform');
+      g.removeAttribute('data-tl-rotf');
+    }
+  });
+  /* 图面平移（2026-10-27 用户「强迫症」需求）：#tlPlotGroup 整体微移，指北针留在角落不动。
+     步长 = 当前 viewBox 尺寸的 0.5%/次，钳位 ±15% 防止把图面挪丢；存 localStorage 与角度同口径。 */
+  var shift=(function(){try{return{x:Number(localStorage.getItem('tlOutputShiftX'))||0,y:Number(localStorage.getItem('tlOutputShiftY'))||0};}catch(e){return{x:0,y:0};}})();
+  var hasShift=shift.x!==0||shift.y!==0;
+  if(angle||hasShift){
+    var cx=vb[0]+vb[2]/2,cy=vb[1]+vb[3]/2,rad=(angle||0)*Math.PI/180;
+    var c=Math.cos(rad),s=Math.sin(rad);
+    var corners=[[vb[0],vb[1]],[vb[0]+vb[2],vb[1]],[vb[0]+vb[2],vb[1]+vb[3]],[vb[0],vb[1]+vb[3]]].map(function(p){
+      var dx=p[0]-cx,dy=p[1]-cy;
+      return [cx+dx*c-dy*s+shift.x,cy+dx*s+dy*c+shift.y];
+    });
+    var xs=corners.map(function(p){return p[0];}),ys=corners.map(function(p){return p[1];});
+    var minX=Math.min.apply(null,xs),maxX=Math.max.apply(null,xs),minY=Math.min.apply(null,ys),maxY=Math.max.apply(null,ys);
+    svg.setAttribute('viewBox',[minX,minY,maxX-minX,maxY-minY].join(' '));
+    if(plot){
+      var tf='';
+      if(hasShift)tf+='translate('+shift.x.toFixed(2)+' '+shift.y.toFixed(2)+')';
+      if(angle)tf+=(tf?' ':'')+'rotate('+angle+' '+cx+' '+cy+')';
+      plot.setAttribute('data-tl-rotf',plot.getAttribute('transform')||'');
+      plot.setAttribute('transform',tf+(plot.getAttribute('transform')?' '+plot.getAttribute('transform'):''));
+    }
+    if(north&&angle){
+      /* 指北针绕自身圆心叠转：圆心从既有 rotate(a cx cy) 解析；tlNrot=0 时无 transform，
+         回退到生成器常量 (svgW-96, 82)（见 tlNorthGroup 段注释，改版式需同步）。
+         平移不影响指北针——它固定在右上角原位。 */
+      var nm=tlParseTfStr(north.getAttribute('transform'));
+      var nx,nxok=false;
+      if(nm&&(nm.a!==1||nm.b!==0)){
+        var deg0=Math.atan2(nm.b,nm.a)*180/Math.PI;
+        /* 圆心 = 既有旋转不动点：解 (I−R)·p = t（纯旋转时精确解）
+           M=[[1−co,si],[−si,1−co]]，p = M⁻¹·t ⇒ px=[(1−co)e−si·f]/det，py=[si·e+(1−co)f]/det */
+        var co=Math.cos(deg0*Math.PI/180),si=Math.sin(deg0*Math.PI/180);
+        var det=(1-co)*(1-co)+si*si;
+        if(Math.abs(det)>1e-9){
+          nx=[((1-co)*nm.e-si*nm.f)/det,(si*nm.e+(1-co)*nm.f)/det];
+          nxok=true;
+        }
+      }
+      if(!nxok)nx=[vb[2]-96,82];
+      var degN=(nm&&(nm.a!==1||nm.b!==0)?Math.atan2(nm.b,nm.a)*180/Math.PI:0)+angle;
+      north.setAttribute('data-tl-rotf',north.getAttribute('transform')||'');
+      north.setAttribute('transform','rotate('+degN.toFixed(2)+' '+nx[0].toFixed(2)+' '+nx[1].toFixed(2)+')');
+    }
+  }else svg.setAttribute('viewBox',original);
+  tlTextCompensate(svg,angle||hasShift?1:0);
+  if(persist!==false){try{localStorage.setItem('tlOutputRotationDeg',String(angle));}catch(e){}}
+  return true;
+}
+
+/* 细调角度 UI 同步（2026-10-27）：数字框 ±180° 精确输入；
+   [第五轮·用户反馈] 滑块已取消，只留数字框。 */
+function tlRotSyncUI(){
+  var cur=0;try{cur=Number(localStorage.getItem('tlOutputRotationDeg'))||0;}catch(e){}
+  var num=document.getElementById('tlRotNum');
+  if(num)num.value=String(cur);
+}
+window.tlRotSyncUI=tlRotSyncUI;
+/* ── 悬浮卡任意拖动（2026-10-27 第五轮·用户需求）──────────────────────────
+   「图面调整」标签即拖拽手柄；位置存 tlRotFinePos（相对图区左上角 px），
+   显示时恢复并钳位在图区内。 */
+function tlRotFineRestorePos(){
+  var fine=document.getElementById('tlRotFine'),wrap=document.getElementById('tlDiagramWrap');
+  if(!fine||!wrap)return;
+  var pos=null;
+  try{pos=JSON.parse(localStorage.getItem('tlRotFinePos')||'null');}catch(e){}
+  if(!pos||typeof pos.x!=='number'||typeof pos.y!=='number')return;
+  var fw=fine.offsetWidth||0,fh=fine.offsetHeight||0;
+  var x=Math.max(0,Math.min((wrap.clientWidth||0)-fw,pos.x));
+  var y=Math.max(0,Math.min((wrap.clientHeight||0)-fh,pos.y));
+  fine.style.left=x+'px';fine.style.top=y+'px';fine.style.right='auto';
+}
+window.tlRotFineRestorePos=tlRotFineRestorePos;
+/* ── 图面平移（上下左右微移）──────────────────────────────────────────────
+   步长 0.5% viewBox 尺寸/次、钳位 ±15%；只动 #tlPlotGroup，指北针/装饰组不动；
+   存 tlOutputShiftX/Y，与旋转共用 tlApplyOutputRotation 一条链（重生成/打印/导出同源）。 */
+window.tlNudgeOutput=function(dx,dy){
+  var svgHost=document.getElementById('tlDiagramContent');
+  var svg=svgHost&&svgHost.querySelector('svg');
+  if(!svg)return;
+  var vb=(svg.getAttribute('viewBox')||'').trim().split(/[\s,]+/).map(Number);
+  if(vb.length!==4||vb.some(function(n){return !isFinite(n);}))return;
+  var stepX=vb[2]*0.005,stepY=vb[3]*0.005,limX=vb[2]*0.15,limY=vb[3]*0.15;
+  var cur={x:0,y:0};
+  try{cur.x=Number(localStorage.getItem('tlOutputShiftX'))||0;cur.y=Number(localStorage.getItem('tlOutputShiftY'))||0;}catch(e){}
+  var nx=Math.max(-limX,Math.min(limX,cur.x+dx*stepX));
+  var ny=Math.max(-limY,Math.min(limY,cur.y+dy*stepY));
+  try{localStorage.setItem('tlOutputShiftX',String(+nx.toFixed(2)));localStorage.setItem('tlOutputShiftY',String(+ny.toFixed(2)));}catch(e){}
+  var ang=0;try{ang=Number(localStorage.getItem('tlOutputRotationDeg'))||0;}catch(e){}
+  tlApplyOutputRotation(ang,false);
+};
+window.tlOutputShiftReset=function(){
+  try{localStorage.removeItem('tlOutputShiftX');localStorage.removeItem('tlOutputShiftY');}catch(e){}
+  var ang=0;try{ang=Number(localStorage.getItem('tlOutputRotationDeg'))||0;}catch(e){}
+  tlApplyOutputRotation(ang,false);
+};
+(function bindTlOutputRotation(){
+  var tabs=document.getElementById('tlTabs');
+  if(tabs&&!tabs.__tlOutputRotationBound){
+    tabs.__tlOutputRotationBound=true;
+    tabs.addEventListener('click',function(e){
+      var button=e.target.closest&&e.target.closest('[data-tl-output-rotate]');
+      if(!button)return;
+      e.preventDefault();e.stopPropagation();
+      var delta=Number(button.getAttribute('data-tl-output-rotate'))||0;
+      var current=0;try{current=Number(localStorage.getItem('tlOutputRotationDeg'))||0;}catch(err){}
+      tlApplyOutputRotation(delta===0?0:current+delta,true);
+      tlRotSyncUI();
+    });
+    /* 图面平移：方向微移按钮 + 位置复位按钮。
+       [第三轮] 细调控件已移到图区右上角悬浮卡 #tlRotFine（不在 #tlTabs 内），
+       委托挂在悬浮卡自己身上。 */
+    var rotFine=document.getElementById('tlRotFine');
+    if(rotFine&&!rotFine.__tlShiftBound){
+      rotFine.__tlShiftBound=true;
+      rotFine.addEventListener('click',function(e){
+        var nudge=e.target.closest&&e.target.closest('[data-tl-nudge]');
+        if(nudge){
+          e.preventDefault();e.stopPropagation();
+          var d=nudge.getAttribute('data-tl-nudge').split(',').map(Number);
+          window.tlNudgeOutput(d[0]||0,d[1]||0);
+          return;
+        }
+        var rst=e.target.closest&&e.target.closest('[data-tl-shift-reset]');
+        if(rst){
+          e.preventDefault();e.stopPropagation();
+          window.tlOutputShiftReset();
+        }
+      });
+      /* 拖拽手柄：按住「图面调整」标签拖动整卡，松手记忆位置（钳位在图区内） */
+      var handle=document.getElementById('tlRotFineHandle');
+      if(handle){
+        handle.addEventListener('mousedown',function(e){
+          if(e.button!==0)return;
+          e.preventDefault();
+          var wrap=document.getElementById('tlDiagramWrap');
+          if(!wrap)return;
+          var wr=wrap.getBoundingClientRect(),fr=rotFine.getBoundingClientRect();
+          var ox=e.clientX-fr.x,oy=e.clientY-fr.y;
+          function mv(ev){
+            var x=Math.max(0,Math.min(wr.width-fr.width,ev.clientX-wr.left-ox));
+            var y=Math.max(0,Math.min(wr.height-fr.height,ev.clientY-wr.top-oy));
+            rotFine.style.left=x+'px';rotFine.style.top=y+'px';rotFine.style.right='auto';
+          }
+          function up(){
+            document.removeEventListener('mousemove',mv);
+            document.removeEventListener('mouseup',up);
+            try{localStorage.setItem('tlRotFinePos',JSON.stringify({x:parseFloat(rotFine.style.left)||0,y:parseFloat(rotFine.style.top)||0}));}catch(e){}
+          }
+          document.addEventListener('mousemove',mv);
+          document.addEventListener('mouseup',up);
+        });
+      }
+    }
+  }
+  /* 细调角度数字框：change 精确落库。[第五轮] 滑块已取消。只绑一次。 */
+  if(!window.__tlRotFineBound){
+    var num=document.getElementById('tlRotNum');
+    if(num){
+      window.__tlRotFineBound=true;
+      num.addEventListener('change',function(){
+        var v=Number(num.value)||0;
+        if(v>180)v=180;if(v<-180)v=-180;
+        num.value=String(v);
+        tlApplyOutputRotation(v,true);
+        tlRotSyncUI();
+      });
+    }
+  }
+})();
+
 function tlExportSvgString(ctn){
   var svgEl=ctn?ctn.querySelector('svg'):null;
   if(!svgEl)return tlDiagramSVG;
@@ -5126,7 +5349,8 @@ function tlInitDrag(){
   }
   function tlNodeDragMove(ev){
     if(!nodeDrag)return;
-    var dpx=(nodeDrag.axis==='V')?(ev.clientY-nodeDrag.y0):(ev.clientX-nodeDrag.x0);
+    var dx=ev.clientX-nodeDrag.x0,dy=ev.clientY-nodeDrag.y0;
+    var dpx=dx*nodeDrag.ux+dy*nodeDrag.uy;
     var dsvg=dpx*nodeDrag.scale;                                  /* 屏幕像素 → SVG 用户单位 */
     var dm=(nodeDrag.mps>0)?(dsvg/nodeDrag.mps):0;                /* SVG 单位 → 米（沿主管方向） */
     var off=nodeDrag.off+dm;
@@ -5136,7 +5360,7 @@ function tlInitDrag(){
     var dsvg2=(off-nodeDrag.off)*(nodeDrag.mps>0?nodeDrag.mps:0);
     var gs=document.querySelectorAll('[data-junction-key="'+nodeDrag.key+'"]');
     for(var i=0;i<gs.length;i++){
-      gs[i].setAttribute('transform',(nodeDrag.axis==='V')?('translate(0,'+dsvg2.toFixed(1)+')'):('translate('+dsvg2.toFixed(1)+',0)'));
+      gs[i].setAttribute('transform','translate('+(nodeDrag.ux*dsvg2).toFixed(1)+','+(nodeDrag.uy*dsvg2).toFixed(1)+')');
     }
   }
   function tlNodeDragUp(){
@@ -5205,6 +5429,8 @@ function tlInitDrag(){
                 off:parseFloat(jEl.getAttribute('data-junction-off'))||0,
                 max:parseFloat(jEl.getAttribute('data-junction-max'))||0,
                 axis:jEl.getAttribute('data-junction-axis')||'V',
+                ux:isFinite(parseFloat(jEl.getAttribute('data-junction-ux')))?parseFloat(jEl.getAttribute('data-junction-ux')):((jEl.getAttribute('data-junction-axis')==='H')?1:0),
+                uy:isFinite(parseFloat(jEl.getAttribute('data-junction-uy')))?parseFloat(jEl.getAttribute('data-junction-uy')):((jEl.getAttribute('data-junction-axis')==='V')?1:0),
                 mps:parseFloat(jEl.getAttribute('data-junction-mps'))||0,
                 x0:e.clientX,y0:e.clientY,scale:getScale(),cur:0};
       document.body.style.userSelect='none';
@@ -5531,10 +5757,25 @@ function rySetTab(sectionId, view) {
     for (var i = 0; i < btns.length; i++) {
       btns[i].classList.toggle('active', btns[i].getAttribute('data-ry-view') === view);
     }
+    var outputRotators=bar.querySelectorAll('[data-tl-output-rotate]');
+    for(var ri=0;ri<outputRotators.length;ri++)outputRotators[ri].style.display=view==='pipe'?'':'none';
+    /* [2026-10-27] 细调角度控件与档位按钮同进同出；切进 pipe 视图时顺带把滑块/
+       数字框对齐到当前已存角度（重新生成简图后角度从 localStorage 恢复，UI 要跟上）。 */
+    var rotFine=document.getElementById('tlRotFine');
+    if(rotFine){
+      rotFine.style.display=view==='pipe'?'inline-flex':'none';
+      if(view==='pipe'){
+        if(typeof tlRotSyncUI==='function')tlRotSyncUI();
+        /* 显示时恢复用户拖放的位置（钳位在图区内） */
+        if(typeof tlRotFineRestorePos==='function')tlRotFineRestorePos();
+      }
+    }
   }
   /* 目标功能区若未激活（如从顶部导航直接点「⚙️ 生成系统图」），先切过去 */
+  var _ryTabActivatedSection = false;
   if (typeof window.ryShowSection === 'function' && !sec.classList.contains('ry-active')) {
     window.ryShowSection(sec, null);
+    _ryTabActivatedSection = true;
   }
   if (typeof window.ryStatusUpdate === 'function') window.ryStatusUpdate(sec);
   /* 三级管路切到「三级系统图」时自动内嵌渲染一次
@@ -5573,7 +5814,6 @@ function rySetTab(sectionId, view) {
     }
     /* 工具栏显隐：无图时也显示，但只露「生成管线图」（第四十三轮） */
     try { tlWsBarSync(); } catch (e) { }
-    try { if (typeof window.tlRefreshGroupPanel === 'function') window.tlRefreshGroupPanel(); } catch (e) { }
     }
   }
   /* 三级管路切到「三级简图」(pipe)：图例重新定位（默认贴图框右上内缩；
@@ -5584,7 +5824,11 @@ function rySetTab(sectionId, view) {
     if (lgNode && !_tlLegendUserPos) tlPositionLegendInsideFrame(document.getElementById('tlDiagramContent'), lgNode);
   }
   /* 面板由隐藏变可见后，画布 / 图纸需按新容器尺寸重绘 */
-  try { window.dispatchEvent(new Event('resize')); } catch (e) { }
+  /* ryShowSection 已在下一帧安排画布重算；避免同一次切页再同步派发一次 resize，
+     否则从其他功能区切入二级页会让画布连续完整重绘两次。 */
+  if (!_ryTabActivatedSection) {
+    try { window.dispatchEvent(new Event('resize')); } catch (e) { }
+  }
 }
 
 /* 三级系统图：切到「三级系统图」Tab 并在 iframe 内渲染 */
@@ -5637,7 +5881,6 @@ document.querySelectorAll('#tlZoneCountGroup button').forEach(function(btn){
       try { if (window.tlPersistManualGroups) window.tlPersistManualGroups(); } catch(e){}
     }
     tlUpdatePlanBar();
-    try { if (typeof window.tlRefreshGroupPanel === 'function') window.tlRefreshGroupPanel(); } catch (e) { }
     /* 2026-09-16：联合灌溉区数 N 改变 → 联合灌溉分组色带同步。
        分组色带画在「三级简图」源头（本生成器），而工作区底图 = 简图克隆，
        故 N 变必须重生成简图，两处色带才能同步；未生成过简图（无 polygon）时仅刷新图例。 */
@@ -5656,8 +5899,9 @@ document.querySelectorAll('#tlZoneCountGroup button').forEach(function(btn){
     }
   });
 });
-/* v98 手动分区成组：入口改为右侧「联合灌溉分组」面板（#tlGroupPanel），见下方 tlRefreshGroupPanel / 面板接线 IIFE。
-   原工具轨「✎分区成组 / ✓成组 / ↺自动均分」三按钮已移除（避免两套入口混淆）。 */
+/* [2026-10-27] v98 手动分区成组整链已取消（面板 #tlGroupPanel + tlRefreshGroupPanel /
+   面板接线 IIFE 均删）；分区只按「预设 1/2/3/4 区 + 面积亩组合 tlGroupByArea」两条原则执行。
+   原工具轨「✎分区成组 / ✓成组 / ↺自动均分」三按钮更早已移除（避免两套入口混淆）。 */
 // Plan bar inputs
 /* 2026-09-16 面板「总管长度」输入已取消：其 input/change 两个监听一并删除（元素不存在
    会 getElementById→null→TypeError 中断整段脚本，见删除控件的守卫纪律） */

@@ -26,7 +26,9 @@
   var body=directChild(sec,'pp-body');
   if(!body) return;
   var side=directChild(body,'pp-side');
-  var stage=directChild(body,'pp-stage');
+  /* 初始活动页可能是三级：共享宿主此时在三级 .pp-body，二级 body 暂时没有
+     .pp-stage。仍要先装好二级拖拽条，稍后宿主切回二级时由网格列接管。 */
+  var stage=directChild(body,'pp-stage')||document.getElementById('ryDrawingHost');
   var tool=document.getElementById('ppToolbar');
   if(!side||!stage||!tool) return;
 
@@ -53,7 +55,8 @@
     return Math.max(MIN_SIDE,Math.min(MAX_SIDE,inner-10-CANVAS_MIN));
   }
   function maxTool(){
-    return Math.max(MIN_TOOL,Math.min(MAX_TOOL,stage.clientWidth-10-CANVAS_MIN));
+    var host=document.getElementById('ryDrawingHost')||directChild(body,'pp-stage')||stage;
+    return Math.max(MIN_TOOL,Math.min(MAX_TOOL,host.clientWidth-10-CANVAS_MIN));
   }
   function applySide(px){ if(px==null) sec.style.removeProperty('--pp-side-w'); else sec.style.setProperty('--pp-side-w',px+'px'); }
   function applyTool(px){ if(px==null) sec.style.removeProperty('--pp-tool-w'); else sec.style.setProperty('--pp-tool-w',px+'px'); }
@@ -83,16 +86,12 @@
   }
   var gripSide=makeGrip('pp-grip-side','拖动调整参数栏宽度 · 双击恢复默认');
   var gripTool=makeGrip('pp-grip-tool','拖动调整工具条宽度 · 双击恢复默认');
-  body.insertBefore(gripSide,stage);      /* 插在参数栏与图纸区之间（列 2） */
-  /* 工具轨拖拽条要挂在「真正承载网格的那一层」。
-     Tab 改造后工具条被包进 .ry-pane-edit（网格也随之下移），若仍挂在 .pp-stage，
-     它会成为 .pp-stage 竖向 flex 里的一个 0 高度项 → 既看不见也 hover 不到，
-     工具轨宽度就拖不动了。找到 .ry-pane-edit 就挂进去，找不到则维持原行为。 */
-  var paneEdit=null;
-  for(var pi=0;pi<stage.children.length;pi++){
-    var ch=stage.children[pi];
-    if(ch.classList&&ch.classList.contains('ry-pane-edit')){ paneEdit=ch; break; }
-  }
+  if(stage&&stage.parentNode===body) body.insertBefore(gripSide,stage);
+  else body.appendChild(gripSide);        /* 宿主暂在三级时，先留在二级网格第 2 列 */
+  /* 共用宿主后，外层 .pp-stage 是跨功能区移动的网格项；二级工具轨仍属于
+     partition 渲染层中的 .ry-pane-edit，因此把拖拽条挂到实际网格容器。 */
+  var ppLayer=stage.querySelector('[data-ry-drawing-layer="partition"]')||stage;
+  var paneEdit=ppLayer.querySelector('.ry-pane-edit');
   (paneEdit||stage).appendChild(gripTool); /* 插在画布列与工具轨之间（列 2） */
 
   var EV=window.PointerEvent

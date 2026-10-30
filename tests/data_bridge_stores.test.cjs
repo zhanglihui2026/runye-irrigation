@@ -748,6 +748,8 @@ test('map partition capture rolls the network snapshot back when the plot-librar
     __runyeGeoBase: { refLat: 0, refLng: 0 },
     RunyeBridge: {
       state: { cutSnap: { sig: '' }, cutOverrides: { x: {}, y: {} }, zoneRotated: false },
+      getPartitionState() { return this.state; },
+      getPlotPolygon() { return []; },
       getZoneCuts() { return null; }
     },
     document: { getElementById() { return null; } }
@@ -839,6 +841,8 @@ test('map partition rollback preserves a newer network snapshot from another wri
     __runyeGeoBase: { refLat: 0, refLng: 0 },
     RunyeBridge: {
       state: { cutSnap: { sig: '' }, cutOverrides: { x: {}, y: {} }, zoneRotated: false },
+      getPartitionState() { return this.state; },
+      getPlotPolygon() { return []; },
       getZoneCuts() { return null; }
     },
     document: { getElementById() { return null; } }

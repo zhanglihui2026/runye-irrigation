@@ -169,6 +169,15 @@
     var placeCancelled = false;
     function placeWhenVisible(sl, st, tries) {
       if (placeCancelled) return;
+      /* [v776 修复] 等待条件补上「面板自身还不可见」：clampToViewport 面板 bounds=null，
+         旧条件短路 —— 区块仍 display:none（共享宿主未挂载）时 rect 全 0，夹紧失效，
+         面板被钉到视口右缘外，表现为「挤在边上、拖不动、展不开」。
+         自身 rect.width<50 同样视为未就绪，等宿主挂载、布局成型后再落位。 */
+      var selfReady = rootEl.getBoundingClientRect().width >= 50;
+      if (selfReady === false && tries > 0) {
+        setTimeout(function () { placeWhenVisible(sl, st, tries - 1); }, 200);
+        return;
+      }
       if (bounds && (bounds.clientWidth < 50 || bounds.clientHeight < 50) && tries > 0) {
         setTimeout(function () { placeWhenVisible(sl, st, tries - 1); }, 200);
         return;

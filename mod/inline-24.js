@@ -174,17 +174,34 @@
      （2026-09-28 用户：按钮前缀图标取消，纯文字更简洁）。 */
   function drawMultiBtn(on){
     if(!multiBtn) return;
-    multiBtn.classList.toggle('active', !!on);
-    multiBtn.setAttribute('aria-pressed', on?'true':'false');
-    multiBtn.textContent = on ? '多选中 · 点此退出' : '多选管道';
-    multiBtn.title = on
-      ? '多选已开启：点管身逐段加选（同类型），再点已选段取消该段；点空白清空全部；点本按钮退出多选'
-      : '多选管道：开启后点管身即可逐段加选（同类型），选中后旁边弹出信息卡可改管径、看长度累加；Ctrl/⌘ + 点管身可直接加选（无需开启）';
+    /* [v797 合并多选] 用户要求：「管道多选按钮 跟标注多选按钮 合并成一个，功能就是
+       多选功能」。按钮态 = 联合状态（管道多选 或 标注多选 任一开启即高亮）；
+       标注侧变化经 tlMultiSyncUI（inline-25 drawM 回灌）走到这里统一渲染。 */
+    var pipeOn = (typeof on==='boolean') ? on : !!(window.RyTlWs && RyTlWs.isMultiMode && RyTlWs.isMultiMode());
+    var unified = pipeOn || !!window._tlDimMulti;
+    multiBtn.classList.toggle('active', !!unified);
+    multiBtn.setAttribute('aria-pressed', unified?'true':'false');
+    multiBtn.textContent = unified ? '多选中 · 点此退出' : '多选';
+    multiBtn.title = unified
+      ? '多选已开启：点管身逐段加选管道（同类型），点尺寸线逐条加选标注；再点已选对象取消该段；点空白清空管道选择；点本按钮退出并清空两侧选择'
+      : '多选：开启后点管身逐段加选管道（同类型），点尺寸线逐条加选标注；选中后旁边弹出信息卡可改管径、看长度累加；Ctrl/⌘ + 点管身可直接加选（无需开启）';
   }
   window.tlWsMultiToggle=function(){
     if(!window.RyTlWs || !RyTlWs.setMultiMode) return;
     RyTlWs.setMultiMode(!RyTlWs.isMultiMode());
   };
+  /* [v797 合并多选] 统一入口：任一已开 → 全关（清空两侧选择集）；全关 → 全开。
+     点管身加选管道、点尺寸线加选标注，两侧交互各自不变。 */
+  window.tlMultiToggle=function(){
+    var pipeOn = !!(window.RyTlWs && RyTlWs.isMultiMode && RyTlWs.isMultiMode());
+    var dimOn = !!window._tlDimMulti;
+    var target = !(pipeOn || dimOn);
+    if(window.RyTlWs && RyTlWs.setMultiMode) RyTlWs.setMultiMode(target);
+    if(!!window._tlDimMulti !== target){
+      if(typeof window.tlDimMultiToggle==='function'){ try{ window.tlDimMultiToggle(); }catch(e){} }
+    }
+  };
+  window.tlMultiSyncUI=function(){ try{ drawMultiBtn(); }catch(e){} };
   /* v162：管道遮蔽开关（2026-09-29 用户要求）—— 与 drawMultiBtn 同一套路：按钮态由
      RyTlWs.onMaskMode 回推（进画线/配件插入/多选时工作区内部会自动退出遮蔽模式，
      页面不能只认自己那次点击）。文案写「动作」：未开 →「遮蔽管道」，已开 →「遮蔽中 · 点此退出」。 */

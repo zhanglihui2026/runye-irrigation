@@ -18,14 +18,14 @@
 
   /* ---------- 2. 底部状态栏 ---------- */
   var NAMES={designInput:'标准分区预设',areaTool:'地块绘制',
-             pipePlanSection:'地块分区',tlPipePlanSection:'管路规划',detailsSection:'材料清单',
+             pipePlanSection:'分区与管路 · 地块分区',tlPipePlanSection:'分区与管路 · 管路规划',detailsSection:'材料清单',
              threeDModelingSection:'经济指标分析',parametricModelingSection:'数字化建模',
              filterSystemSection:'过滤系统'};
   var HINTS={
     designInput:'调整左侧参数，方案与管径选型结果实时更新',
     areaTool:'上传图片或在线地图描绘地块边界，闭合后自动回填面积',
-    pipePlanSection:'绘制主管 / 支管 → 生成施工图；二级简图入口暂时停用',
-    tlPipePlanSection:'设定联合灌溉分区 → 生成管线图 → 「三级制图」可缩放/插入管线',
+    pipePlanSection:'调整分区与地块内管线，再在制图区上方切换到管路规划',
+    tlPipePlanSection:'生成管线图后编辑管线；在制图区上方可返回地块分区',
     detailsSection:'材料清单与工程量汇总',
 threeDModelingSection:'经济指标分析 · 入口预留（方案确定后上线）',
     parametricModelingSection:'数字化建模 · 入口预留（方案确定后上线）',

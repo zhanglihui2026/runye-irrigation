@@ -2,6 +2,7 @@
 // ===== 地块库：保存/召回多个实际地块（localStorage 数组，不覆盖） =====
 (function(){
   window.currentPlotId=null;
+  var groupSelection=Object.create(null);
   function readLibState(){
     var store=window.RyPlotLibraryStore;
     return store?store.read():{ok:false,error:'plot-library-store-unavailable'};
@@ -18,6 +19,66 @@
   // 加 try 是为了「提示失败不能中断后续流程」—— 例如 setCurrent 里提示之后还要跳转二级管路制图区。
   function toast(m){ try{ if(typeof atShowToast==='function'){ atShowToast(m); return; } }catch(e){} alert(m); }
 
+  function hasSavedPlotDesign(id){
+    try{
+      var raw=localStorage.getItem('runye_plot_design_v1:'+encodeURIComponent(String(id)));
+      if(!raw)return false;
+      var saved=JSON.parse(raw),d=saved&&saved.design;
+      return !!(d&&Array.isArray(d.polyPts)&&d.polyPts.length>=3);
+    }catch(e){return false;}
+  }
+  function renderPlotWorkflow(arr){
+    var list=document.getElementById('ppPlotWorkflowList');
+    var groupBtn=document.getElementById('ppCreatePlotGroup');
+    var status=document.getElementById('ppPlotWorkflowStatus');
+    if(!list)return;
+    var available=(arr||[]).filter(function(p){return p&&!p.mergedInto&&!p.merged&&!p.grouped;});
+    Object.keys(groupSelection).forEach(function(id){
+      if(!available.some(function(p){return String(p.id)===id;}))delete groupSelection[id];
+    });
+    list.innerHTML='';
+    if(!available.length){
+      list.innerHTML='<div class="pp-plot-workflow-empty">在线地图传递的地块会列在这里</div>';
+    }else available.forEach(function(p){
+      var row=document.createElement('div');
+      row.className='pp-plot-workflow-row'+(String(p.id)===String(window.currentPlotId)?' is-current':'');
+      var hasBoundary=Array.isArray(p.polyLatLng)&&p.polyLatLng.length>=3;
+      var hasPlan=hasSavedPlotDesign(p.id);
+      var canGroup=hasBoundary&&hasPlan;
+      var plan=hasPlan?'已保存规划':'尚未保存规划';
+      row.innerHTML='<label class="pp-plot-workflow-check"><input type="checkbox" data-group-id="'+esc(p.id)+'"'+(groupSelection[String(p.id)]?' checked':'')+(canGroup?'':' disabled')+' aria-label="选择'+esc(p.name||'地块')+'加入组"></label>'+
+        '<div class="pp-plot-workflow-main"><div class="pp-plot-workflow-name">'+esc(p.name||'未命名地块')+'</div><div class="pp-plot-workflow-meta">'+(Number(p.mu)||0).toFixed(2)+' 亩 · '+plan+(!hasBoundary?' · 缺少地图边界':(!hasPlan?' · 完成单块规划后可成组':''))+'</div></div>'+
+        '<button type="button" class="pp-plot-workflow-edit" data-edit-id="'+esc(p.id)+'">编辑</button>';
+      var check=row.querySelector('[data-group-id]');
+      if(check)check.addEventListener('change',function(){groupSelection[String(p.id)]=!!check.checked;renderPlotWorkflow(arr);});
+      var edit=row.querySelector('[data-edit-id]');
+      if(edit)edit.addEventListener('click',function(){setCurrent(p.id);});
+      list.appendChild(row);
+    });
+    var selected=Object.keys(groupSelection).filter(function(id){return groupSelection[id];});
+    if(groupBtn)groupBtn.disabled=selected.length<2;
+    if(status)status.textContent=selected.length?'已勾选 '+selected.length+' 块；成组后将进入多地块规划。':'请先完成并保存各地块的分区与单块管路规划，再勾选至少两块成组。未保存规划或缺少边界的地块暂不能加入组。';
+  }
+  var groupBtn=document.getElementById('ppCreatePlotGroup');
+  if(groupBtn)groupBtn.addEventListener('click',function(){
+    var ids=Object.keys(groupSelection).filter(function(id){return groupSelection[id];});
+    if(ids.length<2){toast('请至少勾选 2 个地块后成组');return;}
+    try{
+      if(window.currentPlotId){
+        if(typeof window.runyeSaveCurrentPlotBeforeSwitch!=='function')throw new Error('当前地块安全保存接口未加载');
+        if(window.runyeSaveCurrentPlotBeforeSwitch()!==true)throw new Error('当前地块快照未确认写入');
+      }
+    }
+    catch(eSave){toast('当前地块方案未能保存，暂不成组：'+(eSave&&eSave.message?eSave.message:'本地存储失败'));return;}
+    var api=window.RunyeMapEnhance&&window.RunyeMapEnhance.merge;
+    if(!api||typeof api.groupFromLibrary!=='function'){toast('成组功能暂不可用，请刷新页面后重试');return;}
+    var result=api.groupFromLibrary(ids,{});
+    if(!result||!result.ok){toast(result&&result.reason?result.reason:'成组失败，地块库未更改');return;}
+    groupSelection=Object.create(null);
+    renderLib();
+    setCurrent(result.merged.id);
+  });
+
   function renderLib(){
     // 列表渲染只读展示：损坏存档时显示空列表，不得阻断页面启动；写入入口仍严格拒绝。
     var arr=loadLib();
@@ -26,6 +87,7 @@
     var cnt=document.getElementById('plotLibCount');
     if(cnt) cnt.textContent=arr.length;
     if(sum){ if(!arr.length) sum.textContent='还没有保存的地块'; else { var t=arr.reduce(function(a,p){return a+(p.mu||0);},0); sum.innerHTML='已保存 <b>'+arr.length+'</b> 个 · 合计 <b>'+t.toFixed(2)+'</b> 亩'; } }
+    renderPlotWorkflow(arr);
     if(!list) return;
     list.innerHTML='';
     arr.forEach(function(p){
@@ -55,7 +117,10 @@
       var matches=arr.filter(function(x){return x&&String(x.id)===String(id);});
       if(matches.length!==1) throw new Error('地块库编号重复或地块已删除，无法安全设为当前');
       window.currentPlotId=id; renderLib();
-      if(window.measuredPolygon && window.measuredPolygon.length>=3 && typeof window.ppLoadPolygon==='function') window.ppLoadPolygon();
+      if(typeof window.ppSetState==='function') window.ppSetState({});
+      else if(window.measuredPolygon && window.measuredPolygon.length>=3 && typeof window.ppLoadPolygon==='function') window.ppLoadPolygon();
+      if(typeof window.ppRestorePlotDesign==='function') window.ppRestorePlotDesign(id);
+      if(typeof window.runyeRestoreGroupDesign==='function') window.runyeRestoreGroupDesign(id);
       if(typeof window.ppGenerateDiagram==='function') window.ppGenerateDiagram({scroll:false});
       if(typeof window.runyeSetCurrentPlot==='function') window.runyeSetCurrentPlot(id);
       return matches[0];
@@ -110,7 +175,12 @@
     if(!saved.ok) throw new Error('地块库写入失败：'+saved.error);
     window.currentPlotId=id; renderLib();
     // 同步本页「管线绘图区」（管道规划）
-    try{ if(window.measuredPolygon && window.measuredPolygon.length>=3 && typeof window.ppLoadPolygon==='function') window.ppLoadPolygon(); }catch(e){}
+    try{
+      if(typeof window.ppSetState==='function') window.ppSetState({});
+      else if(window.measuredPolygon && window.measuredPolygon.length>=3 && typeof window.ppLoadPolygon==='function') window.ppLoadPolygon();
+    }catch(e){}
+    try{ if(typeof window.ppRestorePlotDesign==='function') window.ppRestorePlotDesign(id); }catch(e){}
+    try{ if(typeof window.runyeRestoreGroupDesign==='function') window.runyeRestoreGroupDesign(id); }catch(e){}
     try{ if(typeof window.ppGenerateDiagram==='function') window.ppGenerateDiagram({scroll:false}); }catch(e){}
     /* v161：回传落库后该地块即为当前地块 → 记锚点 + 静默留存，供切页返回恢复 */
     try{ if(typeof window.runyeSetCurrentPlot==='function') window.runyeSetCurrentPlot(id); }catch(e){}
@@ -172,6 +242,10 @@
     var saved=saveLib(arr,state);
     if(!saved.ok){ toast('保存失败，地块库未更改：'+saved.error); return; }
     window.currentPlotId=id;
+    /* Saving a new library plot changes the design identity; do not leave the
+       previous plot's canonical model active while the new snapshot is built. */
+    window.__runyeSingleCanonicalDesign=null;
+    window.__runyeSingleDrawingDesignShadow=null;
     if(nameInput) nameInput.value='';
     renderLib(); toast('已保存到地块库：'+name);
     // 同步到本页「管线绘图区」（管道规划）：即时把刚画好的边界载入管线画布
@@ -187,6 +261,21 @@
     if(matches.length>1){ toast('地块库中存在重复编号，无法确定当前地块；请先检查重复记录'); return; }
     var p=matches[0];
     if(!p) return;
+    if(window.currentPlotId && String(window.currentPlotId)===String(id)){
+      try{ if(typeof window.runyeSaveCurrentPlotBeforeSwitch==='function') window.runyeSaveCurrentPlotBeforeSwitch(); }catch(eSaveSame){ toast('当前地块未能保存：'+(eSaveSame&&eSaveSame.message?eSaveSame.message:'本地存储失败')); return; }
+      var sameSection=(p.merged||p.grouped)&&Array.isArray(p.subPlots)&&p.subPlots.length>=2?'grPipeSection':'pipePlanSection';
+      try{ if(typeof window.ryJumpToSection==='function') window.ryJumpToSection(sameSection); }catch(eSameRoute){}
+      return;
+    }
+    if(window.currentPlotId && String(window.currentPlotId)!==String(id)){
+      try{
+        if(typeof window.runyeSaveCurrentPlotBeforeSwitch!=='function') throw new Error('旧地块安全保存接口未加载');
+        window.runyeSaveCurrentPlotBeforeSwitch();
+      }catch(eSave){ toast('当前地块未能先行保存：'+(eSave&&eSave.message?eSave.message:'本地存储失败')); return; }
+    }
+    /* 已保存上一块后清除全局三级临时管网与编辑器缓存；目标块只从自身 ID 档案恢复 L2。 */
+    try{ if(typeof window.runyeResetPlotScopedNetworkState==='function') window.runyeResetPlotScopedNetworkState(); }
+    catch(eReset){ toast('切换地块前的临时管网状态未能清理：'+(eReset&&eReset.message?eReset.message:'请重试')); return; }
     if(p.polyLatLng && p.polyLatLng.length>=3 && window.RunyeGeo){
       if(!p.geo) p.geo=RunyeGeo.baseOfFeature(p);
       if(!Array.isArray(p.poly) || p.poly.length<3) p.poly=RunyeGeo.toCanvasPoly(p);
@@ -223,8 +312,12 @@
       if(p && Array.isArray(p.subPlots) && p.subPlots.length){
         var _rec=[];
         p.subPlots.forEach(function(s){
-          if(s && Array.isArray(s.poly) && s.poly.length>=3){
-            var _ring = s.poly.map(function(q){return{x:+q.x,y:_v219Flip?-(+q.y):+q.y};});
+          var _sourceRing=s&&Array.isArray(s.poly)&&s.poly.length>=3?s.poly:null;
+          if(!_sourceRing&&s&&Array.isArray(s.polyLatLng)&&s.polyLatLng.length>=3&&p.geo&&window.RunyeGeo){
+            try{_sourceRing=RunyeGeo.polyLL2m(s.polyLatLng,p.geo);}catch(eConvert){_sourceRing=null;}
+          }
+          if(s && _sourceRing && _sourceRing.length>=3){
+            var _ring = _sourceRing.map(function(q){return{x:+q.x,y:_v219Flip?-(+q.y):+q.y};});
             _rec.push({ id:s.id, name:s.name, mu:s.mu, sqm:s.sqm,
                         polyLatLng:s.polyLatLng||null,
                         poly:_ring });
@@ -234,13 +327,19 @@
       } else { window.__runyeSubPlots=null; }
     }catch(e){ window.__runyeSubPlots=null; }
     try{ if(typeof updatePlan==='function') updatePlan(); }catch(e){}
-    try{ if(typeof window.ppLoadPolygon==='function') window.ppLoadPolygon(); }catch(e){}
+    try{
+      if(typeof window.ppSetState==='function') window.ppSetState({});
+      else if(typeof window.ppLoadPolygon==='function') window.ppLoadPolygon();
+      if(typeof window.ppRestorePlotDesign==='function') window.ppRestorePlotDesign(id);
+      if(typeof window.runyeRestoreGroupDesign==='function') window.runyeRestoreGroupDesign(id);
+    }catch(e){}
     try{ if(typeof window.ppGenerateDiagram==='function') window.ppGenerateDiagram({scroll:false}); }catch(e){}
     renderLib();
     // 2026-09-13：按用户要求去掉「已设为当前地块」提示（该提示在页面无 toast 容器时兜底为
     // 阻塞式原生 alert，需多点一次「确定」）——点击「设为当前」后直接跳转「二级管路制图区」。
     // 落点几何复用导航的 ryJumpToSection（stickyOffset() 已含吸顶栏真实高度 43px）。
-    try{ if(typeof window.ryJumpToSection==='function') window.ryJumpToSection('pipePlanSection'); }catch(e){}
+    var targetSection=(p.merged||p.grouped)&&Array.isArray(p.subPlots)&&p.subPlots.length>=2?'grPipeSection':'pipePlanSection';
+    try{ if(typeof window.ryJumpToSection==='function') window.ryJumpToSection(targetSection); }catch(e){}
     /* v161：设为当前后记锚点并静默留存完整工作状态（地块 + 二级/三级划分）。
        否则整页跳到「在线地图」再切回时内存状态全丢 —— 见 ryAutoRestoreProject。 */
     try{ if(typeof window.runyeSetCurrentPlot==='function') window.runyeSetCurrentPlot(id); }catch(e){}

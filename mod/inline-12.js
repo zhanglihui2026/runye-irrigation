@@ -2,6 +2,7 @@
 // ===== Project save/load =====
 (function(){
   var SAVE_KEY='runye_irrigation_saved_project_v1';
+  var RESTORE_ROLLBACK_KEY='runye_project_restore_rollback_v1', restoreRollbackActive=false;
   function readPlotLibrary(){
     var store=window.RyPlotLibraryStore;
     if(!store||typeof store.read!=='function') return [];
@@ -26,6 +27,320 @@
     var store=window.RyIrrigationDataStore;
     if(!store||typeof store.writeCurrentPlotAnchor!=='function') return false;
     return store.writeCurrentPlotAnchor(id,options)!==false;
+  }
+  function snapshotContainsGroup(snapshot){
+    var group=snapshot&&snapshot.groupPlan;
+    return !!(group&&((Array.isArray(group.subPlots)&&group.subPlots.length>0) ||
+      (group.edit&&Array.isArray(group.edit.slots)&&group.edit.slots.length>0)));
+  }
+  function isGroupProjectSnapshot(snapshot){
+    return !!((window.__runyeGroupEdit&&window.__runyeGroupEdit.active) || snapshotContainsGroup(snapshot));
+  }
+  function singleGenerationSignatureMismatch(snapshot){
+    var geometry=snapshot&&snapshot.tlDiagramData;
+    return !snapshotContainsGroup(snapshot)&&!!(geometry&&geometry.sourceSignature&&
+      geometry.sourceSignature!==drawingDesignGenerationInputSignature(snapshot));
+  }
+  function sameCanonicalContent(a,b){
+    function normalize(value){
+      var copy=JSON.parse(JSON.stringify(value));
+      copy.revision=0;
+      (copy.plots||[]).forEach(function(plot){
+        plot.revision=0;
+        if(plot.generated) plot.generated.sourceRevision=0;
+        var part=plot.partition;
+        if(part&&part.cutSnap){
+          ['x','y'].forEach(function(axis){
+            var cuts=axis==='x'?part.xCuts:part.yCuts;
+            if(part.cutSnap[axis]==null&&Array.isArray(cuts))part.cutSnap[axis]=cuts.slice();
+          });
+        }
+      });
+      (copy.groups||[]).forEach(function(group){group.revision=0;});
+      return JSON.stringify(copy);
+    }
+    try{return normalize(a)===normalize(b);}catch(e){return false;}
+  }
+  function drawingDesignGenerationInputSignature(snapshot){
+    snapshot=snapshot||{};
+    var inputValues=snapshot.inputValues||collectInputValues(), inputs={};
+    Object.keys(inputValues).sort().forEach(function(id){
+      if(/^(fld_|tl_|plan)/.test(id)) inputs[id]=inputValues[id];
+    });
+    var plan=snapshot.pipePlan||(typeof window.ppGetState==='function'?window.ppGetState():{})||{};
+    var planInputs={};
+    ['polyPts','mainPipes','branchPipes','subBranchPipes','source','valves','hiddenPipes','pipeIds',
+      'nextPipeId','cutSnap','partitionCuts','cutOverrides','areaLocked','zoneRotated','zoneAngleDeg','zoneAuto']
+      .forEach(function(key){if(Object.prototype.hasOwnProperty.call(plan,key))planInputs[key]=plan[key];});
+    /* 恢复时分区切线会从 partitionCuts 回填到 cutSnap。两者表示同一组切线，
+       签名应在回填前后保持一致；真正不同的手动切线仍保留在签名中。 */
+    if(planInputs.cutSnap&&planInputs.partitionCuts){
+      planInputs.cutSnap=JSON.parse(JSON.stringify(planInputs.cutSnap));
+      ['x','y'].forEach(function(axis){
+        if(planInputs.cutSnap[axis]==null&&Array.isArray(planInputs.partitionCuts[axis]))
+          planInputs.cutSnap[axis]=planInputs.partitionCuts[axis].slice();
+      });
+    }
+    var zoneStep=snapshot.zoneStep!==undefined?snapshot.zoneStep:(window.tlZoneStep||null);
+    if(!zoneStep||!Object.keys(zoneStep.x||{}).length&&!Object.keys(zoneStep.y||{}).length) zoneStep=null;
+    var auxiliary=snapshot.tlAux!==undefined?snapshot.tlAux:readTlAux();
+    var payload={
+      boundary:snapshot.measuredPolygon!==undefined?snapshot.measuredPolygon:(window.measuredPolygon||[]),
+      area:snapshot.measuredArea!=null?snapshot.measuredArea:(window.measuredArea||0),
+      inputs:inputs,
+      plan:planInputs,
+      planDims:snapshot.planDims!==undefined?snapshot.planDims:(window.runyePlanDims||null),
+      zoneStep:zoneStep,
+      manualGroups:snapshot.manualGroups!==undefined?snapshot.manualGroups:(window.tlManualGroups||[]),
+      auxiliary:auxiliary?{drops:auxiliary.drops||null,src:auxiliary.src||null}:null,
+      groupPlan:snapshot.groupPlan!==undefined?snapshot.groupPlan:null,
+      terrain:snapshot.terrain!==undefined?snapshot.terrain:(window.RyTerrain?window.RyTerrain.exportState():null)
+    };
+    var raw=JSON.stringify(payload),a=2166136261,b=5381;
+    for(var i=0;i<raw.length;i++){
+      var code=raw.charCodeAt(i);
+      a=Math.imul(a^code,16777619);
+      b=Math.imul(b,33)^code;
+    }
+    function hex(value){return ('00000000'+(value>>>0).toString(16)).slice(-8);}
+    return hex(a)+hex(b);
+  }
+  window.ryDrawingDesignGenerationInputSignature=function(){
+    return drawingDesignGenerationInputSignature();
+  };
+  window.ryCommitSinglePlotL2Snapshot=function(beforePlan,afterPlan){
+    var plotId=window.currentPlotId==null?'':String(window.currentPlotId);
+    if(!plotId||(window.__runyeGroupEdit&&window.__runyeGroupEdit.active)) return null;
+    var model=window.RyDrawingDesignModel, adapter=window.RyDrawingDesignLegacyAdapter;
+    var design=window.__runyeSingleCanonicalDesign;
+    if(!design){
+      var seeded=singlePlotCanonical({currentPlotId:plotId,measuredPolygon:beforePlan&&beforePlan.polyPts,pipePlan:beforePlan},plotId);
+      if(!seeded) return null;
+      design=seeded;
+    }
+    if(!model||!adapter||!model.validate(design).ok||
+        design.projectId!=='legacy-project:'+plotId||design.plots.length!==1||
+        design.groups.length!==0||design.plots[0].plotId!==plotId) return false;
+    function importPlan(plan){
+      if(!plan||!Array.isArray(plan.polyPts)||plan.polyPts.length<3) return null;
+      return adapter.fromProjectSnapshot({currentPlotId:plotId,measuredPolygon:plan.polyPts,pipePlan:plan},{
+        projectId:'legacy-project:'+plotId,plotId:plotId,frameId:'legacy-frame:'+plotId
+      });
+    }
+    function comparable(plot){
+      if(!plot) return '';
+      var network=JSON.parse(JSON.stringify(plot.network||{}));
+      delete network.level3Edits;
+      return JSON.stringify({boundary:plot.geometry&&plot.geometry.boundary,partition:plot.partition,network:network});
+    }
+    var before=importPlan(beforePlan), after=importPlan(afterPlan);
+    if(!before||!before.ok||!after||!after.ok||
+        comparable(design.plots[0])!==comparable(before.design.plots[0])) return false;
+    var nextPlot=after.design.plots[0];
+    var updated=model.updatePlot(design,plotId,design.revision,function(target){
+      target.geometry.boundary=JSON.parse(JSON.stringify(nextPlot.geometry.boundary));
+      target.partition=JSON.parse(JSON.stringify(nextPlot.partition));
+      target.network=JSON.parse(JSON.stringify(nextPlot.network));
+      delete target.network.level3Edits;
+      delete target.generated;
+    });
+    if(!updated||!updated.ok) return false;
+    window.__runyeSingleCanonicalDesign=updated.design;
+    window.__runyeSingleDrawingDesignShadow={ok:true,stage:'l2-partition-write',plotId:plotId,
+      designRevision:updated.design.revision,plotRevision:updated.design.plots[0].revision};
+    return true;
+  };
+  function singlePlotCanonical(snapshot,plotId){
+    var model=window.RyDrawingDesignModel, adapter=window.RyDrawingDesignLegacyAdapter;
+    if(!model||!adapter||typeof adapter.fromProjectSnapshot!=='function') return null;
+    if(singleGenerationSignatureMismatch(snapshot)) return null;
+    var imported=adapter.fromProjectSnapshot(snapshot,{
+      projectId:'legacy-project:'+String(plotId),
+      plotId:String(plotId),
+      frameId:'legacy-frame:'+String(plotId)
+    });
+    if(!imported||!imported.ok||!imported.design||imported.design.plots.length!==1) return null;
+    var next=imported.design, previous=window.__runyeSingleCanonicalDesign;
+    if(previous&&model.validate(previous).ok&&previous.projectId===next.projectId&&
+        previous.plots.length===1&&previous.groups.length===0&&previous.plots[0].plotId===String(plotId)){
+      if(sameCanonicalContent(previous,next)) next=previous;
+      else return null;
+    }
+    if(!model.validate(next).ok) return null;
+    window.__runyeSingleCanonicalDesign=JSON.parse(JSON.stringify(next));
+    return next;
+  }
+  window.ryCommitSingleLevel3CanonicalFromRuntime=function(){
+    if(!window.currentPlotId||!window.tlDiagramData||
+        (window.__runyeGroupEdit&&window.__runyeGroupEdit.active)) return false;
+    var model=window.RyDrawingDesignModel, adapter=window.RyDrawingDesignLevel3Adapter;
+    var design=window.__runyeSingleCanonicalDesign, plotId=String(window.currentPlotId);
+    if(!model||!adapter||!design||!model.validate(design).ok||
+        design.projectId!=='legacy-project:'+plotId||design.plots.length!==1||
+        design.groups.length!==0||design.plots[0].plotId!==plotId) return false;
+    var sourceSignature=window.tlDiagramData.sourceSignature;
+    if(!sourceSignature||sourceSignature!==drawingDesignGenerationInputSignature()) return false;
+    var plot=design.plots[0];
+    var plan=typeof window.ppGetState==='function'?window.ppGetState():null;
+    function comparableCutSnap(value){
+      if(value==null)return 'null';
+      var snap=JSON.parse(JSON.stringify(value));
+      ['x','y'].forEach(function(axis){
+        var cuts=axis==='x'?plot.partition.xCuts:plot.partition.yCuts;
+        if(snap[axis]==null&&Array.isArray(cuts))snap[axis]=cuts.slice();
+      });
+      return JSON.stringify(snap);
+    }
+    if(!plan||JSON.stringify(plot.geometry.boundary)!==JSON.stringify(plan.polyPts)||
+        JSON.stringify(plot.network.mainPipes)!==JSON.stringify(plan.mainPipes||[])||
+        JSON.stringify(plot.network.branchPipes)!==JSON.stringify(plan.branchPipes||[])||
+        JSON.stringify(plot.network.subBranchPipes)!==JSON.stringify(plan.subBranchPipes||[])||
+        JSON.stringify(plot.network.source)!==JSON.stringify(plan.source==null?null:plan.source)||
+        JSON.stringify(plot.network.valves)!==JSON.stringify(plan.valves||[])||
+        JSON.stringify(plot.network.ids)!==JSON.stringify(plan.pipeIds||{main:[],branch:[],subbranch:[]})||
+        JSON.stringify(plot.network.hidden)!==JSON.stringify(plan.hiddenPipes||{main:{},branch:{},subbranch:{}})||
+        plot.network.nextPipeId!==(Number.isSafeInteger(plan.nextPipeId)&&plan.nextPipeId>0?plan.nextPipeId:1)||
+        plot.partition.angleDeg!==(Number.isFinite(Number(plan.zoneAngleDeg))?Number(plan.zoneAngleDeg):(plan.zoneRotated?90:0))||
+        plot.partition.mode!==(plan.zoneAuto===false?'manual':'auto')||
+        plot.partition.areaLocked!==(plan.areaLocked===true)||
+        JSON.stringify(plot.partition.xCuts)!==JSON.stringify(plan.partitionCuts&&plan.partitionCuts.x||[])||
+        JSON.stringify(plot.partition.yCuts)!==JSON.stringify(plan.partitionCuts&&plan.partitionCuts.y||[])||
+        comparableCutSnap(plot.partition.cutSnap)!==comparableCutSnap(plan.cutSnap)||
+        JSON.stringify(plot.partition.stepOverrides)!==JSON.stringify(plan.cutOverrides||{x:{},y:{}})) return false;
+    if(plot.generated&&typeof adapter.isCurrent==='function'&&
+        !adapter.isCurrent(plot.generated,window.tlDiagramData,plot.revision)) return false;
+    var snapshot={
+      tlDiagramData:window.tlDiagramData,
+      tlEditPipes:window.RyTlEditPipes?window.RyTlEditPipes.serialize():null,
+      tlAutoEdits:window.RyTlAutoEdits?window.RyTlAutoEdits.serialize():null,
+      tlAux:readTlAux(),
+      manualGroups:window.tlManualGroups||[]
+    };
+    var converted=adapter.fromProjectSnapshot(snapshot,{sourceRevision:plot.revision});
+    if(!converted||!converted.ok||!converted.generated||!converted.edits) return false;
+    var updated=model.updatePlot(design,plotId,design.revision,function(target){
+      target.generated=JSON.parse(JSON.stringify(converted.generated));
+      target.network.level3Edits=JSON.parse(JSON.stringify(converted.edits));
+    });
+    if(!updated||!updated.ok) return false;
+    window.__runyeSingleCanonicalDesign=updated.design;
+    window.__runyeSingleDrawingDesignShadow={ok:true,stage:'level3-runtime-write',plotId:plotId,
+      designRevision:updated.design.revision,plotRevision:updated.design.plots[0].revision};
+    return true;
+  };
+  window.ryRestoreSingleLevel3CanonicalRuntime=function(){
+    if(!window.currentPlotId||(window.__runyeGroupEdit&&window.__runyeGroupEdit.active)) return false;
+    var model=window.RyDrawingDesignModel, adapter=window.RyDrawingDesignLevel3Adapter;
+    var design=window.__runyeSingleCanonicalDesign, plotId=String(window.currentPlotId);
+    if(!model||!adapter||!design||!model.validate(design).ok||
+        design.projectId!=='legacy-project:'+plotId||design.plots.length!==1||
+        design.groups.length!==0||design.plots[0].plotId!==plotId) return false;
+    var plot=design.plots[0];
+    if(!plot.generated||!adapter.isCurrent(plot.generated,plot.generated.level3Geometry,plot.revision)) return false;
+    var baseline={tlAux:readTlAux()}, automatic=window.RyTlAutoEdits&&window.RyTlAutoEdits.serialize();
+    var projected=adapter.toProjectPatch({generated:plot.generated,edits:plot.network.level3Edits},
+      plot.generated.level3Geometry,plot.revision,baseline);
+    if(!projected||!projected.ok) return false;
+    var snapshot=projected.snapshot, checked=adapter.fromProjectSnapshot({
+      tlDiagramData:snapshot.tlDiagramData,tlEditPipes:snapshot.tlEditPipes,
+      tlAutoEdits:snapshot.tlAutoEdits,tlAux:snapshot.tlAux,manualGroups:snapshot.manualGroups
+    },{sourceRevision:plot.revision});
+    if(!checked||!checked.ok||JSON.stringify(checked.generated)!==JSON.stringify(plot.generated)||
+        JSON.stringify(checked.edits)!==JSON.stringify(plot.network.level3Edits)) return false;
+    var editPipes=window.RyTlEditPipes,autoEdits=window.RyTlAutoEdits,nodes=window.RyTlNodes;
+    if(snapshot.tlEditPipes!=null&&(!editPipes||typeof editPipes.restore!=='function'))return false;
+    if(snapshot.tlAutoEdits!=null&&(!autoEdits||typeof autoEdits.restore!=='function'))return false;
+    if(snapshot.tlAux&&snapshot.tlAux.nodes!=null&&(!nodes||typeof nodes.restore!=='function'))return false;
+    if(editPipes&&(typeof editPipes.syncGeometry!=='function'||typeof editPipes.reset!=='function'))return false;
+    if(autoEdits&&(typeof autoEdits.syncGeometry!=='function'||typeof autoEdits.reset!=='function'))return false;
+    if(nodes&&typeof nodes.reset!=='function')return false;
+    var sessionCaliberKeys=automatic&&automatic.cals?Object.keys(automatic.cals):[];
+    if(sessionCaliberKeys.length&&(!autoEdits||typeof autoEdits.setCaliber!=='function'))return false;
+    var geometry=snapshot.tlDiagramData;
+    window.tlDiagramData=JSON.parse(JSON.stringify(geometry));
+    window.tlManualGroups=Array.isArray(snapshot.manualGroups)?JSON.parse(JSON.stringify(snapshot.manualGroups)):[];
+    if(editPipes){
+      editPipes.syncGeometry(geometry);
+      if(snapshot.tlEditPipes){
+        if(!editPipes.restore(snapshot.tlEditPipes)) return false;
+      }else{
+        editPipes.reset();
+        if(editPipes.discardSaved) editPipes.discardSaved();
+      }
+    }
+    if(autoEdits){
+      autoEdits.syncGeometry(geometry);
+      if(snapshot.tlAutoEdits){
+        if(!autoEdits.restore(snapshot.tlAutoEdits)) return false;
+      }else{
+        autoEdits.reset();
+        if(autoEdits.discardSaved) autoEdits.discardSaved();
+      }
+      var sessionCals=automatic&&automatic.cals||{};
+      Object.keys(sessionCals).forEach(function(pid){
+        autoEdits.setCaliber(pid,sessionCals[pid],geometry,'canonical-rollback');
+      });
+    }
+    if(nodes){
+      if(snapshot.tlAux&&snapshot.tlAux.nodes){
+        if(!nodes.restore(snapshot.tlAux.nodes)) return false;
+      }else nodes.reset();
+    }
+    var auxiliary=snapshot.tlAux;
+    if(auxiliary===null) auxiliary={drops:null,src:null,dims:null,plotPos:null};
+    if(auxiliary&&typeof auxiliary==='object'){
+      writeTlAux({drops:auxiliary.drops,src:auxiliary.src,dims:auxiliary.dims,plotPos:auxiliary.plotPos});
+    }
+    try{if(window.RyTlWs&&typeof window.RyTlWs.rerenderKeepView==='function')window.RyTlWs.rerenderKeepView();}catch(eRender){}
+    try{if(typeof renderThreeLevel==='function')renderThreeLevel();}catch(eDiagram){}
+    window.__runyeSingleDrawingDesignShadow={ok:true,stage:'level3-runtime-rollback',plotId:plotId,
+      designRevision:design.revision,plotRevision:plot.revision};
+    return true;
+  };
+  function projectSingleCanonical(snapshot,expectedPlotId){
+    if(!Object.prototype.hasOwnProperty.call(snapshot,'canonicalDrawingDesign')) return {ok:true,snapshot:snapshot,legacy:true};
+    var model=window.RyDrawingDesignModel, adapter=window.RyDrawingDesignLegacyAdapter;
+    var canonical=snapshot.canonicalDrawingDesign;
+    if(singleGenerationSignatureMismatch(snapshot)){
+      return {ok:false,error:'level3-generation-input-signature-mismatch'};
+    }
+    if(!model||!adapter||typeof adapter.toLegacyPatch!=='function') return {ok:false,error:'drawing-design-adapter-unavailable'};
+    var validation=model.validate(canonical);
+    if(!validation.ok||canonical.plots.length!==1||canonical.groups.length!==0||
+        canonical.plots[0].plotId!==String(expectedPlotId)||canonical.projectId!=='legacy-project:'+String(expectedPlotId)){
+      return {ok:false,error:'canonical-single-plot-binding-invalid'};
+    }
+    var projected=adapter.toLegacyPatch(canonical,String(expectedPlotId),snapshot);
+    if(!projected||!projected.ok) return {ok:false,error:projected&&projected.error||'canonical-projection-failed'};
+    var result=projected.snapshot;
+    var roundTrip=adapter.fromProjectSnapshot(result,{
+      projectId:'legacy-project:'+String(expectedPlotId),
+      plotId:String(expectedPlotId),
+      frameId:'legacy-frame:'+String(expectedPlotId)
+    });
+    if(!roundTrip||!roundTrip.ok||!roundTrip.design||
+        !sameCanonicalContent(canonical,roundTrip.design)){
+      return {ok:false,error:'canonical-projection-roundtrip-mismatch'};
+    }
+    result.canonicalDrawingDesign=JSON.parse(JSON.stringify(canonical));
+    return {ok:true,snapshot:result,legacy:false};
+  }
+  function importLegacySingleCanonicalForRestore(snapshot,plotId){
+    var model=window.RyDrawingDesignModel, adapter=window.RyDrawingDesignLegacyAdapter;
+    if(!plotId||!model||typeof model.validate!=='function'||!adapter||
+        typeof adapter.fromProjectSnapshot!=='function'||singleGenerationSignatureMismatch(snapshot)) return null;
+    try{
+      var imported=adapter.fromProjectSnapshot(snapshot,{
+        projectId:'legacy-project:'+String(plotId),
+        plotId:String(plotId),
+        frameId:'legacy-frame:'+String(plotId)
+      });
+      if(!imported||!imported.ok||!imported.design||!model.validate(imported.design).ok||
+          imported.design.projectId!=='legacy-project:'+String(plotId)||
+          imported.design.plots.length!==1||imported.design.groups.length!==0||
+          imported.design.plots[0].plotId!==String(plotId)) return null;
+      return JSON.parse(JSON.stringify(imported.design));
+    }catch(e){return null;}
   }
   function aiHandoffId(){
     try{
@@ -138,11 +453,17 @@
     }catch(e){}
   }
 
-  window.runyeSaveProject=function(silent,key){
+  window.runyeSaveProject=function(silent,key,snapshotOnly){
     /* v161：可选第二参 key —— 静默自动留存与「手动保存」共用同一套快照构造，
        不传 key 时写原有 SAVE_KEY，行为与改动前一致。 */
     /* [v284] __ryUndoQuiet：撤销模块只借「构造快照」这一步，不需要它顺手重算材料清单 */
     if(!window.__ryUndoQuiet&&typeof updateMaterialTotals==='function') updateMaterialTotals();
+    var _groupActive=!!(window.__runyeGroupEdit&&window.__runyeGroupEdit.active);
+    var _groupPlan=window.grExportState?window.grExportState():null;
+    if(_groupActive&&(!_groupPlan||!_groupPlan.canonicalDrawingDesign)){
+      try{console.warn('[drawing-design] canonical group snapshot unavailable; save refused');}catch(eGroupSaveWarn){}
+      return false;
+    }
     var data={
       savedAt:new Date().toISOString(),
       inputValues:collectInputValues(),
@@ -150,8 +471,9 @@
       layoutSides:getSelectedLayoutSides(),
       tlBranchCount:readSelectedInt('#tl_branchGroup .selected', 2),
       tlLayoutSides:readSelectedInt('#tl_layoutGroup .selected', 1),
-      pipeOdOverride:tlAppliedPipeOverride(),
+      pipeOdOverride:_groupActive?null:tlAppliedPipeOverride(),
       measuredArea:window.measuredArea||0,
+      planDims:window.runyePlanDims||null,
       /* v161：快照一并记录当前地块 id —— 自动恢复时用它校验「存档 ↔ 锚点」一致，
          不一致宁可不恢复，避免把旧方案套到新地块上。 */
       currentPlotId:window.currentPlotId||null,
@@ -162,19 +484,159 @@
       materialQtyOverrides:JSON.parse(JSON.stringify(window.materialQtyOverrides||materialQtyOverrides||{})),
       customMaterials:JSON.parse(JSON.stringify(window.customMaterials||customMaterials||{})),
       pipePlan:typeof window.ppGetState==='function'?window.ppGetState():null,
-      groupPlan:window.grExportState ? window.grExportState() : null,
+      groupPlan:_groupPlan,
       terrain:window.RyTerrain ? window.RyTerrain.exportState() : null,
-      tlDiagramData:window.tlDiagramData||null,
-      tlEditPipes:(window.RyTlEditPipes && window.tlDiagramData) ? window.RyTlEditPipes.serialize() : null,
-      tlAutoEdits:(window.RyTlAutoEdits && window.tlDiagramData) ? window.RyTlAutoEdits.serialize() : null,
-      manualGroups:(typeof window.tlManualGroups!=='undefined' && window.tlManualGroups) ? window.tlManualGroups : [],
-      zoneStep:(typeof tlZoneStepCount==='function' && tlZoneStepCount()>0) ? window.tlZoneStep : null,
-      ppGenSig:(typeof window.__ryPpGenSig!=='undefined'&&window.__ryPpGenSig)?window.__ryPpGenSig:null,
-      tlAux:readTlAux()
+      tlDiagramData:_groupActive?null:(window.tlDiagramData||null),
+      tlEditPipes:(!_groupActive&&window.RyTlEditPipes && window.tlDiagramData) ? window.RyTlEditPipes.serialize() : null,
+      tlAutoEdits:(!_groupActive&&window.RyTlAutoEdits && window.tlDiagramData) ? window.RyTlAutoEdits.serialize() : null,
+      manualGroups:(!_groupActive&&typeof window.tlManualGroups!=='undefined' && window.tlManualGroups) ? window.tlManualGroups : [],
+      zoneStep:(!_groupActive&&typeof tlZoneStepCount==='function' && tlZoneStepCount()>0) ? window.tlZoneStep : null,
+      ppGenSig:(!_groupActive&&typeof window.__ryPpGenSig!=='undefined'&&window.__ryPpGenSig)?window.__ryPpGenSig:null,
+      tlAux:_groupActive?{drops:null,src:null,nodes:null,dims:null,plotPos:null}:readTlAux()
     };
+    /* Keep single-plot project archives bound to the canonical model while the
+       legacy fields remain the runtime projection consumed by the current UI.
+       Once a matching canonical model exists, legacy runtime state may confirm it
+       but must not silently replace it during save. */
+    var canonicalSaveMustFail=false;
+    try{
+      if(data.currentPlotId&&!isGroupProjectSnapshot(data)){
+        var prior=window.__runyeSingleCanonicalDesign, model=window.RyDrawingDesignModel;
+        var hasBoundCanonical=!!(prior&&model&&model.validate(prior).ok&&
+          prior.projectId==='legacy-project:'+String(data.currentPlotId)&&prior.plots.length===1&&
+          prior.groups.length===0&&prior.plots[0].plotId===String(data.currentPlotId));
+        canonicalSaveMustFail=hasBoundCanonical;
+        if(hasBoundCanonical&&data.tlDiagramData&&data.tlDiagramData.sourceSignature&&
+            data.tlDiagramData.sourceSignature===drawingDesignGenerationInputSignature(data)&&
+            (typeof window.ryCommitSingleLevel3CanonicalFromRuntime!=='function'||
+             window.ryCommitSingleLevel3CanonicalFromRuntime()!==true)){
+          if(silent!==true)projectToast('三级状态未能提交到规范绘图模型，方案未保存');
+          return false;
+        }
+        var canonical=singlePlotCanonical(data,data.currentPlotId);
+        if(canonical&&hasBoundCanonical){
+          var adapter=window.RyDrawingDesignLegacyAdapter;
+          var projection=adapter&&adapter.toLegacyPatch(canonical,String(data.currentPlotId),data);
+          if(!projection||!projection.ok){
+            if(silent!==true)projectToast('规范绘图模型无法安全投影到存档，方案未保存');
+            return false;
+          }
+          data=projection.snapshot;
+          data.canonicalDrawingDesign=JSON.parse(JSON.stringify(canonical));
+        }else if(canonical){
+          data.canonicalDrawingDesign=canonical;
+        }else if(hasBoundCanonical){
+          if(silent!==true)projectToast('旧编辑状态与规范绘图模型不一致，方案未保存');
+          return false;
+        }else if(window.RyDrawingDesignModel&&window.RyDrawingDesignLegacyAdapter){
+          try{console.warn('[drawing-design] 单地块规范快照未生成，保留兼容存档');}catch(eCanonicalWarn){}
+        }
+      }
+      canonicalSaveMustFail=false;
+    }catch(eCanonicalSave){
+      if(canonicalSaveMustFail){
+        if(silent!==true)projectToast('规范绘图模型保存校验异常，方案未保存');
+        return false;
+      }
+    }
     localStorage.setItem(key||projectSaveKey(),JSON.stringify(data));
+    /* ===== [v677 成组继承] 非成组态把当前单地块的完整设计按地块 id 留档 =====
+       用户拍板的新方向：「所有地块都是单地块进行划分，最后才拼成一组」。
+       留档键 runye_plot_design_v1:<plotId>；将来这块被划进组（或与其他块拼组）时，
+       二级页 ppInitGroupEdit 按 sub.id 找回这份设计，质心平移继承到对应子地块 ——
+       单地块在二级页布好的管/调好的分区线，成组后原样带过去，不再整组重画。
+       ★ 成组态不写（各块设计已在 ge.slots 里，由 groupPlan 走主存档）；
+       ★ 写档失败静默跳过：留档是增益路径，绝不能影响主存档本身。 */
+    if(!snapshotOnly)try{
+      var _geNow=window.__runyeGroupEdit;
+      var _pid=window.currentPlotId;
+      if(!(_geNow&&_geNow.active)&&_pid&&data.pipePlan&&data.pipePlan.polyPts&&data.pipePlan.polyPts.length>=3){
+        var _design={
+          savedAt:data.savedAt,
+          polySig:typeof window.ryPolySig==='function'?window.ryPolySig(data.pipePlan.polyPts):'',
+          canonicalDrawingDesign:data.canonicalDrawingDesign||null,
+          design:{
+            polyPts:data.pipePlan.polyPts,
+            mainPipes:data.pipePlan.mainPipes||[],
+            branchPipes:data.pipePlan.branchPipes||[],
+            subBranchPipes:data.pipePlan.subBranchPipes||[],
+            valves:data.pipePlan.valves||[],
+            source:data.pipePlan.source||null,
+            cutSnap:data.pipePlan.cutSnap||null,
+            partitionCuts:data.pipePlan.partitionCuts||null,
+            cutOverrides:data.pipePlan.cutOverrides||null,
+            hiddenPipes:data.pipePlan.hiddenPipes||null,
+            pipeIds:data.pipePlan.pipeIds||null,
+            nextPipeId:data.pipePlan.nextPipeId||1,
+            areaLocked:!!data.pipePlan.areaLocked,
+            zoneRotated:!!data.pipePlan.zoneRotated,
+            zoneAngleDeg:isFinite(Number(data.pipePlan.zoneAngleDeg))?Number(data.pipePlan.zoneAngleDeg):(data.pipePlan.zoneRotated?90:0),
+            zoneAuto:data.pipePlan.zoneAuto!==false
+          }
+        };
+        localStorage.setItem('runye_plot_design_v1:'+encodeURIComponent(String(_pid)),JSON.stringify(_design));
+      }
+    }catch(eArc){ }
+    /* 组级设计另按组 ID 保存，避免切换到另一地块/组时覆盖唯一的当前工程快照。
+       此档案包含组内 L2 slots 与手绘组级总管；与单地块 L2 档案完全分开。 */
+    if(!snapshotOnly)try{
+      if(window.__runyeGroupEdit&&window.__runyeGroupEdit.active&&window.currentPlotId&&data.groupPlan){
+        localStorage.setItem('runye_group_design_v1:'+encodeURIComponent(String(window.currentPlotId)),JSON.stringify({
+          savedAt:data.savedAt,
+          design:data.groupPlan
+        }));
+      }
+    }catch(eGroupArc){ }
     if(silent!==true)projectToast('方案已保存到本机');
+    return true;
   };
+
+  function captureRestoreRollbackSnapshot(){
+    if(typeof window.runyeSaveProject!=='function'||!window.localStorage)return null;
+    var previousQuiet=window.__ryUndoQuiet,raw=null;
+    try{
+      window.__ryUndoQuiet=true;
+      try{window.localStorage.removeItem(RESTORE_ROLLBACK_KEY);}catch(e0){}
+      if(window.runyeSaveProject(true,RESTORE_ROLLBACK_KEY,true)!==true)return null;
+      raw=window.localStorage.getItem(RESTORE_ROLLBACK_KEY);
+      if(!raw)return null;
+      var snapshot=JSON.parse(raw),edits=window.RyTlAutoEdits;
+      if(edits&&typeof edits.calibersMap==='function'){
+        var calibers=edits.calibersMap(),keys=calibers?Object.keys(calibers):[];
+        if(keys.length){snapshot.__restoreCals={};keys.forEach(function(k){snapshot.__restoreCals[k]=calibers[k];});}
+      }
+      return JSON.stringify(snapshot);
+    }catch(e){return null;}
+    finally{
+      window.__ryUndoQuiet=previousQuiet;
+      try{window.localStorage.removeItem(RESTORE_ROLLBACK_KEY);}catch(e1){}
+    }
+  }
+  function restoreAfterFailedProjectLoad(raw){
+    if(typeof raw!=='string'||!raw||!window.localStorage||typeof window.runyeLoadProject!=='function')return false;
+    var previousQuiet=window.__ryUndoQuiet,restored=false,snapshot=null;
+    try{
+      snapshot=JSON.parse(raw);
+      window.__ryUndoQuiet=true;
+      restoreRollbackActive=true;
+      window.localStorage.setItem(RESTORE_ROLLBACK_KEY,raw);
+      restored=window.runyeLoadProject(RESTORE_ROLLBACK_KEY,true)===true;
+    }catch(e){restored=false;}
+    finally{
+      restoreRollbackActive=false;
+      window.__ryUndoQuiet=previousQuiet;
+      try{window.localStorage.removeItem(RESTORE_ROLLBACK_KEY);}catch(e1){}
+    }
+    if(!restored)return false;
+    try{
+      var edits=window.RyTlAutoEdits,want=snapshot&&snapshot.__restoreCals||{},current=edits&&typeof edits.calibersMap==='function'?edits.calibersMap()||{}:{};
+      if(edits){
+        Object.keys(current).forEach(function(k){if(!(k in want)&&typeof edits.clearCaliber==='function')edits.clearCaliber(k,'restore-rollback');});
+        Object.keys(want).forEach(function(k){if(Math.abs((current[k]||0)-want[k])>1e-6&&typeof edits.setCaliber==='function')edits.setCaliber(k,want[k],null,'restore-rollback');});
+      }
+    }catch(e2){}
+    return true;
+  }
 
   window.runyeLoadProject=function(keyOrOpts,silentOpt){
     /* v161：支持指定存档 key 与静默恢复（自动恢复走静默、不弹提示）。
@@ -184,21 +646,63 @@
     else if(keyOrOpts && typeof keyOrOpts==='object'){ if(keyOrOpts.key) _key=String(keyOrOpts.key); if(keyOrOpts.silent===true) _silent=true; if(keyOrOpts.isolated===true)_anchorOptions={sharedDefault:false}; }
     var toast=function(m){ if(!_silent) projectToast(m); };
     var raw=localStorage.getItem(_key);
-    if(!raw){toast('还没有保存过方案');return;}
+    if(!raw){toast('还没有保存过方案');return false;}
     var data;
-    try{data=JSON.parse(raw);}catch(e){toast('保存数据读取失败');return;}
-    if(!data||typeof data!=='object'||Array.isArray(data)){toast('保存数据格式无效');return;}
+    try{data=JSON.parse(raw);}catch(e){toast('保存数据读取失败');return false;}
+    if(!data||typeof data!=='object'||Array.isArray(data)){toast('保存数据格式无效');return false;}
+    var restoringGroupSnapshot=snapshotContainsGroup(data);
+    if(singleGenerationSignatureMismatch(data)){
+      toast('三级生成图与存档中的设计输入不匹配，方案未恢复');
+      return false;
+    }
     /* 恢复前先确定工程的地块归属。缺失/已删除/重复的地块ID按未绑定工程载入，
        并清除当前标签页锚点，避免把存档中的图纸与页面原地块身份混用。 */
     var plotBinding=resolveProjectPlotBinding(data.currentPlotId);
     if(plotBinding.reason==='unavailable'){
       toast('地块库当前不可用，无法核对存档归属，方案未恢复');
-      return;
+      return false;
     }
+    var restoredCanonicalDesign=null;
+    if(Object.prototype.hasOwnProperty.call(data,'canonicalDrawingDesign')){
+      var canonicalRestore=projectSingleCanonical(data,plotBinding.id);
+      if(!canonicalRestore.ok){
+        toast('规范绘图模型校验或旧格式投影失败，方案未恢复：'+canonicalRestore.error);
+        return false;
+      }
+      data=canonicalRestore.snapshot;
+      restoredCanonicalDesign=data.canonicalDrawingDesign;
+    }else if(plotBinding.id){
+      /* Legacy archives remain loadable even when conversion cannot represent every field.
+         A successful preflight seeds the canonical runtime only after the plot anchor commits. */
+      restoredCanonicalDesign=importLegacySingleCanonicalForRestore(data,plotBinding.id);
+    }
+    if(data.groupPlan&&
+        (typeof window.grValidateRestoreState!=='function'||typeof window.grRestoreState!=='function')){
+      toast('多地块组恢复器不可用，方案未恢复');
+      return false;
+    }
+    if(data.groupPlan&&!window.grValidateRestoreState(data.groupPlan)){
+      toast('多地块组快照校验或规范模型导入失败，方案未恢复');
+      return false;
+    }
+    var rollbackSnapshot=null;
+    if(!restoreRollbackActive){
+      rollbackSnapshot=captureRestoreRollbackSnapshot();
+      if(!rollbackSnapshot){
+        toast('当前工程状态无法建立安全回滚点，方案未恢复');
+        return false;
+      }
+    }
+    try{
     if(!writeCurrentPlotAnchor(plotBinding.id,_anchorOptions)){
       toast('当前地块状态无法安全更新，方案未恢复');
-      return;
+      return false;
     }
+    /* Publish the canonical model only after the plot anchor commits. Legacy imports are
+       best-effort so unrepresentable historical fields retain their existing restore path. */
+    window.__runyeSingleCanonicalDesign=restoredCanonicalDesign
+      ? JSON.parse(JSON.stringify(restoredCanonicalDesign)) : null;
+    window.__runyeSingleDrawingDesignShadow=null;
     window.currentPlotId=plotBinding.id;
     var bindingNotice=plotBinding.reason
       ? (plotBinding.reason==='duplicate'?'存档关联地块ID重复，已按未绑定工程恢复':'存档关联地块已不存在，已按未绑定工程恢复')
@@ -240,25 +744,32 @@
     if(typeof calcPlan==='function') calcPlan();
     if(typeof window.ppSetState==='function') window.ppSetState(data.pipePlan||{});
     else if(typeof window.ppLoadPolygon==='function') window.ppLoadPolygon();
-    if (window.grRestoreState) window.grRestoreState(data.groupPlan || null);
+    var groupRestoreResult = window.grRestoreState
+      ? window.grRestoreState(data.groupPlan || null)
+      : null;
+    /* A missing groupPlan intentionally clears any active group and returns false from
+       grRestoreState; only a present group snapshot can fail the project restore. */
+    if (data.groupPlan && groupRestoreResult === false) {
+      throw new Error('多地块组规范状态恢复失败');
+    }
     // 施工简图管线恢复后重渲染，材料清单随之采用施工简图实际长度
     if(typeof render==='function') render();
     if(typeof updateMaterialTotals==='function') updateMaterialTotals();
     /* 管网几何由工作区共享；兼容旧存档的 isoDiagram.data 字段名。 */
-    var savedTlDiagram = (data.tlDiagramData && data.tlDiagramData.version === 1)
+    var savedTlDiagram = !restoringGroupSnapshot && (data.tlDiagramData && data.tlDiagramData.version === 1)
       ? data.tlDiagramData
-      : (data.isoDiagram && data.isoDiagram.data && data.isoDiagram.data.version === 1 ? data.isoDiagram.data : null);
+      : (!restoringGroupSnapshot && data.isoDiagram && data.isoDiagram.data && data.isoDiagram.data.version === 1 ? data.isoDiagram.data : null);
     window.tlDiagramData = savedTlDiagram;
     /* [v619] 位置层先于下面的几何/编辑恢复写回：三通下移、水源、标注线偏移都要在
        渲染（renderThreeLevel / 工作区重绘）之前就位，否则画面仍按旧位置画。 */
-    writeTlAux(data.tlAux);
+    writeTlAux(restoringGroupSnapshot?{drops:null,src:null,nodes:null,dims:null,plotPos:null}:data.tlAux);
     if (savedTlDiagram) {
       if (window.RyTlEditPipes) window.RyTlEditPipes.syncGeometry(savedTlDiagram);
       if (window.RyTlAutoEdits) window.RyTlAutoEdits.syncGeometry(savedTlDiagram);
     }
     /* 共享图面数据层恢复（2026-09-15 阶段1）：几何签名随存档校验，不符拒绝 */
     if(window.RyTlEditPipes){
-      if(data.tlEditPipes && window.RyTlEditPipes.restore(data.tlEditPipes)){
+      if(!restoringGroupSnapshot&&data.tlEditPipes && window.RyTlEditPipes.restore(data.tlEditPipes)){
         toast('三级手工管线已随方案恢复 ' + window.RyTlEditPipes.count() + ' 条');
       }else{
         window.RyTlEditPipes.reset();     // 无存档或签名不符 → 清空，不复活旧几何上的管线
@@ -267,7 +778,7 @@
     }
     /* 自动管线图面编辑随主方案恢复（几何签名校验，2026-09-15 阶段2） */
     if(window.RyTlAutoEdits){
-      if(data.tlAutoEdits && window.RyTlAutoEdits.restore(data.tlAutoEdits)){
+      if(!restoringGroupSnapshot&&data.tlAutoEdits && window.RyTlAutoEdits.restore(data.tlAutoEdits)){
         toast('三级自动管线编辑已随方案恢复（改长 ' + Object.keys(window.RyTlAutoEdits.lensMap()).length + ' 处 · 配件 ' + window.RyTlAutoEdits.fitCount() + ' 个）');
       }else{
         window.RyTlAutoEdits.reset();     // 无存档或签名不符 → 清空，不复活旧几何上的编辑
@@ -275,16 +786,15 @@
       }
     }
     if (typeof window !== 'undefined') {
-      window.tlManualGroups = Array.isArray(data.manualGroups) ? data.manualGroups : [];
+      window.tlManualGroups = !restoringGroupSnapshot&&Array.isArray(data.manualGroups) ? data.manualGroups : [];
       /* v98h 阶梯分区覆盖表随方案恢复（签名不符时 tlZoneStepFor 会自行作废，不会套到新几何上） */
-      if (data.zoneStep && data.zoneStep.x && data.zoneStep.y && data.zoneStep.sig) {
+      if (!restoringGroupSnapshot&&data.zoneStep && data.zoneStep.x && data.zoneStep.y && data.zoneStep.sig) {
         window.tlZoneStep = { sig: String(data.zoneStep.sig), x: data.zoneStep.x, y: data.zoneStep.y };
       } else if (typeof tlZoneStepClear === 'function') {
         tlZoneStepClear();
       }
       window.tlPendingSel = [];
       window.tlGroupMode = false;
-      try { if (typeof window.tlRefreshGroupPanel === 'function') window.tlRefreshGroupPanel(); } catch (e) { }
       /* Loading a complete project already carries manualGroups. Persisting here
          would save a partially restored state over the project being loaded. */
     }
@@ -292,12 +802,19 @@
     restoreInputValues(data.inputValues);
     document.querySelectorAll('#tl_branchGroup button').forEach(function (b) { b.classList.toggle('selected', +b.dataset.n === tlBc); });
     document.querySelectorAll('#tl_layoutGroup button').forEach(function (b) { b.classList.toggle('selected', +b.dataset.sides === tlLs); });
-    tlPipeOdOverride = tlNormalizePipeOverride(data.pipeOdOverride);
+    tlPipeOdOverride = restoringGroupSnapshot?null:tlNormalizePipeOverride(data.pipeOdOverride);
     if (!tlAppliedPipeOverride()) tlPipeOdOverride = null;
     renderThreeLevel();
     if (typeof tlUpdatePlanBar === 'function') tlUpdatePlanBar();
     if (window.tlPumpUpdateNote) window.tlPumpUpdateNote();
     toast(bindingNotice||'方案已打开');
+    return true;
+    }catch(restoreError){
+      var rollbackOk=restoreRollbackActive||restoreAfterFailedProjectLoad(rollbackSnapshot);
+      try{console.error('[project-restore] restore failed',restoreError);}catch(eLog){}
+      toast(rollbackOk?'方案恢复失败，已恢复载入前状态':'方案恢复失败，载入前状态回滚未能确认');
+      return false;
+    }
   };
 
   ['saveProjectBtn','ppSaveProject'].forEach(function(id){
@@ -324,8 +841,60 @@
   };
   /* 「本页当前地块已变为 id」：记锚点 + 静默留存完整状态（id 为空 = 只清锚点，不动存档） */
   window.runyeSetCurrentPlot=function(id){
-    window.runyeMarkCurrentPlot(id);
-    if(id && typeof window.runyeSaveProject==='function'){ try{ window.runyeSaveProject(true); }catch(e){} }
+    if(id){
+      if(typeof window.runyeSaveProject!=='function') return false;
+      try{ if(window.runyeSaveProject(true)!==true) return false; }catch(e){ return false; }
+    }
+    return window.runyeMarkCurrentPlot(id)!==false;
+  };
+  /* 替换当前边界前先保存旧地块。hash 切页不会触发 pagehide，在线地图回传和地块库
+     「设为当前」必须显式走这一步，避免旧二级管网被新 currentPlotId 错误归档。 */
+  window.runyeSaveCurrentPlotBeforeSwitch=function(){
+    if(!window.currentPlotId) return true;
+    if(typeof window.runyeSaveProject!=='function') throw new Error('当前地块保存接口未加载');
+    if(window.runyeSaveProject(true)!==true) throw new Error('当前地块快照未确认写入');
+    return true;
+  };
+  /* 新地块接管前清除运行时三级方案，避免旧块的总管/泵站编辑混入新块快照。
+     旧块已先写入工程快照；各块在多地块页只恢复 L2 档案，组级总管由组页单独维护。 */
+  window.runyeResetPlotScopedNetworkState=function(){
+    window.tlDiagramData=null;
+    window.tlManualGroups=[];
+    window.tlPendingSel=[];
+    window.tlGroupMode=false;
+    /* A canonical single-plot model belongs to exactly one plot ID. Do not let the
+       outgoing plot's model survive while the incoming plot is loading its own L2 slot. */
+    window.__runyeSingleCanonicalDesign=null;
+    window.__runyeSingleDrawingDesignShadow=null;
+    window.__ryPpGenSig=null;
+    try{ if(typeof tlPipeOdOverride!=='undefined') tlPipeOdOverride=null; }catch(eOverride){}
+    try{ if(typeof tlZoneStepClear==='function') tlZoneStepClear(); }catch(eZone){}
+    try{ if(typeof writeTlAux==='function') writeTlAux({drops:null,src:null,nodes:null,dims:null,plotPos:null}); }catch(eAux){}
+    try{ if(window.RyTlEditPipes){ window.RyTlEditPipes.reset(); if(window.RyTlEditPipes.discardSaved) window.RyTlEditPipes.discardSaved(); } }catch(eEdit){}
+    try{ if(window.RyTlAutoEdits){ window.RyTlAutoEdits.reset(); if(window.RyTlAutoEdits.discardSaved) window.RyTlAutoEdits.discardSaved(); } }catch(eAuto){}
+    try{ if(window.RyTlNodes&&window.RyTlNodes.reset) window.RyTlNodes.reset(); }catch(eNodes){}
+    return true;
+  };
+  /* 组级设计只在组 ID、成员和几何均匹配时恢复，防止组边界更新后套用旧总管。 */
+  window.runyeRestoreGroupDesign=function(groupId){
+    try{
+      var ge=window.__runyeGroupEdit, current=window.__runyeSubPlots;
+      if(!ge||!ge.active||!Array.isArray(current)||current.length<2||typeof window.grRestoreState!=='function') return false;
+      var raw=localStorage.getItem('runye_group_design_v1:'+encodeURIComponent(String(groupId)));
+      if(!raw) return false;
+      var saved=JSON.parse(raw), design=saved&&saved.design, source=design&&design.subPlots;
+      if(!Array.isArray(source)||source.length!==current.length) return false;
+      var byId=Object.create(null);
+      source.forEach(function(s){if(s&&s.id!=null)byId[String(s.id)]=s;});
+      for(var i=0;i<current.length;i++){
+        var a=current[i],b=a&&byId[String(a.id)];
+        if(!a||!b||!Array.isArray(a.poly)||!Array.isArray(b.poly)||a.poly.length!==b.poly.length)return false;
+        for(var j=0;j<a.poly.length;j++){
+          if(Math.abs((+a.poly[j].x)-(+b.poly[j].x))>0.5||Math.abs((+a.poly[j].y)-(+b.poly[j].y))>0.5)return false;
+        }
+      }
+      return window.grRestoreState(design)===true;
+    }catch(eGroupRestore){ return false; }
   };
   function ryAutoRestoreProject(){
     try{
@@ -345,8 +914,8 @@
       var lib=readPlotLibrary();
       var hit=false; for(var i=0;i<lib.length;i++){ if(lib[i].id===a.id){ hit=true; break; } }
       if(!hit) return;                                                   /* 地块已删除 → 不恢复 */
+      if(window.runyeLoadProject({key:SAVE_KEY, silent:true})!==true) return;
       window.__runyeAutoRestored=true;
-      window.runyeLoadProject({key:SAVE_KEY, silent:true});
       /* load 恢复三级管网几何与设计状态；设计工作区按恢复的地块/参数延迟重建，
          否则用户回到三级页仍是一片空白。二级施工图同理重出一次。 */
       /* 重建期间临时静音弹窗：tlAutoGenerate / ppGenerateDiagram 在「无地块」或「生成出错」时会
@@ -384,7 +953,10 @@
         if(!handoffSnap||!Array.isArray(handoffSnap.measuredPolygon)||handoffSnap.measuredPolygon.length<3)return;
         var expectedPlotId=handoffSnap.currentPlotId==null||handoffSnap.currentPlotId===''?null:String(handoffSnap.currentPlotId);
         var expectedPoly=(handoffSnap.groupPlan&&Array.isArray(handoffSnap.groupPlan.frame))?handoffSnap.groupPlan.frame:handoffSnap.measuredPolygon;
-        window.runyeLoadProject({key:restoreKey,silent:true,isolated:true});
+        if(window.runyeLoadProject({key:restoreKey,silent:true,isolated:true})!==true){
+          try{if(typeof atShowToast==='function')atShowToast('AI 规划地块交接载入失败，请返回原页面重试');}catch(eLoadToast){}
+          return;
+        }
         var actualPlotId=window.currentPlotId==null||window.currentPlotId===''?null:String(window.currentPlotId);
         var actualPoly=(typeof window.ppGetPolyPts==='function')?window.ppGetPolyPts():(window.measuredPolygon||[]);
         var samePoly=typeof window.ryPolySig==='function'&&window.ryPolySig(actualPoly)===window.ryPolySig(expectedPoly);
@@ -420,7 +992,10 @@
         var anchorPlotId=anchor.id==null||anchor.id===''?null:String(anchor.id);
         if(anchorPlotId!==savedPlotId)return;
       }else if(savedPlotId&&pagePlotId!==savedPlotId)return;
-      window.runyeLoadProject({key:SAVE_KEY,silent:true});
+      if(window.runyeLoadProject({key:SAVE_KEY,silent:true})!==true){
+        try{if(typeof atShowToast==='function')atShowToast('AI 规划恢复失败，请返回重试');}catch(eLoadToast){}
+        return;
+      }
       try{localStorage.removeItem('runye_aiplot_anchor_v1');}catch(e){}
       var _ryAlert0=window.alert;
       try{
@@ -461,9 +1036,9 @@
         var anchorPlotId=anchor.id==null||anchor.id===''?null:String(anchor.id);
         if(anchorPlotId!==savedPlotId) return;
       }else if(savedPlotId&&pagePlotId!==savedPlotId) return;
+      if(window.runyeLoadProject({key:SAVE_KEY, silent:true})!==true) return;
       window.__runyeAutoRestored=true;
       window.__ryPpGenSig=snap.ppGenSig;   /* 记回内存：后续 pagehide 继续留存 */
-      window.runyeLoadProject({key:SAVE_KEY, silent:true});
       var _ryAlert0=window.alert;
       try{
         window.alert=function(){};

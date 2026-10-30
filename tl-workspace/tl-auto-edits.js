@@ -62,7 +62,7 @@
   var emitting = false;
   /* v141 批处理：批量写入（如经济面板「应用到图面」逐段 setCaliber）期间不逐次广播/落盘，
      最外层 endBatch 合并为一次 notify('batch')。手工单段编辑不走批，行为不变。 */
-  var batchDepth = 0, batchDirty = false;
+  var batchDepth = 0, batchDirty = false, batchActions = {};
   var savedLS = null;                   // localStorage 兜底存档（init 时读一次）
 
   /* ---------- 基础 ---------- */
@@ -83,12 +83,12 @@
     if (typeof localStorage === 'undefined') return;
     try { localStorage.setItem(LS_KEY, JSON.stringify(serialize())); } catch (e) {}
   }
-  function notify(action, source) {
+  function notify(action, source, actions) {
     if (emitting) return;
-    if (batchDepth > 0) { batchDirty = true; return; }   /* v141：批处理期间只记脏标记 */
+    if (batchDepth > 0) { batchDirty = true; batchActions[action] = true; return; }   /* v141：批处理期间只记脏标记 */
     emitting = true;
     try {
-      var detail = { action: action, source: source || '', lens: Object.keys(lens).length, fits: fits.length, cals: Object.keys(cals).length, moves: Object.keys(moves).length, hidden: Object.keys(hidden).length };
+      var detail = { action: action, source: source || '', actions: actions || null, lens: Object.keys(lens).length, fits: fits.length, cals: Object.keys(cals).length, moves: Object.keys(moves).length, hidden: Object.keys(hidden).length };
       for (var i = 0; i < subs.length; i++) { try { subs[i](detail); } catch (e) {} }
     } finally { emitting = false; }
     persist();
@@ -489,7 +489,11 @@
   function beginBatch() { batchDepth++; }
   function endBatch() {
     if (batchDepth > 0) batchDepth--;
-    if (batchDepth === 0 && batchDirty) { batchDirty = false; notify('batch', 'endBatch'); }
+    if (batchDepth === 0 && batchDirty) {
+      batchDirty = false;
+      var actions = Object.keys(batchActions); batchActions = {};
+      notify('batch', 'endBatch', actions);
+    }
   }
 
   /* 订阅：fn({action, source, lens, fits})；返回退订函数 */
