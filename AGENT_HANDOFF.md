@@ -4516,4 +4516,60 @@ grRender 从下到上＝地块底图+分区线 → v236 尺寸标注 → 各块�
 - 闸门：`ci_check_static` PASS=29、`node --test` **186/186**、`check_publish_refs` PASS、`_probe_errors.mjs` 连点 5 键 0 异常。
 
 **版本**：`sw.js VERSION = 'v826-flat-toolbar'`；`style-01.css?v=826-flat-toolbar`。
-**状态**：本地已验证，未提交未发布（v824 / v825 / v826 三版在同一批未发）。
+**状态**：已随 `c1c6af3` 发布（见 §26.72）。
+
+### 26.72 v816~v826 发布结果：`c1c6af3` 推送成功，线上复核全过（2026-10-30）
+
+**用户原话**：「部署吧」（紧接 v826 工具栏拍平之后）。
+
+**提交**：`c1c6af3`（`fb991fc..c1c6af3`，35 files，+1706 / −2152）。分支 `master`。
+
+**发布范围 —— 这批不是单一版本，是一个长期未提交的工作区**
+上次提交是 `fb991fc`（v815），此后 v816~v826 十一版全部堆在工作区，其中混着**另一轮会话**的 v818/v819/v821/v822/v823。逐 hunk 拆分不可行（非交互环境无 `git add -p`，且 `index.html` / `style-01.css` / `sw.js` 三个文件里两轮的改动在同一份 diff 里咬合），因此**按全量提交**处理 —— 这也与用户实际所见一致（用户一直在本地工作区验收）。
+
+清单要点：
+- 本次（v824~v826）：`mod/ry-icons.js`、`mod/plot-editor.js`、`mod/inline-24.js`、`mod/style-01.css`、`sw.js`、`index.html`；
+- 他轮（v818~v823）：`core/storage-guard.js`（新增）、`core/measured-area-bridge-store.js`、`core/plot-library-store.js`、`mod/inline-12/13/16.js`、`mod/online-map.js`、`runye-nav.js` 等；
+- 结构改动：`runye-hydraulics.html`(−906) 与 `runye-map-measure.html`(−363) 删除、`ryp-demo.html` 移入 `feature-archive/_dev-leftovers/`。**删除前已 grep 确认无任何页面/脚本引用**（命中的只有 `.aoci/` 里的代码认知历史快照，非运行引用）；
+- 测试：`tests/toolbar_dedupe.test.cjs`(6) + `tests/toolbar_single_layer.test.cjs`(10) 用 `git add -f` 入库（`tests/` 被 `.gitignore` 屏蔽，第 78~95 行是逐文件白名单）。
+
+**刻意不入库的**
+- `_probe_*.mjs` / `_shot_*.mjs`：`.gitignore` **第 138-139 行有专门规则**，说明项目刻意不收这类探针。历史那 47 个入库的 `_*.mjs` 是 `_dump_*` / `_audit_*` / `_diff_*` 等旧命名，规则不同 —— **不要用 `-f` 强加**（上一轮曾判断「可入库」，是错的）；
+- `_crop_*.mjs` / `_scan_*.mjs` / `_enhance_*.mjs` / `_*.json` / `*.png`：分析产物与临时截图。
+
+**发布前闸门**
+`ci_check_static` **PASS=29 FAIL=0**；`node --test tests/*.test.cjs` **186 pass / 0 fail**；`check_publish_refs` **PASS**（36 页面 / 214 条本地引用）。
+
+**Pages 传播**：`sw.js` 轮询到第 5 次（约 40s）才从 `v815-icon-unify` 翻到 `v826-flat-toolbar`。前面 4 次都是旧值 —— 印证「线上冒烟首跑大面积红先怀疑传播未完成」。
+
+**线上复核（`BASE=https://zhanglihui2026.github.io/runye-irrigation/`）**
+
+| 探针 | 结果 |
+| --- | --- |
+| `_probe_bar_bg.mjs` | 条带 `rgb(255,255,255)` / `bgImg:none` / `border 0px` / `shadow:none`；**分区组与管路组容器均 `rgba(0,0,0,0)` + `bgImg:none`** ⇒ 浅绿渐变彻底消失 |
+| `_probe_lock_click.mjs` | 三态全对：`{lock, hasSvg:true, bg transparent}` → `{unlock, hasSvg:true, active, bg #e6f2ec, color #1c6b4f, aria true}` → 回到 `lock` |
+| `_probe_fontsize.mjs` | 「多地块编辑」12px/12px/h=97；「图层控制」12px/12px/h=96 |
+| `_smoke_v521_live.mjs` | **26/27**，唯一红项见下 |
+
+**唯一红项（既存，非本次回归）**
+`线上 [v530] style-01 已无「无效圆角」声明（不带 !important 且非 50%） :: 8`
+用同款正则本地复现 8 处，`git blame` 归属：
+
+| 行 | 值 | 归属 |
+| --- | --- | --- |
+| 2629 | `0` | `e0331918`（v653b） |
+| 3408 | `0` | `2552c742`（v668） |
+| 4897 | `8px` | `fb991fc`（v815） |
+| 4976 | `4px 0 0 4px` | `fb991fc`（v815） |
+| 4977 | `0 4px 4px 0` | `fb991fc`（v815） |
+| 5032 | `4px` | `fb991fc`（v815） |
+| 5127 | `0` | `fb991fc`（v815） |
+| 4850 | `2px` | 本次 `c1c6af3`，但 diff 里同行**同时有 `+` 和 `−`** ⇒ 是「合并条带盒模型」时**搬家**，不是新写 |
+
+⇒ **七处历史既存，一处是搬家**，本次没有引入任何新的无效圆角。
+L4850 那处是 `::-webkit-scrollbar-thumb` 伪元素，`body *{border-radius:0!important}` **不作用于伪元素**，所以它实际生效、不属于「死声明」；冒烟用的是纯文本正则，区分不了伪元素才判红。
+**决定先不改**：视觉零变化却要动 v815/v653b/v668 的七个元素，属扩大改动面，等用户发话统一清一次。
+
+**下一步可做（等用户拍板）**
+1. 清掉那 7 处历史无效圆角（视觉零变化，纯死代码），让冒烟回到 27/27；
+2. 若想让检查更准，可把 v530 项改成「排除 `::-webkit-scrollbar*` 规则」，但**改测试去迁就代码有风险**，优先删代码而非放宽检查。
