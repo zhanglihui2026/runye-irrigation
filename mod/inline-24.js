@@ -12,6 +12,9 @@
       multiCalBtn=el('tlWsMultiCalBtn'), multiClearBtn=el('tlWsMultiClearBtn'), multiBtn=el('tlWsMultiBtn'),
       maskBtn=el('tlWsMaskBtn');   /* v162：管道遮蔽开关按钮 */
   var curAutoPid=null;
+  /* [v824] 改按钮文字一律走这里：直接写 textContent 会连 RyIcons.decorate 挂的
+     <svg class="ry-ico"> 一起清掉，按钮随即变空白（#ppLockArea 踩过同一个坑）。 */
+  function setBtnLabel(b,t){ if(!b)return; if(window.RyIcons&&window.RyIcons.setLabel)window.RyIcons.setLabel(b,t); else b.textContent=t; }
   var HINT_IDLE='点「阀门/三通/弯头/节点」后再点管线即插入（弯头自动吸附到最近拐角/端头；节点=配件组合，点节点弹面板勾选配件、可两节点连线）；点击管线可选中，按住管线拖动可整条平移；总管按主管接入点分段，点选即选中所在段';
   function f1(v){ return (Math.round(v*10)/10).toFixed(1); }
   function refresh(m){
@@ -63,7 +66,7 @@
       if(isAuto) curAutoPid = info.id; else curAutoPid=null;
       if(lenBtn) lenBtn.style.display = (info && !isFit && !isManFit) ? '' : 'none';   /* 配件无可改长度 */
       if(delBtn){ delBtn.style.display = (info && !isAuto) ? '' : 'none';   /* 自动管线不可删除 */
-        delBtn.textContent = (isFit || isManFit) ? '🗑 删除配件' : '🗑 删除选中'; }
+        setBtnLabel(delBtn, (isFit || isManFit) ? '🗑 删除配件' : '🗑 删除选中'); }
       if(moveResetBtn) moveResetBtn.style.display = (isAuto && window.RyTlAutoEdits && window.RyTlAutoEdits.moveOf(info.id)) ? '' : 'none';
       if(fitDist) fitDist.style.display = isFit ? '' : 'none';   /* 选中配件：两侧距离输入框（阶段2b） */
       if(isFit && fitA && fitB){
@@ -181,7 +184,7 @@
     var unified = pipeOn || !!window._tlDimMulti;
     multiBtn.classList.toggle('active', !!unified);
     multiBtn.setAttribute('aria-pressed', unified?'true':'false');
-    multiBtn.textContent = unified ? '多选中 · 点此退出' : '多选';
+    setBtnLabel(multiBtn, unified ? '多选中 · 点此退出' : '多选');
     multiBtn.title = unified
       ? '多选已开启：点管身逐段加选管道（同类型），点尺寸线逐条加选标注；再点已选对象取消该段；点空白清空管道选择；点本按钮退出并清空两侧选择'
       : '多选：开启后点管身逐段加选管道（同类型），点尺寸线逐条加选标注；选中后旁边弹出信息卡可改管径、看长度累加；Ctrl/⌘ + 点管身可直接加选（无需开启）';
@@ -209,7 +212,7 @@
     if(!maskBtn) return;
     maskBtn.classList.toggle('active', !!on);
     maskBtn.setAttribute('aria-pressed', on?'true':'false');
-    maskBtn.textContent = on ? '遮蔽中 · 点此退出' : '遮蔽管道';
+    setBtnLabel(maskBtn, on ? '遮蔽中 · 点此退出' : '遮蔽管道');
     maskBtn.title = on
       ? '遮蔽已开启：点管身即切换该管的遮蔽/取消遮蔽（不进入拖动）；被遮蔽的管道灰色虚线显示且不计入材料清单；Esc 或再点本按钮退出'
       : '遮蔽管道：开启后点管身切换该管的遮蔽/取消遮蔽；被遮蔽的管道以灰色虚线显示，且不计入材料清单（管长/管径/三通与阀门件数/该管上的节点配件）';

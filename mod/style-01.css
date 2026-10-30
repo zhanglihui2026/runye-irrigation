@@ -3943,36 +3943,18 @@ body.ry-tool #pipePlanSection .ry-pane-edit>#ppCanvasWrap{
 body.ry-tool #pipePlanSection .ry-pane-edit>#ppLegend{
   grid-column:1;grid-row:3;margin:0;min-width:0;padding:4px 10px 8px;
 }
-/* 工具列：贴主区右缘，跨满三行 */
-body.ry-tool #pipePlanSection #ppToolbar{
-  grid-column:3;grid-row:1 / -1;
-  display:flex;flex-direction:column;flex-wrap:nowrap;align-items:stretch;
-  margin:0;padding:7px;gap:4px;
-  background:var(--ry-panel);
-  border:0;border-left:1px solid var(--ry-line);
-  overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
-}
-/* 每个按钮独占一行、铺满列宽。
-   justify-content 兜住 JS 写的行内 display:inline-flex，text-align 兜住 inline-block，
-   两种行内 display 都能保持文字居中（行内样式无法被本层覆盖，故用双保险）。 */
-body.ry-tool #pipePlanSection #ppToolbar>.pp-btn,
-body.ry-tool #pipePlanSection #ppToolbar>.pp-btn-ghost,
-body.ry-tool #pipePlanSection #ppToolbar>.pp-btn-generate{
-  width:100%;box-sizing:border-box;flex:0 0 auto;
-  height:28px;min-height:0;padding:0 6px;
-  display:flex;align-items:center;justify-content:center;text-align:center;
-  font-size:12px;line-height:1;white-space:nowrap;
-  overflow:hidden;text-overflow:ellipsis;
-}
-body.ry-tool #pipePlanSection #ppToolbar>.pp-btn-generate{
-  height:32px;font-size:12.5px;font-weight:700;
-}
-/* 分隔符：竖排下由竖线改为横线；主操作「生成施工图」沉底
-   （:has() 不被支持时该条自动失效 → 退化为整体靠上排布，无副作用） */
-body.ry-tool #pipePlanSection #ppToolbar>.pp-sep{
-  width:100%;height:1px;margin:3px 0;flex:0 0 auto;background:var(--ry-line);
-}
-body.ry-tool #pipePlanSection #ppToolbar>.pp-sep:has(+ .pp-btn-generate){margin-top:auto}
+/* [v824 收口 · 竖排工具列时代残留，整组删除]
+   原内容：「贴主区右缘、跨满三行」的 #ppToolbar 容器（grid-column:3 / grid-row:1/-1 /
+   flex-direction:column / overflow-y:auto）+ 每个按钮「独占一行、铺满列宽」
+   （width:100% / height:28px / padding:0 6px / font-size:12px）+ 竖排专用分隔符。
+   删除依据（_probe_lock_btn.mjs 把 #ppLockArea 的 18 条命中规则原样导出）：
+     · 容器：被 `#ryDrawingHost #ppToolbar{display:flex!important;flex-direction:row!important;
+       width:auto!important}` 与 `body.ry-tool …#ryDrawingHost #ppToolbar{grid-column:auto;
+       grid-row:auto}` 全量覆盖 —— 工具栏早已改成宿主顶部一行；
+     · 按钮：被 v802 的 32×32!important / padding:0!important / font-size:0!important
+       全量覆盖，实测计算宽度 32px，height:28px 这行从没生效；
+     · 分隔符：组分隔线整体 display:none!important，量的是不存在的盒子。
+   这正是用户说的「多层样式、覆盖掉的、没用的」那两层。 */
 /* [v193] 成组编辑切换组：竖排下整宽、标题独占一行、两个模式键并排等分 */
 body.ry-tool #pipePlanSection #ppToolbar>.pp-group-edit{
   display:flex;flex-direction:row;flex-wrap:wrap;justify-content:center;align-content:center;
@@ -4803,55 +4785,30 @@ body.ry-tool #tlPipePlanSection[data-ry-rail="1"] > .pp-body>.pp-grip-side,
   body.ry-tool.ry-cad-vp > main > #tlPipePlanSection{padding-top:0!important}
 }
 
-/* ===== [v597] 二级工具轨（#ppToolbar）按钮皮肤统一到三级 .tl-ws-btn 口径 =====
-   用户对比截图：「地块分区 vs 管路规划 右侧控制面板显然不一样」。
-   根因（探针 _probe_pp_right_v2.mjs 实测）：v357 时代的全局 .pp-btn / .pp-btn-ghost
-   基础皮肤（border+radius+背景）在历次清理中被删（现仅剩 hover 与 #ryCadSide
-   搬移态的 scoped 规则 —— 而工具轨从不搬进 #ryCadSide）⇒ 主区 #ppToolbar 的
-   按钮退化成 UA 默认 2px outset 立体边框、方角、灰底，与三级 .tl-ws-btn
-   （1px solid #c5d6cc 扁平浅绿）完全两样。
-   本段按三级实际渲染值（_probe_tl_ref.mjs 实测：border #c5d6cc / bg #f8fbf9 /
-   字色 #2c4a3d / 高 28px / 字号 13px 由 .runye-typography 统一）对齐；
-   轨体背景同步三级 .tl-ws-toolbar 的渐变。
-   双 ID 前缀 + !important：压过上方「去绿收口」的 u-* hover/active（4041/4046/
-   4139/4140）与 #ppAutoPipe 常亮强调（4140）—— 工具轨内一律以三级口径为准。
-   hover 口径同三级：只变边框色（#2d604b），底色/字色不动；
-   active 口径同三级 .tl-ws-btn.active：实心 #2d604b 白字。 */
-body.ry-tool #pipePlanSection #ppToolbar{
-  background:linear-gradient(180deg,#f8fbf9 0%,#f2f7f4 100%);
-  border:0;border-left:1px solid #dde8e1;
-}
-body.ry-tool #pipePlanSection #ppToolbar>button.pp-btn,
-body.ry-tool #pipePlanSection #ppToolbar>button.pp-btn-ghost,
-body.ry-tool #pipePlanSection #ppToolbar button.pp-mirror-btn,
-body.ry-tool #pipePlanSection #ppToolbar button.pp-fine-btn,
-body.ry-tool #pipePlanSection #ppToolbar button.pp-ge-mode,
-body.ry-tool #pipePlanSection #ppToolbar button.pp-ge-chip,
-body.ry-tool #pipePlanSection #ppToolbar button.pp-back-group{
-  border:1px solid #c5d6cc;background:#f8fbf9;color:#2c4a3d;
-}
-body.ry-tool #pipePlanSection #ppToolbar>button.pp-btn:hover,
-body.ry-tool #pipePlanSection #ppToolbar>button.pp-btn-ghost:hover,
-body.ry-tool #pipePlanSection #ppToolbar button.pp-mirror-btn:hover,
-body.ry-tool #pipePlanSection #ppToolbar button.pp-fine-btn:hover,
-body.ry-tool #pipePlanSection #ppToolbar button.pp-ge-mode:hover,
-body.ry-tool #pipePlanSection #ppToolbar button.pp-ge-chip:hover{
-  border-color:#2d604b!important;background:#f8fbf9!important;color:#2c4a3d!important;
-}
-body.ry-tool #pipePlanSection #ppToolbar>button.pp-btn.active,
-body.ry-tool #pipePlanSection #ppToolbar>button.pp-btn-ghost.active,
-body.ry-tool #pipePlanSection #ppToolbar button.pp-mirror-btn.active,
-body.ry-tool #pipePlanSection #ppToolbar button.pp-ge-mode.active,
-body.ry-tool #pipePlanSection #ppToolbar button.pp-ge-chip.active{
-  background:#2d604b!important;border-color:#2d604b!important;color:#fff!important;font-weight:600;
-}
-/* 「自动管路」原 u-accent 常亮强调取消：与其它键同皮肤，开启态走 .active 实心绿 */
-body.ry-tool #pipePlanSection #ppToolbar>#ppAutoPipe{
-  color:#2c4a3d!important;background:#f8fbf9!important;border-color:#c5d6cc!important;
-}
-body.ry-tool #pipePlanSection #ppToolbar>#ppAutoPipe.active{
-  background:#2d604b!important;border-color:#2d604b!important;color:#fff!important;
-}
+/* ===== [v826 顶部工具栏最终模型：一条白条 + 一堆透明按钮] =====
+   用户（2026-10-30 红框截图）：「这个工具栏与其他的样式不一样，有若隐若现的浅绿色……
+   我要的就是一个简单的工具栏，上面有各种功能按钮，鼠标放在功能按钮上、点击变色就好了，
+   不需要那么复杂。现在工具栏的样式没问题，但我怀疑代码有多层覆盖。」
+
+   那句话被证实了 —— 浅绿就是下面这层画的（`_probe_bar_bg.mjs` 用 CDP 取计算样式）：
+     分区组 #ppToolbar  background-image: linear-gradient(#f8fbf9 → #f2f7f4)  + border-left
+     管路组 #tlWsToolbar background-image: none
+   ⇒ 同一条工具栏，左半截（分区组）发绿、右半截（管路组）是白的，分界线正好落在两组的接缝。
+   那层是 v597「把二级工具轨皮肤对齐三级 .tl-ws-btn」时加的（连按钮的 #f8fbf9 浅绿底 +
+   #c5d6cc 边框一起）。它早就被 v815 的 SVG 图标段整段覆盖成透明，只剩这层**底色**还在发光。
+
+   现在只保留三层，各只有一个出处（这就是「简单」的全部内容）：
+     ① 条带 #ryDrawingHost > .ry-drawing-toolbar：白底 + 1px 下边框，是**唯一**的绘制面；
+     ② 组容器 #ppToolbar / #tlWsToolbar：透明、无边框、无阴影（见上方同组那条规则）；
+     ③ 按钮：透明、无边框、32×32；hover 一种浅灰 #eef2f6，激活一种浅绿 #e6f2ec（v815 段）。
+   要加新按钮：不用写任何 CSS，挂上 id/label 让 ry-icons.js 认出来即可。 */
+/* [v824 收口] 此处原有「实心绿 active」两条（.pp-btn/.pp-btn-ghost/.pp-mirror-btn/
+   .pp-ge-mode/.pp-ge-chip 的 active，以及 #ppAutoPipe 常亮态）—— 全部删除。
+   依据：`_probe_toolbar_map.mjs` 实测工具栏 34 个按钮**全部**带 data-ry-icon，
+   于是 v815 段 `#pipePlanSection #ryDrawingHost …button[data-ry-icon].active`
+   （3 个 id）无条件压过这里（2 个 id），后者从未生效；.pp-ge-mode/.pp-ge-chip 在
+   v803 后只存在于 #ppPlotPanel 抽屉里，本组选择器也不再命中。
+   激活态的唯一出处现在只剩 v815 段那一处（#e6f2ec 底 / #1c6b4f 图标）。 */
 
 /* CAD 单一制图区迁移阶段 2：同一宿主随二级/三级功能区移动，内部保留各自渲染层。 */
 #ryDrawingHost{
@@ -4876,15 +4833,21 @@ body.ry-tool #pipePlanSection #ppToolbar>#ppAutoPipe.active{
 
 /* Unified CAD canvas: both legacy renderers share one persistent viewport.
    Tool mode changes the visible control group; layer toggles never replace the canvas. */
+/* [v824 收口] 工具栏外观的**唯一出处**：宿主网格行高 + 条带盒模型。
+   此前这里是 46px/gap5/5px8px/#f8fbf9/#c9d8cf，下游 [v782] 又写一遍 40px/gap2/
+   4px10px/#fff/#e4ebee —— 两份都在跑，靠源码顺序后者赢，改动时永远不知道该改哪份。
+   现在合并成一份，值＝用户当前实际看到的（_probe_lock_btn.mjs 实测计算样式）。 */
 #ryDrawingHost.ry-drawing-host{
-  position:relative;grid-column:3;grid-row:1;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:46px minmax(0,1fr);
+  position:relative;grid-column:3;grid-row:1;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:40px minmax(0,1fr);
   min-width:0;min-height:0;width:100%;max-width:100%;height:100%;overflow:hidden;background:#e8eeeb;
 }
 #ryDrawingHost>.ry-drawing-toolbar{
-  grid-row:1;display:flex;align-items:center;gap:5px;min-width:0;width:100%;max-width:100%;min-height:42px;
-  padding:5px 8px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;background:#f8fbf9;box-sizing:border-box;
-  border-bottom:1px solid #c9d8cf;z-index:50;
+  grid-row:1;display:flex;align-items:center;gap:2px;min-width:0;width:100%;max-width:100%;min-height:40px;
+  padding:4px 10px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;background:#fff;box-sizing:border-box;
+  border-bottom:1px solid #e4ebee;z-index:50;
 }
+#ryDrawingHost>.ry-drawing-toolbar::-webkit-scrollbar{height:4px}
+#ryDrawingHost>.ry-drawing-toolbar::-webkit-scrollbar-thumb{background:#d4dde2;border-radius:2px}
 #ryDrawingHost .ry-drawing-tool-mode,#ryDrawingHost .ry-drawing-layer-toggle{
   flex:0 0 32px;width:32px;height:32px;padding:0;border:1px solid #c7d7ce;background:#fff;
   color:#244b39;font:600 17px/1 system-ui,sans-serif;cursor:pointer;
@@ -4895,21 +4858,24 @@ body.ry-tool #pipePlanSection #ppToolbar>#ppAutoPipe.active{
 #ryDrawingHost #ppToolbar,#ryDrawingHost #tlWsToolbar{
   display:flex!important;flex:0 0 auto!important;flex-direction:row!important;align-items:center;gap:5px;min-width:max-content;
   width:auto!important;max-width:none;max-height:none;margin:0!important;padding:0!important;background:transparent;overflow:visible!important;
+  /* [v826] 组容器只是排版用的透明盒子：不许有自己的底色 / 边框 / 阴影。
+     这一行是「一条工具栏」这个模型的护栏 —— 历史上 v597 就是在这里给分区组
+     加了一层 linear-gradient(#f8fbf9→#f2f7f4)+border-left，于是同一条工具栏
+     左半截发绿、右半截发白（用户 2026-10-30 红框投诉）。 */
+  border:0!important;box-shadow:none!important;
 }
 #ryDrawingHost #ppToolbar[hidden],#ryDrawingHost #tlWsToolbar[hidden],#ryDrawingHost #ppQuickBar[hidden]{display:none!important}
 body.ry-tool #pipePlanSection #ryDrawingHost #ppToolbar{grid-column:auto;grid-row:auto;flex-direction:row!important;flex-wrap:nowrap!important;align-items:center!important;min-width:max-content;max-height:none;overflow:visible!important;border:0!important}
-body.ry-tool #pipePlanSection #ryDrawingHost #ppToolbar>.pp-sep{width:1px;height:24px;flex:0 0 1px;margin:0;background:#d7e2dc}
 #ryDrawingHost #tlWsToolbar .tl-ws-btn{width:auto;min-width:32px;max-width:150px;padding:0 8px}
-#ryDrawingHost #tlWsToolbar .tl-ws-sep{width:1px;height:24px;flex:0 0 1px;margin:0;background:#d7e2dc}
 #ryDrawingHost #tlWsToolbar .tl-ws-hint{display:none}
-body.ry-tool #pipePlanSection #ryDrawingHost [data-ry-tool-group] button[data-ry-icon]{
-  position:relative;flex:0 0 32px!important;width:32px!important;min-width:32px!important;max-width:32px!important;
-  height:32px!important;min-height:32px!important;padding:0!important;font-size:0!important;line-height:32px!important;
-  overflow:hidden;white-space:nowrap;box-sizing:border-box;vertical-align:middle;
-}
-#ryDrawingHost [data-ry-tool-group] button[data-ry-icon]::before{
-  content:attr(data-ry-icon);display:inline-block;margin:0;font-size:18px;line-height:30px;vertical-align:top;
-}
+/* [v824 收口] 此处原有三组规则，全部删除：
+   ① #ppToolbar>.pp-sep / #tlWsToolbar .tl-ws-sep 的 1×24px 竖分隔线尺寸 —— 下方
+      [v788] 已把所有组分隔线 `display:none!important`，这两条量的是不存在的盒子；
+   ② `[data-ry-tool-group] button[data-ry-icon]` 的 32×32 —— 与 v802 段
+      `.ry-drawing-toolbar button[data-ry-icon]` 同值、同作用域（工具组必在工具栏内），
+      两处各写一遍 !important，纯重复；
+   ③ 它的 ::before 字形通道 —— v815 已对挂 SVG 的按钮 content:none，从未生效。
+   现在「按钮尺寸」的唯一出处是 v802 段，「图标渲染通道」的唯一出处是 v815 段。 */
 /* [v788 单层工具栏 + 角度组悬浮] 用户截图（箭头指组分隔线断口）指令：「我要把所有功能
    都放在一个工具栏……只有一层关系，就是面板里面执行按钮，另外，分区旋转角度那一套，
    还是要单独拎出来」。
@@ -4931,7 +4897,8 @@ body.ry-tool #pipePlanSection #ryDrawingHost [data-ry-tool-group] button[data-ry
   border:1px solid #e0e7ea;border-radius:8px;background:#fff;padding:5px 8px;margin:0;
   overflow:visible;z-index:60;white-space:nowrap;
 }
-#ryDrawingHost #ppQuickBar[hidden]{display:none!important}
+/* [v824] 这里原有 `#ryDrawingHost #ppQuickBar[hidden]{display:none!important}`，
+   与上方 `#ppToolbar[hidden],#tlWsToolbar[hidden],#ppQuickBar[hidden]` 那条完全重复，删。 */
 /* 抓手：v246 的 cursor:grab 规则带 `.pp-canvas-wrap>` 前缀，宿主内不命中 —— 按原手感补回
    （全站方角规则会压掉 v783 的 8px 圆角，属有意扁平化，不写 radius）。 */
 #ryDrawingHost #ppQuickBar .pp-quick-grip{cursor:grab;font-size:13px;line-height:1;color:#93a1a8;user-select:none;padding:0 3px;touch-action:none}
@@ -4947,6 +4914,16 @@ body.ry-tool #pipePlanSection #ryDrawingHost [data-ry-tool-group] button[data-ry
   writing-mode:vertical-rl;letter-spacing:3px;text-align:center;
   min-height:96px;padding:10px 6px;border:1px solid #c8d7ce;border-right:0;
   background:#fff;color:#244b39;font:600 12px/1 system-ui,sans-serif;cursor:pointer;
+  /* [v825 2026-10-30 用户截图] 红箭头（图层控制）与蓝箭头（多地块编辑 / 左栏一级标题）
+     「文字尺寸统一」。实测两个标签当时都是 13px —— 不是本段写的 12px，
+     而是被 runye-typography 的 `p,li,input,select,button{font-size:13px!important}`
+     顶上去的（两个标签都是 <button>）；而左栏一级标题是 <summary>，落在 12px 档。
+     ⇒ 要「统一到左栏标题那一档」，只能在本段再写一遍 12px 并同样带 !important：
+       本选择器 2 个 id，与那条元素选择器同为 !important 时按特异性决胜负，我们赢。
+     副作用（这次是好事）：12px 下 5 字高 5×(12+3)+20=95、4 字高 4×(12+3)+20=80，
+     都小于 min-height:96 ⇒ 两个标签高度第一次真的都是 96px，
+     下面那句「96px 高 + 8px 间距 → top:202px」才第一次说得通（此前多地块那个是 102px）。 */
+  font-size:12px!important;line-height:1;
 }
 #ryDrawingHost #tlWsLayerDrawerTab{top:202px}
 #ryDrawingHost #ppPlotDrawerTab:hover,
@@ -5030,24 +5007,14 @@ body.ry-tool #pipePlanSection #ryDrawingHost [data-ry-tool-group] button[data-ry
 /* ================= [v782 视觉重构] 顶部工具栏 → WPS/Office 扁平风格 =================
    用户参考截图（WPS 工具栏）：无边框图标钮、浅灰 hover 高亮、组间细分隔线、
    紧凑单行、彩色图标、主操作带浅色底。仅 #ryDrawingHost 作用域 —— 不改 DOM、
-   绑定与 verify 计数契约；要回旧观感：删除本段（至文件尾）即可。 */
-#ryDrawingHost.ry-drawing-host{grid-template-rows:40px minmax(0,1fr)}
-#ryDrawingHost>.ry-drawing-toolbar{
-  gap:2px;min-height:40px;padding:4px 10px;background:#fff;border-bottom:1px solid #e4ebee;
-}
-#ryDrawingHost>.ry-drawing-toolbar::-webkit-scrollbar{height:4px}
-#ryDrawingHost>.ry-drawing-toolbar::-webkit-scrollbar-thumb{background:#d4dde2;border-radius:2px}
-/* 扁平图标钮：无边框、透明底、28×28、hover 浅灰圆角 */
-#ryDrawingHost .ry-drawing-layer-toggle,
-#ryDrawingHost [data-ry-tool-group] button[data-ry-icon]{
-  flex:0 0 28px!important;width:28px!important;min-width:28px!important;max-width:28px!important;
-  height:28px!important;min-height:28px!important;max-height:28px!important;padding:0!important;
-  border:0!important;border-radius:4px;background:transparent!important;color:#47555e;cursor:pointer;
-}
-#ryDrawingHost .ry-drawing-layer-toggle{font-size:16px;line-height:28px}
-#ryDrawingHost [data-ry-tool-group] button[data-ry-icon]::before{font-size:17px;line-height:28px}
-#ryDrawingHost .ry-drawing-layer-toggle:hover,
-#ryDrawingHost [data-ry-tool-group] button[data-ry-icon]:hover{background:#eef2f6!important}
+   绑定与 verify 计数契约。
+   [v824 收口] 本段原有两份重复内容已删除（都是「同一件事两处写、靠源码顺序决胜负」，
+   实测计算样式证明后者从没生效过）：
+     ① 条带盒模型（grid-template-rows:40px / gap:2px / padding:4px 10px / #fff /
+        border #e4ebee / 滚动条）→ 已合并进上方 #ryDrawingHost>.ry-drawing-toolbar；
+     ② 28×28 一套尺寸（layer-toggle / [data-ry-tool-group] button）+ ::before 17px
+        + hover #eef2f6 → 全被 v802 的 32×32!important 与 v815 的墨色覆盖，
+        实测按钮计算宽度 32px。 */
 /* [v815 退役] 此处原有「彩色图标（WPS 式按功能配色）」一组规则：
      ppPlotPanelToggle 蓝 / ppLockArea 紫 / ppZoneAutoBtn 绿 / ppGenerate 蓝底 /
      tlWsFitValve 橙 / tlWsFitTee 青 / tlWsFitElbow 粉 / tlWsFitNode 蓝 /
@@ -5059,13 +5026,6 @@ body.ry-tool #pipePlanSection #ryDrawingHost [data-ry-tool-group] button[data-ry
 /* 按下 / 激活态：浅色高亮底 + 深图标（替代旧深绿实心块） */
 #ryDrawingHost [data-ry-drawing-mode-button][aria-pressed="true"],
 #ryDrawingHost [data-ry-layer-toggle][aria-pressed="true"]{background:#e6f2ec!important;border:0!important;color:#1c6b4f!important}
-#ryDrawingHost [data-ry-tool-group] button[data-ry-icon][aria-pressed="true"]{background:#e3edf8!important;color:#2f6fd9!important}
-body.ry-tool #pipePlanSection #ryDrawingHost #ppZoneAutoBtn.active,
-#ryDrawingHost #ppZoneAutoBtn.active{background:#e6f2ec!important;border-color:transparent!important;color:#1c6b4f!important}
-/* 组间细分隔线（各组之间一条淡线，代替按钮自带边框） */
-#ryDrawingHost .ry-drawing-tsep,
-#ryDrawingHost #ppToolbar>.pp-sep,
-#ryDrawingHost #tlWsToolbar .tl-ws-sep{height:20px;margin:0 4px;background:#e3e9ec}
 /* 快捷条：grip 淡化、分区角度输入轻边框 */
 #ryDrawingHost .pp-quick-grip{color:#b6c2c9;font-size:14px;padding:0 2px}
 #ryDrawingHost .pp-zone-angle-control{gap:3px;font-size:11px;color:#47555e}
@@ -5082,8 +5042,11 @@ body.ry-tool #pipePlanSection #ryDrawingHost #ppZoneAutoBtn.active,
    ② 彩色 emoji（🔒💾☁📐🔄🔧）字形满格 ≈18px、单色符号（⋈⊤∟⊕╱↶⌖）字形 ≈0.6em，
      同一 font-size 视觉一大一小（「弯头看起来比较大」同源：⌐/∟ 字形比例差异）；
    ③ 原 .pp-btn-ghost/.tl-ws-btn 各自的 border-color/padding 残留（嵌套覆盖）。
-   ⇒ 一套盒子规则压平所有来源：32×32、无边框（active 用背景反馈）、图标单通道
-   ::before 渲染；emoji 按钮 ::before 缩小补偿满格字形。 */
+   ⇒ 一套盒子规则压平所有来源：32×32、无边框（active 用背景反馈）。
+   [v824 收口] 本段现在是**按钮尺寸的唯一出处**：原来还有一处
+   `[data-ry-tool-group] button[data-ry-icon]` 同写 32×32!/padding:0!（已删），
+   v782 段还有一套 28×28（已删）。图标通道也早已改由 v815 段的 SVG 承担，
+   本段不再管图标渲染。 */
 #ryDrawingHost .ry-drawing-toolbar button[data-ry-icon],
 #ryDrawingHost .ry-drawing-toolbar .ry-drawing-layer-toggle{
   flex:0 0 32px!important;width:32px!important;min-width:32px!important;max-width:32px!important;
@@ -5091,17 +5054,11 @@ body.ry-tool #pipePlanSection #ryDrawingHost #ppZoneAutoBtn.active,
   padding:0!important;margin:0!important;border:1px solid transparent!important;border-radius:0!important;
   font-size:0!important;line-height:30px!important;
 }
-#ryDrawingHost .ry-drawing-toolbar button[data-ry-icon]::before{
-  content:attr(data-ry-icon);display:inline-block;margin:0;font-size:18px;line-height:30px;vertical-align:top;
-}
-#ryDrawingHost .ry-drawing-toolbar button[data-ry-icon][data-ry-icon-emoji]::before{
-  font-size:14px;
-}
-/* 图层开关走同一渲染通道后（v802 inline-18 改 data-ry-icon），旧 span 已不存在；
-   兜底清掉其残留内边距/边框表达。 */
-#ryDrawingHost .ry-drawing-toolbar .ry-drawing-layer-toggle::before{
-  content:attr(data-ry-icon);font-size:18px;
-}
+/* [v824 收口] 这里原有三条 ::before 字形通道规则（`content:attr(data-ry-icon)`，
+   font-size 18px / emoji 变体 14px / layer-toggle 18px）——v815 已对**所有**挂了
+   SVG 的按钮写 `content:none!important`，而工具栏 35 个按钮全部有 SVG，
+   ⇒ 这三条一条都没生效过，纯属「图标双份渲染」的历史残留，删除。
+   要回退到字形图标：把 v815 段的两条 content:none 去掉，再按 git 历史恢复本组。 */
 
 /* ===== [v807 在线地图左栏扒平：对齐分区与管路 .ry-props 特性面板] =====
    用户指令：「左侧这个工具栏面板，文字样式大小不一，风格也是各种嵌套/覆盖，不统一，
@@ -5230,15 +5187,29 @@ body.ry-tool #pipePlanSection #ryDrawingHost #ppZoneAutoBtn.active,
      ② 颜色 → 本段单点定义：默认一种墨色 #3f4a45，hover 加深，激活态一种绿
         #1c6b4f / #e6f2ec。「按功能配色」整组已删（见上方退役注释）；
      ③ 通道 → 有 SVG 的按钮停用 ::before 字形通道，避免字符与 SVG 双份图标。
-   纪律：本段是绘图工具栏图标配色的唯一出处，一律 #ryDrawingHost 前缀；
-   只在此处写 !important（对抗 v782/v802 两代历史规则）。 */
+   纪律：本段是绘图工具栏图标配色与「激活态颜色」的唯一出处，一律 #ryDrawingHost 前缀。
+   [v824 收口] 原注释写「只在此处写 !important（对抗 v782/v802 两代历史规则）」——
+   那两代里真正会被本段压掉的规则（v782 的 28×28 / 蓝色 active / 分隔线、
+   v802 与 4905 各自一份的 ::before 字形通道、v597 的实心绿 active）已经在 v824 一并
+   删除，工具栏不再有多层样式互相打架。本段保留 !important 只为一件事：压过
+   `body *{border-radius:0!important}` 这类全站兜底与行内临时态，不是用来跟历史层对抗。 */
 #ryDrawingHost .ry-drawing-toolbar button[data-ry-ico-svg]::before,
 #ryDrawingHost .ry-drawing-toolbar .ry-drawing-layer-toggle[data-ry-ico-svg]::before{
   content:none !important;display:none !important;
 }
 #ryDrawingHost .ry-drawing-toolbar button[data-ry-ico-svg],
 #ryDrawingHost .ry-drawing-toolbar .ry-drawing-layer-toggle[data-ry-ico-svg]{
-  display:flex !important;align-items:center !important;justify-content:center !important;
+  /* [v824 2026-10-30 用户截图反馈] 这里原来是 `display:flex !important` —— 一个 !important
+     把**所有**行内 display:none 全压掉了，于是三类本该隐藏的按钮集体复活：
+       ① v96 明确隐藏的「主管/支管/横竖锁定/水源」（配件插入入口本在工具轨）；
+       ② 「阀门 / 遮蔽管线」——它们在合并工具栏里与管路组那两个同形图标并排，
+          用户看到的就是「两个阀门、两个遮蔽」（本轮截图投诉的正是这个）；
+       ③ 按选中态动态切 display 的那批（改长/删除/改直径/整体改直径/退出多选/恢复位置），
+          本该「选中管线才出现」，结果常显。
+     拆掉 !important 后：行内 display 恢复最高优先级（行内样式本就该赢过样式表），
+     没写行内的按钮照旧吃到 flex 布局。这条是「隐藏按钮又冒出来」这类问题的**唯一**根因，
+     以后改工具栏显隐，别再用 !important 写 display。 */
+  display:flex;align-items:center;justify-content:center;
   font-size:0 !important;
 }
 /* 图标尺寸唯一出处：18×18 in 32×32 按钮；描边参数写在这里，
@@ -5307,3 +5278,33 @@ body.ry-tool #pipePlanSection #ryDrawingHost #ppZoneAutoBtn.active,
   color:#1f2a24 !important;background:#eef2f6 !important;border-color:#cbd8d0 !important;
   box-shadow:none !important;transform:none !important;
 }
+
+/* ===== [v817 按钮行与灰条同宽] =====
+   用户：「红框中的按钮 整体宽度跟标题的浅灰色条，左右同宽。」
+   此前 .tools / .save-row / .pill-list 自带左右 10px 内距，按钮行比 .sec-t 灰条
+   左右各缩进 10px。现去掉这三类容器的左右内距，让按钮吃满整行（与灰条同宽）；
+   纯文字内容（.hint 提示、.results .row 数值行）保持 10px 缩进不变。
+   .tools 是纵向 flex、子按钮默认 stretch；.save-row .mbtn 是 flex:1 1 0 ——
+   容器放开后按钮自动吃满，无需再写宽度。 */
+#onlineMapSection .side .tools{padding:8px 0}
+#onlineMapSection .side .tools .hint{padding:0 10px}
+#onlineMapSection .side .save-row{padding:6px 0}
+#onlineMapSection .side > section > .pill-list{padding:8px 0 2px}
+
+/* ===== [v819 「完成」按钮悬浮说明面板] =====
+   用户：「完成并画下一块，改为完成，鼠标放在这里的时候，要解释这个按钮的功能，
+   要弹出悬浮面板。」
+   结构：.dt-tip 是按钮内的 span（phrasing content，合法），display:block + 绝对定位
+   挂在按钮正下方；悬停显示，pointer-events:none 不吃鼠标、不挡地图拖拽。
+   不用 fixed 定位：工具条挂在 .map-wrap 顶端，下方就是地图画布，没有 overflow 裁切
+   （v809 那种 .side 滚动容器裁切在这里不存在）。 */
+#mapDrawTools #btnFinish{position:relative}
+#mapDrawTools .dt-tip{
+  display:none;position:absolute;top:calc(100% + 8px);left:0;z-index:1300;
+  width:max-content;max-width:330px;padding:10px 12px;box-sizing:border-box;
+  background:#fff;border:1px solid #cbd8d0;box-shadow:0 6px 18px rgba(24,50,38,.16);
+  font-size:11px;line-height:1.7;color:#3f4a45;text-align:left;white-space:normal;
+  letter-spacing:0;pointer-events:none;
+}
+#mapDrawTools #btnFinish:hover .dt-tip,
+#mapDrawTools #btnFinish:focus-visible .dt-tip{display:block}

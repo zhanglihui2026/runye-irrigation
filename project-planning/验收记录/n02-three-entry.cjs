@@ -2,7 +2,7 @@
 'use strict';
 
 /* N02 三入口回传验收。用 Playwright 驱动独立 Edge 页面，验证真实导航、鼠标
- * 右键、列表按钮和“设为当前”按钮；不连接用户浏览器档案，阻断外部网络并阻止
+ * 右键、列表按钮和地图绘制工具栏回传；不连接用户浏览器档案，阻断外部网络并阻止
  * Service Worker，页面数据仅写入本次临时浏览器上下文。
  *
  * 用法：node project-planning/验收记录/n02-three-entry.cjs
@@ -260,11 +260,27 @@ async function main() {
     assert.equal(await page.evaluate((pid) => window.RyTlAutoEdits?.isHidden?.(pid),priorHiddenPid),false,
       '切到另一地块后不得继承上一块的三级遮蔽编辑');
 
-    // 入口三：地块绘制页的地块库“设为当前”。
-    await nav('地块绘制', 'areaTool');
-    const libraryItem = page.locator('#plotLibList .at-lib-item').filter({ hasText: 'N02-A' }).first();
-    await libraryItem.locator('[data-act="current"]').click();
-    await checkEntry('n02-a', '地块库设为当前');
+    // 入口三：在线地图绘制工具栏完成一块新地后直接回传。
+    // 页面合并后不再有独立“地块绘制”页或其“设为当前”列表入口。
+    await nav('在线地图', 'onlineMapSection');
+    await clickMapListButton('N02-A', '.place-go');
+    const libraryBeforeDraw = await page.evaluate(() => JSON.parse(localStorage.getItem('runye_plot_library') || '[]').length);
+    await page.locator('#btnDraw').click();
+    const mapBox = await page.locator('#map').boundingBox();
+    assert.ok(mapBox, '入口三：在线地图画布应可见');
+    for (const [x, y] of [[0.34, 0.34], [0.52, 0.34], [0.52, 0.52], [0.34, 0.52]]) {
+      await page.mouse.click(mapBox.x + mapBox.width * x, mapBox.y + mapBox.height * y);
+    }
+    await page.locator('#btnFinish').click();
+    await waitFor((count) => JSON.parse(localStorage.getItem('runye_plot_library') || '[]').length === count + 1,
+      '入口三 绘制完成后地块自动入库', 10000, libraryBeforeDraw);
+    const drawnPlot = await page.evaluate(() => {
+      const plots = JSON.parse(localStorage.getItem('runye_plot_library') || '[]');
+      return plots.reduce((latest, plot) => !latest || (plot.ts || 0) > (latest.ts || 0) ? plot : latest, null);
+    });
+    assert.ok(drawnPlot?.id && drawnPlot?.polyLatLng?.length >= 3, '入口三：新绘制的地块应按稳定ID及经纬度入库');
+    await page.locator('#btnCopy').click();
+    await checkEntry(drawnPlot.id, '地图绘图工具栏回传');
 
     assert.deepEqual(errors, [], '页面不应出现运行期异常');
     assert.deepEqual(dialogs, [], '流程中不应出现意外原生弹窗');

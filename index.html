@@ -10,20 +10,21 @@
 <script src="core/measured-area-bridge-store.js?v=598-tab-scoped-plot-transfer"></script>
 <script src="core/cloud-design-binding-store.js?v=592-cloud-design-binding"></script>
 <script src="core/economic-settings-store.js?v=1"></script>
-<script src="core/plot-library-store.js?v=569-plot-library-unique-ids"></script>
+<script src="core/plot-library-store.js?v=823-fix-transfer-save-alert"></script>
+<script src="core/storage-guard.js?v=823-fix-transfer-save-alert"></script>
 <script src="runye-material-audit.js?v=607-branch-material-span"></script>
 <script src="runye-map-partition.js?v=690-narrow-partition-bridge"></script>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>润野灌溉设计优化版｜滴灌管径与水泵选型</title>
 <meta name="description" content="输入地块、滴灌带与水源参数，快速计算灌溉分区、主管支管管径和水泵工作点。"/>
-<link rel="stylesheet" href="mod/style-01.css?v=815-icon-unify">
+<link rel="stylesheet" href="mod/style-01.css?v=826-flat-toolbar">
 <link rel="stylesheet" href="runye-inverse-design.css?v=277">
 <script defer src="runye-inverse-design.js?v=438-branch-flow-conservation"></script>
 <link rel="stylesheet" href="runye-terrain.css?v=454-terrain-sidebar-peer">
 <script src="runye-terrain.js?v=650-gr-terrain-btn-gone"></script>
 <link rel="stylesheet" href="runye-ai-plan.css?v=544-float-card-unify">
-<script src="runye-ai-plan.js?v=754-ai-canonical-rollback"></script>
+<script src="runye-ai-plan.js?v=823-fix-transfer-save-alert"></script>
 <link rel="stylesheet" href="runye-case-library.css?v=277">
 <script src="runye-case-library.js?v=277"></script>
 <script src="runye-geo.js"></script>
@@ -231,7 +232,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 
 </style>
 <link rel="stylesheet" href="runye-mobile.css?v=242">
-<script src="runye-mobile.js?v=453-disable-l2-schematic"></script>
+<script src="runye-mobile.js?v=823-fix-transfer-save-alert"></script>
 
 <!-- PWA: independent installation and offline support -->
 <link rel="manifest" href="manifest.webmanifest">
@@ -320,7 +321,7 @@ body.ry-worst-off [data-tlworst]{display:none}
   <script src="runye-announce.js?v=621-invite-l2"></script>
   <!-- 顶部导航动作按钮（系统图，runye-nav.js act 项）：动作映射须先于 runye-nav.js 注册 -->
   <script src="mod/inline-05.js?v=357"></script>
-  <script src="runye-nav.js?v=805-plot-draw-merge"></script>
+  <script src="runye-nav.js?v=823-fix-transfer-save-alert"></script>
   <!-- [NEW MODULE: DXF 导出] 入口：删除本行即卸载（不改动任何原有逻辑） -->
   <script src="runye-dxf.js?v=636-north-arrow"></script>
   <!-- [NEW MODULE: pipe_optim] 入口：删除本行即卸载本隔离模块（不改动任何原有逻辑） -->
@@ -643,12 +644,17 @@ body.ry-worst-off [data-tlworst]{display:none}
           <button class="mbtn" id="btnImport">导入(GeoJSON/KML/KMZ/奥维轨迹)</button>
         </div>
         <input type="file" id="fileImport" accept=".geojson,.json,.kml,.ovkml,.kmz" style="display:none" />
-        <div class="hint">保存后可累计多个地块；可在地块库中选择「设为当前」。</div>
+        <!-- [v816 删除] 此处原有一行提示「保存后可累计多个地块；可在地块库中选择『设为当前』。」
+             ① v806 已把「地块库」整节从本左栏移除（与「我的地块」重复），文案指向的入口不存在了。
+             纯静态 DOM，JS/CSS 均未引用，直接删除即可。要恢复：把该 div 放回本行。
+             [v818] 同组的 #myPlotHint 也按用户要求删除（见「我的地块」节内注释）。 -->
       </section>
       <section>
         <h4 class="sec-t">我的地块</h4>
         <div class="pill-list" id="myPlotList" hidden></div>
-        <div class="hint" id="myPlotHint">保存/导入后的地块列在这里；点击飞到该地块，×删除。</div>
+        <!-- [v818 删除] 此处原有一行提示「保存/导入后的地块列在这里；点击飞到该地块，×删除。」
+             （#myPlotHint）。操作是自解释的：行本身可点（飞到）、×在行尾，无需说明文字；
+             JS 零引用，直接删除。要恢复：把该 div 放回 #myPlotList 之后。 -->
         <!-- [v185/v189 2026-10-03] 多地块成组：勾选若干相邻小地块 → 编为一组便于一起操作。
              ★ 语义：只成组、不改几何；各块轮廓与块间道路/间隔/水渠/空地**原样保留**。
              成组后可直接「回传地块绘制」把**各子地块**（而不是合并后的大块）
@@ -677,15 +683,20 @@ body.ry-worst-off [data-tlworst]{display:none}
     <div class="side-grip" id="mapSideGrip" title="拖动调节工具栏宽度；双击恢复默认"></div>
     <div class="map-wrap">
       <div id="map"></div>
-      <!-- ===== [v495] 主程序内嵌在线地图的绘制工具条（与独立页 runye-map-measure.html
-           v494 同款）：左栏「绘制」区迁来，挂在地图区顶端；按住「⠿ 绘制」抓手拖动
+      <!-- ===== [v495] 主程序内嵌在线地图的绘制工具条（唯一实现，v821 起独立页已删除）：
+           左栏「绘制」区迁来，挂在地图区顶端；按住「⠿ 绘制」抓手拖动
            （mod/ry-panel.js rypDraggable：位置记忆 localStorage['mapDrawToolsPos']，
            clamp 在 .map-wrap 内 = 不超过导航栏）。按钮 id 不变，online-map.js 零改动。 ===== -->
       <div class="map-draw-tools ryp-float ry-hbar" id="mapDrawTools" data-ry-panel
            data-ry-position-key="mapDrawToolsPos" data-ry-default-top="12" data-ry-default-left="12">
         <span class="dt-grip" data-ry-drag title="按住拖动工具条；位置自动记住">⠿ 绘制</span>
         <button class="ry-hbar-btn" id="btnDraw">✏️ 开始画框</button>
-        <button class="ry-hbar-btn" id="btnFinish">✅ 完成并画下一块</button>
+        <!-- [v819] 文案收短 + 悬浮说明面板：用户「完成并画下一块，改为完成；鼠标放上来要弹出悬浮面板解释功能」。
+             功能实义（online-map.js v186）：顶点 ≥3 自动存入「我的地块」→ 清空画布 → 紧接着画下一块（连续绘制）；
+             不足 3 点视为草稿只清不存。停止方式：再点「开始画框」或右键地图。
+             .dt-tip 是按钮内的 span（合法：phrasing content），display:block + 绝对定位挂在按钮下方，
+             悬停显示；pointer-events:none 不吃鼠标。[v821] 独立页已删除，本处即唯一实现。 -->
+        <button class="ry-hbar-btn" id="btnFinish">✅ 完成<span class="dt-tip">完成 = 结束当前地块：顶点满 3 个时自动存入「我的地块」并清空画布，随即开始画下一块，可以连续画多块；不足 3 个顶点视为草稿，只清空不保存。想停止连续绘制，再点一次「✏️ 开始画框」或在地图上右键。</span></button>
         <button class="ry-hbar-btn" id="btnAddPt">➕ 加点</button>
         <button class="ry-hbar-btn" id="btnUndo">↩ 撤销</button>
         <button class="ry-hbar-btn" id="btnMeasure">📏 测距</button>
@@ -862,8 +873,18 @@ body.ry-worst-off [data-tlworst]{display:none}
     <button class="pp-btn-ghost" id="ppLineOrtho" type="button" style="display:none">横竖锁定</button>
     <span class="pp-sep" style="display:none"></span>
     <button class="pp-btn" data-mode="source" style="display:none">水源</button>
-    <button class="pp-btn" data-mode="valve" style="display:none">阀门</button>
-    <button class="pp-btn" data-mode="maskPipe" style="display:none">遮蔽管线</button>
+    <!-- [v824 2026-10-30 用户截图指令] 「阀门 / 遮蔽管线」由隐藏改为**常驻可见**：
+         用户圈出工具栏里两个阀门图标说「这个阀门取消，跟前面的重复了」、两个遮蔽图标说
+         「遮蔽管道也取消，跟前面的也重复了」。
+         排查结论：重复的是**管路组**的那一对（#tlWsFitValve / #tlWsMaskBtn，v70 那批配件插入按钮），
+         它们在「分区与管路」这一页实测是死的（RyTlWs 未初始化，点了不进插入模式），
+         而分区组这两个（data-mode=valve / maskPipe）是活的（实测点画布真的落下一个阀门）。
+         ⇒ 删掉管路组那对（见下方管路组注释），把分区组这对**转为常驻入口**——
+         它原本只是被 v96 用行内 display:none 藏起来（那时配件插入走三级工具轨），
+         现在工具轨合并进同一条，它已是唯一能用的阀门/遮蔽入口，再藏就没入口了。
+         注：v96 那批「主管/支管/横竖锁定/水源」四个仍然隐藏（手工画线不进水力计算，见上条注释）。 -->
+    <button class="pp-btn" data-mode="valve">阀门</button>
+    <button class="pp-btn" data-mode="maskPipe">遮蔽管线</button>
     <button class="pp-btn" data-mode="adjustCut" title="拖动分区线调整分区；把一条线拖到相邻线上松手即可合并分区（分区数随之减少），误操作可用「回退」撤销">调网格</button>
     <button class="pp-btn-ghost" id="ppResetCuts" title="恢复系统默认分区线位置（撤销所有拖动与合并）">重置网格</button>
     <!-- 任务K（2026-09-26）：分区面积锁定按钮。开启后拖动/微调网格线只整体平移分区，各区面积不变；合并/重置/重新分区/旋转会先自动解锁 -->
@@ -904,8 +925,10 @@ body.ry-worst-off [data-tlworst]{display:none}
          非成组地块时整个控件隐藏，不打扰。 -->
     <span class="pp-sep"></span>
     <!-- [v248 2026-10-06 用户要求] 「生成施工图」已整节点搬到做图区左上角快捷条（#ppQuickBar，「重新分区」之后）—— 同一节点搬移而非复制；要搬回：在本行放回 class 为 pp-btn-generate、id 与按钮同名的节点即可。 -->
-    <button class="pp-btn-ghost" id="ppDownload" style="display:none">📥 下载</button>
-    <button class="pp-btn-ghost" id="ppPrint" style="display:none">🖨️ 打印A3</button>
+    <!-- [v824 2026-10-30 用户指令] 「📥 下载 / 🖨️ 打印A3」两个按钮**搬到工具栏最末尾**
+         （用户截图圈这两个：「下载跟打印放在工具栏最后」）。
+         原位置就在本行（#ppToolbar 尾部，且带行内 display:none）；现整节点搬到管路组
+         #tlDxfExport 之后，见下方「工具栏末尾」注释。 -->
     <!-- [v796 取消] 「多地块编辑」顶部入口已按用户截图标注（红箭头指顶部工具栏 ▤ 按钮）
          移除：v789 起右缘已有「多地块编辑」抽屉标签（#ppPlotDrawerTab）驱动同一面板，
          顶部按钮纯属重复。syncPlotDrawer 的 aria-expanded 同步、v775 修复块的点击绑定
@@ -1378,7 +1401,14 @@ body.ry-worst-off [data-tlworst]{display:none}
          常驻可见，不必先选中管线 —— 点按钮高亮进入插入模式 → 点管线即在点击处插入 → 再点本按钮或 Esc 退出；
          自动管线与手工管线都支持；弯头会自动吸附到该管线最近的拐角/端头。
          旧版「⊞ 三通 / 🔩 阀门」需先选中自动管线才出现（且不支持手工管线），此处已取消。 -->
-    <button class="tl-ws-btn" id="tlWsFitValve" type="button" aria-pressed="false" title="插入阀门：点本按钮后，再点管线上的位置即插入（自动/手工管线都支持）">阀门</button>
+    <!-- [v824 2026-10-30 用户截图指令] 「阀门」按钮取消 —— 与前面分区组的「阀门」重复：
+         用户箭头指向本键，原话「这个阀门取消，跟前面的重复了」。
+         实测：本页（分区与管路）window.RyTlWs 未初始化，本键点了不进插入模式（死键），
+         而分区组 data-mode="valve" 是活的 ⇒ 保留分区组那个，删本键。
+         页面侧接线全部空值守卫（mod/inline-24.js: `FIT_BTNS[k]` 循环里 `if(!b) return`），
+         删元素不报错；核心层 setFitMode 未动（三级管线页仍可用）。
+         要恢复：把 <button class="tl-ws-btn" id="tlWsFitValve" …>阀门</button> 原样插回本行，
+         并删掉 verify_ry_tool.js mustNot 里登记的那一条。 -->
     <button class="tl-ws-btn" id="tlWsFitTee" type="button" aria-pressed="false" title="插入三通：点本按钮后，再点管线上的位置即插入（自动/手工管线都支持）">三通</button>
     <button class="tl-ws-btn" id="tlWsFitElbow" type="button" aria-pressed="false" title="插入弯头：点本按钮后点击管线，自动吸附到最近的拐角/端头">弯头</button>
     <button class="tl-ws-btn" id="tlWsFitNode" type="button" aria-pressed="false" title="插入节点（v150）：点本按钮后，再点管线即在点击处插入节点圆点；点节点弹面板勾选配件组合（三通/阀门/45°弯头/90°弯头），两节点可连线，配件按数量计入工程量汇总">节点</button>
@@ -1388,7 +1418,13 @@ body.ry-worst-off [data-tlworst]{display:none}
          手工管线无本地持久化（仅会话内有效），无遗留清理问题。RyTlWs.undo/clearManual 核心能力保留。 -->
     <button class="tl-ws-btn" id="tlWsLenBtn" type="button" style="display:none" title="就地改长：前段保持不动，末段沿原方向拉伸/收缩">📏 改长</button>
     <button class="tl-ws-btn" id="tlWsDelBtn" type="button" style="display:none" title="删除选中的手工管线">🗑 删除选中</button>
-    <button class="tl-ws-btn" id="tlWsMoveResetBtn" type="button" style="display:none" title="恢复选中自动管线的原始位置（清除图面平移）">⌖ 恢复位置</button>
+    <!-- [v824 2026-10-30 用户截图指令] 「⌖ 恢复位置」按钮取消：用户箭头指向本键，原话「这个复位按钮取消吧」。
+         它本来只该在「选中的自动管线被平移过」时出现（inline-24 的 onPipeSelect 动态切 display），
+         但 v815 给工具栏图标写了 display:flex!important，把那句动态 display:none 压掉了 ⇒ 常显。
+         本次两头一起收：按钮删掉（用户要求），样式那处 !important 也拆掉（见 style-01.css v824 段，
+         同一个坑还让「改长/删除/改直径/退出多选」等按选中态切换的键常显）。
+         接线处全部 `if(moveResetBtn)` 空值守卫，删元素零影响；RyTlAutoEdits.moveOf 能力保留（图面平移仍可手动清）。
+         要恢复：把 <button class="tl-ws-btn" id="tlWsMoveResetBtn" …>⌖ 恢复位置</button> 插回本行。 -->
     <button class="tl-ws-btn" id="tlWsCalBtn" type="button" style="display:none" title="改选中管线的管径（与右键改管径等效）">🔧 改直径</button>
     <span class="tl-ws-sep" id="tlWsMultiSep" style="display:none"></span>
     <span class="tl-ws-multi" id="tlWsMultiInfo" style="display:none"></span>
@@ -1422,7 +1458,12 @@ body.ry-worst-off [data-tlworst]{display:none}
          主管根数派生的三通与阀门件数/挂在该管上的节点配件）。再点本按钮或 Esc 退出。
          右键管身也有「遮蔽此管 / 取消遮蔽」一项（单段与多选都支持）。
          必须在 #tlAutoPipe 之前 —— A6 契约要求生成按钮贴底。 -->
-    <button class="tl-ws-btn" id="tlWsMaskBtn" type="button" aria-pressed="false" onclick="tlWsMaskToggle()" title="遮蔽管道：开启后点管身切换该管的遮蔽/取消遮蔽；被遮蔽的管道以灰色虚线显示，且不计入材料清单（管长/管径/三通与阀门件数/该管上的节点配件）">遮蔽管道</button>
+    <!-- [v824 2026-10-30 用户截图指令] 「遮蔽管道」按钮取消 —— 与前面分区组的「遮蔽管线」重复：
+         用户箭头指向本键，原话「遮蔽管道也取消，跟前面的也重复了」。
+         与上一个阀门同因：本页 RyTlWs 未初始化，本键是死键；分区组 data-mode="maskPipe" 是活的。
+         接线是 onclick="tlWsMaskToggle()" + inline-24 的 maskBtn 空值守卫，删元素自动静默；
+         遮蔽核心能力（灰色虚线 + 不计入材料清单）保留在分区组入口与右键菜单上。
+         要恢复：把 <button class="tl-ws-btn" id="tlWsMaskBtn" …>遮蔽管道</button> 插回本行。 -->
     <!-- 最远水路开关（第五十四轮按钮 → 2026-09-28 改勾选框）：移至做图区右上角第三枚勾选
          #tlWsWorstChk（与「标注显示/地块文字」上下同列，JS 对齐），右侧工具轨原按钮取消。 -->
     <!-- [2026-10-27 用户指令取消] 路径测算按钮删除（RyTlPathMeasure.toggle 入口）：
@@ -1464,6 +1505,13 @@ body.ry-worst-off [data-tlworst]{display:none}
 
     <button class="tl-ws-btn" id="tlAutoPipe" type="button" onclick="tlAutoGenerate()" title="按当前参数生成 / 重新生成三级管线平面图（生成后右侧「管段管径与损失」表逐段列出管长与管径）">🔄 生成管线图</button>
     <button class="tl-ws-btn" id="tlDxfExport" type="button" style="margin-top:6px" title="把地块边界/管道/管径标注/地块名/水泵位置导出为 2004 DXF，CAD 直接打开" onclick="if(window.runyeDxf)runyeDxf.export()">📐 导出 CAD(DXF)</button>
+    <!-- [v824 2026-10-30 用户指令] 「📥 下载 / 🖨️ 打印A3」放在**工具栏最后**（用户原话：
+         「下载跟打印放在工具栏最后」）。整节点从 #ppToolbar 尾部搬到这里（同一 id、不是复制），
+         并去掉行内 display:none（它们是成品输出入口，本来就该常显）。
+         放这里的原因：.ry-drawing-toolbar 的子顺序 = 分区组 → 管路组，本行是管路组最后一个按钮之后，
+         视觉上就是整条工具栏的末尾；不再往 .ry-drawing-toolbar 里塞新容器（少一层 DOM 少一处契约）。 -->
+    <button class="pp-btn-ghost" id="ppDownload">📥 下载</button>
+    <button class="pp-btn-ghost" id="ppPrint">🖨️ 打印A3</button>
     <span class="tl-ws-hint" id="tlWsHint">点「阀门/三通/弯头/节点」后再点管线即插入配件</span>
   </div>
   <div id="tlWsContent"><div class="tl-ws-empty">请先生成三级管线平面图（点左侧「生成管线图」）</div></div>
@@ -2328,9 +2376,9 @@ body.ry-worst-off [data-tlworst]{display:none}
 <!-- ===== 实际地块规划 JS ===== -->
 <script src="mod/inline-11.js?v=653-zone-calibers"></script>
 <!-- [v420-split] 绘图编辑器 IIFE 自 inline-11 迁出：必须紧随 inline-11 之后同步执行 -->
-<script src="mod/plot-editor.js?v=805-plot-draw-merge"></script>
-<script src="mod/inline-12.js?v=784-map-cut-snap-save"></script>
-<script src="mod/inline-13.js?v=683-partition-plot-workflow"></script>
+<script src="mod/plot-editor.js?v=824-toolbar-dedupe"></script>
+<script src="mod/inline-12.js?v=823-fix-transfer-save-alert"></script>
+<script src="mod/inline-13.js?v=823-fix-transfer-save-alert"></script>
 <!-- [v422-head-system-svg] 纯 SVG 核心先于 inline-14 同步加载。 -->
 <script src="mod/head-system-svg.js?v=422-head-system-svg"></script>
 <script src="mod/inline-14.js?v=422-head-system-svg"></script>
@@ -2338,8 +2386,8 @@ body.ry-worst-off [data-tlworst]{display:none}
 <!-- ===== 嵌入导航：移动端菜单 ===== -->
 <script src="mod/inline-15.js?v=357"></script>
 
-<!-- ===== 地图面积测量回传：消费 runye-map-measure.html 写入的数据 ===== -->
-<script src="mod/inline-16.js?v=772-shared-map-icon-tools"></script>
+<!-- ===== 地图面积测量回传：消费在线地图 / 地形模块写入的交接数据（v821 起地图页唯一即本页 #onlineMapSection） ===== -->
+<script src="mod/inline-16.js?v=823-fix-transfer-save-alert"></script>
 <script src="mod/ry-diag.js?v=476-pwa-reset"></script>
 
 <!-- ===== 主区 Tab 绑定 + 底部状态栏 + 视口自适应 ===== -->
@@ -2348,8 +2396,8 @@ body.ry-worst-off [data-tlworst]{display:none}
 <!-- ===== 顶部功能区导航：平滑滚动 + 当前区块高亮 + 隐藏区块自动剔除 ===== -->
 <!-- [v815] 绘图工具栏统一图标集（单色线性 SVG）：必须先于 inline-18.js 加载，
      inline-18 的 decorateToolbar 会在首次装饰时调用 window.RyIcons.decorate。 -->
-<script src="mod/ry-icons.js?v=815-icon-unify"></script>
-<script src="mod/inline-18.js?v=815-icon-unify"></script>
+<script src="mod/ry-icons.js?v=824-toolbar-dedupe"></script>
+<script src="mod/inline-18.js?v=823-fix-transfer-save-alert"></script>
 
 <script src="mod/inline-19.js?v=696-shared-host-init-order"></script>
 
@@ -2377,9 +2425,9 @@ body.ry-worst-off [data-tlworst]{display:none}
 <!-- 过滤系统页（2026-09-18 第七十二轮）：GREEN 单体版管路模型 + 选型计算，
      懒挂载（首次可见时建 DOM），与二级/三级计算双向融合。 -->
 <script src="filter-system/filter-system.js"></script>
-<script src="mod/inline-24.js?v=641-tl-legend-corner"></script>
+<script src="mod/inline-24.js?v=824-toolbar-dedupe"></script>
 <script src="mod/inline-25.js?v=357"></script>
-<script src="mod/inline-27.js?v=815-icon-unify"></script>
+<script src="mod/inline-27.js?v=823-fix-transfer-save-alert"></script>
 <!-- ═══ CAD 单一操作区：全局左工具栏（2026-09-14；右上角视口切换条已取消） ═══════════
      需求：按 CAD 方式所有工作在一个操作区进行 —— 地块信息是基础底图，不同图纸作为
      图层叠加切换；原三块左属性栏折叠进本工具栏（details 分组，默认全部折叠，
@@ -2469,11 +2517,11 @@ body.ry-worst-off [data-tlworst]{display:none}
      删除本行即整体卸载插件体系，原有功能零影响；插件清单见 plugins.json。 -->
 <script type="module" src="core/bootstrap.js?v=2"></script>
 <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.1/cdn/shoelace.js"></script>
-<script src="mod/ry-panel.js?v=815-icon-unify"></script>
+<script src="mod/ry-panel.js?v=823-fix-transfer-save-alert"></script>
 <script src="pwa/vendor/leaflet.js"></script>
-<script src="mod/online-map.js?v=815-icon-unify"></script>
+<script src="mod/online-map.js?v=823-fix-transfer-save-alert"></script>
 <script src="terrain/terrain-core.js?v=410-elev"></script>
 <script src="terrain/terrain-ui.js?v=513-sec-gate"></script>
-<script src="runye-hydraulics-page.js?v=442-native"></script>
+<script src="runye-hydraulics-page.js?v=823-fix-transfer-save-alert"></script>
 </body>
 </html>

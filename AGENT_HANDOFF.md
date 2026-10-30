@@ -4422,3 +4422,98 @@ grRender 从下到上＝地块底图+分区线 → v236 尺寸标注 → 各块�
 **验证**：`_p1/_probe_const_dn_v668.cjs` 13/13 PASS——两块面积差 4 倍（11.25/45 亩）⚡生成后 7 个分区主管全组唯一 Ø140、支管唯一 Ø110；改档 140→90 后全组跟随+系统损失 3.04→9.88 重算跟随；grExportState 存档 dnOver={main:90}；选回设计值覆盖清除+dn 回 140；截图 `_probe_out/v668_const_dn.png`；v660/v666 探针回归通过；check.cjs PASS=29 FAIL=0。
 **版本**：`sw.js VERSION = 'v668-const-dn'`；style-01.css 与 inline-29.js → `?v=668-const-dn`；角标 `界面 v668`。
 **状态**：**已发布** —— 合并式提交 `2552c74`（v654~v668 十五版，含并行会话 v663-ai-handoff），2026-10-22 推送 origin/master 成功（0c899dd..2552c74）；线上冒烟：index.html 引用 `?v=668-const-dn`、sw.js VERSION='v668-const-dn'、style-01/inline-29/plot-editor 资源 200。下版从 v669 起编。
+
+### 26.69 v824-lock-icon：锁定面积「点一下就永久空白」+ 工具栏五层冗余样式收口（2026-10-30）
+
+**用户原话**：「锁定面积那个按钮目前还不能正常显示，你检查一下，这个工具栏是不是有多层样式，把覆盖掉的，没有用的样式代码都删除了。」
+
+**① 图标消失的真根因（不是"看不见"）**
+`mod/plot-editor.js` 的 `ppUpdateLockAreaBtn()` 里写 `btn.textContent='已锁定面积'`。`textContent` 是**整体替换子节点**，会把 `mod/ry-icons.js` 的 `decorate()` 刚 `insertAdjacentHTML` 进去的 `<svg class="ry-ico">` 一起清掉；而 `decorate()` 只在初始化跑那一次 ⇒ 图标再也回不来。按钮本身 `font-size:0` 又把新写进去的文字藏起来 ⇒ 用户看到的是**空白方块**。
+实测证据（`_probe_lock_click.mjs`，点前/点后/再点）：`hasSvg: true → false → false`。
+**这也解释了为什么首屏看着是好的**：`ppUpdateLockAreaBtn()` 在 plot-editor 初始化时就跑（擦掉图标），而 `inline-18.js` 后续对整条工具栏再跑一次 `decorate(toolbarStack)` 把它补回来 —— 于是"打开时正常、点一下就没"。
+
+**修法**（三件套，缺一不可）：
+1. `mod/ry-icons.js` 新增 `setIcon(btn,name)` / `setLabel(btn,text)`：
+   `setLabel` 先找 `:scope > .ry-ico`，有就**只替换 SVG 后面的文字节点**；没有就先写文字再按 `data-ry-icon` 把图标补挂回来。
+   同时新增 `unlock` 图标（开口挂锁），锁定/解锁用图标区分，不再靠看不见的文字。
+   `decorate()` 也改成"已挂 SVG 就直接退出、不改 `data-ry-icon`"——否则会把 `setIcon` 写进去的 `unlock` 按 `BY_ID` 掰回 `lock`。
+2. `plot-editor.js`：`ppUpdateLockAreaBtn()` 改成 `lock ⇄ unlock` + `.active` + `aria-pressed` + `title` 四件套表达状态（并新增 `ppSetBtnLabel`/`ppSetBtnIcon` 两个包装函数）；同源写法一并改：`ppUpdateAutoPipeButton`（自动管路/清除管路）、`ppApplyZoneAutoUI`（地块划分/不划分）。
+3. `mod/inline-24.js`：`delBtn` / `multiBtn` / `maskBtn` 三处 `textContent=` 改走本地 `setBtnLabel`（同样会擦 SVG）。
+
+**② 工具栏确实有五层样式，删掉的清单**
+用 `_probe_lock_btn.mjs`（CDP `CSS.getMatchedStylesForNode`）把 `#ppLockArea` 命中的**18 条规则原样导出**，删掉的全是"实测从未生效"的重复层：
+| 删掉的 | 被谁覆盖 |
+| --- | --- |
+| 竖排时代 `body.ry-tool #pipePlanSection #ppToolbar{grid-column:3;grid-row:1/-1;flex-direction:column;overflow-y:auto}` | `#ryDrawingHost #ppToolbar{flex-direction:row!important}` + `…#ryDrawingHost #ppToolbar{grid-column:auto;grid-row:auto}` |
+| 竖排时代 `#ppToolbar>.pp-btn…{width:100%;height:28px;padding:0 6px;font-size:12px}` | v802 的 `32px!important / padding:0!important / font-size:0!important` |
+| v782 的 28×28 一套（layer-toggle + tool-group）+ `::before` 17px + hover | 同上 32×32（实测计算宽度 32px） |
+| `[data-ry-tool-group] button[data-ry-icon]{32×32}` 第二份 | v802 段 `.ry-drawing-toolbar button[data-ry-icon]`（同作用域同值） |
+| 三处 `::before{content:attr(data-ry-icon)}` 字形通道（18px / emoji 14px / toggle 18px） | v815 段 `content:none!important`（35 个按钮全有 SVG，一条都没生效过） |
+| v597 `.pp-btn.active{background:#2d604b}` + `#ppAutoPipe` 常亮 | v815 段 3 个 id 的 `.active`（实测 34 个按钮全带 `data-ry-icon`） |
+| v782 条带盒模型（40px/gap2/4px10px/#fff/#e4ebee/滚动条） | 合并进 `#ryDrawingHost>.ry-drawing-toolbar` 唯一一处（值＝实测生效值） |
+| `#ppQuickBar[hidden]` 重复一条、`>.pp-sep`/`.tl-ws-sep` 竖线尺寸两条 | 合并 / 组分隔线整体 `display:none!important` |
+
+收口后**各只有一个出处**：条带盒模型 → `#ryDrawingHost>.ry-drawing-toolbar`；按钮尺寸 → v802 段；图标通道 → v815 段（SVG）；激活态配色 → v815 段（#e6f2ec / #1c6b4f）。
+
+**验证**：
+- `_probe_toolbar_map.mjs` 前后逐按钮比对：**34 个按钮、x/w/h/vis 全等，差异 0 条**（删的全是死代码，不动布局）；
+- `_probe_lock_click.mjs`：点前 `lock` → 点后 `unlock`+`active`+`aria-pressed=true` → 再点回 `lock`，`hasSvg` 三态恒为 true；
+- `_shot_page.mjs` 整页截图：18 个可见按钮一行排列、间距均匀、无空白键；
+- 新增 `tests/toolbar_single_layer.test.cjs` **8 项**（图标不被 textContent 擦掉 / 条带与尺寸各只一处 / 无 `content:attr(data-ry-icon)` / `#ppToolbar` 不再竖排 / 实心绿 active 与重复隐藏规则不许回来）；
+- 闸门：`ci_check_static` PASS=29、`node --test tests/*.test.cjs` **184/184**、`check_publish_refs` PASS；`_probe_errors.mjs` 连点 5 个按钮 **0 异常**。
+- `verify_ry_tool.js` 仍然是红的（21 FAIL / 55 MISS / 1 REVIVED `pp-plan-unit`），**全部为先前既存**：失败小节集中在 v246~v315 段，且不含任何 `ppToolbar / ry-drawing-toolbar / ry-icons / ppLockArea` 关键词。
+
+**版本**：`sw.js VERSION = 'v824-toolbar-dedupe'`（changelog 已补 ⑤⑥）；`style-01.css / plot-editor.js / ry-icons.js / inline-24.js` 的 `?v=` 全部抬到 `824-toolbar-dedupe`。
+**状态**：本地已验证，**未提交未发布**（工作区还混着他轮 v823 的一批未提交改动）。
+
+### 26.70 v825-drawer-tab-12px：右缘两个竖排抽屉标签统一 12px（2026-10-30）
+
+**用户原话**：「@截图 红色箭头指向面板的文字尺寸，跟蓝色箭头指向的文字尺寸统一」
+（红箭头=右缘「图层控制」竖排标签；蓝箭头①=左栏「二级 · 地块与灌溉参数」一级标题；蓝箭头②=右缘「多地块编辑」竖排标签）
+
+**先量后改，量出来的结论和直觉相反**：两个竖排标签**本来都是 13px、完全一样**（`_probe_fontsize.mjs` 本地+线上双测，含截图逐字墨迹间距 19.6px/字 的复核）。
+13px 不是样式里写的 —— 抽屉标签规则里明明白白写着 `font:600 12px/1 system-ui`，是被 **`runye-typography` 的 `p,li,input,select,button{font-size:13px!important}`** 顶上去的（两个标签都是 `<button>`）；而左栏一级标题是 `<summary>`，不在这条规则里，落在 12px 档。
+⇒ 用户看到的「不统一」其实是**右侧标签比左栏标题大一号**。
+
+**改法**（`mod/style-01.css` 的 `#ryDrawingHost #ppPlotDrawerTab,#ryDrawingHost #tlWsLayerDrawerTab` 那条）：
+补 `font-size:12px!important;line-height:1;`。必须带 `!important`：本选择器 2 个 id，与那条元素选择器同为 `!important` 时按特异性决胜负，我们赢。
+**副作用（这次是好事）**：12px 下 5 字高 5×(12+3)+20=95、4 字高 80，都 < `min-height:96` ⇒ 两个标签高度第一次真的都是 96px，下方那句「96px 高 + 8px 间距 → top:202px」才第一次说得通（此前「多地块编辑」实际是 102px，两标签间距只有 2px）。
+**验证**：改后两标签 `fs=12px / lh=12px / h=97 与 96`，截图无裁切、间距均匀；新增 `tests/toolbar_single_layer.test.cjs` 第 9 项（要求两 id 同一条规则 + `font-size:12px!important`）；`ci_check_static` PASS=29、`node --test` **185/185**、`check_publish_refs` PASS。
+
+**版本**：`sw.js VERSION = 'v825-drawer-tab-12px'`（changelog 已加）；`style-01.css?v=825-drawer-tab-12px`。
+**状态**：本地已验证，未提交未发布（与 v824 同一批未发）。
+
+### 26.71 v826-flat-toolbar：顶部工具栏「一条白条 + 一堆透明按钮」（2026-10-30）
+
+**用户原话**：「这个工具栏与其他的样式不一样，有若隐若现的浅绿色，你应该彻底重构顶部工具栏，现在工具栏的样式没问题，但是我怀疑代码有多层覆盖的情况，实际上我要的就是一个简单的工具栏 上面有各种功能按钮，鼠标放在功能按钮上、点击变色就好了，不需要那么复杂。」
+
+**他的怀疑是对的，浅绿确实是一层「被覆盖到只剩底色」的老皮肤。**
+`_probe_bar_bg.mjs`（CDP 取计算样式 + `CSS.getMatchedStylesForNode` 只留 background/border/box-shadow）实测：
+
+| 元素 | background-image | 边框 |
+| --- | --- | --- |
+| 条带 `.ry-drawing-toolbar` | none | 白底 #fff |
+| **分区组 `#ppToolbar`** | **linear-gradient(#f8fbf9 → #f2f7f4)** | **border-left:1px #dde8e1** |
+| 管路组 `#tlWsToolbar` | none | 无 |
+
+⇒ 同一条工具栏，**左半截（分区组）发绿、右半截（管路组）纯白**，分界线正好落在两组的接缝上 —— 与用户红框位置完全对得上。
+来源是 v597「把二级工具轨皮肤对齐三级 `.tl-ws-btn`」那一段（连按钮的 `#f8fbf9` 浅绿底 + `#c5d6cc` 边框一起加的）。它的按钮部分早被 v815 的 SVG 图标段整段压成透明，**只剩这层底色还在发光** —— 典型的「多层覆盖后残留的活代码」。
+
+**做法（删干净 + 立模型 + 加护栏）**
+1. 删掉 v597 整段：组容器渐变 + `border-left`、`>button.pp-btn/.pp-btn-ghost/.pp-mirror-btn/.pp-fine-btn/.pp-ge-mode/.pp-ge-chip/.pp-back-group` 的 `#f8fbf9` 底 + `#c5d6cc` 边框、以及它们的 hover。
+2. 组容器加护栏（`#ryDrawingHost #ppToolbar,#ryDrawingHost #tlWsToolbar`）：`border:0!important;box-shadow:none!important`（已有 `background:transparent`）。
+3. 在删除处写下**最终模型**（只有三层，各一个出处）：
+   - ① 条带 `#ryDrawingHost > .ry-drawing-toolbar`：白底 + 1px 下边框，**唯一绘制面**；
+   - ② 组容器：透明、无边框、无阴影，只负责横向排版；
+   - ③ 按钮：透明、无边框、32×32；hover `#eef2f6`、激活 `#e6f2ec`（v815 段）。
+   「加新按钮不用写任何 CSS，挂上 id/label 让 ry-icons.js 认出来即可。」
+
+**验证**
+- 计算样式：条带 `#fff/none`、分区组 `transparent/none/0px/none`、管路组同值（改前 `bgImg` 是 gradient）；
+- 条带原始像素（`Page.captureScreenshot` 裁条带，dpr=1，1284×40）：y=1/2/3/38 四行**整条都是 (255,255,255)**，左右零色差；
+- 交互仍在：未交互 `transparent + #3f4a45` → 强制 `:hover` `#eef2f6 + #1f2a24` → 激活 `#e6f2ec`（`CSS.forcePseudoState` 实测）；
+- 新增 `tests/toolbar_single_layer.test.cjs` 第 10 项（`#ppToolbar/#tlWsToolbar` 不许再有 `linear-gradient`；组容器必须 `background:transparent` + `border:0!important` + `box-shadow:none!important`）；
+- 闸门：`ci_check_static` PASS=29、`node --test` **186/186**、`check_publish_refs` PASS、`_probe_errors.mjs` 连点 5 键 0 异常。
+
+**版本**：`sw.js VERSION = 'v826-flat-toolbar'`；`style-01.css?v=826-flat-toolbar`。
+**状态**：本地已验证，未提交未发布（v824 / v825 / v826 三版在同一批未发）。

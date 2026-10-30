@@ -584,8 +584,8 @@
     /* [v201] 成组管路页要能「一键给全组各块布管 / 清管」。
        ppAutoGeneratePipes / ppClearPipes 全在 IIFE 里 ⇒ 只在本侧暴露入口，
        内部**就是二级页同一套**（已按整组态逐块生成、写回各块 slot）—— 不写第二份算法。 */
-    autoPipesWhole: function(){ try{ ppAutoGeneratePipes(); return true; }catch(e){ return false; } },
-    clearPipesWhole: function(){ try{ ppClearPipes(); return true; }catch(e){ return false; } },
+    autoPipesWhole: function(){ try{ return ppAutoGeneratePipes()===true; }catch(e){ return false; } },
+    clearPipesWhole: function(){ try{ return ppClearPipes()===true; }catch(e){ return false; } },
     groupLiveSlot: function(){
       var ge=window.__runyeGroupEdit;
       if(!ge||!ge.active||ge.mode!=='perPlot') return null;
@@ -1337,15 +1337,15 @@
     var ge=window.__runyeGroupEdit;
     if(ge&&ge.active){
       var members=ppReadGroupMemberSlots(ge);
-      if(members.ok){
-        snapshot.groupSlots=members.slots.map(function(slot){return ppCloneJSON(slot);});
-        if(ge.mode==='perPlot'&&ge.current>=0&&ge.current<snapshot.groupSlots.length){
-          snapshot.groupSlots[ge.current]=ppCaptureSlot();
-        }
+      if(!members.ok)return false;
+      snapshot.groupSlots=members.slots.map(function(slot){return ppCloneJSON(slot);});
+      if(ge.mode==='perPlot'&&ge.current>=0&&ge.current<snapshot.groupSlots.length){
+        snapshot.groupSlots[ge.current]=ppCaptureSlot();
       }
     }
     ppState.history.push(snapshot);
     if(ppState.history.length>50)ppState.history.shift();
+    return true;
   }
 
   function ppRestoreState(snap){
@@ -2696,7 +2696,7 @@
     if(!btn)return;
     var has=ppHasPipeContent();
     btn.classList.toggle('active',has);
-    btn.textContent=has?'清除管路':'自动管路';
+    ppSetBtnLabel(btn,has?'清除管路':'自动管路'); // [v824] 用 setLabel 保住 SVG
   }
 
   function ppRefreshDiagramOrReset(){
@@ -2709,16 +2709,16 @@
 
   function ppClearPipes(){
     var groupPreimage=ppGroupMemberPreimage();
-    if(groupPreimage&&groupPreimage.invalid)return;
+    if(groupPreimage&&groupPreimage.invalid)return false;
     var singlePreimage=!groupPreimage&&!ppIsGroupWhole()&&typeof window.ppGetState==='function'
       ?window.ppGetState():null;
-    ppPushHistory();
+    if(ppPushHistory()===false)return false;
     /* [v201] 整组态的「清除管路」必须落到各块 slot —— 与整组态的生成互为逆操作。
        否则只有二级页的合并视图清了、各块 slot 还在 ⇒ 成组管路页照样把管画出来，
        用户点「清除管路」却看着管子还在（第二份「两页不一致」的坑）。 */
     if(ppIsGroupWhole()){
       var memberRead=ppReadGroupMemberSlots(window.__runyeGroupEdit);
-      if(!memberRead.ok){ppDiscardLatestHistoryEntry();return;}
+      if(!memberRead.ok){ppDiscardLatestHistoryEntry();return false;}
       var changes=[];
       memberRead.slots.forEach(function(s,index){
         if(!s)return;
@@ -2731,14 +2731,14 @@
       if(changes.length&&!ppSaveGroupMemberSlots(changes)){
         ppDiscardLatestHistoryEntry();
         console.warn('[plot-editor] group pipe-clear transaction rejected');
-        return;
+        return false;
       }
       /* 同步推给「成组管路」页，避免它停在旧画面 */
       setTimeout(function(){ try{ ppSyncGroupEditUI(); }catch(e){} },0);
     }
     ppState.mainPipes=[];ppState.branchPipes=[];ppState.subBranchPipes=[];
     ppState.source=null;ppState.valves=[];ppState.currentLine=[];ppState.hiddenPipes={main:{},branch:{},subbranch:{}};ppState.pipeIds={main:[],branch:[],subbranch:[]};ppState.nextPipeId=1;ppState.cutOverrides={x:{},y:{}};ppResetCutSnap('');
-    if(groupPreimage&&!ppCommitGroupMemberEdit(groupPreimage))return;
+    if(groupPreimage&&!ppCommitGroupMemberEdit(groupPreimage))return false;
     if(singlePreimage&&typeof window.ryCommitSinglePlotL2Snapshot==='function'){
       var singleCommit=window.ryCommitSinglePlotL2Snapshot(singlePreimage,window.ppGetState());
       if(singleCommit===false){
@@ -2747,13 +2747,14 @@
         ppUpdateLockAreaBtn();
         ppUpdatePickResult(null);ppRender();ppUpdateAutoPipeButton();ppRefreshDiagramOrReset();ppRefreshMaterials();
         console.warn('[plot-editor] single-plot pipe-clear transaction rejected');
-        return;
+        return false;
       }
     }
     ppUpdatePickResult(null);ppRender();
     ppUpdateAutoPipeButton();
     if(typeof window.ppRefreshDiagramIfVisible==='function') window.ppRefreshDiagramIfVisible();
     ppRefreshMaterials();
+    return true;
   }
 
   /* [v201] 自动布管的**纯几何内核**：给一套环点 → 算出该块内部的主管 / 支管 /
@@ -2938,12 +2939,12 @@
   }
 
   function ppAutoGeneratePipes() {
-    if (!ppState.polyPts.length) { alert('请先到「在线地图」画框并回传地块'); return; }
+    if (!ppState.polyPts.length) { alert('请先到「在线地图」画框并回传地块'); return false; }
     var groupPreimage=ppGroupMemberPreimage();
-    if(groupPreimage&&groupPreimage.invalid)return;
+    if(groupPreimage&&groupPreimage.invalid)return false;
     var singlePreimage=!groupPreimage&&!ppIsGroupWhole()&&typeof window.ppGetState==='function'
       ?window.ppGetState():null;
-    ppPushHistory();
+    if(ppPushHistory()===false)return false;
 
     var planN = parseInt(document.getElementById('planN')?.value) || parseInt(document.getElementById('fld_N')?.value) || 4;
     var isThree = ppState.pipeLevel === 'three';
@@ -2955,7 +2956,7 @@
     if (ppIsGroupWhole()) {
       var geW = window.__runyeGroupEdit;
       var memberRead=ppReadGroupMemberSlots(geW);
-      if(!memberRead.ok){ppDiscardLatestHistoryEntry();return;}
+      if(!memberRead.ok){ppDiscardLatestHistoryEntry();return false;}
       var memberChanges=[];
       memberRead.slots.forEach(function (s,slotIndex) {
         if (!s || !s.polyPts || s.polyPts.length < 3) return;
@@ -2971,10 +2972,10 @@
       if(memberChanges.length&&!ppSaveGroupMemberSlots(memberChanges)){
         ppDiscardLatestHistoryEntry();
         console.warn('[plot-editor] group auto-pipe transaction rejected');
-        return;
+        return false;
       }
       var mg = ppCollectGroupAllPipes();
-      if(!mg)return;
+      if(!mg)return false;
       ppState.mainPipes = mg.main; ppState.branchPipes = mg.branch; ppState.subBranchPipes = mg.subbranch;
       ppState.source = null; ppState.valves = [];
       ppState.pipeIds = { main: [], branch: [], subbranch: [] }; ppState.nextPipeId = 1;
@@ -2989,7 +2990,7 @@
       ppRefreshMaterials();
       /* 立刻推给「成组管路」页 —— 它只看得到 slots，不刷新就还是空的 */
       ppSyncGroupEditUI();
-      return;
+      return true;
     }
 
     /* 单块 / 逐块态：照旧写 ppState（行为与 v201 之前完全一致） */
@@ -3004,7 +3005,7 @@
     ppUpdatePickResult(null);
     ppEnsurePipeIds('main'); ppEnsurePipeIds('branch'); ppEnsurePipeIds('subbranch');
 
-    if(groupPreimage&&!ppCommitGroupMemberEdit(groupPreimage))return;
+    if(groupPreimage&&!ppCommitGroupMemberEdit(groupPreimage))return false;
     if(singlePreimage&&typeof window.ryCommitSinglePlotL2Snapshot==='function'){
       var singleCommit=window.ryCommitSinglePlotL2Snapshot(singlePreimage,window.ppGetState());
       if(singleCommit===false){
@@ -3014,13 +3015,14 @@
         if(typeof updatePlan==='function')updatePlan();
         ppUpdateTransform();ppRender();ppUpdateAutoPipeButton();ppRefreshDiagramOrReset();ppRefreshMaterials();
         console.warn('[plot-editor] single-plot auto-pipe transaction rejected');
-        return;
+        return false;
       }
     }
     ppRender();
     ppUpdateAutoPipeButton();
     if (typeof window.ppRefreshDiagramIfVisible === 'function') window.ppRefreshDiagramIfVisible();
     ppRefreshMaterials();
+    return true;
   }
 
   function ppRepartitionDesign(opts){
@@ -3605,11 +3607,29 @@
   })();
 
   // 任务K（2026-09-26）：分区面积锁定按钮的 UI 同步与自动解锁
+  // [v824] 状态不许写 textContent —— 那会连 decorate() 挂的 <svg class="ry-ico"> 一起
+  // 清掉，且没人再补挂（用户实测：点一下按钮图标就永久变空白）。
+  // 现在：图标 lock ⇄ unlock、类 active、aria-pressed、title 四件套表达状态。
+  function ppSetBtnLabel(btn,text){
+    if(!btn)return;
+    if(window.RyIcons&&window.RyIcons.setLabel)window.RyIcons.setLabel(btn,text);
+    else btn.textContent=text;
+  }
+  function ppSetBtnIcon(btn,name){
+    if(!btn||!window.RyIcons||!window.RyIcons.setIcon)return;
+    window.RyIcons.setIcon(btn,name);
+  }
   function ppUpdateLockAreaBtn(){
     var btn=document.getElementById('ppLockArea');
     if(!btn)return;
-    if(ppState.areaLocked){ btn.textContent='已锁定面积'; btn.classList.add('active'); }
-    else { btn.textContent='锁定面积'; btn.classList.remove('active'); }
+    var on=!!ppState.areaLocked;
+    ppSetBtnIcon(btn,on?'unlock':'lock');
+    ppSetBtnLabel(btn,on?'已锁定面积':'锁定面积');
+    btn.classList.toggle('active',on);
+    btn.setAttribute('aria-pressed',on?'true':'false');
+    btn.title=on
+      ?'已锁定分区面积：拖动网格线只整体平移分区、不改变各区面积；再点一次解锁'
+      :'锁定分区面积：开启后拖动网格线只整体平移分区，不改变各区面积（如 18 亩保持 18 亩）；例外：最外侧分区线拖到地块边线可直接合并减区；合并/重置/重新分区/旋转等操作会先自动解锁';
   }
   function ppUnlockArea(){
     if(ppState.areaLocked){ ppState.areaLocked=false; ppUpdateLockAreaBtn(); }
@@ -3647,7 +3667,20 @@
    *     （想手动划分：保持开关打开，然后用「调网格」微调）。
    *   · 状态持久化到 localStorage['runye_zone_auto']，刷新/切页后保持。
    */
-  function ppZoneAutoOn(){ return ppState.zoneAuto !== false; }
+  /* ===== [v822 恒自动分区] 地块一律按左侧面板参数自动划分，不再有「整块一区」态 =====
+   * 背景（P0）：陈年 localStorage['runye_zone_auto']='0' 在 v795 删除顶部「地块划分」
+   *   开关按钮后用户再无法改回，导致 ppGetZoneLayout 恒走 1×1 单区分支 —— 用户实测
+   *   「地块不能被分区」，画布整块一色只剩「1区」。用户明确表态：从未要求过
+   *   「整块一区」，分区应始终自动进行。
+   * 决策：本函数是全链路**唯一**的布局决策点（ppGetZoneLayout 仅调它），故恒返回 true
+   *   ⇒ 布局永远走自动划分分支，与 ppState.zoneAuto / localStorage 的历史值彻底解耦。
+   * 为何不动 ppState.zoneAuto / localStorage / 存档导出：这些值仍被规范绘图模型
+   *   （drawing-design-legacy-adapter）用来推导 partition.mode 并参与 CAS 事务比对；
+   *   若强行改写，会与既有存档里固化的 partition.mode='manual' 冲突，触发
+   *   「single-plot ... transaction rejected」反而让编辑失效（已实测）。保留其原值，
+   *   仅用本函数切断它对「是否分区」的影响 —— 这是副作用最小、最不易回归的收口位置。
+   *   localStorage 的历史 '0' 自此不再具有任何决策作用，作为无害遗留保留，不做清洗。 */
+  function ppZoneAutoOn(){ return true; }
   /* [v202] 开关控件由 checkbox 改为切换按钮（用户原话：「点击执行，不要勾选，
      勾选的话 整体看起来不统一」）。active 高亮 = 正在自动划分，与「↻ 分区旋转90°」
      的 active 口径一致；关闭时给琥珀描边提示「现在是整块一区」。
@@ -3658,7 +3691,7 @@
     var btn=document.getElementById('ppZoneAutoBtn');
     if(btn){
       btn.classList.toggle('active', on);
-      btn.textContent = on ? '地块划分' : '地块不划分';
+      ppSetBtnLabel(btn,on ? '地块划分' : '地块不划分'); // [v824] 保住 SVG 图标
       btn.title = on
         ? '正在自动划分：按左侧面板参数切分区。点击后本块不自动划分，整块作为一个区参与面积/水力/材料计算。'
         : '当前：本块不自动划分分区（整块当一个区）。点击恢复按左侧面板参数自动划分。';
@@ -3716,12 +3749,14 @@
     }catch(e){}
     return true;
   }
-  // 初始态：读存档；首次（无存档）默认开 = 自动划分，与现状一致（向后兼容，老流程零变化）
+  /* [v822 恒自动分区] 初始态恒为自动划分，并一次性清除陈年残留。
+     v795 起顶部「地块划分」开关按钮已删除，用户无法再主动关闭分区；
+     localStorage['runye_zone_auto'] 里的 '0' 是 v185~v202 老开关时代遗留的脏数据，
+     旧逻辑会读它把地块卡成整块 1 区（用户 P0 现场）。这里清除该残留、初始恒 true，
+     与 ppZoneAutoOn() 恒 true 的语义对齐，全链路一致（纯内部，不涉任何 UI）。 */
   (function ppInitZoneAuto(){
-    try{
-      var s=localStorage.getItem('runye_zone_auto');
-      ppState.zoneAuto = (s===null) ? true : (s!=='0');
-    }catch(e){ ppState.zoneAuto = true; }
+    ppState.zoneAuto = true;
+    try{ if(localStorage.getItem('runye_zone_auto')==='0') localStorage.removeItem('runye_zone_auto'); }catch(e){}
     ppApplyZoneAutoUI();
     var btn=document.getElementById('ppZoneAutoBtn');
     if(btn){

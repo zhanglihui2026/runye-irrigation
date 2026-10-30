@@ -453,6 +453,72 @@
     }catch(e){}
   }
 
+  /* ===== [v820] 按地块/按组的小型留档（从 runyeSaveProject 主体里提出来） =====
+     体积远小于主工程快照（不含三级管网），且是回传/切地块时真正必须保住的管网设计。
+     必须在主快照之前写：主快照撞配额时它们已经落盘。 */
+  function archivePlotDesign(data){
+    /* [v677 成组继承] 非成组态把当前单地块的完整设计按地块 id 留档
+       用户拍板的新方向：「所有地块都是单地块进行划分，最后才拼成一组」。
+       留档键 runye_plot_design_v1:<plotId>；将来这块被划进组（或与其他块拼组）时，
+       二级页 ppInitGroupEdit 按 sub.id 找回这份设计，质心平移继承到对应子地块 ——
+       单地块在二级页布好的管/调好的分区线，成组后原样带过去，不再整组重画。
+       ★ 成组态不写（各块设计已在 ge.slots 里，由 groupPlan 走主存档）；
+       ★ 写档失败静默跳过：留档是增益路径，绝不能影响主存档本身。 */
+    try{
+      var _geNow=window.__runyeGroupEdit;
+      var _pid=window.currentPlotId;
+      if((_geNow&&_geNow.active)||!_pid) return false;
+      /* 没有可归档的二级几何时，不会因主快照配额失败而丢失已有 L2 设计。 */
+      if(!data.pipePlan||!data.pipePlan.polyPts||data.pipePlan.polyPts.length<3) return !data.canonicalDrawingDesign;
+      var pp=data.pipePlan;
+      var _design={
+        savedAt:data.savedAt,
+        polySig:typeof window.ryPolySig==='function'?window.ryPolySig(pp.polyPts):'',
+        canonicalDrawingDesign:data.canonicalDrawingDesign||null,
+        design:{
+          polyPts:pp.polyPts,
+          mainPipes:pp.mainPipes||[],
+          branchPipes:pp.branchPipes||[],
+          subBranchPipes:pp.subBranchPipes||[],
+          valves:pp.valves||[],
+          source:pp.source||null,
+          cutSnap:pp.cutSnap||null,
+          partitionCuts:pp.partitionCuts||null,
+          cutOverrides:pp.cutOverrides||null,
+          hiddenPipes:pp.hiddenPipes||null,
+          pipeIds:pp.pipeIds||null,
+          nextPipeId:pp.nextPipeId||1,
+          areaLocked:!!pp.areaLocked,
+          zoneRotated:!!pp.zoneRotated,
+          zoneAngleDeg:isFinite(Number(pp.zoneAngleDeg))?Number(pp.zoneAngleDeg):(pp.zoneRotated?90:0),
+          zoneAuto:pp.zoneAuto!==false
+        }
+      };
+      return guardedSetItem('runye_plot_design_v1:'+encodeURIComponent(String(_pid)),_design);
+    }catch(eArc){ return false; }
+  }
+  /* 组级设计另按组 ID 保存，避免切换到另一地块/组时覆盖唯一的当前工程快照。
+     此档案包含组内 L2 slots 与手绘组级总管；与单地块 L2 档案完全分开。 */
+  function archiveGroupDesign(data){
+    try{
+      if(!(window.__runyeGroupEdit&&window.__runyeGroupEdit.active)) return false;
+      if(!window.currentPlotId||!data.groupPlan) return false;
+      return guardedSetItem('runye_group_design_v1:'+encodeURIComponent(String(window.currentPlotId)),{
+        savedAt:data.savedAt,
+        design:data.groupPlan
+      });
+    }catch(eGroupArc){ return false; }
+  }
+  /* 统一写入口：优先走容量守卫（失败先回收一次性交接槽再重试），守卫缺失时退化为直接写。 */
+  function guardedSetItem(key,value){
+    var json;
+    try{ json=JSON.stringify(value); }catch(e){ return false; }
+    if(window.RyStorageGuard&&typeof window.RyStorageGuard.write==='function'){
+      return window.RyStorageGuard.write(key,json).ok===true;
+    }
+    try{ localStorage.setItem(key,json); return true; }catch(e){ return false; }
+  }
+
   window.runyeSaveProject=function(silent,key,snapshotOnly){
     /* v161：可选第二参 key —— 静默自动留存与「手动保存」共用同一套快照构造，
        不传 key 时写原有 SAVE_KEY，行为与改动前一致。 */
@@ -539,7 +605,38 @@
         return false;
       }
     }
-    localStorage.setItem(key||projectSaveKey(),JSON.stringify(data));
+    /* ===== [v820] 先写小的「按地块留档」，再写大的主工程快照 =====
+       旧顺序是「主快照 → L2 档案」。主快照含三级管网 tlDiagramData，可达 MB 级，
+       一旦撞上 localStorage 配额就抛 QuotaExceededError，L2 档案根本没机会写 ——
+       而回传/切地块时真正必须保住的正是 L2 档案（二级主管/支管/分区线）。
+       故把体积小得多的留档提到前面：主快照写失败，管网设计也已经落盘。 */
+    var _networkArchiveOk=!snapshotOnly;
+    if(!snapshotOnly){
+      _networkArchiveOk=_groupActive?archiveGroupDesign(data):archivePlotDesign(data);
+      window.__ryLastNetworkArchiveOk=_networkArchiveOk===true;
+    }
+    var _saveKey=key||projectSaveKey();
+    var _w=(window.RyStorageGuard&&typeof window.RyStorageGuard.writeSnapshot==='function')
+      ? window.RyStorageGuard.writeSnapshot(_saveKey,data)
+      : (function(){ try{ localStorage.setItem(_saveKey,JSON.stringify(data)); return {ok:true}; }catch(e){ return {ok:false,reason:'quota'}; } })();
+    if(!_w||!_w.ok){
+      /* 存不下：先把占用情况打进控制台，再给用户能照做的指引（旧版只有一句
+         「exceeded the quota」，用户根本看不出是本机存储满了）。 */
+      try{ if(window.RyStorageGuard) window.RyStorageGuard.report('工程快照写入失败',8); }catch(eRep){}
+      /* 三级图面和手工调整只在完整快照里。配额不足时，只有没有三级图面且
+         二级设计已独立落盘，调用方才能继续切换或回传。 */
+      var _quotaFailed=!!(_w&&_w.reason==='quota');
+      window.__ryLastSaveBlockedByL3=_quotaFailed&&!!data.tlDiagramData;
+      window.__ryLastSaveStorageFull=_quotaFailed&&_networkArchiveOk===true&&!data.tlDiagramData;
+      window.__ryLastSaveFullMessage=(window.RyStorageGuard&&typeof window.RyStorageGuard.fullMessage==='function')
+        ? window.RyStorageGuard.fullMessage() : '本机存储已满，方案未能保存。请删除不用的旧档案后重试。';
+      if(silent!==true) projectToast(window.__ryLastSaveFullMessage);
+      return false;
+    }
+    if(_w.trimmed){
+      /* 瘦身后才写进去：三级管网的懒算缓存/规范模型副本被剥掉，功能不受影响 */
+      try{ console.warn('[v820] 工程快照已精简保存（level '+(_w.level||0)+'），释放 '+Math.round((_w.freed||0)/1024)+'KB'); }catch(eTrim){}
+    }
     /* ===== [v677 成组继承] 非成组态把当前单地块的完整设计按地块 id 留档 =====
        用户拍板的新方向：「所有地块都是单地块进行划分，最后才拼成一组」。
        留档键 runye_plot_design_v1:<plotId>；将来这块被划进组（或与其他块拼组）时，
@@ -547,46 +644,6 @@
        单地块在二级页布好的管/调好的分区线，成组后原样带过去，不再整组重画。
        ★ 成组态不写（各块设计已在 ge.slots 里，由 groupPlan 走主存档）；
        ★ 写档失败静默跳过：留档是增益路径，绝不能影响主存档本身。 */
-    if(!snapshotOnly)try{
-      var _geNow=window.__runyeGroupEdit;
-      var _pid=window.currentPlotId;
-      if(!(_geNow&&_geNow.active)&&_pid&&data.pipePlan&&data.pipePlan.polyPts&&data.pipePlan.polyPts.length>=3){
-        var _design={
-          savedAt:data.savedAt,
-          polySig:typeof window.ryPolySig==='function'?window.ryPolySig(data.pipePlan.polyPts):'',
-          canonicalDrawingDesign:data.canonicalDrawingDesign||null,
-          design:{
-            polyPts:data.pipePlan.polyPts,
-            mainPipes:data.pipePlan.mainPipes||[],
-            branchPipes:data.pipePlan.branchPipes||[],
-            subBranchPipes:data.pipePlan.subBranchPipes||[],
-            valves:data.pipePlan.valves||[],
-            source:data.pipePlan.source||null,
-            cutSnap:data.pipePlan.cutSnap||null,
-            partitionCuts:data.pipePlan.partitionCuts||null,
-            cutOverrides:data.pipePlan.cutOverrides||null,
-            hiddenPipes:data.pipePlan.hiddenPipes||null,
-            pipeIds:data.pipePlan.pipeIds||null,
-            nextPipeId:data.pipePlan.nextPipeId||1,
-            areaLocked:!!data.pipePlan.areaLocked,
-            zoneRotated:!!data.pipePlan.zoneRotated,
-            zoneAngleDeg:isFinite(Number(data.pipePlan.zoneAngleDeg))?Number(data.pipePlan.zoneAngleDeg):(data.pipePlan.zoneRotated?90:0),
-            zoneAuto:data.pipePlan.zoneAuto!==false
-          }
-        };
-        localStorage.setItem('runye_plot_design_v1:'+encodeURIComponent(String(_pid)),JSON.stringify(_design));
-      }
-    }catch(eArc){ }
-    /* 组级设计另按组 ID 保存，避免切换到另一地块/组时覆盖唯一的当前工程快照。
-       此档案包含组内 L2 slots 与手绘组级总管；与单地块 L2 档案完全分开。 */
-    if(!snapshotOnly)try{
-      if(window.__runyeGroupEdit&&window.__runyeGroupEdit.active&&window.currentPlotId&&data.groupPlan){
-        localStorage.setItem('runye_group_design_v1:'+encodeURIComponent(String(window.currentPlotId)),JSON.stringify({
-          savedAt:data.savedAt,
-          design:data.groupPlan
-        }));
-      }
-    }catch(eGroupArc){ }
     if(silent!==true)projectToast('方案已保存到本机');
     return true;
   };
@@ -852,7 +909,38 @@
   window.runyeSaveCurrentPlotBeforeSwitch=function(){
     if(!window.currentPlotId) return true;
     if(typeof window.runyeSaveProject!=='function') throw new Error('当前地块保存接口未加载');
-    if(window.runyeSaveProject(true)!==true) throw new Error('当前地块快照未确认写入');
+    window.__ryLastSaveStorageFull=false;
+    window.__ryLastSaveBlockedByL3=false;
+    /* [v823] runyeSaveProject 在 silent=true 下有 5 处规范绘图模型校验失败分支只 return false、
+       不设任何存储标记（本文件 529-606），且中间 projectToast 被 silent 吞掉 ⇒ 旧地块保存失败
+       对用户完全静默，随后被下游误判为「非存储满」而硬 alert 中断回传（用户实测 P0）。
+       这里把「旧地块保存失败」统一标记为可降级的 beforeSwitchSaveFailed，并附诊断类别
+       saveReason，交给调用方判定是否有安全降级条件；校验失败发生在二级留档之前，
+       不能宣称二级已保存，也不能清除旧地块运行态。 */
+    var _ok;
+    try{ _ok=window.runyeSaveProject(true); }
+    catch(eThrow){
+      var _et=new Error('当前地块快照写入异常：'+(eThrow&&eThrow.message?eThrow.message:'未知异常'));
+      _et.storageFull=false;
+      _et.beforeSwitchSaveFailed=true;
+      _et.saveReason='exception';
+      throw _et;
+    }
+    if(_ok!==true){
+      var _reason = window.__ryLastSaveBlockedByL3 ? 'l3-blocked'
+                  : window.__ryLastSaveStorageFull ? 'storage-full'
+                  : 'verify-failed';
+      window.__ryLastSaveReason=_reason;
+      var _e=new Error(window.__ryLastSaveBlockedByL3
+        ?'本机存储空间已满，当前三级管网未保存；请清理空间后重试'
+        :(window.__ryLastSaveStorageFull?'本机存储空间已满'
+          :'当前地块快照未确认写入（规范绘图模型校验未通过）'));
+      _e.storageFull=!!window.__ryLastSaveStorageFull;
+      _e.beforeSwitchSaveFailed=true;
+      _e.saveReason=_reason;
+      throw _e;
+    }
+    window.__ryLastSaveReason='';
     return true;
   };
   /* 新地块接管前清除运行时三级方案，避免旧块的总管/泵站编辑混入新块快照。

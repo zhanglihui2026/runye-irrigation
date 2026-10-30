@@ -52,10 +52,15 @@
       try { serialized = JSON.stringify(payload); } catch (error) { return null; }
       if (typeof serialized !== 'string') return null;
       var id = makeTransferId();
+      var key = KEY_PREFIX + id;
+      try { root.localStorage.setItem(key, serialized); return id; } catch (error) { }
+      /* [v820] 写不下：先回收历史交接槽（本键族只留最新一份）再重试；
+         旧版直接返回 null，主流程把它当成「服务未加载」，用户完全看不出是存储满了。 */
       try {
-        root.localStorage.setItem(KEY_PREFIX + id, serialized);
-        return id;
-      } catch (error) { return null; }
+        var guard = root.RyStorageGuard;
+        if (guard && typeof guard.write === 'function' && guard.write(key, serialized).ok) return id;
+      } catch (error2) { }
+      return null;
     },
     readRaw: function (transferId) {
       var key = transferKey(transferId || currentTransferId());

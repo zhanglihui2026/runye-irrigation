@@ -75,7 +75,17 @@
       try{
         if(typeof window.runyeSaveCurrentPlotBeforeSwitch==='function') window.runyeSaveCurrentPlotBeforeSwitch();
         else if(window.currentPlotId) throw new Error('旧地块安全保存接口未加载');
-      }catch(eSave){ throw new Error('当前地块未能先行保存：'+(eSave&&eSave.message?eSave.message:'本地存储失败')); }
+      }catch(eSave){
+        /* Only the storage-full result proves that L2 was archived and no L3 drawing
+           needs the full snapshot. Canonical validation can fail before either archive
+           is written; continuing would discard the previous plot's unsaved design. */
+        if(!(eSave && eSave.storageFull)){
+          var blocked=new Error('当前地块未能安全保存：'+(eSave&&eSave.message?eSave.message:'本地存储失败'));
+          blocked.currentDesignUnsaved=true;
+          throw blocked;
+        }
+        try{ if(typeof atShowToast==='function') atShowToast((window.__ryLastSaveFullMessage||'本机存储空间已满，上一地块二级设计已留档。')+'回传继续。'); }catch(eToastFull){}
+      }
       if(typeof window.runyeResetPlotScopedNetworkState==='function') window.runyeResetPlotScopedNetworkState();
       /* A previous project's deferred replay must not regenerate over the incoming plot. */
       window.__ryLazyReplay=false;
@@ -203,7 +213,11 @@
     }catch(e){
       console.error('applyMapMeasuredArea error', e);
       /* 保留当前编号的载荷和 URL 参数供刷新重试；刷新仍失败时再回地图重新回传。 */
-      try{ alert('地块回传未完成：'+(e&&e.message?e.message:'数据读取失败')+'。本次数据已保留，可刷新页面重试；若仍失败，再回地图重新回传。'); }catch(eAlert){}
+      try{
+        alert(e&&e.currentDesignUnsaved
+          ?'地块回传暂缓：'+e.message+'。当前设计仍保留在画面中，待回传地块也已保留；请先处理当前地块的保存问题，再重新回传。'
+          :'地块回传未完成：'+(e&&e.message?e.message:'数据读取失败')+'。本次数据已保留，可刷新页面重试；若仍失败，再回地图重新回传。');
+      }catch(eAlert){}
       return false;
     }
   }

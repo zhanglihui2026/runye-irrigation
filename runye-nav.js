@@ -1,7 +1,8 @@
 /* ============================================================
    runye-nav.js — 顶部功能区导航「按钮清单」唯一出处（2026-09-13 去重）
    index.html（站内锚点 + data-target，参与滚动高亮/单视口切换）
-   与 runye-map-measure.html（跨页链接）共用本清单。
+   [v821 唯一页面] 原独立页 runye-map-measure.html 已删除，「在线地图」统一为
+   hash 项 onlineMapSection；子页用 data-base="index.html#" 即可跨页直达，本清单唯一。
    页面用法：
      <div class="fn-inner" data-ry-fnnav>（可含本页特有静态项，如主页 ⚙️生成系统图）</div>
      <script src="runye-nav.js"></script>
@@ -164,7 +165,7 @@
     a.className = 'fn-link';
     if (it.drawingEntry) a.setAttribute('data-ry-drawing-entry', '1');
     a.setAttribute('data-ry-navitem', '1');
-    if (it.href === 'runye-map-measure.html' || it.hash === 'pipePlanSection' || it.hash === 'tlPipePlanSection') a.setAttribute('data-ry-mobile-nav', '1');
+    if (it.hash === 'pipePlanSection' || it.hash === 'tlPipePlanSection') a.setAttribute('data-ry-mobile-nav', '1');
     /* [v358] 锁定态：「·锁」标记 + 捕获阶段拦截（阻断 href 跳转 / data-target 处理器 /
        act 动作 / win 独立窗口 四条路径，与 v346 的线上锁同一手法） */
     var access = accessState(it.feat);
@@ -220,11 +221,9 @@
         if (!base) a.setAttribute('data-target', it.hash);
       }
     } else {
-      // [v235] 移动端直接进新的手机地图预览页；桌面端仍走旧地图页
+      /* [v821 唯一页面] 「在线地图走独立页 + 移动端改跳手机预览」的特判随独立页删除一并退役：
+         在线地图已是 hash 项，任何页面都直达 index.html#onlineMapSection。 */
       var navHref = it.href;
-      if (navHref === 'runye-map-measure.html' && global.RyMobile && global.RyMobile.isActive()) {
-        navHref = 'runye-mobile-map-preview.html?v=242';
-      }
       a.href = root + navHref;
       /* [v331] 独立窗口项：preventDefault 后弹窗，主窗口原地不动；先存档快照+写锚（v327 恢复机制复用） */
       if (it.win) {

@@ -8,6 +8,20 @@
     return JSON.parse(JSON.stringify(value));
   }
 
+  /* [v820] 统一写入口：写满时先让容量守卫回收一次性交接槽（AI 规划/回传槽）再重试，
+     仍失败才如实返回 —— 旧版直接吞掉 QuotaExceededError，用户只看到「保存没反应」。 */
+  function guardedWrite(key, serialized) {
+    try {
+      root.localStorage.setItem(key, serialized);
+      return true;
+    } catch (error) { }
+    try {
+      var guard = root.RyStorageGuard;
+      if (guard && typeof guard.write === 'function') return guard.write(key, serialized).ok === true;
+    } catch (error2) { }
+    return false;
+  }
+
   function hasUniqueIds(plots) {
     var seen = Object.create(null);
     for (var i = 0; i < plots.length; i++) {
@@ -60,12 +74,11 @@
     try { serialized = JSON.stringify(plots); }
     catch (error) { return { ok: false, error: 'plot-library-serialize-failed', cause: error }; }
     if (typeof serialized !== 'string') return { ok: false, error: 'plot-library-serialize-failed' };
-    try {
-      root.localStorage.setItem(KEY, serialized);
-      return { ok: true, plots: clone(plots), revision: serialized };
-    } catch (error) {
-      return { ok: false, error: 'plot-library-write-failed', cause: error };
+    if (!guardedWrite(KEY, serialized)) {
+      try { if (root.RyStorageGuard) root.RyStorageGuard.report('地块库写入失败', 8); } catch (error2) { }
+      return { ok: false, error: 'plot-library-write-failed', storageFull: true };
     }
+    return { ok: true, plots: clone(plots), revision: serialized };
   }
 
   function update(mutator) {
@@ -184,8 +197,8 @@
     if (!current.ok) return current;
     if (current.revision !== expectedRevision) return { ok: false, error: 'plot-library-conflict' };
     try {
-      if (snapshot.revision === null) root.localStorage.removeItem(KEY);
-      else root.localStorage.setItem(KEY, snapshot.revision);
+      if (snapshot.revision === null) { root.localStorage.removeItem(KEY); return { ok: true, plots: clone(snapshot.plots), revision: snapshot.revision }; }
+      if (!guardedWrite(KEY, snapshot.revision)) return { ok: false, error: 'plot-library-write-failed', storageFull: true };
       return { ok: true, plots: clone(snapshot.plots), revision: snapshot.revision };
     } catch (error) {
       return { ok: false, error: 'plot-library-write-failed', cause: error };

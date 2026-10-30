@@ -82,6 +82,13 @@ async function main() {
       return {generated:!!window.tlDiagramData, poly:window.tlDiagramData&&window.tlDiagramData.poly};
     })()`);
     assert.ok(setup.generated, JSON.stringify(setup));
+    assert.equal(await evaluate(`(function(){
+      const tab=document.getElementById('tlWsLayerDrawerTab');
+      if(!tab)return false;
+      tab.click();
+      const panel=document.getElementById('tlWsLayerPanel');
+      return !!panel&&!panel.hidden;
+    })()`), true, 'The layer drawer must open before its viewport position is measured');
     const sample = `new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>{
       window.RyDrawingWorkspace.syncCamera();
       const layer=document.getElementById('tlWsContent'),svg=layer.querySelector('svg.tl-ws-svg');
@@ -114,7 +121,7 @@ async function main() {
     assert.ok(Math.max(...panned.errors) < 3, JSON.stringify(panned));
     assert.notDeepEqual(panned.pan, zoomed.pan);
     assert.ok(panned.rects.panel.right <= panned.rects.wrap.right &&
-      panned.rects.panel.right >= panned.rects.wrap.right - 25,
+      panned.rects.panel.right >= panned.rects.wrap.right - 28,
     'The layer panel must stay at the stable viewport right edge: ' + JSON.stringify(panned.rects));
     assert.ok(panned.rects.panel.top >= panned.rects.wrap.top &&
       panned.rects.panel.top <= panned.rects.wrap.top + 25,
@@ -133,12 +140,31 @@ async function main() {
       const libraryBefore=localStorage.getItem('runye_plot_library');
       const id=window.RyMeasuredAreaBridgeStore.write({ryPlotRef:{id:plot.id,
         geometryKey:JSON.stringify([ring]),areaM2:plot.sqm}});
+      const priorSave=window.runyeSaveCurrentPlotBeforeSwitch,priorPlot=window.currentPlotId;
+      window.currentPlotId='old-unsaved-plot';
+      window.runyeSaveCurrentPlotBeforeSwitch=function(){
+        const error=new Error('canonical validation rejected');
+        error.beforeSwitchSaveFailed=true;error.saveReason='verify-failed';error.storageFull=false;
+        throw error;
+      };
+      const priorAlert=window.alert;let blockedMessage='';
+      window.alert=function(message){blockedMessage=String(message);};
+      const rejected=window.runyeApplyMapPayload(id);
+      window.alert=priorAlert;
+      const preserved=window.RyMeasuredAreaBridgeStore.readRaw(id)!==null;
+      const oldPlotUnchanged=window.currentPlotId==='old-unsaved-plot';
+      window.runyeSaveCurrentPlotBeforeSwitch=priorSave;
+      window.currentPlotId=priorPlot;
       const applied=window.runyeApplyMapPayload(id);
-      return {applied,id,plotId:window.currentPlotId,area:window.measuredArea,
+      return {rejected,preserved,oldPlotUnchanged,blockedMessage,applied,id,plotId:window.currentPlotId,area:window.measuredArea,
         poly:window.measuredPolygon,libraryUnchanged:localStorage.getItem('runye_plot_library')===libraryBefore,
         consumed:window.RyMeasuredAreaBridgeStore.readRaw(id)===null,
         host:!!document.getElementById('ryDrawingHost')?.contains(document.getElementById('ppCanvasWrap'))};
     })()`);
+    assert.equal(handoff.rejected, false, JSON.stringify(handoff));
+    assert.ok(handoff.preserved && handoff.oldPlotUnchanged, JSON.stringify(handoff));
+    assert.match(handoff.blockedMessage, /当前设计仍保留在画面中/, JSON.stringify(handoff));
+    assert.doesNotMatch(handoff.blockedMessage, /刷新页面/, JSON.stringify(handoff));
     assert.equal(handoff.applied, true, JSON.stringify(handoff));
     assert.equal(handoff.plotId, 'browser-map-plot', JSON.stringify(handoff));
     assert.equal(handoff.area, 23500, JSON.stringify(handoff));

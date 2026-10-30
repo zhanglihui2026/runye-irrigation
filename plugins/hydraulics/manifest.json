@@ -20,6 +20,6 @@
     "insertBefore": ".fn-more",
     "feat": "hydraulic-check",
     "autoloadCore": true,
-    "_note": "水力校核界面由主页面 #hydraulicsSection 承载；runye-hydraulics.html 保留为兼容独立入口。本插件负责导航会员门控、确认水力计算内核可用，并通过 ctx API 暴露 hazen / christiansenF / compute。主页面同步加载同一组内核，插件补载保持幂等。href 指向主页面锚点；insertBefore 控制其在更多菜单前的位置。"
+    "_note": "水力校核界面唯一由主页面 #hydraulicsSection 承载（[v821 唯一页面] runye-hydraulics.html 独立页已删除，不再有兼容入口）。本插件负责导航会员门控、确认水力计算内核可用，并通过 ctx API 暴露 hazen / christiansenF / compute。主页面同步加载同一组内核，插件补载保持幂等。href 指向主页面锚点；insertBefore 控制其在更多菜单前的位置。"
   }
 }

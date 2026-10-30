@@ -96,7 +96,9 @@
     oauthRelayBaseUrl: 'https://www.workbuddy.cn/v2/as/genie-baas/oauth',
     publishableKey: 'wbpk_FxUShyeJ60dvzoe0Xbxe5e_PoNN5FVW5opkhQh3nwVIKQ3KcS9ib52O'
   };
-  var MAIN_SITE = 'https://zhanglihui2026.github.io/runye-irrigation/runye-map-measure.html';
+  /* [v821 唯一页面] 主程序在线地图已收敛为 index.html#onlineMapSection；
+     原 runye-map-measure.html 独立页已删除，此处直达主程序页签。 */
+  var MAIN_SITE = 'https://zhanglihui2026.github.io/runye-irrigation/index.html#onlineMapSection';
 
   var cloud = null;
   try { cloud = WorkBuddyCloud.createWorkBuddyCloud(PUBLIC); }

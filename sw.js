@@ -1233,8 +1233,59 @@
    ========================================================================== */
 /* v691: 分区角度同步外圈尺寸线与内部尺寸标注；旋转不改变地块坐标。
    v706: 联合灌溉分组手动合并整链取消（面板/右键合并/快照）；分区只按 预设N区+面积亩组合。
-         轮灌演示水流动画修复：分区格子 rect→polygon 后演示链选择器失效，改 [data-zi]。 */
-const VERSION = 'v815-icon-unify';
+         轮灌演示水流动画修复：分区格子 rect→polygon 后演示链选择器失效，改 [data-zi]。
+   v821: 页面唯一化：删除 runye-map-measure.html（在线地图）与 runye-hydraulics.html（水力校核）
+         两个「与主程序同款、各写一份」的独立页，界面唯一落在 index.html 对应 section；
+         两文件已移出 CORE 预缓存。runye-ai-plan / runye-nav / runye-mobile /
+         runye-hydraulics-page 内的旧链接全部改指 index.html 锚点。 */
+/* v822 恒自动分区（P0）：陈年 localStorage['runye_zone_auto']='0' 曾把地块卡成整块 1 区
+   （v795 删顶部开关后无法改回）。修复：ppZoneAutoOn() 恒 true —— 全链路唯一布局决策点，
+   与历史状态值彻底解耦；ppInitZoneAuto 初始归一 true 并清除陈年残留；界面无「整块一区」控件。
+   分区始终按左栏「分区划定 亩/区」自动切分。回归：_probe_pp_always_partition 8/8。 */
+/* v823 回传保存失败不再中断（P0）：runyeSaveProject(true) 在 silent 模式下有规范绘图模型
+   校验失败分支只 return false、不设存储标记 ⇒ 下游误判「非存储满」而硬 alert 中断回传，
+   新地块白回传（用户实测弹「当前地块快照未确认写入」）。修复：旧地块保存失败统一标记
+   beforeSwitchSaveFailed + saveReason，回传一律降级为明确 toast + 继续装载新地块；接口未加载
+   等真错误仍中断。回归：_probe_transfer_save_alert 修复前 RED 精确复现、修复后 GREEN。 */
+/* v826 顶部工具栏「一条白条 + 一堆透明按钮」（用户红框截图：「有若隐若现的浅绿色」）：
+   实测根因：分区组 #ppToolbar 自己带一层 linear-gradient(#f8fbf9→#f2f7f4) + border-left，
+   而管路组 #tlWsToolbar 没有 ⇒ 同一条工具栏左半截发绿、右半截纯白，分界线正好在两组接缝。
+   那层是 v597「把二级工具轨皮肤对齐三级 .tl-ws-btn」加的，早被 v815 的 SVG 图标段覆盖成透明，
+   只剩底色还在发光（_probe_bar_bg.mjs 用 CDP 取计算样式取证）。
+   删：v597 那一整段（组容器渐变+边框、按钮 #f8fbf9 底 + #c5d6cc 边框 + hover 边框）。
+   加护栏：组容器 border:0!important / box-shadow:none!important / background:transparent。
+   最终模型只有三层，各一个出处 —— 条带（白底+1px 下边框，唯一绘制面）/ 组容器（透明排版盒）/
+   按钮（透明 32×32；hover #eef2f6、激活 #e6f2ec，均在 v815 段）。
+   回归：tests/toolbar_single_layer.test.cjs 第 10 项 + _probe_bar_bg.mjs（条带像素全 255,255,255）。
+ */
+/* v825 右缘两个竖排抽屉标签统一 12px（用户截图：红箭头=图层控制，蓝箭头=多地块编辑/左栏一级标题）：
+   两标签实测都是 13px（不是样式里写的 12px），被 runye-typography 的
+   `p,li,input,select,button{font-size:13px!important}` 顶上去的（标签都是 <button>），
+   而左栏「二级 · 地块与灌溉参数」是 <summary>，落在 12px 档 —— 于是右侧比左栏显眼。
+   修：在 #ryDrawingHost #ppPlotDrawerTab/#tlWsLayerDrawerTab 那条里补 font-size:12px!important
+   （2 个 id 的特异性压过元素选择器）。副作用：两标签高度第一次真的都是 96px，
+   下方 top:202px 的 8px 间距才对得上（此前多地块那个是 102px）。 */
+/* v824 绘图工具栏去重 + 输出收口（用户四张截图指令）：
+   ①「这个阀门取消，跟前面的重复了」②「遮蔽管道也取消，跟前面的也重复了」
+   ③「下载跟打印放在工具栏最后」     ④「这个复位按钮取消吧」
+   做法：删管路组 tlWsFitValve / tlWsMaskBtn / tlWsMoveResetBtn（本页 RyTlWs 未初始化，三支皆死键；
+   分区组 data-mode=valve / maskPipe 是活的，转为常驻）；ppDownload/ppPrint 移到 #tlDxfExport 之后。
+   根因顺带修：style-01.css 给工具栏图标写了 `display:flex !important`，把**所有**行内 display:none
+   全压掉 —— v96 明确隐藏的「主管/支管/横竖锁定/水源」复活（用户看到的"两个阀门/两个遮蔽"就是它），
+   按选中态显隐的「改长/删除/改直径/退出多选/恢复位置」也一并常显。拆掉 !important 后行内样式恢复优先。
+   ⑤「锁定面积那个按钮目前还不能正常显示」→ 真根因不是看不见，是**点一下就永久空白**：
+    ppUpdateLockAreaBtn() 写 `btn.textContent='已锁定面积'`，textContent 整体替换子节点，
+    把 ry-icons.js 的 decorate() 刚插进去的 <svg class="ry-ico"> 一起清掉，而 decorate() 只跑一次。
+    实测（_probe_lock_click.mjs）：点一下 hasSvg true→false，再点也不回来；按钮 font-size:0 又藏字 ⇒ 空方块。
+    修：ry-icons.js 新增 setIcon / setLabel（只换图标、只换文字，保住 SVG）；锁定面积改 lock⇄unlock +
+    active + aria-pressed + title；同源写法一并改（ppAutoPipe / ppZoneAutoBtn / inline-24 的 delBtn/multiBtn/maskBtn）。
+    ⑥「工具栏是不是有多层样式，把覆盖掉的、没用的删了」→ 用 CDP 把 #ppLockArea 命中的 18 条规则原样导出，
+    删掉 5 层从未生效的重复：竖排时代 #ppToolbar 容器+width:100%/28px 按钮+竖分隔线、v782 的 28×28 一套、
+    两份 ::before 字形图标通道、两份 32×32、v597 实心绿 active、重复的 #ppQuickBar[hidden]。
+    现在「条带盒模型 / 按钮尺寸 / 图标通道 / 激活态配色」各只有一个出处，回归
+    tests/toolbar_single_layer.test.cjs（8 项）+ _probe_toolbar_map.mjs（几何前后逐按钮比对）。
+   回归：tests/toolbar_dedupe.test.cjs（6 项）+ _probe_toolbar_map.mjs（导出工具栏实际顺序）。 */
+const VERSION = 'v826-flat-toolbar';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
@@ -1255,6 +1306,7 @@ const CORE = [
   "core/measured-area-bridge-store.js",
   "core/cloud-design-binding-store.js",
   "core/economic-settings-store.js",
+  "core/storage-guard.js",
   "core/drawing-design-model.js",
   "core/drawing-design-legacy-adapter.js",
   "core/drawing-design-level3-adapter.js",
@@ -1341,6 +1393,7 @@ const CORE = [
   "mod/inline-30.js",
   "mod/inline-32.js",
   "mod/ry-cad-toolbar.js",
+  "mod/ry-icons.js",
   "mod/material-formulas.js",
   "mod/zone-geometry.js",
   "mod/flow-geometry.js",
@@ -1396,14 +1449,14 @@ const CORE = [
   "runye-member-ui.js",
   "runye-material-audit.js",
   "runye-geo.js",
-  "runye-hydraulics.html",   /* 兼容独立入口 */
+  /* [v821 唯一页面] runye-hydraulics.html 独立页已删除，水力校核界面唯一落在 index.html#hydraulicsSection */
   "runye-hydraulics-core.js",
   "runye-hydraulics-page.js",
   "hydraulics-main.css",
   "runye-landing.html",
   "runye-map-enhance.js",
   "runye-map-partition.js",
-  "runye-map-measure.html",
+  /* [v821 唯一页面] runye-map-measure.html 独立页已删除，在线地图唯一落在 index.html#onlineMapSection */
   "runye-mobile-map-preview.css",
   "runye-mobile-map-preview.html",
   "runye-mobile-map-preview.js",

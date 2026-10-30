@@ -99,7 +99,19 @@
       var s=localStorage.getItem(k); return s?JSON.parse(s):d;
     }catch(e){ return d; }
   }
-  function lsSet(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); return true; }catch(e){ return false; } }
+  /* [v820] 写失败不再静默返回 false：先让容量守卫回收一次性交接槽重试，
+     仍失败则把占用 Top 8 打进控制台，便于定位是谁把本机存储撑满的。 */
+  function lsSet(k,v){
+    var json; try{ json=JSON.stringify(v); }catch(e){ return false; }
+    try{ localStorage.setItem(k,json); return true; }catch(e){}
+    try{
+      if(window.RyStorageGuard&&typeof window.RyStorageGuard.write==='function'){
+        if(window.RyStorageGuard.write(k,json).ok) return true;
+        window.RyStorageGuard.report('地图页写入失败：'+k,8);
+      }
+    }catch(e2){}
+    return false;
+  }
   function tip(s){ document.getElementById('tip').textContent=s; }
   function curView(){ var c=fromDisplay(map.getCenter()); return {lat:+c.lat.toFixed(6),lng:+c.lng.toFixed(6),zoom:map.getZoom()}; }
   function saveView(){ if(switchingBase) return; var v=curView(); v.ts=Date.now(); lsSet(K_VIEW,v); }
@@ -1090,7 +1102,9 @@
       var transferId=transferStore && typeof transferStore.write==='function'
         ? transferStore.write({ryPlotRef:{id:id,savedAt:savedAt,areaM2:areaM2,geometryKey:clickedKey}}) : null;
       if(!transferId)
-        throw new Error('地块回传存储服务未加载');
+        throw new Error((window.RyStorageGuard&&typeof window.RyStorageGuard.fullMessage==='function')
+          ? window.RyStorageGuard.fullMessage()
+          : '地块回传交接数据写入失败（本机存储已满或服务未加载）');
       /* 云端样本仅在这次回传的本地地块边界与刚载入的云端环完全一致时建立关联。 */
       try{
         var cloudBinding=window.RyCloudDesignBindingStore;

@@ -91,6 +91,12 @@ async function main() {
       const restored=window.grRestoreState(saved);
       const before=window.grExportState();
       const initialMode=window.__runyeGroupEdit.mode;
+      const work=window.__runyeGroupWork,groupId=work.canonicalGroupId;
+      work.canonicalGroupId='invalid-group-binding';
+      const rejectedClear=window.RunyeBridge.clearPipesWhole();
+      const rejectedAuto=window.RunyeBridge.autoPipesWhole();
+      work.canonicalGroupId=groupId;
+      const afterRejected=window.grExportState();
       const clearResult=window.RunyeBridge.clearPipesWhole();
       const cleared=window.grExportState();
       document.getElementById('ppUndo').click();
@@ -108,7 +114,9 @@ async function main() {
       nextSlot.pipeIds.main.push('m2');nextSlot.nextPipeId=3;
       const memberCommitted=window.grCommitGroupMemberSlot(1,nextSlot);
       const afterMemberEdit=window.grExportState();
-      return {restored,clearResult,before:before&&before.edit.slots.map(s=>s.mainPipes.length),
+      return {restored,clearResult,rejectedClear,rejectedAuto,
+        afterRejected:afterRejected&&afterRejected.edit.slots.map(s=>s.mainPipes.length),
+        before:before&&before.edit.slots.map(s=>s.mainPipes.length),
         cleared:cleared&&cleared.edit.slots.map(s=>s.mainPipes.length),
         undone:undone&&undone.edit.slots.map(s=>s.mainPipes.length),
         roundTrip:roundTrip&&roundTrip.edit.slots.map(s=>s.mainPipes.length),
@@ -122,6 +130,10 @@ async function main() {
         shadow:window.__runyeDrawingDesignShadow};
     })()`);
     assert.equal(result.restored, true, JSON.stringify(result));
+    assert.equal(result.rejectedClear, false, JSON.stringify(result));
+    assert.equal(result.rejectedAuto, false, JSON.stringify(result));
+    assert.deepEqual(result.afterRejected, [1, 1], JSON.stringify(result));
+    assert.equal(result.clearResult, true, JSON.stringify(result));
     assert.deepEqual(result.before, [1, 1], JSON.stringify(result));
     assert.deepEqual(result.cleared, [0, 0], JSON.stringify(result));
     assert.deepEqual(result.undone, [1, 1], JSON.stringify(result));

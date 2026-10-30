@@ -102,7 +102,7 @@
       var unverifiedWithoutNetwork = designState && designState.design
         ? '<span style="color:var(--a-600);font-weight:700">三级设计快照未匹配到当前管网，未参与校核。</span><br>' : '';
       el.innerHTML = unverifiedWithoutNetwork + '<span style="color:var(--r-600);font-weight:700">未找到已布置管网</span><br>' +
-        '<span style="font-size:11px;color:var(--s-500)">去 <a href="runye-map-measure.html">在线地图</a> 布置管网，' +
+        '<span style="font-size:11px;color:var(--s-500)">去 <a href="#onlineMapSection">在线地图</a> 布置管网，' +
         '或回主页「生成管线图」后回来校核。</span>';
       return;
     }

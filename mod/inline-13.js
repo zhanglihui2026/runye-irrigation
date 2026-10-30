@@ -69,7 +69,11 @@
         if(window.runyeSaveCurrentPlotBeforeSwitch()!==true)throw new Error('当前地块快照未确认写入');
       }
     }
-    catch(eSave){toast('当前地块方案未能保存，暂不成组：'+(eSave&&eSave.message?eSave.message:'本地存储失败'));return;}
+    catch(eSave){
+      /* [v820] 存储满不阻断：二级管网留档已先行写入，成组可以继续，只提示。 */
+      if(eSave && eSave.storageFull){ toast(window.__ryLastSaveFullMessage||'本机存储空间已满：当前地块完整方案未保存（二级管网已留档）。建议清理旧档案后重试。'); }
+      else { toast('当前地块方案未能保存，暂不成组：'+(eSave&&eSave.message?eSave.message:'本地存储失败')); return; }
+    }
     var api=window.RunyeMapEnhance&&window.RunyeMapEnhance.merge;
     if(!api||typeof api.groupFromLibrary!=='function'){toast('成组功能暂不可用，请刷新页面后重试');return;}
     var result=api.groupFromLibrary(ids,{});
@@ -262,7 +266,12 @@
     var p=matches[0];
     if(!p) return;
     if(window.currentPlotId && String(window.currentPlotId)===String(id)){
-      try{ if(typeof window.runyeSaveCurrentPlotBeforeSwitch==='function') window.runyeSaveCurrentPlotBeforeSwitch(); }catch(eSaveSame){ toast('当前地块未能保存：'+(eSaveSame&&eSaveSame.message?eSaveSame.message:'本地存储失败')); return; }
+      try{ if(typeof window.runyeSaveCurrentPlotBeforeSwitch==='function') window.runyeSaveCurrentPlotBeforeSwitch(); }
+      catch(eSaveSame){
+        /* [v820] 存储满只提示不中断：同一地块重设当前，二级管网留档已先行写入 */
+        if(!(eSaveSame && eSaveSame.storageFull)){ toast('当前地块未能保存：'+(eSaveSame&&eSaveSame.message?eSaveSame.message:'本地存储失败')); return; }
+        toast(window.__ryLastSaveFullMessage||'本机存储空间已满：完整方案未保存（二级管网已留档）。建议清理旧档案后重试。');
+      }
       var sameSection=(p.merged||p.grouped)&&Array.isArray(p.subPlots)&&p.subPlots.length>=2?'grPipeSection':'pipePlanSection';
       try{ if(typeof window.ryJumpToSection==='function') window.ryJumpToSection(sameSection); }catch(eSameRoute){}
       return;
@@ -271,7 +280,11 @@
       try{
         if(typeof window.runyeSaveCurrentPlotBeforeSwitch!=='function') throw new Error('旧地块安全保存接口未加载');
         window.runyeSaveCurrentPlotBeforeSwitch();
-      }catch(eSave){ toast('当前地块未能先行保存：'+(eSave&&eSave.message?eSave.message:'本地存储失败')); return; }
+      }catch(eSave){
+        /* [v820] 存储满只提示不中断：切地块时二级管网留档已在主快照之前写入 */
+        if(!(eSave && eSave.storageFull)){ toast('当前地块未能先行保存：'+(eSave&&eSave.message?eSave.message:'本地存储失败')); return; }
+        toast(window.__ryLastSaveFullMessage||'本机存储空间已满：上一地块完整方案未保存（二级管网已留档）。建议清理旧档案后重试。');
+      }
     }
     /* 已保存上一块后清除全局三级临时管网与编辑器缓存；目标块只从自身 ID 档案恢复 L2。 */
     try{ if(typeof window.runyeResetPlotScopedNetworkState==='function') window.runyeResetPlotScopedNetworkState(); }

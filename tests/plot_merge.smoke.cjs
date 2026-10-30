@@ -23,6 +23,7 @@ const ENHANCE_SRC = fs.readFileSync(path.join(ROOT, 'runye-map-enhance.js'), 'ut
 // Expand the classic-script modules referenced by index.html so contract checks
 // continue to inspect the real assembled page after source extraction.
 const INDEX_SRC = require(path.join(ROOT, 'expand_index.cjs'))(path.join(ROOT, 'index.html'));
+const PLOT_EDITOR_SRC = fs.readFileSync(path.join(ROOT, 'mod', 'plot-editor.js'), 'utf8');
 const PANEL_CSS = fs.readFileSync(path.join(ROOT, 'mod', 'style-01.css'), 'utf8');
 // 在线地图现已作为主页面功能区运行；契约应检查实际装配的主页面片段与
 // 地图行为模块，不能再把迁移前的独立 HTML 当作唯一实现来源。
@@ -269,10 +270,10 @@ test('②-e 模块导出 merge 命名空间（plots/hull/canUnmerge/unmerge 四�
  * ========================================================================= */
 test('③-a 自动划分切换按钮存在，默认开启且绑定切换动作', () => {
   assert.match(MAP_SRC, /id="btnMerge"/, '地图页应有「拼接地块」入口');
-  assert.match(INDEX_SRC, /<button[^>]*id="ppZoneAutoBtn"[^>]*>地块划分<\/button>/);
-  assert.match(INDEX_SRC, /zoneAuto:true/);
-  assert.match(bodyOf(INDEX_SRC,'ppApplyZoneAutoUI'), /classList.toggle\('active', on\)/);
-  assert.match(INDEX_SRC, /btn.addEventListener\('click',function\(\)\{ ppSetZoneAuto\(!ppZoneAutoOn\(\)\); \}\)/);
+  assert.match(PLOT_EDITOR_SRC, /getElementById\('ppZoneAutoBtn'\)/, '绘图编辑器应接管分区开关');
+  assert.match(PLOT_EDITOR_SRC, /zoneAuto:true/, '首次默认开启自动分区');
+  assert.match(bodyOf(PLOT_EDITOR_SRC,'ppApplyZoneAutoUI'), /classList.toggle\('active', on\)/);
+  assert.match(PLOT_EDITOR_SRC, /btn.addEventListener\('click',function\(\)\{ ppSetZoneAuto\(!ppZoneAutoOn\(\)\); \}\)/);
 });
 
 test('③-b 门控口径（v189）：关开关 = **真的不划分**，必须进入分区计算路径', () => {
@@ -370,14 +371,17 @@ test('③-c 关闭开关的处理（v189）：退出 adjustCut + 重算下游，
   assert.ok(INDEX_SRC.includes('getItem(\'runye_zone_auto\')'), '初始态应读存档 runye_zone_auto');
 });
 
-test('③-d 默认口径：无存档时 zoneAuto=true（老流程零变化）', () => {
+test('③-d 地块始终自动分区，旧关闭存档不再控制画布', () => {
   // ppState 初始值
   assert.match(INDEX_SRC, /zoneAuto:true/, 'ppState.zoneAuto 初值应为 true');
-  // 初始化分支：s===null → true
+  assert.match(INDEX_SRC, /function ppZoneAutoOn\(\)\s*\{\s*return true;\s*\}/,
+    '画布分区决策不得再受旧开关存档影响');
   const k = INDEX_SRC.indexOf('function ppInitZoneAuto');
   assert.ok(k > 0, '应有 ppInitZoneAuto');
   const seg = INDEX_SRC.slice(k, k + 900);
-  assert.match(seg, /s===null\)?\s*\?\s*true/, '无存档时必须回落为 true（默认自动划分）');
+  assert.match(seg, /ppState\.zoneAuto\s*=\s*true/, '初始化必须启用自动划分');
+  assert.match(seg, /getItem\('runye_zone_auto'\)===\s*'0'[\s\S]*removeItem\('runye_zone_auto'\)/,
+    '初始化应清除旧版关闭划分的残留存档');
 });
 
 test('③-e 地图页成组模式开关与图层面板勾选框双向一致（不留分裂状态）', () => {
@@ -439,60 +443,23 @@ test('③-g 传递口径（v189）：回传二级页的是**各子地块本身**
   assert.match(seg2, /poly:\s*ll\.map/, '应换算每个子地块自己的本地米坐标 poly');
 });
 
-test('③-h 消费口径（v190）：子地块环传到了就必须**真的被用**——只写不读 = 等于没传', () => {
-  /* 用户原话（第二次发火）：「在线地图中两个地块之间明显是有空隙的，你怎么就给吃掉了。」
-     真因：v189 三层都传对了，但二级页绘制/算面积仍只用 ppState.polyPts（外框/凸包）
-     ⇒ 数据在、下游不消费，空隙照样被吞。
-     ⇒ 静态契约：**写入点存在** 且 **读取点 ≥ 4 处**（画布 / 施工图 / 面积 / 点位判定），
-        外加旋转落定与镜像的同步变换，缺一条就是「只写不读」。 */
-  assert.match(INDEX_SRC, /function ppGetSubPlotRings\(\)/, '应有 ppGetSubPlotRings（数据坐标环，供面积/点位判定）');
-  assert.match(INDEX_SRC, /function ppGetRotatedSubRings\(\)/, '应有 ppGetRotatedSubRings（显示层旋转环）');
-  assert.match(INDEX_SRC, /function ppXformSubRings\(fn\)/, '应有 ppXformSubRings（旋转落定/镜像时同步变换）');
-
-  const count = (re) => (INDEX_SRC.match(re) || []).length;
-
-  /* 「写入 1 处、读取 0 处」就是本次 bug 的形状 —— 直接断言读取点数量 */
-  const reads = count(/ppGetSubPlotRings\(\)|ppGetRotatedSubRings\(\)|ppXformSubRings\(/g);
-  assert.ok(reads >= 6, '子地块环的读取/同步调用点应 ≥ 6 处（三件套定义 3 + 消费 ≥3），实际 ' + reads + ' 处');
-
-  /* 逐个消费点：必须落在正确的函数体内，而不是只定义不用 */
-  const inFn = (fnName, needle) => {
-    const b = bodyOf(INDEX_SRC, fnName, 2500);   // 这些函数都不长；已剥注释
-    return !!b && b.indexOf(needle) >= 0;
-  };
-  assert.ok(inFn('ppTracePlotPath', 'ppGetRotatedSubRings()'),
-    '画布绘制 ppTracePlotPath 必须按成员环画（否则画布继续吞空隙）');
-  assert.ok(inFn('ppPointInPlot', 'ppGetSubPlotRings()'),
-    '点位判定 ppPointInPlot 必须按成员环判（否则空隙里能放阀门）');
-  assert.ok(inFn('ppZoneActualAreaM2', 'ppGetSubPlotRings()'),
-    '分区面积 ppZoneActualAreaM2 必须按成员环求和（否则空隙被并进面积）');
-  assert.ok(inFn('ppRepartitionFromRotatedPlot', 'ppXformSubRings('),
-    '旋转落定必须同步变换子地块环（否则主轮廓转了、子块没转）');
-  /* ★ ppApplyMirror 里必须**两处**都同步：① 先撤销上一次镜像 ② 再应用新镜像。
-     只查「函数体内存在调用」会被①蒙混过关（注入掉②仍绿 —— 实测踩到），
-     故按次数断言（与「判据要能区分正反例」同一条原则）。 */
-  const mirrorCalls = countIn(INDEX_SRC, 'ppApplyMirror', 'ppXformSubRings(');
-  assert.strictEqual(mirrorCalls, 2,
-    'ppApplyMirror 应同步子地块环 2 次（撤销旧镜像 + 应用新镜像），实际 ' + mirrorCalls + ' 次');
-  /* 施工图 SVG 的 d 也是一条独立代码路径（与画布不共用），必须单独盯。
-     [v193] 出图入口已拆成两层：
-       · ppGenerateDiagram(options)      —— 公开入口；成组 + 逐块态时先临时切整组视图
-       · ppGenerateDiagramCore(options)  —— 真正拼 SVG 的那份
-     所以「d 按成员环拼」这条要查的是 **Core**；同时补一条「入口必须委托给 Core」，
-     防止有人把 Core 改名/复制一份后入口不再走它。 */
-  const gd = INDEX_SRC.indexOf('function ppGenerateDiagramCore(');
-  assert.ok(gd > 0 && INDEX_SRC.slice(gd, gd + 6000).indexOf('ppGetRotatedSubRings()') >= 0,
-    '施工图 ppGenerateDiagramCore 的 SVG d 必须按成员环拼（与画布是两条独立路径）');
-  assert.match(INDEX_SRC, /function ppGenerateDiagram\(options\)\{[\s\S]{0,600}ppGenerateDiagramCore\(options\)/,
-    'ppGenerateDiagram 必须把出图委托给 ppGenerateDiagramCore（前面只加一层整组视图切换）');
-
-  /* 反向断言：面积不得再退化成「整块外框裁剪」的唯一口径 */
-  const a = INDEX_SRC.indexOf('function ppZoneActualAreaM2(');
-  const abody = INDEX_SRC.slice(a, a + 1500);
-  assert.match(abody, /var rings=ppGetSubPlotRings\(\);/, 'ppZoneActualAreaM2 应优先取成员环');
-  assert.match(abody, /sum\+=ppPolyArea\(ppClipPolyToRect\(rings\[ri\]/, '面积应为 Σ 各成员环裁剪面积');
+test('③-h 成组成员环消费与稳定边界：画布、水力几何与施工图使用同一成员轮廓', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'mod', 'plot-editor.js'), 'utf8');
+  assert.match(src, /function ppGetSubPlotRings\(\)/, '应提供成员地块原始坐标环');
+  assert.match(src, /function ppGetRotatedSubRings\(\)/, '渲染入口应统一从成员环读取');
+  assert.match(src, /function ppGridFrame\(poly,b,dims,angleDeg\)/, '分区方向应由独立网格坐标框架处理');
+  const inFn = (fnName, needle) => bodyOf(src, fnName).includes(needle);
+  assert.ok(inFn('ppPointInPlot', 'ppGetSubPlotRings()'), '点位判定必须按成员轮廓');
+  assert.ok(inFn('ppZoneActualAreaM2', 'ppGetSubPlotRings()'), '分区面积必须累加成员轮廓');
+  assert.ok(inFn('ppTracePlotPath', 'ppGetRotatedSubRings()'), '画布绘制必须消费相同成员环');
+  assert.ok(inFn('ppGenerateDiagramCore', 'ppGetRotatedSubRings()'), '施工图必须消费相同成员环');
+  assert.match(bodyOf(src, 'ppGetRotatedSubRings'), /return rings;/,
+    '分区旋转只改变网格方向，不得改写成员地块坐标');
+  assert.match(bodyOf(src, 'ppGridFrame'), /angleDeg[\s\S]*Math\.cos[\s\S]*Math\.sin/,
+    '角度应应用到网格投影坐标框架');
+  assert.doesNotMatch(src, /function ppXformSubRings\(/,
+    '成员边界不再因分区方向变化而做物理旋转或镜像');
 });
-
 test('③-i 回传入口（v191）：成组地块必须能**被显式选中回传**，不能只认 currentMapPlotId', () => {
   /* 用户原话（第三次）：「还是不行，两个地块成组之后不能直接传给二级页面吗，
      一定要整合成一个地块才行吗？你检查一下逻辑是怎么样的。」
@@ -555,7 +522,7 @@ test('③-j 参考线（v191 用户拍板）：块间空隙留空，但保留淡
   assert.match(after, /cuts\.yPos\.length/, '横向网格线覆盖整个外框（含块间空隙）');
 });
 
-test('③-k 成组编辑「整组 / 逐块」（v193）：切换控件 + 各块独立 + 三级页隔离', () => {
+test('③-k 成组编辑「整组 / 逐块」与规范成员槽事务', () => {
   /* 断言本体在 tests/_v193_group_edit_contract.cjs —— 与 _p1/_gate_v193_contract.cjs
      的注入体检共用同一份，避免「契约一份、体检另一份」的漂移。 */
   require('./_v193_group_edit_contract.cjs')(INDEX_SRC, { stripComments, bodyOf, countIn });

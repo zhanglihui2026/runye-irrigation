@@ -8,7 +8,8 @@
    单段水损/流速/内径折算复用 RyHcCore，Christiansen F / 电机功率档复用
    RyDesignCore，保证与 index.html 三级水力计算**同口径**，不另立公式）。
 
-   界面见 runye-hydraulics.html；页面控制器通过 RyIrrigationDataStore 读取
+   界面见 index.html 的 #hydraulicsSection（[v821 唯一页面] 原 runye-hydraulics.html 独立页已删除）；
+   页面控制器通过 RyIrrigationDataStore 读取
    localStorage['runye_network_layout']，本模块只接收快照并计算（写入方是 index.html 管网反投）。
 
    ── 数据契约（index.html:13013-13041 实测口径）────────────────────────

@@ -46,6 +46,7 @@
     grid:      '<rect x="3.5" y="3.5" width="17" height="17"/><path d="M3.5 9.2h17M3.5 14.8h17M9.2 3.5v17M14.8 3.5v17"/>',
     gridreset: '<rect x="3" y="3" width="12.5" height="12.5"/><path d="M3 9.2h12.5M9.2 3v12.5"/><path d="M21 15.5a4.6 4.6 0 1 1-3.2 1.3"/><path d="M17 13.6l.6 3.4 3.4-.6"/>',
     lock:      '<rect x="4.5" y="10.4" width="15" height="9.6" rx="1.4"/><path d="M8 10.4V7.4a4 4 0 0 1 8 0v3"/>',
+    unlock:    '<rect x="4.5" y="10.4" width="15" height="9.6" rx="1.4"/><path d="M8.2 10.4V6.9a3.9 3.9 0 0 1 7.2-1.8"/>',
     undo:      '<path d="M4.5 9.5h9.6a4.9 4.9 0 0 1 0 9.8H8.2"/><path d="M8.1 5.4L4 9.5l4.1 4.1"/>',
     autopipe:  '<path d="M3 16.5h6.2a3.4 3.4 0 0 0 3.4-3.4V7"/><path d="M17.6 4.2l1.2 2.7 2.7 1.2-2.7 1.2-1.2 2.7-1.2-2.7-2.7-1.2 2.7-1.2z"/>',
     download:  '<path d="M12 4v10.6"/><path d="M7.8 10.4L12 14.6l4.2-4.2"/><path d="M4.5 19.4h15"/>',
@@ -151,8 +152,13 @@
         name = button.getAttribute('data-ry-layer-toggle') === 'pipeline' ? 'pipenet' : 'layers';
       }
       if(!name) return;
+      /* 已挂图标就先退出，别改 data-ry-icon —— 否则会把 setIcon() 写进去的
+         状态图标名（如 lock → unlock）按 BY_ID 又掰回默认名。 */
+      if(button.querySelector(':scope > .ry-ico')){
+        if(!button.getAttribute('data-ry-icon')) button.setAttribute('data-ry-icon', name);
+        return;
+      }
       button.setAttribute('data-ry-icon', name);
-      if(button.querySelector(':scope > .ry-ico')) return;
       button.insertAdjacentHTML('afterbegin', svgFor(name));
       button.setAttribute('data-ry-ico-svg', '1');
       n++;
@@ -160,5 +166,44 @@
     return n;
   }
 
-  window.RyIcons = { decorate: decorate, nameFor: nameFor, svgFor: svgFor, names: Object.keys(P) };
+  /* ── [v824] 换图标 / 改文案，都不许把已挂的 SVG 弄丢 ──────────────────────
+     病根：历史脚本用 `btn.textContent='已锁定面积'` 表达状态。textContent 是
+     「整体替换子节点」，会把 decorate() 刚插进去的 <svg class="ry-ico"> 一起清掉，
+     而 decorate() 只在初始化跑那一次 ⇒ 用户点一下按钮，图标就**永久**消失，
+     之后按钮只剩 font-size:0 藏起来的文字（= 空白方块）。
+     实测（_probe_lock_click.mjs）：#ppLockArea 点一下 hasSvg 由 true 变 false，
+     再点一次也回不来。
+     所以状态变化一律走这两个函数：
+       setIcon(btn, name)  只换图标（锁定/解锁这类状态本身就是图标要表达的）
+       setLabel(btn, text) 只换文字，保留首子节点的 SVG。 */
+  function setIcon(button, name){
+    if(!button) return false;
+    var body = P[name];
+    if(!body) return false;
+    button.setAttribute('data-ry-icon', name);
+    var old = button.querySelector(':scope > .ry-ico');
+    var html = svgFor(name);
+    if(old){ old.outerHTML = html; }
+    else { button.insertAdjacentHTML('afterbegin', html); }
+    button.setAttribute('data-ry-ico-svg', '1');
+    return true;
+  }
+
+  function setLabel(button, text){
+    if(!button) return;
+    var svg = button.querySelector(':scope > .ry-ico');
+    if(svg){
+      /* 保留 SVG，只替换它后面的文字节点 */
+      var n = svg.nextSibling;
+      while(n){ var nx = n.nextSibling; button.removeChild(n); n = nx; }
+      button.appendChild(document.createTextNode(String(text)));
+      return;
+    }
+    button.textContent = String(text);
+    /* 兜底：若图标此前已被别的 textContent 擦掉，这里按 data-ry-icon 补挂回来 */
+    var name = button.getAttribute('data-ry-icon');
+    if(name){ setIcon(button, name); }
+  }
+
+  window.RyIcons = { decorate: decorate, nameFor: nameFor, svgFor: svgFor, setIcon: setIcon, setLabel: setLabel, names: Object.keys(P) };
 })();
