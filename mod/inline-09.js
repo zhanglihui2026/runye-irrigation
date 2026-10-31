@@ -2870,6 +2870,19 @@ function tlNorthAngleDeg() {
 }
 window.tlNorthAngleDeg = tlNorthAngleDeg;
 
+/* [v837] 本文件自带的 HTML 转义。
+   ★ 为什么必须自带（2026-10-31 实测踩到）：`esc` 的定义在 **mod/inline-14.js**（全局函数），
+     而 inline-14.js 在 index.html 里排在 inline-09.js **之后**加载。于是任何「inline-09 已就绪、
+     inline-14 尚未执行」的时间窗里调用下面这些函数，转义点就会抛 `ReferenceError: esc is not defined`。
+     最致命的是 `tlAutoGenerate` 的 **catch 分支**（错误提示框）也用了它 ⇒ 真正的错误被
+     「esc is not defined」顶替，控制台只剩一条与病因无关的报错，现场无法定位（v837 前就是这样
+     把「规范绘图模型拒绝三级生成结果」埋掉的）。`tlPrintDiagram`（打印图纸）同样吃这个全局。
+   ⇒ 本文件不再依赖别的脚本提供转义；语义与 inline-14 的同名函数逐字一致（& < > " 四字符）。 */
+function esc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 function tlAutoGenerate(options) {
   options = options || {};
   var doScroll = options.scroll !== false;

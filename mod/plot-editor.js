@@ -771,6 +771,92 @@
     return fn(point,ppState.polyPts);
   }
 
+  /* ===== [v837 2026-10-31 用户实测] 分区旋转后「网格与管路整体画到地块外面」的统一裁剪 =====
+     现象（用户原话：「分区角度 30° 时，分区网格和管路整体画到地块边界外面」）：
+     分区角度非 0 时，格子是**旋转后的外接框**切出来的，格子四角、整条网格线、按整格撒出去的
+     管路都一定伸到地块多边形外面。线上 v834 实测（300×170m 地块、30°、两管程）：
+       · 网格线：画出去的长度只有 **32%** 落在地块内（最长的一条线 100% 在外）
+       · 主管：界内长度 52%（越界采样 50%）
+       · 支管：界内长度 51%
+     办法：一律裁到地块多边形。**只用一份实现** —— ppClipPolylineToRing（v659，逐线段求交点
+     → 按 t 排序切子段 → 子段中点内外判定 → 连续界内子段首尾拼接），不另写线-多边形求交。
+     [v837] 撤掉 v830 那份临时实现 ppClipSegToPoly：它与 ppClipPolylineToRing 重复，而且
+       「只保留最长的一段界内区间」在**凹多边形**上会把另一段真实管段吞掉（U 形地块一条线
+       穿进穿出两次，就只剩一条臂有管）。
+     ★ 0° 必须逐位不变：矩形地块上所有线本来就整段在界内 ⇒ 下面原值透传（不走 lerp），
+       生成结果与旧实现完全相同。这是本改动的回归底线。
+     ★ 为什么透传要显式写：ppClipPolylineToRing 内部用 lerp 取端点，t=1 时
+       a+(b-a)*1 在浮点下未必等于 b（如 0.1+(0.3-0.1)*1 = 0.30000000000000004），
+       不透传就会让「0° 生成结果哈希不变」这条底线随机破掉。 */
+  function ppClipSegsToPlot(a, b, poly) {
+    var ring = poly || ppState.polyPts;
+    if (!ring || ring.length < 3) return [[a, b]];
+    /* ★ 必须把 ppRingIn 传进去：网格线里**正好压在地块边上**的那几条（0° 时的最外圈、
+       30° 时贴边的），用纯射线法会判成「在界外」⇒ 整条线被裁没（实测 0° 下第 4 条竖线
+       直接消失）。ppRingIn = 射线法 或 落在边上。 */
+    var segs = ppClipPolylineToRing([a, b], ring, ppRingIn);
+    if (!segs.length) return [];
+    var same = function (p, q) { return Math.abs(p.x - q.x) < 1e-9 && Math.abs(p.y - q.y) < 1e-9; };
+    for (var i = 0; i < segs.length; i++) {
+      var s = segs[i];
+      if (s.length === 2 && same(s[0], a) && same(s[1], b)) segs[i] = [a, b];
+    }
+    return segs;
+  }
+  try { window.ppClipSegsToPlot = ppClipSegsToPlot; } catch (eClip) { }
+
+  /* [v837] 「在环内」的软判定：射线法 或 压在环边上。
+     为什么需要：网格线的最外圈那几条本来就与地块边重合，射线法对**边界上的点**的结果是
+     未定义的（实现在 inline-10.js atPointInPolygon，用的是严格 `<`）—— 实测 0° 下右侧
+     那条竖线被判成整条在界外、于是整条不画，比越界更糟（用户会以为网格少了一条）。
+     容差取环尺度的相对值：网格裁剪时环是**世界系多边形（米）**，管路裁剪时环是
+     **格系多边形**（实测 cutScaleX/Y=1、origin=地块包围盒左下 ⇒ 相对世界只是一个平移，
+     量级可能到 1e5），一处写死的绝对容差不可能同时合适。 */
+  function ppOnRingEdge(p, ring, tol) {
+    var n = ring.length;
+    for (var i = 0, j = n - 1; i < n; j = i++) {
+      var ax = ring[j].x, ay = ring[j].y, bx = ring[i].x, by = ring[i].y;
+      var dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy;
+      var t = L2 < 1e-18 ? 0 : ((p.x - ax) * dx + (p.y - ay) * dy) / L2;
+      if (t < -1e-9 || t > 1 + 1e-9) continue;
+      if (t < 0) t = 0; else if (t > 1) t = 1;
+      var qx = ax + dx * t, qy = ay + dy * t;
+      if (Math.sqrt((p.x - qx) * (p.x - qx) + (p.y - qy) * (p.y - qy)) <= tol) return true;
+    }
+    return false;
+  }
+  function ppRingIn(p, ring) {
+    var fnIn = window.atPointInPolygon || atPointInPolygon;
+    if (typeof fnIn === 'function' && fnIn(p, ring)) return true;
+    var ext = 0;
+    for (var i = 0; i < ring.length; i++) {
+      ext = Math.max(ext, Math.abs(ring[i].x), Math.abs(ring[i].y));
+    }
+    return ppOnRingEdge(p, ring, Math.max(1e-9, ext * 1e-9));
+  }
+
+  /* [v837] 格子在界内的形心（世界坐标）—— 只在「格子中心已经跑到地块外」时用来把标注拽回来。
+     复用 ppClipPolyToRect：地块换到格系 → 按本格矩形裁一刀 → 取裁剪后多边形的面积形心。 */
+  function ppZoneClipCenterWorld(zc, zr, cuts) {
+    try {
+      if (!cuts || !cuts.frame || !ppState.polyPts || ppState.polyPts.length < 3) return null;
+      var local = ppState.polyPts.map(cuts.frame.toGrid);
+      var clipped = ppClipPolyToRect(local, cuts.xPos[zc], cuts.yPos[zr], cuts.xPos[zc + 1], cuts.yPos[zr + 1]);
+      var c = ppPolyCentroid(clipped);
+      return c ? cuts.frame.toWorld(c) : null;
+    } catch (eC) { return null; }
+  }
+  function ppPolyCentroid(pts) {
+    if (!pts || pts.length < 3) return null;
+    var a = 0, cx = 0, cy = 0;
+    for (var i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      var cross = pts[j].x * pts[i].y - pts[i].x * pts[j].y;
+      a += cross; cx += (pts[j].x + pts[i].x) * cross; cy += (pts[j].y + pts[i].y) * cross;
+    }
+    if (Math.abs(a) < 1e-9) return null;
+    return { x: cx / (3 * a), y: cy / (3 * a) };
+  }
+
   function ppGetRotatedPlotPoints(){
     if(!ppState.polyPts.length)return [];
     /* 规划坐标是地块的固定真实坐标；只有分区网格可以改变方向。 */
@@ -2062,6 +2148,16 @@
         if(labelAngle>Math.PI/2)labelAngle-=Math.PI;else if(labelAngle<-Math.PI/2)labelAngle+=Math.PI;
         var _m2=ppZoneActualAreaM2(zc,zr,cuts,ppState.polyPts);
         var _mu=_m2/666.67;
+        /* [v837] 部分落在地块外的格子（旋转角下最外圈必有一批），格子中心可能已经跑到地块
+           外侧的空白里，标注就浮在外面。中心在界内时**一个像素都不动**（0° 与凸形地块行为不变），
+           只有真的出界才换成「本格 ∩ 地块」的形心。 */
+        if(_mu>0.05&&!ppPointInPlot(ppCutPoint(cuts,(cuts.xPos[zc]+cuts.xPos[zc+1])/2,(cuts.yPos[zr]+cuts.yPos[zr+1])/2))){
+          var __cw=ppZoneClipCenterWorld(zc,zr,cuts);
+          if(__cw&&ppPointInPlot(__cw)){
+            var __cc=ppToCanvas(__cw.x,__cw.y);
+            labelCenter={x:__cc.x,y:__cc.y};
+          }
+        }
         var _std=cuts.xPlan[zc]*cuts.yPlan[zr]/666.67;
         var _partial=_std>0 && _mu<_std*0.97 && _mu>0.05;
         if(_mu>0.05)__act.push({zi:zi,m2:_m2,mu:_mu});
@@ -2100,20 +2196,32 @@
     ppCtx.strokeStyle='rgba(15,23,42,.38)';
     ppCtx.lineWidth=1.1;
     ppCtx.setLineDash([7,5]);
+    /* [v837] 网格线同样裁到地块多边形。
+       ★ 旧写法是「从格系包围框 minY 画到 maxY」—— 30° 下这个包围框就是**旋转外接框**，
+         每条线两端各伸出一截到地块外（线上实测：画出去的长度只有 32% 在地块内）。
+         第一遍的分区底色本来就被 ppTracePlotPath 的 clip 裁掉了，只有这一遍的虚线没裁，
+         于是画面上「色块在地块内、虚线探到地块外」——用户看到的就是这个。
+       ★ 这里不开 canvas 的 clip 而是真裁线段：①与第一遍的口径一致（真几何 vs 画布遮罩）；
+         ②网格线的命中判定 ppHitTestCutLine 用的是几何，两边不会各说各话。 */
+    var __gbLine=cuts.bounds||b;
+    var __gridSegs=[], __stroked=[];
     for(var bx=0;bx<cuts.xPos.length;bx++){
-      var gb=cuts.bounds||b;
-      var vx1=ppCutCanvas(cuts,cuts.xPos[bx],gb.minY);
-      var vx2=ppCutCanvas(cuts,cuts.xPos[bx],gb.maxY);
-      ppCtx.beginPath();ppCtx.moveTo(vx1.x,vx1.y);ppCtx.lineTo(vx2.x,vx2.y);ppCtx.stroke();
+      __gridSegs.push([ppCutPoint(cuts,cuts.xPos[bx],__gbLine.minY),ppCutPoint(cuts,cuts.xPos[bx],__gbLine.maxY)]);
     }
     for(var by=0;by<cuts.yPos.length;by++){
-      var gb2=cuts.bounds||b;
-      var hy1=ppCutCanvas(cuts,gb2.minX,cuts.yPos[by]);
-      var hy2=ppCutCanvas(cuts,gb2.maxX,cuts.yPos[by]);
-      ppCtx.beginPath();ppCtx.moveTo(hy1.x,hy1.y);ppCtx.lineTo(hy2.x,hy2.y);ppCtx.stroke();
+      __gridSegs.push([ppCutPoint(cuts,__gbLine.minX,cuts.yPos[by]),ppCutPoint(cuts,__gbLine.maxX,cuts.yPos[by])]);
     }
+    __gridSegs.forEach(function(seg){
+      ppClipSegsToPlot(seg[0],seg[1]).forEach(function(s){
+        __stroked.push(s);
+        var c1=ppToCanvas(s[0].x,s[0].y),c2=ppToCanvas(s[1].x,s[1].y);
+        ppCtx.beginPath();ppCtx.moveTo(c1.x,c1.y);ppCtx.lineTo(c2.x,c2.y);ppCtx.stroke();
+      });
+    });
     ppCtx.restore();
     ppCtx.setLineDash([]);
+    /* 测量钩子：把本次真正画出去的切分与网格线段交出去（探针用，无行为影响）。 */
+    try{ window.__ppLastCuts=cuts; window.__ppLastGridSegs=__stroked; }catch(eCuts){}
     ppDrawCutHandles(b,cuts);
   }
 
@@ -2826,6 +2934,22 @@
         ppState.cutSnap={sig:ppGetZoneCutSignature(b,layout),x:keepSnap.x.slice(),y:keepSnap.y.slice()};
       }
       var cuts = ppGetZoneCuts(b, layout);
+      /* [v837] 每根线都裁到地块多边形；裁完不足 1 m 的整根丢弃（旋转角下的幽灵角格子）。
+         ★ 这里 ppState.polyPts 已被上面换成**格系**多边形（角度≠0 时），管坐标也在格系，
+           所以裁剪环就是 ppPipeClipPoly —— 两者同一个坐标系，别换成外面那份世界多边形。
+         0° 时所有线整段在界内 ⇒ 原值推入，结果与旧实现逐点相同。 */
+      var ppPipeClipPoly = ppState.polyPts;
+      function pushSeg(arr, a, c, minLen) {
+        var segs = ppClipSegsToPlot(a, c, ppPipeClipPoly), pushed = 0;
+        var min = (minLen === undefined ? 1 : minLen);
+        for (var si = 0; si < segs.length; si++) {
+          var seg = segs[si];
+          var L = Math.sqrt((seg[1].x - seg[0].x) * (seg[1].x - seg[0].x) + (seg[1].y - seg[0].y) * (seg[1].y - seg[0].y));
+          if (L < min) continue;
+          arr.push(seg); pushed++;
+        }
+        return pushed > 0;
+      }
 
       /* [v229 2026-10-05 用户要求] 主管/支管走向「少数服从多数」，全块统一：
          用户原话：「分了 20 个分区，其中有 11 个以上的分区是横向走主管、支管，
@@ -2875,34 +2999,34 @@
                （旧口径：主管落分区块 40%、支管落中线 ⇒ 间距 = 10% 块宽，随分区尺寸缩放） */
             var gapV1 = ppVisGap(zoneW);
             var mainX = centerX - gapV1 / 2, branchX = centerX + gapV1 / 2;
-            out.main.push([{ x: mainX, y: zy }, { x: mainX, y: zy + zoneH }]);
+            pushSeg(out.main, { x: mainX, y: zy }, { x: mainX, y: zy + zoneH });
             // 支管两端各缩进一段距离（分区边长 6%，4~14m），不与分区边缘相接，使各地块支管视觉上独立断开
             var gapV2 = Math.min(Math.max(zoneH * 0.06, 4), 14, zoneH * 0.22);
-            out.branch.push([{ x: branchX, y: zy + gapV2 }, { x: branchX, y: zy + zoneH - gapV2 }]);
+            pushSeg(out.branch, { x: branchX, y: zy + gapV2 }, { x: branchX, y: zy + zoneH - gapV2 });
             if (ppPointInPlot({ x: branchX, y: centerY })) out.valves.push({ x: branchX, y: centerY });
             // Three-level: sub-branch pipes perpendicular to branch (horizontal)
             if (isThree) {
               var nSub = Math.max(2, Math.floor(zoneH / 15));
               for (var sb = 1; sb <= nSub; sb++) {
                 var sbY = zy + zoneH * sb / (nSub + 1);
-                out.subbranch.push([{ x: zx + zoneW * 0.15, y: sbY }, { x: zx + zoneW * 0.85, y: sbY }]);
+                pushSeg(out.subbranch, { x: zx + zoneW * 0.15, y: sbY }, { x: zx + zoneW * 0.85, y: sbY }, 0.5);
               }
             }
           } else {
             /* [v638] 同竖向分支：对称夹住真实位置，错开量固定 */
             var gapH1 = ppVisGap(zoneH);
             var mainY = centerY - gapH1 / 2, branchY = centerY + gapH1 / 2;
-            out.main.push([{ x: zx, y: mainY }, { x: zx + zoneW, y: mainY }]);
+            pushSeg(out.main, { x: zx, y: mainY }, { x: zx + zoneW, y: mainY });
             // 支管两端缩进，与分区边缘留出空隙
             var gapH2 = Math.min(Math.max(zoneW * 0.06, 4), 14, zoneW * 0.22);
-            out.branch.push([{ x: zx + gapH2, y: branchY }, { x: zx + zoneW - gapH2, y: branchY }]);
+            pushSeg(out.branch, { x: zx + gapH2, y: branchY }, { x: zx + zoneW - gapH2, y: branchY });
             if (ppPointInPlot({ x: centerX, y: branchY })) out.valves.push({ x: centerX, y: branchY });
             // Three-level: sub-branch pipes perpendicular to branch (vertical)
             if (isThree) {
               var nSub2 = Math.max(2, Math.floor(zoneW / 15));
               for (var sb2 = 1; sb2 <= nSub2; sb2++) {
                 var sbX = zx + zoneW * sb2 / (nSub2 + 1);
-                out.subbranch.push([{ x: sbX, y: zy + zoneH * 0.15 }, { x: sbX, y: zy + zoneH * 0.85 }]);
+                pushSeg(out.subbranch, { x: sbX, y: zy + zoneH * 0.15 }, { x: sbX, y: zy + zoneH * 0.85 }, 0.5);
               }
             }
           }
@@ -4632,10 +4756,12 @@
     if(t<0||t>1||u<0||u>1)return null;
     return t;
   }
-  function ppClipPolylineToRing(line,ring){
+  function ppClipPolylineToRing(line,ring,fnInOverride){
     var out=[];
     if(!line||line.length<2||!ring||ring.length<3)return out;
-    var fnIn=window.atPointInPolygon||atPointInPolygon;
+    /* [v837] 第三个参数是纯增量：给「需要边界容差」的调用方（分区裁剪 ppClipSegsToPlot）用，
+       不传时行为与 v659 完全一致（v659 的调用点是块间分发，那里不需要软判定）。 */
+    var fnIn=fnInOverride||window.atPointInPolygon||atPointInPolygon;
     var cur=null;   /* 正在拼接的环内折线 */
     var lastPt=null;
     function lerp(p,q,t){ return {x:p.x+(q.x-p.x)*t, y:p.y+(q.y-p.y)*t}; }
