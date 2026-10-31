@@ -494,10 +494,22 @@ test('③-i 回传入口（v191）：成组地块必须能**被显式选中回�
   /* ★ 反向断言（防止退回「只认 currentMapPlotId」的旧写法）：
      buildPlotPayload 的入参是 plot（地块记录），不是从 currentMapPlotId 里取 */
   assert.ok(!/function buildPlotPayload\(\s*\)/.test(MAP_SRC), 'buildPlotPayload 必须接受 plot 入参（不能退回只认 currentMapPlotId）');
-  /* btnCopy 仍要能处理「当前画布草稿」这条老路径（没有它，未保存的地块就传不了了） */
-  const bc = MAP_SRC.indexOf("document.getElementById('btnCopy').onclick");
-  assert.ok(bc > 0, 'btnCopy 入口应仍在');
-  assert.match(stripComments(MAP_SRC.slice(bc, bc + 1200)), /sendPlotToDesign\(/, 'btnCopy 也应走统一的 sendPlotToDesign');
+  /* btnCopy 仍要能处理「当前画布草稿」这条老路径（没有它，未保存的地块就传不了了）
+     [v830 2026-10-31] 用户要求把面板里那个「回传地块绘制」按钮去掉（同入口已在列表行「→」）。
+     按钮没了，但**草稿路径不能跟着消失** ⇒ 逻辑提成具名函数 onSendCurrentDraft，
+     并用空守卫绑定 DOM（存在才绑），同时导出 window.__rySendCurrentDraft / RyMapHost.sendDraft。
+     断言随之改口径：不再找 DOM 绑定，而是钉住「具名函数存在 + 走 sendPlotToDesign + 已导出」。 */
+  assert.match(MAP_SRC, /function onSendCurrentDraft\(/, '草稿回传应保留为具名函数 onSendCurrentDraft');
+  const oc = MAP_SRC.indexOf('function onSendCurrentDraft(');
+  assert.ok(oc > 0, '应能找到 onSendCurrentDraft');
+  const ocBody = stripComments(MAP_SRC.slice(oc, oc + 1600));
+  assert.match(ocBody, /sendPlotToDesign\(/, 'onSendCurrentDraft 也应走统一的 sendPlotToDesign');
+  assert.match(ocBody, /saveCurrentDraftToLibrary\(/, '草稿路径必须先把画布草稿落库再回传');
+  assert.match(MAP_SRC, /window\.__rySendCurrentDraft\s*=\s*onSendCurrentDraft/, '应导出 __rySendCurrentDraft 供编程调用');
+  assert.match(MAP_SRC, /sendDraft\s*:\s*onSendCurrentDraft/, 'RyMapHost 应暴露 sendDraft');
+  /* 空守卫：DOM 按钮若不存在，绝不允许裸取 .onclick（否则整段 online-map.js 加载即断） */
+  assert.ok(!/document\.getElementById\('(btnCopy|btnCopyTerrain|btnSavePlot)'\)\.onclick/.test(MAP_SRC),
+    '已移除的三个按钮不得再有裸 .onclick 绑定，必须走 if(el) 空守卫');
 });
 
 test('③-j 参考线（v191 用户拍板）：块间空隙留空，但保留淡虚线做参考', () => {
