@@ -5204,3 +5204,69 @@ pp.zoom   N1=6.298666666666667  N2=1  N3=6.298666666666667  O1=6.298666666666667
   `check_publish_refs.cjs` **PASS**、`scripts/lint.cjs` 无告警。
 - ⚠ 探针需要 playwright：`PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm i --no-save playwright`，
   跑完**删掉 `node_modules`**（`node_modules` 不在 `.gitignore` 里）。
+
+## 26.78 总管五期：流速黄色告警 + 单根屏蔽（v839 · 2026-10-31）
+
+> 规格六。第一批（v838 属性面板）把 `dn/designFlow` 带进了界面，这一批才有"超标"可判。
+
+### 一、判定是纯函数（`mod/trunk-panel.js`）
+
+```js
+RyTrunkPanel.shouldWarn(entry, derived?) -> { warn, muted, vLevel, v, text }
+```
+- 只对 `vLevel ∈ {warn, bad}` 告警；**`low`（<0.8 m/s）不算告警** —— 偏低是选型浪费，
+  不是水力风险，把它塞进来会让提示永远在响，等于没有提示。
+- `warnMuted` **只看严格 `true`**：老数据里可能是 `'true'`/`1`/`'false'`，按 falsy 判会
+  出现"点了不再提醒它还在弹"或反之。
+- 缺 `dn`/`designFlow` 时 `v` 是 `null` ⇒ 不告警（**不能**被当成 0 去比档位，否则误报"偏低"）。
+- 文案 `WARN_TEXT` 是规格原文，`tests/trunk_warn.test.cjs` 逐字比对。
+
+### 二、卡片是"非模态"，这是设计决定不是偷懒
+
+- 规格一⑧：「水力超标只黄色提示，不能阻断绘制/保存/导出/复核」。
+  做 modal 遮罩就等于阻断（遮罩会吃掉后面所有点击）⇒ 用地图区里的一张浮卡片：
+  `position:absolute`、`top:44px` 居中、`z-index 1185`（提示条是 1190，互不覆盖）、无 backdrop。
+- 探针用**机械判据**验"非阻断"，不靠肉眼：① `elementFromPoint` 命中的仍是面板控件本身；
+  ② `body` 下不存在 `fixed` + 全屏 + `z>1000` 的节点；③ 卡片在时改管径仍然落库。
+- 位置避让：顶部 8px 是 `.map-trunk-hint`，右下是属性面板 + PWA 安装条 ⇒ 卡片取 44px。
+
+### 三、触发与失效（都在 `mod/online-map.js`）
+
+| 时机 | 行为 |
+|---|---|
+| 面板【重新复核水力】 | 有 tip 结论 + 超标就弹卡 |
+| 保存干线（`commitTrunkDraft` 成功） | 记 `savedId` 后判一次（"画完才想起没填管径"是最常见的现场） |
+| 改任何参数（`patchTrunkParams` 成功） | **收起**旧卡（上面那个流速已成旧值，宁可让用户再点一次复核） |
+| 换选中线 / 进入绘制态 | 收起（卡里说的是另一根线的事） |
+| 点【知道了】 | 只收起，**不写**屏蔽 |
+| 点【不再对该总管提醒】 | `patch({warnMuted:true})` 走 `commitTrunks`（正常写库、revision+1、可撤销） |
+
+### 四、屏蔽的出口必须双向
+
+- `core/trunk-schema.js` 的 `normalizeParams`：`warnMuted !== true` 一律删键 ——
+  库里不攒"等价于 false"的脏值，下游也不用再判"哪种算屏蔽"。
+- 面板 footer 第三个按钮 `#tpWarnToggle`：`流速提醒：开启 / 已屏蔽`，点一次翻转。
+  没有这个出口的话，用户点了"不再提醒"就**永久**看不到该线告警（除非重画），那是个死胡同。
+
+### 五、测试
+
+- `tests/trunk_warn.test.cjs`（11 项）：经济不弹、偏高/超标弹、**偏低不弹**、脏值当没屏蔽、
+  缺数不误报、文案逐字、可传 derived、不改入参、schema 只留 true、端到端（存 true → normalize → 仍屏蔽）。
+- `_probe_trunk_p8_warn.mjs`（**27 项全绿**）：文案/按钮/编号/档位、非阻断三条机械判据、
+  【知道了】≠ 屏蔽（D2~D4）、屏蔽落库 + revision+1 + 面板变「已屏蔽」（E1~E4）、
+  屏蔽后不弹但仍给 tip（E5~E6）、**另一条线照弹**（F1~F2）、面板解除后重新弹（G1~G4）、无 pageerror。
+
+### 六、仍没做（下一批）
+
+1. DXF `ZG_总管层` + 过滤捕捉白点（`runye-dxf.js` 现在只有 PLOT/ZONE/PIPE_*）。
+2. 「联合水力复核」（总管 + 下游分区管网）—— 前提是地图页先有 AI 管网图层。
+3. 地图页叠加 AI 分区管网（只读）+ 图层配色（总管仍深灰 `#475569`，规格要粗深蓝）。
+4. 分区页移除手绘总管入口 `#grTrunkDraw`（两套总管并存）。
+5. 众包案例库打包。
+
+### 七、发布状态（v839）
+
+- 版本同抬：`sw.js VERSION='v839-trunk-warn'`、`index.html` 的 `style-01.css?v=839-trunk-warn`
+  + `core/trunk-schema.js` / `mod/online-map.css` / `mod/online-map.js` / `mod/trunk-panel.js` 的 `?v=`
+  （`mod/trunk-panel.js` 已在 CORE 名单，无需再加）。
+- 闸门：`check.cjs` 全部通过 / 单测 **364 项全绿** / `check_publish_refs.cjs` PASS / lint 无告警。

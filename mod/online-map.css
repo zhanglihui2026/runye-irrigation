@@ -213,3 +213,37 @@ body:has(.ry-pwa-install) #onlineMapSection .ry-trunk-panel{bottom:96px}
 .ry-node-btn:hover{border-color:#38bdf8;color:#0369a1;background:#f0f9ff}
 .ry-node-btn.is-primary{background:#2563eb;border-color:#2563eb;color:#fff}
 .ry-node-btn.is-primary:hover{background:#1d4ed8;border-color:#1d4ed8;color:#fff}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   [v839] 流速告警卡（规格六：黄色 / 非阻断 / 单根屏蔽）
+   ───────────────────────────────────────────────────────────────────────────
+   ★ 刻意**不做遮罩层**：规格要求「只黄色提示，不能阻断绘制、保存、导出、复核」，
+     遮罩会把后面所有点击吃掉，那就是阻断。这张卡只是地图区里的一张浮卡片，
+     它出现在顶部居中、常驻提示条（.map-trunk-hint，top:8，z 1190）下方，
+     z-index 取 1185 保证不压住提示条、也不被提示条压住。
+   ★ 不写 border-radius：全站 body *{border-radius:0!important} 会压掉它。
+   ═══════════════════════════════════════════════════════════════════════════ */
+#onlineMapSection .ry-trunk-warn{
+  position:absolute;left:50%;top:44px;transform:translateX(-50%);z-index:1185;
+  width:420px;max-width:calc(100% - 40px);
+  background:#fef3c7;border:1px solid #f59e0b;
+  box-shadow:0 6px 18px rgba(120,53,15,.18);
+  font-size:11px;line-height:1.5;color:#92400e}
+#onlineMapSection .ry-trunk-warn .tw-head{
+  display:flex;align-items:center;gap:6px;
+  padding:5px 9px;background:#fde68a;border-bottom:1px solid #f59e0b}
+#onlineMapSection .ry-trunk-warn .tw-ico{flex:none;font-size:12px!important;line-height:1}
+#onlineMapSection .ry-trunk-warn .tw-title{
+  flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:12px!important;font-weight:700;color:#78350f}
+#onlineMapSection .ry-trunk-warn .tw-v{
+  flex:none;font-weight:700;font-variant-numeric:tabular-nums;color:#b45309}
+#onlineMapSection .ry-trunk-warn .tw-body{padding:6px 9px;font-size:11px!important}
+#onlineMapSection .ry-trunk-warn .tw-foot{display:flex;gap:6px;justify-content:flex-end;padding:0 9px 7px}
+#onlineMapSection .ry-trunk-warn .tw-btn{
+  height:22px;padding:0 9px;border:1px solid #d97706;background:#fff;color:#92400e;
+  font-family:inherit;font-size:11px!important;font-weight:700;cursor:pointer}
+#onlineMapSection .ry-trunk-warn .tw-btn:hover{background:#fffbeb}
+#onlineMapSection .ry-trunk-warn .tw-btn.is-quiet{
+  border-color:#fcd34d;background:transparent;color:#a16207;font-weight:600}
+#onlineMapSection .ry-trunk-warn .tw-btn.is-quiet:hover{background:#fffbeb;color:#92400e}

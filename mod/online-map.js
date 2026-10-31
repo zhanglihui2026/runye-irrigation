@@ -774,6 +774,7 @@
     });
     var params=draft.params?JSON.parse(JSON.stringify(draft.params)):{material:'PE',dn:null,designFlow:null};
 
+    var savedId=null;
     var res=commitTrunks(function(next,ctx){
       var S=ctx.schema;
       /* [v838] 显示用管线编号：默认 ZG-001 / ZG-002…递增（规格五①）。
@@ -798,11 +799,14 @@
         if(next.trunks.length>=S.MAX_TRUNKS) return {ok:false,error:'干线数量已达上限（'+S.MAX_TRUNKS+' 条），请先删掉不用的线。'};
         next.trunks.push(entry);
       }
+      savedId=String(entry.id);   /* [v839] 保存完要按这条线判一次流速告警 */
       return {ok:true,trunk:next};
     });
     if(!res.ok) return false;
     setTrunkMode('idle');
     tip('总管已保存（共 '+res.trunk.trunks.length+' 条）。回到分区页重新回传该地块后可读取这条地图总管。');
+    /* [v839] 保存时也判一次：用户常常"画完才想起没填管径"，保存是最自然的那次复核。 */
+    if(savedId) maybeWarnTrunk(savedId);
     return true;
   }
   /* 进入/退出总管绘制。**所有互斥都收口在这里**，别在各按钮里各写一份
@@ -812,6 +816,7 @@
     trunkDragPreview=null;      // 切模式一律丢掉拖动预览，别让状态栏停在旧数字上
     if(nextMode==='draw'){
       if(drawing) setDrawing(false);
+      hideTrunkWarn();          // 卡里说的是"已保存的那根线"，开始画新的就过时了
       if(measuring) finishMeasure();
       if(addMode) setAddMode(false);
       map.dragging.disable();
@@ -1209,6 +1214,8 @@
   function selectTrunk(id){
     activeTrunkId=id===null?null:String(id);
     activeVertexIdx=-1;
+    /* 卡里的数字属于"上一条线"，换线后就过时了（留着会让人以为新线也超标）。 */
+    if(trunkWarnFor && String(trunkWarnFor)!==String(activeTrunkId)) hideTrunkWarn();
     renderTrunkDraft();
     renderTrunkEditHandles();
     updateStatusbar();
@@ -1400,6 +1407,8 @@
       return {ok:true,trunk:nx};
     },{silent:true,tipText:tipText||null});
     if(trunkPanel) trunkPanel.refresh();
+    /* 参数一改，卡上那个流速就是旧值了 —— 宁可让用户自己再点一次复核，也不要留个假数。 */
+    if(res&&res.ok && trunkWarnFor!==null && String(trunkWarnFor)===String(id)) hideTrunkWarn();
     return res;
   }
 
@@ -1422,7 +1431,87 @@
     if(d.vLevel==='warn'||d.vLevel==='bad') msg+='。建议加大管径或降低设计流量。';
     else msg+='。';
     tip(msg);
+    /* 超标就出黄色提示卡（非阻断：它不遮罩、不抢焦点，后面的点/拖/保存照常）。 */
+    maybeWarnTrunk(id);
     return true;
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     [v839] 流速告警卡（规格六）
+     ──────────────────────────────────────────────────────────────────────
+     形态：**黄色卡片，不遮罩**。规格要求「只黄色提示，不能阻断绘制/保存/导出/复核」，
+     所以没有用 modal 遮罩（遮罩会把后面所有点击吃掉，等于阻断）。
+     位置：地图区顶部居中、常驻提示条（top:8）下方，z-index 1185 —— 提示条是 1190，
+     两者不会互相盖；也不放右下角（那里是属性面板 + PWA 安装条）。
+     屏蔽：`params.warnMuted=true`，**只对单根生效**（判定在 RyTrunkPanel.shouldWarn）。
+     ══════════════════════════════════════════════════════════════════════ */
+  var trunkWarnEl=null, trunkWarnFor=null;
+
+  function mapWrapEl(){
+    return document.querySelector('#onlineMapSection .map-wrap')||document.querySelector('.map-wrap');
+  }
+
+  function hideTrunkWarn(){
+    if(trunkWarnEl && trunkWarnEl.parentNode) trunkWarnEl.parentNode.removeChild(trunkWarnEl);
+    trunkWarnEl=null;
+    trunkWarnFor=null;
+  }
+
+  function showTrunkWarn(entry, d){
+    var P=trunkPanelApi();
+    if(!P||!entry) return false;
+    var host=mapWrapEl();
+    if(!host) return false;
+    var id=String(entry.id);
+    /* 同一条线重复触发不重建：重建会让卡片闪一下，用户会以为点了两次。 */
+    if(trunkWarnEl && trunkWarnFor===id){ trunkWarnEl.dataset.v=String(d.v); return true; }
+    hideTrunkWarn();
+
+    var code=(entry.params&&entry.params.code)||id;
+    var card=document.createElement('div');
+    card.className='ry-trunk-warn';
+    card.id='trunkWarnCard';
+    card.setAttribute('role','status');      // 非模态：只播报，不夺焦点
+
+    var head=document.createElement('div'); head.className='tw-head';
+    var ico=document.createElement('span'); ico.className='tw-ico'; ico.textContent='⚠';
+    var ttl=document.createElement('span'); ttl.className='tw-title';
+    ttl.textContent='水力提示 · '+code;
+    var vv=document.createElement('span'); vv.className='tw-v';
+    vv.textContent=P.fmtV(d.v)+(d.vLevel?'（'+(V_LABEL[d.vLevel]||'—')+'）':'');
+    head.appendChild(ico); head.appendChild(ttl); head.appendChild(vv);
+
+    var body=document.createElement('div'); body.className='tw-body';
+    body.textContent=P.WARN_TEXT;
+
+    var foot=document.createElement('div'); foot.className='tw-foot';
+    var okBtn=document.createElement('button'); okBtn.type='button'; okBtn.className='tw-btn';
+    okBtn.id='twAck'; okBtn.textContent='知道了';
+    var muteBtn=document.createElement('button'); muteBtn.type='button'; muteBtn.className='tw-btn is-quiet';
+    muteBtn.id='twMute'; muteBtn.textContent='不再对该总管提醒';
+    foot.appendChild(okBtn); foot.appendChild(muteBtn);
+
+    okBtn.onclick=function(){ hideTrunkWarn(); };
+    muteBtn.onclick=function(){
+      hideTrunkWarn();
+      patchTrunkParams(id,{warnMuted:true},'已对 '+code+' 关闭流速提醒（只影响这一根，其它干线仍会提示）。');
+    };
+
+    card.appendChild(head); card.appendChild(body); card.appendChild(foot);
+    host.appendChild(card);
+    trunkWarnEl=card; trunkWarnFor=id;
+    return true;
+  }
+
+  /* 唯一触发口径：算 → 判（纯函数）→ 弹。判断逻辑一个字都不在这里写。 */
+  function maybeWarnTrunk(id){
+    var entry=findSavedTrunk(id);
+    if(!entry) return false;
+    var P=trunkPanelApi();
+    if(!P) return false;
+    var d=P.compute(entry);
+    if(!P.shouldWarn(entry,d).warn) return false;
+    return showTrunkWarn(entry,d);
   }
 
   /* 【标记该节点为水源 / 分水三通】—— 单选窗。用 DOM 拼而不是 innerHTML：

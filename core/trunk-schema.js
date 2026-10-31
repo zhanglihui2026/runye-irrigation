@@ -108,6 +108,10 @@
     if (!own(out, 'dn')) out.dn = null;
     if (!own(out, 'designFlow')) out.designFlow = null;
     if (own(out, 'code')) out.code = normalizeCode(out.code);
+    /* 流速提醒屏蔽（规格六）：**只认严格 true**。false / 0 / '' / 'false' 一律删掉 ——
+       它们语义上都是"没屏蔽"，留着只会让库里攒一堆等价脏值，
+       而下游又要为"到底哪种算屏蔽"再写一次判断（那种二义性迟早出错）。 */
+    if (own(out, 'warnMuted') && out.warnMuted !== true) delete out.warnMuted;
     return out;
   }
 

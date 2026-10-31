@@ -197,6 +197,29 @@
     return out;
   }
 
+  /* ── 流速告警（规格六）：**黄色、非阻断、只对单根生效** ─────────────────
+     判定与渲染分开：shouldWarn 是纯函数（Node 单测锁着），弹窗由宿主画。
+     ★ 判据只有"偏高/超标"，不含"偏低" —— 偏低是选型浪费，不是水力风险；
+       把它也塞进告警会让提示失去意义（低流速永远存在）。
+     ★ `warnMuted` 只看严格 true：老数据里可能是 0/''/'false'，那些都当"没屏蔽"，
+       宁可多提示一次，也不要因为一个脏值让用户以为"系统坏了不报警"。 */
+  var WARN_TEXT = '流速超过推荐经济流速，水头损失偏大，请复核管径或流量。';
+
+  function shouldWarn(entry, derived) {
+    var d = derived || compute(entry);
+    var prm = (entry && entry.params && typeof entry.params === 'object') ? entry.params : {};
+    var out = {
+      warn: false,
+      muted: prm.warnMuted === true,
+      vLevel: d.vLevel,
+      v: d.v,
+      text: WARN_TEXT
+    };
+    if (d.vLevel !== 'warn' && d.vLevel !== 'bad') return out;
+    out.warn = !out.muted;
+    return out;
+  }
+
   /* ── 格式化（面板与提示共用，避免两处口径不一） ─────────────────────── */
   function fmtLen(m) {
     if (m === null || m === undefined || !isFinite(m)) return '—';
@@ -265,6 +288,7 @@
       '<div class="tp-foot">' +
         '<button type="button" class="tp-btn" id="tpRecheck">重新复核水力</button>' +
         '<button type="button" class="tp-btn" id="tpMarkNode">标记该节点为水源 / 分水三通</button>' +
+        '<button type="button" class="tp-btn tp-btn-quiet" id="tpWarnToggle" title="只影响这一根干线；关闭后其它干线照常提示">流速提醒：开启</button>' +
       '</div>';
     return d;
   }
@@ -348,6 +372,15 @@
         dnEl.value = '';
       }
       paint(compute(entry));
+      /* 屏蔽状态的唯一显示出口：用户必须能看出"这条线被我关掉提醒了"，
+         否则下次复核不弹时会以为功能坏了。 */
+      var wt = q('tpWarnToggle');
+      if (wt) {
+        var muted = prm.warnMuted === true;
+        wt.textContent = '流速提醒：' + (muted ? '已屏蔽' : '开启');
+        wt.classList.toggle('is-muted', muted);
+        wt.setAttribute('aria-pressed', muted ? 'false' : 'true');
+      }
     }
 
     function show(entry) {
@@ -402,6 +435,14 @@
       if (!curId) return;
       if (typeof opts.onMarkNode === 'function') opts.onMarkNode(curId);
     };
+    q('tpWarnToggle').onclick = function () {
+      var entry = curEntry();
+      if (!entry) return;
+      var muted = !!(entry.params && entry.params.warnMuted === true);
+      /* 反向写回：true/false 都要落库。只写 true、取消时"不写"，会让用户点了没反应
+         （normalize 里 false 会被删掉，但那是"存了等于没存"，不是"没存"）。 */
+      patch({ warnMuted: !muted });
+    };
 
     api = {
       el: el,
@@ -422,6 +463,8 @@
     V_ECON_MIN: V_ECON_MIN,
     V_ECON_MAX: V_ECON_MAX,
     V_BAD: V_BAD,
+    WARN_TEXT: WARN_TEXT,
+    shouldWarn: shouldWarn,
     haversine: haversine,
     compute: compute,
     fmtLen: fmtLen,
