@@ -137,6 +137,8 @@
     var plot={ id:id, name:name, mu:Math.round(area/666.67*100)/100, sqm:Math.round(area*100)/100,
       poly:(window.measuredPolygon||[]).map(function(pt){return {x:Math.round((pt.x||0)*100)/100,y:Math.round((pt.y||0)*100)/100};}),
       source:'map', ts:Date.now(), note:(exist&&exist.note)||'' };
+    /* 地块边界/面积更新只维护 L2 几何；地图拥有的总管是独立 L3 输入，更新时必须保留。 */
+    if(exist&&exist.trunk)plot.trunk=JSON.parse(JSON.stringify(exist.trunk));
     /* [map-enhance 补全 2026-09-28] 回传落库时补 polyLatLng + geo，否则地图页叠加地块
        框线因缺经纬度被 runye-map-enhance.js 跳过。基准 __runyeGeoBase 来自地图页画框
        的 GCJ-02 经纬度，反投结果与地图页 btnSavePlot 存的 polyLatLng 同坐标系。 */
@@ -265,6 +267,25 @@
     if(matches.length>1){ toast('地块库中存在重复编号，无法确定当前地块；请先检查重复记录'); return; }
     var p=matches[0];
     if(!p) return;
+    /* Validate and, where possible, repair the incoming plot before clearing the
+       outgoing plot's runtime design. A broken library entry must not strand the
+       user with the old plot still selected but its L2/L3 state already erased. */
+    try{
+      if(p.polyLatLng && p.polyLatLng.length>=3 && window.RunyeGeo){
+        if(!p.geo) p.geo=RunyeGeo.baseOfFeature(p);
+        if(!Array.isArray(p.poly) || p.poly.length<3) p.poly=RunyeGeo.toCanvasPoly(p);
+        if(typeof p.sqm!=='number' || !isFinite(p.sqm) || p.sqm<=0){
+          p.sqm=Math.round(RunyeGeo.geodesicArea(p.polyLatLng));
+          p.mu=+(p.sqm/666.67).toFixed(2);
+          var repaired=saveLib(arr,state);
+          if(!repaired.ok){toast('地块信息修复未保存：'+repaired.error);return;}
+        }
+      }
+    }catch(eGeometry){toast('目标地块几何无法读取，当前设计未切换');return;}
+    if(!Array.isArray(p.poly)||p.poly.length<3||p.poly.some(function(q){return !q||!isFinite(+q.x)||!isFinite(+q.y);})){
+      toast('目标地块边界无效，当前设计未切换');
+      return;
+    }
     if(window.currentPlotId && String(window.currentPlotId)===String(id)){
       try{ if(typeof window.runyeSaveCurrentPlotBeforeSwitch==='function') window.runyeSaveCurrentPlotBeforeSwitch(); }
       catch(eSaveSame){
@@ -289,11 +310,6 @@
     /* 已保存上一块后清除全局三级临时管网与编辑器缓存；目标块只从自身 ID 档案恢复 L2。 */
     try{ if(typeof window.runyeResetPlotScopedNetworkState==='function') window.runyeResetPlotScopedNetworkState(); }
     catch(eReset){ toast('切换地块前的临时管网状态未能清理：'+(eReset&&eReset.message?eReset.message:'请重试')); return; }
-    if(p.polyLatLng && p.polyLatLng.length>=3 && window.RunyeGeo){
-      if(!p.geo) p.geo=RunyeGeo.baseOfFeature(p);
-      if(!Array.isArray(p.poly) || p.poly.length<3) p.poly=RunyeGeo.toCanvasPoly(p);
-      if(typeof p.sqm!=='number' || !isFinite(p.sqm) || p.sqm<=0){p.sqm=Math.round(RunyeGeo.geodesicArea(p.polyLatLng));p.mu=+(p.sqm/666.67).toFixed(2);var repaired=saveLib(arr,state);if(!repaired.ok){toast('地块信息修复未保存：'+repaired.error);return;}}
-    }
     window.measuredArea=p.sqm||0;
     window.measuredPolygon=Array.isArray(p.poly)?p.poly:[];
     /* [map-enhance] 任务2（2026-09-26）：「设为当前」同步 geo 反投基准 —— 地图页存的地块带
@@ -318,6 +334,26 @@
         if (_o.flipped) { window.measuredPolygon = _o.pts; _v219Flip = true; }
       }
     } catch (e219) { }
+    /* 地图总管随当前地块恢复；与边界共用 geo 原点，并遵循本次 setCurrent 的镜像修正。
+       [v831] 改走 RyTrunkSchema：v1 单段与 v2 多干线都能读，且下游统一只取主干
+       （pickMainTrunk = main 优先，否则 trunks[0]）—— 施工图仍是一根 frontPipe，
+       多干线只在地图页编辑，不在这里铺开。 */
+    window.__runyeImportedTrunk=null;
+    try{
+      var _S=window.RyTrunkSchema, tb=p.geo;
+      var _tr=_S&&_S.normalize(p.trunk);
+      var _trMain=_tr&&_S.pickMainTrunk(_tr);
+      if(!(p.merged||p.grouped) && _tr && _tr.coordinateSystem==='GCJ-02' && _trMain &&
+         tb && isFinite(tb.refLat) && isFinite(tb.refLng)){
+        var trM=6378137*Math.PI/180, trCos=Math.cos(tb.refLat*Math.PI/180);
+        var trPts=_trMain.points.map(function(q){
+          var rd=_S.readPoint(q);
+          if(!rd)return null;
+          return {x:(rd.lng-tb.refLng)*trM*trCos,y:(rd.lat-tb.refLat)*trM*(_v219Flip?1:-1)};
+        });
+        if(trPts.length>=2&&trPts.every(Boolean))window.__runyeImportedTrunk={plotId:String(id),revision:Number(_tr.revision)||0,trunkId:_trMain.id,points:trPts};
+      }
+    }catch(eTrunk){window.__runyeImportedTrunk=null;}
     /* [v191] 恢复成组地块的各子环（本地米坐标，与 measuredPolygon 同坐标系）。
        无库存子环则置 null，二级页回退画单块凸包。
        ★ [v219] 主环翻了子环必须跟着翻，否则子地块相对外框上下错位。 */

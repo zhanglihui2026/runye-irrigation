@@ -57,6 +57,7 @@ async function main() {
   const consoleErrors = [];
   const consoleWarnings = [];
   const dialogs = [];
+  let trunkContext = null;
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()); });
   page.on('console', (message) => { if (message.type() === 'warning') consoleWarnings.push(message.text()); });
@@ -93,6 +94,15 @@ async function main() {
       const section = document.getElementById(id);
       return !!section && (section.classList.contains('ry-active') || section.classList.contains('active'));
     }, `切换到 ${label}`, 15000, sectionId);
+    await page.evaluate(() => {
+      const warning = document.getElementById('warn');
+      if (!warning) return;
+      const unblock = () => {
+        if (/地图瓦片加载失败/.test(warning.textContent || '')) warning.style.setProperty('display', 'none', 'important');
+      };
+      new MutationObserver(unblock).observe(warning, { attributes: true, childList: true, subtree: true });
+      unblock();
+    });
   };
   const readState = () => page.evaluate(() => ({
     id: window.currentPlotId,
@@ -239,6 +249,18 @@ async function main() {
       throw new Error(`${error.message}\n页面状态：${JSON.stringify(diag)}\n运行期异常：${JSON.stringify(errors.slice(-8))}\n控制台/加载错误：${JSON.stringify(consoleErrors.slice(-12))}`);
     }
     await closeNotice();
+    // 本回归主动屏蔽外网瓦片；只对预期的离线提示层放开指针，免得它挡住本地绘图工具。
+    await page.evaluate(() => {
+      const warning = document.getElementById('warn');
+      if (!warning) return;
+      const unblock = () => {
+        if (/地图瓦片加载失败/.test(warning.textContent || '')) {
+          warning.style.setProperty('display', 'none', 'important');
+        }
+      };
+      new MutationObserver(unblock).observe(warning, { attributes: true, childList: true, subtree: true });
+      unblock();
+    });
 
     // 入口一：地图列表选地后，在地图地块上真实右键并点击弹窗按钮。
     await clickMapListButton('N02-A', '.place-go');
@@ -265,6 +287,8 @@ async function main() {
     await nav('在线地图', 'onlineMapSection');
     await clickMapListButton('N02-A', '.place-go');
     const libraryBeforeDraw = await page.evaluate(() => JSON.parse(localStorage.getItem('runye_plot_library') || '[]').length);
+    // 先退出当前地块编辑态；否则“完成”会按设计更新 N02-A 原记录，下面的新增数量断言不成立。
+    await page.locator('#btnClear').click();
     await page.locator('#btnDraw').click();
     const mapBox = await page.locator('#map').boundingBox();
     assert.ok(mapBox, '入口三：在线地图画布应可见');
@@ -274,18 +298,114 @@ async function main() {
     await page.locator('#btnFinish').click();
     await waitFor((count) => JSON.parse(localStorage.getItem('runye_plot_library') || '[]').length === count + 1,
       '入口三 绘制完成后地块自动入库', 10000, libraryBeforeDraw);
+    /* [v831] 工具互斥：绘制框还很可能是激活态（「完成」只是定稿 + 继续画下一块，不退出绘制），
+       而总管按钮在绘制框时被禁用 ⇒ 这里必须先显式退出画框，否则点不动。 */
+    if (await page.evaluate(() => document.getElementById('btnDraw')?.classList.contains('btn-on'))) {
+      await page.locator('#btnDraw').click();
+      await sleep(300);
+    }
     const drawnPlot = await page.evaluate(() => {
       const plots = JSON.parse(localStorage.getItem('runye_plot_library') || '[]');
       return plots.reduce((latest, plot) => !latest || (plot.ts || 0) > (latest.ts || 0) ? plot : latest, null);
     });
     assert.ok(drawnPlot?.id && drawnPlot?.polyLatLng?.length >= 3, '入口三：新绘制的地块应按稳定ID及经纬度入库');
-    await page.locator('#btnCopy').click();
-    await checkEntry(drawnPlot.id, '地图绘图工具栏回传');
+    // 「完成」会清空草稿并复位当前编辑 ID；先从库中明确选回刚保存的新地块再绘总管。
+    await page.locator(`#myPlotList .place-go[data-plot-id="${drawnPlot.id}"]`).click();
+    await sleep(400);
+    await page.locator('#btnDrawTrunk').click();
+    /* [v831] 激活态类从 .btn-on（绿色，侧栏共用）换成 .is-trunk-on（蓝色，规格要求灰→高亮蓝）。 */
+    await waitFor(() => document.getElementById('btnDrawTrunk')?.classList.contains('is-trunk-on'), '总管绘制模式');
+    const trunkMapBox = await page.locator('#map').boundingBox();
+    assert.ok(trunkMapBox, '地图总管：在线地图画布应可见');
+    for (const [x, y] of [[0.24, 0.52], [0.48, 0.48], [0.72, 0.44]]) {
+      await page.mouse.click(trunkMapBox.x + trunkMapBox.width * x, trunkMapBox.y + trunkMapBox.height * y);
+    }
+    await page.locator('#btnFinishTrunk').click();
+    /* [v831] plot.trunk 升到 schema 2（多干线），折点在 trunks[i].points 里。
+       断言统一走 RyTrunkSchema 取主干 —— 与四个下游读取方同一个口径，
+       这样以后 schema 再变，这条断言不用跟着改。 */
+    await waitFor((id) => {
+      const rows = window.RyPlotLibraryStore?.read?.()?.plots || [];
+      const matches = rows.filter((plot) => String(plot.id) === String(id));
+      const S = window.RyTrunkSchema;
+      const t = matches.length === 1 && S ? S.normalize(matches[0].trunk) : null;
+      const m = t ? S.pickMainTrunk(t) : null;
+      return matches.length === 1 && t?.source === 'map' &&
+        t.coordinateSystem === 'GCJ-02' && m && m.points.length >= 2;
+    }, '地图总管保存到当前地块', 10000, drawnPlot.id);
+    const savedTrunk = await page.evaluate((id) => {
+      const matches = (window.RyPlotLibraryStore?.read?.()?.plots || [])
+        .filter((plot) => String(plot.id) === String(id));
+      return matches.length === 1 ? matches[0].trunk : null;
+    }, drawnPlot.id);
+    const trunkPlot = { ...drawnPlot, trunk: savedTrunk };
+    const mainTrunkPoints = await page.evaluate((trunk) => {
+      const S = window.RyTrunkSchema;
+      const t = S && S.normalize(trunk);
+      const m = t && S.pickMainTrunk(t);
+      return m ? m.points.length : null;
+    }, savedTrunk);
+    assert.equal(savedTrunk?.source, 'map');
+    assert.equal(savedTrunk?.coordinateSystem, 'GCJ-02');
+    assert.equal(savedTrunk?.schema, 2, '总管应写成 schema 2（多干线）');
+    assert.ok(mainTrunkPoints >= 2, '地图总管至少保存两个折点，实际 ' + mainTrunkPoints);
+
+    // Use a clean isolated design session for the end-to-end handoff. Earlier cases
+    // intentionally mutate canonical/L3 state to cover migration guards, which can
+    // correctly block switching away from an invalid outgoing snapshot.
+    trunkContext = await browser.newContext({ viewport: { width: 1600, height: 1000 }, serviceWorkers: 'block' });
+    await trunkContext.route(/^https?:\/\//, (route) => route.abort());
+    await trunkContext.addInitScript((plots) => {
+      localStorage.setItem('runye_plot_library', JSON.stringify(plots));
+      localStorage.setItem('runyeLocalAdminSession', '1');
+    }, [...PLOTS, trunkPlot]);
+    const trunkPage = await trunkContext.newPage();
+    await trunkPage.goto(APP_URL, { waitUntil: 'load', timeout: 90000 });
+    await trunkPage.waitForFunction(() => window.RyMapHost && window.RyEntitle?.ready?.(), null, { timeout: 20000 });
+    // [v830 2026-10-31] 右侧角度面板里的「回传地块绘制」(#btnCopy) 已按用户要求移除。
+    // 改走列表行内「→」(.place-send) —— 这是保留的真实用户入口，也是同一函数 sendPlotToDesign。
+    await trunkPage.locator('#myPlotList .place-item[data-plot-id="' + drawnPlot.id + '"] .place-send').click();
+    await trunkPage.waitForFunction((id) => {
+      if (window.currentPlotId !== id) return false;
+      if (window.__runyeImportedTrunk?.plotId !== id) return false;
+      /* [v831] 库里是 schema 2：折点在 trunks[i].points，用 schema 模块取主干长度。 */
+      const S = window.RyTrunkSchema;
+      const plot = (window.RyPlotLibraryStore.read().plots || []).find((x) => String(x.id) === String(id));
+      const t = S && S.normalize(plot?.trunk);
+      const m = t && S.pickMainTrunk(t);
+      return !!m && window.__runyeImportedTrunk.points?.length === m.points.length;
+    },
+    drawnPlot.id, { timeout: 15000 }).catch(async (error) => {
+      const state = await trunkPage.evaluate(() => ({ url: location.href, currentPlotId: window.currentPlotId,
+        imported: window.__runyeImportedTrunk || null, latest: window.RyPlotLibraryStore?.read?.()?.plots?.slice(-1)[0] || null,
+        tip: document.getElementById('tip')?.textContent }));
+      throw new Error(`${error.message}\n总管回传现场：${JSON.stringify(state)}`);
+    });
+    await trunkPage.evaluate(() => window.tlAutoGenerate?.({ scroll: false }));
+    const generatedTrunk = await trunkPage.evaluate(() => ({
+      source: window.tlDiagramData?.trunkSource,
+      points: window.tlDiagramData?.frontPipe?.length || 0,
+      plotId: window.currentPlotId,
+    }));
+    assert.equal(generatedTrunk.plotId, drawnPlot.id, '施工图应属于刚回传的地块');
+    assert.equal(generatedTrunk.source, 'map', '施工图总管来源应为地图地块记录');
+    assert.equal(generatedTrunk.points, mainTrunkPoints, '施工图应使用保存的地图总管折点');
+
+    // The floating library arrow is the second explicit handoff entry for the same
+    // persisted trunk; verify it can rehydrate the same route after navigation.
+    await trunkPage.evaluate(() => window.RyAnnounce?.close?.());
+    await trunkPage.locator('.fn-nav .fn-link').filter({ hasText: '在线地图' }).first().click();
+    await trunkPage.locator(`#myPlotList .place-item[data-plot-id="${drawnPlot.id}"] .place-send`).click();
+    await trunkPage.waitForFunction((id) => window.currentPlotId === id &&
+      window.__runyeImportedTrunk?.plotId === id &&
+      window.__runyeImportedTrunk.points?.length >= 2,
+    drawnPlot.id, { timeout: 15000 });
 
     assert.deepEqual(errors, [], '页面不应出现运行期异常');
     assert.deepEqual(dialogs, [], '流程中不应出现意外原生弹窗');
     console.log('\nN02 三入口验收：全部通过。');
   } finally {
+    if (trunkContext) await trunkContext.close().catch(() => {});
     await context.close().catch(() => {});
     await browser.close().catch(() => {});
   }

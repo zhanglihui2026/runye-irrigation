@@ -1285,7 +1285,20 @@
     现在「条带盒模型 / 按钮尺寸 / 图标通道 / 激活态配色」各只有一个出处，回归
     tests/toolbar_single_layer.test.cjs（8 项）+ _probe_toolbar_map.mjs（几何前后逐按钮比对）。
    回归：tests/toolbar_dedupe.test.cjs（6 项）+ _probe_toolbar_map.mjs（导出工具栏实际顺序）。 */
-const VERSION = 'v826-flat-toolbar';
+/* v827 划线模式下节点也能拖动（用户：「平时是可以拖动的，划线之后就不能拖动了，让它划线也可以拖动」）：
+   真因：pointerdown 里划线模式分支（lineMode）排在节点拖动分支**之前**，命中节点就
+   `lineDrag=...; return` 把事件整个截走，nodeDrag 永远起不来 —— 不是几何问题，
+   与管道是否水平/垂直无关（locate() 是通用点到折线投影，9 个角度闭环误差 0）。
+   修：手势按**落点**分流，不新增按钮、不改划线手感 ——
+     · 松手落在**另一个节点**上 = 连线（与旧行为逐字一致，节点留在原处，startAtM 记着但不用）；
+     · 松手落在**空白处**且拖动过 3px = 把起点节点沿管移到这里（moveNode(locate(松手点))）。
+   起点节点在拖动中**不跟随**：跟了就会贴在指针下，永远吸附到自己、连不成线。
+   拖动中给「N-01 · 桩号 xx m」提示表示松手落点，避免"看起来还是拖不动"。
+   顺带补 3px 启动阈值（原来 pointermove 首行无条件 moved=true，轻点也算拖动），
+   并把 lineDrag.sx/sy 固定为按下点（原来每帧更新，阈值会永远不触发）。
+   回归：_probe_line_mode_drag.mjs 两个用例（A 拖空白→atM 10.8→29.12 moveNode=1；
+   B 拖到节点→links 0→1 且 atM 不变），普通模式复测 moveNode=9 无影响。 */
+const VERSION = 'v835-trunk-geo-snap';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
@@ -1300,6 +1313,8 @@ const CORE = [
   "core/event-bus.js",
   "core/data-service.js",
   "core/plot-library-store.js",
+  /* [v831] 地图总管数据契约 v2：所有 trunk 读取方都依赖它先加载。 */
+  "core/trunk-schema.js",
   "core/irrigation-data-store.js",
   "core/terrain-bridge-store.js",
   "core/sprinkler-bridge-store.js",
@@ -1401,6 +1416,10 @@ const CORE = [
   "mod/ry-panel.js",
   "mod/ry-panel.css",
   "mod/online-map.css",
+  "mod/trunk-snap.js",
+  "mod/trunk-geo.js",
+  "mod/trunk-edit.js",
+  "mod/trunk-history.js",
   "mod/online-map.js",
   "mod/style-01.css",
   "mod/style-03.css",

@@ -49,6 +49,14 @@
     return {plotId:p.id,name:p.name||'',sqm:sqm,mu:Number(p.mu)||+(sqm/666.67).toFixed(2),poly:ring,
       source:p.source||'map',merged:!!p.merged,grouped:!!p.grouped,subPlots:p.subPlots||[],
       polyLatLngSet:p.polyLatLngSet||null,partitionPlan:p.partitionPlan||null,
+      /* [v831] 总管随 payload 带 v2（多干线）；归一失败或非 GCJ-02 一律 null，
+         下游靠 pickMainTrunk 取主干，别再手写 schema===1。 */
+      trunk:(function(){
+        var S=window.RyTrunkSchema;
+        if(!S||p.merged||p.grouped) return null;
+        var t=S.normalize(p.trunk);
+        return t&&t.coordinateSystem==='GCJ-02'?t:null;
+      })(),
       terrainProfile:p.terrainProfile||null};
   }
 
@@ -141,6 +149,21 @@
         window.__runyeGeoBase=null;
         window.measuredPolygon = [];
         window.__runyeMapFramePoly = null;
+      }
+
+      /* 地图总管是地块库中的 GCJ-02 折线；用与边界相同的参考原点投影，
+         并镜像 y 到分区画布坐标。没有有效总管时明确置空，防止沿用上一块。
+         [v831] 走 RyTrunkSchema 归一 + 取主干。 */
+      window.__runyeImportedTrunk = null;
+      var _ts16=window.RyTrunkSchema, _tn16=_ts16&&_ts16.normalize(d.trunk), _tm16=_tn16&&_ts16.pickMainTrunk(_tn16);
+      if(!isXY && _tm16 && _tn16.coordinateSystem==='GCJ-02' && window.__runyeGeoBase){
+        var tb=window.__runyeGeoBase, tm=6378137*Math.PI/180, tc=Math.cos(tb.refLat*Math.PI/180);
+        var trunkPts=_tm16.points.map(function(q){
+          var rd=_ts16.readPoint(q);
+          if(!rd)return null;
+          return {x:(rd.lng-tb.refLng)*tm*tc,y:-(rd.lat-tb.refLat)*tm};
+        });
+        if(trunkPts.length>=2 && trunkPts.every(Boolean)) window.__runyeImportedTrunk={plotId:d.plotId,revision:Number(_tn16.revision)||0,trunkId:_tm16.id,points:trunkPts};
       }
 
       /* [v185/v189 2026-10-03] 成组地块：把各子地块环一并换算成本地米坐标存到全局。

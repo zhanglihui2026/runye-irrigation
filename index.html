@@ -11,6 +11,10 @@
 <script src="core/cloud-design-binding-store.js?v=592-cloud-design-binding"></script>
 <script src="core/economic-settings-store.js?v=1"></script>
 <script src="core/plot-library-store.js?v=823-fix-transfer-save-alert"></script>
+<!-- [v831] 地图总管数据契约 v2。必须**先于**所有读取方加载（inline-13 / inline-16 / inline-09 / online-map），
+     否则它们调 RyTrunkSchema.normalize 时拿到 undefined，会退回「只认 schema===1」而读不到总管。
+     为什么要有这个模块：plot.trunk 有 5 个读取方，v1→v2 的迁移只允许一个入口，理由见文件头注释。 -->
+<script src="core/trunk-schema.js?v=831-trunk-schema-v2"></script>
 <script src="core/storage-guard.js?v=823-fix-transfer-save-alert"></script>
 <script src="runye-material-audit.js?v=607-branch-material-span"></script>
 <script src="runye-map-partition.js?v=690-narrow-partition-bridge"></script>
@@ -18,7 +22,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>润野灌溉设计优化版｜滴灌管径与水泵选型</title>
 <meta name="description" content="输入地块、滴灌带与水源参数，快速计算灌溉分区、主管支管管径和水泵工作点。"/>
-<link rel="stylesheet" href="mod/style-01.css?v=826-flat-toolbar">
+<link rel="stylesheet" href="mod/style-01.css?v=835-trunk-geo-snap">
 <link rel="stylesheet" href="runye-inverse-design.css?v=277">
 <script defer src="runye-inverse-design.js?v=438-branch-flow-conservation"></script>
 <link rel="stylesheet" href="runye-terrain.css?v=454-terrain-sidebar-peer">
@@ -43,7 +47,7 @@
 <link rel="stylesheet" href="hydraulic-calc/hydraulic-calc.css">
 <link rel="stylesheet" href="filter-system/filter-system.css">
 <link rel="stylesheet" href="pwa/vendor/leaflet.css">
-<link rel="stylesheet" href="mod/online-map.css?v=807-map-side-flat">
+<link rel="stylesheet" href="mod/online-map.css?v=835-trunk-geo-snap">
 <link rel="stylesheet" href="terrain/terrain.css?v=535-terrain-single-source">
 <link rel="stylesheet" href="hydraulics-main.css?v=442-native">
 <style id="ryCadTwinCss">
@@ -246,7 +250,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <link rel="stylesheet" href="pwa/pwa.css?v=2">
 <script defer src="pwa/pwa.js?v=2"></script>
     <link rel="stylesheet" href="runye-theme.css?v=2">
-    <link rel="stylesheet" href="mod/ry-panel.css?v=684-workflow-right-rail">
+    <link rel="stylesheet" href="mod/ry-panel.css?v=831-trunk-schema-v2">
     <!-- Shoelace 2.15.1（与紧凑分组样板一致）；Shoelace 不可用时保留原生输入控件。 -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.1/cdn/themes/light.css">
   <link rel="stylesheet" href="runye-typography.css?v=530-h1-scope">
@@ -686,11 +690,19 @@ body.ry-worst-off [data-tlworst]{display:none}
       <!-- ===== [v495] 主程序内嵌在线地图的绘制工具条（唯一实现，v821 起独立页已删除）：
            左栏「绘制」区迁来，挂在地图区顶端；按住「⠿ 绘制」抓手拖动
            （mod/ry-panel.js rypDraggable：位置记忆 localStorage['mapDrawToolsPos']，
-           clamp 在 .map-wrap 内 = 不超过导航栏）。按钮 id 不变，online-map.js 零改动。 ===== -->
+           clamp 在 .map-wrap 内 = 不超过导航栏）。地图工具行为统一由 online-map.js 绑定。 ===== -->
       <div class="map-draw-tools ryp-float ry-hbar" id="mapDrawTools" data-ry-panel
            data-ry-position-key="mapDrawToolsPos" data-ry-default-top="12" data-ry-default-left="12">
         <span class="dt-grip" data-ry-drag title="按住拖动工具条；位置自动记住">⠿ 绘制</span>
         <button class="ry-hbar-btn" id="btnDraw">✏️ 开始画框</button>
+        <button class="ry-hbar-btn" id="btnDrawTrunk" title="从头重绘当前地块总管；完成保存前，旧线路保留">🟠 绘制总管</button>
+        <button class="ry-hbar-btn" id="btnFinishTrunk" title="结束并保存当前总管线">完成总管</button>
+        <button class="ry-hbar-btn" id="btnUndoTrunk" title="撤销总管最后一个折点">↩ 撤销总管点</button>
+        <!-- [v833] 编辑总管（三期）：没有已保存的干线时自动置灰（syncTrunkUI 管）。
+             进入后：点线选中 → 拖白点改拐点（拖到邻点上=并掉它）→ 右键开 6 项菜单 → Esc 退出。
+             快捷键 E。按钮样式复用 .ry-hbar-btn，**不需要为它写任何 CSS**。 -->
+        <button class="ry-hbar-btn" id="btnEditTrunk" aria-pressed="false" disabled
+                title="编辑当前地块已保存的干线：点线选中、拖白点改拐点、右键开菜单；快捷键 E">✎ 编辑总管</button>
         <!-- [v819] 文案收短 + 悬浮说明面板：用户「完成并画下一块，改为完成；鼠标放上来要弹出悬浮面板解释功能」。
              功能实义（online-map.js v186）：顶点 ≥3 自动存入「我的地块」→ 清空画布 → 紧接着画下一块（连续绘制）；
              不足 3 点视为草稿只清不存。停止方式：再点「开始画框」或右键地图。
@@ -701,6 +713,23 @@ body.ry-worst-off [data-tlworst]{display:none}
         <button class="ry-hbar-btn" id="btnUndo">↩ 撤销</button>
         <button class="ry-hbar-btn" id="btnMeasure">📏 测距</button>
         <button class="ry-hbar-btn" id="btnClear">🗑 清除</button>
+      </div>
+      <!-- ===== [v832] 总管绘制状态栏 + 顶部常驻提示条（二期）=====
+           为什么放在 .map-wrap 里：它就是地图的定位容器，两者都用 absolute 吸边
+           （状态栏吸底、提示条吸顶），不会挤压地图区域，也不影响 Leaflet 的尺寸计算。
+           状态栏整体 pointer-events:none —— 否则它会吃掉地图底部的拖动/点击；
+           只有「捕捉」胶囊单独 pointer-events:auto（它要能按）。
+           字段与格式按规格固定：总管：X｜投影：X m｜高差：±X m｜流速：X m/s｜捕捉：开启/关闭
+           ★ 分隔符是全角 ｜（U+FF5C），缺数据用 em dash（U+2014），**绝不写 0.00** ——
+             伪造 0 高差会让人拿去做水力判断，而真实数据是"没有"。 -->
+      <div class="map-trunk-hint" id="mapTrunkHint" hidden></div>
+      <div class="map-statusbar" id="mapStatusbar" aria-live="off">
+        <span>总管：<b id="msbTrunk">—</b></span><i class="msb-sep">｜</i>
+        <span>投影：<b id="msbProj">—</b></span><i class="msb-sep">｜</i>
+        <span>高差：<b id="msbDrop">—</b></span><i class="msb-sep">｜</i>
+        <span>流速：<b id="msbFlow">—</b></span><i class="msb-sep">｜</i>
+        <button type="button" class="msb-snap" id="btnSnapToggle" aria-pressed="true"
+                title="捕捉地块顶点 / 水源 / 干线拐点 / 阀门 / 支管起点 / 分区顶点；快捷键 S">捕捉：开启</button>
       </div>
       <!-- ===== [v282] 分区角度悬浮面板 =====
            形态仿手机端 runye-mobile-map-preview.html 的 .map-angle：↶＋1° / 角度输入 / ↷−1° 竖排。
@@ -718,10 +747,10 @@ body.ry-worst-off [data-tlworst]{display:none}
                ★ 必须留在 section#mapPartitionTools **之外** —— 该 section 是分区角度模块
                  按 id 取的盒子，往里塞无关按钮会改变其 querySelector('input') 的落点语义。 -->
           <div class="map-float-actions" id="mapFloatActions">
-            <button class="ry-float-chip" id="btnCopy">回传地块绘制</button>
-            <!-- [NEW MODULE: 地形模块 v286d] 回传地形模块：卸载=删除本行 + sendPlotToTerrain/btnCopyTerrain 那两段 JS -->
-            <button class="ry-float-chip" id="btnCopyTerrain">回传地形模块</button>
-            <button class="ry-float-chip is-primary" id="btnSavePlot">💾 保存地块</button>
+            <!-- [v830 2026-10-31 用户要求] 「回传地块绘制 / 回传地形模块 / 💾 保存地块」三个按钮已从此面板移除
+                 —— 同功能入口已在别处：回传走列表行「→」或地图右键弹窗，保存由「完成」自动入库，
+                 回传地形走地形模块页。「☁ 提交到云端」保留（它不是重复入口）。
+                 按钮 id 仍被 JS 引用，但绑定已全部加空守卫，删除元素不再抛错。 -->
             <!-- [v587] 提交到云端（地块库）：把当前绘制的地块边界带参数跳到云端提交页（应用域），
                  用户登录后提交，管理员在地块库可见。与「保存地块」（存本机 localStorage）互不影响。 -->
             <button class="ry-float-chip" id="btnCloudSubmit">☁ 提交到云端</button>
@@ -2289,7 +2318,7 @@ body.ry-worst-off [data-tlworst]{display:none}
           <legend><span>联合灌溉</span> 总管选型</legend>
           <div class="form-grid">
             <label class="field"><span>联合灌溉分区数</span><span class="input-shell"><input id="tl_zoneCount" type="number" min="1" max="12" step="1" value="2"><em>个</em></span></label>
-            <label class="field"><span>总管长度（水源至首区分区阀）</span><span class="input-shell"><input id="tl_frontPipeLen" type="number" min="0" step="1" value="200"><em>m</em></span></label>
+            <label class="field"><span>总管长度（无地图总管时的试算值）</span><span class="input-shell"><input id="tl_frontPipeLen" type="number" min="0" step="1" value="200"><em>m</em></span></label>
           </div>
           <p class="field-hint">将多个分区同时灌溉，总管承担全部联合流量。总管从前端水源接到第一个分区阀门，需要比单区主管更粗的管径。</p>
         </fieldset>
@@ -2366,7 +2395,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script src="mod/material-table.js?v=421-mat-table"></script>
 <!-- [v424-plan-calc-render] 扬程公式与分解展示模块，先于计算控制器和三级调用方装载。 -->
 <script src="mod/plan-calc-render.js?v=614-head-formula"></script>
-<script src="mod/inline-09.js?v=805-plot-draw-merge"></script>
+<script src="mod/inline-09.js?v=831-trunk-schema-v2"></script>
 <!-- [v423-header-layout] 三级简图标题布局依赖 inline-09 的 tlMeasureText 与生成时写入的标题状态。 -->
 <script src="mod/tl-header-layout.js?v=423-header-layout"></script>
 
@@ -2378,7 +2407,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <!-- [v420-split] 绘图编辑器 IIFE 自 inline-11 迁出：必须紧随 inline-11 之后同步执行 -->
 <script src="mod/plot-editor.js?v=824-toolbar-dedupe"></script>
 <script src="mod/inline-12.js?v=823-fix-transfer-save-alert"></script>
-<script src="mod/inline-13.js?v=823-fix-transfer-save-alert"></script>
+<script src="mod/inline-13.js?v=831-trunk-schema-v2"></script>
 <!-- [v422-head-system-svg] 纯 SVG 核心先于 inline-14 同步加载。 -->
 <script src="mod/head-system-svg.js?v=422-head-system-svg"></script>
 <script src="mod/inline-14.js?v=422-head-system-svg"></script>
@@ -2387,7 +2416,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script src="mod/inline-15.js?v=357"></script>
 
 <!-- ===== 地图面积测量回传：消费在线地图 / 地形模块写入的交接数据（v821 起地图页唯一即本页 #onlineMapSection） ===== -->
-<script src="mod/inline-16.js?v=823-fix-transfer-save-alert"></script>
+<script src="mod/inline-16.js?v=831-trunk-schema-v2"></script>
 <script src="mod/ry-diag.js?v=476-pwa-reset"></script>
 
 <!-- ===== 主区 Tab 绑定 + 底部状态栏 + 视口自适应 ===== -->
@@ -2413,7 +2442,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script src="tl-workspace/tl-nodes.js?v=619-undo-cover"></script>
 <!-- v180b（2026-10-02）：tl-nodes.js 就绪后再挂简图实时刷新订阅（见 tlHookTlNodesLiveSync 注释） -->
 <script src="mod/inline-22.js?v=357"></script>
-<script src="tl-workspace/tl-workspace.js?v=785-l3-host-edit-canonical"></script>
+<script src="tl-workspace/tl-workspace.js?v=827-line-mode-drag"></script>
 <script src="tl-workspace/tl-path-measure.js"></script>
 <!-- 2026-09-23（用户指令）v135：水力计算器「入口预留」总闸——置 true 时界面不挂载
      （hydraulic-calc.js 的 mount/setConfig/importThreeLevel 直接空转），导航入口与占位文案保留，
@@ -2519,9 +2548,13 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.1/cdn/shoelace.js"></script>
 <script src="mod/ry-panel.js?v=823-fix-transfer-save-alert"></script>
 <script src="pwa/vendor/leaflet.js"></script>
-<script src="mod/online-map.js?v=823-fix-transfer-save-alert"></script>
+<script src="mod/trunk-snap.js?v=832-trunk-snap"></script>
+<script src="mod/trunk-geo.js?v=835-trunk-geo-snap"></script>
+<script src="mod/trunk-edit.js?v=835-trunk-geo-snap"></script>
+<script src="mod/trunk-history.js?v=835-trunk-geo-snap"></script>
+<script src="mod/online-map.js?v=835-trunk-geo-snap"></script>
 <script src="terrain/terrain-core.js?v=410-elev"></script>
 <script src="terrain/terrain-ui.js?v=513-sec-gate"></script>
-<script src="runye-hydraulics-page.js?v=823-fix-transfer-save-alert"></script>
+<script src="runye-hydraulics-page.js?v=829-hyd-auto-refresh"></script>
 </body>
 </html>

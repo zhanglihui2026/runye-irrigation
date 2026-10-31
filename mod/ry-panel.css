@@ -1233,6 +1233,13 @@ body.ry-tool #ryCadSide [data-pp="pipePlanSection"][data-ry-view="edit"] .ry-pan
 }
 .ry-hbar .ry-hbar-btn:hover{border-color:#16a34a;color:#15803d;background:#f0fdf4}
 .ry-hbar .ry-hbar-btn.btn-on{background:#22c55e;border-color:#22c55e;color:#fff}
+/* [v831] 总管绘制激活态单独用蓝色：.btn-on 是绿色（侧栏与快捷条共用），
+   而「绘制总管」在规格里是**灰 → 高亮蓝**。写在这里（.btn-on 之后、同特异性）
+   才能压过上面的绿色；不要去改 .btn-on 本身 —— 侧栏 8 个按钮都靠它。
+   注：禁止写成 `display:...!important`，全站 body*{border-radius:0!important} 之外
+   还有别的 !important 层，加 !important 会连带影响按钮显隐（v824 的教训）。 */
+.ry-hbar .ry-hbar-btn.is-trunk-on{background:#2563eb;border-color:#2563eb;color:#fff}
+.ry-hbar .ry-hbar-btn.is-trunk-on:hover{background:#1d4ed8;border-color:#1d4ed8;color:#fff}
 .ry-hbar .ry-hbar-btn:disabled{opacity:.55;cursor:default}
 /* 地块分区快捷条沿用面板绿皮，只把按钮几何/字号并到同一档（原 26px 保留，字号 11.5→11） */
 #ppQuickBar .pp-btn-ghost,#ppQuickBar .pp-btn-generate{height:26px;padding:0 8px;font-size:11px!important;line-height:1}

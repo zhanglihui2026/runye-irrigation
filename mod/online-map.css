@@ -41,3 +41,83 @@
    本组 v490 对抗与 v807 同特异性（#onlineMapSection .side 前缀 + !important），
    但本表在 style-01.css 之后加载会反压 v807 ⇒ 整组删除，不再留值拷贝。
    独立页 runye-map-measure.html 不加载 style-01.css，其页内 <style> 副本保持原值不受影响。 */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   [v832] 总管绘制状态栏 / 常驻提示条 / 捕捉胶囊（二期）
+   ───────────────────────────────────────────────────────────────────────────
+   状态栏吸底、提示条吸顶，都用 absolute 挂在 .map-wrap 上（不挤占地图高度）。
+   状态栏整体 pointer-events:none，只有捕捉胶囊 auto —— 否则底部一条 24px 的横带
+   会把地图的下边缘点击/拖动全吃掉，而这种"点不动"极难归因。
+   ★ 不要写 border-radius:<数值>（不带 !important）：全站 body *{border-radius:0!important}
+     会压掉它，等于死声明，还会撞 v530 检查。
+   ═══════════════════════════════════════════════════════════════════════════ */
+#onlineMapSection .map-statusbar{
+  position:absolute;left:0;right:0;bottom:0;height:24px;z-index:1180;
+  display:flex;align-items:center;padding:0 10px;
+  background:rgba(255,255,255,.94);border-top:1px solid #e2e8f0;
+  font-size:11px;line-height:1;color:#475569;white-space:nowrap;overflow:hidden;
+  pointer-events:none}
+#onlineMapSection .map-statusbar b{font-weight:700;color:#1e293b;font-variant-numeric:tabular-nums}
+/* 分隔符用 #94a3b8：原来用 #cbd5e1 在 100% 缩放下几乎看不见，
+   实测截图里整条状态栏像"字段之间只有空格"，读不出是分隔符。 */
+#onlineMapSection .map-statusbar .msb-sep{font-style:normal;color:#94a3b8;margin:0 7px;flex:none}
+#onlineMapSection .msb-snap{
+  pointer-events:auto;margin-left:auto;flex:none;height:18px;padding:0 8px;
+  border:1px solid #cbd5e1;background:#fff;color:#334155;
+  font-family:inherit;font-size:11px!important;font-weight:600;line-height:1;cursor:pointer}
+#onlineMapSection .msb-snap:hover{border-color:#38bdf8;color:#0369a1;background:#f0f9ff}
+#onlineMapSection .msb-snap[aria-pressed="true"]{background:#e0f2fe;border-color:#38bdf8;color:#0369a1}
+/* 首访未安装 PWA 时右下角有 .ry-pwa-install(z-index:2000, body 级 fixed)，
+   它会把状态栏右端压住。「捕捉」胶囊正好在那里 ⇒ 给它让出宽度，不跟它抢层级
+   （抬高 z-index 只会让安装条被盖住、用户点不到安装）。 */
+body:has(.ry-pwa-install) #onlineMapSection .map-statusbar{padding-right:180px}
+
+#onlineMapSection .map-trunk-hint{
+  position:absolute;left:50%;top:8px;transform:translateX(-50%);z-index:1190;
+  max-width:calc(100% - 40px);padding:4px 12px;
+  background:rgba(30,41,59,.9);color:#f8fafc;
+  font-size:11px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  pointer-events:none}
+#onlineMapSection .map-trunk-hint[hidden]{display:none!important}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   [v833] 总管编辑层（三期）：拐点手柄 / 右键菜单
+   ───────────────────────────────────────────────────────────────────────────
+   手柄用 L.divIcon（class 由 Leaflet 拼成 "leaflet-marker-icon ry-trunk-vtx"），
+   所以这里**不需要**清默认白底方框 —— L.divIcon 的默认 class 是 .leaflet-div-icon，
+   被我们整个替换掉就不再套用那条 CSS 了。
+   ★ 圆点必须 border-radius:50%!important：全站 body *{border-radius:0!important}
+     会把不带 !important 的圆角压成直角（见文件头口径），白点会变成白方块。
+   ═══════════════════════════════════════════════════════════════════════════ */
+.ry-trunk-vtx{background:none;border:0}
+.ry-trunk-vtx .tv-dot{
+  display:block;width:12px;height:12px;margin:1px;
+  background:#fff;border:2px solid #2563eb;border-radius:50%!important;
+  box-shadow:0 1px 3px rgba(15,23,42,.35);box-sizing:border-box;
+  transition:transform .08s ease-out}
+.ry-trunk-vtx.is-end .tv-dot{border-color:#1e40af;background:#dbeafe}
+.ry-trunk-vtx:hover .tv-dot{transform:scale(1.18)}
+.ry-trunk-vtx.is-dragging .tv-dot{background:#2563eb;border-color:#fff;transform:scale(1.22)}
+.ry-trunk-vtx-tip{
+  background:rgba(30,41,59,.92);color:#f8fafc;border:0;
+  font-size:11px;line-height:1.4;padding:2px 7px;white-space:nowrap;
+  box-shadow:0 2px 8px rgba(15,23,42,.25)}
+.ry-trunk-vtx-tip::before{display:none}
+
+/* 右键菜单：position:fixed + z-index 2200。
+   2200 是硬要求 —— .ry-pwa-install 是 body 级 fixed、z-index:2000，
+   菜单若低于它，首访未安装时右下角那一截会被安装条盖住、点了没反应。 */
+.trunk-ctx-menu{
+  position:fixed;z-index:2200;min-width:180px;padding:4px;
+  font-size:12px;line-height:1.5;user-select:none}
+.trunk-ctx-menu[hidden]{display:none!important}
+.trunk-ctx-menu .tcm-head{
+  padding:3px 8px 5px;margin-bottom:3px;border-bottom:1px solid #e2e8f0;
+  color:#64748b;font-size:11px;font-weight:600;white-space:nowrap}
+.trunk-ctx-menu .tcm-item{
+  display:block;width:100%;text-align:left;
+  padding:5px 8px;border:0;background:transparent;color:#1f2937;
+  font-family:inherit;font-size:12px!important;line-height:1.5;cursor:pointer;
+  white-space:nowrap}
+.trunk-ctx-menu .tcm-item:hover:not(:disabled){background:#eff6ff;color:#1d4ed8}
+.trunk-ctx-menu .tcm-item:disabled{color:#cbd5e1;cursor:default;background:transparent}

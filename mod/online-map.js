@@ -181,9 +181,54 @@
   // ===== 绘制逻辑 =====
   var drawing = false;
   var currentMapPlotId=null;
+  /* ===== [v831] 总管绘制状态（多干线） =====
+   * 旧模型是一个布尔 drawingTrunk + 一个 trunkPoints 数组，把「是否在画」和「画的是哪条」
+   * 混在一起 ⇒ 想表达「已存两条、正在画第三条」根本无处安放，打断/合并也无从谈起。
+   * 现在拆成：
+   *   trunkMode  'idle' | 'draw'（三期再加 'edit'）
+   *   trunkSaved 当前地块已保存的规范 v2（RyTrunkSchema.normalize 的结果）；null = 无总管
+   *   trunkDraft 正在画的那条 {id, points, params}；id 为 null 表示「要新增一条」
+   *   trunkPoints 保留旧名 = 草稿折点，撤销按钮 / 渲染 / 探针都还读它
+   * drawingTrunk 这个名字**不再有变量** —— 它是 IIFE 私有的，外部读不到，
+   *   仓库内 5 个写点已全部改走 setTrunkMode()，不留垫片（残留垫片只会让两套状态打架）。
+   *   外部想读状态走 window.RyMapHost.trunkState()。 */
+  var trunkMode = 'idle';
+  var trunkSaved = null;
+  var trunkDraft = null;
+  var trunkTargetPlotId=null;
   var points = [];           // [{lat,lng}]
   var markers = [];          // L.marker —— 与 points 必须始终同长同序（下标即点序）
   var poly = null;           // L.polygon 实时
+  var trunkPoints = [];      // GCJ-02 [{lat,lng,z?}]；当前草稿折点
+  var trunkLine = null;      // 草稿虚线
+  var trunkSavedLayers = []; // 已保存干线的 polyline（不含草稿）
+  var trunkClickTs = 0;      // 双击完成的判定锚点（Leaflet 双击会先发两次 click）
+  var trunkClickPt = null;
+  /* ===== [v833] 编辑态（三期）：选中 / 拖拐点 / 右键菜单 =====
+     activeTrunkId   当前选中的干线 id（null = 未选）；只有选中才渲染拐点手柄
+     activeVertexIdx 命中的拐点下标（-1 = 点在线身上，不是拐点）
+     trunkActiveLine 选中线的高亮 polyline（拖动时直接改它，不整层重画）
+     trunkEditLayers 拐点手柄 marker（白点蓝边）
+     trunkCtxMenu    右键菜单 DOM（懒建，只建一次）
+     paramsClipboard 参数剪贴板；**故意只放内存**，不落库 —— 用户复制一条线的参数
+                     往往是为了贴到另一块地去，没必要为它写一条存储契约。
+     ★ 不变量：activeTrunkId 必须指向 trunkSaved 里真实存在的 id。
+       打断/合并/删除都会让 id 消失 ⇒ 每次写库后由 applyTrunkEdit 统一复核。 */
+  var activeTrunkId = null;
+  var activeVertexIdx = -1;
+  var trunkActiveLine = null;
+  var trunkEditLayers = [];
+  var trunkCtxMenu = null;
+  var paramsClipboard = null;
+  /* 拖动中的预览折点（GCJ-02）。**只喂状态栏**，不参与写库、不参与命中判定：
+     库里那份要等 dragend 才变，状态栏若只读库，拖动全程数字就是死的。 */
+  var trunkDragPreview = null;
+  /* [v834] 撤销 / 重做栈：只认 plot.trunk 这棵子树（见 mod/trunk-history.js 文件头）。
+     ★ 归零时机只有两个 —— 换地块（renderMyPlots 的 .place-go）和页面重载。
+       别在 setTrunkMode('idle') 里清：每次保存都会走到那儿，一清就没法撤销了。 */
+  var trunkHistory = window.RyTrunkHistory
+    ? window.RyTrunkHistory.create({limit:window.RyTrunkHistory.LIMIT})
+    : null;
   var rubber = null;         // 橡皮筋线
   var lastAdded = null;      // [v153] 最近新增的顶点 marker；「撤销」优先撤它（无记录时等同弹队尾）
   var latlngs = function(){ return points.map(function(p){return [p.lat,p.lng];}); };
@@ -513,6 +558,8 @@
     if(addMode){
       if(drawing) setDrawing(false);               // 与「画框」互斥
       if(measuring) finishMeasure();               // 与「测距」互斥
+      /* [v833] 与总管编辑互斥：编辑态的拐点手柄会盖在框线边上，两套手柄同时活着必然抢鼠标。 */
+      if(trunkMode!=='idle') setTrunkMode('idle');
       buildMidHandles();
       tip('加点模式：把框线上的 ⊕ 手柄拖到地块真实边界处松手即增加标点；也可贴着框线单击。再点「➕ 加点」退出。');
     }else{
@@ -522,9 +569,1103 @@
   }
 
   map.on('click', function(e){
+    if(trunkMode==='draw'){
+      /* Leaflet 的双击会先派发两次 click、再派发 dblclick。若只在 dblclick 里收线，
+         那两次 click 已经各塞了一个点（位置几乎重合）⇒ 收线后白白多出两个点。
+         所以在这里用「时间 + 屏幕距离」认出双击的第二下，直接收线。 */
+      var now=Date.now(), cp=e.containerPoint;
+      if(now-trunkClickTs<320 && trunkClickPt && cp.distanceTo(trunkClickPt)<8){
+        trunkClickTs=0; trunkClickPt=null;
+        commitTrunkDraft();
+        return;
+      }
+      trunkClickTs=now; trunkClickPt=cp;
+      var trunkPoint=fromDisplay(e.latlng);
+      trunkPoint={lat:+trunkPoint.lat,lng:+trunkPoint.lng};
+      var shiftOn=!!(e.originalEvent && e.originalEvent.shiftKey);
+      /* [v832] Shift 优先于捕捉：按住 Shift 是**显式**声明"我要正交"，
+         这时再去吸附会把点拽离轴线，用户看到的就是"正交没生效"。
+         所以两者互斥，Shift 期间不捕捉。 */
+      if(shiftOn && trunkPoints.length){
+        trunkPoint=orthoPoint(trunkPoints[trunkPoints.length-1], trunkPoint);
+      }else if(snapOn){
+        var _snap=snapApi(), hit=_snap?_snap.nearest(trunkPoint):null;
+        if(hit) trunkPoint={lat:hit.lat,lng:hit.lng};
+      }
+      trunkPoints.push(trunkPoint);
+      renderTrunkDraft();
+      return;
+    }
     if(!drawing) return;
     var p=fromDisplay(e.latlng);
     addPoint(p.lat, p.lng);
+  });
+  /* Shift 正交：在「水平」与「垂直」两条轴里取更接近鼠标实际方向的那条。
+     经度差要乘 cos(lat) 才能和纬度差直接比较（否则高纬度地区会系统性地偏向水平）。 */
+  function orthoPoint(prev, cur){
+    if(!prev || !cur) return cur;
+    var cos=Math.cos(prev.lat*Math.PI/180) || 1;
+    var dLng=Math.abs(cur.lng-prev.lng)*cos;
+    var dLat=Math.abs(cur.lat-prev.lat);
+    return dLng>=dLat ? {lat:prev.lat,lng:cur.lng} : {lat:cur.lat,lng:prev.lng};
+  }
+  /* 同一套读点口径（[lat,lng] / [lat,lng,z] / {lat,lng}）统一走 schema 模块，别在这里重写分支。 */
+  function readTrunkPoint(q){
+    var S=window.RyTrunkSchema;
+    return S&&S.readPoint?S.readPoint(q):null;
+  }
+  function loadSavedTrunkFor(plot){
+    var S=window.RyTrunkSchema;
+    if(!S||!plot) return null;
+    if(plot.merged||plot.grouped||plot.mergedInto) return null;
+    return S.normalize(plot.trunk);
+  }
+  function renderTrunkDraft(){
+    if(trunkLine && map.hasLayer(trunkLine)) measureGroup.removeLayer(trunkLine);
+    trunkLine=null;
+    trunkSavedLayers.forEach(function(l){ if(l && map.hasLayer(l)) measureGroup.removeLayer(l); });
+    trunkSavedLayers=[];
+    trunkActiveLine=null;
+    /* 已保存的干线：主深灰实线、次浅灰 —— 只有一条时看上去与旧版完全一致。
+       interactive:false 很重要：否则这些线会吃掉地图点击，无法在上面继续加点。
+       三期例外：edit 态另加一条**透明加宽命中线**（weight 16 / opacity 0）专门接点击。
+       为什么不让可见线自己 interactive —— idle 态下它会挡住地块点选和右键"回传"弹窗，
+       那是现役功能，不能为了编辑手感把它压掉。 */
+    if(trunkSaved && trunkSaved.trunks){
+      trunkSaved.trunks.forEach(function(entry){
+        var pts=(entry.points||[]).map(function(q){
+          var rd=readTrunkPoint(q);
+          return rd?toDisplay({lat:rd.lat,lng:rd.lng}):null;
+        }).filter(function(q){return !!q;});
+        if(pts.length<2) return;
+        var isActive=trunkMode==='edit' && activeTrunkId!==null && String(entry.id)===String(activeTrunkId);
+        var line=L.polyline(pts,{
+          color:isActive?'#2563eb':(entry.main?'#475569':'#94a3b8'),
+          weight:isActive?5:(entry.main?4:3),
+          opacity:isActive?1:.85,
+          interactive:false
+        }).addTo(measureGroup);
+        if(isActive) trunkActiveLine=line;
+        trunkSavedLayers.push(line);
+        if(trunkMode==='edit'){
+          var hit=L.polyline(pts,{color:'#2563eb',weight:16,opacity:0,interactive:true,className:'ry-trunk-hit'}).addTo(measureGroup);
+          hit.on('click',function(ev){
+            if(ev&&ev.originalEvent) L.DomEvent.stopPropagation(ev.originalEvent);
+            selectTrunk(entry.id);
+          });
+          trunkSavedLayers.push(hit);
+        }
+      });
+    }
+    /* 草稿：紫色虚线（绘制态）／紫事实线（只读显示态） */
+    if(trunkPoints.length){
+      trunkLine=L.polyline(trunkPoints.map(toDisplay),{color:'#7c3aed',weight:5,opacity:.95,dashArray:trunkMode==='draw'?'8,5':null,interactive:false}).addTo(measureGroup);
+    }
+  }
+  /* ===== [v833] 唯一写库口 =====
+     commitTrunkDraft / 拖拐点 / 打断 / 合并 / 删除 / 粘贴参数 —— 全部走 commitTrunks。
+     为什么非抽不可：旧版把「拼 entry」和「写库 + revision 冲突处理」揉在 commitTrunkDraft 里，
+     三期每加一个编辑动作就要把后面那 20 行复制一遍。复制出来的分支必然有人抄漏 revision 校验，
+     而那种错是**静默**的（别的标签页刚存过地块，这一笔就覆盖掉了），事后根本查不出来。
+
+     mutator(next, ctx) 直接在深拷贝上改，返回 {ok:true, trunk} 或 {ok:false, error}。
+     ★ trunks 空数组存不进去 —— RyTrunkSchema.normalize/validate 都要求非空
+       （normalize 见空数组直接返回 null）。所以「删掉最后一条」统一落成 trunk=null，
+       也就是「这块地没有总管」，读取方本来就按 null 处理。 */
+  function resolveTrunkTarget(){
+    var plotId=String(trunkTargetPlotId||currentMapPlotId||'');
+    if(!plotId) return {ok:false,error:'请先选中并保存一个地块，再编辑该地块总管。'};
+    var store=window.RyPlotLibraryStore;
+    var snapshot=store&&typeof store.read==='function'?store.read():null;
+    if(!snapshot||!snapshot.ok) return {ok:false,error:'地块库读取失败，总管未保存。'};
+    var matches=(snapshot.plots||[]).filter(function(p){return p&&String(p.id)===plotId;});
+    if(matches.length!==1) return {ok:false,error:'当前地块编号不唯一或已删除，请重新选择地块。'};
+    if(matches[0].merged||matches[0].grouped||matches[0].mergedInto)
+      return {ok:false,error:'成组地块的总管由多地块规划单独管理，请到多地块规划中编辑。'};
+    return {ok:true,plotId:plotId,snapshot:snapshot,plot:matches[0]};
+  }
+
+  function commitTrunks(mutator, opts){
+    opts=opts||{};
+    var S=window.RyTrunkSchema;
+    if(!S){tip('总管数据模块未加载，无法保存；请刷新页面后重试。');return {ok:false,error:'no_schema'};}
+    var ctx=resolveTrunkTarget();
+    if(!ctx.ok){ if(!opts.silent) tip(ctx.error); return {ok:false,error:ctx.error}; }
+
+    var next=S.normalize(ctx.plot.trunk) ||
+      {schema:S.VERSION,source:'map',coordinateSystem:'GCJ-02',revision:0,trunks:[]};
+    next=JSON.parse(JSON.stringify(next));
+
+    var r;
+    try{ r=mutator(next,{plotId:ctx.plotId,schema:S,plot:ctx.plot}); }
+    catch(err){ r={ok:false,error:'编辑失败：'+((err&&err.message)||String(err))}; }
+    if(!r||!r.ok){
+      var m1=(r&&r.error)||'编辑未生效';
+      if(!opts.silent) tip(m1);
+      return {ok:false,error:m1};
+    }
+
+    /* ★ 不能用 `r.trunk || next`：撤销回"没有总管"时 mutator 返回 trunk:null，
+       逻辑或会把它换成 next（当前状态）⇒ 撤销看起来"没生效"，且库里仍是新的。
+       所以按"有没有这个键"取值。 */
+    var out=Object.prototype.hasOwnProperty.call(r,'trunk')?r.trunk:next;
+    var empty=!out||!Array.isArray(out.trunks)||!out.trunks.length;
+    if(!empty){
+      /* main 丢了就顺延给第一条：整块地"没有主干"会让下游施工图直接没有总管。 */
+      if(!out.trunks.some(function(t){return t.main===true;})) out.trunks[0].main=true;
+      var chk=S.validate(out);
+      if(!chk.ok){
+        var m2='总管数据校验未通过：'+chk.errors.join('；');
+        if(!opts.silent) tip(m2);
+        return {ok:false,error:m2};
+      }
+      /* ★ revision 必须从**库里当前那份**往上加，不能用 out.revision 加。
+         撤销/重做送进来的是旧快照，它自带的 revision 是当时的号（比如 3），
+         用 `out.revision+1` 会算出 4 —— 正好等于撤销前的号，库里出现
+         "revision 没变但内容变了"。下游（水力校验 / 施工图快照）按 revision 配对，
+         看到号没变就会继续用旧快照，属于最难查的那类静默故障。 */
+      out.revision=(Number(ctx.plot.trunk&&ctx.plot.trunk.revision)||0)+1;
+    }
+
+    var pid=ctx.plotId, payload=empty?null:out;
+    /* [v834] 撤销栈要的是**写库前**的真实值：它既当基线，也用来发现"栈顶和现实对不上"
+       （别的标签页改过 / 切了地块）。放在这里取，是因为这是唯一看得到 before 的地方。 */
+    var beforeRaw=ctx.plot.trunk==null?null:JSON.parse(JSON.stringify(ctx.plot.trunk));
+    var nextPlots=ctx.snapshot.plots.map(function(p){
+      if(String(p.id)!==pid) return p;
+      var copy=JSON.parse(JSON.stringify(p));
+      copy.trunk=payload;
+      return copy;
+    });
+    var result=window.RyPlotLibraryStore.replace(nextPlots,ctx.snapshot.revision);
+    if(!result||!result.ok){
+      var m3='总管保存失败：'+((result&&result.error)||'地块库版本冲突');
+      if(!opts.silent) tip(m3);
+      return {ok:false,error:m3};
+    }
+    currentMapPlotId=pid;
+    trunkSaved=payload;
+    /* 只有**写成功之后**才入栈（写失败绝不能留一步能撤销的假历史）。
+       undo/redo 自己回写时带 noHistory:true，否则撤销会把撤销本身记成一步新历史。 */
+    if(!opts.noHistory && trunkHistory){
+      try{
+        trunkHistory.record({plotId:pid,before:beforeRaw,after:payload,activeTrunkId:activeTrunkId});
+      }catch(err){}
+    }
+    if(opts.tipText) tip(opts.tipText);
+    return {ok:true,trunk:payload};
+  }
+
+  /* 把当前草稿提交成一条干线：id 为空 = 新增一条，否则替换同 id 那条。
+     ★ 多干线的写入点只有 commitTrunks 这一个 —— 别在别处再拼 plot.trunk。 */
+  function commitTrunkDraft(){
+    if(trunkMode!=='draw'){tip('请先进入总管绘制状态，再完成保存。');return false;}
+    if(trunkPoints.length<2){tip('总管至少需要两个点，请继续绘制。');return false;}
+    var trunkLengthM=0;for(var tli=1;tli<trunkPoints.length;tli++)trunkLengthM+=map.distance(L.latLng(trunkPoints[tli-1].lat,trunkPoints[tli-1].lng),L.latLng(trunkPoints[tli].lat,trunkPoints[tli].lng));
+    if(!(trunkLengthM>0.5)){tip('总管长度不足 0.5 米，请调整折点后再保存。');return false;}
+
+    var draft=trunkDraft||{};
+    var draftId=draft.id?String(draft.id):null;
+    /* 有高程才带第三位，绝不补 0 —— 缺数据要让 UI 显示「—」，不是伪造 0 高差。 */
+    var pts=trunkPoints.map(function(p){
+      return (p.z===undefined||p.z===null||!isFinite(Number(p.z))) ? [p.lat,p.lng] : [p.lat,p.lng,Number(p.z)];
+    });
+    var params=draft.params?JSON.parse(JSON.stringify(draft.params)):{material:'PE',dn:null,designFlow:null};
+
+    var res=commitTrunks(function(next,ctx){
+      var S=ctx.schema;
+      var entry={
+        id: draftId || S.makeId(next),
+        main: draftId ? false : !next.trunks.length,
+        points: pts,
+        params: params
+      };
+      var replaced=false;
+      for(var i=0;i<next.trunks.length;i++){
+        if(draftId && String(next.trunks[i].id)===draftId){
+          /* 替换时要**继承原来的 main**：否则重画主干会把它悄悄降级，
+             再被「ensure main」顺延给列表第一条 —— 主干换了一条用户完全不知道。 */
+          entry.main = next.trunks[i].main===true || entry.main;
+          next.trunks[i]=entry; replaced=true;
+        }
+      }
+      if(!replaced){
+        if(next.trunks.length>=S.MAX_TRUNKS) return {ok:false,error:'干线数量已达上限（'+S.MAX_TRUNKS+' 条），请先删掉不用的线。'};
+        next.trunks.push(entry);
+      }
+      return {ok:true,trunk:next};
+    });
+    if(!res.ok) return false;
+    setTrunkMode('idle');
+    tip('总管已保存（共 '+res.trunk.trunks.length+' 条）。回到分区页重新回传该地块后可读取这条地图总管。');
+    return true;
+  }
+  /* 进入/退出总管绘制。**所有互斥都收口在这里**，别在各按钮里各写一份
+     （旧版就是这样：setDrawing / 测距 / 右键 各清一次，漏一处就出现"两个工具同时活着"）。 */
+  function setTrunkMode(mode){
+    var nextMode = (mode==='draw'||mode==='edit') ? mode : 'idle';
+    trunkDragPreview=null;      // 切模式一律丢掉拖动预览，别让状态栏停在旧数字上
+    if(nextMode==='draw'){
+      if(drawing) setDrawing(false);
+      if(measuring) finishMeasure();
+      if(addMode) setAddMode(false);
+      map.dragging.disable();
+      /* 双击 = 收线，不能同时触发地图缩放，否则点完线地图自己跳一下。 */
+      if(map.doubleClickZoom) map.doubleClickZoom.disable();
+      trunkClickTs=0; trunkClickPt=null;
+      trunkTargetPlotId=String(currentMapPlotId||'');
+      /* [v832] 进入绘制才采候选点（地块环/水源/已存拐点在这期间不会变）。 */
+      lastCursorLatLng=null;
+      refreshSnapTargets();
+      activeTrunkId=null; activeVertexIdx=-1;
+      closeTrunkMenu();
+    }else if(nextMode==='edit'){
+      if(drawing) setDrawing(false);
+      if(measuring) finishMeasure();
+      if(addMode) setAddMode(false);
+      /* 编辑态**不关** map.dragging：拖拐点时也常常要平移地图找位置。
+         双击缩放保留 —— 编辑态不需要双击干任何事（选中靠单击命中线）。 */
+      trunkTargetPlotId=String(trunkTargetPlotId||currentMapPlotId||'');
+      trunkPoints=[];
+      trunkDraft=null;
+      trunkClickTs=0; trunkClickPt=null;
+      lastCursorLatLng=null;
+      if(snapApi()) snapApi().clearMarker();
+    }else{
+      trunkPoints=[];
+      trunkDraft=null;
+      trunkTargetPlotId=null;
+      trunkClickTs=0; trunkClickPt=null;
+      lastCursorLatLng=null;
+      activeTrunkId=null; activeVertexIdx=-1;
+      closeTrunkMenu();
+      if(snapApi()) snapApi().clearMarker();
+      if(map.doubleClickZoom) map.doubleClickZoom.enable();
+      if(!drawing && !measuring) map.dragging.enable();
+    }
+    trunkMode=nextMode;
+    map.getContainer().classList.toggle('drawing', drawing || trunkMode==='draw');
+    renderTrunkDraft();
+    renderTrunkEditHandles();
+    syncTrunkUI();
+    updateTrunkHint();
+    updateStatusbar();
+  }
+  function syncTrunkUI(){
+    var btn=document.getElementById('btnDrawTrunk');
+    if(btn){
+      var on=trunkMode==='draw';
+      btn.classList.toggle('is-trunk-on',on);
+      /* 不再同时挂 .btn-on：它是绿色皮肤，靠 .is-trunk-on 后写覆盖才变蓝，
+         一旦有人调整 CSS 顺序就会"突然变绿"。激活态只留一个类。 */
+      btn.setAttribute('aria-pressed',on?'true':'false');
+      btn.title=on?'退出总管绘制（草稿丢弃，已保存的线不动）；快捷键 M':'绘制当前地块的输水总管；快捷键 M';
+      btn.textContent=on?'🟠 总管绘制中…':'🟠 绘制总管';
+    }
+    /* 互斥矩阵：总管绘制中，画框/加点不可用；反过来在读地块框时总管按钮不可用。 */
+    [['btnDraw',trunkMode==='draw'],['btnAddPt',trunkMode==='draw'],['btnDrawTrunk',!!drawing]].forEach(function(it){
+      var el=document.getElementById(it[0]);
+      if(el) el.disabled=!!it[1];
+    });
+    ['btnFinishTrunk','btnUndoTrunk'].forEach(function(id){
+      var el=document.getElementById(id);
+      if(el) el.disabled=trunkMode!=='draw';
+    });
+    /* [v833] 编辑总管：没有已保存的干线就没东西可编辑，直接置灰（别让用户点进空态再被告知）。 */
+    var eb=document.getElementById('btnEditTrunk');
+    if(eb){
+      var onEdit=trunkMode==='edit';
+      eb.classList.toggle('is-trunk-on',onEdit);
+      eb.setAttribute('aria-pressed',onEdit?'true':'false');
+      eb.disabled = trunkMode==='draw' || !!drawing || !(trunkSaved&&trunkSaved.trunks&&trunkSaved.trunks.length);
+      eb.title = onEdit ? '退出总管编辑（Esc）；快捷键 E'
+        : '编辑当前地块已保存的干线：点线选中、拖白点改拐点、右键开菜单；快捷键 E';
+      eb.textContent = onEdit ? '✎ 编辑中' : '✎ 编辑总管';
+    }
+  }
+  /* ===== [v832] 捕捉 + 状态栏 + 常驻提示条（二期） =====
+     职责划分：判定逻辑全在 mod/trunk-snap.js（纯函数、可 Node 单测）；
+     这里只负责「给素材 / 给投影器 / 给标记 / 写 DOM」。 */
+  var snapOn = true;
+  var snapMarker = null;
+  var lastCursorLatLng = null;
+
+  function snapApi(){ return window.RyTrunkSnap || null; }
+
+  /* GCJ-02 经纬度 → Leaflet 用的显示坐标（地图底图可能是 WGS-84，toDisplay 负责换）。 */
+  function displayLatLngOf(lat,lng){
+    var d=toDisplay({lat:+lat,lng:+lng});
+    return Array.isArray(d)?L.latLng(d[0],d[1]):L.latLng(d.lat,d.lng);
+  }
+
+  function ensureSnapSupport(){
+    var S=snapApi();
+    if(!S) return;
+    S.setProjector(function(ll){
+      try{
+        var cp=map.latLngToContainerPoint(displayLatLngOf(ll.lat,ll.lng));
+        return {x:cp.x,y:cp.y};
+      }catch(e){ return null; }
+    });
+    S.setMarkerApi({
+      show:function(hit){
+        if(trunkMode!=='draw') return;
+        var ll=displayLatLngOf(hit.lat,hit.lng);
+        if(!snapMarker){
+          /* 白色空心小圆 + 深蓝描边；interactive:false 否则它会挡住后续点击。
+             className 是给探针的稳定锚点 —— 靠 fill 颜色猜太脆（Leaflet 会改写属性）。 */
+          snapMarker=L.circleMarker(ll,{radius:5,weight:2,color:'#1e40af',fillColor:'#fff',fillOpacity:1,
+            interactive:false,className:'ry-snap-mark'}).addTo(map);
+        }else{
+          snapMarker.setLatLng(ll);
+          if(!map.hasLayer(snapMarker)) snapMarker.addTo(map);
+        }
+      },
+      hide:function(){
+        if(snapMarker && map.hasLayer(snapMarker)) map.removeLayer(snapMarker);
+      }
+    });
+  }
+
+  /* ===== [v835] 施工图素材 → 经纬度（三期遗留：阀门 / 支管起点 / 分区顶点） =====
+     这三类在 tlDiagramData 里是**画布世界米坐标**，接进捕捉得先反算成 GCJ-02。
+     ★ 符号不许硬编码。实测（_probe_trunk_p5_geo.mjs）：同一份 geoBase 下，
+       plot.poly（地图页存的）是 +y、measuredPolygon / tlDiagramData 是 −y，
+       两边差一个镜像；地块库里的历史数据两种都存在（inline-13 的 ryOrientPlotPoly
+       就是在判方向）。选错符号时 300×170m 的地块误差正好 170m —— 整块南北颠倒。
+     ⇒ 拿地块库的 polyLatLng 当标尺，对 ±y 各算一次 RMS，选能对上的；
+       对不上（或两个都像）就返回 null，让这三类静默跳过。
+       宁可少吸一个点，不要吸到错误位置。
+     取证：与站点自己反投进 runye_network_layout 的经纬度逐点对照，
+       最大差 7cm（纯 toFixed(6) 舍入），见 _probe_trunk_p5_geo_out.json。 */
+  /* 判定与换算全在 mod/trunk-geo.js（纯函数，Node 单测覆盖 ±y 与旋转 frame）；
+     这里只负责「取素材 / 缓存 / 落地」。 */
+  var geoBridgeMemo=null;
+  function trunkGeoBridge(plot){
+    var G=window.RyTrunkGeo;
+    if(!G) return null;
+    var dd=window.tlDiagramData, base=window.__runyeGeoBase;
+    if(!dd||dd.world!=='meter') return null;
+    if(!Array.isArray(dd.poly)||dd.poly.length<3) return null;
+    if(!plot||!Array.isArray(plot.polyLatLng)||plot.polyLatLng.length!==dd.poly.length) return null;
+    /* ★ 地块一致性（最容易被忽略的一条）：tlDiagramData 属于「分区页当前地块」
+       （window.currentPlotId）；本函数服务的 plot 是「地图页正在编辑的地块」
+       （currentMapPlotId）。两者不是同一块时，把前者的阀门吸到后者身上
+       = 吸到别人家的管子，比不接更糟。 */
+    if(String(window.currentPlotId||'')!==String(currentMapPlotId||'')) return null;
+    var sig=String(currentMapPlotId)+'|'+String(dd.generatedAt||'')+'|'+dd.poly.length;
+    if(geoBridgeMemo&&geoBridgeMemo.sig===sig) return geoBridgeMemo.bridge;
+    var cal=G.autoSign(dd.poly, plot.polyLatLng, base);
+    var bridge=cal.ok?{
+      sign:cal.sign, rms:cal.rms,
+      toLL:function(pt){ return pt?G.m2ll(pt.x, pt.y, base, cal.sign):null; }
+    }:null;
+    geoBridgeMemo={sig:sig, bridge:bridge};
+    return bridge;
+  }
+
+  /* 分区网格交点数上限：nearest() 每帧对全部候选做一次投影，
+     太大的网格会把 mousemove 拖慢 ⇒ 超限就不接（宁缺不卡）。 */
+  var ZONE_VERT_CAP=150;
+
+  function extraSnapTargets(plot){
+    var dd=window.tlDiagramData;
+    var bridge=trunkGeoBridge(plot);
+    if(!bridge) return null;
+    var valves=[], branchStarts=[], zoneVerts=[], zoneNote=null;
+    (Array.isArray(dd.valves)?dd.valves:[]).forEach(function(v){
+      var ll=bridge.toLL(v); if(ll) valves.push(ll);
+    });
+    (Array.isArray(dd.branchPipes)?dd.branchPipes:[]).forEach(function(line){
+      if(!line||!line.length) return;
+      var ll=bridge.toLL(line[0]); if(ll) branchStarts.push(ll);
+    });
+    var G=window.RyTrunkGeo, zw=G?G.zoneWorlds(dd.zones):[];
+    if(zw.length>ZONE_VERT_CAP){ zoneNote='capped:'+zw.length; zw=[]; }
+    zw.forEach(function(p){ var ll=bridge.toLL(p); if(ll) zoneVerts.push(ll); });
+    return {valves:valves, branchStarts:branchStarts, zoneVerts:zoneVerts,
+      stats:{sign:bridge.sign, rms:Math.round(bridge.rms*1000)/1000,
+        valves:valves.length, branchStarts:branchStarts.length, zoneVerts:zoneVerts.length, zoneNote:zoneNote}};
+  }
+
+  var snapExtras=null;
+
+  /* 采集捕捉候选。三类「本身就带经纬度」的直接给（地块顶点 / 水源 / 已存干线拐点），
+     另三类（阀门 / 支管起点 / 分区顶点）走 trunkGeoBridge 反算 —— 反算不成就跳过，
+     绝不拿猜出来的坐标去吸。 */
+  function refreshSnapTargets(){
+    var S=snapApi();
+    if(!S) return 0;
+    var input={};
+    var snap=window.RyPlotLibraryStore&&window.RyPlotLibraryStore.read();
+    var plot=null;
+    if(snap&&snap.ok&&currentMapPlotId){
+      plot=snap.plots.filter(function(p){return p&&String(p.id)===String(currentMapPlotId);})[0]||null;
+    }
+    if(plot){
+      input.plotRing=plot.polyLatLng||null;
+      if(plot.waterSource) input.waterSource=plot.waterSource;
+    }
+    if(trunkSaved&&Array.isArray(trunkSaved.trunks)){
+      input.savedTrunks=trunkSaved.trunks;
+      var SS=window.RyTrunkSchema, m=SS?SS.pickMainTrunk(trunkSaved):null;
+      if(m) input.mainTrunkPoints=m.points;
+    }
+    snapExtras=extraSnapTargets(plot);
+    if(snapExtras){
+      input.valves=snapExtras.valves;
+      input.branchStarts=snapExtras.branchStarts;
+      input.zoneVerts=snapExtras.zoneVerts;
+    }
+    var list=S.buildTargets(input);
+    return S.setTargets(list,{plotId:currentMapPlotId?String(currentMapPlotId):null, extras:snapExtras?snapExtras.stats:null});
+  }
+
+  function setSnapOn(on){
+    snapOn=!!on;
+    var S=snapApi();
+    if(S) S.setEnabled(snapOn);
+    if(!snapOn && snapMarker && map.hasLayer(snapMarker)) map.removeLayer(snapMarker);
+    var b=document.getElementById('btnSnapToggle');
+    if(b){
+      b.textContent='捕捉：'+(snapOn?'开启':'关闭');
+      b.setAttribute('aria-pressed',snapOn?'true':'false');
+    }
+    updateTrunkHint();
+  }
+
+  /* 单点高程：缺就返回 null（**不补 0**）。状态栏据此显示「—」。 */
+  function zOfPoint(q){
+    var S=window.RyTrunkSchema;
+    var rd=S&&S.readPoint?S.readPoint(q):null;
+    return rd&&typeof rd.z==='number'&&isFinite(rd.z)?rd.z:null;
+  }
+
+  function fmtLen(m){
+    if(!isFinite(m)||m<=0) return '—';
+    return (m<1000?m.toFixed(1):(m/1000).toFixed(2))+' '+(m<1000?'m':'km');
+  }
+  function setField(id,val){
+    var el=document.getElementById(id);
+    if(el&&el.textContent!==val) el.textContent=val;   // 值没变就不写 DOM（mousemove 每帧都在跑）
+  }
+
+  /* 状态栏 5 字段。缺数据一律「—」：**绝不写 0.00**，那会被当成真值去做水力判断。
+     [v833] 拖动拐点时状态栏必须跟着**拖动中的位置**走：
+       库里那份在 dragend 之前是不动的，直接读 trunkSaved 会让数字在拖动全程是死的
+       （用户看到"拖了半天投影不变"，会以为拖动没生效）。所以拖动期间用 trunkDragPreview
+       顶替几何来源；它只供显示，绝不参与写库。 */
+  function updateStatusbar(){
+    if(!mapSectionVisible()) return;
+    var S=window.RyTrunkSchema;
+    var main=(S&&trunkSaved)?S.pickMainTrunk(trunkSaved):null;
+
+    setField('msbTrunk', main?String(main.id):'—');
+
+    /* 几何来源优先级：绘制中的草稿 > 拖动中的预览 > 库里的主干 */
+    var pts=(trunkMode==='draw'&&trunkPoints.length)?trunkPoints
+      :(trunkDragPreview?trunkDragPreview.points:(main?main.points:null));
+
+    /* 投影：绘制中=首点到光标的累计平面长度（实时预览）；否则=该线全长。 */
+    var proj='—';
+    if(pts&&pts.length){
+      var total=0;
+      for(var i=1;i<pts.length;i++){
+        var a=S.readPoint(pts[i-1]), b=S.readPoint(pts[i]);
+        if(a&&b) total+=map.distance(L.latLng(a.lat,a.lng),L.latLng(b.lat,b.lng));
+      }
+      if(trunkMode==='draw'&&lastCursorLatLng&&pts.length){
+        var last=S.readPoint(pts[pts.length-1]);
+        if(last) total+=map.distance(L.latLng(last.lat,last.lng),L.latLng(lastCursorLatLng.lat,lastCursorLatLng.lng));
+      }
+      proj=fmtLen(total);
+    }
+    setField('msbProj', proj);
+
+    /* 高差：首尾两点都有高程才算，否则「—」。 */
+    var drop='—';
+    if(pts&&pts.length>=2){
+      var z0=zOfPoint(pts[0]), z1=zOfPoint(pts[pts.length-1]);
+      if(z0!==null&&z1!==null){
+        var d=z1-z0;
+        drop=(d>=0?'+':'')+d.toFixed(2)+' m';
+      }
+    }
+    setField('msbDrop', drop);
+
+    /* 流速：v = Q/(π·D²/4)，D 取主干管径(mm)，Q 按 m³/h 折算成 m³/s。
+       任一缺失就「—」—— 编一个流速出来会误导选型。
+       流速只与管径/流量有关，与拖动位置无关 ⇒ 拖动中不重算，天然满足"不在拖动中跑水力"。 */
+    var flow='—';
+    if(main&&main.params){
+      var dn=Number(main.params.dn), q=Number(main.params.designFlow);
+      if(isFinite(dn)&&dn>0&&isFinite(q)&&q>0){
+        var D=dn/1000, v=(q/3600)/(Math.PI*D*D/4);
+        if(isFinite(v)) flow=v.toFixed(2)+' m/s';
+      }
+    }
+    setField('msbFlow', flow);
+  }
+
+  function updateTrunkHint(){
+    var el=document.getElementById('mapTrunkHint');
+    if(!el) return;
+    if(trunkMode==='idle'){ el.hidden=true; el.textContent=''; return; }
+    el.hidden=false;
+    el.textContent = trunkMode==='draw'
+      ? ('点击加点 · 双击/回车完成 · Esc 取消 · 按住 Shift 正交 · Ctrl+Z 撤销 · 捕捉：'+(snapOn?'开启':'关闭'))
+      : '点选干线后可拖拐点 · 右键打开菜单 · Ctrl+Z 撤销 · Esc 退出';
+  }
+
+  var snapToggleBtn=document.getElementById('btnSnapToggle');
+  if(snapToggleBtn)snapToggleBtn.onclick=function(){ setSnapOn(!snapOn); };
+  ensureSnapSupport();
+
+  /* 光标移动：更新吸附标记 + 状态栏投影预览。 */
+  map.on('mousemove', function(e){
+    if(trunkMode!=='draw') return;
+    lastCursorLatLng=fromDisplay(e.latlng);
+    var S=snapApi();
+    if(S){
+      if(snapOn) S.nearest(lastCursorLatLng);
+      else S.clearMarker();
+    }
+    updateStatusbar();
+  });
+
+  var trunkDrawBtn=document.getElementById('btnDrawTrunk');
+  if(trunkDrawBtn)trunkDrawBtn.onclick=function(){
+    if(trunkMode==='draw'){
+      setTrunkMode('idle');
+      tip('已退出总管绘制，草稿已丢弃；已保存的线没有被改动。');
+      return;
+    }
+    if(!currentMapPlotId){tip('请先在地图中选中已保存的地块，再绘制总管。');return;}
+    var priorSnap=window.RyPlotLibraryStore&&window.RyPlotLibraryStore.read();
+    var prior=priorSnap&&priorSnap.ok?(priorSnap.plots||[]).filter(function(p){return p&&String(p.id)===String(currentMapPlotId);}):[];
+    if(prior.length!==1){tip('当前地块记录无法唯一确认，请重新回传地块后再绘制总管。');return;}
+    if(prior[0].merged||prior[0].grouped||prior[0].mergedInto){tip('成组地块的总管由多地块规划单独管理，请到多地块规划中编辑。');return;}
+    /* 每次进入都从「新增一条」开始画：已保存的线原样留着，重画不会覆盖它。
+       想改某条已有线，走三期「选中 + 拖拐点」，不是重画。 */
+    trunkSaved=loadSavedTrunkFor(prior[0]);
+    trunkPoints=[];
+    trunkDraft={id:null,params:{material:'PE',dn:null,designFlow:null}};
+    setTrunkMode('draw');
+    tip('依次点击水源到地块内的折点：双击或回车完成，Esc 取消，按住 Shift 正交。灰线是已保存的干线，不会被改动。');
+  };
+  var finishTrunkBtn=document.getElementById('btnFinishTrunk');
+  if(finishTrunkBtn)finishTrunkBtn.onclick=function(){commitTrunkDraft();};
+  var undoTrunkBtn=document.getElementById('btnUndoTrunk');
+  if(undoTrunkBtn)undoTrunkBtn.onclick=function(){if(trunkMode!=='draw')return;trunkPoints.pop();renderTrunkDraft();};
+
+  /* ===== [v833] 编辑层（三期）：选中 / 拖拐点 / 右键菜单 =====
+     分工：算法全在 mod/trunk-edit.js（纯函数、Node 单测锁着），这里只做三件事：
+       ① 把状态接上 Leaflet（命中判定、拐点手柄、选中高亮）
+       ② 把右键菜单画出来（项与顺序由 RyTrunkEdit.MENU_ORDER 决定，**不要在这里重排**）
+       ③ 把结果写回（一律走 commitTrunks，不另开写库分支） */
+  function findSavedTrunk(id){
+    if(id===null||id===undefined) return null;
+    if(!trunkSaved||!Array.isArray(trunkSaved.trunks)) return null;
+    for(var i=0;i<trunkSaved.trunks.length;i++){
+      if(String(trunkSaved.trunks[i].id)===String(id)) return trunkSaved.trunks[i];
+    }
+    return null;
+  }
+  function trunkIndexById(id){
+    if(!trunkSaved||!Array.isArray(trunkSaved.trunks)) return -1;
+    for(var i=0;i<trunkSaved.trunks.length;i++){
+      if(String(trunkSaved.trunks[i].id)===String(id)) return i;
+    }
+    return -1;
+  }
+  /* 两点距离（米），入参是 GCJ-02 的 {lat,lng}。
+     同坐标系之间的平移偏移不影响距离，所以不必先换到显示坐标。 */
+  function trunkDistM(a,b){
+    if(!a||!b) return Infinity;
+    return map.distance(L.latLng(a.lat,a.lng),L.latLng(b.lat,b.lng));
+  }
+  /* 两点距离（屏幕像素）。**拖拽手势必须按像素判**，不能按米：
+     fitBounds 后常见 2.3 px/m ⇒ MERGE_M=0.3 m 只有 0.7 px，比一次像素取整还小，
+     用户把点拖到邻点上，落点误差就 0.6 m 了 ⇒ 永远并不掉，手势等于死键。
+     所以手势加一条 8px 的"够得着"下限；0.3 m 仍然管**数据层**的判定
+     （mergeTrunks 的 jointOf、validate 之后的连线判断），那是几何事实，与缩放无关。 */
+  function trunkDistPx(a,b){
+    if(!a||!b) return Infinity;
+    var pa=projectToContainer(a.lat,a.lng), pb=projectToContainer(b.lat,b.lng);
+    var dx=pa.x-pb.x, dy=pa.y-pb.y;
+    return Math.sqrt(dx*dx+dy*dy);
+  }
+  var MERGE_PX = 8;
+
+  function selectTrunk(id){
+    activeTrunkId=id===null?null:String(id);
+    activeVertexIdx=-1;
+    renderTrunkDraft();
+    renderTrunkEditHandles();
+    updateStatusbar();
+    syncTrunkUI();
+  }
+
+  /* 拐点手柄：白底蓝边小圆（.ry-trunk-vtx）。拖拽用 Leaflet marker 自带的 draggable，
+     鼠标/触摸都稳，不用自己算 pointer 增量。
+     ★ 拖动中**只改线、不写库**：每帧写一次 localStorage 会卡死；dragend 才落一次。 */
+  function renderTrunkEditHandles(){
+    trunkEditLayers.forEach(function(m){ if(m && map.hasLayer(m)) map.removeLayer(m); });
+    trunkEditLayers=[];
+    if(trunkMode!=='edit') return;
+    var entry=findSavedTrunk(activeTrunkId);
+    if(!entry) return;
+    var S=window.RyTrunkSchema, E=window.RyTrunkEdit;
+    if(!S||!E) return;
+    var raw=Array.isArray(entry.points)?entry.points:[];
+    var labels=(entry.params&&entry.params.labels)||{};
+    raw.forEach(function(q,idx){
+      var rd=S.readPoint(q); if(!rd) return;
+      var isEnd=(idx===0||idx===raw.length-1);
+      var mk=L.marker(displayLatLngOf(rd.lat,rd.lng),{
+        draggable:true, keyboard:false, autoPan:true, zIndexOffset:1200,
+        icon:L.divIcon({className:'ry-trunk-vtx'+(isEnd?' is-end':''),iconSize:[14,14],iconAnchor:[7,7],
+          html:'<span class="tv-dot"></span>'})
+      }).addTo(map);
+      var label=labels[String(idx)];
+      if(label){
+        mk.bindTooltip(String(label),{permanent:true,direction:'top',offset:[0,-10],className:'ry-trunk-vtx-tip',interactive:false});
+      }
+      mk.on('dragstart',function(){
+        activeVertexIdx=idx;
+        var el=mk.getElement(); if(el) el.classList.add('is-dragging');
+      });
+      mk.on('drag',function(ev){
+        /* 拖动中只把线跟着挪 + 更新状态栏，不写库（每帧写一次 localStorage 会卡死），
+           也不跑水力（流速只与管径/流量有关，本来就不随位置变）。 */
+        var ll=ev.target.getLatLng();
+        if(trunkActiveLine){
+          var arr=trunkActiveLine.getLatLngs();
+          if(arr && arr[idx]){ arr[idx]=ll; trunkActiveLine.setLatLngs(arr); }
+        }
+        var gcjDrag=fromDisplay(ll);
+        var preview=raw.map(function(q,i){
+          if(i===idx) return [+gcjDrag.lat,+gcjDrag.lng];
+          var rd=S.readPoint(q);
+          return rd?[rd.lat,rd.lng]:null;
+        }).filter(function(v){return !!v;});
+        trunkDragPreview={id:String(entry.id),points:preview};
+        updateStatusbar();
+      });
+      mk.on('dragend',function(ev){
+        var el=mk.getElement(); if(el) el.classList.remove('is-dragging');
+        /* 先清预览再写库：否则状态栏会一直停在"拖动中的数字"上，和库里对不上。 */
+        trunkDragPreview=null;
+        var gcj=fromDisplay(ev.target.getLatLng());
+        var target={lat:+gcj.lat,lng:+gcj.lng};
+        var prev=idx>0?S.readPoint(raw[idx-1]):null;
+        var next=idx<raw.length-1?S.readPoint(raw[idx+1]):null;
+        var nearM=Math.min(prev?trunkDistM(prev,target):Infinity, next?trunkDistM(next,target):Infinity);
+        var nearPx=Math.min(prev?trunkDistPx(prev,target):Infinity, next?trunkDistPx(next,target):Infinity);
+        var res;
+        if(nearM<=E.MERGE_M || nearPx<=MERGE_PX){
+          /* 拖到邻点上 = 想把这个拐点并掉。removeVertex 拒绝（只剩两点）时不写库，
+             applyTrunkEdit 照常重画 ⇒ 手柄弹回原位，等于整次拖拽被回滚。 */
+          res=applyTrunkEdit(function(nx){
+            var rr=E.removeVertex(nx,entry.id,idx);
+            return rr.ok?{ok:true,trunk:rr.trunk}:{ok:false,error:rr.error};
+          },{silent:true});
+          if(res.ok) tip('拐点已并到相邻点上（相距不足 0.3 m）。');
+          else tip(res.error||'这个拐点不能删除：这条线至少要保留两个拐点。');
+        }else{
+          res=applyTrunkEdit(function(nx){
+            var mv=E.moveVertex(nx,entry.id,idx,target.lat,target.lng);
+            return mv.ok?{ok:true,trunk:mv.trunk}:{ok:false,error:mv.error};
+          },{silent:true});
+          if(!res.ok) tip(res.error||'拐点未保存。');
+        }
+      });
+      trunkEditLayers.push(mk);
+    });
+  }
+
+  /* 所有编辑动作的唯一出口：写库 → 复核 activeTrunkId 是否还存在 → 重画。
+     失败也要重画：拖拽期间线是被乐观改过的，不重画就和库里不一致了。
+     注意这里**不再补 tip** —— 提示由 commitTrunks 或调用方负责，两层都提示会弹两遍。 */
+  function applyTrunkEdit(fn,opts){
+    var res=commitTrunks(fn,opts||{});
+    var has=!!(trunkSaved&&Array.isArray(trunkSaved.trunks)&&trunkSaved.trunks.length);
+    if(!has && trunkMode==='edit'){
+      /* 删掉最后一条 = 这块地没有总管了，编辑态没有对象可编辑 ⇒ 直接退回 idle，
+         按钮也会跟着置灰。「留在一个空的编辑态里」会让用户以为还能右键。 */
+      setTrunkMode('idle');
+      return res;
+    }
+    if(!findSavedTrunk(activeTrunkId)){ activeTrunkId=null; activeVertexIdx=-1; }
+    renderTrunkDraft();
+    renderTrunkEditHandles();
+    updateStatusbar();
+    syncTrunkUI();
+    if(trunkMode==='draw') refreshSnapTargets();
+    return res;
+  }
+
+  /* ===== [v834] 撤销 / 重做（四期）=====
+     只回滚 plot.trunk 这一个数据域：
+       · 已回传的系统分区管网（二级页 designState / tlDiagramData）—— 一根头发都不碰
+       · 成组管路（W.trunk.lines / ge.trunkPipes）—— 它有自己的撤销系统，绝不接管
+     快照里也只有 {trunk, activeTrunkId}，不含 polyLatLng、不含 revision（见模块文件头）。 */
+  function applyHistorySnapshot(snap, verb){
+    if(!snap) return false;
+    var target=snap.trunk?JSON.parse(JSON.stringify(snap.trunk)):null;
+    /* 照样走 commitTrunks：版本校验、validate、revision+1 一个都不跳过。
+       「撤销」不是"把旧字节覆盖回去"，它也是一次正常写入。 */
+    var res=applyTrunkEdit(function(){ return {ok:true,trunk:target}; },{noHistory:true});
+    if(!res.ok) return false;
+    /* 恢复选中态：快照里那条还在就选它，否则退回主干（打断/合并会让原 id 消失）。 */
+    var want=snap.activeTrunkId;
+    if(want && findSavedTrunk(want)){
+      activeTrunkId=String(want);
+    }else{
+      var S=window.RyTrunkSchema, m=(S&&trunkSaved)?S.pickMainTrunk(trunkSaved):null;
+      activeTrunkId=m?String(m.id):null;
+    }
+    activeVertexIdx=-1;
+    renderTrunkDraft();
+    renderTrunkEditHandles();
+    updateStatusbar();
+    syncTrunkUI();
+    tip(verb+'：当前地块'+(res.trunk?('共 '+res.trunk.trunks.length+' 条干线'):'已没有总管')+'。');
+    return true;
+  }
+  function undoTrunk(){
+    if(!trunkHistory){ tip('撤销模块未加载；请刷新页面后重试。'); return false; }
+    var step=trunkHistory.undo();
+    if(!step.ok){ tip('没有可撤销的总管操作了。'); return false; }
+    var done=applyHistorySnapshot(step.state,'已撤销');
+    /* 写失败（地块库被别的页面改过）⇒ 游标退回原位，别让"栈说有、库里没有"。
+       这一句漏掉的话，用户会连按两次 Ctrl+Z 才看到反应，然后发现少了一步。 */
+    if(!done) trunkHistory.redo();
+    return done;
+  }
+  function redoTrunk(){
+    if(!trunkHistory){ tip('撤销模块未加载；请刷新页面后重试。'); return false; }
+    var step=trunkHistory.redo();
+    if(!step.ok){ tip('没有可重做的总管操作了。'); return false; }
+    var done=applyHistorySnapshot(step.state,'已重做');
+    if(!done) trunkHistory.undo();
+    return done;
+  }
+
+  /* 点到线段的距离（屏幕像素）。做命中判定必须在像素里算：
+     按米算会随纬度漂，而且 mousemove/contextmenu 每帧调 map.distance() 会掉帧。 */
+  function segDistPx(p,a,b){
+    var vx=b.x-a.x, vy=b.y-a.y, len2=vx*vx+vy*vy;
+    if(len2<=0.000001) return Math.sqrt((p.x-a.x)*(p.x-a.x)+(p.y-a.y)*(p.y-a.y));
+    var t=((p.x-a.x)*vx+(p.y-a.y)*vy)/len2;
+    t=t<0?0:(t>1?1:t);
+    var dx=p.x-(a.x+t*vx), dy=p.y-(a.y+t*vy);
+    return Math.sqrt(dx*dx+dy*dy);
+  }
+  function hitTestTrunk(cp,tolPx){
+    var S=window.RyTrunkSchema;
+    if(!S||!trunkSaved||!Array.isArray(trunkSaved.trunks)) return null;
+    var tol=isFinite(tolPx)?tolPx:8;
+    var vBest=null, vBestD=11;      // 拐点优先（11px 内算命中拐点）
+    var sBest=null, sBestD=tol;     // 其次算命中线身
+    trunkSaved.trunks.forEach(function(entry){
+      var disp=(entry.points||[]).map(function(q){
+        var rd=S.readPoint(q);
+        return rd?projectToContainer(rd.lat,rd.lng):null;
+      });
+      for(var i=0;i<disp.length;i++){
+        if(!disp[i]) continue;
+        var dv=Math.sqrt((cp.x-disp[i].x)*(cp.x-disp[i].x)+(cp.y-disp[i].y)*(cp.y-disp[i].y));
+        if(dv<=vBestD){ vBestD=dv; vBest={id:String(entry.id),idx:i}; }
+      }
+      for(var j=1;j<disp.length;j++){
+        if(!disp[j-1]||!disp[j]) continue;
+        var d=segDistPx(cp,disp[j-1],disp[j]);
+        if(d<sBestD){ sBestD=d; sBest={id:String(entry.id),idx:-1}; }
+      }
+    });
+    return vBest||sBest;
+  }
+
+  /* 菜单壳：懒建一次，position:fixed。
+     z-index 必须高过 .ry-pwa-install（2000），否则首访未安装时菜单右下角那一截点不到。 */
+  function ensureTrunkMenu(){
+    if(trunkCtxMenu && document.body.contains(trunkCtxMenu)) return trunkCtxMenu;
+    var el=document.createElement('div');
+    el.id='trunkCtxMenu';
+    el.className='ry-float-card trunk-ctx-menu';
+    el.setAttribute('role','menu');
+    el.hidden=true;
+    document.body.appendChild(el);
+    /* 点空白关闭。用捕获阶段：菜单外壳自己的空白区也要关，但点按钮不算空白。 */
+    document.addEventListener('mousedown',function(ev){
+      if(el.hidden) return;
+      if(el.contains(ev.target)) return;
+      closeTrunkMenu();
+    },true);
+    trunkCtxMenu=el;
+    return el;
+  }
+  function closeTrunkMenu(){ if(trunkCtxMenu) trunkCtxMenu.hidden=true; }
+
+  function openTrunkMenu(clientX,clientY,id,idx){
+    var E=window.RyTrunkEdit;
+    if(!E){ tip('编辑模块未加载，无法打开菜单；请刷新页面后重试。'); return; }
+    activeTrunkId=(id===null||id===undefined)?null:String(id);
+    activeVertexIdx=(typeof idx==='number')?idx:-1;
+    var entry=findSavedTrunk(activeTrunkId);
+    var pts=entry&&Array.isArray(entry.points)?entry.points:[];
+    var connected=entry?E.connectedIds(trunkSaved,entry.id,trunkDistM):[];
+    var items=E.buildMenuItems({
+      activeId:activeTrunkId,
+      points:pts,
+      vertexIndex:activeVertexIdx,
+      connectedIds:connected,
+      clipboardEmpty:paramsClipboard===null
+    });
+    var el=ensureTrunkMenu();
+    el.innerHTML='';
+    var head=document.createElement('div');
+    head.className='tcm-head';
+    head.textContent='干线 '+activeTrunkId+(connected.length?(' · 相连 '+connected.length+' 条'):'');
+    el.appendChild(head);
+    items.forEach(function(it,order){
+      var b=document.createElement('button');
+      b.type='button';
+      b.className='tcm-item';
+      b.setAttribute('data-act',it.key);
+      b.textContent=(order+1)+'. '+it.label;
+      b.disabled=!it.enabled;
+      b.onclick=function(ev){ if(ev) ev.preventDefault(); runTrunkMenuAction(it.key); };
+      el.appendChild(b);
+    });
+    el.hidden=false;
+    /* 先落 0 再量：隐藏元素量不出尺寸，贴边翻转就永远不生效。 */
+    el.style.left='0px'; el.style.top='0px';
+    var w=el.offsetWidth, h=el.offsetHeight;
+    var vw=window.innerWidth||document.documentElement.clientWidth;
+    var vh=window.innerHeight||document.documentElement.clientHeight;
+    var x=clientX, y=clientY;
+    if(x+w>vw-8) x=Math.max(8,vw-w-8);
+    if(y+h>vh-8) y=Math.max(8,vh-h-8);
+    el.style.left=x+'px';
+    el.style.top=y+'px';
+    renderTrunkDraft();
+    renderTrunkEditHandles();
+    updateStatusbar();
+  }
+
+  function runTrunkMenuAction(key){
+    var E=window.RyTrunkEdit, S=window.RyTrunkSchema;
+    var id=activeTrunkId, idx=activeVertexIdx;
+    closeTrunkMenu();
+    if(!E||!S||!id) return;
+    var entry=findSavedTrunk(id);
+    if(!entry) return;
+
+    if(key==='delete'){
+      if(!confirm('删除干线 '+id+'？\n\n这条线的折点与参数会一并删除，本版还不能撤销。')) return;
+      applyTrunkEdit(function(nx){
+        var r=E.removeTrunk(nx,id);
+        return r.ok?{ok:true,trunk:r.trunk}:{ok:false,error:r.error};
+      },{tipText:'已删除干线 '+id+'。'});
+      return;
+    }
+
+    if(key==='split'){
+      var newId=null;
+      applyTrunkEdit(function(nx){
+        var r=E.splitTrunk(nx,id,idx,S.makeId);
+        if(!r.ok) return {ok:false,error:r.error};
+        newId=r.newId;
+        /* 拐点标签按**下标**存，切开/合并后下标全变 ⇒ 直接丢弃，
+           宁可不显示，也不能让标签串到别的拐点上（那会误导现场施工）。 */
+        r.trunk.trunks.forEach(function(t){ if(t.params) delete t.params.labels; });
+        return {ok:true,trunk:r.trunk};
+      },{});
+      if(newId) tip('已在第 '+(idx+1)+' 个拐点处打断：前段保留 '+id+'，后段是 '+newId+'（参数已复制，互不影响）。');
+      return;
+    }
+
+    if(key==='merge'){
+      var conn=E.connectedIds(trunkSaved,id,trunkDistM);
+      if(!conn.length){ tip('没有首尾相接的干线可合并（相差需在 0.3 m 内）。'); return; }
+      var target=conn[0];
+      /* 编号与参数沿用**列表里在前的那条**（用户点名的语义），先算好再确认。 */
+      var atSelf=trunkIndexById(id), atOther=trunkIndexById(target);
+      var keepId=(atSelf>=0&&atOther>=0&&atSelf<atOther)?id:target;
+      var dropId=(keepId===id)?target:id;
+      if(!confirm('合并 '+keepId+' 与 '+dropId+'？\n\n将删除 '+dropId+'，编号与参数沿用 '+keepId+'（列表里在前的那条）。')) return;
+      applyTrunkEdit(function(nx){
+        var r=E.mergeTrunks(nx,keepId,dropId,trunkDistM);
+        if(!r.ok) return {ok:false,error:r.error};
+        r.trunk.trunks.forEach(function(t){ if(t.params) delete t.params.labels; });
+        return {ok:true,trunk:r.trunk};
+      },{});
+      activeTrunkId=keepId;
+      renderTrunkDraft(); renderTrunkEditHandles(); syncTrunkUI();
+      return;
+    }
+
+    if(key==='copyParams'){
+      var cp=JSON.parse(JSON.stringify(entry.params||{}));
+      delete cp.labels;            // 拐点标签跟着拐点走，不跟着参数走
+      paramsClipboard=cp;
+      tip('已复制 '+id+' 的参数（'+(cp.material||'PE')+' / DN'+(cp.dn==null?'—':cp.dn)+' / '+(cp.designFlow==null?'—':cp.designFlow)+' m³/h）。');
+      return;
+    }
+
+    if(key==='pasteParams'){
+      if(paramsClipboard===null){ tip('剪贴板是空的：先对某条干线用「复制参数」。'); return; }
+      var clip=JSON.parse(JSON.stringify(paramsClipboard));
+      applyTrunkEdit(function(nx){
+        for(var i=0;i<nx.trunks.length;i++){
+          if(String(nx.trunks[i].id)!==String(id)) continue;
+          var keepLabels=nx.trunks[i].params&&nx.trunks[i].params.labels;
+          var merged=S.normalizeParams(clip);
+          if(keepLabels) merged.labels=keepLabels;   // 粘贴参数不该冲掉本线的拐点标签
+          nx.trunks[i].params=merged;
+          return {ok:true,trunk:nx};
+        }
+        return {ok:false,error:'找不到干线 '+id};
+      },{tipText:'参数已粘贴到 '+id+'。'});
+      return;
+    }
+
+    if(key==='markVertex'){
+      if(idx<0){ tip('先右键点在某一个拐点上，再选「标记当前拐点」。'); return; }
+      var cur=(entry.params&&entry.params.labels&&entry.params.labels[String(idx)])||'';
+      var text=prompt('给干线 '+id+' 的第 '+(idx+1)+' 个拐点起个名字（≤12 字，留空 = 清除标记）',cur);
+      if(text===null) return;
+      text=String(text).trim().slice(0,12);
+      applyTrunkEdit(function(nx){
+        for(var i=0;i<nx.trunks.length;i++){
+          if(String(nx.trunks[i].id)!==String(id)) continue;
+          var prm=S.normalizeParams(nx.trunks[i].params);
+          var lb=prm.labels&&typeof prm.labels==='object'?prm.labels:{};
+          if(text) lb[String(idx)]=text; else delete lb[String(idx)];
+          if(Object.keys(lb).length) prm.labels=lb; else delete prm.labels;
+          nx.trunks[i].params=prm;
+          return {ok:true,trunk:nx};
+        }
+        return {ok:false,error:'找不到干线 '+id};
+      },{tipText:text?('已标记第 '+(idx+1)+' 个拐点为「'+text+'」。'):'已清除该拐点的标记。'});
+      return;
+    }
+  }
+
+  /* 进入编辑：必须当前地块有已保存的干线。trunkId 省略 = 选主干。 */
+  function enterTrunkEdit(trunkId){
+    if(!currentMapPlotId){ tip('请先在地图中选中已保存的地块，再编辑总管。'); return false; }
+    var priorSnap=window.RyPlotLibraryStore&&window.RyPlotLibraryStore.read();
+    var prior=priorSnap&&priorSnap.ok?(priorSnap.plots||[]).filter(function(p){return p&&String(p.id)===String(currentMapPlotId);}):[];
+    if(prior.length!==1){ tip('当前地块记录无法唯一确认，请重新回传地块后再编辑总管。'); return false; }
+    var saved=loadSavedTrunkFor(prior[0]);
+    if(!saved||!Array.isArray(saved.trunks)||!saved.trunks.length){
+      tip('当前地块还没有保存过总管；先点「🟠 绘制总管」画一条。');
+      return false;
+    }
+    trunkSaved=saved;
+    trunkTargetPlotId=String(currentMapPlotId);
+    var S=window.RyTrunkSchema, want=trunkId?String(trunkId):null;
+    if(!want||!saved.trunks.some(function(t){return String(t.id)===want;})){
+      var m=S?S.pickMainTrunk(saved):null;
+      want=String(m?m.id:saved.trunks[0].id);
+    }
+    activeTrunkId=want;
+    activeVertexIdx=-1;
+    setTrunkMode('edit');
+    refreshSnapTargets();      // 画另一条线时还能吸到这条线的拐点
+    tip('编辑总管：点线选中，拖白点改拐点（拖到邻点上=并掉它），右键开菜单，Esc 退出。');
+    return true;
+  }
+  function exitTrunkEdit(){
+    if(trunkMode!=='edit') return;
+    setTrunkMode('idle');
+    tip('已退出总管编辑；已保存的线没有被改动。');
+  }
+
+  var editTrunkBtn=document.getElementById('btnEditTrunk');
+  if(editTrunkBtn)editTrunkBtn.onclick=function(){
+    if(trunkMode==='edit'){ exitTrunkEdit(); return; }
+    enterTrunkEdit(null);
+  };
+  /* 启动时同步一次按钮态：没有已保存的干线时「✎ 编辑总管」必须是灰的。
+     不调这一下，按钮就保持 HTML 里的初始态（可点），点进去才被告知"还没有总管"。 */
+  syncTrunkUI();
+
+  /* ===== [v831] 地图快捷键层 =====
+     全站原来只有搜索框一处 keydown（本文件 :990 附近），所以这套是新建的，
+     必须自己处理「输入框聚焦时不吃键」—— 否则在搜索框里打 m 会退出地图模式。 */
+  function isTypingTarget(el){
+    if(!el || el===document.body) return false;
+    var tag=(el.tagName||'').toUpperCase();
+    return tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||el.isContentEditable===true;
+  }
+  function mapSectionVisible(){
+    var sec=document.getElementById('onlineMapSection');
+    if(!sec || sec.hidden) return false;
+    return sec.offsetParent!==null || sec.getClientRects().length>0;
+  }
+  document.addEventListener('keydown', function(e){
+    if(e.defaultPrevented) return;
+    /* [v834] 撤销 / 重做必须先于「带修饰键就早退」那一行，否则永远进不来。
+       ★ 输入框里**不接管**：那里 Ctrl+Z 是浏览器原生的文本撤销，抢过来用户就打不了字，
+         而且这种"抢键"错误用户只会描述成"输入框抽风"，极难定位。 */
+    var mod=e.ctrlKey||e.metaKey;
+    if(mod && !e.altKey){
+      var km=String(e.key||'').toLowerCase();
+      if(km==='z'||km==='y'){
+        if(isTypingTarget(document.activeElement)) return;
+        if(!mapSectionVisible()) return;
+        /* 绘制中且还有草稿点：Ctrl+Z = 撤掉最后一个**草稿**点（与「↩ 撤销总管点」同义）。
+           不这么做的话，用户画到第 5 个点时按 Ctrl+Z，会看到**上一条已保存的干线**消失 ——
+           这是"撤销把别的东西改掉了"最典型的惊吓。草稿点撤完才轮到历史栈。 */
+        if(km==='z' && !e.shiftKey && trunkMode==='draw' && trunkPoints.length){
+          e.preventDefault();
+          trunkPoints.pop();
+          renderTrunkDraft();
+          updateStatusbar();
+          tip('已撤掉最后一个草稿点（还剩 '+trunkPoints.length+' 个）。草稿撤完后 Ctrl+Z 才会撤销已保存的历史。');
+          return;
+        }
+        e.preventDefault();
+        if(km==='y'||e.shiftKey) redoTrunk(); else undoTrunk();
+        return;
+      }
+    }
+    if(e.ctrlKey || e.metaKey || e.altKey) return;
+    if(isTypingTarget(document.activeElement)) return;
+    if(!mapSectionVisible()) return;
+    var k=String(e.key||'').toLowerCase();
+    if(k==='m'){
+      var b=document.getElementById('btnDrawTrunk');
+      if(b && !b.disabled){ b.click(); e.preventDefault(); }
+      return;
+    }
+    /* [v832] S 切换捕捉。任何时刻都允许切（不必先进绘制态），与按钮同源。 */
+    if(k==='s'){
+      var sb=document.getElementById('btnSnapToggle');
+      if(sb){ setSnapOn(!snapOn); e.preventDefault(); }
+      return;
+    }
+    /* [v833] E 进出编辑态。同样只在按钮真的可用时才响应（没干线可编辑就别切）。 */
+    if(k==='e'){
+      var eb=document.getElementById('btnEditTrunk');
+      if(eb && !eb.disabled){ eb.click(); e.preventDefault(); }
+      return;
+    }
+    if(trunkMode==='edit'){
+      if(k==='escape'){ closeTrunkMenu(); exitTrunkEdit(); e.preventDefault(); }
+      return;
+    }
+    if(trunkMode!=='draw') return;
+    if(k==='enter'){ commitTrunkDraft(); e.preventDefault(); }
+    else if(k==='escape'){ setTrunkMode('idle'); tip('已取消本次总管绘制，草稿已丢弃；已保存的线没有被改动。'); e.preventDefault(); }
+  });
+  /* 双击缩放已关，这里再挡一次冒泡：否则 Leaflet 仍会把这个 dblclick 传给其它 handler。 */
+  map.on('dblclick', function(e){
+    if(trunkMode==='draw'){ L.DomEvent.stop(e); }
   });
   map.on('mousemove', function(e){
     if(!drawing || points.length===0) return;
@@ -546,7 +1687,22 @@
    * 原生菜单：Leaflet _fireDOMEvent 对 contextmenu 仅在「有命中目标」时 preventDefault
    * （vendored pwa/vendor/leaflet.js 已核实 "contextmenu"===e&&O(t) 在 targets 非空分支内），
    * 挂上本监听后 targets=[map] 恒非空 ⇒ 绘制态右键不再弹浏览器原生菜单。 */
-  map.on('contextmenu', function(){
+  map.on('contextmenu', function(e){
+    /* [v833] 编辑态：右键 = 打开 6 项菜单。命中判定在**地图级**统一做，
+       不给每条线各挂一个 handler —— 那些 handler 拿不到「点在线身还是拐点上」的一致口径，
+       而且打断需要的是拐点下标，只能由同一套 hitTest 给出。 */
+    if(trunkMode==='edit'){
+      var hit=hitTestTrunk(e.containerPoint,8);
+      if(hit){
+        L.DomEvent.stop(e);
+        var oe=e.originalEvent||{};
+        var cx=isFinite(oe.clientX)?oe.clientX:0, cy=isFinite(oe.clientY)?oe.clientY:0;
+        openTrunkMenu(cx,cy,hit.id,hit.idx);
+      }else{
+        closeTrunkMenu();
+      }
+      return;
+    }
     if(!drawing) return;                  // 非绘制态：右键=v298k 地块弹窗，不截胡
     var hadShape = points.length>=3 && geodesicArea(points)>0;
     var savedName='';
@@ -565,6 +1721,7 @@
   // ===== 按钮 =====
   var btnDraw=document.getElementById('btnDraw');
   function setDrawing(on){
+    if(on && trunkMode!=='idle') setTrunkMode('idle');   // [v831] 互斥收口：一律走 setTrunkMode，别在这里手写清状态（v833 起含 edit）
     if(on && measuring) finishMeasure();
     if(!on && rubber){measureGroup.removeLayer(rubber);rubber=null;}
     if(on) setAddMode(false);            // [v153] 与「加点」互斥：一开始画框就退出加点模式
@@ -576,6 +1733,9 @@
     document.getElementById('tip').textContent = drawing
       ? '十字光标处即落点：依次点击地块边界顶点；点「完成」即可定稿并**直接接着画下一块**（可连画多块，最后再成组；想停时**右键地图**截止）。'
       : '点击「✏️ 开始画框」后，在卫星图上依次点击地块边界顶点即可；点「完成」自动保存该块、清空画布并继续下一块。';
+    /* [v831] 画框会改变「绘制总管」的可用性（互斥矩阵），必须通知一次 UI；
+       漏了这行就会出现"正在画框，总管按钮却还能点进去"。 */
+    syncTrunkUI();
   }
   btnDraw.onclick=function(){ setDrawing(!drawing); };
   // [v153] 加点模式开关：需先有框（≥2 点）才有「边」可插点
@@ -1041,7 +2201,12 @@
       setTimeout(function(){ if(document.getElementById('terrainSection')) window.location.hash='#terrainSection'; else window.location.href='terrain/index.html'; }, 350);
     }catch(e){ alert('写入失败：'+e.message); }
   }
-  document.getElementById('btnCopyTerrain').onclick=function(){
+  /* [v830 2026-10-31] 用户要求：本按钮已从右侧角度面板移除（同功能入口在「我的地块」行内
+     「回传地形」与地图右键弹窗里）。**必须保留空守卫** —— 否则 getElementById 返回 null，
+     对 null 取 .onclick 会在脚本加载阶段抛 TypeError，整段 online-map.js 从这里断开，
+     下面所有绑定（btnCopy / btnSavePlot / 云端提交 / 地块库叠加）全部静默失效。 */
+  var btnCopyTerrainEl=document.getElementById('btnCopyTerrain');
+  if(btnCopyTerrainEl)btnCopyTerrainEl.onclick=function(){
     /* 取地块逻辑与 btnCopy 同源；不改动 btnCopy 任何原有代码 */
     try{
       var lib=lsGet('runye_plot_library',[]);
@@ -1091,6 +2256,7 @@
       return;
     }
     var saved=matches[0];
+    currentMapPlotId=saved.id;
     var destinationSection=(saved.merged||saved.grouped)&&Array.isArray(saved.subPlots)&&saved.subPlots.length>=2
       ? 'grPipeSection' : 'pipePlanSection';
     var areaM2=Number(saved.areaM2)||Number(saved.sqm)||0;
@@ -1138,7 +2304,12 @@
   }
 
   // 回传地块绘制：写入按编号隔离的载荷，并跳转到 index.html 的地块分区页
-  document.getElementById('btnCopy').onclick=function(){
+  /* [v830 2026-10-31] 「回传地块绘制」按钮已按用户要求从右侧角度面板移除
+     （同功能入口：我的地块列表行「→」.place-send、地图右键弹窗、runye-map-partition 的 RyMapHost.send）。
+     但**这条分支不能跟着消失** —— 它处理的是「画布上有刚画好、还没入库的草稿」这条路径：
+     按 id 取库里记录取不到，必须先把画布草稿落库再回传（v475 的教训）。
+     做法：提成具名函数并挂到 RyMapHost.sendDraft；DOM 按钮存在时照旧绑定，不存在则只留编程入口。 */
+  function onSendCurrentDraft(btnEl){
     /* [v475]（2026-10-16 用户实测踩坑）画布上有有效边界时**永远以画布为准**：
        旧逻辑 currentMapPlotId 指着旧记录就优先传旧记录 ⇒ 用户改完边界/画了新地块
        还没（重新）保存时，卡片显示的是画布实时测量、回传却发了旧地块——
@@ -1153,26 +2324,29 @@
         var savedSqm=saved0?(Number(saved0.areaM2)||Number(saved0.sqm)||0):0;
         if(isFinite(liveSqm)&&liveSqm>0&&(!saved0||!savedSqm||Math.abs(liveSqm-savedSqm)>savedSqm*0.005)){
           var fresh=saveCurrentDraftToLibrary({silent:false,newId:true});
-          if(fresh){ sendPlotToDesign(fresh, this); return; }
+          if(fresh){ sendPlotToDesign(fresh, btnEl); return; }
         }
       }
       var lib=lsGet('runye_plot_library',[]);
       var saved=currentMapPlotId?lib.filter(function(p){return p.id===currentMapPlotId;})[0]:null;
-      if(saved){ sendPlotToDesign(saved, this); return; }
+      if(saved){ sendPlotToDesign(saved, btnEl); return; }
       /* [v249 2026-10-05 用户要求] 「完成并画下一块」之后画布已清空、currentMapPlotId 已复位，
          用户随时可能就此停手点回传——此时「当前地块」= 刚定稿入库的最近一块（按 ts 取最新，
          成组与否一视同仁）。画布还有草稿时不兜底：半成品仍走下方草稿路径（原行为）。 */
       if(!points.length && lib.length){
         saved=lib.reduce(function(a,b){return (!a || (b.ts||0)>(a.ts||0)) ? b : a;}, null);
-        if(saved){ sendPlotToDesign(saved, this); return; }
+        if(saved){ sendPlotToDesign(saved, btnEl); return; }
       }
     }catch(e){}
     /* 否则回退：把当前画布上的草稿作为一个新地块回传 */
     var mu=parseFloat((geodesicArea(points)/666.67).toFixed(2));
     if(!isFinite(mu) || mu<=0){ alert('画布为空，地块库里也没有可回传的地块——请先画框测量出有效面积'); return; }
     var draft=saveCurrentDraftToLibrary({silent:false});
-    if(draft) sendPlotToDesign(draft, this);
-  };
+    if(draft) sendPlotToDesign(draft, btnEl);
+  }
+  var btnCopyEl=document.getElementById('btnCopy');
+  if(btnCopyEl)btnCopyEl.onclick=function(){ onSendCurrentDraft(this); };
+  window.__rySendCurrentDraft=onSendCurrentDraft;   // 契约测试与 runye-map-partition 的编程入口
 
   /* ===== [v186 2026-10-03] 地块定稿 / 清空 两个原子操作 =====
    * 从原「💾 保存地块」里抽出「把当前画布上的草稿存进地块库」这一段，
@@ -1206,6 +2380,11 @@
     var plot={ id:((opts&&opts.newId)||!currentMapPlotId)?('p'+Date.now()+Math.floor(Math.random()*1000)):currentMapPlotId, name:name, mu:mu, sqm:sqm,
       poly:xs.map(function(x,i){return {x:Math.round(x*100)/100,y:Math.round(ys[i]*100)/100};}),
       source:'map', ts:Date.now(), note:'' };
+    /* 调整已保存地块边界时保留地图绘制的总管，避免多边形重存静默清除总管数据。 */
+    /* A forced new record represents a different boundary and must not inherit
+       the selected plot's independent map route. Keep the route only when this
+       operation updates that same stable plot ID. */
+    if(previous&&!(opts&&opts.newId)&&previous.trunk)plot.trunk=JSON.parse(JSON.stringify(previous.trunk));
     // [map-enhance] 写入权威经纬度坐标，供卫星图实景叠加（旧字段 poly 保留不动，主程序画布照常消费）
     var rawLL=latlngs();
     if(rawLL && rawLL.length>=1){
@@ -1244,7 +2423,8 @@
   window.__ryClearDraft=clearDraft;    // 供契约测试直接驱动（不依赖 UI 点击）
 
   // 保存到地块库（与精准灌溉页共用 localStorage['runye_plot_library']），可累计多个地块
-  document.getElementById('btnSavePlot').onclick=function(){
+  var btnSavePlotEl=document.getElementById('btnSavePlot');  /* [v830] 按钮已移除；保存改由「完成」自动入库 */
+  if(btnSavePlotEl)btnSavePlotEl.onclick=function(){
     var plot=saveCurrentDraftToLibrary({silent:false});
     if(!plot) return;
     alert('已保存到地块库：'+plot.name+'（'+plot.mu+' 亩）\n可在精准灌溉页「地块库」设为当前。');
@@ -1341,7 +2521,53 @@
     if(partitionHandle)partitionHandle.refresh();
   }
 
-  window.RyMapHost={payload:buildPlotPayload,send:sendPlotToDesign,toDisplay:toDisplay,refresh:refreshPlotLibrary};
+  /* [v831] trunkState 给探针与并行模块读总管状态用 —— drawingTrunk 已删，别再想办法摸私有变量。
+     counts 里 main/others 的划分与 renderTrunkDraft 的配色一致。
+     [v832] project 把 GCJ-02 经纬度换成**相对 #map 的容器像素**：探针要精确把鼠标移到某个
+     顶点上（验证吸附），而 map 实例是 IIFE 私有的，没有这个出口就只能靠猜坐标。 */
+  function trunkState(){
+    var t=trunkSaved;
+    return {
+      mode: trunkMode,
+      plotId: currentMapPlotId?String(currentMapPlotId):null,
+      targetPlotId: trunkTargetPlotId?String(trunkTargetPlotId):null,
+      draftPoints: trunkPoints.length,
+      trunkCount: t&&Array.isArray(t.trunks)?t.trunks.length:0,
+      mainId: (function(){var S=window.RyTrunkSchema;if(!S||!t)return null;var m=S.pickMainTrunk(t);return m?m.id:null;})(),
+      schema: t?t.schema:null,
+      snapOn: snapOn,
+      /* [v833] 编辑态：探针要能判「选中的是哪条、手柄有几个」，
+         而这些数字全在 IIFE 私有变量里，没有出口就只能靠截图猜。 */
+      activeTrunkId: activeTrunkId===null?null:String(activeTrunkId),
+      vertexHandles: trunkEditLayers.length,
+      menuOpen: !!(trunkCtxMenu && !trunkCtxMenu.hidden),
+      clipboardEmpty: paramsClipboard===null,
+      trunkIds: t&&Array.isArray(t.trunks)?t.trunks.map(function(x){return String(x.id);}):[],
+      /* [v834] 撤销栈状态：探针要能判「栈里几步、游标在哪、能不能撤」，
+         这些数字全在模块私有闭包里，没有出口就只能靠"按一下看看反应"猜。 */
+      history: trunkHistory?trunkHistory.stats():null,
+      /* [v835] 三期遗留的三类捕捉是否真接上了：sign 是自校准选出的 y 方向，
+         三类计数为 0 且 extras=null 说明「这块地反算不可靠，按设计跳过」。 */
+      snapExtras: snapExtras?JSON.parse(JSON.stringify(snapExtras.stats)):null
+    };
+  }
+  function projectToContainer(lat,lng){
+    var cp=map.latLngToContainerPoint(displayLatLngOf(lat,lng));
+    return {x:cp.x,y:cp.y};
+  }
+  window.RyMapHost={payload:buildPlotPayload,send:sendPlotToDesign,sendDraft:onSendCurrentDraft,trunkState:trunkState,
+    project:projectToContainer,toDisplay:toDisplay,refresh:refreshPlotLibrary,
+    /* [v833] 编辑层出口：探针要能「按 id 进编辑、拿菜单项、算两点米距」。
+       菜单项走 RyTrunkEdit.buildMenuItems 的同一口径，避免探针自己复制一份文案
+       然后每次改文案都要同步两个地方。 */
+    editTrunk:enterTrunkEdit,exitTrunkEdit:exitTrunkEdit,
+    trunkMenuItems:function(state){var E=window.RyTrunkEdit;return E?E.buildMenuItems(state||{}):[];},
+    trunkDist:trunkDistM,
+    /* [v834] 撤销 / 重做：探针要能绕过键盘直接调（键盘路径由 D6 单独验）。 */
+    undoTrunk:undoTrunk,redoTrunk:redoTrunk,
+    /* [v835] 捕捉候选重算：探针要能验「换了地块归属之后三类是否真的被踢出去」，
+       否则只能靠"切地块再进绘制态"间接触发，测不出守卫本身。 */
+    refreshSnapTargets:refreshSnapTargets,snapStats:function(){var S=snapApi();return S?S.stats():null;}};
   var partitionHandle=window.RyMapPartition && RyMapPartition.attach(map);
   // [map-enhance] 导出：把当前画框 + 地块库全部带坐标地块打包成 GeoJSON / KML
   function collectPlotsForExport(){
@@ -1498,9 +2724,9 @@
     if(!snapshot.ok){box.textContent='地块库读取失败，未显示列表；请刷新后重试。';box.hidden=false;return;}
     arr.forEach(function(p){
       if(!p || !p.id) return;
-      var row=document.createElement('div'); row.className='place-item';
+      var row=document.createElement('div'); row.className='place-item'; row.setAttribute('data-plot-id',String(p.id));
       var go=document.createElement('button');
-      go.type='button'; go.className='place-go';
+      go.type='button'; go.className='place-go'; go.setAttribute('data-plot-id',String(p.id));
       // [v185/v189] 成组地块：前缀「🔗」并在名称后显示子地块数；归档中的子地块加「⊂」前缀
       // [v810 去图标] 普通地块不再加 📍 前缀（用户：左栏图标一律取消）；🔗/⊂ 是状态标记（成组/已归档）保留。
       var prefix = p.merged ? '🔗' : (p.mergedInto ? '⊂' : '');
@@ -1509,6 +2735,17 @@
       go.title = p.merged ? ('由 '+(p.subPlots||[]).length+' 个子地块成组（轮廓与块间空隙保留）：'+(p.subPlots||[]).map(function(s){return s.name||s.id;}).join('、'))
                           : (p.name||'');
       go.onclick=function(){
+        if(trunkMode==='draw'){tip('请先完成或取消当前总管绘制，再切换地块；草稿不会转存到其他地块。');return;}
+        /* [v834] 换地块必须清撤销栈：快照里没有地块归属，留着它撤销会把 A 块的状态
+           写到 B 块上（module 里 record 也会因 plotId 变化自愈，但这里显式清一次，
+           保证「切过去就撤不动」这个行为是确定的，而不是"等到下一次编辑才自愈"）。 */
+        if(trunkHistory && String(p.id)!==String(currentMapPlotId)) trunkHistory.clear();
+        currentMapPlotId=p.id;
+        /* [v831] 回填改走 schema 归一：v1 单段与 v2 多干线都能读，不再手写 schema===1。
+           这里只把已保存的线画出来（只读），不自动进入绘制态。 */
+        trunkSaved=loadSavedTrunkFor(p);
+        setTrunkMode('idle');
+        renderTrunkDraft();
         var ll=p.polyLatLng;
         if(ll && ll.length>=3){ try{ map.fitBounds(L.latLngBounds(displayRing(ll)),{padding:[40,40],maxZoom:17}); }catch(e){} }
         else if(p.center){ try{ map.setView(toDisplay(p.center),16); }catch(e){} }
@@ -1565,6 +2802,7 @@
     measuring=!measuring;
     this.classList.toggle('btn-on',measuring);
     if(measuring){
+      if(trunkMode!=='idle'){setTrunkMode('idle');}
       setAddMode(false);
       if(drawing) setDrawing(false);
       map.dragging.disable();
