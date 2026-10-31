@@ -65,6 +65,16 @@ for (const file of files) {
 console.log(`语法检查：${files.length} 个 JS/CJS/MJS 文件，失败 ${syntaxFailures} 个`);
 if (syntaxFailures) process.exit(1);
 
+// ESLint 静态检查（第二道：语法过关之后的字面/结构缺陷）。
+// 口径见 eslint.config.js 文件头：第一轮只开「一报就是真缺陷」的规则，首跑必须 0 错。
+// eslint 是 devDependency ⇒ 没跑过 npm install 的机器上跳过，不让发布闸因为缺依赖卡死。
+const eslintBin = path.join(root, 'node_modules', 'eslint', 'bin', 'eslint.js');
+if (fs.existsSync(eslintBin)) {
+  if (run('ESLint 静态检查', node, ['scripts/lint.cjs']) !== 0) process.exit(1);
+} else {
+  console.log('\n== ESLint 静态检查 ==\nnode_modules/eslint 未安装，跳过（在本机跑一次 npm install 即自动纳入）。');
+}
+
 if (run('静态契约', node, ['ci_check_static.cjs']) !== 0) process.exit(1);
 
 const listedTests = spawnSync('git', [

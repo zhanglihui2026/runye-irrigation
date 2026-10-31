@@ -4630,3 +4630,72 @@ git ls-files | grep -cE "^_probe_trunk_p"          # 应为 6
 ```
 
 ---
+
+### 26.74 ESLint 基线落地：275→285 个脚本首跑 0 错（2026-10-31）
+
+**背景**：代码审计的三条风险里，② 「无构建 = 无静态闸门」是真问题 —— 全站只有
+`scripts/check.cjs` 的 `node --check`（纯语法）和 `ci_check_static.cjs`（29 条自定义契约），
+**没有一条规则能发现「对象里写了重复键」「return 后面还有代码」这类字面缺陷**。
+
+**落地了四个文件**
+
+| 文件 | 职责 |
+|---|---|
+| `eslint.config.js` | flat config（eslint 9）。规则分级与「为什么关掉两条」全写在文件头 |
+| `eslint.globals.json` | 257 个 `window.*` 隐式全局白名单，**自动生成，勿手改** |
+| `scripts/gen-eslint-globals.cjs` | 从已跟踪脚本里抓 `window.X =` 重新生成白名单 |
+| `scripts/lint.cjs` | 闸门入口。用 `git ls-files --cached --others --exclude-standard` 取文件集 |
+
+**为什么不用 `eslint .`** —— 这条是本次最关键的技术判断
+
+根目录常年有 `_backup_*`（140+ 个）、`_probe_*.mjs`、`verify_*.cjs`。它们在 `.gitignore` 里，
+但 **eslint 不读 `.gitignore`**。第一次直接 `eslint .` 就报了 29 条，其中 20 条是
+`plugins/*/main.js` / `core/*.js` 的 ESM 解析错误、7 条是一个 `verify_*.cjs` 里
+**故意保留的 `${...}` 字面量**（它在断言浏览器模板里确实写着 `${nodeFitRows}`）。
+信噪比接近 0。
+
+⇒ 改用 git 枚举，口径与 `check.cjs` 的语法检查**完全一致**（已跟踪 + 未跟踪但未被忽略）。
+新写的文件不用 `git add` 就已在闸内；被忽略的临时产物永远进不来。
+
+**首跑结果：285 个脚本，0 error 0 warning**（含 53 个入库探针、48 个 mod 模块、14 个插件）
+
+**★ 两条被关掉的规则 —— 别再重新打开，除非先看这里**
+
+1. `no-cond-assign` —— 13 处 `if(el=document.getElementById('x')) el.textContent=…`，
+   全在 `mod/inline-09.js:2658-2691` 同一块，一个 `el` 变量反复复用，**是有意的紧凑赋值链**。
+   想重开：给那 13 处各加一层括号 `if((el=…))`（零行为变化），规则自带的 `except-parens`
+   就会放行。**没做**是因为 `inline-09.js` 在 CORE 名单里，改它必须抬 VERSION，
+   不该混进「建闸门」这一个提交。
+2. `no-func-assign` —— 2 处，**刻意的拦截器模式**：
+   `mod/plot-editor.js:2369` 注释原文「把局部 `ppRender` 换成一个转发器（函数声明可重新赋值）」；
+   `mod/inline-09.js:6065` `render = function(){ origRender(); initScrollReveal(); }`。
+   站点依赖「函数声明当可替换槽位」，规则天然认它是错的 ⇒ 永久关闭。
+
+**已知局限（写清楚，别当它不存在）**
+
+`no-undef` / `no-unused-vars` / `no-redeclare` 三条**关着**。全站是 IIFE + 隐式全局写法，
+不配白名单直接开会刷上千条假错。所以现在**拼错全局名抓不到**（`RyTilWs` vs `RyTlWs` 这类）。
+将来要开，前置条件是 globals 补齐 + 各文件 env 分准。
+
+**与发布闸的接线**
+
+`scripts/check.cjs` 里加了 ESLint 一步，位置在「语法检查」之后、「静态契约」之前。
+**未装 eslint 时优雅跳过**（`node_modules/eslint` 不存在就打印跳过说明），
+不让发布闸因为某台机器没跑 `npm install` 而卡死。
+
+`package.json` 只服务本地质量闸门（`lint` / `lint:fix` / `globals` / `check` / `test`），
+**不参与发布链路**。`node_modules/` 已补进 `.gitignore`（原本没忽略，19MB 一直挂在 `??` 里）。
+
+**复核命令**
+
+```bash
+npm run lint                                     # 285 个脚本，应为 0 问题
+node scripts/check.cjs | grep -A2 ESLint         # 闸门里应看到 ESLint 静态检查
+npx eslint mod/inline-09.js mod/plot-editor.js   # 两个巨头单独跑也应为空
+```
+
+**一条自检经验**：闸门建好那一刻必须**故意写坏一个文件**验证规则有牙 ——
+本次用 `{a:1,a:2}` / `return` 后死代码 / `x===x` / `[1,,3]` / `'${x}'` 五连测，
+5/5 全部命中，才敢相信「285 个文件 0 问题」是真的干净而不是规则没生效。
+
+---

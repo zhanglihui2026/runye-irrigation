@@ -1,0 +1,16 @@
+{
+  "name": "runye-irrigation",
+  "private": true,
+  "version": "0.0.0",
+  "description": "润野灌溉工具套件。纯静态多页站，无构建；本文件仅供本地静态质量闸门（lint / check / test），不参与发布链路。",
+  "scripts": {
+    "lint": "node scripts/lint.cjs",
+    "lint:fix": "node scripts/lint.cjs --fix",
+    "globals": "node scripts/gen-eslint-globals.cjs",
+    "check": "node scripts/check.cjs",
+    "test": "node --test tests/*.test.cjs"
+  },
+  "devDependencies": {
+    "eslint": "^9.39.0"
+  }
+}

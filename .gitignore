@@ -137,3 +137,7 @@ _mapside_*.json
 # 判据与清单见 _p1/_audit_root_probes.md；新增探针若被文档引用，记得 git add 而不是让它落到规则里。
 _probe_*.mjs
 _shot_*.mjs
+
+# Node 工具链（仅本地静态质量检查用，不参与发布链路）
+node_modules/
+npm-debug.log*
