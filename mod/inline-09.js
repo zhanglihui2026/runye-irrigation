@@ -2987,20 +2987,11 @@ function tlAutoGenerate(options) {
 
   // 预统计：每个分区的实际面积（裁剪到地块多边形）与名义标准区比较，判定"非标分区"
   var tlZoneCuts={xPos:xPos,yPos:yPos,xPlan:xPlan,yPlan:yPlan,frame:tlShare&&tlShare.frame||null,cutOffX:(tlZoneStepRef?tlZoneStepRef.x:null),cutOffY:(tlZoneStepRef?tlZoneStepRef.y:null)};
-  function tlFrameToWorld(frame,p){
-    if(!frame)return{x:p.x,y:p.y};
-    if(typeof frame.toWorld==='function')return frame.toWorld(p);
-    var c=frame.center||{x:0,y:0},o=frame.origin||{x:0,y:0},a=(Number(frame.angle)||0)*Math.PI/180,cs=Math.cos(a),sn=Math.sin(a);
-    var sx=Number(frame.scaleX)||1,sy=Number(frame.scaleY)||1,dx=p.x-c.x,dy=p.y-c.y;
-    return{x:o.x+(c.x+dx*cs-dy*sn)/sx,y:o.y+(c.y+dx*sn+dy*cs)/sy};
-  }
-  function tlFrameToGrid(frame,p){
-    if(!frame)return{x:p.x,y:p.y};
-    if(typeof frame.toGrid==='function')return frame.toGrid(p);
-    var c=frame.center||{x:0,y:0},o=frame.origin||{x:0,y:0},a=(Number(frame.angle)||0)*Math.PI/180,cs=Math.cos(a),sn=Math.sin(a);
-    var sx=Number(frame.scaleX)||1,sy=Number(frame.scaleY)||1,dx=(p.x-o.x)*sx-c.x,dy=(p.y-o.y)*sy-c.y;
-    return{x:c.x+dx*cs+dy*sn,y:c.y-dx*sn+dy*cs};
-  }
+  /* [v836] frame 换算收口到 core/coord-frame.js（纯函数 + tests/coord_frame.test.cjs）。
+     本地保留同名转发：tlGridWorld / tlGridPlotPoly / 各处 tlFrameToGrid 的调用点一行没动。
+     公式、单位口径与「frame 自带 toWorld 时优先委托」的规则一起搬进了那个文件头。 */
+  function tlFrameToWorld(frame,p){ return window.RyCoordFrame.frameToWorld(frame,p); }
+  function tlFrameToGrid(frame,p){ return window.RyCoordFrame.frameToGrid(frame,p); }
   function tlGridWorld(x,y){return tlFrameToWorld(tlZoneCuts.frame,{x:x,y:y});}
   var tlGridPlotPoly=(poly||[]).map(function(p){return tlFrameToGrid(tlZoneCuts.frame,p);});
   var tlGeoBounds=(function(){

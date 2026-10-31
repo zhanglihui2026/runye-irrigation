@@ -186,6 +186,8 @@ const scriptOrderRules = [
   ['terrain/terrain-core.js', 'terrain/terrain-ui.js'],
   ['mod/material-formulas.js', 'mod/material-table.js'],
   ['mod/material-table.js', 'mod/inline-09.js'],
+  /* [v836] frame 换算收口：inline-09 的同名函数只是转发，模块必须先在。 */
+  ['core/coord-frame.js', 'mod/inline-09.js'],
   ['mod/tl-polyline-geometry.js', 'mod/inline-09.js'],
   ['mod/plan-calc-render.js', 'mod/inline-09.js'],
   ['mod/inline-09.js', 'mod/tl-header-layout.js'],

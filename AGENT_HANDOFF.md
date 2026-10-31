@@ -4699,3 +4699,249 @@ npx eslint mod/inline-09.js mod/plot-editor.js   # 两个巨头单独跑也应�
 5/5 全部命中，才敢相信「285 个文件 0 问题」是真的干净而不是规则没生效。
 
 ---
+
+### 26.75 关键模块契约盘点 + 首个隔离切片：frame 坐标换算（v836 · 2026-10-31）
+
+**范围**：降低 `mod/inline-09.js`（6110 行）与 `mod/plot-editor.js`（5008 行）之间的隐式全局依赖风险。
+本轮**只做一个切片**，其余只出结论不落地。
+
+#### 一、契约盘点（有源码依据的部分）
+
+| 全局 | 所有者（写） | 读者 | 定性 |
+|---|---|---|---|
+| `window.tlDiagramData` | `inline-09.js:4634`（生成器，唯一常规写点）<br>`inline-12.js:260/819/949`（还原/清空）<br>`plot-editor.js:711`（回滚 preimage） | inline-09 内 54 处、inline-12、inline-27、plot-editor 19、tl-workspace、online-map | **单生产者 + 多读者**。plot-editor 只读来画叠加层，写只在回滚 |
+| `window.measuredPolygon` | inline-10:186 / 12:791,793 / 13:314,334 / 16:121,143,150,264 / 29:1114,1828 / **09:1782** 共 **12 处 / 6 个文件** | inline-09 13 处、inline-13 18、inline-12 16、plot-editor 9 | **无单一所有者**（谁拿到地块谁写），是当前最大的隐式耦合点。<br>⚠ 09:1782 是**防御性回填**（缺了就从 `ppGetPolyPts()` 重建）⇒ inline-09 对这个全局**不是纯读者**，上一版表把它漏了 |
+| `window.currentPlotId` | inline-10:190 / 12:763 / 13:4,123,182,250,324,414 / 16:107 共 **9 处 / 4 个文件** | inline-12 30、inline-13 11、inline-09 9 | 同上；inline-09 只读不写 |
+| `window.measuredArea` | inline-10:185 / 11:2（置 0）/ 12:790 / 13:313 / 16:105,262 共 **6 处 / 5 个文件** | inline-09 4、inline-11/13、plot-editor、ry-diag、插件 | 单位 **m²**，下游多处 `/666.67` 转亩 |
+| `window.runyeSaveProject` | `inline-12.js:522`（唯一实现） | inline-12 14、runye-undo 7、plot-editor 5、data-service 4、tl-workspace | 存档唯一入口，是「双向」接口（读全局状态 → 写存储） |
+
+**三个「看着能替代、其实不能」的模块**（本轮逐条核实）：
+
+- `hydraulic-calc/hc-core.js`：**纯公式库**（UMD，挂 `window.RyHcCore`，`index.html:38` 同步加载，
+  `tests/hc_core.test.cjs` 钉着与主页的逐值一致）。零 DOM、零状态。**它不是几何/坐标工具，别往里塞**。
+- `core/data-service.js`：**插件侧的工程快照/档案层**，`createDataService()` 工厂，只经
+  `core/bootstrap.js` → 插件上下文 `ctx.data` 暴露，**没有任何 HTML 直接加载它**。
+  它自己反过来依赖主页的 `window.runyeSaveProject` 与 `window.CloudSync` ⇒ 是「消费方」不是「访问层」。
+- `core/event-bus.js`：58 行，`on/off/emit`，只被 `bootstrap.js` import，服务于插件。主页面主流程**完全不经过它**。
+
+> 结论：这三者都不能用来替代主页面接口。主流程的真实耦合面是上表的 window 全局，
+> 而不是 core/ 里那套插件体系。
+
+#### 二、选中切片与理由
+
+**`tlFrameToWorld` / `tlFrameToGrid`（分区网格 ↔ 世界米）→ `core/coord-frame.js`**
+
+选它的四个理由（都可验证，不是"感觉合适"）：
+1. **已被复制 4 份**：inline-09 两份局部实现、`plot-editor.js` 的 `ppGridFrame()` 闭包一份、
+   `mod/trunk-geo.js:68` 一份（注释自承"与 tlFrameToWorld 逐字一致"）。
+2. 纯函数、零 DOM、零全局状态 ⇒ 边界可完整测试。
+3. 下游是分区网格 → 管路布局 → 材料量，**算错不是画歪而是整套量错**。
+4. 本站已有同类先例：`inline-09.js:27-105` 早就把 `polyAreaM2 / clipPolyToRect / zoneGx` 等
+   委托给 `window.RyZoneGeometry`。本次是同一套收口方式，不是新范式。
+
+**没做的**（明确留给后续，理由见「剩余风险」）：
+`plot-editor.js` 里 `ppGridFrame()` 的闭包版、`mod/trunk-geo.js` 的副本、`measuredPolygon` / `currentPlotId`
+的写点收敛。一次性全改会变成大规模重构，本轮不做。
+
+#### 三、改动文件
+
+| 文件 | 改动 |
+|---|---|
+| `core/coord-frame.js` | **新增**。`RyCoordFrame.frameToWorld / frameToGrid`，逐字保留原数学 |
+| `tests/coord_frame.test.cjs` | **新增**。46 项：正常/边界/无效输入/回调委托/往返/单位/防倒退 + ⑥trunk-geo 漂移锁 + ⑦ppGridFrame 闭包等价 |
+| `tests/global_contracts.test.cjs` | **新增**。9 项：上面那张契约表的**写入面**门禁（见下） |
+| `tests/version_sync.test.cjs` | **新增**。6 项：发布版本号「同抬」+ CORE 名单卫生 |
+| `scripts/check.cjs` | 单测枚举后**打印「未入库测试」清单**（只提示、不改退出码）。见下 |
+| `mod/inline-09.js` | 两个函数改成转发（调用点一行没动） |
+| `index.html` | 新增 script（core 区，先于 inline-09）；`style-01.css?v=836-coord-frame` |
+| `sw.js` | `VERSION='v836-coord-frame'`；CORE 增 `core/coord-frame.js` |
+| `ci_check_static.cjs` | `scriptOrderRules` 增 `['core/coord-frame.js','mod/inline-09.js']` |
+| `_probe_coord_frame.cjs` | **新增**（浏览器回归探针，零依赖 CDP） |
+| `_probe_coord_equiv.cjs` | **新增**（行为等价性证明：新旧实现 + 四跑噪声底线） |
+
+#### 四、验证
+
+- 基线（改动前）：`check.cjs` PASS=29/FAIL=0，单测 **44** 文件通过，WASM 2500 项通过。
+- 改动后：`check.cjs` PASS=29/FAIL=0，单测 **47** 个文件 / **321** 项通过（+coord_frame、+global_contracts、+version_sync），WASM、地块拼接均通过。
+- 单测 **46/46**（含第⑥节 trunk-geo 漂移锁 12 项、第⑦节 ppGridFrame 闭包等价 5 项）。**抽取前**先跑一遍：27 项数值断言全绿 ⇒ 模块输出与原实现逐值一致，
+  只有「防倒退」两条红（那时 inline-09 还没接线）。这就是"先证明现状再迁移"的证据。
+- 浏览器回归 `_probe_coord_frame.cjs` **PASS 9/9**：`RyCoordFrame` 在位、0° 与 30° 各生成一次、
+  25/38 个管线阀门点全部落在地块包围盒内、真实 frame 往返误差 1e-14、零脚本异常、
+  且 30° 点集与 0° **不同**（证明旋转真的传到世界坐标，不是恒等）。
+
+**★ 契约面门禁（`tests/global_contracts.test.cjs`，PASS 9/9）**
+
+上面那张表原先只有人读。这个文件把它变成会响的断言，钉的是**写入文件集合**（不是行号、不是处数：
+
+行号随任何编辑漂、处数随合理重构变，而「又有一个新文件开始写这个全局」才是真正的破坏信号）：
+
+- 5 个全局各一条：写入文件集合必须等于基线，失败信息直接点名「新增写者 / 消失写者」并给出实测处数。
+- **架构约束**：`core/` 与 `plugins/` 不许写这五个全局 ⇒ 把「core 是插件侧访问层、plugins 只消费」从注释变成闸门。
+- **存档唯一性**：`window.runyeSaveProject` 全站只许 1 个赋值点，且必须在 `mod/inline-12.js`。
+  多一份实现 = 两份快照格式，而 restore 只认其中一份（静默丢档）。
+- **扫描器自检**：`===` / `==` 不算写入。第一版盘点就是被这个坑到 —— `typeof window.runyeSaveProject === 'function'`
+  让 `plugins/ai-plan/main.js:126` 和 `tl-workspace.js:3467` 被误报成"两个额外实现"。
+- **有牙验证**：临时在 `mod/` 放一个 `window.measuredPolygon = []` 的新文件，闸门 `not ok 2` 并点名
+  `新增写者：mod/zz_teeth_tmp.js`；删除后恢复绿。（临时文件已删。）
+
+⚠ 一个必须记住的坑：`check.cjs` 用 `git ls-files --cached --others --exclude-standard` 枚举测试，
+而 `tests/*` 在 `.gitignore` 里 ⇒ **没 `git add -f` 的测试文件根本不会进闸门**，本地 `node --test tests/*.test.cjs`
+却是绿的（glob 不看 git）。加了新测试一定要 `git add -f`，再跑一次 `check.cjs` 核对文件数 +1。
+
+这个坑**已经攒了 9 次**：2026-10-31 实测磁盘上 56 个 `tests/*.test.cjs`，闸门只跑 47 个，差的 9 个
+（`ai_member_register` / `case-library` / `drawing-design-group-adapter` / `entitle_pending_nav` /
+`pipe_path_loss` / `plugin-control` / `runye-irrigation-design` / `runye_hydraulics_core` / `tape_axis`）
+单独跑 **27 项全绿**——也就是说它们都是有效测试，却从未拦过任何回归。
+本切片**没有替人把这 9 个文件入库**（那是对别人未提交工作的所有权判断），而是在 `scripts/check.cjs`
+里加了一段**只打印、不影响退出码**的提示：每次跑闸门都把「因未入库而不会执行」的测试列出来。
+入库命令：`git add -f tests/xxx.test.cjs`，入库后自动纳入闸门。
+
+**★ 顺带补齐的发布纪律闸门（`tests/version_sync.test.cjs`，PASS 6/6）**
+
+本轮抬版本号时发现：「`sw.js VERSION` 去 `v` 必须等于页面 `style-01.css?v=`」这条纪律
+**只靠人记着，没有任何脚本守**——而 v632 正是栽在这里（SW 抬了、CSS 查询串没抬 ⇒ 老用户命中
+旧缓存，界面看起来"没生效"，于是一路查 SW 和构建）。现在钉住三件：
+
+- 每个生产页面的 `style-01.css?v=` 必须逐字等于 `VERSION` 去 `v`；不一致时直接打印
+  `页面：sw=… 页面写的是 …`。
+- **反向自检**：拿合成 HTML 喂审计函数，版本不一致必须报红 —— 否则"真仓库全绿"只说明今天没坏，
+  不说明坏了会响。另外单列一条「至少有一个页面真的引用了这个样式表」，防止比对集合为空导致恒绿。
+- `CORE` 名单条目不许带 `?v=`：install 按原样 `addAll`（带查询串）、fetch 按 `key()`（抹掉查询串）查
+  ⇒ 存查不同 key，**离线必 miss**，且只在断网时才炸。名单里现在一条都没有。
+- 磁盘接线也实测过：临时把 `index.html` 的 `?v=` 改成 `999-broken` → `not ok 2` 并点名；
+  复原后 `git diff index.html` 为空、测试回到 6/6。
+
+**★ 行为等价性证明（`_probe_coord_equiv.cjs`，PASS 7/7）**
+
+回答的问题：「换实现之后，分区 / 管路 / 材料 / 存档有没有哪怕一位数字变了？」
+
+判据设计经过一次推翻重做，值得留档：
+
+- ~~朴素做法「A 生成一次、B 生成一次，比结果」~~ → **不能用**。`tlAutoGenerate` 尾部会走规范绘图模型提交
+  （`ryCommitSingleLevel3CanonicalFromRuntime`），连续/换角度重生成会被「规范绘图模型拒绝三级生成结果」拒掉，
+  **且与坐标换算无关**：把 HEAD 的旧实现注入回去照样红。实测序列 `0°,30°` 必红、`0°,0°,30°` 时好时坏 ⇒
+  是站点既有竞态。拿它当判据只会得到一个随机红的探针。
+- 改成 **E1 逐点比对**：同一页面内 `git show HEAD:mod/inline-09.js` 切出旧实现原文（**不手打**）与
+  `core/coord-frame.js` 现实现，在管线**真实产生的 frame**（0°/30°/12.5°+缩放2/负 origin/null/带闭包回调）
+  上比 101 个点。→ **最大差 0，逐位相同**；E3 计数桩证明旧实现真被执行（N1=0/N2=0/N3=0/**O1=1478**）。
+- **四跑结构**：N1/N2/N3 = 现实现连跑三次求噪声底线，O1 = 旧实现接管。原因见下。
+
+**噪声底线的实测结果（这条是本节最该记住的）**：
+
+```
+pp.zoom   N1=6.298666666666667  N2=1  N3=6.298666666666667  O1=6.298666666666667
+```
+
+同一份实现连跑三次就有一次 `pp.zoom=1`（其余 6.2986…），而**旧实现那次 O1 反而是 6.2986**
+⇒ `pp.zoom` 的跳变**属于同实现重跑抖动**（`ppFitView()` 与材料价回填谁先跑完的竞态），
+与本次切片无关。若只跑两跑（前一版做法），就会把 N2 这个异类当成"切片引入的差异"，做出错误结论。
+
+因此正式比对 N2 vs O1 时，用 N1/N2/N3 实测出的**不稳定集**做字段级豁免，并要求差异**全部**落在集内：
+
+- 不稳定集 = `pp{pp.zoom}` / `saved{inputValues.optPriceF/M/B, pipePlan.zoom, tlAux.nodes, canonicalDrawingDesign.revision}`。
+  —— 这个集合本身是**证据**，不是放宽：它由三次同实现重跑算出，且逐字段打印。
+- **E4**（不参与判定的底线）：同实现三跑之间 `tlDiagramData` **0 处**差异、材料表**完全一致**
+  ⇒ 这两项可以硬断言，不需要任何豁免。
+- **E2a** `tlDiagramData` 逐字段：**0 处**。
+- **E2b** `ppGetState`：抖动域内 1 处（`pp.zoom`），**域外 0 处**。
+- **E2c** 材料表：总价 ¥23,045 / 10 行，**完全一致**。
+- **E2d** `runyeSaveProject` 快照：`saveOk` 两边 true，抖动域内 6 处，**域外 0 处**。
+
+⇒ 结论：**材料量与存档结构在换实现后逐值未变**；唯一变化的是本来就不稳定的 `pp.zoom`/`optPrice*` 回填时序，
+且其异类样本出现在**同实现**那一跑。上一版文档里「本轮没做材料量数值对照」的缺口，至此补齐。
+
+**★ 独立可回滚验证（干净 HEAD 工作树实测，2026-10-31）**
+
+「这个切片能单独回滚」这句话之前只是声称。实测做法：`git worktree add --detach HEAD` 开一个干净树，
+只把 `git diff --cached` 的补丁 `apply --index` 进去（并 `git add -f` 那几个被 `.gitignore` 拦住的测试），
+再跑 `check.cjs`。结果：**PASS=29 / 47 个测试文件**，与主工作树一致 ⇒ 本切片不依赖那 9 个并行未提交改动。
+
+**但查出一件事，提交前必须知道：**
+
+- 干净 HEAD 上 `tests/plot_merge.smoke.cjs` 的 **③-i「回传入口（v191）」本来就是红的**
+  （`btnCopy 入口应仍在` 断言失败）。用**不带本切片**的纯 HEAD 工作树复跑，同样红 ⇒ **与本次改动无关**。
+- 原因：v830 已把面板里那个「回传地块绘制」按钮删掉、逻辑提成 `onSendCurrentDraft` 并导出
+  `__rySendCurrentDraft` / `RyMapHost.sendDraft`，**但那条测试没跟着改**；改它的补丁现在还在工作区未提交。
+- ⇒ **不要只提交本切片的 11 个文件**：那样新提交上的 `check.cjs` 会是红的（红的不是本切片，是 HEAD 自带的债）。
+  要么把 `tests/plot_merge.smoke.cjs` 的那份改动一起提交，要么等它先落地。
+
+**★ 三个坑（都是本轮实测踩出来的，写下来免得下次重踩）**
+
+1. **手抄公式就是把 `c.y` 写成 `c.x`**。我第一版黄金值生成器手打了函数体，结果
+   `world.y` 整体偏 65 m —— 恰好等于 `(c.x-c.y)/1000`。**凡是要"复刻现状"的地方，一律从源码切片取值，
+   不许手打**。（生成器已删，做法写进测试文件头。）
+2. **headless Edge 默认 800×600 ⇒ 站点判定为手机 ⇒ 跳 `runye-mobile-map-preview.html#second`**，
+   在那个页面上所有主程序全局都不存在，表现为"RyCoordFrame 没加载"的**假红**。
+   探针必须先 `Emulation.setDeviceMetricsOverride({width:1600,height:1000})`，并且**校验
+   `location.href` 真的落在 index.html**（本机 Edge 还会复用已有会话页，实测拿到过别的 target）。
+3. **`check.cjs` ⑩ 会拦"页面引用了但文件没进 git"**。新增被 index.html 引用的脚本，
+   必须 `git add` 之后闸门才绿 —— 这不是误报，它防的正是"上线后 404"。
+
+**★ 本轮验证面矩阵（哪些是 CI 覆盖的，哪些只在本机）**
+
+`check.cjs` 报 PASS=29 很容易被误读成"全覆盖"。实际上**两个最重要的证据都只在本机**：
+
+| 验证 | 覆盖方式 | 依赖 | 红了会怎样 |
+|---|---|---|---|
+| 语法 / 静态契约 / 单测 47 文件 / WASM 2500 / 地块拼接 | **CI**（`.github/workflows/ci.yml` 直接跑 `node scripts/check.cjs`，同一入口） | 无 | 推送即红 |
+| 面板漂移（`panel`） | 本机 `node scripts/gate.cjs --filter=panel`（0.1s，纯静态，**CI 未接入**） | 无 | 要人手跑 |
+| `_probe_coord_frame.cjs`（RyCoordFrame 在位、0°/30° 生成、25 个阀门点落界、往返 1e-14） | **仅本机** | 本机 Edge + CDP | 无人自动发现 |
+| `_probe_coord_equiv.cjs`（E1 逐点逐位相等、四跑噪声底线、材料/存档一致） | **仅本机** | 本机 Edge + CDP | 无人自动发现 |
+| `_probe_*` 之外的 e2e（n02/n03/pump/nav） | 仓库 `gate.cjs` 的 playwright 阶段 | playwright + Edge | 本轮没跑（见下） |
+
+- **为什么 CI 不跑探针**：`ci.yml` 文件头已写明"需要本机 Edge + CDP 的项一律不进 CI，假红比没有更坏"。
+  所以这两个探针的价值取决于**有人记得在本机跑**——它们已入库（`_probe_coord_*.cjs`），但不是自动哨兵。
+- **playwright 那四个阶段本轮没跑**：本机 `npm i playwright` 一直 502（registry 不通），
+  探针改用本机 Edge + 原生 CDP。`n02/n03/pump/nav` 因此**没有本轮证据**，这是明确的缺口，不是"应该没事"。
+- 仓库对"双副本"已有登记惯例（`scripts/panel-drift-baseline.json` 里 4 条 + `check_panel_drift.cjs`），
+  本切片的两把漂移锁沿用的是同一套思路：**不强行合并，先把"必须一致"变成会响的断言**。
+
+#### 五、剩余风险 / 后续建议
+
+- `mod/plot-editor.js` 的 `ppGridFrame()` 仍是闭包版自算；`mod/trunk-geo.js:68` 仍是副本。
+  **不建议下一轮直接改**：trunk-geo 已在 5 个读取方的链路上，把它的内部实现换成
+  委托会引入新的加载顺序依赖。等 coord-frame 在线上跑稳一版再说。
+
+  **但本轮给它加了漂移锁**（`tests/coord_frame.test.cjs` 第⑥节）：40 点 × 9 种 frame，
+  要求 `RyTrunkGeo.frameToWorld` 与 `RyCoordFrame.frameToWorld` **逐位相同**（strict 相等，
+  不是 1e-9 容差）。附两条前提断言：
+  - trunk-geo 只有 `frameToWorld` 一个方向；长出 `frameToGrid` 就红（说明有人在加第二套语义）。
+  - `tlDiagramData.zones.frame` 必须仍按 `{angle,center,origin,scaleX,scaleY}` **白名单重建**，
+    不许按引用透传、不许带 `toWorld/toGrid`。这是「副本可以合法地不委托回调」的唯一前提 ——
+    一旦生产者把活 frame 直接递下来，副本会静默分叉。
+  - 漂移锁**已验证有牙**：把副本里 `dx*sn + dy*cs` 的符号改掉，160/160 点全部分叉，
+    `y` 偏 170.08 m ≈ 地块南北跨度（就是"吸附点整块颠倒"那个故障形态）。临时脚本跑完即删。
+
+- **第 3 份副本（`plot-editor.js:195 ppGridFrame`）也已锁住**（第⑦节 5 项），但它和 trunk-geo 那份性质不同：
+  它返回的是**活 frame**（自带 `toWorld/toGrid` 闭包），coord-frame 见到这种 frame 会直接委托。
+  于是整条链路依赖一条**从没被验证过的假设**：
+  > 把 frame 的闭包剥掉、只留 `{angle,center,origin,scaleX,scaleY}`，下游用 coord-frame 自算，
+  > 结果必须一位数字都不差。
+  `inline-09:4631` 正是这么剥的。剥了之后数字若变了，画布上看到的点与总管捕捉用的点就不是同一个点，
+  且**不会有任何报错**。第⑦节把这条假设变成断言：40 点 × 4 个角度（0/30/12.5/−47°），
+  `f.toWorld(p)` 与 `CF.frameToWorld(thinned,p)` 逐位相等；顺带钉死口径
+  （`center` 在图纸系 mm、`origin` 在世界系 m、`scaleX/scaleY = 图纸mm ÷ 地块m`）。
+  - 取证方式**不改 plot-editor.js**（它有别人的未提交改动）：按大括号配平切出 `ppGridFrame` 函数体，
+    用「一调用就抛」的桩替掉 `ppGetBounds/ppGetPlanDims/ppZoneAngle`。桩没被触发 ⇒ 证明测试把四个入参
+    传齐了，不是靠内部兜底碰巧算对。
+  - **有牙验证**：把切片里 `gx=c.x+x*cs-y*sn` 的符号改掉 → 120/160 点分叉。
+    没分叉的正是 0° 那 40 点（`sin0=0` 让符号错误隐身）—— 这就是"只在 0° 上验等于没验"的实证。
+- `measuredPolygon` / `currentPlotId` 仍是多写点无主状态 —— 这是比坐标换算更大的风险，
+  但收敛它必然要动 5 个 inline 模块，属于"重写"而非"切片"，需要单独排期。
+- 材料量 / 存档的数值对照已由 `_probe_coord_equiv.cjs` 补齐（见上）。**但 `pp.zoom`、`optPriceF/M/B`、
+  `tlAux.nodes`、`canonicalDrawingDesign.revision` 这 6 个字段本身在同实现重跑时就会抖**，
+  这是站点既有的回填时序问题，本轮**只登记不修**：它会让任何"两次生成结果 diff"式的验收都不可靠，
+  下次做等价性证明必须先跑噪声底线，否则一定会误判。
+
+#### 六、AOCI 状态
+
+**本会话 AOCI 工具不可用**：`aoci_rules` / `aoci_overview` / `aoci_maintain` 未注册（`.mcp.json` 为
+`{"mcpServers":{}}`，`.aoci/hooks` 为空目录，`~/.aoci` 不存在）。按 AGENTS.md「证据不足时用
+`aoci_report` 登记待办，不猜写」——该工具同样不可用，故**没有手写 `aoci.code.txt` 任何条目**
+（手写会违反"Entry 语义必须来自真实证据 + 机器签发的 Plan"）。
+
+⇒ 需要下一次有 AOCI 工具时补做 Maintain：新对象 `core/coord-frame.js`、
+`tests/coord_frame.test.cjs`、变更对象 `mod/inline-09.js` / `index.html` / `sw.js` / `ci_check_static.cjs`。
+`.aoci/baseline.json` 与 `aoci.code.txt` 的现有 `M` 状态**是别的会话的未提交改动，本轮没碰**。
+
+---

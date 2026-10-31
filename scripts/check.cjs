@@ -89,6 +89,25 @@ if (!tests.length) {
   console.error('没有找到可运行的 tests/*.test.cjs，拒绝以空测试集通过。');
   process.exit(1);
 }
+
+/* 盲区提示（只打印，不影响退出码）：
+   `git ls-files --exclude-standard` 会漏掉 `.gitignore` 里的 tests/*，而本仓库的惯例是
+   "新增测试要 git add -f"。忘了加就会得到一个**永远不会被执行**的测试文件 ——
+   本地 `node --test tests/*.test.cjs` 照样绿（glob 不看 git），于是没人发现它没进闸门。
+   2026-10-31 实测：磁盘 56 个、闸门只跑 47 个，差的 9 个全绿但从未拦过任何回归。
+   把它们打印出来，让"看着有测试、其实没跑"这件事每次运行都可见。 */
+const testsDir = path.join(root, 'tests');
+const testsOnDisk = fs.existsSync(testsDir)
+  ? fs.readdirSync(testsDir).filter((f) => f.endsWith('.test.cjs')).sort()
+  : [];
+const enumeratedTests = new Set(tests.map((p) => path.basename(p)));
+const notEnumeratedTests = testsOnDisk.filter((f) => !enumeratedTests.has(f));
+if (notEnumeratedTests.length) {
+  console.log(`\n⚠ 有 ${notEnumeratedTests.length} 个测试文件因未入库而不会被执行（.gitignore 的 tests/* + --exclude-standard）：`);
+  for (const f of notEnumeratedTests) console.log(`    tests/${f}`);
+  console.log('    ⇒ 要让它们真正拦住回归：git add -f <文件>；入库后自动纳入本闸门。');
+}
+
 if (run(`Node 单测（${tests.length} 个文件）`, node, ['--test', ...tests], { summary: true }) !== 0) process.exit(1);
 
 if (run('水力计算核心与 WASM 等价验证', node, ['hydraulic-calc/native/verify.cjs']) !== 0) process.exit(1);

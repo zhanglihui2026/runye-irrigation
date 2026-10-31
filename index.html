@@ -16,13 +16,17 @@
      为什么要有这个模块：plot.trunk 有 5 个读取方，v1→v2 的迁移只允许一个入口，理由见文件头注释。 -->
 <script src="core/trunk-schema.js?v=831-trunk-schema-v2"></script>
 <script src="core/storage-guard.js?v=823-fix-transfer-save-alert"></script>
+<!-- [v836] 分区网格 frame ↔ 世界米的坐标换算。纯函数、零 DOM。
+     必须先于 mod/inline-09.js（它的 tlFrameToWorld/tlFrameToGrid 是转发），
+     顺序契约登记在 ci_check_static.cjs 的 scriptOrderRules 里。 -->
+<script src="core/coord-frame.js?v=836-coord-frame"></script>
 <script src="runye-material-audit.js?v=607-branch-material-span"></script>
 <script src="runye-map-partition.js?v=690-narrow-partition-bridge"></script>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>润野灌溉设计优化版｜滴灌管径与水泵选型</title>
 <meta name="description" content="输入地块、滴灌带与水源参数，快速计算灌溉分区、主管支管管径和水泵工作点。"/>
-<link rel="stylesheet" href="mod/style-01.css?v=835-trunk-geo-snap">
+<link rel="stylesheet" href="mod/style-01.css?v=836-coord-frame">
 <link rel="stylesheet" href="runye-inverse-design.css?v=277">
 <script defer src="runye-inverse-design.js?v=438-branch-flow-conservation"></script>
 <link rel="stylesheet" href="runye-terrain.css?v=454-terrain-sidebar-peer">
