@@ -661,6 +661,8 @@
     if(trunkPoints.length){
       trunkLine=L.polyline(trunkPoints.map(toDisplay),{color:'#7c3aed',weight:5,opacity:.95,dashArray:trunkMode==='draw'?'8,5':null,interactive:false}).addTo(measureGroup);
     }
+    /* [v838] 水源/三通标记画在线的上面：它是"这条线的用途"，比线本身更需要被看见。 */
+    renderTrunkNodes();
   }
   /* ===== [v833] 唯一写库口 =====
      commitTrunkDraft / 拖拐点 / 打断 / 合并 / 删除 / 粘贴参数 —— 全部走 commitTrunks。
@@ -774,6 +776,9 @@
 
     var res=commitTrunks(function(next,ctx){
       var S=ctx.schema;
+      /* [v838] 显示用管线编号：默认 ZG-001 / ZG-002…递增（规格五①）。
+         只在"新建"时补，重画同一条时 params 里已经带着原编号，不动它。 */
+      if(!params.code) params.code=S.makeCode(next);
       var entry={
         id: draftId || S.makeId(next),
         main: draftId ? false : !next.trunks.length,
@@ -850,6 +855,7 @@
     syncTrunkUI();
     updateTrunkHint();
     updateStatusbar();
+    syncTrunkPanel();
   }
   function syncTrunkUI(){
     var btn=document.getElementById('btnDrawTrunk');
@@ -1058,9 +1064,12 @@
   function updateStatusbar(){
     if(!mapSectionVisible()) return;
     var S=window.RyTrunkSchema;
-    var main=(S&&trunkSaved)?S.pickMainTrunk(trunkSaved):null;
+    /* [v838] 编辑态选中了某条线，状态栏就该显示**那一条**（编号/投影/高差/流速），
+       否则用户在面板里改 ZG-003，状态栏却还念着主干的数字，两个控件互相拆台。 */
+    var shown=(trunkMode==='edit'&&activeTrunkId)?findSavedTrunk(activeTrunkId):null;
+    var main=shown||((S&&trunkSaved)?S.pickMainTrunk(trunkSaved):null);
 
-    setField('msbTrunk', main?String(main.id):'—');
+    setField('msbTrunk', main?((main.params&&main.params.code)||String(main.id)):'—');
 
     /* 几何来源优先级：绘制中的草稿 > 拖动中的预览 > 库里的主干 */
     var pts=(trunkMode==='draw'&&trunkPoints.length)?trunkPoints
@@ -1204,6 +1213,7 @@
     renderTrunkEditHandles();
     updateStatusbar();
     syncTrunkUI();
+    syncTrunkPanel();
   }
 
   /* 拐点手柄：白底蓝边小圆（.ry-trunk-vtx）。拖拽用 Leaflet marker 自带的 draggable，
@@ -1284,6 +1294,251 @@
     });
   }
 
+  /* ══════════════════════════════════════════════════════════════════════
+     [v838] 节点标记（水源进水口 / 分水三通）+ 右侧属性面板（四期）
+     ──────────────────────────────────────────────────────────────────────
+     分工：计算与面板渲染全在 mod/trunk-panel.js（纯函数 + DOM，Node 单测锁着）；
+     本段只负责三件事——喂数据、把面板改的字段走 commitTrunks 写回、把标记画到地图上。
+     ★ 水源进水口**全方案唯一**：写 source 时必须主动清掉其它干线上的 source。
+       不主动清也能"用"，但 normalize 会在读取时按顺序丢弃多余的 source ⇒
+       用户会看到"我标的水源自己跑了"，而且换一次读取顺序就是另一个结果。
+     ★ 标记不画在 measureGroup 里：那个组在测距/清除时会被整体清空，标记会跟着消失。
+     ══════════════════════════════════════════════════════════════════════ */
+  var trunkNodeLayers=[];
+  var NODE_STYLE={
+    source:{radius:8,color:'#1d4ed8',weight:2,fillColor:'#2563eb',fillOpacity:1},
+    tee:{radius:5,color:'#9a3412',weight:1.5,fillColor:'#f97316',fillOpacity:1}
+  };
+  var NODE_LABEL={plain:'普通拐点',source:'水源进水口',tee:'分水三通节点'};
+  var V_LABEL={low:'偏低',good:'经济',warn:'偏高',bad:'超标'};
+
+  function renderTrunkNodes(){
+    trunkNodeLayers.forEach(function(l){ if(l&&map.hasLayer(l)) map.removeLayer(l); });
+    trunkNodeLayers=[];
+    var S=window.RyTrunkSchema;
+    if(!S||!trunkSaved||!Array.isArray(trunkSaved.trunks)) return 0;
+    var n=0;
+    trunkSaved.trunks.forEach(function(entry){
+      var nt=entry&&entry.params&&entry.params.nodeTypes;
+      if(!nt||typeof nt!=='object') return;
+      var raw=Array.isArray(entry.points)?entry.points:[];
+      Object.keys(nt).forEach(function(k){
+        var st=NODE_STYLE[nt[k]]; if(!st) return;
+        var rd=S.readPoint(raw[Number(k)]);
+        if(!rd) return;
+        /* interactive:false —— 标记是纯装饰，吃掉点击就没法在它上面继续加点/选线。 */
+        var mk=L.circleMarker(displayLatLngOf(rd.lat,rd.lng),{
+          radius:st.radius,color:st.color,weight:st.weight,
+          fillColor:st.fillColor,fillOpacity:st.fillOpacity,
+          interactive:false,className:'ry-trunk-node'
+        }).addTo(map);
+        trunkNodeLayers.push(mk); n++;
+      });
+    });
+    return n;
+  }
+
+  /* 面板实例延迟创建：地图页首次加载时 .map-wrap 可能还没插入（ensureSharedHost 会搬 DOM），
+     所以不在启动阶段建，等第一次要显示时再建。 */
+  var trunkPanel=null;
+  /* 「用户点过 × 的那条线」的 id：只压住**同一条线**，换一条线照常弹。
+     这样既不会关了又自己回来，也不会让用户以为"这个面板坏了打不开"。 */
+  var trunkPanelMutedId=null;
+
+  function trunkPanelApi(){ return window.RyTrunkPanel||null; }
+
+  function ensureTrunkPanel(){
+    if(trunkPanel) return trunkPanel;
+    var P=trunkPanelApi();
+    if(!P) return null;
+    var host=document.querySelector('#onlineMapSection .map-wrap')||document.querySelector('.map-wrap');
+    if(!host) return null;
+    trunkPanel=P.mount({
+      container:host,
+      getEntry:function(id){ return findSavedTrunk(id); },
+      onPatch:function(id,patch){ patchTrunkParams(id,patch); },
+      onRecheck:function(id){ recheckTrunk(id); },
+      onMarkNode:function(id){ openNodeDialog(id,activeVertexIdx); },
+      onClose:function(){ trunkPanelMutedId=trunkPanel?trunkPanel.currentId():null; }
+    });
+    return trunkPanel;
+  }
+
+  /* 面板显隐：只在编辑态、且真的选中了一条线时才弹（规格五「选中即弹、无选中隐藏」）。
+     用户点过 × 之后不再自动弹 —— 否则每改一次参数它都自己回来，等于关不掉。 */
+  function syncTrunkPanel(){
+    var P=ensureTrunkPanel();
+    if(!P) return;
+    var entry=(trunkMode==='edit')?findSavedTrunk(activeTrunkId):null;
+    if(!entry){ P.hide(); return; }
+    if(trunkPanelMutedId!==null && String(entry.id)===trunkPanelMutedId){ P.hide(); return; }
+    trunkPanelMutedId=null;
+    P.show(entry);
+  }
+
+  /* 面板改字段的唯一写回口。**走 applyTrunkEdit → commitTrunks**：
+     这样 revision 冲突、校验、撤销栈记账全都照常发生，面板不需要知道任何存储细节。 */
+  function patchTrunkParams(id,patch,tipText){
+    if(!id) return {ok:false,error:'no_id'};
+    var S=window.RyTrunkSchema;
+    if(!S) return {ok:false,error:'no_schema'};
+    var res=applyTrunkEdit(function(nx){
+      var target=null;
+      for(var i=0;i<nx.trunks.length;i++){
+        if(String(nx.trunks[i].id)===String(id)){ target=nx.trunks[i]; break; }
+      }
+      if(!target) return {ok:false,error:'找不到干线 '+id};
+      var p=S.normalizeParams(target.params);
+      Object.keys(patch).forEach(function(k){ p[k]=patch[k]; });
+      /* 再归一一次：管径可能是字符串、nodeTypes 下标可能越界（改完后点数变了）。 */
+      p=S.normalizeParams(p);
+      if(p.nodeTypes){
+        var nt=S.normalizeNodeTypes(p.nodeTypes,(target.points||[]).length);
+        if(nt) p.nodeTypes=nt; else delete p.nodeTypes;
+      }
+      target.params=p;
+      return {ok:true,trunk:nx};
+    },{silent:true,tipText:tipText||null});
+    if(trunkPanel) trunkPanel.refresh();
+    return res;
+  }
+
+  /* 【重新复核水力】：按当前参数重算本条干线并回话。
+     ★ 现在只算**本条线**（海曾-威廉沿程 + 弯头/三通局部）。规格五要求的
+       「总管 + 下游所有分区管网整套复核」还缺地图页的 AI 管网图层，
+       那部分不是这里补得出来的（见 AGENT_HANDOFF §26.77 未完成项）。 */
+  function recheckTrunk(id){
+    var entry=findSavedTrunk(id);
+    if(!entry){ tip('先选中一条干线，再复核水力。'); return false; }
+    var P=trunkPanelApi();
+    if(!P){ tip('属性面板模块未加载，请刷新页面后重试。'); return false; }
+    var d=P.compute(entry);
+    var code=(entry.params&&entry.params.code)||String(entry.id);
+    if(d.v==null){
+      tip('无法复核 '+code+'：请先在右侧面板填写管径与设计流量。');
+      return false;
+    }
+    var msg='已复核 '+code+'：流速 '+P.fmtV(d.v)+'（'+(V_LABEL[d.vLevel]||'—')+'），沿程 '+P.fmtM(d.hf)+'，局部 '+P.fmtM(d.hj);
+    if(d.vLevel==='warn'||d.vLevel==='bad') msg+='。建议加大管径或降低设计流量。';
+    else msg+='。';
+    tip(msg);
+    return true;
+  }
+
+  /* 【标记该节点为水源 / 分水三通】—— 单选窗。用 DOM 拼而不是 innerHTML：
+     拐点名称是用户输入，拼字符串就必须转义，漏一次就是 XSS 面。 */
+  function openNodeDialog(id,idx){
+    var entry=findSavedTrunk(id);
+    if(!entry){ tip('先选中一条干线，再标记拐点。'); return false; }
+    var raw=Array.isArray(entry.points)?entry.points:[];
+    if(!(idx>=0&&idx<raw.length)) idx=(activeVertexIdx>=0&&activeVertexIdx<raw.length)?activeVertexIdx:0;
+    var prm=entry.params||{};
+    var nt=(prm.nodeTypes&&typeof prm.nodeTypes==='object')?prm.nodeTypes:{};
+    var cur=nt[String(idx)]||'plain';
+    var labels=(prm.labels&&typeof prm.labels==='object')?prm.labels:{};
+    var curLabel=labels[String(idx)]||'';
+    var P=trunkPanelApi();
+    var types=(P&&P.NODE_TYPES)?P.NODE_TYPES:[
+      {key:'plain',label:'普通拐点'},{key:'source',label:'水源进水口'},{key:'tee',label:'分水三通节点'}
+    ];
+
+    var old=document.getElementById('ryNodeDialog');
+    if(old&&old.parentNode) old.parentNode.removeChild(old);
+
+    var mask=document.createElement('div');
+    mask.id='ryNodeDialog'; mask.className='ry-node-mask';
+
+    var box=document.createElement('div'); box.className='ry-node-box';
+    var head=document.createElement('div'); head.className='ry-node-head';
+    head.textContent='标记拐点（第 '+(idx+1)+' 个）';
+    box.appendChild(head);
+
+    var list=document.createElement('div'); list.className='ry-node-list';
+    var picked=cur;
+    types.forEach(function(t){
+      var row=document.createElement('label'); row.className='ry-node-item';
+      var r=document.createElement('input');
+      r.type='radio'; r.name='ryNodeKind'; r.value=t.key; r.checked=(t.key===cur);
+      r.onchange=function(){ picked=t.key; };
+      var sp=document.createElement('span'); sp.textContent=t.label;
+      row.appendChild(r); row.appendChild(sp); list.appendChild(row);
+    });
+    box.appendChild(list);
+
+    var nameRow=document.createElement('div'); nameRow.className='ry-node-name';
+    var inp=document.createElement('input');
+    inp.type='text'; inp.maxLength=12; inp.value=curLabel;
+    inp.placeholder='拐点名称（可留空）';
+    inp.setAttribute('aria-label','拐点名称');
+    nameRow.appendChild(inp); box.appendChild(nameRow);
+
+    var foot=document.createElement('div'); foot.className='ry-node-foot';
+    var cancel=document.createElement('button'); cancel.type='button'; cancel.className='ry-node-btn';
+    cancel.textContent='取消';
+    var ok=document.createElement('button'); ok.type='button'; ok.className='ry-node-btn is-primary';
+    ok.textContent='确定';
+    foot.appendChild(cancel); foot.appendChild(ok); box.appendChild(foot);
+
+    function close(){ if(mask.parentNode) mask.parentNode.removeChild(mask); }
+    cancel.onclick=close;
+    ok.onclick=function(){
+      var res=applyNodeMark(id,idx,picked,inp.value);
+      close();
+      if(res&&res.ok) return;
+      tip((res&&res.error)||'标记未保存。');
+    };
+    mask.addEventListener('click',function(ev){ if(ev.target===mask) close(); });
+
+    mask.appendChild(box);
+    document.body.appendChild(mask);
+    return true;
+  }
+
+  function applyNodeMark(id,idx,kind,label){
+    var S=window.RyTrunkSchema;
+    if(!S) return {ok:false,error:'总管数据模块未加载。'};
+    return applyTrunkEdit(function(nx){
+      var target=null;
+      for(var i=0;i<nx.trunks.length;i++){
+        if(String(nx.trunks[i].id)===String(id)){ target=nx.trunks[i]; break; }
+      }
+      if(!target) return {ok:false,error:'找不到干线 '+id};
+      /* 水源全方案唯一：先把其它干线的 source 全部摘掉（同一份 nx 里改，一次写库）。
+         ★ normalizeParams 是**浅拷贝**：p2.nodeTypes 与 t.params.nodeTypes 是同一个对象，
+           所以要么事后无条件把 p2 写回 t.params，要么只改不改回 —— 后者会留下一个
+           空对象 {}（视觉无感，但库里多一条脏数据，而且 normalize 每次读都要清理一遍）。 */
+      if(kind==='source'){
+        nx.trunks.forEach(function(t){
+          if(t===target) return;
+          var p2=S.normalizeParams(t.params);
+          if(!p2.nodeTypes||typeof p2.nodeTypes!=='object') return;
+          var dirty=false;
+          Object.keys(p2.nodeTypes).forEach(function(k){
+            if(p2.nodeTypes[k]==='source'){ delete p2.nodeTypes[k]; dirty=true; }
+          });
+          if(!dirty) return;
+          if(!Object.keys(p2.nodeTypes).length) delete p2.nodeTypes;
+          t.params=p2;
+        });
+      }
+      var p=S.normalizeParams(target.params);
+      var m=(p.nodeTypes&&typeof p.nodeTypes==='object')?JSON.parse(JSON.stringify(p.nodeTypes)):{};
+      if(kind==='plain') delete m[String(idx)];
+      else m[String(idx)]=kind;
+      var nm=S.normalizeNodeTypes(m,(target.points||[]).length);
+      if(nm) p.nodeTypes=nm; else delete p.nodeTypes;
+
+      /* 拐点名称是 v833 就有的能力，标记窗口顺带保留它（同一个拐点上的两条信息）。 */
+      var txt=String(label==null?'':label).trim().slice(0,12);
+      var lb=(p.labels&&typeof p.labels==='object')?p.labels:{};
+      if(txt) lb[String(idx)]=txt; else delete lb[String(idx)];
+      if(Object.keys(lb).length) p.labels=lb; else delete p.labels;
+
+      target.params=p;
+      return {ok:true,trunk:nx};
+    },{tipText:'第 '+(idx+1)+' 个拐点已标记为'+(NODE_LABEL[kind]||kind)+'。'});
+  }
+
   /* 所有编辑动作的唯一出口：写库 → 复核 activeTrunkId 是否还存在 → 重画。
      失败也要重画：拖拽期间线是被乐观改过的，不重画就和库里不一致了。
      注意这里**不再补 tip** —— 提示由 commitTrunks 或调用方负责，两层都提示会弹两遍。 */
@@ -1301,6 +1556,9 @@
     renderTrunkEditHandles();
     updateStatusbar();
     syncTrunkUI();
+    /* 编辑生效后让面板重画只读量：库里的值可能和用户刚敲的不同（校验会把字符串转数/清成 null）。 */
+    if(trunkPanel) trunkPanel.refresh();
+    syncTrunkPanel();
     if(trunkMode==='draw') refreshSnapTargets();
     return res;
   }
@@ -1533,23 +1791,11 @@
     }
 
     if(key==='markVertex'){
+      /* [v838] 原来是「prompt 给拐点起个名字」，规格四要的是**节点类型单选**
+         （普通拐点 / 水源进水口 / 分水三通节点）。弹窗顺带保留了命名输入，
+         所以旧数据里的 params.labels 不会因为这次改版变得改不回去。 */
       if(idx<0){ tip('先右键点在某一个拐点上，再选「标记当前拐点」。'); return; }
-      var cur=(entry.params&&entry.params.labels&&entry.params.labels[String(idx)])||'';
-      var text=prompt('给干线 '+id+' 的第 '+(idx+1)+' 个拐点起个名字（≤12 字，留空 = 清除标记）',cur);
-      if(text===null) return;
-      text=String(text).trim().slice(0,12);
-      applyTrunkEdit(function(nx){
-        for(var i=0;i<nx.trunks.length;i++){
-          if(String(nx.trunks[i].id)!==String(id)) continue;
-          var prm=S.normalizeParams(nx.trunks[i].params);
-          var lb=prm.labels&&typeof prm.labels==='object'?prm.labels:{};
-          if(text) lb[String(idx)]=text; else delete lb[String(idx)];
-          if(Object.keys(lb).length) prm.labels=lb; else delete prm.labels;
-          nx.trunks[i].params=prm;
-          return {ok:true,trunk:nx};
-        }
-        return {ok:false,error:'找不到干线 '+id};
-      },{tipText:text?('已标记第 '+(idx+1)+' 个拐点为「'+text+'」。'):'已清除该拐点的标记。'});
+      openNodeDialog(id,idx);
       return;
     }
   }
@@ -2561,6 +2807,8 @@
        菜单项走 RyTrunkEdit.buildMenuItems 的同一口径，避免探针自己复制一份文案
        然后每次改文案都要同步两个地方。 */
     editTrunk:enterTrunkEdit,exitTrunkEdit:exitTrunkEdit,
+    /* [v838] 选中指定干线（探针要能验"换一条线面板跟着换"）。 */
+    selectTrunk:selectTrunk,
     trunkMenuItems:function(state){var E=window.RyTrunkEdit;return E?E.buildMenuItems(state||{}):[];},
     trunkDist:trunkDistM,
     /* [v834] 撤销 / 重做：探针要能绕过键盘直接调（键盘路径由 D6 单独验）。 */

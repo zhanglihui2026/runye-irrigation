@@ -5112,3 +5112,95 @@ pp.zoom   N1=6.298666666666667  N2=1  N3=6.298666666666667  O1=6.298666666666667
   `runye-hydraulics-page.js`、`tl-workspace/tl-workspace.js`、`shared-canvas-browser.cjs` 等），
   **本次不得 `git add -A`**。注意 `mod/plot-editor.js` 的 diff 里含着 v830 那份并行改动，
   本版是在它基础上改的（撤掉了其中的 `ppClipSegToPoly`），提交前需与对方确认归属。
+
+## 26.77 总管四期：右侧属性面板 + 节点标记（v838 · 2026-10-31）
+
+> 规格书九节审计后的**第一批**。用户「按照你的建议逐步推进」⇒ 先补「参数与校核」层的入口件：
+> 没有面板，`params.dn/designFlow` 在界面上根本无处可填，底部状态栏的「流速」永远是「—」，
+> 后面的告警/水力复核/材料清单都缺输入。节点类型（水源/三通）与它同批次做，因为
+> 局部损失要数三通、DXF 要按类型分层、水源唯一性要跨线约束——三者都读这一份数据。
+
+### 一、新增 `mod/trunk-panel.js`（约 330 行，纯计算 + DOM）
+
+- `compute(entry)` **纯函数**：输入一条干线，输出 11 个派生量（projM / slopeM / z0 / z1 / dz /
+  dn / flow / v / vLevel / hf / hj / hfTotal）。不读 DOM、不读 `window` 状态、**不改入参**。
+- 沿程损失 = 海曾-威廉 `hf = 10.67·L·Q^1.852/(C^1.852·D^4.8704)`，C 随管材：
+  PE 140 / PVC-U 145 / 镀锌钢管 120（`MATERIALS[].hwC` 是**唯一**实现点，别在别处再写一份）。
+- 局部损失 = `(0.5·弯头 + 1.5·三通 + 0.5·进口)·v²/2g`；弯头数 = 拐点数 − 2，三通数来自
+  `params.nodeTypes`，进口损失只在 0 号点是 `source` 时计。
+- 流速分档：`<0.8 low(黄) / ≤2.0 good(绿) / ≤3.0 warn(黄) / >3.0 bad(红)`。**只上色，不阻断**（规格一⑧）。
+- `mount({container,getEntry,onPatch,onRecheck,onMarkNode,onClose})` 只负责画 DOM 与发意图，
+  **不碰存储**：写库一律由宿主 `onPatch` → `commitTrunks` 完成。
+
+### 二、`core/trunk-schema.js` 增量（契约扩展，向后兼容）
+
+| 新增 | 作用 | 关键约束 |
+|---|---|---|
+| `normalizeCode(v)` | 管线编号规范化 | trim + 压空白 + 截断 24 字；**非字符串给空串** |
+| `normalizeNodeTypes(raw,count)` | 拐点类型归一 | 只认 `source`/`tee`；`plain` 不落库；越界下标丢弃；单线内多 `source` 只留键序第一个 |
+| `makeCode(trunk)` | 生成 `ZG-001…` | 补空位、避让已占用，与 `makeId`（T1/T2）**分开** |
+| `normalize()` 尾部 | 跨干线去重水源 | 全方案只留第一个 `source`，顺序按 trunks ⇒ 结果确定 |
+
+- `id` 仍是引用键（`activeTrunkId` / `labels` 下标都挂在它上面），**编号只写 `params.code`**，
+  改编号不会打断任何引用（探针 E3 锁着）。
+- `params` 的核心约定不变：**保留对方给的全部字段**，只规范化 `code`（它是显示字符串）。
+
+### 三、`mod/online-map.js` 增量
+
+- `renderTrunkNodes()`：`L.circleMarker` 画水源（r8 蓝实心）/ 三通（r5 橙实心），`interactive:false`；
+  在 `renderTrunkDraft()` 末尾调用。**不放进 `measureGroup`**（那组在测距/清除时会被整体清空）。
+- `ensureTrunkPanel()` **延迟创建**：`.map-wrap` 会被 `ensureSharedHost` 搬动，启动阶段建可能建进游离树。
+- `patchTrunkParams(id,patch)`：面板改字段的唯一写回口，走 `applyTrunkEdit → commitTrunks`
+  （revision 冲突/校验/撤销记账照常发生，面板不需要知道存储细节）。
+- `openNodeDialog(id,idx)`：右键「标记当前拐点」与面板底部按钮共用。**用 DOM 拼不用 innerHTML**
+  （拐点名称是用户输入）。顺带保留 v833 的命名能力，旧 `params.labels` 不会变得改不回去。
+- `applyNodeMark()`：写 `nodeTypes`；`kind==='source'` 时先把**其它**干线上的 `source` 摘掉。
+- 底部状态栏：`msbTrunk` 改显示 `params.code || id`；编辑态显示**当前选中那条**（原来恒显示主干，
+  用户在面板改 ZG-003 时状态栏却念主干，两个控件互相拆台）。
+- `commitTrunkDraft()`：新建时补 `params.code = S.makeCode(next)`。
+
+### 四、四个踩过的坑（都已在代码注释里留了口径）
+
+1. **`normalizeParams` 是浅拷贝**：`p2.nodeTypes` 与 `t.params.nodeTypes` 是**同一个对象**。
+   清完水源若"只在还有别的标记时回写 `t.params`"，库里会留下 `nodeTypes:{}` 空壳
+   （探针 G5 实测到）。⇒ 现在无条件回写。
+2. **水源唯一必须写入期就清**：只在读取期（`normalize`）去重也能"用"，但用户会看到
+   「我标的水源自己跑了」，且换一次读取顺序就是另一个结果。两处都要做。
+3. **一位小数看不见的差**：4 m 高差摊在 211 m 上只多 0.04 m，斜长与投影**显示串完全相同**。
+   断言必须比 `compute()` 的数值，比显示串会假红（探针 F2 第一版就这么红过）。
+4. **面板「关闭记忆」要按线 id 压住**：按布尔值记会导致"改一次管径又自己弹回来"；
+   完全不记又变成"关了就打不开"。现在的口径：× 只压住**当时那条线**，换线照常弹。
+
+### 五、测试与探针
+
+- `tests/trunk_panel.test.cjs`（12 项）：缺高程 ⇒ 斜长/高差必须 null、高差上坡正下坡负、
+  缺 dn/flow ⇒ 水力区全 null、流速公式与分档边界、三档管材 C 值排序、弯头/三通计数、
+  `compute` 不改入参、带/不带 schema 两条读取路径一致、haversine 对称性与量级。
+- `tests/trunk_node_types.test.cjs`（10 项）：plain 不落库、越界下标丢弃、单线多 source、
+  跨线唯一、`code` 不影响 `id`、`makeCode` 补空位、未知参数仍透传、v1 升级不凭空造标记。
+- `_probe_trunk_p7_panel.mjs`（**41 项全绿**）：面板显隐/标题/12 行字段、只读量与状态栏同源、
+  改管径/流量/编号后「库 + 面板 + 状态栏」三处一致、revision 递增、有高程线的斜长与高差、
+  节点弹窗 3 项文案、水源唯一（G4~G6）、同点改标不新增圆点（G7）、两条线各留标记（G8）、
+  复核水力有结论、× 关掉不弹回/换线弹回（I1~I3）、**Ctrl+Z 能退回面板改动**（K1~K2）、
+  全程无 `pageerror`。
+
+### 六、本切片**没做**（下一批，按用户确认的顺序）
+
+1. 黄色非阻断告警弹窗 + 「不再对该总管提醒」单根屏蔽（依赖本批的 dn/flow ✅ 已具备）。
+2. DXF `ZG_总管层` + 过滤捕捉白点（`runye-dxf.js` 现在只有 PLOT/ZONE/PIPE_*）。
+3. 「重新复核水力」的**联合**部分：现在只算本条线；规格要「总管 + 下游所有分区管网整套复核」，
+   前提是地图页先有 AI 管网图层（当前 `tlDiagramData` 只被拿去反算捕捉点，**不渲染**）。
+4. 地图页叠加 AI 分区管网（只读）+ 图层顺序/线宽规范（总管现在是深灰 `#475569`，
+   规格要「粗深蓝」）。
+5. 分区管路页移除手绘总管入口 `#grTrunkDraw`（`inline-29.js:1247` 仍绑着，两套总管并存）。
+6. 众包案例库打包（`众包` 全站零命中）。
+
+### 七、发布状态（v838）
+
+- 版本三处同抬：`sw.js VERSION='v838-trunk-panel'`、`index.html` 的 `style-01.css?v=838-trunk-panel`、
+  `core/trunk-schema.js` / `mod/online-map.css` / `mod/online-map.js` / 新增 `mod/trunk-panel.js` 的 `?v=` 一并抬；
+  `mod/trunk-panel.js` 已进 SW `CORE` 名单（裸路径，不带 `?v=`）。
+- 闸门：`scripts/check.cjs` **全部通过**、`node --test tests/*.test.cjs` **353/353**、
+  `check_publish_refs.cjs` **PASS**、`scripts/lint.cjs` 无告警。
+- ⚠ 探针需要 playwright：`PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm i --no-save playwright`，
+  跑完**删掉 `node_modules`**（`node_modules` 不在 `.gitignore` 里）。

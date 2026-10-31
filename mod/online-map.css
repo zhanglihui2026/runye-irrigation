@@ -121,3 +121,95 @@ body:has(.ry-pwa-install) #onlineMapSection .map-statusbar{padding-right:180px}
   white-space:nowrap}
 .trunk-ctx-menu .tcm-item:hover:not(:disabled){background:#eff6ff;color:#1d4ed8}
 .trunk-ctx-menu .tcm-item:disabled{color:#cbd5e1;cursor:default;background:transparent}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   [v838] 总管右侧属性面板 + 节点标记弹窗（四期）
+   ───────────────────────────────────────────────────────────────────────────
+   定位：吸右下（bottom:30px 让开 24px 的状态栏），**不吸右上** —— 右上 96px 处是
+   「分区角度」浮面板（.ry-angle-panel，z 1150），两个都吸顶会叠在一起。
+   首访未安装 PWA 时右下有 .ry-pwa-install（body 级 fixed，z 2000）⇒ 面板整体上抬，
+   不跟它抢层级（抬高 z-index 只会让安装条被盖住、用户点不到安装）。
+   ★ 不写 border-radius:<数值>：全站 body *{border-radius:0!important} 会压掉它。
+   ═══════════════════════════════════════════════════════════════════════════ */
+#onlineMapSection .ry-trunk-panel{
+  position:absolute;right:12px;bottom:30px;z-index:1170;
+  width:226px;max-height:calc(100% - 140px);overflow-y:auto;
+  background:#fff;border:1px solid #cbd5e1;
+  box-shadow:0 4px 16px rgba(15,23,42,.18);
+  font-size:11px;line-height:1.4;color:#334155}
+#onlineMapSection .ry-trunk-panel[hidden]{display:none!important}
+body:has(.ry-pwa-install) #onlineMapSection .ry-trunk-panel{bottom:96px}
+#onlineMapSection .ry-trunk-panel .tp-head{
+  display:flex;align-items:center;gap:6px;
+  padding:5px 8px;background:#f1f5f9;border-bottom:1px solid #e2e8f0}
+#onlineMapSection .ry-trunk-panel .tp-title{
+  flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:12px!important;font-weight:700;color:#1e293b}
+#onlineMapSection .ry-trunk-panel .tp-close{
+  flex:none;width:18px;height:18px;padding:0;border:0;background:transparent;
+  color:#64748b;font-family:inherit;font-size:14px!important;line-height:1;cursor:pointer}
+#onlineMapSection .ry-trunk-panel .tp-close:hover{color:#0f172a}
+#onlineMapSection .ry-trunk-panel .tp-body{padding:6px 8px;display:flex;flex-direction:column;gap:2px}
+#onlineMapSection .ry-trunk-panel .tp-row{display:flex;align-items:center;gap:6px;min-height:22px}
+#onlineMapSection .ry-trunk-panel .tp-row[hidden]{display:none!important}
+#onlineMapSection .ry-trunk-panel .tp-k{flex:0 0 74px;color:#64748b}
+#onlineMapSection .ry-trunk-panel .tp-v{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:3px}
+#onlineMapSection .ry-trunk-panel .tp-ro{
+  justify-content:flex-end;text-align:right;
+  font-weight:700;color:#1e293b;font-variant-numeric:tabular-nums;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+#onlineMapSection .ry-trunk-panel .tp-input,
+#onlineMapSection .ry-trunk-panel .tp-sel{
+  width:100%;min-width:0;height:22px;padding:0 4px;
+  border:1px solid #cbd5e1;background:#fff;color:#1e293b;
+  font-family:inherit;font-size:11px!important}
+#onlineMapSection .ry-trunk-panel .tp-input:focus,
+#onlineMapSection .ry-trunk-panel .tp-sel:focus{outline:1px solid #38bdf8}
+#onlineMapSection .ry-trunk-panel .tp-v em{flex:none;font-style:normal;color:#94a3b8;font-size:10px!important}
+#onlineMapSection .ry-trunk-panel .tp-sep{height:1px;background:#e2e8f0;margin:4px 0}
+#onlineMapSection .ry-trunk-panel .tp-foot{
+  display:flex;flex-direction:column;gap:4px;
+  padding:6px 8px;border-top:1px solid #e2e8f0;background:#f8fafc}
+#onlineMapSection .ry-trunk-panel .tp-btn{
+  height:24px;padding:0 6px;border:1px solid #cbd5e1;background:#fff;color:#334155;
+  font-family:inherit;font-size:11px!important;font-weight:600;cursor:pointer}
+#onlineMapSection .ry-trunk-panel .tp-btn:hover{border-color:#38bdf8;color:#0369a1;background:#f0f9ff}
+/* 流速分色：绿=经济、黄=偏低/偏高、红=超标。**纯提示，不阻断任何操作**。 */
+#onlineMapSection .ry-trunk-panel .tp-v-good{color:#15803d}
+#onlineMapSection .ry-trunk-panel .tp-v-low{color:#b45309}
+#onlineMapSection .ry-trunk-panel .tp-v-warn{color:#b45309}
+#onlineMapSection .ry-trunk-panel .tp-v-bad{color:#b91c1c}
+
+/* 节点标记弹窗：z-index 2400 —— 必须高过右键菜单(2200)与安装条(2000)，
+   它是模态的，被任何东西盖住都会表现为"点了没反应"。 */
+.ry-node-mask{
+  position:fixed;inset:0;z-index:2400;display:flex;align-items:center;justify-content:center;
+  background:rgba(15,23,42,.34)}
+.ry-node-box{
+  width:250px;background:#fff;border:1px solid #cbd5e1;
+  box-shadow:0 10px 30px rgba(15,23,42,.3);
+  font-family:-apple-system,"PingFang SC","Microsoft YaHei",Segoe UI,sans-serif;
+  font-size:12px;color:#1f2937}
+.ry-node-head{
+  padding:7px 10px;background:#f1f5f9;border-bottom:1px solid #e2e8f0;
+  font-size:12px!important;font-weight:700;color:#1e293b}
+.ry-node-list{display:flex;flex-direction:column;gap:2px;padding:8px 10px 4px}
+.ry-node-item{
+  display:flex;align-items:center;gap:7px;padding:5px 6px;
+  cursor:pointer;font-size:12px!important}
+.ry-node-item:hover{background:#f0f9ff}
+.ry-node-item input{margin:0;flex:none}
+.ry-node-name{padding:2px 10px 8px}
+.ry-node-name input{
+  width:100%;height:26px;padding:0 6px;border:1px solid #cbd5e1;background:#fff;color:#1e293b;
+  font-family:inherit;font-size:12px!important}
+.ry-node-name input:focus{outline:1px solid #38bdf8}
+.ry-node-foot{
+  display:flex;gap:6px;justify-content:flex-end;
+  padding:8px 10px;border-top:1px solid #e2e8f0;background:#f8fafc}
+.ry-node-btn{
+  min-width:58px;height:26px;padding:0 10px;border:1px solid #cbd5e1;background:#fff;color:#334155;
+  font-family:inherit;font-size:12px!important;font-weight:600;cursor:pointer}
+.ry-node-btn:hover{border-color:#38bdf8;color:#0369a1;background:#f0f9ff}
+.ry-node-btn.is-primary{background:#2563eb;border-color:#2563eb;color:#fff}
+.ry-node-btn.is-primary:hover{background:#1d4ed8;border-color:#1d4ed8;color:#fff}

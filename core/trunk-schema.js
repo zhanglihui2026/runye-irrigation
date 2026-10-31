@@ -64,8 +64,41 @@
     return true;
   }
 
+  /* 管线编号（显示用，如 "ZG-001"）：只做 trim + 长度截断，**不做格式校验**。
+     它是给人看的标签，宽容一点没有坏处；id 才是引用键，改 id 会打断
+     activeTrunkId / params.labels 的下标语义，所以编号绝不参与 id。 */
+  var CODE_MAX = 24;
+  function normalizeCode(v) {
+    if (typeof v !== 'string' && typeof v !== 'number') return '';
+    return String(v).replace(/\s+/g, ' ').trim().slice(0, CODE_MAX);
+  }
+
+  /* 整条线内最多一个水源进水口：多出来的降级丢弃（不做「留第一个」以外的补救，
+     因为「哪个才算」没有正确答案，让用户自己再标一次比猜更安全）。 */
+  var NODE_KIND = { source: true, tee: true };
+  function normalizeNodeTypes(raw, count) {
+    if (!raw || typeof raw !== 'object') return null;
+    var keys = Object.keys(raw), out = {}, hasSource = false;
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      if (!/^(0|[1-9]\d*)$/.test(k)) continue;
+      var idx = Number(k);
+      if (!isFinite(idx)) continue;
+      if (count != null && (idx < 0 || idx >= count)) continue;
+      var t = raw[k];
+      if (!NODE_KIND[t]) continue;
+      if (t === 'source') {
+        if (hasSource) continue;
+        hasSource = true;
+      }
+      out[String(idx)] = t;
+    }
+    return Object.keys(out).length ? out : null;
+  }
+
   /* 参数归一：保留调用方给的全部字段（未来可能加 label/埋深），只补最小默认值。
-     不要在这里做白名单裁剪 —— 会静默吃掉别人刚加的参数。 */
+     不要在这里做白名单裁剪 —— 会静默吃掉别人刚加的参数。
+     例外：code 会被规范化（trim/截断），因为它是**显示字符串**，不是数据。 */
   function normalizeParams(p) {
     var out = {};
     if (p && typeof p === 'object') {
@@ -74,6 +107,7 @@
     if (typeof out.material !== 'string' || !out.material) out.material = 'PE';
     if (!own(out, 'dn')) out.dn = null;
     if (!own(out, 'designFlow')) out.designFlow = null;
+    if (own(out, 'code')) out.code = normalizeCode(out.code);
     return out;
   }
 
@@ -83,11 +117,20 @@
     var id = entry.id == null ? '' : String(entry.id).trim();
     if (!id) id = fallbackId;
     if (!id) return null;
+    var pts = Array.isArray(entry.points) ? entry.points.slice() : [];
+    var params = normalizeParams(entry.params);
+    /* nodeTypes 的下标必须落在点数范围内 —— 打断/删点之后旧下标会越界，
+       越界的标记不能留（它指的那个拐点已经不存在了）。 */
+    if (own(params, 'nodeTypes')) {
+      var nt = normalizeNodeTypes(params.nodeTypes, pts.length);
+      if (nt) params.nodeTypes = nt;
+      else delete params.nodeTypes;
+    }
     return {
       id: id,
       main: entry.main === true || (entry.main === undefined && fallbackMain === true),
-      points: Array.isArray(entry.points) ? entry.points.slice() : [],
-      params: normalizeParams(entry.params)
+      points: pts,
+      params: params
     };
   }
 
@@ -120,6 +163,20 @@
       for (var m = 0; m < out.trunks.length; m++) {
         if (out.trunks[m].main && !seenMain) { seenMain = true; continue; }
         out.trunks[m].main = false;
+      }
+      /* 水源进水口**全方案唯一**（规格四）：跨干线也只留第一个。
+         顺序按 trunks 顺序走 ⇒ 结果确定，不会每次读出来"水源换了个人"。 */
+      var seenSource = false;
+      for (var s = 0; s < out.trunks.length; s++) {
+        var prm = out.trunks[s].params;
+        if (!prm || !prm.nodeTypes) continue;
+        var nt = prm.nodeTypes, dirty = false;
+        for (var k in nt) {
+          if (!own(nt, k) || nt[k] !== 'source') continue;
+          if (seenSource) { delete nt[k]; dirty = true; }
+          else seenSource = true;
+        }
+        if (dirty && !Object.keys(nt).length) delete prm.nodeTypes;
       }
       return out;
     }
@@ -187,6 +244,29 @@
     return 'T' + (MAX_TRUNKS + 1);
   }
 
+  /* 显示用管线编号：ZG-001 / ZG-002…（规格五①）。
+     与 makeId 分开是有意的 —— id 是引用键（不能被用户改），编号是标签（用户可以改）。 */
+  function pad3(n) {
+    var s = String(n);
+    while (s.length < 3) s = '0' + s;
+    return s;
+  }
+  function makeCode(trunk) {
+    var t = trunk && trunk.schema === VERSION ? trunk : normalize(trunk);
+    var used = Object.create(null);
+    if (t && Array.isArray(t.trunks)) {
+      for (var i = 0; i < t.trunks.length; i++) {
+        var c = t.trunks[i].params && t.trunks[i].params.code;
+        if (c) used[String(c)] = true;
+      }
+    }
+    for (var n = 1; n <= MAX_TRUNKS; n++) {
+      var code = 'ZG-' + pad3(n);
+      if (!used[code]) return code;
+    }
+    return 'ZG-' + pad3(MAX_TRUNKS + 1);
+  }
+
   function validate(trunk) {
     var errors = [];
     if (!trunk || typeof trunk !== 'object') return { ok: false, errors: ['trunk 不是对象'] };
@@ -251,11 +331,14 @@
     pointsOk: pointsOk,
     normalize: normalize,
     normalizeParams: normalizeParams,
+    normalizeCode: normalizeCode,
+    normalizeNodeTypes: normalizeNodeTypes,
     pickMainTrunk: pickMainTrunk,
     mainPoints: mainPoints,
     hasUsableTrunk: hasUsableTrunk,
     toV1: toV1,
     makeId: makeId,
+    makeCode: makeCode,
     validate: validate,
     migratePlot: migratePlot,
     appendTrunk: appendTrunk
