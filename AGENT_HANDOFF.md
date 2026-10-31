@@ -4768,6 +4768,18 @@ npx eslint mod/inline-09.js mod/plot-editor.js   # 两个巨头单独跑也应�
 - 浏览器回归 `_probe_coord_frame.cjs` **PASS 9/9**：`RyCoordFrame` 在位、0° 与 30° 各生成一次、
   25/38 个管线阀门点全部落在地块包围盒内、真实 frame 往返误差 1e-14、零脚本异常、
   且 30° 点集与 0° **不同**（证明旋转真的传到世界坐标，不是恒等）。
+  > **⚠ 这条结论后来被推翻一半（2026-10-31 发布日实测）**：那次 9/9 是在**页面还没解析完**
+  > （`document.readyState==='loading'`）时就驱动生成的，图面尚未完全初始化，所以"全在界内"
+  > 是「驱动太早」换来的。把就绪判据补成 `readyState==='complete'` 之后：
+  > - **本地 file://** 反而在 0° 就崩：`ReferenceError: esc is not defined`
+  >   （`inline-09.js:4967`——那是 `catch` 分支自己崩了，掩盖真错因「规范绘图模型拒绝三级生成结果」，
+  >   站点既有竞态：`0°,30°` 必红、`0°,0°,30°` 时好时坏）；
+  > - **线上 Pages** 正常生成，但 30° 有 **23/54 点越出地块包围盒**。
+  > 这 23 点**不是本切片造成的**：本切片只把两个函数的函数体换成转发，而 `_probe_coord_equiv.cjs`
+  > 的 E1 已在**真实 30° frame** 上逐位比对过新旧实现（101 点 × 6 帧，最大差 0）。
+  > 它对应的是「已知未修：分区角度 30° 时网格与虚线尺寸框越出地块边界」。
+  > ⇒ 结论修正为：**「模块在位 + 数学逐位一致」这两个断言成立；「30° 点位全在界内」不成立，
+  > 且本来就不该由本切片负责。** 后续若要让 C4(30°) 变绿，得先修那个 30° 越界问题。
 
 **★ 契约面门禁（`tests/global_contracts.test.cjs`，PASS 9/9）**
 
@@ -4895,6 +4907,39 @@ pp.zoom   N1=6.298666666666667  N2=1  N3=6.298666666666667  O1=6.298666666666667
   探针改用本机 Edge + 原生 CDP。`n02/n03/pump/nav` 因此**没有本轮证据**，这是明确的缺口，不是"应该没事"。
 - 仓库对"双副本"已有登记惯例（`scripts/panel-drift-baseline.json` 里 4 条 + `check_panel_drift.cjs`），
   本切片的两把漂移锁沿用的是同一套思路：**不强行合并，先把"必须一致"变成会响的断言**。
+
+**★ 发布到线上（2026-10-31，v836 已上线）**
+
+用户当轮指令「发布到网络吧」，范围确认为**全部推**（含此前未发布的 3 个提交）+ 携带
+`tests/plot_merge.smoke.cjs` 的测试修复（否则新提交的 CI 会红）。
+
+- 本地 master 原本领先 `origin/master` **5 个提交**（3 个历史 + 本切片 2 个）：
+  `3d1a9eb` 地图总管交互层 一~五期（7535 行）、`16a7d4c` 五期探针、`321b3a7` ESLint 基线、
+  `a01291f` 本切片、`f128434` 测试修复。
+- **仓库自带的 `推送更新.bat` 无法使用**：它要求「本地 master == origin/master」才肯跑
+  （防顺带推送旧提交）。这次必须手工 submit + push，等于绕开那道保险。
+- **`git push` 两次报错（`Recv failure` / `CONNECT tunnel 502`）但实际已成功**：
+  远端 master 已是 `f128434`。⇒ 判定只能是 `git ls-remote` / API 比对，**不能凭 push 的报错下结论**
+  （`_p1/_pub_api.py --dry` 打印「远端已是本地 HEAD，无需发布」就是已发布信号）。
+  本机有 `HTTP(S)_PROXY=127.0.0.1:50855`，小请求通、大上传断，属链路质量问题。
+- 发布后核验（`_p1/_verify_pub_836.py`，全绿）：
+  | 项 | 结果 |
+  |---|---|
+  | 远端 master = 本地 HEAD | ✅ `f128434` |
+  | 根树逐字节相同 | ✅ `b040566` |
+  | 文件数 | ✅ 510 |
+  | 关键 blob（index.html / sw.js / core/coord-frame.js / inline-09 / 两个新测试） | ✅ 全同 |
+  | Pages 构建 | ✅ `built`（**必须查**：构建失败时站点继续服务旧版本） |
+  | 线上 `index.html` / `sw.js` / `core/coord-frame.js` / `mod/inline-09.js` 与仓库 blob | ✅ 逐字节相同 |
+  | 线上引用 `core/coord-frame.js?v=836-coord-frame` 与 `style-01.css?v=836-coord-frame` | ✅ 都在 |
+- **线上专属断言**（`_probe_coord_frame_live.cjs`，入口换成 Pages URL、不再拦网络、加 404 收集）：
+  C1 模块在位（`RyCoordFrame` 两方法可调、`tagCount=1`）、C2 零脚本异常、C7 **零 4xx/5xx**、
+  0° 生成 5/5/5 且 25 点全在界内、往返 1e-14、30° 点集≠0° —— 全绿；
+  **C4(30°) 红（23/54 越界）**，见上一节说明：属已知 30° 越界问题，不是本切片引入。
+- 发布后本地仍有 8 个并行改动未提交（`.aoci/*`、`aoci.code.txt`、`inline-18`、`plot-editor`、
+  `style-01.css`、`runye-hydraulics-page`、`tl-workspace`、验收记录的 `shared-canvas-browser.cjs`）——
+  **它们没上线**，线上跑的是这些文件的 HEAD 版本。下次发布前要确认不会漏发。
+- ⚠ 本段文档与上面「C4 结论修正」是在发布**之后**写的，**尚未推送**；需要下次发布时一并带出。
 
 #### 五、剩余风险 / 后续建议
 
