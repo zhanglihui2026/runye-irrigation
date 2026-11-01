@@ -32,6 +32,18 @@
   function apiUrl() { var base = root.RyAiPlan && root.RyAiPlan.apiBase ? root.RyAiPlan.apiBase() : 'https://runye-irrigation.vercel.app/api/ai-irrigation'; return base.replace(/\/ai-irrigation(?:\?.*)?$/, '/case-library'); }
   function access() { return root.RyAiPlan && root.RyAiPlan.getAccessToken ? root.RyAiPlan.getAccessToken() : ''; }
   function post(payload) { return root.fetch(apiUrl(), {method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+access()},body:JSON.stringify(payload)}).then(function(r){return r.json().catch(function(){return {code:r.status,msg:'案例服务返回格式错误'};});}); }
+  /* [v845 众包案例库打包] 相似案例检索口：queryCases({area, ratio}) → {ok, rows:[top3]}。
+   * 消费方：AI 规划（服务端注入为主）、外部插件可自行调用做参考展示。
+   * 未填访问码 / 面积缺失 / 服务端不可用 → {ok:false, msg}，绝不 throw。 */
+  function queryCases(q) {
+    var b = q && typeof q === 'object' ? q : {};
+    var area = Number(b.area);
+    if (!(isFinite(area) && area > 0)) return Promise.resolve({ ok: false, msg: '缺少地块面积，无法检索相似案例。' });
+    if (!access()) return Promise.resolve({ ok: false, msg: '未填写会员访问码。' });
+    return post({ action: 'query', q: { area: area, ratio: Number(b.ratio) || 1 } })
+      .then(function (r) { return (r && r.code === 0) ? { ok: true, rows: Array.isArray(r.data) ? r.data : [] } : { ok: false, msg: (r && r.msg) || '案例库暂不可用。' }; })
+      .catch(function (e) { return { ok: false, msg: (e && e.message) || '网络错误。' }; });
+  }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','>':'&gt;','<':'&lt;','"':'&quot;'}[c];}); }
   function close() { if (dialog && dialog.open) dialog.close(); pending = null; }
   function submit() {
@@ -51,6 +63,6 @@
     dialog=document.createElement('dialog');dialog.className='case-dialog';dialog.innerHTML='<form method="dialog"><header><strong>保存方案与匿名案例授权</strong><button value="cancel" aria-label="关闭">关闭</button></header><div class="case-body"><p>方案已先保存到您的本机。若授权，系统仅上传匿名工程案例：相对地块边界、管网、管径、滴灌配置、轮灌分组、水泵与水力校核结果；不会上传姓名、电话、访问码、地理坐标或地块名称。</p><label><input data-case="consent" type="checkbox"> 我同意匿名将本案例用于产品 AI 优化和相似案例检索</label><label>方案来源<select data-case="source"><option value="manual">用户手动绘制</option><option value="ai">AI 生成后修改</option></select></label><label>项目状态<select data-case="status"><option value="pending">待施工</option><option value="deployed">已落地</option><option value="abandoned">废弃</option></select></label><label>方案评分（可选）<select data-case="rating"><option value="0">未评分</option><option value="1">1 分</option><option value="2">2 分</option><option value="3">3 分</option><option value="4">4 分</option><option value="5">5 分</option></select></label><label>备注（可选，请勿填写姓名、电话等信息）<textarea data-case="note" maxlength="500" rows="3"></textarea></label><p class="case-msg" data-case="msg"></p><footer><button type="button" data-case="local">仅保存到本机</button><button type="button" data-case="submit">保存并按授权处理</button></footer></div></form>';
     document.body.appendChild(dialog);dialog.querySelector('[data-case=local]').onclick=close;dialog.querySelector('[data-case=submit]').onclick=submit;
   }
-  root.RyCaseLibrary={onProjectSaved:onProjectSaved,build:build,engineCheck:engineCheck};
+  root.RyCaseLibrary={onProjectSaved:onProjectSaved,build:build,engineCheck:engineCheck,queryCases:queryCases};
   if (root.document) { if(root.document.readyState==='loading')root.document.addEventListener('DOMContentLoaded',init);else init(); }
 })(typeof window!=='undefined'?window:globalThis);

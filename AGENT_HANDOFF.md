@@ -5818,3 +5818,59 @@ W.mode 置成 'draw'**（入口真的删干净了）。
 2. 真中文 DXF 层名（AC1021/UTF-8 专项，见 §26.79 三）。
 3. `readPoint/readLatLng` 的 `[null,1]` → `{lat:0,lng:1}` 隐患（见 §26.82 十一）。
 4. `snapOn` 默认 true，规格要「重开默认关闭」。
+
+## 26.84 众包案例库：打通检索闭环（v845 · 2026-11-01）
+
+### 一、真相核查（重要：旧待办是误判出来的）
+
+「众包案例库打包」这条待办挂在清单上很久，注记写「`众包` 全站零命中」——**当时审计者按
+「众包」二字面搜索，漏看了以「匿名案例库 / case-library / case-lib」命名的一整套实现**。
+实际早已存在且全部入库：
+
+- 前端授权上传：`runye-case-library.js`（保存工程 → dialog 征集授权 → clean 脱敏 → POST submit）；
+- 后端提交：`api/case-library.js` + `lib/case-library.cjs`（Upstash Redis，owner 身份哈希，TTL 3 年，
+  强制引擎水力校核通过才收）；
+- 服务端检索 `retrieve(q)`：rank 排序（manual+100 / deployed+80 / rating×3 − 面积偏差 − 形状偏差）
+  取 top3 —— **一直是死代码**；
+- 本地档案推荐（与远程案例库无关）：`data-service.findSimilar/recommend` + `plugins/case-lib`
+  （面积 .4/作物 .25/区域 .2/水源 .15；P25/中位/P75 造价区间；DN 加权投票）。
+
+真正的断链：① API 只收 `action:'submit'`，检索没有出口；② AI 规划链路零消费——上传成功 toast
+承诺「可作为后续 AI 规划参考」从未兑现；③ `tests/case-library.test.cjs` 未入库。
+
+### 二、v845 改动
+
+1. `api/case-library.js`：新增 `action:'query'`（Bearer 会员访问码 → `quota.identity`；
+   `q.area` 必须有限正数；`q.ratio` 缺省按 1）。返回 top3 已脱敏案例——**检索出口不给
+   `owner_hash`、不给 `plan.polygon`**（retrieve 的返回映射本来就没带，测试锁死）。
+2. `api/ai-irrigation.js`：规划前 `similarCases(body)` 检索案例库 top3 注入 user prompt
+   新增段「五、相似工程案例参考」，原「输出要求」顺延为「六」。要点：
+   - **fail-open**：案例库未配置/超时/空库/任何异常 → null，AI 规划照常，绝不因案例库挂掉而拒绝规划；
+   - `bboxRatioOf(poly)` 服务端现算形状比，口径与前端 `build()` 的 `feature.bbox_ratio` 一致
+     （`max(w,h)/max(1,min(w,h))`）；上传案例的 poly 与请求 polygon 同为图面相对坐标 ⇒ 可直接比；
+   - prompt 案例行只取 `feature`/`engine_check` 规范化字段（`design.input_values` 是页面原始
+     key 如 `planTapeSpacing`，**不进 prompt**）；
+   - 案例文案必须带「实测锁定项不受案例影响…不得照抄为本地块结论」（防 LLM 把别人工况的
+     扬程当本地结论）；
+   - 成功响应 extra 新增 `similar_used: n`。
+3. `runye-case-library.js`：新增 `queryCases({area,ratio})` 前端检索口（挂 `RyCaseLibrary`，
+   `{ok,rows}` 永不 throw）；文件 `?v=277→278-case-query`。
+4. `runye-ai-plan.js`：成功提示合并「参考了 n 个相似匿名案例」+ 剩余次数（`similar_used` 用户知情）；
+   自有 `?v=823-…→845-case-closure`。
+5. 测试：`tests/case-library.test.cjs` 补 query 用例（鉴权 401 / area 校验 400 / 排序 /
+   脱敏 / 空库空数组）并 **git add -f 入闸门**；新增 `tests/ai_case_injection.test.cjs`
+   （bboxRatioOf 口径 / 注入段出现与顺延 / 无案例时与旧版逐字一致 / caseLine 无
+   undefined/NaN / fail-open 五连）。
+
+### 三、版本
+
+`v845-case-closure`：`sw.js` VERSION + `index.html` style-01.css?v= + runye-ai-plan.js?v=
+（其余 6 处 844 串对应的文件本次未改，不抬）。
+
+### 四、仍没做
+
+1. 真中文 DXF 层名（AC1021/UTF-8 专项，见 §26.79 三）。
+2. `readPoint/readLatLng` 的 `[null,1]` → `{lat:0,lng:1}` 隐患（见 §26.82 十一）。
+3. `snapOn` 默认 true，规格要「重开默认关闭」。
+4. 案例库前端「检索消费 UI」（case-lib 插件目前只读本地档案；`RyCaseLibrary.queryCases`
+   已具备，插件想接远程库随时可接）。

@@ -39,6 +39,9 @@ const FREE_LIMIT = 5;
 const quota = require('../lib/ai-quota.cjs');
 const crypto = require('node:crypto'); /* [v329] 注册访问码生成 */
 const schema = require('../runye-ai-plan.js');
+/* [v845 众包案例库打包] 相似匿名案例消费端：规划前检索案例库 top3 注入 prompt。
+ * 口径：上传案例的 poly 与本请求 polygon 同为图面相对坐标（m），bbox 比可直接比。 */
+const cases = require('../lib/case-library.cjs');
 
 /* 在线大模型是会员功能。默认关闭：只有后台明确配置 AI_MEMBER_TOKENS 后，
    对应会员访问码才可越过此门槛；校验发生在额度预占和 DeepSeek 请求之前。 */
@@ -201,7 +204,14 @@ function buildUserPrompt(p) {
   L.push('- 滴灌带间距 ' + (isNum(cur.tape_spacing) ? cur.tape_spacing : 0.4) + ' m；滴孔间距 ' + (isNum(cur.emitter_spacing) ? cur.emitter_spacing : 0.3) + ' m；滴头流量 ' + (isNum(cur.emitter_flow) ? cur.emitter_flow : 0.8) + ' L/h');
   L.push('- 单边铺设长度 ' + (isNum(cur.tape_lay_side) ? cur.tape_lay_side : 100) + ' m；单区 ' + (isNum(cur.zone_mu) ? cur.zone_mu : 18) + ' 亩；目标流速 ' + (isNum(cur.target_velocity) ? cur.target_velocity : 1.5) + ' m/s');
   L.push('');
-  L.push('## 五、输出要求');
+  /* [v845] 相似匿名案例参考：用户授权上传的历史工程（已过引擎水力校核）。仅供取值风格参考。 */
+  if (Array.isArray(p.similars) && p.similars.length) {
+    L.push('## 五、相似工程案例参考（匿名历史案例，已通过水力校核）');
+    L.push('以下是与本地块面积/形状相近的历史工程参数取值，仅供设计项取值参考；实测锁定项（高差、提升高度、水源距离、入口压力）不受案例影响，案例中的扬程/流量/管径是各自工况下的校核结果，不得照抄为本地块结论。');
+    p.similars.forEach(function (c, i) { L.push(caseLine(i, c)); });
+    L.push('');
+  }
+  L.push('## ' + (Array.isArray(p.similars) && p.similars.length ? '六' : '五') + '、输出要求');
   L.push('只输出一个 JSON 对象（不要代码块、不要解释），字段与单位严格按 System Prompt 的规定。');
   return L.join('\n');
 }
@@ -299,6 +309,43 @@ function validateGeometry(p){
   for(const k of ['slope','terrain_dh','pump_lift','src_distance','tape_pressure'])if(p[k]!=null&&!isNum(p[k]))return k+' 必须为有限数字。';
   if(p.user_text!=null&&(typeof p.user_text!=='string'||p.user_text.length>10000))return '需求文字格式或长度无效。';return null;
 }
+/* ============================ [v845] 相似案例检索（众包案例库消费端） ============================
+ * fail-open：案例库未配置 / 超时 / 空库，一律返回 null，AI 规划照常（绝不因案例库挂掉而拒绝规划）。
+ * bbox 比口径与 runye-case-library.js build() 的 feature.bbox_ratio 一致：
+ *   max(w,h)/max(1,min(w,h))，w/h 取顶点坐标的极差。 */
+function bboxRatioOf(poly) {
+  if (!Array.isArray(poly) || poly.length < 3) return null;
+  const xs = poly.map(q => +q.x || 0), ys = poly.map(q => +q.y || 0);
+  const w = Math.max.apply(null, xs) - Math.min.apply(null, xs);
+  const h = Math.max.apply(null, ys) - Math.min.apply(null, ys);
+  return Math.max(w, h) / Math.max(1, Math.min(w, h));
+}
+async function similarCases(p) {
+  try {
+    if (!(isNum(p.area) && p.area > 0) || !Array.isArray(p.polygon) || p.polygon.length < 3) return null;
+    const r = bboxRatioOf(p.polygon);
+    const rows = await cases.retrieve({ area: Math.round(p.area), ratio: (r != null && isFinite(r)) ? r : 1 });
+    return (Array.isArray(rows) && rows.length) ? rows : null;
+  } catch (e) { return null; }
+}
+/* 案例行格式化：只取 feature/engine_check 的规范化字段（input_values 是页面原始 key，不进 prompt） */
+function caseLine(i, c) {
+  const f = c.feature || {}, e = c.engine_check || {};
+  const st = c.status === 'deployed' ? '已落地' : (c.status === 'pending' ? '待施工' : '已放弃');
+  const num = (v, d) => (typeof v === 'number' && isFinite(v)) ? v.toFixed(d == null ? 1 : d) : null;
+  const parts = [];
+  const mu = num(f.mu, 1); if (mu) parts.push(mu + '亩');
+  parts.push(st);
+  if (c.rating > 0) parts.push('评分' + c.rating);
+  const sp = num(f.tape_spacing, 2), es = num(f.emitter_spacing, 2), ef = num(f.emitter_flow, 2);
+  if (sp) parts.push('带距' + sp + 'm'); if (es) parts.push('孔距' + es + 'm'); if (ef) parts.push('滴头' + ef + 'L/h');
+  const zm = num(f.zone_mu, 1); if (zm) parts.push('单区' + zm + '亩');
+  const ph = num(e.pump_head_m, 1), pf = num(e.pump_flow_m3h, 1);
+  if (ph) parts.push('扬程' + ph + 'm'); if (pf) parts.push('流量' + pf + 'm³/h');
+  const mo = num(e.main_od_mm, 0), bo = num(e.branch_od_mm, 0);
+  if (mo) parts.push('主管' + mo + 'mm'); if (bo) parts.push('支管' + bo + 'mm');
+  return (i + 1) + '. ' + parts.join('｜');
+}
 /* ============================ 四、主入口 ============================ */
 module.exports = async function handler(req, res) {
   const origin = (req.headers && req.headers.origin) ? String(req.headers.origin) : '';
@@ -347,13 +394,15 @@ module.exports = async function handler(req, res) {
   const qLeft = () => reservation ? reservation.left + 1 : '不限'; /* [v329] 管理员次数显示 */
   let settled=false;
   try {
+  /* ---- [v845] 相似案例检索（fail-open，失败不阻塞规划）---- */
+  const similars = await similarCases(body);
   /* ---- 调大模型（超时 / 网络 / HTTP 错误在此全部捕获，不扣次数） ---- */
   const t0 = Date.now();
   let content;
   try {
     content = await callDeepSeek([
       { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: buildUserPrompt(body) }
+      { role: 'user', content: buildUserPrompt(Object.assign({}, body, { similars: similars })) }
     ]);
   } catch (e) {
     return reply(res, e.http || 502, e.code || 502, e.message || '调用大模型失败。', null, { quota_left: qLeft() });
@@ -378,7 +427,7 @@ module.exports = async function handler(req, res) {
   checked.plan.plot.area_m2=body.area;
   settled=true; // 提交结果不确定时保留预占，不恢复额度以免超发。
   const left=reservation?await quota.finish(reservation,true):'不限'; /* [v329] 管理员不限次 */
-  return reply(res,200,0,'ok',JSON.stringify(checked.plan),{quota_left:left,model:MODEL,elapsed_ms:Date.now()-t0,quota_store:'持久原子额度',request_id:body.request_id||null});
+  return reply(res,200,0,'ok',JSON.stringify(checked.plan),{quota_left:left,model:MODEL,elapsed_ms:Date.now()-t0,quota_store:'持久原子额度',request_id:body.request_id||null,similar_used:Array.isArray(similars)?similars.length:0});
   } catch(e) { return reply(res,503,503,'额度提交暂不可用，请联系作者核查；未重复调用模型。'); }
   finally { if(!settled&&reservation) { try { await quota.finish(reservation,false); } catch(e) { /* 保留预占，人工核查 */ } } } /* [v329] 管理员无预占可还 */
 
@@ -391,5 +440,6 @@ module.exports.default = module.exports;
 module.exports.__test = {
   SYSTEM_PROMPT: SYSTEM_PROMPT, buildUserPrompt: buildUserPrompt, stripFences: stripFences,
   MODEL: MODEL, ALLOWED_ORIGIN: ALLOWED_ORIGIN, FREE_LIMIT: FREE_LIMIT,
-  validateGeometry, requireMember, _reset: quota._reset
+  validateGeometry, requireMember, _reset: quota._reset,
+  bboxRatioOf, caseLine, similarCases /* [v845] 案例注入 */
 };

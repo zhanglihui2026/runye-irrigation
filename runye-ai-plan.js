@@ -637,7 +637,13 @@
       if(expected!==fingerprint()){setStatus('生成期间地块或参数发生变化，返回方案未写入当前地块。请重新生成。',true);return;}
       addConversation('assistant',(res.plan.remark || '已生成候选方案。')+'\n请核对下面的参数变化，确认后应用；系统会重新划分、生成管路并进行水力复算。');
       preview(res.plan,expected);
-      if(typeof data.quota_left==='number')setStatus('已取得候选方案，尚未应用；本用户剩余 '+data.quota_left+' 次。');
+      /* [v845 众包案例库] 成功提示合并剩余次数 + 相似案例来源（用户知情）。 */
+      (function(){
+        var msg='已取得候选方案，尚未应用';
+        if(data.similar_used>0)msg+='；本次规划参考了 '+data.similar_used+' 个相似匿名案例';
+        if(typeof data.quota_left==='number')msg+='；本用户剩余 '+data.quota_left+' 次';
+        setStatus(msg+'。');
+      })();
 
     }).catch(function (err) {
       btn.disabled = false; btn.textContent = old;
