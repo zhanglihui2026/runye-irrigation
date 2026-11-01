@@ -5377,3 +5377,91 @@ RyTrunkPanel.shouldWarn(entry, derived?) -> { warn, muted, vLevel, v, text }
 3. 分区页移除手绘总管入口 `#grTrunkDraw`（两套总管并存）。
 4. 众包案例库打包。
 5. 「真中文层名」需要 AC1021/UTF-8 专项（见第三节），不在本批。
+
+---
+
+## 26.80 总管七期：地图配色 / 图层顺序 / 与 AI 管网的从属关系（v841 · 2026-11-01）
+
+### 〇、先纠正一条审计结论（重要）
+
+之前（§26.76 之后的实现度审计）写的是「地图页叠加 AI 分区管网 —— 缺失，
+`tlDiagramData` 只用于捕捉反算、**不渲染**」。**这条是错的**，本批用探针实测推翻：
+
+- 三级页出图时，`mod/inline-09.js:4790` 起会把设计管网反投成经纬度，
+  经 `RyIrrigationDataStore.writeNetworkLayout()` 写进 `runye_network_layout`；
+- 地图页 `runye-map-enhance.js` 读它，按「图层」面板的 **管网 / 滴灌带 / 设备** 三行渲染，
+  并用 `networkMatchesCurrentPlot()` 按「当前地块锚点」绑定（失配就整片不画，不拿别的地块的管子充数）。
+- 探针 B1/E1 实测：`overlayPane` 里确实有 `#f59e0b`（主管 dn90）/`#3b82f6`（支管 dn63）/
+  `#dc2626`（总管 dn160）三条路径。
+
+⇒ **真正缺的不是"叠加"，是"总管在图上认不出来"**：设计 front 段按管径着色（dn>110 → 红 5px），
+真总管是深灰 4px，两个都在 ⇒ 用户看到的是**一根红线**，地图可编辑的那根总管被压在下面、看不出来。
+本批改的就是这件事。
+
+### 一、总管 = 粗深蓝（规格五「图层顺序 / 线宽」）
+
+`mod/online-map.js` 新增 `TRUNK_STYLE`：
+
+| 状态 | 颜色 | 线宽 | 说明 |
+|---|---|---|---|
+| 主干 | `#1e3a8a` | 6 | 与 DXF `ZG_TRUNK` 层**同一个色值**（`tests/trunk_palette.test.cjs` ① 锁着） |
+| 次干 | `#1e3a8a` | 4 | 只差粗细不差颜色 —— 同一根总管换条线换色，用户会以为是两种东西 |
+| 选中（编辑态） | `#2563eb` | 7 | 亮蓝加粗，编辑时需要"哪根被选中"一眼可辨 |
+| 草稿 | `#7c3aed` | 6 | **仍是紫色**：它还没保存，不是总管。改深蓝会让人以为已完成 |
+
+旧的深灰 `#475569` / 浅灰 `#94a3b8` 全部退场（`trunk_palette.test.cjs` ② 用去注释后的源码扫，防回潮）。
+
+### 二、图层顺序：总管独占 pane（`ryTrunkPane`，z=430）
+
+- 为什么不能靠"后添加"：Leaflet 同 pane 内按 DOM 顺序排，而管网**每次重绘都 `clearLayers()` 再重加**
+  （`renderNetwork`），`bringToFront()` 下一次刷新就被打回去 ⇒ 顺序必须是**结构性**的。
+- 层级：`overlayPane 400`（地块框 / AI 管网）< `ryTrunkPane 430`（总管）< `markerPane 600`
+  （编辑手柄、捕捉白点、水源/三通之外的标记）。夹在中间是刻意的：手柄要能压住总管。
+- 自定义 pane 的 CSS 是安全的：`leaflet.css` 的 `.leaflet-pane > svg`、`.leaflet-pane > svg path`、
+  `.leaflet-pane > svg path.leaflet-interactive` 都是**通用选择器**（不是 `.leaflet-overlay-pane` 专属），
+  所以透明点击区（`weight:16 / opacity:0`）在自定义 pane 里照样能点。
+
+### 三、顺手修掉一个真实缺陷：「测量框」不再连带关掉总管
+
+总管此前与面积测量框共用 `measureGroup`，而「测量框」开关是 `measureGroup.remove()` ——
+**关掉面积测量框，总管跟着消失**（水源/三通圆点反而还在，因为它裸挂在 `map` 上）。
+现在：总管折线 + 命中线 + 节点标记统一进新的 `trunkGroup` + `TRUNK_PANE`，
+测量框开关只管测量框。探针 D1/D2/D3 用"先真画一个测量框 → 关掉它 → 框消失而总管与圆点都在"验。
+
+### 四、有真总管的地块不再画设计 front 段
+
+`runye-map-enhance.js` 新增 `mapTrunkExistsFor(plotId)`（复用 `RyTrunkSchema.hasUsableTrunk`，
+排除成组/合并），`renderNetwork` 里 `if (isTrunk && suppressFront) return;`。
+
+- **只在渲染层跳过**：`runye_network_layout` 里那段照旧保留 —— 水力校核读的就是它
+  （`trunk_palette.test.cjs` ⑤ 断言 `net.segments` 不被改写）。
+- 没有总管的地块（手画 / 未在地图上画干线）行为不变，设计 front 段照旧画（探针 E1）。
+- `RyTrunkSchema` 不存在时（`runye-mobile-map-preview.html`）恒 false ⇒ 完全退回旧行为。
+
+### 五、测试
+
+- `tests/trunk_palette.test.cjs`（**5 项**，读源码的静态锁）：两处深蓝同值 / 旧灰退场（去注释后扫）/
+  主次只差粗细 + 草稿仍紫 + 选中色不同 / pane z 夹在 400~600 且等于 430 /
+  抑制只在有真总管时且不改写 `net.segments`。
+- `_probe_trunk_p10_layers.mjs`（**18 项**，本地 18/18）：pane 存在与 z、深蓝 6/4、
+  总管不在 overlayPane、水源圆点同 pane、管网在 overlayPane 且 pane 序正确、
+  有总管时无红 front 段 / 主支管照画、画真测量框后关掉"框消失而总管与圆点都在"、
+  无总管地块 front 段照画、无 pageerror。
+- 探针踩过的坑：**Leaflet 把 `circleMarker` 渲染成 `<path>`，不是 `<circle>`**
+  ⇒ 按 `stroke` 色 + `stroke-width` 认（水源 `#1d4ed8`/2、三通 `#9a3412`/1.5），
+  查 `circle` 标签会永远 0 个。
+
+### 六、发布状态（v841）
+
+- 版本同抬：`sw.js VERSION='v841-trunk-layers'`、`index.html` 的 `style-01.css?v=` +
+  `runye-map-enhance.js` / `mod/online-map.js` 的 `?v=`；`runye-mobile-map-preview.html` 的
+  `runye-map-enhance.js?v=` 一起抬。
+- 闸门：`check.cjs` 29 项 PASS / 单测 **378 项全绿** / `check_publish_refs.cjs` PASS / lint 无告警。
+
+### 七、仍没做
+
+1. 「联合水力复核」（总管 + 下游分区管网）：现在两套数据（`plot.trunk.params` 与
+   `runye_network_layout`）各自的流量还没打通，需要先定"总管流量取设计值还是实测值"。
+2. 分区页移除手绘总管入口 `#grTrunkDraw`（两套总管并存）。
+3. 众包案例库打包。
+4. 真中文层名（AC1021/UTF-8 专项，见 §26.79 三）。

@@ -248,6 +248,29 @@
    * 状态随既有 runye_map_layers 一起持久化（刷新后保持）。
    * 注意：本条只管「面积测量」；紫色测距线是另一套（measureLayer），不受本开关影响。 */
   var measureGroup = L.layerGroup().addTo(map);
+
+  /* ===== [v841] 总管独立图层组 + 独立 pane（规格五：图层顺序 / 线宽）=====
+   *
+   * 两个问题，一个修法：
+   *   ① **图层顺序**：总管此前和面积测量框共用一个 measureGroup，而 AI 分区管网在
+   *      runye-map-enhance.js 的 networkGroup 里 —— 那个组建得晚，同一 overlayPane 里
+   *      DOM 顺序在后 ⇒ **总管被压在管网下面**（细管盖住粗管，越放大越明显）。
+   *      Leaflet 的图层顺序只由「pane 的 z-index」和「同 pane 内的添加顺序」决定，
+   *      跨组拔 DOM 顺序不可靠 ⇒ 给总管单开一个 pane（overlayPane=400，本 pane=430），
+   *      总管恒在管网之上、markerPane(600) 之下（编辑手柄/捕捉点仍然盖在最上面）。
+   *   ② **「测量框」开关会连带关掉总管**（同一个组的副作用）：关掉面积测量框，
+   *      总管跟着消失 —— 那不是用户的意思。独立成组后两者互不影响。
+   *
+   * 为什么不用 `map.bringToFront()`：它只在同 pane 内改 DOM 顺序，下一次管网重绘
+   * （runye-map-enhance 的 renderNetwork 每次 clearLayers 再重加）就把顺序打回去了。
+   */
+  var TRUNK_PANE = 'ryTrunkPane';
+  if (!map.getPane(TRUNK_PANE)) {
+    var trunkPaneEl = map.createPane(TRUNK_PANE);
+    trunkPaneEl.style.zIndex = '430';
+  }
+  var trunkGroup = L.layerGroup().addTo(map);
+
   var measureOn = true;
   function setMeasureOn(on){
     on = !!on;
@@ -620,13 +643,29 @@
     if(plot.merged||plot.grouped||plot.mergedInto) return null;
     return S.normalize(plot.trunk);
   }
+  /* [v841] 总管线型（规格五「图层顺序 / 线宽：总管粗深蓝」）。
+     深蓝取 #1e3a8a —— 与 DXF 的 ZG_TRUNK 图层同一个色值，图纸与地图对得上；
+     比原来的深灰 #475569 在卫星图上结实得多（深灰跟田埂、道路几乎同色）。
+     主次只靠**粗细**分开（6 / 4），不用两套颜色：同一根总管换条线就换个色，
+     用户会以为是两种东西。选中用亮蓝加粗（编辑态需要"哪根被选中"一眼可辨）。
+     草稿仍留紫色：它**还不是总管**（没保存），与深蓝实线区分开才不会误以为已完成。 */
+  var TRUNK_STYLE = {
+    main:   { color: '#1e3a8a', weight: 6, opacity: 1 },
+    sub:    { color: '#1e3a8a', weight: 4, opacity: 0.75 },
+    active: { color: '#2563eb', weight: 7, opacity: 1 },
+    draft:  { color: '#7c3aed', weight: 6, opacity: 0.95 }
+  };
+  function trunkLineStyle(entry, isActive){
+    if(isActive) return TRUNK_STYLE.active;
+    return entry && entry.main ? TRUNK_STYLE.main : TRUNK_STYLE.sub;
+  }
   function renderTrunkDraft(){
-    if(trunkLine && map.hasLayer(trunkLine)) measureGroup.removeLayer(trunkLine);
+    if(trunkLine && map.hasLayer(trunkLine)) trunkGroup.removeLayer(trunkLine);
     trunkLine=null;
-    trunkSavedLayers.forEach(function(l){ if(l && map.hasLayer(l)) measureGroup.removeLayer(l); });
+    trunkSavedLayers.forEach(function(l){ if(l && map.hasLayer(l)) trunkGroup.removeLayer(l); });
     trunkSavedLayers=[];
     trunkActiveLine=null;
-    /* 已保存的干线：主深灰实线、次浅灰 —— 只有一条时看上去与旧版完全一致。
+    /* 已保存的干线：主干粗深蓝、次干细深蓝（只差粗细，不差颜色）。
        interactive:false 很重要：否则这些线会吃掉地图点击，无法在上面继续加点。
        三期例外：edit 态另加一条**透明加宽命中线**（weight 16 / opacity 0）专门接点击。
        为什么不让可见线自己 interactive —— idle 态下它会挡住地块点选和右键"回传"弹窗，
@@ -639,16 +678,16 @@
         }).filter(function(q){return !!q;});
         if(pts.length<2) return;
         var isActive=trunkMode==='edit' && activeTrunkId!==null && String(entry.id)===String(activeTrunkId);
+        var st=trunkLineStyle(entry,isActive);
         var line=L.polyline(pts,{
-          color:isActive?'#2563eb':(entry.main?'#475569':'#94a3b8'),
-          weight:isActive?5:(entry.main?4:3),
-          opacity:isActive?1:.85,
+          color:st.color, weight:st.weight, opacity:st.opacity,
+          pane:TRUNK_PANE,
           interactive:false
-        }).addTo(measureGroup);
+        }).addTo(trunkGroup);
         if(isActive) trunkActiveLine=line;
         trunkSavedLayers.push(line);
         if(trunkMode==='edit'){
-          var hit=L.polyline(pts,{color:'#2563eb',weight:16,opacity:0,interactive:true,className:'ry-trunk-hit'}).addTo(measureGroup);
+          var hit=L.polyline(pts,{color:'#2563eb',weight:16,opacity:0,interactive:true,pane:TRUNK_PANE,className:'ry-trunk-hit'}).addTo(trunkGroup);
           hit.on('click',function(ev){
             if(ev&&ev.originalEvent) L.DomEvent.stopPropagation(ev.originalEvent);
             selectTrunk(entry.id);
@@ -659,7 +698,11 @@
     }
     /* 草稿：紫色虚线（绘制态）／紫事实线（只读显示态） */
     if(trunkPoints.length){
-      trunkLine=L.polyline(trunkPoints.map(toDisplay),{color:'#7c3aed',weight:5,opacity:.95,dashArray:trunkMode==='draw'?'8,5':null,interactive:false}).addTo(measureGroup);
+      trunkLine=L.polyline(trunkPoints.map(toDisplay),{
+        color:TRUNK_STYLE.draft.color, weight:TRUNK_STYLE.draft.weight,
+        opacity:TRUNK_STYLE.draft.opacity,
+        dashArray:trunkMode==='draw'?'8,5':null, pane:TRUNK_PANE, interactive:false
+      }).addTo(trunkGroup);
     }
     /* [v838] 水源/三通标记画在线的上面：它是"这条线的用途"，比线本身更需要被看见。 */
     renderTrunkNodes();
@@ -1320,7 +1363,7 @@
   var V_LABEL={low:'偏低',good:'经济',warn:'偏高',bad:'超标'};
 
   function renderTrunkNodes(){
-    trunkNodeLayers.forEach(function(l){ if(l&&map.hasLayer(l)) map.removeLayer(l); });
+    trunkNodeLayers.forEach(function(l){ if(l&&map.hasLayer(l)) trunkGroup.removeLayer(l); });
     trunkNodeLayers=[];
     var S=window.RyTrunkSchema;
     if(!S||!trunkSaved||!Array.isArray(trunkSaved.trunks)) return 0;
@@ -1333,12 +1376,14 @@
         var st=NODE_STYLE[nt[k]]; if(!st) return;
         var rd=S.readPoint(raw[Number(k)]);
         if(!rd) return;
-        /* interactive:false —— 标记是纯装饰，吃掉点击就没法在它上面继续加点/选线。 */
+        /* interactive:false —— 标记是纯装饰，吃掉点击就没法在它上面继续加点/选线。
+           [v841] 进 trunkGroup + 同一个 pane：与折线同生共死（关「测量框」不再只剩标记）。 */
         var mk=L.circleMarker(displayLatLngOf(rd.lat,rd.lng),{
           radius:st.radius,color:st.color,weight:st.weight,
           fillColor:st.fillColor,fillOpacity:st.fillOpacity,
+          pane:TRUNK_PANE,
           interactive:false,className:'ry-trunk-node'
-        }).addTo(map);
+        }).addTo(trunkGroup);
         trunkNodeLayers.push(mk); n++;
       });
     });

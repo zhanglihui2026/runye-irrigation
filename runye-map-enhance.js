@@ -875,6 +875,22 @@
       return !!ownership && ownership.status === 'current';
     } catch (e) { return false; }
   }
+  /* [v841] 该地块在地图上有没有「可编辑的真总管」（plot.trunk）。
+     与 online-map.js 同一条判据：schema 归一 + hasUsableTrunk（排除成组/合并地块）。
+     模块缺失（手机预览页没有 trunk 编辑器）时一律 false ⇒ 退回"画设计 front 段"的旧行为。 */
+  function mapTrunkExistsFor(plotId) {
+    try {
+      var S = (typeof window !== 'undefined') ? window.RyTrunkSchema : null;
+      if (!S || typeof S.hasUsableTrunk !== 'function') return false;
+      if (plotId == null || plotId === '') return false;
+      var plots = readPlotLibrary();
+      for (var i = 0; i < plots.length; i++) {
+        var p = plots[i];
+        if (p && String(p.id) === String(plotId)) return !!S.hasUsableTrunk(p);
+      }
+      return false;
+    } catch (e) { return false; }
+  }
   function dnStyle(dn) {
     dn = +dn || 0;
     if (dn > 110) return { color: '#dc2626', weight: 5 };
@@ -969,6 +985,13 @@
     }
     var hydraulic = state.hydraulicOn ? readHydraulicOverlay(net) : null;
     var clipRings = clipPlotRings();   /* [v230] 有地块才裁剪 */
+    /* [v841] 这块地在**地图上已经有可编辑的真总管** ⇒ 不画设计推出来的 front 段。
+       为什么：设计 frontPipe 是网格化/截断过的（为了布下游支管），几何与地图上的真折线
+       不一致；两条都画 = 屏幕上两根"总管"，一根红（按管径着色）一根深蓝粗线。
+       规格五也明确总管归地图管、设计只管下游分区管网。
+       只在**渲染**层跳过，`runye_network_layout` 里那段照旧保留（水力校核要读它）。
+       RyTrunkSchema 不存在时（如手机预览页）恒为 false ⇒ 完全退回旧行为。 */
+    var suppressFront = mapTrunkExistsFor(net.plotId);
     (net.segments || []).forEach(function (s) {
       try {
         var sLL = validRingLL(s.latLng, 2);   // 同样挡住含 null 顶点的管段（否则 _project 抛错连累全部矢量层）
@@ -979,6 +1002,7 @@
         /* [v232] 总管(front) 不裁剪：地块回传后只裁 主管/支管/滴灌带，总管跨地块互连须整段可见。
            s.kind 由三级管路生成写入（'front'/'main'/'branch'）；旧 localStorage 无 kind 时回退 id/name 前缀 'front' 判定。 */
         var isTrunk = (s.kind === 'front') || (typeof s.id === 'string' && s.id.indexOf('front') === 0) || (typeof s.name === 'string' && s.name.indexOf('front') === 0);
+        if (isTrunk && suppressFront) return;
         var length = s.len;
         if (typeof length !== 'number' || !isFinite(length) || length<0) {
           length=0;
