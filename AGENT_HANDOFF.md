@@ -5465,3 +5465,123 @@ RyTrunkPanel.shouldWarn(entry, derived?) -> { warn, muted, vLevel, v, text }
 2. 分区页移除手绘总管入口 `#grTrunkDraw`（两套总管并存）。
 3. 众包案例库打包。
 4. 真中文层名（AC1021/UTF-8 专项，见 §26.79 三）。
+
+---
+
+## 26.81 总管八期：联合复核只读视图（v842 · 2026-11-01）
+
+### 一、这一版**故意不做**什么（先看这条，否则会以为漏做）
+
+规格七要「联合水力复核：总管 + 下游分区管网 ⇒ 给出合计损失」。**合计损失这一项这一版不给出**，
+这是决策不是遗漏。
+
+原因：总管侧的数字来自 `plot.trunk.params.designFlow`（**设计值**，用户填的），下游侧的数字来自
+`runye_network_layout.segments[].q`（**由分区反投出来的段流量**）。两条链现在没有共同的流量来源：
+总管流量不是从下游 Σ 反算得到的，下游 Σ 也不受总管约束。**直接把两边损失相加，在物理上等于
+「假设两次独立设计刚好首尾相接」**，是个可能对也可能错两倍的数字。在一个验收工具里给出一个
+可能错两倍的总损失，比不给更糟。
+
+所以本版只做**只读对照**：两套数字并排放、各自标出来源、加三条自洽性判据，并在面板上常驻一句
+「合计损失暂不给出：总管流量取设计值还是下游实际值尚未定口径，本版只做对照」。
+这句说明是**产品的一部分**（`D1` 探针守着），不是临时占位符 —— 删掉它才是回归。
+
+口径定下来之后，接的方式是：在 `jointReview()` 里把 `out.trunk.flow` 换成 `resolveJointFlow()`
+返回的单一来源，然后才允许出现「合计」两个字。
+
+### 二、`mod/trunk-panel.js`：`jointReview(entry, layout, derived)` 纯函数
+
+```js
+jointReview(entry, layout, derived) -> {
+  ok, hasLayout,
+  trunk: { code, material, dn, flow, v, hf, len },      // 来自 derived（compute 的结果）
+  down:  { segCount, mainCount, branchCount, mainMaxDn, lenM, qMax },
+  checks: [{ lvl:'ok'|'warn'|'info', t:'…' }],
+  note:   '…'
+}
+```
+
+四条硬口径：
+
+1. **`front` 段不计入「下游」统计**（`kindOf(seg)` 认 `front` 前缀，也认 `kind:'front'`）。
+   `front` 是分区反投时给总管画的那条**设计代理线**，把它算进下游 = 同一根管被数两遍，
+   总长直接虚高，还会让「总管 DN ≥ 最大主管 DN」这条判据永远成立（因为它就是总管自己的复制品）。
+2. **流量取「最大段流量」`qMax`，绝不 Σq。** 下游各段是**并联**关系（一个三通分出去几路），
+   相加得到的是「如果所有支管同时按设计流量满流」的假想值，比总管设计流量大得多，
+   会让「总管流量不足」这条判据变成永远在叫。这是最容易写错的一条。
+3. **地块归属必须校验**：`layout.plotId !== 地图上正在编辑的地块` ⇒ 返回 `out.note='下游管网快照
+   属于另一块地（xxx）…'` 且 `checks:[]`。宿主侧 `currentPlotNetwork()` 用 `{mismatch:true,plotId}`
+   表达这件事，**不是返回 `null`** —— 返回 null 会被渲染成"下游还没做"，把"看错地块"伪装成"还没做"，
+   这是两种完全不同的用户动作。
+4. **缺任一边 ⇒ `info`「…对照暂不可做」，不是 `ok`。** 没有总管管径时不能说"管径自洽"。
+
+判据本身只有两条（都只在两边都有数时才出）：
+
+- `trunk.dn < down.mainMaxDn` ⇒ warn「总管 DN63 比下游最大主管 DN90 还细，管径需复核。」
+- `trunk.flow < down.qMax` ⇒ warn（同理）。
+
+### 三、`mod/online-map.js`：宿主侧只做两件事
+
+```js
+trunkPanel = P.mount({ …, getLayout: currentPlotNetwork });   // 注入
+
+function currentPlotNetwork(){        // 读快照 + 校验归属，不做任何计算
+  var store = window.RyIrrigationDataStore;
+  if (!store || typeof store.readNetworkLayout !== 'function') return null;
+  var net = store.readNetworkLayout();                        // try/catch 兜住
+  if (!net || !Array.isArray(net.segments) || !net.segments.length) return null;
+  var pid = String(currentMapPlotId == null ? '' : currentMapPlotId);
+  if (!pid) return { mismatch:true, plotId:… };
+  if (String(net.plotId ?? '') !== pid) return { mismatch:true, plotId:… };
+  return net;
+}
+```
+
+**归属锚点用 `currentMapPlotId`，不是 `currentPlotId`**（理由同 §26.75：`currentPlotId` 是施工图
+那套，`currentMapPlotId` 才是地图这套；两者在同一次操作里可能不一致）。面板是地图上的面板。
+
+### 四、`mod/online-map.css`：`.tp-joint` 一族
+
+`.tp-jt-check` 用 `::before` 小圆点表达级别（`.is-ok` 绿 / `.is-warn` 琥珀 / 默认灰），
+**不用图标字体、不写 `border-radius` 数值**（`body *{border-radius:0!important}` 会压掉，
+正式模板见 §26.76 那条教训）。区块标题右侧 `.tp-jt-sub` 常驻写「总管 + 下游分区管网」，
+让"这两行数字不是同一个来源"在界面上自证，别只写在文档里。
+
+### 五、测试
+
+- `tests/trunk_joint_review.test.cjs`（**12 项**，`git add -f` 入库）：
+  front 段不计 / 并联支管不 Σq / 两边都有数才出判据 / DN 细则 warn / 流量细则 warn /
+  缺总管管径出 info 不出 ok / 地块失配说"属于另一块地"且不给 checks / 下游空也给 note /
+  「合计损失暂不给出」文案常驻 / `qMax` 取最大不是求和 / 长度按段长求和不含 front / 导出面。
+
+- `_probe_trunk_p11_joint.mjs`（**16 项**，本地 16/16）：A1~A4 两行数字与来源、B1~B3 自洽判据、
+  B4-pre/B4-pre2/B4/B5/B6 改管径立刻重算且真写库、C1/C2 地块失配、D1 口径说明、F1 无 pageerror。
+
+### 六、探针踩的坑：`select.value='63'` 是假失败
+
+第一版 B4 写 `document.getElementById('tpDn').value = '63'` 后触发 `change`，结果
+`{"dn":null,"rev":5}` —— revision 前进了（说明真写库了），但值写成了 `null`。
+
+原因：`DN_PRESETS = [110,125,160,200]` 里**没有 63**，`<select>` 里也就没有 `value="63"` 的
+`<option>`。给 `select.value` 赋一个不存在的选项，DOM 规范的做法是**赋成空串**（而且 `selectedIndex`
+变 -1），于是 `dnEl.onchange` 里的 `Number('')` → `0`／`null` → `patch({dn:null})`。
+
+**教训不是"探针要写对"，而是"探针要顺着真实用户路径走"**：界面上想输 63 只能走「自定义…」
+（`value='__custom'` → 展开 `#tpDnCustom` → 在 input 上触发 `change`）。任何"绕过交互直接塞值"
+的探针都可能在一个**用户根本走不到的状态**下判绿或判红。B6 就是为了堵这条：写库成功后回填
+必须还是「自定义 63」，不能被旧值悄悄改回去。
+
+### 七、发布状态（v842）
+
+- 版本同抬：`sw.js VERSION='v842-trunk-joint'`、`index.html` 的 `style-01.css?v=` +
+  `core/trunk-schema.js` / `runye-map-enhance.js` / `mod/online-map.css` / `mod/trunk-panel.js` /
+  `mod/online-map.js` 的 `?v=`。
+- `runye-mobile-map-preview.html` 的 `runye-map-enhance.js?v=` **本版不动**（该文件内容本版没改，
+  抬 `?v=` 只会让移动预览多下一次 300KB 的包，没有收益）。
+- 闸门：`check.cjs` 29 项 PASS / 单测全绿 / `check_publish_refs.cjs` PASS / lint 无告警。
+
+### 八、仍没做
+
+1. **合计损失**（口径未定，见本节一）。
+2. 分区页移除手绘总管入口 `#grTrunkDraw`（两套总管并存）。
+3. 众包案例库打包。
+4. 真中文层名（AC1021/UTF-8 专项，见 §26.79 三）。

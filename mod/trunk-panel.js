@@ -220,6 +220,112 @@
     return out;
   }
 
+  /* ── 联合复核（规格七）：总管 + 下游分区管网 ─────────────────────────────
+   *
+   * ★ 本版**只对照、不合计**，这是有意的，不是半成品：
+   *   「系统总损失 = 总管 hf + 下游最不利路径」听着简单，但**总管流量取哪个数**没有定论：
+   *   面板上的 designFlow 是用户填的设计依据，下游快照里的 segments[].q 是三级页算出来的
+   *   实际值，两者可以不一样（而且经常不一样）。随便挑一个相加，结果会被当成"复核结论"用；
+   *   错在口径上比错在算术上更难发现。
+   *   ⇒ 先把两边的数并排放，只指认**必然不成立**的不自洽：
+   *     ① 总管比最大主管还细（总管不可能比它供的管子细）
+   *     ② 总管设计流量小于下游最大段流量（同理）
+   *     ★ 不做「Σ segments[].q」——并联支管的流量相加是重复计数，那个数看着像总流量，
+   *       其实没有物理意义。取**最大段流量**当下限才是安全的。
+   *   合计等口径定下来再做（AGENT_HANDOFF §26.81）。
+   *
+   * layout = RyIrrigationDataStore 的管网快照：
+   *   { plotId, segments:[{id,name,dn,kind,len,q,latLng}], valves, dripTapes }
+   *   宿主传入前已做地块绑定校验；不属于本块时传 { mismatch:true, plotId } 而不是 null，
+   *   这样面板能说清"为什么没有下游数据"，而不是让人以为"下游没做"。
+   */
+  function kindOf(seg) {
+    var k = seg && seg.kind;
+    if (k === 'front' || k === 'main' || k === 'branch') return k;
+    var tag = String((seg && (seg.id || seg.name)) || '');
+    if (tag.indexOf('front') === 0) return 'front';
+    if (tag.indexOf('branch') === 0) return 'branch';
+    if (tag.indexOf('main') === 0) return 'main';
+    return 'other';
+  }
+
+  function jointReview(entry, layout, derived) {
+    var d = derived || compute(entry);
+    var prm = (entry && entry.params && typeof entry.params === 'object') ? entry.params : {};
+    var out = {
+      ok: !!d.ok,
+      hasLayout: false,
+      trunk: {
+        code: String(prm.code || (entry && entry.id) || ''),
+        material: d.material,
+        dn: d.dn,
+        flow: d.flow,
+        v: d.v,
+        hf: d.hfTotal,
+        len: d.projM
+      },
+      down: { segCount: 0, mainCount: 0, branchCount: 0, mainMaxDn: null, lenM: null, qMax: null },
+      checks: [],
+      note: ''
+    };
+
+    if (layout && layout.mismatch === true) {
+      out.note = '下游管网快照属于另一块地' + (layout.plotId ? '（' + String(layout.plotId) + '）' : '') +
+                 '，与地图上正在编辑的地块不一致，不做联合复核。';
+      return out;
+    }
+    var segs = (layout && Array.isArray(layout.segments)) ? layout.segments : null;
+    if (!segs || !segs.length) {
+      out.note = '未找到本块的下游设计快照：先在三级页「生成管线图」，下游主管/支管才会落到地图上。';
+      return out;
+    }
+    out.hasLayout = true;
+
+    var mainMax = null, lenSum = 0, lenAll = true, qMax = null;
+    for (var i = 0; i < segs.length; i++) {
+      var s = segs[i], k = kindOf(s);
+      if (k !== 'front') {
+        out.down.segCount++;
+        if (k === 'main') {
+          out.down.mainCount++;
+          var dn = num(s.dn);
+          if (dn !== null && dn > 0 && (mainMax === null || dn > mainMax)) mainMax = dn;
+        } else if (k === 'branch') out.down.branchCount++;
+        var q = num(s.q);
+        if (q !== null && q > 0 && (qMax === null || q > qMax)) qMax = q;
+      }
+      var L = num(s.len);
+      if (L === null || L < 0) lenAll = false; else lenSum += L;
+    }
+    out.down.mainMaxDn = mainMax;
+    out.down.lenM = lenAll ? lenSum : null;
+    out.down.qMax = qMax;
+
+    /* ① 管径：总管必须 ≥ 最大主管。缺任一边就明说"缺"，不拿 0 或猜测的档位顶。 */
+    if (d.dn === null || mainMax === null) {
+      out.checks.push({ level: 'info', text: '管径对照暂不可做：' + (d.dn === null ? '总管未选管径' : '下游主管没有管径数据') + '。' });
+    } else if (d.dn < mainMax) {
+      out.checks.push({ level: 'warn', text: '总管 DN' + d.dn + ' 比下游最大主管 DN' + mainMax + ' 还细，管径需复核。' });
+    } else {
+      out.checks.push({ level: 'ok', text: '总管 DN' + d.dn + ' ≥ 下游最大主管 DN' + mainMax + '。' });
+    }
+
+    /* ② 流量：总管设计流量不得小于下游最大段流量。 */
+    if (d.flow === null || qMax === null) {
+      out.checks.push({ level: 'info', text: '流量对照暂不可做：' + (d.flow === null ? '总管未填设计流量' : '下游段没有流量数据') + '。' });
+    } else if (d.flow + 1e-9 < qMax) {
+      out.checks.push({ level: 'warn', text: '总管设计流量 ' + round2(d.flow) + ' m³/h 小于下游最大段流量 ' + round2(qMax) + ' m³/h，总管不可能比它供的管子还小。' });
+    } else {
+      out.checks.push({ level: 'ok', text: '总管设计流量 ' + round2(d.flow) + ' m³/h ≥ 下游最大段流量 ' + round2(qMax) + ' m³/h。' });
+    }
+
+    out.note = '合计损失暂不给出：总管流量取设计值还是下游实际值尚未定口径，本版只做对照。';
+    return out;
+  }
+  function round2(v) {
+    return (Math.round(Number(v) * 100) / 100).toString();
+  }
+
   /* ── 格式化（面板与提示共用，避免两处口径不一） ─────────────────────── */
   function fmtLen(m) {
     if (m === null || m === undefined || !isFinite(m)) return '—';
@@ -284,6 +390,13 @@
         '<div class="tp-row"><span class="tp-k">计算流速</span><b class="tp-v tp-ro" id="tpV">—</b></div>' +
         '<div class="tp-row"><span class="tp-k">沿程水头损失</span><b class="tp-v tp-ro" id="tpHf">—</b></div>' +
         '<div class="tp-row"><span class="tp-k">局部损失预估</span><b class="tp-v tp-ro" id="tpHj">—</b></div>' +
+        '<div class="tp-sep"></div>' +
+        '<div class="tp-joint" id="tpJoint">' +
+          '<div class="tp-jt-h">联合复核<span class="tp-jt-sub">总管 + 下游分区管网</span></div>' +
+          '<div class="tp-jt-rows" id="tpJointRows"></div>' +
+          '<div class="tp-jt-checks" id="tpJointChecks"></div>' +
+          '<div class="tp-jt-note" id="tpJointNote"></div>' +
+        '</div>' +
       '</div>' +
       '<div class="tp-foot">' +
         '<button type="button" class="tp-btn" id="tpRecheck">重新复核水力</button>' +
@@ -337,6 +450,39 @@
       vEl.className = 'tp-v tp-ro' + (d.vLevel ? ' tp-v-' + d.vLevel : '');
       q('tpHf').textContent = fmtM(d.hf);
       q('tpHj').textContent = fmtM(d.hj);
+      paintJoint(d);
+    }
+
+    /* 联合复核渲染。每帧都重算：下游快照可能在别的页被重生成过（show/复核时都会重进这里）。
+       ★ 这里只**展示** jointReview 的结论，不在这里做任何判断 —— 判断在纯函数里、Node 单测锁着。 */
+    function paintJoint(d) {
+      var rowsEl = q('tpJointRows'), ckEl = q('tpJointChecks'), noteEl = q('tpJointNote');
+      if (!rowsEl || !ckEl || !noteEl) return;
+      var layout = (typeof opts.getLayout === 'function') ? opts.getLayout() : null;
+      var jr = jointReview(curEntry(), layout, d);
+      var T = jr.trunk, D = jr.down;
+
+      var tParts = [];
+      if (T.code) tParts.push(esc(T.code));
+      if (T.material) tParts.push(esc(T.material));
+      if (T.dn !== null) tParts.push('DN' + T.dn);
+      if (T.flow !== null) tParts.push('Q ' + round2(T.flow) + ' m³/h');
+      if (T.v !== null) tParts.push(fmtV(T.v));
+      if (T.hf !== null) tParts.push('损失 ' + fmtM(T.hf));
+      rowsEl.innerHTML =
+        '<div class="tp-jt-row"><span>总管</span><b>' + (tParts.length ? tParts.join(' · ') : '—') + '</b></div>' +
+        '<div class="tp-jt-row"><span>下游</span><b>' + (jr.hasLayout
+          ? ('主管 ' + D.mainCount + ' 段 · 支管 ' + D.branchCount + ' 段' +
+             (D.mainMaxDn !== null ? ' · 最大主管 DN' + D.mainMaxDn : '') +
+             (D.lenM !== null ? ' · 总长 ' + fmtLen(D.lenM) : ''))
+          : '—') + '</b></div>';
+
+      ckEl.innerHTML = jr.checks.map(function (c) {
+        return '<div class="tp-jt-check is-' + esc(c.level) + '">' + esc(c.text) + '</div>';
+      }).join('');
+
+      noteEl.textContent = jr.note || '';
+      noteEl.hidden = !jr.note;
     }
 
     function refresh() {
@@ -465,6 +611,7 @@
     V_BAD: V_BAD,
     WARN_TEXT: WARN_TEXT,
     shouldWarn: shouldWarn,
+    jointReview: jointReview,
     haversine: haversine,
     compute: compute,
     fmtLen: fmtLen,

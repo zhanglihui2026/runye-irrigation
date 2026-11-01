@@ -180,6 +180,33 @@ body:has(.ry-pwa-install) #onlineMapSection .ry-trunk-panel{bottom:96px}
 #onlineMapSection .ry-trunk-panel .tp-v-warn{color:#b45309}
 #onlineMapSection .ry-trunk-panel .tp-v-bad{color:#b91c1c}
 
+/* [v842] 联合复核（总管 + 下游分区管网）：只读对照区。
+   字号一律 11px + !important —— 样式表里有 button/全局排版规则会盖掉它（见 §26.x 字号坑）。
+   结论分三色：ok 绿 / warn 琥珀 / info 灰（缺数据不是错，别用红）。 */
+#onlineMapSection .ry-trunk-panel .tp-joint{display:flex;flex-direction:column;gap:3px;padding:2px 0 0}
+#onlineMapSection .ry-trunk-panel .tp-jt-h{
+  display:flex;align-items:baseline;gap:5px;
+  font-size:11px!important;font-weight:700;color:#334155}
+#onlineMapSection .ry-trunk-panel .tp-jt-sub{font-weight:400;color:#94a3b8;font-size:10px!important}
+#onlineMapSection .ry-trunk-panel .tp-jt-rows{display:flex;flex-direction:column;gap:2px}
+#onlineMapSection .ry-trunk-panel .tp-jt-row{display:flex;align-items:baseline;gap:6px;line-height:1.45}
+#onlineMapSection .ry-trunk-panel .tp-jt-row>span{flex:0 0 30px;color:#64748b;font-size:10px!important}
+#onlineMapSection .ry-trunk-panel .tp-jt-row>b{
+  flex:1 1 auto;min-width:0;font-weight:600;color:#1e293b;font-size:11px!important;
+  font-variant-numeric:tabular-nums;word-break:break-word}
+#onlineMapSection .ry-trunk-panel .tp-jt-checks{display:flex;flex-direction:column;gap:2px;margin-top:2px}
+#onlineMapSection .ry-trunk-panel .tp-jt-check{
+  font-size:10.5px!important;line-height:1.5;padding-left:11px;position:relative;color:#475569}
+#onlineMapSection .ry-trunk-panel .tp-jt-check:before{
+  content:'';position:absolute;left:2px;top:6px;width:5px;height:5px;border-radius:50%;background:#94a3b8}
+#onlineMapSection .ry-trunk-panel .tp-jt-check.is-ok{color:#15803d}
+#onlineMapSection .ry-trunk-panel .tp-jt-check.is-ok:before{background:#16a34a}
+#onlineMapSection .ry-trunk-panel .tp-jt-check.is-warn{color:#b45309}
+#onlineMapSection .ry-trunk-panel .tp-jt-check.is-warn:before{background:#d97706}
+#onlineMapSection .ry-trunk-panel .tp-jt-note{
+  font-size:10px!important;line-height:1.5;color:#94a3b8;margin-top:1px}
+#onlineMapSection .ry-trunk-panel .tp-jt-note[hidden]{display:none!important}
+
 /* 节点标记弹窗：z-index 2400 —— 必须高过右键菜单(2200)与安装条(2000)，
    它是模态的，被任何东西盖住都会表现为"点了没反应"。 */
 .ry-node-mask{

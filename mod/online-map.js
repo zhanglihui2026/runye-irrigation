@@ -1408,12 +1408,31 @@
     trunkPanel=P.mount({
       container:host,
       getEntry:function(id){ return findSavedTrunk(id); },
+      getLayout:currentPlotNetwork,
       onPatch:function(id,patch){ patchTrunkParams(id,patch); },
       onRecheck:function(id){ recheckTrunk(id); },
       onMarkNode:function(id){ openNodeDialog(id,activeVertexIdx); },
       onClose:function(){ trunkPanelMutedId=trunkPanel?trunkPanel.currentId():null; }
     });
     return trunkPanel;
+  }
+
+  /* [v842] 下游分区管网快照（联合复核用）。**必须做地块归属校验**：
+     runye_network_layout 绑在「当前地块锚点」上，不一定是地图上正在编辑的这块地。
+     不是同一块时返回 {mismatch:true}（而不是 null）—— 面板据此能说清
+     "下游快照属于另一块地"，而不是让人以为"下游还没做"。
+     另外把 front 段一并交给面板没关系：面板自己按 kind 排除，它只统计下游。 */
+  function currentPlotNetwork(){
+    var store=window.RyIrrigationDataStore;
+    if(!store||typeof store.readNetworkLayout!=='function') return null;
+    var net=null;
+    try{ net=store.readNetworkLayout(); }catch(e){ return null; }
+    if(!net||!Array.isArray(net.segments)||!net.segments.length) return null;
+    var pid=String(currentMapPlotId==null?'':currentMapPlotId);
+    if(!pid) return {mismatch:true,plotId:net.plotId==null?null:String(net.plotId)};
+    if(String(net.plotId==null?'':net.plotId)!==pid)
+      return {mismatch:true,plotId:net.plotId==null?null:String(net.plotId)};
+    return net;
   }
 
   /* 面板显隐：只在编辑态、且真的选中了一条线时才弹（规格五「选中即弹、无选中隐藏」）。
