@@ -6228,3 +6228,29 @@ z-index 1170）。改动三件套：
   交互不动。
 - 版本 v863-demo-visible：三处同抬。490 单测 + check.cjs + publish_refs PASS。
   发布 84dcf25，sha256 复量 OK。
+
+## 26.101 演示组常驻地图左栏（v864-map-demo-dock · 2026-11-01）
+
+用户截图（分区与管路页左栏「分组组合 · 轮灌演示」组）要求把这块内容放到
+**在线地图左侧工具栏**，样式与本栏原有卡片统一，轮灌演示在地图实际地块演。
+
+- **实现（dock 搬移）**：mod/map-flow-demo.js 新增 ensureDock/dockDockIn/dockDockBack。
+  在线地图激活（isMapActive，refresh 的 onMap 分支）时：**动态创建**同款卡片
+  （section + h4.sec-t「分组组合 · 轮灌演示」+ #mapDemoDock，append 到
+  #onlineMapSection aside.side 末尾——与本栏其他卡片完全同款、零新增样式），
+  把 #tlPlanBar（联合灌溉/分组组合/轮灌演示 chips）与 #mapDemoBar 搬入；
+  离开地图按 memo 原样搬回（#tlPlanBar→#tlSide、#mapDemoBar→#ryCadGrpDemo 组尾）
+  并隐藏卡片。CSS .pp-plan-bar 是全局类，跨栏搬移样式不变。
+- **两个坑（都实测踩过）**：① 静态 DOM 写在地图 aside 里会被工作区重排挪位
+  （dock 祖先链漂到 MAIN 直下）⇒ dock 必须 JS 运行时动态创建；② dockDockIn
+  必须幂等（重复 refresh 不得覆盖 memo，否则搬回失效）——memo 只在真正搬入时记。
+- **与 v858 工具模式互斥**：body.ry-tool 时 dockDockIn 不抢 #tlPlanBar
+  （它归 ry-cad-toolbar 的 #ryCadGrpDemo 管），dock 只补 #mapDemoBar。
+- 验证：dock_test 两轮（headless 默认 ry-tool 验证 mb 链路+工具模式分流；
+  移除 ry-tool 验证非工具模式全链：进 dock ✓ 搬回 ✓ 卡片隐藏 ✓）。
+  490 单测 + check.cjs + lint + publish_refs 全过。
+- ⚠ **p8 探针 10/12（环境漂移）**：C2（折叠 CSS 未命中）/D4（拖拽未移动）两项
+  失败，git worktree 对照 v859/v862/v863 **同样失败** —— 与本会话代码无关，
+  疑 Edge 自动更新改变 headless 行为（v862 发布当天同探针 12/12）。v855 面板
+  功能用户已实测过，不阻塞发布；留观察，若用户报面板折叠/拖拽异常再深挖。
+- 版本 v864-map-demo-dock：三处同抬。发布 815b5c9，sha256 复量 OK。
