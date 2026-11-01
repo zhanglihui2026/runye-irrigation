@@ -26,7 +26,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>润野灌溉设计优化版｜滴灌管径与水泵选型</title>
 <meta name="description" content="输入地块、滴灌带与水源参数，快速计算灌溉分区、主管支管管径和水泵工作点。"/>
-<link rel="stylesheet" href="mod/style-01.css?v=850-zone-label">
+<link rel="stylesheet" href="mod/style-01.css?v=851-draw-btn-order">
 <link rel="stylesheet" href="runye-inverse-design.css?v=277">
 <script defer src="runye-inverse-design.js?v=438-branch-flow-conservation"></script>
 <link rel="stylesheet" href="runye-terrain.css?v=454-terrain-sidebar-peer">
@@ -698,7 +698,6 @@ body.ry-worst-off [data-tlworst]{display:none}
       <div class="map-draw-tools ryp-float ry-hbar" id="mapDrawTools" data-ry-panel
            data-ry-position-key="mapDrawToolsPos" data-ry-default-top="12" data-ry-default-left="12">
         <span class="dt-grip" data-ry-drag title="按住拖动工具条；位置自动记住">⠿ 绘制</span>
-        <button class="ry-hbar-btn" id="btnDraw">✏️ 开始画框</button>
         <button class="ry-hbar-btn" id="btnDrawTrunk" title="从头重绘当前地块总管；完成保存前，旧线路保留">🟠 绘制总管</button>
         <button class="ry-hbar-btn" id="btnFinishTrunk" title="结束并保存当前总管线">完成总管</button>
         <button class="ry-hbar-btn" id="btnUndoTrunk" title="撤销总管最后一个折点">↩ 撤销总管点</button>
@@ -707,6 +706,10 @@ body.ry-worst-off [data-tlworst]{display:none}
              快捷键 E。按钮样式复用 .ry-hbar-btn，**不需要为它写任何 CSS**。 -->
         <button class="ry-hbar-btn" id="btnEditTrunk" aria-pressed="false" disabled
                 title="编辑当前地块已保存的干线：点线选中、拖白点改拐点、右键开菜单；快捷键 E">✎ 编辑总管</button>
+        <!-- [v850 用户反馈] 「✏️ 开始画框」挪到「✎ 编辑总管」之后、「✅ 完成」之前
+             （地块绘制一组：总管三钮 + 编辑 → 开始画框 → 完成）。纯 DOM 顺序调整，
+             online-map.js 按 id 绑定，逻辑零改动。 -->
+        <button class="ry-hbar-btn" id="btnDraw">✏️ 开始画框</button>
         <!-- [v819] 文案收短 + 悬浮说明面板：用户「完成并画下一块，改为完成；鼠标放上来要弹出悬浮面板解释功能」。
              功能实义（online-map.js v186）：顶点 ≥3 自动存入「我的地块」→ 清空画布 → 紧接着画下一块（连续绘制）；
              不足 3 点视为草稿只清不存。停止方式：再点「开始画框」或右键地图。

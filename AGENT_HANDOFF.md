@@ -5987,3 +5987,13 @@ case-lib manifest 1.1.0。
   （inline-09 展开内联随主页串走）。
 - 静态锁 `tests/zone_label_corner.test.cjs`（4 项）：三处锚点/对齐 + 居中锚退场 +
   v837 兜底保留。纯显示层改动——管径选择（__act/ryZonePipePick）、水力计算零触碰。
+
+## 26.90 工具栏「开始画框」按钮挪位（v851 · 2026-11-01 · 用户反馈）
+
+用户原话：开始画框这个按钮位置移动到完成按钮前面、编辑总管后面。
+
+- index.html `#mapDrawTools` 内 `#btnDraw` 从第 2 位（grip 之后）挪到 `#btnEditTrunk`
+  之后、`#btnFinish` 之前。新顺序：⠿绘制 ｜ 绘制总管 · 完成总管 · 撤销总管点 · 编辑总管 ·
+  **开始画框** · 完成 ｜ 加点 · 撤销 · 测距 · 清除。
+- 纯 DOM 顺序调整：online-map.js 按 id 绑定，逻辑零改动；无测试锁按钮顺序。
+- 版本同抬 `v851-draw-btn-order`：sw VERSION + style-01.css?v=。
