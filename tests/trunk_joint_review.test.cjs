@@ -1,13 +1,18 @@
 'use strict';
-/* tests/trunk_joint_review.test.cjs —— 联合复核（总管 + 下游分区管网）的对照口径
+/* tests/trunk_joint_review.test.cjs —— 联合复核（总管 + 下游分区管网）的对照与合计算口径
  *
- * 这个函数**故意不算合计损失**。要钉住的正是"没算"和"算的是什么"：
+ * 口径已定（v843，用户 2026-11-01）：「扬程按 在线地图总管长度 + 分区主管及支管长度 算」。
+ * ⇒ 合计 = 总管 + 主管 + 支管 三段损失相加，而那个和就是三级页 computeThreeLevel 的
+ *   totalPipeLoss，**本模块不另算一份**。这个文件钉住的是"没算错、没多算、没少算"：
+ *
  *   ① 缺数据一律 info（"暂不可做"），不许拿 0 或默认档顶上去；
  *   ② 下游流量取**最大段流量**，绝不 Σq —— 并联支管相加是重复计数，
  *      那个数看着像总流量，其实没有物理意义，而它一旦出现在界面上就会被当成结论；
- *   ③ front 段不属于"下游"，不许混进统计（它是总管自己）；
+ *   ③ front 段不属于"下游"，**数量、长度都不许算**（它是掌管自己那根管的代理线）；
  *   ④ 地块绑定失配时要说"属于另一块地"，不能含糊成"下游没做"；
- *   ⑤ 不改入参（面板每次 refresh 都会重算，就地改会把库里的数据带脏）。
+ *   ⑤ 不改入参（面板每次 refresh 都会重算，就地改会把库里的数据带脏）；
+ *   ⑥ 段长度**必须能从 latLng 现算** —— 生产数据里根本没有 len 字段，
+ *      只认 len 会让面板上的"管长"永远是「—」（v842 的真缺陷）。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -106,18 +111,101 @@ test('⑧ front 段不算"下游"（它是总管自己）', () => {
   assert.equal(jr.down.branchCount, 2);
 });
 
-test('⑨ 总长只在每段都有 len 时求和，缺一段就整栏给 null', () => {
-  const ok = P.jointReview(ENTRY, LAYOUT);
-  assert.equal(ok.down.lenM, 200 + 120 + 90 + 40 + 40);
-  const broken = JSON.parse(JSON.stringify(LAYOUT));
-  delete broken.segments[3].len;
-  const jr = P.jointReview(ENTRY, broken);
-  assert.equal(jr.down.lenM, null, '缺一段长度就不能给一个"看起来完整"的总长');
+test('⑨ 管长合计只加主/支管，**不含 front**（v842 把 front 也加进去了，同一条管数两遍）', () => {
+  const jr = P.jointReview(ENTRY, LAYOUT);
+  assert.equal(jr.down.lenMainM, 120 + 90);
+  assert.equal(jr.down.lenBranchM, 40 + 40);
+  assert.equal(jr.down.lenM, 120 + 90 + 40 + 40, '200 m 的 front 不许进来');
 });
 
-test('⑩ 永远说明"合计损失暂不给出"（口径未定，别让人以为漏了）', () => {
+test('⑨b 段上没有 len 时从 latLng 现算（生产数据就是这种情况）', () => {
+  const noLen = { plotId: 'p1', segments: [{ id: 'main_1', name: 'main1', kind: 'main', dn: 90, latLng: [[18.25, 109.52], [18.2501, 109.5201]] }] };
+  const jr = P.jointReview(ENTRY, noLen);
+  assert.equal(jr.down.lenMainM !== null, true, '没有 len 必须能靠 latLng 算出来，不能给 —');
+  /* 0.0001° 纬度 ≈ 11.13 m、0.0001° 经度（18.25°N）≈ 10.57 m ⇒ 约 15.4 m */
+  assert.ok(Math.abs(jr.down.lenMainM - 15.35) < 0.3, '实际 ' + jr.down.lenMainM);
+});
+
+test('⑨c len 和 latLng 都没有 ⇒ null（不补 0，也不猜）', () => {
+  const bare = { plotId: 'p1', segments: [{ id: 'main_1', name: 'main1', kind: 'main', dn: 90 }] };
+  const jr = P.jointReview(ENTRY, bare);
+  assert.equal(jr.down.lenM, null);
+});
+
+test('⑨d latLng 里有坏点 ⇒ 整段不给长度（不跳过坏点抄近道）', () => {
+  const bad = { plotId: 'p1', segments: [{ id: 'main_1', kind: 'main', dn: 90, latLng: [[18.25, 109.52], ['x', 1], [18.2502, 109.5202]] }] };
+  const jr = P.jointReview(ENTRY, bad);
+  assert.equal(jr.down.lenM, null);
+});
+
+test('⑩ 没有三级计算式时明说"暂不给出"，不编一个数', () => {
   const jr = P.jointReview(ENTRY, LAYOUT);
-  assert.match(jr.note, /合计损失暂不给出/);
+  assert.equal(jr.design, null);
+  assert.match(jr.note, /暂不给出/);
+});
+
+/* ---------- 合计（v843）：三段损失相加 ---------- */
+
+const DESIGN = {
+  frontLenUsed: 342.6, mainLenUsed: 120, branchLenUsed: 40,
+  frontPipeLoss: 0.85, mainLoss: 0.32, branchLoss: 0.11,
+  totalPipeLoss: 1.28, frontLenSrc: 'mapTrunk', frontLenMap: 342.6, pumpHead: 23.4
+};
+
+test('⑬ 三段长度与损失原样带出，管路总长 = 三段相加', () => {
+  const jr = P.jointReview(ENTRY, LAYOUT, null, DESIGN);
+  assert.ok(jr.design);
+  assert.equal(jr.design.front, 342.6);
+  assert.equal(jr.design.main, 120);
+  assert.equal(jr.design.branch, 40);
+  assert.ok(Math.abs(jr.design.lenSum - 502.6) < 1e-9);
+});
+
+test('⑭ 合计直接用 totalPipeLoss（与三级页同一个数，不重新加一遍）', () => {
+  const jr = P.jointReview(ENTRY, LAYOUT, null, DESIGN);
+  assert.equal(jr.design.totalLoss, 1.28);
+  /* 故意给一个"三项相加 ≠ totalPipeLoss"的脏输入：必须信 totalPipeLoss */
+  const dirty = Object.assign({}, DESIGN, { totalPipeLoss: 9.99 });
+  assert.equal(P.jointReview(ENTRY, LAYOUT, null, dirty).design.totalLoss, 9.99);
+});
+
+test('⑭b 没有 totalPipeLoss 时退回三项相加', () => {
+  const d = Object.assign({}, DESIGN); delete d.totalPipeLoss;
+  const jr = P.jointReview(ENTRY, LAYOUT, null, d);
+  assert.ok(Math.abs(jr.design.totalLoss - (0.85 + 0.32 + 0.11)) < 1e-9);
+});
+
+test('⑭c 三段长度缺一个 ⇒ design=null（不拿两段当合计）', () => {
+  const d = Object.assign({}, DESIGN); delete d.branchLenUsed;
+  assert.equal(P.jointReview(ENTRY, LAYOUT, null, d).design, null);
+});
+
+test('⑭d 合计必须写清"不含静扬程/工作压力/安全系数"（别让人拿 1.28 m 当扬程）', () => {
+  const jr = P.jointReview(ENTRY, LAYOUT, null, DESIGN);
+  assert.match(jr.note, /不含静扬程/);
+  assert.match(jr.note, /1\.10 安全系数/);
+  assert.match(jr.note, /扬程计算式/);
+});
+
+test('⑭e 总管长度来源要带出来（地图实测 / 图面 / 试算输入）', () => {
+  assert.equal(P.jointReview(ENTRY, LAYOUT, null, DESIGN).design.src, 'mapTrunk');
+  const d2 = Object.assign({}, DESIGN, { frontLenSrc: 'figure', frontLenMap: null });
+  assert.equal(P.jointReview(ENTRY, LAYOUT, null, d2).design.src, 'figure');
+  const d3 = Object.assign({}, DESIGN, { frontLenSrc: '乱写的' });
+  assert.equal(P.jointReview(ENTRY, LAYOUT, null, d3).design.src, '', '未知来源一律清空，不硬塞');
+});
+
+test('⑭f 地块失配时仍然不给 checks，但 design 可以带出来（那是另一回事）', () => {
+  const jr = P.jointReview(ENTRY, { mismatch: true, plotId: 'p9' }, null, DESIGN);
+  assert.equal(jr.checks.length, 0);
+  assert.match(jr.note, /属于另一块地/);
+});
+
+test('⑮ segLenOf：len 优先于 latLng（图面改长后以库里的值为准）', () => {
+  assert.equal(P.segLenOf({ len: 77, latLng: [[18.25, 109.52], [18.26, 109.53]] }), 77);
+  assert.equal(P.segLenOf({ len: 0 }), 0, '0 是合法长度，不能被当成"没有"');
+  assert.equal(P.segLenOf(null), null);
+  assert.equal(P.segLenOf({ latLng: [[18.25, 109.52]] }), null, '单点不是一段');
 });
 
 test('⑪ 不改入参（面板每次 refresh 都重算）', () => {

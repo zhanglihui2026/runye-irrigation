@@ -5585,3 +5585,170 @@ function currentPlotNetwork(){        // 读快照 + 校验归属，不做任何
 2. 分区页移除手绘总管入口 `#grTrunkDraw`（两套总管并存）。
 3. 众包案例库打包。
 4. 真中文层名（AC1021/UTF-8 专项，见 §26.79 三）。
+
+---
+
+## 26.82 总管九期：扬程口径定稿 —— 在线地图总管长 + 分区主管及支管（v843 · 2026-11-01）
+
+### 一、用户的口径（一句话）
+
+> **扬程应该是「在线地图总管长度 + 分区主管及支管长度」来算。**
+
+这同时回答了 §26.81 留下的问题（合计损失怎么给）。但要先把「改之前是什么」说清楚，
+否则下次有人看到代码会觉得这是个 bug：
+
+三级扬程的算式（`mod/inline-09.js` 的 `computeThreeLevel`）本来**就是**三段相加：
+
+```js
+const totalPipeLoss = frontPipeLoss + mainLoss + branchLoss;
+head = (lift + dh + 入口压力 − 已有压力 + totalPipeLoss + 过滤损失 + 4m富余) × 1.10
+```
+
+**主/支管**已是「最远分区最不利路径」的实际折线长（`tlWorstPathLen`）。
+缺的是**总管那一项**：它取的是**设计图面** `tlDiagramData.frontPipe` 从水源走到最远分区
+接点的弧长 —— 而用户在在线地图（`plot.trunk`）亲手画的那根总管，**从头到尾没进过扬程**。
+两条路画出来的总管不是同一根，长度自然也不一样。
+
+⇒ v843 补的正是这个缺口：**有地图总管就用它的实测长度**，不复述设计值。
+
+### 二、一个必须说清的单位问题（这次撞上了）
+
+把两段长度相加以前，得先确认它们**落在同一个米里**。
+
+- `__runyeGeoBase` 的 `mlat`（`m2ll` / `ll2m` / inline-09 / inline-13 / inline-16 / online-map）
+  全部用 **R = 6378137**；图面里量出来的主管/支管长度就是这套米。
+- `mod/trunk-panel.js` 的 haversine 从 v838 起用 **R = 6371008.8**（IUGG 平均半径）。
+  这是全站**唯一一处**孤立取值，看着更"正确"，实际让地图侧的长度比图面侧**短 0.11%**
+  （342 m 上差 0.38 m）。
+
+0.38 m 本身不影响结论，但**两个单位的米不能直接相加**。所以 v843 把 haversine 的 R
+统一到 **6378137**，并且：
+
+- 唯一实现放在 `mod/trunk-geo.js`（`haversine` / `lineLen` / `trunkLen`）；
+- `trunk-panel.js` 保留一份本地兜底（只在 geo 未加载时），用
+  `tests/trunk_geo_ll2m.test.cjs ⑰` 锁**逐位相等**；
+- 抛 Mona 那条反查用例：`⑫` 用 `m2ll` 造一条精确 100 m 的线、`lineLen` 量回来必须等于
+  100.000 —— R 一旦取错这条立刻红。（它确实红了一次，就是这么发现的。）
+
+顺带：`tests/trunk_panel.test.cjs ①` 的期望值原本写死了 207493（旧 R），已改为 207725。
+
+### 三、改动清单
+
+| 文件 | 改了什么 |
+|---|---|
+| `mod/trunk-geo.js` | 新增 `haversine`（R=6378137）、`rawPointOk`、`lineLen`、`trunkLen`；收 imaging 测距唯一实现 |
+| `mod/trunk-panel.js` | haversine 改走 geo（带兜底）；新增 `segLenOf`、`designBlock`；`jointReview` 多一个 `design` 入参；修复两个真缺陷（见下） |
+| `mod/inline-09.js` | 新增 `tlMapTrunkLen()`、`tlFrontLenUse()`（总管长度**唯一收口**）；两个赋值点都改走它；返回新增 `frontLenSrc` / `frontLenMap`；「扬程计算式」标注来源 |
+| `mod/online-map.js` | `getDesign: currentDesignNumbers`（读 `computeThreeLevel()`）；**`RyMapHost.currentPlotId()` 新开只读出口** |
+| `hydraulic-calc/pipe-path-loss.js` | 新增可选入参 `frontTotalOverride`（按比例缩各取水点 run）；不传时**逐位不变** |
+| `mod/online-map.css` | `.tp-jt-sep` / `.tp-jt-h2` / `.tp-jt-loss` / `.tp-jt-sum`；顺手修 `border-radius:50%` 没带 `!important`（全站规则会把它压成方块） |
+
+### 四、`tlFrontLenUse()`：三个来源，必须能自证
+
+```js
+tlFrontLenUse(wpFront, frontPipeLen) -> { len, src, mapLen, mapId }
+src = 'mapTrunk'   // 在线地图总管实测（优先）
+      'figure'     // 设计图面最远分区弧长
+      'input'      // 试算输入值
+```
+
+- 水源连接段（`tlSourceLinkLen`）+ 水源距离（`planSrcDist`）**照加** —— 那是「水源到总管
+  起点」，不属于总管本体。
+- 「扬程计算式」下方会把来源写出来：「总管 423.4 m（在线地图实测 · 最远 3 区主/支管）」。
+  **「423.4 m（在线地图实测）」和「200 m（试算输入）」对用户是完全不同的两条信息**，不能
+  只给一个数。
+
+### 五、`frontTotalOverride`：为什么是"按比例缩"而不是"整根替换"
+
+总管是一根**带多处取水点**的管，各段流量沿程递减（`pipe-path-loss.js` 的
+`active.forEach` 就是在按这个累损失）。直接「全长 × 组流量」会把后段流量算大。
+
+⇒ 取`runMax = max(每区取水点沿总管的 run)`，`runScale = override / runMax`，各取水点按原
+比例缩放。总长等于实测值，**相对位置不变**，逐段递减的流量口径也没动。
+
+不传 / 传 0 / 传负数 / 传 NaN / 传字符串垃圾 ⇒ `runScale = 1`，与改动前**逐位相同**
+（`tests/pipe_path_loss_front_override.test.cjs ⑥` 守着，老调用方零影响）。
+
+### 六、顺手修掉的两个真缺陷（都是 v842 埋的）
+
+1. **下游「管长」在生产环境一直是「—」。** `runye_network_layout.segments` 由
+   `mod/inline-09.js` 反投时只写 `{id, name, dn, kind, latLng}`，**根本没有 `len` 也没有 `q`**。
+   面板只读 `s.len` ⇒ null。探针的 fixture 是我自己编的（带了 len/q），所以没暴露。
+   ⇒ 新增 `segLenOf()`：`len` 优先，没有就按 `latLng` 现算（haversine）。
+   **教训：探针 fixture 不能比生产数据更完整，否则它守的是一个不存在的场景。**
+
+2. **「管长合计」把 front 也算进去了。** 原代码 `if (k !== 'front')` 只挡住了「数量」，
+   长度那行在判断**外面**无条件累加 ⇒ 同一根管在"总管"行和"下游"行各出现一次。
+   v842 的探针断言（A4 = 360 m）把错数也一并锁住了。
+   ⇒ 现在 front 整段 `continue`；`down.lenMainM` / `lenBranchM` 分开给，`lenM` 不含 front。
+
+另外：`down.lenM` 是**画在地图上的管线总长（材料量口径）**，而损失拆分里的主/支管长度是
+**最不利路径长度**。两者不是一回事，界面上必须分开写「管长合计」与「损失拆分」，不许混用。
+
+### 七、面板现在给什么
+
+```
+总管      ZG-001 · PE · DN160 · Q 60 m³/h · 0.83 m/s · 损失 1.85 m
+下游      主管 1 段 · 支管 1 段 · 最大主管 DN90 · 管长合计 352.6 m
+──────────────────────────────
+损失拆分  按一条最不利路径
+总管      423.4 m · 在线地图实测 · 5.12 m
+主管      300.0 m · 5.70 m
+支管      33.3 m · 0.20 m
+合计损失  11.02 m
+管路总长  756.7 m
+三级页扬程 42.04 m
+```
+
+底注：**「合计 = 总管 + 主管 + 支管 的沿程与局部损失（按一条最不利路径）。不含静扬程、
+入口工作压力、过滤损失、富余水头与 1.10 安全系数 —— 完整扬程见三级页『扬程计算式』。」**
+
+这条界线必须写出来：1.28 m 那个数一旦被当成扬程，后果比不给更严重。
+合计 = `computeThreeLevel().totalPipeLoss`，**面板不另算一份**。
+
+### 八、`RyMapHost.currentPlotId()`：为什么必须新开这个口
+
+`currentMapPlotId` 是 `mod/online-map.js` 的**闭包变量**，`window.currentMapPlotId` 恒为
+`undefined`（历史上探针就栽过一次，memory 里记着"`currentMapPlotId` 不挂 window"）。
+而 `tlMapTrunkLen()` 在 `inline-09` 里，读不到它。
+
+⇒ 按文件里既有的约定（「外部想读状态走 `window.RyMapHost`」）加一个只读标量出口。
+
+地块锚点口径：**两个锚点都有且不等 ⇒ 撤回**（这根总管不属于正在算的这块地，任取一边都会
+把甲地的管长算进乙地的扬程）；只有一个 ⇒ 用那一个。
+
+### 九、探针踩的坑（两条，都写进 memory 了）
+
+1. **`RyPlotLibraryStore.replace()` 有形状校验**，外部拼的库对象会被拒：
+   `{ok:false, error:'invalid-plot-library'}`。别在探针里直接改写地块库。
+   ⇒ E7/E8/E9 改成**切换地块**（短总管 vs 长总管 vs 无总管），走真实用户路径。
+   这跟 B4 那条（`select.value='63'` 假失败）是同一个道理：**绕过交互直接改状态，
+   会在一个用户根本走不到的地方判绿或判红。**
+2. 切地块时 app 会把自己的那份管网快照再写回去，所以「往 `...:p11-a` 键里塞一份别家
+   plotId 的快照」这种构造**不生效**（会退化成"未找到本块的快照"）。失配场景要改
+   `runye_current_plot_v1` 这个锚点。
+
+### 十、测试与发布状态（v843）
+
+- `tests/trunk_geo_ll2m.test.cjs`：+8 项（haversine 量级与对称、m2ll↔lineLen 100 m 闭环、
+  坏点拒绝、main 优先 / 最长优先 / 选中者坏点则撤回、两份 haversine 逐位相等）。
+- `tests/trunk_joint_review.test.cjs`：重写消费者（front 不计长度、latLng 现算、合计来源、
+  合计≠扬程的文案、来源标签白名单）。
+- `tests/pipe_path_loss_front_override.test.cjs`（新，9 项）：缩放正确、流量口径不变、
+  只动总管、**不传时逐位不变**、退化不出 NaN、多组各自缩放。
+- `tests/trunk_panel.test.cjs ①`：期望值按新 R 修正（207493 → 207725）。
+- `_probe_trunk_p11_joint.mjs`：**29/29**（本地）。关键三跳：
+  E7 总管 423→632 m、E8 合计损失 11.02→13.55 m、E9 **扬程 42.04→44.82 m**。
+- 版本同抬 `v843-trunk-head`：`sw.js` + `index.html` 八处 `?v=`（含 `pipe-path-loss.js`、
+  `trunk-geo.js`）。闸门：check.cjs 29 项 PASS / 单测 382 / publish_refs PASS / lint 无告警。
+
+### 十一、仍没做
+
+1. 分区页移除手绘总管入口 `#grTrunkDraw`（**三套**总管并存：`plot.trunk` v2 / 成组
+   `W.trunk={lines,dn}` / 设计图面 `frontPipe`）。
+2. 众包案例库打包。
+3. 真中文 DXF 层名（AC1021/UTF-8 专项，见 §26.79 三）。
+4. **已知未修**：`readPoint` / `readLatLng` 会把 `[null, 1]` 读成 `{lat:0, lng:1}`
+   （`Number(null) === 0`）。历史数据里一个空位就会让整根线量出几千公里。
+   只在 `lineLen` 这条新链上加了 `rawPointOk` 收紧；改 `readLatLng` 本身会影响
+   `normalize` 的迁移语义（空位点会被判非法 ⇒ 丢掉整根干线），要单独评估。

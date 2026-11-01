@@ -62,10 +62,14 @@
   }
 
   /* 经纬度球面距离（米）。不用 Leaflet：本函数要能在 Node 里跑，
-     而在线地图的 `map.distance` 依赖 L 与实例。R 取 IUGG 平均半径，
-     与 Leaflet 的 6371000 差 8.8 m 半径 ⇒ 300 m 上差 4 mm，可忽略。 */
-  function haversine(a, b) {
-    var R = 6371008.8;
+     而在线地图的 `map.distance` 依赖 L 与实例。
+     ★ 唯一实现在 `mod/trunk-geo.js`（v843 起）—— 扬程算总管长度用的是同一个公式。
+       R 必须 6378137（与 __runyeGeoBase 的 mlat 同值），否则量出来的米和图上量的米
+       差 0.11%，而扬程要把两边长度直接相加。
+       本地副本只在 geo 未加载时兜底（Node 单测就是这种情形），
+       tests/trunk_geo_ll2m.test.cjs ⑰ 有一条逐位相等锁着两者不许漂移。 */
+  function haversineLocal(a, b) {
+    var R = 6378137;
     var rad = Math.PI / 180;
     var dLat = (b.lat - a.lat) * rad;
     var dLng = (b.lng - a.lng) * rad;
@@ -73,6 +77,11 @@
     var h = s1 * s1 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * s2 * s2;
     if (h < 0) h = 0;
     return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+  }
+  function haversine(a, b) {
+    var g = root.RyTrunkGeo;
+    if (g && typeof g.haversine === 'function') return g.haversine(a, b);
+    return haversineLocal(a, b);
   }
 
   function readPoint(q) {
@@ -222,22 +231,31 @@
 
   /* ── 联合复核（规格七）：总管 + 下游分区管网 ─────────────────────────────
    *
-   * ★ 本版**只对照、不合计**，这是有意的，不是半成品：
-   *   「系统总损失 = 总管 hf + 下游最不利路径」听着简单，但**总管流量取哪个数**没有定论：
-   *   面板上的 designFlow 是用户填的设计依据，下游快照里的 segments[].q 是三级页算出来的
-   *   实际值，两者可以不一样（而且经常不一样）。随便挑一个相加，结果会被当成"复核结论"用；
-   *   错在口径上比错在算术上更难发现。
-   *   ⇒ 先把两边的数并排放，只指认**必然不成立**的不自洽：
-   *     ① 总管比最大主管还细（总管不可能比它供的管子细）
-   *     ② 总管设计流量小于下游最大段流量（同理）
-   *     ★ 不做「Σ segments[].q」——并联支管的流量相加是重复计数，那个数看着像总流量，
-   *       其实没有物理意义。取**最大段流量**当下限才是安全的。
-   *   合计等口径定下来再做（AGENT_HANDOFF §26.81）。
+   * [v843 定稿] 合计口径已由用户拍板（2026-11-01）：
+   *   **扬程按「在线地图总管长度 + 分区主管及支管长度」算。**
+   *   ⇒ 三段损失相加，而这个和**就是三级页 computeThreeLevel 的 totalPipeLoss**
+   *     （它的 frontLenUsed 已改为优先取地图总管实测长度，见 mod/inline-09.js 的
+   *     tlFrontLenUse）。所以本面板**不另算一份**，只把三个数拆开给人看。
+   *
+   * v842 当时不敢合计的理由（保留作记录）：总管流量取 designFlow（设计值）还是
+   *   segments[].q（三级算出来的）没有定论。现在这个疑问被口径本身绕开了 ——
+   *   合计走三级那套流量，总管长度走地图实测，两边不再各用一套流量相加。
+   *
+   * 仍然坚持的三条：
+   *   ① 不做「Σ segments[].q」——并联支管的流量相加是重复计数，取**最大段流量**当下限。
+   *   ② front 段整段不计（数量、长度都不算）：它是分区反投给总管画的代理线，
+   *      算进去同一根管在"总管"行和"下游"行各出现一次。
+   *   ③ 管长合计 ≠ 最不利路径长度：前者是画在地图上的所有管子之和（材料量口径），
+   *      后者才是水力路径。界面上分开写「管长合计」与「损失拆分」，不许混用。
    *
    * layout = RyIrrigationDataStore 的管网快照：
-   *   { plotId, segments:[{id,name,dn,kind,len,q,latLng}], valves, dripTapes }
+   *   { plotId, segments:[{id,name,dn,kind,latLng, len?, q?}], valves, dripTapes }
+   *   ★ len / q 是**可选**的：inline-09 反投时只写 id/name/dn/kind/latLng。
+   *     长度靠 segLenOf 从 latLng 现算，流量没有就明说"没有"，不猜。
    *   宿主传入前已做地块绑定校验；不属于本块时传 { mismatch:true, plotId } 而不是 null，
    *   这样面板能说清"为什么没有下游数据"，而不是让人以为"下游没做"。
+   *
+   * design = computeThreeLevel() 的返回（宿主 getDesign 现算），取不到的字段一律 null。
    */
   function kindOf(seg) {
     var k = seg && seg.kind;
@@ -249,7 +267,44 @@
     return 'other';
   }
 
-  function jointReview(entry, layout, derived) {
+  /* 一条段的长度：优先用快照自带的 `len`，**没有就按 latLng 现算**。
+     ★ 这一条是 v842 的真缺陷：`runye_network_layout.segments` 由 inline-09 反投时只写
+       `{id,name,dn,kind,latLng}`，**根本没有 len / q** —— 面板上那个"总长"在生产环境一直是「—」。
+       探针里我自己的 fixture 带了 len，所以没暴露。能现算的（长度）就必须现算。 */
+  function segLenOf(seg) {
+    var L = num(seg && seg.len);
+    if (L !== null && L >= 0) return L;
+    var arr = (seg && (seg.latLng || seg.points)) || null;
+    if (!Array.isArray(arr) || arr.length < 2) return null;
+    var tot = 0;
+    for (var i = 1; i < arr.length; i++) {
+      var a = readPoint(arr[i - 1]), b = readPoint(arr[i]);
+      if (!a || !b) return null;          /* 有坏点就整段不给长度，不抄近道 */
+      tot += haversine(a, b);
+    }
+    return tot;
+  }
+
+  /* 三级页的损失拆分（computeThreeLevel 的返回子集）。缺字段返回 null，界面就不显示这一段。 */
+  function designBlock(dz) {
+    if (!dz || typeof dz !== 'object') return null;
+    var f = num(dz.frontLenUsed), m = num(dz.mainLenUsed), b = num(dz.branchLenUsed);
+    if (f === null || m === null || b === null) return null;
+    var fl = num(dz.frontPipeLoss), ml = num(dz.mainLoss), bl = num(dz.branchLoss);
+    var tot = num(dz.totalPipeLoss);
+    if (tot === null) tot = (fl || 0) + (ml || 0) + (bl || 0);
+    var src = dz.frontLenSrc;
+    if (src !== 'mapTrunk' && src !== 'figure' && src !== 'input') src = '';
+    return {
+      src: src,
+      mapLen: num(dz.frontLenMap),
+      front: f, main: m, branch: b, lenSum: f + m + b,
+      frontLoss: fl, mainLoss: ml, branchLoss: bl, totalLoss: tot,
+      pumpHead: num(dz.pumpHead)
+    };
+  }
+
+  function jointReview(entry, layout, derived, design) {
     var d = derived || compute(entry);
     var prm = (entry && entry.params && typeof entry.params === 'object') ? entry.params : {};
     var out = {
@@ -264,10 +319,13 @@
         hf: d.hfTotal,
         len: d.projM
       },
-      down: { segCount: 0, mainCount: 0, branchCount: 0, mainMaxDn: null, lenM: null, qMax: null },
+      down: { segCount: 0, mainCount: 0, branchCount: 0, mainMaxDn: null, lenMainM: null, lenBranchM: null, lenM: null, qMax: null },
+      design: null,
       checks: [],
       note: ''
     };
+
+    out.design = designBlock(design);
 
     if (layout && layout.mismatch === true) {
       out.note = '下游管网快照属于另一块地' + (layout.plotId ? '（' + String(layout.plotId) + '）' : '') +
@@ -281,24 +339,35 @@
     }
     out.hasLayout = true;
 
-    var mainMax = null, lenSum = 0, lenAll = true, qMax = null;
+    /* ★ front 段整段跳过：既不算数量，也**不算长度**。
+       v842 这里是"数量跳过、长度照加"，于是「总长」把总管代理线也算进去了，
+       同一条管在"总管"行和"下游"行各出现一次。测试当时也照抄了这个错数（A4 断言 360）。 */
+    var mainMax = null, lenMain = 0, lenBranch = 0, lenOther = 0, lenOK = true, qMax = null;
     for (var i = 0; i < segs.length; i++) {
       var s = segs[i], k = kindOf(s);
-      if (k !== 'front') {
-        out.down.segCount++;
-        if (k === 'main') {
-          out.down.mainCount++;
-          var dn = num(s.dn);
-          if (dn !== null && dn > 0 && (mainMax === null || dn > mainMax)) mainMax = dn;
-        } else if (k === 'branch') out.down.branchCount++;
-        var q = num(s.q);
-        if (q !== null && q > 0 && (qMax === null || q > qMax)) qMax = q;
-      }
-      var L = num(s.len);
-      if (L === null || L < 0) lenAll = false; else lenSum += L;
+      if (k === 'front') continue;
+      out.down.segCount++;
+      var L = segLenOf(s);
+      if (L === null) lenOK = false;
+      if (k === 'main') {
+        out.down.mainCount++;
+        var dn = num(s.dn);
+        if (dn !== null && dn > 0 && (mainMax === null || dn > mainMax)) mainMax = dn;
+        if (L !== null) lenMain += L;
+      } else if (k === 'branch') {
+        out.down.branchCount++;
+        if (L !== null) lenBranch += L;
+      } else if (L !== null) lenOther += L;
+      var q = num(s.q);
+      if (q !== null && q > 0 && (qMax === null || q > qMax)) qMax = q;
     }
     out.down.mainMaxDn = mainMax;
-    out.down.lenM = lenAll ? lenSum : null;
+    /* 长度是**画在地图上的管线总长**（材料量口径），不是最不利路径长度。
+       两者不能混：扬程要的是"一条路走到底"，而这里是一张网上所有管子的和。
+       界面文案必须写清「管长合计」，别让人拿它去当水力路径。 */
+    out.down.lenMainM = lenOK ? lenMain : null;
+    out.down.lenBranchM = lenOK ? lenBranch : null;
+    out.down.lenM = lenOK ? (lenMain + lenBranch + lenOther) : null;
     out.down.qMax = qMax;
 
     /* ① 管径：总管必须 ≥ 最大主管。缺任一边就明说"缺"，不拿 0 或猜测的档位顶。 */
@@ -319,7 +388,16 @@
       out.checks.push({ level: 'ok', text: '总管设计流量 ' + round2(d.flow) + ' m³/h ≥ 下游最大段流量 ' + round2(qMax) + ' m³/h。' });
     }
 
-    out.note = '合计损失暂不给出：总管流量取设计值还是下游实际值尚未定口径，本版只做对照。';
+    /* [v843] 合计口径已定（用户 2026-11-01）：**总管长度取在线地图总管实测 ＋ 分区主管及支管**，
+       三段损失相加。这个数就是三级页 computeThreeLevel 的 totalPipeLoss —— 本面板**不另算一份**。
+       ★ 它不等于水泵扬程：扬程还要加静扬程、入口工作压力、过滤损失、富余水头，再乘 1.10 安全系数。
+         界面上必须把这条界线写出来，否则用户会拿 1.28 m 去当扬程。 */
+    if (out.design) {
+      out.note = '合计 = 总管 + 主管 + 支管 的沿程与局部损失（按一条最不利路径）。' +
+                 '不含静扬程、入口工作压力、过滤损失、富余水头与 1.10 安全系数 —— 完整扬程见三级页「扬程计算式」。';
+    } else {
+      out.note = '未取到三级计算式，合计损失暂不给出（需要三级页 computeThreeLevel 的结果）。';
+    }
     return out;
   }
   function round2(v) {
@@ -459,8 +537,11 @@
       var rowsEl = q('tpJointRows'), ckEl = q('tpJointChecks'), noteEl = q('tpJointNote');
       if (!rowsEl || !ckEl || !noteEl) return;
       var layout = (typeof opts.getLayout === 'function') ? opts.getLayout() : null;
-      var jr = jointReview(curEntry(), layout, d);
-      var T = jr.trunk, D = jr.down;
+      /* 三级计算式：合计损失的唯一来源。宿主那边 getDesign 是「现算」的薄封装，
+         取不到（未加载/异常）就传 null，本函数会退回只做对照。 */
+      var design = (typeof opts.getDesign === 'function') ? opts.getDesign() : null;
+      var jr = jointReview(curEntry(), layout, d, design);
+      var T = jr.trunk, D = jr.down, G = jr.design;
 
       var tParts = [];
       if (T.code) tParts.push(esc(T.code));
@@ -469,13 +550,34 @@
       if (T.flow !== null) tParts.push('Q ' + round2(T.flow) + ' m³/h');
       if (T.v !== null) tParts.push(fmtV(T.v));
       if (T.hf !== null) tParts.push('损失 ' + fmtM(T.hf));
-      rowsEl.innerHTML =
+
+      var html =
         '<div class="tp-jt-row"><span>总管</span><b>' + (tParts.length ? tParts.join(' · ') : '—') + '</b></div>' +
         '<div class="tp-jt-row"><span>下游</span><b>' + (jr.hasLayout
           ? ('主管 ' + D.mainCount + ' 段 · 支管 ' + D.branchCount + ' 段' +
              (D.mainMaxDn !== null ? ' · 最大主管 DN' + D.mainMaxDn : '') +
-             (D.lenM !== null ? ' · 总长 ' + fmtLen(D.lenM) : ''))
+             (D.lenM !== null ? ' · 管长合计 ' + fmtLen(D.lenM) : ''))
           : '—') + '</b></div>';
+
+      /* 损失拆分。三段长度口径不同，必须逐行标出来：
+         总管 = 一条线（在线地图实测）、主管/支管 = 各自最不利那一条，不是地图上的管线总长。 */
+      if (G) {
+        var srcTag = G.src === 'mapTrunk'
+          ? '在线地图实测'
+          : (G.src === 'figure' ? '设计图面' : (G.src === 'input' ? '试算输入' : ''));
+        html += '<div class="tp-jt-sep"></div>' +
+          '<div class="tp-jt-h2">损失拆分<span>按一条最不利路径</span></div>' +
+          '<div class="tp-jt-row tp-jt-loss"><span>总管</span><b>' + fmtLen(G.front) +
+            (srcTag ? ' · ' + esc(srcTag) : '') + ' · ' + fmtM(G.frontLoss) + '</b></div>' +
+          '<div class="tp-jt-row tp-jt-loss"><span>主管</span><b>' + fmtLen(G.main) + ' · ' + fmtM(G.mainLoss) + '</b></div>' +
+          '<div class="tp-jt-row tp-jt-loss"><span>支管</span><b>' + fmtLen(G.branch) + ' · ' + fmtM(G.branchLoss) + '</b></div>' +
+          '<div class="tp-jt-row tp-jt-sum"><span>合计损失</span><b>' + fmtM(G.totalLoss) + '</b></div>' +
+          '<div class="tp-jt-row"><span>管路总长</span><b>' + fmtLen(G.lenSum) + '</b></div>' +
+          (G.pumpHead !== null
+            ? '<div class="tp-jt-row"><span>三级页扬程</span><b>' + fmtM(G.pumpHead) + '</b></div>'
+            : '');
+      }
+      rowsEl.innerHTML = html;
 
       ckEl.innerHTML = jr.checks.map(function (c) {
         return '<div class="tp-jt-check is-' + esc(c.level) + '">' + esc(c.text) + '</div>';
@@ -612,6 +714,8 @@
     WARN_TEXT: WARN_TEXT,
     shouldWarn: shouldWarn,
     jointReview: jointReview,
+    designBlock: designBlock,
+    segLenOf: segLenOf,
     haversine: haversine,
     compute: compute,
     fmtLen: fmtLen,

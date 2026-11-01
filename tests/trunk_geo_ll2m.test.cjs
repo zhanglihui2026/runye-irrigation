@@ -144,3 +144,86 @@ test('⑨ 单点也能回（不打补丁、不插值）', () => {
   assert.equal(cad.length, 1);
   assert.ok(cad[0][0] > 0 && cad[0][1] > 0, '东北方向 => x>0 且 CAD y>0（北为正）');
 });
+
+/* ===== [v843] 经纬度测距：haversine / lineLen / trunkLen =====
+ * 为什么要在这里钉：扬程的「总管长度」项改成取在线地图总管实测长度，而面板那一栏显示的
+ * 是同一个数。两边必须同源 —— 差 0.2m 不影响结论，但两个数不一致会让人不信任整张表。
+ */
+
+test('⑩ haversine：赤道上 1° 经度 ≈ 111.3 km（量级对了才谈后面的比例）', () => {
+  const d = G.haversine({ lat: 0, lng: 0 }, { lat: 0, lng: 1 });
+  assert.ok(Math.abs(d - 111319) < 200, '实际 ' + d);
+});
+
+test('⑪ haversine：同一点为 0，且对称', () => {
+  const a = { lat: 18.25, lng: 109.52 }, b = { lat: 18.2514, lng: 109.5231 };
+  assert.equal(G.haversine(a, a), 0);
+  assert.equal(G.haversine(a, b), G.haversine(b, a));
+});
+
+test('⑫ lineLen：100 m 东西向折线（18°N 纬度圈上）要还原成 100 m', () => {
+  const refLat = 18, refLng = 109;
+  const cosLat = Math.cos(refLat * Math.PI / 180);
+  /* 用 m2ll 造一个精确 100 m 的线段，再用 lineLen 量回来 —— 闭环 */
+  const p0 = G.m2ll(0, 0, { refLat: refLat, refLng: refLng }, 1);
+  const p1 = G.m2ll(100, 0, { refLat: refLat, refLng: refLng }, 1);
+  assert.ok(p0 && p1 && cosLat > 0);
+  const L = G.lineLen([[p0.lat, p0.lng], [p1.lat, p1.lng]]);
+  assert.equal(L.ok, true);
+  assert.ok(Math.abs(L.len - 100) < 0.01, '实际 ' + L.len);
+});
+
+test('⑬ lineLen：有坏点 ⇒ ok=false（不跳过坏点硬连，那会让线抄近道）', () => {
+  const L = G.lineLen([[18.25, 109.52], [null, 1], [18.2502, 109.5202]]);
+  assert.equal(L.ok, false);
+  assert.equal(L.bad, 1);
+  assert.equal(G.lineLen([[18.25, 109.52]]).ok, false, '单点不是一条线');
+  assert.equal(G.lineLen(null).ok, false);
+});
+
+test('⑭ trunkLen：有 main 标记就取 main，不看谁长', () => {
+  const long = [[18.25, 109.52], [18.26, 109.52]];      // 更长
+  const main = [[18.25, 109.52], [18.2545, 109.52]];    // 更短但标了 main
+  const r = G.trunkLen([
+    { id: 'sub', main: false, points: long },
+    { id: 'trunk', main: true, points: main }
+  ]);
+  assert.equal(r.ok, true);
+  assert.equal(r.id, 'trunk');
+  assert.equal(r.source, 'main');
+  assert.ok(Math.abs(r.len - 500) < 1, '实际 ' + r.len);
+});
+
+test('⑮ trunkLen：没有 main 标记 ⇒ 取最长的一条（最不利）', () => {
+  const r = G.trunkLen([
+    { id: 'a', points: [[18.25, 109.52], [18.252, 109.52]] },
+    { id: 'b', points: [[18.25, 109.52], [18.255, 109.52]] }
+  ]);
+  assert.equal(r.id, 'b');
+  assert.equal(r.source, 'longest');
+});
+
+test('⑯ trunkLen：选中的那条有坏点 ⇒ ok=false，调用方必须退回旧口径', () => {
+  const r = G.trunkLen([{ id: 'x', main: true, points: [[18.25, 109.52], ['bad', 0]] }]);
+  assert.equal(r.ok, false);
+  assert.equal(G.trunkLen(null).ok, false);
+  assert.equal(G.trunkLen([]).ok, false);
+  /* 一条坏、一条好的，且都没 main ⇒ 取最长那条；坏的那条长度是 0，不会赢 */
+  const mix = G.trunkLen([
+    { id: 'bad', points: [[18.25, 109.52], ['bad', 0]] },
+    { id: 'ok', points: [[18.25, 109.52], [18.2536, 109.52]] }
+  ]);
+  assert.equal(mix.id, 'ok');
+  assert.equal(mix.ok, true);
+});
+
+test('⑰ trunk-panel 的兜底 haversine 与 trunk-geo 逐位相等（防两份实现漂移）', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'mod', 'trunk-panel.js'), 'utf8');
+  /* 只喂 window 不喂 RyTrunkGeo ⇒ 走 trunk-panel 内部的 haversineLocal 兜底。
+     取一个让 compute() 必须用到它的管线，再用 geo 的 haversine 手算同一段做对照。 */
+  const P = new Function('window', src + '\nreturn window.RyTrunkPanel;')({});
+  const a = [18.2500, 109.5180], b = [18.2509, 109.5224];
+  const d1 = P.compute({ id: 'T', points: [a, b], params: {} }).projM;
+  const d2 = G.haversine({ lat: a[0], lng: a[1] }, { lat: b[0], lng: b[1] });
+  assert.equal(d1, d2, '两个 haversine 必须给同一个数（面板与扬程会同时显示它）');
+});

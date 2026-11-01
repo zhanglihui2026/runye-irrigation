@@ -15,6 +15,10 @@
  *   ⇒ 做法：拿地块库的 polyLatLng（权威 GCJ-02）当标尺，对 ±y 各算一次 RMS，
  *     选能对上的那个；对不上（或两个都像 ⇒ 地块退化）就**拒绝反算**。
  *     宁可少吸一个点，不要吸到错误位置。
+ *
+ * 另一个身份（v843 起）：**经纬度测距的唯一实现**（haversine / lineLen / trunkLen）。
+ *   扬程要把「在线地图总管实测长度」算进总管沿程损失，而面板又要在自己那一栏显示同一个长度，
+ *   两处必须同源 —— 差 0.2m 不影响结论，但两个数不一致会让人不信任整张表。
  */
 (function (root) {
   'use strict';
@@ -100,6 +104,92 @@
     return out;
   }
 
+  /* 两点球面距离（米）。
+     ★ R 必须是 **6378137** —— 和 `__runyeGeoBase` 的 mlat（`m2ll`/`ll2m` 用的那个）、
+       以及 inline-09/13/16、online-map 里所有「米 ⇄ 经纬度」换算**同一个 R**。
+       取 IUGG 平均半径 6371008.8 看着更"正确"，但那样量出来的米和图上量出来的米
+       差 0.11%（342 m 上差 0.38 m），而扬程要把「地图总管长」和「图面主管/支管长」
+       直接相加 —— 两段不在同一个米里的数加起来，就不是长度了。
+     （自检闭环：tests/trunk_geo_ll2m.test.cjs ⑫ 用 m2ll 造 100 m、lineLen 量回来必须
+       等于 100.000；R 一旦取错这条立刻红。） */
+  function haversine(a, b) {
+    var R = 6378137;
+    var rad = Math.PI / 180;
+    var dLat = (b.lat - a.lat) * rad;
+    var dLng = (b.lng - a.lng) * rad;
+    var s1 = Math.sin(dLat / 2), s2 = Math.sin(dLng / 2);
+    var h = s1 * s1 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * s2 * s2;
+    if (h < 0) h = 0;
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+  }
+
+  /* 折点"原始值是否像一个坐标"。
+     ★ 为什么要多这一层：`Number(null)` 是 0、`Number('')` 也是 0，所以
+       `readLatLng([null, 1])` 会老老实实返回 {lat:0, lng:1} —— 一个几内亚湾上的点。
+       历史数据里真出现一个空位就会让整根干线量出几千公里。
+       ★ 只在**测距**这条新链上收紧（lineLen），不动 readLatLng 本身：
+         改它会连带改动 normalize/autoSign 的迁移语义（旧档里的空位点会被当成非法
+         从而丢掉整根干线），那是另一件事，要单独评估。 */
+  function rawPointOk(q) {
+    if (Array.isArray(q)) {
+      if (q.length < 2) return false;
+      return q[0] !== null && q[0] !== undefined && q[0] !== '' &&
+             q[1] !== null && q[1] !== undefined && q[1] !== '';
+    }
+    if (q && typeof q === 'object') {
+      return q.lat !== null && q.lat !== undefined && q.lat !== '' &&
+             q.lng !== null && q.lng !== undefined && q.lng !== '';
+    }
+    return false;
+  }
+
+  /* 一条折线的投影长度。返回 { ok, len, bad }：
+     ★ 有一个折点读不出来就 ok=false —— **不跳过坏点硬连**。跳过会让折线抄近道，
+       长度偏小、扬程偏小，而这种偏差在矩形地块上看不出来（视觉上还是"沿着画的"）。
+       宁可让调用方退回上一种长度来源，也不要给一个悄悄变短的数。 */
+  function lineLen(points) {
+    if (!Array.isArray(points)) return { ok: false, len: 0, bad: 0 };
+    var pts = [], bad = 0;
+    for (var i = 0; i < points.length; i++) {
+      var p = rawPointOk(points[i]) ? readLatLng(points[i]) : null;
+      if (p) pts.push(p); else bad++;
+    }
+    if (pts.length < 2) return { ok: false, len: 0, bad: bad + (2 - pts.length) };
+    var L = 0;
+    for (var j = 1; j < pts.length; j++) L += haversine(pts[j - 1], pts[j]);
+    return { ok: bad === 0, len: L, bad: bad };
+  }
+
+  /* 一组干线里「总管」的长度。
+   *
+   * 选哪一条：优先 main===true 的那条；没有标记就取**最长**的一条。
+   *   理由：地块里可能同时画了总管和支线，扬程走的是最不利那一条，
+   *   按最长取既符合"最不利"的物理含义，也不需要依赖用户记得给干线打 main 标记。
+   *
+   * 返回 { ok, len, id, source, count }。source='main' 表示按 main 标记取的，
+   * 'longest' 表示按最长取的（界面要能说清这个数是哪来的）。
+   * 任意一条被选中的干线折点不全 ⇒ ok=false，调用方退回原来的长度来源。
+   */
+  function trunkLen(trunks) {
+    if (!Array.isArray(trunks) || !trunks.length) {
+      return { ok: false, len: 0, id: null, source: 'none', count: 0 };
+    }
+    var mains = [], all = [];
+    for (var i = 0; i < trunks.length; i++) {
+      var t = trunks[i];
+      if (!t || typeof t !== 'object') continue;
+      var L = lineLen(t.points);
+      var rec = { ok: L.ok, len: L.len, id: (typeof t.id === 'string') ? t.id : null, main: t.main === true };
+      all.push(rec);
+      if (rec.main) mains.push(rec);
+    }
+    if (!all.length) return { ok: false, len: 0, id: null, source: 'none', count: 0 };
+    var pool = mains.length ? mains : all;
+    var pick = pool[0];
+    for (var k = 1; k < pool.length; k++) if (pool[k].len > pick.len) pick = pool[k];
+    return { ok: pick.ok, len: pick.len, id: pick.id, source: mains.length ? 'main' : 'longest', count: all.length };
+  }
+
   /* 分区网格交点：frame 局部坐标 → 世界米。
      口径与 mod/inline-09.js 的 tlFrameToWorld 逐字一致（frame 允许为 null = 恒等）。 */
   function frameToWorld(frame, p) {
@@ -170,6 +260,9 @@
     readLatLng: readLatLng,
     m2ll: m2ll,
     ll2m: ll2m,
+    haversine: haversine,
+    lineLen: lineLen,
+    trunkLen: trunkLen,
     trunkToCad: trunkToCad,
     frameToWorld: frameToWorld,
     zoneWorlds: zoneWorlds,

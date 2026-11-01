@@ -1409,6 +1409,7 @@
       container:host,
       getEntry:function(id){ return findSavedTrunk(id); },
       getLayout:currentPlotNetwork,
+      getDesign:currentDesignNumbers,
       onPatch:function(id,patch){ patchTrunkParams(id,patch); },
       onRecheck:function(id){ recheckTrunk(id); },
       onMarkNode:function(id){ openNodeDialog(id,activeVertexIdx); },
@@ -1422,6 +1423,24 @@
      不是同一块时返回 {mismatch:true}（而不是 null）—— 面板据此能说清
      "下游快照属于另一块地"，而不是让人以为"下游还没做"。
      另外把 front 段一并交给面板没关系：面板自己按 kind 排除，它只统计下游。 */
+  /* [v843] 三级计算式的三个损失项（联合复核的合计来源）。
+     ★ 为什么借 computeThreeLevel 而不是在面板里自己算：
+       ① 「总管 + 主管 + 支管」这套最不利路径逻辑已经在那边实现了（含取水点分段、
+         支管 Christiansen 折减、手动改径），再写一份必然漂移；
+       ② 它的 frontLenUsed 已经改成**优先取在线地图总管实测长度**（inline-09 的
+          tlFrontLenUse），所以这里拿到的总管长度就是要的那个数，不用再传一遍；
+       ③ 面板显示的合计必须和三级页「扬程计算式」上的数是同一个，否则用户会问哪个对。
+     取不到就返回 null —— 面板会退回只做对照，不会编一个 0 出来。
+     包在 try 里：computeThreeLevel 读 DOM 输入，页面没初始化时会抛。 */
+  function currentDesignNumbers(){
+    try{
+      if(typeof window.computeThreeLevel!=='function') return null;
+      var r=window.computeThreeLevel();
+      if(!r||typeof r!=='object') return null;
+      return r;
+    }catch(e){ return null; }
+  }
+
   function currentPlotNetwork(){
     var store=window.RyIrrigationDataStore;
     if(!store||typeof store.readNetworkLayout!=='function') return null;
@@ -2955,6 +2974,12 @@
     return {x:cp.x,y:cp.y};
   }
   window.RyMapHost={payload:buildPlotPayload,send:sendPlotToDesign,sendDraft:onSendCurrentDraft,trunkState:trunkState,
+    /* [v843] 当前在地图上编辑哪块地。
+       为什么必须有这个口：`currentMapPlotId` 是**闭包变量**，外面读不到（探针踩过：
+       `window.currentMapPlotId` 恒为 undefined）。而 v843 要让三级扬程取"在线地图上画的
+       总管"，就得知道这块地的 id 去地块库里翻 plot.trunk。
+       只读、不暴露整个状态 —— 需要的只是一个标量。 */
+    currentPlotId:function(){return currentMapPlotId;},
     project:projectToContainer,toDisplay:toDisplay,refresh:refreshPlotLibrary,
     /* [v833] 编辑层出口：探针要能「按 id 进编辑、拿菜单项、算两点米距」。
        菜单项走 RyTrunkEdit.buildMenuItems 的同一口径，避免探针自己复制一份文案

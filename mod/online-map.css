@@ -198,11 +198,26 @@ body:has(.ry-pwa-install) #onlineMapSection .ry-trunk-panel{bottom:96px}
 #onlineMapSection .ry-trunk-panel .tp-jt-check{
   font-size:10.5px!important;line-height:1.5;padding-left:11px;position:relative;color:#475569}
 #onlineMapSection .ry-trunk-panel .tp-jt-check:before{
-  content:'';position:absolute;left:2px;top:6px;width:5px;height:5px;border-radius:50%;background:#94a3b8}
+  content:'';position:absolute;left:2px;top:6px;width:5px;height:5px;
+  border-radius:50%!important;background:#94a3b8}  /* 见下：全站 border-radius:0!important 会把它压成方块 */
 #onlineMapSection .ry-trunk-panel .tp-jt-check.is-ok{color:#15803d}
 #onlineMapSection .ry-trunk-panel .tp-jt-check.is-ok:before{background:#16a34a}
 #onlineMapSection .ry-trunk-panel .tp-jt-check.is-warn{color:#b45309}
 #onlineMapSection .ry-trunk-panel .tp-jt-check.is-warn:before{background:#d97706}
+/* [v843] 损失拆分：三段 + 合计。合计单独加一条上边线，让"加起来是几"一眼能看出来。 */
+#onlineMapSection .ry-trunk-panel .tp-jt-sep{
+  height:1px;background:#e2e8f0;margin:4px 0 3px}
+#onlineMapSection .ry-trunk-panel .tp-jt-h2{
+  display:flex;align-items:baseline;gap:5px;margin-bottom:2px;
+  font-size:10.5px!important;font-weight:700;color:#334155}
+#onlineMapSection .ry-trunk-panel .tp-jt-h2>span{font-weight:400;color:#94a3b8;font-size:10px!important}
+/* 三段的标签比上面两行宽一点（"总管/主管/支管"两字，"合计损失"四字） */
+#onlineMapSection .ry-trunk-panel .tp-jt-loss>span,
+#onlineMapSection .ry-trunk-panel .tp-jt-sum>span{flex:0 0 48px}
+#onlineMapSection .ry-trunk-panel .tp-jt-loss>b{font-weight:500;color:#475569}
+#onlineMapSection .ry-trunk-panel .tp-jt-sum{
+  margin-top:3px;padding-top:3px;border-top:1px dashed #cbd5e1}
+#onlineMapSection .ry-trunk-panel .tp-jt-sum>b{font-weight:700;color:#1e3a8a;font-size:11.5px!important}
 #onlineMapSection .ry-trunk-panel .tp-jt-note{
   font-size:10px!important;line-height:1.5;color:#94a3b8;margin-top:1px}
 #onlineMapSection .ry-trunk-panel .tp-jt-note[hidden]{display:none!important}

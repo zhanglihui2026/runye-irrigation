@@ -14,7 +14,7 @@
 <!-- [v831] 地图总管数据契约 v2。必须**先于**所有读取方加载（inline-13 / inline-16 / inline-09 / online-map），
      否则它们调 RyTrunkSchema.normalize 时拿到 undefined，会退回「只认 schema===1」而读不到总管。
      为什么要有这个模块：plot.trunk 有 5 个读取方，v1→v2 的迁移只允许一个入口，理由见文件头注释。 -->
-<script src="core/trunk-schema.js?v=842-trunk-joint"></script>
+<script src="core/trunk-schema.js?v=843-trunk-head"></script>
 <script src="core/storage-guard.js?v=823-fix-transfer-save-alert"></script>
 <!-- [v836] 分区网格 frame ↔ 世界米的坐标换算。纯函数、零 DOM。
      必须先于 mod/inline-09.js（它的 tlFrameToWorld/tlFrameToGrid 是转发），
@@ -26,7 +26,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>润野灌溉设计优化版｜滴灌管径与水泵选型</title>
 <meta name="description" content="输入地块、滴灌带与水源参数，快速计算灌溉分区、主管支管管径和水泵工作点。"/>
-<link rel="stylesheet" href="mod/style-01.css?v=842-trunk-joint">
+<link rel="stylesheet" href="mod/style-01.css?v=843-trunk-head">
 <link rel="stylesheet" href="runye-inverse-design.css?v=277">
 <script defer src="runye-inverse-design.js?v=438-branch-flow-conservation"></script>
 <link rel="stylesheet" href="runye-terrain.css?v=454-terrain-sidebar-peer">
@@ -36,7 +36,7 @@
 <link rel="stylesheet" href="runye-case-library.css?v=277">
 <script src="runye-case-library.js?v=277"></script>
 <script src="runye-geo.js"></script>
-<script src="runye-map-enhance.js?v=842-trunk-joint"></script>
+<script src="runye-map-enhance.js?v=843-trunk-head"></script>
 <script src="hydraulic-calc/hydraulics-wasm.js"></script>
 <script src="hydraulic-calc/native-bridge.js"></script>
 <script src="hydraulic-calc/hc-core.js"></script>
@@ -51,7 +51,7 @@
 <link rel="stylesheet" href="hydraulic-calc/hydraulic-calc.css">
 <link rel="stylesheet" href="filter-system/filter-system.css">
 <link rel="stylesheet" href="pwa/vendor/leaflet.css">
-<link rel="stylesheet" href="mod/online-map.css?v=842-trunk-joint">
+<link rel="stylesheet" href="mod/online-map.css?v=843-trunk-head">
 <link rel="stylesheet" href="terrain/terrain.css?v=535-terrain-single-source">
 <link rel="stylesheet" href="hydraulics-main.css?v=442-native">
 <style id="ryCadTwinCss">
@@ -2453,7 +2453,7 @@ body.ry-worst-off [data-tlworst]{display:none}
      计算核心与 API 照常加载。将来恢复：改 false 或删除本行。
      注意 pipe-path-loss.js 是三级扬程校核（RyPipePathLoss.calculate）依赖，必须照常加载。 -->
 <script src="mod/inline-23.js?v=357"></script>
-<script src="hydraulic-calc/pipe-path-loss.js?v=607-branch-material-span"></script>
+<script src="hydraulic-calc/pipe-path-loss.js?v=843-trunk-head"></script>
 <script src="hydraulic-calc/hydraulic-calc.js"></script>
 <!-- 过滤系统页（2026-09-18 第七十二轮）：GREEN 单体版管路模型 + 选型计算，
      懒挂载（首次可见时建 DOM），与二级/三级计算双向融合。 -->
@@ -2553,11 +2553,11 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script src="mod/ry-panel.js?v=823-fix-transfer-save-alert"></script>
 <script src="pwa/vendor/leaflet.js"></script>
 <script src="mod/trunk-snap.js?v=832-trunk-snap"></script>
-<script src="mod/trunk-geo.js?v=840-trunk-dxf"></script>
+<script src="mod/trunk-geo.js?v=843-trunk-head"></script>
 <script src="mod/trunk-edit.js?v=835-trunk-geo-snap"></script>
 <script src="mod/trunk-history.js?v=835-trunk-geo-snap"></script>
-<script src="mod/trunk-panel.js?v=842-trunk-joint"></script>
-<script src="mod/online-map.js?v=842-trunk-joint"></script>
+<script src="mod/trunk-panel.js?v=843-trunk-head"></script>
+<script src="mod/online-map.js?v=843-trunk-head"></script>
 <script src="terrain/terrain-core.js?v=410-elev"></script>
 <script src="terrain/terrain-ui.js?v=513-sec-gate"></script>
 <script src="runye-hydraulics-page.js?v=829-hyd-auto-refresh"></script>

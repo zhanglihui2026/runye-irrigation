@@ -991,6 +991,71 @@ window.tlBranchSpanInfo = function (zi) {
     return { full: (full > 0 ? full : span), base: (base > 0 ? base : Math.max(0, span - 2 * gap)) };
   } catch (e) { return null; }
 };
+/* ===== [v843] 总管长度取「在线地图总管实测」 =====
+   用户口径（2026-11-01）：扬程 = 在线地图总管长度 + 分区主管及支管长度。
+   改之前：frontLenUsed 只按**设计图面**的 frontPipe 走到最远分区接点的弧长算（tlWorstPathLen），
+   而用户在地图页亲手画的那根总管（plot.trunk）从头到尾没进过扬程 —— 两条路画出来的总管
+   长度不一样，扬程自然对不上，而且用户看着地图上的线以为它已经算过了。
+
+   口径三条：
+     · 有可用地图总管 ⇒ 取它（打了 main 标记那条；没有标记就取最长一条）的实测折线长；
+     · 没有 / 折点有坏点 ⇒ **原样退回**图面弧长或试算输入，并把来源标出来；
+     · 水源连接段 + 水源距离照加 —— 那是「水源到总管起点」，不属于总管本体。
+
+   ★ 为什么不在这里自己算距离：`mod/trunk-geo.js` 是经纬度测距的唯一实现（v843），
+     面板上显示的总管长度也走它。两边各写一份就会出现"面板 342.6 m、扬程按 342.4 m"。
+   ★ 为什么不跳过坏点硬连：跳过会让折线抄近道，长度偏小 ⇒ 扬程偏小，
+     而这种偏差在矩形地块上肉眼看不出（线还是"沿着画的"）。宁可退回旧口径。 */
+function tlMapTrunkLen() {
+  try {
+    var S = window.RyTrunkSchema, G = window.RyTrunkGeo;
+    if (!S || !G || typeof G.trunkLen !== 'function') return null;
+    var store = window.RyPlotLibraryStore;
+    if (!store || typeof store.read !== 'function') return null;
+    /* 地块锚点：地图页有地图页的（闭包里的 currentMapPlotId，走 RyMapHost 只读出口），
+       三级/设计页有自己的（window.currentPlotId）。两边**完全可以不一样**。
+       口径（宁撤回、不猜）：
+         · 两个都有且相等 ⇒ 用
+         · 两个都有但不等 ⇒ **撤回**（这根总管不属于正在算的这块地，
+           任取一边都会把甲地的管长算进乙地的扬程）
+         · 只有一个 ⇒ 用那一个
+       ★ 别试图用 `window.currentMapPlotId`：它是 mod/online-map.js 的**闭包变量**，
+         在 window 上恒为 undefined（历史上探针就栽过一次）。 */
+    var a = (window.RyMapHost && typeof window.RyMapHost.currentPlotId === 'function')
+      ? window.RyMapHost.currentPlotId() : null;
+    var b = window.currentPlotId;
+    var aid = (a === null || a === undefined || a === '') ? '' : String(a);
+    var bid = (b === null || b === undefined || b === '') ? '' : String(b);
+    if (aid && bid && aid !== bid) return null;
+    var pid = aid || bid;
+    if (!pid) return null;
+    var lib = store.read();
+    var plots = (lib && Array.isArray(lib.plots)) ? lib.plots : [];
+    var plot = null;
+    for (var i = 0; i < plots.length; i++) {
+      if (plots[i] && String(plots[i].id) === String(pid)) { plot = plots[i]; break; }
+    }
+    if (!plot || !plot.trunk) return null;
+    var doc = S.normalize(plot.trunk);
+    if (!doc || !Array.isArray(doc.trunks) || !doc.trunks.length) return null;
+    var L = G.trunkLen(doc.trunks);
+    if (!L || !L.ok || !(L.len > 0)) return null;
+    return { ok: true, len: L.len, id: L.id, source: L.source, count: L.count };
+  } catch (e) { return null; }
+}
+
+/* 总管长度（扬程用）的**唯一收口**。三个调用点都走这里，别各写一份三元表达式。
+   返回 { len, src, mapLen, mapId }，src='mapTrunk'|'figure'|'input' —— 界面靠它标注来源：
+   「总管 342.6 m（在线地图实测）」和「总管 300.0 m（设计图面）」对用户是完全不同的信息。 */
+function tlFrontLenUse(wpFront, frontPipeLen) {
+  var link = (typeof window.tlSourceLinkLen === 'function') ? window.tlSourceLinkLen() : 0;
+  var srcDist = readNumber('planSrcDist', 0, { min: 0 });
+  var mt = tlMapTrunkLen();
+  if (mt && mt.ok) return { len: mt.len + link + srcDist, src: 'mapTrunk', mapLen: mt.len, mapId: mt.id };
+  if (wpFront > 0) return { len: wpFront + link + srcDist, src: 'figure', mapLen: null, mapId: null };
+  return { len: (frontPipeLen || 0) + link + srcDist, src: 'input', mapLen: null, mapId: null };
+}
+
 /* 最远分区最不利路径（2026-09-16 用户要求）：
    水头损失只按「水源 → 最远分区」一条路径计：总管（水源→该区接水点）+ 该区主管 + 该区支管；
    不把各地块的支管/主管全部相加。图面已生成时，长度取图面真实折线（含图面改长/平移，走 AE.effPts）；
@@ -1253,9 +1318,14 @@ function computeThreeLevel() {
   const frontPipeLen = readNumber('tl_frontPipeLen', 0, { min: 0 });
 
   /* 最远分区最不利路径（2026-09-16）：图面已生成时，总管/主管/支管长度改用图面到「最远分区」的
-     实际折线长，损失只算这一条路径（不再按各地块累加）。无图面时退回试算输入值。 */
+     实际折线长，损失只算这一条路径（不再按各地块累加）。无图面时退回试算输入值。
+     [v843] 总管那一段改由 tlFrontLenUse 收口：在线地图画了总管就用它的实测长（用户口径
+     「扬程 = 在线地图总管长度 + 分区主管及支管长度」），没画才退回图面弧长/试算输入。 */
   const wp = (typeof tlWorstPathLen === 'function') ? tlWorstPathLen() : { fromFigure: false, zoneIndex: -1, front: 0, main: 0, branch: 0, taps: [] };
-  let frontLenUsed = ((wp.fromFigure && wp.front > 0) ? wp.front : frontPipeLen) + ((typeof window.tlSourceLinkLen === 'function') ? window.tlSourceLinkLen() : 0) + readNumber('planSrcDist', 0, { min: 0 });   /* 任务⑮ + [v570]：水源连接段直线 + 水源距离 */
+  let frontLenPick = tlFrontLenUse((wp.fromFigure && wp.front > 0) ? wp.front : 0, frontPipeLen);
+  let frontLenUsed = frontLenPick.len;
+  let frontLenSrc = frontLenPick.src;
+  let frontLenMap = frontLenPick.mapLen;
   let mainLenUsed = (wp.fromFigure && wp.main > 0) ? wp.main : mainPipeLen;
 
   /* 水泵流量按「最大分区的实际面积」计（2026-09-21，用户口径）：分区实际面积=裁剪到实测地块
@@ -1397,6 +1467,9 @@ function computeThreeLevel() {
     var pathCheck = window.RyPipePathLoss.calculate({ zones: pathZones, groups: pathGroups,
       calibers: appliedPipes ? appliedPipes.calibers : null, frontOd: frontPipe.od, mainOd: mainPipe.od, branchOd: branchPipe.od,
       sourceDistance: readNumber('planSrcDist', 0, { min: 0 }),
+      /* [v843] 总管总长改用在线地图实测值（按比例缩各取水点 run，不整根替换）。
+         没画地图总管时传 0 ⇒ 模块内 runScale=1，与改动前逐位相同。 */
+      frontTotalOverride: (frontLenSrc === 'mapTrunk') ? frontLenMap : 0,
       branchCount: branchParallelCount, branchF: branchF, innerDiam: peInnerDiam, hazen: hazenWilliams });
     /* [v226] 每组取本组 total 最大的一行 = 该组最不利分区路径；flow = 组内各分区流量和（m³/h） */
     groupLoss = pathGroups.map(function (ids, gi) {
@@ -1417,7 +1490,12 @@ function computeThreeLevel() {
     hydraulicPath = pathCheck.worst;
     if (hydraulicPath) {
       frontPipeLoss = hydraulicPath.frontPipeLoss; mainLoss = hydraulicPath.mainLoss; branchLoss = hydraulicPath.branchLoss;
-      frontLenUsed = hydraulicPath.front + ((typeof window.tlSourceLinkLen === 'function') ? window.tlSourceLinkLen() : 0) + readNumber('planSrcDist', 0, { min: 0 }); mainLenUsed = hydraulicPath.main; branchLenUsed = hydraulicPath.branch;   /* 任务⑮ + [v570]：水源连接段直线计入 */
+      /* [v843] 总管长度仍走同一个收口（地图总管优先）。hydraulicPath.front 已在
+         pipe-path-loss 里按 frontTotalOverride 缩放过，所以两种来源的数值自洽：
+         用地图总管 ⇒ 这里等于 mapLen；没画 ⇒ 等于原来的图面弧长。 */
+      var fp2 = tlFrontLenUse(hydraulicPath.front, 0);
+      frontLenPick = fp2; frontLenUsed = fp2.len; frontLenSrc = fp2.src; frontLenMap = fp2.mapLen;
+      mainLenUsed = hydraulicPath.main; branchLenUsed = hydraulicPath.branch;   /* 任务⑮ + [v570]：水源连接段直线计入 */
     }
     if (appliedPipes) {
       /* 手动选管已通过 tlBuildPipeOverride 写入逐管口径；损失以 hydraulicPath 为唯一事实源。
@@ -1487,6 +1565,10 @@ function computeThreeLevel() {
     branchPipe, branchLoss, branchFlow, branchLen: branchLenUsed, branchSpan, layoutSides, tapsPerBranch, branchF,
     /* 最远分区最不利路径（2026-09-16）：wp=来源与分区号，*LenUsed=各段实际采用长度（米） */
     wp, hydraulicPath, frontLenUsed, mainLenUsed, branchLenUsed,
+    /* [v843] 总管长度来源：'mapTrunk'（在线地图总管实测）/ 'figure'（设计图面最远路径）/ 'input'（试算输入）。
+       frontLenMap = 地图总管的净长（不含水源连接段/水源距离），null 表示不是地图来源。
+       界面上必须标出来 ——「总管 342.6 m（在线地图实测）」和「总管 300 m（试算输入）」对用户是两件事。 */
+    frontLenSrc, frontLenMap,
     /* [v226] 逐组水头损失：groupLoss[g]={members:[分区号0基], zi:本组最不利分区, flow:组流量m³/h,
        front/main/branch:路径长度m, frontLoss/mainLoss/branchLoss/total:水头损失m}；无图面路径时 null */
     groupLoss,
@@ -1556,7 +1638,11 @@ function renderTLDerivation(r) {
     <div class="derivation-row"><span>＋ 富余水头</span><b class="val">${MARGIN_HEAD} m</b></div>
     <div style="margin-top:6px;font-size:11px;line-height:1.6;color:var(--s-500,#64748b)">
       损失按<b>一条最不利路径</b>计：总管 ${fmt(r.frontLenUsed,1)} m ＋ 主管 ${fmt(r.mainLenUsed,1)} m ＋ 支管 ${fmt(r.branchLenUsed,1)} m
-      ${r.wp && r.wp.fromFigure ? '（图面实际几何 · 最远 ' + fmt0(r.wp.zoneIndex + 1) + ' 区）' : '（试算输入值；生成管线图后改用图面实际几何）'}
+      ${r.frontLenSrc === 'mapTrunk'
+        ? '（总管取<b>在线地图总管实测</b> ' + fmt(r.frontLenMap,1) + ' m'
+          + (r.wp && r.wp.fromFigure ? ' · 最远 ' + fmt0(r.wp.zoneIndex + 1) + ' 区主/支管' : '')
+          + '）'
+        : (r.wp && r.wp.fromFigure ? '（图面实际几何 · 最远 ' + fmt0(r.wp.zoneIndex + 1) + ' 区）' : '（试算输入值；生成管线图后改用图面实际几何）')}
     </div>
     <div class="derivation-sum">
       <div class="expr">

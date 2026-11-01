@@ -53,8 +53,13 @@ test('① 投影长度 = 各段球面距离之和；缺高程时斜长与总高�
   const d = P.compute(line());
   assert.equal(d.ok, true);
   assert.equal(d.ptCount, 3);
-  /* 两段：lat30 处 1° 经度 ≈ 96.3 km，1° 纬度 ≈ 111.2 km ⇒ 合计 ≈ 207.5 km */
-  const expect = 111194.93 * (1 + Math.cos(30 * D));
+  /* 两段：1° 纬度 + lat30 处 1° 经度 ⇒ 合计约 207.7 km。
+     ★ 这里的 111319.49 是 **6378137·π/180**（= mod/trunk-geo.js 里 MLAT 用的那个半径），
+       不是 IUGG 平均半径 6371008.8。v843 把 haversine 的 R 统一到 6378137，理由见
+       mod/trunk-geo.js haversine 的注释：扬程要把"地图总管长"和"图面主管/支管长"相加，
+       两段必须落在同一个米里，否则 342 m 上差 0.38 m。
+       顺带修的是一个老问题：面板原本用的 6371008.8 是全站唯一一处孤立取值。 */
+  const expect = 111319.49 * (1 + Math.cos(30 * D));
   assert.ok(Math.abs(d.projM - expect) < 200, '投影应约 ' + Math.round(expect) + ' m，实际 ' + d.projM);
   assert.equal(d.slopeM, null, '没有高程就不能有斜长（否则是编出来的数）');
   assert.equal(d.dz, null, '没有高程就不能有总高差');
