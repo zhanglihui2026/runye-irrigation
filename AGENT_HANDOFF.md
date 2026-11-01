@@ -5965,3 +5965,25 @@ case-lib manifest 1.1.0。
   section/☁ 按钮都在 host 内、角度输入 step=1 可用、±1 按钮消失、无 pageerror。
 - 版本同抬 `v849-panel-merge`：sw VERSION + style-01 / online-map.css /
   runye-map-enhance.js / runye-map-partition.js 的 `?v=`。
+
+## 26.89 分区文字标注移到分块右上角（v850 · 2026-11-01 · 用户反馈）
+
+用户原话：地块分区的文字标注，放在分地块的右上角。原先三处都锚在分块中心，
+压着主管线和管口标注难读。
+
+- **三处同批口径**（缺一 = 两页/导出风格分叉）：
+  ① `mod/plot-editor.js` canvas 标注（屏幕所见，ppCtx.fillText「N区/尺寸/亩数/主Ø支Ø」）：
+     锚 = q2（右上）沿边内缩（padX=5/padY=4），`textAlign='right'`，行从锚点向下排
+     （r1=baseFont*0.65，行距 1.15×baseFont）；
+  ② `mod/plot-editor.js` 施工简图 SVG 导出（labelParts）：锚 = cellPts[1] 内缩
+     （pad 随格子尺寸 4%~6%），`text-anchor="end"`；
+  ③ `mod/inline-09.js` 三级 SVG（data-tlzone）：同 ②（PADX=6/PADY=5）。
+- cellPts 四角布局：[0]左上 [1]右上 [2]右下 [3]左下；局部 x 轴 = [0]→[1]，
+  y 轴 = [0]→[3]；旋转角不变（文字仍沿网格方向）。
+- **v837 出界兜底判定升级**：从「格子中心出界」改为「右上角锚点出界」——
+  锚点比中心更靠边，旋转最外圈更容易出界；锚点经 `ppToMeters` 转世界坐标判
+  `ppPointInPlot`，出界回退「本格 ∩ 地块」形心（界内）。0° 凸形地块行为不变。
+- 版本同抬 `v850-zone-label`：sw VERSION + style-01.css?v= + plot-editor.js?v=
+  （inline-09 展开内联随主页串走）。
+- 静态锁 `tests/zone_label_corner.test.cjs`（4 项）：三处锚点/对齐 + 居中锚退场 +
+  v837 兜底保留。纯显示层改动——管径选择（__act/ryZonePipePick）、水力计算零触碰。

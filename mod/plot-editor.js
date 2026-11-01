@@ -2143,15 +2143,23 @@
         var x=Math.min(q1.x,q2.x,q3.x,q4.x),y=Math.min(q1.y,q2.y,q3.y,q4.y);
         var w=Math.max(q1.x,q2.x,q3.x,q4.x)-x,h=Math.max(q1.y,q2.y,q3.y,q4.y)-y;
         var zoneScreenW=Math.hypot(q2.x-q1.x,q2.y-q1.y),zoneScreenH=Math.hypot(q3.x-q2.x,q3.y-q2.y);
-        var labelCenter={x:(q1.x+q2.x+q3.x+q4.x)/4,y:(q1.y+q2.y+q3.y+q4.y)/4};
         var labelAngle=Math.atan2(q2.y-q1.y,q2.x-q1.x);
         if(labelAngle>Math.PI/2)labelAngle-=Math.PI;else if(labelAngle<-Math.PI/2)labelAngle+=Math.PI;
         var _m2=ppZoneActualAreaM2(zc,zr,cuts,ppState.polyPts);
         var _mu=_m2/666.67;
-        /* [v837] 部分落在地块外的格子（旋转角下最外圈必有一批），格子中心可能已经跑到地块
-           外侧的空白里，标注就浮在外面。中心在界内时**一个像素都不动**（0° 与凸形地块行为不变），
-           只有真的出界才换成「本格 ∩ 地块」的形心。 */
-        if(_mu>0.05&&!ppPointInPlot(ppCutPoint(cuts,(cuts.xPos[zc]+cuts.xPos[zc+1])/2,(cuts.yPos[zr]+cuts.yPos[zr+1])/2))){
+        /* [v850 用户反馈] 标注放到分块**右上角**（原居中，压着主管线难读）。
+           q1 左上 / q2 右上 / q3 右下 / q4 左下。锚点 = q2 沿边内缩（局部 x 缩 padX、
+           y 缩 padY），文字右对齐（textAlign='right'），行从锚点向下排。
+           与三级页 inline-09 的 SVG 标注、施工简图导出同一批口径。 */
+        var labelPadX=5,labelPadY=4;
+        var lUx=zoneScreenW>0?(q2.x-q1.x)/zoneScreenW:1, lUy=zoneScreenW>0?(q2.y-q1.y)/zoneScreenW:0;
+        var lVx=zoneScreenH>0?(q4.x-q1.x)/zoneScreenH:0, lVy=zoneScreenH>0?(q4.y-q1.y)/zoneScreenH:1;
+        var labelAnchor={x:q2.x-labelPadX*lUx+labelPadY*lVx,y:q2.y-labelPadX*lUy+labelPadY*lVy};
+        var labelCenter={x:labelAnchor.x,y:labelAnchor.y};
+        /* [v837→v850] 出界兜底：判定从「格子中心出界」改为「右上角锚点出界」——
+           锚点比中心更靠边，旋转最外圈更容易出界。锚点换算世界坐标判界内，
+           出界时回退「本格 ∩ 地块」的形心（界内），标注不再浮在空白里。 */
+        if(_mu>0.05&&!ppPointInPlot(ppToMeters(labelAnchor.x,labelAnchor.y))){
           var __cw=ppZoneClipCenterWorld(zc,zr,cuts);
           if(__cw&&ppPointInPlot(__cw)){
             var __cc=ppToCanvas(__cw.x,__cw.y);
@@ -2167,17 +2175,18 @@
           var zoneAreaText=(_partial?_mu:(cuts.xPlan[zc]*cuts.yPlan[zr]/666.67)).toFixed(1)+'亩';
           var baseFont=Math.max(6,Math.min(10,Math.min(zoneScreenW/12,zoneScreenH/4.5)));
           ppCtx.save();ppCtx.translate(labelCenter.x,labelCenter.y);ppCtx.rotate(labelAngle);
-          ppCtx.fillStyle=_partial?'#9a4d05':'#111827';ppCtx.textAlign='center';ppCtx.textBaseline='middle';
+          ppCtx.fillStyle=_partial?'#9a4d05':'#111827';ppCtx.textAlign='right';ppCtx.textBaseline='middle';
+          var rowH=baseFont*1.15,r1=baseFont*0.65;
           if(zoneScreenH>=31){
-            ppCtx.font=baseFont+'px sans-serif';ppCtx.fillText((zi+1)+'区',0,-baseFont*.95);
-            ppCtx.font=baseFont+'px sans-serif';ppCtx.fillText(zoneSizeText,0,baseFont*.1);
-            if(zoneScreenH>=43)ppCtx.fillText(zoneAreaText,0,baseFont*1.15);
+            ppCtx.font=baseFont+'px sans-serif';ppCtx.fillText((zi+1)+'区',0,r1);
+            ppCtx.font=baseFont+'px sans-serif';ppCtx.fillText(zoneSizeText,0,r1+rowH);
+            if(zoneScreenH>=43)ppCtx.fillText(zoneAreaText,0,r1+rowH*2);
           }else{
             ppCtx.font=Math.max(5.5,baseFont*.82)+'px sans-serif';
-            ppCtx.fillText((zi+1)+'区 '+zoneSizeText,0,0);
+            ppCtx.fillText((zi+1)+'区 '+zoneSizeText,0,r1);
           }
           /* [v653] 实切口径：该区按实切面积的建议主管/支管档 */
-          if(__pick&&zoneScreenH>=57){ppCtx.fillStyle='#7c2d12';ppCtx.font=Math.max(6,baseFont*.9)+'px sans-serif';ppCtx.fillText('主 Ø'+__pick.main.od+' / 支 Ø'+__pick.branch.od,0,baseFont*2.2);}
+          if(__pick&&zoneScreenH>=57){ppCtx.fillStyle='#7c2d12';ppCtx.font=Math.max(6,baseFont*.9)+'px sans-serif';ppCtx.fillText('主 Ø'+__pick.main.od+' / 支 Ø'+__pick.branch.od,0,r1+rowH*3.15);}
           ppCtx.restore();
         }
       }
@@ -4181,9 +4190,16 @@
         // shrinks as the grid rotates and must not decide whether dimensions exist).
         var zoneScreenW=Math.hypot(cellPts[1].x-cellPts[0].x,cellPts[1].y-cellPts[0].y);
         var zoneScreenH=Math.hypot(cellPts[2].x-cellPts[1].x,cellPts[2].y-cellPts[1].y);
-        var labelCenter={x:(cellPts[0].x+cellPts[1].x+cellPts[2].x+cellPts[3].x)/4,y:(cellPts[0].y+cellPts[1].y+cellPts[2].y+cellPts[3].y)/4};
         var labelAngle=Math.atan2(cellPts[1].y-cellPts[0].y,cellPts[1].x-cellPts[0].x)*180/Math.PI;
         if(labelAngle>90)labelAngle-=180;else if(labelAngle<-90)labelAngle+=180;
+        /* [v850 用户反馈] 标注放到分块**右上角**（原居中，压着管线难读）。
+           cellPts 布局：[0]左上 [1]右上 [2]右下 [3]左下。锚点 = 右上角沿边内缩
+           （局部 x 缩 PADX、y 缩 PADY），文字右对齐（text-anchor:end），行全部从
+           锚点向下排（y 正值），与三级页 inline-09 同一批口径。 */
+        var labelPadX=Math.max(4,zoneScreenW*0.04), labelPadY=Math.max(3,zoneScreenH*0.06);
+        var lUx=zoneScreenW>0?(cellPts[1].x-cellPts[0].x)/zoneScreenW:1, lUy=zoneScreenW>0?(cellPts[1].y-cellPts[0].y)/zoneScreenW:0;
+        var lVx=zoneScreenH>0?(cellPts[3].x-cellPts[0].x)/zoneScreenH:0, lVy=zoneScreenH>0?(cellPts[3].y-cellPts[0].y)/zoneScreenH:1;
+        var labelCorner={x:cellPts[1].x-labelPadX*lUx+labelPadY*lVx, y:cellPts[1].y-labelPadX*lUy+labelPadY*lVy};
         var actualM2=ppZoneActualAreaM2(zc,zr,zoneCuts,plotPoly);
         var actualMu=actualM2/666.67;
         var _stdMu=zoneCuts.xPlan[zc]*zoneCuts.yPlan[zr]/666.67;
@@ -4196,18 +4212,18 @@
           var zoneAreaText=(isPartial?actualMu:(zoneCuts.xPlan[zc]*zoneCuts.yPlan[zr]/666.67)).toFixed(1)+'亩';
           var detailFont=Math.max(6.5,Math.min(10.5,Math.min(zoneScreenW/12,zoneScreenH/4.8)));
           var compactFont=Math.max(6,Math.min(8.5,Math.min(zoneScreenW/18,zoneScreenH/2.8)));
-          labelParts.push('<g transform="translate('+labelCenter.x.toFixed(1)+' '+labelCenter.y.toFixed(1)+') rotate('+labelAngle.toFixed(2)+')" text-anchor="middle" fill="'+(isPartial?'#b45309':'#111827')+'">');
+          labelParts.push('<g transform="translate('+labelCorner.x.toFixed(1)+' '+labelCorner.y.toFixed(1)+') rotate('+labelAngle.toFixed(2)+')" text-anchor="end" fill="'+(isPartial?'#b45309':'#111827')+'">');
           if(zoneScreenW>=42&&zoneScreenH>=20){
-            var titleY=zoneScreenH>=38?-detailFont*1.05:0;
+            var titleY=detailFont*1.2;
             labelParts.push('<text x="0" y="'+titleY.toFixed(1)+'" font-size="'+detailFont.toFixed(1)+'">'+(zi+1)+'区</text>');
             if(zoneScreenH>=34){
               labelParts.push('<text x="0" y="'+(titleY+detailFont*1.15).toFixed(1)+'" font-size="'+detailFont.toFixed(1)+'">'+zoneSizeText+'</text>');
               if(zoneScreenH>=48)labelParts.push('<text x="0" y="'+(titleY+detailFont*2.25).toFixed(1)+'" font-size="'+compactFont.toFixed(1)+'">'+zoneAreaText+'</text>');
             }else{
-              labelParts.push('<text x="0" y="'+(detailFont*1.05).toFixed(1)+'" font-size="'+compactFont.toFixed(1)+'">'+zoneSizeText+'</text>');
+              labelParts.push('<text x="0" y="'+(titleY+detailFont*1.15).toFixed(1)+'" font-size="'+compactFont.toFixed(1)+'">'+zoneSizeText+'</text>');
             }
           }else if(zoneScreenW>=28&&zoneScreenH>=12){
-            labelParts.push('<text x="0" y="0" font-size="'+compactFont.toFixed(1)+'">'+(zi+1)+'区 '+zoneSizeText+'</text>');
+            labelParts.push('<text x="0" y="'+compactFont.toFixed(1)+'" font-size="'+compactFont.toFixed(1)+'">'+(zi+1)+'区 '+zoneSizeText+'</text>');
           }
           labelParts.push('</g>');
         }

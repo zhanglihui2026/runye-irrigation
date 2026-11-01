@@ -3334,8 +3334,6 @@ function tlAutoGenerate(options) {
          ⚠ 无阶梯覆盖时两个修正项都恰好是 0.0 ⇒ 与旧输出**逐字节相同**（eq 基线不受影响）。 */
       var zoneW=xSrc[zc2]+(zX(zr,zc2+1)-xPos[zc2+1])+(xPos[zc2]-zX(zr,zc2)), zoneH=ySrc[zr]+(zY(zc2,zr+1)-yPos[zr+1])+(yPos[zr]-zY(zc2,zr));
        var cellPts=tsGridCell(zx,zy,zx+zoneW,zy+zoneH), r1=cellPts[0], r2=cellPts[2];
-       var cellCx=(cellPts[0].x+cellPts[1].x+cellPts[2].x+cellPts[3].x)/4;
-       var cellCy=(cellPts[0].y+cellPts[1].y+cellPts[2].y+cellPts[3].y)/4;
        var cellWpx=Math.hypot(cellPts[1].x-cellPts[0].x,cellPts[1].y-cellPts[0].y);
        var cellHpx=Math.hypot(cellPts[3].x-cellPts[0].x,cellPts[3].y-cellPts[0].y);
        var cellTextAngle=Math.atan2(cellPts[1].y-cellPts[0].y,cellPts[1].x-cellPts[0].x)*180/Math.PI;
@@ -3345,25 +3343,33 @@ function tlAutoGenerate(options) {
       var actMu=actM2/MU_TO_SQM;
       var isPartial=tlPartialFlags[zi];
        if(cellWpx>10&&cellHpx>10 && actMu>0.05){
+         /* [v850 用户反馈] 标注放到分块**右上角**（原居中，压着主管线不好看）。
+            cellPts 局部坐标：[0]=左上、[1]=右上（局部 x 正向末端）、[3]=左下（局部 y 正向末端）。
+            锚点 = 右上角沿边内缩（x 缩 PADX、y 缩 PADY），文字右对齐（text-anchor:end），
+            行距 14px 从 y=12 起排。旋转角度不变（文字仍沿网格方向）。 */
+         var PADX=6, PADY=5;
+         var uX=(cellWpx>0)?(cellPts[1].x-cellPts[0].x)/cellWpx:1, uY=(cellWpx>0)?(cellPts[1].y-cellPts[0].y)/cellWpx:0;
+         var vX=(cellHpx>0)?(cellPts[3].x-cellPts[0].x)/cellHpx:0, vY=(cellHpx>0)?(cellPts[3].y-cellPts[0].y)/cellHpx:1;
+         var cornerX=cellPts[1].x-PADX*uX+PADY*vX, cornerY=cellPts[1].y-PADX*uY+PADY*vY;
          var zoneLabelParts=[];
          if(isPartial){
            // 非标准分区显示区名与裁剪后的实际亩数，位置和文字方向都以当前网格为准。
-           zoneLabelParts.push('<text data-tlzone="1" x="0" y="-3" text-anchor="middle" font-size="12" font-weight="700" fill="#b45309">'+(zi+1)+'区</text>');
-           zoneLabelParts.push('<text data-tlzone="1" x="0" y="11" text-anchor="middle" font-size="9.5" font-weight="700" fill="#b45309">实际 '+actMu.toFixed(1)+' 亩</text>');
+           zoneLabelParts.push('<text data-tlzone="1" x="0" y="12" text-anchor="end" font-size="12" font-weight="700" fill="#b45309">'+(zi+1)+'区</text>');
+           zoneLabelParts.push('<text data-tlzone="1" x="0" y="26" text-anchor="end" font-size="9.5" font-weight="700" fill="#b45309">实际 '+actMu.toFixed(1)+' 亩</text>');
          }else{
            // 标准区尺寸始终按网格 X×Y 次序输出，避免旋转后标注内容也被交换。
            var zoneSizeText=tlZoneSizeLabel(xPlan[zc2],yPlan[zr]);
            var zoneAreaText=(xPlan[zc2]*yPlan[zr]/MU_TO_SQM).toFixed(1)+'亩';
            var enoughForThreeLines=cellWpx>=78&&cellHpx>=42;
            if(enoughForThreeLines){
-             zoneLabelParts.push('<text data-tlzone="1" x="0" y="-14" text-anchor="middle" font-size="13" font-weight="700" fill="#111827">'+(zi+1)+'区</text>');
-             zoneLabelParts.push('<text data-tlzone="1" x="0" y="1" text-anchor="middle" font-size="9.5" font-weight="600" fill="#111827">'+zoneSizeText+'</text>');
-             zoneLabelParts.push('<text data-tlzone="1" x="0" y="15" text-anchor="middle" font-size="9" fill="#111827">'+zoneAreaText+'</text>');
+             zoneLabelParts.push('<text data-tlzone="1" x="0" y="12" text-anchor="end" font-size="13" font-weight="700" fill="#111827">'+(zi+1)+'区</text>');
+             zoneLabelParts.push('<text data-tlzone="1" x="0" y="26" text-anchor="end" font-size="9.5" font-weight="600" fill="#111827">'+zoneSizeText+'</text>');
+             zoneLabelParts.push('<text data-tlzone="1" x="0" y="40" text-anchor="end" font-size="9" fill="#111827">'+zoneAreaText+'</text>');
            }else{
-             zoneLabelParts.push('<text data-tlzone="1" x="0" y="3" text-anchor="middle" font-size="8" font-weight="700" fill="#111827">'+(zi+1)+'区 '+zoneSizeText+'</text>');
+             zoneLabelParts.push('<text data-tlzone="1" x="0" y="12" text-anchor="end" font-size="8" font-weight="700" fill="#111827">'+(zi+1)+'区 '+zoneSizeText+'</text>');
            }
          }
-         tlLabelParts.push('<g transform="translate('+cellCx.toFixed(1)+' '+cellCy.toFixed(1)+') rotate('+cellTextAngle.toFixed(2)+')">'+zoneLabelParts.join('')+'</g>');
+         tlLabelParts.push('<g transform="translate('+cornerX.toFixed(1)+' '+cornerY.toFixed(1)+') rotate('+cellTextAngle.toFixed(2)+')">'+zoneLabelParts.join('')+'</g>');
       }
     }
   }
