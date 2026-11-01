@@ -6275,3 +6275,32 @@ z-index 1170）。改动三件套：
 - 探针固化：_probe_pp_rot_diagram.mjs（旋转矩阵）、/tmp/coord_check.mjs 逻辑可并入。
   备忘录已知未修 #3 就此关闭。
 - 版本 v865-zero-deg-frame：三处同抬。发布 7e7ab33，sha256 复量 OK。
+
+## 26.103 修「dock 搬进左栏后地图看不到」（v866-map-parse-fix · 2026-11-01）
+
+用户报 v864 上线后「分区轮灌组搬到在线地图左侧工具栏底部之后，地图就看不到了」。
+
+- **现象**：v864 下 #map 1566×**0**、瓦片仅 7 块；v863 对照 1310×835、24 块。
+- **排查链（三条证据收敛到解析层）**：
+  ① `/tmp/dom_dump2.mjs`：.map-wrap 存在但父链 `DIV < MAIN`——#onlineMapSection 的
+  .main 里只剩 aside，.side-grip 也不见了；
+  ② `/tmp/movetrace.mjs`（Page.addScriptToEvaluateOnNewDocument hook
+  appendChild/insertBefore/removeChild + 栈）：**MOVES=[]**——没有任何 JS 搬过
+  .map-wrap（ensureSharedHost 只搬 ppSide/tlSide/ppCanvas/tlCanvas，不碰地图）；
+  ③ `/tmp/parseonly.mjs`（**Emulation.setScriptExecutionDisabled 禁 JS 纯解析**）：
+  解析树里 .map-wrap 就已经是 MAIN 直下 ⇒ **纯 HTML 解析问题**，与 JS/时序全无关。
+- **根因**：v864 编辑 index.html 时在地图左栏 aside 内（我的地块 </section> 之后、
+  v864 注释之前）多写了一个游离 `</section>`（v863 同位置是 `</aside>`）。浏览器解析
+  到它时把 **#onlineMapSection 整个提前闭合**，其后 .side-grip/.map-wrap 全部解析成
+  MAIN 直下兄弟节点 ⇒ 地图容器脱离 `.main` 的 flex 行布局（高度塌成 97px）＝「地图看不到」。
+  dock 卡片本身在 aside 里正常（ensureDock 动态创建），v864 的 JS 搬移逻辑无辜。
+- **修复**：删游离 `</section>`（原 689 行），原地留 v866 病史注释。
+- **静态锁**：`tests/html_map_section.test.cjs`——截取 #onlineMapSection → .map-wrap
+  之间文本，断言 section/aside 开合标签两两配对；游离闭合标签再出现立即红。
+- **教训**：改 index.html 注释区时必须保持容器标签配对；「元素离奇换父」先用
+  **禁 JS 纯解析**探针排除解析层（一条命令定性），再查 JS 搬移，顺序别反。
+- **验证**：parseonly 恢复 `DIV < DIV.main < DIV#onlineMapApp < SECTION < MAIN`；
+  map_blank 1310×835/瓦片 24；dock_test2 非工具模式全链（进 dock/搬回/卡片隐藏）OK；
+  491 单测 + check + check_publish_refs（**仓库根**）+ lint 全绿。
+- 版本 v866-map-parse-fix：三处同抬。发布 4da9f1a（API --apply），sleep 80s 后
+  线上 sha256 复量 index.html/sw.js/tests 三文件全 OK。
