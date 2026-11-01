@@ -4524,14 +4524,22 @@ function tlAutoGenerate(options) {
     });
   }
 
-  /* [v859 用户需求 → v868 定版] 段总管（自动生成）：垂直于主管、串联各分区主管；
+  /* [v859 用户需求 → v869 定版] 段总管（自动生成）：垂直于主管、串联各分区主管；
      起点在最上/最左分区主管上（vMin 端）、终点在最下/最右分区主管上（vMax 端），
      两端不再外延驳接段（stub=0，用户方案B），驳接点方块标记画在首末主管串联处。
-     用局部坐标 build（frame 是仿射，垂直/共线关系保持）；数据落地在下方
-     tlDiagramData.segTrunk（转世界坐标、len 按世界坐标重算），供在线地图页驳接点
-     捕捉与扬程收口（tlFrontLenUse）。 */
+     [v869] 贴边：干线贴各主管**同一侧端点**（不再放走向交集正中——用户实测
+     「没看到/不好定位」）；贴哪侧自动判断：水源（tlSrcDesign，缺则总管起点
+     frontPipe[0]，再缺则默认左/上侧）落在走向交集中点的哪一半。传局部格系 src。
+     数据落地在下方 tlDiagramData.segTrunk（转世界坐标、len 按世界坐标重算），
+     供在线地图页驳接点捕捉与扬程收口（tlFrontLenUse）。 */
   var tlSegTrunkLoc = null;
-  try { if (window.RySegTrunk && mainPipes.length >= 2) tlSegTrunkLoc = window.RySegTrunk.build(mainPipes); } catch (eSeg0) { }
+  try {
+    if (window.RySegTrunk && mainPipes.length >= 2) {
+      tlSegTrunkLoc = window.RySegTrunk.build(mainPipes, {
+        src: tlSrcDesign || (frontPipe && frontPipe[0]) || null
+      });
+    }
+  } catch (eSeg0) { }
   if (tlSegTrunkLoc) {
     var sgD = '';
     tlSegTrunkLoc.points.forEach(function (p, i) { var q = tsGrid(p.x, p.y); sgD += (i === 0 ? 'M' : 'L') + q.x.toFixed(1) + ' ' + q.y.toFixed(1) + ' '; });
