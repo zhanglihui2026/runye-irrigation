@@ -446,6 +446,7 @@
     d.innerHTML =
       '<div class="tp-head">' +
         '<span class="tp-title">总管参数设置</span>' +
+        '<button type="button" class="tp-fold" id="tpFold" title="折叠面板" aria-label="折叠或展开面板">▾</button>' +
         '<button type="button" class="tp-close" id="tpClose" title="关闭面板（不影响已保存的参数）">×</button>' +
       '</div>' +
       '<div class="tp-body">' +
@@ -484,6 +485,93 @@
     return d;
   }
 
+  /* ══════════════════════════════════════════════════════════════════════
+     面板外壳：拖拽 + 折叠（v855-panel-drag-fold）。
+     只在元素上绑一次（__ryTpChrome 标记；mount 可能复用已存在的旧元素）。
+   · 拖拽：按住标题栏 .tp-head 拖动（折叠/关闭按钮不触发）；首次移动时把
+     right/bottom 定位切换成 inline left/top（此后 CSS 的 right/bottom 与
+     PWA 安装条的 bottom:96px 规则自动失效），范围钳制在宿主 .map-wrap 内；
+     位置存 localStorage('ryTrunkPanelPos')，下次打开自动恢复。
+   · 折叠：#tpFold 收起/展开 .tp-body + .tp-foot，标题栏保留；
+     状态存 localStorage('ryTrunkPanelFolded')。外观在 online-map.css 尾部。
+     ══════════════════════════════════════════════════════════════════════ */
+  function setupPanelChrome(el) {
+    if (el.__ryTpChrome) return;
+    el.__ryTpChrome = true;
+    var POS_KEY = 'ryTrunkPanelPos', FOLD_KEY = 'ryTrunkPanelFolded';
+    var head = el.querySelector('.tp-head');
+    var foldBtn = el.querySelector('#tpFold');
+    if (!head || !foldBtn) return;
+
+    function setFolded(f) {
+      el.classList.toggle('is-folded', !!f);
+      foldBtn.textContent = f ? '▸' : '▾';
+      foldBtn.title = f ? '展开面板' : '折叠面板';
+      try { localStorage.setItem(FOLD_KEY, f ? '1' : '0'); } catch (e) { /* 隐私模式忽略 */ }
+    }
+    var folded0 = false;
+    try { folded0 = localStorage.getItem(FOLD_KEY) === '1'; } catch (e) {}
+    setFolded(folded0);
+    foldBtn.addEventListener('click', function (ev) {
+      ev.stopPropagation();
+      setFolded(!el.classList.contains('is-folded'));
+    });
+
+    /* 恢复上次拖出的位置（存的是相对宿主 .map-wrap 的 left/top，像素） */
+    var saved = null;
+    try { saved = JSON.parse(localStorage.getItem(POS_KEY) || 'null'); } catch (e) { saved = null; }
+    if (saved && isFinite(saved.x) && isFinite(saved.y)) {
+      el.style.right = 'auto'; el.style.bottom = 'auto';
+      el.style.left = saved.x + 'px'; el.style.top = saved.y + 'px';
+    }
+
+    head.addEventListener('pointerdown', function (ev) {
+      if (ev.button !== 0) return;
+      if (ev.target && ev.target.closest && ev.target.closest('#tpFold,#tpClose')) return;
+      var host = el.offsetParent || document.body;   /* absolute 定位的包含块（.map-wrap） */
+      var hostRect = host.getBoundingClientRect();
+      var r0 = el.getBoundingClientRect();
+      var offX = ev.clientX - r0.left, offY = ev.clientY - r0.top;
+      var moved = false;
+      function clampTo(x, y) {
+        var w = el.offsetWidth || r0.width, h = el.offsetHeight || r0.height;
+        var maxX = Math.max(0, host.clientWidth - w);
+        var maxY = Math.max(0, host.clientHeight - h);
+        return [Math.min(Math.max(x, 0), maxX), Math.min(Math.max(y, 0), maxY)];
+      }
+      function onMove(e) {
+        if (!moved) {
+          moved = true;
+          el.style.right = 'auto'; el.style.bottom = 'auto';
+          el.style.left = (r0.left - hostRect.left) + 'px';
+          el.style.top = (r0.top - hostRect.top) + 'px';
+          el.classList.add('is-dragging');
+        }
+        var c = clampTo(e.clientX - hostRect.left - offX, e.clientY - hostRect.top - offY);
+        el.style.left = c[0] + 'px'; el.style.top = c[1] + 'px';
+        e.preventDefault();
+      }
+      function onUp() {
+        document.removeEventListener('pointermove', onMove, true);
+        document.removeEventListener('pointerup', onUp, true);
+        document.removeEventListener('pointercancel', onUp, true);
+        el.classList.remove('is-dragging');
+        if (moved) {
+          try {
+            localStorage.setItem(POS_KEY, JSON.stringify({
+              x: parseFloat(el.style.left) || 0,
+              y: parseFloat(el.style.top) || 0
+            }));
+          } catch (e) { /* 隐私模式忽略 */ }
+        }
+      }
+      document.addEventListener('pointermove', onMove, true);
+      document.addEventListener('pointerup', onUp, true);
+      document.addEventListener('pointercancel', onUp, true);
+      ev.preventDefault();
+    });
+  }
+
   function mount(opts) {
     opts = opts || {};
     var host = opts.container;
@@ -491,6 +579,7 @@
     var existing = host.querySelector('#trunkPropPanel');
     var el = existing || buildDom();
     if (!existing) host.appendChild(el);
+    setupPanelChrome(el);
 
     var curId = null;
     var api;

@@ -296,3 +296,21 @@ body:has(.ry-pwa-install) #onlineMapSection .ry-trunk-panel{bottom:96px}
 #onlineMapSection .ry-trunk-warn .tw-btn.is-quiet{
   border-color:#fcd34d;background:transparent;color:#a16207;font-weight:600}
 #onlineMapSection .ry-trunk-warn .tw-btn.is-quiet:hover{background:#fffbeb;color:#92400e}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   v855-panel-drag-fold：总管参数面板可拖动 + 可折叠。
+   交互实现在 mod/trunk-panel.js（pointer 拖拽 + 折叠 + localStorage 持久化），
+   这里只管外观。拖拽把手 = .tp-head；首次拖动后 inline left/top 接管定位，
+   上面的 right/bottom（含 PWA 安装条的 bottom:96px 规则）自动失效。
+   ★ 不写 border-radius:<数值>：全站 body *{border-radius:0!important} 会压掉它。
+   ═══════════════════════════════════════════════════════════════════════════ */
+#onlineMapSection .ry-trunk-panel .tp-head{
+  cursor:move;touch-action:none;user-select:none;-webkit-user-select:none}
+#onlineMapSection .ry-trunk-panel .tp-fold{
+  flex:none;width:18px;height:18px;padding:0;border:0;background:transparent;
+  color:#64748b;font-family:inherit;font-size:11px!important;line-height:1;cursor:pointer}
+#onlineMapSection .ry-trunk-panel .tp-fold:hover{color:#0f172a}
+#onlineMapSection .ry-trunk-panel.is-folded .tp-body,
+#onlineMapSection .ry-trunk-panel.is-folded .tp-foot{display:none!important}
+#onlineMapSection .ry-trunk-panel.is-dragging{
+  user-select:none;-webkit-user-select:none;box-shadow:0 8px 24px rgba(15,23,42,.28)}

@@ -6046,3 +6046,35 @@ case-lib manifest 1.1.0。
   硬编码期望——它们是入库资产（git add 过），假红会淹没真红。
 - 版本同抬 `v853-trunk-dist-unity`：sw VERSION + style-01.css?v= + online-map.js?v=
   （online-map 是 CORE 文件必须抬）。**工作区完成，未提交未发布**（等并行会话改动落定）。
+
+## 26.93 总管参数面板可拖动 + 可折叠（v855-panel-drag-fold · 2026-11-01）
+
+用户截图需求「总管参数设置面板，要变成可以拖动的，可折叠的」。面板 = `#trunkPropPanel`
+（mod/trunk-panel.js buildDom 创建、延迟挂载在 .map-wrap，absolute right:12px/bottom:30px，
+z-index 1170）。改动三件套：
+
+- **mod/trunk-panel.js**：① buildDom 标题栏加折叠按钮 `#tpFold`（在 #tpClose 之前，
+  ▾/▸）；② 模块级 `setupPanelChrome(el)`（`__ryTpChrome` 标记防重复绑定——mount 可能
+  复用已存在的面板元素，重复绑定会让一次 pointerdown 挂 N 个 move 监听）；③ 拖拽把手
+  = `.tp-head`，`closest('#tpFold,#tpClose')` 排除按钮；首次移动把 right/bottom 切成
+  inline left/top（此后 CSS right/bottom 与 PWA 安装条 `body:has(.ry-pwa-install)
+  {bottom:96px}` 规则自动失效），范围钳制在宿主 clientWidth/Height 内；位置存
+  localStorage `ryTrunkPanelPos`、折叠存 `ryTrunkPanelFolded`，下次打开自动恢复。
+- **mod/online-map.css 尾部**：tp-head `cursor:move; touch-action:none; user-select:none`
+  （touch-action:none 是触屏能拖的前提）；`.tp-fold` 样式；`.is-folded` 隐藏
+  tp-body/tp-foot；`.is-dragging` 阴影。★ 禁写 border-radius 数值（全站
+  `body *{border-radius:0!important}` 压掉）——静态锁在守。
+- **契约不破**：11 个 tp* 只读控件 id（tpCode/tpDn/tpProj/tpV/tpJoint…）全部不动，
+  探针 p7 与宿主 refresh() 都按 id 取件。
+
+- 静态锁 `tests/trunk_panel_chrome.test.cjs`（7 项）：DOM 结构/防重复绑定/把手排除/
+  持久化键/状态类/CSS 规则（含 border-radius 禁令——断言前要剥注释，注释里的反例文字
+  会假红）/版本三处同抬。探针 `_dev-tools/probes/_probe_trunk_p8_chrome.mjs`（12 项）：
+  折叠往返 + localStorage、点按钮不拖拽、拖拽 inline 接管 + is-dragging + 钳制、
+  刷新后位置与折叠恢复、无 pageerror。
+- 验收：476 单测全过、check.cjs/lint(299)/check_publish_refs(仓库根) 全过、p7 41/41、
+  p8 12/12。
+- 版本同抬 `v855-panel-drag-fold`：sw VERSION + style-01.css?v= + online-map.js?v=
+  （三处同抬）+ online-map.css?v= + trunk-panel.js?v=（两 CORE 文件各自 ?v=）。
+- 提交纪律再验证：并行会话探针迁移的 50+ 暂存重命名仍在索引里 ⇒ `git commit -- <pathspec>`
+  严格限定六文件，重命名零带走。
