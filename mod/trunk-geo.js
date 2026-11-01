@@ -41,13 +41,19 @@
   }
 
   /* 读一个折点，与 core/trunk-schema.js / mod/trunk-snap.js 同口径：
-     [lat,lng] / [lat,lng,z] / {lat,lng} 都认。 */
+     [lat,lng] / [lat,lng,z] / {lat,lng} 都认。
+     [v854 专项] 空位（null/undefined/''）一律非法 —— 与 rawPointOk / schema.readPoint
+     同语义（Number(null)===0 会把空位读成几内亚湾上的点）。本函数的全部调用方
+     （ll2m / autoSign 的 rmsOf / lineLen 经 rawPointOk 前置）都已对 null 返回值
+     做失败关闭处理：ll2m 返回 null 调用方跳过、rmsOf 判 Infinity 走默认 sign。 */
   function readLatLng(q) {
     if (Array.isArray(q)) {
+      if (q[0] == null || q[0] === '' || q[1] == null || q[1] === '') return null;
       var a = Number(q[0]), b = Number(q[1]);
       return isNum(a) && isNum(b) ? { lat: a, lng: b } : null;
     }
     if (q && typeof q === 'object') {
+      if (q.lat == null || q.lat === '' || q.lng == null || q.lng === '') return null;
       var la = Number(q.lat), ln = Number(q.lng);
       return isNum(la) && isNum(ln) ? { lat: la, lng: ln } : null;
     }
@@ -124,12 +130,12 @@
   }
 
   /* 折点"原始值是否像一个坐标"。
-     ★ 为什么要多这一层：`Number(null)` 是 0、`Number('')` 也是 0，所以
-       `readLatLng([null, 1])` 会老老实实返回 {lat:0, lng:1} —— 一个几内亚湾上的点。
-       历史数据里真出现一个空位就会让整根干线量出几千公里。
-       ★ 只在**测距**这条新链上收紧（lineLen），不动 readLatLng 本身：
-         改它会连带改动 normalize/autoSign 的迁移语义（旧档里的空位点会被当成非法
-         从而丢掉整根干线），那是另一件事，要单独评估。 */
+     ★ 为什么要多这一层：`Number(null)` 是 0、`Number('')` 也是 0，宽容读会把
+       空位变成「几内亚湾上的点」，历史数据里真出现一个空位就会让整根干线
+       量出几千公里。
+     ★ [v854 专项] readLatLng 本体现在也按同语义收紧了（空位 ⇒ null，全部调用方
+       均失败关闭）——本函数保留：lineLen 需要区分「坏点计数」与「读出但越界」，
+       且它是这条收紧链的历史出处。 */
   function rawPointOk(q) {
     if (Array.isArray(q)) {
       if (q.length < 2) return false;

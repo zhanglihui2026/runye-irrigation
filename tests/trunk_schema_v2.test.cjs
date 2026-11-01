@@ -248,3 +248,31 @@ test('⑭ mainPoints 便捷取点', () => {
   assert.equal(S.mainPoints({ schema: 2, trunks: [] }), null);
   assert.equal(S.mainPoints(null), null);
 });
+
+test('⑮ [v854 专项] 空位坐标非法：readPoint 不再 Number(null)===0，normalize 按既有契约判废干线', () => {
+  /* readPoint 本体：空位 ⇒ null（此前 [null,1] 被读成 {lat:0,lng:1}） */
+  assert.equal(S.readPoint([null, 1]), null);
+  assert.equal(S.readPoint([18.2, null]), null);
+  assert.equal(S.readPoint({ lat: null, lng: 109.5 }), null);
+  assert.equal(S.readPoint({ lat: '', lng: 109.5 }), null);
+  assert.equal(S.readPoint([18.2, 109.5]).lat, 18.2, '合法点不受影响');
+  assert.equal(S.readPoint([18.2, 109.5, 12]).z, 12, 'z 口径不变');
+
+  /* v1 形状：含空位点 ⇒ pointsOk 判废 ⇒ normalize null（垃圾几何不再带进库） */
+  assert.equal(S.normalize({ points: [[null, 1], [18.2, 109.5]] }), null);
+
+  /* v2 形状：含空位干线被逐条判废（"无法识别 ⇒ null ⇒ continue"），全空 ⇒ null */
+  assert.equal(S.normalize({
+    schema: 2, trunks: [{ id: 'T1', points: [[18.2, 109.5], [null, 1]] }]
+  }), null, '空位干线丢弃后 trunks 为空 ⇒ null');
+
+  /* 同一批里好干线不受牵连（逐条判废，不是整库丢弃） */
+  const mixed = S.normalize({
+    schema: 2, trunks: [
+      { id: 'T1', points: [[18.2, 109.5], [null, 1]] },
+      { id: 'T2', points: [[18.3, 109.6], [18.31, 109.61]] }
+    ]
+  });
+  assert.ok(mixed && mixed.trunks.length === 1 && mixed.trunks[0].id === 'T2',
+    '坏干线丢弃、好干线保留');
+});

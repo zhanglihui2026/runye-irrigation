@@ -40,14 +40,21 @@
   }
 
   /* 读一个点：兼容 [lat,lng] / [lat,lng,z] / {lat,lng} / {lat,lng,z}。
-     z 缺失就返回 undefined（不补 0），调用方可据此显示「—」。 */
+     z 缺失就返回 undefined（不补 0），调用方可据此显示「—」。
+     [v854 专项] 空位（null/undefined/''）一律非法：Number(null)===0、Number('')===0，
+     宽容读会把空位变成「几内亚湾上的点」并流进 pointsOk ⇒ 垃圾几何带进库、
+     状态栏/面板/DXF 全链算出几千公里。与 mod/trunk-geo.js 的 rawPointOk 同语义
+     （那条链 v851 前已收紧）；这里收紧后 normalize 对含空位的干线按既有契约
+     逐条判废（"无法识别 ⇒ null ⇒ continue"），不是新增语义。 */
   function readPoint(q) {
     var lat, lng, z;
     if (Array.isArray(q)) {
       if (q.length < 2) return null;
+      if (q[0] == null || q[0] === '' || q[1] == null || q[1] === '') return null;
       lat = Number(q[0]); lng = Number(q[1]);
       if (q.length >= 3 && isNum(q[2])) z = Number(q[2]);
     } else if (q && typeof q === 'object') {
+      if (q.lat == null || q.lat === '' || q.lng == null || q.lng === '') return null;
       lat = Number(q.lat); lng = Number(q.lng);
       if (isNum(q.z)) z = Number(q.z);
     } else return null;

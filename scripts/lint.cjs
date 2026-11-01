@@ -28,6 +28,8 @@ const EXCLUDE_PREFIXES = [
   'pwa/vendor/'       // 第三方 minify 打包
 ];
 
+const fs = require('node:fs');
+
 const files = execFileSync(
   'git',
   ['ls-files', '--cached', '--others', '--exclude-standard', '-z', '--', '*.js', '*.cjs', '*.mjs'],
@@ -36,7 +38,11 @@ const files = execFileSync(
   .split('\0')
   .filter(Boolean)
   .filter(f => !EXCLUDE_PREFIXES.some(p => f.startsWith(p)))
-  .filter(f => !f.endsWith('.min.js'));
+  .filter(f => !f.endsWith('.min.js'))
+  /* [2026-11-01] 已跟踪但工作区里已删除的文件（并行会话 git mv/整理进行中的中间态）
+     跳过 —— 磁盘上不存在的文件没法 lint，硬塞给 eslint 只会报
+     "No files matching the pattern" 让全闸假红。 */
+  .filter(f => fs.existsSync(path.join(root, f)));
 
 if (files.length === 0) {
   console.error('lint: 没有找到任何已跟踪脚本，检查 git 状态');
@@ -47,7 +53,11 @@ console.log(`lint: ${files.length} 个脚本（已跟踪 + 未跟踪但未被忽
 
 const eslintBin = path.join(root, 'node_modules', 'eslint', 'bin', 'eslint.js');
 const extraArgs = process.argv.slice(2);   // 透传，如 `node scripts/lint.cjs --fix --debug`
-const result = spawnSync(process.execPath, [eslintBin, ...files, '--max-warnings', '0', ...extraArgs], {
+/* --no-warn-ignored：文件集是「git 已跟踪 + 未跟踪未忽略」，而 eslint 自己的 ignore
+   （如 _dev-tools/**）可能覆盖其中一部分（2026-11-01 探针迁入 _dev-tools/probes/ 后
+   每个文件一条 "File ignored" 警告 ×57 ⇒ --max-warnings 0 假红）。被 eslint 忽略的
+   文件本来就不在检查范围内，这条警告纯属噪音。 */
+const result = spawnSync(process.execPath, [eslintBin, ...files, '--max-warnings', '0', '--no-warn-ignored', ...extraArgs], {
   cwd: root,
   stdio: 'inherit'
 });

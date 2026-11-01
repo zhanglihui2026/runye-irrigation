@@ -14,7 +14,7 @@
 <!-- [v831] 地图总管数据契约 v2。必须**先于**所有读取方加载（inline-13 / inline-16 / inline-09 / online-map），
      否则它们调 RyTrunkSchema.normalize 时拿到 undefined，会退回「只认 schema===1」而读不到总管。
      为什么要有这个模块：plot.trunk 有 5 个读取方，v1→v2 的迁移只允许一个入口，理由见文件头注释。 -->
-<script src="core/trunk-schema.js?v=844-gr-trunk-gate"></script>
+<script src="core/trunk-schema.js?v=854-null-slot-strict"></script>
 <script src="core/storage-guard.js?v=823-fix-transfer-save-alert"></script>
 <!-- [v836] 分区网格 frame ↔ 世界米的坐标换算。纯函数、零 DOM。
      必须先于 mod/inline-09.js（它的 tlFrameToWorld/tlFrameToGrid 是转发），
@@ -2547,7 +2547,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script src="mod/ry-panel.js?v=823-fix-transfer-save-alert"></script>
 <script src="pwa/vendor/leaflet.js"></script>
 <script src="mod/trunk-snap.js?v=832-trunk-snap"></script>
-<script src="mod/trunk-geo.js?v=844-gr-trunk-gate"></script>
+<script src="mod/trunk-geo.js?v=854-null-slot-strict"></script>
 <script src="mod/trunk-edit.js?v=835-trunk-geo-snap"></script>
 <script src="mod/trunk-history.js?v=835-trunk-geo-snap"></script>
 <script src="mod/trunk-panel.js?v=844-gr-trunk-gate"></script>

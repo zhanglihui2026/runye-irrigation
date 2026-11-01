@@ -227,3 +227,24 @@ test('⑰ trunk-panel 的兜底 haversine 与 trunk-geo 逐位相等（防两份
   const d2 = G.haversine({ lat: a[0], lng: a[1] }, { lat: b[0], lng: b[1] });
   assert.equal(d1, d2, '两个 haversine 必须给同一个数（面板与扬程会同时显示它）');
 });
+
+test('⑱ [v854 专项] 空位坐标一律非法（Number(null)===0 不再把空位读成几内亚湾）', () => {
+  /* readLatLng 本体收紧：空位 ⇒ null（此前返回 {lat:0,lng:1}） */
+  assert.equal(G.readLatLng([null, 1]), null);
+  assert.equal(G.readLatLng([18.2, null]), null);
+  assert.equal(G.readLatLng({ lat: null, lng: 1 }), null);
+  assert.equal(G.readLatLng({ lat: '', lng: 1 }), null);
+  assert.equal(G.readLatLng([18.2, 109.5]).lat, 18.2, '合法点不受影响');
+
+  /* ll2m（DXF 导出链）：空位 ⇒ null，调用方跳过 —— 不再悄悄写赤道坐标进 CAD */
+  assert.equal(G.ll2m([null, 1], BASE, -1), null);
+  assert.equal(G.ll2m({ lat: null, lng: 1 }, BASE, -1), null);
+
+  /* autoSign：含空位的环 → rms 双双 Infinity → degenerate（失败关闭，走默认 sign） */
+  const poly = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 80 }];
+  const good = [G.m2ll(0, 0, BASE, -1), G.m2ll(100, 0, BASE, -1), G.m2ll(100, 80, BASE, -1)];
+  const bad = [good[0], good[1], [null, 1]];
+  const r = G.autoSign(poly, bad, BASE);
+  assert.equal(r.ok, false);
+  assert.equal(r.why, 'degenerate');
+});
