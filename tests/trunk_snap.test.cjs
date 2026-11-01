@@ -31,18 +31,21 @@ function fresh() {
   return S;
 }
 
-test('① prioOf：6 类目标各有固定优先级，未知类型垫底', () => {
+test('① prioOf：7 类目标各有固定优先级，未知类型垫底', () => {
   const S = fresh();
   assert.equal(S.prioOf('plot-vertex'), 1);
   assert.equal(S.prioOf('water-source'), 2);
   assert.equal(S.prioOf('trunk-vertex'), 3);
-  assert.equal(S.prioOf('valve-node'), 4);
-  assert.equal(S.prioOf('branch-start'), 5);
-  assert.equal(S.prioOf('zone-vertex'), 6);
+  assert.equal(S.prioOf('seg-coupler'), 4, '[v872] 驳接点必须注册（此前漏注册落 99 垫底档）');
+  assert.equal(S.prioOf('valve-node'), 5);
+  assert.equal(S.prioOf('branch-start'), 6);
+  assert.equal(S.prioOf('zone-vertex'), 7);
   assert.equal(S.prioOf('whatever'), 99);
-  /* 顺序不能乱：地块顶点必须最高 */
+  /* 顺序不能乱：地块顶点必须最高；驳接点压过阀门/支管起点（设计落点不被抢） */
   assert.ok(S.prioOf('plot-vertex') < S.prioOf('water-source'));
   assert.ok(S.prioOf('water-source') < S.prioOf('trunk-vertex'));
+  assert.ok(S.prioOf('trunk-vertex') < S.prioOf('seg-coupler'));
+  assert.ok(S.prioOf('seg-coupler') < S.prioOf('valve-node'));
 });
 
 test('② readPoint：三种历史形状都认，非法一律 null', () => {
@@ -56,7 +59,7 @@ test('② readPoint：三种历史形状都认，非法一律 null', () => {
   assert.equal(S.readPoint(null), null);
 });
 
-test('③ buildTargets：六类目标各自生成，标签带序号', () => {
+test('③ buildTargets：七类目标各自生成，标签带序号', () => {
   const S = fresh();
   const list = S.buildTargets({
     plotRing: [[18.2, 109.5], [18.2, 109.51], [18.21, 109.51]],
@@ -64,7 +67,8 @@ test('③ buildTargets：六类目标各自生成，标签带序号', () => {
     savedTrunks: [{ id: 'T1', points: [[18.22, 109.52], [18.23, 109.53]] }],
     valves: [[18.24, 109.54]],
     branchStarts: [[18.25, 109.55]],
-    zoneVerts: [[18.26, 109.56]]
+    zoneVerts: [[18.26, 109.56]],
+    couplers: [[18.27, 109.57], [18.28, 109.58]]
   });
   const kinds = list.map((x) => x.kind);
   assert.equal(kinds.filter((k) => k === 'plot-vertex').length, 3);
@@ -73,9 +77,11 @@ test('③ buildTargets：六类目标各自生成，标签带序号', () => {
   assert.equal(kinds.filter((k) => k === 'valve-node').length, 1);
   assert.equal(kinds.filter((k) => k === 'branch-start').length, 1);
   assert.equal(kinds.filter((k) => k === 'zone-vertex').length, 1);
-  assert.equal(list.length, 9);
+  assert.equal(kinds.filter((k) => k === 'seg-coupler').length, 2, '[v872] 驳接点目标必须生成');
+  assert.equal(list.length, 11);
   assert.ok(list.some((x) => x.label === '地块顶点 1'));
   assert.ok(list.some((x) => x.label.indexOf('T1') >= 0));
+  assert.ok(list.some((x) => x.label === '驳接点 1'), '驳接点标签带序号');
 });
 
 test('③ b 没有显式水源时退到主干首点', () => {
@@ -200,4 +206,25 @@ test('⑪ 阈值常量：吸附 10px / 合并 0.3m 必须是两个不同的量',
   assert.equal(S.SNAP_PX, 10);
   assert.equal(S.MERGE_M, 0.3);
   assert.notEqual(S.SNAP_PX, S.MERGE_M);
+});
+
+/* [v872] 审核修正锁：驳接点优先级缺口（此前 seg-coupler 漏注册落 99 垫底档，
+   v870 起驳接点进地块内与阀门共享空间 ⇒ 想吸驳接点被阀门抢走）。
+   ① 驳接点压过阀门（即使阀门更近）；② 驳接点仍输给干线拐点（编辑抢点不变）。 */
+test('⑫ 驳接点优先级：同半径内压过更近的阀门；仍让位于干线拐点', () => {
+  const S = fresh();
+  S.setTargets([
+    { lat: 18.2, lng: 109.5, kind: 'valve-node' },        // prio 5，几乎贴脸（0px）
+    { lat: 18.2, lng: 109.5005, kind: 'seg-coupler' }     // prio 4，约 5px
+  ]);
+  const hit = S.nearest({ lat: 18.2, lng: 109.5 });
+  assert.equal(hit.kind, 'seg-coupler', '同半径内驳接点胜过更近的阀门（设计落点不被抢）');
+
+  const S2 = fresh();
+  S2.setTargets([
+    { lat: 18.2, lng: 109.5, kind: 'seg-coupler' },       // prio 4，贴脸
+    { lat: 18.2, lng: 109.5005, kind: 'trunk-vertex' }    // prio 3，约 5px
+  ]);
+  const hit2 = S2.nearest({ lat: 18.2, lng: 109.5 });
+  assert.equal(hit2.kind, 'trunk-vertex', '编辑已有干线时拐点抢点行为不变');
 });
