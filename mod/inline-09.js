@@ -1051,8 +1051,8 @@ function tlFrontLenUse(wpFront, frontPipeLen) {
   var link = (typeof window.tlSourceLinkLen === 'function') ? window.tlSourceLinkLen() : 0;
   var srcDist = readNumber('planSrcDist', 0, { min: 0 });
   /* [v859] 段总管（自动生成的分区主管串联干线）计入总管长——它与手绘总管驳接后
-     构成完整水路。长度读 tlDiagramData.segTrunk.len（世界坐标，含两端驳接段）；
-     段总管未生成（单区/参差）时为 0，输出与旧口径逐字节一致。 */
+     构成完整水路。长度读 tlDiagramData.segTrunk.len（世界坐标全长；v868 起止=首末
+     主管、无外延驳接段）；段总管未生成（单区/参差）时为 0，输出与旧口径逐字节一致。 */
   var segLen = 0;
   try {
     var sd0 = window.tlDiagramData && window.tlDiagramData.segTrunk;
@@ -4524,10 +4524,12 @@ function tlAutoGenerate(options) {
     });
   }
 
-  /* [v859 用户需求] 段总管（自动生成）：垂直于主管、串联各主管同一侧端点，
-     两端驳接段（stub≥3m）+ 驳接点方块标记。用局部坐标 build（frame 是仿射，
-     垂直/共线关系保持）；数据落地在下方 tlDiagramData.segTrunk（转世界坐标、
-     len 按世界坐标重算），供在线地图页驳接点捕捉与扬程收口（tlFrontLenUse）。 */
+  /* [v859 用户需求 → v868 定版] 段总管（自动生成）：垂直于主管、串联各分区主管；
+     起点在最上/最左分区主管上（vMin 端）、终点在最下/最右分区主管上（vMax 端），
+     两端不再外延驳接段（stub=0，用户方案B），驳接点方块标记画在首末主管串联处。
+     用局部坐标 build（frame 是仿射，垂直/共线关系保持）；数据落地在下方
+     tlDiagramData.segTrunk（转世界坐标、len 按世界坐标重算），供在线地图页驳接点
+     捕捉与扬程收口（tlFrontLenUse）。 */
   var tlSegTrunkLoc = null;
   try { if (window.RySegTrunk && mainPipes.length >= 2) tlSegTrunkLoc = window.RySegTrunk.build(mainPipes); } catch (eSeg0) { }
   if (tlSegTrunkLoc) {

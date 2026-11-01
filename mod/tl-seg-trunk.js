@@ -1,19 +1,22 @@
 (function(){
   'use strict';
   /* ═══════════════════════════════════════════════════════════════════════
-     [v859→v862 用户需求] 段总管（自动生成的分区主管串联干线）—— 纯几何函数，Node 单测锁。
+     [v859→v862→v868 用户需求] 段总管（自动生成的分区主管串联干线）—— 纯几何函数，Node 单测锁。
 
      需求原话：在分区与管路页面中增加一个段总管，这个总管是自动生成的，垂直于
      自动生成的主管，把垂直方向的分区主管通过一根总管连接起来，两端预留驳接点；
      数据回传在线地图页，用户在地图页绘制总管后与驳接点驳接，变成完整水路。
+     [v868 定版]（用户看图拍板「方案B」）：「垂直于主管的方向布置，起点是上/左分区
+     终点是下/右分区」——起止就在**首末主管**上（两端不再外延驳接段），并定死方向
+     语义：起点=最上/最左分区主管，终点=最下/最右分区主管。
 
      输入：mainPipes —— tlDiagramData.mainPipes（世界米坐标，每分区一条折线）。
            不足 2 条（单区）无需串联，返回 null。
      输出：null 或 {
        axis: 'x'|'y',     段总管走向（垂直于主管主方向）
        base: number,      段总管所在直线的法向坐标（axis=x 时是 y，axis=y 时是 x）
-       points: [{x,y}×2], 线段两端（含两端驳接延伸段）
-       couplers:[{x,y}×2] 两端驳接点（= points 两端）
+       points: [{x,y}×2], [0]=起点（上/左=vMin 端）、[1]=终点（下/右=vMax 端）
+       couplers:[{x,y}×2] 两端驳接点（= points 两端 = 首末主管串联处）
        joinPts:[{x,y}×N]  与各分区主管的串联点（主管与干线的交点）
        stub, len, lenJoin, side
      }
@@ -25,7 +28,11 @@
      · 各主管须轴对齐（两端在干线延伸轴上的坐标差 ≤ EPS）—— 斜主管不出。
      · 干线位置 base = 各主管走向范围 [min,max] 交集的中点；交集为空（主管沿
        走向轴完全错开，垂直干线无法同时穿过）⇒ 返回 null 不硬生成。
-     · 驳接段 stub = max(3, 主管平均间距×0.35)，两端各延伸一段，端点即驳接点。
+     · [v868] 起止 = 首末主管：vMin 端=起点（上/左）、vMax 端=终点（下/右）。
+       方向依据：简图世界系**北=−y**（ts() 世界→屏幕不翻 y，世界 +y = 屏幕向下
+       = 南；+x 恒为东）⇒ 「上」与「左」都是 vMin 端、「下」与「右」都是 vMax 端，
+       两轴同式，无需按 axis 分叉。
+     · stub 恒 0（无外延段）；len = 全长；lenJoin = len − 2×stub = len。
      ═══════════════════════════════════════════════════════════════════════ */
   var AXIS_EPS = 0.05;
 
@@ -59,13 +66,12 @@
       var base=(L+H)/2;
       var vMin=Math.min.apply(null,cs), vMax=Math.max.apply(null,cs);
       if(!(vMax>vMin)) return null;           /* 横向共点（退化） */
-      var sorted=cs.slice().sort(function(p,q){return p-q;});
-      var gaps=0,gn=0;
-      for(var k=1;k<sorted.length;k++){ gaps+=sorted[k]-sorted[k-1]; gn++; }
-      var stub=Math.max(3, gn?(gaps/gn)*0.35:3);
+      /* [v868] 起点=上/左分区主管（vMin 端）→ 终点=下/右分区主管（vMax 端）；
+         驳接点=首末主管串联处。stub 恒 0：不再有外延驳接段。 */
       var p1x,p1y,p2x,p2y;
-      if(vertAxis==='x'){ p1x=vMin-stub; p1y=base; p2x=vMax+stub; p2y=base; }
-      else              { p1x=base; p1y=vMin-stub; p2x=base; p2y=vMax+stub; }
+      if(vertAxis==='x'){ p1x=vMin; p1y=base; p2x=vMax; p2y=base; }
+      else              { p1x=base; p1y=vMin; p2x=base; p2y=vMax; }
+      var len=Math.hypot(p2x-p1x,p2y-p1y);
       return {
         axis: vertAxis, base: base,
         points:[{x:p1x,y:p1y},{x:p2x,y:p2y}],
@@ -73,12 +79,11 @@
         joinPts:cs.map(function(c){
           return (vertAxis==='x') ? {x:c,y:base} : {x:base,y:c};
         }),
-        stub:stub, len:Math.hypot(p2x-p1x,p2y-p1y),
-        lenJoin:Math.hypot(p2x-p1x,p2y-p1y)-2*stub,
-        side:'mid'
+        stub:0, len:len, lenJoin:len,
+        side:'ends'
       };
     }catch(e){ return null; }
   }
 
-  window.RySegTrunk = { VERSION:'v862-seg-cross', build:build, axisOf:axisOf, AXIS_EPS:AXIS_EPS };
+  window.RySegTrunk = { VERSION:'v868-seg-ends', build:build, axisOf:axisOf, AXIS_EPS:AXIS_EPS };
 })(window);
