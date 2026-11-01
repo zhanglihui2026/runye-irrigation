@@ -2977,25 +2977,49 @@ function esc(s) {
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-/* [v871] 「🔄 生成并回传地图」（#tlAutoPipe）—— 与「生成施工图」语义区分（用户 2026-11-01 拍板）：
-   · 生成施工图（plot-editor）：旋转角度后**本页**重新生成主管/支管（其内部本就链式调
-     tlAutoGenerate({scroll:false})），不跳页；
-   · 本键 = 重新生成三级管线 + **回传在线地图**：成功后自动切到在线地图页并刷新轮灌演示
-     （地图页对 tlDiagramData 是实时读取——捕捉/演示/驳接 geoBridge 的签名含 generatedAt，
-     数据一换自动失效重建，无需额外推送）。
-   成败判定：tlAutoGenerate 无返回值约定（失败走内部 catch 弹错误框），这里用
-   generatedAt 前后对比 —— 未变化（被校验拦截/抛错）⇒ 留在本页看报错，不跳页。 */
+/* 「生成施工图」负责本页重算；#tlAutoPipe 只把已生成且角度匹配的管线交给在线地图。
+   地图直接读取 tlDiagramData/网络快照，因此本动作不再重复生成三级管线。 */
 function tlAutoPipeToMap() {
-  var before = (window.tlDiagramData && window.tlDiagramData.generatedAt) || null;
-  try { tlAutoGenerate({ scroll: false }); } catch (eGen) { console.warn('[tlAutoPipeToMap] 生成失败', eGen); }
   var dd = window.tlDiagramData;
-  if (!(dd && dd.generatedAt && dd.generatedAt !== before)) return;   /* 生成未落地 ⇒ 不跳页 */
+  if (!(dd && dd.generatedAt && Array.isArray(dd.mainPipes) && Array.isArray(dd.branchPipes))) {
+    alert('请先点击「生成施工图」生成当前分区的管线，再回传到在线地图。');
+    return false;
+  }
+  var currentAngle = null;
+  try {
+    var pp = window.ppGetState && window.ppGetState();
+    if (pp && isFinite(Number(pp.zoneAngleDeg))) currentAngle = Number(pp.zoneAngleDeg);
+  } catch (eState) { }
+  var generatedAngle = dd.zones && dd.zones.frame && isFinite(Number(dd.zones.frame.angle))
+    ? Number(dd.zones.frame.angle) : null;
+  if (currentAngle !== null && (generatedAngle === null || Math.abs(currentAngle - generatedAngle) > 0.05)) {
+    alert('分区角度已变化，请先点击「生成施工图」更新主管和支管，再回传在线地图。');
+    return false;
+  }
+  /* tlAutoGenerate 的网络投影必须确实落到当前地块的正式网络槽；只检查三级内存图
+     会把投影失败误报成回传成功，尤其是地图分区与管网事务提交失败时。 */
+  var plotId=window.currentPlotId==null?'':String(window.currentPlotId);
+  var store=window.RyIrrigationDataStore;
+  var network=null,networkState=null;
+  try{
+    network=store&&store.readNetworkLayout?store.readNetworkLayout():null;
+    networkState=network&&store&&store.readNetworkLayoutStateForCurrentPlot
+      ?store.readNetworkLayoutStateForCurrentPlot(network):null;
+  }catch(eNetworkRead){network=null;}
+  if(!plotId||!network||!networkState||networkState.status!=='current'||
+      network.needsReplan||String(network.plotId)!==plotId||network.sourceGeneratedAt!==dd.generatedAt){
+    alert('当前管线成果尚未完整写入在线地图数据，或分区角度已变更。请先点击「生成施工图」重新生成，再回传。');
+    return false;
+  }
   try {
     var sec = document.getElementById('onlineMapSection');
     if (sec && typeof window.ryShowSection === 'function') window.ryShowSection(sec);
     else if (sec) location.hash = 'onlineMapSection';
   } catch (eJump) { console.warn('[tlAutoPipeToMap] 跳转在线地图失败', eJump); }
+  /* 同标签页 localStorage 写入不触发 storage 事件，显式刷新地图地块/分区图层。 */
+  try { if (window.RyMapHost && typeof window.RyMapHost.refresh === 'function') window.RyMapHost.refresh(); } catch (eMapRefresh) { }
   try { if (window.RyMapFlowDemo && window.RyMapFlowDemo.refresh) window.RyMapFlowDemo.refresh(); } catch (eRef) { }
+  return true;
 }
 window.tlAutoPipeToMap = tlAutoPipeToMap;
 
@@ -4378,8 +4402,13 @@ function tlAutoGenerate(options) {
      ⇒ 这里不再叠加 moves['front']，frontPipe / sourcePos 直接用设计几何；
        主管/支管的整条让位拖动保留（AE.moves 机制仍在用，见 tl-workspace autoDrag）。
      tlFrontDesign / tlSrcDesign 仍预存：tlDiagramData 快照要用（否则 effPts 会二次叠加）。 */
-  var tlFrontDesign=frontPipe?JSON.parse(JSON.stringify(frontPipe)):null;
-  var tlSrcDesign=sourcePos?{x:sourcePos.x,y:sourcePos.y}:null;
+  /* The partition drawing owns only segTrunk. The map owns the route from the
+     water source to either coupler; never render the legacy frontPipe/source
+     candidate or persist it as a second trunk in this drawing. */
+  frontPipe=null;
+  sourcePos=null;
+  var tlFrontDesign=null;
+  var tlSrcDesign=null;
 
   // Draw front main pipe (总管) — orange, thick
   if(frontPipe){
@@ -4573,6 +4602,12 @@ function tlAutoGenerate(options) {
       parts.push('<rect data-tlseg-coupler="' + ci + '" x="' + (q.x - 4).toFixed(1) + '" y="' + (q.y - 4).toFixed(1) + '" width="8" height="8" fill="#ffffff" stroke="#111827" stroke-width="1.6"/>');
       parts.push('<text data-tlseg-coupler-label="' + ci + '" x="' + (q.x + 7).toFixed(1) + '" y="' + (q.y + 3.5).toFixed(1) + '" font-size="9" fill="#111827" font-family="system-ui">驳接</text>');
     });
+  } else if (window.RySegTrunk && window.RySegTrunk.lastError) {
+    /* [v873] 段总管未生成不再静默：图面左上角淡字提示原因（用户实测旋转分区角度后
+       干线消失却看不到任何原因）；原因同时随 tlDiagramData.segTrunkSource 落库，
+       在线地图/工作区/远程排障都能读到。 */
+    var __segWhy = String(window.RySegTrunk.lastError);
+    parts.push('<text data-tlseg-missing="1" x="12" y="20" font-size="12" fill="#b45309" font-family="system-ui">段总管未生成：' + __segWhy.replace(/[<>&]/g,'') + '</text>');
   }
 
   // Draw main pipes (blue) — clipped to plot boundary
@@ -4787,7 +4822,9 @@ function tlAutoGenerate(options) {
      （先算 r → 再写 tlDiagramData）本幅图的简图参数/水泵扬程会用上一幅图的旧几何。
      故这里先把本次几何快照写入，再重算一次 r，并同步刷新左栏结果条与左下角损失卡。 */
   window.tlDiagramData = { version: 1, schemaVersion: 1, world: 'meter', generatedAt: new Date().toISOString(), plot: { w: plotW, h: plotH },
-    trunkSource: frontPipe&&frontPipe.length>=2 ? (tlImportedTrunk?'map':'auto') : 'missing',
+    /* [v873] trunkSource 带失败原因：'auto' | 'missing(<原因>)' —— 旋转分区角度后
+       段总管消失的排障依据（地图页/工作区/探针都读得到）。 */
+    trunkSource: tlSegTrunkLoc ? 'auto' : ('missing(' + (window.RySegTrunk && window.RySegTrunk.lastError ? window.RySegTrunk.lastError : 'not-built') + ')'),
     poly: JSON.parse(JSON.stringify(poly)),
     combinedN: tlGetZoneCount(),   /* 2026-09-16 联合灌溉区数 N，供工作区分组着色读取（简图不变） */
     zones: { cols: cols, rows: rows, xPos: xPos.slice(), yPos: yPos.slice(), xPlan: xPlan.slice(), yPlan: yPlan.slice(), xSrc: xSrc.slice(), ySrc: ySrc.slice(),
@@ -5016,7 +5053,7 @@ function tlAutoGenerate(options) {
       var designTs=hydraulicDesignSaved?hydraulicDesignTs:null;
       var designRevisionId=hydraulicDesignSaved?hydraulicDesignRevisionId:null;
       var previousNetworkRaw=window.RyIrrigationDataStore.readRawNetworkLayout(plotId);
-      var candidateNet={ sourcePos: src?{lat:src[0],lng:src[1]}:null, segments: segments, plotId:plotId, designTs:designTs, designRevisionId:designRevisionId, crs:'GCJ-02', ts: Date.now(), valves:[], dripTapes:[] };
+      var candidateNet={ sourcePos: src?{lat:src[0],lng:src[1]}:null, segments: segments, plotId:plotId, designTs:designTs, designRevisionId:designRevisionId, sourceGeneratedAt:dd.generatedAt, crs:'GCJ-02', ts: Date.now(), valves:[], dripTapes:[] };
       /* [map-enhance] 阀门 + 滴灌带反投：在内存中组装完整管网快照，显式限定本页地块；
          若分区方案也适用，则由 RyMapPartition 将地块库与管网快照作为一项事务提交。 */
       try{

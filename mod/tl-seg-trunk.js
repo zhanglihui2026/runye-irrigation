@@ -45,6 +45,10 @@
      · stub 恒 0（无外延段）；len = 全长；lenJoin = len − 2×stub = len。
      ═══════════════════════════════════════════════════════════════════════ */
   var AXIS_EPS = 0.05;
+  /* [v873] 最近一次 build 失败的原因（成功时置 null）。只读诊断：
+     inline-09 落库 segTrunkSource、简图画淡字提示，用户/远程排障都能看到为什么没出干线。 */
+  var lastError = null;
+  function failWhy(reason){ lastError = reason; return null; }
 
   function axisOf(line){
     if(!line||line.length<2) return null;
@@ -55,26 +59,38 @@
 
   function build(mainPipes, opts){
     try{
+      lastError = null;
       var lines=(mainPipes||[]).filter(function(l){return l&&l.length>=2;});
-      if(lines.length<2) return null;
+      if(lines.length<2) return failWhy('主管少于2条(n='+(mainPipes||[]).length+')，无需串联');
       var nx=0;
       lines.forEach(function(l){ if(axisOf(l)==='x') nx++; });
       var mainAxis = nx*2>=lines.length ? 'x':'y';   /* 主管走向 */
       var vertAxis = mainAxis==='x' ? 'y':'x';       /* 干线延伸轴（垂直于主管） */
       /* 逐主管：轴对齐校验 + 走向范围收集 */
-      var los=[], his=[], cs=[];
+      var groups=[],los=[],his=[],cs=[];
       for(var i=0;i<lines.length;i++){
         var a=lines[i][0], b=lines[i][lines[i].length-1];
-        if(Math.abs(a[vertAxis]-b[vertAxis])>AXIS_EPS) return null;  /* 斜主管 ⇒ 不猜 */
-        los.push(Math.min(a[mainAxis],b[mainAxis]));
-        his.push(Math.max(a[mainAxis],b[mainAxis]));
-        cs.push(a[vertAxis]);
+        if(Math.abs(a[vertAxis]-b[vertAxis])>AXIS_EPS) return failWhy('主管'+(i+1)+'斜出容差(偏差'+(Math.abs(a[vertAxis]-b[vertAxis])).toFixed(2)+'m>'+AXIS_EPS+'m)');
+        var c=a[vertAxis], lo=Math.min(a[mainAxis],b[mainAxis]), hi=Math.max(a[mainAxis],b[mainAxis]);
+        los.push(lo);his.push(hi);cs.push(c);
+        var group=groups.find(function(g){return Math.abs(g.c-c)<=AXIS_EPS;});
+        if(group){group.lo=Math.min(group.lo,lo);group.hi=Math.max(group.hi,hi);}
+        else groups.push({c:c,lo:lo,hi:hi});
+      }
+      /* A physical main is split into one segment per partition cell. Combine
+         collinear segments before finding the common crossing range. */
+      var originalL=Math.max.apply(null,los),originalH=Math.min.apply(null,his);
+      if(originalL>originalH){
+        if(groups.length<2) return failWhy('各主管首尾错开且合并后仅剩1条共线主管，干线无法垂直穿过全部');
+        los=groups.map(function(g){return g.lo;});
+        his=groups.map(function(g){return g.hi;});
+        cs=groups.map(function(g){return g.c;});
       }
       /* 走向交集；空 ⇒ 错开 ⇒ 不出 */
       var L=Math.max.apply(null,los), H=Math.min.apply(null,his);
-      if(L>H) return null;
+      if(L>H) return failWhy('各主管走向范围无公共交集(跨度错开)');
       var vMin=Math.min.apply(null,cs), vMax=Math.max.apply(null,cs);
-      if(!(vMax>vMin)) return null;           /* 横向共点（退化） */
+      if(!(vMax>vMin)) return failWhy('各分区主管共点(无串联跨度)');           /* 横向共点（退化） */
       /* [v870] 干线位置：主管中心 C 向水源侧偏移 跨度×1/4（用户方案甲）。
          水源在交集哪一半 ⇒ 向哪侧偏；无水源/坐标非法 ⇒ 默认 lo（左/上）。
          偏移量 (H-L)/4 < 半跨度 ⇒ base 恒在 [L,H] 内，clamp 仅防御。 */
@@ -100,8 +116,10 @@
         stub:0, len:len, lenJoin:len,
         side:sidePos
       };
-    }catch(e){ return null; }
+    }catch(e){ lastError='exception:'+(e&&e.message||e); return null; }
   }
 
-  window.RySegTrunk = { VERSION:'v870-seg-inset', build:build, axisOf:axisOf, AXIS_EPS:AXIS_EPS };
+  window.RySegTrunk = { VERSION:'v873-seg-why', build:build, axisOf:axisOf, AXIS_EPS:AXIS_EPS,
+    /* [v873] 最近一次 build 的失败原因（null=最近一次成功或未跑过）。 */
+    get lastError(){ return lastError; } };
 })(window);

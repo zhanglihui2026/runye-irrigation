@@ -49,11 +49,22 @@
         plot.revision=0;
         if(plot.generated) plot.generated.sourceRevision=0;
         var part=plot.partition;
+        /* [v873] 保存→恢复 round-trip 的 cutSnap 表示差异不得算「内容变化」：
+           · sig（ppGetZoneCutSignature 适用布局签名）是运行时缓存——保存链可能是
+             ppResetCutSnap 的 ''（partitionCuts 尚未应用），恢复链 ppApplySavedPartitionCuts
+             会重算成非空；剔除后只比手动线位置。
+           · 空数组 ⇔ null：恢复链 ppApplySavedPartitionCuts 用 partitionCuts（toLegacyPatch
+             恒写数组，可为 []）重建 cutSnap ⇒ x=[]；保存链无手动线时是 x=null。
+           真差异（手动线位置变了）仍被捕获——位置数组非空时逐值比较。
+           （v861 起 canonical 事务 fail-closed，这个表示差异曾把「旋转角度→生成施工图」
+           全部拦死且无提示——探针实测两条 transaction rejected、管线几何原地不动。） */
         if(part&&part.cutSnap){
           ['x','y'].forEach(function(axis){
             var cuts=axis==='x'?part.xCuts:part.yCuts;
             if(part.cutSnap[axis]==null&&Array.isArray(cuts))part.cutSnap[axis]=cuts.slice();
+            if(Array.isArray(part.cutSnap[axis])&&!part.cutSnap[axis].length)part.cutSnap[axis]=null;
           });
+          delete part.cutSnap.sig;
         }
       });
       (copy.groups||[]).forEach(function(group){group.revision=0;});
@@ -109,6 +120,7 @@
     return drawingDesignGenerationInputSignature();
   };
   window.ryCommitSinglePlotL2Snapshot=function(beforePlan,afterPlan){
+    window.__runyeSingleL2CommitFailure=null;
     var plotId=window.currentPlotId==null?'':String(window.currentPlotId);
     if(!plotId||(window.__runyeGroupEdit&&window.__runyeGroupEdit.active)) return null;
     var model=window.RyDrawingDesignModel, adapter=window.RyDrawingDesignLegacyAdapter;
@@ -120,22 +132,73 @@
     }
     if(!model||!adapter||!model.validate(design).ok||
         design.projectId!=='legacy-project:'+plotId||design.plots.length!==1||
-        design.groups.length!==0||design.plots[0].plotId!==plotId) return false;
+        design.groups.length!==0||design.plots[0].plotId!==plotId){
+      window.__runyeSingleL2CommitFailure='规范设计或地块绑定无效';return false;
+    }
     function importPlan(plan){
       if(!plan||!Array.isArray(plan.polyPts)||plan.polyPts.length<3) return null;
-      return adapter.fromProjectSnapshot({currentPlotId:plotId,measuredPolygon:plan.polyPts,pipePlan:plan},{
-        projectId:'legacy-project:'+plotId,plotId:plotId,frameId:'legacy-frame:'+plotId
+      /* L2 edit payloads carry only the mutable partition/network state. Keep the
+         immutable plot provenance from the canonical preimage when re-importing it;
+         otherwise a map-origin plot is silently reclassified as legacy-project and
+         the canonical preimage comparison rejects valid angle/pipeline edits. */
+      var canonicalPlot=design.plots[0],geometry=canonicalPlot&&canonicalPlot.geometry||{};
+      var sourceRef=geometry.sourceRef||{};
+      return adapter.fromProjectSnapshot({
+        currentPlotId:plotId,measuredPolygon:plan.polyPts,measuredPolygonSource:sourceRef.source||'legacy-project',
+        geoBase:sourceRef.geoBase||null,mapFramePoly:sourceRef.mapFrameBoundary||null,pipePlan:plan
+      },{
+        projectId:design.projectId,plotId:plotId,frameId:geometry.frameId||('legacy-frame:'+plotId),
+        geometryRevision:sourceRef.geometryRevision
       });
     }
+    /* [v873] 与 sameCanonicalContent 同一口径的 partition 归一：cutSnap 的
+       sig（适用布局签名，运行时缓存）与「空数组⇔null」（恢复链 ppApplySavedPartitionCuts
+       用 partitionCuts 重建 ⇒ x=[]；保存链无手动线 ⇒ x=null）是保存→恢复 round-trip
+       的表示差异，不算内容变化——否则档案恢复后每次 commit（旋转分区角度、生成管线）
+       都被 fail-closed 拒绝且无用户提示（探针实测：管线几何原地不动、三级图不生成）。 */
     function comparable(plot){
       if(!plot) return '';
       var network=JSON.parse(JSON.stringify(plot.network||{}));
       delete network.level3Edits;
-      return JSON.stringify({boundary:plot.geometry&&plot.geometry.boundary,partition:plot.partition,network:network});
+      var part=plot.partition?JSON.parse(JSON.stringify(plot.partition)):null;
+      if(part&&part.cutSnap){
+        ['x','y'].forEach(function(axis){
+          var cuts=axis==='x'?part.xCuts:part.yCuts;
+          if(part.cutSnap[axis]==null&&Array.isArray(cuts))part.cutSnap[axis]=cuts.slice();
+          if(Array.isArray(part.cutSnap[axis])&&!part.cutSnap[axis].length)part.cutSnap[axis]=null;
+        });
+        delete part.cutSnap.sig;
+      }
+      /* ppGetState recomputes cut arrays while reading the live editor. Their
+         current values are committed below, but old canonical cut caches are
+         not a reliable preimage guard for this single-tab L2 editor. Geometry,
+         angle, mode, authored step overrides and network stay guarded. */
+      if(part){part.xCuts=[];part.yCuts=[];part.cutSnap=null;}
+      return JSON.stringify({boundary:plot.geometry&&plot.geometry.boundary,partition:part,network:network});
     }
     var before=importPlan(beforePlan), after=importPlan(afterPlan);
-    if(!before||!before.ok||!after||!after.ok||
-        comparable(design.plots[0])!==comparable(before.design.plots[0])) return false;
+    if(!before||!before.ok||!after||!after.ok){
+      window.__runyeSingleL2CommitFailure='L2导入失败：'+((before&&!before.ok&&before.error)||(after&&!after.ok&&after.error)||'无效地块边界');
+      return false;
+    }
+    if(comparable(design.plots[0])!==comparable(before.design.plots[0])){
+      var canonical=design.plots[0],runtime=before.design.plots[0];
+      var fields=['boundary','partition','network'];
+      var changed=fields.filter(function(key){
+        var a=key==='boundary'?canonical.geometry.boundary:canonical[key];
+        var b=key==='boundary'?runtime.geometry.boundary:runtime[key];
+        if(key==='network'){a=JSON.parse(JSON.stringify(a));b=JSON.parse(JSON.stringify(b));delete a.level3Edits;delete b.level3Edits;}
+        return JSON.stringify(a)!==JSON.stringify(b);
+      });
+      /* Partition is rebuilt in the live editor as the angle and layout inputs
+         change. This single-plot transaction owns that partition; reconcile it
+         from afterPlan while keeping boundary and network preimage guards. */
+      if(changed.some(function(key){return key!=='partition';})){
+        window.__runyeSingleL2CommitFailure='当前画布与规范设计不一致：'+changed.join('、');
+        console.warn('[drawing-design] L2 preimage mismatch',window.__runyeSingleL2CommitFailure);
+        return false;
+      }
+    }
     var nextPlot=after.design.plots[0];
     var updated=model.updatePlot(design,plotId,design.revision,function(target){
       target.geometry.boundary=JSON.parse(JSON.stringify(nextPlot.geometry.boundary));
@@ -144,7 +207,7 @@
       delete target.network.level3Edits;
       delete target.generated;
     });
-    if(!updated||!updated.ok) return false;
+    if(!updated||!updated.ok){window.__runyeSingleL2CommitFailure='规范设计更新失败：'+(updated&&updated.error||'未知原因');return false;}
     window.__runyeSingleCanonicalDesign=updated.design;
     window.__runyeSingleDrawingDesignShadow={ok:true,stage:'l2-partition-write',plotId:plotId,
       designRevision:updated.design.revision,plotRevision:updated.design.plots[0].revision};

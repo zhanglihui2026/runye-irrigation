@@ -37,6 +37,8 @@
     zoneAuto:true,    // [v185] 地块划分开关：true=自动划分并显示分区线；false=隐藏自动分区线（改手动，见 ppSetZoneAuto）
     history:[]
   };
+  /* 角度变化后，直到自动管线按新分区成功重建前，持续保留该标记。 */
+  var ppAnglePipeRegenPending=false;
 
   /* [v201] 「此刻正在按**某一块自己的环**算分区」的临时开关。
      ★ 为什么还需要它（v197 只认 mode==='perPlot' 不够）：
@@ -162,6 +164,7 @@
     a=((a+180)%360+360)%360-180;
     if(Math.abs(a)<0.05)a=0;
     a=Math.round(a*10)/10;
+    var previousAngle=ppZoneAngle();
     var groupPreimage=refreshPlan?ppGroupMemberPreimage():null;
     if(groupPreimage&&groupPreimage.invalid)return false;
     var singlePreimage=refreshPlan&&!groupPreimage&&typeof window.ppGetState==='function'
@@ -169,6 +172,10 @@
     ppUnlockArea();
     ppState.zoneAngleDeg=a;
     ppState.zoneRotated=Math.abs(Math.abs(a)-90)<0.001;
+    /* updatePlan rebuilds the angle-dependent partition cuts and cut snapshot.
+       Commit only after that rebuild, so the canonical before/after comparison
+       sees one coherent L2 state instead of rejecting its own refreshed cuts. */
+    if(refreshPlan&&typeof updatePlan==='function')updatePlan();
     if(groupPreimage&&!ppCommitGroupMemberEdit(groupPreimage)){
       ppSyncZoneAngleUI(preserveInput);
       return false;
@@ -186,9 +193,9 @@
         return false;
       }
     }
+    if(Math.abs(a-previousAngle)>0.001)ppAnglePipeRegenPending=true;
     ppSyncZoneAngleUI(preserveInput);
     ppRender();
-    if(refreshPlan&&typeof updatePlan==='function')updatePlan();
     if(refreshPlan)ppRefreshDiagramOrReset();
     return true;
   }
@@ -585,6 +592,23 @@
        ppAutoGeneratePipes / ppClearPipes 全在 IIFE 里 ⇒ 只在本侧暴露入口，
        内部**就是二级页同一套**（已按整组态逐块生成、写回各块 slot）—— 不写第二份算法。 */
     autoPipesWhole: function(){ try{ return ppAutoGeneratePipes()===true; }catch(e){ return false; } },
+    /* 地图首次交接到分区页时，只为从未建立过L2方案的新地块生成初始管线。
+       已有档案即使为空也视为用户保存过的设计，不自动覆盖；组模式先检查全部成员槽。 */
+    ensureInitialPipes: function(){
+      if(!ppState.polyPts||ppState.polyPts.length<3)return false;
+      var ge=window.__runyeGroupEdit;
+      if(ppHasPipeContent())return false;
+      if(ge&&ge.active&&Array.isArray(ge.slots)&&ge.slots.some(function(s){
+        return !!(s&&((s.mainPipes&&s.mainPipes.length)||(s.branchPipes&&s.branchPipes.length)||
+          (s.subBranchPipes&&s.subBranchPipes.length)||(s.valves&&s.valves.length)||s.source));
+      }))return false;
+      var id=window.currentPlotId==null?'':String(window.currentPlotId);
+      if(id){
+        var savedKeys=['runye_plot_design_v1:'+encodeURIComponent(id),'runye_group_design_v1:'+encodeURIComponent(id)];
+        try{if(savedKeys.some(function(key){return window.localStorage.getItem(key)!=null;}))return false;}catch(eSaved){return false;}
+      }
+      return ppAutoGeneratePipes()===true;
+    },
     clearPipesWhole: function(){ try{ return ppClearPipes()===true; }catch(e){ return false; } },
     groupLiveSlot: function(){
       var ge=window.__runyeGroupEdit;
@@ -1415,6 +1439,8 @@
   }
 
   function ppPushHistory(){
+    /* 历史快照只记录撤销点，不代表自动管线已经按当前角度重建。
+       pending 只能由成功的自动布管消费；普通编辑/保存动作不得清掉重建要求。 */
     if(!ppState.history)ppState.history=[];
     var snapshot=ppCloneState();
     /* Group operations such as clear-all mutate every member slot while the canvas
@@ -3148,6 +3174,7 @@
       ppRefreshMaterials();
       /* 立刻推给「成组管路」页 —— 它只看得到 slots，不刷新就还是空的 */
       ppSyncGroupEditUI();
+      ppAnglePipeRegenPending=false;
       return true;
     }
 
@@ -3180,6 +3207,7 @@
     ppUpdateAutoPipeButton();
     if (typeof window.ppRefreshDiagramIfVisible === 'function') window.ppRefreshDiagramIfVisible();
     ppRefreshMaterials();
+    ppAnglePipeRegenPending=false;
     return true;
   }
 
@@ -4834,6 +4862,27 @@
   window.ppClipPolylineToRing=ppClipPolylineToRing;
 
   document.getElementById('ppGenerate').addEventListener('click',function(){
+    /* 分区角度改变后，先按新角度重建自动主管/支管，再生成二级图与三级图。
+       角度待重建状态不会被普通历史记录清掉，只有自动布管成功后才消费。
+       [v873] 重生成失败必须让用户看见——此前 fail-closed 回滚只有 console.warn，
+       用户点按钮毫无反应（真机实测「旋转角度后生成施工图没反应」）。 */
+    var rebuildForMapAngle=false;
+    try{
+      /* 地图端应用角度会将持久化网络标为 needsReplan；分区恢复走 ppSetState/restore，
+         不经过 ppApplyZoneAngle，因此本地 pending 标记不足以识别该路径。 */
+      var mapNet=window.RyIrrigationDataStore&&window.RyIrrigationDataStore.readNetworkLayout
+        ?window.RyIrrigationDataStore.readNetworkLayout():null;
+      rebuildForMapAngle=!!(mapNet&&mapNet.needsReplan);
+      var priorDiagram=window.tlDiagramData;
+      var priorAngle=priorDiagram&&priorDiagram.zones&&priorDiagram.zones.frame
+        ?Number(priorDiagram.zones.frame.angle):null;
+      if(isFinite(priorAngle)&&Math.abs(priorAngle-ppZoneAngle())>0.05)rebuildForMapAngle=true;
+    }catch(eMapReplan){console.warn('[ppGenerate] 地图角度状态读取失败',eMapReplan);}
+    if((ppAnglePipeRegenPending||rebuildForMapAngle)&&!ppAutoGeneratePipes()){
+      ppAnglePipeRegenPending=true;
+      alert('按新分区角度重生成管线未完成：'+(window.__runyeSingleL2CommitFailure||'布管或设计提交失败')+'。当前画面已保留。');
+      return;
+    }
     /* [v656 2026-10-21 用户拍板] 成组态智能分流：多地块点「生成施工图」不进三级，
        直接回「多地块规划页」——用户流程是「在二级逐块把管路生成好、检查没问题，
        再传递给多地块规划页手绘总管」。出口复用 grBackFromPlotEdit（与「◀ 返回成组
@@ -5041,6 +5090,7 @@
   }
   window.ppSetState=function(saved){
     saved=saved||{};
+    ppAnglePipeRegenPending=false;
     ppState.mainPipes=JSON.parse(JSON.stringify(saved.mainPipes||[]));
     ppState.branchPipes=JSON.parse(JSON.stringify(saved.branchPipes||[]));
     ppState.subBranchPipes=JSON.parse(JSON.stringify(saved.subBranchPipes||[]));
