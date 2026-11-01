@@ -5928,3 +5928,14 @@ case-lib manifest 1.1.0。
   PWA 让位规则 + DOM/注释卫生。
 - CDP 实测（Edge headless 1600×1000）：hint 754~777、tip 778~813、状态栏 803~827，
   顶部工具栏区域 elementFromPoint 非 hint，无 pageerror。
+
+## 26.87 工具栏按钮文字不加粗（v848 · 2026-11-01 · 用户反馈）
+
+用户截图反馈：地图页工具栏一排按钮文字全是加粗的，「文字都不要加粗」。
+
+- 加粗来源 = `mod/ry-panel.css` v544 统一工具栏时写的 `font-weight:600` ——
+  地图绘制条 `.ry-hbar-btn` 与分区快捷条 `#ppQuickBar` 共用这一条，改一处两条一起生效。
+- 改成 **显式 `font-weight:400`**（不省略声明）：runye-theme.css 的 `.ry-btn` 有
+  `--ry-btn-weight` 等来源，删掉声明会回到继承/UA 的加粗。
+- 静态锁 `tests/hbar_weight.test.cjs`（2 项）：显式 400 + 不回潮 600/700。
+- 版本同抬 `v848-hbar-normal`：sw VERSION + style-01.css?v= + ry-panel.css?v=。

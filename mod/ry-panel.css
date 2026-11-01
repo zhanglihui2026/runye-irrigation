@@ -1229,7 +1229,9 @@ body.ry-tool #ryCadSide [data-pp="pipePlanSection"][data-ry-view="edit"] .ry-pan
 .ry-hbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:5px 7px;max-width:calc(100% - 24px)}
 .ry-hbar .ry-hbar-btn{
   height:26px;padding:0 8px;border:1px solid #cbd5e1;background:#fff;color:#334155;
-  font-family:inherit;font-size:11px!important;font-weight:600;line-height:1;cursor:pointer;white-space:nowrap;
+  font-family:inherit;font-size:11px!important;font-weight:400;line-height:1;cursor:pointer;white-space:nowrap;
+  /* [v848 用户反馈] 工具栏文字不加粗（原 600）。显式写 400 不省略：
+     全局 button 有 --ry-btn-weight 等来源，省略会回到继承/UA 的加粗。 */
 }
 .ry-hbar .ry-hbar-btn:hover{border-color:#16a34a;color:#15803d;background:#f0fdf4}
 .ry-hbar .ry-hbar-btn.btn-on{background:#22c55e;border-color:#22c55e;color:#fff}
