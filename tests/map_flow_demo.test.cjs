@@ -70,3 +70,22 @@ test('④ 容差边界 + ⑤ 驳接点仅在 hasSeg 时参与', () => {
   assert.equal(M.validateConnection(Object.assign({ couplersLL: couplers, hasSeg: true }, base)).ok, true, '段总管驳接点 3m');
   assert.equal(M.validateConnection(Object.assign({ couplersLL: couplers, hasSeg: false }, base)).ok, false, '无段总管时驳接点不算');
 });
+
+/* [v867] 地图演示 chips「原来的圆形样式」同源锁（用户要求：还用原来的圆形样式）：
+   ① style-01.css 的圆点/选中环/图标钮规则必须同时覆盖 #tlDemoChips 与 #mapDemoChips；
+   ② border-radius:50%!important 豁免必须在场（对抗全站 body *{border-radius:0!important} 扁平化）；
+   ③ syncChipsState 用 .selected 类（与简图版同源的白+绿双环），不许回退内联 outline。 */
+test('⑥ 地图演示 chips 与简图版圆形样式同源（CSS 覆盖 + selected 类）', () => {
+  const css = fs.readFileSync(path.join(__dirname, '..', 'mod', 'style-01.css'), 'utf8');
+  assert.ok(/#tlDemoChips button\.tl-demo-dot,\s*#mapDemoChips button\.tl-demo-dot\{/.test(css),
+    '圆点几何规则必须同时选择 #tlDemoChips 与 #mapDemoChips');
+  const dotRule = css.match(/#tlDemoChips button\.tl-demo-dot[^}]*\}/);
+  assert.ok(dotRule && /border-radius:50%!important/.test(dotRule[0]), 'border-radius:50%!important 豁免必须在场');
+  const selRule = css.match(/button\.tl-demo-dot\.selected[^}]*\}/g);
+  assert.ok(selRule && selRule.length >= 1 && /#mapDemoChips/.test(selRule.join('')),
+    '选中环（白+绿 box-shadow）必须覆盖 #mapDemoChips');
+  assert.ok(/#tlDemoChips button\.tl-demo-ctl,\s*#mapDemoChips button\.tl-demo-ctl\{/.test(css),
+    '▶/■ 图标钮规则必须同时覆盖两个演示条');
+  const src = fs.readFileSync(SRC, 'utf8');
+  assert.ok(/classList\.toggle\('selected'/.test(src), 'syncChipsState 必须切 .selected 类（同源双环）');
+});

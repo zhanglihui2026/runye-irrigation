@@ -219,7 +219,10 @@
     var dots = box.querySelectorAll('[data-mapdemo-g]');
     for (var i = 0; i < dots.length; i++) {
       var g = parseInt(dots[i].getAttribute('data-mapdemo-g'), 10);
-      dots[i].style.outline = (g === active) ? '2px solid #1f2937' : 'none';
+      /* [v867] 选中态与简图版同源：切 .selected 类（白+绿双环，#tlDemoChips 同款规则
+         已由 v867 扩到 #mapDemoChips），不再用内联 outline —— 视觉与「原来的圆形样式」一致。 */
+      if (dots[i].classList) dots[i].classList.toggle('selected', g === active);
+      else dots[i].style.outline = (g === active) ? '2px solid #1f2937' : 'none';
     }
   }
 

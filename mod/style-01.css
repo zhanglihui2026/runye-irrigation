@@ -790,18 +790,21 @@ footer span:first-child{font-weight:600;color:var(--s-500)}
    高于本表任意非 !important 规则，hover 换底规则天然失效＝圆点颜色稳定）；
    此处只负责圆形几何与选中环。⚠ border-radius:50%!important 是对下方 3428 行全站扁平化
    body *{border-radius:0!important} 的**有意豁免**（圆点语义；同强度 !important 下
-   靠 #id+类 的更高优先级胜出）。「▶ 轮播 / ■ 退出」不带 .tl-demo-dot，仍是文字按钮。 */
-#tlDemoChips button.tl-demo-dot{
+   靠 #id+类 的更高优先级胜出）。「▶ 轮播 / ■ 退出」不带 .tl-demo-dot，仍是文字按钮。
+   [v867]（2026-11-01 用户要求）在线地图轮灌演示条（#mapDemoChips，v861）同用「原来的
+   圆形样式」：同款圆点/图标钮/选中环一并覆盖（用户原话：还用原来的圆形样式，那个好看）。
+   选中态由 map-flow-demo.js syncChipsState 切 .selected 类（与简图版同源），不再用内联 outline。 */
+#tlDemoChips button.tl-demo-dot, #mapDemoChips button.tl-demo-dot{
   width:18px;height:18px;padding:0;margin:0;flex:0 0 auto;
   border:none;border-radius:50%!important;
   line-height:1;font-weight:700;text-align:center;vertical-align:middle;
 }
-#tlDemoChips button.tl-demo-dot.selected{
+#tlDemoChips button.tl-demo-dot.selected, #mapDemoChips button.tl-demo-dot.selected{
   box-shadow:0 0 0 1.5px #fff,0 0 0 3px var(--g-700,#16a34a);
 }
 /* [v465]（2026-10-15 用户要求）轮播/退出图标化：▶/⏸/■ 单字符方块按钮（文字语义收进 title/aria-label）。
-   与圆点同行等高（20px），白底描边沿用上方 1099 行基础规则。 */
-#tlDemoChips button.tl-demo-ctl{
+   与圆点同行等高（20px），白底描边沿用上方 1099 行基础规则。[v867] 同扩 #mapDemoChips。 */
+#tlDemoChips button.tl-demo-ctl, #mapDemoChips button.tl-demo-ctl{
   min-width:20px;height:20px;padding:0 3px;
   display:inline-flex;align-items:center;justify-content:center;
   line-height:1;font-size:11px;
@@ -1225,8 +1228,17 @@ body.ry-zoneauto-off #ppRotateZones{
    ⚠ 不写 border-radius：全站 `body *{border-radius:0!important}` 会把它压成 0，
      留着就是一条死声明，且正好撞上 v530「style-01.css 不得出现无效圆角声明」的检查
      （线上冒烟判红 1 项 —— v612 踩过一次，这次又踩了，已删）。 */
+/* [v826b] 两处遮挡，都要躲开，否则这颗按钮永远点不到（_probe_fitbtn.mjs 复现）：
+   ① 堆叠：胶囊原在 #ppCanvasWrap 内，而后者是 position:absolute + z-index:1 —— 自己就是
+      堆叠上下文，内部任何 z-index 都被封在 1；管路叠加层 #tlWsContent 是 z-index:2 的兄弟层，
+      整层 <svg> 盖在胶囊上（elementFromPoint 命中 svg.tl-ws-svg）。⇒ 已由 inline-18 把胶囊
+      提到 canvasStack 直下（叠加层之后），这里给它 z-index:3 压过叠加层即可。
+   ② 位置：pwa/pwa.css 的 `.ry-pwa-install{position:fixed;right:16px;bottom:16px;z-index:2000}`
+      首访未安装时挂在 body 右下角，正好是同一点（实测命中 #ryPwaInstall）。⇒ 抬到它上方；
+      提示块约 61px 高 + bottom:16 ⇒ 顶边在 H-77，取 bottom:84 留 7px 余量。
+   只动浮层位置与层级，不碰 pwa.css、不碰相机、不碰图层顺序。 */
 .pp-fitview{
-  display:none;position:absolute;right:10px;bottom:34px;z-index:4;
+  display:none;position:absolute;right:10px;bottom:84px;z-index:3;
   align-items:center;gap:4px;
   height:24px;padding:0 9px;
   background:rgba(255,251,235,.97);
