@@ -6304,3 +6304,22 @@ z-index 1170）。改动三件套：
   491 单测 + check + check_publish_refs（**仓库根**）+ lint 全绿。
 - 版本 v866-map-parse-fix：三处同抬。发布 4da9f1a（API --apply），sleep 80s 后
   线上 sha256 复量 index.html/sw.js/tests 三文件全 OK。
+
+## 26.104 地图轮灌演示 chips 同用「原来的圆形样式」（v867-map-demo-round · 2026-11-01）
+
+用户要求：轮灌区演示（在线地图左栏 dock 里的这组 chips）还用原来的圆形样式（v461 简图版）。
+
+- **根因**：v461 圆形圆点样式选择器写死 `#tlDemoChips button.tl-demo-dot`——地图演示条
+  #mapDemoChips（v861）用了同名类但不在选择器范围 ⇒ 渲染成默认方按钮；且地图版选中态
+  是内联 outline（2px 深灰），与简图版「白+绿双环 box-shadow」不一致。
+- **修复**：①三组规则（圆点几何/.selected 双环/▶■ 图标钮）选择器扩为
+  `#tlDemoChips …, #mapDemoChips …`（样式零新增，纯并集）；②map-flow-demo.js
+  syncChipsState 改切 `.selected` 类（classList.toggle，与简图版同源；classList 不可用时
+  降级内联 outline）。border-radius:50%!important 豁免随选择器自然继承（ID+类优先级压过
+  全站 body *{border-radius:0!important} 扁平化）。
+- **静态锁**：tests/map_flow_demo.test.cjs ⑥——CSS 三组规则必须同时覆盖两个演示条 +
+  50%!important 在场 + syncChipsState 必须切 .selected。
+- **无头实机验证（/tmp/roundchip*.mjs）**：圆点 18×18 radius 50% 无边框；选中态计算样式
+  `rgb(255,255,255) 1.5px + rgb(20,83,45) 3px` 双环；ctl 钮 20px。探针里点 chip 未选中属
+  预期（无手绘总管 ⇒ start() 按设计报错）。
+- 版本 v867-map-demo-round：三处同抬。发布 705f618，sleep 80s 线上 sha256 四文件全 OK。
