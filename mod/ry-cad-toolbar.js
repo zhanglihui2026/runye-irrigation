@@ -66,8 +66,40 @@
       sec.setAttribute('data-ry-rail','1');
       changed=true;
     }
+    moveDemoIn();
     applyWidth();
     if(changed) refit();
+  }
+
+  /* [v858 用户要求]「地块与灌溉参数」功能区（#tlPlanBar：联合灌溉/分组组合/轮灌演示）
+     单独搬到左工具栏底部新组 #ryCadGrpDemo（地形高程之后）。
+     它是 #tlSide 的孩子，搬回顺序必须**先于** #tlSide 整体搬回 —— moveBack() 里
+     moveDemoBack() 放在 HOSTS 循环之前。原位记忆 memoDemo（#tlSide 末尾）。 */
+  var DEMO={node:'tlPlanBar', grp:'ryCadGrpDemo', side:'tlSide'};
+  var memoDemo=null;
+  function moveDemoIn(){
+    var n=$(DEMO.node), grp=$(DEMO.grp);
+    if(!n||!grp||n.getAttribute('data-ry-demo')==='1') return;
+    var body=grp.querySelector('.ry-cad-grp-body')||grp;
+    memoDemo={parent:n.parentNode, next:n.nextSibling};
+    body.appendChild(n);
+    n.setAttribute('data-ry-demo','1');
+  }
+  function moveDemoBack(){
+    var n=$(DEMO.node);
+    if(!n||n.getAttribute('data-ry-demo')!=='1') return;
+    var p=memoDemo&&memoDemo.parent, done=false;
+    if(p&&p.parentNode){
+      var ref=(memoDemo.next&&memoDemo.next.parentNode===p)?memoDemo.next:null;
+      if(p===n.parentNode){ /* 已在原位（异常序列兜底） */ }
+      else{ p.insertBefore(n, ref); done=true; }
+    }
+    if(!done&&p!==n.parentNode){
+      var side=$(DEMO.side);
+      if(side) side.appendChild(n);   /* 原位失效退化为挂回 #tlSide 末尾 */
+    }
+    n.removeAttribute('data-ry-demo');
+    memoDemo=null;
   }
 
   function moveBackOne(h){
@@ -86,6 +118,7 @@
 
   function moveBack(){
     var changed=false;
+    moveDemoBack();   /* tlPlanBar 是 tlSide 的孩子，必须先回 tlSide 再整体搬回 */
     for(var i=HOSTS.length-1;i>=0;i--){ if(moveBackOne(HOSTS[i])) changed=true; }
     if(changed) refit();
   }
