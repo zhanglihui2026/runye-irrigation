@@ -6323,3 +6323,26 @@ z-index 1170）。改动三件套：
   `rgb(255,255,255) 1.5px + rgb(20,83,45) 3px` 双环；ctl 钮 20px。探针里点 chip 未选中属
   预期（无手绘总管 ⇒ start() 按设计报错）。
 - 版本 v867-map-demo-round：三处同抬。发布 705f618，sleep 80s 线上 sha256 四文件全 OK。
+
+## 26.105 段总管起止定版「方案B：起止在首末主管」（v868-seg-ends · 2026-11-01）
+
+用户看着图面提出：「分区与管路生成一段总管的逻辑改下，垂直于主管的方向布置，起点是
+上/左分区 终点是下/右分区」。先出三方案对比图（当前对称 stub / A 贯穿分区边界 /
+B 起止在首末主管），用户选 **B**。
+
+- **改动（mod/tl-seg-trunk.js build）**：points = [vMin 端(起点=上/左分区主管),
+  vMax 端(终点=下/右分区主管)]，去掉两端 ±stub 外延；stub 恒 0、lenJoin=len；
+  couplers = points 两端 = 首末主管串联处；side 'mid'→'ends'。
+- **方向语义的坐标依据**：简图世界系**北=−y**（ts() 世界→屏幕不翻 y，世界 +y=屏幕
+  向下=南，+x 恒东）⇒ 「上」与「左」都是 vMin 端、「下」与「右」都是 vMax 端，
+  两轴同式无需按 axis 分叉；与 points[0]/points[1] 既有顺序天然一致，输入主管
+  乱序不影响（单测⑧锁死）。
+- **消费方零改动**：扬程只读 segTrunk.len（变短=真实管长口径，正确）；inline-09
+  渲染按 points/couplers 画，白底「驳接」方块现落在首末主管串联处（与主管重叠，
+  语义即「在此驳接」）；地图页捕捉（online-map.js:1069）与连通判定（map-flow-demo
+  collect→validateConnection）消费 couplers，新位置天然兼容。
+- **单测重写**（tl_seg_trunk.test.cjs 8 项）：③④合并重写为「起止=首末主管不外延」
+  口径 + 驳接点与首末 joinPts 重合断言；新增 ⑧ 方向语义锁（乱序不变、竖直主管
+  左=vMin/右=vMax）。
+- 版本 v868-seg-ends：三处同抬（tl-seg-trunk.js 与 inline-09.js 均 CORE 白名单）。
+  发布 04f3b2e，sleep 80s 线上 sha256 四文件全 OK。
