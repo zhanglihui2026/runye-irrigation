@@ -270,10 +270,23 @@
     }
     var d = collect();
     if (!d || d.gCount <= 0) {
-      bar.style.display = 'none';
+      /* [v863] 无可拾取数据时给引导提示而不是整条隐藏 —— 用户找不到入口。 */
+      bar.style.display = '';
+      bar.__noData = true;
+      var hint = document.getElementById('mapDemoHint');
+      if (!hint) {
+        hint = document.createElement('div');
+        hint.id = 'mapDemoHint';
+        hint.style.cssText = 'margin-top:4px;color:#9a3412';
+        hint.textContent = '尚未拾取到分区主管/支管：请先到「分区与管路」页生成分区图面（并保存总管），再回这里演示。';
+        bar.appendChild(hint);
+      }
       if (active != null || playing) stop();
       return;
     }
+    bar.__noData = false;
+    var hint0 = document.getElementById('mapDemoHint');
+    if (hint0) hint0.parentNode.removeChild(hint0);
     bar.style.display = '';
     rebuildChips(d);
     var tb = document.getElementById('tlDemoBar');
