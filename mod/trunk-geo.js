@@ -1,4 +1,4 @@
-/* 施工图坐标 → 经纬度（总管绘制捕捉用）。纯函数，可在 Node 里直接单测。
+/* 施工图坐标 ⇄ 经纬度（总管绘制捕捉 / DXF 导出用）。纯函数，可在 Node 里直接单测。
  *
  * 为什么单独一个模块（改之前先读）：
  *   判定逻辑留在宿主里就只能靠浏览器探针验，而"符号选错"这种错误在 angle=0 的
@@ -61,6 +61,43 @@
       lat: base.refLat + s * (py / MLAT),
       lng: base.refLng + px / (MLAT * cosLat)
     };
+  }
+
+  /* 经纬度 → 米坐标（m2ll 的逆）。sign 口径与 m2ll 完全一致：
+     sign=+1 北=+y（地图口径），-1 北=−y（画布口径）。
+     之所以要它：DXF 导出要把地图页的总管折线搬回施工图坐标系 —— 那条链是反的。 */
+  function ll2m(q, base, sign) {
+    if (!baseOk(base)) return null;
+    var w = readLatLng(q);
+    if (!w) return null;
+    var s = (sign < 0) ? -1 : 1;
+    var cosLat = Math.cos(base.refLat * Math.PI / 180);
+    return {
+      x: (w.lng - base.refLng) * MLAT * cosLat,
+      y: s * (w.lat - base.refLat) * MLAT
+    };
+  }
+
+  /* 地图总管折点 → 施工图 DXF 的 CAD 坐标（[[x,y],…]）。
+   *
+   * ★ y 必须取负，且理由要说清楚（这行符号错了整根干线南北翻转，
+   *   而正南北走向的干线上看起来"只是挪了位置"，是最难查的那一类错）：
+   *   runye-dxf.js 的 makeInv 把 SVG 屏幕坐标换回 CAD 时是
+   *     CAD_y = -((sy - oy)/s + minY)
+   *   而图面是 sy = (my - minY)*s + oy  ⇒  CAD_y = -my。
+   *   x 方向则**完全相同**（minX / ox 在 ts 与 inv 里正好抵消）。
+   *   ⇒ 图面米坐标 (x, my) 到 CAD 只差一个 y 取负，别在这里重新做一遍 view 变换。
+   *
+   * 任一折点非法就返回 null（宁可不画这根，也不要画一根缺段的线）。 */
+  function trunkToCad(points, base, sign) {
+    if (!Array.isArray(points) || !points.length) return null;
+    var out = [];
+    for (var i = 0; i < points.length; i++) {
+      var m = ll2m(points[i], base, sign);
+      if (!m || !isNum(m.x) || !isNum(m.y)) return null;
+      out.push([m.x, -m.y]);
+    }
+    return out;
   }
 
   /* 分区网格交点：frame 局部坐标 → 世界米。
@@ -132,6 +169,8 @@
     WRONG_M: WRONG_M,
     readLatLng: readLatLng,
     m2ll: m2ll,
+    ll2m: ll2m,
+    trunkToCad: trunkToCad,
     frameToWorld: frameToWorld,
     zoneWorlds: zoneWorlds,
     autoSign: autoSign

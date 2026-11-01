@@ -5270,3 +5270,102 @@ RyTrunkPanel.shouldWarn(entry, derived?) -> { warn, muted, vLevel, v, text }
   + `core/trunk-schema.js` / `mod/online-map.css` / `mod/online-map.js` / `mod/trunk-panel.js` 的 `?v=`
   （`mod/trunk-panel.js` 已在 CORE 名单，无需再加）。
 - 闸门：`check.cjs` 全部通过 / 单测 **364 项全绿** / `check_publish_refs.cjs` PASS / lint 无告警。
+
+---
+
+## 26.79 总管六期：DXF「ZG_TRUNK」地图总管层（v840 · 2026-11-01）
+
+规格五的「DXF 导出含 ZG_总管层」。选了**方案 A**：改现有导出器 `runye-dxf.js`，
+而不是在地图页另开一个 DXF 入口 —— 用户要的是「一张图带全部图层」，两个入口必然分裂。
+
+### 一、为什么这一层不走 SVG 遍历
+
+`buildDxf()` 其余图层都是遍历 `window.tlDiagramSVG`（出图用的权威 SVG 字符串）。
+总管不行：图纸里画的是由总管**推出来**的设计 `frontPipe`（经过网格化 / 断点 / 平移），
+真折线只住在 `plot.trunk` 里。所以这一层是唯一的"外部数据源"：
+
+```
+地块库 plot.trunk（GCJ-02 经纬度）
+  → RyTrunkGeo.ll2m（±y 选边由 autoSign 定）
+  → 图面米坐标
+  → y 取负 ⇒ CAD 坐标（与 makeInv 同口径）
+```
+
+### 二、新增纯函数（`mod/trunk-geo.js`，Node 可测）
+
+| 函数 | 作用 | 为什么必须在这里 |
+|---|---|---|
+| `ll2m(q, base, sign)` | `m2ll` 的逆 | 站点里第一次走"经纬度 → 米"反向链路 |
+| `trunkToCad(points, base, sign)` | 折点 → `[[x,y],…]`，**y 取负** | 符号错在正南北干线上看不出来，只能靠单测钉 |
+
+`y 取负`的推导（别自己重新做 view 变换）：`CAD_y = -((sy-oy)/s + minY)`，而
+`sy = (my-minY)*s + oy` ⇒ `CAD_y = -my`；x 方向 `minX/ox` 正好抵消 ⇒ **CAD_x = 图面 x**。
+`tlPlanView` 的 `s/ox/oy` 在这一层里根本不用出现。
+
+### 三、层名为什么是 ASCII（`ZG_TRUNK` 而不是 `ZG_总管层`）
+
+本导出器写 `$ACADVER=AC1018`(2004) + `$DWGCODEPAGE=ANSI_1252`，字符串按 1252 解码：
+
+- 文字实体：`escText()` 把非 ASCII 转成 `\U+XXXX` ⇒ 中文正常（既有做法）；
+- **层名没有这样的转义**。层名写 UTF-8 中文字节，AutoCAD 按 1252 解码 ⇒ 一串乱码字母，
+  比 ASCII 层名更难用。
+
+要真中文层名只有一条路：`$ACADVER` 抬到 `AC1021`(2007+) 改成 UTF-8 编码 ——
+那会同时改掉**所有既有图层与实体**的编码，影响面远大于收益，需要单独一批 + 真机验证。
+⇒ 层名 `ZG_TRUNK`（ZG = 总管），中文说明写在 `999` 注释行（读取方一律忽略）+ 对话框标签。
+探针 A4/A6 把这两件事都锁住。
+
+### 四、跨地块必须拒绝（本批最重要的一条纪律）
+
+`tlDiagramData.poly` 属于**当前这张施工图**，`plot.trunk` 属于**库里那块地**。
+二者不是同一块时（换了地块没重出图 / 打开的是别的地块的图），反算出的总管会整体错位
+几十到几百米，而图上"确实有根线"，最难发现。
+
+判据不用 id（库里没有 plotId 可比）：`autoSign(dd.poly, plot.polyLatLng, base)` ——
+±y 两个候选都凑不出 `rms < 0.5m` 就是"这张图不是从这块地长出来的" ⇒ **不导**。
+拒绝时**不弹窗**：对话框里那一行提示直接写原因并把勾选框 `disabled`
+（"点了导出才发现少一层"比"提前说一声"糟得多）。
+
+其余拒绝路径（同样只提示不中断）：成组/合并地块、没有总管、坐标系不是 GCJ-02、
+缺 `tlDiagramData` 快照。
+
+### 五、实体口径
+
+| 内容 | 图层 | 说明 |
+|---|---|---|
+| 干线折线 | `ZG_TRUNK` | `LWPOLYLINE`，真彩 0x1E3A8A（深蓝）、`43`=0.5（图示宽度，**不是管径**）、不闭合 |
+| 水源 / 三通 | `SYMBOL` | `CIRCLE` r=1.2 / 0.8，与地图同色（#2563eb / #f97316）；受「水泵/阀门符号」开关控制 |
+| 干线编号 | `TEXT` | `params.code`（缺省 `id`），挂在中点、与图面文字同高（12px ⇒ 12/s 米）；受「文字」开关控制 |
+
+- 节点标记是**拐点属性**（`params.nodeTypes` 一个下标只有一个类型）⇒ 同一点不会被画成两个圆。
+- 勾选框 `data-k="trunk"` 默认勾选（条件满足时）；不勾就一个 ZG 实体都不出，但**层表仍然保留**该层
+  （用户自己要往这层画东西时不用新建）。
+- 图层表 `70` 条数由 `LAYERS.length` 自动跟随，新增层不用改别处。
+
+### 六、测试
+
+- `tests/trunk_geo_ll2m.test.cjs`（**9 项**）：`ll2m` 是 `m2ll` 的逆（±sign）、北=−y 选 −1、
+  北=+y 选 +1、退化地块（y 全等）必须拒绝、环整体挪 40m 必须拒绝、CAD y 取负、
+  **与 `makeInv` 逐位一致**（用 ts/inv 复刻闭环）、坏点整根返回 null、单点不插值。
+  容差写 `0.2m` 而不是 `1e-6`：环按 `toFixed(6)` 落库，1e-6° ≈ 0.11m 是量化误差，与符号无关。
+- `_probe_trunk_p9_dxf.mjs`（**28 项全绿**，本地）：段序 / 严格 (code,value) 成对 /
+  LAYER 表声明条数 == 实际记录数 / 层名全 ASCII / ZG 折线与**探针独立算的** (x,−y) 逐点相等 /
+  北为正 / 圆点半径与圆心 / 编号各一次 / 三个开关（trunk、symbol、text）/
+  四条拒绝路径（含"对不上时强行导也一个 ZG 折线都没有"）/ 无 pageerror。
+  探针**故意不复用**页面里的 `ll2m`（否则两边同错也能全绿）。
+- 探针踩过的坑（写新探针时照抄）：TABLE 表头是 `0 TABLE / 2 LAYER / 5 <h> / 100 … / 70 <count>`，
+  `70` 在 `2` 的**后面**；第一版从 `2` 往前找 ⇒ 恒读成 `declared=0`。
+
+### 七、发布状态（v840）
+
+- 版本同抬：`sw.js VERSION='v840-trunk-dxf'`、`index.html` 的 `style-01.css?v=840-trunk-dxf`
+  + `runye-dxf.js` / `mod/trunk-geo.js` 的 `?v=`。
+- 闸门：`check.cjs` 29 项 PASS / 单测 **373 项全绿** / `check_publish_refs.cjs` PASS / lint 无告警。
+
+### 八、仍没做
+
+1. 「联合水力复核」（总管 + 下游分区管网）—— 前提是地图页先有 AI 管网图层。
+2. 地图页叠加 AI 分区管网（只读）+ 图层配色（现深灰 `#475569`，规格要粗深蓝）。
+3. 分区页移除手绘总管入口 `#grTrunkDraw`（两套总管并存）。
+4. 众包案例库打包。
+5. 「真中文层名」需要 AC1021/UTF-8 专项（见第三节），不在本批。

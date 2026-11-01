@@ -6,7 +6,8 @@
    坐标反算：window.tlPlanView {s,ox,oy,minX,minY}。
    图层带颜色（AutoCAD 颜色号）：
      PLOT 地块边界(白) ZONE 分区(灰) PIPE_FRONT 总管(品红)
-     PIPE_MAIN 主管(蓝) PIPE_BRANCH 支管(绿) SYMBOL 水泵阀门(红) TEXT 文字(黄)
+     PIPE_MAIN 主管(蓝) PIPE_BRANCH 支管(绿) ZG_TRUNK 地图总管(深蓝)
+     SYMBOL 水泵阀门(红) TEXT 文字(黄)
    ============================================================================ */
 (function (global) {
   'use strict';
@@ -19,6 +20,7 @@
     { name: 'PIPE_BRANCH',  color: 3  },
     { name: 'PIPE_TAPE', color: 4 },
     { name: 'PIPE_LINK', color: 6 },
+    { name: 'ZG_TRUNK',     color: 5  },
     { name: 'SYMBOL',       color: 1  },
     { name: 'TEXT',         color: 2  }
   ];
@@ -143,6 +145,113 @@
     return false;
   }
 
+  /* ===== 地图总管层（规格五「ZG_总管层」） =====
+   *
+   * 图纸 SVG 里**没有**这根线：施工图画的是由总管推出来的设计 frontPipe（被网格化/截取过），
+   * 地图页那份真折线只住在 plot.trunk 里。所以这一层不走 SVG 遍历，而是
+   * 「地块库拿经纬度 → 反算回图面米坐标 → 按 makeInv 同口径转 CAD」。
+   *
+   * ★ 为什么层名是 ASCII（规格书写的是「ZG_总管层」）：
+   *   本导出器写 $ACADVER=AC1018(2004) + $DWGCODEPAGE=ANSI_1252，字符串按 1252 解码。
+   *   文字实体可以靠 \U+XXXX 转义绕开（escText），**层名不行** —— 直接写 UTF-8 中文
+   *   在 AutoCAD 里会变成一串乱码字母。要真中文层名必须把 $ACADVER 抬到 AC1021(2007+)
+   *   整体改 UTF-8，那会动到所有既有图层与实体的编码，风险远大于收益。
+   *   ⇒ 层名 ASCII（ZG_TRUNK，ZG 即"总管"），中文名只出现在对话框标签与文档里。
+   *     要真中文层名，先把 $ACADVER 抬到 AC1021 全量改 UTF-8，再单独议。
+   *
+   * ★ 跨地块必须拒绝（与「宁可少吸一个点」同一条纪律）：
+   *   tlDiagramData.poly 属于**当前这张施工图**，plot.trunk 属于**库里那块地**。
+   *   两者不是同一块时（用户换了地块但没重新生成图 / 打开的是别的地的图），
+   *   反算出来的总管会整体错位几百米，而且看上去"图上有根线"，最难发现。
+   *   判据不用 id（库里没有 plotId 字段可比），用几何：autoSign 拿地块环当标尺，
+   *   ±y 两个候选都算不出 <0.5m 就说明这张图压根不是从这块地长出来的 ⇒ 不导出。
+   */
+  var TRUNK_LAYER = 'ZG_TRUNK';
+  var TRUNK_RGB = 0x1e3a8a;        // 深蓝（规格：总管粗深蓝）；图层色 5 = 蓝
+  var TRUNK_WIDTH = 0.5;           // 图示宽度（米），不是管径 —— 与其它管线同一量级
+  var NODE_SOURCE_R = 1.2;         // 水源进水口半径（米）
+  var NODE_TEE_R = 0.8;            // 分水三通半径（米）
+  var NODE_RGB = { source: 0x2563eb, tee: 0xf97316 };   // 与地图上的圆点同色
+
+  function currentPlotRow() {
+    var store = global.RyPlotLibraryStore;
+    var pid = String(global.currentPlotId == null ? '' : global.currentPlotId);
+    if (!store || typeof store.read !== 'function' || !pid) return null;
+    var snap = null;
+    try { snap = store.read(); } catch (e) { return null; }
+    if (!snap || !snap.ok || !Array.isArray(snap.plots)) return null;
+    for (var i = 0; i < snap.plots.length; i++) {
+      var p = snap.plots[i];
+      if (p && String(p.id) === pid) return p;
+    }
+    return null;
+  }
+
+  /* 本次能不能导总管：返回 {ok, reason, trunks, toCad}。
+     ok=false 时 reason 是**给人看的一句话**（对话框直接显示，不弹窗打断）。 */
+  function trunkPlan() {
+    var out = { ok: false, reason: '', trunks: [], toCad: null };
+    var G = global.RyTrunkGeo, S = global.RyTrunkSchema;
+    if (!G || !S) { out.reason = '总管模块未加载'; return out; }
+    var plot = currentPlotRow();
+    if (!plot) { out.reason = '当前地块不在地块库里'; return out; }
+    if (!S.hasUsableTrunk(plot)) {
+      out.reason = (plot.merged || plot.grouped || plot.mergedInto)
+        ? '成组/合并地块暂不支持导出总管'
+        : '当前地块还没有地图总管';
+      return out;
+    }
+    var t = S.normalize(plot.trunk);
+    if (!t || !t.trunks.length) { out.reason = '总管数据无法识别'; return out; }
+    if (t.coordinateSystem !== 'GCJ-02') { out.reason = '总管坐标系不是 GCJ-02'; return out; }
+    var dd = global.tlDiagramData;
+    if (!dd || dd.world !== 'meter' || !Array.isArray(dd.poly) || dd.poly.length < 3) {
+      out.reason = '缺少图纸几何快照，请重新生成管线图'; return out;
+    }
+    var base = (plot.geo && typeof plot.geo === 'object') ? plot.geo : global.__runyeGeoBase;
+    var cal = G.autoSign(dd.poly, plot.polyLatLng, base);
+    if (!cal.ok) {
+      out.reason = '这张施工图与当前地块对不上（不是同一块地），不导出总管';
+      return out;
+    }
+    out.ok = true;
+    out.trunks = t.trunks;
+    out.toCad = function (pts) { return G.trunkToCad(pts, base, cal.sign); };
+    return out;
+  }
+
+  /* 把总管写进 ents[]。geometry 全在 tp.toCad 里（纯函数、Node 单测覆盖），
+     这里只负责"发几个实体"。 */
+  function pushTrunkEntities(ents, tp, opts, scale) {
+    tp.trunks.forEach(function (trunk) {
+      var pts = tp.toCad(trunk.points);
+      if (!pts || pts.length < 2) return;
+      ents.push(entPoly(pts, TRUNK_LAYER, false, { color: TRUNK_RGB, width: TRUNK_WIDTH, type: 'BYLAYER' }));
+
+      /* 干线编号（规格五⑤ params.code，缺省退回 id）：挂在中点，与图面文字同高 */
+      if (opts.text) {
+        var mid = pts[Math.floor((pts.length - 1) / 2)];
+        var label = String((trunk.params && trunk.params.code) || trunk.id || '').trim();
+        if (label) {
+          var th = 12 / scale;
+          ents.push(entText([mid[0], mid[1] + th * 1.4], th, label, 'TEXT', { color: TRUNK_RGB, type: 'BYLAYER' }));
+        }
+      }
+
+      /* 水源 / 分水三通（规格四）：**是拐点属性，不是叠加物** —— 一个下标只有一个类型，
+         所以这里按下标取点，同一点不会被画成两个圆。 */
+      var nt = trunk.params && trunk.params.nodeTypes;
+      if (opts.symbol && nt && typeof nt === 'object') {
+        Object.keys(nt).forEach(function (k) {
+          var idx = Number(k), pt = pts[idx], kind = nt[k];
+          if (!pt || !isFinite(idx) || (kind !== 'source' && kind !== 'tee')) return;
+          ents.push(entCircle(pt, kind === 'source' ? NODE_SOURCE_R : NODE_TEE_R, 'SYMBOL',
+            { color: NODE_RGB[kind], type: 'BYLAYER' }));
+        });
+      }
+    });
+  }
+
   function tablesSection(){
     var o=['0','SECTION','2','TABLES'];
     function table(name,count){o.push('0','TABLE','2',name,'5',handle(),'100','AcDbSymbolTable','70',String(count));}
@@ -151,7 +260,11 @@
     ['BYBLOCK','BYLAYER','CONTINUOUS'].forEach(function(n){record('LTYPE','AcDbLinetypeTableRecord');o.push('2',n,'70','0','3',n,'72','65','73','0','40','0');});
     Object.keys(lineTypes).forEach(function(n){var a=lineTypes[n].pattern;record('LTYPE','AcDbLinetypeTableRecord');o.push('2',n,'70','0','3','Imported SVG dash','72','65','73',String(a.length),'40',f(a.reduce(function(s,v){return s+Math.abs(v);},0)));a.forEach(function(v){o.push('49',f(v),'74','0');});});o.push('0','ENDTAB');
     table('STYLE',1);record('STYLE','AcDbTextStyleTableRecord');o.push('2','STANDARD','70','0','40','0','41','1','50','0','71','0','42','2.5','3','txt','4','','0','ENDTAB');
-    table('LAYER',LAYERS.length);LAYERS.forEach(function(L){record('LAYER','AcDbLayerTableRecord');o.push('2',L.name,'70','0','62',String(L.color),'6','CONTINUOUS','370','-3');});o.push('0','ENDTAB','0','ENDSEC');return o.join('\n');
+    table('LAYER',LAYERS.length);
+    /* 999 = 注释组码（读取方一律忽略）。层名只能是 ASCII —— 见文件头「为什么层名是 ASCII」，
+       中文说明放注释里，不占层名字节。 */
+    o.push('999','ZG_TRUNK = map trunk line (layer name kept ASCII: AC1018 DXF decodes names as ANSI_1252)');
+    LAYERS.forEach(function(L){record('LAYER','AcDbLayerTableRecord');o.push('2',L.name,'70','0','62',String(L.color),'6','CONTINUOUS','370','-3');});o.push('0','ENDTAB','0','ENDSEC');return o.join('\n');
   }
 
   function buildDxf(opts){
@@ -189,6 +302,14 @@
       }
     });
 
+    /* 地图总管（规格五）：图纸 SVG 里没有这根线，单独反算一段。
+       勾了但条件不满足时**静默跳过** —— 对话框里已经写明原因并禁用了勾选框，
+       这里再弹一次窗只会在下载前打断用户。 */
+    if (opts.trunk) {
+      var tp = trunkPlan();
+      if (tp.ok) pushTrunkEntities(ents, tp, opts, scale);
+    }
+
     if(!ents.length){ alert('按当前勾选没有可导出的内容。'); return null; }
     var head=['0','SECTION','2','HEADER','9','$ACADVER','1','AC1018','9','$INSUNITS','70','6','9','$DWGCODEPAGE','3','ANSI_1252','0','ENDSEC'];
     /* 标准段序：HEADER → TABLES → ENTITIES → EOF（2026-10-02 修复：旧版 ENTITIES 排在 TABLES 前） */
@@ -211,6 +332,9 @@
     if (!requireDrawingExport()) return;
     var old=document.getElementById('ryDxfDlg'); if(old) old.remove();
     var hasPlan=!!(window.tlDiagramSVG && window.tlDiagramSVG.indexOf('<svg')>=0);
+    /* 总管能不能导，在**打开对话框时**就算一次并写清楚原因：
+       让用户在勾之前就知道"这次没有"，而不是点了导出才发现少一层。 */
+    var tp = hasPlan ? trunkPlan() : { ok: false, reason: '还没生成施工图', trunks: [], toCad: null };
     var box=document.createElement('div');
     box.id='ryDxfDlg';
     box.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:99999;display:flex;align-items:center;justify-content:center';
@@ -224,6 +348,12 @@
       +'<label style="display:block;font-size:13.5px;margin:3px 0"><input type="checkbox" class="ryDxfOpt" data-k="plot" checked> 地块边界</label>'
       +'<label style="display:block;font-size:13.5px;margin:3px 0"><input type="checkbox" class="ryDxfOpt" data-k="zone" checked> 分区</label>'
       +'<label style="display:block;font-size:13.5px;margin:3px 0"><input type="checkbox" class="ryDxfOpt" data-k="front" checked> 总管</label>'
+      +'<label style="display:block;font-size:13.5px;margin:3px 0"><input type="checkbox" class="ryDxfOpt" data-k="trunk"'
+        +(tp.ok?' checked':' disabled')+'> 地图总管（'+TRUNK_LAYER+' 层）</label>'
+      +'<div id="ryDxfTrunkHint" style="font-size:11px;line-height:1.5;margin:2px 0 8px 20px;color:'+(tp.ok?'#64748b':'#b45309')+'">'
+        +(tp.ok ? ('共 '+tp.trunks.length+' 条干线，按当前地块经纬度反算到图面坐标；水源/三通圆点随「水泵/阀门符号」一起导')
+                : ('不导出：'+tp.reason))
+      +'</div>'
       +'<label style="display:block;font-size:13.5px;margin:3px 0"><input type="checkbox" class="ryDxfOpt" data-k="main" checked> 主管</label>'
       +'<label style="display:block;font-size:13.5px;margin:3px 0"><input type="checkbox" class="ryDxfOpt" data-k="branch" checked> 支管</label>'
       +'<label style="display:block;font-size:13.5px;margin:3px 0"><input type="checkbox" class="ryDxfOpt" data-k="tape" checked> 滴灌带</label>'
