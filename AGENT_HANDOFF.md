@@ -5752,3 +5752,69 @@ src = 'mapTrunk'   // 在线地图总管实测（优先）
    （`Number(null) === 0`）。历史数据里一个空位就会让整根线量出几千公里。
    只在 `lineLen` 这条新链上加了 `rawPointOk` 收紧；改 `readLatLng` 本身会影响
    `normalize` 的迁移语义（空位点会被判非法 ⇒ 丢掉整根干线），要单独评估。
+
+---
+
+## 26.83 分区成组页：移除手绘总管入口 `#grTrunkDraw`（v844 · 2026-11-01）
+
+### 一、这一版做什么
+
+规格审计（§26.80 之前的实现度盘点）一直挂着一条「不符规格：分区页仍有手绘总管入口」。
+v843 把扬程口径统一到「在线地图总管实测长度」之后，这件事从"该改"变成了"必须改"：
+**扬程都认地图总管了，分区页还能画另一套总管，用户画完只会发现扬程不认。**
+
+⇒ 本版把 `#grTrunkDraw`（按钮 DOM + `click('grTrunkDraw')` 绑定 + active 同步）整组移除，
+提示文案改为指路：「总管已改为在『在线地图』页绘制：选地块 → 『✎ 编辑总管』→ 画线/复核。
+本页不再支持手画；已画的旧总管仍可点选删除。」
+
+### 二、删的是入口，不是数据（这条边界必须说清）
+
+- **存量 `W.trunk`（成组页手画的总管）照旧渲染、照旧参与材料汇总与流速体检。**
+  `grRenderTrunk` / `grCommitTrunk` / `grComputeHydraulics` 一行没动。
+- 「🗑 删除选中」（含 Delete 键）、「清空」、「参考线」三个按钮保留 —— 用户要把旧总管
+  清掉换成地图总管，得有工具；「参考线」本来就是纯视觉。
+- pick 态点选、Delete 删除的提示文案同步改（原话里还教人「画总管时点击加点」）。
+
+### 三、画线状态机**保留不动**（W.mode / W.draw / grExitDraw）
+
+入口删了，但双击收线、右键回退、Esc 取消这一整套状态机一行没删。
+W.mode 恒为 `'pick'` ⇒ 画线分支不可达。为什么留着：
+
+- 存量总管的**点选/删除仍走这套分支**（click 里 `if (W.mode==='draw')` 在前、pick 在后）；
+- 将来若要恢复入口（比如离线场景不能开地图），**加回按钮与绑定即可，不用重写状态机**；
+- 真正删除状态机要动 7 处事件分支，风险收益完全不成比例。
+
+`tests/gr_trunk_draw_removed.test.cjs ⑥` 钉了两头：状态机在、但**没有任何活代码能把
+W.mode 置成 'draw'**（入口真的删干净了）。
+
+### 四、静态锁（6 项，`tests/gr_trunk_draw_removed.test.cjs`）
+
+为什么用静态锁不用探针：要钉的是「入口不许回来」—— 这种回归的表现不是报错，而是按钮
+悄悄出现在页面上，等发现时三套总管又并存了。
+
+1. index.html 无 `id="grTrunkDraw"`（去 HTML 注释后扫）；
+2. inline-29 无 `grTrunkDraw` 引用（去 JS 注释后扫）；
+3. 活代码无「✎ 画总管」指引文案；
+4. 提示文案指路「在线地图 / 编辑总管」（DOM 初始 + JS 运行时两处）；
+5. 存量能力仍在：grRenderTrunk / grTrunkDel / grTrunkClear / grTrunkGhost /
+   grCommitTrunk / grComputeHydraulics + 8 个 DOM 节点；
+6. 状态机在（W.mode/W.draw/grExitDraw）且不可达（无 `mode='draw'` 赋值）。
+
+★ 负向断言必须先去注释再扫（v841 踩过：注释里写旧色值会被自己扫到）。
+★ `grTrunkGhost` 是 `$('grTrunkGhost')` + addEventListener，不是 `click()` 包装 ——
+   断言写 `click('grTrunkGhost'` 会假红。
+
+### 五、发布状态（v844）
+
+- 版本同抬 `v844-gr-trunk-gate`：`sw.js` + `index.html` 八处 `?v=`。
+  `mod/inline-29.js` 是展开内联的，无独立 `?v=`，随主页版本走。
+- 闸门：check.cjs 29 项 / 单测 388 / publish_refs PASS / lint 无告警。
+- 「三套总管并存」至此收口为：**地图总管 `plot.trunk` v2 是唯一可新增的权威**；
+  成组 `W.trunk` 只减不增；设计 `frontPipe` 是渲染代理。
+
+### 六、仍没做
+
+1. 众包案例库打包。
+2. 真中文 DXF 层名（AC1021/UTF-8 专项，见 §26.79 三）。
+3. `readPoint/readLatLng` 的 `[null,1]` → `{lat:0,lng:1}` 隐患（见 §26.82 十一）。
+4. `snapOn` 默认 true，规格要「重开默认关闭」。

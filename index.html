@@ -14,7 +14,7 @@
 <!-- [v831] 地图总管数据契约 v2。必须**先于**所有读取方加载（inline-13 / inline-16 / inline-09 / online-map），
      否则它们调 RyTrunkSchema.normalize 时拿到 undefined，会退回「只认 schema===1」而读不到总管。
      为什么要有这个模块：plot.trunk 有 5 个读取方，v1→v2 的迁移只允许一个入口，理由见文件头注释。 -->
-<script src="core/trunk-schema.js?v=843-trunk-head"></script>
+<script src="core/trunk-schema.js?v=844-gr-trunk-gate"></script>
 <script src="core/storage-guard.js?v=823-fix-transfer-save-alert"></script>
 <!-- [v836] 分区网格 frame ↔ 世界米的坐标换算。纯函数、零 DOM。
      必须先于 mod/inline-09.js（它的 tlFrameToWorld/tlFrameToGrid 是转发），
@@ -26,7 +26,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>润野灌溉设计优化版｜滴灌管径与水泵选型</title>
 <meta name="description" content="输入地块、滴灌带与水源参数，快速计算灌溉分区、主管支管管径和水泵工作点。"/>
-<link rel="stylesheet" href="mod/style-01.css?v=843-trunk-head">
+<link rel="stylesheet" href="mod/style-01.css?v=844-gr-trunk-gate">
 <link rel="stylesheet" href="runye-inverse-design.css?v=277">
 <script defer src="runye-inverse-design.js?v=438-branch-flow-conservation"></script>
 <link rel="stylesheet" href="runye-terrain.css?v=454-terrain-sidebar-peer">
@@ -36,7 +36,7 @@
 <link rel="stylesheet" href="runye-case-library.css?v=277">
 <script src="runye-case-library.js?v=277"></script>
 <script src="runye-geo.js"></script>
-<script src="runye-map-enhance.js?v=843-trunk-head"></script>
+<script src="runye-map-enhance.js?v=844-gr-trunk-gate"></script>
 <script src="hydraulic-calc/hydraulics-wasm.js"></script>
 <script src="hydraulic-calc/native-bridge.js"></script>
 <script src="hydraulic-calc/hc-core.js"></script>
@@ -51,7 +51,7 @@
 <link rel="stylesheet" href="hydraulic-calc/hydraulic-calc.css">
 <link rel="stylesheet" href="filter-system/filter-system.css">
 <link rel="stylesheet" href="pwa/vendor/leaflet.css">
-<link rel="stylesheet" href="mod/online-map.css?v=843-trunk-head">
+<link rel="stylesheet" href="mod/online-map.css?v=844-gr-trunk-gate">
 <link rel="stylesheet" href="terrain/terrain.css?v=535-terrain-single-source">
 <link rel="stylesheet" href="hydraulics-main.css?v=442-native">
 <style id="ryCadTwinCss">
@@ -1120,15 +1120,18 @@ body.ry-worst-off [data-tlworst]{display:none}
         <span class="gr-label">根数</span><span class="gr-val" id="grTrunkN">0</span>
       </div>
       <div class="gr-btns">
-        <button type="button" class="pp-btn-ghost gr-btn" id="grTrunkDraw" title="进入画总管：在图上点击加点，双击结束，右键退回上一点">✎ 画总管</button>
-        <!-- [v655] 参考线：临时显示系统建议走向（虚线幽灵，仅视觉，不参与计算不出料） -->
+        <!-- [v844 用户拍板] 「✎ 画总管」入口移除：总管只在在线地图页画（选地块 → ✎ 编辑总管）。
+             分区成组页不再新增手绘总管 —— 三套总管并存（plot.trunk v2 / 本页成组 W.trunk /
+             设计图面 frontPipe）里，地图总管是唯一权威。已画的存量 W.trunk 照旧渲染、
+             可选中删除（删除选中/清空/参考线三个按钮保留），只是不能再画新的。
+             绑定侧（inline-29 的 click('grTrunkDraw')）同步移除。 -->
         <button type="button" class="pp-btn-ghost gr-btn" id="grTrunkGhost" title="临时显示系统建议走向（虚线，仅参考，不参与计算与材料）">参考线</button>
         <!-- [v196] 「⚡ 自动生成」撤掉：用户原话「总管我会根据实际情况，手动画」——
              自动连线猜不出水源和走向，生成一版还要删，反而碍事。只留手画。 -->
         <button type="button" class="pp-btn-ghost gr-btn" id="grTrunkDel" title="删除选中的总管（先在图上点选一根）">🗑 删除选中</button>
         <button type="button" class="pp-btn-ghost gr-btn" id="grTrunkClear" title="清除全部总管">清空</button>
       </div>
-      <div class="gr-hint" id="grTrunkHint">总管请按实际情况手动画：点「✎ 画总管」后在图上点击加点、双击结束、右键退回上一点；点一根已画的总管可选中删除。</div>
+      <div class="gr-hint" id="grTrunkHint">总管已改为在「在线地图」页绘制：选地块 → 「✎ 编辑总管」→ 画线/复核。本页不再支持手画；已画的旧总管仍可点选删除。</div>
     </div>
 
     <!-- [v678 用户拍板] 「驳接点 / 管径 / 水头损失」卡与右侧悬浮水力面板随页面瘦身整体移除
@@ -1154,11 +1157,11 @@ body.ry-worst-off [data-tlworst]{display:none}
 
   <div class="pp-stage">
     <div class="pp-toolbar" id="grToolbar">
-      <span class="pp-tool-hint" id="grHint">整组总览：各块分区线与管线为只读展示；总管在左侧「✎ 画总管」手绘，画好自动计入材料汇总</span>
+      <span class="pp-tool-hint" id="grHint">整组总览：各块分区线与管线为只读展示；总管在「在线地图」页绘制（v844 起本页不再手画），旧总管仍可选中删除并计入材料汇总</span>
       <span class="pp-sep"></span>
       <!-- [v678 用户拍板] 工具栏瘦身：「🗑 清除各块管路」「↺ 驳接点复位」「▤ 水力面板」
            「▣ 三级管路」四个按钮整体移除（对应 JS 绑定一并删除）；本页只保留
-           展示 + 画总管（左侧总管卡）+ 材料清单。各块管线要改回二级页单地块改。 -->
+           展示 + 总管卡（v844 起只管存量）+ 材料清单。各块管线要改回二级页单地块改。 -->
       <!-- [v240 2026-10-05 用户指令] 缩放的三个按钮按用户要求取消（截图三处箭头：
            「⤢ 适应」+「－ 缩小」+「＋ 放大」）—— 滚轮缩放、拖拽平移已覆盖同样能力，
            且按钮过多会把工具栏挤到换行（＋ 掉到第二行左侧、看着像凭空冒出的小方块）。
@@ -2453,7 +2456,7 @@ body.ry-worst-off [data-tlworst]{display:none}
      计算核心与 API 照常加载。将来恢复：改 false 或删除本行。
      注意 pipe-path-loss.js 是三级扬程校核（RyPipePathLoss.calculate）依赖，必须照常加载。 -->
 <script src="mod/inline-23.js?v=357"></script>
-<script src="hydraulic-calc/pipe-path-loss.js?v=843-trunk-head"></script>
+<script src="hydraulic-calc/pipe-path-loss.js?v=844-gr-trunk-gate"></script>
 <script src="hydraulic-calc/hydraulic-calc.js"></script>
 <!-- 过滤系统页（2026-09-18 第七十二轮）：GREEN 单体版管路模型 + 选型计算，
      懒挂载（首次可见时建 DOM），与二级/三级计算双向融合。 -->
@@ -2553,11 +2556,11 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script src="mod/ry-panel.js?v=823-fix-transfer-save-alert"></script>
 <script src="pwa/vendor/leaflet.js"></script>
 <script src="mod/trunk-snap.js?v=832-trunk-snap"></script>
-<script src="mod/trunk-geo.js?v=843-trunk-head"></script>
+<script src="mod/trunk-geo.js?v=844-gr-trunk-gate"></script>
 <script src="mod/trunk-edit.js?v=835-trunk-geo-snap"></script>
 <script src="mod/trunk-history.js?v=835-trunk-geo-snap"></script>
-<script src="mod/trunk-panel.js?v=843-trunk-head"></script>
-<script src="mod/online-map.js?v=843-trunk-head"></script>
+<script src="mod/trunk-panel.js?v=844-gr-trunk-gate"></script>
+<script src="mod/online-map.js?v=844-gr-trunk-gate"></script>
 <script src="terrain/terrain-core.js?v=410-elev"></script>
 <script src="terrain/terrain-ui.js?v=513-sec-gate"></script>
 <script src="runye-hydraulics-page.js?v=829-hyd-auto-refresh"></script>

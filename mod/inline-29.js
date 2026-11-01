@@ -562,7 +562,8 @@
 
   /* [v196] 原「总管自动生成 grAutoTrunk」整个撤掉：用户原话「总管我会根据
      实际情况，手动画」—— 自动连线猜不出水源与走向，生成的还要删，反而碍事。
-     总管 = 本页手画（✎ 画总管），画完照旧计入材料汇总的总管行。 */
+     [v844] 本页手画入口也已移除（见 grBind 里的 grTrunkDraw 注释）：
+     总管统一在在线地图页画（plot.trunk v2 是唯一权威），本页只渲染/删除存量。 */
 
   /* ---------------- 面板渲染 ---------------- */
   function grRenderBar() {
@@ -582,7 +583,7 @@
     if ($('grTrunkLen')) $('grTrunkLen').textContent = fmt(len, 1);
     if ($('grTrunkN')) $('grTrunkN').textContent = String(n);
     if ($('grTrunkMat')) $('grTrunkMat').textContent = 'Ø' + W.trunk.dn + ' mm PE';
-    if ($('grTrunkDraw')) $('grTrunkDraw').classList.toggle('active', W.mode === 'draw');
+    /* [v844] 「✎ 画总管」按钮已删，active 同步一并移除。 */
     grUpdateTrunkVel();   /* [v654] 管径下拉/一键建议档改后，流速行同步刷新 */
   }
   /* [v654] 大总管流速体检行：有水力结果且总流量>0 才显示；超出经济区间给「一键建议档」。
@@ -1046,8 +1047,9 @@
   /* 本页工具栏的操作反馈（总管区已有 grHint，别混用两条 —— 否则用户分不清
      这句是「说总管的」还是「说各块管路的」）。用完 6 秒还原默认说明。 */
   function grDefaultHint() {
-    /* [v678] 瘦身后只有一句话：展示只读、总管手画。不再提「生成按钮 / 双击进编辑」。 */
-    return '整组总览：各块分区线与管线为只读展示；总管在左侧「✎ 画总管」手绘，画好自动计入材料汇总';
+    /* [v678] 瘦身后只有一句话：展示只读、总管手画。不再提「生成按钮 / 双击进编辑」。
+       [v844] 手画入口移除：这句话要跟 index.html 的 #grHint 初始文案保持同义。 */
+    return '整组总览：各块分区线与管线为只读展示；总管在「在线地图」页绘制（本页不再手画），旧总管仍可选中删除并计入材料汇总';
   }
   var grHintT = 0;
   function grHint2(msg) {
@@ -1243,16 +1245,12 @@
        [v678 用户拍板] 页面进一步瘦身：只保留 展示 + 画总管 + 材料清单 ——
        「🗑 清除各块管路」（grPipeClear/grClearAllPipes/grKeepMode）、「▤ 水力面板」、
        「↺ 驳接点复位」、「▣ 三级管路」四组绑定全部移除。各块管线改错了
-       回二级页单地块改（成组继承会带过来），本页只画总管。 */
-    click('grTrunkDraw', function () {
-      W.mode = (W.mode === 'draw') ? 'pick' : 'draw';
-      W.draw = W.draw || [];
-      if (W.mode !== 'draw') W.draw = null;
-      grRenderTrunk(); grRender();
-      grHint(W.mode === 'draw'
-        ? '画总管中：点击加点，双击结束（收线后自动退出画线模式），右键退回上一点，Esc 取消。'
-        : '总图里点一根总管可选中；画总管时点击加点、双击结束、右键退回上一点。');
-    });
+       回二级页单地块改（成组继承会带过来），本页只画总管。
+       [v844 用户拍板] 「✎ 画总管」入口移除：总管只在在线地图页画（plot.trunk v2
+       是唯一权威，否则三套总管永远说不清谁算数）。按钮 DOM 与本绑定一起删。
+       ★ 画线状态机（W.mode/W.draw、双击收线、右键回退、Esc）**保留不动**：
+         W.mode 恒为 'pick' ⇒ 这些分支不可达，但存量总管的点选/删除仍走它们；
+         将来若要恢复入口，加回按钮与绑定即可，不用重写状态机。 */
     click('grTrunkDel', function () {
       /* ★ 想删除就不是想画线 —— 先退出画线模式，否则用户点图想「选中」、实际还在加点 */
       grExitDraw();
@@ -1316,8 +1314,8 @@
         W.sel = grPick(wp);
         grRender();
         if ($('grTrunkHint')) $('grTrunkHint').textContent = W.sel >= 0
-          ? '已选中第 ' + (W.sel + 1) + ' 根总管（长度 ' + fmt(sumLen([W.trunk.lines[W.sel]]), 1) + ' m），点「删除选中」移除。'
-          : '总图里点一根总管可选中；画总管时点击加点、双击结束、右键退回上一点。';
+          ? '已选中第 ' + (W.sel + 1) + ' 根总管（长度 ' + fmt(sumLen([W.trunk.lines[W.sel]]), 1) + ' m），点「删除选中」或按 Delete 移除。'
+          : '总管在「在线地图」页绘制（本页不再手画）；点一根旧总管仍可选中删除。';
       });
       cvs.addEventListener('dblclick', function (e) {
         if (W.mode !== 'draw' || !W.draw) return;
@@ -1334,8 +1332,8 @@
         W.mode = 'pick';
         grRender(); grRenderTrunk(); grRenderMat();
         if ($('grTrunkHint')) $('grTrunkHint').textContent = got
-          ? '已收线（共 ' + W.trunk.lines.length + ' 根）。点图可选中一根；再点「✎ 画总管」继续画下一根。'
-          : '不足两点未收线。再点「✎ 画总管」重新画。';
+          ? '已收线（共 ' + W.trunk.lines.length + ' 根）。点图可选中一根。'
+          : '不足两点未收线。';
       });
       /* [v678] 非画线态双击 = 适应窗口（v240 取消「⤢ 适应」按钮后唯一的复位入口）。
          「双击地块进入二级编辑」已随瘦身移除，这里不再做块命中。 */
