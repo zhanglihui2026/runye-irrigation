@@ -5912,3 +5912,19 @@ v845 打通了检索闭环但只有 AI 消费；本批给 `plugins/case-lib` 加
 
 `v846-snap-off-case-ui`：sw VERSION + style-01.css?v= + mod/online-map.js?v= +
 case-lib manifest 1.1.0。
+
+## 26.86 总管提示条挪到地图底部（v847 · 2026-11-01 · 用户反馈）
+
+用户截图反馈：顶部居中的常驻提示条（`#mapTrunkHint`）弹出时盖住右侧「图层」面板的
+一行按钮，「体验非常不好」；要求与底部提示文字合并一处。
+
+- `mod/online-map.css`：`.map-trunk-hint` 定位 `top:8 居中` → **`bottom:50px; left:14px`**。
+  底部从下往上：状态栏(0~24) → `#tip`(≈14~47，黑条) → hint(50 起)，三条竖排互不叠、
+  视觉上合并成地图下沿一个提示区；`left:14` 与 `#tip` 对齐。
+- 右下角有 `.ry-pwa-install`（z2000）时 hint `max-width` 收窄 210px（对齐状态栏同款让位）。
+- `.ry-trunk-warn` 的 top:44 **保持不动**：它避让的是顶部横排工具栏，不是提示条（注释已改）。
+- 显隐与文案逻辑（`updateTrunkHint`）零改动——探针 p2 C4/C9 照旧。
+- 静态锁 `tests/map_hint_bottom.test.cjs`（3 项）：bottom 定位 + 无 top/translateX 回潮 +
+  PWA 让位规则 + DOM/注释卫生。
+- CDP 实测（Edge headless 1600×1000）：hint 754~777、tip 778~813、状态栏 803~827，
+  顶部工具栏区域 elementFromPoint 非 hint，无 pageerror。

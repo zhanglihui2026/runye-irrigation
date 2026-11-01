@@ -45,7 +45,7 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    [v832] 总管绘制状态栏 / 常驻提示条 / 捕捉胶囊（二期）
    ───────────────────────────────────────────────────────────────────────────
-   状态栏吸底、提示条吸顶，都用 absolute 挂在 .map-wrap 上（不挤占地图高度）。
+   状态栏吸底、提示条（v847 起）也吸底，都用 absolute 挂在 .map-wrap 上（不挤占地图高度）。
    状态栏整体 pointer-events:none，只有捕捉胶囊 auto —— 否则底部一条 24px 的横带
    会把地图的下边缘点击/拖动全吃掉，而这种"点不动"极难归因。
    ★ 不要写 border-radius:<数值>（不带 !important）：全站 body *{border-radius:0!important}
@@ -72,12 +72,19 @@
    （抬高 z-index 只会让安装条被盖住、用户点不到安装）。 */
 body:has(.ry-pwa-install) #onlineMapSection .map-statusbar{padding-right:180px}
 
+/* [v847 用户反馈] 提示条从顶部挪到底部：原来 top:8 居中那条黑字会盖住右侧
+   「图层」面板的一行按钮，体验差。现在贴在状态栏正上方、与 #tip(left:14) 对齐 ——
+   底部从下往上：状态栏(0~24) → #tip(≈14~47，黑条) → 本条(50 起)，
+   三条竖排互不叠，提示文字全部收在地图下沿一个区域里。 */
 #onlineMapSection .map-trunk-hint{
-  position:absolute;left:50%;top:8px;transform:translateX(-50%);z-index:1190;
+  position:absolute;left:14px;bottom:50px;z-index:1190;
   max-width:calc(100% - 40px);padding:4px 12px;
   background:rgba(30,41,59,.9);color:#f8fafc;
   font-size:11px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   pointer-events:none}
+/* 右下角有 .ry-pwa-install(z2000, body 级 fixed) 时给右侧让位（对齐状态栏同款做法），
+   避免 hint 右端伸进安装条下面被盖住一半。 */
+body:has(.ry-pwa-install) #onlineMapSection .map-trunk-hint{max-width:calc(100% - 210px)}
 #onlineMapSection .map-trunk-hint[hidden]{display:none!important}
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -261,8 +268,8 @@ body:has(.ry-pwa-install) #onlineMapSection .ry-trunk-panel{bottom:96px}
    ───────────────────────────────────────────────────────────────────────────
    ★ 刻意**不做遮罩层**：规格要求「只黄色提示，不能阻断绘制、保存、导出、复核」，
      遮罩会把后面所有点击吃掉，那就是阻断。这张卡只是地图区里的一张浮卡片，
-     它出现在顶部居中、常驻提示条（.map-trunk-hint，top:8，z 1190）下方，
-     z-index 取 1185 保证不压住提示条、也不被提示条压住。
+     top:44 是避让顶部横排工具栏（v847 起常驻提示条已挪到地图底部，与本卡无关），
+     z-index 1185：低于工具栏浮层、高于地图。
    ★ 不写 border-radius：全站 body *{border-radius:0!important} 会压掉它。
    ═══════════════════════════════════════════════════════════════════════════ */
 #onlineMapSection .ry-trunk-warn{

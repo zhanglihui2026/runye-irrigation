@@ -26,7 +26,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>润野灌溉设计优化版｜滴灌管径与水泵选型</title>
 <meta name="description" content="输入地块、滴灌带与水源参数，快速计算灌溉分区、主管支管管径和水泵工作点。"/>
-<link rel="stylesheet" href="mod/style-01.css?v=846-snap-off-case-ui">
+<link rel="stylesheet" href="mod/style-01.css?v=847-hint-bottom">
 <link rel="stylesheet" href="runye-inverse-design.css?v=277">
 <script defer src="runye-inverse-design.js?v=438-branch-flow-conservation"></script>
 <link rel="stylesheet" href="runye-terrain.css?v=454-terrain-sidebar-peer">
@@ -51,7 +51,7 @@
 <link rel="stylesheet" href="hydraulic-calc/hydraulic-calc.css">
 <link rel="stylesheet" href="filter-system/filter-system.css">
 <link rel="stylesheet" href="pwa/vendor/leaflet.css">
-<link rel="stylesheet" href="mod/online-map.css?v=844-gr-trunk-gate">
+<link rel="stylesheet" href="mod/online-map.css?v=847-hint-bottom">
 <link rel="stylesheet" href="terrain/terrain.css?v=535-terrain-single-source">
 <link rel="stylesheet" href="hydraulics-main.css?v=442-native">
 <style id="ryCadTwinCss">
@@ -718,9 +718,10 @@ body.ry-worst-off [data-tlworst]{display:none}
         <button class="ry-hbar-btn" id="btnMeasure">📏 测距</button>
         <button class="ry-hbar-btn" id="btnClear">🗑 清除</button>
       </div>
-      <!-- ===== [v832] 总管绘制状态栏 + 顶部常驻提示条（二期）=====
+      <!-- ===== [v832] 总管绘制状态栏 + 常驻提示条（二期；v847 提示条挪到底部）=====
            为什么放在 .map-wrap 里：它就是地图的定位容器，两者都用 absolute 吸边
-           （状态栏吸底、提示条吸顶），不会挤压地图区域，也不影响 Leaflet 的尺寸计算。
+           （状态栏吸底、提示条 v847 起也吸底 —— 顶部弹字会盖住右侧图层面板的按钮），
+           不会挤压地图区域，也不影响 Leaflet 的尺寸计算。
            状态栏整体 pointer-events:none —— 否则它会吃掉地图底部的拖动/点击；
            只有「捕捉」胶囊单独 pointer-events:auto（它要能按）。
            字段与格式按规格固定：总管：X｜投影：X m｜高差：±X m｜流速：X m/s｜捕捉：开启/关闭
