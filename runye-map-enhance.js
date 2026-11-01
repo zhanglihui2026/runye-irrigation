@@ -222,7 +222,16 @@
       '<i style="background:#dc2626"></i>超流速<i style="background:#d97706"></i>未连通' +
       '<i style="background:#7c3aed"></i>环网<i style="background:#94a3b8"></i>无需求</div>' +
       '<label class="ry-float-row ry-float-sep">' +
-      '<input type="checkbox" data-rym="fieldmode"' + (saved.fieldmode ? ' checked' : '') + '><span>☀️ 田间模式</span></label>'
+      '<input type="checkbox" data-rym="fieldmode"' + (saved.fieldmode ? ' checked' : '') + '><span>☀️ 田间模式</span></label>' +
+      /* [v849 用户反馈] 「分区角度」独立浮面板并入本面板：两个浮层叠在右侧占地方。
+         这里只放小节标题 + 宿主容器，内容（☁ 提交到云端 + section#mapPartitionTools）
+         在挂载后从静态 DOM #ryAnglePanel **整体搬进来** —— 节点移动不丢事件监听，
+         runye-map-partition.js 按 id/子节点取控件全部照旧。移动端预览页没有
+         #ryAnglePanel，host 留空（模板里该小节不渲染，见下方 mount 后搬运判断）。 */
+      '<div class="rym-angle-wrap" data-rym-angle-wrap hidden>' +
+      '<div class="rym-angle-title">分区角度</div>' +
+      '<div class="rym-angle-host" data-rym-angle-host></div>' +
+      '</div>'
       + '</div>';
     /* [v544] 补齐可拖/可折/可调宽：与「图层控制」等同款外壳（.ry-float-card）＋同一套共用交互
        （mod/ry-panel.js）。此前这张卡是固定右上角、只有勾选状态有记忆。 */
@@ -252,6 +261,20 @@
       if (tries > 0) setTimeout(function () { initFloatCard(tries - 1); }, 200);
     })(25);
     state.panelEl = el;
+    /* [v849] 把静态暂存容器 #ryAngleParts 的内容搬进本面板（见上方模板注释）。
+       ★ 判空搬运：没有 #ryAngleParts 的引用页（移动端预览）小节保持 hidden。
+       ★ 搬运放在 initFloatCard 之前也无妨——移动的是节点本身，
+         ry-panel.js 对本面板的折叠/拖拽初始化不受影响。 */
+    (function mergeAnglePanel() {
+      var src = document.getElementById('ryAngleParts');
+      var wrap = el.querySelector('[data-rym-angle-wrap]');
+      if (!src || !wrap) return;
+      var host = wrap.querySelector('[data-rym-angle-host]');
+      if (!host) return;
+      while (src.firstChild) host.appendChild(src.firstChild);      // 节点整体搬走，事件随节点
+      if (src.parentNode) src.parentNode.removeChild(src);         // 暂存容器使命完成，移除
+      wrap.hidden = false;
+    })();
     function apply(k, on) {
       if (k === 'measure') {                 // 页面级测量框：转交宿主页实现
         if (opts && typeof opts.onMeasure === 'function') { try { opts.onMeasure(on); } catch (e) {} }

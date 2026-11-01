@@ -5939,3 +5939,29 @@ case-lib manifest 1.1.0。
   `--ry-btn-weight` 等来源，删掉声明会回到继承/UA 的加粗。
 - 静态锁 `tests/hbar_weight.test.cjs`（2 项）：显式 400 + 不回潮 600/700。
 - 版本同抬 `v848-hbar-normal`：sw VERSION + style-01.css?v= + ry-panel.css?v=。
+
+## 26.88 分区角度并入图层面板 + 取消 ±1° 按钮（v849 · 2026-11-01 · 用户反馈）
+
+用户原话：两个工具栏合并到一起，旋转分区角度就用上下箭头调节就行，单独的正一度
+负一度的按钮取消。
+
+- **合并方式**：index.html 的独立 `#ryAnglePanel` 浮卡壳删除；内容（☁ 提交到云端 +
+  section#mapPartitionTools）留在 hidden 暂存容器 `#ryAngleParts`，
+  `runye-map-enhance.js` buildPanel 挂载后**逐子节点搬进**图层面板的
+  `[data-rym-angle-host]`（节点移动不丢监听，runye-map-partition.js 按
+  `getElementById('mapPartitionTools')` + querySelector 取控件零改动）。
+  搬不到（移动端预览页无暂存容器）小节保持 hidden，功能自然缺省。
+- **±1° 按钮**：DOM 与 partition JS 绑定一并删——那两行是裸 querySelector 赋
+  onclick，只删 DOM 不删绑定直接炸 IIFE。number input（step=1）自带上下箭头，
+  交互等价；实时预览监听（input 事件）照旧。
+- **踩坑记录**：① v849 首版把壳和内容一起删了，搬运函数 `getElementById('ryAnglePanel')`
+  永远 null ⇒ host 空小节隐藏——CDP 实测抓出（静态锁测不出这种「搬运源不存在」），
+  改为暂存容器方案。② **file:// 直开 index.html 会被重定向到 runye-mobile-map-preview.html**
+  ——无头验证必须带 `?full=1&rymock=L2`（历史探针命令模板一直带着，这次又验证了）。
+- **CSS**：壳规则（absolute 定位/头部/折叠/body）删除；`.ry-angle-panel .save-row/.hint`
+  前缀改 `.rym-angle-host`；新增 host 容器与小节标题规则。v847 的提示条、v839 告警卡
+  位置不受影响（告警卡避让的是顶部工具栏）。
+- 静态锁 `tests/map_panel_merge.test.cjs`（5 项）+ Edge headless CDP 实测：
+  section/☁ 按钮都在 host 内、角度输入 step=1 可用、±1 按钮消失、无 pageerror。
+- 版本同抬 `v849-panel-merge`：sw VERSION + style-01 / online-map.css /
+  runye-map-enhance.js / runye-map-partition.js 的 `?v=`。

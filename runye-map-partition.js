@@ -72,7 +72,7 @@
  }
  function attach(map){
   var box=root.document.getElementById('mapPartitionTools');if(!box)return;var select=box.querySelector('select'),input=box.querySelector('input'),status=box.querySelector('[role=status]'),layer=root.L.layerGroup().addTo(map),iframe=null,busy=false;
-  var plusBtn=box.querySelector('[data-angle-plus]'),minusBtn=box.querySelector('[data-angle-minus]'),sendBtn=box.querySelector('[data-angle-send]');
+  var sendBtn=box.querySelector('[data-angle-send]');
   /* [v673 2026-10-23 隔离] 成组地块（merged）的分区角度只在「多地块规划」页按块调整，
      在线地图端**只读**：角度输入/±1°/应用/回传全部禁用 —— 地图整组一把转会与组页
      逐块角度打架（用户原话：「在线地图不能对这些分区角度调整，不然容易乱」）。
@@ -80,7 +80,7 @@
   function isGrouped(p){return !!(p&&p.merged);}
   function gate(p){
     var g=isGrouped(p);
-    [input,plusBtn,minusBtn,applyBtn,sendBtn].forEach(function(el){if(el)el.disabled=g;});
+    [input,applyBtn,sendBtn].forEach(function(el){if(el)el.disabled=g;});
     if(g){input.value='';setStatus('成组地块：分区角度请在「多地块规划」页按块调整，地图端只读。');}
   }
   function library(){var state=readLibrary();return state.ok?state.plots:[];}
@@ -193,9 +193,9 @@
   }
   function refresh(){var old=select.value,list=library().filter(p=>!p.mergedInto&&p.polyLatLng&&p.polyLatLng.length>=3);select.innerHTML='';list.forEach(p=>{var o=root.document.createElement('option');o.value=p.id;o.textContent=p.name||p.id;select.appendChild(o);});if(list.some(p=>p.id===old))select.value=old;var p=current();gate(p);input.value=(p&&!p.merged&&valid(p.partitionPlan))?p.partitionPlan.angle.toFixed(2):'0';draw(p);}
   select.onchange=function(){var p=current();gate(p);input.value=(p&&!p.merged&&valid(p.partitionPlan))?p.partitionPlan.angle.toFixed(2):'0';draw(p);setStatus('正角度为从东向北旋转；真实地块边界不变。');};
-  /* [v481] ±1° 与手动输入都实时转动分区线（预览），点「应用并重新划分」才真正重划 */
-  box.querySelector('[data-angle-minus]').onclick=()=>{input.value=Math.max(-180,Number(input.value)-1);drawPreview(current(),Number(input.value));};
-  box.querySelector('[data-angle-plus]').onclick=()=>{input.value=Math.min(180,Number(input.value)+1);drawPreview(current(),Number(input.value));};
+  /* [v481] 手动输入实时转动分区线（预览），点「应用并重新划分」才真正重划。
+     [v849 用户反馈] ±1° 按钮取消：number input 自带上下箭头（step=1）即等价交互，
+     DOM 与绑定一并移除（裸 querySelector 赋 onclick，留绑定不删 DOM 会炸 IIFE）。 */
   input.addEventListener('input',function(){drawPreview(current(),Number(input.value));});
   async function engine(){if(!iframe){iframe=root.document.createElement('iframe');iframe.src='index.html?partitionPreview=1';iframe.title='分区计算';iframe.setAttribute('aria-hidden','true');iframe.style.cssText='position:fixed;left:-10000px;width:1280px;height:900px;border:0';root.document.body.appendChild(iframe);}var start=Date.now();while(!iframe.contentWindow.RyMapPartition||!iframe.contentWindow.RunyeBridge||!iframe.contentWindow.runyeApplyMapPayload){if(Date.now()-start>20000)throw new Error('二级分区引擎加载超时');await new Promise(r=>setTimeout(r,100));}return iframe.contentWindow;}
   /* [v481] 应用逻辑抽成具名函数：send 未应用时自动先走一遍，成功才回二级 */

@@ -21,12 +21,12 @@
      顺序契约登记在 ci_check_static.cjs 的 scriptOrderRules 里。 -->
 <script src="core/coord-frame.js?v=836-coord-frame"></script>
 <script src="runye-material-audit.js?v=607-branch-material-span"></script>
-<script src="runye-map-partition.js?v=690-narrow-partition-bridge"></script>
+<script src="runye-map-partition.js?v=849-panel-merge"></script>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>润野灌溉设计优化版｜滴灌管径与水泵选型</title>
 <meta name="description" content="输入地块、滴灌带与水源参数，快速计算灌溉分区、主管支管管径和水泵工作点。"/>
-<link rel="stylesheet" href="mod/style-01.css?v=848-hbar-normal">
+<link rel="stylesheet" href="mod/style-01.css?v=849-panel-merge">
 <link rel="stylesheet" href="runye-inverse-design.css?v=277">
 <script defer src="runye-inverse-design.js?v=438-branch-flow-conservation"></script>
 <link rel="stylesheet" href="runye-terrain.css?v=454-terrain-sidebar-peer">
@@ -36,7 +36,7 @@
 <link rel="stylesheet" href="runye-case-library.css?v=277">
 <script src="runye-case-library.js?v=278-case-query"></script>
 <script src="runye-geo.js"></script>
-<script src="runye-map-enhance.js?v=844-gr-trunk-gate"></script>
+<script src="runye-map-enhance.js?v=849-panel-merge"></script>
 <script src="hydraulic-calc/hydraulics-wasm.js"></script>
 <script src="hydraulic-calc/native-bridge.js"></script>
 <script src="hydraulic-calc/hc-core.js"></script>
@@ -51,7 +51,7 @@
 <link rel="stylesheet" href="hydraulic-calc/hydraulic-calc.css">
 <link rel="stylesheet" href="filter-system/filter-system.css">
 <link rel="stylesheet" href="pwa/vendor/leaflet.css">
-<link rel="stylesheet" href="mod/online-map.css?v=847-hint-bottom">
+<link rel="stylesheet" href="mod/online-map.css?v=849-panel-merge">
 <link rel="stylesheet" href="terrain/terrain.css?v=535-terrain-single-source">
 <link rel="stylesheet" href="hydraulics-main.css?v=442-native">
 <style id="ryCadTwinCss">
@@ -736,41 +736,28 @@ body.ry-worst-off [data-tlworst]{display:none}
         <button type="button" class="msb-snap" id="btnSnapToggle" aria-pressed="false"
                 title="捕捉地块顶点 / 水源 / 干线拐点 / 阀门 / 支管起点 / 分区顶点；快捷键 S">捕捉：关闭</button>
       </div>
-      <!-- ===== [v282] 分区角度悬浮面板 =====
-           形态仿手机端 runye-mobile-map-preview.html 的 .map-angle：↶＋1° / 角度输入 / ↷−1° 竖排。
-           原「分区角度」那一节（id=mapPartitionTools）整体迁入（runye-map-partition.js 只按 id 取 box，
-           再用 querySelector 取内部 select / input / [role=status] / [data-angle-*]，
-           故「搬容器不改结构」= JS 逻辑零改动）。默认靠地图区右侧，标题栏可拖动，位置记忆。 -->
-      <div class="ry-angle-panel ry-float-card" id="ryAnglePanel" data-ry-panel data-ry-drag-bounds data-ry-position-key="ryAnglePanelPos" data-ry-position-legacy-key="ryAnglePanelPos" data-ry-fold-key="ryAnglePanelFolded" data-ry-fold-legacy-key="ryAnglePanelFolded" data-ry-default-top="96">
-        <div class="ry-angle-head ry-float-head" id="ryAngleHead" data-ry-drag title="按住这里可拖动面板">
-          <span class="ah-t ry-float-title">分区角度</span>
-          <button class="ah-fold ry-float-caret" id="ryAngleFold" type="button" data-ry-fold aria-label="折叠或展开分区角度面板" aria-expanded="true" data-ry-fold-open="▾" data-ry-fold-closed="▸" title="折叠/展开">▾</button>
+      <!-- ===== [v282→v849] 分区角度面板已并入「图层」浮面板 =====
+           [v849 用户反馈] 两个浮面板叠在右侧占地方 ⇒ 独立 #ryAnglePanel 浮卡壳删除；
+           其内容（☁ 提交到云端 + section#mapPartitionTools）保留在这个 **hidden 暂存容器**
+           里，由 runye-map-enhance.js 在图层面板挂载后整体搬入 —— 节点移动不丢事件监听，
+           runye-map-partition.js 按 id/子节点取控件的逻辑零改动。容器本身 hidden，
+           图层面板被任何原因禁用时分区角度不显示（与旧行为一致地「没有这个功能」）。
+           ±1° 按钮同时取消：number input 自带上下箭头（step=1）即等价交互。
+           静态锁 tests/map_panel_merge.test.cjs。 -->
+      <div id="ryAngleParts" hidden>
+        <div class="map-float-actions" id="mapFloatActions">
+          <!-- [v587] 提交到云端（地块库）：把当前绘制的地块边界带参数跳到云端提交页（应用域），
+               用户登录后提交，管理员在地块库可见。与「保存地块」（存本机 localStorage）互不影响。 -->
+          <button class="ry-float-chip" id="btnCloudSubmit">☁ 提交到云端</button>
         </div>
-        <div class="ry-angle-body ry-float-body" data-ry-body>
-          <!-- [v283 2026-10-06] 「↩ 回传地块绘制」「💾 保存地块」：用户截图指定放在**本面板内部顶端**、
-               「当前设计地块」下拉之上（v282 曾浮在地图左上角）。button id 与 JS 绑定仍零改动。
-               ★ 必须留在 section#mapPartitionTools **之外** —— 该 section 是分区角度模块
-                 按 id 取的盒子，往里塞无关按钮会改变其 querySelector('input') 的落点语义。 -->
-          <div class="map-float-actions" id="mapFloatActions">
-            <!-- [v830 2026-10-31 用户要求] 「回传地块绘制 / 回传地形模块 / 💾 保存地块」三个按钮已从此面板移除
-                 —— 同功能入口已在别处：回传走列表行「→」或地图右键弹窗，保存由「完成」自动入库，
-                 回传地形走地形模块页。「☁ 提交到云端」保留（它不是重复入口）。
-                 按钮 id 仍被 JS 引用，但绑定已全部加空守卫，删除元素不再抛错。 -->
-            <!-- [v587] 提交到云端（地块库）：把当前绘制的地块边界带参数跳到云端提交页（应用域），
-                 用户登录后提交，管理员在地块库可见。与「保存地块」（存本机 localStorage）互不影响。 -->
-            <button class="ry-float-chip" id="btnCloudSubmit">☁ 提交到云端</button>
+        <section id="mapPartitionTools">
+          <select aria-label="选择分区地块"></select>
+          <div class="map-angle-row">
+            <div class="map-angle-value"><input aria-label="地图分区角度" type="number" min="-180" max="180" step="1" value="0"><span>°</span></div>
           </div>
-          <section id="mapPartitionTools">
-            <select aria-label="选择分区地块"></select>
-            <div class="map-angle-row">
-              <button class="ang-btn" type="button" data-angle-plus title="增加1°">↶<small>＋1°</small></button>
-              <div class="map-angle-value"><input aria-label="地图分区角度" type="number" min="-180" max="180" step="1" value="0"><span>°</span></div>
-              <button class="ang-btn" type="button" data-angle-minus title="减少1°">↷<small>－1°</small></button>
-            </div>
-            <div class="save-row"><button class="ry-float-chip is-primary" data-angle-apply>应用并重新划分</button><button class="ry-float-chip" data-angle-send>回二级继续规划</button></div>
-            <p class="hint" role="status">只调整分区方向，地块边界不动。正角度从东向北旋转。</p>
-          </section>
-        </div>
+          <div class="save-row"><button class="ry-float-chip is-primary" data-angle-apply>应用并重新划分</button><button class="ry-float-chip" data-angle-send>回二级继续规划</button></div>
+          <p class="hint" role="status">只调整分区方向，地块边界不动。正角度从东向北旋转。</p>
+        </section>
       </div>
       <div class="warn" id="warn">⚠️ 地图瓦片加载失败，请检查网络（本工具需要联网获取卫星影像）。</div>
       <div class="tip" id="tip">点击「✏️ 开始画框」后，在卫星图上依次点击地块边界顶点即可。</div>
