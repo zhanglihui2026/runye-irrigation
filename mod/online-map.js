@@ -940,7 +940,9 @@
   /* ===== [v832] 捕捉 + 状态栏 + 常驻提示条（二期） =====
      职责划分：判定逻辑全在 mod/trunk-snap.js（纯函数、可 Node 单测）；
      这里只负责「给素材 / 给投影器 / 给标记 / 写 DOM」。 */
-  var snapOn = true;
+  /* [v846 规格意见] 捕捉重开默认**关闭**：吸附是高级手感，默认吸容易让新用户困惑
+     「点下去线怎么自己弯了」；要吸的时候按 S 或点按钮打开。会话内记住切换，不落库。 */
+  var snapOn = false;
   var snapMarker = null;
   var lastCursorLatLng = null;
 
@@ -1177,6 +1179,7 @@
   var snapToggleBtn=document.getElementById('btnSnapToggle');
   if(snapToggleBtn)snapToggleBtn.onclick=function(){ setSnapOn(!snapOn); };
   ensureSnapSupport();
+  setSnapOn(snapOn); /* [v846] 初始态三处同步：引擎 enabled / 按钮 DOM / 提示条（别只改变量） */
 
   /* 光标移动：更新吸附标记 + 状态栏投影预览。 */
   map.on('mousemove', function(e){

@@ -78,10 +78,14 @@ function buildPanel() {
   var bFind = el('button', 'case-btn primary', '找相似案例');
   bFind.type = 'button';
   bFind.addEventListener('click', find);
+  var bRemote = el('button', 'case-btn', '查在线案例');
+  bRemote.type = 'button';
+  bRemote.title = '检索在线匿名案例库（用户授权上传、已过水力校核的历史工程）；需会员访问码';
+  bRemote.addEventListener('click', findRemote);
   var bReport = el('button', 'case-btn', '导出方案报告');
   bReport.type = 'button';
   bReport.addEventListener('click', exportReport);
-  btns.appendChild(bFind); btns.appendChild(bReport);
+  btns.appendChild(bFind); btns.appendChild(bRemote); btns.appendChild(bReport);
   p.appendChild(btns);
 
   var out = el('div', 'case-out');
@@ -177,6 +181,68 @@ function hitRow(h) {
   main.appendChild(el('div', 'case-why', why.join(' ｜ ')));
   r.appendChild(main);
   return r;
+}
+
+/* ---------------- [v846] 在线匿名案例库（远程检索） ----------------
+   复用 v845 的 RyCaseLibrary.queryCases()（服务端 rank 排序 top3，已脱敏——
+   检索出口没有 owner_hash、没有地块边界）。与本地档案检索互补：
+   本地档案带造价/BOM，在线库带「别人家已落地」的参数与水力校核结果。
+   未填访问码 / 服务端不可用 / 空库 → 提示行，绝不 throw。 */
+var STATUS_LABEL = { deployed: '已落地', pending: '待施工', abandoned: '已放弃' };
+var SOURCE_LABEL = { manual: '用户手动', ai: 'AI 生成' };
+
+function remoteRow(c) {
+  var f = c.feature || {}, e = c.engine_check || {};
+  var r = el('div', 'case-hit');
+  var main = el('div', 'case-hit-main');
+  var bits = [];
+  if (f.mu != null) bits.push(Number(f.mu).toFixed(1) + ' 亩');
+  bits.push(STATUS_LABEL[c.status] || String(c.status || '—'));
+  bits.push(SOURCE_LABEL[c.source] || String(c.source || '—'));
+  if (c.rating > 0) bits.push('评分 ' + c.rating);
+  main.appendChild(el('div', 'case-hit-title', '匿名案例 ｜ ' + bits.join(' · ')));
+  var eng = [];
+  if (f.tape_spacing != null) eng.push('带距 ' + f.tape_spacing + ' m');
+  if (f.emitter_spacing != null) eng.push('孔距 ' + f.emitter_spacing + ' m');
+  if (f.emitter_flow != null) eng.push('滴头 ' + f.emitter_flow + ' L/h');
+  if (f.zone_mu != null) eng.push('单区 ' + f.zone_mu + ' 亩');
+  if (e.pump_head_m != null) eng.push('扬程 ' + e.pump_head_m + ' m');
+  if (e.pump_flow_m3h != null) eng.push('流量 ' + e.pump_flow_m3h + ' m³/h');
+  if (e.main_od_mm != null) eng.push('主管 Ø' + e.main_od_mm);
+  if (e.branch_od_mm != null) eng.push('支管 Ø' + e.branch_od_mm);
+  main.appendChild(el('div', 'case-hit-sub', eng.length ? eng.join(' · ') : '（无工程参数）'));
+  main.appendChild(el('div', 'case-why', '已通过引擎水力校核；他人工况仅供参考，不得照抄为本地结论'));
+  r.appendChild(main);
+  return r;
+}
+
+function findRemote() {
+  var f = panel._f;
+  var area = parseFloat(f.area.value) || 0;
+  if (!area) { toast('请先填面积（在线库按面积与形状相似度排序）'); return; }
+  var L = window.RyCaseLibrary;
+  if (!L || typeof L.queryCases !== 'function') { toast('在线案例库组件未加载'); return; }
+  f.out.innerHTML = '';
+  f.out.appendChild(el('div', 'case-dim', '在线检索中…'));
+  L.queryCases({ area: area }).then(function (res) {
+    if (!panel) return;
+    f.out.innerHTML = '';
+    var head = el('div', 'case-reco');
+    head.appendChild(el('div', 'case-reco-title', '在线匿名案例库'));
+    if (!res.ok) {
+      head.appendChild(el('div', 'case-empty', res.msg || '在线案例库暂不可用。'));
+      f.out.appendChild(head);
+      return;
+    }
+    if (!res.rows.length) {
+      head.appendChild(el('div', 'case-empty', '在线案例库还没有与该面积相近的案例（案例来自用户匿名授权上传）。'));
+      f.out.appendChild(head);
+      return;
+    }
+    head.appendChild(el('div', 'case-dim', '共 ' + res.rows.length + ' 条相近案例（已脱敏）'));
+    f.out.appendChild(head);
+    res.rows.forEach(function (c) { f.out.appendChild(remoteRow(c)); });
+  });
 }
 
 /* ---------------- 方案报告导出 ---------------- */

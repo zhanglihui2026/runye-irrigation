@@ -26,7 +26,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>润野灌溉设计优化版｜滴灌管径与水泵选型</title>
 <meta name="description" content="输入地块、滴灌带与水源参数，快速计算灌溉分区、主管支管管径和水泵工作点。"/>
-<link rel="stylesheet" href="mod/style-01.css?v=845-case-closure">
+<link rel="stylesheet" href="mod/style-01.css?v=846-snap-off-case-ui">
 <link rel="stylesheet" href="runye-inverse-design.css?v=277">
 <script defer src="runye-inverse-design.js?v=438-branch-flow-conservation"></script>
 <link rel="stylesheet" href="runye-terrain.css?v=454-terrain-sidebar-peer">
@@ -732,8 +732,8 @@ body.ry-worst-off [data-tlworst]{display:none}
         <span>投影：<b id="msbProj">—</b></span><i class="msb-sep">｜</i>
         <span>高差：<b id="msbDrop">—</b></span><i class="msb-sep">｜</i>
         <span>流速：<b id="msbFlow">—</b></span><i class="msb-sep">｜</i>
-        <button type="button" class="msb-snap" id="btnSnapToggle" aria-pressed="true"
-                title="捕捉地块顶点 / 水源 / 干线拐点 / 阀门 / 支管起点 / 分区顶点；快捷键 S">捕捉：开启</button>
+        <button type="button" class="msb-snap" id="btnSnapToggle" aria-pressed="false"
+                title="捕捉地块顶点 / 水源 / 干线拐点 / 阀门 / 支管起点 / 分区顶点；快捷键 S">捕捉：关闭</button>
       </div>
       <!-- ===== [v282] 分区角度悬浮面板 =====
            形态仿手机端 runye-mobile-map-preview.html 的 .map-angle：↶＋1° / 角度输入 / ↷−1° 竖排。
@@ -2560,7 +2560,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script src="mod/trunk-edit.js?v=835-trunk-geo-snap"></script>
 <script src="mod/trunk-history.js?v=835-trunk-geo-snap"></script>
 <script src="mod/trunk-panel.js?v=844-gr-trunk-gate"></script>
-<script src="mod/online-map.js?v=844-gr-trunk-gate"></script>
+<script src="mod/online-map.js?v=846-snap-off-case-ui"></script>
 <script src="terrain/terrain-core.js?v=410-elev"></script>
 <script src="terrain/terrain-ui.js?v=513-sec-gate"></script>
 <script src="runye-hydraulics-page.js?v=829-hyd-auto-refresh"></script>

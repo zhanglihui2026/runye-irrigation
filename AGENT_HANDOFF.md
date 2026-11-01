@@ -5874,3 +5874,41 @@ W.mode 置成 'draw'**（入口真的删干净了）。
 3. `snapOn` 默认 true，规格要「重开默认关闭」。
 4. 案例库前端「检索消费 UI」（case-lib 插件目前只读本地档案；`RyCaseLibrary.queryCases`
    已具备，插件想接远程库随时可接）。
+
+## 26.85 捕捉默认关闭 + case-lib 插件接在线案例库（v846 · 2026-11-01）
+
+### 一、snapOn 重开默认关闭（规格意见落地）
+
+待办挂了很久的规格意见：「snapOn 默认 true，规格要『重开默认关闭』」。本批落地：
+
+- `mod/online-map.js`：`var snapOn = false;`；**mount 时 `setSnapOn(snapOn)` 一次同步三处**
+  （引擎 `setEnabled` / 按钮 DOM / 提示条）——只改变量不够，按钮初始文案是 HTML 写死的。
+- `index.html`：`#btnSnapToggle` 初始 `aria-pressed="false"` + 「捕捉：关闭」。
+- 会话内切换照旧（按钮 / S 键），不落库。
+- 静态锁 `tests/snap_default_off.test.cjs`（4 项）：默认值、setSnapOn 三处同步、
+  HTML 初始态一致、切换入口仍在。
+
+### 二、case-lib 插件「查在线案例」（v845 闭环的展示端）
+
+v845 打通了检索闭环但只有 AI 消费；本批给 `plugins/case-lib` 加第三个按钮「查在线案例」：
+
+- 走 `RyCaseLibrary.queryCases({area})` 唯一收口（插件里不许出现裸 fetch——测试锁死）；
+- `remoteRow(c)` 只消费服务端 retrieve 的脱敏返回面（feature/engine_check/source/status/rating），
+  展示：亩数 / 已落地·待施工 / 来源 / 评分 / 带距·孔距·滴头·单区 / 扬程·流量·主管·支管；
+- 免责文案常驻「已通过引擎水力校核；他人工况仅供参考，不得照抄为本地结论」
+  （v842 联合复核同款纪律的插件版）；
+- 未填访问码 / 服务端不可用 / 空库 → 提示行，绝不 throw；
+- `manifest.json` version 1.0.0→1.1.0（loader 用 `?v=<manifest.version>` 破 import 缓存，
+  **改插件必须抬 manifest 版本**，否则用户永远拿旧 main.js）。
+- 静态锁 `tests/case_lib_remote.test.cjs`（4 项）。
+
+### 三、与 DXF 真中文层名专项的关系
+
+本批**有意跳过**待办第一项「真中文层名」：它需要 `$ACADVER` 抬 AC1021 全量改 UTF-8，
+影响所有既有图层，且必须真机（CAD 软件）验证——沙箱无法闭环，盲发风险是全局乱码。
+等用户确认验证条件再开专项（§26.79 三）。
+
+### 四、版本与闸门（v846）
+
+`v846-snap-off-case-ui`：sw VERSION + style-01.css?v= + mod/online-map.js?v= +
+case-lib manifest 1.1.0。
