@@ -2378,7 +2378,38 @@
        所以**天然不进任何一块的水力与材料统计**（用户拍板 ③）。 */
     ppDrawGroupTrunk();
 
+    /* [v875 统一工作区双层去重] 三级管线层（含段总管/尺寸标注）已生成且与二级管线
+       **同一代**（主/支/阀几何逐线一致）时，二级画布不再重复画静态管线层。
+       背景：统一绘图工作区把「分区图层」（二级画布）与「管路图层」（三级工作区）
+       叠在同一视口，同一套管在两层各画一遍——用户实测「有两组管线，一组包含总管的，
+       一组不包含总管的，把不包含总管那组不要」。带总管的权威显示在三级层，二级画布
+       这份无总管的重复显示按用户要求去掉。
+       · 手绘模式（main/branch/subbranch）不抑制：编辑时必须看得见二级管线。
+       · 三级数据与二级不一致（过期/其他地块代际）时不抑制：保持原有显示，
+         下一次「生成施工图」后两级重新同代、抑制自动生效。 */
+    var ppPipeLayerSuppressed=false;
+    (function(){
+      if(ppState.mode==='main'||ppState.mode==='branch'||ppState.mode==='subbranch')return;
+      var dd=window.tlDiagramData;
+      if(!dd||!Array.isArray(dd.mainPipes)||!dd.mainPipes.length)return;
+      if(!Array.isArray(ppState.mainPipes)||!ppState.mainPipes.length)return;
+      if((dd.mainPipes||[]).length!==ppState.mainPipes.length)return;
+      function sig(list){
+        return (list||[]).map(function(l){
+          return (l||[]).map(function(p){return Number(p.x).toFixed(1)+','+Number(p.y).toFixed(1);}).join(';');
+        }).join('|');
+      }
+      try{
+        /* 只比主管：三级会对传导支管做端点缩进（tlTrimBranchToZone）并把次支管
+           并入 branchPipes，支管几何逐值比对会永久失配；主管无任何改写（探针实测
+           生成后两级 toFixed(1) 逐值一致），是可靠的同代判据。 */
+        if(sig(dd.mainPipes)!==sig(ppState.mainPipes))return;
+      }catch(eSig){return;}
+      ppPipeLayerSuppressed=true;
+    })();
+
     // Main pipes
+    if(!ppPipeLayerSuppressed){
     ppState.mainPipes.forEach(function(l,idx){
       if(!ppIsPipeHidden('main',idx))ppDrawLine(l,'#185FA5',4);
     });
@@ -2416,6 +2447,7 @@
       ppDrawLine(ppState.pickedPipe.line,'#f59e0b',pickW);
       ppDrawLine(ppState.pickedPipe.line,pickedHidden?'rgba(100,116,139,.65)':pickColor,pickOW,pickedHidden?[7,5]:null);
     }
+    } /* [v875] !ppPipeLayerSuppressed 结束：静态管线层整块由三级层接管 */
 
     // Current line being drawn
     if(ppState.currentLine.length>0){
@@ -2442,10 +2474,12 @@
     }
 
     // Valves
+    if(!ppPipeLayerSuppressed){
     ppState.valves.filter(function(v){return ppPointInPlot(v);}).forEach(function(v,idx){
       var vp=ppToCanvas(v.x,v.y);
       window.ryValveCanvas(ppCtx,vp.x,vp.y);   /* v159：与总管×主管交接阀同规格（尺寸取自 window.RY_VALVE） */
     });
+    }
 
     /* [v251 2026-10-06 用户要求] 画布左上那行操作提示（模式 / 快捷键说明）已取消 ——
        原绘制语句整块移除；像素闸门 _v246b_pixels.py 的 A 项已同步反转为
@@ -4962,6 +4996,10 @@
          且会一并写好 data-ry-clean='0'（ws 是工作区，左属性栏保留），无需再手工补标记。
        二级简图已停用，生成过程中不再切换到 draw 视图。 */
     try{ if(typeof tlShowWorkspace==='function') tlShowWorkspace(); }catch(e){ console.warn('[ppGenerate] 跳三级管路编辑失败', e); }
+    /* [v875] 三级快照落地后二级画布必须重绘一次：ppAutoGeneratePipes 里的 ppRender
+       发生在 tlAutoGenerate 之前，那时 tlDiagramData 还是上一代 —— 同代抑制判定
+       会落空，二级画布残留一份无总管的重复管线层（用户实测「两组管线」）。 */
+    try{ ppRender(); }catch(eRe){ console.warn('[ppGenerate] 二级画布同步重绘失败', eRe); }
     /* [v355] 生成成功即记「已生成」边界签名：此后切页/整页重载（含手画、图片测量、AI 回带等
        没有地块库锚的路径）可按签名自动恢复。签名锚在边界多边形本身——几何没变设计就有效，
        变了宁可不恢复（与 v161 原则一致）。恢复链见 ryPpGenRestoreProject。 */
