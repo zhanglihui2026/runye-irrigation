@@ -5348,19 +5348,27 @@ RyTrunkPanel.shouldWarn(entry, derived?) -> { warn, muted, vLevel, v, text }
   北=+y 选 +1、退化地块（y 全等）必须拒绝、环整体挪 40m 必须拒绝、CAD y 取负、
   **与 `makeInv` 逐位一致**（用 ts/inv 复刻闭环）、坏点整根返回 null、单点不插值。
   容差写 `0.2m` 而不是 `1e-6`：环按 `toFixed(6)` 落库，1e-6° ≈ 0.11m 是量化误差，与符号无关。
-- `_probe_trunk_p9_dxf.mjs`（**28 项全绿**，本地）：段序 / 严格 (code,value) 成对 /
+- `_probe_trunk_p9_dxf.mjs`（**28 项全绿**，本地 28/28 + 线上 28/28）：段序 / 严格 (code,value) 成对 /
   LAYER 表声明条数 == 实际记录数 / 层名全 ASCII / ZG 折线与**探针独立算的** (x,−y) 逐点相等 /
   北为正 / 圆点半径与圆心 / 编号各一次 / 三个开关（trunk、symbol、text）/
   四条拒绝路径（含"对不上时强行导也一个 ZG 折线都没有"）/ 无 pageerror。
   探针**故意不复用**页面里的 `ll2m`（否则两边同错也能全绿）。
-- 探针踩过的坑（写新探针时照抄）：TABLE 表头是 `0 TABLE / 2 LAYER / 5 <h> / 100 … / 70 <count>`，
-  `70` 在 `2` 的**后面**；第一版从 `2` 往前找 ⇒ 恒读成 `declared=0`。
+- 探针踩过的坑（写新探针时照抄）：
+  ① TABLE 表头是 `0 TABLE / 2 LAYER / 5 <h> / 100 … / 70 <count>`，`70` 在 `2` 的**后面**；
+     第一版从 `2` 往前找 ⇒ 恒读成 `declared=0`。
+  ② **线上匿名没有 `drawing-export` 权益**，而 `?rymock=` 只在 `file:// / localhost / 127.0.0.1`
+     生效（`runye-entitle.js` 的防绕过，是对的，不该改）⇒ 线上跑 DXF 探针必须给权益门一个替身
+     （`RyEntitle.can/ready = () => true`），并在 A0 里如实打印 `entStubbed:true`。
+     别为此去放宽线上钩子。
 
 ### 七、发布状态（v840）
 
 - 版本同抬：`sw.js VERSION='v840-trunk-dxf'`、`index.html` 的 `style-01.css?v=840-trunk-dxf`
   + `runye-dxf.js` / `mod/trunk-geo.js` 的 `?v=`。
 - 闸门：`check.cjs` 29 项 PASS / 单测 **373 项全绿** / `check_publish_refs.cjs` PASS / lint 无告警。
+- 发布：`b6d799d`，`_pub_api.py --apply` 成功；线上 `sw.js`/`index.html`/`runye-dxf.js`/
+  `mod/trunk-geo.js` 四个文件的 blob sha256 与 `git cat-file blob HEAD:<path>` 全等；
+  Pages `builds/latest` = `built` 且 commit 命中；探针线上 28/28。
 
 ### 八、仍没做
 
