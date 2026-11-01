@@ -2384,12 +2384,16 @@
        叠在同一视口，同一套管在两层各画一遍——用户实测「有两组管线，一组包含总管的，
        一组不包含总管的，把不包含总管那组不要」。带总管的权威显示在三级层，二级画布
        这份无总管的重复显示按用户要求去掉。
-       · 手绘模式（main/branch/subbranch）不抑制：编辑时必须看得见二级管线。
+       · 正在画线（currentLine 非空）时不抑制：编辑时必须看得见二级管线。
        · 三级数据与二级不一致（过期/其他地块代际）时不抑制：保持原有显示，
          下一次「生成施工图」后两级重新同代、抑制自动生效。 */
     var ppPipeLayerSuppressed=false;
     (function(){
-      if(ppState.mode==='main'||ppState.mode==='branch'||ppState.mode==='subbranch')return;
+      /* [v875b 修订] 豁免判据改为「正在画线」而不是「处于手绘档位」：
+         mode='main' 是工具栏常驻默认档（探针实测待机态也是 'main'），按档位豁免
+         等于永不抑制。只在 currentLine 非空（用户正在落点画线）时豁免，
+         画线过程中管线立即恢复可见，落点间隙的待机态仍走抑制。 */
+      if(ppState.currentLine&&ppState.currentLine.length)return;
       var dd=window.tlDiagramData;
       if(!dd||!Array.isArray(dd.mainPipes)||!dd.mainPipes.length)return;
       if(!Array.isArray(ppState.mainPipes)||!ppState.mainPipes.length)return;
@@ -2407,6 +2411,10 @@
       }catch(eSig){return;}
       ppPipeLayerSuppressed=true;
     })();
+    /* [v875] 调试/验收锚点：探针与线上排障直接读最近一次渲染的抑制判定与判据摘要。 */
+    window.__ppPipeLayerDedupe={suppressed:ppPipeLayerSuppressed,
+      ddMains:Array.isArray(window.tlDiagramData&&window.tlDiagramData.mainPipes)?window.tlDiagramData.mainPipes.length:0,
+      ppMains:Array.isArray(ppState.mainPipes)?ppState.mainPipes.length:0,mode:ppState.mode||''};
 
     // Main pipes
     if(!ppPipeLayerSuppressed){
