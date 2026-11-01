@@ -3765,6 +3765,13 @@ function tlAutoGenerate(options) {
 
   // ===== 管线：优先采用二级页已生成几何（数据传导），否则三级页自动布管 =====
   var mainPipes=[], branchPipes=[], valves=[];
+  /* [v874] 段总管串联基准：分区管位（裁剪前的理想主管）。
+     为什么必须有：旋转角度下真实地块边界转到网格局部系后是**斜多边形**，v830 的
+     「裁到地块内、裁空整根丢弃」会把外圈主管整根裁掉 —— 裁剪后的主管可能退化成
+     单列共线 / 走向交集为空，段总管 build 因此失败（用户实测：旋转角度前有段总管、
+     旋转后消失）。段总管串联的是「各分区主管的管位」，不应依赖外圈主管是否被
+     地块边界裁掉；干线自身落在走向 1/4 分位（v870），恒在地块内部。 */
+  var tlIdealMains=[];
   /* [v601 2026-10-19 用户口径] 支管计算长度的两个基准，随图面快照一起落 tlDiagramData：
      · branchFullSpans —— 该支管所在分区的「设计满跨」（贯通整个分区的净尺寸），
        与图面两端 gapV/gapH 留边无关；
@@ -3835,6 +3842,24 @@ function tlAutoGenerate(options) {
       branchPipes=branchPipes.map(function(l){return l.map(function(p){return tlFrameToGrid(tlZoneCuts.frame,p);});});
       valves=valves.map(function(v){return tlFrameToGrid(tlZoneCuts.frame,v);});
     }
+    /* [v874] 传导主管理想化：按中点所在分区块延长为满跨管位（二级管线可能已被二级
+       裁剪过；段总管基准要用未裁剪的分区管位）。竖管延长到所在行上下边界、横管
+       延长到所在列左右边界；找不到所在格（浮点出界）就丢弃该条。 */
+    mainPipes.forEach(function(l){
+      if(!l||l.length<2)return;
+      var a=l[0], b=l[l.length-1];
+      var dx=Math.abs(b.x-a.x), dy=Math.abs(b.y-a.y);
+      var mid={x:(a.x+b.x)/2, y:(a.y+b.y)/2};
+      if(dy>=dx){
+        for(var r0=0;r0+1<yPos.length;r0++){
+          if(mid.y>=yPos[r0]-0.5&&mid.y<=yPos[r0+1]+0.5){ tlIdealMains.push([{x:a.x,y:yPos[r0]},{x:a.x,y:yPos[r0+1]}]); return; }
+        }
+      }else{
+        for(var c0=0;c0+1<xPos.length;c0++){
+          if(mid.x>=xPos[c0]-0.5&&mid.x<=xPos[c0+1]+0.5){ tlIdealMains.push([{x:xPos[c0],y:a.y},{x:xPos[c0+1],y:a.y}]); return; }
+        }
+      }
+    });
     // 复用二级页支管时端点若贴在分区边缘，同样向内缩进，保证相邻地块支管视觉上断开
     branchPipes=branchPipes.map(tlTrimBranchToZone);
     branchDrawnLens=branchPipes.map(function(l){return tlPolyLen(l);});
@@ -3903,6 +3928,8 @@ function tlAutoGenerate(options) {
           }
           /* [v830] 裁到地块内：旋转角下角格子会伸到外面；裁空的整根丢弃（含其满跨/留边记录），
              保证 mainPipes/branchPipes/branchFullSpans/branchDrawnLens 四个数组始终等长对齐。 */
+          /* [v874] 裁剪前先记分区管位（满跨理想主管），供段总管兜底串联。 */
+          tlIdealMains.push([{x:mainX,y:zy2},{x:mainX,y:zy2+zoneH2}]);
           var tlMOk=true,tlSegM=tlClipPipeSeg({x:mainX,y:zy2},{x:mainX,y:tlMainEndY});
           var tlSegB=tlClipPipeSeg({x:brX,y:zy2+gapV},{x:brX,y:zy2+zoneH2-gapV});
           if(!tlSegB){ tlMOk=false; }
@@ -3932,6 +3959,8 @@ function tlAutoGenerate(options) {
             if(tlMainEndX<zx2+gapH)tlMainEndX=zx2+gapH;
           }
           /* [v830] 同上：裁到地块内，裁空的整根丢弃 */
+          /* [v874] 同上：裁剪前先记分区管位。 */
+          tlIdealMains.push([{x:zx2,y:mainY},{x:zx2+zoneW2,y:mainY}]);
           var tlMOk2=true,tlSegM2=tlClipPipeSeg({x:zx2,y:mainY},{x:tlMainEndX,y:mainY});
           var tlSegB2=tlClipPipeSeg({x:zx2+gapH,y:brY},{x:zx2+zoneW2-gapH,y:brY});
           if(!tlSegB2){ tlMOk2=false; }
@@ -4589,6 +4618,19 @@ function tlAutoGenerate(options) {
   try {
     if (window.RySegTrunk && mainPipes.length >= 2) {
       tlSegTrunkLoc = window.RySegTrunk.build(mainPipes, {
+        src: tlSrcDesign || (frontPipe && frontPipe[0]) || null
+      });
+      /* [v874] 裁剪退化兜底：旋转角度下外圈主管被斜边裁掉后，裁剪态主管可能退化
+         （单列共线 / 交集空）⇒ 第一次 build 失败。改用分区管位基准（未裁剪理想主管）
+         再试 —— 干线串联的是「各分区主管的管位」，外圈管被裁不该影响干线生成。 */
+      if (!tlSegTrunkLoc && tlIdealMains.length >= 2) {
+        tlSegTrunkLoc = window.RySegTrunk.build(tlIdealMains, {
+          src: tlSrcDesign || (frontPipe && frontPipe[0]) || null
+        });
+      }
+    } else if (window.RySegTrunk && tlIdealMains.length >= 2) {
+      /* 裁剪后主管不足 2 条但管位基准足够（极端斜边裁剪），同样兜底。 */
+      tlSegTrunkLoc = window.RySegTrunk.build(tlIdealMains, {
         src: tlSrcDesign || (frontPipe && frontPipe[0]) || null
       });
     }
