@@ -92,3 +92,20 @@ test('⑥ 三页标注颜色统一纯黑（工作区/inline-09/plot-editor）', 
   assert.ok(/text-anchor="end" fill="#000"/.test(pelive), 'plot-editor 施工 SVG 标注纯黑');
   assert.equal(pelive.includes("'#9a4d05'"), false, 'canvas 非标琥珀残留应删');
 });
+
+/* ── v860 用户反馈：旋转裁剪场景最外圈标注「跑到格子中间」——v850 的出界兜底
+ * 直接回退形心所致。改为三级化：① 格子参数面扫锚（右上角起，沿顶边向左、逐行
+ * 向下找第一个界内点 ⇒ 标注仍贴格子右上区域）；② 整格扫不出才回退形心。
+ * 另：用户截图的琥珀色 = 旧 SW 缓存（v857 已全黑 + skipWaiting 一次刷新即换版），
+ * 非代码回归——本锁顺带钉死 canvas 标注 fill 仍为 #000。 */
+test('⑦ canvas 出界兜底三级化：先扫锚后形心，扫锚从右上角起', () => {
+  const live = stripJs(pe);
+  assert.ok(live.includes('__fixed=(function(){'), '参数面扫锚 IIFE 应存在');
+  assert.ok(/for\(var __sj=0;__sj<=8;__sj\+\+\)/.test(live), '竖向步进 s=0..8');
+  assert.ok(/for\(var __si=12;__si>=1;__si--\)/.test(live), '横向从右上角向左扫（t=1→1/12）');
+  assert.ok(live.includes('ppPointInPlot(ppToMeters(__cx,__cy))'), '扫锚判据 = 界内');
+  const idxScan = live.indexOf('__fixed=(function(){');
+  const idxCent = live.indexOf('ppZoneClipCenterWorld(zc,zr,cuts)');
+  assert.ok(idxScan >= 0 && idxCent > idxScan, '形心兜底必须排在扫锚之后（末级）');
+  assert.ok(live.includes("ppCtx.fillStyle='#000'"), 'canvas 标注保持纯黑（v857）');
+});

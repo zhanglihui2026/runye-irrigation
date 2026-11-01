@@ -2156,14 +2156,32 @@
         var lVx=zoneScreenH>0?(q4.x-q1.x)/zoneScreenH:0, lVy=zoneScreenH>0?(q4.y-q1.y)/zoneScreenH:1;
         var labelAnchor={x:q2.x-labelPadX*lUx+labelPadY*lVx,y:q2.y-labelPadX*lUy+labelPadY*lVy};
         var labelCenter={x:labelAnchor.x,y:labelAnchor.y};
-        /* [v837→v850] 出界兜底：判定从「格子中心出界」改为「右上角锚点出界」——
-           锚点比中心更靠边，旋转最外圈更容易出界。锚点换算世界坐标判界内，
-           出界时回退「本格 ∩ 地块」的形心（界内），标注不再浮在空白里。 */
+        /* [v837→v850→v860] 出界兜底三级化：锚点出界（旋转/裁剪最外圈常见）时——
+           ① 先在格子参数面上扫锚：从右上角 (t=1,s=0) 沿顶边向左（t↓）、再逐行向下（s↑）
+             找第一个界内点 ⇒ 标注仍在格子右上区域、贴着地块边界内移（v860 用户：
+             「还有分区的文字不在分区的右上角」——v850 直接回退形心会让最外圈标注
+             跑到格子中间）；② 整格扫不出界内点（极端碎格）才回退「本格 ∩ 地块」
+             形心（界内），标注不再浮在空白里。 */
         if(_mu>0.05&&!ppPointInPlot(ppToMeters(labelAnchor.x,labelAnchor.y))){
-          var __cw=ppZoneClipCenterWorld(zc,zr,cuts);
-          if(__cw&&ppPointInPlot(__cw)){
-            var __cc=ppToCanvas(__cw.x,__cw.y);
-            labelCenter={x:__cc.x,y:__cc.y};
+          var __fixed=(function(){
+            for(var __sj=0;__sj<=8;__sj++){
+              for(var __si=12;__si>=1;__si--){
+                var __t=__si/12,__s=__sj/8;
+                var __cx=q1.x+(q2.x-q1.x)*__t+(q4.x-q1.x)*__s - labelPadX*lUx + labelPadY*lVx;
+                var __cy=q1.y+(q2.y-q1.y)*__t+(q4.y-q1.y)*__s - labelPadX*lUy + labelPadY*lVy;
+                if(ppPointInPlot(ppToMeters(__cx,__cy))) return {x:__cx,y:__cy};
+              }
+            }
+            return null;
+          })();
+          if(__fixed){
+            labelCenter={x:__fixed.x,y:__fixed.y};
+          }else{
+            var __cw=ppZoneClipCenterWorld(zc,zr,cuts);
+            if(__cw&&ppPointInPlot(__cw)){
+              var __cc=ppToCanvas(__cw.x,__cw.y);
+              labelCenter={x:__cc.x,y:__cc.y};
+            }
           }
         }
         var _std=cuts.xPlan[zc]*cuts.yPlan[zr]/666.67;
