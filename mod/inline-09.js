@@ -2977,6 +2977,28 @@ function esc(s) {
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+/* [v871] 「🔄 生成并回传地图」（#tlAutoPipe）—— 与「生成施工图」语义区分（用户 2026-11-01 拍板）：
+   · 生成施工图（plot-editor）：旋转角度后**本页**重新生成主管/支管（其内部本就链式调
+     tlAutoGenerate({scroll:false})），不跳页；
+   · 本键 = 重新生成三级管线 + **回传在线地图**：成功后自动切到在线地图页并刷新轮灌演示
+     （地图页对 tlDiagramData 是实时读取——捕捉/演示/驳接 geoBridge 的签名含 generatedAt，
+     数据一换自动失效重建，无需额外推送）。
+   成败判定：tlAutoGenerate 无返回值约定（失败走内部 catch 弹错误框），这里用
+   generatedAt 前后对比 —— 未变化（被校验拦截/抛错）⇒ 留在本页看报错，不跳页。 */
+function tlAutoPipeToMap() {
+  var before = (window.tlDiagramData && window.tlDiagramData.generatedAt) || null;
+  try { tlAutoGenerate({ scroll: false }); } catch (eGen) { console.warn('[tlAutoPipeToMap] 生成失败', eGen); }
+  var dd = window.tlDiagramData;
+  if (!(dd && dd.generatedAt && dd.generatedAt !== before)) return;   /* 生成未落地 ⇒ 不跳页 */
+  try {
+    var sec = document.getElementById('onlineMapSection');
+    if (sec && typeof window.ryShowSection === 'function') window.ryShowSection(sec);
+    else if (sec) location.hash = 'onlineMapSection';
+  } catch (eJump) { console.warn('[tlAutoPipeToMap] 跳转在线地图失败', eJump); }
+  try { if (window.RyMapFlowDemo && window.RyMapFlowDemo.refresh) window.RyMapFlowDemo.refresh(); } catch (eRef) { }
+}
+window.tlAutoPipeToMap = tlAutoPipeToMap;
+
 function tlAutoGenerate(options) {
   options = options || {};
   var doScroll = options.scroll !== false;
@@ -4254,8 +4276,8 @@ function tlAutoGenerate(options) {
   }
   var FRONT_IN_ROW = 0;       // 总管所在排（列）序号：0 = 最外一排（123 区）
   var FRONT_IN_OFFSET = 0;    // 距该排顶边（该列左缘）往内偏移（米）；0 = 紧贴顶边
-  /* Kept temporarily for migration comparison; this legacy route is deliberately disabled. */
-  if(false){
+  /* 没有当前地块的有效地图总管时，按当前分区主方向自动生成默认总管。 */
+  if(!tlImportedTrunk){
   if (firstFixedSideIsHorizontal) {
     /* 横向总管的 x 范围取自**列**主管 ⇒ 至少 2 列才有意义（v550 首版误写成 rows>=2，
        单列地块会算出零长度总管——A/B 基线实测抓到）。 */
@@ -4335,11 +4357,13 @@ function tlAutoGenerate(options) {
     }
   }
   }
-  /* Retire the orientation-generated trunk. Only a current-plot map line may
-     populate frontPipe; without one the internal zone network remains intact. */
-  tlFrontMK=[];
-  frontPipe=tlImportedTrunk ? tlImportedTrunk.map(function(p){return{x:p.x,y:p.y};}) : null;
-  sourcePos=frontPipe ? {x:frontPipe[0].x,y:frontPipe[0].y} : null;
+  /* Prefer the saved map route. Otherwise retain the orientation-generated
+     default above so a newly partitioned plot always has a visible trunk. */
+  if(tlImportedTrunk){
+    tlFrontMK=[];
+    frontPipe=tlImportedTrunk.map(function(p){return{x:p.x,y:p.y};});
+    sourcePos=frontPipe ? {x:frontPipe[0].x,y:frontPipe[0].y} : null;
+  }
   // 若二级页已放置水源点，优先采用二级页的水源几何
   if(ppShare && ppShare.source){ sourcePos=tlFrameToGrid(tlZoneCuts.frame,ppShare.source); }
   /* [v570] 用户拖动水源：优先级最高（绝对坐标，按地块指纹匹配）。
@@ -4763,7 +4787,7 @@ function tlAutoGenerate(options) {
      （先算 r → 再写 tlDiagramData）本幅图的简图参数/水泵扬程会用上一幅图的旧几何。
      故这里先把本次几何快照写入，再重算一次 r，并同步刷新左栏结果条与左下角损失卡。 */
   window.tlDiagramData = { version: 1, schemaVersion: 1, world: 'meter', generatedAt: new Date().toISOString(), plot: { w: plotW, h: plotH },
-    trunkSource: frontPipe&&frontPipe.length>=2 ? 'map' : 'missing',
+    trunkSource: frontPipe&&frontPipe.length>=2 ? (tlImportedTrunk?'map':'auto') : 'missing',
     poly: JSON.parse(JSON.stringify(poly)),
     combinedN: tlGetZoneCount(),   /* 2026-09-16 联合灌溉区数 N，供工作区分组着色读取（简图不变） */
     zones: { cols: cols, rows: rows, xPos: xPos.slice(), yPos: yPos.slice(), xPlan: xPlan.slice(), yPlan: yPlan.slice(), xSrc: xSrc.slice(), ySrc: ySrc.slice(),
@@ -6057,7 +6081,7 @@ function rySetTab(sectionId, view) {
           }
         } catch (eHidRestore) { }
       } else {
-        wsCtn.innerHTML = '<div class="tl-ws-empty">请先生成三级管线平面图（点右侧工具栏底部的「🔄 生成管线图」）</div>';
+        wsCtn.innerHTML = '<div class="tl-ws-empty">请先生成三级管线平面图（点右侧工具栏底部的「🔄 生成并回传地图」）</div>';
       }
     }
     /* 工具栏显隐：无图时也显示，但只露「生成管线图」（第四十三轮） */
