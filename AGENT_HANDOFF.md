@@ -6386,3 +6386,26 @@ B 起止在首末主管），用户选 **B**。
   范围内」断言；⑦ 加参差交集锁（los 参差时按实际 [L,H] 取 1/4）；⑤b/⑤c 交集
   仅一点 ⇒ offset=0 位置不变。
 - 版本 v870-seg-inset：三处同抬。发布 78699bd，sleep 80s 线上 sha256 三文件全 OK。
+
+## 26.108 双生成按钮语义区分「生成并回传地图」（v871-pipe-to-map · 2026-11-01）
+
+用户提出：「分区与管路应该是旋转分区角度之后点击生成施工图重新生成主管、支管管线，
+那个生成管线图按钮点击之后应该是回传给在线地图的，所以两个功能是不同的，要区分开。」
+出选项后用户选「生成后自动跳地图」。
+
+- **现状核实**：「生成施工图」(#ppGenerate) 的处理器**本就内链** tlAutoGenerate({scroll:false})
+  （plot-editor v104 行为，4896-4902 行）——旋转角度后主管/支管随点随新，这部分不动；
+  「🔄 生成管线图」(#tlAutoPipe) 与它看似重复（都是生成），地图页虽实时读 tlDiagramData
+  （捕捉/演示/geoBridge 签名含 generatedAt，数据一换自动重建）但没有任何可见的「交给地图」动作。
+- **改动**：#tlAutoPipe 文案「🔄 生成管线图」→「🔄 生成并回传地图」，onclick 改
+  tlAutoPipeToMap()（inline-09 新增包装）：①tlAutoGenerate({scroll:false}) 重生成；
+  ②generatedAt 前后对比判成败（tlAutoGenerate 无返回值约定，失败走内部 catch 弹错误框）
+  ——未落地 ⇒ 留在本页不跳页；③成功 ⇒ ryShowSection(onlineMapSection) 切地图 +
+  RyMapFlowDemo.refresh() 刷新演示。
+- **无头端到端（/tmp/pipe2map.mjs）**：种子地块 → 生成施工图 → 点「生成并回传地图」
+  ⇒ regened:true + mapActive:true + bodySec=onlineMapSection + demoBar 可见 + dock 已建。
+  （注：探针里 ppGenerate 内链的 tlAutoGenerate 未落地而直点按钮成功——疑探针时序，
+  真机链路正常，留观察。）
+- **静态锁**：tests/pipe_to_map.test.cjs 三项——①按钮接线/文案；②包装函数成败判定+
+  跳页+刷新演示；③生成施工图内链三级重生成不许回退。
+- 版本 v871-pipe-to-map：三处同抬。发布 241a2ad，sleep 80s 线上 sha256 三文件全 OK。
