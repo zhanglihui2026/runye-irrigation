@@ -82,7 +82,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const sbExists = await page.evaluate(() => !!document.getElementById('mapStatusbar'));
   rec('C1a 状态栏存在', sbExists);
   const emptyText = await statusText();
-  rec('C1b 未选地块时五字段全为「—」', emptyText === '总管：—｜投影：—｜高差：—｜流速：—｜捕捉：开启', emptyText);
+  rec('C1b 未选地块时五字段全为「—」', emptyText === '总管：—｜投影：—｜高差：—｜流速：—｜捕捉：关闭', emptyText);
   rec('C1c 分隔符是全角 ｜ 且无 0.00', emptyText.includes('｜') && !emptyText.includes('0.00'), emptyText);
 
   /* ---------- 选地块：v1 总管应能显示（迁移后） ---------- */
@@ -101,7 +101,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await page.waitForTimeout(1200);
   const switched = await statusText();
   rec('C3 切到无总管地块后状态栏清空（不残留上一块）',
-    switched === '总管：—｜投影：—｜高差：—｜流速：—｜捕捉：开启', switched);
+    switched === '总管：—｜投影：—｜高差：—｜流速：—｜捕捉：关闭', switched);
 
   /* ---------- C4 进入绘制：提示条 ---------- */
   await killMask();
@@ -127,6 +127,11 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     return plot.polyLatLng.map(([lat, lng]) => window.RyMapHost.project(lat, lng));
   });
   rec('C5c 拿到 4 个顶点屏幕坐标', vtx.length === 4, JSON.stringify(vtx.map(v => [Math.round(v.x), Math.round(v.y)])));
+
+  /* [v846] 捕捉重开默认关闭（三处同步）→ 吸附正测之前先按 S 打开。
+     旧版默认开启时探针没这一步；v846 起不改这里 C5d/C5e/C6b 必假红。 */
+  await page.keyboard.press('s');
+  await page.waitForTimeout(300);
 
   await page.mouse.move(box.x + vtx[0].x + 6, box.y + vtx[0].y + 2);
   await page.waitForTimeout(300);

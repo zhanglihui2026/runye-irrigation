@@ -158,7 +158,10 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     'plot-vertex=' + (bk['plot-vertex'] || 0) + ' trunk-vertex=' + (bk['trunk-vertex'] || 0));
   rec('H1e 出口里能看到自校准结果', !!(h1.extras && h1.extras.sign === -1), JSON.stringify(h1.extras));
 
-  /* ---- H2：真实鼠标移到阀门上 ⇒ 命中阀门 + 标记出现 ---- */
+  /* ---- H2：真实鼠标移到阀门上 ⇒ 命中阀门 + 标记出现 ----
+     [v846] 捕捉重开默认关闭 → 实际命中测试前先按 S 打开（旧版默认开启没这一步） */
+  await page.keyboard.press('s');
+  await sleep(350);
   const valveLL = await page.evaluate(() => {
     const dd = window.tlDiagramData;
     if (!dd || !dd.valves || !dd.valves.length) return null;

@@ -6023,3 +6023,26 @@ case-lib manifest 1.1.0。
   trunkSnapPoint（click 块禁直调）② 橡皮筋挂 trunkGroup/TRUNK_PANE/interactive:false/
   dashArray ③ setTrunkMode 里 removeTrunkRubber ④ click 落点后 updateTrunkRubber。
 - 版本同抬 `v852-trunk-rubber`：sw VERSION + style-01.css?v= + online-map.js?v=。
+
+## 26.92 状态栏测距回归唯一口径 + 总管探针三份跟上规格（v853 · 2026-11-01 · 工作区未发布）
+
+任务 #8/#9 核查时全套复跑总管探针（p1~p11 + n02），抓出 1 个真实产品缺陷 + 3 份探针
+未跟上规格变更。A/B 定界用 git worktree（探针未入库 ⇒ 拷过去跑；node_modules 用 junction）。
+
+- **产品缺陷（v843 引入，v843~v852 五个版本都没复跑 p7 所以漏了）**：v843 面板改走
+  `RyTrunkGeo.haversine`（R=6378137，唯一测距实现）后，状态栏还留在 Leaflet
+  `map.distance`（CRS Earth **R=6371e3**；压缩码里的 6378137 是 SphericalMercator 投影
+  常数，别认错）。326 m 的线上两处差 0.38 m —— 状态栏显示的数既不等于面板、也不等于
+  扬程用的总管长。修法：状态栏 `updateTrunkStatus` 改走 `RyTrunkGeo.haversine`（缺席才退
+  map.distance）。`_probe_trunk_p7_panel.mjs` B1 守着（v838~v842 绿，v843 起红）。
+- **p2/p6 假红（v846 规格变更没同步探针）**：v846「捕捉重开默认关闭」后，p2 的
+  C1b/C3 还硬编码期望「捕捉：开启」、C5/C6 吸附正测没先开捕捉；p6 的 H2 实际命中同理。
+  修法：C1b/C3 期望翻转；吸附测试前 `keyboard.press('s')`。
+- **p3 假红（v838 弹窗改造没同步探针）**：探针头的 `page.on('dialog')` prompt 接管是给
+  v835 原生 prompt 的；v838 换成 `#ryNodeDialog` 后 prompt 永不触发 ⇒ 标签写不进库
+  （C8 假红）**且弹窗遮罩挡住后续右键** ⇒ copyParams 无限重试超时。修法：C8 走真实
+  用户路径 waitForSelector('#ryNodeDialog') → fill → 点 `.ry-node-btn.is-primary`。
+- **教训**：改交互规格（默认值/弹窗形态）时，同批要扫 `_probe_trunk_*.mjs` 里对旧行为的
+  硬编码期望——它们是入库资产（git add 过），假红会淹没真红。
+- 版本同抬 `v853-trunk-dist-unity`：sw VERSION + style-01.css?v= + online-map.js?v=
+  （online-map 是 CORE 文件必须抬）。**工作区完成，未提交未发布**（等并行会话改动落定）。

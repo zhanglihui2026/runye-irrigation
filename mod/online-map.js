@@ -1151,17 +1151,26 @@
     var pts=(trunkMode==='draw'&&trunkPoints.length)?trunkPoints
       :(trunkDragPreview?trunkDragPreview.points:(main?main.points:null));
 
-    /* 投影：绘制中=首点到光标的累计平面长度（实时预览）；否则=该线全长。 */
+    /* 投影：绘制中=首点到光标的累计平面长度（实时预览）；否则=该线全长。
+       [v853] 测距唯一口径：走 mod/trunk-geo.js 的 haversine（R=6378137，与右侧属性面板、
+       扬程 tlFrontLenUse 同源）。v843 面板切到唯一实现后这里还留在 Leaflet
+       map.distance（CRS Earth R=6371000），326 m 的线上两处差 0.38 m —— 状态栏显示的数
+       既不等于面板、也不等于水力计算用的总管长。探针 _probe_trunk_p7_panel.mjs B1 守着
+       （v838~v842 一直绿，v843 起红，本次复跑 #8 核查时抓出）。RyTrunkGeo 缺席时才退
+       map.distance（不应发生：trunk-geo 在 SW CORE，先于本文件加载）。 */
     var proj='—';
     if(pts&&pts.length){
+      var G=window.RyTrunkGeo;
+      var geoDist=(G&&typeof G.haversine==='function')?G.haversine
+        :function(u,v){ return map.distance(L.latLng(u.lat,u.lng),L.latLng(v.lat,v.lng)); };
       var total=0;
       for(var i=1;i<pts.length;i++){
         var a=S.readPoint(pts[i-1]), b=S.readPoint(pts[i]);
-        if(a&&b) total+=map.distance(L.latLng(a.lat,a.lng),L.latLng(b.lat,b.lng));
+        if(a&&b) total+=geoDist(a,b);
       }
       if(trunkMode==='draw'&&lastCursorLatLng&&pts.length){
         var last=S.readPoint(pts[pts.length-1]);
-        if(last) total+=map.distance(L.latLng(last.lat,last.lng),L.latLng(lastCursorLatLng.lat,lastCursorLatLng.lng));
+        if(last) total+=geoDist(last,lastCursorLatLng);
       }
       proj=fmtLen(total);
     }

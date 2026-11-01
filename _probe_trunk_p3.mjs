@@ -309,6 +309,14 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await page.mouse.click(box.x + pT3v0.x, box.y + pT3v0.y, { button: 'right' });
   await page.waitForTimeout(400);
   await page.locator('#trunkCtxMenu .tcm-item[data-act="markVertex"]').click();
+  await page.waitForTimeout(400);
+  /* [v838] 标记弹窗从原生 prompt 换成自定义 DOM 弹窗（#ryNodeDialog）——
+     探针同步走真实用户路径：填名称 → 点确定。
+     旧 page.on('dialog') 的 prompt 接管在 v838 起不再触发，标签永远写不进库，
+     且弹窗遮罩会挡住后续右键菜单（copyParams 无限重试超时）。 */
+  await page.waitForSelector('#ryNodeDialog', { timeout: 3000 });
+  await page.fill('#ryNodeDialog .ry-node-name input', '三通口');
+  await page.locator('#ryNodeDialog .ry-node-btn.is-primary').click();
   await page.waitForTimeout(900);
   const trunkD = await trunkOf('p3-a');
   const labels = (trunkById(trunkD, 'T3') || {}).params || {};
