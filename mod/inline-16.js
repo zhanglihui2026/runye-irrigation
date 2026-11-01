@@ -231,6 +231,22 @@
       if(destinationSection==='pipePlanSection'&&window.RyDrawingWorkspace&&typeof window.RyDrawingWorkspace.refreshPlot==='function'){
         window.RyDrawingWorkspace.refreshPlot();
       }
+      /* 首次回传的新地块没有L2存档时，进入分区工作区就建立默认主管、支管和阀门；
+         已有（包括明确保存为空的）地块设计仍按原档案恢复，不自动覆盖。 */
+      if(destinationSection==='pipePlanSection'&&window.RyPlotPartitionEditor&&
+          typeof window.RyPlotPartitionEditor.ensureInitialPipes==='function'&&
+          window.RyPlotPartitionEditor.ensureInitialPipes()){
+        try{if(typeof window.ppGenerateDiagram==='function')window.ppGenerateDiagram({scroll:false});}catch(eInitialDiagram){console.warn('[map-transfer] 初始施工图生成失败',eInitialDiagram);}
+        /* 首次初始化也要建立共享画布/地图消费的三级快照；只画二级SVG会让切到
+           管路工具时仍是空层，回传按钮也找不到本次生成的网络版本。stay 避免接收器
+           擅自切换当前工具，用户仍停留在分区视图。 */
+        try{
+          if(typeof window.tlAutoGenerate==='function'&&window.measuredPolygon&&window.measuredPolygon.length>=3){
+            window.tlAutoGenerate({scroll:false,stay:true});
+          }
+        }catch(eInitialNetwork){console.warn('[map-transfer] 初始管路图层生成失败',eInitialNetwork);}
+        try{if(typeof window.runyeSaveProject==='function')window.runyeSaveProject(true);}catch(eInitialSave){console.warn('[map-transfer] 初始分区管线留档失败',eInitialSave);}
+      }
       transferStore.remove(transferId);
       return true;
     }catch(e){

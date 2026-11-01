@@ -8,7 +8,7 @@ const ringB = [[18.4,109.7],[18.4,109.701],[18.401,109.701]];
 const plot = (id,ring) => ({id,name:id,polyLatLng:ring,sqm:1000,mu:1.5,source:'map',ts:10,poly:ring.map((_,i)=>({x:i,y:i}))});
 function fixture(plots) {
   const data = new Map([['runye_plot_library',JSON.stringify(plots)]]);
-  const calls = {jumps:[],alerts:[],saves:0,loads:0,diagrams:0,refreshes:0};
+  const calls = {jumps:[],alerts:[],saves:0,projectSaves:0,loads:0,diagrams:0,refreshes:0,initialPipes:0,networks:0,initialNetworkOptions:null,initialPipesReady:false};
   const list = {children:[],set innerHTML(v){this.children=[]},appendChild(x){this.children.push(x)}};
   const document = {
     readyState:'loading',addEventListener(type,fn){this.onready=fn},
@@ -21,8 +21,11 @@ function fixture(plots) {
     localStorage:{getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k)},
     alert:m=>calls.alerts.push(m),updatePlan(){},
     ppLoadPolygon(){calls.loads++},ppGenerateDiagram(){calls.diagrams++},
+    tlAutoGenerate(options){calls.networks++;calls.initialNetworkOptions=options;},
+    runyeSaveProject(){calls.projectSaves++;return true;},
     ryJumpToSection:id=>calls.jumps.push(id),runyeSetCurrentPlot:id=>{calls.saves++},
     runyeSaveCurrentPlotBeforeSwitch(){return true},
+    RyPlotPartitionEditor:{ensureInitialPipes(){calls.initialPipes++;return calls.initialPipesReady}},
     RyDrawingWorkspace:{refreshPlot(){calls.refreshes++;assert.equal(calls.jumps.at(-1),'pipePlanSection','refresh happens after the viewport is visible')}},
   };
   ctx.window=ctx;vm.createContext(ctx);
@@ -43,8 +46,17 @@ assert.equal(f.data.has(f.ctx.RyMeasuredAreaBridgeStore.keyPrefix+transferId),fa
 assert.equal(f.ctx.location.search,'','successful receive removes its URL token');
 assert.equal(f.calls.jumps.at(-1),'pipePlanSection');
 assert.equal(f.calls.loads>0 && f.calls.diagrams>0,true);
+assert.equal(f.calls.initialPipes,1,'map handoff checks whether the new plot needs its first default L2 pipe design');
 assert.equal(f.ctx.__ryLazyReplay,false,'incoming map geometry cancels outgoing deferred generation');
 assert.equal(f.calls.refreshes,1,'map handoff refreshes and fits the single drawing viewport');
+const firstDesign=fixture([a]);
+firstDesign.calls.initialPipesReady=true;
+const firstId=firstDesign.ctx.RyMeasuredAreaBridgeStore.write({ryPlotRef:{id:'a',geometryKey:JSON.stringify([ringA]),areaM2:1000}});
+firstDesign.ctx.location.search='?ryPlotTransfer='+encodeURIComponent(firstId);
+assert.equal(firstDesign.ctx.runyeApplyMapPayload(),true,'a valid new plot handoff completes');
+assert.equal(firstDesign.calls.networks,1,'first-use default pipes also build the shared level-three pipe layer');
+assert.equal(firstDesign.calls.initialNetworkOptions.stay,true,'initial generation keeps the user in partition view');
+assert.equal(firstDesign.calls.projectSaves,1,'both levels are archived after initial generation');
 const missingRef=fixture([a]);
 const stalePayload=JSON.stringify({ryPlotRef:{id:'missing',geometryKey:JSON.stringify([ringB]),areaM2:1000}});
 const staleId=missingRef.ctx.RyMeasuredAreaBridgeStore.write(JSON.parse(stalePayload));

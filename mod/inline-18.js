@@ -63,7 +63,7 @@
            （实测节点→⋈、划线→⊕），与 v787 ppAiPlan 同款修法。 */
         /* [v800] 多选/遮蔽换语义图标：多选 = ☑ 勾选框（逐段加选）；遮蔽 = ⊘ 禁止/排除
            （被遮蔽的管灰色虚线且不计入材料清单）。id 显式映射优先于 rules 正则。 */
-        var icons={ppPlotPanelToggle:'▤',ppResetCuts:'⟲',ppLockArea:'🔒',ppUndo:'↶',ppAutoPipe:'⇢',ppZoneAutoBtn:'▧',ppRotateZones:'↻',ppGenerate:'▣',ppAiPlan:'🤖',tlAutoPipe:'⇢',tlDimMultiBtn:'▦',tlFrontNodeResetBtn:'⌖',tlWsFitValve:'⋈',tlWsFitTee:'⊤',tlWsFitElbow:'∟',tlWsFitNode:'⊕',tlLineBtn:'╱',tlWsMultiBtn:'☑',tlWsMaskBtn:'⊘',tlDimSaveBtn:'💾'};
+        var icons={ppPlotPanelToggle:'▤',ppResetCuts:'⟲',ppLockArea:'🔒',ppUndo:'↶',ppAutoPipe:'⇢',ppZoneAutoBtn:'▧',ppRotateZones:'↻',ppGenerate:'▣',ppAiPlan:'🤖',tlAutoPipe:'☁',tlDimMultiBtn:'▦',tlFrontNodeResetBtn:'⌖',tlWsFitValve:'⋈',tlWsFitTee:'⊤',tlWsFitElbow:'∟',tlWsFitNode:'⊕',tlLineBtn:'╱',tlWsMultiBtn:'☑',tlWsMaskBtn:'⊘',tlDimSaveBtn:'💾'};
         /* [v787] ppAiPlan 显式定 🤖：其 title 含「回传」二字，规则表 /回传|上传/ 排在
            /AI规划/ 之前会把图标错配成 ☁（悬浮态时代按钮带文字未露馅，图标化后必修）。 */
         var icon=icons[button.id];
@@ -116,6 +116,9 @@
       var tlSide=document.getElementById('tlSide');
       var ppCanvas=document.getElementById('ppCanvasWrap');
       var tlCanvas=document.getElementById('tlWsContent');
+      /* [v826b] 必须在任何 DOM 搬迁之前取到胶囊引用：稍后 ppCanvasWrap 会被搬进
+         尚未插入 body 的 sharedHost，那时 getElementById 搜不到游离树里的节点。 */
+      var ppFitChip=document.getElementById('ppFitViewBtn');
       if(!main||!pp||!tl||!ppCanvas||!tlCanvas)return null;
       sharedHost=document.createElement('div');
       sharedHost.id='ryDrawingHost';
@@ -324,6 +327,19 @@
       if(ppSide)sharedHost.appendChild(ppSide);
       if(tlSide)sharedHost.appendChild(tlSide);
       canvasStack.appendChild(ppCanvas);canvasStack.appendChild(tlCanvas);
+      /* [v826b] 「⤢ 适应窗口」胶囊必须排在叠加层之后、直属 canvasStack，否则永远点不到。
+         #ppCanvasWrap 自身是 position:absolute + z-index:1 ⇒ 它自己就是一个堆叠上下文，
+         把内部任何 z-index（哪怕是 2100）都封在 1；而 #tlWsContent 是 z-index:2 的兄弟层，
+         整层 <svg> 会盖死胶囊。实测（_probe_fitbtn.mjs）：胶囊亮起后 elementFromPoint
+         命中的是 svg.tl-ws-svg，真实点击进不去 ⇒ ppFitView() 从不执行，
+         宏观表现就是「缩放按钮点了没反应」（zoom 9.85 原地不动、只有 pan 被拖走）。
+         做法：把胶囊提到 canvasStack 直下、append 在叠加层之后（配合 .pp-fitview 的 z-index:3），
+         只搬一个浮层，不动任何图层顺序或相机。restoreStageHomes 会按 nodeHomes 放回原位。 */
+      (function(){
+        if(!ppFitChip||ppFitChip.parentNode!==ppCanvas)return;
+        nodeHomes.push({node:ppFitChip,parent:ppFitChip.parentNode,next:ppFitChip.nextSibling});
+        canvasStack.appendChild(ppFitChip);
+      })();
       /* Wheel navigation always belongs to the base camera, including over pipe nodes. */
       canvasStack.addEventListener('wheel',function(e){
         if(e.target.closest&&e.target.closest('#ppPlotPanel'))return;
