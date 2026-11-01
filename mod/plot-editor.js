@@ -2951,13 +2951,19 @@
       var sourceBounds=ppGetBounds(),sourceDims=ppGetPlanDims(sourceBounds);
       var effectiveAngle=isFinite(Number(gridAngle))?Number(gridAngle):ppZoneAngle();
       frame=ppGridFrame(ppState.polyPts,sourceBounds,sourceDims,effectiveAngle);
-      if(frame&&Math.abs(effectiveAngle)>0.001){
+      /* [v865] 0° 也走格系统一变换（修复「0°+地块原点偏移 ⇒ 管线全空」老缺陷）：
+         ppGetZoneCuts 的网格恒铺在 frame.bounds（格系）上，管线坐标恒是格系——
+         旧代码 0° 时不把 ppState.polyPts 换成格系环（条件 Math.abs(angle)>0.001），
+         格系管线被拿去裁世界系环，地块 min 角不在原点时两系错开 ⇒ 全部裁空。
+         0° 的 frame 是纯平移+缩放（无旋转），toGrid/toWorld 互逆，变换后行为=
+         旧实现（min 角在原点、scale=1 时 toWorld 恒等）。 */
+      if(frame){
         ppState.polyPts=frame.poly.map(function(p){return{x:p.x,y:p.y};});
         ppState.zoneAngleDeg=0;ppState.zoneRotated=false;
         ppState.cutSnap={sig:'',x:null,y:null};ppState.cutOverrides={x:{},y:{}};
       }
       var b = ppGetBounds(),layout=ppGetZoneLayout(b,planN);
-      if(frame&&Math.abs(frame.angle)>0.001&&keepSnap&&keepSnap.x&&keepSnap.y){
+      if(frame&&keepSnap&&keepSnap.x&&keepSnap.y){
         ppState.cutSnap={sig:ppGetZoneCutSignature(b,layout),x:keepSnap.x.slice(),y:keepSnap.y.slice()};
       }
       var cuts = ppGetZoneCuts(b, layout);
@@ -3060,7 +3066,8 @@
         }
       }
     } finally {
-      if(frame&&Math.abs(frame.angle)>0.001){
+      /* [v865] 0° 也 toWorld：管线恒生成于格系，统一转回世界系（0° 时 toWorld=纯平移+缩放）。 */
+      if(frame){
         ['main','branch','subbranch'].forEach(function(k){out[k]=out[k].map(function(line){return line.map(frame.toWorld);});});
         out.valves=out.valves.map(frame.toWorld);
       }
