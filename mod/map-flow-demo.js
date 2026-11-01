@@ -255,6 +255,61 @@
     });
   }
 
+  /* [v864] 地图左栏 dock 搬移：在线地图激活时把「分组组合 · 轮灌演示」组内容搬进
+     地图左栏卡片（section/sec-t 与该栏其他卡片同款，样式零新增）；离开地图按 memo
+     原样搬回并隐藏卡片。dock **运行时动态创建**（静态 DOM 会被工作区重排挪位，实测）；
+     #tlPlanBar 归属与 ry-cad-toolbar（v858 工具模式搬移）靠 memo 闭环互不破坏。 */
+  var dockMemo = null;   /* { pb:{parent,next}, mb:{parent,next} } */
+  function ensureDock() {
+    var dock = document.getElementById('mapDemoDock');
+    if (dock) { dock.parentNode.style.display = ''; return dock; }
+    var sec = document.getElementById('onlineMapSection');
+    var side = sec ? sec.querySelector('aside.side') : null;
+    if (!side) return null;
+    var card = document.createElement('section');
+    card.id = 'mapDemoDockCard';
+    var h = document.createElement('h4');
+    h.className = 'sec-t';
+    h.textContent = '分组组合 · 轮灌演示';
+    dock = document.createElement('div');
+    dock.id = 'mapDemoDock';
+    card.appendChild(h); card.appendChild(dock);
+    side.appendChild(card);
+    return dock;
+  }
+  function dockDockIn(dock) {
+    if (!dockMemo) dockMemo = { pb: null, mb: null };   /* 幂等：重复 refresh 不覆盖已记原位 */
+    var tool = !!(document.body && document.body.classList.contains('ry-tool'));
+    var pb = document.getElementById('tlPlanBar');
+    var mb = document.getElementById('mapDemoBar');
+    /* 工具模式（body.ry-tool）下不抢 #tlPlanBar —— 它归 ry-cad-toolbar 的
+       #ryCadGrpDemo 组管（v858）；dock 只补 #mapDemoBar。 */
+    if (pb && !tool && pb.parentNode !== dock) {
+      dockMemo.pb = { parent: pb.parentNode, next: pb.nextSibling };
+      dock.appendChild(pb);
+    }
+    if (mb && mb.parentNode !== dock) {
+      dockMemo.mb = { parent: mb.parentNode, next: mb.nextSibling };
+      dock.appendChild(mb);   /* mb 在 pb 之后：先搬 pb 再搬 mb，顺序即组内顺序 */
+    }
+  }
+  function dockDockBack(dock) {
+    if (!dockMemo) return;
+    var m = dockMemo; dockMemo = null;
+    var pb = document.getElementById('tlPlanBar');
+    if (pb && pb.parentNode === dock && m.pb && m.pb.parent && m.pb.parent.parentNode) {
+      var ref1 = (m.pb.next && m.pb.next.parentNode === m.pb.parent) ? m.pb.next : null;
+      m.pb.parent.insertBefore(pb, ref1);
+    }
+    var mb = document.getElementById('mapDemoBar');
+    if (mb && mb.parentNode === dock && m.mb && m.mb.parent && m.mb.parent.parentNode) {
+      var ref2 = (m.mb.next && m.mb.next.parentNode === m.mb.parent) ? m.mb.next : null;
+      m.mb.parent.insertBefore(mb, ref2);
+    }
+    var card = document.getElementById('mapDemoDockCard');
+    if (card) card.style.display = 'none';
+  }
+
   /* 刷新：地图页激活且数据可拾取 ⇒ 显示面板 + 重建 chips；否则隐藏并清层。
      规划简图演示条（#tlDemoBar）在地图页隐藏（两套演示不同画布）。 */
   function refresh() {
@@ -263,11 +318,15 @@
     var onMap = !!(ctx.isMapActive && ctx.isMapActive());
     if (!onMap) {
       bar.style.display = 'none';
+      var dock0 = document.getElementById('mapDemoDock');
+      if (dock0) dockDockBack(dock0);
       if (active != null || playing) stop();
       var tb0 = document.getElementById('tlDemoBar');
       if (tb0 && window.__tlDemoGroup == null && !tb0.__keepHidden) tb0.style.display = '';
       return;
     }
+    var dock = ensureDock();
+    if (dock) dockDockIn(dock);
     var d = collect();
     if (!d || d.gCount <= 0) {
       /* [v863] 无可拾取数据时给引导提示而不是整条隐藏 —— 用户找不到入口。 */
