@@ -1,20 +1,21 @@
 'use strict';
 /* tests/tl_seg_trunk.test.cjs —— 段总管生成器（v859 需求 / v862 判定重写 /
- * v868 起止定版 / v869 贴水源一侧定版）
+ * v868 起止定版 / v869 自动选侧 / v870 内移定位定版）
  *
  * 钉的是几何契约：
  *   ① 垂直于主管主方向：水平主管 ⇒ 干线竖直；竖直主管 ⇒ 干线水平。
- *   ② [v869] 干线位置 = 贴主管**同一侧端点**：base = 走向交集里贴水源那侧的端
- *      （lo ⇒ max(los)，hi ⇒ min(his)）；对齐网格 = 同侧端点公共坐标。
- *      水源在交集中点哪一半 ⇒ 贴哪侧；无水源 ⇒ 默认 lo（左/上）。
+ *   ② [v870] 干线位置 = 主管走向中心 C 向水源侧偏移 跨度×1/4（用户方案甲）：
+ *      base = C ± (H-L)×0.25，恒在交集 [L,H] 内（必穿过每根主管、必在地块内
+ *      1/4 分位附近，不再贴边界/总管被盖住）。水源在交集哪一半 ⇒ 向哪侧偏；
+ *      无水源/坐标非法 ⇒ 默认 lo（左/上）。交集仅一点时 offset=0（位置不变）。
  *      斜主管 / 交集为空 ⇒ null（宁可不出）。
  *   ③ 单区（<2 条）不生成。
  *   ④ [v868] 起止 = 首末主管：points[0]=起点=最上/最左分区主管（vMin 端），
  *      points[1]=终点=最下/最右分区主管（vMax 端）；两端不再外延（stub=0，
  *      lenJoin=len）。方向依据：简图世界系北=−y ⇒ 上/左恒为 vMin 端。
- *   ⑤ [v862 回归] 多行网格的竖直主管（行间走向范围恰好相接）⇒ 必须生成。
+ *   ⑤ [v862 回归] 多行网格的竖直主管 ⇒ 必须生成。
  *   ⑥ [v868] 方向语义与输入顺序无关。
- *   ⑦ [v869] 选侧与水源：左右/上下两侧各验一遍 + 非法 src 回退 lo。
+ *   ⑦ [v869/v870] 选侧与水源：左右/上下各验 + 非法 src 回退 lo + 参差主管。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -30,7 +31,7 @@ function load() {
 const S = load();
 const R = (v) => Math.round(v * 1e6) / 1e6;
 
-test('① 水平主管 ⇒ 干线竖直；无水源 ⇒ 默认贴左端（base=max(los)）', () => {
+test('① 水平主管 ⇒ 干线竖直；无水源 ⇒ 默认向左/上偏移 跨度×1/4', () => {
   const mains = [
     [{ x: 10, y: 25 }, { x: 95, y: 25 }],
     [{ x: 10, y: 75 }, { x: 95, y: 75 }],
@@ -39,16 +40,17 @@ test('① 水平主管 ⇒ 干线竖直；无水源 ⇒ 默认贴左端（base=m
   const g = S.build(mains);
   assert.ok(g, '应生成');
   assert.equal(g.axis, 'y', '干线垂直于水平主管（沿 y 延伸）');
-  assert.equal(g.side, 'lo', '无水源 ⇒ 默认贴左/上侧');
-  assert.equal(R(g.base), 10, 'base = 走向交集左端（对齐网格 = 同侧端点公共 x）');
+  assert.equal(g.side, 'lo', '无水源 ⇒ 默认向左/上侧偏');
+  assert.equal(R(g.base), 31.25, 'C=52.5 向 lo 偏 (95-10)×1/4=21.25 ⇒ 31.25（地块内 1/4 分位）');
   assert.equal(g.joinPts.length, 3);
   g.joinPts.forEach((p, i) => {
-    assert.equal(R(p.x), 10, '交点在各主管左端点上');
+    assert.equal(R(p.x), 31.25, '交点在干线上');
     assert.equal(R(p.y), [25, 75, 125][i]);
   });
+  assert.ok(g.base > 10 && g.base < 95, 'base 必在主管范围内（穿过每根主管、不再贴边）');
 });
 
-test('② 竖直主管 ⇒ 干线水平；无水源 ⇒ 默认贴上端', () => {
+test('② 竖直主管 ⇒ 干线水平；无水源 ⇒ 默认向上/下偏移 跨度×1/4', () => {
   const mains = [
     [{ x: 30, y: 5 }, { x: 30, y: 90 }],
     [{ x: 70, y: 5 }, { x: 70, y: 90 }]
@@ -57,7 +59,7 @@ test('② 竖直主管 ⇒ 干线水平；无水源 ⇒ 默认贴上端', () => 
   assert.ok(g);
   assert.equal(g.axis, 'x');
   assert.equal(g.side, 'lo');
-  assert.equal(R(g.base), 5, 'base = y 交集上端（北=−y ⇒ 上=vMin）');
+  assert.equal(R(g.base), 26.25, 'C=47.5 向 lo 偏 (90-5)×1/4=21.25 ⇒ 26.25（北=−y ⇒ lo=上侧）');
   assert.equal(g.joinPts.length, 2);
 });
 
@@ -120,7 +122,7 @@ test('⑤b [v862 回归] 2×2 多行网格竖直主管（v859 恒 null 的用户
   const g = S.build(mains);
   assert.ok(g, '行间范围相接（交集 {50}）必须生成，这是线上用户场景');
   assert.equal(g.axis, 'x', '干线水平（垂直于竖直主管）');
-  assert.equal(R(g.base), 50, 'base 落在行间分界（交集仅一点，选侧不改变位置）');
+  assert.equal(R(g.base), 50, '交集仅一点 ⇒ C=50、offset=0，位置不变');
   assert.equal(g.joinPts.length, 4, '穿过全部 4 根主管');
   const xs = g.points.map(p => p.x).sort((a, b) => a - b);
   assert.equal(R(xs[0]), 12, '起点端 = 最左分区主管（不外延）');
@@ -136,7 +138,7 @@ test('⑤c 部分错开但仍有交集 ⇒ 生成（相邻行共享边即可）'
   ];
   const g = S.build(mains);
   assert.ok(g);
-  assert.equal(R(g.base), 60, '交集 [60,60]');
+  assert.equal(R(g.base), 60, '交集 [60,60] ⇒ offset=0');
 });
 
 test('⑥ [v868] 方向语义与输入顺序无关：起点恒=上/左（vMin 端）、终点恒=下/右（vMax 端）', () => {
@@ -155,35 +157,43 @@ test('⑥ [v868] 方向语义与输入顺序无关：起点恒=上/左（vMin �
   assert.equal(R(g3.points[1].x), 70, '终点=右分区（vMax）');
 });
 
-test('⑦ [v869] 自动选侧：水源在交集中点哪一半 ⇒ 贴哪侧；非法 src 回退 lo', () => {
+test('⑦ [v869/v870] 选侧：水源在交集哪一半 ⇒ 向哪侧偏 跨度×1/4；非法 src 回退 lo', () => {
   const mains = [
     [{ x: 10, y: 25 }, { x: 95, y: 25 }],
     [{ x: 10, y: 75 }, { x: 95, y: 75 }],
     [{ x: 10, y: 125 }, { x: 95, y: 125 }]
   ];
-  /* 水源在左半（x<52.5）⇒ 贴左端 base=10 */
+  /* 水源在左半（x<52.5）⇒ 向左偏：base = 52.5-21.25 = 31.25 */
   const gl = S.build(mains, { src: { x: 0, y: 60 } });
   assert.equal(gl.side, 'lo');
-  assert.equal(R(gl.base), 10);
-  /* 水源在右半（x>52.5）⇒ 贴右端 base=95 */
+  assert.equal(R(gl.base), 31.25);
+  /* 水源在右半 ⇒ 向右偏：base = 52.5+21.25 = 73.75 */
   const gr = S.build(mains, { src: { x: 120, y: 60 } });
   assert.equal(gr.side, 'hi');
-  assert.equal(R(gr.base), 95);
-  assert.equal(R(gr.joinPts[0].x), 95, '交点随 base 移到右端');
-  /* 竖直主管：水源在上（y<47.5）⇒ 贴上端；在下 ⇒ 贴下端 */
+  assert.equal(R(gr.base), 73.75);
+  assert.equal(R(gr.joinPts[0].x), 73.75, '交点随 base 移到右侧 1/4 分位');
+  /* 竖直主管：水源在上（y<47.5）⇒ 向上偏；在下 ⇒ 向下偏 */
   const vm = [
     [{ x: 30, y: 5 }, { x: 30, y: 90 }],
     [{ x: 70, y: 5 }, { x: 70, y: 90 }]
   ];
   const gt = S.build(vm, { src: { x: 50, y: -20 } });
   assert.equal(gt.side, 'lo');
-  assert.equal(R(gt.base), 5, '贴上端');
+  assert.equal(R(gt.base), 26.25, '向上偏');
   const gb = S.build(vm, { src: { x: 50, y: 200 } });
   assert.equal(gb.side, 'hi');
-  assert.equal(R(gb.base), 90, '贴下端');
+  assert.equal(R(gb.base), 68.75, '向下偏');
   /* 非法/缺失 src ⇒ 回退 lo */
   const gf = S.build(mains, { src: { x: NaN, y: 60 } });
   assert.equal(gf.side, 'lo');
   assert.equal(S.build(mains, {}).side, 'lo');
   assert.equal(S.build(mains, null).side, 'lo');
+  /* 参差主管：交集 [30,95]，向 lo 偏 (95-30)/4=16.25 ⇒ base=62.5-16.25=46.25 */
+  const stag = [
+    [{ x: 10, y: 25 }, { x: 95, y: 25 }],
+    [{ x: 30, y: 75 }, { x: 95, y: 75 }]
+  ];
+  const gs = S.build(stag);
+  assert.equal(R(gs.base), 46.25, '参差交集按实际 [L,H] 取 1/4 偏移');
+  assert.ok(gs.base >= 30 && gs.base <= 95, 'base 恒在交集内');
 });
