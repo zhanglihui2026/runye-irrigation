@@ -1108,6 +1108,47 @@
     return S.setTargets(list,{plotId:currentMapPlotId?String(currentMapPlotId):null, extras:snapExtras?snapExtras.stats:null});
   }
 
+  /* ===== [v861] 在线地图轮灌演示（RyMapFlowDemo）：拾取手绘总管 + 分区主管/支管，
+     在实际地块上播放水流；总管与主管未连接时报错。ctx 注入闭包上下文：
+     toLL 走 v835 geoBridge（地块一致/±y 符号判定复用）；getTrunkPoints 读 trunkSaved
+     主干（闭包变量，函数捕获引用 ⇒ 后续重绘自动可见）。init 内自挂 section 观察器。 */
+  try {
+    if (window.RyMapFlowDemo && typeof window.RyMapFlowDemo.init === 'function') {
+      window.RyMapFlowDemo.init({
+        map: map,
+        toLL: function (pt) {
+          var plot = (function () {
+            var snap = window.RyPlotLibraryStore && window.RyPlotLibraryStore.read();
+            if (snap && snap.ok && currentMapPlotId) {
+              return snap.plots.filter(function (p) { return p && String(p.id) === String(currentMapPlotId); })[0] || null;
+            }
+            return null;
+          })();
+          var b = trunkGeoBridge(plot);
+          return b ? b.toLL(pt) : null;
+        },
+        getTrunkPoints: function () {
+          if (!trunkSaved || !Array.isArray(trunkSaved.trunks) || !trunkSaved.trunks.length) return null;
+          var SS = window.RyTrunkSchema, m = SS ? SS.pickMainTrunk(trunkSaved) : null;
+          var lines = m ? [m.points] : trunkSaved.trunks.map(function (t) { return t && t.points; });
+          var out = [];
+          lines.forEach(function (pts) {
+            (pts || []).forEach(function (p) {
+              if (Array.isArray(p) && isFinite(p[0]) && isFinite(p[1])) out.push({ lat: p[0], lng: p[1] });
+              else if (p && isFinite(p.lat) && isFinite(p.lng)) out.push({ lat: p.lat, lng: p.lng });
+            });
+          });
+          return out.length >= 2 ? out : null;
+        },
+        tip: tip,
+        isMapActive: function () {
+          var s = document.getElementById('onlineMapSection');
+          return !!(s && s.classList.contains('ry-active'));
+        }
+      });
+    }
+  } catch (eDemoInit) { /* 演示面板初始化失败不影响地图主流程 */ }
+
   function setSnapOn(on){
     snapOn=!!on;
     var S=snapApi();

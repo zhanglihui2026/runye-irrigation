@@ -6159,3 +6159,31 @@ z-index 1170）。改动三件套：
   仍贴格子右上区域；② 整格扫不出（极端碎格）才回退形心（v850 原行为降为末级兜底）。
   SVG 施工导出（恒右上锚、无兜底）不受影响。
 - 版本 v860-zone-anchor-clamp：三处同抬 + plot-editor.js?v=。484 单测 + 四闸 + p1 22/22。
+
+## 26.98 轮灌演示搬到在线地图实际地块（v861-map-flow-demo · 2026-11-01）
+
+用户：分区与管路页的水流动画演示不显示了（疑似绘制总管后失效），已把演示面板
+移到在线地图左栏（v858 #tlPlanBar）；现在要求**进来就在在线地图实际地块上演示**，
+拾取手动绘制总管 + 分区主管/支管，**总管与分区主管没连接就报错**（连接细节后议）。
+
+- **新模块 `mod/map-flow-demo.js`**（已入 CORE，先于 online-map.js 装载）：
+  `window.RyMapFlowDemo`。纯函数 `groupOf/groupCount/validateConnection`（Node 单测锁
+  `tests/map_flow_demo.test.cjs` 4 项）；`collect()` 从 tlDiagramData 取素材经
+  geoBridge(plot).toLL 转经纬度（mainsLL/branchLL/valves/couplersLL/segLL/trunkLL，
+  manual=tlManualGroups、nPer=combinedN）；`render()` Leaflet 图层（活动组主管
+  #185FA5 宽5 / 支管 #16a34a 宽3 虚线滚动动画、总管 #111827 宽5 + 段总管宽4 常亮、
+  阀门圆点活动绿/组外灰）；`start(g)` 先 validateConnection；`playToggle()` 1000ms
+  组轮播；chips 复用 .tl-demo-dot/.tl-demo-ctl。
+- **连接校验**：`validateConnection` tolM=5m；有段总管（v859 couplers）时总管贴任一
+  驳接点 ≤tol 即贯通；无段总管看总管端点 ↔ 主管端点。no-trunk（未画总管）/
+  disconnected（最近距离 X.Xm）均 tip 报错——用户明确要求报错。
+- **页面切换**：进入在线地图（onlineMapSection active，MutationObserver + hashchange）
+  显示 #mapDemoBar（index.html #ryCadGrpDemo 组内、v861 新增）并隐藏规划页
+  #tlDemoBar；离开地图隐藏 #mapDemoBar + 清图层。isMapActive 判定与 v859
+  geoBridge 同源（currentMapPlotId 闭包 → 宿主注入 RyMapFlowDemo.init 传
+  `currentPlotId()` 读法）。**tlDiagramData 无浏览器实测路径**（探针 place-go 后
+  currentPlotId 仍 null，§26.9x 老限制），几何算法走纯函数 + Node 单测。
+- 版本 v861-map-flow-demo：三处同抬 + map-flow-demo.js?v=。488 单测 + 四闸 +
+  p1 22/22 / p2 24/24 / p7 41/41 / p8 12/12。发布与线上复量见工作日志。
+- 遗留：tlWorstPathLen 未并入段总管（最不利路径损失略偏小）；手绘总管→驳接点
+  实机链路待用户页面验证；用户预告连接细节下轮再议。
