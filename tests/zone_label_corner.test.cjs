@@ -56,3 +56,39 @@ test('④ 标注层外的其他居中排版不受影响（守卫：管线/管口
   /* 真正的守卫：管线标注函数（ppDrawPipes 系）没有被本次改动碰过——抽查其锚变量仍存在 */
   assert.ok(live.includes('function ppToMeters'), '坐标逆变换仍在');
 });
+
+/* ── v857 用户反馈：工作区（tl-workspace）标注还有不在右上角的 + 全部黑色不加粗 ──
+ * ⑤ 工作区分区标注：锚 = 分块实际右上顶点 l1 沿边内缩（原用轴对齐包围盒右上
+ *   rx+rw——平行四边形格子下包围盒角 ≠ 格子角）；窄高竖排/小格两个居中分支
+ *   全部改右上，标注层不许残留 middle；文字全 #000、无 font-weight。
+ * ⑥ 三页口径同批（工作区/inline-09 简图/plot-editor canvas+施工SVG）颜色统一纯黑，
+ *   非标琥珀语义色一并取消（用户：「文字全部用黑色字」）。
+ */
+const tw = fs.readFileSync(path.join(ROOT, 'tl-workspace', 'tl-workspace.js'), 'utf8');
+
+test('⑤ 工作区标注：锚 = l1 右上顶点、无居中残留、无加粗', () => {
+  const live = stripJs(tw);
+  assert.ok(live.includes('var lx = l1.x - 5, ly = l1.y + 13;'), '锚点 = 分块实际右上顶点 l1 内缩');
+  const labelLines = live.split('\n').filter((l) => l.includes('lp.push('));
+  assert.ok(labelLines.length >= 8, '工作区分区标注行应存在');
+  /* 组级标注（data-tlunion）锚定保持 v100 组重心设计，不在本锁范围 */
+  const zoneOnly = labelLines.filter((l) => !l.includes('data-tlunion'));
+  assert.equal(zoneOnly.some((l) => l.includes('text-anchor="middle"')), false, '分区标注层不许残留居中');
+  assert.equal(zoneOnly.some((l) => l.includes('<text') && l.includes('font-weight')), false, '标注层不许加粗');
+  assert.ok(zoneOnly.every((l) => !l.includes('<text') || l.includes('fill="#000"')), '标注层全部纯黑（g 壳行除外）');
+  assert.ok(live.includes("translate(' + fmt(l1.x - 4)"), '竖排分支也锚右上（l1）');
+  /* 包围盒 rx/rw 仍被尺寸分支判断使用，不许误删 */
+  assert.ok(live.includes('var aw = Math.abs(rw)'), 'aw/ah 尺寸判断保留');
+});
+
+test('⑥ 三页标注颜色统一纯黑（工作区/inline-09/plot-editor）', () => {
+  const i9live = stripJs(i9);
+  const i9Lines = i9live.split('\n').filter((l) => l.includes('zoneLabelParts.push('));
+  assert.ok(i9Lines.length >= 6, 'inline-09 标注行应存在');
+  assert.ok(i9Lines.every((l) => l.includes('fill="#000"')), 'inline-09 标注全黑');
+  assert.equal(i9Lines.some((l) => l.includes('font-weight')), false, 'inline-09 标注不加粗');
+  const pelive = stripJs(pe);
+  assert.ok(pelive.includes("ppCtx.fillStyle='#000'"), 'plot-editor canvas 标注纯黑');
+  assert.ok(/text-anchor="end" fill="#000"/.test(pelive), 'plot-editor 施工 SVG 标注纯黑');
+  assert.equal(pelive.includes("'#9a4d05'"), false, 'canvas 非标琥珀残留应删');
+});

@@ -6089,3 +6089,25 @@ z-index 1170）。改动三件套：
   1243/1246 的「绘制总管」是动词短语，不是按钮名引用，保留。
 - 探针全部按 id 定位按钮（无 textContent 断言），p1 22/22、p7 41/41、p8 12/12 复验过。
 - 版本 v856-trunk-btn-label 五处同抬（online-map.js 是 CORE 文件）。
+
+## 26.95 分区文字标注统一右上角 + 全黑不加粗（v857-zone-label-black · 2026-11-01）
+
+用户截图（分区与管路工作台）：「分区的文字标注怎么还有不在右上角的，都改到分区的右上角，
+文字全部用黑色字，不加粗」。根因与改动：
+
+- **根因**：v850 右上角批次只改了 plot-editor canvas/施工SVG + inline-09 三级SVG 三处
+  （cellPts[1] 顶点锚），**tl-workspace 工作区不在批次里**，且它用「轴对齐包围盒右上
+  （rx+rw）」当锚——地块拖成平行四边形后包围盒角 ≠ 格子角；另有窄高 rotate(-90) 竖排、
+  小格两处**居中**分支残留。
+- **tl-workspace.js**：锚改「分块实际右上顶点 l1 沿边内缩」（lx=l1.x-5, ly=l1.y+13，
+  l0..l3=左上/右上/右下/左下）；竖排分支锚右上（translate(l1.x-4,l1.y+2) rotate(-90) +
+  anchor=end，文字从锚点向下延伸）；小格居中分支改 anchor=end 右上；包围盒 rx/ry/rw/rh
+  保留（aw/ah 尺寸分支判断仍要用）。组级标注（data-tlunion，v100 落组重心）位置不动。
+- **颜色字重三页同批**：tl-workspace / inline-09 / plot-editor（canvas fillStyle + 施工
+  SVG fill）标注全部 fill #000、去 font-weight 700/600；非标区琥珀语义色（#b45309/
+  #9a4d05）一并取消（用户「全部黑色」）。v653 管径建议行 #7c2d12 保留（附加信息非标注本体）。
+- **测试**：zone_label_corner.test.cjs 加 ⑤⑥（tl-workspace 锚= l1 + 无 middle 残留
+  （data-tlunion 组级行除外）+ 无 font-weight + 全 #000；三页颜色统一）；tl_workspace
+  旧断言「非标琥珀字色」反转为「琥珀已退出」。
+- 版本 v857-zone-label-black：三处同抬 + plot-editor.js?v= + tl-workspace.js?v=
+  （两文件均 CORE）。476→478 单测全过、四闸过。

@@ -234,7 +234,7 @@ console.log('== tl-workspace 纯逻辑回归 ==');
     ok(s2.indexOf('rgba(245,158,11,.18)') < 0, '旧·非标琥珀底色已退出（反向）');
     ok(s2.indexOf('1区') > 0 && s2.indexOf('50×50m') > 0 && s2.indexOf('亩') > 0, '标准分区标注：编号+尺寸+亩数');
     ok(s2.indexOf('2区') > 0 && s2.indexOf('实际 2.3 亩') > 0, '非标分区标注：编号+实际亩数');
-    ok(s2.indexOf('#b45309') > 0, '非标分区标注琥珀字色');
+    ok(s2.indexOf('#b45309') < 0, '[v857] 非标分区标注琥珀字色已退出（用户：全部黑色）');
   }
   {
     const d3 = mkData();                            // 旧数据（无 partialFlags/zoneActMu）→ 全按标准区渲染不报错

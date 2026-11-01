@@ -3354,19 +3354,19 @@ function tlAutoGenerate(options) {
          var zoneLabelParts=[];
          if(isPartial){
            // 非标准分区显示区名与裁剪后的实际亩数，位置和文字方向都以当前网格为准。
-           zoneLabelParts.push('<text data-tlzone="1" x="0" y="12" text-anchor="end" font-size="12" font-weight="700" fill="#b45309">'+(zi+1)+'区</text>');
-           zoneLabelParts.push('<text data-tlzone="1" x="0" y="26" text-anchor="end" font-size="9.5" font-weight="700" fill="#b45309">实际 '+actMu.toFixed(1)+' 亩</text>');
+           zoneLabelParts.push('<text data-tlzone="1" x="0" y="12" text-anchor="end" font-size="12" fill="#000">'+(zi+1)+'区</text>');
+           zoneLabelParts.push('<text data-tlzone="1" x="0" y="26" text-anchor="end" font-size="9.5" fill="#000">实际 '+actMu.toFixed(1)+' 亩</text>');
          }else{
            // 标准区尺寸始终按网格 X×Y 次序输出，避免旋转后标注内容也被交换。
            var zoneSizeText=tlZoneSizeLabel(xPlan[zc2],yPlan[zr]);
            var zoneAreaText=(xPlan[zc2]*yPlan[zr]/MU_TO_SQM).toFixed(1)+'亩';
            var enoughForThreeLines=cellWpx>=78&&cellHpx>=42;
            if(enoughForThreeLines){
-             zoneLabelParts.push('<text data-tlzone="1" x="0" y="12" text-anchor="end" font-size="13" font-weight="700" fill="#111827">'+(zi+1)+'区</text>');
-             zoneLabelParts.push('<text data-tlzone="1" x="0" y="26" text-anchor="end" font-size="9.5" font-weight="600" fill="#111827">'+zoneSizeText+'</text>');
-             zoneLabelParts.push('<text data-tlzone="1" x="0" y="40" text-anchor="end" font-size="9" fill="#111827">'+zoneAreaText+'</text>');
+             zoneLabelParts.push('<text data-tlzone="1" x="0" y="12" text-anchor="end" font-size="13" fill="#000">'+(zi+1)+'区</text>');
+             zoneLabelParts.push('<text data-tlzone="1" x="0" y="26" text-anchor="end" font-size="9.5" fill="#000">'+zoneSizeText+'</text>');
+             zoneLabelParts.push('<text data-tlzone="1" x="0" y="40" text-anchor="end" font-size="9" fill="#000">'+zoneAreaText+'</text>');
            }else{
-             zoneLabelParts.push('<text data-tlzone="1" x="0" y="12" text-anchor="end" font-size="8" font-weight="700" fill="#111827">'+(zi+1)+'区 '+zoneSizeText+'</text>');
+             zoneLabelParts.push('<text data-tlzone="1" x="0" y="12" text-anchor="end" font-size="8" fill="#000">'+(zi+1)+'区 '+zoneSizeText+'</text>');
            }
          }
          tlLabelParts.push('<g transform="translate('+cornerX.toFixed(1)+' '+cornerY.toFixed(1)+') rotate('+cellTextAngle.toFixed(2)+')">'+zoneLabelParts.join('')+'</g>');

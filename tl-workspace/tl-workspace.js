@@ -1144,15 +1144,18 @@
           var l0=gridT(tlZx(z,ri2,ci2),tlZy(z,ci2,ri2)),l1=gridT(tlZx(z,ri2,ci2+1),tlZy(z,ci2+1,ri2)),l2=gridT(tlZx(z,ri2+1,ci2+1),tlZy(z,ci2+1,ri2+1)),l3=gridT(tlZx(z,ri2+1,ci2),tlZy(z,ci2,ri2+1));
           var rx=Math.min(l0.x,l1.x,l2.x,l3.x),ry=Math.min(l0.y,l1.y,l2.y,l3.y),rw=Math.max(l0.x,l1.x,l2.x,l3.x)-rx,rh=Math.max(l0.y,l1.y,l2.y,l3.y)-ry;
           var aw = Math.abs(rw), ah = Math.abs(rh);
-          var lx = rx + rw - 5, ly = ry + 13;
+          /* [v857 用户反馈] 标注锚从「轴对齐包围盒右上」改为**分块实际右上顶点 l1 沿边内缩**
+             —— 地块拖成平行四边形后包围盒角 ≠ 格子角（用户：怎么还有不在右上角的）。
+             文字全部纯黑、不加粗（用户：清爽）。l0=左上 l1=右上 l2=右下 l3=左下。 */
+          var lx = l1.x - 5, ly = l1.y + 13;
           var FF = ' font-family="system-ui"';
           if (flags[zi2]) {
             /* 非标准分区：琥珀色，编号 + 实际亩数 */
             if (aw > 78 && ah > 44) {
-              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly) + '" text-anchor="end" font-size="12" font-weight="700" fill="#b45309" data-tlzone="1" ' + FF + '>' + tlZoneGrpTag(zi2, tlN) + '区</text>');
-              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly + 13) + '" text-anchor="end" font-size="9" font-weight="700" fill="#b45309" data-tlzone="1" ' + FF + '>实际 ' + muTxt(actMu2) + ' 亩</text>');
+              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly) + '" text-anchor="end" font-size="12" fill="#000" data-tlzone="1" ' + FF + '>' + tlZoneGrpTag(zi2, tlN) + '区</text>');
+              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly + 13) + '" text-anchor="end" font-size="9" fill="#000" data-tlzone="1" ' + FF + '>实际 ' + muTxt(actMu2) + ' 亩</text>');
             } else if (aw > 34 && ah > 22) {
-              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly) + '" text-anchor="end" font-size="8" font-weight="700" fill="#b45309" data-tlzone="1" ' + FF + '>' + tlZoneGrpTag(zi2, tlN) + '区 实际' + muTxt(actMu2) + '亩</text>');
+              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly) + '" text-anchor="end" font-size="8" fill="#000" data-tlzone="1" ' + FF + '>' + tlZoneGrpTag(zi2, tlN) + '区 实际' + muTxt(actMu2) + '亩</text>');
             }
           } else {
             /* 标准分区：深灰，编号 + 设计尺寸 + 亩数 */
@@ -1161,17 +1164,19 @@
             var sizeTxt = muTxt(dw) + '×' + muTxt(dh2) + 'm';
             var areaTxt = muTxt(stdMu2) + '亩';
             if (aw > 120 && ah > 68) {
-              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly) + '" text-anchor="end" font-size="13" font-weight="700" fill="#111827" data-tlzone="1" ' + FF + '>' + tlZoneGrpTag(zi2, tlN) + '区</text>');
-              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly + 14) + '" text-anchor="end" font-size="9.5" font-weight="600" fill="#111827" data-tlzone="1" ' + FF + '>' + sizeTxt + '</text>');
-              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly + 26) + '" text-anchor="end" font-size="9" fill="#111827" data-tlzone="1" ' + FF + '>' + areaTxt + '</text>');
+              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly) + '" text-anchor="end" font-size="13" fill="#000" data-tlzone="1" ' + FF + '>' + tlZoneGrpTag(zi2, tlN) + '区</text>');
+              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly + 14) + '" text-anchor="end" font-size="9.5" fill="#000" data-tlzone="1" ' + FF + '>' + sizeTxt + '</text>');
+              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly + 26) + '" text-anchor="end" font-size="9" fill="#000" data-tlzone="1" ' + FF + '>' + areaTxt + '</text>');
             } else if (ah > 90) {
-              lp.push('<g transform="translate(' + fmt(rx + rw / 2) + ' ' + fmt(ry + rh / 2) + ') rotate(-90)">');
-              lp.push('<text x="0" y="3" text-anchor="middle" font-size="9" font-weight="700" fill="#111827" data-tlzone="1" ' + FF + '>' + tlZoneGrpTag(zi2, tlN) + '区 ' + sizeTxt + ' ' + areaTxt + '</text></g>');
+              /* [v857] 窄高格竖排：从居中改到**右上角**——rotate(-90) 后局部 +x=屏幕上、
+                 +y=屏幕右；anchor=end ⇒ 文字从锚点向屏幕下方延伸，y=3 ⇒ 墨迹贴右边内侧。 */
+              lp.push('<g transform="translate(' + fmt(l1.x - 4) + ' ' + fmt(l1.y + 2) + ') rotate(-90)">');
+              lp.push('<text x="0" y="3" text-anchor="end" font-size="9" fill="#000" data-tlzone="1" ' + FF + '>' + tlZoneGrpTag(zi2, tlN) + '区 ' + sizeTxt + ' ' + areaTxt + '</text></g>');
             } else if (aw > 46 && ah > 34) {
-              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly) + '" text-anchor="end" font-size="11" font-weight="700" fill="#111827" data-tlzone="1" ' + FF + '>' + tlZoneGrpTag(zi2, tlN) + '区</text>');
-              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly + 12) + '" text-anchor="end" font-size="8.5" fill="#111827" data-tlzone="1" ' + FF + '>' + sizeTxt + ' ' + areaTxt + '</text>');
+              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly) + '" text-anchor="end" font-size="11" fill="#000" data-tlzone="1" ' + FF + '>' + tlZoneGrpTag(zi2, tlN) + '区</text>');
+              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly + 12) + '" text-anchor="end" font-size="8.5" fill="#000" data-tlzone="1" ' + FF + '>' + sizeTxt + ' ' + areaTxt + '</text>');
             } else if (aw > 30 && ah > 22) {
-              lp.push('<text x="' + fmt(rx + rw / 2) + '" y="' + fmt(ry + rh / 2 + 3) + '" text-anchor="middle" font-size="7.5" font-weight="700" fill="#111827" data-tlzone="1" ' + FF + '>' + tlZoneGrpTag(zi2, tlN) + '区 ' + areaTxt + '</text>');
+              lp.push('<text x="' + fmt(lx) + '" y="' + fmt(ly) + '" text-anchor="end" font-size="7.5" fill="#000" data-tlzone="1" ' + FF + '>' + tlZoneGrpTag(zi2, tlN) + '区 ' + areaTxt + '</text>');
             }
           }
         }
@@ -1183,8 +1188,9 @@
           var lpPt = tlUnionLabelWorld(tlMgL[lg], z, zcN, zrN, lpCells);
           if (!lpPt) continue;
           var lpQ = T(lpPt), lpLines = tlUnionLabelLines(tlMgL, lg, lpCells);
-          lp.push('<text x="' + fmt(lpQ.x) + '" y="' + fmt(lpQ.y + 4) + '" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a" font-family="system-ui" data-tlzone="1" data-tlunion="' + lg + '">' + lpLines.name + '</text>');
-          lp.push('<text x="' + fmt(lpQ.x) + '" y="' + fmt(lpQ.y + 19) + '" text-anchor="middle" font-size="11" font-weight="700" fill="#0f172a" font-family="system-ui" data-tlzone="1" data-tlunion="' + lg + '">' + (lpLines.mu === '' ? '面积待算' : lpLines.mu + ' 亩') + '</text>');
+          /* [v857] 组级标注跟分区标注同批改纯黑、不加粗；锚定保持 v100 组重心设计不动。 */
+          lp.push('<text x="' + fmt(lpQ.x) + '" y="' + fmt(lpQ.y + 4) + '" text-anchor="middle" font-size="13" fill="#000" font-family="system-ui" data-tlzone="1" data-tlunion="' + lg + '">' + lpLines.name + '</text>');
+          lp.push('<text x="' + fmt(lpQ.x) + '" y="' + fmt(lpQ.y + 19) + '" text-anchor="middle" font-size="11" fill="#000" font-family="system-ui" data-tlzone="1" data-tlunion="' + lg + '">' + (lpLines.mu === '' ? '面积待算' : lpLines.mu + ' 亩') + '</text>');
         }
       }
       if (lp.length) s.push('<g>' + lp.join('') + '</g>');
@@ -1688,7 +1694,7 @@
     if (btn) { btn.setAttribute('aria-pressed', lineMode ? 'true' : 'false'); btn.classList.toggle('active', lineMode); }
     var hint = (typeof document !== 'undefined') ? document.getElementById('tlWsHint') : null;
     if (hint) hint.textContent = lineMode
-      ? '划线：在节点圆点(N-##)上按住，拖到另一节点松手（自动吸附）；松手后选管径'
+      ? '划线：节点上按住拖到另一节点松手=连线（自动吸附）；拖到空白处松手=把该节点移过去'
       : '点「阀门/三通/弯头/节点」后再点管线即插入配件';
     if (typeof api.onLineModeChange === 'function') api.onLineModeChange(lineMode);
     return lineMode;
@@ -2303,7 +2309,15 @@
         var nhLL = rawLL ? pickNode(rawLL, snapTolUnits(el) / viewState.k) : null;
         if (nhLL) {
           var scLL = nodeScreenCenterOf(nhLL.id) || { x: e.clientX, y: e.clientY };
-          lineDrag = { fromId: nhLL.id, pointerId: e.pointerId, moved: false, sx: e.clientX, sy: e.clientY, fromScreen: scLL };
+          /* [v827] 划线模式下也要能拖节点（用户：「平时是可以拖动的，划线之后就不能拖动了」）。
+             手势判别沿用划线本意：**拖到另一个节点松手 = 连线**（与旧行为完全一致）；
+             **拖到空白处松手 = 把节点移过去**（新增能力）。
+             ⇒ 起点节点在拖动过程中**不跟随**（跟了就会贴在指针下，永远吸附到自己、
+             连不成线），只在松手那一刻落位；拖动中给桩号提示，让用户知道"松手会移到这"。
+             startAtM 记下来是为了「连线成功时把节点还原」——用户只是想连根线，不是想挪节点。 */
+          var ndLL = (window.RyTlNodes && typeof window.RyTlNodes.nodeById === 'function') ? window.RyTlNodes.nodeById(nhLL.id) : null;
+          lineDrag = { fromId: nhLL.id, pid: ndLL ? ndLL.pid : null, startAtM: ndLL ? ndLL.atM : null,
+            pointerId: e.pointerId, moved: false, sx: e.clientX, sy: e.clientY, fromScreen: scLL };
           suppressAutoPick = true;
           var rbLL = ensureLineRubber();
           if (rbLL) {
@@ -2538,8 +2552,10 @@
     });
     ctn.addEventListener('pointermove', function (e) {
       if (lineDrag && e.pointerId === lineDrag.pointerId) {       // 划线拖动：橡皮筋跟随，终点吸附到最近节点
+        /* [v827] 3px 启动阈值（与 nodeDrag / autoDrag / pipeDrag 同款）。
+           注意：这里不能再更新 lineDrag.sx/sy —— 那是「按下点」，更新了阈值就永远不触发。 */
+        if (!lineDrag.moved && Math.hypot(e.clientX - lineDrag.sx, e.clientY - lineDrag.sy) < 3) return;
         lineDrag.moved = true;
-        lineDrag.sx = e.clientX; lineDrag.sy = e.clientY;
         var elLM = currentEL(ctn);
         var rawLM = elLM ? rawDataPoint(elLM, e) : null;
         var tLM = rawLM ? pickNode(rawLM, snapTolUnits(elLM) / viewState.k) : null;
@@ -2549,6 +2565,16 @@
           var toC = tLM ? (nodeScreenCenterOf(tLM.id) || { x: e.clientX, y: e.clientY }) : { x: e.clientX, y: e.clientY };
           rbLM.setAttribute('x1', fromC.x); rbLM.setAttribute('y1', fromC.y);
           rbLM.setAttribute('x2', toC.x); rbLM.setAttribute('y2', toC.y);
+        }
+        /* [v827] 拖动中的意图提示：指着别的节点 = 松手连线；指着空白 = 松手把本节点移到这里。
+           起点节点在拖动中原地不动（理由见 pointerdown 注释），所以这里算出的桩号就是落点桩号。 */
+        var tOtherLM = (tLM && tLM.id !== lineDrag.fromId) ? tLM : null;
+        if (tOtherLM) {
+          nodeDragTipHide();
+        } else {
+          var locLM = (rawLM && lineDrag.pid) ? AE.locate(lineDrag.pid, lastDataRef, rawLM) : null;
+          if (locLM) nodeDragTipShow(e.clientX, e.clientY, lineDrag.fromId, locLM.along);
+          else nodeDragTipHide();
         }
         return;
       }
@@ -2711,10 +2737,16 @@
       if (lineDrag && (e.pointerId === undefined || e.pointerId === lineDrag.pointerId)) {  // 划线：松手=终点吸附→建连→弹管径面板
         var ld = lineDrag; lineDrag = null;
         hideLineRubber();
+        nodeDragTipHide();
         var elLU = currentEL(ctn);
         var rawLU = elLU ? rawDataPoint(elLU, e) : null;
         var tLU = rawLU ? pickNode(rawLU, snapTolUnits(elLU) / viewState.k) : null;
-        if (tLU && tLU.id !== ld.fromId && window.RyTlNodes && typeof window.RyTlNodes.completeLink === 'function') {
+        /* [v827] 两种意图二选一：
+           · 松手落在**另一个节点**上 ⇒ 连线意图（不管成不成，节点都留在原处）；
+           · 松手落在**空白处**且确实拖动过 ⇒ 移动意图，把起点节点沿管移到这里。
+           旧行为（松手在空白 = 什么也不做）在划线模式下让节点完全拖不动，用户明确要求改。 */
+        var intentLink = !!(tLU && tLU.id !== ld.fromId);
+        if (intentLink && window.RyTlNodes && typeof window.RyTlNodes.completeLink === 'function') {
           window.RyTlNodes.setLinkStart(ld.fromId);
           var lk = window.RyTlNodes.completeLink(tLU.id);
           if (lk && typeof window.RyTlNodes.openLinkPanel === 'function') {
@@ -2722,6 +2754,10 @@
           } else if (typeof window.RyTlNodes.setLinkStart === 'function') {
             window.RyTlNodes.setLinkStart(null);                          // 重复连线等：清起点
           }
+        } else if (!intentLink && ld.moved && ld.pid && rawLU &&
+                   window.RyTlNodes && typeof window.RyTlNodes.moveNode === 'function') {
+          var locLU = AE.locate(ld.pid, lastDataRef, rawLU);
+          if (locLU) window.RyTlNodes.moveNode(ld.fromId, locLU.along);
         }
         e.preventDefault();
         return;

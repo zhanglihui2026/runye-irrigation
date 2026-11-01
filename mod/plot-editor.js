@@ -2175,7 +2175,7 @@
           var zoneAreaText=(_partial?_mu:(cuts.xPlan[zc]*cuts.yPlan[zr]/666.67)).toFixed(1)+'亩';
           var baseFont=Math.max(6,Math.min(10,Math.min(zoneScreenW/12,zoneScreenH/4.5)));
           ppCtx.save();ppCtx.translate(labelCenter.x,labelCenter.y);ppCtx.rotate(labelAngle);
-          ppCtx.fillStyle=_partial?'#9a4d05':'#111827';ppCtx.textAlign='right';ppCtx.textBaseline='middle';
+          ppCtx.fillStyle='#000';ppCtx.textAlign='right';ppCtx.textBaseline='middle';
           var rowH=baseFont*1.15,r1=baseFont*0.65;
           if(zoneScreenH>=31){
             ppCtx.font=baseFont+'px sans-serif';ppCtx.fillText((zi+1)+'区',0,r1);
@@ -4212,7 +4212,7 @@
           var zoneAreaText=(isPartial?actualMu:(zoneCuts.xPlan[zc]*zoneCuts.yPlan[zr]/666.67)).toFixed(1)+'亩';
           var detailFont=Math.max(6.5,Math.min(10.5,Math.min(zoneScreenW/12,zoneScreenH/4.8)));
           var compactFont=Math.max(6,Math.min(8.5,Math.min(zoneScreenW/18,zoneScreenH/2.8)));
-          labelParts.push('<g transform="translate('+labelCorner.x.toFixed(1)+' '+labelCorner.y.toFixed(1)+') rotate('+labelAngle.toFixed(2)+')" text-anchor="end" fill="'+(isPartial?'#b45309':'#111827')+'">');
+          labelParts.push('<g transform="translate('+labelCorner.x.toFixed(1)+' '+labelCorner.y.toFixed(1)+') rotate('+labelAngle.toFixed(2)+')" text-anchor="end" fill="#000">');
           if(zoneScreenW>=42&&zoneScreenH>=20){
             var titleY=detailFont*1.2;
             labelParts.push('<text x="0" y="'+titleY.toFixed(1)+'" font-size="'+detailFont.toFixed(1)+'">'+(zi+1)+'区</text>');
