@@ -1054,7 +1054,7 @@
     var dd=window.tlDiagramData;
     var bridge=trunkGeoBridge(plot);
     if(!bridge) return null;
-    var valves=[], branchStarts=[], zoneVerts=[], zoneNote=null;
+    var valves=[], branchStarts=[], zoneVerts=[], couplers=[], zoneNote=null;
     (Array.isArray(dd.valves)?dd.valves:[]).forEach(function(v){
       var ll=bridge.toLL(v); if(ll) valves.push(ll);
     });
@@ -1065,9 +1065,13 @@
     var G=window.RyTrunkGeo, zw=G?G.zoneWorlds(dd.zones):[];
     if(zw.length>ZONE_VERT_CAP){ zoneNote='capped:'+zw.length; zw=[]; }
     zw.forEach(function(p){ var ll=bridge.toLL(p); if(ll) zoneVerts.push(ll); });
-    return {valves:valves, branchStarts:branchStarts, zoneVerts:zoneVerts,
+    /* [v859] 段总管驳接点（自动生成的串联干线两端）：手绘总管接到这里即贯通地块内水路 */
+    (dd.segTrunk&&Array.isArray(dd.segTrunk.couplers)?dd.segTrunk.couplers:[]).forEach(function(c){
+      var ll=bridge.toLL(c); if(ll) couplers.push(ll);
+    });
+    return {valves:valves, branchStarts:branchStarts, zoneVerts:zoneVerts, couplers:couplers,
       stats:{sign:bridge.sign, rms:Math.round(bridge.rms*1000)/1000,
-        valves:valves.length, branchStarts:branchStarts.length, zoneVerts:zoneVerts.length, zoneNote:zoneNote}};
+        valves:valves.length, branchStarts:branchStarts.length, zoneVerts:zoneVerts.length, couplers:couplers.length, zoneNote:zoneNote}};
   }
 
   var snapExtras=null;
@@ -1098,6 +1102,7 @@
       input.valves=snapExtras.valves;
       input.branchStarts=snapExtras.branchStarts;
       input.zoneVerts=snapExtras.zoneVerts;
+      if(snapExtras.couplers&&snapExtras.couplers.length) input.couplers=snapExtras.couplers;
     }
     var list=S.buildTargets(input);
     return S.setTargets(list,{plotId:currentMapPlotId?String(currentMapPlotId):null, extras:snapExtras?snapExtras.stats:null});

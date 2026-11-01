@@ -112,6 +112,13 @@
       if (zp) push(zp.lat, zp.lng, 'zone-vertex', '分区顶点 ' + (zi + 1));
     });
 
+    /* 7. [v859] 段总管驳接点：三级规划自动生成的串联干线两端，手绘总管接到这里
+          即与地块内水路贯通（经纬度由宿主 geoBridge 从世界米坐标反算）。 */
+    (Array.isArray(input.couplers) ? input.couplers : []).forEach(function (c, ci) {
+      var cp = readPoint(c);
+      if (cp) push(cp.lat, cp.lng, 'seg-coupler', '驳接点 ' + (ci + 1));
+    });
+
     return out;
   }
 

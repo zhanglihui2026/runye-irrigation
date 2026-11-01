@@ -1200,7 +1200,17 @@
     /* v162：底图兜底路径（克隆不到简图时自绘）—— 遮蔽管按同一口径画灰虚线 */
     (data.branchPipes || []).forEach(function (l, bi) { if (l && l.length >= 2) s.push('<path d="' + pl(l) + '" fill="none"' + hidAttr('branch-' + bi, COLORS.branch, 1.6) + ' stroke-linecap="round" stroke-linejoin="round"/>'); });
     (data.mainPipes || []).forEach(function (l, mi) { if (l && l.length >= 2) s.push('<path d="' + pl(l) + '" fill="none"' + hidAttr('main-' + mi, COLORS.main, 2.6) + ' stroke-linecap="round" stroke-linejoin="round"/>'); });
-    if (data.frontPipe && data.frontPipe.length >= 2) s.push('<path d="' + pl(data.frontPipe) + '" fill="none"' + hidAttr('front', COLORS.front, 4) + ' stroke-linecap="round" stroke-linejoin="round"/>');
+    (data.frontPipe && data.frontPipe.length >= 2) ? s.push('<path d="' + pl(data.frontPipe) + '" fill="none"' + hidAttr('front', COLORS.front, 4) + ' stroke-linecap="round" stroke-linejoin="round"/>') : 0;
+    /* [v859] 段总管（自动生成的分区主管串联干线）+ 两端驳接点方块：
+       克隆路径下简图 SVG 自带 data-tlpipe="segTrunk"，这里只兜底「自绘路径」
+       （克隆不到简图时的底图重建），与 frontPipe 同层同色系、细一号。 */
+    if (data.segTrunk && Array.isArray(data.segTrunk.points) && data.segTrunk.points.length === 2) {
+      s.push('<path d="' + pl(data.segTrunk.points) + '" fill="none"' + hidAttr('segTrunk', '#111827', 3.4) + ' stroke-linecap="round" stroke-linejoin="round"/>');
+      (Array.isArray(data.segTrunk.couplers) ? data.segTrunk.couplers : []).forEach(function (c, ci) {
+        var q = T(c);
+        s.push('<rect data-tlseg-coupler="' + ci + '" x="' + (q.x - 3.5).toFixed(1) + '" y="' + (q.y - 3.5).toFixed(1) + '" width="7" height="7" fill="#ffffff" stroke="#111827" stroke-width="1.4"/>');
+      });
+    }
     /* 4) 水源 + 阀门 */
     if (data.sourcePos) {
       var sp = T(data.sourcePos);

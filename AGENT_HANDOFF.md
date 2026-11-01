@@ -6111,3 +6111,31 @@ z-index 1170）。改动三件套：
   旧断言「非标琥珀字色」反转为「琥珀已退出」。
 - 版本 v857-zone-label-black：三处同抬 + plot-editor.js?v= + tl-workspace.js?v=
   （两文件均 CORE）。476→478 单测全过、四闸过。
+
+## 26.96 段总管（自动生成的分区主管串联干线）+ 驳接点（v859-seg-trunk · 2026-11-01）
+
+用户需求：「在分区与管路页面中增加一个段总管，垂直于自动生成的主管，把垂直方向的分区
+主管通过一根总管连接起来，两端预留驳接点；数据传回在线地图页面，绘制总管后与驳接点驳接，
+变成完整水路。」
+
+- **mod/tl-seg-trunk.js（新，纯几何，Node 单测锁 5 项）**：RySegTrunk.build(mainPipes)。
+  主方向多数投票 → 段总管走垂直方向；串联端取各主管「同一侧」端点（min/max 侧极差小者，
+  两侧都超过 TOL=0.35m 不共线 ⇒ 返回 null 绝不猜位置）；stub=max(3, 主管平均间距×0.35)
+  两端驳接段。单区（<2 条）不生成。
+- **inline-09.js**：① 主管渲染段前 build（局部坐标，frame 仿射下垂直/共线保持）+ 渲染
+  data-tlpipe="segTrunk"（#111827 宽 5，总管层）+ 两端白底方块「驳接」标记；②
+  tlDiagramData.segTrunk 落地（points/couplers/joinPts 转世界坐标，len 世界重算）；③
+  tlFrontLenUse 三分支全部 + segLen（扬程收口唯一改动点；segTrunk 缺席时 +0，输出与旧
+  口径逐字节一致——Node mock 无该字段零影响）。
+- **地图驳接闭环**：trunk-snap.js buildTargets 加第 7 类候选 seg-coupler「驳接点 N」；
+  online-map.js extraSnapTargets 走既有 v835 geoBridge 把 segTrunk.couplers 世界米坐标
+  反算成经纬度进捕捉（地块一致性/±y 符号判定全复用）。手绘总管开捕捉即可吸到驳接点。
+- **tl-workspace.js**：自绘兜底路径补画 segTrunk 线+驳接方块（克隆路径简图 SVG 自带）。
+- **验收**：483 单测 + 四闸全过；p1 22/22、p2 24/24、p7 41/41、p8 12/12。
+  新增 _probe_tl_geom.mjs（CDP dump 三级几何，段总管实测工具——UI 流程 place-go 后
+  currentPlotId 仍 null，tlDiagramData 未生成，浏览器端实机验证待用户页面复测）。
+- 版本 v859-seg-trunk：三处同抬 + inline-09?v= + trunk-snap.js?v= + tl-workspace.js?v=
+  + plot-editor.js?v= 等（CORE 全抬）；tl-seg-trunk.js 入 CORE 白名单。
+- 已知边界：①最不利路径 tlWorstPathLen 未并入段总管（frontPipe 路径不含竖干线，损失
+  估算略偏小，下轮评估）；②浏览器端「手绘总管吸驳接点」的实机链路未在本环境跑通
+  （三级页需要真实地块上下文），算法已被单测与桥接复用性覆盖。

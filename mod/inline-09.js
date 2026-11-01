@@ -1050,10 +1050,18 @@ function tlMapTrunkLen() {
 function tlFrontLenUse(wpFront, frontPipeLen) {
   var link = (typeof window.tlSourceLinkLen === 'function') ? window.tlSourceLinkLen() : 0;
   var srcDist = readNumber('planSrcDist', 0, { min: 0 });
+  /* [v859] 段总管（自动生成的分区主管串联干线）计入总管长——它与手绘总管驳接后
+     构成完整水路。长度读 tlDiagramData.segTrunk.len（世界坐标，含两端驳接段）；
+     段总管未生成（单区/参差）时为 0，输出与旧口径逐字节一致。 */
+  var segLen = 0;
+  try {
+    var sd0 = window.tlDiagramData && window.tlDiagramData.segTrunk;
+    segLen = (sd0 && typeof sd0.len === 'number' && sd0.len > 0) ? sd0.len : 0;
+  } catch (eSeg1) { }
   var mt = tlMapTrunkLen();
-  if (mt && mt.ok) return { len: mt.len + link + srcDist, src: 'mapTrunk', mapLen: mt.len, mapId: mt.id };
-  if (wpFront > 0) return { len: wpFront + link + srcDist, src: 'figure', mapLen: null, mapId: null };
-  return { len: (frontPipeLen || 0) + link + srcDist, src: 'input', mapLen: null, mapId: null };
+  if (mt && mt.ok) return { len: mt.len + link + srcDist + segLen, src: 'mapTrunk', mapLen: mt.len, mapId: mt.id, segLen: segLen };
+  if (wpFront > 0) return { len: wpFront + link + srcDist + segLen, src: 'figure', mapLen: null, mapId: null, segLen: segLen };
+  return { len: (frontPipeLen || 0) + link + srcDist + segLen, src: 'input', mapLen: null, mapId: null, segLen: segLen };
 }
 
 /* 最远分区最不利路径（2026-09-16 用户要求）：
@@ -4516,6 +4524,23 @@ function tlAutoGenerate(options) {
     });
   }
 
+  /* [v859 用户需求] 段总管（自动生成）：垂直于主管、串联各主管同一侧端点，
+     两端驳接段（stub≥3m）+ 驳接点方块标记。用局部坐标 build（frame 是仿射，
+     垂直/共线关系保持）；数据落地在下方 tlDiagramData.segTrunk（转世界坐标、
+     len 按世界坐标重算），供在线地图页驳接点捕捉与扬程收口（tlFrontLenUse）。 */
+  var tlSegTrunkLoc = null;
+  try { if (window.RySegTrunk && mainPipes.length >= 2) tlSegTrunkLoc = window.RySegTrunk.build(mainPipes); } catch (eSeg0) { }
+  if (tlSegTrunkLoc) {
+    var sgD = '';
+    tlSegTrunkLoc.points.forEach(function (p, i) { var q = tsGrid(p.x, p.y); sgD += (i === 0 ? 'M' : 'L') + q.x.toFixed(1) + ' ' + q.y.toFixed(1) + ' '; });
+    parts.push('<path data-tlpipe="segTrunk" d="' + sgD + '" fill="none" stroke="#111827" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>');
+    tlSegTrunkLoc.couplers.forEach(function (p, ci) {
+      var q = tsGrid(p.x, p.y);
+      parts.push('<rect data-tlseg-coupler="' + ci + '" x="' + (q.x - 4).toFixed(1) + '" y="' + (q.y - 4).toFixed(1) + '" width="8" height="8" fill="#ffffff" stroke="#111827" stroke-width="1.6"/>');
+      parts.push('<text data-tlseg-coupler-label="' + ci + '" x="' + (q.x + 7).toFixed(1) + '" y="' + (q.y + 3.5).toFixed(1) + '" font-size="9" fill="#111827" font-family="system-ui">驳接</text>');
+    });
+  }
+
   // Draw main pipes (blue) — clipped to plot boundary
   parts.push('<g clip-path="url(#tlPlotClip)">');
   mainPipes.forEach(function(l,mi){
@@ -4740,6 +4765,18 @@ function tlAutoGenerate(options) {
              cutOffX: (tlZoneStepRef ? tlZoneStepRef.x : null), cutOffY: (tlZoneStepRef ? tlZoneStepRef.y : null) },
     /* SVG/设计阶段使用旋转网格局部坐标；tlDiagramData 是跨模块的真实地块坐标契约。 */
     mainPipes: mainPipes.map(function(line){return line.map(function(p){return tlGridWorld(p.x,p.y);});}),
+    /* [v859] 段总管：局部几何转世界坐标 + len 按世界坐标重算（frame 缩放不漂）。
+       在线地图页读 segTrunk.couplers 反算经纬度做驳接点捕捉；扬程收口读 segTrunk.len。 */
+    segTrunk: (function(){
+      if(!tlSegTrunkLoc) return null;
+      var W=function(p){return tlGridWorld(p.x,p.y);};
+      var pts=tlSegTrunkLoc.points.map(W);
+      var len=Math.hypot(pts[1].x-pts[0].x, pts[1].y-pts[0].y);
+      return { axis: tlSegTrunkLoc.axis, side: tlSegTrunkLoc.side,
+        points: pts, couplers: tlSegTrunkLoc.couplers.map(W),
+        joinPts: tlSegTrunkLoc.joinPts.map(W),
+        stub: tlSegTrunkLoc.stub, len: len, lenJoin: len - 2*tlSegTrunkLoc.stub };
+    })(),
     branchPipes: branchPipes.map(function(line){return line.map(function(p){return tlGridWorld(p.x,p.y);});}),
     /* [v601] 支管「设计满跨 / 图面长」两个基准（索引与 branchPipes 一一对应）：
        计算（材料清单、最不利路径水损）一律按满跨；图面两端 gapV/gapH 留边只影响显示。 */
