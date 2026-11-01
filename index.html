@@ -26,7 +26,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>润野灌溉设计优化版｜滴灌管径与水泵选型</title>
 <meta name="description" content="输入地块、滴灌带与水源参数，快速计算灌溉分区、主管支管管径和水泵工作点。"/>
-<link rel="stylesheet" href="mod/style-01.css?v=855-panel-drag-fold">
+<link rel="stylesheet" href="mod/style-01.css?v=856-trunk-btn-label">
 <link rel="stylesheet" href="runye-inverse-design.css?v=277">
 <script defer src="runye-inverse-design.js?v=438-branch-flow-conservation"></script>
 <link rel="stylesheet" href="runye-terrain.css?v=454-terrain-sidebar-peer">
@@ -51,7 +51,7 @@
 <link rel="stylesheet" href="hydraulic-calc/hydraulic-calc.css">
 <link rel="stylesheet" href="filter-system/filter-system.css">
 <link rel="stylesheet" href="pwa/vendor/leaflet.css">
-<link rel="stylesheet" href="mod/online-map.css?v=855-panel-drag-fold">
+<link rel="stylesheet" href="mod/online-map.css?v=856-trunk-btn-label">
 <link rel="stylesheet" href="terrain/terrain.css?v=535-terrain-single-source">
 <link rel="stylesheet" href="hydraulics-main.css?v=442-native">
 <style id="ryCadTwinCss">
@@ -698,9 +698,9 @@ body.ry-worst-off [data-tlworst]{display:none}
       <div class="map-draw-tools ryp-float ry-hbar" id="mapDrawTools" data-ry-panel
            data-ry-position-key="mapDrawToolsPos" data-ry-default-top="12" data-ry-default-left="12">
         <span class="dt-grip" data-ry-drag title="按住拖动工具条；位置自动记住">⠿ 绘制</span>
-        <button class="ry-hbar-btn" id="btnDrawTrunk" title="从头重绘当前地块总管；完成保存前，旧线路保留">🟠 绘制总管</button>
-        <button class="ry-hbar-btn" id="btnFinishTrunk" title="结束并保存当前总管线">完成总管</button>
-        <button class="ry-hbar-btn" id="btnUndoTrunk" title="撤销总管最后一个折点">↩ 撤销总管点</button>
+        <button class="ry-hbar-btn" id="btnDrawTrunk" title="从头重绘当前地块总管；完成保存前，旧线路保留">🟠 绘制</button>
+        <button class="ry-hbar-btn" id="btnFinishTrunk" title="结束并保存当前总管线">完成</button>
+        <button class="ry-hbar-btn" id="btnUndoTrunk" title="撤销总管最后一个折点">撤销点</button>
         <!-- [v833] 编辑总管（三期）：没有已保存的干线时自动置灰（syncTrunkUI 管）。
              进入后：点线选中 → 拖白点改拐点（拖到邻点上=并掉它）→ 右键开 6 项菜单 → Esc 退出。
              快捷键 E。按钮样式复用 .ry-hbar-btn，**不需要为它写任何 CSS**。 -->
@@ -2550,8 +2550,8 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script src="mod/trunk-geo.js?v=854-null-slot-strict"></script>
 <script src="mod/trunk-edit.js?v=835-trunk-geo-snap"></script>
 <script src="mod/trunk-history.js?v=835-trunk-geo-snap"></script>
-<script src="mod/trunk-panel.js?v=855-panel-drag-fold"></script>
-<script src="mod/online-map.js?v=855-panel-drag-fold"></script>
+<script src="mod/trunk-panel.js?v=856-trunk-btn-label"></script>
+<script src="mod/online-map.js?v=856-trunk-btn-label"></script>
 <script src="terrain/terrain-core.js?v=410-elev"></script>
 <script src="terrain/terrain-ui.js?v=513-sec-gate"></script>
 <script src="runye-hydraulics-page.js?v=829-hyd-auto-refresh"></script>

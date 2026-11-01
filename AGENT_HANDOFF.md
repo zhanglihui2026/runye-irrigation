@@ -6078,3 +6078,14 @@ z-index 1170）。改动三件套：
   （三处同抬）+ online-map.css?v= + trunk-panel.js?v=（两 CORE 文件各自 ?v=）。
 - 提交纪律再验证：并行会话探针迁移的 50+ 暂存重命名仍在索引里 ⇒ `git commit -- <pathspec>`
   严格限定六文件，重命名零带走。
+
+## 26.94 总管工具栏按钮文案精简（v856-trunk-btn-label · 2026-11-01）
+
+用户截图需求：绘制总管→绘制、完成总管→完成、撤销总管点→撤销点，且撤销点前面的
+↩ 图例取消。改动：
+- index.html 701~703 三个按钮初始文案（btnDrawTrunk/btnFinishTrunk/btnUndoTrunk id 不动）。
+- mod/online-map.js 两处**动态文案必须同步**：943 绘制态切换 textContent（不改的话
+  一进绘制态按钮就变回旧文案）、2026 tip 引用按钮名（文案与按钮对不上用户找不到）。
+  1243/1246 的「绘制总管」是动词短语，不是按钮名引用，保留。
+- 探针全部按 id 定位按钮（无 textContent 断言），p1 22/22、p7 41/41、p8 12/12 复验过。
+- 版本 v856-trunk-btn-label 五处同抬（online-map.js 是 CORE 文件）。

@@ -940,7 +940,7 @@
          一旦有人调整 CSS 顺序就会"突然变绿"。激活态只留一个类。 */
       btn.setAttribute('aria-pressed',on?'true':'false');
       btn.title=on?'退出总管绘制（草稿丢弃，已保存的线不动）；快捷键 M':'绘制当前地块的输水总管；快捷键 M';
-      btn.textContent=on?'🟠 总管绘制中…':'🟠 绘制总管';
+      btn.textContent=on?'🟠 总管绘制中…':'🟠 绘制';
     }
     /* 互斥矩阵：总管绘制中，画框/加点不可用；反过来在读地块框时总管按钮不可用。 */
     [['btnDraw',trunkMode==='draw'],['btnAddPt',trunkMode==='draw'],['btnDrawTrunk',!!drawing]].forEach(function(it){
@@ -2023,7 +2023,7 @@
     if(prior.length!==1){ tip('当前地块记录无法唯一确认，请重新回传地块后再编辑总管。'); return false; }
     var saved=loadSavedTrunkFor(prior[0]);
     if(!saved||!Array.isArray(saved.trunks)||!saved.trunks.length){
-      tip('当前地块还没有保存过总管；先点「🟠 绘制总管」画一条。');
+      tip('当前地块还没有保存过总管；先点「🟠 绘制」画一条。');
       return false;
     }
     trunkSaved=saved;
@@ -2079,7 +2079,7 @@
       if(km==='z'||km==='y'){
         if(isTypingTarget(document.activeElement)) return;
         if(!mapSectionVisible()) return;
-        /* 绘制中且还有草稿点：Ctrl+Z = 撤掉最后一个**草稿**点（与「↩ 撤销总管点」同义）。
+        /* 绘制中且还有草稿点：Ctrl+Z = 撤掉最后一个**草稿**点（与「撤销点」按钮同义）。
            不这么做的话，用户画到第 5 个点时按 Ctrl+Z，会看到**上一条已保存的干线**消失 ——
            这是"撤销把别的东西改掉了"最典型的惊吓。草稿点撤完才轮到历史栈。 */
         if(km==='z' && !e.shiftKey && trunkMode==='draw' && trunkPoints.length){
@@ -2194,7 +2194,7 @@
     document.getElementById('tip').textContent = drawing
       ? '十字光标处即落点：依次点击地块边界顶点；点「完成」即可定稿并**直接接着画下一块**（可连画多块，最后再成组；想停时**右键地图**截止）。'
       : '点击「✏️ 开始画框」后，在卫星图上依次点击地块边界顶点即可；点「完成」自动保存该块、清空画布并继续下一块。';
-    /* [v831] 画框会改变「绘制总管」的可用性（互斥矩阵），必须通知一次 UI；
+    /* [v831] 画框会改变「绘制」总管按钮的可用性（互斥矩阵），必须通知一次 UI；
        漏了这行就会出现"正在画框，总管按钮却还能点进去"。 */
     syncTrunkUI();
   }
