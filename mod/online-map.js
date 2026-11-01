@@ -606,17 +606,10 @@
       var trunkPoint=fromDisplay(e.latlng);
       trunkPoint={lat:+trunkPoint.lat,lng:+trunkPoint.lng};
       var shiftOn=!!(e.originalEvent && e.originalEvent.shiftKey);
-      /* [v832] Shift 优先于捕捉：按住 Shift 是**显式**声明"我要正交"，
-         这时再去吸附会把点拽离轴线，用户看到的就是"正交没生效"。
-         所以两者互斥，Shift 期间不捕捉。 */
-      if(shiftOn && trunkPoints.length){
-        trunkPoint=orthoPoint(trunkPoints[trunkPoints.length-1], trunkPoint);
-      }else if(snapOn){
-        var _snap=snapApi(), hit=_snap?_snap.nearest(trunkPoint):null;
-        if(hit) trunkPoint={lat:hit.lat,lng:hit.lng};
-      }
+      trunkPoint=trunkSnapPoint(trunkPoint, shiftOn);
       trunkPoints.push(trunkPoint);
       renderTrunkDraft();
+      updateTrunkRubber(toDisplay(trunkPoint)); /* [v852] 落点后虚线收缩到新末点（长度 0），随鼠标再长出来 */
       return;
     }
     if(!drawing) return;
@@ -631,6 +624,38 @@
     var dLng=Math.abs(cur.lng-prev.lng)*cos;
     var dLat=Math.abs(cur.lat-prev.lat);
     return dLng>=dLat ? {lat:prev.lat,lng:cur.lng} : {lat:cur.lat,lng:prev.lng};
+  }
+  /* [v852] 落点/预览共用一个换算：Shift 优先于捕捉（v832 语义原样保留）——
+     按住 Shift 是**显式**声明"我要正交"，这时再去吸附会把点拽离轴线，
+     用户看到的就是"正交没生效"。所以两者互斥，Shift 期间不捕捉。
+     click（真落点）与 mousemove（橡皮筋预览）必须走同一个函数：
+     两边各写一份迟早漂移——预览吸到了、落点没吸上（或反过来）是最迷惑的一种 bug。 */
+  function trunkSnapPoint(cur, shiftOn){
+    if(shiftOn && trunkPoints.length){
+      return orthoPoint(trunkPoints[trunkPoints.length-1], cur);
+    }
+    if(snapOn){
+      var _snap=snapApi(), hit=_snap?_snap.nearest(cur):null;
+      if(hit) return {lat:hit.lat,lng:hit.lng};
+    }
+    return cur;
+  }
+  /* [v852 用户反馈] 橡皮筋虚线：点下第一个点后，线跟着鼠标走（虚线、更细更淡），
+     点击第二个点才真正落线。只挂 trunkGroup（TRUNK_PANE、interactive:false）——
+     关「测量框」不连坐，也不会吃地图点击。 */
+  var trunkRubber=null;
+  function removeTrunkRubber(){
+    if(trunkRubber && map.hasLayer(trunkRubber)) trunkGroup.removeLayer(trunkRubber);
+    trunkRubber=null;
+  }
+  function updateTrunkRubber(cursorDisp){
+    removeTrunkRubber();
+    if(trunkMode!=='draw' || !trunkPoints.length || !cursorDisp) return;
+    var last=toDisplay(trunkPoints[trunkPoints.length-1]);
+    trunkRubber=L.polyline([last,cursorDisp],{
+      color:TRUNK_STYLE.draft.color, weight:2, opacity:.65,
+      dashArray:'4,7', pane:TRUNK_PANE, interactive:false
+    }).addTo(trunkGroup);
   }
   /* 同一套读点口径（[lat,lng] / [lat,lng,z] / {lat,lng}）统一走 schema 模块，别在这里重写分支。 */
   function readTrunkPoint(q){
@@ -857,6 +882,7 @@
   function setTrunkMode(mode){
     var nextMode = (mode==='draw'||mode==='edit') ? mode : 'idle';
     trunkDragPreview=null;      // 切模式一律丢掉拖动预览，别让状态栏停在旧数字上
+    removeTrunkRubber();        // [v852] 橡皮筋跟着模式走：退出绘制（含 Esc/完成/双击收线）即清
     if(nextMode==='draw'){
       if(drawing) setDrawing(false);
       hideTrunkWarn();          // 卡里说的是"已保存的那根线"，开始画新的就过时了
@@ -1181,7 +1207,7 @@
   ensureSnapSupport();
   setSnapOn(snapOn); /* [v846] 初始态三处同步：引擎 enabled / 按钮 DOM / 提示条（别只改变量） */
 
-  /* 光标移动：更新吸附标记 + 状态栏投影预览。 */
+  /* 光标移动：更新吸附标记 + 橡皮筋虚线 + 状态栏投影预览。 */
   map.on('mousemove', function(e){
     if(trunkMode!=='draw') return;
     lastCursorLatLng=fromDisplay(e.latlng);
@@ -1190,6 +1216,11 @@
       if(snapOn) S.nearest(lastCursorLatLng);
       else S.clearMarker();
     }
+    /* [v852] 橡皮筋：预览终点与真实落点走同一个 trunkSnapPoint——
+       吸附白点吸到哪，虚线就跟到哪（Shift 正交同理），落点不会和预览不一致。 */
+    var shiftOn=!!(e.originalEvent && e.originalEvent.shiftKey);
+    var pv=trunkSnapPoint(lastCursorLatLng, shiftOn);
+    updateTrunkRubber(pv?toDisplay(pv):null);
     updateStatusbar();
   });
 

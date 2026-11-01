@@ -5997,3 +5997,29 @@ case-lib manifest 1.1.0。
   **开始画框** · 完成 ｜ 加点 · 撤销 · 测距 · 清除。
 - 纯 DOM 顺序调整：online-map.js 按 id 绑定，逻辑零改动；无测试锁按钮顺序。
 - 版本同抬 `v851-draw-btn-order`：sw VERSION + style-01.css?v=。
+
+## 26.91 总管绘制橡皮筋虚线预览（v852 · 2026-11-01 · 用户反馈）
+
+用户原话：在线地图绘制总管的逻辑稍微改下，点一个点后随鼠标有虚线显示，再点第二个点形成直线。
+
+- **公共换算防漂移（核心设计）**：click 落点与 mousemove 预览原来各自做
+  「Shift 正交 → 捕捉」链，若不抽公共函数，最迷惑的 bug 就是「预览吸到了、
+  落点没吸」或反之。新增 `trunkSnapPoint(cur, shiftOn)`（mod/online-map.js）：
+  ① Shift 有前点 → 正交（v832 互斥语义：Shift 优先于捕捉）；② 否则 snapOn →
+  `snapApi().nearest()`；③ 都不满足原值返回。click 块内**禁止**直调
+  orthoPoint/`_snap.nearest`（静态锁 ① 守着）。
+- **橡皮筋线**：`trunkRubber` 变量 + `removeTrunkRubber()`/`updateTrunkRubber(cursorDisp)`。
+  样式 = TRUNK_STYLE.draft 紫色、weight:2、opacity:.65、dashArray:'4,7'、
+  `pane:TRUNK_PANE`（z=430 独立层）、`interactive:false`（不挡地块点选）、挂 `trunkGroup`
+  （关测量框不连坐，v841 拆组纪律）。虚线只在有落点后出现（≥1 点）。
+- mousemove 里 `pv = trunkSnapPoint(lastCursorLatLng, shiftOn)` →
+  `updateTrunkRubber(pv ? toDisplay(pv) : null)`；click 落点 push 后立即
+  `updateTrunkRubber(toDisplay(trunkPoint))`（落点后虚线缩短为 0 段，
+  防旧橡皮筋与新草稿双重显示）。
+- **清理统一挂 setTrunkMode 开头**（`removeTrunkRubber()`）——全部退出路径
+  （Esc/完成/双击收线/互斥切换）都走 setTrunkMode('idle')（v844 收口纪律），
+  grep 验证 585/874/1230/1757/2036/2116/2176 七处全走它，无漏网路径。
+- 静态锁 `tests/trunk_rubber.test.cjs`（4 项）：① click 与 mousemove 共用
+  trunkSnapPoint（click 块禁直调）② 橡皮筋挂 trunkGroup/TRUNK_PANE/interactive:false/
+  dashArray ③ setTrunkMode 里 removeTrunkRubber ④ click 落点后 updateTrunkRubber。
+- 版本同抬 `v852-trunk-rubber`：sw VERSION + style-01.css?v= + online-map.js?v=。
