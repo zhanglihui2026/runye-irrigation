@@ -4797,52 +4797,7 @@ function tlAutoGenerate(options) {
     });
   }
 
-  /* [v859 用户需求 → v869 定版] 段总管（自动生成）：垂直于主管、串联各分区主管；
-     起点在最上/最左分区主管上（vMin 端）、终点在最下/最右分区主管上（vMax 端），
-     两端不再外延驳接段（stub=0，用户方案B），驳接点方块标记画在首末主管串联处。
-     [v869] 贴边：干线贴各主管**同一侧端点**（不再放走向交集正中——用户实测
-     「没看到/不好定位」）；贴哪侧自动判断：水源（tlSrcDesign，缺则总管起点
-     frontPipe[0]，再缺则默认左/上侧）落在走向交集中点的哪一半。传局部格系 src。
-     数据落地在下方 tlDiagramData.segTrunk（转世界坐标、len 按世界坐标重算），
-     供在线地图页驳接点捕捉与扬程收口（tlFrontLenUse）。 */
-  var tlSegTrunkLoc = null;
-  try {
-    if (window.RySegTrunk && mainPipes.length >= 2) {
-      tlSegTrunkLoc = window.RySegTrunk.build(mainPipes, {
-        src: tlSrcDesign || (frontPipe && frontPipe[0]) || null
-      });
-      /* [v874] 裁剪退化兜底：旋转角度下外圈主管被斜边裁掉后，裁剪态主管可能退化
-         （单列共线 / 交集空）⇒ 第一次 build 失败。改用分区管位基准（未裁剪理想主管）
-         再试 —— 干线串联的是「各分区主管的管位」，外圈管被裁不该影响干线生成。 */
-      if (!tlSegTrunkLoc && tlIdealMains.length >= 2) {
-        tlSegTrunkLoc = window.RySegTrunk.build(tlIdealMains, {
-          src: tlSrcDesign || (frontPipe && frontPipe[0]) || null
-        });
-      }
-    } else if (window.RySegTrunk && tlIdealMains.length >= 2) {
-      /* 裁剪后主管不足 2 条但管位基准足够（极端斜边裁剪），同样兜底。 */
-      tlSegTrunkLoc = window.RySegTrunk.build(tlIdealMains, {
-        src: tlSrcDesign || (frontPipe && frontPipe[0]) || null
-      });
-    }
-  } catch (eSeg0) { }
-  if (tlSegTrunkLoc) {
-    var sgD = '';
-    tlSegTrunkLoc.points.forEach(function (p, i) { var q = tsGrid(p.x, p.y); sgD += (i === 0 ? 'M' : 'L') + q.x.toFixed(1) + ' ' + q.y.toFixed(1) + ' '; });
-    parts.push('<path data-tlpipe="segTrunk" d="' + sgD + '" fill="none" stroke="#111827" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>');
-    tlSegTrunkLoc.couplers.forEach(function (p, ci) {
-      var q = tsGrid(p.x, p.y);
-      parts.push('<rect data-tlseg-coupler="' + ci + '" x="' + (q.x - 4).toFixed(1) + '" y="' + (q.y - 4).toFixed(1) + '" width="8" height="8" fill="#ffffff" stroke="#111827" stroke-width="1.6"/>');
-      parts.push('<text data-tlseg-coupler-label="' + ci + '" x="' + (q.x + 7).toFixed(1) + '" y="' + (q.y + 3.5).toFixed(1) + '" font-size="9" fill="#111827" font-family="system-ui">驳接</text>');
-    });
-  } else if (window.RySegTrunk && window.RySegTrunk.lastError) {
-    /* [v873] 段总管未生成不再静默：图面左上角淡字提示原因（用户实测旋转分区角度后
-       干线消失却看不到任何原因）；原因同时随 tlDiagramData.segTrunkSource 落库，
-       在线地图/工作区/远程排障都能读到。 */
-    var __segWhy = String(window.RySegTrunk.lastError);
-    parts.push('<text data-tlseg-missing="1" x="12" y="20" font-size="12" fill="#b45309" font-family="system-ui">段总管未生成：' + __segWhy.replace(/[<>&]/g,'') + '</text>');
-  }
-
+  // 总管由在线地图手绘，施工图只生成主管、支管和滴灌带。
   // Draw main pipes (blue) — clipped to plot boundary
   parts.push('<g clip-path="url(#tlPlotClip)">');
   mainPipes.forEach(function(l,mi){
@@ -4895,9 +4850,10 @@ function tlAutoGenerate(options) {
 
   if(sourcePos){
     var sp=tsGrid(sourcePos.x,sourcePos.y);
-    /* [v255 2026-10-06 用户要求] 水源点可右键换向：外圈透明热区 r=18 承接 contextmenu
-       （事件委托挂 document，见 tlSrcFlip）；<title> 给悬停提示。 */
-    parts.push('<g data-tl-src="1" data-tl-src-drag="1"><circle cx="'+sp.x.toFixed(1)+'" cy="'+sp.y.toFixed(1)+'" r="18" fill="rgba(0,0,0,0)"><title>拖动：移动水源位置（任意）　｜　右键：切换水源方向（换到总管另一端）</title></circle><circle cx="'+sp.x.toFixed(1)+'" cy="'+sp.y.toFixed(1)+'" r="10" fill="#f59e0b" stroke="#fff" stroke-width="2"/></g>');
+    /* [v899] 水源换向已随 v899-src-flip-remove 移除（用户拍板 A）；水源**拖动**链（svg mousedown
+       处 data-tl-src 分支）读 dd.sourcePos——v873 起设计侧恒 null，同样不可达（死分支保留待清理）。
+       title 原文「拖动：移动水源位置（任意）｜右键：切换水源方向」两句均为误导，改为如实说明。 */
+    parts.push('<g data-tl-src="1" data-tl-src-drag="1"><circle cx="'+sp.x.toFixed(1)+'" cy="'+sp.y.toFixed(1)+'" r="18" fill="rgba(0,0,0,0)"><title>水源位置随管线走向自动确定</title></circle><circle cx="'+sp.x.toFixed(1)+'" cy="'+sp.y.toFixed(1)+'" r="10" fill="#f59e0b" stroke="#fff" stroke-width="2"/></g>');
     /* [v570] 拖动水源要用到的两个量（tlInitDrag 在另一作用域）：SVG 单位/米比例、地块指纹 */
     window.tlSrcScale=s; window.tlSrcSig=tlSrcSig;
     var tlSrcLabelY=tlHdrY0+tlHeaderLines.length*18+16; // 信息行下方
@@ -5057,7 +5013,7 @@ function tlAutoGenerate(options) {
   window.tlDiagramData = { version: 1, schemaVersion: 1, world: 'meter', generatedAt: new Date().toISOString(), plot: { w: plotW, h: plotH },
     /* [v873] trunkSource 带失败原因：'auto' | 'missing(<原因>)' —— 旋转分区角度后
        段总管消失的排障依据（地图页/工作区/探针都读得到）。 */
-    trunkSource: tlSegTrunkLoc ? 'auto' : ('missing(' + (window.RySegTrunk && window.RySegTrunk.lastError ? window.RySegTrunk.lastError : 'not-built') + ')'),
+    trunkSource: 'map-manual',
     poly: JSON.parse(JSON.stringify(poly)),
     combinedN: tlGetZoneCount(),   /* 2026-09-16 联合灌溉区数 N，供工作区分组着色读取（简图不变） */
     zones: { cols: cols, rows: rows, xPos: xPos.slice(), yPos: yPos.slice(), xPlan: xPlan.slice(), yPlan: yPlan.slice(), xSrc: xSrc.slice(), ySrc: ySrc.slice(),
@@ -5071,16 +5027,7 @@ function tlAutoGenerate(options) {
     mainPipes: mainPipes.map(function(line){return line.map(function(p){return tlGridWorld(p.x,p.y);});}),
     /* [v859] 段总管：局部几何转世界坐标 + len 按世界坐标重算（frame 缩放不漂）。
        在线地图页读 segTrunk.couplers 反算经纬度做驳接点捕捉；扬程收口读 segTrunk.len。 */
-    segTrunk: (function(){
-      if(!tlSegTrunkLoc) return null;
-      var W=function(p){return tlGridWorld(p.x,p.y);};
-      var pts=tlSegTrunkLoc.points.map(W);
-      var len=Math.hypot(pts[1].x-pts[0].x, pts[1].y-pts[0].y);
-      return { axis: tlSegTrunkLoc.axis, side: tlSegTrunkLoc.side,
-        points: pts, couplers: tlSegTrunkLoc.couplers.map(W),
-        joinPts: tlSegTrunkLoc.joinPts.map(W),
-        stub: tlSegTrunkLoc.stub, len: len, lenJoin: len - 2*tlSegTrunkLoc.stub };
-    })(),
+    segTrunk: null,
     branchPipes: branchPipes.map(function(line){return line.map(function(p){return tlGridWorld(p.x,p.y);});}),
     /* [v601] 支管「设计满跨 / 图面长」两个基准（索引与 branchPipes 一一对应）：
        计算（材料清单、最不利路径水损）一律按满跨；图面两端 gapV/gapH 留边只影响显示。 */
@@ -5287,10 +5234,6 @@ function tlAutoGenerate(options) {
        会抑制 front 段（v841），而手绘总管（水源→驳接点）与段总管（驳接点串联干线）
        是水路互补的两段，必须同时显示。trunk-panel 联合复核同轮把它归入 front 桶跳过
        （长度已折进 frontLenUsed，再计入下游合计就是 v842 式双重计数）。 */
-    if(dd.segTrunk && Array.isArray(dd.segTrunk.points) && dd.segTrunk.points.length>=2){
-      var stLL=ln2ll(dd.segTrunk.points);
-      if(stLL) segments.push({id:'segTrunk', name:'段总管', dn:segDn.front||segDn.main, kind:'segTrunk', latLng:stLL});
-    }
     var src = dd.sourcePos ? p2ll(dd.sourcePos) : null;
     if(!segments.length && !src){if(plotId)window.RyIrrigationDataStore.writeNetworkLayout(null,plotId);return;}
     var net=null;

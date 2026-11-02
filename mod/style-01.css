@@ -908,8 +908,8 @@ body.ry-tool #ppDiagramContent > svg{height:100%;max-height:100%}
 #tlDiagramContent svg #tlHeaderGroup{cursor:move}
 #tlDiagramContent svg #tlHeaderGroup:hover #tlHeaderBg{fill:rgba(59,130,246,.04);stroke:rgba(59,130,246,.2);stroke-dasharray:3,3}
 #tlDiagramContent svg #tlHeaderGroup:hover #tlHeaderHandle{fill:rgba(99,102,241,.7)}
-/* [v255] 水源点右键换向：热区手型光标 */
-#tlDiagramContent svg [data-tl-src]{cursor:pointer}
+/* [v899] 水源换向已移除（用户拍板 A）、水源拖动链读 dd.sourcePos（v873 后恒 null）不可达
+   —— 原手型光标（v255）撤下，恢复默认光标；data-tl-src 热区元素保留仅作渲染标记。 */
 
 /* ===== Three-level view: dark panel green→blue overrides ===== */
 #threeLevelView .result-heading .step.light{color:#bbf7d0}
