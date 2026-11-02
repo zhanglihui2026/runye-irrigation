@@ -296,6 +296,13 @@
   }
 
   var api = {
+    /* [v887 2026-11-02 缓存事故] 本文件的 ?v= 串曾在 v425 停摆——v883/v886 两轮都实质
+       修改了 tapeAxisOf 却没抬缓存串（违反 sw.js CORE 白名单「必须抬版本」纪律），
+       用户浏览器弱网/旧标签页拿到旧 tapeAxisOf，方向修复看起来「没生效」。
+       现以数字版本号暴露，plot-editor 页面级闸门校验：加载到的版本 < 页面要求
+       ⇒ 强制硬刷新一次（sessionStorage 防循环）。往后本文件每改一次，此号与
+       index.html 的 ?v= 串、sw.js VERSION 三处同步上抬。 */
+    VERSION: 887,
     MAX_AUTO_ZONE_COUNT: MAX_AUTO_ZONE_COUNT,
     manualZoneLayout: manualZoneLayout,
     splitZoneLength: splitZoneLength,

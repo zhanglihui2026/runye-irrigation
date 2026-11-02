@@ -6548,3 +6548,30 @@ renderMyPlots 同判据过滤，列表不出现双行。runye-map-enhance.js 自
 **测试**：tape_axis.test.cjs 重写（含用户案例 127.5×187.5）、zone_geometry 127.2×187.2
 用例期望翻转。524/0。教训：v883 把「长边」理解成地块/网格级，用户口径一直是
 **分区级** —— 规则载体（网格 vs 分区）必须与用户语义逐字对齐。
+
+## 26.116 方向修复「没生效」真凶：zone-geometry.js 缓存串停摆（v887-tape-zone-vgate · 2026-11-02）
+
+用户报（v886 发布后截图：527×396 地块、分区角度 4°、8 分区 127.5×187.5 竖长、
+铺设 80m）：「不对，没改过来，这个滴灌带的方向，你深度挖掘一下」。
+
+**深度挖掘**：①精确量图：左边标 396m（585.9 是「最远输水距离」标注，非边长），
+分区格 ≈131.75×198 竖长 ⇒ 任何 ≥v886 的 tapeAxisOf 都必投 y。②CDP 探针
+（gen_dir_user.mjs）在本地 v886 代码上按用户参数全流程点「生成施工图」⇒
+tapeAxis 'y'、主管 h:8 横铺、source ppShare 传导自洽 —— **代码链本身正确**。
+③截图行为（带横主管竖）与 v416 贴合票（S=80: fx=0.627>fy=0.427 投 x）精确吻合
+⇒ 用户浏览器在跑**旧版 zone-geometry.js**。④审计实锤：该文件 ?v= 串停在
+**v425-manual-zone-geometry** —— v883、v886 两轮都实质修改它却没抬串，直接违反
+sw.js 头注「zone-geometry.js 在 CORE 白名单必须抬版本」的发布纪律；inline-18.js
+?v=823 同样落后于 v873 的实质修改。弱网下 SW 静默回退旧缓存（v628 自注「网络一慢
+很常见」）/ 旧标签页驻留旧脚本，任何一层 URL 键缓存都能喂旧文件。
+
+**修复（v887 三层）**：①补抬 zone-geometry.js?v= 与 inline-18.js?v= 至 887
+（连同主页 13 处版本串、sw.js VERSION 全局同抬）。②zone-geometry.js 暴露数字
+`VERSION: 887`。③plot-editor.js 文件头加**页面级缓存守卫**：加载到的
+RyZoneGeometry.VERSION 落后于页面要求 ⇒ 强制 location.reload() 一次
+（sessionStorage 防离线死循环），刷新后仍旧则 console.warn 留显式证据。
+④tests/zone_geo_version.test.cjs 四把锁：zone-geo ?v= 串与主页版本串同 token
+（结构性杜绝再停摆）、VERSION>=887、守卫存在且先于主体 IIFE、inline-18 串>=87x。
+528/0。教训：**发布纪律「改 CORE 名单文件必须抬版本」要落到「逐文件 ?v= 串」级
+——只抬 sw VERSION + 主页主串挡不住单个 mod 文件停摆；探针验证的是本地新代码，
+永远无法发现「用户浏览器拿旧文件」这类交付断层，必须靠版本闸门 + 串对齐锁。**

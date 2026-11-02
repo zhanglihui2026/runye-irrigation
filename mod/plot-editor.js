@@ -3,6 +3,28 @@
    加载顺序铁律：必须紧跟 mod/inline-11.js 之后同步执行（index.html），不得提前/延后。
    依赖与公开 API 审计：见 _p1/_audit11_report.md。 */
 // ===== 07 管路规划与施工简图 =====
+/* [v887 2026-11-02 缓存守卫] zone-geometry.js 的 ?v= 串曾在 v425 停摆两轮（v883/v886
+   都实质改了 tapeAxisOf 却没抬串），弱网下 SW 静默回退旧缓存 / 旧标签页驻留旧脚本
+   ⇒ 用户拿到旧方向逻辑，修复看起来「没生效」（用户三次报同一问题，本地探针全绿）。
+   本文件在 index.html 中装载于 zone-geometry.js 之后，此处校验其数字版本：
+   落后于页面要求 ⇒ 硬刷新一次；sessionStorage 防离线死循环（刷一次仍旧就放行，
+   至少 console 里留下显式证据，不再无声错下去）。 */
+  (function(){
+    try{
+      var need = 887;
+      var g = window.RyZoneGeometry;
+      var ver = (g && Number(g.VERSION)) || 0;
+      if (ver < need) {
+        var k = 'ryZgGateReloaded' + need;
+        if (!window.sessionStorage || !window.sessionStorage.getItem(k)) {
+          if (window.sessionStorage) window.sessionStorage.setItem(k, '1');
+          window.location.reload();
+          return;
+        }
+        try { console.warn('[ry:zone-geo-gate] RyZoneGeometry.VERSION=' + ver + ' 落后于页面要求 ' + need + '——缓存旧文件在跑，布管方向可能仍按旧规则（刷新或清缓存后消失）'); } catch (eWarn) {}
+      }
+    }catch(eGate){}
+  })();
 (function(){
   var ppCanvas=document.getElementById('ppCanvas');
   var ppCtx=ppCanvas.getContext('2d');
