@@ -5088,6 +5088,18 @@ function tlAutoGenerate(options) {
     if(dd.frontPipe) pushSegs([dd.frontPipe], segDn.front||segDn.main, 'front');
     pushSegs(dd.mainPipes, segDn.main, 'main');
     pushSegs(dd.branchPipes, segDn.branch, 'branch');
+    /* [v878] 段总管反投：分区与管路自动生成的分区主管串联干线（v859）传给在线地图。
+       用户要求「自动生成的那一段总管要传递过去」——此前它只进 tlDiagramData.segTrunk
+       （轮灌演示播放时临时画、停止即清；地图页只拿 couplers 做驳接点捕捉），
+       常驻的管网叠加层（runye_network_layout → renderNetwork）里没有它。
+       kind 用独立的 'segTrunk'，不能复用 'front'：renderNetwork 在地图已有手绘真总管时
+       会抑制 front 段（v841），而手绘总管（水源→驳接点）与段总管（驳接点串联干线）
+       是水路互补的两段，必须同时显示。trunk-panel 联合复核同轮把它归入 front 桶跳过
+       （长度已折进 frontLenUsed，再计入下游合计就是 v842 式双重计数）。 */
+    if(dd.segTrunk && Array.isArray(dd.segTrunk.points) && dd.segTrunk.points.length>=2){
+      var stLL=ln2ll(dd.segTrunk.points);
+      if(stLL) segments.push({id:'segTrunk', name:'段总管', dn:segDn.front||segDn.main, kind:'segTrunk', latLng:stLL});
+    }
     var src = dd.sourcePos ? p2ll(dd.sourcePos) : null;
     if(!segments.length && !src){if(plotId)window.RyIrrigationDataStore.writeNetworkLayout(null,plotId);return;}
     var net=null;

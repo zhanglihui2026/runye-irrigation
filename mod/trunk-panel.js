@@ -259,7 +259,11 @@
    */
   function kindOf(seg) {
     var k = seg && seg.kind;
-    if (k === 'front' || k === 'main' || k === 'branch') return k;
+    /* [v878] 段总管（inline-09 反投 kind:'segTrunk'）按 front 桶处理：它的长度已经
+       折进 computeThreeLevel 的 frontLenUsed（v859 口径 tlFrontLenUse + segLen），
+       designBlock.front 就是那个数；下游合计（lenM/segCount）再算一遍，
+       同一条管就在"总管"行和"下游"行各出现一次 —— v842 双重计数的同款错误。 */
+    if (k === 'front' || k === 'segTrunk') return 'front';
     var tag = String((seg && (seg.id || seg.name)) || '');
     if (tag.indexOf('front') === 0) return 'front';
     if (tag.indexOf('branch') === 0) return 'branch';
