@@ -6606,3 +6606,18 @@ nearest(顶点贴脸)=null；捕捉开 ⇒ 顶点恢复吸附。注意合成环�
 ② 改口径（setEnabled(true)+setKindGate+aria-pressed）+ ②b 驳接点常开锁。533/0。
 版本注：v888/v889 已被并行会话占用（zone-real-span / first-zone-axis，工作区未
 提交），本版取 v890 并把并行抬号一并吸收。
+
+## 26.118 驳接点磁吸回滚（v891-trunk-revert-coupler-snap · 2026-11-02）
+
+用户撤销前令：「以上指令执行的内容都取消吧，改回去吧」——v890 驳接点磁吸常开
+（§26.117）整体回退。
+
+**回退方式**：版本只升不降，不删历史。v890 中只含磁吸改动的四个文件
+（mod/trunk-snap.js / mod/online-map.js / tests/trunk_snap.test.cjs /
+tests/snap_default_off.test.cjs）直接 `git checkout 32ccf1e --` 字节级恢复到
+v887 状态（v887→v890 间该四文件无其他改动，checkout 最干净）；版本串全局抬到
+v891-trunk-revert-coupler-snap。驳接点吸附回到 v859/v872 口径：**链路在，
+但要手动开「捕捉」才生效**。
+
+测试锁同步回退：trunk_snap ⑬⑭ 删除、snap_default_off ② 恢复
+setEnabled(snapOn) 原口径（git checkout 已一并还原）。
