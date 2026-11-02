@@ -6718,3 +6718,19 @@ autoPipesWhole 各槽写入 → clearPipesWhole 清空 → **整组 undo（批�
 **探针教训补充**：gen_legacy_archive 首轮缺 Page.javascriptDialogOpening 自动接受 → 某次 alert 挂死整页
 （SIGTERM 无输出）；保存链需要先「地块库注册探针本体」（RyPlotLibraryStore 克隆 auto 副本）否则
 plotBinding 校验失败；tlDiagramData 存在时保存要求三级 canonical 提交成功（需先点 ppGenerate+tlAutoPipe）。
+
+## 26.123 权威切换批次 D：迁移系统验收通过（2026-11-02 · 8daab0a，7/7 ALL PASS，零产品代码改动）
+
+gen_batch_d.mjs 四产物一致性 + CAS 反馈 + revision 单调，7/7 全 PASS：
+- D1 图纸（权威 SVG 实体）/材料表（「总管 Ø90 220m ¥3,740」行）/长度口径/DXF 数据源/canonical 健康全过；
+- D2 无效提交（polyPts=null、before=null）→ false + __runyeSingleL2CommitFailure 显式原因（v895 反馈链在；
+- D3 编辑→undo→再生成 revision 单调。
+**语义澄清（防误判）**：tlDiagramSVG 不含总管实体是 v873 定版语义（设计侧只拥有段总管）；
+DXF 总管来自地图手绘总管（对话框 trunkPlan() 单独算，未画时显式禁用+原因）——不是缺口。
+
+四批次探针矩阵（迁移验收）：rot_regen 七轮(v895)+undo_group 11/11(B)+legacy_archive C3/C3b(C)+batch_d 7/7(D)。
+
+**进度：A✅ B✅ C✅ D✅**。批次 E（停写）按规划前置「线上稳定至少一个版本周期」暂不启动，等拍板；
+批次 F（AOCI）代码最终稳定后执行。
+**遗留用户手工项**：真机「保存方案→导入工程」往返一次（C1/C2，探针合成环境保存链受限）。
+验收记录：project-planning/权威切换批次D验收记录_2026-11-02.md。
