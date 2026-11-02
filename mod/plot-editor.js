@@ -4900,6 +4900,24 @@
   }
   window.ppClipPolylineToRing=ppClipPolylineToRing;
 
+  function ppMainDirectionOutdated(){
+    if(ppIsGroupWhole()||!ppState.mainPipes||!ppState.mainPipes.length)return false;
+    var expected=ppBuildAutoPipes(ppState.polyPts,
+      parseInt(document.getElementById('planN')?.value)||parseInt(document.getElementById('fld_N')?.value)||4,
+      ppState.pipeLevel==='three');
+    function longestDirection(lines){
+      var best=null,bestLen=0;
+      (lines||[]).forEach(function(line){
+        if(!line||line.length<2)return;
+        var a=line[0],b=line[line.length-1],dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy);
+        if(len>bestLen){best={x:dx/len,y:dy/len};bestLen=len;}
+      });
+      return best;
+    }
+    var oldDir=longestDirection(ppState.mainPipes),newDir=longestDirection(expected.main);
+    return !!(oldDir&&newDir&&Math.abs(oldDir.x*newDir.x+oldDir.y*newDir.y)<0.94);
+  }
+
   document.getElementById('ppGenerate').addEventListener('click',function(){
     /* 分区角度改变后，先按新角度重建自动主管/支管，再生成二级图与三级图。
        角度待重建状态不会被普通历史记录清掉，只有自动布管成功后才消费。
@@ -4917,7 +4935,7 @@
         ?Number(priorDiagram.zones.frame.angle):null;
       if(isFinite(priorAngle)&&Math.abs(priorAngle-ppZoneAngle())>0.05)rebuildForMapAngle=true;
     }catch(eMapReplan){console.warn('[ppGenerate] 地图角度状态读取失败',eMapReplan);}
-    if((ppAnglePipeRegenPending||rebuildForMapAngle)&&!ppAutoGeneratePipes()){
+    if((ppAnglePipeRegenPending||rebuildForMapAngle||ppMainDirectionOutdated())&&!ppAutoGeneratePipes()){
       ppAnglePipeRegenPending=true;
       alert('按新分区角度重生成管线未完成：'+(window.__runyeSingleL2CommitFailure||'布管或设计提交失败')+'。当前画面已保留。');
       return;

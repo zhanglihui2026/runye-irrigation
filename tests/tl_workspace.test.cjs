@@ -117,6 +117,7 @@ console.log('== tl-workspace 纯逻辑回归 ==');
   ok(svg1.indexOf('<svg') === 0 || svg1.indexOf('<div class="tl-ws-canvas"') === 0, '输出为容器 SVG 片段');
   ok(svg1.indexOf('tlWsManual') > 0, '含手工层分组');
   ok(svg1.indexOf('tlWsPreview') > 0, '含预览分组');
+  ok(svg1.indexOf('data-tltape="1"') > 0, '工作区显示滴灌带示意');
   W.render(ctn, d);
   eq(ctn.innerHTML, svg1, '同输入渲染逐字节一致（幂等）');
   eq(JSON.stringify(d), snap0, '红线：渲染不修改平面数据');
@@ -209,7 +210,7 @@ console.log('== tl-workspace 纯逻辑回归 ==');
      反向断言：#e6f2ea / rgba(245,158,11,.18) 不得再作为分区底色出现。 */
   ok(svg.indexOf('rgba(239,68,68,.30)') > 0 && svg.indexOf('data-g="0"') > 0, '标准分区联合灌溉组底色在位（G1 同色带）');
   ok(svg.indexOf('#e6f2ea') < 0, '旧·标准浅绿底色已退出（反向）');
-  ok(svg.indexOf('#67e8f9') < 0 && svg.indexOf('3,3" opacity="0.85"') < 0, '滴灌带已不再绘制');
+  ok(svg.indexOf('data-tltape="1"') > 0 && svg.indexOf('stroke="#0e7490"') > 0, '滴灌带与主管同图绘制');
   /* 2026-09-16 新增：联合灌溉分组（调色板 API / 组边界深线 / 底部读数 / 分组正确性） */
   ok(typeof W.groupFillCss === 'function' && W.groupFillCss(0) === 'rgba(239,68,68,.30)' && W.groupFillCss(1) === 'rgba(245,158,11,.30)', '调色板 API groupFillCss（G1/G2 色值）');
   {

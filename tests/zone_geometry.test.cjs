@@ -69,3 +69,10 @@ test('zone grouping preserves planned-area fallback and invalid-input result', (
   assert.deepEqual(fallback.groups, [{ g: 0, sum: 53, zones: [0, 1, 2] }, { g: 1, sum: 24, zones: [3] }]);
   assert.equal(geometry.zoneAreaGroups(null, null, 1).ok, false);
 });
+
+test('80m single-side lay across 127×187m zones puts mains across vertical drip tapes', () => {
+  const cuts = { cols: 4, rows: 2, xPlan: [127.2, 127.2, 127.2, 127.2], yPlan: [187.2, 187.2] };
+  const axis = geometry.tapeAxisOf(cuts, 160);
+  assert.equal(axis.tapeAxis, 'y');
+  assert.equal(axis.pipeAxis, 'x');
+});
