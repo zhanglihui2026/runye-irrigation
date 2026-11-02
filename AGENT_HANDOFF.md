@@ -6670,3 +6670,30 @@ T4 消费端=v879 segWorstPath/v878 network_layout kind:'segTrunk'/v843 tlFrontL
 六批次：A 剩余写路径审计与接入（最大，先审计后分小批）→ B 组撤销权威收口（轻量）→
 C 单地块旧格式边界验收 → D 迁移系统验收（发版闸门）→ E 旧字段停写与清退（最后，前置 A~D 稳定）→ F AOCI Maintain。
 **未动工**，等用户拍板从批次 A 开始。docs 提交 7a21699 已同步远端。
+
+## 26.121 权威切换批次 A：剩余写路径审计 + 死代码标记（v897-write-path-audit · a0e88a3 · 2026-11-02）
+
+用户拍板「按照你的建议推进」→ 启动批次 A。子代理全量盘点 plot-editor.js 234 处 `ppState.*=` +
+tlDiagramData 9 处活跃字段级写入，逐处核对事务链。
+
+**核心结论（好消息）**：用户编辑主路径（角度/水源/阀门/遮蔽/清管/自动布管/重分区/面积锁/
+分区线拖拽微调合并/undo/整组 slot）**全部已在 canonical 事务链内**——cut-drag 是规范的
+「先写后提交、松手 CAS 结算」。绕过事务仅 7 条：2 死代码 + 2 降级 + 2 导入语义 + 1 缓存。
+**批次 A 无需大规模写路径改造**，批次 E（停写）前提提前具备。
+
+7 条路径与处置（全表见 `project-planning/剩余写路径审计_2026-11-02.md`）：
+- D1 ppAddPipe 手动画管链：v304 guard 后不可达，v897 加 warn 标记+注释（恢复绘制前必须补事务）
+- D2 window.ppSetState：**全仓无调用者**（恢复实走 inline-12 canonical 优先+RunyeBridge），保留留痕
+- F1 tlAutoResetGroups fallback 直写 cutOffX/Y：v897 加 warn 标记（**留工作区未入库**——同文件混有
+  并行会话未提交改动「底图滴灌带同图可见策略」，禁代提交；并行落地后补 warn 断言入库）
+- F2 inline-09 N 区按钮清 cutOff：依赖 tlAutoGenerate 提交（v115 注释已明示），接受
+- I1/I2 导入语义（ppLoadPolygon/ppApplySlot/ppRestoreState）：初始导入无前像，按设计无 CAS
+- A1/A2/A3 缓存规整/拖中直写（先写后提交）/swap-restore 借用：可接受
+
+tests/write_path_audit.test.cjs 三锁：v304 guard 仍在 / ppAddPipe 带标记 / tlAutoResetGroups 主路径
+优先 cutStepReset。539/0。待评估项：mergePreview 在 PP_SLOT_KEYS 内会随 slot 持久化（挂入批次 E 前）。
+
+**教训修正（v896 §26.120 的「sed 静默失败疑锁文件」判断错了）**：真相是串格式差异——
+index.html 串为 `?v=NNN-name`（带 `=`），sw.js 为 `'vNNN-name'`；sed 查找串若带 `v` 前缀
+（`v896-...`）对 index.html 天然 0 命中。**正确姿势：sed 用 `NNN-name`（不带 v）全局匹配**，
+且 sed 后用 python `data.count(b'NNN-name')` 核对（grep 对此文件偶发输出异常）。
