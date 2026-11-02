@@ -80,6 +80,11 @@
   function moveDemoIn(){
     var n=$(DEMO.node), grp=$(DEMO.grp);
     if(!n||!grp||n.getAttribute('data-ry-demo')==='1') return;
+    /* [v884] 在线地图轮灌演示 dock（map-flow-demo）持有 #tlPlanBar 期间绝不抢：
+       切到地图时 dock 把它搬进 #mapDemoDock（绘图轨此刻整条隐藏），此时 moveIn
+       若把它拽进轨内分组，dock 的 memo 与轨的 memoDemo 会互相打结（实测探针
+       STAGE2 抓到「搬进 dock 又被拽回隐藏 tlSide」）。 */
+    if(n.closest&&n.closest('#mapDemoDock')) return;
     var body=grp.querySelector('.ry-cad-grp-body')||grp;
     memoDemo={parent:n.parentNode, next:n.nextSibling};
     body.appendChild(n);
@@ -88,6 +93,8 @@
   function moveDemoBack(){
     var n=$(DEMO.node);
     if(!n||n.getAttribute('data-ry-demo')!=='1') return;
+    /* [v884] dock 持有期间不拽回：地图激活时它归 #mapDemoDock 管，轨已隐藏。 */
+    if(n.closest&&n.closest('#mapDemoDock')) return;
     var p=memoDemo&&memoDemo.parent, done=false;
     if(p&&p.parentNode){
       var ref=(memoDemo.next&&memoDemo.next.parentNode===p)?memoDemo.next:null;

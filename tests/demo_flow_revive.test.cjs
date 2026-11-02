@@ -62,4 +62,13 @@ function region(src, from, to) {
   assert.ok(demo.includes('没有连接'), '未连通的报错提示文案必须保留');
   assert.ok(demo.includes('TOL_M'), '容差口径必须保留');
 }
-console.log('demo_flow_revive: 4 locks OK');
+/* 锁 5：[v884] dock 搬 #tlPlanBar 不得按工具模式跳过 —— 绘图轨只在绘图区块显示
+   （ry-cad-vp 门控不含 onlineMapSection），工具模式切地图若不搬 = 联合灌溉 chips
+   全消失（用户实测）。dockDockIn 里不允许再出现工具模式判定拦截 pb。 */
+{
+  const dockIn = region(demo, 'function dockDockIn(', 'function dockDockBack(');
+  assert.ok(dockIn.includes("getElementById('tlPlanBar')"), 'dock 必须搬 #tlPlanBar');
+  assert.ok(!/tool\s*&&\s*pb|!tool\s*&&\s*pb|contains\('ry-tool'\)/.test(dockIn),
+    'dockDockIn 不得再按工具模式跳过 #tlPlanBar（v884 废除 v864 的工具模式豁免）');
+}
+console.log('demo_flow_revive: 5 locks OK');

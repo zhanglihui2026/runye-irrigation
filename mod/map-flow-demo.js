@@ -268,8 +268,9 @@
 
   /* [v864] 地图左栏 dock 搬移：在线地图激活时把「分组组合 · 轮灌演示」组内容搬进
      地图左栏卡片（section/sec-t 与该栏其他卡片同款，样式零新增）；离开地图按 memo
-     原样搬回并隐藏卡片。dock **运行时动态创建**（静态 DOM 会被工作区重排挪位，实测）；
-     #tlPlanBar 归属与 ry-cad-toolbar（v858 工具模式搬移）靠 memo 闭环互不破坏。 */
+     原样搬回并隐藏卡片。[v884] 工具模式同样搬 #tlPlanBar（绘图轨在地图区块整条
+     隐藏，不搬就是「切地图按钮全消失」）；#tlPlanBar 归属与 ry-cad-toolbar（v858
+     工具模式搬移）靠 memo 闭环互不破坏。 */
   var dockMemo = null;   /* { pb:{parent,next}, mb:{parent,next} } */
   function ensureDock() {
     var dock = document.getElementById('mapDemoDock');
@@ -290,12 +291,15 @@
   }
   function dockDockIn(dock) {
     if (!dockMemo) dockMemo = { pb: null, mb: null };   /* 幂等：重复 refresh 不覆盖已记原位 */
-    var tool = !!(document.body && document.body.classList.contains('ry-tool'));
     var pb = document.getElementById('tlPlanBar');
     var mb = document.getElementById('mapDemoBar');
-    /* 工具模式（body.ry-tool）下不抢 #tlPlanBar —— 它归 ry-cad-toolbar 的
-       #ryCadGrpDemo 组管（v858）；dock 只补 #mapDemoBar。 */
-    if (pb && !tool && pb.parentNode !== dock) {
+    /* [v884] #tlPlanBar（联合灌溉/轮播组）工具模式也搬。v858~v864 曾让绘图轨代管、
+       dock 不抢 —— 但绘图轨只在绘图区块显示（ry-cad-vp 门控，VPS 不含
+       onlineMapSection）⇒ 切到在线地图整条轨 display:none，联合灌溉 chips 全部
+       消失（用户实测「切地图后按钮就没有了」）。地图页统一归 dock 管，离开按
+       memo 原样搬回；ry-cad-toolbar 的 moveDemoIn/back 加了 #mapDemoDock 守卫
+       （dock 持有期间轨不抢不拽），两边 memo 各自闭环不冲突。 */
+    if (pb && pb.parentNode !== dock) {
       dockMemo.pb = { parent: pb.parentNode, next: pb.nextSibling };
       dock.appendChild(pb);
     }
@@ -372,7 +376,7 @@
   }
 
   window.RyMapFlowDemo = {
-    VERSION: 'v882-map-flow-demo',
+    VERSION: 'v884-map-flow-demo',
     TOL_M: TOL_M,
     INTERVAL_MS: INTERVAL_MS,
     init: function (c) {

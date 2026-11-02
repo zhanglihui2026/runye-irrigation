@@ -6485,3 +6485,26 @@ v:8、三级带 h:64）。
 zone_geometry.test.cjs 的 127×187 旧用例期望翻转（v416 口径→v883 口径）。
 522/0。教训：软目标（贴合 S）不能当主判据用 —— 用户口径里「沿长边」是硬约束，
 硬约束必须显式编码，不能指望软投票凑巧命中。
+
+## 26.113 地图页演示按钮消失修复（v884-demo-dock-map · 2026-11-02）
+
+用户报（v882/v883 后）：「分区与管路页面有轮灌演示按钮，切到在线地图后就没有了」；
+并定口径：**两页都要能演示** —— 三级页只演自动生成的段总管+主管/支管（不含手绘
+总管，v882 已是如此）；在线地图演完整闭环（手绘总管+段总管+主管/支管，v882 已做）。
+
+**根因（dock 归属竞态）**：v864 规定工具模式（body.ry-tool）下 dock 不搬 #tlPlanBar
+（联合灌溉/轮播组），认为它归绘图轨 #ryCadGrpDemo 代管。但绘图轨显隐由 ry-cad-vp
+门控（VPS=[pipePlan/tlPipePlan/grPipe]，**不含 onlineMapSection**）⇒ 切到地图整条轨
+display:none，#tlPlanBar 随之消失；dock 又只搬 #mapDemoBar ⇒ 用户看到「按钮全没了」。
+探针还抓到第二层竞态：v884 首版直接搬后，ry-cad-toolbar 的 moveDemoBack（认节点
+data-ry-demo 标记）在 syncAll 时把 #tlPlanBar 从 dock 拽回隐藏的 tlSide。
+
+**修复（两处配对）**：①map-flow-demo.dockDockIn 废除工具模式豁免，#tlPlanBar 一律
+搬进 dock（dockDockBack 按 memo 原样搬回不变）；②ry-cad-toolbar 的 moveDemoIn/
+moveDemoBack 加 `closest('#mapDemoDock')` 守卫 —— dock 持有期间轨不抢不拽，两边
+memo 各自闭环。探针三态复验：三级页轨内可见 → 地图 dock 内 pb+chips 双可见 →
+返回三级页正常还原。
+
+**测试**：demo_flow_revive.test.cjs 增锁 5（dockDockIn 不得再按工具模式跳过）。
+522/0。教训：跨模块的 DOM 搬移链（rail↔section↔dock 三方共管一个节点）必须给
+每个持有方加「别人持有期间不碰」守卫，只靠各自 memo 会互相打结。
