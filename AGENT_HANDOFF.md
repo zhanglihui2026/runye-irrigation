@@ -6697,3 +6697,24 @@ tests/write_path_audit.test.cjs 三锁：v304 guard 仍在 / ppAddPipe 带标记
 index.html 串为 `?v=NNN-name`（带 `=`），sw.js 为 `'vNNN-name'`；sed 查找串若带 `v` 前缀
 （`v896-...`）对 index.html 天然 0 命中。**正确姿势：sed 用 `NNN-name`（不带 v）全局匹配**，
 且 sed 后用 python `data.count(b'NNN-name')` 核对（grep 对此文件偶发输出异常）。
+
+## 26.122 权威切换批次 B/C 验收（2026-11-02 · 2c298c2，纯文档+探针，零产品代码改动）
+
+批次 B（组撤销权威收口）——探针 gen_undo_group.mjs **11/11 全 PASS**：
+逐块态 setSourcePosition ×2（revision 单调）→ 逐块 undo source 回退 → 切整组 →
+autoPipesWhole 各槽写入 → clearPipesWhole 清空 → **整组 undo（批次B核心）成员槽回写+revision 单调** →
+再导出 canonical 存在+validate 通过+无 shadow 错误。§50 的「组撤销复用预检验证过的规范设计」实现正确。
+
+批次 C（单地块旧格式边界）——探针 gen_legacy_archive.mjs：
+- **C3/C3b PASS**：canonical 绑定损坏（plotId 改错）/校验损坏（revision=-5）→ runyeLoadProject 整份拒绝且现状不被半改。
+- **C1/C2 合成环境受限**：runyeSaveProject 被保存链三级 canonical 提交分支拒绝
+  （诊断：绑定健康 bound=true/rev=7、签名匹配，但 ryCommitSingleLevel3CanonicalFromRuntime
+  合成环境返回 false——与 §26.119 存档恢复链 restored:false 同源，非产品缺陷）。
+  C1 成功路径静态审计确认（inline-12:364 legacy:true 分支 + :796 importLegacySingleCanonicalForRestore）；
+  真机「保存→导入工程」手工验证并入批次 D。
+
+进度：A✅(v897) B✅ C✅；D/E/F 待拍板。验收记录：project-planning/权威切换批次BC验收记录_2026-11-02.md。
+
+**探针教训补充**：gen_legacy_archive 首轮缺 Page.javascriptDialogOpening 自动接受 → 某次 alert 挂死整页
+（SIGTERM 无输出）；保存链需要先「地块库注册探针本体」（RyPlotLibraryStore 克隆 auto 副本）否则
+plotBinding 校验失败；tlDiagramData 存在时保存要求三级 canonical 提交成功（需先点 ppGenerate+tlAutoPipe）。
