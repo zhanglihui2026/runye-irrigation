@@ -40,6 +40,12 @@
   var markerApi = null;     // {show(hit), hide()}
   var lastHit = null;
   var buildStats = null;
+  /* [v888 2026-11-02 用户口径] 类别闸门：null = 全放行；fn(target)->boolean 决定
+     哪类目标**可见可吸**。宿主用法：捕捉开关关掉普通类，但「段总管驳接点」常开
+     —— 用户原话「断点接近驳接点时要能自动吸附，形成完整水流闭环」，驳接点是
+     手绘总管的设计落点，不该藏在一个开关后面。闸门只做过滤，优先级/半径判定
+     照旧走同一套 ⇒ 落点与橡皮筋预览天然一致（v852 教训）。 */
+  var kindGate = null;
 
   function prioOf(kind) { return PRIORITY[kind] || 99; }
 
@@ -153,6 +159,14 @@
   }
   function isEnabled() { return enabled; }
 
+  /* [v888] 设置类别闸门；传 null/非函数 = 清除（全放行）。切换即清标记，
+     防止上一态的白圈残留（同类问题 v846 在 setEnabled 里踩过）。 */
+  function setKindGate(fn) {
+    kindGate = typeof fn === 'function' ? fn : null;
+    clearMarker();
+    return true;
+  }
+
   function clearMarker() {
     lastHit = null;
     if (markerApi && typeof markerApi.hide === 'function') markerApi.hide();
@@ -167,6 +181,8 @@
     var best = null;
     for (var i = 0; i < targets.length; i++) {
       var t = targets[i];
+      /* [v888] 类别闸门：被过滤的类别等同不存在（不命中、不显示标记） */
+      if (kindGate && !kindGate(t)) continue;
       var q = projector(t);
       if (!q) continue;
       var dx = q.x - p.x, dy = q.y - p.y;
@@ -197,6 +213,7 @@
       lastHit: lastHit,
       snapPx: SNAP_PX,
       mergeM: MERGE_M,
+      gateActive: !!kindGate,
       build: buildStats
     };
   }
@@ -211,6 +228,7 @@
     setTargets: setTargets,
     setProjector: setProjector,
     setMarkerApi: setMarkerApi,
+    setKindGate: setKindGate,
     setEnabled: setEnabled,
     isEnabled: isEnabled,
     nearest: nearest,

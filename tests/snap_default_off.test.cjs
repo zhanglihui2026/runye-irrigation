@@ -30,9 +30,18 @@ test('① 默认值是 false：var snapOn = false;', () => {
 test('② mount 时用 setSnapOn(snapOn) 同步三处（引擎/按钮/提示条）', () => {
   const live = stripJsComments(mapJs);
   assert.ok(live.includes('setSnapOn(snapOn);'), '初始化必须调 setSnapOn，只改变量按钮会说谎');
-  /* setSnapOn 本体要仍然有牙：写按钮文字 + aria-pressed + 引擎 setEnabled */
-  assert.ok(/function setSnapOn\(on\)[\s\S]*?setEnabled\(snapOn\)[\s\S]*?aria-pressed/.test(live),
-    'setSnapOn 里必须同时管引擎 setEnabled 与按钮 aria-pressed');
+  /* [v888] setSnapOn 本体要仍然有牙：引擎常开（setEnabled(true)）+ 类别闸门
+     （普通类跟随开关、驳接点常开）+ 按钮 aria-pressed 三处一次同步。
+     旧口径 setEnabled(snapOn) 会把驳接点磁吸一起关掉——用户 2026-11-02 拍板
+     「断点接近驳接点要能自动吸附」，驳接点不藏开关后面。 */
+  assert.ok(/function setSnapOn\(on\)[\s\S]*?setEnabled\(true\)[\s\S]*?setKindGate[\s\S]*?aria-pressed/.test(live),
+    'setSnapOn 里必须同时管引擎 setEnabled(true)、类别闸门 setKindGate 与按钮 aria-pressed');
+});
+
+test('② b [v888] 类别闸门：捕捉关时驳接点（seg-coupler）必须常开', () => {
+  const live = stripJsComments(mapJs);
+  assert.ok(live.includes("snapOn || (t && t.kind==='seg-coupler')"),
+    'setSnapOn 的闸门谓词必须放行 seg-coupler——驳接点是手绘总管的设计落点（水流闭环）');
 });
 
 test('③ index.html 按钮初始态与默认值一致：aria-pressed="false" + 「捕捉：关闭」', () => {

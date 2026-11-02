@@ -228,3 +228,44 @@ test('⑫ 驳接点优先级：同半径内压过更近的阀门；仍让位于�
   const hit2 = S2.nearest({ lat: 18.2, lng: 109.5 });
   assert.equal(hit2.kind, 'trunk-vertex', '编辑已有干线时拐点抢点行为不变');
 });
+
+/* [v888 2026-11-02 用户口径] 类别闸门：捕捉开关关掉普通类，但「段总管驳接点」
+   常开 —— 用户原话「断点接近驳接点时要能自动吸附，形成完整水流闭环」。
+   闸门只过滤，优先级/半径判定照旧走同一套 ⇒ 落点与橡皮筋预览天然一致。 */
+test('⑬ 类别闸门：被过滤的类别等同不存在（不命中、不显示标记）', () => {
+  const S = fresh();
+  const calls = [];
+  S.setMarkerApi({ show: (h) => calls.push('show:' + h.kind), hide: () => calls.push('hide') });
+  S.setTargets([
+    { lat: 18.2, lng: 109.5, kind: 'plot-vertex' },
+    { lat: 18.2001, lng: 109.5001, kind: 'seg-coupler' }
+  ]);
+  /* 闸门=只放行驳接点：贴脸的地块顶点被滤掉，命中驳接点 */
+  S.setKindGate((t) => t.kind === 'seg-coupler');
+  const hit = S.nearest({ lat: 18.2, lng: 109.5 });
+  assert.equal(hit.kind, 'seg-coupler', '闸门外（plot-vertex）不参与判定');
+  assert.ok(S.stats().gateActive, 'stats 报告闸门激活');
+
+  /* 闸门把所有目标都滤掉 = 无命中 + 清标记（setKindGate 每次设置都 hide：首调一次、
+     切水闸门一次；nearest 落空再一次） */
+  S.setKindGate((t) => t.kind === 'water-source');
+  assert.equal(S.nearest({ lat: 18.2, lng: 109.5 }), null, '全被滤掉 ⇒ null');
+  assert.deepEqual(calls, ['hide', 'show:seg-coupler', 'hide', 'hide'], '切换/落空时清标记（防上一态白圈残留）');
+
+  /* 清除闸门（null/非函数）= 全放行 */
+  S.setKindGate(null);
+  const hit2 = S.nearest({ lat: 18.2, lng: 109.5 });
+  assert.equal(hit2.kind, 'plot-vertex', '无闸门时按优先级/距离正常判定');
+  assert.equal(S.stats().gateActive, false);
+});
+
+test('⑭ 驳接点在闸门内仍守优先级规则（v872 锁不因 v888 回退）', () => {
+  const S = fresh();
+  S.setKindGate((t) => t.kind === 'seg-coupler');
+  S.setTargets([
+    { lat: 18.2, lng: 109.5, kind: 'valve-node' },       // 更近但被闸门滤掉
+    { lat: 18.2001, lng: 109.5001, kind: 'seg-coupler' }
+  ]);
+  const hit = S.nearest({ lat: 18.2, lng: 109.5 });
+  assert.equal(hit.kind, 'seg-coupler', '闸门放行的一类里按半径/优先级判定');
+});

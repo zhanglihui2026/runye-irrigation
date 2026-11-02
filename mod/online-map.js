@@ -607,6 +607,10 @@
       trunkPoint={lat:+trunkPoint.lat,lng:+trunkPoint.lng};
       var shiftOn=!!(e.originalEvent && e.originalEvent.shiftKey);
       trunkPoint=trunkSnapPoint(trunkPoint, shiftOn);
+      /* [v888] 吸到驳接点即贯通：给用户一句显式确认（闭环是演示动画的前提） */
+      if(trunkSnapHit && trunkSnapHit.kind==='seg-coupler'){
+        tip('已吸附段总管驳接点：手绘总管在此与地块内自动生成的总管贯通（轮灌演示可全链走水）');
+      }
       trunkPoints.push(trunkPoint);
       renderTrunkDraft();
       updateTrunkRubber(toDisplay(trunkPoint)); /* [v852] 落点后虚线收缩到新末点（长度 0），随鼠标再长出来 */
@@ -634,12 +638,17 @@
     if(shiftOn && trunkPoints.length){
       return orthoPoint(trunkPoints[trunkPoints.length-1], cur);
     }
-    if(snapOn){
-      var _snap=snapApi(), hit=_snap?_snap.nearest(cur):null;
-      if(hit) return {lat:hit.lat,lng:hit.lng};
+    /* [v888] 无条件走引擎：类别闸门在引擎内过滤（捕捉关时只有驳接点能命中）。
+       命中详情存 trunkSnapHit 供 click 提示「已贯通」用——落点与预览仍共用本函数。 */
+    var S=snapApi();
+    trunkSnapHit=null;
+    if(S){
+      var hit=S.nearest(cur);
+      if(hit){ trunkSnapHit=hit; return {lat:hit.lat,lng:hit.lng}; }
     }
     return cur;
   }
+  var trunkSnapHit=null;
   /* [v852 用户反馈] 橡皮筋虚线：点下第一个点后，线跟着鼠标走（虚线、更细更淡），
      点击第二个点才真正落线。只挂 trunkGroup（TRUNK_PANE、interactive:false）——
      关「测量框」不连坐，也不会吃地图点击。 */
@@ -1152,7 +1161,16 @@
   function setSnapOn(on){
     snapOn=!!on;
     var S=snapApi();
-    if(S) S.setEnabled(snapOn);
+    /* [v888 2026-11-02 用户口径] 引擎常开 + 类别闸门：捕捉开 ⇒ 全类吸附；
+       捕捉关 ⇒ 只吸「段总管驳接点」（seg-coupler）——它是手绘总管的设计落点，
+       用户原话「断点接近驳接点时要能自动吸附，形成完整水流闭环」，不该藏在
+       开关后面。驳接点每地块最多 2 个、吸附半径 10px、优先级仍让位于
+       地块顶点/水源/干线拐点，误吸风险可控。（引擎 setEnabled 硬开关保留，
+       宿主不再用它表达捕捉开关——v846 的「三处同步」改为 gate+按钮+提示条。） */
+    if(S){
+      S.setEnabled(true);
+      S.setKindGate(function(t){ return snapOn || (t && t.kind==='seg-coupler'); });
+    }
     if(!snapOn && snapMarker && map.hasLayer(snapMarker)) map.removeLayer(snapMarker);
     var b=document.getElementById('btnSnapToggle');
     if(b){
@@ -1253,7 +1271,8 @@
     if(trunkMode==='idle'){ el.hidden=true; el.textContent=''; return; }
     el.hidden=false;
     el.textContent = trunkMode==='draw'
-      ? ('点击加点 · 双击/回车完成 · Esc 取消 · 按住 Shift 正交 · Ctrl+Z 撤销 · 捕捉：'+(snapOn?'开启':'关闭'))
+      ? ('点击加点 · 双击/回车完成 · Esc 取消 · 按住 Shift 正交 · Ctrl+Z 撤销 · 捕捉：'+(snapOn?'开启':'关闭')
+        + ((snapExtras&&snapExtras.couplers&&snapExtras.couplers.length) ? ' · 驳接点磁吸中' : ''))
       : '点选干线后可拖拐点 · 右键打开菜单 · Ctrl+Z 撤销 · Esc 退出';
   }
 
@@ -1267,10 +1286,9 @@
     if(trunkMode!=='draw') return;
     lastCursorLatLng=fromDisplay(e.latlng);
     var S=snapApi();
-    if(S){
-      if(snapOn) S.nearest(lastCursorLatLng);
-      else S.clearMarker();
-    }
+    /* [v888] 无条件跑引擎：类别闸门决定哪类目标可见可吸（驳接点常开），
+       未命中时引擎自己清标记，不再按 snapOn 分叉。 */
+    if(S) S.nearest(lastCursorLatLng);
     /* [v852] 橡皮筋：预览终点与真实落点走同一个 trunkSnapPoint——
        吸附白点吸到哪，虚线就跟到哪（Shift 正交同理），落点不会和预览不一致。 */
     var shiftOn=!!(e.originalEvent && e.originalEvent.shiftKey);
@@ -1297,7 +1315,10 @@
     trunkPoints=[];
     trunkDraft={id:null,params:{material:'PE',dn:null,designFlow:null}};
     setTrunkMode('draw');
-    tip('依次点击水源到地块内的折点：双击或回车完成，Esc 取消，按住 Shift 正交。灰线是已保存的干线，不会被改动。');
+    /* [v888] 有驳接点时把「磁吸闭环」讲在前面：用户画到驳接点附近会看到白圈并自动吸上 */
+    tip('依次点击水源到地块内的折点：双击或回车完成，Esc 取消，按住 Shift 正交。灰线是已保存的干线，不会被改动。'
+      + ((snapExtras&&snapExtras.couplers&&snapExtras.couplers.length)
+        ? ' 接近地块内自动总管的驳接点（白圈）会自动吸附，接上即成完整水流闭环。' : ''));
   };
   var finishTrunkBtn=document.getElementById('btnFinishTrunk');
   if(finishTrunkBtn)finishTrunkBtn.onclick=function(){commitTrunkDraft();};

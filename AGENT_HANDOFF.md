@@ -6575,3 +6575,34 @@ RyZoneGeometry.VERSION 落后于页面要求 ⇒ 强制 location.reload() 一次
 528/0。教训：**发布纪律「改 CORE 名单文件必须抬版本」要落到「逐文件 ?v= 串」级
 ——只抬 sw VERSION + 主页主串挡不住单个 mod 文件停摆；探针验证的是本地新代码，
 永远无法发现「用户浏览器拿旧文件」这类交付断层，必须靠版本闸门 + 串对齐锁。**
+
+## 26.117 驳接点磁吸常开：手绘总管端点自动吸附自动总管（v890-coupler-magnet-snap · 2026-11-02）
+
+用户口径：「在线地图绘制的总管，断点接近分区与管路页面自动生成的总管驳接点时，
+要能自动吸附，这样手动总管 + 自动总管 + 主管 + 支管形成完整水流闭环，演示动画
+更直观」。
+
+**现状勘察**：吸附链 v859/v872 已建全（trunk-snap kind='seg-coupler' 优先级 4、
+宿主 extraSnapTargets 经 geoBridge 反算 dd.segTrunk.couplers），但整套吸附被
+「捕捉」开关（snapOn，v846 规格**重开默认关**）闸死——用户不点「捕捉：开启」
+驳接点永远不吸，与「自动吸附」的诉求相悖。
+
+**修复**：①trunk-snap.js 新增 `setKindGate(fn)` 类别闸门（nearest() 内过滤：
+被滤类别等同不存在，不命中不显示标记；切换即清标记防白圈残留；stats().gateActive
+上报）；②online-map setSnapOn 改「引擎常开 + 闸门分诊」——捕捉开 ⇒ 全类吸附；
+捕捉关 ⇒ 只放行 seg-coupler（驳接点是设计落点，全图最多 2 个/块、半径 10px、
+优先级仍让位顶点/水源/干线拐点，误吸风险可控）；③mousemove 无条件跑引擎（闸门
+决定可见性，不再按 snapOn 分叉——落点与橡皮筋预览继续共用 trunkSnapPoint）；
+④吸中驳接点落点时 tip「已吸附段总管驳接点……贯通（轮灌演示可全链走水）」；
+⑤进绘制态提示与状态栏追加「驳接点磁吸中」（couplers=0 时不出，geoBridge
+一致性守卫挡住时不虚假承诺）。
+
+**探针**（gen_snap_coupler.mjs，全真实路径：种地块→生成施工图→回传地图→
+.place-go 选中→进绘制态）：捕捉关 ⇒ nearest(驳接点偏 2.83px) 命中 seg-coupler、
+nearest(顶点贴脸)=null；捕捉开 ⇒ 顶点恢复吸附。注意合成环境要点：auto-current
+副本 id ≠ 设计页 currentPlotId 会被 geoBridge 一致性守卫正确拒算（extras=null），
+须先克隆成本体再选（真实流程本体天然同 id 不触发）。
+**测试**：trunk_snap ⑬⑭（闸门过滤/清标记序列/闸门内仍守优先级）、snap_default_off
+② 改口径（setEnabled(true)+setKindGate+aria-pressed）+ ②b 驳接点常开锁。533/0。
+版本注：v888/v889 已被并行会话占用（zone-real-span / first-zone-axis，工作区未
+提交），本版取 v890 并把并行抬号一并吸收。
