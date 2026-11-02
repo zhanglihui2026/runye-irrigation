@@ -6752,3 +6752,18 @@ projectSingleCanonical 预检+restoredCanonicalDesign 装载收口），不构�
   内 adapter.isCurrent(plot.generated,...) 合成环境 false）→ rollback=null → 「无法建立安全回滚点」拒恢复。
   与 §26.119「存档恢复链合成环境失败」同根因，**非产品缺陷**（真实浏览器保存/恢复是日常路径）。
 - C1/C2 结论维持：恢复语义正确（拒绝路径 C3/C3b 已探针 PASS），成功路径待用户真机「保存→导入工程」验证。
+
+## 26.125 批次E前评估项落地：mergePreview 恢复置空（v898-merge-preview-restore · 536c8b9 · 2026-11-02）
+
+**mergePreview 评估结论**（批次 C 审计遗留评估项）：渲染消费仅 ppDrawCutHandles（mode==='adjustCut'
+才画橙色合并高亮）；随 slot 持久化是「捕获一致性」有意设计（ppBlankSlot 也带 mergePreview:null 键）；
+**不移出 slot keys**。唯一缺口：ppApplySlot 恢复原语的兜底段漏了它——恢复后残留非 null 会在切回
+adjustCut 时画一次幽灵橙色高亮（极窄窗口：拖动中恰好捕获 slot）。修复 1 行：ppApplySlot 统一
+`ppState.mergePreview=null`，与 ppBlankSlot 语义对齐。539/0，线上 sha256 复量 3 文件 OK。
+
+**待用户拍板项**（本轮发现，未擅动）：tlSrcFlip（v255 右键水源换向）读 dd.frontPipe/sourcePos——
+v873 后两者恒 null，右键水源**永久弹「请先在管路规划页生成管线图」误导提示**（即使已生成）。
+三个处置选项：A 移除监听（右键无反应）/ B 改提示文案「该功能已随段总管改版下线」/
+C 恢复功能（改读段总管/地图总管口径——是否需要等价功能属产品问题）。等用户选。
+
+线上版本：**v898-merge-view 系列最新 tip=536c8b9**。
