@@ -21,14 +21,24 @@
     }
     var rest = total - used;
     if (rest > 0.05) {
-      if (parts.length >= limit) {
-        var restError = new RangeError('手动分区数量超过 ' + limit + ' 个上限');
-        restError.code = 'manual_zone_count_exceeded';
-        restError.requestedCount = parts.length + 1;
-        restError.maxCount = limit;
-        throw restError;
+      /* [v877] 窄条吸收：余数小于半个设计步长时不再独立成末段——窄条行/列会照常
+         生成主管、参与材料计算并被段总管串联，用户实测手动亩/区模式下底部/右缘
+         多出一条贴边主管（如 total=500、step=160 → [160,160,160,20]）。改为把
+         余数均摊进已有分段 → [166.7,166.7,166.7]，分段数不增、与分区标签口径
+         （均分段长）一致；rest ≥ 0.5×step 时仍视为正常分区保留独立段。 */
+      if (parts.length > 0 && rest < boundedStep * 0.5) {
+        var add = rest / parts.length;
+        for (var ai = 0; ai < parts.length; ai++) parts[ai] += add;
+      } else {
+        if (parts.length >= limit) {
+          var restError = new RangeError('手动分区数量超过 ' + limit + ' 个上限');
+          restError.code = 'manual_zone_count_exceeded';
+          restError.requestedCount = parts.length + 1;
+          restError.maxCount = limit;
+          throw restError;
+        }
+        parts.push(rest);
       }
-      parts.push(rest);
     }
     return parts.length ? parts : [total];
   }

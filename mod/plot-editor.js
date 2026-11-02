@@ -1567,15 +1567,12 @@
   }
 
   function ppSplitLength(total,step){
-    var parts=[],used=0;
-    step=Math.max(1,step||1);
-    while(total-used>step+0.05){
-      parts.push(step);
-      used+=step;
-    }
-    var rest=total-used;
-    if(rest>0.05)parts.push(rest);
-    return parts.length?parts:[total];
+    /* [v877] 改为委托唯一实现 zone-geometry.splitZoneLength（窄条吸收）。
+       旧本地副本 `rest>0.05 → push(rest)` 会把余数独立成贴边窄条段，且与
+       manualZoneLayout / ppGetZoneLayout（走 zone-geometry）失配：
+       layout.N ≠ cuts.zoneCount（655×327 / 45亩 实测 9 vs 12）。 */
+    return window.RyZoneGeometry.splitZoneLength(total, step,
+      (typeof MAX_MANUAL_ZONE_COUNT === 'number') ? MAX_MANUAL_ZONE_COUNT : 500);
   }
 
   // ===== 分区线快照（支持拖动合并减区）=====

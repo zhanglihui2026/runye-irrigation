@@ -30,6 +30,36 @@ test('zone areas honor staircase overrides and group cells in row-major order', 
   assert.equal(geometry.zoneAreaGroups(cuts, polygon, 2).groups[0].sum, 200);
 });
 
+test('splitZoneLength absorbs sub-half-step remainder instead of creating a sliver strip', () => {
+  /* [v877] 余数 < 0.5×步长 → 均摊进已有分段，不新增贴边窄条 */
+  assert.deepEqual(
+    geometry.splitZoneLength(500, 160, 100).map(function (v) { return Math.round(v * 10) / 10; }),
+    [166.7, 166.7, 166.7]
+  );
+  /* 余数 ≥ 0.5×步长 → 仍是正常独立分区 */
+  assert.deepEqual(geometry.splitZoneLength(560, 160, 100), [160, 160, 160, 80]);
+  /* 恰好整除 → 无余数路径 */
+  assert.deepEqual(geometry.splitZoneLength(480, 160, 100), [160, 160, 160]);
+  /* 无已有分段（total ≤ step）→ 单段返回 */
+  assert.deepEqual(geometry.splitZoneLength(120, 160, 100), [120]);
+  /* 均摊后总和守恒 */
+  const parts = geometry.splitZoneLength(501, 200, 100);
+  assert.equal(parts.length, 3);
+  assert.ok(Math.abs(parts.reduce(function (a, b) { return a + b; }, 0) - 501) < 1e-9);
+});
+
+test('manualZoneLayout stays sliver-free when the remainder is sub-half-step', () => {
+  /* 高度 500、设计行高 160 → 3 行均分（旧实现会出 4 行、末行 20m 窄条） */
+  const layout = geometry.manualZoneLayout(480, 500, 40, 160, 666.6667, 200);
+  assert.equal(layout.rows, 3);
+  assert.equal(layout.cols, 3);
+  assert.equal(layout.N, 9);
+  assert.ok(Math.abs(layout.drawZoneH - 500 / 3) < 1e-6);
+  /* 余数超半步时行数不变（独立窄区保留）：600/166.67 → 3 步长段 + 余 100 ≥ 半步 83.3 */
+  const layout2 = geometry.manualZoneLayout(480, 600, 40, 160, 666.6667, 200);
+  assert.equal(layout2.rows, 4);
+});
+
 test('zone grouping preserves planned-area fallback and invalid-input result', () => {
   const fallback = geometry.zoneAreaGroups({
     cols: 2, rows: 2, xPos: [0, 1, 2], yPos: [0, 1, 2],
