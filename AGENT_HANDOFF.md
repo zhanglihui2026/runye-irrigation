@@ -6850,3 +6850,30 @@ gen_batch_d 签名堵点深挖四层，每层结论：
 
 批次 E 完成判据三件套：旧字段写路径清零（复用批次 A 审计表）+ 三条同代链字节级锁全绿 +
 探针矩阵零回归。关键行号在 v900 时点全部实测核实。批次 E 仍等用户拍板动工。
+
+## 26.132 v901-src-autopipe-remove：删除二级页面「自动管路」入口（a89a22d · 2026-11-02）
+
+**来源**：并行会话（Doubao agent）执行改动后请求独立复核，审核报告
+`取消自动管路入口_审核报告_20261102.md`（Doubao workspace）。本会话独立复核通过后抬版本发布。
+
+**改动依据**：二级分区页面已合并为最终分区管路页，`#ppAutoPipe` 与「生成施工图」`#ppGenerate`
+重复（都调 `ppAutoGeneratePipes()`，ppGenerate 在角度变化/待重建时同样重建管线）——用户确认取消。
+
+**三处改动**（与报告一致，逐 diff 核实）：
+1. index.html：删 `#ppAutoPipe` 按钮节点（+取消说明注释，#ppUndo 之后）；
+2. mod/plot-editor.js:3349：删 click 绑定（**必删**——元素不存在时 getElementById 返回 null，
+   .addEventListener 抛 TypeError 中断整个编辑器初始化，v804「重新分区」同款坑）；
+3. mod/style-01.css:5004：删 v780 隐藏死规则 `#ryDrawingHost #ppAutoPipe{display:none!important}`。
+
+**底层函数全保留**（实测在位）：ppAutoGeneratePipes(:3200)/ppClearPipes(:2944)/
+ppHasPipeContent(:2924)/ppUpdateAutoPipeButton(:2928，有 `if(!btn)return` 判空自动跳过)。
+
+**独立复核增量发现**（报告之外）：
+- tests/ 目录零引用 ppAutoPipe（grep 实测）；
+- `project-planning/验收记录/shared-canvas-browser.cjs:226` 有 `getElementById('ppAutoPipe').click()`
+  ——历史验收探针，**不在活跃闸门链**（check.cjs/tests 均无引用），但重跑会 TypeError，已记录不处理；
+- 残留引用全部无害：inline-18.js:66 图标映射、ry-icons.js:87、ry-panel.css:1106、
+  style-01.css:4641（对不存在元素的死规则）、runye-undo.js:360/sw.js:1281（纯注释）。
+
+**发布**：抬 v901-src-autopipe-remove（index.html 12 处 + sw.js 1 处，python count 核对），
+全闸 541/0 + check_publish_refs PASS + lint 通过；远端 tip=a89a22d。
