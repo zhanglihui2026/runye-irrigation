@@ -6429,3 +6429,12 @@ trunk-snap.js 的 PRIORITY 表 ⇒ prioOf 落 99 垫底档；②trunk_snap.test.
   输入（数量/标签「驳接点 N」）；新增 ⑫ 同半径内驳接点压过更近的阀门 + 仍让位干线拐点。
 - 版本 v872-snap-coupler-prio：三处同抬（trunk-snap.js 在 CORE 名单 sw.js:1427）。
   发布 e24662b，sleep 80s 线上 sha256 三文件全 OK。
+
+## 26.110 版本撞号接管备忘（v880-worst-path-seg · 2026-11-02）
+
+并行会话（v879-tape-layer，主管方向过期重算 ppMainDirectionOutdated）与本会话
+（v879-worst-path-seg，最不利路径引擎补齐）同占 v879 且互相覆盖 sw/index 版本串；
+用户拍板由本会话接管，统一抬 **v880-worst-path-seg** 发布（e799722，两特性随车，
+全闸 515/0，线上 sha256 四文件 OK）。**tape-layer 会话回来请注意：你的特性已随
+v880 上线，版本串已是 v880-worst-path-seg，勿再按 v879 发布**；详情见 e799722
+提交说明与 tests/worst_path_seg.test.cjs。
