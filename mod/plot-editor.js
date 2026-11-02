@@ -3744,44 +3744,12 @@
     init(document.getElementById('tlPlanBar2'), false);
 
 
-  /* ===== [v255 2026-10-06 用户要求] 水源方向可调：三级管线简图右键水源点，
-         水源换到总管另一端（左右端/上下端互换）。事件委托挂 document 的 contextmenu，
-         命中 [data-tl-src] 热区后：① 取 tlDiagramData 设计几何 frontPipe 两端中
-         「距当前水源更远」的一端；② 经 RunyeBridge.setSourcePosition 提交二级规范源坐标
-         （随二级快照持久化，二级/三级两页水源一致）；③ tlAutoGenerate({scroll:false,stay:true})
-         重画 —— 管路几何不变，水力/材料不受影响，只水流方向动画与水源标注位置变。
-         没生成管线图时右键给提示不动作。 ===== */
-  (function tlSrcFlip(){
-    document.addEventListener('contextmenu',function(e){
-      var viaHot=e.target&&e.target.closest&&e.target.closest('[data-tl-src]');
-      if(!viaHot){
-        /* [v255b] 兜底：后画的引线/标注会盖住热区中心（elementFromPoint 落在 polyline 上），
-           closest 命中不了 —— 改按几何命中：指针落在热区屏幕包围盒（r=18，+2px 容差）内也算 */
-        var hot=document.querySelector('#tlDiagramContent svg [data-tl-src]');
-        if(!hot)return;
-        var hr=hot.getBoundingClientRect();
-        if(e.clientX<hr.left-2||e.clientX>hr.right+2||e.clientY<hr.top-2||e.clientY>hr.bottom+2)return;
-      }
-      e.preventDefault();
-      var dd=window.tlDiagramData;
-      var fp=dd&&dd.frontPipe,sp=dd&&dd.sourcePos;
-      if(!fp||fp.length<2||!sp){ if(typeof window.atShowToast==='function')window.atShowToast('请先在管路规划页生成管线图，再右键水源换向'); return; }
-      var best=null,bd=-1;
-      for(var i=0;i<fp.length;i++){
-        var d2=(fp[i].x-sp.x)*(fp[i].x-sp.x)+(fp[i].y-sp.y)*(fp[i].y-sp.y);
-        if(d2>bd){bd=d2;best=fp[i];}
-      }
-      if(!best||bd<1)return;   /* 水源总在端点上 ⇒ 最远端即另一端；退化情形不动 */
-      var bridge=window.RunyeBridge;
-      if(!bridge||typeof bridge.setSourcePosition!=='function')return;
-      /* [v570] 用户手动拖过水源时，拖动值是绝对位置且优先级更高 —— 换向前必须先清掉，
-         否则换向写进 state.source 也被拖动值盖住，看起来"右键没反应"。 */
-      if(bridge.setSourcePosition({x:best.x,y:best.y})!==true)return;
-      if(typeof window.tlSourceMoveClear==='function')window.tlSourceMoveClear();
-      try{ tlAutoGenerate({scroll:false,stay:true}); }catch(err){}
-      if(typeof window.atShowToast==='function')window.atShowToast('水源已换到总管另一端（可再右键切换）');
-    });
-  })();
+  /* ===== [v899 用户拍板] tlSrcFlip 右键水源换向（v255）整体移除 =====
+     原功能读 tlDiagramData.frontPipe/sourcePos 定位换向端点；v873 起设计侧两者恒置 null
+     （设计侧只拥有段总管），该功能实际退化为永久弹「请先生成管线图」误导提示。
+     三选一（A 移除监听 / B 改文案 / C 恢复功能改读段总管口径）中用户 2026-11-02 拍板 A。
+     注：三级 SVG 里的 [data-tl-src] 热区元素保留（纯渲染标记，无行为），水源方向现在
+     由地图总管的画法定义。 */
   })();
 
 
