@@ -428,11 +428,14 @@
       if(tl){
         var data=window.tlDiagramData;
         if(data&&data!==renderedPipelineData&&window.RyTlWs){
+          var firstRender=!renderedPipelineData;
           renderedPipelineData=data;window.RyTlWs.render(tl,data);
-          /* [v784] 重新生成后重置分区视图为「适应窗口」：ppFitScale 已含 0.8 标注余量系数，
-             保证图幅外沿的尺寸标注（旋转后左端更低）随图一起落入画布可视区；
-             否则沿用户上一次的紧边缩放，底部尺寸线左半段会被画布边裁掉（用户实测）。 */
-          if(layerState.pipeline){try{if(typeof window.ppFitView==='function')window.ppFitView();}catch(e){}}
+          /* [v896] 仅首次渲染（画布从空到有内容）时适应窗口：保证图幅外沿的尺寸标注
+             （ppFitScale 含 0.8 标注余量系数，旋转后左端更低的底部尺寸线）落入可视区；
+             后续数据更新（重新生成管线图）保持用户当前缩放/平移不再被重置——
+             用户手动调整视图后触发任何数据变化都不该把视图甩回默认位，需要时点「⤢ 适应窗口」。
+             [v784] 原行为：每次数据变化都 ppFitView（副作用：重置用户视图）。 */
+          if(firstRender&&layerState.pipeline){try{if(typeof window.ppFitView==='function')window.ppFitView();}catch(e){}}
         }
         if(!data)renderedPipelineData=null;
         var ready=!!data&&!!tl.querySelector('svg.tl-ws-svg');

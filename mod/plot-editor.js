@@ -2340,8 +2340,9 @@
 
     if(!ppState.polyPts.length){
       // Empty state: just show hint text
-      ppCtx.fillStyle='rgba(15,23,42,.42)';ppCtx.font='10px sans-serif';ppCtx.textAlign='right';
-      ppCtx.fillText('缩放 '+((ppState.zoom*100).toFixed(0))+'%',ppCanvas.width-8,ppCanvas.height-18);
+      ppCtx.fillStyle='rgba(15,23,42,.42)';ppCtx.font='10px sans-serif';ppCtx.textAlign='left';
+      /* [v896] 缩放文字画在左下角：右下角会被 .ry-pwa-install 浮条（fixed right/bottom 16px, z-index 2000）遮挡 */
+      ppCtx.fillText('缩放 '+((ppState.zoom*100).toFixed(0))+'%',8,ppCanvas.height-18);
       ppCtx.fillStyle='rgba(15,23,42,.46)';ppCtx.font='14px sans-serif';ppCtx.textAlign='center';
       ppCtx.fillText('请先到「在线地图」画框并回传地块',ppCanvas.width/2,ppCanvas.height/2);
       return;
@@ -2382,10 +2383,10 @@
     ppCtx.fill();
     ppDrawZones(b);
 
-    // Scale + zoom indicator bottom-right
-    ppCtx.fillStyle='rgba(15,23,42,.42)';ppCtx.font='10px sans-serif';ppCtx.textAlign='right';
+    // Scale + zoom indicator bottom-left [v896] 挪到左下角：右下角被 .ry-pwa-install 浮条遮挡
+    ppCtx.fillStyle='rgba(15,23,42,.42)';ppCtx.font='10px sans-serif';ppCtx.textAlign='left';
     var zPct=(ppState.zoom*100).toFixed(0)+'%';
-    ppCtx.fillText('缩放 '+zPct,ppCanvas.width-8,ppCanvas.height-18);
+    ppCtx.fillText('缩放 '+zPct,8,ppCanvas.height-18);
 
     // Polygon outline
     ppCtx.strokeStyle='rgba(26,71,49,.65)';
