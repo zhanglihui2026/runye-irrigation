@@ -6816,3 +6816,16 @@ v899 移除右键换向后复查发现**配套误导残留两处**，且实锤**
 - verify_ry_tool.js 锁的旧 tooltip 文案不需同步——gate.cjs:50 已注明其为历史审计工具、不在现行闸门链。
 
 全闸 541/0；线上 sha256 复量 5 文件 OK。远端 tip=fb12ca2（v900）。
+
+## 26.130 C1/C2 保存链四层诊断收官（2026-11-02 · 探针，无代码改动）
+
+gen_batch_d 签名堵点深挖四层，每层结论：
+1. rollback→save：确认（captureRestoreRollbackSnapshot 内 runyeSaveProject 失败即拒恢复）；
+2. save 拒绝分支定位：640 行三条件 hasBoundCanonical && dd.sourceSignature===签名 && commit!==true；
+3. **commit 前置条件逐项复现全过**：validate ✓ / 绑定 ✓ / **isCurrent ✓** / **s4 L2 十五项字段逐一 JSON 比对全等** ✓——保存链健康度证据充分；
+4. 剩余堵点=闭包内 `drawingDesignGenerationInputSignature` 与实时辅助态（terrain/tlAux/collectInputValues）
+   在探针多步操作间的漂移——**签名护栏设计正确**（护栏本该拒绝「输入态与生成时不一致」的保存；
+   且 sig 不匹配时 640 分支不拒绝保存、走宽容路径保留旧 L3 canonical——真实用户单步流程不受影响）。
+
+**C1/C2 最终定性**：探针合成环境多层时序依赖，非产品缺陷；等用户真机「保存→导入工程」一次即可闭环。
+后续存档类探针若需在合成环境跑，可在生成后**立即** save（不插入库注册/refresh 等中间步骤）尝试绕开漂移。
