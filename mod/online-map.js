@@ -3235,6 +3235,13 @@
     var store=window.RyPlotLibraryStore;
     var snapshot=store&&typeof store.read==='function'?store.read():{ok:false,error:'plot-library-store-unavailable'};
     var arr=snapshot.ok?snapshot.plots:[];
+    /* [v885] 地块唯一性：auto-current 副本的本体已在库里时不进列表（与地图叠加层
+       renderPlots 同判据）—— 否则「我的地块」双行 + 卫星图两层叠加（用户实测）。 */
+    arr=arr.filter(function(p){
+      if(!p||p.source!=='auto'||p.designPlotId==null||p.designPlotId==='')return true;
+      var owner=String(p.designPlotId);
+      return !snapshot.plots.some(function(o){return o&&String(o.id)===owner;});
+    });
     box.innerHTML='';
     if(!snapshot.ok){box.textContent='地块库读取失败，未显示列表；请刷新后重试。';box.hidden=false;return;}
     arr.forEach(function(p){

@@ -6508,3 +6508,25 @@ memo 各自闭环。探针三态复验：三级页轨内可见 → 地图 dock �
 **测试**：demo_flow_revive.test.cjs 增锁 5（dockDockIn 不得再按工具模式跳过）。
 522/0。教训：跨模块的 DOM 搬移链（rail↔section↔dock 三方共管一个节点）必须给
 每个持有方加「别人持有期间不碰」守卫，只靠各自 memo 会互相打结。
+
+## 26.114 地块唯一性：auto-current 副本叠加修复（v885-plot-unique · 2026-11-02）
+
+用户问：「在线地图我的地块中，当前地块跟地图测量地块还有分区与管路回传回来的
+地块，是不是有多层叠加的情况？地块应该是唯一性的。」
+
+**确认属实**：inline-09 生成施工图后无条件 upsertGeneratedCurrent 创建
+auto-current:<plotId> 副本（source:'auto'，designPlotId 指本体）；本体（地图画框/
+测量保存的那条）本就在库 ⇒ 库里两条同形地块，renderPlots 各画一层 + 我的地块
+双行。分区方案其实早已由 RyMapPartition.capture 挂到**本体**（capture 认
+id===net.plotId），副本是纯冗余。
+
+**修复（三层）**：①inline-09 同步块：库里有本体（id===plotId）⇒ 不建副本，并
+removeGeneratedCurrent 清掉旧副本（自愈老数据）；本体不在（设计来自手动画框）
+⇒ auto-current 机制保留（它的本职）。②runye-map-enhance renderPlots 显示级
+去重（autoDupOwnerExists 判据），老数据不等重新生成就不再叠画。③online-map
+renderMyPlots 同判据过滤，列表不出现双行。runye-map-enhance.js 自身 ?v= 串
+849-panel-merge → 885-plot-unique（本轮有改动）。
+
+**探针验证**（gen_plotdup.mjs）：CASE-A 本体在库+旧副本 ⇒ 生成后只剩本体（副本
+被清）；CASE-B 无本体 ⇒ auto-current 正常创建。
+**测试**：tests/plot_unique.test.cjs 三把静态锁。523/0。

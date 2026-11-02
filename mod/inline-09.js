@@ -5332,7 +5332,12 @@ function tlAutoGenerate(options) {
     }
     /* [map-enhance] 同步当前设计地块到共享地块库，与管网一起供地图叠加。
        自动记录使用所属项目ID，避免不同地块在固定 auto-current 槽位互相覆盖；
-       无明确项目ID时不写入共享库，避免把临时几何误认成其他项目的地块。 */
+       无明确项目ID时不写入共享库，避免把临时几何误认成其他项目的地块。
+       [v885] 地块唯一性：库里已有本设计地块的**本体**（id === plotId，地图画框/
+       测量保存的那条）⇒ 不再另存 auto-current 副本 —— 副本与本体会被地图叠加层
+       各画一层，同一地块多层叠加、我的地块列表双行（用户实测「叠加多次实际操作
+       就是乱的」）。分区方案已由 RyMapPartition.capture 挂到本体（capture 认
+       id===plotId）；这里顺手清掉旧版本遗留的副本（自愈老数据）。 */
     try{
       if(net && dd.poly && dd.poly.length>=3){
         var pll = []; for(var pi=0; pi<dd.poly.length; pi++){ var llpt=p2ll(dd.poly[pi]); if(llpt) pll.push(llpt); }
@@ -5342,6 +5347,22 @@ function tlAutoGenerate(options) {
           area = Math.abs(area*6378137*6378137/2);
           var sl=0, sn=0; pll.forEach(function(q){ sl+=q[0]; sn+=q[1]; });
           var plotStore=window.RyPlotLibraryStore;
+          var hasOwner=false;
+          try{
+            var libState=plotStore&&typeof plotStore.read==='function'?plotStore.read():null;
+            if(libState&&libState.ok){
+              for(var oi=0; oi<libState.plots.length; oi++){
+                var op=libState.plots[oi];
+                if(op&&String(op.id)===String(plotId)){ hasOwner=true; break; }
+              }
+            }
+          }catch(eOwner){}
+          if(hasOwner){
+            if(plotStore&&typeof plotStore.removeGeneratedCurrent==='function'){
+              var cleaned=plotStore.removeGeneratedCurrent(plotId);
+              if(cleaned&&cleaned.ok&&!cleaned.unchanged)console.log('[map-enhance] 已清理重复的自动地块副本（本体已在地块库）:',plotId);
+            }
+          }else{
           var autoId=plotStore&&typeof plotStore.generatedCurrentId==='function' ? plotStore.generatedCurrentId(plotId) : null;
           if(autoId && typeof plotStore.upsertGeneratedCurrent==='function'){
             var entry={ id:autoId, name:'当前设计地块', mu:Math.round(area/666.67*100)/100, sqm:Math.round(area),
@@ -5351,6 +5372,7 @@ function tlAutoGenerate(options) {
             var saved=plotStore.upsertGeneratedCurrent(plotId,entry);
             if(!saved.ok)console.warn('[map-enhance] automatic plot sync skipped:',saved.error);
           }else if(plotId) console.warn('[map-enhance] automatic plot sync skipped: plot library store unavailable');
+          }
         }
       }
     }catch(ePlot){}

@@ -614,6 +614,18 @@
     var librarySnapshot = hasProvidedPlots ? null : readPlotLibraryState();
     var fromLib = !hasProvidedPlots && !!(librarySnapshot && librarySnapshot.ok);
     var plots = hasProvidedPlots ? opts.plots : (fromLib ? librarySnapshot.plots : []);
+    /* [v885] 地块唯一性显示兜底：auto-current 副本（source==='auto'，designPlotId 指向
+       本体）在本体已在库里时跳过绘制 —— 老版本可能已留有副本，等下次生成才被
+       inline-09 清掉；渲染层先按同一判据去重，同一地块不再多层叠加。 */
+    function autoDupOwnerExists(p, arr) {
+      if (!p || p.source !== 'auto' || p.designPlotId == null || p.designPlotId === '') return false;
+      var owner = String(p.designPlotId);
+      for (var i = 0; i < arr.length; i++) {
+        if (arr[i] && String(arr[i].id) === owner) return true;
+      }
+      return false;
+    }
+    plots = plots.filter(function (p) { return !autoDupOwnerExists(p, plots); });
     if (!hasProvidedPlots && !fromLib && typeof console !== 'undefined' && console.warn) {
       console.warn('[map-enhance] 地块库不可用，本次不绘制地块且不会将空列表写回：', librarySnapshot && librarySnapshot.error);
     }
