@@ -3971,8 +3971,8 @@ function tlAutoGenerate(options) {
      二级传导（ppHasPipes）几何不动，滴灌带方向也维持按分区几何（与二级支管一致）。 */
   /* [v416 2026-10-13 用户口径] 方向单一事实来源：滴灌带 ∥ tapeAxis、主管∥支管 ⊥ tapeAxis。
      —— 旧实现「管道按多数派、滴灌带按单分区宽高比」两套判据会在混合朝向地块上互相平行，
-        现统一由 RyZoneGeometry.tapeAxisOf 一次算出（判据改为「贴合单边铺设长度」，
-        平票由更省支管的一侧破平）。RyZoneGeometry 缺失时退回旧投票，行为不变。 */
+        现统一由 RyZoneGeometry.tapeAxisOf 一次算出（[v883] 判据改为「带沿地块长边」硬规则，
+        地块接近正方形时退回「贴合单边铺设长度」投票）。RyZoneGeometry 缺失时退回旧投票，行为不变。 */
   var tlAxisReport=null;
   var majFixedH=(function(){
     /* [v881] 二级传导优先：滴灌带轴必须 ⊥ 实际传导来的主管。三级自己的网格变量

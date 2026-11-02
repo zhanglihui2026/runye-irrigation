@@ -226,10 +226,11 @@
   /* [v416 2026-10-13 用户口径] 布管方向单一事实来源 —— 彻底解决「主管/支管与滴灌带不垂直」。
      规则优先级（硬约束在前，冲突时牺牲后者）：
        ① 滴灌带 ∥ tapeAxis，主管 ∥ 支管 ⊥ tapeAxis（由本函数单一输出保证，不可能被违反）；
-       ② 全图（同一地块）方向统一：少数服从多数；
-       ③ 各分区滴灌带长度尽量贴合「单边铺设长度×2」（= 固定边 S）：软目标，冲突时牺牲（支管略增）。
-     投票判据由旧的「宽高比」改为「贴合 S 的程度」（fit = extent/S，>1 反向惩罚）——
-     多数派天然是更省支管、更贴合铺设长度的方向。
+       ② [v883 2026-11-02 用户拍板] 滴灌带沿地块长边布置：网格总宽/总高差 >5% ⇒ 长边即带轴
+         （硬规则，不再投票）；主管/支管随 ① 自动转成短边方向；
+       ③ 全图（同一地块）方向统一：单一 tapeAxis 天然满足；
+       ④ 各分区滴灌带长度尽量贴合「单边铺设长度×2」（= 固定边 S）：软目标，仅在地块
+         接近正方形（≤5%，无明确长边）时作为投票判据，冲突时牺牲（支管略增）。
      segs[]：沿 tapeAxis 的滴灌带分段数（带长 > S 时自动切段，杜绝画出超长带）。 */
   function axisFit(extent, S) {
     if (!(extent > 0) || !(S > 0)) return 0;
@@ -252,10 +253,26 @@
         if (fx >= fy) votes.x++; else votes.y++;
       }
     }
-    /* 平票（如上下两排分区数相同）→ 由「贴合度加权」更高的一侧破平：
-       即选更省支管、更贴合单边铺设长度的方向，而不是任意取默认轴。 */
-    axis = (votes.x === votes.y) ? (fitSum.y > fitSum.x ? 'y' : 'x')
-                                 : (votes.x > votes.y ? 'x' : 'y');
+    /* [v883 2026-11-02 用户拍板] 硬规则：滴灌带沿地块长边布置（带 ∥ 长边，
+       主管/支管 ⊥ 带）。网格总宽/总高差异明显（>5%）⇒ 直接取长边为带轴，
+       不再看「贴合铺设长度」投票 —— 91×254 分区 + S=80 时贴合票必投短边
+       （0.879 > 0.314），带横在窄边上，与长边布置诉求正好相反（用户实测截图）。
+       接近正方形（≤5%，无明确长边）⇒ 退回贴合投票（平票由贴合度加权破平）。
+       votes/fitSum 仍照算，只作报告信息（__ryTapeAxisReport / 探针可对照）。 */
+    var totX = 0, totY = 0;
+    for (var tx = 0; tx < cuts.xPlan.length; tx++) totX += Number(cuts.xPlan[tx]) || 0;
+    for (var ty = 0; ty < cuts.yPlan.length; ty++) totY += Number(cuts.yPlan[ty]) || 0;
+    var hiDim = Math.max(totX, totY);
+    var longSide = (totX > 0 && totY > 0 && hiDim - Math.min(totX, totY) > hiDim * 0.05)
+      ? (totY > totX ? 'y' : 'x') : null;
+    if (longSide) {
+      axis = longSide;
+    } else {
+      /* 平票（如上下两排分区数相同）→ 由「贴合度加权」更高的一侧破平：
+         即选更省支管、更贴合单边铺设长度的方向，而不是任意取默认轴。 */
+      axis = (votes.x === votes.y) ? (fitSum.y > fitSum.x ? 'y' : 'x')
+                                   : (votes.x > votes.y ? 'x' : 'y');
+    }
     for (var r2 = 0; r2 < cuts.rows; r2++) {
       for (var c2 = 0; c2 < cuts.cols; c2++) {
         var ex2 = Number(cuts.xPlan[c2]) || 0, ey2 = Number(cuts.yPlan[r2]) || 0;
