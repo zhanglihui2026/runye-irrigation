@@ -6438,3 +6438,27 @@ trunk-snap.js 的 PRIORITY 表 ⇒ prioOf 落 99 垫底档；②trunk_snap.test.
 全闸 515/0，线上 sha256 四文件 OK）。**tape-layer 会话回来请注意：你的特性已随
 v880 上线，版本串已是 v880-worst-path-seg，勿再按 v879 发布**；详情见 e799722
 提交说明与 tests/worst_path_seg.test.cjs。
+
+## 26.111 轮灌演示水流动画复活 + 地图端完整闭环（v882-demo-flow-revive · 2026-11-02）
+
+用户报：「原来的分区轮灌动画演示，现在被我们改的乱了，它已经彻底失效了」；要求在
+在线地图实现：路径 = 手动总管 + 分区内自动生成的段总管连成闭合系统后动画演示。
+
+**根因（简图演示）**：v873「分区图只拥有段总管」起 `frontPipe=null; sourcePos=null`
+（inline-09 ~4614），简图 SVG 不再画 `path[data-tlpipe="front"]`；而
+`tlDemoRenderFlow`（v218 水流动画）第一步找 front path、找不到就静默 `return`
+（~2381）⇒ 水流层整链消失（chips 高亮还在、水流线/光晕/阀门开启全没了）。
+探针复现实锤（gen_tldemo.mjs）：点 chip 后 flow:0/halo:0/valve:0/layer:0。
+
+**修复①（简图）**：tlDemoRenderFlow 找不到 front path 时兜底走
+`path[data-tlpipe="segTrunk"]`；水流入口端 = `tlSegAnchorIdx()`（v880 驳接端判定，
+0=起点 1=终点，读不到退 0），为 1 时整条反序——与最不利路径同源。探针复验：
+flow:2/halo:2/valve:2/layer:1，动画复活。
+
+**修复②（地图端完整闭环）**：mod/map-flow-demo.js render() 把手绘总管与段总管从
+「静态黑骨架」升级为「实线骨架 + 青色 #38bdf8 流动虚线叠层」（与简图 v218 水流线
+同语言），演示时水流动画沿「水源→手动总管→段总管→当组主管/支管」整条路径走。
+连通校验（validateConnection，5m 容差、未连报错不播放）保持不变。
+
+**测试**：tests/demo_flow_revive.test.cjs 四把静态锁（兜底顺序 front→segTrunk→判空、
+tlSegAnchorIdx 反序、地图端双叠层、连通报错门槛不放松）。

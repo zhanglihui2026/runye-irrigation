@@ -141,9 +141,17 @@
     /* 底态：全部主管/支管淡化灰 */
     d.mainsLL.forEach(function (l) { if (l) ly.addLayer(poly(l, '#cbd5e1', 2, false)); });
     d.branchLL.forEach(function (l) { if (l) ly.addLayer(poly(l, '#e2e8f0', 1.5, false)); });
-    /* 总管 + 段总管常亮（水源 → 驳接 → 串联干线的骨架） */
-    if (d.trunkLL && d.trunkLL.length >= 2) ly.addLayer(poly(d.trunkLL, '#111827', 5, false));
-    if (d.segLL) ly.addLayer(poly(d.segLL, '#111827', 4, false));
+    /* [v882] 总管 + 段总管 = 完整闭合水路（用户要求：手动总管接上自动生成的段总管
+       形成闭合系统，演示时水流沿整条路径走）。实线深色骨架常亮 + 青色流动虚线叠层
+       （与简图 v218 水流线同语言：#38bdf8 光流），叠加不遮管线原色。 */
+    if (d.trunkLL && d.trunkLL.length >= 2) {
+      ly.addLayer(poly(d.trunkLL, '#111827', 5, false));
+      ly.addLayer(poly(d.trunkLL, '#38bdf8', 2.4, true));
+    }
+    if (d.segLL) {
+      ly.addLayer(poly(d.segLL, '#111827', 4, false));
+      ly.addLayer(poly(d.segLL, '#38bdf8', 2.2, true));
+    }
     /* 活动组：主管蓝粗 + 支管绿 + 水流虚线滚动动画；组内阀门开（绿），组外关（灰） */
     for (var zi = 0; zi < d.total; zi++) {
       var gi = groupOf(zi, d.manual, d.nPer);
@@ -364,7 +372,7 @@
   }
 
   window.RyMapFlowDemo = {
-    VERSION: 'v861-map-flow-demo',
+    VERSION: 'v882-map-flow-demo',
     TOL_M: TOL_M,
     INTERVAL_MS: INTERVAL_MS,
     init: function (c) {

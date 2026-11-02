@@ -2379,9 +2379,23 @@ function tlDemoRenderFlow(svg, g) {
        ⇒ 水源端「要不要反序」的判断会失效（水流从错误的一端起算）。改优先取整管引用
        （data-tlpipe-ref，d 与 frontPipe 同点数），取不到再退回旧顺序（行为不变）。 */
     var fEl = svg.querySelector('path[data-tlpipe="front"][data-tlpipe-ref]') || svg.querySelector('path[data-tlpipe="front"]:not([data-tlpipe-ref])') || svg.querySelector('path[data-tlpipe="front"]');
+    /* [v882] seg-trunk 时代（v873「分区图只拥有段总管」）：frontPipe 生成时恒 null ⇒
+       简图不再画 data-tlpipe="front"，本函数曾在无 front path 时静默 return ⇒
+       轮灌演示的水流动画整链消失（用户实测「彻底失效」，chips 高亮还在、水流线没了）。
+       修复：干线改走段总管 path[data-tlpipe="segTrunk"]（v859 起恒画）；水流入口端 =
+       tlSegAnchorIdx()（手绘总管在地图上驳接到干线哪一端：0=起点 1=终点，读不到退 0，
+       与最不利路径同源）⇒ 驳接端为终点时整条反序，水流从驳接端流向干线末端。 */
+    var segEntryRev = false;
+    if (!fEl) {
+      fEl = svg.querySelector('path[data-tlpipe="segTrunk"]');
+      if (fEl) {
+        try { segEntryRev = (typeof tlSegAnchorIdx === 'function') && tlSegAnchorIdx() === 1; } catch (eAnchor) { segEntryRev = false; }
+      }
+    }
     if (!fEl) return;
     var fPts = tlFlowParseD(fEl.getAttribute('d'));
     if (fPts.length < 2) return;
+    if (segEntryRev) fPts = fPts.slice().reverse();
     /* 水源端：world 数组与 path 同序同长 ⇒ 用最近 sourcePos 的下标判断要不要反序 */
     var dd = window.tlDiagramData;
     if (dd && dd.sourcePos && dd.frontPipe && dd.frontPipe.length === fPts.length) {
