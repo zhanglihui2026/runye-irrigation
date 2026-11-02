@@ -5001,12 +5001,10 @@ body.ry-tool #pipePlanSection #ryDrawingHost #ppToolbar{grid-column:auto;grid-ro
    （verify_sketchup 计数契约不破坏；宿主卸载回退原二级页面时两者仍可用）。
    恢复方式：删除本行即可。 */
 #ryDrawingHost #ppToolbar button[data-mode="adjustCut"],#ryDrawingHost #ppResetCuts{display:none!important}
-/* [v780 取消] 「⇢ 自动管路」（#ppAutoPipe，ppToolbar 组内、回退与地块划分之间）
-   在统一绘图工作区内隐藏 —— 用户截图标注「没什么意义了，取消吧」（管路生成已由
-   管路组「🔄 生成管线图」承担）。按 v96/v778 惯例只隐藏宿主内入口：DOM 与点击
-   绑定、verify_sketchup 按钮计数契约均保留；宿主卸载回退原二级页面时仍可用。
-   恢复方式：删除本行即可。 */
-#ryDrawingHost #ppAutoPipe{display:none!important}
+/* [2026-11-02 删除] 「⇢ 自动管路」（#ppAutoPipe）入口已随 index.html 按钮节点一并彻底删除
+   （与「生成施工图」重复，都调 ppAutoGeneratePipes）。原 v780 此处的
+   #ryDrawingHost #ppAutoPipe{display:none!important} 对已不存在的元素是死规则，一并清理；
+   底层 ppAutoGeneratePipes / ppClearPipes 函数保留。 */
 /* [v778 取消] 分区线微调四键（↑↓←→，#ppCutFineGroup，调网格模式下出现）
    在统一绘图工作区内隐藏 —— 用户截图红箭头标注取消。
    只隐藏宿主内的入口：DOM 与 ppNudgeCut 绑定原样保留（不破坏 verify_sketchup

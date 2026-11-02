@@ -3346,10 +3346,12 @@
     ppRefreshDiagramOrReset();
   }
 
-  document.getElementById('ppAutoPipe').addEventListener('click',function(){
-    if(ppHasPipeContent())ppClearPipes();
-    else ppAutoGeneratePipes();
-  });
+  /* [2026-11-02 取消「自动管路」入口] 原 click 绑定（document.getElementById('ppAutoPipe')
+     addEventListener，有管→ppClearPipes / 没管→ppAutoGeneratePipes）已随按钮一并删除——
+     与「生成施工图」#ppGenerate 重复（都调 ppAutoGeneratePipes）。若删除 DOM 却留此绑定，
+     元素不存在会抛 TypeError 中断整个编辑器初始化（v804「重新分区」同款坑）。
+     底层函数全部保留：ppAutoGeneratePipes 供 #ppGenerate(:4959)/autoPipesWhole/ensureInitialPipes
+     调用；ppClearPipes 供 clearPipesWhole(:634) 调用。 */
 
   document.getElementById('ppRotateZones').addEventListener('click',function(){
     ppPushHistory();
