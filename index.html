@@ -26,7 +26,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>润野灌溉设计优化版｜滴灌管径与水泵选型</title>
 <meta name="description" content="输入地块、滴灌带与水源参数，快速计算灌溉分区、主管支管管径和水泵工作点。"/>
-<link rel="stylesheet" href="mod/style-01.css?v=897-write-path-audit">
+<link rel="stylesheet" href="mod/style-01.css?v=898-merge-preview-restore">
 <link rel="stylesheet" href="runye-inverse-design.css?v=277">
 <script defer src="runye-inverse-design.js?v=438-branch-flow-conservation"></script>
 <link rel="stylesheet" href="runye-terrain.css?v=454-terrain-sidebar-peer">
@@ -36,7 +36,7 @@
 <link rel="stylesheet" href="runye-case-library.css?v=277">
 <script src="runye-case-library.js?v=278-case-query"></script>
 <script src="runye-geo.js"></script>
-<script src="runye-map-enhance.js?v=897-write-path-audit"></script>
+<script src="runye-map-enhance.js?v=898-merge-preview-restore"></script>
 <script src="hydraulic-calc/hydraulics-wasm.js"></script>
 <script src="hydraulic-calc/native-bridge.js"></script>
 <script src="hydraulic-calc/hc-core.js"></script>
@@ -51,7 +51,7 @@
 <link rel="stylesheet" href="hydraulic-calc/hydraulic-calc.css">
 <link rel="stylesheet" href="filter-system/filter-system.css">
 <link rel="stylesheet" href="pwa/vendor/leaflet.css">
-<link rel="stylesheet" href="mod/online-map.css?v=897-write-path-audit">
+<link rel="stylesheet" href="mod/online-map.css?v=898-merge-preview-restore">
 <link rel="stylesheet" href="terrain/terrain.css?v=535-terrain-single-source">
 <link rel="stylesheet" href="hydraulics-main.css?v=442-native">
 <style id="ryCadTwinCss">
@@ -2396,7 +2396,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 </div>
 
 <script src="mod/material-formulas.js?v=412"></script>
-<script src="mod/zone-geometry.js?v=897-write-path-audit"></script>
+<script src="mod/zone-geometry.js?v=898-merge-preview-restore"></script>
 <script src="mod/flow-geometry.js?v=414"></script>
 <script src="mod/tl-polyline-geometry.js?v=426-tl-polyline-geometry"></script>
 <!-- [v421-mat-table] 材料清单/材料表管理（自 inline-09 迁出）：先于 inline-09 加载 —— inline-09 尾部
@@ -2405,7 +2405,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <!-- [v424-plan-calc-render] 扬程公式与分解展示模块，先于计算控制器和三级调用方装载。 -->
 <script src="mod/plan-calc-render.js?v=614-head-formula"></script>
 <!-- [v887-tape-zone-vgate] 段总管生成器（纯几何，Node 单测锁），先于 inline-09 消费方装载。 -->
-<script src="mod/inline-09.js?v=897-write-path-audit"></script>
+<script src="mod/inline-09.js?v=898-merge-preview-restore"></script>
 <!-- [v423-header-layout] 三级简图标题布局依赖 inline-09 的 tlMeasureText 与生成时写入的标题状态。 -->
 <script src="mod/tl-header-layout.js?v=423-header-layout"></script>
 
@@ -2415,7 +2415,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <!-- ===== 实际地块规划 JS ===== -->
 <script src="mod/inline-11.js?v=653-zone-calibers"></script>
 <!-- [v420-split] 绘图编辑器 IIFE 自 inline-11 迁出：必须紧随 inline-11 之后同步执行 -->
-<script src="mod/plot-editor.js?v=897-write-path-audit"></script>
+<script src="mod/plot-editor.js?v=898-merge-preview-restore"></script>
 <script src="mod/inline-12.js?v=823-fix-transfer-save-alert"></script>
 <script src="mod/inline-13.js?v=831-trunk-schema-v2"></script>
 <!-- [v422-head-system-svg] 纯 SVG 核心先于 inline-14 同步加载。 -->
@@ -2436,7 +2436,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <!-- [v815] 绘图工具栏统一图标集（单色线性 SVG）：必须先于 inline-18.js 加载，
      inline-18 的 decorateToolbar 会在首次装饰时调用 window.RyIcons.decorate。 -->
 <script src="mod/ry-icons.js?v=824-toolbar-dedupe"></script>
-<script src="mod/inline-18.js?v=897-write-path-audit"></script>
+<script src="mod/inline-18.js?v=898-merge-preview-restore"></script>
 
 <script src="mod/inline-19.js?v=696-shared-host-init-order"></script>
 
@@ -2452,7 +2452,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script src="tl-workspace/tl-nodes.js?v=619-undo-cover"></script>
 <!-- v180b（2026-10-02）：tl-nodes.js 就绪后再挂简图实时刷新订阅（见 tlHookTlNodesLiveSync 注释） -->
 <script src="mod/inline-22.js?v=357"></script>
-<script src="tl-workspace/tl-workspace.js?v=897-write-path-audit"></script>
+<script src="tl-workspace/tl-workspace.js?v=898-merge-preview-restore"></script>
 <script src="tl-workspace/tl-path-measure.js"></script>
 <!-- 2026-09-23（用户指令）v135：水力计算器「入口预留」总闸——置 true 时界面不挂载
      （hydraulic-calc.js 的 mount/setConfig/importThreeLevel 直接空转），导航入口与占位文案保留，
@@ -2517,7 +2517,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 
   </div>
 </aside>
-<script src="mod/ry-cad-toolbar.js?v=897-write-path-audit"></script>
+<script src="mod/ry-cad-toolbar.js?v=898-merge-preview-restore"></script>
 
 <!-- ===== 设置（2026-09-27 用户要求）：顶栏齿轮打开，收纳「可调节的数据」=====
      参考 AutoCAD 的 Options：左侧分类 + 右侧参数 + 底部「恢复本页默认 / 取消 / 保存」。
@@ -2576,10 +2576,10 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script src="mod/trunk-geo.js?v=854-null-slot-strict"></script>
 <script src="mod/trunk-edit.js?v=835-trunk-geo-snap"></script>
 <script src="mod/trunk-history.js?v=835-trunk-geo-snap"></script>
-<script src="mod/trunk-panel.js?v=897-write-path-audit"></script>
+<script src="mod/trunk-panel.js?v=898-merge-preview-restore"></script>
 <!-- [v887-tape-zone-vgate] 在线地图轮灌演示（分组/校验纯函数 + Leaflet 图层），先于宿主装载。 -->
-<script src="mod/map-flow-demo.js?v=897-write-path-audit"></script>
-<script src="mod/online-map.js?v=897-write-path-audit"></script>
+<script src="mod/map-flow-demo.js?v=898-merge-preview-restore"></script>
+<script src="mod/online-map.js?v=898-merge-preview-restore"></script>
 <script src="terrain/terrain-core.js?v=410-elev"></script>
 <script src="terrain/terrain-ui.js?v=513-sec-gate"></script>
 <script src="runye-hydraulics-page.js?v=829-hyd-auto-refresh"></script>

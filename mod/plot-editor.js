@@ -1060,6 +1060,11 @@
     if(!ppState.nextPipeId) ppState.nextPipeId=1;
     if(ppState.cutOverrides==null) ppState.cutOverrides={x:{},y:{}};
     if(ppState.partitionCuts==null)ppState.partitionCuts=null;
+    /* [v898 mergePreview 评估] 预览标志是会话内瞬态（ppDrawCutHandles 仅在 adjustCut 档画它），
+       随 slot 持久化是「捕获一致性」设计，但恢复后残留非 null 会在切回 adjustCut 时画出
+       一次幽灵橙色合并高亮（极窄窗口：拖动中恰好捕获 slot）。恢复原语统一置空，与
+       ppBlankSlot 的 mergePreview:null 语义对齐。 */
+    ppState.mergePreview=null;
     if(ppState.zoneRotated==null)ppState.zoneRotated=false;
     if(!isFinite(Number(ppState.zoneAngleDeg)))ppState.zoneAngleDeg=ppState.zoneRotated?90:0;
     if(ppState.zoneAuto==null)ppState.zoneAuto=true;
