@@ -6800,3 +6800,19 @@ C 恢复功能（改读段总管/地图总管口径——是否需要等价功�
 - 语义：水源方向现在由地图总管（plot.trunk 手绘）画法定义；
 - 残留引用核查：grep tlSrcFlip/data-tl-src 仅剩渲染侧与注释，无行为消费；
 - 全闸 541/0；线上 sha256 复量 3 文件 OK。远端 tip=d154d4a（v899）。
+
+## 26.129 水源热区 tooltip/光标同步 v899 拍板（v900-src-tooltip-fix · fb12ca2 · 2026-11-02）
+
+v899 移除右键换向后复查发现**配套误导残留两处**，且实锤**水源拖动链同死**：
+- `tlFrontDesign/tlSrcDesign`（inline-09.js:4630-4631）声明为 null 后**无任何赋值点** ⇒
+  `tlDiagramData.frontPipe/sourcePos` 恒 null（v873 设计侧剥离的实锤）；
+- 水源**拖动**链（:5905 svg mousedown data-tl-src 分支）读 dd.sourcePos → 不可达（死分支）；
+  局部 sourcePos（走向分支赋值）仅用于渲染，水源点显示正常但不可拖。
+
+修复（v900）：
+- tooltip「拖动：移动水源位置（任意）｜右键：切换水源方向」→「水源位置随管线走向自动确定」；
+- style-01.css 撤下 data-tl-src 手型光标（v255），恢复默认；
+- 拖动死分支保留+注释标记（同 v897 ppAddPipe 处置策略，后续清理批次处理）；
+- verify_ry_tool.js 锁的旧 tooltip 文案不需同步——gate.cjs:50 已注明其为历史审计工具、不在现行闸门链。
+
+全闸 541/0；线上 sha256 复量 5 文件 OK。远端 tip=fb12ca2（v900）。
