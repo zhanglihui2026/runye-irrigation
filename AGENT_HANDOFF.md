@@ -6646,3 +6646,27 @@ setEnabled(snapOn) 原口径（git checkout 已一并还原）。
 534/0。**未决**：用户真实数据形态仍未复现「消失」，若 v895 上线后重现，alert 会给出
 确切原因（不再静默）——届时按提示归因。版本注：v892/v893/v894 被并行会话跳占
 （工作区未提交），本版取 v895 并吸收其抬号。
+
+## 26.120 彻底合并第一步：两枚遗留 bug 修复 + 总管清单重评 + 权威切换规划（v896-merge-view-guard · 2026-11-02）
+
+用户拍板「按照你的建议，一步一步解决，彻底合并」。三步全部完成：
+
+**① 优先级 1：两枚遗留 bug 修复（v896-merge-view-guard，9a3fbdc，已发布+线上 sha256 复量 4 文件 OK）**
+- inline-18.js syncLayers（~430）：**仅首次渲染**（renderedPipelineData null→有值）才 ppFitView 适应窗口；
+  后续数据更新（重新生成管线图）保持用户缩放/平移不再被重置——v784 副作用修复。锁：tests/workspace_view_guard.test.cjs 锁①。
+- plot-editor.js ppRender 两处「缩放 xx%」（空态+正常）从右下角挪到**左下角**（x=8, textAlign='left'）：
+  右下角被 .ry-pwa-install 浮条（fixed right/bottom 16px, z-index 2000）遮挡。锁：同文件锁②。
+- 536/0（534 基线+2 新锁）；版本串全局抬 v896-merge-view-guard（sed 首次对 index.html 静默失败疑并行进程锁文件，重跑成功——**教训：sed -i 后必须立即 grep 核对，不能假设成功**）。
+- 版本纪律注意：index.html 实际 12 处 v896 串（含 runye-map-enhance/online-map.css/inline-09 等引用串全跟主页版本走）。
+
+**② 优先级 2：总管剥离改造清单（10-31 v2）现状重评** → `project-planning/总管剥离改造_现状重评_2026-11-02.md`
+结论：**清单主体已被 v840~v895 实际演进超越，可归档**。T2 关兜底=v873 恒置 frontPipe/sourcePos null；
+T3 数据源=core/trunk-schema.js v2 + v844 plot.trunk 唯一可新增（落位与清单推荐 B 一致）；
+T4 消费端=v879 segWorstPath/v878 network_layout kind:'segTrunk'/v843 tlFrontLenUse 收口；T6 手绘=v840+ 已上线。
+残留仅 3 项（全低危）：①plot-editor.js:3756 水源换向死代码（读恒 null 的 dd.frontPipe）；
+②T6.5/6.6/6.7 属性面板/黄标/撤销隔离按需增强；③权威切换见 ③。
+
+**③ 优先级 3：权威切换分批实施规划** → `project-planning/权威切换分批实施规划_2026-11-02.md`
+六批次：A 剩余写路径审计与接入（最大，先审计后分小批）→ B 组撤销权威收口（轻量）→
+C 单地块旧格式边界验收 → D 迁移系统验收（发版闸门）→ E 旧字段停写与清退（最后，前置 A~D 稳定）→ F AOCI Maintain。
+**未动工**，等用户拍板从批次 A 开始。docs 提交 7a21699 已同步远端。
