@@ -3187,6 +3187,9 @@
 
   function ppAutoGeneratePipes() {
     if (!ppState.polyPts.length) { alert('请先到「在线地图」画框并回传地块'); return false; }
+    /* [v892] 入口即重置失败原因：alert 文案只反映本次失败，
+       不再吃到上一轮遗留的 __runyeSingleL2CommitFailure 旧值误导归因。 */
+    window.__runyeSingleL2CommitFailure=null;
     var groupPreimage=ppGroupMemberPreimage();
     if(groupPreimage&&groupPreimage.invalid)return false;
     var singlePreimage=!groupPreimage&&!ppIsGroupWhole()&&typeof window.ppGetState==='function'
@@ -3242,7 +3245,21 @@
     }
 
     /* 单块 / 逐块态：照旧写 ppState（行为与 v201 之前完全一致） */
+    var prevMainCount=(ppState.mainPipes||[]).length;
     var r2 = ppBuildAutoPipes(ppState.polyPts, planN, isThree);
+    /* [v892 2026-11-02 用户报「旋转角度后生成施工图管线消失」] 重建空结果保护：
+       地块上明明有管线、重建却一根不剩 ⇒ 大概率旋转角度下格系与地块多边形
+       裁剪异常（坐标系错位/幽灵角格），按失败处理并**保留旧管线**——
+       不允许「点生成施工图后图上管线凭空消失」这种静默结果。 */
+    if(!r2.main.length && !r2.branch.length && prevMainCount>0){
+      ppDiscardLatestHistoryEntry();
+      if(singlePreimage)ppApplySlot(singlePreimage);
+      if(typeof updatePlan==='function')updatePlan();
+      ppUpdateTransform();ppRender();ppUpdateAutoPipeButton();ppRefreshDiagramOrReset();ppRefreshMaterials();
+      window.__runyeSingleL2CommitFailure='重建管线结果为空（裁剪后一根不剩），已保留原管线';
+      alert('按新分区角度重生成管线未完成：重建管线结果为空（可能被地块裁剪全部丢弃）。已保留原管线与画面，请调整分区角度后重试；若反复出现请截图反馈。');
+      return false;
+    }
     ppState.mainPipes = r2.main;
     ppState.branchPipes = r2.branch;
     ppState.subBranchPipes = r2.subbranch;
@@ -5029,7 +5046,11 @@
       if(window.measuredPolygon && window.measuredPolygon.length>=3 && typeof tlAutoGenerate==='function'){
         tlAutoGenerate({scroll:false});
       }
-    }catch(e){ console.warn('[ppGenerate] 三级管线图生成失败', e); }
+    }catch(e){
+      console.error('[ppGenerate] 三级管线图生成失败', e);
+      alert('生成施工图失败：'+(e&&e.message?e.message:String(e))+'。当前地块与原有数据已保留。');
+      return;
+    }
     // 二级首部系统图（二级系统图.html）的自动弹出已按要求取消（用户 2026-09-12）：
     // 原为 try{ if(typeof openL2Head==='function') openL2Head(); }catch(e){...}
     // 取消原因：「⚙️ 生成系统图」按钮取消后，生成施工图时不应再自动弹新窗口。

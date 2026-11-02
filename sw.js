@@ -1298,7 +1298,7 @@
    并把 lineDrag.sx/sy 固定为按下点（原来每帧更新，阈值会永远不触发）。
    回归：_probe_line_mode_drag.mjs 两个用例（A 拖空白→atM 10.8→29.12 moveNode=1；
    B 拖到节点→links 0→1 且 atM 不变），普通模式复测 moveNode=9 无影响。 */
-const VERSION = 'v891-trunk-revert-coupler-snap';
+const VERSION = 'v895-rot-regen-guard';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
@@ -1319,7 +1319,6 @@ const CORE = [
   "core/coord-frame.js",
   /* [v872-snap-coupler-prio] 段总管生成器（纯几何）：inline-09 落 tlDiagramData.segTrunk、
      在线地图驳接点捕捉与扬程收口都消费它，先于 inline-09 装载。 */
-  "mod/tl-seg-trunk.js",
   /* [v872-snap-coupler-prio] 在线地图轮灌演示（分组/连接校验纯函数 + Leaflet 图层），
      先于 online-map.js 装载（宿主 init 注入闭包上下文）。 */
   "mod/map-flow-demo.js",
