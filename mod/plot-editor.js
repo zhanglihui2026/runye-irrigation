@@ -1951,7 +1951,13 @@
     });
   }
 
+  /* [v897 审计标记·死代码] 手动画管收线链（ppAddPipe ← ppFinishCurrentLine ← dblclick/ppSetMode）
+     自 v304（2026-10-08，用户要求）在 canvas mousedown 拦截 main/branch/subbranch 三种落点后
+     实际不可达（currentLine 恒为空）。且本函数**绕过 canonical 事务**（无 preimage/无 CAS）——
+     未来若恢复手动绘制（删 v304 guard），必须先给本链补 ppCommitSinglePlotEdit 事务，
+     参见 project-planning/剩余写路径审计_2026-11-02.md。 */
   function ppAddPipe(type,line){
+    try{console.warn('[plot-editor] ppAddPipe 触发：v304 后手动画管链应为死代码，若非测试环境请反馈');}catch(e){}
     var group=type==='main'?'main':type==='subbranch'?'subbranch':'branch';
     if(group==='main')ppState.mainPipes.push(line);
     else if(group==='subbranch'){if(!ppState.subBranchPipes)ppState.subBranchPipes=[];ppState.subBranchPipes.push(line);}
