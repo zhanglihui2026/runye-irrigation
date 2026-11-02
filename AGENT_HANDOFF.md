@@ -6734,3 +6734,21 @@ DXF 总管来自地图手绘总管（对话框 trunkPlan() 单独算，未画时
 批次 F（AOCI）代码最终稳定后执行。
 **遗留用户手工项**：真机「保存方案→导入工程」往返一次（C1/C2，探针合成环境保存链受限）。
 验收记录：project-planning/权威切换批次D验收记录_2026-11-02.md。
+
+## 26.124 批次 C1/C2 补强探针 + v897 审计一处结论修正（2026-11-02 · 探针+文档）
+
+**审计修正（重要）**：v897 §26.121「window.ppSetState 全仓无调用者」结论**错误**——
+inline-12.js:806 恢复链 `window.ppSetState(data.pipePlan||{})` 是其唯一消费点（当时 grep 管道
+head 截断漏检）。归类从「死代码」修正为**导入语义**（存档→内存投影，canonical 由恢复链
+projectSingleCanonical 预检+restoredCanonicalDesign 装载收口），不构成绕过事务的用户编辑。
+审计文档已原地修正；write_path_audit.test.cjs 未锁该结论，无需改测试。
+**教训：grep 管道接 head 前先看总命中数，审计结论逐条核对调用方后再定「死代码」**。
+
+**C1/C2 补强探针**（gen_archive_c12.mjs）：绕过合成环境受限的 runyeSaveProject，页面内直接
+构造存档 JSON（结构与保存链一致）写 localStorage → runyeLoadProject：
+- 构造成功（C1 无键/C2 带 canonical revision=7）；
+- load 返回 false 根因链定位：runyeLoadProject → captureRestoreRollbackSnapshot(:715) →
+  runyeSaveProject(ROLLBACK_KEY) → 三级 canonical 提交分支（ryCommitSingleLevel3CanonicalFromRuntime
+  内 adapter.isCurrent(plot.generated,...) 合成环境 false）→ rollback=null → 「无法建立安全回滚点」拒恢复。
+  与 §26.119「存档恢复链合成环境失败」同根因，**非产品缺陷**（真实浏览器保存/恢复是日常路径）。
+- C1/C2 结论维持：恢复语义正确（拒绝路径 C3/C3b 已探针 PASS），成功路径待用户真机「保存→导入工程」验证。
