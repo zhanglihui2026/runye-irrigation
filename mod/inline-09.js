@@ -3961,6 +3961,32 @@ function tlAutoGenerate(options) {
         平票由更省支管的一侧破平）。RyZoneGeometry 缺失时退回旧投票，行为不变。 */
   var tlAxisReport=null;
   var majFixedH=(function(){
+    /* [v881] 二级传导优先：滴灌带轴必须 ⊥ 实际传导来的主管。三级自己的网格变量
+       (xPlan/yPlan，设计口径) 与二级 cuts（bbox 均分 + v877 窄条吸收）尺寸不同，
+       各跑一遍 tapeAxisOf 投票会翻转发散（实测 30亩/区+S160 地块：二级 votes y:8、
+       三级 votes x:8）⇒ 统一工作区里滴灌带与主管平行（用户实测截图，v416 的
+       「单一事实源」实际是两份事实源）。二级主管在场 ⇒ 直接按其最长主向定带轴，
+       构造性保证带 ⊥ 主管；tlAxisReport 复用二级布管留下的同源报告（segs 与二级
+       cuts 配对，长度对不上就弃用 ⇒ nSeg=1，只影响显示接缝不影响材料/水力）。
+       无二级管线（三级自布管）⇒ 维持 tapeAxisOf 投票（自布管分支主/带同源自洽）。 */
+    if(ppHasPipes){
+      function dominantVertical(lines){
+        var v=0,h=0;
+        (lines||[]).forEach(function(l){ if(!l||l.length<2)return; var a=l[0],b=l[l.length-1];
+          var dx=Math.abs(b.x-a.x),dy=Math.abs(b.y-a.y); if(Math.max(dx,dy)<0.5)return; if(dy>=dx)v++; else h++; });
+        return (v>h)?true:(h>v)?false:null;
+      }
+      var dv=dominantVertical(ppShare.mainPipes);
+      if(dv===null&&ppShare.branchPipes&&ppShare.branchPipes.length)dv=dominantVertical(ppShare.branchPipes);
+      if(dv!==null){
+        var rep0=window.__ryTapeAxisReport;
+        if(rep0&&rep0.ok&&Array.isArray(rep0.segs)&&rep0.segs.length===cols*rows)tlAxisReport=rep0;
+        try{window.__ryTapeAxisReport={ok:true,tapeAxis:dv?'x':'y',pipeAxis:dv?'y':'x',source:'ppShare',
+          votes:{x:0,y:0},segs:(tlAxisReport&&tlAxisReport.segs)||[],
+          report:{shortZones:0,overZones:0,avgTape:0,avgOpt:0,branchRatio:1}};}catch(eRep){}
+        return dv;
+      }
+    }
     var G=window.RyZoneGeometry;
     if(G&&typeof G.tapeAxisOf==='function'){
       var ax=G.tapeAxisOf({cols:cols,rows:rows,xPlan:xPlan,yPlan:yPlan,xSrc:xSrc,ySrc:ySrc,xPos:xPos,yPos:yPos},
