@@ -70,11 +70,12 @@ test('zone grouping preserves planned-area fallback and invalid-input result', (
   assert.equal(geometry.zoneAreaGroups(null, null, 1).ok, false);
 });
 
-test('wide plot (127×187m zones, grid 509×374) puts tape along the long side per v883 rule', () => {
+test('127×187.5m portrait zones (grid 510×375): tape along zone long side per v886 rule', () => {
   const cuts = { cols: 4, rows: 2, xPlan: [127.2, 127.2, 127.2, 127.2], yPlan: [187.2, 187.2] };
   const axis = geometry.tapeAxisOf(cuts, 160);
-  /* [v883] 网格 508.8×374.4：长边在 X ⇒ 带横铺沿长边；主管/支管竖向 ⊥ 带。
-     （v416 旧判据是贴合 S=160 投票会投 y —— 用户 2026-11-02 拍板废除：带必须沿地块长边。） */
-  assert.equal(axis.tapeAxis, 'x');
-  assert.equal(axis.pipeAxis, 'y');
+  /* [v886] 分区是竖长方形（127.2×187.2）⇒ 带竖铺沿分区长边；主管/支管横向 ⊥ 带。
+     （v883 曾按「网格总宽/高」取 x —— 网格未铺满地块时长边判反，用户实测截图
+     推翻；v886 改为逐区分区长边投票。） */
+  assert.equal(axis.tapeAxis, 'y');
+  assert.equal(axis.pipeAxis, 'x');
 });

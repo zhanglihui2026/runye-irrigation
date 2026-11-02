@@ -13,11 +13,9 @@ test('axis fit rewards贴合单边铺设长度 and penalizes overlong runs', () 
   assert.equal(geometry.axisFit(100, 0), 0);
 });
 
-/* [v883 2026-11-02 用户拍板] 硬规则：滴灌带沿地块长边布置。
-   用户实测地块：竖向 364×509（长边在 Y），手动 30 亩/区 → 4 列 × 2 行，
-   分区 91×254.5，S=80。旧「贴合 S 投票」必投 X（0.879 > 0.314 ⇒ 带横在短边）；
-   v883 起长边差 40% ≫ 5% ⇒ 直接取 Y 为带轴 ⇒ 主管/支管横向 ⊥ 带。 */
-test('tape follows the plot long side (tall plot → vertical tape)', () => {
+/* [v886 2026-11-02 用户拍板] 硬规则：滴灌带始终沿分区（每块）的长边布置。
+   用户实测地块：竖长分区 91×254.5（4 列 × 2 行）→ 全区投 y ⇒ 带竖铺。 */
+test('tape follows the zone long side (portrait zones → vertical tape)', () => {
   const cuts = {
     cols: 4, rows: 2,
     xPos: [0, 91, 182, 273, 364], yPos: [0, 254.5, 509],
@@ -25,14 +23,14 @@ test('tape follows the plot long side (tall plot → vertical tape)', () => {
   };
   const ax = geometry.tapeAxisOf(cuts, 80);
   assert.equal(ax.ok, true);
-  assert.equal(ax.tapeAxis, 'y');       /* 滴灌带沿长边（竖铺） */
+  assert.equal(ax.tapeAxis, 'y');       /* 滴灌带沿分区长边（竖铺） */
   assert.equal(ax.pipeAxis, 'x');       /* 主管/支管横向 ⊥ 滴灌带 */
   /* 每区带长 254.5 / S=80 → 4 段 */
   assert.deepEqual(ax.segs, [4, 4, 4, 4, 4, 4, 4, 4]);
 });
 
-/* 宽版孪生：509×364（长边在 X）⇒ 带横向、主管/支管竖向 —— 长边规则随地块翻转 */
-test('tape follows the plot long side (wide plot → horizontal tape)', () => {
+/* 宽扁分区孪生：254.5×91（2 列 × 4 行）⇒ 带横向 —— 分区长边规则随分区形状翻转 */
+test('tape follows the zone long side (landscape zones → horizontal tape)', () => {
   const cuts = {
     cols: 2, rows: 4,
     xPos: [0, 254.5, 509], yPos: [0, 91, 182, 273, 364],
@@ -43,10 +41,23 @@ test('tape follows the plot long side (wide plot → horizontal tape)', () => {
   assert.equal(ax.pipeAxis, 'y');
 });
 
-/* 混合朝向地块（上排 58×195 高瘦 + 下排 58×47 扁宽）：网格 527×242，
-   长边差 >5% ⇒ v883 长边规则直接取 X（不再走贴合票；旧判据此时会投 Y，
-   带横在 58 短边上——正是用户要求废掉的口径）。 */
-test('mixed-aspect plot: long-side rule wins over fit vote', () => {
+/* [v886 用户实测案例] 分区 127.5×187.5（竖长，4 列 × 2 行，网格 510×375 未铺满
+   地块 527×584）：v883 的「网格总宽/高」判据会取 x（510>375）⇒ 带横在 127.5
+   短边上；v886 分区长边规则 ⇒ 全区投 y，带竖铺沿 187.5 长边。 */
+test('user case 127.5×187.5 portrait zones: zone long side wins over grid extent', () => {
+  const cuts = {
+    cols: 4, rows: 2,
+    xPos: [0, 127.5, 255, 382.5, 510], yPos: [0, 187.5, 375],
+    xPlan: [127.5, 127.5, 127.5, 127.5], yPlan: [187.5, 187.5]
+  };
+  const ax = geometry.tapeAxisOf(cuts, 160);
+  assert.equal(ax.tapeAxis, 'y');       /* 分区长边在 y ⇒ 带竖铺 */
+  assert.equal(ax.pipeAxis, 'x');       /* 主管/支管横向 ⊥ 滴灌带 */
+});
+
+/* 混合朝向地块（上排 58×195 高瘦 + 下排 58×47 扁宽）：逐区投票 9:9 平票
+   ⇒ 退回「贴合 S」加权破平（fitSum.y 9.08 > fitSum.x 4.35）⇒ 带竖铺。 */
+test('mixed-aspect plot: tie falls back to fit weighting', () => {
   const cuts = {
     cols: 9, rows: 2,
     xPos: [0, 58, 116, 174, 232, 290, 348, 406, 464, 527],
@@ -56,20 +67,15 @@ test('mixed-aspect plot: long-side rule wins over fit vote', () => {
   };
   const ax = geometry.tapeAxisOf(cuts, 240);
   assert.equal(ax.ok, true);
-  assert.equal(ax.tapeAxis, 'x');       /* 网格 522×242：长边在 X ⇒ 带横铺 */
-  assert.equal(ax.pipeAxis, 'y');       /* 主管/支管竖向 ⊥ 滴灌带 */
-  /* 贴合票仍照算（仅作报告信息）：上排投 y、下排投 x → 9:9 平票记录在案 */
+  assert.equal(ax.tapeAxis, 'y');
+  assert.equal(ax.pipeAxis, 'x');
   assert.equal(ax.votes.y, 9);
   assert.equal(ax.votes.x, 9);
-  /* 带轴取 X 后每区带长 58 ≪ S=240 → 全部记 shortZones（软目标被长边硬规则牺牲） */
-  assert.equal(ax.report.shortZones, 18);
-  assert.equal(ax.report.overZones, 0);
-  assert.ok(ax.report.branchRatio > 1);
   assert.deepEqual(ax.segs.slice(0, 9), [1, 1, 1, 1, 1, 1, 1, 1, 1]);
 });
 
-/* 接近正方形（≤5%）无明确长边 ⇒ 退回「贴合单边铺设长度」投票 */
-test('near-square plot falls back to the fit vote', () => {
+/* 全正方形网格：无区投票（votes2 平票）→ 贴合票（fx==fy 投 x）⇒ 默认 x */
+test('all-square zones fall back to the fit vote', () => {
   const cuts = {
     cols: 2, rows: 2,
     xPos: [0, 100, 200], yPos: [0, 100, 200],
@@ -77,7 +83,6 @@ test('near-square plot falls back to the fit vote', () => {
   };
   const ax = geometry.tapeAxisOf(cuts, 120);
   assert.equal(ax.ok, true);
-  /* 200×200 正方：无长边；S=120 → axisFit(100,120)=0.833 两向相同 → 平票 → 贴合度加权相等 → 默认 x */
   assert.equal(ax.tapeAxis, 'x');
 });
 
@@ -89,7 +94,7 @@ test('overlong tape runs are segmented along the tape axis', () => {
     xPlan: [60], yPlan: [500]
   };
   const ax = geometry.tapeAxisOf(cuts, 200);
-  assert.equal(ax.tapeAxis, 'y');       /* 60×500：长边在 Y ⇒ 带竖铺 */
+  assert.equal(ax.tapeAxis, 'y');       /* 60×500 竖长分区：长边在 y ⇒ 带竖铺 */
   assert.equal(ax.segs[0], 3);          /* ceil(500/200) = 3 段 */
   assert.equal(ax.report.overZones, 1);
 });

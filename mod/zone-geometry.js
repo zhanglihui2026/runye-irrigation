@@ -226,11 +226,11 @@
   /* [v416 2026-10-13 用户口径] 布管方向单一事实来源 —— 彻底解决「主管/支管与滴灌带不垂直」。
      规则优先级（硬约束在前，冲突时牺牲后者）：
        ① 滴灌带 ∥ tapeAxis，主管 ∥ 支管 ⊥ tapeAxis（由本函数单一输出保证，不可能被违反）；
-       ② [v883 2026-11-02 用户拍板] 滴灌带沿地块长边布置：网格总宽/总高差 >5% ⇒ 长边即带轴
-         （硬规则，不再投票）；主管/支管随 ① 自动转成短边方向；
+       ② [v886 2026-11-02 用户拍板] 滴灌带**始终沿分区（每块）的长边**：逐区按宽高比
+         投票，多数派定全局带轴（硬规则）；全正方形网格/平票时退回 ③；
        ③ 全图（同一地块）方向统一：单一 tapeAxis 天然满足；
-       ④ 各分区滴灌带长度尽量贴合「单边铺设长度×2」（= 固定边 S）：软目标，仅在地块
-         接近正方形（≤5%，无明确长边）时作为投票判据，冲突时牺牲（支管略增）。
+       ④ 各分区滴灌带长度尽量贴合「单边铺设长度×2」（= 固定边 S）：软目标，仅平票时
+         作为破平判据，冲突时牺牲（支管略增）。
      segs[]：沿 tapeAxis 的滴灌带分段数（带长 > S 时自动切段，杜绝画出超长带）。 */
   function axisFit(extent, S) {
     if (!(extent > 0) || !(S > 0)) return 0;
@@ -253,22 +253,24 @@
         if (fx >= fy) votes.x++; else votes.y++;
       }
     }
-    /* [v883 2026-11-02 用户拍板] 硬规则：滴灌带沿地块长边布置（带 ∥ 长边，
-       主管/支管 ⊥ 带）。网格总宽/总高差异明显（>5%）⇒ 直接取长边为带轴，
-       不再看「贴合铺设长度」投票 —— 91×254 分区 + S=80 时贴合票必投短边
-       （0.879 > 0.314），带横在窄边上，与长边布置诉求正好相反（用户实测截图）。
-       接近正方形（≤5%，无明确长边）⇒ 退回贴合投票（平票由贴合度加权破平）。
-       votes/fitSum 仍照算，只作报告信息（__ryTapeAxisReport / 探针可对照）。 */
-    var totX = 0, totY = 0;
-    for (var tx = 0; tx < cuts.xPlan.length; tx++) totX += Number(cuts.xPlan[tx]) || 0;
-    for (var ty = 0; ty < cuts.yPlan.length; ty++) totY += Number(cuts.yPlan[ty]) || 0;
-    var hiDim = Math.max(totX, totY);
-    var longSide = (totX > 0 && totY > 0 && hiDim - Math.min(totX, totY) > hiDim * 0.05)
-      ? (totY > totX ? 'y' : 'x') : null;
-    if (longSide) {
-      axis = longSide;
+    /* [v886 2026-11-02 用户拍板] 硬规则：滴灌带**始终沿分区（每块）的长边**布置。
+       逐区按宽高比投票：yPlan>xPlan（竖长区）投 y、xPlan>yPlan（横扁区）投 x、
+       正方形不投；多数派定全局带轴（全图统一，与主管/段总管架构一致），
+       平票退回 v416「贴合 S」加权破平。
+       v883 曾用「网格总宽/总高」判长边 —— 网格没铺满地块时（实测 4×2 格
+       510×375 vs 地块 527×584，分区本身是 127.5×187.5 竖长方形）网格长边
+       ≠ 分区长边，整体选反（用户实测截图：带横在 127.5 短边上）。 */
+    var votes2 = { x: 0, y: 0 };
+    for (var za = 0; za < cuts.rows; za++) {
+      for (var zb = 0; zb < cuts.cols; zb++) {
+        var exA = Number(cuts.xPlan[zb]) || 0, eyA = Number(cuts.yPlan[za]) || 0;
+        if (eyA > exA) votes2.y++; else if (exA > eyA) votes2.x++;
+      }
+    }
+    if (votes2.x !== votes2.y) {
+      axis = votes2.x > votes2.y ? 'x' : 'y';
     } else {
-      /* 平票（如上下两排分区数相同）→ 由「贴合度加权」更高的一侧破平：
+      /* 平票（含全正方形网格）→ 由「贴合度加权」更高的一侧破平：
          即选更省支管、更贴合单边铺设长度的方向，而不是任意取默认轴。 */
       axis = (votes.x === votes.y) ? (fitSum.y > fitSum.x ? 'y' : 'x')
                                    : (votes.x > votes.y ? 'x' : 'y');
