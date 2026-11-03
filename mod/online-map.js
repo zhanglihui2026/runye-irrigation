@@ -923,6 +923,9 @@
       if(!drawing && !measuring) map.dragging.enable();
     }
     trunkMode=nextMode;
+    /* [v920] 进入编辑态后重采捕捉目标：此前只有 draw 态刷新，edit 态目标表是空的——
+       用户拖白点到节点附近永远不吸（真机反馈「不能形成闭环」的主因之一）。 */
+    if(trunkMode==='edit') refreshSnapTargets();
     map.getContainer().classList.toggle('drawing', drawing || trunkMode==='draw');
     renderTrunkDraft();
     renderTrunkEditHandles();
@@ -1438,6 +1441,9 @@
     if(trunkWarnFor && String(trunkWarnFor)!==String(activeTrunkId)) hideTrunkWarn();
     renderTrunkDraft();
     renderTrunkEditHandles();
+    /* [v920] 编辑态选线后必须重采捕捉目标（excludeTrunkId 换成新选的线）——
+       否则目标表还是空的/旧的，拖白点靠近节点也不会吸（真机反馈缺口）。 */
+    if(trunkMode==='edit') refreshSnapTargets();
     updateStatusbar();
     syncTrunkUI();
     syncTrunkPanel();
@@ -1493,7 +1499,12 @@
         var el=mk.getElement(); if(el) el.classList.remove('is-dragging');
         /* 先清预览再写库：否则状态栏会一直停在"拖动中的数字"上，和库里对不上。 */
         trunkDragPreview=null;
-        var gcj=fromDisplay(ev.target.getLatLng());
+        /* [v920] 编辑拖点吸附：捕捉开启时松手落点走 nearest（与 draw 态 trunkSnapPoint
+           同口径；edit 态目标表已把本线 exclude，不会自吸）。用户「拖白点到节点附近
+           自动吸上去形成闭环」就是这个入口；没命中目标则原样落点。 */
+        var gcjRaw=fromDisplay(ev.target.getLatLng());
+        var _eS=snapOn?snapApi():null, _eHit=_eS?_eS.nearest(gcjRaw):null;
+        var gcj=_eHit?{lat:+_eHit.lat,lng:+_eHit.lng}:gcjRaw;
         var target={lat:+gcj.lat,lng:+gcj.lng};
         var prev=idx>0?S.readPoint(raw[idx-1]):null;
         var next=idx<raw.length-1?S.readPoint(raw[idx+1]):null;

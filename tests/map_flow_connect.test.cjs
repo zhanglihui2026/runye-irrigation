@@ -69,23 +69,45 @@ test('①c 全断：总管远离一切 ⇒ partial 且列出全部组', () => {
   assert.deepEqual(r.brokenGroups, [0, 1]);
 });
 
-test('② 节点结构化匹配：总管拐点贴节点 ⇒ 该主管贯通（端点不必贴近）', () => {
-  /* 组1 的主管 zi2 端点 (0,100) 远离总管；但其节点在 (60,100)，总管拐点路过节点 3m 处 */
-  const trunk = [P(-2, 0), P(-2, 50), P(57, 100), P(500, 120)];
+test('② [v920] 总管拐点贴节点（节点在主管线上）⇒ 该主管贯通', () => {
+  /* [v920 夹具更新] 线体×线体口径下，节点匹配与线体贴近自然重合：
+     节点 (60,100) 在主管 zi2（y=100 线）上，总管拐点 (60,96) 距节点 4m ⇒
+     距主管线体也 ≤4m，两条通道都命中 ⇒ 贯通。
+     （旧「无节点对照 partial」在此口径下数学上不可能成立——总管贴节点
+     就必然贴主管线体，对照失效移除；「节点没被贴到 ⇒ 不贯通」由 ②b 锁。） */
+  const trunk = [P(-2, 0), P(-2, 50), P(60, 96), P(500, 120)];
   const nodes = [{ pipeKey: 'm3', mi: 2, ll: P(60, 100) }];
   const r = M.validateConnection({ hasTrunk: true, trunkLL: trunk, mainsLL: mains, tolM: tol, dist, groupOfZi, groups, nodesLL: nodes });
   assert.equal(r.code, 'connected', '节点被总管拐点匹配 ⇒ zi2 贯通 ⇒ 组1 连通');
-  /* 对照：同样的总管，没有节点数据 ⇒ 组1 断（partial），证明节点匹配真的参与判定 */
-  const rNoNode = M.validateConnection({ hasTrunk: true, trunkLL: trunk, mainsLL: mains, tolM: tol, dist, groupOfZi, groups });
-  assert.equal(rNoNode.code, 'partial');
-  assert.deepEqual(rNoNode.brokenGroups, [1]);
 });
 
-test('②b 节点未命中（拐点距离 > tol）不贯通', () => {
-  const trunk = [P(-2, 0), P(-2, 50), P(57, 100), P(500, 120)];   /* 距节点 3m */
-  const nodes = [{ pipeKey: 'm3', mi: 2, ll: P(70, 100) }];       /* 节点在 13m 外 */
+test('②b [v920] 节点在主管上但总管线体远离 ⇒ 不贯通', () => {
+  /* 节点 (60,100) 仍在 zi2 线上，但总管沿 y=93 绕行 7m——
+     既不被拐点/线体命中节点，也不贴近主管线体 ⇒ partial。
+     （夹具几何已数值验证：zi0/zi1 贴上、zi2=7m、zi3=57m、节点距线体 7m。） */
+  const trunk = [P(-2, 0), P(-2, 93), P(200, 93)];
+  const nodes = [{ pipeKey: 'm3', mi: 2, ll: P(60, 100) }];
   const r = M.validateConnection({ hasTrunk: true, trunkLL: trunk, mainsLL: mains, tolM: tol, dist, groupOfZi, groups, nodesLL: nodes });
-  assert.equal(r.code, 'partial', '节点 13m 外不构成匹配');
+  assert.equal(r.code, 'partial', '总管线体离主管 7m(>tol)、离节点也 >tol ⇒ 不贯通');
+  assert.deepEqual(r.brokenGroups, [1]);
+  assert.ok(r.brokenMains.includes(2), 'zi2 断开必须出现在 brokenMains（画红）');
+});
+
+test('⑩a [v920] 总管直线横穿主管（穿越处无拐点）⇒ 线体贴近即贯通', () => {
+  /* 用户真机场景：总管一条竖线直穿两条横主管，穿越处无拐点——
+     旧拐点口径全断，dense 口径应判 connected。 */
+  const tMains = [
+    [P(0, 50), P(200, 50)],    /* zi0 上行主管（横线 y=50） */
+    [P(0, 150), P(200, 150)]   /* zi1 下行主管（横线 y=150） */
+  ];
+  const tGoF = zi => zi, tG = 2;
+  const trunk = [P(50, -10), P(50, 200)];   /* 竖线穿过 y=50 与 y=150，全程无拐点贴近 */
+  const r = M.validateConnection({ hasTrunk: true, trunkLL: trunk, mainsLL: tMains, tolM: tol, dist, groupOfZi: tGoF, groups: tG });
+  assert.equal(r.code, 'connected', '线体相交=接通（v920 直觉语义）');
+  /* 边界：总管沿 y=43 右行（距主管线体 7m > tol，不跨越）⇒ 仍断 */
+  const trunkFar = [P(50, -10), P(50, 20), P(200, 43), P(500, 43)];
+  const rFar = M.validateConnection({ hasTrunk: true, trunkLL: trunkFar, mainsLL: tMains, tolM: tol, dist, groupOfZi: tGoF, groups: tG });
+  assert.equal(rFar.code, 'partial', '掠过不贴线仍判断（口径不无限放宽）');
 });
 
 test('③ 兼容：不传 groupOfZi/groups ⇒ v861 原口径（整体 min，任一处贴近即连通）', () => {

@@ -95,27 +95,51 @@
     if (!mainsFlat.length) return { ok: false, code: 'no-data', minM: null };
     var dist = o.dist || function () { return Infinity; };
     var tol = (typeof o.tolM === 'number' && o.tolM > 0) ? o.tolM : TOL_M;
+    /* [v920] 判定口径升级：**总管与主管都**按 2m 步长插值成密点再算贴近——
+       旧口径只认双方**拐点**，一条直线总管横穿主管（穿越处无拐点、且穿越点
+       在主管中段离两端点都远）会被判「未接通」，违背「线穿过=接上」的直觉
+       （真机反馈：总管明明穿过两根主管仍报 6 组断）。插值点含全部原拐点，
+       行为只放宽不收紧；2m 步长在 5m 容差下精度足够（最坏欠估 <1m）。 */
+    function densifyLL(ll) {
+      if (!Array.isArray(ll) || ll.length < 2) return (ll || []).slice();
+      var out = [];
+      for (var i = 1; i < ll.length; i++) {
+        var a = ll[i - 1], b = ll[i], d = dist(a, b);
+        if (!isFinite(d) || d <= 0) { continue; }
+        var n = Math.max(1, Math.ceil(d / 2));
+        for (var k = 0; k < n; k++) {
+          out.push({ lat: a.lat + (b.lat - a.lat) * k / n, lng: a.lng + (b.lng - a.lng) * k / n });
+        }
+      }
+      out.push(ll[ll.length - 1]);
+      return out;
+    }
+    var trunkDense = densifyLL(o.trunkLL);
     function minTo(set) {
       var m = Infinity;
-      o.trunkLL.forEach(function (tp) {
+      trunkDense.forEach(function (tp) {
         set.forEach(function (p) { var d = dist(tp, p); if (d < m) m = d; });
       });
       return m;
     }
-    var mMain = minTo(mainsFlat);
+    var mainsDenseFlat = [];
+    (o.mainsLL || []).forEach(function (l) {
+      densifyLL((l || []).filter(Boolean)).forEach(function (p) { mainsDenseFlat.push(p); });
+    });
+    var mMain = minTo(mainsDenseFlat);   /* [v920] 线体×线体 */
     var mCoup = (o.hasSeg && Array.isArray(o.couplersLL) && o.couplersLL.length) ? minTo(o.couplersLL) : Infinity;
 
     /* [v915] 逐组判定：需要 nodesLL + groupOfZi + groups 三者齐备；任一缺席退旧口径。 */
-    var perMain = null;   /* mZi[zi]=该主管到总管的最小距离（端点口径） */
+    var perMain = null;   /* mZi[zi]=该主管到总管的最小距离（线体口径） */
     if (typeof o.groupOfZi === 'function' && o.groups > 1 && Array.isArray(o.mainsLL)) {
       perMain = o.mainsLL.map(function (l) {
-        return minTo((l || []).filter(Boolean));
+        return minTo(densifyLL((l || []).filter(Boolean)));   /* [v920] 线体×线体（双向插值） */
       });
       if (Array.isArray(o.nodesLL)) {
         o.nodesLL.forEach(function (n) {
           if (!n || !n.ll || !(n.mi >= 0)) return;
           var hit = false;
-          o.trunkLL.forEach(function (tp) { if (dist(tp, n.ll) <= tol) hit = true; });
+          trunkDense.forEach(function (tp) { if (dist(tp, n.ll) <= tol) hit = true; });   /* [v920] 线体命中也算 */
           if (hit && perMain[n.mi] > 0) perMain[n.mi] = 0;   /* 节点匹配 ⇒ 该主管贯通 */
         });
       }
