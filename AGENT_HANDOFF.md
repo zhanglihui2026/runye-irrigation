@@ -6902,3 +6902,40 @@ commit 4aa89f5/3cacc8e）确立执行模式：执行 agent 实施 → 设计方�
 3. 线段目标无数量上限（类似 ZONE_VERT_CAP）——主管折线规模小可接受，大地块观察 mousemove 帧耗。
 
 **注意**：工作区仍有大量并行改动未提交（29 文件，滴灌带/分区主题），与本次发布无关，勿混提交。
+
+## 26.134 v913-coupler-nodes：设计页参数化接驳节点（步骤 1，设计方直接施工）（bb4cf2d · 2026-11-03）
+
+**背景**：步骤 2a 审核发布后，执行 agent 反复「只出计划不出码」（每回合耗在勘察接入点），
+设计方把六落点钉进 5.5 实现附录（6e012b1）后仍停 ⇒ 经用户 AskUserQuestion 拍板改由**设计方直接施工**。
+本节是施工记录兼审核结论（施工方=审核方，全闸+探针留痕补偿）。
+
+**落点实现**（六落点+交互层，mod/plot-editor.js + inline-09.js + index.html + style-01.css + sw.js）：
+- 数据：ppState.couplerNodes=[{pipeKey,s米}]（唯一新增 ppState 字段，每主管至多 1 条；s 以
+  dd.mainPipes 世界米折线为基准）；PP_SLOT_KEYS 18 字段（同步锁 18⊇17 自动适配）/ designKeys /
+  ppGetState 白名单（显式字段构造，:5305）/ ppSetState 回填（filter pipeKey+s）/ inline-09 投影 IIFE。
+- 身份口径（**施工中实测修正，5.5 附录原口径错误**）：pipeKey='m'+(dd.mainPipes 索引+1)，两端同源。
+  原「pipeIds 清零重分配⇒稳定」前提不成立——自动生成流（ensureInitialPipes/#ppGenerate 直通分支）
+  里 L2 手绘层为空 ⇒ pipeIds.main=[]，全量 missing。首版探针 0/6 的主因之一。
+- 交互：⚓ 放置按钮→垂距≤3m 点击即选中进入拖动（点击=零位移拖动）；mousemove 实时投影（预览与落点
+  共用 ppCouplerProject，v852 教训）；定位面板（主管标签+s 输入框+移除）；Esc 退出；成组态禁用。
+  画布是 **2D context 非 SVG**——节点绘制用 ppCtx.arc（描边 #b45309 画布内独占，探针像素扫描锚点）；
+  施工图快照 ppGenerateDiagramCore（SVG）另画 data-pp-coupler 圆点。
+- 事务：拖动松手/面板输入/移除走 ppCommitSinglePlotEdit（preimage/after JSON 自动感知）。
+
+**施工中新发现的隐藏落点（5.5 附录没有，探针逐轮逼出）**：
+1. **undo 快照链是第三份手工字段清单**：ppCloneState/ppRestoreState 不走 PP_SLOT_KEYS，
+   漏 couplerNodes ⇒ undo 不回退节点且事务 diff 为空变 no-op（fail=null 无报错，极隐蔽）。已补。
+2. **事务成功分支只刷二级快照**：ppCommitSinglePlotEdit(refreshPlan=true) 也只调
+   ppRefreshDiagramIfVisible（二级 lastSVG），不重建 tlDiagramData——couplerNodes 只投影进 dd，
+   三个 coupler 事务点（move/input/remove）必须补 ppRefreshTLAfterCuts（与 cut-drag 松手同一口径）。
+3. **探针直调陷阱**：ppCommitSinglePlotEdit 是 IIFE 局部函数未挂 window——探针必须走真实 canvas
+   事件路径（mousedown/mousemove/mouseup），节点屏幕坐标用 #b45309 描边像素扫描定位
+   （backing store=CSS 像素无 DPR 缩放，可直接派发）。
+
+**验证**：探针 6/6 两轮稳定（在位性/空投影/世界米垂足在管线/真实拖动事务 revision 4→7 单调+
+白名单导出+dd 重投影一致/undo 回位 s=20/失配 m99→坐标 null+source missing）；全闸 553/0
+（基线 548+5 新测试）+ publish_refs PASS + lint PASS；三处同抬 v913-coupler-nodes（index 12 处）；
+已 push bb4cf2d，线上 sha256 复量 6/6 一致。
+
+**下一步**：步骤 2b（节点捕捉接入地图端复用 ppCouplerUpsert 口径 + excludeTrunkId 补滤 trunk-edge）；
+真机手工验证放置/拖动手感与面板输入。模式回归：设计方施工后仍按「完成一步交审一步」推进后续步骤。

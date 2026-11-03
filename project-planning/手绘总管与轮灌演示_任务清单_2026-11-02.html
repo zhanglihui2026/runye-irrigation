@@ -373,6 +373,7 @@
 <tr><td>2026-11-03</td><td>—</td><td>三项设计决策按推荐定稿（每主管一节点 / 节点链折线总管 / 松手即提交）；新增第九章执行交接说明。执行模式确立：执行 agent 实施 → 设计方审核发布。</td></tr>
 <tr><td>2026-11-03</td><td>—</td><td><b>用户逐项确认三项决策</b>（每主管一节点 ✓ / 手绘折线 ✓ / 地图拖动松手即保存 ✓）——第三章定稿生效，可交执行 agent 按 9.4 次序动工。</td></tr>
   <tr><td>2026-11-03</td><td>v911-trunk-segment-snap-2a</td><td><b>9.4 次序 1 / 步骤 2a：主管线段垂足捕捉。</b> 捕捉引擎以屏幕像素计算有限线段垂足，点目标优先；地图宿主将分区主管经 geoBridge 反算并以 Leaflet 反投影得到落点，地块不匹配或几何无效时不生成目标。专项 Node 回归 18/18；旋转重生成 4/4；全闸静态 29/0、单测 548/0、发布引用 PASS、lint PASS。组清管/撤销 Edge 探针断言通过，脚本临时目录清理遇 EPERM 后已人工核实并清除。未找到 batch_d / legacy_archive 独立探针脚本。7 项与 3 项已拍板决策均未被改变；未 push、待审核发布。</td></tr>
+  <tr><td>2026-11-03</td><td>v913-coupler-nodes</td><td><b>9.4 次序 2a / 步骤 1：设计页参数化接驳节点（设计方直接施工）。</b> 执行 agent 多轮仅出计划不出码，经用户拍板改由设计方施工。落点：ppState.couplerNodes=[{pipeKey,s米}]（唯一新增字段，每主管至多 1 条）+ 六落点（PP_SLOT_KEYS 18 字段 / designKeys / ppGetState 白名单 / ppSetState 回填 / inline-09 投影 / undo 零新代码）+ 交互层（⚓放置按钮、沿管拖动、定位面板、Esc、成组禁用）。<b>施工中实测新增三处隐藏落点</b>（6 落点口径不足）：①pipeKey 身份源=dd.mainPipes 索引+1（pipeIds.main 在自动生成流恒空，禁做身份源）②undo 快照链 ppCloneState/ppRestoreState 是手工字段清单，必须补 couplerNodes（否则 undo 不回退节点）③事务成功分支只刷二级快照，coupler 三个事务点必须补 ppRefreshTLAfterCuts 重建 dd 投影。探针 6/6（真实 canvas 鼠标 mousedown/mousemove/mouseup 路径+revision 单调 4→7+undo 回位+失配 missing(m99)）；全闸 553/0、lint PASS；已发布 bb4cf2d，线上 sha256 复量 6/6 一致。<b>真机待验证</b>：放置/拖动手感、面板输入、与手绘总管（步骤 2b）衔接。下一步=步骤 2b（节点捕捉接入地图端 + excludeTrunkId 补滤线段）。</td></tr>
 </table>
 
 <!-- ═══════════ 九、执行交接说明 ═══════════ -->
