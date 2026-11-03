@@ -1058,7 +1058,7 @@
     var dd=window.tlDiagramData;
     var bridge=trunkGeoBridge(plot);
     if(!bridge) return null;
-    var valves=[], branchStarts=[], zoneVerts=[], couplers=[], mainPipeLines=[], zoneNote=null;
+    var valves=[], branchStarts=[], zoneVerts=[], couplers=[], mainPipeLines=[], mainCouplers=[], zoneNote=null;
     (Array.isArray(dd.valves)?dd.valves:[]).forEach(function(v){
       var ll=bridge.toLL(v); if(ll) valves.push(ll);
     });
@@ -1077,9 +1077,18 @@
       if(valid && llLine.length>=2) mainPipeLines.push(llLine);
     });
     /* [v859] 段总管驳接点（自动生成的串联干线两端）：手绘总管接到这里即贯通地块内水路 */
-    return {valves:valves, branchStarts:branchStarts, zoneVerts:zoneVerts, couplers:couplers, mainPipeLines:mainPipeLines,
+    /* [v914] 设计页接驳节点（dd.couplerNodes，世界米投影坐标）：手绘总管吸到节点上=
+       与该主管在设计页的接驳点精确贯通。失配节点（x/y null，v913 missing）静默跳过——
+       宁可少吸，不吸错位（§五投影保真口径）。桥（trunkGeoBridge）已含地块一致性守卫。 */
+    (Array.isArray(dd.couplerNodes)?dd.couplerNodes:[]).forEach(function(n){
+      if(!n||n.x==null||n.y==null) return;
+      var ll=bridge.toLL(n); if(!ll) return;
+      mainCouplers.push({lat:ll.lat, lng:ll.lng,
+        label:'主管节点 '+n.pipeKey+(isFinite(Number(n.s))?(' · 距起点 '+(Math.round(Number(n.s)*10)/10)+'m'):'')});
+    });
+    return {valves:valves, branchStarts:branchStarts, zoneVerts:zoneVerts, couplers:couplers, mainPipeLines:mainPipeLines, mainCouplers:mainCouplers,
       stats:{sign:bridge.sign, rms:Math.round(bridge.rms*1000)/1000,
-        valves:valves.length, branchStarts:branchStarts.length, zoneVerts:zoneVerts.length, couplers:couplers.length, mainPipeLines:mainPipeLines.length, zoneNote:zoneNote}};
+        valves:valves.length, branchStarts:branchStarts.length, zoneVerts:zoneVerts.length, couplers:couplers.length, mainPipeLines:mainPipeLines.length, mainCouplers:mainCouplers.length, zoneNote:zoneNote}};
   }
 
   var snapExtras=null;
@@ -1105,6 +1114,8 @@
       var SS=window.RyTrunkSchema, m=SS?SS.pickMainTrunk(trunkSaved):null;
       if(m) input.mainTrunkPoints=m.points;
     }
+    /* [v914] 编辑已有总管时：该线拐点与 trunk-edge 线段都不吃自己的（v911 记过#2 收口） */
+    if(trunkMode==='edit'&&activeTrunkId!=null) input.excludeTrunkId=activeTrunkId;
     snapExtras=extraSnapTargets(plot);
     if(snapExtras){
       input.valves=snapExtras.valves;
@@ -1112,6 +1123,7 @@
       input.zoneVerts=snapExtras.zoneVerts;
       input.mainPipeLines=snapExtras.mainPipeLines;
       if(snapExtras.couplers&&snapExtras.couplers.length) input.couplers=snapExtras.couplers;
+      if(snapExtras.mainCouplers&&snapExtras.mainCouplers.length) input.mainCouplers=snapExtras.mainCouplers;   /* [v914] 设计页接驳节点 */
     }
     var list=S.buildTargets(input);
     return S.setTargets(list,{plotId:currentMapPlotId?String(currentMapPlotId):null, extras:snapExtras?snapExtras.stats:null});

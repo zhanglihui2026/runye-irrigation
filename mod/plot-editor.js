@@ -2661,16 +2661,53 @@
     if(panel)panel.style.display=ppCouplerPlacing?'block':'none';
     if(ppCouplerPlacing&&!ppIsGroupWhole()&&typeof tip==='function')tip('接驳节点：点击主管线放置或选中节点，拖动调整，Esc 退出');
   }
+  /* [v914] 节点经纬度：dd.couplerNodes（世界米）→ RyTrunkGeo.m2ll。±y 方向沿用地图侧
+     autoSign 标尺口径（地块库 polyLatLng 当尺，对不上就放弃显示——宁缺不错）。
+     sign 只由地块环几何决定 ⇒ 按 sig memo，拖动 mousemove 每帧调用不重算 RMS。 */
+  var ppCouplerLLMemo={sig:null,ll:null};
+  function ppCouplerLL(node){
+    var ctx=ppCouplerCtx();if(!ctx)return null;
+    /* [v914] 两种入参：参数节点 {pipeKey,s}（ppState，无坐标）⇒ 按 pipeKey 查 dd 投影
+       取世界米坐标；投影节点 {pipeKey,s,x,y} 直接用。失配节点（坐标 null）⇒ null。 */
+    if(node&&node.x==null&&node.pipeKey&&Array.isArray(ctx.dd.couplerNodes)){
+      node=ctx.dd.couplerNodes.filter(function(n){return n.pipeKey===node.pipeKey;})[0]||null;
+    }
+    if(!node||node.x==null||node.y==null)return null;
+    var G=window.RyTrunkGeo,base=window.__runyeGeoBase;
+    if(!G||!G.m2ll||!G.autoSign||!base)return null;
+    var store=window.RyPlotLibraryStore&&window.RyPlotLibraryStore.read?window.RyPlotLibraryStore.read():null;
+    var plot=store&&store.ok&&Array.isArray(store.plots)
+      ?store.plots.filter(function(p){return p&&String(p.id)===String(window.currentPlotId);})[0]:null;
+    if(!plot||!Array.isArray(plot.polyLatLng)||!Array.isArray(ctx.dd.poly)
+      ||plot.polyLatLng.length!==ctx.dd.poly.length)return null;
+    var sig=String(window.currentPlotId)+'|'+String(ctx.dd.generatedAt||'')+'|'+ctx.dd.poly.length;
+    if(ppCouplerLLMemo.sig!==sig){
+      var cal=G.autoSign(ctx.dd.poly,plot.polyLatLng,base);
+      ppCouplerLLMemo={sig:sig,ll:(cal&&cal.ok)?{sign:cal.sign}:null};
+    }
+    var memo=ppCouplerLLMemo.ll;
+    return memo?G.m2ll(node.x,node.y,base,memo.sign):null;
+  }
   function ppCouplerSyncPanel(){
     var panel=document.getElementById('ppCouplerPanel');
     if(!panel)return;
     var inp=panel.querySelector('input');
     var lab=panel.querySelector('.pp-coupler-pipe');
+    var llEl=panel.querySelector('.pp-coupler-lng');
     var node=ppState.couplerNodes&&ppCouplerSelected?ppState.couplerNodes.filter(function(n){return n.pipeKey===ppCouplerSelected;})[0]:null;
     if(lab)lab.textContent=ppCouplerSelected?('主管 '+ppCouplerSelected):'未选中';
     if(inp){inp.value=node?String(Math.round(node.s*10)/10):'';inp.disabled=!node;}
+    if(llEl){
+      /* [v914] 经纬度只读随动（2b 接真值）：桥不成/节点失配/未选中 ⇒ 保持占位文案 */
+      var ll=node?ppCouplerLL(node):null;
+      if(ll)llEl.textContent=ll.lat.toFixed(6)+', '+ll.lng.toFixed(6);
+      else llEl.textContent='经纬度在地图同步后可见';
+    }
   }
   window.ppCouplerSyncPanel=ppCouplerSyncPanel;   /* 面板输入事件与外部探针共用 */
+  /* [v914] 节点世界米→经纬度唯一换算出口：面板经纬度、步骤 3 贯通判据、步骤 4 演示
+     水路与外部探针共用同一口径（autoSign 标尺 + memo），禁再写第二份换算。 */
+  window.ppCouplerLL=ppCouplerLL;
   /* [v913] 跨模块/探针入口：定位面板与地图端（步骤 2b）复用同一 upsert/remove 口径 */
   window.ppCouplerUpsert=ppCouplerUpsert;
   window.ppCouplerRemove=ppCouplerRemove;

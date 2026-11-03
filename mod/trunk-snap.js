@@ -23,12 +23,15 @@
      v870 起驳接点已进地块内（首末主管 1/4 分位处），与阀门/支管起点共享空间 —— 审核属实：
      不注册则用户想吸驳接点时被 10px 内的阀门抢走。定 4：驳接点是手绘总管的**设计落点**
      （接到这里即贯通），应压过顺路的阀门/支管起点；仍低于地块顶点/水源/干线拐点
-     （编辑已有干线时抢点行为不变）。 */
+     （编辑已有干线时抢点行为不变）。
+     [v914] main-coupler（设计页接驳节点，dd.couplerNodes 投影）同档 4：同为手绘总管的
+     设计落点——节点在哪，总管就应接到哪（接到即贯通该主管）。 */
   var PRIORITY = {
     'plot-vertex': 1,
     'water-source': 2,
     'trunk-vertex': 3,
     'seg-coupler': 4,
+    'main-coupler': 4,
     'valve-node': 5,
     'branch-start': 6,
     'zone-vertex': 7,
@@ -129,19 +132,41 @@
       if (cp) push(cp.lat, cp.lng, 'seg-coupler', '驳接点 ' + (ci + 1));
     });
 
+    /* 7b. [v914] 设计页接驳节点（dd.couplerNodes 投影，宿主经 geoBridge 反算成经纬度）。
+          宿主已把失配节点（坐标 null，v913 missing）剔除，这里照收；
+          label 由宿主带 pipeKey+沿管距离，拾取气泡直接可读。编号按有效项计（跳过不占号）。 */
+    var mcValid = 0;
+    (Array.isArray(input.mainCouplers) ? input.mainCouplers : []).forEach(function (c) {
+      var cp = readPoint(c);
+      if (!cp) return;
+      mcValid++;
+      push(cp.lat, cp.lng, 'main-coupler', (c && c.label) ? c.label : ('主管节点 ' + mcValid));
+    });
+
     /* 8~9. 垂足兜底：主管和已存手绘总管的线段只在没有更高优先级点命中时胜出。 */
-    function addEdges(lines, kind, prefix) {
+    function addEdges(lines, kind, labelOf) {
       (Array.isArray(lines) ? lines : []).forEach(function (line, li) {
         if (!Array.isArray(line) || line.length < 2) return;
         for (var ei = 0; ei + 1 < line.length; ei++) {
           var a = readPoint(line[ei]), b = readPoint(line[ei + 1]);
           if (!a || !b || (a.lat === b.lat && a.lng === b.lng)) continue;
-          out.push({ kind: kind, label: prefix + ' ' + (li + 1) + ' · 段 ' + (ei + 1), a: a, b: b });
+          out.push({ kind: kind, label: labelOf(li, ei), a: a, b: b });
         }
       });
     }
-    addEdges(input.mainPipeLines, 'mainpipe-edge', '主管');
-    addEdges(trunks.map(function (t) { return t && t.points; }), 'trunk-edge', '总管');
+    addEdges(input.mainPipeLines, 'mainpipe-edge', function (li, ei) {
+      return '主管 ' + (li + 1) + ' · 段 ' + (ei + 1);
+    });
+    /* [v914] trunk-edge 补 excludeTrunkId 过滤（v911 审核记过#2 收口）：编辑已有总管时，
+       该线的 trunk-edge 线段与自身拐点（上方已滤）同死——否则线段垂足永远吸在自己脚下，
+       拖不动/画不出偏离。label 编号与 v911 保持逐字节一致。 */
+    (Array.isArray(trunks) ? trunks : []).forEach(function (tk, li) {
+      if (!tk) return;
+      if (input.excludeTrunkId != null && String(tk.id) === String(input.excludeTrunkId)) return;
+      addEdges([tk.points], 'trunk-edge', function (_li, ei) {
+        return '总管 ' + (li + 1) + ' · 段 ' + (ei + 1);
+      });
+    });
 
     return out;
   }
