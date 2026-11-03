@@ -49,8 +49,9 @@ function region(src, from, to) {
 /* 锁 3：地图演示完整闭环 —— 手绘总管与段总管都要有「实线骨架 + 青色流动叠层」两笔。 */
 {
   const render = region(demo, 'function render(g)', 'function stop(');
-  assert.ok(render.includes("poly(d.trunkLL, '#111827', 5, false)"), '手绘总管实线骨架必须保留');
-  assert.ok(render.includes("poly(d.trunkLL, '#38bdf8', 2.4, true)"), '手绘总管必须叠青色流动层');
+  assert.ok(render.includes("poly(line, '#111827', 5, false)"), '每条手绘总管实线骨架必须保留');
+  assert.ok(render.includes("poly(line, '#38bdf8', 2.4, true)"), '每条手绘总管必须叠青色流动层');
+  assert.ok(render.includes('(d.trunkLinesLL ||'), '多条总管必须逐线渲染，不能拼出虚构线段');
   assert.ok(render.includes("poly(d.segLL, '#111827', 4, false)"), '段总管实线骨架必须保留');
   assert.ok(render.includes("poly(d.segLL, '#38bdf8', 2.2, true)"), '段总管必须叠青色流动层');
 }

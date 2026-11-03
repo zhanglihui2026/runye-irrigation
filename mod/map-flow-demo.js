@@ -10,7 +10,7 @@
      · 本模块 = 分组/校验纯函数（Node 单测锁） + Leaflet 图层演示 + chips 面板
        （#mapDemoBar，挂在左工具栏底部「分组组合 · 轮灌演示」组内，v858 组）。
      · 宿主（online-map.js）注入 ctx：map / toLL(世界米→经纬度，走 v835 geoBridge) /
-       getTrunkPoints(当前地块 trunk v2 主干) / tip / isMapActive。
+       getTrunkLines(当前地块全部 trunk v2 总管) / getTrunkPoints(旧宿主兼容) / tip / isMapActive。
      · 数据全部来自既有事实：tlDiagramData（mainPipes/branchPipes/valves/segTrunk/
        combinedN）+ window.tlManualGroups（面积成组）+ trunkSaved（手绘总管）。
        与规划页简图演示（inline-09 v215/v218）互不干扰：地图页激活时隐藏 #tlDemoBar、
@@ -21,6 +21,7 @@
        落在各主管端点上）；总管直接贴近主管端点也算连通。
      · 无段总管：只看总管折线与各主管端点的最近距离。
      · 未连通 ⇒ start() 直接报错（用户明确要求），不播放。
+     [v917] 同时接收 RyTlNodes 的主管/支管施工节点；多条保存总管分线演示，不合并虚构连接段。
      ═══════════════════════════════════════════════════════════════════════ */
   var TOL_M = 5, INTERVAL_MS = 1000;
   var DOT_FILLS = ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6'];
@@ -48,6 +49,25 @@
     if (!(total > 0)) return 0;
     if (manual && manual.length) return manual.length;
     return Math.max(1, Math.ceil(total / Math.max(1, nPer || 1)));
+  }
+  /* 将三级施工节点 N-xx 投影为在线地图的轮灌入口点。
+     pid=main-i / branch-i，atM 沿工作区有效管线弧长；支管节点归属同索引分区。 */
+  function collectWorkspaceNodes(dd, list, pointAt, toLL) {
+    var out=[];
+    if(!dd||!Array.isArray(list)||typeof pointAt!=='function'||typeof toLL!=='function')return out;
+    list.forEach(function(n){
+      if(!n)return;
+      var m=/^(main|branch)-(\d+)$/.exec(String(n.pid||''));
+      if(!m)return;
+      var mi=Number(m[2]), lines=m[1]==='main'?dd.mainPipes:dd.branchPipes;
+      if(!isFinite(mi)||mi<0||!Array.isArray(lines)||!Array.isArray(lines[mi])||lines[mi].length<2)return;
+      var p;try{p=pointAt(n.pid,dd,Number(n.atM));}catch(e){return;}
+      if(!p||p.x==null||p.y==null)return;
+      var q;try{q=toLL(p);}catch(e2){return;}
+      if(!q)return;
+      out.push({pipeKey:(m[1]==='main'?'m':'b')+(mi+1),mi:mi,ll:q,nodeId:String(n.id||''),source:'tl-node'});
+    });
+    return out;
   }
   /* 连接校验。o = {
        hasTrunk:bool, trunkLL:[{lat,lng}], mainsLL:[[{lat,lng}]×N],
@@ -167,17 +187,33 @@
       var q = toLLSafe({ x: n.x, y: n.y });
       if (q) nodesLL.push({ pipeKey: String(n.pipeKey), mi: mi - 1, ll: q });
     });
+    /* [v917] 施工节点与设计接驳节点统一进入水路验证及入口高亮。 */
+    try {
+      var tlNodes=window.RyTlNodes, autoEdits=window.RyTlAutoEdits;
+      if(tlNodes&&typeof tlNodes.list==='function'&&autoEdits&&typeof autoEdits.pointAt==='function'){
+        nodesLL=nodesLL.concat(collectWorkspaceNodes(dd,tlNodes.list(),autoEdits.pointAt,toLLSafe));
+      }
+    } catch(eNodes) { /* 无可用施工节点时保留既有接驳节点链路 */ }
     if (dd.segTrunk && Array.isArray(dd.segTrunk.points)) {
       segLL = toLLLine(dd.segTrunk.points);
       (dd.segTrunk.couplers || []).forEach(function (c) { var q = toLLSafe(c); if (q) couplersLL.push(q); });
     }
-    var trunkLL = ctx.getTrunkPoints ? ctx.getTrunkPoints() : null;
+    var trunkLinesLL = [];
+    if(typeof ctx.getTrunkLines==='function'){
+      var gotLines=ctx.getTrunkLines();
+      if(Array.isArray(gotLines))gotLines.forEach(function(line){if(Array.isArray(line)&&line.length>=2)trunkLinesLL.push(line);});
+    } else {
+      var legacyTrunk=ctx.getTrunkPoints?ctx.getTrunkPoints():null;
+      if(Array.isArray(legacyTrunk)&&legacyTrunk.length>=2)trunkLinesLL.push(legacyTrunk);
+    }
+    var trunkLL=[];
+    trunkLinesLL.forEach(function(line){trunkLL=trunkLL.concat(line);});
     var total = (dd.mainPipes || []).length;
     if (!total) return null;
     var manual = (window.tlManualGroups && window.tlManualGroups.length) ? window.tlManualGroups : null;
     return {
       mainsLL: mainsLL, branchLL: branchLL, valves: valves,
-      couplersLL: couplersLL, segLL: segLL, trunkLL: trunkLL,
+      couplersLL: couplersLL, segLL: segLL, trunkLL: trunkLL, trunkLinesLL: trunkLinesLL,
       nodesLL: nodesLL,
       manual: manual, nPer: dd.combinedN || 1, total: total,
       gCount: groupCount(total, manual, dd.combinedN || 1)
@@ -205,10 +241,11 @@
     /* [v882] 总管 + 段总管 = 完整闭合水路（用户要求：手动总管接上自动生成的段总管
        形成闭合系统，演示时水流沿整条路径走）。实线深色骨架常亮 + 青色流动虚线叠层
        （与简图 v218 水流线同语言：#38bdf8 光流），叠加不遮管线原色。 */
-    if (d.trunkLL && d.trunkLL.length >= 2) {
-      ly.addLayer(poly(d.trunkLL, '#111827', 5, false));
-      ly.addLayer(poly(d.trunkLL, '#38bdf8', 2.4, true));
-    }
+    (d.trunkLinesLL || (d.trunkLL && d.trunkLL.length >= 2 ? [d.trunkLL] : [])).forEach(function(line){
+      if(!line||line.length<2)return;
+      ly.addLayer(poly(line, '#111827', 5, false));
+      ly.addLayer(poly(line, '#38bdf8', 2.4, true));
+    });
     if (d.segLL) {
       ly.addLayer(poly(d.segLL, '#111827', 4, false));
       ly.addLayer(poly(d.segLL, '#38bdf8', 2.2, true));
@@ -465,7 +502,7 @@
   }
 
   window.RyMapFlowDemo = {
-    VERSION: 'v884-map-flow-demo',
+    VERSION: 'v917-workspace-nodes',
     TOL_M: TOL_M,
     INTERVAL_MS: INTERVAL_MS,
     init: function (c) {
@@ -491,6 +528,6 @@
     isActive: function () { return active != null || playing; },
     /* 纯函数导出（Node 单测） */
     groupOf: groupOf, groupCount: groupCount, validateConnection: validateConnection,
-    entrancesOf: entrancesOf
+    entrancesOf: entrancesOf, collectWorkspaceNodes: collectWorkspaceNodes
   };
 })(window);

@@ -120,6 +120,31 @@ test('⑥ 宿主接线：collect 采 dd.couplerNodes + start 传逐组参数 + p
   assert.ok(/轮灌组 ' \+ gs/.test(src), 'partial 必须逐组报错（列出断组号）');
 });
 
+test('⑥b 施工节点：主管/支管节点按有效几何和桩号映射到所属轮灌区', () => {
+  const dd = { mainPipes: [[{}, {}]], branchPipes: [[{}, {}]] };
+  const nodes = [
+    { id: 'N-01', pid: 'main-0', atM: 30 },
+    { id: 'N-02', pid: 'branch-0', atM: 12 },
+    { id: 'N-03', pid: 'front', atM: 8 },
+    { id: 'N-04', pid: 'main-2', atM: 5 }
+  ];
+  const pointAt = (pid, _dd, atM) => ({ x: atM, y: pid.startsWith('branch-') ? 2 : 1 });
+  const toLL = p => ({ lat: p.y, lng: p.x });
+  const out = M.collectWorkspaceNodes(dd, nodes, pointAt, toLL);
+  assert.deepEqual(out.map(n => [n.nodeId, n.pipeKey, n.mi, n.ll]), [
+    ['N-01', 'm1', 0, P(1, 30)],
+    ['N-02', 'b1', 0, P(2, 12)]
+  ]);
+});
+
+test('⑥c 多条已保存总管各自投影与绘制，不拼出不存在的线段', () => {
+  const onlineSrc = fs.readFileSync(path.join(__dirname, '..', 'mod', 'online-map.js'), 'utf8');
+  const src = fs.readFileSync(SRC, 'utf8');
+  assert.ok(/getTrunkLines: function \(\)/.test(onlineSrc), '地图宿主必须逐条交付已保存总管');
+  assert.ok(/trunkLinesLL\.forEach\(function\(line\)/.test(src), '演示采集保留总管分线');
+  assert.ok(/\(d\.trunkLinesLL \|\|/.test(src), '演示渲染按每条总管独立画线');
+});
+
 /* ── [v916 步骤 4] 演示水路入口精确化 ─────────────────────────────── */
 const d4 = () => ({
   nodesLL: [

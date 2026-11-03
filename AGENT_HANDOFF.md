@@ -7076,3 +7076,13 @@ gen_coupler_step2b.mjs 线上化（gen_coupler_online.mjs，Temp）：页面改�
 
 **线上探针从此可用**：发布后抽验跑 `node <Temp>/gen_coupler_online.mjs`（脚本在 Temp 不进仓，
 重建方法=本地版三改：删 srv、去禁代理/瓦片劫持、URL 换线上加 _t）。
+
+## 26.141 v917-workspace-nodes：三级施工节点直达地图吸附与轮灌入口（2026-11-03）
+
+根据用户真机截图中 `N-01 · 主管#1 · 桩号 30m` 需求，补齐现有 v913-v916 参数接驳点之外的三级施工节点链路：
+
+- `mod/online-map.js` 的 `extraSnapTargets()` 读取 `RyTlNodes.list()`，按节点 `pid + atM` 经 `RyTlAutoEdits.pointAt()` 取当前有效主管/支管几何（含工作区长度与平移覆盖），再经同一地块 `trunkGeoBridge` 反算经纬度，作为高优先级 `main-coupler` 吸附目标。目标标签含节点 ID、管名和桩号；`front` 节点不归入分区主管/支管入口。
+- `mod/map-flow-demo.js` 通过同一 `pointAt` 投影把主管/支管施工节点加入 `nodesLL`，按管线索引映射轮灌区，供逐组连通校验和入口标记共用。`getTrunkLines()` 逐条传递已保存总管，演示逐条渲染，避免把多条不相连的总管拼成一段假线；旧 `getTrunkPoints()` 仍作为宿主兼容回退。
+- 主页面缓存串与 Service Worker 统一提升为 `v917-workspace-nodes`；工作区/在线地图/轮灌演示专项测试 44/44；`node scripts/check.cjs` 全量通过（语法、lint、静态契约、558 Node tests、WASM 等价和地块拼接 27/27）。
+
+**验收边界**：尚未在用户当前地块上做真机手绘吸附和多总管动画目视验收，尚未发布。部署后要在同一地块复核：① N 节点出现在地图捕捉气泡/吸附结果；②总管松手保存后每条线分别显示；③所有轮灌组连通时动画可启用，断组时仍报出组号。当前工作仅为源码与自动化门禁证据。

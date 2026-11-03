@@ -1086,6 +1086,24 @@
       mainCouplers.push({lat:ll.lat, lng:ll.lng,
         label:'主管节点 '+n.pipeKey+(isFinite(Number(n.s))?(' · 距起点 '+(Math.round(Number(n.s)*10)/10)+'m'):'')});
     });
+    /* [v917] 三级施工节点（N-01 等）也直接作为地图总管吸附目标。
+       RyTlNodes 只保存 pid+atM；位置按工作区实际有效管线（含长度/平移覆盖）重算，
+       再经同一地块 geoBridge 反算。front 节点不映射到灌溉分区；主管/支管节点可接入水路。 */
+    (function(){
+      var N=window.RyTlNodes, A=window.RyTlAutoEdits;
+      if(!N||typeof N.list!=='function'||!A||typeof A.pointAt!=='function')return;
+      var list;try{list=N.list();}catch(e){return;}
+      if(!Array.isArray(list))return;
+      list.forEach(function(n){
+        if(!n||!/^((main|branch))-\d+$/.test(String(n.pid||'')))return;
+        var p;try{p=A.pointAt(n.pid,dd,Number(n.atM));}catch(e){return;}
+        if(!p||!isFinite(p.x)||!isFinite(p.y))return;
+        var ll=bridge.toLL(p);if(!ll)return;
+        var name=typeof A.pipeName==='function'?A.pipeName(n.pid):n.pid;
+        mainCouplers.push({lat:ll.lat,lng:ll.lng,
+          label:'施工节点 '+String(n.id||'')+' · '+name+' · 桩号 '+(Math.round(Number(n.atM)*10)/10)+'m'});
+      });
+    })();
     return {valves:valves, branchStarts:branchStarts, zoneVerts:zoneVerts, couplers:couplers, mainPipeLines:mainPipeLines, mainCouplers:mainCouplers,
       stats:{sign:bridge.sign, rms:Math.round(bridge.rms*1000)/1000,
         valves:valves.length, branchStarts:branchStarts.length, zoneVerts:zoneVerts.length, couplers:couplers.length, mainPipeLines:mainPipeLines.length, mainCouplers:mainCouplers.length, zoneNote:zoneNote}};
@@ -1160,6 +1178,17 @@
             });
           });
           return out.length >= 2 ? out : null;
+        },
+        getTrunkLines: function () {
+          if (!trunkSaved || !Array.isArray(trunkSaved.trunks)) return [];
+          return trunkSaved.trunks.map(function (t) {
+            var line=[];
+            (t&&Array.isArray(t.points)?t.points:[]).forEach(function(p){
+              if(Array.isArray(p)&&isFinite(p[0])&&isFinite(p[1]))line.push({lat:p[0],lng:p[1]});
+              else if(p&&isFinite(p.lat)&&isFinite(p.lng))line.push({lat:p.lat,lng:p.lng});
+            });
+            return line.length>=2?line:null;
+          }).filter(Boolean);
         },
         tip: tip,
         isMapActive: function () {

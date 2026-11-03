@@ -105,3 +105,13 @@ test('[v914] 宿主接线：online-map 采 dd.couplerNodes + edit 态 excludeTru
     '面板必须把经纬度写进 .pp-coupler-lng');
   assert.ok(idxSrc.indexOf('pp-coupler-lng') > 0, '面板 DOM 缺经纬度占位 span');
 });
+
+test('[v917] 宿主接线：三级 N 节点按有效管线桩号投影为地图捕捉点', () => {
+  const omSrc = fs.readFileSync(path.join(ROOT, 'mod', 'online-map.js'), 'utf8');
+  const flowSrc = fs.readFileSync(path.join(ROOT, 'mod', 'map-flow-demo.js'), 'utf8');
+  assert.ok(/window\.RyTlNodes/.test(omSrc) && /A\.pointAt\(n\.pid,dd,Number\(n\.atM\)\)/.test(omSrc),
+    '在线地图必须通过 RyTlNodes + RyTlAutoEdits.pointAt 读取施工节点位置');
+  assert.ok(/label:'施工节点 '\+String\(n\.id\|\|''\)/.test(omSrc), '吸附提示应显示节点ID');
+  assert.ok(/collectWorkspaceNodes\(dd,tlNodes\.list\(\),autoEdits\.pointAt,toLLSafe\)/.test(flowSrc),
+    '水路校验与演示必须读取同一批施工节点');
+});
