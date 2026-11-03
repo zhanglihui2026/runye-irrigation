@@ -6939,3 +6939,43 @@ commit 4aa89f5/3cacc8e）确立执行模式：执行 agent 实施 → 设计方�
 
 **下一步**：步骤 2b（节点捕捉接入地图端复用 ppCouplerUpsert 口径 + excludeTrunkId 补滤 trunk-edge）；
 真机手工验证放置/拖动手感与面板输入。模式回归：设计方施工后仍按「完成一步交审一步」推进后续步骤。
+
+## 26.135 v914-coupler-map-snap：步骤 2b 节点接入地图捕捉 + trunk-edge 补滤（18ea23c · 2026-11-03）
+
+**范围**（任务清单 9.4 次序 3，设计方继续施工）：①接驳节点成为手绘总管捕捉目标
+②v911 记过#2 收口 ③设计页面板经纬度接真值。地图端拖动微调/面板（跨端事务写）
+**不在步骤 2 定义内**，未做，等后续拍板。
+
+**落点**：
+- trunk-snap.js：`main-coupler` 优先级 4（与 seg-coupler 同档——都是设计落点，压过
+  阀门/支管起点/主管线段）；`buildTargets` 收 `input.mainCouplers`（label 透传，编号按
+  有效项计）；trunk-edge 补 `excludeTrunkId` 过滤（v911 记过#2），label 编号与 v911
+  **逐字节一致**（'总管 N · 段 n'，实测断言锁死）。
+- online-map.js：`extraSnapTargets` 遍历 `dd.couplerNodes`——**失配节点（x/y null）
+  静默跳过**（宁缺不错）；edit 态 `input.excludeTrunkId=activeTrunkId`；
+  `trunkGeoBridge` 既有地块一致性守卫（currentPlotId===currentMapPlotId）天然覆盖。
+- plot-editor.js：`ppCouplerLL`（挂 window 唯一出口）——autoSign 标尺判 ±y + sig memo
+  （sign 只由地块环决定，拖动每帧不重算 RMS）。
+
+**施工实测两坑**：
+1. 面板 node 是 ppState **参数形态** {pipeKey,s}（无坐标）——ppCouplerLL 必须按 pipeKey
+   回查 dd.couplerNodes 投影取世界米坐标；只认 x/y 会永远 null（探针 3 轮定位）。
+2. 捕捉**默认关**（v846 决策，`var snapOn=false` + setEnabled(false)）——探针直调
+   nearest 前必须按真实按钮 `#btnSnapToggle` 开启；STAGE5 stats 有目标 ≠ nearest 能命中。
+
+**探针**（gen_coupler_step2b.mjs，7/7 两轮稳定）：设计页种地块+入库（polyLatLng 由
+m2ll sign=-1 反算，autoSign 必对齐 rms=0）→ 节点投影 → 像素扫描+真实 mousedown 选中 →
+面板经纬度真值=m2ll 期望（±1e-6）→ 切地图 → RyMapHost.refresh() 后点 .place-go →
+进 draw 态 → stats.byKind['main-coupler']≥1 → nearest 精确+6px 偏移（像素标定）命中
+→ 失配 m99 不入表。注意：切地图后列表不自动重渲染，探针须调 RyMapHost.refresh()。
+
+**矩阵回归**（9.4 要求，对照 bb4cf2d worktree 基线）：undo_group 11/11 ✓、batch_d 7/7 ✓、
+legacy_archive 6/8（C1/C2 失败=**基线既有**，load 链不进本次改动）、rot_regen 脚本无判定
+输出且 angle 不生效（基线同）=脚本腐化既有问题。**零回归**。既有失败待专项（不阻塞本步）。
+
+**发布**：全闸 557/0 + publish_refs PASS + lint PASS；v914-coupler-map-snap 三处同抬
+（index 12 处 + sw）；push 18ea23c；线上 sha256 复量 6/6 一致。测试：tests/coupler_map_snap
+4 条（目标构建/优先级竞争 main-coupler(4) 压过 valve(5)+mainpipe-edge(8)/补滤回归/宿主
+接线静态锁）。
+
+**下一步**：步骤 3 贯通判据升级（5m→结构匹配，Node 单测为主）；真机验证手绘吸节点手感。
