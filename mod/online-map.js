@@ -1144,7 +1144,45 @@
       if(snapExtras.mainCouplers&&snapExtras.mainCouplers.length) input.mainCouplers=snapExtras.mainCouplers;   /* [v914] 设计页接驳节点 */
     }
     var list=S.buildTargets(input);
-    return S.setTargets(list,{plotId:currentMapPlotId?String(currentMapPlotId):null, extras:snapExtras?snapExtras.stats:null});
+    var rc=S.setTargets(list,{plotId:currentMapPlotId?String(currentMapPlotId):null, extras:snapExtras?snapExtras.stats:null});
+    renderCouplerMarkers(snapExtras);
+    return rc;
+  }
+
+  /* ===== [v918] 设计页节点常显标记层：手绘总管前用户能直接看到「节点在哪」。
+     此前（v914/v917）节点只是吸附目标——不开捕捉看不见、开了也要靠近才出气泡，
+     用户真机反馈「地图上根本没看到节点」。数据源=snapExtras.mainCouplers
+     （v914 参数接驳节点 + v917 三级施工节点，label 已带管名/桩号）。
+     样式与演示层入口标记同语言（外环 #b45309 描边 + 橙芯 #f59e0b）；
+     interactive:false 不吃绘制点击；permanent tooltip 常显标签，
+     CSS pointer-events:none 不挡地图操作。无选中地块/地块不一致
+     （snapExtras=null）⇒ 清层。标记层与捕捉开关（snapOn）无关——它是指引，不是捕捉。 */
+  var couplerMarkerLayer=null, couplerTipCssDone=false;
+  function renderCouplerMarkers(extras){
+    if(!couplerMarkerLayer) couplerMarkerLayer=window.L.layerGroup().addTo(map);
+    couplerMarkerLayer.clearLayers();
+    if(!couplerTipCssDone){
+      couplerTipCssDone=true;
+      try{
+        var st=document.createElement('style');
+        st.textContent='.ry-coupler-tip{pointer-events:none;background:rgba(255,255,255,.93);'+
+          'color:#7c2d12;border:1px solid #b45309;font-size:11px;padding:1px 6px;box-shadow:none;white-space:nowrap}'+
+          '.ry-coupler-tip::before{display:none}';
+        document.head.appendChild(st);
+      }catch(eCss){}
+    }
+    var list=(extras&&Array.isArray(extras.mainCouplers))?extras.mainCouplers:[];
+    list.forEach(function(n){
+      if(!n||!isFinite(n.lat)||!isFinite(n.lng)) return;
+      window.L.circleMarker([n.lat,n.lng],{
+        radius:9, color:'#b45309', weight:2.5, fillOpacity:0, interactive:false
+      }).addTo(couplerMarkerLayer);
+      window.L.circleMarker([n.lat,n.lng],{
+        radius:5, color:'#ffffff', weight:2, fillColor:'#f59e0b', fillOpacity:1, interactive:false
+      }).addTo(couplerMarkerLayer).bindTooltip(n.label||'主管节点',{
+        permanent:true, direction:'top', offset:[0,-9], className:'ry-coupler-tip', opacity:0.95
+      });
+    });
   }
 
   /* ===== [v861] 在线地图轮灌演示（RyMapFlowDemo）：拾取手绘总管 + 分区主管/支管，

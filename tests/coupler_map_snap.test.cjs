@@ -115,3 +115,23 @@ test('[v917] 宿主接线：三级 N 节点按有效管线桩号投影为地图�
   assert.ok(/collectWorkspaceNodes\(dd,tlNodes\.list\(\),autoEdits\.pointAt,toLLSafe\)/.test(flowSrc),
     '水路校验与演示必须读取同一批施工节点');
 });
+
+test('[v918] 节点常显标记：地图上手绘总管前可见「节点在哪」（真机反馈缺口）', () => {
+  const omSrc = fs.readFileSync(path.join(ROOT, 'mod', 'online-map.js'), 'utf8');
+  /* ① refreshSnapTargets 无条件重建标记层（含无地块时清层） */
+  assert.ok(/renderCouplerMarkers\(snapExtras\);\s*\n\s*return rc;/.test(omSrc),
+    'refreshSnapTargets 末尾必须调用 renderCouplerMarkers（snapExtras=null 时清层）');
+  /* ② 双环样式与演示层入口同语言：外环 #b45309 fillOpacity:0 + 橙芯 #f59e0b */
+  assert.ok(/radius:9,\s*color:'#b45309',\s*weight:2\.5,\s*fillOpacity:0,\s*interactive:false/.test(omSrc),
+    '外环参数必须与演示入口标记同语言');
+  assert.ok(/radius:5,\s*color:'#ffffff',\s*weight:2,\s*fillColor:'#f59e0b',\s*fillOpacity:1,\s*interactive:false/.test(omSrc),
+    '橙芯参数错误');
+  /* ③ 永久 tooltip 常显标签 + 不吃绘制点击 + 不挡地图操作 */
+  assert.ok(/bindTooltip\(n\.label\|\|'主管节点',\{[\s\S]*?permanent:true/.test(omSrc),
+    '标签必须常显（permanent）——用户靠它分辨 m1/m2 与桩号');
+  assert.ok(/interactive:false/.test(omSrc), '标记必须 interactive:false（不吃绘制点击）');
+  assert.ok(/\.ry-coupler-tip\{pointer-events:none/.test(omSrc),
+    'tooltip CSS 必须 pointer-events:none（不挡地图操作）');
+  /* ④ 无主标注兜底 */
+  assert.ok(/n\.label\|\|'主管节点'/.test(omSrc), 'label 缺失须有兜底文案');
+});
