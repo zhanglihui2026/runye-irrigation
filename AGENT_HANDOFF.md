@@ -7055,3 +7055,24 @@ push 3bc25d1；线上 sha256 复量 4/4 一致。矩阵矩阵本步不跑（纯�
 - **#2 readPoint [null,1]**：**早已修复**——v854 专项（readPoint :54 空位坐标判 null），且 trunk_schema_v2.test.cjs ⑮ 已有锁。实测 [null,1]/[1,undefined]/{lat:null,lng:1} 全部正确返回 null。记忆过时，销项。
 - **#3 angle=0+原点偏移**：**早已修复**——v865（ppBuildAutoPipes :3296 注释：0° 也走格系统一变换，frame 为纯平移+缩放，toGrid/toWorld 互逆）。frame 层数学有 coord_frame.test 锁，但修复本体无防回退锁 ⇒ 新增 `tests/zero_angle_frame_lock.test.cjs` 三条静态锁：①ppState.polyPts=frame.poly 在 if(frame){} 内无角度前置条件 ②旧缺陷条件 Math.abs(angle)>0.001 不得回到函数代码（剥注释后查——v865 注释引用了原文）③裁剪环 ppPipeClipPoly=ppState.polyPts（格系）不变量。全量 574/0。
 - 剩余待办：真中文 DXF 层名（等真机 CAD）、成组地块角度入口（等拍板）、真机验收（§9.4 累积）、tlSrcFlip 三选项、批次 E/F。
+
+## 26.140 v916 线上行为验证：探针矩阵线上化 10/10 三连绿（2026-11-03 · 纯探针，零产品改动）
+
+gen_coupler_step2b.mjs 线上化（gen_coupler_online.mjs，Temp）：页面改开 GitHub Pages 线上
+`index.html?full=1&rymock=L2&_t=<ts>`（cache-bust），去掉本地 http 服务/`--no-proxy-server`/
+瓦片劫持（走系统代理+真瓦片）。同一断言集 ①~⑧ 在**真实发布环境**验证：
+
+- **10/10 PASS 三连绿**（种地块入库/节点投影/面板经纬度真值/地图选中/捕捉表含 main-coupler/
+  nearest 吸附/失配节点滤除/总管写库/trunkSaved 重载/演示入口标记计数）。
+- **线上专属坑两枚**：
+  1. **SW 版本切换竞态**：线上首跑 2/10（RyTrunkGeo/RyMapHost 等 window 模块 undefined）——
+     探针开头 unregister SW+caches.delete+reload，但旧 SW 退场与新 CORE 下载有窗口期，模块
+     半新半旧。第二轮起自愈（SW 已是 v916）。线上探针须「首跑丢弃、二跑起信」，或开场等
+     `RyTrunkGeo && RyMapHost && RyTrunkSnap` 三模块齐备再继续。
+  2. **网络时序敏感**：固定 sleep 在线上偏短会随机挂（③ 像素扫描 no pixel、⑧ chips 未渲染）。
+     全线 sleep 加长（600→1500 等）+ ⑧ 点 chips 改条件等待（最多 9s 重试）后三连绿。
+- 定位手段：本地探针版本恒绿 ⇒ 排除产品回归，归因环境时序；sha256 字节复量（§26.137）
+  + 线上行为探针双验证齐了，v916 线上发布置信度完整。
+
+**线上探针从此可用**：发布后抽验跑 `node <Temp>/gen_coupler_online.mjs`（脚本在 Temp 不进仓，
+重建方法=本地版三改：删 srv、去禁代理/瓦片劫持、URL 换线上加 _t）。
