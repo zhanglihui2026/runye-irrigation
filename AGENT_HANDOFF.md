@@ -6979,3 +6979,28 @@ legacy_archive 6/8（C1/C2 失败=**基线既有**，load 链不进本次改动�
 接线静态锁）。
 
 **下一步**：步骤 3 贯通判据升级（5m→结构匹配，Node 单测为主）；真机验证手绘吸节点手感。
+
+## 26.136 v915-flow-connect：步骤 3 贯通判据升级（3bc25d1 · 2026-11-03）
+
+**判据变化**（map-flow-demo.js validateConnection，纯函数）：
+- 旧（v861）：整体 min(trunk拐点×主管端点/驳接点) ≤5m ⇒ 任一处贴近=全局连通，
+  **部分组断开检测不到**。
+- 新（v915）：nodesLL+groupOfZi+groups 三者齐备时**逐组判定**——每组至少一根主管贯通
+  （端点贴近 ≤tol 或 接驳节点被总管拐点贴近=结构化匹配，与 2b「总管吸到节点=拐点落在
+  节点上」的用户操作一一对应）；有组不通 ⇒ code='partial'+brokenGroups，start() 报错
+  文案列出断组号；未连通仍不播放（用户要求保留）。
+- 兼容：nodesLL/groupOfZi/groups 任一缺席（旧档/没放节点/单组）⇒ 走 v861 原口径，
+  tests/map_flow_demo.test.cjs 旧场景零变化（16/16 一起跑过）。
+- collect 增采 dd.couplerNodes：失配节点（x/y null，v913 missing）跳过；
+  mi=parseInt(pipeKey 去 m)-1，解析不出跳过。
+
+**测试**：tests/map_flow_connect.test.cjs 11 条（连通/部分断开 brokenGroups=[1]/
+全断=[0,1]/节点匹配参与判定对照/节点未命中不贯通/兼容×3/no-trunk/no-data 优先级/
+失败语义 ok=false 不回退/宿主接线静态锁）。全闸 568/0（557+11）。
+
+**发布**：v915-flow-connect 三处同抬（map-flow-demo.js 在 SW CORE 名单 sw.js:1324）；
+push 3bc25d1；线上 sha256 复量 4/4 一致。矩阵矩阵本步不跑（纯函数+Node 单测为主，
+浏览器侧无新路径；步骤 4 后一并跑）。
+
+**下一步**：步骤 4 演示水路精确化（收尾展示层：v882 已把总管+段总管画进演示底态，
+本步补「活动组主管只高亮接驳节点所在主管链路」等待拍板细节）；真机验证：逐组报错文案。
