@@ -128,7 +128,7 @@
     if(!preimage||typeof window.ryCommitSinglePlotL2Snapshot!=='function')return true;
     var after=window.ppGetState();
     var designKeys=['polyPts','mainPipes','branchPipes','subBranchPipes','source','valves','hiddenPipes','pipeIds','nextPipeId',
-      'cutSnap','partitionCuts','cutOverrides','areaLocked','zoneAngleDeg','zoneRotated','zoneAuto'];
+      'cutSnap','partitionCuts','cutOverrides','areaLocked','zoneAngleDeg','zoneRotated','zoneAuto','couplerNodes'];
     if(!designKeys.some(function(key){return JSON.stringify(preimage[key])!==JSON.stringify(after[key]);}))return true;
     var result=window.ryCommitSinglePlotL2Snapshot(preimage,after);
     if(result!==false){
@@ -970,7 +970,11 @@
    */
   var PP_SLOT_KEYS=['polyPts','mainPipes','branchPipes','subBranchPipes','source','valves',
     'pipeIds','nextPipeId','hiddenPipes','cutOverrides','cutSnap','partitionCuts','mergePreview','areaLocked',
-    'zoneRotated','zoneAngleDeg','zoneAuto'];
+    'zoneRotated','zoneAngleDeg','zoneAuto','couplerNodes'];
+  /* [v913-coupler-nodes] couplerNodes = 接驳节点参数（[{pipeKey:'m1', s:米}]，每主管至多 1 条）。
+     s 以 tlDiagramData.mainPipes（世界米）折线为基准；四接入点（成员槽/提交检测/ppGetState/
+     ppSetState）全部显式接线，事务/undo 零新代码（进 ppState 后由 preimage/after 自动覆盖）。
+     canonical 投影在 inline-09 tlAutoGenerate（写 dd.couplerNodes 世界米坐标）。 */
 
   function ppCloneJSON(v){ try{ return JSON.parse(JSON.stringify(v===undefined?null:v)); }catch(e){ return null; } }
 
@@ -1461,7 +1465,9 @@
         y:(ppState.cutSnap&&ppState.cutSnap.y)?ppState.cutSnap.y.slice():null
       },
       zoneAngleDeg:ppZoneAngle(),zoneRotated:!!ppState.zoneRotated,areaLocked:!!ppState.areaLocked,
-      zoneAuto:ppState.zoneAuto!==false
+      zoneAuto:ppState.zoneAuto!==false,
+      /* [v913] undo 快照必须带接驳节点参数——手工字段清单，漏加即 undo 不回退节点 */
+      couplerNodes:JSON.parse(JSON.stringify(ppState.couplerNodes||[]))
     };
   }
 
@@ -1510,6 +1516,8 @@
     ppState.zoneAngleDeg=isFinite(Number(snap.zoneAngleDeg))?Number(snap.zoneAngleDeg):(snap.zoneRotated?90:0);
     ppState.zoneRotated=!!snap.zoneRotated;
     ppState.areaLocked=!!snap.areaLocked;
+    /* [v913] undo 恢复接驳节点参数：旧历史条目无此字段 ⇒ 恢复为空数组（节点尚未创建，语义正确） */
+    ppState.couplerNodes=JSON.parse(JSON.stringify(snap.couplerNodes||[]));
     if(typeof snap.zoneAuto==='boolean'){
       ppState.zoneAuto=snap.zoneAuto;
       try{localStorage.setItem('runye_zone_auto',snap.zoneAuto?'1':'0');}catch(e){}
@@ -2488,6 +2496,25 @@
     }
     } /* [v875] !ppPipeLayerSuppressed 结束：静态管线层整块由三级层接管 */
 
+    /* [v913-coupler-nodes] 接驳节点（交互画布，2D context）：dd.couplerNodes（世界米）
+       → frameToGrid 回格系 → ppToCanvas 上屏。失配节点（x/y null）不画但参数保留。
+       依赖 dd.zones.frame + window.RyCoordFrame，缺席则整段静默跳过。
+       选中/拖动态橙色填充；描边 #b45309 为本元素独占色（探针像素扫描锚点）。 */
+    (function(){
+      var cctx=ppCouplerCtx();if(!cctx)return;
+      var clist=cctx.dd.couplerNodes;
+      if(!Array.isArray(clist))return;
+      clist.forEach(function(n){
+        if(n.x==null||n.y==null)return;
+        var cg=cctx.frame?cctx.F.frameToGrid(cctx.frame,{x:n.x,y:n.y}):{x:n.x,y:n.y};
+        var cp=ppToCanvas(cg.x,cg.y);
+        var csel=(ppCouplerSelected===n.pipeKey)||ppState.dragCoupler===n.pipeKey;
+        ppCtx.beginPath();ppCtx.arc(cp.x,cp.y,csel?7:5.5,0,Math.PI*2);
+        ppCtx.fillStyle=csel?'#f59e0b':'#fff';ppCtx.fill();
+        ppCtx.lineWidth=2;ppCtx.strokeStyle='#b45309';ppCtx.stroke();
+      });
+    })();
+
     // Current line being drawn
     if(ppState.currentLine.length>0){
       var c=ppState.mode==='main'?'#185FA5':ppState.mode==='branch'?'#16a34a':ppState.mode==='subbranch'?'#185FA5':'rgba(0,0,0,.35)';
@@ -2572,6 +2599,82 @@
     return{x:e.clientX-rect.left,y:e.clientY-rect.top};
   }
 
+  /* ===== [v913-coupler-nodes] 接驳节点：放置 / 拖动 / 定位面板 =====
+     数据：ppState.couplerNodes=[{pipeKey,s 米}]（s 以 dd.mainPipes 世界米折线为基准）。
+     非等比 frame（scaleX≠scaleY）下弧长必须在世界米系算：
+     鼠标格系 → frameToWorld → 世界米垂足投影 → s；渲染 dd.couplerNodes(x,y) → frameToGrid → ts()。
+     事务：松手走现有 ppCommitSinglePlotEdit（preimage/after 自动感知，undo 零新代码）。
+     成组态（ppIsGroupWhole）禁用——成员槽继承语义留待后续批次。 */
+  var ppCouplerPlacing=false,ppCouplerSelected=null,ppCouplerDrag=null,
+      ppCouplerPreimage=null,ppCouplerSinglePreimage=null;
+  function ppCouplerCtx(){
+    var dd=window.tlDiagramData;
+    if(!dd||dd.world!=='meter'||!Array.isArray(dd.mainPipes)||!dd.mainPipes.length)return null;
+    var frame=(dd.zones&&dd.zones.frame)?dd.zones.frame:null;
+    var F=window.RyCoordFrame;
+    if(!F||typeof F.frameToWorld!=='function'||typeof F.frameToGrid!=='function')return null;
+    return {dd:dd,frame:frame,F:F};
+  }
+  /* 世界米点 → 最近主管垂足。返回 {pipeKey,idx,s,fx,fy,d}（s=世界米弧长，d=垂距米）或 null。 */
+  function ppCouplerProject(worldPt){
+    var ctx=ppCouplerCtx();if(!ctx)return null;
+    var best=null;
+    ctx.dd.mainPipes.forEach(function(line,idx){
+      var acc=0;
+      for(var k=1;k<line.length;k++){
+        var ax=line[k-1].x,ay=line[k-1].y,bx=line[k].x,by=line[k].y;
+        var vx=bx-ax,vy=by-ay,den=vx*vx+vy*vy;
+        if(den<=0)continue;
+        var t=((worldPt.x-ax)*vx+(worldPt.y-ay)*vy)/den;
+        t=Math.max(0,Math.min(1,t));
+        var fx=ax+vx*t,fy=ay+vy*t;
+        var d=Math.hypot(worldPt.x-fx,worldPt.y-fy);
+        if(!best||d<best.d)best={d:d,idx:idx,s:acc+Math.sqrt(den)*t,fx:fx,fy:fy};
+        acc+=Math.sqrt(den);
+      }
+    });
+    if(!best)return null;
+    /* [v913] 身份口径：pipeKey='m'+(dd.mainPipes 索引+1)——投影几何锚在 dd.mainPipes
+       （tlAutoGenerate 从分区网格确定性重建，重生成顺序稳定 ⇒ pipeKey 跨重生成稳定）。
+       不能用 ppState.pipeIds.main 做身份源：自动生成流（ensureInitialPipes/#ppGenerate
+       直通分支）里 L2 手绘层为空 ⇒ pipeIds.main=[]，会全量 missing。 */
+    best.pipeKey='m'+(best.idx+1);
+    return best;
+  }
+  /* upsert 节点参数（同 pipeKey 覆盖，否则追加）；拖动中实时写内存，松手统一走事务。 */
+  function ppCouplerUpsert(pipeKey,s){
+    ppState.couplerNodes=Array.isArray(ppState.couplerNodes)?ppState.couplerNodes:[];
+    var found=ppState.couplerNodes.filter(function(n){return n.pipeKey===pipeKey;})[0];
+    if(found)found.s=s;
+    else ppState.couplerNodes.push({pipeKey:pipeKey,s:s});
+  }
+  function ppCouplerRemove(pipeKey){
+    ppState.couplerNodes=(Array.isArray(ppState.couplerNodes)?ppState.couplerNodes:[])
+      .filter(function(n){return n.pipeKey!==pipeKey;});
+  }
+  function ppCouplerSetPlacing(on){
+    ppCouplerPlacing=!!on;
+    var btn=document.getElementById('ppCouplerBtn');
+    if(btn)btn.classList.toggle('active',ppCouplerPlacing);
+    ppCanvas.style.cursor=ppCouplerPlacing?'crosshair':'grab';
+    var panel=document.getElementById('ppCouplerPanel');
+    if(panel)panel.style.display=ppCouplerPlacing?'block':'none';
+    if(ppCouplerPlacing&&!ppIsGroupWhole()&&typeof tip==='function')tip('接驳节点：点击主管线放置或选中节点，拖动调整，Esc 退出');
+  }
+  function ppCouplerSyncPanel(){
+    var panel=document.getElementById('ppCouplerPanel');
+    if(!panel)return;
+    var inp=panel.querySelector('input');
+    var lab=panel.querySelector('.pp-coupler-pipe');
+    var node=ppState.couplerNodes&&ppCouplerSelected?ppState.couplerNodes.filter(function(n){return n.pipeKey===ppCouplerSelected;})[0]:null;
+    if(lab)lab.textContent=ppCouplerSelected?('主管 '+ppCouplerSelected):'未选中';
+    if(inp){inp.value=node?String(Math.round(node.s*10)/10):'';inp.disabled=!node;}
+  }
+  window.ppCouplerSyncPanel=ppCouplerSyncPanel;   /* 面板输入事件与外部探针共用 */
+  /* [v913] 跨模块/探针入口：定位面板与地图端（步骤 2b）复用同一 upsert/remove 口径 */
+  window.ppCouplerUpsert=ppCouplerUpsert;
+  window.ppCouplerRemove=ppCouplerRemove;
+
   // Wheel zoom — centered on mouse position
   ppCanvas.addEventListener('wheel',function(e){
     e.preventDefault();
@@ -2584,6 +2687,10 @@
   var ppKeyHandler=function(e){
     if(e.code==='Space'&&!ppSpacePressed&&document.activeElement===document.body){
       ppSpacePressed=true;ppCanvas.style.cursor='grab';e.preventDefault();
+    }
+    /* [v913-coupler-nodes] Esc 退出接驳节点放置模式（输入框聚焦时不抢） */
+    if(e.code==='Escape'&&ppCouplerPlacing&&(!document.activeElement||document.activeElement.tagName!=='INPUT')){
+      ppCouplerSetPlacing(false);ppRender();
     }
     // Arrow keys for fine-tune in adjustCut mode
     if(ppState.mode==='adjustCut'&&!ppSpacePressed&&document.activeElement===document.body){
@@ -2633,6 +2740,30 @@
           e.preventDefault();return;
         }
       }
+      /* [v913-coupler-nodes] 接驳节点放置/选中：放置模式下点击主管线（垂距 ≤3m 世界米）
+         创建或选中节点并直接进入拖动（点击=零位移拖动，松手统一提交）。
+         成组态禁用（成员槽继承语义留待后续批次）。 */
+      if(ppCouplerPlacing){
+        if(ppIsGroupWhole()){
+          if(typeof tip==='function')tip('成组地块请在拆组后调整接驳节点');
+        }else{
+          var cw=ppToMeters(pos.x,pos.y);
+          var cctx=ppCouplerCtx();
+          var wpt=(cctx&&cctx.frame)?cctx.F.frameToWorld(cctx.frame,cw):cw;
+          var chit=ppCouplerProject(wpt);
+          if(chit&&chit.d<=3){
+            ppPushHistory();
+            ppCouplerPreimage=ppGroupMemberPreimage();
+            ppCouplerSinglePreimage=window.ppGetState();
+            ppState.dragCoupler=chit.pipeKey;
+            ppCouplerSelected=chit.pipeKey;
+            ppCouplerUpsert(chit.pipeKey,chit.s);
+            ppRender();
+            ppCouplerSyncPanel();
+            e.preventDefault();return;
+          }
+        }
+      }
     }
   });
 
@@ -2656,8 +2787,22 @@
       if(typeof window.ppRefreshDiagramIfVisible==='function')window.ppRefreshDiagramIfVisible();
       return;
     }
+    /* [v913-coupler-nodes] 接驳节点拖动：鼠标格系 → 世界米 → 垂足投影 → 实时更新参数。
+       预览与松手落点走同一投影函数 ppCouplerProject（v852 教训）。 */
+    if(ppState.dragCoupler){
+      var cmW=ppToMeters(pos.x,pos.y);
+      var cmCtx=ppCouplerCtx();
+      var cmWpt=(cmCtx&&cmCtx.frame)?cmCtx.F.frameToWorld(cmCtx.frame,cmW):cmW;
+      var cmHit=ppCouplerProject(cmWpt);
+      if(cmHit&&cmHit.pipeKey===ppState.dragCoupler){
+        ppCouplerUpsert(cmHit.pipeKey,cmHit.s);
+        ppCouplerSyncPanel();
+      }
+      ppRender();
+      return;
+    }
     // If dragging with left button (no space, not dragging cut), check threshold
-    if(ppMouseDownPos&&e.buttons===1&&!ppSpacePressed&&!ppState.dragCut){
+    if(ppMouseDownPos&&e.buttons===1&&!ppSpacePressed&&!ppState.dragCut&&!ppState.dragCoupler){
       var dx2=pos.x-ppMouseDownPos.x,dy2=pos.y-ppMouseDownPos.y;
       if(Math.abs(dx2)>2||Math.abs(dy2)>2){
         // Start panning
@@ -2701,6 +2846,29 @@
       else if(typeof window.ppRefreshDiagramIfVisible==='function')window.ppRefreshDiagramIfVisible();
       if(ppMerged&&typeof ppRefreshMaterials==='function')ppRefreshMaterials();
       ppRender();
+      return;
+    }
+    /* [v913-coupler-nodes] 接驳节点松手结算：点击=零位移拖动也走这里——统一事务提交。
+       成功后 ppRefreshDiagramOrReset 联动三级重投影（tlAutoGenerate 重读 couplerNodes）。 */
+    if(ppState.dragCoupler){
+      ppState.dragCoupler=null;
+      ppMouseDownPos=null;
+      ppCanvas.style.cursor=ppCouplerPlacing?'crosshair':'grab';
+      var cpPreimage=ppCouplerPreimage,cpSingle=ppCouplerSinglePreimage;
+      ppCouplerPreimage=null;ppCouplerSinglePreimage=null;
+      if(ppIsGroupWhole()){ppRender();return;}
+      var cpOk=ppCommitSinglePlotEdit(cpSingle,'coupler-move',true,true);
+      if(cpOk===false){
+        /* 事务拒绝：ppCommitSinglePlotEdit 已回滚 ppApplySlot(preimage)，这里恢复选中态 */
+        ppCouplerSelected=null;
+      }else{
+        /* [v913] 投影刷新：ppCommitSinglePlotEdit 成功分支只刷二级快照（ppRefreshDiagramIfVisible），
+           不重建 tlDiagramData——couplerNodes 只投影进 dd，必须 tlAutoGenerate 才会重投影
+           （与 cut-drag 松手 :2841 同一口径）。 */
+        if(typeof window.ppRefreshTLAfterCuts==='function')window.ppRefreshTLAfterCuts();
+      }
+      ppRender();
+      ppCouplerSyncPanel();
       return;
     }
     if(ppState.isPanning){
@@ -2909,9 +3077,45 @@
   }
 
   // Undo — global step-back through all operations
+  /* [v913-coupler-nodes] 接驳节点：放置模式按钮 + 定位面板事件 */
+  (function(){
+    var btn=document.getElementById('ppCouplerBtn');
+    if(btn)btn.addEventListener('click',function(){
+      if(ppIsGroupWhole()){if(typeof tip==='function')tip('成组地块请在拆组后调整接驳节点');return;}
+      ppCouplerSetPlacing(!ppCouplerPlacing);
+      if(!ppCouplerPlacing){ppCouplerSelected=null;ppRender();}
+    });
+    var panel=document.getElementById('ppCouplerPanel');
+    if(panel){
+      var inp=panel.querySelector('input');
+      if(inp)inp.addEventListener('change',function(){
+        var v=Number(inp.value);
+        if(!ppCouplerSelected||!isFinite(v)||v<0){ppCouplerSyncPanel();return;}
+        if(ppIsGroupWhole()){ppCouplerSyncPanel();return;}
+        var pre=window.ppGetState();
+        ppPushHistory();
+        ppCouplerUpsert(ppCouplerSelected,v);
+        var ok=ppCommitSinglePlotEdit(pre,'coupler-input',true,true);
+        if(ok===false)ppCouplerSelected=null;
+        else if(typeof window.ppRefreshTLAfterCuts==='function')window.ppRefreshTLAfterCuts();   /* [v913] 重投影 dd.couplerNodes */
+        ppRender();ppCouplerSyncPanel();
+      });
+      var rm=panel.querySelector('.pp-coupler-remove');
+      if(rm)rm.addEventListener('click',function(){
+        if(!ppCouplerSelected||ppIsGroupWhole())return;
+        var pre=window.ppGetState();
+        ppPushHistory();
+        ppCouplerRemove(ppCouplerSelected);
+        var ok=ppCommitSinglePlotEdit(pre,'coupler-remove',true,true);
+        if(ok===false)ppCouplerSelected=null;
+        else if(typeof window.ppRefreshTLAfterCuts==='function')window.ppRefreshTLAfterCuts();   /* [v913] 重投影 dd.couplerNodes */
+        ppRender();ppCouplerSyncPanel();
+      });
+    }
+  })();
+
   document.getElementById('ppUndo').addEventListener('click',function(){
-    var ok=ppUndoStep();
-    if(ok){
+    var ok=ppUndoStep();    if(ok){
       ppUpdatePickResult(null);
       ppRender();ppUpdateAutoPipeButton();
       /* v166：回退后同步三级简图（界线可能回到上一状态） */
@@ -4446,6 +4650,22 @@
     });
     parts.push('</g>');
 
+    /* [v913-coupler-nodes] 接驳节点渲染：读 dd.couplerNodes（世界米）→ frameToGrid 回格系 →
+       ts() 上屏。失配节点（x/y null）不画但参数保留（重挂后自动复活）。
+       依赖 dd.zones.frame（纯数据）+ window.RyCoordFrame —— 两者缺席则整段静默跳过。 */
+    (function(){
+      var ctx=ppCouplerCtx();if(!ctx)return;
+      var list=ctx.dd.couplerNodes;
+      if(!Array.isArray(list)||!list.length)return;
+      list.forEach(function(n){
+        if(n.x==null||n.y==null)return;
+        var g=ctx.frame?ctx.F.frameToGrid(ctx.frame,{x:n.x,y:n.y}):{x:n.x,y:n.y};
+        var p=ts(g.x,g.y);
+        var sel=(ppCouplerSelected===n.pipeKey)||ppState.dragCoupler===n.pipeKey;
+        parts.push('<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="'+(sel?7:5.5)+'" fill="'+(sel?'#f59e0b':'#fff')+'" stroke="#b45309" stroke-width="2" data-pp-coupler="'+n.pipeKey+'"><title>接驳节点 · '+n.pipeKey+' · 距起点 '+(Math.round(n.s*10)/10)+'m</title></circle>');
+      });
+    })();
+
     if(showPipeNoteMain||showPipeNoteBranch){
       var pipeNoteX=zoneDimX1+10;
       var pipeNoteY=Math.max(zoneDimY1+18,zoneDimY2-24);
@@ -5115,6 +5335,8 @@
       zoneRotated:!!ppState.zoneRotated,
       zoneAngleDeg:ppZoneAngle(),
       zoneAuto:ppState.zoneAuto!==false,
+      /* [v913-coupler-nodes] 白名单式构造——漏加此行则节点参数永远进不了存档与提交快照。 */
+      couplerNodes:JSON.parse(JSON.stringify(ppState.couplerNodes||[])),
       zoom:ppState.zoom||1,
       panX:ppState.panX||0,
       panY:ppState.panY||0,
@@ -5206,6 +5428,11 @@
     ppState.zoneAngleDeg=isFinite(Number(saved.zoneAngleDeg))?Number(saved.zoneAngleDeg):(ppState.zoneRotated?90:0);
     /* 旧存档里的地块旋转值不再应用；设计几何始终使用原始地块坐标。 */
     if(typeof saved.zoneAuto==='boolean')ppState.zoneAuto=saved.zoneAuto;
+    /* [v913-coupler-nodes] 接驳节点参数回填：非法项（缺 pipeKey/s 或非正 s）直接丢弃，
+       旧存档无此字段 ⇒ 自然回退 []，零迁移成本。 */
+    ppState.couplerNodes=(Array.isArray(saved.couplerNodes)?saved.couplerNodes:[])
+      .filter(function(n){return n&&typeof n.pipeKey==='string'&&n.pipeKey&&isFinite(Number(n.s))&&Number(n.s)>=0;})
+      .map(function(n){return {pipeKey:n.pipeKey,s:Number(n.s)};});
     ppState.zoom=saved.zoom||1;
     ppState.panX=saved.panX||0;
     ppState.panY=saved.panY||0;

@@ -4860,6 +4860,7 @@ function tlAutoGenerate(options) {
      computeThreeLevel 的「最远分区最不利路径」长度读 window.tlDiagramData；若按原来的顺序
      （先算 r → 再写 tlDiagramData）本幅图的简图参数/水泵扬程会用上一幅图的旧几何。
      故这里先把本次几何快照写入，再重算一次 r，并同步刷新左栏结果条与左下角损失卡。 */
+  var ddCouplerSource='none';   /* [v913-coupler-nodes] 由下方 couplerNodes 投影 IIFE 接力写入 */
   window.tlDiagramData = { version: 1, schemaVersion: 1, world: 'meter', generatedAt: new Date().toISOString(), plot: { w: plotW, h: plotH },
     /* [v873] trunkSource 带失败原因：'auto' | 'missing(<原因>)' —— 旋转分区角度后
        段总管消失的排障依据（地图页/工作区/探针都读得到）。 */
@@ -4875,6 +4876,53 @@ function tlAutoGenerate(options) {
              cutOffX: (tlZoneStepRef ? tlZoneStepRef.x : null), cutOffY: (tlZoneStepRef ? tlZoneStepRef.y : null) },
     /* SVG/设计阶段使用旋转网格局部坐标；tlDiagramData 是跨模块的真实地块坐标契约。 */
     mainPipes: mainPipes.map(function(line){return line.map(function(p){return tlGridWorld(p.x,p.y);});}),
+    /* [v913-coupler-nodes] 接驳节点参数投影：读设计侧 ppState.couplerNodes（[{pipeKey,s 米}]），
+       在本幅世界米主管折线上取 s 弧长点 → dd.couplerNodes=[{pipeKey,s,x,y}]。
+       s 跨重生成稳定（「距起点 30m」在新几何上仍有效），失配仅当 pipeKey 对应主管消失
+       ⇒ 保留参数、坐标置 null + couplerSource 带原因（仿 trunkSource 排障惯例）。
+       非等比 frame（scaleX≠scaleY）下弧长必须在世界米折线上算，禁止用格系折线按比例取点。 */
+    couplerNodes: (function(){
+      try{
+        var pp=window.ppGetState?window.ppGetState():null;
+        var list=(pp&&Array.isArray(pp.couplerNodes))?pp.couplerNodes:[];
+        if(!list.length)return [];
+        /* [v913] 身份口径：pipeKey='m'+(本幅 mainPipes 索引+1)，与设计侧
+           ppCouplerProject 产出严格同源（dd.mainPipes 由 tlAutoGenerate 确定性重建，
+           顺序稳定 ⇒ pipeKey 跨重生成稳定）。禁用 ppState.pipeIds.main 做身份源——
+           自动生成流里 L2 手绘层为空 ⇒ pipeIds.main=[]，会全量 missing。 */
+        function pipeIndexByKey(key){
+          var m=/^m(\d+)$/.exec(String(key||''));
+          return m?(parseInt(m[1],10)-1):-1;
+        }
+        var world=mainPipes.map(function(line){return line.map(function(p){return tlGridWorld(p.x,p.y);});});
+        function linePointAt(line,s){
+          var acc=0;
+          for(var k=1;k<line.length;k++){
+            var dx=line[k].x-line[k-1].x,dy=line[k].y-line[k-1].y,seg=Math.hypot(dx,dy);
+            if(seg<=0)continue;
+            if(acc+seg>=s){var t=(s-acc)/seg;return {x:line[k-1].x+dx*t,y:line[k-1].y+dy*t};}
+            acc+=seg;
+          }
+          var last=line[line.length-1];return {x:last.x,y:last.y};
+        }
+        var missing=null;
+        var out=list.map(function(n){
+          var idx=pipeIndexByKey(n.pipeKey);
+          var s=Math.max(0,Number(n.s)||0);
+          if(idx<0||!world[idx]||world[idx].length<2){
+            if(!missing)missing=n.pipeKey;
+            return {pipeKey:n.pipeKey,s:s,x:null,y:null};
+          }
+          var pt=linePointAt(world[idx],s);
+          return {pipeKey:n.pipeKey,s:s,x:pt.x,y:pt.y};
+        });
+        ddCouplerSource=(list.length?(missing?('missing('+missing+')'):'ok'):'none');
+        return out;
+      }catch(e){ try{console.warn('[coupler-nodes] 投影失败',e);}catch(e2){} ddCouplerSource='error'; return []; }
+    })(),
+    /* [v913-coupler-nodes] 投影健康度：'none'(无节点) | 'ok' | 'missing(<pipeKey>)' | 'error'。
+       由上方 IIFE 写入 ddCouplerSource（对象字面量内无法给兄弟字段赋值，故用临时变量接力）。 */
+    couplerSource: (typeof ddCouplerSource!=='undefined'?ddCouplerSource:'none'),
     /* [v859] 段总管：局部几何转世界坐标 + len 按世界坐标重算（frame 缩放不漂）。
        在线地图页读 segTrunk.couplers 反算经纬度做驳接点捕捉；扬程收口读 segTrunk.len。 */
     segTrunk: null,

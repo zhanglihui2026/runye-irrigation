@@ -5318,3 +5318,20 @@ body.ry-tool #pipePlanSection #ryDrawingHost #ppToolbar{grid-column:auto;grid-ro
 }
 #mapDrawTools #btnFinish:hover .dt-tip,
 #mapDrawTools #btnFinish:focus-visible .dt-tip{display:block}
+
+/* [v913-coupler-nodes] 接驳节点定位面板：画布容器内绝对定位（右下），选中节点时显示 */
+#ppCanvasWrap #ppCouplerPanel{
+  position:absolute;right:12px;bottom:52px;z-index:6;
+  display:none;align-items:center;
+  background:#fff;border:1px solid #d3d1c7;border-radius:8px;
+  padding:6px 10px;font-size:12px;color:#2c2c2a;
+  box-shadow:0 2px 8px rgba(0,0,0,.12);
+}
+#ppCanvasWrap #ppCouplerPanel input{
+  width:64px;padding:2px 6px;border:1px solid #b4b2a9;border-radius:4px;font-size:12px;
+}
+#ppCanvasWrap #ppCouplerPanel .pp-coupler-remove{
+  margin-left:8px;padding:2px 10px;border:1px solid #f09595;border-radius:4px;
+  background:#fcebeb;color:#a32d2d;font-size:12px;cursor:pointer;
+}
+#ppCanvasWrap #ppCouplerPanel .pp-coupler-remove:hover{background:#f7c1c1}
