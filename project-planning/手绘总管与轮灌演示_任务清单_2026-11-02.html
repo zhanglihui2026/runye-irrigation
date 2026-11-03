@@ -309,6 +309,39 @@
 </div>
 
 <!-- ═══════════ 六、现状地基 ═══════════ -->
+<!-- ═══════════ 5.5 实现附录 ═══════════ -->
+<h3>5.5 步骤 1 实现附录（2026-11-03 设计方钉死落点 · 执行方照表施工，无需自行勘察）</h3>
+
+<div class="card">
+<b>A0 参数结构（唯一新增 ppState 字段）</b>
+<pre style="background:#f1efe8;padding:8px 12px;border-radius:6px;font-size:12.5px;margin:8px 0">ppState.couplerNodes = [ { pipeKey:'m1', s:12.5 } ]   // 每根主管至多一条（决策①）</pre>
+<ul>
+<li><code>pipeKey</code> = <code>ppState.pipeIds.main</code> 的稳定 id（'m1'/'m2'…），不用坐标哈希</li>
+<li><code>s</code> = 沿主管折线距离，<b>以 tlDiagramData.mainPipes（世界米）折线为基准</b>；ppState.mainPipes 是画布坐标，两者禁止混算（全局契约）</li>
+<li>世界米坐标 = tlDiagramData.mainPipes 同序折线取 s 处（超长 clamp 到端点）</li>
+</ul>
+</div>
+
+<table>
+<tr><th style="width:36px">#</th><th>接入点</th><th>位置（v912 时点实测）</th><th>改法</th></tr>
+<tr><td>1</td><td>成员槽捕获</td><td><code>plot-editor.js:971</code> PP_SLOT_KEYS</td><td>数组加 <code>'couplerNodes'</code></td></tr>
+<tr><td>2</td><td>提交变更检测</td><td><code>ppCommitSinglePlotEdit</code> 内 designKeys（:130）</td><td>加 <code>'couplerNodes'</code>——<b>两清单必须同加</b>（同步测试锁校验，漏加必红）</td></tr>
+<tr><td>3</td><td>存档/快照出口</td><td><code>ppGetState</code> 白名单（<b>:5087，显式字段构造，非整体序列化！</b>）</td><td><b>必须显式加一行</b> <code>couplerNodes:JSON.parse(JSON.stringify(ppState.couplerNodes||[]))</code>——不加则字段永远进不了存档与提交快照</td></tr>
+<tr><td>4</td><td>恢复回填</td><td><code>ppSetState</code>（:5177）</td><td>显式回填 <code>ppState.couplerNodes</code>（缺省 []）</td></tr>
+<tr><td>5</td><td>canonical 投影</td><td><code>inline-09</code> tlAutoGenerate 写 tlDiagramData 处（:5013 附近）</td><td>生成时读 ppState.couplerNodes → geoKey 同代校验 → 写 <code>dd.couplerNodes=[{pipeKey,s,x,y}]</code>（世界米坐标现算）；pipeKey 失配 → 保留参数、坐标置 null + <code>dd.couplerSource:'missing(...)'</code>（仿 trunkSource 惯例）</td></tr>
+<tr><td>6</td><td>事务/undo</td><td><b>零新代码</b></td><td>couplerNodes 进 ppState 后由 preimage/after JSON 比对自动覆盖——前提是落点 1/2/3 都做了</td></tr>
+</table>
+
+<div class="card">
+<b>拖动与面板</b>
+<ul>
+<li>拖动：屏幕空间对当前主管折线垂足投影 → 反算 s；<b>预览与松手落点共用同一函数</b>（v852 教训）</li>
+<li>松手提交：更新 ppState.couplerNodes → <code>ppCommitSinglePlotEdit(preimage,'coupler-move')</code>（现有链，勿新造）</li>
+<li>面板：主管标签 + s 可输入精确置位；<b>经纬度列本步骤只做占位</b>（"地图同步后可见"）——经纬度显示在步骤 2b 接，避免本步扩范围</li>
+</ul>
+<b>步骤 1 范围红线</b>：不动 segTrunk/扬程/水力（步骤 3 才接）；不动地图端（步骤 2b）；无增删节点 UI（每主管恒 1 个）。
+</div>
+
 <h2>六、现状地基盘点（已有能力，直接复用）</h2>
 <table>
 <tr><th style="width:180px">能力</th><th>现状</th><th style="width:150px">本任务中的角色</th></tr>
