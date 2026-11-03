@@ -51,8 +51,18 @@
   }
   /* 连接校验。o = {
        hasTrunk:bool, trunkLL:[{lat,lng}], mainsLL:[[{lat,lng}]×N],
-       couplersLL:[{lat,lng}]|null, hasSeg:bool, tolM:number, dist:(a,b)=>米 }
-     返回 { ok, code:'no-trunk'|'no-data'|'connected'|'disconnected', minM } */
+       couplersLL:[{lat,lng}]|null, hasSeg:bool, tolM:number, dist:(a,b)=>米,
+       nodesLL:[{pipeKey,mi,ll}]|null, groupOfZi:fn(zi)=>g|null, groups:number|null }
+     返回 { ok, code:'no-trunk'|'no-data'|'connected'|'disconnected'|'partial',
+            minM, brokenGroups?:[g] }
+     [v915 步骤 3] 判据升级（任务清单 §9.4 次序 4）：
+     · 结构化匹配：接驳节点（v913 dd.couplerNodes 投影，ll=geoBridge 反算）被总管任一
+       拐点贴近（≤tol）⇒ 该节点所在主管（mi）视为贯通——与 2b 的「总管吸到节点」
+       用户操作一一对应（吸附落点就是拐点）。
+     · 逐组可达性：每组（轮灌组）至少一根主管贯通（主管端点贴近 或 该组任一节点的
+       主管匹配）才算连通；有组不通 ⇒ code:'partial' + brokenGroups（演示前逐组报错）。
+     · 兼容：未提供 nodesLL/groupOfZi（旧档/没放节点/单组）⇒ 走 v861 原口径
+       （整体 min(主管端点, 驳接点) ≤tol），旧测试与既有用户流程零影响。 */
   function validateConnection(o) {
     o = o || {};
     if (!o.hasTrunk || !Array.isArray(o.trunkLL) || !o.trunkLL.length) {
@@ -74,6 +84,35 @@
     }
     var mMain = minTo(mainsFlat);
     var mCoup = (o.hasSeg && Array.isArray(o.couplersLL) && o.couplersLL.length) ? minTo(o.couplersLL) : Infinity;
+
+    /* [v915] 逐组判定：需要 nodesLL + groupOfZi + groups 三者齐备；任一缺席退旧口径。 */
+    var perMain = null;   /* mZi[zi]=该主管到总管的最小距离（端点口径） */
+    if (typeof o.groupOfZi === 'function' && o.groups > 1 && Array.isArray(o.mainsLL)) {
+      perMain = o.mainsLL.map(function (l) {
+        return minTo((l || []).filter(Boolean));
+      });
+      if (Array.isArray(o.nodesLL)) {
+        o.nodesLL.forEach(function (n) {
+          if (!n || !n.ll || !(n.mi >= 0)) return;
+          var hit = false;
+          o.trunkLL.forEach(function (tp) { if (dist(tp, n.ll) <= tol) hit = true; });
+          if (hit && perMain[n.mi] > 0) perMain[n.mi] = 0;   /* 节点匹配 ⇒ 该主管贯通 */
+        });
+      }
+      var broken = [];
+      for (var g = 0; g < o.groups; g++) {
+        var gMin = Infinity;
+        for (var zi = 0; zi < perMain.length; zi++) {
+          if (o.groupOfZi(zi) === g && perMain[zi] < gMin) gMin = perMain[zi];
+        }
+        if (!(gMin <= tol)) broken.push(g);
+      }
+      if (broken.length) {
+        return { ok: false, code: 'partial', minM: Math.min.apply(null, perMain.filter(isFinite)), brokenGroups: broken };
+      }
+      return { ok: true, code: 'connected', minM: Math.min.apply(null, perMain.filter(isFinite)) };
+    }
+
     var ok = (mMain <= tol) || (mCoup <= tol);
     return { ok: ok, code: ok ? 'connected' : 'disconnected', minM: Math.min(mMain, isFinite(mCoup) ? mCoup : Infinity) };
   }
@@ -100,12 +139,21 @@
     if (!ctx) return null;
     var dd = window.tlDiagramData;
     if (!dd || dd.world !== 'meter') return null;
-    var mainsLL = [], branchLL = [], valves = [], couplersLL = [], segLL = null;
+    var mainsLL = [], branchLL = [], valves = [], couplersLL = [], segLL = null, nodesLL = [];
     (dd.mainPipes || []).forEach(function (l) { mainsLL.push(toLLLine(l)); });
     (dd.branchPipes || []).forEach(function (l) { branchLL.push(toLLLine(l)); });
     (dd.valves || []).forEach(function (v) {
       var q = toLLSafe(v);
       if (q) valves.push({ ll: q, mi: (typeof v.mi === 'number') ? v.mi : -1 });
+    });
+    /* [v915] 接驳节点（v913 dd.couplerNodes 投影，世界米）→ 经纬度 + 主管下标。
+       失配节点（x/y null）跳过；mi=parseInt('m3')-1，解析不出跳过（宁缺不错）。 */
+    (dd.couplerNodes || []).forEach(function (n) {
+      if (!n || n.x == null || n.y == null) return;
+      var mi = parseInt(String(n.pipeKey || '').replace(/^m/, ''), 10);
+      if (!isFinite(mi) || mi < 0) return;
+      var q = toLLSafe({ x: n.x, y: n.y });
+      if (q) nodesLL.push({ pipeKey: String(n.pipeKey), mi: mi - 1, ll: q });
     });
     if (dd.segTrunk && Array.isArray(dd.segTrunk.points)) {
       segLL = toLLLine(dd.segTrunk.points);
@@ -118,6 +166,7 @@
     return {
       mainsLL: mainsLL, branchLL: branchLL, valves: valves,
       couplersLL: couplersLL, segLL: segLL, trunkLL: trunkLL,
+      nodesLL: nodesLL,
       manual: manual, nPer: dd.combinedN || 1, total: total,
       gCount: groupCount(total, manual, dd.combinedN || 1)
     };
@@ -205,12 +254,20 @@
       trunkLL: d.trunkLL || [],
       mainsLL: d.mainsLL, couplersLL: d.couplersLL, hasSeg: !!d.segLL,
       tolM: TOL_M,
-      dist: (window.RyTrunkGeo && window.RyTrunkGeo.haversine) ? window.RyTrunkGeo.haversine : function () { return Infinity; }
+      dist: (window.RyTrunkGeo && window.RyTrunkGeo.haversine) ? window.RyTrunkGeo.haversine : function () { return Infinity; },
+      /* [v915] 步骤 3：逐组可达性 + 节点结构化匹配（齐备才启用，缺则退 v861 原口径） */
+      nodesLL: d.nodesLL,
+      groupOfZi: function (zi) { return groupOf(zi, d.manual, d.nPer); },
+      groups: d.gCount
     });
     if (!v.ok) {
       if (ctx.tip) {
         if (v.code === 'no-trunk') ctx.tip('还没有手动绘制的总管：请先在在线地图绘制总管（并打开捕捉吸到「驳接点」），再演示水流。');
         else if (v.code === 'no-data') ctx.tip('图面上没有分区主管，无法演示水流。');
+        else if (v.code === 'partial') {
+          var gs = (v.brokenGroups || []).map(function (g) { return g + 1; }).join('、');
+          ctx.tip('轮灌组 ' + gs + ' 的主管还没接到总管上（最近 ' + (v.minM == null ? '?' : v.minM.toFixed(1)) + ' m > 容差 ' + TOL_M + ' m），暂无法演示水流。请把总管画到这些组的「主管节点」或主管端点附近。');
+        }
         else ctx.tip('手动绘制的总管与分区主管没有连接（最近 ' + (v.minM == null ? '?' : v.minM.toFixed(1)) + ' m > 容差 ' + TOL_M + ' m），暂无法演示水流。请把总管画到「驳接点」或主管端点附近。');
       }
       return false;
