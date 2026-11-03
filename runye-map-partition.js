@@ -42,7 +42,25 @@
  function valid(p){return p&&p.version===1&&Number.isFinite(p.angle)&&p.angle>=-180&&p.angle<=180;}
  function center(poly){return{x:(Math.min.apply(null,poly.map(p=>p.x))+Math.max.apply(null,poly.map(p=>p.x)))/2,y:(Math.min.apply(null,poly.map(p=>p.y))+Math.max.apply(null,poly.map(p=>p.y)))/2};}
  function params(){var p={};PARAMS.forEach(function(id){var e=root.document.getElementById(id);if(e)p[id]=e.value;});return p;}
- function restore(plan){if(!valid(plan))return false;var b=root.RunyeBridge;if(!b||typeof b.restorePartitionState!=='function'||b.restorePartitionState({cutSnap:plan.cutSnap,cutOverrides:plan.cutOverrides,zoneAngleDeg:-plan.angle})!==true)return false;Object.keys(plan.params||{}).forEach(function(id){if(PARAMS.indexOf(id)<0)return;var e=root.document.getElementById(id);if(e)e.value=plan.params[id];});if(typeof root.calcPlan==='function')root.calcPlan();if(typeof root.ppRender==='function')root.ppRender();return true;}
+ function restore(plan){
+  if(!valid(plan))return false;
+  var b=root.RunyeBridge;if(!b||typeof b.restorePartitionState!=='function')return false;
+  /* The canonical L2 transaction reads the current layout inputs when it captures
+     partition cuts. Restore those inputs before committing the map's angle. */
+  var previous={};
+  Object.keys(plan.params||{}).forEach(function(id){
+   if(PARAMS.indexOf(id)<0)return;
+   var e=root.document.getElementById(id);if(!e)return;
+   previous[id]=e.value;e.value=plan.params[id];
+  });
+  if(b.restorePartitionState({cutSnap:plan.cutSnap,cutOverrides:plan.cutOverrides,zoneAngleDeg:-plan.angle})!==true){
+   Object.keys(previous).forEach(function(id){root.document.getElementById(id).value=previous[id];});
+   return false;
+  }
+  if(typeof root.calcPlan==='function')root.calcPlan();
+  if(typeof root.ppRender==='function')root.ppRender();
+  return true;
+ }
  function polygons(toLL){var b=root.RunyeBridge,cuts=b.getZoneCuts(),rings=root.__runyeSubPlots&&root.__runyeSubPlots.length?root.__runyeSubPlots.map(s=>s.poly):[b.getPlotPolygon()],out=[];
   if(!cuts)return out;var localRings=rings.map(function(r){return b.polyToGrid(cuts,r);});for(var y=0;y<cuts.yPos.length-1;y++)for(var x=0;x<cuts.xPos.length-1;x++)localRings.forEach(function(r){var local=b.clipPolyToRect(r,cuts.xPos[x],cuts.yPos[y],cuts.xPos[x+1],cuts.yPos[y+1]);if(local&&local.length>=3){var p=b.polyToWorld(cuts,local),area=b.polyArea(p);if(area>0.01)out.push({latLng:p.map(toLL),area:area});}});return out;
  }

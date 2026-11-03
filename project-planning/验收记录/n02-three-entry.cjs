@@ -158,6 +158,15 @@ async function main() {
       window.tlAutoGenerate?.({ scroll: false });
       window.runyeSaveProject?.(true);
     });
+    const defaultTrunk = await page.evaluate(() => ({
+      source: window.tlDiagramData?.trunkSource,
+      points: window.tlDiagramData?.frontPipe?.length || 0,
+      visible: [...document.querySelectorAll('path[data-tlpipe="front"]:not([data-tlpipe-ref]), path[data-tlpipe-seg^="front-"]')]
+        .some((el) => getComputedStyle(el).stroke !== 'none' && getComputedStyle(el).display !== 'none'),
+    }));
+    assert.equal(defaultTrunk.source, 'auto', `${entry}：无地图总管时应自动生成默认总管`);
+    assert.ok(defaultTrunk.points >= 2, `${entry}：自动总管应包含至少两个几何点`);
+    assert.equal(defaultTrunk.visible, true, `${entry}：自动总管应有实际可见的绘图路径`);
     await waitFor((wanted) => window.RyIrrigationDataStore?.readNetworkLayout?.()?.plotId === wanted,
       `${entry} 管网归属 ${id}`, 15000, id);
     const generated = await readState();

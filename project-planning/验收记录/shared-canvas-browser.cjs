@@ -82,6 +82,22 @@ async function main() {
       return {generated:!!window.tlDiagramData, poly:window.tlDiagramData&&window.tlDiagramData.poly};
     })()`);
     assert.ok(setup.generated, JSON.stringify(setup));
+    const regeneration = await evaluate(`(function(){
+      window.measuredPolygon=[{x:0,y:0},{x:527,y:0},{x:527,y:320},{x:500,y:320},{x:500,y:396},{x:0,y:396}];
+      window.measuredArea=527*396-27*76; window.ppLoadPolygon();
+      document.getElementById('planTapeLaySide').value='80';
+      document.getElementById('planZoneMuManual').value='30';
+      const angle=document.getElementById('ppZoneAngleInput'); angle.value='3.7';
+      angle.dispatchEvent(new Event('input',{bubbles:true}));
+      const before=window.tlDiagramData;
+      document.getElementById('ppGenerate').click();
+      const d=window.tlDiagramData;
+      return {fresh:d!==before,main:d&&d.mainPipes&&d.mainPipes.length,branch:d&&d.branchPipes&&d.branchPipes.length,tape:d&&d.dripTapes&&d.dripTapes.length,shadow:window.__runyeDrawingDesignShadow};
+    })()`);
+    assert.ok(regeneration.fresh && regeneration.main && regeneration.branch && regeneration.tape, JSON.stringify(regeneration));
+    await sleep(300);
+    const visible = await evaluate(`(function(){const e=document.getElementById('tlWsContent');return {visibility:getComputedStyle(e).visibility,pipes:e.querySelectorAll('[data-tlpipe^="main-"]').length,tapes:e.querySelectorAll('[data-tltape]').length};})()`);
+    assert.ok(visible.visibility==='visible' && visible.pipes && visible.tapes, JSON.stringify(visible));
     assert.equal(await evaluate(`(function(){
       const tab=document.getElementById('tlWsLayerDrawerTab');
       if(!tab)return false;
@@ -133,9 +149,12 @@ async function main() {
       fs.writeFileSync(screenshotPath, Buffer.from(screenshot.data, 'base64'));
     }
     const handoff = await evaluate(`(function(){
-      const ring=[[18.2,109.5],[18.2,109.502],[18.201,109.502],[18.201,109.5]];
+      const ring=[[18.2,109.5],[18.2,109.502],[18.2008,109.502],
+        [18.2008,109.5019],[18.201,109.5019],[18.201,109.5]];
       const plot={id:'browser-map-plot',name:'Browser map plot',polyLatLng:ring,
-        sqm:23500,mu:35.25,source:'map',ts:100};
+        sqm:23500,mu:35.25,source:'map',ts:100,
+        partitionPlan:{version:1,angle:-2,cutSnap:{sig:'',x:null,y:null},
+          cutOverrides:{x:{},y:{}},params:{planZoneMuManual:'25',planN:'3'}}};
       localStorage.setItem('runye_plot_library',JSON.stringify([plot]));
       const libraryBefore=localStorage.getItem('runye_plot_library');
       const id=window.RyMeasuredAreaBridgeStore.write({ryPlotRef:{id:plot.id,
@@ -168,8 +187,94 @@ async function main() {
     assert.equal(handoff.applied, true, JSON.stringify(handoff));
     assert.equal(handoff.plotId, 'browser-map-plot', JSON.stringify(handoff));
     assert.equal(handoff.area, 23500, JSON.stringify(handoff));
-    assert.equal(handoff.poly.length, 4, JSON.stringify(handoff));
+    assert.equal(handoff.poly.length, 6, JSON.stringify(handoff));
+    const invalidTarget = await evaluate(`(function(){
+      const oldId=window.currentPlotId,oldDiagram=window.tlDiagramData;
+      const bad={id:'browser-invalid-plot',name:'Invalid boundary',sqm:1200,mu:1.8,
+        poly:[{x:0,y:0},{x:10,y:0}],source:'area',ts:101};
+      const library=JSON.parse(localStorage.getItem('runye_plot_library'));
+      library.push(bad);localStorage.setItem('runye_plot_library',JSON.stringify(library));
+      const previousReset=window.runyeResetPlotScopedNetworkState;
+      let resets=0;
+      window.runyeResetPlotScopedNetworkState=function(){resets++;return previousReset();};
+      window.runyeRenderPlotLib();
+      const button=document.querySelector('#ppPlotWorkflowList [data-edit-id="browser-invalid-plot"]');
+      if(!button)throw new Error('invalid target plot button missing');
+      button.click();
+      window.runyeResetPlotScopedNetworkState=previousReset;
+      return {resets,plotId:window.currentPlotId,oldId,diagramPreserved:window.tlDiagramData===oldDiagram};
+    })()`);
+    assert.deepEqual(invalidTarget,
+      { resets: 0, plotId: handoff.plotId, oldId: handoff.plotId, diagramPreserved: true },
+      JSON.stringify(invalidTarget));
+    const validSwitch = await evaluate(`(function(){
+      const messages=[],oldAlert=window.alert;window.alert=m=>messages.push(String(m));
+      const next={id:'browser-next-plot',name:'Next boundary',sqm:12000,mu:18,
+        poly:[{x:0,y:0},{x:150,y:0},{x:150,y:80},{x:0,y:80}],source:'area',ts:102};
+      const library=JSON.parse(localStorage.getItem('runye_plot_library'));
+      library.push(next);localStorage.setItem('runye_plot_library',JSON.stringify(library));
+      window.runyeRenderPlotLib();
+      document.querySelector('#ppPlotWorkflowList [data-edit-id="browser-next-plot"]').click();
+      const first={id:window.currentPlotId,poly:window.measuredPolygon,diagram:window.tlDiagramData};
+      document.querySelector('#ppPlotWorkflowList [data-edit-id="browser-map-plot"]').click();
+      window.alert=oldAlert;
+      return {first,returnId:window.currentPlotId,returnPoly:window.measuredPolygon,messages};
+    })()`);
+    assert.equal(validSwitch.first.id, 'browser-next-plot', JSON.stringify(validSwitch));
+    assert.equal(validSwitch.first.poly.length, 4, JSON.stringify(validSwitch));
+    assert.equal(validSwitch.first.diagram, null, JSON.stringify(validSwitch));
+    assert.equal(validSwitch.returnId, handoff.plotId, JSON.stringify(validSwitch));
+    assert.equal(validSwitch.returnPoly.length, 6, JSON.stringify(validSwitch));
+    assert.equal(validSwitch.messages.length, 0, JSON.stringify(validSwitch));
     assert.ok(handoff.libraryUnchanged && handoff.consumed && handoff.host, JSON.stringify(handoff));
+    assert.equal(await evaluate(`window.runyeSaveProject(true)`), true, 'Map plot must save before reload');
+    await send('Page.reload', { ignoreCache: true });
+    for (let i = 0; i < 80; i++) {
+      if (await evaluate("!!window.ppLoadPolygon && !!window.tlAutoGenerate && !!window.RyPlotPartitionEditor")) break;
+      await sleep(250);
+    }
+    assert.equal(await evaluate(`window.runyeLoadProject({silent:true})`), true, 'Saved map plot must restore');
+    const mapAngleReturn = await evaluate(`(function(){
+      const messages=[],oldAlert=window.alert;window.alert=m=>messages.push(String(m));
+      const state=window.RunyeBridge.getPartitionState();
+      const restored=window.RyMapPartition.restore({version:1,angle:-2,
+        cutSnap:state.cutSnap,cutOverrides:state.cutOverrides,
+        params:{planZoneMuManual:'25',planN:'3'}});
+      const before=window.tlDiagramData;
+      document.getElementById('ppGenerate').click();window.alert=oldAlert;
+      const d=window.tlDiagramData;
+      return {restored,fresh:d!==before,main:d&&d.mainPipes&&d.mainPipes.length,
+        branch:d&&d.branchPipes&&d.branchPipes.length,messages,
+        shadow:window.__runyeSingleDrawingDesignShadow};
+    })()`);
+    assert.ok(mapAngleReturn.restored && mapAngleReturn.fresh && mapAngleReturn.main &&
+      mapAngleReturn.branch && !mapAngleReturn.messages.length, JSON.stringify(mapAngleReturn));
+    const rotatedHandoff = await evaluate(`(function(){
+      const messages=[];const oldAlert=window.alert;window.alert=m=>messages.push(String(m));
+      document.getElementById('ppGenerate').click();
+      const initial=window.tlDiagramData&&window.tlDiagramData.mainPipes.length;
+      const angle=document.getElementById('ppZoneAngleInput');angle.value='3.7';
+      angle.dispatchEvent(new Event('input',{bubbles:true}));
+      angle.dispatchEvent(new Event('change',{bubbles:true}));
+      const before=window.tlDiagramData;document.getElementById('ppGenerate').click();
+      window.alert=oldAlert;const d=window.tlDiagramData;
+      return {initial,fresh:d!==before,main:d&&d.mainPipes&&d.mainPipes.length,branch:d&&d.branchPipes&&d.branchPipes.length,tape:d&&d.dripTapes&&d.dripTapes.length,messages,shadow:window.__runyeDrawingDesignShadow,commitFailure:window.__runyeSingleL2CommitFailure};
+    })()`);
+    assert.ok(rotatedHandoff.initial && rotatedHandoff.fresh && rotatedHandoff.main && rotatedHandoff.branch && rotatedHandoff.tape, JSON.stringify(rotatedHandoff));
+    await sleep(300);
+    assert.equal(await evaluate(`getComputedStyle(document.getElementById('tlWsContent')).visibility`), 'visible');
+    const rejectedGeneration = await evaluate(`(function(){
+      const messages=[];const oldAlert=window.alert,oldCommit=window.ryCommitSingleLevel3CanonicalFromRuntime;
+      window.alert=m=>messages.push(String(m));
+      window.ryCommitSingleLevel3CanonicalFromRuntime=()=>false;
+      try{document.getElementById('ppGenerate').click();}
+      finally{window.alert=oldAlert;window.ryCommitSingleLevel3CanonicalFromRuntime=oldCommit;}
+      const layer=document.getElementById('tlWsContent');
+      return {messages,main:window.tlDiagramData&&window.tlDiagramData.mainPipes&&window.tlDiagramData.mainPipes.length,
+        visible:getComputedStyle(layer).visibility,drawn:layer.querySelectorAll('[data-tlpipe^="main-"]').length};
+    })()`);
+    assert.ok(rejectedGeneration.main && rejectedGeneration.visible==='visible' && rejectedGeneration.drawn &&
+      rejectedGeneration.messages.some(m=>m.includes('生成施工图失败')), JSON.stringify(rejectedGeneration));
     console.log('shared canvas: generated overlay, zoom, and pan align within 3px; maximum errors',
       [before, zoomed, panned].map(x => Math.max(...x.errors).toFixed(2)).join(', '));
     console.log('viewport and layer bounds', JSON.stringify(panned.rects));

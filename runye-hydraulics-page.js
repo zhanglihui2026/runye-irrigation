@@ -6,6 +6,11 @@
   if (!Core) { root.querySelector('#srcCard').textContent = '计算核心加载失败（runye-hydraulics-core.js）'; return; }
   var CFG_KEY = 'runye_hydraulics_check_cfg_v1';   /* 只在用户点「校核」时写（站内约定） */
   var lastFull = null, lastNet = null, lastDesign = null;
+  /* [v829] 切回本页自动重读：run() 原本只在脚本首次执行时跑一次（见文件末尾 bootHydraulics）。
+     用户在「地块分区」回传地图总管 / 重新生成施工图之后再进本页，会一直停在启动时的空态
+     ——0 管段、没有水流动画，必须手动点「重新读取」才出图。这里用「已消费的数据签名」做闸门：
+     签名没变就什么都不做（滚动、来回切页都不会重算），变了才重跑一次 run()。 */
+  var hydBooted = false, lastSig = '';
 
   function $(id) { return root.querySelector('#' + id); }
   function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
@@ -140,6 +145,7 @@
   function run() {
     var net = readNet();
     var designState = readDesignState(net);
+    lastSig = sigOf(net, designState);   /* [v829] 记下本次已消费的数据签名，供切回时判重 */
     var design = usableDesign(designState);
     renderSrc(net, designState);
     syncParameterMode(!!(design && design.version === 1));
@@ -586,6 +592,34 @@
     }
     gate.appendChild(box);
   }
+  /* ---------- [v829] 切回本页自动重读（见文件头 lastSig 注释） ---------- */
+  function sigOf(net, designState) {
+    var d = designState && designState.design;
+    return [
+      String(window.currentPlotId || ''),
+      String(designState && designState.status || ''),
+      net ? String(net.ts || '') + ':' + String((net.segments || []).length) : 'nonet',
+      d && d.version === 1 && d.generatedAt ? String(d.generatedAt) : 'nodesign'
+    ].join('|');
+  }
+  function hydVisible() {
+    if (!root || !document.documentElement.contains(root)) return false;
+    if (root.hidden) return false;
+    var cs = window.getComputedStyle ? window.getComputedStyle(root) : null;
+    if (cs && (cs.display === 'none' || cs.visibility === 'hidden')) return false;
+    return root.getBoundingClientRect().height > 1;
+  }
+  function refreshIfChanged() {
+    if (!hydBooted) return;
+    if (hydraulicAccess() !== 'allowed') return;
+    if (!hydVisible()) return;
+    try {
+      var net = readNet();
+      if (sigOf(net, readDesignState(net)) === lastSig) return;
+    } catch (e) { return; }
+    run();
+  }
+
   function bootHydraulics() {
     if (hydraulicAccess() !== 'allowed') return false;
     var gate = root.querySelector('#hydEntitlementGate');
@@ -598,6 +632,7 @@
     restoreCfg();
     renderSrc();
     run();
+    hydBooted = true;
     return true;
   }
   function checkHydraulicAccess() {
@@ -606,5 +641,18 @@
     showHydraulicGate(status);
     if (status === 'pending') setTimeout(checkHydraulicAccess, 500);
   }
+  /* [v829] 用 IntersectionObserver 而不是包 ryJumpToSection —— 切功能区的入口不止一个
+     （导航点击 / hash 直达 / rySetTab / history.replaceState），只有「本区块真的可见了」
+     才是所有路径的公共事实。hashchange 作兜底（滚动定位型切换不改变可见性时仍能补一次）。 */
+  if (window.IntersectionObserver) {
+    try {
+      new window.IntersectionObserver(function (rows) {
+        for (var i = 0; i < rows.length; i++) { if (rows[i].isIntersecting) { refreshIfChanged(); return; } }
+      }, { threshold: 0 }).observe(root);
+    } catch (e) { }
+  }
+  window.addEventListener('hashchange', function () {
+    if (String(location.hash || '').replace(/^#+/, '') === 'hydraulicsSection') refreshIfChanged();
+  });
   checkHydraulicAccess();
 })();

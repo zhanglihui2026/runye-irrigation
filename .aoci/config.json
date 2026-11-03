@@ -130,6 +130,28 @@
         "created_by": "aoci-init",
         "order": 106,
         "enabled": true
+      },
+      {
+        "rule_id": "browser-probe-profiles",
+        "action": "exclude",
+        "pattern": ".probe-*/**",
+        "pattern_kind": "glob",
+        "reason": "Exclude contents of temporary Edge/Playwright browser profile directories at repository root; these hold browser runtime state, not project source.",
+        "source": "user",
+        "created_by": "Codex",
+        "order": 200,
+        "enabled": true
+      },
+      {
+        "rule_id": "dev-tools-probes",
+        "action": "exclude",
+        "pattern": "_dev-tools/probes/**",
+        "pattern_kind": "glob",
+        "reason": "Keep repository diagnostic probe artifacts outside the formal index; the user selected a narrow cleanup and did not authorize adding the 91 probe files to Whole-Index.",
+        "source": "user",
+        "created_by": "Codex",
+        "order": 210,
+        "enabled": true
       }
     ]
   },

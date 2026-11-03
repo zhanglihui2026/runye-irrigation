@@ -4,8 +4,7 @@
  * 职责：读取三级平面图最终几何数据（window.tlDiagramData，由 tlAutoGenerate
  *       末尾导出），在「三级制图」视图渲染可缩放/平移的设计底图，
  *       并提供手工插入管线层（主管/支管折线）。
- * 2026-09-15 用户要求：底图改为直接显示「三级简图」成图内容（仅去滴灌带示意，
- *       三级简图本身不变）；简图未生成时回退本模块原有自绘底图。
+ * 底图直接显示「三级简图」成图内容；简图未生成时回退本模块自绘底图。
  * 2026-09-15 阶段1（用户批准）：手工管线迁入共享图面数据层 RyTlEditPipes
  *       （tl-edit-pipes.js）供三级工作区管理；支持拾取选中、改长（末段拉伸）、删除、
  *       数量/长度自动汇总。
@@ -412,11 +411,9 @@
   function esc(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 
   /* ---------- 三级简图底图接管（2026-09-15 用户要求）----------
-   * 工作区底图 = 「三级简图」成图内容（标题/信息行/图面/图例全套），仅剔除滴灌带示意
-   * （只在本页取消；三级简图本身不变）。
-   * 做法：克隆 #tlDiagramContent svg → ①去滴灌带（stroke #67e8f9 的 path）；
-   * ②#tlPlotGroup 拖动 translate 清零（本页无该交互，图面坐标保持 = ts 公式）；
-   * ③全部 id 加前缀 tlWsPipe_ 并同步 url(# 引用，避免与管线视图同 id 冲突。
+   * 工作区底图 = 「三级简图」成图内容（包括滴灌带）。
+   * 克隆后将 #tlPlotGroup 拖动 translate 清零，并给 id 加前缀 tlWsPipe_，
+   * 同步 url(# 引用，避免与管线视图同 id 冲突。
    * 坐标对齐：viewState 改用 window.tlPlanView（简图 s/ox/oy/minX/minY），
    * ts 公式 svg=(data−minX)*s+ox → T(p)=(p+OX)*s 的 OX 合并 = ox简图/s − minX
    * （2026-09-15 阶段2 修正单位折算；命中/吸附/手工层/预览数学全部随之对齐）。
@@ -428,8 +425,9 @@
     if (!src || !pv || !isFinite(pv.s) || !isFinite(pv.minX)) return null;
     try {
       var clone = src.cloneNode(true);
-      var drips = clone.querySelectorAll('path[stroke="#67e8f9"]');
-      for (var i = 0; i < drips.length; i++) drips[i].parentNode.removeChild(drips[i]);
+      /* 滴灌带与主管须同图可见；稍加深示意线，便于在分区底色上辨识方向。 */
+      var drips = clone.querySelectorAll('path[data-tltape="1"]');
+      for (var i = 0; i < drips.length; i++) drips[i].setAttribute('stroke', '#0e7490');
       /* 最不利路径标注（第四十七轮）：简图那份标注只留在简图；工作区由 renderPipeBaseSVG 按**当前
          有效几何**（AE.effPts）重画 —— 先剥掉克隆来的旧标注，避免重复、也避免与改长后的几何不符。 */
       var wg = clone.querySelectorAll('[data-tlworst]');
@@ -441,14 +439,6 @@
       /* v100：联合分区「合并后即一个独立分区」——把同组内部的分区线/格边框/小分区标注抹掉，
          只留组底色 + 覆盖层重画的组边界 + 一条组级面积标注。无手动分组 ⇒ 本函数直接返回。 */
       try { tlMergeCloneZones(clone); } catch (e) { }
-      /* 图例里的「滴灌带」项一并去掉（本页不画滴灌带，图例不留空项）：文本 + 前面的色样 <line> 成对删 */
-      var lgTexts = clone.querySelectorAll('text');
-      for (var k = 0; k < lgTexts.length; k++) {
-        if ((lgTexts[k].textContent || '').trim() !== '滴灌带') continue;
-        var prev = lgTexts[k].previousElementSibling;
-        if (prev && prev.tagName && prev.tagName.toLowerCase() === 'line') prev.parentNode.removeChild(prev);
-        lgTexts[k].parentNode.removeChild(lgTexts[k]);
-      }
       /* 2026-09-16：页眉信息/底部参数/图例三组在工作区改由固定 HTML 覆盖层呈现（不随缩放平移），
          克隆底图剥离；标题/图框恢复于简图源头（2026-09-16），工作区同样剥离（做图区不显示）。
          2026-10-20：tlNorthGroup（指北针）同属图框装饰，做图区不显示，一并剥离。 */
@@ -1195,22 +1185,13 @@
       }
       if (lp.length) s.push('<g>' + lp.join('') + '</g>');
     }
-    /* 2) 滴灌带 —— 工作区不绘制（数据仍由 tlDiagramData 导出）。 */
-    /* 3) 支管 → 主管 → 总管（下位先画） */
+    /* 2) 支管 → 主管 → 总管（下位先画） */
     /* v162：底图兜底路径（克隆不到简图时自绘）—— 遮蔽管按同一口径画灰虚线 */
     (data.branchPipes || []).forEach(function (l, bi) { if (l && l.length >= 2) s.push('<path d="' + pl(l) + '" fill="none"' + hidAttr('branch-' + bi, COLORS.branch, 1.6) + ' stroke-linecap="round" stroke-linejoin="round"/>'); });
     (data.mainPipes || []).forEach(function (l, mi) { if (l && l.length >= 2) s.push('<path d="' + pl(l) + '" fill="none"' + hidAttr('main-' + mi, COLORS.main, 2.6) + ' stroke-linecap="round" stroke-linejoin="round"/>'); });
+    /* 滴灌带与主管共用画布变换，并压在支管上方，与简图层序一致。 */
+    (data.dripTapes || []).forEach(function (l) { if (l && l.length >= 2) s.push('<path data-tltape="1" d="' + pl(l) + '" fill="none" stroke="#0e7490" stroke-width="1.4" stroke-dasharray="3,3" stroke-linecap="round"/>'); });
     (data.frontPipe && data.frontPipe.length >= 2) ? s.push('<path d="' + pl(data.frontPipe) + '" fill="none"' + hidAttr('front', COLORS.front, 4) + ' stroke-linecap="round" stroke-linejoin="round"/>') : 0;
-    /* [v859] 段总管（自动生成的分区主管串联干线）+ 两端驳接点方块：
-       克隆路径下简图 SVG 自带 data-tlpipe="segTrunk"，这里只兜底「自绘路径」
-       （克隆不到简图时的底图重建），与 frontPipe 同层同色系、细一号。 */
-    if (data.segTrunk && Array.isArray(data.segTrunk.points) && data.segTrunk.points.length === 2) {
-      s.push('<path d="' + pl(data.segTrunk.points) + '" fill="none"' + hidAttr('segTrunk', '#111827', 3.4) + ' stroke-linecap="round" stroke-linejoin="round"/>');
-      (Array.isArray(data.segTrunk.couplers) ? data.segTrunk.couplers : []).forEach(function (c, ci) {
-        var q = T(c);
-        s.push('<rect data-tlseg-coupler="' + ci + '" x="' + (q.x - 3.5).toFixed(1) + '" y="' + (q.y - 3.5).toFixed(1) + '" width="7" height="7" fill="#ffffff" stroke="#111827" stroke-width="1.4"/>');
-      });
-    }
     /* 4) 水源 + 阀门 */
     if (data.sourcePos) {
       var sp = T(data.sourcePos);
@@ -3461,6 +3442,10 @@
     if (window.RunyeBridge && typeof window.RunyeBridge.cutStepReset === 'function') {
       try { if (window.RunyeBridge.cutStepReset() === false) return; } catch (eReset) { return; }
     } else {
+      /* [v897 审计标记] 降级直写：RunyeBridge.cutStepReset 不可用时绕过 ppCommitGroupMemberStep
+         事务直改 tlDiagramData.zones.cutOffX/Y——剩余写路径审计（2026-11-02）确认的仅存
+         绕事务路径之一。主路径（上方 if）已走事务；此分支仅在桥未挂载时触达。 */
+      try { console.warn('[tl-workspace] cutStepReset 桥不可用，阶梯覆盖表走降级直写（未经 canonical 事务）'); } catch(e){}
       try { if (typeof window.tlZoneStepClear === 'function') window.tlZoneStepClear(); } catch(e){}
       try { if (window.tlDiagramData && window.tlDiagramData.zones) { window.tlDiagramData.zones.cutOffX = null; window.tlDiagramData.zones.cutOffY = null; } } catch(e){}
     }

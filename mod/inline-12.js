@@ -126,7 +126,10 @@
     var model=window.RyDrawingDesignModel, adapter=window.RyDrawingDesignLegacyAdapter;
     var design=window.__runyeSingleCanonicalDesign;
     if(!design){
-      var seeded=singlePlotCanonical({currentPlotId:plotId,measuredPolygon:beforePlan&&beforePlan.polyPts,pipePlan:beforePlan},plotId);
+      var seeded=singlePlotCanonical({currentPlotId:plotId,measuredPolygon:beforePlan&&beforePlan.polyPts,
+        measuredPolygonSource:window.measuredPolygonSource||'legacy-project',
+        geoBase:window.__runyeGeoBase||null,mapFramePoly:window.__runyeMapFramePoly||null,
+        pipePlan:beforePlan},plotId);
       if(!seeded) return null;
       design=seeded;
     }
@@ -621,7 +624,8 @@
       manualGroups:(!_groupActive&&typeof window.tlManualGroups!=='undefined' && window.tlManualGroups) ? window.tlManualGroups : [],
       zoneStep:(!_groupActive&&typeof tlZoneStepCount==='function' && tlZoneStepCount()>0) ? window.tlZoneStep : null,
       ppGenSig:(!_groupActive&&typeof window.__ryPpGenSig!=='undefined'&&window.__ryPpGenSig)?window.__ryPpGenSig:null,
-      tlAux:_groupActive?{drops:null,src:null,nodes:null,dims:null,plotPos:null}:readTlAux()
+      tlAux:(!_groupActive&&window.tlDiagramData)?readTlAux():
+        {drops:null,src:null,nodes:null,dims:null,plotPos:null}
     };
     /* Keep single-plot project archives bound to the canonical model while the
        legacy fields remain the runtime projection consumed by the current UI.

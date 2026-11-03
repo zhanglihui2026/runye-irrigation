@@ -3,15 +3,15 @@
    加载顺序铁律：必须紧跟 mod/inline-11.js 之后同步执行（index.html），不得提前/延后。
    依赖与公开 API 审计：见 _p1/_audit11_report.md。 */
 // ===== 07 管路规划与施工简图 =====
-/* [v887 2026-11-02 缓存守卫] zone-geometry.js 的 ?v= 串曾在 v425 停摆两轮（v883/v886
-   都实质改了 tapeAxisOf 却没抬串），弱网下 SW 静默回退旧缓存 / 旧标签页驻留旧脚本
+/* [v889 2026-11-03 缓存守卫] zone-geometry.js 方向规则变更必须同步更新资源串和SW版本；
+   弱网下 SW 静默回退旧缓存 / 旧标签页驻留旧脚本
    ⇒ 用户拿到旧方向逻辑，修复看起来「没生效」（用户三次报同一问题，本地探针全绿）。
    本文件在 index.html 中装载于 zone-geometry.js 之后，此处校验其数字版本：
    落后于页面要求 ⇒ 硬刷新一次；sessionStorage 防离线死循环（刷一次仍旧就放行，
    至少 console 里留下显式证据，不再无声错下去）。 */
   (function(){
     try{
-      var need = 887;
+      var need = 889;
       var g = window.RyZoneGeometry;
       var ver = (g && Number(g.VERSION)) || 0;
       if (ver < need) {
@@ -3083,23 +3083,13 @@
         return pushed > 0;
       }
 
-      /* [v229 2026-10-05 用户要求] 主管/支管走向「少数服从多数」，全块统一：
-         用户原话：「分了 20 个分区，其中有 11 个以上的分区是横向走主管、支管，
-           那剩余 9 个分区也应该按照横向走，而不是用了其他计算规则，变换了方向」。
-         ★ 口径：先按各分区自然朝向（xPlan>=yPlan ⇒ 竖向，否则横向）投票，
-           **严格多数**方向强制给全体分区；平票不强改（维持各分区原朝向）。
-           自然朝向判定与下方生成循环同一套（cuts.xPlan/yPlan，已含拖线/合并结果），
-           投票与生成永远看同一份 cuts ⇒ 不存在两套规则。 */
-      /* [v416 2026-10-13 用户口径] 布管方向单一事实来源 —— 与三级页共用 RyZoneGeometry.tapeAxisOf。
+      /* 布管方向单一事实来源，与三级页共用 RyZoneGeometry.tapeAxisOf。
          优先级（硬约束在前，冲突时牺牲后者）：
            ① 滴灌带 ∥ tapeAxis，主管 ∥ 支管 ⊥ tapeAxis（同一函数一次算出，不可能被违反）；
-           ② [v886] 滴灌带沿分区（每块）长边布置（逐区宽高比投票，多数派定轴）；
+           ② 第一分区沿自身长边铺带，其余分区固定沿同一轴向；
            ③ 全块方向统一（单一 tapeAxis 天然满足）；
-           ④ 各分区带长尽量贴合「单边铺设长度×2」S（软目标：仅地块近正方形时作为投票判据，
-             冲突时牺牲 → 支管略增）。
-         ★ 旧 v229 用「分区宽高比」投票、三级用「逐区判向」，两套判据在混合朝向地块上会让
-           少数派分区的滴灌带与多数派管道平行（用户实测截图），现统一由 tapeAxisOf 出唯一
-           tapeAxis。RyZoneGeometry 缺失时退回旧投票，行为不变。 */
+           ④ 单边铺设长度只影响滴灌带分段数，不得改变方向。
+         RyZoneGeometry 缺失时也按第一分区选择，不能退回全图多数方向。 */
       if (forceDir !== 'v' && forceDir !== 'h') {
         var _ryG = (typeof window !== 'undefined') ? window.RyZoneGeometry : null;
         var _ryAx = (_ryG && typeof _ryG.tapeAxisOf === 'function')
@@ -3109,12 +3099,9 @@
           try { window.__ryTapeAxisReport = _ryAx; } catch (eRep) { }   /* 三级页/探针共用同一份代价报告 */
           forceDir = (_ryAx.tapeAxis === 'x') ? 'v' : 'h';   /* 带 ∥ x ⇒ 主管·支管竖直（⊥ 带） */
         } else {
-          var votesV = 0;
-          for (var vr = 0; vr < cuts.rows; vr++)
-            for (var vc = 0; vc < cuts.cols; vc++)
-              votesV += (cuts.xPlan[vc] >= cuts.yPlan[vr]) ? 1 : -1;
-          if (votesV > 0) forceDir = 'v';
-          else if (votesV < 0) forceDir = 'h';
+          var firstWidth = Number(cuts.xSrc && cuts.xSrc[0]) || Number(cuts.xPlan[0]) || 0;
+          var firstHeight = Number(cuts.ySrc && cuts.ySrc[0]) || Number(cuts.yPlan[0]) || 0;
+          forceDir = firstWidth >= firstHeight ? 'v' : 'h';
         }
       }
 
@@ -3123,7 +3110,7 @@
           var zx = cuts.xPos[zc], zy = cuts.yPos[zr];
           var zoneW = cuts.xSrc[zc], zoneH = cuts.ySrc[zr];
           var centerX = zx + zoneW / 2, centerY = zy + zoneH / 2;
-          /* [v229] 多数派方向优先：forceDir 命中时不再按本分区宽高比各自判定 */
+          /* 全部区域沿第1分区确定的方向布管；forceDir 由第一分区长边派生 */
           var fixedSideIsHorizontal = (forceDir === 'v') ? true
             : (forceDir === 'h') ? false
             : (cuts.xPlan[zc] >= cuts.yPlan[zr]);
@@ -3373,7 +3360,14 @@
     input.addEventListener('input',function(){
       var raw=Number(input.value);if(input.value.trim()===''||!isFinite(raw))return;
       raw=Math.max(-180,Math.min(180,raw));
-      if(!pushed&&Math.abs(raw-startAngle)>0.001){ppPushHistory();pushed=true;}
+      if(Math.abs(raw-startAngle)>0.001){
+        if(!pushed){ppPushHistory();pushed=true;}
+        /* input 事件先更新 ppState.zoneAngleDeg，随后 change 事件再次调用
+           ppApplyZoneAngle 时 previousAngle 已等于最终值，无法再发现角度变化。
+           因此在用户开始改值时就置脏；点击「生成施工图」会据此重建二级主管/支管，
+           避免小角度旋转未改变横/竖分类时沿用旧方向管线。 */
+        ppAnglePipeRegenPending=true;
+      }
       ppApplyZoneAngle(raw,false,true);
     });
     input.addEventListener('change',function(){
@@ -5026,7 +5020,11 @@
     // 同步生成三级管线施工简图：默认按当前选择的分区数（首次为2区一总管），调整4/6/8区后再次点击即按新选择重算
     try{
       if(window.measuredPolygon && window.measuredPolygon.length>=3 && typeof tlAutoGenerate==='function'){
-        tlAutoGenerate({scroll:false});
+        tlAutoGenerate({scroll:false,rethrowError:true});
+        if(!window.tlDiagramData||!window.tlDiagramData.mainPipes||!window.tlDiagramData.mainPipes.length||
+           !window.tlDiagramData.branchPipes||!window.tlDiagramData.branchPipes.length){
+          throw new Error('管线生成结果为空，请检查当前分区与地块边界');
+        }
       }
     }catch(e){
       console.error('[ppGenerate] 三级管线图生成失败', e);

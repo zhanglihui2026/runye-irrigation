@@ -226,11 +226,9 @@
   /* [v416 2026-10-13 用户口径] 布管方向单一事实来源 —— 彻底解决「主管/支管与滴灌带不垂直」。
      规则优先级（硬约束在前，冲突时牺牲后者）：
        ① 滴灌带 ∥ tapeAxis，主管 ∥ 支管 ⊥ tapeAxis（由本函数单一输出保证，不可能被违反）；
-       ② [v886 2026-11-02 用户拍板] 滴灌带**始终沿分区（每块）的长边**：逐区按宽高比
-         投票，多数派定全局带轴（硬规则）；全正方形网格/平票时退回 ③；
-       ③ 全图（同一地块）方向统一：单一 tapeAxis 天然满足；
-       ④ 各分区滴灌带长度尽量贴合「单边铺设长度×2」（= 固定边 S）：软目标，仅平票时
-         作为破平判据，冲突时牺牲（支管略增）。
+       ② 第1分区沿自身长边铺带，其余分区跟随第1分区的轴；
+       ③ 主管/支管取垂直轴，总管再垂直于主管；
+       ④ 单边铺设长度只决定分段数，不改变方向。
      segs[]：沿 tapeAxis 的滴灌带分段数（带长 > S 时自动切段，杜绝画出超长带）。 */
   function axisFit(extent, S) {
     if (!(extent > 0) || !(S > 0)) return 0;
@@ -238,46 +236,50 @@
     return r <= 1 ? r : 1 / r;
   }
 
+  function firstZoneSpans(cuts) {
+    if (!cuts || !cuts.xPos || cuts.xPos.length < 2 || !cuts.yPos || cuts.yPos.length < 2) {
+      return {
+        horizontal: Number(cuts && cuts.xSrc && cuts.xSrc[0]) || Number(cuts && cuts.xPlan && cuts.xPlan[0]) || 0,
+        vertical: Number(cuts && cuts.ySrc && cuts.ySrc[0]) || Number(cuts && cuts.yPlan && cuts.yPlan[0]) || 0
+      };
+    }
+    var x0 = zoneGx(cuts, 0, 0), x1 = zoneGx(cuts, 0, 1);
+    var x2 = zoneGx(cuts, 1, 1), x3 = zoneGx(cuts, 1, 0);
+    var y0 = zoneGy(cuts, 0, 0), y1 = zoneGy(cuts, 1, 0);
+    var y2 = zoneGy(cuts, 1, 1), y3 = zoneGy(cuts, 0, 1);
+    var horizontal = (Math.hypot(x1 - x0, y1 - y0) + Math.hypot(x2 - x3, y2 - y3)) / 2;
+    var vertical = (Math.hypot(x2 - x1, y2 - y1) + Math.hypot(x3 - x0, y3 - y0)) / 2;
+    if (!(horizontal > 0) || !(vertical > 0)) {
+      horizontal = Number(cuts.xSrc && cuts.xSrc[0]) || Number(cuts.xPlan && cuts.xPlan[0]) || 0;
+      vertical = Number(cuts.ySrc && cuts.ySrc[0]) || Number(cuts.yPlan && cuts.yPlan[0]) || 0;
+    }
+    return { horizontal: horizontal, vertical: vertical };
+  }
+
   function tapeAxisOf(cuts, fixedSide) {
     var out = { ok: false, tapeAxis: 'x', pipeAxis: 'y', votes: { x: 0, y: 0 }, segs: [],
                 report: { shortZones: 0, overZones: 0, avgTape: 0, avgOpt: 0, branchRatio: 1 } };
     if (!cuts || !(cuts.cols > 0) || !(cuts.rows > 0) || !cuts.xPlan || !cuts.yPlan) return out;
     var S = Number(fixedSide) > 0 ? Number(fixedSide) : 200;
-    var votes = { x: 0, y: 0 }, fitSum = { x: 0, y: 0 }, n = 0, sumTape = 0, sumOpt = 0, short = 0, over = 0;
+    var votes = { x: 0, y: 0 }, n = 0, sumTape = 0, sumOpt = 0, short = 0, over = 0;
     var axis = 'x';
     for (var zr = 0; zr < cuts.rows; zr++) {
       for (var zc = 0; zc < cuts.cols; zc++) {
-        var ex = Number(cuts.xPlan[zc]) || 0, ey = Number(cuts.yPlan[zr]) || 0;
+        var ex = Number(cuts.xSrc && cuts.xSrc[zc]) || Number(cuts.xPlan[zc]) || 0;
+        var ey = Number(cuts.ySrc && cuts.ySrc[zr]) || Number(cuts.yPlan[zr]) || 0;
         var fx = axisFit(ex, S), fy = axisFit(ey, S);
-        fitSum.x += fx; fitSum.y += fy;
         if (fx >= fy) votes.x++; else votes.y++;
       }
     }
-    /* [v886 2026-11-02 用户拍板] 硬规则：滴灌带**始终沿分区（每块）的长边**布置。
-       逐区按宽高比投票：yPlan>xPlan（竖长区）投 y、xPlan>yPlan（横扁区）投 x、
-       正方形不投；多数派定全局带轴（全图统一，与主管/段总管架构一致），
-       平票退回 v416「贴合 S」加权破平。
-       v883 曾用「网格总宽/总高」判长边 —— 网格没铺满地块时（实测 4×2 格
-       510×375 vs 地块 527×584，分区本身是 127.5×187.5 竖长方形）网格长边
-       ≠ 分区长边，整体选反（用户实测截图：带横在 127.5 短边上）。 */
-    var votes2 = { x: 0, y: 0 };
-    for (var za = 0; za < cuts.rows; za++) {
-      for (var zb = 0; zb < cuts.cols; zb++) {
-        var exA = Number(cuts.xPlan[zb]) || 0, eyA = Number(cuts.yPlan[za]) || 0;
-        if (eyA > exA) votes2.y++; else if (exA > eyA) votes2.x++;
-      }
-    }
-    if (votes2.x !== votes2.y) {
-      axis = votes2.x > votes2.y ? 'x' : 'y';
-    } else {
-      /* 平票（含全正方形网格）→ 由「贴合度加权」更高的一侧破平：
-         即选更省支管、更贴合单边铺设长度的方向，而不是任意取默认轴。 */
-      axis = (votes.x === votes.y) ? (fitSum.y > fitSum.x ? 'y' : 'x')
-                                   : (votes.x > votes.y ? 'x' : 'y');
-    }
+    /* 第1分区是行优先序列的左上格；用实际四条边（含阶梯切线覆盖）定向，正方形固定取 x。
+       后续格子不能通过投票或铺设长度覆盖这个方向。 */
+    var firstSpan = firstZoneSpans(cuts);
+    var firstW = firstSpan.horizontal, firstH = firstSpan.vertical;
+    axis = firstH > firstW ? 'y' : 'x';
     for (var r2 = 0; r2 < cuts.rows; r2++) {
       for (var c2 = 0; c2 < cuts.cols; c2++) {
-        var ex2 = Number(cuts.xPlan[c2]) || 0, ey2 = Number(cuts.yPlan[r2]) || 0;
+        var ex2 = Number(cuts.xSrc && cuts.xSrc[c2]) || Number(cuts.xPlan[c2]) || 0;
+        var ey2 = Number(cuts.ySrc && cuts.ySrc[r2]) || Number(cuts.yPlan[r2]) || 0;
         var tape = axis === 'x' ? ex2 : ey2;
         var opt = Math.max(ex2, ey2);
         out.segs.push(Math.max(1, Math.ceil(tape / S)));
@@ -296,19 +298,19 @@
   }
 
   var api = {
-    /* [v887 2026-11-02 缓存事故] 本文件的 ?v= 串曾在 v425 停摆——v883/v886 两轮都实质
-       修改了 tapeAxisOf 却没抬缓存串（违反 sw.js CORE 白名单「必须抬版本」纪律），
+    /* [v889 2026-11-03] 本文件每次改变方向规则时，须同步更新版本号、页面资源串和SW版本；
        用户浏览器弱网/旧标签页拿到旧 tapeAxisOf，方向修复看起来「没生效」。
        现以数字版本号暴露，plot-editor 页面级闸门校验：加载到的版本 < 页面要求
        ⇒ 强制硬刷新一次（sessionStorage 防循环）。往后本文件每改一次，此号与
        index.html 的 ?v= 串、sw.js VERSION 三处同步上抬。 */
-    VERSION: 887,
+    VERSION: 889,
     MAX_AUTO_ZONE_COUNT: MAX_AUTO_ZONE_COUNT,
     manualZoneLayout: manualZoneLayout,
     splitZoneLength: splitZoneLength,
     splitZoneLengthCount: splitZoneLengthCount,
     autoZoneLayout: autoZoneLayout,
     axisFit: axisFit,
+    firstZoneSpans: firstZoneSpans,
     tapeAxisOf: tapeAxisOf,
     polyAreaM2: polyAreaM2,
     clipPolyToRect: clipPolyToRect,

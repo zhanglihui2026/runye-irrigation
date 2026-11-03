@@ -219,7 +219,9 @@
       if(d.partitionPlan && d.plotId && typeof window.runyeSetCurrentPlot==='function') window.runyeSetCurrentPlot(d.plotId);
       if(window.RyMapPartition && d.partitionPlan){
         if(typeof ppLoadPolygon==='function')ppLoadPolygon();
-        RyMapPartition.restore(d.partitionPlan);
+        if(RyMapPartition.restore(d.partitionPlan)!==true){
+          throw new Error('地图分区方案恢复失败，已保留回传数据');
+        }
         /* 分区计划恢复会重建编辑器状态，随后从该组自己的档案恢复组级总管。 */
         if(typeof window.runyeRestoreGroupDesign==='function') window.runyeRestoreGroupDesign(window.currentPlotId||d.plotId);
       }

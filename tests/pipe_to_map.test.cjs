@@ -46,7 +46,7 @@ test('③ 「生成施工图」先处理角度待重算，再生成二级图和�
   assert.match(seg, /mapNet&&mapNet\.needsReplan/, '必须识别在线地图已清空旧网络并标记重规划');
   assert.match(seg, /!ppAutoGeneratePipes\(\)/, '角度变化后必须先重算自动主管/支管');
   assert.match(seg, /ppGenerateDiagram\(\{scroll:false\}\)/, '二级图面生成必须在场');
-  assert.match(seg, /tlAutoGenerate\(\{scroll:false\}\)/, '三级管线内链重生成必须在场（v104 行为）');
+  assert.match(seg, /tlAutoGenerate\(\{scroll:false,rethrowError:true\}\)/, '三级管线内链重生成失败必须回报按钮');
   assert.match(seg, /tlShowWorkspace/, '生成后落三级管路编辑视图必须在场');
 });
 
@@ -79,7 +79,16 @@ test('⑦ 角度重算先刷新分区切线，再提交规范L2状态', () => {
   assert.match(angle, /ppCommitGroupMemberEdit\(groupPreimage\)/, '组成员也必须在刷新后提交');
 });
 
-test('⑧ 分区预像漂移可由当前角度提交修复，管网预像漂移仍拒绝', () => {
+test('⑧ 角度输入事件必须立即标记管线待重建，不能依赖 change 再比较已更新角度', () => {
+  const bind = pe.slice(pe.indexOf('function bindZoneAngleInput()'), pe.indexOf('ppAiPlanFlow()'));
+  const inputHandler = bind.slice(bind.indexOf("input.addEventListener('input'"), bind.indexOf("input.addEventListener('change'"));
+  assert.match(inputHandler, /Math\.abs\(raw-startAngle\)>0\.001[\s\S]*?ppAnglePipeRegenPending=true/,
+    '小角度输入会先改变 ppState，必须在 input 阶段保留待重生成信号');
+  assert.match(inputHandler, /ppApplyZoneAngle\(raw,false,true\)/,
+    '输入预览仍保持轻量，不在每个键入事件提交设计事务');
+});
+
+test('⑨ 分区预像漂移可由当前角度提交修复，管网预像漂移仍拒绝', () => {
   const vm = require('node:vm');
   const ctx = { console, JSON };
   ctx.window = ctx;

@@ -70,12 +70,39 @@ test('zone grouping preserves planned-area fallback and invalid-input result', (
   assert.equal(geometry.zoneAreaGroups(null, null, 1).ok, false);
 });
 
-test('127×187.5m portrait zones (grid 510×375): tape along zone long side per v886 rule', () => {
+test('127×187.5m portrait first zone sets tape direction regardless of grid bounds', () => {
   const cuts = { cols: 4, rows: 2, xPlan: [127.2, 127.2, 127.2, 127.2], yPlan: [187.2, 187.2] };
   const axis = geometry.tapeAxisOf(cuts, 160);
-  /* [v886] 分区是竖长方形（127.2×187.2）⇒ 带竖铺沿分区长边；主管/支管横向 ⊥ 带。
-     （v883 曾按「网格总宽/高」取 x —— 网格未铺满地块时长边判反，用户实测截图
-     推翻；v886 改为逐区分区长边投票。） */
+  /* 第一分区是竖长方形（127.2×187.2）⇒ 带竖铺沿第一分区长边；主管/支管横向 ⊥ 带。 */
   assert.equal(axis.tapeAxis, 'y');
   assert.equal(axis.pipeAxis, 'x');
+});
+
+test('actual zone spans override planned dimensions when choosing the tape long side', () => {
+  const cuts = { cols: 2, rows: 1, xPlan: [210, 210], yPlan: [100],
+    xSrc: [120, 120], ySrc: [185] };
+  const axis = geometry.tapeAxisOf(cuts, 160);
+  assert.equal(axis.tapeAxis, 'y');
+  assert.equal(axis.pipeAxis, 'x');
+});
+
+test('first zone fixes the tape axis even when later zones have the opposite long side', () => {
+  const cuts = { cols: 2, rows: 2, xSrc: [90, 180], ySrc: [200, 70],
+    xPlan: [90, 180], yPlan: [200, 70] };
+  const axis = geometry.tapeAxisOf(cuts, 160);
+  assert.equal(axis.tapeAxis, 'y');
+  assert.equal(axis.pipeAxis, 'x');
+  assert.ok(axis.votes.x > axis.votes.y, 'majority telemetry points the other way but must not choose orientation');
+  assert.deepEqual(axis.segs, [2, 2, 1, 1]);
+});
+
+test('first zone direction uses actual edited cut edges instead of nominal spans', () => {
+  const cuts = { cols: 2, rows: 2, xPos: [0, 100, 300], yPos: [0, 120, 300],
+    xSrc: [100, 200], ySrc: [120, 180], xPlan: [100, 200], yPlan: [120, 180],
+    cutOffX: { '0,1': 160, '1,1': 160 }, cutOffY: { '0,1': 80, '1,1': 80 } };
+  const spans = geometry.firstZoneSpans(cuts);
+  assert.equal(spans.horizontal, 160);
+  assert.equal(spans.vertical, 80);
+  const axis = geometry.tapeAxisOf(cuts, 160);
+  assert.equal(axis.tapeAxis, 'x', 'the edited first zone is wide even though nominal xSrc/ySrc say it is tall');
 });

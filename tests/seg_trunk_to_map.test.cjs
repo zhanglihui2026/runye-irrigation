@@ -23,18 +23,11 @@ const i09 = fs.readFileSync(path.join(ROOT, 'mod', 'inline-09.js'), 'utf8');
 const enhance = fs.readFileSync(path.join(ROOT, 'runye-map-enhance.js'), 'utf8');
 const panel = fs.readFileSync(path.join(ROOT, 'mod', 'trunk-panel.js'), 'utf8');
 
-test('① 管网反投块把段总管投成 kind:segTrunk 段（在 branch 投段之后）', () => {
+test('① 分区施工图不再向在线地图回传自动段总管', () => {
   const block = i09.slice(i09.indexOf('[map-enhance] 管网反投卫星图'));
   assert.ok(block.length > 0, '反投块必须存在');
-  assert.match(block, /if\(dd\.segTrunk && Array\.isArray\(dd\.segTrunk\.points\) && dd\.segTrunk\.points\.length>=2\)/,
-    '必须读 dd.segTrunk.points（>=2 点才成线）');
-  assert.match(block, /segments\.push\(\{id:'segTrunk', name:'段总管', dn:segDn\.front\|\|segDn\.main, kind:'segTrunk', latLng:stLL\}\)/,
-    '段总管段：id/name/dn（总管口径）/kind/latLng 齐全');
-  const atBranch = block.indexOf("pushSegs(dd.branchPipes, segDn.branch, 'branch')");
-  const atSeg = block.indexOf("segments.push({id:'segTrunk'");
-  assert.ok(atBranch >= 0 && atSeg > atBranch, '段总管投段必须排在主管/支管投段之后（同一 segments 数组）');
-  assert.doesNotMatch(block, /kind:'front'[\s\S]{0,80}segTrunk|segTrunk[\s\S]{0,80}kind:'front'/,
-    '段总管不得复用 front kind（v841 会抑制 front 段）');
+  assert.doesNotMatch(block, /segments\.push\(\{id:'segTrunk'/);
+  assert.match(i09, /segTrunk: null,/);
 });
 
 test('② renderNetwork 的 front 抑制不误伤 segTrunk（通用循环照画+弹窗）', () => {

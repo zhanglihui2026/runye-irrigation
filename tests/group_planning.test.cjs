@@ -22,5 +22,16 @@ function fixture(){
 }
 test('group flow clips real fields and ignores stale display text',()=>{const {W,win,inputs}=fixture();assert(Math.abs(W.hyd.totalFlow-266.6666666666667)<1e-8);inputs.planEmitterFlow.value='1.6';win.grRefreshGroupPage();assert(Math.abs(W.hyd.totalFlow-533.3333333333333)<1e-8);});
 test('group branch fallback follows the existing direction and end gap',()=>{const {W}=fixture();const spans=[200,100];W.hyd.blocks.forEach((b,i)=>{const span=spans[i],gap=Math.min(Math.max(span*.06,4),14,span*.22);assert.equal(b.zones[0].bL,span-2*gap);});});
+test('group pipe direction follows the first zone even when a majority points the other way',()=>{
+ const {win}=fixture();
+ const ring=[{x:0,y:0},{x:450,y:0},{x:450,y:250},{x:0,y:250}];
+ win.__runyeSubPlots=[{id:'A',name:'方向回归1',poly:ring},{id:'B',name:'方向回归2',poly:ring}];
+ win.__runyeGroupEdit={active:true,mode:'whole',current:0,framePts:ring,slots:[{polyPts:ring,mainPipes:[],branchPipes:[]},{polyPts:ring,mainPipes:[],branchPipes:[]}],trunkPipes:[]};
+ win.RunyeBridge.zoneCutsFor=()=>({zoneCount:4,cols:2,rows:2,xPlan:[90,180],yPlan:[200,70],xSrc:[90,180],ySrc:[200,70],xPos:[0,90,270],yPos:[0,200,270]});
+ win.grRefreshGroupPage();
+ const first=win.__runyeGroupWork.hyd.blocks[0].zones[0].line;
+ assert.ok(Math.abs(first[0].y-first[1].y)<1e-9,'first zone is tall, so its main pipe must be horizontal');
+ assert.ok(Math.abs(first[0].x-first[1].x)>1,'a vertical majority must not override the first zone');
+});
 test('new group and standalone plot do not inherit group design state',()=>{const {W,win}=fixture();W.blocks[0].tlData={old:true};W.trunk.lines.push([{x:0,y:0},{x:5,y:0}]);win.__runyeGroupEdit={...win.__runyeGroupEdit,trunkPipes:[]};win.grRefreshGroupPage();assert.equal(W.blocks[0].tlData,null);assert.equal(W.trunk.lines.length,0);win.__runyeSubPlots=null;win.grRefreshGroupPage();assert.equal(W.blocks.length,0);assert.equal(win.__runyeGroupFrame,null);});
 test('total trunk shares the canonical geometry used by plot transforms',()=>{const {W,win}=fixture();win.__runyeGroupEdit.trunkPipes=[[{x:0,y:0},{x:30,y:0}]];win.grRefreshGroupPage();assert.equal(W.trunk.lines,win.__runyeGroupEdit.trunkPipes);assert.equal(W.hyd.trunkLen,30);});

@@ -1077,9 +1077,6 @@
       if(valid && llLine.length>=2) mainPipeLines.push(llLine);
     });
     /* [v859] 段总管驳接点（自动生成的串联干线两端）：手绘总管接到这里即贯通地块内水路 */
-    (dd.segTrunk&&Array.isArray(dd.segTrunk.couplers)?dd.segTrunk.couplers:[]).forEach(function(c){
-      var ll=bridge.toLL(c); if(ll) couplers.push(ll);
-    });
     return {valves:valves, branchStarts:branchStarts, zoneVerts:zoneVerts, couplers:couplers, mainPipeLines:mainPipeLines,
       stats:{sign:bridge.sign, rms:Math.round(bridge.rms*1000)/1000,
         valves:valves.length, branchStarts:branchStarts.length, zoneVerts:zoneVerts.length, couplers:couplers.length, mainPipeLines:mainPipeLines.length, zoneNote:zoneNote}};

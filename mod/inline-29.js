@@ -683,7 +683,7 @@
          沿程损失 × christiansenF(每根支管的滴头/接头数) —— 与二级页扬程模型同款；
        · 每亩流量 I：优先读二级页算好的 #planIntensity；没算过就按同一组输入现算
          I = 666.67 ÷(带间距×滴头间距)×滴头流量÷1000（v231 兜底读错字段，已修）。
-     ★ 分区驳接点 = 该分区主管端点中离块质心较近的那个（主管走向沿用 v229 多数派）。
+     ★ 分区驳接点 = 该分区主管端点中离块质心较近的那个（管线走向沿用首分区定向）。
      ★ 块总管 = 各分区驳接点的最短链路（v243 起=最短哈密顿路径，非旧版最近邻示意链；从最靠质心的那点起链），管径按
        【整块总流量】选；水源点 = 链两端中离块质心较远的外端。
      ★ 整体损失 = 大总管(满载) + max(各块: 块总管损失 + 块内最大分区损失)；跨块大总管 v244 起默认自动连各块红点成最短链路（手画优先，见 grComputeHydraulics）。
@@ -858,6 +858,18 @@
     var constBp = selectPipe(Math.max(baseBranchFlow, 0.01), tv, 0, BRANCH_PIPE_MAX_OD);
     var ovMainOd = constMp.od, ovBranchOd = constBp.od;
     var ovMainId = constMp.id, ovBranchId = constBp.id;
+    /* 组内统一取首个有效成员的第1分区长边；所有成员跟随该轴，不受全组多数票影响。 */
+    var groupTapeAxis = null;
+    for (var ga = 0; ga < W.blocks.length && !groupTapeAxis; ga++) {
+      var firstCuts = grZonesFor(W.blocks[ga]);
+      if (!firstCuts || !firstCuts.zoneCount) continue;
+      var firstAxis = window.RyZoneGeometry && window.RyZoneGeometry.tapeAxisOf
+        ? window.RyZoneGeometry.tapeAxisOf(firstCuts, grNum('planZoneFixedSide', 200)) : null;
+      var firstW = Number(firstCuts.xSrc && firstCuts.xSrc[0]) || Number(firstCuts.xPlan && firstCuts.xPlan[0]) || 0;
+      var firstH = Number(firstCuts.ySrc && firstCuts.ySrc[0]) || Number(firstCuts.yPlan && firstCuts.yPlan[0]) || 0;
+      groupTapeAxis = firstAxis && firstAxis.ok ? firstAxis.tapeAxis : (firstW >= firstH ? 'x' : 'y');
+    }
+    var groupMainDirection = groupTapeAxis === 'x' ? 'v' : 'h';
     var blocks = [], totalFlow = 0, maxBlkLoss = 0, anyPipe = false;
     W.blocks.forEach(function (b, bi) {
       var cuts = grZonesFor(b);
@@ -865,10 +877,7 @@
       var slot = b.slot || {}, mains = slot.mainPipes || [], brs = slot.branchPipes || [];
       var nz = cuts.zoneCount;
       if ((mains.length + brs.length) > 0) anyPipe = true;
-      /* 多数派方向（与 v229 同源）：投票后强制全体分区同一走向 */
-      var votesV = 0, r, c;
-      for (r = 0; r < cuts.rows; r++) for (c = 0; c < cuts.cols; c++) votesV += (cuts.xPlan[c] >= cuts.yPlan[r]) ? 1 : -1;
-      var force = votesV > 0 ? 'v' : (votesV < 0 ? 'h' : null);
+      var force = groupTapeAxis ? groupMainDirection : null;
       var cx = 0, cy = 0; b.ring.forEach(function (p) { cx += p.x; cy += p.y; }); cx /= b.ring.length; cy /= b.ring.length;
       var zones = [], blkMax = 0, blkFlow = 0;
       for (var z = 0; z < nz; z++) {
@@ -880,7 +889,7 @@
         var mu = B.polyArea(cell || []) / 666.67;
         if (!(mu > 1e-9)) continue;   // No crop outside the actual block boundary.
         var flow = mu * I;
-        var fs = (force === 'v') ? true : (force === 'h') ? false : (cuts.xPlan[zc] >= cuts.yPlan[zr]);
+        var fs = (force === 'v') ? true : (force === 'h') ? false : (cuts.xSrc[zc] >= cuts.ySrc[zr]);
         var mPts;
         if (fs) { var mx = zx + 0.40 * zW; mPts = [{ x: mx, y: zy }, { x: mx, y: zy + zH }]; }
         else { var my = zy + 0.40 * zH; mPts = [{ x: zx, y: my }, { x: zx + zW, y: my }]; }

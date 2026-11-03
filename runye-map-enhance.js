@@ -1029,6 +1029,7 @@
     var suppressFront = mapTrunkExistsFor(net.plotId);
     (net.segments || []).forEach(function (s) {
       try {
+        if (s.kind === 'segTrunk' || s.id === 'segTrunk') return; // 旧成果中的自动段总管已退役
         var sLL = validRingLL(s.latLng, 2);   // 同样挡住含 null 顶点的管段（否则 _project 抛错连累全部矢量层）
         if (!sLL) return;
         var st = dnStyle(s.dn);

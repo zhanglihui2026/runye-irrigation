@@ -1,13 +1,9 @@
 #!/usr/bin/env node
 'use strict';
-/* tests/tape_axis_share.test.cjs —— 滴灌带轴跟随传导主管（v881-tape-axis-share）静态锁
- *
- * 用户实测：统一工作区里滴灌带与主管平行（应垂直）。根因：二级传导管线（ppHasPipes）时
- * 主管/支管来自二级 cuts，三级却用自己的网格变量（设计口径 xPlan/yPlan，与二级 bbox
- * 均分 cuts 尺寸不同）重跑 tapeAxisOf 投票 → 两票翻转（实测二级 y:8 / 三级 x:8）→
- * 带 ∥ 主管。v416 的「单一事实源」实际是两份事实源。
- * 锁定：ppHasPipes 时必须先按传导主管最长主向定带轴（构造性垂直），tapeAxisOf 投票
- * 只允许在无二级管线（三级自布管）时兜底；segs 复用二级报告需形状校验。
+/* tests/tape_axis_share.test.cjs —— 第一分区长边为布管方向唯一来源的静态锁
+ * 用户确认：第一分区的实际长边决定滴灌带方向，所有后续分区跟随；主管和支管垂直于带。
+ * 既有二级管线方向、其他分区多数票、旧的方向报告均不得覆盖第一分区规则。
+ * 三级重生成还必须把阶梯切线覆盖交给几何函数，以实际第一分区边长判向。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -17,25 +13,24 @@ const path = require('node:path');
 const ROOT = path.join(__dirname, '..');
 const i09 = fs.readFileSync(path.join(ROOT, 'mod', 'inline-09.js'), 'utf8');
 
-test('① majFixedH：ppShare 主向推导先于 tapeAxisOf 投票（构造性保证带⊥主管）', () => {
+test('① majFixedH：始终由第一分区几何判轴，不由已有主管或多数票覆盖', () => {
   const start = i09.indexOf('var majFixedH=(function(){');
   const end = i09.indexOf('})();', start);
   const block = i09.slice(start, end);
   assert.ok(block.length > 0, 'majFixedH IIFE 必须存在');
-  const atShare = block.indexOf('if(ppHasPipes){');
-  const atVote = block.indexOf('var G=window.RyZoneGeometry;');
-  assert.ok(atShare >= 0, '必须保留 ppHasPipes 传导分支');
-  assert.ok(atVote > atShare, 'ppShare 主向推导必须先于 tapeAxisOf 投票（投票只兜底自布管）');
-  assert.match(block, /function dominantVertical\(lines\)/, '主向统计函数在场');
-  assert.match(block, /dominantVertical\(ppShare\.mainPipes\)/, '首选主管主向');
-  assert.match(block, /dominantVertical\(ppShare\.branchPipes\)/, '主管缺失时退支管主向');
-  assert.match(block, /return dv;/, '传导分支直接返回主向结论');
+  assert.match(block, /var G=window\.RyZoneGeometry;/, '共享几何函数必须参与方向判定');
+  assert.match(block, /G\.tapeAxisOf\(/, '方向来自第一分区几何');
+  assert.match(block, /return ax\.tapeAxis==='x';/, '主管方向由第一分区轴的垂直轴派生');
+  assert.doesNotMatch(block, /dominantVertical|ppShare\.mainPipes/, '已有管线方向不能覆盖第一分区规则');
+  assert.match(block, /cutOffX:tlZoneStepRef\?tlZoneStepRef\.x:null/, '传入实际阶梯X切线');
+  assert.match(block, /cutOffY:tlZoneStepRef\?tlZoneStepRef\.y:null/, '传入实际阶梯Y切线');
 });
 
-test('② segs 复用必须形状校验（segs.length===cols*rows），否则弃用', () => {
+test('② 三级方向和分段数从当前几何重算，不复用旧方向报告', () => {
   const start = i09.indexOf('var majFixedH=(function(){');
   const block = i09.slice(start, i09.indexOf('})();', start));
-  assert.match(block, /rep0\.segs\.length===cols\*rows/, '二级报告 segs 与三级网格数对不上必须弃用');
+  assert.match(block, /tlAxisReport=ax/, '当前网格的方向报告由统一几何函数生成');
+  assert.doesNotMatch(block, /rep0\.segs/, '不得读取旧的方向报告分段数');
 });
 
 test('③ 带几何继续由 majFixedH 单点驱动（fixedH 分支横向带 / else 竖向带）', () => {
