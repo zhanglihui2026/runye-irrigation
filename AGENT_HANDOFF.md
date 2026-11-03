@@ -6877,3 +6877,28 @@ ppHasPipeContent(:2924)/ppUpdateAutoPipeButton(:2928，有 `if(!btn)return` 判�
 
 **发布**：抬 v901-src-autopipe-remove（index.html 12 处 + sw.js 1 处，python count 核对），
 全闸 541/0 + check_publish_refs PASS + lint 通过；远端 tip=a89a22d。
+
+## 26.133 v911-trunk-segment-snap-2a：执行/审核分离首次落地（0178639 · 2026-11-03）
+
+**背景**：手绘总管×参数化节点×轮灌动画任务清单（`project-planning/手绘总管与轮灌演示_2026-11-02.html`，
+commit 4aa89f5/3cacc8e）确立执行模式：执行 agent 实施 → 设计方（本会话）审核发布。本节为首次审核记录。
+
+**步骤 2a 交付**（mod/trunk-snap.js + online-map.js + index.html/sw.js 抬版本 + 测试）：
+- trunk-snap.js：新增线段目标 mainpipe-edge(8)/trunk-edge(9)，独立 segments 数组；nearest() 点目标
+  **未命中才**扫线段（决策「点优先、线段兜底」落实正确）；屏幕像素正交投影 + t∈[0,1] 端点钳制；
+  命中经 setUnprojector 反算垂足真实经纬度（非端点坐标）；trunk-edge 自动覆盖已存总管折线 ⇒
+  再手绘总管可吸已有总管线段（用户诉求③）。
+- online-map.js：extraSnapTargets 新增 mainPipeLines——每区主管折线经 geoBridge 反算，
+  单点失败整线跳过（宁缺不错口径）；地块一致性守卫复用 trunkGeoBridge；写库链零改动 ✓。
+- 测试 +7（548/0，基线 541）：优先级锁/垂足精度/端点钳制/点目标优先。
+
+**审核结论：通过并发布**。三处同抬核实（index 12 处 + sw VERSION v911 + 901 残留 0）；
+全闸 548/0 + publish_refs PASS + lint 0 error；线上复量 4 文件 OK。远端 tip=0178639。
+
+**审核记过（不阻塞，已记录）**：
+1. **跳号**：v902~910 空闲却用 v911——违反「接续前 grep 查空号」；不回滚（重排代价>收益），
+   v902~910 视为保留空号，下一版本顺延 v912；
+2. excludeTrunkId 未过滤 trunk-edge（编辑已有总管时自吸）——宿主当前未传该参，与点目标行为一致非回归；步骤 2b 补；
+3. 线段目标无数量上限（类似 ZONE_VERT_CAP）——主管折线规模小可接受，大地块观察 mousemove 帧耗。
+
+**注意**：工作区仍有大量并行改动未提交（29 文件，滴灌带/分区主题），与本次发布无关，勿混提交。
