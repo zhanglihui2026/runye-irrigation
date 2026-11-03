@@ -7097,3 +7097,29 @@ gen_coupler_step2b.mjs 线上化（gen_coupler_online.mjs，Temp）：页面改�
   二跑 **10/10 全绿**——既有参数节点链路线上零回归。
 - 剩余验收边界（真机手工，用户侧）：①N 节点出现在地图捕捉气泡/吸附结果 ②总管松手保存后每条
   线分别显示 ③轮灌组全通时动画可启用、断组仍报组号。提醒用户：**手绘总管前先点「捕捉：开启」**（v846 决策默认关）。
+
+## 26.143 v918-coupler-visible：设计页节点在地图常显标记（768c2f5 · 2026-11-03）
+
+**用户真机反馈（截图）**：设计页主管上放的两个节点，切到在线地图「根本没看到」——手绘总管时
+不知道节点在哪、往哪画。定性：v914/v917 只把节点做成**吸附目标**（不开捕捉看不见、开了也要
+鼠标靠近才出气泡），地图上没有任何常显标记——真实 UX 缺口，非数据链路问题
+（snapExtras.mainCouplers 采集一直正常，含 v914 参数节点与 v917 施工节点）。
+
+**实现**（mod/online-map.js，~40 行）：
+- `renderCouplerMarkers(extras)`：在 `refreshSnapTargets` 末尾**无条件**调用——重建节点标记层
+  （`couplerMarkerLayer` L.layerGroup）：每节点双环（r9 外环 #b45309 描边 fillOpacity:0 +
+  r5 白描边橙芯 #f59e0b，与演示入口标记同语言）+ **permanent tooltip** 常显标签
+  （`主管节点 m1 · 距起点 30m` / `施工节点 N-01 · …`）。
+- `interactive:false`（不吃绘制点击）+ tooltip CSS `.ry-coupler-tip{pointer-events:none}`
+  （style 注入一次，不挡地图操作）。
+- **与捕捉开关无关**：标记=指引，捕捉=吸附；无选中地块/地块不一致（snapExtras=null）⇒ 清层。
+- 触发时机：进 draw 态（:898）等既有 refreshSnapTargets 调用点顺带刷新——用户点「绘制总管」
+  即见节点，无需开捕捉。
+
+**验证**：静态锁 +1（coupler_map_snap 6/6：无条件调用/双环参数/permanent tooltip/
+interactive:false/pointer-events CSS/label 兜底）；本地探针 **11/11**（新 ⑨：未开捕捉未演示
+即见 `.ry-coupler-tip`≥1 + b45309 双环 + 文本含「主管节点」）；全量 **578/0**；线上 sha256
+复量 2/2 一致；线上探针（含 ⑨）两轮 **11/11 全绿**。三处同抬 918-coupler-visible。
+
+**真机验收**（用户侧）：刷新两次更新 SW → 设计页生成管线图 → 切地图选同一地块 → 点「绘制总管」
+→ 无需开捕捉即可看到节点双环+标签 → 开「捕捉：开启」靠近节点吸附。
