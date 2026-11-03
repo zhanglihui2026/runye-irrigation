@@ -128,7 +128,14 @@
         if (!(gMin <= tol)) broken.push(g);
       }
       if (broken.length) {
-        return { ok: false, code: 'partial', minM: Math.min.apply(null, perMain.filter(isFinite)), brokenGroups: broken };
+        /* [v919] 断组对应的主管索引（去重）：宿主在地图上把这些主管线画红，
+           用户直接看到「哪几根还没接」，不用对着组号猜。 */
+        var brokenMains = [];
+        for (var zi2 = 0; zi2 < perMain.length; zi2++) {
+          if (perMain[zi2] > tol && broken.indexOf(o.groupOfZi(zi2)) > -1 &&
+              brokenMains.indexOf(zi2) === -1) brokenMains.push(zi2);
+        }
+        return { ok: false, code: 'partial', minM: Math.min.apply(null, perMain.filter(isFinite)), brokenGroups: broken, brokenMains: brokenMains };
       }
       return { ok: true, code: 'connected', minM: Math.min.apply(null, perMain.filter(isFinite)) };
     }
@@ -335,7 +342,21 @@
         else if (v.code === 'no-data') ctx.tip('图面上没有分区主管，无法演示水流。');
         else if (v.code === 'partial') {
           var gs = (v.brokenGroups || []).map(function (g) { return g + 1; }).join('、');
-          ctx.tip('轮灌组 ' + gs + ' 的主管还没接到总管上（最近 ' + (v.minM == null ? '?' : v.minM.toFixed(1)) + ' m > 容差 ' + TOL_M + ' m），暂无法演示水流。请把总管画到这些组的「主管节点」或主管端点附近。');
+          /* [v919] 文案去误导（旧「最近 0.0 m」是已接主管的距离）：改报已通/未通统计 +
+             两条可操作路径；并把未接通的主管线在地图上画红（redMains），用户直接看到补哪里。 */
+          var done = (d.gCount || 0) - (v.brokenGroups || []).length;
+          var redMains = Array.isArray(v.brokenMains) ? v.brokenMains : [];
+          var ly2 = ensureLayer(); if (ly2) ly2.clearLayers();
+          (redMains || []).forEach(function (mi) {
+            var line = d.mainsLL && d.mainsLL[mi];
+            if (line && line.length >= 2) {
+              ly2.addLayer(window.L.polyline(line.map(function (p) { return [p.lat, p.lng]; }),
+                { color: '#dc2626', weight: 6, opacity: 0.85, interactive: false, className: 'mapflow-anim' }));
+            }
+          });
+          ctx.tip('轮灌组 ' + gs + ' 的主管还没接到总管上（已通 ' + done + '/' + (d.gCount || '?') +
+            ' 组，容差 ' + TOL_M + ' m），暂无法演示水流。图中红色主管就是还没接通的——延伸总管，让每根红色主管贴到总管 ' +
+            TOL_M + ' m 内（在它附近点一个拐点，或吸它的施工节点）；也可在「分区与管路」为每根主管放施工节点并重新生成管线图后，回地图吸附。');
         }
         else ctx.tip('手动绘制的总管与分区主管没有连接（最近 ' + (v.minM == null ? '?' : v.minM.toFixed(1)) + ' m > 容差 ' + TOL_M + ' m），暂无法演示水流。请把总管画到「驳接点」或主管端点附近。');
       }

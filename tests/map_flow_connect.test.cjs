@@ -51,6 +51,17 @@ test('①b 部分断开：总管只贴组0，组1 主管端点 100m 外 ⇒ part
   assert.ok(r.minM > 0 && isFinite(r.minM), 'minM 给出最近距离供文案');
 });
 
+test('⑨a [v919] partial 携带 brokenMains（断组主管索引，去重）供地图画红', () => {
+  const trunk = [P(-2, 0), P(-2, 50)];   /* 组0 两根贴上；组1（zi2/zi3）全断 */
+  const r = M.validateConnection({ hasTrunk: true, trunkLL: trunk, mainsLL: mains, tolM: tol, dist, groupOfZi, groups });
+  assert.equal(r.code, 'partial');
+  assert.deepEqual(r.brokenGroups, [1]);
+  assert.deepEqual(r.brokenMains, [2, 3], '断组对应的主管索引（zi2/zi3 距离>tol 且属断组）');
+  /* 已接的主管不得混入：zi0/zi1 距离 0 但只属组 0（已通） */
+  assert.equal(r.brokenMains.includes(0), false);
+  assert.equal(r.brokenMains.includes(1), false);
+});
+
 test('①c 全断：总管远离一切 ⇒ partial 且列出全部组', () => {
   const trunk = [P(500, 500), P(600, 600)];
   const r = M.validateConnection({ hasTrunk: true, trunkLL: trunk, mainsLL: mains, tolM: tol, dist, groupOfZi, groups });
