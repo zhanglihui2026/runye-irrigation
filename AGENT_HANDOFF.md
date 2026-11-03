@@ -7028,3 +7028,22 @@ push 3bc25d1；线上 sha256 复量 4/4 一致。矩阵矩阵本步不跑（纯�
 **真机待验证（全链累积）**：设计页节点放置/拖动手感/面板输入；手绘总管吸节点手感；演示逐组报错文案；演示入口标记视觉。
 
 **下一步**：§9.4 五步全部完成，任务清单进入真机验收阶段。既有问题专项（不阻塞）：legacy_archive C1/C2（基线既有）、rot_regen 脚本腐化；地图端节点拖动微调+定位面板（跨端事务写）待拍板。
+
+## 26.138 探针矩阵腐化专项：legacy_archive 8/8 全绿 + rot_regen 判定段恢复（2026-11-03 · 纯探针修复，零产品代码改动）
+
+§9.4 收官后的既有问题专项。两个「基线既有」红项全部查清并修复——**均为探针脚本自身问题，产品无缺陷**。
+
+**gen_legacy_archive（C1/C2 失败根因链，插桩定位）**：
+1. **STAGE1 注册姿势错误（主根因）**：直调 `RyPlotLibraryStore.replace(snap.plots, snap.revision)` 且**不检查返回值**——CAS 静默失败，库里只有 `auto-current:probe_legacy_1` 副本而没有 id=`probe_legacy_1` 本体 ⇒ 恢复链 `resolveProjectPlotBinding(存档.currentPlotId)` 返回 null ⇒ `projectSingleCanonical` 绑定检查 `canonical-single-plot-binding-invalid` 拒绝。修复：改 `upsertUnique` + 注册后 verify（v914 探针同款姿势）。
+2. **C1 恢复前 clearPipesWhole（次根因）**：清空画布后运行时 `tlDiagramData` 与 canonical 几何签名不一致 → `ryCommitSingleLevel3CanonicalFromRuntime` 的 `isCurrent=false` → 保存链拒绝 → `captureRestoreRollbackSnapshot` 建 rollback 失败 → **有意拒恢复（设计语义，非缺陷）**。移除；「从旧档重建」由恢复后 pipes>0 断言承担。
+3. **load2b 动态找 key 启发式失效**：「第一个含 canonicalDrawingDesign 的 key」会撞上探针自己注入的 rollback test 档（isolated 保存不带 currentPlotId）。改为直接用 ARCH_KEY。
+4. **执行顺序**：C2（带 canonical 恢复）必须先于 C1——C1 恢复后运行时是 legacy 重建投影，再验 C2 的 rollback 签名比对会挂。C2 提前到干净运行时上。
+5. **§26.124 定性修正**：当时「合成环境限制/rollback=null 根因」实为上述 1+2 叠加误判——插桩（[probe-load] F1~T11 逐 return 点打标）显示拒绝走的是 F6（canonical 绑定校验），rollback 保存单独复现是成功的。真实浏览器「保存→导入工程」路径从来不受影响（用户地块本就经 upsertUnique 正常入库）。
+6. **插桩教训（重要）**：给单行 `if(cond) return X;` 插桩时把 warn 插到 if 与 return 之间会**改变语义**（if 无块只覆盖第一条语句，return 变无条件执行）——首轮插桩制造了假 F6。必须包块：`if(cond){ warn; return X; }`。
+结果：**8/8 ALL PASS**（两轮稳定），探针退出码 0。
+
+**gen_rot_regen（判定段丢失）**：v895 时代的判定型脚本被后来的观测版覆盖（112 行只有 A/B/C 打印+console 尾巴，无 PASS/FAIL 无 exitCode）。补判定段：①进设计页管线在 ②旋转输入生效 ③重生成发生（ddGeneratedAt 更新）④重生成后管线不消失（v895 守卫口径）⑤无新增错误弹窗。坑：`await obs(...)` 原来不接收返回值，需 `const A=await obs(...)`。结果 **5/5 PASS**，dialogs=1（进页回传提示，预期内）。
+
+产品代码零改动（git status 干净，inline-12.js 插桩已还原比对）。探针脚本在 Temp 不进仓；结论已固化到本节。至此探针矩阵全绿：legacy_archive 8/8 + rot_regen 5/5 + undo_group 11/11 + batch_d 7/7。
+
+**下一步**：真机验收（§9.4 全链累积项）；tlSrcFlip 三选项（§26.125）等拍板；批次 E/F 等拍板。
