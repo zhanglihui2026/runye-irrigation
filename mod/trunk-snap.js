@@ -31,12 +31,16 @@
     'seg-coupler': 4,
     'valve-node': 5,
     'branch-start': 6,
-    'zone-vertex': 7
+    'zone-vertex': 7,
+    'mainpipe-edge': 8,
+    'trunk-edge': 9
   };
 
   var enabled = true;
   var targets = [];
+  var segments = [];
   var projector = null;
+  var unprojector = null;
   var markerApi = null;     // {show(hit), hide()}
   var lastHit = null;
   var buildStats = null;
@@ -125,14 +129,34 @@
       if (cp) push(cp.lat, cp.lng, 'seg-coupler', '驳接点 ' + (ci + 1));
     });
 
+    /* 8~9. 垂足兜底：主管和已存手绘总管的线段只在没有更高优先级点命中时胜出。 */
+    function addEdges(lines, kind, prefix) {
+      (Array.isArray(lines) ? lines : []).forEach(function (line, li) {
+        if (!Array.isArray(line) || line.length < 2) return;
+        for (var ei = 0; ei + 1 < line.length; ei++) {
+          var a = readPoint(line[ei]), b = readPoint(line[ei + 1]);
+          if (!a || !b || (a.lat === b.lat && a.lng === b.lng)) continue;
+          out.push({ kind: kind, label: prefix + ' ' + (li + 1) + ' · 段 ' + (ei + 1), a: a, b: b });
+        }
+      });
+    }
+    addEdges(input.mainPipeLines, 'mainpipe-edge', '主管');
+    addEdges(trunks.map(function (t) { return t && t.points; }), 'trunk-edge', '总管');
+
     return out;
   }
 
   function setTargets(list, meta) {
     targets = [];
+    segments = [];
     if (Array.isArray(list)) {
       for (var i = 0; i < list.length; i++) {
         var t = list[i];
+        if (t && (t.kind === 'mainpipe-edge' || t.kind === 'trunk-edge')) {
+          var a = readPoint(t.a), b = readPoint(t.b);
+          if (a && b) segments.push({ a: a, b: b, kind: t.kind, label: t.label || '', prio: prioOf(t.kind) });
+          continue;
+        }
         if (!t || !isNum(t.lat) || !isNum(t.lng)) continue;
         var kind = t.kind || 'plot-vertex';
         targets.push({ lat: t.lat, lng: t.lng, kind: kind, label: t.label || '', prio: prioOf(kind) });
@@ -144,6 +168,7 @@
   }
 
   function setProjector(fn) { projector = typeof fn === 'function' ? fn : null; }
+  function setUnprojector(fn) { unprojector = typeof fn === 'function' ? fn : null; }
   function setMarkerApi(api) { markerApi = api || null; }
 
   function setEnabled(on) {
@@ -158,9 +183,9 @@
     if (markerApi && typeof markerApi.hide === 'function') markerApi.hide();
   }
 
-  /* 核心判定。返回 {lat,lng,kind,label,dist} 或 null。 */
+  /* 核心判定。点目标优先；无点命中时，对线段做屏幕像素正交投影并反算落点。 */
   function nearest(latlng, pxTol) {
-    if (!enabled || !projector || !targets.length || !latlng) return null;
+    if (!enabled || !projector || (!targets.length && !segments.length) || !latlng) return null;
     var tol = typeof pxTol === 'number' ? pxTol : SNAP_PX;
     var p = projector(latlng);
     if (!p) return null;
@@ -175,10 +200,27 @@
       var score = t.prio * 1e6 + d;
       if (!best || score < best.score) best = { target: t, dist: d, score: score };
     }
+    if (!best) {
+      for (var si = 0; si < segments.length; si++) {
+        var s = segments[si], qa = projector(s.a), qb = projector(s.b);
+        if (!qa || !qb) continue;
+        var vx = qb.x - qa.x, vy = qb.y - qa.y, denom = vx * vx + vy * vy;
+        if (!denom) continue;
+        var rawT = ((p.x - qa.x) * vx + (p.y - qa.y) * vy) / denom;
+        var t = Math.max(0, Math.min(1, rawT));
+        var fx = qa.x + t * vx, fy = qa.y + t * vy;
+        var sd = Math.sqrt((p.x - fx) * (p.x - fx) + (p.y - fy) * (p.y - fy));
+        if (sd > tol) continue;
+        var segmentScore = s.prio * 1e6 + sd;
+        if (!best || segmentScore < best.score) best = { target: s, dist: sd, score: segmentScore, screen: { x: fx, y: fy } };
+      }
+    }
     if (!best) { clearMarker(); return null; }
+    var hitPoint = best.screen && unprojector ? unprojector(best.screen) : best.target;
+    if (!hitPoint || !isNum(hitPoint.lat) || !isNum(hitPoint.lng)) { clearMarker(); return null; }
     lastHit = {
-      lat: best.target.lat,
-      lng: best.target.lng,
+      lat: hitPoint.lat,
+      lng: hitPoint.lng,
       kind: best.target.kind,
       label: best.target.label,
       dist: Math.round(best.dist * 100) / 100
@@ -190,9 +232,10 @@
   function stats() {
     var byKind = {};
     for (var i = 0; i < targets.length; i++) byKind[targets[i].kind] = (byKind[targets[i].kind] || 0) + 1;
+    for (var si = 0; si < segments.length; si++) byKind[segments[si].kind] = (byKind[segments[si].kind] || 0) + 1;
     return {
       enabled: enabled,
-      total: targets.length,
+      total: targets.length + segments.length,
       byKind: byKind,
       lastHit: lastHit,
       snapPx: SNAP_PX,
@@ -210,6 +253,7 @@
     buildTargets: buildTargets,
     setTargets: setTargets,
     setProjector: setProjector,
+    setUnprojector: setUnprojector,
     setMarkerApi: setMarkerApi,
     setEnabled: setEnabled,
     isEnabled: isEnabled,

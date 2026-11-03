@@ -12,6 +12,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const SRC = path.join(__dirname, '..', 'mod', 'trunk-snap.js');
+const MAP_SRC = path.join(__dirname, '..', 'mod', 'online-map.js');
 
 /* 用 new Function 在**当前 realm** 里执行，而不是 vm.runInNewContext。
    跨 realm 返回的对象原型不同，assert.deepStrictEqual 会报
@@ -40,6 +41,8 @@ test('① prioOf：7 类目标各有固定优先级，未知类型垫底', () =>
   assert.equal(S.prioOf('valve-node'), 5);
   assert.equal(S.prioOf('branch-start'), 6);
   assert.equal(S.prioOf('zone-vertex'), 7);
+  assert.equal(S.prioOf('mainpipe-edge'), 8);
+  assert.equal(S.prioOf('trunk-edge'), 9);
   assert.equal(S.prioOf('whatever'), 99);
   /* 顺序不能乱：地块顶点必须最高；驳接点压过阀门/支管起点（设计落点不被抢） */
   assert.ok(S.prioOf('plot-vertex') < S.prioOf('water-source'));
@@ -78,7 +81,7 @@ test('③ buildTargets：七类目标各自生成，标签带序号', () => {
   assert.equal(kinds.filter((k) => k === 'branch-start').length, 1);
   assert.equal(kinds.filter((k) => k === 'zone-vertex').length, 1);
   assert.equal(kinds.filter((k) => k === 'seg-coupler').length, 2, '[v872] 驳接点目标必须生成');
-  assert.equal(list.length, 11);
+  assert.equal(list.length, 12, '手绘总管折线还生成一条线段兜底目标');
   assert.ok(list.some((x) => x.label === '地块顶点 1'));
   assert.ok(list.some((x) => x.label.indexOf('T1') >= 0));
   assert.ok(list.some((x) => x.label === '驳接点 1'), '驳接点标签带序号');
@@ -227,4 +230,42 @@ test('⑫ 驳接点优先级：同半径内压过更近的阀门；仍让位于�
   ]);
   const hit2 = S2.nearest({ lat: 18.2, lng: 109.5 });
   assert.equal(hit2.kind, 'trunk-vertex', '编辑已有干线时拐点抢点行为不变');
+});
+
+test('⑬ 主管线段垂足：按屏幕像素投影并由宿主反算到地图坐标', () => {
+  const S = fresh();
+  S.setUnprojector((p) => ({ lat: p.y / 10000, lng: p.x / 10000 }));
+  S.setTargets(S.buildTargets({ mainPipeLines: [[[0, 0], [0, 1]]] }));
+  const hit = S.nearest({ lat: 0.0003, lng: 0.0005 }); // 3px 垂距，垂足在线段内部
+  assert.equal(hit.kind, 'mainpipe-edge');
+  assert.ok(Math.abs(hit.lat) < 1e-12);
+  assert.ok(Math.abs(hit.lng - 0.0005) < 1e-12);
+  assert.equal(hit.dist, 3);
+});
+
+test('⑭ 点目标优先于垂足线段；线段端点外投影被限制在线段端点', () => {
+  const S = fresh();
+  S.setUnprojector((p) => ({ lat: p.y / 10000, lng: p.x / 10000 }));
+  S.setTargets(S.buildTargets({
+    plotRing: [[0, 0.0005]],
+    mainPipeLines: [[[0, 0], [0, 1]]]
+  }));
+  assert.equal(S.nearest({ lat: 0.0001, lng: 0.0005 }).kind, 'plot-vertex');
+
+  S.setTargets(S.buildTargets({ mainPipeLines: [[[0, 0], [0, 1]]] }));
+  const endHit = S.nearest({ lat: 0.0002, lng: -0.0005 });
+  assert.equal(endHit.kind, 'mainpipe-edge');
+  assert.ok(Math.abs(endHit.lng) < 1e-12, '投影超出线段时应吸到最近端点');
+});
+
+test('⑮ 在线地图接线：主管经 geoBridge 反算，地块守卫与 Leaflet 反投影保持闭合', () => {
+  const src = fs.readFileSync(MAP_SRC, 'utf8');
+  assert.ok(src.includes("if(String(window.currentPlotId||'')!==String(currentMapPlotId||'')) return null;"),
+    '分区页与地图当前地块不一致时不得产出捕捉目标');
+  assert.match(src, /Array\.isArray\(dd\.mainPipes\)[\s\S]*?bridge\.toLL\(p\)[\s\S]*?mainPipeLines\.push\(llLine\)/,
+    '每条主管折线必须逐点经 geoBridge 反算后送入线段捕捉');
+  assert.match(src, /input\.mainPipeLines\s*=\s*snapExtras\.mainPipeLines/,
+    '反算的主管折线必须进入捕捉引擎');
+  assert.match(src, /setUnprojector\(function\(cp\)[\s\S]*?map\.containerPointToLatLng\(\[cp\.x,cp\.y\]\)/,
+    '屏幕垂足必须通过 Leaflet 反投影成地图坐标');
 });
