@@ -7047,3 +7047,11 @@ push 3bc25d1；线上 sha256 复量 4/4 一致。矩阵矩阵本步不跑（纯�
 产品代码零改动（git status 干净，inline-12.js 插桩已还原比对）。探针脚本在 Temp 不进仓；结论已固化到本节。至此探针矩阵全绿：legacy_archive 8/8 + rot_regen 5/5 + undo_group 11/11 + batch_d 7/7。
 
 **下一步**：真机验收（§9.4 全链累积项）；tlSrcFlip 三选项（§26.125）等拍板；批次 E/F 等拍板。
+
+## 26.139 已知未修清单核查 + v865 防回退锁（8b86c84 · 2026-11-03）
+
+「已知未修」两条过时项核查销号 + 一条防回退锁：
+
+- **#2 readPoint [null,1]**：**早已修复**——v854 专项（readPoint :54 空位坐标判 null），且 trunk_schema_v2.test.cjs ⑮ 已有锁。实测 [null,1]/[1,undefined]/{lat:null,lng:1} 全部正确返回 null。记忆过时，销项。
+- **#3 angle=0+原点偏移**：**早已修复**——v865（ppBuildAutoPipes :3296 注释：0° 也走格系统一变换，frame 为纯平移+缩放，toGrid/toWorld 互逆）。frame 层数学有 coord_frame.test 锁，但修复本体无防回退锁 ⇒ 新增 `tests/zero_angle_frame_lock.test.cjs` 三条静态锁：①ppState.polyPts=frame.poly 在 if(frame){} 内无角度前置条件 ②旧缺陷条件 Math.abs(angle)>0.001 不得回到函数代码（剥注释后查——v865 注释引用了原文）③裁剪环 ppPipeClipPoly=ppState.polyPts（格系）不变量。全量 574/0。
+- 剩余待办：真中文 DXF 层名（等真机 CAD）、成组地块角度入口（等拍板）、真机验收（§9.4 累积）、tlSrcFlip 三选项、批次 E/F。
