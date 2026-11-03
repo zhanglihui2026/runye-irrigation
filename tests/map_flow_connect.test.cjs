@@ -119,3 +119,40 @@ test('⑥ 宿主接线：collect 采 dd.couplerNodes + start 传逐组参数 + p
     'start 必须把 nodesLL/groupOfZi/groups 传给 validateConnection');
   assert.ok(/轮灌组 ' \+ gs/.test(src), 'partial 必须逐组报错（列出断组号）');
 });
+
+/* ── [v916 步骤 4] 演示水路入口精确化 ─────────────────────────────── */
+const d4 = () => ({
+  nodesLL: [
+    { pipeKey: 'm1', mi: 0, ll: P(10, 0) },    /* 组0 */
+    { pipeKey: 'm3', mi: 2, ll: P(60, 100) },  /* 组1 */
+    { pipeKey: 'm2', mi: 1, ll: null },        /* 失配（防御：collect 不该给，入口兜底跳过） */
+    { pipeKey: 'm9', mi: 8, ll: P(5, 5) }      /* mi 越界 */
+  ],
+  manual: [[0, 1], [2, 3]], nPer: 1
+});
+
+test('⑦a entrancesOf：活动组入口=该组节点，组间互不串', () => {
+  const d = d4();
+  const e0 = M.entrancesOf(d, 0);
+  assert.equal(e0.length, 1);
+  assert.equal(e0[0].pipeKey, 'm1');
+  const e1 = M.entrancesOf(d, 1);
+  assert.equal(e1.length, 1);
+  assert.equal(e1[0].pipeKey, 'm3');
+});
+
+test('⑦b entrancesOf：失配/越界节点过滤，空数据返回 []', () => {
+  const d = d4();
+  assert.ok(!M.entrancesOf(d, 0).some(n => n.pipeKey === 'm9'), 'mi 越界不进入口');
+  assert.ok(!M.entrancesOf(d, 0).some(n => n.pipeKey === 'm2'), 'll null 不进入口');
+  assert.deepEqual(M.entrancesOf({ nodesLL: [] }, 0), [], '无节点数据 ⇒ 空（渲染退化零破坏）');
+  assert.deepEqual(M.entrancesOf(null, 0), []);
+});
+
+test('⑦c 渲染接线：render 画节点标记+活动组入口双环', () => {
+  const src = fs.readFileSync(SRC, 'utf8');
+  assert.ok(/entrancesOf\(d, g\)\.forEach/.test(src), 'render 必须为活动组画入口标记');
+  assert.ok(/radius: 9, color: '#b45309'/.test(src), '入口外环（描边 #b45309）');
+  assert.ok(/radius: 4, color: '#b45309'/.test(src), '全部节点常驻小橙点');
+  assert.ok(/entrancesOf: entrancesOf/.test(src), '纯函数必须导出（Node 单测口径）');
+});

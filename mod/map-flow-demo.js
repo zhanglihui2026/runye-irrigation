@@ -117,6 +117,18 @@
     return { ok: ok, code: ok ? 'connected' : 'disconnected', minM: Math.min(mMain, isFinite(mCoup) ? mCoup : Infinity) };
   }
 
+  /* [v916 步骤 4] 演示水路入口精确化（纯函数，Node 单测锁）。
+     活动组 g 的「水流入口」= 该组内接驳节点所在主管的节点（nodesLL 来自 v913
+     dd.couplerNodes 投影，ll=geoBridge 反算经纬度）。返回 [{pipeKey, mi, ll}]；
+     无节点数据/该组没放节点 ⇒ []（渲染层自然退化为只高亮主管，零破坏）。 */
+  function entrancesOf(d, g) {
+    if (!d || !Array.isArray(d.nodesLL)) return [];
+    var gof = d.groupOfZi || function (zi) { return groupOf(zi, d.manual, d.nPer); };
+    return d.nodesLL.filter(function (n) {
+      return n && n.ll && (n.mi >= 0) && gof(n.mi) === g;
+    });
+  }
+
   /* ── 运行时（依赖宿主注入 ctx） ────────────────────────────────────── */
   var ctx = null, layer = null, active = null, timer = null, playing = false;
 
@@ -209,6 +221,26 @@
         if (d.branchLL[zi]) ly.addLayer(poly(d.branchLL[zi], '#16a34a', 3, true));
       }
     }
+    /* [v916] 接驳节点标记（常驻）：全部节点小橙点——用户能看见「水路入口在哪」；
+       失配节点（collect 已跳过 x/y null）不出现在图上。 */
+    (d.nodesLL || []).forEach(function (n) {
+      if (!n || !n.ll) return;
+      ly.addLayer(window.L.circleMarker([n.ll.lat, n.ll.lng], {
+        radius: 4, color: '#b45309', weight: 2,
+        fillColor: '#f59e0b', fillOpacity: 1, interactive: false
+      }));
+    });
+    /* [v916] 活动组水路入口：该组节点位置画双环大标记（外环描边+白芯橙心）——
+       「水从节点进入主管」的精确入口（步骤 4 验收：入口坐标=节点坐标）。 */
+    entrancesOf(d, g).forEach(function (n) {
+      ly.addLayer(window.L.circleMarker([n.ll.lat, n.ll.lng], {
+        radius: 9, color: '#b45309', weight: 2.5, fillOpacity: 0, interactive: false
+      }));
+      ly.addLayer(window.L.circleMarker([n.ll.lat, n.ll.lng], {
+        radius: 5, color: '#ffffff', weight: 2,
+        fillColor: '#f59e0b', fillOpacity: 1, interactive: false
+      }));
+    });
     d.valves.forEach(function (v) {
       var on = (v.mi >= 0) && (groupOf(v.mi, d.manual, d.nPer) === g);
       ly.addLayer(window.L.circleMarker([v.ll.lat, v.ll.lng], {
@@ -458,6 +490,7 @@
     stop: stop,
     isActive: function () { return active != null || playing; },
     /* 纯函数导出（Node 单测） */
-    groupOf: groupOf, groupCount: groupCount, validateConnection: validateConnection
+    groupOf: groupOf, groupCount: groupCount, validateConnection: validateConnection,
+    entrancesOf: entrancesOf
   };
 })(window);
