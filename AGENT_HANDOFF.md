@@ -7004,3 +7004,27 @@ push 3bc25d1；线上 sha256 复量 4/4 一致。矩阵矩阵本步不跑（纯�
 
 **下一步**：步骤 4 演示水路精确化（收尾展示层：v882 已把总管+段总管画进演示底态，
 本步补「活动组主管只高亮接驳节点所在主管链路」等待拍板细节）；真机验证：逐组报错文案。
+
+## 26.137 v916-demo-entrance：步骤 4 演示水路入口精确到节点（bdfb821 · 2026-11-03）
+
+§9.4 全链收官。改动只在 `mod/map-flow-demo.js`：
+
+- **entrancesOf(d,g) 纯函数**（:121 附近）：活动组水路入口 = `d.nodesLL.filter(n => n.ll && n.mi>=0 && gof(n.mi)===g)`。gof=groupOf（manual 优先，nPer 兜底）。导出入口挂 UMD。
+- **render 两处标记**：
+  1. 全部节点常驻橙点（r4，color #b45309 / fillColor #f59e0b，interactive:false）——「入口在哪」常显，不管当前播哪组；
+  2. 活动组入口双环（r9 外环 stroke #b45309 fillOpacity:0 + r5 白描边橙芯）——「水从该节点进主管」。
+- collect/validateConnection/报错文案**零改动**（步骤 3 语义不变）；v882 底态渲染兼容（橙点叠在底态之上，layer 每帧 clearLayers 重建）。
+- 测试 `tests/map_flow_connect.test.cjs` 扩至 14 条：entrancesOf 三测（过滤正确性/失配 mi 跳过/manual 分组）+ 渲染静态锁（两段 circleMarker 参数逐项断言）。全量 571/0。
+
+**探针 10/10**（gen_coupler_step2b.mjs，浏览器真实路径）：
+
+- ⑦b **页内造总管写库**：等效「用户吸附保存后」状态——拐点 1 = m1 节点经纬度（组 0 走节点结构化匹配贯通），拐点 2 = m2 主管末端点（组 1 端点贯通），坐标用探针自己的 `RyTrunkGeo.m2ll(x,y,geoBase,-1)` 反算（与 ppCouplerLL 同尺）。走 `RyPlotLibraryStore.replace(plots, snapshot.revision)` 真实写库，raw={schema:2,trunks:[{id:'probe-t1',main:true,points:[[lat,lng],...]}]}（normalize v2 口径，v1 单段 points 也可）。
+- **坑（重要）**：place-go 的 onclick 闭包持有**列表渲染时的旧地块对象**（无 trunk 字段）——写库后直接点 place-go，trunkSaved 载入 null（trunkCount=0）。**必须先 `RyMapHost.refresh()` 重渲染列表再点**（⑦c 首轮 FAIL 的根因）。
+- ⑦c 验态：`RyMapHost.trunkState()` → trunkCount=1 + mainId='probe-t1'。
+- ⑧ 点组 chips 断言 `#map [stroke="#b45309"]` path 数：组 0（m1 节点属组 0）≥2（常驻橙点+入口外环）、组 1（无节点）=1（仅常驻橙点）。circleMarker 渲染成 path、样式在 **attribute**（stroke=...）非 style。
+
+**发布**：三处同抬 916-demo-entrance（index.html 13 处+sw.js 1 处，python count 核对残余 0）；check.cjs + publish_refs（仓库根）+ lint PASS；提交 bdfb821 push（ls-remote 确认）；线上 sha256 复量 3/3 一致（sw.js f1a4bdcd / map-flow-demo.js d3762403 / index.html 7c64afea）。
+
+**真机待验证（全链累积）**：设计页节点放置/拖动手感/面板输入；手绘总管吸节点手感；演示逐组报错文案；演示入口标记视觉。
+
+**下一步**：§9.4 五步全部完成，任务清单进入真机验收阶段。既有问题专项（不阻塞）：legacy_archive C1/C2（基线既有）、rot_regen 脚本腐化；地图端节点拖动微调+定位面板（跨端事务写）待拍板。
