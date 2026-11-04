@@ -7710,3 +7710,39 @@ MutationObserver 的下个微任务才熄灭 —— 探针在同一 tick 里读�
 
 发布：master `c2c0dd1`，线上五件（sw.js / index.html / online-map.css / online-map.js / map-right-drawer.js）sha 全等，
 VERSION=`v961-map-rail-drawer`；static 611/615、全量 630/634（4 红仍为既有）；refs PASS；lint 0。
+
+### §26.167 v962-announce-simple（2026-11-04，首页公告弹窗简化）
+
+用户定稿文案（原话）：
+「免费开源灌溉设计工具｜纯公益，无收费套路，欢迎反馈 BUG，邀 3 位好友注册，解锁高级会员，
+浏览器即开即用，欢迎转发给农业灌溉同行 + https://zhanglihui2026.github.io/runye-irrigation/」
+
+**改法**（`runye-announce.js`，CORE 文件）：
+· 卡片 `520px → 420px` 宽，高约 195；删掉旧版三块：副标题 `.ry-ann-sub`、5 条列表 `.ry-ann-list`、
+  页脚说明 `.ry-ann-note`（对应 CSS 规则一并删除，不留死规则）；
+· 竖线前的「免费开源灌溉设计工具」作 `h3`，其余作一段正文，两个卖点
+  （纯公益，无收费套路 / 邀 3 位好友注册，解锁高级会员）加粗 —— 一段话比 5 条列表读得快；
+· 地址由不可点的 `div` 改成 `<a href target=_blank rel=noopener>`：这段公告的核心动作就是转发，
+  能直接点开/右键复制，比手抄一行 URL 强；
+· 动作三个 → 两个：`免费注册 / 登录`（已登录仍换「查看会员权益」）+ `复制链接`，删「开始使用」（× 已够）。
+
+**★ 缓存坑（这次是真会咬人的那种）**：`runye-announce.js?v=` 长期停在 `621-invite-l2` 这种一次性串上，
+而项目平时的习惯是「三处同抬到同一个版本串」。只抬 `sw.js` 的 VERSION 时：
+SW 那条路会更新（install 重新抓 CORE），但**没装 SW 或直连 HTTP 缓存的老用户仍按旧 `?v=` 命中旧文件**
+（v632 那次 CSS 就是这么翻车的）。⇒ 这次把它的 `?v=` 一并抬到本次版本串，并写进测试 ④ 锁住
+（断言 `?v=` 不许再以 `621-` 开头）。
+
+**新锁 `tests/announce_simple.test.cjs` 4/4**：①标题+正文三句逐字；②旧三块与旧文案句子不许回来；
+③`<a>` + `target=_blank` + `rel=noopener`、动作只剩两个；④`?v=` 与 sw VERSION 同抬、CORE 里有登记。
+（只钉文案与结构，不钉版式 —— 钉宽高会把以后调字号的人挡住。）
+
+**探针 `probe_announce_simple.mjs` 6/6**：卡片宽 420（≤440）、标题与正文逐字相等（用 JS 里读回来的
+`textContent` 跟定稿字符串做 `===`，不是 `includes`）、地址是 `A` 且 `href/target` 正确、
+旧三块 `querySelector` 全为空、按钮数组正好 `[免费注册 / 登录, 复制链接]`、点 × 后 mask 与 card 都从 DOM 消失。
+**线上同一套探针 6/6**（`probe_announce_simple_online.mjs`，PROBE_URL 走 Pages）。
+
+发布：master `61e3dd6`，线上 `sw.js` / `index.html` / `runye-announce.js` 三件 sha 全等、
+VERSION=`v962-announce-simple`、线上 `ry-ann-list` 残留 0；
+static 615/619、全量 634/638（4 红仍为既有）；refs PASS；lint 0。
+· 小坑：线上复量时 `sw.js` 第一次报 DIFF、隔一分钟连测三次全等 —— 边缘节点传播时间差，
+  别急着判「发布失败」，同一文件复量两次再下结论。
