@@ -1784,16 +1784,98 @@ window.tlGroupLossOf = function (g) {
   }
 };
 
+/* [v950] 没有「逐分区路径」时的按组扬程估算（用户 2026-11-04：
+   「我希望是在地图演示分区轮灌的时候，在卡片中，能把扬程显示出来」）。
+
+   为什么不新写一套公式：这里**复用 computeThreeLevel 的三段口径**，只把流量换成
+   「本组同轮合流」，用同一组 hazenWilliams / christiansenF / MARGIN_HEAD / SAFETY_FACTOR
+   重算 —— 与三级页「扬程计算式」逐项同源，差别仅在长度：
+     · 总管段 Q = 本组合流（总管要供全组）；
+     · 主管段 Q = **该区自己的流量**（每区一条主管，computeThreeLevel 也是这么算的）；
+     · 支管段 Q = 该区流量 ÷ 并联数，再乘 Christiansen 折减；
+   长度取 r.frontLenUsed / r.mainLenUsed / r.branchLenUsed（有图面路径时就是实长，
+   没有时是设计估算值）⇒ 所以结果标 estimated:true，UI 必须写「估算」并标出用的长度。
+
+   与 tlMapGroupHydraulicsOf 的路径模式的差别只在：路径模式逐区不同长度、分口径沿程累加；
+   这里是「全组共用同一组长度」，口径精度略低但没有段总管也能出数 —— 比"给不出扬程"有用。 */
+function tlEstimateGroupHead(r, zoneIndexes, areaOverride) {
+  var areas = (Array.isArray(areaOverride) && areaOverride.length) ? areaOverride
+    : (Array.isArray(r.zoneAreas) ? r.zoneAreas : null);
+  if (!areas || !areas.length) return null;
+  var members = [], missing = [], seen = {};
+  zoneIndexes.forEach(function (raw) {
+    var zi = Number(raw);
+    if (!isFinite(zi) || zi < 0 || Math.floor(zi) !== zi || seen[zi]) return;
+    seen[zi] = true;
+    var a = Number(areas[zi]);
+    if (isFinite(a) && a > 0) members.push(zi); else missing.push(zi);
+  });
+  if (!members.length) return null;
+  var perM2 = 1 / r.tapeSpacing / r.emitterSpacing * r.emitterFlow / 1000;   /* m³/h 每 m² */
+  var qGroup = members.reduce(function (s, zi) { return s + Number(areas[zi]) * perM2; }, 0);
+  if (!(qGroup > 0)) return null;
+  var par = Math.max(1, Number(r.branchParallelCount) || 1);
+  var frontLoss = hazenWilliams(r.frontLenUsed, qGroup, r.frontPipe.id);
+  var rows = members.map(function (zi) {
+    var q = Number(areas[zi]) * perM2;
+    var mainLoss = hazenWilliams(r.mainLenUsed, q, r.mainPipe.id);
+    var branchLoss = hazenWilliams(r.branchLenUsed, q / par, r.branchPipe.id) * r.branchF;
+    var total = frontLoss + mainLoss + branchLoss;
+    var rawHead = r.lift + r.dh + r.tapePressureM - r.existPressure * 10.2 + total + r.filterLoss + MARGIN_HEAD;
+    return {
+      zi: zi, flow: q,
+      frontLoss: frontLoss, mainLoss: mainLoss, branchLoss: branchLoss,
+      totalLoss: total,
+      head: RyDesignCore.head(Math.max(0, rawHead), 0, 0, SAFETY_FACTOR)
+    };
+  });
+  var worst = rows.reduce(function (a, b) { return !a || b.totalLoss > a.totalLoss ? b : a; }, null);
+  var downstreamMinOd = Math.max(MAIN_PIPE_MIN_OD, Number(r.mainPipe && r.mainPipe.od) || 0, Number(r.branchPipe && r.branchPipe.od) || 0);
+  var trunkPick = (!missing.length && qGroup > 0) ? selectPipe(qGroup, r.targetV, downstreamMinOd) : null;
+  return {
+    members: members,
+    missing: missing,
+    zones: rows,
+    flow: qGroup,
+    /* ★ 三个位必须让 UI 看得见：估算 / 用了哪三段长度 / 长度来源 */
+    estimated: true,
+    lengths: { front: r.frontLenUsed, main: r.mainLenUsed, branch: r.branchLenUsed },
+    lengthSource: { front: r.frontLenSrc || null, main: r.wp && r.wp.fromFigure ? 'figure' : 'estimate', branch: r.wp && r.wp.fromFigure ? 'figure' : 'estimate' },
+    trunkAdvice: trunkPick ? {
+      od: trunkPick.od,
+      id: trunkPick.id,
+      velocity: trunkPick.v,
+      targetVelocity: r.targetV,
+      minDownstreamOd: downstreamMinOd,
+      mainOd: r.mainPipe && r.mainPipe.od,
+      branchOd: r.branchPipe && r.branchPipe.od
+    } : null,
+    frontLoss: worst.frontLoss,
+    mainLoss: worst.mainLoss,
+    branchLoss: worst.branchLoss,
+    totalLoss: worst.totalLoss,
+    head: worst.head
+  };
+}
+
 /* 在线地图按自身当前轮灌组成员请求水力结果，避免地图的组号与本页 tl_zoneCount
    分组序号不一致时误报“逐组数据尚未生成”。数据仍来自同一张图面的逐分区路径，
    每个区的扬程按该轮组实际合流流量计算，组扬程取其中最不利区。 */
-window.tlMapGroupHydraulicsOf = function (zoneIndexes) {
+window.tlMapGroupHydraulicsOf = function (zoneIndexes, opts) {
   try {
-    if (!Array.isArray(zoneIndexes) || !zoneIndexes.length || !window.RyPipePathLoss ||
-        typeof window.RyPipePathLoss.calculate !== 'function') return null;
+    if (!Array.isArray(zoneIndexes) || !zoneIndexes.length) return null;
     var r = computeThreeLevel();
-    if (!r || !r.inversePath || !Array.isArray(r.inversePath.zones) || !r.inversePath.zones.length) return null;
-    var available = r.inversePath.zones;
+    if (!r) return null;
+    var areaOverride = (opts && Array.isArray(opts.zoneAreas) && opts.zoneAreas.length) ? opts.zoneAreas : null;
+    var pathZones = (r.inversePath && Array.isArray(r.inversePath.zones) && r.inversePath.zones.length)
+      ? r.inversePath.zones : null;
+    /* [v950] 没有逐区路径（手绘总管路线 / 还没生成段总管）时不再直接返回 null ——
+       退到「同一套公式、换成本组流量」的估算，让演示卡片能把扬程显示出来。
+       opts.zoneAreas：地图端从地块 partitions 取到的逐区面积（比 computed 的网格口径更贴实际）。 */
+    if (!pathZones || !window.RyPipePathLoss || typeof window.RyPipePathLoss.calculate !== 'function') {
+      return tlEstimateGroupHead(r, zoneIndexes, areaOverride);
+    }
+    var available = pathZones;
     var members = [], missing = [], seen = {};
     zoneIndexes.forEach(function (raw) {
       var zi = Number(raw);

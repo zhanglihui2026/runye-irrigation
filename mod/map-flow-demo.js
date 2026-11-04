@@ -827,7 +827,10 @@
     var groupName=manual?'M'+(g+1):'G'+(g+1);
     var loss=null;
     try{
-      if(typeof window.tlMapGroupHydraulicsOf==='function')loss=window.tlMapGroupHydraulicsOf(memberIndexes);
+      /* [v950] 第二个参数把「当前地块的逐区面积」递进去：没有段总管时 inline-09 会退回
+         按组扬程估算，估算离不开逐区面积（地图端的地块 partitions 才是权威值）。 */
+      var _za=(typeof ctx.getZoneAreas==='function')?ctx.getZoneAreas():null;
+      if(typeof window.tlMapGroupHydraulicsOf==='function')loss=window.tlMapGroupHydraulicsOf(memberIndexes,{zoneAreas:_za});
       else if(typeof window.tlGroupLossOf==='function')loss=window.tlGroupLossOf(g);
     }catch(e){}
     /* [v945] 没有图面路径时的口径反推（用户 2026-11-04）：
@@ -863,10 +866,18 @@
     }
     if(loss&&isFinite(loss.flow)&&isFinite(loss.totalLoss==null?loss.total:loss.totalLoss)){
       var totalLoss=Number(loss.totalLoss==null?loss.total:loss.totalLoss);
+      /* [v950] 有逐区路径 ⇒ 精确；没有 ⇒ inline-09 退回「同一套公式、换成本组流量」的估算。
+         估算值必须自证：写明「估算」并列出用的三段长度，否则用户会把它当实测扬程去选泵。 */
+      var est=loss.estimated===true;
       lines+='<div class="mfg-value">本轮合灌流量 ≈ '+Number(loss.flow).toFixed(2)+' m³/h</div>'+
-        '<div class="mfg-value">本轮需求扬程 ≈ '+(isFinite(loss.head)?Number(loss.head).toFixed(2):'—')+' m</div>'+
-        '<div class="mfg-loss">本轮最不利路径损失 ≈ '+totalLoss.toFixed(2)+' m</div>'+
+        '<div class="mfg-value">本轮需求扬程 ≈ '+(isFinite(loss.head)?Number(loss.head).toFixed(2):'—')+' m'+(est?'（估算）':'')+'</div>'+
+        '<div class="mfg-loss">本轮最不利路径损失 ≈ '+totalLoss.toFixed(2)+' m'+(est?'（估算）':'')+'</div>'+
         '<div class="mfg-breakdown">总管 '+(Number(loss.frontLoss)||0).toFixed(2)+' + 主管 '+(Number(loss.mainLoss)||0).toFixed(2)+' + 支管 '+(Number(loss.branchLoss)||0).toFixed(2)+' m</div>';
+      if(est&&loss.lengths){
+        lines+='<div class="mfg-advice-note">按长度估算：总管 '+Number(loss.lengths.front||0).toFixed(1)+' m · 主管 '+
+          Number(loss.lengths.main||0).toFixed(1)+' m · 支管 '+Number(loss.lengths.branch||0).toFixed(1)+
+          ' m；在「分区与管路」生成施工图后改为逐区实长</div>';
+      }
       if(Array.isArray(loss.zones)&&loss.zones.length){
         lines+='<div class="mfg-zone-list" aria-label="本轮各分区水力参数">'+loss.zones.map(function(z){
           return '<div class="mfg-zone-row"><b>'+ (z.zi+1) +'区</b><span>流量 '+Number(z.flow).toFixed(2)+' m³/h</span><strong>扬程 '+Number(z.head).toFixed(2)+' m</strong></div>';
@@ -895,7 +906,7 @@
   }
 
   window.RyMapFlowDemo = {
-    VERSION: 'v945-trunk-od-by-zones',
+    VERSION: 'v950-group-head-estimate',
     TOL_M: TOL_M,
     INTERVAL_MS: INTERVAL_MS,
     init: function (c) {

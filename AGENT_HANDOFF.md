@@ -7306,3 +7306,44 @@ SW 自造重装风暴，§26.140 竞态在「每轮都清 SW」的用法下会�
 
 **注意**：`verify_nav_compact.js` 与 `scripts/nav-compact-acceptance.cjs` 里的 `WANT_ITEMS` 是 v402 时代的
 旧清单（还含已退役的「地块绘制」「地块分区」），本轮未同步 —— 它们不在 `npm test` 闸门内，属历史手工脚本。
+
+### §26.156 v950-group-head-estimate（2026-11-04，地图轮灌卡片显示扬程）
+
+**用户诉求（原话）**：「我希望是在地图演示分区轮灌的时候，在卡片中，能把扬程显示出来。」
+背景：卡片上原来「本轮需求扬程」是空行 —— 只有用户在「分区与管路」生成施工图、
+再「生成管线图」、再「☁ 回传在线地图」之后，`tlDiagramData` 里才有 `inversePath`，
+`tlMapGroupHydraulicsOf` 才拿得到逐区路径。用户不愿意为了看一个数字跑四步手工流程。
+
+**改法（不新增第二套水力口径，只补「长度来源」）**：
+- `mod/inline-09.js` 新增 `tlEstimateGroupHead(r, zoneIndexes, areaOverride)`：
+  按组算需求流量 ⇒ 用**同一套三段公式**（总管 / 主管 / 支管）算损失，只是**长度取不到实长**，
+  由面积推：`支管长 = 面积 / 滴灌带间距`、`主管长`、`总管长` 走既有 `tlFrontLenUse()` / 主干长度口径。
+  返回值带 `estimated:true` + `lengths{front,main,branch}` + `lengthSource` + `trunkAdvice`。
+- `window.tlMapGroupHydraulicsOf(zoneIndexes, opts)`：原来「没有 `inversePath` 就 return null」，
+  改为**退回估算**（有路径仍然走精确路径，一分不改）；`opts.zoneAreas` 由调用方递入逐区面积。
+- `mod/map-flow-demo.js`：`updateGroupInfo` 调 `tlMapGroupHydraulicsOf(memberIndexes, {zoneAreas: ctx.getZoneAreas()})`；
+  卡片扬程/损失带「（估算）」后缀，并加一行长度自证「按长度估算：总管 x m · 主管 y m · 支管 z m；
+  在「分区与管路」生成施工图后改为逐区实长」。
+
+**为什么必须打「（估算）」**：估算值看起来和实测值一模一样，用户会拿它去选泵。数字可以估算，
+**口径不许含糊** —— 必须自证是估算、并自证用的是哪三段长度。
+
+**踩坑（会静默算错 1000 倍）**：单位面积流量是
+`perM2 = 1 / tapeSpacing / emitterSpacing * emitterFlow / 1000`（滴头流量 L/h → m³/h）。
+写成 `emitterFlow / 1000 / (tapeSpacing * emitterSpacing)` 数值等价但容易被后人「化简」成
+`emitterFlow / 1000 / tapeSpacing / emitterSpacing` 之外的形式；真正危险的是漏掉 `/1000` 或把它乘进去。
+已有注释钉住。
+
+**版本串冲突（发布纪律现场案例）**：抬版本时发现 `sw.js` 的 `VERSION` 已被并行会话改成
+`v950-hand-partition`（地形手绘分区），而本轮是 `v950-group-head-estimate` ⇒
+`style-01.css?v=` 与 sw 不一致，`version_sync` 必红。**处置**：本轮把 sw VERSION 与 index.html
+9 处资源串统一为 `v950-group-head-estimate`；并行会话的手绘分区改动
+（`mod/inline-18.js` / `runye-map-partition.js` / `terrain/*`）**不随本轮发布**，
+其 index.html 内联工具条块在本轮提交前已被并行会话自行回滚，故本轮 index.html 只含 9 处 `?v=` 抬升。
+
+**验证**：探针 `probe_group_head.mjs` 本地 4/4，实测卡片文本
+`本轮合灌流量 ≈ 156.00 m³/h / 本轮需求扬程 ≈ 42.16 m（估算）/ 本轮最不利路径损失 ≈ 11.13 m（估算）/
+总管 3.23 + 主管 7.63 + 支管 0.27 m / 按长度估算：总管 200.0 m · 主管 300.0 m · 支管 33.3 m…`；
+`version_sync` 6/6；static 576/580（4 红为既有：`demo_flow_revive`、`plot_transfer`、
+`snap_default_off` ①③ —— 后两条红在 **HEAD 就有**，`mod/online-map.js` 里是 `var snapOn = true;`、
+`btnSnapToggle` 的 DOM 形态也变了，与本轮无关）；refs PASS；lint 0。
