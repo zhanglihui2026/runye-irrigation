@@ -7838,3 +7838,50 @@ B 段把 A 算出的 tierNote 交给真渲染器 `RyMapFlowDemo.updateGroupInfo`
 不会消失 —— 离散档位的台阶是结构性的，所以这次选择「说清楚」而不是「改规则」。
 
 发布：master 见下、VERSION=`v964-tier-step-note`、static 619/623（4 红仍为既有）、全量 645/649、refs PASS、lint 0。
+
+### §26.170 v965/v966-trunk-joint-off（2026-11-04，「联合复核」整块取消）
+
+**用户原话（第二次）**：「红框的内容我说取消掉得了，之前就让你取消，你怎么没有取消掉？」
+红框圈住的是总管参数设置面板里**整个「联合复核」块**：标题「联合复核」+ 副标题「总管 + 下游分区管网」、
+「总管」信息行（ZG-001 · PE · DN180 · Q 97.4 · 1.06 m/s · 损失 3.11 m）、「下游」行（主管 8 段 · 支管 8 段 ·
+最大主管 DN160 · 管长合计 1.91 km）。下面「损失拆分」（总管 510.4 m 地图实测 5.64 m / 主管 527.0 m 5.52 m /
+支管 62.5 m 0.40 m / 合计损失 11.57 m / 管路总长 1.10 km）**要保留**。
+
+**为什么 v959 没做成**：那一轮只按字面删了块底部那段说明文字（`合计 = 总管 + 主管 + 支管…不含静扬程…`），
+标题与两行对照、复核结论（`.is-ok/.is-warn` 三色点）、说明行都还在 —— 用户看到的红框里全是这些。
+教训：**用户说「取消某块内容」时先确认范围是「那段文字」还是「整块」**，拿截图圈选就以圈选为准。
+
+**改动**
+- `mod/trunk-panel.js`：markup 只留 `<div class="tp-jt-rows" id="tpLossRows">`（连同 `#tpJoint` 容器、
+  `.tp-jt-h/.tp-jt-sub` 标题、`#tpJointChecks`、`#tpJointNote` 一起删）；渲染函数 `paintJoint` → `paintLoss`：
+  **不再调 `jointReview()`、不再逐帧取 `opts.getLayout()`**（下游快照那套计算整段停掉），
+  只 `designBlock(design)` 出损失拆分六行。另删掉块内那条 `.tp-jt-sep`（面板级 `.tp-sep` 已是这条分隔线，
+  留着就是两条并排、看着像多一格空行 —— 探针 ⑧ 量 1px 断言）。
+- `mod/online-map.css`：删「联合复核」专用的 8 条选择器（容器 / 标题 / 副标题 / 结论区 / 结论点 /
+  结论点圆点 / 结论点两色 / 说明行 / 块内分隔线）；保留 `.tp-jt-rows`、`.tp-jt-row(>span 52px nowrap, >b)`、
+  `.tp-jt-nw`、`.tp-jt-h2`、`.tp-jt-loss`、`.tp-jt-sum`（损失拆分还在用）。
+- `jointReview()` **纯函数保留**（`designBlock` 与下游段统计的单测入口；v842「front 段整段跳过」那个
+  双重计数坑就靠 `tests/trunk_joint_review.test.cjs` 与 `tests/seg_trunk_to_map.test.cjs` ③ 锚着）。
+  文件头已注明「面板不展示」+ 彻底删除的前置步骤（先删那两个测试）。
+
+**新锁 `tests/trunk_panel_joint_removed.test.cjs` 5/5**：①DOM 只剩 `#tpLossRows`、四个旧节点 0 次；
+②渲染路径（从 `id="tpLossRows"` 到文件尾）里「联合复核」0 次（纯函数本体不参与，它带自己的结论文案）；
+③`paintLoss` 在/`paintJoint` 0 次、不调 `jointReview(`、不取 `opts.getLayout`、仍走 `designBlock`；
+④六行标签齐（总管/主管/支管/合计损失/管路总长/三级页扬程）+ 来源标签仍是「地图实测」；
+⑤CSS 八个选择器删净、`.tp-jt-row>span` 的 52px + nowrap 与 `.tp-jt-nw` 保留。全部先剥注释再断言。
+
+**既有锁调整**：`tests/trunk_joint_label_nowrap.test.cjs`（6/6）锚点 `paintJoint`→`paintLoss`；
+③`sepJoin` 下限 4→3（原 4 处含联合复核的总管信息行/下游行）；⑥从「要求下游行在」**反转**成
+「下游行与 `jr.hasLayout` 不许回来，但损失拆分三段的 `<span>总管</span>` 必须还在」（同名标签容易误删）。
+
+**探针 `probe_joint_block_gone.mjs` 8/8**（真 `RyTrunkPanel.mount()`，宿主仍故意提供 layout 与 design）：
+①面板文本 0 次「联合复核」②副标题没了 ③四个旧节点都不存在 ④`#tpLossRows`+标题+六行仍在
+⑤六行标签顺序正确 ⑥`.tp-jt-check`/`.tp-jt-note` 元素数 0 ⑦零 `Runtime.exceptionThrown`
+⑧损失拆分上方只剩一条 1px 分隔线（`prevClass==='tp-sep'`、`prevH===1`、`.tp-jt-sep` 计数 0）。
+
+**注释不许照抄已删原文**（v959 教训复用）：v965 第一次提交时注释里留了 `id="tpJoint"`、`.tp-jt-check` 等字样，
+线上 `grep -c tpJoint` 仍是 1 —— v966 把这几个字面量改成描述性说法（恢复路径指向
+`git show v964:…`），线上 grep 才归零。
+
+发布：v965 = `ab3c4fb`（Pages 构建卡住 15 分钟后 errored → 手动 `POST /pages/builds` 重触发，14.5 分钟后 built；
+期间线上一直停在 v964，**别把它当推送失败**：判定看 `_p1/_pub_api.py --verify` 的远端 tip）。

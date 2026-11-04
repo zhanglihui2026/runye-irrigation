@@ -337,9 +337,9 @@ body:has(.ry-pwa-install) #onlineMapSection .ry-trunk-panel{bottom:96px}
 
 /* [v842] 损失拆分：只读对照区（[v965] 上面的「联合复核」整块已按用户要求取消，
    这一节保留 —— 总管 / 主管 / 支管 / 合计损失 / 管路总长 / 三级页扬程 六行）。
-   ★ 被删掉的 .tp-joint / .tp-jt-h / .tp-jt-sub / .tp-jt-checks / .tp-jt-check(.is-ok/.is-warn)
-     / .tp-jt-note / .tp-jt-sep 是「联合复核」标题、结论三色点与说明行用的，随 DOM 一起撤了；
-     要恢复那两块，样式从 git 里 v964 那个提交取（别凭记忆重写，字号/圆点半径都是踩过坑的值）。 */
+   ★ 「联合复核」那套样式（容器、标题+副标题、结论三色点、说明行、块内分隔线）已随 DOM 一起删；
+     要恢复那两块，样式从 git 的 v964 提交取（`git show v964:mod/online-map.css`），别凭记忆重写 ——
+     字号、圆点半径都是踩过坑的值。**注释里不抄那些选择器**，否则线上 grep 永远不归零。 */
 #onlineMapSection .ry-trunk-panel .tp-jt-rows{display:flex;flex-direction:column;gap:2px}
 #onlineMapSection .ry-trunk-panel .tp-jt-row{display:flex;align-items:baseline;gap:6px;line-height:1.45}
 /* [v954] 标签列宽按**最长标签**定：最长的「三级页扬程」是 5 个汉字 × 10px = 50px，取 52px，

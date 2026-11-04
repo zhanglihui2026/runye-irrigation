@@ -33,8 +33,10 @@ test('① DOM：#tpFold 存在、位于 #tpClose 之前、核心 tp* 控件 id �
   const src = buildDom[0];
   assert.ok(src.includes("id=\"tpFold\""), 'buildDom 应包含折叠按钮 #tpFold');
   assert.ok(src.indexOf('tpFold') < src.indexOf('tpClose'), 'tpFold 应在 tpClose 之前');
+  /* [v965] 'tpJoint' 从这份「不得改名」名单里移除：那个容器是「联合复核」块的宿主，
+     已被用户要求整块取消（见 tests/trunk_panel_joint_removed.test.cjs）。其余 id 一个都不许动。 */
   for (const id of ['tpCode', 'tpMaterial', 'tpDn', 'tpDnCustom', 'tpFlow', 'tpProj',
-    'tpSlope', 'tpZ0', 'tpZ1', 'tpDz', 'tpV', 'tpHf', 'tpHj', 'tpJoint', 'tpRecheck',
+    'tpSlope', 'tpZ0', 'tpZ1', 'tpDz', 'tpV', 'tpHf', 'tpHj', 'tpRecheck',
     'tpMarkNode', 'tpWarnToggle']) {
     assert.ok(src.includes('id="' + id + '"'), '核心控件 id 不得改名：' + id);
   }

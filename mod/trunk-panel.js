@@ -493,11 +493,9 @@
         '<div class="tp-sep"></div>' +
         /* [v965] 「联合复核」整块取消（用户 2026-11-04 第二次点名，红框圈住：总管行 / 下游行 /
            复核结论 / 底部说明）。v959 只删了它下面那段说明文字，块本体还在 —— 这次连标题、
-           #tpJointRows 里的「总管」「下游」两行、#tpJointChecks、#tpJointNote 一起拿掉，
-           只留「损失拆分」。要恢复：把下面这段 DOM 换回
-             '<div class="tp-joint" id="tpJoint">' + 标题 + rows + checks + note + '</div>'
-           并把 paintLoss 里被删掉的 tParts / 下游行 / checks / note 四段接回去（handoff §26.165
-           有当时的完整代码）。 */
+           容器里的「总管」「下游」两行、结论区、说明区一起拿掉，只留「损失拆分」。
+           要恢复：DOM 与渲染的四段代码都在 git 的 v964 提交里（`git show v964:mod/trunk-panel.js`），
+           别凭记忆重写；**注释里不抄这些 id 与选择器**，否则线上 grep 永远不归零（v959 踩过）。 */
         '<div class="tp-jt-rows" id="tpLossRows"></div>' +
       '</div>' +
       '<div class="tp-foot">' +
