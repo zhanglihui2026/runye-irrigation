@@ -7781,3 +7781,60 @@ static 615/619、全量 634/638（4 红仍为既有）；refs PASS；lint 0。
 
 发布：master `489789d`，线上 `sw.js` / `index.html` sha 全等、VERSION=`v963-pp-formula-off`、
 线上 `id="ppCalcDetail"` 残留 0；static 619/623、全量 638/642（4 红仍为既有）；refs PASS；lint 0。
+
+### §26.169 v964-tier-step-note（2026-11-04，第 8 区扬程突然升高 = 档位台阶）
+
+**用户原话**：「第8区扬程突然升高了，是怎么回事？其他区域扬程都没有超过39米，第8区快接近45米了，不正常我认为。」
+截图是地图「联合灌溉组 G8」浮卡：含区 8（1 区同轮灌溉）、Q 87.48 m³/h、扬程 44.62 m（估算）、
+损失 17.36 = 总管 8.38 + 主管 8.65 + 支管 0.33、口径 Ø160 总管/主管 + Ø125 支管、管长 510.4/527.0/62.5。
+地图上 8 个区面积：1~7 区 34.1~35.1 亩，**第 8 区 31.6 亩（最小）**。
+
+**结论：不是取数错，也不是面积错，是「离散管径 + 经济流速就近取档」在档位分界处的台阶。**
+复现（`/tmp` 里一次性脚本，用真 `hydraulic-calc/design-core.js` 逐区选档）与卡片一字不差：
+
+| 区 | 面积 | Q | 总管/主管 | 总管 | 主管 | 扬程 |
+|---|---|---|---|---|---|---|
+| 1~7 | 34.1~35.1 亩 | 94.4~97.2 | Ø180 | 5.4~5.7 | 5.6~5.9 | **38.4~39.2** |
+| 8 | 31.6 亩 | 87.48 | **Ø160** | 8.38 | 8.65 | **44.9** |
+
+- Ø160/Ø180 的**就近选档分界流量 = 88.25 m³/h**（`Q·(1/A160+1/A180)/3600 = 2·targetV` 解出）。
+  第 8 区 87.48，**只差 0.77 m³/h（0.9%）没跨过去** ⇒ 被钉在 Ø160（v=1.66 m/s），
+  其余区 v≈1.44 ⇒ Ø180。管径小一档，Hazen 的 `D^-4.87` 把 510.4 m 总管 + 527 m 主管的损失
+  从 9.6 m 抬到 17.0 m，乘 1.10 安全系数后就是那 6 m。**面积最小的区扬程最高**，看着像 bug，其实是被细档坑了。
+- 选档规则本身**没动**（「就近取一档」是全局口径，改它会牵动二级/三级/总管建议的每一个数）——
+  这次只把台阶**算出来并写到卡片上**，让用户自己决定要不要按大一档施工。
+
+**代码改动**
+- `mod/trunk-size.js`：新增纯函数 `tierStep(o)`（`VERSION='v964-tier-step-note'`）+ 常量 `TIER_OVER_RATIO=1.05`。
+  入参全注入：`{flow, length, od, targetV, nextOd, inner, hazen}` —— **不写档位表、不写 C 值**
+  （文件头 ②③ 的纪律，`ci_check_static` 的 countDef 锁连字面量都算）。返回
+  `{fromOd,toOd,vNow,vAlt,gapFlow,gap,lossNow,lossAlt,saved,over}`；`over = vNow > targetV×1.05`
+  才是「被钉在细档」。长度 0 / 已是最大档 / 缺注入 ⇒ `null`（不瞎算）。
+- `mod/inline-09.js` `tlEstimateGroupHead`：`worst` 之后算 `tierNote`（主管按本区 q、总管按 qGroup，
+  `nextOd` 从本文件 `PE_OD_SERIES` 取），`stepSaved ≥ 1 m` 才出；`altHead` 用同一套
+  `lift+dh+tapePressure−existPressure+MARGIN → ×SAFETY_FACTOR` 重算一次，**只写进 tierNote，
+  不许顶掉 `head: worst.head` / `totalLoss: worst.totalLoss`**。整体 try/catch ⇒ 模块没加载时静默降级。
+  注意 `frontLen` 为 0（总管未画）时 `tierStep` 返回 null，只报主管段。
+- `mod/map-flow-demo.js`：`est` 分支里 `loss.tierNote` 存在才渲染 `.mfg-advice-note.mfg-tier-note`，
+  文案：「档位台阶：8区 87.48 m³/h 距 Ø180 档分界（88.25）还差 0.77 m³/h，按 Ø160 时流速 1.66 m/s
+  （目标 1.50）⇒ 总管+主管损失比大一档多 7.43 m；该区按 Ø180 施工则扬程约 36.74 m」。
+  **卡片只排版不重算**（不调 tierStep / selectPipe）。
+
+**新锁 `tests/trunk_tier_step.test.cjs` 7/7**：①第 8 区数值锁（1.6613/1.3126/88.2488/0.7688/3.7753/3.6564，
+总管长换 510.4 得 8.3764）；②1~7 区 `over=false`（且同流量换 Ø160 必须转 true ⇒ 判据看「选中档」不是「流量大小」）；
+③分界自洽（Q=分界时两档离目标流速等距、gap=0、越界转负）；④缺参 6 种返回 null；
+⑤接线（调 `RyTrunkSize.tierStep`、注入 `nextOd`、上一档从 `PE_OD_SERIES` 取、按 `worst.zi`、`stepSaved>=1` 阈值）；
+⑥卡片只读 `loss.tierNote`、不许出现 `tierStep`/`selectPipe`；⑦反向锁 `head: worst.head` 仍在、
+`altHead` 只许在 tierNote 里、不许 `worst.head =`。全部先剥注释再断言。
+
+**探针 `probe_tier_note.mjs` 13/13**（本地 CDP + `?full=1&rymock=L2`）：
+A 段在页面里用真模块复算（A1~A6 数值与单测逐项相等，含 A6 对照组 Ø180 v=1.44 不提示）；
+B 段把 A 算出的 tierNote 交给真渲染器 `RyMapFlowDemo.updateGroupInfo`（只 stub 取数层、不换渲染路径），
+断言 `.mfg-tier-note` 出现、文案含「档位台阶/8区/87.48/0.77/Ø180/36.7」、位置在 `.mfg-zone-list` 之前、
+**tierNote=null 时该行不出现而分区行仍在**（不误报）、全程零 `Runtime.exceptionThrown`。
+
+**留下的选项（等用户拍板）**：要不要把估算的选档从「就近一档」改成「不超过目标流速的最小档」？
+改了第 8 区会落 Ø180（36.7 m），代价是**所有区普遍粗一档**（成本上升），而且台阶只是挪到 v=1.5 那条线上、
+不会消失 —— 离散档位的台阶是结构性的，所以这次选择「说清楚」而不是「改规则」。
+
+发布：master 见下、VERSION=`v964-tier-step-note`、static 619/623（4 红仍为既有）、全量 645/649、refs PASS、lint 0。
