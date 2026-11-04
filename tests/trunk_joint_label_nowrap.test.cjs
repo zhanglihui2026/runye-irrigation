@@ -80,9 +80,9 @@ test('③ 值一律包 .tp-jt-nw（nowrap），且分隔点粘在后一段里', 
   assert.equal(/<b>'?\s*\+\s*fmt(?:Len|M)\(/.test(jsPaint), false, '还有直接拼 fmtLen/fmtM 的地方，没走 nw()/sepJoin()');
 });
 
-/* ④ 来源标签必须短：它和长度、损失挤在同一行 */
-test('④ 长度来源标签是两个字的短词，全文只放 title', () => {
-  assert.ok(/G\.src === 'mapTrunk' \? '实测'/.test(jsPaint), 'mapTrunk 的可见标签应是「实测」');
+/* ④ 来源标签必须短：它和长度、损失挤在同一行（v956 起为「地图实测」4 字，全文仍只放 title） */
+test('④ 长度来源标签用「地图实测」4 字短词，全文只放 title', () => {
+  assert.ok(/G\.src === 'mapTrunk' \? '地图实测'/.test(jsPaint), 'mapTrunk 的可见标签应是「地图实测」（用户 2026-11-04 定稿：4 字）');
   assert.ok(/'figure' \? '图面'/.test(jsPaint) && /'input' \? '试算'/.test(jsPaint), '图面/试算 两个字短词');
   /* 全长文案只能进 title，不许当可见文案 */
   assert.ok(/title: srcFull/.test(jsPaint), '来源全文应作为 {t,title} 的 title 传进去');
