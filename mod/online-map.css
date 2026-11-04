@@ -90,6 +90,14 @@
 /* 地图让出条带高度：条带 40px（含边框）⇒ #map 从 40px 起。
    Leaflet 初始化时读的就是这个盒子的尺寸，静态 CSS 改到位即可，不需要 invalidateSize。 */
 #onlineMapSection #map{top:40px}
+/* ===== [v953 2026-11-04 用户截图] 地图左栏 dock 里「联合灌溉 / 面积成组」两行，
+   左沿要与下方「轮灌演示（在线地图）」文字对齐。
+   病因：#tlPlanBar 带的是基础 .pp-plan-bar{padding:10px 14px}——在「分区与管路」页里
+   那条 padding 被 `#tlPipePlanSection .pp-side .pp-plan-bar{padding:0}` 清零过，
+   搬到地图 dock（#mapDemoDock 不在那两个选择器里）就又吃回了 14px，
+   于是内容整体比 #mapDemoBar 里的标题多缩进 14px（实测 24 vs 10）。
+   只在地图 dock 内清零，规划页原样不动。 */
+#mapDemoDock #tlPlanBar{padding-left:0;padding-right:0}
 #onlineMapSection .leaflet-container.placing-reservoir{cursor:crosshair}
 #onlineMapSection .ry-reservoir-icon-wrap{background:transparent;border:0;white-space:nowrap}
 #onlineMapSection .ry-reservoir-mark{position:absolute;left:14px;top:10px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;

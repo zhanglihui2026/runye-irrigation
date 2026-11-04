@@ -7438,3 +7438,26 @@ v949 抬 `runye-nav.js` 时踩过同一条）。
 
 **验证**：探针 `probe_map_toolbar.mjs` 本地 9/9（新增「装饰完成数：11」前置日志）；
 `version_sync` 6/6；refs PASS；lint 0；static 583/587（4 红为既有）。
+
+### §26.159 v953-dock-align（2026-11-04，地图左栏分组条左沿对齐）
+
+**用户诉求（原话）**：「红框内的内容，整体向左侧移动跟下面的轮灌演示（在线地图）文字左侧对齐。」
+（红框 = 地图左栏「分组组合 · 轮灌演示」卡里的「联合灌溉 1/2/3/4 区」与「面积成组 36 亩 按亩组合」两行）
+
+**先量再改**（探针 `probe_dock_align.mjs`，取 `getBoundingClientRect`）：
+`#tlPlanBar` 内容左沿 **x=24**，`#mapDemoBar` 里「轮灌演示（在线地图）」左沿 **x=10**，差 14px。
+根因不是"少写 margin"，是**作用域漏了**：`#tlPlanBar` 吃的是基础
+`.pp-plan-bar{padding:10px 14px}`；「分区与管路」页里那条 padding 被
+`#tlPipePlanSection .pp-side .pp-plan-bar{padding:0}` 清零过，而地图端是把 `#tlPlanBar`
+搬进 `#mapDemoDock` —— 不在那两个选择器覆盖范围内，14px 又回来了。
+
+**改法**：`mod/online-map.css` 加一条 `#mapDemoDock #tlPlanBar{padding-left:0;padding-right:0}`，
+**只在地图 dock 内**清零（规划页那几页正靠这 14px 与卡片对齐，写成全局会一起扒平）。
+改后实测 `#tlPlanBar` 首行 / 面积成组行 / 标题全部 x=10。
+
+**新增锁 `tests/dock_align.test.cjs` 2/2**：① 该规则存在且左右都清零；
+② 不许出现全局 `.pp-plan-bar{padding:0}`（反向约束，防止"顺手全局扒平"）。
+
+**验证**：探针实测三处左沿同为 10px；`version_sync` 6/6；refs PASS；lint 0；static 585/589（4 红为既有）。
+**注意**：#tlPlanBar 的 `padding-top/bottom:10px` 与 `margin-bottom:8px` 未动 ——
+用户只提了左沿；纵向间距若要收紧（与 8px+8px 的叠距合并）需另说。
