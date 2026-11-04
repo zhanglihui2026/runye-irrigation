@@ -7264,3 +7264,21 @@ SW 自造重装风暴，§26.140 竞态在「每轮都清 SW」的用法下会�
 **验证**：`tests/trunk_size.test.cjs` 12/12（⑩ 新增三条静态锁：必须有 setDnPlaceholder / 失败不许 `row.hidden = true` / DN_PRESETS ⊆ PE 序列且含 355）；本地探针 **16/16**（新增 ⑦b 失败露行+原因、⑦c 占位建议值、⑦d 档位含 355）；全量 588/592（4 红为既有）；static 29/0；refs PASS；lint 0 错。
 
 **验收**：刷新两次 → 点总管 → 面板「管径」下拉应显示「未选择（建议 Ø xxx）」、下面「推算管径」行给 Ø 值与流速、「采用」写入；若推算不出，该行会写清缺什么。
+
+### §26.154 v948-zone-chip-stay（2026-11-04，发布级交互修复）
+**用户诉求**（截图，左下「联合灌溉 1区 2区 3区 4区」）：「这轮罐区切换 1区 2区 点击按钮就会跳转到分区与管路页面，这步要省略掉。」
+
+**根因链（完整，别再"顺手恢复"）**：
+1. `#tlZoneCountGroup` 的 click（inline-09:6450）→ `tlAutoGenerate()`（因为 `#tlDiagramContent svg` 已存在，走真分支）；
+2. `tlAutoGenerate` 尾部 `if(!options.stay){ tlShowWorkspace(); }` → `rySetTab('tlPipePlanSection','ws')`；
+3. `rySetTab` 末尾有「目标功能区若未激活，先切过去」：`if(... && !sec.classList.contains('ry-active')) window.ryShowSection(sec, null)` ⇒ **整页切到「分区与管路」**；
+4. 而 map-flow-demo 的 v864 dock 把 `#tlPlanBar`（正是这一排按钮）搬进了 `#mapDemoDock` ⇒ 「在在线地图上点分区分组」这条路必然被弹走。**面积成组 / 按亩组合同一条路**（`tlGroupByArea` → `tlApplyGroups` → `tlAutoGenerate({scroll:false})`，`stay` 未传 ⇒ 同样弹走）。
+
+**修法（单点收口，不动调用方）**：
+- 新增 `tlPlanBarOnMap()`：① `#tlPlanBar` 的祖先是 `#mapDemoDock`；② 兜底「`onlineMapSection` 带 `ry-active`」。异常一律返回 false（判据绝不能抛）。
+- `tlAutoGenerate` 尾部改成 `if(!options.stay && !_onMapNow){ tlShowWorkspace(); } else if(_onMapNow){ RyMapFlowDemo.refresh(); }` —— 在地图上只重生成图面、不动页面；同时刷新「轮灌演示」的组 chips（分组变了不刷，点下去会演上一组）。
+- 不在地图上时行为完全不变（生成完仍落在三级设计工作区）。版本 `v948-zone-chip-stay`。
+
+**为什么可以"隐藏着重生成"**：这条路径在本轮之前就已经是"先在地图上（分区与管路未激活）重生成，然后才弹走" —— 渲染顺序没变，本轮只是不再弹。用户之后自己点「分区与管路」时 `ryShowSection` 的 refit（resize + restoreActiveViewport）照旧执行。
+
+**验证**：`tests/zone_chip_no_jump.test.cjs` 3/3（判据两条依据都在 / 跳转条件必须 `!options.stay && !_onMapNow` 且不许写反 / 留在地图要刷 chips）；本地探针 `probe_zone_stay.mjs` **4/4**（dock 上判据为真、挪出 dock 且地图未激活时为假、点 1区/3区 后仍停 `onlineMapSection`、无脚本错误）；全量 591/595（4 红为既有）；static 29/0；refs PASS；lint 0。

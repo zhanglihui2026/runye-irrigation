@@ -3332,6 +3332,20 @@ function tlAutoPipeToMap() {
 }
 window.tlAutoPipeToMap = tlAutoPipeToMap;
 
+/* [v948] 「联合灌溉 1/2/3/4 区」这一排在在线地图上是搬进 #mapDemoDock 显示的
+   （mod/map-flow-demo.js 的 v864 dock）。在地图上点它只是换个分区分组看效果，
+   不该把人弹去「分区与管路」——所以判一下这一排现在归谁。
+   判据两条（任一成立即视为"在地图上"）：① #tlPlanBar 的祖先是 #mapDemoDock；
+   ② 在线地图功能区正是当前激活的那一个（dock 被拆/临时搬回时的兜底）。 */
+function tlPlanBarOnMap(){
+  try{
+    var pb = document.getElementById('tlPlanBar');
+    if (pb && pb.closest && pb.closest('#mapDemoDock')) return true;
+    var sec = document.getElementById('onlineMapSection');
+    return !!(sec && sec.classList.contains('ry-active'));
+  }catch(e){ return false; }
+}
+
 function tlAutoGenerate(options) {
   options = options || {};
   var doScroll = options.scroll !== false;
@@ -5404,8 +5418,17 @@ function tlAutoGenerate(options) {
   // tlSavePng 已移除，不再显示
   // 生成完直接落在「三级设计」工作区（可缩放/可插管）
   /* v170c：options.stay 为真时不跳视图 —— AE 订阅（front 平移→重建简图）每帧触发本函数，
-     若每次都 tlShowWorkspace 会把用户从简图视图强行切走（且拖动中每帤 rySetTab）。其余调用方不传 stay，行为不变。 */
-  if(!options.stay){ try{ tlShowWorkspace(); }catch(e){} }
+     若每次都 tlShowWorkspace 会把用户从简图视图强行切走（且拖动中每帤 rySetTab）。其余调用方不传 stay，行为不变。
+     [v948] 在在线地图上同样不跳：那里的「联合灌溉 1/2/3/4 区」「面积成组 / 按亩组合」都在
+     同一排（#tlPlanBar 被 dock 到 #mapDemoDock），点一下只为换分组看效果，被弹到「分区与管路」
+     属于打断操作（用户 2026-11-04：「这步要省略掉」）。图面照旧重生成，只是人留在原地。 */
+  var _onMapNow = tlPlanBarOnMap();
+  if(!options.stay && !_onMapNow){ try{ tlShowWorkspace(); }catch(e){}
+  } else if(_onMapNow){
+    /* 分组变了 ⇒ 地图那条「轮灌演示」的组 chips 要跟着重算（它们由 map-flow-demo 现建，
+       不主动刷就还是上一组的分组，点下去会演错组）。 */
+    try{ if(window.RyMapFlowDemo && typeof window.RyMapFlowDemo.refresh === 'function') window.RyMapFlowDemo.refresh(); }catch(eDock){}
+  }
   try{
     /* 分区调整后生成的是一代新管线几何。先让几何绑定编辑层同步到该代；
        节点层没有工作区渲染器的 syncGeometry，因此只清除签名仍指向旧图的节点，
