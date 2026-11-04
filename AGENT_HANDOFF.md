@@ -7495,3 +7495,47 @@ v949 抬 `runye-nav.js` 时踩过同一条）。
 demo_flow_revive / plot_transfer / snap_default_off ①③）。
 **未动**：「下游」行仍是 3 行（4 段在 150px 值列里最多 2 段/行）—— 单位不再被拆，只是整段换行；
 若要压成 2 行得删「最大主管 DN160」或加宽面板，均未做（用户只要求那两行不换行）。
+
+### §26.161 v955-est-same-source（2026-11-04，估算扬程「流量/管径/长度」同源）
+
+**用户口径（原话，两条合并）**：
+① 「在 tlEstimateGroupHead 内按本组实际流量重选三段管径（selectPipe(qGroup, targetV, downstreamMinOd) /
+   各区 selectPipe(q, …)），让损失和卡片上的建议口径一致」；
+② 「这个总管200米是不是重复了，总管不要再加这个 200 米了，总管就按照地图实测多长就是多长来计算，
+   核对一下主管的两个节点之间的总管是否计入了总长度」。
+
+**① 管径同源（真缺陷）**：v950 的估算是拿 `computeThreeLevel` 的 `r.frontPipe/r.mainPipe/r.branchPipe`
+直接算损失 —— 那三档是按**输入框面积**（flowAreaM2，默认 30 亩=20000 m²）选的，
+而损失按**地图分区实测面积**（常 23000~24000 m²）算 ⇒ 流量高 ~17%，Q^1.852 放大 1.34 倍，
+再叠加管径低一档（D^-4.87≈×1.43）⇒ 主管损失几乎翻倍；且卡片建议 Ø225、损失按 Ø200 算，自相矛盾。
+改：函数内 `selectPipe(q/par → 支管)`、`selectPipe(q → 主管)`、`selectPipe(qGroup → 总管)` 全部现选，
+`trunkAdvice.mainOd/branchOd` 也回填这几档（原来写的是 `r.mainPipe.od`，两处口径分叉的根源）。
+
+**② 总管长度**：估算路径**只认 `frontLenSrc === 'mapTrunk' | 'figure'`**；`'input'`（tl_frontPipeLen 默认 200 m）
+一律归零并 `frontSource:'none'`，卡片写「总管未绘制（未计入）」。
+★ 三级页输入框 `tl_frontPipeLen` **保留**（它标着「无地图总管时的试算值」，是设计页的合法输入），
+  只有地图估算卡不吃它 —— 两个口径的边界写在这里，别再有人"统一"掉。
+
+**实测（同参复算）**：Ø225/Ø160/Ø110 + 无总管 ⇒ 管损 4.25 m、扬程 34.60 m（旧 42.16）；
+带 510.4 m 地图实测总管 ⇒ 管损 8.89 m、扬程 39.70 m（总管 4.65 用 Ø225 算，旧口径用 Ø200 是 8.2+）。
+
+**卡片新增三口**（`mod/map-flow-demo.js`）：
+`估算口径：按 Ø 225 总管 / Ø 160 主管 / Ø 110 支管（按本组实际流量选档）`
+`管长：总管 510.4 m（地图实测） · 主管 300.0 m · 支管 33.3 m（主管/支管为试算长…）`
+`另加富余水头 2.0 m，合计后再乘安全系数 1.10（两项都不在上面这 X m 管损里）`
+返回对象新增 `pipes{front,mainOd,branchOd,perZone}` / `marginHead` / `safetyFactor` / `staticHead`。
+
+**新增锁 `tests/est_group_pipes_source.test.cjs` 4/4**：① 函数体内不许再出现 `r.*Pipe.id`/`r.frontLenUsed` 进 hazen；
+② 三条 selectPipe 现选 + trunkAdvice 回填 maxMainOd/maxBranchOd；③ 长度来源白名单 + `frontSource='none'`；
+④ 返回字段与卡片三段文案齐全，且旧的「按长度估算：总管 …」文案不得复活。
+**探针**：`probe_est_policy.mjs` 6/6（构造两份假 r：src='input' 与 'mapTrunk'，用返回的 pipes 自己复算 hazen 对账）；
+`probe_group_head.mjs` 4/4（卡片渲染 + 截图 `group_card_shot.png`）。
+
+**验证**：static 595/599、`node --test tests/*.test.cjs` 614/618（4 红为既有）；refs PASS；lint 0；
+线上 sha256 六件逐一对齐（index/sw/inline-09/map-flow-demo/trunk-panel/online-map.css）。
+
+**核对结论（总管长度怎么算，用户要的示意图已给）**：`trunkLen()` 取 main 标记那条主干、
+`lineLen()` 把**全部顶点**逐段 haversine 相加 ⇒ 两主管接驳节点之间的那段**计入且只算一次**；
+主管长度从接驳点单独起算，与总管不重叠。
+★ **待用户拍板**：若用户把总管**分段画成多条干线**（非 main 那些），当前口径只取主干一条 ⇒ 其余段不计入。
+要改成"所有干线求和"会连带改面板、三级页、DXF 导出三处口径，未动。
