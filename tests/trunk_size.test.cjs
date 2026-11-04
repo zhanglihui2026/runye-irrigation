@@ -185,6 +185,20 @@ test('⑩ 接线：宿主取数 + 面板行 + 页面/SW 登记', () => {
   assert.ok(/btn\.hidden = \(cur !== null && cur === adv\.od\)/.test(panel),
     '管径已等于推算值时应隐藏「采用」');
 
+  /* v947：反推失败不许整行隐藏（否则用户只看到「管径 未选择」，读不到为什么没推算），
+     并且"外径未选"时下拉占位要带建议值 —— 这两条是用户第二次追问的直接原因。 */
+  assert.ok(/function setDnPlaceholder/.test(panel), '必须有 setDnPlaceholder（占位提示建议值）');
+  assert.ok(/建议 Ø/.test(panel), '占位文案要写明「建议 Ø」');
+  assert.ok(!/if \(!adv \|\| adv\.ok !== true\)[\s\S]{0,80}row\.hidden = true/.test(panel),
+    '反推失败不许把整行藏掉');
+
+  /* 下拉档位必须是 PE 序列里的真值（不许自造 DN），且要覆盖到按分区反推的常见结果。 */
+  const presetSrc = (panel.match(/var DN_PRESETS = \[([^\]]+)\]/) || [])[1];
+  assert.ok(presetSrc, '必须能找到 DN_PRESETS');
+  const presets = presetSrc.split(',').map(s => Number(s.trim())).filter(n => n > 0);
+  assert.ok(presets.every(v => OD.indexOf(v) >= 0), 'DN_PRESETS 只允许 PE 序列里的值，实际 ' + presets.join('/'));
+  assert.ok(presets.indexOf(355) >= 0, '必须含 Ø355（一组 70 亩的合流常推到这一档）');
+
   const idx = read('index.html');
   assert.ok(/mod\/trunk-size\.js\?v=/.test(idx), 'index.html 必须引用 trunk-size.js（带缓存串）');
   const sw = read('sw.js');

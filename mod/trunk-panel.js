@@ -24,7 +24,7 @@
 (function (root) {
   'use strict';
 
-  var VERSION = 1;
+  var VERSION = 2;
 
   /* 海曾-威廉 C 值：PE 140 / PVC-U 145 / 镀锌钢管 120。
      这几个数是「管材联动沿程损失系数」的唯一实现点，别在别处再写一份。 */
@@ -33,7 +33,12 @@
     { key: 'PVC-U', label: 'PVC-U',    hwC: 145 },
     { key: 'GI',    label: '镀锌钢管',  hwC: 120 }
   ];
-  var DN_PRESETS = [110, 125, 160, 200];
+  /* 管径下拉的候选档。**这是 UI 预设，不是水力档位表** —— 真正参与计算/选档的是
+     inline-09 的 PE 外径序列（ci_check_static 锁着单一来源），这里只决定下拉里能直接
+     点什么。v947 从 [110,125,160,200] 扩到常用大口径：总管按分区反推后常在 Ø225~Ø400
+     （一组的合流是成倍于单区主管的），只给到 200 等于逼用户每次都走「自定义…」。
+     新增档位必须是 PE 序列里的值，别自己造数。 */
+  var DN_PRESETS = [110, 125, 140, 160, 180, 200, 225, 250, 280, 315, 355, 400, 450, 500];
 
   var NODE_TYPES = [
     { key: 'plain',  label: '普通拐点' },
@@ -629,22 +634,49 @@
       paintJoint(d);
     }
 
+    /* 占位项文案：只在"外径还没选"时存在（refresh 里补的 option[value=""]）。
+       有建议值就写进占位文案，没有就退回「未选择」——不动 prm.dn，不写库。 */
+    function setDnPlaceholder(od) {
+      var ph = dnEl && dnEl.querySelector ? dnEl.querySelector('option[value=""]') : null;
+      if (!ph) return;
+      ph.textContent = (od === null || od === undefined) ? '未选择' : '未选择（建议 Ø' + od + '）';
+    }
+
     /* [v945] 推算管径行（用户 2026-11-04）：「地图上画的总管只是路由，直径要通过实际
        规划地块的分区推算出来」。数据由宿主 getOdAdvice 现算（算法在 mod/trunk-size.js：
        分区面积 → 分区流量 → 最不利组合流 → 经济流速选档 → 不小于下游主管/支管外径）。
        ★ 这里**只显示 + 一键采用**，不自动写库：自动改写会与用户手选的管径打架，
-         而且面板是"看现状"的地方，静默改数据会让人以为选了没生效。 */
+         而且面板是"看现状"的地方，静默改数据会让人以为选了没生效。
+       [v947] 两处改动，都为了让"算不出来"和"算出来了但还没采用"不再无声：
+         ① 反推失败时**不再整行隐藏**（以前 row.hidden=true ⇒ 用户只看到「管径 未选择」，
+            连"为什么没推算"都读不到，第二次问同一个问题就是这么来的）⇒ 现在露行 + 说明原因；
+         ② 管径还没选时，把建议值挂到下拉的占位项上（「未选择（建议 Ø355）」）——
+            第一眼看的就是这个下拉，不写库、不抢值，只是别再让人对着「未选择」猜。 */
     function paintOdAdvice(entry) {
       var row = q('tpDnAdviceRow'), valEl = q('tpDnAdvice'), noteEl = q('tpDnAdviceNote'), btn = q('tpDnAdopt');
       if (!row || !valEl || !btn) return;
       var adv = (typeof opts.getOdAdvice === 'function') ? opts.getOdAdvice() : null;
-      if (!adv || adv.ok !== true) {
+      /* 宿主根本没给反推接口（别的页面/单测裸挂）⇒ 整行不出现，不留空壳 */
+      if (!adv) {
         row.hidden = true;
         if (noteEl) noteEl.hidden = true;
+        setDnPlaceholder(null);
+        return;
+      }
+      if (adv.ok !== true) {
+        row.hidden = false;
+        valEl.textContent = '—';
+        btn.hidden = true;
+        if (noteEl) {
+          noteEl.textContent = adv.text || '按当前数据推算不出管径（缺分区面积 / 滴灌参数 / 轮灌分组）。';
+          noteEl.hidden = false;
+        }
+        setDnPlaceholder(null);
         return;
       }
       var cur = num(entry && entry.params && entry.params.dn);
       row.hidden = false;
+      setDnPlaceholder(cur === null ? adv.od : null);
       valEl.textContent = 'Ø ' + adv.od + ' mm' +
         (isFinite(adv.velocity) ? '（' + Number(adv.velocity).toFixed(2) + ' m/s）' : '');
       /* 已一致就把按钮藏起来 —— 点了也不会有变化，留着反而是噪音。 */
