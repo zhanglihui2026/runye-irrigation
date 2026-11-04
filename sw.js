@@ -1298,7 +1298,7 @@
    并把 lineDrag.sx/sy 固定为按下点（原来每帧更新，阈值会永远不触发）。
    回归：_probe_line_mode_drag.mjs 两个用例（A 拖空白→atM 10.8→29.12 moveNode=1；
    B 拖到节点→links 0→1 且 atM 不变），普通模式复测 moveNode=9 无影响。 */
-const VERSION = 'v960-note-clean';
+const VERSION = 'v961-map-rail-drawer';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
@@ -1430,6 +1430,7 @@ const CORE = [
   "mod/trunk-history.js",
   "mod/trunk-panel.js",
   "mod/online-map.js",
+  "mod/map-right-drawer.js",
   "mod/style-01.css",
   "mod/style-03.css",
   "mod/style-04.css",

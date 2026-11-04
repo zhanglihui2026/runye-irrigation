@@ -469,3 +469,34 @@ body:has(.ry-pwa-install) #onlineMapSection .ry-trunk-panel{bottom:96px}
 #onlineMapSection .ry-trunk-panel.is-folded .tp-foot{display:none!important}
 #onlineMapSection .ry-trunk-panel.is-dragging{
   user-select:none;-webkit-user-select:none;box-shadow:0 8px 24px rgba(15,23,42,.28)}
+
+/* ===== [v961 2026-11-04 用户要求] 地图右缘抽屉：图层面板 + 总管参数面板
+   用户原话：「在线地图的图层悬浮面板及总管参数设置面板都靠右侧收起来，做法参照
+   分区与管路页面中的多地块编辑 与图层控制面板。」
+   参照物 = #ppPlotDrawerTab / #tlWsLayerDrawerTab（mod/style-01.css v789/v803/v825 那一段），
+   外观逐项对齐：竖排字、12px、白底细边、min-height 96px、展开态深绿底白字。
+   ★ font-size 必须带 !important：runye-typography 的 `button{font-size:13px!important}`
+     会顶掉这里的 12px（v825 实测踩过，两个参照标签当时都是 13px）。
+   ★ 标签条只占右缘 26px、只在自身矩形吃事件，卡外地图照常拖拽缩放。 */
+#onlineMapSection .ry-map-rail{
+  position:absolute;right:0;top:52px;z-index:1180;
+  display:flex;flex-direction:column;gap:8px;align-items:flex-end;
+  pointer-events:none}
+#onlineMapSection .ry-map-rail-tab{
+  pointer-events:auto;
+  writing-mode:vertical-rl;letter-spacing:3px;text-align:center;
+  width:26px;min-height:96px;padding:10px 6px;
+  border:1px solid #c8d7ce;border-right:0;
+  background:#fff;color:#244b39;font:600 12px/1 system-ui,sans-serif;
+  font-size:12px!important;line-height:1;
+  cursor:pointer;user-select:none}
+#onlineMapSection .ry-map-rail-tab:hover{background:#f2f8f4}
+#onlineMapSection .ry-map-rail-tab.open{background:#2d604b;border-color:#2d604b;color:#fff}
+#onlineMapSection .ry-map-rail-tab:focus-visible{outline:2px solid #39795b;outline-offset:-2px}
+/* 「面板还没准备好 / 先选中总管」的瞬时提示：只闪一下边框，不改文字（文字在 title 里） */
+#onlineMapSection .ry-map-rail-tab.is-hint{border-color:#f59e0b;background:#fffbeb;color:#92400e}
+
+/* 两张卡收起时用 hidden 属性彻底移除：图层面板没有任何 display 规则，UA 的
+   [hidden]{display:none} 本来够用，但 .ry-float-card 一族哪天补了 display 就会漏，
+   这里显式兜一条（与 .ry-trunk-panel[hidden] 同款）。 */
+#onlineMapSection .rym-layer-panel[hidden]{display:none!important}

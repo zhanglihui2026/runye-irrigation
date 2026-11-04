@@ -64,6 +64,12 @@
   function fromDisplay(p){var q=RunyeGeo.coordPair(p);return baseIdx===2?RunyeGeo.wgs2gcj(q[0],q[1]):{lat:q[0],lng:q[1]};}
   function displayRing(ll){return ll.map(toDisplay);}
   var map = L.map('map', { center:[defCenter.lat, defCenter.lng], zoom:15, doubleClickZoom:false });
+  /* [v961] 预热「总管参数设置」面板（挂载即 hidden，buildDom 里已有 hidden=true）：
+     右缘抽屉的「总管参数」标签要在**还没点选总管**时给出「先点选一条总管」的提示；
+     面板不在 DOM 里时标签只能报「面板还没准备好」，那是句废话。
+     面板本体一直是懒创建的（syncTrunkPanel 在进入编辑态时才 ensure），这里只提前建壳，
+     不影响选中即弹的时序（syncTrunkPanel 仍按 trunkMode/activeTrunkId 决定显隐）。 */
+  setTimeout(function(){ try{ var P0=ensureTrunkPanel(); if(P0) P0.hide(); }catch(eWarm){} }, 0);
   function refreshMapSize(){
     var section=document.getElementById('onlineMapSection');
     if(section && section.classList.contains('ry-active')) setTimeout(function(){map.invalidateSize({animate:false});},60);
@@ -1795,6 +1801,9 @@
     var P=ensureTrunkPanel();
     if(!P) return;
     var entry=(trunkMode==='edit')?findSavedTrunk(activeTrunkId):null;
+    /* [v961] 右缘抽屉据此决定「总管参数」标签点了能不能展开：
+       没选中总管时 refresh 会立刻 hide，硬弹只会闪一下（见 mod/map-right-drawer.js）。 */
+    try{ if(P.el) P.el.setAttribute('data-ry-has-trunk', entry?'1':'0'); }catch(e){}
     if(!entry){ P.hide(); return; }
     if(trunkPanelMutedId!==null && String(entry.id)===trunkPanelMutedId){ P.hide(); return; }
     trunkPanelMutedId=null;
