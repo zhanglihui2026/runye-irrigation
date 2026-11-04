@@ -7547,3 +7547,37 @@ demo_flow_revive / plot_transfer / snap_default_off ①③）。
 「510.4 m · 地图实测 · 5.35 m」实测单行（`probe_jt_nowrap.mjs` 5/5，值 1 行 / 150px），余量很小 ——
 **再往这个标签里加字就会折行**，加字前先跑探针。全文「总管长度取在线地图实测」仍只放 title。
 锁：`tests/trunk_joint_label_nowrap.test.cjs` ④ 断言可见文案是「地图实测」。线上 sha 三件对齐。
+
+### §26.163 v957-card-drag（2026-11-04，轮灌水力浮卡可拖动）
+
+用户原话：「这个悬浮卡片要变成可拖动的」（`#mapFlowGroupInfo`，地图左上角「联合灌溉组 Gn」水力卡）。
+
+**前提变化**：这张卡 v924 起是 `pointer-events:none` 的**纯展示浮层**（刻意点击穿透给地图）。
+要能拖必须改成 `auto` —— 口径：**只有卡片自身矩形吃事件**，卡外地图操作一切照旧。
+`touch-action:none` 是手机端必需项：少了它，手指一拖变成页面滚动而不是拖卡片。
+
+**实现**（`mod/map-flow-demo.js` 的 setupGroupCardDrag / restoreGroupCardPos / clampCardPos）：
+· pointer 全家（down/move/up/cancel）+ **move/up/cancel 都挂 capture 阶段** + `setPointerCapture`，
+  手指划出卡片、指针被别处接管都不丢事件；
+· **不 preventDefault** —— 那会连带压掉 dblclick 的兼容事件；防选中靠 `.is-dragging{user-select:none}`；
+· 位置夹在宿主（`el.offsetParent` = .map-wrap）内，存档 `localStorage['ryMapGroupCardPos']`，
+  每次 `updateGroupInfo` 显示后 restore 并重新夹一遍（窗口变小后旧坐标可能在可视区外）；
+· 单击（没移动）**不写存档**，避免误触把默认位顶掉；
+· 双击**标题**复位到 12/52 并清存档。★ 判定必须用**标题矩形 + 鼠标坐标**，
+  不能用 `ev.target.closest('.mfg-title')`：这张卡每次更新都重渲 innerHTML，
+  按下与松开之间标题节点被换掉时，dblclick 的 target 会退化成整个 section
+  （探针实测事件序列：`pointerdown:mfg-title` → `dblclick:map-flow-group-info`，closest 直接失效）。
+
+**踩坑（探针第一次拖不动）**：`runye-announce.js` 的公告弹窗是 `.ry-ann-mask`（fixed 全屏、z-index 11990），
+首次访问会盖住一切 ⇒ `elementFromPoint` 命中遮罩、pointerdown 全被吃掉。
+探针必须先 `document.querySelector('.ry-ann-x').click()` 关掉公告再测。真机上公告关过一次就不再挡。
+
+**新锁 `tests/map_group_card_drag.test.cjs` 5/5**：① pointer-events:auto + touch-action:none + cursor:grab +
+`.is-dragging{cursor:grabbing;user-select:none}`；② pointer 四事件 + setPointerCapture + 三条 capture=true，
+且禁止退回 mousedown 老写法；③ 位置必过 clampCardPos + 存档/读档，禁止 `style.left=clientX` 直赋；
+④ 双击按矩形坐标判定（反向禁止 closest 写法）+ 交互元素白名单；⑤ 显示后接管 + 幂等。
+**★ 测试里反向断言先剥注释**（`js = raw.replace(/\/\*[\s\S]*?\*\//g,'')`）—— 注释里提到旧写法会把断言误判红，已踩一次。
+
+**探针 `probe_card_drag.mjs` 5/5**（CDP 真鼠标事件，判据盯位移/夹边界/存档/复位）：拖 (+90,+80) 位移精确 90/80；
+拖到左外夹在 0；存档与 style 一致；双击标题回到 12/52 且存档清空。
+发布：master `65bd51e`，线上 sha 四件对齐；static 600/604（4 红为既有）；refs PASS；lint 0。
