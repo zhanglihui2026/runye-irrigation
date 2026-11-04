@@ -7347,3 +7347,59 @@ SW 自造重装风暴，§26.140 竞态在「每轮都清 SW」的用法下会�
 `version_sync` 6/6；static 576/580（4 红为既有：`demo_flow_revive`、`plot_transfer`、
 `snap_default_off` ①③ —— 后两条红在 **HEAD 就有**，`mod/online-map.js` 里是 `var snapOn = true;`、
 `btnSnapToggle` 的 DOM 形态也变了，与本轮无关）；refs PASS；lint 0。
+
+### §26.157 v951-map-toolbar-docked（2026-11-04，地图工具条吸附顶部 + 图标钮）
+
+**用户诉求（原话）**：「红框中的工具栏跟分区与管路页面一样，也放在顶部吧，能用图例（图标）的
+尽量用图例，手放在上面提示功能，图例样式跟分区与管路页面的统一。」
+（红框 = 在线地图画布左上那条浮着的文字工具条：💧蓄水池 / 🟠绘制 / 完成 / 撤销点 / ✎编辑总管 /
+✏️开始画框 / ✅完成 / ➕加点 / ↩撤销 / 📏测距 / 🗑清除）
+
+**先量真值再改**（探针 `probe_toolbars_shot.mjs`，别凭记忆写 CSS）：
+分区与管路那条 `#ryDrawingHost > .ry-drawing-toolbar` 实测
+`h=40 / bg#fff / border-bottom 1px #e4ebee / gap 2px / padding 4px 10px / overflow-x auto`，
+按钮 `32×32 / font-size 0 / 图标 18px SVG / 透明底无边框 / hover#eef2f6 / 激活#e6f2ec+#1c6b4f`，
+19 个按钮**全部**靠原生 `title` 做悬停说明。地图条改造前是：
+`position:absolute 于 12,12 / 26px 高文字钮 / 11px 字 / 绿#22c55e 或蓝#2563eb 实心激活`。
+
+**改动**：
+- `index.html`：`#mapDrawTools` 去掉 `ryp-float`/`ry-hbar`/`data-ry-panel`（不再浮动可拖），
+  改三簇 `.mdt-group`（总管绘制 / 地块绘制 / 工具），11 个按钮统一 `class="mdt-btn"`，
+  **每个都补 `title`**（v951 前只有 5 个有）；删掉 `#btnFinish` 里的 `span.dt-tip`。
+- `mod/online-map.css`：浮条段整段替换为吸附条 —— 40px 白条 + 1px `#e4ebee` 下边框、
+  `.mdt-btn` 32×32 / `font-size:0!important`（页面级 button 13px 会压过来）/ hover / 激活三色收口、
+  `.ry-ico` 18px 通道复用；`#map{top:40px}` 让地图给条带让位；`#mapFlowGroupInfo` top 68→52。
+- `mod/ry-icons.js`：新增 `pencil` / `polygon` / `check` 三个图标；
+  `BY_ID` 补 11 条 —— **必须走精确表**：条带里有**两组同名**「完成」和一对「撤销点/撤销」，
+  按标签正则必然错配，且「绘制」「完成」这种泛词在 `BY_LABEL` 里根本认不出来。
+  `btnUndo` 用 `back` 不用 `undo`（同条里已经有一个 undo = 撤销点，并排同形等于没图标）。
+- `mod/online-map.js`：新增 `setBtnLabel()`（优先 `RyIcons.setLabel`），
+  **把 5 处 `textContent=` 全换掉**（btnDrawTrunk / btnEditTrunk / btnPlaceReservoir /
+  btnDraw / btnAddPt）；启动时 `RyIcons.decorate(#mapDrawTools)` 一次；
+  画框/加点/测距/蓄水池补 `aria-pressed`（激活态与分区与管路同一对颜色）。
+
+**踩坑**：
+1. **条带高度别只写 `min-height:40`** —— 32px 按钮 + 8px 内距 + 1px 边框 = 41px，
+   实测条带比地图让位的 40px 高 1px，地图被压住 1px（探针 ①/② 直接抓到）。
+   必须 `height:40px` + `box-sizing:border-box`（分区与管路那条是 grid 行高钉死的，所以没这问题）。
+2. **`font-size:0` 要带 `!important`** —— 页面级 `button{font-size:13px}` 会压过来，
+   文字与图标同时出现（探针 ③ 报 `font:13px`）。
+3. **`textContent=` 是老坑的新现场**：按钮一旦挂 SVG，任何 `btn.textContent=` 都会把图标擦掉、
+   且 `decorate()` 只在启动跑一次 ⇒ 图标永久消失。这条现在有静态锁（见下 ⑤）与探针 ⑦/⑧。
+4. **图标语义别硬凑**：先用 `main`（管道带箭头）当「绘制」—— 18px 下读起来是 `→|`（像「下一段」），
+   换成 `line`（斜线+两端点）才读得出「画一条线」；`polygon` 原本 5 个顶点圈，18px 下糊成一团，
+   减到 2 个顶点圈才干净。**图标必须截图放大看，别只看 SVG 源码觉得没问题。**
+
+**新增静态锁 `tests/map_toolbar_unified.test.cjs` 6/6**（`tests/*` 被 gitignore ⇒ 要 `git add -f`，
+否则 check.cjs 会把它列进「未入库不执行」而静默放过）：
+① 条带不带浮动/可拖标记；② 条带 40px 与 `#map` top 40px 同值；③ 11 个按钮都有 title（带反向自检）；
+④ 11 个 id 都在 `BY_ID` 且图标名在 `P` 里真实存在、且条带内不重复；
+⑤ `online-map.js` 里禁 `ID.textContent=`（带反向自检）；⑥ 七组外观数值在两份 CSS 里都存在
+（改一边不改另一边 = 红 —— 两处选择器隔着三层 id 没法共用，这是「统一」唯一可执行的判据）。
+
+**验证**：探针 `probe_map_toolbar.mjs` 本地 9/9（含激活态取色 `rgb(230,242,236)`/`rgb(28,107,79)`、
+点「测距」「画框」后 SVG 仍在）；截图 `shot_bar_zoom.png` 逐图标肉眼过；
+`version_sync` 6/6；refs PASS；lint 0；static 582/586（4 红为既有）。
+
+**未做**：用户若还想要「悬停即时浮层」（原生 title 有 ~1s 延迟），下一步可把 v819 的 `.dt-tip`
+改造成工具栏级 tooltip（`data-tip` + 单例浮层），但那要新增一套定位逻辑，本轮按「与分区与管路同机制」处理。

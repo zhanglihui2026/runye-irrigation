@@ -594,14 +594,14 @@
     if(on&&reservoirPlaceMode)setReservoirPlaceMode(false);
     addMode=on;
     var b=document.getElementById('btnAddPt');
-    if(b){ b.classList.toggle('btn-on',addMode); b.textContent = addMode ? '➕ 加点中…' : '➕ 加点'; }
+    if(b){ b.classList.toggle('btn-on',addMode); b.setAttribute('aria-pressed',addMode?'true':'false'); setBtnLabel(b, addMode ? '加点中…' : '加点'); }
     if(addMode){
       if(drawing) setDrawing(false);               // 与「画框」互斥
       if(measuring) finishMeasure();               // 与「测距」互斥
       /* [v833] 与总管编辑互斥：编辑态的拐点手柄会盖在框线边上，两套手柄同时活着必然抢鼠标。 */
       if(trunkMode!=='idle') setTrunkMode('idle');
       buildMidHandles();
-      tip('加点模式：把框线上的 ⊕ 手柄拖到地块真实边界处松手即增加标点；也可贴着框线单击。再点「➕ 加点」退出。');
+      tip('加点模式：把框线上的 ⊕ 手柄拖到地块真实边界处松手即增加标点；也可贴着框线单击。再点「加点」退出。');
     }else{
       clearMidHandles();
       tip('已退出加点模式。');
@@ -972,7 +972,7 @@
          一旦有人调整 CSS 顺序就会"突然变绿"。激活态只留一个类。 */
       btn.setAttribute('aria-pressed',on?'true':'false');
       btn.title=on?'退出总管绘制（草稿丢弃，已保存的线不动）；快捷键 M':'绘制当前地块的输水总管；快捷键 M';
-      btn.textContent=on?'🟠 总管绘制中…':'🟠 绘制';
+      setBtnLabel(btn, on?'总管绘制中…':'绘制');
     }
     /* 互斥矩阵：总管绘制中，画框/加点不可用；反过来在读地块框时总管按钮不可用。 */
     [['btnDraw',trunkMode==='draw'],['btnAddPt',trunkMode==='draw'],['btnDrawTrunk',!!drawing]].forEach(function(it){
@@ -992,7 +992,7 @@
       eb.disabled = trunkMode==='draw' || !!drawing || !(trunkSaved&&trunkSaved.trunks&&trunkSaved.trunks.length);
       eb.title = onEdit ? '退出总管编辑（Esc）；快捷键 E'
         : '编辑当前地块已保存的干线：点线选中、拖白点改拐点、右键开菜单；快捷键 E';
-      eb.textContent = onEdit ? '✎ 编辑中' : '✎ 编辑总管';
+      setBtnLabel(eb, onEdit ? '编辑中' : '编辑总管');
     }
   }
   /* ===== [v832] 捕捉 + 状态栏 + 常驻提示条（二期） =====
@@ -1229,7 +1229,7 @@
   function setReservoirPlaceMode(on){
     reservoirPlaceMode=!!on;
     var btn=document.getElementById('btnPlaceReservoir');
-    if(btn){btn.classList.toggle('btn-on',reservoirPlaceMode);btn.setAttribute('aria-pressed',reservoirPlaceMode?'true':'false');btn.textContent=reservoirPlaceMode?'💧 点击地图放置…':'💧 蓄水池';}
+    if(btn){btn.classList.toggle('btn-on',reservoirPlaceMode);btn.setAttribute('aria-pressed',reservoirPlaceMode?'true':'false');setBtnLabel(btn, reservoirPlaceMode?'点击地图放置…':'蓄水池');}
     map.getContainer().classList.toggle('placing-reservoir',reservoirPlaceMode);
     if(!reservoirPlaceMode)return;
     if(drawing)setDrawing(false);
@@ -2484,6 +2484,20 @@
   });
 
   // ===== 按钮 =====
+  /* [v951] 工具条图标钮（用户：「能用图例的尽量用图例，手放在上面提示功能，
+     图例样式跟分区与管路页面的统一」）。
+     - 图标来自 mod/ry-icons.js（18px 线性 SVG，按 BY_ID 精确挂：本组里有**两组同名**
+       的「完成」和一对「撤销点 / 撤销」，标签正则必然错配，所以必须走精确表）；
+     - decorate 幂等，这里挂一次就够；文案留在 DOM 里由 CSS font-size:0 隐藏，
+       悬停说明走原生 title（与分区与管路同机制）；
+     - 之后**任何**文案变化都不许写 `btn.textContent=`（会把刚挂的 SVG 一起擦掉，
+       v824 的坑：点一下图标就永久变空白方块），一律走 setBtnLabel。 */
+  function setBtnLabel(b, t){
+    if(!b) return;
+    if(window.RyIcons && typeof window.RyIcons.setLabel === 'function') window.RyIcons.setLabel(b, t);
+    else b.textContent = t;
+  }
+  try{ if(window.RyIcons) window.RyIcons.decorate(document.getElementById('mapDrawTools')); }catch(eIco){}
   var btnDraw=document.getElementById('btnDraw');
   function setDrawing(on){
     if(on&&reservoirPlaceMode)setReservoirPlaceMode(false);
@@ -2493,12 +2507,13 @@
     if(on) setAddMode(false);            // [v153] 与「加点」互斥：一开始画框就退出加点模式
     drawing=on;
     btnDraw.classList.toggle('btn-on',drawing);
+    btnDraw.setAttribute('aria-pressed',drawing?'true':'false');
     map.getContainer().classList.toggle('drawing',drawing);
     if(drawing) map.dragging.disable(); else map.dragging.enable();
-    btnDraw.textContent = drawing ? '✏️ 绘制中…' : '✏️ 开始画框';
+    setBtnLabel(btnDraw, drawing ? '绘制中…' : '开始画框');
     document.getElementById('tip').textContent = drawing
       ? '十字光标处即落点：依次点击地块边界顶点；点「完成」即可定稿并**直接接着画下一块**（可连画多块，最后再成组；想停时**右键地图**截止）。'
-      : '点击「✏️ 开始画框」后，在卫星图上依次点击地块边界顶点即可；点「完成」自动保存该块、清空画布并继续下一块。';
+      : '点击工具条上的「开始画框」后，在卫星图上依次点击地块边界顶点即可；点「完成」自动保存该块、清空画布并继续下一块。';
     /* [v831] 画框会改变「绘制」总管按钮的可用性（互斥矩阵），必须通知一次 UI；
        漏了这行就会出现"正在画框，总管按钮却还能点进去"。 */
     syncTrunkUI();
@@ -2506,7 +2521,7 @@
   btnDraw.onclick=function(){ setDrawing(!drawing); };
   // [v153] 加点模式开关：需先有框（≥2 点）才有「边」可插点
   document.getElementById('btnAddPt').onclick=function(){
-    if(!addMode && points.length<2){ tip('先点「✏️ 开始画框」画出一个框（至少 2 个顶点），再用「➕ 加点」在框线上插点。'); return; }
+    if(!addMode && points.length<2){ tip('先点「开始画框」画出一个框（至少 2 个顶点），再用「加点」在框线上插点。'); return; }
     setAddMode(!addMode);
   };
   document.getElementById('btnFinish').onclick=function(){
@@ -3588,6 +3603,7 @@
     measuring=!measuring;
     if(measuring&&reservoirPlaceMode)setReservoirPlaceMode(false);
     this.classList.toggle('btn-on',measuring);
+    this.setAttribute('aria-pressed',measuring?'true':'false');
     if(measuring){
       if(trunkMode!=='idle'){setTrunkMode('idle');}
       setAddMode(false);
@@ -3598,7 +3614,7 @@
   };
   function finishMeasure(){
     measuring=false;
-    var bm=document.getElementById('btnMeasure'); if(bm) bm.classList.remove('btn-on');
+    var bm=document.getElementById('btnMeasure'); if(bm){ bm.classList.remove('btn-on'); bm.setAttribute('aria-pressed','false'); }
     if(!drawing) map.dragging.enable();
     measureLayer.clearLayers(); measurePts=[];
     tip('测距结束。');

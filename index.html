@@ -26,7 +26,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>润野灌溉设计优化版｜滴灌管径与水泵选型</title>
 <meta name="description" content="输入地块、滴灌带与水源参数，快速计算灌溉分区、主管支管管径和水泵工作点。"/>
-<link rel="stylesheet" href="mod/style-01.css?v=950-group-head-estimate">
+<link rel="stylesheet" href="mod/style-01.css?v=951-map-toolbar-docked">
 <link rel="stylesheet" href="runye-inverse-design.css?v=277">
 <script defer src="runye-inverse-design.js?v=438-branch-flow-conservation"></script>
 <link rel="stylesheet" href="runye-terrain.css?v=454-terrain-sidebar-peer">
@@ -51,7 +51,7 @@
 <link rel="stylesheet" href="hydraulic-calc/hydraulic-calc.css">
 <link rel="stylesheet" href="filter-system/filter-system.css">
 <link rel="stylesheet" href="pwa/vendor/leaflet.css">
-<link rel="stylesheet" href="mod/online-map.css?v=950-group-head-estimate">
+<link rel="stylesheet" href="mod/online-map.css?v=951-map-toolbar-docked">
 <link rel="stylesheet" href="terrain/terrain.css?v=535-terrain-single-source">
 <link rel="stylesheet" href="hydraulics-main.css?v=442-native">
 <style id="ryCadTwinCss">
@@ -329,7 +329,7 @@ body.ry-worst-off [data-tlworst]{display:none}
   <script src="runye-announce.js?v=621-invite-l2"></script>
   <!-- 顶部导航动作按钮（系统图，runye-nav.js act 项）：动作映射须先于 runye-nav.js 注册 -->
   <script src="mod/inline-05.js?v=357"></script>
-  <script src="runye-nav.js?v=950-group-head-estimate"></script>
+  <script src="runye-nav.js?v=951-map-toolbar-docked"></script>
   <!-- [NEW MODULE: DXF 导出] 入口：删除本行即卸载（不改动任何原有逻辑） -->
   <script src="runye-dxf.js?v=840-trunk-dxf"></script>
   <!-- [NEW MODULE: pipe_optim] 入口：删除本行即卸载本隔离模块（不改动任何原有逻辑） -->
@@ -702,36 +702,53 @@ body.ry-worst-off [data-tlworst]{display:none}
     <div class="side-grip" id="mapSideGrip" title="拖动调节工具栏宽度；双击恢复默认"></div>
     <div class="map-wrap">
       <div id="map"></div>
-      <!-- ===== [v495] 主程序内嵌在线地图的绘制工具条（唯一实现，v821 起独立页已删除）：
-           左栏「绘制」区迁来，挂在地图区顶端；按住「⠿ 绘制」抓手拖动
-           （mod/ry-panel.js rypDraggable：位置记忆 localStorage['mapDrawToolsPos']，
-           clamp 在 .map-wrap 内 = 不超过导航栏）。地图工具行为统一由 online-map.js 绑定。 ===== -->
-      <div class="map-draw-tools ryp-float ry-hbar" id="mapDrawTools" data-ry-panel
-           data-ry-position-key="mapDrawToolsPos" data-ry-default-top="12" data-ry-default-left="12">
-        <span class="dt-grip" data-ry-drag title="按住拖动工具条；位置自动记住">⠿ 绘制</span>
-        <button class="ry-hbar-btn" id="btnPlaceReservoir" type="button" aria-pressed="false" title="点击后在地图中放置蓄水池；放置后可拖动调整，也可吸附到现有节点">💧 蓄水池</button>
-        <button class="ry-hbar-btn" id="btnDrawTrunk" title="从头重绘当前地块总管；完成保存前，旧线路保留">🟠 绘制</button>
-        <button class="ry-hbar-btn" id="btnFinishTrunk" title="结束并保存当前总管线">完成</button>
-        <button class="ry-hbar-btn" id="btnUndoTrunk" title="撤销总管最后一个折点">撤销点</button>
-        <!-- [v833] 编辑总管（三期）：没有已保存的干线时自动置灰（syncTrunkUI 管）。
-             进入后：点线选中 → 拖白点改拐点（拖到邻点上=并掉它）→ 右键开 6 项菜单 → Esc 退出。
-             快捷键 E。按钮样式复用 .ry-hbar-btn，**不需要为它写任何 CSS**。 -->
-        <button class="ry-hbar-btn" id="btnEditTrunk" aria-pressed="false" disabled
-                title="编辑当前地块已保存的干线：点线选中、拖白点改拐点、右键开菜单；快捷键 E">✎ 编辑总管</button>
-        <!-- [v850 用户反馈] 「✏️ 开始画框」挪到「✎ 编辑总管」之后、「✅ 完成」之前
-             （地块绘制一组：总管三钮 + 编辑 → 开始画框 → 完成）。纯 DOM 顺序调整，
-             online-map.js 按 id 绑定，逻辑零改动。 -->
-        <button class="ry-hbar-btn" id="btnDraw">✏️ 开始画框</button>
-        <!-- [v819] 文案收短 + 悬浮说明面板：用户「完成并画下一块，改为完成；鼠标放上来要弹出悬浮面板解释功能」。
-             功能实义（online-map.js v186）：顶点 ≥3 自动存入「我的地块」→ 清空画布 → 紧接着画下一块（连续绘制）；
-             不足 3 点视为草稿只清不存。停止方式：再点「开始画框」或右键地图。
-             .dt-tip 是按钮内的 span（合法：phrasing content），display:block + 绝对定位挂在按钮下方，
-             悬停显示；pointer-events:none 不吃鼠标。[v821] 独立页已删除，本处即唯一实现。 -->
-        <button class="ry-hbar-btn" id="btnFinish">✅ 完成<span class="dt-tip">完成 = 结束当前地块：顶点满 3 个时自动存入「我的地块」并清空画布，随即开始画下一块，可以连续画多块；不足 3 个顶点视为草稿，只清空不保存。想停止连续绘制，再点一次「✏️ 开始画框」或在地图上右键。</span></button>
-        <button class="ry-hbar-btn" id="btnAddPt">➕ 加点</button>
-        <button class="ry-hbar-btn" id="btnUndo">↩ 撤销</button>
-        <button class="ry-hbar-btn" id="btnMeasure">📏 测距</button>
-        <button class="ry-hbar-btn" id="btnClear">🗑 清除</button>
+      <!-- ===== [v951] 绘制工具条：**吸附在画布顶端**（用户 2026-11-04 截图指令：
+           「红框中的工具栏跟分区与管路页面一样，也放在顶部吧，能用图例（图标）的尽量用图例，
+           手放在上面提示功能，图例样式跟分区与管路页面的统一」）。
+           外观口径与「分区与管路」#ryDrawingHost>.ry-drawing-toolbar 逐项对齐：
+           40px 白条 + 1px #e4ebee 下边框；按钮 32×32、透明底无边框、字号 0（图标独占）；
+           图标 = mod/ry-icons.js 的 18px 线性 SVG（currentColor）；hover #eef2f6、
+           激活 #e6f2ec 底 + #1c6b4f 图标；悬停说明走原生 title（与那条工具栏同机制）。
+           按钮文案仍留在 DOM 里（font-size:0 隐藏）—— 无障碍与探针按 textContent 取名字不受影响。
+           为什么不再浮动可拖（v495 做法）：浮在卫星图上会盖住地块标注与图层面板，
+           且位置记忆一旦被拖到边角，新用户找不到「开始画框」。
+           恢复浮动：把 ryp-float / ry-hbar 加回 class，再补 data-ry-panel 与
+           data-ry-position-key="mapDrawToolsPos"，并还原 online-map.css 里被替换的旧段。 ===== -->
+      <div class="map-draw-tools" id="mapDrawTools" role="toolbar" aria-label="地图绘制工具">
+        <div class="mdt-group" role="group" aria-label="总管绘制">
+          <button class="mdt-btn" id="btnDrawTrunk" aria-pressed="false"
+                  title="绘制：从头重绘当前地块的输水总管；完成保存前旧线路保留。快捷键 M">绘制</button>
+          <button class="mdt-btn" id="btnFinishTrunk"
+                  title="完成：结束并保存当前总管线">完成</button>
+          <button class="mdt-btn" id="btnUndoTrunk"
+                  title="撤销点：删掉总管最后一个折点，可连撤">撤销点</button>
+          <!-- [v833] 编辑总管（三期）：没有已保存的干线时自动置灰（syncTrunkUI 管）。
+               进入后：点线选中 → 拖白点改拐点（拖到邻点上=并掉它）→ 右键开 6 项菜单 → Esc 退出。 -->
+          <button class="mdt-btn" id="btnEditTrunk" aria-pressed="false" disabled
+                  title="编辑总管：点线选中、拖白点改拐点（拖到邻点上=并掉它）、右键开菜单；快捷键 E。没有已保存的总管时置灰">编辑总管</button>
+        </div>
+        <div class="mdt-group" role="group" aria-label="地块绘制">
+          <button class="mdt-btn" id="btnDraw" aria-pressed="false"
+                  title="开始画框：在地图上依次点击地块边界顶点；再点一次退出">开始画框</button>
+          <!-- [v819] 「完成」的功能实义（online-map.js v186）：顶点 ≥3 自动存入「我的地块」
+               → 清空画布 → 紧接着画下一块（连续绘制）；不足 3 点视为草稿只清不存。
+               说明文字 v951 起从按钮内的 .dt-tip 悬浮面板改为 title —— 图标钮里塞 span
+               会跟着 font-size:0 一起被压扁，而分区与管路那条工具栏本来就是 title。 -->
+          <button class="mdt-btn" id="btnFinish"
+                  title="完成：顶点满 3 个就存入「我的地块」并清空画布，随即接着画下一块，可以连续画多块；不足 3 个顶点视为草稿，只清空不保存。想停止连续绘制，再点一次「开始画框」，或在地图上右键">完成</button>
+          <button class="mdt-btn" id="btnAddPt"
+                  title="加点：在已画好的框线上插入新顶点（需要画面上已有框线）">加点</button>
+          <button class="mdt-btn" id="btnUndo"
+                  title="撤销：删掉地块框最后一个顶点">撤销</button>
+        </div>
+        <div class="mdt-group" role="group" aria-label="工具">
+          <button class="mdt-btn" id="btnPlaceReservoir" type="button" aria-pressed="false"
+                  title="蓄水池：点击后在地图中放置蓄水池；放置后可拖动调整，开启捕捉时会吸附到附近节点">蓄水池</button>
+          <button class="mdt-btn" id="btnMeasure" aria-pressed="false"
+                  title="测距：点击地图逐点打点，紫色虚线显示累计距离，双击结束（只量不存）">测距</button>
+          <button class="mdt-btn" id="btnClear"
+                  title="清除：清空画布上正在画的草稿；已保存的地块不受影响">清除</button>
+        </div>
       </div>
       <!-- ===== [v832] 总管绘制状态栏 + 常驻提示条（二期；v847 提示条挪到底部）=====
            为什么放在 .map-wrap 里：它就是地图的定位容器，两者都用 absolute 吸边
@@ -1145,7 +1162,7 @@ body.ry-worst-off [data-tlworst]{display:none}
         <button type="button" class="pp-btn-ghost gr-btn" id="grTrunkDel" title="删除选中的总管（先在图上点选一根）">🗑 删除选中</button>
         <button type="button" class="pp-btn-ghost gr-btn" id="grTrunkClear" title="清除全部总管">清空</button>
       </div>
-      <div class="gr-hint" id="grTrunkHint">总管已改为在「在线地图」页绘制：选地块 → 「✎ 编辑总管」→ 画线/复核。本页不再支持手画；已画的旧总管仍可点选删除。</div>
+      <div class="gr-hint" id="grTrunkHint">总管已改为在「在线地图」页绘制：选地块 → 「编辑总管」→ 画线/复核。本页不再支持手画；已画的旧总管仍可点选删除。</div>
     </div>
 
     <!-- [v678 用户拍板] 「驳接点 / 管径 / 水头损失」卡与右侧悬浮水力面板随页面瘦身整体移除
@@ -2408,7 +2425,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 </div>
 
 <script src="mod/material-formulas.js?v=412"></script>
-<script src="mod/zone-geometry.js?v=950-group-head-estimate"></script>
+<script src="mod/zone-geometry.js?v=951-map-toolbar-docked"></script>
 <script src="mod/flow-geometry.js?v=414"></script>
 <script src="mod/tl-polyline-geometry.js?v=426-tl-polyline-geometry"></script>
 <!-- [v421-mat-table] 材料清单/材料表管理（自 inline-09 迁出）：先于 inline-09 加载 —— inline-09 尾部
@@ -2417,7 +2434,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <!-- [v424-plan-calc-render] 扬程公式与分解展示模块，先于计算控制器和三级调用方装载。 -->
 <script src="mod/plan-calc-render.js?v=614-head-formula"></script>
 <!-- [v887-tape-zone-vgate] 段总管生成器（纯几何，Node 单测锁），先于 inline-09 消费方装载。 -->
-<script src="mod/inline-09.js?v=950-group-head-estimate"></script>
+<script src="mod/inline-09.js?v=951-map-toolbar-docked"></script>
 <!-- [v423-header-layout] 三级简图标题布局依赖 inline-09 的 tlMeasureText 与生成时写入的标题状态。 -->
 <script src="mod/tl-header-layout.js?v=423-header-layout"></script>
 
@@ -2587,13 +2604,13 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script src="mod/trunk-snap.js?v=911-trunk-snap-edge"></script>
 <script src="mod/trunk-geo.js?v=854-null-slot-strict"></script>
 <!-- [v945] 总管口径反推（纯函数）：由规划分区的面积/流量 + 下游主管支管管径推手绘总管外径。 -->
-<script src="mod/trunk-size.js?v=950-group-head-estimate"></script>
+<script src="mod/trunk-size.js?v=951-map-toolbar-docked"></script>
 <script src="mod/trunk-edit.js?v=835-trunk-geo-snap"></script>
 <script src="mod/trunk-history.js?v=835-trunk-geo-snap"></script>
-<script src="mod/trunk-panel.js?v=950-group-head-estimate"></script>
+<script src="mod/trunk-panel.js?v=951-map-toolbar-docked"></script>
 <!-- [v887-tape-zone-vgate] 在线地图轮灌演示（分组/校验纯函数 + Leaflet 图层），先于宿主装载。 -->
-<script src="mod/map-flow-demo.js?v=950-group-head-estimate"></script>
-<script src="mod/online-map.js?v=950-group-head-estimate"></script>
+<script src="mod/map-flow-demo.js?v=951-map-toolbar-docked"></script>
+<script src="mod/online-map.js?v=951-map-toolbar-docked"></script>
 <script src="terrain/terrain-core.js?v=410-elev"></script>
 <script src="terrain/terrain-ui.js?v=513-sec-gate"></script>
 <script src="runye-hydraulics-page.js?v=829-hyd-auto-refresh"></script>

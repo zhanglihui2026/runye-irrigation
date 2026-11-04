@@ -48,6 +48,12 @@
     lock:      '<rect x="4.5" y="10.4" width="15" height="9.6" rx="1.4"/><path d="M8 10.4V7.4a4 4 0 0 1 8 0v3"/>',
     unlock:    '<rect x="4.5" y="10.4" width="15" height="9.6" rx="1.4"/><path d="M8.2 10.4V6.9a3.9 3.9 0 0 1 7.2-1.8"/>',
     undo:      '<path d="M4.5 9.5h9.6a4.9 4.9 0 0 1 0 9.8H8.2"/><path d="M8.1 5.4L4 9.5l4.1 4.1"/>',
+    /* [v951] 在线地图绘制条图标钮用：编辑（铅笔）/ 画框（多边形+顶点）/ 完成（对勾）。
+       画框图标刻意保留顶点小圈 —— 它表达的是「点顶点围一块地」，不是「画一条线」，
+       与 line（划线，两端点）区分开。 */
+    pencil:    '<path d="M4.6 19.4l1.1-4.2 9.5-9.5a2.05 2.05 0 0 1 2.9 2.9l-9.5 9.5z"/><path d="M13.4 6.6l4 4"/>',
+    polygon:   '<path d="M12 4.6l7 5-2.7 8H7.7L4.7 9.6z"/><circle cx="12" cy="4.6" r="1.5"/><circle cx="16.2" cy="17.6" r="1.5"/>',
+    check:     '<path d="M4.8 12.9l4.7 4.6L19.3 6.7"/>',
     autopipe:  '<path d="M3 16.5h6.2a3.4 3.4 0 0 0 3.4-3.4V7"/><path d="M17.6 4.2l1.2 2.7 2.7 1.2-2.7 1.2-1.2 2.7-1.2-2.7-2.7-1.2 2.7-1.2z"/>',
     download:  '<path d="M12 4v10.6"/><path d="M7.8 10.4L12 14.6l4.2-4.2"/><path d="M4.5 19.4h15"/>',
     print:     '<path d="M7 9.4V4.5h10v4.9"/><rect x="4" y="9.4" width="16" height="6.6" rx="1.2"/><path d="M7 13.4h10v6.1H7z"/>',
@@ -96,7 +102,18 @@
     tlWsZoomIn:'zoomin', tlWsZoomOut:'zoomout', tlWsZoomFit:'fit', tlWsMultiBtn:'multi',
     tlWsMaskBtn:'mask', tlDesignUploadBtn:'upload', tlDimSaveBtn:'save',
     tlAutoPipe:'autopipe', tlDxfExport:'cad', tlFrontNodeResetBtn:'relocate',
-    tlDimMultiBtn:'grid'
+    tlDimMultiBtn:'grid',
+
+    /* [v951] 在线地图绘制条 #mapDrawTools（吸附顶部、图标钮）。
+       为什么必须走精确表：这里有**两组同名**按钮（「完成」总管 / 「完成」地块，
+       「撤销点」/「撤销」），按标签正则匹配必然错配；而且「绘制」「完成」这类
+       泛词在 BY_LABEL 里根本认不出来（会被当成「生成管线」之类）。
+       注意：btnUndo 用 back（左向箭头+竖挡板）而不是 undo —— 同一条里已经有一个
+       undo（撤销点），并排两个同图标等于没有图标。 */
+    btnPlaceReservoir:'water', btnDrawTrunk:'line', btnFinishTrunk:'save',
+    btnUndoTrunk:'undo', btnEditTrunk:'pencil', btnDraw:'polygon',
+    btnFinish:'check', btnAddPt:'node', btnUndo:'back', btnMeasure:'length',
+    btnClear:'trash'
   };
 
   /* 无 id 的按钮（主管/支管/水源/阀门/遮蔽管线/调网格/整组…）走标签规则。

@@ -5301,23 +5301,11 @@ body.ry-tool #pipePlanSection #ryDrawingHost #ppToolbar{grid-column:auto;grid-ro
 #onlineMapSection .side .save-row{padding:6px 0}
 #onlineMapSection .side > section > .pill-list{padding:8px 0 2px}
 
-/* ===== [v819 「完成」按钮悬浮说明面板] =====
-   用户：「完成并画下一块，改为完成，鼠标放在这里的时候，要解释这个按钮的功能，
-   要弹出悬浮面板。」
-   结构：.dt-tip 是按钮内的 span（phrasing content，合法），display:block + 绝对定位
-   挂在按钮正下方；悬停显示，pointer-events:none 不吃鼠标、不挡地图拖拽。
-   不用 fixed 定位：工具条挂在 .map-wrap 顶端，下方就是地图画布，没有 overflow 裁切
-   （v809 那种 .side 滚动容器裁切在这里不存在）。 */
-#mapDrawTools #btnFinish{position:relative}
-#mapDrawTools .dt-tip{
-  display:none;position:absolute;top:calc(100% + 8px);left:0;z-index:1300;
-  width:max-content;max-width:330px;padding:10px 12px;box-sizing:border-box;
-  background:#fff;border:1px solid #cbd8d0;box-shadow:0 6px 18px rgba(24,50,38,.16);
-  font-size:11px;line-height:1.7;color:#3f4a45;text-align:left;white-space:normal;
-  letter-spacing:0;pointer-events:none;
-}
-#mapDrawTools #btnFinish:hover .dt-tip,
-#mapDrawTools #btnFinish:focus-visible .dt-tip{display:block}
+/* ===== [v951 删除] v819「完成」按钮悬浮说明面板（.dt-tip）=====
+   那段规则服务的是「文字按钮里内嵌一个 span 说明面板」。v951 地图工具条改成
+   吸附顶部的图标钮（与分区与管路一致），说明统一走原生 title；按钮内塞 span 会跟着
+   font-size:0 一起被压扁，所以 DOM 里的 .dt-tip 一并删除了。
+   要恢复：index.html #btnFinish 里放回 span.dt-tip + 从 git 历史取回本段 CSS。 */
 
 /* [v913-coupler-nodes] 接驳节点定位面板：画布容器内绝对定位（右下），选中节点时显示 */
 #ppCanvasWrap #ppCouplerPanel{

@@ -22,18 +22,63 @@
     border:1px solid #f59e0b;padding:8px 14px;font-size:12px;z-index:1100;border-radius:var(--radius);display:none}#onlineMapSection .ry-area-tip{background:rgba(255,255,255,.96);border:1.5px solid #ff6b00;border-radius:8px;
     box-shadow:0 3px 10px rgba(0,0,0,.25);padding:5px 10px;pointer-events:none}#onlineMapSection .ry-area-tip .ab-t{font-size:14px;font-weight:800;color:#ea580c;white-space:nowrap}#onlineMapSection .ry-area-tip .ab-s{font-size:11px;font-weight:600;color:var(--ry-s-500);margin-top:1px;white-space:nowrap}#onlineMapSection .leaflet-container.drawing{ cursor:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2730%27%20height%3D%2730%27%3E%3Cg%20stroke%3D%27black%27%20stroke-width%3D%273%27%3E%3Cline%20x1%3D%2715%27%20y1%3D%273%27%20x2%3D%2715%27%20y2%3D%2712%27%2F%3E%3Cline%20x1%3D%2715%27%20y1%3D%2718%27%20x2%3D%2715%27%20y2%3D%2727%27%2F%3E%3Cline%20x1%3D%273%27%20y1%3D%2715%27%20x2%3D%2712%27%20y2%3D%2715%27%2F%3E%3Cline%20x1%3D%2718%27%20y1%3D%2715%27%20x2%3D%2727%27%20y2%3D%2715%27%2F%3E%3C%2Fg%3E%3Cg%20stroke%3D%27white%27%20stroke-width%3D%271.5%27%3E%3Cline%20x1%3D%2715%27%20y1%3D%273%27%20x2%3D%2715%27%20y2%3D%2712%27%2F%3E%3Cline%20x1%3D%2715%27%20y1%3D%2718%27%20x2%3D%2715%27%20y2%3D%2727%27%2F%3E%3Cline%20x1%3D%273%27%20y1%3D%2715%27%20x2%3D%2712%27%20y2%3D%2715%27%2F%3E%3Cline%20x1%3D%2718%27%20y1%3D%2715%27%20x2%3D%2727%27%20y2%3D%2715%27%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2715%27%20cy%3D%2715%27%20r%3D%272.5%27%20fill%3D%27white%27%20stroke%3D%27black%27%20stroke-width%3D%271%27%2F%3E%3C%2Fsvg%3E") 15 15, crosshair !important; }#onlineMapSection .leaflet-container.drawing .leaflet-grab{ cursor:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2730%27%20height%3D%2730%27%3E%3Cg%20stroke%3D%27black%27%20stroke-width%3D%273%27%3E%3Cline%20x1%3D%2715%27%20y1%3D%273%27%20x2%3D%2715%27%20y2%3D%2712%27%2F%3E%3Cline%20x1%3D%2715%27%20y1%3D%2718%27%20x2%3D%2715%27%20y2%3D%2727%27%2F%3E%3Cline%20x1%3D%273%27%20y1%3D%2715%27%20x2%3D%2712%27%20y2%3D%2715%27%2F%3E%3Cline%20x1%3D%2718%27%20y1%3D%2715%27%20x2%3D%2727%27%20y2%3D%2715%27%2F%3E%3C%2Fg%3E%3Cg%20stroke%3D%27white%27%20stroke-width%3D%271.5%27%3E%3Cline%20x1%3D%2715%27%20y1%3D%273%27%20x2%3D%2715%27%20y2%3D%2712%27%2F%3E%3Cline%20x1%3D%2715%27%20y1%3D%2718%27%20x2%3D%2715%27%20y2%3D%2727%27%2F%3E%3Cline%20x1%3D%273%27%20y1%3D%2715%27%20x2%3D%2712%27%20y2%3D%2715%27%2F%3E%3Cline%20x1%3D%2718%27%20y1%3D%2715%27%20x2%3D%2727%27%20y2%3D%2715%27%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2715%27%20cy%3D%2715%27%20r%3D%272.5%27%20fill%3D%27white%27%20stroke%3D%27black%27%20stroke-width%3D%271%27%2F%3E%3C%2Fsvg%3E") 15 15, crosshair !important; }#onlineMapSection .leaflet-container.drawing .leaflet-overlay-pane path{ pointer-events:none !important; }@media(max-width:700px){#onlineMapSection .main{flex-direction:column}#onlineMapSection .side{width:100%;max-height:46vh;border-right:0;border-bottom:1px solid var(--s-300)}#onlineMapSection .side-grip{display:none}
   }#onlineMapSection *::-webkit-scrollbar-track{background:transparent}#onlineMapSection *::-webkit-scrollbar-thumb{background:rgba(188,211,198,.25)}#onlineMapSection *::-webkit-scrollbar-thumb:hover{background:rgba(188,211,198,.8)}#onlineMapSection *::-webkit-scrollbar-corner{background:transparent}#onlineMapSection .side{border-right-color:transparent}
-/* ===== [v495 2026-10-16 用户要求] 主程序内嵌在线地图的绘制工具条（与独立页
-   runye-map-measure.html v494 同款）：左栏「绘制」区迁出，地图区顶端可拖动横条。
-   拖动/位置记忆 = mod/ry-panel.js rypDraggable（bounds=#onlineMapSection .map-wrap，
-   拖不出地图区 = 不超过导航栏）；位置存 localStorage['mapDrawToolsPos']。
-   全站扁平化（style-01.css body *{border-radius:0!important}）会把圆角压直角，
-   与面板内其他控件同待遇。撤功能：删 index.html #mapDrawTools + 本段即可。 ===== */
-/* [v544] 几何（flex/gap/padding/max-width）与按钮规格统一到 .ry-toolbar / .ry-toolbar-btn
-   （mod/ry-panel.css）；这里只留定位与「浮在卫星影像上要纯白」这一条场景配色差异。 */
-#onlineMapSection .map-draw-tools{position:absolute;left:12px;top:12px;z-index:1050;
-  background:#fff;border:1px solid var(--s-300);box-shadow:0 2px 8px rgba(15,23,42,.14)}
-#onlineMapSection .map-draw-tools .dt-grip{flex:none;padding:4px 7px;font-size:12px;font-weight:700;color:var(--g-700);
-  background:var(--g-50);border-right:1px solid var(--s-300);cursor:move;user-select:none;touch-action:none;letter-spacing:1px}
+/* ===== [v951 2026-11-04 用户要求] 地图绘制工具条：从「浮在卫星图上的拖动横条」
+   改成「吸附在画布顶端的固定条」，外观**逐项对齐**「分区与管路」的
+   #ryDrawingHost>.ry-drawing-toolbar（style-01.css v824/v815 段）。
+   用户原话：「红框中的工具栏跟分区与管路页面一样，也放在顶部吧，能用图例（图标）的尽量用
+   图例，手放在上面提示功能，图例样式跟分区与管路页面的统一。」
+   为什么那条不能直接复用：它的每条规则都挂在 `#ryDrawingHost ...` 三层 id 下，
+   本工具条不在那个宿主里；所以这里按值镜像一份，并由
+   tests/map_toolbar_unified.test.cjs 把两边的关键数值逐项比对锁住（改一边不改另一边 = 红）。
+   几何：条带 40px 高（含 1px 下边框，box-sizing:border-box）⇒ #map 的 top 必须同步 40px，
+   否则地图会顶到条带底下（见下方 #map 那条）。
+   撤功能：删 index.html #mapDrawTools + 本段，并把 #map 的 top 改回 0。 ===== */
+#onlineMapSection .map-draw-tools{
+  position:absolute;left:0;top:0;right:0;z-index:1040;
+  display:flex;align-items:center;gap:2px;min-width:0;height:40px;
+  padding:4px 10px;box-sizing:border-box;
+  background:#fff;border:0;border-bottom:1px solid #e4ebee;box-shadow:none;
+  overflow-x:auto;overflow-y:hidden;white-space:nowrap;
+}
+#onlineMapSection .map-draw-tools::-webkit-scrollbar{height:4px}
+#onlineMapSection .map-draw-tools::-webkit-scrollbar-thumb{background:#d4dde2;border-radius:2px}
+/* 组只是排版用的透明盒子：不许有自己的底色 / 边框 / 阴影（同 v826 那条护栏），
+   组间只靠 margin-left 拉开距离，与分区与管路「两簇按钮」的观感一致。 */
+#onlineMapSection .map-draw-tools .mdt-group{
+  display:flex;align-items:center;gap:2px;flex:0 0 auto;min-width:max-content;
+  background:transparent;border:0;box-shadow:none;
+}
+#onlineMapSection .map-draw-tools .mdt-group + .mdt-group{margin-left:10px}
+/* 按钮：32×32、透明底、无边框、字号 0（图标独占）；图标尺寸与描边由 .ry-ico 全局段给。 */
+#onlineMapSection .map-draw-tools .mdt-btn{
+  flex:0 0 32px;display:flex;align-items:center;justify-content:center;
+  width:32px;height:32px;padding:0;margin:0;box-sizing:border-box;
+  /* !important：页面级 button 规则（13px）会压过来；分区与管路那条也是这么写的 */
+  font-size:0 !important;font-family:inherit;line-height:1;
+  color:#3f4a45;background:transparent;border:1px solid transparent;cursor:pointer;
+}
+#onlineMapSection .map-draw-tools .mdt-btn:hover{color:#1f2a24;background:#eef2f6}
+#onlineMapSection .map-draw-tools .mdt-btn:focus-visible{outline:2px solid #39795b;outline-offset:-2px}
+/* 激活态：一种绿（与分区与管路同一对颜色）。
+   覆盖三种历史写法：.btn-on（蓄水池/测距/画框）、.is-trunk-on（总管绘制/编辑，
+   ry-panel.css 里是蓝底白字）、[aria-pressed="true"]。 */
+#onlineMapSection .map-draw-tools .mdt-btn[aria-pressed="true"],
+#onlineMapSection .map-draw-tools .mdt-btn.btn-on,
+#onlineMapSection .map-draw-tools .mdt-btn.active,
+#onlineMapSection .map-draw-tools .mdt-btn.is-trunk-on{
+  color:#1c6b4f;background:#e6f2ec;border-color:transparent;
+}
+#onlineMapSection .map-draw-tools .mdt-btn:disabled{opacity:.45;cursor:default;background:transparent;color:#3f4a45}
+#onlineMapSection .map-draw-tools .mdt-btn:disabled:hover{background:transparent;color:#3f4a45}
+/* 图标尺寸：与「分区与管路」工具栏同值（18×18 / 1.7 描边 / currentColor）。 */
+#onlineMapSection .map-draw-tools .mdt-btn .ry-ico{
+  width:18px;height:18px;flex:0 0 18px;display:block;
+  fill:none;stroke:currentColor;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round;pointer-events:none;
+}
+/* 地图让出条带高度：条带 40px（含边框）⇒ #map 从 40px 起。
+   Leaflet 初始化时读的就是这个盒子的尺寸，静态 CSS 改到位即可，不需要 invalidateSize。 */
+#onlineMapSection #map{top:40px}
 #onlineMapSection .leaflet-container.placing-reservoir{cursor:crosshair}
 #onlineMapSection .ry-reservoir-icon-wrap{background:transparent;border:0;white-space:nowrap}
 #onlineMapSection .ry-reservoir-mark{position:absolute;left:14px;top:10px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;
@@ -45,8 +90,10 @@
 #onlineMapSection .ry-reservoir-tip:before{border-top-color:#0369a1}
 #onlineMapSection .map-draw-tools #btnPlaceReservoir.btn-on{background:#e0f2fe;border-color:#38bdf8;color:#075985}
 
-/* [v924] 轮灌动画当前组水力摘要：固定在地图上沿工具条下方，播放切组时同步更新。 */
-#onlineMapSection .map-flow-group-info{position:absolute;left:12px;top:68px;z-index:1160;width:min(320px,calc(100% - 24px));
+/* [v924] 轮灌动画当前组水力摘要：固定在地图上沿工具条下方，播放切组时同步更新。
+   [v951] top 68→52：工具条从「12px 起浮 + 38px 高」变成「0 起吸附 + 40px 高」，
+   卡片贴条带下沿留 12px。 */
+#onlineMapSection .map-flow-group-info{position:absolute;left:12px;top:52px;z-index:1160;width:min(320px,calc(100% - 24px));
   padding:10px 12px;background:rgba(255,255,255,.96);border:1px solid #94a3b8;box-shadow:0 2px 10px rgba(15,23,42,.22);
   color:#334155;font-size:12px;line-height:1.45;pointer-events:none}
 #onlineMapSection .map-flow-group-info[hidden]{display:none!important}
