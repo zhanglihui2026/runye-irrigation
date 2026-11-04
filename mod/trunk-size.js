@@ -10,9 +10,9 @@
  *   ① 判定/计算在纯函数里、宿主只负责取素材与落地（站内既有分工，见 mod/trunk-snap.js
  *      与 mod/trunk-geo.js 文件头的同一条理由）；混进 online-map.js 那 3000 行 IIFE 就只能
  *      靠浏览器探针验，而「管径差一档」在截图上根本看不出来。
- *   ② **管径档位与 PE 序列不许在本文件复制一份**：`selectPipe` 与 `PE_OD_SERIES` 的
+ *   ② **管径档位与 PE 序列不许在本文件复制一份**：`selectPipe` 与 PE 外径序列的
  *      唯一出处是 mod/inline-09.js（`ci_check_static.cjs` 有 countDef 锁，出现第二份
- *      `const PE_OD_SERIES = [` 会直接判红）。所以本模块把它们当**入参注入**：
+ *      序列常量定义会直接判红 —— 所以本文件连字面量都不写，只做入参注入）。
  *      调用方（inline-09 的 window.tlTrunkOdAdvice）传真实的 selectPipe / 序列 / SDR。
  *
  * 口径（与三级页 computeThreeLevel / ryZonePipePick 同一条，不另立算法）：
