@@ -7618,3 +7618,45 @@ demo_flow_revive / plot_transfer / snap_default_off ①③）。
 `refs/heads/master` 那一行。网络阻断走兜底 `python _p1/_pub_api.py --dry|--apply|--verify`
 （Git Data API，只取**提交里**的 blob ⇒ 不夹带工作区并行会话的未提交改动；`--verify` 会核对 567 个文件的树/blob SHA）。
 发布：master `9385061`，线上三件 sha 全等、VERSION=`v958-head-sticky`；static 600/604（4 红为既有：demo_flow_revive / plot_transfer / snap_default_off ①③）；refs PASS；lint 0。
+
+### §26.165 v959/v960（2026-11-04，总管面板底部那段口径说明取消）
+
+用户原话：「总管参数设置面板中，联合复核的内容取消，损失拆分保留。以下这段文字取消
+"合计 = 总管 + 主管 + 支管 的沿程与局部损失（按一条最不利路径）。不含静扬程、入口工作压力、
+过滤损失、富余水头与 1.10 安全系数 —— 完整扬程见三级页「扬程计算式」。"」
+
+**改法**（`mod/trunk-panel.js` 的 `jointReview`）：原来 `if (out.design) { out.note = '合计 = …' }`，
+现在反过来 —— **只有取不到三级计算式才写 note**：
+```js
+if (!out.design) {
+  out.note = '未取到三级计算式，合计损失暂不给出（需要三级页 computeThreeLevel 的结果）。';
+}
+```
+⇒ 有数据时 note 保持初始 `''` ⇒ `paintJoint` 里 `noteEl.hidden = !jr.note` 直接收起（CSS 有
+`.tp-jt-note[hidden]{display:none!important}`，不会留空框）。
+· 保留的是**诊断**（未取到三级计算式 / 下游快照属于另一块地 / 未找到下游快照），删掉的是**解释**。
+  这条界线（合计损失 ≠ 扬程）现在靠「合计损失」与「三级页扬程」两行并列自证，不再用文字兜。
+· `.tp-jt-note` 元素与 CSS 都留着 —— 诊断还需要它。
+
+**为什么「联合复核」其它内容没动**：用户点名删的是那段**文字**；对照行（总管/下游）和核对项
+（管径/流量对照）是数据与告警面，删掉会静默丢提示。若用户要的是整段取消，需另行确认。
+
+**测试反转**：原 ⑭d 断言「note 必须写清 不含静扬程 / 1.10 安全系数 / 扬程计算式」⇒ 改为
+「有 design 时 note 必须为空」，并新增 ⑭d2 反向锁（剥注释后断言面板代码里没有这三句、
+但 `未取到三级计算式` 必须在）。**★ 反向锁必须先剥注释**（`raw.replace(/\/\*[\s\S]*?\*\//g,'')`），
+这一轮我第一版把删掉的原文抄进了注释，直接把自己的注释当成违规 —— v957 同款，第二次踩。
+
+**★ 别把「已删除的原文」抄进注释**：v959 提交后线上 `grep 不含静扬程` 还能搜到 1 处（就是注释），
+看起来像没删干净。改注释时只描述「删了什么类型的话」，不复述原句 ⇒ 线上残留数归零。
+因为改了 CORE 名单文件（`mod/trunk-panel.js` 在 sw.js CORE 里），按纪律抬串到 v960，
+否则 SW 会继续喂 v959 的旧缓存副本。
+
+**探针 `probe_joint_note_gone.mjs` 4/4**（走**真模块** `RyTrunkPanel.mount()` 挂进页面，不是手写 HTML）：
+① `.tp-jt-note` 不可见 + 文字为空 + 盒高 0；② 损失拆分 h2 + 八行（总管/下游/总管/主管/支管/合计损失/管路总长/三级页扬程）全在；
+③ checks≥1；④ `textContent` 里再无「不含静扬程 / 扬程计算式」。
+· 坑：`.map-wrap` 自带高度规则会把探针宿主的 inline height 压成 0 ⇒ 面板 `max-height:calc(100% - 140px)`
+  退化成负 ⇒ 面板只剩 2px 边框（内容全在、却量不到高度）。除错时先量宿主高度，别先怀疑面板。
+  出图改成把面板 `position:static` 流式摆放，一张图看全。
+
+发布：`3735ffd`（v959，常规 push 成功）→ `2c1a992`（v960，push 又被 502 阻断，走 `_p1/_pub_api.py --apply`）。
+线上三件 sha 全等、VERSION=`v960-note-clean`、`不含静扬程` 残留 0；static 605/609、全量 624/628（4 红仍为既有）；refs PASS；lint 0。
