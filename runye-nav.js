@@ -55,6 +55,16 @@
     /* [v250] 「二级管路」改名「地块分区」、「三级管路编辑」改名「管路规划」（hash/id 不变，仅显示名变） */
     { label: '分区与管路',   hash: 'pipePlanSection',          pre: 1, feat: 'zone-split', drawingEntry: 1 },
     { label: '管路规划',     hash: 'tlPipePlanSection',        pre: 1, feat: 'pipe-layout', routeOnly: 1 },
+    /* [v949 2026-11-04 用户指令]「地形模块 / 多地块规划」移到「分区与管路」之后、
+       「智能规划」之前。实现方式：加 pre:1 进 pre 组。
+       ★ 渲染顺序规则（本文件下面的 ITEMS.forEach）：带 pre 的项 insertBefore(marker)
+         （恒排在静态项之前、组内按数组顺序），不带 pre 的项 appendChild 到末尾
+         （智能规划/水力校核/材料清单都在这一组）⇒ 想让两项站到「智能规划」前面，
+         只能进 pre 组，光调数组位置没用。
+       地形模块在主页面内承载；独立旧入口保留兼容。 */
+    { label: '地形模块',     hash: 'terrainSection',           pre: 1, feat: 'pro-others', title: '地形模块：shp/RTK边界导入、CGCS2000校验、面积、高程数据源登记' },
+    /* [v391 2026-10-12 用户指令] 多地块规划 恢复上线（v386 剥离时业务全保留，此处按原条目加回） */
+    { label: '多地块规划',   hash: 'grPipeSection',            pre: 1, feat: 'pro-others', title: '成组地块：展示各块二级主管/支管 + 手动画组级总管' },
     /* [v311 2026-10-08 用户要求] 水力校核顶级导航项：主页面功能区自动读 runye_network_layout，
        展示树状拓扑、全链路水损、滴灌带多孔出流、水泵选型和 EPANET WASM 对照。 */
     { label: '水力校核',     hash: 'hydraulicsSection',             feat: 'hydraulic-check', title: '水力校核：自动读已布置管网，逐段流量/流速/水损 + 最不利路径 + 需求扬程与水泵选型' },
@@ -63,11 +73,8 @@
        与将来恢复的功能项。 */
     /* [v358] feat 说明：'pro-others' = 高级会员通配键（L1 四大功能之外的全部）；
        feat:'' = 完全免费、不参与门控。滴灌带查询器是公开查询小工具，保持免费。 */
-    /* 地形模块在主页面内承载；独立旧入口保留兼容。 */
-    { label: '地形模块',     hash: 'terrainSection',                feat: 'pro-others', title: '地形模块：shp/RTK边界导入、CGCS2000校验、面积、高程数据源登记' },
-    /* [v391 2026-10-12 用户指令] 多地块规划 恢复上线（v386 剥离时业务全保留，此处按原条目加回，
-       位置：地形模块 之后） */
-    { label: '多地块规划',   hash: 'grPipeSection',            feat: 'pro-others', title: '成组地块：展示各块二级主管/支管 + 手动画组级总管' },
+    /* [v949 2026-11-04] 地形模块 / 多地块规划 已上移到「管路规划」之后（pre 组），
+       此处不再重复声明 —— 同一 label 出现两次会让顶栏重复渲染两个入口。 */
     /* [v385 2026-10-12 用户指令] 四项功能剥离下线（入口摘除，业务代码/页面全部保留，将来需要时
        把对应行加回 MORE_ITEMS 或 ITEMS 即可恢复）：多地块规划(已于 v391 恢复)、管路拼装(独立页+
        pipe-assemble 壳插件同步摘除)、经济指标分析(#threeDModelingSection)、数字化建模
