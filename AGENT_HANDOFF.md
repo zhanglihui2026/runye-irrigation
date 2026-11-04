@@ -7230,3 +7230,22 @@ SW 自造重装风暴，§26.140 竞态在「每轮都清 SW」的用法下会�
 **验证**：`tests/trunk_size.test.cjs` 10/10（含 ⑧⑨⑩ 接线静态锁）；本地浏览器探针 `gen_trunk_od.mjs` **13/13**（模块加载、纯函数口径、不缩颈、缺面积原因、接线可达、面板显示/采用写回/无建议隐藏、浮层三分支、无脚本错误）；全量 586/0-4，**4 个红灯为工作区既有**（并行会话把总管骨架改 `#cbd5e1`、把 `snapOn` 改 true，测试仍锁旧值；HEAD 对照已证）；check 静态 29/0、refs PASS、lint 0 错。
 
 **待用户真机确认**：地图上点开某根总管 → 面板「推算管径」应出现 Ø 值并可一键采用；点轮灌组圆点 → 浮层应直接给口径（不再只说「尚未齐备」）。
+
+### §26.152 v946-trunk-od-picker-fix（2026-11-04，发布级修复）
+**用户反馈**（截图，浮层报「低于下限 160 mm 的档位选不出结果」）：「这个低于下限160档位选不出结果我不明白是什么意思，总管的尺寸应该是大于主管的，这个数据是不是算反了？」
+
+**定性：不是算反，是选档器接线传错了参数**。v945 的 `RyTrunkSize.suggest` 调 `picker(flow, targetV, series, sdr, floorOd, Infinity)`（按 `RyDesignCore.selectPipe` 的 6 参签），但 `inline-09` 注入进去的是**本文件的 4 参包装器** `selectPipe(Q, targetV, minOd = 0, maxOd = Infinity)`（series/SDR 已固化）⇒ 档位表被塞进 `minOd`、SDR 塞进 `maxOd` ⇒ `pipes()` 里 `od >= [数组]` 全是 false ⇒ **一个候选都没进比较** ⇒ `selectPipe` 返回 undefined ⇒ 落到「选不出结果」分支。文案里的 160 是 `floorOd`（下游主管外径），所以读起来像「总管必须大于 160 所以超限」，其实是接线错了。
+
+**修法**（把「第二个签名」彻底删掉，回归站内唯一契约）：
+- `trunk-size.js`：picker 只按 3 个位置参数调 `picker(pick.flow, targetV, floorOd)`，不再接 `series`/`sdr`；失败分支拆成 `no-picker`（选择器未加载）与 `no-candidate`（下限已超序列上限，文案点名 Ø 值与「超出 PE 外径序列」）。
+- `inline-09.js`：注入里删掉 `series`/`sdr`（留着就是下一次误传的诱因），只留 `selectPipe: selectPipe`，并在注释里写清 4 参包装器的坑。
+- 版本 `v946-trunk-od-picker-fix`（index.html 8 处 + sw.js VERSION + CORE 名单不变，trunk-size.js 已在名单内）。
+
+**为什么 v945 的测试/探针全绿却线上是坏的（本轮最该记住的一条）**：
+1. `tests/trunk_size.test.cjs` 里的 `picker` 适配器自己写了 6 参签名 ⇒ 测试替产品"修好"了 bug；⑧ 静态锁还断言 `selectPipe: selectPipe` —— 把错误形态锁成了正确形态。
+2. 探针 `gen_trunk_od.mjs` ⑤ 的断言是 `ok === true || (ok === false && !!reason)`：**对失败宽容的断言等于没断言**，真实的 `ok:false / no-picker` 直接 PASS。
+本轮修法：测试适配器改 3 参（`Core.selectPipe(q,tv,OD,SDR,minOd,Infinity)`，注释写明"不许再吃 6 参"）；⑧ 增加被调用侧锁 `/picker\(pick\.flow,\s*targetV,\s*floorOd\)/` 且断言注入里没有 `series:`；新增 ⑪ 数值锁（2 区×23400 m²、滴头 1.6 L/h ⇒ 416 m³/h ⇒ **Ø355**，且 `od > 主管 160`——把"总管比主管粗"这个方向钉住）；新增 ⑫ `no-candidate` 文案锁。探针 ⑤ 改成必须 `ok:true && od>=90 && flow>0 && v>0`。
+
+**验证**：`tests/trunk_size.test.cjs` 12/12；本地探针 13/13（真实页面参数下 `ok:true`，od=140 / Q=66.67，mock L2 分区面积 10000 m²×2）；全量 588/592（**4 红为既有**：demo_flow_revive、plot_transfer、snap_default_off ①②，均为并行会话改动未同步测试）；`ci_check_static` 29/0；`check_publish_refs` PASS；`npm run lint` 0 错。
+
+**给用户的口径说明（同一段话可直接复用）**：总管本来就该比主管粗（这是设计口径，不是 bug）——总管承担同轮灌溉**全部成员区**的合流；截图里 G1 = 1、2 区共约 70 亩，按 0.6/0.3/1.6 的滴灌参数 ≈ 416 m³/h，经济流速 1.5 m/s 落到 Ø355，而单区主管 Ø160 只管 1/2 的量。若嫌口径大，正确做法是**拆轮灌组**（每轮少开几个区），不是压总管。

@@ -13,7 +13,12 @@
  *   ② **管径档位与 PE 序列不许在本文件复制一份**：`selectPipe` 与 PE 外径序列的
  *      唯一出处是 mod/inline-09.js（`ci_check_static.cjs` 有 countDef 锁，出现第二份
  *      序列常量定义会直接判红 —— 所以本文件连字面量都不写，只做入参注入）。
- *      调用方（inline-09 的 window.tlTrunkOdAdvice）传真实的 selectPipe / 序列 / SDR。
+ *   ③ **选档器的签名只有一条**（v946 踩过坑）：站内的 selectPipe 是「序列/SDR 已固化」
+ *      的包装器，签名 `(Q, targetV, minOd, maxOd)`；本文件只按前三个位置传
+ *      `(flow, targetV, floorOd)`，**不许再传 series/sdr**。传了就等于把档位表当成
+ *      「管径下限」塞进去 ⇒ 所有档位都过不了 `od >= minOd` ⇒ 一个候选都没比较，
+ *      却报出「低于下限 xxx mm 选不出结果」，看起来像「总管比主管大所以超限」，
+ *      实际是接线错了。谁要动这里，先看 tests/trunk_size.test.cjs ⑪ 的数值锁。
  *
  * 口径（与三级页 computeThreeLevel / ryZonePipePick 同一条，不另立算法）：
  *   · 分区流量 q = 面积(m²) ÷ 滴带间距(m) ÷ 滴孔间距(m) × 滴头流量(L/h) ÷ 1000  → m³/h
@@ -29,7 +34,7 @@
 (function (root) {
   'use strict';
 
-  var VERSION = 'v945-trunk-od-by-zones';
+  var VERSION = 'v946-trunk-od-picker-fix';
 
   /* 与 inline-09 的 MAIN_PIPE_MIN_OD 同值；调用方注入时以注入值为准。
      留着这个默认值只是为了「面板单独调用」时不至于算出 DN50 的总管。 */
@@ -88,7 +93,8 @@
        targetV:   经济流速 m/s（默认 1.5）
        mainOd, branchOd: 下游主管/支管外径 mm（可 null）
        minOd:     管径下限（调用方传 MAIN_PIPE_MIN_OD）
-       series, sdr, selectPipe        注入的选档器（唯一出处 inline-09）
+       selectPipe:(Q m³/h, targetV m/s, minOd mm) ⇒ {od, v}  —— 站内唯一选档包装器，
+                  序列/SDR 已固化在里面，**别再传 series/sdr**（见文件头 ③）
        groupIndex: 指定看哪一组（不传/负 ⇒ 取最不利组合流最大的）
      }
      返回 { ok, reason, flow, od, velocity, groupIndex, zones, zoneCount, missingZones,
@@ -130,14 +136,18 @@
 
     var targetV = num(o.targetV);
     if (!(targetV > 0)) targetV = 1.5;
-    var picker = o.selectPipe, series = o.series, sdr = o.sdr;
-    if (typeof picker !== 'function' || !Array.isArray(series) || !series.length) {
+    var picker = o.selectPipe;
+    if (typeof picker !== 'function') {
       return { ok: false, reason: 'no-picker', text: '管径档位选择器未加载，暂不能推算口径。' };
     }
+    /* 三个位置参数，一个都不能多（文件头 ③）：多传两个会把档位表/SDR 顶进 minOd。 */
     var pipe = null;
-    try { pipe = picker(pick.flow, targetV, series, sdr, floorOd, Infinity); } catch (e) { pipe = null; }
+    try { pipe = picker(pick.flow, targetV, floorOd); } catch (e) { pipe = null; }
     if (!pipe || !isNum(pipe.od)) {
-      return { ok: false, reason: 'no-picker', text: '低于下限 ' + floorOd + ' mm 的档位选不出结果，请核对下游管径。' };
+      return {
+        ok: false, reason: 'no-candidate',
+        text: '管径下限 Ø' + floorOd + ' mm 及以上没有可选档位（已超出 PE 外径序列），请核对下游主管/支管管径。'
+      };
     }
 
     var perZone = pick.zones.map(function (zi) {

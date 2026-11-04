@@ -22,11 +22,13 @@ const T = (function load() {
 })();
 
 /* 真实选档器（唯一出处 hydraulic-calc/design-core.js）+ 与 inline-09 同值的档位参数。
-   测试里不复制产品常量以外的逻辑：序列是夹具，选档规则走真代码。 */
+   注意签名：产品里注入的是 inline-09 的 **4 参包装器**（序列/SDR 固化），trunk-size 只传
+   前三个位置参数 ⇒ 这里的适配器也必须只吃三个参数，否则等于把「接线错误」写进了测试
+   （v945 的测试与探针都吃了 6 个参数，于是产品坏了测试还是绿的）。 */
 const Core = require(path.join(__dirname, '..', 'hydraulic-calc', 'design-core.js'));
 const OD = [50, 63, 75, 90, 110, 125, 140, 160, 180, 200, 225, 250, 280, 315, 355, 400, 450, 500];
 const SDR = 13.6;
-const picker = (q, tv, series, sdr, minOd, maxOd) => Core.selectPipe(q, tv, series, sdr, minOd, maxOd);
+const picker = (q, tv, minOd) => Core.selectPipe(q, tv, OD, SDR, minOd, Infinity);
 
 /* 4 个区各 10000 m²（1 公顷），滴带间距 0.6m、滴孔间距 0.3m、滴头 2 L/h
    ⇒ 单位面积流量 = 2/1000/0.6/0.3 = 0.011111 m³/h·m²
@@ -36,7 +38,7 @@ const BASE = {
   groups: [[0, 1], [2, 3]],
   tapeSpacing: 0.6, emitterSpacing: 0.3, emitterFlow: 2,
   targetV: 1.5, minOd: 90,
-  series: OD, sdr: SDR, selectPipe: picker
+  selectPipe: picker
 };
 
 test('① zoneFlows：面积 ÷ 间距 ÷ 间距 × 滴头流量/1000，缺面积给 null 不补 0', () => {
@@ -142,15 +144,22 @@ test('⑦ 面积缺失的分区进 missingZones（合流只算读得到的，且
 const ROOT = path.join(__dirname, '..');
 const read = f => fs.readFileSync(path.join(ROOT, f), 'utf8');
 
-test('⑧ 接线：inline-09 导出 tlTrunkOdAdvice 且注入档位（不重复定义序列）', () => {
+test('⑧ 接线：inline-09 导出 tlTrunkOdAdvice 且注入站内唯一的选档器', () => {
   const src = read('mod/inline-09.js');
   assert.ok(/window\.tlTrunkOdAdvice\s*=\s*function/.test(src), '必须导出 window.tlTrunkOdAdvice');
   assert.ok(/selectPipe:\s*selectPipe/.test(src), '必须注入本文件的 selectPipe（唯一选档口径）');
-  assert.ok(/series:\s*PE_OD_SERIES/.test(src), '必须注入 PE_OD_SERIES（不许在别处再定义一份）');
+  assert.ok(!/series:\s*PE_OD_SERIES/.test(src.split('window.tlTrunkOdAdvice')[1] || ''),
+    '注入里不许再传 series：包装器只吃 4 参，多传会把档位表顶进 minOd（v946 的坑）');
   assert.ok(/minOd:\s*MAIN_PIPE_MIN_OD/.test(src), '管径下限必须沿用 MAIN_PIPE_MIN_OD');
   assert.ok(/zoneAreas:\s*zoneStat\s*\?\s*zoneStat\.cells\.slice\(\)\s*:\s*null/.test(src),
     'computeThreeLevel 必须导出逐区面积（zoneAreas）');
   assert.equal((src.match(/const PE_OD_SERIES = \[/g) || []).length, 1, 'PE_OD_SERIES 只允许定义一次');
+
+  /* 被调用侧：trunk-size 只能按 (flow, targetV, floorOd) 三个位置参数调选档器 */
+  const size = read('mod/trunk-size.js');
+  assert.ok(/picker\(pick\.flow,\s*targetV,\s*floorOd\)/.test(size),
+    'trunk-size 必须按 3 参调用 picker(flow, targetV, floorOd)');
+  assert.ok(!/picker\([^)]*series/.test(size), 'trunk-size 不许把 series/sdr 塞进 picker');
 });
 
 test('⑨ 接线：浮层三条分支（有反推/反推失败/无接口）', () => {
@@ -180,4 +189,35 @@ test('⑩ 接线：宿主取数 + 面板行 + 页面/SW 登记', () => {
   assert.ok(/mod\/trunk-size\.js\?v=/.test(idx), 'index.html 必须引用 trunk-size.js（带缓存串）');
   const sw = read('sw.js');
   assert.ok(/"mod\/trunk-size\.js"/.test(sw), 'sw.js 的 CORE 名单必须收录 trunk-size.js');
+});
+
+/* ⑪ 数值锁（v946）：用**真实**选档器复算一次田块级算例，钉住「总管比主管粗」这个方向。
+   算例来自用户截图：G1 = 1、2 区，各 34.8 / 35.0 亩 ≈ 23400 m²，滴带 0.6m、滴孔 0.3m、滴头 1.6 L/h
+     · 单位面积流量 = 1.6/1000/0.6/0.3 = 0.0088889 m³/h·m²
+     · 每区 q = 23400 × 0.0088889 = 208.0 m³/h ⇒ 两区合流 Q = 416.0 m³/h
+     · 按 1.5 m/s 经济流速：Ø315 时 v≈2.03、Ø355 时 v≈1.60 ⇒ 取最接近 1.5 的 Ø355
+   ⇒ 总管 Ø355 **远大于**下游主管 Ø160（截图里主管已经是 160 上限），方向没错。
+   这条锁也是「选档器接线错了」的探测器：接线错 ⇒ picker 返回 undefined ⇒ ok:false ⇒ 直接红。 */
+test('⑪ 数值锁：G1（2 区×23400 m²，滴头 1.6 L/h）⇒ 416 m³/h ⇒ Ø355，且远大于主管 Ø160', () => {
+  const r = T.suggest({
+    zoneAreas: [23400, 23400, 23400, 23400],
+    groups: [[0, 1], [2, 3]],
+    tapeSpacing: 0.6, emitterSpacing: 0.3, emitterFlow: 1.6,
+    targetV: 1.5, minOd: 90, mainOd: 160, branchOd: 160,
+    selectPipe: picker
+  });
+  assert.equal(r.ok, true, '有面积有参数有分组 ⇒ 必须出结果（ok:false 说明选档器接线又断了）');
+  assert.ok(Math.abs(r.flow - 416.0) < 0.2, '两区合流应约 416 m³/h，实际 ' + r.flow);
+  assert.equal(r.od, 355, '按 1.5 m/s 应选 Ø355');
+  assert.ok(r.od > 160, '总管必须比它供的主管（Ø160）粗 —— 这正是用户直觉的那条口径');
+  assert.ok(r.velocity > 1.2 && r.velocity < 1.9, '落档流速应在经济区间附近，实际 ' + r.velocity);
+});
+
+/* ⑫ 档位封顶：下限被抬到序列之外 ⇒ 说清「没有可选档位」，不再吐「低于下限…选不出结果」 */
+test('⑫ 下限超出序列上限 ⇒ reason=no-candidate + 指名下限值', () => {
+  const r = T.suggest(Object.assign({}, BASE, { minOd: 600 }));
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'no-candidate');
+  assert.match(r.text, /Ø600/);
+  assert.match(r.text, /超出|没有可选档位/);
 });

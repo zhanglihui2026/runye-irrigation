@@ -1916,8 +1916,9 @@ window.tlTrunkOdAdvice = function (opts) {
       mainOd: r.mainPipe && r.mainPipe.od,
       branchOd: r.branchPipe && r.branchPipe.od,
       minOd: MAIN_PIPE_MIN_OD,
-      series: PE_OD_SERIES,
-      sdr: SDR,
+      /* 只注入站内的 selectPipe 包装器（序列/SDR 已在里面固化）。**不要**再传 series/sdr：
+         本文件这个包装器是 4 参 (Q, targetV, minOd, maxOd)，多塞两个实参会被当成 minOd，
+         档位全被过滤掉（v946 修的就是这个——报「低于下限 xxx mm 选不出结果」）。 */
       selectPipe: selectPipe
     });
   } catch (e) { return null; }
