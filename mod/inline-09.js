@@ -1815,23 +1815,56 @@ function tlEstimateGroupHead(r, zoneIndexes, areaOverride) {
   var qGroup = members.reduce(function (s, zi) { return s + Number(areas[zi]) * perM2; }, 0);
   if (!(qGroup > 0)) return null;
   var par = Math.max(1, Number(r.branchParallelCount) || 1);
-  var frontLoss = hazenWilliams(r.frontLenUsed, qGroup, r.frontPipe.id);
-  var rows = members.map(function (zi) {
+  var branchF = (typeof r.branchF === 'number' && isFinite(r.branchF)) ? r.branchF : 1;
+
+  /* [v955] ★ 三段管径必须与本组**实际流量**同源（用户 2026-11-04 拍板）。
+     旧写法直接吃 r.frontPipe / r.mainPipe / r.branchPipe —— 那三个是 computeThreeLevel 用
+     「单个分区面积」输入值算出的 flowAreaM2 选的管，而这里算损失用的是**地图分区实测面积**。
+     实测面积通常大于输入值（默认 30 亩 ≈ 20000 m²，实测分区常在 23000~24000），于是：
+       流量高 ~17% → Q^1.852 放大 1.34 倍 → 再叠加管径低一档（D^-4.87 ≈ ×1.43）
+       ⇒ 主管损失凭空接近翻倍（实测 7.63 m，同源后应为 3.98 m）。
+     更糟的是卡片自己建议 Ø225、损失却按 Ø200 算 —— 同一张卡两个口径（用户一眼看出"偏大"）。
+     改法：总管按 qGroup、各自主管按本区 q、支管按 q/并联数，全部现选；顺带把「下游最小口径」
+     也算成这几档，trunkAdvice 与损失从此同源。 */
+  var picks = {};
+  var maxMainOd = 0, maxBranchOd = 0;
+  members.forEach(function (zi) {
     var q = Number(areas[zi]) * perM2;
-    var mainLoss = hazenWilliams(r.mainLenUsed, q, r.mainPipe.id);
-    var branchLoss = hazenWilliams(r.branchLenUsed, q / par, r.branchPipe.id) * r.branchF;
+    var bp = selectPipe(q / par, r.targetV, 0, BRANCH_PIPE_MAX_OD);
+    var mp = selectPipe(q, r.targetV, MAIN_PIPE_MIN_OD);
+    picks[zi] = { q: q, branch: bp, main: mp };
+    if (mp && mp.od > maxMainOd) maxMainOd = mp.od;
+    if (bp && bp.od > maxBranchOd) maxBranchOd = bp.od;
+  });
+  var downstreamMinOd = Math.max(MAIN_PIPE_MIN_OD, maxMainOd, maxBranchOd);
+  var trunkPick = missing.length ? null : selectPipe(qGroup, r.targetV, downstreamMinOd);
+  var frontId = trunkPick ? trunkPick.id : (r.frontPipe && r.frontPipe.id);
+
+  /* [v955] 总管长度**只认地图实测 / 设计图面**，不吃 tl_frontPipeLen 的试算默认值（200 m）。
+     用户 2026-11-04：「总管就按照地图实测多长就是多长来计算，不要再加这个 200 米」——
+     那张 200 m 是「还没画总管时」的设计页试算值，地图上明明画了 510.4 m 却按 200 m 算，
+     等于把总管损失换成一个人造数（还和面板上显示的实测长打架）。
+     没画总管 ⇒ frontLen=0 且 frontSource='none'，卡片必须明说「总管未绘制，该项未计」。 */
+  var frontLen = 0, frontSource = 'none';
+  if ((r.frontLenSrc === 'mapTrunk' || r.frontLenSrc === 'figure') && r.frontLenUsed > 0) {
+    frontLen = r.frontLenUsed; frontSource = r.frontLenSrc;
+  }
+  var frontLoss = hazenWilliams(frontLen, qGroup, frontId);
+
+  var rows = members.map(function (zi) {
+    var p = picks[zi];
+    var mainLoss = hazenWilliams(r.mainLenUsed, p.q, p.main.id);
+    var branchLoss = hazenWilliams(r.branchLenUsed, p.q / par, p.branch.id) * branchF;
     var total = frontLoss + mainLoss + branchLoss;
     var rawHead = r.lift + r.dh + r.tapePressureM - r.existPressure * 10.2 + total + r.filterLoss + MARGIN_HEAD;
     return {
-      zi: zi, flow: q,
+      zi: zi, flow: p.q,
       frontLoss: frontLoss, mainLoss: mainLoss, branchLoss: branchLoss,
       totalLoss: total,
       head: RyDesignCore.head(Math.max(0, rawHead), 0, 0, SAFETY_FACTOR)
     };
   });
   var worst = rows.reduce(function (a, b) { return !a || b.totalLoss > a.totalLoss ? b : a; }, null);
-  var downstreamMinOd = Math.max(MAIN_PIPE_MIN_OD, Number(r.mainPipe && r.mainPipe.od) || 0, Number(r.branchPipe && r.branchPipe.od) || 0);
-  var trunkPick = (!missing.length && qGroup > 0) ? selectPipe(qGroup, r.targetV, downstreamMinOd) : null;
   return {
     members: members,
     missing: missing,
@@ -1839,16 +1872,30 @@ function tlEstimateGroupHead(r, zoneIndexes, areaOverride) {
     flow: qGroup,
     /* ★ 三个位必须让 UI 看得见：估算 / 用了哪三段长度 / 长度来源 */
     estimated: true,
-    lengths: { front: r.frontLenUsed, main: r.mainLenUsed, branch: r.branchLenUsed },
-    lengthSource: { front: r.frontLenSrc || null, main: r.wp && r.wp.fromFigure ? 'figure' : 'estimate', branch: r.wp && r.wp.fromFigure ? 'figure' : 'estimate' },
+    lengths: { front: frontLen, main: r.mainLenUsed, branch: r.branchLenUsed },
+    lengthSource: { front: frontSource, main: r.wp && r.wp.fromFigure ? 'figure' : 'estimate', branch: r.wp && r.wp.fromFigure ? 'figure' : 'estimate' },
+    /* [v955] 损失实际用的三段管径（与 trunkAdvice 同源，卡片要照抄这一行，别再让用户自己猜） */
+    pipes: {
+      front: trunkPick ? { od: trunkPick.od, id: trunkPick.id, v: trunkPick.v } : { od: (r.frontPipe && r.frontPipe.od) || null, id: frontId || null, v: (r.frontPipe && r.frontPipe.v) || null },
+      mainOd: maxMainOd || null,
+      branchOd: maxBranchOd || null,
+      perZone: members.map(function (zi) {
+        return { zi: zi, flow: picks[zi].q, mainOd: picks[zi].main.od, branchOd: picks[zi].branch.od };
+      })
+    },
+    /* 未被管损包含的两项（富余水头 / 安全系数）：卡片要单列，避免被当成管损 */
+    marginHead: MARGIN_HEAD,
+    safetyFactor: SAFETY_FACTOR,
+    filterLoss: r.filterLoss,
+    staticHead: r.lift + r.dh + r.tapePressureM - r.existPressure * 10.2,
     trunkAdvice: trunkPick ? {
       od: trunkPick.od,
       id: trunkPick.id,
       velocity: trunkPick.v,
       targetVelocity: r.targetV,
       minDownstreamOd: downstreamMinOd,
-      mainOd: r.mainPipe && r.mainPipe.od,
-      branchOd: r.branchPipe && r.branchPipe.od
+      mainOd: maxMainOd || null,
+      branchOd: maxBranchOd || null
     } : null,
     frontLoss: worst.frontLoss,
     mainLoss: worst.mainLoss,

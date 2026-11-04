@@ -873,10 +873,31 @@
         '<div class="mfg-value">本轮需求扬程 ≈ '+(isFinite(loss.head)?Number(loss.head).toFixed(2):'—')+' m'+(est?'（估算）':'')+'</div>'+
         '<div class="mfg-loss">本轮最不利路径损失 ≈ '+totalLoss.toFixed(2)+' m'+(est?'（估算）':'')+'</div>'+
         '<div class="mfg-breakdown">总管 '+(Number(loss.frontLoss)||0).toFixed(2)+' + 主管 '+(Number(loss.mainLoss)||0).toFixed(2)+' + 支管 '+(Number(loss.branchLoss)||0).toFixed(2)+' m</div>';
-      if(est&&loss.lengths){
-        lines+='<div class="mfg-advice-note">按长度估算：总管 '+Number(loss.lengths.front||0).toFixed(1)+' m · 主管 '+
-          Number(loss.lengths.main||0).toFixed(1)+' m · 支管 '+Number(loss.lengths.branch||0).toFixed(1)+
-          ' m；在「分区与管路」生成施工图后改为逐区实长</div>';
+      /* [v955] 口径自证升级（用户 2026-11-04）：
+         ① 三段**实际用的管径**要写出来 —— 不然用户只看到建议 Ø225，不知道损失是按哪个口径算的；
+         ② 总管长度只认地图实测/图面，没画就写「未绘制（未计入）」，不再拿 200 m 试算值充数；
+         ③ 富余水头与安全系数单列一行 —— 它们是「合计之后另加的」，不属于那 X m 管损。 */
+      if(est){
+        var PP=loss.pipes||null, LL=loss.lengths||null;
+        if(PP&&PP.front&&isFinite(PP.front.od)&&isFinite(PP.mainOd)&&isFinite(PP.branchOd)){
+          lines+='<div class="mfg-advice-note">估算口径：按 Ø '+Number(PP.front.od)+' 总管 / Ø '+Number(PP.mainOd)+
+            ' 主管 / Ø '+Number(PP.branchOd)+' 支管（按本组实际流量选档）</div>';
+        }
+        if(LL){
+          var fSrc=(loss.lengthSource&&loss.lengthSource.front)||'none';
+          var fTxt=fSrc==='mapTrunk'
+            ? '总管 '+Number(LL.front||0).toFixed(1)+' m（地图实测）'
+            : (fSrc==='figure'
+              ? '总管 '+Number(LL.front||0).toFixed(1)+' m（设计图面）'
+              : '总管未绘制（未计入）');
+          lines+='<div class="mfg-advice-note">管长：'+fTxt+' · 主管 '+Number(LL.main||0).toFixed(1)+' m · 支管 '+
+            Number(LL.branch||0).toFixed(1)+' m（主管/支管为试算长，生成施工图后改为逐区实长）</div>';
+        }
+        if(isFinite(loss.marginHead)&&isFinite(loss.safetyFactor)){
+          lines+='<div class="mfg-advice-note">另加富余水头 '+Number(loss.marginHead).toFixed(1)+
+            ' m，合计后再乘安全系数 '+Number(loss.safetyFactor).toFixed(2)+
+            '（两项都不在上面这 '+totalLoss.toFixed(2)+' m 管损里）</div>';
+        }
       }
       if(Array.isArray(loss.zones)&&loss.zones.length){
         lines+='<div class="mfg-zone-list" aria-label="本轮各分区水力参数">'+loss.zones.map(function(z){
