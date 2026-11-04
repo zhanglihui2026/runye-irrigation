@@ -818,6 +818,89 @@
     var el=document.getElementById('mapFlowGroupInfo');
     if(el){el.hidden=true;el.innerHTML='';}
   }
+
+  /* [v957] 这张卡原来是 pointer-events:none 的纯展示浮层（点击穿透给地图，不挡任何操作）。
+     用户 2026-11-04：「这个悬浮卡片要变成可拖动的」—— 一旦可交互就必然吃指针事件，
+     所以口径定为：**只有卡片自身这块矩形吃事件**，卡外的地图操作完全不变；
+     拖动整张卡（不是只能抓标题），位置存 localStorage，双击标题复位。
+     不 preventDefault（那会连带压掉 dblclick 的兼容事件），防选中靠 .is-dragging 的 user-select:none，
+     防触摸滚动靠 CSS 的 touch-action:none（手机端没它一拖就变成页面滚动）。 */
+  var GROUP_CARD_POS_KEY = 'ryMapGroupCardPos';
+  var GROUP_CARD_DEFAULT = { left: 12, top: 52 };
+
+  /* 位置必须夹在宿主（.map-wrap）内：卡片被拖出可视区就再也抓不回来了 */
+  function clampCardPos(el, host, x, y) {
+    var maxX = Math.max(0, host.clientWidth - el.offsetWidth);
+    var maxY = Math.max(0, host.clientHeight - el.offsetHeight);
+    return { x: Math.min(Math.max(x, 0), maxX), y: Math.min(Math.max(y, 0), maxY) };
+  }
+
+  function setupGroupCardDrag(el){
+    if(el.__ryDragBound) return;
+    el.__ryDragBound = true;
+    el.title = '按住可拖动；双击标题复位';
+    el.addEventListener('pointerdown', function (ev) {
+      if (ev.button !== 0) return;
+      var t = ev.target;
+      if (t && t.closest && t.closest('a,button,input,select,textarea')) return;  /* 卡片以后加按钮别被拖走 */
+      var host = el.offsetParent || el.parentElement;
+      if (!host) return;
+      var hr = host.getBoundingClientRect(), r0 = el.getBoundingClientRect();
+      var offX = ev.clientX - r0.left, offY = ev.clientY - r0.top;
+      var moved = false;
+      el.style.right = 'auto'; el.style.bottom = 'auto';
+      el.style.left = Math.round(r0.left - hr.left) + 'px';
+      el.style.top = Math.round(r0.top - hr.top) + 'px';
+      el.classList.add('is-dragging');
+      try { el.setPointerCapture(ev.pointerId); } catch (eCap) {}
+      function onMove(e2) {
+        moved = true;
+        var p = clampCardPos(el, host, e2.clientX - hr.left - offX, e2.clientY - hr.top - offY);
+        el.style.left = p.x + 'px'; el.style.top = p.y + 'px';
+      }
+      function onUp() {
+        el.classList.remove('is-dragging');
+        try { el.releasePointerCapture(ev.pointerId); } catch (eRel) {}
+        window.removeEventListener('pointermove', onMove, true);
+        window.removeEventListener('pointerup', onUp, true);
+        window.removeEventListener('pointercancel', onUp, true);
+        if (!moved) return;   /* 单击（没移动）不写位置，避免误触把默认位顶掉 */
+        var keep = clampCardPos(el, host, parseInt(el.style.left, 10) || 0, parseInt(el.style.top, 10) || 0);
+        try { localStorage.setItem(GROUP_CARD_POS_KEY, JSON.stringify({ x: keep.x, y: keep.y })); } catch (eLs) {}
+      }
+      /* capture 阶段监听：手指划出卡片、或指针被别的元素接管时也不会丢事件 */
+      window.addEventListener('pointermove', onMove, true);
+      window.addEventListener('pointerup', onUp, true);
+      window.addEventListener('pointercancel', onUp, true);
+    });
+    /* 双击标题复位。**不能用 ev.target.closest('.mfg-title') 判断**：这张卡会随组切换
+       /地图移动重渲染 innerHTML，按下与松开之间标题节点可能已被换掉，事件 target 就变成
+       整个 section（探针实测：pointerdown 命中 mfg-title，dblclick 却落在 map-flow-group-info），
+       用 closest 判断会直接失效。改成用坐标命中标题矩形 —— 与"哪个节点被重渲染"无关。 */
+    el.addEventListener('dblclick', function (ev) {
+      var t = el.querySelector('.mfg-title');
+      if (!t) return;
+      var r = t.getBoundingClientRect();
+      if (!r.width || !r.height) return;
+      if (ev.clientX < r.left || ev.clientX > r.right || ev.clientY < r.top || ev.clientY > r.bottom) return;
+      el.style.left = GROUP_CARD_DEFAULT.left + 'px';
+      el.style.top = GROUP_CARD_DEFAULT.top + 'px';
+      try { localStorage.removeItem(GROUP_CARD_POS_KEY); } catch (eRm) {}
+    });
+  }
+
+  /* 每次显示都按存档复位（并重新夹一遍）：窗口变小/地图换尺寸后旧坐标可能已在可视区外 */
+  function restoreGroupCardPos(el){
+    if(!el) return;
+    var host = el.offsetParent || el.parentElement;
+    if(!host) return;
+    var saved = null;
+    try { saved = JSON.parse(localStorage.getItem(GROUP_CARD_POS_KEY) || 'null'); } catch (e) { saved = null; }
+    if(!saved || !isFinite(saved.x) || !isFinite(saved.y)) return;
+    var p = clampCardPos(el, host, saved.x, saved.y);
+    el.style.left = p.x + 'px'; el.style.top = p.y + 'px';
+  }
+
   function updateGroupInfo(d,g){
     var el=document.getElementById('mapFlowGroupInfo');
     if(!el||!d||!(g>=0))return;
@@ -924,6 +1007,9 @@
     }
     el.innerHTML=lines;
     el.hidden=false;
+    /* [v957] 显示后再接管拖动：hidden 时 offsetParent 为 null，量不到宿主尺寸 */
+    setupGroupCardDrag(el);
+    restoreGroupCardPos(el);
   }
 
   window.RyMapFlowDemo = {
