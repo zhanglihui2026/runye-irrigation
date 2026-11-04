@@ -7746,3 +7746,38 @@ VERSION=`v962-announce-simple`、线上 `ry-ann-list` 残留 0；
 static 615/619、全量 634/638（4 红仍为既有）；refs PASS；lint 0。
 · 小坑：线上复量时 `sw.js` 第一次报 DIFF、隔一分钟连测三次全等 —— 边缘节点传播时间差，
   别急着判「发布失败」，同一文件复量两次再下结论。
+
+### §26.168 v963-pp-formula-off（2026-11-04，取消二级「扬程计算式」）
+
+用户原话：「二级管网的扬程计算式取消吧。」（截图红框 = 二级左栏「水力计算结果」条下面那一段：
+灰条标题「扬程计算式」+ 深色拆解算式「扬程 H =（提升 5.00 + 地形 1.00 + 入口压力 10.20 + …）× 1.10 = …」）
+
+**改法（只动 index.html 的三行 DOM）**：
+· 删 `<div class="ry-props-head">扬程计算式</div>` 与 `<div id="ppCalcDetail" class="pp-calc-formula pp-calc-h">`；
+· 二级左栏分组条从三组变两组（灌溉参数 / 计算结果），`#ppZoneCalHead` 默认 display:none 照旧；
+· **水泵扬程本身没动**：仍在「水力计算结果」条的 `planPumpHead`；三级页那套（`#ppHeadBreak` +
+  由 plan-calc-render 输出的「扬程计算式」标题）**原样保留** —— 用户只点名二级。
+
+**代码侧零改动即安全（改前先确认过）**：
+· `mod/plan-calc-render.js` 的 `renderPlanCalcDetail` 第一行取元素、第二行 `if (!el) return;`；
+· `mod/plot-editor.js` 的 `ppFormulaFold` 是 `var d2 = getElementById('ppCalcDetail'); var h2 = d2 && d2.previousElementSibling;`
+  再判 `if (h2 && …)` ⇒ d2 为空时整段跳过，不会出现「折叠状态挂在空节点上」。
+⇒ 删节点后两处都自然 no-op，**没有**留下半截折叠逻辑或空渲染。判空是这次能不能安全删的前提，
+以后再加回这类「可删块」时先做同样的检查。
+
+**样式与恢复路径**：`.pp-calc-formula` / `.pp-cf-*` 一族保留在 `mod/ry-panel.css`（恢复那三行 DOM 即可原样回来，
+不用重写皮肤）。恢复说明写进了 index.html 的 v963 注释里。
+
+**新锁 `tests/pp_no_head_formula.test.cjs` 4/4**：①二级 aside 里 `#ppCalcDetail` 与「扬程计算式」灰条都不在
+（并且**全 index.html 里出现 0 次** —— 不许留 display:none 死节点）；②三级 `#ppHeadBreak` 与它的标题仍在
+（防「顺手把三级的也删了」）；③两个消费方必须判空（正则钉住 `if (!el) return;` 与 `d2 && d2.previousElementSibling`）；
+④`.pp-calc-formula`/`.pp-cf-num`/`.pp-cf-final` 样式保留。
+
+**探针 `probe_pp_formula_gone.mjs` 4/4**（跳转 `#pipePlanSection` 后量真实页面）：左栏 `#ppCalcDetail` 为空、
+`.ry-props-head` 只剩「灌溉参数」「分区管径明细（实切）」、`#ppPlanBar2` 与 `planPumpHead` 行仍在、
+三级 `#ppHeadBreak` 存在、**全程零 Runtime.exceptionThrown**（删 DOM 最怕别处 `.style` 访问炸掉渲染链，这条是重点）。
+· 探针里「扬程」值显示 `—` 是空态（headless 没有选中地块 ⇒ 没有设计数据），不是缺陷；
+  同理 `#ppSide` 高度为 0，所以这次没出可视截图，判据全走 DOM/文本。
+
+发布：master `489789d`，线上 `sw.js` / `index.html` sha 全等、VERSION=`v963-pp-formula-off`、
+线上 `id="ppCalcDetail"` 残留 0；static 619/623、全量 638/642（4 红仍为既有）；refs PASS；lint 0。
