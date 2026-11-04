@@ -34,7 +34,7 @@
 (function (root) {
   'use strict';
 
-  var VERSION = 'v946-trunk-od-picker-fix';
+  var VERSION = 'v964-tier-step-note';
 
   /* 与 inline-09 的 MAIN_PIPE_MIN_OD 同值；调用方注入时以注入值为准。
      留着这个默认值只是为了「面板单独调用」时不至于算出 DN50 的总管。 */
@@ -172,11 +172,71 @@
     };
   }
 
+  /* ── 档位台阶（v964，用户 2026-11-04「第 8 区扬程突然升高了…不正常我认为」）───────
+     现象：8 个区面积 34.1~35.1 亩时扬程都在 38.4~39.2 m，只有 31.6 亩的第 8 区
+     窜到 44.6 m —— **面积最小的区扬程最高**，看起来像算错了。
+
+     逐项拆开（与卡片上的数字一致）后是这么回事：第 8 区 Q=87.48 m³/h，按「经济流速
+     就近取档」选了 Ø160（v=1.66 m/s）；其余区 Q=94~97 落在 Ø180（v≈1.44）。
+     Ø160/Ø180 的两档分界流量是 **88.25 m³/h** —— 第 8 区只差 0.77 m³/h（0.9%）没跨过去。
+     管径小一档，Hazen 的 D^-4.87 就把 510 m 总管 + 527 m 主管的损失从 9.6 m 推到 17.0 m，
+     乘 1.10 安全系数后就是那 6 m 的「突然升高」。
+
+     所以这不是取数错、也不是面积错，是**离散管径 + 就近选档**在档位分界处的台阶：
+     流向下一档只差一点点的区，反而被钉在细档上吃亏。这个函数只做「把台阶算出来」，
+     不动任何既有数字（选档规则是全局口径，改它会动到二级/三级/总管建议的每一个数）。
+     宿主拿到 saved / head 后在卡片里写一行自证，用户就知道该不该按大一档施工。 */
+  var TIER_OVER_RATIO = 1.05;   /* 选中档流速超目标 5% 以上才算「被钉在细档」 */
+
+  /* o = {
+       flow   该段流量 m³/h（主管=本区流量；总管=本组合流）
+       length 该段长度 m（0/缺 ⇒ 返回 null：没这段就没有损失可比）
+       od     当前选中的外径 mm
+       targetV 经济流速 m/s（缺省 1.5）
+       nextOd (od) ⇒ 上一档外径 mm（由调用方注入，**本文件不写档位表**，见文件头 ②）
+       inner  (od) ⇒ 内径 mm（注入 peInnerDiam，与 selectPipe 同一 SDR 口径）
+       hazen  (L, Q, id) ⇒ m（注入站内 hazenWilliams，C 值不许在这里另立）
+     }
+     返回 { fromOd, toOd, vNow, vAlt, targetV, gapFlow, gap, lossNow, lossAlt, saved, over }
+       gapFlow = 就近选档在这两档之间的分界流量（m³/h）；gap = gapFlow − flow（正数=还没跨过去）
+       saved   = 按大一档能少多少米损失（>0 才有提示价值）
+       over    = 选中档流速是否明显超目标（超了才说明「被钉在细档」） */
+  function tierStep(o) {
+    o = o || {};
+    var q = num(o.flow), L = num(o.length), od = num(o.od);
+    if (!(q > 0) || !(L > 0) || !(od > 0)) return null;
+    var targetV = num(o.targetV);
+    if (!(targetV > 0)) targetV = 1.5;
+    var nextOf = o.nextOd, innerOf = o.inner, hz = o.hazen;
+    if (typeof nextOf !== 'function' || typeof innerOf !== 'function' || typeof hz !== 'function') return null;
+    var toOd = num(nextOf(od));
+    if (!(toOd > od)) return null;                     /* 已经是最大档：没有台阶可说 */
+    var idNow = num(innerOf(od)), idAlt = num(innerOf(toOd));
+    if (!(idNow > 0) || !(idAlt > 0)) return null;
+    var areaNow = Math.PI * Math.pow(idNow / 1000, 2) / 4;
+    var areaAlt = Math.PI * Math.pow(idAlt / 1000, 2) / 4;
+    if (!(areaNow > 0) || !(areaAlt > 0)) return null;
+    var vNow = q / 3600 / areaNow, vAlt = q / 3600 / areaAlt;
+    /* 分界：|v_now − V| = |v_alt − V| ⇒ Q·(1/A_now + 1/A_alt)/3600 = 2V */
+    var gapFlow = (2 * targetV * 3600) / (1 / areaNow + 1 / areaAlt);
+    var lossNow = num(hz(L, q, idNow)), lossAlt = num(hz(L, q, idAlt));
+    if (!isNum(lossNow) || !isNum(lossAlt)) return null;
+    return {
+      fromOd: od, toOd: toOd,
+      vNow: vNow, vAlt: vAlt, targetV: targetV,
+      gapFlow: gapFlow, gap: gapFlow - q,
+      lossNow: lossNow, lossAlt: lossAlt, saved: lossNow - lossAlt,
+      over: vNow > targetV * TIER_OVER_RATIO
+    };
+  }
+
   root.RyTrunkSize = {
     VERSION: VERSION,
     DEFAULT_MIN_OD: DEFAULT_MIN_OD,
+    TIER_OVER_RATIO: TIER_OVER_RATIO,
     zoneFlows: zoneFlows,
     groupFlows: groupFlows,
-    suggest: suggest
+    suggest: suggest,
+    tierStep: tierStep
   };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -981,6 +981,25 @@
             ' m，合计后再乘安全系数 '+Number(loss.safetyFactor).toFixed(2)+
             '（两项都不在上面这 '+totalLoss.toFixed(2)+' m 管损里）</div>';
         }
+        /* [v964] 档位台阶自证（用户 2026-11-04：「第 8 区扬程突然升高了」）：
+           估算的管径是现选的，就近取档在分界处有台阶 —— 差 0.9% 流量就可能被钉在细一档，
+           损失反而比大区高出一截。不把这层说出来，用户只会看到「越小的区扬程越高」。
+           数字全部来自 inline-09 的 tierNote（算法在 mod/trunk-size.js，Node 单测锁着），
+           本处只排版，不重算。 */
+        if(loss.tierNote){
+          var tn=loss.tierNote;
+          var st=(tn.main&&tn.main.over)?tn.main:((tn.front&&tn.front.over)?tn.front:null);
+          var tTxt='档位台阶：'+(Number(tn.zi)+1)+'区 '+Number(tn.flow).toFixed(2)+' m³/h';
+          if(st){
+            tTxt+=' 距 Ø'+Number(st.toOd)+' 档分界（'+Number(st.gapFlow).toFixed(2)+'）还差 '+
+              Math.max(0,Number(st.gap)).toFixed(2)+' m³/h';
+            tTxt+='，按 Ø'+Number(st.fromOd)+' 时流速 '+Number(st.vNow).toFixed(2)+
+              ' m/s（目标 '+Number(st.targetV).toFixed(2)+'）';
+          }
+          tTxt+='⇒ 总管+主管损失比大一档多 '+Number(tn.saved).toFixed(2)+' m';
+          if(st) tTxt+='；该区按 Ø'+Number(st.toOd)+' 施工则扬程约 '+Number(tn.head).toFixed(2)+' m';
+          lines+='<div class="mfg-advice-note mfg-tier-note">'+tTxt+'</div>';
+        }
       }
       if(Array.isArray(loss.zones)&&loss.zones.length){
         lines+='<div class="mfg-zone-list" aria-label="本轮各分区水力参数">'+loss.zones.map(function(z){

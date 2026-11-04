@@ -1865,6 +1865,59 @@ function tlEstimateGroupHead(r, zoneIndexes, areaOverride) {
     };
   });
   var worst = rows.reduce(function (a, b) { return !a || b.totalLoss > a.totalLoss ? b : a; }, null);
+
+  /* [v964] 档位台阶自证（用户 2026-11-04：「第 8 区扬程突然升高了…不正常我认为」）。
+     估算里三段管径是**现选**的（v955），选档规则是「经济流速就近取一档」⇒ 离散档位在
+     分界处必然出现台阶：面积最小的第 8 区 Q=87.48 m³/h 差 0.77 m³/h 没进 Ø180 档，
+     被钉在 Ø160（v=1.66 m/s），总管+主管损失比 Ø180 多 7.4 m，乘 1.10 后扬程从 36.7
+     变成 44.6 —— 于是「越小的区扬程越高」，用户看到的就是那根突然冒头的柱子。
+
+     这里**不改任何既有数字**（就近选档是全局口径，动它会牵动二级/三级/总管建议），
+     只把台阶算清楚交给卡片写一行：差多少流量、多几米损失、按大一档是多少扬程。
+     算法在 mod/trunk-size.js（纯函数、Node 单测锁着），本处只做取素材 + 注入。 */
+  var tierNote = null;
+  try {
+    var TS = window.RyTrunkSize;
+    if (TS && typeof TS.tierStep === 'function' && worst) {
+      var wPick = picks[worst.zi];
+      var stepOf = function (flow, length, pipe) {
+        if (!pipe || !(Number(pipe.od) > 0)) return null;
+        return TS.tierStep({
+          flow: flow, length: length, od: Number(pipe.od), targetV: r.targetV,
+          inner: peInnerDiam,
+          hazen: function (L, Q, id) { return hazenWilliams(L, Q, id); },
+          /* 上一档：只用本文件的 PE_OD_SERIES（档位唯一出处），不在这里另排一份序 */
+          nextOd: function (od) {
+            var i = PE_OD_SERIES.indexOf(od);
+            return (i >= 0 && i + 1 < PE_OD_SERIES.length) ? PE_OD_SERIES[i + 1] : null;
+          }
+        });
+      };
+      var mainStep = stepOf(wPick.q, r.mainLenUsed, wPick.main);
+      var frontStep = stepOf(qGroup, frontLen, trunkPick);
+      var stepSaved = (mainStep && mainStep.over ? mainStep.saved : 0) +
+        (frontStep && frontStep.over ? frontStep.saved : 0);
+      /* 少于 1 m 的差没有提示价值（还会把卡片堆满），门槛就按 1 m */
+      if (stepSaved >= 1) {
+        var altTotal = worst.totalLoss - stepSaved;
+        var altHead = RyDesignCore.head(Math.max(0,
+          r.lift + r.dh + r.tapePressureM - r.existPressure * 10.2 + altTotal + r.filterLoss + MARGIN_HEAD),
+          0, 0, SAFETY_FACTOR);
+        tierNote = {
+          zi: worst.zi,
+          flow: wPick.q,
+          targetV: r.targetV,
+          saved: stepSaved,
+          totalLoss: altTotal,
+          head: altHead,
+          /* 哪一段被钉住了就报哪一段（主管/总管可能只中一个） */
+          main: (mainStep && mainStep.over) ? mainStep : null,
+          front: (frontStep && frontStep.over) ? frontStep : null
+        };
+      }
+    }
+  } catch (eTier) { tierNote = null; }
+
   return {
     members: members,
     missing: missing,
@@ -1872,6 +1925,8 @@ function tlEstimateGroupHead(r, zoneIndexes, areaOverride) {
     flow: qGroup,
     /* ★ 三个位必须让 UI 看得见：估算 / 用了哪三段长度 / 长度来源 */
     estimated: true,
+    /* [v964] 档位台阶（null=本组没有「被钉在细档」的区）：卡片照它写一行自证 */
+    tierNote: tierNote,
     lengths: { front: frontLen, main: r.mainLenUsed, branch: r.branchLenUsed },
     lengthSource: { front: frontSource, main: r.wp && r.wp.fromFigure ? 'figure' : 'estimate', branch: r.wp && r.wp.fromFigure ? 'figure' : 'estimate' },
     /* [v955] 损失实际用的三段管径（与 trunkAdvice 同源，卡片要照抄这一行，别再让用户自己猜） */
