@@ -276,6 +276,12 @@ body:has(.ry-pwa-install) #onlineMapSection .map-trunk-hint{max-width:calc(100% 
 #onlineMapSection .ry-trunk-panel[hidden]{display:none!important}
 body:has(.ry-pwa-install) #onlineMapSection .ry-trunk-panel{bottom:96px}
 #onlineMapSection .ry-trunk-panel .tp-head{
+  /* [v958] 面板内容长到要滚动时，标题栏（含折叠/关闭按钮）锁在顶部不跟滚（用户 2026-11-04）。
+     用 sticky 而不是把面板拆成 flex 三段：**滚动容器仍是面板本身**，各个子元素的宽度
+     与现在逐像素相同 —— 拆 flex 会让 .tp-body 出现自己的滚动条，值列立刻窄 8~15px，
+     「510.4 m · 地图实测 · 5.35 m」那一行就会重新折行（v956 刚量过的边界）。
+     z-index:2 必须有：sticky 元素要盖住从它下面滚过去的内容，否则字会叠在标题上。 */
+  position:sticky;top:0;z-index:2;
   display:flex;align-items:center;gap:6px;
   padding:5px 8px;background:#f1f5f9;border-bottom:1px solid #e2e8f0}
 #onlineMapSection .ry-trunk-panel .tp-title{
