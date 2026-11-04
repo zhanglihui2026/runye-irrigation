@@ -7660,3 +7660,53 @@ if (!out.design) {
 
 发布：`3735ffd`（v959，常规 push 成功）→ `2c1a992`（v960，push 又被 502 阻断，走 `_p1/_pub_api.py --apply`）。
 线上三件 sha 全等、VERSION=`v960-note-clean`、`不含静扬程` 残留 0；static 605/609、全量 624/628（4 红仍为既有）；refs PASS；lint 0。
+
+### §26.166 v961-map-rail-drawer（2026-11-04，地图右缘抽屉：图层 + 总管参数）
+
+用户原话：「在线地图的图层悬浮面板及总管参数设置面板都靠右侧收起来，做法参照分区与管路页面中的
+多地块编辑 与图层控制面板。」
+
+**参照物口径**（`mod/inline-18.js` 的 #ppPlotDrawerTab/#tlWsLayerDrawerTab + `mod/style-01.css` v789/v803/v825 段）：
+平时收起 → 右缘一枚竖排标签（`writing-mode:vertical-rl`、**12px+`!important`**、min-height 96px、
+白底 `#c8d7ce` 细边、无右边框）→ 点击展开、再点收起 → 展开态 `#2d604b` 深绿底白字 →
+面板贴标签左侧（`right:36px`）不压住标签，否则收不回去。
+· `font-size` 必须 `!important`：runye-typography 的 `button{font-size:13px!important}` 会顶掉 12px（v825 实测）。
+
+**新模块 `mod/map-right-drawer.js`（CORE）**：
+· 在 `#onlineMapSection .map-wrap` 里建 `.ry-map-rail`（`right:0`、`pointer-events:none`，只有标签自己 `auto`），
+  两枚标签「图层」「总管参数」；
+· **面板的 `hidden` 是唯一真相**：`MutationObserver(attributeFilter:['hidden'])` 同步标签态。
+  绝不做「标签驱动面板」的单向同步 —— 面板也会被别处开关（选中总管自动弹、点面板自己的 ×）；
+· 两张卡**懒创建**（图层面板在 runye-map-enhance 建图时、总管面板在 online-map 的 ensureTrunkPanel 里），
+  用 `.map-wrap` 子树 MutationObserver 补接管，谁后到接管谁（慢 CDN 下顺序会变）。
+
+**★ 坐标：两张卡不在同一个坐标系**
+`#map` 从 `.map-wrap` 顶部往下 40px（工具条占位）⇒ 同一视觉高度要写两个 top：
+图层面板在 `#map` 内 `top:12px`；总管面板在 `.map-wrap` 内 `top:52px`。右缘统一 `right:36px`。
+每次展开都 `anchor()` 一次：清 `left/bottom` 再写 `right/top` —— ry-panel 拖拽写的是 left/top，
+只改 right/top 会「left 和 right 同时生效被拉伸」。总管面板吸顶后还要重算
+`max-height:calc(100% - 70px)`（原来那条 `calc(100% - 140px)` 是按 `bottom:30` 量的）。
+
+**★ 互斥必须同步刷标签**：`closeOther()` 里只写 `hidden=true` 的话，被关那张卡的标签高亮要等
+MutationObserver 的下个微任务才熄灭 —— 探针在同一 tick 里读到「两个标签同时亮」，外观上是一帧错位，
+逻辑上是「谁是当前面板」有两个答案。⇒ 关完立刻 `sync(d)`。
+
+**★ 总管面板的两个时序问题**
+· 它原本是「选中总管才 ensure」，启动时 DOM 里没有 ⇒ 标签只能报「面板还没准备好」（废话）。
+  ⇒ `mod/online-map.js` 建图后 `setTimeout(0)` 预热 `ensureTrunkPanel()` 并 `hide()`（buildDom 本来就带 hidden）。
+· 没选中总管时硬弹空面板会「闪一下就没」（`refresh()` 里 `if(!entry){hide();return;}`）。
+  ⇒ `syncTrunkPanel()` 写 `data-ry-has-trunk="1|0"`，标签据此决定展开还是闪提示（`.is-hint`）。
+
+**新锁 `tests/map_right_drawer.test.cjs` 6/6**：①标签条/标签/展开态/收起兜底（含 12px!important 与 26px 宽）；
+②两面板按选择器接管且默认收起；③MutationObserver + closeOther 同步 sync + 禁 display 双轨；
+④has-trunk 判定 + 预热挂载；⑤两档 top / 36px / left·bottom 清零 / max-height 重算；
+⑥index.html 与 sw.js CORE 同名版本串（这条是「功能写完但线上不生效」的唯一拦网）。
+
+**探针 `probe_map_rail.mjs` 7/7**（几何 + 状态，不读源码）：标签竖排 96px/距右 0、两卡初始 hidden、
+点开贴 right=36/top=52、再点收起、未选总管给提示不弹、两卡互斥且都贴右缘、地图中部 elementFromPoint 不被标签条拦截。
+**线上同一套探针 7/7**（`probe_map_rail_online.mjs`，PROBE_URL 走 Pages）——
+★ 首次线上跑 6 红是**首屏慢于等待循环**（rail 与 #trunkPropPanel 都没就绪就开始断言），
+加一段诊断 + 多等一会儿即全绿；线上探针的等待时间要按首屏（含 SW 安装）放宽，别按本地口径。
+
+发布：master `c2c0dd1`，线上五件（sw.js / index.html / online-map.css / online-map.js / map-right-drawer.js）sha 全等，
+VERSION=`v961-map-rail-drawer`；static 611/615、全量 630/634（4 红仍为既有）；refs PASS；lint 0。
