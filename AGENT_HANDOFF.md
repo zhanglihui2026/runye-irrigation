@@ -7403,3 +7403,38 @@ SW 自造重装风暴，§26.140 竞态在「每轮都清 SW」的用法下会�
 
 **未做**：用户若还想要「悬停即时浮层」（原生 title 有 ~1s 延迟），下一步可把 v819 的 `.dt-tip`
 改造成工具栏级 tooltip（`data-tip` + 单例浮层），但那要新增一套定位逻辑，本轮按「与分区与管路同机制」处理。
+
+### §26.158 v952-map-toolbar-fallback（2026-11-04，慢网不许闪空方块 + 探针就绪判据）
+
+**怎么发现的**：v951 发布后按惯例跑线上探针，9 项里**挂了 4 项**（③ 全无 SVG、⑥ 点击后底色不变、
+⑦⑧ 图标不在）。第一反应会以为「发布漏了」或「图标没挂上」，实际是两件事叠在一起：
+
+1. **产品侧的真相**：线上 decorate 在 `online-map.js`（页面第 2613 行的脚本）里跑，而按钮的
+   `font-size:0` 在 CSS 里**早就生效**。主页面要跑 100+ 个脚本，慢网下先看到的是
+   **11 个 32×32 的空方块**，图标要等一两秒才出现。功能没坏，但观感像坏了
+   （用户看到的第一次就是空白钮）。
+2. **探针侧的真相**：就绪判据盯的是代理量（`#mapDrawTools && window.L && window.RyIcons`），
+   这些在 online-map.js 执行**之前**就都为真 ⇒ 探针在图标还没挂上时就开始断言，
+   于是把「还没跑完」误报成「没有图标」。诊断脚本（等 9 秒）里 `decoratedCount: 11`、
+   手动 `decorate()` 返回 0（幂等，说明早就挂好了）——**证据表明代码是对的，探针是错的**。
+
+**修法（两条都要，缺一条下次还会误判）**：
+- 产品侧：`ry-icons.js` 新增 `iconizeAll()`，本脚本载入时扫描 `[data-ry-iconize]` 容器立即装饰；
+  `#mapDrawTools` 加 `data-ry-iconize`。CSS 拆成两段：
+  基础 `.mdt-btn` **不再写 font-size:0**（先显示 11px 文案、宽度自适应），
+  图标态 `.mdt-btn[data-ry-ico-svg]` 才收成 32×32 + 字号 0。
+  ⇒ 慢网/图标脚本失败时退化成「旧文字钮」，而不是一排空方块；图标一到就收成图标钮。
+  `online-map.js` 的那次 decorate 保留为**第二次机会**（幂等）。
+- 探针侧：就绪判据改成盯**效果** —— `#mapDrawTools button[data-ry-ico-svg]` 数到 11 才继续，
+  线上给足 40s。这条比任何断言都重要：**盯代理量的就绪判断会把「慢」误报成「坏」**。
+
+**顺带**：`mod/ry-icons.js?v=` 从 `824-toolbar-dedupe` 抬到 `952-…`（它在 sw CORE 白名单里，
+全局 VERSION 已覆盖 SW 侧，但 HTTP 缓存按 URL 走，不抬查询串会让老用户十分钟内拿到旧图标脚本——
+v949 抬 `runye-nav.js` 时踩过同一条）。
+
+**新增锁**：`tests/map_toolbar_unified.test.cjs` 第 ⑥ 例（7/7）——基础按钮规则里出现 `font-size:0` 即红、
+必须有 `[data-ry-ico-svg]` 图标态、`#mapDrawTools` 必须有 `data-ry-iconize`、
+`ry-icons.js` 必须有 `iconizeAll` 且真的调用一次。
+
+**验证**：探针 `probe_map_toolbar.mjs` 本地 9/9（新增「装饰完成数：11」前置日志）；
+`version_sync` 6/6；refs PASS；lint 0；static 583/587（4 红为既有）。

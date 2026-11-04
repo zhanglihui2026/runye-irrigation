@@ -131,8 +131,31 @@ test('⑤ online-map.js 不许对工具条按钮写 textContent（会擦掉 SVG�
   assert.deepEqual(textContentWrites('setBtnLabel(btnClear, "x");', IDS), []);
 });
 
-/* ---------- ⑥ 与分区与管路同源 ---------- */
-test('⑥ 外观数值在两份 CSS 里逐项同名同值（改一边不改另一边 = 红）', () => {
+/* ---------- ⑦ 图标未就绪时不许出现空方块 ---------- */
+/* ---------- ⑥ 图标未就绪时不许出现空方块 ---------- */
+test('⑥ 图标未挂上前先显示文案（慢网不许闪一排空方块）', () => {
+  const css = stripCss(cssMap);
+  /* 基础按钮规则里不许有 font-size:0 —— 那会让「图标脚本还没跑」的那段时间里
+     按钮既没文字也没图标，线上实测就是 11 个空方块。字号 0 只许挂在
+     [data-ry-ico-svg]（= decorate 已挂 SVG）的规则上。 */
+  const i = css.indexOf('.map-draw-tools .mdt-btn{');
+  assert.ok(i >= 0, '.mdt-btn 基础规则必须存在');
+  const base = css.slice(i, css.indexOf('}', i));
+  assert.equal(/font-size:\s*0/.test(base), false,
+    '基础规则不能写 font-size:0（会在图标脚本执行前露出一排空方块）');
+  const j = css.indexOf('.mdt-btn[data-ry-ico-svg]{');
+  assert.ok(j >= 0, '必须有 [data-ry-ico-svg] 的图标态规则');
+  assert.equal(/font-size:\s*0/.test(css.slice(j, css.indexOf('}', j))), true,
+    '图标态必须把字号压成 0（否则图标旁边还挂着文字）');
+  /* 容器必须被标记，ry-icons.js 才会在载入瞬间装饰它 */
+  assert.ok(/id="mapDrawTools"[^>]*data-ry-iconize/.test(stripHtml(html)),
+    '#mapDrawTools 必须带 data-ry-iconize（否则只能等页面末尾的宿主脚本装饰）');
+  assert.ok(icons.includes('iconizeAll'), 'ry-icons.js 必须提供容器级自动装饰');
+  assert.ok(/iconizeAll\(\);/.test(icons), 'ry-icons.js 载入时必须真的调用一次');
+});
+
+/* ---------- ⑦ 与分区与管路同源 ---------- */
+test('⑦ 外观数值在两份 CSS 里逐项同名同值（改一边不改另一边 = 红）', () => {
   /* 这些字面值必须在 #ryDrawingHost 那条工具栏（style-01.css）与
      地图条（online-map.css）里**同时**出现，否则就是「样式没统一」。 */
   const tokens = ['#e4ebee', '#eef2f6', '#e6f2ec', '#1c6b4f', '32px', '18px', '40px'];

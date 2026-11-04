@@ -223,4 +223,15 @@
   }
 
   window.RyIcons = { decorate: decorate, nameFor: nameFor, svgFor: svgFor, setIcon: setIcon, setLabel: setLabel, names: Object.keys(P) };
+
+  /* [v952] 标记容器自动挂图标：HTML 里带 data-ry-iconize 的容器，在本脚本载入的**那一刻**
+     就装饰，不等宿主脚本（v951 让 online-map.js 在页面末尾调 decorate，主页面要跑 100+ 个
+     脚本，线上实测慢网下会先闪出一排**空方块** —— 因为按钮的 font-size:0 在 CSS 里早就生效了）。
+     现在容器一被标记就立即装饰，宿主那边留一次幂等调用当第二次机会即可。 */
+  function iconizeAll(){
+    var hosts = document.querySelectorAll('[data-ry-iconize]');
+    for(var i = 0; i < hosts.length; i++){ try{ decorate(hosts[i]); }catch(e){} }
+  }
+  window.RyIcons.iconizeAll = iconizeAll;
+  try{ iconizeAll(); }catch(e){}
 })();

@@ -2488,8 +2488,10 @@
      图例样式跟分区与管路页面的统一」）。
      - 图标来自 mod/ry-icons.js（18px 线性 SVG，按 BY_ID 精确挂：本组里有**两组同名**
        的「完成」和一对「撤销点 / 撤销」，标签正则必然错配，所以必须走精确表）；
-     - decorate 幂等，这里挂一次就够；文案留在 DOM 里由 CSS font-size:0 隐藏，
-       悬停说明走原生 title（与分区与管路同机制）；
+     - decorate 幂等。[v952] 主装饰点是 ry-icons.js 载入时的 iconizeAll（容器带
+       data-ry-iconize 就自动挂），这里只留**第二次机会**：万一图标脚本比本文件晚到、
+       或容器被别处重建，这一行还能补上。文案留在 DOM 里由 CSS 隐藏（挂上图标才压字号 0，
+       没挂之前显示文字 —— 慢网不许闪一排空方块），悬停说明走原生 title；
      - 之后**任何**文案变化都不许写 `btn.textContent=`（会把刚挂的 SVG 一起擦掉，
        v824 的坑：点一下图标就永久变空白方块），一律走 setBtnLabel。 */
   function setBtnLabel(b, t){

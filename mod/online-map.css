@@ -51,11 +51,22 @@
 #onlineMapSection .map-draw-tools .mdt-group + .mdt-group{margin-left:10px}
 /* 按钮：32×32、透明底、无边框、字号 0（图标独占）；图标尺寸与描边由 .ry-ico 全局段给。 */
 #onlineMapSection .map-draw-tools .mdt-btn{
-  flex:0 0 32px;display:flex;align-items:center;justify-content:center;
-  width:32px;height:32px;padding:0;margin:0;box-sizing:border-box;
-  /* !important：页面级 button 规则（13px）会压过来；分区与管路那条也是这么写的 */
-  font-size:0 !important;font-family:inherit;line-height:1;
+  display:flex;align-items:center;justify-content:center;
+  min-width:32px;height:32px;margin:0;box-sizing:border-box;
+  font-family:inherit;line-height:1;
   color:#3f4a45;background:transparent;border:1px solid transparent;cursor:pointer;
+  /* [v952] 未挂图标时先显示文案（11px，宽度自适应）—— 这一步是**降级兜底**不是最终态：
+     ry-icons.js 一载入就装饰容器，装饰完下面那条 [data-ry-ico-svg] 规则接管，
+     立刻变成 32×32 图标钮。为什么不直接写死 font-size:0：本页要跑 100+ 个脚本，
+     图标脚本排在后面，慢网下会先看到一排**空方块**（v951 线上实测就是这个观感），
+     宁可先看到旧文字钮再收成图标。 */
+  padding:0 8px;font-size:11px;
+}
+/* 图标态（decorate 挂了 SVG 才生效）：32×32、字号 0、图标独占。
+   !important 压页面级 button 的 13px（分区与管路那条也这么写）。 */
+#onlineMapSection .map-draw-tools .mdt-btn[data-ry-ico-svg]{
+  flex:0 0 32px;width:32px;min-width:32px;padding:0;
+  font-size:0 !important;
 }
 #onlineMapSection .map-draw-tools .mdt-btn:hover{color:#1f2a24;background:#eef2f6}
 #onlineMapSection .map-draw-tools .mdt-btn:focus-visible{outline:2px solid #39795b;outline-offset:-2px}
