@@ -7581,3 +7581,40 @@ demo_flow_revive / plot_transfer / snap_default_off ①③）。
 **探针 `probe_card_drag.mjs` 5/5**（CDP 真鼠标事件，判据盯位移/夹边界/存档/复位）：拖 (+90,+80) 位移精确 90/80；
 拖到左外夹在 0；存档与 style 一致；双击标题回到 12/52 且存档清空。
 发布：master `65bd51e`，线上 sha 四件对齐；static 600/604（4 红为既有）；refs PASS；lint 0。
+
+### §26.164 v958-head-sticky（2026-11-04，总管参数设置面板标题栏锁顶）
+
+用户原话：「总管参数设置滚动时 标题锁定不能跟着滚动。」（`#trunkPropPanel` 的 `.tp-head`）
+
+**实现只有一行 CSS**（`mod/online-map.css`）：`.tp-head{position:sticky;top:0;z-index:2}`。
+
+**为什么是 sticky 而不是把面板拆成 flex 三段（head 固定 / body 滚动 / foot 固定）**：
+拆了之后滚动容器从「面板本身」变成 `.tp-body`，`.tp-body` 会多出一条 8~15px 的竖向滚动条，
+**值列宽度立刻从 150px 缩到 135~142px** —— v954~v956 三轮刚量过的「510.4 m · 地图实测 · 5.35 m」
+单行边界会当场重新折行（用户前一条需求正是「不要换行」）。sticky 的滚动容器仍是面板本身，
+所有子元素宽度**逐像素不变**。探针实测：面宽 226 / body 内容宽 220，损失行仍 1 行。
+· `z-index:2` 不是可选项：sticky 元素只是「位置不动」，不压层的话滚上来的正文会盖在标题字上。
+· 面板本身保留 `overflow-y:auto`（它是滚动容器），**禁止**再给 `.tp-body` 加 `overflow-y:auto` ——
+  两条规则同时成立会让 sticky 的参照系变掉，标题锁在 `.tp-body` 顶上而不是面板顶上。
+
+**★ 踩坑（第二轮同款陷阱）：判「标题是否盖住正文」不能用 `elementFromPoint`**
+`elementFromPoint` 只返回**最顶层的一个**元素，而这个页面首次访问时 `.ry-ann-mask`（`runye-announce.js`
+的公告遮罩，fixed 全屏、z-index 11990）永远在最上面 —— v957 探针被它吃掉 pointerdown，这轮又被它骗了一次：
+`pos==='sticky'` 已为真、②③ 也全绿，只有 ④ 报 `hit=false`，一打印 `hitTag` 才发现命中的是 `div.ry-ann-ma.k`。
+**改判据：用 `document.elementsFromPoint()` 拿整条绘制栈（由顶到底），断言 `.tp-head` 的索引 < `.tp-row` 的索引**。
+这条判据直接量「谁压谁」，对任何外来浮层免疫。实测 `headIdx=2 < rowIdx=3`。
+以后凡是要判「A 在 B 之上」，一律走栈顺序；`elementFromPoint` 只适合判「这个点能不能点到」。
+
+**新锁 `tests/trunk_panel_head_sticky.test.cjs` 4/4**：① `.tp-head` 有 `position:sticky` + `top:0`；
+② `z-index>=1`；③ 面板保留 `overflow-y:auto` 且**禁** `.tp-body{overflow-y:auto}`；④ 禁退回 `absolute/fixed`。
+
+**探针 `probe_head_sticky.mjs` 5/5**（在真页面里造 24 行 + 损失拆分 + 页脚的假面板，`max-height:240px`）：
+① 可滚（sh>ch）；② `scrollTop=140` 后标题 y 不变（±1px）；③ 首行确实上移；④ 绘制栈里标题压住正文；⑤ 有滚动条时损失行仍单行。
+另出两张 2x 截图对照：滚到顶首行是「字段 1」、滚到 140 首行变成被裁一半的「字段 6」，标题栏位置逐像素相同。
+
+**发布踩坑（这次 push 是真失败）**：`git push` 报 schannel / `CONNECT tunnel failed, response 502`，
+而 `git ls-remote` 也一起失败 —— **只有一个 sha 打印出来时，那是本地 `rev-parse HEAD` 的输出，不是远端值**，
+上一轮差点据此误判「已推送」（线上 VERSION 一直是 v957 才暴露）。判定口径不变：`ls-remote` 必须显式打印
+`refs/heads/master` 那一行。网络阻断走兜底 `python _p1/_pub_api.py --dry|--apply|--verify`
+（Git Data API，只取**提交里**的 blob ⇒ 不夹带工作区并行会话的未提交改动；`--verify` 会核对 567 个文件的树/blob SHA）。
+发布：master `9385061`，线上三件 sha 全等、VERSION=`v958-head-sticky`；static 600/604（4 红为既有：demo_flow_revive / plot_transfer / snap_default_off ①③）；refs PASS；lint 0。
