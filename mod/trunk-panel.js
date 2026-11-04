@@ -236,6 +236,12 @@
 
   /* ── 联合复核（规格七）：总管 + 下游分区管网 ─────────────────────────────
    *
+   * ★ [v965] **面板已不展示这一块**（用户 2026-11-04 第二次点名要取消，红框圈住标题、
+   *   「总管」「下游」两行、复核结论与底部说明）。UI 现在只调 `designBlock()` 渲染损失拆分。
+   *   本函数保留为「下游段统计 / 结论文案」的唯一实现，`tests/trunk_joint_review.test.cjs`
+   *   与 `tests/seg_trunk_to_map.test.cjs` ③ 仍拿它当口径锚点（v842 双重计数那个坑就是
+   *   A4 断言 360 记下来的）。要彻底删：先删那两个测试，再把本函数与 kindOf/segLenOf 一起删。
+   *
    * [v843 定稿] 合计口径已由用户拍板（2026-11-01）：
    *   **扬程按「在线地图总管长度 + 分区主管及支管长度」算。**
    *   ⇒ 三段损失相加，而这个和**就是三级页 computeThreeLevel 的 totalPipeLoss**
@@ -485,12 +491,14 @@
         '<div class="tp-row"><span class="tp-k">沿程水头损失</span><b class="tp-v tp-ro" id="tpHf">—</b></div>' +
         '<div class="tp-row"><span class="tp-k">局部损失预估</span><b class="tp-v tp-ro" id="tpHj">—</b></div>' +
         '<div class="tp-sep"></div>' +
-        '<div class="tp-joint" id="tpJoint">' +
-          '<div class="tp-jt-h">联合复核<span class="tp-jt-sub">总管 + 下游分区管网</span></div>' +
-          '<div class="tp-jt-rows" id="tpJointRows"></div>' +
-          '<div class="tp-jt-checks" id="tpJointChecks"></div>' +
-          '<div class="tp-jt-note" id="tpJointNote"></div>' +
-        '</div>' +
+        /* [v965] 「联合复核」整块取消（用户 2026-11-04 第二次点名，红框圈住：总管行 / 下游行 /
+           复核结论 / 底部说明）。v959 只删了它下面那段说明文字，块本体还在 —— 这次连标题、
+           #tpJointRows 里的「总管」「下游」两行、#tpJointChecks、#tpJointNote 一起拿掉，
+           只留「损失拆分」。要恢复：把下面这段 DOM 换回
+             '<div class="tp-joint" id="tpJoint">' + 标题 + rows + checks + note + '</div>'
+           并把 paintLoss 里被删掉的 tParts / 下游行 / checks / note 四段接回去（handoff §26.165
+           有当时的完整代码）。 */
+        '<div class="tp-jt-rows" id="tpLossRows"></div>' +
       '</div>' +
       '<div class="tp-foot">' +
         '<button type="button" class="tp-btn" id="tpRecheck">重新复核水力</button>' +
@@ -632,7 +640,7 @@
       vEl.className = 'tp-v tp-ro' + (d.vLevel ? ' tp-v-' + d.vLevel : '');
       q('tpHf').textContent = fmtM(d.hf);
       q('tpHj').textContent = fmtM(d.hj);
-      paintJoint(d);
+      paintLoss();
     }
 
     /* 占位项文案：只在"外径还没选"时存在（refresh 里补的 option[value=""]）。
@@ -690,31 +698,22 @@
       }
     }
 
-    /* 联合复核渲染。每帧都重算：下游快照可能在别的页被重生成过（show/复核时都会重进这里）。
-       ★ 这里只**展示** jointReview 的结论，不在这里做任何判断 —— 判断在纯函数里、Node 单测锁着。 */
-    function paintJoint(d) {
-      var rowsEl = q('tpJointRows'), ckEl = q('tpJointChecks'), noteEl = q('tpJointNote');
-      if (!rowsEl || !ckEl || !noteEl) return;
-      var layout = (typeof opts.getLayout === 'function') ? opts.getLayout() : null;
-      /* 三级计算式：合计损失的唯一来源。宿主那边 getDesign 是「现算」的薄封装，
-         取不到（未加载/异常）就传 null，本函数会退回只做对照。 */
+    /* 损失拆分渲染（[v965] 「联合复核」整块取消后只剩这一节）。
+       每帧都重算：三级计算式可能在别的页被改过（重新生成管线图、改滴灌参数）。
+       数字全部来自 designBlock(computeThreeLevel()) —— 三级页那套口径，本面板不另算一份；
+       这里只**排版**，不在这里做任何判断（判断在纯函数里、Node 单测锁着）。 */
+    function paintLoss() {
+      var rowsEl = q('tpLossRows');
+      if (!rowsEl) return;
       var design = (typeof opts.getDesign === 'function') ? opts.getDesign() : null;
-      var jr = jointReview(curEntry(), layout, d, design);
-      var T = jr.trunk, D = jr.down, G = jr.design;
-
-      var tParts = [];
-      if (T.code) tParts.push(esc(T.code));
-      if (T.material) tParts.push(esc(T.material));
-      if (T.dn !== null) tParts.push('DN' + T.dn);
-      if (T.flow !== null) tParts.push('Q ' + round2(T.flow) + ' m³/h');
-      if (T.v !== null) tParts.push(fmtV(T.v));
-      if (T.hf !== null) tParts.push('损失 ' + fmtM(T.hf));
+      /* 三级计算式：合计损失的唯一来源。宿主那边 getDesign 是「现算」的薄封装，
+         取不到（未加载/异常）就传 null ⇒ 整节不渲染（不拿 0 顶，也不显示半截空行）。 */
+      var G = designBlock(design);
 
       /* [v954] 值片段包裹器：每段「数 + 单位 / 一句短说明」各自 nowrap，断行只许发生在段与段之间。
          不加这个，word-break:break-word 会把「1.91 km」拆成「1.91 / km」、「5.35 m」拆成
          「5.35 / m」—— 226px 面板里这几乎每行都会发生（用户截图指出）。
-         ★ 分隔点「 · 」写进**后一段**的 span 里（见 sepJoin），否则行尾会吊一个孤零零的「·」。
-         定义提到最前面：上面「总管」「下游」两行也要用。 */
+         ★ 分隔点「 · 」写进**后一段**的 span 里（见 sepJoin），否则行尾会吊一个孤零零的「·」。 */
       var nw = function (t, title) {
         return '<span class="tp-jt-nw"' + (title ? ' title="' + esc(title) + '"' : '') + '>' + esc(t) + '</span>';
       };
@@ -733,16 +732,7 @@
         return out.length ? out.join(' ') : '—';
       };
 
-      var html =
-        '<div class="tp-jt-row"><span>总管</span><b>' + sepJoin(tParts) + '</b></div>' +
-        '<div class="tp-jt-row"><span>下游</span><b>' + (jr.hasLayout
-          ? sepJoin([
-            '主管 ' + D.mainCount + ' 段',
-            '支管 ' + D.branchCount + ' 段',
-            D.mainMaxDn !== null ? '最大主管 DN' + D.mainMaxDn : null,
-            D.lenM !== null ? '管长合计 ' + fmtLen(D.lenM) : null
-          ])
-          : '—') + '</b></div>';
+      var html = '';
 
       /* 损失拆分。三段长度口径不同，必须逐行标出来：
          总管 = 一条线（在线地图实测）、主管/支管 = 各自最不利那一条，不是地图上的管线总长。 */
@@ -759,8 +749,10 @@
           : (G.src === 'figure' ? '总管长度取设计图面'
             : (G.src === 'input' ? '总管长度取试算输入（尚未画总管/未生成施工图）' : ''));
         var FRONT = G.front, MAIN = G.main, BRANCH = G.branch;
-        html += '<div class="tp-jt-sep"></div>' +
-          '<div class="tp-jt-h2">损失拆分<span>按一条最不利路径</span></div>' +
+        /* [v965] 原来这里先有一个 .tp-jt-sep：它是「联合复核」与「损失拆分」之间的分隔线。
+           联合复核整块取消后，面板级的 .tp-sep 已经是这条线了，再留一个就是两条并排的线
+           （视觉上像多出一格空行），所以删掉。 */
+        html += '<div class="tp-jt-h2">损失拆分<span>按一条最不利路径</span></div>' +
           '<div class="tp-jt-row tp-jt-loss"><span>总管</span><b>' + sepJoin([
             fmtLen(FRONT),
             srcTag ? { t: srcTag, title: srcFull } : null,
@@ -777,13 +769,6 @@
             : '');
       }
       rowsEl.innerHTML = html;
-
-      ckEl.innerHTML = jr.checks.map(function (c) {
-        return '<div class="tp-jt-check is-' + esc(c.level) + '">' + esc(c.text) + '</div>';
-      }).join('');
-
-      noteEl.textContent = jr.note || '';
-      noteEl.hidden = !jr.note;
     }
 
     function refresh() {

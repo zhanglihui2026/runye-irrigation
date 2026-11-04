@@ -24,10 +24,11 @@ const ROOT = path.join(__dirname, '..');
 const rawCss = fs.readFileSync(path.join(ROOT, 'mod', 'online-map.css'), 'utf8');
 const css = rawCss.replace(/\/\*[\s\S]*?\*\//g, '');
 const rawJs = fs.readFileSync(path.join(ROOT, 'mod', 'trunk-panel.js'), 'utf8');
-/* 只看 paintJoint 那段（别把面板别处的 <span> 标签也算进来） */
+/* 只看「损失拆分」那段渲染函数（[v965] 起叫 paintLoss —— 原 paintJoint 里的联合复核
+   两行「总管」「下游」已随整块取消，本文件锁的是剩下六行的排版） */
 const jsPaint = (() => {
-  const i = rawJs.indexOf('function paintJoint(');
-  assert.ok(i >= 0, 'trunk-panel.js 里必须还有 paintJoint');
+  const i = rawJs.indexOf('function paintLoss(');
+  assert.ok(i >= 0, 'trunk-panel.js 里必须还有损失拆分的渲染函数 paintLoss');
   const j = rawJs.indexOf('function refresh(', i);
   return rawJs.slice(i, j > i ? j : i + 20000);
 })();
@@ -71,7 +72,10 @@ test('③ 值一律包 .tp-jt-nw（nowrap），且分隔点粘在后一段里', 
   const single = [...jsPaint.matchAll(/nw\(fmt(?:Len|M)\(/g)].length;
   const multi = [...jsPaint.matchAll(/sepJoin\(\[/g)].length;
   assert.ok(single >= 3, '合计损失/管路总长/三级页扬程 三行应各走一次 nw()，实际 ' + single + ' 处');
-  assert.ok(multi >= 4, '总管(信息)/下游/总管(损失)/主管/支管 应走 sepJoin()，实际 ' + multi + ' 处');
+  /* [v965] 原来是 4 处（总管(信息)/下游 + 总管(损失)/主管/支管），联合复核整块取消后
+     只剩损失拆分那三段，所以下限改成 3。**仍要求三段都走 sepJoin**：
+     谁要是为了「省事」把某段改成裸拼，这里就会掉到 2 并判红。 */
+  assert.ok(multi >= 3, '总管(损失)/主管/支管 三段应各走一次 sepJoin()，实际 ' + multi + ' 处');
   /* ★ 分隔点必须写进**后一段**的 span 里：写成 join(' · ') 会让行尾吊一个孤零零的「·」（v954 第一版） */
   assert.ok(/nw\(\(out\.length \? '· ' : ''\) \+ t/.test(jsPaint),
     'sepJoin 必须把「· 」拼进后一段再 nowrap，否则行尾会吊一个分隔点');
@@ -96,10 +100,14 @@ test('⑤ 「管路总长」「三级页扬程」两个标签仍在，且各自�
 });
 
 /* ⑥ 「下游」那行同样要按段 nowrap —— 它是最长的一行，拆开就会出现「1.91 / km」 */
-test('⑥ 「下游」行四段各自 nowrap（不许把 1.91 km 拆成 1.91 / km）', () => {
-  const i = jsPaint.indexOf('<span>下游</span>');
-  assert.ok(i >= 0, '下游 行不见了');
-  const block = jsPaint.slice(i, i + 600);
-  assert.ok(/sepJoin\(\[/.test(block), '下游 的四段必须走 sepJoin（逐段 nowrap），否则单位会被拆到下一行');
-  assert.ok(/管长合计 ' \+ fmtLen\(D\.lenM\)/.test(block), '管长合计 段要保留（材料量口径，别删）');
+test('⑥ 联合复核的两行行首不许回来（总管信息 / 下游），损失拆分六行仍在', () => {
+  /* [v965] 用户 2026-11-04 第二次点名：整个「联合复核」块取消，`<span>总管</span>`（信息行）
+     与 `<span>下游</span>` 都不许再渲染。这条从「要求下游行在」反转成「要求它不在」——
+     但**损失拆分那三段的 `<span>总管</span>` 必须留着**（同一标签名出现在两行里，别误删）。 */
+  assert.equal(jsPaint.indexOf('<span>下游</span>'), -1, '「下游」行已取消，不许回来');
+  assert.equal(jsPaint.indexOf('jr.hasLayout'), -1, '下游段的判空逻辑应随行一起删（留着就是死分支）');
+  const loss = jsPaint.slice(jsPaint.indexOf('损失拆分'));
+  assert.ok(loss.indexOf('<span>总管</span>') >= 0 && loss.indexOf('<span>主管</span>') >= 0 &&
+    loss.indexOf('<span>支管</span>') >= 0, '损失拆分三段（总管/主管/支管）必须还在');
+  assert.ok(/sepJoin\(\[/.test(loss), '三段各自走 sepJoin（逐段 nowrap），否则单位会被拆到下一行');
 });
