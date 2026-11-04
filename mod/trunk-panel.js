@@ -709,30 +709,67 @@
       if (T.v !== null) tParts.push(fmtV(T.v));
       if (T.hf !== null) tParts.push('损失 ' + fmtM(T.hf));
 
+      /* [v954] 值片段包裹器：每段「数 + 单位 / 一句短说明」各自 nowrap，断行只许发生在段与段之间。
+         不加这个，word-break:break-word 会把「1.91 km」拆成「1.91 / km」、「5.35 m」拆成
+         「5.35 / m」—— 226px 面板里这几乎每行都会发生（用户截图指出）。
+         ★ 分隔点「 · 」写进**后一段**的 span 里（见 sepJoin），否则行尾会吊一个孤零零的「·」。
+         定义提到最前面：上面「总管」「下游」两行也要用。 */
+      var nw = function (t, title) {
+        return '<span class="tp-jt-nw"' + (title ? ' title="' + esc(title) + '"' : '') + '>' + esc(t) + '</span>';
+      };
+      /* segs: 字符串数组（空值跳过；对象形式 {t,title} 用来带悬停全文）
+         → 第一段原样、后续段前面粘「· 」，段与段之间只留可断的普通空格 */
+      var sepJoin = function (segs) {
+        var out = [];
+        for (var i = 0; i < segs.length; i++) {
+          var s = segs[i];
+          if (s === null || s === undefined || s === '') continue;
+          var obj = (typeof s === 'object');
+          var t = obj ? s.t : s;
+          if (t === null || t === undefined || t === '') continue;
+          out.push(nw((out.length ? '· ' : '') + t, obj ? s.title : null));
+        }
+        return out.length ? out.join(' ') : '—';
+      };
+
       var html =
-        '<div class="tp-jt-row"><span>总管</span><b>' + (tParts.length ? tParts.join(' · ') : '—') + '</b></div>' +
+        '<div class="tp-jt-row"><span>总管</span><b>' + sepJoin(tParts) + '</b></div>' +
         '<div class="tp-jt-row"><span>下游</span><b>' + (jr.hasLayout
-          ? ('主管 ' + D.mainCount + ' 段 · 支管 ' + D.branchCount + ' 段' +
-             (D.mainMaxDn !== null ? ' · 最大主管 DN' + D.mainMaxDn : '') +
-             (D.lenM !== null ? ' · 管长合计 ' + fmtLen(D.lenM) : ''))
+          ? sepJoin([
+            '主管 ' + D.mainCount + ' 段',
+            '支管 ' + D.branchCount + ' 段',
+            D.mainMaxDn !== null ? '最大主管 DN' + D.mainMaxDn : null,
+            D.lenM !== null ? '管长合计 ' + fmtLen(D.lenM) : null
+          ])
           : '—') + '</b></div>';
 
       /* 损失拆分。三段长度口径不同，必须逐行标出来：
          总管 = 一条线（在线地图实测）、主管/支管 = 各自最不利那一条，不是地图上的管线总长。 */
       if (G) {
-        var srcTag = G.src === 'mapTrunk'
-          ? '在线地图实测'
-          : (G.src === 'figure' ? '设计图面' : (G.src === 'input' ? '试算输入' : ''));
+        /* [v954] 长度来源标签改「两个字的短词」，全文放 title：
+           面板本体只有 226px，「在线地图实测」这 5 个字会把总管那一行撑到折行，
+           而这一行的重点是长度与损失两个数 —— 来源是补充信息，悬停能看到全文就够。 */
+        var srcTag = G.src === 'mapTrunk' ? '实测'
+          : (G.src === 'figure' ? '图面' : (G.src === 'input' ? '试算' : ''));
+        var srcFull = G.src === 'mapTrunk' ? '总管长度取在线地图实测'
+          : (G.src === 'figure' ? '总管长度取设计图面'
+            : (G.src === 'input' ? '总管长度取试算输入（尚未画总管/未生成施工图）' : ''));
+        var FRONT = G.front, MAIN = G.main, BRANCH = G.branch;
         html += '<div class="tp-jt-sep"></div>' +
           '<div class="tp-jt-h2">损失拆分<span>按一条最不利路径</span></div>' +
-          '<div class="tp-jt-row tp-jt-loss"><span>总管</span><b>' + fmtLen(G.front) +
-            (srcTag ? ' · ' + esc(srcTag) : '') + ' · ' + fmtM(G.frontLoss) + '</b></div>' +
-          '<div class="tp-jt-row tp-jt-loss"><span>主管</span><b>' + fmtLen(G.main) + ' · ' + fmtM(G.mainLoss) + '</b></div>' +
-          '<div class="tp-jt-row tp-jt-loss"><span>支管</span><b>' + fmtLen(G.branch) + ' · ' + fmtM(G.branchLoss) + '</b></div>' +
-          '<div class="tp-jt-row tp-jt-sum"><span>合计损失</span><b>' + fmtM(G.totalLoss) + '</b></div>' +
-          '<div class="tp-jt-row"><span>管路总长</span><b>' + fmtLen(G.lenSum) + '</b></div>' +
+          '<div class="tp-jt-row tp-jt-loss"><span>总管</span><b>' + sepJoin([
+            fmtLen(FRONT),
+            srcTag ? { t: srcTag, title: srcFull } : null,
+            fmtM(G.frontLoss)
+          ]) + '</b></div>' +
+          '<div class="tp-jt-row tp-jt-loss"><span>主管</span><b>' +
+            sepJoin([fmtLen(MAIN), fmtM(G.mainLoss)]) + '</b></div>' +
+          '<div class="tp-jt-row tp-jt-loss"><span>支管</span><b>' +
+            sepJoin([fmtLen(BRANCH), fmtM(G.branchLoss)]) + '</b></div>' +
+          '<div class="tp-jt-row tp-jt-sum"><span>合计损失</span><b>' + nw(fmtM(G.totalLoss)) + '</b></div>' +
+          '<div class="tp-jt-row"><span>管路总长</span><b>' + nw(fmtLen(G.lenSum)) + '</b></div>' +
           (G.pumpHead !== null
-            ? '<div class="tp-jt-row"><span>三级页扬程</span><b>' + fmtM(G.pumpHead) + '</b></div>'
+            ? '<div class="tp-jt-row"><span>三级页扬程</span><b>' + nw(fmtM(G.pumpHead)) + '</b></div>'
             : '');
       }
       rowsEl.innerHTML = html;

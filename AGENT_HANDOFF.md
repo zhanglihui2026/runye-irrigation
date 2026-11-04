@@ -7461,3 +7461,37 @@ v949 抬 `runye-nav.js` 时踩过同一条）。
 **验证**：探针实测三处左沿同为 10px；`version_sync` 6/6；refs PASS；lint 0；static 585/589（4 红为既有）。
 **注意**：#tlPlanBar 的 `padding-top/bottom:10px` 与 `margin-bottom:8px` 未动 ——
 用户只提了左沿；纵向间距若要收紧（与 8px+8px 的叠距合并）需另说。
+
+### §26.160 v954-jt-nowrap（2026-11-04，总管面板「损失拆分」行不再折行）
+
+**用户诉求（原话）**：「红框的文字格式调整下，管路总长文字不要换行，三级页扬程文字也不要换行。」
+（红框 = 在线地图右侧「总管参数设置」面板里的「联合复核 / 损失拆分」区）
+
+**病根（两条，都在 CSS/渲染结构上）**：
+① `.tp-jt-row>span{flex:0 0 30px}` —— 标签字号 10px，30px 只够 **3 个汉字**；而「管路总长」「三级页扬程」
+   是 4~5 个字，且标签没写 nowrap ⇒ 被压成「管路总/长」「三级页/扬程」两行。
+   另外 `.tp-jt-loss>span/.tp-jt-sum>span` 又单独覆盖成 48px ⇒ 两套列宽，值列左沿还参差 18px。
+② 值是整串纯文本 + `word-break:break-word` ⇒ 在任意位置断，「5.35 m」被拆成「5.35 / m」、
+   「1.91 km」被拆成「1.91 / km」；「在线地图实测」5 个字本身就把 226px 面板的那行撑爆。
+
+**改法**：
+· CSS：标签列 `flex:0 0 52px` + `white-space:nowrap`（52 = 最长标签「三级页扬程」5 字 × 10px + 2 余量），
+  删掉 48px 那套覆盖；新增 `.tp-jt-nw{white-space:nowrap}`。
+· JS：paintJoint 加 `nw(文本, title)` 包裹器 + `sepJoin(segs)` 多段拼接器 ——
+  **分隔点「· 」拼进后一段的 span 里**（`nw((out.length ? '· ' : '') + t)`）。
+  写成 `join(' · ')` 时 v954 第一版实测行尾会吊一个孤零零的「·」（截图确认），所以点必须在段内。
+· 来源标签由「在线地图实测 / 设计图面 / 试算输入」缩成「实测 / 图面 / 试算」，**全文进 title**
+  （「在线地图实测」是 5 个字，留着必折行）。
+
+**新增锁 `tests/trunk_joint_label_nowrap.test.cjs` 6/6**：
+① 标签列宽 ≥ 最长标签字数 × 字号（**从 JS 抓标签文案、从 CSS 抓字号现算**，以后调字号/加长标签会红）；
+② 不许再出现 30px / 48px 两套列宽；③ 值走 nw()/sepJoin()，且分隔点必须在段内（断言 `join(' · ')` 不出现）；
+④ 来源标签短词 + 全文进 title；⑤ 两个标签行仍在；⑥「下游」行四段也走 sepJoin。
+**反向自检已做**：把 52px 改回 30px 跑一次，① ② 立刻红（提示「装不下最长的三级页扬程」）。
+
+**验证**：探针 `probe_jt_nowrap.mjs` 5/5（用真实 CSS + 真实 computeThreeLevel 数据，
+判据盯效果：标签 scrollWidth ≤ clientWidth、值 `offsetHeight/lineHeight` ≤ 1.01、无 `.tp-jt-nw` 被拆成两行 rect）；
+`version_sync` 6/6；refs PASS；lint 0；static 591/595、`node --test tests/*.test.cjs` 610/614（**4 红为既有**：
+demo_flow_revive / plot_transfer / snap_default_off ①③）。
+**未动**：「下游」行仍是 3 行（4 段在 150px 值列里最多 2 段/行）—— 单位不再被拆，只是整段换行；
+若要压成 2 行得删「最大主管 DN160」或加宽面板，均未做（用户只要求那两行不换行）。

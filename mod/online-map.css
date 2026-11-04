@@ -334,10 +334,18 @@ body:has(.ry-pwa-install) #onlineMapSection .ry-trunk-panel{bottom:96px}
 #onlineMapSection .ry-trunk-panel .tp-jt-sub{font-weight:400;color:#94a3b8;font-size:10px!important}
 #onlineMapSection .ry-trunk-panel .tp-jt-rows{display:flex;flex-direction:column;gap:2px}
 #onlineMapSection .ry-trunk-panel .tp-jt-row{display:flex;align-items:baseline;gap:6px;line-height:1.45}
-#onlineMapSection .ry-trunk-panel .tp-jt-row>span{flex:0 0 30px;color:#64748b;font-size:10px!important}
+/* [v954] 标签列宽按**最长标签**定：最长的「三级页扬程」是 5 个汉字 × 10px = 50px，取 52px，
+   并一律 nowrap。旧值 `flex:0 0 30px` 只够 3 个汉字，于是「管路总长」「三级页扬程」被压成
+   「管路总/长」「三级页/扬程」两行（用户 2026-11-04 截图指出）。
+   标签都是定长词，折行永远不是想要的效果 —— 宁可窄一点的值列，也不折标签。 */
+#onlineMapSection .ry-trunk-panel .tp-jt-row>span{
+  flex:0 0 52px;color:#64748b;font-size:10px!important;white-space:nowrap}
 #onlineMapSection .ry-trunk-panel .tp-jt-row>b{
   flex:1 1 auto;min-width:0;font-weight:600;color:#1e293b;font-size:11px!important;
   font-variant-numeric:tabular-nums;word-break:break-word}
+/* 值里的每个「数字 + 单位」「来源词」各自 nowrap，断行只允许发生在「 · 」处。
+   否则会出现「… · 5.35 / m」这种把单位单独甩到下一行的断法（同一张截图）。 */
+#onlineMapSection .ry-trunk-panel .tp-jt-nw{white-space:nowrap}
 #onlineMapSection .ry-trunk-panel .tp-jt-checks{display:flex;flex-direction:column;gap:2px;margin-top:2px}
 #onlineMapSection .ry-trunk-panel .tp-jt-check{
   font-size:10.5px!important;line-height:1.5;padding-left:11px;position:relative;color:#475569}
@@ -355,9 +363,8 @@ body:has(.ry-pwa-install) #onlineMapSection .ry-trunk-panel{bottom:96px}
   display:flex;align-items:baseline;gap:5px;margin-bottom:2px;
   font-size:10.5px!important;font-weight:700;color:#334155}
 #onlineMapSection .ry-trunk-panel .tp-jt-h2>span{font-weight:400;color:#94a3b8;font-size:10px!important}
-/* 三段的标签比上面两行宽一点（"总管/主管/支管"两字，"合计损失"四字） */
-#onlineMapSection .ry-trunk-panel .tp-jt-loss>span,
-#onlineMapSection .ry-trunk-panel .tp-jt-sum>span{flex:0 0 48px}
+/* 三段与合计的标签列：v954 起统一吃上面的 52px，不再单设 48px（两套不同宽度会让
+   「合计损失」与「总管」的值列左沿差 18px，且都容不下 5 汉字）。 */
 #onlineMapSection .ry-trunk-panel .tp-jt-loss>b{font-weight:500;color:#475569}
 #onlineMapSection .ry-trunk-panel .tp-jt-sum{
   margin-top:3px;padding-top:3px;border-top:1px dashed #cbd5e1}
