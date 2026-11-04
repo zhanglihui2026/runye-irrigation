@@ -180,11 +180,24 @@ test('⑭c 三段长度缺一个 ⇒ design=null（不拿两段当合计）', ()
   assert.equal(P.jointReview(ENTRY, LAYOUT, null, d).design, null);
 });
 
-test('⑭d 合计必须写清"不含静扬程/工作压力/安全系数"（别让人拿 1.28 m 当扬程）', () => {
+/* [v959] 原 ⑭d 断言「note 必须写清 不含静扬程 / 1.10 安全系数 / 扬程计算式」——
+   用户 2026-11-04 明确要求删掉那段说明（226px 面板里四行字太占地方），断言随之反转。 */
+test('⑭d 口径说明段已取消：有 design 时 note 必须为空', () => {
   const jr = P.jointReview(ENTRY, LAYOUT, null, DESIGN);
-  assert.match(jr.note, /不含静扬程/);
-  assert.match(jr.note, /1\.10 安全系数/);
-  assert.match(jr.note, /扬程计算式/);
+  assert.ok(!jr.note, '有三级计算式时不再往面板底部塞说明文字，实际=' + JSON.stringify(jr.note));
+});
+
+test('⑭d2 说明段不许从别处溜回面板（反向锁）', () => {
+  /* ★ 反向断言的铁律：先剥注释再查。
+     trunk-panel.js 里留着「[v959] 删掉了哪句话」的注释（故意保留来防止有人好心加回去），
+     注释里当然带着原文 —— 不剥就会把自己的注释当成违规（v957 已踩一次）。 */
+  const raw = fs.readFileSync(path.join(__dirname, '..', 'mod', 'trunk-panel.js'), 'utf8');
+  const src = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  assert.ok(!/不含静扬程/.test(src), '面板代码里不许再出现「不含静扬程…」那段说明');
+  assert.ok(!/1\.10 安全系数/.test(src), '面板代码里不许再出现「1.10 安全系数」解释');
+  assert.ok(!/扬程计算式/.test(src), '面板代码里不许再引用「三级页扬程计算式」');
+  /* 但「取不到数据」的提示必须留着：那不是解释，是缺数据的诊断。 */
+  assert.ok(/未取到三级计算式/.test(src), '缺三级计算式时的提示不能一起删掉');
 });
 
 test('⑭e 总管长度来源要带出来（地图实测 / 图面 / 试算输入）', () => {
