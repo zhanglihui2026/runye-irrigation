@@ -1734,6 +1734,10 @@ function computeThreeLevel() {
     inversePath: (pathZones ? {zones: pathZones.filter(function(z){return z.flow>0;}).map(function(z){ return Object.assign({},z,{area:z.flow*tapeSpacing*emitterSpacing*1000/emitterFlow}); }), groups:pathGroups.map(function(g){return g.filter(function(id){return pathZones.some(function(z){return z.zi===id && z.flow>0;});});}).filter(function(g){return g.length>0;}), calibers:appliedPipes ? appliedPipes.calibers : null} : null),
     /* 流量口径（2026-09-21）：flowAreaM2=最大分区实际面积(m²)，flowAreaSrc='figureMaxZone'|'input' */
     flowAreaM2, flowZoneMu, flowAreaSrc,
+    /* [v945] 逐区实际面积(m²，按分区序号 0 基，缺失位为 0)。总管口径反推要用「每个区各自的
+       面积」而不是「最大分区面积 × 区数」——后者假设各区等大，实际地块裁切后常常差 20% 以上，
+       会把手绘总管的口径推细。取不到网格时 null（调用方据此明说"没有分区面积"）。 */
+    zoneAreas: zoneStat ? zoneStat.cells.slice() : null,
     /* v95 联合分区：combinedAreaM2=最大一组实际面积和(m²)；worstGroup={g:组号(0基),zones:分区序号(0基),sum:m²}；
        无图面数据时 worstGroup=null、combinedAreaM2=flowAreaM2×zoneCount（初步估算） */
     combinedAreaM2, groupCount: (zoneStat ? zoneStat.groupCount : 0),
@@ -1778,6 +1782,145 @@ window.tlGroupLossOf = function (g) {
     return r.groupLoss[g] || null;
   } catch (e2) { return null;
   }
+};
+
+/* 在线地图按自身当前轮灌组成员请求水力结果，避免地图的组号与本页 tl_zoneCount
+   分组序号不一致时误报“逐组数据尚未生成”。数据仍来自同一张图面的逐分区路径，
+   每个区的扬程按该轮组实际合流流量计算，组扬程取其中最不利区。 */
+window.tlMapGroupHydraulicsOf = function (zoneIndexes) {
+  try {
+    if (!Array.isArray(zoneIndexes) || !zoneIndexes.length || !window.RyPipePathLoss ||
+        typeof window.RyPipePathLoss.calculate !== 'function') return null;
+    var r = computeThreeLevel();
+    if (!r || !r.inversePath || !Array.isArray(r.inversePath.zones) || !r.inversePath.zones.length) return null;
+    var available = r.inversePath.zones;
+    var members = [], missing = [], seen = {};
+    zoneIndexes.forEach(function (raw) {
+      var zi = Number(raw);
+      if (!isFinite(zi) || zi < 0 || Math.floor(zi) !== zi || seen[zi]) return;
+      seen[zi] = true;
+      if (available.some(function (z) { return z.zi === zi && z.flow > 0; })) members.push(zi);
+      else missing.push(zi);
+    });
+    if (!members.length) return null;
+    var totalFlow = available.reduce(function (sum, z) {
+      return members.indexOf(z.zi) >= 0 ? sum + z.flow : sum;
+    }, 0);
+    var downstreamMinOd = Math.max(MAIN_PIPE_MIN_OD, Number(r.mainPipe && r.mainPipe.od) || 0, Number(r.branchPipe && r.branchPipe.od) || 0);
+    var trunkPick = (!missing.length && totalFlow > 0)
+      ? selectPipe(totalFlow, r.targetV, downstreamMinOd)
+      : null;
+    var check = window.RyPipePathLoss.calculate({
+      zones: available,
+      groups: [members],
+      calibers: r.inversePath.calibers,
+      /* 以当前轮灌组合反推的总管口径复算损失和需求扬程；已确认的逐段改径仍由 calibers 覆盖。 */
+      frontOd: trunkPick ? trunkPick.od : r.frontPipe.od,
+      mainOd: r.mainPipe.od,
+      branchOd: r.branchPipe.od,
+      sourceDistance: readNumber('planSrcDist', 0, { min: 0 }),
+      frontTotalOverride: (r.frontLenSrc === 'mapTrunk' && !(r.wp && r.wp.fromSeg)) ? r.frontLenMap : 0,
+      branchCount: r.branchParallelCount,
+      branchF: r.branchF,
+      innerDiam: peInnerDiam,
+      hazen: hazenWilliams
+    });
+    var rows = (check.paths || []).map(function (p) {
+      var rawHead = r.lift + r.dh + r.tapePressureM - r.existPressure * 10.2 +
+        p.total + r.filterLoss + MARGIN_HEAD;
+      return {
+        zi: p.zoneIndex,
+        flow: p.mainFlow,
+        frontLoss: p.frontPipeLoss,
+        mainLoss: p.mainLoss,
+        branchLoss: p.branchLoss,
+        totalLoss: p.total,
+        head: RyDesignCore.head(Math.max(0, rawHead), 0, 0, SAFETY_FACTOR)
+      };
+    });
+    if (!rows.length) return null;
+    var worst = rows.reduce(function (a, b) { return !a || b.totalLoss > a.totalLoss ? b : a; }, null);
+    return {
+      members: members,
+      missing: missing,
+      zones: rows,
+      flow: totalFlow,
+      trunkAdvice: trunkPick ? {
+        od: trunkPick.od,
+        id: trunkPick.id,
+        velocity: trunkPick.v,
+        targetVelocity: r.targetV,
+        minDownstreamOd: downstreamMinOd,
+        mainOd: r.mainPipe && r.mainPipe.od,
+        branchOd: r.branchPipe && r.branchPipe.od
+      } : null,
+      frontLoss: worst.frontLoss,
+      mainLoss: worst.mainLoss,
+      branchLoss: worst.branchLoss,
+      totalLoss: worst.totalLoss,
+      head: worst.head
+    };
+  } catch (e) { return null; }
+};
+
+/* [v945] 总管口径反推（用户 2026-11-04）：「地图上画的总管只是路由，直径要通过实际规划
+   地块的分区推算出来」。这里只做**取素材 + 注入**：算法在 mod/trunk-size.js（纯函数、
+   Node 单测锁着），管径档位与选档规则用本文件的 selectPipe / PE_OD_SERIES（唯一出处，
+   不复制第二份）。
+
+   为什么不能只靠 tlMapGroupHydraulicsOf：那条链要 computeThreeLevel 的 inversePath，
+   而 inversePath 的前置是 wp.fromFigure —— 需要分区与管路页生成过**段总管**（d.segTrunk）。
+   手绘总管的用户走的是「地图画线」路线，设计侧常常只有主管/支管、没有段总管 ⇒
+   inversePath 为空 ⇒ 那条链直接返回 null，界面上就是「分区管路路径或水力参数尚未齐备」。
+   但「分区面积 + 滴灌参数 + 主管/支管管径」这三样**本来就有**，足够反推口径。
+
+   opts（可选，宿主传入以覆盖默认取数）：
+     zoneAreas  逐区面积 m²（地图端从当前地块 partitions 取；缺省用 computeThreeLevel 的 zoneAreas）
+     groups     轮灌分组 [[zi…]]（缺省用 tlManualGroups，再缺省按 zoneCount 均分）
+     groupIndex 只看某一组（负数/不传 ⇒ 取最不利组） */
+window.tlTrunkOdAdvice = function (opts) {
+  opts = opts || {};
+  try {
+    var S = window.RyTrunkSize;
+    if (!S || typeof S.suggest !== 'function') return null;
+    var r = computeThreeLevel();
+    if (!r) return null;
+    var areas = (Array.isArray(opts.zoneAreas) && opts.zoneAreas.length) ? opts.zoneAreas : r.zoneAreas;
+    if (!Array.isArray(areas) || !areas.length) {
+      return { ok: false, reason: 'no-zone-area', text: '当前地块没有分区面积（先在「分区与管路」划出分区）。' };
+    }
+    var groups = (Array.isArray(opts.groups) && opts.groups.length) ? opts.groups : null;
+    if (!groups) {
+      var manual = Array.isArray(window.tlManualGroups) ? window.tlManualGroups : null;
+      if (manual && manual.length) {
+        groups = manual.map(function (g) { return (g || []).slice(); }).filter(function (g) { return g.length; });
+      } else {
+        /* 均分口径与 groupOf(zi, null, nPer) 一致：组号 = floor(zi / zoneCount)。 */
+        var per = Math.max(1, Math.round(Number(r.zoneCount) || 1)), auto = [];
+        for (var zi = 0; zi < areas.length; zi++) {
+          var gi = Math.floor(zi / per);
+          if (!auto[gi]) auto[gi] = [];
+          auto[gi].push(zi);
+        }
+        groups = auto.filter(Boolean);
+      }
+    }
+    return S.suggest({
+      zoneAreas: areas,
+      groups: groups,
+      groupIndex: (typeof opts.groupIndex === 'number' && isFinite(opts.groupIndex)) ? opts.groupIndex : null,
+      tapeSpacing: r.tapeSpacing,
+      emitterSpacing: r.emitterSpacing,
+      emitterFlow: r.emitterFlow,
+      targetV: r.targetV,
+      mainOd: r.mainPipe && r.mainPipe.od,
+      branchOd: r.branchPipe && r.branchPipe.od,
+      minOd: MAIN_PIPE_MIN_OD,
+      series: PE_OD_SERIES,
+      sdr: SDR,
+      selectPipe: selectPipe
+    });
+  } catch (e) { return null; }
 };
 
 function renderTLDerivation(r) {
@@ -5262,6 +5405,26 @@ function tlAutoGenerate(options) {
   /* v170c：options.stay 为真时不跳视图 —— AE 订阅（front 平移→重建简图）每帧触发本函数，
      若每次都 tlShowWorkspace 会把用户从简图视图强行切走（且拖动中每帤 rySetTab）。其余调用方不传 stay，行为不变。 */
   if(!options.stay){ try{ tlShowWorkspace(); }catch(e){} }
+  try{
+    /* 分区调整后生成的是一代新管线几何。先让几何绑定编辑层同步到该代；
+       节点层没有工作区渲染器的 syncGeometry，因此只清除签名仍指向旧图的节点，
+       否则规范三级适配器会以 level3-node-signature-mismatch 拒绝整张新施工图。 */
+    var generatedGeometry=window.tlDiagramData;
+    ['RyTlEditPipes','RyTlAutoEdits'].forEach(function(name){
+      var layer=window[name];
+      if(layer&&typeof layer.syncGeometry==='function')layer.syncGeometry(generatedGeometry);
+    });
+    var level3Adapter=window.RyDrawingDesignLevel3Adapter;
+    var newGeometrySig=level3Adapter&&typeof level3Adapter.geometrySignature==='function'
+      ?level3Adapter.geometrySignature(generatedGeometry):'';
+    var savedNodes=null;
+    try{savedNodes=JSON.parse(localStorage.getItem('runye_tlNodes_v1')||'null');}catch(eSavedNodes){}
+    if(newGeometrySig&&savedNodes&&savedNodes.geoSig&&savedNodes.geoSig!==newGeometrySig&&
+       window.RyTlNodes&&typeof window.RyTlNodes.reset==='function'){
+      window.RyTlNodes.reset();
+      console.info('[drawing-design] 已清除与新管线几何不匹配的三级节点');
+    }
+  }catch(eGeometryBinding){try{console.warn('[drawing-design] 三级几何状态同步失败',eGeometryBinding);}catch(eLog){}}
   try{
     var generationInputSignature=window.ryDrawingDesignGenerationInputSignature;
     var groupEdit=window.__runyeGroupEdit;

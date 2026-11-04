@@ -112,7 +112,20 @@
     }catch(e2){}
     return false;
   }
-  function tip(s){ document.getElementById('tip').textContent=s; }
+  function syncBottomMapHints(){
+    var message=document.getElementById('tip'), hint=document.getElementById('mapTrunkHint');
+    if(!hint) return;
+    if(hint.hidden){ hint.style.bottom=''; return; }
+    /* #tip 的底边固定在状态栏上方；按实际换行高度抬高常驻帮助，避免两条文案相撞。 */
+    var messageHeight=message&&message.textContent.trim()?message.getBoundingClientRect().height:0;
+    hint.style.bottom=(messageHeight?34+messageHeight+8:50)+'px';
+  }
+  function tip(s){
+    var el=document.getElementById('tip');
+    if(!el) return;
+    el.textContent=s;
+    requestAnimationFrame(syncBottomMapHints);
+  }
   function curView(){ var c=fromDisplay(map.getCenter()); return {lat:+c.lat.toFixed(6),lng:+c.lng.toFixed(6),zoom:map.getZoom()}; }
   function saveView(){ if(switchingBase) return; var v=curView(); v.ts=Date.now(); lsSet(K_VIEW,v); }
 
@@ -181,6 +194,9 @@
   // ===== 绘制逻辑 =====
   var drawing = false;
   var currentMapPlotId=null;
+  var reservoirPlaceMode=false;
+  var reservoirMarkerLayer=L.layerGroup().addTo(map);
+  var reservoirMarker=null;
   /* ===== [v831] 总管绘制状态（多干线） =====
    * 旧模型是一个布尔 drawingTrunk + 一个 trunkPoints 数组，把「是否在画」和「画的是哪条」
    * 混在一起 ⇒ 想表达「已存两条、正在画第三条」根本无处安放，打断/合并也无从谈起。
@@ -575,6 +591,7 @@
   function setAddMode(on){
     on = !!on && points.length>=2;                 // 少于 2 点没有边，加点无从谈起
     if(on===addMode){ if(on) buildMidHandles(); return; }   // 幂等
+    if(on&&reservoirPlaceMode)setReservoirPlaceMode(false);
     addMode=on;
     var b=document.getElementById('btnAddPt');
     if(b){ b.classList.toggle('btn-on',addMode); b.textContent = addMode ? '➕ 加点中…' : '➕ 加点'; }
@@ -592,6 +609,17 @@
   }
 
   map.on('click', function(e){
+    if(reservoirPlaceMode){
+      var sourcePoint=fromDisplay(e.latlng);
+      sourcePoint={lat:+sourcePoint.lat,lng:+sourcePoint.lng};
+      var sourceSnap=snapApi();
+      if(snapOn&&sourceSnap){var sourceHit=sourceSnap.nearest(sourcePoint);if(sourceHit)sourcePoint={lat:sourceHit.lat,lng:sourceHit.lng};}
+      if(saveWaterSource(sourcePoint)){
+        setReservoirPlaceMode(false);
+        tip('蓄水池已保存；拖动水池图标可调整位置，开启捕捉时会吸附到附近节点。');
+      }
+      return;
+    }
     if(trunkMode==='draw'){
       /* Leaflet 的双击会先派发两次 click、再派发 dblclick。若只在 dblclick 里收线，
          那两次 click 已经各塞了一个点（位置几乎重合）⇒ 收线后白白多出两个点。
@@ -881,6 +909,7 @@
      （旧版就是这样：setDrawing / 测距 / 右键 各清一次，漏一处就出现"两个工具同时活着"）。 */
   function setTrunkMode(mode){
     var nextMode = (mode==='draw'||mode==='edit') ? mode : 'idle';
+    if(nextMode!=='idle'&&reservoirPlaceMode)setReservoirPlaceMode(false);
     trunkDragPreview=null;      // 切模式一律丢掉拖动预览，别让状态栏停在旧数字上
     removeTrunkRubber();        // [v852] 橡皮筋跟着模式走：退出绘制（含 Esc/完成/双击收线）即清
     if(nextMode==='draw'){
@@ -971,7 +1000,7 @@
      这里只负责「给素材 / 给投影器 / 给标记 / 写 DOM」。 */
   /* [v846 规格意见] 捕捉重开默认**关闭**：吸附是高级手感，默认吸容易让新用户困惑
      「点下去线怎么自己弯了」；要吸的时候按 S 或点按钮打开。会话内记住切换，不落库。 */
-  var snapOn = false;
+  var snapOn = true;
   var snapMarker = null;
   var lastCursorLatLng = null;
 
@@ -1117,7 +1146,8 @@
   /* 采集捕捉候选。三类「本身就带经纬度」的直接给（地块顶点 / 水源 / 已存干线拐点），
      另三类（阀门 / 支管起点 / 分区顶点）走 trunkGeoBridge 反算 —— 反算不成就跳过，
      绝不拿猜出来的坐标去吸。 */
-  function refreshSnapTargets(){
+  function refreshSnapTargets(options){
+    options=options||{};
     var S=snapApi();
     if(!S) return 0;
     var input={};
@@ -1128,7 +1158,7 @@
     }
     if(plot){
       input.plotRing=plot.polyLatLng||null;
-      if(plot.waterSource) input.waterSource=plot.waterSource;
+      if(plot.waterSource&&!options.excludeWaterSource) input.waterSource=plot.waterSource;
     }
     if(trunkSaved&&Array.isArray(trunkSaved.trunks)){
       input.savedTrunks=trunkSaved.trunks;
@@ -1150,6 +1180,70 @@
     var rc=S.setTargets(list,{plotId:currentMapPlotId?String(currentMapPlotId):null, extras:snapExtras?snapExtras.stats:null});
     renderCouplerMarkers(snapExtras);
     return rc;
+  }
+
+  function reservoirIcon(){
+    return L.divIcon({className:'ry-reservoir-icon-wrap',iconSize:[54,48],iconAnchor:[27,42],
+      html:'<span class="ry-reservoir-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5C9.4 6.1 5.3 10.2 5.3 14.4a6.7 6.7 0 0 0 13.4 0C18.7 10.2 14.6 6.1 12 2.5Z"/></svg></span><span class="ry-reservoir-label">蓄水池</span>'});
+  }
+  function renderReservoir(){
+    reservoirMarkerLayer.clearLayers();
+    reservoirMarker=null;
+    if(!currentMapPlotId)return;
+    var snap=window.RyPlotLibraryStore&&window.RyPlotLibraryStore.read();
+    var matches=snap&&snap.ok?(snap.plots||[]).filter(function(p){return p&&String(p.id)===String(currentMapPlotId);}):[];
+    var source=matches.length===1&&!matches[0].merged&&!matches[0].grouped&&!matches[0].mergedInto&&matches[0].waterSource?matches[0].waterSource:null;
+    if(!source)return;
+    var point=window.RyTrunkSnap&&window.RyTrunkSnap.readPoint?window.RyTrunkSnap.readPoint(source):null;
+    if(!point)return;
+    reservoirMarker=L.marker(toDisplay(point),{icon:reservoirIcon(),draggable:true,keyboard:false,zIndexOffset:1400})
+      .addTo(reservoirMarkerLayer).bindTooltip('蓄水池 · 拖动调整位置',{direction:'top',offset:[0,-35],className:'ry-reservoir-tip',opacity:.96});
+    reservoirMarker.on('dragend',function(){
+      var moved=fromDisplay(reservoirMarker.getLatLng());
+      moved={lat:+moved.lat,lng:+moved.lng};
+      var S=snapApi();
+      if(snapOn&&S){refreshSnapTargets({excludeWaterSource:true});var hit=S.nearest(moved);if(hit)moved={lat:hit.lat,lng:hit.lng};}
+      if(!saveWaterSource(moved))renderReservoir();
+    });
+  }
+  function saveWaterSource(point){
+    if(!currentMapPlotId||!point||!isFinite(point.lat)||!isFinite(point.lng)||Math.abs(point.lat)>90||Math.abs(point.lng)>180){
+      tip('请先选中一个已保存的单独地块，再放置蓄水池。');return false;
+    }
+    var store=window.RyPlotLibraryStore, snap=store&&store.read();
+    if(!snap||!snap.ok){tip('蓄水池保存失败：地块库读取失败。');return false;}
+    var matches=(snap.plots||[]).filter(function(p){return p&&String(p.id)===String(currentMapPlotId);});
+    if(matches.length!==1){tip('蓄水池保存失败：当前地块身份无法唯一确认。');return false;}
+    var plot=matches[0];
+    if(plot.merged||plot.grouped||plot.mergedInto){tip('成组地块暂不支持单独设置蓄水池，请先选择单独地块。');return false;}
+    var next=snap.plots.map(function(p){
+      if(!p||String(p.id)!==String(currentMapPlotId))return p;
+      var copy=JSON.parse(JSON.stringify(p));copy.waterSource={lat:+point.lat,lng:+point.lng};return copy;
+    });
+    var saved=store.replace(next,snap.revision);
+    if(!saved||!saved.ok){tip('蓄水池保存失败：地块库已变化，请重新操作。');return false;}
+    renderReservoir();
+    refreshSnapTargets();
+    return true;
+  }
+  function setReservoirPlaceMode(on){
+    reservoirPlaceMode=!!on;
+    var btn=document.getElementById('btnPlaceReservoir');
+    if(btn){btn.classList.toggle('btn-on',reservoirPlaceMode);btn.setAttribute('aria-pressed',reservoirPlaceMode?'true':'false');btn.textContent=reservoirPlaceMode?'💧 点击地图放置…':'💧 蓄水池';}
+    map.getContainer().classList.toggle('placing-reservoir',reservoirPlaceMode);
+    if(!reservoirPlaceMode)return;
+    if(drawing)setDrawing(false);
+    if(measuring)finishMeasure();
+    if(addMode)setAddMode(false);
+    if(trunkMode!=='idle')setTrunkMode('idle');
+    if(!currentMapPlotId){setReservoirPlaceMode(false);tip('请先在地图中选中已保存的地块，再放置蓄水池。');return;}
+    var activeSnap=window.RyPlotLibraryStore&&window.RyPlotLibraryStore.read();
+    var activePlots=activeSnap&&activeSnap.ok?(activeSnap.plots||[]).filter(function(p){return p&&String(p.id)===String(currentMapPlotId);}):[];
+    if(activePlots.length!==1||activePlots[0].merged||activePlots[0].grouped||activePlots[0].mergedInto){
+      setReservoirPlaceMode(false);tip('蓄水池需要绑定唯一的单独地块；请先从「我的地块」选择一个单独地块。');return;
+    }
+    refreshSnapTargets({excludeWaterSource:true});
+    tip('请在地图上点击蓄水池位置；开启捕捉时会吸附到附近的总管节点。放置后可直接拖动调整。');
   }
 
   /* ===== [v918] 设计页节点常显标记层：手绘总管前用户能直接看到「节点在哪」。
@@ -1231,6 +1325,17 @@
             return line.length>=2?line:null;
           }).filter(Boolean);
         },
+        getWaterSource: function () {
+          var snap=window.RyPlotLibraryStore&&window.RyPlotLibraryStore.read();
+          var plot=snap&&snap.ok&&currentMapPlotId?(snap.plots||[]).filter(function(p){return p&&String(p.id)===String(currentMapPlotId);})[0]:null;
+          var point=plot&&window.RyTrunkSnap&&window.RyTrunkSnap.readPoint?window.RyTrunkSnap.readPoint(plot.waterSource):null;
+          if(!point)return null;
+          var display=toDisplay(point);
+          return {lat:display[0],lng:display[1]};
+        },
+        /* [v945] 逐区分区面积（m²）—— 演示浮层按分区反推总管口径时用；
+           与属性面板的「推算管径」同一个取数口，不在地图端另算面积。 */
+        getZoneAreas: currentZoneAreas,
         tip: tip,
         isMapActive: function () {
           var s = document.getElementById('onlineMapSection');
@@ -1341,12 +1446,20 @@
   function updateTrunkHint(){
     var el=document.getElementById('mapTrunkHint');
     if(!el) return;
-    if(trunkMode==='idle'){ el.hidden=true; el.textContent=''; return; }
+    if(trunkMode==='idle'){ el.hidden=true; el.textContent=''; syncBottomMapHints(); return; }
     el.hidden=false;
     el.textContent = trunkMode==='draw'
       ? ('点击加点 · 双击/回车完成 · Esc 取消 · 按住 Shift 正交 · Ctrl+Z 撤销 · 捕捉：'+(snapOn?'开启':'关闭'))
       : '点选干线后可拖拐点 · 右键打开菜单 · Ctrl+Z 撤销 · Esc 退出';
+    syncBottomMapHints();
   }
+
+  (function(){
+    var message=document.getElementById('tip');
+    if(message&&typeof ResizeObserver==='function') new ResizeObserver(syncBottomMapHints).observe(message);
+    window.addEventListener('resize',syncBottomMapHints);
+    requestAnimationFrame(syncBottomMapHints);
+  })();
 
   var snapToggleBtn=document.getElementById('btnSnapToggle');
   if(snapToggleBtn)snapToggleBtn.onclick=function(){ setSnapOn(!snapOn); };
@@ -1390,6 +1503,8 @@
     setTrunkMode('draw');
     tip('依次点击水源到地块内的折点：双击或回车完成，Esc 取消，按住 Shift 正交。灰线是已保存的干线，不会被改动。');
   };
+  var reservoirBtn=document.getElementById('btnPlaceReservoir');
+  if(reservoirBtn)reservoirBtn.onclick=function(){setReservoirPlaceMode(!reservoirPlaceMode);};
   var finishTrunkBtn=document.getElementById('btnFinishTrunk');
   if(finishTrunkBtn)finishTrunkBtn.onclick=function(){commitTrunkDraft();};
   var undoTrunkBtn=document.getElementById('btnUndoTrunk');
@@ -1598,6 +1713,7 @@
       getEntry:function(id){ return findSavedTrunk(id); },
       getLayout:currentPlotNetwork,
       getDesign:currentDesignNumbers,
+      getOdAdvice:currentOdAdvice,
       onPatch:function(id,patch){ patchTrunkParams(id,patch); },
       onRecheck:function(id){ recheckTrunk(id); },
       onMarkNode:function(id){ openNodeDialog(id,activeVertexIdx); },
@@ -1626,6 +1742,37 @@
       var r=window.computeThreeLevel();
       if(!r||typeof r!=='object') return null;
       return r;
+    }catch(e){ return null; }
+  }
+
+  /* [v945] 当前地块的逐区面积（m²，分区序号 0 基）。
+     来源与地图上分区标签的亩数是同一条：地块库里的 plot.partitions
+     （由 runye-map-partition.js 回写，每项带 zoneIndex + area + latLng）。
+     取不到返回 null —— 总管口径反推会明说「没有分区面积」，不拿 0 或均分面积瞎猜。 */
+  function currentZoneAreas(){
+    try{
+      var snap=window.RyPlotLibraryStore&&window.RyPlotLibraryStore.read();
+      if(!snap||!snap.ok||!currentMapPlotId) return null;
+      var plot=(snap.plots||[]).filter(function(p){return p&&String(p.id)===String(currentMapPlotId);})[0];
+      if(!plot||!Array.isArray(plot.partitions)||!plot.partitions.length) return null;
+      var out=[];
+      plot.partitions.forEach(function(z,i){
+        var zi=(z&&isFinite(z.zoneIndex))?Number(z.zoneIndex):i;
+        var a=Number(z&&z.area);
+        out[zi]=(isFinite(a)&&a>0)?a:null;
+      });
+      for(var k=0;k<out.length;k++) if(out[k]===undefined) out[k]=null;
+      return out.length?out:null;
+    }catch(e){ return null; }
+  }
+
+  /* [v945] 总管口径反推（供属性面板「推算管径」行）：算法在 mod/trunk-size.js，
+     取数与注入在 inline-09 的 window.tlTrunkOdAdvice。这里只负责把「当前地块的分区面积」
+     递进去 —— 地图端不重算面积，避免与分区标签/三级页出现两个不同的亩数。 */
+  function currentOdAdvice(){
+    try{
+      if(typeof window.tlTrunkOdAdvice!=='function') return null;
+      return window.tlTrunkOdAdvice({zoneAreas:currentZoneAreas()});
     }catch(e){ return null; }
   }
 
@@ -1695,7 +1842,7 @@
     var d=P.compute(entry);
     var code=(entry.params&&entry.params.code)||String(entry.id);
     if(d.v==null){
-      tip('无法复核 '+code+'：请先在右侧面板填写管径与设计流量。');
+      tip('总管本线复核尚缺参数（'+code+'）：请在右侧面板填写管径与设计流量；分区流量和扬程按下游管网单独计算。');
       return false;
     }
     var msg='已复核 '+code+'：流速 '+P.fmtV(d.v)+'（'+(V_LABEL[d.vLevel]||'—')+'），沿程 '+P.fmtM(d.hf)+'，局部 '+P.fmtM(d.hj);
@@ -2180,6 +2327,8 @@
     }
     activeTrunkId=want;
     activeVertexIdx=-1;
+    /* 重新进入编辑时，应允许属性面板再次自动弹出；关闭面板只对当前编辑会话生效。 */
+    trunkPanelMutedId=null;
     setTrunkMode('edit');
     refreshSnapTargets();      // 画另一条线时还能吸到这条线的拐点
     tip('编辑总管：点线选中，拖白点改拐点（拖到邻点上=并掉它），右键开菜单，Esc 退出。');
@@ -2193,7 +2342,17 @@
 
   var editTrunkBtn=document.getElementById('btnEditTrunk');
   if(editTrunkBtn)editTrunkBtn.onclick=function(){
-    if(trunkMode==='edit'){ exitTrunkEdit(); return; }
+    if(trunkMode==='edit'){
+      var selected=findSavedTrunk(activeTrunkId);
+      /* 编辑中关闭过信息面板，再点「编辑中」先恢复面板；再次点击才退出编辑。 */
+      if(selected && trunkPanelMutedId!==null && String(selected.id)===trunkPanelMutedId){
+        trunkPanelMutedId=null;
+        syncTrunkPanel();
+        return;
+      }
+      exitTrunkEdit();
+      return;
+    }
     enterTrunkEdit(null);
   };
   /* 启动时同步一次按钮态：没有已保存的干线时「✎ 编辑总管」必须是灰的。
@@ -2327,6 +2486,7 @@
   // ===== 按钮 =====
   var btnDraw=document.getElementById('btnDraw');
   function setDrawing(on){
+    if(on&&reservoirPlaceMode)setReservoirPlaceMode(false);
     if(on && trunkMode!=='idle') setTrunkMode('idle');   // [v831] 互斥收口：一律走 setTrunkMode，别在这里手写清状态（v833 起含 edit）
     if(on && measuring) finishMeasure();
     if(!on && rubber){measureGroup.removeLayer(rubber);rubber=null;}
@@ -2863,6 +3023,7 @@
     }
     var saved=matches[0];
     currentMapPlotId=saved.id;
+    renderReservoir();
     var destinationSection=(saved.merged||saved.grouped)&&Array.isArray(saved.subPlots)&&saved.subPlots.length>=2
       ? 'grPipeSection' : 'pipePlanSection';
     var areaM2=Number(saved.areaM2)||Number(saved.sqm)||0;
@@ -2991,6 +3152,7 @@
        the selected plot's independent map route. Keep the route only when this
        operation updates that same stable plot ID. */
     if(previous&&!(opts&&opts.newId)&&previous.trunk)plot.trunk=JSON.parse(JSON.stringify(previous.trunk));
+    if(previous&&!(opts&&opts.newId)&&previous.waterSource)plot.waterSource=JSON.parse(JSON.stringify(previous.waterSource));
     // [map-enhance] 写入权威经纬度坐标，供卫星图实景叠加（旧字段 poly 保留不动，主程序画布照常消费）
     var rawLL=latlngs();
     if(rawLL && rawLL.length>=1){
@@ -3009,6 +3171,7 @@
     var saveResult=plotStore.replace(arr,snapshot.revision);
     if(!saveResult.ok){ if(!opts.silent) alert('保存失败，地块库未更改：'+saveResult.error); return null; }
     currentMapPlotId=plot.id;
+    renderReservoir();
     refreshPlotLibrary();
     return plot;
   }
@@ -3024,6 +3187,7 @@
     if(poly){measureGroup.removeLayer(poly);poly=null;}
     if(rubber){measureGroup.removeLayer(rubber);rubber=null;}
     currentMapPlotId=null;             // 复位「正在编辑的地块」：下一块才会拿到新 id
+    renderReservoir();
     refresh();
   }
   window.__ryClearDraft=clearDraft;    // 供契约测试直接驱动（不依赖 UI 点击）
@@ -3362,6 +3526,7 @@
            保证「切过去就撤不动」这个行为是确定的，而不是"等到下一次编辑才自愈"）。 */
         if(trunkHistory && String(p.id)!==String(currentMapPlotId)) trunkHistory.clear();
         currentMapPlotId=p.id;
+        renderReservoir();
         /* [v831] 回填改走 schema 归一：v1 单段与 v2 多干线都能读，不再手写 schema===1。
            这里只把已保存的线画出来（只读），不自动进入绘制态。 */
         trunkSaved=loadSavedTrunkFor(p);
@@ -3421,6 +3586,7 @@
   var measuring=false, measurePts=[], measureLayer=L.layerGroup().addTo(map);
   document.getElementById('btnMeasure').onclick=function(){
     measuring=!measuring;
+    if(measuring&&reservoirPlaceMode)setReservoirPlaceMode(false);
     this.classList.toggle('btn-on',measuring);
     if(measuring){
       if(trunkMode!=='idle'){setTrunkMode('idle');}

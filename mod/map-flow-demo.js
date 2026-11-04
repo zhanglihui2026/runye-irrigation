@@ -16,14 +16,16 @@
        与规划页简图演示（inline-09 v215/v218）互不干扰：地图页激活时隐藏 #tlDemoBar、
        显示本模块 #mapDemoBar；切回规划页自动还原。
 
-     连接判定（validateConnection，容差默认 5m，haversine R=6378137 唯一口径）：
-     · 有段总管（v859）：总管贴近任一驳接点（≤tol）即视为贯通（段总管串联点本就
-       落在各主管端点上）；总管直接贴近主管端点也算连通。
-     · 无段总管：只看总管折线与各主管端点的最近距离。
-     · 未连通 ⇒ start() 直接报错（用户明确要求），不播放。
+     连接判定（validateConnection，接入容差默认 5m，haversine R=6378137 唯一口径）：
+     · 总管线体与主管线体或施工/驳接节点相距不超过容差时，命中主管作为水路入口。
+     · 分区主管若首尾相接（端点落到另一主管线体 2m 内），就沿接续关系传播可达性；
+       只靠近的平行管线不会因此合并。
+     · 每组至少有一根主管可从入口到达；仍有断组时 start() 报错且不播放。
      [v917] 同时接收 RyTlNodes 的主管/支管施工节点；多条保存总管分线演示，不合并虚构连接段。
+     [v924] 手绘总管接入主管后，沿几何相接的分区主管段传播可达性；在线地图浮卡展示当前轮灌组水力摘要。
+     [v927] 活动区使用独立地图Pane和脉冲色层；无mi的分区阀按支管几何归属，并动画显示开阀。
      ═══════════════════════════════════════════════════════════════════════ */
-  var TOL_M = 5, INTERVAL_MS = 1000;
+  var TOL_M = 5, INTERVAL_MS = 1000, FLOW_PANE = 'ryMapFlowPane';
   var DOT_FILLS = ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6'];
   var DOT_FILLS_LT = ['#fca5a5', '#fcd34d', '#86efac', '#93c5fd'];
   var DOT_INKS_LT = ['#7f1d1d', '#78350f', '#14532d', '#1e3a8a'];
@@ -67,6 +69,28 @@
       if(!q)return;
       out.push({pipeKey:(m[1]==='main'?'m':'b')+(mi+1),mi:mi,ll:q,nodeId:String(n.id||''),source:'tl-node'});
     });
+    return out;
+  }
+  /* 读取与分区画布相同的分区网格，并把每格裁剪到地块真实边界后投影到地图。
+     轮灌演示只叠加显示，不改写分区状态或管网数据。 */
+  function collectZonePolygons(toLL) {
+    var B=window.RunyeBridge, G=window.RyZoneGeometry, out=[];
+    if(!B||typeof B.getZoneCuts!=='function'||typeof B.getPlotPolygon!=='function'||
+       typeof B.polyToGrid!=='function'||typeof B.polyToWorld!=='function'||
+       !G||typeof G.clipPolyToRect!=='function'||typeof toLL!=='function')return out;
+    try {
+      var cuts=B.getZoneCuts(), plot=B.getPlotPolygon();
+      if(!cuts||!Array.isArray(plot)||plot.length<3||!(cuts.cols>0)||!(cuts.rows>0))return out;
+      var grid=B.polyToGrid(cuts,plot);
+      if(!Array.isArray(grid)||grid.length<3)return out;
+      for(var zr=0;zr<cuts.rows;zr++)for(var zc=0;zc<cuts.cols;zc++){
+        var clipped=G.clipPolyToRect(grid,cuts.xPos[zc],cuts.yPos[zr],cuts.xPos[zc+1],cuts.yPos[zr+1]);
+        if(!Array.isArray(clipped)||clipped.length<3)continue;
+        var world=B.polyToWorld(cuts,clipped), ll=[];
+        (world||[]).forEach(function(p){var q;try{q=toLL(p);}catch(e){q=null;}if(q)ll.push(q);});
+        if(ll.length>=3)out.push({zi:zr*cuts.cols+zc,ll:ll});
+      }
+    } catch(e) { return []; }
     return out;
   }
   /* 连接校验。o = {
@@ -114,6 +138,20 @@
       out.push(ll[ll.length - 1]);
       return out;
     }
+    /* 分区主管在设计图中可能是一根物理主管按分区切成的相邻线段。
+       只有两段的端点碰到另一段线体（或彼此端点相碰）才视为主管接续，
+       避免把两根仅仅平行靠近的主管误并成一条水路。 */
+    function mainSegmentsJoin(a, b, joinTol) {
+      if (!Array.isArray(a) || a.length < 2 || !Array.isArray(b) || b.length < 2) return false;
+      var ad=densifyLL(a), bd=densifyLL(b), min=Infinity;
+      [a[0],a[a.length-1]].forEach(function(p){
+        bd.forEach(function(q){var d=dist(p,q);if(d<min)min=d;});
+      });
+      [b[0],b[b.length-1]].forEach(function(p){
+        ad.forEach(function(q){var d=dist(p,q);if(d<min)min=d;});
+      });
+      return min<=joinTol;
+    }
     var trunkDense = densifyLL(o.trunkLL);
     function minTo(set) {
       var m = Infinity;
@@ -122,27 +160,44 @@
       });
       return m;
     }
-    var mainsDenseFlat = [];
-    (o.mainsLL || []).forEach(function (l) {
-      densifyLL((l || []).filter(Boolean)).forEach(function (p) { mainsDenseFlat.push(p); });
-    });
+    var mainLines=(o.mainsLL||[]).map(function(l){return(l||[]).filter(Boolean);});
+    var mainsDense=mainLines.map(densifyLL), mainsDenseFlat=[];
+    mainsDense.forEach(function(l){l.forEach(function(p){mainsDenseFlat.push(p);});});
     var mMain = minTo(mainsDenseFlat);   /* [v920] 线体×线体 */
     var mCoup = (o.hasSeg && Array.isArray(o.couplersLL) && o.couplersLL.length) ? minTo(o.couplersLL) : Infinity;
 
     /* [v915] 逐组判定：需要 nodesLL + groupOfZi + groups 三者齐备；任一缺席退旧口径。 */
     var perMain = null;   /* mZi[zi]=该主管到总管的最小距离（线体口径） */
     if (typeof o.groupOfZi === 'function' && o.groups > 1 && Array.isArray(o.mainsLL)) {
-      perMain = o.mainsLL.map(function (l) {
-        return minTo(densifyLL((l || []).filter(Boolean)));   /* [v920] 线体×线体（双向插值） */
-      });
+      perMain = mainsDense.map(function (l) { return minTo(l); });   /* [v920] 线体×线体（双向插值） */
+      /* Keep the main-to-main continuation tolerance aligned with the map's
+         5 m snap/connectivity contract. Generated zone segments can move a
+         little at clipped boundaries; a 2 m-only join falsely marks the
+         downstream groups unreachable and prevents the demo from starting. */
+      var minMainDistance=Math.min.apply(null,perMain.filter(isFinite));
+      var mainReach=perMain.map(function(m){return m<=tol;}),joinTol=tol;
       if (Array.isArray(o.nodesLL)) {
         o.nodesLL.forEach(function (n) {
           if (!n || !n.ll || !(n.mi >= 0)) return;
           var hit = false;
           trunkDense.forEach(function (tp) { if (dist(tp, n.ll) <= tol) hit = true; });   /* [v920] 线体命中也算 */
-          if (hit && perMain[n.mi] > 0) perMain[n.mi] = 0;   /* 节点匹配 ⇒ 该主管贯通 */
+          if (hit && n.mi < mainReach.length) mainReach[n.mi] = true;   /* 节点匹配 ⇒ 该主管贯通 */
         });
       }
+      /* 从总管直接接入的主管出发，沿相接的主管分段传播可达性。
+         例如主管 1–4 首尾连成一条物理管时，捕捉到主管 1 会同时接通 2、3、4。 */
+      var grew=true;
+      while(grew){
+        grew=false;
+        for(var mi=0;mi<mainLines.length;mi++){
+          if(!mainReach[mi])continue;
+          for(var mj=0;mj<mainLines.length;mj++){
+            if(mainReach[mj]||mi===mj)continue;
+            if(mainSegmentsJoin(mainLines[mi],mainLines[mj],joinTol)){mainReach[mj]=true;grew=true;}
+          }
+        }
+      }
+      mainReach.forEach(function(reachable,mi){if(reachable)perMain[mi]=0;});
       var broken = [];
       for (var g = 0; g < o.groups; g++) {
         var gMin = Infinity;
@@ -159,9 +214,9 @@
           if (perMain[zi2] > tol && broken.indexOf(o.groupOfZi(zi2)) > -1 &&
               brokenMains.indexOf(zi2) === -1) brokenMains.push(zi2);
         }
-        return { ok: false, code: 'partial', minM: Math.min.apply(null, perMain.filter(isFinite)), brokenGroups: broken, brokenMains: brokenMains };
+        return { ok: false, code: 'partial', minM: minMainDistance, brokenGroups: broken, brokenMains: brokenMains };
       }
-      return { ok: true, code: 'connected', minM: Math.min.apply(null, perMain.filter(isFinite)) };
+      return { ok: true, code: 'connected', minM: minMainDistance };
     }
 
     var ok = (mMain <= tol) || (mCoup <= tol);
@@ -203,11 +258,29 @@
     var dd = window.tlDiagramData;
     if (!dd || dd.world !== 'meter') return null;
     var mainsLL = [], branchLL = [], valves = [], couplersLL = [], segLL = null, nodesLL = [];
+    var sourceLL=null;
+    try{sourceLL=typeof ctx.getWaterSource==='function'?readLL(ctx.getWaterSource()):null;}catch(eSource){}
     (dd.mainPipes || []).forEach(function (l) { mainsLL.push(toLLLine(l)); });
     (dd.branchPipes || []).forEach(function (l) { branchLL.push(toLLLine(l)); });
+    function valveBranchIndex(v){
+      if(v&&typeof v.mi==='number'&&isFinite(v.mi)&&v.mi>=0)return v.mi|0;
+      if(!v||!isFinite(v.x)||!isFinite(v.y))return -1;
+      var best=-1,bestD=Infinity,p={x:Number(v.x),y:Number(v.y)};
+      (dd.branchPipes||[]).forEach(function(line,idx){
+        if(!Array.isArray(line)||line.length<2)return;
+        for(var i=1;i<line.length;i++){
+          var a=line[i-1],b=line[i];if(!a||!b)continue;
+          var dx=b.x-a.x,dy=b.y-a.y,den=dx*dx+dy*dy;
+          var t=den?Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/den)):0;
+          var d=Math.hypot(p.x-a.x-dx*t,p.y-a.y-dy*t);
+          if(d<bestD){bestD=d;best=idx;}
+        }
+      });
+      return bestD<=15?best:-1;
+    }
     (dd.valves || []).forEach(function (v) {
       var q = toLLSafe(v);
-      if (q) valves.push({ ll: q, mi: (typeof v.mi === 'number') ? v.mi : -1 });
+      if (q) valves.push({ ll: q, mi: valveBranchIndex(v) });
     });
     /* [v915] 接驳节点（v913 dd.couplerNodes 投影，世界米）→ 经纬度 + 主管下标。
        失配节点（x/y null）跳过；mi=parseInt('m3')-1，解析不出跳过（宁缺不错）。 */
@@ -225,6 +298,7 @@
         nodesLL=nodesLL.concat(collectWorkspaceNodes(dd,tlNodes.list(),autoEdits.pointAt,toLLSafe));
       }
     } catch(eNodes) { /* 无可用施工节点时保留既有接驳节点链路 */ }
+    var zonePolygons=collectZonePolygons(toLLSafe);
     if (dd.segTrunk && Array.isArray(dd.segTrunk.points)) {
       segLL = toLLLine(dd.segTrunk.points);
       (dd.segTrunk.couplers || []).forEach(function (c) { var q = toLLSafe(c); if (q) couplersLL.push(q); });
@@ -245,7 +319,7 @@
     return {
       mainsLL: mainsLL, branchLL: branchLL, valves: valves,
       couplersLL: couplersLL, segLL: segLL, trunkLL: trunkLL, trunkLinesLL: trunkLinesLL,
-      nodesLL: nodesLL,
+      nodesLL: nodesLL, zonePolygons:zonePolygons, sourceLL:sourceLL,
       manual: manual, nPer: dd.combinedN || 1, total: total,
       gCount: groupCount(total, manual, dd.combinedN || 1)
     };
@@ -253,12 +327,176 @@
 
   function ensureLayer() {
     if (!ctx || !ctx.map) return null;
+    if(ctx.map.getPane&&!ctx.map.getPane(FLOW_PANE)){
+      var pane=ctx.map.createPane(FLOW_PANE);
+      pane.style.zIndex='450';
+      pane.style.pointerEvents='none';
+    }
     if (!layer) layer = window.L.layerGroup().addTo(ctx.map);
     return layer;
   }
   function poly(ll, color, weight, anim) {
     return window.L.polyline(ll.map(function (p) { return [p.lat, p.lng]; }),
-      { color: color, weight: weight, opacity: 0.95, className: anim ? 'mapflow-anim' : '', interactive: false });
+      { pane:FLOW_PANE,color: color, weight: weight, opacity: 0.95, className: anim ? 'mapflow-anim' : '', interactive: false });
+  }
+
+  /* Build only the source-to-active-zone route. The graph is split at the saved
+     coupler nodes, main-line end joins and branch takeoffs, so a later trunk
+     junction (for example N-02) is not animated when an earlier zone (zone 3)
+     can be supplied from N-01 directly. */
+  function buildFlowRoutes(d,g){
+    if(!d||!Array.isArray(d.trunkLinesLL)||!d.trunkLinesLL.length)return null;
+    var activeZones=[];
+    for(var zi=0;zi<d.total;zi++)if(groupOf(zi,d.manual,d.nPer)===g)activeZones.push(zi);
+    if(!activeZones.length)return null;
+    var refLat=d.sourceLL&&isFinite(d.sourceLL.lat)?d.sourceLL.lat:
+      ((d.trunkLinesLL[0][0]&&d.trunkLinesLL[0][0].lat)||0);
+    var cos=Math.max(.01,Math.cos(refLat*Math.PI/180)), lines=[], byMain={}, byTrunk=[];
+    function xy(p){return{x:p.lng*111320*cos,y:p.lat*110540};}
+    function gap(a,b){var dx=a.x-b.x,dy=a.y-b.y;return Math.sqrt(dx*dx+dy*dy);}
+    function makeLine(key,kind,index,raw){
+      if(!Array.isArray(raw)||raw.length<2)return null;
+      var pts=raw.map(xy), cum=[0];
+      for(var i=1;i<pts.length;i++)cum[i]=cum[i-1]+gap(pts[i-1],pts[i]);
+      var o={key:key,kind:kind,index:index,raw:raw,pts:pts,cum:cum,len:cum[cum.length-1],cuts:[]};
+      if(!(o.len>0))return null;
+      function endpoint(s,id){o.cuts.push({s:s,id:id});}
+      endpoint(0,key+':a');endpoint(o.len,key+':b');lines.push(o);return o;
+    }
+    function project(o,p){
+      var q=xy(p),best={d:Infinity,s:0};
+      for(var i=1;i<o.pts.length;i++){
+        var a=o.pts[i-1],b=o.pts[i],dx=b.x-a.x,dy=b.y-a.y,den=dx*dx+dy*dy;
+        var t=den?Math.max(0,Math.min(1,((q.x-a.x)*dx+(q.y-a.y)*dy)/den)):0;
+        var x=a.x+dx*t,y=a.y+dy*t,d=Math.hypot(q.x-x,q.y-y);
+        if(d<best.d)best={d:d,s:o.cum[i-1]+gap(a,{x:x,y:y}),p:{x:x,y:y}};
+      }
+      return best;
+    }
+    function addCut(o,s,id){o.cuts.push({s:Math.max(0,Math.min(o.len,s)),id:id});}
+    function at(o,s){
+      s=Math.max(0,Math.min(o.len,s));
+      for(var i=1;i<o.cum.length;i++)if(s<=o.cum[i]){
+        var span=o.cum[i]-o.cum[i-1],t=span?(s-o.cum[i-1])/span:0,a=o.raw[i-1],b=o.raw[i];
+        return{lat:a.lat+(b.lat-a.lat)*t,lng:a.lng+(b.lng-a.lng)*t};
+      }
+      return o.raw[o.raw.length-1];
+    }
+    function slice(o,a,b){
+      var rev=b<a;if(rev){var tmp=a;a=b;b=tmp;}
+      var out=[at(o,a)];
+      for(var i=1;i<o.cum.length-1;i++)if(o.cum[i]>a+.01&&o.cum[i]<b-.01)out.push(o.raw[i]);
+      out.push(at(o,b));if(rev)out.reverse();return out;
+    }
+    (d.trunkLinesLL||[]).forEach(function(l,i){var o=makeLine('trunk:'+i,'trunk',i,l);if(o)byTrunk.push(o);});
+    if(d.segLL){var seg=makeLine('segment:0','trunk',byTrunk.length,d.segLL);if(seg)byTrunk.push(seg);}
+    (d.mainsLL||[]).forEach(function(l,i){var o=makeLine('main:'+i,'main',i,l);if(o)byMain[i]=o;});
+    var branchLines={};
+    activeZones.forEach(function(i){var o=makeLine('branch:'+i,'branch',i,d.branchLL&&d.branchLL[i]);if(o)branchLines[i]=o;});
+    if(!byTrunk.length)return null;
+
+    /* Source is the graph root on the nearest saved trunk polyline. */
+    var rootLine=null,rootProj=null;
+    if(d.sourceLL)byTrunk.forEach(function(o){var p=project(o,d.sourceLL);if(!rootProj||p.d<rootProj.d){rootLine=o;rootProj=p;}});
+    var rootId='flow:source';
+    if(rootLine&&rootProj&&rootProj.d<=20)addCut(rootLine,rootProj.s,rootId);
+    else {rootLine=byTrunk[0];rootId=rootLine.key+':a';}
+
+    /* Join trunk polylines at actual touching endpoints. */
+    for(var ti=0;ti<byTrunk.length;ti++)for(var tj=ti+1;tj<byTrunk.length;tj++){
+      var ta=byTrunk[ti],tb=byTrunk[tj],endsA=[0,ta.len],endsB=[0,tb.len];
+      endsA.forEach(function(sa,ai){var p=at(ta,sa),q=project(tb,p);if(q.d<=2){var id='trunk-join:'+ti+':'+tj+':'+ai;addCut(ta,sa,id);addCut(tb,q.s,id);}});
+      endsB.forEach(function(sb,bi){var p=at(tb,sb),q=project(ta,p);if(q.d<=2){var id='trunk-join:'+ti+':'+tj+':b'+bi;addCut(tb,sb,id);addCut(ta,q.s,id);}});
+    }
+
+    /* A saved coupler is the authoritative trunk-to-main junction. */
+    var seenNodes={};
+    (d.nodesLL||[]).forEach(function(n){
+      if(!n||!n.ll||!(n.mi>=0)||!byMain[n.mi])return;
+      var sig=n.mi+':'+n.ll.lat.toFixed(6)+':'+n.ll.lng.toFixed(6);if(seenNodes[sig])return;seenNodes[sig]=true;
+      var mp=project(byMain[n.mi],n.ll);if(mp.d>8)return;
+      var best=null;
+      byTrunk.forEach(function(o){var p=project(o,n.ll);if(p.d<=TOL_M&&(!best||p.d<best.p.d))best={o:o,p:p};});
+      if(!best)return;
+      var id='coupler:'+sig;addCut(best.o,best.p.s,id);addCut(byMain[n.mi],mp.s,id);
+    });
+
+    /* Main pipes are continuous only where a main endpoint meets another main
+       line. This links zone 1 -> 2 -> 3 but does not bridge separate rows. */
+    for(var mi=0;mi<d.mainsLL.length;mi++)for(var mj=mi+1;mj<d.mainsLL.length;mj++){
+      var a=byMain[mi],b=byMain[mj];if(!a||!b)continue;
+      [[0,a.raw[0]],[a.len,a.raw[a.raw.length-1]]].forEach(function(e,ei){var p=project(b,e[1]);if(p.d<=TOL_M){var id='main-join:'+mi+':'+mj+':a'+ei;addCut(a,e[0],id);addCut(b,p.s,id);}});
+      [[0,b.raw[0]],[b.len,b.raw[b.raw.length-1]]].forEach(function(e,ei){var p=project(a,e[1]);if(p.d<=TOL_M){var id='main-join:'+mi+':'+mj+':b'+ei;addCut(b,e[0],id);addCut(a,p.s,id);}});
+    }
+
+    /* Treat each valve as the branch flow splitter: feed it from the nearest
+       point on its zone main, then route outward from the valve to both branch
+       ends. The short feed connector is a visualization overlay only; it never
+       changes the saved pipe geometry or hydraulic model. */
+    var targets=[],feeds=[];
+    activeZones.forEach(function(i){
+      var main=byMain[i],branch=branchLines[i];if(!main)return;
+      if(branch){
+        var valve=null;(d.valves||[]).some(function(v){if(v&&v.mi===i&&v.ll){valve=v;return true;}return false;});
+        var valveProj=valve?project(branch,valve.ll):{s:branch.len/2};
+        var valvePoint=at(branch,valveProj.s),mainProj=project(main,valvePoint);
+        if(mainProj.d<=20){
+          var feedMainId='branch-feed-main:'+i,feedValveId='branch-valve:'+i;
+          addCut(main,mainProj.s,feedMainId);addCut(branch,valveProj.s,feedValveId);
+          var startId='branch-start:'+i,endId='branch-end:'+i;
+          addCut(branch,0,startId);addCut(branch,branch.len,endId);
+          feeds.push({zi:i,from:feedMainId,to:feedValveId,points:[at(main,mainProj.s),valvePoint]});
+          targets.push({zi:i,id:startId},{zi:i,id:endId});
+          return;
+        }
+      }
+      var idA='zone-target:'+i;addCut(main,main.len/2,idA);targets.push({zi:i,id:idA});
+    });
+
+    var graph={};
+    function node(id){if(!graph[id])graph[id]=[];}
+    function link(a,b,weight,edge){node(a);node(b);graph[a].push({to:b,weight:weight,edge:edge});graph[b].push({to:a,weight:weight,edge:edge});}
+    lines.forEach(function(o){
+      var cuts=o.cuts.slice().sort(function(a,b){return a.s-b.s;});
+      var groups=[];
+      cuts.forEach(function(c){var last=groups[groups.length-1];if(last&&Math.abs(last.s-c.s)<.05)last.ids.push(c.id);else groups.push({s:c.s,ids:[c.id]});});
+      groups.forEach(function(gr){gr.ids.forEach(node);for(var i=1;i<gr.ids.length;i++)link(gr.ids[0],gr.ids[i],0,null);});
+      for(var i=1;i<groups.length;i++){
+        var ga=groups[i-1],gb=groups[i],pts=slice(o,ga.s,gb.s),weight=Math.max(.01,gb.s-ga.s);
+        for(var ai=0;ai<ga.ids.length;ai++)for(var bi=0;bi<gb.ids.length;bi++)
+          link(ga.ids[ai],gb.ids[bi],weight,{key:o.key,kind:o.kind,points:pts,a:ga.ids[ai],b:gb.ids[bi]});
+      }
+    });
+    feeds.forEach(function(f){
+      var dx=xy(f.points[1]).x-xy(f.points[0]).x,dy=xy(f.points[1]).y-xy(f.points[0]).y;
+      link(f.from,f.to,Math.max(.01,Math.sqrt(dx*dx+dy*dy)),{
+        key:'branch-feed:'+f.zi,kind:'branch',points:f.points,a:f.from,b:f.to
+      });
+    });
+    if(!graph[rootId])return null;
+
+    /* Dijkstra from the source endpoint. The reconstructed edges retain their
+       direction, which makes the moving dash travel toward the selected zone. */
+    var distMap={},prev={},open={};distMap[rootId]=0;open[rootId]=true;
+    while(Object.keys(open).length){
+      var u=null,bestD=Infinity;Object.keys(open).forEach(function(k){if(distMap[k]<bestD){u=k;bestD=distMap[k];}});
+      if(u==null)break;delete open[u];
+      (graph[u]||[]).forEach(function(e){var nd=bestD+e.weight;if(nd<(distMap[e.to]==null?Infinity:distMap[e.to])){distMap[e.to]=nd;prev[e.to]={from:u,edge:e.edge};open[e.to]=true;}});
+    }
+    var routes=[];
+    targets.forEach(function(t){
+      if(distMap[t.id]==null)return;
+      var path=[],cur=t.id,guard=0;
+      while(cur!==rootId&&prev[cur]&&guard++<5000){var step=prev[cur];if(step.edge)path.push({edge:step.edge,forward:step.from===step.edge.a});cur=step.from;}
+      path.reverse();
+      var route={zi:t.zi,trunk:[],main:[],branch:[]};
+      path.forEach(function(s){
+        var pts=s.forward?s.edge.points:s.edge.points.slice().reverse();
+        route[s.edge.kind].push({key:s.edge.key,points:pts});
+      });
+      routes.push(route);
+    });
+    return routes.length?routes:null;
   }
 
   function render(g) {
@@ -266,28 +504,42 @@
     ly.clearLayers();
     active = g;
     var d = collect(); if (!d) { stop(); return; }
+    updateGroupInfo(d,g);
+    /* 先压暗非活动区，再用青蓝蒙版突出当前组；管网线随后绘制，保持可读。 */
+    (d.zonePolygons||[]).forEach(function(z){
+      var on=groupOf(z.zi,d.manual,d.nPer)===g;
+      ly.addLayer(window.L.polygon(z.ll.map(function(p){return[p.lat,p.lng];}),{
+        pane:FLOW_PANE,color:on?'#fff7ed':'#475569',weight:on?2.5:1,opacity:on?1:0.4,
+        fillColor:on?'#fb923c':'#0f172a',fillOpacity:on?0.5:0.14,
+        dashArray:on?'7 4':null,interactive:false,
+        className:on?'mapflow-zone-active':'mapflow-zone-dim'
+      }));
+    });
     /* 底态：全部主管/支管淡化灰 */
     d.mainsLL.forEach(function (l) { if (l) ly.addLayer(poly(l, '#cbd5e1', 2, false)); });
     d.branchLL.forEach(function (l) { if (l) ly.addLayer(poly(l, '#e2e8f0', 1.5, false)); });
-    /* [v882] 总管 + 段总管 = 完整闭合水路（用户要求：手动总管接上自动生成的段总管
-       形成闭合系统，演示时水流沿整条路径走）。实线深色骨架常亮 + 青色流动虚线叠层
-       （与简图 v218 水流线同语言：#38bdf8 光流），叠加不遮管线原色。 */
+    /* 全部总管与分段总管仅作淡色底图；实际流动路线在后面按水源到当前分区裁剪，
+       不再把 N01 之后通往 N02 的下游干线误画成每一组都在流动。 */
     (d.trunkLinesLL || (d.trunkLL && d.trunkLL.length >= 2 ? [d.trunkLL] : [])).forEach(function(line){
       if(!line||line.length<2)return;
-      ly.addLayer(poly(line, '#111827', 5, false));
-      ly.addLayer(poly(line, '#38bdf8', 2.4, true));
+      ly.addLayer(poly(line, '#cbd5e1', 2, false));
     });
     if (d.segLL) {
-      ly.addLayer(poly(d.segLL, '#111827', 4, false));
-      ly.addLayer(poly(d.segLL, '#38bdf8', 2.2, true));
+      ly.addLayer(poly(d.segLL, '#cbd5e1', 2, false));
     }
-    /* 活动组：主管蓝粗 + 支管绿 + 水流虚线滚动动画；组内阀门开（绿），组外关（灰） */
-    for (var zi = 0; zi < d.total; zi++) {
-      var gi = groupOf(zi, d.manual, d.nPer);
-      if (gi === g) {
-        if (d.mainsLL[zi]) ly.addLayer(poly(d.mainsLL[zi], '#185FA5', 5, true));
-        if (d.branchLL[zi]) ly.addLayer(poly(d.branchLL[zi], '#16a34a', 3, true));
-      }
+    /* 活动区水路：水源→已吸附节点→相接主管段→目标分区阀门支管。 */
+    var routes=buildFlowRoutes(d,g),drawn={};
+    if(routes)routes.forEach(function(route){
+      route.trunk.concat(route.main).concat(route.branch).forEach(function(seg){
+        if(!seg.points||seg.points.length<2)return;
+        var key=seg.key+':'+seg.points[0].lat.toFixed(6)+':'+seg.points[0].lng.toFixed(6)+':'+seg.points[seg.points.length-1].lat.toFixed(6)+':'+seg.points[seg.points.length-1].lng.toFixed(6);
+        if(drawn[key])return;drawn[key]=true;
+        ly.addLayer(poly(seg.points,seg.key.indexOf('branch:')===0?'#16a34a':'#185FA5',seg.key.indexOf('branch:')===0?3:5,true));
+      });
+    });
+    else for (var zi = 0; zi < d.total; zi++) if (groupOf(zi,d.manual,d.nPer)===g) {
+      if(d.mainsLL[zi])ly.addLayer(poly(d.mainsLL[zi],'#185FA5',5,true));
+      if(d.branchLL[zi])ly.addLayer(poly(d.branchLL[zi],'#16a34a',3,true));
     }
     /* [v916] 接驳节点标记（常驻）：全部节点小橙点——用户能看见「水路入口在哪」；
        失配节点（collect 已跳过 x/y null）不出现在图上。 */
@@ -295,7 +547,7 @@
       if (!n || !n.ll) return;
       ly.addLayer(window.L.circleMarker([n.ll.lat, n.ll.lng], {
         radius: 4, color: '#b45309', weight: 2,
-        fillColor: '#f59e0b', fillOpacity: 1, interactive: false
+        fillColor: '#f59e0b', fillOpacity: 1, pane:FLOW_PANE, interactive: false
       }));
     });
     /* [v916] 活动组水路入口：该组节点位置画双环大标记（外环描边+白芯橙心）——
@@ -311,12 +563,19 @@
     });
     d.valves.forEach(function (v) {
       var on = (v.mi >= 0) && (groupOf(v.mi, d.manual, d.nPer) === g);
-      ly.addLayer(window.L.circleMarker([v.ll.lat, v.ll.lng], {
-        radius: on ? 6 : 4,
-        color: on ? '#16a34a' : '#94a3b8', weight: 2,
-        fillColor: on ? '#22c55e' : '#e2e8f0', fillOpacity: 1, interactive: false
+      var cls=on?'is-open':'is-closed',iconHtml='<span class="mapflow-valve '+cls+'" aria-hidden="true"><svg viewBox="0 0 24 24"><circle class="mapflow-valve-ring" cx="12" cy="12" r="10"/><path class="mapflow-valve-pipe" d="M1 12h6m10 0h6"/><path class="mapflow-valve-body" d="M7 7l5 5-5 5zm10 0l-5 5 5 5z"/><g class="mapflow-valve-handle"><path d="M12 7V1.5M8 1.5h8"/></g></svg></span>';
+      ly.addLayer(window.L.marker([v.ll.lat,v.ll.lng],{
+        icon:window.L.divIcon({className:'mapflow-valve-icon',html:iconHtml,iconSize:[24,24],iconAnchor:[12,12]}),
+        keyboard:false,interactive:false,zIndexOffset:1200
       }));
     });
+    if(d.sourceLL){
+      ly.addLayer(window.L.marker([d.sourceLL.lat,d.sourceLL.lng],{
+        icon:window.L.divIcon({className:'ry-reservoir-icon-wrap mapflow-reservoir-icon',iconSize:[54,48],iconAnchor:[27,42],
+          html:'<span class="ry-reservoir-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5C9.4 6.1 5.3 10.2 5.3 14.4a6.7 6.7 0 0 0 13.4 0C18.7 10.2 14.6 6.1 12 2.5Z"/></svg></span><span class="ry-reservoir-label">蓄水池</span>'}),
+        interactive:false,zIndexOffset:1500
+      }));
+    }
   }
 
   function stop() {
@@ -324,6 +583,7 @@
     playing = false;
     active = null;
     if (layer) layer.clearLayers();
+    hideGroupInfo();
     syncChipsState();
   }
   function playToggle() {
@@ -334,7 +594,7 @@
       clearInterval(timer); timer = null; playing = false;
     } else {
       var g0 = (active == null || active < 0 || active >= M) ? 0 : active;
-      start(g0, true);
+      if(!start(g0, true)){syncChipsState();return;}
       timer = setInterval(function () {
         var dd2 = collect();
         var M2 = dd2 ? dd2.gCount : 0;
@@ -361,6 +621,11 @@
       groups: d.gCount
     });
     if (!v.ok) {
+      active = null;
+      hideGroupInfo();
+      if (timer) { clearInterval(timer); timer = null; }
+      playing = false;
+      syncChipsState();
       if (ctx.tip) {
         if (v.code === 'no-trunk') ctx.tip('还没有手动绘制的总管：请先在在线地图绘制总管（并打开捕捉吸到「驳接点」），再演示水流。');
         else if (v.code === 'no-data') ctx.tip('图面上没有分区主管，无法演示水流。');
@@ -518,6 +783,9 @@
       /* [v863] 无可拾取数据时给引导提示而不是整条隐藏 —— 用户找不到入口。 */
       bar.style.display = '';
       bar.__noData = true;
+      /* 恢复/换地块后数据源可能暂不可用。旧 chips 不能留在屏上伪装成可播放状态。 */
+      var chips = document.getElementById('mapDemoChips');
+      if (chips) chips.innerHTML = '';
       var hint = document.getElementById('mapDemoHint');
       if (!hint) {
         hint = document.createElement('div');
@@ -546,8 +814,88 @@
     document.head.appendChild(st);
   }
 
+  function hideGroupInfo(){
+    var el=document.getElementById('mapFlowGroupInfo');
+    if(el){el.hidden=true;el.innerHTML='';}
+  }
+  function updateGroupInfo(d,g){
+    var el=document.getElementById('mapFlowGroupInfo');
+    if(!el||!d||!(g>=0))return;
+    var members=[], memberIndexes=[];
+    for(var zi=0;zi<d.total;zi++)if(groupOf(zi,d.manual,d.nPer)===g){members.push(zi+1);memberIndexes.push(zi);}
+    var manual=!!(d.manual&&d.manual.length), totalGroups=d.gCount||0;
+    var groupName=manual?'M'+(g+1):'G'+(g+1);
+    var loss=null;
+    try{
+      if(typeof window.tlMapGroupHydraulicsOf==='function')loss=window.tlMapGroupHydraulicsOf(memberIndexes);
+      else if(typeof window.tlGroupLossOf==='function')loss=window.tlGroupLossOf(g);
+    }catch(e){}
+    /* [v945] 没有图面路径时的口径反推（用户 2026-11-04）：
+       「地图上画的总管只是路由，直径要通过实际规划地块的分区推算出来」。
+       tlMapGroupHydraulicsOf 需要 wp.fromFigure（设计侧段总管），手绘总管路线常常没有，
+       于是整块卡只会说「尚未齐备」。但分区面积 + 滴灌参数 + 主管/支管管径本来就有，
+       足够把**手绘总管该选多大**推出来 —— 缺的只是扬程（那确实要路径长度）。 */
+    var adv=null;
+    if(!(loss&&loss.trunkAdvice)){
+      try{
+        if(typeof window.tlTrunkOdAdvice==='function'){
+          var gs=[];
+          for(var gzi=0;gzi<d.total;gzi++){
+            var ggi=groupOf(gzi,d.manual,d.nPer);
+            if(ggi>=0){ if(!gs[ggi])gs[ggi]=[]; gs[ggi].push(gzi); }
+          }
+          adv=window.tlTrunkOdAdvice({
+            zoneAreas:(typeof ctx.getZoneAreas==='function')?ctx.getZoneAreas():null,
+            groups:gs.filter(Boolean),
+            groupIndex:g
+          });
+        }
+      }catch(eAdv){ adv=null; }
+    }
+    var lines='<div class="mfg-title">'+(manual?'手动联合灌溉组 ':'联合灌溉组 ')+groupName+' · 共 '+totalGroups+' 组之一</div>'+
+      '<div class="mfg-members">含区 '+(members.length?members.join('、'):'—')+'</div>'+
+      '<div class="mfg-count">'+members.length+' 区同轮灌溉</div>';
+    if(loss&&loss.trunkAdvice&&isFinite(loss.trunkAdvice.od)&&isFinite(loss.trunkAdvice.velocity)&&
+       isFinite(loss.trunkAdvice.mainOd)&&isFinite(loss.trunkAdvice.branchOd)){
+      var advice=loss.trunkAdvice;
+      lines+='<div class="mfg-trunk-advice">建议手绘总管：PE 外径 Ø '+Number(advice.od)+' mm · 流速 '+Number(advice.velocity).toFixed(2)+' m/s</div>'+
+        '<div class="mfg-advice-note">本轮 Q '+Number(loss.flow).toFixed(2)+' m³/h · 目标流速 '+Number(advice.targetVelocity).toFixed(2)+' m/s；下限按主管 Ø '+Number(advice.mainOd)+' / 支管 Ø '+Number(advice.branchOd)+' mm</div>';
+    }
+    if(loss&&isFinite(loss.flow)&&isFinite(loss.totalLoss==null?loss.total:loss.totalLoss)){
+      var totalLoss=Number(loss.totalLoss==null?loss.total:loss.totalLoss);
+      lines+='<div class="mfg-value">本轮合灌流量 ≈ '+Number(loss.flow).toFixed(2)+' m³/h</div>'+
+        '<div class="mfg-value">本轮需求扬程 ≈ '+(isFinite(loss.head)?Number(loss.head).toFixed(2):'—')+' m</div>'+
+        '<div class="mfg-loss">本轮最不利路径损失 ≈ '+totalLoss.toFixed(2)+' m</div>'+
+        '<div class="mfg-breakdown">总管 '+(Number(loss.frontLoss)||0).toFixed(2)+' + 主管 '+(Number(loss.mainLoss)||0).toFixed(2)+' + 支管 '+(Number(loss.branchLoss)||0).toFixed(2)+' m</div>';
+      if(Array.isArray(loss.zones)&&loss.zones.length){
+        lines+='<div class="mfg-zone-list" aria-label="本轮各分区水力参数">'+loss.zones.map(function(z){
+          return '<div class="mfg-zone-row"><b>'+ (z.zi+1) +'区</b><span>流量 '+Number(z.flow).toFixed(2)+' m³/h</span><strong>扬程 '+Number(z.head).toFixed(2)+' m</strong></div>';
+        }).join('')+'</div>';
+      }
+      if(loss.missing&&loss.missing.length) lines+='<div class="mfg-unavailable">缺少 '+loss.missing.map(function(zi){return(zi+1)+'区';}).join('、')+' 的有效分区管路路径</div>';
+    }else{
+      /* [v945] 分三种情况说话，不再一律「尚未齐备」：
+         · 反推成功 ⇒ 直接给出总管该选多大（这是用户真正要的那个数），并说清为什么没有扬程；
+         · 反推失败 ⇒ 把缺什么原样说出来（没有分区面积 / 缺滴灌参数…），用户知道去哪补；
+         · 连反推接口都没有（脚本未加载） ⇒ 才退回原来那句「尚未齐备」。 */
+      if(adv&&adv.ok===true){
+        lines+='<div class="mfg-trunk-advice">建议手绘总管：PE 外径 Ø '+Number(adv.od)+' mm'+
+          (isFinite(adv.velocity)?' · 流速 '+Number(adv.velocity).toFixed(2)+' m/s':'')+'（按分区反推）</div>'+
+          '<div class="mfg-advice-note">本轮 '+Number(adv.zoneCount)+' 区合计 Q '+Number(adv.flow).toFixed(2)+' m³/h · '+
+          '总管不小于下游主管/支管 Ø '+Number(adv.minDownstreamOd)+' mm</div>'+
+          '<div class="mfg-unavailable">扬程与最不利路径损失要等「分区与管路」页生成管线图后才有（那两项需要真实管道长度）</div>';
+      }else if(adv&&adv.ok===false&&adv.text){
+        lines+='<div class="mfg-unavailable">'+adv.text+'</div>';
+      }else{
+        lines+='<div class="mfg-unavailable">分区管路路径或水力参数尚未齐备，暂不能可靠计算本轮扬程及手绘总管建议口径</div>';
+      }
+    }
+    el.innerHTML=lines;
+    el.hidden=false;
+  }
+
   window.RyMapFlowDemo = {
-    VERSION: 'v917-workspace-nodes',
+    VERSION: 'v945-trunk-od-by-zones',
     TOL_M: TOL_M,
     INTERVAL_MS: INTERVAL_MS,
     init: function (c) {
@@ -573,6 +921,9 @@
     isActive: function () { return active != null || playing; },
     /* 纯函数导出（Node 单测） */
     groupOf: groupOf, groupCount: groupCount, validateConnection: validateConnection,
-    entrancesOf: entrancesOf, collectWorkspaceNodes: collectWorkspaceNodes
+    entrancesOf: entrancesOf, collectWorkspaceNodes: collectWorkspaceNodes,
+    /* [v945] 导出给探针/宿主驱动：分组浮层文案（含"没有图面路径时按分区反推口径"这条分支）。
+       它是纯 DOM 拼装、不写任何状态，导出去比藏在闭包里更好验。 */
+    updateGroupInfo: updateGroupInfo
   };
 })(window);

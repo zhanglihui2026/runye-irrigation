@@ -21,12 +21,12 @@
      顺序契约登记在 ci_check_static.cjs 的 scriptOrderRules 里。 -->
 <script src="core/coord-frame.js?v=836-coord-frame"></script>
 <script src="runye-material-audit.js?v=607-branch-material-span"></script>
-<script src="runye-map-partition.js?v=916-demo-entrance"></script>
+<script src="runye-map-partition.js?v=933-zone-label-alignment"></script>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>润野灌溉设计优化版｜滴灌管径与水泵选型</title>
 <meta name="description" content="输入地块、滴灌带与水源参数，快速计算灌溉分区、主管支管管径和水泵工作点。"/>
-<link rel="stylesheet" href="mod/style-01.css?v=920-trunk-close-loop">
+<link rel="stylesheet" href="mod/style-01.css?v=945-trunk-od-by-zones">
 <link rel="stylesheet" href="runye-inverse-design.css?v=277">
 <script defer src="runye-inverse-design.js?v=438-branch-flow-conservation"></script>
 <link rel="stylesheet" href="runye-terrain.css?v=454-terrain-sidebar-peer">
@@ -51,7 +51,7 @@
 <link rel="stylesheet" href="hydraulic-calc/hydraulic-calc.css">
 <link rel="stylesheet" href="filter-system/filter-system.css">
 <link rel="stylesheet" href="pwa/vendor/leaflet.css">
-<link rel="stylesheet" href="mod/online-map.css?v=920-trunk-close-loop">
+<link rel="stylesheet" href="mod/online-map.css?v=945-trunk-od-by-zones">
 <link rel="stylesheet" href="terrain/terrain.css?v=535-terrain-single-source">
 <link rel="stylesheet" href="hydraulics-main.css?v=442-native">
 <style id="ryCadTwinCss">
@@ -709,6 +709,7 @@ body.ry-worst-off [data-tlworst]{display:none}
       <div class="map-draw-tools ryp-float ry-hbar" id="mapDrawTools" data-ry-panel
            data-ry-position-key="mapDrawToolsPos" data-ry-default-top="12" data-ry-default-left="12">
         <span class="dt-grip" data-ry-drag title="按住拖动工具条；位置自动记住">⠿ 绘制</span>
+        <button class="ry-hbar-btn" id="btnPlaceReservoir" type="button" aria-pressed="false" title="点击后在地图中放置蓄水池；放置后可拖动调整，也可吸附到现有节点">💧 蓄水池</button>
         <button class="ry-hbar-btn" id="btnDrawTrunk" title="从头重绘当前地块总管；完成保存前，旧线路保留">🟠 绘制</button>
         <button class="ry-hbar-btn" id="btnFinishTrunk" title="结束并保存当前总管线">完成</button>
         <button class="ry-hbar-btn" id="btnUndoTrunk" title="撤销总管最后一个折点">撤销点</button>
@@ -742,13 +743,14 @@ body.ry-worst-off [data-tlworst]{display:none}
            ★ 分隔符是全角 ｜（U+FF5C），缺数据用 em dash（U+2014），**绝不写 0.00** ——
              伪造 0 高差会让人拿去做水力判断，而真实数据是"没有"。 -->
       <div class="map-trunk-hint" id="mapTrunkHint" hidden></div>
+      <section id="mapFlowGroupInfo" class="map-flow-group-info" aria-live="polite" hidden></section>
       <div class="map-statusbar" id="mapStatusbar" aria-live="off">
         <span>总管：<b id="msbTrunk">—</b></span><i class="msb-sep">｜</i>
         <span>投影：<b id="msbProj">—</b></span><i class="msb-sep">｜</i>
         <span>高差：<b id="msbDrop">—</b></span><i class="msb-sep">｜</i>
         <span>流速：<b id="msbFlow">—</b></span><i class="msb-sep">｜</i>
-        <button type="button" class="msb-snap" id="btnSnapToggle" aria-pressed="false"
-                title="捕捉地块顶点 / 水源 / 干线拐点 / 阀门 / 支管起点 / 分区顶点；快捷键 S">捕捉：关闭</button>
+        <button type="button" class="msb-snap" id="btnSnapToggle" aria-pressed="true"
+                title="捕捉地块顶点 / 水源 / 干线拐点 / 阀门 / 支管起点 / 分区顶点；快捷键 S">捕捉：开启</button>
       </div>
       <!-- ===== [v282→v849] 分区角度面板已并入「图层」浮面板 =====
            [v849 用户反馈] 两个浮面板叠在右侧占地方 ⇒ 独立 #ryAnglePanel 浮卡壳删除；
@@ -2406,7 +2408,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 </div>
 
 <script src="mod/material-formulas.js?v=412"></script>
-<script src="mod/zone-geometry.js?v=920-trunk-close-loop"></script>
+<script src="mod/zone-geometry.js?v=945-trunk-od-by-zones"></script>
 <script src="mod/flow-geometry.js?v=414"></script>
 <script src="mod/tl-polyline-geometry.js?v=426-tl-polyline-geometry"></script>
 <!-- [v421-mat-table] 材料清单/材料表管理（自 inline-09 迁出）：先于 inline-09 加载 —— inline-09 尾部
@@ -2415,7 +2417,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <!-- [v424-plan-calc-render] 扬程公式与分解展示模块，先于计算控制器和三级调用方装载。 -->
 <script src="mod/plan-calc-render.js?v=614-head-formula"></script>
 <!-- [v887-tape-zone-vgate] 段总管生成器（纯几何，Node 单测锁），先于 inline-09 消费方装载。 -->
-<script src="mod/inline-09.js?v=916-demo-entrance"></script>
+<script src="mod/inline-09.js?v=945-trunk-od-by-zones"></script>
 <!-- [v423-header-layout] 三级简图标题布局依赖 inline-09 的 tlMeasureText 与生成时写入的标题状态。 -->
 <script src="mod/tl-header-layout.js?v=423-header-layout"></script>
 
@@ -2446,7 +2448,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <!-- [v815] 绘图工具栏统一图标集（单色线性 SVG）：必须先于 inline-18.js 加载，
      inline-18 的 decorateToolbar 会在首次装饰时调用 window.RyIcons.decorate。 -->
 <script src="mod/ry-icons.js?v=824-toolbar-dedupe"></script>
-<script src="mod/inline-18.js?v=916-demo-entrance"></script>
+<script src="mod/inline-18.js?v=939-map-first-replay"></script>
 
 <script src="mod/inline-19.js?v=696-shared-host-init-order"></script>
 
@@ -2584,12 +2586,14 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script src="pwa/vendor/leaflet.js"></script>
 <script src="mod/trunk-snap.js?v=911-trunk-snap-edge"></script>
 <script src="mod/trunk-geo.js?v=854-null-slot-strict"></script>
+<!-- [v945] 总管口径反推（纯函数）：由规划分区的面积/流量 + 下游主管支管管径推手绘总管外径。 -->
+<script src="mod/trunk-size.js?v=945-trunk-od-by-zones"></script>
 <script src="mod/trunk-edit.js?v=835-trunk-geo-snap"></script>
 <script src="mod/trunk-history.js?v=835-trunk-geo-snap"></script>
-<script src="mod/trunk-panel.js?v=920-trunk-close-loop"></script>
+<script src="mod/trunk-panel.js?v=945-trunk-od-by-zones"></script>
 <!-- [v887-tape-zone-vgate] 在线地图轮灌演示（分组/校验纯函数 + Leaflet 图层），先于宿主装载。 -->
-<script src="mod/map-flow-demo.js?v=920-trunk-close-loop"></script>
-<script src="mod/online-map.js?v=920-trunk-close-loop"></script>
+<script src="mod/map-flow-demo.js?v=945-trunk-od-by-zones"></script>
+<script src="mod/online-map.js?v=945-trunk-od-by-zones"></script>
 <script src="terrain/terrain-core.js?v=410-elev"></script>
 <script src="terrain/terrain-ui.js?v=513-sec-gate"></script>
 <script src="runye-hydraulics-page.js?v=829-hyd-auto-refresh"></script>

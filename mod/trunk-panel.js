@@ -462,6 +462,11 @@
           '<select class="tp-sel" id="tpDn" aria-label="管径"></select></span></div>' +
         '<div class="tp-row" id="tpDnCustomRow" hidden><span class="tp-k">自定义管径</span><span class="tp-v">' +
           '<input class="tp-input" id="tpDnCustom" type="number" min="20" max="1200" step="1" aria-label="自定义管径"><em>mm</em></span></div>' +
+        '<div class="tp-row" id="tpDnAdviceRow" hidden><span class="tp-k">推算管径</span><span class="tp-v">' +
+          '<b class="tp-ro" id="tpDnAdvice">—</b>' +
+          '<button type="button" class="tp-adopt" id="tpDnAdopt" title="按当前地块分区推算的外径写入本线管径">采用</button>' +
+        '</span></div>' +
+        '<div class="tp-advice-note" id="tpDnAdviceNote" hidden></div>' +
         '<div class="tp-row"><span class="tp-k">设计流量</span><span class="tp-v">' +
           '<input class="tp-input" id="tpFlow" type="number" min="0" step="0.1" aria-label="设计流量"><em>m³/h</em></span></div>' +
         '<div class="tp-sep"></div>' +
@@ -624,6 +629,34 @@
       paintJoint(d);
     }
 
+    /* [v945] 推算管径行（用户 2026-11-04）：「地图上画的总管只是路由，直径要通过实际
+       规划地块的分区推算出来」。数据由宿主 getOdAdvice 现算（算法在 mod/trunk-size.js：
+       分区面积 → 分区流量 → 最不利组合流 → 经济流速选档 → 不小于下游主管/支管外径）。
+       ★ 这里**只显示 + 一键采用**，不自动写库：自动改写会与用户手选的管径打架，
+         而且面板是"看现状"的地方，静默改数据会让人以为选了没生效。 */
+    function paintOdAdvice(entry) {
+      var row = q('tpDnAdviceRow'), valEl = q('tpDnAdvice'), noteEl = q('tpDnAdviceNote'), btn = q('tpDnAdopt');
+      if (!row || !valEl || !btn) return;
+      var adv = (typeof opts.getOdAdvice === 'function') ? opts.getOdAdvice() : null;
+      if (!adv || adv.ok !== true) {
+        row.hidden = true;
+        if (noteEl) noteEl.hidden = true;
+        return;
+      }
+      var cur = num(entry && entry.params && entry.params.dn);
+      row.hidden = false;
+      valEl.textContent = 'Ø ' + adv.od + ' mm' +
+        (isFinite(adv.velocity) ? '（' + Number(adv.velocity).toFixed(2) + ' m/s）' : '');
+      /* 已一致就把按钮藏起来 —— 点了也不会有变化，留着反而是噪音。 */
+      btn.hidden = (cur !== null && cur === adv.od);
+      if (noteEl) {
+        var txt = '按 ' + adv.basis + ' 反推';
+        if (cur !== null && cur !== adv.od) txt += '；当前 DN' + cur + '，与推算不一致';
+        noteEl.textContent = txt;
+        noteEl.hidden = false;
+      }
+    }
+
     /* 联合复核渲染。每帧都重算：下游快照可能在别的页被重生成过（show/复核时都会重进这里）。
        ★ 这里只**展示** jointReview 的结论，不在这里做任何判断 —— 判断在纯函数里、Node 单测锁着。 */
     function paintJoint(d) {
@@ -713,6 +746,7 @@
         dnEl.value = '';
       }
       paint(compute(entry));
+      paintOdAdvice(entry);
       /* 屏蔽状态的唯一显示出口：用户必须能看出"这条线被我关掉提醒了"，
          否则下次复核不弹时会以为功能坏了。 */
       var wt = q('tpWarnToggle');
@@ -770,6 +804,18 @@
     q('tpRecheck').onclick = function () {
       if (!curId) return;
       if (typeof opts.onRecheck === 'function') opts.onRecheck(curId);
+      refresh();
+    };
+    q('tpDnAdopt').onclick = function () {
+      var adv = (typeof opts.getOdAdvice === 'function') ? opts.getOdAdvice() : null;
+      if (!adv || adv.ok !== true) return;
+      var entry = curEntry();
+      var prm = (entry && entry.params) || {};
+      var delta = { dn: adv.od };
+      /* 设计流量只在**用户没填**时顺带写入（它就是推算用的合流 Q）；
+         已经填过的一律不动 —— 用户的实测/经验值优先。 */
+      if (num(prm.designFlow) === null && adv.flow > 0) delta.designFlow = Math.round(adv.flow * 10) / 10;
+      patch(delta);
       refresh();
     };
     q('tpMarkNode').onclick = function () {

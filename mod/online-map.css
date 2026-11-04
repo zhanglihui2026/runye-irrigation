@@ -34,6 +34,52 @@
   background:#fff;border:1px solid var(--s-300);box-shadow:0 2px 8px rgba(15,23,42,.14)}
 #onlineMapSection .map-draw-tools .dt-grip{flex:none;padding:4px 7px;font-size:12px;font-weight:700;color:var(--g-700);
   background:var(--g-50);border-right:1px solid var(--s-300);cursor:move;user-select:none;touch-action:none;letter-spacing:1px}
+#onlineMapSection .leaflet-container.placing-reservoir{cursor:crosshair}
+#onlineMapSection .ry-reservoir-icon-wrap{background:transparent;border:0;white-space:nowrap}
+#onlineMapSection .ry-reservoir-mark{position:absolute;left:14px;top:10px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;
+  background:#fff;border:2px solid #0369a1;border-radius:50%;box-shadow:0 1px 5px #0f172a66}
+#onlineMapSection .ry-reservoir-mark svg{display:block;width:17px;height:17px;fill:#0284c7}
+#onlineMapSection .ry-reservoir-label{position:absolute;left:0;top:-1px;padding:1px 5px;background:#fff;border:1px solid #0369a1;color:#075985;
+  box-shadow:0 1px 4px #0f172a66;font-size:10px;font-weight:800;line-height:14px}
+#onlineMapSection .ry-reservoir-tip{background:#fff;border:1px solid #0369a1;color:#075985;font-size:11px;font-weight:700}
+#onlineMapSection .ry-reservoir-tip:before{border-top-color:#0369a1}
+#onlineMapSection .map-draw-tools #btnPlaceReservoir.btn-on{background:#e0f2fe;border-color:#38bdf8;color:#075985}
+
+/* [v924] 轮灌动画当前组水力摘要：固定在地图上沿工具条下方，播放切组时同步更新。 */
+#onlineMapSection .map-flow-group-info{position:absolute;left:12px;top:68px;z-index:1160;width:min(320px,calc(100% - 24px));
+  padding:10px 12px;background:rgba(255,255,255,.96);border:1px solid #94a3b8;box-shadow:0 2px 10px rgba(15,23,42,.22);
+  color:#334155;font-size:12px;line-height:1.45;pointer-events:none}
+#onlineMapSection .map-flow-group-info[hidden]{display:none!important}
+#onlineMapSection .map-flow-group-info .mfg-title{font-size:13px;font-weight:800;color:#0f172a}
+#onlineMapSection .map-flow-group-info .mfg-members{margin-top:2px;color:#475569}
+#onlineMapSection .map-flow-group-info .mfg-count{font-size:11px;color:#64748b}
+#onlineMapSection .map-flow-group-info .mfg-trunk-advice{margin-top:5px;padding:4px 6px;background:#ecfdf5;border-left:3px solid #059669;color:#047857;font-weight:800}
+#onlineMapSection .map-flow-group-info .mfg-advice-note{font-size:10px;color:#64748b;line-height:1.35}
+#onlineMapSection .map-flow-group-info .mfg-value{margin-top:3px;font-weight:800;color:#dc2626}
+#onlineMapSection .map-flow-group-info .mfg-loss{margin-top:2px;color:#475569;font-size:10px}
+#onlineMapSection .map-flow-group-info .mfg-breakdown{font-size:10px;color:#64748b}
+#onlineMapSection .map-flow-group-info .mfg-zone-list{display:grid;grid-template-columns:1fr 1fr;gap:3px 8px;margin-top:6px;padding-top:5px;border-top:1px solid #cbd5e1}
+#onlineMapSection .map-flow-group-info .mfg-zone-row{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 6px;font-size:10px;line-height:1.35;color:#334155}
+#onlineMapSection .map-flow-group-info .mfg-zone-row b{color:#0f172a}
+#onlineMapSection .map-flow-group-info .mfg-zone-row strong{color:#0369a1}
+#onlineMapSection .map-flow-group-info .mfg-unavailable{margin-top:4px;color:#a16207}
+#onlineMapSection .mapflow-zone-active{animation:mapflowZonePulse .62s ease-in-out infinite alternate}
+@keyframes mapflowZonePulse{from{fill-opacity:.34}to{fill-opacity:.68}}
+#onlineMapSection .mapflow-zone-dim{transition:fill-opacity .2s ease-out}
+#onlineMapSection .mapflow-valve-icon{background:transparent!important;border:0!important;overflow:visible!important}
+#onlineMapSection .mapflow-valve{display:block;width:24px;height:24px;filter:drop-shadow(0 1px 2px #0f172a88)}
+#onlineMapSection .mapflow-valve svg{display:block;width:24px;height:24px;overflow:visible}
+#onlineMapSection .mapflow-valve-ring{fill:#fff;stroke:#94a3b8;stroke-width:1.7}
+#onlineMapSection .mapflow-valve-pipe{fill:none;stroke:#64748b;stroke-width:1.8;stroke-linecap:round}
+#onlineMapSection .mapflow-valve-body{fill:#cbd5e1;stroke:#475569;stroke-width:1.2;stroke-linejoin:round}
+#onlineMapSection .mapflow-valve-handle{fill:none;stroke:#475569;stroke-width:1.8;stroke-linecap:round;transform-box:view-box;transform-origin:12px 7px}
+#onlineMapSection .mapflow-valve.is-open .mapflow-valve-ring{stroke:#15803d;stroke-width:2.6;animation:mapflowValvePulse .52s ease-in-out infinite alternate}
+#onlineMapSection .mapflow-valve.is-open .mapflow-valve-pipe{stroke:#16a34a;stroke-width:2.4}
+#onlineMapSection .mapflow-valve.is-open .mapflow-valve-body{fill:#4ade80;stroke:#15803d;stroke-width:1.7}
+#onlineMapSection .mapflow-valve.is-open .mapflow-valve-handle{stroke:#166534;stroke-width:2.4;animation:mapflowValveOpen .52s cubic-bezier(.22,.85,.25,1) both}
+#onlineMapSection .mapflow-valve.is-closed .mapflow-valve-handle{transform:rotate(0deg)}
+@keyframes mapflowValveOpen{0%{transform:rotate(0deg)}72%{transform:rotate(108deg)}100%{transform:rotate(90deg)}}
+@keyframes mapflowValvePulse{from{stroke-width:1.8;opacity:.68}to{stroke-width:3.4;opacity:1}}
 
 /* [v497-map-side-font → v807 退役] 左栏字号/高度统一改由 style-01.css 的 v807 段管理
    （对齐分区与管路 .ry-props 灰条体系：控件 26px/12px、灰分组条 22px/11px、hint 11px）。
@@ -85,6 +131,18 @@ body:has(.ry-pwa-install) #onlineMapSection .map-statusbar{padding-right:180px}
    避免 hint 右端伸进安装条下面被盖住一半。 */
 body:has(.ry-pwa-install) #onlineMapSection .map-trunk-hint{max-width:calc(100% - 210px)}
 #onlineMapSection .map-trunk-hint[hidden]{display:none!important}
+
+/* [v922] 底部提示三层纵向排开：状态栏(24px) → 消息条 → 总管操作帮助。
+   长验证提示限制高度并允许滚动，避免遮住地图，同时保留完整文案供查看。 */
+#onlineMapSection .tip{bottom:34px;max-height:25vh;overflow:auto;line-height:1.45;box-sizing:border-box}
+#onlineMapSection .map-trunk-hint{transition:bottom .12s ease-out}
+/* [v923] 回传的分区图层标签只呈现分区名和裁剪后的亩数；不附带地块总面积/尺寸。 */
+#onlineMapSection .ry-map-zone-label-icon{border:0!important;background:transparent!important;overflow:visible!important}
+#onlineMapSection .ry-map-zone-label{position:absolute;left:0;top:0;transform:translate(-100%,0) rotate(var(--ry-map-zone-label-rotation,0deg));transform-origin:100% 0;display:flex;align-items:center;gap:5px;
+  white-space:nowrap;padding:3px 7px;background:rgba(15,23,42,.84);border:1px solid rgba(255,255,255,.9);
+  box-shadow:0 1px 4px rgba(0,0,0,.38);color:#fff;font:600 12px/1.25 Arial,sans-serif;pointer-events:none}
+#onlineMapSection .ry-map-zone-label b{font-size:12px;color:#fff}
+#onlineMapSection .ry-map-zone-label small{font-size:11px;color:#cffafe}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    [v833] 总管编辑层（三期）：拐点手柄 / 右键菜单
@@ -181,6 +239,19 @@ body:has(.ry-pwa-install) #onlineMapSection .ry-trunk-panel{bottom:96px}
   height:24px;padding:0 6px;border:1px solid #cbd5e1;background:#fff;color:#334155;
   font-family:inherit;font-size:11px!important;font-weight:600;cursor:pointer}
 #onlineMapSection .ry-trunk-panel .tp-btn:hover{border-color:#38bdf8;color:#0369a1;background:#f0f9ff}
+
+/* [v945] 推算管径行（由规划分区反推）：值 + 一键「采用」。
+   注意字号必须 11px + !important —— 全局 button 排版规则会盖掉面板字号（§26.x 字号坑）。
+   「采用」用琥珀色描边：它是**建议值**，不是系统已生效的值，视觉上要和只读行区分开。 */
+#onlineMapSection .ry-trunk-panel .tp-adopt{
+  margin-left:6px;height:20px;padding:0 7px;border:1px solid #d97706;border-radius:4px;
+  background:#fffbeb;color:#b45309;font-family:inherit;font-size:10.5px!important;
+  font-weight:700;cursor:pointer;white-space:nowrap}
+#onlineMapSection .ry-trunk-panel .tp-adopt:hover{background:#fef3c7;border-color:#b45309}
+#onlineMapSection .ry-trunk-panel .tp-adopt[hidden]{display:none!important}
+#onlineMapSection .ry-trunk-panel .tp-advice-note{
+  font-size:10.5px!important;line-height:1.5;color:#64748b;padding:0 0 2px 0}
+#onlineMapSection .ry-trunk-panel .tp-advice-note[hidden]{display:none!important}
 /* 流速分色：绿=经济、黄=偏低/偏高、红=超标。**纯提示，不阻断任何操作**。 */
 #onlineMapSection .ry-trunk-panel .tp-v-good{color:#15803d}
 #onlineMapSection .ry-trunk-panel .tp-v-low{color:#b45309}
