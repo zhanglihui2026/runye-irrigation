@@ -89,6 +89,7 @@ tests/*
 
 # 主管共享段复核（v976 扬程反序消除）回归
 !tests/main_recheck.test.cjs
+!tests/input_persist.test.cjs
 
 # 手动高程与压力校核回归
 !tests/terrain.test.cjs
