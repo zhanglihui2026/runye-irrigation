@@ -8267,3 +8267,6 @@ zone_merge_last 15/15 + verify 系全绿。
 ## 26.189 v985-valve-flow：轮灌演示水流流到每一枚阀门（2026-11-05）
 
 用户截图（1 区激活、主管上多枚阀门）反馈：主管到各阀门那一段没有水流动画。根因：buildFlowRoutes 只取每区第一枚阀门做支管馈线（d.valves.some 首枚即停），其余阀门所在管段静止。改法：当前组每枚阀门注册成独立 Dijkstra 终点——主管投影切点 valve-main:N + 短馈线 valve-feed:N→valve-node:N（复用 feeds 机制，feeds 链接支持 ownKey 兼容旧支管馈线 key=branch-feed:zi），投影容差 20m 与既有馈线一致、超限跳过宁缺不错。纯可视化叠层，不改管线几何与水力模型。版本 14 处同抬 985-valve-flow，sw VERSION 同步。新增 tests/v985_valve_flow.test.cjs 五把锁（注意 tests 白名单需 git add -f）。全量 697/697，gate PASS，commit e8e3176，Pages 冒烟 14 处 985 + 线上 map-flow-demo.js 含 valve-node。
+## 26.190 v986-valve-gap：阀门投影容差压线修复（v985 无效根因，2026-11-05）
+
+用户反馈 v985 后仍看不到主管→阀门动画，要求画理解图核对。画图核实管系结构时发现根因：主管与支管平行对称摆放、固定间距 PP_MAIN_BRANCH_GAP_M=20m（plot-editor.js 3307，tlVisGap 兜底同值），阀门装在支管上→阀门到主管投影距离≈正好 20m，v985 容差 `vp.d>20 return` 与旧支管馈线判据 `mainProj.d<=20` 全部压线跳过（浮点>20），整批馈线静默失败回退主管中点——这同时解释了 v985 之前用户也看不到动画。修复：两处判据 20→26m（投影目标固定为阀门自己所属主管 byMain[v.mi]，无误连风险），根因注释留源码。版本 14 处同抬 986-valve-gap。v985 测试锁④⑤同步更新。全量 697/697，gate PASS，commit bfb9818，Pages 冒烟 14 处 986 + 线上含 vp.d>26。
