@@ -92,6 +92,7 @@ tests/*
 !tests/input_persist.test.cjs
 !tests/card_king_badges.test.cjs
 !tests/v981_path_recheck_linkguard.test.cjs
+!tests/v982_coupler_entry_removed.test.cjs
 
 # 手动高程与压力校核回归
 !tests/terrain.test.cjs
