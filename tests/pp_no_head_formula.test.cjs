@@ -36,9 +36,12 @@ test('① 二级左栏不再有扬程计算式（节点真的删了，不是隐�
   assert.ok(!/class="ry-props-head">扬程计算式</.test(aside), '二级左栏里还有「扬程计算式」灰条');
 });
 
-test('② 三级那套必须还在（这次只取消二级）', () => {
-  assert.ok(/id="ppHeadBreak"/.test(html), '三级 #ppHeadBreak 被误删了 —— 用户只说二级');
-  assert.ok(/tl-flat-head">扬程计算式</.test(calc), '三级算式带的「扬程计算式」标题没了');
+test('② 三级那套也已取消（v984，用户 2026-11-05 点名三级）', () => {
+  assert.ok(!/id="ppHeadBreak"/.test(html), '三级 #ppHeadBreak 应已随 v984 删除');
+  /* 渲染器 dormant 保留：标题串与判空都要在，恢复时插回一行 DOM 即可 */
+  assert.ok(/tl-flat-head">扬程计算式</.test(calc), '三级算式带的「扬程计算式」标题（dormant）没了');
+  assert.ok(/getElementById\('ppHeadBreak'\);\s*\n\s*if \(!el \|\| !r\) return;/.test(calc),
+    'renderHeadBreakdown 必须判空 no-op（节点已删，不能抛错带停渲染链）');
 });
 
 test('③ 消费方必须判空：元素不在就 no-op，不许抛错', () => {
