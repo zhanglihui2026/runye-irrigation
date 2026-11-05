@@ -453,6 +453,20 @@
       var idA='zone-target:'+i;addCut(main,main.len/2,idA);targets.push({zi:i,id:idA});
     });
 
+    /* [v985 用户 2026-11-05] 主管→每枚阀门那一段也要看见水流：此前只有第一枚
+       阀门有支管馈线，其余阀门所在管段静止。现在把当前组每枚阀门都注册成
+       独立终点——主管投影切点 + 短馈线连到阀门图标，Dijkstra 自动把水流
+       引到每枚阀门。纯可视化叠层（feeds 机制），不改管线几何与水力模型。 */
+    (d.valves||[]).forEach(function(v,vi){
+      if(!v||!v.ll||activeZones.indexOf(v.mi)<0)return;
+      var main=byMain[v.mi];if(!main)return;
+      var vp=project(main,v.ll);if(vp.d>20)return;
+      var mainId='valve-main:'+vi,nodeId='valve-node:'+vi;
+      addCut(main,vp.s,mainId);
+      feeds.push({zi:v.mi,from:mainId,to:nodeId,points:[at(main,vp.s),v.ll],ownKey:'valve-feed:'+vi});
+      targets.push({zi:v.mi,id:nodeId});
+    });
+
     var graph={};
     function node(id){if(!graph[id])graph[id]=[];}
     function link(a,b,weight,edge){node(a);node(b);graph[a].push({to:b,weight:weight,edge:edge});graph[b].push({to:a,weight:weight,edge:edge});}
@@ -470,7 +484,7 @@
     feeds.forEach(function(f){
       var dx=xy(f.points[1]).x-xy(f.points[0]).x,dy=xy(f.points[1]).y-xy(f.points[0]).y;
       link(f.from,f.to,Math.max(.01,Math.sqrt(dx*dx+dy*dy)),{
-        key:'branch-feed:'+f.zi,kind:'branch',points:f.points,a:f.from,b:f.to
+        key:f.ownKey||('branch-feed:'+f.zi),kind:'branch',points:f.points,a:f.from,b:f.to
       });
     });
     if(!graph[rootId])return null;
