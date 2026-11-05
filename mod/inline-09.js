@@ -1784,6 +1784,56 @@ window.tlGroupLossOf = function (g) {
   }
 };
 
+/* [v967] 总管是**一条物理管**，全项目只能有一个口径（用户 2026-11-05 拍板：
+   「其他7个区都按照180选择的总管，8区难道我还要再单独接一个吸管吗？那其他分区的180的
+   管道怎么办？我扔了？…每个分区的管径都一样才行，用流量最大那个分区/联合流量最大分区
+   确定总管管径」）。
+
+   v950 起的估算与路径模式都是「拿本组流量现选一档」⇒ 8 个单区组算出 8 个总管口径，
+   面积最小的第 8 区被钉在 Ø160、扬程反而比大区高 6 m。物理上不成立（同一根管不可能
+   一段 Ø180 一段 Ø160），经济上更不成立（不能为了一个区换整根管）。
+
+   口径的唯一算法出处仍是 mod/trunk-size.js 的 suggest()：它本来就按「最不利轮灌组合流」
+   选一档，只是以前只有「手绘总管建议口径」在用。这里把全部组喂进去选**一次**，
+   再把同一个 od 发给两条计算路径 —— 流量仍按各组自己的（管里当时走多少水就是多少），
+   只有管径是共享的。 */
+function tlResolveGroups(areas, r) {
+  var manual = Array.isArray(window.tlManualGroups) ? window.tlManualGroups : null;
+  if (manual && manual.length) {
+    var mg = manual.map(function (g) { return (g || []).slice(); }).filter(function (g) { return g.length; });
+    if (mg.length) return mg;
+  }
+  var list = [], per = Math.max(1, Math.round(Number(r && r.zoneCount) || 1));
+  var n = Array.isArray(areas) ? areas.length : 0;
+  for (var zi = 0; zi < n; zi++) {
+    var gi = Math.floor(zi / per);
+    if (!list[gi]) list[gi] = [];
+    list[gi].push(zi);
+  }
+  return list.filter(function (g) { return g && g.length; });
+}
+
+function tlSharedTrunkPick(areas, groups, r) {
+  try {
+    var S = window.RyTrunkSize;
+    if (!S || typeof S.suggest !== 'function') return null;
+    if (!Array.isArray(areas) || !areas.length || !Array.isArray(groups) || !groups.length) return null;
+    var res = S.suggest({
+      zoneAreas: areas,
+      groups: groups,
+      tapeSpacing: r.tapeSpacing,
+      emitterSpacing: r.emitterSpacing,
+      emitterFlow: r.emitterFlow,
+      targetV: r.targetV,
+      mainOd: r.mainPipe && r.mainPipe.od,
+      branchOd: r.branchPipe && r.branchPipe.od,
+      minOd: MAIN_PIPE_MIN_OD,
+      selectPipe: selectPipe
+    });
+    return (res && res.ok === true && Number(res.od) > 0) ? res : null;
+  } catch (e) { return null; }
+}
+
 /* [v950] 没有「逐分区路径」时的按组扬程估算（用户 2026-11-04：
    「我希望是在地图演示分区轮灌的时候，在卡片中，能把扬程显示出来」）。
 
@@ -1798,7 +1848,7 @@ window.tlGroupLossOf = function (g) {
 
    与 tlMapGroupHydraulicsOf 的路径模式的差别只在：路径模式逐区不同长度、分口径沿程累加；
    这里是「全组共用同一组长度」，口径精度略低但没有段总管也能出数 —— 比"给不出扬程"有用。 */
-function tlEstimateGroupHead(r, zoneIndexes, areaOverride) {
+function tlEstimateGroupHead(r, zoneIndexes, areaOverride, sharedPick) {
   var areas = (Array.isArray(areaOverride) && areaOverride.length) ? areaOverride
     : (Array.isArray(r.zoneAreas) ? r.zoneAreas : null);
   if (!areas || !areas.length) return null;
@@ -1837,7 +1887,22 @@ function tlEstimateGroupHead(r, zoneIndexes, areaOverride) {
     if (bp && bp.od > maxBranchOd) maxBranchOd = bp.od;
   });
   var downstreamMinOd = Math.max(MAIN_PIPE_MIN_OD, maxMainOd, maxBranchOd);
-  var trunkPick = missing.length ? null : selectPipe(qGroup, r.targetV, downstreamMinOd);
+  /* [v967] 总管口径用**全项目共享值**（见 tlSharedTrunkPick 注释）：这一条管要供所有组，
+     尺寸只能由最不利组合流定一次。它必然 ≥ 本组任何一支下游管；若不满足说明数据异常，
+     退回逐组选档并让 trunkAdvice.shared=false，不硬套一个比自己下游还细的总管。 */
+  var sharedOd = (sharedPick && Number(sharedPick.od) > 0) ? Number(sharedPick.od) : 0;
+  if (sharedOd && sharedOd < downstreamMinOd) sharedOd = 0;
+  var trunkPick = null;
+  if (!missing.length) {
+    if (sharedOd) {
+      /* 只取该档，流速按本组流量算。取不到（档位不在序列里 = 数据异常）就退回逐组选档，
+         绝不硬留一个没有 od/id 的「共享总管」—— 那会让 frontId 掉回 r.frontPipe，
+         损失按一个口径、建议按另一个口径，正是 v955 修掉的同卡两口径。 */
+      trunkPick = selectPipe(qGroup, r.targetV, sharedOd, sharedOd);
+      if (!trunkPick) sharedOd = 0;
+    }
+    if (!trunkPick) trunkPick = selectPipe(qGroup, r.targetV, downstreamMinOd);
+  }
   var frontId = trunkPick ? trunkPick.id : (r.frontPipe && r.frontPipe.id);
 
   /* [v955] 总管长度**只认地图实测 / 设计图面**，不吃 tl_frontPipeLen 的试算默认值（200 m）。
@@ -1894,7 +1959,10 @@ function tlEstimateGroupHead(r, zoneIndexes, areaOverride) {
         });
       };
       var mainStep = stepOf(wPick.q, r.mainLenUsed, wPick.main);
-      var frontStep = stepOf(qGroup, frontLen, trunkPick);
+      /* [v967] 总管口径已由全项目共享值定死（不随本组流量变），所以这里**不再**对总管算台阶：
+         小流量组按共享口径流速本就偏低，那不是「被钉在细档」，报出来只会误导。
+         只有退回逐组选档时（sharedOd=0）才继续算总管台阶。 */
+      var frontStep = sharedOd ? null : stepOf(qGroup, frontLen, trunkPick);
       var stepSaved = (mainStep && mainStep.over ? mainStep.saved : 0) +
         (frontStep && frontStep.over ? frontStep.saved : 0);
       /* 少于 1 m 的差没有提示价值（还会把卡片堆满），门槛就按 1 m */
@@ -1910,7 +1978,9 @@ function tlEstimateGroupHead(r, zoneIndexes, areaOverride) {
           saved: stepSaved,
           totalLoss: altTotal,
           head: altHead,
-          /* 哪一段被钉住了就报哪一段（主管/总管可能只中一个） */
+          /* 哪一段被钉住了就报哪一段（v967 起总管走共享口径，通常只剩主管） */
+          segments: (mainStep && mainStep.over && frontStep && frontStep.over) ? 'both'
+            : ((mainStep && mainStep.over) ? 'main' : 'front'),
           main: (mainStep && mainStep.over) ? mainStep : null,
           front: (frontStep && frontStep.over) ? frontStep : null
         };
@@ -1950,7 +2020,12 @@ function tlEstimateGroupHead(r, zoneIndexes, areaOverride) {
       targetVelocity: r.targetV,
       minDownstreamOd: downstreamMinOd,
       mainOd: maxMainOd || null,
-      branchOd: maxBranchOd || null
+      branchOd: maxBranchOd || null,
+      /* [v967] 总管口径是项目级共享值：所有组同一个 od，流量才是逐组的 */
+      shared: !!sharedOd,
+      sharedFlow: sharedOd ? Number(sharedPick.flow) : null,
+      sharedGroupIndex: sharedOd && typeof sharedPick.groupIndex === 'number' ? sharedPick.groupIndex : null,
+      sharedZoneCount: sharedOd && Array.isArray(sharedPick.zones) ? sharedPick.zones.length : null
     } : null,
     frontLoss: worst.frontLoss,
     mainLoss: worst.mainLoss,
@@ -1969,13 +2044,20 @@ window.tlMapGroupHydraulicsOf = function (zoneIndexes, opts) {
     var r = computeThreeLevel();
     if (!r) return null;
     var areaOverride = (opts && Array.isArray(opts.zoneAreas) && opts.zoneAreas.length) ? opts.zoneAreas : null;
+    /* [v967] 总管口径：全项目一次选定，两条计算路径共用（用户 2026-11-05 拍板）。
+       opts.groups = 地图端自己的全部轮灌组（优先）；没传就按手动组/自动分组还原。 */
+    var areaList = areaOverride || (Array.isArray(r.zoneAreas) ? r.zoneAreas : null);
+    var allGroups = (opts && Array.isArray(opts.groups) && opts.groups.length)
+      ? opts.groups.filter(function (g) { return Array.isArray(g) && g.length; })
+      : tlResolveGroups(areaList, r);
+    var sharedPick = tlSharedTrunkPick(areaList, allGroups, r);
     var pathZones = (r.inversePath && Array.isArray(r.inversePath.zones) && r.inversePath.zones.length)
       ? r.inversePath.zones : null;
     /* [v950] 没有逐区路径（手绘总管路线 / 还没生成段总管）时不再直接返回 null ——
        退到「同一套公式、换成本组流量」的估算，让演示卡片能把扬程显示出来。
        opts.zoneAreas：地图端从地块 partitions 取到的逐区面积（比 computed 的网格口径更贴实际）。 */
     if (!pathZones || !window.RyPipePathLoss || typeof window.RyPipePathLoss.calculate !== 'function') {
-      return tlEstimateGroupHead(r, zoneIndexes, areaOverride);
+      return tlEstimateGroupHead(r, zoneIndexes, areaOverride, sharedPick);
     }
     var available = pathZones;
     var members = [], missing = [], seen = {};
@@ -1991,15 +2073,17 @@ window.tlMapGroupHydraulicsOf = function (zoneIndexes, opts) {
       return members.indexOf(z.zi) >= 0 ? sum + z.flow : sum;
     }, 0);
     var downstreamMinOd = Math.max(MAIN_PIPE_MIN_OD, Number(r.mainPipe && r.mainPipe.od) || 0, Number(r.branchPipe && r.branchPipe.od) || 0);
+    /* [v967] 同样只认共享口径；管里走的是本组流量，管径是全项目那一个。 */
+    var sharedOd = (sharedPick && Number(sharedPick.od) >= downstreamMinOd) ? Number(sharedPick.od) : 0;
     var trunkPick = (!missing.length && totalFlow > 0)
-      ? selectPipe(totalFlow, r.targetV, downstreamMinOd)
+      ? (sharedOd ? selectPipe(totalFlow, r.targetV, sharedOd, sharedOd) : selectPipe(totalFlow, r.targetV, downstreamMinOd))
       : null;
     var check = window.RyPipePathLoss.calculate({
       zones: available,
       groups: [members],
       calibers: r.inversePath.calibers,
-      /* 以当前轮灌组合反推的总管口径复算损失和需求扬程；已确认的逐段改径仍由 calibers 覆盖。 */
-      frontOd: trunkPick ? trunkPick.od : r.frontPipe.od,
+      /* 以全项目共享的总管口径复算损失和需求扬程；已确认的逐段改径仍由 calibers 覆盖。 */
+      frontOd: trunkPick ? trunkPick.od : (sharedOd || r.frontPipe.od),
       mainOd: r.mainPipe.od,
       branchOd: r.branchPipe.od,
       sourceDistance: readNumber('planSrcDist', 0, { min: 0 }),
@@ -2036,7 +2120,12 @@ window.tlMapGroupHydraulicsOf = function (zoneIndexes, opts) {
         targetVelocity: r.targetV,
         minDownstreamOd: downstreamMinOd,
         mainOd: r.mainPipe && r.mainPipe.od,
-        branchOd: r.branchPipe && r.branchPipe.od
+        branchOd: r.branchPipe && r.branchPipe.od,
+        /* [v967] 与估算路径同口径：总管 od 项目级共享，流量逐组 */
+        shared: !!sharedOd,
+        sharedFlow: sharedOd ? Number(sharedPick.flow) : null,
+        sharedGroupIndex: sharedOd && typeof sharedPick.groupIndex === 'number' ? sharedPick.groupIndex : null,
+        sharedZoneCount: sharedOd && Array.isArray(sharedPick.zones) ? sharedPick.zones.length : null
       } : null,
       frontLoss: worst.frontLoss,
       mainLoss: worst.mainLoss,
@@ -2074,20 +2163,9 @@ window.tlTrunkOdAdvice = function (opts) {
       return { ok: false, reason: 'no-zone-area', text: '当前地块没有分区面积（先在「分区与管路」划出分区）。' };
     }
     var groups = (Array.isArray(opts.groups) && opts.groups.length) ? opts.groups : null;
-    if (!groups) {
-      var manual = Array.isArray(window.tlManualGroups) ? window.tlManualGroups : null;
-      if (manual && manual.length) {
-        groups = manual.map(function (g) { return (g || []).slice(); }).filter(function (g) { return g.length; });
-      } else {
-        /* 均分口径与 groupOf(zi, null, nPer) 一致：组号 = floor(zi / zoneCount)。 */
-        var per = Math.max(1, Math.round(Number(r.zoneCount) || 1)), auto = [];
-        for (var zi = 0; zi < areas.length; zi++) {
-          var gi = Math.floor(zi / per);
-          if (!auto[gi]) auto[gi] = [];
-          auto[gi].push(zi);
-        }
-        groups = auto.filter(Boolean);
-      }
+    if (!groups) groups = tlResolveGroups(areas, r);
+    if (!Array.isArray(groups) || !groups.length) {
+      return { ok: false, reason: 'no-groups', text: '没有轮灌分组，无法确定同轮灌溉的合流流量。' };
     }
     return S.suggest({
       zoneAreas: areas,

@@ -7885,3 +7885,75 @@ B 段把 A 算出的 tierNote 交给真渲染器 `RyMapFlowDemo.updateGroupInfo`
 
 发布：v965 = `ab3c4fb`（Pages 构建卡住 15 分钟后 errored → 手动 `POST /pages/builds` 重触发，14.5 分钟后 built；
 期间线上一直停在 v964，**别把它当推送失败**：判定看 `_p1/_pub_api.py --verify` 的远端 tip）。
+
+### §26.171 v967-trunk-od-shared（2026-11-05，总管口径改为「全项目一个数」）
+
+**用户原话（决定性）**：先问「其他分区总管都是按照多少计算的，怎么这个分区的总管突然就变成直径 160 了？」，
+在拿到 §26.169 的台阶解释后**否掉了「第 8 区单独按 Ø160」这个结论**：
+「其他 7 个区都按照 180 选择的总管，8 区难道我还要再单独接一个吸管吗？那其他分区的 180 的管道怎么办？
+我扔了？这显然是不经济的，**这个要用一个原则来判断：每个分区的管径都一样才行，用流量最大那个分区/
+联合流量最大分区 确定总管管径**。」
+
+**为什么 v964 没解决**：v964 只把台阶「算清楚并写到卡片上」，口径仍是逐组现选 ⇒ 同一项目出现 8 个总管口径
+（7 个 Ø180 + 第 8 区 Ø160）。物理上不成立（同一根管不能一段 180 一段 160），经济上更不成立。
+
+**改法（口径唯一出处不变，只改「喂什么、发几次」）**
+- `mod/inline-09.js` 新增两个内部函数：
+  - `tlResolveGroups(areas, r)`：手动组 `window.tlManualGroups` 优先，否则 `组号 = floor(zi / zoneCount)`
+    （与 `map-flow-demo` 的 `groupOf(zi, manual, nPer)` 同口径），空组滤掉。
+  - `tlSharedTrunkPick(areas, groups, r)`：把**全部组**喂给 `RyTrunkSize.suggest()`（它本来就按最不利组选一档），
+    返回 `{ok,od,flow,velocity,groupIndex,zones,zoneCount,...}`；异常/缺模块一律 `null`（不猜）。
+  - ★ `suggest()` 的 `selectPipe` 注入仍是**三个位置参数** `(flow, targetV, floorOd)` —— 多传两个会被当成
+    `minOd`（v946 的坑，文件头 ③）。
+- `tlEstimateGroupHead(r, zoneIndexes, areaOverride, sharedPick)`：新增第 4 参。
+  `sharedOd = sharedPick.od`；**只取该档** `selectPipe(qGroup, targetV, sharedOd, sharedOd)`（流速按本组流量算），
+  取不到就 `sharedOd = 0` 退回逐组（不许留一个没有 od/id 的「共享总管」，否则 `frontId` 掉回
+  `r.frontPipe`，损失一个口径、建议另一个口径——v955 修的就是这个）。**共享口径细于本组下游管时同样归零**
+  （不许缩颈）。`frontStep = sharedOd ? null : stepOf(...)`：共享口径下总管不会「被钉在细档」，
+  再报总管台阶只会误导。`tierNote` 增 `segments: 'both'|'main'|'front'`；`trunkAdvice` 增
+  `shared / sharedFlow / sharedGroupIndex / sharedZoneCount`。
+- `tlMapGroupHydraulicsOf(zoneIndexes, opts)`：先 `tlSharedTrunkPick` 再分叉——估算链与路径链吃同一个 od；
+  路径链 `frontOd: trunkPick ? trunkPick.od : (sharedOd || r.frontPipe.od)`。`opts.groups`（地图端自己的分组）优先。
+- `tlTrunkOdAdvice`：分组还原收敛到 `tlResolveGroups`，删掉重复的 manual/auto 分支与 `no-groups` 兜底外的猜测。
+- `mod/map-flow-demo.js` `updateGroupInfo` 四处：
+  ① 把 `gsAll`（地图端**全部**轮灌组）递进 `tlMapGroupHydraulicsOf(..., {zoneAreas, groups:gsAll})`；
+  ② 反推兜底**不再传 `groupIndex`**（那是「每区各算一个总管」的做法）；
+  ③ 口径行分叉：「项目统一总管：PE 外径 Ø180 mm · 本轮流速 1.31 m/s」+「总管 Ø180 是全项目一根管，
+     口径按**最不利组**（7 区同轮 97.20 m³/h）定一次、各区共用 —— 本轮流量偏小，所以流速低于目标属正常」；
+     非共享时才退回旧文案；
+  ④ `tierNote` 按 `segments` 措辞：`main` 才说「该区主管单独放大到 Ø… 则扬程约 …（只是建议，不自动改）」，
+     涉及总管一律改说「总管只此一根、不随单区放大」——**「该区按 Ø… 施工则扬程约 …」这句必须消失**，
+     它等于让用户为一区换整根管。
+
+**数值（真 design-core 复算，S=静扬程+过滤，由卡片 44.62 反解 ≈20.7~21.2）**
+
+| 区 | 面积 | Q | 主管（每区一根，不变） | 旧：总管按本组 | 新：总管共享 Ø180 |
+|---|---|---|---|---|---|
+| 1~7 | 34.1~35.1 亩 | 94.4~97.2 | Ø180 | Ø180，扬程 38.4~39.2 | 同左（它们本来就是 Ø180） |
+| 8 | 31.6 亩 | 87.48 | **Ø160** | Ø160，总管 8.38 + 主管 8.65 + 支管 0.33 = 17.36 ⇒ **44.62** | **Ø180，总管 4.72** + 8.65 + 0.33 = 13.70 ⇒ **≈40.6** |
+
+- 共享口径由最不利组（1 区 97.2 m³/h）定 ⇒ Ø180。第 8 区降 **4.02 m**（= 总管 8.3764→4.72 的差 ×1.10）。
+- 残留的 +1.5 m 来自**它自己那根 Ø160 主管**（每区一根、物理独立，不在本次口径内）。
+  若用户愿意把第 8 区主管也升 Ø180：合计 9.92 ⇒ 扬程 ≈36.5（比 1~7 区还低，因为流量最小）。
+  ⇒ **「扬程要改小需要动哪些管径」的答案：总管一根都不用动（已是全项目 Ø180），只需决定第 8 区那根
+  主管要不要 Ø160→Ø180。** 卡片上 `tierNote` 现在就是这么说的。
+- **第 8 区主管仍是 Ø160 是对的**：它自己只走 87.48 m³/h，`selectPipe` 就近取档；这是「你花钱买粗管」的选择题，
+  不是 bug。**不要再把主管也改成共享** —— 那等于给每个区都按全项目最大流量买管。
+
+**新锁 `tests/trunk_shared_od.test.cjs` 7/7**（`git add -f`；①③是真执行 inline-09 里切出来的
+`tlResolveGroups`/`tlSharedTrunkPick`，不是正则）：
+① 8 个单区组 ⇒ 共享 od=180、`groupIndex=0`、flow=97.2，且**不管演示哪一组 od 都是 180**；
+② 病根对照：`suggest({groupIndex:7})` ⇒ od=160、v=1.6613（证明差异来源是「按组现选」，谁把逐组选档改回来，
+② 会绿而 ① 会红）；③ 分组还原（zoneCount=1/4、手动组优先、空组滤掉）；
+④ 缺模块/缺面积/缺滴灌/面积全 0 ⇒ null（不猜、不补 0）；⑤ 两条链都用 sharedOd + 缩颈归零 + 取不到归零 +
+共享时不算总管台阶；⑥ 卡片传 groups、不传 groupIndex、按 segments 措辞、旧「该区按 Ø… 施工」已删；
+⑦ 反向锁 `head: worst.head` / `totalLoss: worst.totalLoss` 仍是最不利区，`altHead` 只许在 tierNote 里。
+
+**既有锁**：`tests/est_group_pipes_source.test.cjs` ② 断言的 `selectPipe(qGroup, r.targetV, downstreamMinOd)`
+仍作为**退回逐组**的那一行存在 ⇒ 未动。`tests/trunk_tier_step.test.cjs` 7/7 未动（`tierStep` 纯函数没改）。
+
+**没做的事（下次别当成漏的）**：`suggest()` 本身没改一行；`selectPipe` 的「就近取档」也没改
+（改它会牵动二级/三级/总管建议的每一个数，且台阶只是挪到 v=1.5 那条线上、不会消失）。
+
+发布：VERSION=`v967-trunk-od-shared`（index.html 12 处 `?v=` 同抬，含 style-01.css）、static 635/639
+（4 红仍为既有 demo_flow_revive / plot_transfer / snap_default_off ①③）、refs PASS（37 页/224 引用）、lint 341 脚本 0 错。
