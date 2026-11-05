@@ -75,18 +75,27 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     await sleep(2500);
 
     const b = await page.evaluate(() => {
+      const numIn = t => { const m = /(-?\d+(?:\.\d+)?)/.exec(t || ''); return m ? Number(m[1]) : NaN; };
       const el = document.getElementById('tlCalSelBranch');
       if (!el) return null;
       const opts = Array.from(el.options).map(o => ({ v: Number(o.value), t: o.textContent }));
+      const mainTxt = (document.getElementById('tlPlanMainPipe') || {}).textContent || '';
       return {
+        opts,
         n: opts.length,
         min: opts.length ? opts[0].v : NaN,
+        max: opts.length ? opts[opts.length - 1].v : NaN,
         o63: opts.find(o => o.v === 63),
         oDes: opts.find(o => /设计/.test(o.t)),
-        des: Number(el.getAttribute('data-design'))
+        des: Number(el.getAttribute('data-design')),
+        mainOd: numIn(mainTxt)
       };
     });
-    check('B1 支管下拉 = 18 项（全档位）', b && b.n === 18, b ? '实际 ' + b.n : '无下拉');
+    /* [v972] 支管档位改为 < 主管管径的上限过滤（用户口径：比主管粗的档不会选），
+       B1/B2 断言随之改为「全部档位 < 主管有效管径、最大档 180」；总管/主管下拉仍是全档位。 */
+    check('B1 支管下拉全部档位 < 主管管径（v972 上限过滤）',
+      b && b.mainOd > 0 && b.opts.every(o => o.v < b.mainOd),
+      b ? '主管 ' + b.mainOd + ' mm，档位 ' + b.opts.map(o => o.v).join(',') : '无下拉');
     check('B2 最小档 = Ø50（比旧 ±3 档窗口的 Ø90 更小）', b && b.min === 50, b ? '实际 ' + b.min : '');
     check('B3 Ø63 档带流速后缀', b && b.o63 && /m\/s/.test(b.o63.t), b && b.o63 ? b.o63.t : '');
     check('B4 设计档 Ø140 标注「设计」', b && b.oDes && b.oDes.v === b.des && b.des === 140,
@@ -120,7 +129,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     const realErrors = errors.filter(e => !/favicon|ERR_FILE_NOT_FOUND|ERR_CONNECTION|ERR_NAME_NOT_RESOLVED|ERR_FAILED|Failed to load resource|CORS policy|tcloudbase|Access to (script|fetch)/i.test(e));
     check('E1 无脚本错误', realErrors.length === 0, realErrors.slice(0, 3).join(' | '));
   } catch (err) {
-    check('执行异常', false, err && err.message);
+    check('执行异常', false, err && (err.message + ' | ' + String(err.stack || '').split('\n').slice(1, 3).join(' ~ ')));
   } finally {
     try { if (browser) await browser.close(); } catch (e) { }
   }

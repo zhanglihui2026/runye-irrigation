@@ -296,14 +296,19 @@
   window.tlPipeCaliberSnapshot = pipeCaliberSnapshot;
   function pumpComparison() {
     var saved = tlPipeOdOverride;
+    var mcSave = window.tlManualCals;
     try {
       tlPipeOdOverride = null;
+      /* [v972] 无图面手动选管也算「覆盖」：设计值必须剔除（有图面时 appliedPipes
+         本来就为空、行为不变；无图面时不清空会让 before==after，差值卡恒为 0）。 */
+      window.tlManualCals = { front: null, main: null, branch: null };
       var design = computeThreeLevel();
+      window.tlManualCals = mcSave;
       /* 当前值必须与面板选径一致；快照单独读取图面改径，会漏掉 tlManualCals。 */
       if (typeof tlBuildPipeOverride === 'function') tlBuildPipeOverride();
       else tlPipeOdOverride = pipeCaliberSnapshot();
       return { design: design, current: computeThreeLevel() };
-    } finally { tlPipeOdOverride = saved; }
+    } finally { tlPipeOdOverride = saved; window.tlManualCals = mcSave; }
   }
   /* 统计图面改径情况（供按钮状态与提示行） */
   window.tlPumpOverrideStat = function () {

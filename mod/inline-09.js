@@ -228,8 +228,16 @@ function tlBuildPipeOverride() {
    设计值标注「设计」，其余档按当前流量算出实际流速标在档位后面，用户自己权衡。
    手动选管 → tlManualCals → tlBuildPipeOverride → 改径重算，链路不变；
    tlNormalizePipeOverride 下限 16mm，全档位都在合法区间。 */
-function tlCalSelOptions(designOd, curOd, flow) {
-  return PE_OD_SERIES.map(function (od) {
+function tlCalSelOptions(designOd, curOd, flow, maxOd) {
+  /* [v972 用户口径] 「支管可选择的管径范围一定是比主管细的，比主管粗的按常理不会选」：
+     maxOd 传入主管有效管径（设计档或手动改径后的档），≥ maxOd 的档位直接不出现；
+     设计档例外保留（防止下拉失去选中值），全过滤空时退化为仅设计档。 */
+  var series = PE_OD_SERIES;
+  if (isFinite(maxOd) && maxOd > 0) {
+    series = series.filter(function (od) { return od < maxOd || od === designOd; });
+    if (!series.length) series = [designOd];
+  }
+  return series.map(function (od) {
     var label = 'Ø ' + od;
     if (od === designOd) { label += ' · 设计'; }
     else if (isFinite(flow) && flow > 0) {
@@ -243,14 +251,15 @@ function tlRefreshCalSels(r, rDes) {
   if (!r || !r.frontPipe || !rDes || !rDes.frontPipe) return;
   var hp = r.hydraulicPath;
   var sels = [
-    { sel: 'tlCalSelFront', des: rDes.frontPipe.od, cur: r.frontPipe.od, flow: hp ? hp.frontFlow : r.combinedFlow },
-    { sel: 'tlCalSelMain', des: rDes.mainPipe.od, cur: r.mainPipe.od, flow: hp ? hp.mainFlow : r.zoneFlow },
-    { sel: 'tlCalSelBranch', des: rDes.branchPipe.od, cur: r.branchPipe.od, flow: hp ? hp.branchFlow : r.branchFlow }
+    { sel: 'tlCalSelFront', des: rDes.frontPipe.od, cur: r.frontPipe.od, flow: hp ? hp.frontFlow : r.combinedFlow, maxOd: Infinity },
+    { sel: 'tlCalSelMain', des: rDes.mainPipe.od, cur: r.mainPipe.od, flow: hp ? hp.mainFlow : r.zoneFlow, maxOd: Infinity },
+    /* [v972] 支管档位上限 = 主管有效管径（含手动改径后的 r.mainPipe.od）：比主管粗的档不出现 */
+    { sel: 'tlCalSelBranch', des: rDes.branchPipe.od, cur: r.branchPipe.od, flow: hp ? hp.branchFlow : r.branchFlow, maxOd: r.mainPipe.od }
   ];
   tlBindCalSels();
   sels.forEach(function (s) {
     var el = document.getElementById(s.sel); if (!el) return;
-    var opts = tlCalSelOptions(s.des, s.cur, s.flow);
+    var opts = tlCalSelOptions(s.des, s.cur, s.flow, s.maxOd);
     el.innerHTML = opts.map(function (o) { return '<option value="' + o.od + '">' + o.label + '</option>'; }).join('');
     el.setAttribute('data-design', s.des);
     var chosen = isFinite(s.cur) ? s.cur : s.des;
@@ -258,27 +267,35 @@ function tlRefreshCalSels(r, rDes) {
   });
 }
 /* 选择按钮 change 事件绑定（仅绑定一次）。选回设计值即清除该档覆盖。 */
+/* [v972 2026-11-05 用户反馈「支管的管径选择之后 相关的扬程 流速 计算数据没有变」]
+   根因①：绑定用「首元素一次性 addEventListener」，而三级面板 DOM 会整块重建
+   （切页 / 重新生成简图 / 恢复存档）。重建后的 <select> 是**新元素**，旧监听随
+   旧节点一起消失，window._tlCalSelBound 却仍为 true ⇒ 新下拉永远没有监听，
+   选档毫无反应。改为 document 级事件委托（按 id 匹配），面板怎么重建都有效。 */
 function tlBindCalSels() {
   if (window._tlCalSelBound) return; window._tlCalSelBound = true;
-  [['front', 'tlCalSelFront'], ['main', 'tlCalSelMain'], ['branch', 'tlCalSelBranch']].forEach(function (p) {
-    var el = document.getElementById(p[1]); if (!el) return;
-    el.addEventListener('change', function () {
-      var design = Number(el.getAttribute('data-design'));
-      var val = Number(el.value);
-      if (!window.tlManualCals) window.tlManualCals = { front: null, main: null, branch: null };
-      window.tlManualCals[p[0]] = (val === design) ? null : val;
-      tlBuildPipeOverride();
-      /* 管径选择与“更新水泵扬程”走同一刷新入口，避免主结果已更新而确认摘要仍显示旧损失。
-         兼容更新入口尚未装配或缺少图面路径的场景，保留原有即时显示与快照同步。 */
-      var updated = false;
-      if (typeof window.tlPumpUpdateRun === 'function') {
-        try { updated = window.tlPumpUpdateRun() === true; } catch (eUpdate) { updated = false; }
-      }
-      if (!updated) {
-        if (typeof tlUpdatePlanBar === 'function') tlUpdatePlanBar();
-        if (typeof window.tlSyncHydDesignSnapshot === 'function') window.tlSyncHydDesignSnapshot();
-      }
-    });
+  document.addEventListener('change', function (ev) {
+    var el = ev.target;
+    if (!el || !el.id) return;
+    var key = el.id === 'tlCalSelFront' ? 'front'
+      : el.id === 'tlCalSelMain' ? 'main'
+      : el.id === 'tlCalSelBranch' ? 'branch' : null;
+    if (!key) return;
+    var design = Number(el.getAttribute('data-design'));
+    var val = Number(el.value);
+    if (!window.tlManualCals) window.tlManualCals = { front: null, main: null, branch: null };
+    window.tlManualCals[key] = (val === design) ? null : val;
+    tlBuildPipeOverride();
+    /* 管径选择与“更新水泵扬程”走同一刷新入口，避免主结果已更新而确认摘要仍显示旧损失。
+       兼容更新入口尚未装配或缺少图面路径的场景，保留原有即时显示与快照同步。 */
+    var updated = false;
+    if (typeof window.tlPumpUpdateRun === 'function') {
+      try { updated = window.tlPumpUpdateRun() === true; } catch (eUpdate) { updated = false; }
+    }
+    if (!updated) {
+      if (typeof tlUpdatePlanBar === 'function') tlUpdatePlanBar();
+      if (typeof window.tlSyncHydDesignSnapshot === 'function') window.tlSyncHydDesignSnapshot();
+    }
   });
 }
 
@@ -1619,6 +1636,7 @@ function computeThreeLevel() {
   // 支管沿用现有均分流量及 Christiansen 折减规则。
   var hydraulicPath = null;
   var appliedPipes = tlAppliedPipeOverride();
+  var noFigManualApplied = false; /* [v972] 无图面手动选管生效标记（供面板 ovApplied 判定） */
   /* 有图面路径时，设计管径和手动改径都使用同一套逐路径损失模型；
      否则“设计值”和“改径值”来自不同算法，不能直接比较。 */
   var groupLoss = null;
@@ -1690,6 +1708,30 @@ function computeThreeLevel() {
         if (_mc.branch != null) { branchPipe.od = _mc.branch; branchPipe.id = peInnerDiam(_mc.branch); }
       }
     }
+  } else if (window.tlManualCals &&
+      (window.tlManualCals.front != null || window.tlManualCals.main != null || window.tlManualCals.branch != null)) {
+    /* [v972 2026-11-05 用户反馈] 根因②：无三级图面（tlDiagramData 为空 / wp.fromFigure=false）
+       时手动选管完全不参与计算——覆盖应用块只存在于图面路径分支里，选了等于白选
+       （改径重算列恒「—」，下拉被刷新回设计值）。现按设计长度路径就地重算：
+       算法与设计值同一条 hazen/Christiansen 链路，改径列与设计列可直接比较。
+       速度 v 同步重算，保证下游消费方（扬程拆解卡等）读到一致口径。 */
+    var _mcNoFig = window.tlManualCals;
+    if (_mcNoFig.front != null) {
+      frontPipe.od = _mcNoFig.front; frontPipe.id = peInnerDiam(_mcNoFig.front);
+      frontPipe.v = combinedFlow / 3600 / (Math.PI * Math.pow(frontPipe.id / 1000, 2) / 4);
+      frontPipeLoss = hazenWilliams(frontLenUsed, combinedFlow, frontPipe.id);
+    }
+    if (_mcNoFig.main != null) {
+      mainPipe.od = _mcNoFig.main; mainPipe.id = peInnerDiam(_mcNoFig.main);
+      mainPipe.v = zoneFlow / 3600 / (Math.PI * Math.pow(mainPipe.id / 1000, 2) / 4);
+      mainLoss = hazenWilliams(mainLenUsed, zoneFlow, mainPipe.id);
+    }
+    if (_mcNoFig.branch != null) {
+      branchPipe.od = _mcNoFig.branch; branchPipe.id = peInnerDiam(_mcNoFig.branch);
+      branchPipe.v = branchFlow / 3600 / (Math.PI * Math.pow(branchPipe.id / 1000, 2) / 4);
+      branchLoss = hazenWilliams(branchLenUsed, branchFlow, branchPipe.id) * branchF;
+    }
+    noFigManualApplied = true;
   }
 
   const tapeID = tapeOD * 0.8;
@@ -1778,6 +1820,8 @@ function computeThreeLevel() {
     groupAreaByN,
     tapeID, tapeLoss, tapePressureM, tapeDeltaPct,
     totalPipeLoss, headBeforeSafetyRaw, headBeforeSafety, pumpHead, pumpPower, motorKW, motorKW_rounded,
+    /* [v972] 无图面路径且手动选管生效时为 true：面板据此点亮「改径重算」列并反算设计值列 */
+    manualApplied: noFigManualApplied,
     intensity, mainAll, branchAll, branchAlternatives
   };
 }
@@ -3335,6 +3379,15 @@ function tlUpdatePlanBar() {
       tlPipeOdOverride = null;
       rDes = computeThreeLevel();
       tlPipeOdOverride = ovTmp;
+    } else if (r && r.manualApplied && window.tlManualCals) {
+      /* [v972] 无图面手动选管：r 已按手动档重算（computeThreeLevel 无图面分支），
+         设计值列同样要剔除手动档反算一遍，两条列才能对照。 */
+      ovApplied = true;
+      var mcSave = window.tlManualCals;
+      try {
+        window.tlManualCals = { front: null, main: null, branch: null };
+        rDes = computeThreeLevel();
+      } finally { window.tlManualCals = mcSave; }
     }
   } catch (eOv) {
     try { if (typeof ovTmp !== 'undefined' && ovTmp) tlPipeOdOverride = ovTmp; } catch (e2) { }

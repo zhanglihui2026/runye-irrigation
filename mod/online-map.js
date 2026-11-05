@@ -2508,7 +2508,9 @@
     if(window.RyIcons && typeof window.RyIcons.setLabel === 'function') window.RyIcons.setLabel(b, t);
     else b.textContent = t;
   }
-  try{ if(window.RyIcons) window.RyIcons.decorate(document.getElementById('mapDrawTools')); }catch(eIco){}
+  /* [v972 用户要求：地图绘制工具栏恢复文字钮] 原此处有第二次 decorate(mapDrawTools)
+     —— 已随 data-ry-iconize 一起移除，容器不再被图标化；setBtnLabel 走 RyIcons.setLabel
+     时按钮没有 data-ry-icon 属性，不会补挂图标，纯文字更新，安全。 */
   var btnDraw=document.getElementById('btnDraw');
   function setDrawing(on){
     if(on&&reservoirPlaceMode)setReservoirPlaceMode(false);

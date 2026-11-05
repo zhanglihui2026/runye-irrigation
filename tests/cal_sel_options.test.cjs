@@ -91,6 +91,34 @@ check('E1 flow=0/Infinity/NaN 不产生 NaN/Infinity 字样', () => {
   });
 });
 
+/* ── [v972] maxOd 上限：支管档位必须比主管细 ── */
+check('F1 maxOd=200：≥200 的档全部不出现，最大档 180', () => {
+  const o = ctx.tlCalSelOptions(140, null, 9, 200);
+  assert.ok(o.every(x => x.od < 200), '出现 ≥200 档：' + o.map(x => x.od).join(','));
+  assert.equal(o[o.length - 1].od, 180);
+  assert.equal(o.length, 9); // 50..180 共 9 档（桩序列含 125）
+});
+check('F2 maxOd=200：设计档 Ø140 仍在列且唯一标注「设计」', () => {
+  const o = ctx.tlCalSelOptions(140, null, 9, 200);
+  const d = o.filter(x => /设计/.test(x.label));
+  assert.equal(d.length, 1);
+  assert.equal(d[0].od, 140);
+});
+check('F3 设计档 ≥ maxOd 时例外保留（防下拉无选中值）', () => {
+  const o = ctx.tlCalSelOptions(250, null, null, 200);
+  assert.ok(o.some(x => x.od === 250 && /设计/.test(x.label)), '设计档 250 被过滤掉了');
+  assert.ok(o.every(x => x.od < 200 || x.od === 250), o.map(x => x.od).join(','));
+});
+check('F4 maxOd 极小：退化为仅设计档，不返回空数组', () => {
+  const o = ctx.tlCalSelOptions(50, null, null, 40);
+  assert.deepEqual(o.map(x => x.od), [50]);
+});
+check('F5 不传 maxOd：行为与 v970 全档位完全一致', () => {
+  const o = ctx.tlCalSelOptions(140, null, 9, undefined);
+  assert.equal(o.length, 18);
+  assert.deepEqual(o.map(x => x.od), ctx.PE_OD_SERIES);
+});
+
 const ok = results.length > 0 && results.every(Boolean);
 console.log('\n' + (ok ? '== 全部通过 ==' : '== 存在失败项 =='));
 process.exit(ok ? 0 : 1);

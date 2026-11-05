@@ -8052,3 +8052,57 @@ index.html 统计 `?v=` 串频次取带主题后缀的最高频串（排除 `357
 zone_area_drift 16/16（含端到端双口径标签）。
 
 **没做的事**：三级页水力计算结果条未动；每亩流量只做位置移动，取值口径未变。
+
+### §26.175 v972-branch-cal-fix（2026-11-05，支管改径不联动 + 档位上限<主管）
+
+**用户原话**：「支管的管径选择之后 相关的扬程 流速 计算数据没有变，应该随着支管调整
+数据就要变」「支管可选择的管径范围一定是比主管细的，因此比主管粗的按照常理是不会
+选的，这个要改下。」
+
+**两个根因（叠加导致"选了没反应"）**
+1. `inline-09.js tlBindCalSels`：首元素一次性 `addEventListener`。三级面板 DOM 整块
+   重建（切页/重新生成简图/恢复存档）后 `<select>` 是**新元素**，旧监听随旧节点消失，
+   而 `window._tlCalSelBound` 仍为 true ⇒ 新下拉永远没有监听。
+   ⇒ 改 **document 级事件委托**（按 `#tlCalSelFront/Main/Branch` id 匹配），重建免疫。
+2. `inline-09.js computeThreeLevel`：手动选管（tlManualCals）只在图面路径分支
+   （`wp.fromFigure && RyPipePathLoss`）里应用。**无三级图面**（tlDiagramData 为空）
+   时选档完全不参与计算 ⇒ 改径列恒「—」、下拉被 tlRefreshCalSels 刷回设计值。
+   ⇒ 加 `else if` 分支：无图面时按设计长度路径就地重算损失（hazen/Christiansen
+   同一条链路），同步重算 `.v`，返回值新增 `manualApplied:true`；
+   `tlUpdatePlanBar` 的 `ovApplied` 判定加 `r.manualApplied` 回退（设计值列清空
+   tlManualCals 反算一遍，两列可对照）；`inline-27.js pumpComparison` 的 design
+   计算同样清空 tlManualCals（否则前后差值卡恒 0）。
+
+**档位上限**：`tlCalSelOptions(designOd,curOd,flow,maxOd)` 加第 4 参——`≥maxOd` 档
+不出现（设计档例外保留防空选中）；`tlRefreshCalSels` 给支管传 `r.mainPipe.od`
+（主管有效管径，含手动改径）。主管 Ø200 ⇒ 支管最大可选 Ø180。
+
+**新锁**
+- `tests/cal_sel_options.test.cjs` 11/11（原 6 + maxOd 5 项：过滤/设计档例外/空退化/不传不变）。
+- `verify_branch_cal_fix.js` 16/16（无图面选 Ø63：扬程 36.5→49.1 m 点亮且方向正确、
+  流速 6.81 m/s、下拉不回弹；档位全部 <200；**克隆替换 select 后选档仍生效**——委托绑定锁）。
+- `verify_cal_sel_full.js` B1 改为「全档位 < 主管管径」断言。
+
+### §26.176 v972 同批（2026-11-05，分区标注漂移护栏 + 地图工具栏恢复文字）
+
+**① 标注漂移（用户截图：顶排 4 区标注跑到格子左半部、压住 3 区标注）**
+- 根因：`plot-editor.js ppDrawZones` canvas 标注的 v860 出界兜底——锚点出界时沿格子
+  顶边向左逐行扫「第一个界内点」，无距离上限。用户地块顶边倾角与分区角度(2.7°)不一致，
+  4 区右上角整片出界 ⇒ 扫描跨过**大半格宽**才命中 ⇒ 标注甩到格子另一端与邻格叠字。
+  （SVG 简图路径无此兜底，故 SVG 探针测不出。）
+- 修复：兜底点离右上角 > `zoneScreenW*0.5`（半格宽）时判为「右上区域整片出界」，
+  退回「本格∩地块」形心（界内居中，v850 前行为）。v860 的"小内移贴角"主场景不受影响。
+- 探针：`verify_label_anchor.js`（S1 旋转/S2 斜四边形/S3 拖切割线，SVG 路径 15 标注
+  全贴右上角）+ canvas 截图人工复核（`_p1/canvas_label_after_fix.png`，顶排零叠字）。
+
+**② 地图绘制工具栏恢复文字（用户原话：「还是用文字吧…现在这个样式没问题，只是把
+图标换成文字，不要乱改样式」）**
+- 只做两处：`index.html #mapDrawTools` 去掉 `data-ry-iconize`；
+  `online-map.js` 删第二次 `decorate(mapDrawTools)` 调用。按钮文案/结构/悬停/激活态
+  全部原样（CSS 兜底态本就是文字钮），11 钮全部显示文字（绘制/完成/撤销点/编辑总管/
+  开始画框/完成/加点/撤销/蓄水池/测距/清除），探针 `_probe_toolbar_text.mjs` 确认
+  0 SVG、字号 13px。
+
+**没做的事**：SVG 施工简图路径未加同样的兜底护栏（导出图纸标注恒贴格右上角，
+出界也画在界外空白，与 canvas 语义不同，暂不动）；主管档位未按总管做上限过滤
+（用户只要求支管<主管）。

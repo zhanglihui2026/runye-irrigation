@@ -2265,6 +2265,16 @@
             return null;
           })();
           if(__fixed){
+            /* [v973 2026-11-05 用户截图] 兜底护栏：扫描命中的界内点离右上角超过
+               半格宽 ⇒ 本格右上区域整片在地块外（地块顶边倾角与网格角度不一致时
+               最外圈常见），硬贴过去会把标注甩到格子另一端、与邻格标注叠字
+               （实例：顶排 4 区标注跑到格子左半部，压住 3 区标注）。
+               这种格子退回「本格 ∩ 地块」形心（界内居中，v850 前行为）——
+               牺牲贴角换来可读。扫描在半格内的小内移（v860 主场景）不受影响。 */
+            var __fixD=Math.hypot(__fixed.x-labelAnchor.x,__fixed.y-labelAnchor.y);
+            if(__fixD>zoneScreenW*0.5)__fixed=null;
+          }
+          if(__fixed){
             labelCenter={x:__fixed.x,y:__fixed.y};
           }else{
             var __cw=ppZoneClipCenterWorld(zc,zr,cuts);
