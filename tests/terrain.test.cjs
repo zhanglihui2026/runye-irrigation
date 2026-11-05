@@ -1,6 +1,7 @@
 'use strict';
 const test=require('node:test'), assert=require('node:assert/strict'),path=require('node:path'),fs=require('node:fs'),vm=require('node:vm');
-const T=require(path.join(process.env.RUNYE_TEST_ROOT || path.join(__dirname,'..'),'runye-terrain.js'));
+/* [v974-terrain-split] runye-terrain.js 归档至 feature-archive/地形模块/（主程序不再加载） */
+const T=require(path.join(process.env.RUNYE_TEST_ROOT || path.join(__dirname,'..'),'feature-archive','地形模块','runye-terrain.js'));
 const TerrainCore=require(path.join(__dirname,'..','terrain','terrain-core.js'));
 const HydraulicCore=require(path.join(__dirname,'..','hydraulic-calc','hc-core.js'));
 const DesignCore=require(path.join(__dirname,'..','hydraulic-calc','design-core.js'));

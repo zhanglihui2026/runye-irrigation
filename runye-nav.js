@@ -55,14 +55,15 @@
     /* [v250] 「二级管路」改名「地块分区」、「三级管路编辑」改名「管路规划」（hash/id 不变，仅显示名变） */
     { label: '分区与管路',   hash: 'pipePlanSection',          pre: 1, feat: 'zone-split', drawingEntry: 1 },
     { label: '管路规划',     hash: 'tlPipePlanSection',        pre: 1, feat: 'pipe-layout', routeOnly: 1 },
-    /* [v949 2026-11-04 用户指令]「地形模块 / 多地块规划」移到「分区与管路」之后、
-       「智能规划」之前。实现方式：加 pre:1 进 pre 组。
+    /* [v949 2026-11-04 用户指令]「多地块规划」移到「分区与管路」之后、「智能规划」之前。
+       实现方式：加 pre:1 进 pre 组。
        ★ 渲染顺序规则（本文件下面的 ITEMS.forEach）：带 pre 的项 insertBefore(marker)
          （恒排在静态项之前、组内按数组顺序），不带 pre 的项 appendChild 到末尾
          （智能规划/水力校核/材料清单都在这一组）⇒ 想让两项站到「智能规划」前面，
          只能进 pre 组，光调数组位置没用。
-       地形模块在主页面内承载；独立旧入口保留兼容。 */
-    { label: '地形模块',     hash: 'terrainSection',           pre: 1, feat: 'pro-others', title: '地形模块：shp/RTK边界导入、CGCS2000校验、面积、高程数据源登记' },
+       [v974 2026-11-05 用户指令] 地形模块已彻底剥离出主程序（原 terrainSection 整段
+         与 runye-terrain.js/css 引用删除），功能只保留独立页 terrain/index.html；
+         在线地图「回传地形」走 RyTerrainBridgeStore 桥后自动跳独立页。 */
     /* [v391 2026-10-12 用户指令] 多地块规划 恢复上线（v386 剥离时业务全保留，此处按原条目加回） */
     { label: '多地块规划',   hash: 'grPipeSection',            pre: 1, feat: 'pro-others', title: '成组地块：展示各块二级主管/支管 + 手动画组级总管' },
     /* [v311 2026-10-08 用户要求] 水力校核顶级导航项：主页面功能区自动读 runye_network_layout，

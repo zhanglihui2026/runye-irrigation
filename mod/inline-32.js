@@ -163,10 +163,13 @@
     ryFileClickExportProj: function () { return clickInSection('onlineMapSection', 'btnExportProj'); },
     ryFileExportGeoJSON: function () { return clickInSection('onlineMapSection', 'btnGeoJSON'); },
     ryFileExportKML: function () { return clickInSection('onlineMapSection', 'btnKML'); },
-    ryFileClickSHP: function () { return clickInSection('terrainSection', 'fileSHP'); },
-    ryFileClickBoundaryCSV: function () { return clickInSection('terrainSection', 'fileBoundaryCSV'); },
-    ryFileClickElevCSV: function () { return clickInSection('terrainSection', 'fileElevCSV'); },
-    ryFileClickPRJ: function () { return clickInSection('terrainSection', 'filePRJ'); }
+    /* [v974 2026-11-05 用户指令] 地形模块剥离出主程序后，文件菜单的 4 个地形导入
+       动作改跳独立页 terrain/index.html（原 clickInSection('terrainSection',…) 的
+       目标元素已不存在）。独立页自带同款文件输入与 ../core 桥。 */
+    ryFileClickSHP: function () { window.open('terrain/index.html', '_blank'); return true; },
+    ryFileClickBoundaryCSV: function () { window.open('terrain/index.html', '_blank'); return true; },
+    ryFileClickElevCSV: function () { window.open('terrain/index.html', '_blank'); return true; },
+    ryFileClickPRJ: function () { window.open('terrain/index.html', '_blank'); return true; }
   };
 
   /* ---------------- 面板构建 ---------------- */

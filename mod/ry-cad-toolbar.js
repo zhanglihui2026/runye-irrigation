@@ -178,7 +178,7 @@
      （verify 9e 把关），仅在视口变化那一次触发；用户随后收起不被反复顶开
      （除非再切视口，那时按新目标重新互斥）。 */
   var GRP_FOR={'pipePlanSection':'ryCadGrpPipe','tlPipePlanSection':'ryCadGrpTl','grPipeSection':'ryCadGrpGr'};
-  var ALL_GRPS=['ryCadGrpPipe','ryCadGrpTl','ryCadGrpGr','ryCadGrpTerrain'];
+  var ALL_GRPS=['ryCadGrpPipe','ryCadGrpTl','ryCadGrpGr']; // [v974] ryCadGrpTerrain 随地形模块剥离删除
   function ensureFor(spec){
     try{
       if(!inVp()) return;

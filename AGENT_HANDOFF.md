@@ -8140,3 +8140,37 @@ zone_area_drift 16/16（含端到端双口径标签）。
 
 **版本串** 972-branch-cal-fix → 973-descol-btnrow（13 处 + sw.js）。
 `verify_branch_cal_fix.js` A2 版本锁同步更新。
+
+### §26.178 v974-terrain-split（2026-11-05，地形模块彻底剥离出主程序）
+
+**用户指令**：「把地形模块还有多地块规划从主程序中彻底剥离出来……我担心这两部分内容
+对主程序有污染。」经确认拍板：**本轮彻底剥地形；多地块规划与二级页成组编辑/工程存档
+深耦合（__runyeGroupEdit 25 处消费、inline-29 越界写全局、按块进三级），强剥会破坏
+切块/存档/撤销链路，保留、单独立项。**
+
+**剥离形态（数字农业样板：独立目录 + 主页摘除 + SW 白名单同步）**
+- `index.html`（2650→2440 行）：删 #terrainSection 整段（原 1850-2045）、
+  runye-terrain.css/js 两处 head 引用、terrain/terrain.css、#ryCadGrpTerrain 工具栏
+  分组、terrain-core/ui 底部两脚本。**保留 core/terrain-bridge-store.js**（在线地图
+  「回传地形」的数据桥，跨页传递量测边界/面积）。
+- `runye-nav.js`：删「地形模块」tab（hash terrainSection）。
+- `mod/inline-32.js`：文件菜单 4 个地形导入动作（SHP/边界CSV/高程CSV/PRJ）改
+  window.open 独立页 terrain/index.html。
+- `mod/ry-cad-toolbar.js`：ALL_GRPS 删 'ryCadGrpTerrain'。
+- `mod/online-map.js` **零改动**：sendPlotToTerrain 原有守卫天然兼容——
+  `getElementById('terrainSection')` 不存在自动跳 terrain/index.html，桥数据经
+  localStorage 跨页交接。
+- `runye-terrain.js/css` 归档 `feature-archive/地形模块/`（git mv 保历史）；
+  `tests/terrain.test.cjs` 路径同步。**terrain/ 目录原地不动**（terrain-core.js 被
+  plugins/sprinkler、plugins/contour-dxf 硬编码路径引用，两插件按需注入/动态 import）。
+- `sw.js`：VERSION → v974-terrain-split；CORE 删 runye-terrain.js/css 两项；
+  terrain/ 独立页四件与桥保留（独立页离线可用）。
+
+**降级语义（已向用户确认接受）**：4 个 RyTerrain 消费点（inline-09×2、inline-11、
+runye-ai-plan、runye-inverse-design 指纹）均有存在性守卫 ⇒ 主页不再加载
+runye-terrain.js 后 resolveDh 回退手填 fld_dh/tl_dh；工程存档 terrain 字段容忍 null。
+terrain/index.html 内核功能不变（双宿主 terrain-ui.js root 探测）。
+
+**回归**：terrain.test 14/0、terrain_stage1 115/0、terrain_sprinkler_layout 98/0、
+data_bridge_stores 通过、partition_query 238/0、group_planning 5/0、cal_sel 11/11、
+zone_merge_last 15/15 + verify 系全绿。

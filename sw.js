@@ -1298,7 +1298,7 @@
    并把 lineDrag.sx/sy 固定为按下点（原来每帧更新，阈值会永远不触发）。
    回归：_probe_line_mode_drag.mjs 两个用例（A 拖空白→atM 10.8→29.12 moveNode=1；
    B 拖到节点→links 0→1 且 atM 不变），普通模式复测 moveNode=9 无影响。 */
-const VERSION = 'v973-descol-btnrow';
+const VERSION = 'v974-terrain-split';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
@@ -1448,8 +1448,10 @@ const CORE = [
   "plugin-admin.html",
   "runye-inverse-design.js",
   "runye-inverse-design.css",
-  "runye-terrain.js",
-  "runye-terrain.css",
+  /* [v974-terrain-split 2026-11-05 用户指令] runye-terrain.js/css 随地形模块剥离归档
+     至 feature-archive/地形模块/（主程序不再加载；4 个 RyTerrain 消费点有存在性守卫，
+     高差回退手填 fld_dh/tl_dh）。terrain/ 独立页四件与 core/terrain-bridge-store.js
+     保留：独立页仍是在线功能入口，在线地图「回传地形」经桥跳独立页。 */
   "runye-ai-plan.js",
   "runye-ai-plan.css",
   "manifest.webmanifest",
