@@ -8174,3 +8174,28 @@ terrain/index.html 内核功能不变（双宿主 terrain-ui.js root 探测）�
 **回归**：terrain.test 14/0、terrain_stage1 115/0、terrain_sprinkler_layout 98/0、
 data_bridge_stores 通过、partition_query 238/0、group_planning 5/0、cal_sel 11/11、
 zone_merge_last 15/15 + verify 系全绿。
+
+## 26.179 v974 收尾 + v975/v976（2026-11-05 下午）
+
+**v974 收尾（地形剥离发布闸门）**
+- check_publish_refs FAIL 根因：runye-mobile-map-preview.html 仍引用已归档的 runye-terrain.js/css。该页所有代码路径都有 `window.RyTerrain ? … : 手填兜底`，删引用即回退手填地形高差，功能无损 → 摘除引用（8c3696c），PASS。
+- 发现 index.html 版本串 13 处仍是 ?v=973（v974 同抬漏落盘）→ 补抬 974（a124fc6）。教训：python 行号删除脚本重写 index.html 后必须 grep 复核版本串。
+
+**v975 节点删除不同步（用户：分区与管路删了节点，在线地图还在、生成管线图也不更新）**
+- 根因：地图 v917/v918 施工节点标记层的数据源 snapExtras 只在进绘制/编辑态、拖白点等动作时经 refreshSnapTargets() 重建；RyTlNodes.removeNode 有 notify 但地图侧无钩子 → 残留。「生成管线图」是三级页按钮，与地图标记层本就无关。
+- 修复（online-map.js，选地块导出对象后）：①订阅 RyTlNodes.notify；②#onlineMapSection class/hidden MutationObserver（删除动作发生在三级页、地图页隐藏时纯订阅会错过）；共用 300ms 防抖调 refreshSnapTargets()。另在「我的地块」go.onclick 选中地块后补一次 refreshSnapTargets()（v918 常显标记不再等进绘制态）。tl-nodes.js(2304) 先于 online-map.js(2432) 加载，订阅时必就绪。
+- 探针 verify_tl_node_map_sync.js（Playwright+msedge）：T1 加载无错/T1b 造数据链/T2 加节点出标记/T3 可见时删除同步消失/T4a 恢复/T4b 隐藏时删除→切回兜底 6/6 PASS。**踩坑**：ryShowSection(sec, link) 收的是 section **元素**不是 id 字符串——传字符串会把全部 section 置为非 active（探针假象「地图页可见性 false」差点误导成作用域问题）。
+
+**v976 主管共享段复核（用户拍板：扬程反序要解决）**
+- 现象：联合灌溉组 G6(109.03 m³/h) 扬程 42.33 > G7(111.69) 39.44、G11(68.03) 43.59 > G12(70.48) 38.56——路径短的反而高。四组三段管长完全相同（总管 427.7 地图实测 / 主管 538.0 / 支管 52.1 试算长），差异全部来自主管「就近选档」的档位台阶：6区差 1.43 没进 Ø200 分界(110.46)被钉 Ø180、11区差 0.47 没进 Ø160 分界(68.50)被钉 Ø140，流速 1.64/1.69 超目标 1.50，损失反超。
+- 用户决策：**主管与总管同一哲学——共用管道取大的计算值，后台自动复核，无开关无额外操作**。
+- 实现（inline-09 tlEstimateGroupHead，估算路径）：qMaxAll=全部分区最大区流量 → mainRecheckPick=selectPipe(qMaxAll)；各区主管 = max(本区档, 复核档)。复核档 ≤ 总管共享档（最大区流量 ≤ 最不利组流量、选档随流量单调），不会顶掉总管共享口径（v967）。支管不共享、维持本区选档。返回加 pipes.mainRecheck{od,flow}；map-flow-demo 口径行文案改「主管按共享段最大流量后台复核取大——最大区 X m³/h；支管按本区流量选档」。tierNote 主管台阶自动消失（复核档流速必 ≤ 目标）。
+- 效果（与截图对账）：6区→Ø200 扬程约 39.03 < 7区 39.44；11区→Ø200 扬程约 33.9 < 12区。反序消除。估算建议偏保守（尾段也按复核档）——主管/支管本就是试算长，施工图后改实长。
+- 路径模式（inversePath+RyPipePathLoss）未动：那条链 mainOd 是设计页统一值，本就无逐区台阶。
+
+**顺手修的三处旧测试锁（均非本轮引入）**
+- snap_default_off：v945 提交把 `var snapOn` 误从 false 改 true（违背 v846 规格「重开默认关闭」）→ 恢复 false + index.html 按钮 aria-pressed=false/「捕捉：关闭」。
+- nav_order：v974 删地形 tab 后测试还在断言「ITEMS 必须有地形模块」→ 改为锁「地形模块不许再上顶栏」+ 分区与管路→多地块规划→智能规划。
+- map_toolbar_unified ⑥：v972 工具栏恢复纯文字后还在断言 data-ry-iconize 必须存在 → 反转为「不许带」。
+
+**回归**：113 个测试文件全过（not ok 口径）；check_publish_refs PASS；verify_tl_node_map_sync 6/6；main_recheck.test.cjs 4/4（含旧行为 bug 存在性锁）。发布 dcecdbf，线上 index 13×?v=976-mainrecheck + sw VERSION 确认。
