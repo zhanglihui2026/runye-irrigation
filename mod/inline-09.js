@@ -3374,20 +3374,24 @@ function tlUpdatePlanBar() {
   var rDes = r, ovApplied = false;
   try {
     var ovTmp = (typeof tlPipeOdOverride !== 'undefined') ? tlPipeOdOverride : null;
-    if (tlAppliedPipeOverride()) {
-      ovApplied = true;
-      tlPipeOdOverride = null;
-      rDes = computeThreeLevel();
-      tlPipeOdOverride = ovTmp;
-    } else if (r && r.manualApplied && window.tlManualCals) {
-      /* [v972] 无图面手动选管：r 已按手动档重算（computeThreeLevel 无图面分支），
-         设计值列同样要剔除手动档反算一遍，两条列才能对照。 */
+    var appliedFig = tlAppliedPipeOverride();
+    var manualActive = !!(r && r.manualApplied && window.tlManualCals &&
+      (window.tlManualCals.front != null || window.tlManualCals.main != null || window.tlManualCals.branch != null));
+    if (appliedFig || manualActive) {
+      /* [v973 2026-11-05 用户反馈「设计值是140的管道，不应该把设计值也换了」]
+         设计值列必须保持系统自动选径口径 ⇒ 反算 rDes 时 override 与 tlManualCals
+         **两者都要清空**。v972 只清 override：图面数据在但没画管线（tlWorstPathLen
+         =EMPTY）时手动档落进 computeThreeLevel 的无图面分支，设计值列被改径档污染
+         （实测：支管设计 Ø140/1.33 被换成 Ø110/2.23，扬程 38.3 变 38.9）。 */
       ovApplied = true;
       var mcSave = window.tlManualCals;
-      try {
-        window.tlManualCals = { front: null, main: null, branch: null };
-        rDes = computeThreeLevel();
-      } finally { window.tlManualCals = mcSave; }
+      tlPipeOdOverride = null;
+      window.tlManualCals = { front: null, main: null, branch: null };
+      try { rDes = computeThreeLevel(); }
+      finally {
+        window.tlManualCals = mcSave;
+        if (typeof tlPipeOdOverride !== 'undefined') tlPipeOdOverride = ovTmp;
+      }
     }
   } catch (eOv) {
     try { if (typeof ovTmp !== 'undefined' && ovTmp) tlPipeOdOverride = ovTmp; } catch (e2) { }

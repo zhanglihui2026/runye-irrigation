@@ -8106,3 +8106,37 @@ zone_area_drift 16/16（含端到端双口径标签）。
 **没做的事**：SVG 施工简图路径未加同样的兜底护栏（导出图纸标注恒贴格右上角，
 出界也画在界外空白，与 canvas 语义不同，暂不动）；主管档位未按总管做上限过滤
 （用户只要求支管<主管）。
+
+### §26.177 v973-descol-btnrow（2026-11-05，设计值列去污染 + 灌溉参数区双按钮行）
+
+**① 设计值列被改径污染（用户实测 v972 后反馈）**
+**用户原话**：「改径重算是只算改径之后的数据，原来系统自动生成的不要去动，这样我才
+能看出来对比。比如说我把支管改成110了 流速变成2.23米了，设计值是140的管道对应的
+流速，不应该把设计值也换了。」
+- 实测复现：选支管 Ø110 后**设计值列**全变成改径值（Ø110/2.23、扬程 38.9、
+  轴功率 36.3）——差值卡（38.3→38.9）反而正确。
+- 根因：图面数据存在但**没画管线**（tlWorstPathLen=EMPTY，mainPipes.length=0）时，
+  图面逐路径分支条件不成立，手动档落进 v972 加的**无图面分支**（manualApplied=true）；
+  而 tlUpdatePlanBar 反算 rDes 的第一分支（tlAppliedPipeOverride()=true，geoKey 匹配）
+  **只清 override 不清 tlManualCals** ⇒ computeThreeLevel 在 override=null 下仍从
+  无图面分支吃到手动档 ⇒ rDes 被污染。v972 的第二分支（manualActive）本来就清了
+  tlManualCals，第一分支漏了。
+- 修复：两分支合并——反算 rDes 时 override 与 tlManualCals **都清空**（try/finally
+  恢复）。实测：设计列 Ø140/1.38/36.5 原封不动，改径列 Ø110/2.23/37.0 对照。
+
+**② 「末排并入上排」+「管径口径」改双按钮行（用户原话：「红框中的两个功能，做成两
+个按钮吧，左右放置排成一行，放在灌溉参数这个区域的最下一行」）**
+- `index.html`：删 checkbox 行与管径口径行；每亩流量行下新增 `.pp-plan-btnrow`，
+  两按钮左右并排。`#planZoneMergeLast` 保留为**隐藏 checkbox**（消费点
+  planZoneMergeLastOn() 等读 .checked，零改动）。
+- `inline-11.js`：#planZoneMergeLastBtn 切换隐藏 checkbox + .active 视觉态 +
+  派发 change；**顺带补缺口——v969 起 planZoneMergeLast 的 change 从未绑过
+  calcPlan**（勾选后面板/画布不重算），本轮加入输入监听数组。口径按钮激活态
+  文案缩短「实切面积」→「实切」（窄栏双按钮均分宽度，完整语义在 title）。
+- `ry-panel.css`：.pp-plan-btnrow 占满一行、按钮均分（font-size 10px）；选中态
+  实心深绿与 #ppCaliberModeBtn.active 同款（hover 选择器合并，注意别再吃掉相邻规则）。
+- 探针：`_probe_btnrow.mjs`（点击→active/aria-pressed/checkbox 同步、mergeOn=true、
+  文字完整）；截图 `_p1/btnrow_bar.png` 人工复核。
+
+**版本串** 972-branch-cal-fix → 973-descol-btnrow（13 处 + sw.js）。
+`verify_branch_cal_fix.js` A2 版本锁同步更新。

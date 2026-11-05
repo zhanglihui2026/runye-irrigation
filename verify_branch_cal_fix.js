@@ -8,7 +8,7 @@
      ② 「支管可选择的管径范围一定是比主管细的，比主管粗的按照常理是不会选的」
 
    本闸门（注入 521×480 地块 / 24 亩 / 铺设长度 80，真实渲染）：
-     A. 版本串 = 972-branch-cal-fix、面板下拉存在
+     A. 版本串 = 973-descol-btnrow、面板下拉存在
      B. 支管下拉全部档位 < 主管有效管径，设计档在列（含「设计」标注）
      C. 无图面（tlDiagramData=null）选支管 Ø63 → tlManualCals.branch=63、
         改径重算列（扬程/流速 Real）点亮且扬程 > 设计值（管径变细损失增大）、
@@ -54,8 +54,8 @@ const num = t => { const m = /(-?\d+(?:\.\d+)?)/.exec(t || ''); return m ? Numbe
       sel: !!document.getElementById('tlCalSelBranch')
     }));
     check('A1 #tlCalSelBranch 存在', a.sel);
-    const verOk = fs.readFileSync(path.join(WS, 'index.html'), 'utf8').includes('972-branch-cal-fix');
-    check('A2 版本串 = 972-branch-cal-fix', verOk);
+    const verOk = fs.readFileSync(path.join(WS, 'index.html'), 'utf8').includes('973-descol-btnrow');
+    check('A2 版本串 = 973-descol-btnrow', verOk);
 
     /* 注入地块并生成（同 verify_zone_area_drift F 路径） */
     await page.evaluate(() => {

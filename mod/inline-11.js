@@ -292,7 +292,9 @@ function ppRenderHeadBreakdown(r) {
 window.ppRenderHeadBreakdown = ppRenderHeadBreakdown;
 
 // Input listeners — all plan parameters
-['planTapeLaySide','planTapeSpacing','planEmitterSpacing','planEmitterFlow','planN','planZoneMode','planZoneMuManual','planTargetV'].forEach(id=>{
+/* [v973] 加入 'planZoneMergeLast'（隐藏 checkbox，由 #planZoneMergeLastBtn 切换）：
+   v969 起它从未绑过重算——勾选/取消后面板与画布都不刷新，属遗留缺口。 */
+['planTapeLaySide','planTapeSpacing','planEmitterSpacing','planEmitterFlow','planN','planZoneMode','planZoneMuManual','planTargetV','planZoneMergeLast'].forEach(id=>{
   document.getElementById(id).addEventListener('input', calcPlan);
   document.getElementById(id).addEventListener('change', calcPlan);
 });
@@ -357,7 +359,9 @@ function ppApplyCaliberModeUI(){
   if (!btn) return;
   var actual = ppCaliberMode() === 'actual';
   btn.classList.toggle('active', actual);
-  btn.textContent = actual ? '口径：实切面积' : '口径：设计值';
+  /* [v973] 文案缩短（「实切面积」→「实切」）：按钮与「末排并入上排」同排均分宽度，
+     窄栏下 6 字已贴边；完整语义在 title 里。 */
+  btn.textContent = actual ? '口径：实切' : '口径：设计值';
   btn.title = actual
     ? '当前按「分区实切面积」口径：取最大实切分区为单区基准，主管/支管/水泵随实切流量选型，画布逐区标注建议管径。点击切回设计值。'
     : '当前按 v97 设计值口径（标准分区/划定亩数，全区一档）。点击切换「实切面积」：小分区的建议管径自动变细，并可看逐区明细。';
@@ -373,4 +377,28 @@ window.ppSetCaliberMode = ppSetCaliberMode;
   var b = document.getElementById('ppCaliberModeBtn');
   if (b) b.addEventListener('click', function(){ ppSetCaliberMode(ppCaliberMode() === 'actual' ? 'design' : 'actual'); });
   ppApplyCaliberModeUI();
+})();
+
+/* ===== [v973 2026-11-05 用户要求] 「末排并入上排」从 checkbox 行改为切换按钮
+   （与「管径口径」并排在灌溉参数区最下一行）。隐藏 checkbox #planZoneMergeLast
+   仍是数据源（planZoneMergeLastOn() 等消费点零改动），按钮只负责翻转 + 视觉态。
+   ★ 顺带补缺口：v969 起该 checkbox 的 change 从未绑过 calcPlan，勾选后不重算；
+   现已加入上方输入监听数组（input/change → calcPlan），按钮切换时派发 change。 */
+(function(){
+  var mb = document.getElementById('planZoneMergeLastBtn');
+  var ck = document.getElementById('planZoneMergeLast');
+  if (!mb || !ck) return;
+  function ppApplyMergeLastUI(){
+    mb.classList.toggle('active', !!ck.checked);
+    mb.setAttribute('aria-pressed', ck.checked ? 'true' : 'false');
+    mb.title = ck.checked
+      ? '已开启：末排（含余排）整排并入上一排，分区数减少、单区面积增大。再点一次恢复逐段划分。'
+      : '开启后，末排（含被地块边裁出的余排）整排并入上一排：分区数减少、单区面积增大，如 15 区 → 10 区';
+  }
+  mb.addEventListener('click', function(){
+    ck.checked = !ck.checked;
+    ppApplyMergeLastUI();
+    ck.dispatchEvent(new Event('change', { bubbles: true }));   // 触发 calcPlan（见输入监听数组）
+  });
+  ppApplyMergeLastUI();
 })();

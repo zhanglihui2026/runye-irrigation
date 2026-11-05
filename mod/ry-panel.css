@@ -636,6 +636,25 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-to
     #ryCadSide [data-pp="pipePlanSection"]) .pp-side #ppCaliberModeBtn.active{
   border-color:#2d604b;background:#2d604b;color:#fff;
 }
+/* ===== [v973 2026-11-05 用户要求] 灌溉参数区最下一行：「末排并入上排」+「管径口径」
+   两个切换按钮左右排成一行。占满整行、按钮均分宽度；「管径口径」原 margin-left:auto
+   （贴右）在本行改为均分，用 :is(#ppPlanBar) 作用域内的 btnrow 覆盖。选中态 =
+   实心深绿白字（与 #ppCaliberModeBtn.active 同款）。 ===== */
+:is(#pipePlanSection,
+    #ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-btnrow{
+  display:flex;align-items:center;gap:6px;width:100%;
+}
+:is(#pipePlanSection,
+    #ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-btnrow .pp-recipe-btn{
+  flex:1 1 0;min-width:0;text-align:center;margin-left:0;
+  font-size:10px !important;padding:0 4px;
+}
+:is(#pipePlanSection,
+    #ryCadSide [data-pp="pipePlanSection"]) .pp-side #planZoneMergeLastBtn.active{
+  border-color:#2d604b;background:#2d604b;color:#fff;
+}
+:is(#pipePlanSection,
+    #ryCadSide [data-pp="pipePlanSection"]) .pp-side #planZoneMergeLastBtn.active:hover,
 :is(#pipePlanSection,
     #ryCadSide [data-pp="pipePlanSection"]) .pp-side #ppCaliberModeBtn.active:hover{
   background:#244f3e;
