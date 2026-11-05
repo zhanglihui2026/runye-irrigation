@@ -970,19 +970,39 @@
           var wName='G'+((TA.sharedGroupIndex!=null?TA.sharedGroupIndex:0)+1);
           var wFlow=isFinite(TA.sharedFlow)?Number(TA.sharedFlow).toFixed(2):null;
           if(TA.sharedGroupIndex===g){
-            lines+='<div class="mfg-note mfg-note-worst"><b>本轮即最不利点</b>'+(wFlow?('（'+wFlow+' m³/h 全项目最大）'):'')+
+            lines+='<div class="mfg-note mfg-note-worst"><b>本轮即最不利点</b><span class="mfg-king mfg-king-flow">流量王</span>'+(wFlow?('（'+wFlow+' m³/h 全项目最大）'):'')+
               '：总管按它定一次、主管按它复核取大，各区共用</div>';
           }else{
-            lines+='<div class="mfg-note">总管按最不利点 <b>'+wName+(wFlow?('（'+wFlow+' m³/h）'):'')+'</b>定一次、各区共用；主管按最大区复核取大'+
+            lines+='<div class="mfg-note">总管按最不利点 <b class="mfg-king-flow">'+wName+(wFlow?('（'+wFlow+' m³/h）'):'')+'</b><span class="mfg-king mfg-king-flow">流量王</span>定一次、各区共用；主管按最大区复核取大'+
               (isFinite(TA.velocity)&&isFinite(TA.targetVelocity)&&TA.velocity<TA.targetVelocity?' —— 本轮流速低于目标属正常':'')+'</div>';
           }
         }else{
           lines+='<div class="mfg-note">三段口径按本组流量选档；下限按主管 Ø '+Number(TA.mainOd)+' / 支管 Ø '+Number(TA.branchOd)+' mm</div>';
         }
       }
+      /* [v979] 双王标记（用户 2026-11-05 拍板）：流量王=组合流最大的组（总管口径按它定，
+         TA.sharedGroupIndex 已有）；扬程王=全组需求扬程最大的组（损失=路径×流量共同决定，
+         不一定是路径最远）。逐组复算一遍水力只为找扬程王——估算/路径都是毫秒级，
+         切组频率下无感。找不到有效扬程（缺路径/缺面积）就不标，绝不硬造。 */
+      var headKing=null;
+      try{
+        var _zaK=(typeof ctx.getZoneAreas==='function')?ctx.getZoneAreas():null;
+        for(var gk=0;gk<gsAll.length;gk++){
+          var _memK=gsAll[gk];
+          if(!Array.isArray(_memK)||!_memK.length)continue;
+          var _LK=null;
+          try{_LK=window.tlMapGroupHydraulicsOf(_memK,{zoneAreas:_zaK,groups:gsAll});}catch(eKH){_LK=null;}
+          if(_LK&&isFinite(_LK.head)&&(!headKing||Number(_LK.head)>headKing.head))headKing={gi:gk,head:Number(_LK.head)};
+        }
+      }catch(eKingAll){headKing=null;}
+      var isHeadKing=!!(headKing&&headKing.gi===g);
       lines+='<div class="mfg-metrics">'+
         '<div class="mfg-metric"><span>本轮流量</span><b>'+Number(loss.flow).toFixed(2)+' m³/h</b></div>'+
-        '<div class="mfg-metric"><span>需求扬程'+(est?'（估算）':'')+'</span><b class="mfg-head-val">'+(isFinite(loss.head)?Number(loss.head).toFixed(2)+' m':'—')+'</b></div></div>';
+        '<div class="mfg-metric"><span>需求扬程'+(est?'（估算）':'')+'</span><b class="mfg-head-val'+(isHeadKing?' mfg-head-king':'')+'">'+(isFinite(loss.head)?Number(loss.head).toFixed(2)+' m':'—')+'</b>'+
+        (isHeadKing?'<span class="mfg-king mfg-king-head">扬程王</span>':'')+'</div></div>';
+      if(headKing){
+        lines+='<div class="mfg-note mfg-note-headking">需求扬程按损失最大组 <b class="mfg-king-head">G'+(headKing.gi+1)+'（'+headKing.head.toFixed(2)+' m）</b><span class="mfg-king mfg-king-head">扬程王</span>校核 · 损失由路径×流量共同决定，不只是远近</div>';
+      }
       var foot='管损 '+totalLoss.toFixed(2)+' m = 总管 '+(Number(loss.frontLoss)||0).toFixed(2)+
         ' + 主管 '+(Number(loss.mainLoss)||0).toFixed(2)+' + 支管 '+(Number(loss.branchLoss)||0).toFixed(2)+' m';
       if(isFinite(loss.marginHead)) foot+='　·　另加富余 '+Number(loss.marginHead).toFixed(1)+' m';

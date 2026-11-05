@@ -55,7 +55,7 @@ test('① inline-09 估算路径有主管共享段复核块', () => {
 
 test('② map-flow-demo 卡片口径说明点名最不利点（v977 列表版式）', () => {
   assert.ok(/主管按最大区复核取大/.test(mapDemo), '口径说明要写明主管是复核取大');
-  assert.ok(/总管按最不利点 <b>/.test(mapDemo), '口径说明要点名最不利组');
+  assert.ok(/总管按最不利点 <b class="mfg-king-flow">/.test(mapDemo), '口径说明要点名最不利组（v979 流量王蓝字）');
   assert.ok(/TA.sharedGroupIndex===g/.test(mapDemo), '本组即最不利点要有高亮分支');
   assert.ok(/mfg-seg/.test(mapDemo), '卡片要有管径/长度/流速三行列表');
 });

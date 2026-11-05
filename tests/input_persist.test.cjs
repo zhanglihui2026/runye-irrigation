@@ -28,7 +28,9 @@ test('[v978] inline-33 挂载在 index.html 所有脚本之后', () => {
   const m = htmlText.match(/<script src="mod\/inline-33\.js\?v=([^"]+)"><\/script>/);
   assert.ok(m, 'index.html 必须挂载 mod/inline-33.js');
   const tagAt = htmlText.indexOf(m[0]);
-  assert.equal(m[1], '978-inputpersist', '挂载版本串必须与 sw VERSION 同抬');
+  const swVer = (swText.match(/^const VERSION = '([^']+)';/m) || [])[1];
+  assert.ok(swVer, 'sw.js 必须有 VERSION');
+  assert.equal(m[1], swVer.replace(/^v/, ''), '挂载版本串必须与 sw VERSION 同抬（动态对齐，抬版本不再红）');
   /* 不得有脚本排在它后面（type=module 的 bootstrap/shoelace CDN 除外：模块天然异步） */
   const after = htmlText.slice(tagAt + m[0].length);
   const later = [...after.matchAll(/<script src="([^"]+)"><\/script>/g)]
@@ -66,7 +68,8 @@ test('[v978] sw.js CORE 登记 inline-33 且不带 ?v=；版本同抬', () => {
   assert.ok(entries.includes('mod/inline-33.js'), 'CORE 必须含 inline-33');
   assert.ok(entries.every((e) => !e.includes('?v=')), 'CORE 条目不许带 ?v=（离线 key miss 雷）');
   const v = swText.match(/^const VERSION = '([^']+)';/m);
-  assert.equal(v[1], 'v978-inputpersist');
-  assert.ok(!htmlText.includes('?v=977-cardlist'), '旧版本串必须清零');
-  assert.equal(htmlText.split('?v=978-inputpersist').length - 1, 14, '13 处同抬 + 1 处新挂载');
+  const want = v[1].replace(/^v/, '');
+  /* 版本串动态对齐 sw VERSION：只要全网同抬就绿，写死版本号会让每次抬版本都误红。
+     数量 14 = 13 处主引用 + 1 处 inline-33 挂载；若有漏抬，计数必然 <14 而红。 */
+  assert.equal(htmlText.split('?v=' + want).length - 1, 14);
 });

@@ -503,3 +503,12 @@ body:has(.ry-pwa-install) #onlineMapSection .ry-trunk-panel{bottom:96px}
 #onlineMapSection .map-flow-group-info .mfg-metric b{font-size:13px;color:#0f172a;font-weight:800}
 #onlineMapSection .map-flow-group-info .mfg-metric b.mfg-head-val{color:#dc2626}
 #onlineMapSection .map-flow-group-info .mfg-foot{margin-top:6px;font-size:10px;color:#64748b;line-height:1.5}
+
+/* [v979] 轮灌组卡片「双王」标记（用户 2026-11-05 拍板）：流量王=蓝（与总管管径同色
+   #185fa5），扬程王=红（与需求扬程同色 #dc2626）。小徽章 + 组名同色，一眼分清
+   「口径跟谁走、扬程跟谁走」两件事。注意：v855 段锁 —— 本段起到文件尾禁 border-radius。 */
+#onlineMapSection .map-flow-group-info .mfg-king{display:inline-block;margin:0 4px;padding:0 6px;font-size:10px;font-weight:700;line-height:17px;vertical-align:1px;background:rgba(255,255,255,.8)}
+#onlineMapSection .map-flow-group-info .mfg-king-flow{color:#185fa5}
+#onlineMapSection .map-flow-group-info .mfg-king-head{color:#dc2626}
+#onlineMapSection .map-flow-group-info .mfg-metric b.mfg-head-king{color:#dc2626}
+#onlineMapSection .map-flow-group-info .mfg-note-headking{margin-top:4px}

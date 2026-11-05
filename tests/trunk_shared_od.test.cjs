@@ -166,7 +166,7 @@ test('⑥ 地图卡片：声明统一口径、传全部组、不再按 groupInde
     '反推兜底不许再传 groupIndex（那是「每区各算一个总管」的做法）');
   assert.ok(/项目统一总管：/.test(rawDemo), '卡片要明说这是全项目统一口径（adv 分支保留）');
   /* [v977] 卡片改列表版式：口径说明压缩成一句并点名最不利区（用户：要看到哪个是最不利点）。 */
-  assert.ok(/总管按最不利点 <b>/.test(rawDemo), '口径说明要点名最不利组（G+组号+流量）');
+  assert.ok(/总管按最不利点 <b class="mfg-king-flow">/.test(rawDemo), '口径说明要点名最不利组（v979 流量王蓝字，G+组号+流量）');
   assert.ok(/mfg-note-worst/.test(rawDemo), '本轮即最不利点要有高亮态');
   assert.ok(/主管按最大区复核取大/.test(rawDemo), '口径说明要写明主管复核取大（v976 拍板）');
   assert.ok(/TA.sharedGroupIndex===g/.test(rawDemo), '最不利点高亮要按组号判断（本组即最不利点）');
