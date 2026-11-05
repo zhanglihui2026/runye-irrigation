@@ -8234,3 +8234,11 @@ zone_merge_last 15/15 + verify 系全绿。
 **发布**：全量 677/680（3 失败=已知历史遗留）→ gate PASS → commit 8e0b465 → push → Pages 冒烟 200（14 处 979）。
 
 **注意**：双王循环每次切组多算 14 次水力（估算/路径复算均毫秒级），实测无感；若未来组数上百需加缓存签名。
+
+## 26.184 v981-recheck-linkguard：决策点②③落地（2026-11-05）
+
+**② 联动防覆盖**：三级字段被用户手改（真实 input/change 事件）即打 dataset.ryDirty=1；syncThreeLevelFromPlan.setv 见脏跳过——二级重算不再悄悄顶回手改值。「↻ 同步」按钮改走 tlForceSyncFromPlan（先清脏再全量同步，title 写明会覆盖手改值）；三级复位顺带清脏（复位后联动恢复覆盖权）。程序赋值不触发事件天然不误标。
+
+**③ 路径模式补 v976 主管复核**：路径链补 perM2/qMaxAll（areaList 优先地图 partitions，与估算链同源）→ mainRecheckPick → mainOdEff=max(设计档,复核档)；downstreamMinOd 同步吃复核口径；RyPipePathLoss.calculate 的 mainOd 改吃 mainOdEff，逐区确认改径（calibers）仍优先。路径链返回补 pipes（front/mainOd/branchOd/mainRecheck/frontV/mainV/branchV）+ lengths + lengthSource=figure 实长 + marginHead/safetyFactor/filterLoss——v977 卡片三行表两条链都能渲染，路径模式主管流速按最不利区自身流量算（比估算链的合流口径更贴物理），长度不再标试算 *。
+
+**发布**：全量 684/687（3 失败=已知遗留）→ gate PASS → commit 27fe7f8 → push → Pages 冒烟 14 处 981。新增 tests/v981_path_recheck_linkguard 七把锁。版本锁已全部动态对齐 sw VERSION（v979/v980/v981 三连抬零误红）。
