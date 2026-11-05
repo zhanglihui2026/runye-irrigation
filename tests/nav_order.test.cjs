@@ -3,6 +3,8 @@
  *
  * 用户原话：「导航栏功能模块的顺序调整下，地形模块与多地块规划一起移动到分区与管路后面，
  *            放在智能规划前面。」
+ * [v974] 地形模块已剥离为独立页（terrain/index.html，入口收进文件菜单），顶栏只剩
+ *        多地块规划保持在分区与管路之后、智能规划之前。
  *
  * 为什么锁的是 runye-nav.js 的 ITEMS 而不是 DOM 断言：
  *   顶栏由 runye-nav.js 的 ITEMS 渲染（唯一出处），渲染规则是
@@ -48,28 +50,24 @@ const rendered = items.filter(i => !i.routeOnly)
   .filter(i => i.pre).map(i => i.label)
   .concat(items.filter(i => !i.routeOnly && !i.pre).map(i => i.label));
 
-test('① 地形模块 / 多地块规划 都带 pre:1（否则永远排在智能规划之后）', () => {
-  const t = items.find(i => i.label === '地形模块');
+test('① 多地块规划带 pre:1；地形模块不再上顶栏（v974 剥离为独立页）', () => {
   const g = items.find(i => i.label === '多地块规划');
-  assert.ok(t, 'ITEMS 里必须有地形模块');
   assert.ok(g, 'ITEMS 里必须有多地块规划');
-  assert.equal(t.pre, true, '地形模块必须 pre:1 —— 渲染规则里 pre 组才排得进前段');
-  assert.equal(g.pre, true, '多地块规划必须 pre:1');
-  assert.equal(t.hash, 'terrainSection');
+  assert.equal(g.pre, true, '多地块规划必须 pre:1 —— 渲染规则里 pre 组才排得进前段');
   assert.equal(g.hash, 'grPipeSection');
+  /* [v974] 地形模块彻底剥离为独立页（terrain/index.html），入口收进「文件」菜单；
+     顶栏不再有地形 tab —— 若这里红了，说明有人把地形 tab 加回来了。 */
+  const t = items.find(i => i.label === '地形模块');
+  assert.equal(t, undefined, '地形模块不许再出现在顶栏 ITEMS 里（v974 已剥离）');
 });
 
-test('② 渲染后：分区与管路 → 地形模块 → 多地块规划 → 智能规划', () => {
+test('② 渲染后：分区与管路 → 多地块规划 → 智能规划', () => {
   const iP = rendered.indexOf('分区与管路');
-  const iT = rendered.indexOf('地形模块');
   const iG = rendered.indexOf('多地块规划');
   const iS = rendered.indexOf('智能规划');
-  assert.ok(iP >= 0 && iT >= 0 && iG >= 0 && iS >= 0, '四个入口都要在顶栏出现：' + rendered.join(' / '));
-  assert.ok(iT > iP, '地形模块要在分区与管路之后（实际 ' + iT + ' vs ' + iP + '）');
+  assert.ok(iP >= 0 && iG >= 0 && iS >= 0, '三个入口都要在顶栏出现：' + rendered.join(' / '));
   assert.ok(iG > iP, '多地块规划要在分区与管路之后');
-  assert.ok(iT < iS, '地形模块要在智能规划之前（实际 ' + iT + ' vs ' + iS + '）');
   assert.ok(iG < iS, '多地块规划要在智能规划之前');
-  assert.ok(iT < iG, '地形模块在多地块规划之前（用户原话的顺序）');
 });
 
 test('③ 不许因搬移产生重复入口（同一 label 只能出现一次）', () => {

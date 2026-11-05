@@ -1946,10 +1946,25 @@ function tlEstimateGroupHead(r, zoneIndexes, areaOverride, sharedPick) {
      也算成这几档，trunkAdvice 与损失从此同源。 */
   var picks = {};
   var maxMainOd = 0, maxBranchOd = 0;
+  /* [v976] 主管共享段复核（用户 2026-11-05 拍板，后台自动执行、**无开关无额外操作**）：
+     「7区水流过来的时候，一定是有一部分管道之前是给到6区的，6、7区共用的管道应该取大的
+     计算值，以此类推。」主管是一条连续共享管，估算里又只有一根试算长（无逐段拓扑），
+     复核口径取**全部分区里的最大区流量**现选一档；各区主管统一取 本区档 与 复核档 的
+     较大者 —— 贴着档位分界的小区（如 6区 109.03 差 1.43 没进 Ø200、11区 68.03 差 0.47
+     没进 Ø160）不再被钉在细档上，扬程不再反超路径更远的大户。复核档必然 ≤ 总管共享档
+     （最大区流量 ≤ 最不利组流量，选档随流量单调），不会把总管共享口径顶掉。
+     支管是各区自己的内部小管、不共享，维持按本区流量选档。 */
+  var qMaxAll = 0;
+  areas.forEach(function (a) {
+    var q0 = Number(a) * perM2;
+    if (isFinite(q0) && q0 > qMaxAll) qMaxAll = q0;
+  });
+  var mainRecheckPick = (qMaxAll > 0) ? selectPipe(Math.max(qMaxAll, 0.01), r.targetV, MAIN_PIPE_MIN_OD) : null;
   members.forEach(function (zi) {
     var q = Number(areas[zi]) * perM2;
     var bp = selectPipe(q / par, r.targetV, 0, BRANCH_PIPE_MAX_OD);
     var mp = selectPipe(q, r.targetV, MAIN_PIPE_MIN_OD);
+    if (mainRecheckPick && (!mp || mainRecheckPick.od > mp.od)) mp = mainRecheckPick;
     picks[zi] = { q: q, branch: bp, main: mp };
     if (mp && mp.od > maxMainOd) maxMainOd = mp.od;
     if (bp && bp.od > maxBranchOd) maxBranchOd = bp.od;
@@ -2072,6 +2087,9 @@ function tlEstimateGroupHead(r, zoneIndexes, areaOverride, sharedPick) {
       front: trunkPick ? { od: trunkPick.od, id: trunkPick.id, v: trunkPick.v } : { od: (r.frontPipe && r.frontPipe.od) || null, id: frontId || null, v: (r.frontPipe && r.frontPipe.v) || null },
       mainOd: maxMainOd || null,
       branchOd: maxBranchOd || null,
+      /* [v976] 主管共享段复核信息：卡片口径行照此写明「主管按共享段最大流量复核取大」，
+         让用户知道这不是按本区流量选的档，而是后台自动复核过的共享口径。 */
+      mainRecheck: mainRecheckPick ? { od: mainRecheckPick.od, flow: qMaxAll } : null,
       perZone: members.map(function (zi) {
         return { zi: zi, flow: picks[zi].q, mainOd: picks[zi].main.od, branchOd: picks[zi].branch.od };
       })

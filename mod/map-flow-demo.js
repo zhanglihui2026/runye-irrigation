@@ -987,7 +987,7 @@
           var shEst=(loss.trunkAdvice&&loss.trunkAdvice.shared)===true;
           lines+='<div class="mfg-advice-note">估算口径：按 Ø '+Number(PP.front.od)+' 总管 / Ø '+Number(PP.mainOd)+
             ' 主管 / Ø '+Number(PP.branchOd)+' 支管'+
-            (shEst?'（总管为全项目共享口径；主管/支管按各区自己的流量选档）'
+            (shEst?'（总管为全项目共享口径；主管按共享段最大流量后台复核取大'+((PP.mainRecheck&&isFinite(PP.mainRecheck.flow))?('——最大区 '+Number(PP.mainRecheck.flow).toFixed(2)+' m³/h'):'')+'；支管按本区流量选档）'
                   :'（三段都按本组实际流量选档）')+'</div>';
         }
         if(LL){

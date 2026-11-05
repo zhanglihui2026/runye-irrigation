@@ -166,8 +166,12 @@ test('⑥ 地图卡片：声明统一口径、传全部组、不再按 groupInde
     '反推兜底不许再传 groupIndex（那是「每区各算一个总管」的做法）');
   assert.ok(/项目统一总管：/.test(rawDemo), '卡片要明说这是全项目统一口径');
   assert.ok(/口径按<b>最不利组<\/b>/.test(rawDemo), '卡片要写清口径是按最不利组定的');
-  assert.ok(/总管为全项目共享口径；主管\/支管按各区自己的流量选档/.test(rawDemo),
-    '「估算口径」行要说明只有主管/支管逐区选档');
+  /* [v976] 主管也改为共享段复核取大（用户 2026-11-05 拍板：「6、7区共用的管道应该
+     取大的计算值，以此类推，后台自动复核、无开关」），卡片文案同步。 */
+  assert.ok(/总管为全项目共享口径；主管按共享段最大流量后台复核取大/.test(rawDemo),
+    '「估算口径」行要说明主管按共享段最大流量后台复核取大（v976）');
+  assert.ok(/支管按本区流量选档/.test(rawDemo),
+    '「估算口径」行要说明支管仍按本区流量选档');
   assert.ok(/var shEst=\(loss\.trunkAdvice&&loss\.trunkAdvice\.shared\)===true;/.test(rawDemo),
     '「估算口径」行必须按 shared 分支措辞（共享时只说明主管/支管逐区选档）');
   assert.equal(/该区按 Ø.\{0,20\}施工则扬程约/.test(rawDemo), false,

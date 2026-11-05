@@ -1006,7 +1006,7 @@
      这里只负责「给素材 / 给投影器 / 给标记 / 写 DOM」。 */
   /* [v846 规格意见] 捕捉重开默认**关闭**：吸附是高级手感，默认吸容易让新用户困惑
      「点下去线怎么自己弯了」；要吸的时候按 S 或点按钮打开。会话内记住切换，不落库。 */
-  var snapOn = true;
+  var snapOn = false;
   var snapMarker = null;
   var lastCursorLatLng = null;
 
@@ -3375,6 +3375,33 @@
        否则只能靠"切地块再进绘制态"间接触发，测不出守卫本身。 */
     refreshSnapTargets:refreshSnapTargets,snapStats:function(){var S=snapApi();return S?S.stats():null;}};
   var partitionHandle=window.RyMapPartition && RyMapPartition.attach(map);
+  /* ===== [v975] 三级施工节点变更 → 地图节点标记/吸附候选自动刷新。
+     此前 snapExtras（含 v917 三级施工节点 → mainCouplers）只在进绘制/编辑态、
+     拖白点等动作时经 refreshSnapTargets() 重建；用户在「分区与管路」删除施工
+     节点（RyTlNodes.removeNode）后地图侧没有任何钩子 ⇒ v918 常显标记层残留
+     已删节点，切回地图页也不更新。两路触发、共用 300ms 防抖：
+     ① 订阅 RyTlNodes 通知（增删节点/改桩号/连线变化）；
+     ② #onlineMapSection class/hidden 变化（切页回地图时兜底重建——
+        删除动作发生在三级页、当时地图页隐藏，纯订阅会错过）。
+     tl-nodes.js 先于本文件加载（index.html 2304 vs 2432），订阅时必已就绪。 */
+  (function(){
+    var t=null;
+    function schedule(){
+      if(!map) return;
+      if(t) clearTimeout(t);
+      t=setTimeout(function(){ t=null; if(mapSectionVisible()){ try{ refreshSnapTargets(); }catch(eRf){} } },300);
+    }
+    try{
+      if(window.RyTlNodes&&typeof window.RyTlNodes.subscribe==='function') window.RyTlNodes.subscribe(schedule);
+    }catch(eSub){}
+    try{
+      var sec=document.getElementById('onlineMapSection');
+      if(sec&&window.MutationObserver){
+        new MutationObserver(function(){ if(mapSectionVisible()) schedule(); })
+          .observe(sec,{attributes:true,attributeFilter:['class','hidden','style']});
+      }
+    }catch(eObs){}
+  })();
   // [map-enhance] 导出：把当前画框 + 地块库全部带坐标地块打包成 GeoJSON / KML
   function collectPlotsForExport(){
     var arr=[];
@@ -3560,6 +3587,9 @@
         trunkSaved=loadSavedTrunkFor(p);
         setTrunkMode('idle');
         renderTrunkDraft();
+        /* [v975] 换地块即重建节点标记/吸附候选：v918 常显标记层不该等到进绘制态才出现，
+           选中地块当下就该看到这块地身上的施工节点（数据源 extraSnapTargets(plot)）。 */
+        try{ refreshSnapTargets(); }catch(eRfGo){}
         var ll=p.polyLatLng;
         if(ll && ll.length>=3){ try{ map.fitBounds(L.latLngBounds(displayRing(ll)),{padding:[40,40],maxZoom:17}); }catch(e){} }
         else if(p.center){ try{ map.setView(toDisplay(p.center),16); }catch(e){} }

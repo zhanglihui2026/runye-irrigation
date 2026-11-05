@@ -132,7 +132,7 @@ test('⑤ online-map.js 不许对工具条按钮写 textContent（会擦掉 SVG�
 });
 
 /* ---------- ⑦ 图标未就绪时不许出现空方块 ---------- */
-/* ---------- ⑥ 图标未就绪时不许出现空方块 ---------- */
+/* ---------- ⑥ 图标未就绪时不许出现空方块（v972 起地图工具栏为纯文字，锁「不再图标化」） ---------- */
 test('⑥ 图标未挂上前先显示文案（慢网不许闪一排空方块）', () => {
   const css = stripCss(cssMap);
   /* 基础按钮规则里不许有 font-size:0 —— 那会让「图标脚本还没跑」的那段时间里
@@ -147,11 +147,13 @@ test('⑥ 图标未挂上前先显示文案（慢网不许闪一排空方块）'
   assert.ok(j >= 0, '必须有 [data-ry-ico-svg] 的图标态规则');
   assert.equal(/font-size:\s*0/.test(css.slice(j, css.indexOf('}', j))), true,
     '图标态必须把字号压成 0（否则图标旁边还挂着文字）');
-  /* 容器必须被标记，ry-icons.js 才会在载入瞬间装饰它 */
-  assert.ok(/id="mapDrawTools"[^>]*data-ry-iconize/.test(stripHtml(html)),
-    '#mapDrawTools 必须带 data-ry-iconize（否则只能等页面末尾的宿主脚本装饰）');
-  assert.ok(icons.includes('iconizeAll'), 'ry-icons.js 必须提供容器级自动装饰');
-  assert.ok(/iconizeAll\(\);/.test(icons), 'ry-icons.js 载入时必须真的调用一次');
+  /* [v972] 用户拍板：地图顶部工具栏恢复**纯文字**，不再图标化 ——
+     #mapDrawTools 已摘掉 data-ry-iconize（ry-icons.js 不再装饰此容器）。
+     若这里红了，说明有人把图标化加回来了。 */
+  assert.equal(/id="mapDrawTools"[^>]*data-ry-iconize/.test(stripHtml(html)), false,
+    '#mapDrawTools 是纯文字工具栏，不许带 data-ry-iconize（v972 用户拍板）');
+  assert.ok(icons.includes('iconizeAll'), 'ry-icons.js 仍保留容器级自动装饰能力（别的工具栏在用）');
+  assert.ok(/iconizeAll\(\);/.test(icons), 'ry-icons.js 载入时自动装饰的调用要保留');
 });
 
 /* ---------- ⑦ 与分区与管路同源 ---------- */
