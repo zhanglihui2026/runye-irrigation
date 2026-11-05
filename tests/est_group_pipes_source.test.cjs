@@ -63,8 +63,9 @@ test('④ 返回值带 pipes / marginHead / safetyFactor，卡片照抄', () => 
   ['pipes:', 'marginHead:', 'safetyFactor:', 'staticHead:', 'lengthSource:'].forEach(function (k) {
     assert.ok(estBody.indexOf(k) >= 0, '估算返回值缺字段 ' + k);
   });
-  assert.ok(/估算口径：按 Ø/.test(rawDemo), '卡片缺「估算口径：按 Ø …」行');
-  assert.ok(/另加富余水头/.test(rawDemo), '卡片缺「另加富余水头 … 乘安全系数 …」行');
-  assert.ok(/总管未绘制（未计入）/.test(rawDemo), '卡片必须能明说「总管未绘制（未计入）」');
+  /* [v977] 卡片改列表版式：口径自证改为 管段×管径/长度/流速 三行表（mfg-seg）。 */
+  assert.ok(/mfg-seg/.test(rawDemo) && /管段/.test(rawDemo), '卡片要有管径/长度/流速三行列表');
+  assert.ok(/另加富余 /.test(rawDemo), '卡片缺「另加富余 … × 安全系数 …」尾行');
+  assert.ok(/未绘制/.test(rawDemo), '卡片必须能明说总管「未绘制」');
   assert.equal(/按长度估算：总管/.test(rawDemo), false, '旧的「按长度估算：总管 …」文案应已替换（它会把 200 m 当实长展示）');
 });

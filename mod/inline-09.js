@@ -2014,62 +2014,13 @@ function tlEstimateGroupHead(r, zoneIndexes, areaOverride, sharedPick) {
   });
   var worst = rows.reduce(function (a, b) { return !a || b.totalLoss > a.totalLoss ? b : a; }, null);
 
-  /* [v964] 档位台阶自证（用户 2026-11-04：「第 8 区扬程突然升高了…不正常我认为」）。
-     估算里三段管径是**现选**的（v955），选档规则是「经济流速就近取一档」⇒ 离散档位在
-     分界处必然出现台阶：面积最小的第 8 区 Q=87.48 m³/h 差 0.77 m³/h 没进 Ø180 档，
-     被钉在 Ø160（v=1.66 m/s），总管+主管损失比 Ø180 多 7.4 m，乘 1.10 后扬程从 36.7
-     变成 44.6 —— 于是「越小的区扬程越高」，用户看到的就是那根突然冒头的柱子。
-
-     这里**不改任何既有数字**（就近选档是全局口径，动它会牵动二级/三级/总管建议），
-     只把台阶算清楚交给卡片写一行：差多少流量、多几米损失、按大一档是多少扬程。
-     算法在 mod/trunk-size.js（纯函数、Node 单测锁着），本处只做取素材 + 注入。 */
-  var tierNote = null;
-  try {
-    var TS = window.RyTrunkSize;
-    if (TS && typeof TS.tierStep === 'function' && worst) {
-      var wPick = picks[worst.zi];
-      var stepOf = function (flow, length, pipe) {
-        if (!pipe || !(Number(pipe.od) > 0)) return null;
-        return TS.tierStep({
-          flow: flow, length: length, od: Number(pipe.od), targetV: r.targetV,
-          inner: peInnerDiam,
-          hazen: function (L, Q, id) { return hazenWilliams(L, Q, id); },
-          /* 上一档：只用本文件的 PE_OD_SERIES（档位唯一出处），不在这里另排一份序 */
-          nextOd: function (od) {
-            var i = PE_OD_SERIES.indexOf(od);
-            return (i >= 0 && i + 1 < PE_OD_SERIES.length) ? PE_OD_SERIES[i + 1] : null;
-          }
-        });
-      };
-      var mainStep = stepOf(wPick.q, r.mainLenUsed, wPick.main);
-      /* [v967] 总管口径已由全项目共享值定死（不随本组流量变），所以这里**不再**对总管算台阶：
-         小流量组按共享口径流速本就偏低，那不是「被钉在细档」，报出来只会误导。
-         只有退回逐组选档时（sharedOd=0）才继续算总管台阶。 */
-      var frontStep = sharedOd ? null : stepOf(qGroup, frontLen, trunkPick);
-      var stepSaved = (mainStep && mainStep.over ? mainStep.saved : 0) +
-        (frontStep && frontStep.over ? frontStep.saved : 0);
-      /* 少于 1 m 的差没有提示价值（还会把卡片堆满），门槛就按 1 m */
-      if (stepSaved >= 1) {
-        var altTotal = worst.totalLoss - stepSaved;
-        var altHead = RyDesignCore.head(Math.max(0,
-          r.lift + r.dh + r.tapePressureM - r.existPressure * 10.2 + altTotal + r.filterLoss + MARGIN_HEAD),
-          0, 0, SAFETY_FACTOR);
-        tierNote = {
-          zi: worst.zi,
-          flow: wPick.q,
-          targetV: r.targetV,
-          saved: stepSaved,
-          totalLoss: altTotal,
-          head: altHead,
-          /* 哪一段被钉住了就报哪一段（v967 起总管走共享口径，通常只剩主管） */
-          segments: (mainStep && mainStep.over && frontStep && frontStep.over) ? 'both'
-            : ((mainStep && mainStep.over) ? 'main' : 'front'),
-          main: (mainStep && mainStep.over) ? mainStep : null,
-          front: (frontStep && frontStep.over) ? frontStep : null
-        };
-      }
-    }
-  } catch (eTier) { tierNote = null; }
+  /* [v977] 三段流速（卡片管径列表用）：总管=共享口径按本组流量的流速；主管=共享复核口径
+     按**本组**流量的流速（复核档按全项目最大区流量选档，直接用 mainRecheckPick.v 会把
+     小流量组的流速算大，必须按本组流量现算）；支管=最不利区自己的支管档流速。 */
+  var frontVRow = trunkPick ? trunkPick.v : ((r.frontPipe && r.frontPipe.v) || null);
+  var mainVRow = null;
+  if (maxMainOd > 0) { try { var mpV = selectPipe(qGroup, r.targetV, maxMainOd, maxMainOd); if (mpV) mainVRow = mpV.v; } catch (eMV) {} }
+  var branchVRow = (worst && picks[worst.zi] && picks[worst.zi].branch) ? picks[worst.zi].branch.v : null;
 
   return {
     members: members,
@@ -2079,7 +2030,6 @@ function tlEstimateGroupHead(r, zoneIndexes, areaOverride, sharedPick) {
     /* ★ 三个位必须让 UI 看得见：估算 / 用了哪三段长度 / 长度来源 */
     estimated: true,
     /* [v964] 档位台阶（null=本组没有「被钉在细档」的区）：卡片照它写一行自证 */
-    tierNote: tierNote,
     lengths: { front: frontLen, main: r.mainLenUsed, branch: r.branchLenUsed },
     lengthSource: { front: frontSource, main: r.wp && r.wp.fromFigure ? 'figure' : 'estimate', branch: r.wp && r.wp.fromFigure ? 'figure' : 'estimate' },
     /* [v955] 损失实际用的三段管径（与 trunkAdvice 同源，卡片要照抄这一行，别再让用户自己猜） */
@@ -2090,6 +2040,11 @@ function tlEstimateGroupHead(r, zoneIndexes, areaOverride, sharedPick) {
       /* [v976] 主管共享段复核信息：卡片口径行照此写明「主管按共享段最大流量复核取大」，
          让用户知道这不是按本区流量选的档，而是后台自动复核过的共享口径。 */
       mainRecheck: mainRecheckPick ? { od: mainRecheckPick.od, flow: qMaxAll } : null,
+      /* [v977] 三段流速（卡片管径列表用）：总管=共享口径按本组流量的流速（trunkPick.v 同源）；
+         主管=共享复核口径按**本组**流量的流速（复核档是按全项目最大区流量选的，直接用
+         mainRecheckPick.v 会把小流量组的流速算大 —— 要按本组流量现算）；支管=最不利区
+         自己的支管档流速（支管不共享，各区内部小管）。 */
+      frontV: frontVRow, mainV: mainVRow, branchV: branchVRow,
       perZone: members.map(function (zi) {
         return { zi: zi, flow: picks[zi].q, mainOd: picks[zi].main.od, branchOd: picks[zi].branch.od };
       })

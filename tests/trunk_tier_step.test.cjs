@@ -15,7 +15,7 @@
  *   ④ 缺参不瞎算：没有该段长度 / 已是最大档 / 缺注入 ⇒ null；
  *   ⑤ 接线：inline-09 真的调它、且算的是**最不利区**，并把结果作为 tierNote 交给卡片；
  *   ⑥ 渲染：卡片只读 loss.tierNote 排版，不重算；
- *   ⑦ 反向锁：tierNote 只是说明，**不许**顶掉 head / totalLoss（估算数字口径不变）。
+ *   ⑦ 反向锁：扬程/管损仍取最不利区估算值（v977 起 altHead 随 tierNote 下线）。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -94,34 +94,22 @@ test('④ 缺参不瞎算：没该段长度 / 已是最大档 / 缺注入 ⇒ nu
 /* ── 接线（剥注释后断言：v957/v959 两次被自己的注释咬到）────────────────────── */
 const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
-test('⑤ inline-09 真的接线：调 RyTrunkSize.tierStep，算最不利区，结果作为 tierNote 交出去', () => {
+/* [v977] 用户拍板「共用管道取大的计算值」后，主管档位 = max(本区档, 全项目最大区流量复核档)，
+   复核档流速必 ≤ 目标 ⇒ 主管台阶从根上消失，tierNote 随之下线。
+   本测试反转：锁「不再接线」，防止将来有人把台阶提示加回来而不加复核。 */
+test('⑤ v977 起 inline-09 不再有 tierNote 接线（复核取大让台阶不存在）', () => {
   const src = strip(fs.readFileSync(path.join(ROOT, 'mod', 'inline-09.js'), 'utf8'));
-  assert.ok(/RyTrunkSize[\s\S]{0,40}\.tierStep/.test(src), 'inline-09 必须调用 RyTrunkSize.tierStep（不许只写注释不接线）');
-  assert.ok(/tierStep\(\{[\s\S]{0,400}?nextOd:/.test(src), 'tierStep 必须注入 nextOd（档位表只许一份）');
-  assert.ok(/PE_OD_SERIES\.indexOf\(od\)/.test(src), '上一档必须从本文件的 PE_OD_SERIES 取，不许另排一份序列');
-  /* 算的是最不利区：tierNote 的 zi 必须来自 worst，不能拿 members[0] 顶 */
-  assert.ok(/var wPick = picks\[worst\.zi\]/.test(src), '台阶必须按最不利区（worst.zi）算');
-  assert.ok(/tierNote: tierNote/.test(src), '估算结果必须带 tierNote 字段给卡片');
-  assert.ok(/stepSaved >= 1/.test(src), '省不到 1 m 就不提示（阈值要在，防止卡片被堆满）');
+  assert.equal(/RyTrunkSize[\s\S]{0,40}\.tierStep/.test(src), false,
+    'inline-09 不许再调 RyTrunkSize.tierStep（主管已按共享段复核取大，台阶不复存在）');
+  assert.equal(/tierNote/.test(src), false, 'tierNote 字段必须下线');
+  assert.ok(/mainRecheckPick = \(qMaxAll > 0\)/.test(src), '复核取大接线必须在（它是台阶消失的原因）');
+  /* 纯函数 tierStep 本体保留在 trunk-size.js，上面的单测继续锁它的数学正确性。 */
 });
 
-test('⑥ 卡片只排版不重算：读 loss.tierNote，且仍在 est（估算）分支里', () => {
-  const src = strip(fs.readFileSync(path.join(ROOT, 'mod', 'map-flow-demo.js'), 'utf8'));
-  assert.ok(/loss\.tierNote/.test(src), '卡片必须渲染 loss.tierNote');
-  assert.ok(/mfg-tier-note/.test(src), '台阶行要有独立 class，便于探针/样式定位');
-  assert.ok(/档位台阶/.test(src) && /档分界/.test(src), '文案要自己说清是「档位分界」');
-  /* 不重算：卡片里不许出现 tierStep / selectPipe 的二次调用 */
-  assert.ok(!/tierStep/.test(src), '卡片不许自己再算一遍台阶（重算=两处口径）');
-  assert.ok(!/selectPipe/.test(src), '卡片不许自己选管');
-});
-
-test('⑦ 反向锁：台阶只做说明，不许顶掉估算的 head / totalLoss', () => {
+test('⑦ 反向锁：扬程/管损仍取最不利区估算值（altHead 随 tierNote 一起下线）', () => {
   const src = strip(fs.readFileSync(path.join(ROOT, 'mod', 'inline-09.js'), 'utf8'));
-  assert.ok(/head: worst\.head/.test(src), '组扬程仍取最不利区的估算值，不能被 altHead 顶替');
+  assert.ok(/head: worst\.head/.test(src), '组扬程仍取最不利区的估算值');
   assert.ok(/totalLoss: worst\.totalLoss/.test(src), '组管损仍取 worst.totalLoss');
-  /* altHead 只许出现在 tierNote 对象里（作为「按大一档」的对照值），
-     且不许赋值回 rows/worst —— 那才是「偷改既有数字」。 */
-  assert.ok(/tierNote = \{[\s\S]{0,600}?head: altHead/.test(src), 'altHead 必须是 tierNote 的字段');
-  assert.ok(!/worst\.head\s*=/.test(src), '不许把 altHead 写回 worst.head');
-  assert.ok(!/\.head\s*=\s*altHead/.test(src), '不许把 altHead 写回任何区的 head');
+  assert.equal(/altHead/.test(src), false, 'altHead 已随 tierNote 下线（v977 复核取大后没有「按大一档」对照值）');
+  assert.ok(!/worst\.head\s*=/.test(src), '不许回写 worst.head');
 });

@@ -87,6 +87,9 @@ tests/*
 # 成组管路真实面积与独立状态回归
 !tests/group_planning.test.cjs
 
+# 主管共享段复核（v976 扬程反序消除）回归
+!tests/main_recheck.test.cjs
+
 # 手动高程与压力校核回归
 !tests/terrain.test.cjs
 !tests/runye_hydraulics_topology.test.cjs
@@ -105,6 +108,7 @@ tests/*
 !tests/hydraulics_plugin_api.test.cjs
 !tests/project_restore_binding.test.cjs
 !tests/drawing_design_model.test.cjs
+!tests/mountain_plan_contract.test.cjs
 
 # AOCI agent host integration (machine-bound; do not commit)
 .codex/config.toml

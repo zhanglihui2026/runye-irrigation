@@ -482,3 +482,24 @@ body:has(.ry-pwa-install) #onlineMapSection .ry-trunk-panel{bottom:96px}
    [hidden]{display:none} 本来够用，但 .ry-float-card 一族哪天补了 display 就会漏，
    这里显式兜一条（与 .ry-trunk-panel[hidden] 同款）。 */
 #onlineMapSection .rym-layer-panel[hidden]{display:none!important}
+
+/* ===== [v977] 轮灌组卡片列表版式：管径/长度/流速三行表 + 最不利点说明 + 数字块 ===== */
+#onlineMapSection .map-flow-group-info .mfg-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+#onlineMapSection .map-flow-group-info .mfg-sub{font-size:10px;color:#64748b;white-space:nowrap}
+#onlineMapSection .map-flow-group-info .mfg-seg{width:100%;border-collapse:collapse;margin-top:6px;font-size:11px}
+#onlineMapSection .map-flow-group-info .mfg-seg th{color:#64748b;font-weight:400;text-align:right;padding:2px 0;font-size:10px}
+#onlineMapSection .map-flow-group-info .mfg-seg th:first-child{text-align:left}
+#onlineMapSection .map-flow-group-info .mfg-seg td{border-top:1px solid #e2e8f0;padding:4px 0;text-align:right;color:#0f172a}
+#onlineMapSection .map-flow-group-info .mfg-seg td:first-child{text-align:left}
+#onlineMapSection .map-flow-group-info .mfg-seg td.od{color:#185fa5;font-weight:800}
+#onlineMapSection .map-flow-group-info .mfg-star{font-size:10px;color:#94a3b8;margin-top:3px}
+#onlineMapSection .map-flow-group-info .mfg-note{margin-top:6px;padding:5px 8px;background:#f1f5f9;color:#475569;line-height:1.5;font-size:10px}
+#onlineMapSection .map-flow-group-info .mfg-note b{color:#0f172a;font-weight:800}
+#onlineMapSection .map-flow-group-info .mfg-note-worst{background:#e6f1fb;color:#185fa5}
+#onlineMapSection .map-flow-group-info .mfg-note-worst b{color:#185fa5}
+#onlineMapSection .map-flow-group-info .mfg-metrics{display:flex;gap:6px;margin-top:6px}
+#onlineMapSection .map-flow-group-info .mfg-metric{flex:1;background:#f8fafc;border:1px solid #e2e8f0;padding:4px 8px}
+#onlineMapSection .map-flow-group-info .mfg-metric span{display:block;font-size:10px;color:#64748b}
+#onlineMapSection .map-flow-group-info .mfg-metric b{font-size:13px;color:#0f172a;font-weight:800}
+#onlineMapSection .map-flow-group-info .mfg-metric b.mfg-head-val{color:#dc2626}
+#onlineMapSection .map-flow-group-info .mfg-foot{margin-top:6px;font-size:10px;color:#64748b;line-height:1.5}

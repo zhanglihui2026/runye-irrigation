@@ -945,102 +945,51 @@
         }
       }catch(eAdv){ adv=null; }
     }
-    var lines='<div class="mfg-title">'+(manual?'手动联合灌溉组 ':'联合灌溉组 ')+groupName+' · 共 '+totalGroups+' 组之一</div>'+
-      '<div class="mfg-members">含区 '+(members.length?members.join('、'):'—')+'</div>'+
-      '<div class="mfg-count">'+members.length+' 区同轮灌溉</div>';
-    if(loss&&loss.trunkAdvice&&isFinite(loss.trunkAdvice.od)&&isFinite(loss.trunkAdvice.velocity)&&
-       isFinite(loss.trunkAdvice.mainOd)&&isFinite(loss.trunkAdvice.branchOd)){
-      var advice=loss.trunkAdvice;
-      /* [v967] 总管口径是**项目级共享值**（用户 2026-11-05 拍板：全项目一根管，按流量最大的
-         那个组合定一次）。小流量组按这根管走，流速必然偏低 —— 那不是「算错了」，
-         要在这行里说清，否则用户又会以为第 8 区被单独钉了个细管。 */
-      var shared=advice.shared===true;
-      lines+='<div class="mfg-trunk-advice">'+(shared?'项目统一总管：':'建议手绘总管：')+'PE 外径 Ø '+Number(advice.od)+' mm · '+
-        (shared?'本轮流速 ':'流速 ')+Number(advice.velocity).toFixed(2)+' m/s</div>';
-      if(shared){
-        var sw=(advice.sharedZoneCount!=null&&isFinite(advice.sharedFlow))
-          ? '（'+Number(advice.sharedZoneCount)+' 区同轮 '+Number(advice.sharedFlow).toFixed(2)+' m³/h）' : '';
-        lines+='<div class="mfg-advice-note">本轮 Q '+Number(loss.flow).toFixed(2)+' m³/h · 目标流速 '+
-          Number(advice.targetVelocity).toFixed(2)+' m/s；总管 Ø '+Number(advice.od)+
-          ' 是全项目一根管，口径按<b>最不利组</b>'+sw+'定一次、各区共用 —— 本轮流量偏小，所以流速低于目标属正常</div>';
-      }else{
-        lines+='<div class="mfg-advice-note">本轮 Q '+Number(loss.flow).toFixed(2)+' m³/h · 目标流速 '+Number(advice.targetVelocity).toFixed(2)+' m/s；下限按主管 Ø '+Number(advice.mainOd)+' / 支管 Ø '+Number(advice.branchOd)+' mm</div>';
-      }
-    }
-    if(loss&&isFinite(loss.flow)&&isFinite(loss.totalLoss==null?loss.total:loss.totalLoss)){
-      var totalLoss=Number(loss.totalLoss==null?loss.total:loss.totalLoss);
-      /* [v950] 有逐区路径 ⇒ 精确；没有 ⇒ inline-09 退回「同一套公式、换成本组流量」的估算。
-         估算值必须自证：写明「估算」并列出用的三段长度，否则用户会把它当实测扬程去选泵。 */
+    var lines='<div class="mfg-head"><span class="mfg-title">'+(manual?'手动组 ':'联合灌溉组 ')+groupName+'</span>'+
+      '<span class="mfg-sub">含 '+(members.length?members.join('、'):'—')+' 区 · 共 '+totalGroups+' 组</span></div>';
+    if(loss&&isFinite(loss.flow)){
+      var TA=loss.trunkAdvice||null, PP=loss.pipes||null, LL=loss.lengths||null, LS=loss.lengthSource||null;
       var est=loss.estimated===true;
-      lines+='<div class="mfg-value">本轮合灌流量 ≈ '+Number(loss.flow).toFixed(2)+' m³/h</div>'+
-        '<div class="mfg-value">本轮需求扬程 ≈ '+(isFinite(loss.head)?Number(loss.head).toFixed(2):'—')+' m'+(est?'（估算）':'')+'</div>'+
-        '<div class="mfg-loss">本轮最不利路径损失 ≈ '+totalLoss.toFixed(2)+' m'+(est?'（估算）':'')+'</div>'+
-        '<div class="mfg-breakdown">总管 '+(Number(loss.frontLoss)||0).toFixed(2)+' + 主管 '+(Number(loss.mainLoss)||0).toFixed(2)+' + 支管 '+(Number(loss.branchLoss)||0).toFixed(2)+' m</div>';
-      /* [v955] 口径自证升级（用户 2026-11-04）：
-         ① 三段**实际用的管径**要写出来 —— 不然用户只看到建议 Ø225，不知道损失是按哪个口径算的；
-         ② 总管长度只认地图实测/图面，没画就写「未绘制（未计入）」，不再拿 200 m 试算值充数；
-         ③ 富余水头与安全系数单列一行 —— 它们是「合计之后另加的」，不属于那 X m 管损。 */
-      if(est){
-        var PP=loss.pipes||null, LL=loss.lengths||null;
-        if(PP&&PP.front&&isFinite(PP.front.od)&&isFinite(PP.mainOd)&&isFinite(PP.branchOd)){
-          /* [v967] 三段不再都「按本组流量选档」：总管是全项目共享口径，只有主管/支管逐区选。 */
-          var shEst=(loss.trunkAdvice&&loss.trunkAdvice.shared)===true;
-          lines+='<div class="mfg-advice-note">估算口径：按 Ø '+Number(PP.front.od)+' 总管 / Ø '+Number(PP.mainOd)+
-            ' 主管 / Ø '+Number(PP.branchOd)+' 支管'+
-            (shEst?'（总管为全项目共享口径；主管按共享段最大流量后台复核取大'+((PP.mainRecheck&&isFinite(PP.mainRecheck.flow))?('——最大区 '+Number(PP.mainRecheck.flow).toFixed(2)+' m³/h'):'')+'；支管按本区流量选档）'
-                  :'（三段都按本组实际流量选档）')+'</div>';
-        }
-        if(LL){
-          var fSrc=(loss.lengthSource&&loss.lengthSource.front)||'none';
-          var fTxt=fSrc==='mapTrunk'
-            ? '总管 '+Number(LL.front||0).toFixed(1)+' m（地图实测）'
-            : (fSrc==='figure'
-              ? '总管 '+Number(LL.front||0).toFixed(1)+' m（设计图面）'
-              : '总管未绘制（未计入）');
-          lines+='<div class="mfg-advice-note">管长：'+fTxt+' · 主管 '+Number(LL.main||0).toFixed(1)+' m · 支管 '+
-            Number(LL.branch||0).toFixed(1)+' m（主管/支管为试算长，生成施工图后改为逐区实长）</div>';
-        }
-        if(isFinite(loss.marginHead)&&isFinite(loss.safetyFactor)){
-          lines+='<div class="mfg-advice-note">另加富余水头 '+Number(loss.marginHead).toFixed(1)+
-            ' m，合计后再乘安全系数 '+Number(loss.safetyFactor).toFixed(2)+
-            '（两项都不在上面这 '+totalLoss.toFixed(2)+' m 管损里）</div>';
-        }
-        /* [v964] 档位台阶自证（用户 2026-11-04：「第 8 区扬程突然升高了」）：
-           估算的管径是现选的，就近取档在分界处有台阶 —— 差 0.9% 流量就可能被钉在细一档，
-           损失反而比大区高出一截。不把这层说出来，用户只会看到「越小的区扬程越高」。
-           数字全部来自 inline-09 的 tierNote（算法在 mod/trunk-size.js，Node 单测锁着），
-           本处只排版，不重算。 */
-        if(loss.tierNote){
-          var tn=loss.tierNote;
-          /* [v967] 只有**主管**还可能「被钉在细档」：总管口径已按最不利组统一，不随本组流量变，
-             所以 inline-09 在共享口径下干脆不算总管台阶（tn.front 恒 null、segments 恒 'main'）。
-             文案里绝不能再出现「该区按 Ø180 施工总管」这种建议 —— 那等于让用户为一区换整根管。 */
-          var seg=tn.segments||'main';
-          var st=(seg==='front')?tn.front:(seg==='both'?(tn.main||tn.front):tn.main);
-          var segName=(seg==='both')?'总管+主管':(seg==='front'?'总管':'主管');
-          var tTxt='档位台阶（'+segName+'）：'+(Number(tn.zi)+1)+'区 '+Number(tn.flow).toFixed(2)+' m³/h';
-          if(st){
-            tTxt+=' 距 Ø'+Number(st.toOd)+' 档分界（'+Number(st.gapFlow).toFixed(2)+'）还差 '+
-              Math.max(0,Number(st.gap)).toFixed(2)+' m³/h';
-            tTxt+='，按 Ø'+Number(st.fromOd)+' 时流速 '+Number(st.vNow).toFixed(2)+
-              ' m/s（目标 '+Number(st.targetV).toFixed(2)+'）';
-          }
-          tTxt+='⇒ '+segName+'损失比大一档多 '+Number(tn.saved).toFixed(2)+' m';
-          if(seg==='main'&&st){
-            tTxt+='；该区主管单独放大到 Ø'+Number(st.toOd)+' 则扬程约 '+Number(tn.head).toFixed(2)+' m（只是建议，不自动改）';
+      var totalLoss=Number(loss.totalLoss==null?loss.total:loss.totalLoss);
+      /* [v977] 管径/长度/流速三行列表（用户 2026-11-05 拍板版式）：切组只变数字不变版式，
+         总管/主管/支管各自一行，管径蓝色加重。解释性长段压缩成一句并点名最不利区。 */
+      if(TA&&PP&&PP.front&&isFinite(TA.od)&&isFinite(PP.mainOd)&&isFinite(PP.branchOd)){
+        var fLen=(LL&&isFinite(Number(LL.front)))?Number(LL.front):0;
+        var mainEst=(LS&&LS.main==='estimate'), branchEst=(LS&&LS.branch==='estimate');
+        var fVel=isFinite(TA.velocity)?Number(TA.velocity).toFixed(2)+' m/s':'—';
+        var mVel=isFinite(PP.mainV)?Number(PP.mainV).toFixed(2)+' m/s':'—';
+        var bVel=isFinite(PP.branchV)?Number(PP.branchV).toFixed(2)+' m/s':'—';
+        var fLenTxt=(fLen>0)?(fLen.toFixed(1)+' m'):'未绘制';
+        lines+='<table class="mfg-seg"><thead><tr><th>管段</th><th>管径</th><th>长度</th><th>流速</th></tr></thead><tbody>'+
+          '<tr><td>总管</td><td class="od">Ø '+Number(TA.od)+'</td><td>'+fLenTxt+'</td><td>'+fVel+'</td></tr>'+
+          '<tr><td>主管</td><td class="od">Ø '+Number(PP.mainOd)+'</td><td>'+Number(LL.main||0).toFixed(1)+' m'+(mainEst?'*':'')+'</td><td>'+mVel+'</td></tr>'+
+          '<tr><td>支管</td><td class="od">Ø '+Number(PP.branchOd)+'</td><td>'+Number(LL.branch||0).toFixed(1)+' m'+(branchEst?'*':'')+'</td><td>'+bVel+'</td></tr>'+
+          '</tbody></table>';
+        if(mainEst||branchEst) lines+='<div class="mfg-star">* 试算长，生成施工图后改为逐区实长</div>';
+        if(TA.shared){
+          var wName='G'+((TA.sharedGroupIndex!=null?TA.sharedGroupIndex:0)+1);
+          var wFlow=isFinite(TA.sharedFlow)?Number(TA.sharedFlow).toFixed(2):null;
+          if(TA.sharedGroupIndex===g){
+            lines+='<div class="mfg-note mfg-note-worst"><b>本轮即最不利点</b>'+(wFlow?('（'+wFlow+' m³/h 全项目最大）'):'')+
+              '：总管按它定一次、主管按它复核取大，各区共用</div>';
           }else{
-            tTxt+='；总管只此一根、不随单区放大，故此项仅作说明，不改口径';
+            lines+='<div class="mfg-note">总管按最不利点 <b>'+wName+(wFlow?('（'+wFlow+' m³/h）'):'')+'</b>定一次、各区共用；主管按最大区复核取大'+
+              (isFinite(TA.velocity)&&isFinite(TA.targetVelocity)&&TA.velocity<TA.targetVelocity?' —— 本轮流速低于目标属正常':'')+'</div>';
           }
-          lines+='<div class="mfg-advice-note mfg-tier-note">'+tTxt+'</div>';
+        }else{
+          lines+='<div class="mfg-note">三段口径按本组流量选档；下限按主管 Ø '+Number(TA.mainOd)+' / 支管 Ø '+Number(TA.branchOd)+' mm</div>';
         }
       }
-      if(Array.isArray(loss.zones)&&loss.zones.length){
-        lines+='<div class="mfg-zone-list" aria-label="本轮各分区水力参数">'+loss.zones.map(function(z){
-          return '<div class="mfg-zone-row"><b>'+ (z.zi+1) +'区</b><span>流量 '+Number(z.flow).toFixed(2)+' m³/h</span><strong>扬程 '+Number(z.head).toFixed(2)+' m</strong></div>';
-        }).join('')+'</div>';
-      }
+      lines+='<div class="mfg-metrics">'+
+        '<div class="mfg-metric"><span>本轮流量</span><b>'+Number(loss.flow).toFixed(2)+' m³/h</b></div>'+
+        '<div class="mfg-metric"><span>需求扬程'+(est?'（估算）':'')+'</span><b class="mfg-head-val">'+(isFinite(loss.head)?Number(loss.head).toFixed(2)+' m':'—')+'</b></div></div>';
+      var foot='管损 '+totalLoss.toFixed(2)+' m = 总管 '+(Number(loss.frontLoss)||0).toFixed(2)+
+        ' + 主管 '+(Number(loss.mainLoss)||0).toFixed(2)+' + 支管 '+(Number(loss.branchLoss)||0).toFixed(2)+' m';
+      if(isFinite(loss.marginHead)) foot+='　·　另加富余 '+Number(loss.marginHead).toFixed(1)+' m';
+      if(isFinite(loss.safetyFactor)) foot+=' × 安全系数 '+Number(loss.safetyFactor).toFixed(2);
+      lines+='<div class="mfg-foot">'+foot+'</div>';
       if(loss.missing&&loss.missing.length) lines+='<div class="mfg-unavailable">缺少 '+loss.missing.map(function(zi){return(zi+1)+'区';}).join('、')+' 的有效分区管路路径</div>';
-    }else{
+        }else{
       /* [v945] 分三种情况说话，不再一律「尚未齐备」：
          · 反推成功 ⇒ 直接给出总管该选多大（这是用户真正要的那个数），并说清为什么没有扬程；
          · 反推失败 ⇒ 把缺什么原样说出来（没有分区面积 / 缺滴灌参数…），用户知道去哪补；

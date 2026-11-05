@@ -142,10 +142,10 @@ test('⑤ 估算链与路径链都用共享口径（不是各自拿本组流量�
     '共享口径细于本组下游管时必须退回逐组选档（不许缩颈）');
   assert.ok(/if \(!trunkPick\) sharedOd = 0;/.test(est),
     '取不到该档时要退回逐组，不能留一个没有 od/id 的「共享总管」');
-  assert.ok(/var frontStep = sharedOd \? null : stepOf\(qGroup, frontLen, trunkPick\);/.test(est),
-    '共享口径下总管不会「被钉在细档」，不许再报总管台阶（报出来只会误导）');
+  /* [v977] tierNote/tierStep 接线已下线（主管复核取大使台阶不复存在，见 trunk_tier_step ⑤） */
+  assert.equal(/frontStep/.test(est), false, '总管台阶判断已随 tierNote 下线');
   assert.ok(/shared: !!sharedOd/.test(est) && /sharedFlow:/.test(est), 'trunkAdvice 必须回传 shared/sharedFlow');
-  assert.ok(/segments:/.test(est), 'tierNote 必须带 segments，卡片才能分段说人话');
+  assert.ok(/sharedGroupIndex:/.test(est), 'trunkAdvice 必须回传 sharedGroupIndex（卡片点名最不利点用）');
 
   const map = (() => {
     const i = rawInline.indexOf('window.tlMapGroupHydraulicsOf');
@@ -164,20 +164,13 @@ test('⑥ 地图卡片：声明统一口径、传全部组、不再按 groupInde
     'updateGroupInfo 必须把地图端全部轮灌组递进去');
   assert.ok(/groups:gsAll/.test(rawDemo) && !/groupIndex:g\b/.test(rawDemo),
     '反推兜底不许再传 groupIndex（那是「每区各算一个总管」的做法）');
-  assert.ok(/项目统一总管：/.test(rawDemo), '卡片要明说这是全项目统一口径');
-  assert.ok(/口径按<b>最不利组<\/b>/.test(rawDemo), '卡片要写清口径是按最不利组定的');
-  /* [v976] 主管也改为共享段复核取大（用户 2026-11-05 拍板：「6、7区共用的管道应该
-     取大的计算值，以此类推，后台自动复核、无开关」），卡片文案同步。 */
-  assert.ok(/总管为全项目共享口径；主管按共享段最大流量后台复核取大/.test(rawDemo),
-    '「估算口径」行要说明主管按共享段最大流量后台复核取大（v976）');
-  assert.ok(/支管按本区流量选档/.test(rawDemo),
-    '「估算口径」行要说明支管仍按本区流量选档');
-  assert.ok(/var shEst=\(loss\.trunkAdvice&&loss\.trunkAdvice\.shared\)===true;/.test(rawDemo),
-    '「估算口径」行必须按 shared 分支措辞（共享时只说明主管/支管逐区选档）');
-  assert.equal(/该区按 Ø.\{0,20\}施工则扬程约/.test(rawDemo), false,
-    '不许再建议「该区按 Ø… 施工」（总管一根管，为一区换整根管正是被否掉的做法）');
-  assert.ok(/var seg=tn\.segments\|\|'main';/.test(rawDemo), '卡片要按 segments 分段措辞');
-  assert.ok(/总管只此一根、不随单区放大/.test(rawDemo), '涉及总管时必须说清「不随单区放大」');
+  assert.ok(/项目统一总管：/.test(rawDemo), '卡片要明说这是全项目统一口径（adv 分支保留）');
+  /* [v977] 卡片改列表版式：口径说明压缩成一句并点名最不利区（用户：要看到哪个是最不利点）。 */
+  assert.ok(/总管按最不利点 <b>/.test(rawDemo), '口径说明要点名最不利组（G+组号+流量）');
+  assert.ok(/mfg-note-worst/.test(rawDemo), '本轮即最不利点要有高亮态');
+  assert.ok(/主管按最大区复核取大/.test(rawDemo), '口径说明要写明主管复核取大（v976 拍板）');
+  assert.ok(/TA.sharedGroupIndex===g/.test(rawDemo), '最不利点高亮要按组号判断（本组即最不利点）');
+  assert.ok(/各区共用/.test(rawDemo), '涉及总管时必须说清「各区共用」（不随单区放大的 v977 表述）');
 });
 
 /* ⑦ 反向锁：tierNote 只是说明，不许顶掉估算出来的 head / totalLoss */
@@ -189,8 +182,8 @@ test('⑦ tierNote 不顶掉 head/totalLoss（估算口径仍是那一套三段�
   })();
   assert.ok(/head: worst\.head/.test(est), '总扬程必须仍是 worst.head（最不利区）');
   assert.ok(/totalLoss: worst\.totalLoss/.test(est), '总损失必须仍是 worst.totalLoss');
-  assert.ok(/tierNote: tierNote/.test(est) && /head: altHead/.test(est),
-    'altHead 只许出现在 tierNote 里当说明');
+  /* [v977] altHead 随 tierNote 下线，扬程/管损仍是最不利区估算值 */
+  assert.equal(/altHead/.test(est), false, 'altHead 已下线');
   assert.ok(/MARGIN_HEAD/.test(est) && /SAFETY_FACTOR/.test(est),
     '富余水头与安全系数仍在合计之后另加');
 });
