@@ -8249,3 +8249,11 @@ zone_merge_last 15/15 + verify 系全绿。
 - tl_auto_edits：readFileSync 用相对路径，依赖 cwd=仓库根，node --test 从外部目录跑必挂 ENOENT——改 __dirname 解析。本体 129/0 一直是好的。
 - demo_flow_revive 锁 3 过时：v916 已把「#111827 骨架+#38bdf8 青色叠层」两笔制改为「#cbd5e1 淡灰底图+buildFlowRoutes 裁剪流动路线（#185FA5 干线/#16a34a 支管）+无 routes 兜底」，锁改钉新不变量。
 - 纯测试改动不抬版本。全量 687/687（仓库首次全绿），commit 0e2ed65。期间 push 三次 502/schannel 失败后恢复成功——网络抖动重试即可，不必换通道。
+
+## 26.186 v982-remove-coupler：接驳节点入口下线（2026-11-05）
+
+用户看图拍板：「这个接驳点似乎没什么用了，取消吧」。与「自动管路」下线同款口径——只删入口，底层全保留：
+- index.html 删 ⚓接驳节点按钮 + ppCouplerPanel 定位面板（留存照注释）
+- 底层 ppState.couplerNodes / ppCouplerSetPlacing / 地图捕捉 / 演示入口标记 / 既有节点渲染全部保留，旧存档兼容；plot-editor 对缺失元素全部 if(btn)/if(panel) 守卫
+- 版本 14 处同抬 982-remove-coupler；新增 tests/v982_coupler_entry_removed（入口删除/守卫保留/底层数据链/版本同抬）；coupler_map_snap 的面板 DOM 断言随取消更新（经纬度写链保留 dormant）
+- 全量 691/691 全绿，gate PASS，commit b58cba5。push 遇持续 502（4 次），commit 在本地待推。
