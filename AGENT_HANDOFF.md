@@ -7957,3 +7957,45 @@ B 段把 A 算出的 tierNote 交给真渲染器 `RyMapFlowDemo.updateGroupInfo`
 
 发布：VERSION=`v967-trunk-od-shared`（index.html 12 处 `?v=` 同抬，含 style-01.css）、static 635/639
 （4 红仍为既有 demo_flow_revive / plot_transfer / snap_default_off ①③）、refs PASS（37 页/224 引用）、lint 341 脚本 0 错。
+
+### §26.172 v969-zone-merge-last（2026-11-05，新增「末排并入上排」开关 = 方案C）
+
+**用户决策链**：上午确认分区面积 24→25 漂移为取整口径（v968 双口径显示承接）→ 用户拍板
+「24 亩随手估算、允差 ±5%、最经济」→ 选定方案C（底排并入中排，15 区 → 10 区，商务口径
+「实际面积优先」）→ 放弃手工试算，要求直接改软件：**加勾选项让软件自己生成 10 区制**。
+
+**改动**
+- `mod/zone-geometry.js`（VERSION 890→891）：`splitZoneLength` 加第 4 参 `mergeLast`
+  （窄条吸收之后执行，末段整段并入前一段、单段不并、总和守恒）；`manualZoneLayout`
+  加第 7 参 `mergeLastRow`（返回 yParts/mergeLastRow）；★ 上限校验从
+  `splitZoneLengthCount` 预估改为「按实际分段数校验」——该函数不做 v877 窄条吸收、
+  余条会多计一格，贴上限的合法布局被误抛（521/24亩/limit=10 实测踩中）。
+- `mod/inline-09.js`：新增全局 `planZoneMergeLastOn()`（读 #planZoneMergeLast）；
+  `splitZoneLength`/`calcManualZoneLayout`/`calcPlanZoneLayout` 透传开关；
+  `getManualPlanZoneMu` 校验口径同步。
+- `mod/plot-editor.js`：新增 IIFE 内兜底包装 `ppZoneMergeLastOn()`（单测沙箱不装
+  inline-09 时退回 false）；`ppGetZoneLayout` 行数、`ppSplitLength`（第 3 参）、
+  `ppGetZoneCutSignature`（签名追加 `|m` 标志，勾选即作废旧切割线快照）、
+  `ppGetZoneCuts`（yPlan 并入）五处接上；★ 行/列计数从裸调全局 `splitZoneLength`
+  改为 `ppSplitLength` —— 展开单文件视图里全局名与 zone-geometry 的 4 参同名函数
+  撞名，第 3 参会被误当 limit（partition_query 沙箱实测踩中）。
+- `index.html`：分区划定旁新增 `<input type="checkbox" id="planZoneMergeLast">`；
+  全部 `?v=` 968-zone-area-drift → 969-zone-merge-last。`sw.js` VERSION 同步。
+- `verify_zone_area_drift.js` 既有锁调整：A2 890→891、D1 968→969（17/17 PASS，
+  缺省不勾选行为逐字节未变）。
+
+**新锁**
+- `tests/zone_merge_last_row.test.cjs` 15/15（纯函数：缺省回归锚 / 合并行为 /
+  设计口径不变 / limit 按实际段数）。
+- `verify_zone_merge_last.js` 11/11（页面级端到端：勾选 → 表头「10分区 · 标准区
+  25.01~50.02 亩」、标签 5×「25.0亩 设24.0」+5×「50.0亩 设24.0」；取消勾选 →
+  回 15 分区，开关可逆）。
+- 回归：`tests/partition_query.test.cjs` 238 checks 0 fail（names 清单补
+  ppZoneMergeLastOn）、`tests/group_planning.test.cjs` 5/5。
+
+**用户实际地块预期**（521×~423.6，底排 103.6m 余排）：勾选后 15 → 10 区，
+末排格子 104.2×263.6 ≈ 41.2 亩（非 50 亩——那是 480 整除探针的场景）。
+
+**没做的事（下次别当成漏的）**：未跑全量 static/refs/lint 发布闸门、未推送线上
+（推送更新.bat 是用户发布管线，未经允许不动）；三级页独立使用（无二级桥接）的
+fallback 路径不读该开关，仍按逐段划分。

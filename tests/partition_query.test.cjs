@@ -36,7 +36,7 @@ const ctx = { MU_TO_SQM: 2000/3, MAX_MANUAL_ZONE_COUNT: 500, window: { RyZoneGeo
   ppSyncManualZoneWarning() {} };
 vm.createContext(ctx);
 const names = ['planZoneFixedSide','calcZoneLayout','splitZoneLength','splitZoneLengthCount','calcManualZoneLayout','getManualPlanZoneMu',
-  'calcPlanZoneLayout','ppGetPlanDims','ppGetZoneLayout','ppSplitLength','ppCutSig','ppResetCutSnap','ppApplyCutSnap',
+  'calcPlanZoneLayout','ppGetPlanDims','ppGetZoneLayout','ppSplitLength','ppZoneMergeLastOn','ppCutSig','ppResetCutSnap','ppApplyCutSnap',
   'ppGetZoneCuts','ppGetZoneCutSignature','ppPolyArea','ppClipPolyToRect','ppZoneAngle','ppGridFrame'];
 vm.runInContext(names.map(n => extract(html,n)).join('\n'), ctx);
 check(() => assert.equal(ctx.calcZoneLayout(600,300,Number.MAX_SAFE_INTEGER).N,zoneGeometry.MAX_AUTO_ZONE_COUNT,

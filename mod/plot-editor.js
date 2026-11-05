@@ -11,7 +11,7 @@
    至少 console 里留下显式证据，不再无声错下去）。 */
   (function(){
     try{
-      var need = 889;
+      var need = 890;
       var g = window.RyZoneGeometry;
       var ver = (g && Number(g.VERSION)) || 0;
       if (ver < need) {
@@ -310,10 +310,15 @@
     var dims=ppGetPlanDims(b),frame=ppGridFrame(ppState.polyPts,b,dims),gd=frame?frame.bounds:dims;
     var manualZoneMu=getManualPlanZoneMu(gd.w,gd.h);
     ppSyncManualZoneWarning(document.getElementById('planZoneMuManual'));
-    var base=calcPlanZoneLayout(gd.w,gd.h,planN,manualZoneMu);
+    /* [v969] 第 5 参：末排并入上排（#planZoneMergeLast）—— layout.N 与
+       ppGetZoneCuts 的 rows/zoneCount 必须同口径，否则「图面 10 区、面板 15 区」。 */
+    var base=calcPlanZoneLayout(gd.w,gd.h,planN,manualZoneMu,ppZoneMergeLastOn());
     var xDesign=base.designW,yDesign=base.designH;
-    var cols=splitZoneLength(gd.w,xDesign).length;
-    var rows=splitZoneLength(gd.h,yDesign).length;
+    /* [v969] 行/列计数统一走 ppSplitLength（带 500 上限、支持 mergeLast），
+       不再裸调全局 splitZoneLength —— 展开单文件视图里它与 zone-geometry 的
+       4 参同名函数撞名，第 3 参会被误当 limit（partition_query 沙箱实测踩中）。 */
+    var cols=ppSplitLength(gd.w,xDesign).length;
+    var rows=ppSplitLength(gd.h,yDesign,ppZoneMergeLastOn()).length;
     return {
       cols:cols,
       rows:rows,
@@ -1601,13 +1606,23 @@
     return f(w)+'×'+f(h)+'m';
   }
 
-  function ppSplitLength(total,step){
+  /* [v969] 「末排并入上排」开关读取。唯一出处是 inline-09 的全局
+     ppZoneMergeLastOn()（读 #planZoneMergeLast）；这里包一层兜底：
+     单测沙箱只装 plot-editor、不装 inline-09 时退回 false（= 缺省不并入口径），
+     不让分区主链路因为这个开关挂掉。 */
+  function ppZoneMergeLastOn(){
+    try { return typeof planZoneMergeLastOn === 'function' ? !!planZoneMergeLastOn() : false; }
+    catch (eMergeLast) { return false; }
+  }
+
+  function ppSplitLength(total,step,mergeLast){
     /* [v877] 改为委托唯一实现 zone-geometry.splitZoneLength（窄条吸收）。
        旧本地副本 `rest>0.05 → push(rest)` 会把余数独立成贴边窄条段，且与
        manualZoneLayout / ppGetZoneLayout（走 zone-geometry）失配：
-       layout.N ≠ cuts.zoneCount（655×327 / 45亩 实测 9 vs 12）。 */
+       layout.N ≠ cuts.zoneCount（655×327 / 45亩 实测 9 vs 12）。
+       [v969] 第 3 参 mergeLast：末排并入上排（仅 y 方向调用点传）。 */
     return window.RyZoneGeometry.splitZoneLength(total, step,
-      (typeof MAX_MANUAL_ZONE_COUNT === 'number') ? MAX_MANUAL_ZONE_COUNT : 500);
+      (typeof MAX_MANUAL_ZONE_COUNT === 'number') ? MAX_MANUAL_ZONE_COUNT : 500, !!mergeLast);
   }
 
   // ===== 分区线快照（支持拖动合并减区）=====
@@ -1759,14 +1774,20 @@
     var dims=ppGetPlanDims(b);
     var frame=ppGridFrame(ppState.polyPts,b,dims),gd=frame?frame.bounds:dims;
     var xDesign=layout.designW || layout.zoneW,yDesign=layout.designH || layout.zoneH;
-    var xPlan=ppSplitLength(gd.w,xDesign),yPlan=ppSplitLength(gd.h,yDesign);
-    return ppCutSig(gd,xPlan.length,yPlan.length,xDesign,yDesign)+'|a'+ppZoneAngle().toFixed(3);
+    /* [v969] yPlan 并入口径进签名：勾选/取消「末排并入上排」必须作废旧切割线快照，
+       否则旧 yPos 行数与合并后行数错位（快照按内部线索引对位）。 */
+    var mLast=ppZoneMergeLastOn();
+    var xPlan=ppSplitLength(gd.w,xDesign),yPlan=ppSplitLength(gd.h,yDesign,mLast);
+    return ppCutSig(gd,xPlan.length,yPlan.length,xDesign,yDesign)+'|a'+ppZoneAngle().toFixed(3)+'|m'+(mLast?1:0);
   }
   function ppGetZoneCuts(b,layout){
     var dims=ppGetPlanDims(b);
     var frame=ppGridFrame(ppState.polyPts,b,dims),gd=frame?frame.bounds:{minX:0,minY:0,maxX:dims.w,maxY:dims.h,w:dims.w,h:dims.h};
     var xDesign=layout.designW || layout.zoneW,yDesign=layout.designH || layout.zoneH;
-    var xPlan=ppSplitLength(gd.w,xDesign),yPlan=ppSplitLength(gd.h,yDesign);
+    /* [v969] 仅 y 方向传入合并开关：末排整排并入上一排（列方向不并）。
+       桥接 RunyeBridge.getZoneCuts() 读本函数 ⇒ 三级页 / 施工简图 / 水力 / 材料全链路自动跟随。 */
+    var mLastCuts=ppZoneMergeLastOn();
+    var xPlan=ppSplitLength(gd.w,xDesign),yPlan=ppSplitLength(gd.h,yDesign,mLastCuts);
     var xSrc=[],ySrc=[],xPos=[gd.minX],yPos=[gd.minY];
     for(var xi=0;xi<xPlan.length;xi++){xSrc.push(xPlan[xi]);xPos.push(xPos[xPos.length-1]+xSrc[xi]);}
     for(var yi=0;yi<yPlan.length;yi++){ySrc.push(yPlan[yi]);yPos.push(yPos[yPos.length-1]+ySrc[yi]);}
@@ -2151,6 +2172,11 @@
     var planN=parseInt(document.getElementById('planN')?.value)||parseInt(document.getElementById('fld_N')?.value)||4;
     var layout=ppGetZoneLayout(b,planN);
     var cuts=ppGetZoneCuts(b,layout);
+    /* [v890 2026-11-05] 向三级 / 结果栏发布「设计单区亩数」：实划值与设计值的
+       偏差说明（zoneAreaDrift）在几处 UI 都要用，设计值只在这里算一次。
+       layout.zoneArea 是设计单区面积 m²（手动模式 = 固定边 x 折算边；自动模式
+       = 地块外接面积 / 区数），与实际切出来的 xPlan*yPlan 是两个口径。 */
+    window.__ppZoneDesignMu = (layout && layout.zoneArea > 0) ? layout.zoneArea / 666.67 : 0;
     /* 2026-09-27：分区底色改用「三级设计工作区」同一套 4 色循环调色板
        （红/琥珀/绿/蓝，α=.30）—— 与 tl-workspace.js 的 GROUP_FILLS 逐色一致，
        用户要求「二级地块划分颜色参照三级管线」。原为 8 色 α=.12（偏灰、偏花）。 */
@@ -2254,7 +2280,11 @@
         var __pick=(__calActual&&_mu>0.05&&window.ryZonePipePick)?window.ryZonePipePick(_m2,__tsp,__esp,__ef,__tv,__par):null;
         if(_mu>0.05&&zoneScreenW>16&&zoneScreenH>11){
           var zoneSizeText=ppZoneSizeLabel(cuts.xPlan[zc],cuts.yPlan[zr]);
-          var zoneAreaText=(_partial?_mu:(cuts.xPlan[zc]*cuts.yPlan[zr]/666.67)).toFixed(1)+'亩';
+          /* [v890 2026-11-05] 双口径：实划亩数 +（偏差 >3% 时）设计亩数。
+             _partial（被地块边界裁掉一角）时保持只显示实切亩数 —— 那种偏差是
+             几何裁切造成的，已有琥珀描边提示，再叠一层文字会互相打架。 */
+          var __zaDrift=(function(){ try{ if(_partial) return null; var G=window.RyZoneGeometry; return (G&&G.zoneAreaDrift)?G.zoneAreaDrift(layout.zoneArea,_std*666.67):null; }catch(e0){ return null; } })();
+          var zoneAreaText=(__zaDrift&&__zaDrift.ok)?(zoneScreenW>=72?__zaDrift.text:__zaDrift.shortText):((_partial?_mu:(cuts.xPlan[zc]*cuts.yPlan[zr]/666.67)).toFixed(1)+'亩');
           var baseFont=Math.max(6,Math.min(10,Math.min(zoneScreenW/12,zoneScreenH/4.5)));
           ppCtx.save();ppCtx.translate(labelCenter.x,labelCenter.y);ppCtx.rotate(labelAngle);
           ppCtx.fillStyle='#000';ppCtx.textAlign='right';ppCtx.textBaseline='middle';
@@ -2262,7 +2292,12 @@
           if(zoneScreenH>=31){
             ppCtx.font=baseFont+'px sans-serif';ppCtx.fillText((zi+1)+'区',0,r1);
             ppCtx.font=baseFont+'px sans-serif';ppCtx.fillText(zoneSizeText,0,r1+rowH);
-            if(zoneScreenH>=43)ppCtx.fillText(zoneAreaText,0,r1+rowH*2);
+            if(zoneScreenH>=43){
+              /* 漂移标琥珀：与「非标分区」描边同色系但更暗，避免和管径行抢注意力 */
+              ppCtx.fillStyle=(__zaDrift&&__zaDrift.drift)?'#b45309':'#000';
+              ppCtx.fillText(zoneAreaText,0,r1+rowH*2);
+              ppCtx.fillStyle='#000';
+            }
           }else{
             ppCtx.font=Math.max(5.5,baseFont*.82)+'px sans-serif';
             ppCtx.fillText((zi+1)+'区 '+zoneSizeText,0,r1);
@@ -4476,6 +4511,10 @@
       if(_nomMu>_nomMuMax)_nomMuMax=_nomMu;
     }}
     var zoneAreaMu=(!isFinite(_nomMuMin)||_nomMuMax<=0)?'0.00':((Math.round(_nomMuMin*100)!==Math.round(_nomMuMax*100))?(_nomMuMin.toFixed(2)+'~'+_nomMuMax.toFixed(2)):_nomMuMax.toFixed(2));
+    /* [v890 2026-11-05] 表头「标准区 N 亩」补设计值对照：施工简图是导出给别人看的，
+       只有实划值会被当成「设计就是这么定的」，把偏差写在表头比藏在格子里更有效。 */
+    var __hdrDrift=(function(){ try{ var G=window.RyZoneGeometry; return (G&&G.zoneAreaDrift&&_nomMuMax>0)?G.zoneAreaDrift(zoneLayout.zoneArea,_nomMuMax*666.67):null; }catch(e2){ return null; } })();
+    var zoneAreaHeadText=zoneAreaMu+' 亩'+((__hdrDrift&&__hdrDrift.drift)?('（设计 '+__hdrDrift.designMu.toFixed(1)+'，'+(__hdrDrift.deltaPct>0?'+':'')+__hdrDrift.deltaPct.toFixed(1)+'%）'):'');
     // 预统计：实际面积小于标准分区的"非标准分区"数量
     var plotPoly=ppState.polyPts&&ppState.polyPts.length>=3?ppState.polyPts.map(function(p){return{x:p.x,y:p.y};}):null;
     var partialCount=0;
@@ -4491,7 +4530,14 @@
     parts.push('<rect x="8" y="8" width="'+(svgW-16)+'" height="'+(svgH-16)+'" fill="none" stroke="#999" stroke-width="1.5" rx="2"/>');
     parts.push('<text x="'+svgW/2+'" y="42" text-anchor="middle" font-size="20" font-weight="700" fill="#1a4731">润野灌溉 · 施工简图</text>');
     var headerExtra=partialCount>0?(' | 非标准 '+partialCount+' 区'):'';
-    parts.push('<text x="34" y="42" text-anchor="start" font-size="12" font-weight="700" fill="#334155">面积 '+areaMu+' 亩 | 地块 '+planA+'×'+planB+' m | '+planN+'分区 | 标准区 '+zoneAreaMu+' 亩'+headerExtra+'</text>');
+    /* [v890 2026-11-05] 表头带上设计对照后会变长，与居中的主标题「润野灌溉 · 施工简图」
+       在同一 y 上相撞（实测右侧被压掉半个「%）」）。这里按字符估宽（全角 1em /
+       半角 0.55em）逐档降字号，保证左端表头始终在标题左边界之前收尾。 */
+    var __headTxt='面积 '+areaMu+' 亩 | 地块 '+planA+'×'+planB+' m | '+planN+'分区 | 标准区 '+zoneAreaHeadText+headerExtra;
+    var __headFont=12, __headLimit=svgW/2-95-34-14;
+    function __headEstW(t,f){var w=0;for(var hi=0;hi<t.length;hi++)w+=(t.charCodeAt(hi)>255?f:f*0.55);return w;}
+    while(__headEstW(__headTxt,__headFont)>__headLimit&&__headFont>9)__headFont-=0.5;
+    parts.push('<text x="34" y="42" text-anchor="start" font-size="'+__headFont.toFixed(1)+'" font-weight="700" fill="#334155">'+__headTxt+'</text>');
     parts.push('<g id="ppPlotGroup">');
     parts.push('<defs><clipPath id="ppPlotClip"><path d="'+d+'"/></clipPath></defs>');
     parts.push('<path d="'+d+'" fill="rgba(134,239,172,.1)" stroke="none"/>');
@@ -4559,7 +4605,9 @@
           // Use a readable rotation of the text with the grid and choose detail by the
           // cell's true along-axis space, not its shrinking screen-aligned bounding box.
           var zoneSizeText=ppZoneSizeLabel(zoneCuts.xPlan[zc],zoneCuts.yPlan[zr]);
-          var zoneAreaText=(isPartial?actualMu:(zoneCuts.xPlan[zc]*zoneCuts.yPlan[zr]/666.67)).toFixed(1)+'亩';
+          /* [v890 2026-11-05] 与画布同一口径（见 ppDrawZones 同段注释） */
+          var __svgDrift=(function(){ try{ if(isPartial) return null; var G=window.RyZoneGeometry; return (G&&G.zoneAreaDrift)?G.zoneAreaDrift(zoneLayout.zoneArea,_stdMu*666.67):null; }catch(e1){ return null; } })();
+          var zoneAreaText=(__svgDrift&&__svgDrift.ok)?(zoneScreenW>=72?__svgDrift.text:__svgDrift.shortText):((isPartial?actualMu:(zoneCuts.xPlan[zc]*zoneCuts.yPlan[zr]/666.67)).toFixed(1)+'亩');
           var detailFont=Math.max(6.5,Math.min(10.5,Math.min(zoneScreenW/12,zoneScreenH/4.8)));
           var compactFont=Math.max(6,Math.min(8.5,Math.min(zoneScreenW/18,zoneScreenH/2.8)));
           labelParts.push('<g transform="translate('+labelCorner.x.toFixed(1)+' '+labelCorner.y.toFixed(1)+') rotate('+labelAngle.toFixed(2)+')" text-anchor="end" fill="#000">');
@@ -4568,7 +4616,7 @@
             labelParts.push('<text x="0" y="'+titleY.toFixed(1)+'" font-size="'+detailFont.toFixed(1)+'">'+(zi+1)+'区</text>');
             if(zoneScreenH>=34){
               labelParts.push('<text x="0" y="'+(titleY+detailFont*1.15).toFixed(1)+'" font-size="'+detailFont.toFixed(1)+'">'+zoneSizeText+'</text>');
-              if(zoneScreenH>=48)labelParts.push('<text x="0" y="'+(titleY+detailFont*2.25).toFixed(1)+'" font-size="'+compactFont.toFixed(1)+'">'+zoneAreaText+'</text>');
+              if(zoneScreenH>=48)labelParts.push('<text x="0" y="'+(titleY+detailFont*2.25).toFixed(1)+'" font-size="'+compactFont.toFixed(1)+'"'+((__svgDrift&&__svgDrift.drift)?' fill="#b45309" font-weight="700"':'')+'>'+zoneAreaText+'</text>');
             }else{
               labelParts.push('<text x="0" y="'+(titleY+detailFont*1.15).toFixed(1)+'" font-size="'+compactFont.toFixed(1)+'">'+zoneSizeText+'</text>');
             }

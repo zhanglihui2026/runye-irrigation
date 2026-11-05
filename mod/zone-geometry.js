@@ -4,7 +4,12 @@
   var MAX_AUTO_ZONE_COUNT = 500;
   var MAX_AUTO_ZONE_DIMENSION = 1000000000;
 
-  function splitZoneLength(total, step, limit) {
+  /* [v891 2026-11-05 用户拍板「方案C」] 第 4 参 mergeLast：末排并入上一排。
+     背景：地块高除不尽设计格高时，末排是被边界裁出来的余排（如 423.6 / 160
+     → [160,160,103.6]，末排每格只有 ~15.7 亩）。勾选「末排并入上排」后把
+     末段并进前一段 → [160,263.6]，分区数减少、单区面积增大（15 区 → 10 区）。
+     仅在调用方显式传 true 时生效，缺省行为与 v877（窄条吸收）逐字节一致。 */
+  function splitZoneLength(total, step, limit, mergeLast) {
     var parts = [];
     var used = 0;
     var boundedStep = Math.max(1, Number(step) || 1);
@@ -40,6 +45,13 @@
         parts.push(rest);
       }
     }
+    /* [v891] mergeLast 在窄条吸收之后执行：单段不并（并无可并对象）；
+       并入是整段相加，不重新均摊——设计口径仍是「末排 = 上排 + 余排」。 */
+    if (mergeLast && parts.length >= 2) {
+      var lastSum = parts[parts.length - 2] + parts[parts.length - 1];
+      parts = parts.slice(0, parts.length - 2);
+      parts.push(lastSum);
+    }
     return parts.length ? parts : [total];
   }
 
@@ -55,7 +67,11 @@
     return count + (rest > 0.05 ? 1 : 0) || 1;
   }
 
-  function manualZoneLayout(width, height, manualMu, fixedSide, muToSqm, limit) {
+  /* [v891] 第 7 参 mergeLastRow：行方向末排并入上一排（列方向不变）。
+     yCount 的上限校验用「并入后」的行数，避免误报 manual_zone_count_exceeded；
+     zoneArea / designW / designH 仍返回「设计口径」（未并入的目标值），
+     实划口径由调用方按 yParts（并入后）与 drift 双口径展示。 */
+  function manualZoneLayout(width, height, manualMu, fixedSide, muToSqm, limit, mergeLastRow) {
     var w = Number(width), h = Number(height);
     var safeW = isFinite(w) && w > 0 ? Math.min(w, MAX_AUTO_ZONE_DIMENSION) : 1;
     var safeH = isFinite(h) && h > 0 ? Math.min(h, MAX_AUTO_ZONE_DIMENSION) : 1;
@@ -77,23 +93,27 @@
     var longIsX = safeW >= safeH;
     var xDesign = longIsX ? derivedSide : side;
     var yDesign = longIsX ? side : derivedSide;
-    var xCount = splitZoneLengthCount(safeW, xDesign, limit);
-    var yCount = splitZoneLengthCount(safeH, yDesign, limit);
-    if (xCount * yCount > limit) {
+    /* [v969] 上限校验改按「实际分段数」（先切后校验）。原先用 splitZoneLengthCount
+       预估，但该函数不做 v877 窄条吸收——余条（rest < 0.5×step）会被多计一格，
+       导致「实际 5 列」被按 6 列校验、贴着上限的合法布局被误抛
+       manual_zone_count_exceeded（实测 521/24亩/limit=10）。逐段函数自身仍带
+       limit 硬顶，超大轴不会失控。 */
+    var xParts = splitZoneLength(safeW, xDesign, limit);
+    var yParts = splitZoneLength(safeH, yDesign, limit, !!mergeLastRow);
+    var cols = xParts.length, rows = yParts.length;
+    if (cols * rows > limit) {
       var countError = new RangeError('手动分区数量超过 ' + limit + ' 个上限');
       countError.code = 'manual_zone_count_exceeded';
-      countError.requestedCount = xCount * yCount;
+      countError.requestedCount = cols * rows;
       countError.maxCount = limit;
       throw countError;
     }
-    var xParts = splitZoneLength(safeW, xDesign, limit);
-    var yParts = splitZoneLength(safeH, yDesign, limit);
-    var cols = xParts.length, rows = yParts.length;
     return {
       cols: cols, rows: rows, N: cols * rows,
       zoneW: side, zoneH: derivedSide, zoneArea: side * derivedSide,
       drawZoneW: safeW / cols, drawZoneH: safeH / rows,
-      designW: xDesign, designH: yDesign, manual: true
+      designW: xDesign, designH: yDesign, manual: true,
+      mergeLastRow: !!mergeLastRow, yParts: yParts
     };
   }
 
@@ -297,13 +317,42 @@
     return out;
   }
 
+  /* [v890 2026-11-05 用户要求] 「设计亩数」与「图面实划亩数」双口径对照。
+     起因：手填「分区划定 N 亩/区」时，设计格宽 = N x 666.67 / 分区固定边长；
+     地块外接宽除不尽设计格宽，只能落成整数列数，余数按 splitZoneLength 的
+     「余数均摊」规则并入已有各列 => 每格实际大于 N 亩（实测 24 -> 25.0，+4.2%）。
+     此前界面只显示实划值，用户读作「算错了」。本函数给出统一对照口径，
+     供二级画布标签 / 施工简图 / 三级「依据」行共用，避免三处各写一套阈值。
+     designM2 / actualM2 均为平方米；tolPct 缺省 3（正常取整不打扰）。
+     返回 text 即可直接上屏：未漂移时是「25.0亩」，漂移时是「25.0亩 设24.0」。 */
+  function zoneAreaDrift(designM2, actualM2, tolPct) {
+    var d = Number(designM2), a = Number(actualM2), tol = Number(tolPct);
+    if (!isFinite(tol) || tol <= 0) tol = 3;
+    var out = { ok: false, drift: false, designMu: 0, actualMu: 0, deltaPct: 0, text: '', shortText: '' };
+    if (!isFinite(a) || a <= 0) return out;
+    out.ok = true;
+    out.actualMu = a / 666.67;
+    out.text = out.actualMu.toFixed(1) + '亩';
+    out.shortText = out.text;
+    if (!isFinite(d) || d <= 0) return out;
+    out.designMu = d / 666.67;
+    var delta = out.actualMu - out.designMu;
+    out.deltaPct = out.designMu > 0 ? (delta / out.designMu) * 100 : 0;
+    /* 0.1 亩以内的差按「显示精度噪声」处理，不当漂移（避免 24.00 对 24.04 误标） */
+    out.drift = Math.abs(out.deltaPct) > tol && Math.abs(delta) > 0.1;
+    /* text 用于宽格子（实划 + 设计并列）；shortText 用于窄格子 —— 后者只写实划值，
+       设计值与偏差由图面表头 / 三级「依据」行承担，避免 42px 窄格里文字顶穿左边界。 */
+    if (out.drift) out.text = out.actualMu.toFixed(1) + '亩 设' + out.designMu.toFixed(1);
+    return out;
+  }
+
   var api = {
     /* [v889 2026-11-03] 本文件每次改变方向规则时，须同步更新版本号、页面资源串和SW版本；
        用户浏览器弱网/旧标签页拿到旧 tapeAxisOf，方向修复看起来「没生效」。
        现以数字版本号暴露，plot-editor 页面级闸门校验：加载到的版本 < 页面要求
        ⇒ 强制硬刷新一次（sessionStorage 防循环）。往后本文件每改一次，此号与
        index.html 的 ?v= 串、sw.js VERSION 三处同步上抬。 */
-    VERSION: 889,
+    VERSION: 891,
     MAX_AUTO_ZONE_COUNT: MAX_AUTO_ZONE_COUNT,
     manualZoneLayout: manualZoneLayout,
     splitZoneLength: splitZoneLength,
@@ -316,7 +365,8 @@
     clipPolyToRect: clipPolyToRect,
     zoneGx: zoneGx,
     zoneGy: zoneGy,
-    zoneAreaGroups: zoneAreaGroups
+    zoneAreaGroups: zoneAreaGroups,
+    zoneAreaDrift: zoneAreaDrift
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.RyZoneGeometry = api;

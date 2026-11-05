@@ -117,17 +117,27 @@ function planZoneFixedSide() {
   return Math.max(1, 2 * v);  // 单边×2=滴灌带总长（支管两侧敷设）；只钳制滴灌带方向那一边
 }
 
+/* [v969 2026-11-05 用户拍板「方案C」] 「末排并入上排」开关（index.html #planZoneMergeLast）。
+   勾选后：行方向末排（含被地块边裁出的余排）整排并入上一排 —— 分区数减少、
+   单区面积增大（如 15 区 → 10 区）。只作用于手动亩/区模式的行切分；
+   消费点：calcManualZoneLayout / getManualPlanZoneMu / ppGetZoneLayout /
+   ppGetZoneCutSignature / ppGetZoneCuts（plot-editor）。 */
+function planZoneMergeLastOn() {
+  var el = document.getElementById('planZoneMergeLast');
+  return !!(el && el.checked);
+}
+
 function calcZoneLayout(width, height, requestedN) {
   return window.RyZoneGeometry.autoZoneLayout(width, height, requestedN, planZoneFixedSide());
 }
 
-function splitZoneLength(total, step) {
-  return window.RyZoneGeometry.splitZoneLength(total, step, MAX_MANUAL_ZONE_COUNT);
+function splitZoneLength(total, step, mergeLast) {
+  return window.RyZoneGeometry.splitZoneLength(total, step, MAX_MANUAL_ZONE_COUNT, !!mergeLast);
 }
 
-function calcManualZoneLayout(width, height, manualMu) {
+function calcManualZoneLayout(width, height, manualMu, mergeLastRow) {
   return window.RyZoneGeometry.manualZoneLayout(width, height, manualMu,
-    planZoneFixedSide(), MU_TO_SQM, MAX_MANUAL_ZONE_COUNT);
+    planZoneFixedSide(), MU_TO_SQM, MAX_MANUAL_ZONE_COUNT, !!mergeLastRow);
 }
 
 function splitZoneLengthCount(total, step, limit) {
@@ -142,7 +152,7 @@ function getManualPlanZoneMu(width, height) {
   if (!isFinite(v) || v <= 0) return 0;
   if (isFinite(width) && isFinite(height)) {
     try {
-      calcManualZoneLayout(width, height, v);
+      calcManualZoneLayout(width, height, v, planZoneMergeLastOn());
       window.__manualZoneLayoutWarning = null;
     } catch (err) {
       if (!err || err.code !== 'manual_zone_count_exceeded') throw err;
@@ -153,8 +163,8 @@ function getManualPlanZoneMu(width, height) {
   return v;
 }
 
-function calcPlanZoneLayout(width, height, requestedN, manualMu) {
-  return manualMu > 0 ? calcManualZoneLayout(width, height, manualMu) : calcZoneLayout(width, height, requestedN);
+function calcPlanZoneLayout(width, height, requestedN, manualMu, mergeLastRow) {
+  return manualMu > 0 ? calcManualZoneLayout(width, height, manualMu, mergeLastRow) : calcZoneLayout(width, height, requestedN);
 }
 
 function peInnerDiam(od) { return RyDesignCore.inner(od, SDR); }
@@ -3329,9 +3339,22 @@ function tlUpdatePlanBar() {
      含义不变：该值仍是最大联合分区的面积和，单位亩）。 */
   if (el = document.getElementById('tlPlanCombinedSrc')) {
     if (r.worstGroup) {
+      /* [v890 2026-11-05 用户要求] 双口径：实划亩数后面补设计亩数与偏差。
+         设计值取二级发布的 window.__ppZoneDesignMu（单区），乘本联合分区的区数
+         才和 worstGroup.sum（整组实切面积和）同口径。无发布值（未进地块页）
+         或偏差在 3% 内则保持原文案，不打扰。 */
+      var __grpZones = r.worstGroup.zones.length || 1;
+      var __designMu0 = (typeof window.__ppZoneDesignMu === 'number' && window.__ppZoneDesignMu > 0) ? window.__ppZoneDesignMu : 0;
+      var __drift = null;
+      try {
+        var __G = window.RyZoneGeometry;
+        if (__G && __G.zoneAreaDrift && __designMu0 > 0) __drift = __G.zoneAreaDrift(__designMu0 * 666.67 * __grpZones, r.worstGroup.sum);
+      } catch (eD) { __drift = null; }
+      var __areaTxt = fmt(r.worstGroup.sum / 666.67, 1) + ' 亩';
+      if (__drift && __drift.drift) __areaTxt += '（设计 ' + __drift.designMu.toFixed(1) + ' 亩，' + (__drift.deltaPct > 0 ? '+' : '') + __drift.deltaPct.toFixed(1) + '%）';
       el.textContent = '依据：分区 M' + (r.worstGroup.g + 1) + '（'
         + r.worstGroup.zones.map(function (z) { return (z + 1) + '区'; }).join('、')
-        + '）*实际面积= ' + fmt(r.worstGroup.sum / 666.67, 1) + ' 亩';
+        + '）*实际面积= ' + __areaTxt;
     } else {
       el.textContent = '依据：暂无图面分组数据（按单区流量 × ' + fmt0(r.zoneCount || 1) + ' 估算）';
     }
