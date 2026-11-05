@@ -222,25 +222,39 @@ function tlBuildPipeOverride() {
     : null;
 }
 /* 面板三个直径选择 <select> 的填充：以设计值(±3档)为选项，当前有效值为选中态。 */
+/* [v970 2026-11-05 用户要求] 选项改为「全部档位」+ 每档流速提示。
+   背景：±3 档窗口卡死向下选择——支管设计 Ø140 时最小只能选 Ø90，用户要选更小档
+   （流速偏高可接受，扬程影响小）。改后：选项 = PE_OD_SERIES 全档位（18 档），
+   设计值标注「设计」，其余档按当前流量算出实际流速标在档位后面，用户自己权衡。
+   手动选管 → tlManualCals → tlBuildPipeOverride → 改径重算，链路不变；
+   tlNormalizePipeOverride 下限 16mm，全档位都在合法区间。 */
+function tlCalSelOptions(designOd, curOd, flow) {
+  return PE_OD_SERIES.map(function (od) {
+    var label = 'Ø ' + od;
+    if (od === designOd) { label += ' · 设计'; }
+    else if (isFinite(flow) && flow > 0) {
+      var v = flow / 3600 / (Math.PI * Math.pow(peInnerDiam(od) / 1000, 2) / 4);
+      if (isFinite(v)) label += ' · ' + v.toFixed(2) + ' m/s';
+    }
+    return { od: od, label: label };
+  });
+}
 function tlRefreshCalSels(r, rDes) {
   if (!r || !r.frontPipe || !rDes || !rDes.frontPipe) return;
+  var hp = r.hydraulicPath;
   var sels = [
-    { sel: 'tlCalSelFront', des: rDes.frontPipe.od, cur: r.frontPipe.od },
-    { sel: 'tlCalSelMain', des: rDes.mainPipe.od, cur: r.mainPipe.od },
-    { sel: 'tlCalSelBranch', des: rDes.branchPipe.od, cur: r.branchPipe.od }
+    { sel: 'tlCalSelFront', des: rDes.frontPipe.od, cur: r.frontPipe.od, flow: hp ? hp.frontFlow : r.combinedFlow },
+    { sel: 'tlCalSelMain', des: rDes.mainPipe.od, cur: r.mainPipe.od, flow: hp ? hp.mainFlow : r.zoneFlow },
+    { sel: 'tlCalSelBranch', des: rDes.branchPipe.od, cur: r.branchPipe.od, flow: hp ? hp.branchFlow : r.branchFlow }
   ];
   tlBindCalSels();
   sels.forEach(function (s) {
     var el = document.getElementById(s.sel); if (!el) return;
-    var centerIdx = PE_OD_SERIES.indexOf(s.des);
-    if (centerIdx < 0) { var best = 0, bd = Infinity; for (var i = 0; i < PE_OD_SERIES.length; i++) { var d = Math.abs(PE_OD_SERIES[i] - s.des); if (d < bd) { bd = d; best = i; } } centerIdx = best; }
-    var lo = Math.max(0, centerIdx - 3), hi = Math.min(PE_OD_SERIES.length - 1, centerIdx + 3);
-    var opts = PE_OD_SERIES.slice(lo, hi + 1);
-    if (isFinite(s.cur) && opts.indexOf(s.cur) < 0 && PE_OD_SERIES.indexOf(s.cur) >= 0) { opts = opts.concat([s.cur]); opts.sort(function (a, b) { return a - b; }); }
-    el.innerHTML = opts.map(function (od) { return '<option value="' + od + '">Ø ' + od + '</option>'; }).join('');
+    var opts = tlCalSelOptions(s.des, s.cur, s.flow);
+    el.innerHTML = opts.map(function (o) { return '<option value="' + o.od + '">' + o.label + '</option>'; }).join('');
     el.setAttribute('data-design', s.des);
     var chosen = isFinite(s.cur) ? s.cur : s.des;
-    el.value = (opts.indexOf(chosen) >= 0) ? chosen : s.des;
+    el.value = (PE_OD_SERIES.indexOf(chosen) >= 0) ? chosen : s.des;
   });
 }
 /* 选择按钮 change 事件绑定（仅绑定一次）。选回设计值即清除该档覆盖。 */

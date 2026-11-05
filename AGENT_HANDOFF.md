@@ -7999,3 +7999,27 @@ B 段把 A 算出的 tierNote 交给真渲染器 `RyMapFlowDemo.updateGroupInfo`
 **没做的事（下次别当成漏的）**：未跑全量 static/refs/lint 发布闸门、未推送线上
 （推送更新.bat 是用户发布管线，未经允许不动）；三级页独立使用（无二级桥接）的
 fallback 路径不读该开关，仍按逐段划分。
+
+### §26.173 v970-cal-sel-full（2026-11-05，管径选择下拉改全档位 + 流速提示）
+
+**用户原话**：「我想把支管的直径进一步缩小，系统不让我往小选择，支管的流速高点没关系，
+对整体扬程影响不大。」（10 区制生成后，支管设计 Ø140，±3 档窗口最小只到 Ø90）
+
+**改法（只动选项生成，选管链路一行没碰）**
+- `mod/inline-09.js`：选项生成抽成纯函数 `tlCalSelOptions(designOd, curOd, flow)`——
+  选项 = `PE_OD_SERIES` 全档位（18 档，最小 Ø50），设计档标注「设计」，其余档按
+  当前流量（worst 路径 front/main/branchFlow）用 `peInnerDiam` 标实际流速
+  「Ø 63 · 6.81 m/s」；`tlRefreshCalSels` 改喂 flow 并消费该函数。
+  ★ 提示流速是**最不利轮灌组**口径的保守值；选完后「改径重算」列显示本区真实流速
+  （实测选 Ø63 后刷出 1.38 m/s）。手动选管 → tlManualCals → tlBuildPipeOverride →
+  改径重算链路与 v242 起一致，`tlNormalizePipeOverride` 下限 16mm 覆盖全档位。
+- `index.html` `?v=` 969 → 970-cal-sel-full（13 处同抬），`sw.js` VERSION 同步。
+
+**新锁**
+- `tests/cal_sel_options.test.cjs` 6/6（vm 提取纯函数：全档位 18 项升序 / 设计档
+  唯一且不带流速 / 流速数值与 design-core 手算一致 / 无流量与 0/∞/NaN 不出坏字样）。
+- `verify_cal_sel_full.js` 10/10（页面级端到端：18 项、最小 Ø50、选 Ø63 →
+  tlManualCals.branch=63 且改径重算流速格刷新、选回设计值覆盖清除）。
+
+**没做的事**：主管/总管的自动选档下限（MAIN_PIPE_MIN_OD=90 等）未动——只是
+手动下拉放开全档位；flow 提示用 worst 组流量，未做逐区流速提示。
