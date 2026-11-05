@@ -8270,3 +8270,6 @@ zone_merge_last 15/15 + verify 系全绿。
 ## 26.190 v986-valve-gap：阀门投影容差压线修复（v985 无效根因，2026-11-05）
 
 用户反馈 v985 后仍看不到主管→阀门动画，要求画理解图核对。画图核实管系结构时发现根因：主管与支管平行对称摆放、固定间距 PP_MAIN_BRANCH_GAP_M=20m（plot-editor.js 3307，tlVisGap 兜底同值），阀门装在支管上→阀门到主管投影距离≈正好 20m，v985 容差 `vp.d>20 return` 与旧支管馈线判据 `mainProj.d<=20` 全部压线跳过（浮点>20），整批馈线静默失败回退主管中点——这同时解释了 v985 之前用户也看不到动画。修复：两处判据 20→26m（投影目标固定为阀门自己所属主管 byMain[v.mi]，无误连风险），根因注释留源码。版本 14 处同抬 986-valve-gap。v985 测试锁④⑤同步更新。全量 697/697，gate PASS，commit bfb9818，Pages 冒烟 14 处 986 + 线上含 vp.d>26。
+## 26.191 v987-revert-valveflow：回滚 v985/v986 阀门水流（2026-11-05）
+
+用户反馈 v986 后第三区演示断流——「水流应该经过第二区的主管，现在断了」，且原功能被改坏，拍板回滚。git revert bfb9818 + e8e3176（逆序，无冲突），map-flow-demo.js 恢复 v984 状态（grep valve-node/vp.d>26 清零），tests/v985_valve_flow.test.cjs 随 revert 删除；版本另抬 987-revert-valveflow（14 处 + sw VERSION）保证全端强制刷新而非落回旧缓存串。全量 692/692，gate PASS，commit bfed288。**待研究**：用户透露关键拓扑——本地块演示里「第三区的水路要经过第二区的主管」（跨区主管串联），v985/v986 加的每阀切点+终点在某种图结构下破坏了跨区中继段的路径重建（Dijkstra prev 链或 dedupe），根因未定位；再动手前必须先在本地用该地块数据复现三区演示的 routes 输出，搞清断在哪一段，严禁直接再推修复。推送遇沙箱 502（同 v982），commit 安全在本地（ahead 3），待网络恢复推送或用户经 GitHub Desktop 同步。
