@@ -8199,3 +8199,11 @@ zone_merge_last 15/15 + verify 系全绿。
 - map_toolbar_unified ⑥：v972 工具栏恢复纯文字后还在断言 data-ry-iconize 必须存在 → 反转为「不许带」。
 
 **回归**：113 个测试文件全过（not ok 口径）；check_publish_refs PASS；verify_tl_node_map_sync 6/6；main_recheck.test.cjs 4/4（含旧行为 bug 存在性锁）。发布 dcecdbf，线上 index 13×?v=976-mainrecheck + sw VERSION 确认。
+
+## 26.180 v977 轮灌组卡片列表版式（2026-11-05 傍晚）
+
+- 用户拍板（按视觉稿截图确认）：卡片改**管段×管径/长度/流速三行表**，解释性长段不删但压缩成一句并**点名最不利区**（用户：「我要看哪个是最不利点」）。
+- map-flow-demo.js updateGroupInfo 重写：mfg-head（组名+含区·共N组）→ mfg-seg 三行表（总管/主管/支管 × 管径蓝字/长度/流速）→ mfg-star 试算长脚注 → mfg-note 口径说明（shared 时点名 G+组号+流量；本组即最不利点用 mfg-note-worst 蓝底）→ mfg-metrics 数字块（本轮流量/需求扬程红字）→ mfg-foot（管损分解·另加富余×安全系数）。旧 mfg-value/loss/breakdown/zone-list/tier-note 渲染删除（CSS 规则暂留，adv 无路径分支仍用 trunk-advice/advice-note/unavailable）。
+- inline-09 tlEstimateGroupHead：tierNote/tierStep 接线整体下线（主管复核取大后台阶不复存在，mainRecheckPick 保证 v≤目标）；return 新增 frontV/mainV/branchV —— mainV 必须按**本组**流量对复核口径现算（mainRecheckPick.v 是按最大区流量算的，直接用会把小流量组流速算大）；branchV 取最不利区自己的支管档流速。
+- 踩坑：新 CSS 写了 border-radius:4px 触发 trunk_panel_chrome ⑥（v855 段起到文件尾禁 border-radius 数值，全站统一切角）→ 去掉。tests/* 是白名单制（.gitignore !tests/xxx），main_recheck.test.cjs 在 v976 被静默排除未入库（commit 显示 8 files 实为 10 项被忽略 2 个）→ 已加白名单补入库；verify_*.js 按惯例留本地不入库。
+- 测试锁同步：trunk_tier_step ⑤⑥⑦ 反转为「不许再接 tierStep/tierNote」（纯函数 tierStep 本体单测保留）、trunk_shared_od ⑤⑥⑦、est_group_pipes_source ④、main_recheck ②。113 个测试文件全过，check_publish_refs PASS。发布 04daff7，线上 index 13×?v=977-cardlist + sw VERSION 确认。
