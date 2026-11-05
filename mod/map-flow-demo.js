@@ -421,6 +421,28 @@
       var id='coupler:'+sig;addCut(best.o,best.p.s,id);addCut(byMain[n.mi],mp.s,id);
     });
 
+    /* [v988] 总管↔主管贴近直连（与 validateConnection 的 v861 口径对齐）：
+       此前图里只有接驳节点/施工节点能把总管接到主管——接驳点为空的地块
+       连通性验证按「主管端点贴近总管 ≤tol」通过、演示能开始，但找路图里
+       总管与主管零连接 ⇒ routes=null 走兜底动画，表现为「断流/不经过上游区」
+       （2026-11-05 用户地块实测：couplers 空 + 主管链完好，3/4 区拿不到上游路径；
+       接驳点入口又已随 v982 下线，没地方补节点）。补边口径：主管两端点投影到
+       任一总管折线 ≤TOL_M，即在垂足处打通（同一 id 切进总管与主管，零权相连）。
+       纯找路图层补边，不改管线几何与水力模型；已放节点的地块行为不变。 */
+    Object.keys(byMain).forEach(function(mk){
+      var m=byMain[mk];
+      [0,m.len].forEach(function(s,ei){
+        var p=at(m,s);
+        byTrunk.forEach(function(t,ti){
+          var tp=project(t,p);
+          if(tp.d<=TOL_M){
+            var id='trunk-entry:'+mk+':'+ei+':'+ti;
+            addCut(m,s,id);addCut(t,tp.s,id);
+          }
+        });
+      });
+    });
+
     /* Main pipes are continuous only where a main endpoint meets another main
        line. This links zone 1 -> 2 -> 3 but does not bridge separate rows. */
     for(var mi=0;mi<d.mainsLL.length;mi++)for(var mj=mi+1;mj<d.mainsLL.length;mj++){
