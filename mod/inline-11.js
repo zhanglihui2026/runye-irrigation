@@ -202,18 +202,23 @@ function calcPlan(){
   if (planBEl) planBEl.textContent = B;
 
   // Row 2 (computed results)
-  document.getElementById('planIntensity').textContent = intensity.toFixed(2);
-  document.getElementById('planPumpFlow').textContent = zoneFlow.toFixed(1);
-  document.getElementById('planPumpHead').textContent = pumpHead.toFixed(1);
-  document.getElementById('planPumpPower').textContent = pumpPower.toFixed(1);
-  document.getElementById('planMotorPower').textContent = motorKW.toFixed(1);
-  document.getElementById('planMainPipe').textContent = 'Ø '+mainPipe.od+' mm';
-  document.getElementById('planMainVelocity').textContent = mainPipe.v.toFixed(2);
-  document.getElementById('planBranchPipe').textContent = 'Ø '+branchPipe.od+' mm';
-  document.getElementById('planBranchVelocity').textContent = branchPipe.v.toFixed(2);
+  /* [v972 2026-11-05 用户要求] 二级「水力计算结果」结果条（#ppPlanBar2）整条裁撤，
+     仅「每亩流量」(#planIntensity) 移入灌溉参数区（目标流速之下）。写入全部改走
+     ppResPut 守卫：元素不在即跳过，不再因 getElementById(...).textContent 抛错；
+     数据仍全量存 window.planData（系统图联动/施工简图改读数据源）。 */
+  function ppResPut(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+  ppResPut('planIntensity', intensity.toFixed(2));
+  ppResPut('planPumpFlow', zoneFlow.toFixed(1));
+  ppResPut('planPumpHead', pumpHead.toFixed(1));
+  ppResPut('planPumpPower', pumpPower.toFixed(1));
+  ppResPut('planMotorPower', motorKW.toFixed(1));
+  ppResPut('planMainPipe', 'Ø ' + mainPipe.od + ' mm');
+  ppResPut('planMainVelocity', mainPipe.v.toFixed(2));
+  ppResPut('planBranchPipe', 'Ø ' + branchPipe.od + ' mm');
+  ppResPut('planBranchVelocity', branchPipe.v.toFixed(2));
   // 单根支管长度 = 分区垂直跨度 ÷ (支管根数 × 敷设边数)；超出地块边界的部分不计算。
   var branchSingleLen = Math.round(branchLen);
-  document.getElementById('planBranchSingleLen').textContent = branchSingleLen;
+  ppResPut('planBranchSingleLen', branchSingleLen);
 
   // 实时更新「计算过程」面板：仅刷新内容，不控制折叠状态
   ppRenderPlanCalcDetail({

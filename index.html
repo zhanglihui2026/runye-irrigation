@@ -26,7 +26,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>润野灌溉设计优化版｜滴灌管径与水泵选型</title>
 <meta name="description" content="输入地块、滴灌带与水源参数，快速计算灌溉分区、主管支管管径和水泵工作点。"/>
-<link rel="stylesheet" href="mod/style-01.css?v=970-cal-sel-full">
+<link rel="stylesheet" href="mod/style-01.css?v=971-resbar-trim">
 <link rel="stylesheet" href="runye-inverse-design.css?v=277">
 <script defer src="runye-inverse-design.js?v=438-branch-flow-conservation"></script>
 <link rel="stylesheet" href="runye-terrain.css?v=454-terrain-sidebar-peer">
@@ -51,7 +51,7 @@
 <link rel="stylesheet" href="hydraulic-calc/hydraulic-calc.css">
 <link rel="stylesheet" href="filter-system/filter-system.css">
 <link rel="stylesheet" href="pwa/vendor/leaflet.css">
-<link rel="stylesheet" href="mod/online-map.css?v=970-cal-sel-full">
+<link rel="stylesheet" href="mod/online-map.css?v=971-resbar-trim">
 <link rel="stylesheet" href="terrain/terrain.css?v=535-terrain-single-source">
 <link rel="stylesheet" href="hydraulics-main.css?v=442-native">
 <style id="ryCadTwinCss">
@@ -326,10 +326,10 @@ body.ry-worst-off [data-tlworst]{display:none}
   <script src="runye-entitle.js?v=621-invite-l2"></script>
   <script src="runye-member-ui.js?v=632-login-deeplink"></script>
   <!-- [v605-announce-modal] 首页公告弹窗（每次访问展示）：删掉本行即卸载，样式随脚本注入 #ryAnnCss -->
-  <script src="runye-announce.js?v=970-cal-sel-full"></script>
+  <script src="runye-announce.js?v=971-resbar-trim"></script>
   <!-- 顶部导航动作按钮（系统图，runye-nav.js act 项）：动作映射须先于 runye-nav.js 注册 -->
   <script src="mod/inline-05.js?v=357"></script>
-  <script src="runye-nav.js?v=970-cal-sel-full"></script>
+  <script src="runye-nav.js?v=971-resbar-trim"></script>
   <!-- [NEW MODULE: DXF 导出] 入口：删除本行即卸载（不改动任何原有逻辑） -->
   <script src="runye-dxf.js?v=840-trunk-dxf"></script>
   <!-- [NEW MODULE: pipe_optim] 入口：删除本行即卸载本隔离模块（不改动任何原有逻辑） -->
@@ -883,6 +883,11 @@ body.ry-worst-off [data-tlworst]{display:none}
          需要撤掉：删本 item + PP_LIFTDH_PAIRS 里的镜像对 + 下方 calcPlan 触发循环里的一项。 -->
     <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">入口压力</span><input class="ryp-native-fallback" type="number" id="planTapePressure" value="1" min="0" step="0.1" aria-label="入口压力" title="滴灌带入口工作压力（bar）：计入水泵扬程（×10.2 折算水头），与 01 一级表单同源联动"><sl-input data-ry-proxy-for="planTapePressure" type="number" value="1" min="0" step="0.1" size="small" aria-label="入口压力" hidden></sl-input><span class="pp-plan-unit">bar</span></span>
     <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">目标流速</span><input class="ryp-native-fallback" type="number" id="planTargetV" value="1.5" min="0.3" max="5" step="0.1" aria-label="目标流速"><sl-input data-ry-proxy-for="planTargetV" type="number" value="1.5" min="0.3" max="5" step="0.1" size="small" aria-label="目标流速" hidden></sl-input><span class="pp-plan-unit">m/s</span></span>
+    <!-- [v972 2026-11-05 用户要求] 「每亩流量」从下方「水力计算结果」条（原 #ppPlanBar2，已整条裁撤）
+         移入灌溉参数区、放在「目标流速」之下 —— 它是设计输入的派生参考值（面积÷间距÷孔距×滴头流量），
+         与目标流速同属"配参时就要看"的量。写入点：mod/inline-11.js calcPlan（ppResPut 守卫写）。
+         数据仍全量存 window.planData.intensity；要恢复旧行：把 #ppPlanBar2 整块按 git 历史加回。 -->
+    <span class="pp-plan-item"><span class="pp-plan-label">每亩流量</span><span class="pp-plan-val" id="planIntensity">—</span><span class="pp-plan-unit">m³/h</span></span>
     <!-- [v653] 管径口径切换：设计值（v97 默认）/ 实切面积（小分区建议管径自动变细 + 逐区明细）
          [v653b] 按钮皮肤 = 面板共享档 .pp-recipe-btn（与「保存/调用」「更新水泵扬程」同款），
          选中态规则在 ry-panel.css —— 不再用工具栏的 .pp-btn-ghost（那是工具轨的皮）。 -->
@@ -890,31 +895,16 @@ body.ry-worst-off [data-tlworst]{display:none}
     <input type="hidden" id="planN" value="4">
     <input type="hidden" id="planZoneMode" value="manual">
   </div>
-  <!-- 第2行：计算结果 -->
-  <div class="pp-plan-bar pp-plan-bar-result" id="ppPlanBar2">
-    <span class="pp-sep-vert"></span>
-    <span class="pp-plan-item"><span class="pp-plan-label">每亩流量</span><span class="pp-plan-val" id="planIntensity">—</span><span class="pp-plan-unit">m³/h</span></span>
-    <span class="pp-sep-vert"></span>
-    <span class="pp-plan-item"><span class="pp-plan-label">水泵流量</span><span class="pp-plan-val" id="planPumpFlow">—</span><span class="pp-plan-unit">m³/h</span></span>
-    <span class="pp-plan-item"><span class="pp-plan-label">水泵扬程</span><span class="pp-plan-val" id="planPumpHead">—</span><span class="pp-plan-unit">m</span></span>
-    <span class="pp-plan-item"><span class="pp-plan-label">计算轴功率</span><span class="pp-plan-val" id="planPumpPower">—</span><span class="pp-plan-unit">kW</span></span>
-    <span class="pp-plan-item"><span class="pp-plan-label">建议电机功率</span><span class="pp-plan-val" id="planMotorPower">—</span><span class="pp-plan-unit">kW</span></span>
-    <span class="pp-sep-vert"></span>
-    <span class="pp-plan-item"><span class="pp-plan-label">主管</span><span class="pp-plan-val" id="planMainPipe">—</span><span class="pp-plan-unit"></span></span>
-    <span class="pp-plan-item"><span class="pp-plan-label">主管流速</span><span class="pp-plan-val" id="planMainVelocity">—</span><span class="pp-plan-unit">m/s</span></span>
-    <span class="pp-plan-item"><span class="pp-plan-label">支管</span><span class="pp-plan-val" id="planBranchPipe">—</span><span class="pp-plan-unit"></span></span>
-    <span class="pp-plan-item"><span class="pp-plan-label">支管流速</span><span class="pp-plan-val" id="planBranchVelocity">—</span><span class="pp-plan-unit">m/s</span></span>
-    <span class="pp-plan-item" style="display:none"><span class="pp-plan-label">支管总长度</span><span class="pp-plan-val" id="planBranchSingleLen">—</span><span class="pp-plan-unit">m</span></span>
-  </div>
-  <!-- 扬程计算式（紧贴结果栏下方，仅扬程一行，实时跟随输入更新，不换行）
-       [v963 2026-11-04 用户要求] 「二级管网的扬程计算式取消吧」（截图红框圈住灰条 + 算式带）
-       ⇒ 灰条 `.ry-props-head` 与算式带 `#ppCalcDetail` 一并删除。
-       · 水泵扬程本身仍在上面「水力计算结果」条里（planPumpHead），删的只是这行拆解算式；
-       · 想要逐项拆解可以看水泵参数面板的三级页（那边有自己的「扬程计算式」，不共用本节点）；
-       · 代码侧无需改：mod/plan-calc-render.js 的 renderPlanCalcDetail 开头就是
-         `if (!el) return;`，mod/plot-editor.js 的 ppFormulaFold 也先 `getElementById` 再判空，
-         元素不在就自然变成 no-op（不留死面板、不留半截折叠逻辑）。
-       · 要恢复：把下面三行（注释 + head + detail）加回来即可，renderPlanCalcDetail 仍在。 -->
+  <!-- [v972 2026-11-05 用户要求] 原「水力计算结果」结果条（#ppPlanBar2，v252/v609 折叠头）整条裁撤：
+       每亩流量移入上方灌溉参数区（目标流速之下）；水泵流量/扬程/轴功率/电机功率、
+       主管/主管流速、支管/支管流速全部取消 —— 同类数据三级页「水力计算结果」（#tlPlanBar2，
+       带改径重算下拉）仍完整保留，二级不再重复展示。
+       数据侧零损失：calcPlan 每次全量写 window.planData（zoneFlow/pumpHead/pumpPower/motorKW/
+       mainPipeOD/mainVelocity/branchPipeOD/branchVelocity），系统图联动 hmSyncFromRunye 已改读该数据源。
+       JS 侧：inline-11 写入点改 ppResPut 守卫、plot-editor 施工简图的 4 个死局部变量删除、
+       ppResCollapse init(ppPlanBar2) 对 null 自守（plot-editor 4002 行 if(!bar)return）。
+       仅删二级；三级 #tlPlanBar2 与其折叠头未动（用户明确提醒「别移除错」）。
+       要恢复：git show 971: 恢复 #ppPlanBar2 整块 + 目标流速下方每亩流量行删除即可。 -->
   <!-- 分区管径明细（仅实切口径下显示）：逐区实切亩数 → 流量 / 主管Ø / 支管Ø -->
   <div class="ry-props-head" id="ppZoneCalHead" style="display:none">分区管径明细（实切）</div>
   <div id="ppZoneCalDetail" style="display:none"></div>
@@ -2441,7 +2431,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 </div>
 
 <script src="mod/material-formulas.js?v=412"></script>
-<script src="mod/zone-geometry.js?v=970-cal-sel-full"></script>
+<script src="mod/zone-geometry.js?v=971-resbar-trim"></script>
 <script src="mod/flow-geometry.js?v=414"></script>
 <script src="mod/tl-polyline-geometry.js?v=426-tl-polyline-geometry"></script>
 <!-- [v421-mat-table] 材料清单/材料表管理（自 inline-09 迁出）：先于 inline-09 加载 —— inline-09 尾部
@@ -2450,7 +2440,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <!-- [v424-plan-calc-render] 扬程公式与分解展示模块，先于计算控制器和三级调用方装载。 -->
 <script src="mod/plan-calc-render.js?v=614-head-formula"></script>
 <!-- [v887-tape-zone-vgate] 段总管生成器（纯几何，Node 单测锁），先于 inline-09 消费方装载。 -->
-<script src="mod/inline-09.js?v=970-cal-sel-full"></script>
+<script src="mod/inline-09.js?v=971-resbar-trim"></script>
 <!-- [v423-header-layout] 三级简图标题布局依赖 inline-09 的 tlMeasureText 与生成时写入的标题状态。 -->
 <script src="mod/tl-header-layout.js?v=423-header-layout"></script>
 
@@ -2460,7 +2450,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <!-- ===== 实际地块规划 JS ===== -->
 <script src="mod/inline-11.js?v=653-zone-calibers"></script>
 <!-- [v420-split] 绘图编辑器 IIFE 自 inline-11 迁出：必须紧随 inline-11 之后同步执行 -->
-<script src="mod/plot-editor.js?v=970-cal-sel-full"></script>
+<script src="mod/plot-editor.js?v=971-resbar-trim"></script>
 <script src="mod/inline-12.js?v=823-fix-transfer-save-alert"></script>
 <script src="mod/inline-13.js?v=831-trunk-schema-v2"></script>
 <!-- [v422-head-system-svg] 纯 SVG 核心先于 inline-14 同步加载。 -->
@@ -2480,7 +2470,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <!-- ===== 顶部功能区导航：平滑滚动 + 当前区块高亮 + 隐藏区块自动剔除 ===== -->
 <!-- [v815] 绘图工具栏统一图标集（单色线性 SVG）：必须先于 inline-18.js 加载，
      inline-18 的 decorateToolbar 会在首次装饰时调用 window.RyIcons.decorate。 -->
-<script src="mod/ry-icons.js?v=970-cal-sel-full"></script>
+<script src="mod/ry-icons.js?v=971-resbar-trim"></script>
 <script src="mod/inline-18.js?v=939-map-first-replay"></script>
 
 <script src="mod/inline-19.js?v=696-shared-host-init-order"></script>
@@ -2620,17 +2610,17 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script src="mod/trunk-snap.js?v=911-trunk-snap-edge"></script>
 <script src="mod/trunk-geo.js?v=854-null-slot-strict"></script>
 <!-- [v945] 总管口径反推（纯函数）：由规划分区的面积/流量 + 下游主管支管管径推手绘总管外径。 -->
-<script src="mod/trunk-size.js?v=970-cal-sel-full"></script>
+<script src="mod/trunk-size.js?v=971-resbar-trim"></script>
 <script src="mod/trunk-edit.js?v=835-trunk-geo-snap"></script>
 <script src="mod/trunk-history.js?v=835-trunk-geo-snap"></script>
-<script src="mod/trunk-panel.js?v=970-cal-sel-full"></script>
+<script src="mod/trunk-panel.js?v=971-resbar-trim"></script>
 <!-- [v887-tape-zone-vgate] 在线地图轮灌演示（分组/校验纯函数 + Leaflet 图层），先于宿主装载。 -->
-<script src="mod/map-flow-demo.js?v=970-cal-sel-full"></script>
-<script src="mod/online-map.js?v=970-cal-sel-full"></script>
+<script src="mod/map-flow-demo.js?v=971-resbar-trim"></script>
+<script src="mod/online-map.js?v=971-resbar-trim"></script>
 <!-- [v961] 在线地图右缘抽屉：把「图层」与「总管参数设置」两张浮层收成右缘竖排标签。
      参照「分区与管路」页的 #ppPlotDrawerTab / #tlWsLayerDrawerTab。必须在 online-map.js
      之后（它建的 #trunkPropPanel 由本模块接管；本模块自带轮询 + MutationObserver，顺序晚了也不丢）。 -->
-<script src="mod/map-right-drawer.js?v=970-cal-sel-full"></script>
+<script src="mod/map-right-drawer.js?v=971-resbar-trim"></script>
 <script src="terrain/terrain-core.js?v=410-elev"></script>
 <script src="terrain/terrain-ui.js?v=513-sec-gate"></script>
 <script src="runye-hydraulics-page.js?v=829-hyd-auto-refresh"></script>

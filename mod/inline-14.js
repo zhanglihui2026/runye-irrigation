@@ -333,18 +333,21 @@ function nearestDN(v, arr) {
 
 /* 从润野计算结果联动：水泵流量/扬程/功率、主管管径；吸水管按水泵总流量同主管联动 */
 function hmSyncFromRunye() {
-  function txt(id) { var el = document.getElementById(id); return el ? el.textContent.trim() : ''; }
-  var flow = txt('planPumpFlow'), head = txt('planPumpHead'), power = txt('planPumpPower');
-  var mainTxt = txt('planMainPipe');
-  var mainDN = (mainTxt.match(/(\d+)/) || [])[1];
-  var hasCalc = flow && flow !== '—' && flow !== '';
+  /* [v972 2026-11-05] 二级结果行 DOM（#ppPlanBar2）已裁撤——数据源改读
+     window.planData（calcPlan 每次全量刷新），DOM 文本读取不再可靠。
+     输出格式与原 DOM 文本口径一致（Q/H/P 不带单位、主管取数字档位）。 */
+  var pd = window.planData || null;
+  function num(v) { return (typeof v === 'number' && isFinite(v)) ? v : null; }
+  var flowV = num(pd && pd.zoneFlow), headV = num(pd && pd.pumpHead), powerV = num(pd && pd.pumpPower);
+  var mainDN = pd && pd.mainPipeODValue != null ? String(pd.mainPipeODValue) : '';
+  var hasCalc = flowV != null;
 
   // 工程名称联动计算结果
   var parts = ['润野灌溉 — 供水首部系统图'];
   if (hasCalc) {
-    if (flow) parts.push('Q ' + flow);
-    if (head) parts.push('H ' + head);
-    if (power) parts.push('P ' + power);
+    if (flowV != null) parts.push('Q ' + flowV.toFixed(1));
+    if (headV != null) parts.push('H ' + headV.toFixed(1));
+    if (powerV != null) parts.push('P ' + powerV.toFixed(1));
   }
   cfg.title = parts.join(' · ');
 

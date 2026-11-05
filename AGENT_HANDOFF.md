@@ -8023,3 +8023,32 @@ fallback 路径不读该开关，仍按逐段划分。
 
 **没做的事**：主管/总管的自动选档下限（MAIN_PIPE_MIN_OD=90 等）未动——只是
 手动下拉放开全档位；flow 提示用 worst 组流量，未做逐区流速提示。
+
+### §26.174 v971-resbar-trim（2026-11-05，二级水力计算结果条裁撤 + 每亩流量移位）
+
+**用户原话**：「每亩流量那行放在灌溉参数那区域，放在目标流速下面。红框的内容取消，
+取消之后这个"水力计算结果"也随之移除吧，注意有好几处水力计算结果呢，别移除错了。」
+
+**改法（数据侧零损失：window.planData 是单一数据源，DOM 只作展示）**
+- `index.html`：①每亩流量行移入 `#ppPlanBar` 参数区、放 `planTargetV`（目标流速）
+  之后；②整块删除 `#ppPlanBar2` 结果条（水泵流量/扬程/轴功率/电机功率/主管及流速/
+  支管及流速）。**三级页 `#tlPlanBar2`（带改径重算下拉那个）原样保留**——用户特意
+  提醒「别移除错了」。顺手清理 v963 注释块残留裸文本。
+- `mod/inline-11.js`：calcPlan 对二级结果行的写入改走 `ppResPut(id, v)` 守卫
+  （元素已不存在时静默跳过），planData 写入逻辑不变。
+- `mod/inline-14.js`：`hmSyncFromRunye()` 不再读二级 DOM 文本，改直接读
+  `window.planData`（zoneFlow/pumpHead/pumpPower/mainPipeODValue），输出格式不变。
+- `mod/plot-editor.js`：删除 ppGenerateDiagramCore 中 4 个死局部变量
+  （planPumpFlow/Head/Power/planIntensity）。
+- `index.html` `?v=` 970 → 971-resbar-trim（13 处同抬），`sw.js` VERSION 同步。
+
+**新锁**：`verify_resbar_trim.js` 7/7（A2 三级 #tlPlanBar2 健在且带折叠头 / B 系
+每亩流量行位置与生成后写值 4.44 / C1 #ppPlanBar2 不存在 / D1 planData 四键健在 /
+E1 无脚本错误）。`verify_zone_area_drift.js` D1 版本锁改为**动态锁**——从
+index.html 统计 `?v=` 串频次取带主题后缀的最高频串（排除 `357`/`2` 这类纯数字
+独立资源串），以后上抬版本无需再改该探针。
+
+**回归**：partition_query 238/0、zone_merge_last_row 15/15、group_planning 通过、
+zone_area_drift 16/16（含端到端双口径标签）。
+
+**没做的事**：三级页水力计算结果条未动；每亩流量只做位置移动，取值口径未变。

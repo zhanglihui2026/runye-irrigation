@@ -91,8 +91,15 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     }
 
     const srcs = data.srcs || [];
-    const bad = srcs.filter(s => !/969-zone-merge-last/.test(s));
-    check('D1 三个改动文件均按 969 装载', srcs.length >= 2 && bad.length === 0,
+    // 动态版本锁：从 index.html 统计 ?v= 串出现频次，取出现最多的作为主版本串（个别样式表保留独立旧串不计入）
+    const html = require('fs').readFileSync(require('path').join(__dirname, 'index.html'), 'utf8');
+    const freq = {};
+    for (const m of html.matchAll(/\?v=([a-z0-9-]+)/gi)) {
+      if (/\d/.test(m[1]) && /[a-z]/i.test(m[1])) freq[m[1]] = (freq[m[1]] || 0) + 1; // 排除纯数字独立串，只计带主题后缀的主版本串
+    }
+    const curVer = Object.entries(freq).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+    const bad = curVer ? srcs.filter(s => !s.includes(curVer)) : [];
+    check('D1 三个改动文件均按当前版本(' + (curVer || '未知') + ')装载', !!curVer && srcs.length >= 2 && bad.length === 0,
       bad.length ? '仍为旧串: ' + bad.join(' , ') : srcs.join(' , '));
 
     /* ---------- F：端到端真实渲染 ---------- */

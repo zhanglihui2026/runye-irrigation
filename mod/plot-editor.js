@@ -4456,10 +4456,10 @@
     var stDims=window.runyePlanDims||{};
     var planA=document.getElementById('planA')?document.getElementById('planA').textContent:(isFinite(stDims.A)?String(stDims.A):'—');
     var planB=document.getElementById('planB')?document.getElementById('planB').textContent:(isFinite(stDims.B)?String(stDims.B):'—');
-    var planPumpFlow=document.getElementById('planPumpFlow')?document.getElementById('planPumpFlow').textContent:'—';
-    var planPumpHead=document.getElementById('planPumpHead')?document.getElementById('planPumpHead').textContent:'—';
-    var planPumpPower=document.getElementById('planPumpPower')?document.getElementById('planPumpPower').textContent:'—';
-    var planIntensity=document.getElementById('planIntensity')?document.getElementById('planIntensity').textContent:'—';
+    /* [v972 2026-11-05] 原 planPumpFlow/planPumpHead/planPumpPower/planIntensity 四个
+       局部变量（读 #ppPlanBar2 结果行文本）实为**死变量**——定义后无任何消费点，
+       且宿主行已随「水力计算结果」条裁撤删除，就地移除。Q/H/P 展示用上面的
+       pFlow/pHead/motorKW（来自 window._r 实算）。 */
     var planTapeSpacing=document.getElementById('planTapeSpacing')?document.getElementById('planTapeSpacing').value:'—';
     var planEmitterSpacing=document.getElementById('planEmitterSpacing')?document.getElementById('planEmitterSpacing').value:'—';
     var layoutSides=parseInt(document.querySelector('#layoutGroup .selected')?.dataset?.sides||1);
