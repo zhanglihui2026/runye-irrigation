@@ -59,12 +59,15 @@ function seqKeys(route) {
   return seq;
 }
 
-test('① 源码锁：总管↔主管贴近直连块与口径注释存在', () => {
-  assert.ok(/\/\* \[v988\] 总管↔主管贴近直连（与 validateConnection 的 v861 口径对齐）/.test(demo),
-    'v988 口径注释丢了');
-  assert.ok(/var id='trunk-entry:'\+mk\+':'\+ei\+':'\+ti;/.test(demo), 'trunk-entry 补边 id 丢了');
+test('① 源码锁：总管↔主管贴近直连块（端点+线体双口径）存在', () => {
+  assert.ok(/总管↔主管贴近直连（口径与 validateConnection 对齐）/.test(demo), 'v988/v989 口径注释丢了');
+  assert.ok(/var id='trunk-entry:'\+mk\+':body:'\+ti;/.test(demo), '线体口径补边 id 丢了（v989）');
+  assert.ok(/var id2='trunk-entry:'\+mk\+':body-end:'\+tj;/.test(demo), '末端补扫 id 丢了（v989）');
+  assert.ok(/for\(var s=0;s<=m\.len&&!done;s\+=step\)\{/.test(demo), '线体 2m 步长扫描丢了（v989）');
   assert.ok(/if\(tp\.d<=TOL_M\)\{/.test(demo), '贴近容差必须沿用 TOL_M（与连通性验证同口径）');
-  assert.ok(/addCut\(m,s,id\);addCut\(t,tp\.s,id\);/.test(demo), '同一 id 要切进主管与总管（零权相连）');
+  assert.ok(/addCut\(m,s,id\);addCut\(t,tp\.s,id\);|addCut\(m,s,id\);addCut\(byTrunk\[ti\],tp\.s,id\);/.test(demo),
+    '同一 id 要切进主管与总管（零权相连）');
+  assert.ok(/debugGraph: function \(g\) \{/.test(demo), 'v989 只读诊断出口 debugGraph 丢了');
 });
 
 test('② 真实拓扑（couplers 空）：第 3 区路线经过第 1、2 区主管', () => {
@@ -128,10 +131,32 @@ test('④ 老地块行为不变：已放接驳节点时节点路径照常', () =
   assert.ok(keys.indexOf('main:1') >= 0, '节点场景下第 3 区依旧要经过第 2 区主管');
 });
 
-test('⑤ 版本锁：index.html 14 处与 sw.js VERSION 动态同抬（v988-trunk-entry）', () => {
+test('⑤ 版本锁：index.html 14 处与 sw.js VERSION 动态同抬（v989-trunk-body）', () => {
   const m = sw.match(/const VERSION = '(v\d+[^']*)';/);
   assert.ok(m, 'sw.js 缺 VERSION');
   const num = m[1].replace(/^v/, '');
   assert.strictEqual(html.split('?v=' + num).length - 1, 14, 'index.html 应有 14 处 ?v=' + num);
-  assert.ok(/v988-trunk-entry/.test(m[1]), '本次应为 v988-trunk-entry');
+  assert.ok(/v989-trunk-body/.test(m[1]), '本次应为 v989-trunk-body');
+});
+
+test('⑥ v989 新场景：总管中段横穿、端点距离 >5m——线体口径必须接通', () => {
+  const { DBG, sandbox } = loadDemo();
+  const w = realWorldData();
+  /* 总管竖线在平面 x=60m 处纵穿全场：横穿主管 0（y=-167.9，x∈[-2.4,125.1]）的中段，
+     且距所有主管端点都远（主管 0 端点 x=-2.4/125.1 距竖线 62m+）——v988 端点口径接不通，
+     v989 线体口径（与验证的「线体×线体」一致）必须接通。 */
+  const trunkLL = [{lat:-300/110540, lng:60/111320},{lat:300/110540, lng:60/111320}];
+  const toLL = p => ({ lat: p.y/110540, lng: p.x/111320 });
+  DBG.setCtx({ toLL, getTrunkLines: () => [trunkLL],
+    getWaterSource: () => ({ lat: -280/110540, lng: 60/111320 }), tip: () => {} });
+  const dd = { world: 'meter', mainPipes: w.mains, branchPipes: w.branches, valves: w.valves,
+    couplerNodes: [], combinedN: 1, segTrunk: null };
+  sandbox.window.tlDiagramData = dd;
+  sandbox.window.tlManualGroups = [[0,4,8],[1,5,9],[2,6,10],[3,7,11]];
+  const d = DBG.collect();
+  const routes = DBG.buildFlowRoutes(d, 2);
+  assert.ok(routes && routes.length, '中段穿越场景第 3 区不应再断流（v988 端点口径接不通）');
+  const zs = routes.filter(r => r.zi === 2);
+  const keys = seqKeys(zs[0]);
+  assert.ok(keys.indexOf('main:1') >= 0, '中段穿越场景第 3 区也要经过第 2 区主管');
 });

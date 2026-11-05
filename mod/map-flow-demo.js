@@ -421,26 +421,37 @@
       var id='coupler:'+sig;addCut(best.o,best.p.s,id);addCut(byMain[n.mi],mp.s,id);
     });
 
-    /* [v988] 总管↔主管贴近直连（与 validateConnection 的 v861 口径对齐）：
-       此前图里只有接驳节点/施工节点能把总管接到主管——接驳点为空的地块
-       连通性验证按「主管端点贴近总管 ≤tol」通过、演示能开始，但找路图里
-       总管与主管零连接 ⇒ routes=null 走兜底动画，表现为「断流/不经过上游区」
-       （2026-11-05 用户地块实测：couplers 空 + 主管链完好，3/4 区拿不到上游路径；
-       接驳点入口又已随 v982 下线，没地方补节点）。补边口径：主管两端点投影到
-       任一总管折线 ≤TOL_M，即在垂足处打通（同一 id 切进总管与主管，零权相连）。
+    /* [v988→v989] 总管↔主管贴近直连（口径与 validateConnection 对齐）：
+       验证口径是「线体×线体」——双方按 2m 步长插值密点后算最小距离（v920，
+       总管横穿主管中段也算接通）；而图里此前只有接驳节点/施工节点能连总管
+       ⇒ couplers 为空的地块「验证放行、图仍断」⇒ routes=null 走兜底动画
+       =「断流/不经过上游区」（2026-11-05 用户地块实测：couplers 空 + 主管链完好）。
+       v988 先按主管两端点补边；v989 再按**线体**补齐：沿主管弧长每 2m 取点
+       （与验证 densify 同步长）扫总管，首个 ≤TOL_M 命中即在垂足打通。
        纯找路图层补边，不改管线几何与水力模型；已放节点的地块行为不变。 */
     Object.keys(byMain).forEach(function(mk){
-      var m=byMain[mk];
-      [0,m.len].forEach(function(s,ei){
+      var m=byMain[mk],step=2,done=false;
+      for(var s=0;s<=m.len&&!done;s+=step){
         var p=at(m,s);
-        byTrunk.forEach(function(t,ti){
-          var tp=project(t,p);
+        for(var ti=0;ti<byTrunk.length&&!done;ti++){
+          var tp=project(byTrunk[ti],p);
           if(tp.d<=TOL_M){
-            var id='trunk-entry:'+mk+':'+ei+':'+ti;
-            addCut(m,s,id);addCut(t,tp.s,id);
+            var id='trunk-entry:'+mk+':body:'+ti;
+            addCut(m,s,id);addCut(byTrunk[ti],tp.s,id);
+            done=true;
           }
-        });
-      });
+        }
+      }
+      if(!done){ var pe=at(m,m.len);   /* 弧长循环取不到的末端点单独补扫 */
+        for(var tj=0;tj<byTrunk.length&&!done;tj++){
+          var tpe=project(byTrunk[tj],pe);
+          if(tpe.d<=TOL_M){
+            var id2='trunk-entry:'+mk+':body-end:'+tj;
+            addCut(m,m.len,id2);addCut(byTrunk[tj],tpe.s,id2);
+            done=true;
+          }
+        }
+      }
     });
 
     /* Main pipes are continuous only where a main endpoint meets another main
@@ -1060,7 +1071,58 @@
   }
 
   window.RyMapFlowDemo = {
-    VERSION: 'v950-group-head-estimate',
+    /* [v989] 只读诊断：宿主 console 一行取找路图实况（排障用，不写任何状态）。
+       debugGraph(g) => { ver, groups, trunkPts, perMainMinM[mi], entries[mi],
+                          routes(g) 的段键序列 }。
+       entries 按与 buildFlowRoutes 相同的口径重扫（端点+线体 2m 步长），
+       perMainMinM 用平面近似（度差×111320/110540），排障精度足够。 */
+    debugGraph: function (g) {
+      function flatDist(a, b) {
+        var x = (b.lng - a.lng) * 111320 * Math.max(0.1, Math.cos((a.lat + b.lat) / 2 * Math.PI / 180));
+        var y = (b.lat - a.lat) * 110540;
+        return Math.sqrt(x * x + y * y);
+      }
+      function densify(ll) {
+        var out = [];
+        for (var i = 1; i < ll.length; i++) {
+          var a = ll[i - 1], b = ll[i], dd2 = flatDist(a, b);
+          var n = Math.max(1, Math.ceil(dd2 / 2));
+          for (var k = 0; k < n; k++) out.push({ lat: a.lat + (b.lat - a.lat) * k / n, lng: a.lng + (b.lng - a.lng) * k / n });
+        }
+        if (ll.length) out.push(ll[ll.length - 1]);
+        return out;
+      }
+      try {
+        var d = collect();
+        if (!d) return { ver: 'v989-trunk-body', error: 'collect-null（页面缺管线图数据）' };
+        var trunkPts = [];
+        (d.trunkLinesLL || []).forEach(function (l) { l.forEach(function (p) { trunkPts.push([+p.lat.toFixed(6), +p.lng.toFixed(6)]); }); });
+        var trunkDense = densify(d.trunkLinesLL ? [].concat.apply([], d.trunkLinesLL) : []);
+        var perMainMinM = [], entries = [];
+        (d.mainsLL || []).forEach(function (line, mi) {
+          var dense = densify(line), min = Infinity, hitS = null;
+          for (var i = 0; i < dense.length; i++) {
+            for (var j = 0; j < trunkDense.length; j++) {
+              var dd3 = flatDist(dense[i], trunkDense[j]);
+              if (dd3 < min) min = dd3;
+            }
+          }
+          perMainMinM.push(+min.toFixed(1));
+          if (min <= TOL_M) entries.push(mi);
+        });
+        var routes = (typeof g === 'number') ? buildFlowRoutes(d, g) : null;
+        var routeSeq = null;
+        if (routes) routeSeq = routes.map(function (rt) {
+          var seq = [];
+          rt.trunk.concat(rt.main).concat(rt.branch).forEach(function (s) { seq.push(s.key); });
+          return { zi: rt.zi, keys: seq };
+        });
+        return { ver: 'v989-trunk-body', groups: d.gCount, manual: d.manual, nPer: d.nPer,
+                 trunkPts: trunkPts, perMainMinM: perMainMinM, entries: entries,
+                 nodes: (d.nodesLL || []).length, routes: routeSeq };
+      } catch (e) { return { ver: 'v989-trunk-body', error: String(e && e.message || e) }; }
+    },
+    VERSION: 'v989-trunk-body',
     TOL_M: TOL_M,
     INTERVAL_MS: INTERVAL_MS,
     init: function (c) {
