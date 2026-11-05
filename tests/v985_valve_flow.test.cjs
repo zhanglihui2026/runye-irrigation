@@ -52,9 +52,12 @@ test('③ 阀门节点进 targets：Dijkstra 终点=阀门', () => {
     '阀门节点必须进 targets，否则 Dijkstra 不会往那流');
 });
 
-test('④ 容差口径：阀门投影 >20m 跳过（与既有支管馈线一致，宁缺不错）', () => {
-  assert.ok(/var vp=project\(main,v\.ll\);if\(vp\.d>20\)return;/.test(demo),
-    '阀门投影容差应为 20m（超过就不画，避免图面出现穿地馈线）');
+test('④ 容差口径：投影容差必须盖过主支显示间距 20m（v986 修边界）', () => {
+  assert.ok(/var vp=project\(main,v\.ll\);if\(vp\.d>26\)return;/.test(demo),
+    '阀门投影容差应为 26m——阀门在支管上、距主管默认 20m，旧 20m 容差把整批阀门压线跳过（v985 无效根因）');
+  assert.ok(/if\(mainProj\.d<=26\)\{/.test(demo),
+    '既有支管馈线的主管判据同步放宽到 26m（同一个压线问题）');
+  assert.ok(/v986.*20m|PP_MAIN_BRANCH_GAP_M=20/.test(demo), '容差放宽的根因注释要留在源码里');
 });
 
 test('⑤ 版本锁：index.html 14 处与 sw.js VERSION 动态同抬', () => {
@@ -63,5 +66,5 @@ test('⑤ 版本锁：index.html 14 处与 sw.js VERSION 动态同抬', () => {
   const num = m[1].replace(/^v/, '');
   assert.strictEqual(html.split('?v=' + num).length - 1, 14,
     'index.html 应有 14 处 ?v=' + num + '（与 sw VERSION 一致）');
-  assert.ok(/v985-valve-flow/.test(m[1]), '本次应为 v985-valve-flow');
+  assert.ok(/v986-valve-gap/.test(m[1]), '本次应为 v986-valve-gap');
 });

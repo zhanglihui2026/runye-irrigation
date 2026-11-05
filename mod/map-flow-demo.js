@@ -440,7 +440,8 @@
         var valve=null;(d.valves||[]).some(function(v){if(v&&v.mi===i&&v.ll){valve=v;return true;}return false;});
         var valveProj=valve?project(branch,valve.ll):{s:branch.len/2};
         var valvePoint=at(branch,valveProj.s),mainProj=project(main,valvePoint);
-        if(mainProj.d<=20){
+        /* [v986] 判据 20→26：支管距主管默认 20m，旧 20m 判据把这条链也压线跳过 */
+        if(mainProj.d<=26){
           var feedMainId='branch-feed-main:'+i,feedValveId='branch-valve:'+i;
           addCut(main,mainProj.s,feedMainId);addCut(branch,valveProj.s,feedValveId);
           var startId='branch-start:'+i,endId='branch-end:'+i;
@@ -460,7 +461,10 @@
     (d.valves||[]).forEach(function(v,vi){
       if(!v||!v.ll||activeZones.indexOf(v.mi)<0)return;
       var main=byMain[v.mi];if(!main)return;
-      var vp=project(main,v.ll);if(vp.d>20)return;
+      /* [v986] 阀门在支管上，主管与支管平行相距 PP_MAIN_BRANCH_GAP_M=20m，
+         投影距离≈20m 正好压在旧容差 20 的边界上被整批跳过（v985 无效的根因）。
+         放宽到 26m 盖过间距+余量；投影目标固定为阀门自己的主管，无误连风险。 */
+      var vp=project(main,v.ll);if(vp.d>26)return;
       var mainId='valve-main:'+vi,nodeId='valve-node:'+vi;
       addCut(main,vp.s,mainId);
       feeds.push({zi:v.mi,from:mainId,to:nodeId,points:[at(main,vp.s),v.ll],ownKey:'valve-feed:'+vi});
