@@ -110,7 +110,7 @@ const sender={window:null,document:{getElementById:id=>id==='onlineMapSection'?{
     pushState(state,title,url){const next=new URL(url,'https://local.test/');sender.location.search=next.search;sender.location.hash=next.hash;sender.location.pathname=next.pathname;}},
   localStorage:{getItem:k=>sent.get(k)||null,setItem:(k,v)=>sent.set(k,v)},
   lsGet:k=>JSON.parse(sent.get(k)||'[]'),setTimeout:fn=>{fn();return 1},
-  alert:m=>sentCalls.alerts.push(m),console,JSON,URL,URLSearchParams,Math,Number,String,Date,isFinite};
+  alert:m=>sentCalls.alerts.push(m),console,JSON,URL,URLSearchParams,Math,Number,String,Date,isFinite,/* [v981] sendPlotToDesign 切片新增水源渲染调用，沙箱补 no-op 桩（测试只验回传链路） */renderReservoir:()=>{}};
 sender.window=sender;
 sender.ryJumpToSection=id=>sentCalls.jumps.push(id);
 vm.createContext(sender);
@@ -122,7 +122,7 @@ sender.runyeApplyMapPayload=id=>{
   sender.RyMeasuredAreaBridgeStore.remove(id);
   sender.ryJumpToSection('pipePlanSection'); return true;
 };
-vm.runInContext(mapSrc.slice(start,end)+'\nwindow.__send=sendPlotToDesign;',sender);
+vm.runInContext(mapSrc.slice(start,end)+'\nfunction renderReservoir(){}\nwindow.__send=sendPlotToDesign;',sender);
 sender.__send(b,null);
 assert.equal(sentCalls.payloads[0].ryPlotRef.id,'b');
 assert.ok(sentCalls.transferIds[0]);
@@ -161,7 +161,7 @@ const external={window:null,document:{getElementById:()=>null},location:{search:
   Math,Number,String,Date,isFinite};
 external.window=external;vm.createContext(external);
 vm.runInContext(fs.readFileSync(path.join(root,'core/measured-area-bridge-store.js'),'utf8'),external);
-vm.runInContext(mapSrc.slice(start,end)+'\nwindow.__send=sendPlotToDesign;',external);
+vm.runInContext(mapSrc.slice(start,end)+'\nfunction renderReservoir(){}\nwindow.__send=sendPlotToDesign;',external);
 external.__send(b,null);
 const externalUrl=new URL(external.location.href,'https://local.test/');
 const externalTransferId=externalUrl.searchParams.get('ryPlotTransfer');

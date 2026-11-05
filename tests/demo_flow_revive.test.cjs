@@ -46,14 +46,21 @@ function region(src, from, to) {
            /if\s*\(segEntryRev\)\s*fPts/.test(flow), '驳接端为终点时必须反序 fPts');
 }
 
-/* 锁 3：地图演示完整闭环 —— 手绘总管与段总管都要有「实线骨架 + 青色流动叠层」两笔。 */
+/* 锁 3：地图演示完整闭环 —— 流动层不可消失。
+   [v916 改版后的现实] 旧「实线骨架 #111827 + 青色叠层 #38bdf8」两笔制已被替换：
+   底态=全部总管/段总管淡灰（#cbd5e1），流动=按水源到当前分区裁剪的路线
+   （干线 #185FA5 w5 动画、支管 #16a34a w3），无 routes 时退回整条 mains 绘制。
+   本锁钉住改版后仍必须成立的不变量：淡色底图、裁剪路线入口、动画流动层、兜底分支。 */
 {
   const render = region(demo, 'function render(g)', 'function stop(');
-  assert.ok(render.includes("poly(line, '#111827', 5, false)"), '每条手绘总管实线骨架必须保留');
-  assert.ok(render.includes("poly(line, '#38bdf8', 2.4, true)"), '每条手绘总管必须叠青色流动层');
+  assert.ok(render.includes("poly(line, '#cbd5e1', 2, false)"), '多条手绘总管淡色底图必须保留');
+  assert.ok(render.includes("poly(d.segLL, '#cbd5e1', 2, false)"), '段总管淡色底图必须保留');
   assert.ok(render.includes('(d.trunkLinesLL ||'), '多条总管必须逐线渲染，不能拼出虚构线段');
-  assert.ok(render.includes("poly(d.segLL, '#111827', 4, false)"), '段总管实线骨架必须保留');
-  assert.ok(render.includes("poly(d.segLL, '#38bdf8', 2.2, true)"), '段总管必须叠青色流动层');
+  assert.ok(render.includes('buildFlowRoutes(d,g)'), '流动路线必须经 buildFlowRoutes 裁剪（不许整条干线都在流动）');
+  assert.ok(render.includes("'#185FA5',5,true"), '干线流动层（动画描边）必须保留');
+  assert.ok(render.includes("'#16a34a',3,true"), '支管流动层（动画描边）必须保留');
+  assert.ok(render.includes("ly.addLayer(poly(d.mainsLL[zi],'#185FA5',5,true))"),
+    '无 routes 兜底分支必须仍然绘制主管流动层（v882 复活的底线）');
 }
 
 /* 锁 4：连通校验门槛不放松 —— 闭合系统 = 手绘总管接上段总管/主管，未连仍报错不播放。 */
