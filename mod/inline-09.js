@@ -2113,7 +2113,20 @@ window.tlMapGroupHydraulicsOf = function (zoneIndexes, opts) {
     var totalFlow = available.reduce(function (sum, z) {
       return members.indexOf(z.zi) >= 0 ? sum + z.flow : sum;
     }, 0);
-    var downstreamMinOd = Math.max(MAIN_PIPE_MIN_OD, Number(r.mainPipe && r.mainPipe.od) || 0, Number(r.branchPipe && r.branchPipe.od) || 0);
+    /* [v981] 决策点③：主管共享段复核补齐路径模式 —— v976 只加在估算链，有段总管时
+       主管口径直接吃设计侧 r.mainPipe.od，复核缺席，两条链语义不一致（用户拍板补齐）。
+       复核档 = 全部分区最大区流量现选一档（面积源与估算链同：areaList 优先地图 partitions）；
+       实际主管口径 = max(设计侧档, 复核档)。逐区已确认的改径（calibers）仍然优先。 */
+    var perM2 = 1 / r.tapeSpacing / r.emitterSpacing * r.emitterFlow / 1000;
+    var qMaxAll = 0;
+    (areaList || []).forEach(function (a) {
+      var q0 = Number(a) * perM2;
+      if (isFinite(q0) && q0 > qMaxAll) qMaxAll = q0;
+    });
+    var mainRecheckPick = (qMaxAll > 0) ? selectPipe(Math.max(qMaxAll, 0.01), r.targetV, MAIN_PIPE_MIN_OD) : null;
+    var mainOdEff = (r.mainPipe && Number(r.mainPipe.od) > 0) ? Number(r.mainPipe.od) : 0;
+    if (mainRecheckPick && mainRecheckPick.od > mainOdEff) mainOdEff = mainRecheckPick.od;
+    var downstreamMinOd = Math.max(MAIN_PIPE_MIN_OD, mainOdEff, Number(r.branchPipe && r.branchPipe.od) || 0);
     /* [v967] 同样只认共享口径；管里走的是本组流量，管径是全项目那一个。 */
     var sharedOd = (sharedPick && Number(sharedPick.od) >= downstreamMinOd) ? Number(sharedPick.od) : 0;
     var trunkPick = (!missing.length && totalFlow > 0)
@@ -2125,7 +2138,7 @@ window.tlMapGroupHydraulicsOf = function (zoneIndexes, opts) {
       calibers: r.inversePath.calibers,
       /* 以全项目共享的总管口径复算损失和需求扬程；已确认的逐段改径仍由 calibers 覆盖。 */
       frontOd: trunkPick ? trunkPick.od : (sharedOd || r.frontPipe.od),
-      mainOd: r.mainPipe.od,
+      mainOd: mainOdEff || r.mainPipe.od,
       branchOd: r.branchPipe.od,
       sourceDistance: readNumber('planSrcDist', 0, { min: 0 }),
       frontTotalOverride: (r.frontLenSrc === 'mapTrunk' && !(r.wp && r.wp.fromSeg)) ? r.frontLenMap : 0,
@@ -2149,19 +2162,45 @@ window.tlMapGroupHydraulicsOf = function (zoneIndexes, opts) {
     });
     if (!rows.length) return null;
     var worst = rows.reduce(function (a, b) { return !a || b.totalLoss > a.totalLoss ? b : a; }, null);
+    /* [v981] 与估算链同构的 pipes/lengths：v977 卡片三行表与口径说明在路径模式下也能渲染。
+       主管行 = 复核后的实际口径（max 设计档, 复核档）+ 最不利区自身流量的流速
+       （路径模式主管逐区独立，按本区流量算流速比估算链的合流口径更贴物理）；
+       长度/来源直接用图面实长（figure），不再是试算长、卡片不标 *。 */
+    var worstRaw = check.paths[rows.indexOf(worst)] || null;
+    var mainVEff = null, branchVEff = null;
+    if (worstRaw && mainOdEff > 0) {
+      try { var mpvP = selectPipe(worstRaw.mainFlow, r.targetV, mainOdEff, mainOdEff); if (mpvP) mainVEff = mpvP.v; } catch (eMVP) {}
+    }
+    var branchOdPath = (r.branchPipe && Number(r.branchPipe.od) > 0) ? Number(r.branchPipe.od) : 0;
+    if (worstRaw && branchOdPath > 0) {
+      try { var bpvP = selectPipe(worstRaw.branchFlow, r.targetV, branchOdPath, branchOdPath); if (bpvP) branchVEff = bpvP.v; } catch (eBVP) {}
+    }
     return {
       members: members,
       missing: missing,
       zones: rows,
       flow: totalFlow,
+      pipes: {
+        front: trunkPick ? { od: trunkPick.od, id: trunkPick.id, v: trunkPick.v } : { od: (sharedOd || (r.frontPipe && r.frontPipe.od)) || null, id: null, v: null },
+        mainOd: mainOdEff || null,
+        branchOd: branchOdPath || null,
+        mainRecheck: mainRecheckPick ? { od: mainRecheckPick.od, flow: qMaxAll } : null,
+        frontV: trunkPick ? trunkPick.v : null,
+        mainV: mainVEff, branchV: branchVEff
+      },
+      lengths: { front: worstRaw ? worstRaw.front : 0, main: worstRaw ? worstRaw.main : 0, branch: worstRaw ? worstRaw.branch : 0 },
+      lengthSource: { front: 'figure', main: 'figure', branch: 'figure' },
+      marginHead: MARGIN_HEAD,
+      safetyFactor: SAFETY_FACTOR,
+      filterLoss: r.filterLoss,
       trunkAdvice: trunkPick ? {
         od: trunkPick.od,
         id: trunkPick.id,
         velocity: trunkPick.v,
         targetVelocity: r.targetV,
         minDownstreamOd: downstreamMinOd,
-        mainOd: r.mainPipe && r.mainPipe.od,
-        branchOd: r.branchPipe && r.branchPipe.od,
+        mainOd: mainOdEff || null,
+        branchOd: branchOdPath || null,
         /* [v967] 与估算路径同口径：总管 od 项目级共享，流量逐组 */
         shared: !!sharedOd,
         sharedFlow: sharedOd ? Number(sharedPick.flow) : null,
@@ -2442,6 +2481,10 @@ function syncThreeLevelFromPlan() {
   function setv(id, v) {
     if (v == null || !isFinite(v)) return;
     var el = document.getElementById(id);
+    /* [v981] 决策点②：用户手改过的三级字段（ryDirty=1）不被联动悄悄覆盖——
+       之前二级每重算一次就把三级滴灌参数顶回去，用户毫无感知（G5 事故帮凶之一）。
+       「↻ 同步」按钮走 tlForceSyncFromPlan（先清脏标记）= 用户主动要求强制覆盖。 */
+    if (el && el.dataset && el.dataset.ryDirty === '1') return;
     if (el) el.value = v;
   }
   // 单区面积：由二级"单区流量 / 灌溉强度"反算，精确等于二级单区面积（避免拿二级表单默认值 30 亩）

@@ -101,8 +101,26 @@
   function isDesignInput(t) {
     return !!(t && t.tagName === 'INPUT' && t.id && (ID_RE.test(t.id) || SPECIAL_IDS[t.id]));
   }
-  document.addEventListener('change', function (ev) { if (isDesignInput(ev.target)) save(); }, true);
-  document.addEventListener('input', function (ev) { if (isDesignInput(ev.target)) saveSoon(); }, true);
+  /* [v981] 决策点②：三级字段被用户亲手改过 → 打脏标记（dataset.ryDirty）。
+     二级联动（syncThreeLevelFromPlan 的 setv）见到脏标记就跳过，不再悄悄顶回手改值；
+     「↻ 同步」按钮（tlForceSyncFromPlan）先清脏再全量同步 = 用户主动要求覆盖。
+     只认真实用户事件（程序赋值不触发 input/change，天然不会误标）。 */
+  function markDirty(t) {
+    if (isDesignInput(t) && t.id.indexOf('tl_') === 0) {
+      try { t.dataset.ryDirty = '1'; } catch (e) { }
+    }
+  }
+  function clearDirty() {
+    document.querySelectorAll('input[id^="tl_"]').forEach(function (el) {
+      try { delete el.dataset.ryDirty; } catch (e) { }
+    });
+  }
+  document.addEventListener('change', function (ev) {
+    if (isDesignInput(ev.target)) { markDirty(ev.target); save(); }
+  }, true);
+  document.addEventListener('input', function (ev) {
+    if (isDesignInput(ev.target)) { markDirty(ev.target); saveSoon(); }
+  }, true);
   GROUPS.forEach(function (gid) {
     document.addEventListener('click', function (ev) {
       var t = ev.target && ev.target.closest ? ev.target.closest('#' + gid + ' button') : null;
@@ -110,12 +128,23 @@
     });
   });
 
-  /* ---- 复位按钮是程序赋值、不触发 change，包一层补存 ---- */
+  /* [v981] 决策点②：「↻ 同步」按钮入口 = 用户主动要求强制覆盖手改值。
+     先清全部脏标记再走原联动三连（sync → render → planBar）。 */
+  window.tlForceSyncFromPlan = function () {
+    clearDirty();
+    try { if (typeof window.syncThreeLevelFromPlan === 'function') window.syncThreeLevelFromPlan(); } catch (e) { }
+    try { if (typeof window.renderThreeLevel === 'function') window.renderThreeLevel(); } catch (e) { }
+    try { if (typeof window.tlUpdatePlanBar === 'function') window.tlUpdatePlanBar(); } catch (e) { }
+  };
+
+  /* ---- 复位按钮是程序赋值、不触发 change，包一层补存；顺带清脏标记
+     （复位后字段不再是「用户手改态」，联动恢复对它们的覆盖权） ---- */
   ['resetDefaults', 'resetThreeLevelDefaults'].forEach(function (fn) {
     var orig = window[fn];
     if (typeof orig === 'function') {
       window[fn] = function () {
         var r = orig.apply(this, arguments);
+        if (fn === 'resetThreeLevelDefaults') clearDirty();
         save();
         return r;
       };
