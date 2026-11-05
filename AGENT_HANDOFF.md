@@ -8221,3 +8221,16 @@ zone_merge_last 15/15 + verify 系全绿。
 **发布**：check_publish_refs PASS → commit 02b4820 → push 成功 → GitHub Pages 冒烟 200（index 14 处 978、inline-33.js 200）。Vercel 域沙箱内连接 000 未验（非本轮改动引入）。
 
 **遗留**：demo_flow_revive / plot_transfer / tl_auto_edits 三测试失败，读的都是本轮未改文件（inline-09/13/16、map-flow-demo、tl-workspace），历史遗留非本轮回归，另立任务排查。决策点②（联动防覆盖）③（路径模式补 v976 复核）待用户拍板。
+
+## 26.182 v979-king-badges：轮灌组卡片「双王」颜色区分（2026-11-05）
+
+**背景**：用户确认理解「最不利=流量王+扬程王」两件事后拍板：「流量王跟扬程王应该用不同颜色的字区分」。
+
+**改动**：
+- map-flow-demo.js：headKing 逐组调 tlMapGroupHydraulicsOf 实算需求扬程取最大（isFinite 过滤，缺数据不硬标）；说明行流量王组名 mfg-king-flow 蓝字+「流量王」徽章，本轮即王蓝框内也带徽章；需求扬程值本轮即扬程王时 mfg-head-king 加重+「扬程王」徽章；新增校核行「需求扬程按损失最大组 Gx（xx m）扬程王 校核 · 损失由路径×流量共同决定，不只是远近」。
+- online-map.css v979 段：流量王 #185fa5（与总管管径同色）、扬程王 #dc2626（与需求扬程同色）；无 border-radius 数值。
+- 版本 14 处同抬 979-king-badges；tests/card_king_badges.test.cjs 新增（扬程王逐组实算锁/双徽章锁/CSS 双色锁/段锁/版本锁）；main_recheck、trunk_shared_od 的「总管按最不利点 <b」锁随版式更新；input_persist 版本锁改动态对齐 sw VERSION（写死版本号每次抬版本都误红，教训入档）。
+
+**发布**：全量 677/680（3 失败=已知历史遗留）→ gate PASS → commit 8e0b465 → push → Pages 冒烟 200（14 处 979）。
+
+**注意**：双王循环每次切组多算 14 次水力（估算/路径复算均毫秒级），实测无感；若未来组数上百需加缓存签名。
