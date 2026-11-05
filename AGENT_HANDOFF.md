@@ -8261,3 +8261,6 @@ zone_merge_last 15/15 + verify 系全绿。
 ## 26.187 v983-remove-teereset：「三通复位」按钮下线（2026-11-05）
 
 用户截图红箭头指 ⌖ 图标（多选与☁回传在线地图之间）= tlFrontNodeResetBtn「三通复位」。同款口径只删入口：window.tlFrontNodeReset()（inline-09 清 tlFrontNodeDrops_v1）全保留，cloud_design_binding 源码锁不受影响，控制台可手动应急。版本 14 处同抬 983-remove-teereset；toolbar_dedupe 增补删除锁（延续 v824 恢复位置同款）。全量 692/692，gate PASS，commit 996b9cd，Pages 冒烟 14 处 983 且按钮 DOM 清零。另：v982（接驳点下线）此前已由用户经 GitHub Desktop 推上远端（沙箱网络 502 期间），线上已生效。
+## 26.188 v984-remove-headbreak：三级左栏「扬程计算式」下线（2026-11-05）
+
+用户截图指三级左栏扬程计算式条，拍板取消。同款口径只删入口：index.html 删 `<div id="ppHeadBreak" class="pp-head-break" hidden>`（留恢复指引注释），plan-calc-render.renderHeadBreakdown 与 plot-editor 折叠逻辑全保留且判空 no-op，CSS .pp-head-break 一族未动，恢复只需插回一行 DOM。版本 14 处同抬 984-remove-headbreak，sw.js VERSION 同步。pp_no_head_formula 测试② 翻转为「三级也已取消」；首轮红灯根因是恢复注释含字面量 id="ppHeadBreak" 被断言误判残留，注释改写措辞后 4/4。全量 692/692，gate PASS，commit 8e9efe6，Pages 冒烟 14 处 984 + ppHeadBreak 仅剩 2 处注释 + 线上 sw VERSION=v984。注意：本次 push 分支名为 master（main refspec 报错）。
