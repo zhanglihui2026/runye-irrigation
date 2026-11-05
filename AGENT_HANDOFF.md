@@ -8264,3 +8264,6 @@ zone_merge_last 15/15 + verify 系全绿。
 ## 26.188 v984-remove-headbreak：三级左栏「扬程计算式」下线（2026-11-05）
 
 用户截图指三级左栏扬程计算式条，拍板取消。同款口径只删入口：index.html 删 `<div id="ppHeadBreak" class="pp-head-break" hidden>`（留恢复指引注释），plan-calc-render.renderHeadBreakdown 与 plot-editor 折叠逻辑全保留且判空 no-op，CSS .pp-head-break 一族未动，恢复只需插回一行 DOM。版本 14 处同抬 984-remove-headbreak，sw.js VERSION 同步。pp_no_head_formula 测试② 翻转为「三级也已取消」；首轮红灯根因是恢复注释含字面量 id="ppHeadBreak" 被断言误判残留，注释改写措辞后 4/4。全量 692/692，gate PASS，commit 8e9efe6，Pages 冒烟 14 处 984 + ppHeadBreak 仅剩 2 处注释 + 线上 sw VERSION=v984。注意：本次 push 分支名为 master（main refspec 报错）。
+## 26.189 v985-valve-flow：轮灌演示水流流到每一枚阀门（2026-11-05）
+
+用户截图（1 区激活、主管上多枚阀门）反馈：主管到各阀门那一段没有水流动画。根因：buildFlowRoutes 只取每区第一枚阀门做支管馈线（d.valves.some 首枚即停），其余阀门所在管段静止。改法：当前组每枚阀门注册成独立 Dijkstra 终点——主管投影切点 valve-main:N + 短馈线 valve-feed:N→valve-node:N（复用 feeds 机制，feeds 链接支持 ownKey 兼容旧支管馈线 key=branch-feed:zi），投影容差 20m 与既有馈线一致、超限跳过宁缺不错。纯可视化叠层，不改管线几何与水力模型。版本 14 处同抬 985-valve-flow，sw VERSION 同步。新增 tests/v985_valve_flow.test.cjs 五把锁（注意 tests 白名单需 git add -f）。全量 697/697，gate PASS，commit e8e3176，Pages 冒烟 14 处 985 + 线上 map-flow-demo.js 含 valve-node。
