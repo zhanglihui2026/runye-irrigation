@@ -53,6 +53,14 @@ test('[v979] 扬程王红字：扬程值加重 + 徽章 + 校核行点名', () =
   assert.ok(demo.includes('损失由路径×流量共同决定'), '校核行必须说清损失不只是远近');
 });
 
+test('[v980] 本轮即扬程王时校核行亮淡红底（与流量王淡蓝底对称）', () => {
+  assert.ok(demo.includes("(isHeadKing?' mfg-note-headking-active':'')"),
+    '校核行类名必须按 isHeadKing 条件挂 active');
+  assert.ok(/\.mfg-note-headking-active\{background:#fdecec;color:#dc2626\}/.test(css),
+    'CSS 淡红底 #fdecec 必须存在（与 mfg-note-worst #e6f1fb 对称）');
+  assert.ok(/\.mfg-note-worst\{background:#e6f1fb/.test(css), '流量王淡蓝底仍在（对称参照）');
+});
+
 test('[v979] CSS 双色钉死 + v979 段无 border-radius 数值', () => {
   const i0 = css.indexOf('[v979]');
   assert.ok(i0 > 0, 'online-map.css 应有 v979 段');
@@ -62,9 +70,9 @@ test('[v979] CSS 双色钉死 + v979 段无 border-radius 数值', () => {
   assert.ok(!/border-radius:\s*\d/.test(seg), 'v979 段禁止 border-radius 数值（v855 段锁延伸）');
 });
 
-test('[v979] 版本同抬：index 14 处 979-king-badges，sw VERSION 一致', () => {
-  assert.equal(html.split('?v=979-king-badges').length - 1, 14);
+test('[v979] 版本同抬：index 14 处主版本串动态等于 sw VERSION', () => {
   const v = sw.match(/^const VERSION = '([^']+)';/m);
-  assert.equal(v[1], 'v979-king-badges');
-  assert.ok(!html.includes('?v=978-inputpersist'), '旧版本串必须清零');
+  const want = v[1].replace(/^v/, '');
+  /* 动态对齐 sw VERSION：写死版本号会让每次抬版本都误红（input_persist 的教训） */
+  assert.equal(html.split('?v=' + want).length - 1, 14);
 });

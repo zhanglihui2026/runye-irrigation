@@ -512,3 +512,8 @@ body:has(.ry-pwa-install) #onlineMapSection .ry-trunk-panel{bottom:96px}
 #onlineMapSection .map-flow-group-info .mfg-king-head{color:#dc2626}
 #onlineMapSection .map-flow-group-info .mfg-metric b.mfg-head-king{color:#dc2626}
 #onlineMapSection .map-flow-group-info .mfg-note-headking{margin-top:4px}
+
+/* [v980] 扬程王校核行「本轮即王」亮淡红底 —— 与流量王 mfg-note-worst(#e6f1fb) 淡蓝底
+   对称（用户 2026-11-05 拍板）。红系取 #fdecec，与 #dc2626 同族。v855 段锁继续有效。 */
+#onlineMapSection .map-flow-group-info .mfg-note-headking-active{background:#fdecec;color:#dc2626}
+#onlineMapSection .map-flow-group-info .mfg-note-headking-active b{color:#dc2626}

@@ -1001,7 +1001,9 @@
         '<div class="mfg-metric"><span>需求扬程'+(est?'（估算）':'')+'</span><b class="mfg-head-val'+(isHeadKing?' mfg-head-king':'')+'">'+(isFinite(loss.head)?Number(loss.head).toFixed(2)+' m':'—')+'</b>'+
         (isHeadKing?'<span class="mfg-king mfg-king-head">扬程王</span>':'')+'</div></div>';
       if(headKing){
-        lines+='<div class="mfg-note mfg-note-headking">需求扬程按损失最大组 <b class="mfg-king-head">G'+(headKing.gi+1)+'（'+headKing.head.toFixed(2)+' m）</b><span class="mfg-king mfg-king-head">扬程王</span>校核 · 损失由路径×流量共同决定，不只是远近</div>';
+        /* [v980] 本轮即扬程王时校核行亮淡红底（用户 2026-11-05 拍板）——与流量王的
+           mfg-note-worst 淡蓝底对称：切到王卡，说明区一眼知道自己就是那个王。 */
+        lines+='<div class="mfg-note mfg-note-headking'+(isHeadKing?' mfg-note-headking-active':'')+'">需求扬程按损失最大组 <b class="mfg-king-head">G'+(headKing.gi+1)+'（'+headKing.head.toFixed(2)+' m）</b><span class="mfg-king mfg-king-head">扬程王</span>校核 · 损失由路径×流量共同决定，不只是远近</div>';
       }
       var foot='管损 '+totalLoss.toFixed(2)+' m = 总管 '+(Number(loss.frontLoss)||0).toFixed(2)+
         ' + 主管 '+(Number(loss.mainLoss)||0).toFixed(2)+' + 支管 '+(Number(loss.branchLoss)||0).toFixed(2)+' m';
