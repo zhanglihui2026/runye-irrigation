@@ -8257,3 +8257,7 @@ zone_merge_last 15/15 + verify 系全绿。
 - 底层 ppState.couplerNodes / ppCouplerSetPlacing / 地图捕捉 / 演示入口标记 / 既有节点渲染全部保留，旧存档兼容；plot-editor 对缺失元素全部 if(btn)/if(panel) 守卫
 - 版本 14 处同抬 982-remove-coupler；新增 tests/v982_coupler_entry_removed（入口删除/守卫保留/底层数据链/版本同抬）；coupler_map_snap 的面板 DOM 断言随取消更新（经纬度写链保留 dormant）
 - 全量 691/691 全绿，gate PASS，commit b58cba5。push 遇持续 502（4 次），commit 在本地待推。
+
+## 26.187 v983-remove-teereset：「三通复位」按钮下线（2026-11-05）
+
+用户截图红箭头指 ⌖ 图标（多选与☁回传在线地图之间）= tlFrontNodeResetBtn「三通复位」。同款口径只删入口：window.tlFrontNodeReset()（inline-09 清 tlFrontNodeDrops_v1）全保留，cloud_design_binding 源码锁不受影响，控制台可手动应急。版本 14 处同抬 983-remove-teereset；toolbar_dedupe 增补删除锁（延续 v824 恢复位置同款）。全量 692/692，gate PASS，commit 996b9cd，Pages 冒烟 14 处 983 且按钮 DOM 清零。另：v982（接驳点下线）此前已由用户经 GitHub Desktop 推上远端（沙箱网络 502 期间），线上已生效。
