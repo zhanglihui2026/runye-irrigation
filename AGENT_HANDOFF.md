@@ -8242,3 +8242,10 @@ zone_merge_last 15/15 + verify 系全绿。
 **③ 路径模式补 v976 主管复核**：路径链补 perM2/qMaxAll（areaList 优先地图 partitions，与估算链同源）→ mainRecheckPick → mainOdEff=max(设计档,复核档)；downstreamMinOd 同步吃复核口径；RyPipePathLoss.calculate 的 mainOd 改吃 mainOdEff，逐区确认改径（calibers）仍优先。路径链返回补 pipes（front/mainOd/branchOd/mainRecheck/frontV/mainV/branchV）+ lengths + lengthSource=figure 实长 + marginHead/safetyFactor/filterLoss——v977 卡片三行表两条链都能渲染，路径模式主管流速按最不利区自身流量算（比估算链的合流口径更贴物理），长度不再标试算 *。
 
 **发布**：全量 684/687（3 失败=已知遗留）→ gate PASS → commit 27fe7f8 → push → Pages 冒烟 14 处 981。新增 tests/v981_path_recheck_linkguard 七把锁。版本锁已全部动态对齐 sw VERSION（v979/v980/v981 三连抬零误红）。
+
+## 26.185 三个历史遗留失败测试清零：687/687 全绿（2026-11-05）
+
+- plot_transfer：online-map 的 sendPlotToDesign 后来新增 renderReservoir()（水源渲染），测试的 vm 切片沙箱缺桩——sender/external 两处切片文本注入 no-op 桩（渲染不在该测试靶内）。教训：切片式测试对源码演化脆弱，缺标识符先想到「源码新增调用」。
+- tl_auto_edits：readFileSync 用相对路径，依赖 cwd=仓库根，node --test 从外部目录跑必挂 ENOENT——改 __dirname 解析。本体 129/0 一直是好的。
+- demo_flow_revive 锁 3 过时：v916 已把「#111827 骨架+#38bdf8 青色叠层」两笔制改为「#cbd5e1 淡灰底图+buildFlowRoutes 裁剪流动路线（#185FA5 干线/#16a34a 支管）+无 routes 兜底」，锁改钉新不变量。
+- 纯测试改动不抬版本。全量 687/687（仓库首次全绿），commit 0e2ed65。期间 push 三次 502/schannel 失败后恢复成功——网络抖动重试即可，不必换通道。
