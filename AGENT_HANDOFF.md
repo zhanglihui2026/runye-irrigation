@@ -8207,3 +8207,17 @@ zone_merge_last 15/15 + verify 系全绿。
 - inline-09 tlEstimateGroupHead：tierNote/tierStep 接线整体下线（主管复核取大后台阶不复存在，mainRecheckPick 保证 v≤目标）；return 新增 frontV/mainV/branchV —— mainV 必须按**本组**流量对复核口径现算（mainRecheckPick.v 是按最大区流量算的，直接用会把小流量组流速算大）；branchV 取最不利区自己的支管档流速。
 - 踩坑：新 CSS 写了 border-radius:4px 触发 trunk_panel_chrome ⑥（v855 段起到文件尾禁 border-radius 数值，全站统一切角）→ 去掉。tests/* 是白名单制（.gitignore !tests/xxx），main_recheck.test.cjs 在 v976 被静默排除未入库（commit 显示 8 files 实为 10 项被忽略 2 个）→ 已加白名单补入库；verify_*.js 按惯例留本地不入库。
 - 测试锁同步：trunk_tier_step ⑤⑥⑦ 反转为「不许再接 tierStep/tierNote」（纯函数 tierStep 本体单测保留）、trunk_shared_od ⑤⑥⑦、est_group_pipes_source ④、main_recheck ②。113 个测试文件全过，check_publish_refs PASS。发布 04daff7，线上 index 13×?v=977-cardlist + sw VERSION 确认。
+
+## 26.181 v978-inputpersist：设计输入自动持久化（2026-11-05）
+
+**根因闭环**：G5 卡「旧数据冒出来」深挖实锤——二级 fld_* / 三级 tl_* 设计输入无持久化，v977 强刷后滴灌参数回默认（perM2 变 1.2 倍，111.69÷1.2=93.08 分毫不差）；tlLinkChk「与二级联动」默认勾选且二级重算单向覆盖三级手改值（inline-11.js:267）。卡片链路本身同源自洽（93.08→复核档 Ø180 符合 v976 规则）。历史疑点同解：旧 G10 卡 111.03 vs 111.69 = 设计侧网格面积 vs 地图 partitions 两源差 0.6%。
+
+**改动**：
+- mod/inline-33.js（新，CORE）：fld_*/tl_*/planSrcDist 快照 localStorage['runye_design_inputs_v1']；还原顺序铁律 = fld_→二级按钮组→calcPlan(联动派生)→tl_ 存档覆盖（手改值赢联动值）→三级按钮组→renderThreeLevel→save 回写；resetDefaults/resetThreeLevelDefaults 包一层补存（程序赋值不触发 change）；syncThreeLevelFromPlan 故意不包（联动语义归决策点②）。
+- index.html：13 处 ?v= 同抬 978-inputpersist；inline-33 挂载在 runye-hydraulics-page.js 之后（必须最后一个经典脚本）。
+- sw.js：VERSION→v978-inputpersist；CORE 登记 mod/inline-33.js（不带 ?v=）。
+- tests/input_persist.test.cjs（新，白名单入库）：挂载位置（最后一个经典脚本）/还原顺序（calcPlan 先于 tl_ 覆盖、收尾 save）/白名单正则钉死/复位补存/CORE 卫生+版本同抬（13+1=14 处）五把锁。
+
+**发布**：check_publish_refs PASS → commit 02b4820 → push 成功 → GitHub Pages 冒烟 200（index 14 处 978、inline-33.js 200）。Vercel 域沙箱内连接 000 未验（非本轮改动引入）。
+
+**遗留**：demo_flow_revive / plot_transfer / tl_auto_edits 三测试失败，读的都是本轮未改文件（inline-09/13/16、map-flow-demo、tl-workspace），历史遗留非本轮回归，另立任务排查。决策点②（联动防覆盖）③（路径模式补 v976 复核）待用户拍板。
