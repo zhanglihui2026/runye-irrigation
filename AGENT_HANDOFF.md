@@ -8307,3 +8307,124 @@ zone_merge_last 15/15 + verify 系全绿。
 验证：全量 `node --test tests/*.test.cjs` 698/698；`check_publish_refs.cjs` PASS；`git diff` 无任何 `.css`；CDP 无头 Edge 冒烟 `_p1/_v990_toolbar_smoke.cjs` 13/13（含 A4 SVG=up/diameter、A5 font-size:0、B1/B2 点击选中态与口径切换、B4 切态后 SVG 仍在、C1 无 JS 异常）。版本 14 处 `?v=`、`sw.js VERSION`、`RyMapFlowDemo.VERSION` 同抬 `v990-tb-shortcut`；`tests/v988_trunk_entry.test.cjs` ⑤ 版本锁由写死当轮串改为格式断言（一致性仍由 14 处动态比对负责），以后抬版不用再改测试。
 
 状态：本地已完成并验证，**未推送、未发布**（用户本轮没要求）。另：§26.194 的云端独立应用本地 SDK 修复（commit a3be093）同样仍未部署，用户上一轮虽然选过「同步更新到线上」，但那一轮被中断、deploy 未执行，按发布规则需重新征询。
+
+## 26.196 perf-20261106：轮灌演示卡顿排查与有边界优化（阶段 A/B/C 完整交付报告，2026-11-06）
+
+**结论先行**：卡顿不是语言问题，也不是算法「太重」，而是**每次切组都重算一遍本可复用的连通校验**。合成 36 区异形地块上单次切组中位 149.3 ms，其中 `validateConnection()` 独占 136.1 ms（91%）。按证据做最小缓存后，同场景 A/B 交替对照中位 **148.7 ms → 15.7 ms（改善 89.4%）**，长任务 18/18/18 → 1/1/1，帧间隔中位 166.6 ms → 16.7 ms。未改判据、未降工程计算精度、未迁移 C++/WASM、未提交/推送/发布。
+
+### 1. 边界与认知恢复
+
+| 项 | 状态 |
+| --- | --- |
+| 依据 | `TASK_map_flow_demo_performance_20261106.md`（阶段 A 只读 → 阶段 B 按证据最小改动 → 阶段 C 回归交付） |
+| 未做 | 重写分区/管网算法、改变设计结果、迁移 C++/WebAssembly、简化连通检查、发布线上版本、提交/推送/部署 |
+| 工作树 | 已有用户改动 `.aoci/baseline.json`、`aoci.code.txt`、`mod/inline-18.js`、`runye-map-partition.js`、`terrain/terrain-core.js` 等，一律未覆盖、未回滚 |
+
+**认知恢复限制（如实记录）**：本会话 AOCI 正式 Whole-Index 工具（`aoci_rules` / `aoci_overview`）不可用，`.mcp.json` 为空、`aoci.txt` 无目标模块条目。已按 `AGENTS.md` 阅读规范、检查工作树、复核 `mod/map-flow-demo.js` 当前源码作为局部认知恢复；**未完成正式 Whole-Index 重载，未伪造认知结论**。
+
+### 2. 阶段 A：复现与基线（只读，产品代码零改动）
+
+测量台 `_p1/_perf_harness.html`：真实 `pwa/vendor/leaflet.js` + 真实 `mod/zone-geometry.js` + 内存中函数级插桩的真实 `mod/map-flow-demo.js`；探针 `_p1/_perf_probe.cjs`（Edge headless + CDP + `PerformanceObserver` longtask）。未取得用户原始地块，按任务书 §3.5 建立固定 seed 的**合成异形场景**，明确标注不是原始案例；水力桩 `tlMapGroupHydraulicsOf` 未提供，测值是**不含该分支的下限**。
+
+| 场景 | 边界顶点 | 分区 | 轮灌组 | 主管/点数 | 支管/点数 | 阀门 | 节点 | 总管/点数 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| S | 24 | 12 | 3 | 12 / 36 | 12 / 24 | 12 | 12 | 1 / 5 |
+| L | 48 | 36 | 6 | 36 / 108 | 36 / 72 | 36 | 36 | 2 / 16 |
+
+基线（`_perf_baseline.json`，冷启动 / 连续切换 / 自动播放各 ≥5 次）：
+
+| 指标 | S 基线 | L 基线 |
+| --- | --- | --- |
+| 冷启动 `start(0)` 中位 | 21.3 ms | 221.9 ms |
+| 连续切组中位 | 11.4 ms | **149.3 ms** |
+| 长任务（>50 ms） | 0 | **30/30 次**（中位 156 ms） |
+| 帧间隔中位 | 16.7 ms | **150 ms** |
+
+L 场景分段 self 中位：`validateConnection` **136.1 ms**、`render` 7.3 ms（total 11.5 ms）、`buildFlowRoutes` 3.5 ms、`collect` 0.2 ms × **2 次/切组**、`collectZonePolygons` 0.3 ms × 2、`updateGroupInfo` 0.3 ms。
+
+- **已证实根因**：① `validateConnection()` 每次切组都把总管/主管按 2 m 步长插值成密点做「线体×线体」最小距离比较，36 区规模下即百毫秒级同步长任务，占单次切换 91%；② 一次切组内 `collect()` 调用 2 次（`start()` + `render()`），自动播放定时器另有 1 次。
+- **已排除**：`collect()` 单次 0.2–0.4 ms、`buildFlowRoutes()` 3.5 ms、Leaflet 图层重建 11.5 ms 均非主要瓶颈；「浏览器语言算力不够、改 C++ 能提速」不成立——瓶颈是重复计算而非语言，浏览器端也无法直接跑 C++。
+- 因此**未采用**任务书 §2 假设 3（演示专用降采样，属产品行为变化须先确认）、假设 4（Web Worker）、假设 5（图层保留）：证据不支持，不擅自扩大范围。
+
+### 3. 阶段 B：按证据的最小改动
+
+| 文件 | 改动 |
+| --- | --- |
+| `mod/map-flow-demo.js` | **唯一产品代码改动**：新增 `validationSignature(d)`、缓存状态 `lastValidationSig / lastValidation / lastD / lastDDRef / renderSnapshotD`；`start()` 缓存校验结果、`render()` 复用同一次切组快照、`playToggle()` 定时器改用 `lastD.gCount`；版本字面量抬 `v991-flow-cache` |
+| `index.html` / `sw.js` | 仅 14 处 `?v=` 与 `VERSION` 同步抬版；SW CORE 清单已登记 `mod/map-flow-demo.js`，无新增静态资源 |
+| `_p1/*` | 只读测量台、探针、A/B 对照脚本、优化前源码快照 `_baseline_demo.js` 与证据 JSON，均为诊断资产，不参与产品加载 |
+
+**关键约束落实**：
+- 缓存的是纯函数 `validateConnection()` 的**返回值**，判据、容差 `TOL_M=5`、返回值结构一字不改；不是近似、不是降级。
+- 失效双重保险：`window.tlDiagramData` 对象被替换（换地块 / 恢复工程 / 重生成管线）⇒ 引用变化立即失效；同对象被原地改写（拖动分区、编辑节点或总管、手动分组）⇒ `validationSignature(d)` 完整坐标串变化立即失效（覆盖总管/主管/支管/段总管/接驳点/节点/阀门/分区多边形/组数/手动分组）。签名用完整坐标串不用哈希，零碰撞风险，生成比较约 0.3 ms。
+- 保留 `render(g)` 原签名：改用模块内 `renderSnapshotD` 传快照，避免打破 `tests/demo_flow_revive.test.cjs` 以字面量 `'function render(g)'` 切源码区域的契约；独立调用 `render` 时快照为 null，行为与改动前一致。
+- 缓存**仅在演示模块内**，不外溢到水力、设计、施工图或持久化链路；面积、分区几何、管径、流量、水损、节点位置、持久化数据均未改。
+
+### 4. 阶段 C：回归与交付
+
+主证据 —— `_p1/_perf_ab.cjs` 同会话 / 同浏览器 / 同场景，交替加载优化前快照与当前源码，各 3 轮 × 18 次切组，消除跨次运行漂移：
+
+| 指标 | 优化前 | 优化后 | 变化 |
+| --- | --- | --- | --- |
+| 切组中位（3 轮中位） | 148.7 ms | **15.7 ms** | **−89.4%** |
+| 长任务次数（每轮） | 18 / 18 / 18 | 1 / 1 / 1 | 仅剩冷启动 1 次 |
+| `validateConnection` 调用（每轮 18 次切组） | 18 | 1 | 重复计算消除 |
+| 帧间隔中位 | 166.6 ms | **16.7 ms** | 回到 60 fps |
+| 成功切组 | 18/18 ×3 | 18/18 ×3 | 不变 |
+
+终版完整探针（`_perf_final_v991.json`，抬版后代码）：S 冷启动 43.1 ms / 连续切换中位 4.2 ms；L 冷启动 207.2 ms / 连续切换中位 15.4 ms；两场景自动播放 5 次的长任务数均为 `1,0,0,0,0`；未捕获异常 0。
+
+| 验证项 | 结果 |
+| --- | --- |
+| `node --test tests/*.test.cjs` | **698/698，fail 0** |
+| `check_publish_refs.cjs --quiet` | PASS |
+| 行为回归 6 项 | **6/6 全通过**：缓存命中 / 原地编辑失效 / 替换对象失效 / 图层无残留（4 轮 SVG path 恒 120）/ 断连提示不误报（提示原文保留）/ 停止播放无残留 |
+| 场景变体 8 类，每类优化前·后源码各跑一次并逐字比对 `debugGraph` 路线键序列与组数 | **8/8 PASS、8/8 完全一致** |
+
+变体覆盖任务书 §3 全部 10 项：规则地块（`regularPlot`）、异形地块（主场景 L/S）、无节点（`noNodes`）、施工节点（`workNodes`）、手动总管（合成场景总管本为手绘坐标；`multiTrunk` 另验多条总管）、多条总管（`multiTrunk`）、分组与单组（`manualGroups` / `singleGroup`）、编辑后再播放（`editThenPlay`，编辑后确认真重算且定时器仍推进组号）、切换地图/规划页面（`pageSwitch`，`isMapActive=false` 时 `refresh()` 清演示、回页可恢复）、停止播放（`stop` 回归 + 各变体结束态）。
+
+**静态资源核对**：SW CORE 清单第 1324 行已含 `mod/map-flow-demo.js`，无需新增登记；因产品脚本已变更，按项目规定把 `index.html` 14 处 `?v=`、`sw.js VERSION`、`RyMapFlowDemo.VERSION` 及 `debugGraph.ver` 同步抬到 `v991-flow-cache`，保证将来发布时已装 PWA 的缓存正确失效；**本次不发布**。
+
+**口径说明**：分段统计表中 `render` 的 `calls/switch` 出现 153 / 425 的插桩串扰值，不作图层重建次数证据；图层稳定性由 `layers` 行为回归单独证明。主结论以 A/B 交替对照的总耗时、长任务、帧间隔为准。阶段 A 基线来自优化前源码，A/B 与终版探针来自最终代码，三者口径一致、可复现。
+
+### 5. 未解决风险与后续建议
+
+1. **冷启动 / 编辑后仍有 1 次百毫秒级长任务**（L 冷启动 207 ms，A/B 优化后每轮最大约 220 ms）：缓存只消除连续切组的重算，首次进入或缓存失效时 `validateConnection()` 仍需完整算一次。按任务书「未达到时如实解释瓶颈，不扩大范围」，本次未处理。
+2. **是否建议后续 Web Worker / WASM：本阶段不建议实施**。纯计算已不再是连续切组瓶颈；把 2 m 插值校验搬进 Worker 需引入坐标序列化、异步校验与演示状态机改造，收益只覆盖「首次进入 1 次」，维护成本明显更高。若日后要求「首次进入也不能有一次长任务」，再单独评估预计算 / Worker；C++ / WASM 只有在证据显示纯计算仍为主瓶颈且收益覆盖通信与维护成本时才值得评估，**本次明确不迁移**。
+3. 合成场景非用户原始地块；真实页面水力分支 `tlMapGroupHydraulicsOf` 未纳入测量台，测值是不含该分支的下限。若线上仍卡顿，需用用户真实导出数据在同等口径下复测。
+4. AOCI 正式 Whole-Index 未重载，认知恢复以源码复核代替，已如实标注。
+
+### 6. 状态与待用户拍板
+
+本任务所有改动**未提交、未推送、未部署**；工作树中的用户既有改动未动。复现命令：`node _p1/_perf_probe.cjs`、`node _p1/_perf_ab.cjs`、`node --test tests/*.test.cjs`、`node check_publish_refs.cjs --quiet`。
+
+1. 是否把本次性能改动提交 / 推送 / 发布（任务书默认不做；若发布须按 `v991-flow-cache` 重跑 Pages 冒烟）。
+2. 云端独立应用本地 SDK 修复（§26.194，commit `a3be093`）仍未重新部署，按发布规则需本轮明确授权覆盖线上链接，部署后重跑线上冒烟。
+3. 手机号 OTP 登录 → 写库实机验证需用户本人验证码，助手不能代跑。
+4. 是否另开任务消除冷启动那 1 次长任务（须先测量再定）。
+
+## 26.197 v992-cold-prune：消除冷启动长任务 + 一次性发布（2026-11-06）
+
+用户指令：「发布吧，消除冷启动那次长任务」。按「一次发布最省」判断，先把冷启动优化做完并回归，再与 §26.196 的缓存优化一起发布，避免连发两个版本。
+
+**结论**：冷启动的百毫秒级主线程长任务已消除。两步都是**等价改写**，不改判据、不改容差、不改返回值、不改工程数据：
+1. **等价剪枝**：把 `validateConnection()` 的线体×线体全比较改为「段剪枝 + 三角不等式」。只跳过可证明不可能改进最小值的段，`minTo` 与原逐点全比较逐字节一致；另消除三处纯重复计算（旧口径分支才用的 `mMain/mCoup` 提前算、传播循环里反复 `densifyLL`、节点命中不早停）。`dist` 调用 **2,274,243 → 247,220（−89%）**。
+2. **空闲预热**：`refresh()` 数据就绪后用 `requestIdleCallback` 在空闲期预填校验缓存，用户首次点「轮灌演示」时 `start()` 直接命中。纯计算、不写 DOM、不动 `active/playing`；与 `start()` 共用 `ensureValidation(d)`，只有一套失效判据，数据变更仍按新签名重算。
+
+**专项 A/B**（`_p1/_cold_ab.cjs`，同会话交替加载 `_p1/_cold_baseline_demo.js` 与当前源码，各 3 轮）：
+
+| 指标 | 优化前 | 优化后 | 变化 |
+| --- | --- | --- | --- |
+| `validateConnection` 中位 | 259.8 ms | **24.7 ms** | −90.5% |
+| `dist` 调用数 | 2,274,243 | 247,220 | −89% |
+| 首次 `start(0)` 中位 | 284.6 ms | **28.7 ms** | −89.9% |
+| 交互关键路径长任务 | 1 / 1 / 1（87 / 285 / 438 ms） | **0 / 0 / 0** | 归零 |
+| `validateConnection` 返回值 | — | — | **逐字节一致（PASS）** |
+
+**回归**：连续切换 A/B 161.2 → 13.0 ms（−91.9%）；8 类场景变体优化前/后路线与分组逐字一致 8/8；行为回归 6/6（`disconnected` 提示原文保留、`layers` 恒 120 path）；`node --test tests/*.test.cjs` 698/698；`check_publish_refs.cjs` PASS；完整探针 `_perf_final_v992.json`：S 冷启动 10.8 ms / 长任务 0 / 自动播放 0,0,0,0,0；L 冷启动 52.5 ms / 连续切换中位 12 ms / 帧中位 16.7 ms / 未捕获异常 0。
+
+**两种冷启动口径（如实区分）**：完整探针测的是「页面加载后**立即**点演示」的最坏情况（不等预热），L 为 52.5 ms、仍有 1 次临界长任务；专项 A/B 测的是真实用户「打开页面停留约 300 ms 再点」，为 28.7 ms、0 长任务。预热本身在空闲期仍占用一次计算（已比原先快约 8 倍），只是不在交互关键路径上。
+
+**变更文件**：`mod/map-flow-demo.js`（剪枝 + `ensureValidation` + `scheduleWarmup` + 版本字面量）、`index.html` 14 处 `?v=`、`sw.js VERSION`，统一抬 **`v992-cold-prune`**；`AGENT_HANDOFF.md` 本报告。诊断资产 `_p1/_perf_harness.html`、`_perf_probe.cjs`、`_perf_ab.cjs`、`_cold_ab.cjs`、`_baseline_demo.js`、`_cold_baseline_demo.js` 与证据 JSON 按 `.gitignore` 的 `_*/` 约定留在本地，未入库。工作树中用户既有改动一律未覆盖、未回滚。
+
+**未做/不建议**：未迁移 Web Worker / C++ / WASM——剪枝后纯计算只剩约 25 ms，Worker 的序列化与异步状态机改造成本明显更高；未降低连通检查采样精度（属产品行为变化，须另行确认）。

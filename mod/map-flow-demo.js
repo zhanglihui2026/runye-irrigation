@@ -141,30 +141,63 @@
     /* 分区主管在设计图中可能是一根物理主管按分区切成的相邻线段。
        只有两段的端点碰到另一段线体（或彼此端点相碰）才视为主管接续，
        避免把两根仅仅平行靠近的主管误并成一条水路。 */
-    function mainSegmentsJoin(a, b, joinTol) {
-      if (!Array.isArray(a) || a.length < 2 || !Array.isArray(b) || b.length < 2) return false;
-      var ad=densifyLL(a), bd=densifyLL(b), min=Infinity;
-      [a[0],a[a.length-1]].forEach(function(p){
-        bd.forEach(function(q){var d=dist(p,q);if(d<min)min=d;});
-      });
-      [b[0],b[b.length-1]].forEach(function(p){
-        ad.forEach(function(q){var d=dist(p,q);if(d<min)min=d;});
-      });
+    /* [perf-cold 20261106] 入参改为「已 densify 的主管点集」：传播循环里同一根
+       主管会被反复比较，原实现每对都重新 densify 两次（含大量 dist），纯属重复。
+       densifyLL 的首点/末点就是原折线首末点，故端点判据逐字节不变。 */
+    function mainSegmentsJoin(ad, bd, joinTol) {
+      if (!ad || ad.length < 2 || !bd || bd.length < 2) return false;
+      var min = Infinity;
+      var ae = [ad[0], ad[ad.length-1]], be = [bd[0], bd[bd.length-1]];
+      for (var i = 0; i < ae.length && min > joinTol; i++)
+        for (var j = 0; j < bd.length; j++) { var d1 = dist(ae[i], bd[j]); if (d1 < min) min = d1; }
+      for (var i2 = 0; i2 < be.length && min > joinTol; i2++)
+        for (var j2 = 0; j2 < ad.length; j2++) { var d2 = dist(be[i2], ad[j2]); if (d2 < min) min = d2; }
       return min<=joinTol;
     }
     var trunkDense = densifyLL(o.trunkLL);
+    /* [perf-cold 20261106] 段剪枝：把总管密点按弧长顺序切成连续段，每段记录
+       代表点 c 与半径 R=max dist(c,tp)。由三角不等式
+         dist(p,tp) >= dist(p,c) - dist(c,tp) >= dist(p,c) - R
+       当 dist(c,p) - R >= 当前最小值 m 时，整段不可能给出更小值 ⇒ 跳过。
+       ★ 只跳过「可证明不优」的段，minTo 返回值与原来逐点全比较逐字节一致，
+         不是降采样、不是近似、不改 tol、不改任何连通结论。
+       ★ 前提：o.dist 为对称度量（页面注入 haversine，Node 单测注入欧氏距离）。
+         R 非有限时该段退化为全量比较，异常 dist 下结果仍一致。 */
+    var SEG = 24, segs = [];
+    for (var si = 0; si < trunkDense.length; si += SEG) {
+      var pts = trunkDense.slice(si, Math.min(si + SEG, trunkDense.length));
+      var c = pts[Math.floor(pts.length / 2)], R = 0, finite = true;
+      for (var pi = 0; pi < pts.length; pi++) {
+        var dd = dist(c, pts[pi]);
+        if (!isFinite(dd)) { finite = false; break; }
+        if (dd > R) R = dd;
+      }
+      segs.push({ pts: pts, c: c, R: finite ? R : Infinity });
+    }
     function minTo(set) {
       var m = Infinity;
-      trunkDense.forEach(function (tp) {
-        set.forEach(function (p) { var d = dist(tp, p); if (d < m) m = d; });
-      });
+      for (var xi = 0; xi < set.length; xi++) {
+        var p = set[xi];
+        for (var sj = 0; sj < segs.length; sj++) {
+          var sg = segs[sj];
+          if (isFinite(sg.R) && isFinite(m)) {
+            var dc = dist(sg.c, p);
+            if (isFinite(dc) && dc - sg.R >= m) continue;
+          }
+          for (var qi = 0; qi < sg.pts.length; qi++) {
+            var d = dist(sg.pts[qi], p);
+            if (d < m) m = d;
+          }
+        }
+      }
       return m;
     }
     var mainLines=(o.mainsLL||[]).map(function(l){return(l||[]).filter(Boolean);});
-    var mainsDense=mainLines.map(densifyLL), mainsDenseFlat=[];
-    mainsDense.forEach(function(l){l.forEach(function(p){mainsDenseFlat.push(p);});});
-    var mMain = minTo(mainsDenseFlat);   /* [v920] 线体×线体 */
-    var mCoup = (o.hasSeg && Array.isArray(o.couplersLL) && o.couplersLL.length) ? minTo(o.couplersLL) : Infinity;
+    var mainsDense=mainLines.map(densifyLL);
+    /* [perf-cold 20261106] mMain 的点集 = 全部主管密点，与下面 perMain 完全相同；
+       而逐组分支（真实页面的正常路径）返回值只用 minMainDistance/perMain，
+       mMain/mCoup 一个都不读。原实现无条件先算一遍 ⇒ 白烧近半数 dist。
+       延后到旧口径分支再算，判据与返回值一字不改。 */
 
     /* [v915] 逐组判定：需要 nodesLL + groupOfZi + groups 三者齐备；任一缺席退旧口径。 */
     var perMain = null;   /* mZi[zi]=该主管到总管的最小距离（线体口径） */
@@ -180,7 +213,10 @@
         o.nodesLL.forEach(function (n) {
           if (!n || !n.ll || !(n.mi >= 0)) return;
           var hit = false;
-          trunkDense.forEach(function (tp) { if (dist(tp, n.ll) <= tol) hit = true; });   /* [v920] 线体命中也算 */
+          /* [perf-cold] 命中即停：hit 是 OR 语义，继续扫总管点不会改变结论 */
+          for (var ti = 0; ti < trunkDense.length && !hit; ti++) {
+            if (dist(trunkDense[ti], n.ll) <= tol) hit = true;   /* [v920] 线体命中也算 */
+          }
           if (hit && n.mi < mainReach.length) mainReach[n.mi] = true;   /* 节点匹配 ⇒ 该主管贯通 */
         });
       }
@@ -193,7 +229,7 @@
           if(!mainReach[mi])continue;
           for(var mj=0;mj<mainLines.length;mj++){
             if(mainReach[mj]||mi===mj)continue;
-            if(mainSegmentsJoin(mainLines[mi],mainLines[mj],joinTol)){mainReach[mj]=true;grew=true;}
+            if(mainSegmentsJoin(mainsDense[mi],mainsDense[mj],joinTol)){mainReach[mj]=true;grew=true;}
           }
         }
       }
@@ -219,6 +255,11 @@
       return { ok: true, code: 'connected', minM: minMainDistance };
     }
 
+    /* [perf-cold] 只有旧口径分支（无逐组数据）才需要 mMain/mCoup，此处才计算 */
+    var mainsDenseFlat=[];
+    mainsDense.forEach(function(l){l.forEach(function(p){mainsDenseFlat.push(p);});});
+    var mMain = minTo(mainsDenseFlat);   /* [v920] 线体×线体，判据不变 */
+    var mCoup = (o.hasSeg && Array.isArray(o.couplersLL) && o.couplersLL.length) ? minTo(o.couplersLL) : Infinity;
     var ok = (mMain <= tol) || (mCoup <= tol);
     return { ok: ok, code: ok ? 'connected' : 'disconnected', minM: Math.min(mMain, isFinite(mCoup) ? mCoup : Infinity) };
   }
@@ -237,6 +278,20 @@
 
   /* ── 运行时（依赖宿主注入 ctx） ────────────────────────────────────── */
   var ctx = null, layer = null, active = null, timer = null, playing = false;
+  /* [perf-20261106 阶段B] 切组缓存：validateConnection 是纯函数，但每次切组都要把
+     总管/主管按 2m 步长插值成密点做「线体×线体」距离比较（阶段A实测：36 区异形
+     地块单次 136ms，占一次切换 149ms 的 91%，并触发 >50ms 长任务）。
+     几何/分组数据未变时复用上次校验结果——判据、容差与返回值一字不改，只省重算。
+     签名覆盖校验的全部输入（总管/主管/支管/段总管/接驳点/节点/阀门/分区多边形/
+     分组/组数）+ 数据对象引用；拖动分区、旋转或重生成管线、节点编辑、总管编辑、
+     换地块、恢复工程任一发生都会换签名 ⇒ 立即重算。
+     ★ 缓存仅在演示模块内，绝不外溢到水力、设计、施工图或持久化链路。 */
+  var lastValidationSig = null, lastValidation = null, lastD = null, lastDDRef = null;
+  /* start → render 的同一次切组数据快照（render 取用后立即清空）。刻意不改
+     render() 的函数签名：tests/demo_flow_revive.test.cjs 用 `function render(g)`
+     字面量切源码区域做回归锁，签名一变会打破既有契约。独立调用 render 时
+     该值为 null，行为与改动前逐字节一致（自行 collect）。 */
+  var renderSnapshotD = null;
 
   function readLL(p) {
     if (Array.isArray(p)) return (isFinite(p[0]) && isFinite(p[1])) ? { lat: p[0], lng: p[1] } : null;
@@ -323,6 +378,71 @@
       manual: manual, nPer: dd.combinedN || 1, total: total,
       gCount: groupCount(total, manual, dd.combinedN || 1)
     };
+  }
+
+  /* [perf-20261106] 连通校验输入签名：用完整坐标串（不用哈希）⇒ 零碰撞风险。
+     生成/比较一次约 0.3ms，相对 validateConnection 的百毫秒量级可忽略。
+     只列 validateConnection 真正读到的字段；渲染专用字段不进签名以免误失效，
+     但分区多边形纳入（拖动/重划分区后必定失效，满足任务书的失效口径）。 */
+  function validationSignature(d) {
+    function p2(p) {
+      return p && isFinite(p.lat) && isFinite(p.lng)
+        ? p.lat.toFixed(7) + ',' + p.lng.toFixed(7) : 'x';
+    }
+    function line(l) { return (l || []).map(p2).join(';'); }
+    var a = [];
+    a.push((d.trunkLinesLL || []).map(line).join('|'));
+    a.push((d.mainsLL || []).map(line).join('|'));
+    a.push((d.branchLL || []).map(line).join('|'));
+    a.push(line(d.segLL));
+    a.push((d.couplersLL || []).map(p2).join(';'));
+    a.push((d.nodesLL || []).map(function (n) { return n.mi + ':' + p2(n.ll); }).join(';'));
+    a.push((d.valves || []).map(function (v) { return v.mi + ':' + p2(v.ll); }).join(';'));
+    a.push((d.zonePolygons || []).map(function (z) { return z.zi + ':' + line(z.ll); }).join('|'));
+    a.push(String(d.total) + ':' + String(d.nPer) + ':' + String(d.gCount));
+    a.push(d.manual ? JSON.stringify(d.manual) : '-');
+    return a.join('#');
+  }
+
+  /* [perf-cold 20261106] 缓存读取/计算的唯一入口：start() 与空闲预热共用，
+     保证两者填的是同一份缓存、走同一套失效判据，不产生第二套口径。 */
+  function ensureValidation(d) {
+    var ddRef = window.tlDiagramData;
+    if (ddRef !== lastDDRef) { lastDDRef = ddRef; lastValidationSig = null; }
+    var sig = validationSignature(d);
+    if (sig === lastValidationSig && lastValidation) return lastValidation;
+    var v = validateConnection({
+      hasTrunk: !!(d.trunkLL && d.trunkLL.length),
+      trunkLL: d.trunkLL || [],
+      mainsLL: d.mainsLL, couplersLL: d.couplersLL, hasSeg: !!d.segLL,
+      tolM: TOL_M,
+      dist: (window.RyTrunkGeo && window.RyTrunkGeo.haversine) ? window.RyTrunkGeo.haversine : function () { return Infinity; },
+      /* [v915] 步骤 3：逐组可达性 + 节点结构化匹配（齐备才启用，缺则退 v861 原口径） */
+      nodesLL: d.nodesLL,
+      groupOfZi: function (zi) { return groupOf(zi, d.manual, d.nPer); },
+      groups: d.gCount
+    });
+    lastValidationSig = sig;
+    lastValidation = v;
+    return v;
+  }
+
+  /* [perf-cold 20261106] 空闲预热：页面加载 / 回到地图页且数据就绪后，在浏览器
+     空闲期先把连通校验算好填进缓存。用户首次点「轮灌演示」时 start() 直接命中
+     ⇒ 交互关键路径不再出现 >50ms 长任务。
+     ★ 纯计算：不渲染、不写 DOM、不改 active/playing、不碰 chips；
+     ★ 与 start() 共用 ensureValidation，判据与结果完全一致；
+     ★ 数据变更时签名失效，start() 仍按新数据重算，无陈旧缓存风险。 */
+  var warmupPending = false;
+  function scheduleWarmup(d) {
+    if (warmupPending || !d) return;
+    warmupPending = true;
+    var run = function () {
+      warmupPending = false;
+      try { ensureValidation(d); } catch (e) {}
+    };
+    if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(run, { timeout: 1500 });
+    else if (typeof setTimeout === 'function') setTimeout(run, 0);
   }
 
   function ensureLayer() {
@@ -536,7 +656,10 @@
     var ly = ensureLayer(); if (!ly) return;
     ly.clearLayers();
     active = g;
-    var d = collect(); if (!d) { stop(); return; }
+    /* [perf-20261106] 复用 start() 已收集好的同一份快照，避免一次切组 collect() 两次 */
+    var d = renderSnapshotD || collect();
+    renderSnapshotD = null;
+    if (!d) { stop(); return; }
     updateGroupInfo(d,g);
     /* 先压暗非活动区，再用青蓝蒙版突出当前组；管网线随后绘制，保持可读。 */
     (d.zonePolygons||[]).forEach(function(z){
@@ -629,8 +752,9 @@
       var g0 = (active == null || active < 0 || active >= M) ? 0 : active;
       if(!start(g0, true)){syncChipsState();return;}
       timer = setInterval(function () {
-        var dd2 = collect();
-        var M2 = dd2 ? dd2.gCount : 0;
+        /* [perf-20261106] 原实现先 collect() 取组数、start() 内又 collect() 一次；
+           组数改取最近一次 start 的快照（start 每次都会收最新数据），省掉重复收集。 */
+        var M2 = lastD ? lastD.gCount : 0;
         if (M2 <= 0) { stop(); return; }
         start(((active == null ? 0 : active) + 1) % M2, true);
       }, INTERVAL_MS);
@@ -641,18 +765,11 @@
   /* start：校验（总管↔主管连通）通过才渲染；失败 tip 报错（用户明确要求） */
   function start(g, silentChips) {
     var d = collect();
+    lastD = d;   /* 自动播放定时器取组数用；start 每次都收集最新数据，故不另收一次 */
     if (!d) { if (ctx.tip) ctx.tip('轮灌演示需要先在「分区与管路」生成管线图，且与当前地块一致。'); return false; }
-    var v = validateConnection({
-      hasTrunk: !!(d.trunkLL && d.trunkLL.length),
-      trunkLL: d.trunkLL || [],
-      mainsLL: d.mainsLL, couplersLL: d.couplersLL, hasSeg: !!d.segLL,
-      tolM: TOL_M,
-      dist: (window.RyTrunkGeo && window.RyTrunkGeo.haversine) ? window.RyTrunkGeo.haversine : function () { return Infinity; },
-      /* [v915] 步骤 3：逐组可达性 + 节点结构化匹配（齐备才启用，缺则退 v861 原口径） */
-      nodesLL: d.nodesLL,
-      groupOfZi: function (zi) { return groupOf(zi, d.manual, d.nPer); },
-      groups: d.gCount
-    });
+    /* [perf-20261106] 数据对象被替换（换地块 / 恢复工程 / 重生成管线）⇒ 强制失效；
+       同一对象被原地改写（拖动分区、编辑节点或总管）⇒ 由坐标签名兜住。 */
+    var v = ensureValidation(d);         /* 与空闲预热共用同一缓存入口 */
     if (!v.ok) {
       active = null;
       hideGroupInfo();
@@ -684,6 +801,7 @@
       }
       return false;
     }
+    renderSnapshotD = d;     /* [perf-20261106] 复用同一份快照，不再 collect 第二次 */
     render(g);
     if (!silentChips) syncChipsState();
     return true;
@@ -837,6 +955,7 @@
     rebuildChips(d);
     var tb = document.getElementById('tlDemoBar');
     if (tb) tb.style.display = 'none';   /* 简图演示 chips 在地图页无意义，隐藏防误点 */
+    scheduleWarmup(d);                   /* [perf-cold] 空闲期预填校验缓存，消除首次点击的长任务 */
   }
 
   function injectCss() {
@@ -1094,7 +1213,7 @@
       }
       try {
         var d = collect();
-        if (!d) return { ver: 'v990-tb-shortcut', error: 'collect-null（页面缺管线图数据）' };
+        if (!d) return { ver: 'v992-cold-prune', error: 'collect-null（页面缺管线图数据）' };
         var trunkPts = [];
         (d.trunkLinesLL || []).forEach(function (l) { l.forEach(function (p) { trunkPts.push([+p.lat.toFixed(6), +p.lng.toFixed(6)]); }); });
         var trunkDense = densify(d.trunkLinesLL ? [].concat.apply([], d.trunkLinesLL) : []);
@@ -1117,12 +1236,12 @@
           rt.trunk.concat(rt.main).concat(rt.branch).forEach(function (s) { seq.push(s.key); });
           return { zi: rt.zi, keys: seq };
         });
-        return { ver: 'v990-tb-shortcut', groups: d.gCount, manual: d.manual, nPer: d.nPer,
+        return { ver: 'v992-cold-prune', groups: d.gCount, manual: d.manual, nPer: d.nPer,
                  trunkPts: trunkPts, perMainMinM: perMainMinM, entries: entries,
                  nodes: (d.nodesLL || []).length, routes: routeSeq };
-      } catch (e) { return { ver: 'v990-tb-shortcut', error: String(e && e.message || e) }; }
+      } catch (e) { return { ver: 'v992-cold-prune', error: String(e && e.message || e) }; }
     },
-    VERSION: 'v990-tb-shortcut',
+    VERSION: 'v992-cold-prune',
     TOL_M: TOL_M,
     INTERVAL_MS: INTERVAL_MS,
     init: function (c) {
