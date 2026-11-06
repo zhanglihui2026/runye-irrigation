@@ -3661,7 +3661,11 @@
     });
     input.addEventListener('input',function(){
       var raw=Number(input.value);if(input.value.trim()===''||!isFinite(raw))return;
-      raw=Math.max(-180,Math.min(180,raw));
+      /* [v995 2026-11-06 用户约定] 角度旋转只允许 90° 以内：输入钳到 ±90，
+         超过 90° 的换向一律走「↻ +90°」按钮（旋转后格系宽高互换 ⇒ 地块长/短边
+         重算 ⇒ tapeAxisOf 首分区定带轴 ⇒ 主管/支管垂直自动跟随）。 */
+      if(Math.abs(raw)>90&&typeof tip==='function')tip('分区角度只能旋转 90° 以内；超过 90° 请用「↻ +90°」按钮，旋转后长/短边与滴灌带方向自动重算');
+      raw=Math.max(-90,Math.min(90,raw));
       if(Math.abs(raw-startAngle)>0.001){
         if(!pushed){ppPushHistory();pushed=true;}
         /* input 事件先更新 ppState.zoneAngleDeg，随后 change 事件再次调用
@@ -3674,7 +3678,9 @@
     });
     input.addEventListener('change',function(){
       var raw=Number(input.value);if(input.value.trim()===''||!isFinite(raw)){ppSyncZoneAngleUI();return;}
-      raw=Math.max(-180,Math.min(180,raw));
+      /* [v995] 同 input 事件：钳 ±90，超限提示走「↻ +90°」按钮 */
+      if(Math.abs(raw)>90&&typeof tip==='function')tip('分区角度只能旋转 90° 以内；超过 90° 请用「↻ +90°」按钮，旋转后长/短边与滴灌带方向自动重算');
+      raw=Math.max(-90,Math.min(90,raw));
       if(!pushed&&Math.abs(raw-startAngle)>0.001)ppPushHistory();
       ppApplyZoneAngle(raw,true,false,designPreimage);ppSyncZoneAngleUI();pushed=false;designPreimage=null;
     });

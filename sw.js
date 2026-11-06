@@ -1300,7 +1300,9 @@
    B 拖到节点→links 0→1 且 atM 不变），普通模式复测 moveNode=9 无影响。 */
 /* [v994-area-lock-merge-guard] 面积锁定：合并豁免改为「拖到边线才放行」，
    修掉最外侧内线 / 2 分区轴锁定失效；按钮同步 aria-label 与 title。 */
-const VERSION = 'v994-area-lock-merge-guard';
+/* [v995-angle-90-clamp] 分区角度输入钳制 ±90°，超限提示改用「↻+90°」按钮；
+   带向口径经用户拍板维持分区级长边（v886），不需要改 tapeAxisOf。 */
+const VERSION = 'v995-angle-90-clamp';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
