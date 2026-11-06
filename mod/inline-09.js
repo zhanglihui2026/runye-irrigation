@@ -2581,7 +2581,9 @@ var tlDiagramSVG = null;
 
 function tlGetZoneCount() {
   var btn = document.querySelector('#tlZoneCountGroup .selected');
-  return btn ? parseInt(btn.dataset.n) : 2;
+  /* [v997 2026-11-06 用户要求] 无选中兜底 2 → 1（与 HTML 初始态 data-n="1" selected 同源）：
+     分区轮灌默认联合分区 = 1（单区单组）。 */
+  return btn ? parseInt(btn.dataset.n) : 1;
 }
 /* v98 手动分区成组：分区 -> 手动组号映射 与 左栏分组状态刷新 */
 function tlZoneManualGroupOf(zi) {
