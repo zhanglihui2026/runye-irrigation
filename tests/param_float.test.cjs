@@ -55,17 +55,21 @@ t('输入行位于画布容器（#ppCanvasWrap 之后、.pp-stage 内）',
   html.indexOf('id="ppCanvasWrap"') < floatIdx &&
   html.indexOf('pp-rail-toggle') > planBarIdx);
 
-console.log('[left-rail] 左栏只留入口');
-t('显隐按钮存在', html.includes('id="ppParamFloatToggle"'));
-t('左栏不再有第二份 #ppRecipeBar/#ppPlanBar',
-  recipeIdx === html.lastIndexOf('id="ppRecipeBar"') &&
-  planBarIdx === html.lastIndexOf('<div class="pp-plan-bar" id="ppPlanBar">'));
+console.log('[left-rail] 左栏入口（[v999] 已取消，悬浮窗为唯一入口）');
+/* 剥注释再判：历史沿革注释里允许提及旧 id，只有真实 DOM/代码不许再有 */
+const htmlCode = html.replace(/<!--[\s\S]*?-->/g, '');
+const peCode = pe.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+t('左栏入口按钮/容器已删除（DOM 层）',
+  !htmlCode.includes('ppParamFloatToggle') && !htmlCode.includes('ppParamLauncherBar'));
+t('左栏「灌溉参数」灰分组条已删除（悬浮窗标题栏替代）',
+  !htmlCode.includes('<div class="ry-props-head">灌溉参数</div>'));
+t('plot-editor 显隐接线已退役（代码层）',
+  !peCode.includes('bindParamFloatToggle') && !peCode.includes('runye_panel_ppParamFloat:hidden'));
 t('v990 隐藏 checkbox #planZoneMergeLast 留在左栏',
-  /<!-- \[v996 搬移\][\s\S]*?<input type="checkbox" id="planZoneMergeLast" hidden>/.test(html));
+  /<!-- ===== \[v999[\s\S]*?<input type="checkbox" id="planZoneMergeLast" hidden>/.test(html));
 
 console.log('[wiring] 消费点未动');
 const i09 = fs.readFileSync(path.join(ROOT, 'mod/inline-09.js'), 'utf8');
-t('显隐接线存在', pe.includes('bindParamFloatToggle') && pe.includes('runye_panel_ppParamFloat:hidden'));
 t('planZoneFixedSide / ppRecipeFlow 消费点未动',
   i09.includes('function planZoneFixedSide()') && /ppRecipeFlow|window\.RyRecipes/.test(pe));
 

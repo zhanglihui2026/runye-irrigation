@@ -3686,6 +3686,10 @@
     });
   })();
 
+  /* [v999 2026-11-06 用户要求] 原 bindParamFloatToggle（左栏 #ppParamLauncherBar 显隐按钮）
+     整体退役：蓝框入口取消，悬浮面板 #ppParamFloat 成为唯一控制入口（自身带折叠 ▾，
+     data-ry-fold-key 单独记忆折叠态；旧 runye_panel_ppParamFloat:hidden 存档不再读取）。 */
+
   /* ===== [v325 2026-10-09 用户要求] AI 规划闭环：带地块信息跳 AI 助手；回传结果提示应用 ===== */
   (function ppAiPlanFlow(){
     function snapshot(){

@@ -1302,9 +1302,9 @@
    修掉最外侧内线 / 2 分区轴锁定失效；按钮同步 aria-label 与 title。 */
 /* [v995-angle-90-clamp] 分区角度输入钳制 ±90°，超限提示改用「↻+90°」按钮；
    带向口径经用户拍板维持分区级长边（v886），不需要改 tapeAxisOf。 */
-/* [v998-float-drag-resize] 灌溉参数悬浮面板：标题栏整条可拖动（head data-ry-drag），
-   ⠿ 抓手改回调宽职责（data-ry-resize 200~420，存档+双击复位）——修正 v996 的职责反置。 */
-const VERSION = 'v998-float-drag-resize';
+/* [v999-float-only] 左栏蓝框入口（灌溉参数灰条 + 显隐按钮）取消，悬浮面板为唯一控制入口；
+   bindParamFloatToggle 接线退役，旧 hidden 存档不再读取。 */
+const VERSION = 'v999-float-only';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
