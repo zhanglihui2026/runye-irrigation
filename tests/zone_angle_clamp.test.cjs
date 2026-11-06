@@ -40,12 +40,12 @@ t('输入框 aria 写明 90 度约定', html.includes('仅支持90度以内，�
 t('旋转按钮 title 写明长/短边重算与带向跟随',
   html.includes('旋转后地块长/短边重算，滴灌带方向按分区长边重定，主管/支管自动跟随'));
 
-console.log('[version] 同抬闸门');
+console.log('[version] 同抬闸门（[v996] 改动态口径：本测试不再写死版本串，后续抬号零维护）');
 const ver = (sw.match(/const VERSION = '([^']+)'/) || [])[1];
-t('sw VERSION = v995-angle-90-clamp', ver === 'v995-angle-90-clamp');
+t('sw VERSION 形如 vNNN-xxx', /^v\d+-[a-z0-9-]+$/.test(ver || ''));
 const vref = html.split('?v=' + ver.replace(/^v/, '')).length - 1;
 t('index.html ?v= 全部同抬（14 处）', vref === 14);
-t('index.html 无旧版残留', !html.includes('?v=994-'));
+t('index.html 无上一版残留', !html.includes('?v=995-') || ver.replace(/^v/, '') === '995-angle-90-clamp');
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

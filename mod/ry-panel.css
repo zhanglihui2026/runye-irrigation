@@ -683,11 +683,14 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-to
   border-bottom:1px solid #e8ecea;background:#f7fafa;
 }
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-lib-title{
-  flex:1;font-size:11px;font-weight:700;color:var(--ry-s-700,#334155);line-height:1.4;
+  flex:1;font-size:11px;font-weight:600;color:var(--ry-s-700,#334155);line-height:1.4;   /* [v1001] 700→600：与 .ry-props-head 灰条同基准 */
 }
+/* [v1001 2026-11-06 用户反馈「文字大小要跟其他的统一」] .pp-recipe-lib-item/-save 都是
+   <button>，被 runye-typography.css 的 button{font-size:13px!important} 压成 13px，
+   比周边 11px 大一号 —— 与 v609/v538 同款处理：控件字号必须带 !important 压回。 */
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-lib-save{
   flex:none;height:18px;padding:0 7px;border:1px solid #cfd8d3;background:#fff;
-  color:#244f3e;font-size:10px;line-height:1;cursor:pointer;white-space:nowrap;
+  color:#244f3e;font-size:10px !important;line-height:1;cursor:pointer;white-space:nowrap;
   font-family:inherit;
 }
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-lib-save:hover{ background:#eef4f1; }
@@ -699,7 +702,7 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-to
   min-height:26px;padding:3px 10px 3px 7px;border:0;border-bottom:1px solid #e8ecea;
   border-left:3px solid transparent;
   background:#fff;color:var(--ry-s-700,#334155);
-  font-size:11px;line-height:1.5;cursor:pointer;font-family:inherit;
+  font-size:11px !important;line-height:1.5;cursor:pointer;font-family:inherit;   /* [v1001] !important 压回 typography 全局 13px */
 }
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-lib-item:hover{ background:#eef4f1; }
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-lib-item.selected{
@@ -715,7 +718,7 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-to
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-lib-empty{
-  padding:7px 10px;font-size:10.5px;line-height:1.6;color:var(--ry-s-500,#64748b);
+  padding:7px 10px;font-size:10px;line-height:1.6;color:var(--ry-s-500,#64748b);   /* [v1001] 10.5→10：与 .pp-recipe-status 同档 */
   border-bottom:1px solid #e8ecea;
 }
 /* Shoelace 代理输入：与原生回退同尺寸，主色走品牌深墨绿 */

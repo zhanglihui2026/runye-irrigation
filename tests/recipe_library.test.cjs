@@ -57,6 +57,11 @@ t('.pp-recipe-lib 一族规则齐全',
   rp.includes(S + '.pp-recipe-lib-item.selected{') &&
   rp.includes(S + '.pp-recipe-lib-empty{'));
 t('选中态 = 淡绿底 + 品牌绿左条', /pp-recipe-lib-item\.selected\{[^}]*#e8f3ec[^}]*#16a34a/.test(rp));
+/* [v1001] 文字大小统一：button 字号必须带 !important 压回 typography 全局 13px */
+t('列表项/存当前按钮字号带 !important（11px/10px 压回）',
+  /pp-recipe-lib-item\{[^}]*font-size:11px !important/.test(rp) &&
+  /pp-recipe-lib-save\{[^}]*font-size:10px !important/.test(rp));
+t('库标题与灰条同基准（11px/600）', /pp-recipe-lib-title\{[^}]*font-size:11px;font-weight:600/.test(rp));
 t('index.html 内联 style 无 .pp-recipe-lib 新选择器（⑥b）', (() => {
   const blocks = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map(m => m[1].replace(/\/\*[\s\S]*?\*\//g, '')).join('\n');
   return !blocks.includes('.pp-recipe-lib');
