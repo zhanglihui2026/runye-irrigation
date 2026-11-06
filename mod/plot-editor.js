@@ -1757,6 +1757,13 @@
     var key=axis==='x'?'xPos':'yPos';
     var arr=cuts[key];
     if(anchorIndex<=0||anchorIndex>=arr.length-1)return null;
+    /* [v994] 某方向只有一条内线（2 分区）时，外边界固定、动这条线必然同时改变两区面积，
+       「整轴刚性平移」无对象可平移 ⇒ 锁定态直接冻结。若用户把它拖到地块边线，
+       ppBmFreeOk 会放行 ppDragCutTo 合并减区，不进本分支。 */
+    if(arr.length<=3){
+      ppState.mergePreview=null;
+      return {merge:false,count:arr.length-1,axis:axis,delta:0,frozen:true};
+    }
     var minGap=Math.max(2,4*ppWorldPerPixel(axis));
     var delta=newPos-arr[anchorIndex];
     // 约束整体平移，使最外侧两条内部线仍落在地块边界内（保持格序）
@@ -2815,9 +2822,15 @@
           ppPushHistory();
           ppCutDragPreimage=cutPreimage;
           ppCutSinglePreimage=cutSinglePreimage;
-          ppState.dragCut={axis:hit.axis,index:hit.index};
+          ppState.dragCut={axis:hit.axis,index:hit.index,mergeMode:false};
           ppState.lastSelectedCut={axis:hit.axis,index:hit.index};
           ppState.mergePreview=null;
+          /* [v994] 锁定态下 2 分区轴无法平移，先给一句明确提示，避免「拖了没反应」 */
+          if(ppState.areaLocked){
+            var dc0=ppCurrentCuts(),arr0=dc0&&dc0[hit.axis==='x'?'xPos':'yPos'];
+            if(arr0&&arr0.length<=3&&typeof tip==='function')
+              tip('已锁定面积：该方向只有 2 个分区，拖动网格线不会改变面积；拖到地块边线可合并减区');
+          }
           ppCanvas.style.cursor=hit.axis==='x'?'ew-resize':'ns-resize';
           e.preventDefault();return;
         }
@@ -2862,8 +2875,10 @@
       var dcK=ppState.dragCut;
       var dcCuts=ppCurrentCuts(),dcLocal=dcCuts&&dcCuts.frame?dcCuts.frame.toGrid(world2):world2;
       var dcCoord=dcLocal[dcK.axis==='x'?'x':'y'];
-      // 面积锁定：整轴刚性平移（面积不变）；否则单线拖动（可合并）
-      if(ppState.areaLocked&&!ppBmFreeOk(dcK.axis,dcK.index))ppDragCutAxis(dcK.axis,dcK.index,dcCoord);
+      // 面积锁定：整轴刚性平移（面积不变）；仅「最外侧内线已拖到地块边线」才放行合并
+      var dcFree=ppBmFreeOk(dcK.axis,dcK.index,dcCoord);
+      ppState.dragCut.mergeMode=dcFree;
+      if(ppState.areaLocked&&!dcFree)ppDragCutAxis(dcK.axis,dcK.index,dcCoord);
       else ppDragCutTo(dcK.axis,dcK.index,dcCoord);
       ppRender();
       if(typeof window.ppRefreshDiagramIfVisible==='function')window.ppRefreshDiagramIfVisible();
@@ -2912,8 +2927,9 @@
   ppCanvas.addEventListener('mouseup',function(e){
     // Finalize cut line drag（存在合并预览时执行合并，分区数随之减少）
     if(ppState.dragCut){
-      // 面积锁定：只平移、不合并（合并会改变区数与面积）
-      var ppBmWasOk=ppBmFreeOk(ppState.dragCut.axis,ppState.dragCut.index);
+      // 面积锁定：只平移、不合并（合并会改变区数与面积）；
+      // [v994] 是否处于「边界合并模式」由拖动末帧记录，不能再拿静态线索引反推
+      var ppBmWasOk=!!(ppState.dragCut&&ppState.dragCut.mergeMode);
       var ppMerged=(ppState.areaLocked&&!ppBmWasOk)?false:ppCommitMerge();
       ppState.dragCut=null;
       ppState.hoverCut=null;
@@ -4155,9 +4171,14 @@
     ppSetBtnLabel(btn,on?'已锁定面积':'锁定面积');
     btn.classList.toggle('active',on);
     btn.setAttribute('aria-pressed',on?'true':'false');
+    /* [v994] 同步 aria-label：inline-18.js 只在初始化按可见文案写过一次，
+       状态切换后旧标签会留着，读屏器在锁定态仍念「锁定面积」。 */
+    btn.setAttribute('aria-label',on?'已锁定面积':'锁定面积');
+    /* [v994] title 以当前文案开头：inline-18.js 的 title 归一化规则
+       （description.indexOf(label)===0 才原样保留）否则会拼出「锁定面积：锁定分区面积：…」双重前缀。 */
     btn.title=on
-      ?'已锁定分区面积：拖动网格线只整体平移分区、不改变各区面积；再点一次解锁'
-      :'锁定分区面积：开启后拖动网格线只整体平移分区，不改变各区面积（如 18 亩保持 18 亩）；例外：最外侧分区线拖到地块边线可直接合并减区；合并/重置/重新分区/旋转等操作会先自动解锁';
+      ?'已锁定面积：拖动网格线只整体平移分区、中间各区面积不变；最外侧分区线拖到地块边线可合并减区；再点一次解锁'
+      :'锁定面积：开启后拖动网格线只整体平移分区，不改变各区面积（如 18 亩保持 18 亩）；例外：最外侧分区线拖到地块边线可直接合并减区；合并/重置/重新分区/旋转等操作会先自动解锁';
   }
   function ppUnlockArea(){
     if(ppState.areaLocked){ ppState.areaLocked=false; ppUpdateLockAreaBtn(); }
@@ -4310,14 +4331,26 @@
     });
     ppUpdateLockAreaBtn(); // 同步初始文案（默认未锁定）
   }
-  // 2026-09-28 晚（用户拍板）：取消豁免开关按钮，横竖一个原则——
-  // 「锁定面积」开启时，最外侧内部线（index=1 或 len-2）永远可直接拖到边线合并减区；中间线仍整轴平移。
-  // 未锁定时维持原吸附合并逻辑不变（ppBmFreeOk 仅在锁定态参与判定）。
-  function ppBmFreeOk(axis,index){
+  /* 2026-09-28 晚（用户拍板）：「锁定面积」开启时，最外侧内部线（index=1 或 len-2）
+     可直接拖到地块边线合并减区；中间线仍整轴平移。
+     [v994 修正] 原实现只看「是不是最外侧内线」，不看拖到哪里 ⇒ 两个真实漏洞：
+       ① 最外侧内线小幅拖动也走 ppDragCutTo（单线自由移动）⇒ 锁定态下该区面积照样变；
+       ② 某方向只有一条内线（2 分区）时 index===1 且 ===len-2 ⇒ 整轴被豁免，锁定对该轴完全无效。
+     CDP 合成拖拽实测：12 分区轴首格 60m→32.5m；2 分区轴唯一内线 200→227.06。
+     现在豁免必须同时满足「最外侧内线」+「本帧坐标已贴近/越过相邻地块边线」，
+     阈值与 ppDragCutTo 的边界合并判据（newPos<=lo+thr / >=hi-thr）完全一致：
+     「拖到边线就合并」照旧可用，普通拖动一律走 ppDragCutAxis 整轴刚性平移。 */
+  function ppBmFreeOk(axis,index,coord){
     if(!ppState.areaLocked)return false;
     var cuts=ppCurrentCuts(); if(!cuts)return false;
     var arr=cuts[axis==='x'?'xPos':'yPos'];
-    return index===1||index===arr.length-2;
+    if(!arr||index<=0||index>=arr.length-1)return false;
+    if(index!==1&&index!==arr.length-2)return false;
+    if(typeof coord!=='number'||!isFinite(coord))return false;
+    var thr=Math.max(2,25*ppWorldPerPixel(axis));
+    if(index===1&&coord<=arr[0]+thr)return true;
+    if(index===arr.length-2&&coord>=arr[arr.length-1]-thr)return true;
+    return false;
   }
 
 
@@ -4341,7 +4374,6 @@
       ?window.ppGetState():null;
     // 面积锁定：微调改为整轴刚性平移，各区面积不变（任务K 2026-09-26）
     if(ppState.areaLocked){
-      ppPushHistory();
       var b2=ppGetBounds(); if(!b2)return;
       var planN2=parseInt(document.getElementById('planN')?.value)||parseInt(document.getElementById('fld_N')?.value)||4;
       var layout2=ppGetZoneLayout(b2,planN2);
@@ -4353,10 +4385,13 @@
       else { if(dir==='up')d=-s; else if(dir==='down')d=s; else return; }
       if(d===0)return;
       var arr2=cuts2[ax==='x'?'xPos':'yPos'];
+      /* [v994] 2 分区轴锁定态无法平移，微调一并忽略（不留空历史快照） */
+      if(arr2.length<=3)return;
       var mg=Math.max(2,4*ppWorldPerPixel(ax));
       var dMin=arr2[0]+mg-arr2[1], dMax=arr2[arr2.length-1]-mg-arr2[arr2.length-2];
       var delta=d;
       if(dMin>dMax)delta=0; else { if(delta<dMin)delta=dMin; if(delta>dMax)delta=dMax; }
+      ppPushHistory();
       var o2=arr2.slice();
       for(var i2=1;i2<arr2.length-1;i2++){ ppSetCutPos(ax,i2,o2[i2]+delta); }
       ppState.mergePreview=null;
