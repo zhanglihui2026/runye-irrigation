@@ -3805,8 +3805,18 @@
        按钮走 #rySetBody 事件委托调 window.RyRecipes）。
        ⚠ 设置页 DOM 会被 render() 重建 ⇒ ryRecipe* 一律每次现查、不缓存；
        全部判空：设置页不在时对应功能退化为不可用，工具栏调用不受影响。 */
-    var selEl=$('ppRecipeSelect'),statusEl=$('ppRecipeStatus');
-    if(!selEl||!$('ppRecipeApply'))return;
+    /* [v526] 命名/保存/改名/删除在设置弹窗「灌溉参数」页签（#ryRecipe*，由 inline-28 渲染，
+       按钮走 #rySetBody 事件委托调 window.RyRecipes）。
+       ⚠ 设置页 DOM 会被 render() 重建 ⇒ ryRecipe* 一律每次现查、不缓存；
+       全部判空：设置页不在时对应功能退化为不可用。
+       [v1000 2026-11-06 用户要求] 方案库升级为左栏列表（#ppRecipeLib，像在线地图·地块库）：
+       点列表项 = 直接套用（免「调用」按钮）；「💾 存当前」把悬浮窗 10 项存为新方案；
+       悬浮窗「选择方案+调用」行（#ppRecipeBar/#ppRecipeSelect/#ppRecipeApply）退役。
+       本 IIFE 的锚点从下拉改为列表容器（原 !selEl 早退会连带杀掉 window.RyRecipes，
+       设置页管理一起失灵——勿再按下拉判存活）。 */
+    var listEl=$('ppRecipeList'),statusEl=$('ppRecipeStatus');
+    if(!listEl)return;
+    var lastApplied=null;   /* 最近套用的方案 id（列表高亮，地块库选中态同义） */
     function read(){try{var d=JSON.parse(localStorage.getItem(KEY)||'null');if(d&&d.version===1&&Array.isArray(d.recipes))return d.recipes;}catch(e){}return [];}
     function write(list){try{localStorage.setItem(KEY,JSON.stringify({version:1,recipes:list}));return true;}catch(e){status('保存失败：浏览器不允许写入本地存储','err');return false;}}
     function status(msg,cls){
@@ -3881,29 +3891,37 @@
       });
       if(old&&list.some(function(r){return r.id===old;}))sel.value=old;
     }
+    /* [v1000] 列表项摘要：挑 3 个最有辨识度的参数（亩/区 · 铺设长度 · 滴头流量）+ 保存日期 */
+    function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+    function renderList(list){
+      var h='';
+      if(!list.length){
+        h='<div class="pp-recipe-lib-empty">暂无方案：在悬浮窗调好参数后点「💾 存当前」保存；改名 / 删除在「设置 → 灌溉参数」页签。</div>';
+      }else{
+        list.forEach(function(r){
+          var d=new Date(r.at||0),p=r.params||{},meta=[];
+          if(p.planZoneMuManual)meta.push(p.planZoneMuManual+'亩/区');
+          if(p.planTapeLaySide)meta.push('铺'+p.planTapeLaySide+'m');
+          if(p.planEmitterFlow)meta.push(p.planEmitterFlow+'L/h');
+          var selAttr=r.id===lastApplied;
+          h+='<button type="button" class="pp-recipe-lib-item'+(selAttr?' selected':'')+'"'
+            +' data-rid="'+esc(r.id)+'" role="option" aria-selected="'+(selAttr?'true':'false')+'"'
+            +' title="点击套用「'+esc(r.name)+'」的 10 项参数并重算">'
+            +'<span class="pp-recipe-lib-name">'+esc(r.name)+'</span>'
+            +'<span class="pp-recipe-lib-meta">'+(meta.length?meta.join(' · ')+' · ':'')+(d.getMonth()+1)+'/'+d.getDate()+' 存</span>'
+            +'</button>';
+        });
+      }
+      listEl.innerHTML=h;
+    }
     function refreshSelect(keepId){
       var list=read();
-      fillSelect(selEl,list,keepId);
-      fillSelect($('ryRecipeSelect'),list,keepId);
+      fillSelect($('ryRecipeSelect'),list,keepId);   /* 设置弹窗下拉（改名/删除的选中载体） */
+      renderList(list);
     }
-    function curSelId(){var s=$('ryRecipeSelect');return (s&&s.value)?s.value:(selEl.value||null);}
-    /* [v634] 「调用」取方案的目标：**以工具栏下拉为准**（那是用户眼前选中的），
-       工具栏没选时才回退设置页下拉。curSelId 的语义（设置页优先）留给改名/删除，不动。 */
-    function applyTargetId(){
-      if(selEl&&selEl.value)return selEl.value;
-      var g=$('ryRecipeSelect');
-      if(g&&g.value)return g.value;
-      /* [v634b] 两处都没选：回退到「最近保存的方案」并把它选上。
-         用户点「调用」的本意就是用方案，不该被一句 4 秒就消失的「请先选择方案」挡回来
-         （工具栏宽度不足时下拉框本身就可能看不见，等于让按钮空转）。 */
-      var list=read();
-      if(!list.length)return null;
-      list.sort(function(a,b){return (b.at||0)-(a.at||0);});
-      var id=list[0].id;
-      if(selEl){try{selEl.value=id;}catch(e){}}
-      if(g){try{g.value=id;}catch(e){}}
-      return id;
-    }
+    function curSelId(){var s=$('ryRecipeSelect');return (s&&s.value)?s.value:null;}
+    /* [v1000] 「调用」目标改为列表点击直取（原 applyTargetId 随下拉退役）；
+       curSelId 仅服务设置页改名/删除（那里以 #ryRecipeSelect 为选中载体）。 */
     function curName(){var el=$('ryRecipeName');return el?(el.value||'').trim():'';}
     function doSave(){
       var list=read(),name=curName()||('方案'+(list.length+1));
@@ -3927,17 +3945,23 @@
       var list=read().filter(function(x){return x.id!==rid;});
       if(write(list)){refreshSelect();status('已删除方案');}
     }
-    $('ppRecipeApply').onclick=function(){
-      var rid=applyTargetId();
-      var r=read().find(function(x){return x.id===rid;})||null;
-      if(!r){status('请先在下拉里选择一个方案','err');return;}
+    /* [v1000] 列表点击 = 直接套用（事件委托，列表 innerHTML 重建不丢绑定） */
+    listEl.addEventListener('click',function(e){
+      var t=e.target&&e.target.closest?e.target.closest('[data-rid]'):null;
+      if(!t)return;
+      var r=read().find(function(x){return x.id===t.getAttribute('data-rid');});
+      if(!r){status('方案已不存在，列表已刷新','err');refreshSelect();return;}
       var got=applyParams(r.params||{})||{};
       var miss=(got.skipped&&got.skipped.length)||0;
-      var tip='已调用「'+r.name+'」：'+(got.wrote?got.wrote.length:0)+' 项已回填并重算';
+      var tip='已套用「'+r.name+'」：'+(got.wrote?got.wrote.length:0)+' 项已回填并重算';
       if(miss)tip+='；'+miss+' 项无有效值未回填（'+got.skipped.join('、')+'）';
       if(got.note)tip+='；'+got.note;
+      lastApplied=r.id;refreshSelect(r.id);
       status(tip,miss?'err':undefined);
-    };
+    });
+    /* [v1000] 「💾 存当前」：无名称输入时自动「方案N」，同名覆盖更新（doSave 既有语义）；
+       要自定义名称/改名 → 「设置 → 灌溉参数」页签。 */
+    var _saveCur=$('ppRecipeSaveCur');if(_saveCur)_saveCur.onclick=function(){doSave();};
     /* 旧工具栏 保存/✎/🗑 若 DOM 还在（回滚场景）也照常绑定；不在则跳过 */
     var _old=[[$('ppRecipeSave'),doSave],[$('ppRecipeRename'),doRename],[$('ppRecipeDel'),doDel]];
     _old.forEach(function(pr){if(pr[0])pr[0].onclick=pr[1];});

@@ -44,13 +44,12 @@ t('调宽范围声明 200~420（rypResizePanel 夹紧）',
   html.includes('data-ry-resize-min="200"') && html.includes('data-ry-resize-max="420"'));
 const bodyIdx = html.indexOf('class="ry-float-body pp-side" data-ry-body');
 t('body 复用 .pp-side 类（皮肤零拷贝）', bodyIdx > floatIdx);
-const recipeIdx = html.indexOf('id="ppRecipeBar"');
 const planBarIdx = html.indexOf('<div class="pp-plan-bar" id="ppPlanBar">');
-t('#ppRecipeBar 在悬浮面板 body 内', recipeIdx > bodyIdx);
-t('#ppPlanBar 在悬浮面板 body 内', planBarIdx > recipeIdx);
-t('全页各只有一份 #ppRecipeBar/#ppPlanBar（无重复 id）',
-  html.split('id="ppRecipeBar"').length - 1 === 1 &&
-  html.split('id="ppPlanBar"').length - 1 === 1);
+/* [v1000] 配方行已退役，悬浮窗 body 只剩 10 项输入行；库迁左栏（契约见 recipe_library.test） */
+t('#ppPlanBar 在悬浮面板 body 内，配方下拉不在 DOM 层',
+  planBarIdx > bodyIdx && !html.replace(/<!--[\s\S]*?-->/g, '').includes('id="ppRecipeBar"'));
+t('全页只有一份 #ppPlanBar（无重复 id）',
+  planBarIdx === html.lastIndexOf('<div class="pp-plan-bar" id="ppPlanBar">'));
 t('输入行位于画布容器（#ppCanvasWrap 之后、.pp-stage 内）',
   html.indexOf('id="ppCanvasWrap"') < floatIdx &&
   html.indexOf('pp-rail-toggle') > planBarIdx);

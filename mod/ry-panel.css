@@ -671,6 +671,53 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-to
    ⇒ 空时不给盒子（:empty 对「只有空白文本」也命中），有反馈文字时照常展开，
      .pp-recipe-err 的红字规则在上面，不受影响。 */
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-status:empty{ display:none; }
+/* ===== [v1000 2026-11-06 用户要求] 灌溉参数库（#ppRecipeLib，左栏「二级·地块与灌溉参数」
+   组内第一项）：像在线地图·地块库一样逐条罗列方案，点列表项直接套用（免「调用」按钮）。
+   皮肤挂 v609 特性面板同族作用域；选中态 = 地块库同义（淡绿底 + 左侧 3px 品牌绿条）。 ===== */
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-lib{
+  display:block;padding:0;margin:0;
+}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-lib-head{
+  display:flex;align-items:center;gap:6px;
+  min-height:24px;padding:0 10px;box-sizing:border-box;
+  border-bottom:1px solid #e8ecea;background:#f7fafa;
+}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-lib-title{
+  flex:1;font-size:11px;font-weight:700;color:var(--ry-s-700,#334155);line-height:1.4;
+}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-lib-save{
+  flex:none;height:18px;padding:0 7px;border:1px solid #cfd8d3;background:#fff;
+  color:#244f3e;font-size:10px;line-height:1;cursor:pointer;white-space:nowrap;
+  font-family:inherit;
+}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-lib-save:hover{ background:#eef4f1; }
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-lib-list{
+  display:block;max-height:154px;overflow-y:auto;overscroll-behavior:contain;
+}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-lib-item{
+  display:block;width:100%;box-sizing:border-box;text-align:left;
+  min-height:26px;padding:3px 10px 3px 7px;border:0;border-bottom:1px solid #e8ecea;
+  border-left:3px solid transparent;
+  background:#fff;color:var(--ry-s-700,#334155);
+  font-size:11px;line-height:1.5;cursor:pointer;font-family:inherit;
+}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-lib-item:hover{ background:#eef4f1; }
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-lib-item.selected{
+  background:#e8f3ec;border-left-color:#16a34a;
+}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-lib-item:last-child{ border-bottom-color:#e8ecea; }
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-lib-name{
+  display:block;font-weight:600;color:var(--ry-s-800,#1e293b);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-lib-meta{
+  display:block;font-size:10px;color:var(--ry-s-500,#64748b);font-variant-numeric:tabular-nums;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-recipe-lib-empty{
+  padding:7px 10px;font-size:10.5px;line-height:1.6;color:var(--ry-s-500,#64748b);
+  border-bottom:1px solid #e8ecea;
+}
 /* Shoelace 代理输入：与原生回退同尺寸，主色走品牌深墨绿 */
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side sl-input[data-ry-proxy-for]{
   display:block;flex:0 0 64px;width:64px;min-width:64px;max-width:64px;

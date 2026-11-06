@@ -1302,9 +1302,9 @@
    修掉最外侧内线 / 2 分区轴锁定失效；按钮同步 aria-label 与 title。 */
 /* [v995-angle-90-clamp] 分区角度输入钳制 ±90°，超限提示改用「↻+90°」按钮；
    带向口径经用户拍板维持分区级长边（v886），不需要改 tapeAxisOf。 */
-/* [v999-float-only] 左栏蓝框入口（灌溉参数灰条 + 显隐按钮）取消，悬浮面板为唯一控制入口；
-   bindParamFloatToggle 接线退役，旧 hidden 存档不再读取。 */
-const VERSION = 'v999-float-only';
+/* [v1000-recipe-library] 灌溉参数库升级为左栏列表（#ppRecipeLib，像在线地图·地块库）：
+   点列表项直接套用（免「调用」按钮）+「💾 存当前」；悬浮窗「选择方案+调用」行退役。 */
+const VERSION = 'v1000-recipe-library';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
