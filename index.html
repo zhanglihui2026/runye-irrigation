@@ -826,15 +826,18 @@ body.ry-worst-off [data-tlworst]{display:none}
        [v491] 配方库与 [v91] 输入行的完整沿革注释随块在 #ppParamFloat 内。
        按 v990 口径，隐藏 checkbox #planZoneMergeLast 与 planN/planZoneMode 留此不动。 ===== -->
   <!-- ===== [v1000 2026-11-06 用户要求] 灌溉参数库（像在线地图·地块库一样逐条罗列）：
-       点列表项 = 直接套用该方案 10 项参数并重算（免「调用」按钮）；「💾 存当前」把
-       悬浮窗当前 10 项存为新方案（同名覆盖）；改名/删除仍在「设置 → 灌溉参数」页签。
+       点列表项 = 直接套用该方案 10 项参数并重算（免「调用」按钮）；改名/删除仍在
+       「设置 → 灌溉参数」页签。
+       [2026-11-06 用户要求] 标题行右侧的「💾 存当前」按钮已取消（即下方 head 内不再放按钮）。
+       保存能力本身未删：仍走「设置 → 灌溉参数」页签 / window.RyRecipes.save；
+       plot-editor.js 的绑定是 if(_saveCur) 空守卫，CSS .pp-recipe-lib-save 亦保留，
+       要恢复只需把 <button id="ppRecipeSaveCur"> 加回本 head，逻辑自动接回。
        数据与逻辑 = mod/plot-editor.js ppRecipeFlow（localStorage['runye_irrigation_recipes_v1']，
        window.RyRecipes 同一套 API）；皮肤 = ry-panel.css [v1000] 段（v609 特性面板同族）。
        #ppRecipeStatus 自悬浮窗迁来（id 不变，status() 双写设置页 zero 改动）。 ===== -->
   <div class="pp-recipe-lib" id="ppRecipeLib">
     <div class="pp-recipe-lib-head">
       <span class="pp-recipe-lib-title">灌溉参数库</span>
-      <button type="button" class="pp-recipe-lib-save" id="ppRecipeSaveCur" title="把悬浮窗里当前的 10 项参数存为一个方案（同名覆盖更新）">💾 存当前</button>
     </div>
     <div class="pp-recipe-lib-list" id="ppRecipeList" role="listbox" aria-label="灌溉参数方案列表，点击套用"></div>
     <span class="pp-recipe-status" id="ppRecipeStatus" role="status"></span>
@@ -1093,6 +1096,14 @@ body.ry-worst-off [data-tlworst]{display:none}
           <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">目标流速</span><input class="ryp-native-fallback" type="number" id="planTargetV" value="1.5" min="0.3" max="5" step="0.1" aria-label="目标流速"><sl-input data-ry-proxy-for="planTargetV" type="number" value="1.5" min="0.3" max="5" step="0.1" size="small" aria-label="目标流速" hidden></sl-input><span class="pp-plan-unit">m/s</span></span>
           <span class="pp-plan-item"><span class="pp-plan-label">每亩流量</span><span class="pp-plan-val" id="planIntensity">—</span><span class="pp-plan-unit">m³/h</span></span>
         </div>
+        <!-- ===== [2026-11-06 用户要求] 面板底部「操作说明」：C 完整版 / 常驻展开的一段话。
+             文案按真实交互核过：10 项输入 input/change → calcPlan 即时重算（inline-11.js）；
+             左栏 #ppRecipeLib 点条目直接套用 10 项；方案保存/改名/删除在「设置 → 灌溉参数」；
+             标题栏拖动 + 双击复位、⠿ 调宽、▾ 折叠（v998）；planLift/planDh/planTapePressure
+             与 01 一级表单同源镜像（PP_LIFTDH_PAIRS）。纯静态文字，样式 = ry-panel.css
+             的 #ppParamFloat .ry-float-note 段，零 JS；面板折叠时随 body 一起收起。
+             要撤掉：删本 div 与 CSS 里那两条规则即可。 ===== -->
+        <div class="ry-float-note" id="ppParamNote"><b>操作说明</b>直接修改上方 10 项数值，分区、每亩流量等结果即时重算（「每亩流量」为派生值，不可手填）；左栏「灌溉参数库」点任一方案可一键套用该方案的 10 项参数；方案的保存、改名、删除在「设置 → 灌溉参数」中完成。按住标题栏可拖动面板（双击复位），左侧 ⠿ 调宽，右侧 ▾ 折叠；提升高度、地形高差、入口压力与一级表单同源，改一处两边同步。</div>
       </div>
     </div>
 <button type="button" class="pp-rail-toggle pp-rail-tab" id="ppRailToggle" aria-expanded="false" title="展开工具栏">工具栏</button>

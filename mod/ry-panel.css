@@ -731,6 +731,23 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-to
      新规则必须同为 (1,5,0) 且靠后声明才取胜 —— 补 .ry-float-body 类（首版 (1,4,0)、
      二版 (1,4,0) 均被压，探针实测 flexBasis 仍 46%，第三次修正）。 ===== */
 #ppParamFloat .ry-float-body.pp-side .pp-plan-item > .pp-plan-label:first-child{ flex-basis:28%; }
+/* ===== [2026-11-06 用户要求] 灌溉参数悬浮面板底部「操作说明」（常驻展开的一段话）。
+   只挂 #ppParamFloat，零 JS、不新增全局皮肤类；body 在本面板同时是 .ry-float-body.pp-side
+   （flex column + overflow-y:auto，padding 被 [v609] 归零），故本块是最后一个 flex item：
+   flex:none 防被压缩、width:100% 通栏，浅灰底 + 上细线与参数表分界，与 .ry-props-head 同族。
+   面板 ▾ 折叠时随 body 的 hidden 一起收起，无需额外逻辑。
+   要撤掉：删 index.html 的 #ppParamNote 与下面两条规则即可。 ===== */
+#ppParamFloat .ry-float-note{
+  flex:none;width:100%;box-sizing:border-box;
+  margin:0;padding:6px 10px 8px;
+  border-top:1px solid #e8ecea;background:#f7fafa;
+  color:var(--ry-s-500,#64748b);
+  font-size:11px;line-height:1.6;
+}
+#ppParamFloat .ry-float-note b{
+  display:block;margin-bottom:2px;
+  font-size:11px;font-weight:600;color:var(--ry-s-700,#334155);
+}
 /* Shoelace 代理输入：与原生回退同尺寸，主色走品牌深墨绿 */
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side sl-input[data-ry-proxy-for]{
   display:block;flex:0 0 64px;width:64px;min-width:64px;max-width:64px;
