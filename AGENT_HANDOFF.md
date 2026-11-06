@@ -8428,3 +8428,8 @@ L 场景分段 self 中位：`validateConnection` **136.1 ms**、`render` 7.3 ms
 **变更文件**：`mod/map-flow-demo.js`（剪枝 + `ensureValidation` + `scheduleWarmup` + 版本字面量）、`index.html` 14 处 `?v=`、`sw.js VERSION`，统一抬 **`v992-cold-prune`**；`AGENT_HANDOFF.md` 本报告。诊断资产 `_p1/_perf_harness.html`、`_perf_probe.cjs`、`_perf_ab.cjs`、`_cold_ab.cjs`、`_baseline_demo.js`、`_cold_baseline_demo.js` 与证据 JSON 按 `.gitignore` 的 `_*/` 约定留在本地，未入库。工作树中用户既有改动一律未覆盖、未回滚。
 
 **未做/不建议**：未迁移 Web Worker / C++ / WASM——剪枝后纯计算只剩约 25 ms，Worker 的序列化与异步状态机改造成本明显更高；未降低连通检查采样精度（属产品行为变化，须另行确认）。
+
+**发布结果（2026-11-06）**：
+- 提交 `408d8ca`（4 文件：`mod/map-flow-demo.js`、`index.html`、`sw.js`、`AGENT_HANDOFF.md`）；`git push origin master` 成功，把此前两个本地提交 `a3be093`（云端页本地自带 SDK）、`5cc0b2c`（v990 工具栏两键）一并推上，远端 `e8a3fdc..408d8ca`。
+- GitHub Pages 构建状态 `built`、commit 精确命中 `408d8ca`。线上冒烟（带 `Cache-Control: no-cache`）：`index.html` 14 处 `?v=992-cold-prune`、旧串 0 处；`sw.js VERSION=v992-cold-prune`；线上 `mod/map-flow-demo.js` 含 `scheduleWarmup` / `perf-cold`。**注意**：首次直连拿到 v989 是 Fastly 边缘缓存，加 no-cache 后即新版；浏览器侧由 14 处 `?v=` 与 SW 版本变化强制拉新。
+- **云端独立应用 `https://plot-library.app.workbuddy.host/` 未部署**：`workbuddy_sites_deploy` 返回 `SITES_ACCOUNT_MISMATCH`（`retryable:false`）。平台原话：「这个目录之前发布到的应用属于另一个账号，当前登录的账号无权发布到它，本次没有发布任何内容，重试也不会成功。请切换回当初发布它时使用的账号后再发布；原来的分享链接不受影响。」按发布规则不再重试、不改参数、不另发到别处。本地 SDK 修复代码已随 push 进仓库，但 WorkBuddy 站点上仍是旧 CDN 版本，需用户切回原账号后再发布并重跑线上冒烟。
