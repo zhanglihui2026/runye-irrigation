@@ -1302,9 +1302,9 @@
    修掉最外侧内线 / 2 分区轴锁定失效；按钮同步 aria-label 与 title。 */
 /* [v995-angle-90-clamp] 分区角度输入钳制 ±90°，超限提示改用「↻+90°」按钮；
    带向口径经用户拍板维持分区级长边（v886），不需要改 tapeAxisOf。 */
-/* [v997-zone-default-1] 分区轮灌默认联合分区=1：#tlZoneCountGroup 初始选中 2区→1区，
-   tlGetZoneCount 无选中兜底 2→1。 */
-const VERSION = 'v997-zone-default-1';
+/* [v998-float-drag-resize] 灌溉参数悬浮面板：标题栏整条可拖动（head data-ry-drag），
+   ⠿ 抓手改回调宽职责（data-ry-resize 200~420，存档+双击复位）——修正 v996 的职责反置。 */
+const VERSION = 'v998-float-drag-resize';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

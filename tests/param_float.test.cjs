@@ -34,6 +34,14 @@ t('声明式折叠/拖动/记忆 data-ry-* 齐全',
   html.includes('data-ry-position-key="ppParamFloatPos"') &&
   html.includes('data-ry-fold-key="runye_panel_ppParamFloat:fold"') &&
   html.includes('data-ry-keep-default="1"'));
+/* [v998] 约定对齐：head=拖动（cursor:move）、grip=调宽（cursor:ew-resize）——v996 做反了 */
+const headIdx = html.indexOf('class="ry-float-head" data-ry-toggle data-ry-drag');
+t('标题栏整条可拖动（head 带 data-ry-drag）', headIdx > floatIdx);
+t('抓手负责调宽（grip 带 data-ry-resize，不再兼拖动）',
+  /<span class="ry-float-grip" data-ry-resize title="左右拖动调节面板宽度/.test(html) &&
+  !html.includes('<span class="ry-float-grip" data-ry-drag'));
+t('调宽范围声明 200~420（rypResizePanel 夹紧）',
+  html.includes('data-ry-resize-min="200"') && html.includes('data-ry-resize-max="420"'));
 const bodyIdx = html.indexOf('class="ry-float-body pp-side" data-ry-body');
 t('body 复用 .pp-side 类（皮肤零拷贝）', bodyIdx > floatIdx);
 const recipeIdx = html.indexOf('id="ppRecipeBar"');
