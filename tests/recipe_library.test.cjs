@@ -67,6 +67,12 @@ t('index.html 内联 style 无 .pp-recipe-lib 新选择器（⑥b）', (() => {
   return !blocks.includes('.pp-recipe-lib');
 })());
 
+/* [v1003] 设置弹窗下拉同步：render() 重建 #ryRecipeSelect 后必须当场 RyRecipes.refresh() 重填，
+   否则下拉停留在陈旧快照（用户反馈「设置里的已存方案跟左栏灌溉参数库不同步」的根因） */
+t('设置弹窗渲染灌溉页签后当场重填下拉（RyRecipes.refresh）',
+  /tab === 'irrig' && window\.RyRecipes && typeof window\.RyRecipes\.refresh === 'function'/.test(i28) &&
+  /if \(tab === 'irrig'[^]*?window\.RyRecipes\.refresh\(\);/.test(i28));
+
 console.log('[version] 同抬闸门（动态口径）');
 const ver = (sw.match(/const VERSION = '([^']+)'/) || [])[1];
 t('sw VERSION 形如 vNNN-xxx', /^v\d+-[a-z0-9-]+$/.test(ver || ''));

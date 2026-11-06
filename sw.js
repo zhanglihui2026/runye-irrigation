@@ -1304,7 +1304,7 @@
    带向口径经用户拍板维持分区级长边（v886），不需要改 tapeAxisOf。 */
 /* [v1001-lib-font] 灌溉参数库文字统一 11px 基准：列表项/存当前按钮被 typography 全局
    13px!important 压大，加 !important 压回（v609/v538 同款处理）。 */
-const VERSION = 'v1002-lift-label';
+const VERSION = 'v1003-recipe-sync';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

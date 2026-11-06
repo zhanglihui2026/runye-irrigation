@@ -368,6 +368,15 @@
   function render() {
     body.innerHTML = RENDER[tab]();
     bind();
+    /* [v1003 2026-11-06 用户反馈「设置里的已存方案跟左栏灌溉参数库不同步」]
+       下拉 #ryRecipeSelect 是本次 innerHTML 重建的（只剩占位），必须在渲染后当场重填——
+       否则它停留在上一次 refresh 的陈旧快照：页面加载后左栏新存/改名/删除的方案
+       一概看不见；刷新页面后再打开设置则下拉全空。
+       RyRecipes.refresh = plot-editor 的 refreshSelect（fillSelect 该下拉 + renderList 左栏列表），
+       数据同源 localStorage['runye_irrigation_recipes_v1']，重填后两视图必然一致。 */
+    if (tab === 'irrig' && window.RyRecipes && typeof window.RyRecipes.refresh === 'function') {
+      window.RyRecipes.refresh();
+    }
   }
   function bind() {
     var b;
