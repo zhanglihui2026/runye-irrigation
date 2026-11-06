@@ -1160,6 +1160,10 @@ body.ry-tool #ryCadSide [data-pp="pipePlanSection"][data-ry-view="edit"] .ry-pan
 .ry-float-grip{cursor:ew-resize;color:#94a3b8;padding:0 3px;user-select:none;touch-action:none}
 .ry-float-caret{color:#64748b}
 .ry-float-body{padding:7px 9px 9px}
+/* [v996] 折叠兜底：#ppParamFloat 的 body 复用 .pp-side 皮肤（display:flex，特异性 (1,1,0)），
+   会压过 UA 的 [hidden]{display:none} —— 折叠/显隐都靠 hidden 属性，必须在此强制收起。
+   （online-map.css 482 行注释预警过 .ry-float-card 一族的 display 覆盖漏斗，此处是实例。） */
+.ry-float-card>.ry-float-body[hidden]{display:none!important}
 
 /* ───────────────────────────────────────────────────────────────────────────
    [v547] 卡内节奏（行 / 分组标题 / 说明 / 图例 / 控件字号）

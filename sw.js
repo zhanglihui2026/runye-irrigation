@@ -1302,7 +1302,9 @@
    修掉最外侧内线 / 2 分区轴锁定失效；按钮同步 aria-label 与 title。 */
 /* [v995-angle-90-clamp] 分区角度输入钳制 ±90°，超限提示改用「↻+90°」按钮；
    带向口径经用户拍板维持分区级长边（v886），不需要改 tapeAxisOf。 */
-const VERSION = 'v995-angle-90-clamp';
+/* [v996-param-float] 灌溉参数（选择方案/调用 + 10 项输入行）从左栏抽成画布右上悬浮面板
+   #ppParamFloat；左栏留显隐按钮；id 与消费点零改动。 */
+const VERSION = 'v996-param-float';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

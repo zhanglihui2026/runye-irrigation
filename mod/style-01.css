@@ -2394,6 +2394,22 @@ body > .ry-nav .main-header{display:none!important}
 #pipePlanSection .pp-canvas-wrap>.pp-quick .pp-quick-grip{cursor:grab;font-size:13px;line-height:1;color:#93a1a8;user-select:none;padding:0 3px;touch-action:none}
 #pipePlanSection .pp-canvas-wrap>.pp-quick.pp-quick-dragging{cursor:grabbing;box-shadow:0 6px 18px rgba(15,23,42,.14)}
 @media(max-width:680px){#pipePlanSection .pp-canvas-wrap>.pp-quick{flex-wrap:wrap;max-width:calc(100% - 16px)}}
+/* [v996 2026-11-06 用户要求] 灌溉参数悬浮面板（#ppParamFloat）：原左栏蓝框参数贴到地块旁。
+   默认画布右上（与左上 #ppQuickBar 对称、不占地块中心）；外壳视觉一律走 .ry-float-card
+   （mod/ry-panel.css v544 段，⑧ 单一归属），此处只写定位/尺寸/层级；拖动后位置由
+   ry-panel.js 按 data-ry-position-key 记忆，双击标题栏复位到本默认位。 */
+#pipePlanSection .pp-canvas-wrap>.pp-param-float{
+  position:absolute;top:8px;right:12px;z-index:4;
+  width:240px;max-width:calc(100% - 20px);
+  pointer-events:auto;
+}
+/* 搬移态（body.ry-tool 下整节被 ry-cad-toolbar.js 搬进 #ryCadSide）——与 .pp-quick 同款孪生作用域。
+   ★ 本条是 ry-panel.css 孪生段（搬移态）在基础态的镜像，值必须与上方逐字同源。 */
+#ryCadSide [data-pp="pipePlanSection"] .pp-canvas-wrap>.pp-param-float{
+  position:absolute;top:8px;right:12px;z-index:4;
+  width:240px;max-width:calc(100% - 20px);
+  pointer-events:auto;
+}
 /* [v249] 折叠把手：仅宽屏三列布局显示（下方 @media 内定义），窄屏上下流布局无右轨可折 */
 
 /* [v246b] 提示条（#ppHint）与本条同在画布左上角，会正面相撞 ⇒ 提示条退到快捷条下方
