@@ -8289,3 +8289,21 @@ zone_merge_last 15/15 + verify 系全绿。
 用户选「本地自带 SDK（推荐）」。落地：新增 `plot-cloud/vendor/workbuddy-cloud-sdk.js`（71,891 bytes，镜像同源），4 个页面 script src 统一改 `./vendor/workbuddy-cloud-sdk.js`，全目录已无 `cdn.jsdelivr.net` 残留。`_p1/_cloud_submit_smoke.cjs` 增 `SMOKE_URL` 环境变量（本地静态服务可测）与 `INJECT_SDK=1` 对照模式，D1 断言改为「SDK 资源被加载（本地自带）」。本地 `python -m http.server 8899 --bind 127.0.0.1` 冒烟 **12/12 全通过**；全量回归 698/698。**经验：外部 CDN 单点故障要用「可达镜像 + 注入对照」先证明其余链路完好，再决定自带 vendor；改完先在本地静态服务冒烟，不直接覆盖线上。**
 
 待办：① 线上独立应用 `https://plot-library.app.workbuddy.host/` 尚未重新部署，按发布规则须等用户本轮明确同意覆盖线上链接后再 deploy，并在部署后重跑线上冒烟；② 手机号 OTP 登录→写库需用户本人验证码，助手不能代跑；③ 阀门水流小功能（v985/v986）已回滚，用户确认 v989 演示恢复「OK 可以了」，如需重做必须先用真实地块数据本地验证跨区路径不断。
+
+## 26.195 v990-tb-shortcut：两枚参数按钮搬进顶部工具栏 + 文案简化（2026-11-06）
+
+用户截图（红箭头指二级「灌溉参数」最下一行）指令：「这两个按钮名称简化，具体怎么简化你自己定，简化后放在顶部工具栏，注意样式要服从于顶部工具栏的样式，不要做改变，不要新增样式」。指的是 `#planZoneMergeLastBtn`（末排并入上排）与 `#ppCaliberModeBtn`（口径：设计值）。
+
+**关键判断**：顶部工具栏 `.ry-drawing-toolbar` 是纯图标按钮行——v815 起全部走 `RyIcons` 的 SVG（`data-ry-ico-svg`），`font-size:0` 压掉文字；v824 已把 `content:attr(data-ry-icon)` 三条字形通道规则删除。所以「样式服从工具栏」= 必须走 SVG 通道，做成带短文字的按钮反而要新增 CSS，违反约束。文案简化因此落在短名（aria-label / title 前缀）与图标语义上。
+
+落地（CSS 零改动）：
+- `index.html`：删 `.pp-plan-btnrow` 整行；两键作为 `#ppToolbar` 直接子节点，class 改用工具栏现成 `.pp-btn-ghost`，文案「并末排」「设计口径」；隐藏 checkbox `#planZoneMergeLast` 留在原面板（消费点零改动）。
+- `mod/inline-11.js`：`ppApplyCaliberModeUI` 文案改「设计口径 / 实切口径」、title 加短名前缀；**改文案必须走 `RyIcons.setLabel(btn,label)`** —— 直接写 `textContent` 会把 SVG 子节点一起擦掉（ry-icons.js v824 记录的「点一下图标永久消失、只剩空白方块」病根），RyIcons 未加载时退回 textContent；同时同步 aria-label。
+- `mod/ry-icons.js`：`BY_ID` 加 `planZoneMergeLastBtn:'up'`、`ppCaliberModeBtn:'diameter'`，**复用既有 SVG 笔画**（↑=末排上并，⌀=管径口径），零新图标。`inline-18.js` 的 `icons` 字形映射不需要动（第一版加过 ⇧/Ø，已撤回）。
+- 选中态不需新增样式：工具栏既有 `button[data-ry-icon].active` / `[aria-pressed=true]` 规则自动高亮（实测 `rgb(230,242,236)`）。
+
+**踩过的坑（值得记）**：第一版只在 `decorateToolbar.icons` 给了字形 ⇧/Ø，冒烟截图里两个按钮变成**空白浅绿方块**——因为字形通道已删、又没进 `RyIcons.BY_ID` 挂 SVG。修法即上。**结论：给工具栏加按钮，图标必须走 RyIcons.BY_ID（或 setIcon），不能只写 data-ry-icon 字形。**
+
+验证：全量 `node --test tests/*.test.cjs` 698/698；`check_publish_refs.cjs` PASS；`git diff` 无任何 `.css`；CDP 无头 Edge 冒烟 `_p1/_v990_toolbar_smoke.cjs` 13/13（含 A4 SVG=up/diameter、A5 font-size:0、B1/B2 点击选中态与口径切换、B4 切态后 SVG 仍在、C1 无 JS 异常）。版本 14 处 `?v=`、`sw.js VERSION`、`RyMapFlowDemo.VERSION` 同抬 `v990-tb-shortcut`；`tests/v988_trunk_entry.test.cjs` ⑤ 版本锁由写死当轮串改为格式断言（一致性仍由 14 处动态比对负责），以后抬版不用再改测试。
+
+状态：本地已完成并验证，**未推送、未发布**（用户本轮没要求）。另：§26.194 的云端独立应用本地 SDK 修复（commit a3be093）同样仍未部署，用户上一轮虽然选过「同步更新到线上」，但那一轮被中断、deploy 未执行，按发布规则需重新征询。

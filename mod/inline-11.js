@@ -359,12 +359,20 @@ function ppApplyCaliberModeUI(){
   if (!btn) return;
   var actual = ppCaliberMode() === 'actual';
   btn.classList.toggle('active', actual);
-  /* [v973] 文案缩短（「实切面积」→「实切」）：按钮与「末排并入上排」同排均分宽度，
-     窄栏下 6 字已贴边；完整语义在 title 里。 */
-  btn.textContent = actual ? '口径：实切' : '口径：设计值';
+  /* [v973→v990] 按钮搬进顶部工具栏后文案再简化：「设计口径 / 实切口径」两态各 4 字，
+     工具栏是图标钮，短名同时用于 aria-label 与 title 前缀；完整语义仍在 title 正文。 */
+  var label = actual ? '实切口径' : '设计口径';
+  /* [v990] 工具栏按钮已由 RyIcons 挂上 SVG，直接写 textContent 会把图标子节点
+     一并清掉（ry-icons.js v824 记录的病根：点一下按钮图标永久消失、只剩空白方块）
+     ⇒ 改走 setLabel 只替换文字节点；RyIcons 尚未加载时退回原写法（那时还没挂 SVG）。 */
+  if (window.RyIcons && typeof window.RyIcons.setLabel === 'function') window.RyIcons.setLabel(btn, label);
+  else btn.textContent = label;
+  /* 工具栏把文字压成图标（font-size:0），aria-label 由 decorateToolbar 按初始文字写入；
+     切态后必须自己同步，否则读屏仍报旧口径。 */
+  btn.setAttribute('aria-label', label);
   btn.title = actual
-    ? '当前按「分区实切面积」口径：取最大实切分区为单区基准，主管/支管/水泵随实切流量选型，画布逐区标注建议管径。点击切回设计值。'
-    : '当前按 v97 设计值口径（标准分区/划定亩数，全区一档）。点击切换「实切面积」：小分区的建议管径自动变细，并可看逐区明细。';
+    ? '实切口径：当前按「分区实切面积」取最大实切分区为单区基准，主管/支管/水泵随实切流量选型，画布逐区标注建议管径。点击切回设计值。'
+    : '设计口径：当前按 v97 设计值口径（标准分区/划定亩数，全区一档）。点击切换「实切面积」：小分区的建议管径自动变细，并可看逐区明细。';
 }
 function ppSetCaliberMode(m){
   try { localStorage.setItem('runye_caliber_mode', m === 'actual' ? 'actual' : 'design'); } catch(e){}
@@ -380,7 +388,7 @@ window.ppSetCaliberMode = ppSetCaliberMode;
 })();
 
 /* ===== [v973 2026-11-05 用户要求] 「末排并入上排」从 checkbox 行改为切换按钮
-   （与「管径口径」并排在灌溉参数区最下一行）。隐藏 checkbox #planZoneMergeLast
+   [v990 2026-11-06] 按钮已搬到顶部工具栏、文案简化为「并末排」；隐藏 checkbox #planZoneMergeLast
    仍是数据源（planZoneMergeLastOn() 等消费点零改动），按钮只负责翻转 + 视觉态。
    ★ 顺带补缺口：v969 起该 checkbox 的 change 从未绑过 calcPlan，勾选后不重算；
    现已加入上方输入监听数组（input/change → calcPlan），按钮切换时派发 change。 */
@@ -392,8 +400,8 @@ window.ppSetCaliberMode = ppSetCaliberMode;
     mb.classList.toggle('active', !!ck.checked);
     mb.setAttribute('aria-pressed', ck.checked ? 'true' : 'false');
     mb.title = ck.checked
-      ? '已开启：末排（含余排）整排并入上一排，分区数减少、单区面积增大。再点一次恢复逐段划分。'
-      : '开启后，末排（含被地块边裁出的余排）整排并入上一排：分区数减少、单区面积增大，如 15 区 → 10 区';
+      ? '并末排 · 已开启：末排（含余排）整排并入上一排，分区数减少、单区面积增大。再点一次恢复逐段划分。'
+      : '并末排：开启后末排（含被地块边裁出的余排）整排并入上一排，分区数减少、单区面积增大（如 15 区 → 10 区）';
   }
   mb.addEventListener('click', function(){
     ck.checked = !ck.checked;

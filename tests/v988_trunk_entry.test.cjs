@@ -131,12 +131,14 @@ test('④ 老地块行为不变：已放接驳节点时节点路径照常', () =
   assert.ok(keys.indexOf('main:1') >= 0, '节点场景下第 3 区依旧要经过第 2 区主管');
 });
 
-test('⑤ 版本锁：index.html 14 处与 sw.js VERSION 动态同抬（v989-trunk-body）', () => {
+test('⑤ 版本锁：index.html 14 处与 sw.js VERSION 动态同抬', () => {
   const m = sw.match(/const VERSION = '(v\d+[^']*)';/);
   assert.ok(m, 'sw.js 缺 VERSION');
   const num = m[1].replace(/^v/, '');
   assert.strictEqual(html.split('?v=' + num).length - 1, 14, 'index.html 应有 14 处 ?v=' + num);
-  assert.ok(/v989-trunk-body/.test(m[1]), '本次应为 v989-trunk-body');
+  /* [v990] 原末行写死当轮版本串，每次抬版都要回来改测试；改为格式断言后
+     版本一致性由上面 14 处动态比对负责，抬版不再需要动本文件。 */
+  assert.ok(/^v\d+-/.test(m[1]), 'VERSION 应为 v<数字>-<slug> 形式：' + m[1]);
 });
 
 test('⑥ v989 新场景：总管中段横穿、端点距离 >5m——线体口径必须接通', () => {

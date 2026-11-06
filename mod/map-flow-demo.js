@@ -1094,7 +1094,7 @@
       }
       try {
         var d = collect();
-        if (!d) return { ver: 'v989-trunk-body', error: 'collect-null（页面缺管线图数据）' };
+        if (!d) return { ver: 'v990-tb-shortcut', error: 'collect-null（页面缺管线图数据）' };
         var trunkPts = [];
         (d.trunkLinesLL || []).forEach(function (l) { l.forEach(function (p) { trunkPts.push([+p.lat.toFixed(6), +p.lng.toFixed(6)]); }); });
         var trunkDense = densify(d.trunkLinesLL ? [].concat.apply([], d.trunkLinesLL) : []);
@@ -1117,12 +1117,12 @@
           rt.trunk.concat(rt.main).concat(rt.branch).forEach(function (s) { seq.push(s.key); });
           return { zi: rt.zi, keys: seq };
         });
-        return { ver: 'v989-trunk-body', groups: d.gCount, manual: d.manual, nPer: d.nPer,
+        return { ver: 'v990-tb-shortcut', groups: d.gCount, manual: d.manual, nPer: d.nPer,
                  trunkPts: trunkPts, perMainMinM: perMainMinM, entries: entries,
                  nodes: (d.nodesLL || []).length, routes: routeSeq };
-      } catch (e) { return { ver: 'v989-trunk-body', error: String(e && e.message || e) }; }
+      } catch (e) { return { ver: 'v990-tb-shortcut', error: String(e && e.message || e) }; }
     },
-    VERSION: 'v989-trunk-body',
+    VERSION: 'v990-tb-shortcut',
     TOL_M: TOL_M,
     INTERVAL_MS: INTERVAL_MS,
     init: function (c) {

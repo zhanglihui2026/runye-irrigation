@@ -90,6 +90,9 @@
      精确表存在的意义：多个按钮标签相近（阀门 两组都有、两个「适应窗口」、
      两个「改直径」、两个「遮蔽」），靠正则容易错配。 */  var BY_ID = {
     ppLineOrtho:'ortho', ppResetCuts:'gridreset', ppLockArea:'lock', ppUndo:'undo',
+    /* [v990] 从灌溉参数区搬进顶部工具栏的两枚切换钮：up=末排上并、
+       diameter=管径口径。复用既有 SVG 笔画，工具栏零新增样式、零新图标。 */
+    planZoneMergeLastBtn:'up', ppCaliberModeBtn:'diameter',
     ppAutoPipe:'autopipe', ppDownload:'download', ppPrint:'print',
     ppGeWhole:'group', ppGePerPlot:'each', ppBackToGroupBtn:'back',
     ppCreatePlotGroup:'groupadd', ppFitViewBtn:'fit', ppPlotPanelToggle:'panel',
