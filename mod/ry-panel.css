@@ -721,6 +721,15 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-to
   padding:7px 10px;font-size:10px;line-height:1.6;color:var(--ry-s-500,#64748b);   /* [v1001] 10.5→10：与 .pp-recipe-status 同档 */
   border-bottom:1px solid #e8ecea;
 }
+/* ===== [v1002 2026-11-06 用户反馈] 悬浮面板标签列收窄：46%→38%。
+   首行标签「水泵提升高度」改为「提升高度」四字后，全列最长 4 字（≈50px 含 padding），
+   46%（默认 240px 宽时 ≈110px）明显过宽 ⇒ 收窄到 38%（240px 宽 ≈91px、最窄 200px 时
+   ≈76px，均容得下 4 字）。只挂 #ppParamFloat —— 不动 46% 基准行，三级 grPipeSection
+   搬移态面板仍有「建议电机功率」等 6 字标签，不受影响。
+   ★ 特异性注意：基准行 :is() 取参数最高 `#ryCadSide [data-pp=…]`=(1,1,0)，全式=(1,5,0)。
+     新规则必须同为 (1,5,0) 且靠后声明才取胜 —— 补 .ry-float-body 类（首版 (1,4,0)、
+     二版 (1,4,0) 均被压，探针实测 flexBasis 仍 46%，第三次修正）。 ===== */
+#ppParamFloat .ry-float-body.pp-side .pp-plan-item > .pp-plan-label:first-child{ flex-basis:38%; }
 /* Shoelace 代理输入：与原生回退同尺寸，主色走品牌深墨绿 */
 :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side sl-input[data-ry-proxy-for]{
   display:block;flex:0 0 64px;width:64px;min-width:64px;max-width:64px;

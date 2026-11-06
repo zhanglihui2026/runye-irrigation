@@ -88,6 +88,13 @@ t('index.html 内联 style 无 .pp-param-float / .pp-side 新选择器（⑥b）
 t('折叠兜底规则在（.pp-side 的 display:flex 会压过 [hidden]，必须强制收起）',
   rp.includes('.ry-float-card>.ry-float-body[hidden]{display:none!important}'));
 
+console.log('[v1002] 首行标签改四字 + 悬浮面板标签列收窄');
+t('首行显示标签为「提升高度」四字', /<span class="pp-plan-label">提升高度<\/span>/.test(html));
+t('显示标签不再用全称「水泵提升高度」', !html.includes('<span class="pp-plan-label">水泵提升高度</span>'));
+t('aria-label 保留全称（读屏/镜像语义不变）', html.includes('aria-label="水泵提升高度"'));
+t('ry-panel.css 悬浮面板标签列收窄 38%（.ry-float-body.pp-side 凑齐 (1,5,0) 对压 :is 基准）',
+  rp.includes('#ppParamFloat .ry-float-body.pp-side .pp-plan-item > .pp-plan-label:first-child{ flex-basis:38%; }'));
+
 console.log('[version] 同抬闸门（动态口径，后续抬号零维护）');
 const ver = (sw.match(/const VERSION = '([^']+)'/) || [])[1];
 t('sw VERSION 形如 vNNN-xxx', /^v\d+-[a-z0-9-]+$/.test(ver || ''));
