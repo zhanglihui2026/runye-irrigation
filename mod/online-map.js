@@ -216,6 +216,10 @@
    *   外部想读状态走 window.RyMapHost.trunkState()。 */
   var trunkMode = 'idle';
   var trunkSaved = null;
+  /* [v993] 这份 trunkSaved 真正属于哪块地。currentMapPlotId 是「当前选中的地块」，
+     两者会分叉（画完 A 的总管 → 保存了新地块 B → 当前指向 B，线还是 A 的）。
+     删除判据只认它，不认 currentMapPlotId —— 否则删 A 时若当前选中 B 会漏清。 */
+  var trunkOwnerPlotId=null;
   var trunkDraft = null;
   var trunkTargetPlotId=null;
   var points = [];           // [{lat,lng}]
@@ -849,6 +853,7 @@
     }
     currentMapPlotId=pid;
     trunkSaved=payload;
+    trunkOwnerPlotId=pid;   /* [v993] 写库成功后同步归属（含 payload=null「这块地没有总管」） */
     /* 只有**写成功之后**才入栈（写失败绝不能留一步能撤销的假历史）。
        undo/redo 自己回写时带 noHistory:true，否则撤销会把撤销本身记成一步新历史。 */
     if(!opts.noHistory && trunkHistory){
@@ -1504,6 +1509,7 @@
     /* 每次进入都从「新增一条」开始画：已保存的线原样留着，重画不会覆盖它。
        想改某条已有线，走三期「选中 + 拖拐点」，不是重画。 */
     trunkSaved=loadSavedTrunkFor(prior[0]);
+    trunkOwnerPlotId=String(currentMapPlotId);   /* [v993] 进入绘制即锁定归属，草稿不会转存 */
     trunkPoints=[];
     trunkDraft={id:null,params:{material:'PE',dn:null,designFlow:null}};
     setTrunkMode('draw');
@@ -2328,6 +2334,7 @@
       return false;
     }
     trunkSaved=saved;
+    trunkOwnerPlotId=String(currentMapPlotId);   /* [v993] 编辑态同样锁定归属 */
     trunkTargetPlotId=String(currentMapPlotId);
     var S=window.RyTrunkSchema, want=trunkId?String(trunkId):null;
     if(!want||!saved.trunks.some(function(t){return String(t.id)===want;})){
@@ -3328,6 +3335,8 @@
     return {
       mode: trunkMode,
       plotId: currentMapPlotId?String(currentMapPlotId):null,
+      /* [v993] 屏幕上这份总管的真实归属；与 plotId 分叉时说明「显示的是别块地的线」。 */
+      ownerPlotId: trunkOwnerPlotId?String(trunkOwnerPlotId):null,
       targetPlotId: trunkTargetPlotId?String(trunkTargetPlotId):null,
       draftPoints: trunkPoints.length,
       trunkCount: t&&Array.isArray(t.trunks)?t.trunks.length:0,
@@ -3547,7 +3556,44 @@
   };
 
   // [map-enhance] 我的地块列表：读 runye_plot_library，点击飞到该地块，×删除（删后同步刷新卫星叠加）
+  /* ===== [v993] 总管归属回收：地块删除后，把它名下的手绘总管从地图与缓存一起清掉 =====
+   * 数据层本来就按地块存（plot.trunk 挂在 plot 记录上，删记录即删数据）；漏的是显示层：
+   * trunkSaved / trunkSavedLayers / trunkNodeLayers / trunkPoints / 撤销栈都是 IIFE 私有状态，
+   * 地块库变了不会自动失效 ⇒ 用户看到「地块没了，蓝线还在」，甚至还能继续编辑这条线。
+   * 判据只认地块库 + trunkOwnerPlotId（真实归属），不认 currentMapPlotId：
+   * 删的可能是别的地块，而屏幕上留的线属于刚被删的那块。
+   * 挂在 renderMyPlots()：弹窗删除 / 左栏 × 删除 / 成组 / 解散 / 工程导入 都会重列地块，
+   * 一处收口，不必在每个删除按钮里各写一份清理逻辑。
+   * 库读取失败一律不动 —— 宁可暂时多留一条线，也不能误删用户刚画的总管。 */
+  function trunkOwnerAlive(plots, ownerId){
+    if(!ownerId) return false;
+    for(var i=0;i<plots.length;i++){
+      var p=plots[i];
+      if(p && String(p.id)===String(ownerId))
+        return !p.merged && !p.grouped && !p.mergedInto;
+    }
+    return false;
+  }
+  function gcTrunkByPlotOwner(){
+    var store=window.RyPlotLibraryStore;
+    var snap=store&&typeof store.read==='function'?store.read():null;
+    if(!snap||!snap.ok) return;
+    var plots=Array.isArray(snap.plots)?snap.plots:[];
+    var owner=String(trunkOwnerPlotId||'');
+    var hasVisual=!!(trunkSaved||trunkPoints.length||trunkSavedLayers.length||trunkNodeLayers.length);
+    if(!owner && !hasVisual) return;                     // 本来就没有总管，无需回收
+    if(owner && trunkOwnerAlive(plots,owner)) return;    // 归属地块仍可独立编辑 ⇒ 什么都不动
+    /* 归属地块已删 / 已归入成组 / 压根没有归属却还画着线 ⇒ 清。 */
+    trunkSaved=null;
+    trunkOwnerPlotId=null;
+    if(String(currentMapPlotId||'')===owner || !owner) currentMapPlotId=null;
+    if(trunkHistory) trunkHistory.clear();
+    try{ hideTrunkWarn(); }catch(e){}
+    /* idle 分支统一清草稿/选中/线层/节点层/按钮/状态栏/参数面板，避免漏掉某一层。 */
+    setTrunkMode('idle');
+  }
   function renderMyPlots(){
+    gcTrunkByPlotOwner();   /* [v993] 先按地块库回收无主/已删地块的总管，再重列列表 */
     var box=document.getElementById('myPlotList');
     if(!box) return;
     var store=window.RyPlotLibraryStore;
@@ -3585,6 +3631,7 @@
         /* [v831] 回填改走 schema 归一：v1 单段与 v2 多干线都能读，不再手写 schema===1。
            这里只把已保存的线画出来（只读），不自动进入绘制态。 */
         trunkSaved=loadSavedTrunkFor(p);
+        trunkOwnerPlotId=String(p.id);   /* [v993] 换地块 = 换归属；没有总管的地块记为该块无总管 */
         setTrunkMode('idle');
         renderTrunkDraft();
         /* [v975] 换地块即重建节点标记/吸附候选：v918 常显标记层不该等到进绘制态才出现，

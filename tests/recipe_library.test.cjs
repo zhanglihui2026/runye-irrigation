@@ -2,7 +2,8 @@
 'use strict';
 /* [v1000-recipe-library 2026-11-06 用户要求]
    灌溉参数库升级为左栏列表（#ppRecipeLib，像在线地图·地块库）：
-   点列表项 = 直接套用（免「调用」按钮）+「💾 存当前」一键保存；
+   点列表项 = 直接套用（免「调用」按钮）；「💾 存当前」按钮 v1005 起已按用户要求取消，
+   保存/改名/删除统一在「设置 → 灌溉参数」；
    悬浮窗「选择方案+调用」行（#ppRecipeBar）退役；
    设置弹窗「灌溉参数」页签（#ryRecipe* + window.RyRecipes）管理能力保持。 */
 const fs = require('fs');
@@ -28,7 +29,11 @@ console.log('[rail] 左栏方案库结构');
 const libIdx = htmlCode.indexOf('id="ppRecipeLib"');
 const sideIdx = htmlCode.indexOf('id="ppSide"');
 t('#ppRecipeLib 在 #ppSide 内（组内第一项）', libIdx > sideIdx && htmlCode.indexOf('id="ppRecipeList"', libIdx) > libIdx);
-t('头部带「💾 存当前」按钮', htmlCode.includes('id="ppRecipeSaveCur"'));
+/* [v1005 2026-11-06 用户要求] 「💾 存当前」按钮已从库头部取消，方案保存/改名/删除
+   统一走「设置 → 灌溉参数」。plot-editor.js 仍留 if(_saveCur) 空守卫，注释里也留了
+   一行恢复说明，故这里用剥离注释后的 htmlCode 做反向断言：DOM 里不应再有该按钮。 */
+t('头部不再带「💾 存当前」按钮（v1005 取消，恢复线索仍在注释）',
+  !htmlCode.includes('id="ppRecipeSaveCur"'));
 t('#ppRecipeStatus 自悬浮窗迁来（id 不变）', libIdx > 0 && htmlCode.indexOf('id="ppRecipeStatus"') > libIdx && htmlCode.indexOf('id="ppRecipeStatus"') < htmlCode.indexOf('id="ppPlanBar"'));
 t('列表容器 role=listbox（可访问性）', /id="ppRecipeList" role="listbox"/.test(html));
 

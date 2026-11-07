@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-12T13:33:09Z",
-  "updated_at": "2026-11-03T11:55:48Z",
+  "updated_at": "2026-11-04T05:44:05Z",
   "files": {
     ".gitattributes": {
       "role": "index",
@@ -35,9 +35,9 @@
     },
     "AGENT_HANDOFF.md": {
       "role": "index",
-      "sha256": "3e7ba51941c9b14b607e862bdcb69f3362c1474a4630fbba9e575ad6bf65582d",
-      "size": 588222,
-      "normalized_sha256": "3e7ba51941c9b14b607e862bdcb69f3362c1474a4630fbba9e575ad6bf65582d"
+      "sha256": "84fd88ce31f270e73487213e4cb44391fae73c80fbe9d40338ee5d448afb9a9d",
+      "size": 601517,
+      "normalized_sha256": "f77e5d3bbe4640acc554f8a0f5a9eb6a5f394396526e4c44547f9b61eecb8712"
     },
     "AI_ONLINE.md": {
       "role": "index",
@@ -136,9 +136,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "50842f29f3e8adbecb101747077562cc73bd1a546f3c600cb0fa78ca28bd0c4e",
-      "size": 134117,
-      "normalized_sha256": "50842f29f3e8adbecb101747077562cc73bd1a546f3c600cb0fa78ca28bd0c4e"
+      "sha256": "9e72cd2d94a3e80077fa70125e42deeec601519d7df78ccc8b0c2f1bda5e1f7e",
+      "size": 135414,
+      "normalized_sha256": "9e72cd2d94a3e80077fa70125e42deeec601519d7df78ccc8b0c2f1bda5e1f7e"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -902,9 +902,9 @@
     },
     "index.html": {
       "role": "index",
-      "sha256": "cce3713075cf96d61bc6561960ff6b6b06cbeb19e3b24d8a4bc3a71478168d29",
-      "size": 217334,
-      "normalized_sha256": "cce3713075cf96d61bc6561960ff6b6b06cbeb19e3b24d8a4bc3a71478168d29"
+      "sha256": "d2db3bc69698757c847df8e8eae3ed525a54212a652b36ea3397fcd66d729cd2",
+      "size": 217706,
+      "normalized_sha256": "d2db3bc69698757c847df8e8eae3ed525a54212a652b36ea3397fcd66d729cd2"
     },
     "invite.html": {
       "role": "index",
@@ -1004,9 +1004,9 @@
     },
     "mod/inline-09.js": {
       "role": "index",
-      "sha256": "c05f18f5831a4e44a12d9339659013eab7802cdd4a34a9fed59ef20cec1b8c5a",
-      "size": 428890,
-      "normalized_sha256": "c05f18f5831a4e44a12d9339659013eab7802cdd4a34a9fed59ef20cec1b8c5a"
+      "sha256": "38ef2eb473d4967393302f607bc1b1ff45f1c34312772c38c47a081389e63ea0",
+      "size": 433648,
+      "normalized_sha256": "38ef2eb473d4967393302f607bc1b1ff45f1c34312772c38c47a081389e63ea0"
     },
     "mod/inline-10.js": {
       "role": "index",
@@ -1058,9 +1058,9 @@
     },
     "mod/inline-18.js": {
       "role": "index",
-      "sha256": "3800577d26b3c0b9e2a7627e53b7ddea3561f5dc3ce1d1b52a19f6b165c8d200",
-      "size": 62010,
-      "normalized_sha256": "3800577d26b3c0b9e2a7627e53b7ddea3561f5dc3ce1d1b52a19f6b165c8d200"
+      "sha256": "4b102a00636901ab6125d90a9e6c785f97e816ee6cc393aad6c0b92272de0419",
+      "size": 63460,
+      "normalized_sha256": "4b102a00636901ab6125d90a9e6c785f97e816ee6cc393aad6c0b92272de0419"
     },
     "mod/inline-19.js": {
       "role": "index",
@@ -1136,9 +1136,9 @@
     },
     "mod/map-flow-demo.js": {
       "role": "index",
-      "sha256": "92155dd9a3a61e1b77b5761a59bdd5c3653ba9da4fc6198d3a32af510da4e3b2",
-      "size": 27493,
-      "normalized_sha256": "92155dd9a3a61e1b77b5761a59bdd5c3653ba9da4fc6198d3a32af510da4e3b2"
+      "sha256": "99f1030be8cd5a07bbb603f94ae262c4b72956f83d7e0d1256344ed5e5f81ce0",
+      "size": 50436,
+      "normalized_sha256": "402c01e3f0a4d27ce6bc6c96ae19a340ecbc75a3b949419b8dbf8960eb86834d"
     },
     "mod/material-formulas.js": {
       "role": "index",
@@ -1154,15 +1154,15 @@
     },
     "mod/online-map.css": {
       "role": "index",
-      "sha256": "bfca41d631cae63abad622836681fa8ccb9339aa87532baf8283fa6e84f8af26",
-      "size": 34378,
-      "normalized_sha256": "bfca41d631cae63abad622836681fa8ccb9339aa87532baf8283fa6e84f8af26"
+      "sha256": "c9433e723ead2ffed9045e4e023ea0151784ccd78305e7d87a8cc97e21ce9284",
+      "size": 40297,
+      "normalized_sha256": "c9433e723ead2ffed9045e4e023ea0151784ccd78305e7d87a8cc97e21ce9284"
     },
     "mod/online-map.js": {
       "role": "index",
-      "sha256": "9498d6bb59d29f2fd7b3bf62935e15c72a3878700e8dc80fc7079dd2810a28b1",
-      "size": 203981,
-      "normalized_sha256": "9498d6bb59d29f2fd7b3bf62935e15c72a3878700e8dc80fc7079dd2810a28b1"
+      "sha256": "e044dcccff750ef78f6588af82b0ffaf682e619557d78dbc4f0d3c51bee29663",
+      "size": 214848,
+      "normalized_sha256": "e044dcccff750ef78f6588af82b0ffaf682e619557d78dbc4f0d3c51bee29663"
     },
     "mod/plan-calc-render.js": {
       "role": "index",
@@ -2045,9 +2045,9 @@
     },
     "runye-map-partition.js": {
       "role": "index",
-      "sha256": "b0c4f61dd38db6681dda6993dcef616bdaf76737a9882c66367d665d89ac4355",
-      "size": 21193,
-      "normalized_sha256": "b0c4f61dd38db6681dda6993dcef616bdaf76737a9882c66367d665d89ac4355"
+      "sha256": "5aacae83c2101f982d546c90ede130d9fac861e4e8a978ba2e873d38add7f8d9",
+      "size": 24612,
+      "normalized_sha256": "5aacae83c2101f982d546c90ede130d9fac861e4e8a978ba2e873d38add7f8d9"
     },
     "runye-material-audit.js": {
       "role": "index",
@@ -2249,9 +2249,9 @@
     },
     "sw.js": {
       "role": "index",
-      "sha256": "48c6b9297b84a2824dfd237f259ebdfcb0854e7267ef654abc242cb6edb78ce3",
-      "size": 153158,
-      "normalized_sha256": "48c6b9297b84a2824dfd237f259ebdfcb0854e7267ef654abc242cb6edb78ce3"
+      "sha256": "2fa1bcd1b7481fc7b4e7de0c88f5770d310b0b975d457c4025f8cc94617c7084",
+      "size": 153161,
+      "normalized_sha256": "2fa1bcd1b7481fc7b4e7de0c88f5770d310b0b975d457c4025f8cc94617c7084"
     },
     "terrain/index.html": {
       "role": "index",

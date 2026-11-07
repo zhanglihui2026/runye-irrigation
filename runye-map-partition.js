@@ -62,7 +62,7 @@
   return true;
  }
  function polygons(toLL){var b=root.RunyeBridge,cuts=b.getZoneCuts(),rings=root.__runyeSubPlots&&root.__runyeSubPlots.length?root.__runyeSubPlots.map(s=>s.poly):[b.getPlotPolygon()],out=[];
-  if(!cuts)return out;var localRings=rings.map(function(r){return b.polyToGrid(cuts,r);});for(var y=0;y<cuts.yPos.length-1;y++)for(var x=0;x<cuts.xPos.length-1;x++)localRings.forEach(function(r){var local=b.clipPolyToRect(r,cuts.xPos[x],cuts.yPos[y],cuts.xPos[x+1],cuts.yPos[y+1]);if(local&&local.length>=3){var p=b.polyToWorld(cuts,local),area=b.polyArea(p);if(area>0.01)out.push({latLng:p.map(toLL),area:area});}});return out;
+  if(!cuts)return out;var localRings=rings.map(function(r){return b.polyToGrid(cuts,r);});for(var y=0;y<cuts.yPos.length-1;y++)for(var x=0;x<cuts.xPos.length-1;x++)localRings.forEach(function(r){var local=b.clipPolyToRect(r,cuts.xPos[x],cuts.yPos[y],cuts.xPos[x+1],cuts.yPos[y+1]);if(local&&local.length>=3){var p=b.polyToWorld(cuts,local),area=b.polyArea(p);if(area>0.01)out.push({zoneIndex:y*(cuts.xPos.length-1)+x,name:(y*(cuts.xPos.length-1)+x+1)+'区',latLng:p.map(toLL),area:area});}});return out;
  }
  function capture(net,previousNetworkRaw){
   if(!net)return {ok:false,error:'network-layout-missing'};
@@ -117,7 +117,51 @@
     var parts=(p&&p.partitions||[]).filter(z=>z&&z.latLng&&z.latLng.length>=3);
     if(!parts.length)return;
     var style={color:'#f59e0b',weight:2,fillOpacity:0.04,interactive:false};
-    parts.forEach(z=>root.L.polygon(z.latLng.map(q=>root.RyMapHost.toDisplay(q)),Object.assign({},style,{weight:0,opacity:0})).addTo(layer));
+    function zoneLabelPlacement(ring,angleDeg){
+      var rad=(Number(angleDeg)||0)*Math.PI/180,ref=ring[0],m=6378137*Math.PI/180,co=Math.cos(ref[0]*Math.PI/180);
+      function point(ll){return map.latLngToContainerPoint?map.latLngToContainerPoint(ll):map.latLngToLayerPoint(ll);}
+      /* partitionPlan.angle is CCW from east in the same local east/north frame
+         used by the partition geometry. Project that axis through the live map
+         (including its display-coordinate correction) before rotating the label. */
+      var base=point(ref),eastNorth=[ref[0]+Math.sin(rad)*20/m,ref[1]+Math.cos(rad)*20/(m*co)],axisPoint=point(eastNorth);
+      var ux=axisPoint.x-base.x,uy=axisPoint.y-base.y,ul=Math.sqrt(ux*ux+uy*uy)||1;ux/=ul;uy/=ul;
+      var rotation=Math.atan2(uy,ux)*180/Math.PI;
+      /* Keep text upright; reversing the axis preserves the same partition edge. */
+      if(rotation>90){ux=-ux;uy=-uy;rotation-=180;}
+      else if(rotation< -90){ux=-ux;uy=-uy;rotation+=180;}
+      var vx=uy,vy=-ux,pts=ring.map(function(ll){return point(ll);}),coords=pts.map(function(pt){return{x:pt.x*ux+pt.y*uy,y:pt.x*vx+pt.y*vy};});
+      var minX=Math.min.apply(null,coords.map(q=>q.x)),maxX=Math.max.apply(null,coords.map(q=>q.x)),minY=Math.min.apply(null,coords.map(q=>q.y)),maxY=Math.max.apply(null,coords.map(q=>q.y));
+      var spanX=Math.max(1,maxX-minX),spanY=Math.max(1,maxY-minY),best=0,bestScore=-Infinity;
+      coords.forEach(function(q,i){var score=(q.x-minX)/spanX+(q.y-minY)/spanY;if(score>bestScore){best=i;bestScore=score;}});
+      /* 标签旋转优先贴合锚点处实际渲染的分区边：存档角度用于选右上角，
+         但地块裁剪和地图坐标纠偏会让屏幕上的边与理论轴有少量差异。 */
+      var labelRotation=rotation,neighbors=[(best+pts.length-1)%pts.length,(best+1)%pts.length],edgeScore=0;
+      neighbors.forEach(function(ni){
+        var dx=pts[ni].x-pts[best].x,dy=pts[ni].y-pts[best].y,len=Math.sqrt(dx*dx+dy*dy);
+        if(len<1)return;
+        var dot=(dx*ux+dy*uy)/len,score=Math.abs(dot);
+        if(score>edgeScore&&score>=0.94){
+          edgeScore=score;if(dot<0){dx=-dx;dy=-dy;}
+          labelRotation=Math.atan2(dy,dx)*180/Math.PI;
+          if(labelRotation>90)labelRotation-=180;
+          else if(labelRotation< -90)labelRotation+=180;
+        }
+      });
+      var anchor={x:pts[best].x-8*ux-8*vx,y:pts[best].y-8*uy-8*vy};
+      var ll=map.containerPointToLatLng?map.containerPointToLatLng(anchor):map.layerPointToLatLng(anchor);
+      return{latLng:ll,rotation:labelRotation};
+    }
+    parts.forEach((z,i)=>{
+      var displayRing=z.latLng.map(q=>root.RyMapHost.toDisplay(q));
+      var cell=root.L.polygon(displayRing,Object.assign({},style,{weight:0,opacity:0})).addTo(layer);
+      var mu=Number(z.area)/666.67;
+      if(isFinite(mu)&&mu>0){
+        var name=String(z.name||((i+1)+'区')).replace(/[&<>"']/g,function(ch){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];});
+        var label=zoneLabelPlacement(displayRing,p&&p.partitionPlan&&p.partitionPlan.angle),html='<span class="ry-map-zone-label" style="--ry-map-zone-label-rotation:'+label.rotation.toFixed(3)+'deg"><b>'+name+'</b><small>'+mu.toFixed(1)+' 亩</small></span>';
+        root.L.marker(label.latLng,{interactive:false,keyboard:false,zIndexOffset:1000,
+          icon:root.L.divIcon({className:'ry-map-zone-label-icon',html:html,iconSize:[0,0],iconAnchor:[0,0]})}).addTo(layer);
+      }
+    });
     function qkey(pt){return Math.round(pt[0]*1e5)+','+Math.round(pt[1]*1e5);}
     var edges={};
     parts.forEach(z=>{

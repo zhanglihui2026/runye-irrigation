@@ -48,8 +48,13 @@ test('[v887] plot-editor.js 必须含页面级缓存守卫（落后即 reload �
   assert.ok(gatePos > -1 && iifePos > -1 && gatePos < iifePos, '守卫必须先于主体 IIFE 执行');
 });
 
+/* [v887 → 2026-11-07 同步] 原判据 /^v?(8[7-9]\d|9\d\d)-/ 只认三位数版本号，
+   项目进入 v1011 后会把合规的新缓存串误判为「落后」。保留原意（数字不得低于 870，
+   v873 曾实质修改过 inline-18.js），改为按数值比较，兼容四位数及以后。 */
 test('[v887] inline-18.js 缓存串不得落后于其实质修改版本（v873 曾停摆在 v823）', () => {
   const t = tag('mod/inline-18.js');
   assert.ok(t, 'index.html 必须以 ?v= 引用 inline-18.js');
-  assert.match(t, /^v?(8[7-9]\d|9\d\d)-/, 'inline-18.js ?v= (' + t + ') 必须 >= v87x（v873 实质修改过它）');
+  const m = t && t.match(/^v?(\d+)-/);
+  assert.ok(m && Number(m[1]) >= 870,
+    'inline-18.js ?v= (' + t + ') 数字部分必须 >= 870（v873 实质修改过它）');
 });

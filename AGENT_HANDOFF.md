@@ -8433,3 +8433,314 @@ L 场景分段 self 中位：`validateConnection` **136.1 ms**、`render` 7.3 ms
 - 提交 `408d8ca`（4 文件：`mod/map-flow-demo.js`、`index.html`、`sw.js`、`AGENT_HANDOFF.md`）；`git push origin master` 成功，把此前两个本地提交 `a3be093`（云端页本地自带 SDK）、`5cc0b2c`（v990 工具栏两键）一并推上，远端 `e8a3fdc..408d8ca`。
 - GitHub Pages 构建状态 `built`、commit 精确命中 `408d8ca`。线上冒烟（带 `Cache-Control: no-cache`）：`index.html` 14 处 `?v=992-cold-prune`、旧串 0 处；`sw.js VERSION=v992-cold-prune`；线上 `mod/map-flow-demo.js` 含 `scheduleWarmup` / `perf-cold`。**注意**：首次直连拿到 v989 是 Fastly 边缘缓存，加 no-cache 后即新版；浏览器侧由 14 处 `?v=` 与 SW 版本变化强制拉新。
 - **云端独立应用 `https://plot-library.app.workbuddy.host/` 未部署**：`workbuddy_sites_deploy` 返回 `SITES_ACCOUNT_MISMATCH`（`retryable:false`）。平台原话：「这个目录之前发布到的应用属于另一个账号，当前登录的账号无权发布到它，本次没有发布任何内容，重试也不会成功。请切换回当初发布它时使用的账号后再发布；原来的分享链接不受影响。」按发布规则不再重试、不改参数、不另发到别处。本地 SDK 修复代码已随 push 进仓库，但 WorkBuddy 站点上仍是旧 CDN 版本，需用户切回原账号后再发布并重跑线上冒烟。
+
+## 26.198 v993-trunk-owner：在线地图手绘总管随地块删除回收（2026-11-06）
+
+用户指令：「在地图上绘制的总管 属于哪个地块就应该归属哪个地块，当这个地块被删除之后，管道也随之清除，改下。」（附在线地图截图）
+
+**结论**：数据层本来就是按地块归属的 —— `plot.trunk` 挂在 `runye_plot_library` 的 plot 记录上（v2 多干线，契约见 `core/trunk-schema.js`），删记录即删数据。真正的缺口在**显示层与 IIFE 私有缓存**：`trunkSaved` / `trunkSavedLayers` / `trunkNodeLayers` / `trunkPoints` / 撤销栈不会随地块库变化失效；两个删除入口（地图气泡「🗑 删除地块」、左栏「我的地块 ×」）都只调 `renderMyPlots()` 重列，不清总管 ⇒ 用户看到「地块没了，蓝线还在」，甚至还能继续编辑这条线。
+
+**最小改动（仅 `mod/online-map.js`，不碰分区 / 管网 / 水力 / 持久化算法）**：
+1. 新增 `trunkOwnerPlotId`：记录 `trunkSaved` 的真实归属。`currentMapPlotId` 是「当前选中的地块」，两者会分叉（画完 A 的总管再保存新地块 B ⇒ 当前指向 B、线还是 A 的）；删除判据只认归属，不认当前选中，避免「删 A 时当前选中 B」漏清。4 个 `trunkSaved` 赋值点（`commitTrunks` / 绘制入口 / 编辑入口 / 换地块）全部同步。
+2. 新增纯函数 `trunkOwnerAlive(plots, ownerId)`：归属地块仍在且非 `merged` / `grouped` / `mergedInto` 才算活着（与 `loadSavedTrunkFor` 同口径）。
+3. 新增 `gcTrunkByPlotOwner()`，挂在 `renderMyPlots()` 第一行：清 `trunkSaved` / 归属 / 已删地块的选中态 / 撤销栈 / 流速告警卡，再统一 `setTrunkMode('idle')`，由既有重绘链清线层、节点层、草稿、按钮、状态栏、参数面板。弹窗删除、左栏 × 删除、成组、解散、工程导入五条路径一处收口；`runye-map-enhance.js` 与两个删除按钮**零改动**。
+4. **库读取失败一律不清**：宁可暂时多留一条线，也不能误删用户刚画的总管。
+5. `RyMapHost.trunkState()` 增 `ownerPlotId` 出口，供探针判「屏幕上显示的是谁的总管」。
+
+**验证**：
+
+| 项 | 结果 |
+| --- | --- |
+| `node --test tests/v993_trunk_owner_gc.test.cjs` | 6/6 PASS（纯函数 vm 切片覆盖删除 / 成组 / 归档 / 无归属 / 读失败；归属同步；两入口接线；版本闸门） |
+| `node --test tests/*.test.cjs` | **704/704 PASS，fail 0**（原 698 + 新 6） |
+| `node check_publish_refs.cjs` | PASS（37 页 / 222 条本地引用） |
+| `node --check mod/online-map.js` | 语法 OK |
+| `_p1/_trunk_owner_probe.cjs`（Edge headless + CDP 真跑） | **7/7 PASS**：选中后 1 条线且归属锁定 / 图上有水源节点 / 库读取失败不清 / 删别块不清 / 删归属块后数据·归属·选中全清 / 节点与深蓝干线归零；证据 `_probe_out/v993_trunk_owner_probe.json` |
+
+**版本**：`index.html` 14 处 `?v=` 与 `sw.js VERSION` 统一抬 **`v993-trunk-owner`**；`mod/online-map.js` 已在 SW CORE 清单（第 1433 行），无需新增登记；旧串 `992-cold-prune` 残留 0。
+
+**边界与遗留**：
+- 只处理在线地图手绘总管（`plot.trunk`）。分区与管路页的设计管网 `tlDiagramData`、云端地块库、轮灌演示数据一律未动。
+- **未提交、未推送、未发布**；线上仍是 `v992-cold-prune`。
+- 新增 `tests/v993_trunk_owner_gc.test.cjs` 被 `.gitignore:82 tests/*` 忽略，发布前需 `git add -f tests/v993_trunk_owner_gc.test.cjs` 才纳入跟踪；`_p1/_trunk_owner_probe.cjs` 按 `_*/` 约定留本地不入库。
+- AOCI 正式 Whole-Index 工具（`aoci_rules` / `aoci_overview`）本会话仍不可用，未重载完整认知索引；本次依据源码复核，未改写 `aoci.txt`。
+- 工作树另有用户既有改动（`.aoci/baseline.json`、`aoci.code.txt`、`mod/inline-18.js`、`runye-map-partition.js`、`terrain/terrain-core.js` 等），一律未覆盖、未回滚。
+
+## 26.119 带向口径二次拍板 + 分区角度 90° 约定（v995-angle-90-clamp · 2026-11-06）
+
+用户发截图（地块 559m 横 × 639.7m 竖、3×4=12 区、分区 177×166.7 近方形、末排 177×109.6）问
+「滴灌带不是沿着长边铺设的」，并提议"划分分区→算长/短边→定义带向→定义主管/支管"的显式环节，
+同时要求约定：**角度旋转只允许 90° 以内，超过 90° 用「分区旋转 90°」按钮；按钮旋转后地块
+长/短边重算，再定带向、再定主管/支管方向**。并要求"查一下之前是不是这么要求的，差在哪里"。
+
+**历史口径核查结论**（§26.112 v883 地块级 → §26.115 v886 分区级 → v889 首分区定轴）：
+v883（沿地块长边）与 v886（沿分区自身长边）是用户先后给出的**相反口径**，在"分区近方形 +
+网格未铺满地块"场景结论相反。截图正是该场景：带横向 = 沿分区自身长边 177（v886 满足），
+但沿地块短边 559（v883 不满足）。
+
+**用户 2026-11-06 二次拍板**：「应该是分区的长边来定滴灌带方向，而不是地块的长边，比如说
+分区是 177×166.7 那就用 177 来定义滴灌带的方向」⇒ **维持 v886/v889 分区级口径，
+tapeAxisOf 零改动**。用户提议的"划分分区→算长短边→定带向→定主管支管"链路经核查已存在：
+`ppGetZoneLayout`/`ppGetZoneCuts` 用格系 `frame.bounds` 算行列与长/短边，`tapeAxisOf` 首分区
+定带轴，主管/支管 ⊥ 带由单一事实源硬约束（plot-editor.js 3388–3408 优先级注释）——旋转 90°
+后 frame.bounds 宽高互换，全链路自动重算，无需新代码。
+
+**本次实际改动（角度约定落地）**：
+1. `mod/plot-editor.js` `bindZoneAngleInput`：input 与 change 两个 handler 的钳制从 ±180 改为
+   `Math.max(-90,Math.min(90,raw))`；超限时 `tip('分区角度只能旋转 90° 以内；超过 90° 请用
+   「↻ +90°」按钮，旋转后长/短边与滴灌带方向自动重算')`（typeof tip 守卫）。
+2. `index.html`：`#ppZoneAngleInput` min/max 改 ±90、aria-label 写明约定；`#ppRotateZones`
+   title 改「分区旋转90°：旋转后地块长/短边重算，滴灌带方向按分区长边重定，主管/支管自动
+   跟随（角度输入仅支持90°以内）」；label title 同步。
+3. 版本同抬：`sw.js VERSION = 'v995-angle-90-clamp'`，index.html 14 处 `?v=` 同抬，旧串残留 0。
+
+**验证**：新增 `tests/zone_angle_clamp.test.cjs` 13/13（源码契约：±90 钳制两处、无 ±180 残留、
+提示语与守卫、按钮仍为 +90 叠加；页面标记；版本同抬闸门）；`node --test tests/*.test.cjs`
+**716/716 PASS**；`tape_axis` 8/8、`tape_axis_share` 3/3、`area_lock_merge_guard` 全过；
+`ci_check_static` PASS=28 FAIL=1（既存 ④a terrain 脚本顺序，与 v993 未提交工作树改动相关，
+非本次引入）；`check.cjs` 在既存 ESLint 红（verify_label_anchor.js:89 no-unreachable）处即停，
+与上一提交口径一致。
+
+**边界与遗留**：
+- 带向逻辑（zone-geometry.js）与分区布局决策（manualZoneLayout 固定边放短轴、autoZoneLayout
+  近方形目标、splitZoneLength 窄条吸收）**一律未动**——用户拍板维持现状。
+- 角度输入钳制只管"新输入"；若历史地块存了 >90° 的 zoneAngleDeg，显示不拦，用户一编辑即被
+  钳回 ±90（符合"超过 90 度用按钮控制"的约定方向）。
+- 未提交、未推送；新增测试被 `.gitignore tests/*` 忽略，发布前需 `git add -f tests/zone_angle_clamp.test.cjs`。
+
+## 26.120 灌溉参数抽成地块旁悬浮面板（v996-param-float · 2026-11-06）
+
+用户发截图（红箭头指左栏「选择方案/调用 + 10 项输入行」蓝框）：「蓝框的内容，单独做个悬浮面板
+看看效果，悬浮面板在地块边上 更显眼一些。」
+
+**蓝框 = #ppRecipeBar（v491 配方行）+ #ppPlanBar（v91 起输入行）**。抽取方案的关键约束：
+皮肤全部挂在 `:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-*`
+作用域下（v609 特性面板），把条搬出 `.pp-side` 会整组脱皮；抄一套值又是 v544/v609 明令禁止的
+「自己写一套壳」。
+
+**实现（皮肤零拷贝）**：
+1. `index.html`：#ppRecipeBar 与 #ppPlanBar 整体搬入 `.pp-stage #ppCanvasWrap` 内新悬浮面板
+   `#ppParamFloat`（#ppQuickBar 之后）；外壳挂 `.ry-float-card`（⑧ 单一归属），body 挂
+   `ry-float-body pp-side` 两类 —— `.pp-side` 类让整套 v609 皮肤零拷贝直接命中；
+   折叠/拖动/位置记忆全走 ry-panel.js 声明式 `data-ry-panel / data-ry-panel-key /
+   data-ry-position-key="ppParamFloatPos" / data-ry-keep-default / data-ry-fold-key`（与
+   #ppQuickBar 同款体系，rypInitAll(DOMContentLoaded) 自动接线）。10 项输入 id 与
+   #planZoneMergeLast（v990 口径留在左栏）、#planN、#planZoneMode 一律不动，消费点
+   （planZoneFixedSide / calcPlan / PP_LIFTDH_PAIRS / ppRecipeFlow / calcManualZoneLayout）
+   全部 getElementById 定位，零改动。
+2. 左栏原位置留 `#ppParamLauncherBar`（按钮 #ppParamFloatToggle「⚙ 灌溉参数（悬浮窗）」），
+   plot-editor.js `bindParamFloatToggle` 接线：整块显隐 + `runye_panel_ppParamFloat:hidden`
+   记忆（恢复发生在 DOMContentLoaded 前，rypInitAll 落位重试窗口不受影响）。
+3. `mod/style-01.css` v996 段：`#pipePlanSection .pp-canvas-wrap>.pp-param-float` 与搬移态
+   孪生 `#ryCadSide [data-pp=...]`（与 .pp-quick 同款双作用域）—— 只写定位/尺寸/层级
+   （absolute;top:8px;right:12px;z-index:4;width:240px），外壳视觉全在 .ry-float-card。
+   内联 <style> 零新增（⑥b）。
+4. **真缺陷（截图探针抓到）**：折叠/显隐 initially 无效 —— body 的 `.pp-side` 皮肤自带
+   `display:flex`（特异性 (1,1,0)）压过 UA `[hidden]{display:none}`（online-map.css 482 行
+   注释预警过的漏斗实例）。修复：ry-panel.css 增 `.ry-float-card>.ry-float-body[hidden]
+   {display:none!important}`。
+5. 版本同抬 `v996-param-float`（sw + index 14 处）。
+
+**验证**：新增 `tests/param_float.test.cjs` 19 项（结构/搬移唯一性/入口接线/CSS 双作用域与
+⑥b 纪律/折叠兜底/版本闸门）；`zone_angle_clamp.test.cjs` 与 `param_float.test.cjs` 的版本闸门
+**改动态口径**（读 sw VERSION 断言 14 处同抬，不再写死串 —— v993→v994→v995→v996 每次抬号
+都写死一次红一次的教训收口）；全量 `node --test` fail 0；`ci_check_static` PASS=28 + 既存 ④a；
+Edge headless 探针实测：面板 240×300 可见、11 行 + 配方行齐全、在 #ppCanvasWrap 内、
+折叠成一行标题栏（截图 `param_float_view.png` / `param_float_folded.png`）。
+
+**边界与遗留**：
+- 左栏「灌溉参数」灰分组条（.ry-props-head）保留但组内只剩入口按钮；「计算结果 / 扬程计算式」
+  分组不动。
+- 悬浮面板默认画布右上；被拖走后双击标题栏复位；左栏按钮可整块隐藏/找回。
+- 未提交、未推送；`tests/param_float.test.cjs` 需 `git add -f` 入库。
+
+## 26.121 分区轮灌默认联合分区=1（v997-zone-default-1 · 2026-11-06）
+
+用户指令：「分区轮灌，默认联合分区选择1」。三级页「联合灌溉」按钮组 `#tlZoneCountGroup`
+（1/2/3/4 区，决定轮灌时几区联合为一组）原初始选中 **2区**。
+
+**改动（两处必须同源）**：
+1. `index.html` `#tlZoneCountGroup`：`class="selected"` 从 data-n="2" 移到 data-n="1"，
+   `data-init-n` 2→1（该属性无消费点，仅随实际初始态同步防误导）。
+2. `mod/inline-09.js` `tlGetZoneCount()` 无选中兜底 `: 2` → `: 1`（HTML 被清选中态时
+   行为不与初始态分叉）。
+
+无持久化（选中态纯 DOM，不走 localStorage）；点 1 区按钮即 v115/v150b 既有路径
+（清手动分组 + 阶梯覆盖表 + 重生成简图），行为不变。页面另有两组 `data-n="2"` 默认选中按钮
+（一级表单 :417、支管数选择 :2220）与本次无关，未动。
+
+**验证**：新增 `tests/zone_default_one.test.cjs` 8 项（组内选中态圈定断言——全页断言会误伤
+上述两组同名按钮；兜底同源；动态版本闸门）；全量 `node --test` fail 0；`ci_check_static`
+PASS=28 + 既存 ④a。版本同抬 `v997-zone-default-1`（sw + index 14 处）。
+
+**未提交、未推送**；`tests/zone_default_one.test.cjs` 需 `git add -f`。
+
+## 26.122 悬浮面板拖动/调宽职责修正（v998-float-drag-resize · 2026-11-06）
+
+用户发截图（红箭头指 #ppParamFloat，右缘贴边略裁）：「悬浮窗的位置要可以拖动的，宽度也可以
+调节的。」——v996 把 v544 外壳的两职责做反了：`data-ry-drag` 挂在 ⠿ grip 上（拖动只抓手生效，
+标题栏拖不动），且没挂 `data-ry-resize`（宽度完全不可调）。
+
+**修正（对齐 ry-panel.js 既有约定：head=move、grip=ew-resize）**：
+1. `index.html` `#ppParamFloat`：head 加 `data-ry-drag`（标题栏整条可拖，单击折叠语义保留，
+   4px 阈值防误触；[data-ry-fold] 按钮在拖动句柄内已被 ry-panel.js:207 排除）；grip 的
+   `data-ry-drag` 改 `data-ry-resize`（rypResizePanel：宽度存档键默认
+   `runye_panel_ppParamFloat:w`，min/max 声明 200/420，双击抓手恢复默认宽）；调宽方向随锚定
+   ——右锚定拖左加宽、拖成左锚定后拖右加宽（既有约定，非缺陷）。
+2. 零 JS 改动：rypInitAll 按 data-ry-* 自动接线；grip 调宽的 stopPropagation 天然不触发
+   head 拖动。
+3. 版本同抬 `v998-float-drag-resize`（sw + index 14 处）。
+
+**验证**：param_float.test.cjs 增 3 项（head 拖动 / grip 调宽 / min-max 声明）共 21/21；
+Edge 探针合成 PointerEvent 实测：标题栏拖动 `style.left/top` 实际变化（moved:true）、抓手调宽
+240→200 并写入 localStorage（探针 `param_float_shot.mjs`）；全量 `node --test` fail 0；
+`ci_check_static` PASS=28 + 既存 ④a。
+
+**未提交、未推送**。
+
+## 26.123 左栏蓝框入口取消，悬浮窗为唯一控制入口（v999-float-only · 2026-11-06）
+
+用户发截图（蓝框 = 左栏「灌溉参数」灰分组条 +「⚙ 灌溉参数（悬浮窗）」显隐按钮）：
+「蓝框内的内容取消吧，以后就用悬浮窗来控制。」
+
+**改动（纯删除）**：
+1. `index.html`：删 `<div class="ry-props-head">灌溉参数</div>` 与 `#ppParamLauncherBar`
+   （含 #ppParamFloatToggle）；v996/v491 沿革注释收敛为一条 v999 说明。
+2. `mod/plot-editor.js`：`bindParamFloatToggle` IIFE 整体退役——`runye_panel_ppParamFloat:hidden`
+   记忆不再读写，**旧存档 hidden='1' 不再被读取 ⇒ 悬浮窗恒显示**；折叠态由面板自身
+   `data-ry-fold-key="runye_panel_ppParamFloat:fold"` 单独记忆（▾ 仍可用）。
+3. 隐藏 checkbox #planZoneMergeLast、#planN、#planZoneMode 按 v990 口径留在左栏（不可见）。
+4. 版本同抬 `v999-float-only`（sw + index 14 处）。
+
+**验证**：param_float.test.cjs 断言翻转并**剥注释判定**（历史沿革注释允许提及旧 id，
+DOM/代码层不许再有）21/21；全量 `node --test` fail 0；`ci_check_static` PASS=28 + 既存 ④a。
+
+**未提交、未推送**。
+
+## 26.124 灌溉参数库升级为左栏列表·点击即套用（v1000-recipe-library · 2026-11-06）
+
+用户指令：「把灌溉参数的库放在 二级 地块与灌溉参数 工具栏下一级。就是说我可能存了很多参数库，
+回头我直接点击一个就选择一个，不用点那个调用，类似在线地图 地块库一样。」
+
+**改动**：
+1. `index.html`：左栏 #ppSide 顶部（原灰条位）新增 `#ppRecipeLib`——头部「灌溉参数库 +
+   💾 存当前」，`#ppRecipeList` 列表（role=listbox，max-height 154px 滚动），`#ppRecipeStatus`
+   自悬浮窗迁来（id 不变）。悬浮窗「选择方案+调用」行（#ppRecipeBar）整行删除，悬浮窗只剩
+   10 项输入。
+2. `mod/plot-editor.js` ppRecipeFlow 重构：锚点从下拉改为列表容器（原 `!selEl` 早退会连带
+   杀掉 window.RyRecipes ⇒ 设置页管理失灵，勿再按下拉判存活）；`renderList`（名称经 esc()
+   转义防 XSS，摘要 = 亩/区·铺设长度·滴头流量 + 存档日期）；列表事件委托 `closest('[data-rid]')`
+   → `applyParams`（v634 单一入口重算链原样）→ `lastApplied` 高亮（aria-selected）；
+   `#ppRecipeSaveCur` 复用 doSave（无名称自动「方案N」，同名覆盖）；`applyTargetId` 随下拉退役，
+   `curSelId` 仅服务设置页改名/删除。`window.RyRecipes` API 五元组不变（inline-28 零改动）。
+3. `mod/ry-panel.css` [v1000] 段：库皮肤挂 v609 同族作用域（`:is(#pipePlanSection,#ryCadSide
+   [data-pp=...]) .pp-side .pp-recipe-lib*`）；选中态 = 淡绿底 #e8f3ec + 品牌绿左条 #16a34a
+   （地块库同义）。内联 <style> 零新增（⑥b）。
+4. 版本同抬 `v1000-recipe-library`（sw + index 14 处）。
+
+**验证**：新增 `tests/recipe_library.test.cjs` 19 项（结构/退役/API 保持/XSS/⑥b/版本闸门）；
+param_float.test.cjs 两项断言翻转为 v1000 口径；全量 `node --test` fail 0；`ci_check_static`
+PASS=28 + 既存 ④a。Edge 探针（`recipe_lib_shot.mjs`）行为实测：存当前 → 「方案1」入库；
+改坏 planZoneMuManual=22 → 点列表项 → 回填 18 + 高亮 + 状态「已套用「方案1」：10 项已回填
+并重算」；headless 未登录拦 grip 点击 ⇒ 直接置 `localStorage.ryCadOpen='1'` +
+`data-ry-open='1'` 绕过展开（截图 `recipe_lib_view.png`）。
+
+**未提交、未推送**；`tests/recipe_library.test.cjs` 需 `git add -f`。
+
+## 26.125 库文字大小统一（v1001-lib-font · 2026-11-06）
+
+**用户反馈**：方案库列表「意思是对的，但是 文字大小 要跟其他的统一。」
+
+**根因**：`runye-typography.css` 全局 `button:where(:not(.topbar *)){font-size:var(--ry-fs-body) !important}`
+（13px）把列表项按钮/「💾 存当前」按钮压成 13px，与周边 11px 面板文字不齐；span 类
+（name/meta）不受影响但缺 !important 契约，未来样式来源变动易漂移。
+
+**修复**（`mod/ry-panel.css` [v1001] 段，全部带 !important 压回 + 注释根因）：
+1. `.pp-recipe-lib-item` 11px !important（对齐 `.pp-plan-label` 11px 基准）；
+2. `.pp-recipe-lib-save` 10px !important（小号操作按钮，对齐 v609 面板小件）；
+3. `.pp-recipe-lib-title` 700→600（对齐 `.ry-props-head` 11px/600）；
+4. `.pp-recipe-lib-empty` 10.5→10px。
+
+**验证**：recipe_library.test.cjs 增 3 项字号 !important 契约断言（21/21 过）；全量
+`node --test` 719/719 fail 0。Edge 探针 ②b computed font-size 实测：item=11px、
+row(对照 .pp-plan-label)=11px、save=10px、title=11px、meta=10px——与面板基准一致；
+截图确认视觉统一。行为链路（存/套用/高亮）复测 PASS。
+
+**教训**：探针 evaluate 模板字符串内嵌对象字面量少写一个闭合 `}`（`))};` 应为
+`))}};`），报 `Unexpected token ';'`——多行对象 return 提交前先 `node --check`。
+
+## 26.126 悬浮面板首行标签改四字 + 标签列收窄（v1002-lift-label · 2026-11-06）
+
+**用户反馈**（截图圈悬浮面板标签列）：「水泵提升高度改为提升高度 四个字，这一列的宽度变窄一些。」
+
+**改动**：
+1. `index.html` #ppPlanBar 首行显示标签「水泵提升高度」→「提升高度」；aria-label 保留全称
+   （读屏/PP_LIFTDH_PAIRS 镜像语义不变，inline-11/inline-28 消费点零改动）。
+2. `mod/ry-panel.css` [v1002] 段：`#ppParamFloat .ry-float-body.pp-side .pp-plan-item >
+   .pp-plan-label:first-child{ flex-basis:38% }`——只收窄悬浮面板，46% 基准行不动
+   （三级 grPipeSection 搬移态仍有「建议电机功率」等 6 字标签）。
+3. `tests/param_float.test.cjs` +4 项（四字标签/无全称残留/aria 保留/列宽规则在位），24/24；
+   全量 719/719 fail 0。版本同抬 `v1002-lift-label`（sw + index 14 处）。
+
+**★ 特异性两次翻车的教训（:is() 取参数最高）**：46% 基准行
+`:is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-side .pp-plan-item >
+.pp-plan-label:first-child` 中，:is() 取参数最高 `#ryCadSide [data-pp=…]`=(1,1,0)，
+全式=(1,5,0)。首版 `#ppParamFloat .pp-plan-item > .pp-plan-label:first-child`=(1,3,0)、
+二版补 .pp-side=(1,4,0) 均被压——探针实测 flexBasis 两次仍 46%。第三版补
+`.ry-float-body.pp-side`（#ppParamFloat + .ry-float-body + .pp-side = (1,5,0)）同特异性
+靠后声明才生效。**规则：给 :is() 长选择器加覆盖规则时，先算 :is() 参数最高特异性，
+新规则必须 ≥ 它，且用探针读 computed flex-basis 验收而非只靠静态断言。**
+
+**验证**：探针 `lift_label_shot.mjs`（临时不入库）实测：首行 text=「提升高度」、
+flexBasis=38%、标签列 110px→83px；截图确认无截断、数值/单位列对齐正常。
+发布 commit `3b1aca7`（4 文件）推送一次成功；线上冒烟全过（sw v1002-lift-label、
+index 14 处、四字标签 1 处、flex-basis:38% 命中）。
+
+## 26.127 设置弹窗已存方案下拉与左栏库不同步（v1003-recipe-sync · 2026-11-06）
+
+**用户反馈**（截图）：「设置里面的地块库 跟左侧工具栏地块库的内容没有同步，是怎么回事？」
+——设置 → 灌溉参数 → 「已存方案」下拉（#ryRecipeSelect）显示陈旧方案，左栏「灌溉参数库」
+（#ppRecipeLib，v1000）显示最新方案，两边对不上。
+
+**根因（探针复现）**：下拉是 inline-28 `render()` 用 innerHTML **每次重建**的（重建后只剩
+「— 选择方案 —」占位），而填充它的唯一入口 `RyRecipes.refresh()`（= plot-editor
+refreshSelect：fillSelect 该下拉 + renderList 左栏列表，数据同源
+`localStorage['runye_irrigation_recipes_v1']`）只在**页面加载时 / 左栏存·改·删时 /
+他页 storage 事件时**执行——**打开设置弹窗时没有任何代码重填下拉**。故下拉停留在
+上次 refresh 的快照：期间左栏的新存/改名/删除一概不可见；刷新页面后打开设置则全空。
+用户看到的「一片好方案/袁世凯方案一」即旧快照残留。探针实测：左栏存方案1/方案2 →
+打开设置 → 下拉只有占位、inSync=false。
+
+**修复**：inline-28 `render()` 末尾，`tab==='irrig'` 时当场调
+`window.RyRecipes.refresh()` 重填（open/切页签都走 render，两个入口一并覆盖）。
+复测：打开设置 → 下拉=「方案1（11/6 存）」「方案2（11/6 存）」、inSync=true。
+
+**验证**：recipe_library.test.cjs +1 项（render 内 refresh 契约，22/22）；全量 719/719
+fail 0；版本同抬 `v1003-recipe-sync`（sw + index 14 处）。发布 commit `1daa506`（4 文件）
+推送一次成功；线上冒烟全过（sw v1003-recipe-sync、index 14 处、inline-28 修复段命中）。
+探针 `recipe_sync_shot.mjs`（临时不入库）。
+
+**说明**：此前两处数据本就同源同 KEY，「不同步」纯因下拉重建后无人重填——不是两套库。
+
+## 26.128 悬浮面板二次紧凑化（v1004-panel-compact · 2026-11-06）
+
+**用户反馈**（截图蓝框圈标签列）：「箭头指向的蓝色框内的 宽度还要进一步压缩，窄一点，
+让整个面板 看起来更紧凑一些。」
+
+**改动**（三处联动，避免「压窄标签列却留出一截空白」的半吊子效果）：
+1. `mod/ry-panel.css` [v1002] 段升级 [v1004]：标签列 38%→28%（`#ppParamFloat
+   .ry-float-body.pp-side .pp-plan-item > .pp-plan-label:first-child`，特异性 (1,5,0) 口径
+   不变）。预算：最窄 200px 时 28%=56px ≥ 4 字 50px，行总宽 198<200 不溢出。
+2. `mod/style-01.css` 2403/2410（基础态+搬移态孪生）：面板默认宽 240→220px。
+3. `mod/ry-panel.css` [v1004] 新增：`.pp-plan-unit` 加 `margin-left:auto` 贴行右缘——
+   行内富余被单位列吸收，竖线伪元素 `right:calc(10px+46px+5px)` 的定位前提
+   （单位贴右）在任何面板宽度下恒成立，「数字↔竖线↔单位」间距不随宽度漂移。
+
+**验证**：探针实测 panelW=220、标签列 55px（四字完整无截断）、flexBasis=28%、
+单位贴右整齐；param_float 26/26（width 220 孪生 ×2、28%、unit 贴右等 +2 项）；
+全量 719/719 fail 0；版本同抬 `v1004-panel-compact`（sw + index 14 处）。
+发布 commit `1f2cd85`（5 文件），代理 502 抖动第 2 次重试推送成功；线上冒烟全过
+（sw v1004-panel-compact、index 14 处、width:220px ×2、flex-basis:28% 命中）。
+
+**注意**：rypResizePanel 宽度记忆键 `runye_panel_ppParamFloat:w` 优先于默认值——
+老用户浏览器里存过宽度的不会自动变 220，拖到最窄 200 或双击抓手复位可复现新默认。

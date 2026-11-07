@@ -739,6 +739,49 @@
     root.style.scrollBehavior=prev;
   }
 
+  /* 画面已显示时再重建延迟恢复的管网图面。地图直接作为首屏时不会经过
+     ryShowSection 的切页分支，因此也需要在恢复完成后消费同一个恢复标记。 */
+  function replayLazyPipeline(sec){
+    if(!window.__ryLazyReplay || !sec ||
+       (sec.id!=='pipePlanSection' && sec.id!=='tlPipePlanSection' && sec.id!=='onlineMapSection')) return false;
+    var _la0=window.alert;
+    var _replayOk=false;
+    try{
+      window.alert=function(){};
+      if(typeof window.ppGenerateDiagram==='function') window.ppGenerateDiagram({scroll:false});
+      if((window.measuredPolygon||[]).length>=3 && typeof tlAutoGenerate==='function'){
+        tlAutoGenerate({scroll:false,stay:true,rethrowError:true});
+        _replayOk=!!(window.tlDiagramData&&window.tlDiagramData.world==='meter'&&
+          Array.isArray(window.tlDiagramData.mainPipes)&&window.tlDiagramData.mainPipes.length&&
+          Array.isArray(window.tlDiagramData.branchPipes)&&window.tlDiagramData.branchPipes.length);
+      }
+    }catch(e){console.error('[ryShowSection] 延迟管路重放失败',e);}finally{ window.alert=_la0; }
+    if(_replayOk){
+      window.__ryLazyReplay=false;
+      try{ if(typeof renderThreeLevel==='function') renderThreeLevel(); }catch(e){}
+      try{ if(typeof tlUpdatePlanBar==='function') tlUpdatePlanBar(); }catch(e){}
+      if(sec.id==='onlineMapSection'){
+        try{ if(window.RyMapHost&&typeof window.RyMapHost.refresh==='function') window.RyMapHost.refresh(); }catch(e){}
+        try{ if(window.RyMapFlowDemo&&typeof window.RyMapFlowDemo.refresh==='function') window.RyMapFlowDemo.refresh(); }catch(e){}
+      }
+      return true;
+    }
+    /* 失败时保留标记，后续进入管路页或地图仍可重试。 */
+    window.__ryLazyReplay=true;
+    console.warn('[ryShowSection] 延迟管路重放未生成有效主管/支管图面');
+    return false;
+  }
+
+  function replayActiveMapOnReady(){
+    var run=function(){
+      var sec=document.getElementById('onlineMapSection');
+      if(sec && sec.classList.contains('ry-active')) replayLazyPipeline(sec);
+    };
+    if(document.readyState==='complete') setTimeout(run,0);
+    else window.addEventListener('load',function(){setTimeout(run,0);},{once:true});
+    window.addEventListener('pageshow',function(e){if(e&&e.persisted) setTimeout(run,0);});
+  }
+
   /* 单视口：显示指定功能区，其余隐藏；同步导航高亮与底部状态栏。
      仅工具模式使用；非工具模式由下面的滚动逻辑接管。 */
   function ryShowSection(sec, link){
@@ -787,22 +830,8 @@
     /* [v194] 切入成组管路页时重排一次：只调刷新、不调切换（否则递归）。
        隐藏期间画布宽高量到 0，不重排就是一张空白。 */
     try{ if(sec && sec.id==='grPipeSection' && typeof window.grRefreshGroupPage==='function') window.grRefreshGroupPage(); }catch(err){}
-    /* [v356] 方案B懒重放消费点：打开时各恢复链只置 __ryLazyReplay 不重放图面；
-       首次切入二级/三级管路页在这里一次性重放（静音弹窗），随后的 v355 ws 钩子
-       用重放出的新鲜数据补渲染工作区。用户不进管路页就永不重放——打开零图面成本。 */
-    try{
-      if(window.__ryLazyReplay && sec && (sec.id==='pipePlanSection'||sec.id==='tlPipePlanSection')){
-        window.__ryLazyReplay=false;
-        var _la0=window.alert;
-        try{
-          window.alert=function(){};
-          if(typeof window.ppGenerateDiagram==='function') window.ppGenerateDiagram({scroll:false});
-          if((window.measuredPolygon||[]).length>=3 && typeof tlAutoGenerate==='function') tlAutoGenerate({scroll:false,stay:true});
-        }catch(e){}finally{ window.alert=_la0; }
-        try{ if(typeof renderThreeLevel==='function') renderThreeLevel(); }catch(e){}
-        try{ if(typeof tlUpdatePlanBar==='function') tlUpdatePlanBar(); }catch(e){}
-      }
-    }catch(err){}
+    /* 切页进入时消费延迟的主管/支管图面恢复。 */
+    try{ replayLazyPipeline(sec); }catch(err){}
     /* [v355] 三级停在 ws 视图切入、图面数据已在而画布仍是初始空态提示时，就地补渲染一次。
        背景：整页重载后 data-ry-view 本就是 "ws"，导航点击（data-ry-view!=='ws' 才调 rySetTab）
        会跳过渲染 ⇒ v161/v355 恢复链重放出的 tlDiagramData 永远不被画进 #tlWsContent，
@@ -821,6 +850,7 @@
     if(typeof window.ryStatusUpdate==='function') window.ryStatusUpdate(sec);
   }
   window.ryShowSection=ryShowSection;
+  replayActiveMapOnReady();
 
   /* 供页面其它模块调用：跳到指定功能区。
      工具模式＝切换到该功能区；非工具模式＝滚动定位，落点几何与「点导航」完全一致
