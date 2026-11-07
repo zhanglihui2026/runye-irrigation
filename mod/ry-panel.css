@@ -784,9 +784,10 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-to
 }
 /* ===== [2026-11-07 用户要求] 灌溉参数悬浮面板：数值列底色 + 上下微调箭头常驻显示。
    严格只挂 #ppParamFloat —— 二级/三级/多地块共用 .pp-side 皮肤的面板一律不动。
-   ① 底色只给「阿拉伯数字这一列」：64px 的 sl-input 宿主（Shoelace 代理启用时）与
-      离线时的原生回退 input；标签列 .pp-plan-label、单位列 .pp-plan-unit、数字右侧
-      竖线伪元素、底部操作说明、只读结果 .pp-plan-val（每亩流量）都不加。
+   ① 底色只给「阿拉伯数字这一列」：64px 的 sl-input 宿主（Shoelace 代理启用时）、
+      离线时的原生回退 input，以及 [v1009] 起补上的最后一行只读值 .pp-plan-val
+      （每亩流量，见下方独立段）；标签列 .pp-plan-label、单位列 .pp-plan-unit、
+      数字右侧竖线伪元素、底部操作说明一律不加。
       底色给宿主而非 ::part(input)：后者是 transparent，宿主底色正好透出数字列。
    ② Chrome 的 number spinner 非 hover 时 opacity:0 —— 静态截图里只有鼠标停的那一行
       才有 ▲▼；用户要求平时也显示，用 opacity:1 强制常显。Shoelace 内部 input 在
@@ -810,6 +811,22 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-to
   display:block !important;
   -webkit-appearance:inner-spin-button !important;
   opacity:1 !important;
+}
+/* ===== [v1009 2026-11-07 用户要求] 最后一行「每亩流量」补同款浅绿底色 =====
+   用户反馈：整列数字都有 #f2f7f4，唯独这一行只读结果 .pp-plan-val 是透明的，看着不协调。
+   不是给文字本体刷一小块色斑，而是把它撑成与输入行「完全同构」的 64px 格：
+   flex:0 0 64px + margin-left:auto + margin-right:6px ⇒ 与 10 行 sl-input 宿主落在
+   同一 x（两个 auto margin 平分的逻辑一致，面板调宽 200~420 时仍同步漂移，不会错位）。
+   height:20px 对齐输入行色块高度；padding-right:23px 为实测值 —— 让文字右缘保持
+   原位（原 val 右缘 1328.7、新色块右缘 1351.7），只加底色、不挪数字。
+   作用域仍严格 #ppParamFloat；标签列 / 单位列 / 竖线 / 底部说明依旧不加。
+   要撤掉：删本段即可，上面 10 行输入与箭头逻辑零影响。 ===== */
+#ppParamFloat .pp-side .pp-plan-item > .pp-plan-val{
+  flex:0 0 64px;width:64px;height:20px;line-height:20px;box-sizing:border-box;
+  margin-left:auto;margin-right:6px;
+  padding-left:6px;padding-right:23px;
+  text-align:right;
+  background:#f2f7f4;
 }
 /* [v609] 单位列：固定宽度 + 右对齐 ⇒ 所有行的数值右边缘落在同一条线上（特性面板的观感就靠这条）。
    原来单位是裸文本节点、宽度随内容变（m / L/h / 亩/区 / m³/h/亩），数值会随单位宽度左右漂。

@@ -267,9 +267,13 @@
     /* [v526]（2026-10-17 用户要求）灌溉方案管理区：工具栏只留「选择+调用」，
        命名/保存/改名/删除统一在这里。按钮 data-ry-recipe 走 #rySetBody 事件委托调 window.RyRecipes
        （plot-editor ppRecipeFlow 暴露；#rySetBody 内容会被 render() 重建，故必须委托、不能直绑）。 */
+    /* [v1010 2026-11-07 用户要求] 取消「灌溉方案」标题下那句灰色说明（原文讲的是
+       方案保存与下拉调用的分工）：左栏 v1000 起已改成「灌溉参数库」点条目直接套用，
+       不再有下拉，这层分工说明已过时；方案名称框自带 placeholder，按钮文字本身
+       已说明动作，不需要额外说明。★ 别删下面 #ryRecipeStatus —— 那是保存/改名/删除
+       后的状态反馈行（同为 .rs-note，功能不同）。 */
     h += '<hr class="rs-sep">'
       + '<h4>灌溉方案</h4>'
-      + '<p class="rs-note">把上面 10 项的<b>当前值</b>存成命名方案；地块分区页的「方案」下拉只负责调用。</p>'
       + '<div class="rs-row"><label>方案名称</label><input type="text" id="ryRecipeName" maxlength="40" placeholder="如：海南七彩花生-0.8L-300"></div>'
       + '<div class="rs-row"><label></label><button class="rs-btn" type="button" data-ry-recipe="save">💾 保存为方案（同名覆盖）</button></div>'
       + '<div class="rs-row"><label>已存方案</label><select id="ryRecipeSelect"><option value="">— 选择方案 —</option></select></div>'
