@@ -433,6 +433,7 @@
            这里把同一条规则直接注入本组件的 shadowRoot —— 作用域天然只在这个输入框内部，
            不污染其它页面；且只处理 #ppParamFloat（rootEl 即该面板）的 10 个代理。
            shadowRoot 尚未 attach 时等一帧重试，避开组件升级时序问题。
+           ★ 这里只解决「看得见」；「点得动」见下方 [v1008] 点击兜底，两者配套。
            要撤掉：删本段 + ry-panel.css 里 [2026-11-07] 的箭头规则即可，底色不受影响。 */
         if (rootEl.id === 'ppParamFloat') {
           var injectSpin = function (tries) {
@@ -467,6 +468,65 @@
           descriptor.set.call(nativeInput, proxy.value);
           nativeInput.dispatchEvent(new Event('change', { bubbles: true }));
         });
+        /* ===== [v1008 2026-11-07] ▲▼「看得见却按不动」修复：点击兜底 =====
+           现象：底色与常显箭头都生效，但用户点 ▲▼ 数值不变（键盘 ArrowUp/Down 正常）。
+           根因：这 10 格不是原生 input，是 Shoelace <sl-input> 代理；组件给内部
+                 .input__control 设了 `appearance:none`，原生 number spinner 因此被
+                 「降级」—— 我们用 opacity:1 把它的图形强制画了出来，但在部分 Chromium
+                 内核里它的 step 点击行为并没有一起恢复，于是成了纯装饰的假按钮。
+                 （本机 Edge 143 实测原生 spinner 仍可点，命中区只有约 13×18px，
+                   位于 inner input 右内边距左侧；其它内核不保证。）
+           策略（v1008 定稿）：走与键盘完全相同的同步链路
+                 （shadow input → proxy.value → 业务源 nativeInput 的 input/change → calcPlan），
+                 但不再赌内核差异 —— mousedown 捕获阶段先把 spinner 区域的
+                 原生默认行为关掉，click 时由我们按 min/max/step 走一次，两种内核统一。
+                 早期试过「等一拍看原生有没有自己 step」，但原生 stepUp 排在宏任务之后，
+                 判断永远为 false，实测会连加 2 次，已废弃。
+           ★ 只挂 #ppParamFloat 的 10 个代理，其它面板 / 一级表单零影响。
+           要撤掉：删本段即可；CSS 的箭头与底色规则不受影响。 ===== */
+        if (rootEl.id === 'ppParamFloat') {
+          var applySpinStep = function (dir) {
+            var step = parseFloat(nativeInput.step) || 1;
+            var lo = nativeInput.min === '' ? -Infinity : parseFloat(nativeInput.min);
+            var hi = nativeInput.max === '' ? Infinity : parseFloat(nativeInput.max);
+            var cur = parseFloat(nativeInput.value);
+            if (!isFinite(cur)) cur = 0;
+            var next = Math.min(hi, Math.max(lo, cur + dir * step));
+            /* step 有 0.1 / 0.05，必须按 step 的小数位定精度，否则 0.4+0.1=0.5000…1 */
+            var dec = (String(step).split('.')[1] || '').length;
+            var text = dec ? next.toFixed(dec) : String(Math.round(next * 1e6) / 1e6);
+            if (text === String(nativeInput.value)) return;   // 已到 min/max 或被钳回
+            var inner = proxy.shadowRoot && proxy.shadowRoot.querySelector('input');
+            if (inner) inner.value = text;                     // 显示层
+            proxy.value = text;                                // Shoelace 属性层
+            descriptor.set.call(nativeInput, text);            // 业务源（绕过包装 setter）
+            nativeInput.dispatchEvent(new Event('input', { bubbles: true }));
+            nativeInput.dispatchEvent(new Event('change', { bubbles: true }));
+          };
+          var spinHit = function (event) {
+            var inner = proxy.shadowRoot && proxy.shadowRoot.querySelector('input');
+            if (!inner) return 0;
+            var r = inner.getBoundingClientRect();
+            if (!r.width) return 0;
+            /* Shoelace size=small 的 padding-right=12px；spinner 约 14px 宽贴在内容区右缘。
+               两侧各留 4px 容错，覆盖「箭头画在这里但命中区偏移」的内核差异。 */
+            var pr = parseFloat(global.getComputedStyle(inner).paddingRight) || 0;
+            var right = r.right - pr + 4;
+            var left = right - 18;
+            if (event.clientX < left || event.clientX > right) return 0;
+            if (event.clientY < r.top || event.clientY > r.bottom) return 0;
+            return event.clientY < r.top + r.height / 2 ? 1 : -1;
+          };
+          /* 捕获阶段掐掉原生 spinner 的 step 默认行为：否则「原生可点」的内核会先 +1，
+             click 里我们再 +1 就会 double。preventDefault 不影响 click 事件本身派发。 */
+          proxy.addEventListener('mousedown', function (event) {
+            if (spinHit(event)) event.preventDefault();
+          }, true);
+          proxy.addEventListener('click', function (event) {
+            var dir = spinHit(event);
+            if (dir) applySpinStep(dir);
+          });
+        }
       });
     });
   }

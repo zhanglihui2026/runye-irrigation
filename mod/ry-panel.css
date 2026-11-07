@@ -795,7 +795,10 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-to
       原生回退路径需 !important 压掉 [v609d] 那条 display:none。
    ⚠ 副作用：[v609h] 记的「箭头占位把三位数往左挤」只出现在离线回退路径，
       Shoelace 代理路径占位恒定，不受影响。
-   要撤掉：删本段即可，index.html 零改动。 ===== */
+   ★ [v1008] 本段只负责「看得见」；「点得动」由 mod/ry-panel.js 的 [v1008] 点击兜底
+      负责 —— Shoelace 内部 input 的 appearance:none 会让原生 spinner 在部分内核上
+      只剩图形、失去 step 行为。两段必须一起用，只留本段就是「假按钮」。
+   要撤掉：删本段 + ry-panel.js 的 [v1008] 段即可，index.html 零改动。 ===== */
 #ppParamFloat .pp-side .pp-plan-item-fluid-input sl-input[data-ry-proxy-for],
 #ppParamFloat .pp-side .pp-plan-item-fluid-input input.ryp-native-fallback{
   background:#f2f7f4;
