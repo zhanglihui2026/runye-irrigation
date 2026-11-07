@@ -1096,14 +1096,17 @@ body.ry-worst-off [data-tlworst]{display:none}
           <span class="pp-plan-item pp-plan-item-fluid-input"><span class="pp-plan-label">目标流速</span><input class="ryp-native-fallback" type="number" id="planTargetV" value="1.5" min="0.3" max="5" step="0.1" aria-label="目标流速"><sl-input data-ry-proxy-for="planTargetV" type="number" value="1.5" min="0.3" max="5" step="0.1" size="small" aria-label="目标流速" hidden></sl-input><span class="pp-plan-unit">m/s</span></span>
           <span class="pp-plan-item"><span class="pp-plan-label">每亩流量</span><span class="pp-plan-val" id="planIntensity">—</span><span class="pp-plan-unit">m³/h</span></span>
         </div>
-        <!-- ===== [2026-11-06 用户要求] 面板底部「操作说明」：C 完整版 / 常驻展开的一段话。
-             文案按真实交互核过：10 项输入 input/change → calcPlan 即时重算（inline-11.js）；
-             左栏 #ppRecipeLib 点条目直接套用 10 项；方案保存/改名/删除在「设置 → 灌溉参数」；
-             标题栏拖动 + 双击复位、⠿ 调宽、▾ 折叠（v998）；planLift/planDh/planTapePressure
-             与 01 一级表单同源镜像（PP_LIFTDH_PAIRS）。纯静态文字，样式 = ry-panel.css
-             的 #ppParamFloat .ry-float-note 段，零 JS；面板折叠时随 body 一起收起。
-             要撤掉：删本 div 与 CSS 里那两条规则即可。 ===== -->
-        <div class="ry-float-note" id="ppParamNote"><b>操作说明</b>直接修改上方 10 项数值，分区、每亩流量等结果即时重算（「每亩流量」为派生值，不可手填）；左栏「灌溉参数库」点任一方案可一键套用该方案的 10 项参数；方案的保存、改名、删除在「设置 → 灌溉参数」中完成。按住标题栏可拖动面板（双击复位），左侧 ⠿ 调宽，右侧 ▾ 折叠；提升高度、地形高差、入口压力与一级表单同源，改一处两边同步。</div>
+        <!-- ===== [2026-11-06 用户要求 / 2026-11-07 简化] 面板底部「操作说明」：常驻展开的一段话。
+             [2026-11-07] 用户反馈文字太长，由 C 完整版（约 140 字 / 7 行）换成推荐精简版
+             （约 50 字 / 3 行）：只留「改值自动重算 / 左栏点方案套用 / 设置页管理方案」三条；
+             删掉每亩流量派生值、面板拖动调宽折叠（控件自带 title 提示）、一级表单同源等技术细节。
+             ★「方案管理在设置 → 灌溉参数」必须保留：「💾 存当前」按钮取消后，这是唯一
+               告诉用户去哪存方案的线索。
+             文案依据：10 项输入 input/change → calcPlan（inline-11.js）；左栏 #ppRecipeLib
+             点条目直接套用 10 项；方案保存/改名/删除在「设置 → 灌溉参数」。
+             纯静态文字，样式 = ry-panel.css 的 #ppParamFloat .ry-float-note 段，零 JS；
+             面板折叠时随 body 一起收起。要撤掉：删本 div 与 CSS 里那两条规则即可。 ===== -->
+        <div class="ry-float-note" id="ppParamNote"><b>操作说明</b>改数值即自动重算；左栏「灌溉参数库」点方案一键套用；方案的保存、改名、删除在「设置 → 灌溉参数」。</div>
       </div>
     </div>
 <button type="button" class="pp-rail-toggle pp-rail-tab" id="ppRailToggle" aria-expanded="false" title="展开工具栏">工具栏</button>
