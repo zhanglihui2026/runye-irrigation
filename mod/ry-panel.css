@@ -782,6 +782,32 @@ body.ry-tool :is(#pipePlanSection,#ryCadSide [data-pp="pipePlanSection"]) .pp-to
        文字右缘都恰好 = 内容右缘 − 16，两者恒为 0 间距，CSS 撬不动（用户 2026-10-20 已同意作罢）。 */
   text-align:right;font-size:11px;color:var(--ry-s-800,#1e293b);
 }
+/* ===== [2026-11-07 用户要求] 灌溉参数悬浮面板：数值列底色 + 上下微调箭头常驻显示。
+   严格只挂 #ppParamFloat —— 二级/三级/多地块共用 .pp-side 皮肤的面板一律不动。
+   ① 底色只给「阿拉伯数字这一列」：64px 的 sl-input 宿主（Shoelace 代理启用时）与
+      离线时的原生回退 input；标签列 .pp-plan-label、单位列 .pp-plan-unit、数字右侧
+      竖线伪元素、底部操作说明、只读结果 .pp-plan-val（每亩流量）都不加。
+      底色给宿主而非 ::part(input)：后者是 transparent，宿主底色正好透出数字列。
+   ② Chrome 的 number spinner 非 hover 时 opacity:0 —— 静态截图里只有鼠标停的那一行
+      才有 ▲▼；用户要求平时也显示，用 opacity:1 强制常显。Shoelace 内部 input 在
+      shadow DOM，实测 `::part(input)::-webkit-inner-spin-button` 链式伪元素可穿透，
+      且 ::part(input) 现有的 appearance:textfield 不影响（Edge/Chrome 143 无头截图验证）；
+      原生回退路径需 !important 压掉 [v609d] 那条 display:none。
+   ⚠ 副作用：[v609h] 记的「箭头占位把三位数往左挤」只出现在离线回退路径，
+      Shoelace 代理路径占位恒定，不受影响。
+   要撤掉：删本段即可，index.html 零改动。 ===== */
+#ppParamFloat .pp-side .pp-plan-item-fluid-input sl-input[data-ry-proxy-for],
+#ppParamFloat .pp-side .pp-plan-item-fluid-input input.ryp-native-fallback{
+  background:#f2f7f4;
+}
+#ppParamFloat .pp-side sl-input[data-ry-proxy-for]::part(input)::-webkit-inner-spin-button{
+  opacity:1;
+}
+#ppParamFloat .pp-side .pp-plan-item-fluid-input input.ryp-native-fallback::-webkit-inner-spin-button{
+  display:block !important;
+  -webkit-appearance:inner-spin-button !important;
+  opacity:1 !important;
+}
 /* [v609] 单位列：固定宽度 + 右对齐 ⇒ 所有行的数值右边缘落在同一条线上（特性面板的观感就靠这条）。
    原来单位是裸文本节点、宽度随内容变（m / L/h / 亩/区 / m³/h/亩），数值会随单位宽度左右漂。
    index.html 里计算结果那 10 行已把单位包进 .pp-plan-unit（无单位的「主管/支管」留空 span 占位）。 */

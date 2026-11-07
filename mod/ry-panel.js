@@ -427,6 +427,27 @@
         nativeInput.hidden = true;
         nativeInput.tabIndex = -1;
         nativeInput.setAttribute('aria-hidden', 'true');
+        /* [2026-11-07 用户要求] 数值列 ▲▼ 常显兜底：外部 CSS 用
+           `::part(input)::-webkit-inner-spin-button{opacity:1}` 让原生 spinner 常显，
+           但部分浏览器内核不支持 ::part() 后接 WebKit 伪元素的链式穿透（用户实测无效）。
+           这里把同一条规则直接注入本组件的 shadowRoot —— 作用域天然只在这个输入框内部，
+           不污染其它页面；且只处理 #ppParamFloat（rootEl 即该面板）的 10 个代理。
+           shadowRoot 尚未 attach 时等一帧重试，避开组件升级时序问题。
+           要撤掉：删本段 + ry-panel.css 里 [2026-11-07] 的箭头规则即可，底色不受影响。 */
+        if (rootEl.id === 'ppParamFloat') {
+          var injectSpin = function (tries) {
+            if (!proxy.shadowRoot) {
+              if (tries > 0) global.requestAnimationFrame(function () { injectSpin(tries - 1); });
+              return;
+            }
+            if (proxy.shadowRoot.querySelector('style[data-ry-spin]')) return;
+            var st = global.document.createElement('style');
+            st.setAttribute('data-ry-spin', '1');
+            st.textContent = 'input[type=number]::-webkit-inner-spin-button{opacity:1;-webkit-appearance:inner-spin-button}';
+            proxy.shadowRoot.appendChild(st);
+          };
+          injectSpin(3);
+        }
         try {
           Object.defineProperty(nativeInput, 'value', {
             configurable: true,
