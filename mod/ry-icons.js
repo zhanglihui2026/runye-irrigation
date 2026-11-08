@@ -45,8 +45,13 @@
     water:     '<path d="M12 3.2c0 0 5.8 6.1 5.8 9.9a5.8 5.8 0 0 1-11.6 0C6.2 9.3 12 3.2 12 3.2z"/>',
     grid:      '<rect x="3.5" y="3.5" width="17" height="17"/><path d="M3.5 9.2h17M3.5 14.8h17M9.2 3.5v17M14.8 3.5v17"/>',
     gridreset: '<rect x="3" y="3" width="12.5" height="12.5"/><path d="M3 9.2h12.5M9.2 3v12.5"/><path d="M21 15.5a4.6 4.6 0 1 1-3.2 1.3"/><path d="M17 13.6l.6 3.4 3.4-.6"/>',
-    lock:      '<rect x="4.5" y="10.4" width="15" height="9.6" rx="1.4"/><path d="M8 10.4V7.4a4 4 0 0 1 8 0v3"/>',
-    unlock:    '<rect x="4.5" y="10.4" width="15" height="9.6" rx="1.4"/><path d="M8.2 10.4V6.9a3.9 3.9 0 0 1 7.2-1.8"/>',
+    /* [v1012] 锁定/解锁图标放大：原图形只占 24 网格下半（锁体 15×9.6、钩半径 4），
+       是全工具栏 30+ 图标里的异类小个子 —— 18px 渲染下约 11×14 空心细线，
+       用户实测「锁定面积这个按钮不明显」。按 Feather 比例放大到与 grid/undo 等
+       一致（锁体 17×10.5、钩半径 4.5），视觉分量约 +24%；颜色体系不动
+       （默认墨色 / 激活绿底不变，状态区分仍由 lock⇄unlock + .active 承担）。 */
+    lock:      '<rect x="3.5" y="10.5" width="17" height="10.5" rx="1.8"/><path d="M7.5 10.5V7a4.5 4.5 0 0 1 9 0v3.5"/>',
+    unlock:    '<rect x="3.5" y="10.5" width="17" height="10.5" rx="1.8"/><path d="M7.5 10.5V7a4.5 4.5 0 0 1 8.7-1.5"/>',
     undo:      '<path d="M4.5 9.5h9.6a4.9 4.9 0 0 1 0 9.8H8.2"/><path d="M8.1 5.4L4 9.5l4.1 4.1"/>',
     /* [v951] 在线地图绘制条图标钮用：编辑（铅笔）/ 画框（多边形+顶点）/ 完成（对勾）。
        画框图标刻意保留顶点小圈 —— 它表达的是「点顶点围一块地」，不是「画一条线」，
@@ -104,7 +109,7 @@
     tlWsCalBtn:'diameter', tlWsMultiCalBtn:'diameter2', tlWsMultiClearBtn:'exitmulti',
     tlWsZoomIn:'zoomin', tlWsZoomOut:'zoomout', tlWsZoomFit:'fit', tlWsMultiBtn:'multi',
     tlWsMaskBtn:'mask', tlDesignUploadBtn:'upload', tlDimSaveBtn:'save',
-    tlAutoPipe:'autopipe', tlDxfExport:'cad', tlFrontNodeResetBtn:'relocate',
+    tlAutoPipe:'autopipe', tlDxfExport:'cad',
     tlDimMultiBtn:'grid',
 
     /* [v951] 在线地图绘制条 #mapDrawTools（吸附顶部、图标钮）。

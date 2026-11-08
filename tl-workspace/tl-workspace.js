@@ -216,7 +216,13 @@
       bs[j].setAttribute('opacity', (!tlHi && selGroup !== null && (gbv === selGroup || gbv === selGroup - 1)) ? '1' : '0.7');
     }
     var info = document.getElementById('tlWsGroupInfo');
-    if (info) info.innerHTML = (!tlHi && selGroup !== null) ? buildGroupInfo(selGroup) : '';
+    if (info) {
+      /* [v1012] 空卡片原本也带边框+padding 蹲在左下角，会压住固定层新增的
+         「主管/支管长度」块。没内容时整块隐藏，选中轮灌组时才浮出。 */
+      var giHtml = (!tlHi && selGroup !== null) ? buildGroupInfo(selGroup) : '';
+      info.innerHTML = giHtml;
+      info.style.display = giHtml ? 'block' : 'none';
+    }
     /* [v218 2026-10-04 用户请求] 水流动画 + 阀门开启：与分区变色共用**同一份演示态**，
        所以挂在 applyGroupHighlight 这一个出口上 —— 重涂高亮必然同步重涂水流，不必再记第二处状态。
        实现在 index.html 的 window.tlDemoRenderFlow（两个画布共用一份）；缺失时静默降级（单测桩环境无 SVG）。 */
@@ -228,7 +234,7 @@
     } catch (eFlow) { }
   }
   function groupInfoHtml() {
-    return '<div id="tlWsGroupInfo" style="display:block;position:absolute;bottom:10px;left:10px;max-width:42%;background:rgba(255,255,255,.96);border:1px solid #1f2937;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.12);padding:6px 11px;font:11.5px/1.55 system-ui,sans-serif;color:#1f2937;pointer-events:none;text-align:left;z-index:6"></div>';
+    return '<div id="tlWsGroupInfo" style="display:none;position:absolute;bottom:10px;left:10px;max-width:42%;background:rgba(255,255,255,.96);border:1px solid #1f2937;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.12);padding:6px 11px;font:11.5px/1.55 system-ui,sans-serif;color:#1f2937;pointer-events:none;text-align:left;z-index:6"></div>';
   }
   var KIND_LABEL = { main: '主管', branch: '支管' };
   /* 图面/手工配件类型 → 中文名（2026-09-18 第七十轮）：阀门进入手工层后，原「非三通即弯头」的
@@ -441,8 +447,11 @@
       try { tlMergeCloneZones(clone); } catch (e) { }
       /* 2026-09-16：页眉信息/底部参数/图例三组在工作区改由固定 HTML 覆盖层呈现（不随缩放平移），
          克隆底图剥离；标题/图框恢复于简图源头（2026-09-16），工作区同样剥离（做图区不显示）。
-         2026-10-20：tlNorthGroup（指北针）同属图框装饰，做图区不显示，一并剥离。 */
-      ['tlHeaderGroup', 'tlParamsGroup', 'tlLegendGroup', 'tlTitleGroup', 'tlFrameGroup', 'tlNorthGroup'].forEach(function (gid) {
+         2026-10-20：tlNorthGroup（指北针）同属图框装饰，做图区不显示，一并剥离。
+         [v1012 2026-11-08] tlAxisHintGroup（橙色「布管方向」提示）：此前是裸 <text>、无 id，
+         剥离时漏掉 ⇒ 工作区里它随图纸缩放/平移。现由固定覆盖层 #tlWsOvLengths 同源显示，
+         这里必须一并剥离，否则固定块与 SVG 内那份会叠字。 */
+      ['tlHeaderGroup', 'tlParamsGroup', 'tlLegendGroup', 'tlTitleGroup', 'tlFrameGroup', 'tlNorthGroup', 'tlAxisHintGroup'].forEach(function (gid) {
         var g = clone.querySelector('#' + gid);
         if (g && g.parentNode) g.parentNode.removeChild(g);
       });

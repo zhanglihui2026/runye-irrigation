@@ -1085,6 +1085,43 @@ function tlMapTrunkLen() {
   } catch (e) { return null; }
 }
 
+/* [v1020 待办④] 段总管可用性判定（与 segWorstPath 的塌缩守卫同口径）：
+   joinPts 必须覆盖每一根有效主管（mp.length≥2），且接点真落在本区主管上（投影 ≤1 m）。
+   两排布局下 build 合并共线分支会把 joinPts 塌成少数共线组 ⇒ 判不可用。
+   用途：tlFrontLenUse 的 segLen 兜底归零——两台最不利路径引擎都诚实返回 EMPTY 时，
+   不让「段总管全长」这个假距离从扬程链后门溜回来（v1019 收口了 run，漏了 segLen）。 */
+function tlSegTrunkUsable() {
+  try {
+    var d = window.tlDiagramData, st = d && d.segTrunk;
+    if (!st || !Array.isArray(st.points) || st.points.length < 2 ||
+        !Array.isArray(st.joinPts) || !st.joinPts.length || !(st.len > 0)) return false;
+    var mp = d.mainPipes || [];
+    for (var zi = 0; zi < mp.length; zi++) {
+      var line = mp[zi];
+      if (!line || line.length < 2) continue;
+      var jp = st.joinPts[zi];
+      if (!jp || !isFinite(jp.x) || !isFinite(jp.y)) return false;
+      var best = Infinity;
+      for (var j = 1; j < line.length; j++) {
+        var a = line[j - 1], b = line[j], dx = b.x - a.x, dy = b.y - a.y, den = dx * dx + dy * dy;
+        var t = den ? Math.max(0, Math.min(1, ((jp.x - a.x) * dx + (jp.y - a.y) * dy) / den)) : 0;
+        best = Math.min(best, Math.hypot(jp.x - a.x - dx * t, jp.y - a.y - dy * t));
+      }
+      if (!(best <= 1)) return false;
+    }
+    return true;
+  } catch (e) { return false; }
+}
+
+/* [v1020 待办⑤] 三级管线图是否已生成（有主管即算）——区分「没画图所以用试算输入」
+   与「画了图但两台最不利路径引擎都不可用（如无地图反投数据）」，后者必须向用户明示。 */
+function tlDiagramHasPipes() {
+  try {
+    var d0 = window.tlDiagramData;
+    return !!(d0 && d0.mainPipes && d0.mainPipes.length);
+  } catch (e) { return false; }
+}
+
 /* 总管长度（扬程用）的**唯一收口**。三个调用点都走这里，别各写一份三元表达式。
    返回 { len, src, mapLen, mapId }，src='mapTrunk'|'figure'|'input' —— 界面靠它标注来源：
    「总管 342.6 m（在线地图实测）」和「总管 300.0 m（设计图面）」对用户是完全不同的信息。 */
@@ -1097,7 +1134,10 @@ function tlFrontLenUse(wpFront, frontPipeLen, wpFromSeg) {
   var segLen = 0;
   try {
     var sd0 = window.tlDiagramData && window.tlDiagramData.segTrunk;
-    segLen = (sd0 && typeof sd0.len === 'number' && sd0.len > 0) ? sd0.len : 0;
+    /* [v1020 待办④] segLen 加塌缩守卫：段总管数据在但 joinPts 塌缩/错位（两排布局）
+       ⇒ segLen 归零。此前只挡住了 run（v1019），全长 segLen 仍会经 v859 兜底分支
+       叠进扬程——同一假距离的第二条通路。 */
+    segLen = (sd0 && typeof sd0.len === 'number' && sd0.len > 0 && tlSegTrunkUsable()) ? sd0.len : 0;
   } catch (eSeg1) { }
   var mt = tlMapTrunkLen();
   /* [v879] 最不利路径引擎（segWorstPath）给出 wpFront = 手绘总管全长（未画则 0）
@@ -1119,6 +1159,202 @@ function tlFrontLenUse(wpFront, frontPipeLen, wpFromSeg) {
    不把各地块的支管/主管全部相加。图面已生成时，长度取图面真实折线（含图面改长/平移，走 AE.effPts）；
    无图面数据时返回 fromFigure:false，由调用方退回试算输入值。
    本函数只解析「长度与分区号」，损失仍由 computeThreeLevel 按既有流量口径计算。 */
+/* [v601] 支管计算长度口径（两引擎共用）：满跨 ÷（根数×敷设边数）+ 手动改长增量，
+   图面两端留边不进计算。legacyWorstPath / segWorstPath / tlRoutesWorstPath 三处同式。 */
+function tlBranchCalcLenOf(d, branchLens, zi) {
+  var brCalcCount = readSelectedInt('#tl_branchGroup .selected', 2);
+  var brCalcSides = readSelectedInt('#tl_layoutGroup .selected', 1);
+  var info = (typeof window.tlBranchSpanInfo === 'function') ? window.tlBranchSpanInfo(zi) : null;
+  if (!info || !(info.full > 0)) return 0;
+  var now = (branchLens[zi] > 0) ? branchLens[zi] : info.base;
+  var delta = Math.max(0, now - info.base);
+  return (info.full + delta) / (brCalcCount * brCalcSides);
+}
+
+/* [v1019 用户拍板] 最远水路数据源 = 在线地图轮灌演示同款寻路引擎（RyMapFlowDemo.routesAll）。
+   背景：段总管模型要求「一条垂直干线穿过每一根主管」，两排/多排条状布局下合并共线分支
+   会把主管塌缩成少数共线组（joinPts 只剩 2 个），8 个区被静默跳过、run 是假距离
+   （392×300 十区实测「最远 2 区 · 233.1 m」，真最远在右端 ≈400 m+）。
+   新口径：全分区逐区走真实管道图（手绘总管+段总管反投线+主管链+支管），
+   front = 干线段真实长、main = 沿主管链到该区的真实长（链式主管的过境段计入——
+   旧模型只算本区自己那条，下游区被系统性低估）、branch 沿用 v601 满跨口径。
+   [v1020 待办①] 长度单位统一为**图面米**：主管/段总管切片先反投重建到本地折线再求长
+   （与材料清单同口径）；手绘总管（trunk:i）只存在于地图画布，保持地图经纬折算米。
+   [v1020 待办③] zones[].mainSegs = 链式主管逐段 {key,len,downZi}——切片身份 (key,a,b)，
+   downZi = 路径同样经过该切片的分区号集（树形拓扑下该段流量=这些分区流量和），
+   流量换算在 computeThreeLevel（那里才有逐区 flow），本函数保持纯几何。 */
+function tlRoutesWorstPath(needGeom, EMPTY) {
+  var M = window.RyMapFlowDemo;
+  if (!M || typeof M.routesAll !== 'function') return null;
+  var R = M.routesAll();
+  if (!R || !R.routes || !R.routes.length || !R.total) return null;
+  if (R.missing && R.missing.length) return null;   /* 覆盖率守卫：缺区 ⇒ 整体放弃 */
+  var d = window.tlDiagramData;
+  if (!d) return null;
+  function llLen(pts) {
+    var L = 0;
+    for (var i = 1; i < pts.length; i++) {
+      var cos = Math.max(0.1, Math.cos(((pts[i - 1].lat + pts[i].lat) / 2) * Math.PI / 180));
+      var dx = (pts[i].lng - pts[i - 1].lng) * 111320 * cos, dy = (pts[i].lat - pts[i - 1].lat) * 110540;
+      L += Math.sqrt(dx * dx + dy * dy);
+    }
+    return L;
+  }
+  var AE = window.RyTlAutoEdits;
+  /* [v1020 待办②] AE.effPts(pid, data) 第二参是整个 tlDiagramData（pid 内部查
+     mainPipes/branchPipes）——v1019 曾误传折线当 data，改长/平移覆盖静默失效，已修正。 */
+  function effOf(pid, pts) {
+    try { if (AE && AE.effPts && pid) { var e = AE.effPts(pid, d); if (e && e.length >= 2) return e; } } catch (eE) { }
+    return pts;
+  }
+  var branchLens = (d.branchPipes || []).map(function (bp, bi) {
+    var e = effOf('branch-' + bi, bp);
+    var L = 0; for (var i = 1; i < e.length; i++) L += Math.hypot(e[i].x - e[i - 1].x, e[i].y - e[i - 1].y); return L;
+  });
+  /* [v1020 待办①] 图面米换算基建：collect 的 toLLLine 逐点投影（同序）⇒ 切片经纬点
+     投影回原始折线的（段号 i, 比例 t），再在图面米折线上取同点求长。
+     反投依赖 __runyeGeoBase/__runyeMapFrameInv（与 v879 反投同一套全局量），不可用 ⇒
+     sliceLen 回退地图口径 llLen（诚实降级，不出数也不出错）。 */
+  var base = window.__runyeGeoBase, fInv = window.__runyeMapFrameInv;
+  function localToLL(pt) {
+    if (!pt || !isFinite(pt.x) || !isFinite(pt.y) || !base || typeof base.refLat !== 'number') return null;
+    var x = pt.x, y = pt.y;
+    if (fInv) { var dx = x - fInv.tx, dy = y - fInv.ty; x = fInv.ax * dx + fInv.bx * dy; y = fInv.ay * dx + fInv.by * dy; }
+    var Rr = 6378137, mlat = Rr * Math.PI / 180, cosLat = Math.cos(base.refLat * Math.PI / 180);
+    return { lat: base.refLat + y / mlat, lng: base.refLng + x / (mlat * cosLat) };
+  }
+  function rawLLof(localPts) {
+    var out = [];
+    for (var i = 0; i < localPts.length; i++) { var q = localToLL(localPts[i]); if (q) out.push(q); }
+    return out.length >= 2 ? out : null;
+  }
+  function llSliceToLocal(rawLL, localPts, slicePts) {
+    if (!rawLL || !localPts || rawLL.length !== localPts.length || !slicePts || slicePts.length < 2) return [];
+    var cos0 = Math.max(0.1, Math.cos(rawLL[0].lat * Math.PI / 180));
+    function xy(p) { return { x: p.lng * 111320 * cos0, y: p.lat * 110540 }; }
+    var cum = [0];
+    for (var i = 1; i < rawLL.length; i++) {
+      var a = xy(rawLL[i - 1]), b = xy(rawLL[i]);
+      cum[i] = cum[i - 1] + Math.hypot(b.x - a.x, b.y - a.y);
+    }
+    var outPts = [];
+    slicePts.forEach(function (p) {
+      var q = xy(p), best = null;
+      for (var j = 1; j < rawLL.length; j++) {
+        var a2 = xy(rawLL[j - 1]), b2 = xy(rawLL[j]);
+        var dx = b2.x - a2.x, dy = b2.y - a2.y, den = dx * dx + dy * dy;
+        var t = den ? Math.max(0, Math.min(1, ((q.x - a2.x) * dx + (q.y - a2.y) * dy) / den)) : 0;
+        var px = a2.x + dx * t, py = a2.y + dy * t, dd = Math.hypot(q.x - px, q.y - py);
+        if (!best || dd < best.d) best = { d: dd, i: j - 1, t: t };
+      }
+      if (best && best.d <= 8) {
+        var lp0 = localPts[best.i], lp1 = localPts[Math.min(best.i + 1, localPts.length - 1)];
+        outPts.push({ x: lp0.x + (lp1.x - lp0.x) * best.t, y: lp0.y + (lp1.y - lp0.y) * best.t });
+      }
+    });
+    return outPts;
+  }
+  /* 原始折线缓存（key → {rawLL, localPts} | null）：同一线体多切片共用，反投只做一次。 */
+  var rawCache = {};
+  function linePairOf(key) {
+    if (Object.prototype.hasOwnProperty.call(rawCache, key)) return rawCache[key];
+    var localPts = null;
+    if (/^main:/.test(key)) {
+      var zi = parseInt(key.slice(5), 10);
+      localPts = isFinite(zi) ? effOf('main-' + zi, (d.mainPipes || [])[zi]) : null;
+    } else if (key === 'segment:0' && d.segTrunk && Array.isArray(d.segTrunk.points)) {
+      localPts = d.segTrunk.points;
+    }
+    var pair = null;
+    if (localPts && localPts.length >= 2) { var raw = rawLLof(localPts); if (raw) pair = { rawLL: raw, localPts: localPts }; }
+    rawCache[key] = pair;   /* null 也缓存：反投不可用时不反复尝试 */
+    return pair;
+  }
+  /* 切片求长（v1020 待办①）：手绘总管（trunk:i）无图面对应物 ⇒ 地图口径；
+     主管/段总管切片本地重建（点数不丢才算成功）⇒ 图面米；失败 ⇒ 回退 llLen。 */
+  function sliceLen(s) {
+    if (/^trunk:/.test(s.key)) return llLen(s.points);
+    var pair = linePairOf(s.key);
+    if (!pair) return llLen(s.points);
+    var loc = llSliceToLocal(pair.rawLL, pair.localPts, s.points);
+    if (loc.length !== s.points.length || loc.length < 2) return llLen(s.points);
+    var L = 0;
+    for (var i = 1; i < loc.length; i++) L += Math.hypot(loc[i].x - loc[i - 1].x, loc[i].y - loc[i - 1].y);
+    return L;
+  }
+  /* [v1020 待办③] 切片身份 → 下游分区号集：同一物理 edge（key,a,b 全等）被哪些分区的
+     路径共享，过境段流量 = 这些分区的流量和（树形拓扑严格成立）。 */
+  var edgeZones = {};
+  R.routes.forEach(function (rt) {
+    rt.main.forEach(function (s) {
+      var id = s.key + '#' + s.a + '#' + s.b;
+      (edgeZones[id] || (edgeZones[id] = [])).push(rt.zi);
+    });
+  });
+  var byZi = {}, zones = [], taps = [];
+  R.routes.forEach(function (rt) {
+    var tL = 0; rt.trunk.forEach(function (s) { tL += sliceLen(s); });
+    var mL = 0; rt.main.forEach(function (s) { mL += sliceLen(s); });
+    var prev = byZi[rt.zi], tot = tL + mL;
+    if (!prev || tot > prev.totTrunkMain) byZi[rt.zi] = { zi: rt.zi, totTrunkMain: tot, front: tL, main: mL, rt: rt };
+  });
+  Object.keys(byZi).forEach(function (k) {
+    var z = byZi[k];
+    var bl = tlBranchCalcLenOf(d, branchLens, z.zi);
+    taps.push({ zi: z.zi, run: z.front });
+    /* [v1020 待办③] 逐段序列按路径顺序（rt.main 即 Dijkstra 重建序），len 与 main 同源
+       （同一批 sliceLen），downZi 交给 computeThreeLevel 换算组合流量。 */
+    var mainSegs = z.rt.main.filter(function (s) { return /^main:/.test(s.key); }).map(function (s) {
+      return { key: s.key, len: sliceLen(s), downZi: (edgeZones[s.key + '#' + s.a + '#' + s.b] || [z.zi]).slice() };
+    });
+    zones.push({ zi: z.zi, run: z.front, main: z.main, branch: bl, mainSegs: mainSegs });
+  });
+  taps.sort(function (a, b) { return a.run - b.run; });
+  var worst = null;
+  zones.forEach(function (z) {
+    var tot = z.run + z.main + z.branch;
+    if (!worst || tot > worst.totPath) worst = { totPath: tot, z: z };
+  });
+  if (!worst) return null;
+  var out = { fromFigure: true, fromSeg: true, fromRoutes: true, zoneIndex: worst.z.zi,
+    front: worst.z.run, main: worst.z.main, branch: worst.z.branch, link: 0, taps: taps, zones: zones };
+  if (needGeom) {
+    /* 标注几何重建：重建基建（llSliceToLocal/localToLL/rawLLof）已上移到函数顶部与求长
+       共用（v1020 待办①）；手绘总管（trunk:i）只存在于地图画布、无图面对应物 ⇒
+       沿 v879 口径「计入长度不画」。 */
+    var geomMain = [], geomFront = [];
+    R.routes.forEach(function (rt) {
+      if (rt.zi !== worst.z.zi) return;
+      rt.main.forEach(function (s) {
+        if (/^main:/.test(s.key)) {
+          var zi = parseInt(s.key.slice(5), 10);
+          var mp = effOf('main-' + zi, d.mainPipes[zi]);
+          if (mp && mp.length >= 2) {
+            var seg = llSliceToLocal(rawLLof(mp), mp, s.points);
+            if (seg.length >= 2 && geomMain.length &&
+                Math.abs(seg[0].x - geomMain[geomMain.length - 1].x) < 1e-6 &&
+                Math.abs(seg[0].y - geomMain[geomMain.length - 1].y) < 1e-6) seg.shift();
+            geomMain = geomMain.concat(seg);
+          }
+        }
+      });
+      rt.trunk.forEach(function (s) {
+        if (s.key === 'segment:0' && d.segTrunk && Array.isArray(d.segTrunk.points)) {
+          var seg2 = llSliceToLocal(rawLLof(d.segTrunk.points), d.segTrunk.points, s.points);
+          if (seg2.length >= 2 && geomFront.length &&
+              Math.abs(seg2[0].x - geomFront[geomFront.length - 1].x) < 1e-6 &&
+              Math.abs(seg2[0].y - geomFront[geomFront.length - 1].y) < 1e-6) seg2.shift();
+          geomFront = geomFront.concat(seg2);
+        }
+      });
+    });
+    out.geom = { frontPts: geomFront, mainPts: geomMain, endPt: geomMain[geomMain.length - 1] || null,
+      zoneIndex: worst.z.zi, len: worst.z.run + worst.z.main };
+    if (!geomMain.length) out.geom = null;
+  }
+  return out;
+}
+
 function tlWorstPathLen(needGeom) {
   var EMPTY = { fromFigure: false, zoneIndex: -1, front: 0, main: 0, branch: 0, taps: [] };
   try {
@@ -1128,6 +1364,11 @@ function tlWorstPathLen(needGeom) {
        v873 起把 frontPipe/sourcePos 恒置 null（设计侧只拥有段总管），本分支仅为
        旧快照/未来恢复图面总管留通道；段总管时代走 segWorstPath（见下）。 */
     if (d.frontPipe && d.frontPipe.length >= 2) return legacyWorstPath(d, needGeom, EMPTY);
+    /* [v1019 用户拍板] 主引擎 = 地图轮灌演示同款全分区寻路（拓扑对任意布局正确）；
+       不可用（无反投数据/有分区无路径）⇒ 退段总管引擎（其自身带塌缩守卫，
+       两排布局会诚实返回 EMPTY）⇒ 再退 EMPTY。 */
+    var rw = tlRoutesWorstPath(needGeom, EMPTY);
+    if (rw) return rw;
     return segWorstPath(d, needGeom, EMPTY);
   } catch (e) {
     return EMPTY;
@@ -1271,31 +1512,34 @@ function segWorstPath(d, needGeom, EMPTY) {
   var anchor = st.points[ai === 1 ? 1 : 0];
   var mainPipes = d.mainPipes || [], branchPipes = d.branchPipes || [];
   var branchLens = branchPipes.map(function (bp, bi) { return polyLen(eff('branch-' + bi, bp)); });
-  /* [v601] 支管计算长度口径与 legacy 分支逐字一致：满跨 ÷（根数×敷设边数），留边不进计算。 */
-  var brCalcCount = readSelectedInt('#tl_branchGroup .selected', 2);
-  var brCalcSides = readSelectedInt('#tl_layoutGroup .selected', 1);
-  function branchSingleCalcLen(zi) {
-    var info = (typeof window.tlBranchSpanInfo === 'function') ? window.tlBranchSpanInfo(zi) : null;
-    if (!info || !(info.full > 0)) return 0;
-    var now = (branchLens[zi] > 0) ? branchLens[zi] : info.base;
-    var delta = Math.max(0, now - info.base);
-    return (info.full + delta) / (brCalcCount * brCalcSides);
-  }
-  var zones = [], taps = [], worst = null;
+  var zones = [], taps = [], worst = null, skipped = 0;
   for (var zi = 0; zi < mainPipes.length; zi++) {
     var mp = eff('main-' + zi, mainPipes[zi]);
     if (!mp || mp.length < 2) continue;
     var jp = st.joinPts[zi];                       /* joinPts 与 mainPipes 同序（build 按主管顺序产出） */
-    if (!jp || !isFinite(jp.x) || !isFinite(jp.y)) continue;
+    if (!jp || !isFinite(jp.x) || !isFinite(jp.y)) { skipped++; continue; }
+    /* [v1019] 塌缩守卫：接点必须真落在本区主管上（≤1 m）。两排布局下 build 合并共线
+       分支把 joinPts 塌成少数共线组，序号错位（如区0 拿到下排接点）⇒ 整体判不可用，
+       绝不让假 run 进扬程链（实测 392×300 十区曾产出「最远 2 区 · 233.1 m」假路径）。 */
+    var jpBest = Infinity;
+    for (var jk = 1; jk < mp.length; jk++) {
+      var ja = mp[jk - 1], jb = mp[jk], jdx = jb.x - ja.x, jdy = jb.y - ja.y, jden = jdx * jdx + jdy * jdy;
+      var jt = jden ? Math.max(0, Math.min(1, ((jp.x - ja.x) * jdx + (jp.y - ja.y) * jdy) / jden)) : 0;
+      jpBest = Math.min(jpBest, Math.hypot(jp.x - ja.x - jdx * jt, jp.y - ja.y - jdy * jt));
+    }
+    if (!(jpBest <= 1)) { skipped++; continue; }
     /* 干线穿过主管（joinPt 在主管上）⇒ 接入段 link=0；主管长沿用全长约定（保守，与材料口径一致）。 */
     var run = handLen + dist(jp, anchor);
     var ml = polyLen(mp);
-    var bl = (zi < branchLens.length) ? (branchSingleCalcLen(zi) || branchLens[zi]) : 0;
+    var bl = (zi < branchLens.length) ? (tlBranchCalcLenOf(d, branchLens, zi) || branchLens[zi]) : 0;
     taps.push({ zi: zi, run: run });
     zones.push({ zi: zi, main: ml, branch: bl, run: run });
     var totPath = run + ml + bl;
     if (!worst || totPath > worst.totPath) worst = { totPath: totPath, run: run, main: ml, branch: bl, zi: zi, mp: mp, jp: jp };
   }
+  /* [v1019] 覆盖率守卫：有主管拿不到接点 ⇒ 干线模型对该布局不成立，整体不可用
+     （被跳过的区可能才是真最远，静默竞选会产出假最不利分区）。 */
+  if (skipped > 0) return EMPTY;
   if (!worst) return EMPTY;
   taps.sort(function (a, b) { return a.run - b.run; });
   var out = { fromFigure: true, fromSeg: true, zoneIndex: worst.zi, front: worst.run, main: worst.main, branch: worst.branch, link: 0, taps: taps, zones: zones };
@@ -1438,14 +1682,16 @@ function tlWorstPathMarkSVG(ts) {
   var dM = d(g.mainPts);
   var out = [];
   out.push('<g data-tlworst="1" fill="none" stroke-linecap="round" stroke-linejoin="round" pointer-events="none">');
-  out.push('<path d="' + dF + '" stroke="#a855f7" stroke-opacity="0.40" stroke-width="13"/>');
+  /* [v1019] 空段守卫：routes 引擎的 frontPts 可能为空（手绘总管部分只在地图画布、
+     无图面对应物，沿 v879 口径计入长度不画）⇒ 空串 d="" 的 <path> 不再落 DOM。 */
+  if (dF) out.push('<path d="' + dF + '" stroke="#a855f7" stroke-opacity="0.40" stroke-width="13"/>');
   if (dL) out.push('<path d="' + dL + '" stroke="#a855f7" stroke-opacity="0.40" stroke-width="13"/>');
-  out.push('<path d="' + dM + '" stroke="#a855f7" stroke-opacity="0.40" stroke-width="12"/>');
+  if (dM) out.push('<path d="' + dM + '" stroke="#a855f7" stroke-opacity="0.40" stroke-width="12"/>');
   /* v26：虚线改水流动画（用户要求，观感同过滤器反冲水流 fs-flow）——dasharray/动画由 .tl-worst-flow 类提供，
      保留紫色系与光晕底衬（紫色仍是「最远水路」的识别色，动画只让水「流」起来） */
-  out.push('<path d="' + dF + '" class="tl-worst-flow" stroke="#7e22ce" stroke-width="1.8"/>');
+  if (dF) out.push('<path d="' + dF + '" class="tl-worst-flow" stroke="#7e22ce" stroke-width="1.8"/>');
   if (dL) out.push('<path d="' + dL + '" class="tl-worst-flow" stroke="#7e22ce" stroke-width="1.8"/>');
-  out.push('<path d="' + dM + '" class="tl-worst-flow" stroke="#7e22ce" stroke-width="1.8"/>');
+  if (dM) out.push('<path d="' + dM + '" class="tl-worst-flow" stroke="#7e22ce" stroke-width="1.8"/>');
   var e = ts(g.endPt.x, g.endPt.y);
   out.push('<circle cx="' + e.x.toFixed(1) + '" cy="' + e.y.toFixed(1) + '" r="6" fill="#fff" stroke="#7e22ce" stroke-width="2.5"/>');
   out.push('<text x="' + (e.x + 11).toFixed(1) + '" y="' + (e.y - 9).toFixed(1) + '" font-size="11" font-weight="700" '
@@ -1646,6 +1892,22 @@ function computeThreeLevel() {
       return { zi: z.zi, run: z.run, main: z.main, branch: z.branch > 0 ? z.branch : branchLen,
         flow: area / tapeSpacing / emitterSpacing * emitterFlow / 1000 };
     });
+    /* [v1020 待办③] 链式主管过境段组合流量接线：routes 引擎给的 mainSegs 只带
+       {key,len,downZi}（downZi=路径同样经过该段的分区号集）；流量在本层才知道
+       （分区实际面积换算），这里把 downZi 求和为逐段 flow 交给 RyPipePathLoss。
+       无 mainSegs（旧引擎/旧快照）⇒ 不加字段，损失模型走单段口径零影响。 */
+    (function () {
+      var flowOfZone = {};
+      pathZones.forEach(function (z) { flowOfZone[z.zi] = z.flow; });
+      wp.zones.forEach(function (zSrc, zi2) {
+        if (!pathZones[zi2] || !Array.isArray(zSrc.mainSegs) || !zSrc.mainSegs.length) return;
+        pathZones[zi2].mainSegs = zSrc.mainSegs.map(function (s) {
+          var fl = 0;
+          (s.downZi || []).forEach(function (zd) { fl += (flowOfZone[zd] || 0); });
+          return { len: s.len, flow: fl };
+        });
+      });
+    })();
     var pathGroups = [], assigned = {};
     if (tlManualGroupsRef) {
       tlManualGroupsRef.forEach(function (group) {
@@ -2287,7 +2549,10 @@ function renderTLDerivation(r) {
         ? '（总管取<b>在线地图总管实测</b> ' + fmt(r.frontLenMap,1) + ' m'
           + (r.wp && r.wp.fromFigure ? ' · 最远 ' + fmt0(r.wp.zoneIndex + 1) + ' 区主/支管' : '')
           + '）'
-        : (r.wp && r.wp.fromFigure ? '（图面实际几何 · 最远 ' + fmt0(r.wp.zoneIndex + 1) + ' 区）' : '（试算输入值；生成管线图后改用图面实际几何）')}
+        : (r.wp && r.wp.fromFigure ? '（图面实际几何 · 最远 ' + fmt0(r.wp.zoneIndex + 1) + ' 区）'
+          : (tlDiagramHasPipes()
+            ? '（试算输入值 · <b style="color:#b45309">自动水路不可用</b>，请在在线地图绘制总管后重算）'
+            : '（试算输入值；生成管线图后改用图面实际几何）'))}
     </div>
     <div class="derivation-sum">
       <div class="expr">
@@ -3302,17 +3567,46 @@ function tlWireLegendResize(node) {
 
 /* 左下角「管段长度与水头损失」信息卡（2026-09-16 用户要求）：
    显示总管/主管/支管各自的长度与水头损失，并注明按「最远分区最不利路径」计（不把各地块管道相加）。
-   图面已生成时长度取图面实际几何（最远分区），否则显示试算输入值并在卡内提示。 */
+   图面已生成时长度取图面实际几何（最远分区），否则显示试算输入值并在卡内提示。
+   [v1017 P1 口径收口（TASK_pump_head_mismatch_20261108 §5.2）] 存在改径生效
+   （手动选管残留 或 图面改径 override）时，卡内明示当前生效管径三档 + 「↺ 退回设计档」
+   一键清除 —— 消除「管损卡按 Ø160 在算、选管却显示设计档 Ø180」的口径分叉（用户实测疑点②）。 */
+function tlLossCalsActive(r) {
+  var mc = window.tlManualCals || {};
+  var hasManual = (mc.front != null || mc.main != null || mc.branch != null);
+  var hasOverride = false;
+  try { hasOverride = !!(tlAppliedPipeOverride() && tlAppliedPipeOverride().calibers &&
+    Object.keys(tlAppliedPipeOverride().calibers).length); } catch (eOv) { }
+  return hasManual || hasOverride;
+}
+function tlLossResetCals() {
+  window.tlManualCals = { front: null, main: null, branch: null };
+  tlPipeOdOverride = null;   /* AE 数据本体保留（重新「应用到图面」可恢复），仅退出生效 */
+  try { if (typeof window.tlPumpUpdateRun === 'function') { window.tlPumpUpdateRun(); return; } } catch (e1) { }
+  try { tlUpdatePlanBar(); } catch (e2) { }
+  try { tlRefreshLossCard(); } catch (e3) { }
+}
+function tlBindLossReset() {
+  if (window._tlLossResetBound) return; window._tlLossResetBound = true;
+  document.addEventListener('click', function (ev) {
+    var t = ev.target;
+    if (t && t.id === 'tlLossResetCals') { ev.preventDefault(); tlLossResetCals(); }
+  });
+}
 function tlRefreshLossCard(r) {
   var el = document.getElementById('tlLossCard'); if (!el) return;
   try {
     if (!r) r = computeThreeLevel();
+    tlBindLossReset();
     function f1(v) { return (isFinite(v) ? v : 0).toFixed(1); }
     function f2(v) { return (isFinite(v) ? v : 0).toFixed(2); }
     var fromFig = !!(r.wp && r.wp.fromFigure);
     /* [v618 2026-10-20 用户要求] 括号内分隔符 `·` → `*`：
        「（图面实际 · 最远 30 区）」→「（图面实际 * 最远 30 区）」，其余字面一字未改。 */
-    var ziTxt = fromFig ? ('图面实际 * 最远 ' + (r.wp.zoneIndex + 1) + ' 区') : '试算输入值';
+    var ziTxt = fromFig ? ('图面实际 * 最远 ' + (r.wp.zoneIndex + 1) + ' 区')
+      : (tlDiagramHasPipes()
+        ? '试算输入值 · <span style="color:#b45309">自动水路不可用，请在在线地图绘制总管后重算</span>'
+        : '试算输入值');
     /* [v613] 外观全部交给 style-01.css 的 .tl-flat-*（灰条标题 / 22px 行 / 小字说明），
        本函数只负责结构 + 数值，不再往 DOM 上写 inline 样式 —— 与三级面板其余几条走同一套网格。
        原来这里是「加粗黑标题 + 虚线分隔 + 卡片内边距」，与上面的灰条行完全不是一个语言。 */
@@ -3320,6 +3614,15 @@ function tlRefreshLossCard(r) {
       return '<div class="tl-flat-row">'
         + '<span>' + name + '</span>'
         + '<span>' + f1(len) + ' m · 损失 <b style="color:#b45309">' + f2(loss) + ' m</b></span></div>';
+    }
+    /* [v1017 P1] 生效管径行：有改径生效时才出现（未改径不添噪）。管径读参与计算的
+       r.*Pipe.od（computeThreeLevel 已按手动档/override 覆写），不是设计档。 */
+    var calsLine = '';
+    if (tlLossCalsActive(r)) {
+      calsLine = '<div class="tl-flat-note" style="color:#b45309">生效管径（含改径档）：总管 Ø'
+        + Math.round(r.frontPipe.od) + ' / 主管 Ø' + Math.round(r.mainPipe.od)
+        + ' / 支管 Ø' + Math.round(r.branchPipe.od)
+        + '<span id="tlLossResetCals" style="float:right;cursor:pointer;text-decoration:underline;color:#b45309">↺ 退回设计档</span></div>';
     }
     el.innerHTML = '<div class="tl-flat-head">管段长度与水头损失</div>'
       + '<div class="tl-flat-note">按「最远分区最不利路径」计（' + ziTxt + '），不叠加各地块管道</div>'
@@ -3329,6 +3632,7 @@ function tlRefreshLossCard(r) {
       + '<div class="tl-flat-row"><span>合计</span>'
       + '<span>' + f1((r.frontLenUsed || 0) + (r.mainLenUsed || 0) + (r.branchLenUsed || 0)) + ' m'
       + ' · 损失 <b style="color:#b45309">' + f2(r.totalPipeLoss) + ' m</b></span></div>'
+      + calsLine
       + '<div class="tl-flat-note">'
       + (fromFig ? '主管含由总管接入该区的连接段' : '生成管线图后改用图面实际几何') + '</div>';
     el.style.display = 'block';
@@ -3419,31 +3723,24 @@ function tlUpdatePlanBar() {
   function fmt0(v){return Math.round(v).toString();}
 
   var el;
+  /* [v1017c 2026-11-08 用户口径] 手绘总管闭环门槛：未在在线地图绘制总管（或总管与当前
+     地块不匹配，tlMapTrunkLen 口径「宁撤回、不猜」）时，扬程链的总管长度只能落试算输入值
+     —— 扬程必不准。此时水泵扬程/轴功率/电机功率三格与全部改径重算橙列显示 —，
+     并常驻提示「请在在线地图绘制总管形成闭环，再计算扬程」（#tlPlanLoopHint）；
+     画好总管后自动恢复数字。水泵流量/联合流量与总管无关，照常显示。 */
+  var loopOk = false;
+  try { var _mtLoop = tlMapTrunkLen(); loopOk = !!(_mtLoop && _mtLoop.ok); } catch (eLoop) { }
+  if (el = document.getElementById('tlPlanLoopHint')) el.style.display = loopOk ? 'none' : '';
   if(el=document.getElementById('tlPlanCombinedFlow')) el.textContent=fmt(r.combinedFlow,1)+' m³/h';
   /* v106（2026-09-22 用户要求）：「联合流量」底下注明依据 —— 按哪个联合分区、实际多少亩换算。
      数据与 computeThreeLevel 同源（worstGroup={g,zones,sum}，sum=最大组实际面积和 m²）。
      [v618 2026-10-20 用户要求] 文案简化：「联合流量依据：联合分区 M13…」→「依据：分区 M13…」
-     （前四个字与行标题「联合流量」重复，窄面板下还要多折一行）。
-     同轮第二次：「· 实际面积和 36.0 亩」→「*实际面积= 36.0 亩」（分隔符与措辞按用户原话，
-     含义不变：该值仍是最大联合分区的面积和，单位亩）。 */
+     [v890 2026-11-05 双口径补设计亩数与偏差]
+     [v1014 2026-11-08 用户要求] 再简化：「依据：分区 M3（1区、2区）*实际面积= 16.9 亩（…）」
+     →「依据：分区M3（16.9亩）」，只留组号与实切亩数，区清单与双口径全删。 */
   if (el = document.getElementById('tlPlanCombinedSrc')) {
     if (r.worstGroup) {
-      /* [v890 2026-11-05 用户要求] 双口径：实划亩数后面补设计亩数与偏差。
-         设计值取二级发布的 window.__ppZoneDesignMu（单区），乘本联合分区的区数
-         才和 worstGroup.sum（整组实切面积和）同口径。无发布值（未进地块页）
-         或偏差在 3% 内则保持原文案，不打扰。 */
-      var __grpZones = r.worstGroup.zones.length || 1;
-      var __designMu0 = (typeof window.__ppZoneDesignMu === 'number' && window.__ppZoneDesignMu > 0) ? window.__ppZoneDesignMu : 0;
-      var __drift = null;
-      try {
-        var __G = window.RyZoneGeometry;
-        if (__G && __G.zoneAreaDrift && __designMu0 > 0) __drift = __G.zoneAreaDrift(__designMu0 * 666.67 * __grpZones, r.worstGroup.sum);
-      } catch (eD) { __drift = null; }
-      var __areaTxt = fmt(r.worstGroup.sum / 666.67, 1) + ' 亩';
-      if (__drift && __drift.drift) __areaTxt += '（设计 ' + __drift.designMu.toFixed(1) + ' 亩，' + (__drift.deltaPct > 0 ? '+' : '') + __drift.deltaPct.toFixed(1) + '%）';
-      el.textContent = '依据：分区 M' + (r.worstGroup.g + 1) + '（'
-        + r.worstGroup.zones.map(function (z) { return (z + 1) + '区'; }).join('、')
-        + '）*实际面积= ' + __areaTxt;
+      el.textContent = '依据：分区M' + (r.worstGroup.g + 1) + '（' + fmt(r.worstGroup.sum / 666.67, 1) + '亩）';
     } else {
       el.textContent = '依据：暂无图面分组数据（按单区流量 × ' + fmt0(r.zoneCount || 1) + ' 估算）';
     }
@@ -3455,10 +3752,11 @@ function tlUpdatePlanBar() {
      主列（设计值）= 理论选管计算值；橙列（改径重算）= 应用管径重算值（见下方 tlRealSet 调用）。
      v119 的「主=实际 / 橙=设计」与列头错位，用户读作「改径重算列没更新」；改径后的值
      在橙列与下方黑条（水泵扬程 36.5 m）直接可见。 */
-  if(el=document.getElementById('tlPlanPumpHead')) el.textContent=fmt(rDes.pumpHead,1)+' m';
+  /* [v1017c] 三主格闭环门槛：未闭环显示 —（数据层 computeThreeLevel 不拦，快照/材料链完整） */
+  if(el=document.getElementById('tlPlanPumpHead')) el.textContent=loopOk ? fmt(rDes.pumpHead,1)+' m' : '— m';
 
-  if(el=document.getElementById('tlPlanPumpPower')) el.textContent=fmt(rDes.pumpPower,1)+' kW';
-  if(el=document.getElementById('tlPlanMotorPower')) el.textContent=fmt(rDes.motorKW_rounded,1)+' kW';
+  if(el=document.getElementById('tlPlanPumpPower')) el.textContent=loopOk ? fmt(rDes.pumpPower,1)+' kW' : '— kW';
+  if(el=document.getElementById('tlPlanMotorPower')) el.textContent=loopOk ? fmt(rDes.motorKW_rounded,1)+' kW' : '— kW';
   if(el=document.getElementById('tlPlanFrontPipe')) el.textContent='Ø '+rDes.frontPipe.od+' mm';
   if(el=document.getElementById('tlPlanFrontVelocity')) el.textContent=fmt(rDes.frontPipe.v,2)+' m/s';
   if(el=document.getElementById('tlPlanMainPipe')) el.textContent='Ø '+rDes.mainPipe.od+' mm';
@@ -3466,16 +3764,19 @@ function tlUpdatePlanBar() {
   if(el=document.getElementById('tlPlanMainVelocity')) el.textContent=fmt(rDes.mainPipe.v,2)+' m/s';
   if(el=document.getElementById('tlPlanBranchPipe')) el.textContent='Ø '+rDes.branchPipe.od+' mm';
   if(el=document.getElementById('tlPlanBranchVelocity')) el.textContent=fmt(rDes.branchPipe.v,2)+' m/s';
-  /* v107：实际列（图面改径 + 「⇧ 更新水泵扬程」重算后的真实值；未改径时显示 —） */
-  function tlRealSet(id, v, unit, dec) {
+  /* v107：实际列（图面改径 + 「⇧ 更新水泵扬程」重算后的真实值；未改径时显示 —）
+     [v1017 P1] 第 5 参 odTxt：流速橙列尾部追加生效管径标注「(Ø160)」——
+     生效档可能与设计档不同（残留改径），不标口径就会重演「5.83 反推 Ø160」式误读。
+     仅流速三行传；扬程/功率行不传（不涉及管径）。 */
+  function tlRealSet(id, v, unit, dec, odTxt) {
     var e2 = document.getElementById(id); if (!e2) return;
     if (!ovApplied || typeof v !== 'number' || !isFinite(v)) { e2.textContent = '—'; e2.style.color = '#cbd5e1'; return; }
-    e2.textContent = fmt(v, dec) + ' ' + unit; e2.style.color = '';
+    e2.textContent = fmt(v, dec) + ' ' + unit + (odTxt ? ' (' + odTxt + ')' : ''); e2.style.color = '';
   }
   /* v139：扬程/功率橙列（改径重算）= 应用管径重算后的值（与流速行同款 tlRealSet；未应用显示 —） */
-  tlRealSet('tlPlanPumpHeadReal', r.pumpHead, 'm', 1);
-  tlRealSet('tlPlanPumpPowerReal', r.pumpPower, 'kW', 1);
-  tlRealSet('tlPlanMotorPowerReal', r.motorKW_rounded, 'kW', 1);
+  tlRealSet('tlPlanPumpHeadReal', loopOk ? r.pumpHead : NaN, 'm', 1);
+  tlRealSet('tlPlanPumpPowerReal', loopOk ? r.pumpPower : NaN, 'kW', 1);
+  tlRealSet('tlPlanMotorPowerReal', loopOk ? r.motorKW_rounded : NaN, 'kW', 1);
   /* v109（2026-09-22 用户要求）：管径前后对比 —— 改径重算后实际参与计算的管径
      （computeThreeLevel 按覆盖管径算出的 r.*Pipe.od），与设计管径不同时显示「315 → 280 mm」，
      未改径或改径后没变显示 —（浅灰）。 */
@@ -3493,9 +3794,22 @@ function tlUpdatePlanBar() {
     return ovApplied ? flow / 3600 / (Math.PI * Math.pow(peInnerDiam(od) / 1000, 2) / 4) : NaN;
   }
   var hp = r.hydraulicPath;
-  tlRealSet('tlPlanFrontVelocityReal', actualVelocity(hp ? hp.frontFlow : r.combinedFlow, usedCals.front || r.frontPipe.od), 'm/s', 2);
-  tlRealSet('tlPlanMainVelocityReal', actualVelocity(hp ? hp.mainFlow : r.zoneFlow, usedCals['main-' + worstZi] || r.mainPipe.od), 'm/s', 2);
-  tlRealSet('tlPlanBranchVelocityReal', actualVelocity(hp ? hp.branchFlow : r.branchFlow, usedCals['branch-' + worstZi] || r.branchPipe.od), 'm/s', 2);
+  /* ===== [v1017 P1 口径矩阵（TASK_pump_head_mismatch_20261108 §5.1，写死防再误读）=====
+     三行流速橙列的流量口径各不相同（hp = r.hydraulicPath，v900 后图面链恢复前曾恒 null）：
+       总管橙列: 流量 = hp ? hp.frontFlow : r.combinedFlow   —— 联合流量（最不利组全组合计）
+       主管橙列: 流量 = hp ? hp.mainFlow  : r.zoneFlow       —— 最大单区流量（不是联合流量）
+       支管橙列: 流量 = hp ? hp.branchFlow : r.branchFlow    —— 单区流量 ÷ 并联根数
+     管径口径（三行一致）：usedCals（生效档，= tlAppliedPipeOverride().calibers 的逐段键，
+       含残留改径）优先，无对应键才回退 r.*Pipe.od（computeThreeLevel 已按手动档覆写）。
+     管损卡同口径：总管行=联合流量、主管行=单区流量、支管行=单区÷并联，管径=生效档。
+     ⇒ 用户反推流量时：总管行对联合流量、主管行对单区流量、支管行对单区÷并联数，
+       跨行互相对账必然「对不上」（疑点①的 5.83/145.1 即此）。改这里前先读任务书。 */
+  var frontOdUsed = usedCals.front || r.frontPipe.od;
+  var mainOdUsed = usedCals['main-' + worstZi] || r.mainPipe.od;
+  var branchOdUsed = usedCals['branch-' + worstZi] || r.branchPipe.od;
+  tlRealSet('tlPlanFrontVelocityReal', actualVelocity(hp ? hp.frontFlow : r.combinedFlow, frontOdUsed), 'm/s', 2, 'Ø' + Math.round(frontOdUsed));
+  tlRealSet('tlPlanMainVelocityReal', actualVelocity(hp ? hp.mainFlow : r.zoneFlow, mainOdUsed), 'm/s', 2, 'Ø' + Math.round(mainOdUsed));
+  tlRealSet('tlPlanBranchVelocityReal', actualVelocity(hp ? hp.branchFlow : r.branchFlow, branchOdUsed), 'm/s', 2, 'Ø' + Math.round(branchOdUsed));
   /* 扬程计算过程（三级左栏）：与结果栏同源（computeThreeLevel），生成/切页/改参均经此处刷新 */
   if (typeof ppRenderHeadBreakdown === 'function') ppRenderHeadBreakdown(r);
   /* 管径调整·扬程确认卡（第四十一轮）：随结果栏刷新，无图/无改径时自行隐藏或禁用 */
@@ -4702,80 +5016,6 @@ function tlAutoGenerate(options) {
   }
 
   // ===== Map-owned trunk geometry =====
-  // The legacy orientation route below is retained only as a local migration
-  // scaffold; its output is discarded before rendering and is never persisted.
-  /* 保留方向派生变量供旧几何兼容计算；自动段总管候选最终丢弃，实际总管由在线地图手绘。 */
-  var firstFixedSideIsHorizontal = majFixedH;
-  var frontPipe = null;
-  var sourcePos = null;
-  var importedTrunk = window.__runyeImportedTrunk;
-  if((!importedTrunk || String(importedTrunk.plotId)!==String(window.currentPlotId||'')) && window.currentPlotId){
-    /* On a full page restore the bridge global may not have been rebuilt yet.
-       Rehydrate from the map-owned plot record, never from a previous plot's L3 snapshot. */
-    try{
-      var trunkStore=window.RyPlotLibraryStore, trunkSnapshot=trunkStore&&trunkStore.read();
-      var trunkMatches=trunkSnapshot&&trunkSnapshot.ok?(trunkSnapshot.plots||[]).filter(function(p){return p&&String(p.id)===String(window.currentPlotId);}):[];
-      var trunkPlot=trunkMatches.length===1?trunkMatches[0]:null, savedTrunk=trunkPlot&&trunkPlot.trunk;
-      /* [v831] v1/v2 统一归一后取主干；下面的投影口径与旧版逐字相同。 */
-      var _ts09b=window.RyTrunkSchema;
-      var _tn09=_ts09b&&_ts09b.normalize(savedTrunk);
-      var _tm09=_tn09&&_ts09b.pickMainTrunk(_tn09);
-      if(trunkPlot && !(trunkPlot.merged||trunkPlot.grouped) && _tm09 && _tn09.coordinateSystem==='GCJ-02'){
-        var trunkGeo=trunkPlot.geo;
-        if(!trunkGeo && Array.isArray(trunkPlot.polyLatLng) && trunkPlot.polyLatLng.length>=3){
-          var trLats=trunkPlot.polyLatLng.map(function(q){return Number(q[0]);});
-          trunkGeo={refLat:trLats.reduce(function(a,b){return a+b;},0)/trLats.length,refLng:Number(trunkPlot.polyLatLng[0][1])};
-        }
-        if(trunkGeo&&isFinite(trunkGeo.refLat)&&isFinite(trunkGeo.refLng)){
-          var trunkSign=-1, mapFrame=window.__runyeMapFramePoly, canvasPoly=window.measuredPolygon;
-          if(Array.isArray(mapFrame)&&Array.isArray(canvasPoly)&&mapFrame.length===canvasPoly.length){
-            var directErr=0,mirrorErr=0;
-            for(var ti0=0;ti0<mapFrame.length;ti0++){directErr+=Math.pow(canvasPoly[ti0].x-mapFrame[ti0].x,2)+Math.pow(canvasPoly[ti0].y-mapFrame[ti0].y,2);mirrorErr+=Math.pow(canvasPoly[ti0].x-mapFrame[ti0].x,2)+Math.pow(canvasPoly[ti0].y+mapFrame[ti0].y,2);}
-            if(directErr<mirrorErr)trunkSign=1;
-          }
-          var trMeters=6378137*Math.PI/180,trCos=Math.cos(trunkGeo.refLat*Math.PI/180);
-          var restoredPoints=_tm09.points.map(function(q){var rd=_ts09b.readPoint(q);return rd?{x:(rd.lng-trunkGeo.refLng)*trMeters*trCos,y:(rd.lat-trunkGeo.refLat)*trMeters*trunkSign}:null;});
-          if(restoredPoints.length>=2&&restoredPoints.every(Boolean))importedTrunk={plotId:String(trunkPlot.id),revision:Number(_tn09.revision)||0,trunkId:_tm09.id,points:restoredPoints};
-        }
-      }
-    }catch(eMapTrunkRestore){importedTrunk=null;}
-  }
-  var tlImportedTrunk = importedTrunk && String(importedTrunk.plotId)===String(window.currentPlotId||'') &&
-      Array.isArray(importedTrunk.points) && importedTrunk.points.length>=2
-    ? importedTrunk.points.map(function(p){return p&&isFinite(p.x)&&isFinite(p.y)?tlFrameToGrid(tlZoneCuts.frame,{x:Number(p.x),y:Number(p.y)}):null;}) : null;
-  if(tlImportedTrunk && tlImportedTrunk.some(function(p){return !p;}))tlImportedTrunk=null;
-  if(tlImportedTrunk){var tlImportedLen=0;for(var til=1;til<tlImportedTrunk.length;til++)tlImportedLen+=Math.hypot(tlImportedTrunk[til].x-tlImportedTrunk[til-1].x,tlImportedTrunk[til].y-tlImportedTrunk[til-1].y);if(!(tlImportedLen>0.5))tlImportedTrunk=null;}
-  /* ===== [v557 2026-10-18 用户要求] 总管×主管交接三通 = 总管折线的「断点」，可沿主管向下拖动 =====
-     · 语义：总管被这些三通切成若干「总管段」，三通 = 相邻两段公有的顶点（断点）。
-       某个三通沿主管下移 d ⇒ ① 该顶点下移，两侧总管段斜接 ⇒ 总管由直线变折线（变长）；
-       ② 主管自三通起算，三通上方那段去掉（不通水）⇒ 主管变短。
-     · 约束：只能向下（d ≥ 0）；上限 = min(主管末端上方 5 m，该分区阀锚点上方 2 m)；吸附 1 m。
-     · 持久化：localStorage['tlFrontNodeDrops_v1']，按「物理主管线键 + 地块指纹」匹配 ——
-       换地块 / 重排分区（指纹不符）自动失效（与 v550 总管整体拖动同口径）。
-     · 材料与水力：几何一改，材料清单（总管折线长 / 主管截断后的长）与最不利路径自动跟着走。 */
-  var TL_FNODE_LS='tlFrontNodeDrops_v1';
-  function tlFrontNodeSig(base,xs){
-    return Math.round(base)+'|'+xs.map(function(v){return Math.round(v);}).join(',');
-  }
-  function tlFrontNodeDrops(){
-    try{var o=JSON.parse(localStorage.getItem(TL_FNODE_LS)||'{}');return (o&&typeof o==='object'&&!Array.isArray(o))?o:{};}catch(e){return {};}
-  }
-  function tlFrontNodeDropOf(rec,key,sig){
-    var it=rec&&rec[key];
-    if(!it||it.sig!==sig||!isFinite(it.off))return 0;
-    return Math.max(0,it.off);
-  }
-  function tlFrontNodeDropSet(key,sig,off){
-    var rec=tlFrontNodeDrops();
-    if(off>0)rec[key]={sig:sig,off:Math.round(off*100)/100};else delete rec[key];
-    try{localStorage.setItem(TL_FNODE_LS,JSON.stringify(rec));}catch(e){}
-  }
-  /* 导出到全局：tlInitDrag（另一函数作用域）的拖动提交、以及无头探针注入偏移都要用 */
-  if(typeof window!=='undefined'){
-    window.tlFrontNodeDrops=tlFrontNodeDrops;
-    window.tlFrontNodeDropOf=tlFrontNodeDropOf;
-    window.tlFrontNodeDropSet=tlFrontNodeDropSet;
-  }
   /* ===== [v570] 水源点可任意拖动（用户要求）=====
      口径：
      · 拖动值是**绝对世界坐标**（米），按地块指纹匹配；换地块自动失效。
@@ -4810,13 +5050,6 @@ function tlAutoGenerate(options) {
     window.tlSourceMoveOf=tlSourceMoveOf;
     window.tlSourceMoveSet=tlSourceMoveSet;
     window.tlSourceMoveClear=tlSourceMoveClear;
-    /* ===== [v584] 总管三通复位 =====
-       一键把所有被拖动过的三通恢复到初始位置（总管回到直线）。
-       由来：三通下移后总管变折线，部分地块上水流动画与重构后的路径对不上；
-       与其在动画侧逐个场景兜底，不如给用户一个明确的「退回稳定态」入口。
-       清 localStorage['tlFrontNodeDrops_v1']（按地块指纹存，换地块本身就会失效，这里只清当前档）
-       → 整幅重生成 → 工作区补一次重渲染（v582 教训：宿主重建后底图要重克隆）。
-       无偏移时给提示、不重绘。 */
     /* ===== [v592] 回传设计方案到云端地块库 =====
        把当前三级设计结果（管径 / 流速 / 水泵参数 / 分区数 / 亩数）回传到云端，与该地块配对存档，
        形成「地块 ↔ 设计」样本 —— 将来做统计、比对、回测、学习都靠这份配对数据。
@@ -4852,334 +5085,49 @@ function tlAutoGenerate(options) {
         window.open(url,'_blank','noopener');
       }catch(e){ alert('回传失败：'+(e&&e.message?e.message:e)); }
     };
-    window.tlFrontNodeReset=function(){
-      try{
-        var rec=(typeof tlFrontNodeDrops==='function')?tlFrontNodeDrops():{};
-        var ks=Object.keys(rec||{});
-        if(!ks.length){
-          try{ if(typeof window.atShowToast==='function') window.atShowToast('三通都在初始位置，无需复位'); }catch(eT){}
-          return false;
-        }
-        try{ localStorage.removeItem(TL_FNODE_LS); }catch(eR){}
-        try{ if(typeof tlAutoGenerate==='function') tlAutoGenerate({scroll:false}); }catch(eG){}
-        /* 宿主重建后工作区必须补一次重渲染：底图是克隆的，不补会停在重建前的旧图（v582） */
-        try{ if(window.RyTlWs&&typeof window.RyTlWs.rerenderKeepView==='function') window.RyTlWs.rerenderKeepView(); }catch(eW){}
-        try{ if(typeof window.atShowToast==='function') window.atShowToast('已复位 '+ks.length+' 个三通，总管回到直线'); }catch(eT2){}
-        return true;
-      }catch(e){ return false; }
-    };
     window.tlSourceLinkLen=tlSourceLinkLen;
   }
-  /* 主管物理线归并（同排共线多段 = 一根）：[v557] 提前到总管几何之前 ——
-     总管折线的顶点集由它派生（原在总管绘制之后，折线化必须先有顶点）。 */
-  var tlMainLines={}, tlMainIdx={}, tlMainSpan={};
-  mainPipes.forEach(function(l,mi){
-    var pa=l[0], pb=l[l.length-1];
-    var ddx=Math.abs(pa.x-pb.x), ddy=Math.abs(pa.y-pb.y), mk;
-    if(ddy<=ddx*0.25) mk='H'+(Math.round((pa.y+pb.y)*2)/2);
-    else if(ddx<=ddy*0.25) mk='V'+(Math.round((pa.x+pb.x)*2)/2);
-    else mk='S'+pa.x.toFixed(1)+','+pa.y.toFixed(1);
-    /* [v550] 物理线取全部共线分段的**全跨度** */
-    var tlfLo, tlfHi;
-    if(mk.charAt(0)==='V'){ tlfLo=Math.min(pa.y,pb.y); tlfHi=Math.max(pa.y,pb.y); }
-    else if(mk.charAt(0)==='H'){ tlfLo=Math.min(pa.x,pb.x); tlfHi=Math.max(pa.x,pb.x); }
-    if(!tlMainLines[mk]){tlMainLines[mk]=l;tlMainIdx[mk]=mi;tlMainSpan[mk]={lo:tlfLo,hi:tlfHi};}
-    else if(tlfLo!==undefined){ var tsp=tlMainSpan[mk]; if(tlfLo<tsp.lo)tsp.lo=tlfLo; if(tlfHi>tsp.hi)tsp.hi=tlfHi; }
-  });
-  /* [v553 2026-10-18 用户要求] 总管改贴最外一排（123 区）顶边：
-     「总管移动到分区内，就是这张图片的 123 区内……端头被主管直接裁剪掉。」
-     （v550 曾放进第 2 排、距排顶边 15 米，经示意图三轮确认改为第 1 排、偏移 0 米）：
-     · 横向分支（主管竖置）：总管放进第 1 排分区内部，FRONT_IN_ROW=0、FRONT_IN_OFFSET=0
-       ⇒ 正好压在该排顶边上（「贴着排顶边（0 米）」）；
-     · 两端截止于第 1 排最左/最右主管（端头被主管裁平，不再横贯全幅宽）；
-     · 水源点留在原位（旧总管起点 = 地块外沿老位置），由「水源连接段」接到总管近端
-       （见下方绘制段 data-tlsrcpipe）；
-     · 纵向分支（主管横置）对称：放进第 1 列、贴该列左缘（偏移 0 米）、两端截止于最上/最下主管；
-     · 拖动沿主管走向滑移不变（v579 起「总管整体平移」已取消，改总管只走本机制）；
-     · 分区不足 2 排/列时退回旧几何（地块外沿全宽），保证小地块不空转。 */
-  var tlFrontMK=[];           /* 总管由在线地图手绘；本页面不生成自动总管或自动交接点。 */
-  /* [v557] 构建断点集：axis='V' → 竖主管接横向总管（断点沿 +y 下移，pos=主管 x）；
-     axis='H' → 横主管接纵向总管（断点沿 +x 移动，pos=主管 y）。base = 总管基准坐标。
-     限位：① 主管末端上方 5 m；② 该物理主管上的分区阀锚点上方 2 m（防阀门悬空）；③ ≥ 0。 */
-  function tlBuildFrontNodes(axis, base){
-    var out=[];
-    Object.keys(tlMainLines).forEach(function(mk){
-      if(mk.charAt(0)!==axis)return;
-      var l=tlMainLines[mk]; if(!l||l.length<2)return;
-      var pa=l[0];
-      if(window.tlIsPipeHidden&&window.tlIsPipeHidden('main-'+tlMainIdx[mk]))return;
-      out.push({mk:mk, idx:tlMainIdx[mk], line:l, span:tlMainSpan[mk], pos:(axis==='V')?pa.x:pa.y});
-    });
-    out.sort(function(p,q){return p.pos-q.pos;});
-    var sig=tlFrontNodeSig(base, out.map(function(v){return v.pos;}));
-    var rec=tlFrontNodeDrops();
-    out.forEach(function(v){
-      var hi=(v.span&&isFinite(v.span.hi))?v.span.hi:0;
-      var maxA=Math.max(0, hi-base-5);
-      var maxB=Infinity;
-      for(var vi=0;vi<valves.length;vi++){
-        var vv2=valves[vi]; if(!vv2||vv2.elbow)continue;
-        var ap=(axis==='V')?vv2.ax:vv2.ay;          /* 与 pos 同轴 ⇒ 判定是否同一根主管 */
-        if(ap==null||Math.abs(ap-v.pos)>0.6)continue;
-        var av=(axis==='V')?vv2.ay:vv2.ax;          /* 与拖动同轴 ⇒ 阀门锚点上限 */
-        if(av==null)continue;
-        var lim=av-base-2; if(lim<maxB)maxB=lim;
-      }
-      v.maxA=maxA; v.maxB=isFinite(maxB)?maxB:-1;
-      v.max=Math.max(0,Math.min(maxA,maxB));
-      v.sig=sig;
-      v.base=base;
-      v.off=Math.max(0,Math.min(tlFrontNodeDropOf(rec,v.mk,sig),v.max));
-      v.at=base+v.off;                       /* 断点沿总管走向的坐标（= 总管折线顶点） */
-    });
-    return out;
-  }
-  /* [v557] 折线总管的「分段」口径：顶点 → 弧长比例（0..1）；过近顶点（<0.5%）合并，末尾补 1 */
-  function tlFrontPolyCuts(fp){
-    if(!fp||fp.length<2)return null;
-    var L=0, i, segs=[];
-    for(i=0;i+1<fp.length;i++){ var d=Math.hypot(fp[i+1].x-fp[i].x,fp[i+1].y-fp[i].y); segs.push(d); L+=d; }
-    if(!(L>0))return null;
-    var acc=0, cuts=[0];
-    for(i=0;i<segs.length;i++){ acc+=segs[i]; cuts.push(acc/L); }
-    var out=[0];
-    for(i=1;i<cuts.length;i++){ if(cuts[i]-out[out.length-1]>0.005)out.push(cuts[i]); }
-    if(out[out.length-1]<0.995)out.push(1); else out[out.length-1]=1;
-    return out.length>=2?out:null;
-  }
-  /* [v557] 折线按弧长比例取点（米）：直线场景与线性插值等价 ⇒ 两种几何共用一套 */
-  function tlFrontPolyAt(fp,t){
-    if(!fp||fp.length<2||!isFinite(t))return (fp&&fp[0])?{x:fp[0].x,y:fp[0].y}:null;
-    var segs=[],L=0,i;
-    for(i=0;i+1<fp.length;i++){ var d=Math.hypot(fp[i+1].x-fp[i].x,fp[i+1].y-fp[i].y); segs.push(d); L+=d; }
-    if(!(L>0))return {x:fp[0].x,y:fp[0].y};
-    var left=Math.max(0,Math.min(t,1))*L;
-    for(i=0;i<segs.length;i++){
-      if(segs[i]<=0)continue;
-      if(left<=segs[i]){ var k=left/segs[i]; return {x:fp[i].x+(fp[i+1].x-fp[i].x)*k, y:fp[i].y+(fp[i+1].y-fp[i].y)*k}; }
-      left-=segs[i];
-    }
-    return {x:fp[fp.length-1].x,y:fp[fp.length-1].y};
-  }
-  /* [v557] 退回几何（分区不足 2 排/列，总管落在地块外沿）的折线拼装：
-     两端是固定的地块外沿端点（off=0），断点夹在中间 ⇒ 折线 = 首端 + 各断点 + 尾端。
-     （主分支两端就是最外的断点，端点与断点重合，无需再补端点。） */
-  function tlFrontPolyLine(axis, base, aPos, bPos, nodes){
-    var pts=[];
-    function push(pos, off){
-      var p=(axis==='V')?{x:pos,y:base+off}:{x:base+off,y:pos};
-      if(pts.length){
-        var q=pts[pts.length-1];
-        if(Math.abs(q.x-p.x)<0.01&&Math.abs(q.y-p.y)<0.01)return;   /* 相邻重合 ⇒ 丢（零长段） */
-      }
-      pts.push(p);
-    }
-    var lo=Math.min(aPos,bPos), hi=Math.max(aPos,bPos);
-    push(lo,0);
-    nodes.slice().sort(function(p,q){return p.pos-q.pos;}).forEach(function(v){
-      if(v.pos>lo+0.01&&v.pos<hi-0.01)push(v.pos,v.off);
-    });
-    push(hi,0);
-    return pts;
-  }
-  /* [v557] 主管自三通（断点）起算：三通上方那段去掉 ⇒ 主管变短。
-     判据用「断点坐标 > 主管起点」而不是「断点 == base + off」——退回几何下总管在地块外沿，
-     主管起点在分区顶边，二者本就不等：断点没越过主管起点时不截断（只缩短接入段），越过了才截。 */
-  function tlTruncateMainByNode(axis, base){
-    /* Deprecated with map-owned trunk geometry. Main lines stay whole; their
-       connection points are derived from the actual map trunk below. */
-    return;
-  }
-  /* 仅保留地图总管作为水力/接驳输入；本页不再补造默认总管或水源。 */
-  if(tlImportedTrunk){
-    tlFrontMK=[];
-    frontPipe=tlImportedTrunk.map(function(p){return{x:p.x,y:p.y};});
-    sourcePos=frontPipe ? {x:frontPipe[0].x,y:frontPipe[0].y} : null;
-  }
-  /* 分区绘图页不显示或持久化水源；水源与外接总管由在线地图负责。 */
-  /* [v579] 总管不再整体平移（用户拍板取消）：
-     三通拖动（v564 语义 + v568 工作区入口）已能**真改**总管几何 —— 断点下移后总管成折线、
-     主管自三通起算截断、材料与水力同步重算。而「总管整条平移」(AE.moves['front']) 只动显示层、
-     不进 tlDiagramData，两套并存会出现「同样都是拖、有的算钱有的不算」的矛盾。
-     ⇒ 这里不再叠加 moves['front']，frontPipe / sourcePos 直接用设计几何；
-       主管/支管的整条让位拖动保留（AE.moves 机制仍在用，见 tl-workspace autoDrag）。
-     tlFrontDesign / tlSrcDesign 仍预存：tlDiagramData 快照要用（否则 effPts 会二次叠加）。 */
-  /* The partition drawing owns only segTrunk. The map owns the route from the
-     water source to either coupler; never render the legacy frontPipe/source
-     candidate or persist it as a second trunk in this drawing. */
-  frontPipe=null;
-  sourcePos=null;
-  var tlFrontDesign=null;
-  var tlSrcDesign=null;
 
-  // Draw front main pipe (总管) — orange, thick
-  if(frontPipe){
-    var fd='';
-    for(var fi=0;fi<frontPipe.length;fi++){var fp=tsGrid(frontPipe[fi].x,frontPipe[fi].y);fd+=(fi===0?'M':'L')+fp.x.toFixed(1)+' '+fp.y.toFixed(1)+' ';}
-    /* v162：被遮蔽的管在三级简图改「灰色虚线」（管宽不动 ⇒ 命中/几何/水力全不受影响）。
-       v165（2026-09-30 用户要求「这个遮蔽功能遇到总管，不能分段遮蔽，要改下，可以分段遮蔽」）：
-       总管按「主管接入点」拆成 N 段渲染，每段各自带遮蔽态（半遮蔽 = 一段灰虚线、其余实线）；
-       并额外保留一条**不可见的整管引用 path**（data-tlpipe="front" + data-tlpipe-ref）——
-       工作区 RyTlPathMeasure.frontPathEl() / getTotalLength() 靠它定位与换算分段弧长，
-       缺了它总管分段选择会整条失效。取不到分段（数据未就绪 / 总管非直线 / 无接通主管）→
-       退化为原来的单条整管 path（旧行为逐字节一致）。 */
-    /* ★ 必须显式传本次几何：window.tlDiagramData 在下面 10440 行才落快照，此刻无参会拿到旧图 */
-    /* [v557] 折线总管：frontRatios 只认两点直线（折线返回 null ⇒ 退化为整管、分段遮蔽失效），
-       故折线改由顶点直接切段；切点一律用**弧长**取点（直线沿用两点线性插值在折线上会错位）。 */
-    var tlFR=null;
-    if(frontPipe.length>2) tlFR=tlFrontPolyCuts(frontPipe);
-    else if(window.RyTlPathMeasure&&typeof window.RyTlPathMeasure.frontRatios==='function') tlFR=window.RyTlPathMeasure.frontRatios({frontPipe:frontPipe,mainPipes:mainPipes});
-    if(tlFR&&tlFR.length>2){
-      parts.push('<path data-tlpipe="front" data-tlpipe-ref="1" d="'+fd+'" fill="none" stroke="none" pointer-events="none"/>');
-      var tlFS=[],tlFN=[];
-      for(var fsi=0;fsi+1<tlFR.length;fsi++){
-        var ft0=tlFR[fsi],ft1=tlFR[fsi+1];
-        var fp0=tlFrontPolyAt(frontPipe,ft0), fp1=tlFrontPolyAt(frontPipe,ft1);
-        var fq0=tsGrid(fp0.x,fp0.y), fq1=tsGrid(fp1.x,fp1.y);
-        var fH=window.tlIsPipeSegHidden?window.tlIsPipeSegHidden('front-'+fsi):false;
-        var fP='<path data-tlpipe-seg="front-'+fsi+'" d="M'+fq0.x.toFixed(1)+' '+fq0.y.toFixed(1)+' L'+fq1.x.toFixed(1)+' '+fq1.y.toFixed(1)+'" fill="none" stroke="'+(fH?'#64748b':'#111827')+'" stroke-width="6"'+(fH?' stroke-dasharray="8,5" opacity="0.55"':'')+' stroke-linecap="round" stroke-linejoin="round"/>';
-        if(fH)tlFS.push(fP);else tlFN.push(fP);   /* 遮蔽段先画：灰色圆头不会压在实线端点 */
-      }
-      parts.push(tlFS.join('')+tlFN.join(''));
-    } else {
-      var tlHidF=window.tlIsPipeHidden('front');
-      parts.push('<path data-tlpipe="front" d="'+fd+'" fill="none" stroke="'+(tlHidF?'#64748b':'#111827')+'" stroke-width="6"'+(tlHidF?' stroke-dasharray="8,5" opacity="0.55"':'')+' stroke-linecap="round" stroke-linejoin="round"/>');
-    }
-    /* [v550] 水源连接段：水源留在原位（地块外沿），总管移进分区后二者脱开 ——
-       用「垂直优先」折线把水源点接到总管近端（横向总管=先竖后横；竖向总管=先横后竖）。
-       与总管同色同宽（视觉上是总管的进水段）；仅示意：不进 frontPipe 数据、
-       不参与长度/水力/分段（与主管接入段同原则）。水源已在总管上（距离≤0.5m）不画。 */
-    var tlSrcOnFront=(function(){
-      if(!sourcePos)return true;
-      var sfa=frontPipe[0], sfb=frontPipe[frontPipe.length-1];
-      var sdx=sfb.x-sfa.x, sdy=sfb.y-sfa.y, sL2=sdx*sdx+sdy*sdy;
-      var stx,sty;
-      if(sL2<=0){ stx=sfa.x; sty=sfa.y; }
-      else{ var st=Math.max(0,Math.min(1,((sourcePos.x-sfa.x)*sdx+(sourcePos.y-sfa.y)*sdy)/sL2)); stx=sfa.x+sdx*st; sty=sfa.y+sdy*st; }
-      return Math.hypot(sourcePos.x-stx,sourcePos.y-sty)<=0.5;
-    })();
-    if(!tlSrcOnFront){
-      /* [v570] 水源连接段改**一条直线**（用户要求「不要做成折线，按移动后的三通位置跟水源连起来」）：
-         终点取总管上离水源最近的顶点 —— 横向/纵向主分支下这些顶点就是各三通（含被拖动后的位置）。
-         旧口径是「垂直优先」两段折线（先横后竖 / 先竖后横），水源一挪就多一个直角，已废。 */
-      var scEnd=frontPipe[0], scBest=Infinity;
-      for(var sci1=0;sci1<frontPipe.length;sci1++){
-        var scq=Math.hypot(frontPipe[sci1].x-sourcePos.x,frontPipe[sci1].y-sourcePos.y);
-        if(scq<scBest){scBest=scq;scEnd=frontPipe[sci1];}
-      }
-      var scPts=[sourcePos,scEnd], scd='';
-      for(var sci=0;sci<scPts.length;sci++){var scp=tsGrid(scPts[sci].x,scPts[sci].y);scd+=(sci===0?'M':'L')+scp.x.toFixed(1)+' '+scp.y.toFixed(1)+' ';}
-      parts.push('<path data-tlsrcpipe="1" d="'+scd+'" fill="none" stroke="#111827" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" opacity="0.95"/>');
-    }
-  }
 
-  // 总管→主管连接段（2026-09-15 用户要求，同日扩量）：每根主管朝向总管的一端用垂直接段接到总管上，
-  // 不再要求主管贴地块边界（首排内缩时连接段同样画出）；画在裁剪组之外（地块外部分也显示）。
-  // 仅示意；不进 mainPipes、不写数据，管线长度计算仍按地块内范围。
-  if(frontPipe){
-    var fEnd=frontPipe[frontPipe.length-1];
-    /* [v557] 走向改用「分支设计朝向」判定：总管折线化后两端 y 可能不等（端点三通被拖下去），
-       按端点坐标推断会把横向总管误判成竖向 ⇒ 接入段/三通/阀门全错。 */
-    var frontHoriz=!!firstFixedSideIsHorizontal;
-    var fxMin=Math.min(frontPipe[0].x,fEnd.x), fxMax=Math.max(frontPipe[0].x,fEnd.x);
-    var fyMin=Math.min(frontPipe[0].y,fEnd.y), fyMax=Math.max(frontPipe[0].y,fEnd.y);
-    /* v143：主管先按物理线归并（同排共线多段=一根），连接段/三通/阀门按物理线各画一次
-       （旧版按分段画：20 段共线主管画 20 条重叠 stub、无交接符号）。 */
-    var tlStubs=[], tlJunctions=[];
-    /* [v557] 有断点集 ⇒ 三通落在断点（总管折线顶点）上；无（退回几何）⇒ 沿用旧的「总管直线」判据 */
-    if(tlImportedTrunk){
-      /* Connect each physical zone main to the nearest point on the hand-drawn
-         trunk. This supports bent/oblique map routes without snapping them to
-         the partition's former horizontal/vertical auto-route. */
-      function tlProjectSegment(p,a,b){var dx=b.x-a.x,dy=b.y-a.y,d=dx*dx+dy*dy,t=d?((p.x-a.x)*dx+(p.y-a.y)*dy)/d:0;t=Math.max(0,Math.min(1,t));return{x:a.x+dx*t,y:a.y+dy*t};}
-      function tlNearestTrunkPoint(line){
-        var best=null;
-        for(var mi0=0;mi0+1<line.length;mi0++)for(var ti=0;ti+1<frontPipe.length;ti++){
-          var ma=line[mi0],mb=line[mi0+1],ta=frontPipe[ti],tb=frontPipe[ti+1],tx=tb.x-ta.x,ty=tb.y-ta.y,tl=Math.hypot(tx,ty);
-          if(tl<1e-6)continue;
-          var candidates=[];
-          var q1=tlProjectSegment(ma,ta,tb),q2=tlProjectSegment(mb,ta,tb),q3=tlProjectSegment(ta,ma,mb),q4=tlProjectSegment(tb,ma,mb);
-          candidates.push({main:ma,point:q1},{main:mb,point:q2},{main:q3,point:ta},{main:q4,point:tb});
-          var mx=mb.x-ma.x,my=mb.y-ma.y,den=mx*ty-my*tx;
-          if(Math.abs(den)>1e-9){var ax=ta.x-ma.x,ay=ta.y-ma.y,u=(ax*ty-ay*tx)/den,v=(ax*my-ay*mx)/den;if(u>=0&&u<=1&&v>=0&&v<=1)candidates.push({main:{x:ma.x+mx*u,y:ma.y+my*u},point:{x:ta.x+tx*v,y:ta.y+ty*v}});}
-          candidates.forEach(function(c){var dist=Math.hypot(c.main.x-c.point.x,c.main.y-c.point.y);if(!best||dist<best.distance)best={main:c.main,point:c.point,distance:dist,nx:-ty/tl,ny:tx/tl};});
-        }
-        return best;
-      }
-      Object.keys(tlMainLines).forEach(function(mk){
-        var line=tlMainLines[mk],mi=tlMainIdx[mk];
-        if(!line||line.length<2||(window.tlIsPipeHidden&&window.tlIsPipeHidden('main-'+mi)))return;
-        var hit=tlNearestTrunkPoint(line);
-        if(!hit)return;
-        var nx=hit.nx, ny=hit.ny;
-        if((hit.main.x-hit.point.x)*nx+(hit.main.y-hit.point.y)*ny<0){nx=-nx;ny=-ny;}
-        if(hit.distance>0.5)tlStubs.push([{x:hit.main.x,y:hit.main.y},{x:hit.point.x,y:hit.point.y}]);
-        tlJunctions.push({x:hit.point.x,y:hit.point.y,dx:nx,dy:ny,normalX:nx,normalY:ny,stubM:Math.max(2,hit.distance)});
-      });
-    } else if(tlFrontMK.length){
-      tlFrontMK.forEach(function(v){
-        var l=v.line, pa=l[0], pb=l[l.length-1];
-        var tlJExtra={mk:v.mk,mi:v.idx,off:v.off,max:v.max,maxA:v.maxA,maxB:v.maxB,sig:v.sig,axis:(frontHoriz?'V':'H')};
-        if(frontHoriz && pa.x===pb.x){                    // 垂直主管 → 接横向总管（断点沿 y 下移）
-          var tlfFy=v.at, tlfSpV=v.span;
-          var tlfInV = tlfSpV && tlfFy>=tlfSpV.lo-0.5 && tlfFy<=tlfSpV.hi+0.5;
-          var tlfPtV = tlfInV ? null : (Math.abs(tlfSpV.lo-tlfFy)<=Math.abs(tlfSpV.hi-tlfFy) ? {x:pa.x,y:tlfSpV.lo} : {x:pa.x,y:tlfSpV.hi});
-          if(pa.x>=fxMin-0.5 && pa.x<=fxMax+0.5){
-            if(!tlfInV)tlStubs.push([{x:pa.x,y:tlfFy},{x:pa.x,y:tlfPtV.y}]);
-            tlJunctions.push(Object.assign({x:pa.x,y:tlfFy,dx:0,dy:1,stubM:tlfInV?2:Math.abs(tlfPtV.y-tlfFy)},tlJExtra));
-          }
-        } else if(!frontHoriz && pa.y===pb.y){            // 水平主管 → 接纵向总管（断点沿 x 移动）
-          var tlfFx=v.at, tlfSpH=v.span;
-          var tlfInH = tlfSpH && tlfFx>=tlfSpH.lo-0.5 && tlfFx<=tlfSpH.hi+0.5;
-          var tlfPtH = tlfInH ? null : (Math.abs(tlfSpH.lo-tlfFx)<=Math.abs(tlfSpH.hi-tlfFx) ? {x:tlfSpH.lo,y:pa.y} : {x:tlfSpH.hi,y:pa.y});
-          if(pa.y>=fyMin-0.5 && pa.y<=fyMax+0.5){
-            if(!tlfInH)tlStubs.push([{x:tlfFx,y:pa.y},{x:tlfPtH.x,y:pa.y}]);
-            tlJunctions.push(Object.assign({x:tlfFx,y:pa.y,dx:1,dy:0,stubM:tlfInH?2:Math.abs(tlfPtH.x-tlfFx)},tlJExtra));
-          }
-        }
-      });
-    } else {
-    Object.keys(tlMainLines).forEach(function(mk){
-      var l=tlMainLines[mk];
-      /* v162：被遮蔽的主管 = 该管不计入材料清单 → 接入段/三通/阀门符号一并省略 */
-      if(window.tlIsPipeHidden('main-'+tlMainIdx[mk]))return;
-      var pa=l[0], pb=l[l.length-1];
-      if(frontHoriz && pa.x===pb.x){          // 垂直主管 → 接水平总管
-        /* [v550] 总管 y 落在该列主管全跨度内 ⇒ 直接相交（画三通+阀，不画接入段）；
-           跨度外 ⇒ 接入段连到最近的跨度端点（旧几何=地块外沿，行为不变）。 */
-        var tlfFy=frontPipe[0].y, tlfSpV=tlMainSpan[mk];
-        var tlfInV = tlfSpV && tlfFy>=tlfSpV.lo-0.5 && tlfFy<=tlfSpV.hi+0.5;
-        var tlfPtV = tlfInV ? null : (Math.abs(tlfSpV.lo-tlfFy)<=Math.abs(tlfSpV.hi-tlfFy) ? {x:pa.x,y:tlfSpV.lo} : {x:pa.x,y:tlfSpV.hi});
-        if(pa.x>=fxMin-0.5 && pa.x<=fxMax+0.5){
-          if(!tlfInV)tlStubs.push([{x:pa.x,y:tlfFy},{x:pa.x,y:tlfPtV.y}]);
-          tlJunctions.push({x:pa.x,y:tlfFy,dx:0,dy:1,stubM:tlfInV?2:Math.abs(tlfPtV.y-tlfFy)});
-        }
-      } else if(!frontHoriz && pa.y===pb.y){  // 水平主管 → 接垂直总管
-        var tlfFx=frontPipe[0].x, tlfSpH=tlMainSpan[mk];
-        var tlfInH = tlfSpH && tlfFx>=tlfSpH.lo-0.5 && tlfFx<=tlfSpH.hi+0.5;
-        var tlfPtH = tlfInH ? null : (Math.abs(tlfSpH.lo-tlfFx)<=Math.abs(tlfSpH.hi-tlfFx) ? {x:tlfSpH.lo,y:pa.y} : {x:tlfSpH.hi,y:pa.y});
-        if(pa.y>=fyMin-0.5 && pa.y<=fyMax+0.5){
-          if(!tlfInH)tlStubs.push([{x:tlfFx,y:pa.y},{x:tlfPtH.x,y:pa.y}]);
-          tlJunctions.push({x:tlfFx,y:pa.y,dx:1,dy:0,stubM:tlfInH?2:Math.abs(tlfPtH.x-tlfFx)});
-        }
-      }
-    });
+  /* [v1017 2026-11-08 用户拍板] 恢复 v900 误删的段总管生成链（扬程对不上排查
+     TASK_pump_head_mismatch_20261108 §5.0 P0）：v900(fb12ca2) 修水源 tooltip 时顺带
+     删除了本块与 segTrunk 快照/反投，致 tlWorstPathLen 恒 EMPTY、RyPipePathLoss
+     整链死亡、管损卡恒「试算输入值」。本块按 v859→v869→v873→v874 沿革原文恢复，
+     仅两处适配：① src 传 null（tlSrcDesign/frontPipe 已随 v1015 清除，模块对 null
+     的默认侧行为有 tl_seg_trunk.test.cjs 覆盖）；② v874 的 tlIdealMains 兜底随该
+     变量一同退役，退化场景保持 null + 图面原因提示。 */
+  /* [v859 用户需求 → v869 定版] 段总管（自动生成）：垂直于主管、串联各分区主管；
+     起点在最上/最左分区主管上（vMin 端）、终点在最下/最右分区主管上（vMax 端），
+     两端不再外延驳接段（stub=0，用户方案B），驳接点方块标记画在首末主管串联处。
+     [v869] 贴边：干线贴各主管**同一侧端点**（不再放走向交集正中——用户实测
+     「没看到/不好定位」）；贴哪侧自动判断：水源（tlSrcDesign，缺则总管起点
+     frontPipe[0]，再缺则默认左/上侧）落在走向交集中点的哪一半。传局部格系 src。
+     数据落地在下方 tlDiagramData.segTrunk（转世界坐标、len 按世界坐标重算），
+     供在线地图页驳接点捕捉与扬程收口（tlFrontLenUse）。 */
+  var tlSegTrunkLoc = null;
+  try {
+    if (window.RySegTrunk && mainPipes.length >= 2) {
+      tlSegTrunkLoc = window.RySegTrunk.build(mainPipes, { src: null });
     }
-    /* v170b（2026-10-01 用户更正「不对，是主管」）：总管被拖动过后，主管→总管接入段
-       （主管色粗线，用户口中的「地块外的主管」）并入地块裁剪组 —— 总管尚在地块外/半进时，
-       伸出地块的那段接入线不再显示。
-       [v579] 总管整体平移已取消（改总管靠拖三通）⇒ 该分支的唯一触发条件 tlFrontMv 恒为假，
-       整段连带 `if(tlFrontMv)` 的裁剪外壳一并删除（否则访问已删变量会抛 ReferenceError，
-       实测会让 tlAutoGenerate 整个挂掉、工作区渲染不出来）。接入段回到老场景：画在裁剪组之外，
-       地块外部分照常可见。data-tlstub 供工作区克隆/闸门选择器使用，保持不变。 */
-    tlStubs.forEach(function(sl){
-      var sd='';
-      for(var si=0;si<sl.length;si++){var sp2=tsGrid(sl[si].x,sl[si].y);sd+=(si===0?'M':'L')+sp2.x.toFixed(1)+' '+sp2.y.toFixed(1)+' ';}
-      parts.push('<path data-tlstub="1" d="'+sd+'" fill="none" stroke="#185FA5" stroke-width="5" stroke-linecap="round"/>');
+  } catch (eSeg0) { }
+  /* [v1017b 2026-11-08 用户拍板] 图面**不画**段总管（黑线/驳接点/未生成提示全部撤除）：
+     用户看到黑线以为「已取消的自动总管回潮」。数据快照（下方 segTrunk IIFE）保留 ——
+     segWorstPath / tlFrontLenUse / map-flow-demo 的扬程链依赖它；反投在线地图保留
+     （v878 用户要求 + tlSegAnchorIdx 驳接端判定读快照 seg 段）。 */
+  if (false && tlSegTrunkLoc) {
+    var sgD = '';
+    tlSegTrunkLoc.points.forEach(function (p, i) { var q = tsGrid(p.x, p.y); sgD += (i === 0 ? 'M' : 'L') + q.x.toFixed(1) + ' ' + q.y.toFixed(1) + ' '; });
+    parts.push('<path data-tlpipe="segTrunk" d="' + sgD + '" fill="none" stroke="#111827" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>');
+    tlSegTrunkLoc.couplers.forEach(function (p, ci) {
+      var q = tsGrid(p.x, p.y);
+      parts.push('<rect data-tlseg-coupler="' + ci + '" x="' + (q.x - 4).toFixed(1) + '" y="' + (q.y - 4).toFixed(1) + '" width="8" height="8" fill="#ffffff" stroke="#111827" stroke-width="1.6"/>');
+      parts.push('<text data-tlseg-coupler-label="' + ci + '" x="' + (q.x + 7).toFixed(1) + '" y="' + (q.y + 3.5).toFixed(1) + '" font-size="9" fill="#111827" font-family="system-ui">驳接</text>');
     });
   }
+  /* 末尾渲染分支整体保留供一行恢复：把上面的 if(false) 改回 if(tlSegTrunkLoc)，并恢复
+     else if 的 lastError 提示（v873 口径）。 */
 
-  // 总管由在线地图手绘，施工图只生成主管、支管和滴灌带。
+  // 手绘总管在在线地图（tlMapTrunkLen 收口进扬程）；干线（段总管）由本页自动生成并画在图面。
   // Draw main pipes (blue) — clipped to plot boundary
   parts.push('<g clip-path="url(#tlPlotClip)">');
   mainPipes.forEach(function(l,mi){
@@ -5226,33 +5174,10 @@ function tlAutoGenerate(options) {
        v183（2026-10-02）：无节点/连线时也落一个**空锚点组** —— 实时刷新靠「旧层 nextSibling」
        定位插入点（保持与整图重生成的叠放次序一致：滴灌带之后、水源/阀门/交接符号之前）；
        无锚点时只能 append 到地块组末尾，层序与重生成不一致（节点圆点会压在阀门符号之上）。 */
-    var tlNodeLayerSvg = tlBuildTlNodesLayer({ frontPipe: frontPipe, mainPipes: mainPipes, branchPipes: branchPipes, ts: function(x,y){return tsGrid(x,y);} });
+    var tlNodeLayerSvg = tlBuildTlNodesLayer({ frontPipe: null, mainPipes: mainPipes, branchPipes: branchPipes, ts: function(x,y){return tsGrid(x,y);} });
     parts.push(tlNodeLayerSvg || '<g data-tlnode-layer="1"></g>');
   } catch (eNdLink) { parts.push('<g data-tlnode-layer="1"></g>'); }
 
-  if(sourcePos){
-    var sp=tsGrid(sourcePos.x,sourcePos.y);
-    /* [v899] 水源换向已随 v899-src-flip-remove 移除（用户拍板 A）；水源**拖动**链（svg mousedown
-       处 data-tl-src 分支）读 dd.sourcePos——v873 起设计侧恒 null，同样不可达（死分支保留待清理）。
-       title 原文「拖动：移动水源位置（任意）｜右键：切换水源方向」两句均为误导，改为如实说明。 */
-    parts.push('<g data-tl-src="1" data-tl-src-drag="1"><circle cx="'+sp.x.toFixed(1)+'" cy="'+sp.y.toFixed(1)+'" r="18" fill="rgba(0,0,0,0)"><title>水源位置随管线走向自动确定</title></circle><circle cx="'+sp.x.toFixed(1)+'" cy="'+sp.y.toFixed(1)+'" r="10" fill="#f59e0b" stroke="#fff" stroke-width="2"/></g>');
-    /* [v570] 拖动水源要用到的两个量（tlInitDrag 在另一作用域）：SVG 单位/米比例、地块指纹 */
-    window.tlSrcScale=s; window.tlSrcSig=tlSrcSig;
-    var tlSrcLabelY=tlHdrY0+tlHeaderLines.length*18+16; // 信息行下方
-    /* v160（用户 2026-09-29：「水源/水泵 标注文字距离总管道近一些。」）
-       原口径：标签钉在画布左边界 x=40，靠一条长虚线横跨空白拉到水源点
-               （实测：标签右缘距总管 ≈125 CSS px，太远）。
-       现口径：标签右缘落在「水源点圆心 −(圆半径 + 净距)」处，随水源点移动；
-               引线相应只剩「水源点左侧一小段 + 垂直落到圆心」。
-       两个数字：TL_SRC_LABEL_R 必须与上面 circle 的 r=10 同步；
-                 TL_SRC_LABEL_GAP 是唯一可调量（嫌贴得太紧就调大）。 */
-    var TL_SRC_LABEL_R=10, TL_SRC_LABEL_GAP=6;
-    // 保底：空间不足时右缘退回「左边界 40 + 标签实宽 56」，避免文字越出画布左缘
-    var tlSrcLabelX=Math.max(sp.x-(TL_SRC_LABEL_R+TL_SRC_LABEL_GAP), 96);
-    // 引线：标签右缘 → 水源点圆心（水平一小段 + 垂直落到圆心）
-    parts.push('<polyline points="'+tlSrcLabelX.toFixed(1)+','+(tlSrcLabelY+4).toFixed(1)+' '+sp.x.toFixed(1)+','+(tlSrcLabelY+4).toFixed(1)+' '+sp.x.toFixed(1)+','+sp.y.toFixed(1)+'" fill="none" stroke="#f59e0b" stroke-width="1.2" stroke-dasharray="4,3" opacity="0.8" stroke-linecap="round" stroke-linejoin="round"/>');
-    parts.push('<text x="'+tlSrcLabelX.toFixed(1)+'" y="'+tlSrcLabelY.toFixed(1)+'" text-anchor="end" font-size="11" font-weight="600" fill="#92400e">水源/水泵</text>');
-  }
 
   // 为来自二级页的阀门（仅含坐标、无连接点）补算最近主管线段上的 45° 斜向连接点，
   // 与二级页"阀门沿 45° 斜拉接到主管"的表示方法一致（非垂直投影）
@@ -5315,66 +5240,6 @@ function tlAutoGenerate(options) {
     parts.push(window.ryValveSVG(vp.x, vp.y));   /* v159：与总管×主管交接阀同规格（尺寸取自 window.RY_VALVE） */
   });
 
-  /* v143（用户要求）：总管×主管交接处画「三通 + 阀门」——三通方块在总管口，
-     阀门（红⊗，与分区阀同款式）接在主管接入段上（连接段中点向右侧/下侧固定距离偏移）。
-     数量=物理主管根数，与材料清单三通/总管接入阀行同源。
-     ★ v171c（请求⑬ 2026-10-01）：本渲染从「管线之前」移到「管线之后」（地块组末尾），
-     使深蓝白边四方块完整露在主管/支管之上，四周白框不再被管道覆盖 —— 与 10740
-     主管×支管交接三通同口径（都画在管线之后，白框全可见，视觉一致）。
-     阀门恒置于接入段「右侧（竖管）/ 下侧（横管）」固定距离 JC_VALVE_OFF（米），
-     用短直连线（主管蓝）接通；随总管平移（jc 已由 tlFrontMv 刚性平移）。 */
-  if(tlJunctions && tlJunctions.length){
-    tlJunctions.forEach(function(jc){
-      var jp=tsGrid(jc.x,jc.y);
-      /* [v557] 三通 = 总管折线的断点，可沿主管拖动：输出定位/限位/比例供 tlInitDrag 命中与像素→米换算
-         · key/sig：物理主管线键 + 地块指纹（持久化匹配）；off：当前下移量；max：可下移上限（米）
-         · axis：拖动轴（V=沿 y 上下 / H=沿 x）；mps：该主管「SVG 单位 / 米」比例（像素位移换算用） */
-      var jAttr='', jKeyAttr='';
-      if(jc.mk){
-        var jmps=0, jux=0, juy=0, jl=(jc.mi!=null&&mainPipes[jc.mi])?mainPipes[jc.mi]:null;
-        if(jl&&jl.length>=2){
-          var ja0=tsGrid(jl[0].x,jl[0].y), ja1=tsGrid(jl[1].x,jl[1].y);
-          var jdm=(jc.axis==='V')?Math.abs(jl[1].y-jl[0].y):Math.abs(jl[1].x-jl[0].x);
-          var jlen=Math.hypot(ja1.x-ja0.x,ja1.y-ja0.y);
-          if(jlen>0){jux=(ja1.x-ja0.x)/jlen;juy=(ja1.y-ja0.y)/jlen;}
-          if(jdm>0.01)jmps=jlen/jdm;
-        }
-        jKeyAttr=' data-junction-key="'+jc.mk+'"';
-        jAttr=jKeyAttr
-          +' data-junction-sig="'+String(jc.sig).replace(/"/g,'')+'"'
-          +' data-junction-off="'+Number(jc.off||0).toFixed(2)+'"'
-          +' data-junction-max="'+Number(jc.max||0).toFixed(2)+'"'
-          +' data-junction-maxa="'+Number(jc.maxA||0).toFixed(2)+'" data-junction-maxb="'+Number(isFinite(jc.maxB)?jc.maxB:-1).toFixed(2)+'"'
-          +' data-junction-axis="'+(jc.axis||'V')+'"'
-          +' data-junction-ux="'+Number(jux).toFixed(5)+'" data-junction-uy="'+Number(juy).toFixed(5)+'"'
-          +' data-junction-mps="'+Number(jmps||0).toFixed(4)+'"';
-      }
-      parts.push('<rect data-junction-tee data-junction-front="1"'+jAttr+' x="'+(jp.x-4.5).toFixed(1)+'" y="'+(jp.y-4.5).toFixed(1)+'" width="9" height="9" fill="#0C447C" stroke="#ffffff" stroke-width="1.5"/>');
-      if(jc.stubM>1){
-        /* v171d（用户 2026-10-01 更正：以「总管」为基准，不是主管/接入段）——
-           总管横向(jc.dy≠0) → 阀恒在总管下侧(+y)；总管竖向(jc.dx≠0) → 阀恒在总管右侧(+x)。
-           基准点取「总管×主管交点」jm（落在总管上），阀距总管固定垂直距离 JC_VALVE_OFF（米）。*/
-        var jm=tsGrid(jc.x,jc.y);
-        var JC_VALVE_OFF=10.0; // 固定距离（米）：阀距总管（交点）的垂直距离（2026-10-01 用户要求「适当放大一点」：6.0→10.0）
-        var jox=jc.normalX!=null?JC_VALVE_OFF*jc.normalX:((jc.dx===0)?0:JC_VALVE_OFF); // 斜总管沿法线放阀
-        var joy=jc.normalY!=null?JC_VALVE_OFF*jc.normalY:((jc.dy===0)?0:JC_VALVE_OFF);
-        var jv=tsGrid(jc.x+jox, jc.y+joy);
-        parts.push('<line'+jKeyAttr+' x1="'+jm.x.toFixed(1)+'" y1="'+jm.y.toFixed(1)+'" x2="'+jv.x.toFixed(1)+'" y2="'+jv.y.toFixed(1)+'" stroke="#185FA5" stroke-width="3.5" stroke-linecap="round" opacity="0.92"/>');
-        parts.push('<g data-junction-valve'+jKeyAttr+'><circle cx="'+jv.x.toFixed(1)+'" cy="'+jv.y.toFixed(1)+'" r="6.5" fill="#ef4444" stroke="#ffffff" stroke-width="2"/>'
-          +'<line x1="'+(jv.x-3.6).toFixed(1)+'" y1="'+(jv.y-3.6).toFixed(1)+'" x2="'+(jv.x+3.6).toFixed(1)+'" y2="'+(jv.y+3.6).toFixed(1)+'" stroke="#ffffff" stroke-width="1.4"/>'
-          +'<line x1="'+(jv.x+3.6).toFixed(1)+'" y1="'+(jv.y-3.6).toFixed(1)+'" x2="'+(jv.x-3.6).toFixed(1)+'" y2="'+(jv.y+3.6).toFixed(1)+'" stroke="#ffffff" stroke-width="1.4"/></g>');
-        /* [v568] 阀门命中圈：阀门⊗同属这个三通组，点它等同点三通（拖动时整组一起走）。
-           否则点阀门中心命中的是 circle、closest 找不到 data-junction-front ⇒ 又退化成整图平移。 */
-        parts.push('<circle data-junction-front="1" data-junction-hit="1"'+jAttr+' cx="'+jv.x.toFixed(1)+'" cy="'+jv.y.toFixed(1)+'" r="9" fill="rgba(0,0,0,0)" stroke="none" pointer-events="all"/>');
-      }
-      /* [v568] 三通透明命中圈（置顶）：三通方块只有 9×9（屏幕上约 10px），且中心被自己的连接线
-         （stroke 3.5，起点=三通中心）压住 ⇒ 真实鼠标命中的是 line 而不是 rect，
-         closest('[data-junction-front][data-junction-key]') 永远失败 —— v564 验收是假绿
-         （旧探针把 MouseEvent 直接派发到 rect 元素本身，绕过了命中判定，v155 同款坑）。
-         置顶加一层 r=11 透明圈 ⇒ 点三通必中；hover 时琥珀描边即「抓住了」的反馈。 */
-      parts.push('<circle data-junction-front="1" data-junction-hit="1"'+jAttr+' cx="'+jp.x.toFixed(1)+'" cy="'+jp.y.toFixed(1)+'" r="11" fill="rgba(0,0,0,0)" stroke="none" pointer-events="all"/>');
-    });
-  }
   // ===== 地块组结束：以下参数/图例/A3框固定不动 =====
   /* v488：记录地块组闭合标签在 parts 中的下标 —— 最不利路径标注（tlWorstPathMarkSVG）
      几何上属于地块组（须随 tlInitDrag 的图面拖动 translate 一起平移），但其几何取自
@@ -5396,7 +5261,9 @@ function tlAutoGenerate(options) {
   window.tlDiagramData = { version: 1, schemaVersion: 1, world: 'meter', generatedAt: new Date().toISOString(), plot: { w: plotW, h: plotH },
     /* [v873] trunkSource 带失败原因：'auto' | 'missing(<原因>)' —— 旋转分区角度后
        段总管消失的排障依据（地图页/工作区/探针都读得到）。 */
-    trunkSource: 'map-manual',
+    /* [v1017] 恢复 v873 口径：trunkSource 记录段总管来源 'auto' | 'missing(<原因>)'
+       （v900 曾改为恒 'map-manual'，排障线索丢失）。 */
+    trunkSource: tlSegTrunkLoc ? 'auto' : ('missing(' + (window.RySegTrunk && window.RySegTrunk.lastError ? window.RySegTrunk.lastError : 'not-built') + ')'),
     poly: JSON.parse(JSON.stringify(poly)),
     combinedN: tlGetZoneCount(),   /* 2026-09-16 联合灌溉区数 N，供工作区分组着色读取（简图不变） */
     zones: { cols: cols, rows: rows, xPos: xPos.slice(), yPos: yPos.slice(), xPlan: xPlan.slice(), yPlan: yPlan.slice(), xSrc: xSrc.slice(), ySrc: ySrc.slice(),
@@ -5457,7 +5324,19 @@ function tlAutoGenerate(options) {
     couplerSource: (typeof ddCouplerSource!=='undefined'?ddCouplerSource:'none'),
     /* [v859] 段总管：局部几何转世界坐标 + len 按世界坐标重算（frame 缩放不漂）。
        在线地图页读 segTrunk.couplers 反算经纬度做驳接点捕捉；扬程收口读 segTrunk.len。 */
-    segTrunk: null,
+    /* [v859] 段总管：局部几何转世界坐标 + len 按世界坐标重算（frame 缩放不漂）。
+       在线地图页读 segTrunk.couplers 反算经纬度做驳接点捕捉；扬程收口读 segTrunk.len。
+       [v1017] 恢复 v900 误删的快照落地（segWorstPath/tlFrontLenUse/map-flow-demo 的数据源）。 */
+    segTrunk: (function(){
+      if(!tlSegTrunkLoc) return null;
+      var W=function(p){return tlGridWorld(p.x,p.y);};
+      var pts=tlSegTrunkLoc.points.map(W);
+      var len=Math.hypot(pts[1].x-pts[0].x, pts[1].y-pts[0].y);
+      return { axis: tlSegTrunkLoc.axis, side: tlSegTrunkLoc.side,
+        points: pts, couplers: tlSegTrunkLoc.couplers.map(W),
+        joinPts: tlSegTrunkLoc.joinPts.map(W),
+        stub: tlSegTrunkLoc.stub, len: len, lenJoin: len - 2*tlSegTrunkLoc.stub };
+    })(),
     branchPipes: branchPipes.map(function(line){return line.map(function(p){return tlGridWorld(p.x,p.y);});}),
     /* [v601] 支管「设计满跨 / 图面长」两个基准（索引与 branchPipes 一一对应）：
        计算（材料清单、最不利路径水损）一律按满跨；图面两端 gapV/gapH 留边只影响显示。 */
@@ -5465,23 +5344,11 @@ function tlAutoGenerate(options) {
     valves: valves.map(function(v){var p=tlGridWorld(v.x,v.y),a=(v.ax!=null&&v.ay!=null)?tlGridWorld(v.ax,v.ay):null;return Object.assign({},v,p,a?{ax:a.x,ay:a.y}:{});}),
     dripTapes: dripTapes.map(function(line){return line.map(function(p){return tlGridWorld(p.x,p.y);});}),
     partialFlags: tlPartialFlags.slice(), zoneActMu: tlZoneActMu.slice(),
-    /* v170：快照落「设计几何」—— 总管平移只动显示层（上面 frontPipe/sourcePos
-       已是平移后的绘制副本）；AE.effPts 还会再叠一次 moves，写移动值会双重平移。 */
-    frontPipe: tlFrontDesign ? tlFrontDesign.map(function(p){return tlGridWorld(p.x,p.y);}) : null,
-    sourcePos: tlSrcDesign ? tlGridWorld(tlSrcDesign.x,tlSrcDesign.y) : null,
-    /* [v568] 三通断点清单一并落快照：工作区（tl-workspace）没有 DOM 命中层，靠世界坐标拾取
-       三通，必须拿到「设计几何」的断点位置与限位（mk/x/y/axis/off/max/sig）。
-       坐标 = 主管物理线位置 pos × 总管断点坐标 base+off —— 与简图渲染同源（未含 tlFrontMv 平移）。 */
-    frontNodes: (tlFrontMK || []).map(function (v) {
-      var ax = frontHoriz ? 'V' : 'H';
-      var gridPos={x:frontHoriz?v.pos:v.at,y:frontHoriz?v.at:v.pos};
-      var worldPos=tlGridWorld(gridPos.x,gridPos.y);
-      return { mk: v.mk, axis: ax, pos: v.pos, base: v.base, at: v.at,
-        x: worldPos.x, y: worldPos.y,
-        axisX: (tlGridWorld(gridPos.x+(frontHoriz?0:1),gridPos.y+(frontHoriz?1:0)).x-worldPos.x),
-        axisY: (tlGridWorld(gridPos.x+(frontHoriz?0:1),gridPos.y+(frontHoriz?1:0)).y-worldPos.y),
-        off: v.off || 0, max: v.max || 0, sig: v.sig };
-    }) };
+    /* [v1015 2026-11-08 用户拍板] 快照不再落自动总管/三通/水源设计几何：
+       frontPipe/sourcePos 恒 null（手绘总管经 tlMapTrunkLen/段总管驳接进水力），
+       frontNodes（三通断点清单，全项目零消费方）随自动链路一并移除。 */
+    frontPipe: null,
+    sourcePos: null };
   r = computeThreeLevel();
   try { tlUpdatePlanBar(); } catch (e) { }
   var pumpFlowEl=document.getElementById('tlPlanPumpFlow');
@@ -5546,18 +5413,24 @@ function tlAutoGenerate(options) {
      只动 lx 一个数，各项相对步进（60/60/65/60/55/16）与字号全不变，图例内部节奏原样。
      注：同一条 lx 也被「下载 SVG / 下载 PNG / 打印」共用（都出自本 parts），一处改全局一致；
      工作区克隆底图与 DXF 导出整组剥离 tlLegendGroup，不受影响。 */
-  var lx=svgW-378, ly=iy+17;
+  /* [v1017b] 图例撤「总管」项：段总管黑线已不再画进图面（用户拍板，见上方 if(false) 渲染块），
+     图例不再保留失配条目。整组右缘不变：lx 由 svgW-378 → svgW-318（原总管项占 60），其余步进不变。 */
+  var lx=svgW-318, ly=iy+17;
   parts.push('<g id="tlLegendGroup" font-size="10" font-weight="600">');
-  parts.push('<rect x="'+lx+'" y="'+ly+'" width="14" height="4" fill="#111827" rx="2"/><text x="'+(lx+20)+'" y="'+(ly+2)+'" dominant-baseline="central" fill="#111827">总管</text>');
-  parts.push('<rect x="'+(lx+60)+'" y="'+ly+'" width="14" height="4" fill="#185FA5" rx="2"/><text x="'+(lx+80)+'" y="'+(ly+2)+'" dominant-baseline="central" fill="#0C447C">主管</text>');
-  parts.push('<rect x="'+(lx+120)+'" y="'+ly+'" width="14" height="3" fill="#16a34a" rx="2"/><text x="'+(lx+140)+'" y="'+(ly+2)+'" dominant-baseline="central" fill="#166534">支管</text>');
-  parts.push('<circle cx="'+(lx+185)+'" cy="'+(ly+2)+'" r="5" fill="#f59e0b"/><text x="'+(lx+196)+'" y="'+(ly+2)+'" dominant-baseline="central" fill="#92400e">水源</text>');
-  parts.push('<circle cx="'+(lx+245)+'" cy="'+(ly+2)+'" r="5" fill="#ef4444"/><text x="'+(lx+256)+'" y="'+(ly+2)+'" dominant-baseline="central" fill="#991b1b">阀门</text>');
-  parts.push('<line x1="'+(lx+300)+'" y1="'+(ly+2)+'" x2="'+(lx+312)+'" y2="'+(ly+2)+'" stroke="#67e8f9" stroke-width="1.4" stroke-dasharray="3,3"/><text x="'+(lx+316)+'" y="'+(ly+2)+'" dominant-baseline="central" fill="#155e75">滴灌带</text>');
+  parts.push('<rect x="'+lx+'" y="'+ly+'" width="14" height="4" fill="#185FA5" rx="2"/><text x="'+(lx+20)+'" y="'+(ly+2)+'" dominant-baseline="central" fill="#0C447C">主管</text>');
+  parts.push('<rect x="'+(lx+60)+'" y="'+ly+'" width="14" height="3" fill="#16a34a" rx="2"/><text x="'+(lx+80)+'" y="'+(ly+2)+'" dominant-baseline="central" fill="#166534">支管</text>');
+  parts.push('<circle cx="'+(lx+125)+'" cy="'+(ly+2)+'" r="5" fill="#f59e0b"/><text x="'+(lx+136)+'" y="'+(ly+2)+'" dominant-baseline="central" fill="#92400e">水源</text>');
+  parts.push('<circle cx="'+(lx+185)+'" cy="'+(ly+2)+'" r="5" fill="#ef4444"/><text x="'+(lx+196)+'" y="'+(ly+2)+'" dominant-baseline="central" fill="#991b1b">阀门</text>');
+  parts.push('<line x1="'+(lx+240)+'" y1="'+(ly+2)+'" x2="'+(lx+252)+'" y2="'+(ly+2)+'" stroke="#67e8f9" stroke-width="1.4" stroke-dasharray="3,3"/><text x="'+(lx+256)+'" y="'+(ly+2)+'" dominant-baseline="central" fill="#155e75">滴灌带</text>');
   parts.push('</g>');
 
   /* [v416] 方向代价如实告知：全图统一方向后，少数派分区会「带长偏短 / 支管略增」，
-     超限分区已自动分段——不静默取舍，用户可据此回调「单边铺设长度」或分区数。 */
+     超限分区已自动分段——不静默取舍，用户可据此回调「单边铺设长度」或分区数。
+     [v1012 2026-11-08] 这行原本是 SVG 内「裸 <text>」：pipeBaseSVG() 按 id 剥离三组
+     固定文字时漏了它，于是工作区里它随图纸一起缩放/平移（用户截图指的就是这段）。
+     现在包进 #tlAxisHintGroup 并加入剥离名单；同时把文案存到 window.__tlWsAxisHint，
+     由固定覆盖层 #tlWsOvLengths 同源显示。简图/下载 SVG/打印仍保留原 <text>。 */
+  var _tlAxisHintText = '';
   try {
     var _ar = tlAxisReport || window.__ryTapeAxisReport || null;
     if (_ar && _ar.report && (_ar.report.shortZones > 0 || _ar.report.overZones > 0)) {
@@ -5565,9 +5438,11 @@ function tlAutoGenerate(options) {
       var _tx = '布管方向：滴灌带' + (_ar.tapeAxis === 'x' ? '横向' : '纵向') + '敷设 · 主管支管垂直（全图统一）';
       if (_rp.shortZones > 0) _tx += '；' + _rp.shortZones + '/' + _tot + ' 个分区带长短于最优（均 ' + _rp.avgTape.toFixed(0) + 'm / 最优 ' + _rp.avgOpt.toFixed(0) + 'm，支管略增）';
       if (_rp.overZones > 0) _tx += '；' + _rp.overZones + ' 个分区带长超单边铺设长度，已自动分段';
-      parts.push('<text x="40" y="' + (iy + 38) + '" font-size="9.5" font-weight="600" fill="#92400e">' + _tx + '</text>');
+      _tlAxisHintText = _tx;
+      parts.push('<g id="tlAxisHintGroup"><text x="40" y="' + (iy + 38) + '" font-size="9.5" font-weight="600" fill="#92400e">' + _tx + '</text></g>');
     }
   } catch (eAxisHint) { }
+  window.__tlWsAxisHint = _tlAxisHintText;
 
   /* 最不利路径标注（第四十七轮）：必须放在 window.tlDiagramData 落地**之后**（本函数 8632 行）才画 ——
      标注几何由 tlWorstPathLen 读 tlDiagramData 得出；早于快照落地会标到上一幅图的旧几何。
@@ -5585,7 +5460,7 @@ function tlAutoGenerate(options) {
      实时刷新三级简图的节点/连线图层（无需重新「生成管线图」）。 */
   /* tl-nodes 的 atM 沿用 tlDiagramData 的真实地块米坐标；实时刷新也必须用同一几何口径。 */
   window.__tlPlanGeo = {
-    frontPipe: (frontPipe||[]).map(function(p){return tlGridWorld(p.x,p.y);}),
+    frontPipe: [],
     mainPipes: mainPipes.map(function(line){return line.map(function(p){return tlGridWorld(p.x,p.y);});}),
     branchPipes: branchPipes.map(function(line){return line.map(function(p){return tlGridWorld(p.x,p.y);});}),
     ts: ts
@@ -5662,8 +5537,13 @@ function tlAutoGenerate(options) {
        常驻的管网叠加层（runye_network_layout → renderNetwork）里没有它。
        kind 用独立的 'segTrunk'，不能复用 'front'：renderNetwork 在地图已有手绘真总管时
        会抑制 front 段（v841），而手绘总管（水源→驳接点）与段总管（驳接点串联干线）
-       是水路互补的两段，必须同时显示。trunk-panel 联合复核同轮把它归入 front 桶跳过
-       （长度已折进 frontLenUsed，再计入下游合计就是 v842 式双重计数）。 */
+      是水路互补的两段，必须同时显示。trunk-panel 联合复核同轮把它归入 front 桶跳过
+      （长度已折进 frontLenUsed，再计入下游合计就是 v842 式双重计数）。
+      [v1017] 随段总管生成链一并恢复（v900 误删，致 tlSegAnchorIdx 读不到快照 seg 段）。 */
+    if(dd.segTrunk && Array.isArray(dd.segTrunk.points) && dd.segTrunk.points.length>=2){
+      var stLL=ln2ll(dd.segTrunk.points);
+      if(stLL) segments.push({id:'segTrunk', name:'段总管', dn:segDn.front||segDn.main, kind:'segTrunk', latLng:stLL});
+    }
     var src = dd.sourcePos ? p2ll(dd.sourcePos) : null;
     if(!segments.length && !src){if(plotId)window.RyIrrigationDataStore.writeNetworkLayout(null,plotId);return;}
     var net=null;
@@ -5759,24 +5639,32 @@ function tlAutoGenerate(options) {
       sysPipeBox.style.display = 'block';
     }
   } catch (ePipeBox) { }
-  /* 固定文字层填充（2026-09-16）：与 SVG 内三组同源数据；工作区缩放/平移不影响 */
+  /* 固定文字层填充（2026-09-16）：与 SVG 内同源数据；工作区缩放/平移不影响。
+     [v1012] 布局重排：左上=地块面积信息、底部中间=图例、左下=主管/支管长度+布管方向提示；
+     左下数据由 tlRefreshWsOverlays() 按本次几何写入，三块位置由 tlAlignWsOverlays() 按画布矩形对齐。 */
   (function(){
     var ov=document.getElementById('tlWsOverlays');
     if(!ov)return;
     var oh=document.getElementById('tlWsOvHeader'),ol=document.getElementById('tlWsOvLegend');
     /* 参数行已取消（2026-09-16）：三级设计工作区左侧工具栏已有参数，工作区不再重复显示；
        简图 SVG 内 tlParamsGroup（下载/打印口径）保留不取消 */
-    if(oh)oh.innerHTML=tlHeaderLines.join('<br>');
-    if(ol)ol.innerHTML='<span style="display:inline-flex;align-items:center;vertical-align:middle;gap:5px;margin:0 9px"><i style="display:inline-block;width:14px;height:4px;border-radius:2px;background:#111827"></i>总管</span>'
-      +'<span style="display:inline-flex;align-items:center;vertical-align:middle;gap:5px;margin:0 9px"><i style="display:inline-block;width:14px;height:4px;border-radius:2px;background:#185FA5"></i>主管</span>'
+    /* 左上角：面积是用户要看的重点，把「面积 X 亩」加粗，其余页眉信息照旧 */
+    if(oh)oh.innerHTML=tlHeaderLines.join('<br>').replace(/面积\s*([0-9.]+\s*亩)/,'面积 <b style="color:#0f172a">$1</b>');
+    /* [v1017b] 工作区图例撤「总管」项（图面已不画段总管黑线，见生成块 if(false) 注释） */
+    if(ol)ol.innerHTML='<span style="display:inline-flex;align-items:center;vertical-align:middle;gap:5px;margin:0 9px"><i style="display:inline-block;width:14px;height:4px;border-radius:2px;background:#185FA5"></i>主管</span>'
       +'<span style="display:inline-flex;align-items:center;vertical-align:middle;gap:5px;margin:0 9px"><i style="display:inline-block;width:14px;height:3px;border-radius:2px;background:#16a34a"></i>支管</span>'
       +'<span style="display:inline-flex;align-items:center;vertical-align:middle;gap:5px;margin:0 9px"><i style="display:inline-block;width:14px;height:2px;border-top:2px dashed #0e7490"></i>滴灌带</span>'
       +'<span style="display:inline-flex;align-items:center;vertical-align:middle;gap:5px;margin:0 9px"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f59e0b"></i>水源</span>'
       +'<span style="display:inline-flex;align-items:center;vertical-align:middle;gap:5px;margin:0 9px"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ef4444"></i>阀门</span>';
     ov.style.display='block';
-    /* [v641] 图例贴「画布右缘」而非「整个 .ry-pane-ws 右缘」（后者含工具轨，会压住轨内按钮/提示）。
-       每次生成都会重写图例 innerHTML → 宽度可能变（管径文字变化不影响项数，但保险起见重算一次）。 */
-    if(typeof window.tlAlignWsOvLegend==='function'){ try{ window.tlAlignWsOvLegend(); }catch(eAlign){} }
+    /* [v1012] 每次生成都会重写图例 / 页眉 innerHTML ⇒ 宽度会变，重算三块位置；
+       左下长度与方向提示按本次几何重写（主管方向调整后重新生成图 → 数字跟着变）。 */
+    if(typeof window.tlRefreshWsOverlays==='function'){ try{ window.tlRefreshWsOverlays(); }catch(eLen){} }
+    if(typeof window.tlAlignWsOverlays==='function'){ try{ window.tlAlignWsOverlays(); }catch(eAlign){} }
+    else if(typeof window.tlAlignWsOvLegend==='function'){ try{ window.tlAlignWsOvLegend(); }catch(eAlign){} }
+    /* [v1016 2026-11-08 用户拍板] 页眉（#tlWsOvHeader）第一优先级：页眉重写/对齐后
+       做一次「灌溉参数」面板避让检测（实现与时机说明见 inline-18.js ppParamFloatAvoid）。 */
+    try { if (typeof window.ppParamFloatAvoid === 'function') window.ppParamFloatAvoid(); } catch (ePFAvoid) { }
   })();
   // 平面管网几何快照已在参数块之前写入并重算
   tlInitDrag();
@@ -6351,7 +6239,6 @@ function tlInitDrag(){
     for(var i=0;i<gs.length;i++)gs[i].removeAttribute('transform');
     var off=Math.max(0,Math.min(nd.max,nd.cur||0));
     if(Math.abs(off-nd.off)<0.01)return;                          /* 没动 ⇒ 不落盘不重生成 */
-    if(window.tlFrontNodeDropSet)window.tlFrontNodeDropSet(nd.key,nd.sig,off);
     /* 几何真变了（总管折线 + 主管截断）⇒ 必须整图重生成，材料/水力才会跟着重算 */
     try{ if(typeof tlAutoGenerate==='function') tlAutoGenerate({scroll:false}); }catch(e){}
   }

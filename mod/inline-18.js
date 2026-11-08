@@ -63,7 +63,7 @@
            （实测节点→⋈、划线→⊕），与 v787 ppAiPlan 同款修法。 */
         /* [v800] 多选/遮蔽换语义图标：多选 = ☑ 勾选框（逐段加选）；遮蔽 = ⊘ 禁止/排除
            （被遮蔽的管灰色虚线且不计入材料清单）。id 显式映射优先于 rules 正则。 */
-        var icons={ppPlotPanelToggle:'▤',ppResetCuts:'⟲',ppLockArea:'🔒',ppUndo:'↶',ppAutoPipe:'⇢',ppZoneAutoBtn:'▧',ppRotateZones:'↻',ppGenerate:'▣',ppAiPlan:'🤖',tlAutoPipe:'☁',tlDimMultiBtn:'▦',tlFrontNodeResetBtn:'⌖',tlWsFitValve:'⋈',tlWsFitTee:'⊤',tlWsFitElbow:'∟',tlWsFitNode:'⊕',tlLineBtn:'╱',tlWsMultiBtn:'☑',tlWsMaskBtn:'⊘',tlDimSaveBtn:'💾'};
+        var icons={ppPlotPanelToggle:'▤',ppResetCuts:'⟲',ppLockArea:'🔒',ppUndo:'↶',ppAutoPipe:'⇢',ppZoneAutoBtn:'▧',ppRotateZones:'↻',ppGenerate:'▣',ppAiPlan:'🤖',tlAutoPipe:'☁',tlDimMultiBtn:'▦',tlWsFitValve:'⋈',tlWsFitTee:'⊤',tlWsFitElbow:'∟',tlWsFitNode:'⊕',tlLineBtn:'╱',tlWsMultiBtn:'☑',tlWsMaskBtn:'⊘',tlDimSaveBtn:'💾'};
         /* [v787] ppAiPlan 显式定 🤖：其 title 含「回传」二字，规则表 /回传|上传/ 排在
            /AI规划/ 之前会把图标错配成 ☁（悬浮态时代按钮带文字未露馅，图标化后必修）。 */
         var icon=icons[button.id];
@@ -327,6 +327,23 @@
       if(ppSide)sharedHost.appendChild(ppSide);
       if(tlSide)sharedHost.appendChild(tlSide);
       canvasStack.appendChild(ppCanvas);canvasStack.appendChild(tlCanvas);
+      /* [v1012 2026-11-08] 固定文字层必须跟着画布一起搬进统一绘图工作区。
+         #tlWsContent 搬来了，但 #tlWsOverlays 原本是 #tlPipePlanSection > .ry-pane-ws 的
+         子元素；统一工作区里该 section 恒 display:none ⇒ 页眉/图例/管长覆盖层根本不上屏，
+         用户看到的仍是 SVG 内随图纸缩放移动的「布管方向」文字（截图反馈的正是这个）。
+         canvasStack 是 position:relative 且矩形≈画布，覆盖层 inset:0 天然贴画布；
+         pointer-events:none 不挡框选/拖拽；z-index:5 盖在两层画布（1/2）与适应胶囊（3）之上。
+         rememberNode 让 restoreStageHomes 能把它放回旧分栏，二次挂载再兜一次位。 */
+      var wsOv=document.getElementById('tlWsOverlays');
+      if(wsOv){ rememberNode(wsOv); canvasStack.appendChild(wsOv); }
+      /* [v1012c 用户反馈「右下角蓝色箭头那里多重信息重叠」] 灌溉参数面板原是
+         #ppCanvasWrap（z-index:1，自成层叠上下文）的子元素，它自己的 z-index:4 被
+         封在 1 内 ⇒ 被兄弟层 #tlWsContent（z-index:2，三级图纸）整层盖住，
+         图纸的蓝色滴灌带虚线/分区文字/尺寸数字全叠到面板文字上。
+         与 v826b 的「适应窗口」胶囊同款解法：提到 canvasStack 直属、排在两层画布之后，
+         z-index 由 mod/style-01.css 的搬移态规则给到 6；rememberNode 保证卸载可归位。 */
+      var paramFloat=document.getElementById('ppParamFloat');
+      if(paramFloat){ rememberNode(paramFloat); canvasStack.appendChild(paramFloat); }
       /* [v826b] 「⤢ 适应窗口」胶囊必须排在叠加层之后、直属 canvasStack，否则永远点不到。
          #ppCanvasWrap 自身是 position:absolute + z-index:1 ⇒ 它自己就是一个堆叠上下文，
          把内部任何 z-index（哪怕是 2100）都封在 1；而 #tlWsContent 是 z-index:2 的兄弟层，
@@ -344,6 +361,12 @@
       canvasStack.addEventListener('wheel',function(e){
         if(e.target.closest&&e.target.closest('#ppPlotPanel'))return;
         if(e.target.closest&&e.target.closest('#ppQuickBar'))return;
+        /* [v1013] 灌溉参数面板（#ppParamFloat）v1012c 起也搬进 canvasStack 直属。
+           不豁免的后果（探针 _probe_param_float_input.mjs 实测 reached:false）：
+           面板内滚轮被本拦截器 capture 阶段 stopPropagation+preventDefault 掐断 ⇒
+           number 输入框滚轮调值彻底失效；且事件被转发给画布 ⇒ 在参数框上滚轮=画布缩放。
+           与 #ppPlotPanel/#ppQuickBar 同款豁免。 */
+        if(e.target.closest&&e.target.closest('#ppParamFloat'))return;
         if(e.target===document.getElementById('ppCanvas'))return;
         e.preventDefault();e.stopPropagation();
         document.getElementById('ppCanvas').dispatchEvent(new WheelEvent('wheel',{clientX:e.clientX,clientY:e.clientY,deltaY:e.deltaY,cancelable:true}));
@@ -367,6 +390,53 @@
        ④ 同步抽屉标签高亮态。
        （v792b 时代的 'ry-panel-pos-reset' 派发已删：inline-27 的监听随拖拽机制
        一起退役，改由 align() 直接调用兜位。） */
+    /* ===== [v1016 2026-11-08 用户拍板] 做图区左上角图面文字第一优先级 =====
+       做图区页眉 = 固定覆盖层 #tlWsOvHeader（地块名称/面积/分区等信息行，不随缩放平移，
+       由 inline-09 渲染时重写 innerHTML），与右上「灌溉参数」面板 #ppParamFloat
+       （默认 top:8px;right:12px）重叠时，**面板让位**：top 下移到页眉底部 + 8px。
+       · 覆盖层隐藏/无图时 rect 为 0 ⇒ 自然跳过，面板保持 CSS 默认位；
+       · 只对面板「非用户拖动位」生效：inline top 存在且无本函数 data-pp-avoid 标记
+         ⇒ 用户拖过（ry-panel.js 记忆位），不动；
+       · 下次检测不再重叠且标记还在 ⇒ 清 inline top 复位到 CSS 默认 top:8px；
+       · 调用时机：面板挂载（homeLayerPanel）/ 三级图重生成（页眉重写之后）/ resize；
+         页眉与面板都是画布固定层 ⇒ 平移/缩放不改两者相对位置，无需视图钩子。 */
+    function ppParamFloatAvoid(){
+      var pf=document.getElementById('ppParamFloat');
+      if(!pf||!pf.closest)return;
+      var canvas=pf.closest('.ry-drawing-canvas');
+      if(!canvas)return;
+      var targets=[];
+      var ovHdr=document.getElementById('tlWsOvHeader');
+      if(ovHdr)targets.push(ovHdr);
+      else{
+        [document.getElementById('tlTitleGroup'),document.getElementById('tlHeaderGroup')].forEach(function(g){ if(g)targets.push(g); });
+      }
+      var cr=canvas.getBoundingClientRect();
+      var pr=pf.getBoundingClientRect();
+      if(!cr.width||!pr.width)return;
+      var userDragged=!!pf.style.top&&pf.getAttribute('data-pp-avoid')!=='1';
+      var needBottom=0,hit=false;
+      targets.forEach(function(g){
+        var hr=g.getBoundingClientRect();
+        if(!hr.width)return;
+        if(pr.left<hr.right&&pr.right>hr.left&&pr.top<hr.bottom&&pr.bottom>hr.top){
+          hit=true;
+          var b=hr.bottom-cr.top;
+          if(b>needBottom)needBottom=b;
+        }
+      });
+      if(hit&&!userDragged){
+        var maxTop=cr.height-pr.height-8;
+        var t=Math.max(8,Math.min(needBottom+8,maxTop>8?maxTop:8));
+        pf.style.top=t.toFixed(0)+'px';
+        pf.setAttribute('data-pp-avoid','1');
+      }else if(!hit&&pf.getAttribute('data-pp-avoid')==='1'){
+        pf.style.top='';
+        pf.removeAttribute('data-pp-avoid');
+      }
+    }
+    window.ppParamFloatAvoid=ppParamFloatAvoid;
+    window.addEventListener('resize',function(){ try{ ppParamFloatAvoid(); }catch(e){} });
     function homeLayerPanel(){
       try{ localStorage.removeItem('runye_tlWsLayerPanel_pos'); }catch(e){}
       var lp=document.getElementById('tlWsLayerPanel');
@@ -386,6 +456,16 @@
       }
       lp.style.left='';lp.style.top='';lp.style.right='';lp.style.bottom='';
       lp.hidden=true;
+      /* [v1012] 慢 CDN / restoreStageHomes 卸载后，固定文字层可能又被还原回旧分栏。
+         每次挂载都兜一次位（与上面图层面板归位同一时机），保证覆盖层始终与画布同容器。 */
+      var wsOv=document.getElementById('tlWsOverlays');
+      if(wsOv&&canvasStack&&wsOv.parentNode!==canvasStack){ rememberNode(wsOv); canvasStack.appendChild(wsOv); }
+      /* [v1012c] 灌溉参数面板同款兜位：restoreStageHomes 卸载后会回到 #ppCanvasWrap，
+         第二次挂载若不搬回来就又被三级图纸盖住（叠字复发）。 */
+      var pf=document.getElementById('ppParamFloat');
+      if(pf&&canvasStack&&pf.parentNode!==canvasStack){ rememberNode(pf); canvasStack.appendChild(pf); }
+      /* [v1016] 挂载后立刻做一次与图面文字的避让检测（信息行/标题第一优先级）。 */
+      try{ ppParamFloatAvoid(); }catch(e){}
       try{ if(window.tlWsLayerPanel&&typeof window.tlWsLayerPanel.align==='function')window.tlWsLayerPanel.align(); }catch(e){}
       var layerTab=document.getElementById('tlWsLayerDrawerTab');
       if(layerTab){layerTab.setAttribute('aria-expanded','false');layerTab.classList.remove('open');}

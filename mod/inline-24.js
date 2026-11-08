@@ -260,27 +260,150 @@
     if(!pane) return;
     var zoneWrap=document.getElementById('tlWsZoneChkWrap');
     var worstWrap=document.getElementById('tlWsWorstChkWrap');
-    /* [v641 2026-10-21 用户要求「图例放在右下角」] 工作区图例（#tlWsOvLegend）同款对齐。
-       坑：图例是 #tlWsOverlays 的子元素，而 #tlWsOverlays 是 inset:0 —— 相对的是整个
-       .ry-pane-ws（三列栅格：画布 1fr ｜ 拖拽条 6px ｜ 工具轨），**不是画布**。
-       所以纯 CSS 写 right:8px 会贴到窗口右缘、压在工具轨按钮和轨内提示文字上（右侧面板
-       宽度还会被拖拽条改）。这里沿用上方勾选框的办法：按「画布右缘」换算 ——
-       right = (pane.right - canvas.right) + 8；工具轨宽度变化 → 画布宽度变化 →
-       ResizeObserver(#tlWsContent) 触发重算，无需另挂观察器。
-       生成图时 inline-09 会重写图例 innerHTML 并 ov.display=block，那边也会调一次本函数。 */
-    function tlAlignWsOvLegend(){
+    /* [v1012 2026-11-08 用户要求] 固定覆盖层三块布局：左上 #tlWsOvHeader 地块面积信息、
+       底部中间 #tlWsOvLegend 图例、左下 #tlWsOvLengths 主管/支管长度 + 布管方向提示。
+       v641 曾把图例挪到画布右下角，本轮改回「画布水平居中」——但仍必须按**画布**矩形算，
+       不能按整个 .ry-pane-ws 算：它是三列栅格（画布 1fr ｜ 拖拽条 6px ｜ 工具轨），
+       直接写 right:8px 会压工具轨按钮，直接写 left:50% 会偏到工具轨中线。
+       left = (cr.left - pr.left) + cr.width/2，transform:translateX(-50%)；
+       bottom = (pane.bottom - canvas.bottom) + 8 ⇒ 工具轨宽度/窗口缩放/手机端纵向布局自动跟随。
+       左下块贴画布左缘 12px，max-width 按「图例左缘 − 24px」避让，窄画布自动换行。 */
+    function tlAlignWsOverlays(){
       try{
-        var lg=document.getElementById('tlWsOvLegend');
-        if(!lg) return;
-        var pr=pane.getBoundingClientRect(), cr=ctn.getBoundingClientRect();
-        if(cr.width<40) return;
-        lg.style.right=Math.max(8,(pr.right-cr.right)+8)+'px';
-        lg.style.bottom=Math.max(8,(pr.bottom-cr.bottom)+8)+'px';
-        lg.style.left='auto';          /* 清掉历史居中基准 */
-        lg.style.transform='none';     /* 清掉 translateX(-50%) 回拉 */
+        var lg=document.getElementById('tlWsOvLegend'), len=document.getElementById('tlWsOvLengths');
+        /* [v1012] 定位基准 = 覆盖层当前的 offsetParent：统一绘图工作区会把 #tlWsOverlays
+           搬进 .ry-drawing-canvas（≈画布），旧分栏时代则是 .ry-pane-ws（含工具轨）。
+           直接写死 pane 会在前者里把 left 算成 +365px、图例跑到画布外。 */
+        var ov=document.getElementById('tlWsOverlays');
+        var host=(ov&&ov.offsetParent)?ov.offsetParent:pane;
+        var pr=host.getBoundingClientRect(), cr=ctn.getBoundingClientRect();
+        if(pr.width<40) return;
+        /* [v1012] 统一绘图工作区里 #tlWsContent 自身被相机 transform 缩放/平移
+           （transform-origin:0 0），它的 getBoundingClientRect 会随缩放变化，
+           **不能**拿来当固定层的定位基准。此时覆盖层与它同父（.ry-drawing-canvas），
+           画布可见区就是这个父容器，直接用它的矩形：图例居中、左下贴 12/12px。
+           旧分栏（覆盖层相对 .ry-pane-ws，含工具轨）才按 ctn 换算，沿用 v641 那套。 */
+        var isShared=!!(host.classList&&host.classList.contains('ry-drawing-canvas'));
+        /* [v1012b] 取消白底后 padding 一并去掉，文字下沿比原来下沉 4px ⇒
+           bottom 8→12px 补回视觉高度（与 index.html 首帧兜底保持一致）。 */
+        var baseL=isShared?0:Math.max(0,cr.left-pr.left);
+        var baseB=isShared?12:Math.max(12,pr.bottom-cr.bottom+12);
+        var baseW=isShared?pr.width:cr.width;
+        if(lg){
+          lg.style.left=(baseL+baseW/2)+'px';
+          lg.style.transform='translateX(-50%)';
+          lg.style.right='auto';
+          lg.style.bottom=baseB+'px';
+        }
+        if(len){
+          /* [v1018 2026-11-08 用户截图「支管文字底部还有一层东西」] 排查结论（探针
+             _probe_lenblock/_lenblock2/_lenblock3 全文档扫描证实 DOM 只有一份
+             #tlWsOvLengths，简图 tlParamsGroup 等组剥离完好）：那层灰色残影不是任何
+             功能元素，而是本块在上一次布局位置的**旧帧残影**——面板宽度 / 统计表开关 /
+             窗口缩放改变画布左缘后，固定文字层水平移位（本次实测错位 ≈27px、垂直同排），
+             浏览器合成层未清掉旧位置像素，「主管/支管」字头从白色面板边缘露出来。
+             修复：对齐写入后若 left/bottom 相比上次有变化，把覆盖层容器 display 同帧
+             摘下再挂回，强制浏览器把旧位置区域一并重画（同步执行、中间不产生可见闪烁；
+             位置没变时不做，零开销）。 */
+          var _lenPrevL=parseFloat(len.style.left), _lenPrevB=parseFloat(len.style.bottom);
+          len.style.left=(baseL+12)+'px';
+          len.style.bottom=baseB+'px';
+          var lgW=(lg&&lg.getBoundingClientRect().width)||308;
+          len.style.maxWidth=Math.max(150,Math.floor((baseW-lgW)/2-24))+'px';
+          if(isFinite(_lenPrevL)&&isFinite(_lenPrevB)&&
+             (Math.abs(_lenPrevL-(baseL+12))>0.5||Math.abs(_lenPrevB-baseB)>0.5)){
+            try{
+              var _ovRepaint=document.getElementById('tlWsOverlays');
+              if(_ovRepaint){ _ovRepaint.style.display='none'; void _ovRepaint.offsetHeight; _ovRepaint.style.display='block'; }
+            }catch(eOvRepaint){}
+          }
+        }
+        /* [v1012c 用户要求「红框文字上移，贴近顶部工具栏」]
+           v1012b 让信息块躲到悬浮卡**下方**（top 拉到 60+px），卡片被用户拖到图面
+           下部后却没有重算，信息块就孤零零留在半空 —— 用户看到的正是这个。
+           现在改为：垂直方向恒贴工具栏下沿（+8px），**不再下移**；
+           只有当悬浮卡确实停在这一行、且水平会压住信息块时，才把信息块
+           **水平右移**到卡片右侧（仍是同一行、仍贴工具栏）。
+           卡片拖走/隐藏 ⇒ 自动回到左上角 12px；拖动结束由底部订阅重算一次。 */
+        /* [v1017 2026-11-08 用户拍板] 页眉水平**恒贴画布左缘 12px**（贴左侧工具栏边）：
+           v1012c 的「地块分区快捷条在场则水平右移」分支取消 —— 用户实测页眉被推到
+           画布中部（右移量封顶 = 画布 50%，正是截图里文字偏离的样子），拍板文字贴左优先
+           （与 v1016「图面文字第一优先级」同口径）。垂直仍贴工具栏下沿 +8px 不变。 */
+        var hd=document.getElementById('tlWsOvHeader');
+        if(hd){
+          var baseTop=pr.top+8;
+          try{
+            var tools=document.querySelector('.ry-drawing-toolbar');
+            if(tools){ var tb=tools.getBoundingClientRect(); if(tb.height>0&&tb.bottom>baseTop) baseTop=tb.bottom+8; }
+          }catch(eTop){}
+          hd.style.top=Math.max(6,Math.round(baseTop-pr.top))+'px';
+          hd.style.left=Math.round(baseL+12)+'px';
+        }
       }catch(e){}
     }
-    window.tlAlignWsOvLegend=tlAlignWsOvLegend;
+    window.tlAlignWsOverlays=tlAlignWsOverlays;
+    window.tlAlignWsOvLegend=tlAlignWsOverlays;   /* 兼容 v641 旧调用点 */
+
+    /* [v1012] 左下「主管/支管长度」单一数据源 = window.tlFigParamLines(computeThreeLevel())：
+       ods = 图面加权代表径、lens = AE.effPts() 有效几何逐段累加的全地块实际长度，与材料清单 /
+       简图参数行 / 水力页完全同口径。主管方向调整、图面改长/改径/平移/遮蔽都会改变 lens，
+       因此必须实时刷新，不能只在生成时写死一次。 */
+    function tlRefreshWsOverlays(){
+      var box=document.getElementById('tlWsOvLengths');
+      if(!box) return;
+      var html='';
+      try{
+        var r=(typeof window.computeThreeLevel==='function')?window.computeThreeLevel():null;
+        var pl=(r&&typeof window.tlFigParamLines==='function')?window.tlFigParamLines(r):null;
+        function f1(v){ var n=Number(v); return (v!==null&&v!==undefined&&v!==''&&isFinite(n))?n.toFixed(1):'—'; }
+        var odM=pl?pl.ods.main:(r&&r.mainPipe?r.mainPipe.od:'—');
+        var odB=pl?pl.ods.branch:(r&&r.branchPipe?r.branchPipe.od:'—');
+        var lM=pl?pl.lens.main:(r?r.mainLenUsed:null);
+        var lB=pl?pl.lens.branch:(r?r.branchLenUsed:null);
+        html='<div>主管 Ø '+odM+' mm · '+f1(lM)+' m</div>'
+            +'<div>支管 Ø '+odB+' mm · '+f1(lB)+' m</div>';
+      }catch(eLen){ html='<div style="color:#64748b">主管 / 支管长度：生成管线图后显示</div>'; }
+      var hint=String(window.__tlWsAxisHint||'');
+      if(hint) html+='<div style="margin-top:2px;color:#92400e;font-weight:600;font-size:10.5px;line-height:1.45">'+hint+'</div>';
+      box.innerHTML=html;
+      tlAlignWsOverlays();
+    }
+    window.tlRefreshWsOverlays=tlRefreshWsOverlays;
+
+    /* 图面编辑订阅：RyTlAutoEdits 的 len/caliber/move/hidden/batch 任何一次 notify 都代表
+       有效几何变了 ⇒ 左下长度可能变。rAF 合并同一帧的多次通知，避免拖动时每帧反复
+       computeThreeLevel。方向参数改变后「生成管线图」由 inline-09 覆盖层填充处直接调用本函数。 */
+    try{
+      var _ae=window.RyTlAutoEdits;
+      if(_ae&&typeof _ae.onChange==='function'){
+        var _ovPending=false;
+        _ae.onChange(function(){
+          if(_ovPending)return; _ovPending=true;
+          (window.requestAnimationFrame||function(fn){return setTimeout(fn,0);})(function(){
+            _ovPending=false; tlRefreshWsOverlays();
+          });
+        });
+      }
+    }catch(eOvSub){}
+    /* [v1012c] 「分区角度」悬浮卡是 rypDraggable：用户把它从顶部拖到图面下部后，
+       原先只有 ResizeObserver 会重算对齐 ⇒ 信息块停在旧的避让位。这里补三路重算：
+       卡片 style/class 变化（拖拽写行内坐标）、pointerup（拖拽结束兜底）、窗口 resize。 */
+    try{
+      var _alignPending=false;
+      var alignSoon=function(){
+        if(_alignPending)return; _alignPending=true;
+        (window.requestAnimationFrame||function(fn){return setTimeout(fn,0);})(function(){
+          _alignPending=false; tlAlignWsOverlays();
+        });
+      };
+      var quickEl=document.getElementById('ppQuickBar');
+      if(quickEl&&window.MutationObserver){
+        new MutationObserver(alignSoon).observe(quickEl,{attributes:true,attributeFilter:['style','class']});
+      }
+      window.addEventListener('pointerup',alignSoon);
+      window.addEventListener('resize',alignSoon);
+    }catch(eDragObs){}
+    try{ window.addEventListener('load',function(){ tlRefreshWsOverlays(); tlAlignWsOverlays(); }); }catch(eOvLoad){}
     function tlAlignLabelsChk(){
       try{
         var pr=pane.getBoundingClientRect(), cr=ctn.getBoundingClientRect();
@@ -290,7 +413,7 @@
         if(zoneWrap){ zoneWrap.style.right=r+'px'; zoneWrap.style.top=(t+28)+'px'; }
         if(worstWrap){ worstWrap.style.right=r+'px'; worstWrap.style.top=(t+56)+'px'; }
       }catch(e){}
-      tlAlignWsOvLegend();
+      tlAlignWsOverlays();
     }
     if(window.ResizeObserver){ try{ new ResizeObserver(tlAlignLabelsChk).observe(ctn); }catch(e){} }
     tlAlignLabelsChk();

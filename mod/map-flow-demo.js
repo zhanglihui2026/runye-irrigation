@@ -315,8 +315,23 @@
     var mainsLL = [], branchLL = [], valves = [], couplersLL = [], segLL = null, nodesLL = [];
     var sourceLL=null;
     try{sourceLL=typeof ctx.getWaterSource==='function'?readLL(ctx.getWaterSource()):null;}catch(eSource){}
-    (dd.mainPipes || []).forEach(function (l) { mainsLL.push(toLLLine(l)); });
-    (dd.branchPipes || []).forEach(function (l) { branchLL.push(toLLLine(l)); });
+    /* [v1020 待办②] 主管/支管线体改读 AE 有效几何（手动改长/平移后的折线）再投影——
+       此前读 dd 原始几何，用户改长后轮灌演示与最远水路用的还是改前长度。
+       effPts(pid, data) 第二参是整个 tlDiagramData（pid 内部查 mainPipes/branchPipes），
+       无覆盖时返回原引用，零成本零行为差。 */
+    var _aeCollect = window.RyTlAutoEdits;
+    function effLLLine(pid, line) {
+      var src = line;
+      try {
+        if (_aeCollect && typeof _aeCollect.effPts === 'function') {
+          var e = _aeCollect.effPts(pid, dd);
+          if (e && e.length >= 2) src = e;
+        }
+      } catch (eAE) { /* 取有效几何失败 ⇒ 原始折线兜底 */ }
+      return toLLLine(src);
+    }
+    (dd.mainPipes || []).forEach(function (l, li) { mainsLL.push(effLLLine('main-' + li, l)); });
+    (dd.branchPipes || []).forEach(function (l, bi) { branchLL.push(effLLLine('branch-' + bi, l)); });
     function valveBranchIndex(v){
       if(v&&typeof v.mi==='number'&&isFinite(v.mi)&&v.mi>=0)return v.mi|0;
       if(!v||!isFinite(v.x)||!isFinite(v.y))return -1;
@@ -464,13 +479,17 @@
      coupler nodes, main-line end joins and branch takeoffs, so a later trunk
      junction (for example N-02) is not animated when an earlier zone (zone 3)
      can be supplied from N-01 directly. */
-  function buildFlowRoutes(d,g){
-    if(!d||!Array.isArray(d.trunkLinesLL)||!d.trunkLinesLL.length)return null;
+  function buildFlowRoutes(d,g,allZones){
+    if(!d||!Array.isArray(d.trunkLinesLL))return null;
+    /* [v1019] 无手绘总管时 segLL（段总管反投线）也可作干线参与寻路——扬程链/最远水路
+       共享本引擎（用户拍板 2026-11-08）。两者皆无 ⇒ 由下方 byTrunk 空守卫统一拒绝，
+       行为与旧版一致。 */
     var activeZones=[];
-    for(var zi=0;zi<d.total;zi++)if(groupOf(zi,d.manual,d.nPer)===g)activeZones.push(zi);
+    if(allZones){for(var z0=0;z0<d.total;z0++)activeZones.push(z0);}
+    else for(var zi=0;zi<d.total;zi++)if(groupOf(zi,d.manual,d.nPer)===g)activeZones.push(zi);
     if(!activeZones.length)return null;
     var refLat=d.sourceLL&&isFinite(d.sourceLL.lat)?d.sourceLL.lat:
-      ((d.trunkLinesLL[0][0]&&d.trunkLinesLL[0][0].lat)||0);
+      ((d.trunkLinesLL[0]&&d.trunkLinesLL[0][0]&&d.trunkLinesLL[0][0].lat)||0);
     var cos=Math.max(.01,Math.cos(refLat*Math.PI/180)), lines=[], byMain={}, byTrunk=[];
     function xy(p){return{x:p.lng*111320*cos,y:p.lat*110540};}
     function gap(a,b){var dx=a.x-b.x,dy=a.y-b.y;return Math.sqrt(dx*dx+dy*dy);}
@@ -645,7 +664,9 @@
       var route={zi:t.zi,trunk:[],main:[],branch:[]};
       path.forEach(function(s){
         var pts=s.forward?s.edge.points:s.edge.points.slice().reverse();
-        route[s.edge.kind].push({key:s.edge.key,points:pts});
+        /* [v1020 待办③] 切片补 a/b（线体弧长端点）：同一物理管段的 edge 对象被各分区
+           路径共享，(key,a,b) 即切片身份 —— 供扬程链按「下游覆盖区数」组合过境段流量。 */
+        route[s.edge.kind].push({key:s.edge.key,points:pts,a:s.edge.a,b:s.edge.b});
       });
       routes.push(route);
     });
@@ -1268,6 +1289,26 @@
     /* 纯函数导出（Node 单测） */
     groupOf: groupOf, groupCount: groupCount, validateConnection: validateConnection,
     entrancesOf: entrancesOf, collectWorkspaceNodes: collectWorkspaceNodes,
+    /* [v1019] 寻路引擎纯函数导出（单测/探针用合成数据直测，不经 collect/ctx） */
+    buildRoutes: buildFlowRoutes,
+    /* [v1019 用户拍板] 最远水路共享数据源：全分区逐区寻路（不分轮灌组），与轮灌演示
+       动画同引擎同图（buildFlowRoutes allZones 模式）。返回：
+       · null —— 引擎不可用（无图数据/干线与段总管皆无/图断裂）；
+       · { routes, total, missing } —— missing 非空 = 有分区拿不到有效路径，
+         调用方必须整体放弃（被跳过的区可能才是真最远，宁缺不错）。 */
+    routesAll: function () {
+      try {
+        var d = collect();
+        if (!d || !d.total) return null;
+        var routes = buildFlowRoutes(d, 0, true);
+        if (!routes || !routes.length) return null;
+        var seen = {};
+        routes.forEach(function (r) { seen[r.zi] = 1; });
+        var missing = [];
+        for (var zi = 0; zi < d.total; zi++) if (!seen[zi]) missing.push(zi);
+        return { routes: routes, total: d.total, missing: missing };
+      } catch (e) { return null; }
+    },
     /* [v945] 导出给探针/宿主驱动：分组浮层文案（含"没有图面路径时按分区反推口径"这条分支）。
        它是纯 DOM 拼装、不写任何状态，导出去比藏在闭包里更好验。 */
     updateGroupInfo: updateGroupInfo

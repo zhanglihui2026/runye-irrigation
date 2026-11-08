@@ -26,7 +26,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>润野灌溉设计优化版｜滴灌管径与水泵选型</title>
 <meta name="description" content="输入地块、滴灌带与水源参数，快速计算灌溉分区、主管支管管径和水泵工作点。"/>
-<link rel="stylesheet" href="mod/style-01.css?v=1011-map-trunk-owner">
+<link rel="stylesheet" href="mod/style-01.css?v=1020-caliber-cleanup">
 <link rel="stylesheet" href="runye-inverse-design.css?v=277">
 <script defer src="runye-inverse-design.js?v=438-branch-flow-conservation"></script>
 <link rel="stylesheet" href="runye-ai-plan.css?v=544-float-card-unify">
@@ -49,7 +49,7 @@
 <link rel="stylesheet" href="hydraulic-calc/hydraulic-calc.css">
 <link rel="stylesheet" href="filter-system/filter-system.css">
 <link rel="stylesheet" href="pwa/vendor/leaflet.css">
-<link rel="stylesheet" href="mod/online-map.css?v=1011-map-trunk-owner">
+<link rel="stylesheet" href="mod/online-map.css?v=1020-caliber-cleanup">
 <link rel="stylesheet" href="hydraulics-main.css?v=442-native">
 <style id="ryCadTwinCss">
 /* --- CAD global toolbar · generated selector twins ---
@@ -251,7 +251,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <link rel="stylesheet" href="pwa/pwa.css?v=2">
 <script defer src="pwa/pwa.js?v=2"></script>
     <link rel="stylesheet" href="runye-theme.css?v=2">
-    <link rel="stylesheet" href="mod/ry-panel.css?v=848-hbar-normal">
+    <link rel="stylesheet" href="mod/ry-panel.css?v=1017-caret-flat">
     <!-- Shoelace 2.15.1（与紧凑分组样板一致）；Shoelace 不可用时保留原生输入控件。 -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.1/cdn/themes/light.css">
   <link rel="stylesheet" href="runye-typography.css?v=530-h1-scope">
@@ -323,10 +323,10 @@ body.ry-worst-off [data-tlworst]{display:none}
   <script src="runye-entitle.js?v=621-invite-l2"></script>
   <script src="runye-member-ui.js?v=632-login-deeplink"></script>
   <!-- [v605-announce-modal] 首页公告弹窗（每次访问展示）：删掉本行即卸载，样式随脚本注入 #ryAnnCss -->
-  <script src="runye-announce.js?v=1011-map-trunk-owner"></script>
+  <script src="runye-announce.js?v=1020-caliber-cleanup"></script>
   <!-- 顶部导航动作按钮（系统图，runye-nav.js act 项）：动作映射须先于 runye-nav.js 注册 -->
   <script src="mod/inline-05.js?v=357"></script>
-  <script src="runye-nav.js?v=1011-map-trunk-owner"></script>
+  <script src="runye-nav.js?v=1020-caliber-cleanup"></script>
   <!-- [NEW MODULE: DXF 导出] 入口：删除本行即卸载（不改动任何原有逻辑） -->
   <script src="runye-dxf.js?v=840-trunk-dxf"></script>
   <!-- [NEW MODULE: pipe_optim] 入口：删除本行即卸载本隔离模块（不改动任何原有逻辑） -->
@@ -1299,6 +1299,10 @@ body.ry-worst-off [data-tlworst]{display:none}
     <span class="pp-plan-item"><span class="pp-plan-label">联合流量</span><span class="pp-plan-val" id="tlPlanCombinedFlow">— m³/h</span></span>
     <!-- v106（2026-09-22 用户要求）：联合流量底下、水泵流量上方注明依据 —— 按哪个联合分区、实际多少亩 -->
     <span class="pp-plan-item" id="tlPlanCombinedSrc" style="display:none;font-size:11px;color:#64748b"></span>
+    <!-- [v1017c 2026-11-08 用户口径] 手绘总管闭环门槛：未在在线地图绘制总管（形成闭环水路）前，
+         扬程/轴功率/电机功率不显示数字（总管长度只能是试算输入值，扬程必不准），
+         此提示行常驻显示；绘好总管后自动消失。文案为用户原话。 -->
+    <span class="pp-plan-item" id="tlPlanLoopHint" style="display:none;font-size:11px;color:#b45309">⚠ 请在在线地图绘制总管形成闭环，再计算扬程</span>
     <span class="pp-sep-vert"></span>
     <span class="pp-plan-item"><span class="pp-plan-label">水泵流量</span><span class="pp-plan-val" id="tlPlanPumpFlow">— m³/h</span></span>
     <span class="pp-plan-item"><span class="pp-plan-label">水泵扬程</span><span class="pp-plan-val" id="tlPlanPumpHead">— m</span><span class="pp-plan-val-real" id="tlPlanPumpHeadReal">—</span></span>
@@ -1572,15 +1576,11 @@ body.ry-worst-off [data-tlworst]{display:none}
          （#tlWsMultiBtn → tlMultiToggle()，见 mod/inline-24.js），一键同开/同关
          管道多选与标注多选，两侧交互各自不变。本按钮删除后 drawM 空值保护自动静默。
          要恢复：从 git 历史恢复本行按钮。 -->
-    <!-- [v584] 总管三通复位（用户要求）：一键把所有被拖动过的三通恢复到初始位置（总管回到直线）。
-         背景：三通下移后总管变折线，水流动画在部分地块上会与重构后的路径对不上；
-         复位即可回到「直线总管」这一稳定态，动画表现正常。
-         与 tlDimScaleRow 的「⟲复位100%」同款语义，但作用域是三通偏移（localStorage tlFrontNodeDrops_v1）。
-         必须排在 #tlAutoPipe 之前 —— A6 契约要求生成按钮贴底。 -->
-    <!-- [2026-11-05 用户拍板 取消] 「三通复位」入口已删：三通拖偏的场景已被在线地图
-         总管绘制链取代，用户不再手拖三通，复位按钮没了用武之地。底层
-         window.tlFrontNodeReset()（inline-09，清 tlFrontNodeDrops_v1）全保留——
-         cloud_design_binding.test.cjs 锁着它的源码结构，控制台仍可手动调用应急。 -->
+    <!-- [v584→2026-11-05 取消入口→v1015 清除底层] 旧「三通」复位按钮的历史：
+         v584 加过一键复位被拖动三通的按钮（localStorage tlFrontNodeDrops_v1），
+         2026-11-05 用户拍板删入口（在线地图总管绘制链取代手拖三通），
+         v1015（2026-11-08）连底层 window.tlFrontNodeReset 与 drops 存取一并清除 ——
+         总管一律由在线地图手绘，经 tlMapTrunkLen / 段总管驳接进水力与材料。 -->
     <!-- [v590] 回传设计方案到云端地块库：把当前三级设计结果（分区数/管径/流速/水泵参数）
          存到对应地块上，形成「地块 ↔ 设计」配对样本，将来用于统计、比对、回测与学习。
          关联哪个地块由 URL 的 cloudid（从云端「载入地图」带进来，已存本地）决定。 -->
@@ -1636,19 +1636,33 @@ body.ry-worst-off [data-tlworst]{display:none}
     <input type="checkbox" id="tlWsWorstChk" checked style="margin:0;width:12px;height:12px;cursor:pointer;accent-color:#185FA5">
     <span id="tlWsWorstChkTxt">最远水路</span>
   </label>
-  <!-- 固定文字层（2026-09-16）：页眉信息/管材参数/图例 改为 HTML 覆盖层，不随图纸缩放平移；
-       克隆底图已在 tl-workspace.pipeBaseSVG 中剥离这三组。普通简图 SVG 内仍保留（供下载/打印）。 -->
+  <!-- 固定文字层（2026-09-16 建，[v1012 2026-11-08] 重排为三块屏幕固定信息）；
+       用户原话：「这段文字，还有图例，应该是放在屏幕的固定位置，地块缩小 放大它应该都是固定不动的……
+       左下角放主管 支管长度说明，中间放图例，左上角放地块面积信息」。
+       ① 左上 #tlWsOvHeader  地块面积信息
+       ② 底部中间 #tlWsOvLegend 图例（按「画布」水平居中）
+       ③ 左下 #tlWsOvLengths 主管/支管长度 + 布管方向提示（随主管方向/图面编辑实时刷新）
+       三块都是 #tlWsOverlays（inset:0）的 HTML 子元素，不进 SVG viewBox ⇒ 滚轮缩放 /
+       拖拽平移图纸时保持屏幕坐标不动；SVG 内那份（含橙色布管方向文字）只留简图/下载/打印。
+       ⚠ 关键坑（v641 踩过）：#tlWsOverlays 相对的是整个 .ry-pane-ws（三列栅格：
+       画布 1fr ｜ 拖拽条 6px ｜ 工具轨），**不是画布**。所以 left/bottom/max-width 一律由
+       JS 按画布矩形换算：mod/inline-24.js 的 window.tlAlignWsOverlays()（与右上角三枚
+       勾选框同一套 ResizeObserver 驱动）；下面的行内值只是首帧兜底。
+       克隆底图在 tl-workspace.pipeBaseSVG 中剥离 tlHeaderGroup / tlParamsGroup /
+       tlLegendGroup / tlAxisHintGroup 四组；普通简图 SVG 内仍保留（供下载/打印）。 -->
   <div id="tlWsOverlays" style="display:none;position:absolute;inset:0;pointer-events:none;z-index:5">
-    <div id="tlWsOvHeader" style="position:absolute;top:10px;left:12px;max-width:62%;font-size:12px;font-weight:700;color:#334155;line-height:1.6;background:rgba(255,255,255,.88);padding:2px 6px;border-radius:4px"></div>
-    <!-- [v641 2026-10-21 用户要求] 工作区图例（总管/主管/支管/水源/阀门）挪到画布**右下角**：
-         原为「bottom:8px + left:50% + translateX(-50%)」居中，用户截图圈的就是它，要求「放在右下角」。
-         ⚠ 关键坑：本 div 是 #tlWsOverlays 的子元素，而 #tlWsOverlays 是 inset:0 —— 相对的是
-         整个 .ry-pane-ws（三列栅格「画布 1fr ｜ 拖拽条 6px ｜ 工具轨」），**不是画布**。
-         只写 right:8px 会贴到窗口右缘、压在工具轨按钮与轨内提示文字上（第一版就是这么翻的车）。
-         故 right/bottom 由 JS 按「画布右缘」实时换算并写在行内（mod/inline-24.js 的
-         window.tlAlignWsOvLegend，与右上角三枚勾选框同一套 ResizeObserver 对齐）；
-         下面写的 right:8px/left:auto/transform:none 只是首帧兜底与清掉旧居中基准。 -->
-    <div id="tlWsOvLegend" style="position:absolute;bottom:8px;right:8px;left:auto;transform:none;font-size:11.5px;font-weight:600;color:#334155;background:rgba(255,255,255,.88);padding:2px 8px;border-radius:4px;white-space:nowrap"></div>
+    <!-- [v1012b 2026-11-08 用户要求] 三块固定信息一律取消白色底色/内边距，
+         只留文字直接落在画布底色上（白框会让左上那行看起来像又一条工具栏）。
+         ① 左上不再写死固定 px：由 tlAlignWsOverlays() 按「顶部图标工具栏 +
+            『分区角度』悬浮卡」的实际底缘动态避让（卡片停在顶部时信息块跟在它
+            下方 12px；卡片被拖走/隐藏时自动回到工具栏正下方 12px）。
+            下面 top:62px 只是 JS 未跑时的首帧兜底。
+         ② 底部两块 bottom 8→12px：取消 padding 后文字下沿会比原来下沉 4px，
+            补 4px 让基线维持原来的视觉高度，也不贴状态栏。
+         实际 bottom/left/max-width 仍由 mod/inline-24.js 的 tlAlignWsOverlays() 按画布容器换算。 -->
+    <div id="tlWsOvHeader" style="position:absolute;top:62px;left:12px;max-width:52%;font-size:12px;font-weight:700;color:#334155;line-height:1.6"></div>
+    <div id="tlWsOvLengths" style="position:absolute;bottom:12px;left:12px;max-width:300px;font-size:11.5px;font-weight:600;color:#334155;line-height:1.55"></div>
+    <div id="tlWsOvLegend" style="position:absolute;bottom:12px;left:50%;transform:translateX(-50%);right:auto;font-size:11.5px;font-weight:600;color:#334155;white-space:nowrap"></div>
   </div>
   <!-- 工具轨宽度拖拽条（2026-09-17 第四十四轮，用户要求"工具栏宽度可调节"）：
        夹在画布与工具轨之间（网格第 2 列），拖动调节工具轨（含轨内统计表）的宽度；
@@ -2261,7 +2275,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 </div>
 
 <script src="mod/material-formulas.js?v=412"></script>
-<script src="mod/zone-geometry.js?v=1011-map-trunk-owner"></script>
+<script src="mod/zone-geometry.js?v=1020-caliber-cleanup"></script>
 <script src="mod/flow-geometry.js?v=414"></script>
 <script src="mod/tl-polyline-geometry.js?v=426-tl-polyline-geometry"></script>
 <!-- [v421-mat-table] 材料清单/材料表管理（自 inline-09 迁出）：先于 inline-09 加载 —— inline-09 尾部
@@ -2269,8 +2283,10 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script src="mod/material-table.js?v=421-mat-table"></script>
 <!-- [v424-plan-calc-render] 扬程公式与分解展示模块，先于计算控制器和三级调用方装载。 -->
 <script src="mod/plan-calc-render.js?v=614-head-formula"></script>
-<!-- [v887-tape-zone-vgate] 段总管生成器（纯几何，Node 单测锁），先于 inline-09 消费方装载。 -->
-<script src="mod/inline-09.js?v=1011-map-trunk-owner"></script>
+<!-- [v887-tape-zone-vgate] 段总管生成器（纯几何，Node 单测锁），先于 inline-09 消费方装载。
+     [v900] 曾随段总管链误删引入；[v1017] 恢复（扬程链 P0，TASK_pump_head_mismatch_20261108 §5.0）。 -->
+<script src="mod/tl-seg-trunk.js?v=887-tape-zone-vgate"></script>
+<script src="mod/inline-09.js?v=1020-caliber-cleanup"></script>
 <!-- [v423-header-layout] 三级简图标题布局依赖 inline-09 的 tlMeasureText 与生成时写入的标题状态。 -->
 <script src="mod/tl-header-layout.js?v=423-header-layout"></script>
 
@@ -2280,7 +2296,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <!-- ===== 实际地块规划 JS ===== -->
 <script src="mod/inline-11.js?v=653-zone-calibers"></script>
 <!-- [v420-split] 绘图编辑器 IIFE 自 inline-11 迁出：必须紧随 inline-11 之后同步执行 -->
-<script src="mod/plot-editor.js?v=1011-map-trunk-owner"></script>
+<script src="mod/plot-editor.js?v=1020-caliber-cleanup"></script>
 <script src="mod/inline-12.js?v=823-fix-transfer-save-alert"></script>
 <script src="mod/inline-13.js?v=831-trunk-schema-v2"></script>
 <!-- [v422-head-system-svg] 纯 SVG 核心先于 inline-14 同步加载。 -->
@@ -2300,8 +2316,8 @@ body.ry-worst-off [data-tlworst]{display:none}
 <!-- ===== 顶部功能区导航：平滑滚动 + 当前区块高亮 + 隐藏区块自动剔除 ===== -->
 <!-- [v815] 绘图工具栏统一图标集（单色线性 SVG）：必须先于 inline-18.js 加载，
      inline-18 的 decorateToolbar 会在首次装饰时调用 window.RyIcons.decorate。 -->
-<script src="mod/ry-icons.js?v=1011-map-trunk-owner"></script>
-<script src="mod/inline-18.js?v=1011-map-first-replay"></script>
+<script src="mod/ry-icons.js?v=1012-lock-icon-bigger"></script>
+<script src="mod/inline-18.js?v=1020-caliber-cleanup"></script>
 
 <script src="mod/inline-19.js?v=696-shared-host-init-order"></script>
 
@@ -2329,7 +2345,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <!-- 过滤系统页（2026-09-18 第七十二轮）：GREEN 单体版管路模型 + 选型计算，
      懒挂载（首次可见时建 DOM），与二级/三级计算双向融合。 -->
 <script src="filter-system/filter-system.js"></script>
-<script src="mod/inline-24.js?v=824-toolbar-dedupe"></script>
+<script src="mod/inline-24.js?v=1018-len-ghost-repaint"></script>
 <script src="mod/inline-25.js?v=357"></script>
 <script src="mod/inline-27.js?v=823-fix-transfer-save-alert"></script>
 <!-- ═══ CAD 单一操作区：全局左工具栏（2026-09-14；右上角视口切换条已取消） ═══════════
@@ -2436,21 +2452,21 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script src="mod/trunk-snap.js?v=911-trunk-snap-edge"></script>
 <script src="mod/trunk-geo.js?v=854-null-slot-strict"></script>
 <!-- [v945] 总管口径反推（纯函数）：由规划分区的面积/流量 + 下游主管支管管径推手绘总管外径。 -->
-<script src="mod/trunk-size.js?v=1011-map-trunk-owner"></script>
+<script src="mod/trunk-size.js?v=1020-caliber-cleanup"></script>
 <script src="mod/trunk-edit.js?v=835-trunk-geo-snap"></script>
 <script src="mod/trunk-history.js?v=835-trunk-geo-snap"></script>
-<script src="mod/trunk-panel.js?v=1011-map-trunk-owner"></script>
+<script src="mod/trunk-panel.js?v=1020-caliber-cleanup"></script>
 <!-- [v887-tape-zone-vgate] 在线地图轮灌演示（分组/校验纯函数 + Leaflet 图层），先于宿主装载。 -->
-<script src="mod/map-flow-demo.js?v=1011-map-trunk-owner"></script>
-<script src="mod/online-map.js?v=1011-map-trunk-owner"></script>
+<script src="mod/map-flow-demo.js?v=1020-caliber-cleanup"></script>
+<script src="mod/online-map.js?v=1020-caliber-cleanup"></script>
 <!-- [v961] 在线地图右缘抽屉：把「图层」与「总管参数设置」两张浮层收成右缘竖排标签。
      参照「分区与管路」页的 #ppPlotDrawerTab / #tlWsLayerDrawerTab。必须在 online-map.js
      之后（它建的 #trunkPropPanel 由本模块接管；本模块自带轮询 + MutationObserver，顺序晚了也不丢）。 -->
-<script src="mod/map-right-drawer.js?v=1011-map-trunk-owner"></script>
+<script src="mod/map-right-drawer.js?v=1020-caliber-cleanup"></script>
 <script src="runye-hydraulics-page.js?v=829-hyd-auto-refresh"></script>
 <!-- [v978] 设计输入自动持久化：二级 fld_* / 三级 tl_* / planSrcDist 存 localStorage，
      刷新自动还原（版本升级强刷不再丢参数）。必须是最后一个脚本——还原时要调 calcPlan /
      renderThreeLevel，且要在「与二级联动」派生之后用存档覆盖回用户手改值。 -->
-<script src="mod/inline-33.js?v=1011-map-trunk-owner"></script>
+<script src="mod/inline-33.js?v=1020-caliber-cleanup"></script>
 </body>
 </html>

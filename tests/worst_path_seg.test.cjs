@@ -46,7 +46,8 @@ function extract(s, name) {
 function makeCtx(fixture, stubs) {
   const schemaSrc = fs.readFileSync(path.join(ROOT, 'core', 'trunk-schema.js'), 'utf8');
   const geoSrc = fs.readFileSync(path.join(ROOT, 'mod', 'trunk-geo.js'), 'utf8');
-  const extracted = ['tlWorstPathLen', 'legacyWorstPath', 'segWorstPath', 'tlSegAnchorIdx', 'tlFrontLenUse']
+  const extracted = ['tlWorstPathLen', 'legacyWorstPath', 'segWorstPath', 'tlSegAnchorIdx', 'tlFrontLenUse',
+    'tlRoutesWorstPath', 'tlBranchCalcLenOf', 'tlSegTrunkUsable', 'tlDiagramHasPipes']
     .map(n => extract(src, n)).join('\n');
   const win = Object.assign({ tlDiagramData: fixture }, stubs.win || {});
   /* new Function 在当前 realm 执行（不用 vm）：跨 realm 的数组原型不同，
@@ -146,6 +147,44 @@ test('⑤ 无段总管/缺 joinPts ⇒ EMPTY（兜底口径不变）', () => {
   }
 });
 
+test('⑦ [v1019] 塌缩守卫：接点缺失/错位 ⇒ 整体 EMPTY（宁缺不错，两排布局实测 392×300 曾产假最远）', () => {
+  /* 3 主管只给 1 个接点 ⇒ skipped>0 ⇒ EMPTY */
+  const f1 = fixture(); f1.segTrunk.joinPts = [{ x: 10, y: 50 }];
+  assert.equal(makeCtx(f1, { tlMapTrunkLen: () => MT_OK }).tlWorstPathLen().fromFigure, false);
+  /* 区0 的接点不在其主管(x=0)上（塌缩序号错位的典型形态）⇒ EMPTY */
+  const f2 = fixture(); f2.segTrunk.joinPts = [{ x: 5, y: 50 }, { x: 10, y: 50 }, { x: 20, y: 50 }];
+  assert.equal(makeCtx(f2, { tlMapTrunkLen: () => MT_OK }).tlWorstPathLen().fromFigure, false);
+});
+
+test('⑧ [v1019] routes 引擎优先：routesAll 可用 ⇒ fromRoutes=true；missing ⇒ 整体放弃', () => {
+  const routes = [
+    { zi: 0, trunk: [{ key: 'segment:0', points: [{ lat: 30, lng: 120 }, { lat: 30, lng: 120.001 }] }],
+      main: [{ key: 'main:0', points: [{ lat: 30, lng: 120 }, { lat: 30, lng: 120.001 }] }], branch: [] },
+    { zi: 1, trunk: [], main: [{ key: 'main:1', points: [{ lat: 30, lng: 120 }, { lat: 30, lng: 120.002 }] }], branch: [] },
+    { zi: 2, trunk: [], main: [{ key: 'main:2', points: [{ lat: 30, lng: 120 }, { lat: 30, lng: 120.003 }] }], branch: [] }
+  ];
+  const ctx = makeCtx(fixture(), {
+    tlMapTrunkLen: () => MT_OK,
+    win: { RyMapFlowDemo: { routesAll: () => ({ routes: routes, total: 3, missing: [] }) } }
+  });
+  const wp = ctx.tlWorstPathLen();
+  assert.equal(wp.fromRoutes, true);
+  assert.equal(wp.fromFigure, true);
+  assert.equal(wp.fromSeg, true);
+  assert.equal(wp.zones.length, 3);
+  assert.equal(wp.zoneIndex, 2);        /* 0.003° ≈ 289 m，三区里最长 */
+  /* 任一分区缺路径 ⇒ routes 引擎放弃 ⇒ 落到兜底段总管引擎（本夹具单排布局其模型成立，
+     fromRoutes 应缺省、兜底正常接手；塌缩布局的兜底拒绝由 ⑦ 锁定） */
+  const ctx2 = makeCtx(fixture(), {
+    tlMapTrunkLen: () => MT_OK,
+    win: { RyMapFlowDemo: { routesAll: () => ({ routes: routes.slice(0, 2), total: 3, missing: [2] }) } }
+  });
+  const wp2 = ctx2.tlWorstPathLen();
+  assert.equal(wp2.fromRoutes, undefined);
+  assert.equal(wp2.fromFigure, true);
+  assert.equal(wp2.fromSeg, true);
+});
+
 test('⑥ tlFrontLenUse：fromSeg 时段总管不按全长叠加；引擎不可用兜底口径逐字节保持 v859', () => {
   /* 引擎可用 + 手绘总管：len = run(含手绘+部分干线)，无 segLen */
   let ctx = makeCtx(fixture(), { tlMapTrunkLen: () => MT_OK });
@@ -167,4 +206,73 @@ test('⑥ tlFrontLenUse：fromSeg 时段总管不按全长叠加；引擎不可�
   assert.deepEqual(
     ctx.tlFrontLenUse(0, 150, false),
     { len: 180, src: 'input', mapLen: null, mapId: null, segLen: 30 });
+});
+
+/* [v1020] routes 引擎切片的经纬点反投基建：与 inline-09 localToLL 同一公式
+   （R=6378137, mlat=R·π/180, cosLat=cos(refLat)），测试里据此由图面米生成 rawLL。 */
+const MLAT = 6378137 * Math.PI / 180, CL30 = Math.cos(30 * Math.PI / 180);
+const llOf = (x, y) => ({ lat: 30 + y / MLAT, lng: 120 + x / (MLAT * CL30) });
+
+test('⑨ [v1020 待办②] routes 长度走 AE 有效几何：effPts(pid, d) 传参锁定', () => {
+  /* main-2 被 AE 拉伸到 150 m：collect 同源（slice points 由拉伸后几何反投生成）。
+     effPts 第二参必须是整个 tlDiagramData —— v1019 曾误传折线当 data，
+     stub 里 data.mainPipes 访问会抛错 ⇒ effOf 静默回退 ⇒ main 停在 100 m，本用例即红。 */
+  const f = fixture();
+  const routes = [0, 1, 2].map(zi => {
+    const yEnd = (zi === 2) ? 150 : 100;
+    return { zi, trunk: [], main: [{ key: 'main:' + zi, points: [llOf(zi * 10, 0), llOf(zi * 10, yEnd)], a: 0, b: yEnd }], branch: [] };
+  });
+  const AE = { effPts: function (pid, data) {
+    if (pid === 'main-2') return [data.mainPipes[2][0], { x: 20, y: 150 }];
+    return null;
+  } };
+  const ctx = makeCtx(f, {
+    tlMapTrunkLen: () => MT_OK,
+    win: { RyMapFlowDemo: { routesAll: () => ({ routes, total: 3, missing: [] }) },
+      RyTlAutoEdits: AE, __runyeGeoBase: { refLat: 30, refLng: 120 } }
+  });
+  const wp = ctx.tlWorstPathLen();
+  assert.equal(wp.fromRoutes, true);
+  assert.equal(wp.zones.length, 3);
+  assert.ok(Math.abs(wp.zones[0].main - 100) < 0.5, 'main-0 无改长应 100 m，实得 ' + wp.zones[0].main);
+  assert.ok(Math.abs(wp.zones[2].main - 150) < 0.5, 'main-2 改长后应 150 m，实得 ' + wp.zones[2].main);
+  assert.ok(Math.abs(wp.zones[2].mainSegs[0].len - 150) < 0.5);
+  assert.deepEqual(wp.zones[2].mainSegs[0].downZi, [2]);
+});
+
+test('⑩ [v1020 待办③] 链式主管过境段 downZi：共享切片 = 下游分区号集', () => {
+  const f = fixture();
+  const seg = (zi, a, b) => ({ key: 'main:' + zi, points: [llOf(zi * 10, a), llOf(zi * 10, b)], a: a, b: b });
+  const s0 = seg(0, 0, 100), s1 = seg(1, 0, 100), s2 = seg(2, 0, 100);
+  const routes = [
+    { zi: 0, trunk: [], main: [s0], branch: [] },
+    { zi: 1, trunk: [], main: [s1, s2], branch: [] },
+    { zi: 2, trunk: [], main: [s0, s1, s2], branch: [] }
+  ];
+  const ctx = makeCtx(f, {
+    tlMapTrunkLen: () => MT_OK,
+    win: { RyMapFlowDemo: { routesAll: () => ({ routes, total: 3, missing: [] }) },
+      __runyeGeoBase: { refLat: 30, refLng: 120 } }
+  });
+  const wp = ctx.tlWorstPathLen();
+  assert.equal(wp.fromRoutes, true);
+  const z2 = wp.zones.find(z => z.zi === 2);
+  assert.ok(Math.abs(z2.main - 300) < 1, '过境链 main 合计应 ≈300 m，实得 ' + z2.main);
+  assert.deepEqual(z2.mainSegs.map(s => s.downZi), [[0, 2], [1, 2], [1, 2]],
+    '过境段流量口径 = 路径同样经过该切片的全部分区（含本区；zone1 也过境 s2 ⇒ [1,2]）');
+  assert.deepEqual(z2.mainSegs.map(s => s.len).reduce((a, b) => a + b, 0).toFixed(3), z2.main.toFixed(3),
+    'mainSegs 段长和必须与 main 同源');
+  const z0 = wp.zones.find(z => z.zi === 0);
+  assert.deepEqual(z0.mainSegs[0].downZi, [0, 2]);
+});
+
+test('⑪ [v1020 待办④] tlFrontLenUse segLen 塌缩守卫：joinPts 塌缩 ⇒ segLen=0', () => {
+  /* 塌缩形态：三根主管拿到同一个接点（x=0）⇒ 区1/区2 接点不在本区主管上。 */
+  const f = fixture();
+  f.segTrunk.joinPts = [{ x: 0, y: 50 }, { x: 0, y: 50 }, { x: 0, y: 50 }];
+  const ctx = makeCtx(f, { tlMapTrunkLen: () => MT_OK });
+  const r = ctx.tlFrontLenUse(0, 150, false);
+  assert.equal(r.segLen, 0, '塌缩时段总管全长不得进扬程兜底');
+  assert.equal(r.len, 200, '兜底 = 手绘 200 + 输入 150，无 segLen');
+  /* 合法 joinPts（⑥ 已锁 segLen=30）在此对照不重复。 */
 });

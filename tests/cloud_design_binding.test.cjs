@@ -91,7 +91,8 @@ test('upload path resolves a checked binding and does not read the legacy global
   const uploadSource = fs.readFileSync(path.join(root, 'mod/inline-09.js'), 'utf8');
   const mapSource = fs.readFileSync(path.join(root, 'mod/online-map.js'), 'utf8');
   const start = uploadSource.indexOf('window.tlUploadDesign=function(){');
-  const end = uploadSource.indexOf('window.tlFrontNodeReset=function(){', start);
+  /* [v1015] tlFrontNodeReset 已随总管自动生成链路清除，切片终点改用下一个导出 tlSourceLinkLen */
+  const end = uploadSource.indexOf('window.tlSourceLinkLen=tlSourceLinkLen;', start);
   assert.ok(start >= 0 && end > start);
   const upload = uploadSource.slice(start, end);
   assert.match(upload, /resolveForCurrentPlot\(\)/);

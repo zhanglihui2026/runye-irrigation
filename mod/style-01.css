@@ -2410,6 +2410,16 @@ body > .ry-nav .main-header{display:none!important}
   width:220px;max-width:calc(100% - 20px);
   pointer-events:auto;
 }
+/* [v1012c] 统一绘图工作区搬移态：inline-18.js 把 #ppParamFloat 提进
+   .ry-drawing-canvas 直属（不再满足上面的「.pp-canvas-wrap >」选择器），
+   同时补回定位/尺寸并把 z-index 抬到 6 —— 高于 #ppCanvasWrap(1)、#tlWsContent(2)、
+   「适应窗口」胶囊(3)、固定文字层 #tlWsOverlays(5)。
+   不这么做，面板会被三级图纸层盖住，蓝色虚线/分区文字全叠到参数行上。 */
+#ryDrawingHost .ry-drawing-canvas>#ppParamFloat{
+  position:absolute;top:8px;right:12px;z-index:6;
+  width:220px;max-width:calc(100% - 20px);
+  pointer-events:auto;
+}
 /* [v249] 折叠把手：仅宽屏三列布局显示（下方 @media 内定义），窄屏上下流布局无右轨可折 */
 
 /* [v246b] 提示条（#ppHint）与本条同在画布左上角，会正面相撞 ⇒ 提示条退到快捷条下方

@@ -1304,7 +1304,87 @@
    带向口径经用户拍板维持分区级长边（v886），不需要改 tapeAxisOf。 */
 /* [v1001-lib-font] 灌溉参数库文字统一 11px 基准：列表项/存当前按钮被 typography 全局
    13px!important 压大，加 !important 压回（v609/v538 同款处理）。 */
-const VERSION = 'v1011-map-trunk-owner';
+/* [v1012-lock-icon-bigger] 「锁定面积」按钮不明显：lock/unlock 图标原图形只占 24 网格
+   下半（锁体 15×9.6），是工具栏 30+ 图标里的异类小个子。按 Feather 比例放大
+   （锁体 17×10.5、钩半径 4.5）回归与 grid/undo 一致占比；功能链路 v824 起已正常
+   （setIcon/setLabel 四件套，点击探针 lock⇄unlock+active 全过）。 */
+/* [v1013-param-float-wheel] 「灌溉参数面板数值不能调整」：v1012c 把 #ppParamFloat 搬进
+   canvasStack 直属后，面板内滚轮被 canvasStack 的 wheel 捕获拦截器
+   stopPropagation+preventDefault 截胡（探针 wheel reached:false 实测）——
+   number 框滚轮调值失效，事件还被转发给画布 ⇒ 在参数框上滚轮=画布缩放。
+   拦截器豁免表补 #ppParamFloat（与 #ppPlotPanel/#ppQuickBar 同款）。
+   注：v1012 序号与并行会话（inline-18 v1012/v1012c）撞车，本次起跳 v1013。 */
+/* [v1014-combined-src-brief] 「联合流量」依据行再简化（用户截图指令）：
+   「依据：分区 M3（1区、2区）*实际面积= 16.9 亩（设计 0.0 亩，+x%）」
+   →「依据：分区M3（16.9亩）」——只留组号与实切亩数，区清单与 v890 双口径全删。
+   仅改 inline-09.js 文案（tlPlanCombinedSrc），无逻辑改动。 */
+/* [v1015-front-auto-purge] 总管自动生成链路整体清除（用户拍板：总管一律在线地图手绘，
+   「分区与管路」页不再有任何自动总管/三通/复位逻辑）：
+   inline-09.js 删 ~470 行死代码 —— tlFrontMK 三通断点集、tlBuildFrontNodes / tlFrontPolyCuts /
+   tlFrontPolyAt / tlFrontPolyLine / tlTruncateMainByNode、tlFrontNodeDrops_v1 存取、
+   window.tlFrontNodeReset、frontPipe 渲染/接入段/三通符号绘制、__runyeImportedTrunk 迁移脚手架、
+   if(sourcePos) 水源标签死块；快照 frontPipe/sourcePos 恒 null、frontNodes 字段删除（零消费方）。
+   inline-18.js / ry-icons.js 删 tlFrontNodeResetBtn 图标映射；eslint.globals.json 删 4 个导出声明。
+   测试三处同步（auto_trunk_removed 强契约 / cloud_design_binding 切片终点 / toolbar_dedupe 反转）。
+   保留：tlMapTrunkLen / 段总管驳接 / suppressFront / trunk-snap·size·panel / map-flow-demo
+   手绘总管全链路；tlSourceLinkLen；inline-12.js drops 备份（hash 口径连锁，故意不动）。 */
+/* [v1016-param-float-avoid] 图面文字第一优先级（用户拍板）：做图区左上角的标题
+   tlTitleGroup / 信息行 tlHeaderGroup 与右上「灌溉参数」面板 #ppParamFloat 重叠时，
+   面板自动下移让位（top=文字底部+8px），不重叠时自动复位 top:8px；
+   用户拖动过的位置（inline top 无 data-pp-avoid 标记）不强制移动。
+   实现：inline-18.js ppParamFloatAvoid() + 挂载/重生成（inline-09 渲染末尾）/resize 三时机。 */
+/* [v1017-seg-trunk-restore] 恢复 v900 误删的段总管生成链（TASK_pump_head_mismatch_20261108
+   §5.0 P0，用户拍板「直接改吧」）：v900(fb12ca2) 修水源 tooltip 时顺带删除了段总管生成
+   IIFE（tlSegTrunkLoc/RySegTrunk.build）、图面渲染（干线+驳接点）、快照 segTrunk 与
+   trunkSource=auto/missing、地图反投 segTrunk 段、index.html 的 tl-seg-trunk.js 引入，
+   致 segWorstPath 恒 EMPTY ⇒ RyPipePathLoss/hydraulicPath 整链死亡（扬程「对不上」根源）。
+   按原样恢复五处，适配两点：src 传 null（tlSrcDesign 已随 v1015 清除）、
+   tlIdealMains 兜底随变量退役；测试契约同步（seg_trunk_to_map 反转、版本闸保持恰 14 处主串，
+   tl-seg-trunk.js 用历史串 v887-tape-zone-vgate 不进主串口径）。
+   同批 P1 两项（§5.2/§5.3，用户拍板「按图改」）：① 管损卡改径生效时明示「生效管径」三档
+   + 「↺ 退回设计档」一键清残留（清 manualCals + tlPipeOdOverride，AE 数据本体保留）；
+   ② 流速橙列尾部追加生效管径标注「(Ø110)」（tlRealSet 第 5 参，扬程/功率行不传）；
+   ③ 橙列口径矩阵注释钉进 tlUpdatePlanBar（页面零变化）。ry-panel.css caret 黑框修复
+   同批（query 抬 v1017-caret-flat）。
+   [v1017b 用户拍板] 段总管**图面渲染撤除**（黑线/驳接点/missing 提示 if(false) 封存，
+   一行恢复口径见 inline-09 生成块注释）；数据快照/反投/演示保留（扬程链不回退）；
+   工作区图例 tlWsOvLegend 与 SVG 图例 tlLegendGroup 撤「总管」项（tlLegendGroup lx 右移补位）。
+   [v1017c 用户口径] 手绘总管闭环门槛：tlMapTrunkLen().ok 判定，未闭环时扬程/轴功率/电机
+   三主格与全部改径橙列显示 —，#tlPlanLoopHint 常驻提示「请在在线地图绘制总管形成闭环，
+   再计算扬程」；数据层 computeThreeLevel 不拦（快照/材料链完整，消费方已有 — 容错）。
+   [v1018-len-ghost-repaint 用户截图「支管文字底部还有一层东西」] 左下固定文字层旧帧残影：
+   探针三连（_probe_lenblock/_lenblock2/_lenblock3 全文档扫描）证实 DOM 只有一份
+   #tlWsOvLengths、简图 tlParamsGroup 等组剥离完好——残影=面板宽度/统计表开关改变画布
+   左缘后，文字层水平移位（实测错位 ≈27px、垂直同排，「主管/支管」字头从面板边缘露出）
+   而合成层未清旧位置像素。修复：tlAlignWsOverlays 写入后检测 left/bottom 变化，变化时
+   覆盖层容器 display 同帧摘挂强制重画旧区域（同步执行无闪烁，位置没变零开销）。
+   inline-24.js query 抬 v1018-len-ghost-repaint；VERSION 随下一批主改动同抬。
+   [v1019 用户拍板「用轮灌演示的数据算扬程、标最远水路」] 最远水路数据源整体更换：
+   ① map-flow-demo buildFlowRoutes 参数化（allZones 全量寻路）+ 无手绘总管时段总管反投线
+   （segLL）也可作干线参与寻路（原 early-return 拒绝）+ 导出 routesAll（全分区逐区寻路，
+   missing 覆盖率守卫）；② inline-09 新增 tlRoutesWorstPath：front=干线段真实长、
+   main=沿主管链真实长（链式主管过境段计入，旧模型只算本区那条——下游区被系统性低估）、
+   branch 沿用 v601 满跨口径；wp.zones 同构喂 RyPipePathLoss（管损链不回退）；
+   标注几何按「切片经纬点→投影回原始折线（段号,比例)→图面米坐标同点」逐顶点重建
+   （collect toLLLine 与图面折线一一对应），手绘总管部分沿 v879 口径计入长度不画；
+   ③ segWorstPath 降级为兜底引擎并加两道守卫：接点必须落在本区主管上（≤1m）、
+   有主管拿不到接点（skipped>0）⇒ 整体 EMPTY——两排布局合并共线塌缩
+   （joinPts 只剩 2 个、8 区静默跳过、run 假距离，实测 392×300 十区产「最远 2 区 · 233.1 m」）
+   从此诚实拒绝；④ tlWorstPathMarkSVG 空段守卫（frontPts 可为空）。主串同抬 14 处。
+   [v1020-caliber-cleanup 用户「这五件事能处理吗，都处理掉吧」] 任务书 §5.4 五条口径待办全清：
+   ① routes 引擎长度统一图面米——主管/段总管切片经「反投→原始折线（段号,比例）→图面米坐标」
+   重建后求长（linePairOf 缓存反投），手绘总管切片保持地图口径；反投基建不可用诚实回退 llLen；
+   ② collect 线体走 AE 有效几何（effPts(pid, dd) 改长/平移后投影）——顺带修正 v1019 在
+   tlRoutesWorstPath/branchLens 误传折线当 data 的静默失效；③ 链式主管过境段组合流量：
+   map-flow-demo 路由切片补 (a,b) 弧长身份，tlRoutesWorstPath 产出 zones[].mainSegs
+   {key,len,downZi}，computeThreeLevel 把 downZi 换算逐段 flow，pipe-path-loss calculate
+   支持 mainSegs 逐段 hazen（过境段按下游覆盖分区流量和，无 mainSegs 逐位兼容旧口径）；
+   ④ tlFrontLenUse segLen 加塌缩守卫（tlSegTrunkUsable：joinPts 覆盖每根主管且落线上 ≤1m），
+   两引擎都 EMPTY 时段总管全长不再从扬程兜底后门溜回；方案乙（梳形模型升级）由 routes
+   引擎取代，正式关闭；⑤ 引擎不可用但管线图已生成时，管损卡/扬程拆解卡明示
+   「自动水路不可用，请在在线地图绘制总管后重算」（tlDiagramHasPipes 区分没画图/画了图算不出）。
+   测试：worst_path_seg ⑨⑩⑪ + pipe_path_loss mainSegs 用例；主串同抬 14 处。 */
+const VERSION = 'v1020-caliber-cleanup';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

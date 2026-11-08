@@ -1275,7 +1275,9 @@ body.ry-tool #ryCadSide [data-pp="pipePlanSection"][data-ry-view="edit"] .ry-pan
       v251 定的绿色调色板是内容语义，不是外壳，不随外壳统一而改。
    ═══════════════════════════════════════════════════════════════════════════ */
 .ry-float-card{
-  background:rgba(255,255,255,.97);
+  /* [v1012c] rgba(...,.97) 会让身下的图纸蓝色虚线/尺寸数字隐约透进浮卡文字区，
+     看起来像「多重信息重叠」。统一改成完全不透明（外壳单一出处，四张卡同时受益）。 */
+  background:#fff;
   border:1px solid #cbd5e1;
   box-shadow:0 10px 28px rgba(15,23,42,.18);
   font:12px/1.6 system-ui,-apple-system,"Microsoft YaHei",sans-serif;
@@ -1288,7 +1290,15 @@ body.ry-tool #ryCadSide [data-pp="pipePlanSection"][data-ry-view="edit"] .ry-pan
 }
 .ry-float-title{flex:1;color:#334155}
 .ry-float-grip{cursor:ew-resize;color:#94a3b8;padding:0 3px;user-select:none;touch-action:none}
-.ry-float-caret{color:#64748b}
+/* [2026-11-08 用户反馈] 折叠/展开按钮周边的黑色方框 = 浏览器 UA 默认 button 边框
+   （2px outset，项目从未给本按钮定义过边框），补扁平样式取消：无边框、透明底、
+   字体继承标题栏；hover 只变字色。 */
+.ry-float-caret{
+  color:#64748b;
+  border:0;background:transparent;padding:0 2px;margin:0;
+  font:inherit;line-height:1;cursor:pointer;appearance:none;
+}
+.ry-float-caret:hover{color:#334155}
 .ry-float-body{padding:7px 9px 9px}
 /* [v996] 折叠兜底：#ppParamFloat 的 body 复用 .pp-side 皮肤（display:flex，特异性 (1,1,0)），
    会压过 UA 的 [hidden]{display:none} —— 折叠/显隐都靠 hidden 属性，必须在此强制收起。

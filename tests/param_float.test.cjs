@@ -94,7 +94,12 @@ t('显示标签不再用全称「水泵提升高度」', !html.includes('<span c
 t('aria-label 保留全称（读屏/镜像语义不变）', html.includes('aria-label="水泵提升高度"'));
 t('ry-panel.css 悬浮面板标签列收窄 28%（[v1004] 二次压缩，.ry-float-body.pp-side 凑齐 (1,5,0)）',
   rp.includes('#ppParamFloat .ry-float-body.pp-side .pp-plan-item > .pp-plan-label:first-child{ flex-basis:28%; }'));
-t('[v1004] 面板默认宽 220（基础态+搬移态孪生）', s01.split('width:220px;').length - 1 === 2);
+/* [v1012c] 原先只有「基础态 + ryCadSide 搬移态孪生」两处；统一绘图工作区把面板
+   提进 .ry-drawing-canvas 直属后，第三段定位规则也必须给回 220px（否则基础态
+   选择器失效、面板宽度塌成内容宽）。三处同值，缺一不可。 */
+t('[v1004/v1012c] 面板默认宽 220（基础态 + 搬移态孪生 + 统一工作区搬移态）',
+  s01.split('width:220px;').length - 1 === 3 &&
+  /#ryDrawingHost \.ry-drawing-canvas>#ppParamFloat\{[\s\S]{0,240}width:220px;/.test(s01));
 t('[v1004] 单位列 margin-left:auto 贴右（竖线-单位间距不随宽度漂移）',
   (rp.match(/\.pp-plan-unit\{\r?\n  margin-left:auto;/g) || []).length === 2 ||
   /pp-plan-unit\{\s*margin-left:auto;/s.test(rp));

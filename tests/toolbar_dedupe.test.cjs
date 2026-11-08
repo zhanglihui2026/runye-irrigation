@@ -49,13 +49,17 @@ test('v824 「恢复位置」按钮已删除', () => {
     '#tlWsMoveResetBtn 应已按用户要求删除');
 });
 
-test('[v982b] 「三通复位」按钮已删除（入口下线，window.tlFrontNodeReset 保留）', () => {
+test('[v982b→v1015] 「三通复位」按钮已删除，底层函数也随总管自动链路清除', () => {
   assert.strictEqual(html.includes('id="tlFrontNodeResetBtn"'), false,
     '#tlFrontNodeResetBtn 应已按用户要求删除');
   assert.ok(!html.includes('三通复位'), '按钮文案不得残留');
   const i09 = fs.readFileSync(path.join(ROOT, 'mod', 'inline-09.js'), 'utf8');
-  assert.ok(i09.includes('window.tlFrontNodeReset=function(){'),
-    '底层 window.tlFrontNodeReset 必须保留（cloud_design_binding 锁 + 控制台应急入口）');
+  /* [v1015 2026-11-08 用户拍板] 总管一律在线地图手绘，window.tlFrontNodeReset 与
+     tlFrontNodeDrops_v1 存取一并清除（原「保留应急」契约作废，见 auto_trunk_removed.test.cjs）。 */
+  assert.ok(!i09.includes('window.tlFrontNodeReset'),
+    'window.tlFrontNodeReset 必须随总管自动生成链路一并清除');
+  assert.ok(!i09.includes('tlFrontNodeDrops_v1'),
+    'tlFrontNodeDrops_v1 持久化必须一并清除');
 });
 
 test('v824 下载 / 打印是工具栏最后两个按钮（紧跟在导出 CAD 之后）', () => {

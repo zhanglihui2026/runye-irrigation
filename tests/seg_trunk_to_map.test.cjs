@@ -23,11 +23,15 @@ const i09 = fs.readFileSync(path.join(ROOT, 'mod', 'inline-09.js'), 'utf8');
 const enhance = fs.readFileSync(path.join(ROOT, 'runye-map-enhance.js'), 'utf8');
 const panel = fs.readFileSync(path.join(ROOT, 'mod', 'trunk-panel.js'), 'utf8');
 
-test('① 分区施工图不再向在线地图回传自动段总管', () => {
+test('① 分区施工图必须向在线地图回传自动段总管', () => {
+  /* [v1017] 契约随用户拍板恢复段总管链而反转（v900 误删 → 恢复，v878 原口径）：
+     反投块必须把 dd.segTrunk 投成 kind:'segTrunk' 段；快照 segTrunk 由生成 IIFE 落地
+     （不再恒 null）。手绘总管（地图）与段总管（干线）是互补两段。 */
   const block = i09.slice(i09.indexOf('[map-enhance] 管网反投卫星图'));
   assert.ok(block.length > 0, '反投块必须存在');
-  assert.doesNotMatch(block, /segments\.push\(\{id:'segTrunk'/);
-  assert.match(i09, /segTrunk: null,/);
+  assert.match(block, /segments\.push\(\{id:'segTrunk'/, 'segTrunk 段必须反投在线地图');
+  assert.match(i09, /segTrunk: \(function\(\)\{/, '快照 segTrunk 必须由生成 IIFE 落地');
+  assert.match(i09, /tlSegTrunkLoc = window\.RySegTrunk\.build\(mainPipes/, '段总管生成必须在场');
 });
 
 test('② renderNetwork 的 front 抑制不误伤 segTrunk（通用循环照画+弹窗）', () => {

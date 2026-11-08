@@ -42,3 +42,32 @@
 - 变更仍按可观察主题归组，不按版本号或会话猜来源：在线地图主页面化（`index.html`、`mod/inline-31.js`、`runye-map-measure.html`、`runye-nav.js`、`mod/online-map.js`、`mod/online-map.css`、`sw.js`）；主参数面板样式调整（`index.html`、`mod/ry-panel.css`）；测试面板层级修正（`runye-test-panel.html`、`mod/ry-panel.css`、`sw.js`）；本地 Vite 预览相关（`vite.config.js`、`.vite/`）。后三个共享文件含跨主题差异，不能按整文件归属；Vite 文件来源和是否纳入项目仍待确认。
 - `tests/plot_merge.smoke.cjs` 的旧地图源码锚点已调整为检查主页面展开后的在线地图区段和 `mod/online-map.js`，没有跳过断言。2026-10-15 的本地统一门禁记录为：234 个 JS/CJS/MJS 语法通过，静态检查 8/8，25 个 Node 测试文件通过，拼接契约 23/23。该结果不替代远端 CI、真实浏览器渲染或线上冒烟。
 - 本轮未提交或发布。下一步应先确认 Vite 预览改动的留存范围，并为在线地图迁移补一次真实浏览器验收；这些事项不妨碍已通过的 Node 基线，但在确认前不应把整个工作区打包发布。
+
+## 2026-11-08 待办巡检（v1020 会话补记，全库 md 巡检结论）
+
+**v1020-caliber-cleanup（同日）**：TASK_pump_head_mismatch_20261108.md §5.4 五条口径待办全清
+（routes 长度统一图面米 / collect 走 AE 有效几何 / 链式主管过境段组合流量 mainSegs /
+tlFrontLenUse segLen 塌缩守卫+方案乙关闭 / EMPTY 明示文案）；npm test 724/724；未部署。
+详见该任务书 §5.4。
+
+**巡检发现的仍开放事项（按优先级）**：
+
+1. **P0（未开任务书）地块面积用外接矩形 A×B**：分区/地块面积按外接矩形计算而非真实
+   多边形面积（285 亩等不规则地块实测水泵选型偏高）。涉及 ryZoneAreaGroups/实测多边形
+   裁剪链路，改动面大，待用户拍板排期。
+2. **P2 云函数目录治理（本巡检核实，修正此前记忆）**：
+   - `functions/syncDb` **不是孤儿**——`cloudbaserc.json` 的 `functionRoot:"functions"`
+     且 functions 列表含 syncDb，是 CloudBase 正式部署函数，**保留**；
+   - `cloud-functions/` 整目录（calcStage、ryEntitle、syncDb 三个子目录共 6 文件）零引用：
+     syncDb 与 functions/syncDb 逐字节相同（MD5 一致副本）、ryEntitle 是 v1 老函数
+     （AGENT_HANDOFF L2560 已记「确认不用后可归档」）、calcStage 无任何引用——
+     待用户确认后整目录归档/删除；
+   - 真正的在线部署源是 `cloudfn/ryEntitle-v2`（部署 ZIP 与之一致，见上方已完成节）。
+3. **P1（待用户确认，方案已给）**：TASK_pump_head_mismatch 阶段 B 的「残留改径显示收口」
+   与「橙列口径矩阵注释」两条，示意图已出，等用户确认后实施。
+4. **疑点①（待用户补数据）**：主管改径橙列 5.83 m/s 与 2.71 m/s 数学上不可同源（§5.1），
+   需用户补完整面板截图（含联合流量行 + 三行橙列同框）或 F12 执行
+   `JSON.stringify({zoneFlow, combinedFlow, zoneCount, manualCals: window.tlManualCals})`。
+5. **上方「待统一处理」5 条（2026-10-14）状态维持**：均为治理类（AOCI E-scale 提示、
+   大文件拆分门禁、数字农业文档、测试失败归因、runye_plot_library 耦合），无新增变化，
+   不阻塞当前发布线。

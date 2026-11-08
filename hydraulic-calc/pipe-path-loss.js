@@ -29,14 +29,33 @@
         var zr = z.run * runScale;
         frontLoss += input.hazen(Math.max(0, zr - from), flow, diameter('front', input.frontOd));
         from = zr;
-        var mainLoss = input.hazen(z.main, z.flow, diameter('main-' + z.zi, input.mainOd));
+        /* [v1020 待办③] 链式主管逐段组合流量：z.mainSegs 非空时逐段 hazen——
+           过境段（本区主管链上、为下游区输水的段）按「下游覆盖分区流量和」计损，
+           旧口径（全程按本区单区流量）系统性低估链式布局的过境损失。
+           每段 {len, flow}；len/flow 非法值按 0 兜底（不产生负长度/负流量）。
+           无 mainSegs ⇒ 与旧口径逐位相同（老调用方零影响）。 */
+        var mainLen = z.main, mainLoss = 0;
+        if (Array.isArray(z.mainSegs) && z.mainSegs.length) {
+          mainLen = 0;
+          z.mainSegs.forEach(function (g) {
+            var gl = Math.max(0, Number(g && g.len) || 0);
+            var gf = Math.max(0, Number(g && g.flow) || 0);
+            mainLen += gl;
+            mainLoss += input.hazen(gl, gf, diameter('main-' + z.zi, input.mainOd));
+          });
+        } else {
+          mainLoss = input.hazen(z.main, z.flow, diameter('main-' + z.zi, input.mainOd));
+        }
         /* branchCount is the physical parallel branch count (selected roots × layout sides). */
         var branchLoss = input.hazen(z.branch, z.flow / input.branchCount,
           diameter('branch-' + z.zi, input.branchOd)) * input.branchF;
-        var row = { zoneIndex: z.zi, groupIndex: gi, front: zr, main: z.main, branch: z.branch,
+        var row = { zoneIndex: z.zi, groupIndex: gi, front: zr, main: mainLen, branch: z.branch,
           frontFlow: groupFlow, mainFlow: z.flow, branchFlow: z.flow / input.branchCount,
           frontPipeLoss: frontLoss, mainLoss: mainLoss, branchLoss: branchLoss,
           total: frontLoss + mainLoss + branchLoss };
+        if (Array.isArray(z.mainSegs) && z.mainSegs.length) {
+          row.mainSegFlowMax = z.mainSegs.reduce(function (m, g) { return Math.max(m, Math.max(0, Number(g && g.flow) || 0)); }, 0);
+        }
         paths.push(row);
         if (!worst || row.total > worst.total) worst = row;
       });
