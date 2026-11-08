@@ -1388,8 +1388,19 @@
    的第二类触发补齐：内容变化（数值刷新/布管方向提示行增删/maxWidth 变化）同样会让
    旧帧文字从新内容底下露出，而位置没动、v1018 检测不触发。改用共享旗标——
    三块覆盖层位置/内容/宽度任一变化 ⇒ #tlWsOverlays 同帧摘挂强制重画，全没变零开销。
-   inline-24 query 抬 v1021-ghost-content-repaint；VERSION 随下一批主改动同抬。 */
-const VERSION = 'v1020-caliber-cleanup';
+   inline-24 query 抬 v1021-ghost-content-repaint；VERSION 随下一批主改动同抬。
+   [v1022-group-card-estimate 用户截图「G7 跟 G10 的轮灌演示面板格式不一样」，续报
+   「G10 之后分区全部如此，统一排查整改」] 地图端组水力卡两种版式分裂的系统性根因与整改：
+   ① tlMapGroupHydraulicsOf 在组内**任一**分区不在设计侧路径表（inversePath 缺该区 /
+   flow=0——routes 引擎对该区寻路失败、设计侧网格裁剪面积 0、图面主管数与分区数不一致）
+   时旧逻辑 return null ⇒ 该组卡片退化成「项目统一总管」提示版。现改为：全部/部分缺失
+   都整组退估算链 tlEstimateGroupHead 兜底（结构与路径模式同构，卡片照常渲染表格版式，
+   扬程标「（估算）」，面积用地图端 partitions；missing 原样传递，卡片保留「缺少 X 区」
+   提示行）；② 估算链内缺区不再阻止总管选档（qGroup 只累加 members，缺区由提示行表达，
+   表格不再连锁消失）。组卡自此只有一种版式，数据口径差异用「（估算）」「* 试算长」
+   明示。巡检：tlGroupLossOf 为死分支（HydraulicsOf 同文件恒在）不改；渲染端 loss 分支
+   内版式已统一。主串同抬 14 处。 */
+const VERSION = 'v1022-group-card-estimate';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

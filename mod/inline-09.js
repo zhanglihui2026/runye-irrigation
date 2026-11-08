@@ -2237,17 +2237,16 @@ function tlEstimateGroupHead(r, zoneIndexes, areaOverride, sharedPick) {
      退回逐组选档并让 trunkAdvice.shared=false，不硬套一个比自己下游还细的总管。 */
   var sharedOd = (sharedPick && Number(sharedPick.od) > 0) ? Number(sharedPick.od) : 0;
   if (sharedOd && sharedOd < downstreamMinOd) sharedOd = 0;
+  /* [v1022] missing 非空不再阻止总管选档——qGroup 只累加 members，总管档与缺区无关；
+     缺区信息由卡片「缺少 X 区」提示行表达，不能让整张表格卡跟着消失（格式统一，
+     用户实测 G10 起整片退化正是这一类连锁）。取不到共享档（数据异常）退回逐组选档，
+     绝不硬留一个没有 od/id 的「共享总管」。 */
   var trunkPick = null;
-  if (!missing.length) {
-    if (sharedOd) {
-      /* 只取该档，流速按本组流量算。取不到（档位不在序列里 = 数据异常）就退回逐组选档，
-         绝不硬留一个没有 od/id 的「共享总管」—— 那会让 frontId 掉回 r.frontPipe，
-         损失按一个口径、建议按另一个口径，正是 v955 修掉的同卡两口径。 */
-      trunkPick = selectPipe(qGroup, r.targetV, sharedOd, sharedOd);
-      if (!trunkPick) sharedOd = 0;
-    }
-    if (!trunkPick) trunkPick = selectPipe(qGroup, r.targetV, downstreamMinOd);
+  if (sharedOd) {
+    trunkPick = selectPipe(qGroup, r.targetV, sharedOd, sharedOd);
+    if (!trunkPick) sharedOd = 0;
   }
+  if (!trunkPick) trunkPick = selectPipe(qGroup, r.targetV, downstreamMinOd);
   var frontId = trunkPick ? trunkPick.id : (r.frontPipe && r.frontPipe.id);
 
   /* [v955] 总管长度**只认地图实测 / 设计图面**，不吃 tl_frontPipeLen 的试算默认值（200 m）。
@@ -2371,7 +2370,17 @@ window.tlMapGroupHydraulicsOf = function (zoneIndexes, opts) {
       if (available.some(function (z) { return z.zi === zi && z.flow > 0; })) members.push(zi);
       else missing.push(zi);
     });
-    if (!members.length) return null;
+    /* [v1022 用户实测「G10 及之后分区全部退化」] 组内**任一**分区不在路径表
+       （inversePath 缺该区 / 该区 flow=0——routes 引擎对该区寻路失败、设计侧网格
+       裁剪把该格面积裁成 0、图面主管数与分区数不一致都会走到这）⇒ 整组退估算链
+       兜底：结构与路径模式同构（pipes/lengths/trunkAdvice 全有），卡片照常渲染
+       表格版式，扬程标「（估算）」，面积用地图端 partitions（比设计侧网格裁剪更贴
+       实际）。全部缺失/部分缺失同一处理——格式不再分裂；missing 随估算链返回
+       原样传递（卡片仍显示「缺少 X 区」提示行）。估算链内部组内真没面积时自己
+       返回 null，不硬造。 */
+    if (!members.length || missing.length) {
+      return tlEstimateGroupHead(r, zoneIndexes, areaOverride, sharedPick);
+    }
     var totalFlow = available.reduce(function (sum, z) {
       return members.indexOf(z.zi) >= 0 ? sum + z.flow : sum;
     }, 0);
