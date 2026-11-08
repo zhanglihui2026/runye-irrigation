@@ -1383,7 +1383,12 @@
    两引擎都 EMPTY 时段总管全长不再从扬程兜底后门溜回；方案乙（梳形模型升级）由 routes
    引擎取代，正式关闭；⑤ 引擎不可用但管线图已生成时，管损卡/扬程拆解卡明示
    「自动水路不可用，请在在线地图绘制总管后重算」（tlDiagramHasPipes 区分没画图/画了图算不出）。
-   测试：worst_path_seg ⑨⑩⑪ + pipe_path_loss mainSegs 用例；主串同抬 14 处。 */
+   测试：worst_path_seg ⑨⑩⑪ + pipe_path_loss mainSegs 用例；主串同抬 14 处。
+   [v1021-ghost-content-repaint 用户截图「主管/支管文字底下还有东西」] v1018 残影修复
+   的第二类触发补齐：内容变化（数值刷新/布管方向提示行增删/maxWidth 变化）同样会让
+   旧帧文字从新内容底下露出，而位置没动、v1018 检测不触发。改用共享旗标——
+   三块覆盖层位置/内容/宽度任一变化 ⇒ #tlWsOverlays 同帧摘挂强制重画，全没变零开销。
+   inline-24 query 抬 v1021-ghost-content-repaint；VERSION 随下一批主改动同抬。 */
 const VERSION = 'v1020-caliber-cleanup';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';

@@ -268,6 +268,14 @@
        left = (cr.left - pr.left) + cr.width/2，transform:translateX(-50%)；
        bottom = (pane.bottom - canvas.bottom) + 8 ⇒ 工具轨宽度/窗口缩放/手机端纵向布局自动跟随。
        左下块贴画布左缘 12px，max-width 按「图例左缘 − 24px」避让，窄画布自动换行。 */
+    /* [v1021 2026-11-08 用户截图「主管/支管文字底下还有东西」] v1018 的强制重画只检测
+       left/bottom **位置**变化，漏了第二类触发：**内容变化**——数值刷新（改长/改径后
+       「1815.5 m」变短变长）、布管方向提示行增删（容器高度变）、maxWidth 变化（文字
+       换行宽度变）都会让旧帧文字从新内容底下露出来，而此时位置没动、v1018 检测不触发。
+       修复：改用共享旗标 _ovRepaintNeeded，三块覆盖层（legend/lengths/header）的
+       位置、内容、宽度任一变化都置位，末尾统一对 #tlWsOverlays 同帧摘挂强制重画
+       （同步执行无闪烁；全都没变时不做，零开销）。 */
+    var _ovRepaintNeeded=false;
     function tlAlignWsOverlays(){
       try{
         var lg=document.getElementById('tlWsOvLegend'), len=document.getElementById('tlWsOvLengths');
@@ -290,42 +298,29 @@
         var baseB=isShared?12:Math.max(12,pr.bottom-cr.bottom+12);
         var baseW=isShared?pr.width:cr.width;
         if(lg){
+          var _lgPrevL=parseFloat(lg.style.left), _lgPrevB=parseFloat(lg.style.bottom);
           lg.style.left=(baseL+baseW/2)+'px';
           lg.style.transform='translateX(-50%)';
           lg.style.right='auto';
           lg.style.bottom=baseB+'px';
+          if(isFinite(_lgPrevL)&&
+             (Math.abs(_lgPrevL-(baseL+baseW/2))>0.5||Math.abs(_lgPrevB-baseB)>0.5)) _ovRepaintNeeded=true;
         }
         if(len){
-          /* [v1018 2026-11-08 用户截图「支管文字底部还有一层东西」] 排查结论（探针
-             _probe_lenblock/_lenblock2/_lenblock3 全文档扫描证实 DOM 只有一份
-             #tlWsOvLengths，简图 tlParamsGroup 等组剥离完好）：那层灰色残影不是任何
-             功能元素，而是本块在上一次布局位置的**旧帧残影**——面板宽度 / 统计表开关 /
-             窗口缩放改变画布左缘后，固定文字层水平移位（本次实测错位 ≈27px、垂直同排），
-             浏览器合成层未清掉旧位置像素，「主管/支管」字头从白色面板边缘露出来。
-             修复：对齐写入后若 left/bottom 相比上次有变化，把覆盖层容器 display 同帧
-             摘下再挂回，强制浏览器把旧位置区域一并重画（同步执行、中间不产生可见闪烁；
-             位置没变时不做，零开销）。 */
           var _lenPrevL=parseFloat(len.style.left), _lenPrevB=parseFloat(len.style.bottom);
+          var _lenPrevW=parseFloat(len.style.maxWidth);
           len.style.left=(baseL+12)+'px';
           len.style.bottom=baseB+'px';
           var lgW=(lg&&lg.getBoundingClientRect().width)||308;
           len.style.maxWidth=Math.max(150,Math.floor((baseW-lgW)/2-24))+'px';
-          if(isFinite(_lenPrevL)&&isFinite(_lenPrevB)&&
-             (Math.abs(_lenPrevL-(baseL+12))>0.5||Math.abs(_lenPrevB-baseB)>0.5)){
-            try{
-              var _ovRepaint=document.getElementById('tlWsOverlays');
-              if(_ovRepaint){ _ovRepaint.style.display='none'; void _ovRepaint.offsetHeight; _ovRepaint.style.display='block'; }
-            }catch(eOvRepaint){}
-          }
+          if(isFinite(_lenPrevL)&&
+             (Math.abs(_lenPrevL-(baseL+12))>0.5||Math.abs(_lenPrevB-baseB)>0.5||
+              !isFinite(_lenPrevW)||Math.abs(_lenPrevW-parseFloat(len.style.maxWidth))>0.5)) _ovRepaintNeeded=true;
         }
-        /* [v1012c 用户要求「红框文字上移，贴近顶部工具栏」]
-           v1012b 让信息块躲到悬浮卡**下方**（top 拉到 60+px），卡片被用户拖到图面
-           下部后却没有重算，信息块就孤零零留在半空 —— 用户看到的正是这个。
-           现在改为：垂直方向恒贴工具栏下沿（+8px），**不再下移**；
-           只有当悬浮卡确实停在这一行、且水平会压住信息块时，才把信息块
-           **水平右移**到卡片右侧（仍是同一行、仍贴工具栏）。
-           卡片拖走/隐藏 ⇒ 自动回到左上角 12px；拖动结束由底部订阅重算一次。 */
-        /* [v1017 2026-11-08 用户拍板] 页眉水平**恒贴画布左缘 12px**（贴左侧工具栏边）：
+        /* [v1012c] 「分区角度」悬浮卡是 rypDraggable：用户把它从顶部拖到图面下部后，
+           原先只有 ResizeObserver 会重算对齐 ⇒ 信息块停在旧的避让位。这里补三路重算：
+           卡片 style/class 变化（拖拽写行内坐标）、pointerup（拖拽结束兜底）、窗口 resize。
+           [v1012c→v1017] 页眉水平**恒贴画布左缘 12px**（贴左侧工具栏边）：
            v1012c 的「地块分区快捷条在场则水平右移」分支取消 —— 用户实测页眉被推到
            画布中部（右移量封顶 = 画布 50%，正是截图里文字偏离的样子），拍板文字贴左优先
            （与 v1016「图面文字第一优先级」同口径）。垂直仍贴工具栏下沿 +8px 不变。 */
@@ -336,8 +331,18 @@
             var tools=document.querySelector('.ry-drawing-toolbar');
             if(tools){ var tb=tools.getBoundingClientRect(); if(tb.height>0&&tb.bottom>baseTop) baseTop=tb.bottom+8; }
           }catch(eTop){}
+          var _hdPrevT=parseFloat(hd.style.top), _hdPrevL=parseFloat(hd.style.left);
           hd.style.top=Math.max(6,Math.round(baseTop-pr.top))+'px';
           hd.style.left=Math.round(baseL+12)+'px';
+          if(isFinite(_hdPrevL)&&
+             (Math.abs(_hdPrevL-Math.round(baseL+12))>0.5||Math.abs(_hdPrevT-Math.max(6,Math.round(baseTop-pr.top)))>0.5)) _ovRepaintNeeded=true;
+        }
+        if(_ovRepaintNeeded){
+          _ovRepaintNeeded=false;
+          try{
+            var _ovRepaint=document.getElementById('tlWsOverlays');
+            if(_ovRepaint){ _ovRepaint.style.display='none'; void _ovRepaint.offsetHeight; _ovRepaint.style.display='block'; }
+          }catch(eOvRepaint){}
         }
       }catch(e){}
     }
@@ -365,6 +370,10 @@
       }catch(eLen){ html='<div style="color:#64748b">主管 / 支管长度：生成管线图后显示</div>'; }
       var hint=String(window.__tlWsAxisHint||'');
       if(hint) html+='<div style="margin-top:2px;color:#92400e;font-weight:600;font-size:10.5px;line-height:1.45">'+hint+'</div>';
+      /* [v1021] 内容变化（数值刷新/提示行增删）也置位强制重画旗标——v1018 只管位置变化，
+         文字底下旧帧（用户截图「主管/支管文字底下还有东西」）正是内容变化触发的。
+         同值重写不置位，拖动时无谓重画为零。 */
+      if(box.innerHTML!==html) _ovRepaintNeeded=true;
       box.innerHTML=html;
       tlAlignWsOverlays();
     }
