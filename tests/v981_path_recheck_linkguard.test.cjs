@@ -89,3 +89,19 @@ test('[v981③] 逐区确认改径仍优先：calibers 入参原样传递', () =
   const cAt = inline09.indexOf('calibers: (r.inversePath && r.inversePath.calibers) || null');
   assert.ok(cAt > 0, '路径复算必须继续传 calibers（手动改径不被复核冲掉）');
 });
+
+test('[v1026] 设计页逐区面积统一口径：partitions 优先、离线回退 cells', () => {
+  assert.ok(inline09.includes('var _mza = (window.RyMapFlowDemo && typeof window.RyMapFlowDemo.zoneAreasOf === \'function\') ? window.RyMapFlowDemo.zoneAreasOf() : null;'),
+    '必须经 RyMapFlowDemo.zoneAreasOf 只读通道取地图 partitions 面积');
+  assert.ok(inline09.includes('function tlZoneAreaAt(zi) {'), '统一取面积函数 tlZoneAreaAt 必须存在');
+  assert.ok(inline09.includes('var area = tlZoneAreaAt(z.zi);'),
+    '逐组损失 pathZones 必须走统一面积源（禁止回退直读 zoneStat.cells）');
+  assert.ok(!inline09.includes('var area = zoneStat ? (zoneStat.cells[z.zi] || 0) : flowAreaM2;'),
+    '旧的 cells 直读写法必须移除');
+  assert.ok(inline09.includes("zoneAreas: (mapZoneAreas && mapZoneAreas.length) ? mapZoneAreas.slice() : (zoneStat ? zoneStat.cells.slice() : null)"),
+    'r.zoneAreas 必须 partitions 优先（估算链/sharedPick/qMaxAll 同源受益）');
+  assert.ok(inline09.includes('var tlCells = (mapZoneAreas && mapZoneAreas.length) ? mapZoneAreas : (zoneStat ? zoneStat.cells : []);'),
+    '最不利手动组判定必须与地图卡流量王同口径');
+  assert.ok(inline09.includes('var flowAreaSrc = zoneStat ? \'figureMaxZone\' : \'input\';'),
+    '选档基准 flowAreaM2 维持现状（v1026 明确不动）');
+});

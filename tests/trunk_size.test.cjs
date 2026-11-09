@@ -151,8 +151,8 @@ test('⑧ 接线：inline-09 导出 tlTrunkOdAdvice 且注入站内唯一的选�
   assert.ok(!/series:\s*PE_OD_SERIES/.test(src.split('window.tlTrunkOdAdvice')[1] || ''),
     '注入里不许再传 series：包装器只吃 4 参，多传会把档位表顶进 minOd（v946 的坑）');
   assert.ok(/minOd:\s*MAIN_PIPE_MIN_OD/.test(src), '管径下限必须沿用 MAIN_PIPE_MIN_OD');
-  assert.ok(/zoneAreas:\s*zoneStat\s*\?\s*zoneStat\.cells\.slice\(\)\s*:\s*null/.test(src),
-    'computeThreeLevel 必须导出逐区面积（zoneAreas）');
+  assert.ok(/zoneAreas:\s*\(mapZoneAreas && mapZoneAreas\.length\)\s*\?\s*mapZoneAreas\.slice\(\)\s*:\s*\(zoneStat\s*\?\s*zoneStat\.cells\.slice\(\)\s*:\s*null\)/.test(src),
+    'computeThreeLevel 必须导出逐区面积（zoneAreas）——v1026 起 partitions 优先、离线回退 cells');
   assert.equal((src.match(/const PE_OD_SERIES = \[/g) || []).length, 1, 'PE_OD_SERIES 只允许定义一次');
 
   /* 被调用侧：trunk-size 只能按 (flow, targetV, floorOd) 三个位置参数调选档器 */

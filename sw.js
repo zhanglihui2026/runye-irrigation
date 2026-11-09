@@ -1426,8 +1426,15 @@
    接点重合）时，不同分区 Dijkstra 可能走同一物理切片的不同 (a,b) 边对象；tlRoutesWorstPath
    的 edgeZones 以 (key,a,b) 为切片身份 ⇒ 同段被拆成多份、downZi 各拿一部分，过境段流量
    被低估（v1023 重算链的输入在源头分裂）。修复：相邻切组间只连「组代表 id」一条边，
-   组内 0 权边已保证连通、不改变最短路权重与路径几何；v1025 锁定用例钉死禁止回退。 */
-const VERSION = 'v1025-edge-identity-canonical';
+   组内 0 权边已保证连通、不改变最短路权重与路径几何；v1025 锁定用例钉死禁止回退。
+   [v1026-area-caliber-unify 用户拍板两项落地] ① 面积口径统一「第一个改」：RyMapFlowDemo
+   新增只读导出 zoneAreasOf（ctx.getZoneAreas 安全封装，地图未开返回 null）；inline-09
+   computeThreeLevel 建 mapZoneAreas + tlZoneAreaAt——逐组损失 pathZones、r.zoneAreas、
+   最不利手动组判定 tlCells 三处 partitions 优先、离线回退 cells（回退路径逐位不变）；
+   选档基准 flowAreaM2 维持现状不动。设计页 groupLoss 与地图组卡自此同一把尺子。
+   ② 扬程王混比按「方案C」：headKing 记录王组 estimated 标记，校核行对估算王明示
+   「（估算口径）」，只标注不数值修正。锁定用例双份（inline-09 侧 + demo 侧）。 */
+const VERSION = 'v1026-area-caliber-unify';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

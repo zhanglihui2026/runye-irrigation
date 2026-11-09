@@ -1799,6 +1799,21 @@ function computeThreeLevel() {
   var flowAreaM2 = zoneStat ? zoneStat.maxCell : zoneAreaM2;
   var flowAreaSrc = zoneStat ? 'figureMaxZone' : 'input';
   const flowZoneMu = flowAreaM2 / MU_TO_SQM;
+  /* [v1026 用户拍板「第一个改」] 逐区面积统一口径：在线地图 partitions 优先
+     （与地图组卡 v1023b 同一把尺子，v950 声明的权威口径），地图未开/离线回退
+     设计网格裁剪——回退路径行为逐位不变。只统一「水力损失链」三处消费：
+     ① 逐组损失 pathZones（原 1891 直读 cells）② r.zoneAreas（原 cells.slice）
+     ③ 最不利手动组判定 tlCells；选档基准 flowAreaM2（flowAreaSrc 声明）维持现状。 */
+  var mapZoneAreas = null;
+  try {
+    var _mza = (window.RyMapFlowDemo && typeof window.RyMapFlowDemo.zoneAreasOf === 'function') ? window.RyMapFlowDemo.zoneAreasOf() : null;
+    if (Array.isArray(_mza) && _mza.length) mapZoneAreas = _mza;
+  } catch (eMZA) { mapZoneAreas = null; }
+  function tlZoneAreaAt(zi) {
+    if (mapZoneAreas && isFinite(Number(mapZoneAreas[zi])) && Number(mapZoneAreas[zi]) > 0) return Number(mapZoneAreas[zi]);
+    if (zoneStat) return zoneStat.cells[zi] || 0;
+    return flowAreaM2;
+  }
 
   const totalArea = zoneAreaM2;
   const totalMu = zoneMu;
@@ -1832,7 +1847,7 @@ function computeThreeLevel() {
   var tlManualWorstG = -1, tlManualWorstZones = [];   /* v107（2026-09-22 修复）：记录获胜手动组，让 worstGroup 与联合流量同源 */
   var tlMaxUngroupedZi = -1;
   if (tlManualGroupsRef) {
-    var tlCells = zoneStat ? zoneStat.cells : [];
+    var tlCells = (mapZoneAreas && mapZoneAreas.length) ? mapZoneAreas : (zoneStat ? zoneStat.cells : []);   /* [v1026] partitions 优先，与地图卡流量王同口径 */
     var tlGroupedSet = {};
     for (var tlGi = 0; tlGi < tlManualGroupsRef.length; tlGi++) {
       var tlSum = 0; var tlArr = tlManualGroupsRef[tlGi];
@@ -1888,7 +1903,7 @@ function computeThreeLevel() {
   var groupLoss = null;
   if (wp.fromFigure && wp.zones && window.RyPipePathLoss) {
     var pathZones = wp.zones.map(function (z) {
-      var area = zoneStat ? (zoneStat.cells[z.zi] || 0) : flowAreaM2;
+      var area = tlZoneAreaAt(z.zi);   /* [v1026] partitions 优先，回退 cells（原直读 zoneStat.cells） */
       return { zi: z.zi, run: z.run, main: z.main, branch: z.branch > 0 ? z.branch : branchLen,
         flow: area / tapeSpacing / emitterSpacing * emitterFlow / 1000 };
     });
@@ -2064,7 +2079,7 @@ function computeThreeLevel() {
     /* [v945] 逐区实际面积(m²，按分区序号 0 基，缺失位为 0)。总管口径反推要用「每个区各自的
        面积」而不是「最大分区面积 × 区数」——后者假设各区等大，实际地块裁切后常常差 20% 以上，
        会把手绘总管的口径推细。取不到网格时 null（调用方据此明说"没有分区面积"）。 */
-    zoneAreas: zoneStat ? zoneStat.cells.slice() : null,
+    zoneAreas: (mapZoneAreas && mapZoneAreas.length) ? mapZoneAreas.slice() : (zoneStat ? zoneStat.cells.slice() : null),   /* [v1026] partitions 优先 */
     /* v95 联合分区：combinedAreaM2=最大一组实际面积和(m²)；worstGroup={g:组号(0基),zones:分区序号(0基),sum:m²}；
        无图面数据时 worstGroup=null、combinedAreaM2=flowAreaM2×zoneCount（初步估算） */
     combinedAreaM2, groupCount: (zoneStat ? zoneStat.groupCount : 0),

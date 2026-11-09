@@ -1170,7 +1170,9 @@
           if(!Array.isArray(_memK)||!_memK.length)continue;
           var _LK=null;
           try{_LK=window.tlMapGroupHydraulicsOf(_memK,{zoneAreas:_zaK,groups:gsAll});}catch(eKH){_LK=null;}
-          if(_LK&&isFinite(_LK.head)&&(!headKing||Number(_LK.head)>headKing.head))headKing={gi:gk,head:Number(_LK.head)};
+          /* [v1026 方案C] 记录王组是否估算口径（_LK.estimated），校核行明示「（估算口径）」
+             ——估算值全组共用试算长、天然偏保守，与路径精确口径不同精度，只标注不修正。 */
+          if(_LK&&isFinite(_LK.head)&&(!headKing||Number(_LK.head)>headKing.head))headKing={gi:gk,head:Number(_LK.head),est:_LK.estimated===true};
         }
       }catch(eKingAll){headKing=null;}
       var isHeadKing=!!(headKing&&headKing.gi===g);
@@ -1181,7 +1183,7 @@
       if(headKing){
         /* [v980] 本轮即扬程王时校核行亮淡红底（用户 2026-11-05 拍板）——与流量王的
            mfg-note-worst 淡蓝底对称：切到王卡，说明区一眼知道自己就是那个王。 */
-        lines+='<div class="mfg-note mfg-note-headking'+(isHeadKing?' mfg-note-headking-active':'')+'">需求扬程按损失最大组 <b class="mfg-king-head">G'+(headKing.gi+1)+'（'+headKing.head.toFixed(2)+' m）</b><span class="mfg-king mfg-king-head">扬程王</span>校核 · 损失由路径×流量共同决定，不只是远近</div>';
+        lines+='<div class="mfg-note mfg-note-headking'+(isHeadKing?' mfg-note-headking-active':'')+'">需求扬程按损失最大组 <b class="mfg-king-head">G'+(headKing.gi+1)+'（'+headKing.head.toFixed(2)+' m）</b><span class="mfg-king mfg-king-head">扬程王</span>'+(headKing.est?'（估算口径）':'')+'校核 · 损失由路径×流量共同决定，不只是远近</div>';
       }
       var foot='管损 '+totalLoss.toFixed(2)+' m = 总管 '+(Number(loss.frontLoss)||0).toFixed(2)+
         ' + 主管 '+(Number(loss.mainLoss)||0).toFixed(2)+' + 支管 '+(Number(loss.branchLoss)||0).toFixed(2)+' m';
@@ -1291,6 +1293,13 @@
     refresh: refresh,
     stop: stop,
     isActive: function () { return active != null || playing; },
+    /* [v1026 用户拍板] 只读导出：宿主 ctx.getZoneAreas 的安全通道——设计页统一逐区
+       面积口径用（与地图组卡 v1023b 同一把尺子）。ctx 未注入/地图未开时返回 null，
+       调用方回退设计网格裁剪，离线行为逐位不变。 */
+    zoneAreasOf: function () {
+      try { return (ctx && typeof ctx.getZoneAreas === 'function') ? ctx.getZoneAreas() : null; }
+      catch (eZA) { return null; }
+    },
     /* 纯函数导出（Node 单测） */
     groupOf: groupOf, groupCount: groupCount, validateConnection: validateConnection,
     entrancesOf: entrancesOf, collectWorkspaceNodes: collectWorkspaceNodes,
