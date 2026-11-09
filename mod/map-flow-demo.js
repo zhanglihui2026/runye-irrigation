@@ -635,8 +635,13 @@
       groups.forEach(function(gr){gr.ids.forEach(node);for(var i=1;i<gr.ids.length;i++)link(gr.ids[0],gr.ids[i],0,null);});
       for(var i=1;i<groups.length;i++){
         var ga=groups[i-1],gb=groups[i],pts=slice(o,ga.s,gb.s),weight=Math.max(.01,gb.s-ga.s);
-        for(var ai=0;ai<ga.ids.length;ai++)for(var bi=0;bi<gb.ids.length;bi++)
-          link(ga.ids[ai],gb.ids[bi],weight,{key:o.key,kind:o.kind,points:pts,a:ga.ids[ai],b:gb.ids[bi]});
+        /* [v1025] 相邻切组间只建「组代表」一条边：同组多 id（同一弧长位置 ±0.05 内出现
+           两个以上切口——三条主管 T 接、阀切口与接点重合等）时，旧写法按 id 笛卡尔积建
+           多条同几何边，不同分区的 Dijkstra 路径可能走同一物理切片的不同 (a,b) 边对象；
+           扬程链 edgeZones 以 (key,a,b) 为切片身份 ⇒ 同一段被拆成多份、downZi 各拿一部分，
+           过境段流量被低估（v1023 重算链的输入在源头就分裂了）。组内 0 权边（上一行）
+           已保证组内任意 id 互相连通，只连代表 id 不改变最短路权重与路径几何。 */
+        link(ga.ids[0],gb.ids[0],weight,{key:o.key,kind:o.kind,points:pts,a:ga.ids[0],b:gb.ids[0]});
       }
     });
     feeds.forEach(function(f){

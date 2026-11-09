@@ -1420,8 +1420,14 @@
    branch 字段 `z.branch>0?z.branch:0`——wp.branch=0（该区没画支管）时地图组卡支管
    损失=0、长度显示 0.0 m，而设计侧 pathZones 与估算链同场景回退试算长
    r.branchLenUsed，老路 inversePath 构造自设计侧已内置回退 ⇒ 同区三处数字分叉。
-   修复：calcZones branch 回退改为与 r.branchLenUsed 同源。主串同抬 14 处。 */
-const VERSION = 'v1024-branch-fallback-calczones';
+   修复：calcZones branch 回退改为与 r.branchLenUsed 同源。主串同抬 14 处。
+   [v1025-edge-identity-canonical] 第四轮深挖挖到地基：routesAll 图构建在相邻切口组之间
+   按 id 笛卡尔积建边——同一弧长位置 ±0.05 内出现两个以上切口（三条主管 T 接、阀切口与
+   接点重合）时，不同分区 Dijkstra 可能走同一物理切片的不同 (a,b) 边对象；tlRoutesWorstPath
+   的 edgeZones 以 (key,a,b) 为切片身份 ⇒ 同段被拆成多份、downZi 各拿一部分，过境段流量
+   被低估（v1023 重算链的输入在源头分裂）。修复：相邻切组间只连「组代表 id」一条边，
+   组内 0 权边已保证连通、不改变最短路权重与路径几何；v1025 锁定用例钉死禁止回退。 */
+const VERSION = 'v1025-edge-identity-canonical';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
