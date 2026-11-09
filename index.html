@@ -26,7 +26,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>润野灌溉设计优化版｜滴灌管径与水泵选型</title>
 <meta name="description" content="输入地块、滴灌带与水源参数，快速计算灌溉分区、主管支管管径和水泵工作点。"/>
-<link rel="stylesheet" href="mod/style-01.css?v=1030-ws-stats-removed">
+<link rel="stylesheet" href="mod/style-01.css?v=1031-nav-version">
 <link rel="stylesheet" href="runye-inverse-design.css?v=277">
 <script defer src="runye-inverse-design.js?v=438-branch-flow-conservation"></script>
 <link rel="stylesheet" href="runye-ai-plan.css?v=544-float-card-unify">
@@ -49,7 +49,7 @@
 <link rel="stylesheet" href="hydraulic-calc/hydraulic-calc.css">
 <link rel="stylesheet" href="filter-system/filter-system.css">
 <link rel="stylesheet" href="pwa/vendor/leaflet.css">
-<link rel="stylesheet" href="mod/online-map.css?v=1030-ws-stats-removed">
+<link rel="stylesheet" href="mod/online-map.css?v=1031-nav-version">
 <link rel="stylesheet" href="hydraulics-main.css?v=442-native">
 <style id="ryCadTwinCss">
 /* --- CAD global toolbar · generated selector twins ---
@@ -310,8 +310,37 @@ body.ry-worst-off [data-tlworst]{display:none}
            面板本体由 mod/inline-32.js 按 RyFileMenu.toggle(btn) 动态创建，彻底消除
            静态块 relocate 与插件锚定的位置竞态。 -->
       <button class="fn-link" type="button" id="fnSettings" style="margin-left:auto;order:999" onclick="ryOpenSettings()" title="设置 · 管材单价 / 造价假设 / 标注与文字 / 标注几何">⚙️ 设置</button>
+      <!-- [v1031 2026-11-09 用户「在导航栏设置的右侧把版本号放上去」] 版本徽标：
+           order:1000 紧随设置（设置 order:999 + margin-left:auto 钉在最右）⇒ 视觉上在设置右侧；
+           mount() 只清 [data-ry-navitem]，本静态项不受权益重渲染影响；内联样式沿用 #fnSettings
+           的既有做法，避免改 runye-nav.css 后其独立 ?v= 未抬导致老用户拿不到新样式。
+           ★ 版本号不写死：由下方脚本从主资源版本串读取，发布时随 14 处主串自动同步。 -->
+      <span id="ryNavVersion" class="ry-nav-version" style="order:1000;flex:0 0 auto;margin-left:8px;padding:2px 7px;border:1px solid rgba(217,233,223,.3);border-radius:999px;font-size:10.5px;line-height:1.3;color:var(--u-nav-ink,#d9e9df);opacity:.78;white-space:nowrap;user-select:text;cursor:help" title="当前发布版本"></span>
     </div>
   </nav>
+  <script>
+  /* [v1031] 导航栏版本号：从主样式表 ?v= 读取（与 sw.js VERSION / 14 处主串同抬，
+     tests/version_sync.test.cjs 锁一致性）⇒ 发布零维护，不会显示过期版本号。
+     显示短号 v1031；完整标识写入 data-ry-version-full 与 title 便于核对；读不到则隐藏，不留空胶囊。
+     ⚠ 选择器不要把样式表文件名与查询串写成连续字面（如 style-01 紧跟 ?v=）——
+       version_sync 的 styleRefVersions 正则会把它当成一条「空版本引用」而误报不一致。 */
+  (function () {
+    try {
+      var el = document.getElementById('ryNavVersion');
+      if (!el) return;
+      var ref = document.querySelector('link[href^="mod/style-01.css"]') ||
+                document.querySelector('script[src^="runye-nav.js"]');
+      var u = ref ? (ref.getAttribute('href') || ref.getAttribute('src') || '') : '';
+      var m = /[?&]v=([^"'<>\s]+)/.exec(u);
+      var full = m ? m[1] : '';
+      if (!full) { el.style.display = 'none'; return; }
+      var n = /^v?(\d+)/.exec(full);
+      el.textContent = 'v' + (n ? n[1] : full);
+      el.setAttribute('data-ry-version-full', full);
+      el.title = '当前线上版本 ' + full + '（与 sw.js VERSION 一致）';
+    } catch (e) { }
+  })();
+  </script>
   <!-- ===== [NEW MODULE: 会员权益] 入口：删掉下面整块即卸载 =====
        卸载后 runye-nav.js 找不到 window.RyEntitle ⇒ 导航保持兼容放行，具体导出操作仍自行判权，
        页面行为与接入前完全一致（零回归）。
@@ -323,10 +352,10 @@ body.ry-worst-off [data-tlworst]{display:none}
   <script src="runye-entitle.js?v=621-invite-l2"></script>
   <script src="runye-member-ui.js?v=632-login-deeplink"></script>
   <!-- [v605-announce-modal] 首页公告弹窗（每次访问展示）：删掉本行即卸载，样式随脚本注入 #ryAnnCss -->
-  <script src="runye-announce.js?v=1030-ws-stats-removed"></script>
+  <script src="runye-announce.js?v=1031-nav-version"></script>
   <!-- 顶部导航动作按钮（系统图，runye-nav.js act 项）：动作映射须先于 runye-nav.js 注册 -->
   <script src="mod/inline-05.js?v=357"></script>
-  <script src="runye-nav.js?v=1030-ws-stats-removed"></script>
+  <script src="runye-nav.js?v=1031-nav-version"></script>
   <!-- [NEW MODULE: DXF 导出] 入口：删除本行即卸载（不改动任何原有逻辑） -->
   <script src="runye-dxf.js?v=840-trunk-dxf"></script>
   <!-- [NEW MODULE: pipe_optim] 入口：删除本行即卸载本隔离模块（不改动任何原有逻辑） -->
@@ -2148,7 +2177,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 </div>
 
 <script src="mod/material-formulas.js?v=412"></script>
-<script src="mod/zone-geometry.js?v=1030-ws-stats-removed"></script>
+<script src="mod/zone-geometry.js?v=1031-nav-version"></script>
 <script src="mod/flow-geometry.js?v=414"></script>
 <script src="mod/tl-polyline-geometry.js?v=426-tl-polyline-geometry"></script>
 <!-- [v421-mat-table] 材料清单/材料表管理（自 inline-09 迁出）：先于 inline-09 加载 —— inline-09 尾部
@@ -2159,7 +2188,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <!-- [v887-tape-zone-vgate] 段总管生成器（纯几何，Node 单测锁），先于 inline-09 消费方装载。
      [v900] 曾随段总管链误删引入；[v1017] 恢复（扬程链 P0，TASK_pump_head_mismatch_20261108 §5.0）。 -->
 <script src="mod/tl-seg-trunk.js?v=887-tape-zone-vgate"></script>
-<script src="mod/inline-09.js?v=1030-ws-stats-removed"></script>
+<script src="mod/inline-09.js?v=1031-nav-version"></script>
 <!-- [v423-header-layout] 三级简图标题布局依赖 inline-09 的 tlMeasureText 与生成时写入的标题状态。 -->
 <script src="mod/tl-header-layout.js?v=423-header-layout"></script>
 
@@ -2169,7 +2198,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <!-- ===== 实际地块规划 JS ===== -->
 <script src="mod/inline-11.js?v=653-zone-calibers"></script>
 <!-- [v420-split] 绘图编辑器 IIFE 自 inline-11 迁出：必须紧随 inline-11 之后同步执行 -->
-<script src="mod/plot-editor.js?v=1030-ws-stats-removed"></script>
+<script src="mod/plot-editor.js?v=1031-nav-version"></script>
 <script src="mod/inline-12.js?v=823-fix-transfer-save-alert"></script>
 <script src="mod/inline-13.js?v=831-trunk-schema-v2"></script>
 <!-- [v422-head-system-svg] 纯 SVG 核心先于 inline-14 同步加载。 -->
@@ -2190,7 +2219,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <!-- [v815] 绘图工具栏统一图标集（单色线性 SVG）：必须先于 inline-18.js 加载，
      inline-18 的 decorateToolbar 会在首次装饰时调用 window.RyIcons.decorate。 -->
 <script src="mod/ry-icons.js?v=1012-lock-icon-bigger"></script>
-<script src="mod/inline-18.js?v=1030-ws-stats-removed"></script>
+<script src="mod/inline-18.js?v=1031-nav-version"></script>
 
 <script src="mod/inline-19.js?v=696-shared-host-init-order"></script>
 
@@ -2325,21 +2354,21 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script src="mod/trunk-snap.js?v=911-trunk-snap-edge"></script>
 <script src="mod/trunk-geo.js?v=854-null-slot-strict"></script>
 <!-- [v945] 总管口径反推（纯函数）：由规划分区的面积/流量 + 下游主管支管管径推手绘总管外径。 -->
-<script src="mod/trunk-size.js?v=1030-ws-stats-removed"></script>
+<script src="mod/trunk-size.js?v=1031-nav-version"></script>
 <script src="mod/trunk-edit.js?v=835-trunk-geo-snap"></script>
 <script src="mod/trunk-history.js?v=835-trunk-geo-snap"></script>
-<script src="mod/trunk-panel.js?v=1030-ws-stats-removed"></script>
+<script src="mod/trunk-panel.js?v=1031-nav-version"></script>
 <!-- [v887-tape-zone-vgate] 在线地图轮灌演示（分组/校验纯函数 + Leaflet 图层），先于宿主装载。 -->
-<script src="mod/map-flow-demo.js?v=1030-ws-stats-removed"></script>
-<script src="mod/online-map.js?v=1030-ws-stats-removed"></script>
+<script src="mod/map-flow-demo.js?v=1031-nav-version"></script>
+<script src="mod/online-map.js?v=1031-nav-version"></script>
 <!-- [v961] 在线地图右缘抽屉：把「图层」与「总管参数设置」两张浮层收成右缘竖排标签。
      参照「分区与管路」页的 #ppPlotDrawerTab / #tlWsLayerDrawerTab。必须在 online-map.js
      之后（它建的 #trunkPropPanel 由本模块接管；本模块自带轮询 + MutationObserver，顺序晚了也不丢）。 -->
-<script src="mod/map-right-drawer.js?v=1030-ws-stats-removed"></script>
+<script src="mod/map-right-drawer.js?v=1031-nav-version"></script>
 <script src="runye-hydraulics-page.js?v=829-hyd-auto-refresh"></script>
 <!-- [v978] 设计输入自动持久化：二级 fld_* / 三级 tl_* / planSrcDist 存 localStorage，
      刷新自动还原（版本升级强刷不再丢参数）。必须是最后一个脚本——还原时要调 calcPlan /
      renderThreeLevel，且要在「与二级联动」派生之后用存档覆盖回用户手改值。 -->
-<script src="mod/inline-33.js?v=1030-ws-stats-removed"></script>
+<script src="mod/inline-33.js?v=1031-nav-version"></script>
 </body>
 </html>

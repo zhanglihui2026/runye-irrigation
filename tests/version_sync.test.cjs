@@ -83,6 +83,20 @@ test('发布纪律：至少有一个页面真的引用了 style-01.css?v=（否�
     '没有页面引用 mod/style-01.css?v= —— 上一条测试会「因为没东西可比对」而恒绿，必须当成红处理');
 });
 
+/* ---------- ①b 导航栏版本徽标（v1031） ---------- */
+test('导航栏版本号：徽标存在，且由主版本串动态填充（不许写死）', () => {
+  const idx = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  assert.match(idx, /id="ryNavVersion"/, '顶栏「设置」右侧的版本徽标应存在');
+  assert.match(idx, /link\[href\^="mod\/style-01\.css"\]/, '版本号应从主样式表版本串读取');
+  const tag = idx.match(/<span[^>]*id="ryNavVersion"[^>]*>([\s\S]*?)<\/span>/);
+  assert.ok(tag, '应能解析版本徽标标签');
+  assert.equal(tag[1].trim(), '', '版本号必须由 JS 填充；写死会在下次发布时变成过期版本号');
+  assert.match(idx, /data-ry-version-full/, '完整版本标识应写入属性便于核对');
+  /* 徽标脚本/注释不许制造一条「空 ?v= 引用」—— styleRefVersions 会把它当不一致 */
+  const bad = auditVersionSync(readVersion(swText), [{ path: 'index.html', text: idx }]);
+  assert.deepEqual(bad, [], 'index.html 里主样式表的 ?v= 引用必须与 sw VERSION 一致');
+});
+
 /* ---------- ② 反向自检：审计函数真的会红 ---------- */
 test('审计自检：版本不一致必须被点名（合成文本，不碰真仓库）', () => {
   const html = '<link rel="stylesheet" href="mod/style-01.css?v=835-old">';

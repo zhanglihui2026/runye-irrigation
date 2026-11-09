@@ -1464,8 +1464,16 @@
    ★ 保留：#tlWsSegStatsGrip 工具轨宽度拖拽（重命名 IIFE 为 bindWsToolbarGrip，pane 改由
    grip.closest 取得）、WS_STATS_WKEY 宽度存档键、wsSegRows()（经济面板数据源）。
    恢复方式：从 git 历史 v1029 之前的提交取回上述文件与本块。
+   主串同抬 14 处 + 本 VERSION。
+   [v1031-nav-version 用户「在导航栏设置的右侧把版本号放上去呗，这样我就能知道发布到网络的是什么版本的」]
+   顶栏「⚙️ 设置」右侧新增版本徽标 #ryNavVersion（index.html 静态 span + 紧随其后的内联脚本）：
+   order:1000 紧随设置（设置 order:999 + margin-left:auto），mount() 只清 [data-ry-navitem] 故静态项
+   不受权益重渲染影响；样式内联，避免改 runye-nav.css 却漏抬它独立的 ?v=。
+   ★ 版本号不写死：脚本从主样式表 ?v= 读取（显示短号 v1031，完整串放 title 与
+   data-ry-version-full），与 14 处主串 / 本 VERSION 同源、同抬，tests/version_sync.test.cjs
+   增一条契约锁「徽标存在 + 由 JS 填充 + 不写死」。
    主串同抬 14 处 + 本 VERSION。 */
-const VERSION = 'v1030-ws-stats-removed';
+const VERSION = 'v1031-nav-version';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
