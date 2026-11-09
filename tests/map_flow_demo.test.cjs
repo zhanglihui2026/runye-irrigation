@@ -89,3 +89,36 @@ test('⑥ 地图演示 chips 与简图版圆形样式同源（CSS 覆盖 + selec
   const src = fs.readFileSync(SRC, 'utf8');
   assert.ok(/classList\.toggle\('selected'/.test(src), 'syncChipsState 必须切 .selected 类（同源双环）');
 });
+
+/* [v1025] 切组多 id 时 downZi 身份统一：相邻切组间只建「组代表」一条边。
+ * 背景：同一弧长位置 ±0.05 内两个以上切口（三条主管 T 接、阀切口与接点重合）时，
+ * 旧写法按 id 笛卡尔积建多条同几何边，不同分区 Dijkstra 可能走不同 (a,b) 边对象，
+ * tlRoutesWorstPath 的 edgeZones 以 (key,a,b) 为切片身份 ⇒ 同段拆多份、downZi 各拿
+ * 一部分，过境段流量被低估（v1023 重算链的输入源头分裂）。 */
+test('⑪ v1025 切组间只建组代表边（downZi 身份不分裂）', () => {
+  const src = fs.readFileSync(SRC, 'utf8');
+  assert.ok(src.includes('link(ga.ids[0],gb.ids[0],weight,{key:o.key,kind:o.kind,points:pts,a:ga.ids[0],b:gb.ids[0]})'),
+    '相邻切组必须只连组代表 id（组内 0 权边保证连通，代表边不改变最短路）');
+  assert.ok(!src.includes('for(var ai=0;ai<ga.ids.length;ai++)for(var bi=0;bi<gb.ids.length;bi++)'),
+    '禁止恢复 id 笛卡尔积建边（downZi 身份分裂根因）');
+});
+
+test('⑫ v1026 面积通道导出 + 扬程王估算口径明示（方案C）', () => {
+  const src = fs.readFileSync(SRC, 'utf8');
+  assert.ok(src.includes('zoneAreasOf: function () {'), '必须导出 zoneAreasOf 只读通道（ctx.getZoneAreas 安全封装）');
+  assert.ok(src.includes('ctx.getZoneAreas() : null'), '通道内必须走 ctx.getZoneAreas');
+  assert.ok(src.includes('est:_LK.estimated===true'), 'headKing 必须记录王组是否估算口径');
+  assert.ok(src.includes("(headKing.est?'（估算口径）':'')"), '校核行必须按 est 明示「（估算口径）」');
+  assert.ok(!src.includes("headKing={gi:gk,head:Number(_LK.head)};"), '旧的无 est 标记写法必须移除');
+});
+
+test('⑬ v1027 段总管反投底图：有手绘总管时不画（用户拍板B）', () => {
+  const src = fs.readFileSync(SRC, 'utf8');
+  assert.ok(src.includes("if (d.segLL && !(d.trunkLinesLL && d.trunkLinesLL.length)) {"),
+    'segLL 底图必须只在无手绘总管时绘制（v1019 兼任干线场景保水源结构可见）');
+  assert.ok(!src.includes("if (d.segLL) {\n      ly.addLayer(poly(d.segLL, '#cbd5e1', 2, false));\n    }"),
+    '禁止恢复 segLL 无条件底图绘制（v878 口径已被 v1027 拍板取代）');
+  assert.ok(src.includes("makeLine('segment:0','trunk',byTrunk.length,d.segLL)"),
+    '寻路切片仍用 d.segLL（数据链零改动，只关视觉）');
+  assert.ok(src.includes("a.push(line(d.segLL))"), '连通校验签名仍含 segLL（零改动）');
+});

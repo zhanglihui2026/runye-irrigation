@@ -1433,8 +1433,14 @@
    最不利手动组判定 tlCells 三处 partitions 优先、离线回退 cells（回退路径逐位不变）；
    选档基准 flowAreaM2 维持现状不动。设计页 groupLoss 与地图组卡自此同一把尺子。
    ② 扬程王混比按「方案C」：headKing 记录王组 estimated 标记，校核行对估算王明示
-   「（估算口径）」，只标注不数值修正。锁定用例双份（inline-09 侧 + demo 侧）。 */
-const VERSION = 'v1026-area-caliber-unify';
+   「（估算口径）」，只标注不数值修正。锁定用例双份（inline-09 侧 + demo 侧）。
+   [v1027-segtrunk-map-hidden 用户拍板B] 用户发现地图演示有一条横贯全场的白线
+   （删手绘总管重画后仍在）——定位为 dd.segTrunk（设计页 RySegTrunk.build 自动生成的
+   段总管，v859→v869→v1017/v1017b 沿革）的反投底图。设计页 v1017b 已「图面不画」，
+   地图反投此前仍开（v878 决定）⇒ 口径缝隙。本版对齐：演示底图不再常态绘制 segLL，
+   仅当无手绘总管（segLL 兼任干线参与寻路，v1019 口径）时保留；寻路/校验/路由切片
+   照旧用 d.segLL（数据链零改动，纯视觉）。段总管存在性登记 AGENT_HANDOFF.md 待办⑥。 */
+const VERSION = 'v1027-segtrunk-map-hidden';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

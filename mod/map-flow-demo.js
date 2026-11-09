@@ -706,7 +706,13 @@
       if(!line||line.length<2)return;
       ly.addLayer(poly(line, '#cbd5e1', 2, false));
     });
-    if (d.segLL) {
+    /* [v1027 用户拍板B] 段总管反投底图不再常态绘制——与设计页 v1017b「图面不画」口径
+       对齐（用户此前把白线误认成多余总管，删总管重画它也不消失才定位到这是 segTrunk
+       反投）。仅当**无手绘总管**（segLL 兼任干线参与寻路，v1019 口径）时保留底图，
+       否则该场景下「水源→主管」的干线结构完全不可见。寻路/校验仍用 d.segLL（本函数
+       上游 531 行 makeLine('segment:0') 与 412/432 行校验签名不动），演示路由的
+       segment:0 切片照常按路由色绘制。段总管存在性待办登记 AGENT_HANDOFF.md。 */
+    if (d.segLL && !(d.trunkLinesLL && d.trunkLinesLL.length)) {
       ly.addLayer(poly(d.segLL, '#cbd5e1', 2, false));
     }
     /* 活动区水路：水源→已吸附节点→相接主管段→目标分区阀门支管。 */
