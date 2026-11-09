@@ -26,7 +26,6 @@
     { title: '导入', items: [
       { label: '地块文件 (GeoJSON/KML/KMZ/奥维)', type: 'page', page: 'online-map', action: 'ryFileClickImport', title: '在线地图页打开「导入地块」文件选择器' },
       { label: '工程文件 (.runye.json)', type: 'page', page: 'online-map', action: 'ryFileClickImportProj', title: '在线地图页打开「导入工程」文件选择器' },
-      { label: 'IRRICAD 数据', type: 'fn', action: 'ryFileOpenIrricad', title: '主程序「经济指标/对比」页 IRRICAD 粘贴与文件导入' },
       { label: '地形 shp 边界', type: 'page', page: 'terrain', action: 'ryFileClickSHP', title: '地形模块「导入 shp 边界」文件选择器' },
       { label: '地形 RTK 边界 CSV', type: 'page', page: 'terrain', action: 'ryFileClickBoundaryCSV', title: '地形模块「导入 RTK 边界 CSV」文件选择器' },
       { label: '地形 RTK 高程 CSV', type: 'page', page: 'terrain', action: 'ryFileClickElevCSV', title: '地形模块「上传 RTK 高程 CSV」文件选择器' },
@@ -141,12 +140,6 @@
         (csv.disabled ? panelEl.querySelector('.cdxf-btn.primary') : csv).focus();
         toast(csv.disabled ? '等高线面板已打开；选择 DXF 并解析后即可导出高程点 CSV' : '等高线面板已打开，请点击「导出高程点 CSV」');
       }, 80);
-    },
-    ryFileOpenIrricad: function () {
-      var box = D.getElementById('icImportBox');
-      if (!box) { toast('IRRICAD 导入区未加载'); return; }
-      if (typeof W.ryJumpToSection === 'function') W.ryJumpToSection('irrCompareSection');
-      setTimeout(function () { box.focus(); }, 150);
     },
     ryFileSaveProject: function () {
       if (typeof W.runyeSaveProject === 'function') { W.runyeSaveProject(); return; }

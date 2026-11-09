@@ -83,11 +83,7 @@
             : (isAuto ? ('已选 '+info.kindLabel+'（'+info.id+' '+info.len.toFixed(1)+'m'+(window.tlPipeCalText&&window.tlPipeCalText(info.id)?'，'+window.tlPipeCalText(info.id):'')+(window.tlPipeHfText&&window.tlPipeHfText(info.id)?'，'+window.tlPipeHfText(info.id):'')+'）：可改长/右键改管径（右键还有「遮蔽此管」），或用工具轨的「阀门/三通/弯头」按钮在管线任意位置插入配件'+(window.tlIsPipeSegHidden&&window.tlIsPipeSegHidden((info.segIndex!=null&&info.id==='front')?('front-'+info.segIndex):info.id)?'【当前已遮蔽：灰色虚线显示、不计入材料清单】':'')+(window.tlIsPipeSegHidden&&window.tlIsPipeSegHidden((info.segIndex!=null&&info.id==='front')?('front-'+info.segIndex):info.id)?'':'（遮蔽管道模式下再点一段即可只遮该段）')+'；点空白处取消')
               : ('已选中 '+info.id+'（'+info.kindLabel+' '+info.len.toFixed(1)+'m）：按住可整条拖动，或改长/删除；点空白处取消'))))
         : HINT_IDLE;
-      /* 第五十二轮（2026-09-17，用户要求）：选中自动管线 → 右侧统计表自动滚到它所在的分区。
-         （钩子在另一个 <script> 里定义，故用 window 取用 + 守卫；手工管线/配件不在统计表内，命中即返回 false） */
-      if (isAuto && info && info.id && typeof window.tlWsRevealPipe === 'function') {
-        try { window.tlWsRevealPipe(info.id); } catch (e) { }
-      }
+      /* [v1030] 原「选中管线 → 右侧统计表滚到对应分区」钩子随统计表整套删除（含其对端实现）。 */
     };
   }
   function bindMode(btn){

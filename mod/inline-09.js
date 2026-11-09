@@ -5736,8 +5736,7 @@ function tlAutoGenerate(options) {
   // 下载/打印按钮已取消（2026-09-16 第三十三轮）：元素已从左栏移除，不再显示
   tlRefreshGroupLegend();   /* 联合灌溉分组图例已于第五十九轮取消（本调用现为空操作，保留以便一行恢复） */
   try { tlRefreshLossCard(); } catch (e) { }   /* 左下角「管段长度与水头损失」按本次图面几何刷新 */
-  /* 右侧「管段管径与损失」统计表（第四十二轮）：按新图面几何重算每段管径与损失 */
-  try { if (typeof window.tlWsStatsRender === 'function') window.tlWsStatsRender(); } catch (e) { }
+  /* [v1030] 原右侧「管段管径与损失」统计表刷新调用随该表整套删除。 */
   try { tlPushToHydraulicCalc(); } catch (e) { }   /* 三级方案数据 → 水力计算器 自动推送（2026-09-19） */
   try { tlWsBarSync(); } catch (e) { }
   // tlSavePng 已移除，不再显示
@@ -6720,9 +6719,7 @@ function rySetTab(sectionId, view) {
      重复切换整幅重渲染（视口复位），手工管线层随数据引用保留。 */
   if (sectionId === 'tlPipePlanSection' && view === 'ws') {
     var wsCtn = document.getElementById('tlWsContent');
-    /* 先定「管段管径与损失」统计表的显隐——第四十四轮起它挂在工具轨内部，显隐不再改画布列宽；
-       仍保持「先刷表、再渲染画布」的顺序（表内容随图面几何变化，顺序固定可避免重复渲染）。 */
-    if (typeof window.tlWsStatsRender === 'function') { try { window.tlWsStatsRender(); } catch (e) { } }
+    /* [v1030] 原「先刷统计表、再渲染画布」两步中的刷表随统计表整套删除，此处直接渲染画布。 */
     if (wsCtn && window.RyTlWs) {
     if (wsCtn && window.RyTlWs) {
       if (window.tlDiagramData) {
@@ -6820,8 +6817,7 @@ document.querySelectorAll('#tlZoneCountGroup button').forEach(function(btn){
         try { tlAutoGenerate(); } catch (e) {}
       } else {
         var _wsc = document.getElementById('tlWsContent');
-        /* 同 rySetTab：统计表显隐先定，再渲染画布（否则缩放按旧列宽算、点击坐标偏移） */
-        try { if (typeof window.tlWsStatsRender === 'function') window.tlWsStatsRender(); } catch (e) { }
+        /* [v1030] 原「统计表显隐先定」调用随统计表整套删除，工具轨同步与画布渲染保留。 */
         try { tlWsBarSync(); } catch (e) { }
         if (_wsc && _wsc.offsetParent !== null && window.RyTlWs) window.RyTlWs.render(_wsc, window.tlDiagramData);
       }

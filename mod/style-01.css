@@ -1958,7 +1958,7 @@ body > .ry-nav .main-header{display:none!important}
       故取 var(--fn-nav-h) + 1px。
    原值 calc(var(--fn-nav-h) + 12px) 多留 11px：点导航跳转后，上一个区块的底部
    （如 01 中栏深绿结果面板 #173f2d）会从吸顶栏下方露出来，形成一条多余的横条。 */
-#designInput,#pipeTablesSection,#networkSection,#areaTool,#pipePlanSection,#tlPipePlanSection,#detailsSection,#irrCompareSection{
+#designInput,#pipeTablesSection,#networkSection,#areaTool,#pipePlanSection,#tlPipePlanSection,#detailsSection{
   scroll-margin-top:calc(var(--fn-nav-h) + 1px);
 }
 /* 手机端（≤768）：保持自然宽度 + 横向滑动，与内容容器同一内距
@@ -3311,8 +3311,7 @@ body.ry-tool #pipePlanSection,
 body.ry-tool #tlPipePlanSection{background:var(--ry-panel);color:var(--ry-ink)}
 body.ry-tool #designInput.workspace{background:var(--ry-canvas);overflow:auto}
 body.ry-tool #areaTool{background:var(--ry-canvas)}
-body.ry-tool #detailsSection.details,
-body.ry-tool #irrCompareSection.details{background:var(--ry-canvas);overflow:auto}
+body.ry-tool #detailsSection.details{background:var(--ry-canvas);overflow:auto}
 body.ry-tool .details .container{max-width:none;margin:0;padding:14px}
 
 /* ── 6. 管路两区（二级 / 三级）：左属性栏 ＋ 右主区 ─────────────────────── */
@@ -4600,21 +4599,21 @@ body.ry-tool #designInput .mw-col-right{
 /* 7.2 步骤序号徽标：绿色实心块 → 中性灰（各功能区统一） */
 .step{background-image:none!important;box-shadow:none!important}
 .details .step,.detail-heading .step,#detailsSection .step,
-#irrCompareSection .step,#designInput .panel-heading .step,
+#designInput .panel-heading .step,
 .result-heading .step,.tl-header-left .step{
   background:var(--u-ink-2)!important;color:#fff!important;
   border-radius:var(--radius-xs)!important;
 }
 /* 7.3 材料清单 / 数据对比：表格与卡片边框去绿 */
 .details .materials-card,.details .detail-heading,
-#detailsSection .materials-card,#irrCompareSection .irr-compare-card{
+#detailsSection .materials-card{
   background:var(--u-canvas)!important;border-color:var(--u-line)!important;box-shadow:none!important;
 }
-#detailsSection .selection-table th,#irrCompareSection .irr-table th{
+#detailsSection .selection-table th{
   background:var(--u-toolbar)!important;color:var(--u-ink-2)!important;
   border-bottom:1px solid var(--u-line)!important;text-transform:none!important;letter-spacing:0!important;
 }
-#detailsSection .selection-table td,#irrCompareSection .irr-table td{
+#detailsSection .selection-table td{
   color:var(--u-ink)!important;border-bottom:1px solid var(--u-line-2)!important;
 }
 .recommended-row,.recommended-row:hover{background:var(--u-accent-bg)!important}

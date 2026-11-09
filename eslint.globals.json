@@ -34,7 +34,6 @@
     "RyRecipes": "readonly",
     "RyTerrainUI": "readonly",
     "RyTlPathMeasure": "readonly",
-    "TL_WS_STATS_HIDDEN": "readonly",
     "__RY_SDK_BUNDLED__": "readonly",
     "__cidReady2": "readonly",
     "__clipInfo": "readonly",
@@ -252,8 +251,6 @@
     "tlWsLayerPanel": "readonly",
     "tlWsMaskToggle": "readonly",
     "tlWsMultiToggle": "readonly",
-    "tlWsRevealPipe": "readonly",
-    "tlWsStatsRender": "readonly",
     "tlZoneManualGroupOf": "readonly",
     "tlZoneStep": "readonly"
   }

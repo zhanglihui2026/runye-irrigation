@@ -922,7 +922,6 @@
       if(sec && sec.id==='tlPipePlanSection' && sec.getAttribute('data-ry-view')==='ws' && window.tlDiagramData && window.RyTlWs){
         var wsC=document.getElementById('tlWsContent');
         if(wsC && !wsC.querySelector('svg')){
-          if(typeof window.tlWsStatsRender==='function'){ try{ window.tlWsStatsRender(); }catch(eS){} }
           window.RyTlWs.render(wsC, window.tlDiagramData);
         }
       }

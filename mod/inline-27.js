@@ -696,14 +696,10 @@
   })();
   window.tlPumpUpdateNote = pumpUpdateNote;
 
-  /* ===== 管段管径与损失统计表（2026-09-17 第四十二轮，用户要求）=====
-     三级工作区绘图区右侧：按分区**逐段**列出总管 / 主管 / 支管
-     （段名 + 长度 + 管径 + 改前 / 改后水头损失 + 差值）。
-     管径下拉就地在表格里改 → 走 RyTlWs.setAutoCaliber（与右键改径同源 AE.cals）→ 图面同步 + 本表数值随动。
-     本表按分区统计**长度**并支持**改管径**。
-     损失口径与 hfFor 同源（总管=联合流量、主管=单区、支管=单区/物理并联支管总数），
-     改完管径后可再点左栏「更新水泵扬程」把管径折算进正式选型计算。 */
-  var WS_STATS_KEY = 'runye_tlWsStats_collapsed';
+  /* ===== 工具轨宽度存档键（第四十四轮）=====
+     [v1030 2026-11-09 用户「让系统简洁高效」分批清理第 2 步] 工具轨「管段管径与损失」
+     统计表整套删除，其折叠态存档键 runye_tlWsStats_collapsed 随之作废（localStorage 里
+     残留的旧值成为无读写方的孤儿，无碍）。下面这个键只服务 #tlWsSegStatsGrip 宽度拖拽。 */
   var WS_STATS_WKEY = 'runye_tlWsToolbar_w';   /* 第四十四轮：宽度改为工具轨宽度（旧 key 作废） */
   /* 点是否落在折线上（tol 米） */
   function wsPtOnPoly(pt, pts, tol) {
@@ -997,175 +993,17 @@
     })();
     return { open: openP, close: closeP, toggle: toggleP, render: render, build: build, applySel: applySel };
   })();
-  /* v105（2026-09-22 用户要求）：「管段管径与损失」统计表目前没啥用 → 总开关隐藏。
-     后续要调回这张表时：把 TL_WS_STATS_HIDDEN 改回 false 即可，其余逻辑一律不动。 */
-  window.TL_WS_STATS_HIDDEN = true;
-  window.tlWsStatsRender = function () {
-    var aside = document.getElementById('tlWsStats');
-    var body = document.getElementById('tlWsStatsBody');
-    if (!aside || !body) return;
-    if (window.TL_WS_STATS_HIDDEN) { aside.style.display = 'none'; return; }   /* v105 总开关：隐藏时所有显示路径在此短路 */
-    var rows = null;
-    try { rows = wsSegRows(); } catch (e) { rows = null; }
-    if (!rows) {
-      aside.style.display = 'none';
-      body.innerHTML = '<div class="tl-ws-stats-empty">生成管线图后按分区逐段列出管长与管径，可就地改管径并查看水头损失变化。</div>';
-      return;
-    }
-    aside.style.display = '';
-    function f1(v) { return (isFinite(v) ? v : 0).toFixed(1); }
-    function f2(v) { return (isFinite(v) ? v : 0).toFixed(2); }
-    /* 第五十轮（2026-09-17，用户要求）：取消最右侧「Δ（改后 − 改前）」列 —— 表尾不再列增减量，
-       「改前 / 改后」两列并列已能看出变化。随之删除仅服务该列的 col()/sgn()，
-       以及行对象上失去消费者的 dlt 字段（wsSegRows）。 */
-    /* 第四十八轮（用户要求）：① 下拉里不再出现「计算值」字样，默认项直接是 Ø###（＝水力计算管径）；
-       ② 「（非标）」长后缀改紧凑「*」（说明见表格底部注记）—— 框宽只需容下 Ø###，不被长文案撑宽。 */
-    function odSel(r) {
-      var h = '<select data-pid="' + r.pid + '"' + (r.changed ? ' class="changed"' : '')
-        + ' title="改这段管的管径（与右键改径等效；选第一项恢复默认管径）">';
-      h += '<option value=""' + (r.changed ? '' : ' selected') + '>' + (r.base ? 'Ø' + r.base : '\u2014') + '</option>';
-      CAL_SERIES.forEach(function (odv) {
-        h += '<option value="' + odv + '"' + (r.cur === odv ? ' selected' : '') + '>Ø' + odv + (odv === 220 ? '*' : '') + '</option>';
-      });
-      return h + '</select>';
-    }
-    /* 分组：总管 / 各分区 / 未归区，顺序 总管 → 1区、2区…（区号数值升序）→ 未归区 */
-    var groups = {}, order = [];
-    rows.forEach(function (r) {
-      var key = r.kind === 'front' ? '__front' : (r.zone || '__unzoned');
-      if (!groups[key]) { groups[key] = []; order.push(key); }
-      groups[key].push(r);
-    });
-    function rank(k) { return k === '__front' ? -1 : (k === '__unzoned' ? 1 : 0); }
-    /* 区号串「37区」按**数值**排序：字典序会把「10区」排到「2区」前面（2026-09-17） */
-    function zoneNum(k) { var m = /^(\d+)/.exec(k); return m ? parseInt(m[1], 10) : 1e9; }
-    order.sort(function (a, b) {
-      var ra = rank(a), rb = rank(b);
-      if (ra !== rb) return ra - rb;
-      var na = zoneNum(a), nb = zoneNum(b);
-      if (na !== nb) return na - nb;
-      return a < b ? -1 : (a > b ? 1 : 0);
-    });
-    function labelOf(k) {
-      if (k === '__front') return '总管（全灌区）';
-      if (k === '__unzoned') return '未归入分区';
-      return '分区 ' + k;
-    }
-    /* 第四十八轮：表头去掉冗余「(m)」后缀（单位移到 title），使表头能完整落在工具轨内，
-       且表头与同列内容统一水平居中（见 tl-workspace.css 的 text-align:center）。
-       第五十轮：6 列 → 5 列（Δ 列取消），列宽余量更大。 */
-    var html = '<table><thead><tr>'
-      + '<th title="分区 / 管段">管段</th>'
-      + '<th title="图面有效长度，单位 m（含改长 / 平移）">长(m)</th>'
-      + '<th title="管径，单位 mm（可就地修改）">管径</th>'
-      + '<th title="改前损失：按水力计算管径的沿程水头损失，单位 m">改前</th>'
-      + '<th title="改后损失：按当前图面管径的沿程水头损失，单位 m">改后</th>'
-      + '</tr></thead><tbody>';
-    order.forEach(function (key) {
-      var list = groups[key];
-      html += '<tr class="zonehead" data-zone="' + key + '"><td colspan="5">' + labelOf(key) + '</td></tr>';
-      var sumL = 0, sumH0 = 0, sumH1 = 0, hasH = false;
-      list.forEach(function (r) {
-        sumL += r.len;
-        if (r.h0 != null) { sumH0 += r.h0; sumH1 += r.h1; hasH = true; }
-        html += '<tr>'
-          + '<td>' + r.name + '</td>'
-          + '<td>' + f1(r.len) + '</td>'
-          + '<td>' + odSel(r) + '</td>'
-          + '<td>' + (r.h0 != null ? f2(r.h0) : '\u2014') + '</td>'
-          + '<td>' + (r.h1 != null ? f2(r.h1) : '\u2014') + '</td>'
-          + '</tr>';
-      });
-      if (list.length > 1) {
-        html += '<tr class="sum"><td>小计</td><td>' + f1(sumL) + '</td><td></td>'
-          + '<td>' + (hasH ? f2(sumH0) : '\u2014') + '</td><td>' + (hasH ? f2(sumH1) : '\u2014') + '</td></tr>';
-      }
-    });
-    var tL = 0, tH0 = 0, tH1 = 0, chN = 0;
-    rows.forEach(function (r) {
-      tL += r.len;
-      if (r.h0 != null) { tH0 += r.h0; tH1 += r.h1; }
-      if (r.changed) chN++;
-    });
-    html += '<tr class="grand"><td>合计</td><td>' + f1(tL) + '</td><td>' + chN + '/' + rows.length + '</td>'
-      + '<td>' + f2(tH0) + '</td><td>' + f2(tH1) + '</td></tr>';
-    html += '</tbody></table>';
-    html += '<div class="tl-ws-stats-note">总管/主管长度取图面实际几何（含改长 / 平移）；支管行显示单根长度，材料总长按「设计满跨」计（物理根数 = 每侧根数 × 敷设边数；图面两端留边只影响显示）；'
-      + '损失按 Hazen-Williams 估算；管径 ＊ 为非标 PE 外径；'
-      + '流量口径与扬程计算一致（总管=联合流量、主管=单区流量、单根支管=单区流量/物理并联支管总数）。'
-      + '改完管径点左栏「更新扬程」即可折算进正式选型。</div>';
-    body.innerHTML = html;
-  };
-  /* 第五十二轮（2026-09-17，用户要求）：「在图上选中某分区的管线，右侧统计表要直接跳到该分区」。
-     用户现场：选中 24 号分区的管线，右侧对应数据已在屏幕下方，得手工在长表里翻找。
-     ★ 滚动容器是 **#tlWsToolbar**（CSS overflow-y:auto；统计表在轨内按内容完全展开、自身不内滚），
-       所以这里只改它的 scrollTop；**不用 scrollIntoView** —— 那会把外层文档一起滚，整页跳一下。
-     ★ 目标：把该分区的组表头（tr.zonehead）放到吸顶标题（.tl-ws-stats-title）之下；
-       若该分区的行放不下，退化为「让选中的那一行刚好完整可见」。已经就位时不动（连点不抖）。 */
-  function wsZoneKeyOf(pid) {
-    if (pid === 'front') return '__front';
-    var z = null;
-    try { z = wsZoneOf(pid); } catch (e) { z = null; }
-    return z || '__unzoned';        /* 与 tlWsStatsRender 的分组键完全同口径 */
-  }
-  /* 目标元素的滚动容器：最近的「纵向可滚且真的溢出」的祖先（桌面＝工具轨；窄屏＝统计表自身） */
-  function wsScrollBox(el) {
-    var p = el && el.parentNode;
-    while (p && p.nodeType === 1 && p !== document.body) {
-      var st = null;
-      try { st = getComputedStyle(p); } catch (e) { st = null; }
-      if (st && /(auto|scroll|overlay)/.test(st.overflowY) && p.scrollHeight > p.clientHeight + 1) return p;
-      p = p.parentNode;
-    }
-    return null;
-  }
-  /* 选中 pid → 把统计表滚到它所在的分区；返回是否真的滚了（供 e2e 断言 / 调试） */
-  window.tlWsRevealPipe = function (pid) {
-    if (!pid) return false;
-    var aside = document.getElementById('tlWsStats');
-    var body = document.getElementById('tlWsStatsBody');
-    if (!aside || !body || aside.style.display === 'none') return false;      /* 还没生成图纸 */
-    if (aside.classList.contains('stats-collapsed')) return false;            /* 折叠态没有可见行，滚动无意义 */
-    var head = body.querySelector('tr.zonehead[data-zone="' + wsZoneKeyOf(pid) + '"]');
-    if (!head) return false;
-    var box = wsScrollBox(head);
-    if (!box) return false;                                                  /* 整表都在视野内，不用动 */
-    var selEl = body.querySelector('select[data-pid="' + pid + '"]');
-    var row = selEl && selEl.closest ? selEl.closest('tr') : null;
-    var title = aside.querySelector('.tl-ws-stats-title');
-    var sticky = title ? title.offsetHeight + 6 : 0;                          /* 吸顶标题占掉的高度 */
-    var br = box.getBoundingClientRect();
-    function rel(el) { return el.getBoundingClientRect().top - br.top; }
-    var d = rel(head) - sticky;                                              /* 首选：分区组表头落到标题下方 */
-    if (row) {
-      var rh = row.offsetHeight || 0;
-      var rowRel = rel(row) - d;                                             /* 按 d 滚动后该行的相对位置 */
-      if (rowRel < sticky - 0.5 || rowRel + rh > box.clientHeight + 0.5) d = rel(row) - sticky;   /* 装不下 → 直接对行 */
-    }
-    var max = Math.max(0, box.scrollHeight - box.clientHeight);
-    var cur = box.scrollTop;
-    var want = Math.round(Math.max(0, Math.min(max, cur + d)));
-    /* ★ 向上跳时保留列标题行（thead）：别把它顶进吸顶标题后面 ——
-       跳到最上面几个分区（尤其「总管」组）时，"把 thead 对齐到安全线"就是向上的极限。
-       向下跳时 cap 通常是很大的负数，本分支不生效（不会妨碍向下对齐）。 */
-    var thead = body.querySelector('thead');
-    if (thead && want < cur) {
-      var cap = Math.round(rel(thead) - sticky + cur);
-      if (cap > 0 && cap < want) want = cap;
-    }
-    if (want === cur) return false;                                          /* 已经就位 → 不动 */
-    box.scrollTop = want;
-    return true;
-  };
-  (function bindWsStats() {
-    var aside = document.getElementById('tlWsStats');
-    var body = document.getElementById('tlWsStatsBody');
-    var tg = document.getElementById('tlWsStatsToggle');
-    var arrow = document.getElementById('tlWsStatsArrow');
-    var pane = aside ? aside.closest('.ry-pane-ws') : null;
-    if (!aside || !body) return;
-    /* 统计表宽度 / 折叠态一变，画布列宽随之变 → 派发一次 resize，让 ws 图纸重新铺满容器
-       （tl-workspace 的 resize 监听仅在「未缩放、未平移」时重算 baseFit，沿用既有约定）。
+  /* [v1030 2026-11-09 用户「让系统简洁高效」分批清理第 2 步] 工具轨「管段管径与损失」统计表整套删除：
+     隐藏总开关、表体渲染函数、分区定位与滚动函数、折叠与表内改管径绑定、折叠态存档键，
+     以及 index.html 的 DOM、专用样式、5 处跨模块调用、verify_ry_tool.js 契约、eslint globals。
+     ★ 保留：下面 bindWsToolbarGrip()（用户仍在用的工具轨宽度拖拽）与 wsSegRows()
+       （经济面板 tlEconPanel.build() 的数据源，与本表无关，误删会打断经济对比）。
+     恢复方式：从 git 历史 v1029 之前的提交取回本块及上述文件。 */
+  (function bindWsToolbarGrip() {
+    var grip = document.getElementById('tlWsSegStatsGrip');
+    var pane = grip ? grip.closest('.ry-pane-ws') : null;
+    if (!grip || !pane) return;
+    /* 工具轨宽度一变，画布列宽随之变 → 派发一次 resize，让 ws 图纸重新铺满容器；
        rAF 去抖：拖拽过程中每帧最多派发一次，避免逐像素触发全页 resize 监听。 */
     var wsStatsRefitPending = false;
     function wsStatsRefit() {
@@ -1177,47 +1015,9 @@
       };
       if (window.requestAnimationFrame) window.requestAnimationFrame(run); else setTimeout(run, 16);
     }
-    /* 表格内改管径：与右键改径同源（AE.cals）；优先走 RyTlWs 以同步重渲染工作区视图 */
-    body.addEventListener('change', function (e) {
-      var sel = e.target && e.target.closest ? e.target.closest('select[data-pid]') : null;
-      if (!sel) return;
-      var pid = sel.getAttribute('data-pid');
-      var v = sel.value;
-      var ok = false;
-      try {
-        if (!v) {
-          ok = (window.RyTlWs && RyTlWs.clearAutoCaliber) ? RyTlWs.clearAutoCaliber(pid) : AE.clearCaliber(pid, 'ws');
-        } else {
-          var od = parseFloat(v);
-          ok = (window.RyTlWs && RyTlWs.setAutoCaliber) ? RyTlWs.setAutoCaliber(pid, od) : AE.setCaliber(pid, od, window.tlDiagramData, 'ws');
-        }
-      } catch (err) { ok = false; }
-      window.tlWsStatsRender();
-      if (typeof window.tlPumpUpdateNote === 'function') { try { window.tlPumpUpdateNote(); } catch (e2) { } }
-      if (typeof setHint === 'function') setHint((ok ? '已把 ' : '未能修改 ') + AE.pipeName(pid) + (v ? ' 改为 Ø' + v : ' 恢复为计算值') + (ok ? '（图面已同步）' : ''));
-    });
-    /* 折叠（第四十四轮：统计表已在工具轨内部 → 折叠只收表体，不再改网格列宽） */
-    if (tg && arrow && pane) {
-      function applyCollapsed(c) {
-        body.style.display = c ? 'none' : '';
-        aside.classList.toggle('stats-collapsed', c);
-        arrow.style.transform = c ? 'rotate(180deg)' : 'rotate(90deg)';
-        tg.title = c ? '点击展开管段统计表' : '点击折叠管段统计表（收起表体，工具轨宽度不变）';
-        wsStatsRefit();          // 表体显隐会改轨内高度分布 → 画布尺寸兜底重算一次
-      }
-      var saved = null;
-      try { saved = localStorage.getItem(WS_STATS_KEY); } catch (e) {}
-      applyCollapsed(saved === '1');
-      tg.addEventListener('click', function () {
-        var c = !aside.classList.contains('stats-collapsed');
-        applyCollapsed(c);
-        try { localStorage.setItem(WS_STATS_KEY, c ? '1' : '0'); } catch (e) {}
-      });
-    }
-    /* 工具轨宽度拖拽：统计表移入工具轨后，拖拽条调节整条工具轨宽度；
+    /* 工具轨宽度拖拽：拖拽条调节整条工具轨宽度；
        没有用户自定义宽度时使用 CSS 回退值 --tlWsToolbarW。
        grip 使用独立 id，避免与其他面板的历史命名冲突。 */
-    var grip = document.getElementById('tlWsSegStatsGrip');
     var TOOLBAR_GAP = 8;   /* 与 .ry-pane-ws 的 column-gap 一致：拖拽条在轨左侧，量宽要扣掉这条缝 */
     if (grip && pane) {
       var wKEY = WS_STATS_WKEY;
@@ -1262,15 +1062,14 @@
         localStorage 键 runye_tlGroupPanel_collapsed 成孤儿无碍，不再读写）。 */
   })();
   /* 图面改长 / 改径 / 整条平移（AE 编辑层）→ 左下角「管段长度与水头损失」同步刷新：
-     最远分区路径长度走 AE.effPts（图面有效几何），几何一变数值就得跟着变；
-     第四十二轮起同步刷新右侧「管段管径与损失」统计表（长度与损失都随之变）。 */
+     最远分区路径长度走 AE.effPts（图面有效几何），几何一变数值就得跟着变。
+     [v1030] 原「同步刷新右侧统计表」一行随该表整套删除，扬程与水力计算器推送保留。 */
   /* v170：总管平移签名（front 的 dx,dy）—— 只在它变化时重建三级简图（水源/接入阀/连接段
      随总管跟随，见 tlAutoGenerate 内 tlFrontMv）。主管/支管的 move 不触碰简图（简图本就不显示它们的
      平移），避免每帧无谓整图重建。 */
   var tlFrontMvSig = '';
   if (AE && AE.onChange) AE.onChange(function (d) {
     window.tlPumpUpdateRun();
-    try { window.tlWsStatsRender(); } catch (e) { }
     try { tlPushToHydraulicCalc(); } catch (e) { }
     if (d && d.action === 'move') {
       /* [v579] 总管整体平移已取消 ⇒ front 不再有 moves，_fm 恒为 null、_sig 恒为 ''，

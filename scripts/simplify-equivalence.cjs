@@ -117,7 +117,6 @@ const SNAP = () => {
     ppLastSvgLen: (window.ppState && window.ppState.lastSVG) ? window.ppState.lastSVG.length : -1,
     ppLastSvg: (window.ppState && window.ppState.lastSVG) ? window.ppState.lastSVG : '',
     materials: materials(),
-    compare: { len: html('irrCompareSection').length, text: norm(document.getElementById('irrCompareSection') ? document.getElementById('irrCompareSection').innerText : '') },
     sys: sys(),
     fns
   };
@@ -222,13 +221,6 @@ const SCEN = [
     ]
   },
   {
-    id: '16', name: '数据对比', steps: [
-      ['reset'], ['section', 'irrCompareSection'], ['wait', 400],
-      ['eval', 'var s=document.getElementById("irrCompareSection");if(s)s.style.display="";if(typeof refreshRunyeCompare==="function")refreshRunyeCompare();'],
-      ['wait', 500]
-    ]
-  },
-  {
     id: '17', name: '下载 / 打印 入口', steps: [
       ['reset'], ['section', 'pipePlanSection'], ['wait', 300],
       ['eval', 'window.measuredPolygon=[{x:0,y:0},{x:120,y:0},{x:120,y:80},{x:0,y:80}];if(typeof window.ppLoadPolygon==="function")window.ppLoadPolygon();'],
@@ -319,7 +311,6 @@ async function runStep(page, st) {
         pp: pack(snap.pp), tl: pack(snap.tl),
         ppLastSvgLen: snap.ppLastSvgLen, ppLastSvgHash: H(snap.ppLastSvg),
         materials: snap.materials,
-        compare: { len: snap.compare.len, hash: H(snap.compare.text) },
         sys: snap.sys,
         fns: snap.fns,
         vis: await page.evaluate(() => ({ ppDownload: window.__vis_ppDownload || null, ppPrint: window.__vis_ppPrint || null, tlDownload: window.__vis_tlDownload || null, tlPrint: window.__vis_tlPrint || null })),

@@ -272,7 +272,6 @@ function calcPlan(){
   if(typeof render==='function') render();
   if(typeof window.ppRender==='function') window.ppRender();
   if(typeof window.ppRefreshDiagramIfVisible==='function') window.ppRefreshDiagramIfVisible();
-  if(typeof refreshRunyeCompare==='function') refreshRunyeCompare();
 }
 
 // 渲染流程独立于二级计算状态；保留历史全局入口供现有调用方使用。

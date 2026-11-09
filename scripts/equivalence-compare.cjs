@@ -25,7 +25,7 @@ function compareSnapshots(base, current, expectedIds) {
     }
   }
   const fields = ['r', 'resultText', 'pipeTablesLen', 'pipeTablesHash', 'planBar', 'tlPlanBar',
-    'pp', 'ppLastSvgLen', 'ppLastSvgHash', 'tl', 'materials', 'compare', 'sys', 'fns', 'vis'];
+    'pp', 'ppLastSvgLen', 'ppLastSvgHash', 'tl', 'materials', 'sys', 'fns', 'vis'];
   for (const id of new Set([...expectedIds, ...Object.keys(base?.scenes || {}), ...Object.keys(current?.scenes || {})])) {
     const a = base?.scenes?.[id], b = current?.scenes?.[id];
     if (!a || !b) { diffs.push('场景 ' + id + ' 缺失'); continue; }

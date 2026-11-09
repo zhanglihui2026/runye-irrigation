@@ -1447,8 +1447,25 @@
    两处（空态+正常）缩放文字改画右下角（textAlign='right'，x=ppCanvas.width-8），画完
    复位 textAlign='start' 防污染下一帧。v896 因 .ry-pwa-install 浮条改左下的决定被本轮覆盖；
    v1018/v1021 的强制重画逻辑无害保留。测试锁②（workspace_view_guard）同步反转。
+   主串同抬 14 处 + 本 VERSION。
+   [v1029-irricad-compare-removed 用户「让系统简洁高效」分批清理第 1 步] 整套删除 06
+   「管道/水泵数据 vs IRRICAD 对比」：index.html 的 #irrCompareSection（121 行 DOM）+
+   两个外链（mod/style-04.css / mod/inline-06.js，文件一并删除）+ 本 CORE 两条登记。
+   外围消费方同步清干净：inline-32.js 文件菜单「IRRICAD 数据」项与 ryFileOpenIrricad
+   动作体、inline-11.js calcPlan 尾部 refreshRunyeCompare 调用、style-01.css 六处选择器、
+   两个等价性脚本的 compare 字段与场景 16、equivalence-compare.cjs 字段清单、
+   verify_design_input.js 入口断言。恢复方式：从 git 历史 v1028 之前取回上述文件。
+   主串同抬 14 处 + 本 VERSION。
+   [v1030-ws-stats-removed 用户「让系统简洁高效」分批清理第 2 步] 工具轨「管段管径与损失」
+   统计表整套删除（v105 起由总开关隐藏，从未上屏）：index.html 的 aside DOM + inline-27.js 的
+   隐藏开关/渲染函数/分区定位与滚动函数/表内改管径绑定/折叠键/表体 IIFE + tl-workspace.css
+   专用样式 + runye-mobile.css 选择器 + 5 处跨模块调用（inline-09 三处、inline-18、
+   inline-24）+ verify_ry_tool.js 七条正向契约（改为两条 mustNot 防复活）+ eslint globals 三项。
+   ★ 保留：#tlWsSegStatsGrip 工具轨宽度拖拽（重命名 IIFE 为 bindWsToolbarGrip，pane 改由
+   grip.closest 取得）、WS_STATS_WKEY 宽度存档键、wsSegRows()（经济面板数据源）。
+   恢复方式：从 git 历史 v1029 之前的提交取回上述文件与本块。
    主串同抬 14 处 + 本 VERSION。 */
-const VERSION = 'v1028-zoom-pct-bottom-right';
+const VERSION = 'v1030-ws-stats-removed';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
@@ -1533,7 +1550,6 @@ const CORE = [
   "mod/inline-03.js",
   "mod/inline-04.js",
   "mod/inline-05.js",
-  "mod/inline-06.js",
   "mod/inline-07.js",
   "mod/inline-08.js",
   "mod/inline-09.js",
@@ -1584,7 +1600,6 @@ const CORE = [
   "mod/map-right-drawer.js",
   "mod/style-01.css",
   "mod/style-03.css",
-  "mod/style-04.css",
   "mod/style-05.css",
   "filter-system/filter-system.css",
   "filter-system/filter-system.js",

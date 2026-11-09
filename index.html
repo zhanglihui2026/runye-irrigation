@@ -26,7 +26,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>润野灌溉设计优化版｜滴灌管径与水泵选型</title>
 <meta name="description" content="输入地块、滴灌带与水源参数，快速计算灌溉分区、主管支管管径和水泵工作点。"/>
-<link rel="stylesheet" href="mod/style-01.css?v=1028-zoom-pct-bottom-right">
+<link rel="stylesheet" href="mod/style-01.css?v=1030-ws-stats-removed">
 <link rel="stylesheet" href="runye-inverse-design.css?v=277">
 <script defer src="runye-inverse-design.js?v=438-branch-flow-conservation"></script>
 <link rel="stylesheet" href="runye-ai-plan.css?v=544-float-card-unify">
@@ -49,7 +49,7 @@
 <link rel="stylesheet" href="hydraulic-calc/hydraulic-calc.css">
 <link rel="stylesheet" href="filter-system/filter-system.css">
 <link rel="stylesheet" href="pwa/vendor/leaflet.css">
-<link rel="stylesheet" href="mod/online-map.css?v=1028-zoom-pct-bottom-right">
+<link rel="stylesheet" href="mod/online-map.css?v=1030-ws-stats-removed">
 <link rel="stylesheet" href="hydraulics-main.css?v=442-native">
 <style id="ryCadTwinCss">
 /* --- CAD global toolbar · generated selector twins ---
@@ -323,10 +323,10 @@ body.ry-worst-off [data-tlworst]{display:none}
   <script src="runye-entitle.js?v=621-invite-l2"></script>
   <script src="runye-member-ui.js?v=632-login-deeplink"></script>
   <!-- [v605-announce-modal] 首页公告弹窗（每次访问展示）：删掉本行即卸载，样式随脚本注入 #ryAnnCss -->
-  <script src="runye-announce.js?v=1028-zoom-pct-bottom-right"></script>
+  <script src="runye-announce.js?v=1030-ws-stats-removed"></script>
   <!-- 顶部导航动作按钮（系统图，runye-nav.js act 项）：动作映射须先于 runye-nav.js 注册 -->
   <script src="mod/inline-05.js?v=357"></script>
-  <script src="runye-nav.js?v=1028-zoom-pct-bottom-right"></script>
+  <script src="runye-nav.js?v=1030-ws-stats-removed"></script>
   <!-- [NEW MODULE: DXF 导出] 入口：删除本行即卸载（不改动任何原有逻辑） -->
   <script src="runye-dxf.js?v=840-trunk-dxf"></script>
   <!-- [NEW MODULE: pipe_optim] 入口：删除本行即卸载本隔离模块（不改动任何原有逻辑） -->
@@ -1481,16 +1481,11 @@ body.ry-worst-off [data-tlworst]{display:none}
          Math.floor(zi/tlGN) 兜底保留；分界线拖动与分区线角度功能不受影响。
          恢复方式：从 git 历史恢复本块 <aside id="tlGroupPanel"> 与 inline-09.js 对应函数块。 -->
     <link rel="stylesheet" href="mod/style-03.css?v=357">
-    <!-- 管段管径与损失统计表（2026-09-17 第四十二轮；第四十四轮按用户要求移入工具轨**内部顶端**）：
-         按分区逐段列出总管 / 主管 / 支管（段名 + 长度 + 管径 + 改前改后水头损失），管径可就地改
-         （同源 AE.cals，与右键改径等效）→ 图面同步 + 本表数值随动。
-         本表按分区统计**长度并支持改管径**。
-         显隐由 tlWsStatsRender 接管（无图时 display:none）；轨道总宽由右侧 #tlWsSegStatsGrip 调节。 -->
-    <aside id="tlWsStats" class="tl-ws-stats" style="display:none">
-      <!-- v105（2026-09-22 用户要求）：本表由 JS 总开关 window.TL_WS_STATS_HIDDEN 整体隐藏（tlWsStatsRender 顶部短路）；调回时把该开关改回 false -->
-      <div class="tl-ws-stats-title" id="tlWsStatsToggle" title="点击折叠 / 展开管段统计表"><span id="tlWsStatsArrow">▸</span> 管段管径与损失</div>
-      <div id="tlWsStatsBody"><div class="tl-ws-stats-empty">生成管线图后按分区逐段列出管长与管径，可就地改管径并查看水头损失变化。</div></div>
-    </aside>
+    <!-- [v1030 2026-11-09 用户「让系统简洁高效」分批清理第 2 步] 工具轨「管段管径与损失」统计表
+         整套删除（v105 起由总开关隐藏，早已不上屏）：DOM、渲染与分区定位函数、隐藏开关、
+         折叠键、表内改管径代理、专用样式、跨模块调用与契约一并清除。
+         恢复方式：从 git 历史 v1029 之前的提交取回上述文件与本块。
+         ★ 保留：工具轨宽度拖拽条 #tlWsSegStatsGrip、wsSegRows()（经济面板数据源，与本表无关）。 -->
     <!-- 插入主管 / 插入支管 / ⊥横竖锁定（2026-09-28 用户指令取消）：手工画线整链路不进水力计算
          与材料清单（红线口径），画了白画 = 实效失效；动态审计（_p1/_probe_wsbtn_audit）确认按钮
          机械可用后仍按指令移除 UI 入口。页面侧接线（bindMode / ortho 监听）全部空值守卫，
@@ -1676,131 +1671,9 @@ body.ry-worst-off [data-tlworst]{display:none}
 <!-- ===== DETAILS ===== -->
 <section class="details ry-sec" id="detailsSection"></section>
 
-<!-- ===== 06 管道/水泵数据 vs IRRICAD 对比 ===== -->
-<link rel="stylesheet" href="mod/style-04.css?v=357">
-<!-- 管道数据 VS IRRICAD 对比模块（功能完整保留，暂隐藏；将来要显示时，删除下一行 section 标签上的 style="display:none" 即可） -->
-<section class="details" id="irrCompareSection" style="display:none">
-  <div class="container">
-    <div class="detail-heading">
-      <span class="step">06</span>
-      <div>
-        <h2>管道 / 水泵数据 vs IRRICAD 对比</h2>
-        <p>将本工具最终确定的单区设计值，与 IRRICAD 灌溉设计软件输出逐项比对，直观查看差值与偏差。</p>
-      </div>
-    </div>
-
-    <div class="irr-compare-card">
-      <div class="card-title">
-        <h3>管径 / 水泵 比对表</h3>
-        <span>随设计参数自动更新</span>
-      </div>
-      <p class="irr-hint">「我们确定值」自动读取上方单区设计结果；在「IRRICAD 计算值」列填入软件输出，差值与偏差自动计算（差值 = 我们 − IRRICAD）。</p>
-      <table class="irr-table">
-        <thead>
-          <tr>
-            <th>项目</th>
-            <th>单位</th>
-            <th>我们确定值</th>
-            <th>IRRICAD 计算值</th>
-            <th>差值（我们−IRRI）</th>
-            <th>偏差 %</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>主管管径</td><td>mm</td>
-            <td class="irr-ours" id="ic_mainPipe">—</td>
-            <td><input class="irr-input" id="ic_mainPipe_irr" type="number" step="1" min="0" placeholder="如 75"></td>
-            <td class="irr-diff" id="ic_mainPipe_diff">—</td>
-            <td class="irr-pct" id="ic_mainPipe_pct">—</td>
-          </tr>
-          <tr>
-            <td>支管管径</td><td>mm</td>
-            <td class="irr-ours" id="ic_branchPipe">—</td>
-            <td><input class="irr-input" id="ic_branchPipe_irr" type="number" step="1" min="0" placeholder="如 50"></td>
-            <td class="irr-diff" id="ic_branchPipe_diff">—</td>
-            <td class="irr-pct" id="ic_branchPipe_pct">—</td>
-          </tr>
-          <tr>
-            <td>滴灌带管径</td><td>mm</td>
-            <td class="irr-ours" id="ic_tapeOD">—</td>
-            <td><input class="irr-input" id="ic_tapeOD_irr" type="number" step="1" min="0" placeholder="如 16"></td>
-            <td class="irr-diff" id="ic_tapeOD_diff">—</td>
-            <td class="irr-pct" id="ic_tapeOD_pct">—</td>
-          </tr>
-          <tr>
-            <td>水泵流量</td><td>m³/h</td>
-            <td class="irr-ours" id="ic_pumpFlow">—</td>
-            <td><input class="irr-input" id="ic_pumpFlow_irr" type="number" step="0.1" min="0" placeholder="如 32"></td>
-            <td class="irr-diff" id="ic_pumpFlow_diff">—</td>
-            <td class="irr-pct" id="ic_pumpFlow_pct">—</td>
-          </tr>
-          <tr>
-            <td>水泵扬程</td><td>m</td>
-            <td class="irr-ours" id="ic_pumpHead">—</td>
-            <td><input class="irr-input" id="ic_pumpHead_irr" type="number" step="0.1" min="0" placeholder="如 28"></td>
-            <td class="irr-diff" id="ic_pumpHead_diff">—</td>
-            <td class="irr-pct" id="ic_pumpHead_pct">—</td>
-          </tr>
-          <tr>
-            <td>水泵功率</td><td>kW</td>
-            <td class="irr-ours" id="ic_pumpPower">—</td>
-            <td><input class="irr-input" id="ic_pumpPower_irr" type="number" step="0.1" min="0" placeholder="如 5.5"></td>
-            <td class="irr-diff" id="ic_pumpPower_diff">—</td>
-            <td class="irr-pct" id="ic_pumpPower_pct">—</td>
-          </tr>
-        </tbody>
-      </table>
-      <div class="irr-toolbar">
-        <button class="irr-btn" id="icClearBtn" type="button">清空 IRRICAD 录入</button>
-        <div class="irr-legend">
-          <span><i class="dot g"></i>偏差≤3% 吻合</span>
-          <span><i class="dot a"></i>3%–8% 可接受</span>
-          <span><i class="dot r"></i>&gt;8% 需复核</span>
-        </div>
-      </div>
-      <div class="irr-import">
-        <div class="irr-import-head">
-          <span>📥 导入 IRRICAD 数据（粘贴报告或上传文件，自动识别 6 项）</span>
-          <button class="irr-btn" id="icToggleImport" type="button">收起</button>
-        </div>
-        <div class="irr-import-body" id="icImportBody">
-          <textarea id="icImportBox" class="irr-textarea" placeholder="在此粘贴 IRRICAD 输出，例如：&#10;主管管径 75 mm&#10;支管管径 50 mm&#10;滴灌带管径 16 mm&#10;水泵流量 32 m³/h&#10;水泵扬程 30 m&#10;水泵功率 6.0 kW&#10;&#10;也支持直接粘贴 IRRICAD 报告原文（自动识别 主管/支管/毛管/流量/扬程/功率 等关键词），或上传 .txt/.csv/.json 导出文件。"></textarea>
-          <div class="irr-import-actions">
-            <button class="irr-btn" id="icImportBtn" type="button">解析并导入</button>
-            <label class="irr-btn irr-filelabel">从文件导入<input type="file" id="icFileInput" accept=".txt,.csv,.json,.html" style="display:none"></label>
-            <span class="irr-import-status" id="icImportStatus"></span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="irr-note">
-      <h4>计算方法说明（差异来源）</h4>
-      <div class="irr-note-grid">
-        <div>
-          <b>本工具（润野）</b>
-          <ul>
-            <li>单区折算，经济流速 1.5 m/s 选 PE 管径（0.8–2.0 m/s 区间），PN0.4 / SDR13.6</li>
-            <li>Hazen-Williams 算沿程水头损失，多孔出流用 Christiansen 系数 F 折减</li>
-            <li>扬程 =（提升高度＋地形高差＋入口工作压力−已有压力＋主/支管损＋过滤阀损＋2 m 富余）×1.10</li>
-            <li>功率 P = 2.725×Q×H/η/1000（kW），参考 GB/T 50485《微灌工程技术标准》</li>
-          </ul>
-        </div>
-        <div>
-          <b>IRRICAD（专业软件）</b>
-          <ul>
-            <li>节点方程组 / 梯度法平差，逐滴头水头平衡，管网整体最优解</li>
-            <li>计入局部损失（弯头、三通、阀门）、逐段管件阻力</li>
-            <li>按设计均匀度要求反算管径与水泵工作点，结果通常更精细</li>
-            <li>差异主要源于：局部损失是否计入、多孔折减系数取值、均匀度标准松紧</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-<script src="mod/inline-06.js?v=357"></script>
+<!-- [v1029 2026-11-09 用户「让系统简洁高效」] 06 管道/水泵 vs IRRICAD 对比模块整套删除
+     （原 #irrCompareSection + mod/inline-06.js + mod/style-04.css + 文件菜单「IRRICAD 数据」）；
+     如需恢复，从 git 历史 v1028 之前的提交取回。 -->
 
 <section id="threeDModelingSection" class="ry-sec ry-modeling-section" aria-label="经济指标分析" style="max-width:none!important;padding-left:20px;padding-right:20px">
   <!-- 2026-09-17 第六十二轮（用户指令）：「水力计算器」接入真实功能，原「三维建模」占位页取消 ——
@@ -2275,7 +2148,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 </div>
 
 <script src="mod/material-formulas.js?v=412"></script>
-<script src="mod/zone-geometry.js?v=1028-zoom-pct-bottom-right"></script>
+<script src="mod/zone-geometry.js?v=1030-ws-stats-removed"></script>
 <script src="mod/flow-geometry.js?v=414"></script>
 <script src="mod/tl-polyline-geometry.js?v=426-tl-polyline-geometry"></script>
 <!-- [v421-mat-table] 材料清单/材料表管理（自 inline-09 迁出）：先于 inline-09 加载 —— inline-09 尾部
@@ -2286,7 +2159,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <!-- [v887-tape-zone-vgate] 段总管生成器（纯几何，Node 单测锁），先于 inline-09 消费方装载。
      [v900] 曾随段总管链误删引入；[v1017] 恢复（扬程链 P0，TASK_pump_head_mismatch_20261108 §5.0）。 -->
 <script src="mod/tl-seg-trunk.js?v=887-tape-zone-vgate"></script>
-<script src="mod/inline-09.js?v=1028-zoom-pct-bottom-right"></script>
+<script src="mod/inline-09.js?v=1030-ws-stats-removed"></script>
 <!-- [v423-header-layout] 三级简图标题布局依赖 inline-09 的 tlMeasureText 与生成时写入的标题状态。 -->
 <script src="mod/tl-header-layout.js?v=423-header-layout"></script>
 
@@ -2296,7 +2169,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <!-- ===== 实际地块规划 JS ===== -->
 <script src="mod/inline-11.js?v=653-zone-calibers"></script>
 <!-- [v420-split] 绘图编辑器 IIFE 自 inline-11 迁出：必须紧随 inline-11 之后同步执行 -->
-<script src="mod/plot-editor.js?v=1028-zoom-pct-bottom-right"></script>
+<script src="mod/plot-editor.js?v=1030-ws-stats-removed"></script>
 <script src="mod/inline-12.js?v=823-fix-transfer-save-alert"></script>
 <script src="mod/inline-13.js?v=831-trunk-schema-v2"></script>
 <!-- [v422-head-system-svg] 纯 SVG 核心先于 inline-14 同步加载。 -->
@@ -2317,7 +2190,7 @@ body.ry-worst-off [data-tlworst]{display:none}
 <!-- [v815] 绘图工具栏统一图标集（单色线性 SVG）：必须先于 inline-18.js 加载，
      inline-18 的 decorateToolbar 会在首次装饰时调用 window.RyIcons.decorate。 -->
 <script src="mod/ry-icons.js?v=1012-lock-icon-bigger"></script>
-<script src="mod/inline-18.js?v=1028-zoom-pct-bottom-right"></script>
+<script src="mod/inline-18.js?v=1030-ws-stats-removed"></script>
 
 <script src="mod/inline-19.js?v=696-shared-host-init-order"></script>
 
@@ -2452,21 +2325,21 @@ body.ry-worst-off [data-tlworst]{display:none}
 <script src="mod/trunk-snap.js?v=911-trunk-snap-edge"></script>
 <script src="mod/trunk-geo.js?v=854-null-slot-strict"></script>
 <!-- [v945] 总管口径反推（纯函数）：由规划分区的面积/流量 + 下游主管支管管径推手绘总管外径。 -->
-<script src="mod/trunk-size.js?v=1028-zoom-pct-bottom-right"></script>
+<script src="mod/trunk-size.js?v=1030-ws-stats-removed"></script>
 <script src="mod/trunk-edit.js?v=835-trunk-geo-snap"></script>
 <script src="mod/trunk-history.js?v=835-trunk-geo-snap"></script>
-<script src="mod/trunk-panel.js?v=1028-zoom-pct-bottom-right"></script>
+<script src="mod/trunk-panel.js?v=1030-ws-stats-removed"></script>
 <!-- [v887-tape-zone-vgate] 在线地图轮灌演示（分组/校验纯函数 + Leaflet 图层），先于宿主装载。 -->
-<script src="mod/map-flow-demo.js?v=1028-zoom-pct-bottom-right"></script>
-<script src="mod/online-map.js?v=1028-zoom-pct-bottom-right"></script>
+<script src="mod/map-flow-demo.js?v=1030-ws-stats-removed"></script>
+<script src="mod/online-map.js?v=1030-ws-stats-removed"></script>
 <!-- [v961] 在线地图右缘抽屉：把「图层」与「总管参数设置」两张浮层收成右缘竖排标签。
      参照「分区与管路」页的 #ppPlotDrawerTab / #tlWsLayerDrawerTab。必须在 online-map.js
      之后（它建的 #trunkPropPanel 由本模块接管；本模块自带轮询 + MutationObserver，顺序晚了也不丢）。 -->
-<script src="mod/map-right-drawer.js?v=1028-zoom-pct-bottom-right"></script>
+<script src="mod/map-right-drawer.js?v=1030-ws-stats-removed"></script>
 <script src="runye-hydraulics-page.js?v=829-hyd-auto-refresh"></script>
 <!-- [v978] 设计输入自动持久化：二级 fld_* / 三级 tl_* / planSrcDist 存 localStorage，
      刷新自动还原（版本升级强刷不再丢参数）。必须是最后一个脚本——还原时要调 calcPlan /
      renderThreeLevel，且要在「与二级联动」派生之后用存档覆盖回用户手改值。 -->
-<script src="mod/inline-33.js?v=1028-zoom-pct-bottom-right"></script>
+<script src="mod/inline-33.js?v=1030-ws-stats-removed"></script>
 </body>
 </html>

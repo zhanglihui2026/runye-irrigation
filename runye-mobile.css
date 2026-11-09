@@ -20,7 +20,6 @@ html.ry-mobile :is(#pipePlanSection,#tlPipePlanSection)[data-mobile-panel="open"
 html.ry-mobile :is(#pipePlanSection,#tlPipePlanSection) .pp-stage{display:flex;flex:1;flex-direction:column;min-width:0;min-height:0;width:100%;max-width:100%;height:100%;padding:0;overflow:hidden}
 html.ry-mobile :is(#pipePlanSection,#tlPipePlanSection) .pp-grip,
 html.ry-mobile #tlWsSegStatsGrip,
-html.ry-mobile #tlWsStats,
 html.ry-mobile #tlWsOverlays{display:none!important}
 html.ry-mobile :is(#pipePlanSection,#tlPipePlanSection) .ry-pane{flex:1;min-width:0;min-height:0;width:100%;max-width:100%;height:100%;overflow:hidden}
 html.ry-mobile #pipePlanSection[data-ry-view="edit"] .ry-pane-edit,
