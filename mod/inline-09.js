@@ -1892,19 +1892,18 @@ function computeThreeLevel() {
       return { zi: z.zi, run: z.run, main: z.main, branch: z.branch > 0 ? z.branch : branchLen,
         flow: area / tapeSpacing / emitterSpacing * emitterFlow / 1000 };
     });
-    /* [v1020 待办③] 链式主管过境段组合流量接线：routes 引擎给的 mainSegs 只带
-       {key,len,downZi}（downZi=路径同样经过该段的分区号集）；流量在本层才知道
-       （分区实际面积换算），这里把 downZi 求和为逐段 flow 交给 RyPipePathLoss。
-       无 mainSegs（旧引擎/旧快照）⇒ 不加字段，损失模型走单段口径零影响。 */
+    /* [v1020 待办③→v1023 深挖] 链式主管过境段组合流量：mainSegs 只透传
+       {key,len,downZi}（downZi=路径同样经过该段的分区号集，全项目拓扑覆盖），
+       段流量由 RyPipePathLoss.calculate 按「本轮实际同开的组内分区」（downZi ∩
+       本组）重算——设计页分组、地图演示组、手动组全部自动正确。
+       v1020 曾在本层预换算 {len,flow}（全项目覆盖口径），地图单区/跨组演示复算时
+       过境段损失虚大（过境区属于别组也计了流量）。无 mainSegs（旧引擎/旧快照）
+       ⇒ 不加字段，损失模型走单段口径零影响。 */
     (function () {
-      var flowOfZone = {};
-      pathZones.forEach(function (z) { flowOfZone[z.zi] = z.flow; });
       wp.zones.forEach(function (zSrc, zi2) {
         if (!pathZones[zi2] || !Array.isArray(zSrc.mainSegs) || !zSrc.mainSegs.length) return;
         pathZones[zi2].mainSegs = zSrc.mainSegs.map(function (s) {
-          var fl = 0;
-          (s.downZi || []).forEach(function (zd) { fl += (flowOfZone[zd] || 0); });
-          return { len: s.len, flow: fl };
+          return { key: s.key, len: s.len, downZi: (s.downZi || []).slice() };
         });
       });
     })();
@@ -2353,8 +2352,36 @@ window.tlMapGroupHydraulicsOf = function (zoneIndexes, opts) {
       ? opts.groups.filter(function (g) { return Array.isArray(g) && g.length; })
       : tlResolveGroups(areaList, r);
     var sharedPick = tlSharedTrunkPick(areaList, allGroups, r);
-    var pathZones = (r.inversePath && Array.isArray(r.inversePath.zones) && r.inversePath.zones.length)
-      ? r.inversePath.zones : null;
+    /* [v1023b 深挖] 数据源升级：直接吃 r.wp.zones（最不利路径引擎的**全分区**几何：
+       run/main/branch 图面米长 + mainSegs 逐段拓扑），逐区流量用**地图端 partitions
+       面积**（areaOverride，v950 声明的权威口径）现算，设计侧 cells 兜底。
+       旧路（inversePath）有两个口径坑：① zones 经 flow>0 过滤——设计侧网格裁剪把
+       某格面积裁成 0 时该区整区消失（用户地块 G10 起整片退化的根因层）；② flow 是
+       设计侧口径，与地图 partitions 面积不一致。wp.zones 无 flow 过滤、直供几何，
+       两坑同解：尾部区从估算口径升级回**精确路径口径**。
+       无 wp.zones（旧快照/引擎不可用）退回 inversePath 老路。 */
+    var calcZones = null;
+    if (r.wp && Array.isArray(r.wp.zones) && r.wp.zones.length) {
+      var perM2Wp = 1 / r.tapeSpacing / r.emitterSpacing * r.emitterFlow / 1000;
+      calcZones = r.wp.zones.map(function (z) {
+        var a = (areaOverride && isFinite(Number(areaOverride[z.zi])) && Number(areaOverride[z.zi]) > 0)
+          ? Number(areaOverride[z.zi])
+          : ((Array.isArray(r.zoneAreas) && isFinite(Number(r.zoneAreas[z.zi])) && Number(r.zoneAreas[z.zi]) > 0)
+            ? Number(r.zoneAreas[z.zi]) : 0);
+        var out = { zi: z.zi, run: z.run, main: z.main,
+          branch: z.branch > 0 ? z.branch : 0, flow: a * perM2Wp };
+        if (Array.isArray(z.mainSegs) && z.mainSegs.length) {
+          out.mainSegs = z.mainSegs.map(function (s) {
+            return { key: s.key, len: s.len, downZi: (s.downZi || []).slice() };
+          });
+        }
+        return out;
+      }).filter(function (z) { return z.flow > 0 && z.main > 0; });
+      if (!calcZones.length) calcZones = null;
+    }
+    var pathZones = calcZones
+      || ((r.inversePath && Array.isArray(r.inversePath.zones) && r.inversePath.zones.length)
+        ? r.inversePath.zones : null);
     /* [v950] 没有逐区路径（手绘总管路线 / 还没生成段总管）时不再直接返回 null ——
        退到「同一套公式、换成本组流量」的估算，让演示卡片能把扬程显示出来。
        opts.zoneAreas：地图端从地块 partitions 取到的逐区面积（比 computed 的网格口径更贴实际）。 */
@@ -2406,7 +2433,7 @@ window.tlMapGroupHydraulicsOf = function (zoneIndexes, opts) {
     var check = window.RyPipePathLoss.calculate({
       zones: available,
       groups: [members],
-      calibers: r.inversePath.calibers,
+      calibers: (r.inversePath && r.inversePath.calibers) || null,   /* [v1023b] inversePath 可为 null（新数据源不经它） */
       /* 以全项目共享的总管口径复算损失和需求扬程；已确认的逐段改径仍由 calibers 覆盖。 */
       frontOd: trunkPick ? trunkPick.od : (sharedOd || r.frontPipe.od),
       mainOd: mainOdEff || r.mainPipe.od,
@@ -2440,7 +2467,14 @@ window.tlMapGroupHydraulicsOf = function (zoneIndexes, opts) {
     var worstRaw = check.paths[rows.indexOf(worst)] || null;
     var mainVEff = null, branchVEff = null;
     if (worstRaw && mainOdEff > 0) {
-      try { var mpvP = selectPipe(worstRaw.mainFlow, r.targetV, mainOdEff, mainOdEff); if (mpvP) mainVEff = mpvP.v; } catch (eMVP) {}
+      /* [v1023] 主管流速口径与损失同源：有 mainSegs 时按本组重算后的**过境段流量峰值**
+         （最不利区路径上流量最大的那一段），比「本区自身流量」更贴链式布局物理；
+         无 mainSegs（旧引擎/旧快照）回退 mainFlow，行为不变。 */
+      try {
+        var mFlowV = (isFinite(worstRaw.mainSegFlowMax) && worstRaw.mainSegFlowMax > 0)
+          ? worstRaw.mainSegFlowMax : worstRaw.mainFlow;
+        var mpvP = selectPipe(mFlowV, r.targetV, mainOdEff, mainOdEff); if (mpvP) mainVEff = mpvP.v;
+      } catch (eMVP) {}
     }
     var branchOdPath = (r.branchPipe && Number(r.branchPipe.od) > 0) ? Number(r.branchPipe.od) : 0;
     if (worstRaw && branchOdPath > 0) {

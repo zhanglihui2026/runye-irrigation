@@ -32,15 +32,29 @@
         /* [v1020 待办③] 链式主管逐段组合流量：z.mainSegs 非空时逐段 hazen——
            过境段（本区主管链上、为下游区输水的段）按「下游覆盖分区流量和」计损，
            旧口径（全程按本区单区流量）系统性低估链式布局的过境损失。
-           每段 {len, flow}；len/flow 非法值按 0 兜底（不产生负长度/负流量）。
-           无 mainSegs ⇒ 与旧口径逐位相同（老调用方零影响）。 */
-        var mainLen = z.main, mainLoss = 0;
+           每段 len/flow 非法值按 0 兜底（不产生负长度/负流量）。
+           无 mainSegs ⇒ 与旧口径逐位相同（老调用方零影响）。
+           [v1023 深挖] 段流量按「本轮实际同开的组内分区」重算：downZi 是**全项目拓扑
+           覆盖**（路径经过该段的分区号集），本轮开阀的只有 active 组内区——设计分组
+           连续时二者一致，但地图演示单区/跨组联合时过境区属于别组，按全集算会把
+           过境段损失虚大（v1020 预换算的口径错位，任何调用方都会踩）。
+           旧 {len,flow} 格式（无 downZi）保持原样兼容。 */
+        var mainLen = z.main, mainLoss = 0, mainSegFlowMax = 0;
         if (Array.isArray(z.mainSegs) && z.mainSegs.length) {
+          var flowByZi = {};
+          active.forEach(function (az) { flowByZi[az.zi] = az.flow; });
           mainLen = 0;
           z.mainSegs.forEach(function (g) {
             var gl = Math.max(0, Number(g && g.len) || 0);
-            var gf = Math.max(0, Number(g && g.flow) || 0);
+            var gf;
+            if (Array.isArray(g && g.downZi)) {
+              gf = 0;
+              g.downZi.forEach(function (zd) { gf += (flowByZi[zd] || 0); });
+            } else {
+              gf = Math.max(0, Number(g && g.flow) || 0);
+            }
             mainLen += gl;
+            if (gf > mainSegFlowMax) mainSegFlowMax = gf;
             mainLoss += input.hazen(gl, gf, diameter('main-' + z.zi, input.mainOd));
           });
         } else {
@@ -54,7 +68,7 @@
           frontPipeLoss: frontLoss, mainLoss: mainLoss, branchLoss: branchLoss,
           total: frontLoss + mainLoss + branchLoss };
         if (Array.isArray(z.mainSegs) && z.mainSegs.length) {
-          row.mainSegFlowMax = z.mainSegs.reduce(function (m, g) { return Math.max(m, Math.max(0, Number(g && g.flow) || 0)); }, 0);
+          row.mainSegFlowMax = mainSegFlowMax;   /* [v1023] 按本组重算后的逐段流量峰值 */
         }
         paths.push(row);
         if (!worst || row.total > worst.total) worst = row;

@@ -1399,8 +1399,24 @@
    提示行）；② 估算链内缺区不再阻止总管选档（qGroup 只累加 members，缺区由提示行表达，
    表格不再连锁消失）。组卡自此只有一种版式，数据口径差异用「（估算）」「* 试算长」
    明示。巡检：tlGroupLossOf 为死分支（HydraulicsOf 同文件恒在）不改；渲染端 loss 分支
-   内版式已统一。主串同抬 14 处。 */
-const VERSION = 'v1022-group-card-estimate';
+   内版式已统一。主串同抬 14 处。
+   [v1023-transit-flow-regroup 用户「深挖一下轮灌演示水力计算」] 审查发现 v1020 引入的
+   过境段组合流量口径错位：mainSegs 在 computeThreeLevel 预换算 {len,flow} 用的是
+   **全项目拓扑覆盖**（downZi 全集流量和），隐含「覆盖区全部同开」——设计自动分组连续时
+   恰好成立，但地图演示单区/跨组联合复算时过境区属于别组、本轮并不开阀，过境段损失
+   被系统性算大。修复：换算责任收进 RyPipePathLoss.calculate——mainSegs 透传
+   {key,len,downZi}，段流量按「本轮实际同开的组内分区」（downZi ∩ 本组 active）重算，
+   设计页/地图组/手动组全部自动正确；旧 {len,flow} 格式兼容；主管流速改按本组重算后的
+   过境段流量峰值（与损失同源）。Node 用例锁定（跨组过境区不计入 + 单区演示组口径）；
+   主串同抬 14 处。
+   [v1023b（并入本版本）hydraulicsOf 数据源升级] 续挖发现组卡水力复算数据源口径坑：
+   tlMapGroupHydraulicsOf 原从 inversePath.zones 取数——该表经 flow>0 过滤且流量为设计侧
+   口径，cells=0 的尾部区整区消失（正是 G10+ 退化根因层）。升级为三级优先：
+   ① r.wp.zones（全分区几何，v1019 定版）+ 地图 partitions 面积现算 flow，mainSegs
+   透传 downZi 参与过境段重算；② inversePath.zones 老路兜底；③ 估算链。
+   calibers 引用加 null 守卫（新数据源不经 inversePath）；v981③ 字符串锁定测试同步
+   守卫写法（语义不变：手动改径仍由 calibers 覆盖）。 */
+const VERSION = 'v1023-transit-flow-regroup';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

@@ -84,6 +84,8 @@ test('[v981③] 路径链返回与估算链同构：pipes.mainRecheck + figure �
 });
 
 test('[v981③] 逐区确认改径仍优先：calibers 入参原样传递', () => {
-  const cAt = inline09.indexOf('calibers: r.inversePath.calibers');
+  /* [v1023b] hydraulicsOf 新数据源（r.wp.zones）下 inversePath 可为 null，
+     calibers 引用升级为守卫写法；语义不变：复核链仍继续传 calibers（手动改径不被冲掉）。 */
+  const cAt = inline09.indexOf('calibers: (r.inversePath && r.inversePath.calibers) || null');
   assert.ok(cAt > 0, '路径复算必须继续传 calibers（手动改径不被复核冲掉）');
 });
