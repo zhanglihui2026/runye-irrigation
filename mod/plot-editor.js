@@ -2411,9 +2411,13 @@
 
     if(!ppState.polyPts.length){
       // Empty state: just show hint text
-      ppCtx.fillStyle='rgba(15,23,42,.42)';ppCtx.font='10px sans-serif';ppCtx.textAlign='left';
-      /* [v896] 缩放文字画在左下角：右下角会被 .ry-pwa-install 浮条（fixed right/bottom 16px, z-index 2000）遮挡 */
-      ppCtx.fillText('缩放 '+((ppState.zoom*100).toFixed(0))+'%',8,ppCanvas.height-18);
+      ppCtx.fillStyle='rgba(15,23,42,.42)';ppCtx.font='10px sans-serif';ppCtx.textAlign='right';
+      /* [v1028 2026-11-09 用户口径] 缩放比例改画**右下角**：左下角与固定覆盖层
+         #tlWsOvLengths 的「主管/支管/布管方向」文字叠在一起——用户所说「文字叠加」的真因，
+         并非 v1018/v1021 判定的旧帧残影。v896 曾因 .ry-pwa-install 浮条移到左下，本轮按
+         用户最新要求移回右下；画完即复位 textAlign，避免污染下一帧的分区文字对齐。 */
+      ppCtx.fillText('缩放 '+((ppState.zoom*100).toFixed(0))+'%',ppCanvas.width-8,ppCanvas.height-18);
+      ppCtx.textAlign='start';
       ppCtx.fillStyle='rgba(15,23,42,.46)';ppCtx.font='14px sans-serif';ppCtx.textAlign='center';
       ppCtx.fillText('请先到「在线地图」画框并回传地块',ppCanvas.width/2,ppCanvas.height/2);
       return;
@@ -2454,10 +2458,11 @@
     ppCtx.fill();
     ppDrawZones(b);
 
-    // Scale + zoom indicator bottom-left [v896] 挪到左下角：右下角被 .ry-pwa-install 浮条遮挡
-    ppCtx.fillStyle='rgba(15,23,42,.42)';ppCtx.font='10px sans-serif';ppCtx.textAlign='left';
+    // Scale + zoom indicator bottom-right [v1028] 右下角，与左下固定文字层不再叠加
+    ppCtx.fillStyle='rgba(15,23,42,.42)';ppCtx.font='10px sans-serif';ppCtx.textAlign='right';
     var zPct=(ppState.zoom*100).toFixed(0)+'%';
-    ppCtx.fillText('缩放 '+zPct,8,ppCanvas.height-18);
+    ppCtx.fillText('缩放 '+zPct,ppCanvas.width-8,ppCanvas.height-18);
+    ppCtx.textAlign='start';
 
     // Polygon outline
     ppCtx.strokeStyle='rgba(26,71,49,.65)';

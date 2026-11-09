@@ -1439,8 +1439,16 @@
    段总管，v859→v869→v1017/v1017b 沿革）的反投底图。设计页 v1017b 已「图面不画」，
    地图反投此前仍开（v878 决定）⇒ 口径缝隙。本版对齐：演示底图不再常态绘制 segLL，
    仅当无手绘总管（segLL 兼任干线参与寻路，v1019 口径）时保留；寻路/校验/路由切片
-   照旧用 d.segLL（数据链零改动，纯视觉）。段总管存在性登记 AGENT_HANDOFF.md 待办⑥。 */
-const VERSION = 'v1027-segtrunk-map-hidden';
+   照旧用 d.segLL（数据链零改动，纯视觉）。段总管存在性登记 AGENT_HANDOFF.md 待办⑥。
+   [v1028-zoom-pct-bottom-right 用户「这个比例放到右下角吧……文字叠加实际上就是文字跟缩放比例叠加到一起了」]
+   根因翻案：用户此前多次反馈的「主管/支管文字底下还有东西」不是 v1018/v1021 判定的
+   浏览器旧帧残影，而是 plot-editor.js ppRender 在画布**左下角**（x=8）画的「缩放 xx%」
+   与固定覆盖层 #tlWsOvLengths 的「主管/支管/布管方向」文字叠在一起。按用户最新口径把
+   两处（空态+正常）缩放文字改画右下角（textAlign='right'，x=ppCanvas.width-8），画完
+   复位 textAlign='start' 防污染下一帧。v896 因 .ry-pwa-install 浮条改左下的决定被本轮覆盖；
+   v1018/v1021 的强制重画逻辑无害保留。测试锁②（workspace_view_guard）同步反转。
+   主串同抬 14 处 + 本 VERSION。 */
+const VERSION = 'v1028-zoom-pct-bottom-right';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

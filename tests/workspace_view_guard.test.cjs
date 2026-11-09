@@ -3,8 +3,11 @@
    锁两件事：
      ① inline-18.js syncLayers 只能在「首次渲染」（renderedPipelineData 从 null → 有值）
         时调 ppFitView 适应窗口——v784 起「每次数据变化都 fit」会重置用户手动缩放/平移；
-     ② plot-editor.js 的「缩放 xx%」文字必须画在画布左下角——右下角被
-        .ry-pwa-install 浮条（position:fixed;right:16px;bottom:16px;z-index:2000）遮挡。 */
+     ② plot-editor.js 的「缩放 xx%」文字必须画在画布**右下角**——
+        [v1028 2026-11-09 用户口径反转] 左下角与固定覆盖层 #tlWsOvLengths 的
+        「主管/支管/布管方向」文字叠在一起，才是用户所说「文字叠加」的真因
+        （v1018/v1021 的旧帧残影判定为误诊）。v896 因 .ry-pwa-install 浮条移到左下，
+        本轮按用户最新要求移回右下，并同步反转本锁②。 */
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
@@ -24,16 +27,17 @@ test('[v896] syncLayers 仅首次渲染适应窗口（数据更新不得重置�
   assert.doesNotMatch(seg, /if\(layerState\.pipeline\)\{try\{if\(typeof window\.ppFitView/, '旧的无条件 ppFitView 形态不得回归');
 });
 
-test('[v896] 缩放文字画在左下角（右下角被 PWA 浮条遮挡）', () => {
-  /* 两处「缩放」绘制都必须 x=8 + textAlign='left' */
+test('[v1028] 缩放文字画在右下角（左下角与固定文字层叠加）', () => {
+  /* 两处「缩放」绘制都必须 ppCanvas.width-8 + textAlign='right'，且画完复位 start */
   const spots = [];
   let idx = peSrc.indexOf("fillText('缩放 ");
   while (idx > -1) { spots.push(idx); idx = peSrc.indexOf("fillText('缩放 ", idx + 1); }
   assert.ok(spots.length === 2, 'plot-editor.js 必须恰好两处「缩放」绘制（空态+正常），实际 ' + spots.length);
   for (const pos of spots) {
-    const seg = peSrc.slice(Math.max(0, pos - 200), pos + 120);
-    assert.ok(seg.includes("textAlign='left'"), '「缩放」绘制必须 textAlign=left');
-    assert.ok(/,8,ppCanvas\.height-18\)/.test(seg), '「缩放」绘制必须画在左下角 (x=8)，实际片段缺失左下角坐标');
-    assert.ok(!/ppCanvas\.width-8,ppCanvas\.height-18/.test(seg), '不得再画在右下角（ppCanvas.width-8）');
+    const seg = peSrc.slice(Math.max(0, pos - 350), pos + 160);
+    assert.ok(seg.includes("textAlign='right'"), '「缩放」绘制必须 textAlign=right');
+    assert.ok(/,ppCanvas\.width-8,ppCanvas\.height-18\)/.test(seg), '「缩放」绘制必须画在右下角（ppCanvas.width-8）');
+    assert.ok(!/,8,ppCanvas\.height-18/.test(seg), '不得再画在左下角（x=8）——会与 #tlWsOvLengths 文字叠加');
+    assert.ok(seg.includes("textAlign='start'"), '画完必须复位 textAlign，避免污染下一帧分区文字对齐');
   }
 });
