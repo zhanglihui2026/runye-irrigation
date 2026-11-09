@@ -2369,7 +2369,12 @@ window.tlMapGroupHydraulicsOf = function (zoneIndexes, opts) {
           : ((Array.isArray(r.zoneAreas) && isFinite(Number(r.zoneAreas[z.zi])) && Number(r.zoneAreas[z.zi]) > 0)
             ? Number(r.zoneAreas[z.zi]) : 0);
         var out = { zi: z.zi, run: z.run, main: z.main,
-          branch: z.branch > 0 ? z.branch : 0, flow: a * perM2Wp };
+          /* [v1024] branch 回退与设计侧/估算链同源：wp.branch=0（该区没画支管）时设计侧
+             pathZones 与估算链都回退试算长 r.branchLenUsed，老路 inversePath 构造自设计侧
+             已内置回退——calcZones 若回退 0，地图组卡该区支管损失=0、与同区设计页数字
+             分叉（v1023b 引入的口径缺口）。 */
+          branch: z.branch > 0 ? z.branch : ((Number(r.branchLenUsed) > 0) ? Number(r.branchLenUsed) : 0),
+          flow: a * perM2Wp };
         if (Array.isArray(z.mainSegs) && z.mainSegs.length) {
           out.mainSegs = z.mainSegs.map(function (s) {
             return { key: s.key, len: s.len, downZi: (s.downZi || []).slice() };

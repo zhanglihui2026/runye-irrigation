@@ -1415,8 +1415,13 @@
    ① r.wp.zones（全分区几何，v1019 定版）+ 地图 partitions 面积现算 flow，mainSegs
    透传 downZi 参与过境段重算；② inversePath.zones 老路兜底；③ 估算链。
    calibers 引用加 null 守卫（新数据源不经 inversePath）；v981③ 字符串锁定测试同步
-   守卫写法（语义不变：手动改径仍由 calibers 覆盖）。 */
-const VERSION = 'v1023-transit-flow-regroup';
+   守卫写法（语义不变：手动改径仍由 calibers 覆盖）。
+   [v1024-branch-fallback-calczones] 续挖发现 v1023b 遗留一处回退缺口：calcZones 的
+   branch 字段 `z.branch>0?z.branch:0`——wp.branch=0（该区没画支管）时地图组卡支管
+   损失=0、长度显示 0.0 m，而设计侧 pathZones 与估算链同场景回退试算长
+   r.branchLenUsed，老路 inversePath 构造自设计侧已内置回退 ⇒ 同区三处数字分叉。
+   修复：calcZones branch 回退改为与 r.branchLenUsed 同源。主串同抬 14 处。 */
+const VERSION = 'v1024-branch-fallback-calczones';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
