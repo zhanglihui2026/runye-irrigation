@@ -82,6 +82,25 @@
   var p=matches[0];p.partitionPlan=plan;p.partitions=partitions;
   return commitPartitionResult(state,net,previousNetworkRaw);
  }
+ function capturePartitions(plotId){
+  if(plotId==null||String(plotId).trim()==='')return {ok:true,skipped:true,reason:'plot-identity-missing'};
+  if(!root.__runyeMapFrameInv||!root.RunyeBridge)return {ok:true,skipped:true,reason:'partition-context-unavailable'};
+  var inv=root.__runyeMapFrameInv,base=root.__runyeGeoBase;
+  if(!base||!Number.isFinite(base.refLat)||!Number.isFinite(base.refLng))return {ok:true,skipped:true,reason:'map-frame-unavailable'};
+  var m=6378137*Math.PI/180,co=Math.cos(base.refLat*Math.PI/180);
+  function ll(p){var x=p.x-inv.tx,y=p.y-inv.ty;return[base.refLat+(inv.ay*x+inv.by*y)/m,base.refLng+(inv.ax*x+inv.bx*y)/(m*co)];}
+  var partitionState=root.RunyeBridge.getPartitionState();
+  var plan={version:1,angle:Math.atan2(inv.ay,inv.ax)*180/Math.PI,params:params(),cutSnap:copy(partitionState.cutSnap),cutOverrides:copy(partitionState.cutOverrides),zoneRotated:!!partitionState.zoneRotated};
+  var partitions=polygons(ll),state=readLibrary();
+  if(!state.ok)return {ok:false,error:state.error||'plot-library-unavailable'};
+  var matches=state.plots.filter(function(p){return p&&String(p.id)===String(plotId);});
+  if(matches.length!==1)return {ok:false,error:'plot-library-identity-not-unique'};
+  var p=matches[0];
+  if(JSON.stringify(p.partitionPlan||null)===JSON.stringify(plan)&&JSON.stringify(p.partitions||[])===JSON.stringify(partitions))return {ok:true,unchanged:true,partitions:partitions};
+  p.partitionPlan=plan;p.partitions=partitions;
+  var saved=commitPartitionResult(state,null,null);
+  return saved.ok?{ok:true,partitions:partitions,revision:saved.revision}:saved;
+ }
  function preview(payload,angle){payload=copy(payload);payload.partitionPlan={version:1,angle:angle,params:(payload.partitionPlan||{}).params||{},zoneRotated:!!(payload.partitionPlan||{}).zoneRotated};root.runyeApplyMapPayload(payload);if(typeof root.ppSetZoneAngleDeg==='function')root.ppSetZoneAngleDeg(-angle);
   var b=root.RunyeBridge,F=root.__runyeMapFramePoly,c=center(F.map(p=>({x:p.x,y:-p.y}))),base=root.__runyeGeoBase,m=6378137*Math.PI/180,co=Math.cos(base.refLat*Math.PI/180);
   function ll(p){return[base.refLat-p.y/m,base.refLng+p.x/(m*co)];}
@@ -304,5 +323,5 @@
    root.RyMapHost.send(p,this);};
   root.addEventListener('storage',refresh);root.addEventListener('runye-plots-updated',refresh);refresh();return{refresh:refresh};
  }
- root.RyMapPartition={center:center,valid:valid,restore:restore,capture:capture,preview:preview,attach:attach,commitPartitionResult:commitPartitionResult};
+ root.RyMapPartition={center:center,valid:valid,restore:restore,capture:capture,capturePartitions:capturePartitions,preview:preview,attach:attach,commitPartitionResult:commitPartitionResult};
 })(typeof window!=='undefined'?window:globalThis);

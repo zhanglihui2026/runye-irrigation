@@ -4095,11 +4095,6 @@ function tlAutoGenerate(options) {
   options = options || {};
   var doScroll = options.scroll !== false;
   var mapAreas = readOnlineMapZoneAreas();
-  if (!mapAreas) {
-    var areaTip = document.getElementById('atToast');
-    if (areaTip) { areaTip.textContent = '请先在在线地图完成并保存当前地块分区面积'; areaTip.classList.add('show'); setTimeout(function () { areaTip.classList.remove('show'); }, 2600); }
-    return false;
-  }
   try {
   // 局部辅助函数（三级页在 IIFE 之外，无法访问二级页内部的 pp* 函数，故此处自包含实现）
   function tlZoneActualAreaM2(zc,zr,zoneCuts,plotPoly){
@@ -4203,9 +4198,37 @@ function tlAutoGenerate(options) {
     cols=xPlan.length; rows=yPlan.length;
   }
   var totalZones=cols*rows;
-  if (mapAreas.length !== totalZones) {
+  /* 二级分区调整后，先用当前 RunyeBridge 网格更新地图地块库，再进入三级水力计算。
+     若先拿旧地图区数做一致性拦截，分区数量变化时会在回写地图之前提前退出。 */
+  var mapFramePoly=window.__runyeMapFramePoly, mapFrameInv=null;
+  try{
+    if(mapFramePoly&&mapFramePoly.length===poly.length&&poly.length>=3){
+      var mp0=mapFramePoly[0],mp1=mapFramePoly[1],mp2=mapFramePoly[2],qp0=poly[0],qp1=poly[1],qp2=poly[2];
+      var mux=mp1.x-mp0.x,muy=mp1.y-mp0.y,mvx=mp2.x-mp0.x,mvy=mp2.y-mp0.y;
+      var mdet=mux*mvy-muy*mvx;
+      if(isFinite(mdet)&&Math.abs(mdet)>=1e-9){
+        var qux=qp1.x-qp0.x,quy=qp1.y-qp0.y,qvx=qp2.x-qp0.x,qvy=qp2.y-qp0.y, miv=1/mdet;
+        var ma=(qux*mvy-qvx*muy)*miv, mb=(qvx*mux-qux*mvx)*miv, mc=(quy*mvy-qvy*muy)*miv, md=(qvy*mux-quy*mvx)*miv;
+        var mdetL=ma*md-mb*mc;
+        if(isFinite(mdetL)&&Math.abs(mdetL)>=1e-9){
+          var mil=1/mdetL;
+          mapFrameInv={ax:md*mil,ay:-mc*mil,bx:-mb*mil,by:ma*mil,tx:qp0.x-(ma*mp0.x+mb*mp0.y),ty:qp0.y-(mc*mp0.x+md*mp0.y)};
+        }
+      }
+    }
+  }catch(eMapFrameInv){mapFrameInv=null;}
+  if(mapFrameInv)window.__runyeMapFrameInv=mapFrameInv;
+  var partitionSync=window.RyMapPartition&&typeof window.RyMapPartition.capturePartitions==='function'
+    ?window.RyMapPartition.capturePartitions(window.currentPlotId||null):{ok:true,skipped:true,reason:'partition-sync-unavailable'};
+  if(partitionSync&&partitionSync.ok===false){
+    var syncTip=document.getElementById('atToast');
+    if(syncTip){syncTip.textContent='地图分区同步失败：'+(partitionSync.error||'请确认当前地块后重试');syncTip.classList.add('show');setTimeout(function(){syncTip.classList.remove('show');},3200);}
+    return false;
+  }
+  mapAreas=readOnlineMapZoneAreas();
+  if(!mapAreas||mapAreas.length!==totalZones){
     var mismatchTip = document.getElementById('atToast');
-    if (mismatchTip) { mismatchTip.textContent = '在线地图分区数量与当前管网图不一致，请先同步当前地块分区'; mismatchTip.classList.add('show'); setTimeout(function () { mismatchTip.classList.remove('show'); }, 3000); }
+    if (mismatchTip) { mismatchTip.textContent = '请先在在线地图保存有效分区，并确认地图分区与当前管网区数一致'; mismatchTip.classList.add('show'); setTimeout(function () { mismatchTip.classList.remove('show'); }, 3200); }
     return false;
   }
   /* v98h 阶梯分区本地包装：zX/zY 取「该行 / 该列的割缝位置」；zXb/zYb 取相邻两行/列在指定格上的公共边带。

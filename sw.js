@@ -1472,9 +1472,9 @@
    ★ 版本号不写死：脚本从主样式表 ?v= 读取（显示短号 v1031，完整串放 title 与
    data-ry-version-full），与 14 处主串 / 本 VERSION 同源、同抬，tests/version_sync.test.cjs
    增一条契约锁「徽标存在 + 由 JS 填充 + 不写死」。
-   [v1032-area-single-source] 水力与材料计算统一读取在线地图当前地块的分区面积；地图分区缺失或无效时停止面积相关计算。
+   [v1033-map-partition-sync] 分区与管路调整后先同步在线地图分区，再继续水力计算。
    主串同抬 + 本 VERSION，确保 Pages 与 Service Worker 更新到唯一面积源版本。 */
-const VERSION = 'v1032-area-single-source';
+const VERSION = 'v1033-map-partition-sync';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
