@@ -210,7 +210,6 @@
       /* 当前边界已换成新地块：清掉内存中的上一块管线；持久化步骤按新 ID 恢复该块自己的
          L2 档案，成组地块则由 ppLoadPolygon 从各成员档案初始化 slots。 */
       if(typeof window.ppSetState==='function') window.ppSetState({});
-      if(typeof updatePlan === 'function') updatePlan();
       // 地块引用已在库中：只更新当前工程，不把旋转后的图面坐标写回地图原始边界。
       // 旧版完整载荷仍走落库路径；两种路径都刷新管线绘图区并保存当前工程。
       // [2026-10-12 数字农业剥离] 原「持久化函数缺失时改走对端回写」的回落分支随桥接层
@@ -249,6 +248,9 @@
         }catch(eInitialNetwork){console.warn('[map-transfer] 初始管路图层生成失败',eInitialNetwork);}
         try{if(typeof window.runyeSaveProject==='function')window.runyeSaveProject(true);}catch(eInitialSave){console.warn('[map-transfer] 初始分区管线留档失败',eInitialSave);}
       }
+      /* 面积与分区已从地图载荷恢复后再统一重算，避免先用旧分区或空面积计算。 */
+      try{if(typeof window.updatePlan==='function')window.updatePlan();}catch(ePlanRefresh){console.warn('[map-transfer] 面积计算刷新失败',ePlanRefresh);}
+      try{if(typeof window.render==='function')window.render();}catch(eRenderRefresh){console.warn('[map-transfer] 水力结果刷新失败',eRenderRefresh);}
       transferStore.remove(transferId);
       return true;
     }catch(e){

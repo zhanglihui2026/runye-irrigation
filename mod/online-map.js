@@ -1784,7 +1784,7 @@
   function currentOdAdvice(){
     try{
       if(typeof window.tlTrunkOdAdvice!=='function') return null;
-      return window.tlTrunkOdAdvice({zoneAreas:currentZoneAreas()});
+      return window.tlTrunkOdAdvice();
     }catch(e){ return null; }
   }
 

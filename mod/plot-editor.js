@@ -2220,7 +2220,7 @@
        并把逐区实切面积发布到 window.__ppZoneActuals —— calcPlan 的实切模式与
        「分区管径明细」吃这份。签名不变不回调 calcPlan（render 本就由 calcPlan 触发，
        最多多走一轮，无死循环）。 */
-    var __calActual = (function(){ try { return localStorage.getItem('runye_caliber_mode') === 'actual'; } catch(e){ return false; } })();
+    var __calActual = true;
     var __tsp = parseFloat((document.getElementById('planTapeSpacing')||{}).value) || 0.4;
     var __esp = parseFloat((document.getElementById('planEmitterSpacing')||{}).value) || 0.3;
     var __ef  = parseFloat((document.getElementById('planEmitterFlow')||{}).value) || 0.8;
@@ -2228,6 +2228,7 @@
     var __par = (typeof readSelectedInt === 'function')
       ? (readSelectedInt('#branchGroup .selected', 2) * readSelectedInt('#layoutGroup .selected', 1)) : 2;
     var __act = [];
+    var __mapAreas = (typeof readOnlineMapZoneAreas === 'function') ? readOnlineMapZoneAreas() : null;
     ppCtx.setLineDash([]);
     ppCtx.textBaseline='top';
     for(var zr=0;zr<cuts.rows;zr++){
@@ -2242,8 +2243,8 @@
         var zoneScreenW=Math.hypot(q2.x-q1.x,q2.y-q1.y),zoneScreenH=Math.hypot(q3.x-q2.x,q3.y-q2.y);
         var labelAngle=Math.atan2(q2.y-q1.y,q2.x-q1.x);
         if(labelAngle>Math.PI/2)labelAngle-=Math.PI;else if(labelAngle<-Math.PI/2)labelAngle+=Math.PI;
-        var _m2=ppZoneActualAreaM2(zc,zr,cuts,ppState.polyPts);
-        var _mu=_m2/666.67;
+        var _mapM2=(__mapAreas && __mapAreas.length>zi) ? __mapAreas[zi] : 0;
+        var _mu=_mapM2/666.67;
         /* [v850 用户反馈] 标注放到分块**右上角**（原居中，压着主管线难读）。
            q1 左上 / q2 右上 / q3 右下 / q4 左下。锚点 = q2 沿边内缩（局部 x 缩 padX、
            y 缩 padY），文字右对齐（textAlign='right'），行从锚点向下排。
@@ -2291,17 +2292,12 @@
             }
           }
         }
-        var _std=cuts.xPlan[zc]*cuts.yPlan[zr]/666.67;
-        var _partial=_std>0 && _mu<_std*0.97 && _mu>0.05;
-        if(_mu>0.05)__act.push({zi:zi,m2:_m2,mu:_mu});
-        var __pick=(__calActual&&_mu>0.05&&window.ryZonePipePick)?window.ryZonePipePick(_m2,__tsp,__esp,__ef,__tv,__par):null;
-        if(_mu>0.05&&zoneScreenW>16&&zoneScreenH>11){
+        if(_mapM2>0)__act.push({zi:zi,m2:_mapM2,mu:_mu});
+        var __pick=(__calActual&&_mapM2>0&&window.ryZonePipePick)?window.ryZonePipePick(_mapM2,__tsp,__esp,__ef,__tv,__par):null;
+        if(_mapM2>0&&zoneScreenW>16&&zoneScreenH>11){
           var zoneSizeText=ppZoneSizeLabel(cuts.xPlan[zc],cuts.yPlan[zr]);
-          /* [v890 2026-11-05] 双口径：实划亩数 +（偏差 >3% 时）设计亩数。
-             _partial（被地块边界裁掉一角）时保持只显示实切亩数 —— 那种偏差是
-             几何裁切造成的，已有琥珀描边提示，再叠一层文字会互相打架。 */
-          var __zaDrift=(function(){ try{ if(_partial) return null; var G=window.RyZoneGeometry; return (G&&G.zoneAreaDrift)?G.zoneAreaDrift(layout.zoneArea,_std*666.67):null; }catch(e0){ return null; } })();
-          var zoneAreaText=(__zaDrift&&__zaDrift.ok)?(zoneScreenW>=72?__zaDrift.text:__zaDrift.shortText):((_partial?_mu:(cuts.xPlan[zc]*cuts.yPlan[zr]/666.67)).toFixed(1)+'亩');
+          /* 分区面积标注与水力计算统一使用在线地图分区面积。 */
+          var zoneAreaText=_mu.toFixed(1)+'亩';
           var baseFont=Math.max(6,Math.min(10,Math.min(zoneScreenW/12,zoneScreenH/4.5)));
           ppCtx.save();ppCtx.translate(labelCenter.x,labelCenter.y);ppCtx.rotate(labelAngle);
           ppCtx.fillStyle='#000';ppCtx.textAlign='right';ppCtx.textBaseline='middle';
@@ -2310,8 +2306,7 @@
             ppCtx.font=baseFont+'px sans-serif';ppCtx.fillText((zi+1)+'区',0,r1);
             ppCtx.font=baseFont+'px sans-serif';ppCtx.fillText(zoneSizeText,0,r1+rowH);
             if(zoneScreenH>=43){
-              /* 漂移标琥珀：与「非标分区」描边同色系但更暗，避免和管径行抢注意力 */
-              ppCtx.fillStyle=(__zaDrift&&__zaDrift.drift)?'#b45309':'#000';
+              ppCtx.fillStyle='#000';
               ppCtx.fillText(zoneAreaText,0,r1+rowH*2);
               ppCtx.fillStyle='#000';
             }

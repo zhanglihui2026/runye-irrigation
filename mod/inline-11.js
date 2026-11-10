@@ -2,11 +2,12 @@
 window.measuredArea = 0;
 
 function updatePlan(){
-  const area = window.measuredArea || 0;
+  const mapZoneAreas = (typeof readOnlineMapZoneAreas === 'function') ? readOnlineMapZoneAreas() : null;
+  const area = mapZoneAreas ? mapZoneAreas.reduce(function(sum, a){ return sum + a; }, 0) : 0;
   const tag = document.getElementById('planAreaTag');
 
   if(area <= 0){
-    if(tag) tag.textContent = '未测量';
+    if(tag) tag.textContent = '请先在在线地图保存完整分区面积';
     /* [v436-pp-normalize] 原此处对 ppPlanBar/ppPlanBar2 写内联 style.display='flex'
        的语句已删除：参数栏显示方式归一至 ry-panel.css 皮肤块（display:block），
        不再需要 CSS 侧用 !important 反压内联样式。 */
@@ -60,8 +61,10 @@ function calcPlan(){
   //   内联编辑 / 联动同步都会走它），而内联编辑是**程序化赋值**、不冒事件，
   //   光靠 document 上的 input/change 捕获监听补不到 ⇒ 放在这里做不变量式回填（相等时无操作）。
   if (typeof ppPullLiftDh === 'function') ppPullLiftDh();
-  const area = window.measuredArea || 0;
-  if(area <= 0) return;
+  const mapZoneAreas = (typeof readOnlineMapZoneAreas === 'function') ? readOnlineMapZoneAreas() : null;
+  if(!mapZoneAreas){ clearPlanResults(); return; }
+  const area = mapZoneAreas.reduce(function(sum, a){ return sum + a; }, 0);
+  if(area <= 0) { clearPlanResults(); return; }
 
   const tapeLen = readNumber('planTapeLaySide', 100, { min: 0.01 });   /* 2026-09-28：单带长度取消，改读单边铺设长度（语义重复合并） */
   const tapeSpacing = readNumber('planTapeSpacing', 0.4, { min: 0.01 });
@@ -81,6 +84,7 @@ function calcPlan(){
   const requestedN = readNumber('planN', 1, { integer: true, min: 1 });
   const zoneModeEl = document.getElementById('planZoneMode');
   const manualZoneInput = document.getElementById('planZoneMuManual');
+  if (manualZoneInput) manualZoneInput.value = (Math.max.apply(null, mapZoneAreas) / MU_TO_SQM).toFixed(2);
 
   // A/B from actual polygon bounding box (fallback to 1.5 ratio when no polygon)
   var A, B, bbOX = 0, bbOY = 0;
@@ -147,25 +151,12 @@ function calcPlan(){
   const totalTapes = Math.max(1, Math.ceil(tapeTotalLen / tapeLen));
   const tapeRolls = tapeRollLen > 0 ? Math.ceil(tapeTotalLen * 1.1 / tapeRollLen) : 0;
 
-  // Per-zone flow (pump sized for single zone operation) — 按最大分区实际面积选型
-  const zoneAreaM2 = zoneAreaForShape;
-  /* v97（2026-09-21，用户口径）：二级「水泵流量」改为按【标准分区设计值】计，不再裁剪图面实测分区面积。
-     原因：实测最大分区面积可能 > 标定亩数，按图面裁剪反而偏小（实测 >18 亩却取到 13.95 亩），与"分区划定 18 亩"对不上。
-     用户要求二级始终按分区划定亩数选型；图面裁剪只作用于三级管线编辑页（手动调分区的影响在三级体现，不影响本页）。
-     flowAreaM2 = 手动亩/区→亩×MU_TO_SQM；否则方正标准分区 A×B/N。flowAreaSrc='design'。 */
-  var flowAreaM2 = manualZoneMu > 0 ? manualZoneMu * MU_TO_SQM : (A * B / N);
-  var flowAreaSrc = 'design';
-  /* [v653] 实切口径：逐区实切面积（网格∩实测多边形）由画布层 ppDrawZones 发布到
-     window.__ppZoneActuals，本页取「最大实切分区」为单区基准 —— 与三级
-     figureMaxZone 同一口径。设计值（v97：标准分区/划定亩数）仍是默认；
-     切换入口 = 结果栏「管径口径」按钮（localStorage 持久化）。 */
-  var __ppActuals = (window.__ppZoneActuals && window.__ppZoneActuals.length) ? window.__ppZoneActuals : null;
-  var __ppCaliberActual = (function(){ try { return localStorage.getItem('runye_caliber_mode') === 'actual'; } catch(e){ return false; } })();
-  if (__ppCaliberActual && __ppActuals) {
-    var __maxActM2 = 0;
-    for (var zaI = 0; zaI < __ppActuals.length; zaI++) { if (__ppActuals[zaI].m2 > __maxActM2) __maxActM2 = __ppActuals[zaI].m2; }
-    if (__maxActM2 > 1) { flowAreaM2 = __maxActM2; flowAreaSrc = 'figureMaxZone'; }
-  }
+  // 全部水力流量与管径只按在线地图分区面积计算；设计网格与手填亩数不作为面积回退源。
+  const flowAreaM2 = Math.max.apply(null, mapZoneAreas);
+  const flowAreaSrc = 'onlineMapPartitions';
+  const zoneAreaM2 = flowAreaM2;
+  var __ppActuals = mapZoneAreas.map(function(m2, zi){ return {zi:zi, m2:m2, mu:m2/MU_TO_SQM}; });
+  var __ppCaliberActual = true;
   const flowZoneMu = flowAreaM2 / MU_TO_SQM;
   const zoneTapeLen = flowAreaM2 / tapeSpacing;
   const zoneRows = Math.max(1, Math.ceil(zoneHEff / tapeSpacing));
@@ -232,11 +223,10 @@ function calcPlan(){
 
   // Update area tag in title
   const tag=document.getElementById('planAreaTag');
-  const zoneModeLabel = manualZoneMu > 0 ? '单区划定' : '单区折算';
-  if(tag) tag.innerHTML='实测 <b>'+area.toFixed(1)+' m²</b> · '+totalMu.toFixed(2)+' 亩 · '+(layoutSides===2?'双边':'单边')+' · '+zoneLayout.cols+'列×'+zoneLayout.rows+'行 · '+zoneModeLabel+'<b>'+Math.round(zoneLayout.zoneW)+'×'+Math.round(zoneLayout.zoneH)+'m</b>'+(flowAreaSrc==='figureMaxZone'?(' · 流量按图面最大分区 <b>'+(flowAreaM2/MU_TO_SQM).toFixed(2)+' 亩</b>'):(flowAreaSrc==='design'?(' · 流量按标准分区 <b>'+(flowAreaM2/MU_TO_SQM).toFixed(2)+' 亩</b>'):''));
+  if(tag) tag.innerHTML='在线地图分区面积 <b>'+area.toFixed(1)+' m²</b> · '+totalMu.toFixed(2)+' 亩 · 最大分区 '+(flowAreaM2/MU_TO_SQM).toFixed(2)+' 亩 · '+(layoutSides===2?'双边':'单边')+' · '+zoneLayout.cols+'列×'+zoneLayout.rows+'行';
 
   // Store all data for apply
-  window.planData = { A, B, N, zoneCols: zoneLayout.cols, zoneRows: zoneLayout.rows, zoneW: zoneLayout.zoneW, zoneH: zoneLayout.zoneH, mainPipeLen, tapeLen, tapeSpacing, emitterSpacing, emitterFlow, tapeRollLen, tapeTotalLen, totalTapes, tapesPerZone, zoneTapeLen, lift, dh, totalMu, zoneFlow, pumpHead, pumpPower, motorKW, intensity, manualZoneMu, targetV, flowAreaM2, flowAreaSrc, mainPipeOD:'Ø '+mainPipe.od+' mm', branchPipeOD:'Ø '+branchPipe.od+' mm', mainPipeODValue:mainPipe.od, branchPipeODValue:branchPipe.od, mainVelocity:mainPipe.v, branchVelocity:branchPipe.v,
+  window.planData = { A, B, N, zoneCols: zoneLayout.cols, zoneRows: zoneLayout.rows, zoneW: zoneLayout.zoneW, zoneH: zoneLayout.zoneH, mainPipeLen, tapeLen, tapeSpacing, emitterSpacing, emitterFlow, tapeRollLen, tapeTotalLen, totalTapes, tapesPerZone, zoneTapeLen, lift, dh, totalMu, zoneFlow, pumpHead, pumpPower, motorKW, intensity, manualZoneMu, targetV, flowAreaM2, flowAreaSrc, zoneAreas: mapZoneAreas.slice(), mainPipeOD:'Ø '+mainPipe.od+' mm', branchPipeOD:'Ø '+branchPipe.od+' mm', mainPipeODValue:mainPipe.od, branchPipeODValue:branchPipe.od, mainVelocity:mainPipe.v, branchVelocity:branchPipe.v,
     // 水泵扬程计算中间量，用于施工简图展示
     tapePressure, tapePressureM, existPressure, mainLoss, branchLoss, filterLoss, headBeforeSafety, headBeforeSafetyRaw, safetyFactor: SAFETY_FACTOR, marginHead: MARGIN_HEAD, efficiency, branchCount, branchParallelCount, layoutSides
   };
@@ -345,13 +335,11 @@ document.addEventListener('change', ppLiftDhCapture, true);
 ppPullLiftDh();                                              // 首屏对齐一次
 // （ppToggleCalc 的 click 已在 ppToggleCalcDetail 定义处立即绑定，无需再注册 DOMContentLoaded）
 
-/* ===== [v653] 管径口径切换：设计值（v97 默认，标准分区/划定亩数口径）/
-   实切面积（最大实切分区为单区基准，与三级 figureMaxZone 同口径）。=====
-   实切模式下：结果栏主管/支管/水泵三件套按实切流量重选，画布逐区标注建议管径，
+/* ===== 管径与流量统一按在线地图分区面积计算：最大分区为单区基准，
+   全部分区面积之和用于全地块滴灌带与材料总量。画布逐区标注建议管径，
    「分区管径明细」显示每区的实切亩数 / 流量 / 主管Ø / 支管Ø（小分区自动变细）。 */
 function ppCaliberMode(){
-  try { return localStorage.getItem('runye_caliber_mode') === 'actual' ? 'actual' : 'design'; }
-  catch(e){ return 'design'; }
+  return 'actual';
 }
 function ppApplyCaliberModeUI(){
   var btn = document.getElementById('ppCaliberModeBtn');
@@ -360,7 +348,7 @@ function ppApplyCaliberModeUI(){
   btn.classList.toggle('active', actual);
   /* [v973→v990] 按钮搬进顶部工具栏后文案再简化：「设计口径 / 实切口径」两态各 4 字，
      工具栏是图标钮，短名同时用于 aria-label 与 title 前缀；完整语义仍在 title 正文。 */
-  var label = actual ? '实切口径' : '设计口径';
+  var label = '地图面积';
   /* [v990] 工具栏按钮已由 RyIcons 挂上 SVG，直接写 textContent 会把图标子节点
      一并清掉（ry-icons.js v824 记录的病根：点一下按钮图标永久消失、只剩空白方块）
      ⇒ 改走 setLabel 只替换文字节点；RyIcons 尚未加载时退回原写法（那时还没挂 SVG）。 */
@@ -369,12 +357,9 @@ function ppApplyCaliberModeUI(){
   /* 工具栏把文字压成图标（font-size:0），aria-label 由 decorateToolbar 按初始文字写入；
      切态后必须自己同步，否则读屏仍报旧口径。 */
   btn.setAttribute('aria-label', label);
-  btn.title = actual
-    ? '实切口径：当前按「分区实切面积」取最大实切分区为单区基准，主管/支管/水泵随实切流量选型，画布逐区标注建议管径。点击切回设计值。'
-    : '设计口径：当前按 v97 设计值口径（标准分区/划定亩数，全区一档）。点击切换「实切面积」：小分区的建议管径自动变细，并可看逐区明细。';
+  btn.title = '面积唯一来源：在线地图当前地块的分区面积；水力流量和管径按最大分区及各区实际面积计算。';
 }
 function ppSetCaliberMode(m){
-  try { localStorage.setItem('runye_caliber_mode', m === 'actual' ? 'actual' : 'design'); } catch(e){}
   ppApplyCaliberModeUI();
   calcPlan();
 }

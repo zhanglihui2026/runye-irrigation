@@ -1104,11 +1104,9 @@
       if(ggi0>=0){ if(!gsAll[ggi0])gsAll[ggi0]=[]; gsAll[ggi0].push(gzi0); }
     }
     gsAll=gsAll.filter(function(x){return Array.isArray(x)&&x.length;});
-    var _za=(typeof ctx.getZoneAreas==='function')?ctx.getZoneAreas():null;
     try{
-      /* [v950] 第二个参数把「当前地块的逐区面积」递进去：没有段总管时 inline-09 会退回
-         按组扬程估算，估算离不开逐区面积（地图端的地块 partitions 才是权威值）。 */
-      if(typeof window.tlMapGroupHydraulicsOf==='function')loss=window.tlMapGroupHydraulicsOf(memberIndexes,{zoneAreas:_za,groups:gsAll});
+      /* 水力计算自行从当前地块地图分区读取唯一面积数组；地图仅传轮灌成员。 */
+      if(typeof window.tlMapGroupHydraulicsOf==='function')loss=window.tlMapGroupHydraulicsOf(memberIndexes,{groups:gsAll});
       else if(typeof window.tlGroupLossOf==='function')loss=window.tlGroupLossOf(g);
     }catch(e){}
     /* [v945] 没有图面路径时的口径反推（用户 2026-11-04）：
@@ -1123,7 +1121,6 @@
           /* [v967] 不再传 groupIndex：总管口径是项目级共享值，按最不利组定一次。
              传了 groupIndex 就等于「每区各算一个总管口径」——正是被否掉的那个做法。 */
           adv=window.tlTrunkOdAdvice({
-            zoneAreas:(typeof ctx.getZoneAreas==='function')?ctx.getZoneAreas():null,
             groups:gsAll
           });
         }
@@ -1170,12 +1167,11 @@
          切组频率下无感。找不到有效扬程（缺路径/缺面积）就不标，绝不硬造。 */
       var headKing=null;
       try{
-        var _zaK=(typeof ctx.getZoneAreas==='function')?ctx.getZoneAreas():null;
         for(var gk=0;gk<gsAll.length;gk++){
           var _memK=gsAll[gk];
           if(!Array.isArray(_memK)||!_memK.length)continue;
           var _LK=null;
-          try{_LK=window.tlMapGroupHydraulicsOf(_memK,{zoneAreas:_zaK,groups:gsAll});}catch(eKH){_LK=null;}
+          try{_LK=window.tlMapGroupHydraulicsOf(_memK,{groups:gsAll});}catch(eKH){_LK=null;}
           /* [v1026 方案C] 记录王组是否估算口径（_LK.estimated），校核行明示「（估算口径）」
              ——估算值全组共用试算长、天然偏保守，与路径精确口径不同精度，只标注不修正。 */
           if(_LK&&isFinite(_LK.head)&&(!headKing||Number(_LK.head)>headKing.head))headKing={gi:gk,head:Number(_LK.head),est:_LK.estimated===true};
@@ -1299,9 +1295,7 @@
     refresh: refresh,
     stop: stop,
     isActive: function () { return active != null || playing; },
-    /* [v1026 用户拍板] 只读导出：宿主 ctx.getZoneAreas 的安全通道——设计页统一逐区
-       面积口径用（与地图组卡 v1023b 同一把尺子）。ctx 未注入/地图未开时返回 null，
-       调用方回退设计网格裁剪，离线行为逐位不变。 */
+    /* 只读导出当前地块地图分区面积；缺少地图分区时返回 null，水力计算必须停止，不能回退网格或手填面积。 */
     zoneAreasOf: function () {
       try { return (ctx && typeof ctx.getZoneAreas === 'function') ? ctx.getZoneAreas() : null; }
       catch (eZA) { return null; }

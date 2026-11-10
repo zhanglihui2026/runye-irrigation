@@ -96,14 +96,6 @@ function tlZoneGx(cuts, ri, ci) {
 function tlZoneGy(cuts, ci, ri) {
   return window.RyZoneGeometry.zoneGy(cuts, ci, ri);
 }
-/* ===== 分区实际面积与联合分组统计（2026-09-21 v95，L2/L3 共用同一口径）=====
-   cuts = {xPos,yPos,xPlan,yPlan,cols,rows}（米制网格，含手动拖拽割缝）；
-   poly = 实测地块多边形点（与 cuts 同坐标系，通常 window.measuredPolygon）；n = 联合分区数。
-   分区序号 zi = zr*cols + zc（行主序，与图面 data-zi / 区号 (zi+1) 一致）；
-   组号 g = floor(zi / n)（与图面联合灌溉色带同规则），尾组不足 n 个区按实际参与比较。
-   返回 { ok, cells[m²], maxCell, maxCellIndex, groups[{g,sum,zones[]}], maxGroup, maxGroupIndex, groupCount } */
-function ryZoneAreaGroups(cuts, poly, n) { return window.RyZoneGeometry.zoneAreaGroups(cuts, poly, n); }
-
 function tlMeasureText(str){var w=0;for(var k=0;k<str.length;k++){var ch=str[k];w+=(ch.charCodeAt(0)>255?12:6.5);}return w;}
 
 /* 2026-09-24 用户要求：分区固定边可调 —— 面板「单边铺设长度」×2（双边铺设长度），
@@ -365,19 +357,31 @@ function readSelectedInt(selector, fallback) {
   return Number.isFinite(value) ? value : fallback;
 }
 
+function readOnlineMapZoneAreas() {
+  try {
+    var values = window.RyMapFlowDemo && typeof window.RyMapFlowDemo.zoneAreasOf === 'function'
+      ? window.RyMapFlowDemo.zoneAreasOf() : null;
+    if (!Array.isArray(values) || !values.length) return null;
+    var areas = Array.from(values, Number);
+    return areas.every(function (a) { return isFinite(a) && a > 0; }) ? areas : null;
+  } catch (e) { return null; }
+}
+
 // ===== COMPUTE =====
 function compute() {
-  const zoneMuInput = readNumber('fld_zoneMu', 30, { min: 0.1 });
+  const mapZoneAreas = readOnlineMapZoneAreas();
+  if (!mapZoneAreas) return null;
+  const zoneMuInput = Math.max.apply(null, mapZoneAreas) / MU_TO_SQM;
   const fixedSideInput = readNumber('fld_zoneFixedSide', MAX_ZONE_SIDE, { min: 1 });
   const fixedSide = Math.min(MAX_ZONE_SIDE, Math.max(1, fixedSideInput));
   document.getElementById('fld_zoneFixedSide').value = fixedSide;
-  const maxZoneAreaM2 = fixedSide * MAX_ZONE_SIDE;
-  const zoneAreaM2 = Math.min(zoneMuInput * MU_TO_SQM, maxZoneAreaM2);
+  const zoneAreaM2 = zoneMuInput * MU_TO_SQM;
   const zoneMu = zoneAreaM2 / MU_TO_SQM;
   const zoneMuField = document.getElementById('fld_zoneMu');
-  const zoneMuProxyActive = document.activeElement && document.activeElement.matches && document.activeElement.matches('sl-input[data-ry-proxy-for="fld_zoneMu"]');
-  if (document.activeElement !== zoneMuField && !zoneMuProxyActive) zoneMuField.value = fmt(zoneMu, 2);
-  const derivedSide = Math.min(MAX_ZONE_SIDE, Math.max(1, zoneAreaM2 / fixedSide));
+  if (zoneMuField) zoneMuField.value = fmt(zoneMu, 2);
+  const zoneMuProxy = document.querySelector('sl-input[data-ry-proxy-for="fld_zoneMu"]');
+  if (zoneMuProxy) zoneMuProxy.value = fmt(zoneMu, 2);
+  const derivedSide = Math.max(1, zoneAreaM2 / fixedSide);
   const A = fixedSide;
   const B = derivedSide;
   document.getElementById('fld_A').value = Math.round(A);
@@ -404,8 +408,8 @@ function compute() {
   const mainPipeLen = readNumber('fld_mainPipeLen', A, { min: 0 });
   const tapeRollLen = readNumber('fld_tapeRollLen', 2000, { min: 0 });
 
-  const totalArea = zoneAreaM2;
-  const totalMu = zoneMu;
+  const totalArea = mapZoneAreas.reduce(function (sum, a) { return sum + a; }, 0);
+  const totalMu = totalArea / MU_TO_SQM;
   const tapeRows = Math.max(1, Math.ceil(B / tapeSpacing));
   const segmentsPerRow = Math.max(1, Math.ceil(A / tapeLen));
   const totalTapes = tapeRows * segmentsPerRow;
@@ -489,6 +493,11 @@ function branchCountLabel(perSide, sides) {
 function render() {
   const r = compute();
   window._r = r;
+  if (!r) {
+    var panel = document.getElementById('resultPanel');
+    if (panel) panel.innerHTML = '<p class="area-source-warning">当前地块没有完整有效的在线地图分区面积，设计计算已停止。请先在在线地图完成并保存分区。</p>';
+    return;
+  }
 
   // 首屏 hero 已取消，原 heroSummary 渲染逻辑一并移除（同数据见下方 result-panel 的 .area-strip）
   // 02 标题栏（02 实际方案 · 实时更新）已按要求取消，内容直接从 .area-strip 开始
@@ -751,8 +760,8 @@ function render() {
     ? window.tlMainLineCount((typeof window.tlVisibleMainPipes === 'function') ? window.tlVisibleMainPipes() : window.tlDiagramData.mainPipes)
     : 0;
   const teeN = mainLineN;
-  const matTotalMu = window.measuredArea ? window.measuredArea / 666.67 : (r.totalMu || (r.zoneMu * r.N) || 0);
-  // 滴灌带：总面积(m²) ÷ 滴灌带间距(m)；面积优先施工简图实测面积、回退设计面积；间距优先施工简图输入、回退设计参数
+  const matTotalMu = r.totalMu || 0;
+  // 滴灌带长度按在线地图分区面积总和计算；间距优先施工简图输入、回退设计参数
   const ppTapeSpEl = document.getElementById('planTapeSpacing');
   const matTapeSpacing = parseFloat(ppTapeSpEl ? ppTapeSpEl.value : '') || r.tapeSpacing || 0.8;
   const matTapeLen = (matTotalMu > 0 && matTapeSpacing > 0) ? (matTotalMu * 666.67) / matTapeSpacing : r.tapeTotalLen;
@@ -764,10 +773,10 @@ function render() {
      支管上的三通按 Ø主 × Ø支。同类型同规格合并数量，单价可填并计入材料总计。
      无节点 / 图面未生成时整段为空串，材料表维持原样。整段删除即卸载本功能。 */
   var nodeFitRows = '';
-  var rrMat=computeThreeLevel(),pipeBuckets=useTl?RyMaterialAudit.buckets(window.tlDiagramData,rrMat,window.RyTlAutoEdits,window.tlIsPipeHidden,window.tlFrontVisibleRatio(),window.RyTlEditPipes?window.RyTlEditPipes.list():[]):null;
-  if(pipeBuckets){var extraSrc=readNumber('planSrcDist',0,{min:0});if(extraSrc>0){var srcBucket=pipeBuckets.front.find(q=>q.od===rrMat.frontPipe.od);if(!srcBucket){srcBucket={od:rrMat.frontPipe.od,len:0};pipeBuckets.front.push(srcBucket);}srcBucket.len+=extraSrc;}}
+  var rrMat=computeThreeLevel(),pipeBuckets=useTl&&rrMat?RyMaterialAudit.buckets(window.tlDiagramData,rrMat,window.RyTlAutoEdits,window.tlIsPipeHidden,window.tlFrontVisibleRatio(),window.RyTlEditPipes?window.RyTlEditPipes.list():[]):null;
+  if(pipeBuckets&&rrMat){var extraSrc=readNumber('planSrcDist',0,{min:0});if(extraSrc>0){var srcBucket=pipeBuckets.front.find(q=>q.od===rrMat.frontPipe.od);if(!srcBucket){srcBucket={od:rrMat.frontPipe.od,len:0};pipeBuckets.front.push(srcBucket);}srcBucket.len+=extraSrc;}}
   try {
-    if (window.RyTlNodes && typeof window.RyTlNodes.list === 'function') {
+    if (rrMat && window.RyTlNodes && typeof window.RyTlNodes.list === 'function') {
       var ndList = window.RyTlNodes.list() || [];
       if (ndList.length) {
         var ndCals = null;
@@ -1627,6 +1636,7 @@ function tlPushToHydraulicCalc() {
     var wp = tlWorstPathLen();
     if (!wp || !wp.fromFigure) return false;
     var r = computeThreeLevel();
+    if (!r) return false;
     var bc = Math.max(1, r.branchParallelCount | 0);
     /* v2.1（2026-09-19 用户核对流量）+ v95（2026-09-21 用户口径）：联合灌溉 = 全图轮灌中同时只开 tl_zoneCount 区
        （面板「联合灌溉分区数」）；总管流量 = 该 N 下「最大联合组的实际面积和」换算的 combinedFlow
@@ -1647,6 +1657,7 @@ function tlPushToHydraulicCalc() {
     /* 来源行列表式（2026-09-19 用户批注「用列表表示更美观」） */
     var srcTitle = '已导入三级方案 · ' + zones.length + ' 区联合灌溉 · 最远 ' + (wp.zoneIndex + 1) + ' 区';
     var srcRows = [
+      '面积来源：在线地图当前地块分区面积，最大分区 ' + fmt(r.flowAreaM2 / MU_TO_SQM, 2) + ' 亩，全地块合计 ' + fmt(r.totalArea / MU_TO_SQM, 2) + ' 亩',
       '总管：OD ' + r.frontPipe.od + ' · ' + fmt(r.frontLenUsed, 1) + ' m',
       '主管：OD ' + r.mainPipe.od + ' × ' + zones.length + ' 区' + (allZones.length > zones.length ? '（全图 ' + allZones.length + ' 区轮灌，按最不利组合取最远 ' + zones.length + ' 区）' : '（各区图面实长）') + ',',
       '支管：OD ' + r.branchPipe.od + ' · ' + fmt(r.branchLenUsed, 1) + ' m × 每区 ' + bc + ' 根（每根 ' + fmt(r.branchFlow, 1) + ' m³/h）',
@@ -1654,7 +1665,8 @@ function tlPushToHydraulicCalc() {
         ? ' · 最大联合组 第 ' + (r.worstGroup.g + 1) + ' 组 ' + r.worstGroup.zones.map(function (z) { return (z + 1) + '区'; }).join('、') + ' 的面积和'
         : ' · 估算 ' + fmt(r.zoneFlow, 1) + ' × ' + (r.zoneCount | 0 || 1)) + '）——计算器总管流量同此值'
     ];
-    HC.importThreeLevel({ trunk: { od: r.frontPipe.od, len: r.frontLenUsed }, mains: mains, srcTitle: srcTitle, srcRows: srcRows });
+    HC.importThreeLevel({ trunk: { od: r.frontPipe.od, len: r.frontLenUsed }, mains: mains, srcTitle: srcTitle, srcRows: srcRows,
+      areaSource: r.flowAreaSrc, zoneAreasM2: r.zoneAreas.slice(), totalAreaM2: r.totalArea, combinedAreaM2: r.combinedAreaM2 });
     return true;
   } catch (e) { return false; }
 }
@@ -1728,11 +1740,18 @@ window.tlWorstPathToggle = tlWorstPathToggle;
    若用同名的 window.tlWorstPathOn 赋值，会把布尔状态替换成函数，开关首击就算错。 */
 window.tlWorstPathIsOn = function () { return tlWorstPathOn; };
 
-function computeThreeLevel() {
-  const zoneMuInput = readNumber('tl_zoneMu', 30, { min: 0.1 });
+function computeThreeLevel(options) {
+  options = options || {};
+  var mapZoneAreas = readOnlineMapZoneAreas();
+  if (!mapZoneAreas) return null;
+  var zoneMuField = document.getElementById('tl_zoneMu');
+  if (zoneMuField) zoneMuField.value = (Math.max.apply(null, mapZoneAreas) / MU_TO_SQM).toFixed(2);
+  var currentZones = window.tlDiagramData && window.tlDiagramData.zones;
+  if (!options.allowUnmatchedGeometry && currentZones && currentZones.cols > 0 && currentZones.rows > 0 && currentZones.cols * currentZones.rows !== mapZoneAreas.length) return null;
+  const zoneMuInput = Math.max.apply(null, mapZoneAreas) / MU_TO_SQM;
   const fixedSideInput = readNumber('tl_zoneFixedSide', 300, { min: 1 });
   const fixedSide = Math.max(1, fixedSideInput);  // no MAX_ZONE_SIDE cap
-  const zoneAreaM2 = Math.max(0.1, zoneMuInput) * MU_TO_SQM;
+  const zoneAreaM2 = zoneMuInput * MU_TO_SQM;
   const zoneMu = zoneAreaM2 / MU_TO_SQM;
   const derivedSide = Math.max(1, zoneAreaM2 / fixedSide);
   const A = fixedSide;
@@ -1773,50 +1792,18 @@ function computeThreeLevel() {
   let frontLenMap = frontLenPick.mapLen;
   let mainLenUsed = (wp.fromFigure && wp.main > 0) ? wp.main : mainPipeLen;
 
-  /* 水泵流量按「最大分区的实际面积」计（2026-09-21，用户口径）：分区实际面积=裁剪到实测地块
-     多边形的面积；取全部分区的最大者作为单区流量基准，联合流量=最大分区流量×联合分区数（最不利）。
-     二级共享网格（RunyeBridge.getZoneCuts，含拖拽割缝）+实测多边形存在时生效；
-     无网格/多边形或取数异常时退回「单个分区面积」输入值（flowAreaSrc='input'）。 */
-  /* v95：一次算全图分区实际面积 + 按联合分区数自动分组（组号 = floor(分区序号 / N)），
-     单区侧取 maxCell（最大分区实际面积），联合侧取 maxGroup（最大组的面积和）。 */
-  var tlGrid = (function () {
-    try {
-      var share = window.RunyeBridge ? window.RunyeBridge.getZoneCuts() : null;
-      var poly = window.measuredPolygon;
-      if (!share || !share.cols || !share.rows || !share.xPos || !share.yPos) return null;
-      if (!poly || poly.length < 3) return null;
-      /* v98h：三级流量 / 面积口径必须和三级图面看到的一致 ⇒ 把阶梯覆盖表挂到共享网格上
-         （ryZoneAreaGroups 认得 cutOffX / cutOffY；空表时与改动前逐位相同）。 */
-      var _st = tlZoneStepFor(share); if (_st) { share.cutOffX = _st.x; share.cutOffY = _st.y; }
-      return { share: share, poly: poly };
-    } catch (e) { return null; }
-  })();
-  var zoneStat = null;
-  if (tlGrid) {
-    var gs = ryZoneAreaGroups(tlGrid.share, tlGrid.poly, zoneCount);
-    if (gs && gs.ok && gs.maxCell > 0) zoneStat = gs;
-  }
-  var flowAreaM2 = zoneStat ? zoneStat.maxCell : zoneAreaM2;
-  var flowAreaSrc = zoneStat ? 'figureMaxZone' : 'input';
+  /* 水力设计面积唯一来源：当前在线地图地块的 partitions.area。网格裁剪仅用于图面几何，
+     不参与流量、选径、轮灌组或水力结果；地图分区缺失/不完整时上方直接阻断计算。 */
+  /* 轮灌自动组按当前地图分区序号连续分组，组面积直接累加唯一地图分区面积数组。 */
+  var flowAreaM2 = Math.max.apply(null, mapZoneAreas);
+  var flowAreaSrc = 'onlineMapPartitions';
   const flowZoneMu = flowAreaM2 / MU_TO_SQM;
-  /* [v1026 用户拍板「第一个改」] 逐区面积统一口径：在线地图 partitions 优先
-     （与地图组卡 v1023b 同一把尺子，v950 声明的权威口径），地图未开/离线回退
-     设计网格裁剪——回退路径行为逐位不变。只统一「水力损失链」三处消费：
-     ① 逐组损失 pathZones（原 1891 直读 cells）② r.zoneAreas（原 cells.slice）
-     ③ 最不利手动组判定 tlCells；选档基准 flowAreaM2（flowAreaSrc 声明）维持现状。 */
-  var mapZoneAreas = null;
-  try {
-    var _mza = (window.RyMapFlowDemo && typeof window.RyMapFlowDemo.zoneAreasOf === 'function') ? window.RyMapFlowDemo.zoneAreasOf() : null;
-    if (Array.isArray(_mza) && _mza.length) mapZoneAreas = _mza;
-  } catch (eMZA) { mapZoneAreas = null; }
   function tlZoneAreaAt(zi) {
-    if (mapZoneAreas && isFinite(Number(mapZoneAreas[zi])) && Number(mapZoneAreas[zi]) > 0) return Number(mapZoneAreas[zi]);
-    if (zoneStat) return zoneStat.cells[zi] || 0;
-    return flowAreaM2;
+    return (Number.isInteger(zi) && zi >= 0 && zi < mapZoneAreas.length) ? mapZoneAreas[zi] : 0;
   }
 
-  const totalArea = zoneAreaM2;
-  const totalMu = zoneMu;
+  const totalArea = mapZoneAreas.reduce(function (sum, a) { return sum + a; }, 0);
+  const totalMu = totalArea / MU_TO_SQM;
   const tapeRows = Math.max(1, Math.ceil(B / tapeSpacing));
   const segmentsPerRow = Math.max(1, Math.ceil(A / tapeLen));
   const totalTapes = tapeRows * segmentsPerRow;
@@ -1847,7 +1834,7 @@ function computeThreeLevel() {
   var tlManualWorstG = -1, tlManualWorstZones = [];   /* v107（2026-09-22 修复）：记录获胜手动组，让 worstGroup 与联合流量同源 */
   var tlMaxUngroupedZi = -1;
   if (tlManualGroupsRef) {
-    var tlCells = (mapZoneAreas && mapZoneAreas.length) ? mapZoneAreas : (zoneStat ? zoneStat.cells : []);   /* [v1026] partitions 优先，与地图卡流量王同口径 */
+    var tlCells = mapZoneAreas;
     var tlGroupedSet = {};
     for (var tlGi = 0; tlGi < tlManualGroupsRef.length; tlGi++) {
       var tlSum = 0; var tlArr = tlManualGroupsRef[tlGi];
@@ -1861,22 +1848,30 @@ function computeThreeLevel() {
     }
     tlGroupSource = 'manual';
   }
+  var autoWorstAreaM2 = 0, autoWorstGroupIndex = -1, autoWorstZones = [];
+  for (var ag = 0; ag < mapZoneAreas.length; ag += zoneCount) {
+    var autoMembers = [], autoSum = 0;
+    for (var az = ag; az < Math.min(mapZoneAreas.length, ag + zoneCount); az++) { autoMembers.push(az); autoSum += mapZoneAreas[az]; }
+    if (autoSum > autoWorstAreaM2) { autoWorstAreaM2 = autoSum; autoWorstGroupIndex = Math.floor(ag / zoneCount); autoWorstZones = autoMembers; }
+  }
   const combinedAreaM2 = tlGroupSource === 'manual'
-    ? Math.max(tlManualWorstM2, tlMaxUngroupedM2, (tlManualWorstM2 > 0 || tlMaxUngroupedM2 > 0) ? 0 : (flowAreaM2 * zoneCount))
-    : ((zoneStat && zoneStat.maxGroup > 0) ? zoneStat.maxGroup : (flowAreaM2 * zoneCount));
+    ? Math.max(tlManualWorstM2, tlMaxUngroupedM2)
+    : autoWorstAreaM2;
   const combinedFlow = combinedAreaM2 / tapeSpacing / emitterSpacing * emitterFlow / 1000;
 
-  /* v95：对比表「不同联合分区数」逐档口径 —— 每一档 N 都按「该 N 下最大组的实际面积和」算流量
-     （与 combinedFlow 同一 ryZoneAreaGroups 口径，故 groupAreaByN[zoneCount].flow === combinedFlow）；
-     无图面网格/多边形时逐档退回「单区流量 × N」的初步估算。 */
+  /* 不同联合分区数逐档比较：每档都按同一地图面积数组分组并求最大组面积和。 */
   var groupAreaByN = {};
   (function () {
     var ns = [1, 2, 3, 4, 6, 8, zoneCount];
     for (var ni = 0; ni < ns.length; ni++) {
       var key = Math.max(1, Math.round(ns[ni]));
       if (groupAreaByN[key]) continue;
-      var g = tlGrid ? ryZoneAreaGroups(tlGrid.share, tlGrid.poly, key) : null;
-      var areaN = (g && g.ok && g.maxGroup > 0) ? g.maxGroup : (flowAreaM2 * key);
+      var areaN = 0;
+      for (var gi = 0; gi < mapZoneAreas.length; gi += key) {
+        var sumN = 0;
+        for (var gj = gi; gj < Math.min(mapZoneAreas.length, gi + key); gj++) sumN += mapZoneAreas[gj];
+        if (sumN > areaN) areaN = sumN;
+      }
       groupAreaByN[key] = { areaM2: areaN, flow: areaN / tapeSpacing / emitterSpacing * emitterFlow / 1000 };
     }
   })();
@@ -2074,23 +2069,22 @@ function computeThreeLevel() {
        front/main/branch:路径长度m, frontLoss/mainLoss/branchLoss/total:水头损失m}；无图面路径时 null */
     groupLoss,
     inversePath: (pathZones ? {zones: pathZones.filter(function(z){return z.flow>0;}).map(function(z){ return Object.assign({},z,{area:z.flow*tapeSpacing*emitterSpacing*1000/emitterFlow}); }), groups:pathGroups.map(function(g){return g.filter(function(id){return pathZones.some(function(z){return z.zi===id && z.flow>0;});});}).filter(function(g){return g.length>0;}), calibers:appliedPipes ? appliedPipes.calibers : null} : null),
-    /* 流量口径（2026-09-21）：flowAreaM2=最大分区实际面积(m²)，flowAreaSrc='figureMaxZone'|'input' */
+    /* flowAreaM2 是在线地图分区面积中的最大值；flowAreaSrc 标识唯一权威来源。 */
     flowAreaM2, flowZoneMu, flowAreaSrc,
     /* [v945] 逐区实际面积(m²，按分区序号 0 基，缺失位为 0)。总管口径反推要用「每个区各自的
        面积」而不是「最大分区面积 × 区数」——后者假设各区等大，实际地块裁切后常常差 20% 以上，
        会把手绘总管的口径推细。取不到网格时 null（调用方据此明说"没有分区面积"）。 */
-    zoneAreas: (mapZoneAreas && mapZoneAreas.length) ? mapZoneAreas.slice() : (zoneStat ? zoneStat.cells.slice() : null),   /* [v1026] partitions 优先 */
-    /* v95 联合分区：combinedAreaM2=最大一组实际面积和(m²)；worstGroup={g:组号(0基),zones:分区序号(0基),sum:m²}；
-       无图面数据时 worstGroup=null、combinedAreaM2=flowAreaM2×zoneCount（初步估算） */
-    combinedAreaM2, groupCount: (zoneStat ? zoneStat.groupCount : 0),
+    zoneAreas: mapZoneAreas.slice(),
+    /* 联合分区面积由同一地图面积数组按实际轮灌成员求和；worstGroup 与 combinedFlow 同源。 */
+    combinedAreaM2, groupCount: mapZoneAreas.length,
     /* v107（2026-09-22 修复）：手动分组存在时，worstGroup 取「手动组里面积最大的一组」（与 combinedFlow 同一口径），
        不再一律回退到 floor(zi/N) 自动配对组——否则「联合流量依据」会错显示成自动配对的第3、4区而误导。 */
     worstGroup: (tlGroupSource === 'manual')
       ? (tlManualWorstM2 >= tlMaxUngroupedM2
           ? { g: tlManualWorstG, zones: tlManualWorstZones, sum: tlManualWorstM2, count: tlManualWorstZones.length }
           : (tlMaxUngroupedZi >= 0 ? { g: tlMaxUngroupedZi, zones: [tlMaxUngroupedZi], sum: tlMaxUngroupedM2, count: 1 } : null))
-      : ((zoneStat && zoneStat.maxGroup > 0)
-          ? { g: zoneStat.maxGroupIndex, zones: zoneStat.groups[zoneStat.maxGroupIndex].zones.slice(), sum: zoneStat.maxGroup, count: zoneStat.groups[zoneStat.maxGroupIndex].zones.length }
+      : ((autoWorstAreaM2 > 0)
+          ? { g: autoWorstGroupIndex, zones: autoWorstZones, sum: autoWorstAreaM2, count: autoWorstZones.length }
           : null),
     /* v95：对比表逐档口径 —— key=N，value={areaM2:该 N 下最大组实际面积和(m²), flow:对应联合流量(m³/h)} */
     groupAreaByN,
@@ -2192,9 +2186,8 @@ function tlSharedTrunkPick(areas, groups, r) {
 
    与 tlMapGroupHydraulicsOf 的路径模式的差别只在：路径模式逐区不同长度、分口径沿程累加；
    这里是「全组共用同一组长度」，口径精度略低但没有段总管也能出数 —— 比"给不出扬程"有用。 */
-function tlEstimateGroupHead(r, zoneIndexes, areaOverride, sharedPick) {
-  var areas = (Array.isArray(areaOverride) && areaOverride.length) ? areaOverride
-    : (Array.isArray(r.zoneAreas) ? r.zoneAreas : null);
+function tlEstimateGroupHead(r, zoneIndexes, sharedPick) {
+  var areas = Array.isArray(r.zoneAreas) ? r.zoneAreas : null;
   if (!areas || !areas.length) return null;
   var members = [], missing = [], seen = {};
   zoneIndexes.forEach(function (raw) {
@@ -2211,15 +2204,7 @@ function tlEstimateGroupHead(r, zoneIndexes, areaOverride, sharedPick) {
   var par = Math.max(1, Number(r.branchParallelCount) || 1);
   var branchF = (typeof r.branchF === 'number' && isFinite(r.branchF)) ? r.branchF : 1;
 
-  /* [v955] ★ 三段管径必须与本组**实际流量**同源（用户 2026-11-04 拍板）。
-     旧写法直接吃 r.frontPipe / r.mainPipe / r.branchPipe —— 那三个是 computeThreeLevel 用
-     「单个分区面积」输入值算出的 flowAreaM2 选的管，而这里算损失用的是**地图分区实测面积**。
-     实测面积通常大于输入值（默认 30 亩 ≈ 20000 m²，实测分区常在 23000~24000），于是：
-       流量高 ~17% → Q^1.852 放大 1.34 倍 → 再叠加管径低一档（D^-4.87 ≈ ×1.43）
-       ⇒ 主管损失凭空接近翻倍（实测 7.63 m，同源后应为 3.98 m）。
-     更糟的是卡片自己建议 Ø225、损失却按 Ø200 算 —— 同一张卡两个口径（用户一眼看出"偏大"）。
-     改法：总管按 qGroup、各自主管按本区 q、支管按 q/并联数，全部现选；顺带把「下游最小口径」
-     也算成这几档，trunkAdvice 与损失从此同源。 */
+  /* 总管、主管、支管选径与损失均由同一份地图分区面积计算出的流量驱动。 */
   var picks = {};
   var maxMainOd = 0, maxBranchOd = 0;
   /* [v976] 主管共享段复核（用户 2026-11-05 拍板，后台自动执行、**无开关无额外操作**）：
@@ -2359,17 +2344,15 @@ window.tlMapGroupHydraulicsOf = function (zoneIndexes, opts) {
     if (!Array.isArray(zoneIndexes) || !zoneIndexes.length) return null;
     var r = computeThreeLevel();
     if (!r) return null;
-    var areaOverride = (opts && Array.isArray(opts.zoneAreas) && opts.zoneAreas.length) ? opts.zoneAreas : null;
     /* [v967] 总管口径：全项目一次选定，两条计算路径共用（用户 2026-11-05 拍板）。
        opts.groups = 地图端自己的全部轮灌组（优先）；没传就按手动组/自动分组还原。 */
-    var areaList = areaOverride || (Array.isArray(r.zoneAreas) ? r.zoneAreas : null);
+    var areaList = Array.isArray(r.zoneAreas) ? r.zoneAreas : null;
     var allGroups = (opts && Array.isArray(opts.groups) && opts.groups.length)
       ? opts.groups.filter(function (g) { return Array.isArray(g) && g.length; })
       : tlResolveGroups(areaList, r);
     var sharedPick = tlSharedTrunkPick(areaList, allGroups, r);
-    /* [v1023b 深挖] 数据源升级：直接吃 r.wp.zones（最不利路径引擎的**全分区**几何：
-       run/main/branch 图面米长 + mainSegs 逐段拓扑），逐区流量用**地图端 partitions
-       面积**（areaOverride，v950 声明的权威口径）现算，设计侧 cells 兜底。
+    /* 数据源：直接吃 r.wp.zones 的全分区路径几何；逐区流量只读取 r.zoneAreas，
+       即 computeThreeLevel 从当前在线地图分区面积读取的权威数组。
        旧路（inversePath）有两个口径坑：① zones 经 flow>0 过滤——设计侧网格裁剪把
        某格面积裁成 0 时该区整区消失（用户地块 G10 起整片退化的根因层）；② flow 是
        设计侧口径，与地图 partitions 面积不一致。wp.zones 无 flow 过滤、直供几何，
@@ -2379,10 +2362,8 @@ window.tlMapGroupHydraulicsOf = function (zoneIndexes, opts) {
     if (r.wp && Array.isArray(r.wp.zones) && r.wp.zones.length) {
       var perM2Wp = 1 / r.tapeSpacing / r.emitterSpacing * r.emitterFlow / 1000;
       calcZones = r.wp.zones.map(function (z) {
-        var a = (areaOverride && isFinite(Number(areaOverride[z.zi])) && Number(areaOverride[z.zi]) > 0)
-          ? Number(areaOverride[z.zi])
-          : ((Array.isArray(r.zoneAreas) && isFinite(Number(r.zoneAreas[z.zi])) && Number(r.zoneAreas[z.zi]) > 0)
-            ? Number(r.zoneAreas[z.zi]) : 0);
+        var a = (Array.isArray(r.zoneAreas) && isFinite(Number(r.zoneAreas[z.zi])) && Number(r.zoneAreas[z.zi]) > 0)
+          ? Number(r.zoneAreas[z.zi]) : 0;
         var out = { zi: z.zi, run: z.run, main: z.main,
           /* [v1024] branch 回退与设计侧/估算链同源：wp.branch=0（该区没画支管）时设计侧
              pathZones 与估算链都回退试算长 r.branchLenUsed，老路 inversePath 构造自设计侧
@@ -2404,9 +2385,9 @@ window.tlMapGroupHydraulicsOf = function (zoneIndexes, opts) {
         ? r.inversePath.zones : null);
     /* [v950] 没有逐区路径（手绘总管路线 / 还没生成段总管）时不再直接返回 null ——
        退到「同一套公式、换成本组流量」的估算，让演示卡片能把扬程显示出来。
-       opts.zoneAreas：地图端从地块 partitions 取到的逐区面积（比 computed 的网格口径更贴实际）。 */
+       面积唯一读取 r.zoneAreas，不接受调用方另传一套面积数组。 */
     if (!pathZones || !window.RyPipePathLoss || typeof window.RyPipePathLoss.calculate !== 'function') {
-      return tlEstimateGroupHead(r, zoneIndexes, areaOverride, sharedPick);
+      return tlEstimateGroupHead(r, zoneIndexes, sharedPick);
     }
     var available = pathZones;
     var members = [], missing = [], seen = {};
@@ -2426,7 +2407,7 @@ window.tlMapGroupHydraulicsOf = function (zoneIndexes, opts) {
        原样传递（卡片仍显示「缺少 X 区」提示行）。估算链内部组内真没面积时自己
        返回 null，不硬造。 */
     if (!members.length || missing.length) {
-      return tlEstimateGroupHead(r, zoneIndexes, areaOverride, sharedPick);
+      return tlEstimateGroupHead(r, zoneIndexes, sharedPick);
     }
     var totalFlow = available.reduce(function (sum, z) {
       return members.indexOf(z.zi) >= 0 ? sum + z.flow : sum;
@@ -2552,8 +2533,7 @@ window.tlMapGroupHydraulicsOf = function (zoneIndexes, opts) {
    inversePath 为空 ⇒ 那条链直接返回 null，界面上就是「分区管路路径或水力参数尚未齐备」。
    但「分区面积 + 滴灌参数 + 主管/支管管径」这三样**本来就有**，足够反推口径。
 
-   opts（可选，宿主传入以覆盖默认取数）：
-     zoneAreas  逐区面积 m²（地图端从当前地块 partitions 取；缺省用 computeThreeLevel 的 zoneAreas）
+   opts（可选）：
      groups     轮灌分组 [[zi…]]（缺省用 tlManualGroups，再缺省按 zoneCount 均分）
      groupIndex 只看某一组（负数/不传 ⇒ 取最不利组） */
 window.tlTrunkOdAdvice = function (opts) {
@@ -2563,7 +2543,7 @@ window.tlTrunkOdAdvice = function (opts) {
     if (!S || typeof S.suggest !== 'function') return null;
     var r = computeThreeLevel();
     if (!r) return null;
-    var areas = (Array.isArray(opts.zoneAreas) && opts.zoneAreas.length) ? opts.zoneAreas : r.zoneAreas;
+    var areas = r.zoneAreas;
     if (!Array.isArray(areas) || !areas.length) {
       return { ok: false, reason: 'no-zone-area', text: '当前地块没有分区面积（先在「分区与管路」划出分区）。' };
     }
@@ -2592,6 +2572,11 @@ window.tlTrunkOdAdvice = function (opts) {
 };
 
 function renderTLDerivation(r) {
+  if (!r) {
+    var card = document.getElementById('tl_derivationCard');
+    if (card) card.innerHTML = '<h3>水力计算未就绪</h3><p>请先在在线地图完成当前地块分区并保存分区面积；水力设计只读取地图分区面积。</p>';
+    return;
+  }
   const existPressureM = r.existPressure * 10.2;
   const rawSum = r.lift + r.dh + r.tapePressureM - existPressureM + r.totalPipeLoss + r.filterLoss + MARGIN_HEAD;
   const sum = Math.max(0, rawSum);
@@ -2630,6 +2615,10 @@ function renderTLDerivation(r) {
 function renderThreeLevel() {
   const r = computeThreeLevel();
   renderTLDerivation(r);
+  if (!r) {
+    document.getElementById('tl_resultPanel').innerHTML = '<div class="panel-heading result-heading"><div><span class="step light">02</span><h2>实际方案</h2></div></div><p class="area-source-warning">当前地块没有完整有效的在线地图分区面积，水力计算已停止。请先在在线地图完成并保存分区。</p>';
+    return;
+  }
 
   document.getElementById('tl_resultPanel').innerHTML = `
     <div class="panel-heading result-heading">
@@ -3486,8 +3475,7 @@ function tlApplyGroups() {
  *            累计到 36 亩范围内作为一个联合灌溉区，这样我可以把 3/4/5 个小灌溉区合成一个联合灌溉区。」
  * 算法：贪心顺序累加 —— zi 从 0 起，累计 ≤ 目标就并入当前组；下一个加进去会超、且当前组非空
  *       ⇒ 断组开新组。单区自身就超目标时独占一组（不许空组、不许回退，保证覆盖全部分区）。
- * 面积口径：ryZoneAreaGroups（与工作区组标注同一来源，已含阶梯覆盖 tlZoneGx/Gy + 地块多边形裁剪）
- *           ⇒ 「标出来的亩数」和「分组用的亩数」必然一致，同一事实只存一份。
+ * 面积口径：在线地图当前地块 partitions.area；显示与成组均读取同一份地图分区面积数组。
  * 落点：window.tlManualGroups（与手动合并同一份状态）+ tlApplyGroups() ⇒ 着色/组标注/联合流量/
  *       演示 chips/保存调出全链路零改动复用；点上方 N 区按钮即回到均分（既有清空路径，天然互补）。 */
 function tlGroupByArea() {
@@ -3510,12 +3498,9 @@ function tlGroupByArea() {
   var z = d && d.zones;
   var total = z ? ((z.cols || (z.xPos ? z.xPos.length - 1 : 0)) * (z.rows || (z.yPos ? z.yPos.length - 1 : 0))) : 0;
   if (!(total > 0)) { _tlToast('请先生成三级管线平面图'); return false; }
-  var areas = null;
-  try {
-    var r = ryZoneAreaGroups(z, d.poly, total);
-    if (r && r.ok && r.cells && r.cells.length === total) areas = r.cells;
-  } catch (eA) { }
-  if (!areas) { _tlToast('分区面积计算失败，请重新生成管线图'); return false; }
+  var areas = readOnlineMapZoneAreas();
+  if (areas && areas.length !== total) areas = null;
+  if (!areas) { _tlToast('请先在在线地图完成并保存当前地块分区面积'); return false; }
   var MU = 666.67, targetM2 = targetMu * MU;
   var groups = [], cur = [], sum = 0;
   for (var zi = 0; zi < total; zi++) {
@@ -3660,6 +3645,7 @@ function tlRefreshLossCard(r) {
   var el = document.getElementById('tlLossCard'); if (!el) return;
   try {
     if (!r) r = computeThreeLevel();
+    if (!r) { el.innerHTML = '<p>请先在在线地图保存完整分区面积，再进行水力校核。</p>'; return; }
     tlBindLossReset();
     function f1(v) { return (isFinite(v) ? v : 0).toFixed(1); }
     function f2(v) { return (isFinite(v) ? v : 0).toFixed(2); }
@@ -3753,6 +3739,14 @@ function tlUpdatePlanBar() {
   if(tvInput) tvInput.value = tv;
 
   var r = computeThreeLevel();
+  if (!r) {
+    ['tlPlanPumpFlow','tlPlanPumpHead','tlPlanPumpPower','tlPlanFrontPipe','tlPlanMainPipe','tlPlanBranchPipe'].forEach(function (id) {
+      var node = document.getElementById(id); if (node) node.textContent = '—';
+    });
+    var srcNode = document.getElementById('tlPlanCombinedSrc');
+    if (srcNode) { srcNode.textContent = '依据：请先保存在线地图分区面积'; srcNode.style.display = ''; }
+    return;
+  }
   /* v107（2026-09-22 用户要求）：设计值 vs 实际值 ——
      图面改径 + 点「⇧ 更新水泵扬程」后 tlPipeOdOverride 生效（此时 r 即实际值）；
      设计值 = 临时清零覆盖重算、算完立刻恢复；未改径时两者相同（行为与旧版一致）。 */
@@ -4100,6 +4094,12 @@ function tlPlanBarOnMap(){
 function tlAutoGenerate(options) {
   options = options || {};
   var doScroll = options.scroll !== false;
+  var mapAreas = readOnlineMapZoneAreas();
+  if (!mapAreas) {
+    var areaTip = document.getElementById('atToast');
+    if (areaTip) { areaTip.textContent = '请先在在线地图完成并保存当前地块分区面积'; areaTip.classList.add('show'); setTimeout(function () { areaTip.classList.remove('show'); }, 2600); }
+    return false;
+  }
   try {
   // 局部辅助函数（三级页在 IIFE 之外，无法访问二级页内部的 pp* 函数，故此处自包含实现）
   function tlZoneActualAreaM2(zc,zr,zoneCuts,plotPoly){
@@ -4203,6 +4203,11 @@ function tlAutoGenerate(options) {
     cols=xPlan.length; rows=yPlan.length;
   }
   var totalZones=cols*rows;
+  if (mapAreas.length !== totalZones) {
+    var mismatchTip = document.getElementById('atToast');
+    if (mismatchTip) { mismatchTip.textContent = '在线地图分区数量与当前管网图不一致，请先同步当前地块分区'; mismatchTip.classList.add('show'); setTimeout(function () { mismatchTip.classList.remove('show'); }, 3000); }
+    return false;
+  }
   /* v98h 阶梯分区本地包装：zX/zY 取「该行 / 该列的割缝位置」；zXb/zYb 取相邻两行/列在指定格上的公共边带。
      空覆盖表时全部退化为 xPos / yPos ⇒ 输出与改动前逐字节一致（eq 基线因此不受影响）。 */
   var tlZoneStepRef = (function () { try { return tlZoneStepFor({ cols: cols, rows: rows, xPos: xPos, yPos: yPos }); } catch (e) { return null; } })();
@@ -4275,7 +4280,7 @@ function tlAutoGenerate(options) {
     +'</g>');
 
   var zc=tlGetZoneCount();
-  var areaMu=window.measuredArea?(window.measuredArea/MU_TO_SQM).toFixed(2):(b.w*b.h/MU_TO_SQM).toFixed(1);
+  var areaMu=(mapAreas.reduce(function(sum,a){return sum+a;},0)/MU_TO_SQM).toFixed(2);
   var tlPlotNameVal=(document.getElementById('tlPlotName')&&document.getElementById('tlPlotName').value.trim())||'未命名地块';
   // 标题（2026-09-16 恢复）：简图/下载/打印显示；工作区克隆剥离 tlTitleGroup
   parts.push('<g id="tlTitleGroup"><text x="'+svgW/2+'" y="40" text-anchor="middle" font-size="20" font-weight="700" fill="#14532d">润野灌溉 · 三级管线施工简图</text></g>');
@@ -5315,7 +5320,8 @@ function tlAutoGenerate(options) {
   parts.push('</g>');
 
   // Legend + params at bottom —— 整体下移、分块对齐、与图面拉开间距
-  var r=computeThreeLevel();
+  var r=computeThreeLevel({ allowUnmatchedGeometry: true });
+  if (!r) return false;
   /* ===== 图面几何快照「提前落地」+ 重算（2026-09-16）=====
      computeThreeLevel 的「最远分区最不利路径」长度读 window.tlDiagramData；若按原来的顺序
      （先算 r → 再写 tlDiagramData）本幅图的简图参数/水泵扬程会用上一幅图的旧几何。
@@ -5422,7 +5428,8 @@ function tlAutoGenerate(options) {
   var branchPipeEl=document.getElementById('tlPlanBranchPipe');
   /* meta 按刷新后的结果条文本补齐（iso/工作区只读；不参与计算） */
   window.tlDiagramData.meta = { zoneCount: totalZones,
-    flowModel: { zoneFlow: r.zoneFlow, branchFlow: r.branchFlow, combinedFlow: r.combinedFlow, zoneCount: r.zoneCount, branchCount: r.branchCount, layoutSides: r.layoutSides, branchParallelCount: r.branchParallelCount },
+    flowModel: { areaSource: r.flowAreaSrc, zoneAreasM2: r.zoneAreas.slice(), totalAreaM2: r.totalArea, maxZoneAreaM2: r.flowAreaM2, combinedAreaM2: r.combinedAreaM2,
+      zoneFlow: r.zoneFlow, branchFlow: r.branchFlow, combinedFlow: r.combinedFlow, zoneCount: r.zoneCount, branchCount: r.branchCount, layoutSides: r.layoutSides, branchParallelCount: r.branchParallelCount },
     pump: { flow: (pumpFlowEl ? pumpFlowEl.textContent : ''), head: (pumpHeadEl ? pumpHeadEl.textContent : ''), power: (pumpPowerEl ? pumpPowerEl.textContent : '') },
     pipes: { front: (frontPipeEl ? frontPipeEl.textContent : ''), main: (mainPipeEl ? mainPipeEl.textContent : ''), branch: (branchPipeEl ? branchPipeEl.textContent : '') } };
   /* 水力校核页唯一计算来源：保存三级规划的最终几何与已确定的设计流量。
@@ -5437,7 +5444,8 @@ function tlAutoGenerate(options) {
       geometry: { frontPipe: JSON.parse(JSON.stringify(window.tlDiagramData.frontPipe || [])),
         mainPipes: JSON.parse(JSON.stringify(window.tlDiagramData.mainPipes || [])),
         branchPipes: JSON.parse(JSON.stringify(window.tlDiagramData.branchPipes || [])) },
-      hydraulics: { combinedFlow: r.combinedFlow, zoneFlow: r.zoneFlow, branchFlow: r.branchFlow, branchParallelCount: r.branchParallelCount, layoutSides: r.layoutSides,
+      hydraulics: { areaSource: r.flowAreaSrc, zoneAreasM2: r.zoneAreas.slice(), totalAreaM2: r.totalArea, maxZoneAreaM2: r.flowAreaM2, combinedAreaM2: r.combinedAreaM2,
+        combinedFlow: r.combinedFlow, zoneFlow: r.zoneFlow, branchFlow: r.branchFlow, branchParallelCount: r.branchParallelCount, layoutSides: r.layoutSides,
         tapePressureM: r.tapePressureM, lift: r.lift, dh: r.dh, filterLoss: r.filterLoss,
         efficiency: r.efficiency, pumpHead: r.pumpHead,
         frontPipe: { od: r.frontPipe.od }, mainPipe: { od: r.mainPipe.od }, branchPipe: { od: r.branchPipe.od } } }) === true;
@@ -6570,7 +6578,8 @@ function tlBuildSysUrl(embed) {
   function txt(id) { var el = document.getElementById(id); return el ? el.textContent.trim() : ''; }
   /* v139：系统图取「应用到图面」后的当前值（tlFigParamLines 同源：水泵参数 1 位小数 +
      图面实际管径），不再读结果栏主数字文本（v139 起主列=设计值口径） */
-  var fpSys = window.tlFigParamLines ? window.tlFigParamLines(computeThreeLevel()) : null;
+  var sysResult = computeThreeLevel();
+  var fpSys = (sysResult && window.tlFigParamLines) ? window.tlFigParamLines(sysResult) : null;
   var q = fpSys ? fpSys.pump.flow : txt('tlPlanPumpFlow'), h = fpSys ? fpSys.pump.head : txt('tlPlanPumpHead'), p = fpSys ? fpSys.pump.power : txt('tlPlanPumpPower');
   var front = fpSys ? String(fpSys.ods.front) : ((txt('tlPlanFrontPipe').match(/(\d+)/) || [])[1] || '');
   var main = fpSys ? String(fpSys.ods.main) : ((txt('tlPlanMainPipe').match(/(\d+)/) || [])[1] || '');
