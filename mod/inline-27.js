@@ -1118,7 +1118,7 @@
   function ensure() {
     if (panel) return panel;
     var st = document.createElement('style');
-    st.textContent = '#tlWsLabelsChkWrap,#tlWsZoneChkWrap,#tlWsWorstChkWrap{display:none !important}';
+    st.textContent = '#tlWsLabelsChkWrap,#tlWsZoneChkWrap{display:none !important}';
     (document.head || document.documentElement).appendChild(st);
     panel = document.createElement('div');
     panel.id = 'tlWsLayerPanel';
@@ -1183,7 +1183,6 @@
     var k = t.getAttribute('data-lp'); if (!k) return;
     if (k === 'labels') syncChip('tlWsLabelsChk', t.checked);
     else if (k === 'zone') syncChip('tlWsZoneChk', t.checked);
-    else if (k === 'worst') syncChip('tlWsWorstChk', t.checked);
     render();
   }
   function targets() {
@@ -1250,7 +1249,6 @@
     h += '<div class="ry-float-sec is-first">图层显隐</div>';
     h += cbRow('labels', '标注显示', chipChecked('tlWsLabelsChk'));
     h += cbRow('zone', '地块文字', chipChecked('tlWsZoneChk'));
-    h += cbRow('worst', '最远水路', chipChecked('tlWsWorstChk'));
     h += '<div class="ry-float-sec is-divided">当前选中</div>';
     h += selHtml();
     h += '<div class="ry-float-sec is-divided">批量操作</div>';

@@ -255,7 +255,6 @@
     var pane=wrap.closest('.ry-pane-ws');
     if(!pane) return;
     var zoneWrap=document.getElementById('tlWsZoneChkWrap');
-    var worstWrap=document.getElementById('tlWsWorstChkWrap');
     /* [v1012 2026-11-08 用户要求] 固定覆盖层三块布局：左上 #tlWsOvHeader 地块面积信息、
        底部中间 #tlWsOvLegend 图例、左下 #tlWsOvLengths 主管/支管长度 + 布管方向提示。
        v641 曾把图例挪到画布右下角，本轮改回「画布水平居中」——但仍必须按**画布**矩形算，
@@ -431,16 +430,5 @@
       if(!window.RyTlWs || typeof RyTlWs.toggleZoneLabels!=='function') return;
       var off=RyTlWs.toggleZoneLabels();
       /* 勾选文字恒为「地块文字」，不随显隐切换（2026-09-28 用户：文字不变） */
-    });
-  })();
-  /* 最远水路勾选框联动（2026-09-28）：change → tlWorstPathToggle（原右侧工具轨按钮取消）；
-     状态一致时不重复触发（防程序同步回写造成死循环） */
-  (function(){
-    var chk=document.getElementById('tlWsWorstChk');
-    if(!chk) return;
-    chk.addEventListener('change', function(){
-      if(typeof window.tlWorstPathIsOn!=='function') return;
-      if(!!chk.checked === !!window.tlWorstPathIsOn()) return;
-      tlWorstPathToggle();
     });
   })();

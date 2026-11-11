@@ -1344,6 +1344,17 @@
           var display=toDisplay(point);
           return {lat:display[0],lng:display[1]};
         },
+        getNetworkSnapshot: function () {
+          var store=window.RyIrrigationDataStore;
+          try{
+            if(!store)return null;
+            if(currentMapPlotId!=null&&typeof store.readNetworkLayoutForPlot==='function')
+              return store.readNetworkLayoutForPlot(String(currentMapPlotId));
+            return typeof store.readNetworkLayout==='function'?store.readNetworkLayout():null;
+          }
+          catch(e){return null;}
+        },
+        currentPlotId: function () { return currentMapPlotId==null?null:String(currentMapPlotId); },
         /* [v945] 逐区分区面积（m²）—— 演示浮层按分区反推总管口径时用；
            与属性面板的「推算管径」同一个取数口，不在地图端另算面积。 */
         getZoneAreas: currentZoneAreas,

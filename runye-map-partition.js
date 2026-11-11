@@ -310,6 +310,9 @@
      throw new Error((saved.error==='plot-library-write-failed'?'地块库保存失败':saved.error)+detail);
     }
     if(net)root.RyMapHost.refresh();
+    /* 分区重划后立即让在线地图轮灌层按新分区重新取数；旧 tlDiagramData
+       与新分区数量不一致时由演示模块封闭播放并清掉旧组按钮。 */
+    if(root.RyMapFlowDemo&&typeof root.RyMapFlowDemo.refresh==='function')root.RyMapFlowDemo.refresh();
     draw(live);setStatus('已重新划分 '+result.partitions.length+' 个区域；旧管路需回二级重新规划。','ok');return true;
    }catch(e){setStatus('未应用：'+e.message,'err');return false;}
    finally{busy=false;applyBtn.disabled=false;}

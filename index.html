@@ -175,23 +175,12 @@
 
 
 
-/* 最远水路（最不利路径）标注的显示开关（2026-09-17 第五十四轮，用户要求）：
-   「在合适的位置增加一个按钮，点击显示，再点击关闭显示」。
-   做法：标注**照常渲染**，只用一个 body 类从视觉上隐去 —— 「再点一次显示」永远即时生效，
-   既不依赖重渲染，也不受「隐藏期间发生重渲染」影响；简图与三级工作区两份标注同属一个开关。
-   注：下载 / 打印走独立快照，不受此开关影响（要跟随一起隐藏就说一声）。 */
-body.ry-worst-off [data-tlworst]{display:none}
-/* 最远水路水流动画（2026-09-19 用户要求：静态颜色虚线 → 流动虚线，观感同过滤器反冲水流 fs-flow）：
-   dasharray 6 7、0.9s 循环、dashoffset → -26（每周期两个 dash 步长），流向 = 路径绘制方向（水源 → 最远区末端）。
-   仍受上面 ry-worst-off 开关门控（整组 display:none，动画类不参与显隐）。 */
-.tl-worst-flow{stroke-dasharray:6 7;animation:tlWorstFlow .9s linear infinite;pointer-events:none}
-@keyframes tlWorstFlow{to{stroke-dashoffset:-26}}
 
 /* ===== [v218 2026-10-04 用户要求] 轮灌演示：把水流动起来 + 阀门转起来表示「开」=====
    用户原话：「轮灌区切换的动画演示时，要把水流模拟出来，从水源过来是怎么走的，哪几个阀门开启，
              可以让阀门转动之类的方式模拟阀门开启。」
-   与上一条 .tl-worst-flow 同族（同为 dash 流动），但**必须另起类名**：
-     · 不复用 data-tlworst（会被 wsStripLabels 剥掉）、不带 data-tlpipe/data-tlpipe-seg
+   轮灌动画使用独立类名：
+     · 不带 data-tlpipe/data-tlpipe-seg
        （verify_v162_hidden.cjs 会按那两个属性换色）；
      · 全部 pointer-events:none —— 否则 verify_v172_layers.cjs 的 elementFromPoint 会假红。
    水流方向 = 路径绘制方向（水源 → 该组各分区），dashoffset 递减 ⇒ 视觉上朝末端跑。
@@ -1588,8 +1577,6 @@ body.ry-worst-off [data-tlworst]{display:none}
          接线是 onclick="tlWsMaskToggle()" + inline-24 的 maskBtn 空值守卫，删元素自动静默；
          遮蔽核心能力（灰色虚线 + 不计入材料清单）保留在分区组入口与右键菜单上。
          要恢复：把 <button class="tl-ws-btn" id="tlWsMaskBtn" …>遮蔽管道</button> 插回本行。 -->
-    <!-- 最远水路开关（第五十四轮按钮 → 2026-09-28 改勾选框）：移至做图区右上角第三枚勾选
-         #tlWsWorstChk（与「标注显示/地块文字」上下同列，JS 对齐），右侧工具轨原按钮取消。 -->
     <!-- [2026-10-27 用户指令取消] 路径测算按钮删除（RyTlPathMeasure.toggle 入口）：
          模块 tl-workspace/tl-path-measure.js 核心保留（全空值守卫，元素删除后自动失效），
          恢复方式：把 <button id="tlPathBtn" onclick="RyTlPathMeasure.toggle()"> 路径测算 原样插回本行。 -->
@@ -1651,14 +1638,6 @@ body.ry-worst-off [data-tlworst]{display:none}
   <label id="tlWsZoneChkWrap" for="tlWsZoneChk" title="勾选=显示地块文字（分区编号/尺寸/亩数）；取消=只隐藏地块文字，标识线/箭头/端线不受影响" style="position:absolute;top:36px;right:188px;z-index:40;display:inline-flex;align-items:center;gap:4px;padding:2px 7px;background:rgba(255,255,255,.94);border:1px solid #cbd5e1;border-radius:999px;font-size:11px;font-weight:400;color:#0f172a;cursor:pointer;user-select:none;box-shadow:0 1px 4px rgba(15,23,42,.14)">
     <input type="checkbox" id="tlWsZoneChk" checked style="margin:0;width:12px;height:12px;cursor:pointer;accent-color:#185FA5">
     <span id="tlWsZoneChkTxt">地块文字</span>
-  </label>
-  <!-- 最远水路勾选框（2026-09-28 用户要求：与另两枚同列、勾选式显隐；原右侧工具轨按钮取消）：
-       勾=显示最远水路标注（水源→最远分区，与水泵扬程同源），取消=隐藏。
-       标注照常渲染、由 body.ry-worst-off 门控显示（与简图/工作区两份标注共用同一开关）。 -->
-  <label id="tlWsWorstChkWrap" for="tlWsWorstChk" title="勾选=显示「最远水路」路径标注（水源→最远分区，与水泵扬程同源）；取消=隐藏（仅图面标注，不影响扬程计算）"
-    style="position:absolute;top:64px;right:188px;z-index:40;display:inline-flex;align-items:center;gap:4px;padding:2px 7px;background:rgba(255,255,255,.94);border:1px solid #cbd5e1;border-radius:999px;font-size:11px;font-weight:400;color:#0f172a;cursor:pointer;user-select:none;box-shadow:0 1px 4px rgba(15,23,42,.14)">
-    <input type="checkbox" id="tlWsWorstChk" checked style="margin:0;width:12px;height:12px;cursor:pointer;accent-color:#185FA5">
-    <span id="tlWsWorstChkTxt">最远水路</span>
   </label>
   <!-- 固定文字层（2026-09-16 建，[v1012 2026-11-08] 重排为三块屏幕固定信息）；
        用户原话：「这段文字，还有图例，应该是放在屏幕的固定位置，地块缩小 放大它应该都是固定不动的……

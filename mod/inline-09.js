@@ -1552,18 +1552,6 @@ function segWorstPath(d, needGeom, EMPTY) {
   if (!worst) return EMPTY;
   taps.sort(function (a, b) { return a.run - b.run; });
   var out = { fromFigure: true, fromSeg: true, zoneIndex: worst.zi, front: worst.run, main: worst.main, branch: worst.branch, link: 0, taps: taps, zones: zones };
-  if (needGeom) {
-    /* 最远水路标注：本画布（分区与管路）只见干线与主管 —— 手绘总管在地图画布，不画
-       但计入长度（与扬程同源：len = 干线部分 + 该区主管全长）。无 linkPts（join 在主管上）。 */
-    var mpOri = worst.mp;
-    var eA = mpOri[0], eB = mpOri[mpOri.length - 1];
-    var endPt = (dist(eA, worst.jp) >= dist(eB, worst.jp)) ? eA : eB;
-    out.geom = {
-      frontPts: [{ x: anchor.x, y: anchor.y }, { x: worst.jp.x, y: worst.jp.y }],
-      mainPts: mpOri, endPt: { x: endPt.x, y: endPt.y },
-      zoneIndex: worst.zi, len: worst.run + worst.main
-    };
-  }
   return out;
 }
 
@@ -1670,75 +1658,6 @@ function tlPushToHydraulicCalc() {
     return true;
   } catch (e) { return false; }
 }
-
-/* ---- 最不利路径图面标注（2026-09-17 第四十七轮，用户要求）----
-   「水路走得最远的那条路径」= 水源 → 最远分区：总管（只走水源到该区接点那一段）+ 该区主管；
-   支管不标（用户明确）。与水泵扬程同源：标出的长度 = 扬程采用的总管 + 主管。
-   视觉：紫色（#a855f7）宽光晕 + 深紫虚线走线 + 末端圆点 + 「最远 N 区 · 123.4 m」标签
-   （紫/深紫与既有橙(总管)/蓝(主管)/绿(支管)/青(滴灌带)/琥珀(水源)/红(阀门) 均不撞色）。
-   ts(x,y) → 图面坐标：简图 ts 与工作区 T 同坐标系（工作区底图是简图 SVG 的克隆），两处共用本函数。 */
-function tlWorstPathMarkSVG(ts) {
-  var wp = (typeof tlWorstPathLen === 'function') ? tlWorstPathLen(true) : null;
-  if (!wp || !wp.fromFigure || !wp.geom) return '';
-  var g = wp.geom;
-  function d(pts) {
-    var s = '';
-    for (var i = 0; i < pts.length; i++) {
-      var p = ts(pts[i].x, pts[i].y);
-      s += (i ? 'L' : 'M') + p.x.toFixed(1) + ' ' + p.y.toFixed(1) + ' ';
-    }
-    return s;
-  }
-  var dF = d(g.frontPts);
-  var dL = (g.linkPts && g.linkPts.length > 1) ? d(g.linkPts) : '';
-  var dM = d(g.mainPts);
-  var out = [];
-  out.push('<g data-tlworst="1" fill="none" stroke-linecap="round" stroke-linejoin="round" pointer-events="none">');
-  /* [v1019] 空段守卫：routes 引擎的 frontPts 可能为空（手绘总管部分只在地图画布、
-     无图面对应物，沿 v879 口径计入长度不画）⇒ 空串 d="" 的 <path> 不再落 DOM。 */
-  if (dF) out.push('<path d="' + dF + '" stroke="#a855f7" stroke-opacity="0.40" stroke-width="13"/>');
-  if (dL) out.push('<path d="' + dL + '" stroke="#a855f7" stroke-opacity="0.40" stroke-width="13"/>');
-  if (dM) out.push('<path d="' + dM + '" stroke="#a855f7" stroke-opacity="0.40" stroke-width="12"/>');
-  /* v26：虚线改水流动画（用户要求，观感同过滤器反冲水流 fs-flow）——dasharray/动画由 .tl-worst-flow 类提供，
-     保留紫色系与光晕底衬（紫色仍是「最远水路」的识别色，动画只让水「流」起来） */
-  if (dF) out.push('<path d="' + dF + '" class="tl-worst-flow" stroke="#7e22ce" stroke-width="1.8"/>');
-  if (dL) out.push('<path d="' + dL + '" class="tl-worst-flow" stroke="#7e22ce" stroke-width="1.8"/>');
-  if (dM) out.push('<path d="' + dM + '" class="tl-worst-flow" stroke="#7e22ce" stroke-width="1.8"/>');
-  var e = ts(g.endPt.x, g.endPt.y);
-  out.push('<circle cx="' + e.x.toFixed(1) + '" cy="' + e.y.toFixed(1) + '" r="6" fill="#fff" stroke="#7e22ce" stroke-width="2.5"/>');
-  out.push('<text x="' + (e.x + 11).toFixed(1) + '" y="' + (e.y - 9).toFixed(1) + '" font-size="11" font-weight="700" '
-    + 'fill="#6b21a8" stroke="#fff" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">'
-    + '最远 ' + (wp.zoneIndex + 1) + ' 区 · ' + (Math.round(g.len * 10) / 10).toFixed(1) + ' m</text>');
-  out.push('</g>');
-  var svg = out.join('');
-  /* 守卫：几何退化（数据带 NaN / 变换未就绪）时整组不画 —— 否则会往 SVG 里写
-     d="MNaN NaN …"、cx="NaN"，浏览器每条都报 "attribute d: Expected number" 页面错误。 */
-  if (svg.indexOf('NaN') >= 0) return '';
-  return svg;
-}
-
-/* ---- 最远水路标注 显示开关（2026-09-17 第五十四轮，用户要求）----
-   用户：「最远水路那个颜色线，…在合适的位置增加一个按钮，点击显示，再点击关闭显示。」
-   状态只用一个 body 类（ry-worst-off）表达，标注本身**照常渲染**（不因开关而少画）：
-   于是「再点一次显示」永远能立刻恢复，也不怕隐藏期间发生的重渲染把状态弄丢。
-   简图（#tlDiagramContent）与三级工作区（#tlWsContent）两份标注共用一个开关（同一功能）。
-   按钮标签写「动作」（显示中 → 关闭 / 已隐藏 → 显示），并配 .active 底色表明当前是否显示。 */
-var tlWorstPathOn = true;
-function tlWorstPathToggle() {
-  tlWorstPathOn = !tlWorstPathOn;
-  if (document.body) document.body.classList.toggle('ry-worst-off', !tlWorstPathOn);
-  /* 2026-09-28：右侧工具轨按钮取消，改同步做图区右上角勾选框（程序赋值不触发 change，无死循环） */
-  var chk = document.getElementById('tlWsWorstChk');
-  if (chk) {
-    chk.checked = tlWorstPathOn;
-    /* 勾选文字恒为「最远水路」，不随显隐切换（2026-09-28 用户：文字不变） */
-  }
-  return tlWorstPathOn;
-}
-window.tlWorstPathToggle = tlWorstPathToggle;
-/* 状态读取器（供 e2e / 调试）：**必须换个名字** —— 顶层 var 本身就是 window 属性，
-   若用同名的 window.tlWorstPathOn 赋值，会把布尔状态替换成函数，开关首击就算错。 */
-window.tlWorstPathIsOn = function () { return tlWorstPathOn; };
 
 function computeThreeLevel(options) {
   options = options || {};
@@ -5332,14 +5251,6 @@ function tlAutoGenerate(options) {
   });
 
   // ===== 地块组结束：以下参数/图例/A3框固定不动 =====
-  /* v488：记录地块组闭合标签在 parts 中的下标 —— 最不利路径标注（tlWorstPathMarkSVG）
-     几何上属于地块组（须随 tlInitDrag 的图面拖动 translate 一起平移），但其几何取自
-     window.tlDiagramData 快照，而快照在此闭合**之后**才落地，不能当场画。
-     故先记下标，待快照落地后用 splice 插回本闭合标签之前（见下方 tlWorstPathMarkSVG 调用处）。
-     病史：v180 节点层曾因画在组外而错位（本文件 tlInitDrag 注释），紫线标注犯了同样的错 ——
-     图面拖动位移存 localStorage['tl-plot-pos'] 且每次重生成自动恢复，组内管线整体平移、
-     组外紫线原地不动 ⇒ 恒定偏移（用户实测「紫色水流动画线与管道路径偏位」）。 */
-  var tlPlotGCloseIdx = parts.length;
   parts.push('</g>');
 
   // Legend + params at bottom —— 整体下移、分块对齐、与图面拉开间距
@@ -5544,11 +5455,6 @@ function tlAutoGenerate(options) {
      随图面拖动 translate 一起平移，与管线/水源/节点层保持同组（修复恒定偏位）；
      时序上仍在快照落地之后，满足上面的约束。splice 只移动字符串位置，SVG 嵌套
      （data-tlworst 组内无嵌套 <g>）与工作区克隆剥离正则均不受影响。 */
-  try {
-    var tlWorstSvg = tlWorstPathMarkSVG(ts);
-    if (tlWorstSvg) parts.splice(tlPlotGCloseIdx, 0, tlWorstSvg);
-  } catch (e) { }
-
   parts.push('</svg>');
   /* v180b（2026-10-02）：缓存本次几何映射，供 tlRefreshTlNodesLayer 在 RyTlNodes 变更时
      实时刷新三级简图的节点/连线图层（无需重新「生成管线图」）。 */
