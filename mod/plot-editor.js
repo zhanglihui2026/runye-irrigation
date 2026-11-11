@@ -5432,6 +5432,11 @@
        发生在 tlAutoGenerate 之前，那时 tlDiagramData 还是上一代 —— 同代抑制判定
        会落空，二级画布残留一份无总管的重复管线层（用户实测「两组管线」）。 */
     try{ ppRender(); }catch(eRe){ console.warn('[ppGenerate] 二级画布同步重绘失败', eRe); }
+    /* 生成成功即校验并刷新同一份在线地图快照；不要求再点回传按钮，也不改变当前工作页。 */
+    try{
+      if(typeof window.tlSyncGeneratedMapSnapshot==='function') window.tlSyncGeneratedMapSnapshot();
+      else console.warn('[ppGenerate] 在线地图同步模块未就绪');
+    }catch(eMapSync){ console.warn('[ppGenerate] 在线地图同步失败',eMapSync); }
     /* [v355] 生成成功即记「已生成」边界签名：此后切页/整页重载（含手画、图片测量、AI 回带等
        没有地块库锚的路径）可按签名自动恢复。签名锚在边界多边形本身——几何没变设计就有效，
        变了宁可不恢复（与 v161 原则一致）。恢复链见 ryPpGenRestoreProject。 */

@@ -109,7 +109,7 @@
     tlWsCalBtn:'diameter', tlWsMultiCalBtn:'diameter2', tlWsMultiClearBtn:'exitmulti',
     tlWsZoomIn:'zoomin', tlWsZoomOut:'zoomout', tlWsZoomFit:'fit', tlWsMultiBtn:'multi',
     tlWsMaskBtn:'mask', tlDesignUploadBtn:'upload', tlDimSaveBtn:'save',
-    tlAutoPipe:'autopipe', tlDxfExport:'cad',
+    tlDxfExport:'cad',
     tlDimMultiBtn:'grid',
 
     /* [v951] 在线地图绘制条 #mapDrawTools（吸附顶部、图标钮）。
@@ -118,7 +118,7 @@
        泛词在 BY_LABEL 里根本认不出来（会被当成「生成管线」之类）。
        注意：btnUndo 用 back（左向箭头+竖挡板）而不是 undo —— 同一条里已经有一个
        undo（撤销点），并排两个同图标等于没有图标。 */
-    btnPlaceReservoir:'water', btnDrawTrunk:'line', btnFinishTrunk:'save',
+    btnPlaceReservoir:'water', btnPlaceNode:'node', btnDrawTrunk:'line', btnFinishTrunk:'save',
     btnUndoTrunk:'undo', btnEditTrunk:'pencil', btnDraw:'polygon',
     btnFinish:'check', btnAddPt:'node', btnUndo:'back', btnMeasure:'length',
     btnClear:'trash'

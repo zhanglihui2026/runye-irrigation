@@ -198,16 +198,16 @@ const SCEN = [
   },
   {
     id: '13', name: '三级管线简图', steps: [
-      ['reset'], ['section', 'tlPipePlanSection'], ['wait', 300],
-      ['eval', 'window.measuredPolygon=[{x:0,y:0},{x:150,y:0},{x:150,y:100},{x:0,y:100}];window.measuredPolygonSource="verify";'],
-      ['click', '#tlAutoPipe'], ['wait', 1600]
+      ['reset'], ['section', 'pipePlanSection'], ['wait', 300],
+      ['eval', 'window.measuredPolygon=[{x:0,y:0},{x:150,y:0},{x:150,y:100},{x:0,y:100}];window.measuredPolygonSource="verify";if(typeof window.ppLoadPolygon==="function")window.ppLoadPolygon();'],
+      ['click', '#ppGenerate'], ['wait', 1600]
     ]
   },
   {
     id: '14', name: '三级供水首部系统图', steps: [
-      ['reset'], ['section', 'tlPipePlanSection'], ['wait', 300],
-      ['eval', 'window.measuredPolygon=[{x:0,y:0},{x:150,y:0},{x:150,y:100},{x:0,y:100}];window.measuredPolygonSource="verify";'],
-      ['click', '#tlAutoPipe'], ['wait', 1200],
+      ['reset'], ['section', 'pipePlanSection'], ['wait', 300],
+      ['eval', 'window.measuredPolygon=[{x:0,y:0},{x:150,y:0},{x:150,y:100},{x:0,y:100}];window.measuredPolygonSource="verify";if(typeof window.ppLoadPolygon==="function")window.ppLoadPolygon();'],
+      ['click', '#ppGenerate'], ['wait', 1200],
       ['eval', 'if(typeof window.tlShowSysDiagram==="function")window.tlShowSysDiagram();'],
       ['wait', 2500]
     ]
@@ -225,9 +225,7 @@ const SCEN = [
       ['reset'], ['section', 'pipePlanSection'], ['wait', 300],
       ['eval', 'window.measuredPolygon=[{x:0,y:0},{x:120,y:0},{x:120,y:80},{x:0,y:80}];if(typeof window.ppLoadPolygon==="function")window.ppLoadPolygon();'],
       ['click', '#ppGenerate'], ['wait', 1200],
-      ['section', 'tlPipePlanSection'], ['wait', 300],
-      ['eval', 'window.measuredPolygon=[{x:0,y:0},{x:150,y:0},{x:150,y:100},{x:0,y:100}];'],
-      ['click', '#tlAutoPipe'], ['wait', 1200],
+      ['section', 'tlPipePlanSection'], ['wait', 1500],
       ['eval', '["ppDownload","ppPrint","tlDownload","tlPrint"].forEach(function(id){var e=document.getElementById(id);if(e){window["__vis_"+id]=getComputedStyle(e).display;}});'],
       ['wait', 200]
     ]

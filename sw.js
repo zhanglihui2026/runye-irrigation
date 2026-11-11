@@ -1000,8 +1000,7 @@
      · 工具栏四键（#tlDimScaleRow）的 tlDimScaleStep/Reset 写的也是同一个 key；
      · 更直接的证据：v520 那页签的说明文案自己就写着「与顶栏工具栏上的「Aa」四键组是同一个值，两边随时同步」。
    做法：
-     ① index.html 删掉 #tlDimScaleRow（整块注释留档，写明怎么恢复 —— 必须放在 #tlAutoPipe 之前，
-        A6 契约要求「生成管线图」贴底）；
+     ① index.html 删掉 #tlDimScaleRow（整块注释留档，写明如何恢复到管路编辑工具组）；
      ② mod/inline-09.js 删掉 window.tlDimScaleStep / window.tlDimScaleReset 与那句 `#tlDimScaleVal` 同步
         （按钮没了就是死代码）；tlDimScaleOf() 与 tlDS 保留 —— 渲染仍按它把 DG 各项乘进去，一点没动；
      ③ mod/inline-28.js 去掉 refresh() 里对已删元素的同步，页签文案从「两边随时同步」改成「这里是唯一入口」；
@@ -1472,9 +1471,8 @@
    ★ 版本号不写死：脚本从主样式表 ?v= 读取（显示短号 v1031，完整串放 title 与
    data-ry-version-full），与 14 处主串 / 本 VERSION 同源、同抬，tests/version_sync.test.cjs
    增一条契约锁「徽标存在 + 由 JS 填充 + 不写死」。
-   [v1033-map-partition-sync] 分区与管路调整后先同步在线地图分区，再继续水力计算。
-   主串同抬 + 本 VERSION，确保 Pages 与 Service Worker 更新到唯一面积源版本。 */
-const VERSION = 'v1033-map-partition-sync';
+   [v1035-shared-node-sync] 施工图生成自动刷新在线地图；两个页面共用施工节点写入与展示，升级离线缓存。 */
+const VERSION = 'v1035-shared-node-sync';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

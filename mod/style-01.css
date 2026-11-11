@@ -5053,7 +5053,7 @@ body.ry-tool #pipePlanSection #ryDrawingHost #ppToolbar{grid-column:auto;grid-ro
 /* [v815 退役] 此处原有「彩色图标（WPS 式按功能配色）」一组规则：
      ppPlotPanelToggle 蓝 / ppLockArea 紫 / ppZoneAutoBtn 绿 / ppGenerate 蓝底 /
      tlWsFitValve 橙 / tlWsFitTee 青 / tlWsFitElbow 粉 / tlWsFitNode 蓝 /
-     tlLineBtn 黄 / tlDesignUploadBtn 天蓝 / tlAutoPipe 绿底 / tlDxfExport 紫。
+     tlLineBtn 黄 / tlDesignUploadBtn 天蓝 / 原回传地图按钮绿底 / tlDxfExport 紫。
    用户实测：「整体颜色也乱，一会儿是黄色 一会儿是绿色 一会儿是红色的。」
    这组还越界命中了快捷条的 #ppGenerate / #ppRotateZones，把「生成施工图 /
    ↺+90°」染成蓝色（上一轮「文字颜色普通黑色就行」的真因）。

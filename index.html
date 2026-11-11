@@ -21,12 +21,12 @@
      顺序契约登记在 ci_check_static.cjs 的 scriptOrderRules 里。 -->
 <script src="core/coord-frame.js?v=836-coord-frame"></script>
 <script src="runye-material-audit.js?v=607-branch-material-span"></script>
-<script src="runye-map-partition.js?v=1033-map-partition-sync"></script>
+<script src="runye-map-partition.js?v=1035-shared-node-sync"></script>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>润野灌溉设计优化版｜滴灌管径与水泵选型</title>
 <meta name="description" content="输入地块、滴灌带与水源参数，快速计算灌溉分区、主管支管管径和水泵工作点。"/>
-<link rel="stylesheet" href="mod/style-01.css?v=1033-map-partition-sync">
+<link rel="stylesheet" href="mod/style-01.css?v=1035-shared-node-sync">
 <link rel="stylesheet" href="runye-inverse-design.css?v=277">
 <script defer src="runye-inverse-design.js?v=438-branch-flow-conservation"></script>
 <link rel="stylesheet" href="runye-ai-plan.css?v=544-float-card-unify">
@@ -49,7 +49,7 @@
 <link rel="stylesheet" href="hydraulic-calc/hydraulic-calc.css">
 <link rel="stylesheet" href="filter-system/filter-system.css">
 <link rel="stylesheet" href="pwa/vendor/leaflet.css">
-<link rel="stylesheet" href="mod/online-map.css?v=1033-map-partition-sync">
+<link rel="stylesheet" href="mod/online-map.css?v=1035-shared-node-sync">
 <link rel="stylesheet" href="hydraulics-main.css?v=442-native">
 <style id="ryCadTwinCss">
 /* --- CAD global toolbar · generated selector twins ---
@@ -341,10 +341,10 @@
   <script src="runye-entitle.js?v=621-invite-l2"></script>
   <script src="runye-member-ui.js?v=632-login-deeplink"></script>
   <!-- [v605-announce-modal] 首页公告弹窗（每次访问展示）：删掉本行即卸载，样式随脚本注入 #ryAnnCss -->
-  <script src="runye-announce.js?v=1033-map-partition-sync"></script>
+  <script src="runye-announce.js?v=1035-shared-node-sync"></script>
   <!-- 顶部导航动作按钮（系统图，runye-nav.js act 项）：动作映射须先于 runye-nav.js 注册 -->
   <script src="mod/inline-05.js?v=357"></script>
-  <script src="runye-nav.js?v=1033-map-partition-sync"></script>
+  <script src="runye-nav.js?v=1035-shared-node-sync"></script>
   <!-- [NEW MODULE: DXF 导出] 入口：删除本行即卸载（不改动任何原有逻辑） -->
   <script src="runye-dxf.js?v=840-trunk-dxf"></script>
   <!-- [NEW MODULE: pipe_optim] 入口：删除本行即卸载本隔离模块（不改动任何原有逻辑） -->
@@ -764,6 +764,8 @@
         <div class="mdt-group" role="group" aria-label="工具">
           <button class="mdt-btn" id="btnPlaceReservoir" type="button" aria-pressed="false"
                   title="蓄水池：点击后在地图中放置蓄水池；放置后可拖动调整，开启捕捉时会吸附到附近节点">蓄水池</button>
+          <button class="mdt-btn" id="btnPlaceNode" type="button" aria-pressed="false"
+                  title="绘制节点：点击后再点主管或支管，节点会吸附到管线上并同步到分区与管路页；按 Esc 退出">绘制节点</button>
           <button class="mdt-btn" id="btnMeasure" aria-pressed="false"
                   title="测距：点击地图逐点打点，紫色虚线显示累计距离，双击结束（只量不存）">测距</button>
           <button class="mdt-btn" id="btnClear"
@@ -1492,7 +1494,7 @@
   <!-- 三级设计工作区（2026-09-13）：可缩放/平移 + 手工插入管线层
        （tl-workspace 模块，只读 window.tlDiagramData；手工层不写回平面数据） -->
   <div class="ry-pane ry-pane-ws">
-  <div class="tl-ws-toolbar tl-ws-toolbar-bare" id="tlWsToolbar" style="display:none">
+  <div class="tl-ws-toolbar" id="tlWsToolbar" style="display:none">
     <!-- [2026-10-27 用户指令取消] 联合灌溉分组面板整块删除（v229 保存/调出/恢复初始化三钮随之取消）：
          分区此后只按两条原则执行 —— ① 预设 1/2/3/4 区按钮；② 面积亩组合（面积分区）。
          inline-09.js 内手动分组机制（tlManualGroups/合并/保存/快照）同步删除，自动分组
@@ -1563,14 +1565,14 @@
          点一下进入多选 —— 之后普通点击管身即逐段加选、再点已选段取消该段、点空白清空；
          再点本按钮退出并回到单选（Ctrl/⌘ + 点管身的旧捷径不受影响）。多选时旁边弹出
          「多选管段信息卡」（可切换管径 + 长度累加），见 index.html 改径菜单 IIFE 末尾。
-         ★ 必须排在 #tlAutoPipe 之前 —— A6 契约要求「生成管线图」贴底。 -->
+         工具顺序按当前管线编辑工具排列。 -->
     <button class="tl-ws-btn" id="tlWsMultiBtn" type="button" aria-pressed="false" onclick="tlMultiToggle()" title="多选：开启后点管身逐段加选管道（同类型），点尺寸线逐条加选标注；再点已选对象取消该段；点空白清空管道选择；Ctrl/⌘ + 点管身可直接加选（无需开启）">多选</button>
     <!-- v162（2026-09-29 用户要求「三级管线页面增加 管道遮蔽/隐藏功能，被遮蔽的管道不计入
          材料清单」）：点一下进入遮蔽模式 —— 之后点管身即切换该管「遮蔽/取消遮蔽」（不进入拖动）；
          被遮蔽的管在简图/工作区改灰色虚线（管宽不动），且不计入材料清单（管长/管径加权/
          主管根数派生的三通与阀门件数/挂在该管上的节点配件）。再点本按钮或 Esc 退出。
          右键管身也有「遮蔽此管 / 取消遮蔽」一项（单段与多选都支持）。
-         必须在 #tlAutoPipe 之前 —— A6 契约要求生成按钮贴底。 -->
+         与管线编辑工具保持同组排列。 -->
     <!-- [v824 2026-10-30 用户截图指令] 「遮蔽管道」按钮取消 —— 与前面分区组的「遮蔽管线」重复：
          用户箭头指向本键，原话「遮蔽管道也取消，跟前面的也重复了」。
          与上一个阀门同因：本页 RyTlWs 未初始化，本键是死键；分区组 data-mode="maskPipe" 是活的。
@@ -1610,10 +1612,9 @@
          核对结论：确实是重复 —— 设置页「标注与文字」页签（#rySetScaleRange 滑块 0.6~1.8）
          与这里写的是**同一个 key** localStorage['tl-dim-scale']，v520 的页签文案自己就写着
          「与顶栏工具栏上的「Aa」四键组是同一个值，两边随时同步」。既然两处等价，就只留设置页一处。
-         要恢复：把四键 div 放回 #tlAutoPipe **之前**（A6 契约要求「生成管线图」贴底），
+         要恢复：把四键 div 放回管线编辑工具组中，
          并还原 mod/inline-09.js 里的 window.tlDimScaleStep / window.tlDimScaleReset。 -->
 
-    <button class="tl-ws-btn" id="tlAutoPipe" type="button" onclick="tlAutoPipeToMap()" title="将已生成且与当前分区角度一致的管线显示在在线地图；角度变化后先点「生成施工图」更新主管和支管">☁ 回传在线地图</button>
     <button class="tl-ws-btn" id="tlDxfExport" type="button" style="margin-top:6px" title="把地块边界/管道/管径标注/地块名/水泵位置导出为 2004 DXF，CAD 直接打开" onclick="if(window.runyeDxf)runyeDxf.export()">📐 导出 CAD(DXF)</button>
     <!-- [v824 2026-10-30 用户指令] 「📥 下载 / 🖨️ 打印A3」放在**工具栏最后**（用户原话：
          「下载跟打印放在工具栏最后」）。整节点从 #ppToolbar 尾部搬到这里（同一 id、不是复制），
@@ -1624,7 +1625,7 @@
     <button class="pp-btn-ghost" id="ppPrint">🖨️ 打印A3</button>
     <span class="tl-ws-hint" id="tlWsHint">点「阀门/三通/弯头/节点」后再点管线即插入配件</span>
   </div>
-  <div id="tlWsContent"><div class="tl-ws-empty">请先生成三级管线平面图（点左侧「生成管线图」）</div></div>
+  <div id="tlWsContent"><div class="tl-ws-empty">请先在「分区与管路」页点击「生成施工图」</div></div>
   <!-- 标注显隐勾选框（2026-09-28 用户要求：做图区右上角、勾选方式显示/隐藏）：
        勾=显示标注（文字：区号/尺寸/亩数 + 标注线：尺寸线/改径套壳/最不利路径；节点连线常显），
        取消勾选=隐藏（选管道不被标注干扰）。与工具栏 🖍 按钮双向同步；位置 JS 对齐画布右上角
@@ -2156,7 +2157,7 @@
 </div>
 
 <script src="mod/material-formulas.js?v=412"></script>
-<script src="mod/zone-geometry.js?v=1033-map-partition-sync"></script>
+<script src="mod/zone-geometry.js?v=1035-shared-node-sync"></script>
 <script src="mod/flow-geometry.js?v=414"></script>
 <script src="mod/tl-polyline-geometry.js?v=426-tl-polyline-geometry"></script>
 <!-- [v421-mat-table] 材料清单/材料表管理（自 inline-09 迁出）：先于 inline-09 加载 —— inline-09 尾部
@@ -2167,7 +2168,7 @@
 <!-- [v887-tape-zone-vgate] 段总管生成器（纯几何，Node 单测锁），先于 inline-09 消费方装载。
      [v900] 曾随段总管链误删引入；[v1017] 恢复（扬程链 P0，TASK_pump_head_mismatch_20261108 §5.0）。 -->
 <script src="mod/tl-seg-trunk.js?v=887-tape-zone-vgate"></script>
-<script src="mod/inline-09.js?v=1033-map-partition-sync"></script>
+<script src="mod/inline-09.js?v=1035-shared-node-sync"></script>
 <!-- [v423-header-layout] 三级简图标题布局依赖 inline-09 的 tlMeasureText 与生成时写入的标题状态。 -->
 <script src="mod/tl-header-layout.js?v=423-header-layout"></script>
 
@@ -2175,9 +2176,9 @@
 <script src="mod/inline-10.js?v=482-nav-refit"></script>
 
 <!-- ===== 实际地块规划 JS ===== -->
-<script src="mod/inline-11.js?v=1033-map-partition-sync"></script>
+<script src="mod/inline-11.js?v=1035-shared-node-sync"></script>
 <!-- [v420-split] 绘图编辑器 IIFE 自 inline-11 迁出：必须紧随 inline-11 之后同步执行 -->
-<script src="mod/plot-editor.js?v=1033-map-partition-sync"></script>
+<script src="mod/plot-editor.js?v=1035-shared-node-sync"></script>
 <script src="mod/inline-12.js?v=823-fix-transfer-save-alert"></script>
 <script src="mod/inline-13.js?v=831-trunk-schema-v2"></script>
 <!-- [v422-head-system-svg] 纯 SVG 核心先于 inline-14 同步加载。 -->
@@ -2188,7 +2189,7 @@
 <script src="mod/inline-15.js?v=357"></script>
 
 <!-- ===== 地图面积测量回传：消费在线地图 / 地形模块写入的交接数据（v821 起地图页唯一即本页 #onlineMapSection） ===== -->
-<script src="mod/inline-16.js?v=1033-map-partition-sync"></script>
+<script src="mod/inline-16.js?v=1035-shared-node-sync"></script>
 <script src="mod/ry-diag.js?v=476-pwa-reset"></script>
 
 <!-- ===== 主区 Tab 绑定 + 底部状态栏 + 视口自适应 ===== -->
@@ -2198,7 +2199,7 @@
 <!-- [v815] 绘图工具栏统一图标集（单色线性 SVG）：必须先于 inline-18.js 加载，
      inline-18 的 decorateToolbar 会在首次装饰时调用 window.RyIcons.decorate。 -->
 <script src="mod/ry-icons.js?v=1012-lock-icon-bigger"></script>
-<script src="mod/inline-18.js?v=1033-map-partition-sync"></script>
+<script src="mod/inline-18.js?v=1035-shared-node-sync"></script>
 
 <script src="mod/inline-19.js?v=696-shared-host-init-order"></script>
 
@@ -2333,21 +2334,21 @@
 <script src="mod/trunk-snap.js?v=911-trunk-snap-edge"></script>
 <script src="mod/trunk-geo.js?v=854-null-slot-strict"></script>
 <!-- [v945] 总管口径反推（纯函数）：由规划分区的面积/流量 + 下游主管支管管径推手绘总管外径。 -->
-<script src="mod/trunk-size.js?v=1033-map-partition-sync"></script>
+<script src="mod/trunk-size.js?v=1035-shared-node-sync"></script>
 <script src="mod/trunk-edit.js?v=835-trunk-geo-snap"></script>
 <script src="mod/trunk-history.js?v=835-trunk-geo-snap"></script>
-<script src="mod/trunk-panel.js?v=1033-map-partition-sync"></script>
+<script src="mod/trunk-panel.js?v=1035-shared-node-sync"></script>
 <!-- [v887-tape-zone-vgate] 在线地图轮灌演示（分组/校验纯函数 + Leaflet 图层），先于宿主装载。 -->
-<script src="mod/map-flow-demo.js?v=1033-map-partition-sync"></script>
-<script src="mod/online-map.js?v=1033-map-partition-sync"></script>
+<script src="mod/map-flow-demo.js?v=1035-shared-node-sync"></script>
+<script src="mod/online-map.js?v=1035-shared-node-sync"></script>
 <!-- [v961] 在线地图右缘抽屉：把「图层」与「总管参数设置」两张浮层收成右缘竖排标签。
      参照「分区与管路」页的 #ppPlotDrawerTab / #tlWsLayerDrawerTab。必须在 online-map.js
      之后（它建的 #trunkPropPanel 由本模块接管；本模块自带轮询 + MutationObserver，顺序晚了也不丢）。 -->
-<script src="mod/map-right-drawer.js?v=1033-map-partition-sync"></script>
+<script src="mod/map-right-drawer.js?v=1035-shared-node-sync"></script>
 <script src="runye-hydraulics-page.js?v=829-hyd-auto-refresh"></script>
 <!-- [v978] 设计输入自动持久化：二级 fld_* / 三级 tl_* / planSrcDist 存 localStorage，
      刷新自动还原（版本升级强刷不再丢参数）。必须是最后一个脚本——还原时要调 calcPlan /
      renderThreeLevel，且要在「与二级联动」派生之后用存档覆盖回用户手改值。 -->
-<script src="mod/inline-33.js?v=1033-map-partition-sync"></script>
+<script src="mod/inline-33.js?v=1035-shared-node-sync"></script>
 </body>
 </html>

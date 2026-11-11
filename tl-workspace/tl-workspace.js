@@ -3143,7 +3143,7 @@
     selGroup = (typeof window !== 'undefined' && window.__tlDemoGroup != null) ? window.__tlDemoGroup : null;
     if (!ctn) return false;
     if (!data || data.version !== 1) {
-      ctn.innerHTML = '<div class="tl-ws-empty">请先生成三级管线平面图（点左侧「生成管线图」）</div>';
+      ctn.innerHTML = '<div class="tl-ws-empty">请先在「分区与管路」页点击「生成施工图」</div>';
       viewState = null; lastDataRef = null;
       return false;
     }

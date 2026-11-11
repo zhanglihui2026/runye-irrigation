@@ -3607,16 +3607,11 @@ function tlRefreshLossCard(r) {
   } catch (e) { }
 }
 
-/* 右侧工作区工具栏显隐（第四十三轮）：
-   有图 → 露出全部按钮；无图 → 只露「生成管线图」
-   （它是唯一生成入口，故 #tlWsToolbar 不再在无图时整体隐藏）。
-   本函数不管 .ry-pane-ws 的可见性 —— 非 ws 视图由面板自身 display:none 隐藏。 */
+/* 右侧工作区工具栏显隐：没有施工图时隐藏管路编辑工具。 */
 function tlWsBarSync() {
   var bar = document.getElementById('tlWsToolbar');
   if (!bar) return;
-  bar.style.display = 'flex';
-  if (window.tlDiagramData) bar.classList.remove('tl-ws-toolbar-bare');
-  else bar.classList.add('tl-ws-toolbar-bare');
+  bar.style.display = window.tlDiagramData ? 'flex' : 'none';
 }
 
 function tlUpdatePlanBar() {
@@ -3624,14 +3619,11 @@ function tlUpdatePlanBar() {
   try { tlRefreshLossCard(); } catch (e) { }
   var poly = window.measuredPolygon || [];
   var hintEl = document.getElementById('tlPpHint');
-  var autoBtn = document.getElementById('tlAutoPipe');
   if (!poly || poly.length < 3) {
     if(hintEl) hintEl.style.display = 'block';
-    if(autoBtn) autoBtn.style.opacity = '0.5';
     return;
   }
   if(hintEl) hintEl.style.display = 'none';
-  if(autoBtn) autoBtn.style.opacity = '1';
 
   var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
   for (var i=0;i<poly.length;i++){
@@ -3950,12 +3942,11 @@ function esc(s) {
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-/* 「生成施工图」负责本页重算；#tlAutoPipe 只把已生成且角度匹配的管线交给在线地图。
-   地图直接读取 tlDiagramData/网络快照，因此本动作不再重复生成三级管线。 */
-function tlAutoPipeToMap() {
+/* 生成施工图后校验并刷新已投影的唯一地图快照；节点仍由 RyTlNodes 独立持久化。 */
+function tlSyncGeneratedMapSnapshot() {
   var dd = window.tlDiagramData;
   if (!(dd && dd.generatedAt && Array.isArray(dd.mainPipes) && Array.isArray(dd.branchPipes))) {
-    alert('请先点击「生成施工图」生成当前分区的管线，再回传到在线地图。');
+    alert('当前管线图尚未生成，在线地图没有可同步的管线成果。');
     return false;
   }
   var currentAngle = null;
@@ -3966,7 +3957,7 @@ function tlAutoPipeToMap() {
   var generatedAngle = dd.zones && dd.zones.frame && isFinite(Number(dd.zones.frame.angle))
     ? Number(dd.zones.frame.angle) : null;
   if (currentAngle !== null && (generatedAngle === null || Math.abs(currentAngle - generatedAngle) > 0.05)) {
-    alert('分区角度已变化，请先点击「生成施工图」更新主管和支管，再回传在线地图。');
+    alert('当前分区角度与管线成果不一致，在线地图未同步。请重新生成施工图。');
     return false;
   }
   /* tlAutoGenerate 的网络投影必须确实落到当前地块的正式网络槽；只检查三级内存图
@@ -3981,20 +3972,36 @@ function tlAutoPipeToMap() {
   }catch(eNetworkRead){network=null;}
   if(!plotId||!network||!networkState||networkState.status!=='current'||
       network.needsReplan||String(network.plotId)!==plotId||network.sourceGeneratedAt!==dd.generatedAt){
-    alert('当前管线成果尚未完整写入在线地图数据，或分区角度已变更。请先点击「生成施工图」重新生成，再回传。');
+    alert('当前管线成果尚未完整写入在线地图数据，或分区角度已变更；地图未同步。请重新生成施工图。');
     return false;
   }
-  try {
-    var sec = document.getElementById('onlineMapSection');
-    if (sec && typeof window.ryShowSection === 'function') window.ryShowSection(sec);
-    else if (sec) location.hash = 'onlineMapSection';
-  } catch (eJump) { console.warn('[tlAutoPipeToMap] 跳转在线地图失败', eJump); }
-  /* 同标签页 localStorage 写入不触发 storage 事件，显式刷新地图地块/分区图层。 */
+  /* 回传前核对图面与地图快照的关键构件数量。生成阶段已将唯一快照写入地块管网槽；
+     这里不另建第二份数据，只拒绝不完整/旧快照，避免把“已打开地图”误报成“已完整回传”。 */
+  var segs=Array.isArray(network.segments)?network.segments:[];
+  function validLineCount(lines){return Array.isArray(lines)?lines.filter(function(line){return Array.isArray(line)&&line.length>=2;}).length:0;}
+  function storedKindCount(kind){return segs.filter(function(s){return s&&(s.kind===kind||String(s.id||'').indexOf(kind)===0);}).length;}
+  var missing=[];
+  ['main','branch'].forEach(function(kind){
+    var expected=validLineCount(dd[kind==='main'?'mainPipes':'branchPipes']);
+    if(storedKindCount(kind)<expected)missing.push(kind==='main'?'主管':'支管');
+  });
+  if(dd.frontPipe&&dd.frontPipe.length>=2&&storedKindCount('front')<1)missing.push('总管连接段');
+  var expectedValves=Array.isArray(dd.valves)?dd.valves.filter(function(v){return v&&isFinite(Number(v.x))&&isFinite(Number(v.y));}).length:0;
+  var expectedTapes=validLineCount(dd.dripTapes);
+  if((network.valves||[]).length<expectedValves)missing.push('阀门');
+  if((network.dripTapes||[]).length<expectedTapes)missing.push('滴灌带');
+  if(dd.sourcePos&&!network.sourcePos)missing.push('水源点');
+  if(missing.length){
+    alert('在线地图快照缺少：'+missing.join('、')+'。地图未同步，请重新生成施工图。');
+    return false;
+  }
+  /* 同标签页写入不触发 storage 事件，显式重绘在线地图、节点捕捉点与轮灌演示。 */
   try { if (window.RyMapHost && typeof window.RyMapHost.refresh === 'function') window.RyMapHost.refresh(); } catch (eMapRefresh) { }
+  try { if (window.RyMapHost && typeof window.RyMapHost.refreshSnapTargets === 'function') window.RyMapHost.refreshSnapTargets(); } catch (eNodeRefresh) { }
   try { if (window.RyMapFlowDemo && window.RyMapFlowDemo.refresh) window.RyMapFlowDemo.refresh(); } catch (eRef) { }
   return true;
 }
-window.tlAutoPipeToMap = tlAutoPipeToMap;
+window.tlSyncGeneratedMapSnapshot = tlSyncGeneratedMapSnapshot;
 
 /* [v948] 「联合灌溉 1/2/3/4 区」这一排在在线地图上是搬进 #mapDemoDock 显示的
    （mod/map-flow-demo.js 的 v864 dock）。在地图上点它只是换个分区分组看效果，
@@ -6674,10 +6681,10 @@ function rySetTab(sectionId, view) {
           }
         } catch (eHidRestore) { }
       } else {
-        wsCtn.innerHTML = '<div class="tl-ws-empty">请先生成三级管线平面图（点右侧工具栏底部的「🔄 生成并回传地图」）</div>';
+        wsCtn.innerHTML = '<div class="tl-ws-empty">请先在「分区与管路」页点击「生成施工图」</div>';
       }
     }
-    /* 工具栏显隐：无图时也显示，但只露「生成管线图」（第四十三轮） */
+    /* 工具栏只在施工图已生成后显示管线编辑工具。 */
     try { tlWsBarSync(); } catch (e) { }
     }
   }

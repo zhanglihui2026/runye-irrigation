@@ -63,7 +63,7 @@
            （实测节点→⋈、划线→⊕），与 v787 ppAiPlan 同款修法。 */
         /* [v800] 多选/遮蔽换语义图标：多选 = ☑ 勾选框（逐段加选）；遮蔽 = ⊘ 禁止/排除
            （被遮蔽的管灰色虚线且不计入材料清单）。id 显式映射优先于 rules 正则。 */
-        var icons={ppPlotPanelToggle:'▤',ppResetCuts:'⟲',ppLockArea:'🔒',ppUndo:'↶',ppAutoPipe:'⇢',ppZoneAutoBtn:'▧',ppRotateZones:'↻',ppGenerate:'▣',ppAiPlan:'🤖',tlAutoPipe:'☁',tlDimMultiBtn:'▦',tlWsFitValve:'⋈',tlWsFitTee:'⊤',tlWsFitElbow:'∟',tlWsFitNode:'⊕',tlLineBtn:'╱',tlWsMultiBtn:'☑',tlWsMaskBtn:'⊘',tlDimSaveBtn:'💾'};
+        var icons={ppPlotPanelToggle:'▤',ppResetCuts:'⟲',ppLockArea:'🔒',ppUndo:'↶',ppAutoPipe:'⇢',ppZoneAutoBtn:'▧',ppRotateZones:'↻',ppGenerate:'▣',ppAiPlan:'🤖',tlDimMultiBtn:'▦',tlWsFitValve:'⋈',tlWsFitTee:'⊤',tlWsFitElbow:'∟',tlWsFitNode:'⊕',tlLineBtn:'╱',tlWsMultiBtn:'☑',tlWsMaskBtn:'⊘',tlDimSaveBtn:'💾'};
         /* [v787] ppAiPlan 显式定 🤖：其 title 含「回传」二字，规则表 /回传|上传/ 排在
            /AI规划/ 之前会把图标错配成 ☁（悬浮态时代按钮带文字未露馅，图标化后必修）。 */
         var icon=icons[button.id];

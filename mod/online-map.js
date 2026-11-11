@@ -201,6 +201,7 @@
   var drawing = false;
   var currentMapPlotId=null;
   var reservoirPlaceMode=false;
+  var nodePlaceMode=false;
   var reservoirMarkerLayer=L.layerGroup().addTo(map);
   var reservoirMarker=null;
   /* ===== [v831] 总管绘制状态（多干线） =====
@@ -600,6 +601,7 @@
   }
   function setAddMode(on){
     on = !!on && points.length>=2;                 // 少于 2 点没有边，加点无从谈起
+    if(on&&nodePlaceMode)setNodePlaceMode(false);
     if(on===addMode){ if(on) buildMidHandles(); return; }   // 幂等
     if(on&&reservoirPlaceMode)setReservoirPlaceMode(false);
     addMode=on;
@@ -619,6 +621,14 @@
   }
 
   map.on('click', function(e){
+    if(nodePlaceMode){
+      var placed=placeSharedNodeAt(e);
+      if(placed){
+        setNodePlaceMode(false);
+        tip('已创建 '+placed.id+'（'+placed.name+'，桩号 '+placed.atM.toFixed(1)+' m）；分区与管路页和在线地图共用此节点。');
+      }
+      return;
+    }
     if(reservoirPlaceMode){
       var sourcePoint=fromDisplay(e.latlng);
       sourcePoint={lat:+sourcePoint.lat,lng:+sourcePoint.lng};
@@ -920,6 +930,7 @@
      （旧版就是这样：setDrawing / 测距 / 右键 各清一次，漏一处就出现"两个工具同时活着"）。 */
   function setTrunkMode(mode){
     var nextMode = (mode==='draw'||mode==='edit') ? mode : 'idle';
+    if(nextMode!=='idle'&&nodePlaceMode)setNodePlaceMode(false);
     if(nextMode!=='idle'&&reservoirPlaceMode)setReservoirPlaceMode(false);
     trunkDragPreview=null;      // 切模式一律丢掉拖动预览，别让状态栏停在旧数字上
     removeTrunkRubber();        // [v852] 橡皮筋跟着模式走：退出绘制（含 Esc/完成/双击收线）即清
@@ -1087,10 +1098,68 @@
     var cal=G.autoSign(dd.poly, plot.polyLatLng, base);
     var bridge=cal.ok?{
       sign:cal.sign, rms:cal.rms,
-      toLL:function(pt){ return pt?G.m2ll(pt.x, pt.y, base, cal.sign):null; }
+      toLL:function(pt){ return pt?G.m2ll(pt.x, pt.y, base, cal.sign):null; },
+      toXY:function(ll){ return ll?G.ll2m(ll,base,cal.sign):null; }
     }:null;
     geoBridgeMemo={sig:sig, bridge:bridge};
     return bridge;
+  }
+
+  /* 地图节点工具只把点击位置投影到当前地块施工图的主管/支管，再写入 RyTlNodes。
+     不创建地图侧节点副本；身份仍是同一份 pid + 桩号。 */
+  function placeSharedNodeAt(e){
+    var N=window.RyTlNodes,A=window.RyTlAutoEdits,dd=window.tlDiagramData;
+    if(!currentMapPlotId){tip('请先在地图中选中并保存一个地块，再绘制施工节点。');return null;}
+    if(!N||typeof N.addAt!=='function'||!A||typeof A.effPts!=='function'||!dd){tip('施工图尚未就绪，请先在「分区与管路」页生成施工图。');return null;}
+    var snap=window.RyPlotLibraryStore&&window.RyPlotLibraryStore.read();
+    var matches=snap&&snap.ok?(snap.plots||[]).filter(function(p){return p&&String(p.id)===String(currentMapPlotId);}):[];
+    if(matches.length!==1||matches[0].merged||matches[0].grouped||matches[0].mergedInto){tip('当前地图地块无法唯一匹配到单地块施工图，未创建节点。');return null;}
+    var bridge=trunkGeoBridge(matches[0]);
+    if(!bridge){tip('地图地块与当前施工图不匹配，或坐标校准失败；未创建节点。');return null;}
+    var clickXY=bridge.toXY(fromDisplay(e.latlng));
+    if(!clickXY){tip('点击位置无法转换到施工图坐标，未创建节点。');return null;}
+    var best=null;
+    function consider(pid){
+      var pts;try{pts=A.effPts(pid,dd);}catch(err){pts=null;}
+      if(!Array.isArray(pts)||pts.length<2)return;
+      var walked=0;
+      for(var i=0;i+1<pts.length;i++){
+        var a=pts[i],b=pts[i+1],dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy);
+        if(!isFinite(len)||len<=1e-8)continue;
+        var t=Math.max(0,Math.min(1,((clickXY.x-a.x)*dx+(clickXY.y-a.y)*dy)/(len*len)));
+        var q={x:a.x+dx*t,y:a.y+dy*t},along=walked+len*t,ll=bridge.toLL(q);
+        if(!ll){walked+=len;continue;}
+        var cp=map.latLngToContainerPoint(displayLatLngOf(ll.lat,ll.lng));
+        var dist=cp.distanceTo?cp.distanceTo(e.containerPoint):Math.hypot(cp.x-e.containerPoint.x,cp.y-e.containerPoint.y);
+        if(!best||dist<best.dist)best={pid:pid,atM:along,dist:dist};
+        walked+=len;
+      }
+    }
+    (Array.isArray(dd.mainPipes)?dd.mainPipes:[]).forEach(function(line,i){if(Array.isArray(line)&&line.length>1)consider('main-'+i);});
+    (Array.isArray(dd.branchPipes)?dd.branchPipes:[]).forEach(function(line,i){if(Array.isArray(line)&&line.length>1)consider('branch-'+i);});
+    if(!best){tip('当前施工图没有可放置节点的主管或支管。');return null;}
+    if(best.dist>14){tip('请点击主管或支管线上（吸附范围 14 像素）；未创建节点。');return null;}
+    var node=N.addAt(best.pid,best.atM);
+    if(!node){tip('节点创建失败，施工图状态可能已变化；未写入节点。');return null;}
+    try{refreshSnapTargets();}catch(errRefresh){}
+    try{if(window.RyMapFlowDemo&&typeof window.RyMapFlowDemo.refresh==='function')window.RyMapFlowDemo.refresh();}catch(errDemoRefresh){}
+    return {id:node.id,pid:best.pid,atM:Number(node.atM),name:A.pipeName?A.pipeName(best.pid):best.pid};
+  }
+
+  function setNodePlaceMode(on){
+    nodePlaceMode=!!on;
+    var btn=document.getElementById('btnPlaceNode');
+    if(btn){btn.classList.toggle('btn-on',nodePlaceMode);btn.setAttribute('aria-pressed',nodePlaceMode?'true':'false');setBtnLabel(btn,nodePlaceMode?'点击管线放置…':'绘制节点');}
+    map.getContainer().classList.toggle('placing-node',nodePlaceMode);
+    if(!nodePlaceMode){map.dragging.enable();return;}
+    if(drawing)setDrawing(false);
+    if(measuring)finishMeasure();
+    if(addMode)setAddMode(false);
+    if(reservoirPlaceMode)setReservoirPlaceMode(false);
+    if(trunkMode!=='idle')setTrunkMode('idle');
+    if(!currentMapPlotId){setNodePlaceMode(false);tip('请先在地图中选中并保存一个地块，再绘制施工节点。');return;}
+    map.dragging.disable();
+    tip('点击施工图主管或支管放置节点；节点会沿用分区与管路页的同一份节点数据。按 Esc 退出。');
   }
 
   /* 分区网格交点数上限：nearest() 每帧对全部候选做一次投影，
@@ -1238,6 +1307,7 @@
     return true;
   }
   function setReservoirPlaceMode(on){
+    if(on&&nodePlaceMode)setNodePlaceMode(false);
     reservoirPlaceMode=!!on;
     var btn=document.getElementById('btnPlaceReservoir');
     if(btn){btn.classList.toggle('btn-on',reservoirPlaceMode);btn.setAttribute('aria-pressed',reservoirPlaceMode?'true':'false');setBtnLabel(btn, reservoirPlaceMode?'点击地图放置…':'蓄水池');}
@@ -1528,6 +1598,8 @@
   };
   var reservoirBtn=document.getElementById('btnPlaceReservoir');
   if(reservoirBtn)reservoirBtn.onclick=function(){setReservoirPlaceMode(!reservoirPlaceMode);};
+  var nodeBtn=document.getElementById('btnPlaceNode');
+  if(nodeBtn)nodeBtn.onclick=function(){setNodePlaceMode(!nodePlaceMode);};
   var finishTrunkBtn=document.getElementById('btnFinishTrunk');
   if(finishTrunkBtn)finishTrunkBtn.onclick=function(){commitTrunkDraft();};
   var undoTrunkBtn=document.getElementById('btnUndoTrunk');
@@ -2401,6 +2473,9 @@
   }
   document.addEventListener('keydown', function(e){
     if(e.defaultPrevented) return;
+    if(e.key==='Escape'&&nodePlaceMode&&mapSectionVisible()){
+      setNodePlaceMode(false);tip('已退出施工节点绘制。');e.preventDefault();return;
+    }
     /* [v834] 撤销 / 重做必须先于「带修饰键就早退」那一行，否则永远进不来。
        ★ 输入框里**不接管**：那里 Ctrl+Z 是浏览器原生的文本撤销，抢过来用户就打不了字，
          而且这种"抢键"错误用户只会描述成"输入框抽风"，极难定位。 */
@@ -2531,6 +2606,7 @@
      时按钮没有 data-ry-icon 属性，不会补挂图标，纯文字更新，安全。 */
   var btnDraw=document.getElementById('btnDraw');
   function setDrawing(on){
+    if(on&&nodePlaceMode)setNodePlaceMode(false);
     if(on&&reservoirPlaceMode)setReservoirPlaceMode(false);
     if(on && trunkMode!=='idle') setTrunkMode('idle');   // [v831] 互斥收口：一律走 setTrunkMode，别在这里手写清状态（v833 起含 edit）
     if(on && measuring) finishMeasure();
@@ -3702,6 +3778,7 @@
   var measuring=false, measurePts=[], measureLayer=L.layerGroup().addTo(map);
   document.getElementById('btnMeasure').onclick=function(){
     measuring=!measuring;
+    if(measuring&&nodePlaceMode)setNodePlaceMode(false);
     if(measuring&&reservoirPlaceMode)setReservoirPlaceMode(false);
     this.classList.toggle('btn-on',measuring);
     this.setAttribute('aria-pressed',measuring?'true':'false');
