@@ -3879,13 +3879,15 @@ function tlSyncGeneratedMapSnapshot() {
   var plotId=window.currentPlotId==null?'':String(window.currentPlotId);
   var store=window.RyIrrigationDataStore;
   var network=null,networkState=null;
+  var geometrySig=JSON.stringify([dd.frontPipe,dd.mainPipes,dd.branchPipes,dd.valves,dd.poly]);
   try{
     network=store&&store.readNetworkLayout?store.readNetworkLayout():null;
     networkState=network&&store&&store.readNetworkLayoutStateForCurrentPlot
       ?store.readNetworkLayoutStateForCurrentPlot(network):null;
   }catch(eNetworkRead){network=null;}
   if(!plotId||!network||!networkState||networkState.status!=='current'||
-      network.needsReplan||String(network.plotId)!==plotId||network.sourceGeneratedAt!==dd.generatedAt){
+      network.needsReplan||String(network.plotId)!==plotId||
+      String(network.diagramGeometrySig||'')!==geometrySig){
     alert('当前管线成果尚未完整写入在线地图数据，或分区角度已变更；地图未同步。请重新生成施工图。');
     return false;
   }
