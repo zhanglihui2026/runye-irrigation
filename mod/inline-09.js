@@ -5634,10 +5634,10 @@ function tlAutoGenerate(options) {
       ?level3Adapter.geometrySignature(generatedGeometry):'';
     var savedNodes=null;
     try{savedNodes=JSON.parse(localStorage.getItem('runye_tlNodes_v1')||'null');}catch(eSavedNodes){}
-    if(mapSnapshotPublished&&newGeometrySig&&savedNodes&&savedNodes.geoSig&&savedNodes.geoSig!==newGeometrySig&&
+    if(newGeometrySig&&savedNodes&&savedNodes.geoSig!==newGeometrySig&&
        window.RyTlNodes&&typeof window.RyTlNodes.reset==='function'){
       window.RyTlNodes.reset();
-      console.info('[drawing-design] 已清除与新管线几何不匹配的三级节点');
+      console.info('[drawing-design] 分区或管线几何已改变，已清除绑定旧几何的三级节点');
     }
   }catch(eGeometryBinding){try{console.warn('[drawing-design] 三级几何状态同步失败',eGeometryBinding);}catch(eLog){}}
   try{

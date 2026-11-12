@@ -5339,15 +5339,25 @@
     if(ppIsGroupWhole())return false;
     var bridge=window.RunyeBridge,live=bridge&&bridge.getZoneCuts();
     var prior=window.tlDiagramData&&window.tlDiagramData.zones;
+    var canonical=window.__runyeSingleCanonicalDesign;
+    var canonicalPlot=canonical&&canonical.plots&&canonical.plots.length===1&&
+      String(canonical.plots[0].plotId)===String(window.currentPlotId||'')?canonical.plots[0]:null;
     /* 没有上一版三级图面就没有可比较的分区前像；首次生成不能因此覆盖
        用户当前已经绘制的管路。可比较时才根据布局差异触发自动重建。 */
-    if(!live||!prior)return false;
-    if(Number(live.cols)!==Number(prior.cols)||Number(live.rows)!==Number(prior.rows))return true;
+    if(!live)return false;
     function sameArray(a,b){
       if(!Array.isArray(a)||!Array.isArray(b)||a.length!==b.length)return false;
       for(var i=0;i<a.length;i++)if(Math.abs(Number(a[i])-Number(b[i]))>0.05)return false;
       return true;
     }
+    /* The preview can already reflect a changed target area while the committed
+       design still carries the previous cuts. Generation must compare against the
+       committed design as well as the last rendered diagram. */
+    if(canonicalPlot&&canonicalPlot.partition&&
+       (!sameArray(canonicalPlot.partition.xCuts,live.xPos.slice(1,-1))||
+        !sameArray(canonicalPlot.partition.yCuts,live.yPos.slice(1,-1))))return true;
+    if(!prior)return false;
+    if(Number(live.cols)!==Number(prior.cols)||Number(live.rows)!==Number(prior.rows))return true;
     if(!sameArray(live.xPlan,prior.xPlan)||!sameArray(live.yPlan,prior.yPlan)||
        !sameArray(live.xPos,prior.xPos)||!sameArray(live.yPos,prior.yPos))return true;
     if(!sameArray(live.xSrc,prior.xSrc)||!sameArray(live.ySrc,prior.ySrc))return true;
@@ -5548,7 +5558,6 @@
       hiddenPipes:JSON.parse(JSON.stringify(ppState.hiddenPipes||{main:{},branch:{},subbranch:{}})),
       pipeIds:JSON.parse(JSON.stringify(ppState.pipeIds||{main:[],branch:[],subbranch:[]})),
       nextPipeId:ppState.nextPipeId||1,
-      cutSnap:JSON.parse(JSON.stringify(ppState.cutSnap||{sig:'',x:null,y:null})),
       partitionCuts:(function(){
         try{
           if(!ppState.polyPts||ppState.polyPts.length<3)return null;
@@ -5558,6 +5567,7 @@
           return {x:cuts.xPos.slice(1,-1),y:cuts.yPos.slice(1,-1)};
         }catch(e){return null;}
       })(),
+      cutSnap:JSON.parse(JSON.stringify(ppState.cutSnap||{sig:'',x:null,y:null})),
       cutOverrides:JSON.parse(JSON.stringify(ppState.cutOverrides||{x:{},y:{}})),
       areaLocked:!!ppState.areaLocked,
       zoneRotated:!!ppState.zoneRotated,
