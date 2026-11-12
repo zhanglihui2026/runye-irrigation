@@ -1472,8 +1472,8 @@
    data-ry-version-full），与 14 处主串 / 本 VERSION 同源、同抬，tests/version_sync.test.cjs
    增一条契约锁「徽标存在 + 由 JS 填充 + 不写死」。
    [v1035-shared-node-sync] 施工图生成自动刷新在线地图；两个页面共用施工节点写入与展示，升级离线缓存。
-   [v1037-published-snapshot-coherence] 动画只读同版发布快照；生成事务提交后清理旧几何节点并刷新地图缓存。 */
-const VERSION = 'v1037-published-snapshot-coherence';
+   [v1038-multiroute-animation] 动画只读同版发布快照；生成事务提交后清理旧几何节点并刷新地图缓存。 */
+const VERSION = 'v1038-multiroute-animation';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

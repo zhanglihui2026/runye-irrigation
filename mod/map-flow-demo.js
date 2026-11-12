@@ -380,7 +380,9 @@
     }
     (dd.valves || []).forEach(function (v) {
       var q = toLLSafe(v);
-      if (q) valves.push({ ll: q, mi: valveBranchIndex(v) });
+      var anchor=null;
+      if(v&&v.ax!=null&&v.ay!=null)anchor=toLLSafe({x:v.ax,y:v.ay});
+      if (q) valves.push({ ll: q, anchorLL:anchor, mi: valveBranchIndex(v) });
     });
     /* [v915] 接驳节点（v913 dd.couplerNodes 投影，世界米）→ 经纬度 + 主管下标。
        失配节点（x/y null）跳过；mi=parseInt('m3')-1，解析不出跳过（宁缺不错）。 */
@@ -610,10 +612,10 @@
       [[0,b.raw[0]],[b.len,b.raw[b.raw.length-1]]].forEach(function(e,ei){var p=project(a,e[1]);if(p.d<=LINK_EPS_M){var id='main-join:'+mi+':'+mj+':b'+ei;addCut(b,e[0],id);addCut(a,p.s,id);}});
     }
 
-    /* Treat each valve as the branch flow splitter: feed it from the nearest
-       point on its zone main, then route outward from the valve to both branch
-       ends. The short feed connector is a visualization overlay only; it never
-       changes the saved pipe geometry or hydraulic model. */
+    /* Treat each valve as the branch flow splitter. Generated施工图 stores the
+       main-side takeoff in valve.ax/ay and the valve center in x/y; the visible
+       connector between them is part of the designed route even when the main
+       and branch centerlines are parallel and separated. */
     var targets=[],feeds=[];
     activeZones.forEach(function(i){
       var main=byMain[i],branch=branchLines[i];if(!main)return;
@@ -621,13 +623,21 @@
         var valve=null;(d.valves||[]).some(function(v){if(v&&v.mi===i&&v.ll){valve=v;return true;}return false;});
         if(!valve)return;
         var valveProj=project(branch,valve.ll);
-        var valvePoint=at(branch,valveProj.s),mainProj=project(main,valvePoint);
+        var valvePoint=at(branch,valveProj.s),mainJoin=valve.anchorLL||valvePoint;
+        var mainProj=project(main,mainJoin);
+        /* Legacy valve records without an anchor retain the prior direct-feed
+           rule. With an anchor, verify that anchor lands on this zone's main;
+           the drawn anchor→valve connector is the physical bridge to the branch. */
         if(mainProj.d<=LINK_EPS_M){
           var feedMainId='branch-feed-main:'+i,feedValveId='branch-valve:'+i;
           addCut(main,mainProj.s,feedMainId);addCut(branch,valveProj.s,feedValveId);
           var startId='branch-start:'+i,endId='branch-end:'+i;
           addCut(branch,0,startId);addCut(branch,branch.len,endId);
-          feeds.push({zi:i,from:feedMainId,to:feedValveId,points:[at(main,mainProj.s),valvePoint]});
+          var feedPoints=[at(main,mainProj.s)];
+          if(valve.anchorLL)feedPoints.push(valve.anchorLL);
+          feedPoints.push(valve.ll);
+          if(gap(xy(valve.ll),xy(valvePoint))>.05)feedPoints.push(valvePoint);
+          feeds.push({zi:i,from:feedMainId,to:feedValveId,points:feedPoints});
           targets.push({zi:i,id:startId},{zi:i,id:endId});
           return;
         }
