@@ -1473,8 +1473,9 @@
    增一条契约锁「徽标存在 + 由 JS 填充 + 不写死」。
    [v1035-shared-node-sync] 施工图生成自动刷新在线地图；两个页面共用施工节点写入与展示，升级离线缓存。
    [v1039-flow-display-decoupling] 分区面仅作动画显示；缺失时不阻断已发布管网的水路计算。
-   [v1042-source-independent-irrigation-route] 页面恢复重绘时按已发布管网几何核对动画版本。 */
-const VERSION = 'v1042-source-independent-irrigation-route';
+   [v1042-source-independent-irrigation-route] 页面恢复重绘时按已发布管网几何核对动画版本。
+   [v1043-coupler-node-lifecycle] 接驳节点随地块设计快照恢复；分区重建或管网重生成时清除旧节点。 */
+const VERSION = 'v1043-coupler-node-lifecycle';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

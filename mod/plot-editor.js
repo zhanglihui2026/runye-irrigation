@@ -44,6 +44,7 @@
     pickedPipe:null,
     hiddenPipes:{main:{},branch:{},subbranch:{}},
     pipeIds:{main:[],branch:[],subbranch:[]},
+    couplerNodes:[],
     nextPipeId:1,
     zoneRotated:false,
     zoneAngleDeg:0,
@@ -1060,6 +1061,7 @@
     ['polyPts','mainPipes','branchPipes','subBranchPipes','valves'].forEach(function(k){
       if(ppState[k]==null) ppState[k]=[];
     });
+    if(!Array.isArray(ppState.couplerNodes))ppState.couplerNodes=[];
     /* [v657] 对象/标量型字段同样兜底 —— v657 探针实测：最小 slot（{}）经上面数组兜底后
        hiddenPipes 仍是 null，ppPushHistory→ppCloneState 读 .main 直接 TypeError
        （「Cannot read properties of null (reading 'main')」）。真实流程字段齐全不触发，
@@ -1090,7 +1092,7 @@
       pipeIds:{main:[],branch:[],subbranch:[]},nextPipeId:1,
       hiddenPipes:{main:{},branch:{},subbranch:{}},
       cutOverrides:{x:{},y:{}},cutSnap:{sig:'',x:null,y:null},partitionCuts:null,mergePreview:null,areaLocked:false,
-      zoneRotated:false,zoneAngleDeg:0,zoneAuto:true
+      zoneRotated:false,zoneAngleDeg:0,zoneAuto:true,couplerNodes:[]
     };
   }
 
@@ -1131,7 +1133,12 @@
               }
               if(!projected||!projected.ok||!projected.snapshot||!projected.snapshot.pipePlan){
                 list.push({invalidCanonical:true,strict:false});
-              }else list.push({design:projected.snapshot.pipePlan,strict:false,canonical:true});
+              }else{
+                /* couplerNodes 目前属于二级规划附属状态，不在 canonical 绘图模型字段内；
+                   canonical 投影恢复几何时，从同一地块档案的设计侧车字段一并带回。 */
+                projected.snapshot.pipePlan.couplerNodes=Array.isArray(d.design.couplerNodes)?d.design.couplerNodes:[];
+                list.push({design:projected.snapshot.pipePlan,strict:false,canonical:true});
+              }
             }else list.push({design:d.design,strict:false,canonical:false});
           }
         }
@@ -1182,6 +1189,13 @@
       slot.branchPipes=mv(d.branchPipes);
       slot.subBranchPipes=mv(d.subBranchPipes);
       slot.valves=(d.valves||[]).map(function(p){return{x:(+p.x)+dx,y:(+p.y)+dy};});
+      /* 接驳点以主管序号+沿线距离为身份；仅在地块形状校验通过后继承，
+         并丢弃已不存在或桩号超出主管长度的旧引用。 */
+      slot.couplerNodes=(Array.isArray(d.couplerNodes)?d.couplerNodes:[]).filter(function(n){
+        var m=n&&/^m([1-9][0-9]*)$/.exec(String(n.pipeKey||''));
+        var idx=m?parseInt(m[1],10)-1:-1, s=Number(n&&n.s), line=slot.mainPipes[idx];
+        return !!(line&&line.length>=2&&isFinite(s)&&s>=0&&s<=ppLineLen(line)+0.5);
+      }).map(function(n){return{pipeKey:String(n.pipeKey),s:Number(n.s)};});
       slot.source=d.source?{x:(+d.source.x)+dx,y:(+d.source.y)+dy}:null;
       /* 轴对齐旧快照保存世界坐标，随地块平移；旋转网格快照保存网格局部坐标，不能平移。 */
       if(d.cutSnap){
@@ -3224,7 +3238,7 @@
   });
 
   function ppHasPipeContent(){
-    return !!(ppState.mainPipes.length||ppState.branchPipes.length||(ppState.subBranchPipes&&ppState.subBranchPipes.length)||ppState.valves.length||ppState.currentLine.length||ppState.source);
+    return !!(ppState.mainPipes.length||ppState.branchPipes.length||(ppState.subBranchPipes&&ppState.subBranchPipes.length)||ppState.valves.length||(ppState.couplerNodes&&ppState.couplerNodes.length)||ppState.currentLine.length||ppState.source);
   }
 
   function ppUpdateAutoPipeButton(){
@@ -3260,7 +3274,7 @@
         if(!s)return;
         var next=ppCloneJSON(s);
         if(!next){changes.push({index:index,slot:null});return;}
-        next.mainPipes=[];next.branchPipes=[];next.subBranchPipes=[];next.source=null;next.valves=[];
+        next.mainPipes=[];next.branchPipes=[];next.subBranchPipes=[];next.source=null;next.valves=[];next.couplerNodes=[];
         ppSlotRebuildIds(next);
         changes.push({index:index,slot:next});
       });
@@ -3273,7 +3287,7 @@
       setTimeout(function(){ try{ ppSyncGroupEditUI(); }catch(e){} },0);
     }
     ppState.mainPipes=[];ppState.branchPipes=[];ppState.subBranchPipes=[];
-    ppState.source=null;ppState.valves=[];ppState.currentLine=[];ppState.hiddenPipes={main:{},branch:{},subbranch:{}};ppState.pipeIds={main:[],branch:[],subbranch:[]};ppState.nextPipeId=1;ppState.cutOverrides={x:{},y:{}};ppResetCutSnap('');
+    ppState.source=null;ppState.valves=[];ppState.couplerNodes=[];ppState.currentLine=[];ppState.hiddenPipes={main:{},branch:{},subbranch:{}};ppState.pipeIds={main:[],branch:[],subbranch:[]};ppState.nextPipeId=1;ppState.cutOverrides={x:{},y:{}};ppResetCutSnap('');
     if(groupPreimage&&!ppCommitGroupMemberEdit(groupPreimage))return false;
     if(singlePreimage&&typeof window.ryCommitSinglePlotL2Snapshot==='function'){
       var singleCommit=window.ryCommitSinglePlotL2Snapshot(singlePreimage,window.ppGetState());
@@ -3515,7 +3529,7 @@
         if(!s){memberChanges.push({index:slotIndex,slot:null});return;}
         var r = ppBuildAutoPipes(s.polyPts, planN, isThree, true, null, s.zoneAngleDeg);
         s.mainPipes = r.main; s.branchPipes = r.branch; s.subBranchPipes = r.subbranch;
-        s.valves = r.valves; s.source = null;
+        s.valves = r.valves; s.source = null; s.couplerNodes=[];
         s.cutOverrides = { x: {}, y: {} }; s.mergePreview = null;
         ppSlotRebuildIds(s);
         memberChanges.push({index:slotIndex,slot:s});
@@ -3528,7 +3542,7 @@
       var mg = ppCollectGroupAllPipes();
       if(!mg)return false;
       ppState.mainPipes = mg.main; ppState.branchPipes = mg.branch; ppState.subBranchPipes = mg.subbranch;
-      ppState.source = null; ppState.valves = [];
+      ppState.source = null; ppState.valves = []; ppState.couplerNodes=[];
       ppState.pipeIds = { main: [], branch: [], subbranch: [] }; ppState.nextPipeId = 1;
       ppState.hiddenPipes = { main: {}, branch: {}, subbranch: {} };
       ppState.currentLine = [];
@@ -3565,6 +3579,7 @@
     ppState.branchPipes = r2.branch;
     ppState.subBranchPipes = r2.subbranch;
     ppState.valves = r2.valves;
+    ppState.couplerNodes = [];
     ppState.currentLine = [];
     ppState.hiddenPipes = { main: {}, branch: {}, subbranch: {} };
     ppState.pipeIds = { main: [], branch: [], subbranch: [] }; ppState.nextPipeId = 1;
@@ -3594,7 +3609,7 @@
 
   function ppRepartitionDesign(opts){
     if(!ppState.polyPts.length){alert('请先到「在线地图」画框并回传地块');return;}
-    if(ppHasPipeContent()&&!confirm('重新分区会清除当前绘制的管线、阀门和水源，是否继续？'))return;
+    if(ppHasPipeContent()&&!confirm('重新分区会清除当前绘制的管线、阀门、接驳节点和水源，是否继续？'))return;
     var groupPreimage=ppGroupMemberPreimage();
     if(groupPreimage&&groupPreimage.invalid)return false;
     var singlePreimage=!groupPreimage&&!ppIsGroupWhole()&&typeof window.ppGetState==='function'
@@ -3607,6 +3622,7 @@
     ppState.subBranchPipes=[];
     ppState.source=null;
     ppState.valves=[];
+    ppState.couplerNodes=[];
     ppState.currentLine=[];
     ppState.hiddenPipes={main:{},branch:{},subbranch:{}};
     ppState.pipeIds={main:[],branch:[],subbranch:[]};

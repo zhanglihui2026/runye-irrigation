@@ -547,6 +547,7 @@
           branchPipes:pp.branchPipes||[],
           subBranchPipes:pp.subBranchPipes||[],
           valves:pp.valves||[],
+          couplerNodes:pp.couplerNodes||[],
           source:pp.source||null,
           cutSnap:pp.cutSnap||null,
           partitionCuts:pp.partitionCuts||null,
