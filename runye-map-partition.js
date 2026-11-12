@@ -62,7 +62,10 @@
   return true;
  }
  function polygons(toLL){var b=root.RunyeBridge,cuts=b.getZoneCuts(),rings=root.__runyeSubPlots&&root.__runyeSubPlots.length?root.__runyeSubPlots.map(s=>s.poly):[b.getPlotPolygon()],out=[];
-  if(!cuts)return out;var localRings=rings.map(function(r){return b.polyToGrid(cuts,r);});for(var y=0;y<cuts.yPos.length-1;y++)for(var x=0;x<cuts.xPos.length-1;x++)localRings.forEach(function(r){var local=b.clipPolyToRect(r,cuts.xPos[x],cuts.yPos[y],cuts.xPos[x+1],cuts.yPos[y+1]);if(local&&local.length>=3){var p=b.polyToWorld(cuts,local),area=b.polyArea(p);if(area>0.01)out.push({zoneIndex:y*(cuts.xPos.length-1)+x,name:(y*(cuts.xPos.length-1)+x+1)+'区',latLng:p.map(toLL),area:area});}});return out;
+  if(!cuts)return out;var localRings=rings.map(function(r){return b.polyToGrid(cuts,r);}),cols=cuts.xPos.length-1,rows=cuts.yPos.length-1;
+  function gx(ri,ci){return typeof root.tlZoneGx==='function'?root.tlZoneGx(cuts,ri,ci):cuts.xPos[ci];}
+  function gy(ci,ri){return typeof root.tlZoneGy==='function'?root.tlZoneGy(cuts,ci,ri):cuts.yPos[ri];}
+  for(var y=0;y<rows;y++)for(var x=0;x<cols;x++)localRings.forEach(function(r){var local=b.clipPolyToRect(r,gx(y,x),gy(x,y),gx(y,x+1),gy(x,y+1));if(local&&local.length>=3){var p=b.polyToWorld(cuts,local),area=b.polyArea(p);if(area>0.01)out.push({zoneIndex:y*cols+x,name:(y*cols+x+1)+'区',latLng:p.map(toLL),area:area});}});return out;
  }
  function capture(net,previousNetworkRaw){
   if(!net)return {ok:false,error:'network-layout-missing'};
@@ -78,28 +81,41 @@
   if(!state.ok)return {ok:true,skipped:true,reason:state.error||'plot-library-unavailable'};
   var matches=state.plots.filter(function(p){return p&&p.id===net.plotId;});
   if(matches.length!==1)return {ok:true,skipped:true,reason:'plot-library-identity-not-unique'};
+  var p=matches[0],measuredArea=Number(p.sqm);
+  if(!Number.isFinite(measuredArea)||measuredArea<=0)return {ok:false,error:'map-measured-area-missing'};
+  var partitionArea=partitions.reduce(function(sum,z){return sum+(Number(z.area)||0);},0);
+  if(!(partitionArea>0))return {ok:false,error:'partition-geometry-area-missing'};
+  var areaScale=measuredArea/partitionArea;
+  partitions=partitions.map(function(z){return Object.assign({},z,{area:z.area*areaScale});});
+  var areaCorrection=measuredArea-partitions.reduce(function(sum,z){return sum+z.area;},0);
+  if(partitions.length)partitions[partitions.length-1].area+=areaCorrection;
+  var zones=root.tlDiagramData&&root.tlDiagramData.zones;
+  var expectedZoneCount=zones&&Number(zones.cols)*Number(zones.rows);
+  if(!(expectedZoneCount>0)||partitions.length!==expectedZoneCount)return {ok:false,error:'partition-count-does-not-match-generated-diagram'};
   net.partitionPlan=plan;net.partitions=partitions;
-  var p=matches[0];p.partitionPlan=plan;p.partitions=partitions;
-  return commitPartitionResult(state,net,previousNetworkRaw);
+  p.partitionPlan=plan;p.partitions=partitions;
+  var nodeKey='runye_tlNodes_v1',previousNodesRaw=null,nodesChanged=false;
+  try{
+   previousNodesRaw=root.localStorage.getItem(nodeKey);
+   var savedNodes=previousNodesRaw?JSON.parse(previousNodesRaw):null,dd=root.tlDiagramData;
+   if(savedNodes&&dd){
+    var nextGeoSig=JSON.stringify([dd.frontPipe,dd.mainPipes,dd.branchPipes,dd.valves,dd.poly]);
+    if(savedNodes.geoSig&&savedNodes.geoSig!==nextGeoSig){
+     root.localStorage.setItem(nodeKey,JSON.stringify({version:1,geoSig:nextGeoSig,nodes:[],links:[]}));
+     nodesChanged=true;
+    }
+   }
+  }catch(eNodes){return {ok:false,error:'node-snapshot-prepare-failed'};}
+  var committed;
+  try{committed=commitPartitionResult(state,net,previousNetworkRaw);}
+  catch(eCommit){committed={ok:false,error:eCommit&&eCommit.message||'partition-network-commit-failed'};}
+  if(!committed.ok&&nodesChanged){
+   try{if(previousNodesRaw==null)root.localStorage.removeItem(nodeKey);else root.localStorage.setItem(nodeKey,previousNodesRaw);}catch(eRestoreNodes){committed.rollbackError=committed.rollbackError||'node-snapshot-rollback-failed';}
+  }
+  return committed;
  }
  function capturePartitions(plotId){
-  if(plotId==null||String(plotId).trim()==='')return {ok:true,skipped:true,reason:'plot-identity-missing'};
-  if(!root.__runyeMapFrameInv||!root.RunyeBridge)return {ok:true,skipped:true,reason:'partition-context-unavailable'};
-  var inv=root.__runyeMapFrameInv,base=root.__runyeGeoBase;
-  if(!base||!Number.isFinite(base.refLat)||!Number.isFinite(base.refLng))return {ok:true,skipped:true,reason:'map-frame-unavailable'};
-  var m=6378137*Math.PI/180,co=Math.cos(base.refLat*Math.PI/180);
-  function ll(p){var x=p.x-inv.tx,y=p.y-inv.ty;return[base.refLat+(inv.ay*x+inv.by*y)/m,base.refLng+(inv.ax*x+inv.bx*y)/(m*co)];}
-  var partitionState=root.RunyeBridge.getPartitionState();
-  var plan={version:1,angle:Math.atan2(inv.ay,inv.ax)*180/Math.PI,params:params(),cutSnap:copy(partitionState.cutSnap),cutOverrides:copy(partitionState.cutOverrides),zoneRotated:!!partitionState.zoneRotated};
-  var partitions=polygons(ll),state=readLibrary();
-  if(!state.ok)return {ok:false,error:state.error||'plot-library-unavailable'};
-  var matches=state.plots.filter(function(p){return p&&String(p.id)===String(plotId);});
-  if(matches.length!==1)return {ok:false,error:'plot-library-identity-not-unique'};
-  var p=matches[0];
-  if(JSON.stringify(p.partitionPlan||null)===JSON.stringify(plan)&&JSON.stringify(p.partitions||[])===JSON.stringify(partitions))return {ok:true,unchanged:true,partitions:partitions};
-  p.partitionPlan=plan;p.partitions=partitions;
-  var saved=commitPartitionResult(state,null,null);
-  return saved.ok?{ok:true,partitions:partitions,revision:saved.revision}:saved;
+  return {ok:false,error:'draft-partition-write-disabled',plotId:plotId||null};
  }
  function preview(payload,angle){payload=copy(payload);payload.partitionPlan={version:1,angle:angle,params:(payload.partitionPlan||{}).params||{},zoneRotated:!!(payload.partitionPlan||{}).zoneRotated};root.runyeApplyMapPayload(payload);if(typeof root.ppSetZoneAngleDeg==='function')root.ppSetZoneAngleDeg(-angle);
   var b=root.RunyeBridge,F=root.__runyeMapFramePoly,c=center(F.map(p=>({x:p.x,y:-p.y}))),base=root.__runyeGeoBase,m=6378137*Math.PI/180,co=Math.cos(base.refLat*Math.PI/180);
@@ -326,5 +342,5 @@
    root.RyMapHost.send(p,this);};
   root.addEventListener('storage',refresh);root.addEventListener('runye-plots-updated',refresh);refresh();return{refresh:refresh};
  }
- root.RyMapPartition={center:center,valid:valid,restore:restore,capture:capture,capturePartitions:capturePartitions,preview:preview,attach:attach,commitPartitionResult:commitPartitionResult};
+ root.RyMapPartition={center:center,valid:valid,restore:restore,capture:capture,preview:preview,attach:attach,commitPartitionResult:commitPartitionResult};
 })(typeof window!=='undefined'?window:globalThis);

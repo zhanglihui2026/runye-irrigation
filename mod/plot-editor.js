@@ -5404,7 +5404,14 @@
     // 同步生成三级管线施工简图：默认按当前选择的分区数（首次为2区一总管），调整4/6/8区后再次点击即按新选择重算
     try{
       if(window.measuredPolygon && window.measuredPolygon.length>=3 && typeof tlAutoGenerate==='function'){
-        tlAutoGenerate({scroll:false,rethrowError:true});
+        var previousGeneratedAt=window.tlDiagramData&&window.tlDiagramData.generatedAt;
+        var generated=tlAutoGenerate({scroll:false,rethrowError:true,publishToMap:true});
+        var currentCuts=window.RunyeBridge&&window.RunyeBridge.getZoneCuts();
+        var expectedZones=currentCuts?currentCuts.cols*currentCuts.rows:0;
+        if(generated!==true||!window.tlDiagramData||window.tlDiagramData.generatedAt===previousGeneratedAt||
+           !window.tlDiagramData.zones||window.tlDiagramData.zones.cols*window.tlDiagramData.zones.rows!==expectedZones){
+          throw new Error('本次分区与管线成果未重新完整生成，在线地图保留原版本');
+        }
         if(!window.tlDiagramData||!window.tlDiagramData.mainPipes||!window.tlDiagramData.mainPipes.length||
            !window.tlDiagramData.branchPipes||!window.tlDiagramData.branchPipes.length){
           throw new Error('管线生成结果为空，请检查当前分区与地块边界');
@@ -5434,8 +5441,9 @@
     try{ ppRender(); }catch(eRe){ console.warn('[ppGenerate] 二级画布同步重绘失败', eRe); }
     /* 生成成功即校验并刷新同一份在线地图快照；不要求再点回传按钮，也不改变当前工作页。 */
     try{
-      if(typeof window.tlSyncGeneratedMapSnapshot==='function') window.tlSyncGeneratedMapSnapshot();
-      else console.warn('[ppGenerate] 在线地图同步模块未就绪');
+      if(typeof window.tlSyncGeneratedMapSnapshot!=='function'||window.tlSyncGeneratedMapSnapshot()!==true){
+        throw new Error('在线地图快照校验未通过');
+      }
     }catch(eMapSync){ console.warn('[ppGenerate] 在线地图同步失败',eMapSync); }
     /* [v355] 生成成功即记「已生成」边界签名：此后切页/整页重载（含手画、图片测量、AI 回带等
        没有地块库锚的路径）可按签名自动恢复。签名锚在边界多边形本身——几何没变设计就有效，

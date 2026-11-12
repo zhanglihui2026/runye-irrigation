@@ -357,15 +357,34 @@ function readSelectedInt(selector, fallback) {
   return Number.isFinite(value) ? value : fallback;
 }
 
-function readOnlineMapZoneAreas() {
+function readCurrentPlanningZoneAreas() {
   try {
-    var values = window.RyMapFlowDemo && typeof window.RyMapFlowDemo.zoneAreasOf === 'function'
-      ? window.RyMapFlowDemo.zoneAreasOf() : null;
-    if (!Array.isArray(values) || !values.length) return null;
-    var areas = Array.from(values, Number);
-    return areas.every(function (a) { return isFinite(a) && a > 0; }) ? areas : null;
+    var bridge=window.RunyeBridge, cuts=bridge&&bridge.getZoneCuts(), poly=bridge&&bridge.getPlotPolygon();
+    var total=Number(window.measuredArea);
+    if(!cuts||!poly||poly.length<3||!isFinite(total)||total<=0)return null;
+    var gridPoly=bridge.polyToGrid(cuts,poly), cols=cuts.cols|0, rows=cuts.rows|0;
+    if(cols<1||rows<1||!cuts.xPos||!cuts.yPos)return null;
+    var areas=[],sum=0;
+    for(var r=0;r<rows;r++)for(var c=0;c<cols;c++){
+      var x0=typeof tlZoneGx==='function'?tlZoneGx(cuts,r,c):cuts.xPos[c];
+      var x1=typeof tlZoneGx==='function'?tlZoneGx(cuts,r,c+1):cuts.xPos[c+1];
+      var y0=typeof tlZoneGy==='function'?tlZoneGy(cuts,c,r):cuts.yPos[r];
+      var y1=typeof tlZoneGy==='function'?tlZoneGy(cuts,c,r+1):cuts.yPos[r+1];
+      var clipped=bridge.clipPolyToRect(gridPoly,x0,y0,x1,y1), a=clipped&&clipped.length>=3?Number(bridge.polyArea(clipped)):0;
+      if(!isFinite(a)||a<0)return null;
+      areas.push(a);sum+=a;
+    }
+    if(!(sum>0))return null;
+    // 地图实测总面积是唯一总量；本页几何只负责按当前切分比例分配到各区。
+    var scale=total/sum;
+    areas=areas.map(function(a){return a*scale;});
+    var corrected=total-areas.reduce(function(s,a){return s+a;},0);
+    areas[areas.length-1]+=corrected;
+    return areas.every(function(a){return isFinite(a)&&a>0;})?areas:null;
   } catch (e) { return null; }
 }
+// 兼容旧调用名，但语义已收敛为本页当前分区几何，不再读取地图旧 partitions。
+function readOnlineMapZoneAreas(){ return readCurrentPlanningZoneAreas(); }
 
 // ===== COMPUTE =====
 function compute() {
@@ -495,7 +514,7 @@ function render() {
   window._r = r;
   if (!r) {
     var panel = document.getElementById('resultPanel');
-    if (panel) panel.innerHTML = '<p class="area-source-warning">当前地块没有完整有效的在线地图分区面积，设计计算已停止。请先在在线地图完成并保存分区。</p>';
+    if (panel) panel.innerHTML = '<p class="area-source-warning">当前地块缺少地图实测总面积或本页分区几何，设计计算已停止。请先取得地块边界与实测面积。</p>';
     return;
   }
 
@@ -761,7 +780,7 @@ function render() {
     : 0;
   const teeN = mainLineN;
   const matTotalMu = r.totalMu || 0;
-  // 滴灌带长度按在线地图分区面积总和计算；间距优先施工简图输入、回退设计参数
+  // 滴灌带长度按地图实测总面积计算；间距优先施工简图输入、回退设计参数
   const ppTapeSpEl = document.getElementById('planTapeSpacing');
   const matTapeSpacing = parseFloat(ppTapeSpEl ? ppTapeSpEl.value : '') || r.tapeSpacing || 0.8;
   const matTapeLen = (matTotalMu > 0 && matTapeSpacing > 0) ? (matTotalMu * 666.67) / matTapeSpacing : r.tapeTotalLen;
@@ -1645,7 +1664,7 @@ function tlPushToHydraulicCalc() {
     /* 来源行列表式（2026-09-19 用户批注「用列表表示更美观」） */
     var srcTitle = '已导入三级方案 · ' + zones.length + ' 区联合灌溉 · 最远 ' + (wp.zoneIndex + 1) + ' 区';
     var srcRows = [
-      '面积来源：在线地图当前地块分区面积，最大分区 ' + fmt(r.flowAreaM2 / MU_TO_SQM, 2) + ' 亩，全地块合计 ' + fmt(r.totalArea / MU_TO_SQM, 2) + ' 亩',
+      '面积来源：地图实测总面积 + 本页当前分区几何，最大分区 ' + fmt(r.flowAreaM2 / MU_TO_SQM, 2) + ' 亩，全地块合计 ' + fmt(r.totalArea / MU_TO_SQM, 2) + ' 亩',
       '总管：OD ' + r.frontPipe.od + ' · ' + fmt(r.frontLenUsed, 1) + ' m',
       '主管：OD ' + r.mainPipe.od + ' × ' + zones.length + ' 区' + (allZones.length > zones.length ? '（全图 ' + allZones.length + ' 区轮灌，按最不利组合取最远 ' + zones.length + ' 区）' : '（各区图面实长）') + ',',
       '支管：OD ' + r.branchPipe.od + ' · ' + fmt(r.branchLenUsed, 1) + ' m × 每区 ' + bc + ' 根（每根 ' + fmt(r.branchFlow, 1) + ' m³/h）',
@@ -1661,7 +1680,7 @@ function tlPushToHydraulicCalc() {
 
 function computeThreeLevel(options) {
   options = options || {};
-  var mapZoneAreas = readOnlineMapZoneAreas();
+  var mapZoneAreas = readCurrentPlanningZoneAreas();
   if (!mapZoneAreas) return null;
   var zoneMuField = document.getElementById('tl_zoneMu');
   if (zoneMuField) zoneMuField.value = (Math.max.apply(null, mapZoneAreas) / MU_TO_SQM).toFixed(2);
@@ -1711,11 +1730,9 @@ function computeThreeLevel(options) {
   let frontLenMap = frontLenPick.mapLen;
   let mainLenUsed = (wp.fromFigure && wp.main > 0) ? wp.main : mainPipeLen;
 
-  /* 水力设计面积唯一来源：当前在线地图地块的 partitions.area。网格裁剪仅用于图面几何，
-     不参与流量、选径、轮灌组或水力结果；地图分区缺失/不完整时上方直接阻断计算。 */
-  /* 轮灌自动组按当前地图分区序号连续分组，组面积直接累加唯一地图分区面积数组。 */
+  /* 总面积取地图实测面积；各区面积由本页当前网格裁剪地块几何后按实测总量归一。 */
   var flowAreaM2 = Math.max.apply(null, mapZoneAreas);
-  var flowAreaSrc = 'onlineMapPartitions';
+  var flowAreaSrc = 'currentPlanGeometry+measuredPlotArea';
   const flowZoneMu = flowAreaM2 / MU_TO_SQM;
   function tlZoneAreaAt(zi) {
     return (Number.isInteger(zi) && zi >= 0 && zi < mapZoneAreas.length) ? mapZoneAreas[zi] : 0;
@@ -1988,13 +2005,13 @@ function computeThreeLevel(options) {
        front/main/branch:路径长度m, frontLoss/mainLoss/branchLoss/total:水头损失m}；无图面路径时 null */
     groupLoss,
     inversePath: (pathZones ? {zones: pathZones.filter(function(z){return z.flow>0;}).map(function(z){ return Object.assign({},z,{area:z.flow*tapeSpacing*emitterSpacing*1000/emitterFlow}); }), groups:pathGroups.map(function(g){return g.filter(function(id){return pathZones.some(function(z){return z.zi===id && z.flow>0;});});}).filter(function(g){return g.length>0;}), calibers:appliedPipes ? appliedPipes.calibers : null} : null),
-    /* flowAreaM2 是在线地图分区面积中的最大值；flowAreaSrc 标识唯一权威来源。 */
+    /* flowAreaM2 是本页当前分区面积中的最大值；总面积绑定地图实测值。 */
     flowAreaM2, flowZoneMu, flowAreaSrc,
     /* [v945] 逐区实际面积(m²，按分区序号 0 基，缺失位为 0)。总管口径反推要用「每个区各自的
        面积」而不是「最大分区面积 × 区数」——后者假设各区等大，实际地块裁切后常常差 20% 以上，
        会把手绘总管的口径推细。取不到网格时 null（调用方据此明说"没有分区面积"）。 */
     zoneAreas: mapZoneAreas.slice(),
-    /* 联合分区面积由同一地图面积数组按实际轮灌成员求和；worstGroup 与 combinedFlow 同源。 */
+    /* 联合分区面积由本页分区面积数组按当前轮灌成员求和；worstGroup 与 combinedFlow 同源。 */
     combinedAreaM2, groupCount: mapZoneAreas.length,
     /* v107（2026-09-22 修复）：手动分组存在时，worstGroup 取「手动组里面积最大的一组」（与 combinedFlow 同一口径），
        不再一律回退到 floor(zi/N) 自动配对组——否则「联合流量依据」会错显示成自动配对的第3、4区而误导。 */
@@ -2123,7 +2140,7 @@ function tlEstimateGroupHead(r, zoneIndexes, sharedPick) {
   var par = Math.max(1, Number(r.branchParallelCount) || 1);
   var branchF = (typeof r.branchF === 'number' && isFinite(r.branchF)) ? r.branchF : 1;
 
-  /* 总管、主管、支管选径与损失均由同一份地图分区面积计算出的流量驱动。 */
+  /* 总管、主管、支管选径与损失由地图实测总面积和本页分区几何驱动。 */
   var picks = {};
   var maxMainOd = 0, maxBranchOd = 0;
   /* [v976] 主管共享段复核（用户 2026-11-05 拍板，后台自动执行、**无开关无额外操作**）：
@@ -2271,7 +2288,7 @@ window.tlMapGroupHydraulicsOf = function (zoneIndexes, opts) {
       : tlResolveGroups(areaList, r);
     var sharedPick = tlSharedTrunkPick(areaList, allGroups, r);
     /* 数据源：直接吃 r.wp.zones 的全分区路径几何；逐区流量只读取 r.zoneAreas，
-       即 computeThreeLevel 从当前在线地图分区面积读取的权威数组。
+       即 computeThreeLevel 从本页当前分区几何生成的面积数组。
        旧路（inversePath）有两个口径坑：① zones 经 flow>0 过滤——设计侧网格裁剪把
        某格面积裁成 0 时该区整区消失（用户地块 G10 起整片退化的根因层）；② flow 是
        设计侧口径，与地图 partitions 面积不一致。wp.zones 无 flow 过滤、直供几何，
@@ -2493,7 +2510,7 @@ window.tlTrunkOdAdvice = function (opts) {
 function renderTLDerivation(r) {
   if (!r) {
     var card = document.getElementById('tl_derivationCard');
-    if (card) card.innerHTML = '<h3>水力计算未就绪</h3><p>请先在在线地图完成当前地块分区并保存分区面积；水力设计只读取地图分区面积。</p>';
+  if (card) card.innerHTML = '<h3>水力计算未就绪</h3><p>请先取得地图地块实测总面积，并在本页完成有效分区。</p>';
     return;
   }
   const existPressureM = r.existPressure * 10.2;
@@ -2535,7 +2552,7 @@ function renderThreeLevel() {
   const r = computeThreeLevel();
   renderTLDerivation(r);
   if (!r) {
-    document.getElementById('tl_resultPanel').innerHTML = '<div class="panel-heading result-heading"><div><span class="step light">02</span><h2>实际方案</h2></div></div><p class="area-source-warning">当前地块没有完整有效的在线地图分区面积，水力计算已停止。请先在在线地图完成并保存分区。</p>';
+    document.getElementById('tl_resultPanel').innerHTML = '<div class="panel-heading result-heading"><div><span class="step light">02</span><h2>实际方案</h2></div></div><p class="area-source-warning">当前地块缺少地图实测总面积或本页分区几何，水力计算已停止。请先取得地块边界与实测面积。</p>';
     return;
   }
 
@@ -3419,7 +3436,7 @@ function tlGroupByArea() {
   if (!(total > 0)) { _tlToast('请先生成三级管线平面图'); return false; }
   var areas = readOnlineMapZoneAreas();
   if (areas && areas.length !== total) areas = null;
-  if (!areas) { _tlToast('请先在在线地图完成并保存当前地块分区面积'); return false; }
+  if (!areas) { _tlToast('请先取得地图实测总面积，并在本页完成有效分区'); return false; }
   var MU = 666.67, targetM2 = targetMu * MU;
   var groups = [], cur = [], sum = 0;
   for (var zi = 0; zi < total; zi++) {
@@ -3564,7 +3581,7 @@ function tlRefreshLossCard(r) {
   var el = document.getElementById('tlLossCard'); if (!el) return;
   try {
     if (!r) r = computeThreeLevel();
-    if (!r) { el.innerHTML = '<p>请先在在线地图保存完整分区面积，再进行水力校核。</p>'; return; }
+    if (!r) { el.innerHTML = '<p>请先取得地图实测总面积，并在本页完成有效分区，再进行水力校核。</p>'; return; }
     tlBindLossReset();
     function f1(v) { return (isFinite(v) ? v : 0).toFixed(1); }
     function f2(v) { return (isFinite(v) ? v : 0).toFixed(2); }
@@ -3655,7 +3672,7 @@ function tlUpdatePlanBar() {
       var node = document.getElementById(id); if (node) node.textContent = '—';
     });
     var srcNode = document.getElementById('tlPlanCombinedSrc');
-    if (srcNode) { srcNode.textContent = '依据：请先保存在线地图分区面积'; srcNode.style.display = ''; }
+    if (srcNode) { srcNode.textContent = '依据：请先取得地图实测总面积并完成本页分区'; srcNode.style.display = ''; }
     return;
   }
   /* v107（2026-09-22 用户要求）：设计值 vs 实际值 ——
@@ -4020,7 +4037,8 @@ function tlPlanBarOnMap(){
 function tlAutoGenerate(options) {
   options = options || {};
   var doScroll = options.scroll !== false;
-  var mapAreas = readOnlineMapZoneAreas();
+  var mapSnapshotPublished=false;
+  var previousHydraulicDesign=null,hydraulicDesignSaved=false;
   try {
   // 局部辅助函数（三级页在 IIFE 之外，无法访问二级页内部的 pp* 函数，故此处自包含实现）
   function tlZoneActualAreaM2(zc,zr,zoneCuts,plotPoly){
@@ -4124,8 +4142,7 @@ function tlAutoGenerate(options) {
     cols=xPlan.length; rows=yPlan.length;
   }
   var totalZones=cols*rows;
-  /* 二级分区调整后，先用当前 RunyeBridge 网格更新地图地块库，再进入三级水力计算。
-     若先拿旧地图区数做一致性拦截，分区数量变化时会在回写地图之前提前退出。 */
+  /* 仅准备反投坐标变换；分区草稿此时仍留在本页，不写入在线地图。 */
   var mapFramePoly=window.__runyeMapFramePoly, mapFrameInv=null;
   try{
     if(mapFramePoly&&mapFramePoly.length===poly.length&&poly.length>=3){
@@ -4144,17 +4161,10 @@ function tlAutoGenerate(options) {
     }
   }catch(eMapFrameInv){mapFrameInv=null;}
   if(mapFrameInv)window.__runyeMapFrameInv=mapFrameInv;
-  var partitionSync=window.RyMapPartition&&typeof window.RyMapPartition.capturePartitions==='function'
-    ?window.RyMapPartition.capturePartitions(window.currentPlotId||null):{ok:true,skipped:true,reason:'partition-sync-unavailable'};
-  if(partitionSync&&partitionSync.ok===false){
-    var syncTip=document.getElementById('atToast');
-    if(syncTip){syncTip.textContent='地图分区同步失败：'+(partitionSync.error||'请确认当前地块后重试');syncTip.classList.add('show');setTimeout(function(){syncTip.classList.remove('show');},3200);}
-    return false;
-  }
-  mapAreas=readOnlineMapZoneAreas();
-  if(!mapAreas||mapAreas.length!==totalZones){
-    var mismatchTip = document.getElementById('atToast');
-    if (mismatchTip) { mismatchTip.textContent = '请先在在线地图保存有效分区，并确认地图分区与当前管网区数一致'; mismatchTip.classList.add('show'); setTimeout(function () { mismatchTip.classList.remove('show'); }, 3200); }
+  var planAreas=readCurrentPlanningZoneAreas();
+  if(!planAreas||planAreas.length!==totalZones){
+    var mismatchTip=document.getElementById('atToast');
+    if(mismatchTip){mismatchTip.textContent='当前分区几何或地图实测总面积无效，请检查地块边界与分区';mismatchTip.classList.add('show');setTimeout(function(){mismatchTip.classList.remove('show');},3200);}
     return false;
   }
   /* v98h 阶梯分区本地包装：zX/zY 取「该行 / 该列的割缝位置」；zXb/zYb 取相邻两行/列在指定格上的公共边带。
@@ -4229,7 +4239,7 @@ function tlAutoGenerate(options) {
     +'</g>');
 
   var zc=tlGetZoneCount();
-  var areaMu=(mapAreas.reduce(function(sum,a){return sum+a;},0)/MU_TO_SQM).toFixed(2);
+  var areaMu=(Number(window.measuredArea)/MU_TO_SQM).toFixed(2);
   var tlPlotNameVal=(document.getElementById('tlPlotName')&&document.getElementById('tlPlotName').value.trim())||'未命名地块';
   // 标题（2026-09-16 恢复）：简图/下载/打印显示；工作区克隆剥离 tlTitleGroup
   parts.push('<g id="tlTitleGroup"><text x="'+svgW/2+'" y="40" text-anchor="middle" font-size="20" font-weight="700" fill="#14532d">润野灌溉 · 三级管线施工简图</text></g>');
@@ -5360,6 +5370,12 @@ function tlAutoGenerate(options) {
     frontPipe: null,
     sourcePos: null };
   r = computeThreeLevel();
+  if(!r||!window.tlDiagramData||!window.tlDiagramData.generatedAt||
+      !Array.isArray(r.zoneAreas)||r.zoneAreas.length!==totalZones||
+      !window.tlDiagramData.mainPipes||!window.tlDiagramData.mainPipes.length||
+      !window.tlDiagramData.branchPipes||!window.tlDiagramData.branchPipes.length){
+    throw new Error('当前施工图数据不完整，未发布到在线地图');
+  }
   try { tlUpdatePlanBar(); } catch (e) { }
   var pumpFlowEl=document.getElementById('tlPlanPumpFlow');
   var pumpHeadEl=document.getElementById('tlPlanPumpHead');
@@ -5375,9 +5391,13 @@ function tlAutoGenerate(options) {
     pipes: { front: (frontPipeEl ? frontPipeEl.textContent : ''), main: (mainPipeEl ? mainPipeEl.textContent : ''), branch: (branchPipeEl ? branchPipeEl.textContent : '') } };
   /* 水力校核页唯一计算来源：保存三级规划的最终几何与已确定的设计流量。
      地图反投只承担显示，不再用滴灌带像素/坐标反推流量。 */
-  var hydraulicDesignTs = Date.now(), hydraulicDesignSaved = false;
+  var hydraulicDesignTs = Date.now();
   var hydraulicDesignRevisionId = hydraulicDesignTs.toString(36) + '-' + Math.random().toString(36).slice(2);
-  try {
+  if(options.publishToMap===true) try {
+    var ds=window.RyIrrigationDataStore;
+    previousHydraulicDesign=ds&&typeof ds.readHydraulicDesignForPlot==='function'
+      ?ds.readHydraulicDesignForPlot(window.currentPlotId||null)
+      :(ds&&typeof ds.readHydraulicDesign==='function'?ds.readHydraulicDesign():null);
     hydraulicDesignSaved = window.RyIrrigationDataStore.writeHydraulicDesign({ version: 1, ts: hydraulicDesignTs,
       designRevisionId: hydraulicDesignRevisionId,
       plotId: window.currentPlotId || null,
@@ -5391,6 +5411,7 @@ function tlAutoGenerate(options) {
         efficiency: r.efficiency, pumpHead: r.pumpHead,
         frontPipe: { od: r.frontPipe.od }, mainPipe: { od: r.mainPipe.od }, branchPipe: { od: r.branchPipe.od } } }) === true;
   } catch (eHydSnapshot) { }
+  if(options.publishToMap===true&&!hydraulicDesignSaved)throw new Error('水力设计快照写入失败，在线地图未更新');
 
   var iy=footerTop+52; // 底部参数块起始 y（整体下移，与图例对齐）
   parts.push('<g id="tlParamsGroup" font-size="10.5" font-weight="600" fill="#334155">');
@@ -5485,18 +5506,12 @@ function tlAutoGenerate(options) {
      反投成经纬度，经 RyIrrigationDataStore 写入 runye_network_layout，地图页 runye-map-enhance.js 读取后
      在卫星图叠加真实主管/支管/水源点。无 geo 基准（手动画矩形、未经地图回传）时静默跳过。
      整段删除即卸载，不影响主流程。 */
-  try { (function(){
+  if(options.publishToMap===true) try { (function(){
     var dd = window.tlDiagramData; if(!dd || dd.world!=='meter') return;
     var plotId=window.currentPlotId || null;
     var base = window.__runyeGeoBase || null;
     if(!base || typeof base.refLat!=='number' || typeof base.refLng!=='number' || !isFinite(base.refLat) || !isFinite(base.refLng)){
-      if(plotId) window.RyIrrigationDataStore.writeNetworkLayout(null,plotId);
-      var plotStore=window.RyPlotLibraryStore;
-      if(plotId && plotStore && typeof plotStore.removeGeneratedCurrent==='function'){
-        var removed=plotStore.removeGeneratedCurrent(plotId);
-        if(!removed.ok)console.warn('[map-enhance] automatic plot cleanup skipped:',removed.error);
-      }else if(plotId) console.warn('[map-enhance] automatic plot cleanup skipped: plot library store unavailable');
-      return;
+      throw new Error('地图坐标基准缺失，在线地图保留原快照');
     }
     var R=6378137, mlat=R*Math.PI/180, cosLat=Math.cos(base.refLat*Math.PI/180);
     /* 地图框线与实际坐标保持固定。window.__runyeMapFramePoly 保存
@@ -5552,7 +5567,10 @@ function tlAutoGenerate(options) {
       if(stLL) segments.push({id:'segTrunk', name:'段总管', dn:segDn.front||segDn.main, kind:'segTrunk', latLng:stLL});
     }
     var src = dd.sourcePos ? p2ll(dd.sourcePos) : null;
-    if(!segments.length && !src){if(plotId)window.RyIrrigationDataStore.writeNetworkLayout(null,plotId);return;}
+    if(!segments.length && !src){
+      if(options.publishToMap===true)throw new Error('当前施工图没有可发布的管网段');
+      return;
+    }
     var net=null;
     if(plotId){
       var designTs=hydraulicDesignSaved?hydraulicDesignTs:null;
@@ -5577,18 +5595,26 @@ function tlAutoGenerate(options) {
         }
         candidateNet.valves = valvesLL;
         candidateNet.dripTapes = dripLL;
+        function lineCount(lines){return Array.isArray(lines)?lines.filter(function(line){return Array.isArray(line)&&line.length>=2;}).length:0;}
+        var mainCount=lineCount(dd.mainPipes),branchCount=lineCount(dd.branchPipes);
+        var storedMain=segments.filter(function(s){return s&&s.kind==='main';}).length;
+        var storedBranch=segments.filter(function(s){return s&&s.kind==='branch';}).length;
+        if(mainCount!==storedMain||branchCount!==storedBranch||
+            candidateNet.valves.length!==(Array.isArray(dd.valves)?dd.valves.filter(function(v){return v&&isFinite(Number(v.x))&&isFinite(Number(v.y));}).length:0)||
+            candidateNet.dripTapes.length!==lineCount(dd.dripTapes)){
+          throw new Error('管网投影校验失败：分区管线、阀门或滴灌带数量不完整');
+        }
         var captureResult=window.RyMapPartition&&typeof window.RyMapPartition.capture==='function'
           ? window.RyMapPartition.capture(candidateNet,previousNetworkRaw) : null;
-        if(captureResult&&captureResult.ok===false){
-          console.warn('[map-enhance] partition/network sync skipped:',captureResult.error||'partition-commit-failed',captureResult.rollbackError||'');
-        }else if(!captureResult||captureResult.skipped){
-          var networkWritten=window.RyIrrigationDataStore.writeNetworkLayout(candidateNet,plotId);
-          if(networkWritten===false)throw new Error('network-layout-write-failed');
-          net=candidateNet;
-        }else{
-          net=candidateNet;
+        if(!captureResult||captureResult.ok!==true||captureResult.skipped){
+          throw new Error('分区、管网未能作为同一快照提交：'+(captureResult&&(captureResult.error||captureResult.reason)||'地图提交模块不可用'));
         }
-      }catch(eVT){try{console.warn('[map-enhance] network projection skipped:',eVT&&eVT.message||eVT);}catch(_){}}
+        net=candidateNet;
+        mapSnapshotPublished=true;
+      }catch(eVT){
+        try{console.warn('[map-enhance] network projection skipped:',eVT&&eVT.message||eVT);}catch(_){}
+        throw eVT;
+      }
     }
     /* [map-enhance] 同步当前设计地块到共享地块库，与管网一起供地图叠加。
        自动记录使用所属项目ID，避免不同地块在固定 auto-current 槽位互相覆盖；
@@ -5636,7 +5662,10 @@ function tlAutoGenerate(options) {
         }
       }
     }catch(ePlot){}
-  })(); } catch(eNet){ try{ console.warn('[map-enhance] network projection skipped:', eNet && eNet.message); }catch(_){} }
+  })(); } catch(eNet){
+    try{ console.warn('[map-enhance] network projection skipped:', eNet && eNet.message); }catch(_){}
+    throw eNet;
+  }
   /* 系统简图图框同步（2026-09-19）：克隆同一 SVG，id 加 sc_ 前缀（url(# / href="# 引用同步替换），防 DOM id 重复 */
   try {
     var sysPipeBox = document.getElementById('tlSysPipeBox');
@@ -5711,7 +5740,7 @@ function tlAutoGenerate(options) {
       ?level3Adapter.geometrySignature(generatedGeometry):'';
     var savedNodes=null;
     try{savedNodes=JSON.parse(localStorage.getItem('runye_tlNodes_v1')||'null');}catch(eSavedNodes){}
-    if(newGeometrySig&&savedNodes&&savedNodes.geoSig&&savedNodes.geoSig!==newGeometrySig&&
+    if(mapSnapshotPublished&&newGeometrySig&&savedNodes&&savedNodes.geoSig&&savedNodes.geoSig!==newGeometrySig&&
        window.RyTlNodes&&typeof window.RyTlNodes.reset==='function'){
       window.RyTlNodes.reset();
       console.info('[drawing-design] 已清除与新管线几何不匹配的三级节点');
@@ -5736,9 +5765,15 @@ function tlAutoGenerate(options) {
       }
     }
   }catch(eSignature){if(eSignature&&eSignature.canonicalCommitRejected)throw eSignature;}
+  if(options.publishToMap===true&&!mapSnapshotPublished)throw new Error('施工图尚未完整提交，在线地图保持原快照');
   console.log('[tlAutoGenerate] SVG generated successfully');
+  return true;
   } catch(err) {
     console.error('[tlAutoGenerate] Error:', err);
+    if(options.publishToMap===true&&!mapSnapshotPublished&&hydraulicDesignSaved){
+      try{window.RyIrrigationDataStore.writeHydraulicDesign(previousHydraulicDesign,window.currentPlotId||null);}
+      catch(eHydRollback){console.error('[tlAutoGenerate] hydraulic snapshot rollback failed',eHydRollback);}
+    }
     if(options.rethrowError===true) throw err;
     var errDiv = document.getElementById('tlDiagramContent');
     if(errDiv) {
@@ -5747,6 +5782,7 @@ function tlAutoGenerate(options) {
     } else {
       alert('生成图纸时出错：' + err.message);
     }
+    return false;
   }
 }
 

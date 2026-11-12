@@ -2,12 +2,11 @@
 window.measuredArea = 0;
 
 function updatePlan(){
-  const mapZoneAreas = (typeof readOnlineMapZoneAreas === 'function') ? readOnlineMapZoneAreas() : null;
-  const area = mapZoneAreas ? mapZoneAreas.reduce(function(sum, a){ return sum + a; }, 0) : 0;
+  const area = Number(window.measuredArea)||0;
   const tag = document.getElementById('planAreaTag');
 
   if(area <= 0){
-    if(tag) tag.textContent = '请先在在线地图保存完整分区面积';
+    if(tag) tag.textContent = '请先从在线地图取得有效地块边界和实测总面积';
     /* [v436-pp-normalize] 原此处对 ppPlanBar/ppPlanBar2 写内联 style.display='flex'
        的语句已删除：参数栏显示方式归一至 ry-panel.css 皮肤块（display:block），
        不再需要 CSS 侧用 !important 反压内联样式。 */
@@ -61,9 +60,9 @@ function calcPlan(){
   //   内联编辑 / 联动同步都会走它），而内联编辑是**程序化赋值**、不冒事件，
   //   光靠 document 上的 input/change 捕获监听补不到 ⇒ 放在这里做不变量式回填（相等时无操作）。
   if (typeof ppPullLiftDh === 'function') ppPullLiftDh();
-  const mapZoneAreas = (typeof readOnlineMapZoneAreas === 'function') ? readOnlineMapZoneAreas() : null;
+  const mapZoneAreas = (typeof readCurrentPlanningZoneAreas === 'function') ? readCurrentPlanningZoneAreas() : null;
   if(!mapZoneAreas){ clearPlanResults(); return; }
-  const area = mapZoneAreas.reduce(function(sum, a){ return sum + a; }, 0);
+  const area = Number(window.measuredArea)||0;
   if(area <= 0) { clearPlanResults(); return; }
 
   const tapeLen = readNumber('planTapeLaySide', 100, { min: 0.01 });   /* 2026-09-28：单带长度取消，改读单边铺设长度（语义重复合并） */
@@ -84,7 +83,6 @@ function calcPlan(){
   const requestedN = readNumber('planN', 1, { integer: true, min: 1 });
   const zoneModeEl = document.getElementById('planZoneMode');
   const manualZoneInput = document.getElementById('planZoneMuManual');
-  if (manualZoneInput) manualZoneInput.value = (Math.max.apply(null, mapZoneAreas) / MU_TO_SQM).toFixed(2);
 
   // A/B from actual polygon bounding box (fallback to 1.5 ratio when no polygon)
   var A, B, bbOX = 0, bbOY = 0;
@@ -151,9 +149,9 @@ function calcPlan(){
   const totalTapes = Math.max(1, Math.ceil(tapeTotalLen / tapeLen));
   const tapeRolls = tapeRollLen > 0 ? Math.ceil(tapeTotalLen * 1.1 / tapeRollLen) : 0;
 
-  // 全部水力流量与管径只按在线地图分区面积计算；设计网格与手填亩数不作为面积回退源。
+  // 总量固定取地图实测面积；单区水力与管径按本页当前分区几何分配的实切面积计算。
   const flowAreaM2 = Math.max.apply(null, mapZoneAreas);
-  const flowAreaSrc = 'onlineMapPartitions';
+  const flowAreaSrc = 'currentPlanGeometry+measuredPlotArea';
   const zoneAreaM2 = flowAreaM2;
   var __ppActuals = mapZoneAreas.map(function(m2, zi){ return {zi:zi, m2:m2, mu:m2/MU_TO_SQM}; });
   var __ppCaliberActual = true;
@@ -223,7 +221,7 @@ function calcPlan(){
 
   // Update area tag in title
   const tag=document.getElementById('planAreaTag');
-  if(tag) tag.innerHTML='在线地图分区面积 <b>'+area.toFixed(1)+' m²</b> · '+totalMu.toFixed(2)+' 亩 · 最大分区 '+(flowAreaM2/MU_TO_SQM).toFixed(2)+' 亩 · '+(layoutSides===2?'双边':'单边')+' · '+zoneLayout.cols+'列×'+zoneLayout.rows+'行';
+  if(tag) tag.innerHTML='地图实测总面积 <b>'+area.toFixed(1)+' m²</b> · '+totalMu.toFixed(2)+' 亩 · 本页最大分区 '+(flowAreaM2/MU_TO_SQM).toFixed(2)+' 亩 · '+(layoutSides===2?'双边':'单边')+' · '+zoneLayout.cols+'列×'+zoneLayout.rows+'行';
 
   // Store all data for apply
   window.planData = { A, B, N, zoneCols: zoneLayout.cols, zoneRows: zoneLayout.rows, zoneW: zoneLayout.zoneW, zoneH: zoneLayout.zoneH, mainPipeLen, tapeLen, tapeSpacing, emitterSpacing, emitterFlow, tapeRollLen, tapeTotalLen, totalTapes, tapesPerZone, zoneTapeLen, lift, dh, totalMu, zoneFlow, pumpHead, pumpPower, motorKW, intensity, manualZoneMu, targetV, flowAreaM2, flowAreaSrc, zoneAreas: mapZoneAreas.slice(), mainPipeOD:'Ø '+mainPipe.od+' mm', branchPipeOD:'Ø '+branchPipe.od+' mm', mainPipeODValue:mainPipe.od, branchPipeODValue:branchPipe.od, mainVelocity:mainPipe.v, branchVelocity:branchPipe.v,
@@ -335,8 +333,8 @@ document.addEventListener('change', ppLiftDhCapture, true);
 ppPullLiftDh();                                              // 首屏对齐一次
 // （ppToggleCalc 的 click 已在 ppToggleCalcDetail 定义处立即绑定，无需再注册 DOMContentLoaded）
 
-/* ===== 管径与流量统一按在线地图分区面积计算：最大分区为单区基准，
-   全部分区面积之和用于全地块滴灌带与材料总量。画布逐区标注建议管径，
+/* ===== 管径与流量按本页当前分区几何计算：最大分区为单区基准，
+   全部分区面积之和严格归一为地图实测总面积。画布逐区标注建议管径，
    「分区管径明细」显示每区的实切亩数 / 流量 / 主管Ø / 支管Ø（小分区自动变细）。 */
 function ppCaliberMode(){
   return 'actual';
@@ -357,7 +355,7 @@ function ppApplyCaliberModeUI(){
   /* 工具栏把文字压成图标（font-size:0），aria-label 由 decorateToolbar 按初始文字写入；
      切态后必须自己同步，否则读屏仍报旧口径。 */
   btn.setAttribute('aria-label', label);
-  btn.title = '面积唯一来源：在线地图当前地块的分区面积；水力流量和管径按最大分区及各区实际面积计算。';
+  btn.title = '总面积唯一来源：在线地图地块实测面积；分区面积由本页当前分区几何计算并按实测总面积归一。';
 }
 function ppSetCaliberMode(m){
   ppApplyCaliberModeUI();
