@@ -94,23 +94,27 @@
   if(!(expectedZoneCount>0)||partitions.length!==expectedZoneCount)return {ok:false,error:'partition-count-does-not-match-generated-diagram'};
   net.partitionPlan=plan;net.partitions=partitions;
   p.partitionPlan=plan;p.partitions=partitions;
-  var nodeKey='runye_tlNodes_v1',previousNodesRaw=null,nodesChanged=false;
+  var nodeKey='runye_tlNodes_v1',nodesChanged=false,nextNodeGeoSig='';
   try{
-   previousNodesRaw=root.localStorage.getItem(nodeKey);
-   var savedNodes=previousNodesRaw?JSON.parse(previousNodesRaw):null,dd=root.tlDiagramData;
+   var savedRaw=root.localStorage.getItem(nodeKey);
+   var savedNodes=savedRaw?JSON.parse(savedRaw):null,dd=root.tlDiagramData;
    if(savedNodes&&dd){
-    var nextGeoSig=JSON.stringify([dd.frontPipe,dd.mainPipes,dd.branchPipes,dd.valves,dd.poly]);
-    if(savedNodes.geoSig&&savedNodes.geoSig!==nextGeoSig){
-     root.localStorage.setItem(nodeKey,JSON.stringify({version:1,geoSig:nextGeoSig,nodes:[],links:[]}));
-     nodesChanged=true;
-    }
+    nextNodeGeoSig=JSON.stringify([dd.frontPipe,dd.mainPipes,dd.branchPipes,dd.valves,dd.poly]);
+    nodesChanged=savedNodes.geoSig!==nextNodeGeoSig;
    }
   }catch(eNodes){return {ok:false,error:'node-snapshot-prepare-failed'};}
   var committed;
   try{committed=commitPartitionResult(state,net,previousNetworkRaw);}
   catch(eCommit){committed={ok:false,error:eCommit&&eCommit.message||'partition-network-commit-failed'};}
-  if(!committed.ok&&nodesChanged){
-   try{if(previousNodesRaw==null)root.localStorage.removeItem(nodeKey);else root.localStorage.setItem(nodeKey,previousNodesRaw);}catch(eRestoreNodes){committed.rollbackError=committed.rollbackError||'node-snapshot-rollback-failed';}
+  if(committed.ok&&nodesChanged){
+   /* Clear through the node owner only after the map transaction commits. Writing an
+      empty localStorage record directly leaves RyTlNodes' in-memory list untouched. */
+   try{
+    if(root.RyTlNodes&&typeof root.RyTlNodes.reset==='function')root.RyTlNodes.reset();
+    else root.localStorage.setItem(nodeKey,JSON.stringify({version:1,geoSig:nextNodeGeoSig,nodes:[],links:[]}));
+   }catch(eResetNodes){
+    try{root.localStorage.setItem(nodeKey,JSON.stringify({version:1,geoSig:nextNodeGeoSig,nodes:[],links:[]}));}catch(eClearNodes){}
+   }
   }
   return committed;
  }

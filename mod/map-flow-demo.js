@@ -71,27 +71,20 @@
     });
     return out;
   }
-  /* 读取与分区画布相同的分区网格，并把每格裁剪到地块真实边界后投影到地图。
-     轮灌演示只叠加显示，不改写分区状态或管网数据。 */
-  function collectZonePolygons(toLL) {
-    var B=window.RunyeBridge, G=window.RyZoneGeometry, out=[];
-    if(!B||typeof B.getZoneCuts!=='function'||typeof B.getPlotPolygon!=='function'||
-       typeof B.polyToGrid!=='function'||typeof B.polyToWorld!=='function'||
-       !G||typeof G.clipPolyToRect!=='function'||typeof toLL!=='function')return out;
-    try {
-      var cuts=B.getZoneCuts(), plot=B.getPlotPolygon();
-      if(!cuts||!Array.isArray(plot)||plot.length<3||!(cuts.cols>0)||!(cuts.rows>0))return out;
-      var grid=B.polyToGrid(cuts,plot);
-      if(!Array.isArray(grid)||grid.length<3)return out;
-      for(var zr=0;zr<cuts.rows;zr++)for(var zc=0;zc<cuts.cols;zc++){
-        var clipped=G.clipPolyToRect(grid,cuts.xPos[zc],cuts.yPos[zr],cuts.xPos[zc+1],cuts.yPos[zr+1]);
-        if(!Array.isArray(clipped)||clipped.length<3)continue;
-        var world=B.polyToWorld(cuts,clipped), ll=[];
-        (world||[]).forEach(function(p){var q;try{q=toLL(p);}catch(e){q=null;}if(q)ll.push(q);});
-        if(ll.length>=3)out.push({zi:zr*cuts.cols+zc,ll:ll});
-      }
-    } catch(e) { return []; }
+  /* 动画只消费与管网同次发布的地图分区快照，不读取规划页的实时草稿。 */
+  function collectPublishedZonePolygons(network) {
+    var out=[],parts=network&&network.partitions;
+    if(!Array.isArray(parts))return out;
+    parts.forEach(function(z){
+      if(!z||z.zoneIndex==null||!Number.isInteger(Number(z.zoneIndex))||!Array.isArray(z.latLng))return;
+      var ll=[];
+      z.latLng.forEach(function(p){var q=readLL(p);if(q)ll.push(q);});
+      if(ll.length>=3)out.push({zi:Number(z.zoneIndex),ll:ll,area:Number(z.area)||0});
+    });
     return out;
+  }
+  function diagramGeometrySignature(dd) {
+    return dd?JSON.stringify([dd.frontPipe,dd.mainPipes,dd.branchPipes,dd.valves,dd.poly]):'';
   }
   /* 连接校验。o = {
        hasTrunk:bool, trunkLL:[{lat,lng}], mainsLL:[[{lat,lng}]×N],
@@ -318,9 +311,9 @@
     if (!ctx) return null;
     var dd = window.tlDiagramData;
     if (!dd || dd.world !== 'meter') return null;
+    var network=null,mapPlotId=typeof ctx.currentPlotId==='function'?ctx.currentPlotId():null;
     if(typeof ctx.getNetworkSnapshot==='function'){
-      var network=null;try{network=ctx.getNetworkSnapshot();}catch(eNetwork){}
-      var mapPlotId=typeof ctx.currentPlotId==='function'?ctx.currentPlotId():null;
+      try{network=ctx.getNetworkSnapshot();}catch(eNetwork){}
       if(mapPlotId==null||String(mapPlotId)===''){
         collectBlockReason='请先在在线地图选中当前地块，再生成和演示轮灌水路。';
         return null;
@@ -337,6 +330,17 @@
         collectBlockReason='当前管路快照不属于地图选中的地块，已停止轮灌演示。请先打开该地块对应的设计并重新生成管线。';
         return null;
       }
+      if(String(network.sourceGeneratedAt||'')!==String(dd.generatedAt||'')){
+        collectBlockReason='在线地图管网与施工图不是同一生成版本，请在「分区与管路」重新生成施工图后再演示。';
+        return null;
+      }
+      if(String(network.diagramGeometrySig||'')!==diagramGeometrySignature(dd)){
+        collectBlockReason='在线地图管网与节点几何版本不一致，请重新生成施工图后再演示。';
+        return null;
+      }
+    }else{
+      collectBlockReason='当前在线地图缺少可核验的已发布管网快照，已停止轮灌演示。';
+      return null;
     }
     var mainsLL = [], branchLL = [], valves = [], couplersLL = [], segLL = null, nodesLL = [];
     var sourceLL=null;
@@ -394,7 +398,7 @@
         nodesLL=nodesLL.concat(collectWorkspaceNodes(dd,tlNodes.list(),autoEdits.pointAt,toLLSafe));
       }
     } catch(eNodes) { /* 无可用施工节点时保留既有接驳节点链路 */ }
-    var zonePolygons=collectZonePolygons(toLLSafe);
+    var zonePolygons=collectPublishedZonePolygons(network);
     if (dd.segTrunk && Array.isArray(dd.segTrunk.points)) {
       segLL = toLLLine(dd.segTrunk.points);
       (dd.segTrunk.couplers || []).forEach(function (c) { var q = toLLSafe(c); if (q) couplersLL.push(q); });

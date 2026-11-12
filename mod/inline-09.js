@@ -4039,6 +4039,7 @@ function tlAutoGenerate(options) {
   var doScroll = options.scroll !== false;
   var mapSnapshotPublished=false;
   var previousHydraulicDesign=null,hydraulicDesignSaved=false;
+  var pendingMapNetwork=null,pendingMapPreviousNetworkRaw=null;
   try {
   // 局部辅助函数（三级页在 IIFE 之外，无法访问二级页内部的 pp* 函数，故此处自包含实现）
   function tlZoneActualAreaM2(zc,zr,zoneCuts,plotPoly){
@@ -5576,7 +5577,7 @@ function tlAutoGenerate(options) {
       var designTs=hydraulicDesignSaved?hydraulicDesignTs:null;
       var designRevisionId=hydraulicDesignSaved?hydraulicDesignRevisionId:null;
       var previousNetworkRaw=window.RyIrrigationDataStore.readRawNetworkLayout(plotId);
-      var candidateNet={ sourcePos: src?{lat:src[0],lng:src[1]}:null, segments: segments, plotId:plotId, designTs:designTs, designRevisionId:designRevisionId, sourceGeneratedAt:dd.generatedAt, crs:'GCJ-02', ts: Date.now(), valves:[], dripTapes:[] };
+      var candidateNet={ sourcePos: src?{lat:src[0],lng:src[1]}:null, segments: segments, plotId:plotId, designTs:designTs, designRevisionId:designRevisionId, sourceGeneratedAt:dd.generatedAt, diagramGeometrySig:JSON.stringify([dd.frontPipe,dd.mainPipes,dd.branchPipes,dd.valves,dd.poly]), crs:'GCJ-02', ts: Date.now(), valves:[], dripTapes:[] };
       /* [map-enhance] 阀门 + 滴灌带反投：在内存中组装完整管网快照，显式限定本页地块；
          若分区方案也适用，则由 RyMapPartition 将地块库与管网快照作为一项事务提交。 */
       try{
@@ -5604,13 +5605,9 @@ function tlAutoGenerate(options) {
             candidateNet.dripTapes.length!==lineCount(dd.dripTapes)){
           throw new Error('管网投影校验失败：分区管线、阀门或滴灌带数量不完整');
         }
-        var captureResult=window.RyMapPartition&&typeof window.RyMapPartition.capture==='function'
-          ? window.RyMapPartition.capture(candidateNet,previousNetworkRaw) : null;
-        if(!captureResult||captureResult.ok!==true||captureResult.skipped){
-          throw new Error('分区、管网未能作为同一快照提交：'+(captureResult&&(captureResult.error||captureResult.reason)||'地图提交模块不可用'));
-        }
+        pendingMapNetwork=candidateNet;
+        pendingMapPreviousNetworkRaw=previousNetworkRaw;
         net=candidateNet;
-        mapSnapshotPublished=true;
       }catch(eVT){
         try{console.warn('[map-enhance] network projection skipped:',eVT&&eVT.message||eVT);}catch(_){}
         throw eVT;
@@ -5765,6 +5762,17 @@ function tlAutoGenerate(options) {
       }
     }
   }catch(eSignature){if(eSignature&&eSignature.canonicalCommitRejected)throw eSignature;}
+  if(options.publishToMap===true){
+    var captureResult=window.RyMapPartition&&typeof window.RyMapPartition.capture==='function'
+      ?window.RyMapPartition.capture(pendingMapNetwork,pendingMapPreviousNetworkRaw):null;
+    if(!captureResult||captureResult.ok!==true||captureResult.skipped){
+      throw new Error('分区、管网未能作为同一快照提交：'+(captureResult&&(captureResult.error||captureResult.reason)||'地图提交模块不可用'));
+    }
+    mapSnapshotPublished=true;
+    try{if(window.RyMapHost&&typeof window.RyMapHost.refresh==='function')window.RyMapHost.refresh();}catch(eMapRefresh){}
+    try{if(window.RyMapHost&&typeof window.RyMapHost.refreshSnapTargets==='function')window.RyMapHost.refreshSnapTargets();}catch(eSnapRefresh){}
+    try{if(window.RyMapFlowDemo&&typeof window.RyMapFlowDemo.refresh==='function')window.RyMapFlowDemo.refresh();}catch(eDemoRefresh){}
+  }
   if(options.publishToMap===true&&!mapSnapshotPublished)throw new Error('施工图尚未完整提交，在线地图保持原快照');
   console.log('[tlAutoGenerate] SVG generated successfully');
   return true;
