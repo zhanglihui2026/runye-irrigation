@@ -332,10 +332,8 @@
         collectBlockReason='当前管路快照不属于地图选中的地块，已停止轮灌演示。请先打开该地块对应的设计并重新生成管线。';
         return null;
       }
-      if(String(network.sourceGeneratedAt||'')!==String(dd.generatedAt||'')){
-        collectBlockReason='在线地图管网与施工图不是同一生成版本，请在「分区与管路」重新生成施工图后再演示。';
-        return null;
-      }
+      /* 页面恢复/重绘会重建相同几何并刷新 generatedAt；时间不是管路版本身份。
+         下面的几何签名仍严格拒绝尚未发布的新分区或管线。 */
       if(String(network.diagramGeometrySig||'')!==diagramGeometrySignature(dd)){
         collectBlockReason='在线地图管网与节点几何版本不一致，请重新生成施工图后再演示。';
         return null;
