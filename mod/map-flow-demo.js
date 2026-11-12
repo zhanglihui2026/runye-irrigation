@@ -518,7 +518,7 @@
       { pane:FLOW_PANE,color: color, weight: weight, opacity: 0.95, className: anim ? 'mapflow-anim' : '', interactive: false });
   }
 
-  /* Build only the source-to-active-zone route. The graph is split at the saved
+  /* Build only the network-root-to-active-zone route. The graph is split at the saved
      coupler nodes, main-line end joins and branch takeoffs, so a later trunk
      junction (for example N-02) is not animated when an earlier zone (zone 3)
      can be supplied from N-01 directly. */
@@ -531,8 +531,8 @@
     if(allZones){for(var z0=0;z0<d.total;z0++)activeZones.push(z0);}
     else for(var zi=0;zi<d.total;zi++)if(groupOf(zi,d.manual,d.nPer)===g)activeZones.push(zi);
     if(!activeZones.length)return null;
-    var refLat=d.sourceLL&&isFinite(d.sourceLL.lat)?d.sourceLL.lat:
-      ((d.trunkLinesLL[0]&&d.trunkLinesLL[0][0]&&d.trunkLinesLL[0][0].lat)||0);
+    var refLat=(d.trunkLinesLL[0]&&d.trunkLinesLL[0][0]&&isFinite(d.trunkLinesLL[0][0].lat))
+      ?d.trunkLinesLL[0][0].lat:0;
     var cos=Math.max(.01,Math.cos(refLat*Math.PI/180)), lines=[], byMain={}, byTrunk=[];
     function xy(p){return{x:p.lng*111320*cos,y:p.lat*110540};}
     function gap(a,b){var dx=a.x-b.x,dy=a.y-b.y;return Math.sqrt(dx*dx+dy*dy);}
@@ -577,12 +577,11 @@
     activeZones.forEach(function(i){var o=makeLine('branch:'+i,'branch',i,d.branchLL&&d.branchLL[i]);if(o)branchLines[i]=o;});
     if(!byTrunk.length)return null;
 
-    /* 水源必须实际落在总管容差内；不再把任意总管端点伪装成水源图根。 */
-    var rootLine=null,rootProj=null;
-    if(d.sourceLL)byTrunk.forEach(function(o){if(o.kind!=='trunk')return;var p=project(o,d.sourceLL);if(!rootProj||p.d<rootProj.d){rootLine=o;rootProj=p;}});
-    if(!d.sourceLL||!rootLine||!rootProj||rootProj.d>LINK_EPS_M)return null;
-    var rootId='flow:source';
-    addCut(rootLine,rootProj.s,rootId);
+    /* 完整水路校验只关心管网拓扑。水源是独立地图点，不作为连通根或播放前置条件；
+       从第一条总管的首端建立稳定图根，再要求所有分区支管两端都能沿管网到达。 */
+    var rootLine=byTrunk[0];
+    var rootId='flow:network-root';
+    addCut(rootLine,0,rootId);
 
     /* Join trunk polylines at actual touching endpoints. */
     for(var ti=0;ti<byTrunk.length;ti++)for(var tj=ti+1;tj<byTrunk.length;tj++){
@@ -676,7 +675,7 @@
     });
     if(!graph[rootId])return null;
 
-    /* Dijkstra from the source endpoint. The reconstructed edges retain their
+    /* Dijkstra from the network root. The reconstructed edges retain their
        direction, which makes the moving dash travel toward the selected zone. */
     var distMap={},prev={},open={};distMap[rootId]=0;open[rootId]=true;
     while(Object.keys(open).length){
@@ -698,7 +697,7 @@
       var path=[],pathLinkIds=[],cur=t.id,guard=0;
       while(cur!==rootId&&prev[cur]&&guard++<5000){var step=prev[cur];pathLinkIds.push(step.linkId);if(step.edge)path.push({edge:step.edge,forward:step.from===step.edge.a});cur=step.from;}
       if(cur!==rootId)return;
-      /* 路线内任一真实管段被移除后，目标仍能从水源到达，说明图中还有另一条物理路线。 */
+      /* 路线内任一真实管段被移除后，目标仍能从管网根节点到达，说明图中还有另一条物理路线。 */
       for(var pi=0;pi<pathLinkIds.length;pi++){
         var pathLinkId=pathLinkIds[pi];
         if(linkGeometry[pathLinkId]&&reachableWithout(t.id,pathLinkId))return;
@@ -738,7 +737,7 @@
     /* 底态：全部主管/支管淡化灰 */
     d.mainsLL.forEach(function (l) { if (l) ly.addLayer(poly(l, '#cbd5e1', 2, false)); });
     d.branchLL.forEach(function (l) { if (l) ly.addLayer(poly(l, '#e2e8f0', 1.5, false)); });
-    /* 全部总管与分段总管仅作淡色底图；实际流动路线在后面按水源到当前分区裁剪，
+    /* 全部总管与分段总管仅作淡色底图；实际流动路线在后面按管网根节点到当前分区裁剪，
        不再把 N01 之后通往 N02 的下游干线误画成每一组都在流动。 */
     (d.trunkLinesLL || (d.trunkLL && d.trunkLL.length >= 2 ? [d.trunkLL] : [])).forEach(function(line){
       if(!line||line.length<2)return;
@@ -885,7 +884,7 @@
     if(!wholeFieldClosed||!routes.length||incomplete||!activeCount){
       if(layer)layer.clearLayers();
       active=null;hideGroupInfo();if(timer){clearInterval(timer);timer=null;}playing=false;syncChipsState();
-      if(ctx.tip)ctx.tip('当前地块尚未形成从水源到所有分区支管两端的完整水路；请先补齐手绘总管、捕捉节点、主管、分区阀门和支管连通，再演示轮灌。');
+      if(ctx.tip)ctx.tip('当前地块尚未形成覆盖所有分区支管两端的连续管路；请检查手绘总管、捕捉节点、主管、分区阀门和支管连接，再演示轮灌。');
       return false;
     }
     renderSnapshotD = d;     /* [perf-20261106] 复用同一份快照，不再 collect 第二次 */
