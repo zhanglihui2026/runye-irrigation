@@ -65,7 +65,7 @@
   if(!cuts)return out;var localRings=rings.map(function(r){return b.polyToGrid(cuts,r);}),cols=cuts.xPos.length-1,rows=cuts.yPos.length-1;
   function gx(ri,ci){return typeof root.tlZoneGx==='function'?root.tlZoneGx(cuts,ri,ci):cuts.xPos[ci];}
   function gy(ci,ri){return typeof root.tlZoneGy==='function'?root.tlZoneGy(cuts,ci,ri):cuts.yPos[ri];}
-  for(var y=0;y<rows;y++)for(var x=0;x<cols;x++)localRings.forEach(function(r){var local=b.clipPolyToRect(r,gx(y,x),gy(x,y),gx(y,x+1),gy(x,y+1));if(local&&local.length>=3){var p=b.polyToWorld(cuts,local),area=b.polyArea(p);if(area>0.01)out.push({zoneIndex:y*cols+x,name:(y*cols+x+1)+'区',latLng:p.map(toLL),area:area});}});return out;
+  for(var y=0;y<rows;y++)for(var x=0;x<cols;x++)localRings.forEach(function(r){var local=b.clipPolyToRect(r,gx(y,x),gy(x,y),gx(y,x+1),gy(x,y+1));if(local&&local.length>=3){var p=b.polyToWorld(cuts,local),area=b.polyArea(p);if(area>1e-6)out.push({zoneIndex:y*cols+x,name:(y*cols+x+1)+'区',latLng:p.map(toLL),area:area});}});return out;
  }
  function capture(net,previousNetworkRaw){
   if(!net)return {ok:false,error:'network-layout-missing'};
@@ -89,9 +89,13 @@
   partitions=partitions.map(function(z){return Object.assign({},z,{area:z.area*areaScale});});
   var areaCorrection=measuredArea-partitions.reduce(function(sum,z){return sum+z.area;},0);
   if(partitions.length)partitions[partitions.length-1].area+=areaCorrection;
-  var zones=root.tlDiagramData&&root.tlDiagramData.zones;
-  var expectedZoneCount=zones&&Number(zones.cols)*Number(zones.rows);
-  if(!(expectedZoneCount>0)||partitions.length!==expectedZoneCount)return {ok:false,error:'partition-count-does-not-match-generated-diagram'};
+  var dd=root.tlDiagramData,zones=dd&&dd.zones;
+  var activeZoneIndices=Array.isArray(dd&&dd.activeZoneIndices)?dd.activeZoneIndices:null;
+  if(!zones||!activeZoneIndices||!activeZoneIndices.length)return {ok:false,error:'generated-active-zone-index-missing'};
+  var actualZoneIndices=Array.from(new Set(partitions.map(function(part){return Number(part.zoneIndex);}))).sort(function(a,b){return a-b;});
+  var expectedZoneIndices=activeZoneIndices.map(Number).sort(function(a,b){return a-b;});
+  if(actualZoneIndices.length!==expectedZoneIndices.length||actualZoneIndices.some(function(index,i){return index!==expectedZoneIndices[i];}))
+    return {ok:false,error:'map-partitions-do-not-match-generated-active-zones'};
   net.partitionPlan=plan;net.partitions=partitions;
   p.partitionPlan=plan;p.partitions=partitions;
   var nodeKey='runye_tlNodes_v1',nodesChanged=false,nextNodeGeoSig='';

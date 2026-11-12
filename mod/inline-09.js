@@ -5262,6 +5262,7 @@ function tlAutoGenerate(options) {
     valves: valves.map(function(v){var p=tlGridWorld(v.x,v.y),a=(v.ax!=null&&v.ay!=null)?tlGridWorld(v.ax,v.ay):null;return Object.assign({},v,p,a?{ax:a.x,ay:a.y}:{});}),
     dripTapes: dripTapes.map(function(line){return line.map(function(p){return tlGridWorld(p.x,p.y);});}),
     partialFlags: tlPartialFlags.slice(), zoneActMu: tlZoneActMu.slice(),
+    activeZoneIndices: planAreas.reduce(function(list,area,index){if(Number(area)>0)list.push(index);return list;},[]),
     /* [v1015 2026-11-08 用户拍板] 快照不再落自动总管/三通/水源设计几何：
        frontPipe/sourcePos 恒 null（手绘总管经 tlMapTrunkLen/段总管驳接进水力），
        frontNodes（三通断点清单，全项目零消费方）随自动链路一并移除。 */

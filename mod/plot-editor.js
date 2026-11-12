@@ -5335,12 +5335,45 @@
     return !!(oldDir&&newDir&&Math.abs(oldDir.x*newDir.x+oldDir.y*newDir.y)<0.94);
   }
 
+  function ppPartitionLayoutOutdated(){
+    if(ppIsGroupWhole())return false;
+    var bridge=window.RunyeBridge,live=bridge&&bridge.getZoneCuts();
+    var prior=window.tlDiagramData&&window.tlDiagramData.zones;
+    /* 没有上一版三级图面就没有可比较的分区前像；首次生成不能因此覆盖
+       用户当前已经绘制的管路。可比较时才根据布局差异触发自动重建。 */
+    if(!live||!prior)return false;
+    if(Number(live.cols)!==Number(prior.cols)||Number(live.rows)!==Number(prior.rows))return true;
+    function sameArray(a,b){
+      if(!Array.isArray(a)||!Array.isArray(b)||a.length!==b.length)return false;
+      for(var i=0;i<a.length;i++)if(Math.abs(Number(a[i])-Number(b[i]))>0.05)return false;
+      return true;
+    }
+    if(!sameArray(live.xPlan,prior.xPlan)||!sameArray(live.yPlan,prior.yPlan)||
+       !sameArray(live.xPos,prior.xPos)||!sameArray(live.yPos,prior.yPos))return true;
+    if(!sameArray(live.xSrc,prior.xSrc)||!sameArray(live.ySrc,prior.ySrc))return true;
+    var lf=live.frame||null,pf=prior.frame||null;
+    if(!!lf!==!!pf)return true;
+    if(lf&&pf){
+      var frameKeys=['angle','scaleX','scaleY'];
+      for(var fi=0;fi<frameKeys.length;fi++)
+        if(Math.abs((Number(lf[frameKeys[fi]])||0)-(Number(pf[frameKeys[fi]])||0))>0.05)return true;
+      var frameMoved=false;
+      ['center','origin'].forEach(function(key){
+        var a=lf[key]||{},b=pf[key]||{};
+        if(Math.abs((Number(a.x)||0)-(Number(b.x)||0))>0.05||
+           Math.abs((Number(a.y)||0)-(Number(b.y)||0))>0.05)frameMoved=true;
+      });
+      if(frameMoved)return true;
+    }
+    return false;
+  }
+
   document.getElementById('ppGenerate').addEventListener('click',function(){
     /* 分区角度改变后，先按新角度重建自动主管/支管，再生成二级图与三级图。
        角度待重建状态不会被普通历史记录清掉，只有自动布管成功后才消费。
        [v873] 重生成失败必须让用户看见——此前 fail-closed 回滚只有 console.warn，
        用户点按钮毫无反应（真机实测「旋转角度后生成施工图没反应」）。 */
-    var rebuildForMapAngle=false;
+    var rebuildForMapAngle=false,rebuildForPartitionLayout=false;
     try{
       /* 地图端应用角度会将持久化网络标为 needsReplan；分区恢复走 ppSetState/restore，
          不经过 ppApplyZoneAngle，因此本地 pending 标记不足以识别该路径。 */
@@ -5352,9 +5385,11 @@
         ?Number(priorDiagram.zones.frame.angle):null;
       if(isFinite(priorAngle)&&Math.abs(priorAngle-ppZoneAngle())>0.05)rebuildForMapAngle=true;
     }catch(eMapReplan){console.warn('[ppGenerate] 地图角度状态读取失败',eMapReplan);}
-    if((ppAnglePipeRegenPending||rebuildForMapAngle||ppMainDirectionOutdated())&&!ppAutoGeneratePipes()){
+    try{rebuildForPartitionLayout=ppPartitionLayoutOutdated();}
+    catch(ePartitionLayout){console.warn('[ppGenerate] 当前分区布局读取失败',ePartitionLayout);rebuildForPartitionLayout=true;}
+    if((ppAnglePipeRegenPending||rebuildForMapAngle||rebuildForPartitionLayout||ppMainDirectionOutdated())&&!ppAutoGeneratePipes()){
       ppAnglePipeRegenPending=true;
-      alert('按新分区角度重生成管线未完成：'+(window.__runyeSingleL2CommitFailure||'布管或设计提交失败')+'。当前画面已保留。');
+      alert('按当前分区重生成管线未完成：'+(window.__runyeSingleL2CommitFailure||'布管或设计提交失败')+'。当前画面已保留。');
       return;
     }
     /* [v656 2026-10-21 用户拍板] 成组态智能分流：多地块点「生成施工图」不进三级，
