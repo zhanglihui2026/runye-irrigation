@@ -1473,8 +1473,8 @@
    增一条契约锁「徽标存在 + 由 JS 填充 + 不写死」。
    [v1035-shared-node-sync] 施工图生成自动刷新在线地图；两个页面共用施工节点写入与展示，升级离线缓存。
    [v1039-flow-display-decoupling] 分区面仅作动画显示；缺失时不阻断已发布管网的水路计算。
-   [v1040-flow-geometry-identity] 页面恢复重绘时按已发布管网几何核对动画版本。 */
-const VERSION = 'v1040-flow-geometry-identity';
+   [v1041-map-only-irrigation-demo] 页面恢复重绘时按已发布管网几何核对动画版本。 */
+const VERSION = 'v1041-map-only-irrigation-demo';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

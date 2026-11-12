@@ -2878,17 +2878,6 @@ window.tlSteppedZoneCuts = tlSteppedZoneCuts;
  *     里待选蓝高亮优先级高于 selGroup，不清会盖住演示色）。
  *   · 演示态挂 window.__tlDemoGroup（单一份），render()/tlAutoGenerate 重渲染后各自恢复，
  *     不靠人记住同步（同一事实只存一份）。 */
-var tlDemoTimer = null, tlDemoIdx = 0;
-/* [v504 2026-10-16 用户要求] 轮灌演示「切换时长」缩短：每组停留/轮播间隔 2000→1000ms。
-   与 v501/v503 的动画时长是两件事——v501/v503 改的是「水流/阀门动画本身跑多快」，
-   这里改的是「多久换下一组」。抽成具名常量，后续再调只动这一处。 */
-var TL_DEMO_INTERVAL_MS = 1000;
-function tlDemoGroupCount() {
-  var total = tlGroupZoneCount(); if (!total) return 0;
-  var mg = (window.tlManualGroups && window.tlManualGroups.length) ? window.tlManualGroups : null;
-  if (mg) return mg.length;                                   /* 手动模式：只演示已合并的组（未分组区保持灰底） */
-  return Math.max(1, Math.ceil(total / Math.max(1, tlGetZoneCount())));
-}
 /* 三级简图侧演示高亮：三态重涂（恢复=还原 data-fill+data-stroke 虚线；选中=加深+深描边；其余=淡化灰） */
 function tlApplyDemoHighlight(g) {
   var svg = document.querySelector('#tlDiagramContent svg'); if (!svg) return;
@@ -3273,101 +3262,9 @@ function tlDemoRenderFlow(svg, g) {
   } catch (eF) { }
 }
 window.tlDemoRenderFlow = tlDemoRenderFlow;
-window.tlApplyDemoHighlight = tlApplyDemoHighlight;
-/* chips 选中态/播放按钮文案同步（chips 内容重建后也靠它恢复状态） */
-function tlDemoChipSync() {
-  var box = document.getElementById('tlDemoChips'); if (!box) return;
-  var cur = window.__tlDemoGroup;
-  var bs = box.querySelectorAll('button[data-demo-g]');
-  for (var i = 0; i < bs.length; i++) {
-    var g = parseInt(bs[i].getAttribute('data-demo-g'), 10);
-    /* [v461] 组 chips 已是圆形色点（class 由 tlRenderDemoChips 写入），
-       此处只翻转选中态——不能整串覆写 className，否则会把 tl-demo-dot 抹掉 */
-    if (bs[i].classList) bs[i].className = 'tl-demo-dot' + (cur === g ? ' selected' : '');
-  }
-  var pb = document.getElementById('tlDemoPlay');
-  if (pb) pb.innerHTML = tlDemoTimer ? '⏸' : '▶';   /* [v465] 图标化：⏸=暂停中可接管 / ▶=轮播 */
-  var eb = document.getElementById('tlDemoExit');
-  if (eb) eb.disabled = (cur == null && !tlDemoTimer);
-}
-/* 重建 chips：分组（N/手动）一变就走这里 —— tlRefreshGroupStatus 与 tlAutoGenerate 都会调 */
-function tlRenderDemoChips() {
-  var bar = document.getElementById('tlDemoBar'), box = document.getElementById('tlDemoChips');
-  if (!bar || !box) return;
-  var M = tlDemoGroupCount();
-  if (M <= 0) { bar.style.display = 'none'; box.innerHTML = ''; if (tlDemoTimer) tlDemoStop(); return; }
-  bar.style.display = '';
-  /* 越界守卫：重分组后组数变少 ⇒ 立刻退出演示，不指向不存在的组 */
-  if (window.__tlDemoGroup != null && window.__tlDemoGroup >= M) { tlDemoStop(); return; }
-  var manual = !!(window.tlManualGroups && window.tlManualGroups.length);
-  /* [v461]（2026-10-15 用户要求）组 chips 改为「圆形填充色 + 阿拉伯数字」，替代「组N」文字。
-     填充色与工作区分组色带同源（tl-workspace GROUP_FILLS 4 色循环：红/琥珀/绿/蓝）；
-     第 2 轮循环起用浅色底+深色字，对应色带「循环降透明度」的同一视觉语言。
-     手动分组时序号仍为 1..M（图面标注是 M{号}，tooltip 里说明对应关系）。 */
-  var DOT_FILLS = ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6'];
-  var DOT_FILLS_LT = ['#fca5a5', '#fcd34d', '#86efac', '#93c5fd'];
-  var DOT_INKS = ['#fff', '#fff', '#fff', '#fff'];
-  var DOT_INKS_LT = ['#7f1d1d', '#78350f', '#14532d', '#1e3a8a'];
-  var h = '';
-  for (var g = 0; g < M; g++) {
-    var ci = g % DOT_FILLS.length, lite = g >= DOT_FILLS.length;
-    h += '<button type="button" class="tl-demo-dot" data-demo-g="' + g + '"' +
-      ' style="background:' + (lite ? DOT_FILLS_LT[ci] : DOT_FILLS[ci]) + ';color:' + (lite ? DOT_INKS_LT[ci] : DOT_INKS[ci]) + '"' +
-      ' title="高亮第 ' + (g + 1) + ' 轮灌组（该组分区加深、其余淡化' + (manual ? '；对应图面 M' + (g + 1) : '') + '）">' + (g + 1) + '</button>';
-  }
-  /* [v465]（2026-10-15 用户要求）轮播/退出取消文字、只用图标：▶=轮播 / ⏸=暂停（轮播中）/ ■=退出；
-     语义收进 title 与 aria-label。按钮尺寸收成图标方块（样式见 style-01.css .tl-demo-ctl）。 */
-  h += '<button type="button" id="tlDemoPlay" class="tl-demo-ctl" aria-label="轮播" title="自动轮流高亮各组（1 秒一组），再点暂停">▶</button>';
-  h += '<button type="button" id="tlDemoExit" class="tl-demo-ctl" aria-label="退出" title="退出演示，所有分区恢复原色">■</button>';
-  box.innerHTML = h;
-  tlDemoChipSync();
-}
-window.tlRenderDemoChips = tlRenderDemoChips;
-/* 设置演示组（g=null 退出）；两视图同步重涂 */
-function tlDemoSet(g) {
-  window.__tlDemoGroup = (g == null ? null : g);
-  window.tlGroupMode = false; window.tlPendingSel = [];    /* 与待选蓝高亮互斥（tlHi 优先会盖演示色） */
-  if (window.RyTlWs && window.RyTlWs.setSelGroup) { try { window.RyTlWs.setSelGroup(g); } catch (e) { } }
-  tlApplyDemoHighlight(g);
-  tlDemoChipSync();
-}
-function tlDemoPlayToggle() {
-  var M = tlDemoGroupCount(); if (M <= 0) return;
-  if (tlDemoTimer) { clearInterval(tlDemoTimer); tlDemoTimer = null; tlDemoChipSync(); return; }
-  tlDemoIdx = (window.__tlDemoGroup != null) ? window.__tlDemoGroup : -1;
-  tlDemoIdx = (tlDemoIdx + 1) % M; tlDemoSet(tlDemoIdx);   /* 点下立即切组，不等一个间隔 */
-  tlDemoTimer = setInterval(function () {
-    var Mc = tlDemoGroupCount(); if (Mc <= 0) { tlDemoStop(); return; }   /* 重分组后组数变化兜底 */
-    tlDemoIdx = (tlDemoIdx + 1) % Mc;
-    tlDemoSet(tlDemoIdx);
-  }, TL_DEMO_INTERVAL_MS);
-  tlDemoChipSync();
-}
-function tlDemoStop() {
-  if (tlDemoTimer) { clearInterval(tlDemoTimer); tlDemoTimer = null; }
-  tlDemoSet(null);
-}
-/* chips 事件委托（chips 是动态重建的，只挂一次） */
-(function () {
-  var box = document.getElementById('tlDemoChips'); if (!box) return;
-  box.addEventListener('click', function (e) {
-    var t = e.target; if (!t || !t.closest) return;
-    var gb = t.closest('[data-demo-g]');
-    if (gb) {
-      if (tlDemoTimer) { clearInterval(tlDemoTimer); tlDemoTimer = null; }   /* 手点组 = 接管，轮播暂停 */
-      tlDemoSet(parseInt(gb.getAttribute('data-demo-g'), 10)); return;
-    }
-    if (t.closest('#tlDemoPlay')) { tlDemoPlayToggle(); return; }
-    if (t.closest('#tlDemoExit')) { tlDemoStop(); return; }
-  });
-})();
 
 window.tlRefreshGroupStatus = function () {
-  /* [v216] 左栏「分组：自动… / 手动分组表格」文字行已按用户要求取消（明细看右侧面板）。
-     ★ 本函数现在只剩一个职责：分组一变 → 轮灌演示 chips 重建。
-     不能保留旧的 `if (!el) return;` —— status DOM 删掉后那行会让函数在 chips 重建
-     之前就返回，演示行永远不出现（删 DOM 必须连带重审函数内所有提前返回）。 */
-  if (typeof tlRenderDemoChips === 'function') { try { tlRenderDemoChips(); } catch (e) { } }
+  /* Retained as a compatibility hook for group-planning callers. */
 };
 /* [2026-10-27 用户指令取消] 联合灌溉分组「手动合并」机制整链删除：
    原 v98 面板（勾选合并为一组 / 清空勾选 / 已建联合组列表 ✕ 删除 / 全部清除回自动均分）、
@@ -5499,10 +5396,7 @@ function tlAutoGenerate(options) {
   document.getElementById('tlDiagramContent').innerHTML=svgStr;
   var _tlOutputDeg=0;try{_tlOutputDeg=Number(localStorage.getItem('tlOutputRotationDeg'))||0;}catch(eTlOutputStore){}
   tlApplyOutputRotation(_tlOutputDeg,false);
-  /* [v215] 轮灌演示跨重渲染：简图整棵重建后立刻按当前演示组重涂 + 演示 chips 重建
-     （组数随 N/手动分组变化；chips 内部自带越界退出守卫。工作区侧由 RyTlWs.render 内恢复）。 */
-  try { if (window.__tlDemoGroup != null) tlApplyDemoHighlight(window.__tlDemoGroup); } catch (e) { }
-  try { if (typeof tlRenderDemoChips === 'function') tlRenderDemoChips(); } catch (e) { }
+  /* 分区与管路页不恢复轮灌演示状态；在线地图独立负责播放。 */
   /* [map-enhance] 管网反投卫星图（2026-09-26）：把 tlDiagramData 米坐标管线按当前 geo 基准
      反投成经纬度，经 RyIrrigationDataStore 写入 runye_network_layout，地图页 runye-map-enhance.js 读取后
      在卫星图叠加真实主管/支管/水源点。无 geo 基准（手动画矩形、未经地图回传）时静默跳过。
