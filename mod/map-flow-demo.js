@@ -79,7 +79,9 @@
       if(!z||z.zoneIndex==null||!Number.isInteger(Number(z.zoneIndex))||!Array.isArray(z.latLng))return;
       var ll=[];
       z.latLng.forEach(function(p){var q=readLL(p);if(q)ll.push(q);});
-      if(ll.length>=3)out.push({zi:Number(z.zoneIndex),ll:ll,area:Number(z.area)||0});
+      /* Zone polygons are display geometry only. Hydraulic inputs come from
+         the generated design; published polygon area must never feed Q/H. */
+      if(ll.length>=3)out.push({zi:Number(z.zoneIndex),ll:ll});
     });
     return out;
   }
@@ -417,17 +419,16 @@
     trunkLinesLL.forEach(function(line){trunkLL=trunkLL.concat(line);});
     var total = (dd.mainPipes || []).length;
     if (!total) return null;
-    /* 当前地图网格与生成管线必须一一对应；数量或索引有差异时拒绝沿用旧演示快照。 */
-    var zoneByIndex={};
-    zonePolygons.forEach(function(z){if(z&&Number.isInteger(z.zi))zoneByIndex[z.zi]=z;});
-    for(var zi=0;zi<total;zi++)if(!zoneByIndex[zi]){
-      collectBlockReason='当前地图分区与管线快照不一致（地图 '+zonePolygons.length+' 区，管线 '+total+' 区）。请回「分区与管路」按最新分区重新生成管线。';
-      return null;
-    }
-    if(zonePolygons.length!==total){
-      collectBlockReason='当前地图分区与管线快照数量不一致（地图 '+zonePolygons.length+' 区，管线 '+total+' 区）。请重新生成管线。';
-      return null;
-    }
+    /* 分区面只负责地图着色，不是水力路径/流量/扬程输入。
+       只有整套发布分区轮廓与生成管线区号一一对应时才显示；缺失、重复或错号时
+       隐去分区面，但继续用已核验的管网几何执行后续闭环校验与动画。 */
+    var zoneByIndex={},zoneOverlayComplete=zonePolygons.length===total;
+    zonePolygons.forEach(function(z){
+      if(!z||!Number.isInteger(z.zi)||z.zi<0||z.zi>=total||zoneByIndex[z.zi])zoneOverlayComplete=false;
+      else zoneByIndex[z.zi]=z;
+    });
+    for(var zi=0;zi<total;zi++)if(!zoneByIndex[zi])zoneOverlayComplete=false;
+    if(!zoneOverlayComplete)zonePolygons=[];
     var manual = (window.tlManualGroups && window.tlManualGroups.length) ? window.tlManualGroups : null;
     return {
       mainsLL: mainsLL, branchLL: branchLL, valves: valves,
@@ -456,7 +457,7 @@
     a.push((d.couplersLL || []).map(p2).join(';'));
     a.push((d.nodesLL || []).map(function (n) { return n.mi + ':' + p2(n.ll); }).join(';'));
     a.push((d.valves || []).map(function (v) { return v.mi + ':' + p2(v.ll); }).join(';'));
-    a.push((d.zonePolygons || []).map(function (z) { return z.zi + ':' + line(z.ll); }).join('|'));
+    /* zonePolygons are display-only and are not read by validateConnection. */
     a.push(String(d.total) + ':' + String(d.nPer) + ':' + String(d.gCount));
     a.push(d.manual ? JSON.stringify(d.manual) : '-');
     return a.join('#');
