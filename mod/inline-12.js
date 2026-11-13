@@ -625,6 +625,10 @@
       manualGroups:(!_groupActive&&typeof window.tlManualGroups!=='undefined' && window.tlManualGroups) ? window.tlManualGroups : [],
       zoneStep:(!_groupActive&&typeof tlZoneStepCount==='function' && tlZoneStepCount()>0) ? window.tlZoneStep : null,
       ppGenSig:(!_groupActive&&typeof window.__ryPpGenSig!=='undefined'&&window.__ryPpGenSig)?window.__ryPpGenSig:null,
+      /* [v1052 数据唯一性] 管线生成时的分区切割签名（边界+行列+设计宽高+角度+末排并入）。
+         恢复链据此拒绝「边界没变但分区参数变过」的异代快照——否则旧管线会盖回新分区
+         图面，与实时滴灌带/分区标签自相矛盾（用户实测复现）。 */
+      ppGenCutSig:(!_groupActive&&window.__ryPpGenCutSig)?window.__ryPpGenCutSig:null,
       tlAux:(!_groupActive&&window.tlDiagramData)?readTlAux():
         {drops:null,src:null,nodes:null,dims:null,plotPos:null}
     };
@@ -1023,6 +1027,7 @@
     window.__runyeSingleCanonicalDesign=null;
     window.__runyeSingleDrawingDesignShadow=null;
     window.__ryPpGenSig=null;
+    window.__ryPpGenCutSig=null;   /* [v1052 数据唯一性] 切地块时切割签名随边界签名一起清 */
     try{ if(typeof tlPipeOdOverride!=='undefined') tlPipeOdOverride=null; }catch(eOverride){}
     try{ if(typeof tlZoneStepClear==='function') tlZoneStepClear(); }catch(eZone){}
     try{ if(typeof writeTlAux==='function') writeTlAux({drops:null,src:null,nodes:null,dims:null,plotPos:null}); }catch(eAux){}
@@ -1193,6 +1198,29 @@
         if(anchorPlotId!==savedPlotId) return;
       }else if(savedPlotId&&pagePlotId!==savedPlotId) return;
       if(window.runyeLoadProject({key:SAVE_KEY, silent:true})!==true) return;
+      /* [v1052 2026-11-13 数据唯一性] 边界签名只证明「地块轮廓没变」，证明不了分区参数
+         没变。快照若带 ppGenCutSig（管线生成时的分区切割签名），恢复后必须与现算签名
+         一致才保留管线；不一致就把管线/阀门/接驳节点清空——宁可让用户点一次「生成
+         施工图」，也不让旧管线盖回新分区图面（用户实测复现：滴灌带纵向、管线竖直与其
+         平行，方向报告还是旧布局的「30 个分区带长超 200m」，支管总米数也对不上）。
+         旧快照（无 ppGenCutSig）无法判定同代：保留管线但 toast 明示请重新生成。 */
+      var _staleCut=false;
+      try{
+        if(window.ppCurrentCutSignature && typeof window.ppCurrentCutSignature==='function'){
+          var _curSig=window.ppCurrentCutSignature();
+          if(_curSig && snap.ppGenCutSig && snap.ppGenCutSig!==_curSig){
+            _staleCut=true;
+            if(window.ppState){
+              window.ppState.mainPipes=[];
+              window.ppState.branchPipes=[];
+              window.ppState.subBranchPipes=[];
+              window.ppState.valves=[];
+              window.ppState.couplerNodes=[];
+              if(typeof window.ppRender==='function')window.ppRender();
+            }
+          }
+        }
+      }catch(eCutSig){}
       window.__runyeAutoRestored=true;
       window.__ryPpGenSig=snap.ppGenSig;   /* 记回内存：后续 pagehide 继续留存 */
       var _ryAlert0=window.alert;
@@ -1204,7 +1232,9 @@
         if(_ryPoly && _ryPoly.length>=3) window.__ryLazyReplay=true;
       }catch(e){}finally{ window.alert=_ryAlert0; }
       try{ if(typeof tlUpdatePlanBar==='function') tlUpdatePlanBar(); }catch(e){}
-      try{ if(typeof atShowToast==='function') atShowToast('已恢复上次生成的施工图'); }catch(e){}
+      try{ if(typeof atShowToast==='function') atShowToast(_staleCut
+        ? '分区参数已变化，旧管线已清空——请点「生成施工图」重新生成'
+        : (snap.ppGenCutSig?'已恢复上次生成的施工图':'已恢复上次生成的施工图（若分区参数改过，请点「生成施工图」重新生成）')); }catch(e){}
     }catch(e){ try{ console.warn('[v355] ppGen restore skipped:',e&&e.message); }catch(_){} }
   }
   if(document.readyState==='complete') setTimeout(function(){ryAutoRestoreProject();ryAiRestoreProject();ryPpGenRestoreProject();},0);

@@ -149,3 +149,6 @@ _shot_*.mjs
 # Node 工具链（仅本地静态质量检查用，不参与发布链路）
 node_modules/
 npm-debug.log*
+
+# v1052 恢复链切割签名校验（数据唯一性）回归
+!tests/v1052_restore_cut_sig.test.cjs

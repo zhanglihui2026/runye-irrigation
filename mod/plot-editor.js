@@ -1787,6 +1787,22 @@
     return {merge:false,count:arr.length-1,axis:axis,delta:delta};
   }
 
+  /* [v1052 2026-11-13 数据唯一性] 分区切割签名的单一出口：边界 + 行列数 + 设计宽高 +
+     分区角度 + 末排并入，全部影响管线几何的分区参数都在里面。管线生成时记下当时的
+     签名；此后画布/恢复链拿现算签名与它比对，不一致即判定「管线为旧分区布局」——
+     滴灌带与分区标签是画布实时按当前分区画的，管线是存档几何，两者不同代就会在
+     同一张图上自相矛盾（实测：滴灌带纵向、管线竖直，方向报告还是旧布局的「30 个
+     分区带长超 200m」）。 */
+  function ppCurrentCutSignature(){
+    if(!ppState.polyPts||ppState.polyPts.length<3)return null;
+    try{
+      var b=ppGetBounds();
+      var n=parseInt(document.getElementById('planN')&&document.getElementById('planN').value)||parseInt(document.getElementById('fld_N')&&document.getElementById('fld_N').value)||4;
+      return ppGetZoneCutSignature(b,ppGetZoneLayout(b,n));
+    }catch(e){return null;}
+  }
+  window.ppCurrentCutSignature=ppCurrentCutSignature;
+
   function ppGetZoneCutSignature(b,layout){
     var dims=ppGetPlanDims(b);
     var frame=ppGridFrame(ppState.polyPts,b,dims),gd=frame?frame.bounds:dims;
@@ -2650,6 +2666,37 @@
       ppCtx.fillStyle='#86efac';
       ppCtx.fillText(txtTotal,tx+12,ty+36);
     }
+
+    /* [v1052 2026-11-13 数据唯一性] 管线过时警示：管线是存档几何，滴灌带/分区标签是
+       画布实时按当前分区画的——分区参数（分区数/角度/切割线/末排并入）在生成之后
+       被改过时，两代数据同图自相矛盾（用户实测复现：滴灌带纵向、管线竖直与其平行，
+       方向报告还是旧布局的「30 个分区带长超 200m」）。签名不一致就在画布右上常驻
+       橙字提示，直到点「生成施工图」清空重算。左上区域是 v251 像素闸门禁区，放右上。 */
+    (function(){
+      try{
+        var hasPipes=(ppState.mainPipes&&ppState.mainPipes.length)||(ppState.branchPipes&&ppState.branchPipes.length);
+        if(!hasPipes)return;
+        var gen=ppState.__ppGenCutSig;
+        if(!gen)return;                    /* 旧档案无生成时签名不强判，恢复链另有校验 */
+        var cur=ppCurrentCutSignature();
+        if(!cur||cur===gen)return;
+        ppCtx.save();
+        ppCtx.font='bold 13px sans-serif';
+        var msg='⚠ 管线为旧分区布局生成，与当前分区不一致 — 请点「生成施工图」重新生成';
+        var w=ppCtx.measureText(msg).width+28;
+        var x=Math.max(10,ppCanvas.width-w-14), y=10;
+        ppCtx.fillStyle='rgba(255,251,235,.96)';
+        ppCtx.strokeStyle='rgba(217,119,6,.8)';
+        ppCtx.lineWidth=1.5;
+        ppCtx.beginPath();
+        if(ppCtx.roundRect){ppCtx.roundRect(x,y,w,30,6);}else{ppCtx.rect(x,y,w,30);}
+        ppCtx.fill();ppCtx.stroke();
+        ppCtx.fillStyle='#92400e';
+        ppCtx.textAlign='left';
+        ppCtx.fillText(msg,x+14,y+20);
+        ppCtx.restore();
+      }catch(eStale){}
+    })();
   }
   /* [v629] 「适应窗口」胶囊的显隐收口在这里，而不是在每个调用点撒一遍：
      分区旋转 / 重新分区 / 回退 / 加管都会改内容尺寸或平移量，只有这里能保证不漏。
@@ -3600,6 +3647,8 @@
       ppRefreshMaterials();
       /* 立刻推给「成组管路」页 —— 它只看得到 slots，不刷新就还是空的 */
       ppSyncGroupEditUI();
+      /* [v1052 数据唯一性] 记下管线生成时的分区切割签名，供画布过时警示与恢复链校验。 */
+      ppState.__ppGenCutSig=ppCurrentCutSignature();
       return true;
     }
 
@@ -3647,6 +3696,8 @@
     ppUpdateAutoPipeButton();
     if (typeof window.ppRefreshDiagramIfVisible === 'function') window.ppRefreshDiagramIfVisible();
     ppRefreshMaterials();
+    /* [v1052 数据唯一性] 记下管线生成时的分区切割签名，供画布过时警示与恢复链校验。 */
+    ppState.__ppGenCutSig=ppCurrentCutSignature();
     return true;
   }
 
@@ -5482,6 +5533,11 @@
     try{
       if(window.measuredPolygon && window.measuredPolygon.length>=3 && typeof window.ryPolySig==='function'){
         window.__ryPpGenSig=window.ryPolySig(window.measuredPolygon);
+        /* [v1052 数据唯一性] 恢复签名从「只锚边界」升级为「边界 + 分区切割」：
+           边界没变但分区参数（分区数/角度/切割线/末排并入）变过时，按旧签名恢复会把
+           旧管线盖回新分区图面——滴灌带/标签是实时的、管线是存档的，两代数据同图
+           自相矛盾（用户实测复现）。切割签名随快照存取，恢复链据此拒绝异代恢复。 */
+        window.__ryPpGenCutSig=ppState.__ppGenCutSig||ppCurrentCutSignature()||null;
       }
     }catch(e){}
   });
@@ -5526,6 +5582,8 @@
       valves:JSON.parse(JSON.stringify(ppState.valves||[])),
       lineDrawMode:ppState.lineDrawMode||'free',
       hiddenPipes:JSON.parse(JSON.stringify(ppState.hiddenPipes||{main:{},branch:{},subbranch:{}})),
+      /* [v1052 数据唯一性] 生成时切割签名随管线走存档：载入/恢复后画布警示与恢复链据此判定管线是否与当前分区同代。 */
+      genCutSig:ppState.__ppGenCutSig||null,
       pipeIds:JSON.parse(JSON.stringify(ppState.pipeIds||{main:[],branch:[],subbranch:[]})),
       nextPipeId:ppState.nextPipeId||1,
       partitionCuts:(function(){
@@ -5621,6 +5679,9 @@
     ppState.partitionCuts=(saved.partitionCuts&&Array.isArray(saved.partitionCuts.x)&&Array.isArray(saved.partitionCuts.y))
       ?ppCloneJSON(saved.partitionCuts):null;
     ppState.hiddenPipes=JSON.parse(JSON.stringify(saved.hiddenPipes||{main:{},branch:{},subbranch:{}}));
+    /* [v1052 数据唯一性] 生成时切割签名随存档回填：新存档带上，旧存档自然回退 null
+       （画布警示对无签名档案不强判，恢复链对无 ppGenCutSig 快照只提示不强杀）。 */
+    ppState.__ppGenCutSig=(typeof saved.genCutSig==='string'&&saved.genCutSig)?saved.genCutSig:null;
     if(!ppState.hiddenPipes.main)ppState.hiddenPipes.main={};
     if(!ppState.hiddenPipes.branch)ppState.hiddenPipes.branch={};
     if(!ppState.hiddenPipes.subbranch)ppState.hiddenPipes.subbranch={};
