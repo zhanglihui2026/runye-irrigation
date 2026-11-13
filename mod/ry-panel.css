@@ -1408,3 +1408,32 @@ body.ry-tool #ryCadSide [data-pp="pipePlanSection"][data-ry-view="edit"] .ry-pan
 .ry-hbar .ry-hbar-btn:disabled{opacity:.55;cursor:default}
 /* 地块分区快捷条沿用面板绿皮，只把按钮几何/字号并到同一档（原 26px 保留，字号 11.5→11） */
 #ppQuickBar .pp-btn-ghost,#ppQuickBar .pp-btn-generate{height:26px;padding:0 8px;font-size:11px!important;line-height:1}
+
+/* 分区管径明细：紧凑五列，值与表头均居中；单位省略以节省侧栏宽度。 */
+#pipePlanSection #ppZoneCalHead,#ryCadSide [data-pp="pipePlanSection"] #ppZoneCalHead{font-size:11px;font-weight:400}
+#pipePlanSection #ppZoneCalDetail{width:100%;font-size:11px;line-height:1.2;color:#334155}
+#pipePlanSection .pp-zone-cal-table{width:100%;background:#fff}
+#pipePlanSection .pp-zone-cal-row{
+  display:grid;grid-template-columns:.82fr 1fr 1fr 1fr 1fr;align-items:center;
+  min-height:24px;box-sizing:border-box;border-bottom:1px solid #e8ecea;
+  font:inherit;text-align:center;
+}
+#pipePlanSection .pp-zone-cal-row>span{min-width:0;padding:2px 1px;box-sizing:border-box;white-space:nowrap}
+#pipePlanSection .pp-zone-cal-header{
+  min-height:24px;background:#f5f7f6;color:#5a656a;font-size:11px;font-weight:400;
+  border-bottom:1px solid #dce2df;
+}
+/* CAD宿主将管路面板移出#pipePlanSection；这一组显式宿主选择器与上方桌面规则同值。 */
+#ryCadSide [data-pp="pipePlanSection"] #ppZoneCalHead{font-size:11px;font-weight:400}
+#ryCadSide [data-pp="pipePlanSection"] #ppZoneCalDetail{width:100%;font-size:11px;line-height:1.2;color:#334155}
+#ryCadSide [data-pp="pipePlanSection"] .pp-zone-cal-table{width:100%;background:#fff}
+#ryCadSide [data-pp="pipePlanSection"] .pp-zone-cal-row{
+  display:grid;grid-template-columns:.82fr 1fr 1fr 1fr 1fr;align-items:center;
+  min-height:24px;box-sizing:border-box;border-bottom:1px solid #e8ecea;
+  font:inherit;text-align:center;
+}
+#ryCadSide [data-pp="pipePlanSection"] .pp-zone-cal-row>span{min-width:0;padding:2px 1px;box-sizing:border-box;white-space:nowrap}
+#ryCadSide [data-pp="pipePlanSection"] .pp-zone-cal-header{
+  min-height:24px;background:#f5f7f6;color:#5a656a;font-size:11px;font-weight:400;
+  border-bottom:1px solid #dce2df;
+}

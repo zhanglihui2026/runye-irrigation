@@ -239,15 +239,20 @@ function calcPlan(){
       if (head) head.style.display = 'none';
       return;
     }
-    var rows = '';
+    var rows = '<div class="pp-zone-cal-row pp-zone-cal-header" role="row">'
+      + '<span role="columnheader">序号</span><span role="columnheader">规模</span>'
+      + '<span role="columnheader">流量</span><span role="columnheader">主管</span>'
+      + '<span role="columnheader">支管</span></div>';
     __ppActuals.forEach(function(z){
       var p = window.ryZonePipePick(z.m2, tapeSpacing, emitterSpacing, emitterFlow, targetV, branchParallelCount);
-      rows += '<span class="pp-plan-item"><span class="pp-plan-label">' + (z.zi + 1) + '区 · ' + z.mu.toFixed(1) + ' 亩</span>'
-        + '<span class="pp-plan-val">' + p.flow.toFixed(1) + '</span><span class="pp-plan-unit">m³/h</span>'
-        + '<span class="pp-plan-val">Ø' + p.main.od + '</span><span class="pp-plan-unit">主管</span>'
-        + '<span class="pp-plan-val">Ø' + p.branch.od + '</span><span class="pp-plan-unit">支管</span></span>';
+      rows += '<div class="pp-zone-cal-row" role="row">'
+        + '<span role="cell">' + (z.zi + 1) + '区</span>'
+        + '<span role="cell">' + z.mu.toFixed(1) + '</span>'
+        + '<span role="cell">' + p.flow.toFixed(1) + '</span>'
+        + '<span role="cell">Ø' + p.main.od + '</span>'
+        + '<span role="cell">Ø' + p.branch.od + '</span></div>';
     });
-    box.innerHTML = rows;
+    box.innerHTML = '<div class="pp-zone-cal-table" role="table" aria-label="分区管径明细">' + rows + '</div>';
     box.style.display = '';
     if (head) head.style.display = '';
   })();
