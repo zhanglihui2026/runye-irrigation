@@ -5727,6 +5727,62 @@ function tlAutoGenerate(options) {
     }
   }catch(eSignature){if(eSignature&&eSignature.canonicalCommitRejected)throw eSignature;}
   if(options.publishToMap===true){
+    /* 路径演示使用的管线、阀门和施工节点在同一发布事务内冻结。
+       运行态编辑层只在此处解析一次；发布后地图不再把它与另一代节点/管线混读。 */
+    try{
+      var publishDd=window.tlDiagramData, publishNodes=window.RyTlNodes, publishEdits=window.RyTlAutoEdits;
+      if(!pendingMapNetwork||!publishDd||!publishEdits||typeof publishEdits.effPts!=='function'||typeof publishEdits.pointAt!=='function')
+        throw new Error('发布管网或有效管线编辑层不可用');
+      var publishGeometrySig=JSON.stringify([publishDd.frontPipe,publishDd.mainPipes,publishDd.branchPipes,publishDd.valves,publishDd.poly]);
+      if(pendingMapNetwork.diagramGeometrySig!==publishGeometrySig)throw new Error('管网几何签名与施工图不一致');
+      function routeLine(pid,raw){
+        var pts=raw;
+        try{var edited=publishEdits.effPts(pid,publishDd);if(Array.isArray(edited)&&edited.length>=2)pts=edited;}catch(eEdit){throw new Error('读取有效管线失败：'+pid);}
+        var world=[],out=[];(pts||[]).forEach(function(p){var ll=p2ll(p);if(!ll)throw new Error('管线坐标无效：'+pid);world.push({x:Number(p.x),y:Number(p.y)});out.push(ll);});
+        if(out.length<2)throw new Error('管线坐标不完整：'+pid);
+        return {world:world,ll:out};
+      }
+      var routeGeometry={version:1,geometrySig:publishGeometrySig,mains:[],branches:[],valves:[],nodes:[],segTrunk:null};
+      var routeMainWorld=[],routeBranchWorld=[];
+      (publishDd.mainPipes||[]).forEach(function(line,i){var r=routeLine('main-'+i,line);routeMainWorld.push(r.world);routeGeometry.mains.push(r.ll);});
+      (publishDd.branchPipes||[]).forEach(function(line,i){var r=routeLine('branch-'+i,line);routeBranchWorld.push(r.world);routeGeometry.branches.push(r.ll);});
+      /* 地图线体的真实坐标与寻路快照同源；平行错位只重算展示副本。 */
+      var routeDisplay=typeof window.ppGetPipeDisplayGeometry==='function'
+        ?window.ppGetPipeDisplayGeometry(routeMainWorld,routeBranchWorld,publishDd.valves||[],typeof tlGapM==='function'?tlGapM():0)
+        :{main:routeMainWorld,branch:routeBranchWorld};
+      (pendingMapNetwork.segments||[]).forEach(function(seg){
+        if(!seg||!seg.id)return;
+        var m=/^(main|branch)(\d+)$/.exec(String(seg.id));if(!m)return;
+        var idx=Number(m[2]),isMain=m[1]==='main',source=isMain?routeGeometry.mains[idx]:routeGeometry.branches[idx];
+        var display=isMain?(routeDisplay.main||[])[idx]:(routeDisplay.branch||[])[idx];
+        if(!source)throw new Error('发布地图线段缺少寻路几何：'+seg.id);
+        seg.latLng=source;
+        if(Array.isArray(display)&&display.length>=2){var shown=[];display.forEach(function(p){var q=p2ll(p);if(!q)throw new Error('显示管线投影失败：'+seg.id);shown.push(q);});seg.displayLatLng=shown;}
+      });
+      (publishDd.valves||[]).forEach(function(v,i){
+        if(!v)throw new Error('阀门数据缺失：'+(i+1));
+        var ll=p2ll(v),anchor=(v.ax!=null&&v.ay!=null)?p2ll({x:v.ax,y:v.ay}):null;
+        if(!ll)throw new Error('阀门坐标无效：'+(i+1));
+        routeGeometry.valves.push({ll:ll,anchorLL:anchor,mi:Number.isFinite(Number(v.mi))?Number(v.mi):i});
+      });
+      if(publishDd.segTrunk&&Array.isArray(publishDd.segTrunk.points)&&publishDd.segTrunk.points.length>=2){
+        routeGeometry.segTrunk=[];publishDd.segTrunk.points.forEach(function(p){var ll=p2ll(p);if(!ll)throw new Error('段总管坐标无效');routeGeometry.segTrunk.push(ll);});
+      }
+      var publishedNodes=[];
+      if(publishNodes&&typeof publishNodes.list==='function'){
+        (publishNodes.list()||[]).forEach(function(node){
+          if(!node||!/^((main|branch))-\d+$/.test(String(node.pid||'')))return;
+          var m=/^(main|branch)-(\d+)$/.exec(String(node.pid)),idx=Number(m[2]);
+          if((m[1]==='main'?idx>=(publishDd.mainPipes||[]).length:idx>=(publishDd.branchPipes||[]).length))throw new Error('施工节点所属管线不存在：'+node.id);
+          var point;try{point=publishEdits.pointAt(node.pid,publishDd,Number(node.atM));}catch(ePoint){throw new Error('施工节点无法投影：'+node.id);}
+          var ll=point&&p2ll(point);if(!ll||!isFinite(ll[0])||!isFinite(ll[1]))throw new Error('施工节点坐标无效：'+node.id);
+          var frozen={id:String(node.id||''),pid:String(node.pid),atM:Number(node.atM)||0,lat:ll[0],lng:ll[1]};
+          publishedNodes.push(frozen);routeGeometry.nodes.push({id:frozen.id,pid:frozen.pid,mi:idx,kind:m[1],ll:ll});
+        });
+      }
+      pendingMapNetwork.publishedNodes={version:1,geometrySig:publishGeometrySig,items:publishedNodes};
+      pendingMapNetwork.routeGeometry=routeGeometry;
+    }catch(ePublishNodes){throw new Error('施工节点未能与管线组成同一发布快照：'+(ePublishNodes&&ePublishNodes.message||ePublishNodes));}
     var captureResult=window.RyMapPartition&&typeof window.RyMapPartition.capture==='function'
       ?window.RyMapPartition.capture(pendingMapNetwork,pendingMapPreviousNetworkRaw):null;
     if(!captureResult||captureResult.ok!==true||captureResult.skipped){

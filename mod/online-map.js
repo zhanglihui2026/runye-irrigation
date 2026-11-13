@@ -1167,49 +1167,40 @@
   var ZONE_VERT_CAP=150;
 
   function extraSnapTargets(plot){
-    var dd=window.tlDiagramData;
-    var bridge=trunkGeoBridge(plot);
-    if(!bridge) return null;
+    var store=window.RyIrrigationDataStore,net=null;
+    try{net=store&&plot&&plot.id!=null&&typeof store.readNetworkLayoutForPlot==='function'?store.readNetworkLayoutForPlot(String(plot.id)):null;}catch(eNet){net=null;}
+    if(!net||String(net.plotId||'')!==String(plot&&plot.id||'')||net.needsReplan)return null;
+    var route=net.routeGeometry,pub=net.publishedNodes;
+    if(!route||route.version!==1||route.geometrySig!==net.diagramGeometrySig||
+        !Array.isArray(route.mains)||!Array.isArray(route.branches)||!Array.isArray(route.valves)||
+        !pub||pub.version!==1||pub.geometrySig!==net.diagramGeometrySig||!Array.isArray(pub.items))return null;
+    function ll(p){try{var q=RunyeGeo.coordPair(p);return{lat:q[0],lng:q[1]};}catch(e){return null;}}
     var valves=[], branchStarts=[], zoneVerts=[], couplers=[], mainPipeLines=[], mainCouplers=[], zoneNote=null;
-    (Array.isArray(dd.valves)?dd.valves:[]).forEach(function(v){
-      var ll=bridge.toLL(v); if(ll) valves.push(ll);
+    route.valves.forEach(function(v){
+      var q=v&&ll(v.ll);if(q)valves.push(q);
     });
-    (Array.isArray(dd.branchPipes)?dd.branchPipes:[]).forEach(function(line){
-      if(!line||!line.length) return;
-      var ll=bridge.toLL(line[0]); if(ll) branchStarts.push(ll);
+    route.branches.forEach(function(line){
+      if(!Array.isArray(line)||!line.length)return;
+      var q=ll(line[0]);if(q)branchStarts.push(q);
     });
-    var G=window.RyTrunkGeo, zw=G?G.zoneWorlds(dd.zones):[];
-    if(zw.length>ZONE_VERT_CAP){ zoneNote='capped:'+zw.length; zw=[]; }
-    zw.forEach(function(p){ var ll=bridge.toLL(p); if(ll) zoneVerts.push(ll); });
-    /* 2a：每区主管折线按 geoBridge 从画布米坐标反算；失败坐标跳过，不作猜测。 */
-    (Array.isArray(dd.mainPipes)?dd.mainPipes:[]).forEach(function(line){
-      if(!Array.isArray(line)||line.length<2) return;
-      var llLine=[], valid=true;
-      line.forEach(function(p){ var ll=bridge.toLL(p); if(ll) llLine.push(ll); else valid=false; });
-      if(valid && llLine.length>=2) mainPipeLines.push(llLine);
+    var parts=Array.isArray(net.partitions)?net.partitions:[],zoneVertexCount=0;
+    parts.forEach(function(z){if(z&&Array.isArray(z.latLng))zoneVertexCount+=z.latLng.length;});
+    if(zoneVertexCount>ZONE_VERT_CAP)zoneNote='capped:'+zoneVertexCount;
+    else parts.forEach(function(z){(z&&Array.isArray(z.latLng)?z.latLng:[]).forEach(function(p){var q=ll(p);if(q)zoneVerts.push(q);});});
+    /* 吸附线体直接取发布物理几何，显示平行偏移不参与吸附。 */
+    route.mains.forEach(function(line){
+      if(!Array.isArray(line)||line.length<2)return;
+      var llLine=[],valid=true;line.forEach(function(p){var q=ll(p);if(q)llLine.push(q);else valid=false;});
+      if(valid&&llLine.length>=2)mainPipeLines.push(llLine);
     });
-    /* [v859] 段总管驳接点（自动生成的串联干线两端）：手绘总管接到这里即贯通地块内水路 */
-    /* [M14] 唯一节点来源：三级施工节点（N-01 等）作为地图总管吸附目标。
-       RyTlNodes 只保存 pid+atM；位置按工作区实际有效管线（含长度/平移覆盖）重算，
-       再经同一地块 geoBridge 反算。front 节点不映射到灌溉分区；主管/支管节点可接入水路。
-       旧 dd.couplerNodes 保留在档案中供兼容读取，不再创建重复吸附候选。 */
-    (function(){
-      var N=window.RyTlNodes, A=window.RyTlAutoEdits;
-      if(!N||typeof N.list!=='function'||!A||typeof A.pointAt!=='function')return;
-      var list;try{list=N.list();}catch(e){return;}
-      if(!Array.isArray(list))return;
-      list.forEach(function(n){
-        if(!n||!/^((main|branch))-\d+$/.test(String(n.pid||'')))return;
-        var p;try{p=A.pointAt(n.pid,dd,Number(n.atM));}catch(e){return;}
-        if(!p||!isFinite(p.x)||!isFinite(p.y))return;
-        var ll=bridge.toLL(p);if(!ll)return;
-        var name=typeof A.pipeName==='function'?A.pipeName(n.pid):n.pid;
-        mainCouplers.push({lat:ll.lat,lng:ll.lng,
-          label:'施工节点 '+String(n.id||'')+' · '+name+' · 桩号 '+(Math.round(Number(n.atM)*10)/10)+'m'});
-      });
-    })();
+    pub.items.forEach(function(n){
+      if(!n||!isFinite(Number(n.lat))||!isFinite(Number(n.lng)))return;
+      mainCouplers.push({lat:Number(n.lat),lng:Number(n.lng),
+        label:'施工节点 '+String(n.id||'')+' · '+String(n.pid||'')+' · 桩号 '+(Math.round(Number(n.atM)*10)/10)+'m',
+        nodeId:String(n.id||''),pid:String(n.pid||''),atM:Number(n.atM)||0});
+    });
     return {valves:valves, branchStarts:branchStarts, zoneVerts:zoneVerts, couplers:couplers, mainPipeLines:mainPipeLines, mainCouplers:mainCouplers,
-      stats:{sign:bridge.sign, rms:Math.round(bridge.rms*1000)/1000,
+      stats:{sign:'published-snapshot', rms:0,
         valves:valves.length, branchStarts:branchStarts.length, zoneVerts:zoneVerts.length, couplers:couplers.length, mainPipeLines:mainPipeLines.length, mainCouplers:mainCouplers.length, zoneNote:zoneNote}};
   }
 

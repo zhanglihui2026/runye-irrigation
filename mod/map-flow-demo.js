@@ -339,6 +339,18 @@
         collectBlockReason='在线地图管网与节点几何版本不一致，请重新生成施工图后再演示。';
         return null;
       }
+      if(!network.publishedNodes||network.publishedNodes.version!==1||
+          network.publishedNodes.geometrySig!==network.diagramGeometrySig||!Array.isArray(network.publishedNodes.items)){
+        collectBlockReason='当前管网快照尚未包含同版施工节点，请回「分区与管路」重新生成施工图后再演示。';
+        return null;
+      }
+      if(!network.routeGeometry||network.routeGeometry.version!==1||
+          network.routeGeometry.geometrySig!==network.diagramGeometrySig||
+          !Array.isArray(network.routeGeometry.mains)||!Array.isArray(network.routeGeometry.branches)||
+          !Array.isArray(network.routeGeometry.valves)||!Array.isArray(network.routeGeometry.nodes)){
+        collectBlockReason='当前管网快照尚未包含同版寻路几何，请回「分区与管路」重新生成施工图后再演示。';
+        return null;
+      }
     }else{
       collectBlockReason='当前在线地图缺少可核验的已发布管网快照，已停止轮灌演示。';
       return null;
@@ -346,58 +358,23 @@
     var mainsLL = [], branchLL = [], valves = [], couplersLL = [], segLL = null, nodesLL = [];
     var sourceLL=null;
     try{sourceLL=typeof ctx.getWaterSource==='function'?readLL(ctx.getWaterSource()):null;}catch(eSource){}
-    /* [v1020 待办②] 主管/支管线体改读 AE 有效几何（手动改长/平移后的折线）再投影——
-       此前读 dd 原始几何，用户改长后轮灌演示与最远水路用的还是改前长度。
-       effPts(pid, data) 第二参是整个 tlDiagramData（pid 内部查 mainPipes/branchPipes），
-       无覆盖时返回原引用，零成本零行为差。 */
-    var _aeCollect = window.RyTlAutoEdits;
-    function effLLLine(pid, line) {
-      var src = line;
-      try {
-        if (_aeCollect && typeof _aeCollect.effPts === 'function') {
-          var e = _aeCollect.effPts(pid, dd);
-          if (e && e.length >= 2) src = e;
-        }
-      } catch (eAE) { /* 取有效几何失败 ⇒ 原始折线兜底 */ }
-      return toLLLine(src);
-    }
-    (dd.mainPipes || []).forEach(function (l, li) { mainsLL.push(effLLLine('main-' + li, l)); });
-    (dd.branchPipes || []).forEach(function (l, bi) { branchLL.push(effLLLine('branch-' + bi, l)); });
-    function valveBranchIndex(v){
-      if(v&&typeof v.mi==='number'&&isFinite(v.mi)&&v.mi>=0)return v.mi|0;
-      if(!v||!isFinite(v.x)||!isFinite(v.y))return -1;
-      var best=-1,bestD=Infinity,p={x:Number(v.x),y:Number(v.y)};
-      (dd.branchPipes||[]).forEach(function(line,idx){
-        if(!Array.isArray(line)||line.length<2)return;
-        for(var i=1;i<line.length;i++){
-          var a=line[i-1],b=line[i];if(!a||!b)continue;
-          var dx=b.x-a.x,dy=b.y-a.y,den=dx*dx+dy*dy;
-          var t=den?Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/den)):0;
-          var d=Math.hypot(p.x-a.x-dx*t,p.y-a.y-dy*t);
-          if(d<bestD){bestD=d;best=idx;}
-        }
-      });
-      return bestD<=15?best:-1;
-    }
-    (dd.valves || []).forEach(function (v) {
-      var q = toLLSafe(v);
-      var anchor=null;
-      if(v&&v.ax!=null&&v.ay!=null)anchor=toLLSafe({x:v.ax,y:v.ay});
-      if (q) valves.push({ ll: q, anchorLL:anchor, mi: valveBranchIndex(v) });
+    /* 动画管线、阀门和节点只读同一发布快照，不再混入实时 DD/AutoEdits 草稿。 */
+    var routeGeometry=network.routeGeometry;
+    function snapshotLine(raw){var out=[];(raw||[]).forEach(function(p){var q=readLL(p);if(q)out.push(q);});return out.length>=2?out:null;}
+    routeGeometry.mains.forEach(function(line){var q=snapshotLine(line);if(q)mainsLL.push(q);});
+    routeGeometry.branches.forEach(function(line){var q=snapshotLine(line);if(q)branchLL.push(q);});
+    routeGeometry.valves.forEach(function(v){if(!v)return;var ll=readLL(v.ll),anchor=readLL(v.anchorLL);if(ll)valves.push({ll:ll,anchorLL:anchor,mi:Number(v.mi)});});
+    routeGeometry.nodes.forEach(function(n){
+      if(!n||!Number.isInteger(Number(n.mi)))return;var ll=readLL(n.ll);if(!ll)return;
+      nodesLL.push({pipeKey:(n.kind==='main'?'m':'b')+(Number(n.mi)+1),mi:Number(n.mi),ll:ll,nodeId:String(n.id||''),source:'published-node'});
     });
-    /* [M14] 单一接驳节点来源：只读带 N-xx 身份的 RyTlNodes。
-       旧 dd.couplerNodes 仍保存在兼容快照中，但不再作为第二套地图接点或动画连通依据。 */
-    try {
-      var tlNodes=window.RyTlNodes, autoEdits=window.RyTlAutoEdits;
-      if(tlNodes&&typeof tlNodes.list==='function'&&autoEdits&&typeof autoEdits.pointAt==='function'){
-        nodesLL=nodesLL.concat(collectWorkspaceNodes(dd,tlNodes.list(),autoEdits.pointAt,toLLSafe));
-      }
-    } catch(eNodes) { /* 无可用施工节点时保留既有接驳节点链路 */ }
-    var zonePolygons=collectPublishedZonePolygons(network);
-    if (dd.segTrunk && Array.isArray(dd.segTrunk.points)) {
-      segLL = toLLLine(dd.segTrunk.points);
-      (dd.segTrunk.couplers || []).forEach(function (c) { var q = toLLSafe(c); if (q) couplersLL.push(q); });
+    if(valves.length!==routeGeometry.valves.length||nodesLL.length!==routeGeometry.nodes.length||
+        nodesLL.length!==(network.publishedNodes.items||[]).length){
+      collectBlockReason='同版快照中的阀门或施工节点数据不完整，请重新生成施工图后再演示。';
+      return null;
     }
+    var zonePolygons=collectPublishedZonePolygons(network);
+    if(routeGeometry.segTrunk)segLL=snapshotLine(routeGeometry.segTrunk);
     var trunkLinesLL = [];
     if(typeof ctx.getTrunkLines==='function'){
       var gotLines=ctx.getTrunkLines();
@@ -408,7 +385,12 @@
     }
     var trunkLL=[];
     trunkLinesLL.forEach(function(line){trunkLL=trunkLL.concat(line);});
-    var total = (dd.mainPipes || []).length;
+    var total = mainsLL.length;
+    if(total!==routeGeometry.mains.length||branchLL.length!==routeGeometry.branches.length||
+        total!==(dd.mainPipes||[]).length||branchLL.length!==(dd.branchPipes||[]).length){
+      collectBlockReason='同版快照中的主管/支管数量不完整，请重新生成施工图后再演示。';
+      return null;
+    }
     if (!total) return null;
     /* 分区面只负责地图着色，不是水力路径/流量/扬程输入。
        只有整套发布分区轮廓与生成管线区号一一对应时才显示；缺失、重复或错号时
