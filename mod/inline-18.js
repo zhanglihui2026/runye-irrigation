@@ -503,6 +503,12 @@
     }
     function syncLayers(){
       if(!canvasStack)return;
+      /* [v1056 用户实测「管线有多层数据」] 管路开关必须同时控制二级 canvas 的静态
+         管线层（主管/支管/一级管/阀门/接驳节点）：统一工作区两层叠放，开关原本只
+         隐藏三级层，二级层的线留在图上——用户隐藏后仍看到一层管（两套管线的来源
+         之一）。标志由 plot-editor 的 ppRender 消费；写完强制重绘一次二级画布。 */
+      window.__ryPipelineLayerVisible=layerState.pipeline!==false;
+      try{ if(typeof window.ppRender==='function') window.ppRender(); }catch(ePR){}
       var pp=document.getElementById('ppCanvasWrap'),tl=document.getElementById('tlWsContent');
       if(pp)pp.style.visibility=layerState.partition?'visible':'hidden';
       if(tl){

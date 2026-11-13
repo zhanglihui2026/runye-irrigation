@@ -61,3 +61,22 @@ test('④ 旧二级回传按钮 #tlAutoPipe 不得复活（v1054 收编既存红
   assert.ok(!html.includes('id="tlAutoPipe"'), '#tlAutoPipe 已删不得复活（回传职责由 #tlGenerateDiagram 承担）');
   assert.ok(!/tlAutoPipeToMap/.test(i09.replace(/\/\*[\s\S]*?\*\//g, '')), 'tlAutoPipeToMap 旧函数不得复活');
 });
+
+const i18 = fs.readFileSync(path.join(ROOT, 'mod', 'inline-18.js'), 'utf8');
+
+test('⑤ v1056 图层统一：管路开关控制二级层 + 自动重算联动刷新三级层 + 一级管残留不上屏', () => {
+  /* 用户实测「管线有多层数据」：统一工作区两层叠放，隐藏管路开关只藏三级层；
+     自动重算后三级层未刷新 → v875 同代抑制失效 → 两套管线叠加显示。 */
+  const render = pe.slice(pe.indexOf('function ppRender()'), pe.indexOf('var ppRenderBase=ppRender'));
+  const hits = render.match(/window\.__ryPipelineLayerVisible!==false/g) || [];
+  assert.ok(hits.length >= 2, '主管/支管块与阀门必须受管路开关控制（实际 ' + hits.length + ' 处）');
+  assert.match(render, /if\(window\.__ryPipelineLayerVisible===false\)return;/, '接驳节点必须受管路开关控制');
+  const subHits = render.match(/ppState\.subBranchPipes && ppState\.pipeLevel==='three'/g) || [];
+  assert.ok(subHits.length >= 2, '一级管（含其滴灌带）只在三级模式绘制，旧存档残留不得上屏（实际 ' + subHits.length + ' 处）');
+  assert.match(render, /三级管路图层同步刷新|tlAutoGenerate\(\{scroll:false,rethrowError:true\}\)/,
+    '自动重算成功后必须联动刷新三级层（不传 publishToMap，定稿才传地图）');
+  assert.match(i18, /window\.__ryPipelineLayerVisible=layerState\.pipeline!==false/,
+    '管路开关必须写入二级层显隐标志');
+  assert.match(i18, /__ryPipelineLayerVisible[\s\S]{0,120}window\.ppRender\(\)/,
+    '开关切换后必须重绘二级画布');
+});

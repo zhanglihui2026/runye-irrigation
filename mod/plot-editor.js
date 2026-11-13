@@ -2540,10 +2540,16 @@
       ppMains:Array.isArray(ppState.mainPipes)?ppState.mainPipes.length:0,mode:ppState.mode||''};
 
     // Main pipes
+    /* [v1056 2026-11-13 用户实测] 「显示/隐藏管路」开关联动二级层：统一工作区把
+       二级画布（partition 图层）与三级工作区（pipeline 图层）叠在同一视口，开关
+       原本只控制三级层 visibility——二级 canvas 上的静态管线不受控，隐藏后仍留
+       一层线（用户截图实锤「两套管线」）。__ryPipelineLayerVisible 由 inline-18
+       syncLayers 写入，false 时二级静态管线层（主管/支管/一级管/遮蔽重画/接驳
+       节点/阀门）整块跳过；正在画线的 currentLine 与水源点不藏。 */
     ppCtx.save();
     ppTracePlotPath();
     ppCtx.clip(); /* 渲染错开线与阀门不得越出异形地块边界；不改变设计坐标 */
-    if(!ppPipeLayerSuppressed){
+    if(!ppPipeLayerSuppressed && window.__ryPipelineLayerVisible!==false){
     var __ppDisplayGeometry=ppGetPipeDisplayGeometry(ppState.mainPipes,ppState.branchPipes,ppState.valves,ppGapM());
     ppState.mainPipes.forEach(function(l,idx){
       if(!ppIsPipeHidden('main',idx))ppDrawLine(__ppDisplayGeometry.main[idx]||l,'#185FA5',4);
@@ -2553,7 +2559,11 @@
       if(!ppIsPipeHidden('branch',idx))ppDrawLine(__ppDisplayGeometry.branch[idx]||l,'#16a34a',2.5);
     });
     // Sub-branch pipes (一级管) — three-level mode only
-    if(ppState.subBranchPipes){
+    /* [v1056] 一级管只在三级模式（pipeLevel==='three'）绘制：v1054 起二级恒为
+       two 级口径，旧存档残留的 subBranchPipes 不再上屏（此前它们以细蓝线 +
+       沿线滴灌带的形式多出一层，且「显示/隐藏管路」开关管不到——用户实测
+       「两套管线」的第二套来源）。自动重算会清空残留数据，显示层双保险。 */
+    if(ppState.subBranchPipes && ppState.pipeLevel==='three'){
       ppState.subBranchPipes.forEach(function(l,idx){
         if(!ppIsPipeHidden('subbranch',idx)){
           ppDrawLine(l,'#185FA5',2);
@@ -2568,7 +2578,7 @@
     ppState.branchPipes.forEach(function(l,idx){
       if(ppIsPipeHidden('branch',idx))ppDrawLine(__ppDisplayGeometry.branch[idx]||l,'rgba(100,116,139,.48)',2,[7,5]);
     });
-    if(ppState.subBranchPipes){
+    if(ppState.subBranchPipes && ppState.pipeLevel==='three'){
       ppState.subBranchPipes.forEach(function(l,idx){
         if(ppIsPipeHidden('subbranch',idx))ppDrawLine(l,'rgba(100,116,139,.42)',1.5,[7,5]);
       });
@@ -2590,6 +2600,8 @@
        依赖 dd.zones.frame + window.RyCoordFrame，缺席则整段静默跳过。
        选中/拖动态橙色填充；描边 #b45309 为本元素独占色（探针像素扫描锚点）。 */
     (function(){
+      /* [v1056] 接驳节点属于管路图层，随「显示/隐藏管路」开关显隐。 */
+      if(window.__ryPipelineLayerVisible===false)return;
       var cctx=ppCouplerCtx();if(!cctx)return;
       var clist=cctx.dd.couplerNodes;
       if(!Array.isArray(clist))return;
@@ -2629,7 +2641,8 @@
     }
 
     // Valves
-    if(!ppPipeLayerSuppressed){
+    /* [v1056] 阀门属于管路图层：随「显示/隐藏管路」开关与同代抑制一起显隐。 */
+    if(!ppPipeLayerSuppressed && window.__ryPipelineLayerVisible!==false){
     ppState.valves.forEach(function(v,idx){
       if(!ppPointInPlot(v))return;
       var __vv=__ppDisplayGeometry.valves[idx]||v;
@@ -2736,6 +2749,16 @@
               return;
             }
             ppAutoRegenFailSig=null;
+            /* [v1056 用户实测「管线有多层数据」] 自动重算后必须同步刷新三级管路图层：
+               统一工作区把二级画布与三级图层叠在同一视口，v875 的同代抑制依赖
+               tlDiagramData 与 ppState 一致——分区变了三级层还停在上一代，抑制失效
+               就会出现两套管线叠加。这里不传 publishToMap（定稿才传地图，v1054 口径）；
+               失败静默 console（不打断调参，定稿按钮有强制刷新+弹窗兜底）。 */
+            try{
+              if(window.measuredPolygon&&window.measuredPolygon.length>=3&&typeof window.tlAutoGenerate==='function'){
+                window.tlAutoGenerate({scroll:false,rethrowError:true});
+              }
+            }catch(eSync){ console.warn('[ppAutoRegen] 三级图层同步刷新失败',eSync); }
             try{ if(window.atShowToast&&had) window.atShowToast('分区已变化，管线已自动重新生成（原管线可在历史记录找回）'); }catch(eT){}
           }catch(eRegen){ console.warn('[ppAutoRegen]',eRegen); }
           finally{ ppAutoRegenRunning=false; }
