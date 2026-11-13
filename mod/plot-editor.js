@@ -2510,12 +2510,19 @@
        · 正在画线（currentLine 非空）时不抑制：编辑时必须看得见二级管线。
        · 三级数据与二级不一致（过期/其他地块代际）时不抑制：保持原有显示，
          下一次「生成施工图」后两级重新同代、抑制自动生效。 */
+    /* [M13 2026-11-13 主线任务「自动管线单一可见绘制层与节点维护位置」]
+       二级平面画布 = 自动管线线体的**唯一可见绘制层**。v875 的「同代抑制」（数据一致
+       时隐藏二级层、让三级 SVG 显示）方向反转：三级叠加 SVG 的主管/支管/阀门线体
+       全部透明化（tl-workspace.js pipeBaseSVG/autoSVG），线体可见性全部由本画布承担；
+       三级叠加层只保留标注（分区号/面积/管长/管径）、透明命中区、控制点与选中高亮。
+       判定 IIFE 保留计算（诊断信息 + __ppPipeLayerDedupe 探针锚点），但结果恒不抑制。
+       · 「显示/隐藏管路」开关（__ryPipelineLayerVisible，v1056）继续控制本层显隐；
+       · 正在画线（currentLine 非空）时照常显示（二级恒画，无抑制需求）。 */
     var ppPipeLayerSuppressed=false;
+    var ppPipeLayerWouldSuppress=false;   /* [M13] v875 判定保留为诊断值 */
     (function(){
-      /* [v875b 修订] 豁免判据改为「正在画线」而不是「处于手绘档位」：
-         mode='main' 是工具栏常驻默认档（探针实测待机态也是 'main'），按档位豁免
-         等于永不抑制。只在 currentLine 非空（用户正在落点画线）时豁免，
-         画线过程中管线立即恢复可见，落点间隙的待机态仍走抑制。 */
+      /* [v875b 判定保留为诊断] 正在画线时判定无意义；此处仅计算「若按 v875 规则
+         是否会抑制」供 __ppPipeLayerDedupe 锚点观察，不再作用于渲染。 */
       if(ppState.currentLine&&ppState.currentLine.length)return;
       var dd=window.tlDiagramData;
       if(!dd||!Array.isArray(dd.mainPipes)||!dd.mainPipes.length)return;
@@ -2532,10 +2539,11 @@
            生成后两级 toFixed(1) 逐值一致），是可靠的同代判据。 */
         if(sig(dd.mainPipes)!==sig(ppState.mainPipes))return;
       }catch(eSig){return;}
-      ppPipeLayerSuppressed=true;
+      ppPipeLayerWouldSuppress=true;   /* [M13] 仅诊断：渲染恒不消费此值 */
     })();
-    /* [v875] 调试/验收锚点：探针与线上排障直接读最近一次渲染的抑制判定与判据摘要。 */
-    window.__ppPipeLayerDedupe={suppressed:ppPipeLayerSuppressed,
+    /* [v875] 调试/验收锚点：探针与线上排障直接读最近一次渲染的抑制判定与判据摘要。
+       suppressed 恒 false（M13 起二级为唯一可见线体层）；wouldSuppress 保留 v875 判定。 */
+    window.__ppPipeLayerDedupe={suppressed:false,wouldSuppress:ppPipeLayerWouldSuppress,
       ddMains:Array.isArray(window.tlDiagramData&&window.tlDiagramData.mainPipes)?window.tlDiagramData.mainPipes.length:0,
       ppMains:Array.isArray(ppState.mainPipes)?ppState.mainPipes.length:0,mode:ppState.mode||''};
 
@@ -2549,14 +2557,47 @@
     ppCtx.save();
     ppTracePlotPath();
     ppCtx.clip(); /* 渲染错开线与阀门不得越出异形地块边界；不改变设计坐标 */
-    if(!ppPipeLayerSuppressed && window.__ryPipelineLayerVisible!==false){
-    var __ppDisplayGeometry=ppGetPipeDisplayGeometry(ppState.mainPipes,ppState.branchPipes,ppState.valves,ppGapM());
+    if(window.__ryPipelineLayerVisible!==false){
+    /* [M13] 二级画布消费三级图面编辑覆盖（**渲染口径**，不动数据/水力）：
+       同代前提下（三级 mainPipes/branchPipes 数量与二级一致），改长管按
+       AE.effPts 有效几何显示、被遮蔽管画灰虚线 —— 线体唯一可见层随编辑态联动，
+       三级叠加层不再画线体。异代/数量不符时不消费（安全回落真身几何）。 */
+    var __tlEffMains=ppState.mainPipes,__tlEffBranches=ppState.branchPipes;
+    var __tlHidMain={},__tlHidBranch={};
+    (function(){
+      try{
+        var AE=window.RyTlAutoEdits, dd=window.tlDiagramData;
+        if(!AE||!dd||!Array.isArray(dd.mainPipes))return;
+        if(dd.mainPipes.length!==(ppState.mainPipes||[]).length)return;
+        if((dd.branchPipes||[]).length!==(ppState.branchPipes||[]).length)return;
+        if(AE.effPts&&AE.lensMap){
+          var lm=AE.lensMap()||{};
+          __tlEffMains=ppState.mainPipes.map(function(l,idx){
+            var pid='main-'+idx;
+            return lm[pid]?(AE.effPts(pid,dd)||l):l;
+          });
+          __tlEffBranches=ppState.branchPipes.map(function(l,idx){
+            var pid='branch-'+idx;
+            return lm[pid]?(AE.effPts(pid,dd)||l):l;
+          });
+        }
+        if(AE.hiddenMap){
+          var hm=AE.hiddenMap()||{};
+          Object.keys(hm).forEach(function(pid){
+            if(!hm[pid])return;
+            var m=pid.match(/^main-(\d+)$/),b=pid.match(/^branch-(\d+)$/);
+            if(m)__tlHidMain[+m[1]]=1; else if(b)__tlHidBranch[+b[1]]=1;
+          });
+        }
+      }catch(eAEOverlay){ __tlEffMains=ppState.mainPipes;__tlEffBranches=ppState.branchPipes;__tlHidMain={};__tlHidBranch={}; }
+    })();
+    var __ppDisplayGeometry=ppGetPipeDisplayGeometry(__tlEffMains,__tlEffBranches,ppState.valves,ppGapM());
     ppState.mainPipes.forEach(function(l,idx){
-      if(!ppIsPipeHidden('main',idx))ppDrawLine(__ppDisplayGeometry.main[idx]||l,'#185FA5',4);
+      if(!ppIsPipeHidden('main',idx)&&!__tlHidMain[idx])ppDrawLine(__ppDisplayGeometry.main[idx]||l,'#185FA5',4);
     });
     // Branch pipes
     ppState.branchPipes.forEach(function(l,idx){
-      if(!ppIsPipeHidden('branch',idx))ppDrawLine(__ppDisplayGeometry.branch[idx]||l,'#16a34a',2.5);
+      if(!ppIsPipeHidden('branch',idx)&&!__tlHidBranch[idx])ppDrawLine(__ppDisplayGeometry.branch[idx]||l,'#16a34a',2.5);
     });
     // Sub-branch pipes (一级管) — three-level mode only
     /* [v1056] 一级管只在三级模式（pipeLevel==='three'）绘制：v1054 起二级恒为
@@ -2573,10 +2614,10 @@
       });
     }
     ppState.mainPipes.forEach(function(l,idx){
-      if(ppIsPipeHidden('main',idx))ppDrawLine(__ppDisplayGeometry.main[idx]||l,'rgba(100,116,139,.55)',3,[7,5]);
+      if(ppIsPipeHidden('main',idx)||__tlHidMain[idx])ppDrawLine(__ppDisplayGeometry.main[idx]||l,'rgba(100,116,139,.55)',3,[7,5]);
     });
     ppState.branchPipes.forEach(function(l,idx){
-      if(ppIsPipeHidden('branch',idx))ppDrawLine(__ppDisplayGeometry.branch[idx]||l,'rgba(100,116,139,.48)',2,[7,5]);
+      if(ppIsPipeHidden('branch',idx)||__tlHidBranch[idx])ppDrawLine(__ppDisplayGeometry.branch[idx]||l,'rgba(100,116,139,.48)',2,[7,5]);
     });
     if(ppState.subBranchPipes && ppState.pipeLevel==='three'){
       ppState.subBranchPipes.forEach(function(l,idx){
@@ -2641,8 +2682,9 @@
     }
 
     // Valves
-    /* [v1056] 阀门属于管路图层：随「显示/隐藏管路」开关与同代抑制一起显隐。 */
-    if(!ppPipeLayerSuppressed && window.__ryPipelineLayerVisible!==false){
+    /* [v1056] 阀门属于管路图层：随「显示/隐藏管路」开关显隐。
+       [M13] ppPipeLayerSuppressed 恒 false（二级为唯一可见线体层），阀门只在本层显示一份。 */
+    if(window.__ryPipelineLayerVisible!==false){
     ppState.valves.forEach(function(v,idx){
       if(!ppPointInPlot(v))return;
       var __vv=__ppDisplayGeometry.valves[idx]||v;
@@ -2745,7 +2787,16 @@
             var had=hasPipes;
             if(!ppAutoGeneratePipes()){
               ppAutoRegenFailSig=cur;   /* [v1055] 失败冷却：此签名下不再自动重试 */
-              alert('分区变化后自动布管未完成：'+(window.__runyeSingleL2CommitFailure||'布管或设计提交失败')+'。请调整分区参数后重试。');
+              /* [M13] 刷新失败不得继续显示旧版管线/旧版标注：清空自动管线（含接驳节点），
+                 图面只留新分区几何 —— 旧管线对应旧分区，留在图上即「新旧两版叠在一起」。 */
+              try{
+                ppState.mainPipes=[];ppState.branchPipes=[];ppState.subBranchPipes=[];
+                ppState.valves=[];ppState.couplerNodes=[];
+                ppState.hiddenPipes={main:{},branch:{},subbranch:{}};
+                ppState.__ppGenCutSig=null;window.__ryPpGenCutSig=null;
+                ppRender();
+              }catch(eClr){ console.warn('[ppAutoRegen] 失败清空异常',eClr); }
+              alert('分区变化后自动布管未完成：'+(window.__runyeSingleL2CommitFailure||'布管或设计提交失败')+'。旧版管线已移除，请调整分区参数后重试。');
               return;
             }
             ppAutoRegenFailSig=null;
@@ -3729,17 +3780,21 @@
     /* 单块 / 逐块态：照旧写 ppState（行为与 v201 之前完全一致） */
     var prevMainCount=(ppState.mainPipes||[]).length;
     var r2 = ppBuildAutoPipes(ppState.polyPts, planN, isThree);
-    /* [v892 2026-11-02 用户报「旋转角度后生成施工图管线消失」] 重建空结果保护：
-       地块上明明有管线、重建却一根不剩 ⇒ 大概率旋转角度下格系与地块多边形
-       裁剪异常（坐标系错位/幽灵角格），按失败处理并**保留旧管线**——
-       不允许「点生成施工图后图上管线凭空消失」这种静默结果。 */
+    /* [v892 2026-11-02 用户报「旋转角度后生成施工图管线消失」] 重建空结果保护。
+       [M13 2026-11-13 主线拍板反转]「刷新失败时不得继续显示旧版管线或旧版标注」：
+       此前本分支保留旧管线（防「凭空消失」恐慌），但旧管线对应旧分区几何，叠在
+       新分区图上正是「新旧两版管线叠在一起」的来源之一。现改为：失败即清空自动
+       管线（含接驳节点），图面只留新分区，并给出可理解的失败提示。
+       注意：不再回滚 preimage —— 分区参数保持用户刚调整的新值，只有管线清空。 */
     if(!r2.main.length && !r2.branch.length && prevMainCount>0){
       ppDiscardLatestHistoryEntry();
-      if(singlePreimage)ppApplySlot(singlePreimage);
+      ppState.mainPipes=[];ppState.branchPipes=[];ppState.subBranchPipes=[];
+      ppState.valves=[];ppState.couplerNodes=[];
+      ppState.hiddenPipes={main:{},branch:{},subbranch:{}};
       if(typeof updatePlan==='function')updatePlan();
       ppUpdateTransform();ppRender();ppUpdateAutoPipeButton();ppRefreshDiagramOrReset();ppRefreshMaterials();
-      window.__runyeSingleL2CommitFailure='重建管线结果为空（裁剪后一根不剩），已保留原管线';
-      alert('按新分区角度重生成管线未完成：重建管线结果为空（可能被地块裁剪全部丢弃）。已保留原管线与画面，请调整分区角度后重试；若反复出现请截图反馈。');
+      window.__runyeSingleL2CommitFailure='重建管线结果为空（裁剪后一根不剩），已移除旧版管线';
+      alert('按新分区重生成管线未完成：重建结果为空（可能被地块裁剪全部丢弃），旧版管线已移除以免误导。请调整分区角度或切割线后重试；若反复出现请截图反馈。');
       return false;
     }
     ppState.mainPipes = r2.main;

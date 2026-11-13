@@ -103,8 +103,8 @@ test('[v914] 宿主接线：online-map 采 dd.couplerNodes + edit 态 excludeTru
   assert.ok(/ppCouplerLLMemo/.test(peSrc), 'autoSign 必须 memo（拖动 mousemove 每帧调用）');
   assert.ok(/llEl\.textContent=ll\.lat\.toFixed\(6\)\+\', \'\+ll\.lng\.toFixed\(6\)/.test(peSrc.replace(/\r\n/g, '\n')),
     '经纬度写链必须保留（v982 面板 DOM 已删，逻辑 dormant——恢复入口零成本）');
-  /* [v982 用户拍板] 接驳节点入口+面板已从 index.html 删除，底层逻辑全部保留 */
-  assert.ok(idxSrc.indexOf('ppCouplerPanel') === -1, 'v982 后 index.html 不得再有面板 DOM');
+  /* [v1057 M13 反转] 接驳节点入口+面板回归 index.html（v982 预留的恢复路径兑现） */
+  assert.ok(idxSrc.includes('ppCouplerPanel'), 'M13 后 index.html 必须有面板 DOM（入口回归二级页）');
 });
 
 test('[v917] 宿主接线：三级 N 节点按有效管线桩号投影为地图捕捉点', () => {

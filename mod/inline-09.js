@@ -5184,7 +5184,11 @@ function tlAutoGenerate(options) {
     var __viewAnchor=tlPipeDisplay.valveAnchors[idx]||((v.ax!==undefined&&v.ay!==undefined)?{x:v.ax,y:v.ay}:null);
     if(__viewAnchor){
       var ap=tsGrid(__viewAnchor.x, __viewAnchor.y);
-      parts.push('<line x1="'+ap.x.toFixed(1)+'" y1="'+ap.y.toFixed(1)+'" x2="'+vp.x.toFixed(1)+'" y2="'+vp.y.toFixed(1)+'" stroke="#185FA5" stroke-width="3.5" stroke-linecap="round" opacity="0.92"/>');
+      /* [M13 2026-11-13] 阀门连接管（蓝实线）包 data-tlvalve 标记：简图（图纸输出）
+         显示不受影响；三级工作区克隆底图时按此标记整组透明化 —— 阀门只由二级
+         画布 ryValveCanvas 显示一份（单一可见线体层）。三通/弯头方块（标注符号，
+         二级不画）留在标记之外保持可见。 */
+      parts.push('<g data-tlvalve="1"><line x1="'+ap.x.toFixed(1)+'" y1="'+ap.y.toFixed(1)+'" x2="'+vp.x.toFixed(1)+'" y2="'+vp.y.toFixed(1)+'" stroke="#185FA5" stroke-width="3.5" stroke-linecap="round" opacity="0.92"/></g>');
       /* 任务⑧（2026-09-24 用户要求）：主管×支管交接处补三通方块 —— 与总管×主管交接
          （data-junction-tee，深蓝白边 9×9）同款式，交接符号全覆盖。
          [v553] 最外一排分区的主管末端是**90°弯头**（不再向下延伸）：同一方块内叠一个白色
@@ -5201,7 +5205,8 @@ function tlAutoGenerate(options) {
         parts.push('<rect data-junction-tee x="'+(ap.x-4.5).toFixed(1)+'" y="'+(ap.y-4.5).toFixed(1)+'" width="9" height="9" fill="#0C447C" stroke="#ffffff" stroke-width="1.5"/>');
       }
     }
-    parts.push(window.ryValveSVG(vp.x, vp.y));   /* v159：与总管×主管交接阀同规格（尺寸取自 window.RY_VALVE） */
+    /* [M13] 阀门圆包 data-tlvalve：工作区克隆时整组 opacity=0，简图本身不变。 */
+    parts.push('<g data-tlvalve="1">' + window.ryValveSVG(vp.x, vp.y) + '</g>');   /* v159：与总管×主管交接阀同规格（尺寸取自 window.RY_VALVE） */
   });
 
   // ===== 地块组结束：以下参数/图例/A3框固定不动 =====
