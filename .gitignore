@@ -155,3 +155,6 @@ npm-debug.log*
 
 # v1053 三级复用二级管线代际校验（数据唯一性续篇）回归
 !tests/v1053_pipe_reuse_generation.test.cjs
+
+# v1054 流程顺序重排：分区自动重算 + 三级定稿按钮（数据唯一性终极形态）
+!tests/v1054_partition_auto_regen.test.cjs

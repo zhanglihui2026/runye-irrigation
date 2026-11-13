@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 'use strict';
-/* tests/pipe_to_map.test.cjs —— 双生成按钮语义区分静态锁
+/* tests/pipe_to_map.test.cjs —— 双生成入口语义区分静态锁
  *
- * 用户拍板（2026-11-01）：分区与管路页两个生成入口必须区分开 ——
- *   ① 「生成施工图」(#ppGenerate)：生成施工图与三级图；
- *   ② 「回传在线地图」(#tlAutoPipe)：只显示已生成且角度匹配的管线，不重复生成。
+ * 用户拍板（2026-11-01）：分区与管路页两个生成入口必须区分开。
  * 用户拍板（2026-11-13「数据唯一性」）：点「生成施工图」一律清空重算全部
- *   主管/支管/阀门，不再按「布局过时」条件复用旧管线——旧几何残留会与新布局
- *   混在同一张图上。ppAnglePipeRegenPending / ppMainDirectionOutdated /
- *   ppPartitionLayoutOutdated 三个过时检测/置脏机制一并退役。
- * 锁按钮职责、无条件清空重算与回传动作的分离。
+ *   主管/支管/阀门，不再按「布局过时」条件复用旧管线。
+ * 用户拍板（2026-11-13 晚「流程顺序」）：「生成施工图」移到三级之后——
+ *   ① 二级不再有生成按钮：分区完成后管线自动生成（ppRender 签名比对 → 防抖
+ *      自动重算，永远同代）；
+ *   ② 三级画完总管等所有信息后点 #tlGenerateDiagram「生成施工图」：刷新简图 +
+ *      同步最新成果到在线地图 + 跳在线地图。
+ * 锁按钮职责、自动重算与三级定稿动作的分离。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -22,44 +23,40 @@ const i09 = fs.readFileSync(path.join(ROOT, 'mod', 'inline-09.js'), 'utf8');
 const i12 = fs.readFileSync(path.join(ROOT, 'mod', 'inline-12.js'), 'utf8');
 const pe = fs.readFileSync(path.join(ROOT, 'mod', 'plot-editor.js'), 'utf8');
 
-test('① #tlAutoPipe 接线 tlAutoPipeToMap + 文案「回传在线地图」', () => {
-  const m = html.match(/<button[^>]*id="tlAutoPipe"[^>]*>([\s\S]*?)<\/button>/);
-  assert.ok(m, '#tlAutoPipe 必须存在');
-  assert.match(m[0], /onclick="tlAutoPipeToMap\(\)"/, 'onclick 必须是 tlAutoPipeToMap()（不再是裸 tlAutoGenerate）');
-  assert.match(m[1], /回传在线地图/, '按钮明确表达回传职责');
+test('① 三级「生成施工图」按钮：定稿 + 同步在线地图（v1054 流程顺序）', () => {
+  const m = html.match(/<button[^>]*id="tlGenerateDiagram"[^>]*>([\s\S]*?)<\/button>/);
+  assert.ok(m, '#tlGenerateDiagram 必须存在（三级工具栏顶部）');
+  assert.match(m[0], /生成施工图/, '按钮文案明确表达定稿职责');
+  assert.match(i09, /function tlGenerateDiagramToMap\(\)/, '绑定函数必须定义');
+  assert.match(i09, /window\.tlGenerateDiagramToMap=tlGenerateDiagramToMap/, '必须挂 window');
+  assert.match(i09, /getElementById\('tlGenerateDiagram'\)[\s\S]{0,120}addEventListener\('click'/, '按钮必须绑定点击');
+  assert.match(i09, /tlSyncGeneratedMapSnapshot\(\)!==true/, '定稿必须同步在线地图快照');
+  assert.match(i09, /ryJumpToSection\('onlineMapSection'\)|rySetTab\('onlineMapSection'\)/, '成功后跳在线地图');
 });
 
-test('② tlAutoPipeToMap：校验当前地块已提交成果 + 跳地图并刷新地图图层', () => {
-  assert.match(i09, /function tlAutoPipeToMap\(\)/, '包装函数必须定义');
-  assert.match(i09, /window\.tlAutoPipeToMap = tlAutoPipeToMap/, '必须挂 window（onclick 依赖全局）');
-  const transfer = i09.slice(i09.indexOf('function tlAutoPipeToMap()'), i09.indexOf('window.tlAutoPipeToMap = tlAutoPipeToMap'));
-  assert.doesNotMatch(transfer, /tlAutoGenerate\(/, '回传动作不能重新生成管线');
-  assert.match(transfer, /generatedAngle/, '必须读取生成成果中的分区角度');
-  assert.match(transfer, /currentAngle/, '必须读取当前分区角度');
-  assert.match(transfer, /角度已变化/, '角度不一致时提示先生成施工图');
-  assert.match(transfer, /sourceGeneratedAt!==dd\.generatedAt/, '必须确认网络快照来自当前这次施工图生成');
-  assert.match(transfer, /networkState\.status!=='current'/, '不能把其他地块或过期网络回传为成功');
-  assert.match(i09, /onlineMapSection/, '必须跳 onlineMapSection');
-  assert.match(transfer, /RyMapHost[\s\S]{0,100}\.refresh\(\)/, '同标签页写入后必须刷新地图网络图层');
-  assert.match(i09, /RyMapFlowDemo[\s\S]{0,40}refresh/, '跳转后必须刷新轮灌演示');
+test('② 二级不再有「生成施工图」按钮；ppRunGenerateFlow 解绑保留', () => {
+  assert.ok(!html.includes('id="ppGenerate"'), '#ppGenerate 按钮必须已从二级移除（v1054：生成施工图在三级之后）');
+  assert.match(pe, /function ppRunGenerateFlow\(\)/, '成组按块分发链保留在 ppRunGenerateFlow（解绑不删）');
+  assert.ok(!pe.includes("getElementById('ppGenerate').addEventListener"), '不得再绑 #ppGenerate 点击');
+  assert.match(pe, /window\.ppRunGenerateFlow=ppRunGenerateFlow/, '保留函数挂 window 备查');
 });
 
-test('③ 「生成施工图」一律清空重算管线，再生成二级图和三级图（v1051 数据唯一性）', () => {
-  const seg = pe.slice(pe.indexOf("getElementById('ppGenerate')"));
-  assert.match(seg, /if\(!ppAutoGeneratePipes\(\)\)\{/,
-    '点「生成施工图」一律先清空重算全部主管/支管/阀门（替换式重算），不得按「布局过时」条件复用旧管线');
-  assert.match(seg, /ppGenerateDiagram\(\{scroll:false\}\)/, '二级图面生成必须在场');
-  assert.match(seg, /tlAutoGenerate\(\{scroll:false,rethrowError:true,publishToMap:true\}\)/, '三级管线内链重生成失败必须回报按钮');
-  assert.match(seg, /tlShowWorkspace/, '生成后落三级管路编辑视图必须在场');
-  assert.match(seg, /__runyeSingleL2CommitFailure/, '重生成失败必须弹窗让用户看见（fail-closed），不能只 console.warn');
+test('③ 分区变化自动重算：ppRender 尾部签名比对 → 防抖调 ppAutoGeneratePipes', () => {
+  const render = pe.slice(pe.indexOf('function ppRender()'), pe.indexOf('var ppRenderBase=ppRender'));
+  assert.match(render, /ppAutoRegenRunning/, '自动重算必须有重入标志（防 ppAutoGeneratePipes 内部 render 递归）');
+  assert.match(render, /clearTimeout\(ppAutoRegenTimer\)/, '必须有防抖');
+  assert.match(render, /ppAutoGeneratePipes\(\)/, '防抖到点必须调替换式重算');
+  assert.match(render, /if\(gen&&gen===cur\)return;/, '同代不得重算（无谓刷新）');
+  assert.match(render, /if\(ge&&ge\.active&&ge\.mode==='perPlot'\)return;/, '三级逐块编辑态不自动重算');
+  const auto = pe.slice(pe.indexOf('function ppAutoGeneratePipes()'), pe.indexOf('function ppRepartitionDesign'));
+  assert.match(auto, /window\.__ryPpGenCutSig=ppState\.__ppGenCutSig\|\|null/, '两条成功路径必须把签名同步到 window（恢复链消费）');
 });
 
-test('④ 「生成施工图」无条件重算；角度待重建等过时检测机制已退役（v1051 数据唯一性）', () => {
-  /* 剥掉注释后检查：历史沿革注释里允许提及旧机制名，但真实代码不得复活。 */
+test('④ 自动重算后机制退役与初始管线交接保持（v1051/v1052 延续）', () => {
   const code = pe.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   assert.doesNotMatch(code, /ppAnglePipeRegenPending/, '角度待重建脏标记已退役，不得复活');
-  assert.doesNotMatch(code, /ppMainDirectionOutdated/, '主管方向过时检测已退役——重算职责统一收敛到「生成施工图」按钮');
-  assert.doesNotMatch(code, /ppPartitionLayoutOutdated/, '分区布局过时检测已退役——重算职责统一收敛到「生成施工图」按钮');
+  assert.doesNotMatch(code, /ppMainDirectionOutdated/, '主管方向过时检测已退役——重算职责由自动重算接管');
+  assert.doesNotMatch(code, /ppPartitionLayoutOutdated/, '分区布局过时检测已退役——重算职责由自动重算接管');
   assert.match(pe, /ensureInitialPipes:\s*function\(\)[\s\S]*?runye_plot_design_v1:[\s\S]*?ppAutoGeneratePipes\(\)/,
     '地图首次交接仅为没有地块L2档案的初始空地块自动建立管线');
 });

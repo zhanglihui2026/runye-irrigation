@@ -2701,11 +2701,48 @@
         ppCtx.restore();
       }catch(eStale){}
     })();
+
+    /* [v1054 2026-11-13 用户拍板] 分区变化 → 管线自动重算（「数据唯一性」终极形态：
+       分区完成后管线自动生成，不存在「过时管线」这种状态——v1052 画布警示与
+       v1053 三级代际校验降级为防御保险）。挂在 ppRender 尾部是因为所有分区变化
+       路径（分区数/角度/切割线/并末排/地块回传/恢复载入）最终都会走到这里，
+       单点覆盖全部入口，无需逐个监听输入。防抖 400ms；重算中标志防 ppAutoGeneratePipes
+       内部递归 render；逐块态（三级按块编辑中）不自动，避免打乱编辑。 */
+    (function(){
+      try{
+        if(ppAutoRegenRunning)return;
+        if(!ppState.polyPts||ppState.polyPts.length<3)return;
+        var ge=window.__runyeGroupEdit;
+        if(ge&&ge.active&&ge.mode==='perPlot')return;
+        var hasPipes=(ppState.mainPipes&&ppState.mainPipes.length)||(ppState.branchPipes&&ppState.branchPipes.length);
+        var gen=ppState.__ppGenCutSig||null;
+        var cur=ppCurrentCutSignature();
+        if(!cur)return;
+        /* 触发条件：① 已有管线且分区签名变了；② 从未生成过（首次分区完成）。 */
+        if(gen&&gen===cur)return;
+        if(!gen&&hasPipes)return;   /* 旧档案（无签名）不自动覆盖，恢复链/三级兜底已兜住 */
+        clearTimeout(ppAutoRegenTimer);
+        ppAutoRegenTimer=setTimeout(function(){
+          ppAutoRegenRunning=true;
+          try{
+            var had=hasPipes;
+            if(!ppAutoGeneratePipes()){
+              alert('分区变化后自动布管未完成：'+(window.__runyeSingleL2CommitFailure||'布管或设计提交失败')+'。请调整分区参数后重试。');
+              return;
+            }
+            try{ if(window.atShowToast&&had) window.atShowToast('分区已变化，管线已自动重新生成（原管线可在历史记录找回）'); }catch(eT){}
+          }catch(eRegen){ console.warn('[ppAutoRegen]',eRegen); }
+          finally{ ppAutoRegenRunning=false; }
+        },400);
+      }catch(eAuto){}
+    })();
   }
   /* [v629] 「适应窗口」胶囊的显隐收口在这里，而不是在每个调用点撒一遍：
      分区旋转 / 重新分区 / 回退 / 加管都会改内容尺寸或平移量，只有这里能保证不漏。
      做法：把局部 ppRender 换成一个转发器（函数声明可重新赋值），
      内部所有 ppRender() 调用立刻跟着生效，绘制逻辑一行没动。 */
+  /* [v1054] 自动重算的防抖定时器与重入标志（函数体在 ppRender 尾部）。 */
+  var ppAutoRegenTimer=null, ppAutoRegenRunning=false;
   var ppRenderBase=ppRender;
   ppRender=function(){ ppRenderBase.apply(null,arguments); ppSyncFitBtn();try{if(window.RyDrawingWorkspace)window.RyDrawingWorkspace.syncCamera();}catch(e){} };
   window.ppRender=ppRender;
@@ -3651,8 +3688,10 @@
       ppRefreshMaterials();
       /* 立刻推给「成组管路」页 —— 它只看得到 slots，不刷新就还是空的 */
       ppSyncGroupEditUI();
-      /* [v1052 数据唯一性] 记下管线生成时的分区切割签名，供画布过时警示与恢复链校验。 */
+      /* [v1052/v1054 数据唯一性] 记下管线生成时的分区切割签名，供画布过时警示、
+         恢复链与三级复用分支校验代际；window 层同步给恢复链（v355 记签消费）。 */
       ppState.__ppGenCutSig=ppCurrentCutSignature();
+      window.__ryPpGenCutSig=ppState.__ppGenCutSig||null;
       return true;
     }
 
@@ -3700,8 +3739,10 @@
     ppUpdateAutoPipeButton();
     if (typeof window.ppRefreshDiagramIfVisible === 'function') window.ppRefreshDiagramIfVisible();
     ppRefreshMaterials();
-    /* [v1052 数据唯一性] 记下管线生成时的分区切割签名，供画布过时警示与恢复链校验。 */
+    /* [v1052/v1054 数据唯一性] 记下管线生成时的分区切割签名，供画布过时警示、
+       恢复链与三级复用分支校验代际；window 层同步给恢复链（v355 记签消费）。 */
     ppState.__ppGenCutSig=ppCurrentCutSignature();
+    window.__ryPpGenCutSig=ppState.__ppGenCutSig||null;
     return true;
   }
 
@@ -5414,7 +5455,11 @@
   }
   window.ppClipPolylineToRing=ppClipPolylineToRing;
 
-  document.getElementById('ppGenerate').addEventListener('click',function(){
+  /* [v1054 2026-11-13 用户拍板] 「生成施工图」按钮已从二级移除（定稿动作迁到三级
+     #tlGenerateDiagram）。本流程函数解绑保留：成组态的按块分发链（v656/v657/v660）
+     与三段生成顺序（管线→二级图→三级图）仍在此处备查；单地块主流程已由
+     ppAutoRegenOnPartitionChange（分区变化自动重算）接管。 */
+  function ppRunGenerateFlow(){
     /* [v1051 2026-11-13 用户拍板「数据唯一性」] 点「生成施工图」一律先清空重算
        全部主管/支管/阀门（ppAutoGeneratePipes 替换式重算 + 历史栈可撤销 +
        canonical 提交失败自动回滚），不再按「布局过时」条件复用旧管线——
@@ -5544,7 +5589,8 @@
         window.__ryPpGenCutSig=ppState.__ppGenCutSig||ppCurrentCutSignature()||null;
       }
     }catch(e){}
-  });
+  }
+  window.ppRunGenerateFlow=ppRunGenerateFlow;   /* v1054：解绑保留，调试/成组链路可手动调用 */
 
   // Download
   document.getElementById('ppDownload').addEventListener('click',function(){

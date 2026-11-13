@@ -25,13 +25,12 @@ const ROOT = path.join(__dirname, '..');
 const pe = fs.readFileSync(path.join(ROOT, 'mod', 'plot-editor.js'), 'utf8');
 const i12 = fs.readFileSync(path.join(ROOT, 'mod', 'inline-12.js'), 'utf8');
 
-test('① 管线生成成功必须记录分区切割签名（整组/单块两条路径 + v355 记签）', () => {
+test('① 管线生成成功必须记录分区切割签名（两条成功路径 + window 层同步）', () => {
   const auto = pe.slice(pe.indexOf('function ppAutoGeneratePipes()'), pe.indexOf('function ppRepartitionDesign'));
   const hits = auto.match(/ppState\.__ppGenCutSig=ppCurrentCutSignature\(\);/g) || [];
   assert.ok(hits.length >= 2, 'ppAutoGeneratePipes 的整组与单块两条成功路径都必须写 __ppGenCutSig（实际 ' + hits.length + ' 处）');
-  const gen = pe.slice(pe.indexOf("getElementById('ppGenerate')"), pe.indexOf("getElementById('ppDownload')"));
-  assert.match(gen, /window\.__ryPpGenCutSig=ppState\.__ppGenCutSig\|\|ppCurrentCutSignature\(\)\|\|null/,
-    'ppGenerate 成功后 v355 记签必须带上切割签名');
+  assert.match(auto, /window\.__ryPpGenCutSig=ppState\.__ppGenCutSig\|\|null/,
+    '成功路径必须同步 window 层签名（v355 恢复链消费；v1054 起记签在生成处而非按钮处）');
 });
 
 test('② 恢复链必须校验切割签名：异代清空管线，快照必须带 ppGenCutSig', () => {

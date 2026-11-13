@@ -3937,6 +3937,44 @@ function tlSyncGeneratedMapSnapshot() {
 }
 window.tlSyncGeneratedMapSnapshot = tlSyncGeneratedMapSnapshot;
 
+/* [v1054 2026-11-13 用户拍板] 「生成施工图」定稿按钮（#tlGenerateDiagram，三级工具栏顶部）：
+   二级分区完成后管线自动生成（v1054 自动重算），用户在三级画完总管等所有信息后点本按钮
+   ——① 强制刷新三级简图（确保与当前分区同代、包含三级最新编辑）；② 同步最新成果到
+   在线地图；③ 跳在线地图让用户直接看到布置效果。失败 fail-closed 弹窗（v873）。 */
+function tlGenerateDiagramToMap(){
+  try{
+    var poly=window.measuredPolygon||[];
+    if(!poly||poly.length<3){
+      alert('请先到「在线地图」画框并回传地块，再到「分区与管路」页完成分区（管线会自动生成）。');
+      return;
+    }
+    var ppShare=window.RunyeBridge&&typeof window.RunyeBridge.getPartitionSnapshot==='function'
+      ?window.RunyeBridge.getPartitionSnapshot():null;
+    if(!ppShare||!(ppShare.mainPipes&&ppShare.mainPipes.length)){
+      alert('当前地块还没有管线成果。请回「分区与管路」页完成分区——管线会自动生成——再回来点「生成施工图」。');
+      return;
+    }
+    /* 刷新三级简图：分区刚变过时图面可能还是上一代，强制按当前分区重出一次。 */
+    var refreshed=tlAutoGenerate({scroll:false,rethrowError:true,publishToMap:true});
+    if(refreshed!==true){
+      alert('三级施工简图刷新未完成：'+(window.__runyeSingleL2CommitFailure||'生成失败')+'。请检查分区参数后重试。');
+      return;
+    }
+    if(window.tlSyncGeneratedMapSnapshot()!==true)return;   /* 内部已提示 */
+    try{ if(window.atShowToast) window.atShowToast('施工图已生成并同步到在线地图'); }catch(eT){ }
+    try{ if(window.RyMapHost&&typeof window.RyMapHost.refresh==='function') window.RyMapHost.refresh(); }catch(eR){}
+    try{
+      if(typeof window.ryJumpToSection==='function') window.ryJumpToSection('onlineMapSection');
+      else if(typeof window.rySetTab==='function') window.rySetTab('onlineMapSection');
+    }catch(eJump){}
+  }catch(eGen){ console.warn('[tlGenerateDiagramToMap]',eGen); }
+}
+window.tlGenerateDiagramToMap=tlGenerateDiagramToMap;
+try{
+  var _tgBtn=document.getElementById('tlGenerateDiagram');
+  if(_tgBtn) _tgBtn.addEventListener('click',function(){ tlGenerateDiagramToMap(); });
+}catch(eTgBind){}
+
 /* [v948] 「联合灌溉 1/2/3/4 区」这一排在在线地图上是搬进 #mapDemoDock 显示的
    （mod/map-flow-demo.js 的 v864 dock）。在地图上点它只是换个分区分组看效果，
    不该把人弹去「分区与管路」——所以判一下这一排现在归谁。
