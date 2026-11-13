@@ -4748,6 +4748,15 @@ function tlAutoGenerate(options) {
   var ppShare=window.RunyeBridge&&typeof window.RunyeBridge.getPartitionSnapshot==='function'
     ?window.RunyeBridge.getPartitionSnapshot():null;
   var ppHasPipes=ppShare && (ppShare.mainPipes.length||ppShare.branchPipes.length||ppShare.valves.length);
+  /* 图纸渲染用的主管/支管错开距离。放在共享生成分支外，确保复用二级管网时也可调用。 */
+  function tlGapM() {
+    var RG = (typeof window !== 'undefined') ? window.RyMainBranchGap : null;
+    if (RG && typeof RG.m === 'function') {
+      var v = RG.m();
+      if (typeof v === 'number' && isFinite(v) && v > 0) return v;
+    }
+    return 20;
+  }
   /* 布管方向硬规则：第一分区的实际长边决定滴灌带轴，所有分区沿同一轴铺带；
      主管与支管垂直于滴灌带。既有主管方向、其余分区的长宽比例和多数投票都不能覆盖此规则。 */
   var tlAxisReport=null;
@@ -4786,6 +4795,43 @@ function tlAutoGenerate(options) {
       branchPipes=branchPipes.map(function(l){return l.map(function(p){return tlFrameToGrid(tlZoneCuts.frame,p);});});
       valves=valves.map(function(v){return tlFrameToGrid(tlZoneCuts.frame,v);});
     }
+    /* 兼容 v1047 及更早的自动布管：旧模型每区主管与支管共线，阀门也因此被
+       渲染偏移。仅当数量、行主序分区归属、主管/支管平行重合和阀门落线全部吻合时，
+       才把主管按中心阀门旋转到支管垂向；手绘或不完整管网不符合该完整签名，不改写。 */
+    (function restoreCenteredCrossLayout(){
+      var zoneTotal=rows*cols;
+      if(!zoneTotal||mainPipes.length!==zoneTotal||branchPipes.length!==zoneTotal||valves.length!==zoneTotal)return;
+      var rebuilt=[];
+      for(var zi0=0;zi0<zoneTotal;zi0++){
+        var rr=Math.floor(zi0/cols),cc=zi0%cols;
+        var zx0=xPos[cc],zy0=yPos[rr],zw0=xSrc[cc],zh0=ySrc[rr];
+        var ml0=mainPipes[zi0],bl0=branchPipes[zi0],vv0=valves[zi0];
+        if(!ml0||ml0.length<2||!bl0||bl0.length<2||!vv0)return;
+        var ma=ml0[0],mb=ml0[ml0.length-1],ba=bl0[0],bb=bl0[bl0.length-1];
+        var mdx=mb.x-ma.x,mdy=mb.y-ma.y,bdx=bb.x-ba.x,bdy=bb.y-ba.y;
+        var mlen=Math.hypot(mdx,mdy),blen=Math.hypot(bdx,bdy);
+        if(mlen<1||blen<1||Math.abs(mdx*bdy-mdy*bdx)/(mlen*blen)>0.02)return;
+        var overlapAxis=Math.abs(bdx)>=Math.abs(bdy)?'x':'y';
+        var lineSep=overlapAxis==='x'?Math.abs(ma.y-ba.y):Math.abs(ma.x-ba.x);
+        var vDist=overlapAxis==='x'?Math.abs(vv0.y-ba.y):Math.abs(vv0.x-ba.x);
+        var vmid=overlapAxis==='x'?vv0.x:vv0.y;
+        var blo=overlapAxis==='x'?Math.min(ba.x,bb.x):Math.min(ba.y,bb.y);
+        var bhi=overlapAxis==='x'?Math.max(ba.x,bb.x):Math.max(ba.y,bb.y);
+        var cellLo=overlapAxis==='x'?zx0:zy0,cellHi=overlapAxis==='x'?zx0+zw0:zy0+zh0;
+        var mainMidX=(ma.x+mb.x)/2,mainMidY=(ma.y+mb.y)/2;
+        if(lineSep>0.5||vDist>0.5||vmid<blo-0.5||vmid>bhi+0.5||blo<cellLo-0.5||bhi>cellHi+0.5||
+           mainMidX<zx0-0.5||mainMidX>zx0+zw0+0.5||mainMidY<zy0-0.5||mainMidY>zy0+zh0+0.5)return;
+        var p0,p1;
+        if(overlapAxis==='y'){p0={x:zx0,y:vv0.y};p1={x:zx0+zw0,y:vv0.y};}
+        else{p0={x:vv0.x,y:zy0};p1={x:vv0.x,y:zy0+zh0};}
+        var clipped=tlClipPipeSeg(p0,p1);
+        if(!clipped||Math.hypot(clipped[1].x-clipped[0].x,clipped[1].y-clipped[0].y)<1)return;
+        rebuilt.push(clipped);
+      }
+      if(rebuilt.length!==zoneTotal)return;
+      mainPipes=rebuilt;
+      valves=valves.map(function(v,i){return Object.assign({},v,{mi:i});});
+    })();
     // 复用二级页支管时端点若贴在分区边缘，同样向内缩进，保证相邻地块支管视觉上断开
     branchPipes=branchPipes.map(tlTrimBranchToZone);
     branchDrawnLens=branchPipes.map(function(l){return tlPolyLen(l);});
@@ -4794,14 +4840,6 @@ function tlAutoGenerate(options) {
        与主管重合时的可视分离只由后续 SVG 渲染副本完成，不改设计几何。 */
     var MAIN_END_ELBOW_R = 0.18;
     /* 仅用于渲染层区分重合的主管/支管；设计与水力坐标保持中心线。 */
-    function tlGapM() {
-      var RG = (typeof window !== 'undefined') ? window.RyMainBranchGap : null;
-      if (RG && typeof RG.m === 'function') {
-        var v = RG.m();
-        if (typeof v === 'number' && isFinite(v) && v > 0) return v;
-      }
-      return 20;   /* 兜底：与 PP_MAIN_BRANCH_GAP_M 同值（plot-editor 未加载时走到这里） */
-    }
     function tlActualCellCenter(x,y,w,h){
       var fallback={x:x+w/2,y:y+h/2},geom=window.RyPlotEditorGeom;
       if(!geom||typeof geom.clipPolyToRect!=='function'||!tlGridPlotPoly||tlGridPlotPoly.length<3)return fallback;
@@ -4834,19 +4872,19 @@ function tlAutoGenerate(options) {
         var gapV=Math.min(Math.max(zoneH2*0.06,4),14,zoneH2*0.22);
         var gapH=Math.min(Math.max(zoneW2*0.06,4),14,zoneW2*0.22);
         if(fixedSideIsHorizontal){
-          /* 设计管线共用分区实际中心线；固定间距仅在下面的SVG渲染层应用。 */
-          var mainX=centerX;
+          /* 支管按既定方向通过实际分区中心；主管取其垂线并经过同一阀门中心。 */
+          var mainY=centerY;
           var brX=centerX;
-          var tlEdgeZ=(zr2===rows-1);                 /* [v553] 最外一排 */
-          var tlMainEndY=zy2+zoneH2;
+          var tlEdgeZ=(zc3===cols-1);                 /* 主管方向上的最外一列 */
+          var tlMainEndX=zx2+zoneW2;
           if(tlEdgeZ){
-            tlMainEndY=zy2+zoneH2*0.5+zoneH2*MAIN_END_ELBOW_R;
-            if(tlMainEndY>zy2+zoneH2-gapV)tlMainEndY=zy2+zoneH2-gapV;
-            if(tlMainEndY<zy2+gapV)tlMainEndY=zy2+gapV;
+            tlMainEndX=zx2+zoneW2*0.5+zoneW2*MAIN_END_ELBOW_R;
+            if(tlMainEndX>zx2+zoneW2-gapH)tlMainEndX=zx2+zoneW2-gapH;
+            if(tlMainEndX<zx2+gapH)tlMainEndX=zx2+gapH;
           }
           /* [v830] 裁到地块内：旋转角下角格子会伸到外面；裁空的整根丢弃（含其满跨/留边记录），
              保证 mainPipes/branchPipes/branchFullSpans/branchDrawnLens 四个数组始终等长对齐。 */
-          var tlMOk=true,tlSegM=tlClipPipeSeg({x:mainX,y:zy2},{x:mainX,y:tlMainEndY});
+          var tlMOk=true,tlSegM=tlClipPipeSeg({x:zx2,y:mainY},{x:tlMainEndX,y:mainY});
           var tlSegB=tlClipPipeSeg({x:brX,y:zy2+gapV},{x:brX,y:zy2+zoneH2-gapV});
           if(!tlSegB){ tlMOk=false; }
           else{ branchPipes.push(tlSegB); branchFullSpans.push(zoneH2); branchDrawnLens.push(zoneH2-2*gapV); }
@@ -4855,17 +4893,17 @@ function tlAutoGenerate(options) {
           if(tlMOk && window.atPointInPolygon&&window.atPointInPolygon({x:centerX,y:centerY},tlGridPlotPoly))
             valves.push({x:centerX,y:centerY,mi:tlMainIdx});
         }else{
-          var mainY=centerY;
+          var mainX=centerX;
           var brY=centerY;
-          var tlEdgeZ=(zc3===cols-1);                 /* [v553] 最外一列（纵向分支对称） */
-          var tlMainEndX=zx2+zoneW2;
+          var tlEdgeZ=(zr2===rows-1);                 /* 主管方向上的最外一排 */
+          var tlMainEndY=zy2+zoneH2;
           if(tlEdgeZ){
-            tlMainEndX=zx2+zoneW2*0.5+zoneW2*MAIN_END_ELBOW_R;
-            if(tlMainEndX>zx2+zoneW2-gapH)tlMainEndX=zx2+zoneW2-gapH;
-            if(tlMainEndX<zx2+gapH)tlMainEndX=zx2+gapH;
+            tlMainEndY=zy2+zoneH2*0.5+zoneH2*MAIN_END_ELBOW_R;
+            if(tlMainEndY>zy2+zoneH2-gapV)tlMainEndY=zy2+zoneH2-gapV;
+            if(tlMainEndY<zy2+gapV)tlMainEndY=zy2+gapV;
           }
           /* [v830] 同上：裁到地块内，裁空的整根丢弃 */
-          var tlMOk2=true,tlSegM2=tlClipPipeSeg({x:zx2,y:mainY},{x:tlMainEndX,y:mainY});
+          var tlMOk2=true,tlSegM2=tlClipPipeSeg({x:mainX,y:zy2},{x:mainX,y:tlMainEndY});
           var tlSegB2=tlClipPipeSeg({x:zx2+gapH,y:brY},{x:zx2+zoneW2-gapH,y:brY});
           if(!tlSegB2){ tlMOk2=false; }
           else{ branchPipes.push(tlSegB2); branchFullSpans.push(zoneW2); branchDrawnLens.push(zoneW2-2*gapH); }

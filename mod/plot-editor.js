@@ -3432,10 +3432,10 @@
             : (forceDir === 'h') ? false
             : (cuts.xPlan[zc] >= cuts.yPlan[zr]);
           if (fixedSideIsHorizontal) {
-            /* 设计几何统一落在分区中心线；主管/支管的可视间距只由绘制层生成，
-               不写入管线、阀门、长度或水力路径坐标。 */
-            var mainX = centerX, branchX = centerX;
-            pushSeg(out.main, { x: mainX, y: zy }, { x: mainX, y: zy + zoneH });
+            /* 支管沿既定轴向穿过分区中心；主管按支管方向取垂线，
+               两者在中心点与阀门相交。 */
+            var branchX = centerX, mainY = centerY;
+            pushSeg(out.main, { x: zx, y: mainY }, { x: zx + zoneW, y: mainY });
             // 支管两端各缩进一段距离（分区边长 6%，4~14m），不与分区边缘相接，使各地块支管视觉上独立断开
             var gapV2 = Math.min(Math.max(zoneH * 0.06, 4), 14, zoneH * 0.22);
             pushSeg(out.branch, { x: branchX, y: zy + gapV2 }, { x: branchX, y: zy + zoneH - gapV2 });
@@ -3449,9 +3449,9 @@
               }
             }
           } else {
-            /* 竖向布管也以分区中心线作为唯一设计坐标。 */
-            var mainY = centerY, branchY = centerY;
-            pushSeg(out.main, { x: zx, y: mainY }, { x: zx + zoneW, y: mainY });
+            /* 横向支管对应竖向主管，主管、支管和阀门仍以分区中心交会。 */
+            var branchY = centerY, mainX = centerX;
+            pushSeg(out.main, { x: mainX, y: zy }, { x: mainX, y: zy + zoneH });
             // 支管两端缩进，与分区边缘留出空隙
             var gapH2 = Math.min(Math.max(zoneW * 0.06, 4), 14, zoneW * 0.22);
             pushSeg(out.branch, { x: zx + gapH2, y: branchY }, { x: zx + zoneW - gapH2, y: branchY });
