@@ -9,7 +9,8 @@
 /* v531-data-service-plot-store: resolve plugin plot references through the shared plot-library adapter. */
 /* v427-archive-3d-iso: detach 3D preview and axonometric UI while retaining shared 2D pipe workspace and data. */
 'use strict';
-/* VERSION 沿革：v1052-restore-matches-partition（用户实测「滴灌带纵向、管线竖直与其
+/* VERSION 沿革：v1053-pipe-reuse-generation-check（数据唯一性续篇：三级 tlAutoGenerate 复用二级管线前必须校验代际——滴灌带每按当前分区现算，管线却是「生成施工图」存档；签名不一致就不复用、走兜底自布管（与滴灌带同一 cuts 恒同代）并红字提示回二级重新生成）→
+   v1052-restore-matches-partition（用户实测「滴灌带纵向、管线竖直与其
    平行」——管线是旧分区布局的存档几何，v355 恢复签名只锚边界不锚分区参数，改了
    分区参数边界没变就会把旧管线盖回新分区图面。修复：管线生成时记录分区切割签名
    （边界+行列+设计宽高+角度+末排并入），恢复链校验异代即清空管线并提示重新生成，
@@ -1490,7 +1491,7 @@
    [v1039-flow-display-decoupling] 分区面仅作动画显示；缺失时不阻断已发布管网的水路计算。
    [v1042-source-independent-irrigation-route] 页面恢复重绘时按已发布管网几何核对动画版本。
    [v1043-coupler-node-lifecycle] 接驳节点随地块设计快照恢复；分区重建或管网重生成时清除旧节点。 */
-const VERSION = 'v1052-restore-matches-partition';
+const VERSION = 'v1053-pipe-reuse-generation-check';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

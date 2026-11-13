@@ -576,7 +576,11 @@
       return ppCloneJSON({polyPts:ppState.polyPts,zoneAngleDeg:ppState.zoneAngleDeg,partitionCuts:ppState.partitionCuts,
         cutSnap:ppState.cutSnap,cutOverrides:ppState.cutOverrides,mainPipes:ppState.mainPipes,
         branchPipes:ppState.branchPipes,subBranchPipes:ppState.subBranchPipes,source:ppState.source,
-        valves:ppState.valves,zoom:ppState.zoom,panX:ppState.panX,panY:ppState.panY});
+        valves:ppState.valves,zoom:ppState.zoom,panX:ppState.panX,panY:ppState.panY,
+        /* [v1053 数据唯一性] 生成时切割签名随管线走：三级 tlAutoGenerate 复用二级管线
+           前据此校验代际——管线是「生成施工图」时的存档几何，滴灌带是三级按当前分区
+           现算的；签名不一致就不复用，防止旧管线铺进新分区图面（两代数据同图）。 */
+        genCutSig:ppState.__ppGenCutSig||null});
     },
     hasPlot: function(){return Array.isArray(ppState.polyPts)&&ppState.polyPts.length>=3;},
     restorePartitionState: function(next){

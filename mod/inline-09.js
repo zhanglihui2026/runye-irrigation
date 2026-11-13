@@ -4748,6 +4748,21 @@ function tlAutoGenerate(options) {
   var ppShare=window.RunyeBridge&&typeof window.RunyeBridge.getPartitionSnapshot==='function'
     ?window.RunyeBridge.getPartitionSnapshot():null;
   var ppHasPipes=ppShare && (ppShare.mainPipes.length||ppShare.branchPipes.length||ppShare.valves.length);
+  /* [v1053 2026-11-13 数据唯一性] 复用二级管线前先校验代际：ppState 里的管线是
+     「生成施工图」时的存档几何，滴灌带/分区标签却是本函数按当前分区切割现算的——
+     分区参数（分区数/角度/切割线/末排并入）在生成之后被改过时，复用会把旧管线铺进
+     新分区图面，同一张三级图上两代数据并存（用户实测：滴灌带纵向、管线竖直与其平行）。
+     签名不一致就不复用，走下方三级兜底自布管（与滴灌带同一套 cuts，恒同代），
+     并立全局标志让状态行提示用户回二级重新生成。二级从未生成过（无签名）不拦——
+     那是合并前的老路径，兜底自布管本就是它的正规出口。 */
+  var ppPipesStale=false;
+  try{
+    if(ppHasPipes && typeof window.ppCurrentCutSignature==='function'){
+      var _curSig=window.ppCurrentCutSignature();
+      if(_curSig && ppShare.genCutSig && ppShare.genCutSig!==_curSig) ppPipesStale=true;
+    }
+  }catch(eStaleSig){ ppPipesStale=false; }
+  window.__tlPipesReusedStale=ppPipesStale;
   /* 图纸渲染用的主管/支管错开距离。放在共享生成分支外，确保复用二级管网时也可调用。 */
   function tlGapM() {
     var RG = (typeof window !== 'undefined') ? window.RyMainBranchGap : null;
@@ -4773,7 +4788,7 @@ function tlAutoGenerate(options) {
     var firstH=Number(ySrc&&ySrc[0])||Number(yPlan&&yPlan[0])||0;
     return firstW>=firstH;
   })();
-  if(ppHasPipes){
+  if(ppHasPipes&&!ppPipesStale){
     mainPipes=ppShare.mainPipes.map(function(l){return l.map(function(p){return{x:p.x,y:p.y};});});
     branchPipes=ppShare.branchPipes.map(function(l){return l.map(function(p){return{x:p.x,y:p.y};});});
     /* [v603 2026-10-19 用户口径修正] 二级传导来的支管**自己已经缩进过**（二级 ppBuildAutoPipes
@@ -5363,6 +5378,14 @@ function tlAutoGenerate(options) {
       if (_rp.overZones > 0) _tx += '；' + _rp.overZones + ' 个分区带长超单边铺设长度，已自动分段';
       _tlAxisHintText = _tx;
       parts.push('<g id="tlAxisHintGroup"><text x="40" y="' + (iy + 38) + '" font-size="9.5" font-weight="600" fill="#92400e">' + _tx + '</text></g>');
+    }
+    /* [v1053 数据唯一性] 二级管线与当前分区不同代时（复用被拒、本次走兜底自布管），
+       必须独立于方向报告常驻提示——否则用户看到的是「滴灌带与管线同代」的假象，
+       却不知道这份管线是三级兜底生成的，材料/水力数字会与二级「生成施工图」不同。 */
+    if (window.__tlPipesReusedStale) {
+      var _txStale = '⚠ 二级管线与当前分区不同代，本次图面按当前分区兜底生成 — 请回「分区与管路」页点「生成施工图」重新生成后再回传';
+      _tlAxisHintText = _tlAxisHintText ? (_tlAxisHintText + '；' + _txStale) : _txStale;
+      parts.push('<g id="tlAxisHintStaleGroup"><text x="40" y="' + (iy + 52) + '" font-size="9.5" font-weight="700" fill="#b91c1c">' + _txStale + '</text></g>');
     }
   } catch (eAxisHint) { }
   window.__tlWsAxisHint = _tlAxisHintText;

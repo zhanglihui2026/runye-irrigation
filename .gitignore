@@ -152,3 +152,6 @@ npm-debug.log*
 
 # v1052 恢复链切割签名校验（数据唯一性）回归
 !tests/v1052_restore_cut_sig.test.cjs
+
+# v1053 三级复用二级管线代际校验（数据唯一性续篇）回归
+!tests/v1053_pipe_reuse_generation.test.cjs
