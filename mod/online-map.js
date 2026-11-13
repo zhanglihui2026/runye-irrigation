@@ -1189,18 +1189,10 @@
       if(valid && llLine.length>=2) mainPipeLines.push(llLine);
     });
     /* [v859] 段总管驳接点（自动生成的串联干线两端）：手绘总管接到这里即贯通地块内水路 */
-    /* [v914] 设计页接驳节点（dd.couplerNodes，世界米投影坐标）：手绘总管吸到节点上=
-       与该主管在设计页的接驳点精确贯通。失配节点（x/y null，v913 missing）静默跳过——
-       宁可少吸，不吸错位（§五投影保真口径）。桥（trunkGeoBridge）已含地块一致性守卫。 */
-    (Array.isArray(dd.couplerNodes)?dd.couplerNodes:[]).forEach(function(n){
-      if(!n||n.x==null||n.y==null) return;
-      var ll=bridge.toLL(n); if(!ll) return;
-      mainCouplers.push({lat:ll.lat, lng:ll.lng,
-        label:'主管节点 '+n.pipeKey+(isFinite(Number(n.s))?(' · 距起点 '+(Math.round(Number(n.s)*10)/10)+'m'):'')});
-    });
-    /* [v917] 三级施工节点（N-01 等）也直接作为地图总管吸附目标。
+    /* [M14] 唯一节点来源：三级施工节点（N-01 等）作为地图总管吸附目标。
        RyTlNodes 只保存 pid+atM；位置按工作区实际有效管线（含长度/平移覆盖）重算，
-       再经同一地块 geoBridge 反算。front 节点不映射到灌溉分区；主管/支管节点可接入水路。 */
+       再经同一地块 geoBridge 反算。front 节点不映射到灌溉分区；主管/支管节点可接入水路。
+       旧 dd.couplerNodes 保留在档案中供兼容读取，不再创建重复吸附候选。 */
     (function(){
       var N=window.RyTlNodes, A=window.RyTlAutoEdits;
       if(!N||typeof N.list!=='function'||!A||typeof A.pointAt!=='function')return;

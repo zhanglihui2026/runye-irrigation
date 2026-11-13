@@ -431,6 +431,12 @@
     if (!src || !pv || !isFinite(pv.s) || !isFinite(pv.minX)) return null;
     try {
       var clone = src.cloneNode(true);
+      /* [M14] 工作区自己会按 RyTlNodes 实时渲染节点与连线；简图克隆里的同源图层必须剥离，
+         否则同一 N-xx 会在底图和工作区覆盖层各画一次，出现双影。 */
+      var clonedNodeLayers = clone.querySelectorAll('[data-tlnode-layer],[data-tlnodelink-layer]');
+      for (var cni = 0; cni < clonedNodeLayers.length; cni++) {
+        if (clonedNodeLayers[cni].parentNode) clonedNodeLayers[cni].parentNode.removeChild(clonedNodeLayers[cni]);
+      }
       /* 滴灌带与主管须同图可见；稍加深示意线，便于在分区底色上辨识方向。 */
       var drips = clone.querySelectorAll('path[data-tltape="1"]');
       for (var i = 0; i < drips.length; i++) drips[i].setAttribute('stroke', '#0e7490');

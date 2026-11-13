@@ -2636,29 +2636,8 @@
     }
     } /* [v875] !ppPipeLayerSuppressed 结束：静态管线层整块由三级层接管 */
 
-    /* [v913-coupler-nodes] 接驳节点（交互画布，2D context）：dd.couplerNodes（世界米）
-       → frameToGrid 回格系 → ppToCanvas 上屏。失配节点（x/y null）不画但参数保留。
-       依赖 dd.zones.frame + window.RyCoordFrame，缺席则整段静默跳过。
-       选中/拖动态橙色填充；描边 #b45309 为本元素独占色（探针像素扫描锚点）。 */
-    (function(){
-      /* [v1056] 接驳节点属于管路图层，随「显示/隐藏管路」开关显隐。 */
-      if(window.__ryPipelineLayerVisible===false)return;
-      var cctx=ppCouplerCtx();if(!cctx)return;
-      var clist=cctx.dd.couplerNodes;
-      if(!Array.isArray(clist))return;
-      var cShifts=ppCouplerShiftMap();   /* [v1059] 节点贴主管显示线 */
-      clist.forEach(function(n){
-        if(n.x==null||n.y==null)return;
-        var cg=cctx.frame?cctx.F.frameToGrid(cctx.frame,{x:n.x,y:n.y}):{x:n.x,y:n.y};
-        var csh=ppCouplerShiftOf(n.pipeKey,cShifts);
-        if(csh.x||csh.y)cg={x:cg.x+csh.x,y:cg.y+csh.y};
-        var cp=ppToCanvas(cg.x,cg.y);
-        var csel=(ppCouplerSelected===n.pipeKey)||ppState.dragCoupler===n.pipeKey;
-        ppCtx.beginPath();ppCtx.arc(cp.x,cp.y,csel?7:5.5,0,Math.PI*2);
-        ppCtx.fillStyle=csel?'#f59e0b':'#fff';ppCtx.fill();
-        ppCtx.lineWidth=2;ppCtx.strokeStyle='#b45309';ppCtx.stroke();
-      });
-    })();
+    /* [M14] 旧 dd.couplerNodes 仅为存档兼容字段，不再绘制。
+       可见/可编辑/可传地图的接驳点统一使用工作区 N-xx 节点，避免两套节点重影。 */
 
     // Current line being drawn
     if(ppState.currentLine.length>0){
@@ -5134,30 +5113,7 @@
     });
     parts.push('</g>');
 
-    /* [v913-coupler-nodes] 接驳节点渲染：读 dd.couplerNodes（世界米）→ frameToGrid 回格系 →
-       ts() 上屏。失配节点（x/y null）不画但参数保留（重挂后自动复活）。
-       依赖 dd.zones.frame（纯数据）+ window.RyCoordFrame —— 两者缺席则整段静默跳过。
-       [v1059] 节点加主管显示偏移向量贴 __ppSvgDisplay 显示线（与线体同口径）。 */
-    (function(){
-      var ctx=ppCouplerCtx();if(!ctx)return;
-      var list=ctx.dd.couplerNodes;
-      if(!Array.isArray(list)||!list.length)return;
-      var svgShifts={};
-      ppState.mainPipes.forEach(function(l,idx){
-        var dl=__ppSvgDisplay.main[idx];
-        if(dl&&dl[0]&&l&&l[0]&&(dl[0].x!==l[0].x||dl[0].y!==l[0].y))
-          svgShifts['m'+(idx+1)]={x:dl[0].x-l[0].x,y:dl[0].y-l[0].y};
-      });
-      list.forEach(function(n){
-        if(n.x==null||n.y==null)return;
-        var g=ctx.frame?ctx.F.frameToGrid(ctx.frame,{x:n.x,y:n.y}):{x:n.x,y:n.y};
-        var sg=svgShifts[n.pipeKey];
-        if(sg){g={x:g.x+sg.x,y:g.y+sg.y};}
-        var p=ts(g.x,g.y);
-        var sel=(ppCouplerSelected===n.pipeKey)||ppState.dragCoupler===n.pipeKey;
-        parts.push('<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="'+(sel?7:5.5)+'" fill="'+(sel?'#f59e0b':'#fff')+'" stroke="#b45309" stroke-width="2" data-pp-coupler="'+n.pipeKey+'"><title>接驳节点 · '+n.pipeKey+' · 距起点 '+(Math.round(n.s*10)/10)+'m</title></circle>');
-      });
-    })();
+    /* [M14] 旧 dd.couplerNodes 不再在简图层重复绘制；接驳点统一由 tl-workspace 的 N-xx 渲染。 */
 
     if(showPipeNoteMain||showPipeNoteBranch){
       var pipeNoteX=zoneDimX1+10;

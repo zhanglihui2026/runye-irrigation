@@ -21,7 +21,8 @@
      · 分区主管若首尾相接（端点落到另一主管线体 2m 内），就沿接续关系传播可达性；
        只靠近的平行管线不会因此合并。
      · 每组至少有一根主管可从入口到达；仍有断组时 start() 报错且不播放。
-     [v917] 同时接收 RyTlNodes 的主管/支管施工节点；多条保存总管分线演示，不合并虚构连接段。
+     [M14] 唯一节点源为三级工作区 RyTlNodes（N-xx）；旧 dd.couplerNodes 不参与连接判定。
+     [v917] 多条保存总管分线演示，不合并虚构连接段。
      [v924] 手绘总管接入主管后，沿几何相接的分区主管段传播可达性；在线地图浮卡展示当前轮灌组水力摘要。
      [v927] 活动区使用独立地图Pane和脉冲色层；无mi的分区阀按支管几何归属，并动画显示开阀。
      ═══════════════════════════════════════════════════════════════════════ */
@@ -90,12 +91,12 @@
   }
   /* 连接校验。o = {
        hasTrunk:bool, trunkLL:[{lat,lng}], mainsLL:[[{lat,lng}]×N],
-       couplersLL:[{lat,lng}]|null, hasSeg:bool, tolM:number, dist:(a,b)=>米,
+       hasSeg:bool, tolM:number, dist:(a,b)=>米,
        nodesLL:[{pipeKey,mi,ll}]|null, groupOfZi:fn(zi)=>g|null, groups:number|null }
      返回 { ok, code:'no-trunk'|'no-data'|'connected'|'disconnected'|'partial',
             minM, brokenGroups?:[g] }
      [v915 步骤 3] 判据升级（任务清单 §9.4 次序 4）：
-     · 结构化匹配：接驳节点（v913 dd.couplerNodes 投影，ll=geoBridge 反算）被总管任一
+     · 结构化匹配：N-xx 施工节点被总管任一
        拐点贴近（≤tol）⇒ 该节点所在主管（mi）视为贯通——与 2b 的「总管吸到节点」
        用户操作一一对应（吸附落点就是拐点）。
      · 逐组可达性：每组（轮灌组）至少一根主管贯通（主管端点贴近 或 该组任一节点的
@@ -264,8 +265,8 @@
   }
 
   /* [v916 步骤 4] 演示水路入口精确化（纯函数，Node 单测锁）。
-     活动组 g 的「水流入口」= 该组内接驳节点所在主管的节点（nodesLL 来自 v913
-     dd.couplerNodes 投影，ll=geoBridge 反算经纬度）。返回 [{pipeKey, mi, ll}]；
+     活动组 g 的「水流入口」= 该组内 N-xx 节点所在主管的节点（nodesLL 来自
+     RyTlNodes 的有效管线投影并由 geoBridge 反算经纬度）。返回 [{pipeKey, mi, ll}]；
      无节点数据/该组没放节点 ⇒ []（渲染层自然退化为只高亮主管，零破坏）。 */
   function entrancesOf(d, g) {
     if (!d || !Array.isArray(d.nodesLL)) return [];
@@ -384,16 +385,8 @@
       if(v&&v.ax!=null&&v.ay!=null)anchor=toLLSafe({x:v.ax,y:v.ay});
       if (q) valves.push({ ll: q, anchorLL:anchor, mi: valveBranchIndex(v) });
     });
-    /* [v915] 接驳节点（v913 dd.couplerNodes 投影，世界米）→ 经纬度 + 主管下标。
-       失配节点（x/y null）跳过；mi=parseInt('m3')-1，解析不出跳过（宁缺不错）。 */
-    (dd.couplerNodes || []).forEach(function (n) {
-      if (!n || n.x == null || n.y == null) return;
-      var mi = parseInt(String(n.pipeKey || '').replace(/^m/, ''), 10);
-      if (!isFinite(mi) || mi < 0) return;
-      var q = toLLSafe({ x: n.x, y: n.y });
-      if (q) nodesLL.push({ pipeKey: String(n.pipeKey), mi: mi - 1, ll: q });
-    });
-    /* [v917] 施工节点与设计接驳节点统一进入水路验证及入口高亮。 */
+    /* [M14] 单一接驳节点来源：只读带 N-xx 身份的 RyTlNodes。
+       旧 dd.couplerNodes 仍保存在兼容快照中，但不再作为第二套地图接点或动画连通依据。 */
     try {
       var tlNodes=window.RyTlNodes, autoEdits=window.RyTlAutoEdits;
       if(tlNodes&&typeof tlNodes.list==='function'&&autoEdits&&typeof autoEdits.pointAt==='function'){

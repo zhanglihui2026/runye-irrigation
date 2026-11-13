@@ -1,4 +1,5 @@
 /* Runye PWA v1. Increment VERSION when changing the offline shell. */
+/* v1060-single-node-source（接驳点统一为三级 N-xx：地图吸附与轮灌连通只消费 RyTlNodes；旧二级 couplerNodes 仅保留存档兼容并移除入口/重复渲染。工作区底图克隆剥离简图中的节点与连线层，避免实时覆盖层重复绘制。 */
 /* v553-network-owner-required: reject network snapshots without an explicit active-plot binding. */
 /* v555-plot-scoped-bridge: keep network, hydraulic design, and overlay snapshots isolated by plot ID. */
 /* v557-legacy-owner-read-guard: reject legacy snapshot fallbacks whose plot ID does not match. */
@@ -1497,7 +1498,7 @@
    [v1039-flow-display-decoupling] 分区面仅作动画显示；缺失时不阻断已发布管网的水路计算。
    [v1042-source-independent-irrigation-route] 页面恢复重绘时按已发布管网几何核对动画版本。
    [v1043-coupler-node-lifecycle] 接驳节点随地块设计快照恢复；分区重建或管网重生成时清除旧节点。 */
-const VERSION = 'v1059-node-display-shift';
+const VERSION = 'v1060-single-node-source';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

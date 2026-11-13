@@ -937,19 +937,8 @@
     </span>
     <span class="pp-sep"></span>
     <button class="pp-btn-ghost" id="ppUndo">↩ 回退</button>
-    <!-- [M13 2026-11-13 主线任务恢复] 「接驳节点」入口回归二级页（v982 曾按当日拍板下线，
-         M13 拍板「加节点放在分区与管路页……不要把地图手绘总管或轮灌动画节点编辑挪进来」）。
-         接驳节点按主管身份（pipeKey）与沿线桩号（s 米）绑定（v913 既有数据层）；
-         分区/切线/角度变化后管线重算，节点参数保留、坐标由 inline-09 投影 IIFE 重新投影。
-         底层 ppCouplerSetPlacing / 面板联动 / 地图捕捉自 v982 起全保留，恢复入口零成本。 -->
-    <button class="pp-btn-ghost" id="ppCouplerBtn" title="接驳节点：在主管上放置/调整总管接驳点（轮灌演示水流入口）">⚓ 接驳节点</button>
-    <!-- [M13] 接驳节点定位面板：选中节点时显示；s 可输入精确置位（走 ppCommitSinglePlotEdit 事务）。 -->
-    <div id="ppCouplerPanel" style="display:none">
-      <span class="pp-coupler-pipe" style="font-weight:600">未选中</span>
-      <label style="margin-left:8px">距起点 <input type="number" min="0" step="0.1" style="width:64px"> m</label>
-      <span class="pp-coupler-lng" style="margin-left:8px;color:#888780;font-size:11px">经纬度在地图同步后可见</span>
-      <button type="button" class="pp-coupler-remove" title="移除该主管的接驳节点">移除</button>
-    </div>
+    <!-- [M14] 单一节点源：接驳/连网节点在三级工作区以 N-xx 创建；
+         二级页不再提供旧 ppState.couplerNodes 入口，旧字段只为历史工程存档兼容。 -->
     <!-- [2026-11-02 取消] 「自动管路」入口已删：与「生成施工图」重复（都调 ppAutoGeneratePipes）。
          底层 ppAutoGeneratePipes / ppClearPipes / ppHasPipeContent / ppUpdateAutoPipeButton
          全部保留——「生成施工图」#ppGenerate 在角度变化时仍调 ppAutoGeneratePipes 重建管线。 -->
