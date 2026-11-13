@@ -3,9 +3,13 @@
 /* tests/pipe_to_map.test.cjs —— 双生成按钮语义区分静态锁
  *
  * 用户拍板（2026-11-01）：分区与管路页两个生成入口必须区分开 ——
- *   ① 「生成施工图」(#ppGenerate)：角度变化后先重算本页主管/支管，再生成施工图与三级图；
+ *   ① 「生成施工图」(#ppGenerate)：生成施工图与三级图；
  *   ② 「回传在线地图」(#tlAutoPipe)：只显示已生成且角度匹配的管线，不重复生成。
- * 锁按钮职责、角度重算顺序与回传动作的分离。
+ * 用户拍板（2026-11-13「数据唯一性」）：点「生成施工图」一律清空重算全部
+ *   主管/支管/阀门，不再按「布局过时」条件复用旧管线——旧几何残留会与新布局
+ *   混在同一张图上。ppAnglePipeRegenPending / ppMainDirectionOutdated /
+ *   ppPartitionLayoutOutdated 三个过时检测/置脏机制一并退役。
+ * 锁按钮职责、无条件清空重算与回传动作的分离。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -40,21 +44,22 @@ test('② tlAutoPipeToMap：校验当前地块已提交成果 + 跳地图并刷�
   assert.match(i09, /RyMapFlowDemo[\s\S]{0,40}refresh/, '跳转后必须刷新轮灌演示');
 });
 
-test('③ 「生成施工图」先处理角度待重算，再生成二级图和三级图', () => {
+test('③ 「生成施工图」一律清空重算管线，再生成二级图和三级图（v1051 数据唯一性）', () => {
   const seg = pe.slice(pe.indexOf("getElementById('ppGenerate')"));
-  assert.match(seg, /ppAnglePipeRegenPending\s*\|\|\s*rebuildForMapAngle/, '本页旋转和在线地图回传的新角度都要触发重算');
-  assert.match(seg, /mapNet&&mapNet\.needsReplan/, '必须识别在线地图已清空旧网络并标记重规划');
-  assert.match(seg, /!ppAutoGeneratePipes\(\)/, '角度变化后必须先重算自动主管/支管');
+  assert.match(seg, /if\(!ppAutoGeneratePipes\(\)\)\{/,
+    '点「生成施工图」一律先清空重算全部主管/支管/阀门（替换式重算），不得按「布局过时」条件复用旧管线');
   assert.match(seg, /ppGenerateDiagram\(\{scroll:false\}\)/, '二级图面生成必须在场');
-  assert.match(seg, /tlAutoGenerate\(\{scroll:false,rethrowError:true\}\)/, '三级管线内链重生成失败必须回报按钮');
+  assert.match(seg, /tlAutoGenerate\(\{scroll:false,rethrowError:true,publishToMap:true\}\)/, '三级管线内链重生成失败必须回报按钮');
   assert.match(seg, /tlShowWorkspace/, '生成后落三级管路编辑视图必须在场');
+  assert.match(seg, /__runyeSingleL2CommitFailure/, '重生成失败必须弹窗让用户看见（fail-closed），不能只 console.warn');
 });
 
-test('④ 角度待重建只能由成功的自动布管消费', () => {
-  const history = pe.slice(pe.indexOf('function ppPushHistory()'), pe.indexOf('function ppDiscardLatestHistoryEntry'));
-  const autoPipes = pe.slice(pe.indexOf('function ppAutoGeneratePipes()'), pe.indexOf('function ppRepartitionDesign'));
-  assert.doesNotMatch(history, /ppAnglePipeRegenPending\s*=\s*false/, '普通历史记录不能清除角度重建标记');
-  assert.match(autoPipes, /ppAnglePipeRegenPending\s*=\s*false[\s\S]*?return true/, '自动布管成功后才消费重建标记');
+test('④ 「生成施工图」无条件重算；角度待重建等过时检测机制已退役（v1051 数据唯一性）', () => {
+  /* 剥掉注释后检查：历史沿革注释里允许提及旧机制名，但真实代码不得复活。 */
+  const code = pe.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  assert.doesNotMatch(code, /ppAnglePipeRegenPending/, '角度待重建脏标记已退役，不得复活');
+  assert.doesNotMatch(code, /ppMainDirectionOutdated/, '主管方向过时检测已退役——重算职责统一收敛到「生成施工图」按钮');
+  assert.doesNotMatch(code, /ppPartitionLayoutOutdated/, '分区布局过时检测已退役——重算职责统一收敛到「生成施工图」按钮');
   assert.match(pe, /ensureInitialPipes:\s*function\(\)[\s\S]*?runye_plot_design_v1:[\s\S]*?ppAutoGeneratePipes\(\)/,
     '地图首次交接仅为没有地块L2档案的初始空地块自动建立管线');
 });
@@ -79,11 +84,12 @@ test('⑦ 角度重算先刷新分区切线，再提交规范L2状态', () => {
   assert.match(angle, /ppCommitGroupMemberEdit\(groupPreimage\)/, '组成员也必须在刷新后提交');
 });
 
-test('⑧ 角度输入事件必须立即标记管线待重建，不能依赖 change 再比较已更新角度', () => {
+test('⑧ 角度输入只做轻量预览，不再置脏管线重建（v1051 数据唯一性）', () => {
   const bind = pe.slice(pe.indexOf('function bindZoneAngleInput()'), pe.indexOf('ppAiPlanFlow()'));
   const inputHandler = bind.slice(bind.indexOf("input.addEventListener('input'"), bind.indexOf("input.addEventListener('change'"));
-  assert.match(inputHandler, /Math\.abs\(raw-startAngle\)>0\.001[\s\S]*?ppAnglePipeRegenPending=true/,
-    '小角度输入会先改变 ppState，必须在 input 阶段保留待重生成信号');
+  const handlerCode = inputHandler.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  assert.doesNotMatch(handlerCode, /ppAnglePipeRegenPending/,
+    'input 阶段不再置脏——管线重算统一由「生成施工图」按钮无条件执行');
   assert.match(inputHandler, /ppApplyZoneAngle\(raw,false,true\)/,
     '输入预览仍保持轻量，不在每个键入事件提交设计事务');
 });

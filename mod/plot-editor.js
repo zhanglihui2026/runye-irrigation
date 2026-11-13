@@ -60,9 +60,6 @@
     zoneAuto:true,    // [v185] 地块划分开关：true=自动划分并显示分区线；false=隐藏自动分区线（改手动，见 ppSetZoneAuto）
     history:[]
   };
-  /* 角度变化后，直到自动管线按新分区成功重建前，持续保留该标记。 */
-  var ppAnglePipeRegenPending=false;
-
   /* [v201] 「此刻正在按**某一块自己的环**算分区」的临时开关。
      ★ 为什么还需要它（v197 只认 mode==='perPlot' 不够）：
         ① 整组态跑「自动管路」是逐块调 ppBuildAutoPipes —— 彼时 ge.mode 仍是
@@ -216,7 +213,6 @@
         return false;
       }
     }
-    if(Math.abs(a-previousAngle)>0.001)ppAnglePipeRegenPending=true;
     ppSyncZoneAngleUI(preserveInput);
     ppRender();
     if(refreshPlan)ppRefreshDiagramOrReset();
@@ -3604,7 +3600,6 @@
       ppRefreshMaterials();
       /* 立刻推给「成组管路」页 —— 它只看得到 slots，不刷新就还是空的 */
       ppSyncGroupEditUI();
-      ppAnglePipeRegenPending=false;
       return true;
     }
 
@@ -3652,7 +3647,6 @@
     ppUpdateAutoPipeButton();
     if (typeof window.ppRefreshDiagramIfVisible === 'function') window.ppRefreshDiagramIfVisible();
     ppRefreshMaterials();
-    ppAnglePipeRegenPending=false;
     return true;
   }
 
@@ -3733,11 +3727,6 @@
       raw=Math.max(-90,Math.min(90,raw));
       if(Math.abs(raw-startAngle)>0.001){
         if(!pushed){ppPushHistory();pushed=true;}
-        /* input 事件先更新 ppState.zoneAngleDeg，随后 change 事件再次调用
-           ppApplyZoneAngle 时 previousAngle 已等于最终值，无法再发现角度变化。
-           因此在用户开始改值时就置脏；点击「生成施工图」会据此重建二级主管/支管，
-           避免小角度旋转未改变横/竖分类时沿用旧方向管线。 */
-        ppAnglePipeRegenPending=true;
       }
       ppApplyZoneAngle(raw,false,true);
     });
@@ -5370,88 +5359,16 @@
   }
   window.ppClipPolylineToRing=ppClipPolylineToRing;
 
-  function ppMainDirectionOutdated(){
-    if(ppIsGroupWhole()||!ppState.mainPipes||!ppState.mainPipes.length)return false;
-    var expected=ppBuildAutoPipes(ppState.polyPts,
-      parseInt(document.getElementById('planN')?.value)||parseInt(document.getElementById('fld_N')?.value)||4,
-      ppState.pipeLevel==='three');
-    function longestDirection(lines){
-      var best=null,bestLen=0;
-      (lines||[]).forEach(function(line){
-        if(!line||line.length<2)return;
-        var a=line[0],b=line[line.length-1],dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy);
-        if(len>bestLen){best={x:dx/len,y:dy/len};bestLen=len;}
-      });
-      return best;
-    }
-    var oldDir=longestDirection(ppState.mainPipes),newDir=longestDirection(expected.main);
-    return !!(oldDir&&newDir&&Math.abs(oldDir.x*newDir.x+oldDir.y*newDir.y)<0.94);
-  }
-
-  function ppPartitionLayoutOutdated(){
-    if(ppIsGroupWhole())return false;
-    var bridge=window.RunyeBridge,live=bridge&&bridge.getZoneCuts();
-    var prior=window.tlDiagramData&&window.tlDiagramData.zones;
-    var canonical=window.__runyeSingleCanonicalDesign;
-    var canonicalPlot=canonical&&canonical.plots&&canonical.plots.length===1&&
-      String(canonical.plots[0].plotId)===String(window.currentPlotId||'')?canonical.plots[0]:null;
-    /* 没有上一版三级图面就没有可比较的分区前像；首次生成不能因此覆盖
-       用户当前已经绘制的管路。可比较时才根据布局差异触发自动重建。 */
-    if(!live)return false;
-    function sameArray(a,b){
-      if(!Array.isArray(a)||!Array.isArray(b)||a.length!==b.length)return false;
-      for(var i=0;i<a.length;i++)if(Math.abs(Number(a[i])-Number(b[i]))>0.05)return false;
-      return true;
-    }
-    /* The preview can already reflect a changed target area while the committed
-       design still carries the previous cuts. Generation must compare against the
-       committed design as well as the last rendered diagram. */
-    if(canonicalPlot&&canonicalPlot.partition&&
-       (!sameArray(canonicalPlot.partition.xCuts,live.xPos.slice(1,-1))||
-        !sameArray(canonicalPlot.partition.yCuts,live.yPos.slice(1,-1))))return true;
-    if(!prior)return false;
-    if(Number(live.cols)!==Number(prior.cols)||Number(live.rows)!==Number(prior.rows))return true;
-    if(!sameArray(live.xPlan,prior.xPlan)||!sameArray(live.yPlan,prior.yPlan)||
-       !sameArray(live.xPos,prior.xPos)||!sameArray(live.yPos,prior.yPos))return true;
-    if(!sameArray(live.xSrc,prior.xSrc)||!sameArray(live.ySrc,prior.ySrc))return true;
-    var lf=live.frame||null,pf=prior.frame||null;
-    if(!!lf!==!!pf)return true;
-    if(lf&&pf){
-      var frameKeys=['angle','scaleX','scaleY'];
-      for(var fi=0;fi<frameKeys.length;fi++)
-        if(Math.abs((Number(lf[frameKeys[fi]])||0)-(Number(pf[frameKeys[fi]])||0))>0.05)return true;
-      var frameMoved=false;
-      ['center','origin'].forEach(function(key){
-        var a=lf[key]||{},b=pf[key]||{};
-        if(Math.abs((Number(a.x)||0)-(Number(b.x)||0))>0.05||
-           Math.abs((Number(a.y)||0)-(Number(b.y)||0))>0.05)frameMoved=true;
-      });
-      if(frameMoved)return true;
-    }
-    return false;
-  }
-
   document.getElementById('ppGenerate').addEventListener('click',function(){
-    /* 分区角度改变后，先按新角度重建自动主管/支管，再生成二级图与三级图。
-       角度待重建状态不会被普通历史记录清掉，只有自动布管成功后才消费。
-       [v873] 重生成失败必须让用户看见——此前 fail-closed 回滚只有 console.warn，
-       用户点按钮毫无反应（真机实测「旋转角度后生成施工图没反应」）。 */
-    var rebuildForMapAngle=false,rebuildForPartitionLayout=false;
-    try{
-      /* 地图端应用角度会将持久化网络标为 needsReplan；分区恢复走 ppSetState/restore，
-         不经过 ppApplyZoneAngle，因此本地 pending 标记不足以识别该路径。 */
-      var mapNet=window.RyIrrigationDataStore&&window.RyIrrigationDataStore.readNetworkLayout
-        ?window.RyIrrigationDataStore.readNetworkLayout():null;
-      rebuildForMapAngle=!!(mapNet&&mapNet.needsReplan);
-      var priorDiagram=window.tlDiagramData;
-      var priorAngle=priorDiagram&&priorDiagram.zones&&priorDiagram.zones.frame
-        ?Number(priorDiagram.zones.frame.angle):null;
-      if(isFinite(priorAngle)&&Math.abs(priorAngle-ppZoneAngle())>0.05)rebuildForMapAngle=true;
-    }catch(eMapReplan){console.warn('[ppGenerate] 地图角度状态读取失败',eMapReplan);}
-    try{rebuildForPartitionLayout=ppPartitionLayoutOutdated();}
-    catch(ePartitionLayout){console.warn('[ppGenerate] 当前分区布局读取失败',ePartitionLayout);rebuildForPartitionLayout=true;}
-    if((ppAnglePipeRegenPending||rebuildForMapAngle||rebuildForPartitionLayout||ppMainDirectionOutdated())&&!ppAutoGeneratePipes()){
-      ppAnglePipeRegenPending=true;
+    /* [v1051 2026-11-13 用户拍板「数据唯一性」] 点「生成施工图」一律先清空重算
+       全部主管/支管/阀门（ppAutoGeneratePipes 替换式重算 + 历史栈可撤销 +
+       canonical 提交失败自动回滚），不再按「布局过时」条件复用旧管线——
+       旧几何残留会与新布局混在同一张图上（实测：不同排出现新旧两代布局并存）。
+       原「地图角度 needsReplan / 分区布局过时 / 主管方向过时」三个过时检测条件、
+       ppMainDirectionOutdated / ppPartitionLayoutOutdated 及角度待重建脏标记
+       ppAnglePipeRegenPending 一并退役。
+       [v873] 重生成失败必须让用户看见——fail-closed 回滚必须弹窗，不能只 console.warn。 */
+    if(!ppAutoGeneratePipes()){
       alert('按当前分区重生成管线未完成：'+(window.__runyeSingleL2CommitFailure||'布管或设计提交失败')+'。当前画面已保留。');
       return;
     }
@@ -5689,7 +5606,6 @@
   }
   window.ppSetState=function(saved){
     saved=saved||{};
-    ppAnglePipeRegenPending=false;
     ppState.mainPipes=JSON.parse(JSON.stringify(saved.mainPipes||[]));
     ppState.branchPipes=JSON.parse(JSON.stringify(saved.branchPipes||[]));
     ppState.subBranchPipes=JSON.parse(JSON.stringify(saved.subBranchPipes||[]));
