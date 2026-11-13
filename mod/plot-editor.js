@@ -1802,7 +1802,9 @@
     try{
       var b=ppGetBounds();
       var n=parseInt(document.getElementById('planN')&&document.getElementById('planN').value)||parseInt(document.getElementById('fld_N')&&document.getElementById('fld_N').value)||4;
-      return ppGetZoneCutSignature(b,ppGetZoneLayout(b,n));
+      /* 管线几何策略也是生成代际的一部分：旧版端点有意缩进分区边界，
+         新版要求主管/支管到达分区边缘；策略签名变化后，旧存档自动重生成。 */
+      return ppGetZoneCutSignature(b,ppGetZoneLayout(b,n))+'|pipeEnds=zone-edge-v1';
     }catch(e){return null;}
   }
   window.ppCurrentCutSignature=ppCurrentCutSignature;
@@ -3641,10 +3643,9 @@
             /* 滴灌带沿 x 向时，支管与主管均沿 y 向并共用同一设计中心线；
                阀门锚在分区中心。两类管的平面错开只由渲染副本表达，不能改水力坐标。 */
             var branchX = centerX;
-            // 支管两端各缩进一段距离（分区边长 6%，4~14m），不与分区边缘相接，使各地块支管视觉上独立断开
-            var gapV2 = Math.min(Math.max(zoneH * 0.06, 4), 14, zoneH * 0.22);
             var branchStart = out.branch.length;
-            if (pushSeg(out.branch, { x: branchX, y: zy + gapV2 }, { x: branchX, y: zy + zoneH - gapV2 })) {
+            /* 主管/支管均延伸至分区边缘；地块外缘仍由地块多边形裁切。 */
+            if (pushSeg(out.branch, { x: branchX, y: zy }, { x: branchX, y: zy + zoneH })) {
               for (var bm = branchStart; bm < out.branch.length; bm++) {
                 out.main.push(out.branch[bm].map(function (p) { return { x: p.x, y: p.y }; }));
               }
@@ -3661,10 +3662,8 @@
           } else {
             /* 滴灌带沿 y 向时，支管与主管均沿 x 向并共用同一设计中心线。 */
             var branchY = centerY;
-            // 支管两端缩进，与分区边缘留出空隙
-            var gapH2 = Math.min(Math.max(zoneW * 0.06, 4), 14, zoneW * 0.22);
             var branchStartH = out.branch.length;
-            if (pushSeg(out.branch, { x: zx + gapH2, y: branchY }, { x: zx + zoneW - gapH2, y: branchY })) {
+            if (pushSeg(out.branch, { x: zx, y: branchY }, { x: zx + zoneW, y: branchY })) {
               for (var bmH = branchStartH; bmH < out.branch.length; bmH++) {
                 out.main.push(out.branch[bmH].map(function (p) { return { x: p.x, y: p.y }; }));
               }
@@ -3751,7 +3750,9 @@
     });
     function shifted(lines,map){return lines.map(function(line,i){var d=map[i];return line.map(function(p){return{x:p.x+(d?d.x:0),y:p.y+(d?d.y:0)};});});}
     var valveAnchors=valvePoints.map(function(v,i){var d=valveShift[i];if(!d)return null;var line=mains[d.main],a=line[0],b=line[line.length-1],dx=b.x-a.x,dy=b.y-a.y,L2=dx*dx+dy*dy;var t=L2>1e-12?((v.x-a.x)*dx+(v.y-a.y)*dy)/L2:0;t=Math.max(0,Math.min(1,t));return{x:a.x+dx*t-d.x,y:a.y+dy*t-d.y};});
-    return{main:shifted(mains,mainShift),branch:shifted(branches,branchShift),valves:valvePoints.map(function(v,i){var d=valveShift[i];return{x:v.x+(d?d.x:0),y:v.y+(d?d.y:0)};}),valveAnchors:valveAnchors};
+    /* 阀门保留真实分区中心坐标；只偏移管线渲染副本。连接短管锚点跟随显示主管。 */
+    return{main:shifted(mains,mainShift),branch:shifted(branches,branchShift),
+      valves:valvePoints.map(function(v){return{x:v.x,y:v.y};}),valveAnchors:valveAnchors};
   }
   try { window.ppGetPipeDisplayGeometry=ppGetPipeDisplayGeometry; } catch(ePipeDisplay) {}
 

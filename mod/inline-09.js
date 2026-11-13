@@ -4009,8 +4009,7 @@ function tlAutoGenerate(options) {
     function f(v){ if(!isFinite(v))return '—'; var rounded=Math.round(v); return Math.abs(v-rounded)<0.05?String(rounded):v.toFixed(1); }
     return f(w)+'×'+f(h)+'m';
   }
-  // 支管端点缩进：若支管为水平/垂直线且端点贴分区边缘（自动生成的贴边管），向内缩进 gap，
-  // 使相邻地块的支管在分界处留出空隙、视觉上独立断开；斜线（手动绘制）不受影响。
+  // 旧版边界缩进函数保留兼容；自动生成管路不再调用，避免相邻分区管段断开。
   function tlTrimBranchToZone(line){
     if(!line||line.length<2)return line;
     var p1=line[0], p2=line[line.length-1];
@@ -4758,11 +4757,12 @@ function tlAutoGenerate(options) {
 
   // ===== 管线：优先采用二级页已生成几何（数据传导），否则三级页自动布管 =====
   var mainPipes=[], branchPipes=[], valves=[];
-  /* [v601 2026-10-19 用户口径] 支管计算长度的两个基准，随图面快照一起落 tlDiagramData：
+  /* 支管计算长度的两个基准，随图面快照一起落 tlDiagramData：
      · branchFullSpans —— 该支管所在分区的「设计满跨」（贯通整个分区的净尺寸），
-       与图面两端 gapV/gapH 留边无关；
-     · branchDrawnLens —— 图面实际画出来的长度（= 满跨 − 2×留边），
-       仅用于识别「用户手动改长」的增量（effLen − drawn）后再叠加到满跨上。
+       用于路径/水力计算；
+     · branchDrawnLens —— 图面实际画出来的长度，
+       用于识别「用户手动改长」的增量（effLen − drawn）后再叠加到满跨上；
+       异形地块因外边界裁剪可短于满跨。
      长度/水损一律按满跨计，图面留边只影响显示（用户 2026-10-19 明确口径）。 */
   var branchFullSpans=[], branchDrawnLens=[];
   function tlPolyLen(pts){ if(!pts||pts.length<2)return 0; var L=0; for(var i=1;i<pts.length;i++){var dx=pts[i].x-pts[i-1].x,dy=pts[i].y-pts[i-1].y;L+=Math.sqrt(dx*dx+dy*dy);} return L; }
@@ -4848,8 +4848,7 @@ function tlAutoGenerate(options) {
       branchPipes=branchPipes.map(function(l){return l.map(function(p){return tlFrameToGrid(tlZoneCuts.frame,p);});});
       valves=valves.map(function(v){return tlFrameToGrid(tlZoneCuts.frame,v);});
     }
-    // 复用二级页支管时端点若贴在分区边缘，同样向内缩进，保证相邻地块支管视觉上断开
-    branchPipes=branchPipes.map(tlTrimBranchToZone);
+    /* [v1061] 不再对复用的二级支管二次缩进；边界端点用于连接相邻分区主管段。 */
     branchDrawnLens=branchPipes.map(function(l){return tlPolyLen(l);});
   } else {
     /* 阀门与支管锚定分区中心；主管埋于支管下方600 mm，平面设计轴线与支管同向重合。
@@ -4883,17 +4882,14 @@ function tlAutoGenerate(options) {
         var center=tlActualCellCenter(zx2,zy2,zoneW2,zoneH2);
         var centerX=center.x, centerY=center.y;
         var fixedSideIsHorizontal=majFixedH;   /* 第一分区定滴灌带轴，其余主管/支管全部垂直于该轴 */
-        // 支管两端各缩进一段距离（约分区边长的 6%，4~14m），不与分区边缘相接，使各地块支管视觉上独立断开
-        var gapV=Math.min(Math.max(zoneH2*0.06,4),14,zoneH2*0.22);
-        var gapH=Math.min(Math.max(zoneW2*0.06,4),14,zoneW2*0.22);
         if(fixedSideIsHorizontal){
           /* 滴灌带沿长边；支管横跨分区短边中心。地下主管与支管同向同投影。 */
           var brX=centerX;
           /* [v830] 裁到地块内：旋转角下角格子会伸到外面；裁空的整根丢弃（含其满跨/留边记录），
              保证 mainPipes/branchPipes/branchFullSpans/branchDrawnLens 四个数组始终等长对齐。 */
-          var tlSegB=tlClipPipeSeg({x:brX,y:zy2+gapV},{x:brX,y:zy2+zoneH2-gapV});
+          var tlSegB=tlClipPipeSeg({x:brX,y:zy2},{x:brX,y:zy2+zoneH2});
           if(tlSegB){
-            branchPipes.push(tlSegB); branchFullSpans.push(zoneH2); branchDrawnLens.push(zoneH2-2*gapV);
+            branchPipes.push(tlSegB); branchFullSpans.push(zoneH2); branchDrawnLens.push(tlPolyLen(tlSegB));
             mainPipes.push(tlSegB.map(function(p){return{x:p.x,y:p.y};}));
           }
           var tlMainIdx = tlSegB ? mainPipes.length-1 : -1;
@@ -4902,9 +4898,9 @@ function tlAutoGenerate(options) {
         }else{
           var brY=centerY;
           /* [v830] 同上：裁到地块内，裁空的整根丢弃 */
-          var tlSegB2=tlClipPipeSeg({x:zx2+gapH,y:brY},{x:zx2+zoneW2-gapH,y:brY});
+          var tlSegB2=tlClipPipeSeg({x:zx2,y:brY},{x:zx2+zoneW2,y:brY});
           if(tlSegB2){
-            branchPipes.push(tlSegB2); branchFullSpans.push(zoneW2); branchDrawnLens.push(zoneW2-2*gapH);
+            branchPipes.push(tlSegB2); branchFullSpans.push(zoneW2); branchDrawnLens.push(tlPolyLen(tlSegB2));
             mainPipes.push(tlSegB2.map(function(p){return{x:p.x,y:p.y};}));
           }
           var tlMainIdx2 = tlSegB2 ? mainPipes.length-1 : -1;
