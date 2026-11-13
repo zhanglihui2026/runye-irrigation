@@ -4795,50 +4795,12 @@ function tlAutoGenerate(options) {
       branchPipes=branchPipes.map(function(l){return l.map(function(p){return tlFrameToGrid(tlZoneCuts.frame,p);});});
       valves=valves.map(function(v){return tlFrameToGrid(tlZoneCuts.frame,v);});
     }
-    /* 兼容 v1047 及更早的自动布管：旧模型每区主管与支管共线，阀门也因此被
-       渲染偏移。仅当数量、行主序分区归属、主管/支管平行重合和阀门落线全部吻合时，
-       才把主管按中心阀门旋转到支管垂向；手绘或不完整管网不符合该完整签名，不改写。 */
-    (function restoreCenteredCrossLayout(){
-      var zoneTotal=rows*cols;
-      if(!zoneTotal||mainPipes.length!==zoneTotal||branchPipes.length!==zoneTotal||valves.length!==zoneTotal)return;
-      var rebuilt=[];
-      for(var zi0=0;zi0<zoneTotal;zi0++){
-        var rr=Math.floor(zi0/cols),cc=zi0%cols;
-        var zx0=xPos[cc],zy0=yPos[rr],zw0=xSrc[cc],zh0=ySrc[rr];
-        var ml0=mainPipes[zi0],bl0=branchPipes[zi0],vv0=valves[zi0];
-        if(!ml0||ml0.length<2||!bl0||bl0.length<2||!vv0)return;
-        var ma=ml0[0],mb=ml0[ml0.length-1],ba=bl0[0],bb=bl0[bl0.length-1];
-        var mdx=mb.x-ma.x,mdy=mb.y-ma.y,bdx=bb.x-ba.x,bdy=bb.y-ba.y;
-        var mlen=Math.hypot(mdx,mdy),blen=Math.hypot(bdx,bdy);
-        if(mlen<1||blen<1||Math.abs(mdx*bdy-mdy*bdx)/(mlen*blen)>0.02)return;
-        var overlapAxis=Math.abs(bdx)>=Math.abs(bdy)?'x':'y';
-        var lineSep=overlapAxis==='x'?Math.abs(ma.y-ba.y):Math.abs(ma.x-ba.x);
-        var vDist=overlapAxis==='x'?Math.abs(vv0.y-ba.y):Math.abs(vv0.x-ba.x);
-        var vmid=overlapAxis==='x'?vv0.x:vv0.y;
-        var blo=overlapAxis==='x'?Math.min(ba.x,bb.x):Math.min(ba.y,bb.y);
-        var bhi=overlapAxis==='x'?Math.max(ba.x,bb.x):Math.max(ba.y,bb.y);
-        var cellLo=overlapAxis==='x'?zx0:zy0,cellHi=overlapAxis==='x'?zx0+zw0:zy0+zh0;
-        var mainMidX=(ma.x+mb.x)/2,mainMidY=(ma.y+mb.y)/2;
-        if(lineSep>0.5||vDist>0.5||vmid<blo-0.5||vmid>bhi+0.5||blo<cellLo-0.5||bhi>cellHi+0.5||
-           mainMidX<zx0-0.5||mainMidX>zx0+zw0+0.5||mainMidY<zy0-0.5||mainMidY>zy0+zh0+0.5)return;
-        var p0,p1;
-        if(overlapAxis==='y'){p0={x:zx0,y:vv0.y};p1={x:zx0+zw0,y:vv0.y};}
-        else{p0={x:vv0.x,y:zy0};p1={x:vv0.x,y:zy0+zh0};}
-        var clipped=tlClipPipeSeg(p0,p1);
-        if(!clipped||Math.hypot(clipped[1].x-clipped[0].x,clipped[1].y-clipped[0].y)<1)return;
-        rebuilt.push(clipped);
-      }
-      if(rebuilt.length!==zoneTotal)return;
-      mainPipes=rebuilt;
-      valves=valves.map(function(v,i){return Object.assign({},v,{mi:i});});
-    })();
     // 复用二级页支管时端点若贴在分区边缘，同样向内缩进，保证相邻地块支管视觉上断开
     branchPipes=branchPipes.map(tlTrimBranchToZone);
     branchDrawnLens=branchPipes.map(function(l){return tlPolyLen(l);});
   } else {
-    /* 最外排/列主管保留既有端部长度规则。阀门与支管设计轴线均落在分区实际中心；
-       与主管重合时的可视分离只由后续 SVG 渲染副本完成，不改设计几何。 */
-    var MAIN_END_ELBOW_R = 0.18;
+    /* 阀门与支管锚定分区中心；主管埋于支管下方600 mm，平面设计轴线与支管同向重合。
+       图面需要区分时只移动渲染副本，不能旋转/平移设计线或水力坐标。 */
     /* 仅用于渲染层区分重合的主管/支管；设计与水力坐标保持中心线。 */
     function tlActualCellCenter(x,y,w,h){
       var fallback={x:x+w/2,y:y+h/2},geom=window.RyPlotEditorGeom;
@@ -4872,44 +4834,28 @@ function tlAutoGenerate(options) {
         var gapV=Math.min(Math.max(zoneH2*0.06,4),14,zoneH2*0.22);
         var gapH=Math.min(Math.max(zoneW2*0.06,4),14,zoneW2*0.22);
         if(fixedSideIsHorizontal){
-          /* 支管按既定方向通过实际分区中心；主管取其垂线并经过同一阀门中心。 */
-          var mainY=centerY;
+          /* 滴灌带沿长边；支管横跨分区短边中心。地下主管与支管同向同投影。 */
           var brX=centerX;
-          var tlEdgeZ=(zc3===cols-1);                 /* 主管方向上的最外一列 */
-          var tlMainEndX=zx2+zoneW2;
-          if(tlEdgeZ){
-            tlMainEndX=zx2+zoneW2*0.5+zoneW2*MAIN_END_ELBOW_R;
-            if(tlMainEndX>zx2+zoneW2-gapH)tlMainEndX=zx2+zoneW2-gapH;
-            if(tlMainEndX<zx2+gapH)tlMainEndX=zx2+gapH;
-          }
           /* [v830] 裁到地块内：旋转角下角格子会伸到外面；裁空的整根丢弃（含其满跨/留边记录），
              保证 mainPipes/branchPipes/branchFullSpans/branchDrawnLens 四个数组始终等长对齐。 */
-          var tlMOk=true,tlSegM=tlClipPipeSeg({x:zx2,y:mainY},{x:tlMainEndX,y:mainY});
           var tlSegB=tlClipPipeSeg({x:brX,y:zy2+gapV},{x:brX,y:zy2+zoneH2-gapV});
-          if(!tlSegB){ tlMOk=false; }
-          else{ branchPipes.push(tlSegB); branchFullSpans.push(zoneH2); branchDrawnLens.push(zoneH2-2*gapV); }
-          if(tlSegM) mainPipes.push(tlSegM);
-          var tlMainIdx = tlSegM ? mainPipes.length-1 : -1;
-          if(tlMOk && window.atPointInPolygon&&window.atPointInPolygon({x:centerX,y:centerY},tlGridPlotPoly))
+          if(tlSegB){
+            branchPipes.push(tlSegB); branchFullSpans.push(zoneH2); branchDrawnLens.push(zoneH2-2*gapV);
+            mainPipes.push(tlSegB.map(function(p){return{x:p.x,y:p.y};}));
+          }
+          var tlMainIdx = tlSegB ? mainPipes.length-1 : -1;
+          if(tlSegB && window.atPointInPolygon&&window.atPointInPolygon({x:centerX,y:centerY},tlGridPlotPoly))
             valves.push({x:centerX,y:centerY,mi:tlMainIdx});
         }else{
-          var mainX=centerX;
           var brY=centerY;
-          var tlEdgeZ=(zr2===rows-1);                 /* 主管方向上的最外一排 */
-          var tlMainEndY=zy2+zoneH2;
-          if(tlEdgeZ){
-            tlMainEndY=zy2+zoneH2*0.5+zoneH2*MAIN_END_ELBOW_R;
-            if(tlMainEndY>zy2+zoneH2-gapV)tlMainEndY=zy2+zoneH2-gapV;
-            if(tlMainEndY<zy2+gapV)tlMainEndY=zy2+gapV;
-          }
           /* [v830] 同上：裁到地块内，裁空的整根丢弃 */
-          var tlMOk2=true,tlSegM2=tlClipPipeSeg({x:mainX,y:zy2},{x:mainX,y:tlMainEndY});
           var tlSegB2=tlClipPipeSeg({x:zx2+gapH,y:brY},{x:zx2+zoneW2-gapH,y:brY});
-          if(!tlSegB2){ tlMOk2=false; }
-          else{ branchPipes.push(tlSegB2); branchFullSpans.push(zoneW2); branchDrawnLens.push(zoneW2-2*gapH); }
-          if(tlSegM2) mainPipes.push(tlSegM2);
-          var tlMainIdx2 = tlSegM2 ? mainPipes.length-1 : -1;
-          if(tlMOk2 && window.atPointInPolygon&&window.atPointInPolygon({x:centerX,y:centerY},tlGridPlotPoly))
+          if(tlSegB2){
+            branchPipes.push(tlSegB2); branchFullSpans.push(zoneW2); branchDrawnLens.push(zoneW2-2*gapH);
+            mainPipes.push(tlSegB2.map(function(p){return{x:p.x,y:p.y};}));
+          }
+          var tlMainIdx2 = tlSegB2 ? mainPipes.length-1 : -1;
+          if(tlSegB2 && window.atPointInPolygon&&window.atPointInPolygon({x:centerX,y:centerY},tlGridPlotPoly))
             valves.push({x:centerX,y:centerY,mi:tlMainIdx2});
         }
       }

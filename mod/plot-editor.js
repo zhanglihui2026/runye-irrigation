@@ -3432,13 +3432,17 @@
             : (forceDir === 'h') ? false
             : (cuts.xPlan[zc] >= cuts.yPlan[zr]);
           if (fixedSideIsHorizontal) {
-            /* 支管沿既定轴向穿过分区中心；主管按支管方向取垂线，
-               两者在中心点与阀门相交。 */
-            var branchX = centerX, mainY = centerY;
-            pushSeg(out.main, { x: zx, y: mainY }, { x: zx + zoneW, y: mainY });
+            /* 滴灌带沿 x 向时，支管与主管均沿 y 向并共用同一设计中心线；
+               阀门锚在分区中心。两类管的平面错开只由渲染副本表达，不能改水力坐标。 */
+            var branchX = centerX;
             // 支管两端各缩进一段距离（分区边长 6%，4~14m），不与分区边缘相接，使各地块支管视觉上独立断开
             var gapV2 = Math.min(Math.max(zoneH * 0.06, 4), 14, zoneH * 0.22);
-            pushSeg(out.branch, { x: branchX, y: zy + gapV2 }, { x: branchX, y: zy + zoneH - gapV2 });
+            var branchStart = out.branch.length;
+            if (pushSeg(out.branch, { x: branchX, y: zy + gapV2 }, { x: branchX, y: zy + zoneH - gapV2 })) {
+              for (var bm = branchStart; bm < out.branch.length; bm++) {
+                out.main.push(out.branch[bm].map(function (p) { return { x: p.x, y: p.y }; }));
+              }
+            }
             if (ppPointInPlot({ x: centerX, y: centerY })) out.valves.push({ x: centerX, y: centerY });
             // Three-level: sub-branch pipes perpendicular to branch (horizontal)
             if (isThree) {
@@ -3449,12 +3453,16 @@
               }
             }
           } else {
-            /* 横向支管对应竖向主管，主管、支管和阀门仍以分区中心交会。 */
-            var branchY = centerY, mainX = centerX;
-            pushSeg(out.main, { x: mainX, y: zy }, { x: mainX, y: zy + zoneH });
+            /* 滴灌带沿 y 向时，支管与主管均沿 x 向并共用同一设计中心线。 */
+            var branchY = centerY;
             // 支管两端缩进，与分区边缘留出空隙
             var gapH2 = Math.min(Math.max(zoneW * 0.06, 4), 14, zoneW * 0.22);
-            pushSeg(out.branch, { x: zx + gapH2, y: branchY }, { x: zx + zoneW - gapH2, y: branchY });
+            var branchStartH = out.branch.length;
+            if (pushSeg(out.branch, { x: zx + gapH2, y: branchY }, { x: zx + zoneW - gapH2, y: branchY })) {
+              for (var bmH = branchStartH; bmH < out.branch.length; bmH++) {
+                out.main.push(out.branch[bmH].map(function (p) { return { x: p.x, y: p.y }; }));
+              }
+            }
             if (ppPointInPlot({ x: centerX, y: centerY })) out.valves.push({ x: centerX, y: centerY });
             // Three-level: sub-branch pipes perpendicular to branch (vertical)
             if (isThree) {

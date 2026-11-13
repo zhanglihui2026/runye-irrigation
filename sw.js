@@ -9,7 +9,9 @@
 /* v531-data-service-plot-store: resolve plugin plot references through the shared plot-library adapter. */
 /* v427-archive-3d-iso: detach 3D preview and axonometric UI while retaining shared 2D pipe workspace and data. */
 'use strict';
-/* VERSION 沿革：v1049-zone-list-compact（实切分区明细改为五列无单位紧凑表格）→
+/* VERSION 沿革：v1050-main-parallel-branch（主管恢复为与支管同向、同设计中心线；
+   删除错误的垂直主管兼容旋转；计划/水力仍读中心线，图面偏移只用于显示）→
+   v1049-zone-list-compact（实切分区明细改为五列无单位紧凑表格）→
    v1048-centered-cross-pipes（修复生成时报错；支管/阀门居中，主管按支管方向垂直布置）→
    v1047-area-center-pathmeasure（逐区面积统一、管线阀门回到分区中心、移除手工路径测量交互）→
    v1046-repartition-publish（面积重划后按当前切线重建，并清理旧几何节点后发布地图快照）→
@@ -1480,7 +1482,7 @@
    [v1039-flow-display-decoupling] 分区面仅作动画显示；缺失时不阻断已发布管网的水路计算。
    [v1042-source-independent-irrigation-route] 页面恢复重绘时按已发布管网几何核对动画版本。
    [v1043-coupler-node-lifecycle] 接驳节点随地块设计快照恢复；分区重建或管网重生成时清除旧节点。 */
-const VERSION = 'v1049-zone-list-compact';
+const VERSION = 'v1050-main-parallel-branch';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
