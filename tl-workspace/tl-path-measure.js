@@ -1,13 +1,7 @@
-/* ===== 路径水头损失测算（2026-09-24 任务⑦，用户需求）=====
- * 用户原话：「总管被主管分段之后，每段要变成可选择的，我想自己手动选择管道之后
- * 形成一个路径，然后测算这个路径的水头损失是多大。」
- *
- * 设计：
- * · 总管分段 = 纯读取视图，不写 tlDiagramData / AE（红线同前）：按每根主管靠总管
- *   端点在总管上的接入位置切成 N+1 段（同排共线多段主管接入点重合 → 一个分段点），
- *   命中线（透明粗线）叠在原 front/main path 之上，只在路径模式下显示。
- * · 用户依次点击总管分段 / 主管段（main-i，分区段）加入路径（再点取消），面板按
- *   选择顺序列出每段：管径 / 长度 / 流量 / 水头损失，并给出合计。
+/* ===== 管段分段与几何计算支持（原路径水头损失测算内核）=====
+ * 手工选择路径和独立测算面板已移除。保留本模块的纯计算接口，因为工作区的
+ * 管段选择/长度/损失展示及三级简图分段仍调用这些接口；此处不启动任何测量交互。
+ * · 总管分段 = 纯读取视图：按每根主管靠总管一端的接入位置切成 N+1 段。
  * · 主管分段（2026-09-24 用户要求「主管被三通分成几段，这些段应可以分段选择」）：
  *   主管按管上三通/阀门切成若干段 —— 图面配件按 atM 定位；自动阀门按 45° 接点 (ax,ay)
  *   投影到主管有效几何上定位；贴端点 / 相邻过近（<1m）的切点不生效。段 pid 'main-i-j'；
@@ -27,10 +21,7 @@
 (function () {
   'use strict';
 
-  var modeOn = false;
-  var pathSegs = [];          /* 有序 pid 数组：'front-0' | 'main-3' */
   var segsCache = null;       /* front 分段缓存 {sig, cuts, Lpx, juncs, fpModel} */
-  var panelEl = null;
 
   function el(id) { return document.getElementById(id); }
   function data() { return window.tlDiagramData; }
@@ -74,24 +65,6 @@
     }
     return out.length >= 2 ? out : null;
   }
-  /* 子折线 → path d（q 为模型→svg 坐标映射） */
-  function polyD(pts, q) {
-    var d = '';
-    for (var i = 0; i < pts.length; i++) {
-      var p = q(pts[i]);
-      d += (i ? 'L' : 'M') + p.x.toFixed(2) + ' ' + p.y.toFixed(2);
-    }
-    return d;
-  }
-  /* 工作区底图坐标映射：模型(米) → svg 用户坐标 —— 与 tl-workspace renderPipeBaseSVG 完全同式
-   * （ts 公式 svg=(data−minX)*s+ox 合并为 T(p)=(p+OX)*s，OX=pv.ox/pv.s−pv.minX）；不可用返回 null */
-  function wsT() {
-    var pv = window.tlPlanView;
-    if (!pv || !isFinite(pv.s) || !(pv.s > 0) || !isFinite(pv.minX) || !isFinite(pv.minY)
-      || !isFinite(pv.ox) || !isFinite(pv.oy)) return null;
-    var OX = pv.ox / pv.s - pv.minX, OY = pv.oy / pv.s - pv.minY;
-    return function (p) { return { x: (p.x + OX) * pv.s, y: (p.y + OY) * pv.s }; };
-  }
   /* 单根主管的分段点：图面配件（三通/阀门 atM）+ 自动阀门 45° 接点在管上的投影位置；
    * 升序去重、贴端点剔除。返回 {epts, Lm, cuts[]}；无有效几何返回 null */
   function mainCuts(mi, d, A) {
@@ -128,7 +101,9 @@
     var fm = d && d.meta && d.meta.flowModel;
     if (fm && fm.zoneFlow > 0) return fm;
     function rd(id, def) { var e = el(id); var v = e ? parseFloat(e.value) : NaN; return isFinite(v) && v > 0 ? v : def; }
-    var areaM2 = rd('tl_zoneMu', 30) * (2000 / 3);
+    var areas=d&&Array.isArray(d.zoneAreasM2)?d.zoneAreasM2:null;
+    if(!Array.isArray(areas)||!areas.length||areas.some(function(a){return !isFinite(Number(a))||Number(a)<=0;}))return null;
+    var areaM2=Math.max.apply(null,areas.map(Number));
     var zoneFlow = areaM2 / rd('tl_tapeSpacing', 1.2) / rd('tl_emitterSpacing', 0.3) * rd('tl_emitterFlow', 2) / 1000;
     var zcEl = el('tl_zoneCount');
     var zcV = zcEl ? parseFloat(zcEl.value) : NaN;
@@ -324,245 +299,8 @@
     return hf(L, Q, od);
   }
 
-  /* ---------- 图面覆盖层 ---------- */
-  function SVG(tag, attrs) {
-    var n = document.createElementNS('http://www.w3.org/2000/svg', tag);
-    for (var k in attrs) n.setAttribute(k, attrs[k]);
-    return n;
-  }
-  function buildLayer() {
-    removeLayer();
-    var svg = wsSvg(), S = segs();
-    if (!svg || !S) return;
-    var g = SVG('g', { id: 'tlPathLayer' });
-    var fpEl = frontPathEl();
-
-    /* 总管分段：命中线（透明）+ 分段刻度 */
-    for (var i = 0; i + 1 < S.cuts.length; i++) {
-      var a = fpEl.getPointAtLength(S.cuts[i]), b = fpEl.getPointAtLength(S.cuts[i + 1]);
-      var hit = SVG('path', { d: 'M' + a.x.toFixed(2) + ' ' + a.y.toFixed(2) + ' L' + b.x.toFixed(2) + ' ' + b.y.toFixed(2),
-        fill: 'none', stroke: 'rgba(0,0,0,0)', 'stroke-width': '16', 'stroke-linecap': 'butt',
-        'data-tlpathseg': frontSegPid(i), 'pointer-events': 'stroke', style: 'cursor:pointer' });
-      g.appendChild(hit);
-      var mid = fpEl.getPointAtLength((S.cuts[i] + S.cuts[i + 1]) / 2);
-      g.appendChild(SVG('circle', { cx: mid.x.toFixed(2), cy: mid.y.toFixed(2), r: '2.6', fill: '#f97316',
-        stroke: '#ffffff', 'stroke-width': '1', 'pointer-events': 'none', opacity: '0.9' }));
-    }
-    /* 主管段：有三通/阀门分段点 → 按段出命中线（2026-09-24 用户要求「主管被三通分成
-       几段后可分段选择」）。命中线按有效几何 + 底图坐标映射重画 —— 改长过的主管分段也正确；
-       无分段点或映射不可用 → 整管一条命中线（克隆原 path d，旧行为）。 */
-    var d = data(), T = wsT();
-    (d.mainPipes || []).forEach(function (line, mi) {
-      var M = (S.mains) ? S.mains[mi] : null;
-      if (M && M.cuts.length && T) {
-        var bnds = [0].concat(M.cuts, [M.Lm]);
-        for (var k = 0; k + 1 < bnds.length; k++) {
-          var sub = slicePoly(M.epts, bnds[k], bnds[k + 1]);
-          if (!sub) continue;
-          g.appendChild(SVG('path', { d: polyD(sub, T), fill: 'none', stroke: 'rgba(0,0,0,0)',
-            'stroke-width': '14', 'stroke-linecap': 'butt', 'data-tlpathseg': 'main-' + mi + '-' + k,
-            'pointer-events': 'stroke', style: 'cursor:pointer' }));
-        }
-        return;
-      }
-      var src = svg.querySelector('[data-tlpipe="main-' + mi + '"]');
-      if (!src) return;
-      g.appendChild(SVG('path', { d: src.getAttribute('d'), fill: 'none', stroke: 'rgba(0,0,0,0)',
-        'stroke-width': '14', 'stroke-linecap': 'butt', 'data-tlpathseg': 'main-' + mi,
-        'pointer-events': 'stroke', style: 'cursor:pointer' }));
-    });
-    /* 高亮层（最上、不吃事件） */
-    g.appendChild(SVG('g', { id: 'tlPathHi', 'pointer-events': 'none' }));
-
-    g.addEventListener('click', function (e) {
-      var t = e.target && e.target.closest ? e.target.closest('[data-tlpathseg]') : null;
-      if (!t) return;
-      e.stopPropagation();
-      toggleSeg(t.getAttribute('data-tlpathseg'));
-    });
-    svg.appendChild(g);
-    drawHi();
-  }
-  function removeLayer() {
-    var svg = wsSvg();
-    var old = svg ? svg.querySelector('#tlPathLayer') : null;
-    if (old && old.parentNode) old.parentNode.removeChild(old);
-  }
-  function hiLayer() {
-    var svg = wsSvg();
-    return svg ? svg.querySelector('#tlPathHi') : null;
-  }
-  function segD(pid) {
-    var svg = wsSvg(), S = segs();
-    if (!svg || !S) return null;
-    var m = /^front-(\d+)$/.exec(pid);
-    if (m) {
-      var i = Number(m[1]);
-      if (i + 1 >= S.cuts.length) return null;
-      var fpEl = frontPathEl();
-      var a = fpEl.getPointAtLength(S.cuts[i]), b = fpEl.getPointAtLength(S.cuts[i + 1]);
-      return 'M' + a.x.toFixed(2) + ' ' + a.y.toFixed(2) + ' L' + b.x.toFixed(2) + ' ' + b.y.toFixed(2);
-    }
-    var ms = mainSegBounds(pid);                           /* 主管段：按有效几何 + 底图映射重画 */
-    if (ms) {
-      var T = wsT();
-      if (!T) return null;
-      var sub = slicePoly(ms.M.epts, ms.a, ms.b);
-      return sub ? polyD(sub, T) : null;
-    }
-    var src = svg.querySelector('[data-tlpipe="' + pid + '"]');
-    return src ? src.getAttribute('d') : null;
-  }
-  function drawHi() {
-    var hi = hiLayer();
-    if (!hi) return;
-    while (hi.firstChild) hi.removeChild(hi.firstChild);
-    pathSegs.forEach(function (pid, idx) {
-      var dd = segD(pid);
-      if (!dd) return;
-      hi.appendChild(SVG('path', { d: dd, fill: 'none', stroke: '#7c3aed', 'stroke-width': '8',
-        'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: '0.85' }));
-      /* 序号标注放在段中点（总管取分段中点；主管段取有效几何弧长中点；整管主管取中点） */
-      var svg = wsSvg(), S = segs(), cx = null, cy = null;
-      var m = /^front-(\d+)$/.exec(pid);
-      var mSeg = /^main-(\d+)-(\d+)$/.exec(pid);
-      if (m && S) {
-        var fpEl = frontPathEl();
-        var p = fpEl.getPointAtLength((S.cuts[Number(m[1])] + S.cuts[Number(m[1]) + 1]) / 2);
-        cx = p.x; cy = p.y;
-      } else if (mSeg && S) {
-        var msB = mainSegBounds(pid);
-        var T = msB ? wsT() : null, Am = AE(), dm = data();
-        if (T && Am && Am.pointAt) {
-          var pm = Am.pointAt('main-' + msB.mi, dm, (msB.a + msB.b) / 2);
-          if (pm) { var qm = T(pm); cx = qm.x; cy = qm.y; }
-        }
-      } else {
-        var src = svg.querySelector('[data-tlpipe="' + pid + '"]');
-        if (src) {
-          var L = src.getTotalLength(), p2 = src.getPointAtLength(L / 2);
-          cx = p2.x; cy = p2.y;
-        }
-      }
-      if (cx != null) {
-        var tx = SVG('text', { x: (cx + 6).toFixed(1), y: (cy - 6).toFixed(1), 'pointer-events': 'none',
-          fill: '#6d28d9', 'font-size': '13', 'font-weight': '700', 'font-family': 'system-ui,sans-serif' });
-        tx.textContent = String(idx + 1);
-        hi.appendChild(tx);
-      }
-    });
-  }
-
-  /* ---------- 面板 ---------- */
-  function fmt(v, n) { return Number(v).toFixed(n == null ? 2 : n); }
-  function esc(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
-  function ensurePanel() {
-    if (panelEl && document.body.contains(panelEl)) return panelEl;
-    panelEl = document.createElement('div');
-    panelEl.id = 'tlPathPanel';
-    panelEl.style.cssText = 'position:fixed;z-index:9998;background:#fff;border:1px solid #c4b5fd;border-radius:8px;'
-      + 'box-shadow:0 8px 24px rgba(0,0,0,.16);padding:10px 12px;min-width:290px;max-width:360px;'
-      + 'font:12px/1.7 system-ui,sans-serif;color:#1f2937;display:none';
-    document.body.appendChild(panelEl);
-    return panelEl;
-  }
-  function placePanel() {
-    if (!panelEl) return;
-    var w = panelEl.offsetWidth || 300;
-    panelEl.style.left = Math.max(8, window.innerWidth - w - 16) + 'px';
-    panelEl.style.top = '86px';
-  }
-  function renderPanel() {
-    if (!modeOn) return;
-    var p = ensurePanel();
-    var h = '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">'
-      + '<b style="color:#6d28d9;font-size:13px">🧭 路径水头损失测算</b>'
-      + '<span style="flex:1"></span>'
-      + '<button type="button" data-pathclear style="border:1px solid #cbd5e1;background:#fff;border-radius:4px;padding:1px 8px;cursor:pointer;font:inherit">清空</button>'
-      + '<button type="button" data-pathclose style="border:1px solid #cbd5e1;background:#fff;border-radius:4px;padding:1px 8px;cursor:pointer;font:inherit">退出</button>'
-      + '</div>';
-    if (!pathSegs.length) {
-      h += '<div style="color:#94a3b8">依次点击图上<b style="color:#f97316">总管分段</b>（橙色刻度点分段）'
-        + '或<b style="color:#185FA5">主管分段</b>（主管已按管上三通/阀门自动分段，无分段点的主管整管可选）'
-        + '加入路径；再点已选段取消。建议从水源一端起选。</div>';
-    } else {
-      h += '<div style="border-top:1px dashed #e2e8f0;margin-top:2px"></div>';
-      var sumL = 0, sumHf = 0, rows = 0;
-      pathSegs.forEach(function (pid, idx) {
-        var L = segLen(pid), Q = segFlow(pid), od = segOd(pid), hfV = segHf(pid);
-        var odTxt = od ? 'Ø' + od : '—';
-        var lenTxt = (L != null) ? fmt(L, 1) + ' m' : '—';
-        var qTxt = (Q != null) ? fmt(Q, 1) : '—';
-        var hfTxt = (hfV != null) ? fmt(hfV, 2) + ' m' : '—';
-        if (L != null) sumL += L;
-        if (hfV != null) sumHf += hfV;
-        rows++;
-        h += '<div style="display:flex;gap:6px;align-items:baseline;margin:2px 0">'
-          + '<b style="flex:none;width:16px;color:#6d28d9">' + (idx + 1) + '</b>'
-          + '<span style="flex:1">' + esc(segName(pid)) + ' <span style="color:#64748b">' + odTxt + ' · ' + lenTxt
-          + ' · Q ' + qTxt + ' · hf ' + hfTxt + '</span></span>'
-          + '<button type="button" data-pathdel="' + esc(pid) + '" title="从路径移除"'
-          + ' style="flex:none;border:0;background:none;color:#b91c1c;cursor:pointer;font:inherit">✕</button></div>';
-      });
-      h += '<div style="border-top:1px dashed #e2e8f0;margin-top:4px;padding-top:4px;font-weight:700">'
-        + '路径 ' + rows + ' 段 · 合计 ' + fmt(sumL, 1) + ' m · 水头损失合计 <b style="color:#6d28d9">' + fmt(sumHf, 2) + ' m</b></div>';
-      h += '<div style="margin-top:3px;color:#94a3b8;font-size:11px">口径：Hazen-Williams C=150、PE SDR13.6 内径；'
-        + '主管（整管/分段同口径）=单区流量，总管段=下游轮灌组最大流量和（与水泵扬程校核同口径）；'
-        + '管长=图面有效几何（含改长），管径=图面改径优先。</div>';
-    }
-    p.innerHTML = h;
-    p.style.display = 'block';
-    placePanel();
-  }
-  function hidePanel() {
-    if (panelEl) { panelEl.style.display = 'none'; }
-  }
-  document.addEventListener('click', function (e) {
-    if (!panelEl || panelEl.style.display === 'none') return;
-    var t = e.target && e.target.closest ? e.target.closest : null;
-    if (t && e.target.closest('[data-pathdel]')) {
-      var pid = e.target.closest('[data-pathdel]').getAttribute('data-pathdel');
-      pathSegs = pathSegs.filter(function (x) { return x !== pid; });
-      drawHi(); renderPanel();
-      return;
-    }
-    if (t && e.target.closest('[data-pathclear]')) { pathSegs = []; drawHi(); renderPanel(); return; }
-    if (t && e.target.closest('[data-pathclose]')) { setMode(false); return; }
-  }, true);
-
-  /* ---------- 模式 ---------- */
-  function toggleSeg(pid) {
-    var ix = pathSegs.indexOf(pid);
-    if (ix >= 0) pathSegs.splice(ix, 1); else pathSegs.push(pid);
-    drawHi(); renderPanel();
-  }
-  function drawBtn() {
-    var b = el('tlPathBtn');
-    if (b) { b.classList.toggle('active', modeOn); b.setAttribute('aria-pressed', modeOn ? 'true' : 'false'); }
-  }
-  function setMode(on) {
-    modeOn = !!on;
-    if (modeOn) {
-      buildLayer();
-      if (!segs()) { modeOn = false; }
-    }
-    if (!modeOn) { removeLayer(); pathSegs = []; hidePanel(); }
-    drawBtn();
-    if (modeOn) renderPanel();
-    return modeOn;
-  }
-  function syncLayer() {
-    /* 图面重渲染后 svg 重建 → 层丢失则按需重建；几何变化 → segs() 内按签名自动重切 */
-    if (!modeOn) return;
-    if (!wsSvg() || !wsSvg().querySelector('#tlPathLayer')) buildLayer();
-    else drawHi();
-  }
-
+  /* ---------- 保留给图面与损失卡片的纯管段几何辅助 ---------- */
   window.RyTlPathMeasure = {
-    toggle: function () { return setMode(!modeOn); },
-    mode: function () { return modeOn; },
-    clear: function () { pathSegs = []; drawHi(); renderPanel(); },
-    segs: function () { return pathSegs.slice(); },
     segInfo: function (pid) {
       return { name: segName(pid), len: segLen(pid), flow: segFlow(pid), od: segOd(pid), baseOd: segBaseOd(pid), hf: segHf(pid), baseHf: segBaseHf(pid) };
     },
@@ -591,8 +329,5 @@
        ★ 为什么需要它：总管在简图里要按段渲染（半遮蔽 = 一段灰虚线、其余实线），而简图渲染
          发生在工作区 svg 之前 —— 不能依赖 frontPathEl()。 */
     frontRatios: function (dIn) { var RC = ratioCuts(dIn); return RC ? RC.cuts.slice() : null },
-    syncLayer: syncLayer,
-    /* 纯逻辑内部函数（单测/体检用，2026-09-24 主管分段）：不参与页面交互 */
-    _internals: { slicePoly: slicePoly, polyD: polyD, wsT: wsT, mainCuts: mainCuts, mainSegBounds: mainSegBounds },
   };
 })();

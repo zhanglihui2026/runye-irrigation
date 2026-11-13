@@ -3148,7 +3148,7 @@
     renderReservoir();
     var destinationSection=(saved.merged||saved.grouped)&&Array.isArray(saved.subPlots)&&saved.subPlots.length>=2
       ? 'grPipeSection' : 'pipePlanSection';
-    var areaM2=Number(saved.areaM2)||Number(saved.sqm)||0;
+    var areaM2=saved.sqm!=null?Number(saved.sqm):(saved.areaM2!=null?Number(saved.areaM2):0);
     var savedAt=Number(saved.savedAt)||Number(saved.ts)||Date.now();
     if(!areaM2 || !isFinite(areaM2)){ alert('地块面积无效，无法回传。'); return; }
     try{
@@ -3210,7 +3210,7 @@
       var saved0=currentMapPlotId?lib0.filter(function(p){return p.id===currentMapPlotId;})[0]:null;
       if(points.length>=3){
         var liveSqm=Math.round(geodesicArea(points));
-        var savedSqm=saved0?(Number(saved0.areaM2)||Number(saved0.sqm)||0):0;
+        var savedSqm=saved0?(saved0.sqm!=null?Number(saved0.sqm):(saved0.areaM2!=null?Number(saved0.areaM2):0)):0;
         if(isFinite(liveSqm)&&liveSqm>0&&(!saved0||!savedSqm||Math.abs(liveSqm-savedSqm)>savedSqm*0.005)){
           var fresh=saveCurrentDraftToLibrary({silent:false,newId:true});
           if(fresh){ sendPlotToDesign(fresh, btnEl); return; }

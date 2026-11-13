@@ -1945,20 +1945,22 @@
 
   function ppFindNearestPipe(worldPt){
     var best=null;
-    function scan(list,type,label){
-      for(var i=0;i<list.length;i++){
-        var line=list[i];
-        for(var j=1;j<line.length;j++){
-          var dist=ppPointToSegmentDistance(worldPt,line[j-1],line[j]);
+    var display=ppGetPipeDisplayGeometry(ppState.mainPipes,ppState.branchPipes,ppState.valves,ppGapM());
+    function scan(displayList,sourceList,type,label){
+      displayList=displayList||[]; sourceList=sourceList||[];
+      for(var i=0;i<displayList.length;i++){
+        var shown=displayList[i],line=sourceList[i]||shown;
+        for(var j=1;j<shown.length;j++){
+          var dist=ppPointToSegmentDistance(worldPt,shown[j-1],shown[j]);
           if(!best||dist<best.dist){
             best={type:type,label:label,index:i,line:line,dist:dist,length:ppLineLen(line)};
           }
         }
       }
     }
-    scan(ppState.mainPipes,'main','主管');
-    scan(ppState.branchPipes,'branch','支管');
-    if(ppState.subBranchPipes)scan(ppState.subBranchPipes,'subbranch','一级管');
+    scan(display.main,ppState.mainPipes,'main','主管');
+    scan(display.branch,ppState.branchPipes,'branch','支管');
+    if(ppState.subBranchPipes)scan(ppState.subBranchPipes,ppState.subBranchPipes,'subbranch','一级管');
     if(!best)return null;
     var scale=(ppState.transform&&ppState.transform.scale)?ppState.transform.scale:1;
     var sx=(ppState.transform&&ppState.transform.scaleX)?ppState.transform.scaleX:1;
@@ -2522,13 +2524,17 @@
       ppMains:Array.isArray(ppState.mainPipes)?ppState.mainPipes.length:0,mode:ppState.mode||''};
 
     // Main pipes
+    ppCtx.save();
+    ppTracePlotPath();
+    ppCtx.clip(); /* 渲染错开线与阀门不得越出异形地块边界；不改变设计坐标 */
     if(!ppPipeLayerSuppressed){
+    var __ppDisplayGeometry=ppGetPipeDisplayGeometry(ppState.mainPipes,ppState.branchPipes,ppState.valves,ppGapM());
     ppState.mainPipes.forEach(function(l,idx){
-      if(!ppIsPipeHidden('main',idx))ppDrawLine(l,'#185FA5',4);
+      if(!ppIsPipeHidden('main',idx))ppDrawLine(__ppDisplayGeometry.main[idx]||l,'#185FA5',4);
     });
     // Branch pipes
     ppState.branchPipes.forEach(function(l,idx){
-      if(!ppIsPipeHidden('branch',idx))ppDrawLine(l,'#16a34a',2.5);
+      if(!ppIsPipeHidden('branch',idx))ppDrawLine(__ppDisplayGeometry.branch[idx]||l,'#16a34a',2.5);
     });
     // Sub-branch pipes (一级管) — three-level mode only
     if(ppState.subBranchPipes){
@@ -2541,10 +2547,10 @@
       });
     }
     ppState.mainPipes.forEach(function(l,idx){
-      if(ppIsPipeHidden('main',idx))ppDrawLine(l,'rgba(100,116,139,.55)',3,[7,5]);
+      if(ppIsPipeHidden('main',idx))ppDrawLine(__ppDisplayGeometry.main[idx]||l,'rgba(100,116,139,.55)',3,[7,5]);
     });
     ppState.branchPipes.forEach(function(l,idx){
-      if(ppIsPipeHidden('branch',idx))ppDrawLine(l,'rgba(100,116,139,.48)',2,[7,5]);
+      if(ppIsPipeHidden('branch',idx))ppDrawLine(__ppDisplayGeometry.branch[idx]||l,'rgba(100,116,139,.48)',2,[7,5]);
     });
     if(ppState.subBranchPipes){
       ppState.subBranchPipes.forEach(function(l,idx){
@@ -2557,8 +2563,9 @@
       var pickW=pt==='main'?7:pt==='subbranch'?5:5;
       var pickOW=pt==='main'?4:pt==='subbranch'?2:2.5;
       var pickColor=pt==='main'?'#185FA5':pt==='subbranch'?'#185FA5':'#16a34a';
-      ppDrawLine(ppState.pickedPipe.line,'#f59e0b',pickW);
-      ppDrawLine(ppState.pickedPipe.line,pickedHidden?'rgba(100,116,139,.65)':pickColor,pickOW,pickedHidden?[7,5]:null);
+      var __pickedDisplay=pt==='main'?__ppDisplayGeometry.main[ppState.pickedPipe.index]:pt==='branch'?__ppDisplayGeometry.branch[ppState.pickedPipe.index]:null;
+      ppDrawLine(__pickedDisplay||ppState.pickedPipe.line,'#f59e0b',pickW);
+      ppDrawLine(__pickedDisplay||ppState.pickedPipe.line,pickedHidden?'rgba(100,116,139,.65)':pickColor,pickOW,pickedHidden?[7,5]:null);
     }
     } /* [v875] !ppPipeLayerSuppressed 结束：静态管线层整块由三级层接管 */
 
@@ -2607,11 +2614,14 @@
 
     // Valves
     if(!ppPipeLayerSuppressed){
-    ppState.valves.filter(function(v){return ppPointInPlot(v);}).forEach(function(v,idx){
-      var vp=ppToCanvas(v.x,v.y);
+    ppState.valves.forEach(function(v,idx){
+      if(!ppPointInPlot(v))return;
+      var __vv=__ppDisplayGeometry.valves[idx]||v;
+      var vp=ppToCanvas(__vv.x,__vv.y);
       window.ryValveCanvas(ppCtx,vp.x,vp.y);   /* v159：与总管×主管交接阀同规格（尺寸取自 window.RY_VALVE） */
     });
     }
+    ppCtx.restore();
 
     /* [v251 2026-10-06 用户要求] 画布左上那行操作提示（模式 / 快捷键说明）已取消 ——
        原绘制语句整块移除；像素闸门 _v246b_pixels.py 的 A 项已同步反转为
@@ -3319,40 +3329,15 @@
            ⇒ 一根都没进 ge.slots[i] ⇒ 成组管路页永远画不出来、jimmy尺寸标注也无从标。
         拆出来之后整组态 =「对每一块各调一次本函数」，与 v193 铁律一致
         （成组 = 多次单块，一行布管规则都不改写）。 */
-  /* [v638 2026-10-20 用户口径] 主管与支管在平面上其实是**同一位置的上下两层**
-     （主管埋地下、支管在地面），图上把它们错开只是为了两根都看得见。
-     所以错开量必须**固定**，不能被地块压缩或拉伸 ——
-     用户原话：「主管跟支管在图中显示的距离，不应该被地块压缩，不管地块大小，应该都保持一致」。
-
-     为什么用「固定的实地距离」而不是「分区块的百分比」，也不是「地块跨度比例」：
-       本画布是**固定比例**的（见 ppUpdateTransform：s = 0.5×zoom，注释写明「1px=2m」），
-       不随地块大小变化 ⇒ 一个固定的实地距离，在任意缩放下就是固定的像素数，
-       地块大小、分区数目都不再影响它。三级图框同样是固定比例（s 被上限 2 夹住，
-       常规地块恒为 2 单位/m），且取的是同一个数 ⇒ 两个视图的视觉间距天生一致。
-     旧口径是「主管落分区块宽/高的 40%、支管落中线」⇒ 错开量 = 分区块尺寸的 10%，
-     实测同一套代码：520×237m/16 区 → 20m；200×120m/8 区 → 12m；60×40m/4 区 → 6m。
-     这就是用户说的「被地块压缩」。
-     zoneDim 是错开方向上的分区尺寸。两根线改成「对称夹住真实位置」（各让一半）后，
-     只有窄于间距的极窄小分区才会触发硬边界，正常地块一律拿到那个固定米数。 */
-  var PP_MAIN_BRANCH_GAP_M = 20;    /* 唯一一处数值，三级简图经 window.RyMainBranchGap 取同一个值 */
+  /* 主、支管设计坐标共用中心线。此常量只控制画布/施工图的表现层间距，
+     不得用于生成管线、阀门或水力计算坐标。 */
+  var PP_MAIN_BRANCH_GAP_M = 20;    /* 唯一的显示偏移值，三级简图经 window.RyMainBranchGap 读取 */
   function ppGapM() {
     /* 探针/比对用：window.__ryMainBranchGapM 可临时改值，不影响正常使用（不设就一直用 PP_MAIN_BRANCH_GAP_M） */
     var o = (typeof window !== 'undefined') ? window.__ryMainBranchGapM : null;
     return (typeof o === 'number' && isFinite(o) && o > 0) ? o : PP_MAIN_BRANCH_GAP_M;
   }
-  function ppVisGap(zoneDim) {
-    var g = ppGapM();
-    /* 硬边界：两根线是「对称夹住真实位置」的（各让一半），
-       所以间距只要不超过分区尺寸的 90%，两根就都还留在本分区里。
-       —— 这个边界只在极窄分区（< 22m）才会咬到 20m，正常地块一律拿到全量。 */
-    if (zoneDim > 0) g = Math.min(g, zoneDim * 0.9);
-    return g;
-  }
-  /* 三级简图（mod/inline-09.js）取同一个数 —— 两个视图都是定比例的，同值即同「实地间距」。
-     数值只有一份，改这里就够；inline-09 里有 20 的兜底字面量（plot-editor 未加载时用）。
-     ★ 为什么是 20 米：v637 在用户当时那块 520×237m 地块上错开量正好约 20 米（45% 缩放下
-       约 4~5 物理像素，蓝绿两根一眼分得开），用户就是对着那张图提的要求 ⇒ 以这个观感为基准，
-       把它从「那块地块恰好算出来的值」提升成「所有地块都用这个值」。 */
+  /* 三级简图与二级画布共享同一个显示偏移值；它只产生渲染副本。 */
   if (typeof window !== 'undefined') window.RyMainBranchGap = { m: ppGapM };
 
   function ppBuildAutoPipes(polyPts, planN, isThree, useOwnDims, forceDir, gridAngle) {
@@ -3426,21 +3411,35 @@
           var zx = cuts.xPos[zc], zy = cuts.yPos[zr];
           var zoneW = cuts.xSrc[zc], zoneH = cuts.ySrc[zr];
           var centerX = zx + zoneW / 2, centerY = zy + zoneH / 2;
+          /* 异形地块按本分区裁剪后的实际几何取面积形心；凹形导致形心落在区外时，
+             在本格内寻找距形心最近的有效点，避免把支管/阀门放到空白地带。 */
+          var zonePoly=ppClipPolyToRect(ppPipeClipPoly,zx,zy,zx+zoneW,zy+zoneH);
+          var zoneCentroid=ppPolyCentroid(zonePoly);
+          if(zoneCentroid&&ppRingIn(zoneCentroid,zonePoly)){
+            centerX=zoneCentroid.x;centerY=zoneCentroid.y;
+          }else if(zoneCentroid){
+            var bestCenter=null,bestCenterD=Infinity;
+            for(var cyi=1;cyi<20;cyi++)for(var cxi=1;cxi<20;cxi++){
+              var cand={x:zx+zoneW*cxi/20,y:zy+zoneH*cyi/20};
+              if(!ppRingIn(cand,zonePoly))continue;
+              var cd=(cand.x-zoneCentroid.x)*(cand.x-zoneCentroid.x)+(cand.y-zoneCentroid.y)*(cand.y-zoneCentroid.y);
+              if(cd<bestCenterD){bestCenterD=cd;bestCenter=cand;}
+            }
+            if(bestCenter){centerX=bestCenter.x;centerY=bestCenter.y;}
+          }
           /* 全部区域沿第1分区确定的方向布管；forceDir 由第一分区长边派生 */
           var fixedSideIsHorizontal = (forceDir === 'v') ? true
             : (forceDir === 'h') ? false
             : (cuts.xPlan[zc] >= cuts.yPlan[zr]);
           if (fixedSideIsHorizontal) {
-            /* [v638] 主管/支管「对称夹住真实位置」：错开量固定（见 ppVisGap），
-               两根各让一半 ⇒ 无论间距多大，只要分区装得下就都留在分区内。
-               （旧口径：主管落分区块 40%、支管落中线 ⇒ 间距 = 10% 块宽，随分区尺寸缩放） */
-            var gapV1 = ppVisGap(zoneW);
-            var mainX = centerX - gapV1 / 2, branchX = centerX + gapV1 / 2;
+            /* 设计几何统一落在分区中心线；主管/支管的可视间距只由绘制层生成，
+               不写入管线、阀门、长度或水力路径坐标。 */
+            var mainX = centerX, branchX = centerX;
             pushSeg(out.main, { x: mainX, y: zy }, { x: mainX, y: zy + zoneH });
             // 支管两端各缩进一段距离（分区边长 6%，4~14m），不与分区边缘相接，使各地块支管视觉上独立断开
             var gapV2 = Math.min(Math.max(zoneH * 0.06, 4), 14, zoneH * 0.22);
             pushSeg(out.branch, { x: branchX, y: zy + gapV2 }, { x: branchX, y: zy + zoneH - gapV2 });
-            if (ppPointInPlot({ x: branchX, y: centerY })) out.valves.push({ x: branchX, y: centerY });
+            if (ppPointInPlot({ x: centerX, y: centerY })) out.valves.push({ x: centerX, y: centerY });
             // Three-level: sub-branch pipes perpendicular to branch (horizontal)
             if (isThree) {
               var nSub = Math.max(2, Math.floor(zoneH / 15));
@@ -3450,14 +3449,13 @@
               }
             }
           } else {
-            /* [v638] 同竖向分支：对称夹住真实位置，错开量固定 */
-            var gapH1 = ppVisGap(zoneH);
-            var mainY = centerY - gapH1 / 2, branchY = centerY + gapH1 / 2;
+            /* 竖向布管也以分区中心线作为唯一设计坐标。 */
+            var mainY = centerY, branchY = centerY;
             pushSeg(out.main, { x: zx, y: mainY }, { x: zx + zoneW, y: mainY });
             // 支管两端缩进，与分区边缘留出空隙
             var gapH2 = Math.min(Math.max(zoneW * 0.06, 4), 14, zoneW * 0.22);
             pushSeg(out.branch, { x: zx + gapH2, y: branchY }, { x: zx + zoneW - gapH2, y: branchY });
-            if (ppPointInPlot({ x: centerX, y: branchY })) out.valves.push({ x: centerX, y: branchY });
+            if (ppPointInPlot({ x: centerX, y: centerY })) out.valves.push({ x: centerX, y: centerY });
             // Three-level: sub-branch pipes perpendicular to branch (vertical)
             if (isThree) {
               var nSub2 = Math.max(2, Math.floor(zoneW / 15));
@@ -3479,6 +3477,49 @@
     }
     return out;
   }
+
+  /* 主管/支管重合时，仅为图面生成平行显示副本。输入、返回的设计数组互不改写；
+     仅对轴线重合的主支管对应用偏移，因此手绘的独立管线保持原坐标。 */
+  function ppGetPipeDisplayGeometry(mainPipes, branchPipes, valves, gap) {
+    var mains=(mainPipes||[]).map(function(l){return(l||[]).map(function(p){return{x:p.x,y:p.y};});});
+    var branches=(branchPipes||[]).map(function(l){return(l||[]).map(function(p){return{x:p.x,y:p.y};});});
+    var valvePoints=(valves||[]).map(function(v){return{x:v.x,y:v.y};});
+    var mainShift={},branchShift={},valveShift={};
+    var amount=Number(gap);
+    if(!(amount>0&&isFinite(amount)))amount=PP_MAIN_BRANCH_GAP_M;
+    function center(line){if(!line||line.length<2)return null;var a=line[0],b=line[line.length-1];return{x:(a.x+b.x)/2,y:(a.y+b.y)/2};}
+    function axis(line){if(!line||line.length<2)return null;var a=line[0],b=line[line.length-1],dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy);if(L<1e-8)return null;var n={x:-dy/L,y:dx/L};if(Math.abs(n.x)>=Math.abs(n.y)){if(n.x<0){n.x=-n.x;n.y=-n.y;}}else if(n.y<0){n.x=-n.x;n.y=-n.y;}return{n:n,dx:dx/L,dy:dy/L,length:L};}
+    function projectedRange(line,ax){var p0=line[0].x*ax.dx+line[0].y*ax.dy,p1=line[line.length-1].x*ax.dx+line[line.length-1].y*ax.dy;return{min:Math.min(p0,p1),max:Math.max(p0,p1)};}
+    branches.forEach(function(bl,bi){
+      var bc=center(bl),ba=axis(bl);if(!bc||!ba)return;
+      var best=-1,bestD=Infinity,brange=projectedRange(bl,ba);
+      mains.forEach(function(ml,mi){
+        var ma=axis(ml);if(!ma||Math.abs(ba.dx*ma.dy-ba.dy*ma.dx)>0.02)return;
+        var lateral=Math.abs((ml[0].x-bl[0].x)*ba.n.x+(ml[0].y-bl[0].y)*ba.n.y);
+        if(lateral>0.5)return;
+        var mrange=projectedRange(ml,ba),overlap=Math.min(brange.max,mrange.max)-Math.max(brange.min,mrange.min);
+        if(overlap<=Math.min(0.5,ba.length*0.5))return;
+        var d=lateral+(Math.max(0,Math.min(brange.min,mrange.min)-Math.max(brange.max,mrange.max))*1e-6);
+        if(d<bestD){bestD=d;best=mi;}
+      });
+      if(best<0)return;
+      var safeGap=amount,nearestZoneSpacing=Infinity;
+      branches.forEach(function(other,oi){if(oi===bi)return;var oc=center(other),oa=axis(other);if(!oc||!oa||Math.abs(ba.dx*oa.dy-ba.dy*oa.dx)>0.02)return;var lateral=Math.abs((oc.x-bc.x)*ba.n.x+(oc.y-bc.y)*ba.n.y);if(lateral>0.5&&lateral<nearestZoneSpacing)nearestZoneSpacing=lateral;});
+      if(isFinite(nearestZoneSpacing))safeGap=Math.min(safeGap,nearestZoneSpacing*0.9);
+      var dx=ba.n.x*safeGap/2,dy=ba.n.y*safeGap/2;
+      mainShift[best]={x:-dx,y:-dy};branchShift[bi]={x:dx,y:dy};
+      valvePoints.forEach(function(v,vi){
+        var vx=v.x-bl[0].x,vy=v.y-bl[0].y,L2=(bl[bl.length-1].x-bl[0].x)*(bl[bl.length-1].x-bl[0].x)+(bl[bl.length-1].y-bl[0].y)*(bl[bl.length-1].y-bl[0].y);
+        var t=L2>1e-12?(vx*(bl[bl.length-1].x-bl[0].x)+vy*(bl[bl.length-1].y-bl[0].y))/L2:0;
+        var proj={x:bl[0].x+t*(bl[bl.length-1].x-bl[0].x),y:bl[0].y+t*(bl[bl.length-1].y-bl[0].y)};
+        if(t>=-0.25&&t<=1.25&&Math.hypot(v.x-proj.x,v.y-proj.y)<=0.5)valveShift[vi]={x:dx,y:dy,main:best};
+      });
+    });
+    function shifted(lines,map){return lines.map(function(line,i){var d=map[i];return line.map(function(p){return{x:p.x+(d?d.x:0),y:p.y+(d?d.y:0)};});});}
+    var valveAnchors=valvePoints.map(function(v,i){var d=valveShift[i];if(!d)return null;var line=mains[d.main],a=line[0],b=line[line.length-1],dx=b.x-a.x,dy=b.y-a.y,L2=dx*dx+dy*dy;var t=L2>1e-12?((v.x-a.x)*dx+(v.y-a.y)*dy)/L2:0;t=Math.max(0,Math.min(1,t));return{x:a.x+dx*t-d.x,y:a.y+dy*t-d.y};});
+    return{main:shifted(mains,mainShift),branch:shifted(branches,branchShift),valves:valvePoints.map(function(v,i){var d=valveShift[i];return{x:v.x+(d?d.x:0),y:v.y+(d?d.y:0)};}),valveAnchors:valveAnchors};
+  }
+  try { window.ppGetPipeDisplayGeometry=ppGetPipeDisplayGeometry; } catch(ePipeDisplay) {}
 
   /* [v201] 给某个 slot 重建 pipeIds / hiddenPipes / nextPipeId（长度必须对得上，
      否则 ppPipeKey(type,i) 取到 undefined ⇒ 隐藏判定与拾取都对不上号）。 */
@@ -4803,16 +4844,18 @@
     parts.push('<g clip-path="url(#ppPlotClip)">');
     // Main pipes
     var actualMainTotal=0;
+    var __ppSvgDisplay=ppGetPipeDisplayGeometry(ppState.mainPipes,ppState.branchPipes,ppState.valves,ppGapM());
     ppState.mainPipes.forEach(function(l,idx){
       if(ppIsPipeHidden('main',idx))return;
       var md='';
-      for(var i=0;i<l.length;i++){var p=ts(l[i].x,l[i].y);md+=(i===0?'M':'L')+p.x.toFixed(1)+' '+p.y.toFixed(1)+' ';}
+      var viewLine=__ppSvgDisplay.main[idx]||l;
+      for(var i=0;i<viewLine.length;i++){var p=ts(viewLine[i].x,viewLine[i].y);md+=(i===0?'M':'L')+p.x.toFixed(1)+' '+p.y.toFixed(1)+' ';}
       parts.push('<path d="'+md+'" fill="none" stroke="#185FA5" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>');
       // Calculate actual drawn length in meters
       var actualLen=ppLineLen(l);
       actualMainTotal+=actualLen;
-      if(l.length>=2){
-        var p1=ts(l[l.length-2].x,l[l.length-2].y),p2=ts(l[l.length-1].x,l[l.length-1].y);
+      if(viewLine.length>=2){
+        var p1=ts(viewLine[viewLine.length-2].x,viewLine[viewLine.length-2].y),p2=ts(viewLine[viewLine.length-1].x,viewLine[viewLine.length-1].y);
         parts.push(ppArrow(p1,p2,'#185FA5'));
       }
     });
@@ -4822,7 +4865,8 @@
     ppState.branchPipes.forEach(function(l,idx){
       if(ppIsPipeHidden('branch',idx))return;
       var bd='';
-      for(var i=0;i<l.length;i++){var p=ts(l[i].x,l[i].y);bd+=(i===0?'M':'L')+p.x.toFixed(1)+' '+p.y.toFixed(1)+' ';}
+      var viewLine=__ppSvgDisplay.branch[idx]||l;
+      for(var i=0;i<viewLine.length;i++){var p=ts(viewLine[i].x,viewLine[i].y);bd+=(i===0?'M':'L')+p.x.toFixed(1)+' '+p.y.toFixed(1)+' ';}
       parts.push('<path d="'+bd+'" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>');
       // Calculate actual drawn length in meters
       var actualLen=ppLineLen(l);
@@ -4869,13 +4913,13 @@
     (function(){
       function ppClamp(v,a,b){return v<a?a:(v>b?b:v);}
       var segs=[];
-      ppState.mainPipes.forEach(function(l,li){
+      __ppSvgDisplay.main.forEach(function(l,li){
         if(ppIsPipeHidden('main',li))return;
         for(var i=0;i+1<l.length;i++)segs.push([l[i],l[i+1]]);
       });
       if(segs.length){
         var connSvg=[];
-        ppState.valves.filter(function(v){return ppPointInPlot(v);}).forEach(function(v){
+        __ppSvgDisplay.valves.filter(function(v){return ppPointInPlot(v);}).forEach(function(v){
           var best=null,bestD=Infinity;
           segs.forEach(function(sg){
             var dx=sg[1].x-sg[0].x,dy=sg[1].y-sg[0].y;
@@ -4913,7 +4957,8 @@
     })();
 
     // Valves (只画阀门符号，不标注名称)
-    ppState.valves.filter(function(v){return ppPointInPlot(v);}).forEach(function(v,idx){
+    __ppSvgDisplay.valves.forEach(function(v,idx){
+      if(!ppPointInPlot(ppState.valves[idx]))return;
       var vp=ts(v.x,v.y);
       parts.push(window.ryValveSVG(vp.x, vp.y));   /* v159：与总管×主管交接阀同规格（尺寸取自 window.RY_VALVE） */
     });

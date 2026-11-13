@@ -65,7 +65,7 @@
   if(!cuts)return out;var localRings=rings.map(function(r){return b.polyToGrid(cuts,r);}),cols=cuts.xPos.length-1,rows=cuts.yPos.length-1;
   function gx(ri,ci){return typeof root.tlZoneGx==='function'?root.tlZoneGx(cuts,ri,ci):cuts.xPos[ci];}
   function gy(ci,ri){return typeof root.tlZoneGy==='function'?root.tlZoneGy(cuts,ci,ri):cuts.yPos[ri];}
-  for(var y=0;y<rows;y++)for(var x=0;x<cols;x++)localRings.forEach(function(r){var local=b.clipPolyToRect(r,gx(y,x),gy(x,y),gx(y,x+1),gy(x,y+1));if(local&&local.length>=3){var p=b.polyToWorld(cuts,local),area=b.polyArea(p);if(area>1e-6)out.push({zoneIndex:y*cols+x,name:(y*cols+x+1)+'区',latLng:p.map(toLL),area:area});}});return out;
+  for(var y=0;y<rows;y++)for(var x=0;x<cols;x++)localRings.forEach(function(r){var local=b.clipPolyToRect(r,gx(y,x),gy(x,y),gx(y,x+1),gy(x,y+1));if(local&&local.length>=3){var p=b.polyToWorld(cuts,local),geometryArea=b.polyArea(p);if(geometryArea>1e-6)out.push({zoneIndex:y*cols+x,name:(y*cols+x+1)+'区',latLng:p.map(toLL),geometryArea:geometryArea});}});return out;
  }
  function capture(net,previousNetworkRaw){
   if(!net)return {ok:false,error:'network-layout-missing'};
@@ -81,21 +81,38 @@
   if(!state.ok)return {ok:true,skipped:true,reason:state.error||'plot-library-unavailable'};
   var matches=state.plots.filter(function(p){return p&&p.id===net.plotId;});
   if(matches.length!==1)return {ok:true,skipped:true,reason:'plot-library-identity-not-unique'};
-  var p=matches[0],measuredArea=Number(p.sqm);
+  var p=matches[0],measuredArea=p.sqm!=null?Number(p.sqm):(p.areaM2!=null?Number(p.areaM2):NaN);
   if(!Number.isFinite(measuredArea)||measuredArea<=0)return {ok:false,error:'map-measured-area-missing'};
-  var partitionArea=partitions.reduce(function(sum,z){return sum+(Number(z.area)||0);},0);
-  if(!(partitionArea>0))return {ok:false,error:'partition-geometry-area-missing'};
-  var areaScale=measuredArea/partitionArea;
-  partitions=partitions.map(function(z){return Object.assign({},z,{area:z.area*areaScale});});
-  var areaCorrection=measuredArea-partitions.reduce(function(sum,z){return sum+z.area;},0);
-  if(partitions.length)partitions[partitions.length-1].area+=areaCorrection;
   var dd=root.tlDiagramData,zones=dd&&dd.zones;
   var activeZoneIndices=Array.isArray(dd&&dd.activeZoneIndices)?dd.activeZoneIndices:null;
-  if(!zones||!activeZoneIndices||!activeZoneIndices.length)return {ok:false,error:'generated-active-zone-index-missing'};
+  var zoneAreasM2=Array.isArray(dd&&dd.zoneAreasM2)?dd.zoneAreasM2:null;
+  if(!zones||!activeZoneIndices||!activeZoneIndices.length||!zoneAreasM2)return {ok:false,error:'generated-active-zone-index-or-area-vector-missing'};
+  var areaTotal=zoneAreasM2.reduce(function(sum,a){return sum+(Number(a)||0);},0);
+  if(zoneAreasM2.length!==zones.cols*zones.rows||zoneAreasM2.some(function(a){return !Number.isFinite(Number(a))||Number(a)<=0;})||Math.abs(areaTotal-measuredArea)>Math.max(0.01,measuredArea*1e-9))return {ok:false,error:'generated-zone-area-vector-invalid'};
   var actualZoneIndices=Array.from(new Set(partitions.map(function(part){return Number(part.zoneIndex);}))).sort(function(a,b){return a-b;});
   var expectedZoneIndices=activeZoneIndices.map(Number).sort(function(a,b){return a-b;});
   if(actualZoneIndices.length!==expectedZoneIndices.length||actualZoneIndices.some(function(index,i){return index!==expectedZoneIndices[i];}))
     return {ok:false,error:'map-partitions-do-not-match-generated-active-zones'};
+  /* Published geometry is only a display layer. Use the exact per-zone area vector
+     already used by hydraulics and drawing labels; distribute it among geometric
+     fragments only when one zone is represented by multiple map rings. */
+  var geometryByZone={};
+  partitions.forEach(function(z){geometryByZone[z.zoneIndex]=(geometryByZone[z.zoneIndex]||0)+(Number(z.geometryArea)||0);});
+  partitions=partitions.map(function(z){
+    var zoneArea=Number(zoneAreasM2[z.zoneIndex]),geometryTotal=geometryByZone[z.zoneIndex];
+    if(!(zoneArea>0)||!(geometryTotal>0))return null;
+    var allocated=zoneArea*(Number(z.geometryArea)||0)/geometryTotal;
+    var published=Object.assign({},z,{area:allocated,mu:allocated/(2000/3)});
+    delete published.geometryArea;
+    return published;
+  });
+  if(partitions.some(function(z){return !z;}))return {ok:false,error:'generated-zone-area-vector-map-assignment-failed'};
+  activeZoneIndices.forEach(function(index){
+   var zi=Number(index),members=partitions.filter(function(z){return Number(z.zoneIndex)===zi;});
+   if(!members.length)return;
+   var sum=members.reduce(function(total,z){return total+Number(z.area||0);},0),last=members[members.length-1];
+   last.area+=Number(zoneAreasM2[zi])-sum;last.mu=last.area/(2000/3);
+  });
   net.partitionPlan=plan;net.partitions=partitions;
   p.partitionPlan=plan;p.partitions=partitions;
   var nodeKey='runye_tlNodes_v1',nodesChanged=false,nextNodeGeoSig='';

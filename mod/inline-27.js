@@ -51,7 +51,9 @@
       return Object.assign({}, fm, { branchCount: branchCount, layoutSides: layoutSides,
         branchParallelCount: branchParallelCount, branchFlow: fm.zoneFlow / branchParallelCount });
     }
-    var areaM2 = rd('tl_zoneMu', 30) * (2000 / 3);
+    var zoneAreas=d&&Array.isArray(d.zoneAreasM2)?d.zoneAreasM2:null;
+    if(!Array.isArray(zoneAreas)||!zoneAreas.length||zoneAreas.some(function(a){return !isFinite(Number(a))||Number(a)<=0;}))return null;
+    var areaM2=Math.max.apply(null,zoneAreas.map(Number));
     var zoneTapeLen = areaM2 / rd('tl_tapeSpacing', 1.2);
     var zoneFlow = zoneTapeLen / rd('tl_emitterSpacing', 0.3) * rd('tl_emitterFlow', 2) / 1000;
     var zcEl = document.getElementById('tl_zoneCount');

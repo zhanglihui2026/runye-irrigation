@@ -64,6 +64,67 @@ function loadStore(file, options = {}) {
 
 function json(value) { return JSON.stringify(value); }
 
+function makePartitionCaptureContext({ replace, onWrite, onRestoreAttempt, initialNetworkRaw } = {}) {
+  const ring = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }];
+  const cuts = { xPos: [0, 1], yPos: [0, 1] };
+  const plot = { id: 'plot-1', name: 'North', sqm: 1000, polyLatLng: [[0, 0], [0, 1], [1, 1], [1, 0]] };
+  const context = {
+    RyPlotLibraryStore: {
+      read() { return { ok: true, plots: [plot], revision: 'plot-library-before' }; },
+      replace(plots, revision) {
+        assert.equal(revision, 'plot-library-before');
+        return replace ? replace(plots) : { ok: false, error: 'plot-library-write-failed' };
+      }
+    },
+    RyIrrigationDataStore: {
+      readRawNetworkLayout(plotId) { assert.equal(plotId, 'plot-1'); return context.__networkRaw; },
+      writeNetworkLayout(value, plotId) {
+        assert.equal(plotId, 'plot-1');
+        assert.equal(value.plotId, 'plot-1');
+        context.__networkRaw = JSON.stringify(value);
+        if (onWrite) onWrite(context.__networkRaw);
+        return true;
+      },
+      restoreNetworkLayoutIfCurrent(expectedRaw, previousRaw, plotId) {
+        if (onRestoreAttempt) onRestoreAttempt();
+        assert.equal(plotId, 'plot-1');
+        if (context.__networkRaw !== expectedRaw) return { ok: false, error: 'network-layout-conflict' };
+        context.__networkRaw = previousRaw;
+        return { ok: true };
+      }
+    },
+    __networkRaw: initialNetworkRaw || JSON.stringify({ plotId: 'plot-1', ts: 10, segments: [{ id: 'main-old' }] }),
+    __runyeMapFrameInv: { tx: 0, ty: 0, ax: 1, ay: 0, bx: 0, by: 1 },
+    __runyeGeoBase: { refLat: 0, refLng: 0 },
+    tlDiagramData: { zones: { cols: 1, rows: 1 }, activeZoneIndices: [0], zoneAreasM2: [1000] },
+    localStorage: { getItem() { return null; }, setItem() {} },
+    RunyeBridge: {
+      state: { cutSnap: { sig: '' }, cutOverrides: { x: {}, y: {} }, zoneRotated: false },
+      getPartitionState() { return this.state; },
+      getPlotPolygon() { return ring; },
+      getZoneCuts() { return cuts; },
+      polyToGrid(_cuts, points) { return points; },
+      polyToWorld(_cuts, points) { return points; },
+      clipPolyToRect(points) { return points; },
+      polyArea(points) {
+        let area = 0;
+        for (let i = 0; i < points.length; i++) {
+          const a = points[i], b = points[(i + 1) % points.length];
+          area += a.x * b.y - b.x * a.y;
+        }
+        return Math.abs(area) / 2;
+      }
+    },
+    document: { getElementById() { return null; } },
+    JSON, Date, Math, Number, String, Object, Array, isFinite, console
+  };
+  context.window = context;
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'runye-map-partition.js'), 'utf8'), context,
+    { filename: 'runye-map-partition.js' });
+  return context;
+}
+
 test('economic settings store preserves legacy keys, merges assumptions, and replaces/clears price overrides', () => {
   const { store, values, calls } = loadStore('core/economic-settings-store.js', { exportName: 'RyEconomicSettingsStore' });
   assert.deepEqual(JSON.parse(JSON.stringify(store.keys)), {
@@ -718,46 +779,13 @@ test('map partition commit rolls back its network write when plot-library persis
     'partition rollback must compare and restore only the network slot belonging to the selected plot');
 });
 
-test('map partition capture rolls the network snapshot back when the plot-library revision is stale', () => {
+test('map partition capture rolls the network snapshot back when the plot-library write fails', () => {
   const previousNetwork = JSON.stringify({ plotId: 'plot-1', ts: 10, segments: [{ id: 'main-1' }] });
-  let networkRaw = previousNetwork;
   let writtenPlotId = null;
-  const irrigation = {
-    readRawNetworkLayout(plotId) { assert.equal(plotId, 'plot-1'); return networkRaw; },
-    writeNetworkLayout(value, plotId) {
-      writtenPlotId = plotId;
-      assert.equal(plotId, value.plotId, 'network writes must target their embedded plot owner');
-      networkRaw = JSON.stringify(value);
-      return true;
-    },
-    restoreNetworkLayoutIfCurrent(expectedRaw, previousRaw, plotId) {
-      assert.equal(plotId, 'plot-1');
-      if (networkRaw !== expectedRaw) return { ok: false, error: 'network-layout-conflict' };
-      networkRaw = previousRaw;
-      return { ok: true };
-    }
-  };
-  const plotStore = {
-    read() { return { ok: true, plots: [{ id: 'plot-1' }], revision: 'plot-library-before' }; },
-    replace() { return { ok: false, error: 'plot-library-write-failed' }; }
-  };
-  const context = {
-    RyIrrigationDataStore: irrigation,
-    RyPlotLibraryStore: plotStore,
-    __runyeMapFrameInv: { tx: 0, ty: 0, ax: 1, ay: 0, bx: 0, by: 1 },
-    __runyeGeoBase: { refLat: 0, refLng: 0 },
-    RunyeBridge: {
-      state: { cutSnap: { sig: '' }, cutOverrides: { x: {}, y: {} }, zoneRotated: false },
-      getPartitionState() { return this.state; },
-      getPlotPolygon() { return []; },
-      getZoneCuts() { return null; }
-    },
-    document: { getElementById() { return null; } }
-  };
-  context.window = context;
-  vm.createContext(context);
-  vm.runInContext(fs.readFileSync(path.join(ROOT, 'runye-map-partition.js'), 'utf8'), context,
-    { filename: 'runye-map-partition.js' });
+  const context = makePartitionCaptureContext({
+    initialNetworkRaw: previousNetwork,
+    onWrite(raw) { writtenPlotId = JSON.parse(raw).plotId; }
+  });
 
   const result = context.RyMapPartition.capture(
     { plotId: 'plot-1', segments: [{ id: 'main-new' }] }, previousNetwork
@@ -766,7 +794,7 @@ test('map partition capture rolls the network snapshot back when the plot-librar
     ok: false, error: 'plot-library-write-failed', rollbackError: null
   });
   assert.equal(writtenPlotId, 'plot-1');
-  assert.equal(networkRaw, previousNetwork, 'capture must restore its exact prior network snapshot');
+  assert.equal(context.__networkRaw, previousNetwork, 'capture must restore its exact prior network snapshot');
 });
 
 test('map partition commit does not persist plot changes when scoped network persistence rejects', () => {
@@ -809,48 +837,15 @@ test('map partition commit does not persist plot changes when scoped network per
 test('map partition rollback preserves a newer network snapshot from another writer', () => {
   const previousNetwork = JSON.stringify({ plotId: 'plot-1', ts: 10, segments: [{ id: 'main-old' }] });
   const concurrentNetwork = JSON.stringify({ plotId: 'plot-1', ts: 12, segments: [{ id: 'main-concurrent' }] });
-  let networkRaw = previousNetwork;
   let restoreCalls = 0;
-  const irrigation = {
-    readRawNetworkLayout(plotId) { assert.equal(plotId, 'plot-1'); return networkRaw; },
-    writeNetworkLayout(value, plotId) {
-      assert.equal(plotId, 'plot-1');
-      assert.equal(plotId, value.plotId);
-      networkRaw = JSON.stringify(value);
-      return true;
-    },
-    restoreNetworkLayoutIfCurrent(expectedRaw, previousRaw, plotId) {
-      restoreCalls += 1;
-      assert.equal(plotId, 'plot-1');
-      if (networkRaw !== expectedRaw) return { ok: false, error: 'network-layout-conflict' };
-      networkRaw = previousRaw;
-      return { ok: true };
-    }
-  };
-  const plotStore = {
-    read() { return { ok: true, plots: [{ id: 'plot-1' }], revision: 'plot-library-before' }; },
+  const context = makePartitionCaptureContext({
+    initialNetworkRaw: previousNetwork,
     replace() {
-      networkRaw = concurrentNetwork;
+      context.__networkRaw = concurrentNetwork;
       return { ok: false, error: 'plot-library-write-failed' };
-    }
-  };
-  const context = {
-    RyIrrigationDataStore: irrigation,
-    RyPlotLibraryStore: plotStore,
-    __runyeMapFrameInv: { tx: 0, ty: 0, ax: 1, ay: 0, bx: 0, by: 1 },
-    __runyeGeoBase: { refLat: 0, refLng: 0 },
-    RunyeBridge: {
-      state: { cutSnap: { sig: '' }, cutOverrides: { x: {}, y: {} }, zoneRotated: false },
-      getPartitionState() { return this.state; },
-      getPlotPolygon() { return []; },
-      getZoneCuts() { return null; }
     },
-    document: { getElementById() { return null; } }
-  };
-  context.window = context;
-  vm.createContext(context);
-  vm.runInContext(fs.readFileSync(path.join(ROOT, 'runye-map-partition.js'), 'utf8'), context,
-    { filename: 'runye-map-partition.js' });
+    onRestoreAttempt() { restoreCalls++; }
+  });
 
   const result = context.RyMapPartition.capture(
     { plotId: 'plot-1', segments: [{ id: 'main-new' }] }, previousNetwork
@@ -859,5 +854,5 @@ test('map partition rollback preserves a newer network snapshot from another wri
     ok: false, error: 'plot-library-write-failed', rollbackError: 'network-layout-conflict'
   });
   assert.equal(restoreCalls, 0, 'a detected concurrent write must skip the restore API');
-  assert.equal(networkRaw, concurrentNetwork, 'rollback must not overwrite a newer network snapshot');
+  assert.equal(context.__networkRaw, concurrentNetwork, 'rollback must not overwrite a newer network snapshot');
 });

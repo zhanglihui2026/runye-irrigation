@@ -44,7 +44,9 @@
         else if(geom&&geom.type==='MultiPolygon'&&coords&&coords[0]&&coords[0][0]) ring=coords[0][0].map(function(q){return [+q[1],+q[0]];});
       }catch(eGeo){ throw new Error('地块 GeoJSON 格式无效'); }
     }
-    var sqm=Number(p.areaM2)||Number(p.sqm)||Number(ref.areaM2)||0;
+    /* sqm is the canonical map-measured area. areaM2 is legacy fallback only
+       for records that predate sqm; it must never override a present sqm value. */
+    var sqm=p.sqm!=null?Number(p.sqm):(p.areaM2!=null?Number(p.areaM2):Number(ref.areaM2)||0);
     if(!ring || ring.length<3 || !isFinite(sqm) || sqm<=0) throw new Error('地块边界或面积无效，请先在地图检查地块');
     return {plotId:p.id,name:p.name||'',sqm:sqm,mu:Number(p.mu)||+(sqm/666.67).toFixed(2),poly:ring,
       source:p.source||'map',merged:!!p.merged,grouped:!!p.grouped,subPlots:p.subPlots||[],

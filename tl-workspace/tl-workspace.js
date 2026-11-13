@@ -1590,8 +1590,6 @@
     wireInteractions(ctn);
     updateCalChip('tlWsCalChip');
     if (selGroup !== null) applyGroupHighlight();     // 分组高亮在局部重渲染后保持
-    /* v146：同 render() —— rerenderKeepView 用 replaceChild 换 svg，也把命中线层抹了，按需补挂 */
-    try { if (global.RyTlPathMeasure && global.RyTlPathMeasure.syncLayer) global.RyTlPathMeasure.syncLayer(); } catch (e) { }
   }
   function commitDraft() {
     if (!draft || draft.pts.length < 2) { draft = null; updatePreview(); return false; }
@@ -1681,10 +1679,6 @@
       if (fitMode) setFitMode(null);
       if (multiMode) setMultiMode(false);
       if (maskMode) setMaskMode(false);
-      if (window.RyTlPathMeasure && typeof window.RyTlPathMeasure.toggle === 'function') {
-        var pbtn = (typeof document !== 'undefined') ? document.getElementById('tlPathBtn') : null;
-        if (pbtn && pbtn.getAttribute('aria-pressed') === 'true') window.RyTlPathMeasure.toggle();
-      }
       lineMode = true;
     } else {
       lineMode = false;
@@ -3168,9 +3162,6 @@
       if (el) { baseFit(c2, el); applyView(c2, el); }
       wireInteractions(c2);
     }
-    /* v146（2026-09-25 用户反馈「总管还是没有分段」）：路径测算命中线层（#tlPathLayer）
-       挂在本函数整棵重建的 svg 上 → 重建后按需补挂（模式未开时 syncLayer 直接返回）。 */
-    try { if (global.RyTlPathMeasure && global.RyTlPathMeasure.syncLayer) global.RyTlPathMeasure.syncLayer(); } catch (e) { }
     /* [v215] 演示态跨重渲染：重建后立刻按演示组重涂（手动点组选中的场景仍走旧路径清空） */
     if (selGroup !== null) { try { applyGroupHighlight(); } catch (e) { } }
     return true;

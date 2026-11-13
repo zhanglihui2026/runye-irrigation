@@ -9,7 +9,8 @@
 /* v531-data-service-plot-store: resolve plugin plot references through the shared plot-library adapter. */
 /* v427-archive-3d-iso: detach 3D preview and axonometric UI while retaining shared 2D pipe workspace and data. */
 'use strict';
-/* VERSION 沿革：v1046-repartition-publish（面积重划后按当前切线重建，并清理旧几何节点后发布地图快照）→
+/* VERSION 沿革：v1047-area-center-pathmeasure（逐区面积统一、管线阀门回到分区中心、移除手工路径测量交互）→
+   v1046-repartition-publish（面积重划后按当前切线重建，并清理旧几何节点后发布地图快照）→
    v1044-area-repartition-publish（按有效实切分区校验地图发布；分区几何变化时先重建管线）→
    v380-cache-fix（另一会话的缓存修复）→ v381-plugin-aiplan（本次新增 ai-plan
    插件 + core/data-service.js、core/event-bus.js、core/ui-shell.js 均在 CORE 白名单内，必须抬版本，
@@ -1477,7 +1478,7 @@
    [v1039-flow-display-decoupling] 分区面仅作动画显示；缺失时不阻断已发布管网的水路计算。
    [v1042-source-independent-irrigation-route] 页面恢复重绘时按已发布管网几何核对动画版本。
    [v1043-coupler-node-lifecycle] 接驳节点随地块设计快照恢复；分区重建或管网重生成时清除旧节点。 */
-const VERSION = 'v1046-repartition-publish';
+const VERSION = 'v1047-area-center-pathmeasure';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

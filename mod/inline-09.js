@@ -364,6 +364,22 @@ function readCurrentPlanningZoneAreas() {
     if(!cuts||!poly||poly.length<3||!isFinite(total)||total<=0)return null;
     var gridPoly=bridge.polyToGrid(cuts,poly), cols=cuts.cols|0, rows=cuts.rows|0;
     if(cols<1||rows<1||!cuts.xPos||!cuts.yPos)return null;
+    /* The area allocation is a generation input, not a value each consumer may
+       independently reconstruct. Cache it by every geometric and measured-area
+       input that affects the allocation; all callers receive the same canonical
+       zone vector until one of those inputs changes. */
+    var cellBounds=[];
+    for(var sr=0;sr<rows;sr++)for(var sc=0;sc<cols;sc++){
+      cellBounds.push([
+        typeof tlZoneGx==='function'?tlZoneGx(cuts,sr,sc):cuts.xPos[sc],
+        typeof tlZoneGy==='function'?tlZoneGy(cuts,sc,sr):cuts.yPos[sr],
+        typeof tlZoneGx==='function'?tlZoneGx(cuts,sr,sc+1):cuts.xPos[sc+1],
+        typeof tlZoneGy==='function'?tlZoneGy(cuts,sc,sr+1):cuts.yPos[sr+1]
+      ]);
+    }
+    var areaKey=JSON.stringify([String(window.currentPlotId||''),total,cols,rows,gridPoly,cellBounds]);
+    var cached=window.__runyePlanningAreaSnapshot;
+    if(cached&&cached.key===areaKey&&Array.isArray(cached.zoneAreasM2))return cached.zoneAreasM2;
     var areas=[],sum=0;
     for(var r=0;r<rows;r++)for(var c=0;c<cols;c++){
       var x0=typeof tlZoneGx==='function'?tlZoneGx(cuts,r,c):cuts.xPos[c];
@@ -380,7 +396,9 @@ function readCurrentPlanningZoneAreas() {
     areas=areas.map(function(a){return a*scale;});
     var corrected=total-areas.reduce(function(s,a){return s+a;},0);
     areas[areas.length-1]+=corrected;
-    return areas.every(function(a){return isFinite(a)&&a>0;})?areas:null;
+    if(!areas.every(function(a){return isFinite(a)&&a>0;}))return null;
+    window.__runyePlanningAreaSnapshot={version:1,key:areaKey,totalAreaM2:total,zoneAreasM2:areas};
+    return areas;
   } catch (e) { return null; }
 }
 // 兼容旧调用名，但语义已收敛为本页当前分区几何，不再读取地图旧 partitions。
@@ -4092,7 +4110,7 @@ function tlAutoGenerate(options) {
     q.w=q.maxX-q.minX;q.h=q.maxY-q.minY;return q;
   })();
   var tlPlotPolyForZone=(tlGridPlotPoly&&tlGridPlotPoly.length>=3)?tlGridPlotPoly:null;
-  var tlPartialFlags=[], tlPartialCount=0, tlZoneActMu=[];
+  var tlPartialFlags=[], tlPartialCount=0;
   for(var _zr=0;_zr<rows;_zr++){for(var _zc=0;_zc<cols;_zc++){
     var _zi=_zr*cols+_zc;
     var _stdMu=xPlan[_zc]*yPlan[_zr]/MU_TO_SQM;
@@ -4100,7 +4118,6 @@ function tlAutoGenerate(options) {
     var _mu=_m2/MU_TO_SQM;
     var _isPartial=_stdMu>0 && _mu<_stdMu*0.97 && _mu>0.05;
     tlPartialFlags[_zi]=_isPartial;
-    tlZoneActMu[_zi]=Math.round(_mu*10)/10;
     if(_isPartial)tlPartialCount++;
   }}
 
@@ -4331,8 +4348,8 @@ function tlAutoGenerate(options) {
        var cellTextAngle=Math.atan2(cellPts[1].y-cellPts[0].y,cellPts[1].x-cellPts[0].x)*180/Math.PI;
        while(cellTextAngle>90)cellTextAngle-=180;
        while(cellTextAngle<-90)cellTextAngle+=180;
-      var actM2=tlZoneActualAreaM2(zc2,zr,tlZoneCuts,tlPlotPolyForZone);
-      var actMu=actM2/MU_TO_SQM;
+      var zoneAreaM2=Number(planAreas[zi]);
+      var actMu=zoneAreaM2/MU_TO_SQM;
       var isPartial=tlPartialFlags[zi];
        if(cellWpx>10&&cellHpx>10 && actMu>0.05){
          /* [v850 用户反馈] 标注放到分块**右上角**（原居中，压着主管线不好看）。
@@ -4345,13 +4362,13 @@ function tlAutoGenerate(options) {
          var cornerX=cellPts[1].x-PADX*uX+PADY*vX, cornerY=cellPts[1].y-PADX*uY+PADY*vY;
          var zoneLabelParts=[];
          if(isPartial){
-           // 非标准分区显示区名与裁剪后的实际亩数，位置和文字方向都以当前网格为准。
+           // 非标准分区显示与水力计算/发布相同的规范逐区面积。
            zoneLabelParts.push('<text data-tlzone="1" x="0" y="12" text-anchor="end" font-size="12" fill="#000">'+(zi+1)+'区</text>');
            zoneLabelParts.push('<text data-tlzone="1" x="0" y="26" text-anchor="end" font-size="9.5" fill="#000">实际 '+actMu.toFixed(1)+' 亩</text>');
          }else{
            // 标准区尺寸始终按网格 X×Y 次序输出，避免旋转后标注内容也被交换。
            var zoneSizeText=tlZoneSizeLabel(xPlan[zc2],yPlan[zr]);
-           var zoneAreaText=(xPlan[zc2]*yPlan[zr]/MU_TO_SQM).toFixed(1)+'亩';
+           var zoneAreaText=actMu.toFixed(1)+'亩';
            var enoughForThreeLines=cellWpx>=78&&cellHpx>=42;
            if(enoughForThreeLines){
              zoneLabelParts.push('<text data-tlzone="1" x="0" y="12" text-anchor="end" font-size="13" fill="#000">'+(zi+1)+'区</text>');
@@ -4773,29 +4790,10 @@ function tlAutoGenerate(options) {
     branchPipes=branchPipes.map(tlTrimBranchToZone);
     branchDrawnLens=branchPipes.map(function(l){return tlPolyLen(l);});
   } else {
-    /* [v553 2026-10-18 用户要求] 最外一排（789 / 28/29/30 区）主管末端改 90°弯头：
-       「主管最边上的地块接到 90°弯头就可以了……90°弯头向上接一段……之后再接支管。」
-       经示意图三轮确认的画法：
-       · 最外一排的主管**不再向下延伸到底边**，截止于「分区中心往下 MAIN_END_ELBOW_R 比例」处
-         （示意图实测 ≈ 分区中心 +18% 分区高）；
-       · 截止点=90°弯头，之后**照抄其他地块**链路：连接管 → 阀门 → 支管三通 → 支管
-         （支管仍按原几何贯通全分区、向上下两侧延伸）；
-       · 唯一区别 = 主管末端由「三通」改「90°弯头」（材料清单同步：分区三通 −N、新增 90°弯头 +N）；
-       · 纵向分支（主管横置）对称：最外一**列**主管不再向右延伸，末端弯头后接阀门/支管；
-       · 二级页传导几何（ppHasPipes 分支）不在此列 —— 该分支几何来自二级页，保持原样。 */
+    /* 最外排/列主管保留既有端部长度规则。阀门与支管设计轴线均落在分区实际中心；
+       与主管重合时的可视分离只由后续 SVG 渲染副本完成，不改设计几何。 */
     var MAIN_END_ELBOW_R = 0.18;
-    /* [v638 2026-10-20 用户口径] 主管/支管是「同一位置的上下两层」（主管埋地下、支管在地面），
-       图面错开只是为了让两根都看得见，错开量必须固定、不被地块压缩 ——
-       用户原话：「主管跟支管在图中显示的距离，不应该被地块压缩，不管地块大小，应该都保持一致」。
-       改法：错开量从「支管所在分区块的 9%」换成「固定的实地米数」，与二级画布同值
-       （数值唯一来源 = mod/plot-editor.js 的 PP_MAIN_BRANCH_GAP_M，经 window.RyMainBranchGap 取）。
-       为什么固定米数在两个视图里都成立：二级 ppUpdateTransform 是 s=0.5×zoom 的固定比例，
-       本图框 s=min(drawW/b.w, drawH/b.h) 并被上限 2 夹住 ⇒ 常规地块（宽 ≤515m、高 ≤306m）
-         实际就是 s=2 的固定比例；两边都只差一个整图缩放，米数固定则视觉间距固定。
-       超过上述尺寸的超大地块，s 会整体降到 2 以下 —— 那时图里所有东西（含分区宽度、标注）
-         都同比例缩小，间距跟着一起缩，比例关系不坏。
-       旧口径的历史：v110 之前主管落 32%、支管落中（相距 18% 块宽），用户反馈「偏移过大」→ 缩到 9%；
-       9% 仍随分区尺寸变化（实测 520m 地块 20m、60m 地块 6m），故再改成本口径。 */
+    /* 仅用于渲染层区分重合的主管/支管；设计与水力坐标保持中心线。 */
     function tlGapM() {
       var RG = (typeof window !== 'undefined') ? window.RyMainBranchGap : null;
       if (RG && typeof RG.m === 'function') {
@@ -4804,30 +4802,41 @@ function tlAutoGenerate(options) {
       }
       return 20;   /* 兜底：与 PP_MAIN_BRANCH_GAP_M 同值（plot-editor 未加载时走到这里） */
     }
-    function tlVisGap(zoneDim) {
-      var g = tlGapM();
-      /* 硬边界：两根线对称夹住真实位置（各让一半）⇒ 间距 ≤ 分区尺寸 90% 时都还在本分区内。
-         只有极窄分区才会咬到，正常地块一律拿到那个固定米数（与二级同一条边界口径）。 */
-      if (zoneDim > 0) g = Math.min(g, zoneDim * 0.9);
-      return g > 0 ? g : 0.001;
+    function tlActualCellCenter(x,y,w,h){
+      var fallback={x:x+w/2,y:y+h/2},geom=window.RyPlotEditorGeom;
+      if(!geom||typeof geom.clipPolyToRect!=='function'||!tlGridPlotPoly||tlGridPlotPoly.length<3)return fallback;
+      var pts=geom.clipPolyToRect(tlGridPlotPoly,x,y,x+w,y+h);if(!pts||pts.length<3)return fallback;
+      var a=0,cx=0,cy=0;
+      for(var i=0,j=pts.length-1;i<pts.length;j=i++){
+        var cr=pts[j].x*pts[i].y-pts[i].x*pts[j].y;a+=cr;
+        cx+=(pts[j].x+pts[i].x)*cr;cy+=(pts[j].y+pts[i].y)*cr;
+      }
+      if(Math.abs(a)<1e-9)return fallback;
+      var c={x:cx/(3*a),y:cy/(3*a)};
+      if(window.atPointInPolygon&&window.atPointInPolygon(c,pts))return c;
+      var best=null,bestD=Infinity;
+      for(var gy=1;gy<20;gy++)for(var gx=1;gx<20;gx++){
+        var q={x:x+w*gx/20,y:y+h*gy/20};
+        if(!window.atPointInPolygon||!window.atPointInPolygon(q,pts))continue;
+        var d=(q.x-c.x)*(q.x-c.x)+(q.y-c.y)*(q.y-c.y);
+        if(d<bestD){bestD=d;best=q;}
+      }
+      return best||fallback;
     }
     for(var zr2=0;zr2<rows;zr2++){
       for(var zc3=0;zc3<cols;zc3++){
         var zx2=xPos[zc3], zy2=yPos[zr2];
         var zoneW2=xSrc[zc3], zoneH2=ySrc[zr2];
-        var centerX=zx2+zoneW2/2, centerY=zy2+zoneH2/2;
+        var center=tlActualCellCenter(zx2,zy2,zoneW2,zoneH2);
+        var centerX=center.x, centerY=center.y;
         var fixedSideIsHorizontal=majFixedH;   /* 第一分区定滴灌带轴，其余主管/支管全部垂直于该轴 */
         // 支管两端各缩进一段距离（约分区边长的 6%，4~14m），不与分区边缘相接，使各地块支管视觉上独立断开
         var gapV=Math.min(Math.max(zoneH2*0.06,4),14,zoneH2*0.22);
         var gapH=Math.min(Math.max(zoneW2*0.06,4),14,zoneW2*0.22);
         if(fixedSideIsHorizontal){
-          /* v110（2026-09-22 用户要求）：主管改到分区横向中间；支管在主管旁平移一小段
-             （原主管 32% 偏置、支管落中 → 主支相距 18% 边长，用户反馈偏移过大，缩到 9%）
-             [v638 2026-10-20] 平移量改为固定显示间距 tlVisGap（固定米数，与二级同值），不再按分区块宽 9%；
-             并且改成「两根对称夹住真实位置」—— 与二级 ppBuildAutoPipes 同一套摆法 */
-          var gapX1=tlVisGap(zoneW2);
-          var mainX=centerX-gapX1/2;
-          var brX=centerX+gapX1/2;
+          /* 设计管线共用分区实际中心线；固定间距仅在下面的SVG渲染层应用。 */
+          var mainX=centerX;
+          var brX=centerX;
           var tlEdgeZ=(zr2===rows-1);                 /* [v553] 最外一排 */
           var tlMainEndY=zy2+zoneH2;
           if(tlEdgeZ){
@@ -4843,21 +4852,11 @@ function tlAutoGenerate(options) {
           else{ branchPipes.push(tlSegB); branchFullSpans.push(zoneH2); branchDrawnLens.push(zoneH2-2*gapV); }
           if(tlSegM) mainPipes.push(tlSegM);
           var tlMainIdx = tlSegM ? mainPipes.length-1 : -1;
-          if(tlMOk && window.atPointInPolygon&&window.atPointInPolygon({x:brX,y:tlEdgeZ?tlMainEndY:centerY},tlGridPlotPoly)){
-            if(tlEdgeZ){
-              /* [v553] 主管末端 90°弯头 → 水平连接管 → 阀门（落点仍在支管上）→ 支管三通 → 支管 */
-              if(tlMainIdx>=0) valves.push({x:brX,y:tlMainEndY,ax:mainX,ay:tlMainEndY,elbow:true,mi:tlMainIdx});
-            }else{
-              var tlDx=brX-mainX, tlAy=centerY-tlDx;
-              if(tlAy<zy2)tlAy=zy2; if(tlAy>zy2+zoneH2)tlAy=zy2+zoneH2;
-              valves.push({x:brX,y:centerY,ax:mainX,ay:tlAy});
-            }
-          }
+          if(tlMOk && window.atPointInPolygon&&window.atPointInPolygon({x:centerX,y:centerY},tlGridPlotPoly))
+            valves.push({x:centerX,y:centerY,mi:tlMainIdx});
         }else{
-          /* [v638] 同竖向分支：固定显示间距 + 对称夹住真实位置，不按分区高 9% */
-          var gapY1=tlVisGap(zoneH2);
-          var mainY=centerY-gapY1/2;
-          var brY=centerY+gapY1/2;
+          var mainY=centerY;
+          var brY=centerY;
           var tlEdgeZ=(zc3===cols-1);                 /* [v553] 最外一列（纵向分支对称） */
           var tlMainEndX=zx2+zoneW2;
           if(tlEdgeZ){
@@ -4872,15 +4871,8 @@ function tlAutoGenerate(options) {
           else{ branchPipes.push(tlSegB2); branchFullSpans.push(zoneW2); branchDrawnLens.push(zoneW2-2*gapH); }
           if(tlSegM2) mainPipes.push(tlSegM2);
           var tlMainIdx2 = tlSegM2 ? mainPipes.length-1 : -1;
-          if(tlMOk2 && window.atPointInPolygon&&window.atPointInPolygon({x:tlEdgeZ?tlMainEndX:centerX,y:brY},tlGridPlotPoly)){
-            if(tlEdgeZ){
-              if(tlMainIdx2>=0) valves.push({x:tlMainEndX,y:brY,ax:tlMainEndX,ay:mainY,elbow:true,mi:tlMainIdx2});
-            }else{
-              var tlDy=brY-mainY, tlAx=centerX+tlDy;
-              if(tlAx<zx2)tlAx=zx2; if(tlAx>zx2+zoneW2)tlAx=zx2+zoneW2;
-              valves.push({x:centerX,y:brY,ax:tlAx,ay:mainY});
-            }
-          }
+          if(tlMOk2 && window.atPointInPolygon&&window.atPointInPolygon({x:centerX,y:centerY},tlGridPlotPoly))
+            valves.push({x:centerX,y:centerY,mi:tlMainIdx2});
         }
       }
     }
@@ -5056,10 +5048,14 @@ function tlAutoGenerate(options) {
 
   // 手绘总管在在线地图（tlMapTrunkLen 收口进扬程）；干线（段总管）由本页自动生成并画在图面。
   // Draw main pipes (blue) — clipped to plot boundary
+  var tlPipeDisplay=(typeof window.ppGetPipeDisplayGeometry==='function')
+    ?window.ppGetPipeDisplayGeometry(mainPipes,branchPipes,valves,tlGapM())
+    :{main:mainPipes,branch:branchPipes,valves:valves,valveAnchors:[]};
   parts.push('<g clip-path="url(#tlPlotClip)">');
   mainPipes.forEach(function(l,mi){
     var md='';
-    for(var i=0;i<l.length;i++){var p=tsGrid(l[i].x,l[i].y);md+=(i===0?'M':'L')+p.x.toFixed(1)+' '+p.y.toFixed(1)+' ';}
+    var viewLine=tlPipeDisplay.main[mi]||l;
+    for(var i=0;i<viewLine.length;i++){var p=tsGrid(viewLine[i].x,viewLine[i].y);md+=(i===0?'M':'L')+p.x.toFixed(1)+' '+p.y.toFixed(1)+' ';}
     var tlHidM=window.tlIsPipeHidden('main-'+mi);
     parts.push('<path data-tlpipe="main-'+mi+'" d="'+md+'" fill="none" stroke="'+(tlHidM?'#64748b':'#185FA5')+'" stroke-width="5"'+(tlHidM?' stroke-dasharray="8,5" opacity="0.55"':'')+' stroke-linecap="round" stroke-linejoin="round"/>');
   });
@@ -5067,7 +5063,8 @@ function tlAutoGenerate(options) {
   // Draw branch pipes (green) — clipped to plot boundary
   branchPipes.forEach(function(l,bi){
     var bd='';
-    for(var i=0;i<l.length;i++){var p=tsGrid(l[i].x,l[i].y);bd+=(i===0?'M':'L')+p.x.toFixed(1)+' '+p.y.toFixed(1)+' ';}
+    var viewLine=tlPipeDisplay.branch[bi]||l;
+    for(var i=0;i<viewLine.length;i++){var p=tsGrid(viewLine[i].x,viewLine[i].y);bd+=(i===0?'M':'L')+p.x.toFixed(1)+' '+p.y.toFixed(1)+' ';}
     var tlHidB=window.tlIsPipeHidden('branch-'+bi);
     parts.push('<path data-tlpipe="branch-'+bi+'" d="'+bd+'" fill="none" stroke="'+(tlHidB?'#64748b':'#16a34a')+'" stroke-width="3"'+(tlHidB?' stroke-dasharray="8,5" opacity="0.55"':'')+' stroke-linecap="round" stroke-linejoin="round"/>');
   });
@@ -5143,10 +5140,13 @@ function tlAutoGenerate(options) {
   valves.forEach(function(v){ if(v.ax===undefined||v.ay===undefined){ var cp=tlValveConnPt(v); if(cp){v.ax=cp.x;v.ay=cp.y;} } });
 
   // Valves —— 斜向连接管把阀门与主管接通，更直观（连接管与主管同色，画在红圈之下）
-  valves.filter(function(v){return window.atPointInPolygon?window.atPointInPolygon(v,tlGridPlotPoly):true;}).forEach(function(v,idx){
-    var vp=tsGrid(v.x,v.y);
-    if(v.ax!==undefined && v.ay!==undefined){
-      var ap=tsGrid(v.ax, v.ay);
+  valves.forEach(function(v,idx){
+    if(window.atPointInPolygon&&!window.atPointInPolygon(v,tlGridPlotPoly))return;
+    var __viewValve=tlPipeDisplay.valves[idx]||v;
+    var vp=tsGrid(__viewValve.x,__viewValve.y);
+    var __viewAnchor=tlPipeDisplay.valveAnchors[idx]||((v.ax!==undefined&&v.ay!==undefined)?{x:v.ax,y:v.ay}:null);
+    if(__viewAnchor){
+      var ap=tsGrid(__viewAnchor.x, __viewAnchor.y);
       parts.push('<line x1="'+ap.x.toFixed(1)+'" y1="'+ap.y.toFixed(1)+'" x2="'+vp.x.toFixed(1)+'" y2="'+vp.y.toFixed(1)+'" stroke="#185FA5" stroke-width="3.5" stroke-linecap="round" opacity="0.92"/>');
       /* 任务⑧（2026-09-24 用户要求）：主管×支管交接处补三通方块 —— 与总管×主管交接
          （data-junction-tee，深蓝白边 9×9）同款式，交接符号全覆盖。
@@ -5263,7 +5263,10 @@ function tlAutoGenerate(options) {
     branchFullSpans: branchFullSpans.slice(), branchDrawnLens: branchDrawnLens.slice(),
     valves: valves.map(function(v){var p=tlGridWorld(v.x,v.y),a=(v.ax!=null&&v.ay!=null)?tlGridWorld(v.ax,v.ay):null;return Object.assign({},v,p,a?{ax:a.x,ay:a.y}:{});}),
     dripTapes: dripTapes.map(function(line){return line.map(function(p){return tlGridWorld(p.x,p.y);});}),
-    partialFlags: tlPartialFlags.slice(), zoneActMu: tlZoneActMu.slice(),
+    partialFlags: tlPartialFlags.slice(), zoneActMu: planAreas.map(function(a){return Math.round((Number(a)/MU_TO_SQM)*10)/10;}),
+    /* This row-major vector is the one area allocation used by hydraulics, labels,
+       and the map publication transaction. The map consumes it; it does not recalculate it. */
+    zoneAreasM2: planAreas.slice(), areaSnapshot: {source:'map-measured-total/current-planning-geometry',totalAreaM2:Number(window.measuredArea),zoneCount:planAreas.length},
     activeZoneIndices: planAreas.reduce(function(list,area,index){if(Number(area)>0)list.push(index);return list;},[]),
     /* [v1015 2026-11-08 用户拍板] 快照不再落自动总管/三通/水源设计几何：
        frontPipe/sourcePos 恒 null（手绘总管经 tlMapTrunkLen/段总管驳接进水力），
@@ -5273,6 +5276,8 @@ function tlAutoGenerate(options) {
   r = computeThreeLevel();
   if(!r||!window.tlDiagramData||!window.tlDiagramData.generatedAt||
       !Array.isArray(r.zoneAreas)||r.zoneAreas.length!==totalZones||
+      !Array.isArray(window.tlDiagramData.zoneAreasM2)||window.tlDiagramData.zoneAreasM2.length!==r.zoneAreas.length||
+      r.zoneAreas.some(function(area,i){return Math.abs(Number(area)-Number(window.tlDiagramData.zoneAreasM2[i]))>Math.max(1e-7,Math.abs(Number(area))*1e-12);})||
       !window.tlDiagramData.mainPipes||!window.tlDiagramData.mainPipes.length||
       !window.tlDiagramData.branchPipes||!window.tlDiagramData.branchPipes.length){
     throw new Error('当前施工图数据不完整，未发布到在线地图');
