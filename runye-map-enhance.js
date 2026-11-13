@@ -1030,8 +1030,9 @@
     (net.segments || []).forEach(function (s) {
       try {
         if (s.kind === 'segTrunk' || s.id === 'segTrunk') return; // 旧成果中的自动段总管已退役
-        var sLL = validRingLL(s.latLng, 2);   // 同样挡住含 null 顶点的管段（否则 _project 抛错连累全部矢量层）
+        var sLL = validRingLL(s.latLng, 2);   // 真实几何：连接、水力与长度的唯一依据
         if (!sLL) return;
+        var drawLL = validRingLL(s.displayLatLng, 2) || sLL; // 旧快照无显示副本时兼容真实几何
         var st = dnStyle(s.dn);
         var hrec = hydraulic && hydraulic.items && hydraulic.items[s.id];
         if (hrec) st = hydraulicStyle(hrec, st);
@@ -1061,7 +1062,7 @@
             '本段损失：' + escapeHtml((+hrec.loss).toFixed(3)) + ' m<br>' : '') +
           '</div>';
         /* [v230] 逐段裁剪：折线按相邻两点拆段，落在地块外的部分不画（弹窗随每一段保留） */
-        var pts = sLL.map(RunyeGeo.coordPair), pieces = [];
+        var pts = drawLL.map(RunyeGeo.coordPair), pieces = [];
         for (var pi = 1; pi < pts.length; pi++) {
           var pa = pts[pi - 1], pb = pts[pi];
           var ivs = (isTrunk || !clipRings.length) ? [[0, 1]] : clipSegIntervals(pa, pb, clipRings);

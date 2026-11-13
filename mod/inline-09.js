@@ -5498,10 +5498,26 @@ function tlAutoGenerate(options) {
     var meta=dd.meta||{}, mpipes=(meta.pipes)||{};
     var segDn={ front:dnOf(mpipes.front), main:dnOf(mpipes.main)||90, branch:dnOf(mpipes.branch)||63 };
     var segments=[];
-    function pushSegs(arr,dn,prefix){ if(!arr) return; for(var i=0;i<arr.length;i++){ var ll=ln2ll(arr[i]); if(ll) segments.push({id:prefix+i, name:prefix+(i+1), dn:dn, kind:prefix, latLng:ll}); } }
+    function pushSegs(arr,dn,prefix,displayArr){
+      if(!arr) return;
+      for(var i=0;i<arr.length;i++){
+        var ll=ln2ll(arr[i]);
+        if(!ll) continue;
+        var seg={id:prefix+i, name:prefix+(i+1), dn:dn, kind:prefix, latLng:ll};
+        /* 地图显示使用与分区页相同的平行错开副本；真实 latLng 保持原设计坐标，
+           轮灌寻路、水力长度和连接校验继续读取真实几何。 */
+        var displayLine=displayArr&&displayArr[i];
+        if(displayLine&&displayLine.length>=2){
+          var displayWorld=displayLine.map(function(p){return tlGridWorld(p.x,p.y);});
+          var displayLL=ln2ll(displayWorld);
+          if(displayLL) seg.displayLatLng=displayLL;
+        }
+        segments.push(seg);
+      }
+    }
     if(dd.frontPipe) pushSegs([dd.frontPipe], segDn.front||segDn.main, 'front');
-    pushSegs(dd.mainPipes, segDn.main, 'main');
-    pushSegs(dd.branchPipes, segDn.branch, 'branch');
+    pushSegs(dd.mainPipes, segDn.main, 'main', tlPipeDisplay&&tlPipeDisplay.main);
+    pushSegs(dd.branchPipes, segDn.branch, 'branch', tlPipeDisplay&&tlPipeDisplay.branch);
     /* [v878] 段总管反投：分区与管路自动生成的分区主管串联干线（v859）传给在线地图。
        用户要求「自动生成的那一段总管要传递过去」——此前它只进 tlDiagramData.segTrunk
        （轮灌演示播放时临时画、停止即清；地图页只拿 couplers 做驳接点捕捉），

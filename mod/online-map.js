@@ -3845,7 +3845,14 @@
         });
         if(d.network!=null){
           if(!Array.isArray(d.network.segments)) throw new Error('工程管网格式错误');
-          d.network.segments.forEach(function(s){if(!s || !Array.isArray(s.latLng) || s.latLng.length<2) throw new Error('管段坐标不足');s.latLng.forEach(RunyeGeo.coordPair);});
+          d.network.segments.forEach(function(s){
+            if(!s || !Array.isArray(s.latLng) || s.latLng.length<2) throw new Error('管段坐标不足');
+            s.latLng.forEach(RunyeGeo.coordPair);
+            if(s.displayLatLng!=null){
+              if(!Array.isArray(s.displayLatLng)||s.displayLatLng.length<2) throw new Error('管段显示坐标不足');
+              s.displayLatLng.forEach(RunyeGeo.coordPair);
+            }
+          });
           if(d.network.sourcePos) RunyeGeo.coordPair(d.network.sourcePos);
           ['valves','dripTapes'].forEach(function(key){if(d.network[key]!=null && !Array.isArray(d.network[key])) throw new Error('设备或滴灌带格式错误');});
           (d.network.valves||[]).forEach(RunyeGeo.coordPair);
