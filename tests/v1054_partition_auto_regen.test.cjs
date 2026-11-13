@@ -39,6 +39,11 @@ test('② 自动重算：签名比对 + 防抖 400ms + 重入标志 + 逐块态�
   assert.match(render, /分区已变化，管线已自动重新生成/, '覆盖手绘管线时必须 toast 告知（可从历史找回）');
   const decl = pe.slice(pe.indexOf('var ppAutoRegenTimer'), pe.indexOf('var ppRenderBase=ppRender'));
   assert.match(decl, /ppAutoRegenRunning=false/, '标志必须初始化为 false');
+  /* [v1055 用户实测] 旧档案管线（无签名）曾被 `if(!gen&&hasPipes)return` 挡死——
+     改角度/改面积后管线纹丝不动。隔断必须保持取消：不得出现该条件。 */
+  assert.ok(!/if\(!gen&&hasPipes\)return/.test(render), '不得复活「无签名不重算」隔断（v1055 死锁根因）');
+  assert.match(render, /cur===ppAutoRegenFailSig/, '失败冷却必须在场（同一签名失败过不重试，防 alert 骚扰）');
+  assert.match(render, /ppAutoRegenFailSig=cur/, '失败时记录冷却签名');
 });
 
 test('③ 三级「生成施工图」：刷新简图 → 同步地图 → 跳地图查看', () => {

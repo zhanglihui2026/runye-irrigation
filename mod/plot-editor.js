@@ -2718,18 +2718,24 @@
         var gen=ppState.__ppGenCutSig||null;
         var cur=ppCurrentCutSignature();
         if(!cur)return;
-        /* 触发条件：① 已有管线且分区签名变了；② 从未生成过（首次分区完成）。 */
+        /* 触发条件：① 已有管线且分区签名变了；② 从未生成过（首次分区完成）；
+           ③ [v1055 用户实测] 旧档案管线（无签名）——此前这条被保守条件挡死，
+           造成「改角度/改面积后管线纹丝不动」的死锁：管线没有签名可比对，
+           任何分区变化都触发不了。取消隔断：无签名也触发升级重算，第一次
+           重算后管线即带上签名，此后走正常同代比对。失败冷却见 FailSig。 */
         if(gen&&gen===cur)return;
-        if(!gen&&hasPipes)return;   /* 旧档案（无签名）不自动覆盖，恢复链/三级兜底已兜住 */
+        if(cur===ppAutoRegenFailSig)return;   /* 同一签名下失败过：等分区再变才重试，防 alert 骚扰 */
         clearTimeout(ppAutoRegenTimer);
         ppAutoRegenTimer=setTimeout(function(){
           ppAutoRegenRunning=true;
           try{
             var had=hasPipes;
             if(!ppAutoGeneratePipes()){
+              ppAutoRegenFailSig=cur;   /* [v1055] 失败冷却：此签名下不再自动重试 */
               alert('分区变化后自动布管未完成：'+(window.__runyeSingleL2CommitFailure||'布管或设计提交失败')+'。请调整分区参数后重试。');
               return;
             }
+            ppAutoRegenFailSig=null;
             try{ if(window.atShowToast&&had) window.atShowToast('分区已变化，管线已自动重新生成（原管线可在历史记录找回）'); }catch(eT){}
           }catch(eRegen){ console.warn('[ppAutoRegen]',eRegen); }
           finally{ ppAutoRegenRunning=false; }
@@ -2741,8 +2747,10 @@
      分区旋转 / 重新分区 / 回退 / 加管都会改内容尺寸或平移量，只有这里能保证不漏。
      做法：把局部 ppRender 换成一个转发器（函数声明可重新赋值），
      内部所有 ppRender() 调用立刻跟着生效，绘制逻辑一行没动。 */
-  /* [v1054] 自动重算的防抖定时器与重入标志（函数体在 ppRender 尾部）。 */
-  var ppAutoRegenTimer=null, ppAutoRegenRunning=false;
+  /* [v1054] 自动重算的防抖定时器与重入标志（函数体在 ppRender 尾部）。
+     [v1055] FailSig：失败冷却——同一分区签名下自动重算失败过就不再重试，
+     等分区再变化才重试，防止几何异常时每次 render 都弹 alert。 */
+  var ppAutoRegenTimer=null, ppAutoRegenRunning=false, ppAutoRegenFailSig=null;
   var ppRenderBase=ppRender;
   ppRender=function(){ ppRenderBase.apply(null,arguments); ppSyncFitBtn();try{if(window.RyDrawingWorkspace)window.RyDrawingWorkspace.syncCamera();}catch(e){} };
   window.ppRender=ppRender;

@@ -9,7 +9,8 @@
 /* v531-data-service-plot-store: resolve plugin plot references through the shared plot-library adapter. */
 /* v427-archive-3d-iso: detach 3D preview and axonometric UI while retaining shared 2D pipe workspace and data. */
 'use strict';
-/* VERSION 沿革：v1054-partition-auto-regen（用户拍板「生成施工图在三级之后」：二级移除生成按钮，分区变化自动重算管线（ppRender 签名比对+防抖+逐块态豁免），三级新增 #tlGenerateDiagram 定稿按钮=刷新简图+同步在线地图）→
+/* VERSION 沿革：v1055-auto-regen-legacy-upgrade（用户实测死锁修复：旧档案管线无代际签名，被「无签名不重算」保守条件挡死——改角度/面积后管线纹丝不动。取消隔断：无签名也触发升级重算（首次重算后带签名走正常比对），加失败冷却 FailSig 防 alert 骚扰）→
+   v1054-partition-auto-regen（用户拍板「生成施工图在三级之后」：二级移除生成按钮，分区变化自动重算管线（ppRender 签名比对+防抖+逐块态豁免），三级新增 #tlGenerateDiagram 定稿按钮=刷新简图+同步在线地图）→
    v1053-pipe-reuse-generation-check（数据唯一性续篇：三级 tlAutoGenerate 复用二级管线前必须校验代际——滴灌带每按当前分区现算，管线却是「生成施工图」存档；签名不一致就不复用、走兜底自布管（与滴灌带同一 cuts 恒同代）并红字提示回二级重新生成）→
    v1052-restore-matches-partition（用户实测「滴灌带纵向、管线竖直与其
    平行」——管线是旧分区布局的存档几何，v355 恢复签名只锚边界不锚分区参数，改了
@@ -1492,7 +1493,7 @@
    [v1039-flow-display-decoupling] 分区面仅作动画显示；缺失时不阻断已发布管网的水路计算。
    [v1042-source-independent-irrigation-route] 页面恢复重绘时按已发布管网几何核对动画版本。
    [v1043-coupler-node-lifecycle] 接驳节点随地块设计快照恢复；分区重建或管网重生成时清除旧节点。 */
-const VERSION = 'v1054-partition-auto-regen';
+const VERSION = 'v1055-auto-regen-legacy-upgrade';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
