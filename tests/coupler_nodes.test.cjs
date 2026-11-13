@@ -58,8 +58,14 @@ test('[v913] 交互接线：放置模式/拖动/事务提交/成组禁用', () =
   assert.ok(/ppCommitSinglePlotEdit\([^)]*'coupler-move'/.test(peSrc), '拖动松手必须走 ppCommitSinglePlotEdit 事务');
   assert.ok(/ppCommitSinglePlotEdit\([^)]*'coupler-input'/.test(peSrc), '面板输入必须走事务');
   assert.ok(/ppCommitSinglePlotEdit\([^)]*'coupler-remove'/.test(peSrc), '移除节点必须走事务');
-  // 拖动中实时投影：预览与落点共用 ppCouplerProject（v852 教训）
-  assert.ok(peSrc.split('ppCouplerProject(').length >= 4, 'ppCouplerProject 必须被放置/拖动/工具定义多处共用');
+  // 拖动中实时投影：预览与落点共用同一投影函数（v852 教训）。
+  // [v1059] 交互链升级为 ppCouplerProjectDisp（显示偏移反算投影）：放置点击与拖拽
+  // mousemove 必须同口径（先按主管偏移反算再投影设计线），ppCouplerProject 保留
+  // 为 world 入参原口径（外部/探针兼容）。
+  assert.ok(peSrc.split('ppCouplerProjectDisp(').length >= 3,
+    'ppCouplerProjectDisp 必须被放置/拖动共用（v1059 显示反算口径）');
+  assert.ok(!peSrc.includes('var chit=ppCouplerProject(wpt);') && !peSrc.includes('var cmHit=ppCouplerProject(cmWpt);'),
+    '交互链不得直连设计几何投影（偏移显示后旧路径错位，v1059 退役）');
   // pan 误触防护：mousemove pan 阈值分支必须排除 dragCoupler
   assert.ok(/!ppState\.dragCut&&!ppState\.dragCoupler/.test(peSrc),
     'pan 阈值分支必须排除 dragCoupler——否则拖节点 2px 就误入平移');

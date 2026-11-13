@@ -160,3 +160,6 @@ npm-debug.log*
 !tests/v1054_partition_auto_regen.test.cjs
 !tests/v1057_single_pipe_layer.test.cjs
 !tests/v1058_offset_pair_relax.test.cjs
+
+# v1059 节点捕捉主管：偏移显示口径统一回归
+!tests/v1059_node_display_shift.test.cjs

@@ -1327,7 +1327,7 @@
     Object.keys(lm).forEach(function (k) { if (k !== 'front') drawPids[k] = 1; });
     Object.keys(hmDraw).forEach(function (k) { if (hmDraw[k] && k !== 'front' && !/^front-\d+$/.test(k)) drawPids[k] = 1; });
     Object.keys(drawPids).forEach(function (pid) {
-      var epts = AE.effPts(pid, data);
+      var epts = dispPts(pid, data);   /* [v1059] 显示口径（含偏移副本平移） */
       if (!epts) return;
       var st = autoStyle(pid);
       var d = '';
@@ -1351,7 +1351,7 @@
     var cm = AE.calibersMap ? AE.calibersMap() : {};
     Object.keys(cm).forEach(function (pid) {
       if (isPidHidden(pid)) return;   /* v162：遮蔽管不画改径套壳/Ø/hf 标注 */
-      var epts = AE.effPts(pid, data);
+      var epts = dispPts(pid, data);   /* [v1059] 显示口径：套壳跟随偏移后的可见主管线 */
       if (!epts) return;
       var st = autoStyle(pid);
       var d = '';
@@ -1366,7 +1366,7 @@
     });
     /* 2) 配件标记（三通/阀门） */
     (AE.fitsList() || []).forEach(function (f) {
-      var pos = AE.pointAt(f.pid, data, f.atM);
+      var pos = dispPointAt(f.pid, data, f.atM);   /* [v1059] 配件标记跟随显示口径 */
       if (!pos) return;
       var q = T(pos);
       var fSel = f.id === selFitId;
@@ -1383,12 +1383,12 @@
       }
       var distLabels = '';
       if (fSel) {   /* 选中/拖动：距起点·距终点两段距离（和=当前有效管长，阶段2b） */
-        var fepts = AE.effPts(f.pid, data);
+        var fepts = dispPts(f.pid, data);   /* [v1059] 距离标注锚点跟随显示口径 */
         if (fepts) {
           var fLen = AE.polylineLen(fepts);
           var fD1 = Math.max(0, Math.min(f.atM, fLen)), fD2 = fLen - fD1;
           var fLab = function (at, tag, val) {
-            var p2 = AE.pointAt(f.pid, data, at);
+            var p2 = dispPointAt(f.pid, data, at);   /* [v1059] 距离标注锚点跟随显示口径 */
             if (!p2) return '';
             var q2 = T(p2);
             return '<text data-tlfitdist="' + tag + '" x="' + fmt(q2.x + 5) + '" y="' + fmt(q2.y - 5) + '" font-size="9.5" font-family="system-ui" font-weight="700" fill="#b45309" paint-order="stroke" stroke="#fff" stroke-width="2.5" pointer-events="none">' + esc(val.toFixed(1) + 'm') + '</text>';
@@ -1423,7 +1423,7 @@
         var na = window.RyTlNodes.nodeById(lk.a), nb = window.RyTlNodes.nodeById(lk.b);
         if (!na || !nb) return;
         if (na.pid === nb.pid) {
-        var ep2 = AE.effPts(na.pid, data); if (!ep2) return;
+        var ep2 = dispPts(na.pid, data); if (!ep2) return;   /* [v1059] 连线沿显示几何贴合 */
         var L2 = ndL(ep2);
         var a1 = Math.max(0, Math.min(na.atM, L2)), b1 = Math.max(0, Math.min(nb.atM, L2));
         if (!(Math.abs(b1 - a1) > 1e-6)) return;
@@ -1471,7 +1471,7 @@
     if (selAutoId) hlSet[selAutoId] = 1;
     selSet.forEach(function (p) { hlSet[p] = 1; });
     Object.keys(hlSet).forEach(function (pid) {
-      var epts2 = AE.effPts(pid, data);
+      var epts2 = dispPts(pid, data);   /* [v1059] 选中高亮跟随偏移后的可见管线 */
       /* v163：多选里的总管段 'front-N' → 该段子折线（与单选 selAutoSeg 同源） */
       var mSegPid = /^front-(\d+)$/.exec(pid);
       if (mSegPid && window.RyTlPathMeasure && typeof window.RyTlPathMeasure.frontSegPts === 'function') {
@@ -2085,20 +2085,64 @@
     window.grBackFromTl();
     return true;
   }
-  /* 点 → 最近自动管线（有效几何，tolM 米）：{pid, along}；仅底图克隆路径启用 */
+  /* ---------- [v1059] 显示偏移辅助层 ----------
+   * 主管/支管线体的唯一可见绘制层在二级平面画布，且按 ppGetPipeDisplayGeometry
+   * 画成偏移副本（±gap/2，用户拍板「假象显示」）；三级工作区线体已透明化（M13）。
+   * 本层所有叠加元素（节点/连线/配件标记/改径套壳/长度标注/选中高亮）若仍按
+   * 设计几何（effPts）定位，就会整体悬空 10m——用户实测「节点捕捉不到主管、
+   * 不能在主管上移动」。此处统一换算：dispShiftOf(pid) 取该管的刚体平移向量，
+   * dispPts/dispPointAt 输出显示位；拾取与拖拽投影按同口径反算，保证点得到、
+   * 拖得动、松手落在可见主管线上。front（手绘总管）不走配对偏移，恒零向量。 */
+  var _dispShiftCache = null;
+  function dispShiftMap() {
+    if (_dispShiftCache) return _dispShiftCache;
+    var out = {};
+    try {
+      var RG = (typeof window !== 'undefined') ? window.RyMainBranchGap : null;
+      var gap = (RG && typeof RG.m === 'function') ? RG.m() : 20;
+      var G = (typeof window !== 'undefined') ? window.ppGetPipeDisplayGeometry : null;
+      if (G && lastDataRef && Array.isArray(lastDataRef.mainPipes)) {
+        var disp = G(lastDataRef.mainPipes, lastDataRef.branchPipes, lastDataRef.valves, gap);
+        (disp.main || []).forEach(function (l, i) {
+          var src = lastDataRef.mainPipes[i];
+          if (l && l[0] && src && src[0]) out['main-' + i] = { x: l[0].x - src[0].x, y: l[0].y - src[0].y };
+        });
+        (disp.branch || []).forEach(function (l, i) {
+          var src = lastDataRef.branchPipes[i];
+          if (l && l[0] && src && src[0]) out['branch-' + i] = { x: l[0].x - src[0].x, y: l[0].y - src[0].y };
+        });
+      }
+    } catch (eDisp) { out = {}; }
+    _dispShiftCache = out;
+    return out;
+  }
+  function dispShiftOf(pid) { var m = dispShiftMap(); return (pid && m[pid]) || { x: 0, y: 0 }; }
+  function dispShiftApply(pid, p) { if (!p) return p; var d = dispShiftOf(pid); return (d.x || d.y) ? { x: p.x + d.x, y: p.y + d.y } : p; }
+  /* 显示口径的管有效几何：effPts + 刚体平移（弧长不变，桩号口径不受影响） */
+  function dispPts(pid, data) {
+    var ep = AE.effPts(pid, data);
+    if (!ep) return null;
+    var d = dispShiftOf(pid);
+    return (d.x || d.y) ? ep.map(function (p) { return { x: p.x + d.x, y: p.y + d.y }; }) : ep;
+  }
+  function dispPointAt(pid, data, atM) { return dispShiftApply(pid, AE.pointAt(pid, data, atM)); }
+  /* 拾取/拖拽反算：鼠标显示位 → 设计几何位（投影求桩号前先减掉偏移） */
+  function dispShiftUndo(pid, p) { if (!p) return p; var d = dispShiftOf(pid); return (d.x || d.y) ? { x: p.x - d.x, y: p.y - d.y } : p; }
+
+  /* 点 → 最近自动管线（显示几何，tolM 米）：{pid, along}；仅底图克隆路径启用 */
   function pickAutoPipe(p, tolM) {
     var data = lastDataRef;
     if (!data || !viewState || !viewState.base) return null;
     var best = null, bd = tolM;
     AE.allPids(data).forEach(function (pid) {
-      var epts = AE.effPts(pid, data);
+      var epts = dispPts(pid, data);
       if (!epts) return;
       for (var i = 0; i + 1 < epts.length; i++) {
         var c = closestOnSeg(p, epts[i], epts[i + 1]);
         var d = Math.hypot(c.x - p.x, c.y - p.y);
         if (d < bd) {
           bd = d;
-          var loc = AE.locate(pid, data, c);
+          var loc = AE.locate(pid, data, dispShiftUndo(pid, c));   /* [v1059] 显示位反算设计几何求桩号 */
           best = { pid: pid, along: loc ? loc.along : 0 };
         }
       }
@@ -2111,7 +2155,7 @@
     if (!data || !viewState || !viewState.base) return null;
     var best = null, bd = Math.max(tolM, 0.8);
     (AE.fitsList() || []).forEach(function (f) {
-      var pos = AE.pointAt(f.pid, data, f.atM);
+      var pos = dispPointAt(f.pid, data, f.atM);
       if (!pos) return;
       var d = Math.hypot(pos.x - p.x, pos.y - p.y);
       if (d < bd) { bd = d; best = f; }
@@ -2120,13 +2164,15 @@
   }
 
   /* ---------- 节点（v150，RyTlNodes：节点=配件组合容器，图面只画圆点）---------- */
-  /* 节点图面位置：pid + atM（改长后超出管长 → 贴末端显示），数据米坐标；不可用返回 null */
+  /* 节点图面位置：pid + atM（改长后超出管长 → 贴末端显示），**显示米坐标**（含偏移副本平移，
+     v1059——用户实测「节点捕捉不到主管」：线体显示层已偏移，节点必须落在同一显示口径上）；
+     不可用返回 null。桩号（atM）口径不变——偏移是刚体平移，弧长恒等。 */
   function nodePos(nd) {
     if (!nd || !lastDataRef) return null;
     var ep = AE.effPts(nd.pid, lastDataRef);
     if (!ep) return null;
     var L = AE.polylineLen(ep);
-    return AE.pointAt(nd.pid, lastDataRef, Math.max(0, Math.min(nd.atM, L)));
+    return dispPointAt(nd.pid, lastDataRef, Math.max(0, Math.min(nd.atM, L)));
   }
   /* 点 → 最近节点（tolM 米容差）：{id, node, pos}；未命中 null */
   function pickNode(p, tolM) {
@@ -2170,11 +2216,11 @@
     });
     if (lastDataRef && viewState && viewState.base) {
       AE.allPids(lastDataRef).forEach(function (pid) {
-        var epts = AE.effPts(pid, lastDataRef);
+        var epts = dispPts(pid, lastDataRef);   /* [v1059] 命中显示几何 */
         if (!epts) return;
         for (var i = 0; i + 1 < epts.length; i++) {
           var c = closestOnSeg(p, epts[i], epts[i + 1]);
-          var loc = AE.locate(pid, lastDataRef, c);
+          var loc = AE.locate(pid, lastDataRef, dispShiftUndo(pid, c));   /* [v1059] 反算回设计几何求桩号 */
           consider(Math.hypot(c.x - p.x, c.y - p.y), { layer: 'auto', pid: pid, pts: epts, along: loc ? loc.along : 0 });
         }
       });
@@ -2627,7 +2673,9 @@
         nodeDrag.moved = true;
         if (elNd && lastDataRef && nodeDrag.pid) {
           var rawNdM = rawDataPoint(elNd, e);
-          var locNd = rawNdM ? AE.locate(nodeDrag.pid, lastDataRef, rawNdM) : null;
+          /* [v1059] 鼠标显示位先反算回设计几何再投影求桩号（显示层带 ±gap/2 平移） */
+          var rawNdMDesign = rawNdM ? dispShiftUndo(nodeDrag.pid, rawNdM) : null;
+          var locNd = rawNdMDesign ? AE.locate(nodeDrag.pid, lastDataRef, rawNdMDesign) : null;
           if (locNd) {
             nodeDrag.atM = locNd.along;
             nodeDragTipShow(e.clientX, e.clientY, nodeDrag.id, locNd.along);
@@ -2651,7 +2699,9 @@
         (AE.fitsList() || []).forEach(function (x) { if (x.id === fitDrag.id) fM = x; });
         if (elM && fM && lastDataRef) {
           var rawM = rawDataPoint(elM, e);
-          var locM = rawM ? AE.locate(fM.pid, lastDataRef, rawM) : null;
+          /* [v1059] 配件拖拽同口径反算（显示位 → 设计几何投影） */
+          var rawMDesign = rawM ? dispShiftUndo(fM.pid, rawM) : null;
+          var locM = rawMDesign ? AE.locate(fM.pid, lastDataRef, rawMDesign) : null;
           if (locM) {
             fitDrag.atM = locM.along;
             if (!fitDragRaf) fitDragRaf = requestAnimationFrame(function () {
@@ -3164,6 +3214,7 @@
     /* 自动管线图面编辑层几何绑定（阶段2）：几何变化 → 改长/配件自动清空 */
     AE.syncGeometry(data);
     lastDataRef = data;
+    _dispShiftCache = null;   /* [v1059] 数据换代即失效偏移缓存 */
     closeCtxMenu();
     /* 2026-09-28 标注显隐：render() 是本工作区 SVG 的唯一出口 —— 开关打开时剥掉全部标注
        （文字 + 标注线：改径套壳/节点连线/命中带/最不利路径；底图克隆与自绘两条路径一次性覆盖），

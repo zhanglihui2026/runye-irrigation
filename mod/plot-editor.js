@@ -2646,9 +2646,12 @@
       var cctx=ppCouplerCtx();if(!cctx)return;
       var clist=cctx.dd.couplerNodes;
       if(!Array.isArray(clist))return;
+      var cShifts=ppCouplerShiftMap();   /* [v1059] 节点贴主管显示线 */
       clist.forEach(function(n){
         if(n.x==null||n.y==null)return;
         var cg=cctx.frame?cctx.F.frameToGrid(cctx.frame,{x:n.x,y:n.y}):{x:n.x,y:n.y};
+        var csh=ppCouplerShiftOf(n.pipeKey,cShifts);
+        if(csh.x||csh.y)cg={x:cg.x+csh.x,y:cg.y+csh.y};
         var cp=ppToCanvas(cg.x,cg.y);
         var csel=(ppCouplerSelected===n.pipeKey)||ppState.dragCoupler===n.pipeKey;
         ppCtx.beginPath();ppCtx.arc(cp.x,cp.y,csel?7:5.5,0,Math.PI*2);
@@ -2857,6 +2860,38 @@
     if(!F||typeof F.frameToWorld!=='function'||typeof F.frameToGrid!=='function')return null;
     return {dd:dd,frame:frame,F:F};
   }
+  /* [v1059] 主管显示偏移向量表（格系，key 'm1'…）：显示层主管按 ppGetPipeDisplayGeometry
+     刚体平移 ±gap/2（假象显示），节点必须贴用户看见的显示线而非设计线。
+     向量 = 显示线首点 − 设计线首点；输入链与 ppRender 的 __tlEffMains/__ppDisplayGeometry
+     完全同链（AE 覆盖 effPts → 显示几何），保证节点与可见主管线同口径。 */
+  function ppCouplerShiftMap(){
+    try{
+      var G=window.ppGetPipeDisplayGeometry;
+      var mains=ppState.mainPipes;
+      if(!G||!Array.isArray(mains)||!mains.length)return null;
+      var AE=window.RyTlAutoEdits,ddw=window.tlDiagramData;
+      var effMains=mains;
+      if(AE&&AE.effPts&&AE.lensMap&&ddw&&Array.isArray(ddw.mainPipes)&&ddw.mainPipes.length===mains.length){
+        var lm=AE.lensMap()||{};
+        effMains=mains.map(function(l,idx){
+          var pid='main-'+idx;
+          return lm[pid]?(AE.effPts(pid,ddw)||l):l;
+        });
+      }
+      var gap=typeof ppGapM==='function'?ppGapM():20;
+      var disp=G(effMains,ppState.branchPipes||[],ppState.valves||[],gap);
+      var out={};
+      ((disp&&disp.main)||[]).forEach(function(dl,idx){
+        var src=effMains[idx];
+        if(dl&&dl[0]&&src&&src[0])out['m'+(idx+1)]={x:dl[0].x-src[0].x,y:dl[0].y-src[0].y};
+      });
+      return out;
+    }catch(eShift){return null;}
+  }
+  function ppCouplerShiftOf(pipeKey,shifts){
+    shifts=shifts||ppCouplerShiftMap();
+    return (pipeKey&&shifts&&shifts[pipeKey])||{x:0,y:0};
+  }
   /* 世界米点 → 最近主管垂足。返回 {pipeKey,idx,s,fx,fy,d}（s=世界米弧长，d=垂距米）或 null。 */
   function ppCouplerProject(worldPt){
     var ctx=ppCouplerCtx();if(!ctx)return null;
@@ -2880,6 +2915,35 @@
        （tlAutoGenerate 从分区网格确定性重建，重生成顺序稳定 ⇒ pipeKey 跨重生成稳定）。
        不能用 ppState.pipeIds.main 做身份源：自动生成流（ensureInitialPipes/#ppGenerate
        直通分支）里 L2 手绘层为空 ⇒ pipeIds.main=[]，会全量 missing。 */
+    best.pipeKey='m'+(best.idx+1);
+    return best;
+  }
+  /* [v1059] 显示反算投影（格系入参）：鼠标点在显示线上，按各主管偏移向量先反算
+     （显示位 − 偏移 = 设计位）再 frameToWorld 投影 dd.mainPipes 设计线求 s。
+     s 弧长口径不变（仍沿 dd.mainPipes 设计线，刚性平移不改弧长）。
+     ppCouplerProject 保留（world 入参原口径，外部/探针用）；交互放置/拖拽全走本函数。 */
+  function ppCouplerProjectDisp(gridPt){
+    var ctx=ppCouplerCtx();if(!ctx)return null;
+    var shifts=ppCouplerShiftMap();
+    var best=null;
+    ctx.dd.mainPipes.forEach(function(line,idx){
+      var sh=shifts?ppCouplerShiftOf('m'+(idx+1),shifts):{x:0,y:0};
+      var gpt=(sh.x||sh.y)?{x:gridPt.x-sh.x,y:gridPt.y-sh.y}:gridPt;
+      var wpt=ctx.frame?ctx.F.frameToWorld(ctx.frame,gpt):gpt;
+      var acc=0;
+      for(var k=1;k<line.length;k++){
+        var ax=line[k-1].x,ay=line[k-1].y,bx=line[k].x,by=line[k].y;
+        var vx=bx-ax,vy=by-ay,den=vx*vx+vy*vy;
+        if(den<=0)continue;
+        var t=((wpt.x-ax)*vx+(wpt.y-ay)*vy)/den;
+        t=Math.max(0,Math.min(1,t));
+        var fx=ax+vx*t,fy=ay+vy*t;
+        var d=Math.hypot(wpt.x-fx,wpt.y-fy);
+        if(!best||d<best.d)best={d:d,idx:idx,s:acc+Math.sqrt(den)*t,fx:fx,fy:fy};
+        acc+=Math.sqrt(den);
+      }
+    });
+    if(!best)return null;
     best.pipeKey='m'+(best.idx+1);
     return best;
   }
@@ -3032,10 +3096,9 @@
         if(ppIsGroupWhole()){
           if(typeof tip==='function')tip('成组地块请在拆组后调整接驳节点');
         }else{
-          var cw=ppToMeters(pos.x,pos.y);
-          var cctx=ppCouplerCtx();
-          var wpt=(cctx&&cctx.frame)?cctx.F.frameToWorld(cctx.frame,cw):cw;
-          var chit=ppCouplerProject(wpt);
+          /* [v1059] 显示反算投影：鼠标在显示线上，先按主管偏移反算再投影设计线求 s。
+             保证点击/拖拽都吸附到用户看见的主管线（偏移假象显示线）。 */
+          var chit=ppCouplerProjectDisp(ppToMeters(pos.x,pos.y));
           if(chit&&chit.d<=3){
             ppPushHistory();
             ppCouplerPreimage=ppGroupMemberPreimage();
@@ -3074,13 +3137,11 @@
       if(typeof window.ppRefreshDiagramIfVisible==='function')window.ppRefreshDiagramIfVisible();
       return;
     }
-    /* [v913-coupler-nodes] 接驳节点拖动：鼠标格系 → 世界米 → 垂足投影 → 实时更新参数。
-       预览与松手落点走同一投影函数 ppCouplerProject（v852 教训）。 */
+    /* [v913-coupler-nodes] 接驳节点拖动：鼠标格系 → 显示反算投影 → 实时更新参数。
+       [v1059] 改走 ppCouplerProjectDisp（先按主管偏移反算再投影设计线）——
+       预览与松手落点、显示线、可见主管同一口径（v852 教训延续）。 */
     if(ppState.dragCoupler){
-      var cmW=ppToMeters(pos.x,pos.y);
-      var cmCtx=ppCouplerCtx();
-      var cmWpt=(cmCtx&&cmCtx.frame)?cmCtx.F.frameToWorld(cmCtx.frame,cmW):cmW;
-      var cmHit=ppCouplerProject(cmWpt);
+      var cmHit=ppCouplerProjectDisp(ppToMeters(pos.x,pos.y));
       if(cmHit&&cmHit.pipeKey===ppState.dragCoupler){
         ppCouplerUpsert(cmHit.pipeKey,cmHit.s);
         ppCouplerSyncPanel();
@@ -5075,14 +5136,23 @@
 
     /* [v913-coupler-nodes] 接驳节点渲染：读 dd.couplerNodes（世界米）→ frameToGrid 回格系 →
        ts() 上屏。失配节点（x/y null）不画但参数保留（重挂后自动复活）。
-       依赖 dd.zones.frame（纯数据）+ window.RyCoordFrame —— 两者缺席则整段静默跳过。 */
+       依赖 dd.zones.frame（纯数据）+ window.RyCoordFrame —— 两者缺席则整段静默跳过。
+       [v1059] 节点加主管显示偏移向量贴 __ppSvgDisplay 显示线（与线体同口径）。 */
     (function(){
       var ctx=ppCouplerCtx();if(!ctx)return;
       var list=ctx.dd.couplerNodes;
       if(!Array.isArray(list)||!list.length)return;
+      var svgShifts={};
+      ppState.mainPipes.forEach(function(l,idx){
+        var dl=__ppSvgDisplay.main[idx];
+        if(dl&&dl[0]&&l&&l[0]&&(dl[0].x!==l[0].x||dl[0].y!==l[0].y))
+          svgShifts['m'+(idx+1)]={x:dl[0].x-l[0].x,y:dl[0].y-l[0].y};
+      });
       list.forEach(function(n){
         if(n.x==null||n.y==null)return;
         var g=ctx.frame?ctx.F.frameToGrid(ctx.frame,{x:n.x,y:n.y}):{x:n.x,y:n.y};
+        var sg=svgShifts[n.pipeKey];
+        if(sg){g={x:g.x+sg.x,y:g.y+sg.y};}
         var p=ts(g.x,g.y);
         var sel=(ppCouplerSelected===n.pipeKey)||ppState.dragCoupler===n.pipeKey;
         parts.push('<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="'+(sel?7:5.5)+'" fill="'+(sel?'#f59e0b':'#fff')+'" stroke="#b45309" stroke-width="2" data-pp-coupler="'+n.pipeKey+'"><title>接驳节点 · '+n.pipeKey+' · 距起点 '+(Math.round(n.s*10)/10)+'m</title></circle>');
