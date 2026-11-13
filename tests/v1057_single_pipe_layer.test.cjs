@@ -82,12 +82,13 @@ function ok(name, cond) { if (cond) { pass++; console.log('  ✓ ' + name); } el
   ok('自动重算失败提示明示旧版已移除', /旧版管线已移除，请调整分区参数后重试/.test(pe));
 
   console.log('— ⑦ 版本纪律 —');
-  const mainSig = '1057-m13-single-pipe-layer';
-  const cnt = (ix.match(new RegExp(mainSig, 'g')) || []).length;
-  ok('index.html 主串正好 14 处 v1057（实测 ' + cnt + '）', cnt === 14);
-  ok('tl-workspace.js 串独立抬版（1057-ws-single-layer，不入主串计数）', /tl-workspace\/tl-workspace\.js\?v=1057-ws-single-layer/.test(ix));
-  const sw = read('sw.js');
-  ok('sw.js VERSION = v1057', /const VERSION = 'v1057-m13-single-pipe-layer';/.test(sw));
+  /* [v1058] 主串动态读 sw VERSION（每版同抬，测试零维护） */
+  const swDyn = read('sw.js');
+  const verPlainDyn = ((swDyn.match(/const VERSION = '([^']+)';/) || [])[1] || '').replace(/^v/, '');
+  const cnt = (ix.match(new RegExp(verPlainDyn, 'g')) || []).length;
+  ok('index.html 主串正好 14 处动态版本串 ' + verPlainDyn + '（实测 ' + cnt + '）', cnt === 14);
+  ok('tl-workspace.js 串独立抬版（不入主串计数）', /tl-workspace\/tl-workspace\.js\?v=(1057-ws-single-layer|1058-|1059-|106\d-)/.test(ix));
+  ok('sw.js VERSION 动态与主串同款', swDyn.includes("const VERSION = 'v" + verPlainDyn + "';"));
   ok('M13 不变量：publishToMap 仍为显式 ===true 判断（发布规则零改动）', /options\.publishToMap===true/.test(i09));
   ok('M13 不变量：轮灌演示动画未被挪动（map-flow-demo 引用仍在）', /map-flow-demo\.js/.test(ix));
 

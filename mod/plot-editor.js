@@ -3668,9 +3668,15 @@
       var bc=center(bl),ba=axis(bl);if(!bc||!ba)return;
       var best=-1,bestD=Infinity,brange=projectedRange(bl,ba);
       mains.forEach(function(ml,mi){
-        var ma=axis(ml);if(!ma||Math.abs(ba.dx*ma.dy-ba.dy*ma.dx)>0.02)return;
+        /* [v1058 用户实测「主管跟支管叠加显示」] 配对宽容度放宽：
+           ① 平行叉积 0.02（≈1.15°）→ 0.06（≈3.4°）——旋转格系/裁剪折线的首尾
+             连线方向与真实轴向有偏差，过严会让近似平行的主支管对配不上；
+           ② 横向重合判定 0.5m → 2.0m——旧版生成/手动微调过的主管与自动支管
+             可能横向差 1~2m（视觉上本就是同一条沟），过严会漏配 → 两线完全不
+             偏移 → 用户看到「主管跟支管叠加」。偏移纯渲染副本，放宽无水力影响。 */
+        var ma=axis(ml);if(!ma||Math.abs(ba.dx*ma.dy-ba.dy*ma.dx)>0.06)return;
         var lateral=Math.abs((ml[0].x-bl[0].x)*ba.n.x+(ml[0].y-bl[0].y)*ba.n.y);
-        if(lateral>0.5)return;
+        if(lateral>2.0)return;
         var mrange=projectedRange(ml,ba),overlap=Math.min(brange.max,mrange.max)-Math.max(brange.min,mrange.min);
         if(overlap<=Math.min(0.5,ba.length*0.5))return;
         var d=lateral+(Math.max(0,Math.min(brange.min,mrange.min)-Math.max(brange.max,mrange.max))*1e-6);
@@ -3678,7 +3684,21 @@
       });
       if(best<0)return;
       var safeGap=amount,nearestZoneSpacing=Infinity;
-      branches.forEach(function(other,oi){if(oi===bi)return;var oc=center(other),oa=axis(other);if(!oc||!oa||Math.abs(ba.dx*oa.dy-ba.dy*oa.dx)>0.02)return;var lateral=Math.abs((oc.x-bc.x)*ba.n.x+(oc.y-bc.y)*ba.n.y);if(lateral>0.5&&lateral<nearestZoneSpacing)nearestZoneSpacing=lateral;});
+      /* [v1058] 「相邻支管」判定阈值 0.5 → 2.0m（与配对宽容度同口径）：异形地块边缘列
+         的分区被斜边裁剪，形心 x 逐分区微移 1~2m——过严会把同列上下分区支管误判成
+         「相邻支管」，safeGap 被压到 1m 多 ⇒ 偏移量被吃掉，用户看到主管贴着支管。
+         [v1058b] 且只对**轴向投影真正重叠**（纵向并排）的支管避让——同列上下分区的
+         支管横向再近也不会在图上相撞（各占一段 y），不构成避让理由。 */
+      branches.forEach(function(other,oi){
+        if(oi===bi)return;
+        var oc=center(other),oa=axis(other);
+        if(!oc||!oa||Math.abs(ba.dx*oa.dy-ba.dy*oa.dx)>0.06)return;
+        var lateral=Math.abs((oc.x-bc.x)*ba.n.x+(oc.y-bc.y)*ba.n.y);
+        if(lateral<=2.0||lateral>=nearestZoneSpacing)return;
+        var orange=projectedRange(other,ba),noverlap=Math.min(brange.max,orange.max)-Math.max(brange.min,orange.min);
+        if(noverlap<=Math.min(0.5,ba.length*0.5))return;
+        nearestZoneSpacing=lateral;
+      });
       if(isFinite(nearestZoneSpacing))safeGap=Math.min(safeGap,nearestZoneSpacing*0.9);
       var dx=ba.n.x*safeGap/2,dy=ba.n.y*safeGap/2;
       mainShift[best]={x:-dx,y:-dy};branchShift[bi]={x:dx,y:dy};

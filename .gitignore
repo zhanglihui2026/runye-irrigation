@@ -159,3 +159,4 @@ npm-debug.log*
 # v1054 流程顺序重排：分区自动重算 + 三级定稿按钮（数据唯一性终极形态）
 !tests/v1054_partition_auto_regen.test.cjs
 !tests/v1057_single_pipe_layer.test.cjs
+!tests/v1058_offset_pair_relax.test.cjs

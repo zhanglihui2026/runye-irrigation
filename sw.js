@@ -9,6 +9,7 @@
 /* v531-data-service-plot-store: resolve plugin plot references through the shared plot-library adapter. */
 /* v427-archive-3d-iso: detach 3D preview and axonometric UI while retaining shared 2D pipe workspace and data. */
 'use strict';
+/* v1058-main-branch-offset-relax（用户实测「主管跟支管叠加显示」：像素扫描定位——部分列主管与支管完全重叠（配对偏移未生效）、部分列正常错开 20m。根因=ppGetPipeDisplayGeometry 配对/避让阈值过严：①平行叉积 0.02(≈1.15°)/横向重合 0.5m 过严，近似共线的主支管对漏配→双方都不偏移；②「相邻支管避让」把横向差 1~3m 的支管误判为邻管（异形地块边缘列形心逐分区微移），safeGap 被压到 1~3m→偏移量被吃掉。修复：配对阈值放宽（0.06≈3.4°、2.0m）+ 避让只对轴向投影真正并排的支管生效；node 探针验证形心漂移列恢复 20m 全间距、30m 独立管不动、1.8m 共沟管正常配对。纯渲染层，水力/材料口径零改动）→
 /* v1057-m13-single-pipe-layer（主线任务 M13「自动管线单一可见绘制层与节点维护位置」：二级平面画布=自动管线线体唯一可见绘制层——取消 v875 同代抑制（二级恒画），二级渲染消费三级图面编辑覆盖（改长 effPts 几何/遮蔽 hiddenMap 灰虚线，渲染口径）；三级叠加 SVG 线体透明化（pipeBaseSVG 克隆 main-/branch- stroke 透明、阀门 data-tlvalve 组 opacity0、autoSVG 改长管线体透明只留长度标注、兜底自绘同口径）；简图阀门+连接管打 data-tlvalve 标记（简图本身不变）；接驳节点入口回归二级页（v982 下线后 M13 拍板恢复，pipeKey+桩号绑定+重算重投影不变）；失败不显旧版——v892 空结果保护与自动重算失败分支反转为清空自动管线+提示）→
 /* VERSION 沿革：v1056-pipe-layer-unify（用户实测「管线有多层数据」：统一工作区两层叠放，管路开关只藏三级层、自动重算后三级层未刷新致 v875 同代抑制失效 → 两套管线叠加。修复：管路开关写入 __ryPipelineLayerVisible 同时控制二级静态管线层；自动重算成功联动刷新三级层（不传 publishToMap）；一级管残留只在三级模式上屏）→
    v1055-auto-regen-legacy-upgrade（用户实测死锁修复：旧档案管线无代际签名，被「无签名不重算」保守条件挡死——改角度/面积后管线纹丝不动。取消隔断：无签名也触发升级重算（首次重算后带签名走正常比对），加失败冷却 FailSig 防 alert 骚扰）→
@@ -1495,7 +1496,7 @@
    [v1039-flow-display-decoupling] 分区面仅作动画显示；缺失时不阻断已发布管网的水路计算。
    [v1042-source-independent-irrigation-route] 页面恢复重绘时按已发布管网几何核对动画版本。
    [v1043-coupler-node-lifecycle] 接驳节点随地块设计快照恢复；分区重建或管网重生成时清除旧节点。 */
-const VERSION = 'v1057-m13-single-pipe-layer';
+const VERSION = 'v1058-main-branch-offset-relax';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
