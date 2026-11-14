@@ -915,7 +915,8 @@
     if(!wholeFieldClosed||!routes.length||incomplete||!activeCount){
       if(layer)layer.clearLayers();
       active=null;hideGroupInfo();if(timer){clearInterval(timer);timer=null;}playing=false;syncChipsState();
-      if(ctx.tip)ctx.tip('当前地块尚未形成覆盖所有分区支管两端的连续管路；请检查手绘总管、捕捉节点、主管、分区阀门和支管连接，再演示轮灌。');
+      if(ctx.tip)ctx.tip('当前地块尚未形成覆盖所有分区支管两端的连续管路；请检查手绘总管、捕捉节点、主管、分区阀门和支管连接。'
+        +'若刚点过「生成施工图」或刚更新过版本，请删掉旧总管沿图上管线重画（先点「捕捉点」开启吸附，白圈吸到施工节点再落点），再演示轮灌。');
       return false;
     }
     renderSnapshotD = d;     /* [perf-20261106] 复用同一份快照，不再 collect 第二次 */

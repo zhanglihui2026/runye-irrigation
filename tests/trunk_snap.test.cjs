@@ -200,13 +200,13 @@ test('⑩ setTargets 会丢掉非法项，stats 给出分类计数', () => {
   assert.equal(s.total, 3);
   assert.equal(s.byKind['plot-vertex'], 2);
   assert.equal(s.byKind['valve-node'], 1);
-  assert.equal(s.snapPx, 10);
+  assert.equal(s.snapPx, 14);
   assert.equal(s.mergeM, 0.3);
 });
 
-test('⑪ 阈值常量：吸附 10px / 合并 0.3m 必须是两个不同的量', () => {
+test('⑪ 阈值常量：吸附 14px / 合并 0.3m 必须是两个不同的量', () => {
   const S = loadSnap();
-  assert.equal(S.SNAP_PX, 10);
+  assert.equal(S.SNAP_PX, 14);
   assert.equal(S.MERGE_M, 0.3);
   assert.notEqual(S.SNAP_PX, S.MERGE_M);
 });

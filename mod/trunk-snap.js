@@ -15,7 +15,12 @@
 (function (root) {
   'use strict';
 
-  var SNAP_PX = 10;
+  /* [v1074] SNAP_PX 10→14（用户实测「手绘总管没有捕捉到节点，是不是容差小了」：
+     10px 在 zoom 17+ 只有 2~6m，鼠标稍偏就脱靶）。节点类目标（main/seg-coupler）
+     再乘 COUPLER_PX_MULT=2（≈28px）：节点是手绘总管的**设计落点**，宁可多吸，
+     别让用户在管线上点来点去接不上（v872 同理由）。 */
+  var SNAP_PX = 14;
+  var COUPLER_PX_MULT = 2;
   var MERGE_M = 0.3;
 
   /* 数字越小越优先。顺序按任务书 §5.3：地块顶点 > 水源 > 已存干线拐点 > 阀门 > 支管起点 > 分区顶点。
@@ -227,7 +232,9 @@
       if (!q) continue;
       var dx = q.x - p.x, dy = q.y - p.y;
       var d = Math.sqrt(dx * dx + dy * dy);
-      if (d > tol) continue;
+      /* [v1074] 节点类目标双倍吸附半径——设计落点宁可多吸。 */
+      var tTol = (t.kind === 'main-coupler' || t.kind === 'seg-coupler') ? tol * COUPLER_PX_MULT : tol;
+      if (d > tTol) continue;
       var score = t.prio * 1e6 + d;
       if (!best || score < best.score) best = { target: t, dist: d, score: score };
     }
@@ -277,13 +284,15 @@
       byKind: byKind,
       lastHit: lastHit,
       snapPx: SNAP_PX,
+      couplerPx: SNAP_PX * COUPLER_PX_MULT,
       mergeM: MERGE_M,
       build: buildStats
     };
-  }
+  };
 
   root.RyTrunkSnap = {
     SNAP_PX: SNAP_PX,
+    COUPLER_PX_MULT: COUPLER_PX_MULT,
     MERGE_M: MERGE_M,
     PRIORITY: PRIORITY,
     readPoint: readPoint,

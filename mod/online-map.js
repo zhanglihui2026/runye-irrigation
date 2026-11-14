@@ -1574,7 +1574,7 @@
     if(trunkMode==='idle'){ el.hidden=true; el.textContent=''; syncBottomMapHints(); return; }
     el.hidden=false;
     el.textContent = trunkMode==='draw'
-      ? ('点击加点 · 双击/回车完成 · Esc 取消 · 按住 Shift 正交 · Ctrl+Z 撤销 · 捕捉：'+(snapOn?'开启':'关闭'))
+      ? ('点击加点 · 双击/回车完成 · Esc 取消 · 按住 Shift 正交 · Ctrl+Z 撤销 · 捕捉：'+(snapOn?'开启':'关闭（点「捕捉点」开启吸附节点）'))
       : '点选干线后可拖拐点 · 右键打开菜单 · Ctrl+Z 撤销 · Esc 退出';
     syncBottomMapHints();
   }
@@ -1627,7 +1627,11 @@
     trunkPoints=[];
     trunkDraft={id:null,params:{material:'PE',dn:null,designFlow:null}};
     setTrunkMode('draw');
-    tip('依次点击水源到地块内的折点：双击或回车完成，Esc 取消，按住 Shift 正交。灰线是已保存的干线，不会被改动。');
+    /* [v1074] 捕捉未开启时进入绘制必须明说——snapOn 每次刷新都回到默认关闭，
+       用户不知道要手动开，画出来的总管吸不上节点（真机反馈「没有捕捉到节点」）。 */
+    tip('依次点击水源到地块内的折点：双击或回车完成，Esc 取消，按住 Shift 正交。灰线是已保存的干线，不会被改动。'
+      + (snapOn ? '捕捉已开启：白圈吸到施工节点/管线上即松手。'
+                : ' 当前捕捉未开启——点工具条「捕捉点」或按 S 开启，白圈会自动吸到施工节点/管线上。'));
   };
   var reservoirBtn=document.getElementById('btnPlaceReservoir');
   if(reservoirBtn)reservoirBtn.onclick=function(){setReservoirPlaceMode(!reservoirPlaceMode);};
