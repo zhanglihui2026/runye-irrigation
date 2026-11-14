@@ -1183,9 +1183,8 @@
     pub.items.forEach(function(n){
       var lat=Number(n&&n.lat),lng=Number(n&&n.lng),atM=Number(n&&n.atM);
       if(!n||!isFinite(lat)||!isFinite(lng)||Math.abs(lat)>90||Math.abs(lng)>180||!/^((main|branch))-\d+$/.test(String(n.pid||'')))return;
-      /* [v1076/v1078] 双坐标口径保持：lat/lng=实体位（写回总管拓扑）、
-         displayLat/displayLng=显示位（屏幕命中与白圈）。捕捉命中显示、保存实体——
-         显示偏移绝不进入拓扑（trunk-snap 7b 以 item.lat 作 snapPoint）。 */
+      /* [v1081] 地图统一实体世界：lat/lng 即节点实体位，标记/命中/白圈/落点全用它；
+         displayLat/displayLng 仅为兼容旧快照保留字段（不再参与命中）。 */
       out.items.push({lat:lat,lng:lng,displayLat:isFinite(Number(n.displayLat))?Number(n.displayLat):lat,
         displayLng:isFinite(Number(n.displayLng))?Number(n.displayLng):lng,atM:isFinite(atM)?atM:0,
         label:'施工节点 '+String(n.id||'')+' · '+String(n.pid||'')+' · 桩号 '+(Math.round((isFinite(atM)?atM:0)*10)/10)+'m',
@@ -1248,8 +1247,8 @@
       input.plotRing=plot.polyLatLng||null;
       if(plot.waterSource&&!options.excludeWaterSource) input.waterSource=plot.waterSource;
     }
-    /* 节点捕捉独立于动画寻路完整性门禁；屏幕命中使用 displayLat/displayLng，
-       保存点使用节点实体 lat/lng，图面偏移不改变总管与主管的拓扑坐标。 */
+    /* 节点捕捉独立于动画寻路完整性门禁；[v1081] 命中与保存统一节点实体坐标
+       （地图已全线实体渲染：标记=命中=白圈=落点=寻路，同一世界）。 */
     var published=publishedCouplersForPlot(plot);
     if(published.items.length)input.mainCouplers=published.items.filter(function(n){return /^main-\d+$/.test(n.pid);});
     if(trunkSaved&&Array.isArray(trunkSaved.trunks)){
@@ -1387,10 +1386,10 @@
     var list=(extras&&Array.isArray(extras.items))?extras.items:((extras&&Array.isArray(extras.mainCouplers))?extras.mainCouplers:[]);
     list.forEach(function(n){
       if(!n||!isFinite(n.lat)||!isFinite(n.lng)) return;
-      /* 标记画显示位（displayLat 优先，旧快照回退 lat）；实体 lat/lng 独立用于捕捉落点
-         与动画连接，显示偏移不会移动节点的拓扑位置。 */
-      var markerLat=isFinite(Number(n.displayLat))?Number(n.displayLat):n.lat;
-      var markerLng=isFinite(Number(n.displayLng))?Number(n.displayLng):n.lng;
+      /* [v1081] 标记画**实体位**（与线体/捕捉落点/白圈同一世界）：
+         v1073 画 displayLat 造成「节点标记在显示副本上、总管折点存实体」的恒偏
+         gap/2（用户实测 26~28px），点节点看着吸上了、落点却偏在旁边。 */
+      var markerLat=n.lat, markerLng=n.lng;
       var color=n.stale?'#b45309':'#6d28d9',fill=n.stale?'#f59e0b':'#7c3aed';
       window.L.circleMarker([markerLat,markerLng],{
         radius:10, color:color, weight:2.5, fillOpacity:0, interactive:false

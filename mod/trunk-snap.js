@@ -146,16 +146,13 @@
     });
 
     /* 7b. 设计页接驳节点（发布快照 publishedNodes 投影）。失配节点由宿主剔除；
-          显示坐标用于地图命中，实体坐标作为写回总管的捕捉点，避免显示偏移进入拓扑。
-          label 带管线身份与桩号，编号按有效项计。 */
+          [v1081] 命中与落点统一实体位（地图已全线实体渲染）：白圈即标记即落点。 */
     var mcValid = 0;
     (Array.isArray(input.mainCouplers) ? input.mainCouplers : []).forEach(function (c) {
       var cp = readPoint(c);
       if (!cp) return;
       mcValid++;
-      var displayLat=c&&isNum(Number(c.displayLat))?Number(c.displayLat):cp.lat;
-      var displayLng=c&&isNum(Number(c.displayLng))?Number(c.displayLng):cp.lng;
-      push(displayLat, displayLng, 'main-coupler', (c && c.label) ? c.label : ('主管节点 ' + mcValid), {lat:cp.lat,lng:cp.lng});
+      push(cp.lat, cp.lng, 'main-coupler', (c && c.label) ? c.label : ('主管节点 ' + mcValid), {lat:cp.lat,lng:cp.lng});
     });
 
     /* 8~9. 垂足兜底：主管和已存手绘总管的线段只在没有更高优先级点命中时胜出。
@@ -238,7 +235,7 @@
     var best = null;
     for (var i = 0; i < targets.length; i++) {
       var t = targets[i];
-      /* 命中测试跟随画面可见位置；snapLat/snapLng 仍是保存到总管的实体坐标。 */
+      /* [v1081] 地图统一实体世界：命中测试与保存点同为实体坐标；snapLat/snapLng 兼容保留。 */
       var q = projector({lat:t.lat,lng:t.lng});
       if (!q) continue;
       var dx = q.x - p.x, dy = q.y - p.y;
@@ -265,8 +262,7 @@
       }
     }
     if (!best) { clearMarker(); return null; }
-    /* 点命中回传实体 snap 坐标，display 坐标只用于屏幕命中和白圈显示；因此视觉错开
-       不会污染保存的总管拓扑。线段垂足仍返回反算的实体落点。 */
+    /* [v1081] 点命中回传实体坐标（=标记绘制位=白圈位=保存位）；线段垂足同样反算实体落点。 */
     var hitPoint = best.screen && unprojector ? unprojector(best.screen)
       : (best.target && isNum(Number(best.target.snapLat)) && isNum(Number(best.target.snapLng))
         ? { lat: Number(best.target.snapLat), lng: Number(best.target.snapLng) }

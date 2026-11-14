@@ -1510,8 +1510,9 @@
    [v1077-topology-display-decoupled] 动画/断线提示描边映射到同代显示副本；连通与寻路仍使用物理中心线。
    [v1078-snap-priority-demote] 手绘总管捕捉节点偏移深挖收口：机制一（命中位/实体位混用）v1076 双坐标已修，本版加锁防回退（publishedCouplers items 保持 lat=实体、displayLat=显示，trunk-snap 7b 以实体位作 snapPoint——试过把 items.lat 改显示位会让总管点存偏 10~20m、1.5m 接驳门禁必挂）；机制二修复——新画总管（draw 态）时旧干线拐点/线体优先级整体 +6（拐点 3→9、线体 9→15），让位施工节点（4），重画不再继承旧坐标；编辑态（edit）不降级，v914 口径保留。
    [v1079-zone-line-align] 用户拍板方案A「主管/支管物理层对齐：竖向/横向一条管道要在一根线上」：逐分区形心被斜边裁剪逐区拉偏 1~2m ⇒ 同列主管/同行支管物理就不共线，显示偏移逐线独立收紧再放大。二级 ppBuildAutoPipes 与三级兜底自布管同口径改——预扫全部分区取有效布管中心，按列（竖管）/行（横管）取统一中心线（中位数抗形心漂移），全列/全行共用；本分区统一线裁剪后过短（<50% 净长）才回退本分区形心线。阀门仍锚分区中心；主管=支管克隆口径不变；竖线横向平移、横线纵向平移不改水力长度；节点按 pid+桩号重投影自动落新线。
-   [v1080-map-fresh-clear] 用户拍板「每次刷新都清空在线地图的地块跟管路内容，不然新旧内容叠加很乱，手绘总管拾取不到节点、水路不能闭环」＋「加个清空按钮」：①加载即清空——clearPublishedOverlays({silent:true}) 在地图初始化末尾清掉上次的管网发布快照（逐地块 scoped + legacy 网络键写 null）与各地块手绘总管（plot.trunk=null，走地块库 replace 事务与 commitTrunks 同口径；成组地块不动），并清本页总管层/草稿/施工节点标记/水库/动画状态后触发 RunyeMapEnhance 重渲染；②工具栏新增「清空管网」按钮（confirm 后同款清空）。地块边界、分区划分、三级设计数据不动——内容只能由「生成施工图」重新发布回来。 */
-const VERSION = 'v1080-map-fresh-clear';
+   [v1080-map-fresh-clear] 用户拍板「每次刷新都清空在线地图的地块跟管路内容，不然新旧内容叠加很乱，手绘总管拾取不到节点、水路不能闭环」＋「加个清空按钮」：①加载即清空——clearPublishedOverlays({silent:true}) 在地图初始化末尾清掉上次的管网发布快照（逐地块 scoped + legacy 网络键写 null）与各地块手绘总管（plot.trunk=null，走地块库 replace 事务与 commitTrunks 同口径；成组地块不动），并清本页总管层/草稿/施工节点标记/水库/动画状态后触发 RunyeMapEnhance 重渲染；②工具栏新增「清空管网」按钮（confirm 后同款清空）。地块边界、分区划分、三级设计数据不动——内容只能由「生成施工图」重新发布回来。
+   [v1081-map-physical-render] 用户实测「你怎么就捕捉不上主管上的节点」像素级定案：总管折点与节点标记恒偏 26~28px、纯 +x，正是显示偏移 gap/2。病根=地图线体与节点标记画在显示副本（displayLatLng/displayLat），而总管捕获落点/已存总管/发布节点 ll/动画寻路全是实体坐标——点节点时白圈吸在标记上、松手后折点跳到 10m 外实体位；未吸中的点存显示位又让 trunk-entry(5m)/node-attach(1.5m) 接不上。修复=地图统一实体世界：线体画 sLL、标记画 n.lat/n.lng、trunk-snap 7b 命中与落点同为实体、map-flow-demo 底图/描边/断线/入口全用实体几何。设计页错开显示不受影响（v1079 后主/支管本就同一根线）。 */
+const VERSION = 'v1081-map-physical-render';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

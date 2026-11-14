@@ -1032,10 +1032,14 @@
         if (s.kind === 'segTrunk' || s.id === 'segTrunk') return; // 旧成果中的自动段总管已退役
         var sLL = validRingLL(s.latLng, 2);   // 真实几何：水力、长度与地块裁剪的唯一依据
         if (!sLL) return;
-        /* displayLatLng 只用于地图图层绘制，来源与二级画布的平行错开副本一致。
-           routeGeometry.latLng 保持物理中心线，供捕捉落点、动画连接和水力路径读取；
-           视觉错开不能改变管网节点关系。 */
-        var drawLL = validRingLL(s.displayLatLng, 2) || sLL;
+        /* [v1081 用户实测「点了节点，落点却偏在标记旁边」] 地图按**实体中心线**绘制。
+           v1073 曾用 displayLatLng（±gap/2 显示副本）画线，而总管捕捉落点、已存总管、
+           发布快照节点 ll、动画寻路全是实体坐标 ⇒ 节点标记画在显示副本上、总管折点存
+           实体 ⇒ 视觉恒偏 gap/2（实测截图偏 26~28px，纯 +x 方向），用户看到「捕捉不上」。
+           主/支管自 v1079 起同列/同区共用一条中心线，地图无需再画拆开的副本：
+           线体、标记、捕捉、白圈、动画描边统一实体世界，点哪存哪、所见即所连。
+           设计页（分区与管路/三级）的错开显示不受影响。 */
+        var drawLL = sLL;
         var st = dnStyle(s.dn);
         var hrec = hydraulic && hydraulic.items && hydraulic.items[s.id];
         if (hrec) st = hydraulicStyle(hrec, st);
