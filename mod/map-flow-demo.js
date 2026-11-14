@@ -577,6 +577,38 @@
       var id='coupler:'+sig;addCut(best.o,best.p.s,id);addCut(byMain[n.mi],mp.s,id);
     });
 
+    /* [v1072] 总管↔主管贴近直连（口径与 validateConnection 对齐）——恢复 v988→v989 补边块：
+       43158da 重写构图时把它删了，且把全部接驳口径收紧到 0.5m ⇒ 主管想接进寻路图，
+       唯一入口是「施工节点 0.5m 内同时贴住主管和总管」。用户真实地块（12 主管只放 3 节点、
+       总管横穿其余主管）预检按线体 5m 放行、图却断 ⇒「尚未形成覆盖所有分区支管两端的
+       连续管路」。恢复：沿主管弧长每 2m 取点（与验证 densify 同步长）扫总管，首个 ≤TOL_M
+       命中即在垂足打通；末端点单独补扫。纯找路图层补边，不改管线几何与水力模型；
+       已放节点的地块行为不变（节点 0.5m 严格口径优先保留）。 */
+    Object.keys(byMain).forEach(function(mk){
+      var m=byMain[mk],step=2,done=false;
+      for(var s=0;s<=m.len&&!done;s+=step){
+        var p=at(m,s);
+        for(var ti=0;ti<byTrunk.length&&!done;ti++){
+          var tp=project(byTrunk[ti],p);
+          if(tp.d<=TOL_M){
+            var id='trunk-entry:'+mk+':body:'+ti;
+            addCut(m,s,id);addCut(byTrunk[ti],tp.s,id);
+            done=true;
+          }
+        }
+      }
+      if(!done){ var pe=at(m,m.len);   /* 弧长循环取不到的末端点单独补扫 */
+        for(var tj=0;tj<byTrunk.length&&!done;tj++){
+          var tpe=project(byTrunk[tj],pe);
+          if(tpe.d<=TOL_M){
+            var id2='trunk-entry:'+mk+':body-end:'+tj;
+            addCut(m,m.len,id2);addCut(byTrunk[tj],tpe.s,id2);
+            done=true;
+          }
+        }
+      }
+    });
+
     /* Main pipes are continuous only where a main endpoint meets another main
        line. This links zone 1 -> 2 -> 3 but does not bridge separate rows. */
     for(var mi=0;mi<d.mainsLL.length;mi++)for(var mj=mi+1;mj<d.mainsLL.length;mj++){

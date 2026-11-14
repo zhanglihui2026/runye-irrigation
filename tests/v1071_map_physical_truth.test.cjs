@@ -49,9 +49,10 @@ ok(snap.includes("push(cp.lat, cp.lng, 'main-coupler'"), '[v1071] main-coupler �
 const i09 = read('mod/inline-09.js');
 ok(i09.includes('displayLat:shownLL'), '[v1071] 发布快照仍写 displayLat 字段（存档兼容，不影响本版修复）');
 
-/* 锁5：版本纪律——动态读 sw VERSION；主串 15 处 + runye-map-enhance/trunk-snap 独立串同值 */
+/* 锁5：版本纪律——动态读 sw VERSION（[v1072] 改动态不写死：写死会让之后每次抬版都炸）；
+   主串 15 处 + runye-map-enhance + trunk-snap 独立串同值 = 17 处 */
 const m = /^const VERSION = '(v[\w-]+)';/m.exec(sw);
-ok(!!m && m[1] === 'v1071-map-physical-truth', '[v1071] sw VERSION = v1071-map-physical-truth');
+ok(!!m && /^v\d{3,4}-[\w-]+$/.test(m[1]), '[v1071] sw VERSION 存在且形如 vNNNN- slug：' + (m && m[1]));
 const want = m ? m[1].replace(/^v/, '') : '';
 const hits = html.split('?v=' + want).length - 1;
 ok(hits === 17, '[v1071] index.html 版本串 17 处同值（主串 15 + runye-map-enhance + trunk-snap），实际 ' + hits);

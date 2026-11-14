@@ -6,11 +6,14 @@
  * 走兜底动画（只亮本区、无源头路径）= 用户看到的「断流、3 区不经过 2 区」。
  *
  * v988 修复：buildFlowRoutes 补「总管↔主管贴近直连」——主管两端点投影到任一总管
- * 折线 ≤TOL_M 即在垂足打通（与验证同口径）。四把锁：
- *   ① 源码补边块与口径注释存在；
- *   ② 真实拓扑复现（couplers 空 + 主管链完好）：第 3 区路线必须经过第 1、2 列主管；
- *   ③ 第 4 区路线必须串过前三列；
- *   ④ 已放接驳节点的老地块行为不变（节点路径照常）。
+ * 折线 ≤TOL_M 即在垂足打通（与验证同口径）。
+ *
+ * [v1072] 历史教训与升级：43158da（11-11 重写构图）把本补边块删了、接驳全收紧 0.5m
+ * ⇒ 主管唯一入图口=施工节点 0.5m 双贴，真实地块（12 主管 3 节点、总管横穿其余主管）
+ * 预检放行而图断 ⇒「尚未形成覆盖所有分区支管两端的连续管路」。v1072 恢复补边块；
+ * 本文件 ②~⑥ 同步升级：v1064 起 collect() 只认发布快照契约（routeGeometry），
+ * 旧「喂 dd 直连」的驱动方式已失效，改为直接构造 d 对象驱动 buildFlowRoutes
+ * （阀门带 anchorLL=主管侧锚点，与 routeGeometry 发布口径一致）。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -53,6 +56,38 @@ function realWorldData() {
   return { mains, branches, valves, trunkLL, toLL };
 }
 
+/* [v1072] 直接构造 buildFlowRoutes 的输入（发布快照同口径）：
+ * 阀门 ll=阀中心；anchorLL=主管侧锚点（发布时由 v.ax/ay 反投，测试里取阀在
+ * 本区主管上的垂足）。nodesLL 为发布施工节点（mi=主管序号、ll=物理经纬度）。 */
+function nearestOnLine(line, pt) {
+  let best = null;
+  for (let i = 1; i < line.length; i++) {
+    const a = line[i-1], b = line[i], dx = b.x-a.x, dy = b.y-a.y, den = dx*dx+dy*dy;
+    const t = den ? Math.max(0, Math.min(1, ((pt.x-a.x)*dx + (pt.y-a.y)*dy)/den)) : 0;
+    const x = a.x+dx*t, y = a.y+dy*t, d = Math.hypot(pt.x-x, pt.y-y);
+    if (!best || d < best.d) best = { d, x, y };
+  }
+  return best;
+}
+function makeD(trunkLL, nodesLL) {
+  const w = realWorldData();
+  const valves = w.valves.map((v, i) => {
+    const a = nearestOnLine(w.mains[i], v);
+    return { ll: w.toLL(v), anchorLL: w.toLL({ x: a.x, y: a.y }), mi: i };
+  });
+  return {
+    trunkLinesLL: [trunkLL],
+    mainsLL: w.mains.map(l => l.map(w.toLL)),
+    branchLL: w.branches.map(l => l.map(w.toLL)),
+    valves: valves,
+    nodesLL: nodesLL || [],
+    segLL: null,
+    manual: [[0,4,8],[1,5,9],[2,6,10],[3,7,11]],
+    nPer: 1,
+    total: 12
+  };
+}
+
 function seqKeys(route) {
   const seq = [];
   route.trunk.concat(route.main).concat(route.branch).forEach(s => seq.push(s.key));
@@ -65,23 +100,15 @@ test('① 源码锁：总管↔主管贴近直连块（端点+线体双口径）
   assert.ok(/var id2='trunk-entry:'\+mk\+':body-end:'\+tj;/.test(demo), '末端补扫 id 丢了（v989）');
   assert.ok(/for\(var s=0;s<=m\.len&&!done;s\+=step\)\{/.test(demo), '线体 2m 步长扫描丢了（v989）');
   assert.ok(/if\(tp\.d<=TOL_M\)\{/.test(demo), '贴近容差必须沿用 TOL_M（与连通性验证同口径）');
-  assert.ok(/addCut\(m,s,id\);addCut\(t,tp\.s,id\);|addCut\(m,s,id\);addCut\(byTrunk\[ti\],tp\.s,id\);/.test(demo),
+  assert.ok(/addCut\(m,s,id\);addCut\(byTrunk\[ti\],tp\.s,id\);/.test(demo),
     '同一 id 要切进主管与总管（零权相连）');
   assert.ok(/debugGraph: function \(g\) \{/.test(demo), 'v989 只读诊断出口 debugGraph 丢了');
 });
 
 test('② 真实拓扑（couplers 空）：第 3 区路线经过第 1、2 区主管', () => {
-  const { DBG, sandbox } = loadDemo();
+  const { DBG } = loadDemo();
   const w = realWorldData();
-  DBG.setCtx({ toLL: w.toLL, getTrunkLines: () => [w.trunkLL],
-    getWaterSource: () => ({ lat: -258/110540, lng: -4/111320 }), tip: () => {} });
-  const dd = { world: 'meter', mainPipes: w.mains, branchPipes: w.branches, valves: w.valves,
-    couplerNodes: [], combinedN: 1, segTrunk: null };
-  sandbox.window.tlDiagramData = dd;
-  sandbox.window.tlManualGroups = [[0,4,8],[1,5,9],[2,6,10],[3,7,11]];
-  const d = DBG.collect();
-  assert.ok(d, 'collect() 不应为 null');
-  const routes = DBG.buildFlowRoutes(d, 2);
+  const routes = DBG.buildFlowRoutes(makeD(w.trunkLL), 2);
   assert.ok(routes && routes.length, '第 3 区 routes 不应为 null（修复前断流）');
   const zs = routes.filter(r => r.zi === 2);
   assert.ok(zs.length, 'zi=2 应有路线');
@@ -92,16 +119,9 @@ test('② 真实拓扑（couplers 空）：第 3 区路线经过第 1、2 区主
 });
 
 test('③ 真实拓扑：第 4 区路线串过第 1、2、3 区主管', () => {
-  const { DBG, sandbox } = loadDemo();
+  const { DBG } = loadDemo();
   const w = realWorldData();
-  DBG.setCtx({ toLL: w.toLL, getTrunkLines: () => [w.trunkLL],
-    getWaterSource: () => ({ lat: -258/110540, lng: -4/111320 }), tip: () => {} });
-  const dd = { world: 'meter', mainPipes: w.mains, branchPipes: w.branches, valves: w.valves,
-    couplerNodes: [], combinedN: 1, segTrunk: null };
-  sandbox.window.tlDiagramData = dd;
-  sandbox.window.tlManualGroups = [[0,4,8],[1,5,9],[2,6,10],[3,7,11]];
-  const d = DBG.collect();
-  const routes = DBG.buildFlowRoutes(d, 3);
+  const routes = DBG.buildFlowRoutes(makeD(w.trunkLL), 3);
   assert.ok(routes && routes.length, '第 4 区 routes 不应为 null');
   const zs = routes.filter(r => r.zi === 3);
   assert.ok(zs.length, 'zi=3 应有路线');
@@ -110,53 +130,52 @@ test('③ 真实拓扑：第 4 区路线串过第 1、2、3 区主管', () => {
     assert.ok(keys.indexOf(k) >= 0, '第 4 区路线必须串过 ' + k));
 });
 
-test('④ 老地块行为不变：已放接驳节点时节点路径照常', () => {
-  const { DBG, sandbox } = loadDemo();
+test('④ 全图闭环：12 区每区支管两端都可达（start() 不再拦「尚未覆盖」）', () => {
+  const { DBG } = loadDemo();
   const w = realWorldData();
-  DBG.setCtx({ toLL: w.toLL, getTrunkLines: () => [w.trunkLL],
-    getWaterSource: () => ({ lat: -258/110540, lng: -4/111320 }), tip: () => {} });
-  const couplers = [0, 4, 8].map(mi => {
-    const line = w.mains[mi];
-    return { pipeKey: 'm' + (mi + 1), s: 2, x: line[0].x + 2, y: line[0].y };
+  const routes = DBG.buildFlowRoutes(makeD(w.trunkLL), 0, true);
+  assert.ok(routes, 'allZones 路由不应为 null');
+  const covered = {};
+  (routes || []).forEach(r => {
+    if (r && r.branch && r.branch.some(s => s.key.indexOf('branch:') === 0)) covered[r.zi] = (covered[r.zi] || 0) + 1;
   });
-  const dd = { world: 'meter', mainPipes: w.mains, branchPipes: w.branches, valves: w.valves,
-    couplerNodes: couplers, combinedN: 1, segTrunk: null };
-  sandbox.window.tlDiagramData = dd;
-  sandbox.window.tlManualGroups = [[0,4,8],[1,5,9],[2,6,10],[3,7,11]];
-  const d = DBG.collect();
-  const routes = DBG.buildFlowRoutes(d, 2);
+  for (let zi = 0; zi < 12; zi++) {
+    assert.equal(covered[zi], 2, '第 ' + (zi + 1) + ' 区支管两端都必须可达（start() 的 wholeFieldClosed 门禁）');
+  }
+});
+
+test('⑤ 老地块行为不变：已放施工节点时节点路径照常', () => {
+  const { DBG } = loadDemo();
+  const w = realWorldData();
+  /* 发布节点：第 1 列三根主管各放一枚（主线起点 2m 处，物理位与主管重合）。 */
+  const nodesLL = [0, 4, 8].map(mi => {
+    const line = w.mains[mi];
+    const p = { x: line[0].x + 2, y: line[0].y };
+    return { mi: mi, ll: w.toLL(p), nodeId: 'N-' + (mi + 1), source: 'published-node' };
+  });
+  const routes = DBG.buildFlowRoutes(makeD(w.trunkLL, nodesLL), 2);
   assert.ok(routes && routes.length, '有节点的地块第 3 区仍应有路线');
   const zs = routes.filter(r => r.zi === 2);
   const keys = seqKeys(zs[0]);
   assert.ok(keys.indexOf('main:1') >= 0, '节点场景下第 3 区依旧要经过第 2 区主管');
 });
 
-test('⑤ 版本锁：index.html 14 处与 sw.js VERSION 动态同抬', () => {
+test('⑥ 版本锁：index.html 17 处与 sw.js VERSION 动态同抬', () => {
   const m = sw.match(/const VERSION = '(v\d+[^']*)';/);
   assert.ok(m, 'sw.js 缺 VERSION');
   const num = m[1].replace(/^v/, '');
-  assert.strictEqual(html.split('?v=' + num).length - 1, 14, 'index.html 应有 14 处 ?v=' + num);
-  /* [v990] 原末行写死当轮版本串，每次抬版都要回来改测试；改为格式断言后
-     版本一致性由上面 14 处动态比对负责，抬版不再需要动本文件。 */
+  /* [v1071] 口径：主串 15 处 + runye-map-enhance.js + trunk-snap.js 同值 = 17 处。 */
+  assert.strictEqual(html.split('?v=' + num).length - 1, 17, 'index.html 应有 17 处 ?v=' + num);
   assert.ok(/^v\d+-/.test(m[1]), 'VERSION 应为 v<数字>-<slug> 形式：' + m[1]);
 });
 
-test('⑥ v989 新场景：总管中段横穿、端点距离 >5m——线体口径必须接通', () => {
-  const { DBG, sandbox } = loadDemo();
-  const w = realWorldData();
+test('⑦ v989 新场景：总管中段横穿、端点距离 >5m——线体口径必须接通', () => {
+  const { DBG } = loadDemo();
   /* 总管竖线在平面 x=60m 处纵穿全场：横穿主管 0（y=-167.9，x∈[-2.4,125.1]）的中段，
      且距所有主管端点都远（主管 0 端点 x=-2.4/125.1 距竖线 62m+）——v988 端点口径接不通，
      v989 线体口径（与验证的「线体×线体」一致）必须接通。 */
   const trunkLL = [{lat:-300/110540, lng:60/111320},{lat:300/110540, lng:60/111320}];
-  const toLL = p => ({ lat: p.y/110540, lng: p.x/111320 });
-  DBG.setCtx({ toLL, getTrunkLines: () => [trunkLL],
-    getWaterSource: () => ({ lat: -280/110540, lng: 60/111320 }), tip: () => {} });
-  const dd = { world: 'meter', mainPipes: w.mains, branchPipes: w.branches, valves: w.valves,
-    couplerNodes: [], combinedN: 1, segTrunk: null };
-  sandbox.window.tlDiagramData = dd;
-  sandbox.window.tlManualGroups = [[0,4,8],[1,5,9],[2,6,10],[3,7,11]];
-  const d = DBG.collect();
-  const routes = DBG.buildFlowRoutes(d, 2);
+  const routes = DBG.buildFlowRoutes(makeD(trunkLL), 2);
   assert.ok(routes && routes.length, '中段穿越场景第 3 区不应再断流（v988 端点口径接不通）');
   const zs = routes.filter(r => r.zi === 2);
   const keys = seqKeys(zs[0]);
