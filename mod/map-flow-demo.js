@@ -27,6 +27,8 @@
      [v927] 活动区使用独立地图Pane和脉冲色层；无mi的分区阀按支管几何归属，并动画显示开阀。
      ═══════════════════════════════════════════════════════════════════════ */
   var TOL_M = 5, LINK_EPS_M = 0.5, NODE_ATTACH_EPS_M = 1.5, INTERVAL_MS = 1000, FLOW_PANE = 'ryMapFlowPane';
+  /* [v1084i] 「管路 vs 分区框」系统错位只提示一次，别每帧刷屏 */
+  var placementWarned = false;
   /* [v1084d] 宽松吸附容差：总管/节点/主管三者的"贴着"判据共用这一份。
      为什么不是 0.5/1.5：总管存的是**实体坐标**，而节点标记画在**显示坐标**
      （主管/支管显示副本平移 ±gap/2≈0.96m；用户实测「阀离支管 0.96m」正是这半个间距），
@@ -97,6 +99,84 @@
       if(ll.length>=3)out.push({zi:Number(z.zoneIndex),ll:ll});
     });
     return out;
+  }
+  /* [v1084i 2026-11-14 用户问「支管/主管位于本分区的位置对不对、两页是不是本身就不对」]
+     「管路 vs 分区框」配准审计。纯读几何、不改任何状态。
+     做法：把本区的分区框与发布管路放进同一套局部米坐标（参考纬度取分区框首点），
+     以**管线自身方向**为纵轴，量三件事 —— 起点侧超出多少米、终点侧超出多少米、横向偏多少米。
+     为什么要按管线自身方向量：主/支管是竖的、地块是旋转的，直接比 bbox 会把"旋转"误判成"偏移"。
+     返回 { rows:[{zi,...}], verdict:{...} }；rows 里 skip 表示该区缺数据。 */
+  function placementAudit(d) {
+    var rows = [], valid = 0, offCount = 0, startOvers = [], endOvers = [], laterals = [], offZones = [];
+    var total = (d && d.total) || 0, polyOf = {};
+    ((d && d.zonePolygons) || []).forEach(function (z) { if (z && z.zi != null) polyOf[z.zi] = z.ll; });
+    function projAt(refLat) {
+      var c = Math.max(.01, Math.cos(refLat * Math.PI / 180));
+      return function (p) { return { x: p.lng * 111320 * c, y: p.lat * 110540 }; };
+    }
+    /* 沿 line 自身方向量：P = 分区框点，L = 管线点（已验证成线） */
+    function axisMetric(P, L) {
+      var a = L[0], b = L[L.length - 1], dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy);
+      if (!(len > 1)) return null;
+      var ux = dx / len, uy = dy / len, sMin = Infinity, sMax = -Infinity, lMin = Infinity, lMax = -Infinity;
+      P.forEach(function (p) {
+        var vx = p.x - a.x, vy = p.y - a.y, s = vx * ux + vy * uy, l = -vx * uy + vy * ux;
+        if (s < sMin) sMin = s; if (s > sMax) sMax = s;
+        if (l < lMin) lMin = l; if (l > lMax) lMax = l;
+      });
+      return {
+        len: len,
+        startOut: sMin,                       /* >0 ⇒ 管线起点落在分区框"上游"之外 */
+        endOut: len - sMax,                   /* >0 ⇒ 管线终点超出"下游"边界 */
+        lateralOut: lMin > 0 ? lMin : (lMax < 0 ? -lMax : 0),
+        sMin: sMin, sMax: sMax,
+        sOf: function (p) { return (p.x - a.x) * ux + (p.y - a.y) * uy; }
+      };
+    }
+    for (var zi = 0; zi < total; zi++) {
+      var poly = polyOf[zi], br = (d.branchLL || [])[zi], mn = (d.mainsLL || [])[zi];
+      if (!poly || poly.length < 3 || !br || br.length < 2 || !mn || mn.length < 2) {
+        rows.push({ zi: zi, skip: !poly ? '缺分区框' : (!br ? '缺支管' : '缺主管') });
+        continue;
+      }
+      var pr = projAt(poly[0].lat), P = poly.map(pr);
+      var bm = axisMetric(P, br.map(pr)), mm = axisMetric(P, mn.map(pr));
+      if (!bm) { rows.push({ zi: zi, skip: '支管长度≈0' }); continue; }
+      var row = { zi: zi, branch: bm, main: mm };
+      var v = null;
+      (d.valves || []).forEach(function (x) { if (!v && x && Number(x.mi) === zi) v = x; });
+      if (v && (v.anchorLL || v.ll)) {
+        var sV = bm.sOf(pr(v.anchorLL || v.ll));
+        row.valveS = sV;
+        row.valveOut = sV < bm.sMin ? bm.sMin - sV : (sV > bm.sMax ? sV - bm.sMax : 0);
+      }
+      rows.push(row);
+      valid++;
+      var over = Math.max(Math.abs(bm.startOut), Math.abs(bm.endOut));
+      if (over > 3) { offCount++; offZones.push(zi + 1); }
+      startOvers.push(bm.startOut); endOvers.push(bm.endOut); laterals.push(bm.lateralOut);
+    }
+    function median(a) {
+      if (!a.length) return 0;
+      var s = a.slice().sort(function (x, y) { return x - y; }), m = s.length >> 1;
+      return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+    }
+    var mStart = median(startOvers), mEnd = median(endOvers), mLat = median(laterals);
+    /* 系统性判据：多数区都偏，且**中位偏移量本身**就超阈值（说明同向同量，不是各偏各的）。 */
+    var systematic = valid > 0 && offCount >= Math.max(2, Math.ceil(valid * 0.6)) &&
+      (Math.abs(mStart) > 3 || Math.abs(mEnd) > 3 || Math.abs(mLat) > 3);
+    var text;
+    if (!valid) text = '没有可用于配准审计的分区（缺分区框或管线）';
+    else if (systematic) text = valid + '/' + valid + ' 区支管整体沿管线方向错开：起点侧中位 ' +
+      (mStart >= 0 ? '+' : '') + mStart.toFixed(1) + 'm、终点侧 ' + (mEnd >= 0 ? '+' : '') + mEnd.toFixed(1) +
+      'm（' + offCount + ' 区同向）⇒ 分区框与管路不是同一代/同一坐标框';
+    else if (offCount) text = offCount + '/' + valid + ' 区支管超出分区框（第 ' + offZones.slice(0, 10).join('、') + ' 区）⇒ 个别区管线数据本身偏';
+    else text = valid + '/' + valid + ' 区支管都落在各自分区框内（|偏移| ≤ 3m）';
+    return {
+      rows: rows,
+      verdict: { n: valid, off: offCount, offZones: offZones, medianStartOver: mStart, medianEndOver: mEnd,
+        medianLateral: mLat, systematic: systematic, text: text }
+    };
   }
   function diagramGeometrySignature(dd) {
     return dd?JSON.stringify([dd.frontPipe,dd.mainPipes,dd.branchPipes,dd.valves,dd.poly]):'';
@@ -470,11 +550,26 @@
     for(var zi=0;zi<total;zi++)if(!zoneByIndex[zi])zoneOverlayComplete=false;
     if(!zoneOverlayComplete)zonePolygons=[];
     var manual = (window.tlManualGroups && window.tlManualGroups.length) ? window.tlManualGroups : null;
+    /* [v1084i] 管路 vs 分区框配准自检：算一次、喊一次，**不阻断演示**（演示照旧跑，
+       只是把"管线整体偏了十几米"这件事说清楚，别再让用户以为是动画画歪了）。 */
+    var placement = null;
+    try {
+      placement = placementAudit({ zonePolygons: zonePolygons, mainsLL: mainsLL, branchLL: branchLL,
+        valves: valves, total: total }).verdict;
+      if (placement && placement.systematic && !placementWarned) {
+        placementWarned = true;
+        try {
+          console.warn('[轮灌演示] 管路与分区框整体错开：' + placement.text +
+            '。这不是动画画歪，是发布快照里两代几何不一致 —— 回「分区与管路」重新生成施工图即可对齐。' +
+            '明细：RyMapFlowDemo.auditZones()');
+        } catch (eW) {}
+      }
+    } catch (ePl) { placement = null; }
     return {
       mainsLL: mainsLL, branchLL: branchLL, displayMainsLL:displayMainsLL, displayBranchLL:displayBranchLL, valves: valves,
       fittings: fittings,
       couplersLL: couplersLL, segLL: segLL, trunkLL: trunkLL, trunkLinesLL: trunkLinesLL,
-      nodesLL: nodesLL, zonePolygons:zonePolygons, sourceLL:sourceLL,
+      nodesLL: nodesLL, zonePolygons:zonePolygons, sourceLL:sourceLL, placement: placement,
       manual: manual, nPer: dd.combinedN || 1, total: total,
       gCount: groupCount(total, manual, dd.combinedN || 1)
     };
@@ -1873,6 +1968,44 @@
           out.routes.push({ redundant: !!r.redundant, segs: segs });
         });
         if (!out.routes.length) out.error = '该区没有可用路线（图没连到本区）';
+      } catch (e) { out.error = e.message; }
+      return out;
+    },
+    /* [v1084i 2026-11-14 用户问「支管/主管位于本分区的位置对不对？两页是不是本身就不对」]
+       配准审计：每区的「分区框」与「发布管路」是否对得上，单位米。
+       用法：RyMapFlowDemo.auditZones()      // 全场，重点看 verdict.text
+             RyMapFlowDemo.auditZones(3)     // 只看一区（0 基：3 = 图上第 4 区）
+       每行含义：
+         支管 45.0m      —— 本区支管总长
+         起点外 +15.2m   —— 支管起点落在分区框**上游**之外 15.2m（正=伸到隔壁区去了）
+         终点外 -2.0m    —— 负值=支管没铺满本区下游那一段
+         横向 0.0m       —— 支管相对分区框左右偏了多少
+         阀门 内外 0.0m  —— 阀门沿支管方向落在框外多少
+       判据写进 verdict.systematic：多数区同向同量 ⇒ 分区框与管路不是同一代/同一坐标框（重新生成施工图）；
+       只有个别区偏 ⇒ 该区管线数据本身的问题。 */
+    auditZones: function (zi, dInj) {
+      var out = { rows: [], verdict: null, error: '' };
+      try {
+        var d = dInj || collect();
+        if (!d) { out.error = '无可用简图数据'; return out; }
+        var res = placementAudit(d);
+        out.rows = res.rows; out.verdict = res.verdict;
+        var want = (zi === undefined || zi === null || isNaN(Number(zi))) ? null : Number(zi);
+        var fmt = function (v) { return (v >= 0 ? '+' : '') + Number(v).toFixed(1) + 'm'; };
+        var lines = [];
+        out.rows.forEach(function (r) {
+          if (want != null && r.zi !== want) return;
+          if (r.skip) { lines.push('第 ' + (r.zi + 1) + ' 区：跳过（' + r.skip + '）'); return; }
+          lines.push('第 ' + (r.zi + 1) + ' 区 | 支管 ' + r.branch.len.toFixed(1) + 'm' +
+            ' | 起点外 ' + fmt(r.branch.startOut) +
+            ' | 终点外 ' + fmt(r.branch.endOut) +
+            ' | 横向 ' + fmt(r.branch.lateralOut) +
+            (r.valveOut == null ? '' : ' | 阀门距框 ' + fmt(r.valveOut)) +
+            (r.main ? ' | 主管 ' + r.main.len.toFixed(1) + 'm 起点外 ' + fmt(r.main.startOut) + ' 终点外 ' + fmt(r.main.endOut) : ''));
+        });
+        lines.push('结论：' + out.verdict.text);
+        try { console.log('[轮灌演示·配准审计]\n' + lines.join('\n')); } catch (eLog) {}
+        out.text = lines.join('\n');
       } catch (e) { out.error = e.message; }
       return out;
     }

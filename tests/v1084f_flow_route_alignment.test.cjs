@@ -169,6 +169,44 @@ const c7route = D.buildRoutes(cd, 0, true).filter(r => r.zi === 6);
 ok(c7route.length > 0 && c7route[0].zoneBranch && c7route[0].zoneBranch.length === 2,
   '[v1084h] 同列定线下 7 区仍给出支管整段（阀门两侧各一段）');
 
+/* ---------- E. [v1084i] 管路 vs 分区框配准审计 ----------
+ * 用户 2026-11-14 第二问：「支管主管位于本分区的位置对不对？分区与管路页面对在线地图
+ * 页面是不是本身就不对？」——演示的描边与发布管线是重合的（红管与绿水同点衔接），
+ * 所以偏移不在动画，而在「分区框」与「管路」两份几何的配准上。这里锁住审计工具本身：
+ * 已知平移量必须被量出来，且方向要对（+ = 伸到上游隔壁区）；全同向同量必须判「系统性」。 */
+ok(/function placementAudit\(d\)/.test(demo), '[v1084i] 配准审计纯函数 placementAudit() 在位');
+ok(/auditZones: function \(zi, dInj\)/.test(demo), '[v1084i] 导出 auditZones()');
+ok(/placement: placement/.test(demo), '[v1084i] collect() 把配准结论挂到 d.placement');
+ok(/placementWarned = true/.test(demo), '[v1084i] 系统错位只 console.warn 一次（不刷屏）');
+
+function fieldWithShift(shiftY) {
+  const m = [], b = [], v = [], polys = [];
+  const COLS2 = [0, 60, 100];
+  for (let row = 0; row < 4; row++) {
+    for (let col = 0; col < 3; col++) {
+      const zi = row * 3 + col, x = COLS2[col], yt = row * 60, yb = yt + 60;
+      m.push([P(x, yt + shiftY), P(x, yb + shiftY)]);
+      b.push([P(x, yt + shiftY), P(x, yb + shiftY)]);
+      v.push({ ll: P(x, yt + 30 + shiftY), anchorLL: P(x, yt + 30 + shiftY), mi: zi });
+      const hw = 18;
+      polys.push({ zi, ll: [P(x - hw, yt), P(x + hw, yt), P(x + hw, yb), P(x - hw, yb)] });
+    }
+  }
+  return { mainsLL: m, branchLL: b, zonePolygons: polys, valves: v, total: 12 };
+}
+const aligned = D.auditZones(undefined, fieldWithShift(0));
+ok(aligned.rows.every(r => r.skip || Math.abs(r.branch.startOut) < 0.5),
+  '[v1084i] 对齐时每区支管起点超出量 ≈ 0');
+ok(aligned.verdict.systematic === false, '[v1084i] 对齐时不报系统性错位');
+
+const shifted = D.auditZones(4, fieldWithShift(-16));
+const r4s = shifted.rows.filter(r => r.zi === 3)[0];
+ok(r4s && Math.abs(r4s.branch.startOut - 16) < 0.5 && Math.abs(r4s.branch.endOut + 16) < 0.5,
+  '[v1084i] 支管整体上移 16m ⇒ 起点外 +16m、终点外 -16m（实测 ' +
+  (r4s ? r4s.branch.startOut.toFixed(1) + ' / ' + r4s.branch.endOut.toFixed(1) : '无') + '）');
+ok(shifted.verdict.systematic === true && shifted.verdict.off === 12,
+  '[v1084i] 12 区同向同量 ⇒ 判「系统性错位」（分区框与管路不是同一代）');
+
 /* ---------- 版本纪律 ---------- */
 const m = /^const VERSION = '(v[\w-]+)';/m.exec(sw);
 ok(!!m && /^v\d{3,4}-[\w-]+$/.test(m[1]), '[v1084f] sw VERSION 形如 vNNNN- slug：' + (m && m[1]));
