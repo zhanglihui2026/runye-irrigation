@@ -27,6 +27,12 @@
      [v927] 活动区使用独立地图Pane和脉冲色层；无mi的分区阀按支管几何归属，并动画显示开阀。
      ═══════════════════════════════════════════════════════════════════════ */
   var TOL_M = 5, LINK_EPS_M = 0.5, NODE_ATTACH_EPS_M = 1.5, INTERVAL_MS = 1000, FLOW_PANE = 'ryMapFlowPane';
+  /* [v1084] 配件切口去重半径：与线上已有切口（节点/阀门垂足/端点）近于此值就复用，
+     不再另切一刀 —— 否则一段管子被劈成 0.1m 碎片，水力切片身份 (key,a,b) 会漂移。 */
+  var FIT_DEDUPE_M = 0.25;
+  /* [v1084] 最近一次建图的诊断（详见 buildFlowRoutes 开头）。宿主失败时读它生成人话；
+     探针/单测也读它 —— 这是"为什么没连上"的唯一机器可读出口。 */
+  var lastDiag = null;
   var DOT_FILLS = ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6'];
   var DOT_FILLS_LT = ['#fca5a5', '#fcd34d', '#86efac', '#93c5fd'];
   var DOT_INKS_LT = ['#7f1d1d', '#78350f', '#14532d', '#1e3a8a'];
@@ -373,7 +379,25 @@
        旧快照缺少显示副本时逐线回退到实体几何。 */
     displayMainsLL=mainsLL.map(function(line,i){return snapshotLine((routeGeometry.displayMains||[])[i])||line;});
     displayBranchLL=branchLL.map(function(line,i){return snapshotLine((routeGeometry.displayBranches||[])[i])||line;});
-    routeGeometry.valves.forEach(function(v){if(!v)return;var ll=readLL(v.ll),anchor=readLL(v.anchorLL);if(ll)valves.push({ll:ll,anchorLL:anchor,mi:Number(v.mi)});});
+    routeGeometry.valves.forEach(function(v){if(!v)return;var ll=readLL(v.ll),anchor=readLL(v.anchorLL);if(ll)valves.push({ll:ll,anchorLL:anchor,mi:Number(v.mi),tier:String(v.tier||'zone')});});
+    /* [v1084 阀门/三通归属] 三级页插入的配件按「所属管线 + 桩号」读入：这是精确归属，
+       不靠几何容差。老快照没有 fittings 字段 ⇒ 空数组，行为与 v1083 一致。
+       逐件宽容：坐标或管线信息不全就跳过这一件，不阻断演示（宁可少一个节点，
+       也不要因为一个坏配件把整场演示拦掉）。 */
+    var fittings = [];
+    (Array.isArray(routeGeometry.fittings)?routeGeometry.fittings:[]).forEach(function(f){
+      if(!f)return;
+      var ll=readLL(Array.isArray(f.ll)?f.ll:[f.lat,f.lng]);
+      if(!ll)return;
+      var pk=String(f.pipeKind||''),mi=Number(f.mi);
+      if(pk!=='main'&&pk!=='branch')return;
+      if(!Number.isInteger(mi)||mi<0)return;
+      fittings.push({
+        id:String(f.id||''),kind:String(f.kind||''),tier:String(f.tier||'pipe'),
+        pipeKind:pk,mi:mi,atM:Number(f.atM)||0,ll:ll,
+        displayLL:readLL(Array.isArray(f.displayLL)?f.displayLL:[f.displayLat,f.displayLng])||ll
+      });
+    });
     routeGeometry.nodes.forEach(function(n){
       if(!n||!Number.isInteger(Number(n.mi)))return;var ll=readLL(n.ll);if(!ll)return;
       nodesLL.push({pipeKey:(n.kind==='main'?'m':'b')+(Number(n.mi)+1),kind:n.kind,mi:Number(n.mi),ll:ll,
@@ -416,6 +440,7 @@
     var manual = (window.tlManualGroups && window.tlManualGroups.length) ? window.tlManualGroups : null;
     return {
       mainsLL: mainsLL, branchLL: branchLL, displayMainsLL:displayMainsLL, displayBranchLL:displayBranchLL, valves: valves,
+      fittings: fittings,
       couplersLL: couplersLL, segLL: segLL, trunkLL: trunkLL, trunkLinesLL: trunkLinesLL,
       nodesLL: nodesLL, zonePolygons:zonePolygons, sourceLL:sourceLL,
       manual: manual, nPer: dd.combinedN || 1, total: total,
@@ -509,15 +534,37 @@
      coupler nodes, main-line end joins and branch takeoffs, so a later trunk
      junction (for example N-02) is not animated when an earlier zone (zone 3)
      can be supplied from N-01 directly. */
+  /* [v1084] 诊断转人话。用户原话「这个地图上的轮灌区演示，到现在都查不清原因」——
+     原因不能被藏在闭包里：失败时把「哪一区、缺什么、差多少米」直接写进提示条。
+     只取前 3 条，避免 36 区的提示条被刷成一片。 */
+  function demoDiagText(diag){
+    if(!diag)return '';
+    var bits=[],f=diag.fittings||{},zs=diag.zones||[];
+    if(diag.blocked)bits.push(diag.blocked);
+    if(f.placed)bits.push('已按「管线+桩号」接入阀门/三通 '+f.placed+' 个');
+    if(f.noPipe)bits.push(f.noPipe+' 个配件的所属管线已不存在（重新生成施工图即可清掉）');
+    if(zs.length){
+      var sample=zs.slice(0,3).map(function(z){return '第'+(Number(z.zi)+1)+'区：'+z.reason;});
+      bits.push('未接通 '+zs.length+' 处 —— '+sample.join('；')+(zs.length>3?' 等':''));
+    }else if(diag.missing){
+      bits.push('有 '+diag.missing+' 个支管端点水路不通');
+    }
+    return bits.length?' 【诊断】'+bits.join('；')+'。':'';
+  }
+
   function buildFlowRoutes(d,g,allZones){
-    if(!d||!Array.isArray(d.trunkLinesLL))return null;
+    /* [v1084] 每轮建图重置诊断：{zones:[{zi,reason}], fittings:{placed,dup,offLine,noPipe},
+       active, missing, blocked}。失败时宿主把它翻成人话，用户才知道"哪个区缺什么"。 */
+    lastDiag={zones:[],fittings:{placed:0,dup:0,offLine:0,noPipe:0},active:0,missing:0,blocked:null};
+    if(!d||!Array.isArray(d.trunkLinesLL)){lastDiag.blocked='没有手绘总管线数据';return null;}
     /* [v1019] 无手绘总管时 segLL（段总管反投线）也可作干线参与寻路——扬程链/最远水路
        共享本引擎（用户拍板 2026-11-08）。两者皆无 ⇒ 由下方 byTrunk 空守卫统一拒绝，
        行为与旧版一致。 */
     var activeZones=[];
     if(allZones){for(var z0=0;z0<d.total;z0++)activeZones.push(z0);}
     else for(var zi=0;zi<d.total;zi++)if(groupOf(zi,d.manual,d.nPer)===g)activeZones.push(zi);
-    if(!activeZones.length)return null;
+    lastDiag.active=activeZones.length;
+    if(!activeZones.length){lastDiag.blocked='本组没有分区';return null;}
     var refLat=(d.trunkLinesLL[0]&&d.trunkLinesLL[0][0]&&isFinite(d.trunkLinesLL[0][0].lat))
       ?d.trunkLinesLL[0][0].lat:0;
     var cos=Math.max(.01,Math.cos(refLat*Math.PI/180)), lines=[], byMain={}, byTrunk=[];
@@ -562,7 +609,7 @@
     (d.mainsLL||[]).forEach(function(l,i){var o=makeLine('main:'+i,'main',i,l);if(o)byMain[i]=o;});
     var branchLines={};
     activeZones.forEach(function(i){var o=makeLine('branch:'+i,'branch',i,d.branchLL&&d.branchLL[i]);if(o)branchLines[i]=o;});
-    if(!byTrunk.length)return null;
+    if(!byTrunk.length){lastDiag.blocked='没有可用的总干线（手绘总管为空）';return null;}
 
     /* 完整水路校验只关心管网拓扑。水源是独立地图点，不作为连通根或播放前置条件；
        从第一条总管的首端建立稳定图根，再要求所有分区支管两端都能沿管网到达。 */
@@ -615,36 +662,62 @@
       });
     });
 
+    /* ══ [v1084 阀门/三通按归属入图] ══════════════════════════════════════
+       三级页插入的配件带「所属管线 + 桩号」，是精确归属，不需要几何容差去猜。
+       以前它们根本不进图：阀门只当"分水节点"、三通/手工阀门完全不参与，
+       于是「闸门层级」在地图端不存在，用户插了阀门却不影响演示，只能靠 0.5m
+       容差把线接上——角度一变就断，且看不出是哪一级闸门的问题。
+       现在：按 pipeKind+mi 找到那根线，用 ll 投影定桩号（atM 兜底），在该处切一刀
+       成为图节点。★ 与已有切口 ≤FIT_DEDUPE_M 就跳过：多切一刀只会把一段管子劈成
+       0.1m 碎片，让水力切片身份 (key,a,b) 漂移（v1025/v1023 踩过这个坑）。 */
+    var diag=lastDiag;
+    (d.fittings||[]).forEach(function(f){
+      var o=(f.pipeKind==='main')?byMain[f.mi]:branchLines[f.mi];
+      if(!o){diag.fittings.noPipe++;return;}
+      var p=project(o,f.ll),s=null;
+      if(p.d<=NODE_ATTACH_EPS_M)s=p.s;
+      else if(isFinite(f.atM))s=Math.max(0,Math.min(o.len,f.atM));
+      if(s==null){diag.fittings.offLine++;return;}
+      var dup=o.cuts.some(function(c){return Math.abs(c.s-s)<=FIT_DEDUPE_M;});
+      if(dup){diag.fittings.dup++;return;}
+      addCut(o,s,'fit:'+(f.id||(f.pipeKind+':'+f.mi+':'+f.atM)));
+      diag.fittings.placed++;
+    });
+
     /* Treat each valve as the branch flow splitter. Generated施工图 stores the
        main-side takeoff in valve.ax/ay and the valve center in x/y; the visible
        connector between them is part of the designed route even when the main
        and branch centerlines are parallel and separated. */
     var targets=[],feeds=[];
     activeZones.forEach(function(i){
-      var main=byMain[i],branch=branchLines[i];if(!main)return;
-      if(branch){
-        var valve=null;(d.valves||[]).some(function(v){if(v&&v.mi===i&&v.ll){valve=v;return true;}return false;});
-        if(!valve)return;
-        var valveProj=project(branch,valve.ll);
-        var valvePoint=at(branch,valveProj.s),mainJoin=valve.anchorLL||valvePoint;
-        var mainProj=project(main,mainJoin);
-        /* Legacy valve records without an anchor retain the prior direct-feed
-           rule. With an anchor, verify that anchor lands on this zone's main;
-           the drawn anchor→valve connector is the physical bridge to the branch. */
-        if(mainProj.d<=LINK_EPS_M){
-          var feedMainId='branch-feed-main:'+i,feedValveId='branch-valve:'+i;
-          addCut(main,mainProj.s,feedMainId);addCut(branch,valveProj.s,feedValveId);
-          var startId='branch-start:'+i,endId='branch-end:'+i;
-          addCut(branch,0,startId);addCut(branch,branch.len,endId);
-          var feedPoints=[at(main,mainProj.s)];
-          if(valve.anchorLL)feedPoints.push(valve.anchorLL);
-          feedPoints.push(valve.ll);
-          if(gap(xy(valve.ll),xy(valvePoint))>.05)feedPoints.push(valvePoint);
-          feeds.push({zi:i,from:feedMainId,to:feedValveId,points:feedPoints});
-          targets.push({zi:i,id:startId},{zi:i,id:endId});
-          return;
-        }
+      var main=byMain[i],branch=branchLines[i];
+      /* [v1084 诊断] 以前这几条分支都是静默 return：某个分区少一根管、少一个阀门、
+         阀门锚点没落在主管上，图里就少一个目标点，最后只报「未覆盖所有分区支管」——
+         用户面对 36 个区根本查不出是哪个区、缺什么。现在逐条记原因。 */
+      if(!main){diag.zones.push({zi:i,reason:'没有主管管段'});return;}
+      if(!branch){diag.zones.push({zi:i,reason:'没有支管管段'});return;}
+      var valve=null;(d.valves||[]).some(function(v){if(v&&v.mi===i&&v.ll){valve=v;return true;}return false;});
+      if(!valve){diag.zones.push({zi:i,reason:'没有分区阀门（阀门数组里缺 mi='+i+'）'});return;}
+      var valveProj=project(branch,valve.ll);
+      var valvePoint=at(branch,valveProj.s),mainJoin=valve.anchorLL||valvePoint;
+      var mainProj=project(main,mainJoin);
+      /* Legacy valve records without an anchor retain the prior direct-feed
+         rule. With an anchor, verify that anchor lands on this zone's main;
+         the drawn anchor→valve connector is the physical bridge to the branch. */
+      if(mainProj.d<=LINK_EPS_M){
+        var feedMainId='branch-feed-main:'+i,feedValveId='branch-valve:'+i;
+        addCut(main,mainProj.s,feedMainId);addCut(branch,valveProj.s,feedValveId);
+        var startId='branch-start:'+i,endId='branch-end:'+i;
+        addCut(branch,0,startId);addCut(branch,branch.len,endId);
+        var feedPoints=[at(main,mainProj.s)];
+        if(valve.anchorLL)feedPoints.push(valve.anchorLL);
+        feedPoints.push(valve.ll);
+        if(gap(xy(valve.ll),xy(valvePoint))>.05)feedPoints.push(valvePoint);
+        feeds.push({zi:i,from:feedMainId,to:feedValveId,points:feedPoints});
+        targets.push({zi:i,id:startId},{zi:i,id:endId});
+        return;
       }
+      diag.zones.push({zi:i,reason:'阀门/锚点不在本区主管上（垂距 '+mainProj.d.toFixed(2)+'m > 容差 '+LINK_EPS_M+'m）'});
     });
 
     var graph={},linkGeometry={};
@@ -678,7 +751,7 @@
         key:'branch-feed:'+f.zi,kind:'branch',points:f.points,a:f.from,b:f.to
       });
     });
-    if(!graph[rootId])return null;
+    if(!graph[rootId]){lastDiag.blocked='水路根节点没有进入管网图（总管未与任何主管相接）';return null;}
 
     /* Dijkstra from the network root. The reconstructed edges retain their
        direction, which makes the moving dash travel toward the selected zone. */
@@ -698,7 +771,9 @@
     }
     var routes=[];
     targets.forEach(function(t){
-      if(distMap[t.id]==null)return;
+      /* [v1084 诊断] 目标点没跑到 ⇒ 沿图断开。以前直接 return，等于把「哪一区断了」
+         这条唯一有用的信息扔掉，只留一句笼统提示。 */
+      if(distMap[t.id]==null){diag.missing++;diag.zones.push({zi:t.zi,reason:'水路走不到支管端（图在总管/主管/阀门处断开）'});return;}
       var path=[],pathLinkIds=[],cur=t.id,guard=0;
       while(cur!==rootId&&prev[cur]&&guard++<5000){var step=prev[cur];pathLinkIds.push(step.linkId);if(step.edge)path.push({edge:step.edge,forward:step.from===step.edge.a});cur=step.from;}
       if(cur!==rootId)return;
@@ -723,6 +798,12 @@
       });
       routes.push(route);
     });
+    /* [v1084] 把本轮建图的诊断交出去（同一分区多条原因去重，最多留 3 条摘要）。 */
+    try{
+      var seen={},uniq=[];
+      diag.zones.forEach(function(z){var k=z.zi+'|'+z.reason;if(seen[k])return;seen[k]=1;uniq.push(z);});
+      diag.zones=uniq;lastDiag=diag;
+    }catch(eDiag){lastDiag=null;}
     return routes.length?routes:null;
   }
 
@@ -897,6 +978,7 @@
       return false;
     }
     var allRoutes=buildFlowRoutes(d,0,true),allCovered={},routes=[],expected={},activeCount=0,groupRoutes=[];
+    var diagAll=lastDiag;   /* [v1084] 全图那一趟的诊断，是"为什么没连上"的权威版本 */
     (allRoutes||[]).forEach(function(route){
       if(route&&route.branch&&route.branch.some(function(s){return s.key.indexOf('branch:')===0;}))allCovered[route.zi]=(allCovered[route.zi]||0)+1;
       if(route&&groupOf(route.zi,d.manual,d.nPer)===g)groupRoutes.push(route);
@@ -914,7 +996,8 @@
       if(layer)layer.clearLayers();
       active=null;hideGroupInfo();if(timer){clearInterval(timer);timer=null;}playing=false;syncChipsState();
       if(ctx.tip)ctx.tip('当前地块尚未形成覆盖所有分区支管两端的连续管路；请检查手绘总管、捕捉节点、主管、分区阀门和支管连接。'
-        +'若刚点过「生成施工图」或刚更新过版本，请删掉旧总管沿图上管线重画（先点「捕捉点」开启吸附，白圈吸到施工节点再落点），再演示轮灌。');
+        +'若刚点过「生成施工图」或刚更新过版本，请删掉旧总管沿图上管线重画（先点「捕捉点」开启吸附，白圈吸到施工节点再落点），再演示轮灌。'
+        +demoDiagText(diagAll));
       return false;
     }
     renderSnapshotD = d;     /* [perf-20261106] 复用同一份快照，不再 collect 第二次 */
@@ -1420,6 +1503,11 @@
     },
     /* [v945] 导出给探针/宿主驱动：分组浮层文案（含"没有图面路径时按分区反推口径"这条分支）。
        它是纯 DOM 拼装、不写任何状态，导出去比藏在闭包里更好验。 */
-    updateGroupInfo: updateGroupInfo
+    updateGroupInfo: updateGroupInfo,
+    /* [v1084] 建图诊断：{blocked, active, missing, fittings:{placed,dup,offLine,noPipe},
+       zones:[{zi,reason}]}。失败提示用它逐条说清"哪个区、缺什么、差多少米"。 */
+    lastDiagnostics: function () { return lastDiag; },
+    /* [v1084] 诊断文案纯函数（单测直测，不必起地图） */
+    diagText: demoDiagText
   };
 })(window);

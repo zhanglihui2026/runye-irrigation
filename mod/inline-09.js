@@ -5887,7 +5887,7 @@ function tlAutoGenerate(options) {
         if(out.length<2)throw new Error('管线坐标不完整：'+pid);
         return {world:world,ll:out};
       }
-      var routeGeometry={version:2,geometrySig:publishGeometrySig,mains:[],branches:[],displayMains:[],displayBranches:[],valves:[],nodes:[],segTrunk:null};
+      var routeGeometry={version:2,geometrySig:publishGeometrySig,mains:[],branches:[],displayMains:[],displayBranches:[],valves:[],nodes:[],fittings:[],segTrunk:null};
       var routeMainWorld=[],routeBranchWorld=[],routeMainLLPhys=[],routeBranchLLPhys=[];
       (publishDd.mainPipes||[]).forEach(function(line,i){var r=routeLine('main-'+i,line);routeMainWorld.push(r.world);routeMainLLPhys.push(r.ll);});
       (publishDd.branchPipes||[]).forEach(function(line,i){var r=routeLine('branch-'+i,line);routeBranchWorld.push(r.world);routeBranchLLPhys.push(r.ll);});
@@ -5928,8 +5928,50 @@ function tlAutoGenerate(options) {
         /* 锚点用于拓扑连接，必须落在实体主管中心线上；显示偏移由独立图层处理。 */
         anchor=(v.ax!=null&&v.ay!=null)?p2ll({x:v.ax,y:v.ay}):null;
         if(!ll)throw new Error('阀门坐标无效：'+(i+1));
-        routeGeometry.valves.push({ll:ll,anchorLL:anchor,mi:Number.isFinite(Number(v.mi))?Number(v.mi):i});
+        /* [v1084 阀门归属] tier 显式标层级：自动阀门是「分区级」（每个分区一个、锚分区中心、
+           mi=主管序号）；三级页手工插入的阀门/三通走下面的 fittings，标「管段级」。
+           以前只有 {ll,anchorLL,mi}，地图端无法区分层级，只能靠几何猜。 */
+        routeGeometry.valves.push({ll:ll,anchorLL:anchor,mi:Number.isFinite(Number(v.mi))?Number(v.mi):i,tier:'zone'});
       });
+      /* [v1084 阀门/三通归属进快照] 三级页插入的配件（RyTlAutoEdits.fits）本身就是
+         「管线 pid + 桩号 atM」的**精确归属**，却在 v1083 之前从未发布 —— 地图端只能靠
+         0.5m 几何容差把阀门/三通猜着接上，分区角度一变就断，且永远看不出「哪一级闸门」
+         的问题（用户 2026-11-14 原话：「把二级三级的闸门跟层级取消了，所有东西都乱套了，
+         轮灌区演示到现在都查不清原因」）。
+         现在逐件发布：id/kind/所属管线(mi+pipeKind)/桩号 + 实体坐标 + 显示坐标。
+         ★ 宽容失败：管线已不存在（改分区后被裁掉）就跳过这一件，绝不因此阻断整次发布 ——
+           发布是"定稿"动作，不能因为一个失效配件把用户卡死；地图端按 kind 逐件降级。
+         ★ 老快照没有 fittings 字段 ⇒ 地图端按空数组处理，行为与 v1083 完全一致。 */
+      var publishedFittings=[];
+      try{
+        if(publishEdits&&typeof publishEdits.fitsList==='function'){
+          (publishEdits.fitsList()||[]).forEach(function(f){
+            var fm=/^(main|branch)-(\d+)$/.exec(String((f&&f.pid)||''));
+            if(!fm)return;
+            var fIdx=Number(fm[2]),fIsMain=fm[1]==='main';
+            var fArr=fIsMain?(publishDd.mainPipes||[]):(publishDd.branchPipes||[]);
+            if(fIdx>=fArr.length)return;
+            var fPt=null;
+            try{fPt=publishEdits.pointAt(f.pid,publishDd,Number(f.atM));}catch(eFP){return;}
+            var fLL=fPt&&p2ll(fPt);
+            if(!fLL||!isFinite(fLL[0])||!isFinite(fLL[1]))return;
+            /* 显示位与施工节点同款：按桩号比例映射到显示副本，保证地图上压在可见管线上。 */
+            var fSrc=fIsMain?routeMainWorld[fIdx]:routeBranchWorld[fIdx];
+            var fShown=fIsMain?(routeDisplay.main||[])[fIdx]:(routeDisplay.branch||[])[fIdx];
+            var fSrcLen=routeLineLength(fSrc),fShownLen=routeLineLength(fShown);
+            var fShownPt=(fSrcLen>1e-8&&fShownLen>1e-8)
+              ?routePointAt(fShown,Math.max(0,Math.min(1,(Number(f.atM)||0)/fSrcLen))*fShownLen):null;
+            var fShownLL=fShownPt&&p2ll(fShownPt);
+            var fDispLL=(fShownLL&&isFinite(Number(fShownLL[0]))&&isFinite(Number(fShownLL[1])))?fShownLL:fLL;
+            publishedFittings.push({
+              id:String(f.id||''),kind:String(f.kind||''),tier:'pipe',
+              pid:String(f.pid),pipeKind:fm[1],mi:fIdx,atM:Number(f.atM)||0,
+              lat:fLL[0],lng:fLL[1],displayLat:fDispLL[0],displayLng:fDispLL[1]
+            });
+          });
+        }
+      }catch(eFits){ console.warn('[publish] 配件归属发布失败（不影响管线/节点）',eFits); }
+      routeGeometry.fittings=publishedFittings;
       if(publishDd.segTrunk&&Array.isArray(publishDd.segTrunk.points)&&publishDd.segTrunk.points.length>=2){
         routeGeometry.segTrunk=[];publishDd.segTrunk.points.forEach(function(p){var ll=p2ll(p);if(!ll)throw new Error('段总管坐标无效');routeGeometry.segTrunk.push(ll);});
       }
