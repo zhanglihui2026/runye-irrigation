@@ -798,6 +798,21 @@
       [[0,b.raw[0]],[b.len,b.raw[b.raw.length-1]]].forEach(function(e,ei){var p=project(a,e[1]);if(p.d<=LINK_EPS_M){var id='main-join:'+mi+':'+mj+':b'+ei;addCut(b,e[0],id);addCut(a,p.s,id);}});
     }
 
+    /* [v1084g 2026-11-14 用户口径「必须经过阀门」] 阀门是该区支管的**唯一进水口**：
+       某区阀门（或其锚点）确实落在本区主管上时，禁止「支管端点绕过阀门直连本区主管」。
+       以前不禁止，最短路会从主管直接切进支管端点 —— 动画看起来"没经过阀门"；
+       更糟的是「到左端」「到右端」两条路线因此互为旁路，被判 redundant 后只剩一条
+       ⇒ 支管只亮一半（用户实测「支管要全部水流」正是这条）。
+       只禁「本区支管 ↔ 本区主管」这一对：跨区借道（支管端点顶到隔壁行主管）照旧放行，
+       那是带状/列状布局避免断成孤岛的唯一出路（v1073 补的规则，不能动）。 */
+    var valveOnOwnMain={};
+    (d.valves||[]).forEach(function(v){
+      if(!v||!(v.mi>=0)||!v.ll)return;
+      var mo=byMain[v.mi];if(!mo)return;
+      var vpt=v.anchorLL||v.ll;
+      if(project(mo,vpt).d<=NODE_ATTACH_EPS_M)valveOnOwnMain[v.mi]=1;
+    });
+
     /* [v1073] 支管端点直连：带状/列状布局里，相邻行的支管首尾相接、支管端点顶到
        下一行主管——「主管↔主管端点直连」不覆盖这类跨行连接，整图会断成孤岛
        （「尚未形成覆盖所有分区支管两端的连续管路」的真凶之一）。补：每个支管
@@ -807,6 +822,8 @@
       [[0,b.raw[0]],[b.len,b.raw[b.raw.length-1]]].forEach(function(e,ei){
         lines.forEach(function(o){
           if(o.key===b.key||o.kind==='trunk')return;
+          /* [v1084g] 本区有落在自己主管上的阀门 ⇒ 本区支管只能从阀门进水 */
+          if(o.kind==='main'&&valveOnOwnMain[bk]&&o.key==='main:'+bk)return;
           var p=project(o,e[1]);
           if(p.d<=LINK_EPS_M){var id='branch-end:'+bk+':'+ei+':'+o.key;addCut(b,e[0],id);addCut(o,p.s,id);}
         });
@@ -839,7 +856,7 @@
        main-side takeoff in valve.ax/ay and the valve center in x/y; the visible
        connector between them is part of the designed route even when the main
        and branch centerlines are parallel and separated. */
-    var targets=[],feeds=[];
+    var targets=[],feeds=[],zoneBranch={};
     activeZones.forEach(function(i){
       var main=byMain[i],branch=branchLines[i];
       /* [v1084 诊断] 以前这几条分支都是静默 return：某个分区少一根管、少一个阀门、
@@ -875,6 +892,17 @@
         if(gap(xy(valve.ll),xy(valvePoint))>.05)feedPoints.push(valvePoint);
         feeds.push({zi:i,from:feedMainId,to:feedValveId,points:feedPoints});
         targets.push({zi:i,id:startId},{zi:i,id:endId});
+        /* [v1084g 用户口径「支管要全部水流」] 支管整段（阀门两侧各一段）一次给全：
+           以前渲染只画「最短路走到的那一个端点」，另一侧靠另一条路线补；一旦那条路线
+           被判冗余过滤掉，支管就只亮一半。这里与路线数量无关地给出两段，
+           阀门位置精确来自 valveProj.s（就是切在支管上的那一刀）。 */
+        try{
+          var vPtOnBranch=at(branch,valveProj.s);
+          zoneBranch[i]=[
+            {key:'branch:'+i,points:[at(branch,0),vPtOnBranch]},
+            {key:'branch:'+i,points:[vPtOnBranch,at(branch,branch.len)]}
+          ];
+        }catch(eZB){}
         return;
       }
       diag.zones.push({zi:i,reason:'阀门/锚点不在本区主管上（垂距 '+mainProj.d.toFixed(2)+'m > 容差 '+LINK_EPS_M+'m）'});
@@ -967,6 +995,8 @@
       });
       routes.push(route);
     });
+    /* [v1084g] 每区的「支管整段」挂到该区所有路线上，渲染直接消费（与路线条数无关）。 */
+    routes.forEach(function(r){if(r&&zoneBranch[r.zi])r.zoneBranch=zoneBranch[r.zi];});
     /* [v1084] 把本轮建图的诊断交出去（同一分区多条原因去重，最多留 3 条摘要）。 */
     try{
       var seen={},uniq=[];
@@ -1023,7 +1053,7 @@
     var routes=renderSnapshotRoutes||buildFlowRoutes(d,g),drawn={};
     renderSnapshotRoutes=null;
     if(routes)routes.forEach(function(route){
-      route.trunk.concat(route.main).concat(route.branch).forEach(function(seg){
+      route.trunk.concat(route.main).concat(route.branch).concat(route.zoneBranch||[]).forEach(function(seg){
         if(!seg.points||seg.points.length<2)return;
         var key=seg.key+':'+seg.points[0].lat.toFixed(6)+':'+seg.points[0].lng.toFixed(6)+':'+seg.points[seg.points.length-1].lat.toFixed(6)+':'+seg.points[seg.points.length-1].lng.toFixed(6);
         if(drawn[key])return;drawn[key]=true;

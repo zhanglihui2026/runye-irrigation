@@ -96,6 +96,30 @@ ok(m0 > 50, '[v1084f] 第 4 区走的 main:0 累计长 ' + m0.toFixed(1) + 'm（
 ok(r4.some(s => s.key.indexOf('branch:') === 0 && s.lenM > 5),
   '[v1084f] 支管段有实际长度（不是零长切口）');
 
+/* ---------- C. [v1084g] 阀门是支管唯一进水口 + 支管整段流动 ---------- */
+ok(/valveOnOwnMain\[v\.mi\]=1/.test(demo), '[v1084g] 能识别「阀门落在自己主管上」的区');
+ok(/if\(o\.kind==='main'&&valveOnOwnMain\[bk\]&&o\.key==='main:'\+bk\)return;/.test(demo),
+  '[v1084g] 该区支管端点不再绕过阀门直连本区主管');
+ok(/zoneBranch\[i\]=\[/.test(demo), '[v1084g] 每区支管整段（阀门两侧各一段）单独给出');
+ok(/concat\(route\.zoneBranch\|\|\[\]\)/.test(demo), '[v1084g] 渲染消费 zoneBranch（与路线条数无关）');
+
+/* 支管整段：两段之和必须等于整条支管长（45m），且分界点落在阀门上 */
+const rs4 = D.buildRoutes(d, 0, true).filter(r => r.zi === 3);
+ok(rs4.length > 0 && rs4[0].zoneBranch && rs4[0].zoneBranch.length === 2,
+  '[v1084g] 第 4 区带 zoneBranch 两段');
+if (rs4.length && rs4[0].zoneBranch) {
+  const zb = rs4[0].zoneBranch;
+  const segLenOf = (s) => {
+    const a = s.points[0], b = s.points[s.points.length - 1];
+    const cos = Math.max(.01, Math.cos(a.lat * Math.PI / 180));
+    return Math.hypot((b.lng - a.lng) * 111320 * cos, (b.lat - a.lat) * 110540);
+  };
+  const total = segLenOf(zb[0]) + segLenOf(zb[1]);
+  ok(Math.abs(total - COLW) < 0.5, '[v1084g] 两段之和 = 整条支管 ' + total.toFixed(1) + 'm（应 45m）');
+  ok(Math.abs(segLenOf(zb[0]) - COLW / 2) < 0.5 && Math.abs(segLenOf(zb[1]) - COLW / 2) < 0.5,
+    '[v1084g] 分界点落在阀门（两段各 ' + segLenOf(zb[0]).toFixed(1) + ' / ' + segLenOf(zb[1]).toFixed(1) + 'm）');
+}
+
 /* ---------- 版本纪律 ---------- */
 const m = /^const VERSION = '(v[\w-]+)';/m.exec(sw);
 ok(!!m && /^v\d{3,4}-[\w-]+$/.test(m[1]), '[v1084f] sw VERSION 形如 vNNNN- slug：' + (m && m[1]));

@@ -116,8 +116,12 @@ const perZone = {};
 let badC = 0;
 for (let i = 0; i < 12; i++) if (perZone[i] !== 2) badC++;
 ok(badC === 0, '[v1084d] 按目标点计覆盖：12 区全部 2/2（旧口径此处为 0/2 × 12）');
-ok((rC || []).some(r => !r.branch || !r.branch.some(s => s.key.indexOf('branch:') === 0)),
-  '[v1084d] 重合布局里确实存在「不含 branch: 边」的路线（这正是旧口径数不到的原因）');
+/* [v1084g 契约升级] v1084d 时这里断言「确实存在不含 branch: 边的路线」—— 那是当年
+   「旧口径数不到覆盖」的证据。v1084g 起阀门是支管的唯一进水口：某区阀门落在自己主管上时，
+   禁止支管端点绕过阀门直连本区主管，这种绕行路线不再产生（它同时也是「支管只流一半」的
+   根源）。断言随之反转为「不允许再出现」。 */
+ok(!(rC || []).some(r => !r.branch || !r.branch.some(s => s.key.indexOf('branch:') === 0)),
+  '[v1084g] 重合布局下不再出现绕过阀门的支管路线（v1084d 此处曾为 true）');
 
 /* 锁6：版本纪律 */
 const m = /^const VERSION = '(v[\w-]+)';/m.exec(sw);
