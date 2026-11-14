@@ -74,7 +74,8 @@ ok(demo.includes('lastDiagnostics: function () { return lastDiag; }'),
   '[v1084] lastDiagnostics() 对外可读（探针/单测/宿主共用）');
 ok(demo.includes("return bits.length?' 【诊断】'+bits.join('；')+'。':''"),
   '[v1084] diagText 把诊断翻成人话');
-ok(/\+demoDiagText\(diagAll\)\);/.test(demo), '[v1084] 演示失败提示拼接诊断清单');
+ok(/if\(ctx\.tip\)ctx\.tip\(demoDiagText\(dgTip\)/.test(demo),
+  '[v1084→v1084b] 演示失败提示以诊断开头（v1084b 起改用 mergeDiag 补齐后的 dgTip）');
 
 /* 锁4：功能 —— 用合成数据直测纯函数导出（不经地图） */
 global.window = {}; global.document = {};

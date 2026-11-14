@@ -552,6 +552,24 @@
     return bits.length?' 【诊断】'+bits.join('；')+'。':'';
   }
 
+  /* [v1084b] 兜底补诊断：还有一类失败是「路线到了，但没经过真实支管段」——
+     支管切口与阀门/端点重合时切出来的段长为 0，`allCovered` 数不到 2，而 diag 里
+     一条原因都没有 ⇒ 提示条只剩通用建议，等于又回到"查不清"。
+     这里按 allCovered 逐区补原因，保证失败时一定点得出是哪一区。 */
+  function mergeDiagForTip(diag,allCovered,total){
+    var out={zones:(diag&&diag.zones?diag.zones.slice():[]),
+      fittings:diag&&diag.fittings,blocked:diag&&diag.blocked,
+      missing:diag&&diag.missing,active:diag&&diag.active};
+    var has={};out.zones.forEach(function(z){has[z.zi]=1;});
+    for(var zi=0;zi<total;zi++){
+      if(allCovered[zi]===2||has[zi])continue;
+      out.zones.push({zi:zi,reason:(allCovered[zi]
+        ?'只通一端：支管另一端没接到主管/总管'
+        :'支管两端都没进入水路（切口与端点重合，或图没连到本区）')});
+    }
+    return out;
+  }
+
   function buildFlowRoutes(d,g,allZones){
     /* [v1084] 每轮建图重置诊断：{zones:[{zi,reason}], fittings:{placed,dup,offLine,noPipe},
        active, missing, blocked}。失败时宿主把它翻成人话，用户才知道"哪个区缺什么"。 */
@@ -995,9 +1013,12 @@
     if(!wholeFieldClosed||!routes.length||incomplete||!activeCount){
       if(layer)layer.clearLayers();
       active=null;hideGroupInfo();if(timer){clearInterval(timer);timer=null;}playing=false;syncChipsState();
-      if(ctx.tip)ctx.tip('当前地块尚未形成覆盖所有分区支管两端的连续管路；请检查手绘总管、捕捉节点、主管、分区阀门和支管连接。'
-        +'若刚点过「生成施工图」或刚更新过版本，请删掉旧总管沿图上管线重画（先点「捕捉点」开启吸附，白圈吸到施工节点再落点），再演示轮灌。'
-        +demoDiagText(diagAll));
+      /* [v1084b] 诊断放最前：提示条是 max-height:25vh 可滚动的，通用建议很长，
+         把「哪一区、缺什么」压到末尾等于没有。先给原因，再给处理建议。 */
+      var dgTip=mergeDiagForTip(diagAll,allCovered,d.total);
+      if(ctx.tip)ctx.tip(demoDiagText(dgTip)
+        +'处理建议：请检查手绘总管、捕捉节点、主管、分区阀门和支管连接；'
+        +'若刚点过「生成施工图」或刚更新过版本，请删掉旧总管沿图上管线重画（先点「捕捉点」开启吸附，白圈吸到施工节点再落点），再演示轮灌。');
       return false;
     }
     renderSnapshotD = d;     /* [perf-20261106] 复用同一份快照，不再 collect 第二次 */
@@ -1508,6 +1529,61 @@
        zones:[{zi,reason}]}。失败提示用它逐条说清"哪个区、缺什么、差多少米"。 */
     lastDiagnostics: function () { return lastDiag; },
     /* [v1084] 诊断文案纯函数（单测直测，不必起地图） */
-    diagText: demoDiagText
+    diagText: demoDiagText,
+    /* [v1084b] 诊断补齐（按 allCovered 逐区补原因）纯函数 */
+    mergeDiag: mergeDiagForTip,
+    /* [v1084b] 一句话回答「为什么不能演示」：纯读，不改任何状态。
+       控制台 `RyMapFlowDemo.whyNot()` 一次拿到门禁代码/容差/断组/逐区覆盖/诊断，
+       不必再靠"退一个版本试一次"来猜。 */
+    whyNot: function (g, dInj) {
+      var out = { ok: false, gate: '', code: '', minM: null, brokenGroups: [],
+        counts: {}, zones: [], hint: '', diag: null };
+      var d = null;
+      if (dInj) { d = dInj; }   /* 单测注入（等价于 collect() 的返回形状） */
+      else {
+        try { d = collect(); } catch (eC) { out.gate = 'collect'; out.hint = 'collect() 抛错：' + eC.message; return out; }
+      }
+      if (!d) { out.gate = 'collect'; out.hint = collectBlockReason || '没有可用的简图数据（tlDiagramData 缺失或 world≠meter）'; return out; }
+      out.counts = { mains: (d.mainsLL || []).length, branches: (d.branchLL || []).length,
+        valves: (d.valves || []).length, fittings: (d.fittings || []).length,
+        trunkLines: (d.trunkLinesLL || []).length, groups: d.gCount, total: d.total };
+      var v = null;
+      try { v = ensureValidation(d); } catch (eV) { out.gate = 'validation'; out.hint = '校验抛错：' + eV.message; return out; }
+      out.code = (v && v.code) || '';
+      out.minM = (v && v.minM != null) ? v.minM : null;
+      out.brokenGroups = (v && v.brokenGroups) || [];
+      if (!v || !v.ok) { out.gate = 'validation'; out.hint = '手绘总管与已发布主管/节点未接通（code=' + out.code + '）'; return out; }
+      var allRoutes = null;
+      try { allRoutes = buildFlowRoutes(d, 0, true); } catch (eR) { out.gate = 'routes'; out.hint = 'buildFlowRoutes 抛错：' + eR.message; return out; }
+      out.diag = lastDiag;
+      var covered = {};
+      (allRoutes || []).forEach(function (r) {
+        if (r && r.branch && r.branch.some(function (s) { return s.key.indexOf('branch:') === 0; })) covered[r.zi] = (covered[r.zi] || 0) + 1;
+      });
+      var gg = (typeof g === 'number') ? g : 0, groupRoutes = [], expected = 0;
+      for (var zi = 0; zi < d.total; zi++) {
+        out.zones.push({ zi: zi, covered: covered[zi] || 0 });
+        if (groupOf(zi, d.manual, d.nPer) === gg) expected++;
+      }
+      (allRoutes || []).forEach(function (r) { if (r && groupOf(r.zi, d.manual, d.nPer) === gg) groupRoutes.push(r); });
+      out.gate = allRoutes && groupRoutes.length && expected ? 'pass' : 'routes';
+      out.ok = out.gate === 'pass';
+      out.hint = out.ok ? '可以演示（第 ' + (gg + 1) + ' 组 ' + expected + ' 区）'
+        : '图能建但覆盖不全：本组 ' + expected + ' 区，成路 ' + groupRoutes.length + ' 条（逐区 covered 见 zones）';
+      return out;
+    },
+    /* [v1084b] 同上，但要一段可直接截图/粘贴的文字 */
+    whyNotText: function (g, dInj) {
+      var r = null;
+      try { r = this.whyNot(g, dInj); } catch (e) { return '诊断失败：' + e.message; }
+      var c = r.counts || {};
+      var head = '【演示诊断】门禁=' + r.gate + (r.code ? ' / code=' + r.code : '') +
+        '；主管 ' + (c.mains || 0) + ' / 支管 ' + (c.branches || 0) + ' / 阀门 ' + (c.valves || 0) +
+        ' / 配件 ' + (c.fittings || 0) + ' / 总管段 ' + (c.trunkLines || 0) +
+        ' / 分区 ' + (c.total || 0) + ' / 轮灌组 ' + (c.groups || 0);
+      var bad = (r.zones || []).filter(function (z) { return z.covered !== 2; });
+      var tail = bad.length ? '；覆盖≠2 的区：' + bad.slice(0, 8).map(function (z) { return '第' + (z.zi + 1) + '区(' + z.covered + '/2)'; }).join('、') + (bad.length > 8 ? ' 等' + bad.length + '个' : '') : '';
+      return head + '；' + r.hint + tail + demoDiagText(r.diag);
+    }
   };
 })(window);
