@@ -163,3 +163,6 @@ npm-debug.log*
 
 # v1059 节点捕捉主管：偏移显示口径统一回归
 !tests/v1059_node_display_shift.test.cjs
+
+# v1069 节点回传地图：几何换代参数迁移回归
+!tests/v1069_node_resync.test.cjs

@@ -128,10 +128,12 @@
   try{committed=commitPartitionResult(state,net,previousNetworkRaw);}
   catch(eCommit){committed={ok:false,error:eCommit&&eCommit.message||'partition-network-commit-failed'};}
   if(committed.ok&&nodesChanged){
-   /* Clear through the node owner only after the map transaction commits. Writing an
-      empty localStorage record directly leaves RyTlNodes' in-memory list untouched. */
+   /* [v1069] 几何换代节点参数迁移（pid+atM 绑定保留）替代整表清空——用户节点在发布后
+      不再消失、publishedNodes 不再被 live-sync 的 reset 通知用空表覆盖。
+      迁移失败才退回清空（保持「旧几何节点不混入新管线」的底线）。 */
    try{
-    if(root.RyTlNodes&&typeof root.RyTlNodes.reset==='function')root.RyTlNodes.reset();
+    if(root.RyTlNodes&&typeof root.RyTlNodes.resyncGeometry==='function')root.RyTlNodes.resyncGeometry();
+    else if(root.RyTlNodes&&typeof root.RyTlNodes.reset==='function')root.RyTlNodes.reset();
     else root.localStorage.setItem(nodeKey,JSON.stringify({version:1,geoSig:nextNodeGeoSig,nodes:[],links:[]}));
    }catch(eResetNodes){
     try{root.localStorage.setItem(nodeKey,JSON.stringify({version:1,geoSig:nextNodeGeoSig,nodes:[],links:[]}));}catch(eClearNodes){}

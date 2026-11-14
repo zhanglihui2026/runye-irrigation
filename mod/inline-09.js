@@ -3835,7 +3835,11 @@ function tlPublishCurrentNodesToMapSnapshot() {
   var geometrySig=JSON.stringify([dd.frontPipe,dd.mainPipes,dd.branchPipes,dd.valves,dd.poly]);
   var network=null;
   try{network=store.readNetworkLayoutForPlot(pid);}catch(eReadNodeNetwork){return false;}
-  if(!network||String(network.plotId||'')!==pid||network.needsReplan||String(network.diagramGeometrySig||'')!==geometrySig)return false;
+  if(!network||String(network.plotId||'')!==pid||network.needsReplan||String(network.diagramGeometrySig||'')!==geometrySig){
+    /* [v1069] 拒绝原因暴露给地图端提示：节点已保存但快照待更新 ⇒ 用户知道要点「生成施工图」 */
+    window.__tlNodesPublishState={ok:false,reason:'network-stale',ts:Date.now()};
+    return false;
+  }
   var route=network.routeGeometry;
   if(route&&route.geometrySig!==geometrySig)return false;
   var published=[],routeNodes=[];
@@ -3868,7 +3872,8 @@ function tlPublishCurrentNodesToMapSnapshot() {
   if(next.routeGeometry){next.routeGeometry.nodes=routeNodes;}
   var prior=JSON.stringify(network);
   if(JSON.stringify(next)===prior)return true;
-  try{if(store.writeNetworkLayout(next,pid)!==true)return false;}catch(eWriteNodeNetwork){return false;}
+  try{if(store.writeNetworkLayout(next,pid)!==true){window.__tlNodesPublishState={ok:false,reason:'write-failed',ts:Date.now()};return false;}}catch(eWriteNodeNetwork){window.__tlNodesPublishState={ok:false,reason:'write-failed',ts:Date.now()};return false;}
+  window.__tlNodesPublishState={ok:true,count:published.length,ts:Date.now()};
   try{if(typeof host.refreshSnapTargets==='function')host.refreshSnapTargets();}catch(eRefreshNodeSnap){}
   try{if(window.RyMapFlowDemo&&typeof window.RyMapFlowDemo.refresh==='function')window.RyMapFlowDemo.refresh();}catch(eRefreshNodeDemo){}
   return true;
@@ -4027,7 +4032,12 @@ function tlGenerateDiagramToMap(){
       if(typeof window.ryJumpToSection==='function') window.ryJumpToSection('onlineMapSection');
       else if(typeof window.rySetTab==='function') window.rySetTab('onlineMapSection');
     }catch(eJump){}
-  }catch(eGen){ console.warn('[tlGenerateDiagramToMap]',eGen); }
+  }catch(eGen){
+    /* [v1069] 发布失败必须让用户看见——此前只 console.warn，用户点「生成施工图」后
+       地图没更新还以为节点功能坏了（实际是发布链中途失败且零提示）。 */
+    console.warn('[tlGenerateDiagramToMap]',eGen);
+    alert('生成施工图未完成：'+((eGen&&eGen.message)||eGen)+'。在线地图保持上一次发布成果；请按提示处理后重试。');
+  }
 }
 window.tlGenerateDiagramToMap=tlGenerateDiagramToMap;
 try{
@@ -5762,6 +5772,13 @@ function tlAutoGenerate(options) {
     var savedNodes=null;
     try{savedNodes=JSON.parse(localStorage.getItem('runye_tlNodes_v1')||'null');}catch(eSavedNodes){}
     if(newGeometrySig&&savedNodes&&savedNodes.geoSig!==newGeometrySig&&
+       window.RyTlNodes&&typeof window.RyTlNodes.resyncGeometry==='function'){
+      /* [v1069] 几何换代节点参数迁移（M13「重算后重新投影」拍板口径）：pid+atM 绑定保留、
+         atM 夹到新管线长度，persist 以新签名落盘 —— 用户节点不再在每次重新生成时被清空，
+         canonical 适配器签名校验照常通过。 */
+      window.RyTlNodes.resyncGeometry();
+      console.info('[drawing-design] 分区或管线几何已改变，三级节点已按 pid+桩号迁移到新几何');
+    }else if(newGeometrySig&&savedNodes&&savedNodes.geoSig!==newGeometrySig&&
        window.RyTlNodes&&typeof window.RyTlNodes.reset==='function'){
       window.RyTlNodes.reset();
       console.info('[drawing-design] 分区或管线几何已改变，已清除绑定旧几何的三级节点');

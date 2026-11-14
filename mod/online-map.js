@@ -3548,6 +3548,17 @@
       t=setTimeout(function(){ t=null; if(mapSectionVisible()){
         try{restoreActiveMapPlotSelection();}catch(eSelect){}
         try{if(typeof window.tlPublishCurrentNodesToMapSnapshot==='function')window.tlPublishCurrentNodesToMapSnapshot();}catch(ePublishNodes){}
+        /* [v1069] 节点未自动发布（管线快照待更新）时提示用户走「生成施工图」——
+           此前拒绝是纯静默的，用户在地图上等不到节点还以为功能坏了。 */
+        try{
+          var ps=window.__tlNodesPublishState;
+          if(ps&&!ps.ok&&ps.reason==='network-stale'&&typeof tip==='function'){
+            if(window.__tlNodesStaleTipAt==null||Date.now()-(window.__tlNodesStaleTipAt||0)>15000){
+              window.__tlNodesStaleTipAt=Date.now();
+              tip('施工节点已保存在设计页，但管线快照待更新——请到「分区与管路」页点击「生成施工图」，节点就会同步到地图。');
+            }
+          }
+        }catch(eTip){}
         try{refreshSnapTargets();}catch(eRf){}
       } },300);
     }

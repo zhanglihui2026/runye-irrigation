@@ -59,10 +59,12 @@ test('[v1058] 偏移仍为纯渲染副本（不改设计坐标的水力口径）
   assert.ok(/唯一的显示偏移值/.test(pe) && /PP_MAIN_BRANCH_GAP_M = 20;/.test(pe), 'PP_MAIN_BRANCH_GAP_M=20 基准值不变');
 });
 
-test('[v1058] 版本纪律：主串 14 处动态等于 sw VERSION', () => {
+test('[v1058] 版本纪律：主串动态等于 sw VERSION', () => {
   const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
   const sw = fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8');
   const v = sw.match(/^const VERSION = '([^']+)';/m);
   const want = v[1].replace(/^v/, '');
-  assert.equal(html.split('?v=' + want).length - 1, 14);
+  /* [v1069] 口径演进：v1059 时代 14 处（tl-workspace 独立串）；M14 起 tl-workspace.js
+     并入主串同抬 ⇒ 15 处（含 tl-workspace.js），tl-nodes.js 另有独立串。 */
+  assert.equal(html.split('?v=' + want).length - 1, 15);
 });

@@ -491,6 +491,57 @@
     return true;
   }
 
+  /* [v1069 2026-11-14 用户报障「节点不能回传在线地图」] 几何换代参数迁移（M13 拍板口径：
+     「接驳节点按主管身份+沿线桩号绑定，重算后重新投影」——几何再生后节点不丢）。
+     此前几何签名变化时 inline-09/capture 直接 reset() 清空全部节点 → 用户放的节点在
+     每次重新生成/发布后消失 → publishedNodes 永远为空 → 地图上永远看不到节点。
+     本函数以 pid+atM 参数穿越几何换代：atM 夹到所在管线新长度内；pid 已不存在的节点
+     （管线数量变化）才剔除；随后 persist() 以**新几何签名**落盘 —— canonical 三级适配器
+     的 level3-node-signature-mismatch 校验（core/drawing-design-level3-adapter.js:39）
+     与 live-sync 发布都因此通过，而不是靠清空绕开校验。 */
+  function resyncGeometry() {
+    ensureRestored();
+    var dd = typeof window !== 'undefined' ? window.tlDiagramData : null;
+    if (!dd) return false;
+    function lineLen(line) {
+      var s = 0;
+      for (var i = 0; i + 1 < (line || []).length; i++)
+        s += Math.hypot(Number(line[i + 1].x) - Number(line[i].x), Number(line[i + 1].y) - Number(line[i].y));
+      return s;
+    }
+    var before = nodes.length, nextNodes = [];
+    nodes.forEach(function (nd) {
+      if (!nd) return;
+      if (nd.pid === 'front') {
+        /* [v1069] 总管节点：按 frontPipe 新长度夹桩号（与 addAt 的 PID_RE 口径一致） */
+        var Lf = lineLen(dd.frontPipe);
+        if (!(Lf > 0)) return;
+        var cf = copy(nd);
+        cf.atM = Math.round(Math.max(0, Math.min(Number(nd.atM) || 0, Lf)) * 10) / 10;
+        nextNodes.push(cf);
+        return;
+      }
+      var m = /^(main|branch)-(\d+)$/.exec(String(nd.pid || ''));
+      if (!m) return;
+      var lines = m[1] === 'main' ? dd.mainPipes : dd.branchPipes;
+      var idx = Number(m[2]);
+      if (!Array.isArray(lines) || idx >= lines.length) return;
+      var L = lineLen(lines[idx]);
+      if (!(L > 0)) return;
+      var c = copy(nd);
+      c.atM = Math.round(Math.max(0, Math.min(Number(nd.atM) || 0, L)) * 10) / 10;
+      nextNodes.push(c);
+    });
+    var ids = {};
+    nextNodes.forEach(function (n) { ids[n.id] = 1; });
+    links = links.filter(function (lk) { return lk && ids[lk.a] && ids[lk.b]; });
+    nodes = nextNodes;
+    linkFrom = null; restored = true;
+    persist();   /* 以 currentGeoSig()（=新几何）落盘 */
+    notify({ action: 'resync', kept: nextNodes.length, removed: before - nextNodes.length });
+    return true;
+  }
+
   global.RyTlNodes = {
     list: list, links: linksList, nodeById: nodeById,
     addAt: addAt, removeNode: removeNode, setFittings: setFittings, fitTotal: fitTotal,
@@ -502,6 +553,7 @@
     FITS: FITS, pipeName: pipeNameOf,
     reset: reset,
     restore: restoreRaw,
+    resyncGeometry: resyncGeometry,
     _internals: { serialize: function () { ensureRestored(); return { version: VERSION, geoSig: currentGeoSig(), nodes: copy(nodes), links: copy(links) }; } }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

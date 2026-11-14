@@ -103,26 +103,25 @@ test('[v1059-pe] 交互链改走显示反算投影', () => {
     '交互链不得再直连设计几何投影（旧错位路径必须退役）');
 });
 
-test('[v1059-pe] 2D 画布节点渲染加偏移贴显示线', () => {
-  assert.ok(pe.includes('var cShifts=ppCouplerShiftMap();'),
-    '2D 画布渲染必须取偏移向量表');
-  assert.ok(pe.includes('if(csh.x||csh.y)cg={x:cg.x+csh.x,y:cg.y+csh.y};'),
-    '节点位置必须叠加偏移向量');
-});
-
-test('[v1059-pe] SVG 简图节点渲染同口径（__ppSvgDisplay 派生）', () => {
-  assert.ok(pe.includes('svgShifts[\'m\'+(idx+1)]={x:dl[0].x-l[0].x,y:dl[0].y-l[0].y};'),
-    'SVG 简图必须从 __ppSvgDisplay 派生偏移向量（与简图线体同口径）');
+test('[v1059→M14] 二级节点渲染已随 M14 退役：节点唯一源=RyTlNodes', () => {
+  /* M14（ee4a91b 起）二级不再绘制/编辑接驳节点——旧 dd.couplerNodes 仅为存档兼容字段；
+     可见/可编辑/可传地图的接驳点统一使用工作区 N-xx 节点。本条锁 M14 取代后的契约。 */
+  assert.ok(pe.includes('[M14] 旧 dd.couplerNodes 仅为存档兼容字段，不再绘制'),
+    'plot-editor 必须保留 M14 退役存照');
+  assert.ok(!pe.includes('cShifts=ppCouplerShiftMap()'),
+    'M14 后二级 2D 画布不得再渲染接驳节点（偏移标记已随功能退役）');
 });
 
 /* ---------- C. 版本纪律 ---------- */
 
-test('[v1059] 版本纪律：主串 14 处动态等于 sw VERSION；tl-workspace 独立串', () => {
+test('[v1059] 版本纪律：主串动态等于 sw VERSION；tl-nodes 独立串', () => {
   const v = sw.match(/^const VERSION = '([^']+)';/m);
   assert.ok(v, 'sw.js 必须有 VERSION');
   const want = v[1].replace(/^v/, '');
-  assert.equal(html.split('?v=' + want).length - 1, 14, '主串必须恰好 14 处');
-  assert.ok(/tl-workspace\/tl-workspace\.js\?v=1059-ws-disp-shift/.test(html),
-    'tl-workspace.js 独立串必须抬 1059-ws-disp-shift');
-  assert.ok(v[1] === 'v1059-node-display-shift', 'sw VERSION 必须是 v1059-node-display-shift');
+  /* [v1069] 口径演进：v1059 时代 14 处（tl-workspace 独立串）；M14 起 tl-workspace.js
+     并入主串同抬 ⇒ 15 处（含 tl-workspace.js），tl-nodes.js 另有独立串。 */
+  assert.equal(html.split('?v=' + want).length - 1, 15, '主串必须恰好 15 处');
+  assert.ok(/tl-workspace\/tl-nodes\.js\?v=1069-nodes-resync/.test(html),
+    'tl-nodes.js 独立串必须抬 1069-nodes-resync');
+  assert.ok(v[1] === 'v1069-node-resync', 'sw VERSION 必须是 v1069-node-resync');
 });
