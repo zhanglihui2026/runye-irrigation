@@ -2725,7 +2725,7 @@
         if(!cur||cur===gen)return;
         ppCtx.save();
         ppCtx.font='bold 13px sans-serif';
-        var msg='⚠ 管线为旧分区布局生成，与当前分区不一致 — 请点「生成施工图」重新生成';
+        var msg='⚠ 管线为旧分区布局生成，与当前分区不一致 — 请点「更新管路」重排（再点「生成施工图」发布到地图）';
         var w=ppCtx.measureText(msg).width+28;
         var x=Math.max(10,ppCanvas.width-w-14), y=10;
         ppCtx.fillStyle='rgba(255,251,235,.96)';
@@ -3994,10 +3994,53 @@
      底层函数全部保留：ppAutoGeneratePipes 供 #ppGenerate(:4959)/autoPipesWhole/ensureInitialPipes
      调用；ppClearPipes 供 clearPipesWhole(:634) 调用。 */
 
+  /* ══════════════════════════════════════════════════════════════════════
+     [v1083 用户要求] 「更新管路」显式按钮（#ppUpdatePipes）
+     ──────────────────────────────────────────────────────────────────────
+     用户原话：「地块旋转角度之后，点击更新管路之后，管路按照新的地块分区角度布置，
+     然后再点击顶部工具栏的生成施工图按钮，才传递给在线地图」。
+     现有自动链（ppRender 尾部 400ms 防抖 → ppAutoGeneratePipes）保持不变，
+     因为 v1054/v1055 是用户自己拍板要的；本函数补的是**确定动作 + 回执**：
+       · 先撤掉待跑的防抖定时器，避免这一下重排完 400ms 后又跑一遍；
+       · 清掉失败冷却（ppAutoRegenFailSig）——冷却只是防 alert 骚扰，手动点击必须重试；
+       · 同步调用 ppAutoGeneratePipes（含事务/空结果保护/签名记账，不另写一套布管）；
+       · 用 toast 报出条数，让人一眼确认"按新角度真的重排了"；
+       · **不发布**：地图只认「生成施工图」（v1054 定稿口径），这里绝不碰 writeNetworkLayout。
+     ══════════════════════════════════════════════════════════════════════ */
+  function ppUpdatePipesNow(){
+    if(!ppState.polyPts||ppState.polyPts.length<3){alert('请先到「在线地图」画框并回传地块');return false;}
+    try{ clearTimeout(ppAutoRegenTimer); }catch(eT){}
+    ppAutoRegenRunning=true;          /* 防 ppRender 尾部的防抖重算在本次内递归触发 */
+    var ok=false;
+    try{ ok=ppAutoGeneratePipes()===true; }
+    finally{ ppAutoRegenRunning=false; }
+    if(!ok){
+      alert('更新管路未完成：'+(window.__runyeSingleL2CommitFailure||'布管或设计提交失败')+
+        '。分区参数已保留，请调整角度/切割线后重试；若反复出现请截图反馈。');
+      return false;
+    }
+    ppAutoRegenFailSig=null;          /* 手动成功即解除冷却，后续自动链恢复 */
+    var nm=(ppState.mainPipes||[]).length, nb=(ppState.branchPipes||[]).length;
+    var ns=(ppState.subBranchPipes||[]).length, nv=(ppState.valves||[]).length;
+    var msg='管路已按当前分区角度 '+ppZoneAngle()+'° 重排：主管 '+nm+' 条 / 支管 '+nb+' 条 / 三级 '+ns+' 条 / 阀门 '+nv+' 个。确认无误后点顶部「生成施工图」同步到在线地图。';
+    try{ if(typeof window.atShowToast==='function') window.atShowToast(msg); else console.info('[ppUpdatePipes] '+msg); }catch(eMsg){}
+    return true;
+  }
+
   document.getElementById('ppRotateZones').addEventListener('click',function(){
     ppPushHistory();
     ppApplyZoneAngle(ppZoneAngle()+90,true);
   });
+  /* [v1083] 「更新管路」绑定：必须判空——DOM 被删而绑定留着会抛 TypeError
+     中断整个编辑器初始化（v804「重新分区」就是这么炸的）。 */
+  (function bindUpdatePipes(){
+    var btn=document.getElementById('ppUpdatePipes');
+    if(!btn)return;
+    btn.addEventListener('click',function(){
+      ppPushHistory();            /* 与「清除管路」「重新分区」同款：可撤销 */
+      ppUpdatePipesNow();
+    });
+  })();
   /* [v804 取消「重新分区」按钮] 分区角度输入/↻+90° 均实时自动重算（ppApplyZoneAngle），
      手动驱动按钮冗余，按钮已删（index.html）。此处原 click 绑定无判空，必须随按钮
      一起移除，否则脚本加载即抛 TypeError 断掉整个编辑器初始化。

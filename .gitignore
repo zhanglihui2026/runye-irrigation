@@ -194,3 +194,6 @@ npm-debug.log*
 
 # v1082 双世界（实体存储/显示渲染）+ 唯一投影片层回归
 !tests/v1082_dual_world_projection.test.cjs
+
+# v1083 「更新管路」显式按钮回归
+!tests/v1083_update_pipes_button.test.cjs

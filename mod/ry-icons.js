@@ -101,7 +101,7 @@
     ppAutoPipe:'autopipe', ppDownload:'download', ppPrint:'print',
     ppGeWhole:'group', ppGePerPlot:'each', ppBackToGroupBtn:'back',
     ppCreatePlotGroup:'groupadd', ppFitViewBtn:'fit', ppPlotPanelToggle:'panel',
-    ppRotateZones:'rotate', ppGenerate:'sheet', ppAiPlan:'autopipe', ppZoneAutoBtn:'grid',
+    ppRotateZones:'rotate', ppUpdatePipes:'pipenet', ppGenerate:'sheet', ppAiPlan:'autopipe', ppZoneAutoBtn:'grid',
     ppFineUp:'up', ppFineDown:'down', ppFineLeft:'left', ppFineRight:'right',
 
     tlWsFitValve:'valve', tlWsFitTee:'tee', tlWsFitElbow:'elbow', tlWsFitNode:'node',
