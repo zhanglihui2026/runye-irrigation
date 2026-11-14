@@ -247,7 +247,14 @@
       }
     }
     if (!best) { clearMarker(); return null; }
-    var hitPoint = best.screen && unprojector ? unprojector(best.screen) : best.target;
+    /* [v1073] 点目标返回**命中位**（snapLat/snapLng，与屏幕上标记/线体同一坐标世界），
+       线段垂足返回反算落点——白圈、落点、所见三者自此恒重合。v1071 曾把点命中改成
+       返回物理中心线坐标，结果白圈/落点与可见标记错开（旧世界两套口径的残留病灶）；
+       v1073 起发布快照整体是「设计页同款显示世界」，命中位即唯一口径。 */
+    var hitPoint = best.screen && unprojector ? unprojector(best.screen)
+      : (best.target && isNum(Number(best.target.snapLat)) && isNum(Number(best.target.snapLng))
+        ? { lat: Number(best.target.snapLat), lng: Number(best.target.snapLng) }
+        : best.target);
     if (!hitPoint || !isNum(hitPoint.lat) || !isNum(hitPoint.lng)) { clearMarker(); return null; }
     lastHit = {
       lat: hitPoint.lat,

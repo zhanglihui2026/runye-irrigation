@@ -5830,19 +5830,37 @@ function tlAutoGenerate(options) {
         return {world:world,ll:out};
       }
       var routeGeometry={version:1,geometrySig:publishGeometrySig,mains:[],branches:[],valves:[],nodes:[],segTrunk:null};
-      var routeMainWorld=[],routeBranchWorld=[];
-      (publishDd.mainPipes||[]).forEach(function(line,i){var r=routeLine('main-'+i,line);routeMainWorld.push(r.world);routeGeometry.mains.push(r.ll);});
-      (publishDd.branchPipes||[]).forEach(function(line,i){var r=routeLine('branch-'+i,line);routeBranchWorld.push(r.world);routeGeometry.branches.push(r.ll);});
+      var routeMainWorld=[],routeBranchWorld=[],routeMainLLPhys=[],routeBranchLLPhys=[];
+      (publishDd.mainPipes||[]).forEach(function(line,i){var r=routeLine('main-'+i,line);routeMainWorld.push(r.world);routeMainLLPhys.push(r.ll);});
+      (publishDd.branchPipes||[]).forEach(function(line,i){var r=routeLine('branch-'+i,line);routeBranchWorld.push(r.world);routeBranchLLPhys.push(r.ll);});
       /* 地图线体的真实坐标与寻路快照同源；平行错位只重算展示副本。 */
       var routeDisplay=typeof window.ppGetPipeDisplayGeometry==='function'
         ?window.ppGetPipeDisplayGeometry(routeMainWorld,routeBranchWorld,publishDd.valves||[],typeof tlGapM==='function'?tlGapM():0)
         :{main:routeMainWorld,branch:routeBranchWorld};
+      /* [v1073] 寻路快照升级为「设计页同款显示世界」：主/支管物理重合的布局在真实
+         坐标上必然叠成一条线（±10m 显示偏移就是为分开它们而生的），用户明确拍板
+         「直接把分区与管路的图传递过来」。⇒ routeGeometry（地图动画/寻路的唯一
+         几何源）改用显示几何——平移不改变线长，水力路径长度不受影响；阀门锚点、
+         施工节点同步取显示位，地图线体/标记/捕捉/演示自此只有一个坐标世界。
+         network.segments 的 latLng 仍为物理几何（水力与地块裁剪口径不变）。 */
+      function worldLineToLL(line){
+        var out=[];(line||[]).forEach(function(p){var q=p2ll(p);if(!q)throw new Error('显示世界管线投影失败');out.push(q);});
+        return out.length>=2?out:null;
+      }
+      (routeDisplay.main||[]).forEach(function(line,i){
+        var disp=worldLineToLL(line);
+        routeGeometry.mains.push(disp||routeMainLLPhys[i]);
+      });
+      (routeDisplay.branch||[]).forEach(function(line,i){
+        var disp=worldLineToLL(line);
+        routeGeometry.branches.push(disp||routeBranchLLPhys[i]);
+      });
       function routeLineLength(line){var sum=0;for(var j=0;j+1<(line||[]).length;j++)sum+=Math.hypot(Number(line[j+1].x)-Number(line[j].x),Number(line[j+1].y)-Number(line[j].y));return sum;}
       function routePointAt(line,at){var left=Math.max(0,Number(at)||0);for(var j=0;j+1<(line||[]).length;j++){var a=line[j],b=line[j+1],dx=Number(b.x)-Number(a.x),dy=Number(b.y)-Number(a.y),len=Math.hypot(dx,dy);if(len<1e-9)continue;if(left<=len){var t=left/len;return{x:Number(a.x)+dx*t,y:Number(a.y)+dy*t};}left-=len;}return line&&line.length?{x:Number(line[line.length-1].x),y:Number(line[line.length-1].y)}:null;}
       (pendingMapNetwork.segments||[]).forEach(function(seg){
         if(!seg||!seg.id)return;
         var m=/^(main|branch)(\d+)$/.exec(String(seg.id));if(!m)return;
-        var idx=Number(m[2]),isMain=m[1]==='main',source=isMain?routeGeometry.mains[idx]:routeGeometry.branches[idx];
+        var idx=Number(m[2]),isMain=m[1]==='main',source=isMain?routeMainLLPhys[idx]:routeBranchLLPhys[idx];
         var display=isMain?(routeDisplay.main||[])[idx]:(routeDisplay.branch||[])[idx];
         if(!source)throw new Error('发布地图线段缺少寻路几何：'+seg.id);
         seg.latLng=source;
@@ -5850,7 +5868,12 @@ function tlAutoGenerate(options) {
       });
       (publishDd.valves||[]).forEach(function(v,i){
         if(!v)throw new Error('阀门数据缺失：'+(i+1));
-        var ll=p2ll(v),anchor=(v.ax!=null&&v.ay!=null)?p2ll({x:v.ax,y:v.ay}):null;
+        var ll=p2ll(v),anchor=null;
+        /* [v1073] 锚点取显示世界（routeDisplay.valveAnchors 跟随偏移后的主管）；
+           无显示锚点（阀门不在重合主支管对上）回退物理锚点。 */
+        var dAnchor=(routeDisplay.valveAnchors||[])[i];
+        if(dAnchor&&isFinite(Number(dAnchor.x))&&isFinite(Number(dAnchor.y)))anchor=p2ll(dAnchor);
+        else anchor=(v.ax!=null&&v.ay!=null)?p2ll({x:v.ax,y:v.ay}):null;
         if(!ll)throw new Error('阀门坐标无效：'+(i+1));
         routeGeometry.valves.push({ll:ll,anchorLL:anchor,mi:Number.isFinite(Number(v.mi))?Number(v.mi):i});
       });
@@ -5870,8 +5893,11 @@ function tlAutoGenerate(options) {
           var shownPoint=sourceLength>1e-8&&shownLength>1e-8
             ?routePointAt(shownLine,Math.max(0,Math.min(1,(Number(node.atM)||0)/sourceLength))*shownLength):null;
           var shownLL=shownPoint&&p2ll(shownPoint);
-          var frozen={id:String(node.id||''),pid:String(node.pid),atM:Number(node.atM)||0,lat:ll[0],lng:ll[1],displayLat:shownLL&&isFinite(Number(shownLL[0]))?Number(shownLL[0]):ll[0],displayLng:shownLL&&isFinite(Number(shownLL[1]))?Number(shownLL[1]):ll[1]};
-          publishedNodes.push(frozen);routeGeometry.nodes.push({id:frozen.id,pid:frozen.pid,mi:idx,kind:m[1],ll:ll});
+          /* [v1073] 节点冻结位=显示世界（shownLL 在显示主管上，与显示线体/标记/捕捉
+             同一口径）；无显示副本时回退物理位。displayLat 字段保留（存档兼容）。 */
+          var useLL=(shownLL&&isFinite(Number(shownLL[0]))&&isFinite(Number(shownLL[1])))?shownLL:ll;
+          var frozen={id:String(node.id||''),pid:String(node.pid),atM:Number(node.atM)||0,lat:useLL[0],lng:useLL[1],displayLat:useLL[0],displayLng:useLL[1]};
+          publishedNodes.push(frozen);routeGeometry.nodes.push({id:frozen.id,pid:frozen.pid,mi:idx,kind:m[1],ll:[useLL[0],useLL[1]]});
         });
       }
       pendingMapNetwork.publishedNodes={version:1,geometrySig:publishGeometrySig,items:publishedNodes};

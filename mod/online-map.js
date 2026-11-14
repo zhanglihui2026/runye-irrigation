@@ -1379,10 +1379,11 @@
     var list=(extras&&Array.isArray(extras.items))?extras.items:((extras&&Array.isArray(extras.mainCouplers))?extras.mainCouplers:[]);
     list.forEach(function(n){
       if(!n||!isFinite(n.lat)||!isFinite(n.lng)) return;
-      /* [v1071] 标记画物理坐标（n.lat/n.lng）。此前画 displayLat/displayLng（v1059 显示偏移
-         副本），标记整体悬空偏离真实管线 ~1m，与手绘总管落点、白色捕捉圈、演示寻路
-         （全物理口径）对不上——捕捉「吸偏」的可见面。快照里的 displayLat 字段保留仅为存档兼容。 */
-      var markerLat=n.lat,markerLng=n.lng;
+      /* [v1073] 标记画显示位（displayLat 优先，旧快照回退 lat）。v1073 起发布快照
+         本身就是显示世界（lat=displayLat=显示主管上的冻结位），新旧快照都与
+         显示线体/捕捉/演示一致。 */
+      var markerLat=isFinite(Number(n.displayLat))?Number(n.displayLat):n.lat;
+      var markerLng=isFinite(Number(n.displayLng))?Number(n.displayLng):n.lng;
       var color=n.stale?'#b45309':'#6d28d9',fill=n.stale?'#f59e0b':'#7c3aed';
       window.L.circleMarker([markerLat,markerLng],{
         radius:10, color:color, weight:2.5, fillOpacity:0, interactive:false

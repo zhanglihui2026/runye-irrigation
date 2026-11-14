@@ -617,6 +617,21 @@
       [[0,b.raw[0]],[b.len,b.raw[b.raw.length-1]]].forEach(function(e,ei){var p=project(a,e[1]);if(p.d<=LINK_EPS_M){var id='main-join:'+mi+':'+mj+':b'+ei;addCut(b,e[0],id);addCut(a,p.s,id);}});
     }
 
+    /* [v1073] 支管端点直连：带状/列状布局里，相邻行的支管首尾相接、支管端点顶到
+       下一行主管——「主管↔主管端点直连」不覆盖这类跨行连接，整图会断成孤岛
+       （「尚未形成覆盖所有分区支管两端的连续管路」的真凶之一）。补：每个支管
+       两端点投影到**其它**线体（主管/支管/总管）≤LINK_EPS_M 即在垂足打通。 */
+    Object.keys(branchLines).forEach(function(bk){
+      var b=branchLines[bk];
+      [[0,b.raw[0]],[b.len,b.raw[b.raw.length-1]]].forEach(function(e,ei){
+        lines.forEach(function(o){
+          if(o.key===b.key||o.kind==='trunk')return;
+          var p=project(o,e[1]);
+          if(p.d<=LINK_EPS_M){var id='branch-end:'+bk+':'+ei+':'+o.key;addCut(b,e[0],id);addCut(o,p.s,id);}
+        });
+      });
+    });
+
     /* Treat each valve as the branch flow splitter. Generated施工图 stores the
        main-side takeoff in valve.ax/ay and the valve center in x/y; the visible
        connector between them is part of the designed route even when the main
@@ -704,13 +719,19 @@
       var path=[],pathLinkIds=[],cur=t.id,guard=0;
       while(cur!==rootId&&prev[cur]&&guard++<5000){var step=prev[cur];pathLinkIds.push(step.linkId);if(step.edge)path.push({edge:step.edge,forward:step.from===step.edge.a});cur=step.from;}
       if(cur!==rootId)return;
-      /* 路线内任一真实管段被移除后，目标仍能从管网根节点到达，说明图中还有另一条物理路线。 */
+      /* [v1073] 冗余不再剔除、只打标：v1023 口径「任一管段被移除后目标仍可达 ⇒ 存在
+         另一条物理路线」在网格布局里会双杀——同一主管既有施工节点又有贴近直连、
+         上下行支管链互相备份，都会让同一目标存在两条可达路径；两条路线互判冗余
+         全部剔除 ⇒ 该区被判「未覆盖」⇒ 整图门禁拦截（真实地块「链路明明通了却拦」
+         的主因之一）。改为：冗余路线照常入列打 redundant 标——覆盖判定（start()
+         的 wholeFieldClosed）数的是「可达」；动画路线过滤 redundant。 */
+      var redundant=false;
       for(var pi=0;pi<pathLinkIds.length;pi++){
         var pathLinkId=pathLinkIds[pi];
-        if(linkGeometry[pathLinkId]&&reachableWithout(t.id,pathLinkId))return;
+        if(linkGeometry[pathLinkId]&&reachableWithout(t.id,pathLinkId)){redundant=true;break;}
       }
       path.reverse();
-      var route={zi:t.zi,trunk:[],main:[],branch:[]};
+      var route={zi:t.zi,trunk:[],main:[],branch:[],redundant:redundant};
       path.forEach(function(s){
         var pts=s.forward?s.edge.points:s.edge.points.slice().reverse();
         /* [v1020 待办③] 切片补 a/b（线体弧长端点）：同一物理管段的 edge 对象被各分区
@@ -877,11 +898,14 @@
       }
       return false;
     }
-    var allRoutes=buildFlowRoutes(d,0,true),allCovered={},routes=[],expected={},activeCount=0;
+    var allRoutes=buildFlowRoutes(d,0,true),allCovered={},routes=[],expected={},activeCount=0,groupRoutes=[];
     (allRoutes||[]).forEach(function(route){
       if(route&&route.branch&&route.branch.some(function(s){return s.key.indexOf('branch:')===0;}))allCovered[route.zi]=(allCovered[route.zi]||0)+1;
-      if(route&&groupOf(route.zi,d.manual,d.nPer)===g)routes.push(route);
+      if(route&&groupOf(route.zi,d.manual,d.nPer)===g)groupRoutes.push(route);
     });
+    /* [v1073] 动画优先非冗余路线；本组全部冗余时回退全量（不因打标丢动画）。 */
+    routes=groupRoutes.filter(function(r){return !r.redundant;});
+    if(!routes.length)routes=groupRoutes;
     var wholeFieldClosed=!!allRoutes;
     for(var zi=0;zi<d.total;zi++){
       if(allCovered[zi]!==2)wholeFieldClosed=false;

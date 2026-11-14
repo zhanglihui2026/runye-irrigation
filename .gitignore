@@ -170,5 +170,6 @@ npm-debug.log*
 # v1070 发布块 p2ll 作用域桥接回归
 !tests/v1070_node_publish_bridge.test.cjs
 
-# v1071 地图所见即物理（捕捉精度）回归
-!tests/v1071_map_physical_truth.test.cjs
+
+# v1073 地图=设计页同图（显示世界统一）回归
+!tests/v1073_display_world.test.cjs
