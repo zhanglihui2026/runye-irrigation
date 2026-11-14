@@ -5810,6 +5810,8 @@ function tlAutoGenerate(options) {
       var routeDisplay=typeof window.ppGetPipeDisplayGeometry==='function'
         ?window.ppGetPipeDisplayGeometry(routeMainWorld,routeBranchWorld,publishDd.valves||[],typeof tlGapM==='function'?tlGapM():0)
         :{main:routeMainWorld,branch:routeBranchWorld};
+      function routeLineLength(line){var sum=0;for(var j=0;j+1<(line||[]).length;j++)sum+=Math.hypot(Number(line[j+1].x)-Number(line[j].x),Number(line[j+1].y)-Number(line[j].y));return sum;}
+      function routePointAt(line,at){var left=Math.max(0,Number(at)||0);for(var j=0;j+1<(line||[]).length;j++){var a=line[j],b=line[j+1],dx=Number(b.x)-Number(a.x),dy=Number(b.y)-Number(a.y),len=Math.hypot(dx,dy);if(len<1e-9)continue;if(left<=len){var t=left/len;return{x:Number(a.x)+dx*t,y:Number(a.y)+dy*t};}left-=len;}return line&&line.length?{x:Number(line[line.length-1].x),y:Number(line[line.length-1].y)}:null;}
       (pendingMapNetwork.segments||[]).forEach(function(seg){
         if(!seg||!seg.id)return;
         var m=/^(main|branch)(\d+)$/.exec(String(seg.id));if(!m)return;
@@ -5836,7 +5838,12 @@ function tlAutoGenerate(options) {
           if((m[1]==='main'?idx>=(publishDd.mainPipes||[]).length:idx>=(publishDd.branchPipes||[]).length))throw new Error('施工节点所属管线不存在：'+node.id);
           var point;try{point=publishEdits.pointAt(node.pid,publishDd,Number(node.atM));}catch(ePoint){throw new Error('施工节点无法投影：'+node.id);}
           var ll=point&&p2ll(point);if(!ll||!isFinite(ll[0])||!isFinite(ll[1]))throw new Error('施工节点坐标无效：'+node.id);
-          var frozen={id:String(node.id||''),pid:String(node.pid),atM:Number(node.atM)||0,lat:ll[0],lng:ll[1]};
+          var isMain=m[1]==='main',sourceLine=isMain?routeMainWorld[idx]:routeBranchWorld[idx],shownLine=isMain?(routeDisplay.main||[])[idx]:(routeDisplay.branch||[])[idx];
+          var sourceLength=routeLineLength(sourceLine),shownLength=routeLineLength(shownLine);
+          var shownPoint=sourceLength>1e-8&&shownLength>1e-8
+            ?routePointAt(shownLine,Math.max(0,Math.min(1,(Number(node.atM)||0)/sourceLength))*shownLength):null;
+          var shownLL=shownPoint&&p2ll(shownPoint);
+          var frozen={id:String(node.id||''),pid:String(node.pid),atM:Number(node.atM)||0,lat:ll[0],lng:ll[1],displayLat:shownLL&&isFinite(Number(shownLL[0]))?Number(shownLL[0]):ll[0],displayLng:shownLL&&isFinite(Number(shownLL[1]))?Number(shownLL[1]):ll[1]};
           publishedNodes.push(frozen);routeGeometry.nodes.push({id:frozen.id,pid:frozen.pid,mi:idx,kind:m[1],ll:ll});
         });
       }
