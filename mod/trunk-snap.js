@@ -133,16 +133,19 @@
       if (cp) push(cp.lat, cp.lng, 'seg-coupler', '驳接点 ' + (ci + 1));
     });
 
-    /* 7b. [v914] 设计页接驳节点（dd.couplerNodes 投影，宿主经 geoBridge 反算成经纬度）。
+    /* 7b. [v914] 设计页接驳节点（发布快照 publishedNodes 投影）。
           宿主已把失配节点（坐标 null，v913 missing）剔除，这里照收；
-          label 由宿主带 pipeKey+沿管距离，拾取气泡直接可读。编号按有效项计（跳过不占号）。 */
+          label 由宿主带 pipeKey+沿管距离，拾取气泡直接可读。编号按有效项计（跳过不占号）。
+          [v1071] 命中坐标回归物理中心线（c.lat/c.lng）：此前按 displayLat（v1059 显示偏移
+          副本）命中、返回物理坐标——白色捕捉圈画在物理位、紫色标记画在偏移位，两边错开
+          ~1m，用户看到「捕捉不准」。地图统一物理口径后（runye-map-enhance/online-map 同版
+          改回物理绘制），命中=白圈=标记=落点四位一体；桩号换算仍走 pid+atM 不受影响。 */
     var mcValid = 0;
     (Array.isArray(input.mainCouplers) ? input.mainCouplers : []).forEach(function (c) {
       var cp = readPoint(c);
       if (!cp) return;
       mcValid++;
-      push(cp.lat, cp.lng, 'main-coupler', (c && c.label) ? c.label : ('主管节点 ' + mcValid),
-        c&&isNum(Number(c.displayLat))&&isNum(Number(c.displayLng))?{lat:Number(c.displayLat),lng:Number(c.displayLng)}:null);
+      push(cp.lat, cp.lng, 'main-coupler', (c && c.label) ? c.label : ('主管节点 ' + mcValid));
     });
 
     /* 8~9. 垂足兜底：主管和已存手绘总管的线段只在没有更高优先级点命中时胜出。 */

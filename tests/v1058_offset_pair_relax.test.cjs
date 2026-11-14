@@ -65,6 +65,7 @@ test('[v1058] 版本纪律：主串动态等于 sw VERSION', () => {
   const v = sw.match(/^const VERSION = '([^']+)';/m);
   const want = v[1].replace(/^v/, '');
   /* [v1069] 口径演进：v1059 时代 14 处（tl-workspace 独立串）；M14 起 tl-workspace.js
-     并入主串同抬 ⇒ 15 处（含 tl-workspace.js），tl-nodes.js 另有独立串。 */
-  assert.equal(html.split('?v=' + want).length - 1, 15);
+     并入主串同抬 ⇒ 15 处（含 tl-workspace.js）；[v1071] 起 runye-map-enhance.js 与
+     trunk-snap.js 版本串并入同值 ⇒ 17 处。tl-nodes.js 另有独立串。 */
+  assert.equal(html.split('?v=' + want).length - 1, 17);
 });

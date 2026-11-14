@@ -35,9 +35,11 @@ test('[v1070] 发布块入口：var p2ll=tlPublishP2ll + 空值校验', () => {
   assert.ok(seg.includes('管线投影出口未就绪'), '校验失败必须带可辨认文案');
 });
 
-test('[v1070] 版本纪律：主串 15 处动态等于 sw VERSION', () => {
+test('[v1070] 版本纪律：版本串动态等于 sw VERSION', () => {
   const v = sw.match(/^const VERSION = '([^']+)';/m);
-  assert.ok(v && v[1] === 'v1070-node-publish-bridge', 'sw VERSION 必须是 v1070-node-publish-bridge');
+  /* [v1071] 改动态：本锁只要求「index 版本串与 sw VERSION 同值同抬」，
+     不写死版本号（写死会让之后每次抬版都炸）。 */
+  assert.ok(v && /^v\d{3,4}-[\w-]+$/.test(v[1]), 'sw VERSION 必须存在且形如 vNNNN- slug');
   const want = v[1].replace(/^v/, '');
-  assert.equal(html.split('?v=' + want).length - 1, 15, '主串必须恰好 15 处');
+  assert.equal(html.split('?v=' + want).length - 1, 17, '版本串必须恰好 17 处（[v1071] 口径）');
 });

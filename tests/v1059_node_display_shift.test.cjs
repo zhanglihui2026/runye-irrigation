@@ -119,8 +119,9 @@ test('[v1059] 版本纪律：主串动态等于 sw VERSION；tl-nodes 独立串'
   assert.ok(v, 'sw.js 必须有 VERSION');
   const want = v[1].replace(/^v/, '');
   /* [v1069] 口径演进：v1059 时代 14 处（tl-workspace 独立串）；M14 起 tl-workspace.js
-     并入主串同抬 ⇒ 15 处（含 tl-workspace.js），tl-nodes.js 另有独立串（随版本演进）。 */
-  assert.equal(html.split('?v=' + want).length - 1, 15, '主串必须恰好 15 处');
+     并入主串同抬 ⇒ 15 处；[v1071] 起 runye-map-enhance.js 与 trunk-snap.js 并入同值 ⇒ 17 处。
+     tl-nodes.js 另有独立串（随版本演进）。 */
+  assert.equal(html.split('?v=' + want).length - 1, 17, '版本串必须恰好 17 处（主串 15 + map-enhance + trunk-snap）');
   assert.ok(/tl-workspace\/tl-nodes\.js\?v=(1069-nodes-resync|10[7-9]\d-|11\d\d-)/.test(html),
     'tl-nodes.js 必须有独立抬版串');
 });

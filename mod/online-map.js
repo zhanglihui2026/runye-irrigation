@@ -1244,7 +1244,8 @@
       input.plotRing=plot.polyLatLng||null;
       if(plot.waterSource&&!options.excludeWaterSource) input.waterSource=plot.waterSource;
     }
-    /* 节点捕捉独立于动画寻路完整性门禁；按渲染坐标命中，最终仍返回设计中心线坐标。 */
+    /* [v1071] 节点捕捉独立于动画寻路完整性门禁；命中/白圈/落点统一物理坐标
+       （[v1064] 时代「按渲染(偏移)坐标命中」已随地图显示偏移一起退役）。 */
     var published=publishedCouplersForPlot(plot);
     if(published.items.length)input.mainCouplers=published.items;
     if(trunkSaved&&Array.isArray(trunkSaved.trunks)){
@@ -1378,8 +1379,10 @@
     var list=(extras&&Array.isArray(extras.items))?extras.items:((extras&&Array.isArray(extras.mainCouplers))?extras.mainCouplers:[]);
     list.forEach(function(n){
       if(!n||!isFinite(n.lat)||!isFinite(n.lng)) return;
-      var markerLat=isFinite(Number(n.displayLat))?Number(n.displayLat):n.lat;
-      var markerLng=isFinite(Number(n.displayLng))?Number(n.displayLng):n.lng;
+      /* [v1071] 标记画物理坐标（n.lat/n.lng）。此前画 displayLat/displayLng（v1059 显示偏移
+         副本），标记整体悬空偏离真实管线 ~1m，与手绘总管落点、白色捕捉圈、演示寻路
+         （全物理口径）对不上——捕捉「吸偏」的可见面。快照里的 displayLat 字段保留仅为存档兼容。 */
+      var markerLat=n.lat,markerLng=n.lng;
       var color=n.stale?'#b45309':'#6d28d9',fill=n.stale?'#f59e0b':'#7c3aed';
       window.L.circleMarker([markerLat,markerLng],{
         radius:10, color:color, weight:2.5, fillOpacity:0, interactive:false

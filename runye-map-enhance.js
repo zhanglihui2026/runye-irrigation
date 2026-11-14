@@ -1032,7 +1032,11 @@
         if (s.kind === 'segTrunk' || s.id === 'segTrunk') return; // 旧成果中的自动段总管已退役
         var sLL = validRingLL(s.latLng, 2);   // 真实几何：连接、水力与长度的唯一依据
         if (!sLL) return;
-        var drawLL = validRingLL(s.displayLatLng, 2) || sLL; // 旧快照无显示副本时兼容真实几何
+        /* [v1071] 地图只画物理几何。显示平行偏移（ppGetPipeDisplayGeometry 的 ±gap/2 副本）
+           是**设计画布**的看图手段（v1059/M13 口径：错位只服务于看图）；046ba7a 把它搬上
+           地图后，可见管线/节点标记整体挪离真实位置 ±1m，而手绘总管落点、白色捕捉圈、
+           轮灌演示寻路路径全部按物理坐标计算——两套口径在一张图上混用，就是「捕捉吸偏、
+           画线贴不上标记、演示接不进 0.5m 门禁」的根源。地图=物理坐标唯一展示面。 */
         var st = dnStyle(s.dn);
         var hrec = hydraulic && hydraulic.items && hydraulic.items[s.id];
         if (hrec) st = hydraulicStyle(hrec, st);
@@ -1062,7 +1066,7 @@
             '本段损失：' + escapeHtml((+hrec.loss).toFixed(3)) + ' m<br>' : '') +
           '</div>';
         /* [v230] 逐段裁剪：折线按相邻两点拆段，落在地块外的部分不画（弹窗随每一段保留） */
-        var pts = drawLL.map(RunyeGeo.coordPair), pieces = [];
+        var pts = sLL.map(RunyeGeo.coordPair), pieces = [];
         for (var pi = 1; pi < pts.length; pi++) {
           var pa = pts[pi - 1], pb = pts[pi];
           var ivs = (isTrunk || !clipRings.length) ? [[0, 1]] : clipSegIntervals(pa, pb, clipRings);
