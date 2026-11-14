@@ -15,7 +15,7 @@
 /* v1071-map-physical-truth（用户实测「手绘总管捕捉点精度有问题」：046ba7a 把 v1059 显示偏移副本搬上地图（runye-map-enhance 画 displayLatLng、节点标记画 displayLat、节点捕捉按 displayLat 命中）——可见管线/标记整体偏离真实位置 ±gap/2≈1m，而手绘总管落点、白色捕捉圈、轮灌演示寻路全按物理坐标算，两套口径混用 ⇒ 捕捉吸偏、画线贴不上标记、0.5m 接驳门禁挂。修复=地图回归「所见即物理」：管段画 sLL、节点标记画 n.lat/n.lng、捕捉命中物理坐标；设计画布偏移看图不变。 */
 /* v1072-trunk-entry-restore（用户实测「总管-节点-主管-阀门-支管链路已成型仍提示尚未覆盖所有分区支管管路」：43158da 重写构图时删掉 v988→v989 总管↔主管贴近直连补边块、接驳全收紧 0.5m ⇒ 主管唯一入图口=施工节点 0.5m 双贴，12 主管 3 节点的真实地块预检放行而图断。恢复线体 2m 扫描 ≤5m 垂足补边（与 validateConnection 同口径），图语义=预检语义；v988 回归锁由红转绿。 */
 /* v1073-design-view-map（用户拍板「直接把分区与管路的图传递过来」：主/支管物理重合的布局在真实坐标上必然叠成一条线——v1071 改回物理渲染后重叠重现。发布快照 routeGeometry 整体升级为设计页同款显示世界（管线/阀门锚点/施工节点全取 ppGetPipeDisplayGeometry 显示几何，平移不改线长）；地图线体/节点标记/捕捉命中/白圈/演示寻路自此单一坐标世界，命中=白圈=标记=所见=落点。trunk-snap 点命中返回命中位（修 v1064 时代白圈在物理位的错位残留）；map-flow-demo 补支管端点直连（带状布局跨行连接，主↔主管端点直连不覆盖）。network.segments.latLng 仍为物理（水力/裁剪口径不变）。 */
-/* v1074-snap-reach（用户实测「还是不行，是不是捕捉的容差小了？手绘总管没有捕捉到节点」：SNAP_PX 10→14px；节点类目标（main/seg-coupler）双倍半径 28px——节点是设计落点宁可多吸；进入绘制若捕捉未开启必须明说（snapOn 每次刷新回默认关闭，用户不知道要手动开）；演示拦截提示补可执行指引（删旧总管→开捕捉→沿图上管线重画）。 */
+/* v1075-strict-node-link（用户实测「还是不行，是不是捕捉的容差小了？手绘总管没有捕捉到节点」：SNAP_PX 10→14px；节点类目标（main/seg-coupler）双倍半径 28px——节点是设计落点宁可多吸；进入绘制若捕捉未开启必须明说（snapOn 每次刷新回默认关闭，用户不知道要手动开）；演示拦截提示补可执行指引（删旧总管→开捕捉→沿图上管线重画）。 */
 /* v1070-node-publish-bridge（v1069 弹窗暴露真实报错「施工节点未能与管线组成同一发布快照：p2ll is not defined」：破案——p2ll/toFrame/ln2ll 声明在管网反投 IIFE（if(publishToMap) try{(function(){...})()}）内部，而今日新加的发布块（routeGeometry/publishedNodes 冻结，同函数级作用域）直接引用 p2ll ⇒ ReferenceError ⇒ 发布必然失败、节点永远回传不了地图（此前 console.warn 静默所以无人看见）。修复：tlAutoGenerate 函数级 tlPublishP2ll 变量桥接（IIFE 内 p2ll 定义后赋值），发布块入口 var p2ll=tlPublishP2ll 并做空值校验（未就绪=基准/框线缺失，发布本就不该继续）。同函数级无其它 p2ll 引用点，var 提升无冲突。）→
 /* v1069-node-resync（用户实测「分区与管路页面的节点不能回传给在线地图」：破案——几何签名变化时三处 RyTlNodes.reset() 把用户节点整表清空（inline-09 tlAutoGenerate 几何绑定块 / runye-map-partition capture 提交后 / ensureRestored 旧签名丢弃），而 live-sync 与「生成施工图」发布都从 RyTlNodes.list() 取节点 ⇒ publishedNodes 恒为空 ⇒ 地图永远没有节点，且用户节点在每次重新生成后无声消失。修复：①tl-nodes.js 新增 resyncGeometry()——节点按 pid+atM 参数迁移（M13「重算后重新投影」拍板口径）：atM 夹到所在管线新长度、pid 失效才剔除、persist 以新签名落盘（canonical 适配器 level3-node-signature-mismatch 校验照常通过而非靠清空绕开）；②inline-09 几何绑定块与 capture 提交后改调 resyncGeometry（reset 仅作兜底）；③tlGenerateDiagramToMap 发布失败不再静默 console.warn → alert 带原因；④tlPublishCurrentNodesToMapSnapshot 暴露 __tlNodesPublishState，地图端切页时对 network-stale 给一次性 tip 指引「点生成施工图同步」。）→
 /* v1059-node-display-shift（用户实测「节点要捕捉到主管、可在主管上移动——现在实现不了了」：M13 偏移假象显示后，主管可见线体是 ppGetPipeDisplayGeometry 偏移副本（±gap/2），而三级叠加层（RyTlNodes 节点/连线/配件标记/改径套壳/标注/选中高亮）与二级接驳节点全部基于设计几何定位 → 节点整体悬空偏移量，拾取/拖拽投影也按设计线算 → 点不到、拖不中。修复=显示偏移统一口径：tl-workspace.js 增 dispShift 辅助层（dispShiftMap 取各管刚体平移向量并缓存、dispPts/dispPointAt 输出显示位、dispShiftUndo 鼠标显示位反算），节点/连线/配件/套壳/标注/高亮渲染与 pickAutoPipe/pickAutoFit/pickAnyPipe 命中、nodeDrag/fitDrag 拖拽全部换显示口径（缓存随 render 数据换代置 null）；plot-editor.js 二级接驳节点同口径——ppCouplerShiftMap（与 __ppDisplayGeometry 同链）+ ppCouplerProjectDisp（先按主管偏移反算再投影设计线求 s，s 弧长口径不变），2D 画布与 SVG 简图节点渲染加偏移向量贴显示线。刚体平移不改弧长，数据/水力/材料口径零改动）→
@@ -1506,7 +1506,7 @@
    [v1039-flow-display-decoupling] 分区面仅作动画显示；缺失时不阻断已发布管网的水路计算。
    [v1042-source-independent-irrigation-route] 页面恢复重绘时按已发布管网几何核对动画版本。
    [v1043-coupler-node-lifecycle] 接驳节点随地块设计快照恢复；分区重建或管网重生成时清除旧节点。 */
-const VERSION = 'v1074-snap-reach';
+const VERSION = 'v1075-strict-node-link';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

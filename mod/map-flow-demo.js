@@ -26,7 +26,7 @@
      [v924] 手绘总管接入主管后，沿几何相接的分区主管段传播可达性；在线地图浮卡展示当前轮灌组水力摘要。
      [v927] 活动区使用独立地图Pane和脉冲色层；无mi的分区阀按支管几何归属，并动画显示开阀。
      ═══════════════════════════════════════════════════════════════════════ */
-  var TOL_M = 5, LINK_EPS_M = 0.5, INTERVAL_MS = 1000, FLOW_PANE = 'ryMapFlowPane';
+  var TOL_M = 5, LINK_EPS_M = 0.5, NODE_ATTACH_EPS_M = 0.2, INTERVAL_MS = 1000, FLOW_PANE = 'ryMapFlowPane';
   var DOT_FILLS = ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6'];
   var DOT_FILLS_LT = ['#fca5a5', '#fcd34d', '#86efac', '#93c5fd'];
   var DOT_INKS_LT = ['#7f1d1d', '#78350f', '#14532d', '#1e3a8a'];
@@ -116,6 +116,12 @@
     });
     if (!mainsFlat.length) return { ok: false, code: 'no-data', minM: null };
     var dist = o.dist || function () { return Infinity; };
+    if (o.strictNodeEntry) {
+      var mainNodes=(o.nodesLL||[]).filter(function(n){return n&&n.kind==='main'&&n.ll&&n.mi>=0;});
+      if(!mainNodes.length)return {ok:false,code:'no-node',minM:null};
+      var attached=mainNodes.some(function(n){return inputTrunks.some(function(line){return (line||[]).some(function(p){return dist(p,n.ll)<=NODE_ATTACH_EPS_M;});});});
+      return attached ? {ok:true,code:'connected',minM:0} : {ok:false,code:'node-not-connected',minM:null};
+    }
     var tol = (typeof o.tolM === 'number' && o.tolM > 0) ? o.tolM : TOL_M;
     /* [v920] 判定口径升级：**总管与主管都**按 2m 步长插值成密点再算贴近——
        旧口径只认双方**拐点**，一条直线总管横穿主管（穿越处无拐点、且穿越点
@@ -366,7 +372,7 @@
     routeGeometry.valves.forEach(function(v){if(!v)return;var ll=readLL(v.ll),anchor=readLL(v.anchorLL);if(ll)valves.push({ll:ll,anchorLL:anchor,mi:Number(v.mi)});});
     routeGeometry.nodes.forEach(function(n){
       if(!n||!Number.isInteger(Number(n.mi)))return;var ll=readLL(n.ll);if(!ll)return;
-      nodesLL.push({pipeKey:(n.kind==='main'?'m':'b')+(Number(n.mi)+1),mi:Number(n.mi),ll:ll,nodeId:String(n.id||''),source:'published-node'});
+      nodesLL.push({pipeKey:(n.kind==='main'?'m':'b')+(Number(n.mi)+1),kind:n.kind,mi:Number(n.mi),ll:ll,nodeId:String(n.id||''),source:'published-node'});
     });
     if(valves.length!==routeGeometry.valves.length||nodesLL.length!==routeGeometry.nodes.length||
         nodesLL.length!==(network.publishedNodes.items||[]).length){
@@ -428,7 +434,7 @@
     a.push((d.branchLL || []).map(line).join('|'));
     a.push(line(d.segLL));
     a.push((d.couplersLL || []).map(p2).join(';'));
-    a.push((d.nodesLL || []).map(function (n) { return n.mi + ':' + p2(n.ll); }).join(';'));
+    a.push((d.nodesLL || []).map(function (n) { return n.kind + ':' + n.mi + ':' + p2(n.ll); }).join(';'));
     a.push((d.valves || []).map(function (v) { return v.mi + ':' + p2(v.ll); }).join(';'));
     /* zonePolygons are display-only and are not read by validateConnection. */
     a.push(String(d.total) + ':' + String(d.nPer) + ':' + String(d.gCount));
@@ -452,6 +458,7 @@
       dist: (window.RyTrunkGeo && window.RyTrunkGeo.haversine) ? window.RyTrunkGeo.haversine : function () { return Infinity; },
       /* [v915] 步骤 3：逐组可达性 + 节点结构化匹配（齐备才启用，缺则退 v861 原口径） */
       nodesLL: d.nodesLL,
+      strictNodeEntry: true,
       groupOfZi: function (zi) { return groupOf(zi, d.manual, d.nPer); },
       groups: d.gCount
     });
@@ -568,45 +575,16 @@
     /* A saved coupler is the authoritative trunk-to-main junction. */
     var seenNodes={};
     (d.nodesLL||[]).forEach(function(n){
-      if(!n||!n.ll||!(n.mi>=0)||!byMain[n.mi])return;
+      if(!n||n.kind!=='main'||!n.ll||!(n.mi>=0)||!byMain[n.mi])return;
       var sig=n.mi+':'+n.ll.lat.toFixed(6)+':'+n.ll.lng.toFixed(6);if(seenNodes[sig])return;seenNodes[sig]=true;
       var mp=project(byMain[n.mi],n.ll);if(mp.d>LINK_EPS_M)return;
       var best=null;
-      byTrunk.forEach(function(o){var p=project(o,n.ll);if(o.kind==='trunk'&&p.d<=LINK_EPS_M&&(!best||p.d<best.p.d))best={o:o,p:p};});
+      byTrunk.forEach(function(o){
+        if(o.kind!=='trunk'||!o.raw.some(function(p){return gap(xy(p),xy(n.ll))<=NODE_ATTACH_EPS_M;}))return;
+        var p=project(o,n.ll);if(p.d<=NODE_ATTACH_EPS_M&&(!best||p.d<best.p.d))best={o:o,p:p};
+      });
       if(!best)return;
       var id='coupler:'+sig;addCut(best.o,best.p.s,id);addCut(byMain[n.mi],mp.s,id);
-    });
-
-    /* [v1072] 总管↔主管贴近直连（口径与 validateConnection 对齐）——恢复 v988→v989 补边块：
-       43158da 重写构图时把它删了，且把全部接驳口径收紧到 0.5m ⇒ 主管想接进寻路图，
-       唯一入口是「施工节点 0.5m 内同时贴住主管和总管」。用户真实地块（12 主管只放 3 节点、
-       总管横穿其余主管）预检按线体 5m 放行、图却断 ⇒「尚未形成覆盖所有分区支管两端的
-       连续管路」。恢复：沿主管弧长每 2m 取点（与验证 densify 同步长）扫总管，首个 ≤TOL_M
-       命中即在垂足打通；末端点单独补扫。纯找路图层补边，不改管线几何与水力模型；
-       已放节点的地块行为不变（节点 0.5m 严格口径优先保留）。 */
-    Object.keys(byMain).forEach(function(mk){
-      var m=byMain[mk],step=2,done=false;
-      for(var s=0;s<=m.len&&!done;s+=step){
-        var p=at(m,s);
-        for(var ti=0;ti<byTrunk.length&&!done;ti++){
-          var tp=project(byTrunk[ti],p);
-          if(tp.d<=TOL_M){
-            var id='trunk-entry:'+mk+':body:'+ti;
-            addCut(m,s,id);addCut(byTrunk[ti],tp.s,id);
-            done=true;
-          }
-        }
-      }
-      if(!done){ var pe=at(m,m.len);   /* 弧长循环取不到的末端点单独补扫 */
-        for(var tj=0;tj<byTrunk.length&&!done;tj++){
-          var tpe=project(byTrunk[tj],pe);
-          if(tpe.d<=TOL_M){
-            var id2='trunk-entry:'+mk+':body-end:'+tj;
-            addCut(m,m.len,id2);addCut(byTrunk[tj],tpe.s,id2);
-            done=true;
-          }
-        }
-      }
     });
 
     /* Main pipes are continuous only where a main endpoint meets another main
@@ -876,6 +854,8 @@
       if (ctx.tip) {
         if (v.code === 'no-trunk') ctx.tip('还没有手动绘制的总管：请先在在线地图绘制总管（并打开捕捉吸到「驳接点」），再演示水流。');
         else if (v.code === 'no-data') ctx.tip('图面上没有分区主管，无法演示水流。');
+        else if (v.code === 'no-node') ctx.tip('已发布管网没有主管施工节点。请在「分区与管路」主管上放置节点并重新生成施工图。');
+        else if (v.code === 'node-not-connected') ctx.tip('手绘总管尚未接到已发布主管施工节点。请开启捕捉，将总管拐点吸到紫色主管节点后保存。仅靠近或穿过主管不会接通。');
         else if (v.code === 'partial') {
           var gs = (v.brokenGroups || []).map(function (g) { return g + 1; }).join('、');
           /* [v919] 文案去误导（旧「最近 0.0 m」是已接主管的距离）：改报已通/未通统计 +

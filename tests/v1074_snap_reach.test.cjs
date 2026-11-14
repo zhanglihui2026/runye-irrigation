@@ -31,8 +31,8 @@ ok(snap.includes("(t.kind === 'main-coupler' || t.kind === 'seg-coupler') ? tol 
 ok(snap.includes('couplerPx: SNAP_PX * COUPLER_PX_MULT'), '[v1074] stats 暴露 couplerPx');
 
 /* 锁2：捕捉状态引导 */
-ok(oml.includes('当前捕捉未开启——点工具条「捕捉点」或按 S 开启'), '[v1074] 进入绘制捕捉未开启必须明说');
-ok(oml.includes('捕捉已开启：白圈吸到施工节点/管线上即松手'), '[v1074] 捕捉已开启给落点指引');
+ok(/if\(nextMode==='draw'\)[\s\S]*?setSnapOn\(true\);/.test(oml), '进入总管绘制自动开启捕捉');
+ok(oml.includes('请将白圈对准紫色主管施工节点并点击'), '提示准确捕捉主管施工节点');
 ok(oml.includes("关闭（点「捕捉点」开启吸附节点）"), '[v1074] 常驻提示条显示开启入口');
 
 /* 锁3：演示拦截提示可执行 */

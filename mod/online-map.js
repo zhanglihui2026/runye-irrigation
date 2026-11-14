@@ -946,6 +946,7 @@
       trunkTargetPlotId=String(currentMapPlotId||'');
       /* [v832] 进入绘制才采候选点（地块环/水源/已存拐点在这期间不会变）。 */
       lastCursorLatLng=null;
+      setSnapOn(true);
       refreshSnapTargets();
       activeTrunkId=null; activeVertexIdx=-1;
       closeTrunkMenu();
@@ -1219,7 +1220,7 @@
       if(valid&&llLine.length>=2)mainPipeLines.push(llLine);
     });
     var published=publishedCouplersForPlot(plot);
-    mainCouplers=published.items;
+    mainCouplers=published.items.filter(function(n){return /^main-\d+$/.test(n.pid);});
     return {valves:valves, branchStarts:branchStarts, zoneVerts:zoneVerts, couplers:couplers, mainPipeLines:mainPipeLines, mainCouplers:mainCouplers,
       stats:{sign:'published-snapshot', rms:0,
         valves:valves.length, branchStarts:branchStarts.length, zoneVerts:zoneVerts.length, couplers:couplers.length, mainPipeLines:mainPipeLines.length, mainCouplers:mainCouplers.length, zoneNote:zoneNote}};
@@ -1247,7 +1248,7 @@
     /* [v1071] 节点捕捉独立于动画寻路完整性门禁；命中/白圈/落点统一物理坐标
        （[v1064] 时代「按渲染(偏移)坐标命中」已随地图显示偏移一起退役）。 */
     var published=publishedCouplersForPlot(plot);
-    if(published.items.length)input.mainCouplers=published.items;
+    if(published.items.length)input.mainCouplers=published.items.filter(function(n){return /^main-\d+$/.test(n.pid);});
     if(trunkSaved&&Array.isArray(trunkSaved.trunks)){
       input.savedTrunks=trunkSaved.trunks;
       var SS=window.RyTrunkSchema, m=SS?SS.pickMainTrunk(trunkSaved):null;
@@ -1627,11 +1628,7 @@
     trunkPoints=[];
     trunkDraft={id:null,params:{material:'PE',dn:null,designFlow:null}};
     setTrunkMode('draw');
-    /* [v1074] 捕捉未开启时进入绘制必须明说——snapOn 每次刷新都回到默认关闭，
-       用户不知道要手动开，画出来的总管吸不上节点（真机反馈「没有捕捉到节点」）。 */
-    tip('依次点击水源到地块内的折点：双击或回车完成，Esc 取消，按住 Shift 正交。灰线是已保存的干线，不会被改动。'
-      + (snapOn ? '捕捉已开启：白圈吸到施工节点/管线上即松手。'
-                : ' 当前捕捉未开启——点工具条「捕捉点」或按 S 开启，白圈会自动吸到施工节点/管线上。'));
+    tip('依次点击水源到地块内的折点：捕捉已自动开启，请将白圈对准紫色主管施工节点并点击；双击或回车完成，Esc 取消。仅靠近管线不会接通动画。');
   };
   var reservoirBtn=document.getElementById('btnPlaceReservoir');
   if(reservoirBtn)reservoirBtn.onclick=function(){setReservoirPlaceMode(!reservoirPlaceMode);};

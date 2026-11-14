@@ -36,7 +36,7 @@
     'water-source': 2,
     'trunk-vertex': 3,
     'seg-coupler': 4,
-    'main-coupler': 4,
+    'main-coupler': 0,
     'valve-node': 5,
     'branch-start': 6,
     'zone-vertex': 7,
@@ -53,7 +53,7 @@
   var lastHit = null;
   var buildStats = null;
 
-  function prioOf(kind) { return PRIORITY[kind] || 99; }
+  function prioOf(kind) { return PRIORITY[kind] == null ? 99 : PRIORITY[kind]; }
 
   function isNum(v) { return typeof v === 'number' && isFinite(v); }
 

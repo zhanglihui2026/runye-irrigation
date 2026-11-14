@@ -118,7 +118,7 @@ test('⑬ v1027 段总管反投底图：有手绘总管时不画（用户拍板B
     'segLL 底图必须只在无手绘总管时绘制（v1019 兼任干线场景保水源结构可见）');
   assert.ok(!src.includes("if (d.segLL) {\n      ly.addLayer(poly(d.segLL, '#cbd5e1', 2, false));\n    }"),
     '禁止恢复 segLL 无条件底图绘制（v878 口径已被 v1027 拍板取代）');
-  assert.ok(src.includes("makeLine('segment:0','trunk',byTrunk.length,d.segLL)"),
+  assert.ok(src.includes("makeLine('segment:0','trunk',0,d.segLL)"),
     '寻路切片仍用 d.segLL（数据链零改动，只关视觉）');
   assert.ok(src.includes("a.push(line(d.segLL))"), '连通校验签名仍含 segLL（零改动）');
 });
