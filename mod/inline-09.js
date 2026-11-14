@@ -3840,6 +3840,13 @@ function tlPublishCurrentNodesToMapSnapshot() {
   if(route&&route.geometrySig!==geometrySig)return false;
   var published=[],routeNodes=[];
   var nodes=window.RyTlNodes.list()||[];
+  var effectiveMains=(dd.mainPipes||[]).map(function(line,i){try{return window.RyTlAutoEdits.effPts('main-'+i,dd)||line;}catch(e){return line;}});
+  var effectiveBranches=(dd.branchPipes||[]).map(function(line,i){try{return window.RyTlAutoEdits.effPts('branch-'+i,dd)||line;}catch(e){return line;}});
+  var displayGeometry=typeof window.ppGetPipeDisplayGeometry==='function'
+    ?window.ppGetPipeDisplayGeometry(effectiveMains,effectiveBranches,dd.valves||[],typeof tlGapM==='function'?tlGapM():0)
+    :{main:effectiveMains,branch:effectiveBranches};
+  function lineLength(line){var sum=0;for(var j=0;j+1<(line||[]).length;j++)sum+=Math.hypot(Number(line[j+1].x)-Number(line[j].x),Number(line[j+1].y)-Number(line[j].y));return sum;}
+  function pointAtLine(line,at){var left=Math.max(0,Number(at)||0);for(var j=0;j+1<(line||[]).length;j++){var a=line[j],b=line[j+1],dx=Number(b.x)-Number(a.x),dy=Number(b.y)-Number(a.y),len=Math.hypot(dx,dy);if(len<1e-9)continue;if(left<=len){var t=left/len;return{x:Number(a.x)+dx*t,y:Number(a.y)+dy*t};}left-=len;}return line&&line.length?{x:Number(line[line.length-1].x),y:Number(line[line.length-1].y)}:null;}
   for(var i=0;i<nodes.length;i++){
     var node=nodes[i];
     if(!node||!/^((main|branch))-\d+$/.test(String(node.pid||'')))continue;
@@ -3849,7 +3856,11 @@ function tlPublishCurrentNodesToMapSnapshot() {
     try{point=window.RyTlAutoEdits.pointAt(node.pid,dd,Number(node.atM));}catch(eNodePoint){return false;}
     var ll=point&&host.projectDesignPointForPlot(pid,point);
     if(!ll||!isFinite(Number(ll[0]))||!isFinite(Number(ll[1])))return false;
-    var item={id:String(node.id||''),pid:String(node.pid),atM:Number(node.atM)||0,lat:Number(ll[0]),lng:Number(ll[1])};
+    var srcLine=m[1]==='main'?effectiveMains[mi]:effectiveBranches[mi],shownLine=m[1]==='main'?(displayGeometry.main||[])[mi]:(displayGeometry.branch||[])[mi];
+    var displayPoint=null,srcLen=lineLength(srcLine),displayLen=lineLength(shownLine);
+    if(srcLen>1e-8&&displayLen>1e-8)displayPoint=pointAtLine(shownLine,Math.max(0,Math.min(1,(Number(node.atM)||0)/srcLen))*displayLen);
+    var displayLL=displayPoint&&host.projectDesignPointForPlot(pid,displayPoint);
+    var item={id:String(node.id||''),pid:String(node.pid),atM:Number(node.atM)||0,lat:Number(ll[0]),lng:Number(ll[1]),displayLat:displayLL?Number(displayLL[0]):Number(ll[0]),displayLng:displayLL?Number(displayLL[1]):Number(ll[1])};
     published.push(item);routeNodes.push({id:item.id,pid:item.pid,mi:mi,kind:m[1],ll:[item.lat,item.lng]});
   }
   var next=JSON.parse(JSON.stringify(network));

@@ -1182,7 +1182,8 @@
     pub.items.forEach(function(n){
       var lat=Number(n&&n.lat),lng=Number(n&&n.lng),atM=Number(n&&n.atM);
       if(!n||!isFinite(lat)||!isFinite(lng)||Math.abs(lat)>90||Math.abs(lng)>180||!/^((main|branch))-\d+$/.test(String(n.pid||'')))return;
-      out.items.push({lat:lat,lng:lng,atM:isFinite(atM)?atM:0,
+      out.items.push({lat:lat,lng:lng,displayLat:isFinite(Number(n.displayLat))?Number(n.displayLat):lat,
+        displayLng:isFinite(Number(n.displayLng))?Number(n.displayLng):lng,atM:isFinite(atM)?atM:0,
         label:'施工节点 '+String(n.id||'')+' · '+String(n.pid||'')+' · 桩号 '+(Math.round((isFinite(atM)?atM:0)*10)/10)+'m',
         nodeId:String(n.id||''),pid:String(n.pid||''),stale:!!net.needsReplan});
     });
@@ -1243,6 +1244,9 @@
       input.plotRing=plot.polyLatLng||null;
       if(plot.waterSource&&!options.excludeWaterSource) input.waterSource=plot.waterSource;
     }
+    /* 节点捕捉独立于动画寻路完整性门禁；按渲染坐标命中，最终仍返回设计中心线坐标。 */
+    var published=publishedCouplersForPlot(plot);
+    if(published.items.length)input.mainCouplers=published.items;
     if(trunkSaved&&Array.isArray(trunkSaved.trunks)){
       input.savedTrunks=trunkSaved.trunks;
       var SS=window.RyTrunkSchema, m=SS?SS.pickMainTrunk(trunkSaved):null;
@@ -1257,11 +1261,10 @@
       input.zoneVerts=snapExtras.zoneVerts;
       input.mainPipeLines=snapExtras.mainPipeLines;
       if(snapExtras.couplers&&snapExtras.couplers.length) input.couplers=snapExtras.couplers;
-      if(snapExtras.mainCouplers&&snapExtras.mainCouplers.length) input.mainCouplers=snapExtras.mainCouplers;   /* [v914] 设计页接驳节点 */
+      if(snapExtras.mainCouplers&&snapExtras.mainCouplers.length) input.mainCouplers=snapExtras.mainCouplers;   /* [v914] 兼容旧快照候选 */
     }
     var list=S.buildTargets(input);
     var rc=S.setTargets(list,{plotId:currentMapPlotId?String(currentMapPlotId):null, extras:snapExtras?snapExtras.stats:null});
-    var published=publishedCouplersForPlot(plot);
     renderCouplerMarkers(published);
     try{if(window.RyMapHost)window.RyMapHost.publishedNodeState=function(){return{plotId:published.plotId,status:published.status,reason:published.reason,count:published.items.length};};}catch(eNodeState){}
     return rc;
@@ -1375,11 +1378,13 @@
     var list=(extras&&Array.isArray(extras.items))?extras.items:((extras&&Array.isArray(extras.mainCouplers))?extras.mainCouplers:[]);
     list.forEach(function(n){
       if(!n||!isFinite(n.lat)||!isFinite(n.lng)) return;
+      var markerLat=isFinite(Number(n.displayLat))?Number(n.displayLat):n.lat;
+      var markerLng=isFinite(Number(n.displayLng))?Number(n.displayLng):n.lng;
       var color=n.stale?'#b45309':'#6d28d9',fill=n.stale?'#f59e0b':'#7c3aed';
-      window.L.circleMarker([n.lat,n.lng],{
+      window.L.circleMarker([markerLat,markerLng],{
         radius:10, color:color, weight:2.5, fillOpacity:0, interactive:false
       }).addTo(couplerMarkerLayer);
-      window.L.circleMarker([n.lat,n.lng],{
+      window.L.circleMarker([markerLat,markerLng],{
         radius:6, color:'#ffffff', weight:2, fillColor:fill, fillOpacity:1, interactive:false
       }).addTo(couplerMarkerLayer).bindTooltip((n.stale?'待重新生成 · ':'')+(n.label||'主管节点'),{
         permanent:true, direction:'top', offset:[0,-9], className:'ry-coupler-tip', opacity:0.95
@@ -3479,13 +3484,30 @@
     if(!snap||!snap.ok)return null;
     var matches=(snap.plots||[]).filter(function(p){return p&&String(p.id)===String(plotId);});
     if(matches.length!==1)return null;
-    var dd=window.tlDiagramData,base=window.__runyeGeoBase,G=window.RyTrunkGeo;
+    var dd=window.tlDiagramData,base=window.__runyeGeoBase;
     if(String(window.currentPlotId||'')!==String(plotId)||!dd||dd.world!=='meter'||!Array.isArray(dd.poly)||
-        !Array.isArray(matches[0].polyLatLng)||matches[0].polyLatLng.length!==dd.poly.length||!G||!base)return null;
-    var cal=G.autoSign(dd.poly,matches[0].polyLatLng,base);
-    if(!cal||!cal.ok)return null;
-    var ll=G.m2ll(Number(pt.x),Number(pt.y),base,cal.sign);
-    return ll&&isFinite(Number(ll.lat))&&isFinite(Number(ll.lng))?[Number(ll.lat),Number(ll.lng)]:null;
+        !Array.isArray(matches[0].polyLatLng)||matches[0].polyLatLng.length!==dd.poly.length||!base)return null;
+    /* 与施工图发布 p2ll 保持同一变换：先把设计坐标反变换到地图框线坐标，
+       再按 geoBase 投影。直接 autoSign(dd.poly, polyLatLng) 会绕过 mapFramePoly
+       的旋转/镜像校正，节点因而偏离已发布主管。 */
+    var frame=matches[0].mapFramePoly;
+    if(!Array.isArray(frame)||frame.length!==dd.poly.length)frame=window.__runyeMapFramePoly;
+    var q=dd.poly,p=frame, mapped={x:Number(pt.x),y:Number(pt.y)};
+    if(Array.isArray(p)&&p.length===q.length&&p.length>=3){
+      var p0=p[0],p1=p[1],p2=p[2],q0=q[0],q1=q[1],q2=q[2];
+      var ux=p1.x-p0.x,uy=p1.y-p0.y,vx=p2.x-p0.x,vy=p2.y-p0.y,detM=ux*vy-uy*vx;
+      if(!isFinite(detM)||Math.abs(detM)<1e-9)return null;
+      var Ux=q1.x-q0.x,Uy=q1.y-q0.y,Vx=q2.x-q0.x,Vy=q2.y-q0.y,im=1/detM;
+      var a=(Ux*vy-Vx*uy)*im,b=(Vx*ux-Ux*vx)*im,c=(Uy*vy-Vy*uy)*im,d=(Vy*ux-Uy*vx)*im;
+      var detL=a*d-b*c;if(!isFinite(detL)||Math.abs(detL)<1e-9)return null;
+      var tx=q0.x-(a*p0.x+b*p0.y),ty=q0.y-(c*p0.x+d*p0.y),il=1/detL;
+      var ax=d*il,ay=-c*il,bx=-b*il,by=a*il;
+      mapped={x:ax*(Number(pt.x)-tx)+bx*(Number(pt.y)-ty),y:ay*(Number(pt.x)-tx)+by*(Number(pt.y)-ty)};
+    }
+    var mlat=6378137*Math.PI/180,cosLat=Math.cos(Number(base.refLat)*Math.PI/180);
+    if(!isFinite(cosLat)||Math.abs(cosLat)<1e-9)return null;
+    var ll=[Number(base.refLat)+mapped.y/mlat,Number(base.refLng)+mapped.x/(mlat*cosLat)];
+    return isFinite(ll[0])&&isFinite(ll[1])?ll:null;
   }
   window.RyMapHost={payload:buildPlotPayload,send:sendPlotToDesign,sendDraft:onSendCurrentDraft,trunkState:trunkState,
     /* [v843] 当前在地图上编辑哪块地。

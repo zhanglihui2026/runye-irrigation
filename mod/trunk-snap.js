@@ -74,10 +74,11 @@
     input = input || {};
     var out = [];
 
-    function push(lat, lng, kind, label) {
+    function push(lat, lng, kind, label, snapPoint) {
       if (!isNum(lat) || !isNum(lng)) return;
       if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return;
-      out.push({ lat: lat, lng: lng, kind: kind, label: label || '' });
+      var sp=readPoint(snapPoint);
+      out.push({ lat: lat, lng: lng, snapLat:sp?sp.lat:lat, snapLng:sp?sp.lng:lng, kind: kind, label: label || '' });
     }
 
     /* 1. 地块顶点（最常用：贴着地块边界起步） */
@@ -140,7 +141,8 @@
       var cp = readPoint(c);
       if (!cp) return;
       mcValid++;
-      push(cp.lat, cp.lng, 'main-coupler', (c && c.label) ? c.label : ('主管节点 ' + mcValid));
+      push(cp.lat, cp.lng, 'main-coupler', (c && c.label) ? c.label : ('主管节点 ' + mcValid),
+        c&&isNum(Number(c.displayLat))&&isNum(Number(c.displayLng))?{lat:Number(c.displayLat),lng:Number(c.displayLng)}:null);
     });
 
     /* 8~9. 垂足兜底：主管和已存手绘总管的线段只在没有更高优先级点命中时胜出。 */
@@ -184,7 +186,8 @@
         }
         if (!t || !isNum(t.lat) || !isNum(t.lng)) continue;
         var kind = t.kind || 'plot-vertex';
-        targets.push({ lat: t.lat, lng: t.lng, kind: kind, label: t.label || '', prio: prioOf(kind) });
+        targets.push({ lat: t.lat, lng: t.lng, snapLat:isNum(Number(t.snapLat))?Number(t.snapLat):t.lat,
+          snapLng:isNum(Number(t.snapLng))?Number(t.snapLng):t.lng, kind: kind, label: t.label || '', prio: prioOf(kind) });
       }
     }
     buildStats = meta || null;
@@ -217,7 +220,7 @@
     var best = null;
     for (var i = 0; i < targets.length; i++) {
       var t = targets[i];
-      var q = projector(t);
+      var q = projector({lat:t.snapLat,lng:t.snapLng});
       if (!q) continue;
       var dx = q.x - p.x, dy = q.y - p.y;
       var d = Math.sqrt(dx * dx + dy * dy);
