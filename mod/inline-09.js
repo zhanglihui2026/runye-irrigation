@@ -4974,6 +4974,26 @@ function tlAutoGenerate(options) {
       }
       return best||fallback;
     }
+    /* [v1079 用户拍板「竖向/横向一条管道要在一根线上」] 同列/同行一次定线（与二级
+       ppBuildAutoPipes 同口径）：预扫全部格子取有效布管中心，按列（竖管布向）
+       /行（横管布向）取统一中心线（有效值中位数，抗斜边形心漂移），全列/全行共用；
+       本格用统一线裁剪后过短（<50% 净长）才回退本格形心线。 */
+    var tlCentersPre=[];
+    for(var zrP=0;zrP<rows;zrP++)for(var zcP=0;zcP<cols;zcP++)
+      tlCentersPre.push({r:zrP,c:zcP,p:tlActualCellCenter(xPos[zcP],yPos[zrP],xSrc[zcP],ySrc[zrP])});
+    function tlMedianOf(vals){
+      var a=vals.slice().sort(function(u,v){return u-v;});
+      var m=a.length>>1;
+      return a.length%2?a[m]:(a[m-1]+a[m])/2;
+    }
+    var tlColVals=[],tlRowVals=[];
+    tlCentersPre.forEach(function(zi){
+      (tlColVals[zi.c]=tlColVals[zi.c]||[]).push(zi.p.x);
+      (tlRowVals[zi.r]=tlRowVals[zi.r]||[]).push(zi.p.y);
+    });
+    var tlColLineX={},tlRowLineY={};
+    tlColVals.forEach(function(vals,c){if(vals&&vals.length)tlColLineX[c]=tlMedianOf(vals);});
+    tlRowVals.forEach(function(vals,r){if(vals&&vals.length)tlRowLineY[r]=tlMedianOf(vals);});
     for(var zr2=0;zr2<rows;zr2++){
       for(var zc3=0;zc3<cols;zc3++){
         var zx2=xPos[zc3], zy2=yPos[zr2];
@@ -4981,12 +5001,18 @@ function tlAutoGenerate(options) {
         var center=tlActualCellCenter(zx2,zy2,zoneW2,zoneH2);
         var centerX=center.x, centerY=center.y;
         var fixedSideIsHorizontal=majFixedH;   /* 第一分区定滴灌带轴，其余主管/支管全部垂直于该轴 */
+        /* [v1079] 阀门仍锚本格有效中心；管线走本列/本行统一中心线 */
+        var effLineX=(tlColLineX[zc3]!=null)?tlColLineX[zc3]:centerX;
+        var effLineY=(tlRowLineY[zr2]!=null)?tlRowLineY[zr2]:centerY;
         if(fixedSideIsHorizontal){
           /* 滴灌带沿长边；支管横跨分区短边中心。地下主管与支管同向同投影。 */
-          var brX=centerX;
+          var brX=effLineX;
           /* [v830] 裁到地块内：旋转角下角格子会伸到外面；裁空的整根丢弃（含其满跨/留边记录），
              保证 mainPipes/branchPipes/branchFullSpans/branchDrawnLens 四个数组始终等长对齐。 */
           var tlSegB=tlClipPipeSeg({x:brX,y:zy2},{x:brX,y:zy2+zoneH2});
+          /* [v1079] 统一线在本格出界/过短：回退本格形心线，保管线不为空 */
+          if(tlSegB&&tlPolyLen(tlSegB)<zoneH2*0.5)tlSegB=null;
+          if(!tlSegB)tlSegB=tlClipPipeSeg({x:centerX,y:zy2},{x:centerX,y:zy2+zoneH2});
           if(tlSegB){
             branchPipes.push(tlSegB); branchFullSpans.push(zoneH2); branchDrawnLens.push(tlPolyLen(tlSegB));
             mainPipes.push(tlSegB.map(function(p){return{x:p.x,y:p.y};}));
@@ -4995,9 +5021,12 @@ function tlAutoGenerate(options) {
           if(tlSegB && window.atPointInPolygon&&window.atPointInPolygon({x:centerX,y:centerY},tlGridPlotPoly))
             valves.push({x:centerX,y:centerY,mi:tlMainIdx});
         }else{
-          var brY=centerY;
+          var brY=effLineY;
           /* [v830] 同上：裁到地块内，裁空的整根丢弃 */
           var tlSegB2=tlClipPipeSeg({x:zx2,y:brY},{x:zx2+zoneW2,y:brY});
+          /* [v1079] 统一线在本格出界/过短：回退本格形心线 */
+          if(tlSegB2&&tlPolyLen(tlSegB2)<zoneW2*0.5)tlSegB2=null;
+          if(!tlSegB2)tlSegB2=tlClipPipeSeg({x:zx2,y:centerY},{x:zx2+zoneW2,y:centerY});
           if(tlSegB2){
             branchPipes.push(tlSegB2); branchFullSpans.push(zoneW2); branchDrawnLens.push(tlPolyLen(tlSegB2));
             mainPipes.push(tlSegB2.map(function(p){return{x:p.x,y:p.y};}));

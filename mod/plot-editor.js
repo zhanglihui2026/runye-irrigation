@@ -3614,41 +3614,81 @@
         }
       }
 
+      /* [v1079] 单分区有效布管中心（原逐分区形心逻辑提取，供预扫与主循环共用）：
+         异形分区取裁剪后几何的形心；形心落在区外时取区内最近有效点。 */
+      function zoneCenterOf(zr, zc) {
+        var zx = cuts.xPos[zc], zy = cuts.yPos[zr], zoneW = cuts.xSrc[zc], zoneH = cuts.ySrc[zr];
+        var centerX = zx + zoneW / 2, centerY = zy + zoneH / 2;
+        var zonePoly = ppClipPolyToRect(ppPipeClipPoly, zx, zy, zx + zoneW, zy + zoneH);
+        var zoneCentroid = ppPolyCentroid(zonePoly);
+        if (zoneCentroid && ppRingIn(zoneCentroid, zonePoly)) {
+          centerX = zoneCentroid.x; centerY = zoneCentroid.y;
+        } else if (zoneCentroid) {
+          var bestCenter = null, bestCenterD = Infinity;
+          for (var cyi = 1; cyi < 20; cyi++) for (var cxi = 1; cxi < 20; cxi++) {
+            var cand = { x: zx + zoneW * cxi / 20, y: zy + zoneH * cyi / 20 };
+            if (!ppRingIn(cand, zonePoly)) continue;
+            var cd = (cand.x - zoneCentroid.x) * (cand.x - zoneCentroid.x) + (cand.y - zoneCentroid.y) * (cand.y - zoneCentroid.y);
+            if (cd < bestCenterD) { bestCenterD = cd; bestCenter = cand; }
+          }
+          if (bestCenter) { centerX = bestCenter.x; centerY = bestCenter.y; }
+        }
+        return { x: centerX, y: centerY, poly: zonePoly };
+      }
+
+      /* [v1079 用户拍板「竖向/横向一条管道要在一根线上」] 同列/同行一次定线：
+         逐分区形心会被斜边裁剪拉得逐区微移 1~2m ⇒ 同列主管/同行支管物理就不共线，
+         显示偏移又逐线独立收紧放大错位。改为：预扫全部取有效布管中心，按列（竖管）
+         /行（横管）取统一中心线（有效值中位数，抗形心漂移），全列/全行共用——
+         主管与支管继续同线（主干线=支管克隆口径不变），显示偏移向量也随之天然一致。
+         本分区用统一线裁剪后过短（<50% 分区净长）才回退本分区形心线。
+         竖线横向平移、横线纵向平移不改水力长度；节点按 pid+桩号重投影自动落新线。 */
+      var zoneCentersPre = [];
+      for (var zr1 = 0; zr1 < cuts.rows; zr1++) for (var zc1 = 0; zc1 < cuts.cols; zc1++)
+        zoneCentersPre.push({ r: zr1, c: zc1, p: zoneCenterOf(zr1, zc1) });
+      function medianOf(vals) {
+        var a = vals.slice().sort(function (u, v) { return u - v; });
+        var m = a.length >> 1;
+        return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+      }
+      var colVals = [], rowVals = [];
+      zoneCentersPre.forEach(function (zi) {
+        (colVals[zi.c] = colVals[zi.c] || []).push(zi.p.x);
+        (rowVals[zi.r] = rowVals[zi.r] || []).push(zi.p.y);
+      });
+      var colLineX = {}, rowLineY = {};
+      colVals.forEach(function (vals, c) { if (vals && vals.length) colLineX[c] = medianOf(vals); });
+      rowVals.forEach(function (vals, r) { if (vals && vals.length) rowLineY[r] = medianOf(vals); });
+
       for (var zr = 0; zr < cuts.rows; zr++) {
         for (var zc = 0; zc < cuts.cols; zc++) {
           var zx = cuts.xPos[zc], zy = cuts.yPos[zr];
           var zoneW = cuts.xSrc[zc], zoneH = cuts.ySrc[zr];
-          var centerX = zx + zoneW / 2, centerY = zy + zoneH / 2;
-          /* 异形地块按本分区裁剪后的实际几何取面积形心；凹形导致形心落在区外时，
-             在本格内寻找距形心最近的有效点，避免把支管/阀门放到空白地带。 */
-          var zonePoly=ppClipPolyToRect(ppPipeClipPoly,zx,zy,zx+zoneW,zy+zoneH);
-          var zoneCentroid=ppPolyCentroid(zonePoly);
-          if(zoneCentroid&&ppRingIn(zoneCentroid,zonePoly)){
-            centerX=zoneCentroid.x;centerY=zoneCentroid.y;
-          }else if(zoneCentroid){
-            var bestCenter=null,bestCenterD=Infinity;
-            for(var cyi=1;cyi<20;cyi++)for(var cxi=1;cxi<20;cxi++){
-              var cand={x:zx+zoneW*cxi/20,y:zy+zoneH*cyi/20};
-              if(!ppRingIn(cand,zonePoly))continue;
-              var cd=(cand.x-zoneCentroid.x)*(cand.x-zoneCentroid.x)+(cand.y-zoneCentroid.y)*(cand.y-zoneCentroid.y);
-              if(cd<bestCenterD){bestCenterD=cd;bestCenter=cand;}
-            }
-            if(bestCenter){centerX=bestCenter.x;centerY=bestCenter.y;}
-          }
+          var zcInfo = zoneCenterOf(zr, zc);
+          var centerX = zcInfo.x, centerY = zcInfo.y;
           /* 全部区域沿第1分区确定的方向布管；forceDir 由第一分区长边派生 */
           var fixedSideIsHorizontal = (forceDir === 'v') ? true
             : (forceDir === 'h') ? false
             : (cuts.xPlan[zc] >= cuts.yPlan[zr]);
           if (fixedSideIsHorizontal) {
-            /* 滴灌带沿 x 向时，支管与主管均沿 y 向并共用同一设计中心线；
-               阀门锚在分区中心。两类管的平面错开只由渲染副本表达，不能改水力坐标。 */
-            var branchX = centerX;
+            /* 滴灌带沿 x 向时，支管与主管均沿 y 向；[v1079] 走本列统一中心线
+               （全列一根线），本分区裁剪后过短才回退本分区形心线。阀门仍锚分区中心。 */
+            var branchX = (colLineX[zc] != null) ? colLineX[zc] : centerX;
             var branchStart = out.branch.length;
             /* 主管/支管均延伸至分区边缘；地块外缘仍由地块多边形裁切。 */
-            if (pushSeg(out.branch, { x: branchX, y: zy }, { x: branchX, y: zy + zoneH })) {
-              for (var bm = branchStart; bm < out.branch.length; bm++) {
-                out.main.push(out.branch[bm].map(function (p) { return { x: p.x, y: p.y }; }));
-              }
+            pushSeg(out.branch, { x: branchX, y: zy }, { x: branchX, y: zy + zoneH });
+            var vAlignLen = 0;
+            for (var vbi = branchStart; vbi < out.branch.length; vbi++) {
+              var vb0 = out.branch[vbi][0], vb1 = out.branch[vbi][out.branch[vbi].length - 1];
+              vAlignLen += Math.sqrt((vb1.x - vb0.x) * (vb1.x - vb0.x) + (vb1.y - vb0.y) * (vb1.y - vb0.y));
+            }
+            if (vAlignLen < zoneH * 0.5) {
+              /* [v1079] 统一线在本分区出界/过短：回退本分区形心线，保管线不为空 */
+              out.branch.length = branchStart;
+              pushSeg(out.branch, { x: centerX, y: zy }, { x: centerX, y: zy + zoneH });
+            }
+            for (var bm = branchStart; bm < out.branch.length; bm++) {
+              out.main.push(out.branch[bm].map(function (p) { return { x: p.x, y: p.y }; }));
             }
             if (ppPointInPlot({ x: centerX, y: centerY })) out.valves.push({ x: centerX, y: centerY });
             // Three-level: sub-branch pipes perpendicular to branch (horizontal)
@@ -3660,13 +3700,23 @@
               }
             }
           } else {
-            /* 滴灌带沿 y 向时，支管与主管均沿 x 向并共用同一设计中心线。 */
-            var branchY = centerY;
+            /* 滴灌带沿 y 向时，支管与主管均沿 x 向；[v1079] 走本行统一中心线
+               （全行一根线），本分区裁剪后过短才回退本分区形心线。 */
+            var branchY = (rowLineY[zr] != null) ? rowLineY[zr] : centerY;
             var branchStartH = out.branch.length;
-            if (pushSeg(out.branch, { x: zx, y: branchY }, { x: zx + zoneW, y: branchY })) {
-              for (var bmH = branchStartH; bmH < out.branch.length; bmH++) {
-                out.main.push(out.branch[bmH].map(function (p) { return { x: p.x, y: p.y }; }));
-              }
+            pushSeg(out.branch, { x: zx, y: branchY }, { x: zx + zoneW, y: branchY });
+            var hAlignLen = 0;
+            for (var hbi = branchStartH; hbi < out.branch.length; hbi++) {
+              var hb0 = out.branch[hbi][0], hb1 = out.branch[hbi][out.branch[hbi].length - 1];
+              hAlignLen += Math.sqrt((hb1.x - hb0.x) * (hb1.x - hb0.x) + (hb1.y - hb0.y) * (hb1.y - hb0.y));
+            }
+            if (hAlignLen < zoneW * 0.5) {
+              /* [v1079] 统一线在本分区出界/过短：回退本分区形心线 */
+              out.branch.length = branchStartH;
+              pushSeg(out.branch, { x: zx, y: centerY }, { x: zx + zoneW, y: centerY });
+            }
+            for (var bmH = branchStartH; bmH < out.branch.length; bmH++) {
+              out.main.push(out.branch[bmH].map(function (p) { return { x: p.x, y: p.y }; }));
             }
             if (ppPointInPlot({ x: centerX, y: centerY })) out.valves.push({ x: centerX, y: centerY });
             // Three-level: sub-branch pipes perpendicular to branch (vertical)
