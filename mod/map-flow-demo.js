@@ -634,6 +634,22 @@
     return out;
   }
 
+  /* [v1084e] 覆盖口径**唯一实现**。为什么单独抽出来：v1084d 只改了 start() 和
+     routesAll() 两处，whyNot() 里还留着老口径（数 branch: 边），于是「控制台诊断说
+     0/2、点下去却能演示」——排查工具自己会撒谎，比没有工具更糟。
+     规则（别再加分支）：每区两个目标（支管两端），一条到达该区的路线计 1，满 2 即闭合。
+     `counted` 是实际计入的路线数（== 成路条数里带 zi 的），供提示里对账
+     「成路 24 条 ⇒ 12 区 × 2」。 */
+  function coverageOf(routes,total){
+    var covered={},counted=0;
+    (routes||[]).forEach(function(r){
+      if(r&&r.zi!=null){covered[r.zi]=(covered[r.zi]||0)+1;counted++;}
+    });
+    var missing=[];
+    for(var zi=0;zi<total;zi++)if(covered[zi]!==2)missing.push(zi);
+    return {covered:covered,counted:counted,missing:missing,closed:missing.length===0};
+  }
+
   function buildFlowRoutes(d,g,allZones){
     /* [v1084] 每轮建图重置诊断：{zones:[{zi,reason}], fittings:{placed,dup,offLine,noPipe},
        active, missing, blocked}。失败时宿主把它翻成人话，用户才知道"哪个区缺什么"。 */
@@ -1112,7 +1128,7 @@
       }
       return false;
     }
-    var allRoutes=buildFlowRoutes(d,0,true),allCovered={},routes=[],expected={},activeCount=0,groupRoutes=[];
+    var allRoutes=buildFlowRoutes(d,0,true),routes=[],expected={},activeCount=0,groupRoutes=[];
     var diagAll=lastDiag;   /* [v1084] 全图那一趟的诊断，是"为什么没连上"的权威版本 */
     /* [v1084d 第二个根因] 覆盖判定原来要求「路线里必须有一条 key 以 branch: 开头的边」。
        这只在「主管与支管是两条分开的线」时成立；而 v1079 起主管/支管是**同列定线**
@@ -1122,17 +1138,17 @@
        用户实测数据完全对上：`成路 24 条/目标 24`，`首条路线支管边：没有 branch: 开头的边`。
        现在改为**按目标点数**：每个区两个目标（支管两端），到达一个计 1。
        目标本身就是 branch-start/branch-end 两个切口，到达即代表该端进水 —— 比数边种类更准，
-       也不再依赖「主支管是否重合」这种和气流无关的布局细节。 */
+       也不再依赖「主支管是否重合」这种和气流无关的布局细节。
+       ★ 实现在 coverageOf()：start / routesAll / whyNot 三处共用，禁止就地再数一遍。 */
+    var cov=coverageOf(allRoutes,d.total),allCovered=cov.covered;
     (allRoutes||[]).forEach(function(route){
-      if(route&&route.zi!=null)allCovered[route.zi]=(allCovered[route.zi]||0)+1;
       if(route&&groupOf(route.zi,d.manual,d.nPer)===g)groupRoutes.push(route);
     });
     /* [v1073] 动画优先非冗余路线；本组全部冗余时回退全量（不因打标丢动画）。 */
     routes=groupRoutes.filter(function(r){return !r.redundant;});
     if(!routes.length)routes=groupRoutes;
-    var wholeFieldClosed=!!allRoutes;
+    var wholeFieldClosed=!!allRoutes&&cov.closed;
     for(var zi=0;zi<d.total;zi++){
-      if(allCovered[zi]!==2)wholeFieldClosed=false;
       if(groupOf(zi,d.manual,d.nPer)===g){expected[zi]=1;activeCount++;}
     }
     var incomplete=Object.keys(expected).some(function(key){return allCovered[key]!==2;});
@@ -1640,15 +1656,8 @@
         if (!d || !d.total) return null;
         var routes = buildFlowRoutes(d, 0, true);
         if (!routes || !routes.length) return null;
-        var routeCounts = {};
-        routes.forEach(function (r) {
-          /* [v1084d] 同 v1084d 覆盖口径：按目标点数，不按边种类（主支管同列定线时
-             路线会沿主管直达支管端点，一条 branch: 边都没有，旧口径会误判 missing）。 */
-          if(r&&r.zi!=null)routeCounts[r.zi]=(routeCounts[r.zi]||0)+1;
-        });
-        var missing = [];
-        for (var zi = 0; zi < d.total; zi++) if (routeCounts[zi]!==2) missing.push(zi);
-        return { routes: routes, total: d.total, missing: missing };
+        var cov = coverageOf(routes, d.total);
+        return { routes: routes, total: d.total, missing: cov.missing };
       } catch (e) { return null; }
     },
     /* [v945] 导出给探针/宿主驱动：分组浮层文案（含"没有图面路径时按分区反推口径"这条分支）。
@@ -1685,20 +1694,32 @@
       var allRoutes = null;
       try { allRoutes = buildFlowRoutes(d, 0, true); } catch (eR) { out.gate = 'routes'; out.hint = 'buildFlowRoutes 抛错：' + eR.message; return out; }
       out.diag = lastDiag;
-      var covered = {};
-      (allRoutes || []).forEach(function (r) {
-        if (r && r.branch && r.branch.some(function (s) { return s.key.indexOf('branch:') === 0; })) covered[r.zi] = (covered[r.zi] || 0) + 1;
-      });
-      var gg = (typeof g === 'number') ? g : 0, groupRoutes = [], expected = 0;
+      /* [v1084e] 覆盖口径改走 coverageOf()，与 start()/routesAll() 同源。
+         旧实现在这里数 branch: 边 ⇒ 主支管同列定线时恒为 0，控制台会报
+         「12 区全是 0/2」而实际能演示 —— 诊断工具撒谎比没有诊断更耽误事。 */
+      var cov = coverageOf(allRoutes, d.total);
+      out.coverage = { counted: cov.counted, missingZones: cov.missing,
+        wholeFieldClosed: !!allRoutes && cov.closed };
+      var gg = (typeof g === 'number') ? g : 0, groupRoutes = [], expected = 0, incompleteInGroup = false;
       for (var zi = 0; zi < d.total; zi++) {
-        out.zones.push({ zi: zi, covered: covered[zi] || 0 });
-        if (groupOf(zi, d.manual, d.nPer) === gg) expected++;
+        out.zones.push({ zi: zi, covered: cov.covered[zi] || 0 });
+        if (groupOf(zi, d.manual, d.nPer) === gg) {
+          expected++;
+          out.zones[zi].group = gg;
+          if (cov.covered[zi] !== 2) incompleteInGroup = true;
+        } else out.zones[zi].group = groupOf(zi, d.manual, d.nPer);
       }
       (allRoutes || []).forEach(function (r) { if (r && groupOf(r.zi, d.manual, d.nPer) === gg) groupRoutes.push(r); });
-      out.gate = allRoutes && groupRoutes.length && expected ? 'pass' : 'routes';
+      out.coverage.incompleteInGroup = incompleteInGroup;
+      /* 判定与 start() 的四道条件逐一对齐（wholeFieldClosed && routes.length && !incomplete && activeCount），
+         否则又会出现「诊断说不能、点下去能演示」的第二类分叉。 */
+      out.gate = (allRoutes && cov.closed && groupRoutes.length && !incompleteInGroup && expected) ? 'pass' : 'routes';
       out.ok = out.gate === 'pass';
-      out.hint = out.ok ? '可以演示（第 ' + (gg + 1) + ' 组 ' + expected + ' 区）'
-        : '图能建但覆盖不全：本组 ' + expected + ' 区，成路 ' + groupRoutes.length + ' 条（逐区 covered 见 zones）';
+      out.hint = out.ok ? '可以演示（第 ' + (gg + 1) + ' 组 ' + expected + ' 区，成路 ' + groupRoutes.length + ' 条）'
+        : (!allRoutes ? 'buildFlowRoutes 返回空图'
+          : (!cov.closed ? '全场未闭合：' + (cov.missing.length) + ' 区覆盖≠2（第 ' + cov.missing.slice(0, 8).map(function (z) { return z + 1; }).join('、') + ' 区）'
+            : !groupRoutes.length ? '本组没有可用路线'
+              : '本组 ' + expected + ' 区里有区覆盖≠2，成路 ' + groupRoutes.length + ' 条（逐区 covered 见 zones）'));
       return out;
     },
     /* [v1084b] 同上，但要一段可直接截图/粘贴的文字 */
@@ -1710,9 +1731,15 @@
         '；主管 ' + (c.mains || 0) + ' / 支管 ' + (c.branches || 0) + ' / 阀门 ' + (c.valves || 0) +
         ' / 配件 ' + (c.fittings || 0) + ' / 总管段 ' + (c.trunkLines || 0) +
         ' / 分区 ' + (c.total || 0) + ' / 轮灌组 ' + (c.groups || 0);
-      var bad = (r.zones || []).filter(function (z) { return z.covered !== 2; });
-      var tail = bad.length ? '；覆盖≠2 的区：' + bad.slice(0, 8).map(function (z) { return '第' + (z.zi + 1) + '区(' + z.covered + '/2)'; }).join('、') + (bad.length > 8 ? ' 等' + bad.length + '个' : '') : '';
-      return head + '；' + r.hint + tail + demoDiagText(r.diag);
+      var gg = (typeof g === 'number') ? g : 0;
+      var bad = (r.zones || []).filter(function (z) { return z.group === gg && z.covered !== 2; });
+      var covTxt = '';
+      if (r.coverage) {
+        covTxt = '；覆盖口径=按目标点数，计入 ' + r.coverage.counted + ' 条' +
+          (r.coverage.wholeFieldClosed ? '，全场闭合' : '，全场未闭合（' + r.coverage.missingZones.length + ' 区不足）');
+      }
+      var tail = bad.length ? '；本组覆盖≠2 的区：' + bad.slice(0, 8).map(function (z) { return '第' + (z.zi + 1) + '区(' + z.covered + '/2)'; }).join('、') + (bad.length > 8 ? ' 等' + bad.length + '个' : '') : '';
+      return head + covTxt + '；' + r.hint + tail + demoDiagText(r.diag);
     }
   };
 })(window);

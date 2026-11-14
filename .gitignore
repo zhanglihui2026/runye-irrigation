@@ -206,3 +206,6 @@ npm-debug.log*
 
 # v1084c 演示接通判据统一（总管穿过节点即接通）+ 根因回归锁
 !tests/v1084c_demo_connect.test.cjs
+
+# v1084e 覆盖口径只许一份（start/routesAll/whyNot 同源）
+!tests/v1084e_coverage_single_source.test.cjs
