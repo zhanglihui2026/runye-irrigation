@@ -176,3 +176,6 @@ npm-debug.log*
 
 # v1074 捕捉触达增强回归
 !tests/v1074_snap_reach.test.cjs
+
+# v1078 捕捉偏移深挖收口回归
+!tests/v1078_snap_priority.test.cjs

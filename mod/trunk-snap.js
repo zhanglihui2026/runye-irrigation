@@ -74,16 +74,22 @@
   }
 
   /* 由宿主提供原始素材，这里只做"摊平成候选点 + 打标签"。
-     返回 [{lat,lng,kind,label}]；宿主不必关心优先级与去重。 */
+     返回 [{lat,lng,kind,label,demote?}]；宿主不必关心优先级与去重。
+     [v1078] demote：宿主在**新画总管**（draw 态）时置 input.demoteTrunkTargets——
+     旧干线的拐点/线体优先级整体 +6（拐点 3→9、线体 9→15），
+     让位于施工节点（4）：重画时旧线拐点恰好都在节点附近，旧口径 3 级先抢白圈，
+     新线继承旧坐标 = 用户看到的「捕捉节点有偏移」。编辑已有干线（edit 态）不降级，
+     v914「编辑时抢点行为不变」口径保留。 */
   function buildTargets(input) {
     input = input || {};
+    var demoteTrunk = input.demoteTrunkTargets === true;
     var out = [];
 
-    function push(lat, lng, kind, label, snapPoint) {
+    function push(lat, lng, kind, label, snapPoint, demote) {
       if (!isNum(lat) || !isNum(lng)) return;
       if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return;
       var sp=readPoint(snapPoint);
-      out.push({ lat: lat, lng: lng, snapLat:sp?sp.lat:lat, snapLng:sp?sp.lng:lng, kind: kind, label: label || '' });
+      out.push({ lat: lat, lng: lng, snapLat:sp?sp.lat:lat, snapLng:sp?sp.lng:lng, kind: kind, label: label || '', demote: !!demote });
     }
 
     /* 1. 地块顶点（最常用：贴着地块边界起步） */
@@ -103,7 +109,8 @@
     }
 
     /* 3. 已保存干线拐点。excludeTrunkId 用于"正在编辑的那条线不吃自己的点"，
-          否则拐点永远吸在自己脚下，拖不动。 */
+          否则拐点永远吸在自己脚下，拖不动。
+          [v1078] draw 态（demoteTrunk）整类降级：新画总管时节点优先。 */
     var trunks = Array.isArray(input.savedTrunks) ? input.savedTrunks : [];
     for (var ti = 0; ti < trunks.length; ti++) {
       var tk = trunks[ti];
@@ -112,7 +119,7 @@
       var pts = Array.isArray(tk.points) ? tk.points : [];
       for (var pi = 0; pi < pts.length; pi++) {
         var tp = readPoint(pts[pi]);
-        if (tp) push(tp.lat, tp.lng, 'trunk-vertex', '干线 ' + tk.id + ' 拐点 ' + (pi + 1));
+        if (tp) push(tp.lat, tp.lng, 'trunk-vertex', '干线 ' + tk.id + ' 拐点 ' + (pi + 1), null, demoteTrunk);
       }
     }
 
@@ -151,14 +158,15 @@
       push(displayLat, displayLng, 'main-coupler', (c && c.label) ? c.label : ('主管节点 ' + mcValid), {lat:cp.lat,lng:cp.lng});
     });
 
-    /* 8~9. 垂足兜底：主管和已存手绘总管的线段只在没有更高优先级点命中时胜出。 */
-    function addEdges(lines, kind, labelOf) {
+    /* 8~9. 垂足兜底：主管和已存手绘总管的线段只在没有更高优先级点命中时胜出。
+       [v1078] demote 第 4 参：draw 态旧总干线段降级（prio +6），让位施工节点。 */
+    function addEdges(lines, kind, labelOf, demote) {
       (Array.isArray(lines) ? lines : []).forEach(function (line, li) {
         if (!Array.isArray(line) || line.length < 2) return;
         for (var ei = 0; ei + 1 < line.length; ei++) {
           var a = readPoint(line[ei]), b = readPoint(line[ei + 1]);
           if (!a || !b || (a.lat === b.lat && a.lng === b.lng)) continue;
-          out.push({ kind: kind, label: labelOf(li, ei), a: a, b: b });
+          out.push({ kind: kind, label: labelOf(li, ei), a: a, b: b, demote: !!demote });
         }
       });
     }
@@ -171,9 +179,10 @@
     (Array.isArray(trunks) ? trunks : []).forEach(function (tk, li) {
       if (!tk) return;
       if (input.excludeTrunkId != null && String(tk.id) === String(input.excludeTrunkId)) return;
+      /* [v1078] draw 态旧干线段整体降级（见 buildTargets 头注释）。 */
       addEdges([tk.points], 'trunk-edge', function (_li, ei) {
         return '总管 ' + (li + 1) + ' · 段 ' + (ei + 1);
-      });
+      }, demoteTrunk);
     });
 
     return out;
@@ -187,13 +196,16 @@
         var t = list[i];
         if (t && (t.kind === 'mainpipe-edge' || t.kind === 'trunk-edge')) {
           var a = readPoint(t.a), b = readPoint(t.b);
-          if (a && b) segments.push({ a: a, b: b, kind: t.kind, label: t.label || '', prio: prioOf(t.kind) });
+          /* [v1078] demote：draw 态旧干线段 prio +6（9→15），让位施工节点（4）。 */
+          if (a && b) segments.push({ a: a, b: b, kind: t.kind, label: t.label || '', prio: prioOf(t.kind) + (t.demote ? 6 : 0) });
           continue;
         }
         if (!t || !isNum(t.lat) || !isNum(t.lng)) continue;
         var kind = t.kind || 'plot-vertex';
+        /* [v1078] demote：draw 态旧干线拐点 prio +6（3→9），让位施工节点（4）。 */
         targets.push({ lat: t.lat, lng: t.lng, snapLat:isNum(Number(t.snapLat))?Number(t.snapLat):t.lat,
-          snapLng:isNum(Number(t.snapLng))?Number(t.snapLng):t.lng, kind: kind, label: t.label || '', prio: prioOf(kind) });
+          snapLng:isNum(Number(t.snapLng))?Number(t.snapLng):t.lng, kind: kind, label: t.label || '',
+          prio: prioOf(kind) + (t.demote ? 6 : 0) });
       }
     }
     buildStats = meta || null;

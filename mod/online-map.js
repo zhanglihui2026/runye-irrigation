@@ -1183,6 +1183,9 @@
     pub.items.forEach(function(n){
       var lat=Number(n&&n.lat),lng=Number(n&&n.lng),atM=Number(n&&n.atM);
       if(!n||!isFinite(lat)||!isFinite(lng)||Math.abs(lat)>90||Math.abs(lng)>180||!/^((main|branch))-\d+$/.test(String(n.pid||'')))return;
+      /* [v1076/v1078] 双坐标口径保持：lat/lng=实体位（写回总管拓扑）、
+         displayLat/displayLng=显示位（屏幕命中与白圈）。捕捉命中显示、保存实体——
+         显示偏移绝不进入拓扑（trunk-snap 7b 以 item.lat 作 snapPoint）。 */
       out.items.push({lat:lat,lng:lng,displayLat:isFinite(Number(n.displayLat))?Number(n.displayLat):lat,
         displayLng:isFinite(Number(n.displayLng))?Number(n.displayLng):lng,atM:isFinite(atM)?atM:0,
         label:'施工节点 '+String(n.id||'')+' · '+String(n.pid||'')+' · 桩号 '+(Math.round((isFinite(atM)?atM:0)*10)/10)+'m',
@@ -1256,6 +1259,10 @@
     }
     /* [v914] 编辑已有总管时：该线拐点与 trunk-edge 线段都不吃自己的（v911 记过#2 收口） */
     if(trunkMode==='edit'&&activeTrunkId!=null) input.excludeTrunkId=activeTrunkId;
+    /* [v1078] 新画总管（draw 态）：旧干线的拐点/线体优先级整体降 6 级，让位施工节点——
+       否则重画时白圈总被旧线拐点（prio 3）抢在节点（prio 4）前，新线继承旧坐标。
+       编辑态（edit）不降级，v914「编辑时抢点行为不变」口径保留。 */
+    if(trunkMode==='draw') input.demoteTrunkTargets=true;
     snapExtras=extraSnapTargets(plot);
     if(snapExtras){
       input.valves=snapExtras.valves;

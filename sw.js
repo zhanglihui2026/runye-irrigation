@@ -1507,8 +1507,9 @@
    [v1042-source-independent-irrigation-route] 页面恢复重绘时按已发布管网几何核对动画版本。
    [v1043-coupler-node-lifecycle] 接驳节点随地块设计快照恢复；分区重建或管网重生成时清除旧节点。
    [v1076-centerline-topology] 寻路快照只用实体中心线，显示偏移独立保存；节点屏幕捕捉命中显示位并写回实体位；旧显示世界快照要求重新生成。
-   [v1077-topology-display-decoupled] 动画/断线提示描边映射到同代显示副本；连通与寻路仍使用物理中心线。 */
-const VERSION = 'v1077-topology-display-decoupled';
+   [v1077-topology-display-decoupled] 动画/断线提示描边映射到同代显示副本；连通与寻路仍使用物理中心线。
+   [v1078-snap-priority-demote] 手绘总管捕捉节点偏移深挖收口：机制一（命中位/实体位混用）v1076 双坐标已修，本版加锁防回退（publishedCouplers items 保持 lat=实体、displayLat=显示，trunk-snap 7b 以实体位作 snapPoint——试过把 items.lat 改显示位会让总管点存偏 10~20m、1.5m 接驳门禁必挂）；机制二修复——新画总管（draw 态）时旧干线拐点/线体优先级整体 +6（拐点 3→9、线体 9→15），让位施工节点（4），重画不再继承旧坐标；编辑态（edit）不降级，v914 口径保留。 */
+const VERSION = 'v1078-snap-priority-demote';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
