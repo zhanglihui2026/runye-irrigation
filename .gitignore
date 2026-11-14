@@ -182,3 +182,9 @@ npm-debug.log*
 
 # v1079 主管支管同列/同行一次定线回归
 !tests/v1079_zone_line_align.test.cjs
+
+# v1080 在线地图刷新即清空 + 清空管网按钮回归
+!tests/v1080_map_fresh_clear.test.cjs
+
+# v993 总管归属回收（v1080 新增清空入口计数 6→7）
+!tests/v993_trunk_owner_gc.test.cjs

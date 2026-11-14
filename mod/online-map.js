@@ -4063,6 +4063,85 @@
       setTimeout(go, 350);
     }catch(e){ }
   }
+  /* ===== [v1080 用户拍板「刷新即清空 + 清空按钮」] 在线地图发布图层一键清空 =====
+     痛点：上次会话的管网发布快照（分区面/管线/阀门/节点）与手绘总管在刷新后原样
+     恢复，新旧几何叠加 → 手绘总管吸不到新节点、水路闭环失败。这里做一次性清空：
+     ① 管网发布快照：地块库中各地块的 scoped 网络键 + legacy 键全部写 null；
+     ② 手绘总管：各地块 plot.trunk 置空（走地块库 replace 事务，与 commitTrunks
+        同一写入口径；成组地块不动——其总管由多地块规划管理）；
+     ③ 本页显示态：总管层/草稿状态/施工节点标记/水库标记/轮灌动画全部清掉，
+        并触发 RunyeMapEnhance 重渲染（库已空 → 图层干净）。
+     **不动**：地块边界、分区划分（plot.partitions）、三级设计数据（分区槽 dd）——
+     那些是资产；重新点「生成施工图」即可把最新快照发布回地图。 */
+  function clearPublishedOverlays(opts){
+    opts=opts||{};
+    var store=window.RyIrrigationDataStore, lib=window.RyPlotLibraryStore;
+    var clearedNet=0, clearedTrunk=0;
+    /* ① 管网发布快照（逐地块 scoped + legacy） */
+    try{
+      if(store&&typeof store.writeNetworkLayout==='function'){
+        var snap=lib&&typeof lib.read==='function'?lib.read():null;
+        ((snap&&snap.ok?snap.plots:[])||[]).forEach(function(p){
+          if(!p||p.id==null)return;
+          try{
+            if(store.readNetworkLayoutForPlot&&store.readNetworkLayoutForPlot(String(p.id))!=null){
+              store.writeNetworkLayout(null,String(p.id)); clearedNet++;
+            }
+          }catch(eNetP){}
+        });
+        try{
+          if(store.readNetworkLayout&&store.readNetworkLayout()!=null){ store.writeNetworkLayout(null); clearedNet++; }
+        }catch(eNetL){}
+      }
+    }catch(eNet){}
+    /* ② 手绘总管（逐地块 trunk=null，成组地块跳过） */
+    try{
+      if(lib&&typeof lib.read==='function'&&typeof lib.replace==='function'){
+        var snap2=lib.read();
+        if(snap2&&snap2.ok){
+          var changed=false;
+          var nextPlots=(snap2.plots||[]).map(function(p){
+            if(!p||p.id==null||p.trunk==null)return p;
+            if(p.merged||p.grouped||p.mergedInto)return p;
+            var copy=JSON.parse(JSON.stringify(p)); copy.trunk=null; changed=true; clearedTrunk++;
+            return copy;
+          });
+          if(changed){
+            var wr=lib.replace(nextPlots,snap2.revision);
+            if(!wr||wr.ok===false) clearedTrunk=0;
+          }
+        }
+      }
+    }catch(eTrunk){}
+    /* ③ 本页显示态 */
+    try{
+      /* [v993] 配对口径：trunkSaved 赋值必须同步 trunkOwnerPlotId（v1080 清空入口同样遵守）。 */
+      trunkSaved=null;trunkOwnerPlotId=null;
+      if(trunkHistory) trunkHistory.clear();
+      trunkPoints=[];
+      trunkDraft={id:null,params:{material:'PE',dn:null,designFlow:null}};
+      activeTrunkId=null;
+      if(trunkMode!=='idle') setTrunkMode('idle'); else renderTrunkDraft();
+      if(couplerMarkerLayer)couplerMarkerLayer.clearLayers();
+      if(reservoirMarkerLayer)reservoirMarkerLayer.clearLayers();
+      reservoirMarker=null;
+      if(window.RyMapFlowDemo&&typeof window.RyMapFlowDemo.stop==='function')window.RyMapFlowDemo.stop();
+      if(rymHandle&&typeof rymHandle.refresh==='function')rymHandle.refresh();
+    }catch(eDisp){}
+    if(!opts.silent) tip('已清空在线地图发布图层：管网快照 '+clearedNet+' 份、手绘总管 '+clearedTrunk+' 份。地块边界与设计数据未动；请回「分区与管路」点「生成施工图」重新发布，再重画总管。');
+    return {ok:true,net:clearedNet,trunk:clearedTrunk};
+  }
+  var clearLayersBtn=document.getElementById('btnClearLayers');
+  if(clearLayersBtn)clearLayersBtn.onclick=function(){
+    if(!window.confirm('清空在线地图的管网图层与手绘总管？\n（地块边界、分区划分与设计数据保留；清空后请回「分区与管路」点「生成施工图」重新发布）'))return;
+    clearPublishedOverlays();
+  };
+  /* [v1080] 刷新即清空（用户拍板）：每次页面加载先清掉上次的管网发布快照与手绘
+     总管，杜绝新旧几何叠加；内容只能由「生成施工图」重新发布回来。 */
+  (function(){
+    var r=clearPublishedOverlays({silent:true});
+    if(r&&(r.net||r.trunk)) tip('本次加载已清空上次的管网图层（快照 '+r.net+' 份）与手绘总管 '+r.trunk+' 份；请回「分区与管路」点「生成施工图」重新发布，再重画总管。');
+  })();
   importCloudRingFromUrl();
 })();
 
