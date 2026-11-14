@@ -91,6 +91,34 @@ const dFar = Object.assign({}, d, { trunkLL: farTrunk, trunkLinesLL: [farTrunk] 
 const vFar = D.whyNot(0, dFar);
 ok(vFar.code === 'node-not-connected', '[v1084c] 总管离节点 3m 仍判未接通（容差没放水）');
 
+/* 锁5b [v1084d] 第二个根因：主管与支管**同列重合**（v1079 起的正常布局）时，
+   最短路会沿主管直达支管端点，路线里一条 branch: 边都没有。旧口径按边种类数覆盖
+   ⇒ 恒为 0 ⇒ 12 区全报未覆盖，而实际 24 条路线全建出来了（用户实测原话：
+   「成路 24 条/目标 24」「首条路线支管边：没有 branch: 开头的边」）。
+   现在按**目标点数**计覆盖：每区两个目标，到达几个算几个。 */
+const mainsC = [], branchesC = [], valvesC = [], nodesC = [];
+for (let row = 0; row < 4; row++) {
+  for (let col = 0; col < 3; col++) {
+    const zi = row * 3 + col, xC = col * COLW + COLW / 2, yTop = row * ROWH, yBot = yTop + ROWH;
+    mainsC.push([P(xC, yTop), P(xC, yBot)]);
+    branchesC.push([P(xC, yTop + 2), P(xC, yBot - 2)]);   /* 与主管同一条线 */
+    valvesC.push({ ll: P(xC, yTop + ROWH / 2), anchorLL: null, mi: zi, tier: 'zone' });
+    if (row === 0) nodesC.push({ kind: 'main', mi: zi, ll: P(xC, yTop), pipeKey: 'm' + (zi + 1) });
+  }
+}
+const trunkC = [P(-40, 0), P(160, 0)];
+const dC = { trunkLL: trunkC, trunkLinesLL: [trunkC], mainsLL: mainsC, branchLL: branchesC, valves: valvesC,
+  fittings: [], nodesLL: nodesC, couplersLL: [], segLL: null, total: 12, manual: null, nPer: 1, gCount: 4 };
+const rC = D.buildRoutes(dC, 0, true);
+ok(!!rC && rC.length === 24, '[v1084d] 主支管重合布局同样建出 24 条路线（实测 ' + (rC ? rC.length : 0) + '）');
+const perZone = {};
+(rC || []).forEach(r => { if (r && r.zi != null) perZone[r.zi] = (perZone[r.zi] || 0) + 1; });
+let badC = 0;
+for (let i = 0; i < 12; i++) if (perZone[i] !== 2) badC++;
+ok(badC === 0, '[v1084d] 按目标点计覆盖：12 区全部 2/2（旧口径此处为 0/2 × 12）');
+ok((rC || []).some(r => !r.branch || !r.branch.some(s => s.key.indexOf('branch:') === 0)),
+  '[v1084d] 重合布局里确实存在「不含 branch: 边」的路线（这正是旧口径数不到的原因）');
+
 /* 锁6：版本纪律 */
 const m = /^const VERSION = '(v[\w-]+)';/m.exec(sw);
 ok(!!m && /^v\d{3,4}-[\w-]+$/.test(m[1]), '[v1084c] sw VERSION 形如 vNNNN- slug：' + (m && m[1]));

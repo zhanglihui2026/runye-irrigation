@@ -27,6 +27,12 @@
      [v927] 活动区使用独立地图Pane和脉冲色层；无mi的分区阀按支管几何归属，并动画显示开阀。
      ═══════════════════════════════════════════════════════════════════════ */
   var TOL_M = 5, LINK_EPS_M = 0.5, NODE_ATTACH_EPS_M = 1.5, INTERVAL_MS = 1000, FLOW_PANE = 'ryMapFlowPane';
+  /* [v1084d] 宽松吸附容差：总管/节点/主管三者的"贴着"判据共用这一份。
+     为什么不是 0.5/1.5：总管存的是**实体坐标**，而节点标记画在**显示坐标**
+     （主管/支管显示副本平移 ±gap/2≈0.96m；用户实测「阀离支管 0.96m」正是这半个间距），
+     点选落点与实体坐标天然差约 1m。地块尺度是几十米、两根主管相距 30m 以上，
+     3m 不会把相邻管错连；严格值优先，宽松值兜底并在提示里记账（couplersLoose）。 */
+  var LOOSE_ATTACH_M = 3.0;
   /* [v1084] 配件切口去重半径：与线上已有切口（节点/阀门垂足/端点）近于此值就复用，
      不再另切一刀 —— 否则一段管子被劈成 0.1m 碎片，水力切片身份 (key,a,b) 会漂移。 */
   var FIT_DEDUPE_M = 0.25;
@@ -143,8 +149,15 @@
         for(var i=1;i<line.length;i++){var d=segDistM(line[i-1],line[i],p);if(d<m)m=d;}
         return m;
       }
-      var attached=mainNodes.some(function(n){return inputTrunks.some(function(line){
-        return (line||[]).length>=2 && distToLineM(line,n.ll)<=NODE_ATTACH_EPS_M;});});
+      var attached=mainNodes.some(function(n){
+        /* [v1084d] 光"总管贴着节点"还不够：节点本身必须真的落在**自己那根主管**上，
+           否则建图时节点会因「不在主管上」被丢弃 —— 这就是"校验说通了、建图说断了"
+           的第二次翻版。两处判据现在同时检查（主管侧宽松 3m，容纳显示副本的 0.96m 偏移）。 */
+        var ml=(o.mainsLL||[])[n.mi];
+        if(ml&&ml.length>=2&&distToLineM(ml,n.ll)>LOOSE_ATTACH_M)return false;
+        return inputTrunks.some(function(line){
+          return (line||[]).length>=2 && distToLineM(line,n.ll)<=NODE_ATTACH_EPS_M;});
+      });
       return attached ? {ok:true,code:'connected',minM:0} : {ok:false,code:'node-not-connected',minM:null};
     }
     var tol = (typeof o.tolM === 'number' && o.tolM > 0) ? o.tolM : TOL_M;
@@ -581,7 +594,16 @@
         (d.valves||[]).length+'/配件'+(d.fittings||[]).length+'/总管段'+
         (d.trunkLinesLL||[]).length+'（共'+d.total+'区）');
     }
-    if(diag&&diag.nodeTotal!=null)parts.push('总管接上节点 '+(diag.couplers||0)+'/'+diag.nodeTotal);
+    if(diag&&diag.nodeTotal!=null){
+      var cp='总管接上节点 '+(diag.couplers||0)+'/'+diag.nodeTotal+
+        (diag.couplersLoose?('（其中 '+diag.couplersLoose+' 个为宽松吸附）'):'');
+      var pb=diag.nodeProbe;
+      if(pb&&isFinite(pb.minMainD)&&isFinite(pb.minTrunkD)){
+        cp+='；最近节点离主管 '+pb.minMainD.toFixed(2)+'m、离总管 '+pb.minTrunkD.toFixed(2)+
+          'm（严格容差 0.5 / 1.5）';
+      }
+      parts.push(cp);
+    }
     var g=diag&&diag.debug;
     if(g){
       parts.push('第'+(g.zi+1)+'区：支管长'+g.branchLen+'m，阀门桩号'+g.valveS+
@@ -590,7 +612,7 @@
     }
     if(diag&&diag.routes!=null)parts.push('成路'+diag.routes+'条/目标'+(diag.targets||0)+'/馈线'+(diag.feeds||0));
     if(diag&&diag.routeKeys&&diag.routeKeys.length)parts.push('首条路线支管边：'+diag.routeKeys.join('、'));
-    else if(diag&&diag.routes)parts.push('首条路线里没有 branch: 开头的边');
+    else if(diag&&diag.routes)parts.push('首条路线无 branch: 边（主支管同列定线时正常，覆盖已按目标点计）');
     return parts.length?' 【数据】'+parts.join('；')+'。':'';
   }
 
@@ -686,26 +708,45 @@
 
     /* A saved coupler is the authoritative trunk-to-main junction. */
     var seenNodes={};
+    /* [v1084d] 宽松兜底容差：严格 0.5m/1.5m 不中时，3m 内仍认接通并**记账**
+       （couplersLoose），提示里会写明「其中 N 个为宽松吸附」。
+       为什么需要：总管存的是实体坐标、节点标记画在显示坐标（±gap/2≈0.96m，用户实测
+       「阀离支管 0.96m」就是这半个间距），点选落点与实体坐标天然差约 1m；再加上地块
+       尺度是几十米、两根主管相距 30m 以上，3m 不会把相邻管错连。宁可明确地宽一点，
+       也不要让「明明贴着」被判成没接。 */
+    lastDiag.nodeProbe = { n: 0, minMainD: Infinity, minTrunkD: Infinity };
     (d.nodesLL||[]).forEach(function(n){
       if(!n||n.kind!=='main'||!n.ll||!(n.mi>=0)||!byMain[n.mi])return;
       var sig=n.mi+':'+n.ll.lat.toFixed(6)+':'+n.ll.lng.toFixed(6);if(seenNodes[sig])return;seenNodes[sig]=true;
-      var mp=project(byMain[n.mi],n.ll);if(mp.d>LINK_EPS_M)return;
-      var best=null;
-      /* [v1084c 根因修复] 这里原本多一道 `o.raw.some(顶点距≤1.5m)` 的前置过滤：
-         只有「节点正好落在总管的某个折点顶点上」才算接通。而总管是一条折线，
-         捕捉吸附后的落点通常落在**段中间**（用户画的是「从 N-01 直接拉到 N-03」
-         的一段直线，中间那两个节点根本不在折点上），于是：
-           · validateConnection 判「已接通」（它按点到线段的垂距算，1.5m 容差）→ 放行；
-           · buildFlowRoutes 判「没接通」（只认顶点）→ 图断开 → 12 区全报未覆盖。
-         用户看到的现象就是「明明吸附上去了，为什么还报错」——两套判据打架。
-         现在删掉顶点过滤，只保留下面按线段的垂距判据（与 validateConnection 同口径）。 */
+      var mp=project(byMain[n.mi],n.ll);
+      /* 最近总管的垂距（不论是否通过），专供诊断：这两个数就是"为什么没接上"的答案。 */
+      var anyBest=null;
       byTrunk.forEach(function(o){
         if(o.kind!=='trunk')return;
-        var p=project(o,n.ll);if(p.d<=NODE_ATTACH_EPS_M&&(!best||p.d<best.p.d))best={o:o,p:p};
+        var p=project(o,n.ll);if(!anyBest||p.d<anyBest.p.d)anyBest={o:o,p:p};
       });
-      if(!best)return;
-      var id='coupler:'+sig;addCut(best.o,best.p.s,id);addCut(byMain[n.mi],mp.s,id);
-      lastDiag.couplers=(lastDiag.couplers||0)+1;
+      var pr=lastDiag.nodeProbe;
+      if(mp.d<pr.minMainD)pr.minMainD=mp.d;
+      if(anyBest&&anyBest.p.d<pr.minTrunkD)pr.minTrunkD=anyBest.p.d;
+      pr.n++;
+      /* 严格：节点在本区主管上(≤0.5m) + 总管贴到节点(≤1.5m) */
+      if(mp.d<=LINK_EPS_M){
+        var best=null;
+        byTrunk.forEach(function(o){
+          if(o.kind!=='trunk')return;
+          var p=project(o,n.ll);if(p.d<=NODE_ATTACH_EPS_M&&(!best||p.d<best.p.d))best={o:o,p:p};
+        });
+        if(best){
+          var id0='coupler:'+sig;addCut(best.o,best.p.s,id0);addCut(byMain[n.mi],mp.s,id0);
+          lastDiag.couplers=(lastDiag.couplers||0)+1;return;
+        }
+      }
+      /* 宽松：两者都在 3m 内 —— 仍然接通，但要记账，别让它偷偷变成"默认行为" */
+      if(mp.d<=LOOSE_ATTACH_M&&anyBest&&anyBest.p.d<=LOOSE_ATTACH_M){
+        var id1='coupler:'+sig;addCut(anyBest.o,anyBest.p.s,id1);addCut(byMain[n.mi],mp.s,id1);
+        lastDiag.couplers=(lastDiag.couplers||0)+1;
+        lastDiag.couplersLoose=(lastDiag.couplersLoose||0)+1;
+      }
     });
     lastDiag.nodeTotal=(d.nodesLL||[]).filter(function(n){return n&&n.kind==='main'&&n.ll;}).length;
 
@@ -1073,8 +1114,17 @@
     }
     var allRoutes=buildFlowRoutes(d,0,true),allCovered={},routes=[],expected={},activeCount=0,groupRoutes=[];
     var diagAll=lastDiag;   /* [v1084] 全图那一趟的诊断，是"为什么没连上"的权威版本 */
+    /* [v1084d 第二个根因] 覆盖判定原来要求「路线里必须有一条 key 以 branch: 开头的边」。
+       这只在「主管与支管是两条分开的线」时成立；而 v1079 起主管/支管是**同列定线**
+       （实体中心线重合，只有显示副本平移 ±gap/2≈0.96m）。两线重合时最短路会沿主管
+       直接走到支管端点（拓扑完全等价），路线里一条 branch: 边都没有 ⇒ 覆盖数恒为 0
+       ⇒ 12 个区全报「支管两端都没进入水路」，而实际上 24 条路线全都建出来了。
+       用户实测数据完全对上：`成路 24 条/目标 24`，`首条路线支管边：没有 branch: 开头的边`。
+       现在改为**按目标点数**：每个区两个目标（支管两端），到达一个计 1。
+       目标本身就是 branch-start/branch-end 两个切口，到达即代表该端进水 —— 比数边种类更准，
+       也不再依赖「主支管是否重合」这种和气流无关的布局细节。 */
     (allRoutes||[]).forEach(function(route){
-      if(route&&route.branch&&route.branch.some(function(s){return s.key.indexOf('branch:')===0;}))allCovered[route.zi]=(allCovered[route.zi]||0)+1;
+      if(route&&route.zi!=null)allCovered[route.zi]=(allCovered[route.zi]||0)+1;
       if(route&&groupOf(route.zi,d.manual,d.nPer)===g)groupRoutes.push(route);
     });
     /* [v1073] 动画优先非冗余路线；本组全部冗余时回退全量（不因打标丢动画）。 */
@@ -1592,7 +1642,9 @@
         if (!routes || !routes.length) return null;
         var routeCounts = {};
         routes.forEach(function (r) {
-          if(r&&r.branch&&r.branch.some(function(s){return s.key.indexOf('branch:')===0;}))routeCounts[r.zi]=(routeCounts[r.zi]||0)+1;
+          /* [v1084d] 同 v1084d 覆盖口径：按目标点数，不按边种类（主支管同列定线时
+             路线会沿主管直达支管端点，一条 branch: 边都没有，旧口径会误判 missing）。 */
+          if(r&&r.zi!=null)routeCounts[r.zi]=(routeCounts[r.zi]||0)+1;
         });
         var missing = [];
         for (var zi = 0; zi < d.total; zi++) if (routeCounts[zi]!==2) missing.push(zi);
