@@ -498,16 +498,19 @@
         fNodes[0].parentNode.insertBefore(document.createComment('tlFrontSlot'), fNodes[0]);
       }
       for (var fk = 0; fk < fNodes.length; fk++) fNodes[fk].setAttribute('visibility', 'hidden');
-      /* [M13 2026-11-13 主线任务「自动管线单一可见绘制层与节点维护位置」]
-         二级平面画布 = 自动管线线体唯一可见绘制层。克隆底图里的主管/支管 path
-         透明化（stroke=rgba(0,0,0,0)，保留 d 与 data-tlpipe 属性 —— 结构/导出不受影响；
-         工作区拾取走 AE.effPts 几何命中，不依赖线体可见）。阀门圆 + 连接管由简图打
-         data-tlvalve 包裹标记，此处整组 opacity=0 —— 阀门只由二级画布 ryValveCanvas
-         显示一份。滴灌带（二级不画）与总管/段总管（手绘体系）保留可见。 */
-      var m13Pipes = clone.querySelectorAll('path[data-tlpipe^="main-"],path[data-tlpipe^="branch-"]');
-      for (var m13i = 0; m13i < m13Pipes.length; m13i++) m13Pipes[m13i].setAttribute('stroke', 'rgba(0,0,0,0)');
-      var m13Valves = clone.querySelectorAll('[data-tlvalve="1"]');
-      for (var m13v = 0; m13v < m13Valves.length; m13v++) m13Valves[m13v].setAttribute('opacity', '0');
+      /* [v1085 用户拍板 2026-11-14] 管路内容归三级，二级只负责规划地块。
+         M13 那条「二级画布 = 唯一可见线体层、三级透明化」的方向反转回来：
+         · 默认（__ryPipelineLayerVisible!==false）—— 底图克隆里的主管/支管 path 与
+           阀门组（data-tlvalve）**照常可见**，工作区自己显示管路；
+         · 只有用户关掉「显示/隐藏管路」开关时才透明化（保留 d 与 data-tlpipe 属性，
+           结构/导出/几何命中的拾取都不受影响 —— 拾取本来走 AE.effPts，不依赖可见性）。
+         滴灌带与总管/段总管（手绘体系）一直保留可见。 */
+      if (window.__ryPipelineLayerVisible === false) {
+        var m13Pipes = clone.querySelectorAll('path[data-tlpipe^="main-"],path[data-tlpipe^="branch-"]');
+        for (var m13i = 0; m13i < m13Pipes.length; m13i++) m13Pipes[m13i].setAttribute('stroke', 'rgba(0,0,0,0)');
+        var m13Valves = clone.querySelectorAll('[data-tlvalve="1"]');
+        for (var m13v = 0; m13v < m13Valves.length; m13v++) m13Valves[m13v].setAttribute('opacity', '0');
+      }
       var ids = clone.querySelectorAll('[id]');
       for (var j = 0; j < ids.length; j++) ids[j].setAttribute('id', 'tlWsPipe_' + ids[j].getAttribute('id'));
       var html = clone.innerHTML
@@ -1212,10 +1215,10 @@
     }
     /* 2) 支管 → 主管 → 总管（下位先画） */
     /* v162：底图兜底路径（克隆不到简图时自绘）—— 遮蔽管按同一口径画灰虚线 */
-    /* [M13] 兜底自绘路径同样透明化主管/支管线体：二级平面画布是唯一可见线体层，
-       本叠加层只保留命中结构与标注。滴灌带（二级不画）与总管（手绘体系）保留。 */
-    (data.branchPipes || []).forEach(function (l, bi) { if (l && l.length >= 2) s.push('<path d="' + pl(l) + '" fill="none" stroke="rgba(0,0,0,0)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'); });
-    (data.mainPipes || []).forEach(function (l, mi) { if (l && l.length >= 2) s.push('<path d="' + pl(l) + '" fill="none" stroke="rgba(0,0,0,0)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>'); });
+    /* [v1085] 管路归三级：兜底自绘路径恢复可见（M13 的透明化撤回），
+       遮蔽管照旧走 hidAttr 灰虚线（v162 口径不变）。 */
+    (data.branchPipes || []).forEach(function (l, bi) { if (l && l.length >= 2) s.push('<path d="' + pl(l) + '" fill="none"' + hidAttr('branch-' + bi, COLORS.branch, 1.6) + ' stroke-linecap="round" stroke-linejoin="round"/>'); });
+    (data.mainPipes || []).forEach(function (l, mi) { if (l && l.length >= 2) s.push('<path d="' + pl(l) + '" fill="none"' + hidAttr('main-' + mi, COLORS.main, 2.6) + ' stroke-linecap="round" stroke-linejoin="round"/>'); });
     /* 滴灌带与主管共用画布变换，并压在支管上方，与简图层序一致。 */
     (data.dripTapes || []).forEach(function (l) { if (l && l.length >= 2) s.push('<path data-tltape="1" d="' + pl(l) + '" fill="none" stroke="#0e7490" stroke-width="1.4" stroke-dasharray="3,3" stroke-linecap="round"/>'); });
     (data.frontPipe && data.frontPipe.length >= 2) ? s.push('<path d="' + pl(data.frontPipe) + '" fill="none"' + hidAttr('front', COLORS.front, 4) + ' stroke-linecap="round" stroke-linejoin="round"/>') : 0;
@@ -1224,10 +1227,10 @@
       var sp = T(data.sourcePos);
       s.push('<circle cx="' + fmt(sp.x) + '" cy="' + fmt(sp.y) + '" r="5" fill="' + COLORS.source + '" stroke="#fff" stroke-width="1.6"/>');
     }
-    /* [M13] 阀门圆透明化：阀门由二级画布 ryValveCanvas 显示一份（保留结构占位）。 */
+    /* [v1085] 阀门圆恢复可见（M13 的透明化撤回）：管路归三级，阀门由本层画。 */
     (data.valves || []).forEach(function (v) {
       var q = T(v);
-      s.push('<circle cx="' + fmt(q.x) + '" cy="' + fmt(q.y) + '" r="3.6" fill="rgba(0,0,0,0)" stroke="rgba(0,0,0,0)" stroke-width="1.2"/>');
+      s.push('<circle cx="' + fmt(q.x) + '" cy="' + fmt(q.y) + '" r="3.6" fill="' + COLORS.valve + '" stroke="#fff" stroke-width="1.2"/>');
     });
     /* 地块轮廓描边压顶（分区底色/裁剪不遮边线） */
     s.push('<path d="' + polyD + '" fill="none" stroke="' + COLORS.plotLine + '" stroke-width="2"/>');
@@ -1339,12 +1342,10 @@
       var d = '';
       epts.forEach(function (p, i) { var q = T(p); d += (i ? 'L' : 'M') + fmt(q.x) + ' ' + fmt(q.y); });
       var hid = isPidHidden(pid);   /* v162：遮蔽管→灰虚线；长度标注一并省掉（遮蔽即不在图上参与表达） */
-      /* [M13] 改长管线体透明化：二级平面画布按同一 AE.effPts 有效几何显示线体
-         （渲染口径消费），本覆盖层只保留长度标注 —— 不再画可见实线。
-         被遮蔽管不再在此重画灰虚线：遮蔽态由二级画布消费同一 hiddenMap 画灰虚线，
-         保持「单一可见线体层」。 */
+      /* [v1085] 管路归三级：改长管线体恢复可见（M13 透明化撤回）。
+         遮蔽管仍不在本层重画（灰虚线由线体层统一画，保持单一来源）。 */
       if (!hid) {
-        s.push('<path d="' + d + '" fill="none" stroke="rgba(0,0,0,0)" stroke-width="' + st.w + '" stroke-linecap="round" stroke-linejoin="round"/>');
+        s.push('<path d="' + d + '" fill="none" stroke="' + st.c + '" stroke-width="' + st.w + '" stroke-linecap="round" stroke-linejoin="round"/>');
         var mid = epts[Math.floor(epts.length / 2)], mq = T(mid);
         s.push('<text x="' + fmt(mq.x + 6) + '" y="' + fmt(mq.y - 4) + '" font-size="9" font-family="system-ui" fill="#b45309">' + esc(AE.polylineLen(epts).toFixed(1) + 'm') + '</text>');
       }

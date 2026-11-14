@@ -552,6 +552,24 @@
     return bits.length?' 【诊断】'+bits.join('；')+'。':'';
   }
 
+  /* [v1084b] 兜底补诊断：还有一类失败是「路线到了，但没经过真实支管段」——
+     支管切口与阀门/端点重合时切出来的段长为 0，allCovered 数不到 2，而 diag 里
+     一条原因都没有 ⇒ 提示条只剩通用建议，等于又回到"查不清"。
+     这里按 allCovered 逐区补原因，保证失败时一定点得出是哪一区。 */
+  function mergeDiagForTip(diag,allCovered,total){
+    var out={zones:(diag&&diag.zones?diag.zones.slice():[]),
+      fittings:diag&&diag.fittings,blocked:diag&&diag.blocked,
+      missing:diag&&diag.missing,active:diag&&diag.active};
+    var has={};out.zones.forEach(function(z){has[z.zi]=1;});
+    for(var zi=0;zi<total;zi++){
+      if(allCovered[zi]===2||has[zi])continue;
+      out.zones.push({zi:zi,reason:(allCovered[zi]
+        ?'只通一端：支管另一端没接到主管/总管'
+        :'支管两端都没进入水路（切口与端点重合，或图没连到本区）')});
+    }
+    return out;
+  }
+
   function buildFlowRoutes(d,g,allZones){
     /* [v1084] 每轮建图重置诊断：{zones:[{zi,reason}], fittings:{placed,dup,offLine,noPipe},
        active, missing, blocked}。失败时宿主把它翻成人话，用户才知道"哪个区缺什么"。 */
@@ -995,9 +1013,12 @@
     if(!wholeFieldClosed||!routes.length||incomplete||!activeCount){
       if(layer)layer.clearLayers();
       active=null;hideGroupInfo();if(timer){clearInterval(timer);timer=null;}playing=false;syncChipsState();
-      if(ctx.tip)ctx.tip('当前地块尚未形成覆盖所有分区支管两端的连续管路；请检查手绘总管、捕捉节点、主管、分区阀门和支管连接。'
-        +'若刚点过「生成施工图」或刚更新过版本，请删掉旧总管沿图上管线重画（先点「捕捉点」开启吸附，白圈吸到施工节点再落点），再演示轮灌。'
-        +demoDiagText(diagAll));
+      /* [v1084b] 诊断放最前：提示条是 max-height:25vh 可滚动的，通用建议很长，
+         把「哪一区、缺什么」压到末尾等于没有。先给原因，再给处理建议。 */
+      var dgTip=mergeDiagForTip(diagAll,allCovered,d.total);
+      if(ctx.tip)ctx.tip(demoDiagText(dgTip)
+        +'处理建议：请检查手绘总管、捕捉节点、主管、分区阀门和支管连接；'
+        +'若刚点过「生成施工图」或刚更新过版本，请删掉旧总管沿图上管线重画（先点「捕捉点」开启吸附，白圈吸到施工节点再落点），再演示轮灌。');
       return false;
     }
     renderSnapshotD = d;     /* [perf-20261106] 复用同一份快照，不再 collect 第二次 */
@@ -1508,6 +1529,8 @@
        zones:[{zi,reason}]}。失败提示用它逐条说清"哪个区、缺什么、差多少米"。 */
     lastDiagnostics: function () { return lastDiag; },
     /* [v1084] 诊断文案纯函数（单测直测，不必起地图） */
-    diagText: demoDiagText
+    diagText: demoDiagText,
+    /* [v1084b] 诊断补齐（按 allCovered 逐区补原因）纯函数 */
+    mergeDiag: mergeDiagForTip
   };
 })(window);

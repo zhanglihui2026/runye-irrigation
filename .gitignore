@@ -200,3 +200,6 @@ npm-debug.log*
 
 # v1084 阀门/三通归属进快照 + 演示按归属建图 + 断点诊断回归
 !tests/v1084_valve_ownership_publish.test.cjs
+
+# v1085 管路回三级（二级只规划地块）+ 诊断补齐回归
+!tests/v1085_pipes_back_to_level3.test.cjs

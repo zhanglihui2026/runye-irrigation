@@ -2520,7 +2520,20 @@
        判定 IIFE 保留计算（诊断信息 + __ppPipeLayerDedupe 探针锚点），但结果恒不抑制。
        · 「显示/隐藏管路」开关（__ryPipelineLayerVisible，v1056）继续控制本层显隐；
        · 正在画线（currentLine 非空）时照常显示（二级恒画，无抑制需求）。 */
-    var ppPipeLayerSuppressed=false;
+    /* [v1085 用户拍板 2026-11-14] 管路内容归三级，二级只负责规划地块 —— 把 v1056/v1057(M13)
+       「二级恒画、三级透明」的方向反转回来。
+       理由（用户原话）：「把管路这些内容，还是放在三级，二级只负责规划地块」。
+       实情核对：二级的「主管/支管」绘制与拾取按钮早在 2026-09-28 就 display:none 了
+       （手工画线不进水力计算），二级既不能画管也不能选管 ⇒ 本层再画一遍管路只是
+       「同一套管画两遍」的来源，没有任何编辑价值。所以这里恒抑制，不留例外分支。
+       → 二级画布此后只画：地块边界、分区网格、分区号/面积、地块标注（管路层整块
+         —— 主管/支管/一级管/沿线滴灌带/阀门/遮蔽灰虚线/选中高亮 —— 全部不画）；
+       → 主管/支管/一级管/滴灌带/阀门全部由三级工作区显示（tl-workspace 同步撤掉
+         透明化；那里的滴灌带是 data-tltape 独立一条，不依赖本层）。
+       注意：滴灌带（ppDrawDripTape）原本也画在本守卫块内 ⇒ 二级一并停画，
+       不存在「二级只剩滴灌带」的残影。
+       「显示/隐藏管路」开关（__ryPipelineLayerVisible）语义改为只管三级层。 */
+    var ppPipeLayerSuppressed=true;
     var ppPipeLayerWouldSuppress=false;   /* [M13] v875 判定保留为诊断值 */
     (function(){
       /* [v875b 判定保留为诊断] 正在画线时判定无意义；此处仅计算「若按 v875 规则
@@ -2544,8 +2557,10 @@
       ppPipeLayerWouldSuppress=true;   /* [M13] 仅诊断：渲染恒不消费此值 */
     })();
     /* [v875] 调试/验收锚点：探针与线上排障直接读最近一次渲染的抑制判定与判据摘要。
-       suppressed 恒 false（M13 起二级为唯一可见线体层）；wouldSuppress 保留 v875 判定。 */
-    window.__ppPipeLayerDedupe={suppressed:false,wouldSuppress:ppPipeLayerWouldSuppress,
+       [v1085] suppressed 改为如实反映 ppPipeLayerSuppressed（本版恒 true：管路归三级）。
+       M13 期间这里写死 false 而实际也在画——探针说谎，正是「排障看不出是谁在画」的来源；
+       wouldSuppress 继续保留 v875 的判定（仅诊断，不参与渲染）。 */
+    window.__ppPipeLayerDedupe={suppressed:!!ppPipeLayerSuppressed,wouldSuppress:ppPipeLayerWouldSuppress,
       ddMains:Array.isArray(window.tlDiagramData&&window.tlDiagramData.mainPipes)?window.tlDiagramData.mainPipes.length:0,
       ppMains:Array.isArray(ppState.mainPipes)?ppState.mainPipes.length:0,mode:ppState.mode||''};
 
@@ -2559,7 +2574,7 @@
     ppCtx.save();
     ppTracePlotPath();
     ppCtx.clip(); /* 渲染错开线与阀门不得越出异形地块边界；不改变设计坐标 */
-    if(window.__ryPipelineLayerVisible!==false){
+    if(window.__ryPipelineLayerVisible!==false&&!ppPipeLayerSuppressed){
     /* [M13] 二级画布消费三级图面编辑覆盖（**渲染口径**，不动数据/水力）：
        同代前提下（三级 mainPipes/branchPipes 数量与二级一致），改长管按
        AE.effPts 有效几何显示、被遮蔽管画灰虚线 —— 线体唯一可见层随编辑态联动，
@@ -2667,8 +2682,9 @@
 
     // Valves
     /* [v1056] 阀门属于管路图层：随「显示/隐藏管路」开关显隐。
-       [M13] ppPipeLayerSuppressed 恒 false（二级为唯一可见线体层），阀门只在本层显示一份。 */
-    if(window.__ryPipelineLayerVisible!==false){
+       [v1085] 阀门与主管/支管同归三级：ppPipeLayerSuppressed 恒 true ⇒ 本块恒不执行，
+       阀门只由三级工作区画一份（M13「二级唯一可见层」口径已反转）。 */
+    if(window.__ryPipelineLayerVisible!==false&&!ppPipeLayerSuppressed){
     ppState.valves.forEach(function(v,idx){
       if(!ppPointInPlot(v))return;
       var __vv=__ppDisplayGeometry.valves[idx]||v;
