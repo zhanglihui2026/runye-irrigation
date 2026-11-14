@@ -562,6 +562,30 @@
       { pane:FLOW_PANE,color: color, weight: weight, opacity: 0.95, className: anim ? 'mapflow-anim' : '', interactive: false });
   }
 
+  /* [v1084f 2026-11-14] 可见元素一律落在**显示世界**——这是 v1082 定下、却被本模块漏掉一半的规则：
+     只要有一个点还留在实体坐标，它就会比周围的可见管线偏半个显示间距（≈0.96m），
+     用户看到的就是「动画飘在管线旁边」。下面两个 helper 是这条规则在本模块的唯一出口。 */
+
+  /* 实体点 → 挂在「某区支管」上的显示位（阀门、分水连接点用；支管副本是整线刚性平移）。 */
+  function shiftToBranchDisplay(d, zi, p) {
+    if (!p || !(zi >= 0)) return p;
+    var phys = (d.branchLL || [])[zi], show = (d.displayBranchLL || [])[zi];
+    if (!phys || !show || !phys.length || !show.length) return p;
+    return { lat: p.lat + (show[0].lat - phys[0].lat), lng: p.lng + (show[0].lng - phys[0].lng) };
+  }
+
+  /* 实体点 → 显示位，走地图投影层同一实现（online-map 的 toShownPoint，逐点就近管线取位移）。
+     取不到投影层就原样返回：宁可不偏移，也不要自己猜一个方向。 */
+  function shiftToShown(p) {
+    if (!p) return p;
+    var PR = window.RyMapPointProjector;
+    if (!PR || typeof PR.toShown !== 'function') return p;
+    try {
+      var q = PR.toShown(p);
+      return (q && isFinite(q.lat) && isFinite(q.lng)) ? { lat: q.lat, lng: q.lng } : p;
+    } catch (e) { return p; }
+  }
+
   /* Build only the network-root-to-active-zone route. The graph is split at the saved
      coupler nodes, main-line end joins and branch takeoffs, so a later trunk
      junction (for example N-02) is not animated when an earlier zone (zone 3)
@@ -1004,7 +1028,9 @@
         var key=seg.key+':'+seg.points[0].lat.toFixed(6)+':'+seg.points[0].lng.toFixed(6)+':'+seg.points[seg.points.length-1].lat.toFixed(6)+':'+seg.points[seg.points.length-1].lng.toFixed(6);
         if(drawn[key])return;drawn[key]=true;
         /* [v1082] 地图线体画显示副本，描边跟着显示副本走，才不会浮在可见管线旁边。 */
-        var shownPoints=seg.points,match=/^(main|branch):(\d+)$/.exec(String(seg.key||''));
+        var shownPoints=seg.points,segKey=String(seg.key||'');
+        var match=/^(main|branch):(\d+)$/.exec(segKey);
+        var feedMatch=/^branch-feed:(\d+)$/.exec(segKey);
         if(match){
           var main=match[1]==='main',index=Number(match[2]);
           var physical=(main?d.mainsLL:d.branchLL)[index],shown=(main?d.displayMainsLL:d.displayBranchLL)[index];
@@ -1013,6 +1039,28 @@
             var dLat=shown[0].lat-physical[0].lat,dLng=shown[0].lng-physical[0].lng;
             shownPoints=seg.points.map(function(p){return{lat:p.lat+dLat,lng:p.lng+dLng};});
           }
+        } else if(feedMatch){
+          /* [v1084f 用户实测 2026-11-14「动画位置跟管线不重叠」] 只换算 main:N/branch:N 不够：
+             路线里还有两类段照样浮着，整段偏半个显示间距（≈0.96m）。
+             branch-feed:N 是「主管接点 → 阀门」的分水连接段，起点属于主管世界、终点属于
+             支管世界，两头本来就不在同一个偏移里 ⇒ 按点序把两个位移线性混合。
+             该段通常短于 1m，插值误差可忽略；比"整段用一个位移"准得多。 */
+          var fzi=Number(feedMatch[1]);
+          var mp=(d.mainsLL||[])[fzi],mShow=(d.displayMainsLL||[])[fzi];
+          var bp=(d.branchLL||[])[fzi],bShow=(d.displayBranchLL||[])[fzi];
+          var mD=(mp&&mShow&&mp.length&&mShow.length)?{lat:mShow[0].lat-mp[0].lat,lng:mShow[0].lng-mp[0].lng}:{lat:0,lng:0};
+          var bD=(bp&&bShow&&bp.length&&bShow.length)?{lat:bShow[0].lat-bp[0].lat,lng:bShow[0].lng-bp[0].lng}:{lat:0,lng:0};
+          var nPt=seg.points.length;
+          shownPoints=seg.points.map(function(p,pi){
+            var t=nPt>1?pi/(nPt-1):0;
+            return {lat:p.lat+mD.lat*(1-t)+bD.lat*t, lng:p.lng+mD.lng*(1-t)+bD.lng*t};
+          });
+        } else if(/^(trunk|segment):/.test(segKey)){
+          /* trunk:N（手绘总管）/ segment:0（段总管反投线）存的是**实体坐标**，而地图渲染
+             总管时逐点走 RyMapPointProjector.toShown（online-map: toDisplay(toShownPoint(q))）。
+             这里必须用同一个函数，否则「总管上的水流」会整体偏离地图总管半个间距。
+             取不到投影层（老页面/未挂载）⇒ 原样返回，宁可不偏移也不乱偏。 */
+          shownPoints=seg.points.map(shiftToShown);
         }
         ly.addLayer(poly(shownPoints,seg.key.indexOf('branch:')===0?'#16a34a':'#185FA5',seg.key.indexOf('branch:')===0?3:5,true));
       });
@@ -1042,13 +1090,18 @@
     d.valves.forEach(function (v) {
       var on = (v.mi >= 0) && (groupOf(v.mi, d.manual, d.nPer) === g);
       var cls=on?'is-open':'is-closed',iconHtml='<span class="mapflow-valve '+cls+'" aria-hidden="true"><svg viewBox="0 0 24 24"><circle class="mapflow-valve-ring" cx="12" cy="12" r="10"/><path class="mapflow-valve-pipe" d="M1 12h6m10 0h6"/><path class="mapflow-valve-body" d="M7 7l5 5-5 5zm10 0l-5 5 5 5z"/><g class="mapflow-valve-handle"><path d="M12 7V1.5M8 1.5h8"/></g></svg></span>';
-      ly.addLayer(window.L.marker([v.ll.lat,v.ll.lng],{
+      /* [v1084f] 阀门挂在支管上 ⇒ 画在该支管的显示副本上（以前直接用实体坐标，
+         整排阀门比可见支管偏半个间距，用户看到的就是"图标没落在管线上"）。 */
+      var vll=shiftToBranchDisplay(d,v.mi,v.ll)||v.ll;
+      ly.addLayer(window.L.marker([vll.lat,vll.lng],{
         icon:window.L.divIcon({className:'mapflow-valve-icon',html:iconHtml,iconSize:[24,24],iconAnchor:[12,12]}),
         keyboard:false,interactive:false,zIndexOffset:1200
       }));
     });
     if(d.sourceLL){
-      ly.addLayer(window.L.marker([d.sourceLL.lat,d.sourceLL.lng],{
+      /* [v1084f] 水源/蓄水池：贴近管线时同样走显示位（离管线 >reach 的空中点原样） */
+      var sll=shiftToShown(d.sourceLL);
+      ly.addLayer(window.L.marker([sll.lat,sll.lng],{
         icon:window.L.divIcon({className:'ry-reservoir-icon-wrap mapflow-reservoir-icon',iconSize:[54,48],iconAnchor:[27,42],
           html:'<span class="ry-reservoir-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5C9.4 6.1 5.3 10.2 5.3 14.4a6.7 6.7 0 0 0 13.4 0C18.7 10.2 14.6 6.1 12 2.5Z"/></svg></span><span class="ry-reservoir-label">蓄水池</span>'}),
         interactive:false,zIndexOffset:1500
@@ -1740,6 +1793,47 @@
       }
       var tail = bad.length ? '；本组覆盖≠2 的区：' + bad.slice(0, 8).map(function (z) { return '第' + (z.zi + 1) + '区(' + z.covered + '/2)'; }).join('、') + (bad.length > 8 ? ' 等' + bad.length + '个' : '') : '';
       return head + covTxt + '；' + r.hint + tail + demoDiagText(r.diag);
+    },
+    /* [v1084f 2026-11-14 用户报「4区/7区动画路径不对」] 单区路线段清单 —— 让「水实际走哪几段」
+       可以直接打出来看，不用再靠肉眼猜动画对不对。
+       用法：RyMapFlowDemo.routeSegments(3)   // 0 基：3 = 图上第 4 区，6 = 第 7 区
+       返回 { zi, group, routes:[{ redundant, segs:[{dir,key,lenM,from,to}] }] }，
+       其中 segs 按「水源 → 支管端」的顺序排列；lenM 是段长（米），from/to 是等距投影米坐标。
+       期望形状（1 列 4 行的网格）：第 4 区必须出现 main:0（1 区那段主管）再 main:3，
+       第 7 区必须出现 main:0 → main:3 → main:6；只有 main:6 说明上游段没进路线。 */
+    routeSegments: function (zi, dInj) {
+      var out = { zi: zi, group: null, routes: [], error: '' };
+      try {
+        var d = dInj || collect();
+        if (!d) { out.error = '无可用简图数据'; return out; }
+        var gg = groupOf(zi, d.manual, d.nPer);
+        out.group = gg;
+        /* 与建图同一套等距投影（buildFlowRoutes 里的 xy 是它的局部函数，这里按同一公式另算一份，
+           仅供人读坐标，不参与任何判定）。参考纬度取本区主管首点，避免跨区累积误差。 */
+        var refM = (d.mainsLL || [])[zi];
+        var refLat = (refM && refM[0] && isFinite(refM[0].lat)) ? refM[0].lat
+          : ((d.trunkLinesLL && d.trunkLinesLL[0] && d.trunkLinesLL[0][0]) ? d.trunkLinesLL[0][0].lat : 0);
+        var cosL = Math.max(.01, Math.cos(refLat * Math.PI / 180));
+        var proj = function (p) { return { x: p.lng * 111320 * cosL, y: p.lat * 110540 }; };
+        var segLen = function (a, b) { var p = proj(a), q = proj(b); return Math.sqrt(Math.pow(q.x - p.x, 2) + Math.pow(q.y - p.y, 2)); };
+        var rs = buildFlowRoutes(d, gg, false);
+        (rs || []).forEach(function (r) {
+          if (!r || r.zi !== zi) return;
+          var segs = [];
+          ['trunk', 'main', 'branch'].forEach(function (k) {
+            (r[k] || []).forEach(function (s) {
+              if (!s || !s.points || s.points.length < 2) return;
+              var a = s.points[0], b = s.points[s.points.length - 1], pa = proj(a), pb = proj(b);
+              segs.push({ dir: k, key: s.key, lenM: Math.round(segLen(a, b) * 10) / 10,
+                from: [Math.round(pa.x * 10) / 10, Math.round(pa.y * 10) / 10],
+                to: [Math.round(pb.x * 10) / 10, Math.round(pb.y * 10) / 10] });
+            });
+          });
+          out.routes.push({ redundant: !!r.redundant, segs: segs });
+        });
+        if (!out.routes.length) out.error = '该区没有可用路线（图没连到本区）';
+      } catch (e) { out.error = e.message; }
+      return out;
     }
   };
 })(window);

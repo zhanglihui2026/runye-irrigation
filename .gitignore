@@ -209,3 +209,6 @@ npm-debug.log*
 
 # v1084e 覆盖口径只许一份（start/routesAll/whyNot 同源）
 !tests/v1084e_coverage_single_source.test.cjs
+
+# v1084f 演示描边与可见管线对齐（四类段/图标全走显示世界）+ 单区路线段清单
+!tests/v1084f_flow_route_alignment.test.cjs
