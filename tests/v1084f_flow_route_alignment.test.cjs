@@ -98,8 +98,10 @@ ok(r4.some(s => s.key.indexOf('branch:') === 0 && s.lenM > 5),
 
 /* ---------- C. [v1084g] 阀门是支管唯一进水口 + 支管整段流动 ---------- */
 ok(/valveOnOwnMain\[v\.mi\]=1/.test(demo), '[v1084g] 能识别「阀门落在自己主管上」的区');
-ok(/if\(o\.kind==='main'&&valveOnOwnMain\[bk\]&&o\.key==='main:'\+bk\)return;/.test(demo),
-  '[v1084g] 该区支管端点不再绕过阀门直连本区主管');
+ok(/Object\.keys\(branchLines\)\.forEach\(function\(bk\)\{[\s\S]{0,120}?if\(valveOnOwnMain\[bk\]\)return;/.test(demo),
+  '[v1084h] 有阀门的区：支管两端一律不打洞（阀门是唯一进水口）');
+ok(/if\(o\.kind==='branch'&&valveOnOwnMain\[o\.index\]\)return;/.test(demo),
+  '[v1084h] 反方向也挡：别的支管不许往「有阀门的支管」上打洞');
 ok(/zoneBranch\[i\]=\[/.test(demo), '[v1084g] 每区支管整段（阀门两侧各一段）单独给出');
 ok(/concat\(route\.zoneBranch\|\|\[\]\)/.test(demo), '[v1084g] 渲染消费 zoneBranch（与路线条数无关）');
 
@@ -119,6 +121,53 @@ if (rs4.length && rs4[0].zoneBranch) {
   ok(Math.abs(segLenOf(zb[0]) - COLW / 2) < 0.5 && Math.abs(segLenOf(zb[1]) - COLW / 2) < 0.5,
     '[v1084g] 分界点落在阀门（两段各 ' + segLenOf(zb[0]).toFixed(1) + ' / ' + segLenOf(zb[1]).toFixed(1) + 'm）');
 }
+
+/* ---------- D. [v1084h] 真实场地形状：主/支管**同列定线** ----------
+ * 上面 B 段的夹具是「支管横穿、主管竖穿」的十字布局，支管端点到主管有 22.5m，
+ * 永远不会触发端点打洞 —— 所以 v1084f/v1084g 两轮测试全绿，用户现场仍然错。
+ * 真实场地（v1079 主/支管同列定线）是：每个区的**主管和支管都在同一列**上、
+ * 实体坐标完全重合，只在显示副本里左右错开 0.96m。此时支管端点与上游
+ * main:N-1 端点距离恰为 0，v1073 的端点打洞会把支管顶端直接焊到上一区主管末端，
+ * 最短路「沿主管到本区顶部 → 0 米跳进支管」，本区那段主管（顶部→阀门）一段不走。
+ * 这一段就是照这个形状建的：4 行 × 3 列，每区主管=支管=同一竖线，阀门在区中点。 */
+const cMains = [], cBranches = [], cValves = [], cNodes = [];
+const CCOLS = [0, 60, 100], CBH = 60;
+for (let row = 0; row < 4; row++) {
+  for (let col = 0; col < 3; col++) {
+    const zi = row * 3 + col, x = CCOLS[col], yt = row * CBH, yb = yt + CBH, ym = (yt + yb) / 2;
+    cMains.push([P(x, yt), P(x, yb)]);
+    cBranches.push([P(x, yt), P(x, yb)]);
+    cValves.push({ ll: P(x, ym), anchorLL: P(x, ym), mi: zi, tier: 'zone' });
+    if (row === 0) cNodes.push({ kind: 'main', mi: zi, ll: P(x, yt), pipeKey: 'm' + (zi + 1) });
+  }
+}
+const cTrunk = [P(-40, 0), P(140, 0)];
+const cd = { trunkLL: cTrunk, trunkLinesLL: [cTrunk], mainsLL: cMains, branchLL: cBranches,
+  valves: cValves, fittings: [], nodesLL: cNodes, couplersLL: [], segLL: null,
+  total: 12, manual: null, nPer: 1, gCount: 4 };
+function cKeys(zi) {
+  const r = D.routeSegments(zi, cd);
+  return (r && r.routes && r.routes.length) ? r.routes[0].segs.map(s => s.key) : [];
+}
+const c7 = cKeys(6);
+ok(c7.indexOf('main:6') >= 0,
+  '[v1084h] 同列定线下 7 区必须走完本区主管 main:6（7 区顶部→阀门那段）：' + c7.join('→'));
+ok(c7.indexOf('branch-feed:6') >= 0 && c7.indexOf('branch-feed:6') > c7.indexOf('main:6'),
+  '[v1084h] 7 区必须是「main:6 → branch-feed:6（阀门）→ 支管」的顺序');
+ok(c7[c7.length - 1].indexOf('branch:') === 0,
+  '[v1084h] 7 区路线以支管段收尾（不是停在 main:3 上）：' + (c7[c7.length - 1] || '空'));
+/* 12 个区一律「先走本区主管、再进阀门」，一个都不许抄近路 */
+let shortcut = [];
+for (let zi = 0; zi < 12; zi++) {
+  const k = cKeys(zi);
+  if (!k.length || k.indexOf('main:' + zi) < 0 || k.indexOf('branch-feed:' + zi) < 0) shortcut.push(zi + 1);
+}
+ok(shortcut.length === 0,
+  '[v1084h] 12 区全部「本区主管 → 阀门 → 支管」，抄近路的区：' + (shortcut.join(',') || '无'));
+/* 支管整段必须仍给出两段（阀门两侧），且合计等于区高 */
+const c7route = D.buildRoutes(cd, 0, true).filter(r => r.zi === 6);
+ok(c7route.length > 0 && c7route[0].zoneBranch && c7route[0].zoneBranch.length === 2,
+  '[v1084h] 同列定线下 7 区仍给出支管整段（阀门两侧各一段）');
 
 /* ---------- 版本纪律 ---------- */
 const m = /^const VERSION = '(v[\w-]+)';/m.exec(sw);
