@@ -166,3 +166,6 @@ npm-debug.log*
 
 # v1069 节点回传地图：几何换代参数迁移回归
 !tests/v1069_node_resync.test.cjs
+
+# v1070 发布块 p2ll 作用域桥接回归
+!tests/v1070_node_publish_bridge.test.cjs

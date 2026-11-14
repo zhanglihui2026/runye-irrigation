@@ -5525,6 +5525,9 @@ function tlAutoGenerate(options) {
      反投成经纬度，经 RyIrrigationDataStore 写入 runye_network_layout，地图页 runye-map-enhance.js 读取后
      在卫星图叠加真实主管/支管/水源点。无 geo 基准（手动画矩形、未经地图回传）时静默跳过。
      整段删除即卸载，不影响主流程。 */
+  var tlPublishP2ll=null;   /* [v1069b] 下方反投 IIFE 内定义的 p2ll 桥接出口——IIFE 作用域封闭，
+                               后面「施工节点冻结」发布块（同函数级作用域）看不到它，
+                               必须经此变量带出；发布块入口做空值校验（见 publishToMap 块）。 */
   if(options.publishToMap===true) try { (function(){
     var dd = window.tlDiagramData; if(!dd || dd.world!=='meter') return;
     var plotId=window.currentPlotId || null;
@@ -5563,6 +5566,7 @@ function tlAutoGenerate(options) {
       return { x:fInv.ax*dx+fInv.bx*dy, y:fInv.ay*dx+fInv.by*dy };
     }
     function p2ll(pt){ pt=toFrame(pt); if(!pt||!isFinite(pt.x)) return null; return [ +(base.refLat+pt.y/mlat).toFixed(6), +(base.refLng+pt.x/(mlat*cosLat)).toFixed(6) ]; }
+    tlPublishP2ll=p2ll;   /* [v1069b] 桥接：施工节点冻结发布块要用同一投影出口 */
     function ln2ll(line){ if(!line||line.length<2) return null; var out=[]; for(var k=0;k<line.length;k++){ var ll=p2ll(line[k]); if(ll) out.push(ll); } return out.length>=2?out:null; }
     function dnOf(txt){ var m=/(\d+)/.exec(String(txt||'')); return m?+m[1]:0; }
     var meta=dd.meta||{}, mpipes=(meta.pipes)||{};
@@ -5806,6 +5810,12 @@ function tlAutoGenerate(options) {
   if(options.publishToMap===true){
     /* 路径演示使用的管线、阀门和施工节点在同一发布事务内冻结。
        运行态编辑层只在此处解析一次；发布后地图不再把它与另一代节点/管线混读。 */
+    /* [v1069b] p2ll 桥接：它声明在上方管网反投 IIFE 内部，本块直接引用必然
+       ReferenceError('p2ll is not defined')——v1069 失败弹窗暴露的真实报错。
+       反投 IIFE 与本块同被 publishToMap 门控且先执行 ⇒ 桥接变量此时必已就绪；
+       未就绪说明基准/框线早退，发布本就不该继续。 */
+    var p2ll=tlPublishP2ll;
+    if(typeof p2ll!=='function')throw new Error('管线投影出口未就绪（地图坐标基准或地块框线缺失）');
     try{
       var publishDd=window.tlDiagramData, publishNodes=window.RyTlNodes, publishEdits=window.RyTlAutoEdits;
       if(!pendingMapNetwork||!publishDd||!publishEdits||typeof publishEdits.effPts!=='function'||typeof publishEdits.pointAt!=='function')

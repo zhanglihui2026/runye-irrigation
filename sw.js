@@ -12,6 +12,7 @@
 /* v531-data-service-plot-store: resolve plugin plot references through the shared plot-library adapter. */
 /* v427-archive-3d-iso: detach 3D preview and axonometric UI while retaining shared 2D pipe workspace and data. */
 'use strict';
+/* v1070-node-publish-bridge（v1069 弹窗暴露真实报错「施工节点未能与管线组成同一发布快照：p2ll is not defined」：破案——p2ll/toFrame/ln2ll 声明在管网反投 IIFE（if(publishToMap) try{(function(){...})()}）内部，而今日新加的发布块（routeGeometry/publishedNodes 冻结，同函数级作用域）直接引用 p2ll ⇒ ReferenceError ⇒ 发布必然失败、节点永远回传不了地图（此前 console.warn 静默所以无人看见）。修复：tlAutoGenerate 函数级 tlPublishP2ll 变量桥接（IIFE 内 p2ll 定义后赋值），发布块入口 var p2ll=tlPublishP2ll 并做空值校验（未就绪=基准/框线缺失，发布本就不该继续）。同函数级无其它 p2ll 引用点，var 提升无冲突。）→
 /* v1069-node-resync（用户实测「分区与管路页面的节点不能回传给在线地图」：破案——几何签名变化时三处 RyTlNodes.reset() 把用户节点整表清空（inline-09 tlAutoGenerate 几何绑定块 / runye-map-partition capture 提交后 / ensureRestored 旧签名丢弃），而 live-sync 与「生成施工图」发布都从 RyTlNodes.list() 取节点 ⇒ publishedNodes 恒为空 ⇒ 地图永远没有节点，且用户节点在每次重新生成后无声消失。修复：①tl-nodes.js 新增 resyncGeometry()——节点按 pid+atM 参数迁移（M13「重算后重新投影」拍板口径）：atM 夹到所在管线新长度、pid 失效才剔除、persist 以新签名落盘（canonical 适配器 level3-node-signature-mismatch 校验照常通过而非靠清空绕开）；②inline-09 几何绑定块与 capture 提交后改调 resyncGeometry（reset 仅作兜底）；③tlGenerateDiagramToMap 发布失败不再静默 console.warn → alert 带原因；④tlPublishCurrentNodesToMapSnapshot 暴露 __tlNodesPublishState，地图端切页时对 network-stale 给一次性 tip 指引「点生成施工图同步」。）→
 /* v1059-node-display-shift（用户实测「节点要捕捉到主管、可在主管上移动——现在实现不了了」：M13 偏移假象显示后，主管可见线体是 ppGetPipeDisplayGeometry 偏移副本（±gap/2），而三级叠加层（RyTlNodes 节点/连线/配件标记/改径套壳/标注/选中高亮）与二级接驳节点全部基于设计几何定位 → 节点整体悬空偏移量，拾取/拖拽投影也按设计线算 → 点不到、拖不中。修复=显示偏移统一口径：tl-workspace.js 增 dispShift 辅助层（dispShiftMap 取各管刚体平移向量并缓存、dispPts/dispPointAt 输出显示位、dispShiftUndo 鼠标显示位反算），节点/连线/配件/套壳/标注/高亮渲染与 pickAutoPipe/pickAutoFit/pickAnyPipe 命中、nodeDrag/fitDrag 拖拽全部换显示口径（缓存随 render 数据换代置 null）；plot-editor.js 二级接驳节点同口径——ppCouplerShiftMap（与 __ppDisplayGeometry 同链）+ ppCouplerProjectDisp（先按主管偏移反算再投影设计线求 s，s 弧长口径不变），2D 画布与 SVG 简图节点渲染加偏移向量贴显示线。刚体平移不改弧长，数据/水力/材料口径零改动）→
 /* v1058-main-branch-offset-relax（用户实测「主管跟支管叠加显示」：像素扫描定位——部分列主管与支管完全重叠（配对偏移未生效）、部分列正常错开 20m。根因=ppGetPipeDisplayGeometry 配对/避让阈值过严：①平行叉积 0.02(≈1.15°)/横向重合 0.5m 过严，近似共线的主支管对漏配→双方都不偏移；②「相邻支管避让」把横向差 1~3m 的支管误判为邻管（异形地块边缘列形心逐分区微移），safeGap 被压到 1~3m→偏移量被吃掉。修复：配对阈值放宽（0.06≈3.4°、2.0m）+ 避让只对轴向投影真正并排的支管生效；node 探针验证形心漂移列恢复 20m 全间距、30m 独立管不动、1.8m 共沟管正常配对。纯渲染层，水力/材料口径零改动）→
@@ -1501,7 +1502,7 @@
    [v1039-flow-display-decoupling] 分区面仅作动画显示；缺失时不阻断已发布管网的水路计算。
    [v1042-source-independent-irrigation-route] 页面恢复重绘时按已发布管网几何核对动画版本。
    [v1043-coupler-node-lifecycle] 接驳节点随地块设计快照恢复；分区重建或管网重生成时清除旧节点。 */
-const VERSION = 'v1069-node-resync';
+const VERSION = 'v1070-node-publish-bridge';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
