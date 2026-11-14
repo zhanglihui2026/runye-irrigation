@@ -37,12 +37,27 @@ test('nearby trunk without a published main node does not connect', () => {
   assert.equal(api.buildFlowRoutes(d, 0), null);
 });
 
-test('a trunk crossing a main node without a saved vertex does not connect', () => {
+/* [v1084c 契约反转·已拍板] 原锁：「总管穿过节点但没有折点 ⇒ 不算接通」。
+   反转理由（2026-11-14 用户实测截图）：总管是「从 N-01 一路拉到 N-03」的一段直线，
+   中间 N-02/N-03 落在段中间、不是折点 ⇒ 校验说没接通 / 建图说断了，用户看到的
+   却是「线明明从节点上过」「明明吸附上去了」，12 个区全报未覆盖。
+   现在判据统一为**点到线段的垂距 ≤ NODE_ATTACH_EPS_M(1.5m)**（与建图 project() 同一套
+   数学），"穿过即接通"；仍然保留「3m 外擦过不算」的负例，容差没有变松到随便连。 */
+test('a trunk crossing a main node within tolerance connects (no saved vertex required)', () => {
   const api = load();
   const node = { kind: 'main', mi: 0, ll: ll(0, 0), nodeId: 'N-01' };
   const d = fixture([ll(-5, 0), ll(5, 0)], [node]);
+  assert.equal(validate(api, d).code, 'connected');
+  const routes = api.buildFlowRoutes(d, 0, true);
+  assert.ok(routes, '建图必须成功（v1084c 前此处为 null，正是 12 区全挂的根因）');
+  assert.equal(routes.filter(r => r.zi === 0 && r.branch.some(s => s.key === 'branch:0')).length, 2);
+});
+
+test('a trunk passing 3m off the main node still does not connect', () => {
+  const api = load();
+  const node = { kind: 'main', mi: 0, ll: ll(0, 0), nodeId: 'N-01' };
+  const d = fixture([ll(-5, 3), ll(5, 3)], [node]);
   assert.equal(validate(api, d).code, 'node-not-connected');
-  assert.equal(api.buildFlowRoutes(d, 0), null);
 });
 
 test('a saved trunk vertex snapped to a published main node reaches both branch ends', () => {

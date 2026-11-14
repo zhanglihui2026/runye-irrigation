@@ -79,9 +79,14 @@ ok(!!w1 && typeof w1.gate === 'string' && w1.gate !== 'collect', '[v1084b] 注�
 ok(w1.counts && w1.counts.mains === 1 && w1.counts.branches === 1 && w1.counts.valves === 1,
   '[v1084b] counts 如实报主管/支管/阀门条数');
 ok(Array.isArray(w1.zones), '[v1084b] zones 始终是数组（未过校验时不填，调用方不必判空）');
-/* 这条合成场景故意只有「总管穿过主管起点」：strictNodeEntry 要求总管真的接到已发布节点，
-   所以这里应当卡在 validation 并给出 code —— 正是用户最可能撞的那道门。 */
-ok(w1.gate === 'validation' && !!w1.code, '[v1084b] 未接已发布节点 → gate=validation 且给出 code（' + w1.code + '）');
+/* [v1084c] 判据统一后，本合成场景（总管穿过节点 ≤1.5m）已判「接通」，不再卡 validation。
+   用一条 3m 外擦过的总管制造真正的 validation 失败，锁住「门禁名+code 一定要报出来」。 */
+/* 总管整体东移约 3m（lng +0.00003°），在节点旁边擦过而不断开 → 真·未接通 */
+const farTrunk = [P(30, 100.00058), P(30.00005, 100.00058)];
+const far = Object.assign({}, base, { trunkLL: farTrunk, trunkLinesLL: [farTrunk] });
+const wFar = D.whyNot(0, far);
+ok(wFar.gate === 'validation' && !!wFar.code,
+  '[v1084b] 未接通 → gate=validation 且给出 code（' + wFar.code + '）');
 
 /* 3d whyNotText：一段可直接截图/粘贴的话 */
 const t1 = D.whyNotText(0, base);

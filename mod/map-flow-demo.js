@@ -125,7 +125,26 @@
     if (o.strictNodeEntry) {
       var mainNodes=(o.nodesLL||[]).filter(function(n){return n&&n.kind==='main'&&n.ll&&n.mi>=0;});
       if(!mainNodes.length)return {ok:false,code:'no-node',minM:null};
-      var attached=mainNodes.some(function(n){return inputTrunks.some(function(line){return (line||[]).some(function(p){return dist(p,n.ll)<=NODE_ATTACH_EPS_M;});});});
+      /* [v1084c 根因修复] 原来只认「总管折点顶点」贴近节点（line.some(p=>dist(p,n.ll))）。
+         但用户画总管是「从 N-01 一路拉到 N-03」，中间 N-02 落在段中间、不是折点 ⇒
+         节点明明被线穿过却判未接通；更糟的是 buildFlowRoutes 里同一处判据与这里不一致
+         （一处按顶点、一处按线段），于是出现「校验说通了、建图说断了」或反过来的自相矛盾。
+         现在两边统一为**点到线段的垂距 ≤ NODE_ATTACH_EPS_M**，与 buildFlowRoutes 的
+         project() 用同一套等距投影数学，判据只有一份。 */
+      function segDistM(a,b,p){
+        var latRef=(a.lat+b.lat)/2,cos=Math.max(.01,Math.cos(latRef*Math.PI/180));
+        var k=111320*cos, ax=a.lng*k, ay=a.lat*110540, bx=b.lng*k, by=b.lat*110540,
+            px=p.lng*k, py=p.lat*110540, dx=bx-ax, dy=by-ay, den=dx*dx+dy*dy;
+        var t=den?Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/den)):0;
+        return Math.sqrt((px-(ax+dx*t))*(px-(ax+dx*t))+(py-(ay+dy*t))*(py-(ay+dy*t)));
+      }
+      function distToLineM(line,p){
+        var m=Infinity;
+        for(var i=1;i<line.length;i++){var d=segDistM(line[i-1],line[i],p);if(d<m)m=d;}
+        return m;
+      }
+      var attached=mainNodes.some(function(n){return inputTrunks.some(function(line){
+        return (line||[]).length>=2 && distToLineM(line,n.ll)<=NODE_ATTACH_EPS_M;});});
       return attached ? {ok:true,code:'connected',minM:0} : {ok:false,code:'node-not-connected',minM:null};
     }
     var tol = (typeof o.tolM === 'number' && o.tolM > 0) ? o.tolM : TOL_M;
@@ -552,6 +571,29 @@
     return bits.length?' 【诊断】'+bits.join('；')+'。':'';
   }
 
+  /* [v1084c] 观测量转人话：把「支管多长、阀门落哪、阀到主管多远、切了几刀、成路几条、
+     首条路线里有没有真实支管边」直接写在提示里。覆盖判定只认 key 以 branch: 开头的边，
+     所以这一行能一句话区分「图没建对」和「建对了但数不到」。 */
+  function demoDebugText(diag,d){
+    var parts=[];
+    if(d){
+      parts.push('主管'+(d.mainsLL||[]).length+'/支管'+(d.branchLL||[]).length+'/阀门'+
+        (d.valves||[]).length+'/配件'+(d.fittings||[]).length+'/总管段'+
+        (d.trunkLinesLL||[]).length+'（共'+d.total+'区）');
+    }
+    if(diag&&diag.nodeTotal!=null)parts.push('总管接上节点 '+(diag.couplers||0)+'/'+diag.nodeTotal);
+    var g=diag&&diag.debug;
+    if(g){
+      parts.push('第'+(g.zi+1)+'区：支管长'+g.branchLen+'m，阀门桩号'+g.valveS+
+        'm（离支管'+g.valveD+'m），阀到主管'+g.mainDist+'m，支管切口'+g.branchCuts+
+        '刀'+(g.hasValveAnchor?'（带锚点）':'（无锚点）'));
+    }
+    if(diag&&diag.routes!=null)parts.push('成路'+diag.routes+'条/目标'+(diag.targets||0)+'/馈线'+(diag.feeds||0));
+    if(diag&&diag.routeKeys&&diag.routeKeys.length)parts.push('首条路线支管边：'+diag.routeKeys.join('、'));
+    else if(diag&&diag.routes)parts.push('首条路线里没有 branch: 开头的边');
+    return parts.length?' 【数据】'+parts.join('；')+'。':'';
+  }
+
   /* [v1084b] 兜底补诊断：还有一类失败是「路线到了，但没经过真实支管段」——
      支管切口与阀门/端点重合时切出来的段长为 0，`allCovered` 数不到 2，而 diag 里
      一条原因都没有 ⇒ 提示条只剩通用建议，等于又回到"查不清"。
@@ -649,13 +691,23 @@
       var sig=n.mi+':'+n.ll.lat.toFixed(6)+':'+n.ll.lng.toFixed(6);if(seenNodes[sig])return;seenNodes[sig]=true;
       var mp=project(byMain[n.mi],n.ll);if(mp.d>LINK_EPS_M)return;
       var best=null;
+      /* [v1084c 根因修复] 这里原本多一道 `o.raw.some(顶点距≤1.5m)` 的前置过滤：
+         只有「节点正好落在总管的某个折点顶点上」才算接通。而总管是一条折线，
+         捕捉吸附后的落点通常落在**段中间**（用户画的是「从 N-01 直接拉到 N-03」
+         的一段直线，中间那两个节点根本不在折点上），于是：
+           · validateConnection 判「已接通」（它按点到线段的垂距算，1.5m 容差）→ 放行；
+           · buildFlowRoutes 判「没接通」（只认顶点）→ 图断开 → 12 区全报未覆盖。
+         用户看到的现象就是「明明吸附上去了，为什么还报错」——两套判据打架。
+         现在删掉顶点过滤，只保留下面按线段的垂距判据（与 validateConnection 同口径）。 */
       byTrunk.forEach(function(o){
-        if(o.kind!=='trunk'||!o.raw.some(function(p){return gap(xy(p),xy(n.ll))<=NODE_ATTACH_EPS_M;}))return;
+        if(o.kind!=='trunk')return;
         var p=project(o,n.ll);if(p.d<=NODE_ATTACH_EPS_M&&(!best||p.d<best.p.d))best={o:o,p:p};
       });
       if(!best)return;
       var id='coupler:'+sig;addCut(best.o,best.p.s,id);addCut(byMain[n.mi],mp.s,id);
+      lastDiag.couplers=(lastDiag.couplers||0)+1;
     });
+    lastDiag.nodeTotal=(d.nodesLL||[]).filter(function(n){return n&&n.kind==='main'&&n.ll;}).length;
 
     /* Main pipes are continuous only where a main endpoint meets another main
        line. This links zone 1 -> 2 -> 3 but does not bridge separate rows. */
@@ -719,6 +771,15 @@
       var valveProj=project(branch,valve.ll);
       var valvePoint=at(branch,valveProj.s),mainJoin=valve.anchorLL||valvePoint;
       var mainProj=project(main,mainJoin);
+      /* [v1084c 观测量] 首区的一组真实数字：支管多长、阀门落在支管什么桩号、
+         阀到主管多远、支管被切了几刀。这四个数直接决定「能不能切出两段支管」，
+         以前全看不见 —— 只能靠猜。 */
+      if(!diag.debug){
+        diag.debug={zi:i,mainLen:+main.len.toFixed(1),branchLen:+branch.len.toFixed(1),
+          valveS:+valveProj.s.toFixed(2),valveD:+valveProj.d.toFixed(2),
+          mainDist:+mainProj.d.toFixed(2),branchCuts:branch.cuts.length,
+          hasValveAnchor:!!valve.anchorLL};
+      }
       /* Legacy valve records without an anchor retain the prior direct-feed
          rule. With an anchor, verify that anchor lands on this zone's main;
          the drawn anchor→valve connector is the physical bridge to the branch. */
@@ -770,6 +831,12 @@
       });
     });
     if(!graph[rootId]){lastDiag.blocked='水路根节点没有进入管网图（总管未与任何主管相接）';return null;}
+    /* [v1084c] 图体检：节点数 / 根节点度数 / 目标节点是否真的在图上。
+       「水路走不到」有三种完全不同的原因（根是孤岛、目标没进图、中间断），这三个数能分开。 */
+    diag.graphNodes=Object.keys(graph).length;
+    diag.rootDeg=(graph[rootId]||[]).length;
+    diag.targetsInGraph=0;
+    targets.forEach(function(t){if(graph[t.id])diag.targetsInGraph++;});
 
     /* Dijkstra from the network root. The reconstructed edges retain their
        direction, which makes the moving dash travel toward the selected zone. */
@@ -794,7 +861,10 @@
       if(distMap[t.id]==null){diag.missing++;diag.zones.push({zi:t.zi,reason:'水路走不到支管端（图在总管/主管/阀门处断开）'});return;}
       var path=[],pathLinkIds=[],cur=t.id,guard=0;
       while(cur!==rootId&&prev[cur]&&guard++<5000){var step=prev[cur];pathLinkIds.push(step.linkId);if(step.edge)path.push({edge:step.edge,forward:step.from===step.edge.a});cur=step.from;}
-      if(cur!==rootId)return;
+      /* [v1084c] 这里原本是静默 return —— 第 5 个「不说话就放弃」的口子。
+         distMap 有值但 prev 链回不到根（权重 NaN/断链）时，目标被无声丢掉，
+         整图只报「未覆盖」，跟没诊断一样。改为记账。 */
+      if(cur!==rootId){diag.missing++;diag.zones.push({zi:t.zi,reason:'路径回溯不到水源根（图权重异常或断链）'});return;}
       /* [v1073] 冗余不再剔除、只打标：v1023 口径「任一管段被移除后目标仍可达 ⇒ 存在
          另一条物理路线」在网格布局里会双杀——同一主管既有施工节点又有贴近直连、
          上下行支管链互相备份，都会让同一目标存在两条可达路径；两条路线互判冗余
@@ -820,7 +890,13 @@
     try{
       var seen={},uniq=[];
       diag.zones.forEach(function(z){var k=z.zi+'|'+z.reason;if(seen[k])return;seen[k]=1;uniq.push(z);});
-      diag.zones=uniq;lastDiag=diag;
+      diag.zones=uniq;
+      /* [v1084c] 观测量：成路条数 + 首条路线里到底有没有真实支管边（key 以 branch: 开头）。
+         覆盖判定只认这种边，所以「有没有」比「有几条路」更能说明问题。 */
+      diag.routes=routes.length;
+      diag.routeKeys=(routes[0]&&routes[0].branch)?routes[0].branch.map(function(x){return x.key;}).slice(0,3):[];
+      diag.targets=targets.length;diag.feeds=feeds.length;
+      lastDiag=diag;
     }catch(eDiag){lastDiag=null;}
     return routes.length?routes:null;
   }
@@ -972,7 +1048,7 @@
         if (v.code === 'no-trunk') ctx.tip('还没有手动绘制的总管：请先在在线地图绘制总管（并打开捕捉吸到「驳接点」），再演示水流。');
         else if (v.code === 'no-data') ctx.tip('图面上没有分区主管，无法演示水流。');
         else if (v.code === 'no-node') ctx.tip('已发布管网没有主管施工节点。请在「分区与管路」主管上放置节点并重新生成施工图。');
-        else if (v.code === 'node-not-connected') ctx.tip('手绘总管尚未接到已发布主管施工节点。请开启捕捉，将总管拐点吸到紫色主管节点后保存。仅靠近或穿过主管不会接通。');
+        else if (v.code === 'node-not-connected') ctx.tip('手绘总管还没接到已发布主管施工节点上：请把总管画到紫色主管节点处（线从节点 ' + NODE_ATTACH_EPS_M + ' m 内经过就算接通，不必刚好落在折点上）。');
         else if (v.code === 'partial') {
           var gs = (v.brokenGroups || []).map(function (g) { return g + 1; }).join('、');
           /* [v919] 文案去误导（旧「最近 0.0 m」是已接主管的距离）：改报已通/未通统计 +
@@ -1017,6 +1093,7 @@
          把「哪一区、缺什么」压到末尾等于没有。先给原因，再给处理建议。 */
       var dgTip=mergeDiagForTip(diagAll,allCovered,d.total);
       if(ctx.tip)ctx.tip(demoDiagText(dgTip)
+        +demoDebugText(diagAll,d)
         +'处理建议：请检查手绘总管、捕捉节点、主管、分区阀门和支管连接；'
         +'若刚点过「生成施工图」或刚更新过版本，请删掉旧总管沿图上管线重画（先点「捕捉点」开启吸附，白圈吸到施工节点再落点），再演示轮灌。');
       return false;

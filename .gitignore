@@ -203,3 +203,6 @@ npm-debug.log*
 
 # v1084b 演示诊断前置 + whyNot/whyNotText 排障探针（不动逻辑）
 !tests/v1084b_demo_diag.test.cjs
+
+# v1084c 演示接通判据统一（总管穿过节点即接通）+ 根因回归锁
+!tests/v1084c_demo_connect.test.cjs
