@@ -167,9 +167,20 @@
       (Math.abs(mStart) > 3 || Math.abs(mEnd) > 3 || Math.abs(mLat) > 3);
     var text;
     if (!valid) text = '没有可用于配准审计的分区（缺分区框或管线）';
-    else if (systematic) text = valid + '/' + valid + ' 区支管整体沿管线方向错开：起点侧中位 ' +
-      (mStart >= 0 ? '+' : '') + mStart.toFixed(1) + 'm、终点侧 ' + (mEnd >= 0 ? '+' : '') + mEnd.toFixed(1) +
-      'm（' + offCount + ' 区同向）⇒ 分区框与管路不是同一代/同一坐标框';
+    else if (systematic) {
+      /* [v1084k 用户实测 12 区 +13.0/-13.1] 只报「偏了多少」不够，得说清是**平移**还是**缩短**：
+         · 平移 d：起点 +d、终点 -d、长度差 0   ⇒ 两份几何基准/代际不同
+         · 两端缩短：起点 +a、终点 -b、长度差 -(a+b) ⇒ 支管本身没铺满（数据问题）
+         判据：lenDiff = startOut + endOut（= 支管长 - 分区框沿轴向跨度）。 */
+      var lenDiff = mStart + mEnd, shift = (mStart - mEnd) / 2;
+      text = valid + '/' + valid + ' 区整组沿管线方向' +
+        (Math.abs(lenDiff) < 2 ? '平移 ' + Math.abs(shift).toFixed(1) + 'm（长度差 ' + lenDiff.toFixed(1) + 'm ⇒ 平移，不是缩短）'
+          : '错开：起点 ' + (mStart >= 0 ? '+' : '') + mStart.toFixed(1) + 'm、终点 ' + (mEnd >= 0 ? '+' : '') + mEnd.toFixed(1) +
+            'm（长度差 ' + lenDiff.toFixed(1) + 'm ⇒ 支管没铺满）') +
+        '（' + offCount + ' 区同向同量）⇒ 分区框与管路不是同一代/同一坐标框：' +
+        '多半是地图框线/坐标基准变过之后，分区框沿用了旧基准而管路已按新基准重发 —— ' +
+        '回「分区与管路」重新生成施工图后复测；若平移量不变，则是投影基准本身的 bug。';
+    }
     else if (offCount) text = offCount + '/' + valid + ' 区支管超出分区框（第 ' + offZones.slice(0, 10).join('、') + ' 区）⇒ 个别区管线数据本身偏';
     else text = valid + '/' + valid + ' 区支管都落在各自分区框内（|偏移| ≤ 3m）';
     return {
@@ -180,6 +191,68 @@
   }
   function diagramGeometrySignature(dd) {
     return dd?JSON.stringify([dd.frontPipe,dd.mainPipes,dd.branchPipes,dd.valves,dd.poly]):'';
+  }
+  /* [v1084j] 审计报告的唯一文本出口：auditZones / auditSnapshot 共用，避免两处各拼一套。 */
+  function auditText(res, opt) {
+    opt = opt || {};
+    var fmt = function (v) { return (v >= 0 ? '+' : '') + Number(v).toFixed(1) + 'm'; };
+    var want = (opt.zi === undefined || opt.zi === null || isNaN(Number(opt.zi))) ? null : Number(opt.zi);
+    var lines = [];
+    if (opt.fromSnapshot) {
+      if (opt.blocked) lines.push('（演示当前被拦：' + opt.blocked + '）');
+      lines.push('以下直接量「发布快照里的管路」与「发布快照里的分区框」，与能不能播放无关。');
+    }
+    var c = opt.counts;
+    if (c && (c.mains !== c.zones || c.branches !== c.zones)) {
+      lines.push('⚠ 数量不一致：分区框 ' + c.zones + ' 个 / 主管 ' + c.mains + ' 根 / 支管 ' + c.branches +
+        ' 根 —— 这已经是两代数据，先重新生成施工图，再谈偏移多少。');
+    }
+    (res.rows || []).forEach(function (r) {
+      if (want != null && r.zi !== want) return;
+      if (r.skip) { lines.push('第 ' + (r.zi + 1) + ' 区：跳过（' + r.skip + '）'); return; }
+      lines.push('第 ' + (r.zi + 1) + ' 区 | 支管 ' + r.branch.len.toFixed(1) + 'm' +
+        ' | 起点外 ' + fmt(r.branch.startOut) +
+        ' | 终点外 ' + fmt(r.branch.endOut) +
+        ' | 横向 ' + fmt(r.branch.lateralOut) +
+        (r.valveOut == null ? '' : ' | 阀门距框 ' + fmt(r.valveOut)) +
+        (r.main ? ' | 主管 ' + r.main.len.toFixed(1) + 'm 起点外 ' + fmt(r.main.startOut) + ' 终点外 ' + fmt(r.main.endOut) : ''));
+    });
+    lines.push('结论：' + (res.verdict ? res.verdict.text : '无'));
+    return lines.join('\n');
+  }
+  /* [v1084j 2026-11-14 用户实测] 审计不能依赖演示门禁。
+     collect() 在「快照过期 / 签名不一致 / 缺节点」时返回 null（这些正是最需要诊断的时刻），
+     原来的 auditZones 跟着一起哑，只回一句「无可用简图数据」——诊断工具在最该说话时闭嘴。
+     这里直接读网络快照的 partitions + routeGeometry，绕开所有「同版」门槛：
+     门禁问的是「能不能播」，审计问的是「两份几何差多少」，两件事。 */
+  function placementDataFromNetwork(net) {
+    if (!net) return null;
+    var rg = net.routeGeometry;
+    if (!rg || !Array.isArray(rg.mains) || !Array.isArray(rg.branches)) return null;
+    function line(raw) {
+      var out = []; (raw || []).forEach(function (p) { var q = readLL(p); if (q) out.push(q); });
+      return out.length >= 2 ? out : null;
+    }
+    var mains = [], branches = [], valves = [];
+    rg.mains.forEach(function (l) { var q = line(l); if (q) mains.push(q); });
+    rg.branches.forEach(function (l) { var q = line(l); if (q) branches.push(q); });
+    (rg.valves || []).forEach(function (v) {
+      var q = v && readLL(v.ll), a = v && readLL(v.anchorLL);
+      if (q) valves.push({ ll: q, anchorLL: a, mi: Number(v.mi) });
+    });
+    var polys = [];
+    (net.partitions || []).forEach(function (z) {
+      if (!z || z.zoneIndex == null || !Array.isArray(z.latLng)) return;
+      var ll = []; z.latLng.forEach(function (p) { var q = readLL(p); if (q) ll.push(q); });
+      if (ll.length >= 3) polys.push({ zi: Number(z.zoneIndex), ll: ll });
+    });
+    return {
+      mainsLL: mains, branchLL: branches, valves: valves, zonePolygons: polys,
+      total: Math.max(mains.length, branches.length, polys.length),
+      /* 两代几何是否明显不同代：数量对不上就直接说，别让人对着偏移量猜 */
+      counts: { mains: mains.length, branches: branches.length, zones: polys.length,
+        rgMains: rg.mains.length, rgBranches: rg.branches.length, partitions: (net.partitions || []).length }
+    };
   }
   /* 连接校验。o = {
        hasTrunk:bool, trunkLL:[{lat,lng}], mainsLL:[[{lat,lng}]×N],
@@ -1984,30 +2057,41 @@
        判据写进 verdict.systematic：多数区同向同量 ⇒ 分区框与管路不是同一代/同一坐标框（重新生成施工图）；
        只有个别区偏 ⇒ 该区管线数据本身的问题。 */
     auditZones: function (zi, dInj) {
-      var out = { rows: [], verdict: null, error: '' };
+      var out = { rows: [], verdict: null, error: '', source: '' };
       try {
         var d = dInj || collect();
-        if (!d) { out.error = '无可用简图数据'; return out; }
+        if (d) out.source = 'collect';
+        else {
+          /* [v1084j] 演示被门禁拦住时（快照过期/签名不一致/缺节点），仍然量 —— 这种时候更需要它 */
+          var net = null;
+          try { net = (ctx && typeof ctx.getNetworkSnapshot === 'function') ? ctx.getNetworkSnapshot() : null; } catch (eNet) { net = null; }
+          d = placementDataFromNetwork(net);
+          out.source = 'snapshot';
+          out.blocked = collectBlockReason || '';
+          if (!d) {
+            out.error = '当前地块没有可读的管路快照（' + (out.blocked || '网络快照为空') + '）';
+            try { console.log('[轮灌演示·配准审计] ' + out.error); } catch (eLog) {}
+            return out;
+          }
+        }
         var res = placementAudit(d);
-        out.rows = res.rows; out.verdict = res.verdict;
-        var want = (zi === undefined || zi === null || isNaN(Number(zi))) ? null : Number(zi);
-        var fmt = function (v) { return (v >= 0 ? '+' : '') + Number(v).toFixed(1) + 'm'; };
-        var lines = [];
-        out.rows.forEach(function (r) {
-          if (want != null && r.zi !== want) return;
-          if (r.skip) { lines.push('第 ' + (r.zi + 1) + ' 区：跳过（' + r.skip + '）'); return; }
-          lines.push('第 ' + (r.zi + 1) + ' 区 | 支管 ' + r.branch.len.toFixed(1) + 'm' +
-            ' | 起点外 ' + fmt(r.branch.startOut) +
-            ' | 终点外 ' + fmt(r.branch.endOut) +
-            ' | 横向 ' + fmt(r.branch.lateralOut) +
-            (r.valveOut == null ? '' : ' | 阀门距框 ' + fmt(r.valveOut)) +
-            (r.main ? ' | 主管 ' + r.main.len.toFixed(1) + 'm 起点外 ' + fmt(r.main.startOut) + ' 终点外 ' + fmt(r.main.endOut) : ''));
-        });
-        lines.push('结论：' + out.verdict.text);
-        try { console.log('[轮灌演示·配准审计]\n' + lines.join('\n')); } catch (eLog) {}
-        out.text = lines.join('\n');
+        out.rows = res.rows; out.verdict = res.verdict; out.counts = d.counts || null;
+        out.text = auditText(res, { zi: zi, counts: out.counts, blocked: out.blocked, fromSnapshot: out.source === 'snapshot' });
+        try { console.log('[轮灌演示·配准审计]\n' + out.text); } catch (eLog) {}
       } catch (e) { out.error = e.message; }
       return out;
+    },
+    /* 手工入口：直接把网络快照丢进来量（不经过演示门禁）。
+       用法：RyMapFlowDemo.auditSnapshot(RyMapFlowDemo._net?) 一般用不到，
+       正常用 auditZones() 即可——它自己会回退到这里。 */
+    auditSnapshot: function (net, zi) {
+      var d = placementDataFromNetwork(net || null);
+      if (!d) return { rows: [], verdict: null, error: '传入的网络快照没有 routeGeometry' };
+      var res = placementAudit(d);
+      res.counts = d.counts;
+      res.text = auditText(res, { zi: zi, counts: d.counts, fromSnapshot: true });
+      try { console.log('[轮灌演示·配准审计]\n' + res.text); } catch (eLog) {}
+      return res;
     }
   };
 })(window);

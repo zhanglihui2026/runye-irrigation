@@ -207,6 +207,40 @@ ok(r4s && Math.abs(r4s.branch.startOut - 16) < 0.5 && Math.abs(r4s.branch.endOut
 ok(shifted.verdict.systematic === true && shifted.verdict.off === 12,
   '[v1084i] 12 区同向同量 ⇒ 判「系统性错位」（分区框与管路不是同一代）');
 
+/* ---------- F. [v1084j] 审计不许依赖演示门禁 ----------
+ * 用户 2026-11-14 实测：控制台敲 auditZones() 只回 `{rows:[], verdict:null, error:'无可用简图数据'}`
+ * ——因为当时 collect() 正被门禁拦下（快照待更新）。**诊断工具在最该说话的时候闭嘴了。**
+ * 这里锁住：被拦时要回退去读「网络快照本身的 partitions + routeGeometry」，照量不误。 */
+ok(/function placementDataFromNetwork\(net\)/.test(demo),
+  '[v1084j] 有绕过门禁的快照读取 placementDataFromNetwork()');
+ok(/auditSnapshot: function \(net, zi\)/.test(demo), '[v1084j] 导出 auditSnapshot(net)');
+ok(/function auditText\(res, opt\)/.test(demo), '[v1084j] 报告文本只有 auditText() 一个出口');
+ok(/out\.blocked = collectBlockReason/.test(demo), '[v1084j] 被拦时把门禁原因带进报告');
+
+/* 造一个「分区框 12 个 + 管路整体上移 12m」的网络快照，直接喂给 auditSnapshot */
+const netParts = [], netMains = [], netBranches = [], netValves = [];
+const NCOLS = [0, 60, 100];
+for (let row = 0; row < 4; row++) {
+  for (let col = 0; col < 3; col++) {
+    const zi = row * 3 + col, x = NCOLS[col], yt = row * 60, yb = yt + 60, hw = 18;
+    netParts.push({ zoneIndex: zi, latLng: [P(x - hw, yt), P(x + hw, yt), P(x + hw, yb), P(x - hw, yb)].map(p => [p.lat, p.lng]) });
+    netMains.push([P(x, yt - 12), P(x, yb - 12)].map(p => [p.lat, p.lng]));
+    netBranches.push([P(x, yt - 12), P(x, yb - 12)].map(p => [p.lat, p.lng]));
+    netValves.push({ ll: [P(x, yt + 18).lat, P(x, yt + 18).lng], mi: zi });
+  }
+}
+const netSnap = { partitions: netParts, routeGeometry: { mains: netMains, branches: netBranches, valves: netValves } };
+const snapAudit = D.auditSnapshot(netSnap);
+ok(snapAudit.counts && snapAudit.counts.zones === 12 && snapAudit.counts.branches === 12,
+  '[v1084j] 快照审计数出 12 框 / 12 支管（实测 ' +
+  (snapAudit.counts ? snapAudit.counts.zones + ' / ' + snapAudit.counts.branches : '无') + '）');
+ok(snapAudit.verdict && snapAudit.verdict.systematic === true &&
+  Math.abs(snapAudit.verdict.medianStartOver - 12) < 0.5,
+  '[v1084j] 快照里管路整体上移 12m ⇒ 判系统性、中位 +12m（实测 ' +
+  (snapAudit.verdict ? snapAudit.verdict.medianStartOver.toFixed(1) : '无') + '）');
+ok(typeof snapAudit.text === 'string' && snapAudit.text.indexOf('结论：') > 0,
+  '[v1084j] 快照审计也给出人可读的报告文本');
+
 /* ---------- 版本纪律 ---------- */
 const m = /^const VERSION = '(v[\w-]+)';/m.exec(sw);
 ok(!!m && /^v\d{3,4}-[\w-]+$/.test(m[1]), '[v1084f] sw VERSION 形如 vNNNN- slug：' + (m && m[1]));
