@@ -26,7 +26,7 @@
      [v924] 手绘总管接入主管后，沿几何相接的分区主管段传播可达性；在线地图浮卡展示当前轮灌组水力摘要。
      [v927] 活动区使用独立地图Pane和脉冲色层；无mi的分区阀按支管几何归属，并动画显示开阀。
      ═══════════════════════════════════════════════════════════════════════ */
-  var TOL_M = 5, LINK_EPS_M = 0.5, NODE_ATTACH_EPS_M = 0.2, INTERVAL_MS = 1000, FLOW_PANE = 'ryMapFlowPane';
+  var TOL_M = 5, LINK_EPS_M = 0.5, NODE_ATTACH_EPS_M = 1.5, INTERVAL_MS = 1000, FLOW_PANE = 'ryMapFlowPane';
   var DOT_FILLS = ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6'];
   var DOT_FILLS_LT = ['#fca5a5', '#fcd34d', '#86efac', '#93c5fd'];
   var DOT_INKS_LT = ['#7f1d1d', '#78350f', '#14532d', '#1e3a8a'];
@@ -345,12 +345,12 @@
         collectBlockReason='在线地图管网与节点几何版本不一致，请重新生成施工图后再演示。';
         return null;
       }
-      if(!network.publishedNodes||network.publishedNodes.version!==1||
+      if(!network.publishedNodes||network.publishedNodes.version!==2||
           network.publishedNodes.geometrySig!==network.diagramGeometrySig||!Array.isArray(network.publishedNodes.items)){
         collectBlockReason='当前管网快照尚未包含同版施工节点，请回「分区与管路」重新生成施工图后再演示。';
         return null;
       }
-      if(!network.routeGeometry||network.routeGeometry.version!==1||
+      if(!network.routeGeometry||network.routeGeometry.version!==2||
           network.routeGeometry.geometrySig!==network.diagramGeometrySig||
           !Array.isArray(network.routeGeometry.mains)||!Array.isArray(network.routeGeometry.branches)||
           !Array.isArray(network.routeGeometry.valves)||!Array.isArray(network.routeGeometry.nodes)){
@@ -361,7 +361,7 @@
       collectBlockReason='当前在线地图缺少可核验的已发布管网快照，已停止轮灌演示。';
       return null;
     }
-    var mainsLL = [], branchLL = [], valves = [], couplersLL = [], segLL = null, nodesLL = [];
+    var mainsLL = [], branchLL = [], displayMainsLL = [], displayBranchLL = [], valves = [], couplersLL = [], segLL = null, nodesLL = [];
     var sourceLL=null;
     try{sourceLL=typeof ctx.getWaterSource==='function'?readLL(ctx.getWaterSource()):null;}catch(eSource){}
     /* 动画管线、阀门和节点只读同一发布快照，不再混入实时 DD/AutoEdits 草稿。 */
@@ -369,10 +369,15 @@
     function snapshotLine(raw){var out=[];(raw||[]).forEach(function(p){var q=readLL(p);if(q)out.push(q);});return out.length>=2?out:null;}
     routeGeometry.mains.forEach(function(line){var q=snapshotLine(line);if(q)mainsLL.push(q);});
     routeGeometry.branches.forEach(function(line){var q=snapshotLine(line);if(q)branchLL.push(q);});
+    /* 显示副本只用于动画描边贴合地图上可见管线；拓扑和连接判断仍使用上面的物理中心线。
+       旧快照缺少显示副本时逐线回退到实体几何。 */
+    displayMainsLL=mainsLL.map(function(line,i){return snapshotLine((routeGeometry.displayMains||[])[i])||line;});
+    displayBranchLL=branchLL.map(function(line,i){return snapshotLine((routeGeometry.displayBranches||[])[i])||line;});
     routeGeometry.valves.forEach(function(v){if(!v)return;var ll=readLL(v.ll),anchor=readLL(v.anchorLL);if(ll)valves.push({ll:ll,anchorLL:anchor,mi:Number(v.mi)});});
     routeGeometry.nodes.forEach(function(n){
       if(!n||!Number.isInteger(Number(n.mi)))return;var ll=readLL(n.ll);if(!ll)return;
-      nodesLL.push({pipeKey:(n.kind==='main'?'m':'b')+(Number(n.mi)+1),kind:n.kind,mi:Number(n.mi),ll:ll,nodeId:String(n.id||''),source:'published-node'});
+      nodesLL.push({pipeKey:(n.kind==='main'?'m':'b')+(Number(n.mi)+1),kind:n.kind,mi:Number(n.mi),ll:ll,
+        displayLL:readLL(n.displayLL)||ll,nodeId:String(n.id||''),source:'published-node'});
     });
     if(valves.length!==routeGeometry.valves.length||nodesLL.length!==routeGeometry.nodes.length||
         nodesLL.length!==(network.publishedNodes.items||[]).length){
@@ -410,7 +415,7 @@
     if(!zoneOverlayComplete)zonePolygons=[];
     var manual = (window.tlManualGroups && window.tlManualGroups.length) ? window.tlManualGroups : null;
     return {
-      mainsLL: mainsLL, branchLL: branchLL, valves: valves,
+      mainsLL: mainsLL, branchLL: branchLL, displayMainsLL:displayMainsLL, displayBranchLL:displayBranchLL, valves: valves,
       couplersLL: couplersLL, segLL: segLL, trunkLL: trunkLL, trunkLinesLL: trunkLinesLL,
       nodesLL: nodesLL, zonePolygons:zonePolygons, sourceLL:sourceLL,
       manual: manual, nPer: dd.combinedN || 1, total: total,
@@ -741,8 +746,8 @@
       }));
     });
     /* 底态：全部主管/支管淡化灰 */
-    d.mainsLL.forEach(function (l) { if (l) ly.addLayer(poly(l, '#cbd5e1', 2, false)); });
-    d.branchLL.forEach(function (l) { if (l) ly.addLayer(poly(l, '#e2e8f0', 1.5, false)); });
+    (d.displayMainsLL||d.mainsLL).forEach(function (l) { if (l) ly.addLayer(poly(l, '#cbd5e1', 2, false)); });
+    (d.displayBranchLL||d.branchLL).forEach(function (l) { if (l) ly.addLayer(poly(l, '#e2e8f0', 1.5, false)); });
     /* 全部总管与分段总管仅作淡色底图；实际流动路线在后面按管网根节点到当前分区裁剪，
        不再把 N01 之后通往 N02 的下游干线误画成每一组都在流动。 */
     (d.trunkLinesLL || (d.trunkLL && d.trunkLL.length >= 2 ? [d.trunkLL] : [])).forEach(function(line){
@@ -766,14 +771,25 @@
         if(!seg.points||seg.points.length<2)return;
         var key=seg.key+':'+seg.points[0].lat.toFixed(6)+':'+seg.points[0].lng.toFixed(6)+':'+seg.points[seg.points.length-1].lat.toFixed(6)+':'+seg.points[seg.points.length-1].lng.toFixed(6);
         if(drawn[key])return;drawn[key]=true;
-        ly.addLayer(poly(seg.points,seg.key.indexOf('branch:')===0?'#16a34a':'#185FA5',seg.key.indexOf('branch:')===0?3:5,true));
+        var shownPoints=seg.points,match=/^(main|branch):(\d+)$/.exec(String(seg.key||''));
+        if(match){
+          var main=match[1]==='main',index=Number(match[2]);
+          var physical=(main?d.mainsLL:d.branchLL)[index],shown=(main?d.displayMainsLL:d.displayBranchLL)[index];
+          if(physical&&shown&&physical.length&&shown.length){
+            /* ppGetPipeDisplayGeometry 只平移整条折线，点序不变；用首点位移仅改绘制坐标。 */
+            var dLat=shown[0].lat-physical[0].lat,dLng=shown[0].lng-physical[0].lng;
+            shownPoints=seg.points.map(function(p){return{lat:p.lat+dLat,lng:p.lng+dLng};});
+          }
+        }
+        ly.addLayer(poly(shownPoints,seg.key.indexOf('branch:')===0?'#16a34a':'#185FA5',seg.key.indexOf('branch:')===0?3:5,true));
       });
     });
     /* [v916] 接驳节点标记（常驻）：全部节点小橙点——用户能看见「水路入口在哪」；
        失配节点（collect 已跳过 x/y null）不出现在图上。 */
     (d.nodesLL || []).forEach(function (n) {
       if (!n || !n.ll) return;
-      ly.addLayer(window.L.circleMarker([n.ll.lat, n.ll.lng], {
+      var shown=n.displayLL||n.ll;
+      ly.addLayer(window.L.circleMarker([shown.lat, shown.lng], {
         radius: 4, color: '#b45309', weight: 2,
         fillColor: '#f59e0b', fillOpacity: 1, pane:FLOW_PANE, interactive: false
       }));
@@ -781,10 +797,11 @@
     /* [v916] 活动组水路入口：该组节点位置画双环大标记（外环描边+白芯橙心）——
        「水从节点进入主管」的精确入口（步骤 4 验收：入口坐标=节点坐标）。 */
     entrancesOf(d, g).forEach(function (n) {
-      ly.addLayer(window.L.circleMarker([n.ll.lat, n.ll.lng], {
+      var shown=n.displayLL||n.ll;
+      ly.addLayer(window.L.circleMarker([shown.lat, shown.lng], {
         radius: 9, color: '#b45309', weight: 2.5, fillOpacity: 0, interactive: false
       }));
-      ly.addLayer(window.L.circleMarker([n.ll.lat, n.ll.lng], {
+      ly.addLayer(window.L.circleMarker([shown.lat, shown.lng], {
         radius: 5, color: '#ffffff', weight: 2,
         fillColor: '#f59e0b', fillOpacity: 1, interactive: false
       }));
@@ -864,7 +881,7 @@
           var redMains = Array.isArray(v.brokenMains) ? v.brokenMains : [];
           var ly2 = ensureLayer(); if (ly2) ly2.clearLayers();
           (redMains || []).forEach(function (mi) {
-            var line = d.mainsLL && d.mainsLL[mi];
+            var line = (d.displayMainsLL&&d.displayMainsLL[mi])||(d.mainsLL&&d.mainsLL[mi]);
             if (line && line.length >= 2) {
               ly2.addLayer(window.L.polyline(line.map(function (p) { return [p.lat, p.lng]; }),
                 { color: '#dc2626', weight: 6, opacity: 0.85, interactive: false, className: 'mapflow-anim' }));

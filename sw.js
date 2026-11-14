@@ -1505,8 +1505,10 @@
    [v1035-shared-node-sync] 施工图生成自动刷新在线地图；两个页面共用施工节点写入与展示，升级离线缓存。
    [v1039-flow-display-decoupling] 分区面仅作动画显示；缺失时不阻断已发布管网的水路计算。
    [v1042-source-independent-irrigation-route] 页面恢复重绘时按已发布管网几何核对动画版本。
-   [v1043-coupler-node-lifecycle] 接驳节点随地块设计快照恢复；分区重建或管网重生成时清除旧节点。 */
-const VERSION = 'v1075-strict-node-link';
+   [v1043-coupler-node-lifecycle] 接驳节点随地块设计快照恢复；分区重建或管网重生成时清除旧节点。
+   [v1076-centerline-topology] 寻路快照只用实体中心线，显示偏移独立保存；节点屏幕捕捉命中显示位并写回实体位；旧显示世界快照要求重新生成。
+   [v1077-topology-display-decoupled] 动画/断线提示描边映射到同代显示副本；连通与寻路仍使用物理中心线。 */
+const VERSION = 'v1077-topology-display-decoupled';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
@@ -1628,6 +1630,7 @@ const CORE = [
   "mod/zone-geometry.js",
   "mod/flow-geometry.js",
   "mod/tl-polyline-geometry.js",
+  "mod/tl-seg-trunk.js",
   "mod/ry-panel.js",
   "mod/ry-panel.css",
   "mod/online-map.css",

@@ -1032,11 +1032,9 @@
         if (s.kind === 'segTrunk' || s.id === 'segTrunk') return; // 旧成果中的自动段总管已退役
         var sLL = validRingLL(s.latLng, 2);   // 真实几何：水力、长度与地块裁剪的唯一依据
         if (!sLL) return;
-        /* [v1073] 地图画设计页同款显示几何（displayLatLng=发布显示副本，与二级画布
-           同源 ppGetPipeDisplayGeometry）。用户拍板：地图直接呈现「分区与管路」的图——
-           主/支管物理重合的布局在真实坐标上必然叠成一条线，显示副本才分得开。
-           [v1073] 起发布快照 routeGeometry 本身就是显示世界（阀门锚点/节点同步），
-           捕捉、演示与线体同一个坐标世界，不再有两套口径。 */
+        /* displayLatLng 只用于地图图层绘制，来源与二级画布的平行错开副本一致。
+           routeGeometry.latLng 保持物理中心线，供捕捉落点、动画连接和水力路径读取；
+           视觉错开不能改变管网节点关系。 */
         var drawLL = validRingLL(s.displayLatLng, 2) || sLL;
         var st = dnStyle(s.dn);
         var hrec = hydraulic && hydraulic.items && hydraulic.items[s.id];

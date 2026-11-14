@@ -43,7 +43,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
     /* 渲染 + 抽取：每格 polygon 顶点与每条标注的 translate / rotate / 文本 */
     async function renderAndExtract(poly, angleDeg, cutDrag) {
-      return await page.evaluate(({ poly, angleDeg, cutDrag }) => {
+      await page.evaluate(({ poly, angleDeg, cutDrag }) => {
         window.measuredPolygon = poly;
         window.measuredArea = Math.abs(poly.reduce((s, p, i) => {
           const q = poly[(i + 1) % poly.length]; return s + (p.x * q.y - q.x * p.y);

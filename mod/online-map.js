@@ -1051,7 +1051,7 @@
     S.setMarkerApi({
       show:function(hit){
         if(trunkMode!=='draw') return;
-        var ll=displayLatLngOf(hit.lat,hit.lng);
+        var ll=displayLatLngOf(hit.displayLat!=null?hit.displayLat:hit.lat,hit.displayLng!=null?hit.displayLng:hit.lng);
         if(!snapMarker){
           /* 白色空心小圆 + 深蓝描边；interactive:false 否则它会挡住后续点击。
              className 是给探针的稳定锚点 —— 靠 fill 颜色猜太脆（Leaflet 会改写属性）。 */
@@ -1178,7 +1178,7 @@
     if(!net){out.reason='network-snapshot-missing';return out;}
     if(String(net.plotId||'')!==String(plot.id)){out.status='invalid';out.reason='plot-id-mismatch';return out;}
     var pub=net.publishedNodes;
-    if(!pub||pub.version!==1||!Array.isArray(pub.items)){out.status='invalid';out.reason='published-nodes-missing';return out;}
+    if(!pub||pub.version!==2||!Array.isArray(pub.items)){out.status='invalid';out.reason='published-nodes-missing';return out;}
     if(!net.diagramGeometrySig||pub.geometrySig!==net.diagramGeometrySig){out.status='invalid';out.reason='published-node-signature-mismatch';return out;}
     pub.items.forEach(function(n){
       var lat=Number(n&&n.lat),lng=Number(n&&n.lng),atM=Number(n&&n.atM);
@@ -1198,7 +1198,7 @@
     try{net=store&&plot&&plot.id!=null&&typeof store.readNetworkLayoutForPlot==='function'?store.readNetworkLayoutForPlot(String(plot.id)):null;}catch(eNet){net=null;}
     if(!net||String(net.plotId||'')!==String(plot&&plot.id||'')||net.needsReplan)return null;
     var route=net.routeGeometry;
-    if(!route||route.version!==1||route.geometrySig!==net.diagramGeometrySig||
+    if(!route||route.version!==2||route.geometrySig!==net.diagramGeometrySig||
         !Array.isArray(route.mains)||!Array.isArray(route.branches)||!Array.isArray(route.valves))return null;
     function ll(p){try{var q=RunyeGeo.coordPair(p);return{lat:q[0],lng:q[1]};}catch(e){return null;}}
     var valves=[], branchStarts=[], zoneVerts=[], couplers=[], mainPipeLines=[], mainCouplers=[], zoneNote=null;
@@ -1245,8 +1245,8 @@
       input.plotRing=plot.polyLatLng||null;
       if(plot.waterSource&&!options.excludeWaterSource) input.waterSource=plot.waterSource;
     }
-    /* [v1071] 节点捕捉独立于动画寻路完整性门禁；命中/白圈/落点统一物理坐标
-       （[v1064] 时代「按渲染(偏移)坐标命中」已随地图显示偏移一起退役）。 */
+    /* 节点捕捉独立于动画寻路完整性门禁；屏幕命中使用 displayLat/displayLng，
+       保存点使用节点实体 lat/lng，图面偏移不改变总管与主管的拓扑坐标。 */
     var published=publishedCouplersForPlot(plot);
     if(published.items.length)input.mainCouplers=published.items.filter(function(n){return /^main-\d+$/.test(n.pid);});
     if(trunkSaved&&Array.isArray(trunkSaved.trunks)){
@@ -1380,9 +1380,8 @@
     var list=(extras&&Array.isArray(extras.items))?extras.items:((extras&&Array.isArray(extras.mainCouplers))?extras.mainCouplers:[]);
     list.forEach(function(n){
       if(!n||!isFinite(n.lat)||!isFinite(n.lng)) return;
-      /* [v1073] 标记画显示位（displayLat 优先，旧快照回退 lat）。v1073 起发布快照
-         本身就是显示世界（lat=displayLat=显示主管上的冻结位），新旧快照都与
-         显示线体/捕捉/演示一致。 */
+      /* 标记画显示位（displayLat 优先，旧快照回退 lat）；实体 lat/lng 独立用于捕捉落点
+         与动画连接，显示偏移不会移动节点的拓扑位置。 */
       var markerLat=isFinite(Number(n.displayLat))?Number(n.displayLat):n.lat;
       var markerLng=isFinite(Number(n.displayLng))?Number(n.displayLng):n.lng;
       var color=n.stale?'#b45309':'#6d28d9',fill=n.stale?'#f59e0b':'#7c3aed';

@@ -37,7 +37,7 @@
   var LINK_OD_SERIES = (typeof PE_OD_SERIES !== 'undefined' && PE_OD_SERIES.length) ? PE_OD_SERIES.slice()
     : [63, 75, 90, 110, 140, 160, 200, 250, 315, 355, 400];   /* 连线可选管径档（同三级面板 PE 外径） */
   var subs = [];
-  var savedRaw = null;       // localStorage 兜底档（load 时读一次，几何签名吻合才恢复）
+  var savedRaw = null;       // localStorage 兜底档；几何换代时由 resyncGeometry 按 pid+atM 迁移
   var restored = false;
 
   /* ---------- 基础 ---------- */
@@ -56,7 +56,11 @@
   function currentGeoSig() { return geometryKey(typeof window !== 'undefined' ? window.tlDiagramData : null); }
   function persist() {
     if (typeof localStorage === 'undefined') return;
-    try { localStorage.setItem(LS_KEY, JSON.stringify({ version: VERSION, geoSig: currentGeoSig(), nodes: copy(nodes), links: copy(links) })); } catch (e) {}
+    try {
+      var snapshot = { version: VERSION, geoSig: currentGeoSig(), nodes: copy(nodes), links: copy(links) };
+      localStorage.setItem(LS_KEY, JSON.stringify(snapshot));
+      savedRaw = snapshot;
+    } catch (e) {}
   }
   function notify(detail) {
     for (var i = 0; i < subs.length; i++) { try { subs[i](detail); } catch (e) {} }
@@ -500,14 +504,34 @@
      的 level3-node-signature-mismatch 校验（core/drawing-design-level3-adapter.js:39）
      与 live-sync 发布都因此通过，而不是靠清空绕开校验。 */
   function resyncGeometry() {
-    ensureRestored();
     var dd = typeof window !== 'undefined' ? window.tlDiagramData : null;
     if (!dd) return false;
+    var currentSig=currentGeoSig();
+    /* ensureRestored 会因旧几何签名拒绝加载节点；迁移入口必须从原始快照按 pid+atM 读取，
+       否则 list() 先执行过时 nodes 已空，再迁移就会把有效节点永久覆盖为空表。 */
+    if(savedRaw&&savedRaw.version===VERSION&&savedRaw.geoSig&&savedRaw.geoSig!==currentSig){
+      nodes=Array.isArray(savedRaw.nodes)?copy(savedRaw.nodes):[];
+      links=Array.isArray(savedRaw.links)?copy(savedRaw.links):[];
+      var maxN=0,maxL=0;
+      nodes.forEach(function(nd){var m=/^N-(\d+)$/.exec(String(nd&&nd.id));if(m)maxN=Math.max(maxN,+m[1]);});
+      links.forEach(function(lk){var m=/^L-(\d+)$/.exec(String(lk&&lk.id));if(m)maxL=Math.max(maxL,+m[1]);});
+      seq={n:maxN,l:maxL};restored=true;
+    }else ensureRestored();
     function lineLen(line) {
       var s = 0;
       for (var i = 0; i + 1 < (line || []).length; i++)
         s += Math.hypot(Number(line[i + 1].x) - Number(line[i].x), Number(line[i + 1].y) - Number(line[i].y));
       return s;
+    }
+    function boundLineLen(pid, line) {
+      var A = typeof window !== 'undefined' ? window.RyTlAutoEdits : null;
+      if (A && typeof A.effPts === 'function') {
+        try {
+          var effective = A.effPts(pid, dd);
+          if (Array.isArray(effective) && effective.length >= 2) return lineLen(effective);
+        } catch (eEffectiveLength) { }
+      }
+      return lineLen(line);
     }
     var before = nodes.length, nextNodes = [];
     nodes.forEach(function (nd) {
@@ -526,7 +550,8 @@
       var lines = m[1] === 'main' ? dd.mainPipes : dd.branchPipes;
       var idx = Number(m[2]);
       if (!Array.isArray(lines) || idx >= lines.length) return;
-      var L = lineLen(lines[idx]);
+      /* 节点 atM 与 place/move/publish 一样绑定有效管线；改长后的末端节点不能按原始线长截回。 */
+      var L = boundLineLen(nd.pid, lines[idx]);
       if (!(L > 0)) return;
       var c = copy(nd);
       c.atM = Math.round(Math.max(0, Math.min(Number(nd.atM) || 0, L)) * 10) / 10;

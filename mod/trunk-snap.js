@@ -138,19 +138,17 @@
       if (cp) push(cp.lat, cp.lng, 'seg-coupler', '驳接点 ' + (ci + 1));
     });
 
-    /* 7b. [v914] 设计页接驳节点（发布快照 publishedNodes 投影）。
-          宿主已把失配节点（坐标 null，v913 missing）剔除，这里照收；
-          label 由宿主带 pipeKey+沿管距离，拾取气泡直接可读。编号按有效项计（跳过不占号）。
-          [v1071] 命中坐标回归物理中心线（c.lat/c.lng）：此前按 displayLat（v1059 显示偏移
-          副本）命中、返回物理坐标——白色捕捉圈画在物理位、紫色标记画在偏移位，两边错开
-          ~1m，用户看到「捕捉不准」。地图统一物理口径后（runye-map-enhance/online-map 同版
-          改回物理绘制），命中=白圈=标记=落点四位一体；桩号换算仍走 pid+atM 不受影响。 */
+    /* 7b. 设计页接驳节点（发布快照 publishedNodes 投影）。失配节点由宿主剔除；
+          显示坐标用于地图命中，实体坐标作为写回总管的捕捉点，避免显示偏移进入拓扑。
+          label 带管线身份与桩号，编号按有效项计。 */
     var mcValid = 0;
     (Array.isArray(input.mainCouplers) ? input.mainCouplers : []).forEach(function (c) {
       var cp = readPoint(c);
       if (!cp) return;
       mcValid++;
-      push(cp.lat, cp.lng, 'main-coupler', (c && c.label) ? c.label : ('主管节点 ' + mcValid));
+      var displayLat=c&&isNum(Number(c.displayLat))?Number(c.displayLat):cp.lat;
+      var displayLng=c&&isNum(Number(c.displayLng))?Number(c.displayLng):cp.lng;
+      push(displayLat, displayLng, 'main-coupler', (c && c.label) ? c.label : ('主管节点 ' + mcValid), {lat:cp.lat,lng:cp.lng});
     });
 
     /* 8~9. 垂足兜底：主管和已存手绘总管的线段只在没有更高优先级点命中时胜出。 */
@@ -228,7 +226,8 @@
     var best = null;
     for (var i = 0; i < targets.length; i++) {
       var t = targets[i];
-      var q = projector({lat:t.snapLat,lng:t.snapLng});
+      /* 命中测试跟随画面可见位置；snapLat/snapLng 仍是保存到总管的实体坐标。 */
+      var q = projector({lat:t.lat,lng:t.lng});
       if (!q) continue;
       var dx = q.x - p.x, dy = q.y - p.y;
       var d = Math.sqrt(dx * dx + dy * dy);
@@ -254,10 +253,8 @@
       }
     }
     if (!best) { clearMarker(); return null; }
-    /* [v1073] 点目标返回**命中位**（snapLat/snapLng，与屏幕上标记/线体同一坐标世界），
-       线段垂足返回反算落点——白圈、落点、所见三者自此恒重合。v1071 曾把点命中改成
-       返回物理中心线坐标，结果白圈/落点与可见标记错开（旧世界两套口径的残留病灶）；
-       v1073 起发布快照整体是「设计页同款显示世界」，命中位即唯一口径。 */
+    /* 点命中回传实体 snap 坐标，display 坐标只用于屏幕命中和白圈显示；因此视觉错开
+       不会污染保存的总管拓扑。线段垂足仍返回反算的实体落点。 */
     var hitPoint = best.screen && unprojector ? unprojector(best.screen)
       : (best.target && isNum(Number(best.target.snapLat)) && isNum(Number(best.target.snapLng))
         ? { lat: Number(best.target.snapLat), lng: Number(best.target.snapLng) }
@@ -266,6 +263,8 @@
     lastHit = {
       lat: hitPoint.lat,
       lng: hitPoint.lng,
+      displayLat: best.target && isNum(Number(best.target.lat)) ? Number(best.target.lat) : hitPoint.lat,
+      displayLng: best.target && isNum(Number(best.target.lng)) ? Number(best.target.lng) : hitPoint.lng,
       kind: best.target.kind,
       label: best.target.label,
       dist: Math.round(best.dist * 100) / 100
