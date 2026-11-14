@@ -1657,6 +1657,19 @@ function tlPushToHydraulicCalc() {
     var HC = window.RyHydraulicCalc;
     if (!HC || typeof HC.importThreeLevel !== 'function') return false;
     var d = window.tlDiagramData;
+    /* [2026-11-14 排障标注] ⚠ 本函数当前**整体空转**，而且不是 bug，不要去"修"：
+       hydraulic-calc.js 的 mount / setConfig / importThreeLevel 三个入口都被
+       `window.RY_HC_RESERVED` 挡死（该变量全文只有一行：mod/inline-23.js
+       `window.RY_HC_RESERVED=true;`）。依据 v135（2026-09-23 用户指令）：
+       「水力计算器」内容暂不展示，只保留导航入口；计算核心 hc-core.js /
+       pipe-path-loss.js 照常加载（后者是三级扬程校核依赖，不可停）。
+       所以下面这条 `!d.frontPipe` 自 v1015 起就是个**够不到的死门禁**
+       （v1015 把 tlDiagramData.frontPipe 恒置 null，见本文件快照定义处）。
+       ★ 将来若要启用总闸：先把这里改成 `if (!d) return false;`（唯一有效门禁是
+       下面的 wp.fromFigure），否则一开总闸本函数立刻恒 false，界面上表现为
+       "推送没反应"，又会有人当成新 bug 来查。
+       现在不改逻辑：总闸关着，改了既跑不到也无法验证，属假修复。
+       排查记录见 project-planning/排障手册_轮灌演示不接通_2026-11-14.md 附录。 */
     if (!d || !d.frontPipe) return false;
     var wp = tlWorstPathLen();
     if (!wp || !wp.fromFigure) return false;
