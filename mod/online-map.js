@@ -1166,14 +1166,38 @@
      太大的网格会把 mousemove 拖慢 ⇒ 超限就不接（宁缺不卡）。 */
   var ZONE_VERT_CAP=150;
 
+  /* 已发布节点是地图上的独立标记层，不应被动画寻路的完整性门禁连带隐藏。
+     节点坐标与网络快照同代：只在地块身份、节点快照版本和几何签名匹配时显示。
+     needsReplan 表示分区/网络有草稿变更；仍显示最后发布节点，但明确标成旧发布态。 */
+  function publishedCouplersForPlot(plot){
+    var store=window.RyIrrigationDataStore,net=null;
+    try{net=store&&plot&&plot.id!=null&&typeof store.readNetworkLayoutForPlot==='function'?store.readNetworkLayoutForPlot(String(plot.id)):null;}catch(eNet){net=null;}
+    var out={items:[],status:'missing',reason:'network-snapshot-missing',plotId:plot&&plot.id!=null?String(plot.id):null};
+    if(!plot||plot.id==null)return out;
+    if(!net){out.reason='network-snapshot-missing';return out;}
+    if(String(net.plotId||'')!==String(plot.id)){out.status='invalid';out.reason='plot-id-mismatch';return out;}
+    var pub=net.publishedNodes;
+    if(!pub||pub.version!==1||!Array.isArray(pub.items)){out.status='invalid';out.reason='published-nodes-missing';return out;}
+    if(!net.diagramGeometrySig||pub.geometrySig!==net.diagramGeometrySig){out.status='invalid';out.reason='published-node-signature-mismatch';return out;}
+    pub.items.forEach(function(n){
+      var lat=Number(n&&n.lat),lng=Number(n&&n.lng),atM=Number(n&&n.atM);
+      if(!n||!isFinite(lat)||!isFinite(lng)||Math.abs(lat)>90||Math.abs(lng)>180||!/^((main|branch))-\d+$/.test(String(n.pid||'')))return;
+      out.items.push({lat:lat,lng:lng,atM:isFinite(atM)?atM:0,
+        label:'施工节点 '+String(n.id||'')+' · '+String(n.pid||'')+' · 桩号 '+(Math.round((isFinite(atM)?atM:0)*10)/10)+'m',
+        nodeId:String(n.id||''),pid:String(n.pid||''),stale:!!net.needsReplan});
+    });
+    out.status=net.needsReplan?'stale':'current';
+    out.reason=net.needsReplan?'network-needs-replan':null;
+    return out;
+  }
+
   function extraSnapTargets(plot){
     var store=window.RyIrrigationDataStore,net=null;
     try{net=store&&plot&&plot.id!=null&&typeof store.readNetworkLayoutForPlot==='function'?store.readNetworkLayoutForPlot(String(plot.id)):null;}catch(eNet){net=null;}
     if(!net||String(net.plotId||'')!==String(plot&&plot.id||'')||net.needsReplan)return null;
-    var route=net.routeGeometry,pub=net.publishedNodes;
+    var route=net.routeGeometry;
     if(!route||route.version!==1||route.geometrySig!==net.diagramGeometrySig||
-        !Array.isArray(route.mains)||!Array.isArray(route.branches)||!Array.isArray(route.valves)||
-        !pub||pub.version!==1||pub.geometrySig!==net.diagramGeometrySig||!Array.isArray(pub.items))return null;
+        !Array.isArray(route.mains)||!Array.isArray(route.branches)||!Array.isArray(route.valves))return null;
     function ll(p){try{var q=RunyeGeo.coordPair(p);return{lat:q[0],lng:q[1]};}catch(e){return null;}}
     var valves=[], branchStarts=[], zoneVerts=[], couplers=[], mainPipeLines=[], mainCouplers=[], zoneNote=null;
     route.valves.forEach(function(v){
@@ -1193,12 +1217,8 @@
       var llLine=[],valid=true;line.forEach(function(p){var q=ll(p);if(q)llLine.push(q);else valid=false;});
       if(valid&&llLine.length>=2)mainPipeLines.push(llLine);
     });
-    pub.items.forEach(function(n){
-      if(!n||!isFinite(Number(n.lat))||!isFinite(Number(n.lng)))return;
-      mainCouplers.push({lat:Number(n.lat),lng:Number(n.lng),
-        label:'施工节点 '+String(n.id||'')+' · '+String(n.pid||'')+' · 桩号 '+(Math.round(Number(n.atM)*10)/10)+'m',
-        nodeId:String(n.id||''),pid:String(n.pid||''),atM:Number(n.atM)||0});
-    });
+    var published=publishedCouplersForPlot(plot);
+    mainCouplers=published.items;
     return {valves:valves, branchStarts:branchStarts, zoneVerts:zoneVerts, couplers:couplers, mainPipeLines:mainPipeLines, mainCouplers:mainCouplers,
       stats:{sign:'published-snapshot', rms:0,
         valves:valves.length, branchStarts:branchStarts.length, zoneVerts:zoneVerts.length, couplers:couplers.length, mainPipeLines:mainPipeLines.length, mainCouplers:mainCouplers.length, zoneNote:zoneNote}};
@@ -1241,8 +1261,28 @@
     }
     var list=S.buildTargets(input);
     var rc=S.setTargets(list,{plotId:currentMapPlotId?String(currentMapPlotId):null, extras:snapExtras?snapExtras.stats:null});
-    renderCouplerMarkers(snapExtras);
+    var published=publishedCouplersForPlot(plot);
+    renderCouplerMarkers(published);
+    try{if(window.RyMapHost)window.RyMapHost.publishedNodeState=function(){return{plotId:published.plotId,status:published.status,reason:published.reason,count:published.items.length};};}catch(eNodeState){}
     return rc;
+  }
+
+  /* 刷新后 currentMapPlotId 原本总是 null。地块和管网虽已显示（来自地块库/发布快照），
+     但施工节点图层只按当前选中地块绘制，因此页面重载后看起来像节点未发布。
+     从设计页写入的同一活动地块锚点恢复地图选择；严格要求库内唯一匹配，不猜地块。 */
+  function restoreActiveMapPlotSelection(){
+    if(currentMapPlotId)return false;
+    var ds=window.RyIrrigationDataStore,ps=window.RyPlotLibraryStore;
+    if(!ds||typeof ds.readCurrentPlotAnchor!=='function'||!ps||typeof ps.read!=='function')return false;
+    var anchor=ds.readCurrentPlotAnchor(),snapshot=ps.read();
+    if(!anchor||!anchor.ok||!anchor.id||!snapshot||!snapshot.ok||!Array.isArray(snapshot.plots))return false;
+    var matches=snapshot.plots.filter(function(p){return p&&String(p.id)===String(anchor.id);});
+    if(matches.length!==1)return false;
+    var box=document.getElementById('myPlotList');
+    var btn=box&&Array.prototype.slice.call(box.querySelectorAll('.place-go')).filter(function(el){return String(el.getAttribute('data-plot-id'))===String(anchor.id);})[0];
+    if(!btn)return false;
+    btn.click();
+    return String(currentMapPlotId)===String(anchor.id);
   }
 
   function reservoirIcon(){
@@ -1332,15 +1372,16 @@
         document.head.appendChild(st);
       }catch(eCss){}
     }
-    var list=(extras&&Array.isArray(extras.mainCouplers))?extras.mainCouplers:[];
+    var list=(extras&&Array.isArray(extras.items))?extras.items:((extras&&Array.isArray(extras.mainCouplers))?extras.mainCouplers:[]);
     list.forEach(function(n){
       if(!n||!isFinite(n.lat)||!isFinite(n.lng)) return;
+      var color=n.stale?'#b45309':'#6d28d9',fill=n.stale?'#f59e0b':'#7c3aed';
       window.L.circleMarker([n.lat,n.lng],{
-        radius:9, color:'#b45309', weight:2.5, fillOpacity:0, interactive:false
+        radius:10, color:color, weight:2.5, fillOpacity:0, interactive:false
       }).addTo(couplerMarkerLayer);
       window.L.circleMarker([n.lat,n.lng],{
-        radius:5, color:'#ffffff', weight:2, fillColor:'#f59e0b', fillOpacity:1, interactive:false
-      }).addTo(couplerMarkerLayer).bindTooltip(n.label||'主管节点',{
+        radius:6, color:'#ffffff', weight:2, fillColor:fill, fillOpacity:1, interactive:false
+      }).addTo(couplerMarkerLayer).bindTooltip((n.stale?'待重新生成 · ':'')+(n.label||'主管节点'),{
         permanent:true, direction:'top', offset:[0,-9], className:'ry-coupler-tip', opacity:0.95
       });
     });
@@ -3468,7 +3509,7 @@
     function schedule(){
       if(!map) return;
       if(t) clearTimeout(t);
-      t=setTimeout(function(){ t=null; if(mapSectionVisible()){ try{ refreshSnapTargets(); }catch(eRf){} } },300);
+      t=setTimeout(function(){ t=null; if(mapSectionVisible()){ try{restoreActiveMapPlotSelection();}catch(eSelect){} try{ refreshSnapTargets(); }catch(eRf){} } },300);
     }
     try{
       if(window.RyTlNodes&&typeof window.RyTlNodes.subscribe==='function') window.RyTlNodes.subscribe(schedule);
@@ -3917,6 +3958,7 @@
   };
 
   renderMyPlots();
+  try{restoreActiveMapPlotSelection();}catch(eRestoreMapSelection){}
 
   refresh();
 
