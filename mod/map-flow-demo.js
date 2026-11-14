@@ -129,6 +129,13 @@
         startOut: sMin,                       /* >0 ⇒ 管线起点落在分区框"上游"之外 */
         endOut: len - sMax,                   /* >0 ⇒ 管线终点超出"下游"边界 */
         lateralOut: lMin > 0 ? lMin : (lMax < 0 ? -lMax : 0),
+        /* [v1086] 分区框中心相对管线轴线的**带符号**横向偏移（正=框在管线左侧）。
+           lateralOut 只在「管子整根跑到框外」时才非零，管子还在框里就恒为 0 ⇒
+           它对「支管在本区里偏了一截」完全无感。真横向量看这个。
+           ★ 不要把它放进 systematic 判据：v1079 同列定线后，竖管走的是**本列各格形心
+           的中位数**，旋转地块里形心逐行滑动，这一列线的横向偏移本来就能到十几米
+           （8° / 384×502 实测 ±20m），属设计口径、不是故障。 */
+        lateralSigned: (lMin + lMax) / 2,
         sMin: sMin, sMax: sMax,
         sOf: function (p) { return (p.x - a.x) * ux + (p.y - a.y) * uy; }
       };
@@ -143,6 +150,9 @@
       var bm = axisMetric(P, br.map(pr)), mm = axisMetric(P, mn.map(pr));
       if (!bm) { rows.push({ zi: zi, skip: '支管长度≈0' }); continue; }
       var row = { zi: zi, branch: bm, main: mm };
+      /* 横向量单独摊平给探针/控制台看（口径见 axisMetric 里 lateralSigned 注释） */
+      row.lateralSigned = bm.lateralSigned;
+      row.branchLen = bm.len;
       var v = null;
       (d.valves || []).forEach(function (x) { if (!v && x && Number(x.mi) === zi) v = x; });
       if (v && (v.anchorLL || v.ll)) {

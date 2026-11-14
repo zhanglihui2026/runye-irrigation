@@ -3570,16 +3570,57 @@
         ppState.zoneAngleDeg=0;ppState.zoneRotated=false;
         ppState.cutSnap={sig:'',x:null,y:null};ppState.cutOverrides={x:{},y:{}};
       }
+      /* [v1086] 进入格系后，「规划尺寸」必须按**本格系的实际包围盒**取（即 useOwnDims 口径）。
+         为什么必须：旋转角 ≠ 0 时 grid1 的包围盒被撑大（384×502 的地块 8° ⇒ 450×551），
+         若这里仍用规划尺寸 (384,502) 去除，ppGetZoneCuts 内部会**再缩放一次**
+         （sx=0.853 / sy=0.912），于是它算出的 xPos/yPos 与「分区框侧」
+         （runye-map-partition.polygons → RunyeBridge.getZoneCuts，那次用的是世界多边形、
+          sx=sy=1）不但坐标系不同，连**切割数组本身都不同** ⇒ 分区框与管线各切一次、
+         各错一段。改成包围盒口径后两侧 gd 尺寸完全一致、xDesign 完全一致，
+         切割结果只差一个平移（由下面的两级 toWorld 还原）。
+         0° 恒等于改前：包围盒本来就等于规划尺寸 ⇒ sx=sy=1、design 不变，逐点相同。 */
+      if (frame) ppOwnDimOverride = true;
       var b = ppGetBounds(),layout=ppGetZoneLayout(b,planN);
       if(frame&&keepSnap&&keepSnap.x&&keepSnap.y){
         ppState.cutSnap={sig:ppGetZoneCutSignature(b,layout),x:keepSnap.x.slice(),y:keepSnap.y.slice()};
       }
       var cuts = ppGetZoneCuts(b, layout);
+      /* [v1086 2026-11-14 用户实测「管线本身生成的位置就不对」——真根因]
+         ★★ 这里有两个不同的「格系」，别再混：
+            · grid1 = `frame` 的格系（上面第 3569 行把 polyPts 换成 frame.poly 得到的），
+              包围盒 = frame.bounds = 规划尺寸 (A,B)，只由「世界包围盒 + 规划尺寸」决定；
+            · grid2 = `cuts.frame` 的格系，cuts 的 xPos/yPos 就活在这里（ppGetZoneCuts
+              内部又建了一次 ppGridFrame 并把**grid1 多边形**映射进去）。
+         角度 = 0 时 grid1 ≡ grid2（identity），所以这个差别一直隐形。
+         角度 ≠ 0 时 grid1 的包围盒被旋转撑大（如 384×502 的地块 8° ⇒ 450×551），
+         ppGetZoneCuts 用「规划尺寸 A,B」除以这个撑大的包围盒 ⇒ 缩放 ≠ 1、
+         且 grid2 原点被抬到 gd.min（8° 实测 −24.3m）。于是：
+            · 分区框（runye-map-partition.polygons → polyToWorld(cuts,…)）走的是
+              **cuts.frame**，位置正确；
+            · 管线却只经过外层 frame.toWorld（grid1→世界），少了一次
+              cuts.frame.toWorld（grid2→grid1）⇒ **整组管线相对分区框刚性错开 gd.min**，
+              且错开量在缩放层与长度上互相抵消 ⇒ 长度一模一样、只是整体平移。
+         这正是用户看到的「支管 118.6m、起点外 +13.0m、终点外 −13.1m、横向 0」（12 区同向同量）。
+         ⇒ 口径统一：cuts 之后的格内几何一律按 cuts.frame 算，出图时
+            「cuts.frame.toWorld → frame.toWorld」两级回世界。0° 时两级中的内层是
+            identity，结果与改动前逐点相同（回归底线）。 */
+      var gridFrame = (frame && cuts && cuts.frame) ? cuts.frame : null;
       /* [v837] 每根线都裁到地块多边形；裁完不足 1 m 的整根丢弃（旋转角下的幽灵角格子）。
-         ★ 这里 ppState.polyPts 已被上面换成**格系**多边形（角度≠0 时），管坐标也在格系，
-           所以裁剪环就是 ppPipeClipPoly —— 两者同一个坐标系，别换成外面那份世界多边形。
+         裁剪环必须与 cuts 同一格系 ⇒ 用 gridFrame.poly；没有 gridFrame 时才退回 polyPts。
          0° 时所有线整段在界内 ⇒ 原值推入，结果与旧实现逐点相同。 */
-      var ppPipeClipPoly = ppState.polyPts;
+      var ppPipeClipPoly = gridFrame ? gridFrame.poly : ppState.polyPts;
+      /* 阀门是否落在地块内：与管段同一格系判定（gridFrame 下要把成员环映射进 grid2） */
+      function ppInPipePlot(p) {
+        if (!gridFrame) return ppPointInPlot(p);
+        var rings = ppGetSubPlotRings();
+        if (rings) {
+          for (var ri = 0; ri < rings.length; ri++) {
+            if (rings[ri].length >= 3 && ppRingIn(p, rings[ri].map(gridFrame.toGrid))) return true;
+          }
+          return false;
+        }
+        return ppRingIn(p, ppPipeClipPoly);
+      }
       function pushSeg(arr, a, c, minLen) {
         var segs = ppClipSegsToPlot(a, c, ppPipeClipPoly), pushed = 0;
         var min = (minLen === undefined ? 1 : minLen);
@@ -3690,7 +3731,7 @@
             for (var bm = branchStart; bm < out.branch.length; bm++) {
               out.main.push(out.branch[bm].map(function (p) { return { x: p.x, y: p.y }; }));
             }
-            if (ppPointInPlot({ x: centerX, y: centerY })) out.valves.push({ x: centerX, y: centerY });
+            if (ppInPipePlot({ x: centerX, y: centerY })) out.valves.push({ x: centerX, y: centerY });
             // Three-level: sub-branch pipes perpendicular to branch (horizontal)
             if (isThree) {
               var nSub = Math.max(2, Math.floor(zoneH / 15));
@@ -3718,7 +3759,7 @@
             for (var bmH = branchStartH; bmH < out.branch.length; bmH++) {
               out.main.push(out.branch[bmH].map(function (p) { return { x: p.x, y: p.y }; }));
             }
-            if (ppPointInPlot({ x: centerX, y: centerY })) out.valves.push({ x: centerX, y: centerY });
+            if (ppInPipePlot({ x: centerX, y: centerY })) out.valves.push({ x: centerX, y: centerY });
             // Three-level: sub-branch pipes perpendicular to branch (vertical)
             if (isThree) {
               var nSub2 = Math.max(2, Math.floor(zoneW / 15));
@@ -3731,10 +3772,16 @@
         }
       }
     } finally {
-      /* [v865] 0° 也 toWorld：管线恒生成于格系，统一转回世界系（0° 时 toWorld=纯平移+缩放）。 */
-      if(frame){
-        ['main','branch','subbranch'].forEach(function(k){out[k]=out[k].map(function(line){return line.map(frame.toWorld);});});
-        out.valves=out.valves.map(frame.toWorld);
+      /* [v865] 管线恒生成于格系，统一转回世界系。
+         [v1086] 格系是 **grid2 = cuts.frame**（cuts.xPos/yPos 所在的系），
+           所以必须先 gridFrame.toWorld 回到 grid1，再 frame.toWorld 回世界。
+           少了内层：角度≠0 时整组管线相对分区框刚性平移 gd.min（实测 8° / 384×502 ⇒ 24.3m），
+           而长度因两级缩放互相抵消看不出问题 —— 就是「管长一模一样、位置整体偏」那种错。
+           内层是 identity（0° 恒等）时两步合并 ≡ 旧实现，逐点相同。 */
+      if (frame) {
+        var toWorldPipe = gridFrame ? function (p) { return frame.toWorld(gridFrame.toWorld(p)); } : frame.toWorld;
+        ['main', 'branch', 'subbranch'].forEach(function (k) { out[k] = out[k].map(function (line) { return line.map(toWorldPipe); }); });
+        out.valves = out.valves.map(toWorldPipe);
       }
       ppState.polyPts = keepPoly; ppOwnDimOverride = keepOwn; ppState.zoneAngleDeg=keepAngle; ppState.zoneRotated=keepRot; ppState.cutSnap=keepSnap; ppState.cutOverrides=keepOverrides;
     }
