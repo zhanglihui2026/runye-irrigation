@@ -3816,9 +3816,53 @@ function tlHookTlNodesLiveSync() {
   if (window.__tlNodesLiveSyncHooked) return true;
   if (!window.RyTlNodes || typeof window.RyTlNodes.subscribe !== 'function') return false;
   window.__tlNodesLiveSyncHooked = true;
-  window.RyTlNodes.subscribe(function () { try { tlRefreshTlNodesLayer(); } catch (e) {} });
+  window.RyTlNodes.subscribe(function () {
+    try { tlRefreshTlNodesLayer(); } catch (e) {}
+    try { tlPublishCurrentNodesToMapSnapshot(); } catch (ePublishNodes) {}
+  });
   return true;
 }
+
+/* 节点增删/移位后，把节点与当前管线作为同一个地图网络对象原子更新。
+   只允许更新仍绑定同一地块、同一几何代且未标记需重规划的网络；否则不把草稿节点
+   混入旧管线，仍由「生成施工图」完整发布。 */
+function tlPublishCurrentNodesToMapSnapshot() {
+  var dd=window.tlDiagramData,host=window.RyMapHost,store=window.RyIrrigationDataStore;
+  var pid=window.currentPlotId==null?'':String(window.currentPlotId);
+  if(!pid||!dd||!dd.generatedAt||!window.RyTlNodes||!window.RyTlAutoEdits||!host||
+      typeof host.projectDesignPointForPlot!=='function'||!store||typeof store.readNetworkLayoutForPlot!=='function'||
+      typeof store.writeNetworkLayout!=='function')return false;
+  var geometrySig=JSON.stringify([dd.frontPipe,dd.mainPipes,dd.branchPipes,dd.valves,dd.poly]);
+  var network=null;
+  try{network=store.readNetworkLayoutForPlot(pid);}catch(eReadNodeNetwork){return false;}
+  if(!network||String(network.plotId||'')!==pid||network.needsReplan||String(network.diagramGeometrySig||'')!==geometrySig)return false;
+  var route=network.routeGeometry;
+  if(route&&route.geometrySig!==geometrySig)return false;
+  var published=[],routeNodes=[];
+  var nodes=window.RyTlNodes.list()||[];
+  for(var i=0;i<nodes.length;i++){
+    var node=nodes[i];
+    if(!node||!/^((main|branch))-\d+$/.test(String(node.pid||'')))continue;
+    var m=/^(main|branch)-(\d+)$/.exec(String(node.pid)),mi=Number(m[2]);
+    if((m[1]==='main'?mi>=(dd.mainPipes||[]).length:mi>=(dd.branchPipes||[]).length))return false;
+    var point;
+    try{point=window.RyTlAutoEdits.pointAt(node.pid,dd,Number(node.atM));}catch(eNodePoint){return false;}
+    var ll=point&&host.projectDesignPointForPlot(pid,point);
+    if(!ll||!isFinite(Number(ll[0]))||!isFinite(Number(ll[1])))return false;
+    var item={id:String(node.id||''),pid:String(node.pid),atM:Number(node.atM)||0,lat:Number(ll[0]),lng:Number(ll[1])};
+    published.push(item);routeNodes.push({id:item.id,pid:item.pid,mi:mi,kind:m[1],ll:[item.lat,item.lng]});
+  }
+  var next=JSON.parse(JSON.stringify(network));
+  next.publishedNodes={version:1,geometrySig:geometrySig,items:published};
+  if(next.routeGeometry){next.routeGeometry.nodes=routeNodes;}
+  var prior=JSON.stringify(network);
+  if(JSON.stringify(next)===prior)return true;
+  try{if(store.writeNetworkLayout(next,pid)!==true)return false;}catch(eWriteNodeNetwork){return false;}
+  try{if(typeof host.refreshSnapTargets==='function')host.refreshSnapTargets();}catch(eRefreshNodeSnap){}
+  try{if(window.RyMapFlowDemo&&typeof window.RyMapFlowDemo.refresh==='function')window.RyMapFlowDemo.refresh();}catch(eRefreshNodeDemo){}
+  return true;
+}
+window.tlPublishCurrentNodesToMapSnapshot=tlPublishCurrentNodesToMapSnapshot;
 
 /* ── 真北方位角（三级简图出图）──────────────────────────────────────────────
    地块坐标与朝向保持真实且固定，分区网格方向不会旋转地块。在线地图与二级设计页
@@ -3907,6 +3951,11 @@ function tlSyncGeneratedMapSnapshot() {
       network.needsReplan||String(network.plotId)!==plotId||
       String(network.diagramGeometrySig||'')!==geometrySig){
     alert('当前管线成果尚未完整写入在线地图数据，或分区角度已变更；地图未同步。请重新生成施工图。');
+    return false;
+  }
+  var publishedNodeState=network.publishedNodes;
+  if(!publishedNodeState||publishedNodeState.version!==1||publishedNodeState.geometrySig!==geometrySig||!Array.isArray(publishedNodeState.items)){
+    alert('施工节点尚未与当前管线一起发布到在线地图。请确认三级节点已保存；节点会在几何同代时自动同步，或点击「生成施工图」重新发布。');
     return false;
   }
   /* 回传前核对图面与地图快照的关键构件数量。生成阶段已将唯一快照写入地块管网槽；

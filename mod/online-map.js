@@ -3473,13 +3473,27 @@
     var cp=map.latLngToContainerPoint(displayLatLngOf(lat,lng));
     return {x:cp.x,y:cp.y};
   }
+  function projectDesignPointForPlot(plotId,pt){
+    if(!plotId||!pt||!isFinite(Number(pt.x))||!isFinite(Number(pt.y)))return null;
+    var snap=window.RyPlotLibraryStore&&window.RyPlotLibraryStore.read();
+    if(!snap||!snap.ok)return null;
+    var matches=(snap.plots||[]).filter(function(p){return p&&String(p.id)===String(plotId);});
+    if(matches.length!==1)return null;
+    var dd=window.tlDiagramData,base=window.__runyeGeoBase,G=window.RyTrunkGeo;
+    if(String(window.currentPlotId||'')!==String(plotId)||!dd||dd.world!=='meter'||!Array.isArray(dd.poly)||
+        !Array.isArray(matches[0].polyLatLng)||matches[0].polyLatLng.length!==dd.poly.length||!G||!base)return null;
+    var cal=G.autoSign(dd.poly,matches[0].polyLatLng,base);
+    if(!cal||!cal.ok)return null;
+    var ll=G.m2ll(Number(pt.x),Number(pt.y),base,cal.sign);
+    return ll&&isFinite(Number(ll.lat))&&isFinite(Number(ll.lng))?[Number(ll.lat),Number(ll.lng)]:null;
+  }
   window.RyMapHost={payload:buildPlotPayload,send:sendPlotToDesign,sendDraft:onSendCurrentDraft,trunkState:trunkState,
     /* [v843] 当前在地图上编辑哪块地。
        为什么必须有这个口：`currentMapPlotId` 是**闭包变量**，外面读不到（探针踩过：
        `window.currentMapPlotId` 恒为 undefined）。而 v843 要让三级扬程取"在线地图上画的
        总管"，就得知道这块地的 id 去地块库里翻 plot.trunk。
        只读、不暴露整个状态 —— 需要的只是一个标量。 */
-    currentPlotId:function(){return currentMapPlotId;},
+    currentPlotId:function(){return currentMapPlotId;},projectDesignPointForPlot:projectDesignPointForPlot,
     project:projectToContainer,toDisplay:toDisplay,refresh:refreshPlotLibrary,
     /* [v833] 编辑层出口：探针要能「按 id 进编辑、拿菜单项、算两点米距」。
        菜单项走 RyTrunkEdit.buildMenuItems 的同一口径，避免探针自己复制一份文案
@@ -3509,7 +3523,11 @@
     function schedule(){
       if(!map) return;
       if(t) clearTimeout(t);
-      t=setTimeout(function(){ t=null; if(mapSectionVisible()){ try{restoreActiveMapPlotSelection();}catch(eSelect){} try{ refreshSnapTargets(); }catch(eRf){} } },300);
+      t=setTimeout(function(){ t=null; if(mapSectionVisible()){
+        try{restoreActiveMapPlotSelection();}catch(eSelect){}
+        try{if(typeof window.tlPublishCurrentNodesToMapSnapshot==='function')window.tlPublishCurrentNodesToMapSnapshot();}catch(ePublishNodes){}
+        try{refreshSnapTargets();}catch(eRf){}
+      } },300);
     }
     try{
       if(window.RyTlNodes&&typeof window.RyTlNodes.subscribe==='function') window.RyTlNodes.subscribe(schedule);
@@ -3959,6 +3977,9 @@
 
   renderMyPlots();
   try{restoreActiveMapPlotSelection();}catch(eRestoreMapSelection){}
+  /* 旧发布快照可能只有管线、还没有 v1 施工节点字段；若当前设计几何仍与该快照同代，
+     在地图启动时从三级节点唯一源补齐同一网络对象，避免要求用户重复生成才出现捕捉点。 */
+  try{if(typeof window.tlPublishCurrentNodesToMapSnapshot==='function')window.tlPublishCurrentNodesToMapSnapshot();}catch(ePublishCurrentNodes){}
 
   refresh();
 
