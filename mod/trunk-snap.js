@@ -146,13 +146,15 @@
     });
 
     /* 7b. 设计页接驳节点（发布快照 publishedNodes 投影）。失配节点由宿主剔除；
-          [v1081] 命中与落点统一实体位（地图已全线实体渲染）：白圈即标记即落点。 */
+          [v1082 双世界] 这里**只登记实体坐标**：命中屏幕位置由宿主注入的 projector
+          （RyMapPointProjector.toShown）负责投到显示副本，落点又是实体，一步到位。
+          ★ 别再在这里塞 displayLat/displayLng —— 那是第二次平移，白圈会跑出 20 m。 */
     var mcValid = 0;
     (Array.isArray(input.mainCouplers) ? input.mainCouplers : []).forEach(function (c) {
       var cp = readPoint(c);
       if (!cp) return;
       mcValid++;
-      push(cp.lat, cp.lng, 'main-coupler', (c && c.label) ? c.label : ('主管节点 ' + mcValid), {lat:cp.lat,lng:cp.lng});
+      push(cp.lat, cp.lng, 'main-coupler', (c && c.label) ? c.label : ('主管节点 ' + mcValid));
     });
 
     /* 8~9. 垂足兜底：主管和已存手绘总管的线段只在没有更高优先级点命中时胜出。
@@ -235,7 +237,7 @@
     var best = null;
     for (var i = 0; i < targets.length; i++) {
       var t = targets[i];
-      /* [v1081] 地图统一实体世界：命中测试与保存点同为实体坐标；snapLat/snapLng 兼容保留。 */
+      /* [v1082] 命中测试跟随可见位置（显示位）；snapLat/snapLng 是保存到总管的实体坐标。 */
       var q = projector({lat:t.lat,lng:t.lng});
       if (!q) continue;
       var dx = q.x - p.x, dy = q.y - p.y;
@@ -262,11 +264,21 @@
       }
     }
     if (!best) { clearMarker(); return null; }
-    /* [v1081] 点命中回传实体坐标（=标记绘制位=白圈位=保存位）；线段垂足同样反算实体落点。 */
-    var hitPoint = best.screen && unprojector ? unprojector(best.screen)
-      : (best.target && isNum(Number(best.target.snapLat)) && isNum(Number(best.target.snapLng))
+    /* [v1082] 点命中回传实体坐标（拓扑用）；白圈显示走宿主 toShownPoint 投影，视觉压在标记上。
+       ★ 点目标回它**自己的实体坐标**，不要拿 screen 反算：unprojector 会先减位移再取垂足，
+         若这个点本身离管线有几十厘米（地块角点、阀门锚点常这样），垂足会把它拽到管线上。
+         只有线段目标（mainpipe-edge / trunk-edge）才需要屏幕反算求垂足。 */
+    var isEdge = best.target && (best.target.kind === 'mainpipe-edge' || best.target.kind === 'trunk-edge');
+    var hitPoint;
+    if (!isEdge && best.target && isNum(Number(best.target.lat)) && isNum(Number(best.target.lng))) {
+      hitPoint = { lat: Number(best.target.lat), lng: Number(best.target.lng) };
+    } else if (best.screen && unprojector) {
+      hitPoint = unprojector(best.screen);
+    } else {
+      hitPoint = best.target && isNum(Number(best.target.snapLat)) && isNum(Number(best.target.snapLng))
         ? { lat: Number(best.target.snapLat), lng: Number(best.target.snapLng) }
-        : best.target);
+        : best.target;
+    }
     if (!hitPoint || !isNum(hitPoint.lat) || !isNum(hitPoint.lng)) { clearMarker(); return null; }
     lastHit = {
       lat: hitPoint.lat,

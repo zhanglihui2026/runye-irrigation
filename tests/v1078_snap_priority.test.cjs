@@ -32,10 +32,10 @@ const html = read('index.html');
 /* 锁1：机制一保持修复态 —— 双坐标链路（v1076 口径不许回退） */
 ok(oml.includes('out.items.push({lat:lat,lng:lng,displayLat:isFinite(Number(n.displayLat))?Number(n.displayLat):lat,'),
   '[v1078] publishedCouplers items 保持 lat=实体、displayLat=显示（不许改成显示位当 lat）');
-ok(snap.includes("push(cp.lat, cp.lng, 'main-coupler', (c && c.label) ? c.label : ('主管节点 ' + mcValid), {lat:cp.lat,lng:cp.lng})"),
-  '[v1081 取代 v1078] trunk-snap 7b 命中与落点统一实体位（地图全线实体渲染）');
-ok(snap.includes('[v1081] 地图统一实体世界：命中测试与保存点同为实体坐标'),
-  '[v1081] nearest 实体口径注释在位');
+ok(snap.includes("push(cp.lat, cp.lng, 'main-coupler', (c && c.label) ? c.label : ('主管节点 ' + mcValid));"),
+  '[v1082 取代 v1081] trunk-snap 7b 只登记实体坐标（显示投影交给宿主 projector，不许二次平移）');
+ok(snap.includes('[v1082 双世界] 这里**只登记实体坐标**'),
+  '[v1082] nearest 实体口径注释在位');
 ok(snap.includes('? { lat: Number(best.target.snapLat), lng: Number(best.target.snapLng) }'),
   '[v1078] nearest 点命中回传实体 snap 坐标');
 

@@ -657,7 +657,7 @@
       trunkPoint=trunkSnapPoint(trunkPoint, shiftOn);
       trunkPoints.push(trunkPoint);
       renderTrunkDraft();
-      updateTrunkRubber(toDisplay(trunkPoint)); /* [v852] 落点后虚线收缩到新末点（长度 0），随鼠标再长出来 */
+      updateTrunkRubber(trunkPoint); /* [v852] 落点后虚线收缩到新末点（长度 0），随鼠标再长出来 */
       return;
     }
     if(!drawing) return;
@@ -696,11 +696,13 @@
     if(trunkRubber && map.hasLayer(trunkRubber)) trunkGroup.removeLayer(trunkRubber);
     trunkRubber=null;
   }
-  function updateTrunkRubber(cursorDisp){
+  /* [v1082] 入参统一是**实体**经纬度（trunkSnapPoint 返回的就是实体），
+     投影在函数内做一次 —— 调用方不再各自 toDisplay，避免又出现两套口径。 */
+  function updateTrunkRubber(cursor){
     removeTrunkRubber();
-    if(trunkMode!=='draw' || !trunkPoints.length || !cursorDisp) return;
-    var last=toDisplay(trunkPoints[trunkPoints.length-1]);
-    trunkRubber=L.polyline([last,cursorDisp],{
+    if(trunkMode!=='draw' || !trunkPoints.length || !cursor) return;
+    var last=toDisplay(toShownPoint(trunkPoints[trunkPoints.length-1]));
+    trunkRubber=L.polyline([last,toDisplay(toShownPoint(cursor))],{
       color:TRUNK_STYLE.draft.color, weight:2, opacity:.65,
       dashArray:'4,7', pane:TRUNK_PANE, interactive:false
     }).addTo(trunkGroup);
@@ -745,9 +747,13 @@
        那是现役功能，不能为了编辑手感把它压掉。 */
     if(trunkSaved && trunkSaved.trunks){
       trunkSaved.trunks.forEach(function(entry){
+        /* [v1082] 存的是实体中心线，画的时候投影到显示世界（toShownPoint）。
+           理由：用户点的是**可见**管线（显示副本），落点经 toEntityPoint 存成实体；
+           画回来必须走同一位移，否则总管会整体偏 gap/2 —— 眼看着点上了，线却歪在一边。
+           而管线本身必须继续画显示副本（v1081 把管线也画实体 ⇒ 主/支管叠成一根）。 */
         var pts=(entry.points||[]).map(function(q){
           var rd=readTrunkPoint(q);
-          return rd?toDisplay({lat:rd.lat,lng:rd.lng}):null;
+          return rd?toDisplay(toShownPoint({lat:rd.lat,lng:rd.lng})):null;
         }).filter(function(q){return !!q;});
         if(pts.length<2) return;
         var isActive=trunkMode==='edit' && activeTrunkId!==null && String(entry.id)===String(activeTrunkId);
@@ -771,7 +777,7 @@
     }
     /* 草稿：紫色虚线（绘制态）／紫事实线（只读显示态） */
     if(trunkPoints.length){
-      trunkLine=L.polyline(trunkPoints.map(toDisplay),{
+      trunkLine=L.polyline(trunkPoints.map(function(q){ return toDisplay(toShownPoint(q)); }),{
         color:TRUNK_STYLE.draft.color, weight:TRUNK_STYLE.draft.weight,
         opacity:TRUNK_STYLE.draft.opacity,
         dashArray:trunkMode==='draw'?'8,5':null, pane:TRUNK_PANE, interactive:false
@@ -1034,24 +1040,137 @@
     var d=toDisplay({lat:+lat,lng:+lng});
     return Array.isArray(d)?L.latLng(d[0],d[1]):L.latLng(d.lat,d.lng);
   }
+  /* [v1082] 实体经纬度 → 「这东西该画在哪」的 LatLng。
+     = 先投影到显示世界（所贴管线的显示副本），再折算底图坐标。
+     ★ 渲染总管/节点/手柄/白圈一律走这里；漏一个就会有一处比周围偏 gap/2。 */
+  function shownLatLngOf(lat,lng){
+    var s=toShownPoint({lat:+lat,lng:+lng});
+    return displayLatLngOf(s.lat,s.lng);
+  }
+
+  /* ===== [v1082] 双世界投影层：实体（存储/寻路）↔ 显示（渲染/命中） =====
+     发布快照每根主管/支管都有两份几何：实体中心线（mains/branches，水力与寻路）
+     与显示副本（displayMains/displayBranches，图上可见、主支管错开的那两条线）。
+     ppGetPipeDisplayGeometry 只对整条折线做刚性平移 ⇒ **首点差就是该线的显示位移**。
+     规则（唯一口径，别再加分支）：
+       · 一切「用户可见/可点」的落点 → 显示世界：总管线、折点手柄、节点标记、白圈、橡皮筋；
+       · 一切「存储/寻路/接驳」 → 实体世界：总管点、节点 ll、主管/支管、阀门锚点；
+       · 两界之间只经本层换算（离管线 ≤ PIPE_SHIFT_REACH_M 才换算，水源出水等空中点原样）。
+     这正是 v1073↔v1081 反复翻烧饼的根：要么全渲染显示导致存储偏 10m，要么全渲染实体
+     导致主支管叠成一根。这一版把「画什么」和「存什么」拆开，两头都成立。 */
+  var PIPE_SHIFT_REACH_M = 30;
+  var pipeShiftCache = null, pipeShiftKey = '', pipeShiftAt = 0;
+  /* 缓存 2 秒兜底 + 显式失效（refreshSnapTargets / 清空管网 / 切地块都会调）。
+     为什么不能每次都读库：toShownPoint 在 mousemove 里每帧都跑，而
+     readNetworkLayoutForPlot 是 localStorage.getItem + JSON.parse 一整个管网快照
+     —— 每帧解析一次会直接把地图拖到个位数帧率。 */
+  var PIPE_SHIFT_TTL_MS = 2000;
+  function invalidatePipeShift() { pipeShiftCache = null; pipeShiftKey = ''; pipeShiftAt = 0; }
+  function distToSegM(p, a, b) {
+    var k = Math.cos(((a.lat + b.lat) / 2) * Math.PI / 180) || 1;
+    var bx = (b.lng - a.lng) * 111320 * k, by = (b.lat - a.lat) * 110540;
+    var px = (p.lng - a.lng) * 111320 * k, py = (p.lat - a.lat) * 110540;
+    var den = bx * bx + by * by;
+    var t = den > 1e-9 ? Math.max(0, Math.min(1, (px * bx + py * by) / den)) : 0;
+    var dx = px - bx * t, dy = py - by * t;
+    return { d: Math.sqrt(dx * dx + dy * dy), t: t };
+  }
+  function pipeShiftLines() {
+    var plotId = String(currentMapPlotId || '');
+    var now = Date.now();
+    if (pipeShiftCache && pipeShiftKey === plotId && (now - pipeShiftAt) < PIPE_SHIFT_TTL_MS) return pipeShiftCache;
+    var store = window.RyIrrigationDataStore, net = null;
+    try { net = store && plotId && typeof store.readNetworkLayoutForPlot === 'function' ? store.readNetworkLayoutForPlot(plotId) : null; } catch (eNet) { }
+    var route = net && net.routeGeometry;
+    /* 展开成「每条线段 + 它所属那根管线的位移」：命中循环里只做算术，
+       不再每帧 coordPair/建对象（mousemove 每帧都要跑一遍）。 */
+    var segs = [];
+    function add(phys, disp) {
+      (Array.isArray(phys) ? phys : []).forEach(function (line, i) {
+        var d = (disp || [])[i];
+        if (!Array.isArray(line) || line.length < 2 || !Array.isArray(d) || d.length < 2) return;
+        var a0 = RunyeGeo.coordPair(line[0]), b0 = RunyeGeo.coordPair(d[0]);
+        if (!a0 || !b0) return;
+        var dLat = b0[0] - a0[0], dLng = b0[1] - a0[1];
+        if (Math.abs(dLat) < 1e-12 && Math.abs(dLng) < 1e-12) return;
+        for (var k = 0; k + 1 < line.length; k++) {
+          var a = RunyeGeo.coordPair(line[k]), b = RunyeGeo.coordPair(line[k + 1]);
+          if (!a || !b) continue;
+          if (a[0] === b[0] && a[1] === b[1]) continue;
+          segs.push({ a: a, b: b, dLat: dLat, dLng: dLng });
+        }
+      });
+    }
+    try {
+      if (route && Array.isArray(route.mains)) { add(route.mains, route.displayMains); add(route.branches, route.displayBranches); }
+    } catch (eShift) { }
+    pipeShiftCache = segs; pipeShiftKey = plotId; pipeShiftAt = now;
+    return segs;
+  }
+  /* 找最近管线（≤ reach）。
+     ★ 必须在**入参所在的那个世界**里量距离：实体点就对实体线段量（asDisplay=false），
+       显示点就对「实体线段 + 该线位移」量（asDisplay=true）。
+       混着量看似只差 10 m，实际会挑到隔壁那根管的位移，投影出来偏到另一条线上。 */
+  function nearestPipeShift(lat, lng, asDisplay) {
+    var best = null, segs = pipeShiftLines();
+    for (var i = 0; i < segs.length; i++) {
+      var s = segs[i];
+      var oLat = asDisplay ? s.dLat : 0, oLng = asDisplay ? s.dLng : 0;
+      var r = distToSegM({ lat: lat, lng: lng },
+        { lat: s.a[0] + oLat, lng: s.a[1] + oLng },
+        { lat: s.b[0] + oLat, lng: s.b[1] + oLng });
+      if (r.d <= PIPE_SHIFT_REACH_M && (!best || r.d < best.d)) best = { d: r.d, a: s.a, b: s.b, dLat: s.dLat, dLng: s.dLng };
+    }
+    return best;
+  }
+  /* 实体点 → 显示点（渲染/命中用）：沿最近发布管线的显示位移平移。 */
+  function toShownPoint(p) {
+    if (!p || !isFinite(Number(p.lat)) || !isFinite(Number(p.lng))) return p;
+    var lat = Number(p.lat), lng = Number(p.lng);
+    var hit = nearestPipeShift(lat, lng, false);
+    if (!hit) return { lat: lat, lng: lng };
+    return { lat: lat + hit.dLat, lng: lng + hit.dLng };
+  }
+  /* 显示点（用户点/屏幕反算）→ 实体点（存储/寻路用）：先减显示位移回到实体线，再取垂足。 */
+  function toEntityPoint(p) {
+    if (!p || !isFinite(Number(p.lat)) || !isFinite(Number(p.lng))) return p;
+    var lat = Number(p.lat), lng = Number(p.lng);
+    var hit = nearestPipeShift(lat, lng, true);
+    if (!hit) return { lat: lat, lng: lng };
+    lat -= hit.dLat; lng -= hit.dLng;
+    var a = hit.a, b = hit.b;
+    var k = Math.cos(((a[0] + b[0]) / 2) * Math.PI / 180) || 1;
+    var bx = (b[1] - a[1]) * 111320 * k, by = (b[0] - a[0]) * 110540;
+    var px = (lng - a[1]) * 111320 * k, py = (lat - a[0]) * 110540;
+    var den = bx * bx + by * by;
+    var t = den > 1e-9 ? Math.max(0, Math.min(1, (px * bx + py * by) / den)) : 0;
+    return { lat: a[0] + (b[0] - a[0]) * t, lng: a[1] + (b[1] - a[1]) * t };
+  }
+  try { window.RyMapPointProjector = { toShown: toShownPoint, toEntity: toEntityPoint, reachM: PIPE_SHIFT_REACH_M }; } catch (eProj) { }
 
   function ensureSnapSupport(){
     var S=snapApi();
     if(!S) return;
     S.setProjector(function(ll){
       try{
-        var cp=map.latLngToContainerPoint(displayLatLngOf(ll.lat,ll.lng));
+        /* [v1082] 目标坐标是实体位 → 先投影到显示位（所贴管线的显示副本），再换算屏幕点：
+           白圈落在**可见管线/标记**上，而命中返回的仍是实体坐标。 */
+        var shown=toShownPoint({lat:ll.lat,lng:ll.lng});
+        var cp=map.latLngToContainerPoint(displayLatLngOf(shown.lat,shown.lng));
         return {x:cp.x,y:cp.y};
       }catch(e){ return null; }
     });
     S.setUnprojector(function(cp){
-      try{ return fromDisplay(map.containerPointToLatLng([cp.x,cp.y])); }
+      /* 屏幕点 → 经纬度（显示世界）→ 实体点（存总管用）。 */
+      try{ return toEntityPoint(fromDisplay(map.containerPointToLatLng([cp.x,cp.y]))); }
       catch(e){ return null; }
     });
     S.setMarkerApi({
       show:function(hit){
         if(trunkMode!=='draw') return;
-        var ll=displayLatLngOf(hit.displayLat!=null?hit.displayLat:hit.lat,hit.displayLng!=null?hit.displayLng:hit.lng);
+        /* [v1082] 白圈画在显示位（hit 是实体坐标，投影后与节点标记/管线重合）。 */
+        var shown=toShownPoint({lat:hit.lat,lng:hit.lng});
+        var ll=displayLatLngOf(shown.lat,shown.lng);
         if(!snapMarker){
           /* 白色空心小圆 + 深蓝描边；interactive:false 否则它会挡住后续点击。
              className 是给探针的稳定锚点 —— 靠 fill 颜色猜太脆（Leaflet 会改写属性）。 */
@@ -1130,8 +1249,9 @@
         var t=Math.max(0,Math.min(1,((clickXY.x-a.x)*dx+(clickXY.y-a.y)*dy)/(len*len)));
         var q={x:a.x+dx*t,y:a.y+dy*t},along=walked+len*t,ll=bridge.toLL(q);
         if(!ll){walked+=len;continue;}
-        var cp=map.latLngToContainerPoint(displayLatLngOf(ll.lat,ll.lng));
-        var dist=cp.distanceTo?cp.distanceTo(e.containerPoint):Math.hypot(cp.x-e.containerPoint.x,cp.y-e.containerPoint.y);
+        /* [v1082] 施工图管线画的是显示副本，命中也要按显示位算（14 px 容差差不起 28 px）。 */
+        var cp=projectToContainer(ll.lat,ll.lng);
+        var dist=Math.hypot(cp.x-e.containerPoint.x,cp.y-e.containerPoint.y);
         if(!best||dist<best.dist)best={pid:pid,atM:along,dist:dist};
         walked+=len;
       }
@@ -1237,6 +1357,9 @@
     options=options||{};
     var S=snapApi();
     if(!S) return 0;
+    /* [v1082] 发布几何可能刚换过（重新生成施工图 / 切地块）⇒ 显示位移缓存必须作废，
+       否则投影还按上一版的 gap 算，白圈会偏出可见管线。 */
+    invalidatePipeShift();
     var input={};
     var snap=window.RyPlotLibraryStore&&window.RyPlotLibraryStore.read();
     var plot=null;
@@ -1310,10 +1433,13 @@
     if(!source)return;
     var point=window.RyTrunkSnap&&window.RyTrunkSnap.readPoint?window.RyTrunkSnap.readPoint(source):null;
     if(!point)return;
-    reservoirMarker=L.marker(toDisplay(point),{icon:reservoirIcon(),draggable:true,keyboard:false,zIndexOffset:1400})
+    /* [v1082] 水池图标也画显示位：它是可见对象，必须与其他可见元素同一世界
+       （通常离管线 >30 m 时投影是恒等变换，只有贴近管线才真的平移）。 */
+    reservoirMarker=L.marker(shownLatLngOf(point.lat,point.lng),{icon:reservoirIcon(),draggable:true,keyboard:false,zIndexOffset:1400})
       .addTo(reservoirMarkerLayer).bindTooltip('蓄水池 · 拖动调整位置',{direction:'top',offset:[0,-35],className:'ry-reservoir-tip',opacity:.96});
     reservoirMarker.on('dragend',function(){
-      var moved=fromDisplay(reservoirMarker.getLatLng());
+      /* [v1082] 拖出来的坐标是显示世界，存之前换回实体（否则每次拖动漂一个 gap）。 */
+      var moved=toEntityPoint(fromDisplay(reservoirMarker.getLatLng()));
       moved={lat:+moved.lat,lng:+moved.lng};
       var S=snapApi();
       if(snapOn&&S){refreshSnapTargets({excludeWaterSource:true});var hit=S.nearest(moved);if(hit)moved={lat:hit.lat,lng:hit.lng};}
@@ -1386,10 +1512,10 @@
     var list=(extras&&Array.isArray(extras.items))?extras.items:((extras&&Array.isArray(extras.mainCouplers))?extras.mainCouplers:[]);
     list.forEach(function(n){
       if(!n||!isFinite(n.lat)||!isFinite(n.lng)) return;
-      /* [v1081] 标记画**实体位**（与线体/捕捉落点/白圈同一世界）：
-         v1073 画 displayLat 造成「节点标记在显示副本上、总管折点存实体」的恒偏
-         gap/2（用户实测 26~28px），点节点看着吸上了、落点却偏在旁边。 */
-      var markerLat=n.lat, markerLng=n.lng;
+      /* [v1082] 标记画显示位（与可见管线一致）；落点存实体并由 toShownPoint 投影回显示位，
+         所以「点标记→折点落在标记上」与「寻路按实体连通」同时成立。 */
+      var markerLat=isFinite(Number(n.displayLat))?Number(n.displayLat):n.lat;
+      var markerLng=isFinite(Number(n.displayLng))?Number(n.displayLng):n.lng;
       var color=n.stale?'#b45309':'#6d28d9',fill=n.stale?'#f59e0b':'#7c3aed';
       window.L.circleMarker([markerLat,markerLng],{
         radius:10, color:color, weight:2.5, fillOpacity:0, interactive:false
@@ -1450,7 +1576,9 @@
           var plot=snap&&snap.ok&&currentMapPlotId?(snap.plots||[]).filter(function(p){return p&&String(p.id)===String(currentMapPlotId);})[0]:null;
           var point=plot&&window.RyTrunkSnap&&window.RyTrunkSnap.readPoint?window.RyTrunkSnap.readPoint(plot.waterSource):null;
           if(!point)return null;
-          var display=toDisplay(point);
+          /* [v1082] 演示浮层画在显示世界，这里跟着投影一次，箭头才落在地池图标上。 */
+          var shown=toShownPoint({lat:point.lat,lng:point.lng});
+          var display=toDisplay(shown);
           return {lat:display[0],lng:display[1]};
         },
         getNetworkSnapshot: function () {
@@ -1610,7 +1738,7 @@
        吸附白点吸到哪，虚线就跟到哪（Shift 正交同理），落点不会和预览不一致。 */
     var shiftOn=!!(e.originalEvent && e.originalEvent.shiftKey);
     var pv=trunkSnapPoint(lastCursorLatLng, shiftOn);
-    updateTrunkRubber(pv?toDisplay(pv):null);
+    updateTrunkRubber(pv);
     updateStatusbar();
   });
 
@@ -1714,7 +1842,8 @@
     raw.forEach(function(q,idx){
       var rd=S.readPoint(q); if(!rd) return;
       var isEnd=(idx===0||idx===raw.length-1);
-      var mk=L.marker(displayLatLngOf(rd.lat,rd.lng),{
+      /* [v1082] 手柄画显示位：与上面那条投影过的线严格同点，否则拖起来会"跳一下"。 */
+      var mk=L.marker(shownLatLngOf(rd.lat,rd.lng),{
         draggable:true, keyboard:false, autoPan:true, zIndexOffset:1200,
         icon:L.divIcon({className:'ry-trunk-vtx'+(isEnd?' is-end':''),iconSize:[14,14],iconAnchor:[7,7],
           html:'<span class="tv-dot"></span>'})
@@ -1735,7 +1864,8 @@
           var arr=trunkActiveLine.getLatLngs();
           if(arr && arr[idx]){ arr[idx]=ll; trunkActiveLine.setLatLngs(arr); }
         }
-        var gcjDrag=fromDisplay(ll);
+        /* [v1082] 预览点也要换回实体：状态栏的数字、合并判定都按实体世界算。 */
+        var gcjDrag=toEntityPoint(fromDisplay(ll));
         var preview=raw.map(function(q,i){
           if(i===idx) return [+gcjDrag.lat,+gcjDrag.lng];
           var rd=S.readPoint(q);
@@ -1751,7 +1881,10 @@
         /* [v920] 编辑拖点吸附：捕捉开启时松手落点走 nearest（与 draw 态 trunkSnapPoint
            同口径；edit 态目标表已把本线 exclude，不会自吸）。用户「拖白点到节点附近
            自动吸上去形成闭环」就是这个入口；没命中目标则原样落点。 */
-        var gcjRaw=fromDisplay(ev.target.getLatLng());
+        /* [v1082] 手柄画在显示位 ⇒ 拖出来的 ll 是显示世界坐标，必须先 toEntityPoint
+           换回实体再交给捕捉。少了这一步，落点会比目标整体偏一个 gap（10 m 上下），
+           nearest 永远差一截 —— 这就是「拖白点死活吸不上节点」的同一个病根。 */
+        var gcjRaw=toEntityPoint(fromDisplay(ev.target.getLatLng()));
         var _eS=snapOn?snapApi():null, _eHit=_eS?_eS.nearest(gcjRaw):null;
         var gcj=_eHit?{lat:+_eHit.lat,lng:+_eHit.lng}:gcjRaw;
         var target={lat:+gcj.lat,lng:+gcj.lng};
@@ -1815,7 +1948,7 @@
         if(!rd) return;
         /* interactive:false —— 标记是纯装饰，吃掉点击就没法在它上面继续加点/选线。
            [v841] 进 trunkGroup + 同一个 pane：与折线同生共死（关「测量框」不再只剩标记）。 */
-        var mk=L.circleMarker(displayLatLngOf(rd.lat,rd.lng),{
+        var mk=L.circleMarker(shownLatLngOf(rd.lat,rd.lng),{
           radius:st.radius,color:st.color,weight:st.weight,
           fillColor:st.fillColor,fillOpacity:st.fillOpacity,
           pane:TRUNK_PANE,
@@ -3485,7 +3618,11 @@
     };
   }
   function projectToContainer(lat,lng){
-    var cp=map.latLngToContainerPoint(displayLatLngOf(lat,lng));
+    /* [v1082] 入参是**实体**坐标，返回它在屏幕上的**可见**位置：
+       先投影到显示副本再换算。少这一步，选线 / 拐点命中 / 施工节点吸管
+       全都整体偏 gap（20~28 px），表现就是「明明点在总管上却选不中」。 */
+    var s=toShownPoint({lat:+lat,lng:+lng});
+    var cp=map.latLngToContainerPoint(displayLatLngOf(s.lat,s.lng));
     return {x:cp.x,y:cp.y};
   }
   function projectDesignPointForPlot(plotId,pt){
@@ -4074,6 +4211,8 @@
      那些是资产；重新点「生成施工图」即可把最新快照发布回地图。 */
   function clearPublishedOverlays(opts){
     opts=opts||{};
+    /* [v1082] 管网快照要清空 ⇒ 显示位移缓存一并作废（否则清完还按旧 gap 投影）。 */
+    try{ invalidatePipeShift(); }catch(eInv){}
     var store=window.RyIrrigationDataStore, lib=window.RyPlotLibraryStore;
     var clearedNet=0, clearedTrunk=0;
     /* ① 管网发布快照（逐地块 scoped + legacy） */

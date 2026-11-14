@@ -1039,7 +1039,10 @@
            主/支管自 v1079 起同列/同区共用一条中心线，地图无需再画拆开的副本：
            线体、标记、捕捉、白圈、动画描边统一实体世界，点哪存哪、所见即所连。
            设计页（分区与管路/三级）的错开显示不受影响。 */
-        var drawLL = sLL;
+        /* [v1082 双世界] 线体画**显示副本**（主管/支管两条线分开可见）；实体 sLL 仍是
+           水力/裁剪/寻路的唯一依据。总管等用户绘制的要素存储用实体、渲染经投影层
+           （online-map toShownPoint）贴到显示位——所以「看到的管线」与「落点」仍一致。 */
+        var drawLL = validRingLL(s.displayLatLng, 2) || sLL;
         var st = dnStyle(s.dn);
         var hrec = hydraulic && hydraulic.items && hydraulic.items[s.id];
         if (hrec) st = hydraulicStyle(hrec, st);

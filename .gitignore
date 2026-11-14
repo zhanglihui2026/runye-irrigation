@@ -189,5 +189,8 @@ npm-debug.log*
 # v993 总管归属回收（v1080 新增清空入口计数 6→7）
 !tests/v993_trunk_owner_gc.test.cjs
 
-# v1081 在线地图统一实体世界回归
-!tests/v1081_map_physical_render.test.cjs
+# v1081 在线地图统一实体世界回归（v1082 已退役：定稿改为双世界+投影层）
+# !tests/v1081_map_physical_render.test.cjs
+
+# v1082 双世界（实体存储/显示渲染）+ 唯一投影片层回归
+!tests/v1082_dual_world_projection.test.cjs
