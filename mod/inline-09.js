@@ -2399,6 +2399,12 @@ window.tlMapGroupHydraulicsOf = function (zoneIndexes, opts) {
       ? (sharedOd ? selectPipe(totalFlow, r.targetV, sharedOd, sharedOd) : selectPipe(totalFlow, r.targetV, downstreamMinOd))
       : null;
     var trialCalibers = opts && opts.calibers ? Object.assign({}, (r.inversePath && r.inversePath.calibers) || {}, opts.calibers) : (r.inversePath && r.inversePath.calibers) || null;
+    var frontAppliedOd = Number(trialCalibers && trialCalibers.front);
+    if (frontAppliedOd > 0 && totalFlow > 0) {
+      var frontAppliedId = peInnerDiam(frontAppliedOd);
+      trunkPick = { od: frontAppliedOd, id: frontAppliedId,
+        v: window.RyHcCore.velocity(totalFlow, frontAppliedId) };
+    }
     var check = window.RyPipePathLoss.calculate({
       zones: available,
       groups: [members],
@@ -2435,20 +2441,36 @@ window.tlMapGroupHydraulicsOf = function (zoneIndexes, opts) {
        长度/来源直接用图面实长（figure），不再是试算长、卡片不标 *。 */
     var worstRaw = check.paths[rows.indexOf(worst)] || null;
     var mainVEff = null, branchVEff = null;
-    if (worstRaw && mainOdEff > 0) {
-      /* [v1023] 主管流速口径与损失同源：有 mainSegs 时按本组重算后的**过境段流量峰值**
-         （最不利区路径上流量最大的那一段），比「本区自身流量」更贴链式布局物理；
-         无 mainSegs（旧引擎/旧快照）回退 mainFlow，行为不变。 */
-      try {
-        var mFlowV = (isFinite(worstRaw.mainSegFlowMax) && worstRaw.mainSegFlowMax > 0)
-          ? worstRaw.mainSegFlowMax : worstRaw.mainFlow;
-        var mpvP = selectPipe(mFlowV, r.targetV, mainOdEff, mainOdEff); if (mpvP) mainVEff = mpvP.v;
-      } catch (eMVP) {}
-    }
     var branchOdPath = (r.branchPipe && Number(r.branchPipe.od) > 0) ? Number(r.branchPipe.od) : 0;
-    if (worstRaw && branchOdPath > 0) {
-      try { var bpvP = selectPipe(worstRaw.branchFlow, r.targetV, branchOdPath, branchOdPath); if (bpvP) branchVEff = bpvP.v; } catch (eBVP) {}
-    }
+    /* 卡片的口径与流速按本轮实际经过的物理管段汇总；损失计算也读取同一 calibers。
+       同一轮可有多种主管/支管口径，不能再只显示代表管径。 */
+    var mainOds = [], branchOds = [], activeFlow = {};
+    available.forEach(function (z) { if (members.indexOf(z.zi) >= 0) activeFlow[z.zi] = z.flow; });
+    function pushOd(list, od) { od = Number(od); if (od > 0 && list.indexOf(od) < 0) list.push(od); }
+    function pipeV(flow, od) { return window.RyHcCore && window.RyHcCore.velocity ? window.RyHcCore.velocity(flow, peInnerDiam(od)) : null; }
+    available.forEach(function (z) {
+      if (members.indexOf(z.zi) < 0) return;
+      if (Array.isArray(z.mainSegs) && z.mainSegs.length) {
+        z.mainSegs.forEach(function (seg) {
+          var pid = /^main:\d+$/.test(seg.key) ? 'main-' + seg.key.slice(5) : null;
+          var od = Number(pid && trialCalibers && trialCalibers[pid] || trialCalibers && trialCalibers['main-' + z.zi] || mainOdEff);
+          pushOd(mainOds, od);
+          var flow = Array.isArray(seg.downZi) ? seg.downZi.reduce(function (sum, zi) { return sum + (activeFlow[zi] || 0); }, 0) : z.flow;
+          if (flow > 0) { var mv = pipeV(flow, od); if (isFinite(mv) && (mainVEff == null || mv > mainVEff)) mainVEff = mv; }
+        });
+      } else {
+        var ownMainOd = Number(trialCalibers && trialCalibers['main-' + z.zi] || mainOdEff);
+        pushOd(mainOds, ownMainOd);
+        var ownMv = pipeV(z.flow, ownMainOd);
+        if (isFinite(ownMv) && (mainVEff == null || ownMv > mainVEff)) mainVEff = ownMv;
+      }
+      var branchOd = Number(trialCalibers && trialCalibers['branch-' + z.zi] || branchOdPath);
+      pushOd(branchOds, branchOd);
+      var bv = pipeV(z.flow / r.branchParallelCount, branchOd);
+      if (isFinite(bv) && (branchVEff == null || bv > branchVEff)) branchVEff = bv;
+    });
+    mainOds.sort(function (a, b) { return a - b; });
+    branchOds.sort(function (a, b) { return a - b; });
     return {
       members: members,
       missing: missing,
@@ -2458,6 +2480,7 @@ window.tlMapGroupHydraulicsOf = function (zoneIndexes, opts) {
         front: trunkPick ? { od: trunkPick.od, id: trunkPick.id, v: trunkPick.v } : { od: (sharedOd || (r.frontPipe && r.frontPipe.od)) || null, id: null, v: null },
         mainOd: mainOdEff || null,
         branchOd: branchOdPath || null,
+        mainOds: mainOds, branchOds: branchOds,
         mainRecheck: mainRecheckPick ? { od: mainRecheckPick.od, flow: qMaxAll } : null,
         frontV: trunkPick ? trunkPick.v : null,
         mainV: mainVEff, branchV: branchVEff

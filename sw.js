@@ -1531,7 +1531,7 @@
  */
 
 
-const VERSION = 'v1089-head-cap';
+const VERSION = 'v1090-map-card-od';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

@@ -1782,17 +1782,21 @@
     var trunkOd=tableReady?Number(TA.od):(adv&&adv.ok===true?Number(adv.od):null);
     var mainOd=tableReady?Number(PP.mainOd):(TA&&isFinite(Number(TA.mainOd))?Number(TA.mainOd):null);
     var branchOd=tableReady?Number(PP.branchOd):(TA&&isFinite(Number(TA.branchOd))?Number(TA.branchOd):null);
+    var mainOdText=tableReady&&Array.isArray(PP.mainOds)&&PP.mainOds.length?PP.mainOds.map(function(od){return 'Ø '+od;}).join(' / '):(mainOd!=null&&isFinite(mainOd)&&mainOd>0?'Ø '+mainOd:'—');
+    var branchOdText=tableReady&&Array.isArray(PP.branchOds)&&PP.branchOds.length?PP.branchOds.map(function(od){return 'Ø '+od;}).join(' / '):(branchOd!=null&&isFinite(branchOd)&&branchOd>0?'Ø '+branchOd:'—');
+    var mixedOds=tableReady&&((PP.mainOds&&PP.mainOds.length>1)||(PP.branchOds&&PP.branchOds.length>1));
     var tableDash='—';
     var fLen=(LL&&isFinite(Number(LL.front)))?Number(LL.front):0;
     var fVel=TA&&isFinite(TA.velocity)?Number(TA.velocity).toFixed(2)+' m/s':'—';
-    var mVel=PP&&isFinite(PP.mainV)?Number(PP.mainV).toFixed(2)+' m/s':'—';
-    var bVel=PP&&isFinite(PP.branchV)?Number(PP.branchV).toFixed(2)+' m/s':'—';
+    var mVel=PP&&isFinite(PP.mainV)?(mixedOds?'最高 ':'')+Number(PP.mainV).toFixed(2)+' m/s':'—';
+    var bVel=PP&&isFinite(PP.branchV)?(mixedOds?'最高 ':'')+Number(PP.branchV).toFixed(2)+' m/s':'—';
     var mainEst=LS&&LS.main==='estimate', branchEst=LS&&LS.branch==='estimate';
     lines+='<table class="mfg-seg"><thead><tr><th>管段</th><th>管径</th><th>长度</th><th>流速</th></tr></thead><tbody>'+
       '<tr><td>总管</td><td class="od">'+(trunkOd!=null&&isFinite(trunkOd)&&trunkOd>0?'Ø '+trunkOd:'—')+'</td><td>'+(tableReady?(fLen>0?fLen.toFixed(1)+' m':'未绘制'):tableDash)+'</td><td>'+fVel+'</td></tr>'+
-      '<tr><td>主管</td><td class="od">'+(mainOd!=null&&isFinite(mainOd)&&mainOd>0?'Ø '+mainOd:'—')+'</td><td>'+(tableReady?Number(LL.main||0).toFixed(1)+' m'+(mainEst?'*':''):tableDash)+'</td><td>'+mVel+'</td></tr>'+
-      '<tr><td>支管</td><td class="od">'+(branchOd!=null&&isFinite(branchOd)&&branchOd>0?'Ø '+branchOd:'—')+'</td><td>'+(tableReady?Number(LL.branch||0).toFixed(1)+' m'+(branchEst?'*':''):tableDash)+'</td><td>'+bVel+'</td></tr>'+
+      '<tr><td>主管</td><td class="od">'+mainOdText+'</td><td>'+(tableReady?Number(LL.main||0).toFixed(1)+' m'+(mainEst?'*':''):tableDash)+'</td><td>'+mVel+'</td></tr>'+
+      '<tr><td>支管</td><td class="od">'+branchOdText+'</td><td>'+(tableReady?Number(LL.branch||0).toFixed(1)+' m'+(branchEst?'*':''):tableDash)+'</td><td>'+bVel+'</td></tr>'+
       '</tbody></table>';
+    if(mixedOds)lines+='<div class="mfg-star">管径列列出本轮经过的全部档位；流速为对应管段最高值</div>';
     if(tableReady&&(mainEst||branchEst))lines+='<div class="mfg-star">* 试算长，生成施工图后改为逐区实长</div>';
     if(loss&&isFinite(loss.flow)){
       var est=loss.estimated===true;
@@ -1805,9 +1809,9 @@
           var wFlow=isFinite(TA.sharedFlow)?Number(TA.sharedFlow).toFixed(2):null;
           if(TA.sharedGroupIndex===g){
             lines+='<div class="mfg-note mfg-note-worst"><b>本轮即最不利点</b><span class="mfg-king mfg-king-flow">流量王</span>'+(wFlow?('（'+wFlow+' m³/h 全项目最大）'):'')+
-              '：总管按它定一次、主管按它复核取大，各区共用</div>';
+              '：总管按它定一次、'+(mixedOds?'主管及支管按已应用的逐段管径计算':'主管按它复核取大，各区共用')+'</div>';
           }else{
-            lines+='<div class="mfg-note">总管按最不利点 <b class="mfg-king-flow">'+wName+(wFlow?('（'+wFlow+' m³/h）'):'')+'</b><span class="mfg-king mfg-king-flow">流量王</span>定一次、各区共用；主管按最大区复核取大'+
+            lines+='<div class="mfg-note">总管按最不利点 <b class="mfg-king-flow">'+wName+(wFlow?('（'+wFlow+' m³/h）'):'')+'</b><span class="mfg-king mfg-king-flow">流量王</span>定一次、各区共用；'+(mixedOds?'主管及支管按已应用的逐段管径计算':'主管按最大区复核取大')+
               (isFinite(TA.velocity)&&isFinite(TA.targetVelocity)&&TA.velocity<TA.targetVelocity?' —— 本轮流速低于目标属正常':'')+'</div>';
           }
         }else{
