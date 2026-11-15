@@ -40,8 +40,10 @@ test('② 恢复链必须校验切割签名：异代清空管线，快照必须�
   const restore = i12.slice(i12.indexOf('function ryPpGenRestoreProject()'), i12.indexOf('function ryPpGenRestoreProject()') + 4200);
   assert.match(restore, /snap\.ppGenCutSig\s*&&\s*snap\.ppGenCutSig!==_curSig/,
     '恢复链必须比较快照切割签名与现算签名');
-  assert.match(restore, /window\.ppState\.mainPipes=\[\]/, '异代时必须清空旧主管');
-  assert.match(restore, /window\.ppState\.couplerNodes=\[\]/, '异代时必须清空接驳节点');
+  assert.match(restore, /_staleState=window\.ppGetState\(\)/, '异代清理必须通过编辑器公开状态读取接口');
+  assert.match(restore, /_staleState\.mainPipes=\[\]/, '异代时必须清空旧主管');
+  assert.match(restore, /_staleState\.couplerNodes=\[\]/, '异代时必须清空接驳节点');
+  assert.match(restore, /window\.ppSetState\(_staleState\)/, '清理必须写回编辑器状态');
   assert.match(restore, /分区参数已变化，旧管线已清空/, '异代清空必须 toast 让用户看见并指引重新生成');
   assert.match(i12, /window\.__ryPpGenCutSig=null/, '切地块时切割签名必须随边界签名一起清');
 });

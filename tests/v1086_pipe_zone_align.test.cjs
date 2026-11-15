@@ -191,7 +191,52 @@ test('C1 [v1086] 真实页面 8° 生成后，每根管线都落在自己的分�
     }
     return { checked, bad };
   });
-  await browser.close();
   assert.ok(o.checked > 20, '必须真的检查到管线，实测 ' + o.checked);
   assert.deepEqual(o.bad, [], '管线必须落在自己的分区框里，实测不合格：' + JSON.stringify(o.bad.slice(0, 5)));
+
+  /* 模拟旧版同分区签名：旧管线整体偏移，施工节点按主管桩号保存。发布必须先拒绝，
+     手动更新后应把管线放回当前分区，并保留可重投影的节点。 */
+  const upgrade = await p.evaluate(() => {
+    document.getElementById('ppUpdatePipes').click();
+    const before = window.ppGetState();
+    const oldSig = window.ppCurrentCutSignature().replace(/\|pipeFrame=rotated-zone-v2$/, '');
+    const shifted = JSON.parse(JSON.stringify(before));
+    shifted.genCutSig = oldSig;
+    shifted.mainPipes.forEach(line => line.forEach(pt => { pt.x += 12; pt.y += 12; }));
+    shifted.branchPipes.forEach(line => line.forEach(pt => { pt.x += 12; pt.y += 12; }));
+    shifted.couplerNodes = [
+      { pipeKey: shifted.pipeIds.main[0], s: 10 },
+      { pipeKey: shifted.pipeIds.main[4], s: 10 }
+    ];
+    window.ppSetState(shifted);
+    let rejected = false;
+    try { window.tlAutoGenerate({ scroll: false, rethrowError: true, publishToMap: true }); }
+    catch (e) { rejected = /更新管路/.test(String(e.message)); }
+    const stale = window.ppGetState();
+    document.getElementById('ppUpdatePipes').click();
+    const fresh = window.ppGetState();
+    let published = false, publishError = '';
+    try { published = window.tlAutoGenerate({ scroll: false, rethrowError: true, publishToMap: true }) === true; }
+    catch (e) { publishError = String(e.message); }
+    return { rejected, oldSig, currentSig: window.ppCurrentCutSignature(),
+      staleNodeCount: stale.couplerNodes.length, freshNodeCount: fresh.couplerNodes.length,
+      freshSig: fresh.genCutSig, published, publishError, oldX: before.mainPipes[0][0].x,
+      freshX: fresh.mainPipes[0][0].x, oldPipeX: shifted.mainPipes[0][0].x,
+      node: fresh.couplerNodes[0], beforeCount: before.mainPipes.length,
+      freshCount: fresh.mainPipes.length,
+      beforeLen: Math.hypot(before.mainPipes[0].at(-1).x - before.mainPipes[0][0].x,
+        before.mainPipes[0].at(-1).y - before.mainPipes[0][0].y),
+      freshLen: Math.hypot(fresh.mainPipes[0].at(-1).x - fresh.mainPipes[0][0].x,
+        fresh.mainPipes[0].at(-1).y - fresh.mainPipes[0][0].y),
+      beforeLens: before.mainPipes.map(l => Math.hypot(l.at(-1).x-l[0].x,l.at(-1).y-l[0].y).toFixed(1)),
+      freshLens: fresh.mainPipes.map(l => Math.hypot(l.at(-1).x-l[0].x,l.at(-1).y-l[0].y).toFixed(1)) };
+  });
+  await browser.close();
+  assert.equal(upgrade.rejected, true, '旧版管线不能绕过入口直接发布');
+  assert.equal(upgrade.staleNodeCount, 2, '旧节点应保留到用户主动更新');
+  assert.equal(upgrade.freshSig, upgrade.currentSig, '更新后签名必须与当前生成算法一致');
+  assert.equal(upgrade.freshNodeCount, 1, '只保留长度稳定的主管上的桩号节点');
+  assert.equal(upgrade.node.pipeKey, 'm5', '保留的节点仍指向同一主管');
+  assert.match(upgrade.publishError, /地图坐标基准缺失/, '更新后应越过同代门禁；此矩形测试桩没有地图经纬度基准');
+  assert.ok(Math.abs(upgrade.freshX - upgrade.oldPipeX) > 10, '不能复用整体偏移的旧管线');
 });

@@ -4002,11 +4002,18 @@
        只要数量或任一管长变化，就按原规则清除，避免节点接到另一根管。 */
     var nextPipeSig=ppCurrentCutSignature();
     var oldPipeSig=ppState.__ppGenCutSig||null;
-    var keepCouplers=oldPipeSig&&nextPipeSig&&oldPipeSig===nextPipeSig.replace(/\|pipeFrame=rotated-zone-v2$/,'')&&
-      prevMainCount===r2.main.length&&oldMainPipes.every(function(line,i){
-        return Math.abs(ppLineLen(line)-ppLineLen(r2.main[i]))<=0.1;
-      });
-    ppState.couplerNodes=keepCouplers?ppCloneJSON(ppState.couplerNodes||[]):[];
+    var samePipeFrameUpgrade=oldPipeSig&&nextPipeSig&&
+      oldPipeSig===nextPipeSig.replace(/\|pipeFrame=rotated-zone-v2$/,'')&&
+      prevMainCount===r2.main.length;
+    /* 裁剪到地块边界的首尾主管可能变长，中间主管仍可保持原桩号。
+       逐节点核对其所属主管长度；仅丢弃实际变长或消失的主管上的节点。 */
+    ppState.couplerNodes=samePipeFrameUpgrade?(ppCloneJSON(ppState.couplerNodes||[])||[]).filter(function(node){
+      var match=/^m(\d+)$/.exec(node&&node.pipeKey||'');
+      var i=match?Number(match[1])-1:-1;
+      return i>=0&&i<r2.main.length&&oldMainPipes[i]&&
+        Math.abs(ppLineLen(oldMainPipes[i])-ppLineLen(r2.main[i]))<=0.1&&
+        Number(node.s)<=ppLineLen(r2.main[i])+0.1;
+    }):[];
     ppState.currentLine = [];
     ppState.hiddenPipes = { main: {}, branch: {}, subbranch: {} };
     ppState.pipeIds = { main: [], branch: [], subbranch: [] }; ppState.nextPipeId = 1;
@@ -6058,6 +6065,7 @@
     /* [v1052 数据唯一性] 生成时切割签名随存档回填：新存档带上，旧存档自然回退 null
        （画布警示对无签名档案不强判，恢复链对无 ppGenCutSig 快照只提示不强杀）。 */
     ppState.__ppGenCutSig=(typeof saved.genCutSig==='string'&&saved.genCutSig)?saved.genCutSig:null;
+    window.__ryPpGenCutSig=ppState.__ppGenCutSig;
     if(!ppState.hiddenPipes.main)ppState.hiddenPipes.main={};
     if(!ppState.hiddenPipes.branch)ppState.hiddenPipes.branch={};
     if(!ppState.hiddenPipes.subbranch)ppState.hiddenPipes.subbranch={};

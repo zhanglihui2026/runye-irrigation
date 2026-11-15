@@ -4908,6 +4908,14 @@ function tlAutoGenerate(options) {
   var ppShare=window.RunyeBridge&&typeof window.RunyeBridge.getPartitionSnapshot==='function'
     ?window.RunyeBridge.getPartitionSnapshot():null;
   var ppHasPipes=ppShare && (ppShare.mainPipes.length||ppShare.branchPipes.length||ppShare.valves.length);
+  /* 所有发布调用方共用此闸门，不能仅依赖顶部按钮的预检。 */
+  var publishGroupEdit=window.__runyeGroupEdit;
+  if(options.publishToMap===true&&ppHasPipes&&!(publishGroupEdit&&publishGroupEdit.active)&&
+     typeof window.ppCurrentCutSignature==='function'){
+    var publishPipeSig=window.ppCurrentCutSignature();
+    if(publishPipeSig&&ppShare.genCutSig!==publishPipeSig)
+      throw new Error('二级管线与当前分区或布管算法不同代；请先在「分区与管路」更新管路，再生成施工图');
+  }
   /* [v1053 2026-11-13 数据唯一性] 复用二级管线前先校验代际：ppState 里的管线是
      「生成施工图」时的存档几何，滴灌带/分区标签却是本函数按当前分区切割现算的——
      分区参数（分区数/角度/切割线/末排并入）在生成之后被改过时，复用会把旧管线铺进

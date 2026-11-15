@@ -1204,19 +1204,23 @@
          施工图」，也不让旧管线盖回新分区图面（用户实测复现：滴灌带纵向、管线竖直与其
          平行，方向报告还是旧布局的「30 个分区带长超 200m」，支管总米数也对不上）。
          旧快照（无 ppGenCutSig）无法判定同代：保留管线但 toast 明示请重新生成。 */
-      var _staleCut=false;
+      var _staleCut=false,_stalePipeVersion=false;
       try{
         if(window.ppCurrentCutSignature && typeof window.ppCurrentCutSignature==='function'){
           var _curSig=window.ppCurrentCutSignature();
           if(_curSig && snap.ppGenCutSig && snap.ppGenCutSig!==_curSig){
-            _staleCut=true;
-            if(window.ppState){
-              window.ppState.mainPipes=[];
-              window.ppState.branchPipes=[];
-              window.ppState.subBranchPipes=[];
-              window.ppState.valves=[];
-              window.ppState.couplerNodes=[];
-              if(typeof window.ppRender==='function')window.ppRender();
+            _stalePipeVersion=snap.ppGenCutSig===_curSig.replace(/\|pipeFrame=rotated-zone-v2$/,'');
+            _staleCut=!_stalePipeVersion;
+            if(_staleCut&&typeof window.ppGetState==='function'&&typeof window.ppSetState==='function'){
+              var _staleState=window.ppGetState();
+              _staleState.mainPipes=[];
+              _staleState.branchPipes=[];
+              _staleState.subBranchPipes=[];
+              _staleState.valves=[];
+              _staleState.couplerNodes=[];
+              _staleState.genCutSig=null;
+              window.ppSetState(_staleState);
+              window.__ryPpGenCutSig=null;
             }
           }
         }
@@ -1234,7 +1238,8 @@
       try{ if(typeof tlUpdatePlanBar==='function') tlUpdatePlanBar(); }catch(e){}
       try{ if(typeof atShowToast==='function') atShowToast(_staleCut
         ? '分区参数已变化，旧管线已清空——请点「生成施工图」重新生成'
-        : (snap.ppGenCutSig?'已恢复上次生成的施工图':'已恢复上次生成的施工图（若分区参数改过，请点「生成施工图」重新生成）')); }catch(e){}
+        : (_stalePipeVersion?'已恢复旧版管线和节点；请到「分区与管路」点「更新管路」，检查后再生成施工图'
+          :(snap.ppGenCutSig?'已恢复上次生成的施工图':'已恢复上次生成的施工图（若分区参数改过，请点「生成施工图」重新生成）'))); }catch(e){}
     }catch(e){ try{ console.warn('[v355] ppGen restore skipped:',e&&e.message); }catch(_){} }
   }
   if(document.readyState==='complete') setTimeout(function(){ryAutoRestoreProject();ryAiRestoreProject();ryPpGenRestoreProject();},0);

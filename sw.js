@@ -1531,7 +1531,7 @@
  */
 
 
-const VERSION = 'v1087-symbol-display-world';
+const VERSION = 'v1088-old-pipe-frame-upgrade';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
