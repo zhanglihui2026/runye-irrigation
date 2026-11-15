@@ -2099,6 +2099,22 @@
     if(res&&res.ok && trunkWarnFor!==null && String(trunkWarnFor)===String(id)) hideTrunkWarn();
     return res;
   }
+  /* 扬程反推把地图手绘总管当作一条实物管线，统一改其所有已保存段。
+     走现有的修订校验；反推整笔尚可能回滚，不把其中一步塞进总管编辑撤销栈。 */
+  function setTrunkOd(od, rollback){
+    if(typeof od!=='object'&&(!Number.isFinite(Number(od))||Number(od)<=0))return {ok:false,error:'invalid_od'};
+    return applyTrunkEdit(function(nx){
+      if(!nx.trunks||!nx.trunks.length)return {ok:false,error:'没有已保存的总管'};
+      nx.trunks.forEach(function(entry){
+        entry.params=window.RyTrunkSchema.normalizeParams(entry.params);
+        if(typeof od==='object'){
+          if(!Object.prototype.hasOwnProperty.call(od,String(entry.id)))throw new Error('总管段已变化，不能恢复旧管径');
+          entry.params.dn=od[String(entry.id)];
+        }else entry.params.dn=Number(od);
+      });
+      return {ok:true,trunk:nx};
+    },{silent:true,noHistory:true,tipText:rollback?null:'手绘总管已更新为 Ø'+Number(od)+' mm'});
+  }
 
   /* 【重新复核水力】：按当前参数重算本条干线并回话。
      ★ 现在只算**本条线**（海曾-威廉沿程 + 弯头/三通局部）。规格五要求的
@@ -3656,7 +3672,7 @@
     var ll=[Number(base.refLat)+mapped.y/mlat,Number(base.refLng)+mapped.x/(mlat*cosLat)];
     return isFinite(ll[0])&&isFinite(ll[1])?ll:null;
   }
-  window.RyMapHost={payload:buildPlotPayload,send:sendPlotToDesign,sendDraft:onSendCurrentDraft,trunkState:trunkState,
+  window.RyMapHost={payload:buildPlotPayload,send:sendPlotToDesign,sendDraft:onSendCurrentDraft,trunkState:trunkState,setTrunkOd:setTrunkOd,
     /* [v843] 当前在地图上编辑哪块地。
        为什么必须有这个口：`currentMapPlotId` 是**闭包变量**，外面读不到（探针踩过：
        `window.currentMapPlotId` 恒为 undefined）。而 v843 要让三级扬程取"在线地图上画的

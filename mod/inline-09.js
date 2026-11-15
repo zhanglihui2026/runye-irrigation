@@ -1127,7 +1127,12 @@ function tlMapTrunkLen() {
     if (!doc || !Array.isArray(doc.trunks) || !doc.trunks.length) return null;
     var L = G.trunkLen(doc.trunks);
     if (!L || !L.ok || !(L.len > 0)) return null;
-    return { ok: true, len: L.len, id: L.id, source: L.source, count: L.count };
+    var mainTrunk = S.pickMainTrunk(doc);
+    var dnById = {};
+    doc.trunks.forEach(function (entry) { dnById[String(entry.id)] = entry.params && entry.params.dn != null ? Number(entry.params.dn) : null; });
+    var selectedOd = mainTrunk && Number(mainTrunk.params && mainTrunk.params.dn);
+    return { ok: true, len: L.len, id: L.id, source: L.source, count: L.count,
+      od: selectedOd > 0 ? selectedOd : null, dnById: dnById, plotId: pid, revision: doc.revision };
   } catch (e) { return null; }
 }
 
@@ -2398,8 +2403,12 @@ window.tlMapGroupHydraulicsOf = function (zoneIndexes, opts) {
     var trunkPick = (!missing.length && totalFlow > 0)
       ? (sharedOd ? selectPipe(totalFlow, r.targetV, sharedOd, sharedOd) : selectPipe(totalFlow, r.targetV, downstreamMinOd))
       : null;
-    var trialCalibers = opts && opts.calibers ? Object.assign({}, (r.inversePath && r.inversePath.calibers) || {}, opts.calibers) : (r.inversePath && r.inversePath.calibers) || null;
-    var frontAppliedOd = Number(trialCalibers && trialCalibers.front);
+    var mapTrunk = r.frontLenSrc === 'mapTrunk' ? tlMapTrunkLen() : null;
+    var trialCalibers = Object.assign({}, (r.inversePath && r.inversePath.calibers) || {}, opts && opts.calibers || {});
+    /* 地图手绘总管的已选外径是实物口径；试算候选才允许临时覆盖。 */
+    if (mapTrunk && mapTrunk.od && !(opts && opts.calibers && Object.prototype.hasOwnProperty.call(opts.calibers, 'front')))
+      trialCalibers.front = mapTrunk.od;
+    var frontAppliedOd = Number(trialCalibers.front);
     if (frontAppliedOd > 0 && totalFlow > 0) {
       var frontAppliedId = peInnerDiam(frontAppliedOd);
       trunkPick = { od: frontAppliedOd, id: frontAppliedId,
@@ -2520,14 +2529,21 @@ window.tlHeadCapAdvice = function (limit, groups) {
   var r = computeThreeLevel(), AE = window.RyTlAutoEdits, data = window.tlDiagramData;
   if (!r || !r.wp || !r.wp.fromFigure || !AE || !data) return { ok: false, reason: '请先生成包含实际路径的施工图' };
   var sharedPick = tlSharedTrunkPick(r.zoneAreas, groups, r);
-  var base = r.inversePath && r.inversePath.calibers || {};
+  var base = Object.assign({}, r.inversePath && r.inversePath.calibers || {});
+  var mapTrunk = r.frontLenSrc === 'mapTrunk' ? tlMapTrunkLen() : null;
+  if (!mapTrunk || !mapTrunk.ok) return { ok: false, reason: '请先在在线地图保存手绘总管，再反推整条实际水路的管径' };
+  /* 手绘总管不在三级 AE.allPids 中；这里必须显式加入实际保存的总管。 */
+  if (mapTrunk && mapTrunk.ok)
+    base.front = Number(mapTrunk.od || base.front || sharedPick && sharedPick.od || r.frontPipe.od);
   var pids = AE.allPids(data).filter(function (pid) { return /^(front|main-\d+|branch-\d+)$/.test(pid); });
+  if (mapTrunk && mapTrunk.ok && pids.indexOf('front') < 0) pids.unshift('front');
   var ods = {}, lengths = {};
   pids.forEach(function (pid) {
     var type = pid === 'front' ? 'front' : pid.split('-')[0];
     ods[pid] = Number(base[pid] || (r[type + 'Pipe'] && r[type + 'Pipe'].od));
-    var pts = AE.effPts(pid, data) || AE.pipePts(pid, data);
-    lengths[pid] = pid === 'front' && Number(r.frontLenMap) > 0 ? Number(r.frontLenMap) : Math.max(1, pts ? AE.polylineLen(pts) : 1);
+    var pts = pid === 'front' ? null : AE.effPts(pid, data) || AE.pipePts(pid, data);
+    lengths[pid] = pid === 'front' ? Math.max(1, Number(r.frontLenMap) || Number(r.frontLenUsed) || 1)
+      : Math.max(1, pts ? AE.polylineLen(pts) : 1);
   });
   function evalAll(candidate) {
     var worst = -Infinity, results = [];
@@ -2541,23 +2557,65 @@ window.tlHeadCapAdvice = function (limit, groups) {
   }
   var before = evalAll(base), current = Object.assign({}, base), state = before;
   if (!before) return { ok: false, reason: '存在缺失或估算的分区路径，无法可靠反推' };
+  /* 未逐段确认的主管由路径复核选档决定，不能仍按较细的设计代表档做层级判断。 */
+  var mainFloor = 0, branchFloor = 0;
+  before.results.forEach(function (result) {
+    mainFloor = Math.max(mainFloor, Number(result.pipes && result.pipes.mainOd) || 0);
+    branchFloor = Math.max(branchFloor, Number(result.pipes && result.pipes.branchOd) || 0);
+  });
+  pids.forEach(function (pid) {
+    if (base[pid]) return;
+    if (/^main-\d+$/.test(pid)) ods[pid] = Math.max(ods[pid], mainFloor);
+    else if (/^branch-\d+$/.test(pid)) ods[pid] = Math.max(ods[pid], branchFloor);
+  });
   function price(od) { return typeof tlPipePriceByOd === 'function' ? Number(tlPipePriceByOd(od)) || od * od : od * od; }
   function next(od) { for (var i = 0; i < PE_OD_SERIES.length; i++) if (PE_OD_SERIES[i] > od) return PE_OD_SERIES[i]; return null; }
+  /* 沿每个真实寻路链反向传播管径下限：总管 ≥ 上游主管 ≥ 下游主管 ≥ 支管。
+     一段主管可能供多个分区，取所有经过它的路径要求中的最大值。 */
+  function ordered(candidate) {
+    var out = Object.assign({}, candidate), routes = r.wp && r.wp.zones || [];
+    routes.forEach(function (z) {
+      var branch = 'branch-' + z.zi;
+      var floor = pids.indexOf(branch) >= 0 ? Number(out[branch] || ods[branch]) : 0;
+      var path = Array.isArray(z.mainSegs) && z.mainSegs.length
+        ? z.mainSegs.map(function (seg) { return /^main:\d+$/.test(seg.key) ? 'main-' + seg.key.slice(5) : null; }).filter(Boolean)
+        : ['main-' + z.zi];
+      for (var j = path.length - 1; j >= 0; j--) {
+        var pid = path[j];
+        if (pids.indexOf(pid) < 0) continue;
+        floor = Math.max(floor, Number(out[pid] || ods[pid]));
+        out[pid] = floor;
+      }
+    });
+    if (pids.indexOf('front') >= 0) {
+      var biggest = Number(out.front || ods.front);
+      pids.forEach(function (pid) { if (pid !== 'front') biggest = Math.max(biggest, Number(out[pid] || ods[pid])); });
+      out.front = biggest;
+    }
+    return out;
+  }
+  function cost(candidate) { return pids.reduce(function (sum, pid) {
+    var old = Number(ods[pid]), od = Number(candidate[pid] || old);
+    return sum + Math.max(0, price(od) - price(old)) * lengths[pid];
+  }, 0); }
+  current = ordered(current);
+  state = evalAll(current);
+  if (!state) return { ok: false, reason: '管径层级校验后的水力路径不可用' };
   var steps = 0;
   while (state.head > limit + 0.001 && steps++ < pids.length * PE_OD_SERIES.length) {
     var best = null;
     pids.forEach(function (pid) {
       var larger = next(Number(current[pid] || ods[pid]));
       if (!larger) return;
-      var trial = Object.assign({}, current); trial[pid] = larger;
+      var trial = Object.assign({}, current); trial[pid] = larger; trial = ordered(trial);
       var measured = evalAll(trial);
       if (!measured || measured.head >= state.head - 0.000001) return;
-      var extra = Math.max(0.01, (price(larger) - price(Number(current[pid] || ods[pid]))) * lengths[pid]);
+      var extra = Math.max(0.01, cost(trial) - cost(current));
       var score = (state.head - measured.head) / extra;
-      if (!best || score > best.score) best = { pid: pid, od: larger, state: measured, score: score };
+      if (!best || score > best.score) best = { trial: trial, state: measured, score: score };
     });
     if (!best) break;
-    current[best.pid] = best.od; state = best.state;
+    current = best.trial; state = best.state;
   }
   if (state.head <= limit + 0.001) {
     var reduced = true;
@@ -2566,7 +2624,8 @@ window.tlHeadCapAdvice = function (limit, groups) {
       pids.slice().sort(function (a, b) { return lengths[b] - lengths[a]; }).forEach(function (pid) {
         var od = Number(current[pid] || ods[pid]), idx = PE_OD_SERIES.indexOf(od);
         if (idx < 1 || PE_OD_SERIES[idx - 1] < ods[pid]) return;
-        var trial = Object.assign({}, current); trial[pid] = PE_OD_SERIES[idx - 1];
+        var trial = Object.assign({}, current); trial[pid] = PE_OD_SERIES[idx - 1]; trial = ordered(trial);
+        if (Number(trial[pid]) >= od || cost(trial) >= cost(current) - 0.001) return;
         var measured = evalAll(trial);
         if (measured && measured.head <= limit + 0.001) { current = trial; state = measured; reduced = true; }
       });
@@ -2578,6 +2637,7 @@ window.tlHeadCapAdvice = function (limit, groups) {
   });
   return { ok: state.head <= limit + 0.001, limit: limit, groups: groups, before: before.head,
     after: state.head, changes: changes, geometryKey: AE.geometryKey(data), areasKey: JSON.stringify(r.zoneAreas),
+    trunkPlotId: mapTrunk && mapTrunk.plotId, trunkRevision: mapTrunk && mapTrunk.revision,
     extraCost: changes.reduce(function (s, c) { return s + c.extraCost; }, 0),
     reason: state.head > limit + 0.001 ? '现有标准管径仍无法达到上限，请检查固定扬程与路径' : '' };
 };
@@ -2586,21 +2646,39 @@ window.tlApplyHeadCapAdvice = function (advice) {
   var AE = window.RyTlAutoEdits, data = window.tlDiagramData, saved = {};
   if (!AE || !data) return false;
   if (AE.geometryKey(data) !== advice.geometryKey || JSON.stringify(computeThreeLevel().zoneAreas) !== advice.areasKey) return false;
-  advice.changes.forEach(function (change) { saved[change.pid] = AE.caliberOf(change.pid); });
+  var trunkChange = advice.changes.filter(function (change) { return change.pid === 'front'; })[0];
+  var trunkBefore = trunkChange ? tlMapTrunkLen() : null;
+  if (trunkChange && (!trunkBefore || trunkBefore.plotId !== advice.trunkPlotId ||
+      trunkBefore.revision !== advice.trunkRevision || !window.RyMapHost || !window.RyMapHost.setTrunkOd)) return false;
+  var manualFrontBefore = window.tlManualCals && window.tlManualCals.front;
+  advice.changes.forEach(function (change) { if (change.pid !== 'front') saved[change.pid] = AE.caliberOf(change.pid); });
+  if (trunkChange) {
+    var trunkResult = window.RyMapHost.setTrunkOd(trunkChange.to);
+    if (!trunkResult || !trunkResult.ok) return false;
+    window.tlManualCals.front = trunkChange.to;
+  }
+  var applied = true;
   AE.beginBatch();
-  try { advice.changes.forEach(function (change) { AE.setCaliber(change.pid, change.to, data, 'head-cap'); }); }
+  try { advice.changes.forEach(function (change) {
+    if (change.pid !== 'front' && !AE.setCaliber(change.pid, change.to, data, 'head-cap')) applied = false;
+  }); }
   finally { AE.endBatch(); }
   tlBuildPipeOverride();
-  var valid = advice.groups.every(function (group) {
+  var valid = applied && advice.groups.every(function (group) {
     var x = window.tlMapGroupHydraulicsOf(group, { groups: advice.groups });
     return x && !x.estimated && isFinite(x.head) && x.head <= advice.limit + 0.01;
   });
   if (!valid) {
     AE.beginBatch();
     try { advice.changes.forEach(function (change) {
+      if (change.pid === 'front') return;
       if (saved[change.pid]) AE.setCaliber(change.pid, saved[change.pid], data, 'head-cap-rollback');
       else AE.clearCaliber(change.pid, 'head-cap-rollback');
     }); } finally { AE.endBatch(); }
+    if (trunkChange) {
+      window.RyMapHost.setTrunkOd(trunkBefore.dnById, true);
+      window.tlManualCals.front = manualFrontBefore;
+    }
     tlBuildPipeOverride();
     return false;
   }

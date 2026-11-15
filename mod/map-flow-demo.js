@@ -1580,7 +1580,10 @@
         if (!advice || !isFinite(advice.before)) { output.textContent = advice && advice.reason || '缺少有效路径'; return; }
         var changes = advice.changes || [];
         output.textContent = '最大扬程 ' + advice.before.toFixed(2) + ' → ' + advice.after.toFixed(2) + ' m；' +
-          (changes.length ? changes.map(function (c) { return c.pid + ' Ø' + c.from + '→Ø' + c.to; }).join('、') : '无须改径') +
+          (changes.length ? changes.map(function (c) {
+            var name = c.pid === 'front' ? '手绘总管' : c.pid.indexOf('main-') === 0 ? '主管' + (Number(c.pid.slice(5)) + 1) : '支管' + (Number(c.pid.slice(7)) + 1);
+            return name + ' Ø' + c.from + '→Ø' + c.to;
+          }).join('、') : '无须改径') +
           (changes.length && isFinite(advice.extraCost) ? '；估算增加管材费约 ' + advice.extraCost.toFixed(0) + ' 元' : '') +
           (advice.ok ? '' : '。' + advice.reason);
         button.disabled = !advice.ok || !changes.length;
@@ -1591,7 +1594,7 @@
     button.addEventListener('click', function () {
       if (!advice || !advice.ok || typeof window.tlApplyHeadCapAdvice !== 'function') return;
       if (window.tlApplyHeadCapAdvice(advice)) { output.textContent = '建议管径已应用，扬程已重新校核'; button.disabled = true; advice = null; }
-      else output.textContent = '应用后未达标，已恢复原管径；请检查当前管网与改径状态';
+      else { output.textContent = '管网已变化或应用校验未通过；请重新计算建议'; button.disabled = true; advice = null; }
     });
   }
   function refresh() {

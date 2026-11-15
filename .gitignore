@@ -89,6 +89,7 @@ tests/*
 
 # 主管共享段复核（v976 扬程反序消除）回归
 !tests/main_recheck.test.cjs
+!tests/head_cap_hierarchy.test.cjs
 !tests/input_persist.test.cjs
 !tests/card_king_badges.test.cjs
 !tests/v981_path_recheck_linkguard.test.cjs
