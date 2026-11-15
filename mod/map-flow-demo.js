@@ -1550,9 +1550,54 @@
 
   /* 刷新：地图页激活且数据可拾取 ⇒ 显示面板 + 重建 chips；否则隐藏并清层。
      规划简图演示条（#tlDemoBar）在地图页隐藏（两套演示不同画布）。 */
+  function setupHeadCap() {
+    var input = document.getElementById('mapHeadCap'), output = document.getElementById('mapHeadCapResult');
+    var button = document.getElementById('mapHeadCapApply');
+    if (!input || !output || !button || input.__headCapBound) return;
+    input.__headCapBound = true;
+    var advice = null, timer = null;
+    function groupsOf(d) {
+      var groups = [];
+      for (var zi = 0; zi < d.total; zi++) {
+        var gi = groupOf(zi, d.manual, d.nPer);
+        if (gi < 0) continue;
+        if (!groups[gi]) groups[gi] = [];
+        groups[gi].push(zi);
+      }
+      return groups.filter(function (g) { return g && g.length; });
+    }
+    function calculate() {
+      advice = null; button.disabled = true;
+      var d = collect();
+      if (!d || !d.total || typeof window.tlHeadCapAdvice !== 'function') {
+        output.textContent = '请先生成施工图并选中地块'; return;
+      }
+      output.textContent = '正在按当前管网反推…';
+      var groups = groupsOf(d);
+      setTimeout(function () {
+        try { advice = window.tlHeadCapAdvice(Number(input.value), groups); }
+        catch (e) { advice = { ok: false, reason: '计算失败' }; }
+        if (!advice || !isFinite(advice.before)) { output.textContent = advice && advice.reason || '缺少有效路径'; return; }
+        var changes = advice.changes || [];
+        output.textContent = '最大扬程 ' + advice.before.toFixed(2) + ' → ' + advice.after.toFixed(2) + ' m；' +
+          (changes.length ? changes.map(function (c) { return c.pid + ' Ø' + c.from + '→Ø' + c.to; }).join('、') : '无须改径') +
+          (changes.length && isFinite(advice.extraCost) ? '；估算增加管材费约 ' + advice.extraCost.toFixed(0) + ' 元' : '') +
+          (advice.ok ? '' : '。' + advice.reason);
+        button.disabled = !advice.ok || !changes.length;
+      }, 0);
+    }
+    input.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(calculate, 400); });
+    input.addEventListener('change', function () { clearTimeout(timer); calculate(); });
+    button.addEventListener('click', function () {
+      if (!advice || !advice.ok || typeof window.tlApplyHeadCapAdvice !== 'function') return;
+      if (window.tlApplyHeadCapAdvice(advice)) { output.textContent = '建议管径已应用，扬程已重新校核'; button.disabled = true; advice = null; }
+      else output.textContent = '应用后未达标，已恢复原管径；请检查当前管网与改径状态';
+    });
+  }
   function refresh() {
     var bar = document.getElementById('mapDemoBar');
     if (!bar || !ctx) return;
+    setupHeadCap();
     var onMap = !!(ctx.isMapActive && ctx.isMapActive());
     if (!onMap) {
       bar.style.display = 'none';
@@ -1598,7 +1643,7 @@
     if (typeof document === 'undefined' || document.getElementById('mapFlowDemoCss')) return;
     var st = document.createElement('style');
     st.id = 'mapFlowDemoCss';
-    st.textContent = '.mapflow-anim{stroke-dasharray:10 8;animation:mapflowDash .45s linear infinite}@keyframes mapflowDash{to{stroke-dashoffset:-18}}';
+    st.textContent = '.mapflow-anim{stroke-dasharray:10 8;animation:mapflowDash .45s linear infinite}@keyframes mapflowDash{to{stroke-dashoffset:-18}}.map-head-cap{margin-top:10px;padding:8px;border:1px solid #d9e3df;background:#f7faf9;color:#334155}.map-head-cap input{width:72px;margin-left:5px}.map-head-cap button{margin-top:5px}.map-head-cap #mapHeadCapResult{margin-top:5px}';
     document.head.appendChild(st);
   }
 

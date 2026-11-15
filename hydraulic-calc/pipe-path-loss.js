@@ -55,7 +55,9 @@
             }
             mainLen += gl;
             if (gf > mainSegFlowMax) mainSegFlowMax = gf;
-            mainLoss += input.hazen(gl, gf, diameter('main-' + z.zi, input.mainOd));
+            var segmentPid = g && /^main:\d+$/.test(g.key) ? 'main-' + g.key.slice(5) : null;
+            var segmentOd = segmentPid && cals[segmentPid] || cals['main-' + z.zi] || input.mainOd;
+            mainLoss += input.hazen(gl, gf, input.innerDiam(segmentOd));
           });
         } else {
           mainLoss = input.hazen(z.main, z.flow, diameter('main-' + z.zi, input.mainOd));
