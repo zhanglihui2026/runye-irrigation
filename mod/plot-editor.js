@@ -1804,7 +1804,8 @@
       var n=parseInt(document.getElementById('planN')&&document.getElementById('planN').value)||parseInt(document.getElementById('fld_N')&&document.getElementById('fld_N').value)||4;
       /* 管线几何策略也是生成代际的一部分：旧版端点有意缩进分区边界，
          新版要求主管/支管到达分区边缘；策略签名变化后，旧存档自动重生成。 */
-      return ppGetZoneCutSignature(b,ppGetZoneLayout(b,n))+'|pipeEnds=zone-edge-v1';
+      /* 旋转分区双坐标框修正后，旧存档虽有同一切线签名，管段仍可能整体错位。 */
+      return ppGetZoneCutSignature(b,ppGetZoneLayout(b,n))+'|pipeEnds=zone-edge-v1|pipeFrame=rotated-zone-v2';
     }catch(e){return null;}
   }
   window.ppCurrentCutSignature=ppCurrentCutSignature;
@@ -2725,7 +2726,9 @@
         if(!cur||cur===gen)return;
         ppCtx.save();
         ppCtx.font='bold 13px sans-serif';
-        var msg='⚠ 管线为旧分区布局生成，与当前分区不一致 — 请点「更新管路」重排（再点「生成施工图」发布到地图）';
+        /* 文案前 16 字是 v1052/v1083 的锁（「管线为旧分区布局生成，与当前分区不一致」），
+           本次只在其后追加「或生成版本已升级」，不得改动前缀。 */
+        var msg='⚠ 管线为旧分区布局生成，与当前分区不一致或生成版本已升级 — 请点「更新管路」重排（再点「生成施工图」发布到地图）';
         var w=ppCtx.measureText(msg).width+28;
         var x=Math.max(10,ppCanvas.width-w-14), y=10;
         ppCtx.fillStyle='rgba(255,251,235,.96)';
@@ -2763,6 +2766,9 @@
            任何分区变化都触发不了。取消隔断：无签名也触发升级重算，第一次
            重算后管线即带上签名，此后走正常同代比对。失败冷却见 FailSig。 */
         if(gen&&gen===cur)return;
+        /* 仅布管算法升级时保留旧管线与用户接驳节点，由用户检查后主动更新；
+           分区几何真正变化时仍沿用既有自动重算。 */
+        if(gen&&gen===cur.replace(/\|pipeFrame=rotated-zone-v2$/,''))return;
         if(cur===ppAutoRegenFailSig)return;   /* 同一签名下失败过：等分区再变才重试，防 alert 骚扰 */
         clearTimeout(ppAutoRegenTimer);
         ppAutoRegenTimer=setTimeout(function(){
@@ -3789,7 +3795,9 @@
   }
 
   /* 主管/支管重合时，仅为图面生成平行显示副本。输入、返回的设计数组互不改写；
-     仅对轴线重合的主支管对应用偏移，因此手绘的独立管线保持原坐标。 */
+     仅对轴线重合的主支管对应用偏移，因此手绘的独立管线保持原坐标。
+     [v1087] 返回的 valves 也随其所属显示主管一起平移（符号层与线体同口径），
+     真实分区中心坐标仍在 ppState.valves / tlDiagramData 里，数据层不受影响。 */
   function ppGetPipeDisplayGeometry(mainPipes, branchPipes, valves, gap) {
     var mains=(mainPipes||[]).map(function(l){return(l||[]).map(function(p){return{x:p.x,y:p.y};});});
     var branches=(branchPipes||[]).map(function(l){return(l||[]).map(function(p){return{x:p.x,y:p.y};});});
@@ -3838,18 +3846,48 @@
       if(isFinite(nearestZoneSpacing))safeGap=Math.min(safeGap,nearestZoneSpacing*0.9);
       var dx=ba.n.x*safeGap/2,dy=ba.n.y*safeGap/2;
       mainShift[best]={x:-dx,y:-dy};branchShift[bi]={x:dx,y:dy};
-      valvePoints.forEach(function(v,vi){
-        var vx=v.x-bl[0].x,vy=v.y-bl[0].y,L2=(bl[bl.length-1].x-bl[0].x)*(bl[bl.length-1].x-bl[0].x)+(bl[bl.length-1].y-bl[0].y)*(bl[bl.length-1].y-bl[0].y);
-        var t=L2>1e-12?(vx*(bl[bl.length-1].x-bl[0].x)+vy*(bl[bl.length-1].y-bl[0].y))/L2:0;
-        var proj={x:bl[0].x+t*(bl[bl.length-1].x-bl[0].x),y:bl[0].y+t*(bl[bl.length-1].y-bl[0].y)};
-        if(t>=-0.25&&t<=1.25&&Math.hypot(v.x-proj.x,v.y-proj.y)<=0.5)valveShift[vi]={x:dx,y:dy,main:best};
-      });
     });
     function shifted(lines,map){return lines.map(function(line,i){var d=map[i];return line.map(function(p){return{x:p.x+(d?d.x:0),y:p.y+(d?d.y:0)};});});}
-    var valveAnchors=valvePoints.map(function(v,i){var d=valveShift[i];if(!d)return null;var line=mains[d.main],a=line[0],b=line[line.length-1],dx=b.x-a.x,dy=b.y-a.y,L2=dx*dx+dy*dy;var t=L2>1e-12?((v.x-a.x)*dx+(v.y-a.y)*dy)/L2:0;t=Math.max(0,Math.min(1,t));return{x:a.x+dx*t-d.x,y:a.y+dy*t-d.y};});
-    /* 阀门保留真实分区中心坐标；只偏移管线渲染副本。连接短管锚点跟随显示主管。 */
+    /* [v1087 2026-11-15 用户实测「节点落在管路上有点漂移，个别主管上的小方块也有漂移」]
+       ── 符号层必须和**显示主管**同口径 ────────────────────────────────────────
+       三级简图/二级画布画的线体是 main/branch 的显示副本（整线刚性平移 ±safeGap/2），
+       但本函数过去只返回**实体坐标**的 valves，`valveAnchors` 又只在
+       「阀门距**支管**中心线 ≤0.5m 且 t∈[-0.25,1.25]」时才给 —— 两个判据都与现实不符：
+         · 阀门锚的是**分区形心**（ppBuildAutoPipes: out.valves.push({x:centerX,y:centerY})）；
+         · 支管走**本列统一中心线** colLineX[zc]（v1079 定线，全列一根），
+           旋转地块里形心逐行滑动，两者横向差实测 0~5.4m；
+        ⇒ 27 个阀门里 18 个拿不到锚点，调用方退回实体锚点 v.ax/ay（tlValveConnPt 投影
+           到实体主管），三通/弯头方块就落在实体主管上，与可见主管差 gap/2 = 10m。
+       口径统一（只改表现层，刚体平移不改长度/拓扑/水力）：
+         · 归属改判「阀门最近的主管段」——阀门本就锚在主管上，不再拿支管距离当判据；
+         · 阀门与锚点**一起**施加该主管的显示位移 ⇒ 连接短管长度/方向、v.elbow 的
+           「连接管水平/竖直」判定（比的是 ay−y 与 ax−x 的绝对值）逐位不变。 */
+    function nearestMainOn(p){
+      var best=null,bestD=Infinity;
+      for(var mi=0;mi<mains.length;mi++){
+        var ml=mains[mi];if(!ml||ml.length<2)continue;
+        for(var si=0;si+1<ml.length;si++){
+          var a=ml[si],b=ml[si+1],vx=b.x-a.x,vy=b.y-a.y,L2=vx*vx+vy*vy;
+          var t=L2>1e-12?((p.x-a.x)*vx+(p.y-a.y)*vy)/L2:0;
+          if(t<0)t=0;else if(t>1)t=1;
+          var dseg=Math.hypot(p.x-(a.x+vx*t),p.y-(a.y+vy*t));
+          if(dseg<bestD){bestD=dseg;best={mi:mi,proj:{x:a.x+vx*t,y:a.y+vy*t},dist:dseg};}
+        }
+      }
+      return best;
+    }
+    var displayValves=[],valveAnchors=[];
+    valvePoints.forEach(function(v,vi){
+      var hit=nearestMainOn(v);
+      var d=(hit&&mainShift[hit.mi])?mainShift[hit.mi]:null;
+      valveShift[vi]=d?{x:d.x,y:d.y,main:hit.mi}:null;
+      displayValves.push({x:v.x+(d?d.x:0),y:v.y+(d?d.y:0)});
+      /* 该主管没有显示位移（未与支管配对）：锚点等价于实体垂足，返回 null 让调用方
+         沿用 v.ax/ay —— 此时实体线与显示线重合，兜底口径正确。 */
+      valveAnchors.push((d&&hit)?{x:hit.proj.x+d.x,y:hit.proj.y+d.y}:null);
+    });
     return{main:shifted(mains,mainShift),branch:shifted(branches,branchShift),
-      valves:valvePoints.map(function(v){return{x:v.x,y:v.y};}),valveAnchors:valveAnchors};
+      valves:displayValves,valveAnchors:valveAnchors,valveShift:valveShift};
   }
   try { window.ppGetPipeDisplayGeometry=ppGetPipeDisplayGeometry; } catch(ePipeDisplay) {}
 
@@ -3955,23 +3993,39 @@
       alert('按新分区重生成管线未完成：重建结果为空（可能被地块裁剪全部丢弃），旧版管线已移除以免误导。请调整分区角度或切割线后重试；若反复出现请截图反馈。');
       return false;
     }
+    var oldMainPipes=ppState.mainPipes;
     ppState.mainPipes = r2.main;
     ppState.branchPipes = r2.branch;
     ppState.subBranchPipes = r2.subbranch;
     ppState.valves = r2.valves;
-    ppState.couplerNodes = [];
+    /* 旧旋转格系修正只平移管线时，主管序号和桩号不变，保留施工节点并随新主管重投影。
+       只要数量或任一管长变化，就按原规则清除，避免节点接到另一根管。 */
+    var nextPipeSig=ppCurrentCutSignature();
+    var oldPipeSig=ppState.__ppGenCutSig||null;
+    var keepCouplers=oldPipeSig&&nextPipeSig&&oldPipeSig===nextPipeSig.replace(/\|pipeFrame=rotated-zone-v2$/,'')&&
+      prevMainCount===r2.main.length&&oldMainPipes.every(function(line,i){
+        return Math.abs(ppLineLen(line)-ppLineLen(r2.main[i]))<=0.1;
+      });
+    ppState.couplerNodes=keepCouplers?ppCloneJSON(ppState.couplerNodes||[]):[];
     ppState.currentLine = [];
     ppState.hiddenPipes = { main: {}, branch: {}, subbranch: {} };
     ppState.pipeIds = { main: [], branch: [], subbranch: [] }; ppState.nextPipeId = 1;
     ppUpdatePickResult(null);
     ppEnsurePipeIds('main'); ppEnsurePipeIds('branch'); ppEnsurePipeIds('subbranch');
+    /* 与管线一起提交生成签名，避免恢复后把新管线当旧版反复重排。 */
+    var previousPipeSig=ppState.__ppGenCutSig||null;
+    ppState.__ppGenCutSig=ppCurrentCutSignature();
 
-    if(groupPreimage&&!ppCommitGroupMemberEdit(groupPreimage))return false;
+    if(groupPreimage&&!ppCommitGroupMemberEdit(groupPreimage)){
+      ppState.__ppGenCutSig=previousPipeSig;
+      return false;
+    }
     if(singlePreimage&&typeof window.ryCommitSinglePlotL2Snapshot==='function'){
       var singleCommit=window.ryCommitSinglePlotL2Snapshot(singlePreimage,window.ppGetState());
       if(singleCommit===false){
         ppDiscardLatestHistoryEntry();
         ppApplySlot(singlePreimage);
+        ppState.__ppGenCutSig=previousPipeSig;
         ppUpdateLockAreaBtn();
         if(typeof updatePlan==='function')updatePlan();
         ppUpdateTransform();ppRender();ppUpdateAutoPipeButton();ppRefreshDiagramOrReset();ppRefreshMaterials();
@@ -3985,7 +4039,6 @@
     ppRefreshMaterials();
     /* [v1052/v1054 数据唯一性] 记下管线生成时的分区切割签名，供画布过时警示、
        恢复链与三级复用分支校验代际；window 层同步给恢复链（v355 记签消费）。 */
-    ppState.__ppGenCutSig=ppCurrentCutSignature();
     window.__ryPpGenCutSig=ppState.__ppGenCutSig||null;
     return true;
   }

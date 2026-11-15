@@ -4061,6 +4061,16 @@ function tlGenerateDiagramToMap(){
       alert('当前地块还没有管线成果。请回「分区与管路」页完成分区——管线会自动生成——再回来点「生成施工图」。');
       return;
     }
+    /* 发布只能消费当前算法与当前分区同代的二级几何。旧存档的切线即使没变，
+       旋转坐标框修正前生成的管线仍可能整体平移，不能走三级兜底后混合发布。 */
+    var groupEdit=window.__runyeGroupEdit;
+    if(!(groupEdit&&groupEdit.active)&&typeof window.ppCurrentCutSignature==='function'){
+      var currentPipeSig=window.ppCurrentCutSignature();
+      if(currentPipeSig&&ppShare.genCutSig!==currentPipeSig){
+        alert('当前管线来自旧生成版本，可能与分区边界错位。请回「分区与管路」点「更新管路」，检查阀门和管线位置后，再点「生成施工图」同步到在线地图。');
+        return;
+      }
+    }
     /* 刷新三级简图：分区刚变过时图面可能还是上一代，强制按当前分区重出一次。 */
     var refreshed=tlAutoGenerate({scroll:false,rethrowError:true,publishToMap:true});
     if(refreshed!==true){
@@ -5580,10 +5590,17 @@ function tlAutoGenerate(options) {
   /* v180b（2026-10-02）：缓存本次几何映射，供 tlRefreshTlNodesLayer 在 RyTlNodes 变更时
      实时刷新三级简图的节点/连线图层（无需重新「生成管线图」）。 */
   /* tl-nodes 的 atM 沿用 tlDiagramData 的真实地块米坐标；实时刷新也必须用同一几何口径。 */
+  /* [v1087 2026-11-15 用户实测「节点落在管路上有点漂移」]
+     主线体画的是 tlPipeDisplay 显示副本（整线刚性平移 ±gap/2），施工节点/节点连线
+     若仍按设计几何定位，就整体偏离可见管线 gap/2（实测 10m）。这里统一改用显示副本：
+     刚体平移不改弧长 ⇒ nd.atM 口径、节点间距、材料/水力数字全部不变。
+     显示副本缺失（无配对偏移的主/支管）时逐条回退设计几何，与原实现逐点相同。 */
+  var __tlViewMains=(tlPipeDisplay&&tlPipeDisplay.main&&tlPipeDisplay.main.length)?tlPipeDisplay.main:mainPipes;
+  var __tlViewBranches=(tlPipeDisplay&&tlPipeDisplay.branch&&tlPipeDisplay.branch.length)?tlPipeDisplay.branch:branchPipes;
   window.__tlPlanGeo = {
     frontPipe: [],
-    mainPipes: mainPipes.map(function(line){return line.map(function(p){return tlGridWorld(p.x,p.y);});}),
-    branchPipes: branchPipes.map(function(line){return line.map(function(p){return tlGridWorld(p.x,p.y);});}),
+    mainPipes: __tlViewMains.map(function(line){return (line||[]).map(function(p){return tlGridWorld(p.x,p.y);});}),
+    branchPipes: __tlViewBranches.map(function(line){return (line||[]).map(function(p){return tlGridWorld(p.x,p.y);});}),
     ts: ts
   };
   var svgStr=parts.join('');
