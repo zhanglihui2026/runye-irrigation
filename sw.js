@@ -1695,10 +1695,14 @@
    觉得还是原来的名字更清楚，要求改回「应用建议管径」。仅文案回退，横排布局/样式/逻辑一律不动
    （仍是 v1102 的 `.map-head-cap-row` 横排 + 面板统一口径）。主版本串 21 处 + sw VERSION 抬到
    `v1103-head-cap-apply-label`，仅为让浏览器/CDN 刷新到新文案。
+
+   [v1104-zone-head-cap-label] 用户要求（2026-11-17）：标签「扬程上限」改为「分区扬程上限」。
+   仅这一处显示文案，横排布局/按钮/样式/逻辑与 title 悬浮说明一律不动。抬版本串 21 处 +
+   sw VERSION 到 `v1104-zone-head-cap-label`，让浏览器/CDN 刷新到新文案。
  */
 
 
-const VERSION = 'v1103-head-cap-apply-label';
+const VERSION = 'v1104-zone-head-cap-label';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
