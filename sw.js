@@ -1581,10 +1581,27 @@
    index.html 里 v972 那段「三级仍完整保留、别移除错」的注释已就地标注过期。恢复：删 `#tlPlanResHost`
    的 hidden + style 两个属性。验证：无头 Edge 实测块高 0 / offsetParent null、同级 `#tlPlanBar` 仍 73px、
    12 个 id 全部可读；`npm run check` 仍 46 条历史红（零新增）、`npm run lint` 412 脚本干净。
+   [v1097-cal-recall-btn] 「改径结果」随时可调出（2026-11-16）：用户原话「这些信息很有用，但是我可能
+   来回切换页面弄它消失了，因此要给我一个按钮，可以随时调用这个卡片，还有图上改径之后标注的数字。
+   按钮放在分区与管路页面顶部工具栏就行」。病根：画布右上角的汇总条（tl-workspace `#tlWsCalChip`）
+   与管上的琥珀套壳 + `Ø225` + `hf 1.19→0.67 ↓0.52` 标注都是**渲染产物**，`render`/`rerenderKeepView`
+   每次整块重建，用户离开再回来就找不到；而数据（`RyTlAutoEdits.cals`）其实一直在。
+   实现（只读、不写任何水力数据）：① index.html 在 `#tlWsToolbar` 的「🔧 改直径」后加常驻
+   `#tlCalRecallBtn`「📋 改径结果」—— 该组由 inline-18 `toolbarStack.appendChild(root)` 整块搬进顶部
+   `.ry-drawing-toolbar`，所以按钮天生在分区与管路顶部工具栏；② `mod/inline-27.js` 新增
+   `window.tlCalRecall{open,close,toggle,refresh,redraw}`：面板固定定位（不挂在画布容器里，重绘不会
+   把它冲掉），汇总用 `tlCalSummaryText()`、逐段用 `tlPipeCardInfo()` —— **与画布那两条同源**，
+   不另算一份（同屏两个数打架是这个项目反复踩的坑）；③ 打开时顺带 `RyTlWs.rerenderKeepView()`，
+   把图上 Ø/hf 标注与汇总条一起重画，并提供「在图上重画」按钮随时再来一次。
+   空态如实说明「当前没有图面改径记录」，不装作有数。验证：无头 Edge 实测按钮在、`display:flex`、
+   `tlCalRecall` 就绪、点开面板 370×108、空态文案正确、「在图上重画」在、再点能关、**零 pageerror**；
+   `npm run check` 仍 46 条历史红（零新增）、`npm run lint` 412 脚本干净。
+   ★ 已知边界：三级工作区没生成时 `#tlWsToolbar` 整组本来就不进顶部（三通/弯头/节点同款），
+   本按钮随之不出现 —— 那时也没有改径记录可看，语义一致。
  */
 
 
-const VERSION = 'v1096-hyd-result-off';
+const VERSION = 'v1097-cal-recall-btn';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

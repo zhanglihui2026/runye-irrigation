@@ -189,6 +189,110 @@
       + '<br>水泵扬程：设计 ' + pair.design.pumpHead.toFixed(1) + ' → 改径重算 <b>' + r.pumpHead.toFixed(1)
       + ' m</b>（已含安全系数，与右栏一致）';
   };
+  /* [v1097 2026-11-16 用户要求] 「改径结果」面板：随时可调出、只读。
+     背景：画布右上角的汇总条（tl-workspace 的 #tlWsCalChip）和管上的 Ø/hf 标注都是**渲染产物** ——
+     切页面、重排、rerender 都会整块重建，用户离开再回来就找不到它们了。数据其实一直留在
+     RyTlAutoEdits.cals 里，缺的只是一个「按需显示」的入口。
+     面板内容与画布那两条**同一套来源**（汇总 tlCalSummaryText / 逐段 tlPipeCardInfo），
+     绝不另算一份 —— 同屏两个数打架是这个项目反复踩过的坑。
+     打开时顺带调 RyTlWs.rerenderKeepView()：把管上 Ø/hf 标注和右上角汇总条一起重画（只重建显示，
+     不动任何水力数据）。按钮：分区与管路顶部工具栏「📋 改径结果」(#tlCalRecallBtn)。 */
+  var recallBox = null;
+  function recallRows() {
+    if (!AE || !AE.calibersMap) return [];
+    var cals = AE.calibersMap() || {}, out = [];
+    Object.keys(cals).forEach(function (pid) {
+      var info = (typeof window.tlPipeCardInfo === 'function') ? window.tlPipeCardInfo(pid) : null;
+      if (info) out.push(info);
+    });
+    return out;
+  }
+  function recallBody() {
+    var rows = recallRows();
+    var sum = (typeof window.tlCalSummaryText === 'function') ? window.tlCalSummaryText() : '';
+    if (!rows.length) {
+      return '<div style="padding:2px 0 4px;color:#64748b;line-height:1.6">当前没有图面改径记录。<br>'
+        + '在三级工作区右键管线（或选中后点「改直径」）改径后，这里会列出改了哪几段、每段口径与损失的变化。</div>';
+    }
+    var h = '<div style="padding:2px 0 6px;line-height:1.65">' + (sum || '（汇总暂不可用：图面路径未就绪）') + '</div>';
+    var th = 'text-align:left;padding:2px 4px;border-bottom:1px solid #e2e8f0;font-weight:400';
+    h += '<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="color:#64748b">'
+      + '<th style="' + th + '">管线</th><th style="' + th + '">口径</th>'
+      + '<th style="' + th + ';text-align:right">长度</th><th style="' + th + ';text-align:right">本段损失</th>'
+      + '</tr></thead><tbody>';
+    rows.forEach(function (r) {
+      var od = (r.baseOd ? 'Ø' + r.baseOd + ' → ' : '') + (r.od ? '<b>Ø' + r.od + '</b>' : '—');
+      var len = (r.len != null) ? r.len.toFixed(1) + ' m' : '—';
+      var lf = '—';
+      if (r.hf != null) {
+        lf = r.hf.toFixed(2) + ' m';
+        if (r.delta != null && isFinite(r.delta)) {
+          var dlt = Math.abs(r.delta).toFixed(2);
+          lf += (r.delta <= 0)
+            ? ' <span style="color:#15803d">↓' + dlt + '</span>'
+            : ' <span style="color:#b91c1c">↑' + dlt + '</span>';
+        }
+      }
+      var td = 'padding:2px 4px;border-bottom:1px solid #f1f5f9';
+      h += '<tr><td style="' + td + '">' + esc(r.name) + '</td><td style="' + td + '">' + od + '</td>'
+        + '<td style="' + td + ';text-align:right">' + len + '</td>'
+        + '<td style="' + td + ';text-align:right">' + lf + '</td></tr>';
+    });
+    h += '</tbody></table>'
+      + '<div style="margin-top:6px;color:#94a3b8;font-size:10.5px;line-height:1.5">'
+      + '数据取自图面改径记录；改径只影响图面标注与估算，不进材料清单与正式水力计算。</div>';
+    return h;
+  }
+  function recallBtnCss() {
+    return 'border:1px solid #cbd5e1;background:#fff;border-radius:5px;padding:1px 7px;'
+      + 'font:11px/1.6 system-ui,sans-serif;color:#475569;cursor:pointer';
+  }
+  window.tlCalRecall = {
+    isOpen: function () { return !!(recallBox && recallBox.parentNode); },
+    refresh: function () {
+      if (!recallBox) return;
+      var body = recallBox.querySelector('[data-tlcr-body]');
+      if (body) body.innerHTML = recallBody();
+    },
+    /* 只重建显示：图上 Ø/hf 标注 + 右上角汇总条 */
+    redraw: function () {
+      var ok = false;
+      try {
+        if (window.RyTlWs && typeof window.RyTlWs.rerenderKeepView === 'function') {
+          window.RyTlWs.rerenderKeepView(); ok = true;
+        }
+      } catch (e) { ok = false; }
+      this.refresh();
+      return ok;
+    },
+    open: function () {
+      if (!recallBox || !recallBox.parentNode) {
+        recallBox = document.createElement('div');
+        recallBox.id = 'tlCalRecallPanel';
+        /* 固定定位、可关闭：不挂进画布容器，切页面/重绘都不会把它一起冲掉。 */
+        recallBox.style.cssText = 'position:fixed;top:64px;right:16px;z-index:9998;width:min(370px,calc(100vw - 32px));'
+          + 'max-height:70vh;overflow:auto;background:#fff;border:1px solid #f59e0b;border-radius:8px;'
+          + 'box-shadow:0 8px 24px rgba(0,0,0,.18);padding:8px 12px 10px;font:12px/1.6 system-ui,sans-serif;color:#1f2937';
+        recallBox.innerHTML = '<div style="display:flex;align-items:center;gap:6px">'
+          + '<b style="flex:1 1 auto;font-size:12.5px;color:#92400e">改径结果</b>'
+          + '<button type="button" data-tlcr-redraw title="让工作区重画一次：管上的 Ø/损失标注与右上角汇总条会一起恢复">在图上重画</button>'
+          + '<button type="button" data-tlcr-close title="关闭（随时可从工具栏「📋 改径结果」再打开）">✕</button>'
+          + '</div><div data-tlcr-body></div>';
+        document.body.appendChild(recallBox);
+        var rd = recallBox.querySelector('[data-tlcr-redraw]');
+        var cl = recallBox.querySelector('[data-tlcr-close]');
+        if (rd) { rd.style.cssText = recallBtnCss(); rd.addEventListener('click', function () { window.tlCalRecall.redraw(); }); }
+        if (cl) { cl.style.cssText = recallBtnCss(); cl.addEventListener('click', function () { window.tlCalRecall.close(); }); }
+      }
+      this.refresh();
+      this.redraw();
+      return recallBox;
+    },
+    close: function () {
+      if (recallBox && recallBox.parentNode) recallBox.parentNode.removeChild(recallBox);
+    },
+    toggle: function () { return this.isOpen() ? this.close() : this.open(); }
+  };
   function apply(view, pid, od) {
     var mod = window.RyTlWs;
     if (!mod) return;
