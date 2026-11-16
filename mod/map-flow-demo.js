@@ -485,6 +485,7 @@
 
   /* ── 运行时（依赖宿主注入 ctx） ────────────────────────────────────── */
   var ctx = null, layer = null, active = null, timer = null, playing = false;
+  var activeHydraulics = null;
   var collectBlockReason = null, renderSnapshotRoutes = null;
   /* [perf-20261106 阶段B] 切组缓存：validateConnection 是纯函数，但每次切组都要把
      总管/主管按 2m 步长插值成密点做「线体×线体」距离比较（阶段A实测：36 区异形
@@ -1637,6 +1638,7 @@
     if (hint0) hint0.parentNode.removeChild(hint0);
     bar.style.display = '';
     rebuildChips(d);
+    if (active != null) updateGroupInfo(d, active);
     var tb = document.getElementById('tlDemoBar');
     if (tb) tb.style.display = 'none';   /* 简图演示 chips 在地图页无意义，隐藏防误点 */
     scheduleWarmup(d);                   /* [perf-cold] 空闲期预填校验缓存，消除首次点击的长任务 */
@@ -1651,8 +1653,10 @@
   }
 
   function hideGroupInfo(){
+    activeHydraulics = null;
     var el=document.getElementById('mapFlowGroupInfo');
     if(el){el.hidden=true;el.innerHTML='';}
+    if(ctx && typeof ctx.onHydraulicsChanged==='function') ctx.onHydraulicsChanged();
   }
 
   /* [v957] 这张卡原来是 pointer-events:none 的纯展示浮层（点击穿透给地图，不挡任何操作）。
@@ -1761,6 +1765,8 @@
       if(typeof window.tlMapGroupHydraulicsOf==='function')loss=window.tlMapGroupHydraulicsOf(memberIndexes,{groups:gsAll});
       else if(typeof window.tlGroupLossOf==='function')loss=window.tlGroupLossOf(g);
     }catch(e){}
+    activeHydraulics = loss && loss.head != null && isFinite(Number(loss.head))
+      ? { group: groupName, loss: loss } : null;
     /* [v945] 没有图面路径时的口径反推（用户 2026-11-04）：
        「地图上画的总管只是路由，直径要通过实际规划地块的分区推算出来」。
        tlMapGroupHydraulicsOf 需要 wp.fromFigure（设计侧段总管），手绘总管路线常常没有，
@@ -1878,6 +1884,7 @@
     }
     el.innerHTML=lines;
     el.hidden=false;
+    if(ctx && typeof ctx.onHydraulicsChanged==='function') ctx.onHydraulicsChanged();
     /* [v957] 显示后再接管拖动：hidden 时 offsetParent 为 null，量不到宿主尺寸 */
     setupGroupCardDrag(el);
     restoreGroupCardPos(el);
@@ -1957,6 +1964,13 @@
       } catch (e) { }
     },
     refresh: refresh,
+    refreshHydraulics: function () {
+      if (active == null) return;
+      var d = collect();
+      if (d) updateGroupInfo(d, active);
+      else hideGroupInfo();
+    },
+    currentHydraulics: function () { return activeHydraulics; },
     stop: stop,
     isActive: function () { return active != null || playing; },
     /* 只读导出当前地块地图分区面积；缺少地图分区时返回 null，水力计算必须停止，不能回退网格或手填面积。 */

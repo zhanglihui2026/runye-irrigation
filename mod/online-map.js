@@ -1595,6 +1595,7 @@
         /* [v945] 逐区分区面积（m²）—— 演示浮层按分区反推总管口径时用；
            与属性面板的「推算管径」同一个取数口，不在地图端另算面积。 */
         getZoneAreas: currentZoneAreas,
+        onHydraulicsChanged: function () { if(trunkPanel) trunkPanel.refresh(); },
         tip: tip,
         isMapActive: function () {
           var s = document.getElementById('onlineMapSection');
@@ -1979,7 +1980,10 @@
       container:host,
       getEntry:function(id){ return findSavedTrunk(id); },
       getLayout:currentPlotNetwork,
-      getDesign:currentDesignNumbers,
+      getActiveHydraulics:function(){
+        var demo=window.RyMapFlowDemo;
+        return demo&&typeof demo.currentHydraulics==='function'?demo.currentHydraulics():null;
+      },
       getOdAdvice:currentOdAdvice,
       onPatch:function(id,patch){ patchTrunkParams(id,patch); },
       onRecheck:function(id){ recheckTrunk(id); },
@@ -1994,24 +1998,6 @@
      不是同一块时返回 {mismatch:true}（而不是 null）—— 面板据此能说清
      "下游快照属于另一块地"，而不是让人以为"下游还没做"。
      另外把 front 段一并交给面板没关系：面板自己按 kind 排除，它只统计下游。 */
-  /* [v843] 三级计算式的三个损失项（联合复核的合计来源）。
-     ★ 为什么借 computeThreeLevel 而不是在面板里自己算：
-       ① 「总管 + 主管 + 支管」这套最不利路径逻辑已经在那边实现了（含取水点分段、
-         支管 Christiansen 折减、手动改径），再写一份必然漂移；
-       ② 它的 frontLenUsed 已经改成**优先取在线地图总管实测长度**（inline-09 的
-          tlFrontLenUse），所以这里拿到的总管长度就是要的那个数，不用再传一遍；
-       ③ 面板显示的合计必须和三级页「扬程计算式」上的数是同一个，否则用户会问哪个对。
-     取不到就返回 null —— 面板会退回只做对照，不会编一个 0 出来。
-     包在 try 里：computeThreeLevel 读 DOM 输入，页面没初始化时会抛。 */
-  function currentDesignNumbers(){
-    try{
-      if(typeof window.computeThreeLevel!=='function') return null;
-      var r=window.computeThreeLevel();
-      if(!r||typeof r!=='object') return null;
-      return r;
-    }catch(e){ return null; }
-  }
-
   /* [v945] 当前地块的逐区面积（m²，分区序号 0 基）。
      来源与地图上分区标签的亩数是同一条：地块库里的 plot.partitions
      （由 runye-map-partition.js 回写，每项带 zoneIndex + area + latLng）。
@@ -2342,6 +2328,8 @@
       /* 删掉最后一条 = 这块地没有总管了，编辑态没有对象可编辑 ⇒ 直接退回 idle，
          按钮也会跟着置灰。「留在一个空的编辑态里」会让用户以为还能右键。 */
       setTrunkMode('idle');
+      if(res&&res.ok&&window.RyMapFlowDemo&&typeof window.RyMapFlowDemo.refreshHydraulics==='function')
+        window.RyMapFlowDemo.refreshHydraulics();
       return res;
     }
     if(!findSavedTrunk(activeTrunkId)){ activeTrunkId=null; activeVertexIdx=-1; }
@@ -2352,6 +2340,8 @@
     /* 编辑生效后让面板重画只读量：库里的值可能和用户刚敲的不同（校验会把字符串转数/清成 null）。 */
     if(trunkPanel) trunkPanel.refresh();
     syncTrunkPanel();
+    if(res&&res.ok&&window.RyMapFlowDemo&&typeof window.RyMapFlowDemo.refreshHydraulics==='function')
+      window.RyMapFlowDemo.refreshHydraulics();
     if(trunkMode==='draw') refreshSnapTargets();
     return res;
   }

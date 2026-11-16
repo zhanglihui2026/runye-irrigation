@@ -696,17 +696,20 @@
       }
     }
 
-    /* 损失拆分渲染（[v965] 「联合复核」整块取消后只剩这一节）。
-       每帧都重算：三级计算式可能在别的页被改过（重新生成管线图、改滴灌参数）。
-       数字全部来自 designBlock(computeThreeLevel()) —— 三级页那套口径，本面板不另算一份；
-       这里只**排版**，不在这里做任何判断（判断在纯函数里、Node 单测锁着）。 */
+    /* 只显示与在线地图当前轮灌卡同源的水力结果。 */
     function paintLoss() {
       var rowsEl = q('tpLossRows');
       if (!rowsEl) return;
-      var design = (typeof opts.getDesign === 'function') ? opts.getDesign() : null;
-      /* 三级计算式：合计损失的唯一来源。宿主那边 getDesign 是「现算」的薄封装，
-         取不到（未加载/异常）就传 null ⇒ 整节不渲染（不拿 0 顶，也不显示半截空行）。 */
-      var G = designBlock(design);
+      var active = (typeof opts.getActiveHydraulics === 'function') ? opts.getActiveHydraulics() : null;
+      var loss = active && active.loss, lengths = loss && loss.lengths;
+      var G = loss && lengths && num(loss.head) !== null
+        ? { src: '', front: num(lengths.front), main: num(lengths.main),
+            branch: num(lengths.branch), frontLoss: num(loss.frontLoss),
+            mainLoss: num(loss.mainLoss), branchLoss: num(loss.branchLoss),
+            totalLoss: num(loss.totalLoss), pumpHead: num(loss.head) }
+        : null;
+      if (G && (G.front === null || G.main === null || G.branch === null)) G = null;
+      if (G) G.lenSum = G.front + G.main + G.branch;
 
       /* [v954] 值片段包裹器：每段「数 + 单位 / 一句短说明」各自 nowrap，断行只许发生在段与段之间。
          不加这个，word-break:break-word 会把「1.91 km」拆成「1.91 / km」、「5.35 m」拆成
@@ -750,7 +753,7 @@
         /* [v965] 原来这里先有一个 .tp-jt-sep：它是「联合复核」与「损失拆分」之间的分隔线。
            联合复核整块取消后，面板级的 .tp-sep 已经是这条线了，再留一个就是两条并排的线
            （视觉上像多出一格空行），所以删掉。 */
-        html += '<div class="tp-jt-h2">损失拆分<span>按一条最不利路径</span></div>' +
+        html += '<div class="tp-jt-h2">损失拆分<span>' + esc('当前' + active.group + '最不利路径') + '</span></div>' +
           '<div class="tp-jt-row tp-jt-loss"><span>总管</span><b>' + sepJoin([
             fmtLen(FRONT),
             srcTag ? { t: srcTag, title: srcFull } : null,
@@ -763,9 +766,8 @@
           '<div class="tp-jt-row tp-jt-sum"><span>合计损失</span><b>' + nw(fmtM(G.totalLoss)) + '</b></div>' +
           '<div class="tp-jt-row"><span>管路总长</span><b>' + nw(fmtLen(G.lenSum)) + '</b></div>' +
           (G.pumpHead !== null
-            ? '<div class="tp-jt-row"><span>三级页扬程</span><b>' + nw(fmtM(G.pumpHead)) + '</b></div>'
-            : '');
-      }
+            ? '<div class="tp-jt-row"><span>本轮扬程</span><b>' + nw(fmtM(G.pumpHead)) + '</b></div>' : '');
+      } else html = '<div class="tp-jt-note">请选择在线地图轮灌组查看本轮扬程与损失。</div>';
       rowsEl.innerHTML = html;
     }
 

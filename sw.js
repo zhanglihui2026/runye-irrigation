@@ -1531,7 +1531,7 @@
  */
 
 
-const VERSION = 'v1091-trunk-hierarchy';
+const VERSION = 'v1092-group-head-sync';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

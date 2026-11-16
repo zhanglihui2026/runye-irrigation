@@ -2779,7 +2779,6 @@ function renderTLDerivation(r) {
 
 function renderThreeLevel() {
   const r = computeThreeLevel();
-  renderTLDerivation(r);
   if (!r) {
     document.getElementById('tl_resultPanel').innerHTML = '<div class="panel-heading result-heading"><div><span class="step light">02</span><h2>实际方案</h2></div></div><p class="area-source-warning">当前地块缺少地图实测总面积或本页分区几何，水力计算已停止。请先取得地块边界与实测面积。</p>';
     return;
@@ -2851,20 +2850,6 @@ function renderThreeLevel() {
       </article>
     </div>
 
-    <!-- ===== 水泵 ===== -->
-    <div class="pump-card">
-      <div class="pump-topline"><span>水泵建议工作点（${fmt0(r.zoneCount)} 区联合）</span><span class="confidence">含 ${MARGIN_HEAD} m 富余及 ${SAFETY_FACTOR.toFixed(2)} 安全系数</span></div>
-      <div class="pump-metrics">
-        <div><strong>${fmt(r.combinedFlow,1)}</strong><span>m³/h 联合流量</span></div>
-        <b>×</b>
-        <div><strong>${fmt0(r.pumpHead)}</strong><span>m 扬程</span></div>
-      </div>
-      <div class="motor-row"><span>轴功率计算 / 建议电机</span><strong>${fmt(r.pumpPower,1)} / ${fmt0(r.motorKW_rounded)} kW</strong></div>
-      <div class="motor-row"><span>总管损失</span><strong>${fmt(r.frontPipeLoss,2)} m</strong></div>
-      <div class="motor-row"><span>单区主管＋支管损失</span><strong>${fmt(r.mainLoss + r.branchLoss,2)} m</strong></div>
-      <div class="motor-row"><span>管路总损失</span><strong>${fmt(r.totalPipeLoss,2)} m</strong></div>
-    </div>
-
     <!-- ===== 支管方案对比 ===== -->
     <div class="branch-compare">
       <div class="branch-compare-title"><span>分区阀门后支管方案对比</span><small>点击方案即可采用</small></div>
@@ -2890,9 +2875,6 @@ function renderThreeLevel() {
       <div><dt>单区主管</dt><dd>Ø ${r.mainPipe.od} mm · 损失 ${fmt(r.mainLoss,2)} m</dd></div>
       <div><dt>支管方案</dt><dd>${branchCountLabel(r.branchCount, r.layoutSides)} · Ø ${r.branchPipe.od} mm · 损失 ${fmt(r.branchLoss,2)} m</dd></div>
       <div><dt>管路总损失</dt><dd>${fmt(r.totalPipeLoss,2)} m</dd></div>
-      <div><dt>扬程（安全系数前）</dt><dd>${fmt(r.headBeforeSafety,2)} m</dd></div>
-      <div><dt>水泵工作点</dt><dd>${fmt(r.combinedFlow,1)} m³/h × ${fmt0(r.pumpHead)} m</dd></div>
-      <div><dt>建议电机</dt><dd>${fmt0(r.motorKW_rounded)} kW</dd></div>
     </dl>
   `;
 
@@ -3839,9 +3821,6 @@ function tlUpdatePlanBar() {
      —— 扬程必不准。此时水泵扬程/轴功率/电机功率三格与全部改径重算橙列显示 —，
      并常驻提示「请在在线地图绘制总管形成闭环，再计算扬程」（#tlPlanLoopHint）；
      画好总管后自动恢复数字。水泵流量/联合流量与总管无关，照常显示。 */
-  var loopOk = false;
-  try { var _mtLoop = tlMapTrunkLen(); loopOk = !!(_mtLoop && _mtLoop.ok); } catch (eLoop) { }
-  if (el = document.getElementById('tlPlanLoopHint')) el.style.display = loopOk ? 'none' : '';
   if(el=document.getElementById('tlPlanCombinedFlow')) el.textContent=fmt(r.combinedFlow,1)+' m³/h';
   /* v106（2026-09-22 用户要求）：「联合流量」底下注明依据 —— 按哪个联合分区、实际多少亩换算。
      数据与 computeThreeLevel 同源（worstGroup={g,zones,sum}，sum=最大组实际面积和 m²）。
@@ -3864,10 +3843,6 @@ function tlUpdatePlanBar() {
      v119 的「主=实际 / 橙=设计」与列头错位，用户读作「改径重算列没更新」；改径后的值
      在橙列与下方黑条（水泵扬程 36.5 m）直接可见。 */
   /* [v1017c] 三主格闭环门槛：未闭环显示 —（数据层 computeThreeLevel 不拦，快照/材料链完整） */
-  if(el=document.getElementById('tlPlanPumpHead')) el.textContent=loopOk ? fmt(rDes.pumpHead,1)+' m' : '— m';
-
-  if(el=document.getElementById('tlPlanPumpPower')) el.textContent=loopOk ? fmt(rDes.pumpPower,1)+' kW' : '— kW';
-  if(el=document.getElementById('tlPlanMotorPower')) el.textContent=loopOk ? fmt(rDes.motorKW_rounded,1)+' kW' : '— kW';
   if(el=document.getElementById('tlPlanFrontPipe')) el.textContent='Ø '+rDes.frontPipe.od+' mm';
   if(el=document.getElementById('tlPlanFrontVelocity')) el.textContent=fmt(rDes.frontPipe.v,2)+' m/s';
   if(el=document.getElementById('tlPlanMainPipe')) el.textContent='Ø '+rDes.mainPipe.od+' mm';
@@ -3885,9 +3860,6 @@ function tlUpdatePlanBar() {
     e2.textContent = fmt(v, dec) + ' ' + unit + (odTxt ? ' (' + odTxt + ')' : ''); e2.style.color = '';
   }
   /* v139：扬程/功率橙列（改径重算）= 应用管径重算后的值（与流速行同款 tlRealSet；未应用显示 —） */
-  tlRealSet('tlPlanPumpHeadReal', loopOk ? r.pumpHead : NaN, 'm', 1);
-  tlRealSet('tlPlanPumpPowerReal', loopOk ? r.pumpPower : NaN, 'kW', 1);
-  tlRealSet('tlPlanMotorPowerReal', loopOk ? r.motorKW_rounded : NaN, 'kW', 1);
   /* v109（2026-09-22 用户要求）：管径前后对比 —— 改径重算后实际参与计算的管径
      （computeThreeLevel 按覆盖管径算出的 r.*Pipe.od），与设计管径不同时显示「315 → 280 mm」，
      未改径或改径后没变显示 —（浅灰）。 */

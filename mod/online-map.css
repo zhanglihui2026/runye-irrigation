@@ -359,6 +359,7 @@ body:has(.ry-pwa-install) #onlineMapSection .ry-trunk-panel{bottom:96px}
   display:flex;align-items:baseline;gap:5px;margin-bottom:2px;
   font-size:10.5px!important;font-weight:700;color:#334155}
 #onlineMapSection .ry-trunk-panel .tp-jt-h2>span{font-weight:400;color:#94a3b8;font-size:10px!important}
+#onlineMapSection .ry-trunk-panel .tp-jt-note{color:#64748b;font-size:10px;line-height:1.4}
 /* 三段与合计的标签列：v954 起统一吃上面的 52px，不再单设 48px（两套不同宽度会让
    「合计损失」与「总管」的值列左沿差 18px，且都容不下 5 汉字）。 */
 #onlineMapSection .ry-trunk-panel .tp-jt-loss>b{font-weight:500;color:#475569}
