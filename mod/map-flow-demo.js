@@ -1650,7 +1650,17 @@
     if (typeof document === 'undefined' || document.getElementById('mapFlowDemoCss')) return;
     var st = document.createElement('style');
     st.id = 'mapFlowDemoCss';
-    st.textContent = '.mapflow-anim{stroke-dasharray:10 8;animation:mapflowDash .45s linear infinite}@keyframes mapflowDash{to{stroke-dashoffset:-18}}.map-head-cap{margin-top:10px;padding:8px;border:1px solid #d9e3df;background:#f7faf9;color:#334155}.map-head-cap input{width:72px;margin-left:5px}.map-head-cap button{margin-top:5px}.map-head-cap #mapHeadCapResult{margin-top:5px}';
+    st.textContent = '.mapflow-anim{stroke-dasharray:10 8;animation:mapflowDash .45s linear infinite}@keyframes mapflowDash{to{stroke-dashoffset:-18}}' +
+      /* [v1102] 扬程上限条：标签/输入/单位/按钮左右一排；文字与按钮沿用面板统一口径（11px、方角白底描边） */
+      '.map-head-cap{margin-top:8px;color:#334155}' +
+      '.map-head-cap-row{display:flex;align-items:center;gap:5px;flex-wrap:wrap}' +
+      '.map-head-cap-row label{margin:0;font-size:11px;color:#334155;font-weight:600;white-space:nowrap}' +
+      '.map-head-cap-row input{width:58px;height:26px!important;padding:0 5px;margin:0;border:1px solid #cbd8d0;background:#fff;color:#2c4a3d;font-size:11px!important;font-family:inherit;line-height:1;box-sizing:border-box}' +
+      '.map-head-cap-row .map-head-cap-unit{font-size:11px;color:#64748b}' +
+      '.map-head-cap-row button{height:26px;padding:0 10px;margin:0;border:1px solid #cbd8d0;background:#fff;color:#2c4a3d;font-size:11px!important;font-weight:400;font-family:inherit;line-height:1;white-space:nowrap;cursor:pointer}' +
+      '.map-head-cap-row button:hover:not([disabled]){border-color:#39795b;background:#f2f8f4;color:#085041}' +
+      '.map-head-cap-row button[disabled]{opacity:.55;cursor:not-allowed}' +
+      '.map-head-cap #mapHeadCapResult{margin-top:5px}';
     document.head.appendChild(st);
   }
 

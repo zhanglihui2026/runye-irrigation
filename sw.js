@@ -1682,10 +1682,18 @@
    回归扩充 `tests/head_cap_bidirectional.test.cjs` ③b~③e（支管已超仍允许缩径 / 一条主管已超
    不掩盖另一条新超 / 缺流速拒绝 / 一组已超不掩盖另一组），全量 812 测试 46 红零新增。
    本节随提交发布上线。
+
+   [v1102-head-cap-inline-row] 用户截图要求（2026-11-17）：轮灌演示卡「全部分区扬程上限」简化为
+   「扬程上限」，「应用建议管径」简化为「应用」，并让标签/输入框/单位/按钮**左右排列一排**，
+   文字、按钮与左工具栏面板统一。做法：① `index.html` 把四者包进 `.map-head-cap-row`，
+   结果说明 `#mapHeadCapResult`（长文本）仍独占下一行；② `map-flow-demo.js` 的 `injectCss()`
+   把原来「浅绿小卡 + 按钮另起一行」改成 flex 横排，字号 11px、方角、白底描边 #cbd8d0、
+   按钮 hover 绿边（沿用面板 `.mbtn` 口径），disabled 降透明度；id/逻辑一律未动。
+   主版本串 21 处 + sw VERSION 抬到 `v1102-head-cap-inline-row`。
  */
 
 
-const VERSION = 'v1101-head-cap-speed-scope';
+const VERSION = 'v1102-head-cap-inline-row';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
