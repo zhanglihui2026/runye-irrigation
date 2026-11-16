@@ -1563,10 +1563,28 @@
    明确不改：`tlTrunkOdAdvice` 算法（trunk-size.js 选档）、地图组卡浮层里那句「按分区反推」、
    水力/损失/扬程、发布快照，一行都没动。验证：`trunk_size` 12 条（1 条历史红 ⑧ 与本次无关）、
    `trunk_panel*`/`trunk_joint*` 全绿；`npm run check` 仍 46 条历史红（零新增）、`npm run lint` 干净。
+   [v1096-hyd-result-off] 三级「水力计算结果」整条取消显示（2026-11-16）：用户红框「红框中的内容，
+   现在看也没啥用了，我们用扬程反推了」。理由**不是数字错**，是口径已经有主：管径/流速现在由在线地图
+   「扬程反推 + 轮灌卡 + 损失拆分」给出，这里再把「设计值 / 改径重算」两列并排一遍，读的人得自己判断
+   哪列生效；而「改径重算」正是 `tlHeadCapAdvice`（本次改了 6 段）的产物，橙字常与人工决策打架 ——
+   上一版 v1095 刚为同一类问题删过说明文字。做法：**不删 DOM，把整块搬进隐藏宿主 `#tlPlanResHost`**。
+   ★ 为什么不能直接给 `#tlPlanBar2` 加 hidden / 内联 display:none：v611 的整栏扁平化规则
+   `#tlPipePlanSection .pp-side .pp-plan-bar{display:block!important}` 会压掉内联（无头 Edge 实测：
+   inline 生效、计算值仍 block、块高 220px）。宿主不带 `.pp-plan-bar` 类 ⇒ 没有 !important 认领它。
+   ★ 为什么是「藏」不是「删」：这块还有十来个 id 被下游读写 —— ①打印参数 `tlPrintDiagram` 抓
+   `.pp-plan-item` 文本；②导出快照（inline-27）读 `tlPlanPumpHead/PumpFlow`；③三个管径下拉
+   `tlCalSelFront/Main/Branch` 是既有改径绑定与反推写回的宿主。删节点会留一串 null 分支，
+   而 v972 删二级那条时是靠改 `ppResPut` 守卫才做到的，成本不对等。
+   **代价（已告知用户）**：手动改主管/支管口径的下拉入口随之不可见，改径只剩「扬程反推」一条路。
+   同步：`verify_resbar_trim.js` 的 A2 保留（在 + 带折叠头）、新增 A3「不渲染 + 宿主 display:none」；
+   A3 判据必须用 `offsetParent`/宿主计算值，**不能读 tlBar2 自己的 computed display**（会被 v611 报成 block）。
+   index.html 里 v972 那段「三级仍完整保留、别移除错」的注释已就地标注过期。恢复：删 `#tlPlanResHost`
+   的 hidden + style 两个属性。验证：无头 Edge 实测块高 0 / offsetParent null、同级 `#tlPlanBar` 仍 73px、
+   12 个 id 全部可读；`npm run check` 仍 46 条历史红（零新增）、`npm run lint` 412 脚本干净。
  */
 
 
-const VERSION = 'v1095-od-advice-trim';
+const VERSION = 'v1096-hyd-result-off';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

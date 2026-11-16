@@ -4570,6 +4570,9 @@
        折叠能力保留（点灰条仍可收起/展开），只是初始不再收起。
        要退回 v252 行为：把下面第一个参数 true 即可。 */
     init(document.getElementById('ppPlanBar2'), false);
+    /* [v1096] tlPlanBar2 已在 index.html 上改为 display:none（用户：「我们用扬程反推了，这里就没啥用了」），
+       这句 init 留着只为不动 DOM 关联（加 pp-res-head / 绑折叠），视觉上不再出现；
+       真要恢复显示，删 index.html 那行的 style 即可，这里不用改。 */
     init(document.getElementById('tlPlanBar2'), false);
 
 

@@ -4,9 +4,12 @@
      ① 「每亩流量」行移入灌溉参数区、放在「目标流速」之下；
      ② 二级「水力计算结果」整条（#ppPlanBar2 + v252/v609 折叠头）取消；
      ③ 别删错 —— 三级页「水力计算结果」（#tlPlanBar2，带改径重算下拉）必须原样健在。
+      [v1096 2026-11-16] 用户又要求把三级这条也取消（「我们用扬程反推了，这里就没啥用了」）：
+      做法是 display:none、DOM 保留（打印参数 / 导出快照 / 三个管径下拉的绑定都读这些 id）
+      ⇒ ③ 随之改成「在 + 带折叠头 + 不可见」，A3 锁住不可见，防有人「恢复」成可见。
 
    本闸门（页面级 + 真实渲染，注入 521×480 地块 / 24 亩 / 铺设长度 80）：
-     A. #ppPlanBar2 不存在；#tlPlanBar2 存在且带 pp-res-head（三级未受伤）
+     A. #ppPlanBar2 不存在；#tlPlanBar2 存在且带 pp-res-head、且（v1096 起）display:none
      B. #planIntensity 在 #ppPlanBar 内、位于 #planTargetV 之后（DOM 次序）
      C. 生成后 #planIntensity 非「—」（守卫写入生效）
      D. window.planData.zoneFlow/pumpHead/pumpPower 为有限数（数据侧零损失）
@@ -58,11 +61,17 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       return {
         bar2Gone: !bar2,
         tlAlive: !!tlBar2 && tlBar2.classList.contains('pp-res-head'),
+      /* [v1096] 三级那条也取消了，但保留 DOM（导出/打印/改径绑定仍读这些 id）⇒ 断言改成「在、带折叠头、且不渲染」。
+         ★ 判据必须用 offsetParent / 宿主计算值，不能读 tlBar2 自己的 computed display：
+           v611 的 `#tlPipePlanSection .pp-side .pp-plan-bar{display:block!important}` 会把它报成 block。 */
+        tlHidden: !!tlBar2 && !tlBar2.offsetParent && Math.round(tlBar2.getBoundingClientRect().height) === 0,
+        hostDisplay: (() => { const h = document.getElementById('tlPlanResHost'); return h ? getComputedStyle(h).display : 'missing'; })(),
         inBar: inBar, afterTarget: afterTarget
       };
     });
     check('A1 二级 #ppPlanBar2 已整条移除', a.bar2Gone);
     check('A2 三级 #tlPlanBar2 健在且仍带折叠头（别删错）', a.tlAlive);
+    check('A3 三级 #tlPlanBar2 已按 v1096 隐藏（视觉取消、DOM 保留）', a.tlHidden && a.hostDisplay === 'none');
     check('B1 每亩流量在灌溉参数区 #ppPlanBar 内', a.inBar);
     check('B2 每亩流量位于目标流速之后', a.afterTarget);
 

@@ -26,7 +26,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>润野灌溉设计优化版｜滴灌管径与水泵选型</title>
 <meta name="description" content="输入地块、滴灌带与水源参数，快速计算灌溉分区、主管支管管径和水泵工作点。"/>
-<link rel="stylesheet" href="mod/style-01.css?v=1095-od-advice-trim">
+<link rel="stylesheet" href="mod/style-01.css?v=1096-hyd-result-off">
 <link rel="stylesheet" href="runye-inverse-design.css?v=277">
 <script defer src="runye-inverse-design.js?v=438-branch-flow-conservation"></script>
 <link rel="stylesheet" href="runye-ai-plan.css?v=544-float-card-unify">
@@ -34,7 +34,7 @@
 <link rel="stylesheet" href="runye-case-library.css?v=277">
 <script src="runye-case-library.js?v=278-case-query"></script>
 <script src="runye-geo.js"></script>
-<script src="runye-map-enhance.js?v=1095-od-advice-trim"></script>
+<script src="runye-map-enhance.js?v=1096-hyd-result-off"></script>
 <script src="hydraulic-calc/hydraulics-wasm.js"></script>
 <script src="hydraulic-calc/native-bridge.js"></script>
 <script src="hydraulic-calc/hc-core.js"></script>
@@ -49,7 +49,7 @@
 <link rel="stylesheet" href="hydraulic-calc/hydraulic-calc.css">
 <link rel="stylesheet" href="filter-system/filter-system.css">
 <link rel="stylesheet" href="pwa/vendor/leaflet.css">
-<link rel="stylesheet" href="mod/online-map.css?v=1095-od-advice-trim">
+<link rel="stylesheet" href="mod/online-map.css?v=1096-hyd-result-off">
 <link rel="stylesheet" href="hydraulics-main.css?v=442-native">
 <style id="ryCadTwinCss">
 /* --- CAD global toolbar · generated selector twins ---
@@ -878,6 +878,9 @@
        JS 侧：inline-11 写入点改 ppResPut 守卫、plot-editor 施工简图的 4 个死局部变量删除、
        ppResCollapse init(ppPlanBar2) 对 null 自守（plot-editor 4002 行 if(!bar)return）。
        仅删二级；三级 #tlPlanBar2 与其折叠头未动（用户明确提醒「别移除错」）。
+       ★ [v1096 2026-11-16] 三级那条也取消了（用户红框：「我们用扬程反推了，这里就没啥用了」）——
+         但方式是 display:none、DOM 保留，见 #tlPlanBar2 上方的 [v1096] 注释；
+         本段「三级仍完整保留」的说法自此过期，别再据此恢复二级那条。
        要恢复：git show 971: 恢复 #ppPlanBar2 整块 + 目标流速下方每亩流量行删除即可。 -->
   <!-- 分区管径明细（仅实切口径下显示）：逐区实切亩数 → 流量 / 主管Ø / 支管Ø -->
   <div class="ry-props-head" id="ppZoneCalHead" style="display:none">分区管径明细（实切）</div>
@@ -1313,6 +1316,23 @@
   <!-- 版式：复用二级管路「左参数栏 ＋ 右图纸区」的 .pp-body 两栏布局 -->
   <div class="pp-body">
   <aside class="pp-side" id="tlSide">
+  <!-- [v1096 2026-11-16 用户红框「红框中的内容，现在看也没啥用了，我们用扬程反推了」]
+       三级「水力计算结果」整条（#tlPlanBar2）取消显示。理由不是数字错，是**口径已经有主了**：
+       管径与流速现在由在线地图「扬程反推 + 轮灌卡 + 损失拆分」给出，这里再把「设计值 / 改径重算」
+       两列并排一遍，读的人得自己判断哪一列才是当前生效的口径；而「改径重算」那列正是反推
+       （tlHeadCapAdvice，改了 6 段）的产物 —— 橙字常与人工决策打架，上一版刚为同一类问题删过说明文字。
+       ★ 为什么是 display:none 而不是删 DOM：这块里十来个 id 仍被下游读写 ——
+         ① 打印参数 tlPrintDiagram 抓 .pp-plan-item 的文本；
+         ② 导出快照（inline-27）读 tlPlanPumpHead / tlPlanPumpFlow 等；
+         ③ 三个管径下拉 tlCalSelFront/Main/Branch 是既有改径绑定（tlAppliedPipeOverride）的宿主，
+            反推写回也走同一套 id。删节点会留下一串 null 分支，收益只有几十字节。
+       代价（已与用户说明）：手动改主管/支管口径的下拉入口随之不可见，改径只剩「扬程反推」一条路。
+       ★ 为什么是「搬进隐藏宿主」而不是给 #tlPlanBar2 加 hidden/内联 display:none：
+         v611 的整栏扁平化规则 `#tlPipePlanSection .pp-side .pp-plan-bar{display:block!important}`
+         会压掉任何内联/属性级的隐藏（实测：inline display:none 生效但计算值仍是 block、块高 220px）。
+         宿主 div 不带 .pp-plan-bar 类 ⇒ 没有 !important 规则认领它，display:none 说得上话。
+       要恢复：删掉下面宿主的 hidden + style 两个属性即可，块内 DOM 与顺序逐字原样。 -->
+  <div id="tlPlanResHost" hidden style="display:none">
   <div class="pp-plan-bar pp-plan-bar-result tl-plan-result" id="tlPlanBar2">
     <!-- ★ v109 关键发现（2026-09-22）：三级页切 tab 时本栏随 #tlSide 被**搬移**进 CAD 侧栏
          #ryCadGrpTl —— 失去 #tlPipePlanSection 祖先后，v107 挂该前缀的列布局规则全部失效
@@ -1344,6 +1364,7 @@
     <span class="pp-plan-item"><span class="pp-plan-label">支管</span><span class="pp-plan-val" id="tlPlanBranchPipe">—</span><span class="pp-plan-val-real"><select id="tlCalSelBranch" class="pp-cal-sel" title="选择支管管径（设计值±3档），扬程/流速随之实时重算"></select></span></span>
     <span class="pp-plan-item"><span class="pp-plan-label">支管流速</span><span class="pp-plan-val" id="tlPlanBranchVelocity">— m/s</span><span class="pp-plan-val-real" id="tlPlanBranchVelocityReal">—</span></span>
   </div>
+  </div><!-- /#tlPlanResHost [v1096] -->
   <!-- 三级页独立扬程展示已取消；在线地图当前轮灌卡片显示扬程。 -->
   <div class="pp-hint" id="tlPpHint" style="display:none">📋 请先到「在线地图」画框并回传地块</div>
   <!-- 下载 / 打印图纸按钮已按用户要求取消（2026-09-16 第三十三轮）；
@@ -2127,7 +2148,7 @@
 </div>
 
 <script src="mod/material-formulas.js?v=412"></script>
-<script src="mod/zone-geometry.js?v=1095-od-advice-trim"></script>
+<script src="mod/zone-geometry.js?v=1096-hyd-result-off"></script>
 <script src="mod/flow-geometry.js?v=414"></script>
 <script src="mod/tl-polyline-geometry.js?v=426-tl-polyline-geometry"></script>
 <!-- [v421-mat-table] 材料清单/材料表管理（自 inline-09 迁出）：先于 inline-09 加载 —— inline-09 尾部
@@ -2138,7 +2159,7 @@
 <!-- [v887-tape-zone-vgate] 段总管生成器（纯几何，Node 单测锁），先于 inline-09 消费方装载。
      [v900] 曾随段总管链误删引入；[v1017] 恢复（扬程链 P0，TASK_pump_head_mismatch_20261108 §5.0）。 -->
 <script src="mod/tl-seg-trunk.js?v=887-tape-zone-vgate"></script>
-<script src="mod/inline-09.js?v=1095-od-advice-trim"></script>
+<script src="mod/inline-09.js?v=1096-hyd-result-off"></script>
 <!-- [v423-header-layout] 三级简图标题布局依赖 inline-09 的 tlMeasureText 与生成时写入的标题状态。 -->
 <script src="mod/tl-header-layout.js?v=423-header-layout"></script>
 
@@ -2146,11 +2167,11 @@
 <script src="mod/inline-10.js?v=482-nav-refit"></script>
 
 <!-- ===== 实际地块规划 JS ===== -->
-<script src="mod/inline-11.js?v=1095-od-advice-trim"></script>
+<script src="mod/inline-11.js?v=1096-hyd-result-off"></script>
 <!-- [v420-split] 绘图编辑器 IIFE 自 inline-11 迁出：必须紧随 inline-11 之后同步执行 -->
-<script src="mod/plot-editor.js?v=1095-od-advice-trim"></script>
-<script src="mod/inline-12.js?v=1095-od-advice-trim"></script>
-<script src="mod/inline-13.js?v=1095-od-advice-trim"></script>
+<script src="mod/plot-editor.js?v=1096-hyd-result-off"></script>
+<script src="mod/inline-12.js?v=1096-hyd-result-off"></script>
+<script src="mod/inline-13.js?v=1096-hyd-result-off"></script>
 <!-- [v422-head-system-svg] 纯 SVG 核心先于 inline-14 同步加载。 -->
 <script src="mod/head-system-svg.js?v=422-head-system-svg"></script>
 <script src="mod/inline-14.js?v=422-head-system-svg"></script>
@@ -2159,7 +2180,7 @@
 <script src="mod/inline-15.js?v=357"></script>
 
 <!-- ===== 地图面积测量回传：消费在线地图 / 地形模块写入的交接数据（v821 起地图页唯一即本页 #onlineMapSection） ===== -->
-<script src="mod/inline-16.js?v=1095-od-advice-trim"></script>
+<script src="mod/inline-16.js?v=1096-hyd-result-off"></script>
 <script src="mod/ry-diag.js?v=476-pwa-reset"></script>
 
 <!-- ===== 主区 Tab 绑定 + 底部状态栏 + 视口自适应 ===== -->
@@ -2169,7 +2190,7 @@
 <!-- [v815] 绘图工具栏统一图标集（单色线性 SVG）：必须先于 inline-18.js 加载，
      inline-18 的 decorateToolbar 会在首次装饰时调用 window.RyIcons.decorate。 -->
 <script src="mod/ry-icons.js?v=1012-lock-icon-bigger"></script>
-<script src="mod/inline-18.js?v=1095-od-advice-trim"></script>
+<script src="mod/inline-18.js?v=1096-hyd-result-off"></script>
 
 <script src="mod/inline-19.js?v=696-shared-host-init-order"></script>
 
@@ -2182,10 +2203,10 @@
 <script src="tl-workspace/tl-auto-edits.js?v=785-l3-host-edit-canonical"></script>
 
 <!-- ===== 三级设计工作区模块 + 页面接线（2026-09-13） ===== -->
-<script src="tl-workspace/tl-nodes.js?v=1095-od-advice-trim"></script>
+<script src="tl-workspace/tl-nodes.js?v=1096-hyd-result-off"></script>
 <!-- v180b（2026-10-02）：tl-nodes.js 就绪后再挂简图实时刷新订阅（见 tlHookTlNodesLiveSync 注释） -->
 <script src="mod/inline-22.js?v=357"></script>
-<script src="tl-workspace/tl-workspace.js?v=1095-od-advice-trim"></script>
+<script src="tl-workspace/tl-workspace.js?v=1096-hyd-result-off"></script>
 <script src="tl-workspace/tl-path-measure.js"></script>
 <!-- 2026-09-23（用户指令）v135：水力计算器「入口预留」总闸——置 true 时界面不挂载
      （hydraulic-calc.js 的 mount/setConfig/importThreeLevel 直接空转），导航入口与占位文案保留，
@@ -2307,20 +2328,20 @@
 <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.1/cdn/shoelace.js"></script>
 <script src="mod/ry-panel.js?v=823-fix-transfer-save-alert"></script>
 <script src="pwa/vendor/leaflet.js"></script>
-<script src="mod/trunk-snap.js?v=1095-od-advice-trim"></script>
+<script src="mod/trunk-snap.js?v=1096-hyd-result-off"></script>
 <script src="mod/trunk-geo.js?v=854-null-slot-strict"></script>
 <!-- [v945] 总管口径反推（纯函数）：由规划分区的面积/流量 + 下游主管支管管径推手绘总管外径。 -->
-<script src="mod/trunk-size.js?v=1095-od-advice-trim"></script>
+<script src="mod/trunk-size.js?v=1096-hyd-result-off"></script>
 <script src="mod/trunk-edit.js?v=835-trunk-geo-snap"></script>
 <script src="mod/trunk-history.js?v=835-trunk-geo-snap"></script>
-<script src="mod/trunk-panel.js?v=1095-od-advice-trim"></script>
+<script src="mod/trunk-panel.js?v=1096-hyd-result-off"></script>
 <!-- [v887-tape-zone-vgate] 在线地图轮灌演示（分组/校验纯函数 + Leaflet 图层），先于宿主装载。 -->
-<script src="mod/map-flow-demo.js?v=1095-od-advice-trim"></script>
-<script src="mod/online-map.js?v=1095-od-advice-trim"></script>
+<script src="mod/map-flow-demo.js?v=1096-hyd-result-off"></script>
+<script src="mod/online-map.js?v=1096-hyd-result-off"></script>
 <!-- [v961] 在线地图右缘抽屉：把「图层」与「总管参数设置」两张浮层收成右缘竖排标签。
      参照「分区与管路」页的 #ppPlotDrawerTab / #tlWsLayerDrawerTab。必须在 online-map.js
      之后（它建的 #trunkPropPanel 由本模块接管；本模块自带轮询 + MutationObserver，顺序晚了也不丢）。 -->
-<script src="mod/map-right-drawer.js?v=1095-od-advice-trim"></script>
+<script src="mod/map-right-drawer.js?v=1096-hyd-result-off"></script>
 <script src="runye-hydraulics-page.js?v=829-hyd-auto-refresh"></script>
 <!-- [v978] 设计输入自动持久化：二级 fld_* / 三级 tl_* / planSrcDist 存 localStorage，
      刷新自动还原（版本升级强刷不再丢参数）。必须是最后一个脚本——还原时要调 calcPlan /
