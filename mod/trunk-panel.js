@@ -688,12 +688,12 @@
         (isFinite(adv.velocity) ? '（' + Number(adv.velocity).toFixed(2) + ' m/s）' : '');
       /* 已一致就把按钮藏起来 —— 点了也不会有变化，留着反而是噪音。 */
       btn.hidden = (cur !== null && cur === adv.od);
-      if (noteEl) {
-        var txt = '按 ' + adv.basis + ' 反推';
-        if (cur !== null && cur !== adv.od) txt += '；当前 DN' + cur + '，与推算不一致';
-        noteEl.textContent = txt;
-        noteEl.hidden = false;
-      }
+      /* [v1095 2026-11-16 用户圈着这段说明说「这段文字也取消」] 有推算值时不写
+         「按 1 区同轮灌溉合计 113.89 m³/h（下游主管/支管外径不小于 Ø200 mm）反推；当前 DN250，与推算不一致」：
+         上面「管径 DN250」与这一行「推算管径 Ø200」并排摆着，本来就看得见差；再用三行小字把
+         用户自己定的口径称作「与推算不一致」，等于把一次人工决策报成错误。真要用就点「采用」。
+         ★ 反推**失败**时的原因仍然要写（那时没有数值可看），见上面 adv.ok !== true 分支。 */
+      if (noteEl) { noteEl.textContent = ''; noteEl.hidden = true; }
     }
 
     /* 只显示与在线地图当前轮灌卡同源的水力结果。 */

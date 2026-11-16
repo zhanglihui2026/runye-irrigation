@@ -1551,10 +1551,22 @@
    `npm run check` 放行（内含同 46 条历史红）、`npm run lint` 412 脚本干净。
    ★ 更正：上一条 v1093 写的「20 文件 / 30 条」是旧口径，对 `d97d0f9` 复测是 40 文件 / 49 条，
    以后引用失败数请以当次逐文件单跑为准。
+   [v1095-od-advice-trim] 推算管径的说明小字取消（2026-11-16）：用户圈着总管面板「推算管径」
+   下面那三行小字说「这段文字也取消」。原文是
+   「按 1 区同轮灌溉合计 113.89 m³/h（下游主管/支管外径不小于 Ø200 mm）反推；当前 DN250，与推算不一致」，
+   问题不在信息量，在**语气**：DN250 是用户自己（或改径链）定下的口径，同一屏上面「管径 DN250」、
+   下面「推算管径 Ø200」已经并排把差值摆清楚了，再用小字把它称作「与推算不一致」，
+   等于把一次人工决策报成错误，越读越像系统在劝人改回去。改动只在 `trunk-panel.js` 的
+   `paintOdAdvice` 成功分支：不再拼 `adv.basis` 与不一致提示，直接清空并隐藏 `#tpDnAdviceNote`；
+   推算值本身（Ø + 流速）、「采用」按钮、下拉占位「未选择（建议 Øxxx）」全部保留。
+   ★ **反推失败**时的原因文字仍要显示（这时没有数值可看，藏了就只剩「推算管径 —」）。
+   明确不改：`tlTrunkOdAdvice` 算法（trunk-size.js 选档）、地图组卡浮层里那句「按分区反推」、
+   水力/损失/扬程、发布快照，一行都没动。验证：`trunk_size` 12 条（1 条历史红 ⑧ 与本次无关）、
+   `trunk_panel*`/`trunk_joint*` 全绿；`npm run check` 仍 46 条历史红（零新增）、`npm run lint` 干净。
  */
 
 
-const VERSION = 'v1094-loss-panel-trim';
+const VERSION = 'v1095-od-advice-trim';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
