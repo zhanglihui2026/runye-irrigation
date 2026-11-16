@@ -213,3 +213,9 @@ npm-debug.log*
 
 # v1084f 演示描边与可见管线对齐（四类段/图标全走显示世界）+ 单区路线段清单
 !tests/v1084f_flow_route_alignment.test.cjs
+
+# v1098 主管分段流量「每个物理切片、每区只计一次」（轮灌卡 2.48 → 1.239 m/s）
+!tests/trunk_main_flow_dedupe.test.cjs
+
+# v1099 会员限制脱钩（总闸 MEMBER_GATE_ENABLED=false，可逆）
+!tests/member_gate_off.test.cjs

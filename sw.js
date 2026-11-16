@@ -1598,10 +1598,64 @@
    `npm run check` 仍 46 条历史红（零新增）、`npm run lint` 412 脚本干净。
    ★ 已知边界：三级工作区没生成时 `#tlWsToolbar` 整组本来就不进顶部（三通/弯头/节点同款），
    本按钮随之不出现 —— 那时也没有改径记录可看，语义一致。
+
+   [v1098-main-flow-dedupe] 主管分段流量「每个物理切片、每个分区只计一次」（2026-11-16）：用户原话
+   「请修复在线地图轮灌演示卡片中主管流量可能被重复计入的问题……请按『每个物理主管切片、每个分区只计
+   一次流量』修复，保留不同分区共用管段时的真实合流。不要删除支管两端路线，也不要改变动画覆盖逻辑」。
+   病根链（三处，全部只吃分段流量、不改任何几何）：
+   ① `mod/map-flow-demo.js` `targets.push({zi:i,id:startId},{zi:i,id:endId})` —— 每区支管**两端各建一条
+      寻路路线**（v1084g 为让支管整段亮起，不能删；覆盖判定 `coverageOf` 的 covered==2 也依赖这两条），
+      两条路线的主干段逐字段完全相同；
+   ② `mod/inline-09.js` `tlRoutesWorstPath` 的 `edgeZones` 按**路线** push 分区号 ⇒ 同一区号进入同一
+      切片两次，`downZi=[8,8]`（注释从一开始写的就是「分区号**集**」，实现却是列表）；
+   ③ 两个消费点都逐项累加：`hydraulic-calc/pipe-path-loss.js` 段流量、`mod/inline-09.js`
+      `tlMapGroupHydraulicsOf` 卡片最高流速 ⇒ 8 区 101.94 m³/h 经 Ø200 被算成 203.88，卡片显示
+      2.48 m/s（真实 1.239，恰好两倍），主管损失虚大 2^1.852 = 3.610 倍。
+   修法：源头按区去重（保持首次出现顺序，不同区共用同一段仍全部保留＝真实合流不变）+ 两个消费点各自
+   对 `downZi` 幂等（旧快照/外部调用传重复列表也不会再放大一倍）。四条下游链路同源受益：卡片最高流速、
+   主管管损、最不利区扬程（`tlMapGroupHydraulicsOf`）、扬程反推（`tlHeadCapAdvice` → `evalAll` →
+   同一个 `tlMapGroupHydraulicsOf`）。实测该例子：主管损失 7.240 → 2.006 m（反算管长 272.9 m），
+   总损失减 5.234 m，水泵扬程降 5.757 m（×1.10 安全系数）。
+   回归测试 `tests/trunk_main_flow_dedupe.test.cjs` 5 条（同一区两条端点路线只计一次 / 两区共用仍相加 /
+   消费端幂等 / 2.478→1.239 与 7.24→2.006 的真实数值 / 三处修复点防复活），基线 1c08233 上 4 红 1 绿。
+   本节仅本地修复，未部署。
+
+   [v1099-member-gate-off] 会员限制脱钩（2026-11-16）：用户原话「现在软件需要注册会员才能使用一些
+   特定功能，你先把会员限制摘除吧，后面等软件成熟了功能再加回来，你拆开，而不是不需要这个功能，
+   后期还需要，所以不要删除代码跟逻辑，只是把会员限定脱开就行，后面需要我随时可以加回来」。
+   做法：`runye-entitle.js` 加一个总闸 `MEMBER_GATE_ENABLED = false`（+ `memberGateOpen()` 唯一
+   判定出口），只短路四个口子：`can()` 恒 true、`access()` 恒 'allowed'、`ready()` 恒 true、
+   `allFeaturesOpen()` 恒 true。之所以三个都要，是因为拦截不只有一道：
+   ① `access()==='denied'` ⇒ 导航项挂「·锁」、`bindControl` 打 `.fn-locked`、导出/水力/地形/文件菜单
+      弹「高级会员功能」引导；② `access()==='pending'` ⇒ 权益没同步上（离线/网络慢/未登录）时**所有**
+      按钮点了只弹「正在同步会员权益」，这是最伤的一档；③ `ready()===false` ⇒ 各插件 gate() 与
+      `plugins/bom` 的 `!ready() ⇒ false` 直接判无权。
+   **判定逻辑与数据一行未删**：`PLAN_FEATURES` / `L1_BLOCKED_FEATURES` / `canWith()` / 试用计时 /
+   邀请裂变 / 服务端权益读写（心跳、发奖、`invite.html`）全部原样在跑。
+   ⇒ 恢复会员限制：把 `runye-entitle.js` 里那行 `false` 改回 `true`，不改其它任何文件、不动云端。
+   配套文案（`runye-member-ui.js`）：导航胶囊 statusText 显示「全功能开放」、胶囊不再走 试用/到期/高级
+   三色、会员面板顶部加一行「当前版本全功能开放…会员数据仍在正常记录」，面板其余三支（未同步/试用/
+   已到期）保留，翻转总闸即复用。
+   回归 `tests/member_gate_off.test.cjs`（5 条：脱钩生效 / 逻辑未删 / **把同一文件里的 false 替换成
+   true 重放**证明可逆 / bindControl 锁态双向 / 开关唯一且函数没被删）+ `tests/entitle_flow.test.cjs`
+   5 条旧契约改为「脱钩 + 逻辑仍在」双锁（58 通过 0 失败）。
+   ★ 顺带修掉两个「所有人被拦」的独立页（脱钩后才真的会被打开）：
+     ① `terrain/index.html`、`管路接驳拼装.html` 都**没有加载 runye-entitle.js**，而它们的
+        `terrainAccess()` / `packingAccess()` 是 fail-closed（取不到权益层 ⇒ 'denied'）
+        ⇒ 从文件菜单 window.open 直开时**连 L2 会员也被整页遮罩挡住**，与门控开关无关。
+        两页各补一行 `<script src="runye-entitle.js?v=1099-member-gate-off">`，从此听同一个总闸。
+     ② `terrain/terrain-ui.js` `applyMode()` 的 `root.classList.toggle(...)`：独立页 root===document，
+        document 没有 classList ⇒ 必抛 TypeError，`initTerrainUI` 在 persistAndRender 处中断、页面半死。
+        该页自 v512 起被门控挡在前面没人跑到过，所以一直没暴露；改为存在性判断（嵌入式 section 行为不变）。
+        实测脱钩后地形页正常渲染（导航/模式按钮/左栏参数/右画布引导文案），0 pageerror。
+   ★ 不在本次范围：在线大模型仍要「会员访问码」（服务端 `AI_MEMBER_TOKENS` 环境变量 + 每人 5 次额度，
+   `api/ai-irrigation.js`），那是 API 凭证不是前端权益位，前端放行只会换来 401；首页公告弹窗
+   （`runye-announce.js`）仍会弹一次含「邀 3 位好友解锁高级会员」的开源公告，如需一并去掉另说。
+   本节与 v1098 均未部署。
  */
 
 
-const VERSION = 'v1097-cal-recall-btn';
+const VERSION = 'v1099-member-gate-off';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

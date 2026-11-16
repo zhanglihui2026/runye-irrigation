@@ -48,8 +48,18 @@
             var gl = Math.max(0, Number(g && g.len) || 0);
             var gf;
             if (Array.isArray(g && g.downZi)) {
+              /* [v1098] 一个分区在一次累加里只计一次：downZi 语义是「路径经过该切片的
+                 分区号集」，同一区号出现两次只可能是同一区被算了两遍（routesAll 给每区
+                 支管两端各建一条路线，旧 edgeZones 按路线 push ⇒ [8,8]），不是两股合流。
+                 源头已按区去重，这里再幂等一次：旧快照 / 外部调用方传重复列表也不会
+                 把单区流量算成两倍（主管损失虚大 2^1.852 ≈ 3.61 倍的根因）。 */
               gf = 0;
-              g.downZi.forEach(function (zd) { gf += (flowByZi[zd] || 0); });
+              var seenZd = {};
+              g.downZi.forEach(function (zd) {
+                if (seenZd[zd]) return;
+                seenZd[zd] = 1;
+                gf += (flowByZi[zd] || 0);
+              });
             } else {
               gf = Math.max(0, Number(g && g.flow) || 0);
             }

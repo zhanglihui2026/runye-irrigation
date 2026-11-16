@@ -62,6 +62,12 @@
   <div class="fn-inner" data-ry-fnnav data-base="index.html#" data-root="../"></div>
 </nav>
 <script src="../runye-nav.js?v=385-global-open"></script>
+<!-- [v1099] 本页原先不加载权益层：terrain-ui.js 的 terrainAccess() 取不到 RyEntitle 就走
+     fail-closed（'denied'）⇒ 独立打开发布页时**所有人都被整页遮罩拦住**，与「谁是会员」无关。
+     补上同一份权益层后，本页和主程序听同一个总闸（runye-entitle.js 的 MEMBER_GATE_ENABLED）。
+     ★ 恢复会员限制时注意：本页没有 cloud-sync.js，权益状态取不到会停在「正在同步会员权益」，
+      届时需同时引入 cloud-sync（或给该页单独的降级口径）。 -->
+<script src="../runye-entitle.js?v=1099-member-gate-off"></script>
 
 <!-- 模式条：标题 + 预览/工程切换（全宽细条，位于导航与工作区之间） -->
 <header class="t-top">
@@ -264,6 +270,6 @@
 <script src="../core/measured-area-bridge-store.js?v=1"></script>
 <script src="../hydraulic-calc/hc-core.js?v=520-shared-boost-power"></script>
 <script src="terrain-core.js?v=520-shared-boost-power"></script>
-<script src="terrain-ui.js?v=561-terrain-import-atomic"></script>
+<script src="terrain-ui.js?v=1099-member-gate-off"></script>
 </body>
 </html>

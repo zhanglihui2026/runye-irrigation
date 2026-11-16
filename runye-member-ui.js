@@ -455,7 +455,11 @@
 
     p.appendChild(row('当前身份', en.planName()));
     p.appendChild(row('有效期至', en.expireText()));
-    if (typeof en.ready !== 'function' || !en.ready()) {
+    /* [v1099] 会员限制脱钩期间先说明现状：功能全开，会员数据仍在记录。
+       下面的 试用/到期/未同步 三支照旧保留 —— 把总闸改回 true 即恢复原提示。 */
+    if (typeof en.allFeaturesOpen === 'function' && en.allFeaturesOpen()) {
+      p.appendChild(tip('当前版本全功能开放（会员限制暂未启用），无需开通即可使用全部功能；会员数据仍在正常记录。'));
+    } else if (typeof en.ready !== 'function' || !en.ready()) {
       /* 与 gate() 的 fail-open 保持一致：未同步 ⇒ 功能可用，文案不能说「已到期」 */
       p.appendChild(tip('云端权益尚未同步（离线或网络较慢）。此时功能全部可用，不影响使用。', true));
     } else if (en.isTrial()) {
@@ -605,6 +609,9 @@
 
   function pillClass(en) {
     if (!en) return '';
+    /* [v1099] 会员限制已脱钩（runye-entitle.js 的 MEMBER_GATE_ENABLED=false）：
+       胶囊不再用 试用/已到期/高级 三色，保持中性，避免暗示「你现在不能用」。 */
+    if (typeof en.allFeaturesOpen === 'function' && en.allFeaturesOpen()) return '';
     if (en.isTrial()) return 'is-trial';
     if (!en.isActive()) return 'is-expired';
     return en.plan() === 'L2' ? 'is-pro' : '';

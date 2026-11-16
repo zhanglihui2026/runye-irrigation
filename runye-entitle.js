@@ -93,6 +93,24 @@
   /* [2026-10-13] 启用 L1/L2 功能门控；具体权限由 PLAN_FEATURES 与 can() 判定。 */
   var ALL_FEATURES_OPEN = false;
 
+  /* ============================================================
+     [v1099 2026-11-16 用户要求「先把会员限制摘除，等软件成熟了再把功能加回来」
+      —— 只把门控脱开，不删任何代码与逻辑]
+     ------------------------------------------------------------
+     总闸只有这一处：MEMBER_GATE_ENABLED = false ⇒ 功能门控整体旁路：
+       · can(feat)     恒 true       —— 导航/插件/导出/水力/地形一律放行；
+       · access(feat)  恒 'allowed'  —— 不再出现「正在同步会员权益」的 pending 死等
+                                       （离线时它会让所有按钮点了没反应），
+                                       也不再出现「高级会员功能」的 denied 拦截；
+       · ready()       恒 true       —— 各插件 gate() 里 `!ready() ⇒ 放行/拦截` 的分叉归一。
+     等级表 PLAN_FEATURES / L1_BLOCKED_FEATURES / canWith()、匿名试用计时、邀请裂变、
+     服务端权益读写（心跳/发奖/invite.html）**一行未动**：它们照常在跑，只是不再拦人。
+     ⇒ 恢复会员限制：把下面这行 false 改回 true 即可，无需改任何其它文件、无需动云端。
+     ⇒ memberGateOpen() 是唯一判定出口，新增门控请一律走 can()/access()，别再直读开关。
+     ============================================================ */
+  var MEMBER_GATE_ENABLED = false;
+  function memberGateOpen() { return !MEMBER_GATE_ENABLED; }
+
   /* [v408] 云端规则配置（管理员在 plugin-admin 后台调整，存 ry_kv global:member-config）：
      trialDays / plans{L1,L2 → name,days,features} 拉取成功即覆盖上面内置默认值；
      拉取失败静默（fail-open 沿用内置默认），不影响任何判定。 */
@@ -416,7 +434,8 @@
     /* ---------- 身份与匿名策略 ---------- */
     DEFAULT_ANON_POLICY: 'trial',
     isTrial: function () { return !this.localAdminActive() && !!(state && state.trial); },
-    ready: function () { return !!state || localAdminSession; },
+    /* [v1099] 总闸关闭 ⇒ 视为已就绪（各插件 gate() 的 `!ready() ⇒ 拦截` 分支不再触发） */
+    ready: function () { return memberGateOpen() || !!state || localAdminSession; },
     localAdminAvailable: isLocalTestHost,
     localAdminActive: function () { return isLocalTestHost() && localAdminSession; },
     activateLocalAdmin: function () {
@@ -431,9 +450,11 @@
       try { localStorage.removeItem(LOCAL_ADMIN_KEY); } catch (e) {}
       emit();
     },
-    /* 权益门控三态：未取得服务端状态时必须等待，不能伪装成允许或无权。 */
+    /* 权益门控三态：未取得服务端状态时必须等待，不能伪装成允许或无权。
+       [v1099] 总闸关闭时先短路：'allowed' 恒成立（会员限制已脱钩，见文件内 MEMBER_GATE_ENABLED）。 */
     access: function (feature) {
       if (!feature) return 'allowed';
+      if (memberGateOpen()) return 'allowed';
       if (this.mockPlan) return this.can(feature) ? 'allowed' : 'denied';
       if (!state) return 'pending';
       return this.can(feature) ? 'allowed' : 'denied';
@@ -451,8 +472,11 @@
       return Math.max(0, Math.ceil((e - Date.now()) / DAY));
     },
     isActive: function () { return this.localAdminActive() || (!this.isTrial() && this.expireAt() > Date.now()); },
-    allFeaturesOpen: function () { return ALL_FEATURES_OPEN; },
+    allFeaturesOpen: function () { return memberGateOpen() || ALL_FEATURES_OPEN; },
+    /* [v1099] 会员限制当前是否仍在生效（false=已脱钩）。给 UI/探针一个只读出口。 */
+    gateEnabled: function () { return MEMBER_GATE_ENABLED; },
     can: function (feature) {
+      if (memberGateOpen()) return true;
       if (ALL_FEATURES_OPEN) return true;
       if (this.mockPlan) return this.canWith(this.mockPlan, feature);
       if (this.isActive()) return this.canWith(this.plan(), feature);
@@ -468,6 +492,8 @@
       return list.indexOf(feature) >= 0 || list.indexOf(PRO_ALL_KEY) >= 0;
     },
     statusText: function () {
+      /* [v1099] 总闸关闭：胶囊说真话——不再显示「未登录 · 试用中 / 会员已到期」 */
+      if (memberGateOpen()) return '全功能开放';
       if (this.localAdminActive()) return '本地管理员 · 高级会员';
       if (!state) return '会员 · 未同步';
       if (this.isTrial()) return '未登录 · 试用中';
@@ -475,10 +501,10 @@
       return this.planName() + ' · ' + this.daysLeft() + ' 天';
     },
     features: function () {
-      var list = ALL_FEATURES_OPEN ? Object.keys(FEATURES) : (PLAN_FEATURES[this.plan()] || PLAN_FEATURES.L1);
+      var list = this.allFeaturesOpen() ? Object.keys(FEATURES) : (PLAN_FEATURES[this.plan()] || PLAN_FEATURES.L1);
       return list.map(function (k) { return FEATURES[k] || k; });
     },
-    featureKeys: function () { return (ALL_FEATURES_OPEN ? Object.keys(FEATURES) : (PLAN_FEATURES[this.plan()] || PLAN_FEATURES.L1)).slice(); },
+    featureKeys: function () { return (this.allFeaturesOpen() ? Object.keys(FEATURES) : (PLAN_FEATURES[this.plan()] || PLAN_FEATURES.L1)).slice(); },
 
     /* ---------- 邀请 ---------- */
     /* [v621] 奖励口径单一来源：UI 文案与判定都读这里，避免「面板说升级、规则页说续期」 */

@@ -196,13 +196,26 @@ function reset() {
   /* 场景 3 之后 A 已被升级为 L2，这里另起一个干净用户验证 L1 门控 */
   setUser('10009', '13800138008');
   await E.init(true);
-  ok('新注册用户初始等级仍是 L1', E.plan() === 'L1' && !E.can('drawing-export'), E.plan());
   const l1Features = ['zone-split', 'ai-plan', 'pipe-layout', 'online-map'];
   const l2Features = ['drawing-export', 'bom-export', 'hydraulic-check', 'pro-others'];
   const allFeatures = l1Features.concat(l2Features);
-  ok('L1 featureKeys 与门控矩阵完全一致', JSON.stringify(E.featureKeys()) === JSON.stringify(l1Features), E.featureKeys());
+  /* [v1099 2026-11-16 用户原话「你先把会员限制摘除吧……你拆开，而不是不需要这个功能，
+     后期还需要，所以不要删除代码跟逻辑，只是把会员限定脱开就行」]
+     ⇒ 这里必须同时锁两件事，缺一即视为回归：
+       ① 判定逻辑仍在（等级数据、门控矩阵、canWith 拒绝规则一行没变）；
+       ② 总闸关闭期间 can()/access() 全放行（真正被「脱开」的只是拦截动作）。
+     只锁② ⇒ 有人把判定删了也能过；只锁① ⇒ 脱钩失效，用户又被拦住。 */
+  ok('新注册用户初始等级仍是 L1（权益数据未受脱钩影响）', E.plan() === 'L1', E.plan());
+  ok('L1 门控矩阵仍在：PLAN_FEATURES.L1 仍是四个基础功能',
+    JSON.stringify(E.PLAN_FEATURES.L1) === JSON.stringify(l1Features), E.PLAN_FEATURES.L1);
+  ok('L1 判定逻辑仍在：canWith("L1") 仍拒绝全部高级功能',
+    l2Features.every(f => !E.canWith('L1', f)), l2Features.map(f => [f, E.canWith('L1', f)]));
+  ok('[v1099] 脱钩期间 can() 对全部功能放行', allFeatures.every(f => E.can(f)), allFeatures.map(f => [f, E.can(f)]));
+  ok('[v1099] 脱钩期间 featureKeys 覆盖全部功能',
+    JSON.stringify(E.featureKeys()) === JSON.stringify(allFeatures), E.featureKeys());
+  ok('[v1099] 脱钩期间 access() 恒 allowed',
+    allFeatures.every(f => E.access(f) === 'allowed'), allFeatures.map(f => [f, E.access(f)]));
   ok('L1 注册会员可访问基础功能', l1Features.every(f => E.can(f)), E.plan());
-  ok('L1 注册会员不能访问任何高级功能', l2Features.every(f => !E.can(f) && E.access(f) === 'denied'), E.plan());
   const l1Plan = E.PLAN_FEATURES.L1;
   E.PLAN_FEATURES.L1 = l1Features.concat(l2Features);
   ok('L1 即使规则误配也不能获得任何 L2 功能或高级通配权限', l2Features.every(f => !E.canWith('L1', f)), E.PLAN_FEATURES.L1);
@@ -217,7 +230,11 @@ function reset() {
   global.window.location.search = '';
   E = loadEntitle();
   E.reset();
-  ok('权益未同步时所有受限功能均为 pending', allFeatures.every(f => E.access(f) === 'pending'), allFeatures.map(f => [f, E.access(f)]));
+  /* [v1099] 旧断言是「未同步 ⇒ 全部 pending」——离线时它会让整站按钮点了没反应，
+     正是用户要摘掉的东西。改成锁「脱钩后未同步也放行」，pending 的提示代码仍在
+     （下方 file-menu 源码断言照旧，恢复总闸即复用同一套文案）。 */
+  ok('[v1099] 脱钩期间权益未同步也全部 allowed（不再 pending 死等）',
+    allFeatures.every(f => E.access(f) === 'allowed'), allFeatures.map(f => [f, E.access(f)]));
   const fileMenu = fs.readFileSync(path.join(__dirname, '..', 'mod', 'inline-32.js'), 'utf8');
   ok('文件菜单 pending 状态显示同步中并阻止动作', /status === 'pending'[\s\S]*?正在同步会员权益，请稍后重试。[\s\S]*?·同步中[\s\S]*?data-ry-pending/.test(fileMenu), '检查 pending 提示、标记和同步中标签');
   const iso = fs.readFileSync(path.join(__dirname, '..', 'feature-archive', '三维与轴测图', 'source', 'iso-diagram', 'iso-diagram.js'), 'utf8');
@@ -285,7 +302,9 @@ function reset() {
     /function openDetail\(m\)\{[\s\S]{0,1500}?mBind'\)\.innerHTML='（点上方按钮加载/.test(admin));
   setUser('anon-x', '');
   await E.init(true);
-  ok('匿名 trial 仅可访问 L1 基础功能', E.isTrial() && l1Features.every(f => E.can(f)) && l2Features.every(f => !E.can(f)), E.plan());
+  /* [v1099] 匿名身份识别照旧（isTrial 未被脱钩影响），但不再因此限制功能。 */
+  ok('匿名 trial 身份仍被识别（isTrial）', E.isTrial() === true, E.state && E.state.trial);
+  ok('[v1099] 脱钩期间匿名 trial 也能用全部功能', allFeatures.every(f => E.can(f)), allFeatures.map(f => [f, E.can(f)]));
   setUser('10001', '13800138000');
 
   console.log('\n========================================');

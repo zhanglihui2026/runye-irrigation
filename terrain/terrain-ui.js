@@ -58,7 +58,12 @@
   /* ---------------- 模式切换 ---------------- */
 
   function applyMode() {
-    root.classList.toggle('t-engineering', state.mode === 'engineering');
+    /* [v1099] 独立页（terrain/index.html）root === document，document 没有 classList：
+       原先这一行必抛 TypeError ⇒ initTerrainUI 在 persistAndRender 处中断、页面半死。
+       该页自 v512 起被会员门控挡在前面，没人跑到这里，所以一直没暴露；
+       会员限制脱钩后独立页真的会被打开，这里补一个存在性判断（嵌入式 #terrainSection
+       仍照旧切 t-engineering，行为不变）。 */
+    if (root.classList) root.classList.toggle('t-engineering', state.mode === 'engineering');
     $('modePreview').classList.toggle('on', state.mode !== 'engineering');
     $('modeEng').classList.toggle('on', state.mode === 'engineering');
     if (state.mode !== 'engineering') {

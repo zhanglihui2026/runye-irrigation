@@ -1334,12 +1334,19 @@ function tlRoutesWorstPath(needGeom, EMPTY) {
     return L;
   }
   /* [v1020 待办③] 切片身份 → 下游分区号集：同一物理 edge（key,a,b 全等）被哪些分区的
-     路径共享，过境段流量 = 这些分区的流量和（树形拓扑严格成立）。 */
+     路径共享，过境段流量 = 这些分区的流量和（树形拓扑严格成立）。
+     [v1098 修] 这里必须是**集合**（每区一号），不能按路线累加：routesAll 给每区支管
+     两端各建一条路线（map-flow-demo.js 的 targets 同时 push branch-start / branch-end），
+     同一区的两条路线**主干段完全相同** ⇒ 旧写法把同一区号塞进同一切片两次，
+     downZi=[8,8]，下游「逐项累加」直接把 8 区流量算两遍：8 区 101.94 m³/h 经 Ø200
+     显示 2.48 m/s（= 真实 1.239 的两倍），主管损失同步虚大约 3.61 倍（2^1.852）。
+     去重保持首次出现顺序，不同区共用同一段时仍全部保留（真实合流不受影响）。 */
   var edgeZones = {};
   R.routes.forEach(function (rt) {
     rt.main.forEach(function (s) {
       var id = s.key + '#' + s.a + '#' + s.b;
-      (edgeZones[id] || (edgeZones[id] = [])).push(rt.zi);
+      var arr = edgeZones[id] || (edgeZones[id] = []);
+      if (arr.indexOf(rt.zi) < 0) arr.push(rt.zi);
     });
   });
   var byZi = {}, zones = [], taps = [];
@@ -2473,7 +2480,19 @@ window.tlMapGroupHydraulicsOf = function (zoneIndexes, opts) {
           var pid = /^main:\d+$/.test(seg.key) ? 'main-' + seg.key.slice(5) : null;
           var od = Number(pid && trialCalibers && trialCalibers[pid] || trialCalibers && trialCalibers['main-' + z.zi] || mainOdEff);
           pushOd(mainOds, od);
-          var flow = Array.isArray(seg.downZi) ? seg.downZi.reduce(function (sum, zi) { return sum + (activeFlow[zi] || 0); }, 0) : z.flow;
+          /* [v1098] 同一分区在一次段流量累加里只计一次：downZi 是分区号集，重复元素只
+             可能是同一区被算了两次（源头已按区去重，这里对旧快照/外部传入的重复列表
+             仍然幂等，防止卡片流速再被放大一倍）。 */
+          var flow = z.flow;
+          if (Array.isArray(seg.downZi)) {
+            flow = 0;
+            var seenDz = {};
+            seg.downZi.forEach(function (zd) {
+              if (seenDz[zd]) return;
+              seenDz[zd] = 1;
+              flow += (activeFlow[zd] || 0);
+            });
+          }
           if (flow > 0) { var mv = pipeV(flow, od); if (isFinite(mv) && (mainVEff == null || mv > mainVEff)) mainVEff = mv; }
         });
       } else {
