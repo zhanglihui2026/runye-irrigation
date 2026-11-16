@@ -2218,6 +2218,13 @@ function tlEstimateGroupHead(r, zoneIndexes, sharedPick) {
     if (!trunkPick) sharedOd = 0;
   }
   if (!trunkPick) trunkPick = selectPipe(qGroup, r.targetV, downstreamMinOd);
+  /* 估算回退也必须按地图上实际保存的总管管径计损；共享建议档只用于未选径时。 */
+  var savedTrunk = r.frontLenSrc === 'mapTrunk' ? tlMapTrunkLen() : null;
+  if (savedTrunk && Number(savedTrunk.od) > 0) {
+    var savedOd = Number(savedTrunk.od), savedId = peInnerDiam(savedOd);
+    trunkPick = { od: savedOd, id: savedId,
+      v: window.RyHcCore.velocity(qGroup, savedId) };
+  }
   var frontId = trunkPick ? trunkPick.id : (r.frontPipe && r.frontPipe.id);
 
   /* [v955] 总管长度**只认地图实测 / 设计图面**，不吃 tl_frontPipeLen 的试算默认值（200 m）。
@@ -2358,7 +2365,9 @@ window.tlMapGroupHydraulicsOf = function (zoneIndexes, opts) {
     /* [v950] 没有逐区路径（手绘总管路线 / 还没生成段总管）时不再直接返回 null ——
        退到「同一套公式、换成本组流量」的估算，让演示卡片能把扬程显示出来。
        面积唯一读取 r.zoneAreas，不接受调用方另传一套面积数组。 */
-    if (!pathZones || !window.RyPipePathLoss || typeof window.RyPipePathLoss.calculate !== 'function') {
+    /* 有地图总管却没有逐节点寻路结果时，旧图面 run 不能冒充地图上的水源到 N 节点弧长。 */
+    if ((r.frontLenSrc === 'mapTrunk' && !(r.wp && r.wp.fromRoutes)) ||
+        !pathZones || !window.RyPipePathLoss || typeof window.RyPipePathLoss.calculate !== 'function') {
       return tlEstimateGroupHead(r, zoneIndexes, sharedPick);
     }
     var available = pathZones;

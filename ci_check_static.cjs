@@ -180,10 +180,6 @@ const scriptOrderRules = [
   ['core/plot-library-store.js', 'runye-map-enhance.js'],
   ['core/measured-area-bridge-store.js', 'runye-map-enhance.js'],
   ['core/terrain-bridge-store.js', 'mod/online-map.js'],
-  ['core/sprinkler-bridge-store.js', 'terrain/terrain-ui.js'],
-  ['core/measured-area-bridge-store.js', 'terrain/terrain-ui.js'],
-  ['hydraulic-calc/hc-core.js', 'terrain/terrain-core.js'],
-  ['terrain/terrain-core.js', 'terrain/terrain-ui.js'],
   ['mod/material-formulas.js', 'mod/material-table.js'],
   ['mod/material-table.js', 'mod/inline-09.js'],
   /* [v836] frame 换算收口：inline-09 的同名函数只是转发，模块必须先在。 */
@@ -329,11 +325,13 @@ const projectionPlotScopeOk = !!projectionSource &&
   projectionSource.includes('readRawNetworkLayout(plotId)') &&
   !projectionSource.includes('readNetworkLayout()') &&
   projectionSource.includes('if(plotId){') &&
-  projectionSource.includes('capture(candidateNet,previousNetworkRaw)') &&
+  projectionSource.includes('pendingMapNetwork=candidateNet') &&
+  projectionSource.includes('pendingMapPreviousNetworkRaw=previousNetworkRaw') &&
   projectionSource.includes('if(net && dd.poly && dd.poly.length>=3)') &&
-  projectionWrites.length >= 2 && projectionWrites.every((args) => /,\s*plotId\s*$/.test(args)) &&
+  projectionWrites.length === 0 &&
+  hydraulicSnapshotProducer.includes('RyMapPartition.capture(pendingMapNetwork,pendingMapPreviousNetworkRaw)') &&
   mapPartitionSource.includes('writeNetworkLayout(network,network.plotId)') &&
-  mapPartitionSource.includes('return commitPartitionResult(state,net,previousNetworkRaw)');
+  mapPartitionSource.includes('committed=commitPartitionResult(state,net,previousNetworkRaw)');
 check('④a7 三级图面反投按页面地块读写，避免跨标签活动锚点串用', projectionPlotScopeOk,
   projectionPlotScopeOk ? '' : '反投必须读取页面地块原始快照、显式限定管网owner，并让分区库与管网事务一致');
 
