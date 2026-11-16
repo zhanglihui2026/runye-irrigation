@@ -1661,8 +1661,8 @@
    现状 33.72 直接判「没可改的」，按钮灰掉；上限 30 时 30.01 > 30.001 也是按设计灰掉（v1099 诊断）。
    新逻辑：
    ① 高于上限 ⇒ 仍是逐档加大；低于上限 ⇒ 逐档缩小、抬高扬程去贴上限，但每步都过 `velocityOk()`：
-      三类管（frontV/mainV/branchV）取全路径最大流速 ≤ 2.0 m/s；本来就已经超 2.0 的（老图）
-      不放宽也不恶化，维持原值，避免为了反推把既有超速图再改一遍；
+      总管和主管流速 ≤ 2.0 m/s；本来就已经超 2.0 的（老图）不得恶化；
+      支管不受这项流速上限约束。按物理管段分别检查，避免一条已超速主管掩盖另一条新超速主管；
    ② 物理下限 `minOdOf()`：主管 `MAIN_PIPE_MIN_OD=90`，总管/支管 `PE_OD_SERIES[0]`，
       同时保留 `总管 ≥ 主管 ≥ 支管` 层级约束；
    ③ `cost()` 改为**带符号**（`price(od)-price(old)` × 长度），`changes[].extraCost` 同号；
@@ -1670,14 +1670,22 @@
    ④ 应用路径未动：`tlApplyHeadCapAdvice()` 之后照旧 `tlPumpUpdateRun()` + `RyMapFlowDemo.refresh()`，
       所以**改大和改小都会同步影响动画面板扬程**，这正是本次诉求；
    ⑤ `#mapHeadCap` 加 title 说明双向规则，主页面 21 处版本串抬到 `v1100-head-cap-bidirectional`。
-   回归 `tests/head_cap_bidirectional.test.cjs` 5 条，直接抽生产 `tlHeadCapAdvice` + 真实
+   回归 `tests/head_cap_bidirectional.test.cjs`，直接抽生产 `tlHeadCapAdvice` + 真实
    `hydraulic-calc/hc-core.js` 的 hazen/velocity/head 跑实际数字：模型自检 33.72 m、上限 45 ⇒
    缩小且扬程上升且费用为负、2.0 m/s 与物理下限确实拦住、上限低于地板 ⇒ 仍只加大且 ok=false、
-   源码锁防复活；5/5 绿。本节仅本地实现，**未部署**，等用户确认。
+   源码锁防复活。本节已随提交 40ccf0e 部署上线。
+   [v1101-head-cap-speed-scope] 用户进一步明确：2.0 m/s 仅限制总管、主管，支管可以超过。
+   反推与应用复核都按这项范围检查：流速从「三类汇总」升级为逐物理管段（front / main-N /
+   branch-N）分别登记 `pipes.velocitiesByPipe`，避免一条已超速主管掩盖另一条新超速主管；
+   `velocityOk()` 与 `tlApplyHeadCapAdvice()` 应用后复核都只约束 front 与 main-N，
+   branch-N 不设 2.0 上限（原本已超的也不得恶化）；缺少总管或主管流速时 fail-closed 拒绝建议/应用。
+   回归扩充 `tests/head_cap_bidirectional.test.cjs` ③b~③e（支管已超仍允许缩径 / 一条主管已超
+   不掩盖另一条新超 / 缺流速拒绝 / 一组已超不掩盖另一组），全量 812 测试 46 红零新增。
+   本节随提交发布上线。
  */
 
 
-const VERSION = 'v1100-head-cap-bidirectional';
+const VERSION = 'v1101-head-cap-speed-scope';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

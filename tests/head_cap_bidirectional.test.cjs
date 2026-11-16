@@ -8,7 +8,7 @@
  * 做法：把 mod/inline-09.js 里的 tlHeadCapAdvice 原文抽出来，在最小桩上真跑一遍
  * （不是只读源码字符串），用 hydraulic-calc/hc-core.js 的真实 hazen/velocity/head 做水力模型：
  *  · 上限 45（远高于当前 33.72）⇒ 必须产生**缩小**变更、扬程上升、费用为负、ok=true；
- *  · 缩小后任一管段流速不得 > 2.0 m/s（原本就超的除外）；
+ *  · 缩小后总管、主管流速不得 > 2.0 m/s（原本就超的不得恶化）；支管不受此限；
  *  · 上限低于物理地板 ⇒ 仍只加大不缩小、ok=false（老行为不回归）；
  *  · 主管不得低于 MAIN_PIPE_MIN_OD，总管≥主管≥支管层级保持。
  */
@@ -29,14 +29,17 @@ const BASE_OD = { front: 250, 'main-0': 225, 'branch-0': 140 };
 const FIXED = 26.0565;                                    // 由 33.72 m 反标定（见模型下方）
 
 /* 用真实 hc-core 公式构造单调水力模型：管径越大 → 损失越小、流速越低。 */
-function evalModel(cal) {
+function evalModel(cal, flow) {
   const c = Object.assign({}, BASE_OD, cal || {});
+  const q = flow == null ? Q : flow;
   const dF = H.innerDiam(c.front, 13.6), dM = H.innerDiam(c['main-0'], 13.6), dB = H.innerDiam(c['branch-0'], 13.6);
-  const loss = H.hazen(Lf, Q, dF) + H.hazen(Lm, Q, dM) + H.hazen(Lb, Q / 2, dB);
+  const loss = H.hazen(Lf, q, dF) + H.hazen(Lm, q, dM) + H.hazen(Lb, q / 2, dB);
+  const frontV = H.velocity(q, dF), mainV = H.velocity(q, dM), branchV = H.velocity(q / 2, dB);
   return {
     head: H.head(FIXED, loss + 2, 0, 1.1),
-    zones: [{ zi: 0, flow: Q, head: H.head(FIXED, loss + 2, 0, 1.1) }],
-    pipes: { frontV: H.velocity(Q, dF), mainV: H.velocity(Q, dM), branchV: H.velocity(Q / 2, dB) }
+    zones: [{ zi: 0, flow: q, head: H.head(FIXED, loss + 2, 0, 1.1) }],
+    pipes: { frontV, mainV, branchV,
+      velocitiesByPipe: { front: frontV, 'main-0': mainV, 'branch-0': branchV } }
   };
 }
 function near(a, b, tol, msg) { assert.ok(Math.abs(a - b) < tol, (msg || '') + ' 期望 ' + b + '，实得 ' + a); }
@@ -61,7 +64,7 @@ function extractAssigned() {
   return SRC.slice(start, i + 1);
 }
 
-function makeAdvisor() {
+function makeAdvisor(flow, hydraulics) {
   const AE = {
     allPids: () => ['front', 'main-0', 'branch-0'],
     effPts: () => [{ x: 0, y: 0 }, { x: 100, y: 0 }],
@@ -72,7 +75,7 @@ function makeAdvisor() {
   const win = {
     RyTlAutoEdits: AE,
     tlDiagramData: {},
-    tlMapGroupHydraulicsOf: (_groups, opts) => evalModel(opts && opts.calibers)
+    tlMapGroupHydraulicsOf: (group, opts) => (hydraulics || evalModel)(opts && opts.calibers, flow, group)
   };
   const r = {
     wp: { fromFigure: true, zones: [{ zi: 0, mainSegs: [{ key: 'main:0' }] }] },
@@ -112,21 +115,73 @@ test('② 上限 45（高于现状）⇒ 主动缩小、扬程上升、费用为
   near(advice.extraCost, advice.changes.reduce((s, c) => s + c.extraCost, 0), 1e-9);
 });
 
-test('③ 缩小受 2.0 m/s 流速封顶与物理下限约束', () => {
+test('③ 总管和主管受 2.0 m/s 流速封顶与物理下限约束', () => {
   const advice = makeAdvisor()(45, [[0]]);
   const final = {};
   Object.assign(final, BASE_OD);
   advice.changes.forEach(c => { final[c.pid] = c.to; });
   const m = evalModel(final);
-  ['frontV', 'mainV', 'branchV'].forEach(k => {
+  ['frontV', 'mainV'].forEach(k => {
     assert.ok(m.pipes[k] <= VMAX + 0.001, k + ' 不得超过 2.0 m/s，实得 ' + m.pipes[k]);
   });
   assert.ok(final['main-0'] >= MAIN_MIN, '主管不得低于 Ø90，实得 ' + final['main-0']);
   assert.ok(final.front >= final['main-0'] && final['main-0'] >= final['branch-0'],
     '总管≥主管≥支管层级必须保持：' + JSON.stringify(final));
-  /* 若去掉流速闸，模型允许缩到 Ø110（支管流速 2.29 m/s）——本条确保闸门真的拦住 */
-  const tooSmall = evalModel({ 'branch-0': 110 });
-  assert.ok(tooSmall.pipes.branchV > VMAX, '模型里 Ø110 支管应超流速（否则本用例无意义）');
+  const tooSmall = evalModel({ 'main-0': 160 });
+  assert.ok(tooSmall.pipes.mainV > VMAX, '模型里 Ø160 主管应超流速（否则本用例无意义）');
+});
+
+test('③b 支管已超速仍允许缩径，但总管和主管不得新超速', () => {
+  const base = evalModel(BASE_OD, 200);
+  assert.ok(base.pipes.branchV > 2, '夹具原支管必须已超速');
+  const advice = makeAdvisor(200)(45, [[0]]);
+  assert.equal(advice.ok, true, JSON.stringify(advice));
+  const final = Object.assign({}, BASE_OD);
+  advice.changes.forEach(c => { final[c.pid] = c.to; });
+  const after = evalModel(final, 200);
+  assert.ok(after.pipes.frontV <= 2.001 && after.pipes.mainV <= 2.001);
+  assert.ok(final['branch-0'] < BASE_OD['branch-0'], '支管不受 2 m/s 门槛限制，应允许按扬程缩径');
+  assert.ok(advice.after <= 45.001);
+});
+
+test('③c 另一条主管已超速，不能掩盖本主管缩径后新超速', () => {
+  function model(cal) {
+    const x = evalModel(cal);
+    x.pipes.velocitiesByPipe['main-1'] = 2.5;
+    x.pipes.mainV = Math.max(x.pipes.mainV, 2.5);
+    return x;
+  }
+  const advice = makeAdvisor(null, model)(45, [[0]]);
+  const final = Object.assign({}, BASE_OD);
+  advice.changes.forEach(c => { final[c.pid] = c.to; });
+  assert.ok(evalModel(final).pipes.mainV <= 2.001,
+    '别的主管原本 2.5 m/s，不得放行本主管新超速');
+});
+
+test('③d 缺少总管或主管流速时不提供缩径建议', () => {
+  for (const missing of ['front', 'main-0']) {
+    function model(cal) {
+      const x = evalModel(cal);
+      delete x.pipes.velocitiesByPipe[missing];
+      return x;
+    }
+    const advice = makeAdvisor(null, model)(45, [[0]]);
+    assert.equal(advice.ok, false, missing + ' 缺失时不得反推');
+    assert.match(advice.reason, /缺少总管或主管流速/);
+  }
+});
+
+test('③e 一组已有主管超速，不得掩盖另一组同段主管新超速', () => {
+  function model(cal, _flow, group) {
+    const x = evalModel(cal);
+    x.pipes.velocitiesByPipe['main-0'] = group[0] === 1 ? 2.5 :
+      cal && cal['main-0'] < 225 ? 2.2 : 1.5;
+    return x;
+  }
+  const advice = makeAdvisor(null, model)(45, [[0], [1]]);
+  assert.equal(advice.ok, true, JSON.stringify(advice));
+  assert.ok(!advice.changes.some(c => c.pid === 'main-0' && c.to < 225),
+    '第一组的新超速不能被第二组原有 2.5 m/s 遮住');
 });
 
 test('④ 上限低于物理地板 ⇒ 仍只加大、ok=false（老行为不回归）', () => {

@@ -8,7 +8,7 @@ const end = src.indexOf('/* [v945] 总管口径反推', start);
 assert(start >= 0 && end > start);
 
 function fixture() {
-  let trunkOd = 200, revision = 3, forceFailure = false;
+  let trunkOd = 200, revision = 3, forceFailure = false, forceVelocity = false, branchVelocity = 1.4;
   const cals = { 'main-0': 225, 'main-1': 250 };
   const routes = [
     { zi: 0, mainSegs: [{ key: 'main:0' }] },
@@ -40,7 +40,8 @@ function fixture() {
       const main1 = trial['main-1'] || cals['main-1'];
       return { head: forceFailure && !opts.calibers ? 50 : 32 + (250 - front) * 0.08 +
         (250 - main0) * 0.07 + (250 - main1) * 0.06,
-        estimated: false, zones: [{ zi: 0 }] };
+        estimated: false, zones: [{ zi: 0 }],
+        pipes: { frontV: 1.2, mainV: forceVelocity && !opts.calibers ? 2.3 : 1.3, branchV: branchVelocity } };
     }
   };
   const ctx = {
@@ -57,7 +58,9 @@ function fixture() {
     tlBuildPipeOverride() {}
   };
   vm.runInNewContext(src.slice(start, end), ctx);
-  return { win, cals, getTrunk: () => trunkOd, fail: () => { forceFailure = true; } };
+  return { win, cals, getTrunk: () => trunkOd, fail: () => { forceFailure = true; },
+    speedUp: () => { forceVelocity = true; },
+    branchSpeedUp: () => { branchVelocity = 2.5; } };
 }
 
 /* [v1100] 本测试只锁「逆向传播层级 + 应用失败回滚」两件事。
@@ -81,5 +84,20 @@ const LIMIT = 32.05;
   assert.equal(f.win.tlApplyHeadCapAdvice(advice), false);
   assert.equal(f.getTrunk(), 200);
   assert.equal(f.cals['main-0'], 225);
+}
+{
+  const f = fixture();
+  const advice = f.win.tlHeadCapAdvice(LIMIT, [[0, 1]]);
+  f.speedUp();
+  assert.equal(f.win.tlApplyHeadCapAdvice(advice), false, '应用前复核应拒绝主管新增超速');
+  assert.equal(f.getTrunk(), 200);
+  assert.equal(f.cals['main-0'], 225);
+}
+{
+  const f = fixture();
+  const advice = f.win.tlHeadCapAdvice(LIMIT, [[0, 1]]);
+  f.branchSpeedUp();
+  assert.equal(f.win.tlApplyHeadCapAdvice(advice), true, '支管超 2 m/s 不应阻止应用');
+  assert.equal(f.getTrunk(), 250);
 }
 console.log('head cap hierarchy and rollback: ok');

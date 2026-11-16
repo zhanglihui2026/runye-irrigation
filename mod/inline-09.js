@@ -2469,10 +2469,12 @@ window.tlMapGroupHydraulicsOf = function (zoneIndexes, opts) {
     var branchOdPath = (r.branchPipe && Number(r.branchPipe.od) > 0) ? Number(r.branchPipe.od) : 0;
     /* 卡片的口径与流速按本轮实际经过的物理管段汇总；损失计算也读取同一 calibers。
        同一轮可有多种主管/支管口径，不能再只显示代表管径。 */
-    var mainOds = [], branchOds = [], activeFlow = {};
+    var mainOds = [], branchOds = [], activeFlow = {}, velocitiesByPipe = {};
     available.forEach(function (z) { if (members.indexOf(z.zi) >= 0) activeFlow[z.zi] = z.flow; });
     function pushOd(list, od) { od = Number(od); if (od > 0 && list.indexOf(od) < 0) list.push(od); }
     function pipeV(flow, od) { return window.RyHcCore && window.RyHcCore.velocity ? window.RyHcCore.velocity(flow, peInnerDiam(od)) : null; }
+    function recordV(pid, v) { if (v != null && isFinite(v) && v >= 0) velocitiesByPipe[pid] = Math.max(velocitiesByPipe[pid] || 0, v); }
+    if (trunkPick) recordV('front', trunkPick.v);
     available.forEach(function (z) {
       if (members.indexOf(z.zi) < 0) return;
       if (Array.isArray(z.mainSegs) && z.mainSegs.length) {
@@ -2493,17 +2495,19 @@ window.tlMapGroupHydraulicsOf = function (zoneIndexes, opts) {
               flow += (activeFlow[zd] || 0);
             });
           }
-          if (flow > 0) { var mv = pipeV(flow, od); if (isFinite(mv) && (mainVEff == null || mv > mainVEff)) mainVEff = mv; }
+          if (flow > 0) { var mv = pipeV(flow, od); recordV(pid || 'main-' + z.zi, mv); if (isFinite(mv) && (mainVEff == null || mv > mainVEff)) mainVEff = mv; }
         });
       } else {
         var ownMainOd = Number(trialCalibers && trialCalibers['main-' + z.zi] || mainOdEff);
         pushOd(mainOds, ownMainOd);
         var ownMv = pipeV(z.flow, ownMainOd);
+        recordV('main-' + z.zi, ownMv);
         if (isFinite(ownMv) && (mainVEff == null || ownMv > mainVEff)) mainVEff = ownMv;
       }
       var branchOd = Number(trialCalibers && trialCalibers['branch-' + z.zi] || branchOdPath);
       pushOd(branchOds, branchOd);
       var bv = pipeV(z.flow / r.branchParallelCount, branchOd);
+      recordV('branch-' + z.zi, bv);
       if (isFinite(bv) && (branchVEff == null || bv > branchVEff)) branchVEff = bv;
     });
     mainOds.sort(function (a, b) { return a - b; });
@@ -2520,7 +2524,7 @@ window.tlMapGroupHydraulicsOf = function (zoneIndexes, opts) {
         mainOds: mainOds, branchOds: branchOds,
         mainRecheck: mainRecheckPick ? { od: mainRecheckPick.od, flow: qMaxAll } : null,
         frontV: trunkPick ? trunkPick.v : null,
-        mainV: mainVEff, branchV: branchVEff
+        mainV: mainVEff, branchV: branchVEff, velocitiesByPipe: velocitiesByPipe
       },
       lengths: { front: worstRaw ? worstRaw.front : 0, main: worstRaw ? worstRaw.main : 0, branch: worstRaw ? worstRaw.branch : 0 },
       lengthSource: { front: 'figure', main: 'figure', branch: 'figure' },
@@ -2652,28 +2656,49 @@ window.tlHeadCapAdvice = function (limit, groups) {
      changes 也只收加大项 ⇒ 上限设得比现状宽（如 45 m vs 33.72 m）时无变更、按钮灰掉。
      新口径：只要当前扬程不超上限，就逐档往小试，直到再缩会
        ① 扬程超过上限，或
-       ② 任一组的主管/支管/总管流速超过经济上限 ECON_VMAX = 2.0 m/s（原本就超的不算新引入），或
+       ② 任一组的总管或主管流速超过经济上限 ECON_VMAX = 2.0 m/s（原本就超的不得恶化；支管不受此限），或
        ③ 触到物理下限（主管 ≥ MAIN_PIPE_MIN_OD，支管/总管 ≥ PE 最小档；总管 ≥ 下游最大由 ordered 守）。
      三条先到哪条停哪条；「尽量贴上限」= 不再另设人工余量，每档只看是否仍 ≤ limit。
      ⚠ 超标时的加大阶段原样不动，不会一边加大一边缩小自己。 */
-  var VMAX = 2.0;   /* 与 hydraulic-calc/hc-core.js 的 ECON_VMAX 同值；本文件不引入跨模块依赖 */
-  var baseV = { frontV: 0, mainV: 0, branchV: 0 };
-  before.results.forEach(function (x) {
-    var p = x.pipes || {};
-    ['frontV', 'mainV', 'branchV'].forEach(function (k) { if (isFinite(p[k])) baseV[k] = Math.max(baseV[k], p[k]); });
-  });
+  var VMAX = 2.0;   /* 与 hydraulic-calc/hc-core.js 的 ECON_VMAX 同值 */
+  function velocityProfile(results) {
+    var byPipe = {};
+    results.forEach(function (x) {
+      var p = x.pipes || {}, detailed = p.velocitiesByPipe;
+      /* 真实路径逐管线检查；旧调用方只有三类汇总流速时保留兼容。 */
+      var values = detailed && Object.keys(detailed).length ? detailed :
+        { frontV: p.frontV, mainV: p.mainV, branchV: p.branchV };
+      Object.keys(values).forEach(function (pid) {
+        if (values[pid] == null || values[pid] === '') return;
+        var v = Number(values[pid]);
+        if (isFinite(v) && v >= 0) byPipe[pid] = Math.max(byPipe[pid] || 0, v);
+      });
+    });
+    return byPipe;
+  }
+  function hasSupplyVelocity(profile) {
+    var keys = Object.keys(profile);
+    return keys.some(function (pid) { return pid === 'front' || pid === 'frontV'; }) &&
+      keys.some(function (pid) { return pid === 'mainV' || /^main-\d+$/.test(pid); });
+  }
+  var baseV = velocityProfile(before.results);
+  var baseVByGroup = before.results.map(function (x) { return velocityProfile([x]); });
+  if (baseVByGroup.some(function (profile) { return !hasSupplyVelocity(profile); }))
+    return { ok: false, reason: '缺少总管或主管流速，无法可靠反推' };
   function minOdOf(pid) {
     if (/^main-\d+$/.test(pid)) return MAIN_PIPE_MIN_OD;
     return PE_OD_SERIES[0];   /* 支管与总管：总管另有 ordered 的「≥下游最大」硬约束 */
   }
   function velocityOk(st) {
-    var mx = { frontV: 0, mainV: 0, branchV: 0 };
-    st.results.forEach(function (x) {
-      var p = x.pipes || {};
-      ['frontV', 'mainV', 'branchV'].forEach(function (k) { if (isFinite(p[k])) mx[k] = Math.max(mx[k], p[k]); });
-    });
-    return ['frontV', 'mainV', 'branchV'].every(function (k) {
-      return mx[k] <= VMAX + 0.001 || baseV[k] > VMAX + 0.001;   /* 原本就超的不是本次缩小造成的 */
+    return st.results.every(function (x, gi) {
+      var now = velocityProfile([x]), baseline = baseVByGroup[gi];
+      if (!hasSupplyVelocity(now)) return false;
+      return Object.keys(now).every(function (pid) {
+        if (pid !== 'front' && pid !== 'frontV' && pid !== 'mainV' && !/^main-\d+$/.test(pid)) return true;
+        var prior = Number(baseline[pid]) || 0;
+        return now[pid] <= VMAX + 0.001 ||
+          (prior > VMAX + 0.001 && now[pid] <= prior + 0.001);
+      });
     });
   }
   if (state.head <= limit + 0.001) {
@@ -2700,13 +2725,15 @@ window.tlHeadCapAdvice = function (limit, groups) {
       extraCost: (price(current[pid]) - price(ods[pid])) * lengths[pid] };
   });
   return { ok: state.head <= limit + 0.001, limit: limit, groups: groups, before: before.head,
-    after: state.head, changes: changes, geometryKey: AE.geometryKey(data), areasKey: JSON.stringify(r.zoneAreas),
+    after: state.head, changes: changes, velocityBaseline: baseV, velocityBaselineByGroup: baseVByGroup,
+    geometryKey: AE.geometryKey(data), areasKey: JSON.stringify(r.zoneAreas),
     trunkPlotId: mapTrunk && mapTrunk.plotId, trunkRevision: mapTrunk && mapTrunk.revision,
     extraCost: changes.reduce(function (s, c) { return s + c.extraCost; }, 0),
     reason: state.head > limit + 0.001 ? '现有标准管径仍无法达到上限，请检查固定扬程与路径' : '' };
 };
 window.tlApplyHeadCapAdvice = function (advice) {
-  if (!advice || !advice.ok || !advice.changes || !advice.changes.length) return false;
+  if (!advice || !advice.ok || !advice.changes || !advice.changes.length || !Array.isArray(advice.groups) ||
+      !Array.isArray(advice.velocityBaselineByGroup) || advice.velocityBaselineByGroup.length !== advice.groups.length) return false;
   var AE = window.RyTlAutoEdits, data = window.tlDiagramData, saved = {};
   if (!AE || !data) return false;
   if (AE.geometryKey(data) !== advice.geometryKey || JSON.stringify(computeThreeLevel().zoneAreas) !== advice.areasKey) return false;
@@ -2728,9 +2755,21 @@ window.tlApplyHeadCapAdvice = function (advice) {
   }); }
   finally { AE.endBatch(); }
   tlBuildPipeOverride();
-  var valid = applied && advice.groups.every(function (group) {
+  var valid = applied && advice.groups.every(function (group, gi) {
     var x = window.tlMapGroupHydraulicsOf(group, { groups: advice.groups });
-    return x && !x.estimated && isFinite(x.head) && x.head <= advice.limit + 0.01;
+    if (!x || x.estimated || !isFinite(x.head) || x.head > advice.limit + 0.01) return false;
+    var p = x.pipes || {}, detailed = p.velocitiesByPipe;
+    var values = detailed && Object.keys(detailed).length ? detailed :
+      { frontV: p.frontV, mainV: p.mainV, branchV: p.branchV };
+    var keys = Object.keys(values);
+    if (!keys.some(function (pid) { return pid === 'front' || pid === 'frontV'; }) ||
+        !keys.some(function (pid) { return pid === 'mainV' || /^main-\d+$/.test(pid); })) return false;
+    return Object.keys(values).every(function (pid) {
+      if (pid !== 'front' && pid !== 'frontV' && pid !== 'mainV' && !/^main-\d+$/.test(pid)) return true;
+      if (values[pid] == null || values[pid] === '') return false;
+      var v = Number(values[pid]), prior = Number(advice.velocityBaselineByGroup[gi][pid]) || 0;
+      return isFinite(v) && v >= 0 && (v <= 2.001 || (prior > 2.001 && v <= prior + 0.001));
+    });
   });
   if (!valid) {
     AE.beginBatch();
