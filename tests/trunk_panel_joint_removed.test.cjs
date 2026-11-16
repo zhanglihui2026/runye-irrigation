@@ -12,7 +12,8 @@
  *   ① DOM：只剩 #tpLossRows；#tpJoint / #tpJointRows / #tpJointChecks / #tpJointNote 全不许在；
  *   ② 文案：剥掉注释后「联合复核」「总管 + 下游分区管网」出现 0 次（注释里留恢复说明是允许的）；
  *   ③ 渲染：paintLoss 在、paintJoint 不在、不再调 jointReview（下游快照的取数也一起停）;
- *   ④ 损失拆分六行齐全（总管 / 主管 / 支管 / 合计损失 / 管路总长 / 三级页扬程）；
+ *   ④ 损失拆分三段齐全（总管 / 主管 / 支管），且**合计损失 / 管路总长 / 本轮扬程三行不许回来**
+ *      （[v1094] 2026-11-16 用户红框点名取消：轮灌卡上已经有管损合计与需求扬程）；
  *   ⑤ CSS：联合复核专用的 7 条选择器全删，但 `.tp-jt-row>span` 的 52px/nowrap 必须留着。
  */
 const test = require('node:test');
@@ -58,20 +59,33 @@ test('③ 渲染函数换成 paintLoss：不调 jointReview、不取下游快照
   assert.ok(/designBlock\(design\)/.test(js), '损失拆分的数字仍必须来自 designBlock（三级页同源，不另算）');
 });
 
-test('④ 损失拆分六行齐全（删联合复核时最容易连坐的就是这几行）', () => {
+test('④ 损失拆分只剩三段（v1094 用户取消合计 / 总长 / 扬程三行）', () => {
   const loss = js.slice(js.indexOf('function paintLoss('));
-  ['总管', '主管', '支管', '合计损失', '管路总长', '三级页扬程'].forEach((label) => {
+  ['总管', '主管', '支管'].forEach((label) => {
     assert.ok(loss.includes('<span>' + label + '</span>'), '损失拆分缺了「' + label + '」行');
   });
-  assert.ok(loss.includes('tp-jt-sum'), '合计损失行仍要单独加粗（.tp-jt-sum）');
   assert.ok(loss.includes('地图实测'), '总管长度来源标签仍是「地图实测」（v956 用户口径）');
+  /* [v1094 2026-11-16] 用户拿截图、红框圈着「合计损失 2.36 m」那一行说「这个显示取消吧」。
+     原因不是数字不对，是**同一屏给了两遍**：轮灌卡上已经有「管损 1.68 m = 总管 0.53 +
+     主管 0.84 + 支管 0.32 m」和「需求扬程 31.77 m」，面板再列一遍合计与扬程，读的人
+     会以为算了两遍，还可能怀疑哪个准。「管路总长」则是材料口径、不是水力口径，混在水力
+     拆分里更误导。面板只保留卡片没有的那一份：每段的「长度 + 该段损失」。
+     谁要把三行加回来，先问用户 —— 这里判红。 */
+  ['合计损失', '管路总长', '本轮扬程'].forEach((label) => {
+    assert.equal(loss.includes('<span>' + label + '</span>'), false,
+      '「' + label + '」已按 v1094 取消，不许加回来');
+  });
+  assert.equal(loss.includes('tp-jt-sum'), false, '合计行的加粗样式类也不许回来（DOM 已无该行）');
 });
 
 test('⑤ CSS：联合复核的 7 条选择器删净，排版用的 52px/nowrap 保留', () => {
   ['.tp-joint{', '.tp-jt-h{', '.tp-jt-sub{', '.tp-jt-checks{', '.tp-jt-check{',
-    '.tp-jt-check:before{', '.tp-jt-note{', '.tp-jt-sep{'].forEach((sel) => {
+    '.tp-jt-check:before{', '.tp-jt-sep{'].forEach((sel) => {
     assert.equal(css.includes(sel), false, '样式 ' + sel + ' 是联合复核专用的，应随 DOM 一起删');
   });
+  /* `.tp-jt-note` **不在**删除清单里：v965 把它也列进「联合复核专用」是误伤，损失拆分
+     自己的空态提示一直用它（v1094 只改了文案，类名不变）。删了会变成无样式的一行小字。 */
+  assert.ok(css.includes('.tp-jt-note{'), '损失拆分空态提示的 .tp-jt-note 必须留着');
   const rule = css.slice(css.indexOf('.tp-jt-row>span{'));
   assert.ok(/flex:0 0 52px/.test(rule.slice(0, 200)), '.tp-jt-row>span 的 52px 标签列必须保留（v954 的口径）');
   assert.ok(/white-space:nowrap/.test(rule.slice(0, 200)), '标签 nowrap 必须保留');

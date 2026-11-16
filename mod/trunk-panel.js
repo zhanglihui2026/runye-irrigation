@@ -702,14 +702,16 @@
       if (!rowsEl) return;
       var active = (typeof opts.getActiveHydraulics === 'function') ? opts.getActiveHydraulics() : null;
       var loss = active && active.loss, lengths = loss && loss.lengths;
-      var G = loss && lengths && num(loss.head) !== null
+      /* [v1094] 就绪判据从「扬程有值」改成「三段长度齐全」：
+         扬程那行已经取消，再拿它当门槛就是让一个不显示的字段决定这一节显不显示。
+         三种长度的可读性才是这三行的前提（缺一段就会出现「— m」的假值）。
+         注：提供方 online-map.js 那边本来就用 head 筛过 activeHydraulics，这里不再重复。 */
+      var G = (loss && lengths &&
+        num(lengths.front) !== null && num(lengths.main) !== null && num(lengths.branch) !== null)
         ? { src: '', front: num(lengths.front), main: num(lengths.main),
             branch: num(lengths.branch), frontLoss: num(loss.frontLoss),
-            mainLoss: num(loss.mainLoss), branchLoss: num(loss.branchLoss),
-            totalLoss: num(loss.totalLoss), pumpHead: num(loss.head) }
+            mainLoss: num(loss.mainLoss), branchLoss: num(loss.branchLoss) }
         : null;
-      if (G && (G.front === null || G.main === null || G.branch === null)) G = null;
-      if (G) G.lenSum = G.front + G.main + G.branch;
 
       /* [v954] 值片段包裹器：每段「数 + 单位 / 一句短说明」各自 nowrap，断行只许发生在段与段之间。
          不加这个，word-break:break-word 会把「1.91 km」拆成「1.91 / km」、「5.35 m」拆成
@@ -762,12 +764,13 @@
           '<div class="tp-jt-row tp-jt-loss"><span>主管</span><b>' +
             sepJoin([fmtLen(MAIN), fmtM(G.mainLoss)]) + '</b></div>' +
           '<div class="tp-jt-row tp-jt-loss"><span>支管</span><b>' +
-            sepJoin([fmtLen(BRANCH), fmtM(G.branchLoss)]) + '</b></div>' +
-          '<div class="tp-jt-row tp-jt-sum"><span>合计损失</span><b>' + nw(fmtM(G.totalLoss)) + '</b></div>' +
-          '<div class="tp-jt-row"><span>管路总长</span><b>' + nw(fmtLen(G.lenSum)) + '</b></div>' +
-          (G.pumpHead !== null
-            ? '<div class="tp-jt-row"><span>本轮扬程</span><b>' + nw(fmtM(G.pumpHead)) + '</b></div>' : '');
-      } else html = '<div class="tp-jt-note">请选择在线地图轮灌组查看本轮扬程与损失。</div>';
+            sepJoin([fmtLen(BRANCH), fmtM(G.branchLoss)]) + '</b></div>';
+      /* [v1094 2026-11-16 用户指红框「这个显示取消」] 合计损失 / 管路总长 / 本轮扬程
+         三行取消：地图轮灌卡已经给出「管损 1.68 m = 总管 0.53 + 主管 0.84 + 支管 0.32」
+         与「需求扬程 31.77 m」，同一屏两处同值，读的人会以为算了两遍、还可能怀疑哪个准。
+         面板只保留卡片没有的那一份 —— 每段的「长度 + 该段损失」（卡片给的是管径 + 流速）。 */
+      /* [v1094] 空态文案原来写「查看本轮扬程与损失」—— 扬程那行已取消，别再许诺一个不显示的数。 */
+      } else html = '<div class="tp-jt-note">请选择在线地图轮灌组，按最不利路径拆分三段损失。</div>';
       rowsEl.innerHTML = html;
     }
 

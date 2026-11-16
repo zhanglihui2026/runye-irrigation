@@ -14,6 +14,10 @@
  *
  * 钉四件事：标签列够宽且不折行 / 值片段 nowrap / 断行只许发生在「 · 」处 / 来源标签是短词。
  * 这些全是"看起来对了但下次改字号就悄悄坏"的东西，所以都做成数值断言而不是快照比对。
+ *
+ * [v1094] 2026-11-16 用户红框「这个显示取消吧」：损失拆分从六行减到三行
+ * （合计损失 / 管路总长 / 本轮扬程取消，轮灌卡上已有同值）。行数下限、单值行下限
+ * 随之调整；⑤ 由「两行必须在」反转成「两行不许回来」。排版四项一个都没放松。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -25,7 +29,7 @@ const rawCss = fs.readFileSync(path.join(ROOT, 'mod', 'online-map.css'), 'utf8')
 const css = rawCss.replace(/\/\*[\s\S]*?\*\//g, '');
 const rawJs = fs.readFileSync(path.join(ROOT, 'mod', 'trunk-panel.js'), 'utf8');
 /* 只看「损失拆分」那段渲染函数（[v965] 起叫 paintLoss —— 原 paintJoint 里的联合复核
-   两行「总管」「下游」已随整块取消，本文件锁的是剩下六行的排版） */
+   两行「总管」「下游」已随整块取消，本文件锁的是剩下三行的排版） */
 const jsPaint = (() => {
   const i = rawJs.indexOf('function paintLoss(');
   assert.ok(i >= 0, 'trunk-panel.js 里必须还有损失拆分的渲染函数 paintLoss');
@@ -49,7 +53,9 @@ test('① 标签列宽够最长标签（5 汉字 × 10px）且 nowrap', () => {
   assert.ok(fs10, '标签字号必须显式写在同一条规则里（下面的宽度计算依赖它）');
 
   const labels = [...jsPaint.matchAll(/<div class="tp-jt-row[^"]*"><span>([^<]+)<\/span>/g)].map(m => m[1]);
-  assert.ok(labels.length >= 6, '应当解析到至少 6 个行标签，实际 ' + labels.length + ' 个：' + labels.join('/'));
+  /* [v1094] 六行减到三行（合计损失 / 管路总长 / 本轮扬程按用户要求取消），下限跟着改成 3。
+     这条查的是「标签装不装得下」，不是行数 —— 行数由 trunk_panel_joint_removed ④ 锁。 */
+  assert.ok(labels.length >= 3, '应当解析到至少 3 个行标签，实际 ' + labels.length + ' 个：' + labels.join('/'));
   const longest = labels.reduce((a, b) => (b.length > a.length ? b : a), '');
   const need = longest.length * Number(fs10[1]);
   assert.ok(Number(flex[1]) >= need,
@@ -71,7 +77,10 @@ test('③ 值一律包 .tp-jt-nw（nowrap），且分隔点粘在后一段里', 
   /* 单值行走 nw(...)，多段行走 sepJoin(...) */
   const single = [...jsPaint.matchAll(/nw\(fmt(?:Len|M)\(/g)].length;
   const multi = [...jsPaint.matchAll(/sepJoin\(\[/g)].length;
-  assert.ok(single >= 3, '合计损失/管路总长/三级页扬程 三行应各走一次 nw()，实际 ' + single + ' 处');
+  /* [v1094] 六行时这里恰好有 3 个「单值行」（合计损失 / 管路总长 / 本轮扬程）走 nw(fmtXxx(...))；
+     那三行取消后三段全部走 sepJoin，**不再有单值行**，所以这条从「>=3」反转成「必须为 0」。
+     真正防「裸拼」的是下面那条反向自检（`<b>` + fmtLen/fmtM），它仍在生效。 */
+  assert.equal(single, 0, '已经没有单值行了，不该再有 nw(fmtLen/fmtM(...)) 直用，实际 ' + single + ' 处');
   /* [v965] 原来是 4 处（总管(信息)/下游 + 总管(损失)/主管/支管），联合复核整块取消后
      只剩损失拆分那三段，所以下限改成 3。**仍要求三段都走 sepJoin**：
      谁要是为了「省事」把某段改成裸拼，这里就会掉到 2 并判红。 */
@@ -93,14 +102,17 @@ test('④ 长度来源标签用「地图实测」4 字短词，全文只放 titl
   assert.equal(/<b>' \+ esc\(srcTag\)/.test(jsPaint), false, '可见来源标签不许再直拼长文案');
 });
 
-/* ⑤ 那两行标签本身还在（别为了不折行把标签改短/删掉） */
-test('⑤ 「管路总长」「三级页扬程」两个标签仍在，且各自是一个值', () => {
-  assert.ok(/<span>管路总长<\/span><b>/.test(jsPaint), '管路总长 行不见了');
-  assert.ok(/<span>三级页扬程<\/span><b>/.test(jsPaint), '三级页扬程 行不见了（pumpHead 有值时必须显示）');
+/* ⑤ 那两行本身已取消（[v1094] 2026-11-16 用户红框「这个显示取消吧」）—— 反转成「不许回来」 */
+test('⑤ 「管路总长」「本轮扬程」两行已取消，不许回来', () => {
+  assert.equal(/<span>管路总长<\/span><b>/.test(jsPaint), false,
+    '管路总长 行已取消：它是材料口径，混在水力拆分里会让人当成水力长度');
+  assert.equal(/<span>本轮扬程<\/span><b>/.test(jsPaint), false,
+    '本轮扬程 行已取消：轮灌卡上已有「需求扬程」，同屏两处同值会被当成算了两遍');
+  assert.equal(jsPaint.includes('tp-jt-sum'), false, '合计损失行的样式类也要一起消失');
 });
 
 /* ⑥ 「下游」那行同样要按段 nowrap —— 它是最长的一行，拆开就会出现「1.91 / km」 */
-test('⑥ 联合复核的两行行首不许回来（总管信息 / 下游），损失拆分六行仍在', () => {
+test('⑥ 联合复核的两行行首不许回来（总管信息 / 下游），损失拆分三段仍在', () => {
   /* [v965] 用户 2026-11-04 第二次点名：整个「联合复核」块取消，`<span>总管</span>`（信息行）
      与 `<span>下游</span>` 都不许再渲染。这条从「要求下游行在」反转成「要求它不在」——
      但**损失拆分那三段的 `<span>总管</span>` 必须留着**（同一标签名出现在两行里，别误删）。 */
