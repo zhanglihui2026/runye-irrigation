@@ -219,3 +219,6 @@ npm-debug.log*
 
 # v1099 会员限制脱钩（总闸 MEMBER_GATE_ENABLED=false，可逆）
 !tests/member_gate_off.test.cjs
+
+# v1100 扬程上限双向反推（加大 + 缩小省钱，2.0 m/s 封顶）
+!tests/head_cap_bidirectional.test.cjs

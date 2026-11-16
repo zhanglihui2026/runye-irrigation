@@ -2622,9 +2622,11 @@ window.tlHeadCapAdvice = function (limit, groups) {
     }
     return out;
   }
+  /* [v1100] 费用带符号：缩小管径是省钱（负数），不能再用 max(0,…) 抹平。
+     加大阶段的 score 仍取 max(0.01, 差额)，只有省钱回缩阶段会读到负值。 */
   function cost(candidate) { return pids.reduce(function (sum, pid) {
     var old = Number(ods[pid]), od = Number(candidate[pid] || old);
-    return sum + Math.max(0, price(od) - price(old)) * lengths[pid];
+    return sum + (price(od) - price(old)) * lengths[pid];
   }, 0); }
   current = ordered(current);
   state = evalAll(current);
@@ -2645,23 +2647,57 @@ window.tlHeadCapAdvice = function (limit, groups) {
     if (!best) break;
     current = best.trial; state = best.state;
   }
+  /* [v1100 双向反推] 用户口径：上限不只是「超了就加大」，也是「没用满就缩小省钱」。
+     旧实现只在加大成功后才回缩，且被 `PE_OD_SERIES[idx-1] < ods[pid]` 钉死在原档，
+     changes 也只收加大项 ⇒ 上限设得比现状宽（如 45 m vs 33.72 m）时无变更、按钮灰掉。
+     新口径：只要当前扬程不超上限，就逐档往小试，直到再缩会
+       ① 扬程超过上限，或
+       ② 任一组的主管/支管/总管流速超过经济上限 ECON_VMAX = 2.0 m/s（原本就超的不算新引入），或
+       ③ 触到物理下限（主管 ≥ MAIN_PIPE_MIN_OD，支管/总管 ≥ PE 最小档；总管 ≥ 下游最大由 ordered 守）。
+     三条先到哪条停哪条；「尽量贴上限」= 不再另设人工余量，每档只看是否仍 ≤ limit。
+     ⚠ 超标时的加大阶段原样不动，不会一边加大一边缩小自己。 */
+  var VMAX = 2.0;   /* 与 hydraulic-calc/hc-core.js 的 ECON_VMAX 同值；本文件不引入跨模块依赖 */
+  var baseV = { frontV: 0, mainV: 0, branchV: 0 };
+  before.results.forEach(function (x) {
+    var p = x.pipes || {};
+    ['frontV', 'mainV', 'branchV'].forEach(function (k) { if (isFinite(p[k])) baseV[k] = Math.max(baseV[k], p[k]); });
+  });
+  function minOdOf(pid) {
+    if (/^main-\d+$/.test(pid)) return MAIN_PIPE_MIN_OD;
+    return PE_OD_SERIES[0];   /* 支管与总管：总管另有 ordered 的「≥下游最大」硬约束 */
+  }
+  function velocityOk(st) {
+    var mx = { frontV: 0, mainV: 0, branchV: 0 };
+    st.results.forEach(function (x) {
+      var p = x.pipes || {};
+      ['frontV', 'mainV', 'branchV'].forEach(function (k) { if (isFinite(p[k])) mx[k] = Math.max(mx[k], p[k]); });
+    });
+    return ['frontV', 'mainV', 'branchV'].every(function (k) {
+      return mx[k] <= VMAX + 0.001 || baseV[k] > VMAX + 0.001;   /* 原本就超的不是本次缩小造成的 */
+    });
+  }
   if (state.head <= limit + 0.001) {
     var reduced = true;
     while (reduced) {
       reduced = false;
       pids.slice().sort(function (a, b) { return lengths[b] - lengths[a]; }).forEach(function (pid) {
         var od = Number(current[pid] || ods[pid]), idx = PE_OD_SERIES.indexOf(od);
-        if (idx < 1 || PE_OD_SERIES[idx - 1] < ods[pid]) return;
-        var trial = Object.assign({}, current); trial[pid] = PE_OD_SERIES[idx - 1]; trial = ordered(trial);
+        if (idx < 1) return;
+        var smaller = PE_OD_SERIES[idx - 1];
+        if (smaller < minOdOf(pid)) return;   /* [v1100] 底是物理下限，不再是 ods[pid] 原档 */
+        var trial = Object.assign({}, current); trial[pid] = smaller; trial = ordered(trial);
         if (Number(trial[pid]) >= od || cost(trial) >= cost(current) - 0.001) return;
         var measured = evalAll(trial);
-        if (measured && measured.head <= limit + 0.001) { current = trial; state = measured; reduced = true; }
+        if (measured && measured.head <= limit + 0.001 && velocityOk(measured)) {
+          current = trial; state = measured; reduced = true;
+        }
       });
     }
   }
-  var changes = pids.filter(function (pid) { return Number(current[pid] || ods[pid]) > ods[pid]; }).map(function (pid) {
+  /* [v1100] 变更清单双向：缩小项（to<from）也要列出；费用带符号，负 = 省钱。 */
+  var changes = pids.filter(function (pid) { return Number(current[pid] || ods[pid]) !== ods[pid]; }).map(function (pid) {
     return { pid: pid, from: ods[pid], to: current[pid], length: lengths[pid],
-      extraCost: Math.max(0, (price(current[pid]) - price(ods[pid])) * lengths[pid]) };
+      extraCost: (price(current[pid]) - price(ods[pid])) * lengths[pid] };
   });
   return { ok: state.head <= limit + 0.001, limit: limit, groups: groups, before: before.head,
     after: state.head, changes: changes, geometryKey: AE.geometryKey(data), areasKey: JSON.stringify(r.zoneAreas),

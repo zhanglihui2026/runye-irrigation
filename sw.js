@@ -1651,11 +1651,33 @@
    ★ 不在本次范围：在线大模型仍要「会员访问码」（服务端 `AI_MEMBER_TOKENS` 环境变量 + 每人 5 次额度，
    `api/ai-irrigation.js`），那是 API 凭证不是前端权益位，前端放行只会换来 401；首页公告弹窗
    （`runye-announce.js`）仍会弹一次含「邀 3 位好友解锁高级会员」的开源公告，如需一并去掉另说。
-   本节与 v1098 均未部署。
+   本节与 v1098 已随提交 5872fbf 部署上线并 LIVE-PASS。
+
+   [v1100-head-cap-bidirectional] 扬程上限双向反推（2026-11-16，本地）：用户原话「这个扬程能调整成为，
+   改大改小都能影响动画的面板扬程吗？比如说我设定40米，那就加大管道，如果上线是45米，那就可以自动
+   缩小管道，按照这个逻辑执行呢?」，并拍板「自动缩小时流速 2.0 m/s 封顶」「尽量贴上限」。
+   旧 `tlHeadCapAdvice` 只会**加大**（现状高于上限时逐档放大管径压低扬程），回缩时被
+   `PE_OD_SERIES[idx-1] < ods[pid]` 卡在原设计档以内，且 `ok` 只认「压到上限以下」——所以上限 45 时
+   现状 33.72 直接判「没可改的」，按钮灰掉；上限 30 时 30.01 > 30.001 也是按设计灰掉（v1099 诊断）。
+   新逻辑：
+   ① 高于上限 ⇒ 仍是逐档加大；低于上限 ⇒ 逐档缩小、抬高扬程去贴上限，但每步都过 `velocityOk()`：
+      三类管（frontV/mainV/branchV）取全路径最大流速 ≤ 2.0 m/s；本来就已经超 2.0 的（老图）
+      不放宽也不恶化，维持原值，避免为了反推把既有超速图再改一遍；
+   ② 物理下限 `minOdOf()`：主管 `MAIN_PIPE_MIN_OD=90`，总管/支管 `PE_OD_SERIES[0]`，
+      同时保留 `总管 ≥ 主管 ≥ 支管` 层级约束；
+   ③ `cost()` 改为**带符号**（`price(od)-price(old)` × 长度），`changes[].extraCost` 同号；
+      卡片文案区分「估算节省 / 增加管材费约 X 元」（`mod/map-flow-demo.js`），负数不再显示成「增加 -X」；
+   ④ 应用路径未动：`tlApplyHeadCapAdvice()` 之后照旧 `tlPumpUpdateRun()` + `RyMapFlowDemo.refresh()`，
+      所以**改大和改小都会同步影响动画面板扬程**，这正是本次诉求；
+   ⑤ `#mapHeadCap` 加 title 说明双向规则，主页面 21 处版本串抬到 `v1100-head-cap-bidirectional`。
+   回归 `tests/head_cap_bidirectional.test.cjs` 5 条，直接抽生产 `tlHeadCapAdvice` + 真实
+   `hydraulic-calc/hc-core.js` 的 hazen/velocity/head 跑实际数字：模型自检 33.72 m、上限 45 ⇒
+   缩小且扬程上升且费用为负、2.0 m/s 与物理下限确实拦住、上限低于地板 ⇒ 仍只加大且 ok=false、
+   源码锁防复活；5/5 绿。本节仅本地实现，**未部署**，等用户确认。
  */
 
 
-const VERSION = 'v1099-member-gate-off';
+const VERSION = 'v1100-head-cap-bidirectional';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';

@@ -1585,7 +1585,9 @@
             var name = c.pid === 'front' ? '手绘总管' : c.pid.indexOf('main-') === 0 ? '主管' + (Number(c.pid.slice(5)) + 1) : '支管' + (Number(c.pid.slice(7)) + 1);
             return name + ' Ø' + c.from + '→Ø' + c.to;
           }).join('、') : '无须改径') +
-          (changes.length && isFinite(advice.extraCost) ? '；估算增加管材费约 ' + advice.extraCost.toFixed(0) + ' 元' : '') +
+          /* [v1100] 双向反推：缩小管径时 extraCost 为负，文案要说「节省」而不是「增加 -X 元」 */
+          (changes.length && isFinite(advice.extraCost) && Math.abs(advice.extraCost) >= 0.5
+            ? '；估算' + (advice.extraCost < 0 ? '节省' : '增加') + '管材费约 ' + Math.abs(advice.extraCost).toFixed(0) + ' 元' : '') +
           (advice.ok ? '' : '。' + advice.reason);
         button.disabled = !advice.ok || !changes.length;
       }, 0);

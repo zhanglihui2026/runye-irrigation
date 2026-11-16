@@ -53,16 +53,21 @@ function fixture() {
     tlSharedTrunkPick: () => ({ od: 200 }),
     tlPipePriceByOd: od => od * od,
     PE_OD_SERIES: [140, 160, 180, 200, 225, 250, 280, 315],
+    MAIN_PIPE_MIN_OD: 90,   /* [v1100] 反推函数新增的物理下限，抽取式桩须显式提供 */
     tlBuildPipeOverride() {}
   };
   vm.runInNewContext(src.slice(start, end), ctx);
   return { win, cals, getTrunk: () => trunkOd, fail: () => { forceFailure = true; } };
 }
 
+/* [v1100] 本测试只锁「逆向传播层级 + 应用失败回滚」两件事。
+   上限取 32.05（略高于有序化后的 32 m）：留不出任何缩小余量，避免与新的「低于上限就缩小省钱」
+   口径打架；想验证双向缩小请用 tests/head_cap_bidirectional.test.cjs。 */
+const LIMIT = 32.05;
 {
   const f = fixture();
-  const advice = f.win.tlHeadCapAdvice(40, [[0, 1]]);
-  assert.equal(advice.ok, true);
+  const advice = f.win.tlHeadCapAdvice(LIMIT, [[0, 1]]);
+  assert.equal(advice.ok, true, JSON.stringify(advice));
   assert.equal(advice.changes.find(c => c.pid === 'front').to, 250);
   assert.equal(advice.changes.find(c => c.pid === 'main-0').to, 250);
   assert.equal(f.win.tlApplyHeadCapAdvice(advice), true);
@@ -71,7 +76,7 @@ function fixture() {
 }
 {
   const f = fixture();
-  const advice = f.win.tlHeadCapAdvice(40, [[0, 1]]);
+  const advice = f.win.tlHeadCapAdvice(LIMIT, [[0, 1]]);
   f.fail();
   assert.equal(f.win.tlApplyHeadCapAdvice(advice), false);
   assert.equal(f.getTrunk(), 200);
