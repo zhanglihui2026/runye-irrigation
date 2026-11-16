@@ -1690,10 +1690,15 @@
    把原来「浅绿小卡 + 按钮另起一行」改成 flex 横排，字号 11px、方角、白底描边 #cbd8d0、
    按钮 hover 绿边（沿用面板 `.mbtn` 口径），disabled 降透明度；id/逻辑一律未动。
    主版本串 21 处 + sw VERSION 抬到 `v1102-head-cap-inline-row`。
+
+   [v1103-head-cap-apply-label] 用户反馈（2026-11-17）：v1102 把按钮「应用建议管径」精简成「应用」后，
+   觉得还是原来的名字更清楚，要求改回「应用建议管径」。仅文案回退，横排布局/样式/逻辑一律不动
+   （仍是 v1102 的 `.map-head-cap-row` 横排 + 面板统一口径）。主版本串 21 处 + sw VERSION 抬到
+   `v1103-head-cap-apply-label`，仅为让浏览器/CDN 刷新到新文案。
  */
 
 
-const VERSION = 'v1102-head-cap-inline-row';
+const VERSION = 'v1103-head-cap-apply-label';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'runye-pwa-' + BASE.pathname + '-';
 const CORE_CACHE = PREFIX + VERSION + '-core';
